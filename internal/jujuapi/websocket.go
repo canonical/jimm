@@ -5,8 +5,8 @@ package jujuapi
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"net/http"
+	"regexp"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -21,6 +21,8 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/jimm"
 	"github.com/CanonicalLtd/jimm/internal/jimmhttp"
+	"github.com/CanonicalLtd/jimm/internal/jujuclient"
+	jimmRPC "github.com/CanonicalLtd/jimm/internal/rpc"
 	"github.com/CanonicalLtd/jimm/internal/servermon"
 )
 
@@ -55,18 +57,6 @@ func (s *apiServer) Kill() {
 	if s.cleanup != nil {
 		s.cleanup()
 	}
-}
-
-type modelAPIServer struct {
-	jimm *jimm.JIMM
-}
-
-// ServeWS implements jimmhttp.WSServer.
-func (s modelAPIServer) ServeWS(ctx context.Context, conn *websocket.Conn) {
-	uuid := jimmhttp.PathElementFromContext(ctx, "uuid")
-	ctx = zapctx.WithFields(context.Background(), zap.String("model-uuid", uuid))
-	root := newModelRoot(s.jimm, uuid)
-	serveRoot(ctx, root, conn)
 }
 
 // serveRoot serves an RPC root object on a websocket connection.
@@ -109,44 +99,76 @@ func mapError(err error) *jujuparams.Error {
 	}
 }
 
-// A modelCommandsServer serves the /commands server for a model.
-type modelCommandsServer struct {
+// A modelProxyServer serves the /commands and /api server for a model by
+// proxying all requests through to the controller.
+type modelProxyServer struct {
 	jimm *jimm.JIMM
 }
 
+var extractPathInfo = regexp.MustCompile(`^\/?model\/(?P<modeluuid>\w{8}-\w{4}-\w{4}-\w{4}-\w{12})\/(?P<finalPath>.*)$`)
+var modelIndex = mustGetSubexpIndex(extractPathInfo, "modeluuid")
+var finalPathIndex = mustGetSubexpIndex(extractPathInfo, "finalPath")
+
+func mustGetSubexpIndex(regex *regexp.Regexp, name string) int {
+	index := regex.SubexpIndex(name)
+	if index == -1 {
+		panic("failed to find subexp index")
+	}
+	return index
+}
+
+// modelInfoFromPath takes a path to a model endpoint and returns the uuid
+// and final path element. I.e. /model/<uuid>/api return <uuid>,api,err
+// Basic validation of the uuid takes place.
+func modelInfoFromPath(path string) (uuid string, finalPath string, err error) {
+	matches := extractPathInfo.FindStringSubmatch(path)
+	if len(matches) != 3 {
+		return "", "", errors.E("invalid path")
+	}
+	return matches[modelIndex], matches[finalPathIndex], nil
+}
+
 // ServeWS implements jimmhttp.WSServer.
-func (s modelCommandsServer) ServeWS(ctx context.Context, conn *websocket.Conn) {
-	codec := jsoncodec.NewWebsocketConn(conn)
-	defer codec.Close()
+func (s modelProxyServer) ServeWS(ctx context.Context, clientConn *websocket.Conn) {
+	jwtGenerator := jimm.NewJwtGenerator(s.jimm)
+	connectionFunc := controllerConnectionFunc(s, &jwtGenerator)
+	zapctx.Debug(ctx, "Starting proxier")
+	jimmRPC.ProxySockets(ctx, clientConn, &jwtGenerator, connectionFunc)
+}
 
-	uuid := jimmhttp.PathElementFromContext(ctx, "uuid")
-	m := dbmodel.Model{
-		UUID: sql.NullString{
-			String: uuid,
-			Valid:  uuid != "",
-		},
-	}
-	var msg interface{}
-	if err := s.jimm.Database.GetModel(context.Background(), &m); err == nil {
-		addr := m.Controller.PublicAddress
-		if addr == "" {
-			addr = fmt.Sprintf("%s:%d", m.Controller.Addresses[0][0].Value, m.Controller.Addresses[0][0].Port)
+// controllerConnectionFunc returns a function that will be used to
+// connect to a controller when a client makes a request.
+func controllerConnectionFunc(s modelProxyServer, jwtGenerator *jimm.JwtGenerator) func(context.Context) (*websocket.Conn, error) {
+	connectToControllerFunc := func(ctx context.Context) (*websocket.Conn, error) {
+		const op = errors.Op("proxy.controllerConnectionFunc")
+		path := jimmhttp.PathElementFromContext(ctx, "path")
+		zapctx.Debug(ctx, "grabbing model info from path", zap.String("path", path))
+		uuid, finalPath, err := modelInfoFromPath(path)
+		if err != nil {
+			zapctx.Error(ctx, "error parsing path", zap.Error(err))
+			return nil, errors.E(op, err)
 		}
-		msg = struct {
-			RedirectTo string `json:"redirect-to"`
-		}{
-			RedirectTo: fmt.Sprintf("wss://%s/model/%s/commands", addr, uuid),
+		m := dbmodel.Model{
+			UUID: sql.NullString{
+				String: uuid,
+				Valid:  uuid != "",
+			},
 		}
-
-	} else {
-		msg = jujuparams.CLICommandStatus{
-			Done:  true,
-			Error: mapError(err),
+		if err := s.jimm.Database.GetModel(context.Background(), &m); err != nil {
+			zapctx.Error(ctx, "failed to find model", zap.String("uuid", uuid), zap.Error(err))
+			return nil, errors.E(err, errors.CodeNotFound)
 		}
+		jwtGenerator.SetTags(m.ResourceTag(), m.Controller.ResourceTag())
+		mt := m.ResourceTag()
+		zapctx.Debug(ctx, "Dialing Controller", zap.String("path", path))
+		controllerConn, err := jujuclient.ProxyDial(ctx, &m.Controller, mt, finalPath)
+		if err != nil {
+			zapctx.Error(ctx, "cannot dial controller", zap.String("controller", m.Controller.Name), zap.Error(err))
+			return nil, err
+		}
+		return controllerConn, nil
 	}
-	if err := codec.Send(msg); err != nil {
-		zapctx.Error(ctx, "cannot send commands response", zap.Error(err))
-	}
+	return connectToControllerFunc
 }
 
 // Use a 64k frame size for the websockets while we need to deal

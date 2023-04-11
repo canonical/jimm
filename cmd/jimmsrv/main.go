@@ -37,7 +37,11 @@ func start(ctx context.Context, s *service.Service) error {
 			zapctx.Error(ctx, "cannot set log level", zap.Error(err))
 		}
 	}
-
+	// TODO(mhilton) access logs?
+	addr := os.Getenv("JIMM_LISTEN_ADDR")
+	if addr == "" {
+		addr = ":http-alt"
+	}
 	jimmsvc, err := jimm.NewService(ctx, jimm.Params{
 		ControllerUUID:    os.Getenv("JIMM_UUID"),
 		DSN:               os.Getenv("JIMM_DSN"),
@@ -71,11 +75,6 @@ func start(ctx context.Context, s *service.Service) error {
 	s.Go(func() error {
 		return jimmsvc.StartJWKSRotator(ctx, time.NewTicker(time.Hour).C, time.Now().UTC().AddDate(0, 3, 0))
 	})
-	// TODO(mhilton) access logs?
-	addr := os.Getenv("JIMM_LISTEN_ADDR")
-	if addr == "" {
-		addr = ":http-alt"
-	}
 	httpsrv := &http.Server{
 		Addr:    addr,
 		Handler: jimmsvc,
@@ -86,5 +85,7 @@ func start(ctx context.Context, s *service.Service) error {
 		httpsrv.Shutdown(ctx)
 	})
 	s.Go(httpsrv.ListenAndServe)
+	jimmsvc.RegisterJwksCache(ctx)
+	zapctx.Info(ctx, "Successfully started JIMM server")
 	return nil
 }

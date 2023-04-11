@@ -99,30 +99,30 @@ func (s *accessControlSuite) TestRemoveGroupRemovesTuples(c *gc.C) {
 	tuples := []ofga.Tuple{
 		//This tuple should remain as it has no relation to group2
 		{
-			Object:   ofganames.FromTag(user.ResourceTag()),
+			Object:   ofganames.ConvertTag(user.ResourceTag()),
 			Relation: "member",
-			Target:   ofganames.FromTag(group.ResourceTag()),
+			Target:   ofganames.ConvertTag(group.ResourceTag()),
 		},
 		// Below tuples should all be removed as they relate to group2
 		{
-			Object:   ofganames.FromTag(user.ResourceTag()),
+			Object:   ofganames.ConvertTag(user.ResourceTag()),
 			Relation: "member",
-			Target:   ofganames.FromTag(group2.ResourceTag()),
+			Target:   ofganames.ConvertTag(group2.ResourceTag()),
 		},
 		{
-			Object:   ofganames.FromTagWithRelation(group2.ResourceTag(), ofganames.MemberRelation),
+			Object:   ofganames.ConvertTagWithRelation(group2.ResourceTag(), ofganames.MemberRelation),
 			Relation: "member",
-			Target:   ofganames.FromTag(group.ResourceTag()),
+			Target:   ofganames.ConvertTag(group.ResourceTag()),
 		},
 		{
-			Object:   ofganames.FromTagWithRelation(group2.ResourceTag(), ofganames.MemberRelation),
+			Object:   ofganames.ConvertTagWithRelation(group2.ResourceTag(), ofganames.MemberRelation),
 			Relation: "administrator",
-			Target:   ofganames.FromTag(controller.ResourceTag()),
+			Target:   ofganames.ConvertTag(controller.ResourceTag()),
 		},
 		{
-			Object:   ofganames.FromTagWithRelation(group2.ResourceTag(), ofganames.MemberRelation),
+			Object:   ofganames.ConvertTagWithRelation(group2.ResourceTag(), ofganames.MemberRelation),
 			Relation: "writer",
-			Target:   ofganames.FromTag(model.ResourceTag()),
+			Target:   ofganames.ConvertTag(model.ResourceTag()),
 		},
 	}
 
@@ -512,9 +512,9 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 		// Test user -> controller by name
 		{
 			toAdd: ofga.Tuple{
-				Object:   ofganames.FromTag(user.ResourceTag()),
+				Object:   ofganames.ConvertTag(user.ResourceTag()),
 				Relation: "administrator",
-				Target:   ofganames.FromTag(controller.ResourceTag()),
+				Target:   ofganames.ConvertTag(controller.ResourceTag()),
 			},
 			toRemove: tuple{"user-" + user.Username, "administrator", "controller-" + controller.Name},
 			want: createTupleKey(
@@ -528,9 +528,9 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 		// Test user -> controller by UUID
 		{
 			toAdd: ofga.Tuple{
-				Object:   ofganames.FromTag(user.ResourceTag()),
+				Object:   ofganames.ConvertTag(user.ResourceTag()),
 				Relation: "administrator",
-				Target:   ofganames.FromTag(controller.ResourceTag()),
+				Target:   ofganames.ConvertTag(controller.ResourceTag()),
 			},
 			toRemove: tuple{"user-" + user.Username, "administrator", "controller-" + controller.UUID},
 			want: createTupleKey(
@@ -544,9 +544,9 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 		//Test user -> group
 		{
 			toAdd: ofga.Tuple{
-				Object:   ofganames.FromTag(user.ResourceTag()),
+				Object:   ofganames.ConvertTag(user.ResourceTag()),
 				Relation: "member",
-				Target:   ofganames.FromTag(group.ResourceTag()),
+				Target:   ofganames.ConvertTag(group.ResourceTag()),
 			},
 			toRemove: tuple{"user-" + user.Username, "member", "group-" + group.Name},
 			want: createTupleKey(
@@ -560,9 +560,9 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 		//Test group -> controller
 		{
 			toAdd: ofga.Tuple{
-				Object:   ofganames.FromTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
+				Object:   ofganames.ConvertTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
 				Relation: "administrator",
-				Target:   ofganames.FromTag(controller.ResourceTag()),
+				Target:   ofganames.ConvertTag(controller.ResourceTag()),
 			},
 			toRemove: tuple{"group-" + group.Name + "#member", "administrator", "controller-" + controller.UUID},
 			want: createTupleKey(
@@ -576,9 +576,9 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 		//Test user -> model by name
 		{
 			toAdd: ofga.Tuple{
-				Object:   ofganames.FromTag(user.ResourceTag()),
+				Object:   ofganames.ConvertTag(user.ResourceTag()),
 				Relation: "writer",
-				Target:   ofganames.FromTag(model.ResourceTag()),
+				Target:   ofganames.ConvertTag(model.ResourceTag()),
 			},
 			toRemove: tuple{"user-" + user.Username, "writer", "model-" + controller.Name + ":" + user.Username + "/" + model.Name},
 			want: createTupleKey(
@@ -592,9 +592,9 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 		// Test user -> model by UUID
 		{
 			toAdd: ofga.Tuple{
-				Object:   ofganames.FromTag(user.ResourceTag()),
+				Object:   ofganames.ConvertTag(user.ResourceTag()),
 				Relation: "writer",
-				Target:   ofganames.FromTag(model.ResourceTag()),
+				Target:   ofganames.ConvertTag(model.ResourceTag()),
 			},
 			toRemove: tuple{"user-" + user.Username, "writer", "model-" + model.UUID.String},
 			want: createTupleKey(
@@ -608,9 +608,9 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 		// Test user -> applicationoffer by name
 		{
 			toAdd: ofga.Tuple{
-				Object:   ofganames.FromTag(user.ResourceTag()),
+				Object:   ofganames.ConvertTag(user.ResourceTag()),
 				Relation: "consumer",
-				Target:   ofganames.FromTag(offer.ResourceTag()),
+				Target:   ofganames.ConvertTag(offer.ResourceTag()),
 			},
 			toRemove: tuple{"user-" + user.Username, "consumer", "applicationoffer-" + controller.Name + ":" + user.Username + "/" + model.Name + "." + offer.Name},
 			want: createTupleKey(
@@ -624,9 +624,9 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 		// Test user -> applicationoffer by UUID
 		{
 			toAdd: ofga.Tuple{
-				Object:   ofganames.FromTag(user.ResourceTag()),
+				Object:   ofganames.ConvertTag(user.ResourceTag()),
 				Relation: "consumer",
-				Target:   ofganames.FromTag(offer.ResourceTag()),
+				Target:   ofganames.ConvertTag(offer.ResourceTag()),
 			},
 			toRemove: tuple{"user-" + user.Username, "consumer", "applicationoffer-" + offer.UUID},
 			want: createTupleKey(
@@ -640,9 +640,9 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 		// Test group -> controller by name
 		{
 			toAdd: ofga.Tuple{
-				Object:   ofganames.FromTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
+				Object:   ofganames.ConvertTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
 				Relation: "administrator",
-				Target:   ofganames.FromTag(controller.ResourceTag()),
+				Target:   ofganames.ConvertTag(controller.ResourceTag()),
 			},
 			toRemove: tuple{"group-" + group.Name + "#member", "administrator", "controller-" + controller.Name},
 			want: createTupleKey(
@@ -656,9 +656,9 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 		// Test group -> controller by UUID
 		{
 			toAdd: ofga.Tuple{
-				Object:   ofganames.FromTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
+				Object:   ofganames.ConvertTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
 				Relation: "administrator",
-				Target:   ofganames.FromTag(controller.ResourceTag()),
+				Target:   ofganames.ConvertTag(controller.ResourceTag()),
 			},
 			toRemove: tuple{"group-" + group.Name + "#member", "administrator", "controller-" + controller.UUID},
 			want: createTupleKey(
@@ -672,9 +672,9 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 		// Test group -> model by name
 		{
 			toAdd: ofga.Tuple{
-				Object:   ofganames.FromTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
+				Object:   ofganames.ConvertTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
 				Relation: "writer",
-				Target:   ofganames.FromTag(model.ResourceTag()),
+				Target:   ofganames.ConvertTag(model.ResourceTag()),
 			},
 			toRemove: tuple{"group-" + group.Name + "#member", "writer", "model-" + controller.Name + ":" + user.Username + "/" + model.Name},
 			want: createTupleKey(
@@ -688,9 +688,9 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 		// Test group -> model by UUID
 		{
 			toAdd: ofga.Tuple{
-				Object:   ofganames.FromTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
+				Object:   ofganames.ConvertTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
 				Relation: "writer",
-				Target:   ofganames.FromTag(model.ResourceTag()),
+				Target:   ofganames.ConvertTag(model.ResourceTag()),
 			},
 			toRemove: tuple{"group-" + group.Name + "#member", "writer", "model-" + model.UUID.String},
 			want: createTupleKey(
@@ -704,9 +704,9 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 		// Test group -> applicationoffer by name
 		{
 			toAdd: ofga.Tuple{
-				Object:   ofganames.FromTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
+				Object:   ofganames.ConvertTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
 				Relation: "consumer",
-				Target:   ofganames.FromTag(offer.ResourceTag()),
+				Target:   ofganames.ConvertTag(offer.ResourceTag()),
 			},
 			toRemove: tuple{"group-" + group.Name + "#member", "consumer", "applicationoffer-" + controller.Name + ":" + user.Username + "/" + model.Name + "." + offer.Name},
 			want: createTupleKey(
@@ -720,9 +720,9 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 		// Test group -> applicationoffer by UUID
 		{
 			toAdd: ofga.Tuple{
-				Object:   ofganames.FromTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
+				Object:   ofganames.ConvertTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
 				Relation: "consumer",
-				Target:   ofganames.FromTag(offer.ResourceTag()),
+				Target:   ofganames.ConvertTag(offer.ResourceTag()),
 			},
 			toRemove: tuple{"group-" + group.Name + "#member", "consumer", "applicationoffer-" + offer.UUID},
 			want: func() openfga.TupleKey {
@@ -784,22 +784,22 @@ func (s *accessControlSuite) TestJAASTag(c *gc.C) {
 		expectedJAASTag string
 		expectedError   string
 	}{{
-		tag:             ofganames.FromTag(user.ResourceTag()),
+		tag:             ofganames.ConvertTag(user.ResourceTag()),
 		expectedJAASTag: "user-" + user.Username,
 	}, {
-		tag:             ofganames.FromTag(controller.ResourceTag()),
+		tag:             ofganames.ConvertTag(controller.ResourceTag()),
 		expectedJAASTag: "controller-" + controller.Name,
 	}, {
-		tag:             ofganames.FromTag(model.ResourceTag()),
+		tag:             ofganames.ConvertTag(model.ResourceTag()),
 		expectedJAASTag: "model-" + controller.Name + ":" + user.Username + "/" + model.Name,
 	}, {
-		tag:             ofganames.FromTag(applicationOffer.ResourceTag()),
+		tag:             ofganames.ConvertTag(applicationOffer.ResourceTag()),
 		expectedJAASTag: "applicationoffer-" + controller.Name + ":" + user.Username + "/" + model.Name + "." + applicationOffer.Name,
 	}, {
 		tag:           &ofganames.Tag{},
 		expectedError: "unexpected tag kind: ",
 	}, {
-		tag:             ofganames.FromTag(cloud.ResourceTag()),
+		tag:             ofganames.ConvertTag(cloud.ResourceTag()),
 		expectedJAASTag: "cloud-" + cloud.Name,
 	}}
 	for _, test := range tests {
@@ -868,9 +868,9 @@ func (s *accessControlSuite) TestCheckRelationOfferReaderFlow(c *gc.C) {
 	defer closeClient()
 
 	// Some keys to assist in the creation of tuples within OpenFGA (such that they can be tested against)
-	userTag := ofganames.FromTag(user.ResourceTag())
-	groupTag := ofganames.FromTag(group.ResourceTag())
-	offerTag := ofganames.FromTag(offer.ResourceTag())
+	userTag := ofganames.ConvertTag(user.ResourceTag())
+	groupTag := ofganames.ConvertTag(group.ResourceTag())
+	offerTag := ofganames.ConvertTag(offer.ResourceTag())
 
 	// JAAS style keys, to be translated and checked against UUIDs/users/groups
 	userJAASKey := "user-" + user.Username
@@ -884,7 +884,7 @@ func (s *accessControlSuite) TestCheckRelationOfferReaderFlow(c *gc.C) {
 		Target:   groupTag,
 	} // Make user member of group
 	groupToOfferReader := ofga.Tuple{
-		Object:   ofganames.FromTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
+		Object:   ofganames.ConvertTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
 		Relation: "reader",
 		Target:   offerTag,
 	} // Make group members reader of offer via member union
@@ -937,9 +937,9 @@ func (s *accessControlSuite) TestCheckRelationOfferConsumerFlow(c *gc.C) {
 	defer closeClient()
 
 	// Some keys to assist in the creation of tuples within OpenFGA (such that they can be tested against)
-	userTag := ofganames.FromTag(user.ResourceTag())
-	groupTag := ofganames.FromTag(group.ResourceTag())
-	offerTag := ofganames.FromTag(offer.ResourceTag())
+	userTag := ofganames.ConvertTag(user.ResourceTag())
+	groupTag := ofganames.ConvertTag(group.ResourceTag())
+	offerTag := ofganames.ConvertTag(offer.ResourceTag())
 
 	// JAAS style keys, to be translated and checked against UUIDs/users/groups
 	userJAASKey := "user-" + user.Username
@@ -952,7 +952,7 @@ func (s *accessControlSuite) TestCheckRelationOfferConsumerFlow(c *gc.C) {
 		Target:   groupTag,
 	} // Make user member of group
 	groupToOfferConsumer := ofga.Tuple{
-		Object:   ofganames.FromTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
+		Object:   ofganames.ConvertTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
 		Relation: "consumer",
 		Target:   offerTag,
 	} // Make group members consumer of offer via member union
@@ -1004,9 +1004,9 @@ func (s *accessControlSuite) TestCheckRelationModelReaderFlow(c *gc.C) {
 	defer closeClient()
 
 	// Some keys to assist in the creation of tuples within OpenFGA (such that they can be tested against)
-	userTag := ofganames.FromTag(user.ResourceTag())
-	groupTag := ofganames.FromTag(group.ResourceTag())
-	modelTag := ofganames.FromTag(model.ResourceTag())
+	userTag := ofganames.ConvertTag(user.ResourceTag())
+	groupTag := ofganames.ConvertTag(group.ResourceTag())
+	modelTag := ofganames.ConvertTag(model.ResourceTag())
 
 	// Test direct relation to a model from a user of a group via "writer" relation
 
@@ -1021,7 +1021,7 @@ func (s *accessControlSuite) TestCheckRelationModelReaderFlow(c *gc.C) {
 		Target:   groupTag,
 	} // Make user member of group
 	groupToModelReader := ofga.Tuple{
-		Object:   ofganames.FromTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
+		Object:   ofganames.ConvertTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
 		Relation: "reader",
 		Target:   modelTag,
 	} // Make group members writer of model via member union
@@ -1073,9 +1073,9 @@ func (s *accessControlSuite) TestCheckRelationModelWriterFlow(c *gc.C) {
 	defer closeClient()
 
 	// Some keys to assist in the creation of tuples within OpenFGA (such that they can be tested against)
-	userTag := ofganames.FromTag(user.ResourceTag())
-	groupTag := ofganames.FromTag(group.ResourceTag())
-	modelTag := ofganames.FromTag(model.ResourceTag())
+	userTag := ofganames.ConvertTag(user.ResourceTag())
+	groupTag := ofganames.ConvertTag(group.ResourceTag())
+	modelTag := ofganames.ConvertTag(model.ResourceTag())
 
 	// Test direct relation to a model from a user of a group via "writer" relation
 	userToGroupMember := ofga.Tuple{
@@ -1084,7 +1084,7 @@ func (s *accessControlSuite) TestCheckRelationModelWriterFlow(c *gc.C) {
 		Target:   groupTag,
 	} // Make user member of group
 	groupToModelWriter := ofga.Tuple{
-		Object:   ofganames.FromTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
+		Object:   ofganames.ConvertTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
 		Relation: "writer",
 		Target:   modelTag,
 	} // Make group members writer of model via member union
@@ -1140,11 +1140,11 @@ func (s *accessControlSuite) TestCheckRelationControllerAdministratorFlow(c *gc.
 	defer closeClient()
 
 	// Some keys to assist in the creation of tuples within OpenFGA (such that they can be tested against)
-	userTag := ofganames.FromTag(user.ResourceTag())
-	groupTag := ofganames.FromTag(group.ResourceTag())
-	modelTag := ofganames.FromTag(model.ResourceTag())
-	controllerTag := ofganames.FromTag(controller.ResourceTag())
-	offerTag := ofganames.FromTag(offer.ResourceTag())
+	userTag := ofganames.ConvertTag(user.ResourceTag())
+	groupTag := ofganames.ConvertTag(group.ResourceTag())
+	modelTag := ofganames.ConvertTag(model.ResourceTag())
+	controllerTag := ofganames.ConvertTag(controller.ResourceTag())
+	offerTag := ofganames.ConvertTag(offer.ResourceTag())
 
 	// JAAS style keys, to be translated and checked against UUIDs/users/groups
 	userJAASKey := "user-" + user.Username
@@ -1160,7 +1160,7 @@ func (s *accessControlSuite) TestCheckRelationControllerAdministratorFlow(c *gc.
 		Target:   groupTag,
 	} // Make user member of group
 	groupToControllerAdmin := ofga.Tuple{
-		Object:   ofganames.FromTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
+		Object:   ofganames.ConvertTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
 		Relation: "administrator",
 		Target:   controllerTag,
 	} // Make group members administrator of controller via member union
@@ -1297,7 +1297,7 @@ func (s *accessControlSuite) TestResolveTagObjectMapsUsers(c *gc.C) {
 	db := s.JIMM.Database
 	tag, err := jujuapi.ResolveTag(db, "user-alex@externally-werly#member")
 	c.Assert(err, gc.IsNil)
-	c.Assert(tag, gc.DeepEquals, ofganames.FromTagWithRelation(names.NewUserTag("alex@externally-werly"), ofganames.MemberRelation))
+	c.Assert(tag, gc.DeepEquals, ofganames.ConvertTagWithRelation(names.NewUserTag("alex@externally-werly"), ofganames.MemberRelation))
 }
 
 func (s *accessControlSuite) TestResolveTupleObjectMapsGroups(c *gc.C) {
@@ -1311,7 +1311,7 @@ func (s *accessControlSuite) TestResolveTupleObjectMapsGroups(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	tag, err := jujuapi.ResolveTag(db, "group-"+group.Name+"#member")
 	c.Assert(err, gc.IsNil)
-	c.Assert(tag, gc.DeepEquals, ofganames.FromTagWithRelation(jimmnames.NewGroupTag("1"), ofganames.MemberRelation))
+	c.Assert(tag, gc.DeepEquals, ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag("1"), ofganames.MemberRelation))
 }
 
 func (s *accessControlSuite) TestResolveTupleObjectMapsControllerUUIDs(c *gc.C) {
@@ -1335,7 +1335,7 @@ func (s *accessControlSuite) TestResolveTupleObjectMapsControllerUUIDs(c *gc.C) 
 
 	tag, err := jujuapi.ResolveTag(db, "controller-mycontroller#administrator")
 	c.Assert(err, gc.IsNil)
-	c.Assert(tag, gc.DeepEquals, ofganames.FromTagWithRelation(names.NewControllerTag(uuid.String()), ofganames.AdministratorRelation))
+	c.Assert(tag, gc.DeepEquals, ofganames.ConvertTagWithRelation(names.NewControllerTag(uuid.String()), ofganames.AdministratorRelation))
 }
 
 func (s *accessControlSuite) TestResolveTupleObjectMapsModelUUIDs(c *gc.C) {
@@ -1349,7 +1349,7 @@ func (s *accessControlSuite) TestResolveTupleObjectMapsModelUUIDs(c *gc.C) {
 
 	tag, err := jujuapi.ResolveTag(db, jimmTag)
 	c.Assert(err, gc.IsNil)
-	c.Assert(tag, gc.DeepEquals, ofganames.FromTagWithRelation(names.NewModelTag(model.UUID.String), ofganames.AdministratorRelation))
+	c.Assert(tag, gc.DeepEquals, ofganames.ConvertTagWithRelation(names.NewModelTag(model.UUID.String), ofganames.AdministratorRelation))
 
 }
 
@@ -1364,7 +1364,7 @@ func (s *accessControlSuite) TestResolveTupleObjectMapsApplicationOffersUUIDs(c 
 
 	jujuTag, err := jujuapi.ResolveTag(db, jimmTag)
 	c.Assert(err, gc.IsNil)
-	c.Assert(jujuTag, gc.DeepEquals, ofganames.FromTagWithRelation(names.NewApplicationOfferTag(offer.UUID), ofganames.AdministratorRelation))
+	c.Assert(jujuTag, gc.DeepEquals, ofganames.ConvertTagWithRelation(names.NewApplicationOfferTag(offer.UUID), ofganames.AdministratorRelation))
 }
 
 func (s *accessControlSuite) TestParseTag(c *gc.C) {

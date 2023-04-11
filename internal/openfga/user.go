@@ -101,6 +101,19 @@ func (u *User) GetCloudAccess(ctx context.Context, resource names.CloudTag) ofga
 	return ofganames.NoRelation
 }
 
+// GetControllerAccess returns the relation the user has with the specified controller.
+func (u *User) GetControllerAccess(ctx context.Context, resource names.ControllerTag) ofganames.Relation {
+	isAdmin, err := IsAdministrator(ctx, u, resource)
+	if err != nil {
+		zapctx.Error(ctx, "openfga check failed", zap.Error(err))
+		return ofganames.NoRelation
+	}
+	if isAdmin {
+		return ofganames.AdministratorRelation
+	}
+	return ofganames.NoRelation
+}
+
 // GetModelAccess returns the relation the user has with the specified model.
 func (u *User) GetModelAccess(ctx context.Context, resource names.ModelTag) ofganames.Relation {
 	isAdmin, err := IsAdministrator(ctx, u, resource)
@@ -153,7 +166,7 @@ func (u *User) SetApplicationOfferAccess(ctx context.Context, resource names.App
 
 // ListModels returns a slice of model UUIDs this user has at least reader access to.
 func (u *User) ListModels(ctx context.Context) ([]string, error) {
-	return u.client.ListObjects(ctx, ofganames.FromTag(u.ResourceTag()).String(), ofganames.ReaderRelation.String(), "model", nil)
+	return u.client.ListObjects(ctx, ofganames.ConvertTag(u.ResourceTag()).String(), ofganames.ReaderRelation.String(), "model", nil)
 }
 
 type administratorT interface {
@@ -168,9 +181,32 @@ func checkRelation[T ofganames.ResourceTagger](ctx context.Context, u *User, res
 	isAllowed, resolution, err := u.client.checkRelation(
 		ctx,
 		Tuple{
-			Object:   ofganames.FromTag(u.ResourceTag()),
+			Object:   ofganames.ConvertTag(u.ResourceTag()),
 			Relation: relation,
-			Target:   ofganames.FromTag(resource),
+			Target:   ofganames.ConvertTag(resource),
+		},
+		true,
+	)
+	if err != nil {
+		return false, "", errors.E(err)
+	}
+
+	return isAllowed, resolution, nil
+}
+
+// CheckRelation accepts a resource as a tag and checks if the user has the specified relation to the resource.
+// The resource string will be converted to a tag. In cases where one already has a resource tag, consider using
+// the convenience functions like `IsModelWriter` or `IsApplicationOfferConsumer`.
+func CheckRelation(ctx context.Context, u *User, resource names.Tag, relation ofganames.Relation) (bool, string, error) {
+	var tag *ofganames.Tag
+	var err error
+	tag = ofganames.ConvertGenericTag(resource)
+	isAllowed, resolution, err := u.client.checkRelation(
+		ctx,
+		Tuple{
+			Object:   ofganames.ConvertTag(u.ResourceTag()),
+			Relation: relation,
+			Target:   tag,
 		},
 		true,
 	)
@@ -208,9 +244,9 @@ func IsAdministrator[T administratorT](ctx context.Context, u *User, resource T)
 
 func setResourceAccess[T ofganames.ResourceTagger](ctx context.Context, user *User, resource T, relation ofganames.Relation) error {
 	err := user.client.addRelation(ctx, Tuple{
-		Object:   ofganames.FromTag(user.ResourceTag()),
+		Object:   ofganames.ConvertTag(user.ResourceTag()),
 		Relation: relation,
-		Target:   ofganames.FromTag(resource),
+		Target:   ofganames.ConvertTag(resource),
 	})
 	if err != nil {
 		// if the tuple already exist we don't return an error.
@@ -227,7 +263,7 @@ func setResourceAccess[T ofganames.ResourceTagger](ctx context.Context, user *Us
 func ListUsersWithAccess[T ofganames.ResourceTagger](ctx context.Context, client *OFGAClient, resource T, relation ofganames.Relation) ([]*User, error) {
 	t := createTupleKey(Tuple{
 		Relation: relation,
-		Target:   ofganames.FromTag(resource),
+		Target:   ofganames.ConvertTag(resource),
 	})
 
 	list, err := listUsersWithAccess(ctx, client, t)

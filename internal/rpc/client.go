@@ -13,6 +13,8 @@ import (
 
 	"github.com/gorilla/websocket"
 	jujuparams "github.com/juju/juju/rpc/params"
+	"github.com/juju/zaputil/zapctx"
+	"go.uber.org/zap"
 
 	"github.com/CanonicalLtd/jimm/internal/errors"
 )
@@ -46,23 +48,38 @@ type Dialer struct {
 
 // Dial establishes a new client RPC connection to the given URL.
 func (d Dialer) Dial(ctx context.Context, url string) (*Client, error) {
-	const op = errors.Op("rpc.Dial")
+	conn, err := d.DialWebsocket(ctx, url)
+	if err != nil {
+		return nil, err
+	}
+	return NewClient(conn), nil
+}
+
+// DialWebsocket dials a url and returns a websocket.
+func (d Dialer) DialWebsocket(ctx context.Context, url string) (*websocket.Conn, error) {
+	const op = errors.Op("rpc.BasicDial")
 
 	dialer := websocket.Dialer{
 		TLSClientConfig: d.TLSConfig,
 	}
-	conn, _, err := dialer.DialContext(ctx, url, nil)
+	conn, _, err := dialer.DialContext(context.Background(), url, nil)
 	if err != nil {
+		zapctx.Error(ctx, "BasicDial failed", zap.Error(err))
 		return nil, errors.E(op, err)
 	}
+	return conn, nil
+}
+
+// NewClient takes a websocket connection and returns an RPC client.
+// Note that a go routine is started that reads on the websocket.
+func NewClient(conn *websocket.Conn) *Client {
 	cl := &Client{
 		conn:   conn,
 		closed: make(chan struct{}),
 		msgs:   make(map[uint64]inflight),
 	}
 	go cl.recv()
-
-	return cl, nil
+	return cl
 }
 
 type inflight struct {

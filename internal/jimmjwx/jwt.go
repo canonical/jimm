@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/x509"
 	"encoding/pem"
+	"fmt"
 	"net/http"
 	"os"
 	"time"
@@ -27,6 +28,7 @@ import (
 type JWTService struct {
 	Cache *jwk.Cache
 	host  string
+	https bool
 	store credentials.CredentialStore
 }
 
@@ -42,8 +44,8 @@ type JWTParams struct {
 }
 
 // NewJWTService returns a new JWT service for handling JIMMs JWTs.
-func NewJWTService(host string, store credentials.CredentialStore) *JWTService {
-	return &JWTService{host: host, store: store}
+func NewJWTService(host string, store credentials.CredentialStore, https bool) *JWTService {
+	return &JWTService{host: host, store: store, https: https}
 }
 
 // RegisterJWKSCache registers a cache to refresh the public key persisted by JIMM's
@@ -52,7 +54,7 @@ func NewJWTService(host string, store credentials.CredentialStore) *JWTService {
 func (j *JWTService) RegisterJWKSCache(ctx context.Context, client *http.Client) {
 	j.Cache = jwk.NewCache(ctx)
 
-	_ = j.Cache.Register(j.getJWKSEndpoint(), jwk.WithHTTPClient(client))
+	_ = j.Cache.Register(j.getJWKSEndpoint(j.https), jwk.WithHTTPClient(client))
 
 	err := retry.Call(retry.CallArgs{
 		Func: func() error {
@@ -62,7 +64,8 @@ func (j *JWTService) RegisterJWKSCache(ctx context.Context, client *http.Client)
 				return nil
 			default:
 			}
-			if _, err := j.Cache.Refresh(ctx, j.getJWKSEndpoint()); err != nil {
+			if _, err := j.Cache.Refresh(ctx, j.getJWKSEndpoint(j.https)); err != nil {
+				zapctx.Debug(ctx, "Refresh error", zap.Error(err), zap.String("URL", j.getJWKSEndpoint(j.https)))
 				return err
 			}
 			return nil
@@ -88,78 +91,80 @@ func (j *JWTService) RegisterJWKSCache(ctx context.Context, client *http.Client)
 // and instead, a new JWT will be issued each time containing the required claims for
 // authz.
 func (j *JWTService) NewJWT(ctx context.Context, params JWTParams) ([]byte, error) {
-	if jti, err := j.generateJTI(ctx); err != nil {
+	jti, err := j.generateJTI(ctx)
+	if err != nil {
 		return nil, err
-	} else {
-		zapctx.Debug(ctx, "issuing a new JWT", zap.Any("params", params))
-
-		jwkSet, err := j.Cache.Get(ctx, j.getJWKSEndpoint())
-		if err != nil {
-			return nil, err
-		}
-
-		pubKey, ok := jwkSet.Key(jwkSet.Len() - 1)
-		if !ok {
-			zapctx.Error(ctx, "no jwk found")
-			return nil, errors.E("no jwk found")
-		}
-
-		pkeyPem, err := j.store.GetJWKSPrivateKey(ctx)
-		if err != nil {
-			zapctx.Error(ctx, "failed to retrieve private key", zap.Error(err))
-			return nil, err
-		}
-
-		block, _ := pem.Decode([]byte(pkeyPem))
-
-		pkeyDecoded, err := x509.ParsePKCS1PrivateKey(block.Bytes)
-		if err != nil {
-			zapctx.Error(ctx, "failed to parse private key", zap.Error(err))
-			return nil, err
-		}
-
-		signingKey, err := jwk.FromRaw(pkeyDecoded)
-		if err != nil {
-			zapctx.Error(ctx, "failed to create signing key", zap.Error(err))
-			return nil, err
-		}
-
-		expiryDuration, err := time.ParseDuration(os.Getenv("JIMM_JWT_EXPIRY"))
-		if err != nil {
-			zapctx.Error(ctx, "failed to get JIMM_JWT_EXPIRY environment variable", zap.Error(err))
-			return nil, err
-		}
-
-		signingKey.Set(jwk.AlgorithmKey, jwa.RS256)
-		signingKey.Set(jwk.KeyIDKey, pubKey.KeyID())
-
-		token, err := jwt.NewBuilder().
-			Audience([]string{params.Controller}).
-			Subject(params.User).
-			Issuer(os.Getenv("JIMM_DNS_NAME")).
-			JwtID(jti).
-			Claim("access", params.Access).
-			Expiration(time.Now().Add(expiryDuration)).
-			Build()
-		if err != nil {
-			zapctx.Error(ctx, "failed to create token", zap.Error(err))
-			return nil, err
-		}
-
-		freshToken, err := jwt.Sign(
-			token,
-			jwt.WithKey(
-				jwa.RS256,
-				signingKey,
-			),
-		)
-		if err != nil {
-			zapctx.Error(ctx, "failed to sign token", zap.Error(err))
-			return nil, err
-		}
-
-		return freshToken, err
 	}
+
+	zapctx.Debug(ctx, "issuing a new JWT", zap.Any("params", params))
+	if j == nil || j.Cache == nil {
+		zapctx.Debug(ctx, "JwtService struct value", zap.String("JwtService", fmt.Sprintf("%+v", j)))
+		return nil, errors.E("nil pointer in JWT service")
+	}
+
+	jwkSet, err := j.Cache.Get(ctx, j.getJWKSEndpoint(j.https))
+	if err != nil {
+		return nil, err
+	}
+
+	pubKey, ok := jwkSet.Key(jwkSet.Len() - 1)
+	if !ok {
+		zapctx.Error(ctx, "no jwk found")
+		return nil, errors.E("no jwk found")
+	}
+	pkeyPem, err := j.store.GetJWKSPrivateKey(ctx)
+	if err != nil {
+		zapctx.Error(ctx, "failed to retrieve private key", zap.Error(err))
+		return nil, err
+	}
+
+	block, _ := pem.Decode([]byte(pkeyPem))
+
+	pkeyDecoded, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err != nil {
+		zapctx.Error(ctx, "failed to parse private key", zap.Error(err))
+		return nil, err
+	}
+
+	signingKey, err := jwk.FromRaw(pkeyDecoded)
+	if err != nil {
+		zapctx.Error(ctx, "failed to create signing key", zap.Error(err))
+		return nil, err
+	}
+
+	expiryDuration, err := time.ParseDuration(os.Getenv("JIMM_JWT_EXPIRY"))
+	if err != nil {
+		zapctx.Error(ctx, "failed to get JIMM_JWT_EXPIRY environment variable", zap.Error(err))
+		return nil, err
+	}
+
+	signingKey.Set(jwk.AlgorithmKey, jwa.RS256)
+	signingKey.Set(jwk.KeyIDKey, pubKey.KeyID())
+
+	token, err := jwt.NewBuilder().
+		Audience([]string{params.Controller}).
+		Subject(params.User).
+		Issuer(os.Getenv("JIMM_DNS_NAME")).
+		JwtID(jti).
+		Claim("access", params.Access).
+		Expiration(time.Now().Add(expiryDuration)).
+		Build()
+	if err != nil {
+		zapctx.Error(ctx, "failed to create token", zap.Error(err))
+		return nil, err
+	}
+	freshToken, err := jwt.Sign(
+		token,
+		jwt.WithKey(
+			jwa.RS256,
+			signingKey,
+		),
+	)
+	if err != nil {
+		zapctx.Error(ctx, "failed to sign token", zap.Error(err))
+		return nil, err
+	}
+	return freshToken, err
 }
 
 // generateJTI uses a V4 UUID, giving a chance of 1 in 17Billion per year.
@@ -172,6 +177,10 @@ func (j *JWTService) generateJTI(ctx context.Context) (string, error) {
 	return id.String(), nil
 }
 
-func (j *JWTService) getJWKSEndpoint() string {
-	return "https://" + j.host + "/.well-known/jwks.json"
+func (j *JWTService) getJWKSEndpoint(secure bool) string {
+	scheme := "https://"
+	if !secure {
+		scheme = "http://"
+	}
+	return scheme + j.host + "/.well-known/jwks.json"
 }

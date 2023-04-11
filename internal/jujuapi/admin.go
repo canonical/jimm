@@ -76,37 +76,3 @@ func (r *controllerRoot) Login(ctx context.Context, req jujuparams.LoginRequest)
 		ServerVersion: srvVersion.String(),
 	}, nil
 }
-
-// Login implements the Login method on the Admin facade.
-func (r *modelRoot) Login(ctx context.Context, req jujuparams.LoginRequest) (jujuparams.LoginResult, error) {
-	const op = errors.Op("jujuapi.ModelLogin")
-
-	var err error
-	r.redirectInfo, err = r.jimm.RedirectInfo(ctx, names.NewModelTag(r.uuid))
-	if err != nil {
-		if errors.ErrorCode(err) == errors.CodeNotFound {
-			return jujuparams.LoginResult{}, errors.E(op, err, errors.CodeModelNotFound)
-		}
-		return jujuparams.LoginResult{}, errors.E(op, err)
-	}
-	// If the model was found then we'll need to redirect to it.
-	servermon.LoginRedirectCount.Inc()
-	return jujuparams.LoginResult{}, errors.E(op, errors.CodeRedirect, "redirection required")
-}
-
-// RedirectInfo implements the RedirectInfo method on the Admin facade.
-func (r *modelRoot) RedirectInfo(ctx context.Context) (jujuparams.RedirectInfoResult, error) {
-	const op = errors.Op("jujuapi.RedirectInfo")
-
-	if r.redirectInfo.Servers == nil {
-		var err error
-		r.redirectInfo, err = r.jimm.RedirectInfo(ctx, names.NewModelTag(r.uuid))
-		if err != nil {
-			if errors.ErrorCode(err) == errors.CodeNotFound {
-				return jujuparams.RedirectInfoResult{}, errors.E(op, err, errors.CodeModelNotFound)
-			}
-			return jujuparams.RedirectInfoResult{}, errors.E(op, err)
-		}
-	}
-	return r.redirectInfo, nil
-}

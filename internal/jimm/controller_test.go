@@ -1313,24 +1313,24 @@ func TestGetControllerAccess(t *testing.T) {
 	dbUser := env.User("alice@external").DBObject(c, j.Database, client)
 	alice := openfga.NewUser(&dbUser, client)
 
-	access, err := j.GetControllerAccess(ctx, alice, names.NewUserTag("alice@external"))
+	access, err := j.GetJimmControllerAccess(ctx, alice, names.NewUserTag("alice@external"))
 	c.Assert(err, qt.IsNil)
 	c.Check(access, qt.Equals, "superuser")
 
-	access, err = j.GetControllerAccess(ctx, alice, names.NewUserTag("bob@external"))
+	access, err = j.GetJimmControllerAccess(ctx, alice, names.NewUserTag("bob@external"))
 	c.Assert(err, qt.IsNil)
 	c.Check(access, qt.Equals, "login")
 
-	access, err = j.GetControllerAccess(ctx, alice, names.NewUserTag("charlie@external"))
+	access, err = j.GetJimmControllerAccess(ctx, alice, names.NewUserTag("charlie@external"))
 	c.Assert(err, qt.IsNil)
 	c.Check(access, qt.Equals, "login")
 
 	dbUser = env.User("bob@external").DBObject(c, j.Database, client)
 	alice = openfga.NewUser(&dbUser, client)
-	access, err = j.GetControllerAccess(ctx, alice, names.NewUserTag("bob@external"))
+	access, err = j.GetJimmControllerAccess(ctx, alice, names.NewUserTag("bob@external"))
 	c.Assert(err, qt.IsNil)
 	c.Check(access, qt.Equals, "login")
 
-	_, err = j.GetControllerAccess(ctx, alice, names.NewUserTag("alice@external"))
+	_, err = j.GetJimmControllerAccess(ctx, alice, names.NewUserTag("alice@external"))
 	c.Assert(err, qt.ErrorMatches, "unauthorized")
 }

@@ -40,14 +40,14 @@ func (s *userTestSuite) TestIsAdministrator(c *gc.C) {
 
 	user := names.NewUserTag("eve")
 	userToGroup := ofga.Tuple{
-		Object:   ofganames.FromTag(user),
+		Object:   ofganames.ConvertTag(user),
 		Relation: "member",
-		Target:   ofganames.FromTag(jimmnames.NewGroupTag(groupid)),
+		Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(groupid)),
 	}
 	groupToController := ofga.Tuple{
-		Object:   ofganames.FromTagWithRelation(jimmnames.NewGroupTag(groupid), ofganames.MemberRelation),
+		Object:   ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag(groupid), ofganames.MemberRelation),
 		Relation: "administrator",
-		Target:   ofganames.FromTag(controller),
+		Target:   ofganames.ConvertTag(controller),
 	}
 
 	err := s.ofgaClient.AddRelations(ctx, userToGroup, groupToController)
@@ -83,21 +83,21 @@ func (s *userTestSuite) TestModelAccess(c *gc.C) {
 	alice := names.NewUserTag("alice")
 
 	tuples := []ofga.Tuple{{
-		Object:   ofganames.FromTag(eve),
+		Object:   ofganames.ConvertTag(eve),
 		Relation: ofganames.MemberRelation,
-		Target:   ofganames.FromTag(jimmnames.NewGroupTag(groupid)),
+		Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(groupid)),
 	}, {
-		Object:   ofganames.FromTagWithRelation(group, ofganames.MemberRelation),
+		Object:   ofganames.ConvertTagWithRelation(group, ofganames.MemberRelation),
 		Relation: ofganames.AdministratorRelation,
-		Target:   ofganames.FromTag(controller),
+		Target:   ofganames.ConvertTag(controller),
 	}, {
-		Object:   ofganames.FromTag(controller),
+		Object:   ofganames.ConvertTag(controller),
 		Relation: ofganames.ControllerRelation,
-		Target:   ofganames.FromTag(model),
+		Target:   ofganames.ConvertTag(model),
 	}, {
-		Object:   ofganames.FromTag(alice),
+		Object:   ofganames.ConvertTag(alice),
 		Relation: ofganames.WriterRelation,
-		Target:   ofganames.FromTag(model),
+		Target:   ofganames.ConvertTag(model),
 	}}
 	err = s.ofgaClient.AddRelations(ctx, tuples...)
 	c.Assert(err, gc.IsNil)
@@ -178,21 +178,21 @@ func (s *userTestSuite) TestCloudAccess(c *gc.C) {
 	alice := names.NewUserTag("alice")
 
 	tuples := []ofga.Tuple{{
-		Object:   ofganames.FromTag(eve),
+		Object:   ofganames.ConvertTag(eve),
 		Relation: ofganames.MemberRelation,
-		Target:   ofganames.FromTag(jimmnames.NewGroupTag(groupid)),
+		Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(groupid)),
 	}, {
-		Object:   ofganames.FromTagWithRelation(group, ofganames.MemberRelation),
+		Object:   ofganames.ConvertTagWithRelation(group, ofganames.MemberRelation),
 		Relation: ofganames.AdministratorRelation,
-		Target:   ofganames.FromTag(controller),
+		Target:   ofganames.ConvertTag(controller),
 	}, {
-		Object:   ofganames.FromTag(controller),
+		Object:   ofganames.ConvertTag(controller),
 		Relation: ofganames.ControllerRelation,
-		Target:   ofganames.FromTag(cloud),
+		Target:   ofganames.ConvertTag(cloud),
 	}, {
-		Object:   ofganames.FromTag(alice),
+		Object:   ofganames.ConvertTag(alice),
 		Relation: ofganames.CanAddModelRelation,
-		Target:   ofganames.FromTag(cloud),
+		Target:   ofganames.ConvertTag(cloud),
 	}}
 	err = s.ofgaClient.AddRelations(ctx, tuples...)
 	c.Assert(err, gc.IsNil)
@@ -269,37 +269,37 @@ func (s *userTestSuite) TestListRelatedUsers(c *gc.C) {
 	eve := names.NewUserTag("eve")
 
 	tuples := []ofga.Tuple{{
-		Object:   ofganames.FromTag(eve),
+		Object:   ofganames.ConvertTag(eve),
 		Relation: ofganames.MemberRelation,
-		Target:   ofganames.FromTag(jimmnames.NewGroupTag(groupid)),
+		Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(groupid)),
 	}, {
-		Object:   ofganames.FromTagWithRelation(group, ofganames.MemberRelation),
+		Object:   ofganames.ConvertTagWithRelation(group, ofganames.MemberRelation),
 		Relation: ofganames.AdministratorRelation,
-		Target:   ofganames.FromTag(controller),
+		Target:   ofganames.ConvertTag(controller),
 	}, {
-		Object:   ofganames.FromTag(controller),
+		Object:   ofganames.ConvertTag(controller),
 		Relation: ofganames.ControllerRelation,
-		Target:   ofganames.FromTag(model),
+		Target:   ofganames.ConvertTag(model),
 	}, {
-		Object:   ofganames.FromTag(alice),
+		Object:   ofganames.ConvertTag(alice),
 		Relation: ofganames.WriterRelation,
-		Target:   ofganames.FromTag(model),
+		Target:   ofganames.ConvertTag(model),
 	}, {
-		Object:   ofganames.FromTag(model),
+		Object:   ofganames.ConvertTag(model),
 		Relation: ofganames.ModelRelation,
-		Target:   ofganames.FromTag(offer),
+		Target:   ofganames.ConvertTag(offer),
 	}, {
-		Object:   ofganames.FromTag(alice),
+		Object:   ofganames.ConvertTag(alice),
 		Relation: ofganames.ReaderRelation,
-		Target:   ofganames.FromTag(offer),
+		Target:   ofganames.ConvertTag(offer),
 	}, {
-		Object:   ofganames.FromTag(adam),
+		Object:   ofganames.ConvertTag(adam),
 		Relation: ofganames.MemberRelation,
-		Target:   ofganames.FromTag(group2),
+		Target:   ofganames.ConvertTag(group2),
 	}, {
-		Object:   ofganames.FromTagWithRelation(group2, ofganames.MemberRelation),
+		Object:   ofganames.ConvertTagWithRelation(group2, ofganames.MemberRelation),
 		Relation: ofganames.MemberRelation,
-		Target:   ofganames.FromTag(group),
+		Target:   ofganames.ConvertTag(group),
 	}}
 	err = s.ofgaClient.AddRelations(ctx, tuples...)
 	c.Assert(err, gc.IsNil)

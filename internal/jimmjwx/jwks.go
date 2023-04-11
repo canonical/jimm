@@ -63,6 +63,7 @@ func rotateJWKS(ctx context.Context, credStore credentials.CredentialStore, init
 	expires, err := credStore.GetJWKSExpiry(ctx)
 	if err != nil {
 		zapctx.Debug(ctx, "failed to get expiry", zap.Error(err))
+		zapctx.Debug(ctx, "setting initial expiry", zap.Time("time", initialExpiryTime))
 		err = putJwks(initialExpiryTime)
 		if err != nil {
 			credStore.CleanupJWKS(ctx)

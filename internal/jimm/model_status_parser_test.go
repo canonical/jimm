@@ -426,42 +426,42 @@ func TestQueryModelsJq(t *testing.T) {
 		[]ofga.Tuple{
 			// Reader to model via direct relation
 			{
-				Object:   ofganames.FromTag(names.NewUserTag("alice@external")),
+				Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
 				Relation: ofganames.ReaderRelation,
-				Target:   ofganames.FromTag(names.NewModelTag(modelUUIDs[0])),
+				Target:   ofganames.ConvertTag(names.NewModelTag(modelUUIDs[0])),
 			},
 			{
-				Object:   ofganames.FromTag(names.NewUserTag("alice@external")),
+				Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
 				Relation: ofganames.ReaderRelation,
-				Target:   ofganames.FromTag(names.NewModelTag(modelUUIDs[4])),
+				Target:   ofganames.ConvertTag(names.NewModelTag(modelUUIDs[4])),
 			},
 			// Reader to model via group
 			{
-				Object:   ofganames.FromTag(names.NewUserTag("alice@external")),
+				Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
 				Relation: ofganames.MemberRelation,
-				Target:   ofganames.FromTag(jimmnames.NewGroupTag("1")),
+				Target:   ofganames.ConvertTag(jimmnames.NewGroupTag("1")),
 			},
 			{
-				Object:   ofganames.FromTagWithRelation(jimmnames.NewGroupTag("1"), ofganames.MemberRelation),
+				Object:   ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag("1"), ofganames.MemberRelation),
 				Relation: ofganames.ReaderRelation,
-				Target:   ofganames.FromTag(names.NewModelTag(modelUUIDs[1])),
+				Target:   ofganames.ConvertTag(names.NewModelTag(modelUUIDs[1])),
 			},
 			// Reader to model via administrator of controller
 			{
-				Object:   ofganames.FromTag(names.NewUserTag("alice@external")),
+				Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
 				Relation: ofganames.AdministratorRelation,
-				Target:   ofganames.FromTag(names.NewControllerTag("00000000-0000-0000-0000-000000000000")),
+				Target:   ofganames.ConvertTag(names.NewControllerTag("00000000-0000-0000-0000-000000000000")),
 			},
 			{
-				Object:   ofganames.FromTag(names.NewControllerTag("00000000-0000-0000-0000-000000000000")),
+				Object:   ofganames.ConvertTag(names.NewControllerTag("00000000-0000-0000-0000-000000000000")),
 				Relation: ofganames.ControllerRelation,
-				Target:   ofganames.FromTag(names.NewModelTag(modelUUIDs[2])),
+				Target:   ofganames.ConvertTag(names.NewModelTag(modelUUIDs[2])),
 			},
 			// Reader to model via direct relation that does NOT exist
 			{
-				Object:   ofganames.FromTag(names.NewUserTag("alice@external")),
+				Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
 				Relation: ofganames.ReaderRelation,
-				Target:   ofganames.FromTag(names.NewModelTag(modelUUIDs[3])),
+				Target:   ofganames.ConvertTag(names.NewModelTag(modelUUIDs[3])),
 			},
 		}...,
 	), qt.Equals, nil)

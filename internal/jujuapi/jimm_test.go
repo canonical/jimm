@@ -280,7 +280,7 @@ func (s *jimmSuite) TestSetControllerDeprecated(c *gc.C) {
 		},
 	})
 
-	ci, err = client.SetControllerDeprecated(&apiparams.SetControllerDeprecatedRequest{
+	_, err = client.SetControllerDeprecated(&apiparams.SetControllerDeprecatedRequest{
 		Name:       "controller-2",
 		Deprecated: true,
 	})
@@ -290,7 +290,7 @@ func (s *jimmSuite) TestSetControllerDeprecated(c *gc.C) {
 	conn = s.open(c, nil, "bob")
 	defer conn.Close()
 	client = api.NewClient(conn)
-	ci, err = client.SetControllerDeprecated(&apiparams.SetControllerDeprecatedRequest{
+	_, err = client.SetControllerDeprecated(&apiparams.SetControllerDeprecatedRequest{
 		Name:       "controller-1",
 		Deprecated: true,
 	})

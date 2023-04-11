@@ -9,6 +9,7 @@ import (
 
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	jimmnames "github.com/CanonicalLtd/jimm/pkg/names"
+	"github.com/juju/juju/core/permission"
 	"github.com/juju/names/v4"
 )
 
@@ -86,16 +87,17 @@ type ResourceTagger interface {
 	Kind() string
 }
 
-// FromResourceWithRelationTag converts a resource tag to an OpenFGA tag
+// ConvertTagWithRelation converts a resource tag to an OpenFGA tag
 // and adds a relation to it.
-func FromTagWithRelation[RT ResourceTagger](t RT, relation Relation) *Tag {
-	tag := FromTag(t)
+func ConvertTagWithRelation[RT ResourceTagger](t RT, relation Relation) *Tag {
+	tag := ConvertTag(t)
 	tag.relation = relation
 	return tag
 }
 
-// FromTag converts a resource tag to an OpenFGA tag.
-func FromTag[RT ResourceTagger](t RT) *Tag {
+// ConvertTag converts a resource tag to an OpenFGA tag where the resource tag is limited to
+// specific types of tags.
+func ConvertTag[RT ResourceTagger](t RT) *Tag {
 	tag := &Tag{
 		id:   t.Id(),
 		kind: t.Kind(),
@@ -103,8 +105,17 @@ func FromTag[RT ResourceTagger](t RT) *Tag {
 	return tag
 }
 
-// FromString converts an entity tag to an OpenFGA tag.
-func FromString(t string) (*Tag, error) {
+// ConvertGenericTag converts any tag implementing the names.tag interface to an OpenFGA tag.
+func ConvertGenericTag(t names.Tag) *Tag {
+	tag := &Tag{
+		id:   t.Id(),
+		kind: t.Kind(),
+	}
+	return tag
+}
+
+// TagFromString converts an entity tag to an OpenFGA tag.
+func TagFromString(t string) (*Tag, error) {
 	tokens := strings.Split(t, ":")
 	if len(tokens) != 2 {
 		return nil, errors.E("unexpected tag format")
@@ -148,6 +159,31 @@ func BlankKindTag(kind string) (*Tag, error) {
 		}, nil
 	default:
 		return nil, errors.E("unknown tag kind")
+	}
+}
+
+// ConvertJujuRelation takes a juju relation string and converts it to
+// one appropriate for use with OpenFGA.
+func ConvertJujuRelation(relation string) (Relation, error) {
+	switch relation {
+	case string(permission.AdminAccess):
+		return AdministratorRelation, nil
+	case string(permission.ReadAccess):
+		return ReaderRelation, nil
+	case string(permission.WriteAccess):
+		return WriterRelation, nil
+	case string(permission.ConsumeAccess):
+		return ConsumerRelation, nil
+	case string(permission.AddModelAccess):
+		return CanAddModelRelation, nil
+	// Below are controller specific permissions that
+	// are not represented in JIMM's OpenFGA model.
+	case string(permission.LoginAccess):
+		return NoRelation, errors.E("login access unused")
+	case string(permission.SuperuserAccess):
+		return NoRelation, errors.E("superuser access unused")
+	default:
+		return NoRelation, errors.E("unknown relation")
 	}
 }
 

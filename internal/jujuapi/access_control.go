@@ -23,7 +23,6 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/openfga"
-	ofga "github.com/CanonicalLtd/jimm/internal/openfga"
 	ofganames "github.com/CanonicalLtd/jimm/internal/openfga/names"
 	jimmnames "github.com/CanonicalLtd/jimm/pkg/names"
 )
@@ -54,9 +53,6 @@ var (
 	// So if a group, user, UUID, controller name comes in, it will always be index 3 for them
 	// and if a relation specifier is present, it will always be index 10
 	jujuURIMatcher = regexp.MustCompile(`([a-zA-Z0-9]*)(\-|\z)([a-zA-Z0-9-@]*)(\:|)([a-zA-Z0-9-@]*)(\/|)([a-zA-Z0-9-]*)(\.|)([a-zA-Z0-9-]*)([a-zA-Z#]*|\z)\z`)
-
-	// resourceTypes contains a list of all resource kinds (i.e. tags) used throughout JIMM.
-	resourceTypes = [...]string{names.UserTagKind, names.ModelTagKind, names.ControllerTagKind, names.ApplicationOfferTagKind, jimmnames.GroupTagKind}
 )
 
 // AddGroup creates a group within JIMMs DB for reference by OpenFGA.
@@ -212,7 +208,7 @@ func resolveTag(db db.Database, tag string) (*ofganames.Tag, error) {
 			"Resolving JIMM tags to Juju tags for tag kind: user",
 			zap.String("user-name", trailer),
 		)
-		return ofganames.FromTagWithRelation(names.NewUserTag(trailer), relation), nil
+		return ofganames.ConvertTagWithRelation(names.NewUserTag(trailer), relation), nil
 
 	case jimmnames.GroupTagKind:
 		zapctx.Debug(
@@ -227,7 +223,7 @@ func resolveTag(db db.Database, tag string) (*ofganames.Tag, error) {
 		if err != nil {
 			return nil, errors.E("group not found")
 		}
-		return ofganames.FromTagWithRelation(jimmnames.NewGroupTag(strconv.FormatUint(uint64(entry.ID), 10)), relation), nil
+		return ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag(strconv.FormatUint(uint64(entry.ID), 10)), relation), nil
 
 	case names.ControllerTagKind:
 		zapctx.Debug(
@@ -250,7 +246,7 @@ func resolveTag(db db.Database, tag string) (*ofganames.Tag, error) {
 		if err != nil {
 			return nil, errors.E("controller not found")
 		}
-		return ofganames.FromTagWithRelation(names.NewControllerTag(controller.UUID), relation), nil
+		return ofganames.ConvertTagWithRelation(names.NewControllerTag(controller.UUID), relation), nil
 
 	case names.ModelTagKind:
 		zapctx.Debug(
@@ -277,7 +273,7 @@ func resolveTag(db db.Database, tag string) (*ofganames.Tag, error) {
 			return nil, errors.E("model not found")
 		}
 
-		return ofganames.FromTagWithRelation(names.NewModelTag(model.UUID.String), relation), nil
+		return ofganames.ConvertTagWithRelation(names.NewModelTag(model.UUID.String), relation), nil
 
 	case names.ApplicationOfferTagKind:
 		zapctx.Debug(
@@ -302,7 +298,7 @@ func resolveTag(db db.Database, tag string) (*ofganames.Tag, error) {
 			return nil, errors.E("application offer not found")
 		}
 
-		return ofganames.FromTagWithRelation(names.NewApplicationOfferTag(offer.UUID), relation), nil
+		return ofganames.ConvertTagWithRelation(names.NewApplicationOfferTag(offer.UUID), relation), nil
 	}
 	return nil, errors.E("failed to map tag " + matches[1])
 }
@@ -413,8 +409,8 @@ func (r *controllerRoot) CheckRelation(ctx context.Context, req apiparams.CheckR
 
 // parseTuples translate the api request struct containing tuples to a slice of openfga tuple keys.
 // This method utilises the parseTuple method which does all the heavy lifting.
-func (r *controllerRoot) parseTuples(ctx context.Context, tuples []apiparams.RelationshipTuple) ([]ofga.Tuple, error) {
-	keys := make([]ofga.Tuple, 0, len(tuples))
+func (r *controllerRoot) parseTuples(ctx context.Context, tuples []apiparams.RelationshipTuple) ([]openfga.Tuple, error) {
+	keys := make([]openfga.Tuple, 0, len(tuples))
 	for _, tuple := range tuples {
 		key, err := r.parseTuple(ctx, tuple)
 		if err != nil {
@@ -428,14 +424,14 @@ func (r *controllerRoot) parseTuples(ctx context.Context, tuples []apiparams.Rel
 // parseTuple takes the initial tuple from a relational request and ensures that
 // whatever format, be it JAAS or Juju tag, is resolved to the correct identifier
 // to be persisted within OpenFGA.
-func (r *controllerRoot) parseTuple(ctx context.Context, tuple apiparams.RelationshipTuple) (*ofga.Tuple, error) {
+func (r *controllerRoot) parseTuple(ctx context.Context, tuple apiparams.RelationshipTuple) (*openfga.Tuple, error) {
 	const op = errors.Op("jujuapi.parseTuple")
 
 	relation, err := ofganames.ParseRelation(tuple.Relation)
 	if err != nil {
 		return nil, errors.E(op, err, errors.CodeBadRequest)
 	}
-	t := ofga.Tuple{
+	t := openfga.Tuple{
 		Relation: relation,
 	}
 
@@ -568,7 +564,7 @@ func (r *controllerRoot) ListRelationshipTuples(ctx context.Context, req apipara
 		return returnValue, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
-	var key *ofga.Tuple
+	var key *openfga.Tuple
 	if req.Tuple.TargetObject != "" {
 		key, err = r.parseTuple(ctx, req.Tuple)
 		if err != nil {

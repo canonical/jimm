@@ -41,7 +41,7 @@ func (s *controllerrootSuite) TestUnimplementedMethodFails(c *gc.C) {
 	defer conn.Close()
 	var resp jujuparams.RedirectInfoResult
 	err := conn.APICall("Admin", 3, "", "Logout", nil, &resp)
-	c.Assert(err, gc.ErrorMatches, `no such request - method Admin\(3\).Logout is not implemented \(not implemented\)`)
+	c.Assert(err, gc.ErrorMatches, `no such request - method Admin.Logout is not implemented \(not implemented\)`)
 }
 
 func (s *controllerrootSuite) TestUnimplementedRootFails(c *gc.C) {

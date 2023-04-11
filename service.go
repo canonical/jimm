@@ -4,6 +4,7 @@ package jimm
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -190,6 +191,20 @@ func (s *Service) StartJWKSRotator(ctx context.Context, checkRotateRequired <-ch
 	return s.jimm.JWKService.StartJWKSRotator(ctx, checkRotateRequired, initialRotateRequiredTime)
 }
 
+// RegisterJwksCache registers the JWKS Cache with JIMM's JWT service.
+func (s *Service) RegisterJwksCache(ctx context.Context) {
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: true,
+	}
+	client := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: tlsConfig,
+		},
+		Timeout: 15 * time.Second,
+	}
+	s.jimm.JWTService.RegisterJWKSCache(ctx, client)
+}
+
 // NewService creates a new Service using the given params.
 func NewService(ctx context.Context, p Params) (*Service, error) {
 	const op = errors.Op("NewService")
@@ -250,6 +265,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 
 	if s.jimm.CredentialStore != nil {
 		s.jimm.JWKService = jimmjwx.NewJWKSService(s.jimm.CredentialStore)
+		s.jimm.JWTService = jimmjwx.NewJWTService(p.PublicDNSName, s.jimm.CredentialStore, false)
 	}
 
 	mountHandler := func(path string, h jimmhttp.JIMMHttpHandler) {
@@ -482,9 +498,9 @@ func ensureControllerAdministrators(ctx context.Context, client *ofgaClient.OFGA
 		}
 		if !isAdmin {
 			tuples = append(tuples, ofgaClient.Tuple{
-				Object:   ofganames.FromTag(userTag),
+				Object:   ofganames.ConvertTag(userTag),
 				Relation: ofganames.AdministratorRelation,
-				Target:   ofganames.FromTag(controller),
+				Target:   ofganames.ConvertTag(controller),
 			})
 		}
 	}
