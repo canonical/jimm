@@ -52,14 +52,7 @@ func (d Dialer) Dial(ctx context.Context, url string) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	cl := &Client{
-		conn:   conn,
-		closed: make(chan struct{}),
-		msgs:   make(map[uint64]inflight),
-	}
-	go cl.recv()
-
-	return cl, nil
+	return NewClient(conn), nil
 }
 
 // DialWebsocket dials a url and returns a websocket.
@@ -75,6 +68,18 @@ func (d Dialer) DialWebsocket(ctx context.Context, url string) (*websocket.Conn,
 		return nil, errors.E(op, err)
 	}
 	return conn, nil
+}
+
+// NewClient takes a websocket connection and returns an RPC client.
+// Note that a go routine is started that reads on the websocket.
+func NewClient(conn *websocket.Conn) *Client {
+	cl := &Client{
+		conn:   conn,
+		closed: make(chan struct{}),
+		msgs:   make(map[uint64]inflight),
+	}
+	go cl.recv()
+	return cl
 }
 
 type inflight struct {

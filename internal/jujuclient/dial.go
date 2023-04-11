@@ -13,7 +13,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"io"
 	"net/url"
 	"path"
 	"sort"
@@ -231,19 +230,11 @@ func dialAll(ctx context.Context, dialer *rpc.Dialer, urls []string) (*rpc.Clien
 	if len(urls) == 0 {
 		return nil, errors.E("no urls to dial")
 	}
-	res, err := dialAllHelper(ctx, dialer, urls, false)
+	conn, err := dialAllHelper(ctx, dialer, urls)
 	if err != nil {
 		return nil, err
 	}
-	client, ok := res.(*rpc.Client)
-	if !ok {
-		zapctx.Error(ctx, "failed to get client type")
-		return nil, errors.E("failed to get client type")
-	}
-	if client == nil {
-		return nil, err
-	}
-	return client, nil
+	return rpc.NewClient(conn), nil
 }
 
 // dialAllwebsocket is similar to dialAll but returns a raw websocket connection instead of a client.
@@ -251,44 +242,29 @@ func dialAllwebsocket(ctx context.Context, dialer *rpc.Dialer, urls []string) (*
 	if len(urls) == 0 {
 		return nil, errors.E("no urls to dial")
 	}
-	res, err := dialAllHelper(ctx, dialer, urls, true)
+	conn, err := dialAllHelper(ctx, dialer, urls)
 	if err != nil {
-		return nil, err
-	}
-	conn, ok := res.(*websocket.Conn)
-	if !ok {
-		zapctx.Error(ctx, "failed to get conn type")
-		return nil, errors.E("failed to get conn type")
-	}
-	if conn == nil {
 		return nil, err
 	}
 	return conn, nil
 }
 
-// dialAllHelper simultaneously dials all given urls and returns an object that can be a client or a
-// websocket depending on the value passed into basic.
-func dialAllHelper(ctx context.Context, dialer *rpc.Dialer, urls []string, basic bool) (io.Closer, error) {
+// dialAllHelper simultaneously dials all given urls and returns the first successful websocket connection.
+func dialAllHelper(ctx context.Context, dialer *rpc.Dialer, urls []string) (*websocket.Conn, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	var clientOnce, errOnce sync.Once
 	var err error
 	var wg sync.WaitGroup
-	var res io.Closer
+	var res *websocket.Conn
 	for _, url := range urls {
 		zapctx.Info(ctx, "dialing", zap.String("url", url))
 		url := url
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			var dErr error
-			var connector io.Closer
-			if basic {
-				connector, dErr = dialer.DialWebsocket(ctx, url)
-			} else {
-				connector, dErr = dialer.Dial(ctx, url)
-			}
+			conn, dErr := dialer.DialWebsocket(ctx, url)
 			if dErr != nil {
 				errOnce.Do(func() {
 					err = dErr
@@ -297,12 +273,12 @@ func dialAllHelper(ctx context.Context, dialer *rpc.Dialer, urls []string, basic
 			}
 			var keep bool
 			clientOnce.Do(func() {
-				res = connector
+				res = conn
 				keep = true
 				cancel()
 			})
 			if !keep {
-				connector.Close()
+				conn.Close()
 			}
 		}()
 	}
