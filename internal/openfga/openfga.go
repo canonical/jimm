@@ -301,9 +301,9 @@ func (o *OFGAClient) AddControllerModel(ctx context.Context, controller names.Co
 	if err := o.AddRelations(
 		ctx,
 		Tuple{
-			Object:   ofganames.FromTag(controller),
+			Object:   ofganames.ConvertTag(controller),
 			Relation: ofganames.ControllerRelation,
-			Target:   ofganames.FromTag(model),
+			Target:   ofganames.ConvertTag(model),
 		},
 	); err != nil {
 		return errors.E(err)
@@ -316,7 +316,7 @@ func (o *OFGAClient) RemoveModel(ctx context.Context, model names.ModelTag) erro
 	if err := o.removeTuples(
 		ctx,
 		&Tuple{
-			Target: ofganames.FromTag(model),
+			Target: ofganames.ConvertTag(model),
 		},
 	); err != nil {
 		return errors.E(err)
@@ -329,9 +329,9 @@ func (o *OFGAClient) AddModelApplicationOffer(ctx context.Context, model names.M
 	if err := o.AddRelations(
 		ctx,
 		Tuple{
-			Object:   ofganames.FromTag(model),
+			Object:   ofganames.ConvertTag(model),
 			Relation: ofganames.ModelRelation,
-			Target:   ofganames.FromTag(offer),
+			Target:   ofganames.ConvertTag(offer),
 		},
 	); err != nil {
 		return errors.E(err)
@@ -344,7 +344,7 @@ func (o *OFGAClient) RemoveApplicationOffer(ctx context.Context, offer names.App
 	if err := o.removeTuples(
 		ctx,
 		&Tuple{
-			Target: ofganames.FromTag(offer),
+			Target: ofganames.ConvertTag(offer),
 		},
 	); err != nil {
 		return errors.E(err)
@@ -358,7 +358,7 @@ func (o *OFGAClient) RemoveGroup(ctx context.Context, group jimmnames.GroupTag) 
 		ctx,
 		&Tuple{
 			Relation: ofganames.MemberRelation,
-			Target:   ofganames.FromTag(group),
+			Target:   ofganames.ConvertTag(group),
 		},
 	); err != nil {
 		return errors.E(err)
@@ -371,7 +371,7 @@ func (o *OFGAClient) RemoveGroup(ctx context.Context, group jimmnames.GroupTag) 
 			return errors.E(err)
 		}
 		newKey := &Tuple{
-			Object: ofganames.FromTagWithRelation(group, ofganames.MemberRelation),
+			Object: ofganames.ConvertTagWithRelation(group, ofganames.MemberRelation),
 			Target: kt,
 		}
 		err = o.removeTuples(ctx, newKey)
@@ -387,7 +387,7 @@ func (o *OFGAClient) RemoveCloud(ctx context.Context, cloud names.CloudTag) erro
 	if err := o.removeTuples(
 		ctx,
 		&Tuple{
-			Target: ofganames.FromTag(cloud),
+			Target: ofganames.ConvertTag(cloud),
 		},
 	); err != nil {
 		return errors.E(err)
@@ -399,9 +399,9 @@ func (o *OFGAClient) RemoveCloud(ctx context.Context, cloud names.CloudTag) erro
 // a cloud.
 func (o *OFGAClient) AddCloudController(ctx context.Context, cloud names.CloudTag, controller names.ControllerTag) error {
 	if err := o.addRelation(ctx, Tuple{
-		Object:   ofganames.FromTag(controller),
+		Object:   ofganames.ConvertTag(controller),
 		Relation: ofganames.ControllerRelation,
-		Target:   ofganames.FromTag(cloud),
+		Target:   ofganames.ConvertTag(cloud),
 	}); err != nil {
 		// if the tuple already exist we don't return an error.
 		if strings.Contains(err.Error(), "cannot write a tuple which already exists") {
@@ -416,9 +416,9 @@ func (o *OFGAClient) AddCloudController(ctx context.Context, cloud names.CloudTa
 // JIMM admins also have administrator access to the added controller
 func (o *OFGAClient) AddController(ctx context.Context, jimm names.ControllerTag, controller names.ControllerTag) error {
 	if err := o.addRelation(ctx, Tuple{
-		Object:   ofganames.FromTag(jimm),
+		Object:   ofganames.ConvertTag(jimm),
 		Relation: ofganames.ControllerRelation,
-		Target:   ofganames.FromTag(controller),
+		Target:   ofganames.ConvertTag(controller),
 	}); err != nil {
 		// if the tuple already exist we don't return an error.
 		if strings.Contains(err.Error(), "cannot write a tuple which already exists") {

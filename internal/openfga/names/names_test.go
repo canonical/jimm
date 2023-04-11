@@ -27,22 +27,22 @@ func (s *namesSuite) TestFromResourceTag(c *gc.C) {
 	id, err := uuid.NewRandom()
 	c.Assert(err, gc.IsNil)
 
-	result := ofganames.FromTag(names.NewControllerTag(id.String()))
+	result := ofganames.ConvertTag(names.NewControllerTag(id.String()))
 	c.Assert(result, gc.DeepEquals, ofganames.NewTag(id.String(), names.ControllerTagKind, ""))
 
-	result = ofganames.FromTag(names.NewModelTag(id.String()))
+	result = ofganames.ConvertTag(names.NewModelTag(id.String()))
 	c.Assert(result, gc.DeepEquals, ofganames.NewTag(id.String(), names.ModelTagKind, ""))
 
-	result = ofganames.FromTag(names.NewUserTag("eve"))
+	result = ofganames.ConvertTag(names.NewUserTag("eve"))
 	c.Assert(result, gc.DeepEquals, ofganames.NewTag("eve", names.UserTagKind, ""))
 
-	result = ofganames.FromTag(names.NewApplicationOfferTag("test"))
+	result = ofganames.ConvertTag(names.NewApplicationOfferTag("test"))
 	c.Assert(result, gc.DeepEquals, ofganames.NewTag("test", names.ApplicationOfferTagKind, ""))
 
-	result = ofganames.FromTag(names.NewCloudTag("test"))
+	result = ofganames.ConvertTag(names.NewCloudTag("test"))
 	c.Assert(result, gc.DeepEquals, ofganames.NewTag("test", names.CloudTagKind, ""))
 
-	result = ofganames.FromTag(jimmnames.NewGroupTag("1"))
+	result = ofganames.ConvertTag(jimmnames.NewGroupTag("1"))
 	c.Assert(result, gc.DeepEquals, ofganames.NewTag("1", jimmnames.GroupTagKind, ""))
 }
 
@@ -50,10 +50,10 @@ func (s *namesSuite) TestFromGenericResourceTag(c *gc.C) {
 	id, err := uuid.NewRandom()
 	c.Assert(err, gc.IsNil)
 
-	result := ofganames.FromGenericTag(names.NewControllerTag(id.String()))
+	result := ofganames.ConvertGenericTag(names.NewControllerTag(id.String()))
 	c.Assert(result, gc.DeepEquals, ofganames.NewTag(id.String(), names.ControllerTagKind, ""))
 
-	result = ofganames.FromGenericTag(names.NewModelTag(id.String()))
+	result = ofganames.ConvertGenericTag(names.NewModelTag(id.String()))
 	c.Assert(result, gc.DeepEquals, ofganames.NewTag(id.String(), names.ModelTagKind, ""))
 }
 

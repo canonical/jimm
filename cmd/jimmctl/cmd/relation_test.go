@@ -219,13 +219,13 @@ func (s *relationSuite) TestRemoveRelationViaFileSuperuser(c *gc.C) {
 	c.Logf("existing relations %v", resp.Tuples)
 	// Only two relations exist.
 	c.Assert(resp.Tuples, gc.DeepEquals, []ofga.Tuple{{
-		Object:   ofganames.FromTag(names.NewUserTag("admin")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("admin")),
 		Relation: ofganames.AdministratorRelation,
-		Target:   ofganames.FromTag(names.NewControllerTag(s.Params.ControllerUUID)),
+		Target:   ofganames.ConvertTag(names.NewControllerTag(s.Params.ControllerUUID)),
 	}, {
-		Object:   ofganames.FromTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
 		Relation: ofganames.AdministratorRelation,
-		Target:   ofganames.FromTag(names.NewControllerTag(s.Params.ControllerUUID)),
+		Target:   ofganames.ConvertTag(names.NewControllerTag(s.Params.ControllerUUID)),
 	}})
 }
 
@@ -518,14 +518,14 @@ func (s *relationSuite) TestCheckRelationViaSuperuser(c *gc.C) {
 
 	err = ofgaClient.AddRelations(ctx,
 		ofga.Tuple{
-			Object:   ofganames.FromTag(u.ResourceTag()),
+			Object:   ofganames.ConvertTag(u.ResourceTag()),
 			Relation: "member",
-			Target:   ofganames.FromTag(group.Tag().(jimmnames.GroupTag)),
+			Target:   ofganames.ConvertTag(group.Tag().(jimmnames.GroupTag)),
 		},
 		ofga.Tuple{
-			Object:   ofganames.FromTagWithRelation(group.Tag().(jimmnames.GroupTag), ofganames.MemberRelation),
+			Object:   ofganames.ConvertTagWithRelation(group.Tag().(jimmnames.GroupTag), ofganames.MemberRelation),
 			Relation: "reader",
-			Target:   ofganames.FromTag(model.ResourceTag()),
+			Target:   ofganames.ConvertTag(model.ResourceTag()),
 		},
 	)
 	c.Assert(err, gc.IsNil)

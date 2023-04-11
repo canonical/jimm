@@ -2138,9 +2138,9 @@ func TestOfferAssertOpenFGARelationsExist(t *testing.T) {
 	exists, _, err := client.CheckRelation(
 		context.Background(),
 		openfga.Tuple{
-			Object:   ofganames.FromTag(offerArgs.ModelTag),
+			Object:   ofganames.ConvertTag(offerArgs.ModelTag),
 			Relation: ofganames.ModelRelation,
-			Target:   ofganames.FromTag(offer.ResourceTag()),
+			Target:   ofganames.ConvertTag(offer.ResourceTag()),
 		},
 		false,
 	)
@@ -2151,9 +2151,9 @@ func TestOfferAssertOpenFGARelationsExist(t *testing.T) {
 	exists, _, err = client.CheckRelation(
 		context.Background(),
 		openfga.Tuple{
-			Object:   ofganames.FromTag(u.ResourceTag()),
+			Object:   ofganames.ConvertTag(u.ResourceTag()),
 			Relation: ofganames.AdministratorRelation,
-			Target:   ofganames.FromTag(offer.ResourceTag()),
+			Target:   ofganames.ConvertTag(offer.ResourceTag()),
 		},
 		false,
 	)
@@ -3039,41 +3039,41 @@ func TestListApplicationOffers(t *testing.T) {
 	}
 
 	tuples := []openfga.Tuple{{
-		Object:   ofganames.FromTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
 		Relation: ofganames.AdministratorRelation,
-		Target:   ofganames.FromTag(names.NewApplicationOfferTag("00000012-0000-0000-0000-000000000001")),
+		Target:   ofganames.ConvertTag(names.NewApplicationOfferTag("00000012-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.FromTag(names.NewUserTag("eve@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("eve@external")),
 		Relation: ofganames.ReaderRelation,
-		Target:   ofganames.FromTag(names.NewApplicationOfferTag("00000012-0000-0000-0000-000000000001")),
+		Target:   ofganames.ConvertTag(names.NewApplicationOfferTag("00000012-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.FromTag(names.NewUserTag("bob@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
 		Relation: ofganames.ConsumerRelation,
-		Target:   ofganames.FromTag(names.NewApplicationOfferTag("00000012-0000-0000-0000-000000000001")),
+		Target:   ofganames.ConvertTag(names.NewApplicationOfferTag("00000012-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.FromTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
 		Relation: ofganames.AdministratorRelation,
-		Target:   ofganames.FromTag(names.NewApplicationOfferTag("00000012-0000-0000-0000-000000000002")),
+		Target:   ofganames.ConvertTag(names.NewApplicationOfferTag("00000012-0000-0000-0000-000000000002")),
 	}, {
-		Object:   ofganames.FromTag(names.NewUserTag("eve@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("eve@external")),
 		Relation: ofganames.ReaderRelation,
-		Target:   ofganames.FromTag(names.NewApplicationOfferTag("00000012-0000-0000-0000-000000000002")),
+		Target:   ofganames.ConvertTag(names.NewApplicationOfferTag("00000012-0000-0000-0000-000000000002")),
 	}, {
-		Object:   ofganames.FromTag(names.NewUserTag("bob@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
 		Relation: ofganames.ConsumerRelation,
-		Target:   ofganames.FromTag(names.NewApplicationOfferTag("00000012-0000-0000-0000-000000000002")),
+		Target:   ofganames.ConvertTag(names.NewApplicationOfferTag("00000012-0000-0000-0000-000000000002")),
 	}, {
-		Object:   ofganames.FromTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
 		Relation: ofganames.AdministratorRelation,
-		Target:   ofganames.FromTag(names.NewApplicationOfferTag("00000012-0000-0000-0000-000000000003")),
+		Target:   ofganames.ConvertTag(names.NewApplicationOfferTag("00000012-0000-0000-0000-000000000003")),
 	}, {
-		Object:   ofganames.FromTag(names.NewUserTag("eve@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("eve@external")),
 		Relation: ofganames.ReaderRelation,
-		Target:   ofganames.FromTag(names.NewApplicationOfferTag("00000012-0000-0000-0000-000000000003")),
+		Target:   ofganames.ConvertTag(names.NewApplicationOfferTag("00000012-0000-0000-0000-000000000003")),
 	}, {
-		Object:   ofganames.FromTag(names.NewUserTag("bob@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
 		Relation: ofganames.ConsumerRelation,
-		Target:   ofganames.FromTag(names.NewApplicationOfferTag("00000012-0000-0000-0000-000000000003")),
+		Target:   ofganames.ConvertTag(names.NewApplicationOfferTag("00000012-0000-0000-0000-000000000003")),
 	}}
 	err = client.AddRelations(context.Background(), tuples...)
 	c.Assert(err, qt.IsNil)

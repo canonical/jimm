@@ -498,9 +498,9 @@ func ensureControllerAdministrators(ctx context.Context, client *ofgaClient.OFGA
 		}
 		if !isAdmin {
 			tuples = append(tuples, ofgaClient.Tuple{
-				Object:   ofganames.FromTag(userTag),
+				Object:   ofganames.ConvertTag(userTag),
 				Relation: ofganames.AdministratorRelation,
-				Target:   ofganames.FromTag(controller),
+				Target:   ofganames.ConvertTag(controller),
 			})
 		}
 	}

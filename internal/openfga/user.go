@@ -166,7 +166,7 @@ func (u *User) SetApplicationOfferAccess(ctx context.Context, resource names.App
 
 // ListModels returns a slice of model UUIDs this user has at least reader access to.
 func (u *User) ListModels(ctx context.Context) ([]string, error) {
-	return u.client.ListObjects(ctx, ofganames.FromTag(u.ResourceTag()).String(), ofganames.ReaderRelation.String(), "model", nil)
+	return u.client.ListObjects(ctx, ofganames.ConvertTag(u.ResourceTag()).String(), ofganames.ReaderRelation.String(), "model", nil)
 }
 
 type administratorT interface {
@@ -181,9 +181,9 @@ func checkRelation[T ofganames.ResourceTagger](ctx context.Context, u *User, res
 	isAllowed, resolution, err := u.client.checkRelation(
 		ctx,
 		Tuple{
-			Object:   ofganames.FromTag(u.ResourceTag()),
+			Object:   ofganames.ConvertTag(u.ResourceTag()),
 			Relation: relation,
-			Target:   ofganames.FromTag(resource),
+			Target:   ofganames.ConvertTag(resource),
 		},
 		true,
 	)
@@ -200,11 +200,11 @@ func checkRelation[T ofganames.ResourceTagger](ctx context.Context, u *User, res
 func CheckRelation(ctx context.Context, u *User, resource names.Tag, relation ofganames.Relation) (bool, string, error) {
 	var tag *ofganames.Tag
 	var err error
-	tag = ofganames.FromGenericTag(resource)
+	tag = ofganames.ConvertGenericTag(resource)
 	isAllowed, resolution, err := u.client.checkRelation(
 		ctx,
 		Tuple{
-			Object:   ofganames.FromTag(u.ResourceTag()),
+			Object:   ofganames.ConvertTag(u.ResourceTag()),
 			Relation: relation,
 			Target:   tag,
 		},
@@ -244,9 +244,9 @@ func IsAdministrator[T administratorT](ctx context.Context, u *User, resource T)
 
 func setResourceAccess[T ofganames.ResourceTagger](ctx context.Context, user *User, resource T, relation ofganames.Relation) error {
 	err := user.client.addRelation(ctx, Tuple{
-		Object:   ofganames.FromTag(user.ResourceTag()),
+		Object:   ofganames.ConvertTag(user.ResourceTag()),
 		Relation: relation,
-		Target:   ofganames.FromTag(resource),
+		Target:   ofganames.ConvertTag(resource),
 	})
 	if err != nil {
 		// if the tuple already exist we don't return an error.
@@ -263,7 +263,7 @@ func setResourceAccess[T ofganames.ResourceTagger](ctx context.Context, user *Us
 func ListUsersWithAccess[T ofganames.ResourceTagger](ctx context.Context, client *OFGAClient, resource T, relation ofganames.Relation) ([]*User, error) {
 	t := createTupleKey(Tuple{
 		Relation: relation,
-		Target:   ofganames.FromTag(resource),
+		Target:   ofganames.ConvertTag(resource),
 	})
 
 	list, err := listUsersWithAccess(ctx, client, t)

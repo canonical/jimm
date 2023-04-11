@@ -208,7 +208,7 @@ func resolveTag(db db.Database, tag string) (*ofganames.Tag, error) {
 			"Resolving JIMM tags to Juju tags for tag kind: user",
 			zap.String("user-name", trailer),
 		)
-		return ofganames.FromTagWithRelation(names.NewUserTag(trailer), relation), nil
+		return ofganames.ConvertTagWithRelation(names.NewUserTag(trailer), relation), nil
 
 	case jimmnames.GroupTagKind:
 		zapctx.Debug(
@@ -223,7 +223,7 @@ func resolveTag(db db.Database, tag string) (*ofganames.Tag, error) {
 		if err != nil {
 			return nil, errors.E("group not found")
 		}
-		return ofganames.FromTagWithRelation(jimmnames.NewGroupTag(strconv.FormatUint(uint64(entry.ID), 10)), relation), nil
+		return ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag(strconv.FormatUint(uint64(entry.ID), 10)), relation), nil
 
 	case names.ControllerTagKind:
 		zapctx.Debug(
@@ -246,7 +246,7 @@ func resolveTag(db db.Database, tag string) (*ofganames.Tag, error) {
 		if err != nil {
 			return nil, errors.E("controller not found")
 		}
-		return ofganames.FromTagWithRelation(names.NewControllerTag(controller.UUID), relation), nil
+		return ofganames.ConvertTagWithRelation(names.NewControllerTag(controller.UUID), relation), nil
 
 	case names.ModelTagKind:
 		zapctx.Debug(
@@ -273,7 +273,7 @@ func resolveTag(db db.Database, tag string) (*ofganames.Tag, error) {
 			return nil, errors.E("model not found")
 		}
 
-		return ofganames.FromTagWithRelation(names.NewModelTag(model.UUID.String), relation), nil
+		return ofganames.ConvertTagWithRelation(names.NewModelTag(model.UUID.String), relation), nil
 
 	case names.ApplicationOfferTagKind:
 		zapctx.Debug(
@@ -298,7 +298,7 @@ func resolveTag(db db.Database, tag string) (*ofganames.Tag, error) {
 			return nil, errors.E("application offer not found")
 		}
 
-		return ofganames.FromTagWithRelation(names.NewApplicationOfferTag(offer.UUID), relation), nil
+		return ofganames.ConvertTagWithRelation(names.NewApplicationOfferTag(offer.UUID), relation), nil
 	}
 	return nil, errors.E("failed to map tag " + matches[1])
 }
