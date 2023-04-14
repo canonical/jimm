@@ -19,6 +19,7 @@ import hashlib
 import json
 import logging
 import os
+import socket
 
 import hvac
 import requests
@@ -74,6 +75,7 @@ STATE_KEY_CSR = "csr"
 STATE_KEY_DSN = "dsn"
 STATE_KEY_DNS_NAME = "dns"
 STATE_KEY_PRIVATE_KEY = "private-key"
+STATE_KEY_VAULT_ADDRESS = "vault-address"
 
 OPENFGA_STORE_ID = "openfga-store-id"
 OPENFGA_TOKEN = "openfga-token"
@@ -152,6 +154,14 @@ class JimmOperatorCharm(CharmBase):
             self._on_openfga_store_created,
         )
 
+        # Vault relation
+        self.framework.observe(
+            self.on.vault_relation_joined, self._on_vault_relation_joined
+        )
+        self.framework.observe(
+            self.on.vault_relation_changed, self._on_vault_relation_changed
+        )
+
         # create-authorization-model action
         self.framework.observe(
             self.on.create_authorization_model_action,
@@ -162,6 +172,7 @@ class JimmOperatorCharm(CharmBase):
         self._local_vault_secret_filename = "vault_secret.js"
         self._agent_filename = "/root/config/agent.json"
         self._vault_secret_filename = "/root/config/vault_secret.json"
+        self._vault_path = "charm-jimm-k8s-creds"
         self._dashboard_path = "/root/dashboard"
         self._dashboard_hash_path = "/root/dashboard/hash"
 
@@ -205,28 +216,6 @@ class JimmOperatorCharm(CharmBase):
 
             self._push_to_workload(self._agent_filename, agent_data, event)
 
-    def _ensure_vault_config(self, event):
-        addr = self.config.get("vault-url", "")
-        if not addr:
-            return
-
-        # we create the file containing vault secretes if needed.
-        if not self._path_exists_in_workload(self._vault_secret_filename):
-            role_id = self.config.get("vault-role-id", "")
-            if not role_id:
-                return
-            token = self.config.get("vault-token", "")
-            if not token:
-                return
-            client = hvac.Client(url=addr, token=token)
-            secret = client.sys.unwrap()
-            secret["data"]["role_id"] = role_id
-
-            secret_data = json.dumps(secret)
-            self._push_to_workload(
-                self._vault_secret_filename, secret_data, event
-            )
-
     def _update_workload(self, event):
         """' Update workload with all available configuration
         data."""
@@ -240,7 +229,6 @@ class JimmOperatorCharm(CharmBase):
             return
 
         self._ensure_bakery_agent_file(event)
-        self._ensure_vault_config(event)
         self._install_dashboard(event)
 
         dnsname = "{}.{}-endpoints.{}.svc.cluster.local".format(
@@ -253,6 +241,7 @@ class JimmOperatorCharm(CharmBase):
         openfga_address = ""
         openfga_port = ""
         openfga_scheme = ""
+        vault_address = ""
         try:
             if self.state.get(STATE_KEY_DNS_NAME):
                 dnsname = self.state.get(STATE_KEY_DNS_NAME)
@@ -264,6 +253,7 @@ class JimmOperatorCharm(CharmBase):
             openfga_address = self.state.get(OPENFGA_ADDRESS)
             openfga_port = self.state.get(OPENFGA_PORT)
             openfga_scheme = self.state.get(OPENFGA_SCHEME)
+            vault_address = self.state.get(STATE_KEY_VAULT_ADDRESS)
 
         except RelationNotReadyError:
             event.defer()
@@ -294,8 +284,8 @@ class JimmOperatorCharm(CharmBase):
             config_values["BAKERY_AGENT_FILE"] = self._agent_filename
 
         if container.exists(self._vault_secret_filename):
-            config_values["VAULT_ADDR"] = self.config.get("vault-url", "")
-            config_values["VAULT_PATH"] = "charm-jimm-creds"
+            config_values["VAULT_ADDR"] = vault_address
+            config_values["VAULT_PATH"] = self._vault_path
             config_values["VAULT_SECRET_FILE"] = self._vault_secret_filename
             config_values["VAULT_AUTH_PATH"] = "/auth/approle/login"
 
@@ -342,11 +332,11 @@ class JimmOperatorCharm(CharmBase):
             event.defer()
 
         dashboard_relation = self.model.get_relation("dashboard")
-        if dashboard_relation:
+        if dashboard_relation and self.unit.is_leader():
             dashboard_relation.data[self.app].update(
                 {
                     "controller-url": dnsname,
-                    "identity-provider-url": self.config["candid-url"],
+                    "identity-provider-url": self.config.get("candid-url"),
                     "is-juju": str(False),
                 }
             )
@@ -530,6 +520,59 @@ class JimmOperatorCharm(CharmBase):
         self._push_to_workload(
             self._dashboard_hash_path, dashboard_hash, event
         )
+
+    def _get_network_address(self, event):
+        return str(
+            self.model.get_binding(event.relation)
+            .network.egress_subnets[0]
+            .network_address
+        )
+
+    def _on_vault_relation_joined(self, event):
+        event.relation.data[self.unit]["secret_backend"] = json.dumps(
+            self._vault_path
+        )
+        event.relation.data[self.unit]["hostname"] = json.dumps(
+            socket.gethostname()
+        )
+        event.relation.data[self.unit]["access_address"] = json.dumps(
+            self._get_network_address(event)
+        )
+        event.relation.data[self.unit]["isolated"] = json.dumps(False)
+
+    def _on_vault_relation_changed(self, event):
+        container = self.unit.get_container(WORKLOAD_CONTAINER)
+
+        # if we can't connect to the container we should defer
+        # this event.
+        if not container.can_connect():
+            event.defer()
+            return
+
+        if container.exists(self._vault_secret_filename):
+            container.remove_path(self._vault_secret_filename)
+
+        addr = _json_data(event, "vault_url")
+        if not addr:
+            return
+        role_id = _json_data(event, "{}_role_id".format(self.unit.name))
+        if not role_id:
+            return
+        token = _json_data(event, "{}_token".format(self.unit.name))
+        if not token:
+            return
+        client = hvac.Client(url=addr, token=token)
+        secret = client.sys.unwrap()
+        secret["data"]["role_id"] = role_id
+
+        secret_data = json.dumps(secret)
+        self._push_to_workload(self._vault_secret_filename, secret_data, event)
+
+        try:
+            self.state.set(STATE_KEY_VAULT_ADDRESS, addr)
+        except RelationNotReadyError:
+            event.defer()
+            return
 
     def _path_exists_in_workload(self, path: str):
         """Returns true if the specified path exists in the
@@ -780,6 +823,14 @@ class JimmOperatorCharm(CharmBase):
         except RelationNotReadyError:
             event.defer()
             return
+
+
+def _json_data(event, key):
+    logger.debug("getting relation data {}".format(key))
+    try:
+        return json.loads(event.relation.data[event.unit][key])
+    except KeyError:
+        return None
 
 
 if __name__ == "__main__":
