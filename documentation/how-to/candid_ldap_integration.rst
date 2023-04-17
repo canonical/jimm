@@ -128,7 +128,7 @@ Configure TLS
 To obtain a valid certificate for OpenLDAP we will use certbot.
 First we need to tell certbot where to place obtained certificate, key and trust chain:
 
-.. code::
+.. code:: console
 
     juju config certbot chain-path=/etc/ldap/ldap-chain.pem
     juju config certbot key-path=/etc/ldap/ldap-key.pem
@@ -151,7 +151,7 @@ Then we can run the get-certificate action on the certbot unit to obtain certifi
 This will result in creation of .pem files specified by the certbot configuration.
 Now we can ssh back into the ldap unit:
 
-.. code::
+.. code:: console
 
     juju ssh ldap/0
     cd /etc/ldap
@@ -236,7 +236,7 @@ LDAP Identity Provider for Candid
 
 Once we have Candid deployed and LDAP configured all we need to do is let Candid know how to use OpenLDAP as an identity provider. We do this by setting its identity-providers config option:
 
-.. code::
+.. code:: console
 
     juju config candid identity-providers='- type: ldap                                              
     name: <name of your LDAP>  

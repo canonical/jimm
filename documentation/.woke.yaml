@@ -1,0 +1,5 @@
+ignore_files:
+  # Ignore sphinx and vscode files
+  - .sphinx/*
+  - .vscode/*
+  - ./.woke.yaml

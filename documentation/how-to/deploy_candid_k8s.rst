@@ -45,7 +45,7 @@ and the aws-integrator charm:
 which simplifies working with charmed Kubernetes on AWS.
 Use the following commands to configure and relate aws-integrator to various applications:
 
-.. code::
+.. code:: console
 
     juju trust aws-integrator
     juju relate aws-integrator kubernetes-control-plane
@@ -80,7 +80,7 @@ Now we can deploy the Candid into the newly created model:
 
 As Juju does not currently support exposing an application on a k8s cloud, we need to also deploy nginx-ingress-integrator charm. Run:
 
-.. code::
+.. code:: console
     
     juju deploy nginx-ingress-integrator ingress
     juju trust ingress --scope=cluster
@@ -93,7 +93,7 @@ Configure Candid
 
 Once deployed we need to configure Candid. Run the following commands:
 
-.. code::
+.. code:: console
 
     juju config candid-k8s location=https://candid.canonical.stimec.net
     juju config candid-k8s admin-agent-public-key='test-public-key'
@@ -151,7 +151,8 @@ First, you will need to install helm:
 
 Then run the following commands to deploy cert-manager:
 
-.. code::
+.. code:: console
+
     helm repo add jetstack https://charts.jetstack.io
     helm repo update
     helm install certmgr jetstack/cert-manager

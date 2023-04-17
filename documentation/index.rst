@@ -58,8 +58,6 @@ Example Project is a member of the Ubuntu family. It’s an open source project 
 * :ref:`Get support <home>`
 * :ref:`Join our online chat <home>`
 * :ref:`Contribute <home>`
-* :ref:`Roadmap <home>`
-* :ref:`Thinking about using Example Product for your next project? Get in touch! <home>`
 
 
 .. toctree::
