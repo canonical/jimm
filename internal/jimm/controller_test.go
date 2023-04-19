@@ -722,7 +722,6 @@ func TestImportModel(t *testing.T) {
 				ModelUUID:   "00000002-0000-0000-0000-000000000001",
 				Name:        "app-1/1",
 				Application: "app-1",
-				Series:      "warty",
 				CharmURL:    "cs:app-1",
 				Life:        "starting",
 				MachineId:   "machine-1",
