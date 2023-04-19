@@ -38,7 +38,7 @@ fi
 if [ -z "$CLIENT_CREDENTIAL_NAME" ];
 then
     echo "- Client credential name NOT SET, setting it to 'microk8s'"
-    CLIENT_CREDENTIAL_NAME="microk8s"
+    CLIENT_CREDENTIAL_NAME="localhost"
 fi
 
 echo
