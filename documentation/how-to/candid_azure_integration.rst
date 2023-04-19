@@ -81,7 +81,7 @@ Configuring Candid
 
 Next we need to add Azure as an identity provider to Candid, with the application (client) id and the client secret we created in the previous step. Run:
 
-.. code::
+.. code:: console
 
     juju config candid identity-providers='- type: azure                                                   
     client-id: <client id>

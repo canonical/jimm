@@ -15,6 +15,9 @@ help:
 	@$(SPHINXBUILD) -M help "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
 
 install:
+	@echo "Install woke"
+	go get github.com/get-woke/woke
+	go install github.com/get-woke/woke
 	@echo "... setting up virtualenv"
 	python3 -m venv .sphinx/venv
 	. $(VENV); pip install --upgrade -r .sphinx/requirements.txt
@@ -29,7 +32,7 @@ install:
 		"* check spelling: make spelling \n" \
 		"--------------------------------------------------------------- \n"
 run:
-	. $(VENV); sphinx-autobuild -c . -b dirhtml "$(SOURCEDIR)" "$(BUILDDIR)"
+	. $(VENV); sphinx-autobuild --pre-build "woke **/*.rst" -c . -b dirhtml "$(SOURCEDIR)" "$(BUILDDIR)"
 
 html:
 	. $(VENV); $(SPHINXBUILD) -c . -b dirhtml "$(SOURCEDIR)" "$(BUILDDIR)" -w .sphinx/warnings.txt

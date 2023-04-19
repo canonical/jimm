@@ -25,7 +25,6 @@ Prerequisites
 
 For this tutorial you will need the following:
 
-This tutorial assumes that you: 
 - Have valid AWS credentials you can use
 - Have basic knowledge of Juju and are able to use the Juju CLI
 - Have AWS credentials Juju can use to deploy in EC2 (see instructions here)
@@ -102,7 +101,7 @@ which will tell Candid which DNS it is running on.
 Now all that is left is to set up the identity providers. In this tutorial we will set up a static 
 identity provider with hard-coded usernames and passwords:
 
-.. code::
+.. code:: console
 
     juju config candid identity-providers='- type: static                                       
     name: static      
@@ -313,7 +312,7 @@ And login using the credentials you provided the Candid earlier.
 Since we configured JIMM so that user1 is an admin user, you have to log in as user1 to be able to 
 add the controller. If needed, you can always run:
 
-.. code::
+.. code:: console
 
     juju logout
     juju login jimm.canonical.domain.com
@@ -371,7 +370,7 @@ You can verify everything is configured correctly and see the cluster by running
 
 To add simple storage for Kubernetes using NFS run:
 
-.. code::
+.. code:: console
 
     juju deploy nfs --constraints root-disk=200G
     juju add-relation nfs kubernetes-worker
