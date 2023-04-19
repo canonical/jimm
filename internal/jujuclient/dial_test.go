@@ -133,8 +133,6 @@ func (s *dialSuite) TestDialWithCredentialsStoredInVault(c *gc.C) {
 		ControllerCredentialsStore: store,
 	}
 
-	// Test
-
 	// Check dial is OK
 	api, err := dialer.Dial(ctx, &ctl, names.ModelTag{})
 	c.Assert(err, gc.Equals, nil)
