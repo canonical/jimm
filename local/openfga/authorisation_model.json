@@ -204,6 +204,21 @@
                         ]
                     }
                 },
+                "audit_log_viewer": {
+                    "union": {
+                        "child": [
+                            {
+                                "this": {}
+                            },
+                            {
+                                "computedUserset": {
+                                    "object": "",
+                                    "relation": "administrator"
+                                }
+                            }
+                        ]
+                    }
+                },
                 "controller": {
                     "this": {}
                 }
@@ -211,6 +226,17 @@
             "metadata": {
                 "relations": {
                     "administrator": {
+                        "directly_related_user_types": [
+                            {
+                                "type": "user"
+                            },
+                            {
+                                "type": "group",
+                                "relation": "member"
+                            }
+                        ]
+                    },
+                    "audit_log_viewer": {
                         "directly_related_user_types": [
                             {
                                 "type": "user"
