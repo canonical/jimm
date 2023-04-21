@@ -101,6 +101,7 @@ func (u *User) GetCloudAccess(ctx context.Context, resource names.CloudTag) ofga
 	return ofganames.NoRelation
 }
 
+// GetControllerAuditLogViewerAccess returns if the user has audit log viewer relation with the given controller.
 func (u *User) GetControllerAuditLogViewerAccess(ctx context.Context, resource names.ControllerTag) ofganames.Relation {
 	hasAccess, _, err := checkRelation(ctx, u, resource, ofganames.AuditLogViewerRelation)
 	if err != nil {
