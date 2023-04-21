@@ -167,9 +167,9 @@ func (u *User) SetControllerAccess(ctx context.Context, resource names.Controlle
 	return setResourceAccess(ctx, u, resource, relation)
 }
 
-// UnsetControllerAccess removes a direct relation between the user and a controller.
-func (u *User) UnsetControllerAccess(ctx context.Context, resource names.ControllerTag, relation ofganames.Relation) error {
-	return unsetResourceAccess(ctx, u, resource, relation)
+// UnsetControllerAuditLogViewerAccess removes a direct audit log viewer relation between the user and a controller.
+func (u *User) UnsetControllerAuditLogViewerAccess(ctx context.Context, resource names.ControllerTag) error {
+	return unsetResourceAccess(ctx, u, resource, ofganames.AuditLogViewerRelation)
 }
 
 // SetCloudAccess adds a direct relation between the user and the cloud.
