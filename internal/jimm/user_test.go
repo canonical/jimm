@@ -9,6 +9,7 @@ import (
 	"time"
 
 	qt "github.com/frankban/quicktest"
+	"github.com/google/uuid"
 	jujuparams "github.com/juju/juju/rpc/params"
 
 	"github.com/CanonicalLtd/jimm/internal/db"
@@ -17,6 +18,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/jimm"
 	"github.com/CanonicalLtd/jimm/internal/jimmtest"
 	openfga "github.com/CanonicalLtd/jimm/internal/openfga"
+	ofganames "github.com/CanonicalLtd/jimm/internal/openfga/names"
 )
 
 func TestAuthenticateNoAuthenticator(t *testing.T) {
@@ -83,50 +85,55 @@ func TestAuthenticate(t *testing.T) {
 func TestAuditLogAccess(t *testing.T) {
 	c := qt.New(t)
 
+	_, ofgaClient, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+	c.Assert(err, qt.IsNil)
+
 	now := time.Now().UTC().Round(time.Millisecond)
 	j := &jimm.JIMM{
+		UUID: uuid.NewString(),
 		Database: db.Database{
 			DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
 		},
+		OpenFGAClient: ofgaClient,
 	}
 	ctx := context.Background()
 
-	err := j.Database.Migrate(ctx, false)
+	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
-	adminUser := dbmodel.User{
-		Username:         "alice",
-		ControllerAccess: "superuser",
-	}
-	err = j.Database.GetUser(ctx, &adminUser)
-	c.Assert(err, qt.Equals, nil)
+	adminUser := openfga.NewUser(&dbmodel.User{Username: "alice"}, j.OpenFGAClient)
+	err = adminUser.SetControllerAccess(ctx, j.ResourceTag(), ofganames.AdministratorRelation)
+	c.Assert(err, qt.IsNil)
 
-	user := dbmodel.User{
-		Username: "bob",
-	}
+	user := openfga.NewUser(&dbmodel.User{Username: "bob"}, j.OpenFGAClient)
 
-	// admin user can grant other users audit log access (even if the
-	// user does not exist yet).
-	err = j.GrantAuditLogAccess(ctx, &adminUser, user.ResourceTag())
-	c.Assert(err, qt.Equals, nil)
+	// admin user can grant other users audit log access.
+	err = j.GrantAuditLogAccess(ctx, adminUser, user.ResourceTag())
+	c.Assert(err, qt.IsNil)
 
-	err = j.Database.GetUser(ctx, &user)
-	c.Assert(err, qt.Equals, nil)
-	c.Assert(user.AuditLogAccess, qt.Equals, "read")
+	access := user.GetControllerAuditLogViewerAccess(ctx, j.ResourceTag())
+	c.Assert(access, qt.Equals, ofganames.AuditLogViewerRelation)
+
+	// re-granting access does not result in error.
+	err = j.GrantAuditLogAccess(ctx, adminUser, user.ResourceTag())
+	c.Assert(err, qt.IsNil)
 
 	// admin user can revoke other users audit log access.
-	err = j.RevokeAuditLogAccess(ctx, &adminUser, user.ResourceTag())
-	c.Assert(err, qt.Equals, nil)
+	err = j.RevokeAuditLogAccess(ctx, adminUser, user.ResourceTag())
+	c.Assert(err, qt.IsNil)
 
-	err = j.Database.GetUser(ctx, &user)
-	c.Assert(err, qt.Equals, nil)
-	c.Assert(user.AuditLogAccess, qt.Equals, "")
+	access = user.GetControllerAuditLogViewerAccess(ctx, j.ResourceTag())
+	c.Assert(access, qt.Equals, ofganames.NoRelation)
 
-	// non-admin user cannot grant/revoken audt log access
-	err = j.GrantAuditLogAccess(ctx, &user, adminUser.ResourceTag())
+	// re-revoking access does not result in error.
+	err = j.RevokeAuditLogAccess(ctx, adminUser, user.ResourceTag())
+	c.Assert(err, qt.IsNil)
+
+	// non-admin user cannot grant audit log access
+	err = j.GrantAuditLogAccess(ctx, user, adminUser.ResourceTag())
 	c.Assert(err, qt.ErrorMatches, "unauthorized")
 
-	// admin user can revoke other users audit log access.
-	err = j.RevokeAuditLogAccess(ctx, &user, adminUser.ResourceTag())
+	// non-admin user cannot revoke audit log access
+	err = j.RevokeAuditLogAccess(ctx, user, adminUser.ResourceTag())
 	c.Assert(err, qt.ErrorMatches, "unauthorized")
 }
