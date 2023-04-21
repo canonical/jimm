@@ -101,7 +101,7 @@ func (j *JIMM) RevokeAuditLogAccess(ctx context.Context, user *openfga.User, tar
 		return errors.E(op, err)
 	}
 
-	err = openfga.NewUser(targetUser, j.OpenFGAClient).UnsetControllerAccess(ctx, j.ResourceTag(), ofganames.AuditLogViewerRelation)
+	err = openfga.NewUser(targetUser, j.OpenFGAClient).UnsetControllerAuditLogViewerAccess(ctx, j.ResourceTag())
 	if err != nil {
 		return errors.E(op, err)
 	}
