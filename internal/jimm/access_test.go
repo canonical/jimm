@@ -77,7 +77,7 @@ func TestAuditLogAccess(t *testing.T) {
 	err = j.GrantAuditLogAccess(ctx, adminUser, user.ResourceTag())
 	c.Assert(err, qt.IsNil)
 
-	access := user.GetControllerAuditLogViewerAccess(ctx, j.ResourceTag())
+	access := user.GetAuditLogViewerAccess(ctx, j.ResourceTag())
 	c.Assert(access, qt.Equals, ofganames.AuditLogViewerRelation)
 
 	// re-granting access does not result in error.
@@ -88,7 +88,7 @@ func TestAuditLogAccess(t *testing.T) {
 	err = j.RevokeAuditLogAccess(ctx, adminUser, user.ResourceTag())
 	c.Assert(err, qt.IsNil)
 
-	access = user.GetControllerAuditLogViewerAccess(ctx, j.ResourceTag())
+	access = user.GetAuditLogViewerAccess(ctx, j.ResourceTag())
 	c.Assert(access, qt.Equals, ofganames.NoRelation)
 
 	// re-revoking access does not result in error.

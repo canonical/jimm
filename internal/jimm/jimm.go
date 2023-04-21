@@ -308,7 +308,7 @@ func (j *JIMM) addAuditLogEntry(ale *dbmodel.AuditLogEntry) {
 func (j *JIMM) FindAuditEvents(ctx context.Context, user *openfga.User, filter db.AuditLogFilter) ([]dbmodel.AuditLogEntry, error) {
 	const op = errors.Op("jimm.FindAuditEvents")
 
-	access := user.GetControllerAuditLogViewerAccess(ctx, j.ResourceTag())
+	access := user.GetAuditLogViewerAccess(ctx, j.ResourceTag())
 	if access != ofganames.AuditLogViewerRelation {
 		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}

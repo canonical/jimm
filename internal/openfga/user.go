@@ -101,8 +101,8 @@ func (u *User) GetCloudAccess(ctx context.Context, resource names.CloudTag) ofga
 	return ofganames.NoRelation
 }
 
-// GetControllerAuditLogViewerAccess returns if the user has audit log viewer relation with the given controller.
-func (u *User) GetControllerAuditLogViewerAccess(ctx context.Context, resource names.ControllerTag) ofganames.Relation {
+// GetAuditLogViewerAccess returns if the user has audit log viewer relation with the given controller.
+func (u *User) GetAuditLogViewerAccess(ctx context.Context, resource names.ControllerTag) ofganames.Relation {
 	hasAccess, _, err := checkRelation(ctx, u, resource, ofganames.AuditLogViewerRelation)
 	if err != nil {
 		zapctx.Error(ctx, "openfga check failed", zap.Error(err))
@@ -167,8 +167,8 @@ func (u *User) SetControllerAccess(ctx context.Context, resource names.Controlle
 	return setResourceAccess(ctx, u, resource, relation)
 }
 
-// UnsetControllerAuditLogViewerAccess removes a direct audit log viewer relation between the user and a controller.
-func (u *User) UnsetControllerAuditLogViewerAccess(ctx context.Context, resource names.ControllerTag) error {
+// UnsetAuditLogViewerAccess removes a direct audit log viewer relation between the user and a controller.
+func (u *User) UnsetAuditLogViewerAccess(ctx context.Context, resource names.ControllerTag) error {
 	return unsetResourceAccess(ctx, u, resource, ofganames.AuditLogViewerRelation)
 }
 

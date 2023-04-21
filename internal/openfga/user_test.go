@@ -283,13 +283,13 @@ func (s *userTestSuite) TestControllerAccess(c *gc.C) {
 	relation = aliceUser.GetControllerAccess(ctx, controller)
 	c.Assert(relation, gc.DeepEquals, ofganames.NoRelation)
 
-	relation = aliceUser.GetControllerAuditLogViewerAccess(ctx, controller)
+	relation = aliceUser.GetAuditLogViewerAccess(ctx, controller)
 	c.Assert(relation, gc.DeepEquals, ofganames.AuditLogViewerRelation)
 
 	relation = adamUser.GetControllerAccess(ctx, controller)
 	c.Assert(relation, gc.DeepEquals, ofganames.NoRelation)
 
-	relation = adamUser.GetControllerAuditLogViewerAccess(ctx, controller)
+	relation = adamUser.GetAuditLogViewerAccess(ctx, controller)
 	c.Assert(relation, gc.DeepEquals, ofganames.NoRelation)
 }
 
@@ -322,13 +322,13 @@ func (s *userTestSuite) TestSetControllerAccess(c *gc.C) {
 	relation = aliceUser.GetControllerAccess(ctx, controller)
 	c.Assert(relation, gc.DeepEquals, ofganames.NoRelation)
 
-	relation = aliceUser.GetControllerAuditLogViewerAccess(ctx, controller)
+	relation = aliceUser.GetAuditLogViewerAccess(ctx, controller)
 	c.Assert(relation, gc.DeepEquals, ofganames.AuditLogViewerRelation)
 
 	relation = adamUser.GetControllerAccess(ctx, controller)
 	c.Assert(relation, gc.DeepEquals, ofganames.NoRelation)
 
-	relation = adamUser.GetControllerAuditLogViewerAccess(ctx, controller)
+	relation = adamUser.GetAuditLogViewerAccess(ctx, controller)
 	c.Assert(relation, gc.DeepEquals, ofganames.NoRelation)
 }
 
