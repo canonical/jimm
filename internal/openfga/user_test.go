@@ -227,6 +227,7 @@ func (s *userTestSuite) TestSetCloudAccess(c *gc.C) {
 	err = eveUser.SetCloudAccess(ctx, cloud, ofganames.AdministratorRelation)
 	c.Assert(err, gc.IsNil)
 
+	// re-setting an existing relation should be fine
 	err = eveUser.SetCloudAccess(ctx, cloud, ofganames.AdministratorRelation)
 	c.Assert(err, gc.IsNil)
 
