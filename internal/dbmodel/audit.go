@@ -17,6 +17,21 @@ type AuditLogEntry struct {
 	// Time contains the time that the event happened.
 	Time time.Time `gorm:"index"`
 
+	// ConversationId contains a unique ID per websocket request.
+	ConversationId string `gorm:"index"`
+
+	// MessageId represents the message ID used to correlate request/responses.
+	MessageId int
+
+	// FacadeName contains the request facade name.
+	FacadeName string
+
+	// FacadeMethod contains the specific method to be executed on the facade.
+	FacadeMethod string
+
+	// FacadeVersion contains the requested version for the facade method.
+	FacadeVersion string
+
 	// Tag is the tag of the entity that this audit entry is for.
 	Tag string `gorm:"index"`
 
@@ -26,8 +41,8 @@ type AuditLogEntry struct {
 	// Action is the type of event that this audit entry is for.
 	Action string `gorm:"index"`
 
-	// Success indicates whether the action succeeded, or not.
-	Success bool
+	// Response indicates whether the action was a Response/Request.
+	Response bool
 
 	// Params contains the event-specific params for the audit entry.
 	Params StringMap
@@ -39,15 +54,20 @@ func (AuditLogEntry) TableName() string {
 	return "audit_log"
 }
 
-// ToAPIAuditEvent convers an AuditLogEntry to a JIMM API AuditEvent.
+// ToAPIAuditEvent converts an AuditLogEntry to a JIMM API AuditEvent.
 func (e AuditLogEntry) ToAPIAuditEvent() apiparams.AuditEvent {
 	var ale apiparams.AuditEvent
 	ale.Time = e.Time
+	ale.ConversationId = e.ConversationId
+	ale.MessageId = e.MessageId
+	ale.FacadeMethod = e.FacadeMethod
+	ale.FacadeName = e.FacadeName
+	ale.FacadeVersion = e.FacadeVersion
 	ale.Tag = e.Tag
 	ale.UserTag = e.UserTag
 	ale.Action = e.Action
-	ale.Success = e.Success
-	ale.Params = make(map[string]string)
+	ale.Response = e.Response
+	ale.Params = make(map[string]string, len(e.Params))
 	for k, v := range e.Params {
 		ale.Params[k] = v
 	}

@@ -93,6 +93,21 @@ type AuditEvent struct {
 	// Time is the time of the audit event.
 	Time time.Time `json:"time"`
 
+	// ConversationId contains a unique ID per websocket request.
+	ConversationId string `json:"conversation-id"`
+
+	// messageId represents the message ID used to correlate request/responses.
+	MessageId int
+
+	// FacadeName contains the request facade name.
+	FacadeName string `json:"facade-name"`
+
+	// FacadeMethod contains the specific method to be executed on the facade.
+	FacadeMethod string `json:"facade-method"`
+
+	// FacadeVersion contains the requested version for the facade method.
+	FacadeVersion string `json:"facade-version"`
+
 	// Tag contains the tag of the entity the event is for.
 	Tag string `json:"tag"`
 
@@ -103,8 +118,8 @@ type AuditEvent struct {
 	// Action contains the action that occured on the entity.
 	Action string `json:"action"`
 
-	// Success indicates whether the action succeeded, or not.
-	Success bool `json:"success"`
+	// Response indicates whether the message is a request/response.
+	Response bool `json:"response"`
 
 	// Params contains additional details for the audit entry. The contents
 	// will vary depending on the action and the entity.
