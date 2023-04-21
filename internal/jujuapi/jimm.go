@@ -378,14 +378,9 @@ func (r *controllerRoot) FindAuditEvents(ctx context.Context, req apiparams.Find
 func (r *controllerRoot) GrantAuditLogAccess(ctx context.Context, req apiparams.AuditLogAccessRequest) error {
 	const op = errors.Op("jujuapi.GrantAuditLogAccess")
 
-	_, err := parseUserTag(req.UserTag)
+	ut, err := parseUserTag(req.UserTag)
 	if err != nil {
-		return errors.E(op, err, errors.CodeBadRequest)
-	}
-
-	ut, err := names.ParseUserTag(req.UserTag)
-	if err != nil {
-		return errors.E(op, errors.CodeBadRequest, "invalid user tag")
+		return errors.E(op, err, errors.CodeBadRequest, "invalid user tag")
 	}
 
 	err = r.jimm.GrantAuditLogAccess(ctx, r.user, ut)
@@ -401,14 +396,9 @@ func (r *controllerRoot) GrantAuditLogAccess(ctx context.Context, req apiparams.
 func (r *controllerRoot) RevokeAuditLogAccess(ctx context.Context, req apiparams.AuditLogAccessRequest) error {
 	const op = errors.Op("jujuapi.RevokeAuditLogAccess")
 
-	_, err := parseUserTag(req.UserTag)
+	ut, err := parseUserTag(req.UserTag)
 	if err != nil {
-		return errors.E(op, err, errors.CodeBadRequest)
-	}
-
-	ut, err := names.ParseUserTag(req.UserTag)
-	if err != nil {
-		return errors.E(op, errors.CodeBadRequest, "invalid user tag")
+		return errors.E(op, err, errors.CodeBadRequest, "invalid user tag")
 	}
 
 	err = r.jimm.RevokeAuditLogAccess(ctx, r.user, ut)
