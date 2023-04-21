@@ -6,13 +6,11 @@ import (
 	"context"
 
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
 
 	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/openfga"
-	ofganames "github.com/CanonicalLtd/jimm/internal/openfga/names"
 )
 
 // Authenticate processes the given LoginRequest using the configured
@@ -60,50 +58,4 @@ func (j *JIMM) Authenticate(ctx context.Context, req *jujuparams.LoginRequest) (
 		return nil, errors.E(op, err)
 	}
 	return u, nil
-}
-
-// GrantAuditLogAccess grants audit log access for the target user.
-func (j *JIMM) GrantAuditLogAccess(ctx context.Context, user *openfga.User, targetUserTag names.UserTag) error {
-	const op = errors.Op("jimm.GrantAuditLogAccess")
-
-	access := user.GetControllerAccess(ctx, j.ResourceTag())
-	if access != ofganames.AdministratorRelation {
-		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
-	}
-
-	targetUser := &dbmodel.User{}
-	targetUser.SetTag(targetUserTag)
-	err := j.Database.GetUser(ctx, targetUser)
-	if err != nil {
-		return errors.E(op, err)
-	}
-
-	err = openfga.NewUser(targetUser, j.OpenFGAClient).SetControllerAccess(ctx, j.ResourceTag(), ofganames.AuditLogViewerRelation)
-	if err != nil {
-		return errors.E(op, err)
-	}
-	return nil
-}
-
-// RevokeAuditLogAccess revokes audit log access for the target user.
-func (j *JIMM) RevokeAuditLogAccess(ctx context.Context, user *openfga.User, targetUserTag names.UserTag) error {
-	const op = errors.Op("jimm.RevokeAuditLogAccess")
-
-	access := user.GetControllerAccess(ctx, j.ResourceTag())
-	if access != ofganames.AdministratorRelation {
-		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
-	}
-
-	targetUser := &dbmodel.User{}
-	targetUser.SetTag(targetUserTag)
-	err := j.Database.GetUser(ctx, targetUser)
-	if err != nil {
-		return errors.E(op, err)
-	}
-
-	err = openfga.NewUser(targetUser, j.OpenFGAClient).UnsetControllerAuditLogViewerAccess(ctx, j.ResourceTag())
-	if err != nil {
-		return errors.E(op, err)
-	}
-	return nil
 }

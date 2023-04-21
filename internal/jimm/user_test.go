@@ -9,7 +9,6 @@ import (
 	"time"
 
 	qt "github.com/frankban/quicktest"
-	"github.com/google/uuid"
 	jujuparams "github.com/juju/juju/rpc/params"
 
 	"github.com/CanonicalLtd/jimm/internal/db"
@@ -18,7 +17,6 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/jimm"
 	"github.com/CanonicalLtd/jimm/internal/jimmtest"
 	openfga "github.com/CanonicalLtd/jimm/internal/openfga"
-	ofganames "github.com/CanonicalLtd/jimm/internal/openfga/names"
 )
 
 func TestAuthenticateNoAuthenticator(t *testing.T) {
@@ -80,60 +78,4 @@ func TestAuthenticate(t *testing.T) {
 	c.Check(err, qt.ErrorMatches, `test error`)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUnauthorized)
 	c.Check(u, qt.IsNil)
-}
-
-func TestAuditLogAccess(t *testing.T) {
-	c := qt.New(t)
-
-	_, ofgaClient, _, err := jimmtest.SetupTestOFGAClient(c.Name())
-	c.Assert(err, qt.IsNil)
-
-	now := time.Now().UTC().Round(time.Millisecond)
-	j := &jimm.JIMM{
-		UUID: uuid.NewString(),
-		Database: db.Database{
-			DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
-		},
-		OpenFGAClient: ofgaClient,
-	}
-	ctx := context.Background()
-
-	err = j.Database.Migrate(ctx, false)
-	c.Assert(err, qt.IsNil)
-
-	adminUser := openfga.NewUser(&dbmodel.User{Username: "alice"}, j.OpenFGAClient)
-	err = adminUser.SetControllerAccess(ctx, j.ResourceTag(), ofganames.AdministratorRelation)
-	c.Assert(err, qt.IsNil)
-
-	user := openfga.NewUser(&dbmodel.User{Username: "bob"}, j.OpenFGAClient)
-
-	// admin user can grant other users audit log access.
-	err = j.GrantAuditLogAccess(ctx, adminUser, user.ResourceTag())
-	c.Assert(err, qt.IsNil)
-
-	access := user.GetControllerAuditLogViewerAccess(ctx, j.ResourceTag())
-	c.Assert(access, qt.Equals, ofganames.AuditLogViewerRelation)
-
-	// re-granting access does not result in error.
-	err = j.GrantAuditLogAccess(ctx, adminUser, user.ResourceTag())
-	c.Assert(err, qt.IsNil)
-
-	// admin user can revoke other users audit log access.
-	err = j.RevokeAuditLogAccess(ctx, adminUser, user.ResourceTag())
-	c.Assert(err, qt.IsNil)
-
-	access = user.GetControllerAuditLogViewerAccess(ctx, j.ResourceTag())
-	c.Assert(access, qt.Equals, ofganames.NoRelation)
-
-	// re-revoking access does not result in error.
-	err = j.RevokeAuditLogAccess(ctx, adminUser, user.ResourceTag())
-	c.Assert(err, qt.IsNil)
-
-	// non-admin user cannot grant audit log access
-	err = j.GrantAuditLogAccess(ctx, user, adminUser.ResourceTag())
-	c.Assert(err, qt.ErrorMatches, "unauthorized")
-
-	// non-admin user cannot revoke audit log access
-	err = j.RevokeAuditLogAccess(ctx, user, adminUser.ResourceTag())
-	c.Assert(err, qt.ErrorMatches, "unauthorized")
 }
