@@ -243,6 +243,94 @@ func (s *userTestSuite) TestSetCloudAccess(c *gc.C) {
 	c.Assert(relation, gc.DeepEquals, ofganames.NoRelation)
 }
 
+func (s *userTestSuite) TestControllerAccess(c *gc.C) {
+	ctx := context.Background()
+
+	groupid := "3"
+	group := jimmnames.NewGroupTag(groupid)
+
+	controllerUUID, err := uuid.NewRandom()
+	c.Assert(err, gc.IsNil)
+	controller := names.NewControllerTag(controllerUUID.String())
+
+	eve := names.NewUserTag("eve")
+	alice := names.NewUserTag("alice")
+
+	tuples := []ofga.Tuple{{
+		Object:   ofganames.ConvertTag(eve),
+		Relation: ofganames.MemberRelation,
+		Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(groupid)),
+	}, {
+		Object:   ofganames.ConvertTagWithRelation(group, ofganames.MemberRelation),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(controller),
+	}, {
+		Object:   ofganames.ConvertTag(alice),
+		Relation: ofganames.AuditLogViewerRelation,
+		Target:   ofganames.ConvertTag(controller),
+	}}
+	err = s.ofgaClient.AddRelations(ctx, tuples...)
+	c.Assert(err, gc.IsNil)
+
+	adamUser := ofga.NewUser(&dbmodel.User{Username: "adam"}, s.ofgaClient)
+	eveUser := ofga.NewUser(&dbmodel.User{Username: eve.Id()}, s.ofgaClient)
+	aliceUser := ofga.NewUser(&dbmodel.User{Username: alice.Id()}, s.ofgaClient)
+
+	relation := eveUser.GetControllerAccess(ctx, controller)
+	c.Assert(relation, gc.DeepEquals, ofganames.AdministratorRelation)
+
+	relation = aliceUser.GetControllerAccess(ctx, controller)
+	c.Assert(relation, gc.DeepEquals, ofganames.NoRelation)
+
+	relation = aliceUser.GetControllerAuditLogViewerAccess(ctx, controller)
+	c.Assert(relation, gc.DeepEquals, ofganames.AuditLogViewerRelation)
+
+	relation = adamUser.GetControllerAccess(ctx, controller)
+	c.Assert(relation, gc.DeepEquals, ofganames.NoRelation)
+
+	relation = adamUser.GetControllerAuditLogViewerAccess(ctx, controller)
+	c.Assert(relation, gc.DeepEquals, ofganames.NoRelation)
+}
+
+func (s *userTestSuite) TestSetControllerAccess(c *gc.C) {
+	ctx := context.Background()
+	controllerUUID, err := uuid.NewRandom()
+	c.Assert(err, gc.IsNil)
+	controller := names.NewControllerTag(controllerUUID.String())
+
+	eve := names.NewUserTag("eve")
+	alice := names.NewUserTag("alice")
+
+	adamUser := ofga.NewUser(&dbmodel.User{Username: "adam"}, s.ofgaClient)
+	eveUser := ofga.NewUser(&dbmodel.User{Username: eve.Id()}, s.ofgaClient)
+	aliceUser := ofga.NewUser(&dbmodel.User{Username: alice.Id()}, s.ofgaClient)
+
+	err = eveUser.SetControllerAccess(ctx, controller, ofganames.AdministratorRelation)
+	c.Assert(err, gc.IsNil)
+
+	// re-setting an existing relation should be fine
+	err = eveUser.SetControllerAccess(ctx, controller, ofganames.AdministratorRelation)
+	c.Assert(err, gc.IsNil)
+
+	err = aliceUser.SetControllerAccess(ctx, controller, ofganames.AuditLogViewerRelation)
+	c.Assert(err, gc.IsNil)
+
+	relation := eveUser.GetControllerAccess(ctx, controller)
+	c.Assert(relation, gc.DeepEquals, ofganames.AdministratorRelation)
+
+	relation = aliceUser.GetControllerAccess(ctx, controller)
+	c.Assert(relation, gc.DeepEquals, ofganames.NoRelation)
+
+	relation = aliceUser.GetControllerAuditLogViewerAccess(ctx, controller)
+	c.Assert(relation, gc.DeepEquals, ofganames.AuditLogViewerRelation)
+
+	relation = adamUser.GetControllerAccess(ctx, controller)
+	c.Assert(relation, gc.DeepEquals, ofganames.NoRelation)
+
+	relation = adamUser.GetControllerAuditLogViewerAccess(ctx, controller)
+	c.Assert(relation, gc.DeepEquals, ofganames.NoRelation)
+}
+
 func (s *userTestSuite) TestListRelatedUsers(c *gc.C) {
 	ctx := context.Background()
 
