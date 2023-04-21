@@ -48,25 +48,47 @@ The `request name` represents the literal WS endpoint, i.e., `API = /api`.
 
 
 # Q/A Using jimmctl
+
+## Prerequisited
+
+1. Make sure you are using latest juju from their develop branch (at the moment, we're using 3.2-beta1).
+2. change jujuClientVersion in `internal/jujuclient/dial.go` to **3.2-beta1** by running: ``sed -i 's/jujuClientVersion = "2.9.42"/jujuClientVersion = "3.2-beta1"/g' ./internal/jujuclient/dial.go``
+
 Steps:
 
 Manual:
-0. `juju unregister jimm-dev`                                       - Unregister any other local JIMM you have.
-1. `juju login jimm.localhost -c jimm-dev`                          - Login to local JIMM. You don't have to do this, you will be logged in automatically.
-2. `juju bootstrap microk8s qa-controller`                          - Bootstrap a Q/A controller.
-3. `go build ./cmd/jimmctl`                                         - Build CLI tool.
-4. `juju switch jimm-dev`                                           - Switch back to JIMM controller.
+1. `juju unregister jimm-dev`                                       - Unregister any other local JIMM you have.
+2. `juju login jimm.localhost -c jimm-dev`                          - Login to local JIMM. You don't have to do this, you will be logged in automatically.
+3. `juju bootstrap localhost qa-controller --config allow-model-access=true --config login-token-refresh-url=https://jimm.localhost`                          - Bootstrap a Q/A controller.
+   1. run `lxc list` to name of the machine running the juju controller, this will resemble "juju-d5ede3-0"
+   2. export name of the machine using `export TEST_JUJU_CTRL=<instance-name>`
+   3. create a proxy on the controller machine that will enable controller to reach jimm by running `lxc config device add "${TEST_JUJU_CTRL}" myproxy proxy listen=tcp:0.0.0.0:443 connect=tcp:127.0.0.1:443 bind=instance`
+   4. we also need to push the CA cert that was used to create JIMM's certificate to the machine by running `lxc file push local/traefik/certs/ca.crt "${TEST_JUJU_CTRL}"/usr/local/share/ca-certificates/`
+   5. now go into the controller `lxc shell "${TEST_JUJU_CTRL}"`
+   6. and run `update-ca-certificates` to update machine's CA certs
+   7. we also want to add an entry to `/etc/hosts` that will allow the controller to correctly resolve `jimm.localhost` and use the proxy we created in step 3. Run `echo "127.0.0.1 jimm.localhost" >> /etc/hosts`
+   8. next we need to start and stop the controller by running `lxc stop "${TEST_JUJU_CTRL}"` and then `lxc start "${TEST_JUJU_CTRL}"` because controller fetches the jwks from jimm on startup at which point the proxy had not yet been set up.
+4. `go build ./cmd/jimmctl`     
 5. `./jimmctl controller-info qa-controller ./qa-controller.yaml`   - Get Q/A controller info.
-5.1. Modify qa-controller.yaml public address to "juju-apiserver:17070"
-5.2. Run `docker compose exec -it jimm bash` and update the /etc/hosts to have the api-addresses point to "juju-apiserver"
-6. `./jimmctl add-controller ./qa-controller.yaml`                  - Add Q/A controller to JIMM.
-7. `juju update-credentials microk8s --controller jimm-dev`         - Add client credentials for qa-controller's cloud (microk8s) to JIMM's controller credential list. 
-8. `juju add-model test`                                            - Adds a model to qa-controller via JIMM.
+   1. Modify qa-controller.yaml public address to "juju-apiserver:17070"
+   2. Run `docker compose exec -it jimm bash` and update the /etc/hosts to have the api-addresses point to "juju-apiserver"                                    - Build CLI tool.
+6. `juju switch jimm-dev`                                           - Switch back to JIMM controller.
+7. `./jimmctl add-controller ./qa-controller.yaml`                  - Add Q/A controller to JIMM.
+8. `juju update-credentials localhost --controller jimm-dev`         - Add client credentials for qa-controller's cloud (localhost) to JIMM's controller credential list. 
+9. `juju add-model test`                                            - Adds a model to qa-controller via JIMM.
 
 Semi-automated:
 0. `juju unregister jimm-dev`                                       - Unregister any other local JIMM you have.
 1. `juju login jimm.localhost -c jimm-dev`                          - Login to local JIMM. (If you name the controller jimm-dev, the script will pick it up!)
-2. `juju bootstrap microk8s qa-controller`                          - Bootstrap a Q/A controller. (If you name the controller qa-controller and the cloud is microk8s, the script will pick it up!)
+2. `juju bootstrap localhost qa-controller --config allow-model-access=true --config login-token-refresh-url=https://jimm.localhost`                          - - Bootstrap a Q/A controller. (If you name the controller qa-controller and the cloud is lxd or microk8s, the script will pick it up!)
+   1. run `lxc list` to name of the machine running the juju controller, this will resemble "juju-d5ede3-0"
+   2. export name of the machine using `export TEST_JUJU_CTRL=<instance-name>`
+   3. create a proxy on the controller machine that will enable controller to reach jimm by running `lxc config device add "${TEST_JUJU_CTRL}" myproxy proxy listen=tcp:0.0.0.0:443 connect=tcp:127.0.0.1:443 bind=instance`
+   4. we also need to push the CA cert that was used to create JIMM's certificate to the machine by running `lxc file push local/traefik/certs/ca.crt "${TEST_JUJU_CTRL}"/usr/local/share/ca-certificates/`
+   5. now go into the controller `lxc shell "${TEST_JUJU_CTRL}"`
+   6. and run `update-ca-certificates` to update machine's CA certs
+   7. we also want to add an entry to `/etc/hosts` that will allow the controller to correctly resolve `jimm.localhost` and use the proxy we created in step 3. Run `echo "127.0.0.1 jimm.localhost" >> /etc/hosts`
+   8. next we need to start and stop the controller by running `lxc stop "${TEST_JUJU_CTRL}"` and then `lxc start "${TEST_JUJU_CTRL}"` because controller fetches the jwks from jimm on startup at which point the proxy had not yet been set up.
 3. `./local/jimm/add-controller.sh`                                 - A local script to do many of the manual steps for us. See script for more details.
 4. `juju add-model test`                                            - Adds a model to qa-controller via JIMM.
 

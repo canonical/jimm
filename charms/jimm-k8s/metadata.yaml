@@ -33,6 +33,9 @@ requires:
   certificates:
     interface: tls-certificates
     limit: 1
+  vault:
+    interface: vault-kv
+    optional: true
 
 containers:
   jimm:
