@@ -33,7 +33,7 @@ import (
 	ofganames "github.com/CanonicalLtd/jimm/internal/openfga/names"
 )
 
-const jujuVersion = "2.9.43"
+const jujuVersion = "3.2-beta2"
 
 type modelManagerSuite struct {
 	websocketSuite
@@ -61,7 +61,7 @@ func (s *modelManagerSuite) TestListModelSummaries(c *gc.C) {
 		UUID:            s.Model.UUID.String,
 		ControllerUUID:  "914487b5-60e7-42bb-bd63-1adc3fd3a388",
 		ProviderType:    jimmtest.TestProviderType,
-		DefaultSeries:   "focal",
+		DefaultSeries:   "jammy",
 		Cloud:           jimmtest.TestCloudName,
 		CloudRegion:     jimmtest.TestCloudRegionName,
 		CloudCredential: jimmtest.TestCloudName + "/bob@external/cred",
@@ -92,7 +92,7 @@ func (s *modelManagerSuite) TestListModelSummaries(c *gc.C) {
 		UUID:            s.Model3.UUID.String,
 		ControllerUUID:  "914487b5-60e7-42bb-bd63-1adc3fd3a388",
 		ProviderType:    jimmtest.TestProviderType,
-		DefaultSeries:   "focal",
+		DefaultSeries:   "jammy",
 		Cloud:           jimmtest.TestCloudName,
 		CloudRegion:     jimmtest.TestCloudRegionName,
 		CloudCredential: jimmtest.TestCloudName + "/charlie@external/cred",
@@ -164,7 +164,7 @@ func (s *modelManagerSuite) TestListModelSummariesWithoutControllerUUIDMasking(c
 		UUID:            s.Model.UUID.String,
 		ControllerUUID:  "deadbeef-1bad-500d-9000-4b1d0d06f00d",
 		ProviderType:    jimmtest.TestProviderType,
-		DefaultSeries:   "focal",
+		DefaultSeries:   "jammy",
 		Cloud:           jimmtest.TestCloudName,
 		CloudRegion:     jimmtest.TestCloudRegionName,
 		CloudCredential: jimmtest.TestCloudName + "/bob@external/cred",
@@ -195,7 +195,7 @@ func (s *modelManagerSuite) TestListModelSummariesWithoutControllerUUIDMasking(c
 		UUID:            s.Model3.UUID.String,
 		ControllerUUID:  "deadbeef-1bad-500d-9000-4b1d0d06f00d",
 		ProviderType:    jimmtest.TestProviderType,
-		DefaultSeries:   "focal",
+		DefaultSeries:   "jammy",
 		Cloud:           jimmtest.TestCloudName,
 		CloudRegion:     jimmtest.TestCloudRegionName,
 		CloudCredential: jimmtest.TestCloudName + "/charlie@external/cred",
@@ -316,6 +316,7 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 		Result: &jujuparams.ModelInfo{
 			Name:               "model-1",
 			UUID:               s.Model.UUID.String,
+			DefaultBase:        "ubuntu@22.04/stable",
 			ControllerUUID:     "914487b5-60e7-42bb-bd63-1adc3fd3a388",
 			ProviderType:       jimmtest.TestProviderType,
 			CloudTag:           names.NewCloudTag(jimmtest.TestCloudName).String(),
@@ -354,6 +355,7 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 		Result: &jujuparams.ModelInfo{
 			Name:               "model-3",
 			UUID:               s.Model3.UUID.String,
+			DefaultBase:        "ubuntu@22.04/stable",
 			ControllerUUID:     "914487b5-60e7-42bb-bd63-1adc3fd3a388",
 			ProviderType:       jimmtest.TestProviderType,
 			CloudTag:           names.NewCloudTag(jimmtest.TestCloudName).String(),
@@ -384,6 +386,7 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 		Result: &jujuparams.ModelInfo{
 			Name:               "model-4",
 			UUID:               mt4.Id(),
+			DefaultBase:        "ubuntu@22.04/stable",
 			ControllerUUID:     "914487b5-60e7-42bb-bd63-1adc3fd3a388",
 			ProviderType:       jimmtest.TestProviderType,
 			CloudTag:           names.NewCloudTag(jimmtest.TestCloudName).String(),
@@ -435,6 +438,7 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 		Result: &jujuparams.ModelInfo{
 			Name:               "model-5",
 			UUID:               mt5.Id(),
+			DefaultBase:        "ubuntu@22.04/stable",
 			ControllerUUID:     "914487b5-60e7-42bb-bd63-1adc3fd3a388",
 			ProviderType:       jimmtest.TestProviderType,
 			CloudTag:           names.NewCloudTag(jimmtest.TestCloudName).String(),
@@ -542,6 +546,7 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 		Result: &jujuparams.ModelInfo{
 			Name:               "model-1",
 			UUID:               s.Model.UUID.String,
+			DefaultBase:        "ubuntu@22.04/stable",
 			ControllerUUID:     "deadbeef-1bad-500d-9000-4b1d0d06f00d",
 			ProviderType:       jimmtest.TestProviderType,
 			CloudTag:           names.NewCloudTag(jimmtest.TestCloudName).String(),
@@ -575,6 +580,7 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 		Result: &jujuparams.ModelInfo{
 			Name:               "model-2",
 			UUID:               s.Model2.UUID.String,
+			DefaultBase:        "ubuntu@22.04/stable",
 			ControllerUUID:     "deadbeef-1bad-500d-9000-4b1d0d06f00d",
 			ProviderType:       jimmtest.TestProviderType,
 			CloudTag:           names.NewCloudTag(jimmtest.TestCloudName).String(),
@@ -611,6 +617,7 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 		Result: &jujuparams.ModelInfo{
 			Name:               "model-3",
 			UUID:               s.Model3.UUID.String,
+			DefaultBase:        "ubuntu@22.04/stable",
 			ControllerUUID:     "deadbeef-1bad-500d-9000-4b1d0d06f00d",
 			ProviderType:       jimmtest.TestProviderType,
 			CloudTag:           names.NewCloudTag(jimmtest.TestCloudName).String(),
@@ -668,6 +675,7 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 		Result: &jujuparams.ModelInfo{
 			Name:               "model-4",
 			UUID:               mt4.Id(),
+			DefaultBase:        "ubuntu@22.04/stable",
 			ControllerUUID:     "deadbeef-1bad-500d-9000-4b1d0d06f00d",
 			ProviderType:       jimmtest.TestProviderType,
 			CloudTag:           names.NewCloudTag(jimmtest.TestCloudName).String(),
@@ -725,6 +733,7 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 		Result: &jujuparams.ModelInfo{
 			Name:               "model-5",
 			UUID:               mt5.Id(),
+			DefaultBase:        "ubuntu@22.04/stable",
 			ControllerUUID:     "deadbeef-1bad-500d-9000-4b1d0d06f00d",
 			ProviderType:       jimmtest.TestProviderType,
 			CloudTag:           names.NewCloudTag(jimmtest.TestCloudName).String(),
@@ -1217,6 +1226,7 @@ func (s *modelManagerSuite) TestChangeModelCredentialLocalUserCredential(c *gc.C
 }
 
 func (s *modelManagerSuite) TestValidateModelUpgrades(c *gc.C) {
+	c.Skip("3.2 no longer implements ValidateModelUpgrade")
 	conn := s.open(c, nil, "alice@external")
 	defer conn.Close()
 
@@ -1396,7 +1406,7 @@ func (s *caasModelManagerSuite) TestListCAASModelSummaries(c *gc.C) {
 		UUID:            mi.UUID,
 		ControllerUUID:  "914487b5-60e7-42bb-bd63-1adc3fd3a388",
 		ProviderType:    "kubernetes",
-		DefaultSeries:   "focal",
+		DefaultSeries:   "jammy",
 		Cloud:           "bob-cloud",
 		CloudRegion:     "default",
 		CloudCredential: s.cred.Id(),
@@ -1428,7 +1438,7 @@ func (s *caasModelManagerSuite) TestListCAASModelSummaries(c *gc.C) {
 		Type:            "iaas",
 		ControllerUUID:  "914487b5-60e7-42bb-bd63-1adc3fd3a388",
 		ProviderType:    jimmtest.TestProviderType,
-		DefaultSeries:   "focal",
+		DefaultSeries:   "jammy",
 		Cloud:           jimmtest.TestCloudName,
 		CloudRegion:     jimmtest.TestCloudRegionName,
 		CloudCredential: jimmtest.TestCloudName + "/bob@external/cred",
@@ -1450,7 +1460,7 @@ func (s *caasModelManagerSuite) TestListCAASModelSummaries(c *gc.C) {
 		Type:            "iaas",
 		ControllerUUID:  "914487b5-60e7-42bb-bd63-1adc3fd3a388",
 		ProviderType:    jimmtest.TestProviderType,
-		DefaultSeries:   "focal",
+		DefaultSeries:   "jammy",
 		Cloud:           jimmtest.TestCloudName,
 		CloudRegion:     jimmtest.TestCloudRegionName,
 		CloudCredential: jimmtest.TestCloudName + "/charlie@external/cred",
