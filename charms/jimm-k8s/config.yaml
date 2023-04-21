@@ -50,15 +50,6 @@ options:
   uuid:
     type: string
     description: The UUID advertised by the JIMM controller.
-  vault-url:
-    type: string
-    description: Vault URL.
-  vault-role-id:
-    type: string
-    description: Vault Role ID.
-  vault-token:
-    type: string
-    description: Vault Token.
   juju-dashboard-location:
     type: string
     default: https://jaas.ai/models
