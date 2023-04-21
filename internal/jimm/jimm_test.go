@@ -39,29 +39,35 @@ func TestFindAuditEvents(t *testing.T) {
 		OpenFGAClient: client,
 	}
 
-	err = j.Database.Migrate(context.Background(), true)
+	ctx := context.Background()
+
+	err = j.Database.Migrate(ctx, true)
 	c.Assert(err, qt.Equals, nil)
 
-	users := []dbmodel.User{{
-		Username:         "alice@external",
-		ControllerAccess: "superuser",
-	}, {
-		Username: "eve@external",
-	}}
-	for i := range users {
-		c.Assert(j.Database.DB.Create(&users[i]).Error, qt.IsNil)
+	admin := openfga.NewUser(&dbmodel.User{Username: "alice@external"}, client)
+	err = admin.SetControllerAccess(ctx, j.ResourceTag(), ofganames.AdministratorRelation)
+	c.Assert(err, qt.IsNil)
 
-		if users[i].ControllerAccess == "superuser" {
-			u := openfga.NewUser(&users[i], client)
-			err := u.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
-			c.Assert(err, qt.IsNil)
-		}
-	}
+	privileged := openfga.NewUser(&dbmodel.User{Username: "bob@external"}, client)
+	err = privileged.SetControllerAccess(ctx, j.ResourceTag(), ofganames.AuditLogViewerRelation)
+	c.Assert(err, qt.IsNil)
+
+	unprivileged := openfga.NewUser(&dbmodel.User{Username: "eve@external"}, client)
+
+	// for i := range users {
+	// 	c.Assert(j.Database.DB.Create(&users[i]).Error, qt.IsNil)
+
+	// 	if users[i].ControllerAccess == "superuser" {
+	// 		u := openfga.NewUser(&users[i], client)
+	// 		err := u.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
+	// 		c.Assert(err, qt.IsNil)
+	// 	}
+	// }
 
 	events := []dbmodel.AuditLogEntry{{
 		Time:    now,
 		Tag:     "tag-1",
-		UserTag: users[0].Tag().String(),
+		UserTag: admin.User.Tag().String(),
 		Action:  "test-action-1",
 		Success: true,
 		Params: map[string]string{
@@ -71,7 +77,7 @@ func TestFindAuditEvents(t *testing.T) {
 	}, {
 		Time:    now.Add(time.Hour),
 		Tag:     "tag-2",
-		UserTag: users[0].Tag().String(),
+		UserTag: admin.User.Tag().String(),
 		Action:  "test-action-2",
 		Success: true,
 		Params: map[string]string{
@@ -81,7 +87,7 @@ func TestFindAuditEvents(t *testing.T) {
 	}, {
 		Time:    now.Add(2 * time.Hour),
 		Tag:     "tag-1",
-		UserTag: users[1].Tag().String(),
+		UserTag: privileged.User.Tag().String(),
 		Action:  "test-action-3",
 		Success: true,
 		Params: map[string]string{
@@ -91,7 +97,7 @@ func TestFindAuditEvents(t *testing.T) {
 	}, {
 		Time:    now.Add(3 * time.Hour),
 		Tag:     "tag-2",
-		UserTag: users[1].Tag().String(),
+		UserTag: privileged.User.Tag().String(),
 		Action:  "test-action-2",
 		Success: true,
 		Params: map[string]string{
@@ -107,41 +113,41 @@ func TestFindAuditEvents(t *testing.T) {
 
 	tests := []struct {
 		about          string
-		user           *dbmodel.User
+		users          []*openfga.User
 		filter         db.AuditLogFilter
 		expectedEvents []dbmodel.AuditLogEntry
 		expectedError  string
 	}{{
-		about: "superuser is allower to find audit events by time",
-		user:  &users[0],
+		about: "admin/privileged user is allowed to find audit events by time",
+		users: []*openfga.User{admin, privileged},
 		filter: db.AuditLogFilter{
 			Start: now.Add(-time.Hour),
 			End:   now.Add(time.Minute),
 		},
 		expectedEvents: []dbmodel.AuditLogEntry{events[0]},
 	}, {
-		about: "superuser is allower to find audit events by action",
-		user:  &users[0],
+		about: "admin/privileged user is allowed to find audit events by action",
+		users: []*openfga.User{admin, privileged},
 		filter: db.AuditLogFilter{
 			Action: "test-action-2",
 		},
 		expectedEvents: []dbmodel.AuditLogEntry{events[1], events[3]},
 	}, {
-		about: "superuser is allower to find audit events by tag",
-		user:  &users[0],
+		about: "admin/privileged user is allowed to find audit events by tag",
+		users: []*openfga.User{admin, privileged},
 		filter: db.AuditLogFilter{
 			Tag: "tag-1",
 		},
 		expectedEvents: []dbmodel.AuditLogEntry{events[0], events[2]},
 	}, {
-		about: "superuser - no events found",
-		user:  &users[0],
+		about: "admin/privileged user - no events found",
+		users: []*openfga.User{admin, privileged},
 		filter: db.AuditLogFilter{
 			Tag: "no-such-tag",
 		},
 	}, {
-		about: "user is not allowed to access audit events",
-		user:  &users[1],
+		about: "unprivileged user is not allowed to access audit events",
+		users: []*openfga.User{unprivileged},
 		filter: db.AuditLogFilter{
 			Tag: "tag-1",
 		},
@@ -149,12 +155,14 @@ func TestFindAuditEvents(t *testing.T) {
 	}}
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
-			events, err := j.FindAuditEvents(context.Background(), openfga.NewUser(test.user, client), test.filter)
-			if test.expectedError != "" {
-				c.Assert(err, qt.ErrorMatches, test.expectedError)
-			} else {
-				c.Assert(err, qt.Equals, nil)
-				c.Assert(events, qt.DeepEquals, test.expectedEvents)
+			for _, user := range test.users {
+				events, err := j.FindAuditEvents(context.Background(), user, test.filter)
+				if test.expectedError != "" {
+					c.Assert(err, qt.ErrorMatches, test.expectedError)
+				} else {
+					c.Assert(err, qt.Equals, nil)
+					c.Assert(events, qt.DeepEquals, test.expectedEvents)
+				}
 			}
 		})
 	}
