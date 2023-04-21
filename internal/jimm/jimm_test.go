@@ -54,16 +54,6 @@ func TestFindAuditEvents(t *testing.T) {
 
 	unprivileged := openfga.NewUser(&dbmodel.User{Username: "eve@external"}, client)
 
-	// for i := range users {
-	// 	c.Assert(j.Database.DB.Create(&users[i]).Error, qt.IsNil)
-
-	// 	if users[i].ControllerAccess == "superuser" {
-	// 		u := openfga.NewUser(&users[i], client)
-	// 		err := u.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
-	// 		c.Assert(err, qt.IsNil)
-	// 	}
-	// }
-
 	events := []dbmodel.AuditLogEntry{{
 		Time:    now,
 		Tag:     "tag-1",
