@@ -101,6 +101,18 @@ func (u *User) GetCloudAccess(ctx context.Context, resource names.CloudTag) ofga
 	return ofganames.NoRelation
 }
 
+func (u *User) GetControllerAuditLogViewerAccess(ctx context.Context, resource names.ControllerTag) ofganames.Relation {
+	hasAccess, _, err := checkRelation(ctx, u, resource, ofganames.AuditLogViewerRelation)
+	if err != nil {
+		zapctx.Error(ctx, "openfga check failed", zap.Error(err))
+		return ofganames.NoRelation
+	}
+	if hasAccess {
+		return ofganames.AuditLogViewerRelation
+	}
+	return ofganames.NoRelation
+}
+
 // GetControllerAccess returns the relation the user has with the specified controller.
 func (u *User) GetControllerAccess(ctx context.Context, resource names.ControllerTag) ofganames.Relation {
 	isAdmin, err := IsAdministrator(ctx, u, resource)
