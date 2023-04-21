@@ -332,6 +332,38 @@ func (s *userTestSuite) TestSetControllerAccess(c *gc.C) {
 	c.Assert(relation, gc.DeepEquals, ofganames.NoRelation)
 }
 
+func (s *userTestSuite) TestUnsetAuditLogViewerAccess(c *gc.C) {
+	ctx := context.Background()
+
+	controllerUUID, err := uuid.NewRandom()
+	c.Assert(err, gc.IsNil)
+	controller := names.NewControllerTag(controllerUUID.String())
+
+	aliceUser := ofga.NewUser(&dbmodel.User{Username: "alice"}, s.ofgaClient)
+
+	tuples := []ofga.Tuple{{
+		Object:   ofganames.ConvertTag(aliceUser.User.ResourceTag()),
+		Relation: ofganames.AuditLogViewerRelation,
+		Target:   ofganames.ConvertTag(controller),
+	}}
+	err = s.ofgaClient.AddRelations(ctx, tuples...)
+	c.Assert(err, gc.IsNil)
+
+	relation := aliceUser.GetAuditLogViewerAccess(ctx, controller)
+	c.Assert(relation, gc.DeepEquals, ofganames.AuditLogViewerRelation)
+
+	// Un-setting audit log viewer relation
+	err = aliceUser.UnsetAuditLogViewerAccess(ctx, controller)
+	c.Assert(err, gc.IsNil)
+
+	relation = aliceUser.GetAuditLogViewerAccess(ctx, controller)
+	c.Assert(relation, gc.DeepEquals, ofganames.NoRelation)
+
+	// Un-setting again should be fine
+	err = aliceUser.UnsetAuditLogViewerAccess(ctx, controller)
+	c.Assert(err, gc.IsNil)
+}
+
 func (s *userTestSuite) TestListRelatedUsers(c *gc.C) {
 	ctx := context.Background()
 
