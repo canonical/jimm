@@ -12,6 +12,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/openfga"
+	ofganames "github.com/CanonicalLtd/jimm/internal/openfga/names"
 )
 
 // Authenticate processes the given LoginRequest using the configured
@@ -62,28 +63,22 @@ func (j *JIMM) Authenticate(ctx context.Context, req *jujuparams.LoginRequest) (
 }
 
 // GrantAuditLogAccess grants audit log access for the target user.
-func (j *JIMM) GrantAuditLogAccess(ctx context.Context, user *dbmodel.User, targetUserTag names.UserTag) error {
+func (j *JIMM) GrantAuditLogAccess(ctx context.Context, user *openfga.User, targetUserTag names.UserTag) error {
 	const op = errors.Op("jimm.GrantAuditLogAccess")
 
-	if user.ControllerAccess != "superuser" {
+	access := user.GetControllerAccess(ctx, j.ResourceTag())
+	if access != ofganames.AdministratorRelation {
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
-	err := j.Database.Transaction(func(db *db.Database) error {
 
-		targetUser := dbmodel.User{}
-		targetUser.SetTag(targetUserTag)
-		err := j.Database.GetUser(ctx, &targetUser)
-		if err != nil {
-			return errors.E(err)
-		}
-		targetUser.AuditLogAccess = "read"
-		err = j.Database.UpdateUser(ctx, &targetUser)
-		if err != nil {
-			return errors.E(err)
-		}
+	targetUser := &dbmodel.User{}
+	targetUser.SetTag(targetUserTag)
+	err := j.Database.GetUser(ctx, targetUser)
+	if err != nil {
+		return errors.E(op, err)
+	}
 
-		return nil
-	})
+	err = openfga.NewUser(targetUser, j.OpenFGAClient).SetControllerAccess(ctx, j.ResourceTag(), ofganames.AuditLogViewerRelation)
 	if err != nil {
 		return errors.E(op, err)
 	}
@@ -91,28 +86,22 @@ func (j *JIMM) GrantAuditLogAccess(ctx context.Context, user *dbmodel.User, targ
 }
 
 // RevokeAuditLogAccess revokes audit log access for the target user.
-func (j *JIMM) RevokeAuditLogAccess(ctx context.Context, user *dbmodel.User, targetUserTag names.UserTag) error {
+func (j *JIMM) RevokeAuditLogAccess(ctx context.Context, user *openfga.User, targetUserTag names.UserTag) error {
 	const op = errors.Op("jimm.RevokeAuditLogAccess")
 
-	if user.ControllerAccess != "superuser" {
+	access := user.GetControllerAccess(ctx, j.ResourceTag())
+	if access != ofganames.AdministratorRelation {
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
-	err := j.Database.Transaction(func(db *db.Database) error {
 
-		targetUser := dbmodel.User{}
-		targetUser.SetTag(targetUserTag)
-		err := j.Database.GetUser(ctx, &targetUser)
-		if err != nil {
-			return errors.E(err)
-		}
-		targetUser.AuditLogAccess = ""
-		err = j.Database.UpdateUser(ctx, &targetUser)
-		if err != nil {
-			return errors.E(err)
-		}
+	targetUser := &dbmodel.User{}
+	targetUser.SetTag(targetUserTag)
+	err := j.Database.GetUser(ctx, targetUser)
+	if err != nil {
+		return errors.E(op, err)
+	}
 
-		return nil
-	})
+	err = openfga.NewUser(targetUser, j.OpenFGAClient).UnsetControllerAccess(ctx, j.ResourceTag(), ofganames.AuditLogViewerRelation)
 	if err != nil {
 		return errors.E(op, err)
 	}
