@@ -166,6 +166,11 @@ func (u *User) SetControllerAccess(ctx context.Context, resource names.Controlle
 	return setResourceAccess(ctx, u, resource, relation)
 }
 
+// UnsetControllerAccess removes a direct relation between the user and a controller.
+func (u *User) UnsetControllerAccess(ctx context.Context, resource names.ControllerTag, relation ofganames.Relation) error {
+	return unsetResourceAccess(ctx, u, resource, relation)
+}
+
 // SetCloudAccess adds a direct relation between the user and the cloud.
 func (u *User) SetCloudAccess(ctx context.Context, resource names.CloudTag, relation ofganames.Relation) error {
 	return setResourceAccess(ctx, u, resource, relation)
@@ -263,6 +268,23 @@ func setResourceAccess[T ofganames.ResourceTagger](ctx context.Context, user *Us
 	if err != nil {
 		// if the tuple already exist we don't return an error.
 		if strings.Contains(err.Error(), "cannot write a tuple which already exists") {
+			return nil
+		}
+		return errors.E(err)
+	}
+
+	return nil
+}
+
+func unsetResourceAccess[T ofganames.ResourceTagger](ctx context.Context, user *User, resource T, relation ofganames.Relation) error {
+	err := user.client.removeRelation(ctx, Tuple{
+		Object:   ofganames.ConvertTag(user.ResourceTag()),
+		Relation: relation,
+		Target:   ofganames.ConvertTag(resource),
+	})
+	if err != nil {
+		// if the tuple does not exist we don't return an error.
+		if strings.Contains(err.Error(), "cannot delete a tuple which does not exist") {
 			return nil
 		}
 		return errors.E(err)
