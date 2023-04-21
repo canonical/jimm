@@ -268,6 +268,7 @@ func setResourceAccess[T ofganames.ResourceTagger](ctx context.Context, user *Us
 	})
 	if err != nil {
 		// if the tuple already exist we don't return an error.
+		// TODO we should opt to check against specific errors via checking their code/metadata.
 		if strings.Contains(err.Error(), "cannot write a tuple which already exists") {
 			return nil
 		}
@@ -285,6 +286,7 @@ func unsetResourceAccess[T ofganames.ResourceTagger](ctx context.Context, user *
 	})
 	if err != nil {
 		// if the tuple does not exist we don't return an error.
+		// TODO we should opt to check against specific errors via checking their code/metadata.
 		if strings.Contains(err.Error(), "cannot delete a tuple which does not exist") {
 			return nil
 		}
