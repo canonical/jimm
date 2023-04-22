@@ -142,8 +142,7 @@ func getFullStatus(
 // waiting for a db relation to a cross-model endpoint via offer.
 var model1 = getFullStatus("model-1", map[string]jujuparams.ApplicationStatus{
 	"myapp": {
-		Charm:  "myapp",
-		Series: "kubernetes",
+		Charm: "myapp",
 		// handle charm-origin/name/rev/channel alex,
 		Scale:         1,
 		ProviderId:    "10000000-0000-0000-0000-000000000000",
@@ -212,7 +211,6 @@ var model1 = getFullStatus("model-1", map[string]jujuparams.ApplicationStatus{
 var model2 = getFullStatus("model-2", map[string]jujuparams.ApplicationStatus{
 	"hello-kubecon": {
 		Charm:         "hello-kubecon",
-		Series:        "kubernetes",
 		Scale:         1,
 		CharmVersion:  "17",
 		CharmChannel:  "idk",
@@ -250,7 +248,6 @@ var model2 = getFullStatus("model-2", map[string]jujuparams.ApplicationStatus{
 	},
 	"nginx-ingress-integrator": {
 		Charm:         "nginx-ingress-integrator",
-		Series:        "kubernetes",
 		Scale:         1,
 		CharmVersion:  "54",
 		CharmChannel:  "idk",
@@ -563,7 +560,6 @@ func TestQueryModelsJq(t *testing.T) {
 				  "myapp": "alpha"
 				},
 				"exposed": false,
-				"os": "kubernetes",
 				"provider-id": "10000000-0000-0000-0000-000000000000",
 				"relations": {
 				  "db": [
@@ -571,7 +567,6 @@ func TestQueryModelsJq(t *testing.T) {
 				  ]
 				},
 				"scale": 1,
-				"series": "kubernetes",
 				"units": {
 				  "myapp/0": {
 					"address": "10.1.160.61",
@@ -613,10 +608,8 @@ func TestQueryModelsJq(t *testing.T) {
 				  "ingress": "alpha"
 				},
 				"exposed": false,
-				"os": "kubernetes",
 				"provider-id": "20000000-0000-0000-0000-000000000000",
 				"scale": 1,
-				"series": "kubernetes",
 				"units": {
 				  "hello-kubecon/0": {
 					"address": "10.1.160.62",
@@ -653,10 +646,8 @@ func TestQueryModelsJq(t *testing.T) {
 				  "ingress": "alpha"
 				},
 				"exposed": true,
-				"os": "kubernetes",
 				"provider-id": "20000000-0000-0000-0000-000000000000",
 				"scale": 1,
-				"series": "kubernetes",
 				"units": {
 				  "nginx-ingress-integrator/0": {
 					"address": "10.1.160.63",
@@ -720,10 +711,8 @@ func TestQueryModelsJq(t *testing.T) {
 				  "ingress": "alpha"
 				},
 				"exposed": true,
-				"os": "kubernetes",
 				"provider-id": "20000000-0000-0000-0000-000000000000",
 				"scale": 1,
-				"series": "kubernetes",
 				"units": {
 				  "nginx-ingress-integrator/0": {
 					"address": "10.1.160.63",

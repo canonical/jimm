@@ -5,7 +5,7 @@ import (
 	"context"
 	"sort"
 
-	"github.com/juju/charm/v8"
+	"github.com/juju/charm/v10"
 	"github.com/juju/juju/api/client/applicationoffers"
 	"github.com/juju/juju/core/crossmodel"
 	jujuparams "github.com/juju/juju/rpc/params"
