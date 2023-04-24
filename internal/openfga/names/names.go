@@ -38,6 +38,8 @@ var (
 	WriterRelation Relation = "writer"
 	// CanAddModelRelation represents a can_addmodel relation between entities.
 	CanAddModelRelation Relation = "can_addmodel"
+	// AuditLogViewer represents an audit_log_viewer relation between entities.
+	AuditLogViewerRelation Relation = "audit_log_viewer"
 	// NoRelation is returned when there is no relation.
 	NoRelation Relation = ""
 )
