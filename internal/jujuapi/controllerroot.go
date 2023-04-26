@@ -115,3 +115,17 @@ func (r *controllerRoot) setupUUIDGenerator() error {
 	}
 	return nil
 }
+
+func (r *controllerRoot) spawnLogger() dbLogger {
+	return newDbLogger(r.jimm, r.getUser)
+}
+
+// getUser implements jujuapi.root interface to return the currently logged in user.
+func (r *controllerRoot) getUser() names.UserTag {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.user != nil {
+		return r.user.ResourceTag()
+	}
+	return names.UserTag{}
+}

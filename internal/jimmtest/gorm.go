@@ -6,6 +6,7 @@ package jimmtest
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	"gorm.io/driver/sqlite"
@@ -23,13 +24,14 @@ type Tester interface {
 // A gormLogger is a gorm.Logger that is used in tests. It logs everything
 // to the test.
 type gormLogger struct {
-	t Tester
+	t     Tester
+	level logger.LogLevel
 }
 
 // NewGormLogger returns a gorm logger.Interface that can be used in a test
 // All output is logged to the test.
-func NewGormLogger(t Tester) logger.Interface {
-	return gormLogger{t: t}
+func NewGormLogger(t Tester, l logger.LogLevel) logger.Interface {
+	return gormLogger{t: t, level: l}
 }
 
 func (l gormLogger) LogMode(_ logger.LogLevel) logger.Interface {
@@ -37,15 +39,24 @@ func (l gormLogger) LogMode(_ logger.LogLevel) logger.Interface {
 }
 
 func (l gormLogger) Info(_ context.Context, fmt string, args ...interface{}) {
-	l.t.Logf(fmt, args...)
+	if l.level >= logger.Info {
+		l.t.Logf(fmt, args...)
+		l.t.Logf("\n")
+	}
 }
 
 func (l gormLogger) Warn(_ context.Context, fmt string, args ...interface{}) {
-	l.t.Logf(fmt, args...)
+	if l.level >= logger.Warn {
+		l.t.Logf(fmt, args...)
+		l.t.Logf("\n")
+	}
 }
 
 func (l gormLogger) Error(_ context.Context, fmt string, args ...interface{}) {
-	l.t.Logf(fmt, args...)
+	if l.level >= logger.Error {
+		l.t.Logf(fmt, args...)
+		l.t.Logf("\n")
+	}
 }
 
 func (l gormLogger) Trace(ctx context.Context, begin time.Time, fc func() (string, int64), err error) {
@@ -62,8 +73,13 @@ var _ logger.Interface = gormLogger{}
 // MemoryDB returns an in-memory gorm.DB for use in tests. The underlying
 // SQL database is an in-memory SQLite database.
 func MemoryDB(t Tester, nowFunc func() time.Time) *gorm.DB {
+	_, present := os.LookupEnv("TERSE")
+	logLevel := logger.Info
+	if present {
+		logLevel = logger.Warn
+	}
 	cfg := gorm.Config{
-		Logger:  NewGormLogger(t),
+		Logger:  NewGormLogger(t, logLevel),
 		NowFunc: nowFunc,
 	}
 	dsn := fmt.Sprintf("file:%s?mode=memory&cache=shared", t.Name())

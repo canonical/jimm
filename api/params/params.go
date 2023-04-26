@@ -97,7 +97,7 @@ type AuditEvent struct {
 	ConversationId string `json:"conversation-id"`
 
 	// messageId represents the message ID used to correlate request/responses.
-	MessageId int
+	MessageId uint64
 
 	// FacadeName contains the request facade name.
 	FacadeName string `json:"facade-name"`
@@ -106,24 +106,24 @@ type AuditEvent struct {
 	FacadeMethod string `json:"facade-method"`
 
 	// FacadeVersion contains the requested version for the facade method.
-	FacadeVersion string `json:"facade-version"`
+	FacadeVersion int `json:"facade-version"`
 
-	// Tag contains the tag of the entity the event is for.
-	Tag string `json:"tag"`
+	// ObjectId contains the object id to act on, only used by certain facades.
+	ObjectId string `json:"object-id"`
 
 	// UserTag contains the user tag of authenticated user that performed
 	// the action.
 	UserTag string `json:"user-tag"`
 
-	// Action contains the action that occured on the entity.
-	Action string `json:"action"`
+	// IsResponse indicates whether the message is a request/response.
+	IsResponse bool `json:"response"`
 
-	// Response indicates whether the message is a request/response.
-	Response bool `json:"response"`
+	// Errors contains error info received from the controller.
+	Errors map[string]any `json:"error"`
 
-	// Params contains additional details for the audit entry. The contents
+	// Body contains additional details for the audit entry. The contents
 	// will vary depending on the action and the entity.
-	Params map[string]string `json:"params"`
+	Body map[string]any `json:"body"`
 }
 
 // An AuditEvents contains events from the audit log.
@@ -185,17 +185,9 @@ type FindAuditEventsRequest struct {
 	// an RFC3339 encoded time value.
 	Before string `json:"before,omitempty"`
 
-	// Tag is used to filter the event log to only contain events that
-	// occured to a particular entity.
-	Tag string `json:"tag,omitempty"`
-
 	// UserTag is used to filter the event log to only contain events that
 	// were performed by a particular authenticated user.
 	UserTag string `json:"user-tag,omitempty"`
-
-	// Action is used to filter the event log to only contain events that
-	// perform a particular action.
-	Action string `json:"action,omitempty"`
 
 	// Limit is the maximum number of audit events to return.
 	Limit int64 `json:"limit,omitempty"`

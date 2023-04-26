@@ -24,7 +24,7 @@ var listAuditEventsCommandDoc = `
 	list-audit-events command displays matching audit events.
 
 	Example:
-		jimmctl list-audit-events --after <time> --before <time> --tag <tag> --user-tag <user-tag> --action <action> --limit <limit>
+		jimmctl list-audit-events --after <time> --before <time> --user-tag <user-tag> --limit <limit>
 		jimmctl audit-events --after <time> --format yaml
 `
 
@@ -68,9 +68,7 @@ func (c *listAuditEventsCommand) SetFlags(f *gnuflag.FlagSet) {
 	})
 	f.StringVar(&c.args.After, "after", "", "display events that happened after specified time")
 	f.StringVar(&c.args.Before, "before", "", "display events that happened before specified time")
-	f.StringVar(&c.args.Tag, "tag", "", "display events containing the tag")
 	f.StringVar(&c.args.UserTag, "user-tag", "", "display events performed by authenticated user")
-	f.StringVar(&c.args.Action, "action", "", "display events that performed a particular action")
 	f.Int64Var(&c.args.Limit, "limit", 0, "limit the maximum number of returned audit events")
 }
 
@@ -119,11 +117,11 @@ func formatTabular(writer io.Writer, value interface{}) error {
 
 	table.AddRow("Time", "Tag", "User", "Action", "Success", "Params")
 	for _, event := range e.Events {
-		data, err := json.Marshal(event.Params)
+		data, err := json.Marshal(event.Body)
 		if err != nil {
 			return errors.E(err)
 		}
-		table.AddRow(event.Time, event.Tag, event.UserTag, event.Action, event.Success, string(data))
+		table.AddRow(event.Time, event.UserTag, string(data))
 	}
 	fmt.Fprint(writer, table)
 	return nil

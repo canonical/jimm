@@ -17,7 +17,7 @@ type Params struct {
 	// ControllerUUID is the UUID of the JIMM controller.
 	ControllerUUID string
 
-	// IdentityLocation holds the URL of the thrid-party identiry
+	// IdentityLocation holds the URL of the third-party identity
 	// provider.
 	IdentityLocation string
 

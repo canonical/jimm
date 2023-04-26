@@ -6,17 +6,21 @@ CREATE TABLE audit_log (
 	updated_at DATETIME,
 	deleted_at DATETIME,
 	time DATETIME,
-	tag TEXT,
+	conversation_id TEXT,
+	message_id INTEGER,
+	facade_name TEXT, 
+	facade_method TEXT,
+	facade_version INTEGER,
+	object_id TEXT,
 	user_tag TEXT,
-	action TEXT,
-	success INTEGER,
-	params BLOB
+	is_response BOOLEAN,
+	errors BLOB,
+	body BLOB
 );
 CREATE INDEX idx_audit_log_deleted_at ON audit_log (deleted_at);
 CREATE INDEX idx_audit_log_time ON audit_log (time);
-CREATE INDEX idx_audit_log_tag ON audit_log (tag);
 CREATE INDEX idx_audit_log_user_tag ON audit_log (user_tag);
-CREATE INDEX idx_audit_log_action ON audit_log (action);
+CREATE INDEX idx_audit_log_conversation_id ON audit_log (conversation_id);
 
 CREATE TABLE clouds (
 	id INTEGER PRIMARY KEY,

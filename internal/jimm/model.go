@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"math/rand"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -535,51 +534,36 @@ func (b *modelBuilder) JujuModelInfo() *jujuparams.ModelInfo {
 func (j *JIMM) AddModel(ctx context.Context, u *openfga.User, args *ModelCreateArgs) (_ *jujuparams.ModelInfo, err error) {
 	const op = errors.Op("jimm.AddModel")
 
-	ale := dbmodel.AuditLogEntry{
-		Time:    time.Now().UTC().Round(time.Millisecond),
-		UserTag: u.Tag().String(),
-		Action:  "create",
-		Params: dbmodel.StringMap{
-			"name":  args.Name,
-			"owner": args.Owner.String(),
-		},
-	}
-	defer j.addAuditLogEntry(&ale)
-
-	fail := func(err error) (*jujuparams.ModelInfo, error) {
-		ale.Params["err"] = err.Error()
-		return nil, err
-	}
 	owner := dbmodel.User{
 		Username: args.Owner.Id(),
 	}
 	err = j.Database.GetUser(ctx, &owner)
 	if err != nil {
-		return fail(errors.E(op, err))
+		return nil, errors.E(op, err)
 	}
 
 	isControllerAdmin, err := openfga.IsAdministrator(ctx, u, j.ResourceTag())
 	if err != nil {
 		zapctx.Error(ctx, "failed to check for controller admin access", zap.Error(err))
-		return fail(errors.E(op, err))
+		return nil, errors.E(op, err)
 	}
 
 	// Only JIMM admins are able to add models on behalf of other users.
 	if owner.Username != u.Username && !isControllerAdmin {
-		return fail(errors.E(op, errors.CodeUnauthorized, "unauthorized"))
+		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
 	builder := newModelBuilder(ctx, j)
 	builder = builder.WithOwner(&owner)
 	builder = builder.WithName(args.Name)
 	if err := builder.Error(); err != nil {
-		return fail(errors.E(op, err))
+		return nil, errors.E(op, err)
 	}
 
 	// fetch user model defaults
 	userConfig, err := j.UserModelDefaults(ctx, u.User)
 	if err != nil && errors.ErrorCode(err) != errors.CodeNotFound {
-		return fail(errors.E(op, "failed to fetch cloud defaults"))
+		return nil, errors.E(op, "failed to fetch cloud defaults")
 	}
 	builder = builder.WithConfig(userConfig)
 
@@ -593,22 +577,20 @@ func (j *JIMM) AddModel(ctx context.Context, u *openfga.User, args *ModelCreateA
 		}
 		err = j.Database.CloudDefaults(ctx, &cloudDefaults)
 		if err != nil && errors.ErrorCode(err) != errors.CodeNotFound {
-			return fail(errors.E(op, "failed to fetch cloud defaults"))
+			return nil, errors.E(op, "failed to fetch cloud defaults")
 		}
 		builder = builder.WithConfig(cloudDefaults.Defaults)
 	}
 
 	if args.Cloud != (names.CloudTag{}) {
-		ale.Params["cloud"] = args.Cloud.String()
 		builder = builder.WithCloud(args.Cloud)
 		if err := builder.Error(); err != nil {
-			return fail(errors.E(op, err))
+			return nil, errors.E(op, err)
 		}
 	}
-	ale.Params["region"] = args.CloudRegion
 	builder = builder.WithCloudRegion(args.CloudRegion)
 	if err := builder.Error(); err != nil {
-		return fail(errors.E(op, err))
+		return nil, errors.E(op, err)
 	}
 
 	// fetch cloud region defaults
@@ -622,7 +604,7 @@ func (j *JIMM) AddModel(ctx context.Context, u *openfga.User, args *ModelCreateA
 		}
 		err = j.Database.CloudDefaults(ctx, &cloudRegionDefaults)
 		if err != nil && errors.ErrorCode(err) != errors.CodeNotFound {
-			return fail(errors.E(op, "failed to fetch cloud defaults"))
+			return nil, errors.E(op, "failed to fetch cloud defaults")
 		}
 		builder = builder.WithConfig(cloudRegionDefaults.Defaults)
 	}
@@ -632,31 +614,28 @@ func (j *JIMM) AddModel(ctx context.Context, u *openfga.User, args *ModelCreateA
 	builder = builder.WithConfig(args.Config)
 
 	if args.CloudCredential != (names.CloudCredentialTag{}) {
-		ale.Params["cloud-credential"] = args.CloudCredential.String()
 		builder = builder.WithCloudCredential(args.CloudCredential)
 		if err := builder.Error(); err != nil {
-			return fail(errors.E(op, err))
+			return nil, errors.E(op, err)
 		}
 	}
 	builder = builder.CreateDatabaseModel()
 	if err := builder.Error(); err != nil {
-		return fail(errors.E(op, err))
+		return nil, errors.E(op, err)
 	}
 	defer builder.Cleanup()
 
 	builder = builder.CreateControllerModel()
 	if err := builder.Error(); err != nil {
-		return fail(errors.E(op, err))
+		return nil, errors.E(op, err)
 	}
 
 	builder = builder.UpdateDatabaseModel()
 	if err := builder.Error(); err != nil {
-		return fail(errors.E(op, err))
+		return nil, errors.E(op, err)
 	}
 
 	mi := builder.JujuModelInfo()
-	ale.Tag = names.NewModelTag(mi.UUID).String()
-	ale.Success = true
 
 	if err := j.OpenFGAClient.AddControllerModel(
 		ctx,
@@ -886,18 +865,6 @@ func (j *JIMM) GrantModelAccess(ctx context.Context, u *dbmodel.User, mt names.M
 	// TODO (alesstimec) granting and revoking access tbd in a followup
 	return errors.E(errors.CodeNotImplemented)
 	/*
-	   	ale := dbmodel.AuditLogEntry{
-	   		Time:    time.Now().UTC().Round(time.Millisecond),
-	   		Tag:     mt.String(),
-	   		UserTag: u.Tag().String(),
-	   		Action:  "grant",
-	   		Params: dbmodel.StringMap{
-	   			"user":   ut.String(),
-	   			"access": string(access),
-	   		},
-	   	}
-
-	   defer j.addAuditLogEntry(&ale)
 
 	   	err := j.doModelAdmin(ctx, u, mt, func(m *dbmodel.Model, api API) error {
 	   		targetUser := dbmodel.User{
@@ -927,11 +894,9 @@ func (j *JIMM) GrantModelAccess(ctx context.Context, u *dbmodel.User, mt names.M
 	   	})
 
 	   	if err != nil {
-	   		ale.Params["err"] = err.Error()
 	   		return errors.E(op, err)
 	   	}
 
-	   ale.Success = true
 	   return nil
 	*/
 }
@@ -948,18 +913,6 @@ func (j *JIMM) RevokeModelAccess(ctx context.Context, u *dbmodel.User, mt names.
 	// TODO (alesstimec) granting and revoking access tbd in a followup
 	return errors.E(errors.CodeNotImplemented)
 	/*
-		ale := dbmodel.AuditLogEntry{
-			Time:    time.Now().UTC().Round(time.Millisecond),
-			Tag:     mt.String(),
-			UserTag: u.Tag().String(),
-			Action:  "revoke",
-			Params: dbmodel.StringMap{
-				"user":   ut.String(),
-				"access": string(access),
-			},
-		}
-		defer j.addAuditLogEntry(&ale)
-
 		requiredAccess := "admin"
 		if u.Tag() == ut {
 			// If the user is attempting to revoke their own access.
@@ -999,10 +952,8 @@ func (j *JIMM) RevokeModelAccess(ctx context.Context, u *dbmodel.User, mt names.
 			return nil
 		})
 		if err != nil {
-			ale.Params["err"] = err.Error()
 			return errors.E(op, err)
 		}
-		ale.Success = true
 		return nil
 	*/
 }
@@ -1014,20 +965,9 @@ func (j *JIMM) RevokeModelAccess(ctx context.Context, u *dbmodel.User, mt names.
 func (j *JIMM) DestroyModel(ctx context.Context, u *openfga.User, mt names.ModelTag, destroyStorage, force *bool, maxWait, timeout *time.Duration) error {
 	const op = errors.Op("jimm.DestroyModel")
 
-	ale := dbmodel.AuditLogEntry{
-		Time:    time.Now().UTC().Round(time.Millisecond),
-		Tag:     mt.String(),
-		UserTag: u.Tag().String(),
-		Action:  "destroy",
-		Params:  dbmodel.StringMap{},
-	}
-	defer j.addAuditLogEntry(&ale)
-
 	if destroyStorage != nil {
-		ale.Params["destroy-storage"] = strconv.FormatBool(*destroyStorage)
 	}
 	if force != nil {
-		ale.Params["force"] = strconv.FormatBool(*force)
 	}
 
 	err := j.doModelAdmin(ctx, u, mt, func(m *dbmodel.Model, api API) error {
@@ -1043,10 +983,8 @@ func (j *JIMM) DestroyModel(ctx context.Context, u *openfga.User, mt names.Model
 		return nil
 	})
 	if err != nil {
-		ale.Params["err"] = err.Error()
 		return errors.E(op, err)
 	}
-	ale.Success = true
 
 	// NOTE (alesstimec) If we remove OpenFGA relation now, the user
 	// will no longer be authorised to check for model status (which
@@ -1184,22 +1122,6 @@ var allowedModelAccess = map[string]map[string]bool{
 func (j *JIMM) ChangeModelCredential(ctx context.Context, user *openfga.User, modelTag names.ModelTag, cloudCredentialTag names.CloudCredentialTag) error {
 	const op = errors.Op("jimm.ChangeModelCredential")
 
-	ale := dbmodel.AuditLogEntry{
-		Time:    time.Now().UTC().Round(time.Millisecond),
-		Tag:     modelTag.String(),
-		UserTag: user.Tag().String(),
-		Action:  "change-credential",
-		Params: dbmodel.StringMap{
-			"cloud-credential": cloudCredentialTag.String(),
-		},
-	}
-	defer j.addAuditLogEntry(&ale)
-
-	fail := func(err error) error {
-		ale.Params["err"] = err.Error()
-		return err
-	}
-
 	isControllerAdmin, err := openfga.IsAdministrator(ctx, user, j.ResourceTag())
 	if err != nil {
 		zapctx.Error(ctx, "failed to check access rights", zap.Error(err))
@@ -1215,7 +1137,7 @@ func (j *JIMM) ChangeModelCredential(ctx context.Context, user *openfga.User, mo
 
 	err = j.Database.GetCloudCredential(ctx, &credential)
 	if err != nil {
-		return fail(errors.E(op, err))
+		return errors.E(op, err)
 	}
 
 	var m *dbmodel.Model
@@ -1233,16 +1155,15 @@ func (j *JIMM) ChangeModelCredential(ctx context.Context, user *openfga.User, mo
 		return nil
 	})
 	if err != nil {
-		return fail(errors.E(op, err))
+		return errors.E(op, err)
 	}
 
 	m.CloudCredential = credential
 	m.CloudCredentialID = credential.ID
 	err = j.Database.UpdateModel(ctx, m)
 	if err != nil {
-		return fail(errors.E(op, err))
+		return errors.E(op, err)
 	}
 
-	ale.Success = true
 	return nil
 }

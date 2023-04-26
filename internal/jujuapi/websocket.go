@@ -23,7 +23,6 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/jimmhttp"
 	"github.com/CanonicalLtd/jimm/internal/jujuclient"
 	jimmRPC "github.com/CanonicalLtd/jimm/internal/rpc"
-	"github.com/CanonicalLtd/jimm/internal/servermon"
 )
 
 const (
@@ -49,7 +48,8 @@ type apiServer struct {
 func (s apiServer) ServeWS(_ context.Context, conn *websocket.Conn) {
 	controllerRoot := newControllerRoot(s.jimm, s.params)
 	s.cleanup = controllerRoot.cleanup
-	serveRoot(context.Background(), controllerRoot, conn)
+	Dblogger := controllerRoot.spawnLogger()
+	serveRoot(context.Background(), controllerRoot, Dblogger, conn)
 }
 
 // Kill implements the rpc.Killer interface.
@@ -60,18 +60,17 @@ func (s *apiServer) Kill() {
 }
 
 // serveRoot serves an RPC root object on a websocket connection.
-func serveRoot(ctx context.Context, root root, wsConn *websocket.Conn) {
+func serveRoot(ctx context.Context, root root, logger AuditLogger, wsConn *websocket.Conn) {
 	ctx = zapctx.WithFields(ctx, zap.Bool("websocket", true))
 
+	// Note that although NewConn accepts a `RecorderFactory` input, the call to conn.ServeRoot
+	// also accepts a `RecorderFactory` and will override anything set during the call to NewConn.
 	conn := rpc.NewConn(
 		jsoncodec.NewWebsocket(wsConn),
-		func() rpc.Recorder {
-			return recorder{
-				start: time.Now(),
-			}
-		},
+		nil,
 	)
-	conn.ServeRoot(root, nil, func(err error) error {
+	rpcRecorderFactory := func() rpc.Recorder { return newRecorder(logger) }
+	conn.ServeRoot(root, rpcRecorderFactory, func(err error) error {
 		return mapError(err)
 	})
 	defer conn.Close()
@@ -182,21 +181,4 @@ var websocketUpgrader = websocket.Upgrader{
 	// fragmentation, we default to largeish frames.
 	ReadBufferSize:  websocketFrameSize,
 	WriteBufferSize: websocketFrameSize,
-}
-
-// recorder implements an rpc.Recorder.
-type recorder struct {
-	start time.Time
-}
-
-// HandleRequest implements rpc.Recorder.
-func (recorder) HandleRequest(*rpc.Header, interface{}) error {
-	return nil
-}
-
-// HandleReply implements rpc.Recorder.
-func (o recorder) HandleReply(r rpc.Request, _ *rpc.Header, _ interface{}) error {
-	d := time.Since(o.start)
-	servermon.WebsocketRequestDuration.WithLabelValues(r.Type, r.Action).Observe(float64(d) / float64(time.Second))
-	return nil
 }

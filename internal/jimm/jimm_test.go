@@ -60,44 +60,20 @@ func TestFindAuditEvents(t *testing.T) {
 
 	events := []dbmodel.AuditLogEntry{{
 		Time:    now,
-		Tag:     "tag-1",
 		UserTag: users[0].Tag().String(),
-		Action:  "test-action-1",
-		Success: true,
-		Params: map[string]string{
-			"key1": "value1",
-			"key2": "value2",
-		},
+		Body:    []byte(`{"key": "value","key2": "value2"}`),
 	}, {
 		Time:    now.Add(time.Hour),
-		Tag:     "tag-2",
 		UserTag: users[0].Tag().String(),
-		Action:  "test-action-2",
-		Success: true,
-		Params: map[string]string{
-			"key3": "value3",
-			"key4": "value4",
-		},
+		Body:    []byte(`{"key": "value","key2": "value2"}`),
 	}, {
 		Time:    now.Add(2 * time.Hour),
-		Tag:     "tag-1",
 		UserTag: users[1].Tag().String(),
-		Action:  "test-action-3",
-		Success: true,
-		Params: map[string]string{
-			"key1": "value1",
-			"key2": "value2",
-		},
+		Body:    []byte(`{"key": "value","key2": "value2"}`),
 	}, {
 		Time:    now.Add(3 * time.Hour),
-		Tag:     "tag-2",
 		UserTag: users[1].Tag().String(),
-		Action:  "test-action-2",
-		Success: true,
-		Params: map[string]string{
-			"key2": "value3",
-			"key5": "value5",
-		},
+		Body:    []byte(`{"key": "value","key2": "value2"}`),
 	}}
 	for i, event := range events {
 		e := event
@@ -112,7 +88,7 @@ func TestFindAuditEvents(t *testing.T) {
 		expectedEvents []dbmodel.AuditLogEntry
 		expectedError  string
 	}{{
-		about: "superuser is allower to find audit events by time",
+		about: "superuser is allowed to find audit events by time",
 		user:  &users[0],
 		filter: db.AuditLogFilter{
 			Start: now.Add(-time.Hour),
@@ -120,30 +96,23 @@ func TestFindAuditEvents(t *testing.T) {
 		},
 		expectedEvents: []dbmodel.AuditLogEntry{events[0]},
 	}, {
-		about: "superuser is allower to find audit events by action",
+		about: "superuser is allowed to find audit events by user tag",
 		user:  &users[0],
 		filter: db.AuditLogFilter{
-			Action: "test-action-2",
+			UserTag: users[0].Tag().String(),
 		},
-		expectedEvents: []dbmodel.AuditLogEntry{events[1], events[3]},
-	}, {
-		about: "superuser is allower to find audit events by tag",
-		user:  &users[0],
-		filter: db.AuditLogFilter{
-			Tag: "tag-1",
-		},
-		expectedEvents: []dbmodel.AuditLogEntry{events[0], events[2]},
+		expectedEvents: []dbmodel.AuditLogEntry{events[0], events[1]},
 	}, {
 		about: "superuser - no events found",
 		user:  &users[0],
 		filter: db.AuditLogFilter{
-			Tag: "no-such-tag",
+			UserTag: "no-such-user",
 		},
 	}, {
 		about: "user is not allowed to access audit events",
 		user:  &users[1],
 		filter: db.AuditLogFilter{
-			Tag: "tag-1",
+			UserTag: users[0].Tag().String(),
 		},
 		expectedError: "unauthorized",
 	}}

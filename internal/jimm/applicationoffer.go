@@ -6,9 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"sort"
-	"strconv"
 	"strings"
-	"time"
 
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/juju/juju/core/crossmodel"
@@ -40,24 +38,6 @@ type AddApplicationOfferParams struct {
 func (j *JIMM) Offer(ctx context.Context, user *openfga.User, offer AddApplicationOfferParams) error {
 	const op = errors.Op("jimm.Offer")
 
-	ale := dbmodel.AuditLogEntry{
-		Time:    time.Now().UTC().Round(time.Millisecond),
-		UserTag: user.Tag().String(),
-		Action:  "create",
-		Params: dbmodel.StringMap{
-			"model":       offer.ModelTag.String(),
-			"name":        offer.OfferName,
-			"application": offer.ApplicationName,
-			"owner":       offer.OwnerTag.String(),
-		},
-	}
-	defer j.addAuditLogEntry(&ale)
-
-	fail := func(err error) error {
-		ale.Params["err"] = err.Error()
-		return err
-	}
-
 	model := dbmodel.Model{
 		UUID: sql.NullString{
 			String: offer.ModelTag.Id(),
@@ -66,18 +46,18 @@ func (j *JIMM) Offer(ctx context.Context, user *openfga.User, offer AddApplicati
 	}
 	if err := j.Database.GetModel(ctx, &model); err != nil {
 		if errors.ErrorCode(err) == errors.CodeNotFound {
-			return fail(errors.E(op, err, "model not found"))
+			return errors.E(op, err, "model not found")
 		}
-		return fail(errors.E(op, err))
+		return errors.E(op, err)
 	}
 
 	isAdmin, err := openfga.IsAdministrator(ctx, user, model.ResourceTag())
 	if err != nil {
 		zapctx.Error(ctx, "failed administraor check", zap.Error(err))
-		return fail(errors.E(op, "failed administrator check", err))
+		return errors.E(op, "failed administrator check", err)
 	}
 	if !isAdmin {
-		return fail(errors.E(op, errors.CodeUnauthorized, "unauthorized"))
+		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
 	offerURL := crossmodel.OfferURL{
@@ -110,9 +90,9 @@ func (j *JIMM) Offer(ctx context.Context, user *openfga.User, offer AddApplicati
 		})
 	if err != nil {
 		if strings.Contains(err.Error(), "application offer already exists") {
-			return fail(errors.E(op, err, errors.CodeAlreadyExists))
+			return errors.E(op, err, errors.CodeAlreadyExists)
 		}
-		return fail(errors.E(op, err))
+		return errors.E(op, err)
 	}
 
 	offerDetails := jujuparams.ApplicationOfferAdminDetails{
@@ -123,14 +103,14 @@ func (j *JIMM) Offer(ctx context.Context, user *openfga.User, offer AddApplicati
 	err = api.GetApplicationOffer(ctx, &offerDetails)
 	if err != nil {
 		zapctx.Error(ctx, "failed to fetch details of the created application offer", zaputil.Error(err))
-		return fail(errors.E(op, err))
+		return errors.E(op, err)
 	}
 
 	var doc dbmodel.ApplicationOffer
 	doc.FromJujuApplicationOfferAdminDetails(offerDetails)
 	if err != nil {
 		zapctx.Error(ctx, "failed to convert application offer details", zaputil.Error(err))
-		return fail(errors.E(op, err))
+		return errors.E(op, err)
 	}
 	doc.ModelID = model.ID
 	err = j.Database.Transaction(func(db *db.Database) error {
@@ -146,7 +126,7 @@ func (j *JIMM) Offer(ctx context.Context, user *openfga.User, offer AddApplicati
 	})
 	if err != nil {
 		zapctx.Error(ctx, "failed to store the created application offer", zaputil.Error(err))
-		return fail(errors.E(op, err))
+		return errors.E(op, err)
 	}
 
 	if err := j.OpenFGAClient.AddModelApplicationOffer(
@@ -193,7 +173,6 @@ func (j *JIMM) Offer(ctx context.Context, user *openfga.User, offer AddApplicati
 			zap.String("application-offer", doc.UUID))
 	}
 
-	ale.Success = true
 	return nil
 }
 
@@ -388,25 +367,7 @@ func (j *JIMM) GrantOfferAccess(ctx context.Context, u *openfga.User, offerURL s
 	// TODO (alesstimec) granting and revoking access tbd in a followup
 	return errors.E(errors.CodeNotImplemented)
 	/*
-		ale := dbmodel.AuditLogEntry{
-			Time:    time.Now().UTC().Round(time.Millisecond),
-			UserTag: u.Tag().String(),
-			Action:  "grant",
-			Params: dbmodel.StringMap{
-				"url":    offerURL,
-				"user":   ut.String(),
-				"access": string(access),
-			},
-		}
-		defer j.addAuditLogEntry(&ale)
-
-		fail := func(err error) error {
-			ale.Params["err"] = err.Error()
-			return err
-		}
-
 		err := j.doApplicationOfferAdmin(ctx, u, offerURL, func(offer *dbmodel.ApplicationOffer, api API) error {
-			ale.Tag = offer.Tag().String()
 			targetUser := dbmodel.User{
 				Username: ut.Id(),
 			}
@@ -450,10 +411,9 @@ func (j *JIMM) GrantOfferAccess(ctx context.Context, u *openfga.User, offerURL s
 			return nil
 		})
 		if err != nil {
-			return fail(errors.E(op, err))
+			return errors.E(op, err)
 		}
 
-		ale.Success = true
 		return nil
 	*/
 }
@@ -490,57 +450,37 @@ func (j *JIMM) RevokeOfferAccess(ctx context.Context, user *openfga.User, offerU
 	// TODO (alesstimec) granting and revoking access tbd in a followup
 	return errors.E(errors.CodeNotImplemented)
 	/*
-	   	ale := dbmodel.AuditLogEntry{
-	   		Time:    time.Now().UTC().Round(time.Millisecond),
-	   		UserTag: user.Tag().String(),
-	   		Action:  "revoke",
-	   		Params: dbmodel.StringMap{
-	   			"url":    offerURL,
-	   			"user":   ut.String(),
-	   			"access": string(access),
-	   		},
-	   	}
+		err = j.doApplicationOfferAdmin(ctx, user, offerURL, func(offer *dbmodel.ApplicationOffer, api API) error {
+			targetUser := dbmodel.User{
+				Username: ut.Id(),
+			}
+			if err := j.Database.GetUser(ctx, &targetUser); err != nil {
+				return err
+			}
+			if err := api.RevokeApplicationOfferAccess(ctx, offerURL, ut, access); err != nil {
+				return err
+			}
+			var offerAccess dbmodel.UserApplicationOfferAccess
+			for _, a := range offer.Users {
+				if a.Username == targetUser.Username {
+					offerAccess = a
+					break
+				}
+			}
+			offerAccess.Username = targetUser.Username
+			offerAccess.ApplicationOfferID = offer.ID
+			offerAccess.Access = determineAccessLevelAfterRevoke(offerAccess.Access, string(access))
+			if err := j.Database.UpdateUserApplicationOfferAccess(ctx, &offerAccess); err != nil {
+				return errors.E(err, "cannot update database after updating controller")
+			}
+			return nil
+		})
 
-	   defer j.addAuditLogEntry(&ale)
+		if err != nil {
+			return errors.E(op, err)
+		}
 
-	   	fail := func(err error) error {
-	   		ale.Params["err"] = err.Error()
-	   		return err
-	   	}
-
-	   	err = j.doApplicationOfferAdmin(ctx, user, offerURL, func(offer *dbmodel.ApplicationOffer, api API) error {
-	   		ale.Tag = offer.Tag().String()
-	   		targetUser := dbmodel.User{
-	   			Username: ut.Id(),
-	   		}
-	   		if err := j.Database.GetUser(ctx, &targetUser); err != nil {
-	   			return err
-	   		}
-	   		if err := api.RevokeApplicationOfferAccess(ctx, offerURL, ut, access); err != nil {
-	   			return err
-	   		}
-	   		var offerAccess dbmodel.UserApplicationOfferAccess
-	   		for _, a := range offer.Users {
-	   			if a.Username == targetUser.Username {
-	   				offerAccess = a
-	   				break
-	   			}
-	   		}
-	   		offerAccess.Username = targetUser.Username
-	   		offerAccess.ApplicationOfferID = offer.ID
-	   		offerAccess.Access = determineAccessLevelAfterRevoke(offerAccess.Access, string(access))
-	   		if err := j.Database.UpdateUserApplicationOfferAccess(ctx, &offerAccess); err != nil {
-	   			return errors.E(err, "cannot update database after updating controller")
-	   		}
-	   		return nil
-	   	})
-
-	   	if err != nil {
-	   		return fail(errors.E(op, err))
-	   	}
-
-	   ale.Success = true
-	   return nil
+		return nil
 	*/
 }
 
@@ -588,24 +528,7 @@ func determineAccessLevelAfterRevoke(currentAccessLevel, revokeAccessLevel strin
 func (j *JIMM) DestroyOffer(ctx context.Context, user *openfga.User, offerURL string, force bool) error {
 	const op = errors.Op("jimm.DestroyOffer")
 
-	ale := dbmodel.AuditLogEntry{
-		Time:    time.Now().UTC().Round(time.Millisecond),
-		UserTag: user.Tag().String(),
-		Action:  "destroy",
-		Params: dbmodel.StringMap{
-			"url":   offerURL,
-			"force": strconv.FormatBool(force),
-		},
-	}
-	defer j.addAuditLogEntry(&ale)
-
-	fail := func(err error) error {
-		ale.Params["err"] = err.Error()
-		return err
-	}
-
 	err := j.doApplicationOfferAdmin(ctx, user, offerURL, func(offer *dbmodel.ApplicationOffer, api API) error {
-		ale.Tag = offer.Tag().String()
 		if err := api.DestroyApplicationOffer(ctx, offerURL, force); err != nil {
 			return err
 		}
@@ -625,10 +548,9 @@ func (j *JIMM) DestroyOffer(ctx context.Context, user *openfga.User, offerURL st
 		return nil
 	})
 	if err != nil {
-		return fail(errors.E(op, err))
+		return errors.E(op, err)
 	}
 
-	ale.Success = true
 	return nil
 }
 

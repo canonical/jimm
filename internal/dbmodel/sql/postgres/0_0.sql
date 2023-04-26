@@ -10,19 +10,16 @@ CREATE TABLE IF NOT EXISTS audit_log (
 	message_id INTEGER,
 	facade_name TEXT, 
    	facade_method TEXT,
-   	facade_version INT,
-	tag TEXT,
+   	facade_version INTEGER,
+	object_id TEXT,
 	user_tag TEXT,
-	action TEXT,
-	response BOOLEAN,
+	is_response BOOLEAN,
 	errors JSON,
-	params JSON
+	body JSON
 );
 CREATE INDEX IF NOT EXISTS idx_audit_log_deleted_at ON audit_log (deleted_at);
 CREATE INDEX IF NOT EXISTS idx_audit_log_time ON audit_log (time);
-CREATE INDEX IF NOT EXISTS idx_audit_log_tag ON audit_log (tag);
 CREATE INDEX IF NOT EXISTS idx_audit_log_user_tag ON audit_log (user_tag);
-CREATE INDEX IF NOT EXISTS idx_audit_log_action ON audit_log (action);
 CREATE INDEX IF NOT EXISTS idx_audit_log_conversation_id ON audit_log (conversation_id);
 
 CREATE TABLE IF NOT EXISTS clouds (
