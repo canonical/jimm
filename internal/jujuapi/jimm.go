@@ -370,28 +370,16 @@ func (r *controllerRoot) FindAuditEvents(ctx context.Context, req apiparams.Find
 func (r *controllerRoot) GrantAuditLogAccess(ctx context.Context, req apiparams.AuditLogAccessRequest) error {
 	const op = errors.Op("jujuapi.GrantAuditLogAccess")
 
-	// TODO (alesstimec) Once we've added audit logs to openfga, change this bit.
-	return errors.E(errors.CodeNotImplemented)
-	/*
-		_, err := parseUserTag(req.UserTag)
-		if err != nil {
-			return errors.E(op, err, errors.CodeBadRequest)
-		}
-		if r.user.ControllerAccess != "superuser" {
-			return errors.E(op, errors.CodeUnauthorized, "unauthorized")
-		}
+	ut, err := parseUserTag(req.UserTag)
+	if err != nil {
+		return errors.E(op, err, errors.CodeBadRequest, "invalid user tag")
+	}
 
-		ut, err := names.ParseUserTag(req.UserTag)
-		if err != nil {
-			return errors.E(op, errors.CodeBadRequest, "invalid user tag")
-		}
-
-		err = r.jimm.GrantAuditLogAccess(ctx, r.user, ut)
-		if err != nil {
-			return errors.E(op, err)
-		}
-		return nil
-	*/
+	err = r.jimm.GrantAuditLogAccess(ctx, r.user, ut)
+	if err != nil {
+		return errors.E(op, err)
+	}
+	return nil
 }
 
 // RevokeAuditLogAccess revokes access to the audit log at the specified
@@ -400,28 +388,16 @@ func (r *controllerRoot) GrantAuditLogAccess(ctx context.Context, req apiparams.
 func (r *controllerRoot) RevokeAuditLogAccess(ctx context.Context, req apiparams.AuditLogAccessRequest) error {
 	const op = errors.Op("jujuapi.RevokeAuditLogAccess")
 
-	// TODO (alesstimec) Once we've added audit logs to openfga, change this bit.
-	return errors.E(errors.CodeNotImplemented)
-	/*
-		_, err := parseUserTag(req.UserTag)
-		if err != nil {
-			return errors.E(op, err, errors.CodeBadRequest)
-		}
-		if r.user.ControllerAccess != "superuser" {
-			return errors.E(op, errors.CodeUnauthorized, "unauthorized")
-		}
+	ut, err := parseUserTag(req.UserTag)
+	if err != nil {
+		return errors.E(op, err, errors.CodeBadRequest, "invalid user tag")
+	}
 
-		ut, err := names.ParseUserTag(req.UserTag)
-		if err != nil {
-			return errors.E(op, errors.CodeBadRequest, "invalid user tag")
-		}
-
-		err = r.jimm.RevokeAuditLogAccess(ctx, r.user, ut)
-		if err != nil {
-			return errors.E(op, err)
-		}
-		return nil
-	*/
+	err = r.jimm.RevokeAuditLogAccess(ctx, r.user, ut)
+	if err != nil {
+		return errors.E(op, err)
+	}
+	return nil
 }
 
 // FullModelStatus returns the full status of the juju model.

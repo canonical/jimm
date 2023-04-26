@@ -5,6 +5,7 @@ package jimm_test
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"testing"
 	"time"
@@ -39,41 +40,40 @@ func TestFindAuditEvents(t *testing.T) {
 		OpenFGAClient: client,
 	}
 
-	err = j.Database.Migrate(context.Background(), true)
+	ctx := context.Background()
+
+	err = j.Database.Migrate(ctx, true)
 	c.Assert(err, qt.Equals, nil)
 
-	users := []dbmodel.User{{
-		Username:         "alice@external",
-		ControllerAccess: "superuser",
-	}, {
-		Username: "eve@external",
-	}}
-	for i := range users {
-		c.Assert(j.Database.DB.Create(&users[i]).Error, qt.IsNil)
+	admin := openfga.NewUser(&dbmodel.User{Username: "alice@external"}, client)
+	err = admin.SetControllerAccess(ctx, j.ResourceTag(), ofganames.AdministratorRelation)
+	c.Assert(err, qt.IsNil)
 
-		if users[i].ControllerAccess == "superuser" {
-			u := openfga.NewUser(&users[i], client)
-			err := u.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
-			c.Assert(err, qt.IsNil)
-		}
-	}
+	privileged := openfga.NewUser(&dbmodel.User{Username: "bob@external"}, client)
+	err = privileged.SetControllerAccess(ctx, j.ResourceTag(), ofganames.AuditLogViewerRelation)
+	c.Assert(err, qt.IsNil)
+
+	unprivileged := openfga.NewUser(&dbmodel.User{Username: "eve@external"}, client)
+
+	bodyJSON, err := json.Marshal(map[string]string{"key1": "value1", "key2": "value2"})
+	c.Assert(err, qt.IsNil)
 
 	events := []dbmodel.AuditLogEntry{{
 		Time:    now,
-		UserTag: users[0].Tag().String(),
-		Body:    []byte(`{"key": "value","key2": "value2"}`),
+		UserTag: admin.User.Tag().String(),
+		Body:    bodyJSON,
 	}, {
 		Time:    now.Add(time.Hour),
-		UserTag: users[0].Tag().String(),
-		Body:    []byte(`{"key": "value","key2": "value2"}`),
+		UserTag: admin.User.Tag().String(),
+		Body:    bodyJSON,
 	}, {
 		Time:    now.Add(2 * time.Hour),
-		UserTag: users[1].Tag().String(),
-		Body:    []byte(`{"key": "value","key2": "value2"}`),
+		UserTag: privileged.User.Tag().String(),
+		Body:    bodyJSON,
 	}, {
 		Time:    now.Add(3 * time.Hour),
-		UserTag: users[1].Tag().String(),
-		Body:    []byte(`{"key": "value","key2": "value2"}`),
+		UserTag: privileged.User.Tag().String(),
+		Body:    bodyJSON,
 	}}
 	for i, event := range events {
 		e := event
@@ -83,47 +83,49 @@ func TestFindAuditEvents(t *testing.T) {
 
 	tests := []struct {
 		about          string
-		user           *dbmodel.User
+		users          []*openfga.User
 		filter         db.AuditLogFilter
 		expectedEvents []dbmodel.AuditLogEntry
 		expectedError  string
 	}{{
-		about: "superuser is allowed to find audit events by time",
-		user:  &users[0],
+		about: "admin/privileged user is allowed to find audit events by time",
+		users: []*openfga.User{admin, privileged},
 		filter: db.AuditLogFilter{
 			Start: now.Add(-time.Hour),
 			End:   now.Add(time.Minute),
 		},
 		expectedEvents: []dbmodel.AuditLogEntry{events[0]},
 	}, {
-		about: "superuser is allowed to find audit events by user tag",
-		user:  &users[0],
+		about: "admin/privileged user is allowed to find audit events by action",
+		users: []*openfga.User{admin, privileged},
 		filter: db.AuditLogFilter{
-			UserTag: users[0].Tag().String(),
+			UserTag: admin.Tag().String(),
 		},
 		expectedEvents: []dbmodel.AuditLogEntry{events[0], events[1]},
 	}, {
-		about: "superuser - no events found",
-		user:  &users[0],
+		about: "admin/privileged user - no events found",
+		users: []*openfga.User{admin, privileged},
 		filter: db.AuditLogFilter{
 			UserTag: "no-such-user",
 		},
 	}, {
-		about: "user is not allowed to access audit events",
-		user:  &users[1],
+		about: "unprivileged user is not allowed to access audit events",
+		users: []*openfga.User{unprivileged},
 		filter: db.AuditLogFilter{
-			UserTag: users[0].Tag().String(),
+			UserTag: admin.Tag().String(),
 		},
 		expectedError: "unauthorized",
 	}}
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
-			events, err := j.FindAuditEvents(context.Background(), openfga.NewUser(test.user, client), test.filter)
-			if test.expectedError != "" {
-				c.Assert(err, qt.ErrorMatches, test.expectedError)
-			} else {
-				c.Assert(err, qt.Equals, nil)
-				c.Assert(events, qt.DeepEquals, test.expectedEvents)
+			for _, user := range test.users {
+				events, err := j.FindAuditEvents(context.Background(), user, test.filter)
+				if test.expectedError != "" {
+					c.Assert(err, qt.ErrorMatches, test.expectedError)
+				} else {
+					c.Assert(err, qt.Equals, nil)
+					c.Assert(events, qt.DeepEquals, test.expectedEvents)
+				}
 			}
 		})
 	}

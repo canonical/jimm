@@ -101,6 +101,19 @@ func (u *User) GetCloudAccess(ctx context.Context, resource names.CloudTag) ofga
 	return ofganames.NoRelation
 }
 
+// GetAuditLogViewerAccess returns if the user has audit log viewer relation with the given controller.
+func (u *User) GetAuditLogViewerAccess(ctx context.Context, resource names.ControllerTag) ofganames.Relation {
+	hasAccess, _, err := checkRelation(ctx, u, resource, ofganames.AuditLogViewerRelation)
+	if err != nil {
+		zapctx.Error(ctx, "openfga check failed", zap.Error(err))
+		return ofganames.NoRelation
+	}
+	if hasAccess {
+		return ofganames.AuditLogViewerRelation
+	}
+	return ofganames.NoRelation
+}
+
 // GetControllerAccess returns the relation the user has with the specified controller.
 func (u *User) GetControllerAccess(ctx context.Context, resource names.ControllerTag) ofganames.Relation {
 	isAdmin, err := IsAdministrator(ctx, u, resource)
@@ -152,6 +165,11 @@ func (u *User) SetModelAccess(ctx context.Context, resource names.ModelTag, rela
 // SetControllerAccess adds a direct relation between the user and the controller.
 func (u *User) SetControllerAccess(ctx context.Context, resource names.ControllerTag, relation ofganames.Relation) error {
 	return setResourceAccess(ctx, u, resource, relation)
+}
+
+// UnsetAuditLogViewerAccess removes a direct audit log viewer relation between the user and a controller.
+func (u *User) UnsetAuditLogViewerAccess(ctx context.Context, resource names.ControllerTag) error {
+	return unsetResourceAccess(ctx, u, resource, ofganames.AuditLogViewerRelation)
 }
 
 // SetCloudAccess adds a direct relation between the user and the cloud.
@@ -250,7 +268,26 @@ func setResourceAccess[T ofganames.ResourceTagger](ctx context.Context, user *Us
 	})
 	if err != nil {
 		// if the tuple already exist we don't return an error.
+		// TODO we should opt to check against specific errors via checking their code/metadata.
 		if strings.Contains(err.Error(), "cannot write a tuple which already exists") {
+			return nil
+		}
+		return errors.E(err)
+	}
+
+	return nil
+}
+
+func unsetResourceAccess[T ofganames.ResourceTagger](ctx context.Context, user *User, resource T, relation ofganames.Relation) error {
+	err := user.client.removeRelation(ctx, Tuple{
+		Object:   ofganames.ConvertTag(user.ResourceTag()),
+		Relation: relation,
+		Target:   ofganames.ConvertTag(resource),
+	})
+	if err != nil {
+		// if the tuple does not exist we don't return an error.
+		// TODO we should opt to check against specific errors via checking their code/metadata.
+		if strings.Contains(err.Error(), "cannot delete a tuple which does not exist") {
 			return nil
 		}
 		return errors.E(err)

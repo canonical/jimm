@@ -231,7 +231,7 @@ func (s *proxySuite) TestConnectToModelAndLogin(c *gc.C) {
 	if err == nil {
 		defer conn.Close()
 	}
-	c.Assert(err, gc.ErrorMatches, `no credentials provided \(unauthorized access\)`)
+	c.Assert(err, gc.ErrorMatches, `parsing request authToken: no jwt authToken parser configured`)
 }
 
 // TestConnectToModelNoBakeryClient ensures that authentication is in fact

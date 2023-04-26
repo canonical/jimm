@@ -34,8 +34,8 @@ import (
 )
 
 const (
-	// JIMM claims to be a 2.9.33 client.
-	jujuClientVersion = "2.9.33"
+	// JIMM claims to be a 3.2-beta2 client.
+	jujuClientVersion = "3.2-beta2"
 )
 
 // A ControllerCredentialsStore is a store for controller credentials.

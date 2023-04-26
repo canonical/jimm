@@ -423,8 +423,7 @@ user-eve@external   	member       	group-group-2
 group-group-2#member	member       	group-group-3                                                            
 group-group-3#member	administrator	controller-test-controller-1                                             
 group-group-1#member	administrator	model-test-controller-1:alice@external/test-model-1                      
-user-eve@external   	administrator	applicationoffer-test-controller-1:alice@external/test-model-1.testoffer1
-`,
+user-eve@external   	administrator	applicationoffer-test-controller-1:alice@external/test-model-1.testoffer1`,
 	)
 }
 

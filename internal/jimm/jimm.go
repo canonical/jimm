@@ -23,6 +23,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/jimm/credentials"
 	"github.com/CanonicalLtd/jimm/internal/jimmjwx"
 	"github.com/CanonicalLtd/jimm/internal/openfga"
+	ofganames "github.com/CanonicalLtd/jimm/internal/openfga/names"
 	"github.com/CanonicalLtd/jimm/internal/pubsub"
 )
 
@@ -307,19 +308,13 @@ func (j *JIMM) AddAuditLogEntry(ale *dbmodel.AuditLogEntry) {
 func (j *JIMM) FindAuditEvents(ctx context.Context, user *openfga.User, filter db.AuditLogFilter) ([]dbmodel.AuditLogEntry, error) {
 	const op = errors.Op("jimm.FindAuditEvents")
 
-	// NOTE (alesstimec): for now only the admin user will have access
-	// 	to audit logs. Once we've added access logs to the openfga access control
-	// 	this should be changed.
-	isControllerAdmin, err := openfga.IsAdministrator(ctx, user, j.ResourceTag())
-	if err != nil {
-		return nil, errors.E(op, err)
-	}
-	if !isControllerAdmin {
+	access := user.GetAuditLogViewerAccess(ctx, j.ResourceTag())
+	if access != ofganames.AuditLogViewerRelation {
 		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
 	var entries []dbmodel.AuditLogEntry
-	err = j.Database.ForEachAuditLogEntry(ctx, filter, func(entry *dbmodel.AuditLogEntry) error {
+	err := j.Database.ForEachAuditLogEntry(ctx, filter, func(entry *dbmodel.AuditLogEntry) error {
 		entries = append(entries, *entry)
 		return nil
 	})

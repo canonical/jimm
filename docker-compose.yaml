@@ -200,7 +200,7 @@ services:
     volumes:
       - ./local/openfga/authorisation_model.json:/authorisation_model.json
     command: >
-      sh -c " apk update && apk add curl && curl -X POST -H 'Content-Type: application/json' -H 'Authorization: Bearer jimm' openfga:8080/stores/01GP1254CHWJC1MNGVB0WDG1T0/authorization-models -d \"$(cat ./authorisation_model.json)\" && psql -Atx postgresql://jimm:jimm@db/jimm?sslmode=disable -c \"UPDATE authorization_model SET authorization_model_id = '01GP1EC038KHGB6JJ2XXXXCXKB' WHERE store = '01GP1254CHWJC1MNGVB0WDG1T0';\" "
+      sh -c "wget -q -O - --header 'Content-Type: application/json' --header 'Authorization: Bearer jimm' --post-file authorisation_model.json openfga:8080/stores/01GP1254CHWJC1MNGVB0WDG1T0/authorization-models"
     depends_on:
       openfga:
         condition: service_healthy
