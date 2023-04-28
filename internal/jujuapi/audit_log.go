@@ -44,7 +44,7 @@ func NewDbLogger(j *jimm.JIMM, getUserFunc func() names.UserTag) dbLogger {
 	return logger
 }
 
-// AddRequest
+// LogRequest creates an audit log entry from a client request.
 func (r dbLogger) LogRequest(header *rpc.Header, body interface{}) error {
 	ale := dbmodel.AuditLogEntry{
 		Time:           time.Now().UTC().Round(time.Millisecond),
@@ -73,7 +73,7 @@ type jujuError struct {
 	ErrorInfo map[string]any `json:"error-info"`
 }
 
-// AddResponse
+// LogResponse creates an audit log entry from a controller response.
 func (o dbLogger) LogResponse(r rpc.Request, header *rpc.Header, body interface{}) error {
 	errInfo := jujuError{
 		Error:     header.Error,
