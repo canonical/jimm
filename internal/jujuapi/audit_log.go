@@ -26,16 +26,19 @@ type dbLogger struct {
 	getUser        func() names.UserTag
 }
 
-func newConversationID() string {
+// NewConversationID generates a unique ID that is used for the
+// lifetime of a websocket connection.
+func NewConversationID() string {
 	buf := make([]byte, 8)
 	rand.Read(buf) // Can't fail
 	return hex.EncodeToString(buf)
 }
 
-func newDbLogger(j *jimm.JIMM, getUserFunc func() names.UserTag) dbLogger {
+// NewDbLogger returns a new audit logger that logs to the database.
+func NewDbLogger(j *jimm.JIMM, getUserFunc func() names.UserTag) dbLogger {
 	logger := dbLogger{
 		jimm:           j,
-		conversationId: newConversationID(),
+		conversationId: NewConversationID(),
 		getUser:        getUserFunc,
 	}
 	return logger
@@ -111,10 +114,11 @@ type recorder struct {
 	conversationId string
 }
 
-func newRecorder(logger AuditLogger) recorder {
+// NewRecorder returns a new recorder struct useful for recording RPC events.
+func NewRecorder(logger AuditLogger) recorder {
 	return recorder{
 		start:          time.Now(),
-		conversationId: newConversationID(),
+		conversationId: NewConversationID(),
 		logger:         logger,
 	}
 }

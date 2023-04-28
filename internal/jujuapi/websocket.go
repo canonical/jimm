@@ -69,7 +69,9 @@ func serveRoot(ctx context.Context, root root, logger AuditLogger, wsConn *webso
 		jsoncodec.NewWebsocket(wsConn),
 		nil,
 	)
-	rpcRecorderFactory := func() rpc.Recorder { return newRecorder(logger) }
+	rpcRecorderFactory := func() rpc.Recorder {
+		return NewRecorder(logger)
+	}
 	conn.ServeRoot(root, rpcRecorderFactory, func(err error) error {
 		return mapError(err)
 	})
