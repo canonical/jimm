@@ -120,10 +120,6 @@ type AuditEvent struct {
 
 	// Errors contains error info received from the controller.
 	Errors map[string]any `json:"error" yaml:"errors"`
-
-	// Body contains additional details for the audit entry. The contents
-	// will vary depending on the action and the entity.
-	Body map[string]any `json:"body" yaml:"body"`
 }
 
 // An AuditEvents contains events from the audit log.

@@ -2,10 +2,8 @@
 
 CREATE TABLE audit_log (
 	id INTEGER PRIMARY KEY,
-	created_at DATETIME,
-	updated_at DATETIME,
-	deleted_at DATETIME,
 	time DATETIME,
+	model_uuid TEXT,
 	conversation_id TEXT,
 	message_id INTEGER,
 	facade_name TEXT, 
@@ -15,10 +13,10 @@ CREATE TABLE audit_log (
 	user_tag TEXT,
 	is_response BOOLEAN,
 	errors BLOB,
-	body BLOB
 );
-CREATE INDEX idx_audit_log_deleted_at ON audit_log (deleted_at);
 CREATE INDEX idx_audit_log_time ON audit_log (time);
+CREATE INDEX idx_audit_log_method ON audit_log (facade_method);
+CREATE INDEX idx_audit_log_model ON audit_log (model_uuid);
 CREATE INDEX idx_audit_log_user_tag ON audit_log (user_tag);
 CREATE INDEX idx_audit_log_conversation_id ON audit_log (conversation_id);
 

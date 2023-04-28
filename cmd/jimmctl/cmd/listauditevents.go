@@ -115,13 +115,13 @@ func formatTabular(writer io.Writer, value interface{}) error {
 	table.MaxColWidth = 50
 	table.Wrap = true
 
-	table.AddRow("Time", "Tag", "User", "Action", "Success", "Params")
+	table.AddRow("Time", "User", "ConversationId", "MessageId", "Method", "IsResponse", "Errors")
 	for _, event := range e.Events {
-		data, err := json.Marshal(event.Body)
+		errorJSON, err := json.Marshal(event.Errors)
 		if err != nil {
 			return errors.E(err)
 		}
-		table.AddRow(event.Time, event.UserTag, string(data))
+		table.AddRow(event.Time, event.UserTag, event.ConversationId, event.MessageId, event.FacadeMethod, event.IsResponse, string(errorJSON))
 	}
 	fmt.Fprint(writer, table)
 	return nil

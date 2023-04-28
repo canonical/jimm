@@ -2,10 +2,8 @@
 
 CREATE TABLE IF NOT EXISTS audit_log (
 	id BIGSERIAL PRIMARY KEY,
-	created_at TIMESTAMP WITH TIME ZONE,
-	updated_at TIMESTAMP WITH TIME ZONE,
-	deleted_at TIMESTAMP WITH TIME ZONE,
 	time TIMESTAMP WITH TIME ZONE,
+	model_uuid TEXT,
 	conversation_id TEXT,
 	message_id INTEGER,
 	facade_name TEXT, 
@@ -15,11 +13,11 @@ CREATE TABLE IF NOT EXISTS audit_log (
 	user_tag TEXT,
 	is_response BOOLEAN,
 	errors JSON,
-	body JSON
 );
-CREATE INDEX IF NOT EXISTS idx_audit_log_deleted_at ON audit_log (deleted_at);
-CREATE INDEX IF NOT EXISTS idx_audit_log_time ON audit_log (time);
+CREATE INDEX IF NOT EXISTS idx_audit_log_time ON audit_log (created_at);
 CREATE INDEX IF NOT EXISTS idx_audit_log_user_tag ON audit_log (user_tag);
+CREATE INDEX IF NOT EXISTS idx_audit_log_method ON audit_log (facade_method);
+CREATE INDEX IF NOT EXISTS idx_audit_log_model ON audit_log (model_uuid);
 CREATE INDEX IF NOT EXISTS idx_audit_log_conversation_id ON audit_log (conversation_id);
 
 CREATE TABLE IF NOT EXISTS clouds (

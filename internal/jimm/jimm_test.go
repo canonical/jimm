@@ -5,7 +5,6 @@ package jimm_test
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"testing"
 	"time"
@@ -55,25 +54,18 @@ func TestFindAuditEvents(t *testing.T) {
 
 	unprivileged := openfga.NewUser(&dbmodel.User{Username: "eve@external"}, client)
 
-	bodyJSON, err := json.Marshal(map[string]string{"key1": "value1", "key2": "value2"})
-	c.Assert(err, qt.IsNil)
-
 	events := []dbmodel.AuditLogEntry{{
 		Time:    now,
 		UserTag: admin.User.Tag().String(),
-		Body:    bodyJSON,
 	}, {
 		Time:    now.Add(time.Hour),
 		UserTag: admin.User.Tag().String(),
-		Body:    bodyJSON,
 	}, {
 		Time:    now.Add(2 * time.Hour),
 		UserTag: privileged.User.Tag().String(),
-		Body:    bodyJSON,
 	}, {
 		Time:    now.Add(3 * time.Hour),
 		UserTag: privileged.User.Tag().String(),
-		Body:    bodyJSON,
 	}}
 	for i, event := range events {
 		e := event

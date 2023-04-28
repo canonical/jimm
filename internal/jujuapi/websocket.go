@@ -45,7 +45,7 @@ type apiServer struct {
 }
 
 // ServeWS implements jimmhttp.WSServer.
-func (s apiServer) ServeWS(_ context.Context, conn *websocket.Conn) {
+func (s *apiServer) ServeWS(_ context.Context, conn *websocket.Conn) {
 	controllerRoot := newControllerRoot(s.jimm, s.params)
 	s.cleanup = controllerRoot.cleanup
 	Dblogger := controllerRoot.newAuditLogger()

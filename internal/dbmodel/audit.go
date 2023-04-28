@@ -6,17 +6,21 @@ import (
 	"encoding/json"
 	"time"
 
-	"gorm.io/gorm"
-
 	apiparams "github.com/CanonicalLtd/jimm/api/params"
 )
 
 // An AuditLogEntry is an entry in the audit log.
 type AuditLogEntry struct {
-	gorm.Model
+	// ID contains the ID of the entry.
+	ID uint `gorm:"primarykey"`
 
-	// Time contains the time that the event happened.
+	// Time contains the timestamp the entry was created.
 	Time time.Time `gorm:"index"`
+
+	// ModelUuid contains the UUID of the model accessed.
+	// Will be empty when accessing controller facades which are handled
+	// by JIMM.
+	ModelUuid string `gorm:"index"`
 
 	// ConversationId contains a unique ID per websocket request.
 	ConversationId string `gorm:"index"`
@@ -28,7 +32,7 @@ type AuditLogEntry struct {
 	FacadeName string
 
 	// FacadeMethod contains the specific method to be executed on the facade.
-	FacadeMethod string
+	FacadeMethod string `gorm:"index"`
 
 	// FacadeVersion contains the requested version for the facade method.
 	FacadeVersion int
@@ -44,10 +48,6 @@ type AuditLogEntry struct {
 
 	// Errors contains any errors from the controller.
 	Errors JSON
-
-	// Body contains the event-specific params for the audit entry.
-	// This field is populated based on the rpc message body for requests/respones.
-	Body JSON
 }
 
 // TableName overrides the table name gorm will use to find
@@ -74,10 +74,6 @@ func (e AuditLogEntry) ToAPIAuditEvent() apiparams.AuditEvent {
 		if err != nil {
 			ale.Errors = map[string]any{"error": err}
 		}
-	}
-	err := json.Unmarshal(e.Body, &ale.Body)
-	if err != nil {
-		ale.Body = map[string]any{"error": err}
 	}
 	return ale
 }

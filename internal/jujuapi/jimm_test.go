@@ -334,7 +334,6 @@ func (s *jimmSuite) TestAuditLog(c *gc.C) {
 			UserTag:        "user-",
 			IsResponse:     false,
 			Errors:         nil,
-			Body:           evs.Events[0].Body,
 		}, {
 			Time:           evs.Events[1].Time,
 			ConversationId: evs.Events[1].ConversationId,
@@ -346,7 +345,6 @@ func (s *jimmSuite) TestAuditLog(c *gc.C) {
 			UserTag:        "user-",
 			IsResponse:     true,
 			Errors:         evs.Events[1].Errors,
-			Body:           evs.Events[1].Body,
 		}, {
 			Time:           evs.Events[2].Time,
 			ConversationId: evs.Events[2].ConversationId,
@@ -358,7 +356,6 @@ func (s *jimmSuite) TestAuditLog(c *gc.C) {
 			UserTag:        "user-",
 			IsResponse:     false,
 			Errors:         nil,
-			Body:           evs.Events[2].Body,
 		}, {
 			Time:           evs.Events[3].Time,
 			ConversationId: evs.Events[3].ConversationId,
@@ -370,7 +367,6 @@ func (s *jimmSuite) TestAuditLog(c *gc.C) {
 			UserTag:        bobTag,
 			IsResponse:     true,
 			Errors:         evs.Events[3].Errors,
-			Body:           evs.Events[3].Body,
 		}},
 	}
 	truncatedEvents := make([]apiparams.AuditEvent, 4)

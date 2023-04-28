@@ -30,7 +30,7 @@ type Params struct {
 func APIHandler(ctx context.Context, jimm *jimm.JIMM, p Params) http.Handler {
 	return &jimmhttp.WSHandler{
 		Upgrader: websocketUpgrader,
-		Server: apiServer{
+		Server: &apiServer{
 			jimm:   jimm,
 			params: p,
 		},

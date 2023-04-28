@@ -18,10 +18,6 @@ func TestAuditLogEntry(t *testing.T) {
 	c := qt.New(t)
 	db := gormDB(t)
 
-	body := map[string]any{"a": "b", "c": "d"}
-	bodyJSON, err := json.Marshal(body)
-	c.Assert(err, qt.IsNil)
-
 	ale := dbmodel.AuditLogEntry{
 		Time:           time.Now(),
 		ConversationId: "1234",
@@ -33,7 +29,6 @@ func TestAuditLogEntry(t *testing.T) {
 		UserTag:        names.NewUserTag("bob@external").String(),
 		IsResponse:     false,
 		Errors:         nil,
-		Body:           bodyJSON,
 	}
 	c.Assert(db.Create(&ale).Error, qt.IsNil)
 
@@ -45,10 +40,6 @@ func TestAuditLogEntry(t *testing.T) {
 func TestToAPIAuditEvent(t *testing.T) {
 	c := qt.New(t)
 
-	body := map[string]any{"a": "b", "c": "d"}
-	bodyJSON, err := json.Marshal(body)
-	c.Assert(err, qt.IsNil)
-
 	ale := dbmodel.AuditLogEntry{
 		Time:           time.Now(),
 		ConversationId: "1234",
@@ -60,7 +51,6 @@ func TestToAPIAuditEvent(t *testing.T) {
 		UserTag:        names.NewUserTag("bob@external").String(),
 		IsResponse:     false,
 		Errors:         nil,
-		Body:           bodyJSON,
 	}
 	event := ale.ToAPIAuditEvent()
 	expectedEvent := apiparams.AuditEvent{
@@ -74,7 +64,6 @@ func TestToAPIAuditEvent(t *testing.T) {
 		UserTag:        names.NewUserTag("bob@external").String(),
 		IsResponse:     false,
 		Errors:         nil,
-		Body:           map[string]any{"a": "b", "c": "d"},
 	}
 	c.Check(event, qt.DeepEquals, expectedEvent)
 
