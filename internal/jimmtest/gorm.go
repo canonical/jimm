@@ -41,21 +41,18 @@ func (l gormLogger) LogMode(_ logger.LogLevel) logger.Interface {
 func (l gormLogger) Info(_ context.Context, fmt string, args ...interface{}) {
 	if l.level >= logger.Info {
 		l.t.Logf(fmt, args...)
-		l.t.Logf("\n")
 	}
 }
 
 func (l gormLogger) Warn(_ context.Context, fmt string, args ...interface{}) {
 	if l.level >= logger.Warn {
 		l.t.Logf(fmt, args...)
-		l.t.Logf("\n")
 	}
 }
 
 func (l gormLogger) Error(_ context.Context, fmt string, args ...interface{}) {
 	if l.level >= logger.Error {
 		l.t.Logf(fmt, args...)
-		l.t.Logf("\n")
 	}
 }
 

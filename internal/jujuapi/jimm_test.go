@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/juju/juju/api/client/modelmanager"
 	"github.com/juju/juju/apiserver/common"
 	"github.com/juju/juju/cloud"
 	jujuparams "github.com/juju/juju/rpc/params"
@@ -297,74 +298,102 @@ func (s *jimmSuite) TestSetControllerDeprecated(c *gc.C) {
 	c.Check(jujuparams.IsCodeUnauthorized(err), gc.Equals, true)
 }
 
-// func (s *jimmSuite) TestAuditLog(c *gc.C) {
-// 	conn := s.open(c, nil, "bob")
-// 	defer conn.Close()
-// 	client := api.NewClient(conn)
+func (s *jimmSuite) TestAuditLog(c *gc.C) {
+	conn := s.open(c, nil, "bob")
+	defer conn.Close()
+	client := api.NewClient(conn)
 
-// 	_, err := client.FindAuditEvents(&apiparams.FindAuditEventsRequest{})
-// 	c.Check(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
-// 	c.Check(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeUnauthorized)
+	_, err := client.FindAuditEvents(&apiparams.FindAuditEventsRequest{})
+	c.Check(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
+	c.Check(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeUnauthorized)
 
-// 	mmclient := modelmanager.NewClient(conn)
-// 	err = mmclient.DestroyModel(s.Model.ResourceTag(), nil, nil, nil, time.Duration(0))
-// 	c.Assert(err, gc.Equals, nil)
+	mmclient := modelmanager.NewClient(conn)
+	err = mmclient.DestroyModel(s.Model.ResourceTag(), nil, nil, nil, time.Duration(0))
+	c.Assert(err, gc.Equals, nil)
 
-// 	conn2 := s.open(c, nil, "alice")
-// 	defer conn2.Close()
-// 	client2 := api.NewClient(conn2)
+	conn2 := s.open(c, nil, "alice")
+	defer conn2.Close()
+	client2 := api.NewClient(conn2)
 
-// 	evs, err := client2.FindAuditEvents(&apiparams.FindAuditEventsRequest{})
-// 	c.Assert(err, gc.Equals, nil)
+	evs, err := client2.FindAuditEvents(&apiparams.FindAuditEventsRequest{})
+	c.Assert(err, gc.Equals, nil)
 
-// 	c.Assert(len(evs.Events), gc.Equals, 7)
+	c.Assert(len(evs.Events), gc.Equals, 13)
 
-// 	expectedEvents := apiparams.AuditEvents{
-// 		Events: []apiparams.AuditEvent{{
-// 			Time:    evs.Events[0].Time,
-// 			UserTag: names.NewUserTag("alice@external").String(),
-// 		}, {
-// 			Time:    evs.Events[1].Time,
-// 			UserTag: s.Model.Owner.Tag().String(),
-// 		}, {
-// 			Time:    evs.Events[2].Time,
-// 			UserTag: s.Model.Owner.Tag().String(),
-// 		}, {
-// 			Time:    evs.Events[3].Time,
-// 			UserTag: s.Model2.Owner.Tag().String(),
-// 		}, {
-// 			Time:    evs.Events[4].Time,
-// 			UserTag: s.Model2.Owner.Tag().String(),
-// 		}, {
-// 			Time:    evs.Events[5].Time,
-// 			UserTag: s.Model3.Owner.Tag().String(),
-// 		}, {
-// 			Time:    evs.Events[6].Time,
-// 			UserTag: s.Model3.Owner.Tag().String(),
-// 		}, {
-// 			Time:    evs.Events[6].Time,
-// 			UserTag: s.Model.Owner.Tag().String(),
-// 		}},
-// 	}
-// 	c.Check(evs, jc.DeepEquals, expectedEvents)
+	bobTag := names.NewUserTag("bob@external").String()
 
-// 	// alice can grant bob access to audit log entries
-// 	// TODO (alesstimec) uncomment when you've implemented
-// 	// grant functionality
-// 	err = client2.GrantAuditLogAccess(&apiparams.AuditLogAccessRequest{
-// 		UserTag: names.NewUserTag("bob@external").String(),
-// 	})
-// 	c.Assert(err, gc.Equals, nil)
+	expectedEvents := apiparams.AuditEvents{
+		Events: []apiparams.AuditEvent{{
+			Time:           evs.Events[0].Time,
+			ConversationId: evs.Events[0].ConversationId,
+			MessageId:      1,
+			FacadeName:     "Admin",
+			FacadeMethod:   "Login",
+			FacadeVersion:  evs.Events[0].FacadeVersion,
+			ObjectId:       "",
+			UserTag:        "user-",
+			IsResponse:     false,
+			Errors:         nil,
+			Body:           evs.Events[0].Body,
+		}, {
+			Time:           evs.Events[1].Time,
+			ConversationId: evs.Events[1].ConversationId,
+			MessageId:      1,
+			FacadeName:     "Admin",
+			FacadeMethod:   "Login",
+			FacadeVersion:  evs.Events[1].FacadeVersion,
+			ObjectId:       "",
+			UserTag:        "user-",
+			IsResponse:     true,
+			Errors:         evs.Events[1].Errors,
+			Body:           evs.Events[1].Body,
+		}, {
+			Time:           evs.Events[2].Time,
+			ConversationId: evs.Events[2].ConversationId,
+			MessageId:      2,
+			FacadeName:     "Admin",
+			FacadeMethod:   "Login",
+			FacadeVersion:  evs.Events[2].FacadeVersion,
+			ObjectId:       "",
+			UserTag:        "user-",
+			IsResponse:     false,
+			Errors:         nil,
+			Body:           evs.Events[2].Body,
+		}, {
+			Time:           evs.Events[3].Time,
+			ConversationId: evs.Events[3].ConversationId,
+			MessageId:      2,
+			FacadeName:     "Admin",
+			FacadeMethod:   "Login",
+			FacadeVersion:  evs.Events[3].FacadeVersion,
+			ObjectId:       "",
+			UserTag:        bobTag,
+			IsResponse:     true,
+			Errors:         evs.Events[3].Errors,
+			Body:           evs.Events[3].Body,
+		}},
+	}
+	truncatedEvents := make([]apiparams.AuditEvent, 4)
+	copy(truncatedEvents, evs.Events)
+	evs.Events = truncatedEvents
+	c.Check(evs, jc.DeepEquals, expectedEvents)
 
-// 	// now bob can access audit events as well
-// 	conn3 := s.open(c, nil, "bob")
-// 	defer conn3.Close()
-// 	client3 := api.NewClient(conn3)
+	// alice can grant bob access to audit log entries
+	err = client2.GrantAuditLogAccess(&apiparams.AuditLogAccessRequest{
+		UserTag: names.NewUserTag("bob@external").String(),
+	})
+	c.Assert(err, gc.Equals, nil)
 
-// 	evs, err = client3.FindAuditEvents(&apiparams.FindAuditEventsRequest{})
-// 	c.Assert(err, gc.Equals, nil)
-// 	c.Check(evs, jc.DeepEquals, expectedEvents)
-// }
+	// now bob can access audit events as well
+	conn3 := s.open(c, nil, "bob")
+	defer conn3.Close()
+	client3 := api.NewClient(conn3)
+
+	evs, err = client3.FindAuditEvents(&apiparams.FindAuditEventsRequest{})
+	evs.Events = truncatedEvents
+	c.Assert(err, gc.Equals, nil)
+	c.Check(evs, jc.DeepEquals, expectedEvents)
+}
 
 func (s *jimmSuite) TestFullModelStatus(c *gc.C) {
 	s.AddController(c, "controller-2", s.APIInfo(c))
