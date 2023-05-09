@@ -70,7 +70,7 @@ func serveRoot(ctx context.Context, root root, logger dbAuditLogger, wsConn *web
 		nil,
 	)
 	rpcRecorderFactory := func() rpc.Recorder {
-		return NewRecorder(logger)
+		return newRecorder(logger)
 	}
 	conn.ServeRoot(root, rpcRecorderFactory, func(err error) error {
 		return mapError(err)
