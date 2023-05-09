@@ -115,6 +115,9 @@ type AuditEvent struct {
 	// the action.
 	UserTag string `json:"user-tag" yaml:"user-tag"`
 
+	// ModelUUID contains the uuid of the model the event was performed against.
+	ModelUUID string `json:"model-uuid"`
+
 	// IsResponse indicates whether the message is a request/response.
 	IsResponse bool `json:"is-response" yaml:"is-response"`
 
@@ -184,6 +187,14 @@ type FindAuditEventsRequest struct {
 	// UserTag is used to filter the event log to only contain events that
 	// were performed by a particular authenticated user.
 	UserTag string `json:"user-tag,omitempty"`
+
+	// Model is used to filter the event log to only contain events that
+	// were performed against a specific model.
+	Model string `json:"model,omitempty"`
+
+	// Method is used to filter the event log to only contain events that
+	// called a specific facade method.
+	Method string `json:"method,omitempty"`
 
 	// Limit is the maximum number of audit events to return.
 	Limit int64 `json:"limit,omitempty"`

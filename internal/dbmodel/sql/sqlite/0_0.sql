@@ -18,7 +18,6 @@ CREATE INDEX idx_audit_log_time ON audit_log (time);
 CREATE INDEX idx_audit_log_method ON audit_log (facade_method);
 CREATE INDEX idx_audit_log_model ON audit_log (model_uuid);
 CREATE INDEX idx_audit_log_user_tag ON audit_log (user_tag);
-CREATE INDEX idx_audit_log_conversation_id ON audit_log (conversation_id);
 
 CREATE TABLE clouds (
 	id INTEGER PRIMARY KEY,

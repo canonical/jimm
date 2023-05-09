@@ -69,6 +69,8 @@ func (c *listAuditEventsCommand) SetFlags(f *gnuflag.FlagSet) {
 	f.StringVar(&c.args.After, "after", "", "display events that happened after specified time")
 	f.StringVar(&c.args.Before, "before", "", "display events that happened before specified time")
 	f.StringVar(&c.args.UserTag, "user-tag", "", "display events performed by authenticated user")
+	f.StringVar(&c.args.Method, "method", "", "display events for a specific method call")
+	f.StringVar(&c.args.Model, "model", "", "display events for a specific model")
 	f.Int64Var(&c.args.Limit, "limit", 0, "limit the maximum number of returned audit events")
 }
 
@@ -115,13 +117,13 @@ func formatTabular(writer io.Writer, value interface{}) error {
 	table.MaxColWidth = 50
 	table.Wrap = true
 
-	table.AddRow("Time", "User", "ConversationId", "MessageId", "Method", "IsResponse", "Errors")
+	table.AddRow("Time", "User", "Model", "ConversationId", "MessageId", "Method", "IsResponse", "Errors")
 	for _, event := range e.Events {
 		errorJSON, err := json.Marshal(event.Errors)
 		if err != nil {
 			return errors.E(err)
 		}
-		table.AddRow(event.Time, event.UserTag, event.ConversationId, event.MessageId, event.FacadeMethod, event.IsResponse, string(errorJSON))
+		table.AddRow(event.Time, event.UserTag, event.ModelUUID, event.ConversationId, event.MessageId, event.FacadeMethod, event.IsResponse, string(errorJSON))
 	}
 	fmt.Fprint(writer, table)
 	return nil

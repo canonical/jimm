@@ -17,13 +17,13 @@ type AuditLogEntry struct {
 	// Time contains the timestamp the entry was created.
 	Time time.Time `gorm:"index"`
 
-	// ModelUuid contains the UUID of the model accessed.
+	// ModelUUID contains the UUID of the model accessed.
 	// Will be empty when accessing controller facades which are handled
 	// by JIMM.
-	ModelUuid string `gorm:"index"`
+	ModelUUID string `gorm:"index"`
 
 	// ConversationId contains a unique ID per websocket request.
-	ConversationId string `gorm:"index"`
+	ConversationId string
 
 	// MessageId represents the message ID used to correlate request/responses.
 	MessageId uint64
@@ -67,6 +67,7 @@ func (e AuditLogEntry) ToAPIAuditEvent() apiparams.AuditEvent {
 	ale.FacadeVersion = e.FacadeVersion
 	ale.ObjectId = e.ObjectId
 	ale.UserTag = e.UserTag
+	ale.ModelUUID = e.ModelUUID
 	ale.IsResponse = e.IsResponse
 	ale.Errors = nil
 	if e.IsResponse {
