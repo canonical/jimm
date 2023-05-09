@@ -91,39 +91,39 @@ const (
 // An AuditEvent is an event in the audit log.
 type AuditEvent struct {
 	// Time is the time of the audit event.
-	Time time.Time `json:"time"`
+	Time time.Time `json:"time" yaml:"time"`
 
 	// ConversationId contains a unique ID per websocket request.
-	ConversationId string `json:"conversation-id"`
+	ConversationId string `json:"conversation-id" yaml:"conversation-id"`
 
-	// messageId represents the message ID used to correlate request/responses.
-	MessageId uint64
+	// MessageId represents the message ID used to correlate request/responses.
+	MessageId uint64 `json:"message-id" yaml:"message-id"`
 
 	// FacadeName contains the request facade name.
-	FacadeName string `json:"facade-name"`
+	FacadeName string `json:"facade-name" yaml:"facade-name"`
 
 	// FacadeMethod contains the specific method to be executed on the facade.
-	FacadeMethod string `json:"facade-method"`
+	FacadeMethod string `json:"facade-method" yaml:"facade-method"`
 
 	// FacadeVersion contains the requested version for the facade method.
-	FacadeVersion int `json:"facade-version"`
+	FacadeVersion int `json:"facade-version" yaml:"facade-version"`
 
 	// ObjectId contains the object id to act on, only used by certain facades.
-	ObjectId string `json:"object-id"`
+	ObjectId string `json:"object-id" yaml:"object-id"`
 
 	// UserTag contains the user tag of authenticated user that performed
 	// the action.
-	UserTag string `json:"user-tag"`
+	UserTag string `json:"user-tag" yaml:"user-tag"`
 
 	// IsResponse indicates whether the message is a request/response.
-	IsResponse bool `json:"response"`
+	IsResponse bool `json:"is-response" yaml:"is-response"`
 
 	// Errors contains error info received from the controller.
-	Errors map[string]any `json:"error"`
+	Errors map[string]any `json:"error" yaml:"errors"`
 
 	// Body contains additional details for the audit entry. The contents
 	// will vary depending on the action and the entity.
-	Body map[string]any `json:"body"`
+	Body map[string]any `json:"body" yaml:"body"`
 }
 
 // An AuditEvents contains events from the audit log.

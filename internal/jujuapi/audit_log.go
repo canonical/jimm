@@ -8,19 +8,15 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/juju/juju/rpc"
+	"github.com/juju/names/v4"
+
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/jimm"
 	"github.com/CanonicalLtd/jimm/internal/servermon"
-	"github.com/juju/juju/rpc"
-	"github.com/juju/names/v4"
 )
 
-type AuditLogger interface {
-	LogRequest(header *rpc.Header, body interface{}) error
-	LogResponse(r rpc.Request, header *rpc.Header, body interface{}) error
-}
-
-type dbLogger struct {
+type dbAuditLogger struct {
 	jimm           *jimm.JIMM
 	conversationId string
 	getUser        func() names.UserTag
@@ -34,9 +30,9 @@ func NewConversationID() string {
 	return hex.EncodeToString(buf)
 }
 
-// NewDbLogger returns a new audit logger that logs to the database.
-func NewDbLogger(j *jimm.JIMM, getUserFunc func() names.UserTag) dbLogger {
-	logger := dbLogger{
+// NewDbAuditLogger returns a new audit logger that logs to the database.
+func NewDbAuditLogger(j *jimm.JIMM, getUserFunc func() names.UserTag) dbAuditLogger {
+	logger := dbAuditLogger{
 		jimm:           j,
 		conversationId: NewConversationID(),
 		getUser:        getUserFunc,
@@ -44,18 +40,23 @@ func NewDbLogger(j *jimm.JIMM, getUserFunc func() names.UserTag) dbLogger {
 	return logger
 }
 
-// LogRequest creates an audit log entry from a client request.
-func (r dbLogger) LogRequest(header *rpc.Header, body interface{}) error {
+func (r dbAuditLogger) newAuditMessage(header *rpc.Header) dbmodel.AuditLogEntry {
 	ale := dbmodel.AuditLogEntry{
 		Time:           time.Now().UTC().Round(time.Millisecond),
 		MessageId:      header.RequestId,
 		UserTag:        r.getUser().String(),
 		ConversationId: r.conversationId,
-		ObjectId:       header.Request.Id,
-		FacadeName:     header.Request.Type,
-		FacadeMethod:   header.Request.Action,
-		FacadeVersion:  header.Request.Version,
 	}
+	return ale
+}
+
+// LogRequest creates an audit log entry from a client request.
+func (r dbAuditLogger) LogRequest(header *rpc.Header, body interface{}) error {
+	ale := r.newAuditMessage(header)
+	ale.ObjectId = header.Request.Id
+	ale.FacadeName = header.Request.Type
+	ale.FacadeMethod = header.Request.Action
+	ale.FacadeVersion = header.Request.Version
 	if body != nil {
 		jsonBody, err := json.Marshal(body)
 		if err != nil {
@@ -74,7 +75,7 @@ type jujuError struct {
 }
 
 // LogResponse creates an audit log entry from a controller response.
-func (o dbLogger) LogResponse(r rpc.Request, header *rpc.Header, body interface{}) error {
+func (o dbAuditLogger) LogResponse(r rpc.Request, header *rpc.Header, body interface{}) error {
 	errInfo := jujuError{
 		Error:     header.Error,
 		ErrorCode: header.ErrorCode,
@@ -84,18 +85,13 @@ func (o dbLogger) LogResponse(r rpc.Request, header *rpc.Header, body interface{
 	if err != nil {
 		return err
 	}
-	ale := dbmodel.AuditLogEntry{
-		Time:           time.Now().UTC().Round(time.Millisecond),
-		MessageId:      header.RequestId,
-		ConversationId: o.conversationId,
-		UserTag:        o.getUser().String(),
-		ObjectId:       r.Id,
-		FacadeName:     r.Type,
-		FacadeMethod:   r.Action,
-		FacadeVersion:  r.Version,
-		Errors:         jsonErr,
-		IsResponse:     true,
-	}
+	ale := o.newAuditMessage(header)
+	ale.ObjectId = r.Id
+	ale.FacadeName = r.Type
+	ale.FacadeMethod = r.Action
+	ale.FacadeVersion = r.Version
+	ale.Errors = jsonErr
+	ale.IsResponse = true
 	if body != nil {
 		jsonBody, err := json.Marshal(body)
 		if err != nil {
@@ -110,12 +106,12 @@ func (o dbLogger) LogResponse(r rpc.Request, header *rpc.Header, body interface{
 // recorder implements an rpc.Recorder.
 type recorder struct {
 	start          time.Time
-	logger         AuditLogger
+	logger         dbAuditLogger
 	conversationId string
 }
 
 // NewRecorder returns a new recorder struct useful for recording RPC events.
-func NewRecorder(logger AuditLogger) recorder {
+func NewRecorder(logger dbAuditLogger) recorder {
 	return recorder{
 		start:          time.Now(),
 		conversationId: NewConversationID(),

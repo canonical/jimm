@@ -48,7 +48,7 @@ type apiServer struct {
 func (s apiServer) ServeWS(_ context.Context, conn *websocket.Conn) {
 	controllerRoot := newControllerRoot(s.jimm, s.params)
 	s.cleanup = controllerRoot.cleanup
-	Dblogger := controllerRoot.spawnLogger()
+	Dblogger := controllerRoot.newAuditLogger()
 	serveRoot(context.Background(), controllerRoot, Dblogger, conn)
 }
 
@@ -60,7 +60,7 @@ func (s *apiServer) Kill() {
 }
 
 // serveRoot serves an RPC root object on a websocket connection.
-func serveRoot(ctx context.Context, root root, logger AuditLogger, wsConn *websocket.Conn) {
+func serveRoot(ctx context.Context, root root, logger dbAuditLogger, wsConn *websocket.Conn) {
 	ctx = zapctx.WithFields(ctx, zap.Bool("websocket", true))
 
 	// Note that although NewConn accepts a `RecorderFactory` input, the call to conn.ServeRoot

@@ -32,28 +32,28 @@ func (s *listAuditEventsSuite) TestListAuditEventsSuperuser(c *gc.C) {
 	c.Assert(cmdtesting.Stdout(context), gc.Matches,
 		`events:
 - time: .*
-  conversationid: .*
-  messageid: 1
-  facadename: Admin
-  facademethod: Login
-  facadeversion: \d
-  objectid: ""
-  usertag: user-
-  isresponse: false
+  conversation-id: .*
+  message-id: 1
+  facade-name: Admin
+  facade-method: Login
+  facade-version: \d
+  object-id: ""
+  user-tag: user-
+  is-response: false
   errors: .*
   body:
     auth-tag: ""
     bakery-version: \d
   [\s\S]*
 - time: .*
-  conversationid: .*
-  messageid: 1
-  facadename: Admin
-  facademethod: Login
-  facadeversion: \d
-  objectid: ""
-  usertag: user-
-  isresponse: true
+  conversation-id: .*
+  message-id: 1
+  facade-name: Admin
+  facade-method: Login
+  facade-version: \d
+  object-id: ""
+  user-tag: user-
+  is-response: true
   errors:
     error: ""
     error-code: ""
