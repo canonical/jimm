@@ -12,6 +12,9 @@ import (
 	jujuparams "github.com/juju/juju/rpc/params"
 )
 
+// JSON is a custom type implementing the Value() and Scan() methods for
+// reading/writing with Gorm. Implementations have been reused from
+// https://github.com/go-gorm/datatypes
 type JSON json.RawMessage
 
 // Value return json value, implement driver.Valuer interface
