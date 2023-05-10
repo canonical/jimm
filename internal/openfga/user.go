@@ -157,6 +157,36 @@ func (u *User) GetModelAccess(ctx context.Context, resource names.ModelTag) ofga
 	return ofganames.NoRelation
 }
 
+// GetApplicationOfferAccess returns the relation the user has with the specified application offer.
+func (u *User) GetApplicationOfferAccess(ctx context.Context, resource names.ApplicationOfferTag) ofganames.Relation {
+	isAdmin, err := IsAdministrator(ctx, u, resource)
+	if err != nil {
+		zapctx.Error(ctx, "openfga check failed", zap.Error(err))
+		return ofganames.NoRelation
+	}
+	if isAdmin {
+		return ofganames.AdministratorRelation
+	}
+	isConsumer, err := u.IsApplicationOfferConsumer(ctx, resource)
+	if err != nil {
+		zapctx.Error(ctx, "openfga check failed", zap.Error(err))
+		return ofganames.NoRelation
+	}
+	if isConsumer {
+		return ofganames.ConsumerRelation
+	}
+	isReader, err := u.IsApplicationOfferReader(ctx, resource)
+	if err != nil {
+		zapctx.Error(ctx, "openfga check failed", zap.Error(err))
+		return ofganames.NoRelation
+	}
+	if isReader {
+		return ofganames.ReaderRelation
+	}
+
+	return ofganames.NoRelation
+}
+
 // SetModelAccess adds a direct relation between the user and the model.
 func (u *User) SetModelAccess(ctx context.Context, resource names.ModelTag, relation ofganames.Relation) error {
 	return setResourceAccess(ctx, u, resource, relation)
