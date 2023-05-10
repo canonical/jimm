@@ -3,7 +3,7 @@
 CREATE TABLE audit_log (
 	id INTEGER PRIMARY KEY,
 	time DATETIME,
-	model_uuid TEXT,
+	model TEXT,
 	conversation_id TEXT,
 	message_id INTEGER,
 	facade_name TEXT, 
@@ -12,11 +12,12 @@ CREATE TABLE audit_log (
 	object_id TEXT,
 	user_tag TEXT,
 	is_response BOOLEAN,
-	errors BLOB,
+	params BLOB,
+	errors BLOB
 );
 CREATE INDEX idx_audit_log_time ON audit_log (time);
 CREATE INDEX idx_audit_log_method ON audit_log (facade_method);
-CREATE INDEX idx_audit_log_model ON audit_log (model_uuid);
+CREATE INDEX idx_audit_log_model ON audit_log (model);
 CREATE INDEX idx_audit_log_user_tag ON audit_log (user_tag);
 
 CREATE TABLE clouds (

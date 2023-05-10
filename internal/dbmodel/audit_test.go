@@ -28,6 +28,7 @@ func TestAuditLogEntry(t *testing.T) {
 		ObjectId:       "1",
 		UserTag:        names.NewUserTag("bob@external").String(),
 		IsResponse:     false,
+		Params:         nil,
 		Errors:         nil,
 	}
 	c.Assert(db.Create(&ale).Error, qt.IsNil)
@@ -50,6 +51,7 @@ func TestToAPIAuditEvent(t *testing.T) {
 		ObjectId:       "1",
 		UserTag:        names.NewUserTag("bob@external").String(),
 		IsResponse:     false,
+		Params:         nil,
 		Errors:         nil,
 	}
 	event := ale.ToAPIAuditEvent()
@@ -63,6 +65,7 @@ func TestToAPIAuditEvent(t *testing.T) {
 		ObjectId:       "1",
 		UserTag:        names.NewUserTag("bob@external").String(),
 		IsResponse:     false,
+		Params:         nil,
 		Errors:         nil,
 	}
 	c.Check(event, qt.DeepEquals, expectedEvent)

@@ -38,6 +38,18 @@ type AuditLogFilter struct {
 	// UserTag defines the user-tag on the audit log entry to match, if
 	// this is empty all user-tags are matched.
 	UserTag string
+
+	// Model is used to filter the event log to only contain events that
+	// were performed against a specific model.
+	Model string `json:"model,omitempty"`
+
+	// Method is used to filter the event log to only contain events that
+	// called a specific facade method.
+	Method string `json:"method,omitempty"`
+
+	// Limit is the maximum number of audit events to return.
+	// A value of zero will ignore the limit.
+	Limit int `json:"limit,omitempty"`
 }
 
 // ForEachAuditLogEntry iterates through all audit log entries that match
@@ -59,6 +71,14 @@ func (d *Database) ForEachAuditLogEntry(ctx context.Context, filter AuditLogFilt
 	if filter.UserTag != "" {
 		db = db.Where("user_tag = ?", filter.UserTag)
 	}
+	if filter.Model != "" {
+		db = db.Where("model = ?", filter.Model)
+	}
+	if filter.Method != "" {
+		db = db.Where("facade_method = ?", filter.Method)
+	}
+	db = db.Limit(filter.Limit)
+
 	rows, err := db.Rows()
 	if err != nil {
 		return errors.E(op, err)

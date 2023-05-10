@@ -17,10 +17,10 @@ type AuditLogEntry struct {
 	// Time contains the timestamp the entry was created.
 	Time time.Time `gorm:"index"`
 
-	// ModelUUID contains the UUID of the model accessed.
-	// Will be empty when accessing controller facades which are handled
+	// Model contains the name of the model accessed.
+	// Will be empty when accessing controller facades, as they are handled
 	// by JIMM.
-	ModelUUID string `gorm:"index"`
+	Model string `gorm:"index"`
 
 	// ConversationId contains a unique ID per websocket request.
 	ConversationId string
@@ -46,6 +46,9 @@ type AuditLogEntry struct {
 	// IsResponse indicates whether the action was a Response/Request.
 	IsResponse bool
 
+	// Params contains any client request parameters.
+	Params JSON
+
 	// Errors contains any errors from the controller.
 	Errors JSON
 }
@@ -67,13 +70,19 @@ func (e AuditLogEntry) ToAPIAuditEvent() apiparams.AuditEvent {
 	ale.FacadeVersion = e.FacadeVersion
 	ale.ObjectId = e.ObjectId
 	ale.UserTag = e.UserTag
-	ale.ModelUUID = e.ModelUUID
+	ale.Model = e.Model
 	ale.IsResponse = e.IsResponse
 	ale.Errors = nil
 	if e.IsResponse {
 		err := json.Unmarshal(e.Errors, &ale.Errors)
 		if err != nil {
 			ale.Errors = map[string]any{"error": err}
+		}
+	}
+	if e.Params != nil {
+		err := json.Unmarshal(e.Params, &ale.Params)
+		if err != nil {
+			ale.Params = map[string]any{"error": err}
 		}
 	}
 	return ale

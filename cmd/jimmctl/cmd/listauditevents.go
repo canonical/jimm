@@ -71,7 +71,7 @@ func (c *listAuditEventsCommand) SetFlags(f *gnuflag.FlagSet) {
 	f.StringVar(&c.args.UserTag, "user-tag", "", "display events performed by authenticated user")
 	f.StringVar(&c.args.Method, "method", "", "display events for a specific method call")
 	f.StringVar(&c.args.Model, "model", "", "display events for a specific model")
-	f.Int64Var(&c.args.Limit, "limit", 0, "limit the maximum number of returned audit events")
+	f.IntVar(&c.args.Limit, "limit", 0, "limit the maximum number of returned audit events")
 }
 
 // Init implements the cmd.Command interface.
@@ -117,13 +117,17 @@ func formatTabular(writer io.Writer, value interface{}) error {
 	table.MaxColWidth = 50
 	table.Wrap = true
 
-	table.AddRow("Time", "User", "Model", "ConversationId", "MessageId", "Method", "IsResponse", "Errors")
+	table.AddRow("Time", "User", "Model", "ConversationId", "MessageId", "Method", "IsResponse", "Params", "Errors")
 	for _, event := range e.Events {
 		errorJSON, err := json.Marshal(event.Errors)
 		if err != nil {
 			return errors.E(err)
 		}
-		table.AddRow(event.Time, event.UserTag, event.ModelUUID, event.ConversationId, event.MessageId, event.FacadeMethod, event.IsResponse, string(errorJSON))
+		paramsJSON, err := json.Marshal(event.Params)
+		if err != nil {
+			return errors.E(err)
+		}
+		table.AddRow(event.Time, event.UserTag, event.Model, event.ConversationId, event.MessageId, event.FacadeMethod, event.IsResponse, string(paramsJSON), (errorJSON))
 	}
 	fmt.Fprint(writer, table)
 	return nil

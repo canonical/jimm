@@ -7,10 +7,10 @@ used for integration testing within the JIMM test suite.
 # Starting the environment
 1. Run `make pull/candid` to get a local image of candid (this is subject to change!)
 2. Run `./certs.sh` in local/traefik/certs, be sure to be in that directory though!
-2. docker compose up
+3. `docker compose --profile dev up`
 
 The services included are:
-- JIMM
+- JIMM (only started in the dev profile)
 - Vault
 - Postgres
 - OpenFGA

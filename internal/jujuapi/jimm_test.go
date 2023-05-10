@@ -333,6 +333,7 @@ func (s *jimmSuite) TestAuditLog(c *gc.C) {
 			ObjectId:       "",
 			UserTag:        "user-",
 			IsResponse:     false,
+			Params:         evs.Events[0].Params,
 			Errors:         nil,
 		}, {
 			Time:           evs.Events[1].Time,
@@ -344,6 +345,7 @@ func (s *jimmSuite) TestAuditLog(c *gc.C) {
 			ObjectId:       "",
 			UserTag:        "user-",
 			IsResponse:     true,
+			Params:         nil,
 			Errors:         evs.Events[1].Errors,
 		}, {
 			Time:           evs.Events[2].Time,
@@ -355,6 +357,7 @@ func (s *jimmSuite) TestAuditLog(c *gc.C) {
 			ObjectId:       "",
 			UserTag:        "user-",
 			IsResponse:     false,
+			Params:         evs.Events[2].Params,
 			Errors:         nil,
 		}, {
 			Time:           evs.Events[3].Time,
@@ -366,6 +369,7 @@ func (s *jimmSuite) TestAuditLog(c *gc.C) {
 			ObjectId:       "",
 			UserTag:        bobTag,
 			IsResponse:     true,
+			Params:         nil,
 			Errors:         evs.Events[3].Errors,
 		}},
 	}

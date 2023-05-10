@@ -115,11 +115,14 @@ type AuditEvent struct {
 	// the action.
 	UserTag string `json:"user-tag" yaml:"user-tag"`
 
-	// ModelUUID contains the uuid of the model the event was performed against.
-	ModelUUID string `json:"model-uuid"`
+	// Model contains the name of the model the event was performed against.
+	Model string `json:"model" yaml:"model"`
 
 	// IsResponse indicates whether the message is a request/response.
 	IsResponse bool `json:"is-response" yaml:"is-response"`
+
+	// Params contains client request parameters.
+	Params map[string]any `json:"params" yaml:"params"`
 
 	// Errors contains error info received from the controller.
 	Errors map[string]any `json:"error" yaml:"errors"`
@@ -197,7 +200,7 @@ type FindAuditEventsRequest struct {
 	Method string `json:"method,omitempty"`
 
 	// Limit is the maximum number of audit events to return.
-	Limit int64 `json:"limit,omitempty"`
+	Limit int `json:"limit,omitempty"`
 }
 
 // A ListControllersResponse is the response that is sent in a

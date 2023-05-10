@@ -55,17 +55,23 @@ func TestFindAuditEvents(t *testing.T) {
 	unprivileged := openfga.NewUser(&dbmodel.User{Username: "eve@external"}, client)
 
 	events := []dbmodel.AuditLogEntry{{
-		Time:    now,
-		UserTag: admin.User.Tag().String(),
+		Time:         now,
+		UserTag:      admin.User.Tag().String(),
+		FacadeMethod: "Login",
 	}, {
-		Time:    now.Add(time.Hour),
-		UserTag: admin.User.Tag().String(),
+		Time:         now.Add(time.Hour),
+		UserTag:      admin.User.Tag().String(),
+		FacadeMethod: "AddModel",
 	}, {
-		Time:    now.Add(2 * time.Hour),
-		UserTag: privileged.User.Tag().String(),
+		Time:         now.Add(2 * time.Hour),
+		UserTag:      privileged.User.Tag().String(),
+		Model:        "TestModel",
+		FacadeMethod: "Deploy",
 	}, {
-		Time:    now.Add(3 * time.Hour),
-		UserTag: privileged.User.Tag().String(),
+		Time:         now.Add(3 * time.Hour),
+		UserTag:      privileged.User.Tag().String(),
+		Model:        "TestModel",
+		FacadeMethod: "DestroyModel",
 	}}
 	for i, event := range events {
 		e := event
@@ -88,12 +94,26 @@ func TestFindAuditEvents(t *testing.T) {
 		},
 		expectedEvents: []dbmodel.AuditLogEntry{events[0]},
 	}, {
-		about: "admin/privileged user is allowed to find audit events by action",
+		about: "admin/privileged user is allowed to find audit events by user",
 		users: []*openfga.User{admin, privileged},
 		filter: db.AuditLogFilter{
 			UserTag: admin.Tag().String(),
 		},
 		expectedEvents: []dbmodel.AuditLogEntry{events[0], events[1]},
+	}, {
+		about: "admin/privileged user is allowed to find audit events by method",
+		users: []*openfga.User{admin, privileged},
+		filter: db.AuditLogFilter{
+			Method: "Deploy",
+		},
+		expectedEvents: []dbmodel.AuditLogEntry{events[2]},
+	}, {
+		about: "admin/privileged user is allowed to find audit events by model",
+		users: []*openfga.User{admin, privileged},
+		filter: db.AuditLogFilter{
+			Model: "TestModel",
+		},
+		expectedEvents: []dbmodel.AuditLogEntry{events[2], events[3]},
 	}, {
 		about: "admin/privileged user - no events found",
 		users: []*openfga.User{admin, privileged},
