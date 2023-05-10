@@ -127,7 +127,7 @@ func formatTabular(writer io.Writer, value interface{}) error {
 		if err != nil {
 			return errors.E(err)
 		}
-		table.AddRow(event.Time, event.UserTag, event.Model, event.ConversationId, event.MessageId, event.FacadeMethod, event.IsResponse, string(paramsJSON), (errorJSON))
+		table.AddRow(event.Time, event.UserTag, event.Model, event.ConversationId, event.MessageId, event.FacadeMethod, event.IsResponse, string(paramsJSON), string(errorJSON))
 	}
 	fmt.Fprint(writer, table)
 	return nil
