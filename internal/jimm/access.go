@@ -95,6 +95,22 @@ func ToModelRelation(accessLevel string) (ofganames.Relation, error) {
 	}
 }
 
+// ToOfferRelation returns a valid relation for the application offer.
+func ToOfferRelation(accessLevel string) (ofganames.Relation, error) {
+	switch accessLevel {
+	case "":
+		return ofganames.NoRelation, nil
+	case string(jujuparams.OfferAdminAccess):
+		return ofganames.AdministratorRelation, nil
+	case string(jujuparams.OfferConsumeAccess):
+		return ofganames.ConsumerRelation, nil
+	case string(jujuparams.OfferReadAccess):
+		return ofganames.ReaderRelation, nil
+	default:
+		return ofganames.NoRelation, errors.E("unknown application offer access")
+	}
+}
+
 // TokenGenerator generates a JWT token.
 type TokenGenerator interface {
 	// MakeToken authorizes a user if initialLogin is set to true using the information in req.
