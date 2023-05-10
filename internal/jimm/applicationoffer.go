@@ -385,77 +385,58 @@ func (j *JIMM) GetApplicationOffer(ctx context.Context, user *openfga.User, offe
 func (j *JIMM) GrantOfferAccess(ctx context.Context, u *openfga.User, offerURL string, ut names.UserTag, access jujuparams.OfferAccessPermission) error {
 	const op = errors.Op("jimm.GrantOfferAccess")
 
-	// TODO (alesstimec) granting and revoking access tbd in a followup
-	return errors.E(errors.CodeNotImplemented)
-	/*
-		ale := dbmodel.AuditLogEntry{
-			Time:    time.Now().UTC().Round(time.Millisecond),
-			UserTag: u.Tag().String(),
-			Action:  "grant",
-			Params: dbmodel.StringMap{
-				"url":    offerURL,
-				"user":   ut.String(),
-				"access": string(access),
-			},
+	ale := dbmodel.AuditLogEntry{
+		Time:    time.Now().UTC().Round(time.Millisecond),
+		UserTag: u.Tag().String(),
+		Action:  "grant",
+		Params: dbmodel.StringMap{
+			"url":    offerURL,
+			"user":   ut.String(),
+			"access": string(access),
+		},
+	}
+	defer j.addAuditLogEntry(&ale)
+
+	fail := func(err error) error {
+		ale.Params["err"] = err.Error()
+		return err
+	}
+
+	err := j.doApplicationOfferAdmin(ctx, u, offerURL, func(offer *dbmodel.ApplicationOffer, api API) error {
+		ale.Tag = offer.Tag().String()
+		targetUser := dbmodel.User{
+			Username: ut.Id(),
 		}
-		defer j.addAuditLogEntry(&ale)
-
-		fail := func(err error) error {
-			ale.Params["err"] = err.Error()
-			return err
+		if err := j.Database.GetUser(ctx, &targetUser); err != nil {
+			return errors.E(err)
 		}
 
-		err := j.doApplicationOfferAdmin(ctx, u, offerURL, func(offer *dbmodel.ApplicationOffer, api API) error {
-			ale.Tag = offer.Tag().String()
-			targetUser := dbmodel.User{
-				Username: ut.Id(),
-			}
-			if err := j.Database.GetUser(ctx, &targetUser); err != nil {
-				return errors.E(err)
-			}
-			tUser := openfga.NewUserWithClient(&targetUser, u)
+		tUser := openfga.NewUser(&targetUser, j.OpenFGAClient)
+		currentRelation := tUser.GetApplicationOfferAccess(ctx, offer.ResourceTag())
+		currentAccessLevel := ToOfferAccessString(currentRelation)
+		targetAccessLevel := determineAccessLevelAfterGrant(currentAccessLevel, string(access))
 
-			currentAccessLevel, err := j.userOfferAccess(ctx, tUser, offer)
+		// NOTE (alesstimec) not removing the current access level as it might be an
+		// indirect relation.
+		if targetAccessLevel != currentAccessLevel {
+			relation, err := ToOfferRelation(targetAccessLevel)
 			if err != nil {
-				return errors.E(err)
+				return errors.E(op, err)
 			}
-
-			targetAccessLevel := determineAccessLevelAfterGrant(currentAccessLevel, string(access))
-
-			// NOTE (alesstimec) not removing the current access level as it might be an
-			// indirect relation.
-			if targetAccessLevel != currentAccessLevel {
-				var relation ofganames.Relation
-				switch targetAccessLevel {
-				case string(jujuparams.OfferAdminAccess):
-					relation = ofganames.AdministratorRelation
-				case string(jujuparams.OfferConsumeAccess):
-					relation = ofganames.ConsumerRelation
-				case string(jujuparams.OfferReadAccess):
-					relation = ofganames.ReaderRelation
-				default:
-					return errors.E("unknown access level")
-				}
-				err := openfga.SetApplicationOfferAccess(
-					ctx,
-					tUser,
-					offer.ResourceTag(),
-					relation,
-				)
-				if err != nil {
-					return errors.E(op, err)
-				}
+			err = tUser.SetApplicationOfferAccess(ctx, offer.ResourceTag(), relation)
+			if err != nil {
+				return errors.E(op, err)
 			}
-
-			return nil
-		})
-		if err != nil {
-			return fail(errors.E(op, err))
 		}
 
-		ale.Success = true
 		return nil
-	*/
+	})
+	if err != nil {
+		return fail(errors.E(op, err))
+	}
+
+	ale.Success = true
+	return nil
 }
 
 func determineAccessLevelAfterGrant(currentAccessLevel, grantAccessLevel string) string {
