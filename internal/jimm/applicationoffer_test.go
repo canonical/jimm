@@ -377,22 +377,12 @@ func TestGrantOfferAccess(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now().UTC().Round(time.Millisecond)
 
-	grantErrorsChannel := make(chan error, 1)
-
 	tests := []struct {
 		about              string
 		parameterFunc      func(*environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission)
-		grantError         string
 		expectedError      string
 		expectedAccesLevel string
 	}{{
-		about:      "controller returns an error",
-		grantError: "a silly error",
-		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
-			return env.users[0], env.users[1], "test-offer-url", jujuparams.OfferAdminAccess
-		},
-		expectedError: "a silly error",
-	}, {
 		about: "model admin grants an admin user admin access - admin user keeps admin",
 		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
 			return env.users[0], env.users[1], "test-offer-url", jujuparams.OfferAdminAccess
@@ -505,32 +495,24 @@ func TestGrantOfferAccess(t *testing.T) {
 			err := db.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 
-			environment := initializeEnvironment(c, ctx, &db)
+			_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.about)
+			c.Assert(err, qt.IsNil)
+
+			jimmUUID := uuid.NewString()
+
+			environment := initializeEnvironment(c, ctx, &db, client, jimmUUID)
 			authenticatedUser, offerUser, offerURL, grantAccessLevel := test.parameterFunc(environment)
 
 			j := &jimm.JIMM{
-				Database: db,
+				UUID:          jimmUUID,
+				OpenFGAClient: client,
+				Database:      db,
 				Dialer: &jimmtest.Dialer{
-					API: &jimmtest.API{
-						GrantApplicationOfferAccess_: func(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error {
-							select {
-							case err := <-grantErrorsChannel:
-								return err
-							default:
-								return nil
-							}
-						},
-					},
+					API: &jimmtest.API{},
 				},
 			}
 
-			if test.grantError != "" {
-				select {
-				case grantErrorsChannel <- errors.E(test.grantError):
-				default:
-				}
-			}
-			err = j.GrantOfferAccess(ctx, &authenticatedUser, offerURL, offerUser.ResourceTag(), grantAccessLevel)
+			err = j.GrantOfferAccess(ctx, openfga.NewUser(&authenticatedUser, client), offerURL, offerUser.ResourceTag(), grantAccessLevel)
 			if test.expectedError == "" {
 				c.Assert(err, qt.IsNil)
 
@@ -539,14 +521,14 @@ func TestGrantOfferAccess(t *testing.T) {
 				}
 				err = db.GetApplicationOffer(ctx, &offer)
 				c.Assert(err, qt.IsNil)
-				c.Assert(offer.UserAccess(&offerUser), qt.Equals, test.expectedAccesLevel)
+				appliedRelation := openfga.NewUser(&offerUser, client).GetApplicationOfferAccess(ctx, offer.ResourceTag())
+				c.Assert(jimm.ToOfferAccessString(appliedRelation), qt.Equals, test.expectedAccesLevel)
 			} else {
 				c.Assert(err, qt.ErrorMatches, test.expectedError)
 			}
 		})
 	}
 }
-*/
 
 func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 	c := qt.New(t)
