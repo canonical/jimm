@@ -206,29 +206,18 @@ var initializeEnvironment = func(c *qt.C, ctx context.Context, db *db.Database, 
 	return &env
 }
 
-/*
 func TestRevokeOfferAccess(t *testing.T) {
 	c := qt.New(t)
 
 	ctx := context.Background()
 	now := time.Now().UTC().Round(time.Millisecond)
 
-	revokeErrorsChannel := make(chan error, 1)
-
 	tests := []struct {
 		about              string
 		parameterFunc      func(*environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission)
-		revokeError        string
 		expectedError      string
 		expectedAccesLevel string
 	}{{
-		about:       "controller returns an error",
-		revokeError: "a silly error",
-		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
-			return env.users[0], env.users[1], "test-offer-url", jujuparams.OfferAdminAccess
-		},
-		expectedError: "a silly error",
-	}, {
 		about: "model admin revokes an admin user admin access - user keeps consume access",
 		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
 			return env.users[0], env.users[1], "test-offer-url", jujuparams.OfferAdminAccess
@@ -329,32 +318,24 @@ func TestRevokeOfferAccess(t *testing.T) {
 			err := db.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 
-			environment := initializeEnvironment(c, ctx, &db)
+			_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.about)
+			c.Assert(err, qt.IsNil)
+
+			jimmUUID := uuid.NewString()
+
+			environment := initializeEnvironment(c, ctx, &db, client, jimmUUID)
 			authenticatedUser, offerUser, offerURL, revokeAccessLevel := test.parameterFunc(environment)
 
 			j := &jimm.JIMM{
-				Database: db,
+				UUID:          jimmUUID,
+				OpenFGAClient: client,
+				Database:      db,
 				Dialer: &jimmtest.Dialer{
-					API: &jimmtest.API{
-						RevokeApplicationOfferAccess_: func(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error {
-							select {
-							case err := <-revokeErrorsChannel:
-								return err
-							default:
-								return nil
-							}
-						},
-					},
+					API: &jimmtest.API{},
 				},
 			}
 
-			if test.revokeError != "" {
-				select {
-				case revokeErrorsChannel <- errors.E(test.revokeError):
-				default:
-				}
-			}
-			err = j.RevokeOfferAccess(ctx, &authenticatedUser, offerURL, offerUser.ResourceTag(), revokeAccessLevel)
+			err = j.RevokeOfferAccess(ctx, openfga.NewUser(&authenticatedUser, client), offerURL, offerUser.ResourceTag(), revokeAccessLevel)
 			if test.expectedError == "" {
 				c.Assert(err, qt.IsNil)
 
@@ -363,7 +344,8 @@ func TestRevokeOfferAccess(t *testing.T) {
 				}
 				err = db.GetApplicationOffer(ctx, &offer)
 				c.Assert(err, qt.IsNil)
-				c.Assert(offer.UserAccess(&offerUser), qt.Equals, test.expectedAccesLevel)
+				appliedRelation := openfga.NewUser(&offerUser, client).GetApplicationOfferAccess(ctx, offer.ResourceTag())
+				c.Assert(jimm.ToOfferAccessString(appliedRelation), qt.Equals, test.expectedAccesLevel)
 			} else {
 				c.Assert(err, qt.ErrorMatches, test.expectedError)
 			}
