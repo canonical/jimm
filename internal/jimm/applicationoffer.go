@@ -468,61 +468,69 @@ func determineAccessLevelAfterGrant(currentAccessLevel, grantAccessLevel string)
 func (j *JIMM) RevokeOfferAccess(ctx context.Context, user *openfga.User, offerURL string, ut names.UserTag, access jujuparams.OfferAccessPermission) (err error) {
 	const op = errors.Op("jimm.RevokeOfferAccess")
 
-	// TODO (alesstimec) granting and revoking access tbd in a followup
-	return errors.E(errors.CodeNotImplemented)
-	/*
-	   	ale := dbmodel.AuditLogEntry{
-	   		Time:    time.Now().UTC().Round(time.Millisecond),
-	   		UserTag: user.Tag().String(),
-	   		Action:  "revoke",
-	   		Params: dbmodel.StringMap{
-	   			"url":    offerURL,
-	   			"user":   ut.String(),
-	   			"access": string(access),
-	   		},
-	   	}
+	ale := dbmodel.AuditLogEntry{
+		Time:    time.Now().UTC().Round(time.Millisecond),
+		UserTag: user.Tag().String(),
+		Action:  "revoke",
+		Params: dbmodel.StringMap{
+			"url":    offerURL,
+			"user":   ut.String(),
+			"access": string(access),
+		},
+	}
+	defer j.addAuditLogEntry(&ale)
 
-	   defer j.addAuditLogEntry(&ale)
+	fail := func(err error) error {
+		ale.Params["err"] = err.Error()
+		return err
+	}
 
-	   	fail := func(err error) error {
-	   		ale.Params["err"] = err.Error()
-	   		return err
-	   	}
+	err = j.doApplicationOfferAdmin(ctx, user, offerURL, func(offer *dbmodel.ApplicationOffer, api API) error {
+		ale.Tag = offer.Tag().String()
+		targetUser := dbmodel.User{
+			Username: ut.Id(),
+		}
+		if err := j.Database.GetUser(ctx, &targetUser); err != nil {
+			return err
+		}
 
-	   	err = j.doApplicationOfferAdmin(ctx, user, offerURL, func(offer *dbmodel.ApplicationOffer, api API) error {
-	   		ale.Tag = offer.Tag().String()
-	   		targetUser := dbmodel.User{
-	   			Username: ut.Id(),
-	   		}
-	   		if err := j.Database.GetUser(ctx, &targetUser); err != nil {
-	   			return err
-	   		}
-	   		if err := api.RevokeApplicationOfferAccess(ctx, offerURL, ut, access); err != nil {
-	   			return err
-	   		}
-	   		var offerAccess dbmodel.UserApplicationOfferAccess
-	   		for _, a := range offer.Users {
-	   			if a.Username == targetUser.Username {
-	   				offerAccess = a
-	   				break
-	   			}
-	   		}
-	   		offerAccess.Username = targetUser.Username
-	   		offerAccess.ApplicationOfferID = offer.ID
-	   		offerAccess.Access = determineAccessLevelAfterRevoke(offerAccess.Access, string(access))
-	   		if err := j.Database.UpdateUserApplicationOfferAccess(ctx, &offerAccess); err != nil {
-	   			return errors.E(err, "cannot update database after updating controller")
-	   		}
-	   		return nil
-	   	})
+		tUser := openfga.NewUser(&targetUser, j.OpenFGAClient)
+		currentRelation := tUser.GetApplicationOfferAccess(ctx, offer.ResourceTag())
+		currentAccessLevel := ToOfferAccessString(currentRelation)
+		targetAccessLevel := determineAccessLevelAfterRevoke(currentAccessLevel, string(access))
+		targetRelation, err := ToOfferRelation(targetAccessLevel)
+		if err != nil {
+			return errors.E(op, err)
+		}
 
-	   	if err != nil {
-	   		return fail(errors.E(op, err))
-	   	}
+		if targetAccessLevel != currentAccessLevel {
+			err = tUser.UnsetApplicationOfferAccess(ctx, offer.ResourceTag(), currentRelation)
+			if err != nil {
+				return errors.E(op, err, "failed to unset existing access")
+			}
 
-	   ale.Success = true
-	   return nil
-	*/
+			if targetAccessLevel != "" {
+				err = tUser.SetApplicationOfferAccess(ctx, offer.ResourceTag(), targetRelation)
+				if err != nil {
+					// Revert dropped relation
+					// TODO (babakks): This all should have happened in a transactional way
+					undoErr := tUser.SetApplicationOfferAccess(ctx, offer.ResourceTag(), currentRelation)
+					if undoErr != nil {
+						return errors.E(op, undoErr, "failed to revert revoked access")
+					}
+					return errors.E(op, err, "failed to revoke access")
+				}
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		return fail(errors.E(op, err))
+	}
+
+	ale.Success = true
+	return nil
 }
 
 func determineAccessLevelAfterRevoke(currentAccessLevel, revokeAccessLevel string) string {
