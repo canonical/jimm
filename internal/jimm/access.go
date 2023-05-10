@@ -91,7 +91,7 @@ func ToModelRelation(accessLevel string) (ofganames.Relation, error) {
 	case "read":
 		return ofganames.ReaderRelation, nil
 	default:
-		return ofganames.NoRelation, errors.E("unknown cloud access")
+		return ofganames.NoRelation, errors.E("unknown model access")
 	}
 }
 
