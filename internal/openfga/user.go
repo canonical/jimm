@@ -212,6 +212,11 @@ func (u *User) SetApplicationOfferAccess(ctx context.Context, resource names.App
 	return setResourceAccess(ctx, u, resource, relation)
 }
 
+// UnsetApplicationOfferAccess removes a direct relation between the user and the application offer.
+func (u *User) UnsetApplicationOfferAccess(ctx context.Context, resource names.ApplicationOfferTag, relation ofganames.Relation) error {
+	return unsetResourceAccess(ctx, u, resource, relation)
+}
+
 // ListModels returns a slice of model UUIDs this user has at least reader access to.
 func (u *User) ListModels(ctx context.Context) ([]string, error) {
 	return u.client.ListObjects(ctx, ofganames.ConvertTag(u.ResourceTag()).String(), ofganames.ReaderRelation.String(), "model", nil)
