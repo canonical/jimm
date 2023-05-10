@@ -17,10 +17,6 @@ var (
 	DetermineAccessLevelAfterGrant  = determineAccessLevelAfterGrant
 )
 
-func (j *JIMM) AddAuditLogEntry(ale *dbmodel.AuditLogEntry) {
-	j.addAuditLogEntry(ale)
-}
-
 func (w *Watcher) PollControllerModels(ctx context.Context, ctl *dbmodel.Controller) {
 	w.pollControllerModels(ctx, ctl)
 }

@@ -17,6 +17,7 @@ import (
 	"github.com/jackc/pgx/v4/stdlib"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 
 	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/jimmtest"
@@ -70,9 +71,14 @@ func (s *postgresSuite) Init(c *qt.C) {
 			c.Logf("error closing database: %s", err)
 		}
 	})
+	_, present := os.LookupEnv("TERSE")
+	logLevel := logger.Info
+	if present {
+		logLevel = logger.Warn
+	}
 	cfg := gorm.Config{
 		NowFunc: func() time.Time { return time.Now().UTC().Round(time.Millisecond) },
-		Logger:  jimmtest.NewGormLogger(c),
+		Logger:  jimmtest.NewGormLogger(c, logLevel),
 	}
 	pCfg := postgres.Config{
 		Conn: sqlDB,

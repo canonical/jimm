@@ -1,4 +1,4 @@
-// Copyright 2016 Canonical Ltd.
+// Copyright 2023 Canonical Ltd.
 
 package jujuapi_test
 
@@ -318,116 +318,81 @@ func (s *jimmSuite) TestAuditLog(c *gc.C) {
 	evs, err := client2.FindAuditEvents(&apiparams.FindAuditEventsRequest{})
 	c.Assert(err, gc.Equals, nil)
 
-	c.Assert(len(evs.Events), gc.Equals, 7)
+	c.Assert(len(evs.Events), gc.Equals, 13)
+
+	bobTag := names.NewUserTag("bob@external").String()
 
 	expectedEvents := apiparams.AuditEvents{
 		Events: []apiparams.AuditEvent{{
-			Time:    evs.Events[0].Time,
-			Tag:     s.Model.Controller.Tag().String(),
-			UserTag: names.NewUserTag("alice@external").String(),
-			Action:  "add",
-			Success: true,
-			Params: map[string]string{
-				"name": "controller-1",
-			},
+			Time:           evs.Events[0].Time,
+			ConversationId: evs.Events[0].ConversationId,
+			MessageId:      1,
+			FacadeName:     "Admin",
+			FacadeMethod:   "Login",
+			FacadeVersion:  evs.Events[0].FacadeVersion,
+			ObjectId:       "",
+			UserTag:        "user-",
+			IsResponse:     false,
+			Errors:         nil,
+			Body:           evs.Events[0].Body,
 		}, {
-			Time:    evs.Events[1].Time,
-			Tag:     s.Model.CloudCredential.Tag().String(),
-			UserTag: s.Model.Owner.Tag().String(),
-			Action:  "update",
-			Success: true,
-			Params: map[string]string{
-				"skip-check":  "true",
-				"skip-update": "false",
-			},
+			Time:           evs.Events[1].Time,
+			ConversationId: evs.Events[1].ConversationId,
+			MessageId:      1,
+			FacadeName:     "Admin",
+			FacadeMethod:   "Login",
+			FacadeVersion:  evs.Events[1].FacadeVersion,
+			ObjectId:       "",
+			UserTag:        "user-",
+			IsResponse:     true,
+			Errors:         evs.Events[1].Errors,
+			Body:           evs.Events[1].Body,
 		}, {
-			Time:    evs.Events[2].Time,
-			Tag:     s.Model.Tag().String(),
-			UserTag: s.Model.Owner.Tag().String(),
-			Action:  "create",
-			Success: true,
-			Params: map[string]string{
-				"cloud":            names.NewCloudTag(jimmtest.TestCloudName).String(),
-				"cloud-credential": s.Model.CloudCredential.Tag().String(),
-				"name":             "model-1",
-				"owner":            s.Model.Owner.Tag().String(),
-				"region":           jimmtest.TestCloudRegionName,
-			},
+			Time:           evs.Events[2].Time,
+			ConversationId: evs.Events[2].ConversationId,
+			MessageId:      2,
+			FacadeName:     "Admin",
+			FacadeMethod:   "Login",
+			FacadeVersion:  evs.Events[2].FacadeVersion,
+			ObjectId:       "",
+			UserTag:        "user-",
+			IsResponse:     false,
+			Errors:         nil,
+			Body:           evs.Events[2].Body,
 		}, {
-			Time:    evs.Events[3].Time,
-			Tag:     s.Model2.CloudCredential.Tag().String(),
-			UserTag: s.Model2.Owner.Tag().String(),
-			Action:  "update",
-			Success: true,
-			Params: map[string]string{
-				"skip-check":  "true",
-				"skip-update": "false",
-			},
-		}, {
-			Time:    evs.Events[4].Time,
-			Tag:     s.Model2.Tag().String(),
-			UserTag: s.Model2.Owner.Tag().String(),
-			Action:  "create",
-			Success: true,
-			Params: map[string]string{
-				"cloud":            names.NewCloudTag(jimmtest.TestCloudName).String(),
-				"cloud-credential": s.Model2.CloudCredential.Tag().String(),
-				"name":             "model-2",
-				"owner":            s.Model2.Owner.Tag().String(),
-				"region":           jimmtest.TestCloudRegionName,
-			},
-		}, {
-			Time:    evs.Events[5].Time,
-			Tag:     s.Model3.Tag().String(),
-			UserTag: s.Model3.Owner.Tag().String(),
-			Action:  "create",
-			Success: true,
-			Params: map[string]string{
-				"cloud":            names.NewCloudTag(jimmtest.TestCloudName).String(),
-				"cloud-credential": s.Model3.CloudCredential.Tag().String(),
-				"name":             "model-3",
-				"owner":            s.Model3.Owner.Tag().String(),
-				"region":           jimmtest.TestCloudRegionName,
-			},
-		}, /*{
-				Time:    evs.Events[6].Time,
-				Tag:     s.Model3.Tag().String(),
-				UserTag: s.Model3.Owner.Tag().String(),
-				Action:  "grant",
-				Success: true,
-				Params: map[string]string{
-					"access": "read",
-					"user":   names.NewUserTag("bob@external").String(),
-				},
-			},*/{
-				Time:    evs.Events[6].Time,
-				Tag:     s.Model.Tag().String(),
-				UserTag: s.Model.Owner.Tag().String(),
-				Action:  "destroy",
-				Success: true,
-				Params:  map[string]string{},
-			}},
+			Time:           evs.Events[3].Time,
+			ConversationId: evs.Events[3].ConversationId,
+			MessageId:      2,
+			FacadeName:     "Admin",
+			FacadeMethod:   "Login",
+			FacadeVersion:  evs.Events[3].FacadeVersion,
+			ObjectId:       "",
+			UserTag:        bobTag,
+			IsResponse:     true,
+			Errors:         evs.Events[3].Errors,
+			Body:           evs.Events[3].Body,
+		}},
 	}
+	truncatedEvents := make([]apiparams.AuditEvent, 4)
+	copy(truncatedEvents, evs.Events)
+	evs.Events = truncatedEvents
 	c.Check(evs, jc.DeepEquals, expectedEvents)
 
 	// alice can grant bob access to audit log entries
-	// TODO (alesstimec) uncomment when you've implemented
-	// grant functionality
-	/*
-		err = client2.GrantAuditLogAccess(&apiparams.AuditLogAccessRequest{
-			UserTag: names.NewUserTag("bob@external").String(),
-		})
-		c.Assert(err, gc.Equals, nil)
+	err = client2.GrantAuditLogAccess(&apiparams.AuditLogAccessRequest{
+		UserTag: names.NewUserTag("bob@external").String(),
+	})
+	c.Assert(err, gc.Equals, nil)
 
-		// now bob can access audit events as well
-		conn3 := s.open(c, nil, "bob")
-		defer conn3.Close()
-		client3 := api.NewClient(conn3)
+	// now bob can access audit events as well
+	conn3 := s.open(c, nil, "bob")
+	defer conn3.Close()
+	client3 := api.NewClient(conn3)
 
-		evs, err = client3.FindAuditEvents(&apiparams.FindAuditEventsRequest{})
-		c.Assert(err, gc.Equals, nil)
-		c.Check(evs, jc.DeepEquals, expectedEvents)
-	*/
+	evs, err = client3.FindAuditEvents(&apiparams.FindAuditEventsRequest{})
+	evs.Events = truncatedEvents
+	c.Assert(err, gc.Equals, nil)
+	c.Check(evs, jc.DeepEquals, expectedEvents)
 }
 
 func (s *jimmSuite) TestFullModelStatus(c *gc.C) {

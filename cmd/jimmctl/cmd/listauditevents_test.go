@@ -29,34 +29,38 @@ func (s *listAuditEventsSuite) TestListAuditEventsSuperuser(c *gc.C) {
 	bClient := s.userBakeryClient("alice")
 	context, err := cmdtesting.RunCommand(c, cmd.NewListAuditEventsCommandForTesting(s.ClientStore(), bClient))
 	c.Assert(err, gc.IsNil)
-	c.Assert(cmdtesting.Stdout(context), gc.Matches, `events:
+	c.Assert(cmdtesting.Stdout(context), gc.Matches,
+		`events:
 - time: .*
-  tag: controller-deadbeef-1bad-500d-9000-4b1d0d06f00d
-  usertag: user-alice@external
-  action: add
-  success: true
-  params:
-    name: controller-1
+  conversation-id: .*
+  message-id: 1
+  facade-name: Admin
+  facade-method: Login
+  facade-version: \d
+  object-id: ""
+  user-tag: user-
+  is-response: false
+  errors: .*
+  body:
+    auth-tag: ""
+    bakery-version: \d
+  [\s\S]*
 - time: .*
-  tag: cloudcred-`+jimmtest.TestCloudName+`_charlie@external_cred
-  usertag: user-charlie@external
-  action: update
-  success: true
-  params:
-    skip-check: \"true\"
-    skip-update: \"false\"
-- time: .*
-  tag: model-.*
-  usertag: user-charlie@external
-  action: create
-  success: true
-  params:
-    cloud: cloud-`+jimmtest.TestCloudName+`
-    cloud-credential: cloudcred-`+jimmtest.TestCloudName+`_charlie@external_cred
-    name: model-2
-    owner: user-charlie@external
-    region: `+jimmtest.TestCloudRegionName+`
-`)
+  conversation-id: .*
+  message-id: 1
+  facade-name: Admin
+  facade-method: Login
+  facade-version: \d
+  object-id: ""
+  user-tag: user-
+  is-response: true
+  errors:
+    error: ""
+    error-code: ""
+    error-info: null
+  body:
+    bakery-discharge-required:
+  [\s\S]*`)
 }
 
 func (s *listAuditEventsSuite) TestListAuditEventsStatus(c *gc.C) {

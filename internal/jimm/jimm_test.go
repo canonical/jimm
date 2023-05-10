@@ -5,6 +5,7 @@ package jimm_test
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"testing"
 	"time"
@@ -54,46 +55,25 @@ func TestFindAuditEvents(t *testing.T) {
 
 	unprivileged := openfga.NewUser(&dbmodel.User{Username: "eve@external"}, client)
 
+	bodyJSON, err := json.Marshal(map[string]string{"key1": "value1", "key2": "value2"})
+	c.Assert(err, qt.IsNil)
+
 	events := []dbmodel.AuditLogEntry{{
 		Time:    now,
-		Tag:     "tag-1",
 		UserTag: admin.User.Tag().String(),
-		Action:  "test-action-1",
-		Success: true,
-		Params: map[string]string{
-			"key1": "value1",
-			"key2": "value2",
-		},
+		Body:    bodyJSON,
 	}, {
 		Time:    now.Add(time.Hour),
-		Tag:     "tag-2",
 		UserTag: admin.User.Tag().String(),
-		Action:  "test-action-2",
-		Success: true,
-		Params: map[string]string{
-			"key3": "value3",
-			"key4": "value4",
-		},
+		Body:    bodyJSON,
 	}, {
 		Time:    now.Add(2 * time.Hour),
-		Tag:     "tag-1",
 		UserTag: privileged.User.Tag().String(),
-		Action:  "test-action-3",
-		Success: true,
-		Params: map[string]string{
-			"key1": "value1",
-			"key2": "value2",
-		},
+		Body:    bodyJSON,
 	}, {
 		Time:    now.Add(3 * time.Hour),
-		Tag:     "tag-2",
 		UserTag: privileged.User.Tag().String(),
-		Action:  "test-action-2",
-		Success: true,
-		Params: map[string]string{
-			"key2": "value3",
-			"key5": "value5",
-		},
+		Body:    bodyJSON,
 	}}
 	for i, event := range events {
 		e := event
@@ -119,27 +99,20 @@ func TestFindAuditEvents(t *testing.T) {
 		about: "admin/privileged user is allowed to find audit events by action",
 		users: []*openfga.User{admin, privileged},
 		filter: db.AuditLogFilter{
-			Action: "test-action-2",
+			UserTag: admin.Tag().String(),
 		},
-		expectedEvents: []dbmodel.AuditLogEntry{events[1], events[3]},
-	}, {
-		about: "admin/privileged user is allowed to find audit events by tag",
-		users: []*openfga.User{admin, privileged},
-		filter: db.AuditLogFilter{
-			Tag: "tag-1",
-		},
-		expectedEvents: []dbmodel.AuditLogEntry{events[0], events[2]},
+		expectedEvents: []dbmodel.AuditLogEntry{events[0], events[1]},
 	}, {
 		about: "admin/privileged user - no events found",
 		users: []*openfga.User{admin, privileged},
 		filter: db.AuditLogFilter{
-			Tag: "no-such-tag",
+			UserTag: "no-such-user",
 		},
 	}, {
 		about: "unprivileged user is not allowed to access audit events",
 		users: []*openfga.User{unprivileged},
 		filter: db.AuditLogFilter{
-			Tag: "tag-1",
+			UserTag: admin.Tag().String(),
 		},
 		expectedError: "unauthorized",
 	}}
