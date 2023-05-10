@@ -18,6 +18,10 @@ func TestAuditLogEntry(t *testing.T) {
 	c := qt.New(t)
 	db := gormDB(t)
 
+	params := map[string]any{"a": "b", "c": "d"}
+	paramsJSON, err := json.Marshal(params)
+	c.Assert(err, qt.IsNil)
+
 	ale := dbmodel.AuditLogEntry{
 		Time:           time.Now(),
 		ConversationId: "1234",
@@ -28,7 +32,7 @@ func TestAuditLogEntry(t *testing.T) {
 		ObjectId:       "1",
 		UserTag:        names.NewUserTag("bob@external").String(),
 		IsResponse:     false,
-		Params:         nil,
+		Params:         paramsJSON,
 		Errors:         nil,
 	}
 	c.Assert(db.Create(&ale).Error, qt.IsNil)
@@ -41,6 +45,10 @@ func TestAuditLogEntry(t *testing.T) {
 func TestToAPIAuditEvent(t *testing.T) {
 	c := qt.New(t)
 
+	params := map[string]any{"a": "b", "c": "d"}
+	paramsJSON, err := json.Marshal(params)
+	c.Assert(err, qt.IsNil)
+
 	ale := dbmodel.AuditLogEntry{
 		Time:           time.Now(),
 		ConversationId: "1234",
@@ -51,7 +59,7 @@ func TestToAPIAuditEvent(t *testing.T) {
 		ObjectId:       "1",
 		UserTag:        names.NewUserTag("bob@external").String(),
 		IsResponse:     false,
-		Params:         nil,
+		Params:         paramsJSON,
 		Errors:         nil,
 	}
 	event := ale.ToAPIAuditEvent()
@@ -65,7 +73,7 @@ func TestToAPIAuditEvent(t *testing.T) {
 		ObjectId:       "1",
 		UserTag:        names.NewUserTag("bob@external").String(),
 		IsResponse:     false,
-		Params:         nil,
+		Params:         map[string]any{"a": "b", "c": "d"},
 		Errors:         nil,
 	}
 	c.Check(event, qt.DeepEquals, expectedEvent)

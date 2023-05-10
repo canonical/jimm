@@ -47,6 +47,10 @@ type AuditLogFilter struct {
 	// called a specific facade method.
 	Method string `json:"method,omitempty"`
 
+	// Offset is an offset that will be added when retrieving audit logs.
+	// An empty offset is equivalent to zero.
+	Offset int `json:"offset,omitempty"`
+
 	// Limit is the maximum number of audit events to return.
 	// A value of zero will ignore the limit.
 	Limit int `json:"limit,omitempty"`
@@ -78,6 +82,7 @@ func (d *Database) ForEachAuditLogEntry(ctx context.Context, filter AuditLogFilt
 		db = db.Where("facade_method = ?", filter.Method)
 	}
 	db = db.Limit(filter.Limit)
+	db = db.Offset(filter.Offset)
 
 	rows, err := db.Rows()
 	if err != nil {

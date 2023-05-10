@@ -115,6 +115,14 @@ func TestFindAuditEvents(t *testing.T) {
 		},
 		expectedEvents: []dbmodel.AuditLogEntry{events[2], events[3]},
 	}, {
+		about: "admin/privileged user is allowed to find audit events with limit/offset",
+		users: []*openfga.User{admin, privileged},
+		filter: db.AuditLogFilter{
+			Offset: 1,
+			Limit:  2,
+		},
+		expectedEvents: []dbmodel.AuditLogEntry{events[1], events[2]},
+	}, {
 		about: "admin/privileged user - no events found",
 		users: []*openfga.User{admin, privileged},
 		filter: db.AuditLogFilter{

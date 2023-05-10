@@ -347,6 +347,11 @@ func (r *controllerRoot) FindAuditEvents(ctx context.Context, req apiparams.Find
 		limit = maxLimit
 	}
 	filter.Limit = limit
+	offset := req.Offset
+	if offset < 0 {
+		offset = 0
+	}
+	filter.Offset = offset
 
 	entries, err := r.jimm.FindAuditEvents(ctx, r.user, filter)
 	if err != nil {

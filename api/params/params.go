@@ -199,6 +199,9 @@ type FindAuditEventsRequest struct {
 	// called a specific facade method.
 	Method string `json:"method,omitempty"`
 
+	// Offset is the number of items to offset the set of returned results.
+	Offset int `json:"offset,omitempty"`
+
 	// Limit is the maximum number of audit events to return.
 	Limit int `json:"limit,omitempty"`
 }
