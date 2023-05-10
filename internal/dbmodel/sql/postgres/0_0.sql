@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS audit_log (
 	params JSON,
 	errors JSON
 );
-CREATE INDEX IF NOT EXISTS idx_audit_log_time ON audit_log (created_at);
+CREATE INDEX IF NOT EXISTS idx_audit_log_time ON audit_log (time);
 CREATE INDEX IF NOT EXISTS idx_audit_log_user_tag ON audit_log (user_tag);
 CREATE INDEX IF NOT EXISTS idx_audit_log_method ON audit_log (facade_method);
 CREATE INDEX IF NOT EXISTS idx_audit_log_model ON audit_log (model);
