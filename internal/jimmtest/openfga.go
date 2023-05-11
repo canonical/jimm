@@ -105,7 +105,7 @@ func getAuthModelDefinition() (_ []openfga.TypeDefinition, err error) {
 func SetupTestOFGAClient(names ...string) (openfga.OpenFgaApi, *ofga.OFGAClient, *openfga.Configuration, error) {
 	ctx := context.Background()
 
-	testName := strings.ReplaceAll(strings.Join(names, "_"), " ", "_")
+	testName := strings.NewReplacer(" ", "_", "'", "_").Replace(strings.Join(names, "_"))
 
 	setupsMu.Lock()
 	defer setupsMu.Unlock()
