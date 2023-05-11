@@ -199,7 +199,7 @@ func (u *User) SetControllerAccess(ctx context.Context, resource names.Controlle
 
 // UnsetAuditLogViewerAccess removes a direct audit log viewer relation between the user and a controller.
 func (u *User) UnsetAuditLogViewerAccess(ctx context.Context, resource names.ControllerTag) error {
-	return unsetResourceAccess(ctx, u, resource, ofganames.AuditLogViewerRelation)
+	return unsetResourceAccess(ctx, u, resource, ofganames.AuditLogViewerRelation, true)
 }
 
 // SetCloudAccess adds a direct relation between the user and the cloud.
@@ -213,8 +213,8 @@ func (u *User) SetApplicationOfferAccess(ctx context.Context, resource names.App
 }
 
 // UnsetApplicationOfferAccess removes a direct relation between the user and the application offer.
-func (u *User) UnsetApplicationOfferAccess(ctx context.Context, resource names.ApplicationOfferTag, relation ofganames.Relation) error {
-	return unsetResourceAccess(ctx, u, resource, relation)
+func (u *User) UnsetApplicationOfferAccess(ctx context.Context, resource names.ApplicationOfferTag, relation ofganames.Relation, ignoreMissingRelation bool) error {
+	return unsetResourceAccess(ctx, u, resource, relation, ignoreMissingRelation)
 }
 
 // ListModels returns a slice of model UUIDs this user has at least reader access to.
@@ -313,17 +313,19 @@ func setResourceAccess[T ofganames.ResourceTagger](ctx context.Context, user *Us
 	return nil
 }
 
-func unsetResourceAccess[T ofganames.ResourceTagger](ctx context.Context, user *User, resource T, relation ofganames.Relation) error {
+func unsetResourceAccess[T ofganames.ResourceTagger](ctx context.Context, user *User, resource T, relation ofganames.Relation, ignoreMissingRelation bool) error {
 	err := user.client.removeRelation(ctx, Tuple{
 		Object:   ofganames.ConvertTag(user.ResourceTag()),
 		Relation: relation,
 		Target:   ofganames.ConvertTag(resource),
 	})
 	if err != nil {
-		// if the tuple does not exist we don't return an error.
-		// TODO we should opt to check against specific errors via checking their code/metadata.
-		if strings.Contains(err.Error(), "cannot delete a tuple which does not exist") {
-			return nil
+		if ignoreMissingRelation {
+			// if the tuple does not exist we don't return an error.
+			// TODO we should opt to check against specific errors via checking their code/metadata.
+			if strings.Contains(err.Error(), "cannot delete a tuple which does not exist") {
+				return nil
+			}
 		}
 		return errors.E(err)
 	}
