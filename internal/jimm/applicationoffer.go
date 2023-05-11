@@ -386,14 +386,7 @@ func (j *JIMM) GrantOfferAccess(ctx context.Context, u *openfga.User, offerURL s
 	const op = errors.Op("jimm.GrantOfferAccess")
 
 	err := j.doApplicationOfferAdmin(ctx, u, offerURL, func(offer *dbmodel.ApplicationOffer, api API) error {
-		targetUser := dbmodel.User{
-			Username: ut.Id(),
-		}
-		if err := j.Database.GetUser(ctx, &targetUser); err != nil {
-			return errors.E(err)
-		}
-
-		tUser := openfga.NewUser(&targetUser, j.OpenFGAClient)
+		tUser := openfga.NewUser(&dbmodel.User{Username: ut.Id()}, j.OpenFGAClient)
 		currentRelation := tUser.GetApplicationOfferAccess(ctx, offer.ResourceTag())
 		currentAccessLevel := ToOfferAccessString(currentRelation)
 		targetAccessLevel := determineAccessLevelAfterGrant(currentAccessLevel, string(access))
@@ -450,14 +443,7 @@ func (j *JIMM) RevokeOfferAccess(ctx context.Context, user *openfga.User, offerU
 	const op = errors.Op("jimm.RevokeOfferAccess")
 
 	err = j.doApplicationOfferAdmin(ctx, user, offerURL, func(offer *dbmodel.ApplicationOffer, api API) error {
-		targetUser := dbmodel.User{
-			Username: ut.Id(),
-		}
-		if err := j.Database.GetUser(ctx, &targetUser); err != nil {
-			return err
-		}
-
-		tUser := openfga.NewUser(&targetUser, j.OpenFGAClient)
+		tUser := openfga.NewUser(&dbmodel.User{Username: ut.Id()}, j.OpenFGAClient)
 		currentRelation := tUser.GetApplicationOfferAccess(ctx, offer.ResourceTag())
 		currentAccessLevel := ToOfferAccessString(currentRelation)
 		targetAccessLevel := determineAccessLevelAfterRevoke(currentAccessLevel, string(access))
