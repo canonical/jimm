@@ -444,32 +444,13 @@ func (j *JIMM) RevokeOfferAccess(ctx context.Context, user *openfga.User, offerU
 
 	err = j.doApplicationOfferAdmin(ctx, user, offerURL, func(offer *dbmodel.ApplicationOffer, api API) error {
 		tUser := openfga.NewUser(&dbmodel.User{Username: ut.Id()}, j.OpenFGAClient)
-		currentRelation := tUser.GetApplicationOfferAccess(ctx, offer.ResourceTag())
-		currentAccessLevel := ToOfferAccessString(currentRelation)
-		targetAccessLevel := determineAccessLevelAfterRevoke(currentAccessLevel, string(access))
-		targetRelation, err := ToOfferRelation(targetAccessLevel)
+		targetRelation, err := ToOfferRelation(string(access))
 		if err != nil {
 			return errors.E(op, err)
 		}
-
-		if targetAccessLevel != currentAccessLevel {
-			err = tUser.UnsetApplicationOfferAccess(ctx, offer.ResourceTag(), currentRelation)
-			if err != nil {
-				return errors.E(op, err, "failed to unset existing access")
-			}
-
-			if targetAccessLevel != "" {
-				err = tUser.SetApplicationOfferAccess(ctx, offer.ResourceTag(), targetRelation)
-				if err != nil {
-					// Revert dropped relation
-					// TODO (babakks): This all should have happened in a transactional way
-					undoErr := tUser.SetApplicationOfferAccess(ctx, offer.ResourceTag(), currentRelation)
-					if undoErr != nil {
-						return errors.E(op, undoErr, "failed to revert revoked access")
-					}
-					return errors.E(op, err, "failed to revoke access")
-				}
-			}
+		err = tUser.UnsetApplicationOfferAccess(ctx, offer.ResourceTag(), targetRelation, false)
+		if err != nil {
+			return errors.E(op, err, "failed to unset given access")
 		}
 		return nil
 	})
