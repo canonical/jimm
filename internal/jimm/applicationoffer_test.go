@@ -213,16 +213,18 @@ func TestRevokeOfferAccess(t *testing.T) {
 	now := time.Now().UTC().Round(time.Millisecond)
 
 	tests := []struct {
-		about               string
-		parameterFunc       func(*environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission)
-		expectedError       string
-		expectedAccessLevel string
+		about                      string
+		parameterFunc              func(*environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission)
+		expectedError              string
+		expectedAccessLevel        string
+		expectedAccessLevelOnError string // This expectation is meant to ensure there'll be no unpredicted behavior (like changing existing relations) after an error has occurred
 	}{{
 		about: "admin revokes a model's admin user's admin access - an error returns (relation is indirect)",
 		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
 			return env.users[1], env.users[0], "test-offer-url", jujuparams.OfferAdminAccess
 		},
-		expectedError: "failed to unset given access",
+		expectedError:              "failed to unset given access",
+		expectedAccessLevelOnError: "admin",
 	}, {
 		about: "model admin revokes an admin user admin access - user has no access",
 		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
@@ -246,19 +248,22 @@ func TestRevokeOfferAccess(t *testing.T) {
 		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
 			return env.users[0], env.users[1], "test-offer-url", jujuparams.OfferConsumeAccess
 		},
-		expectedError: "failed to unset given access",
+		expectedError:              "failed to unset given access",
+		expectedAccessLevelOnError: "admin",
 	}, {
 		about: "admin revokes an admin user read access - an error returns (no direct relation to remove)",
 		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
 			return env.users[0], env.users[1], "test-offer-url", jujuparams.OfferReadAccess
 		},
-		expectedError: "failed to unset given access",
+		expectedError:              "failed to unset given access",
+		expectedAccessLevelOnError: "admin",
 	}, {
 		about: "admin revokes a consume user admin access - an error returns (no direct relation to remove)",
 		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
 			return env.users[0], env.users[2], "test-offer-url", jujuparams.OfferAdminAccess
 		},
-		expectedError: "failed to unset given access",
+		expectedError:              "failed to unset given access",
+		expectedAccessLevelOnError: "consume",
 	}, {
 		about: "admin revokes a consume user consume access - user has no access",
 		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
@@ -270,19 +275,22 @@ func TestRevokeOfferAccess(t *testing.T) {
 		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
 			return env.users[0], env.users[2], "test-offer-url", jujuparams.OfferReadAccess
 		},
-		expectedError: "failed to unset given access",
+		expectedError:              "failed to unset given access",
+		expectedAccessLevelOnError: "consume",
 	}, {
 		about: "admin revokes a read user admin access - an error returns (no direct relation to remove)",
 		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
 			return env.users[0], env.users[3], "test-offer-url", jujuparams.OfferAdminAccess
 		},
-		expectedError: "failed to unset given access",
+		expectedError:              "failed to unset given access",
+		expectedAccessLevelOnError: "read",
 	}, {
 		about: "admin revokes a read user consume access - an error returns (no direct relation to remove)",
 		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
 			return env.users[0], env.users[3], "test-offer-url", jujuparams.OfferConsumeAccess
 		},
-		expectedError: "failed to unset given access",
+		expectedError:              "failed to unset given access",
+		expectedAccessLevelOnError: "read",
 	}, {
 		about: "admin revokes a read user read access - user has no access",
 		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
@@ -290,7 +298,7 @@ func TestRevokeOfferAccess(t *testing.T) {
 		},
 		expectedAccessLevel: "",
 	}, {
-		about: "admin tries to revoke access to user that does not have access - an error returns (no direct relation to remove)",
+		about: "admin tries to revoke access to user that does not have access - an error returns",
 		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
 			return env.users[0], env.users[4], "test-offer-url", jujuparams.OfferReadAccess
 		},
@@ -341,19 +349,25 @@ func TestRevokeOfferAccess(t *testing.T) {
 				},
 			}
 
-			err = j.RevokeOfferAccess(ctx, openfga.NewUser(&authenticatedUser, client), offerURL, offerUser.ResourceTag(), revokeAccessLevel)
-			if test.expectedError == "" {
-				c.Assert(err, qt.IsNil)
-
+			assertAppliedRelation := func(expectedAppliedRelation string) {
 				offer := dbmodel.ApplicationOffer{
 					URL: offerURL,
 				}
-				err = db.GetApplicationOffer(ctx, &offer)
+				err := db.GetApplicationOffer(ctx, &offer)
 				c.Assert(err, qt.IsNil)
 				appliedRelation := openfga.NewUser(&offerUser, client).GetApplicationOfferAccess(ctx, offer.ResourceTag())
-				c.Assert(jimm.ToOfferAccessString(appliedRelation), qt.Equals, test.expectedAccessLevel)
+				c.Assert(jimm.ToOfferAccessString(appliedRelation), qt.Equals, expectedAppliedRelation)
+			}
+
+			err = j.RevokeOfferAccess(ctx, openfga.NewUser(&authenticatedUser, client), offerURL, offerUser.ResourceTag(), revokeAccessLevel)
+			if test.expectedError == "" {
+				c.Assert(err, qt.IsNil)
+				assertAppliedRelation(test.expectedAccessLevel)
 			} else {
 				c.Assert(err, qt.ErrorMatches, test.expectedError)
+				if test.expectedAccessLevelOnError != "" {
+					assertAppliedRelation(test.expectedAccessLevelOnError)
+				}
 			}
 		})
 	}
