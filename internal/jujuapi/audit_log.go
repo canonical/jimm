@@ -7,7 +7,6 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
-	"strings"
 	"time"
 
 	"github.com/juju/juju/rpc"
@@ -63,19 +62,12 @@ func (r dbAuditLogger) LogRequest(header *rpc.Header, body interface{}) error {
 	ale.FacadeMethod = header.Request.Action
 	ale.FacadeVersion = header.Request.Version
 	if body != nil {
-		method := strings.ToLower(ale.FacadeMethod)
-		switch method {
-		case "login":
-			// Don't log the body on login requests.
-			// This saves space as there is a lot of macaroon info sent on login.
-		default:
-			jsonBody, err := json.Marshal(body)
-			if err != nil {
-				zapctx.Error(context.Background(), "failed to marshal body", zap.Error(err))
-				return err
-			}
-			ale.Params = jsonBody
+		jsonBody, err := json.Marshal(body)
+		if err != nil {
+			zapctx.Error(context.Background(), "failed to marshal body", zap.Error(err))
+			return err
 		}
+		ale.Params = jsonBody
 	}
 	r.jimm.AddAuditLogEntry(&ale)
 	return nil

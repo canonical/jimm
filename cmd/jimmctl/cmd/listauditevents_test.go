@@ -41,7 +41,8 @@ func (s *listAuditEventsSuite) TestListAuditEventsSuperuser(c *gc.C) {
   user-tag: user-
   model: ""
   is-response: false
-  params: {}
+  params:
+    params: redacted
   errors: .*
 - time: .*
   conversation-id: .*
