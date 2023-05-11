@@ -385,25 +385,7 @@ func (j *JIMM) GetApplicationOffer(ctx context.Context, user *openfga.User, offe
 func (j *JIMM) GrantOfferAccess(ctx context.Context, u *openfga.User, offerURL string, ut names.UserTag, access jujuparams.OfferAccessPermission) error {
 	const op = errors.Op("jimm.GrantOfferAccess")
 
-	ale := dbmodel.AuditLogEntry{
-		Time:    time.Now().UTC().Round(time.Millisecond),
-		UserTag: u.Tag().String(),
-		Action:  "grant",
-		Params: dbmodel.StringMap{
-			"url":    offerURL,
-			"user":   ut.String(),
-			"access": string(access),
-		},
-	}
-	defer j.addAuditLogEntry(&ale)
-
-	fail := func(err error) error {
-		ale.Params["err"] = err.Error()
-		return err
-	}
-
 	err := j.doApplicationOfferAdmin(ctx, u, offerURL, func(offer *dbmodel.ApplicationOffer, api API) error {
-		ale.Tag = offer.Tag().String()
 		targetUser := dbmodel.User{
 			Username: ut.Id(),
 		}
@@ -431,11 +413,10 @@ func (j *JIMM) GrantOfferAccess(ctx context.Context, u *openfga.User, offerURL s
 
 		return nil
 	})
-	if err != nil {
-		return fail(errors.E(op, err))
-	}
 
-	ale.Success = true
+	if err != nil {
+		return errors.E(op, err)
+	}
 	return nil
 }
 
@@ -468,25 +449,7 @@ func determineAccessLevelAfterGrant(currentAccessLevel, grantAccessLevel string)
 func (j *JIMM) RevokeOfferAccess(ctx context.Context, user *openfga.User, offerURL string, ut names.UserTag, access jujuparams.OfferAccessPermission) (err error) {
 	const op = errors.Op("jimm.RevokeOfferAccess")
 
-	ale := dbmodel.AuditLogEntry{
-		Time:    time.Now().UTC().Round(time.Millisecond),
-		UserTag: user.Tag().String(),
-		Action:  "revoke",
-		Params: dbmodel.StringMap{
-			"url":    offerURL,
-			"user":   ut.String(),
-			"access": string(access),
-		},
-	}
-	defer j.addAuditLogEntry(&ale)
-
-	fail := func(err error) error {
-		ale.Params["err"] = err.Error()
-		return err
-	}
-
 	err = j.doApplicationOfferAdmin(ctx, user, offerURL, func(offer *dbmodel.ApplicationOffer, api API) error {
-		ale.Tag = offer.Tag().String()
 		targetUser := dbmodel.User{
 			Username: ut.Id(),
 		}
@@ -526,10 +489,8 @@ func (j *JIMM) RevokeOfferAccess(ctx context.Context, user *openfga.User, offerU
 	})
 
 	if err != nil {
-		return fail(errors.E(op, err))
+		return errors.E(op, err)
 	}
-
-	ale.Success = true
 	return nil
 }
 
