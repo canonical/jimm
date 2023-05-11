@@ -218,65 +218,71 @@ func TestRevokeOfferAccess(t *testing.T) {
 		expectedError      string
 		expectedAccesLevel string
 	}{{
-		about: "model admin revokes an admin user admin access - user keeps consume access",
+		about: "admin revokes a model's admin user's admin access - an error returns (relation is indirect)",
+		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
+			return env.users[1], env.users[0], "test-offer-url", jujuparams.OfferAdminAccess
+		},
+		expectedError: "failed to unset given access",
+	}, {
+		about: "model admin revokes an admin user admin access - user has no access",
 		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
 			return env.users[0], env.users[1], "test-offer-url", jujuparams.OfferAdminAccess
 		},
-		expectedAccesLevel: "consume",
+		expectedAccesLevel: "",
 	}, {
-		about: "admin revokes an admin user admin access - user keeps consume access",
+		about: "admin revokes an admin user admin access - user has no access",
 		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
 			return env.users[5], env.users[1], "test-offer-url", jujuparams.OfferAdminAccess
 		},
-		expectedAccesLevel: "consume",
+		expectedAccesLevel: "",
 	}, {
-		about: "superuser revokes an admin user admin access - user keeps consume access",
+		about: "superuser revokes an admin user admin access - user has no access",
 		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
 			return env.users[6], env.users[1], "test-offer-url", jujuparams.OfferAdminAccess
 		},
-		expectedAccesLevel: "consume",
+		expectedAccesLevel: "",
 	}, {
-		about: "admin revokes an admin user consume access - user keeps read access",
+		about: "admin revokes an admin user consume access - an error returns (no direct relation to remove)",
 		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
 			return env.users[0], env.users[1], "test-offer-url", jujuparams.OfferConsumeAccess
 		},
-		expectedAccesLevel: "read",
+		expectedError: "failed to unset given access",
 	}, {
-		about: "admin revokes an admin user read access - user has no access",
+		about: "admin revokes an admin user read access - an error returns (no direct relation to remove)",
 		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
 			return env.users[0], env.users[1], "test-offer-url", jujuparams.OfferReadAccess
 		},
-		expectedAccesLevel: "",
+		expectedError: "failed to unset given access",
 	}, {
-		about: "admin revokes a consume user admin access - user keeps consume access",
+		about: "admin revokes a consume user admin access - an error returns (no direct relation to remove)",
 		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
 			return env.users[0], env.users[2], "test-offer-url", jujuparams.OfferAdminAccess
 		},
-		expectedAccesLevel: "consume",
+		expectedError: "failed to unset given access",
 	}, {
-		about: "admin revokes a consume user consume access - user keeps read access",
+		about: "admin revokes a consume user consume access - user has no access",
 		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
 			return env.users[0], env.users[2], "test-offer-url", jujuparams.OfferConsumeAccess
 		},
-		expectedAccesLevel: "read",
+		expectedAccesLevel: "",
 	}, {
-		about: "admin revokes a consume user read access - user has no access",
+		about: "admin revokes a consume user read access - an error returns (no direct relation to remove)",
 		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
 			return env.users[0], env.users[2], "test-offer-url", jujuparams.OfferReadAccess
 		},
-		expectedAccesLevel: "",
+		expectedError: "failed to unset given access",
 	}, {
-		about: "admin revokes a read user admin access - user keeps read access",
+		about: "admin revokes a read user admin access - an error returns (no direct relation to remove)",
 		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
 			return env.users[0], env.users[3], "test-offer-url", jujuparams.OfferAdminAccess
 		},
-		expectedAccesLevel: "read",
+		expectedError: "failed to unset given access",
 	}, {
-		about: "admin revokes a read user consume access - user keeps read access",
+		about: "admin revokes a read user consume access - an error returns (no direct relation to remove)",
 		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
 			return env.users[0], env.users[3], "test-offer-url", jujuparams.OfferConsumeAccess
 		},
-		expectedAccesLevel: "read",
+		expectedError: "failed to unset given access",
 	}, {
 		about: "admin revokes a read user read access - user has no access",
 		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
@@ -284,11 +290,11 @@ func TestRevokeOfferAccess(t *testing.T) {
 		},
 		expectedAccesLevel: "",
 	}, {
-		about: "admin tries to revoke access to use that does not have access",
+		about: "admin tries to revoke access to user that does not have access - an error returns (no direct relation to remove)",
 		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
 			return env.users[0], env.users[4], "test-offer-url", jujuparams.OfferReadAccess
 		},
-		expectedAccesLevel: "",
+		expectedError: "failed to unset given access",
 	}, {
 		about: "user with consume access cannot revoke access",
 		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
