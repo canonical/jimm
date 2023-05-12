@@ -7,7 +7,6 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
-	"time"
 
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
@@ -35,45 +34,29 @@ import (
 func (j *JIMM) AddController(ctx context.Context, u *openfga.User, ctl *dbmodel.Controller) error {
 	const op = errors.Op("jimm.AddController")
 
-	ale := dbmodel.AuditLogEntry{
-		Time:    time.Now().UTC().Round(time.Millisecond),
-		UserTag: u.Tag().String(),
-		Action:  "add",
-		Params: dbmodel.StringMap{
-			"name": ctl.Name,
-		},
-	}
-	defer j.addAuditLogEntry(&ale)
-
-	fail := func(err error) error {
-		ale.Params["err"] = err.Error()
-		return err
-	}
-
 	isJIMMAdmin, err := openfga.IsAdministrator(ctx, u, j.ResourceTag())
 	if err != nil {
-		return fail(errors.E(op, errors.CodeUnauthorized, "unauthorized"))
+		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 	if !isJIMMAdmin {
-		return fail(errors.E(op, errors.CodeUnauthorized, "unauthorized"))
+		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
 	api, err := j.dial(ctx, ctl, names.ModelTag{})
 	if err != nil {
 		zapctx.Error(ctx, "failed to dial the controller", zaputil.Error(err))
-		return fail(errors.E(op, err, "failed to dial the controller"))
+		return errors.E(op, err, "failed to dial the controller")
 	}
 	defer api.Close()
-	ale.Tag = names.NewControllerTag(ctl.UUID).String()
 
 	var ms jujuparams.ModelSummary
 	if err := api.ControllerModelSummary(ctx, &ms); err != nil {
 		zapctx.Error(ctx, "failed to get model summary", zaputil.Error(err))
-		return fail(errors.E(op, err, "failed to get model summary"))
+		return errors.E(op, err, "failed to get model summary")
 	}
 	ct, err := names.ParseCloudTag(ms.CloudTag)
 	if err != nil {
-		return fail(errors.E(op, err, "failed to parse the cloud tag"))
+		return errors.E(op, err, "failed to parse the cloud tag")
 	}
 	ctl.CloudName = ct.Id()
 	ctl.CloudRegion = ms.CloudRegion
@@ -81,7 +64,7 @@ func (j *JIMM) AddController(ctx context.Context, u *openfga.User, ctl *dbmodel.
 
 	clouds, err := api.Clouds(ctx)
 	if err != nil {
-		return fail(errors.E(op, err, "failed to fetch controller clouds"))
+		return errors.E(op, err, "failed to fetch controller clouds")
 	}
 
 	var dbClouds []dbmodel.Cloud
@@ -120,7 +103,7 @@ func (j *JIMM) AddController(ctx context.Context, u *openfga.User, ctl *dbmodel.
 	if j.CredentialStore != nil {
 		err := j.CredentialStore.PutControllerCredentials(ctx, ctl.Name, ctl.AdminUser, ctl.AdminPassword)
 		if err != nil {
-			return fail(errors.E(op, err, "failed to store controller credentials"))
+			return errors.E(op, err, "failed to store controller credentials")
 		}
 		credentialsStored = true
 	}
@@ -198,7 +181,7 @@ func (j *JIMM) AddController(ctx context.Context, u *openfga.User, ctl *dbmodel.
 	})
 
 	if err != nil {
-		return fail(errors.E(op, err))
+		return errors.E(op, err)
 	}
 
 	for _, cloud := range dbClouds {
@@ -255,7 +238,6 @@ func (j *JIMM) AddController(ctx context.Context, u *openfga.User, ctl *dbmodel.
 		)
 	}
 
-	ale.Success = true
 	return nil
 }
 
@@ -361,29 +343,12 @@ func (a controllerAccessLevel) value() int {
 func (j *JIMM) GrantControllerAccess(ctx context.Context, u *dbmodel.User, accessUserTag names.UserTag, accessLevel string) error {
 	const op = errors.Op("jimm.GrantControllerAccess")
 
-	ale := dbmodel.AuditLogEntry{
-		Time:    time.Now().UTC().Round(time.Millisecond),
-		UserTag: u.Tag().String(),
-		Action:  "grant",
-		Params: dbmodel.StringMap{
-			"access":     accessLevel,
-			"controller": j.ResourceTag().String(),
-			"user":       accessUserTag.String(),
-		},
-	}
-	defer j.addAuditLogEntry(&ale)
-
-	fail := func(err error) error {
-		ale.Params["err"] = err.Error()
-		return err
-	}
-
 	if u.ControllerAccess != "superuser" {
-		return fail(errors.E(op, errors.CodeUnauthorized, "cannot grant controller access"))
+		return errors.E(op, errors.CodeUnauthorized, "cannot grant controller access")
 	}
 
 	if err := controllerAccessLevel(accessLevel).validate(); err != nil {
-		return fail(errors.E(op, err, errors.CodeBadRequest))
+		return errors.E(op, err, errors.CodeBadRequest)
 	}
 
 	user := dbmodel.User{
@@ -391,7 +356,7 @@ func (j *JIMM) GrantControllerAccess(ctx context.Context, u *dbmodel.User, acces
 	}
 	err := j.Database.GetUser(ctx, &user)
 	if err != nil {
-		return fail(errors.E(op, err))
+		return errors.E(op, err)
 	}
 
 	// if user's access level is already greater than what we are trying to set
@@ -411,29 +376,12 @@ func (j *JIMM) GrantControllerAccess(ctx context.Context, u *dbmodel.User, acces
 func (j *JIMM) RevokeControllerAccess(ctx context.Context, u *dbmodel.User, accessUserTag names.UserTag, accessLevel string) error {
 	const op = errors.Op("jimm.RevokeControllerAccess")
 
-	ale := dbmodel.AuditLogEntry{
-		Time:    time.Now().UTC().Round(time.Millisecond),
-		UserTag: u.Tag().String(),
-		Action:  "revoke",
-		Params: dbmodel.StringMap{
-			"access":     accessLevel,
-			"controller": j.ResourceTag().String(),
-			"user":       accessUserTag.String(),
-		},
-	}
-	defer j.addAuditLogEntry(&ale)
-
-	fail := func(err error) error {
-		ale.Params["err"] = err.Error()
-		return err
-	}
-
 	if u.ControllerAccess != "superuser" {
-		return fail(errors.E(op, errors.CodeUnauthorized, "cannot revoke controller access"))
+		return errors.E(op, errors.CodeUnauthorized, "cannot revoke controller access")
 	}
 
 	if err := controllerAccessLevel(accessLevel).validate(); err != nil {
-		return fail(errors.E(op, err, errors.CodeBadRequest))
+		return errors.E(op, err, errors.CodeBadRequest)
 	}
 	userAccess := noAccess
 	switch controllerAccessLevel(accessLevel) {
@@ -447,7 +395,7 @@ func (j *JIMM) RevokeControllerAccess(ctx context.Context, u *dbmodel.User, acce
 	}
 	err := j.Database.GetUser(ctx, &user)
 	if err != nil {
-		return fail(errors.E(op, err))
+		return errors.E(op, err)
 	}
 	user.ControllerAccess = string(userAccess)
 	err = j.Database.UpdateUser(ctx, &user)
@@ -513,29 +461,12 @@ func (j *JIMM) GetControllerAccess(ctx context.Context, user *openfga.User, cont
 func (j *JIMM) ImportModel(ctx context.Context, user *openfga.User, controllerName string, modelTag names.ModelTag) error {
 	const op = errors.Op("jimm.ImportModel")
 
-	ale := dbmodel.AuditLogEntry{
-		Time:    time.Now().UTC().Round(time.Millisecond),
-		UserTag: user.Tag().String(),
-		Action:  "import",
-		Tag:     modelTag.String(),
-		Params: dbmodel.StringMap{
-			"controller": controllerName,
-			"model":      modelTag.String(),
-		},
-	}
-	defer j.addAuditLogEntry(&ale)
-
-	fail := func(err error) error {
-		ale.Params["err"] = err.Error()
-		return err
-	}
-
 	isJIMMAdmin, err := openfga.IsAdministrator(ctx, user, j.ResourceTag())
 	if err != nil {
-		return fail(errors.E(op, err))
+		return errors.E(op, err)
 	}
 	if !isJIMMAdmin {
-		return fail(errors.E(op, errors.CodeUnauthorized, "unauthorized"))
+		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
 	controller := dbmodel.Controller{

@@ -333,13 +333,6 @@ func (r *controllerRoot) FindAuditEvents(ctx context.Context, req apiparams.Find
 			return apiparams.AuditEvents{}, errors.E(op, err, errors.CodeBadRequest, `invalid "before" filter`)
 		}
 	}
-	if req.Tag != "" {
-		tag, err := names.ParseTag(req.Tag)
-		if err != nil {
-			return apiparams.AuditEvents{}, errors.E(op, err, errors.CodeBadRequest, `invalid "tag" filter`)
-		}
-		filter.Tag = tag.String()
-	}
 	if req.UserTag != "" {
 		tag, err := names.ParseUserTag(req.UserTag)
 		if err != nil {
@@ -347,7 +340,6 @@ func (r *controllerRoot) FindAuditEvents(ctx context.Context, req apiparams.Find
 		}
 		filter.UserTag = tag.String()
 	}
-	filter.Action = req.Action
 
 	limit := int(req.Limit)
 	if limit < 1 || limit > maxLimit {

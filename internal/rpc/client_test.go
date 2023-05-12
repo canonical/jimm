@@ -30,7 +30,7 @@ func TestDialError(t *testing.T) {
 	d := *srv.dialer
 	d.TLSConfig = nil
 	_, err := d.Dial(context.Background(), srv.URL)
-	c.Assert(err, qt.ErrorMatches, `x509: certificate signed by unknown authority`)
+	c.Assert(err, qt.ErrorMatches, `.*x509: certificate signed by unknown authority`)
 }
 
 func TestDial(t *testing.T) {

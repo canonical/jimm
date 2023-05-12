@@ -2758,7 +2758,7 @@ func TestFindApplicationOffers(t *testing.T) {
 							Access:   "admin",
 						}}
 					}
-					for i, _ := range offers {
+					for i := range offers {
 						users := offers[i].Users
 						sort.Slice(users, func(i, j int) bool {
 							return users[i].UserName < users[j].UserName
@@ -3079,7 +3079,7 @@ func TestListApplicationOffers(t *testing.T) {
 	offers, err := j.ListApplicationOffers(ctx, openfga.NewUser(&u, client), filters...)
 	c.Assert(err, qt.IsNil)
 
-	for i, _ := range offers {
+	for i := range offers {
 		sort.Slice(offers[i].Users, func(j, k int) bool {
 			return offers[i].Users[j].UserName < offers[i].Users[k].UserName
 		})

@@ -3,6 +3,7 @@
 package dbmodel_test
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -17,13 +18,22 @@ func TestAuditLogEntry(t *testing.T) {
 	c := qt.New(t)
 	db := gormDB(t)
 
+	body := map[string]any{"a": "b", "c": "d"}
+	bodyJSON, err := json.Marshal(body)
+	c.Assert(err, qt.IsNil)
+
 	ale := dbmodel.AuditLogEntry{
-		Time:    time.Now(),
-		Tag:     names.NewModelTag("00000001-0000-0000-0000-0000-000000000008").String(),
-		UserTag: names.NewUserTag("bob@external").String(),
-		Action:  "created",
-		Success: true,
-		Params:  dbmodel.StringMap{"a": "b", "c": "d"},
+		Time:           time.Now(),
+		ConversationId: "1234",
+		MessageId:      9876,
+		FacadeName:     "JIMM",
+		FacadeMethod:   "AddController",
+		FacadeVersion:  1,
+		ObjectId:       "1",
+		UserTag:        names.NewUserTag("bob@external").String(),
+		IsResponse:     false,
+		Errors:         nil,
+		Body:           bodyJSON,
 	}
 	c.Assert(db.Create(&ale).Error, qt.IsNil)
 
@@ -35,38 +45,47 @@ func TestAuditLogEntry(t *testing.T) {
 func TestToAPIAuditEvent(t *testing.T) {
 	c := qt.New(t)
 
+	body := map[string]any{"a": "b", "c": "d"}
+	bodyJSON, err := json.Marshal(body)
+	c.Assert(err, qt.IsNil)
+
 	ale := dbmodel.AuditLogEntry{
-		Time:    time.Now(),
-		Tag:     names.NewModelTag("00000001-0000-0000-0000-0000-000000000008").String(),
-		UserTag: names.NewUserTag("bob@external").String(),
-		Action:  "created",
-		Success: true,
-		Params:  dbmodel.StringMap{"a": "b", "c": "d"},
+		Time:           time.Now(),
+		ConversationId: "1234",
+		MessageId:      9876,
+		FacadeName:     "JIMM",
+		FacadeMethod:   "AddController",
+		FacadeVersion:  1,
+		ObjectId:       "1",
+		UserTag:        names.NewUserTag("bob@external").String(),
+		IsResponse:     false,
+		Errors:         nil,
+		Body:           bodyJSON,
 	}
 	event := ale.ToAPIAuditEvent()
-	c.Check(event, qt.DeepEquals, apiparams.AuditEvent{
-		Time:    ale.Time,
-		Tag:     names.NewModelTag("00000001-0000-0000-0000-0000-000000000008").String(),
-		UserTag: names.NewUserTag("bob@external").String(),
-		Action:  "created",
-		Success: true,
-		Params: map[string]string{
-			"a": "b",
-			"c": "d",
-		},
-	})
+	expectedEvent := apiparams.AuditEvent{
+		Time:           ale.Time,
+		ConversationId: "1234",
+		MessageId:      9876,
+		FacadeName:     "JIMM",
+		FacadeMethod:   "AddController",
+		FacadeVersion:  1,
+		ObjectId:       "1",
+		UserTag:        names.NewUserTag("bob@external").String(),
+		IsResponse:     false,
+		Errors:         nil,
+		Body:           map[string]any{"a": "b", "c": "d"},
+	}
+	c.Check(event, qt.DeepEquals, expectedEvent)
 
-	ale.Success = false
+	// And test with a response
+	errors := map[string]any{}
+	errorsJSON, err := json.Marshal(errors)
+	c.Assert(err, qt.IsNil)
+	ale.Errors = errorsJSON
+	ale.IsResponse = true
 	event = ale.ToAPIAuditEvent()
-	c.Check(event, qt.DeepEquals, apiparams.AuditEvent{
-		Time:    ale.Time,
-		Tag:     names.NewModelTag("00000001-0000-0000-0000-0000-000000000008").String(),
-		UserTag: names.NewUserTag("bob@external").String(),
-		Action:  "created",
-		Success: false,
-		Params: map[string]string{
-			"a": "b",
-			"c": "d",
-		},
-	})
+	expectedEvent.IsResponse = true
+	expectedEvent.Errors = map[string]any{}
+	c.Check(event, qt.DeepEquals, expectedEvent)
 }

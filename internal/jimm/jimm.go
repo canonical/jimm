@@ -297,7 +297,7 @@ func (j *JIMM) forEachController(ctx context.Context, controllers []dbmodel.Cont
 }
 
 // addAuditLogEntry causes an entry to be added the the audit log.
-func (j *JIMM) addAuditLogEntry(ale *dbmodel.AuditLogEntry) {
+func (j *JIMM) AddAuditLogEntry(ale *dbmodel.AuditLogEntry) {
 	ctx := context.Background()
 	if err := j.Database.AddAuditLogEntry(ctx, ale); err != nil {
 		zapctx.Error(ctx, "cannot store audit log entry", zap.Error(err), zap.Any("entry", *ale))

@@ -198,7 +198,9 @@ func (s *proxySuite) SetUpTest(c *gc.C) {
 
 func (s *proxySuite) TearDownTest(c *gc.C) {
 	os.Clearenv()
-	s.cancelJwkRotator()
+	if s.cancelJwkRotator != nil {
+		s.cancelJwkRotator()
+	}
 	s.websocketSuite.TearDownTest(c)
 }
 

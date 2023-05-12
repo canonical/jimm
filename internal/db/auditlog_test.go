@@ -4,6 +4,7 @@ package db_test
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -27,19 +28,17 @@ func TestAddAuditLogEntryUnconfiguredDatabase(t *testing.T) {
 func (s *dbSuite) TestAddAuditLogEntry(c *qt.C) {
 	ctx := context.Background()
 
+	data := map[string]any{"k1": "v1", "k2": "v2"}
+	dataJson, err := json.Marshal(data)
+	c.Assert(err, qt.IsNil)
+
 	ale := dbmodel.AuditLogEntry{
 		Time:    time.Now().UTC().Round(time.Millisecond),
-		Tag:     names.NewModelTag("00000002-0000-0000-0000-000000000001").String(),
 		UserTag: names.NewUserTag("alice@external").String(),
-		Action:  "create",
-		Success: true,
-		Params: dbmodel.StringMap{
-			"k1": "v1",
-			"k2": "v2",
-		},
+		Body:    dataJson,
 	}
 
-	err := s.Database.AddAuditLogEntry(ctx, &ale)
+	err = s.Database.AddAuditLogEntry(ctx, &ale)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
 
 	err = s.Database.Migrate(context.Background(), false)
@@ -71,24 +70,16 @@ func TestForEachAuditLogEntryUnconfiguredDatabase(t *testing.T) {
 
 var testAuditLogEntries = []dbmodel.AuditLogEntry{{
 	Time:    time.Date(2020, time.February, 20, 20, 2, 20, 0, time.UTC),
-	Tag:     names.NewModelTag("00000002-0000-0000-0000-000000000001").String(),
 	UserTag: names.NewUserTag("alice@external").String(),
-	Action:  "create",
 }, {
 	Time:    time.Date(2020, time.February, 20, 20, 2, 21, 0, time.UTC),
-	Tag:     names.NewModelTag("00000002-0000-0000-0000-000000000002").String(),
 	UserTag: names.NewUserTag("alice@external").String(),
-	Action:  "create",
 }, {
 	Time:    time.Date(2020, time.February, 20, 20, 2, 21, 0, time.UTC),
-	Tag:     names.NewModelTag("00000002-0000-0000-0000-000000000001").String(),
 	UserTag: names.NewUserTag("bob@external").String(),
-	Action:  "destroy",
 }, {
 	Time:    time.Date(2020, time.February, 20, 20, 2, 23, 0, time.UTC),
-	Tag:     names.NewModelTag("00000002-0000-0000-0000-000000000002").String(),
 	UserTag: names.NewUserTag("alice@external").String(),
-	Action:  "grant",
 }}
 
 var forEachAuditLogEntryTests = []struct {
@@ -119,23 +110,11 @@ var forEachAuditLogEntryTests = []struct {
 	},
 	expectEntries: []int{1, 2},
 }, {
-	name: "TagFilter",
-	filter: db.AuditLogFilter{
-		Tag: names.NewModelTag("00000002-0000-0000-0000-000000000002").String(),
-	},
-	expectEntries: []int{1, 3},
-}, {
 	name: "UserTagFilter",
 	filter: db.AuditLogFilter{
 		UserTag: names.NewUserTag("alice@external").String(),
 	},
 	expectEntries: []int{0, 1, 3},
-}, {
-	name: "ActionFilter",
-	filter: db.AuditLogFilter{
-		Action: "create",
-	},
-	expectEntries: []int{0, 1},
 }}
 
 func (s *dbSuite) TestForEachAuditLogEntry(c *qt.C) {

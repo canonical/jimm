@@ -35,17 +35,9 @@ type AuditLogFilter struct {
 	// found.
 	End time.Time
 
-	// Tag defines the tag on the audit log entry to match, if this is
-	// empty all tags are matched.
-	Tag string
-
 	// UserTag defines the user-tag on the audit log entry to match, if
 	// this is empty all user-tags are matched.
 	UserTag string
-
-	// Action defines the action on the audit-log entry to match, if
-	// this is empty all actions are matched.
-	Action string
 }
 
 // ForEachAuditLogEntry iterates through all audit log entries that match
@@ -64,14 +56,8 @@ func (d *Database) ForEachAuditLogEntry(ctx context.Context, filter AuditLogFilt
 	if !filter.End.IsZero() {
 		db = db.Where("time <= ?", filter.End)
 	}
-	if filter.Tag != "" {
-		db = db.Where("tag = ?", filter.Tag)
-	}
 	if filter.UserTag != "" {
 		db = db.Where("user_tag = ?", filter.UserTag)
-	}
-	if filter.Action != "" {
-		db = db.Where("action = ?", filter.Action)
 	}
 	rows, err := db.Rows()
 	if err != nil {
