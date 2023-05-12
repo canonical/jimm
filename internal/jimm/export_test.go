@@ -13,8 +13,7 @@ import (
 )
 
 var (
-	DetermineAccessLevelAfterRevoke = determineAccessLevelAfterRevoke
-	DetermineAccessLevelAfterGrant  = determineAccessLevelAfterGrant
+	DetermineAccessLevelAfterGrant = determineAccessLevelAfterGrant
 )
 
 func (w *Watcher) PollControllerModels(ctx context.Context, ctl *dbmodel.Controller) {

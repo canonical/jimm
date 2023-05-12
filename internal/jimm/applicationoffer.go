@@ -440,46 +440,6 @@ func (j *JIMM) RevokeOfferAccess(ctx context.Context, user *openfga.User, offerU
 	return nil
 }
 
-func determineAccessLevelAfterRevoke(currentAccessLevel, revokeAccessLevel string) string {
-	switch currentAccessLevel {
-	case string(jujuparams.OfferAdminAccess):
-		switch revokeAccessLevel {
-		case string(jujuparams.OfferAdminAccess):
-			return string(jujuparams.OfferConsumeAccess)
-		case string(jujuparams.OfferConsumeAccess):
-			return string(jujuparams.OfferReadAccess)
-		case string(jujuparams.OfferReadAccess):
-			return ""
-		default:
-			return ""
-		}
-	case string(jujuparams.OfferConsumeAccess):
-		switch revokeAccessLevel {
-		case string(jujuparams.OfferAdminAccess):
-			return string(jujuparams.OfferConsumeAccess)
-		case string(jujuparams.OfferConsumeAccess):
-			return string(jujuparams.OfferReadAccess)
-		case string(jujuparams.OfferReadAccess):
-			return ""
-		default:
-			return ""
-		}
-	case string(jujuparams.OfferReadAccess):
-		switch revokeAccessLevel {
-		case string(jujuparams.OfferAdminAccess):
-			return string(jujuparams.OfferReadAccess)
-		case string(jujuparams.OfferConsumeAccess):
-			return string(jujuparams.OfferReadAccess)
-		case string(jujuparams.OfferReadAccess):
-			return ""
-		default:
-			return ""
-		}
-	default:
-		return ""
-	}
-}
-
 // DestroyOffer removes the application offer.
 func (j *JIMM) DestroyOffer(ctx context.Context, user *openfga.User, offerURL string, force bool) error {
 	const op = errors.Op("jimm.DestroyOffer")
