@@ -2146,85 +2146,81 @@ func TestOfferAssertOpenFGARelationsExist(t *testing.T) {
 }
 
 func TestDetermineAccessLevelAfterGrant(t *testing.T) {
-	/*
-		c := qt.New(t)
+	c := qt.New(t)
 
-		tests := []struct {
-			about               string
-			currentAccessLevel  string
-			grantAccessLevel    string
-			expectedAccessLevel string
-		}{{
-			about:               "user has no access - grant admin",
-			currentAccessLevel:  "",
-			grantAccessLevel:    string(jujuparams.OfferAdminAccess),
-			expectedAccessLevel: "admin",
-		}, {
-			about:               "user has no access - grant consume",
-			currentAccessLevel:  "",
-			grantAccessLevel:    string(jujuparams.OfferConsumeAccess),
-			expectedAccessLevel: "consume",
-		}, {
-			about:               "user has no access - grant read",
-			currentAccessLevel:  "",
-			grantAccessLevel:    string(jujuparams.OfferReadAccess),
-			expectedAccessLevel: "read",
-		}, {
-			about:               "user has read access - grant admin",
-			currentAccessLevel:  "read",
-			grantAccessLevel:    string(jujuparams.OfferAdminAccess),
-			expectedAccessLevel: "admin",
-		}, {
-			about:               "user has read access - grant consume",
-			currentAccessLevel:  "read",
-			grantAccessLevel:    string(jujuparams.OfferConsumeAccess),
-			expectedAccessLevel: "consume",
-		}, {
-			about:               "user has read access - grant read",
-			currentAccessLevel:  "read",
-			grantAccessLevel:    string(jujuparams.OfferReadAccess),
-			expectedAccessLevel: "read",
-		}, {
-			about:               "user has consume access - grant admin",
-			currentAccessLevel:  "consume",
-			grantAccessLevel:    string(jujuparams.OfferAdminAccess),
-			expectedAccessLevel: "admin",
-		}, {
-			about:               "user has consume access - grant consume",
-			currentAccessLevel:  "consume",
-			grantAccessLevel:    string(jujuparams.OfferConsumeAccess),
-			expectedAccessLevel: "consume",
-		}, {
-			about:               "user has consume access - grant read",
-			currentAccessLevel:  "consume",
-			grantAccessLevel:    string(jujuparams.OfferReadAccess),
-			expectedAccessLevel: "consume",
-		}, {
-			about:               "user has admin access - grant admin",
-			currentAccessLevel:  "admin",
-			grantAccessLevel:    string(jujuparams.OfferAdminAccess),
-			expectedAccessLevel: "admin",
-		}, {
-			about:               "user has admin access - grant consume",
-			currentAccessLevel:  "admin",
-			grantAccessLevel:    string(jujuparams.OfferConsumeAccess),
-			expectedAccessLevel: "admin",
-		}, {
-			about:               "user has admin access - grant read",
-			currentAccessLevel:  "admin",
-			grantAccessLevel:    string(jujuparams.OfferReadAccess),
-			expectedAccessLevel: "admin",
-		}}
+	tests := []struct {
+		about               string
+		currentAccessLevel  string
+		grantAccessLevel    string
+		expectedAccessLevel string
+	}{{
+		about:               "user has no access - grant admin",
+		currentAccessLevel:  "",
+		grantAccessLevel:    string(jujuparams.OfferAdminAccess),
+		expectedAccessLevel: "admin",
+	}, {
+		about:               "user has no access - grant consume",
+		currentAccessLevel:  "",
+		grantAccessLevel:    string(jujuparams.OfferConsumeAccess),
+		expectedAccessLevel: "consume",
+	}, {
+		about:               "user has no access - grant read",
+		currentAccessLevel:  "",
+		grantAccessLevel:    string(jujuparams.OfferReadAccess),
+		expectedAccessLevel: "read",
+	}, {
+		about:               "user has read access - grant admin",
+		currentAccessLevel:  "read",
+		grantAccessLevel:    string(jujuparams.OfferAdminAccess),
+		expectedAccessLevel: "admin",
+	}, {
+		about:               "user has read access - grant consume",
+		currentAccessLevel:  "read",
+		grantAccessLevel:    string(jujuparams.OfferConsumeAccess),
+		expectedAccessLevel: "consume",
+	}, {
+		about:               "user has read access - grant read",
+		currentAccessLevel:  "read",
+		grantAccessLevel:    string(jujuparams.OfferReadAccess),
+		expectedAccessLevel: "read",
+	}, {
+		about:               "user has consume access - grant admin",
+		currentAccessLevel:  "consume",
+		grantAccessLevel:    string(jujuparams.OfferAdminAccess),
+		expectedAccessLevel: "admin",
+	}, {
+		about:               "user has consume access - grant consume",
+		currentAccessLevel:  "consume",
+		grantAccessLevel:    string(jujuparams.OfferConsumeAccess),
+		expectedAccessLevel: "consume",
+	}, {
+		about:               "user has consume access - grant read",
+		currentAccessLevel:  "consume",
+		grantAccessLevel:    string(jujuparams.OfferReadAccess),
+		expectedAccessLevel: "consume",
+	}, {
+		about:               "user has admin access - grant admin",
+		currentAccessLevel:  "admin",
+		grantAccessLevel:    string(jujuparams.OfferAdminAccess),
+		expectedAccessLevel: "admin",
+	}, {
+		about:               "user has admin access - grant consume",
+		currentAccessLevel:  "admin",
+		grantAccessLevel:    string(jujuparams.OfferConsumeAccess),
+		expectedAccessLevel: "admin",
+	}, {
+		about:               "user has admin access - grant read",
+		currentAccessLevel:  "admin",
+		grantAccessLevel:    string(jujuparams.OfferReadAccess),
+		expectedAccessLevel: "admin",
+	}}
 
-		for _, test := range tests {
-			c.Run(test.about, func(c *qt.C) {
-				level := jimm.DetermineAccessLevelAfterGrant(test.currentAccessLevel, test.grantAccessLevel)
-				c.Assert(level, qt.Equals, test.expectedAccessLevel)
-			})
-		}
-	*/
-}
-
+	for _, test := range tests {
+		c.Run(test.about, func(c *qt.C) {
+			level := jimm.DetermineAccessLevelAfterGrant(test.currentAccessLevel, test.grantAccessLevel)
+			c.Assert(level, qt.Equals, test.expectedAccessLevel)
+		})
+	}
 }
 
 func TestDestroyOffer(t *testing.T) {
