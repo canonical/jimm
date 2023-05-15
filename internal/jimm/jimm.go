@@ -29,6 +29,15 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/pubsub"
 )
 
+func init() {
+	redactMap := map[string]string{"params": "redacted"}
+	var err error
+	redactJSON, err = json.Marshal(redactMap)
+	if err != nil {
+		panic("Failed to create redact JSON")
+	}
+}
+
 // A JIMM provides the business logic for managing resources in the JAAS
 // system. A single JIMM instance is shared by all concurrent API
 // connections therefore the JIMM object itself does not contain any per-
@@ -308,6 +317,7 @@ func (j *JIMM) AddAuditLogEntry(ale *dbmodel.AuditLogEntry) {
 }
 
 var sensitiveMethods = map[string]struct{}{"login": {}, "addcredentials": {}, "updatecredentials": {}}
+var redactJSON dbmodel.JSON
 
 func redactSensitiveParams(ale *dbmodel.AuditLogEntry) {
 	if ale.Params == nil {
@@ -315,13 +325,9 @@ func redactSensitiveParams(ale *dbmodel.AuditLogEntry) {
 	}
 	method := strings.ToLower(ale.FacadeMethod)
 	if _, ok := sensitiveMethods[method]; ok {
-		redactMap := map[string]string{"params": "redacted"}
-		redactJSON, err := json.Marshal(redactMap)
-		if err != nil {
-			ale.Params = nil
-			return
-		}
-		ale.Params = redactJSON
+		var newRedactMessage dbmodel.JSON
+		copy(newRedactMessage, redactJSON)
+		ale.Params = newRedactMessage
 	}
 }
 
