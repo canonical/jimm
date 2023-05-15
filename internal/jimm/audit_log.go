@@ -1,6 +1,6 @@
 // Copyright 2023 Canonical Ltd.
 
-package jujuapi
+package jimm
 
 import (
 	"context"
@@ -16,12 +16,11 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
-	"github.com/CanonicalLtd/jimm/internal/jimm"
 	"github.com/CanonicalLtd/jimm/internal/servermon"
 )
 
-type dbAuditLogger struct {
-	jimm           *jimm.JIMM
+type DbAuditLogger struct {
+	jimm           *JIMM
 	conversationId string
 	getUser        func() names.UserTag
 }
@@ -34,9 +33,9 @@ func newConversationID() string {
 	return hex.EncodeToString(buf)
 }
 
-// newDbAuditLogger returns a new audit logger that logs to the database.
-func newDbAuditLogger(j *jimm.JIMM, getUserFunc func() names.UserTag) dbAuditLogger {
-	logger := dbAuditLogger{
+// NewDbAuditLogger returns a new audit logger that logs to the database.
+func NewDbAuditLogger(j *JIMM, getUserFunc func() names.UserTag) DbAuditLogger {
+	logger := DbAuditLogger{
 		jimm:           j,
 		conversationId: newConversationID(),
 		getUser:        getUserFunc,
@@ -44,7 +43,7 @@ func newDbAuditLogger(j *jimm.JIMM, getUserFunc func() names.UserTag) dbAuditLog
 	return logger
 }
 
-func (r dbAuditLogger) newAuditLogEntry(header *rpc.Header) dbmodel.AuditLogEntry {
+func (r DbAuditLogger) newAuditLogEntry(header *rpc.Header) dbmodel.AuditLogEntry {
 	ale := dbmodel.AuditLogEntry{
 		Time:           time.Now().UTC().Round(time.Millisecond),
 		MessageId:      header.RequestId,
@@ -55,7 +54,7 @@ func (r dbAuditLogger) newAuditLogEntry(header *rpc.Header) dbmodel.AuditLogEntr
 }
 
 // LogRequest creates an audit log entry from a client request.
-func (r dbAuditLogger) LogRequest(header *rpc.Header, body interface{}) error {
+func (r DbAuditLogger) LogRequest(header *rpc.Header, body interface{}) error {
 	ale := r.newAuditLogEntry(header)
 	ale.ObjectId = header.Request.Id
 	ale.FacadeName = header.Request.Type
@@ -74,7 +73,7 @@ func (r dbAuditLogger) LogRequest(header *rpc.Header, body interface{}) error {
 }
 
 // LogResponse creates an audit log entry from a controller response.
-func (o dbAuditLogger) LogResponse(r rpc.Request, header *rpc.Header, body interface{}) error {
+func (o DbAuditLogger) LogResponse(r rpc.Request, header *rpc.Header, body interface{}) error {
 	var allErrors params.ErrorResults
 	bulkError, ok := body.(params.ErrorResults)
 	if ok {
@@ -104,12 +103,12 @@ func (o dbAuditLogger) LogResponse(r rpc.Request, header *rpc.Header, body inter
 // recorder implements an rpc.Recorder.
 type recorder struct {
 	start          time.Time
-	logger         dbAuditLogger
+	logger         DbAuditLogger
 	conversationId string
 }
 
-// newRecorder returns a new recorder struct useful for recording RPC events.
-func newRecorder(logger dbAuditLogger) recorder {
+// NewRecorder returns a new recorder struct useful for recording RPC events.
+func NewRecorder(logger DbAuditLogger) recorder {
 	return recorder{
 		start:          time.Now(),
 		conversationId: newConversationID(),
