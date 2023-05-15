@@ -3,13 +3,17 @@
 package jujuapi
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"time"
 
 	"github.com/juju/juju/rpc"
+	"github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
+	"github.com/juju/zaputil/zapctx"
+	"go.uber.org/zap"
 
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/jimm"
@@ -40,7 +44,7 @@ func newDbAuditLogger(j *jimm.JIMM, getUserFunc func() names.UserTag) dbAuditLog
 	return logger
 }
 
-func (r dbAuditLogger) newAuditMessage(header *rpc.Header) dbmodel.AuditLogEntry {
+func (r dbAuditLogger) newAuditLogEntry(header *rpc.Header) dbmodel.AuditLogEntry {
 	ale := dbmodel.AuditLogEntry{
 		Time:           time.Now().UTC().Round(time.Millisecond),
 		MessageId:      header.RequestId,
@@ -52,7 +56,7 @@ func (r dbAuditLogger) newAuditMessage(header *rpc.Header) dbmodel.AuditLogEntry
 
 // LogRequest creates an audit log entry from a client request.
 func (r dbAuditLogger) LogRequest(header *rpc.Header, body interface{}) error {
-	ale := r.newAuditMessage(header)
+	ale := r.newAuditLogEntry(header)
 	ale.ObjectId = header.Request.Id
 	ale.FacadeName = header.Request.Type
 	ale.FacadeMethod = header.Request.Action
@@ -60,45 +64,39 @@ func (r dbAuditLogger) LogRequest(header *rpc.Header, body interface{}) error {
 	if body != nil {
 		jsonBody, err := json.Marshal(body)
 		if err != nil {
+			zapctx.Error(context.Background(), "failed to marshal body", zap.Error(err))
 			return err
 		}
-		ale.Body = jsonBody
+		ale.Params = jsonBody
 	}
 	r.jimm.AddAuditLogEntry(&ale)
 	return nil
 }
 
-type jujuError struct {
-	Error     string         `json:"error"`
-	ErrorCode string         `json:"error-code"`
-	ErrorInfo map[string]any `json:"error-info"`
-}
-
 // LogResponse creates an audit log entry from a controller response.
 func (o dbAuditLogger) LogResponse(r rpc.Request, header *rpc.Header, body interface{}) error {
-	errInfo := jujuError{
-		Error:     header.Error,
-		ErrorCode: header.ErrorCode,
-		ErrorInfo: header.ErrorInfo,
+	var allErrors params.ErrorResults
+	bulkError, ok := body.(params.ErrorResults)
+	if ok {
+		allErrors.Results = append(allErrors.Results, bulkError.Results...)
 	}
-	jsonErr, err := json.Marshal(errInfo)
+	singleError := params.Error{
+		Message: header.Error,
+		Code:    header.ErrorCode,
+		Info:    header.ErrorInfo,
+	}
+	allErrors.Results = append(allErrors.Results, params.ErrorResult{Error: &singleError})
+	jsonErr, err := json.Marshal(allErrors)
 	if err != nil {
 		return err
 	}
-	ale := o.newAuditMessage(header)
+	ale := o.newAuditLogEntry(header)
 	ale.ObjectId = r.Id
 	ale.FacadeName = r.Type
 	ale.FacadeMethod = r.Action
 	ale.FacadeVersion = r.Version
 	ale.Errors = jsonErr
 	ale.IsResponse = true
-	if body != nil {
-		jsonBody, err := json.Marshal(body)
-		if err != nil {
-			return err
-		}
-		ale.Body = jsonBody
-	}
 	o.jimm.AddAuditLogEntry(&ale)
 	return nil
 }

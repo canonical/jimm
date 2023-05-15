@@ -6,20 +6,24 @@ import (
 	"encoding/json"
 	"time"
 
-	"gorm.io/gorm"
-
 	apiparams "github.com/CanonicalLtd/jimm/api/params"
 )
 
 // An AuditLogEntry is an entry in the audit log.
 type AuditLogEntry struct {
-	gorm.Model
+	// ID contains the ID of the entry.
+	ID uint `gorm:"primarykey"`
 
-	// Time contains the time that the event happened.
+	// Time contains the timestamp the entry was created.
 	Time time.Time `gorm:"index"`
 
+	// Model contains the name of the model accessed.
+	// Will be empty when accessing controller facades, as they are handled
+	// by JIMM.
+	Model string `gorm:"index"`
+
 	// ConversationId contains a unique ID per websocket request.
-	ConversationId string `gorm:"index"`
+	ConversationId string
 
 	// MessageId represents the message ID used to correlate request/responses.
 	MessageId uint64
@@ -28,7 +32,7 @@ type AuditLogEntry struct {
 	FacadeName string
 
 	// FacadeMethod contains the specific method to be executed on the facade.
-	FacadeMethod string
+	FacadeMethod string `gorm:"index"`
 
 	// FacadeVersion contains the requested version for the facade method.
 	FacadeVersion int
@@ -42,12 +46,11 @@ type AuditLogEntry struct {
 	// IsResponse indicates whether the action was a Response/Request.
 	IsResponse bool
 
+	// Params contains any client request parameters.
+	Params JSON
+
 	// Errors contains any errors from the controller.
 	Errors JSON
-
-	// Body contains the event-specific params for the audit entry.
-	// This field is populated based on the rpc message body for requests/respones.
-	Body JSON
 }
 
 // TableName overrides the table name gorm will use to find
@@ -67,6 +70,7 @@ func (e AuditLogEntry) ToAPIAuditEvent() apiparams.AuditEvent {
 	ale.FacadeVersion = e.FacadeVersion
 	ale.ObjectId = e.ObjectId
 	ale.UserTag = e.UserTag
+	ale.Model = e.Model
 	ale.IsResponse = e.IsResponse
 	ale.Errors = nil
 	if e.IsResponse {
@@ -75,9 +79,11 @@ func (e AuditLogEntry) ToAPIAuditEvent() apiparams.AuditEvent {
 			ale.Errors = map[string]any{"error": err}
 		}
 	}
-	err := json.Unmarshal(e.Body, &ale.Body)
-	if err != nil {
-		ale.Body = map[string]any{"error": err}
+	if e.Params != nil {
+		err := json.Unmarshal(e.Params, &ale.Params)
+		if err != nil {
+			ale.Params = map[string]any{"error": err}
+		}
 	}
 	return ale
 }

@@ -340,19 +340,22 @@ func (r *controllerRoot) FindAuditEvents(ctx context.Context, req apiparams.Find
 		}
 		filter.UserTag = tag.String()
 	}
+	filter.Model = req.Model
 
 	limit := int(req.Limit)
 	if limit < 1 || limit > maxLimit {
 		limit = maxLimit
 	}
+	filter.Limit = limit
+	offset := req.Offset
+	if offset < 0 {
+		offset = 0
+	}
+	filter.Offset = offset
 
 	entries, err := r.jimm.FindAuditEvents(ctx, r.user, filter)
 	if err != nil {
 		return apiparams.AuditEvents{}, errors.E(op, err)
-	}
-
-	if len(entries) > limit {
-		entries = entries[:limit]
 	}
 
 	events := make([]apiparams.AuditEvent, len(entries))

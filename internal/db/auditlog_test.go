@@ -4,7 +4,6 @@ package db_test
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 	"time"
 
@@ -28,17 +27,12 @@ func TestAddAuditLogEntryUnconfiguredDatabase(t *testing.T) {
 func (s *dbSuite) TestAddAuditLogEntry(c *qt.C) {
 	ctx := context.Background()
 
-	data := map[string]any{"k1": "v1", "k2": "v2"}
-	dataJson, err := json.Marshal(data)
-	c.Assert(err, qt.IsNil)
-
 	ale := dbmodel.AuditLogEntry{
 		Time:    time.Now().UTC().Round(time.Millisecond),
 		UserTag: names.NewUserTag("alice@external").String(),
-		Body:    dataJson,
 	}
 
-	err = s.Database.AddAuditLogEntry(ctx, &ale)
+	err := s.Database.AddAuditLogEntry(ctx, &ale)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
 
 	err = s.Database.Migrate(context.Background(), false)
@@ -49,7 +43,7 @@ func (s *dbSuite) TestAddAuditLogEntry(c *qt.C) {
 
 	var ale2 dbmodel.AuditLogEntry
 	err = s.Database.ForEachAuditLogEntry(ctx, db.AuditLogFilter{}, func(ale *dbmodel.AuditLogEntry) error {
-		if ale2.Model.ID != 0 {
+		if ale2.ID != 0 {
 			return errors.E("too many results")
 		}
 		ale2 = *ale
