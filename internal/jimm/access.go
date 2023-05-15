@@ -95,17 +95,6 @@ func ToModelRelation(accessLevel string) (ofganames.Relation, error) {
 	}
 }
 
-// TokenGenerator authenticates a user and generates a JWT token.
-type TokenGenerator interface {
-	// MakeToken authorizes a user if initialLogin is set to true using the information in req.
-	// It then checks that a user has all the default permissions rquired and then checks for
-	// permissions as required by permissionMap. It then returns a JWT token.
-	MakeToken(ctx context.Context, initialLogin bool, req *jujuparams.LoginRequest, permissionMap map[string]interface{}) ([]byte, error)
-	// SetTags sets the desired model and controller tags that this TokenGenerator is valid for.
-	SetTags(mt names.ModelTag, ct names.ControllerTag)
-	GetUser() names.UserTag
-}
-
 // JwtGenerator provides the necessary state and methods to authorize a user and generate JWT tokens.
 type JwtGenerator struct {
 	jimm           *JIMM

@@ -10,14 +10,26 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/juju/juju/rpc/params"
+	"github.com/juju/names/v4"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
 	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
-	"github.com/CanonicalLtd/jimm/internal/jimm"
 )
+
+// TokenGenerator authenticates a user and generates a JWT token.
+type TokenGenerator interface {
+	// MakeToken authorizes a user if initialLogin is set to true using the information in req.
+	// It then checks that a user has all the default permissions rquired and then checks for
+	// permissions as required by permissionMap. It then returns a JWT token.
+	MakeToken(ctx context.Context, initialLogin bool, req *params.LoginRequest, permissionMap map[string]interface{}) ([]byte, error)
+	// SetTags sets the desired model and controller tags that this TokenGenerator is valid for.
+	SetTags(mt names.ModelTag, ct names.ControllerTag)
+	// GetUser returns the authenticated user.
+	GetUser() names.UserTag
+}
 
 // TODO(Kian): Remove this once we update our Juju library.
 type loginRequest struct {
@@ -87,7 +99,7 @@ type modelProxy struct {
 	dst            *writeLockConn
 	msgs           *inflightMsgs
 	auditLogger    func(*dbmodel.AuditLogEntry)
-	tokenGen       jimm.TokenGenerator
+	tokenGen       TokenGenerator
 	modelName      string
 	conversationId string
 }
@@ -380,7 +392,7 @@ func (p *controllerProxy) redoLogin(ctx context.Context, permissions map[string]
 
 // addJWT adds a JWT token to the the provided message.
 // If initialLogin is set the user will be authenticated.
-func addJWT(ctx context.Context, initialLogin bool, msg *message, permissions map[string]interface{}, tokenGen jimm.TokenGenerator) error {
+func addJWT(ctx context.Context, initialLogin bool, msg *message, permissions map[string]interface{}, tokenGen TokenGenerator) error {
 	const op = errors.Op("rpc.addJWT")
 	// First we unmarshal the existing LoginRequest.
 	if msg == nil {
@@ -423,7 +435,7 @@ func createErrResponse(err error, req *message) *message {
 // connection to a model.
 type ProxyHelpers struct {
 	ConnClient        *websocket.Conn
-	TokenGen          jimm.TokenGenerator
+	TokenGen          TokenGenerator
 	ConnectController func(context.Context) (*websocket.Conn, string, error)
 	AuditLogger       func(*dbmodel.AuditLogEntry)
 }
