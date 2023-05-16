@@ -2,9 +2,6 @@ name: CI
 on:
   pull_request:
   workflow_dispatch:
-env:
-  GH_AUTH: ${{ secrets.GH_AUTH }}
-  GH_USER: ${{ secrets.GH_USER }}
 
 jobs:
   # lint:
@@ -13,9 +10,6 @@ jobs:
   #   steps:
   #     - uses: actions/checkout@v3
   #     - uses: ./.github/workflows/setupgo118amd64
-  #       with:
-  #         user: ${{ secrets.GH_USER }}
-  #         pat: ${{ secrets.GH_AUTH }}
   #     - name: golangci-lint
   #       uses: golangci/golangci-lint-action@v3
   #       with:
@@ -30,9 +24,6 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/workflows/setupgo118amd64
-        with:
-          user: ${{ secrets.GH_USER }}
-          pat: ${{ secrets.GH_AUTH }}
       - name: Install dependencies
         run: sudo apt-get update -y && sudo apt-get install -y gcc git-core gnupg build-essential
       - name: Remove installed mongodb
@@ -44,10 +35,7 @@ jobs:
           cd ./tmp/candid
           DOCKER_BUILDKIT=1 \
           docker build \
-          --build-arg AUTH_TYPE=pat \
           --cache-from candid:latest \
-          --secret id=ghuser,env=GH_USER \
-          --secret id=ghpat,env=GH_AUTH \
           . -f ./Dockerfile -t candid
           docker image ls candid
       - name: Add volume files
