@@ -431,6 +431,33 @@ func (j *JIMM) RevokeOfferAccess(ctx context.Context, user *openfga.User, offerU
 		if err != nil {
 			return errors.E(op, err, "failed to unset given access")
 		}
+
+		// Checking if the target user still has the given access to the
+		// application offer (which is possible because of indirect relations),
+		// and if so, returning an informative error.
+		currentRelation := tUser.GetApplicationOfferAccess(ctx, offer.ResourceTag())
+		stillHasAccess := false
+		switch targetRelation {
+		case ofganames.AdministratorRelation:
+			switch currentRelation {
+			case ofganames.AdministratorRelation:
+				stillHasAccess = true
+			}
+		case ofganames.ConsumerRelation:
+			switch currentRelation {
+			case ofganames.AdministratorRelation, ofganames.ConsumerRelation:
+				stillHasAccess = true
+			}
+		case ofganames.ReaderRelation:
+			switch currentRelation {
+			case ofganames.AdministratorRelation, ofganames.ConsumerRelation, ofganames.ReaderRelation:
+				stillHasAccess = true
+			}
+		}
+
+		if stillHasAccess {
+			return errors.E(op, "unable to completely revoke given access due to other relations; try to remove them as well, or use 'jimmctl' for more control")
+		}
 		return nil
 	})
 
