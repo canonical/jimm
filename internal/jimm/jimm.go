@@ -7,6 +7,8 @@ package jimm
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
@@ -299,8 +301,27 @@ func (j *JIMM) forEachController(ctx context.Context, controllers []dbmodel.Cont
 // addAuditLogEntry causes an entry to be added the the audit log.
 func (j *JIMM) AddAuditLogEntry(ale *dbmodel.AuditLogEntry) {
 	ctx := context.Background()
+	redactSensitiveParams(ale)
 	if err := j.Database.AddAuditLogEntry(ctx, ale); err != nil {
 		zapctx.Error(ctx, "cannot store audit log entry", zap.Error(err), zap.Any("entry", *ale))
+	}
+}
+
+var sensitiveMethods = map[string]struct{}{"login": {}, "addcredentials": {}, "updatecredentials": {}}
+
+func redactSensitiveParams(ale *dbmodel.AuditLogEntry) {
+	if ale.Params == nil {
+		return
+	}
+	method := strings.ToLower(ale.FacadeMethod)
+	if _, ok := sensitiveMethods[method]; ok {
+		redactMap := map[string]string{"params": "redacted"}
+		redactJSON, err := json.Marshal(redactMap)
+		if err != nil {
+			ale.Params = nil
+			return
+		}
+		ale.Params = redactJSON
 	}
 }
 

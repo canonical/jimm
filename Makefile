@@ -81,7 +81,7 @@ jimm-release/bin/jimmsrv: jimmsrv
 
 pull/candid:
 	-git clone https://github.com/canonical/candid.git ./tmp/candid
-	(cd ./tmp/candid && make image auth=pat)
+	(cd ./tmp/candid && make image)
 	docker image ls candid
 
 get-local-auth:
