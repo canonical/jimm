@@ -7,7 +7,6 @@ package jimm
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"strings"
 	"time"
 
@@ -28,15 +27,6 @@ import (
 	ofganames "github.com/CanonicalLtd/jimm/internal/openfga/names"
 	"github.com/CanonicalLtd/jimm/internal/pubsub"
 )
-
-func init() {
-	redactMap := map[string]string{"params": "redacted"}
-	var err error
-	redactJSON, err = json.Marshal(redactMap)
-	if err != nil {
-		panic("Failed to create redact JSON")
-	}
-}
 
 // A JIMM provides the business logic for managing resources in the JAAS
 // system. A single JIMM instance is shared by all concurrent API
@@ -317,7 +307,7 @@ func (j *JIMM) AddAuditLogEntry(ale *dbmodel.AuditLogEntry) {
 }
 
 var sensitiveMethods = map[string]struct{}{"login": {}, "addcredentials": {}, "updatecredentials": {}}
-var redactJSON dbmodel.JSON
+var redactJSON = dbmodel.JSON(`{"params":"redacted"}`)
 
 func redactSensitiveParams(ale *dbmodel.AuditLogEntry) {
 	if ale.Params == nil {

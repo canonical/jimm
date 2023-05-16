@@ -98,7 +98,7 @@ type modelProxy struct {
 	src            *writeLockConn
 	dst            *writeLockConn
 	msgs           *inflightMsgs
-	auditLogger    func(*dbmodel.AuditLogEntry)
+	auditLog       func(*dbmodel.AuditLogEntry)
 	tokenGen       TokenGenerator
 	modelName      string
 	conversationId string
@@ -157,7 +157,7 @@ func (p *modelProxy) auditLogMessage(msg *message, isResponse bool) error {
 		}
 		ale.Params = jsonBody
 	}
-	p.auditLogger(&ale)
+	p.auditLog(&ale)
 	return nil
 }
 
@@ -259,7 +259,7 @@ func (p *clientProxy) makeControllerConnection(ctx context.Context) error {
 			src:            p.dst,
 			dst:            p.src,
 			msgs:           p.msgs,
-			auditLogger:    p.auditLogger,
+			auditLog:       p.auditLog,
 			tokenGen:       p.tokenGen,
 			modelName:      p.modelName,
 			conversationId: p.conversationId,
@@ -437,7 +437,7 @@ type ProxyHelpers struct {
 	ConnClient        *websocket.Conn
 	TokenGen          TokenGenerator
 	ConnectController func(context.Context) (*websocket.Conn, string, error)
-	AuditLogger       func(*dbmodel.AuditLogEntry)
+	AuditLog          func(*dbmodel.AuditLogEntry)
 }
 
 // ProxySockets will proxy requests from a client connection through to a controller
@@ -449,7 +449,7 @@ func ProxySockets(ctx context.Context, helpers ProxyHelpers) error {
 		zapctx.Error(ctx, "Missing controller connect function")
 		return errors.E(op, "Missing controller connect function")
 	}
-	if helpers.AuditLogger == nil {
+	if helpers.AuditLog == nil {
 		zapctx.Error(ctx, "Missing audit log function")
 		return errors.E(op, "Missing audit log function")
 	}
@@ -460,10 +460,10 @@ func ProxySockets(ctx context.Context, helpers ProxyHelpers) error {
 	// after the first message has been received so that any errors can be properly sent back to the client.
 	clProxy := clientProxy{
 		modelProxy: modelProxy{
-			src:         &client,
-			msgs:        &msgInFlight,
-			tokenGen:    helpers.TokenGen,
-			auditLogger: helpers.AuditLogger,
+			src:      &client,
+			msgs:     &msgInFlight,
+			tokenGen: helpers.TokenGen,
+			auditLog: helpers.AuditLog,
 		},
 		errChan:              errChan,
 		createControllerConn: helpers.ConnectController,

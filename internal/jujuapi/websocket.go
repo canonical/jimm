@@ -139,7 +139,7 @@ func (s modelProxyServer) ServeWS(ctx context.Context, clientConn *websocket.Con
 		ConnClient:        clientConn,
 		TokenGen:          &jwtGenerator,
 		ConnectController: connectionFunc,
-		AuditLogger:       auditLogger,
+		AuditLog:          auditLogger,
 	}
 	jimmRPC.ProxySockets(ctx, proxyHelpers)
 }

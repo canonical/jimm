@@ -253,7 +253,7 @@ func TestProxySockets(t *testing.T) {
 			ConnClient:        connClient,
 			TokenGen:          &testTokenGen,
 			ConnectController: f,
-			AuditLogger:       auditLogger,
+			AuditLog:          auditLogger,
 		}
 		err := rpc.ProxySockets(ctx, proxyHelpers)
 		errChan <- err
@@ -300,7 +300,7 @@ func TestCancelProxySockets(t *testing.T) {
 			ConnClient:        connClient,
 			TokenGen:          &testTokenGen,
 			ConnectController: f,
-			AuditLogger:       auditLogger,
+			AuditLog:          auditLogger,
 		}
 		err := rpc.ProxySockets(ctx, proxyHelpers)
 		errChan <- err
@@ -340,7 +340,7 @@ func TestProxySocketsAuditLogs(t *testing.T) {
 			ConnClient:        connClient,
 			TokenGen:          &testTokenGen,
 			ConnectController: f,
-			AuditLogger:       auditLogger,
+			AuditLog:          auditLogger,
 		}
 		err := rpc.ProxySockets(ctx, proxyHelpers)
 		errChan <- err
