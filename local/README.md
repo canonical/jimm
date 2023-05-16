@@ -6,9 +6,15 @@ used for integration testing within the JIMM test suite.
 
 # Starting the environment
 1. Ensure you have docker above v18, confirm this with `docker --version`
-2. Run `make pull/candid` to get a local image of candid (this is subject to change!)
-3. Run `./certs.sh` in local/traefik/certs, be sure to be in that directory though!
-4. `docker compose --profile dev up` if you encounter an error like "Error response from daemon: network ... not found" then the command `docker compose --profile dev up --force-recreate` should help.
+2. Ensure you are in the root JIMM directory.
+3. Run `make pull/candid` to get a local image of candid (this is subject to change!)
+4. Run `cd local/traefik/certs; ./certs.sh; cd -`, this will setup some self signed certs and add them to your cert pool.
+5. Run `touch ./local/vault/approle.json && touch ./local/vault/roleid.txt`
+6. Run `make version/commit.txt` to populate the repo with the git commit info.
+7. Run `make version/version.txt` to populate the repo with the git version info.
+8. `docker compose --profile dev up` if you encounter an error like "Error response from daemon: network ... not found" then the command `docker compose --profile dev up --force-recreate` should help.
+
+After this initial setup, subsequent use of the compose can be done with `docker compose --profile dev up --force-recreate`
 
 The services included are:
 - JIMM (only started in the dev profile)
