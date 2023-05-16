@@ -118,7 +118,10 @@ func (auth *JwtGenerator) SetTags(mt names.ModelTag, ct names.ControllerTag) {
 
 // SetTags implements TokenGenerator
 func (auth *JwtGenerator) GetUser() names.UserTag {
-	return auth.user.ResourceTag()
+	if auth.user != nil {
+		return auth.user.ResourceTag()
+	}
+	return names.UserTag{}
 }
 
 // MakeToken takes a login request and a map of needed permissions and returns a JWT token if the user satisfies

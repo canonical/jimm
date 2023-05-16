@@ -315,7 +315,7 @@ func redactSensitiveParams(ale *dbmodel.AuditLogEntry) {
 	}
 	method := strings.ToLower(ale.FacadeMethod)
 	if _, ok := sensitiveMethods[method]; ok {
-		var newRedactMessage dbmodel.JSON
+		newRedactMessage := make(dbmodel.JSON, len(redactJSON))
 		copy(newRedactMessage, redactJSON)
 		ale.Params = newRedactMessage
 	}
