@@ -115,15 +115,17 @@ type AuditEvent struct {
 	// the action.
 	UserTag string `json:"user-tag" yaml:"user-tag"`
 
+	// Model contains the name of the model the event was performed against.
+	Model string `json:"model" yaml:"model"`
+
 	// IsResponse indicates whether the message is a request/response.
 	IsResponse bool `json:"is-response" yaml:"is-response"`
 
+	// Params contains client request parameters.
+	Params map[string]any `json:"params" yaml:"params"`
+
 	// Errors contains error info received from the controller.
 	Errors map[string]any `json:"error" yaml:"errors"`
-
-	// Body contains additional details for the audit entry. The contents
-	// will vary depending on the action and the entity.
-	Body map[string]any `json:"body" yaml:"body"`
 }
 
 // An AuditEvents contains events from the audit log.
@@ -189,8 +191,19 @@ type FindAuditEventsRequest struct {
 	// were performed by a particular authenticated user.
 	UserTag string `json:"user-tag,omitempty"`
 
+	// Model is used to filter the event log to only contain events that
+	// were performed against a specific model.
+	Model string `json:"model,omitempty"`
+
+	// Method is used to filter the event log to only contain events that
+	// called a specific facade method.
+	Method string `json:"method,omitempty"`
+
+	// Offset is the number of items to offset the set of returned results.
+	Offset int `json:"offset,omitempty"`
+
 	// Limit is the maximum number of audit events to return.
-	Limit int64 `json:"limit,omitempty"`
+	Limit int `json:"limit,omitempty"`
 }
 
 // A ListControllersResponse is the response that is sent in a

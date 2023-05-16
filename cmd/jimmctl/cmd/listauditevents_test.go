@@ -39,12 +39,11 @@ func (s *listAuditEventsSuite) TestListAuditEventsSuperuser(c *gc.C) {
   facade-version: \d
   object-id: ""
   user-tag: user-
+  model: ""
   is-response: false
+  params:
+    params: redacted
   errors: .*
-  body:
-    auth-tag: ""
-    bakery-version: \d
-  [\s\S]*
 - time: .*
   conversation-id: .*
   message-id: 1
@@ -53,14 +52,15 @@ func (s *listAuditEventsSuite) TestListAuditEventsSuperuser(c *gc.C) {
   facade-version: \d
   object-id: ""
   user-tag: user-
+  model: ""
   is-response: true
+  params: {}
   errors:
-    error: ""
-    error-code: ""
-    error-info: null
-  body:
-    bakery-discharge-required:
-  [\s\S]*`)
+    results:
+    - error:
+        code: ""
+        message: ""
+[\s\S]*`)
 }
 
 func (s *listAuditEventsSuite) TestListAuditEventsStatus(c *gc.C) {

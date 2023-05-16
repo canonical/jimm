@@ -5,12 +5,13 @@ with the local Q/A environment. This environment is additionally
 used for integration testing within the JIMM test suite.
 
 # Starting the environment
-1. Run `make pull/candid` to get a local image of candid (this is subject to change!)
-2. Run `./certs.sh` in local/traefik/certs, be sure to be in that directory though!
-2. docker compose up
+1. Ensure you have docker above v18, confirm this with `docker --version`
+2. Run `make pull/candid` to get a local image of candid (this is subject to change!)
+3. Run `./certs.sh` in local/traefik/certs, be sure to be in that directory though!
+4. `docker compose --profile dev up` if you encounter an error like "Error response from daemon: network ... not found" then the command `docker compose --profile dev up --force-recreate` should help.
 
 The services included are:
-- JIMM
+- JIMM (only started in the dev profile)
 - Vault
 - Postgres
 - OpenFGA
