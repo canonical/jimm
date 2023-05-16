@@ -313,7 +313,8 @@ func (r *controllerRoot) SetControllerDeprecated(ctx context.Context, req apipar
 
 // maxLimit is the maximum number of audit-log entries that will be
 // returned from the audit log, no matter how many are requested.
-const maxLimit = 50
+const maxLimit = 500
+const limitDefault = 50
 
 // FindAuditEvents finds the audit-log entries that match the given filter.
 func (r *controllerRoot) FindAuditEvents(ctx context.Context, req apiparams.FindAuditEventsRequest) (apiparams.AuditEvents, error) {
@@ -343,7 +344,10 @@ func (r *controllerRoot) FindAuditEvents(ctx context.Context, req apiparams.Find
 	filter.Model = req.Model
 
 	limit := int(req.Limit)
-	if limit < 1 || limit > maxLimit {
+	if limit < 1 {
+		limit = limitDefault
+	}
+	if limit > maxLimit {
 		limit = maxLimit
 	}
 	filter.Limit = limit
