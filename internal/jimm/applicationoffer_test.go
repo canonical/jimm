@@ -215,6 +215,7 @@ func TestRevokeOfferAccess(t *testing.T) {
 	tests := []struct {
 		about                      string
 		parameterFunc              func(*environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission)
+		setup                      func(*environment, *openfga.OFGAClient)
 		expectedError              string
 		expectedAccessLevel        string
 		expectedAccessLevelOnError string // This expectation is meant to ensure there'll be no unpredicted behavior (like changing existing relations) after an error has occurred
@@ -321,6 +322,39 @@ func TestRevokeOfferAccess(t *testing.T) {
 			return env.users[3], env.users[3], "no-such-offer", jujuparams.OfferReadAccess
 		},
 		expectedError: "application offer not found",
+	}, {
+		about: "admin revokes another user (who is direct admin+consumer) their consume access - an error returns (saying user still has access; hinting to use 'jimmctl' for advanced cases)",
+		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
+			return env.users[1], env.users[4], env.applicationOffers[0].URL, jujuparams.OfferConsumeAccess
+		},
+		setup: func(env *environment, client *openfga.OFGAClient) {
+			openfga.NewUser(&env.users[4], client).SetApplicationOfferAccess(ctx, env.applicationOffers[0].ResourceTag(), ofganames.ConsumerRelation)
+			openfga.NewUser(&env.users[4], client).SetApplicationOfferAccess(ctx, env.applicationOffers[0].ResourceTag(), ofganames.AdministratorRelation)
+		},
+		expectedError:              "unable to completely revoke given access due to other relations.*jimmctl.*",
+		expectedAccessLevelOnError: "admin",
+	}, {
+		about: "admin revokes another user (who is direct admin+reader) their read access - an error returns (saying user still has access; hinting to use 'jimmctl' for advanced cases)",
+		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
+			return env.users[1], env.users[4], env.applicationOffers[0].URL, jujuparams.OfferReadAccess
+		},
+		setup: func(env *environment, client *openfga.OFGAClient) {
+			openfga.NewUser(&env.users[4], client).SetApplicationOfferAccess(ctx, env.applicationOffers[0].ResourceTag(), ofganames.ReaderRelation)
+			openfga.NewUser(&env.users[4], client).SetApplicationOfferAccess(ctx, env.applicationOffers[0].ResourceTag(), ofganames.AdministratorRelation)
+		},
+		expectedError:              "unable to completely revoke given access due to other relations.*jimmctl.*",
+		expectedAccessLevelOnError: "admin",
+	}, {
+		about: "admin revokes another user (who is direct consumer+reader) their read access - an error returns (saying user still has access; hinting to use 'jimmctl' for advanced cases)",
+		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
+			return env.users[1], env.users[4], env.applicationOffers[0].URL, jujuparams.OfferReadAccess
+		},
+		setup: func(env *environment, client *openfga.OFGAClient) {
+			openfga.NewUser(&env.users[4], client).SetApplicationOfferAccess(ctx, env.applicationOffers[0].ResourceTag(), ofganames.ReaderRelation)
+			openfga.NewUser(&env.users[4], client).SetApplicationOfferAccess(ctx, env.applicationOffers[0].ResourceTag(), ofganames.ConsumerRelation)
+		},
+		expectedError:              "unable to completely revoke given access due to other relations.*jimmctl.*",
+		expectedAccessLevelOnError: "consume",
 	}}
 
 	for _, test := range tests {
@@ -338,7 +372,6 @@ func TestRevokeOfferAccess(t *testing.T) {
 			jimmUUID := uuid.NewString()
 
 			environment := initializeEnvironment(c, ctx, &db, client, jimmUUID)
-			authenticatedUser, offerUser, offerURL, revokeAccessLevel := test.parameterFunc(environment)
 
 			j := &jimm.JIMM{
 				UUID:          jimmUUID,
@@ -348,6 +381,11 @@ func TestRevokeOfferAccess(t *testing.T) {
 					API: &jimmtest.API{},
 				},
 			}
+
+			if test.setup != nil {
+				test.setup(environment, client)
+			}
+			authenticatedUser, offerUser, offerURL, revokeAccessLevel := test.parameterFunc(environment)
 
 			assertAppliedRelation := func(expectedAppliedRelation string) {
 				offer := dbmodel.ApplicationOffer{
