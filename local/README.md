@@ -1,8 +1,14 @@
 # Local Development
 
 ## Starting the environment
-1. Run `make pull/candid` to get a local image of candid (this is subject to change!)
-2. docker compose up
+1. Ensure you have docker above v18, confirm this with docker --version
+2. Ensure you are in the root JIMM directory.
+3. Run make pull/candid to get a local image of candid (this is subject to change!)
+4. Run cd local/traefik/certs; ./certs.sh; cd -, this will setup some self signed certs and add them to your cert pool.
+5. Run touch ./local/vault/approle.yaml
+6. Run make version/commit.txt to populate the repo with the git commit info.
+7. Run make version/version.txt to populate the repo with the git version info.
+8. docker compose up
 
 The services included are:
 - JIMM
