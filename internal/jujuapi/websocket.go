@@ -174,7 +174,8 @@ func controllerConnectionFunc(s modelProxyServer, jwtGenerator *jimm.JwtGenerato
 			zapctx.Error(ctx, "cannot dial controller", zap.String("controller", m.Controller.Name), zap.Error(err))
 			return nil, "", err
 		}
-		return controllerConn, m.Name, nil
+		fullModelName := m.Controller.Name + "/" + m.Name
+		return controllerConn, fullModelName, nil
 	}
 	return connectToControllerFunc
 }
