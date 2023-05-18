@@ -1,0 +1,13 @@
+[Unit]
+Description=JAAS Intelligent Model Manager
+Requires=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/jimmsrv
+Restart=on-failure
+RestartSec=10s
+
+[Install]
+WantedBy=multi-user.target
