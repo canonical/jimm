@@ -7,7 +7,6 @@ package jimm
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"strings"
 	"time"
 
@@ -308,6 +307,7 @@ func (j *JIMM) AddAuditLogEntry(ale *dbmodel.AuditLogEntry) {
 }
 
 var sensitiveMethods = map[string]struct{}{"login": {}, "addcredentials": {}, "updatecredentials": {}}
+var redactJSON = dbmodel.JSON(`{"params":"redacted"}`)
 
 func redactSensitiveParams(ale *dbmodel.AuditLogEntry) {
 	if ale.Params == nil {
@@ -315,13 +315,9 @@ func redactSensitiveParams(ale *dbmodel.AuditLogEntry) {
 	}
 	method := strings.ToLower(ale.FacadeMethod)
 	if _, ok := sensitiveMethods[method]; ok {
-		redactMap := map[string]string{"params": "redacted"}
-		redactJSON, err := json.Marshal(redactMap)
-		if err != nil {
-			ale.Params = nil
-			return
-		}
-		ale.Params = redactJSON
+		newRedactMessage := make(dbmodel.JSON, len(redactJSON))
+		copy(newRedactMessage, redactJSON)
+		ale.Params = newRedactMessage
 	}
 }
 

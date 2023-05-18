@@ -6,16 +6,30 @@ import (
 	"encoding/json"
 	stderrors "errors"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/juju/juju/rpc/params"
+	"github.com/juju/names/v4"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
 	"github.com/CanonicalLtd/jimm/internal/auth"
+	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
-	"github.com/CanonicalLtd/jimm/internal/jimm"
 )
+
+// TokenGenerator authenticates a user and generates a JWT token.
+type TokenGenerator interface {
+	// MakeToken authorizes a user if initialLogin is set to true using the information in req.
+	// It then checks that a user has all the default permissions rquired and then checks for
+	// permissions as required by permissionMap. It then returns a JWT token.
+	MakeToken(ctx context.Context, initialLogin bool, req *params.LoginRequest, permissionMap map[string]interface{}) ([]byte, error)
+	// SetTags sets the desired model and controller tags that this TokenGenerator is valid for.
+	SetTags(mt names.ModelTag, ct names.ControllerTag)
+	// GetUser returns the authenticated user.
+	GetUser() names.UserTag
+}
 
 // TODO(Kian): Remove this once we update our Juju library.
 type loginRequest struct {
@@ -39,17 +53,6 @@ func (c *writeLockConn) writeJson(v interface{}) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.conn.WriteJSON(v)
-}
-
-func (c *writeLockConn) sendError(err error, req *message) {
-	if req == nil {
-		// If there was no message to error on, just return.
-		return
-	}
-	msg := createErrResponse(err, req)
-	if msg != nil {
-		c.writeJson(msg)
-	}
 }
 
 func (c *writeLockConn) sendMessage(responseData json.RawMessage, request *message) {
@@ -91,20 +94,83 @@ func (msgs *inflightMsgs) getMessage(key uint64) *message {
 	return msg
 }
 
+type modelProxy struct {
+	src            *writeLockConn
+	dst            *writeLockConn
+	msgs           *inflightMsgs
+	auditLog       func(*dbmodel.AuditLogEntry)
+	tokenGen       TokenGenerator
+	modelName      string
+	conversationId string
+}
+
+func (p *modelProxy) sendError(socket *writeLockConn, req *message, err error) {
+	if req == nil {
+		// If there was no message to error on, just return.
+		return
+	}
+	msg := createErrResponse(err, req)
+	if msg != nil {
+		socket.writeJson(msg)
+	}
+	// An error message is a response back to the client.
+	p.auditLogMessage(msg, true)
+}
+
+func (p *modelProxy) auditLogMessage(msg *message, isResponse bool) error {
+	ale := dbmodel.AuditLogEntry{
+		Time:           time.Now().UTC().Round(time.Millisecond),
+		MessageId:      msg.RequestID,
+		UserTag:        p.tokenGen.GetUser().String(),
+		Model:          p.modelName,
+		ConversationId: p.conversationId,
+		FacadeName:     msg.Type,
+		FacadeMethod:   msg.Request,
+		FacadeVersion:  msg.Version,
+		IsResponse:     isResponse,
+		ObjectId:       msg.ID,
+	}
+
+	// For responses extract errors. For requests extract params.
+	if isResponse {
+		// Extract errors from bulk and non-bulk calls.
+		var allErrors params.ErrorResults
+		if msg.Response != nil {
+			err := json.Unmarshal(msg.Response, &allErrors)
+			if err != nil {
+				zapctx.Error(context.Background(), "failed to unmarshal message response", zap.Error(err), zap.Any("message", msg))
+				return errors.E(err, "failed to unmarshal message response")
+			}
+		}
+		singleError := params.ErrorResult{Error: &params.Error{Message: msg.Error, Code: msg.ErrorCode, Info: msg.ErrorInfo}}
+		allErrors.Results = append(allErrors.Results, singleError)
+		jsonErr, err := json.Marshal(allErrors)
+		if err != nil {
+			return errors.E(err, "failed to marshal all errors")
+		}
+		ale.Errors = jsonErr
+	} else {
+		jsonBody, err := json.Marshal(msg.Params)
+		if err != nil {
+			zapctx.Error(context.Background(), "failed to marshal body", zap.Error(err))
+			return err
+		}
+		ale.Params = jsonBody
+	}
+	p.auditLog(&ale)
+	return nil
+}
+
 // clientProxy proxies messages from client->controller.
 type clientProxy struct {
-	// mu synchronises changes to closed and dst, dst is is only created
-	// at some unspecified point in the future after a client request.
-	mu         sync.Mutex
-	client     *writeLockConn
-	controller *writeLockConn
-	closed     bool
-
-	msgs                 *inflightMsgs
-	tokenGen             jimm.TokenGenerator
-	createControllerConn func(context.Context) (*websocket.Conn, error)
+	modelProxy
 	wg                   sync.WaitGroup
 	errChan              chan error
+	createControllerConn func(context.Context) (*websocket.Conn, string, error)
+	// mu synchronises changes to closed and modelproxy.dst, dst is is only created
+	// at some unspecified point in the future after a client request.
+	mu     sync.Mutex
+	closed bool
 }
 
 // start begins the client->controller proxier.
@@ -112,14 +178,14 @@ func (p *clientProxy) start(ctx context.Context) error {
 	const op = errors.Op("rpc.clientProxy.start")
 	const initialLogin = true
 	defer func() {
-		if p.controller != nil {
-			p.controller.conn.Close()
+		if p.dst != nil {
+			p.dst.conn.Close()
 		}
 	}()
 	for {
 		zapctx.Debug(ctx, "Reading on client connection")
 		msg := new(message)
-		if err := p.client.readJson(&msg); err != nil {
+		if err := p.src.readJson(&msg); err != nil {
 			zapctx.Error(ctx, "clientProxy error reading from src", zap.Error(err))
 			return err
 		}
@@ -127,9 +193,10 @@ func (p *clientProxy) start(ctx context.Context) error {
 		err := p.makeControllerConnection(ctx)
 		if err != nil {
 			zapctx.Error(ctx, "error connecting to controller", zap.Error(err))
-			p.client.sendError(err, msg)
+			p.sendError(p.src, msg, err)
 			return err
 		}
+		p.auditLogMessage(msg, false)
 		// All requests should be proxied as transparently as possible through to the controller
 		// except for auth related requests like Login because JIMM is auth gateway.
 		if msg.Type == "Admin" && msg.Request == "Login" {
@@ -140,27 +207,27 @@ func (p *clientProxy) start(ctx context.Context) error {
 				if stderrors.As(err, &aerr) {
 					res, err := json.Marshal(aerr.LoginResult)
 					if err != nil {
-						p.client.sendError(err, msg)
+						p.sendError(p.src, msg, err)
 						return err
 					}
-					p.client.sendMessage(res, msg)
+					p.src.sendMessage(res, msg)
 					continue
 				}
-				p.client.sendError(err, msg)
+				p.sendError(p.src, msg, err)
 				continue
 			}
 		}
 		if msg.RequestID == 0 {
 			zapctx.Error(ctx, "Invalid request ID 0")
 			err := errors.E(op, "Invalid request ID 0")
-			p.client.sendError(err, msg)
+			p.sendError(p.src, msg, err)
 			continue
 		}
 		p.msgs.addMessage(msg)
 		zapctx.Debug(ctx, "Writing to controller")
-		if err := p.controller.writeJson(msg); err != nil {
+		if err := p.dst.writeJson(msg); err != nil {
 			zapctx.Error(ctx, "clientProxy error writing to dst", zap.Error(err))
-			p.client.sendError(err, msg)
+			p.sendError(p.src, msg, err)
 			p.msgs.removeMessage(msg)
 			continue
 		}
@@ -173,7 +240,7 @@ func (p *clientProxy) makeControllerConnection(ctx context.Context) error {
 	const op = errors.Op("rpc.makeControllerConnection")
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if p.controller != nil {
+	if p.dst != nil {
 		return nil
 	}
 	// Checking closed ensures we don't have a race condition with a cancelled context.
@@ -181,12 +248,23 @@ func (p *clientProxy) makeControllerConnection(ctx context.Context) error {
 		err := errors.E(op, "Client connection closed while starting controller connection")
 		return err
 	}
-	conn, err := p.createControllerConn(ctx)
+	conn, modelName, err := p.createControllerConn(ctx)
 	if err != nil {
 		return err
 	}
-	p.controller = &writeLockConn{conn: conn}
-	controllerToClient := controllerProxy{controller: p.controller, client: p.client, msgs: p.msgs, tokenGen: p.tokenGen}
+	p.modelName = modelName
+	p.dst = &writeLockConn{conn: conn}
+	controllerToClient := controllerProxy{
+		modelProxy: modelProxy{
+			src:            p.dst,
+			dst:            p.src,
+			msgs:           p.msgs,
+			auditLog:       p.auditLog,
+			tokenGen:       p.tokenGen,
+			modelName:      p.modelName,
+			conversationId: p.conversationId,
+		},
+	}
 	p.wg.Add(1)
 	go func() {
 		defer p.wg.Done()
@@ -199,11 +277,7 @@ func (p *clientProxy) makeControllerConnection(ctx context.Context) error {
 // controllerProxy proxies messages from controller->client with the caveat that
 // it will retry client->controller messages that require further permissions.
 type controllerProxy struct {
-	controller *writeLockConn
-	client     *writeLockConn
-	// msgs tracks in flight messages
-	msgs     *inflightMsgs
-	tokenGen jimm.TokenGenerator
+	modelProxy
 }
 
 // start implements the controller->client proxier.
@@ -211,46 +285,52 @@ func (p *controllerProxy) start(ctx context.Context) error {
 	for {
 		zapctx.Debug(ctx, "Reading on controller connection")
 		msg := new(message)
-		if err := p.controller.readJson(msg); err != nil {
+		if err := p.src.readJson(msg); err != nil {
 			zapctx.Error(ctx, "controllerProxy error reading from src", zap.Error(err))
+			// Error reading on the socket implies it is closed, simply return.
 			return err
 		}
 		zapctx.Debug(ctx, "Received message from controller", zap.Any("Message", msg))
 		permissionsRequired, err := p.checkPermissionsRequired(ctx, msg)
 		if err != nil {
 			zapctx.Error(ctx, "failed to determine if more permissions required", zap.Error(err))
-			p.client.sendError(err, msg)
-			p.msgs.removeMessage(msg)
+			p.handleError(msg, err)
 			continue
 		}
 		if permissionsRequired != nil {
 			zapctx.Error(ctx, "Access Required error")
 			if err := p.redoLogin(ctx, permissionsRequired); err != nil {
 				zapctx.Error(ctx, "Failed to redo login", zap.Error(err))
-				p.client.sendError(err, msg)
-				p.msgs.removeMessage(msg)
+				p.handleError(msg, err)
 				continue
 			}
 			// Write back to the controller.
 			msg := p.msgs.getMessage(msg.RequestID)
 			if msg != nil {
-				p.controller.writeJson(msg)
+				p.src.writeJson(msg)
 			}
 			continue
 		} else {
 			if err := modifyControllerResponse(msg); err != nil {
 				zapctx.Error(ctx, "Failed to modify message", zap.Error(err))
-				p.client.sendError(err, msg)
+				p.handleError(msg, err)
+				// An error when modifying the message is a show stopper.
 				return err
 			}
-			p.msgs.removeMessage(msg)
 		}
+		p.msgs.removeMessage(msg)
+		p.auditLogMessage(msg, true)
 		zapctx.Debug(ctx, "Writing modified message to client", zap.Any("Message", msg))
-		if err := p.client.writeJson(msg); err != nil {
+		if err := p.dst.writeJson(msg); err != nil {
 			zapctx.Error(ctx, "controllerProxy error writing to dst", zap.Error(err))
 			return err
 		}
 	}
+}
+
+func (p *controllerProxy) handleError(msg *message, err error) {
+	p.sendError(p.dst, msg, err)
+	p.msgs.removeMessage(msg)
 }
 
 // checkPermissionsRequired returns a nil map if no permissions are required.
@@ -304,7 +384,7 @@ func (p *controllerProxy) redoLogin(ctx context.Context, permissions map[string]
 		return err
 	}
 	zapctx.Info(ctx, "Performing new login", zap.Any("message", loginMsg))
-	if err := p.controller.writeJson(loginMsg); err != nil {
+	if err := p.src.writeJson(loginMsg); err != nil {
 		return err
 	}
 	return nil
@@ -312,7 +392,7 @@ func (p *controllerProxy) redoLogin(ctx context.Context, permissions map[string]
 
 // addJWT adds a JWT token to the the provided message.
 // If initialLogin is set the user will be authenticated.
-func addJWT(ctx context.Context, initialLogin bool, msg *message, permissions map[string]interface{}, tokenGen jimm.TokenGenerator) error {
+func addJWT(ctx context.Context, initialLogin bool, msg *message, permissions map[string]interface{}, tokenGen TokenGenerator) error {
 	const op = errors.Op("rpc.addJWT")
 	// First we unmarshal the existing LoginRequest.
 	if msg == nil {
@@ -351,22 +431,42 @@ func createErrResponse(err error, req *message) *message {
 	return errMsg
 }
 
+// ProxyHelpers contains all the necessary helpers for proxying a Juju client
+// connection to a model.
+type ProxyHelpers struct {
+	ConnClient        *websocket.Conn
+	TokenGen          TokenGenerator
+	ConnectController func(context.Context) (*websocket.Conn, string, error)
+	AuditLog          func(*dbmodel.AuditLogEntry)
+}
+
 // ProxySockets will proxy requests from a client connection through to a controller
 // tokenGen is used to authenticate the user and generate JWT token.
 // connectController provides the function to return a connection to the desired controller endpoint.
-func ProxySockets(ctx context.Context, connClient *websocket.Conn, tokenGen jimm.TokenGenerator, connectController func(context.Context) (*websocket.Conn, error)) error {
+func ProxySockets(ctx context.Context, helpers ProxyHelpers) error {
 	const op = errors.Op("rpc.ProxySockets")
+	if helpers.ConnectController == nil {
+		zapctx.Error(ctx, "Missing controller connect function")
+		return errors.E(op, "Missing controller connect function")
+	}
+	if helpers.AuditLog == nil {
+		zapctx.Error(ctx, "Missing audit log function")
+		return errors.E(op, "Missing audit log function")
+	}
 	errChan := make(chan error, 2)
 	msgInFlight := inflightMsgs{messages: make(map[uint64]*message)}
-	client := writeLockConn{conn: connClient}
+	client := writeLockConn{conn: helpers.ConnClient}
 	// Note that the clProxy start method will create the connection to the desired controller only
 	// after the first message has been received so that any errors can be properly sent back to the client.
 	clProxy := clientProxy{
-		client:               &client,
-		msgs:                 &msgInFlight,
-		tokenGen:             tokenGen,
+		modelProxy: modelProxy{
+			src:      &client,
+			msgs:     &msgInFlight,
+			tokenGen: helpers.TokenGen,
+			auditLog: helpers.AuditLog,
+		},
 		errChan:              errChan,
-		createControllerConn: connectController,
+		createControllerConn: helpers.ConnectController,
 	}
 	clProxy.wg.Add(1)
 	go func() {
@@ -382,11 +482,12 @@ func ProxySockets(ctx context.Context, connClient *websocket.Conn, tokenGen jimm
 	case <-ctx.Done():
 		err = errors.E(op, "Context cancelled")
 		zapctx.Debug(ctx, "Context cancelled")
-		connClient.Close()
+		helpers.ConnClient.Close()
 		clProxy.mu.Lock()
 		clProxy.closed = true
-		if clProxy.controller != nil {
-			clProxy.controller.conn.Close()
+		// TODO(Kian): Test removing close on dst below. The client connection should do it.
+		if clProxy.dst != nil {
+			clProxy.dst.conn.Close()
 		}
 		clProxy.mu.Unlock()
 	}
@@ -400,7 +501,7 @@ func modifyControllerResponse(msg *message) error {
 	if err != nil {
 		return err
 	}
-	// Delete servers block so that juju client's don't get redirected.
+	// Delete servers block so that juju clients don't get redirected.
 	delete(response, "servers")
 	newResp, err := json.Marshal(response)
 	if err != nil {

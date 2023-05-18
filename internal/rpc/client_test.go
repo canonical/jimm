@@ -18,6 +18,7 @@ import (
 	"github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 
+	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/rpc"
 )
@@ -228,9 +229,12 @@ func (p *testTokenGenerator) MakeToken(ctx context.Context, initialLogin bool, r
 func (p *testTokenGenerator) SetTags(names.ModelTag, names.ControllerTag) {
 }
 
+func (p *testTokenGenerator) GetUser() names.UserTag {
+	return names.NewUserTag("testUser")
+}
+
 func TestProxySockets(t *testing.T) {
 	c := qt.New(t)
-
 	ctx := context.Background()
 
 	srvController := newServer(func(conn *websocket.Conn) error {
@@ -239,12 +243,19 @@ func TestProxySockets(t *testing.T) {
 	errChan := make(chan error)
 	srvJIMM := newServer(func(connClient *websocket.Conn) error {
 		testTokenGen := testTokenGenerator{}
-		f := func(context.Context) (*websocket.Conn, error) {
+		f := func(context.Context) (*websocket.Conn, string, error) {
 			connController, err := srvController.dialer.DialWebsocket(ctx, srvController.URL)
 			c.Assert(err, qt.IsNil)
-			return connController, nil
+			return connController, "TestName", nil
 		}
-		err := rpc.ProxySockets(ctx, connClient, &testTokenGen, f)
+		auditLogger := func(ale *dbmodel.AuditLogEntry) {}
+		proxyHelpers := rpc.ProxyHelpers{
+			ConnClient:        connClient,
+			TokenGen:          &testTokenGen,
+			ConnectController: f,
+			AuditLog:          auditLogger,
+		}
+		err := rpc.ProxySockets(ctx, proxyHelpers)
 		errChan <- err
 		return err
 	})
@@ -279,12 +290,19 @@ func TestCancelProxySockets(t *testing.T) {
 	errChan := make(chan error)
 	srvJIMM := newServer(func(connClient *websocket.Conn) error {
 		testTokenGen := testTokenGenerator{}
-		f := func(context.Context) (*websocket.Conn, error) {
+		f := func(context.Context) (*websocket.Conn, string, error) {
 			connController, err := srvController.dialer.DialWebsocket(ctx, srvController.URL)
 			c.Assert(err, qt.IsNil)
-			return connController, nil
+			return connController, "TestName", nil
 		}
-		err := rpc.ProxySockets(ctx, connClient, &testTokenGen, f)
+		auditLogger := func(ale *dbmodel.AuditLogEntry) {}
+		proxyHelpers := rpc.ProxyHelpers{
+			ConnClient:        connClient,
+			TokenGen:          &testTokenGen,
+			ConnectController: f,
+			AuditLog:          auditLogger,
+		}
+		err := rpc.ProxySockets(ctx, proxyHelpers)
 		errChan <- err
 		return err
 	})
@@ -297,6 +315,86 @@ func TestCancelProxySockets(t *testing.T) {
 	cancel()
 	err = <-errChan
 	c.Assert(err.Error(), qt.Equals, "Context cancelled")
+}
+
+func TestProxySocketsAuditLogs(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := context.Background()
+
+	srvController := newServer(func(conn *websocket.Conn) error {
+		return echo(conn)
+	})
+	auditLogs := make([]*dbmodel.AuditLogEntry, 0)
+
+	errChan := make(chan error)
+	srvJIMM := newServer(func(connClient *websocket.Conn) error {
+		testTokenGen := testTokenGenerator{}
+		f := func(context.Context) (*websocket.Conn, string, error) {
+			connController, err := srvController.dialer.DialWebsocket(ctx, srvController.URL)
+			c.Assert(err, qt.IsNil)
+			return connController, "TestModelName", nil
+		}
+		auditLogger := func(ale *dbmodel.AuditLogEntry) { auditLogs = append(auditLogs, ale) }
+		proxyHelpers := rpc.ProxyHelpers{
+			ConnClient:        connClient,
+			TokenGen:          &testTokenGen,
+			ConnectController: f,
+			AuditLog:          auditLogger,
+		}
+		err := rpc.ProxySockets(ctx, proxyHelpers)
+		errChan <- err
+		return err
+	})
+
+	defer srvController.Close()
+	defer srvJIMM.Close()
+	ws, err := srvJIMM.dialer.DialWebsocket(ctx, srvJIMM.URL)
+	c.Assert(err, qt.IsNil)
+	defer ws.Close()
+
+	p := json.RawMessage(`{"Key":"TestVal"}`)
+	msg := rpc.Message{RequestID: 1, Type: "TestType", Request: "TestReq", Params: p}
+	err = ws.WriteJSON(&msg)
+	c.Assert(err, qt.IsNil)
+	resp := rpc.Message{}
+	err = ws.ReadJSON(&resp)
+	c.Assert(err, qt.IsNil)
+	ws.Close()
+	<-errChan // Ensure go routines are cleaned up
+	c.Assert(auditLogs, qt.HasLen, 2)
+	expectedEvents := []*dbmodel.AuditLogEntry{{
+		ID:             auditLogs[0].ID,
+		Time:           auditLogs[0].Time,
+		Model:          "TestModelName",
+		ConversationId: auditLogs[0].ConversationId,
+		MessageId:      1,
+		FacadeName:     "TestType",
+		FacadeMethod:   "TestReq",
+		FacadeVersion:  0,
+		ObjectId:       "",
+		UserTag:        "user-testUser",
+		IsResponse:     false,
+		Params:         dbmodel.JSON(p),
+		Errors:         nil,
+	}, {
+		ID:             auditLogs[1].ID,
+		Time:           auditLogs[1].Time,
+		Model:          "TestModelName",
+		ConversationId: auditLogs[1].ConversationId,
+		MessageId:      1,
+		FacadeName:     "",
+		FacadeMethod:   "",
+		FacadeVersion:  0,
+		ObjectId:       "",
+		UserTag:        "user-testUser",
+		IsResponse:     true,
+		Params:         nil,
+		Errors:         auditLogs[1].Errors,
+	},
+	}
+	c.Assert(auditLogs, qt.DeepEquals, expectedEvents)
+
 }
 
 type server struct {

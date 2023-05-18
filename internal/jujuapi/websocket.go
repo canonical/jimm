@@ -60,7 +60,7 @@ func (s *apiServer) Kill() {
 }
 
 // serveRoot serves an RPC root object on a websocket connection.
-func serveRoot(ctx context.Context, root root, logger dbAuditLogger, wsConn *websocket.Conn) {
+func serveRoot(ctx context.Context, root root, logger jimm.DbAuditLogger, wsConn *websocket.Conn) {
 	ctx = zapctx.WithFields(ctx, zap.Bool("websocket", true))
 
 	// Note that although NewConn accepts a `RecorderFactory` input, the call to conn.ServeRoot
@@ -70,7 +70,7 @@ func serveRoot(ctx context.Context, root root, logger dbAuditLogger, wsConn *web
 		nil,
 	)
 	rpcRecorderFactory := func() rpc.Recorder {
-		return newRecorder(logger)
+		return jimm.NewRecorder(logger)
 	}
 	conn.ServeRoot(root, rpcRecorderFactory, func(err error) error {
 		return mapError(err)
@@ -134,20 +134,27 @@ func (s modelProxyServer) ServeWS(ctx context.Context, clientConn *websocket.Con
 	jwtGenerator := jimm.NewJwtGenerator(s.jimm)
 	connectionFunc := controllerConnectionFunc(s, &jwtGenerator)
 	zapctx.Debug(ctx, "Starting proxier")
-	jimmRPC.ProxySockets(ctx, clientConn, &jwtGenerator, connectionFunc)
+	auditLogger := s.jimm.AddAuditLogEntry
+	proxyHelpers := jimmRPC.ProxyHelpers{
+		ConnClient:        clientConn,
+		TokenGen:          &jwtGenerator,
+		ConnectController: connectionFunc,
+		AuditLog:          auditLogger,
+	}
+	jimmRPC.ProxySockets(ctx, proxyHelpers)
 }
 
 // controllerConnectionFunc returns a function that will be used to
 // connect to a controller when a client makes a request.
-func controllerConnectionFunc(s modelProxyServer, jwtGenerator *jimm.JwtGenerator) func(context.Context) (*websocket.Conn, error) {
-	connectToControllerFunc := func(ctx context.Context) (*websocket.Conn, error) {
+func controllerConnectionFunc(s modelProxyServer, jwtGenerator *jimm.JwtGenerator) func(context.Context) (*websocket.Conn, string, error) {
+	connectToControllerFunc := func(ctx context.Context) (*websocket.Conn, string, error) {
 		const op = errors.Op("proxy.controllerConnectionFunc")
 		path := jimmhttp.PathElementFromContext(ctx, "path")
 		zapctx.Debug(ctx, "grabbing model info from path", zap.String("path", path))
 		uuid, finalPath, err := modelInfoFromPath(path)
 		if err != nil {
 			zapctx.Error(ctx, "error parsing path", zap.Error(err))
-			return nil, errors.E(op, err)
+			return nil, "", errors.E(op, err)
 		}
 		m := dbmodel.Model{
 			UUID: sql.NullString{
@@ -157,7 +164,7 @@ func controllerConnectionFunc(s modelProxyServer, jwtGenerator *jimm.JwtGenerato
 		}
 		if err := s.jimm.Database.GetModel(context.Background(), &m); err != nil {
 			zapctx.Error(ctx, "failed to find model", zap.String("uuid", uuid), zap.Error(err))
-			return nil, errors.E(err, errors.CodeNotFound)
+			return nil, "", errors.E(err, errors.CodeNotFound)
 		}
 		jwtGenerator.SetTags(m.ResourceTag(), m.Controller.ResourceTag())
 		mt := m.ResourceTag()
@@ -165,9 +172,10 @@ func controllerConnectionFunc(s modelProxyServer, jwtGenerator *jimm.JwtGenerato
 		controllerConn, err := jujuclient.ProxyDial(ctx, &m.Controller, mt, finalPath)
 		if err != nil {
 			zapctx.Error(ctx, "cannot dial controller", zap.String("controller", m.Controller.Name), zap.Error(err))
-			return nil, err
+			return nil, "", err
 		}
-		return controllerConn, nil
+		fullModelName := m.Controller.Name + "/" + m.Name
+		return controllerConn, fullModelName, nil
 	}
 	return connectToControllerFunc
 }
