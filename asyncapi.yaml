@@ -1,0 +1,352 @@
+asyncapi: 2.6.0
+info:
+  title: Juju Intelligent Model Manager
+  version: '1.1.5'
+servers:
+  private:
+    url: <jimms public url i forget>
+    protocol: wss
+    description: |
+      JIMM requires authentication and authorisation.
+      Once the socket is open you can subscribe to private-data channels by 
+      sending an authenticated subscribe request message.
+
+      This spec is written slightly differently than what was intended by the authors of
+      AsyncAPI, where we have channel identifiers under each "channels" block, instead
+      of an endpoint (like wss://.../my/endpoint) we have facade/method, as our calls, 
+      despite being async, operate on a specific request/response mechanism. As such, 
+      you can think of each channel as the facade endpoint.
+      
+
+      To login, a message of the following must be sent:
+      ```
+      {
+          "request-id": <id>,
+          "type": "Admin",
+          "version": 3,
+          "request": "Login",
+          "params": {
+              "auth-tag": "<user tag>",
+              "credentials": "<password>",
+              "macaroons": [<auth macaroons>]
+          }
+      }
+      ```
+
+      Once logged in, the following facades (aka channels) will be available.
+channels:
+  api/uuid:
+    publish:
+      summary: Add a controller to JIMM.
+      operationId: addControllerRequest
+      tags:
+        - name: controllers
+      message:
+        name: AddController
+        payload:
+          type: object
+          properties:
+            request-id:
+              type: integer
+              minimum: 1
+              description: The ID of the request.
+            type:
+              type: string
+              description: The facade name.
+            version:
+              type: integer
+              minimum: 1
+              description: The facade version.
+            request:
+              type: string
+              description: The method name.
+
+
+    subscribe:
+      summary: Remove a controller from JIMM.
+      operationId: addControllerResponse
+      tags:
+        - name: controllers
+
+components:
+  schemas:
+    AddControllerRequestParams:
+      type: object
+      properties:
+        name:
+          type: string
+          description: The controller name.
+        public-address:
+          type: string
+          description: The public address of this controller.
+        api-addresses:
+          type: [string]
+          description: The currently known API addresses for this controller.
+        ca-certificate:
+          type: string
+          description: >
+            The CA certificate to use to validate the
+            connection to the controller. This is not needed if certificate is
+            signed by a public CA.
+        username:
+          type: string
+          description: The username that JIMM should use to connect to the controller.
+        password: 
+          type: string
+          description: The password that JIMM should use to connect to the controller.
+    RemoveControllerRequestParams:
+      type: object
+      properties:
+        name:
+          type: string
+          description: The name of the controller to remove.
+        force:
+          type: boolean
+          description: Whether to forcefully remove the controller.
+    SetControllerDeprecatedRequestParams:
+      type: object
+      properties:
+        name:
+          type: string
+          description: The name of the controller to set deprecated.
+        deprecated:
+          type: boolean
+          descrption: Whether to set the controller deprecated.
+    AddCloudToControllerRequestParams:
+      type: object
+      properties:
+        controller-name:
+          type: string
+          description: The controller name to add the cloud to.
+        name:
+          type: string
+          description: The cloud name.
+        force:
+          type: boolean
+          description: TODO
+        cloud:
+          type: object
+          properties:
+            type:
+              type: string
+              description: The cloud type.
+            host-cloud-region:
+              type: string
+              description: The region of this cloud.
+            auth-types:
+              type: [string]
+              description: The authz/authn types of this cloud.
+            endpoint:
+              type: string
+              description: The endpoint for this cloud.
+            identity-endpoint:
+              type: string
+              description: The identity endpoint for this cloud.
+            storage-endpoint:
+              description: The storage endpoint for this cloud.
+            regions:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: The region name.
+                endpoint:
+                  type: string
+                  description: The endpoint for this region.
+                identity-endpoint:
+                  type: string
+                  description: The identity endpoint for this region.
+                storage-endpoint:
+                  description: The storage endpoint for this region.
+            ca-certificates:
+              type: [string]
+              description: An array of certificates for this cloud.
+            skip-tls-verify:
+              type: boolean
+              description: Whether to skip TLS verification when connecting to this cloud.
+            config:
+              type: object
+              description: The config to pass on this cloud request. 
+            region-config:
+              type: object
+              description: The config to pass on this region request.
+            is-controller-cloud:
+              type: boolean
+              description: Whether this is a cloud containing a controller.
+    RemoveCloudFromControllerRequestParams:
+      type: object
+      properties:
+        cloud-tag:
+          type: string
+          description: The tag of the cloud this controller is running in.
+        controller-name:
+          type: string
+          description: The name of the controller from which the cloud should be removed.
+    GrantAditLogAccessRequestParams:
+      type: object
+      properties:
+        user-tag:
+          type: string
+          description: User tag is the user who's audit-log access is being modified.
+        level:
+          type: string
+          description: The access level being granted, the only level is "read".
+    RevokeAuditLogAccessRequestParams:
+      type: object
+      properties:
+        user-tag:
+          type: string
+          description: User tag is the user who's audit-log access is being modified.
+        level:
+          type: string
+          description: The access level being granted, the only level is "read".
+    FindAuditEventsRequestParams:
+      type: object
+      properties:
+        after:
+          type: string
+          format: date-time
+          description: Get events after this time.
+        before:
+          type: string
+          format: date-time
+          description: Get events before this time.
+        user-tag:
+          type: string
+          description: Filter by specific user name.
+        model:
+          type: string
+          description: Filter by specific model name.
+        method: 
+          type: string
+          description: Filter by specific facade method name.
+        offset: 
+          type: integer
+          description: The offset to begin at when returning results.
+        limit:
+          type: integer
+          description: The maximum audit events to return.
+    FullModelStatusRequestParams:  
+      type: object
+      properties:
+        ModelTag:
+          type: string
+          description: The model tag to get the status from.
+        Patterns:
+          type: string
+          description: TODO (also these fields have no go json tags)
+    ImportModelRequestParams:
+      type: object
+      properties:
+        controller:
+          type: string
+          description: The controller name where the model resides.
+        model-tag:
+          type: string
+          description: The model tag of the model to import.
+    UpdateMigratedModelRequestParams:
+      type: object
+      properties:
+        model-tag:
+          type: string
+          description: The model tag of the model that has been migrated.
+        target-controller:
+          type: string
+          description: The name of the controller the model has been migrated to.
+    AddGroupRequestParams:
+      type: object
+      properties:
+        name:
+          type: string
+          description: The name of the group to add.
+    RenameGroupRequestParams:
+      type: object
+      properties:
+        name:
+          type: string
+          description: The name of the group to rename.
+        new-name:
+          type: string
+          description: The new name for this group.
+    RemoveGroupRequestParams:
+      type: object
+      properties:
+        name:
+          type: string
+          description: The name of the group to remove.
+    RelationshipTuple:
+      type: object
+      properties:
+        tuple:
+          type: object
+          description: The relationship tuples to target.
+          properties:
+            object:
+              type: string
+              description: The base object to relate from.
+            relation:
+              type: string
+              description: The type of relation to use.
+            target_object: 
+              type: string
+              description: The target object to relate to.
+    AddRelationRequestParams:
+      type: array
+      items:
+        $ref: '#/components/schemas/RelationshipTuple'
+    RemoveRelationRequestParams:
+      type: array
+      items:
+        $ref: '#/components/schemas/RelationshipTuple'
+    CheckRelationRequestParams:
+      description: >
+        Contains the object, target object and relation
+        to be checked for reachability in OpenFGA.
+      $ref: '#/components/schemas/RelationshipTuple'
+    ListRelationshipTuplesRequestParams:
+      type: object
+      properties:
+        tuple: 
+          $ref: '#/components/schemas/RelationshipTuple'
+        page_size:
+          type: integer
+          description: The page size when listing tuples.
+        continuation_token:
+          type: string
+          description: A token to continue reading from the previous paginated offset.
+    CrossModelQueryRequestParams:
+      type: object
+      properties:
+        type:
+          type: string
+          description: The type of query to perform. Currently only jq is supported.
+        query:
+          type: string
+          description: The query string.
+  # JIMM/RemoveController:
+  # JIMM/ListControllers:
+  # JIMM/SetControllerDeprecated:
+
+  # JIMM/AddCloudToController:
+  # JIMM/RemoveCloudFromController:
+
+  # JIMM/DisableControllerUUIDMasking:
+
+  # JIMM/GrantAuditLogAccess:
+  # JIMM/RevokeAuditLogAccess:
+  # JIMM/FindAuditEvents:
+
+  # JIMM/ImportModel:
+  # JIMM/UpdateMigratedModel:
+  # JIMM/FullModelStatus:
+  # JIMM/CrossModelQuery:
+
+  # JIMM/AddGroup:
+  # JIMM/RenameGroup:
+  # JIMM/RemoveGroup:
+  # JIMM/ListGroups:
+  # JIMM/AddRelation:
+  # JIMM/RemoveRelation:
+  # JIMM/CheckRelation:
+  # JIMM/ListRelationshipTuples:
+
