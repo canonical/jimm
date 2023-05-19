@@ -157,6 +157,36 @@ func (u *User) GetModelAccess(ctx context.Context, resource names.ModelTag) ofga
 	return ofganames.NoRelation
 }
 
+// GetApplicationOfferAccess returns the relation the user has with the specified application offer.
+func (u *User) GetApplicationOfferAccess(ctx context.Context, resource names.ApplicationOfferTag) ofganames.Relation {
+	isAdmin, err := IsAdministrator(ctx, u, resource)
+	if err != nil {
+		zapctx.Error(ctx, "openfga check failed", zap.Error(err))
+		return ofganames.NoRelation
+	}
+	if isAdmin {
+		return ofganames.AdministratorRelation
+	}
+	isConsumer, err := u.IsApplicationOfferConsumer(ctx, resource)
+	if err != nil {
+		zapctx.Error(ctx, "openfga check failed", zap.Error(err))
+		return ofganames.NoRelation
+	}
+	if isConsumer {
+		return ofganames.ConsumerRelation
+	}
+	isReader, err := u.IsApplicationOfferReader(ctx, resource)
+	if err != nil {
+		zapctx.Error(ctx, "openfga check failed", zap.Error(err))
+		return ofganames.NoRelation
+	}
+	if isReader {
+		return ofganames.ReaderRelation
+	}
+
+	return ofganames.NoRelation
+}
+
 // SetModelAccess adds a direct relation between the user and the model.
 func (u *User) SetModelAccess(ctx context.Context, resource names.ModelTag, relation ofganames.Relation) error {
 	return setResourceAccess(ctx, u, resource, relation)
@@ -169,7 +199,7 @@ func (u *User) SetControllerAccess(ctx context.Context, resource names.Controlle
 
 // UnsetAuditLogViewerAccess removes a direct audit log viewer relation between the user and a controller.
 func (u *User) UnsetAuditLogViewerAccess(ctx context.Context, resource names.ControllerTag) error {
-	return unsetResourceAccess(ctx, u, resource, ofganames.AuditLogViewerRelation)
+	return unsetResourceAccess(ctx, u, resource, ofganames.AuditLogViewerRelation, true)
 }
 
 // SetCloudAccess adds a direct relation between the user and the cloud.
@@ -180,6 +210,11 @@ func (u *User) SetCloudAccess(ctx context.Context, resource names.CloudTag, rela
 // SetApplicationOfferAccess adds a direct relation between the user and the application offer.
 func (u *User) SetApplicationOfferAccess(ctx context.Context, resource names.ApplicationOfferTag, relation ofganames.Relation) error {
 	return setResourceAccess(ctx, u, resource, relation)
+}
+
+// UnsetApplicationOfferAccess removes a direct relation between the user and the application offer.
+func (u *User) UnsetApplicationOfferAccess(ctx context.Context, resource names.ApplicationOfferTag, relation ofganames.Relation, ignoreMissingRelation bool) error {
+	return unsetResourceAccess(ctx, u, resource, relation, ignoreMissingRelation)
 }
 
 // ListModels returns a slice of model UUIDs this user has at least reader access to.
@@ -278,17 +313,19 @@ func setResourceAccess[T ofganames.ResourceTagger](ctx context.Context, user *Us
 	return nil
 }
 
-func unsetResourceAccess[T ofganames.ResourceTagger](ctx context.Context, user *User, resource T, relation ofganames.Relation) error {
+func unsetResourceAccess[T ofganames.ResourceTagger](ctx context.Context, user *User, resource T, relation ofganames.Relation, ignoreMissingRelation bool) error {
 	err := user.client.removeRelation(ctx, Tuple{
 		Object:   ofganames.ConvertTag(user.ResourceTag()),
 		Relation: relation,
 		Target:   ofganames.ConvertTag(resource),
 	})
 	if err != nil {
-		// if the tuple does not exist we don't return an error.
-		// TODO we should opt to check against specific errors via checking their code/metadata.
-		if strings.Contains(err.Error(), "cannot delete a tuple which does not exist") {
-			return nil
+		if ignoreMissingRelation {
+			// if the tuple does not exist we don't return an error.
+			// TODO we should opt to check against specific errors via checking their code/metadata.
+			if strings.Contains(err.Error(), "cannot delete a tuple which does not exist") {
+				return nil
+			}
 		}
 		return errors.E(err)
 	}
