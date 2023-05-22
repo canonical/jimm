@@ -63,6 +63,8 @@ func start(ctx context.Context, s *service.Service) error {
 			Token:     os.Getenv("OPENFGA_TOKEN"),
 			Port:      os.Getenv("OPENFGA_PORT"),
 		},
+		PrivateKey: os.Getenv("BAKERY_PRIVATE_KEY"),
+		PublicKey:  os.Getenv("BAKERY_PUBLIC_KEY"),
 	})
 	if err != nil {
 		return err

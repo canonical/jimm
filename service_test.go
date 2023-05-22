@@ -4,7 +4,10 @@ package jimm_test
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -14,6 +17,7 @@ import (
 	"github.com/canonical/candid/candidtest"
 	qt "github.com/frankban/quicktest"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/checkers"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery/agent"
 	"github.com/juju/juju/api"
@@ -25,6 +29,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/jimmtest"
 	"github.com/CanonicalLtd/jimm/internal/openfga"
+	ofganames "github.com/CanonicalLtd/jimm/internal/openfga/names"
 	"github.com/CanonicalLtd/jimm/internal/vault"
 )
 
@@ -232,6 +237,220 @@ func TestOpenFGA(t *testing.T) {
 		allowed, err := openfga.IsAdministrator(context.Background(), user, names.NewControllerTag(p.ControllerUUID))
 		c.Assert(err, qt.IsNil)
 		c.Assert(allowed, qt.IsTrue)
+	}
+}
+
+func TestPublicKey(t *testing.T) {
+	c := qt.New(t)
+
+	_, ofgaClient, cfg, err := jimmtest.SetupTestOFGAClient(c.Name())
+	c.Assert(err, qt.IsNil)
+
+	p := jimm.Params{
+		ControllerUUID: "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
+		OpenFGAParams: jimm.OpenFGAParams{
+			Scheme:    cfg.ApiScheme,
+			Host:      cfg.ApiHost,
+			Store:     cfg.StoreId,
+			Token:     cfg.Credentials.Config.ApiToken,
+			AuthModel: ofgaClient.AuthModelId,
+		},
+		ControllerAdmins: []string{"alice", "eve"},
+		PrivateKey:       "c1VkV05+iWzCxMwMVcWbr0YJWQSEO62v+z3EQ2BhFMw=",
+		PublicKey:        "pC8MEk9MS9S8fhyRnOJ4qARTcTAwoM9L1nH/Yq0MwWU=",
+	}
+	_ = startCandid(c, &p)
+	svc, err := jimm.NewService(context.Background(), p)
+	c.Assert(err, qt.IsNil)
+
+	srv := httptest.NewTLSServer(svc)
+	c.Cleanup(srv.Close)
+
+	response, err := http.Get(srv.URL + "/macaroons/publickey")
+	c.Assert(err, qt.IsNil)
+	data, err := io.ReadAll(response.Body)
+	c.Assert(err, qt.IsNil)
+	c.Assert(string(data), qt.Equals, `{"PublicKey":"pC8MEk9MS9S8fhyRnOJ4qARTcTAwoM9L1nH/Yq0MwWU="}`)
+}
+
+func TestThirdPartyCaveatDischarge(t *testing.T) {
+	c := qt.New(t)
+
+	controller := dbmodel.Controller{
+		UUID: "7e4e7ffb-5116-4544-a400-f584d08c410e",
+		Name: "test-controller",
+	}
+	model := dbmodel.Model{
+		UUID: sql.NullString{
+			String: "7e4e7ffb-5116-4544-a400-f584d08c410e",
+			Valid:  true,
+		},
+		Name: "test-model",
+	}
+	offer := dbmodel.ApplicationOffer{
+		UUID: "7e4e7ffb-5116-4544-a400-f584d08c410e",
+		Name: "test-application-offer",
+	}
+	user := dbmodel.User{
+		Username: "alice@external",
+	}
+
+	ctx := context.Background()
+
+	tests := []struct {
+		about         string
+		setup         func(c *qt.C, ofgaClient *openfga.OFGAClient, user *dbmodel.User)
+		caveats       []string
+		expectedError string
+	}{{
+		about:         "unknown caveats",
+		caveats:       []string{"unknown-caveat"},
+		expectedError: ".*third party refused discharge: cannot discharge: caveat not recognized",
+	}, {
+		about:         "user is not an offer reader",
+		caveats:       []string{fmt.Sprintf("is-reader %s %s", user.ResourceTag(), offer.ResourceTag())},
+		expectedError: ".*cannot discharge: permission denied",
+	}, {
+		about: "user is an offer reader",
+		setup: func(c *qt.C, ofgaClient *openfga.OFGAClient, user *dbmodel.User) {
+			u := openfga.NewUser(user, ofgaClient)
+			err := u.SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.ReaderRelation)
+			c.Assert(err, qt.IsNil)
+		},
+		caveats: []string{fmt.Sprintf("is-reader %s %s", user.ResourceTag(), offer.ResourceTag())},
+	}, {
+		about:         "user is not an offer consumer",
+		caveats:       []string{fmt.Sprintf("is-consumer %s %s", user.ResourceTag(), offer.ResourceTag())},
+		expectedError: ".*cannot discharge: permission denied",
+	}, {
+		about: "user is an offer consumer",
+		setup: func(c *qt.C, ofgaClient *openfga.OFGAClient, user *dbmodel.User) {
+			u := openfga.NewUser(user, ofgaClient)
+			err := u.SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.ConsumerRelation)
+			c.Assert(err, qt.IsNil)
+		},
+		caveats: []string{fmt.Sprintf("is-consumer %s %s", user.ResourceTag(), offer.ResourceTag())},
+	}, {
+		about:         "user is not an offer administrator",
+		caveats:       []string{fmt.Sprintf("is-administrator %s %s", user.ResourceTag(), offer.ResourceTag())},
+		expectedError: ".*cannot discharge: permission denied",
+	}, {
+		about: "user is an offer administrator",
+		setup: func(c *qt.C, ofgaClient *openfga.OFGAClient, user *dbmodel.User) {
+			u := openfga.NewUser(user, ofgaClient)
+			err := u.SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.AdministratorRelation)
+			c.Assert(err, qt.IsNil)
+		},
+		caveats: []string{fmt.Sprintf("is-administrator %s %s", user.ResourceTag(), offer.ResourceTag())},
+	}, {
+		about:         "user is not a model administrator",
+		caveats:       []string{fmt.Sprintf("is-administrator %s %s", user.ResourceTag(), model.ResourceTag())},
+		expectedError: ".*cannot discharge: permission denied",
+	}, {
+		about: "user is a model administrator",
+		setup: func(c *qt.C, ofgaClient *openfga.OFGAClient, user *dbmodel.User) {
+			u := openfga.NewUser(user, ofgaClient)
+			err := u.SetModelAccess(ctx, model.ResourceTag(), ofganames.AdministratorRelation)
+			c.Assert(err, qt.IsNil)
+		},
+		caveats: []string{fmt.Sprintf("is-administrator %s %s", user.ResourceTag(), model.ResourceTag())},
+	}, {
+		about:         "user is not a model reader",
+		caveats:       []string{fmt.Sprintf("is-reader %s %s", user.ResourceTag(), model.ResourceTag())},
+		expectedError: ".*cannot discharge: permission denied",
+	}, {
+		about: "user is a model reader",
+		setup: func(c *qt.C, ofgaClient *openfga.OFGAClient, user *dbmodel.User) {
+			u := openfga.NewUser(user, ofgaClient)
+			err := u.SetModelAccess(ctx, model.ResourceTag(), ofganames.ReaderRelation)
+			c.Assert(err, qt.IsNil)
+		},
+		caveats: []string{fmt.Sprintf("is-reader %s %s", user.ResourceTag(), model.ResourceTag())},
+	}, {
+		about:         "user is not a model writer",
+		caveats:       []string{fmt.Sprintf("is-writer %s %s", user.ResourceTag(), model.ResourceTag())},
+		expectedError: ".*cannot discharge: permission denied",
+	}, {
+		about: "user is a model writer",
+		setup: func(c *qt.C, ofgaClient *openfga.OFGAClient, user *dbmodel.User) {
+			u := openfga.NewUser(user, ofgaClient)
+			err := u.SetModelAccess(ctx, model.ResourceTag(), ofganames.WriterRelation)
+			c.Assert(err, qt.IsNil)
+		},
+		caveats: []string{fmt.Sprintf("is-writer %s %s", user.ResourceTag(), model.ResourceTag())},
+	}, {
+		about:         "user is not a controller administrator",
+		caveats:       []string{fmt.Sprintf("is-administrator %s %s", user.ResourceTag(), controller.ResourceTag())},
+		expectedError: ".*cannot discharge: permission denied",
+	}, {
+		about: "user is a controller administrator",
+		setup: func(c *qt.C, ofgaClient *openfga.OFGAClient, user *dbmodel.User) {
+			u := openfga.NewUser(user, ofgaClient)
+			err := u.SetControllerAccess(ctx, controller.ResourceTag(), ofganames.AdministratorRelation)
+			c.Assert(err, qt.IsNil)
+		},
+		caveats: []string{fmt.Sprintf("is-administrator %s %s", user.ResourceTag(), controller.ResourceTag())},
+	}}
+	for _, test := range tests {
+		c.Run(test.about, func(c *qt.C) {
+			_, ofgaClient, cfg, err := jimmtest.SetupTestOFGAClient(c.Name())
+			c.Assert(err, qt.IsNil)
+
+			p := jimm.Params{
+				ControllerUUID: "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
+				OpenFGAParams: jimm.OpenFGAParams{
+					Scheme:    cfg.ApiScheme,
+					Host:      cfg.ApiHost,
+					Store:     cfg.StoreId,
+					Token:     cfg.Credentials.Config.ApiToken,
+					AuthModel: ofgaClient.AuthModelId,
+				},
+				ControllerAdmins: []string{"alice", "eve"},
+				PrivateKey:       "c1VkV05+iWzCxMwMVcWbr0YJWQSEO62v+z3EQ2BhFMw=",
+				PublicKey:        "pC8MEk9MS9S8fhyRnOJ4qARTcTAwoM9L1nH/Yq0MwWU=",
+			}
+			_ = startCandid(c, &p)
+			svc, err := jimm.NewService(context.Background(), p)
+			c.Assert(err, qt.IsNil)
+
+			srv := httptest.NewTLSServer(svc)
+			c.Cleanup(srv.Close)
+
+			var pk bakery.PublicKey
+			err = pk.UnmarshalText([]byte(p.PublicKey))
+			c.Assert(err, qt.IsNil)
+
+			locator := bakery.NewThirdPartyStore()
+			locator.AddInfo(srv.URL+"/macaroons", bakery.ThirdPartyInfo{
+				PublicKey: pk,
+				Version:   bakery.LatestVersion,
+			})
+
+			if test.setup != nil {
+				test.setup(c, ofgaClient, &user)
+			}
+
+			m, err := bakery.NewMacaroon([]byte("root key"), []byte("id"), "location", bakery.LatestVersion, nil)
+			c.Assert(err, qt.IsNil)
+
+			kp := bakery.MustGenerateKey()
+			for _, caveat := range test.caveats {
+				err = m.AddCaveat(context.TODO(), checkers.Caveat{
+					Location:  srv.URL + "/macaroons",
+					Condition: caveat,
+				}, kp, locator)
+				c.Assert(err, qt.IsNil)
+			}
+
+			bakeryClient := httpbakery.NewClient()
+			ms, err := bakeryClient.DischargeAll(context.TODO(), m)
+			if test.expectedError != "" {
+				c.Assert(err, qt.ErrorMatches, test.expectedError)
+			} else {
+				c.Assert(err, qt.IsNil)
+				c.Check(ms, qt.HasLen, 2)
+			}
+		})
 	}
 }
 
