@@ -694,3 +694,4 @@ components:
     JIMMError:
       type: object
       description: An error returned by JIMM on a facade call.
+      
