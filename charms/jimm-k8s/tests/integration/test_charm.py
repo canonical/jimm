@@ -65,6 +65,8 @@ async def test_build_and_deploy(ops_test: OpsTest):
         {
             "uuid": "f4dec11e-e2b6-40bb-871a-cc38e958af49",
             "candid-url": "https://api.jujucharms.com/identity",
+            "public-key": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
+            "private-key": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
         }
     )
 
@@ -89,16 +91,12 @@ async def test_build_and_deploy(ops_test: OpsTest):
         timeout=40000,
     )
 
-    openfga_unit = await utils.get_unit_by_name(
-        "openfga", "0", ops_test.model.units
-    )
+    openfga_unit = await utils.get_unit_by_name("openfga", "0", ops_test.model.units)
     for i in range(10):
         action: Action = await openfga_unit.run_action("schema-upgrade")
         result = await action.wait()
         logger.info(
-            "attempt {} -> action result {} {}".format(
-                i, result.status, result.results
-            )
+            "attempt {} -> action result {} {}".format(i, result.status, result.results)
         )
         if result.results == {"result": "done", "return-code": 0}:
             break
@@ -119,12 +117,8 @@ async def test_build_and_deploy(ops_test: OpsTest):
     )
 
     logger.info("running the create authorization model action")
-    jimm_unit = await utils.get_unit_by_name(
-        APP_NAME, "0", ops_test.model.units
-    )
-    with open(
-        "../../local/openfga/authorisation_model.json", "r"
-    ) as model_file:
+    jimm_unit = await utils.get_unit_by_name(APP_NAME, "0", ops_test.model.units)
+    with open("../../local/openfga/authorisation_model.json", "r") as model_file:
         model_data = model_file.read()
         for i in range(10):
             action: Action = await jimm_unit.run_action(
