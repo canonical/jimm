@@ -91,18 +91,24 @@ func ToModelRelation(accessLevel string) (ofganames.Relation, error) {
 	case "read":
 		return ofganames.ReaderRelation, nil
 	default:
-		return ofganames.NoRelation, errors.E("unknown cloud access")
+		return ofganames.NoRelation, errors.E("unknown model access")
 	}
 }
 
-// TokenGenerator generates a JWT token.
-type TokenGenerator interface {
-	// MakeToken authorizes a user if initialLogin is set to true using the information in req.
-	// It then checks that a user has all the default permissions rquired and then checks for
-	// permissions as required by permissionMap. It then returns a JWT token.
-	MakeToken(ctx context.Context, initialLogin bool, req *jujuparams.LoginRequest, permissionMap map[string]interface{}) ([]byte, error)
-	// SetTags sets the desired model and controller tags that this TokenGenerator is valid for.
-	SetTags(mt names.ModelTag, ct names.ControllerTag)
+// ToOfferRelation returns a valid relation for the application offer.
+func ToOfferRelation(accessLevel string) (ofganames.Relation, error) {
+	switch accessLevel {
+	case "":
+		return ofganames.NoRelation, nil
+	case string(jujuparams.OfferAdminAccess):
+		return ofganames.AdministratorRelation, nil
+	case string(jujuparams.OfferConsumeAccess):
+		return ofganames.ConsumerRelation, nil
+	case string(jujuparams.OfferReadAccess):
+		return ofganames.ReaderRelation, nil
+	default:
+		return ofganames.NoRelation, errors.E("unknown application offer access")
+	}
 }
 
 // JwtGenerator provides the necessary state and methods to authorize a user and generate JWT tokens.
@@ -124,6 +130,14 @@ func NewJwtGenerator(jimm *JIMM) JwtGenerator {
 func (auth *JwtGenerator) SetTags(mt names.ModelTag, ct names.ControllerTag) {
 	auth.mt = mt
 	auth.ct = ct
+}
+
+// SetTags implements TokenGenerator
+func (auth *JwtGenerator) GetUser() names.UserTag {
+	if auth.user != nil {
+		return auth.user.ResourceTag()
+	}
+	return names.UserTag{}
 }
 
 // MakeToken takes a login request and a map of needed permissions and returns a JWT token if the user satisfies

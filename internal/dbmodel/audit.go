@@ -14,7 +14,7 @@ type AuditLogEntry struct {
 	// ID contains the ID of the entry.
 	ID uint `gorm:"primarykey"`
 
-	// Time contains the timestamp the entry was created.
+	// Time holds the time of event creation.
 	Time time.Time `gorm:"index"`
 
 	// Model contains the name of the model accessed.
