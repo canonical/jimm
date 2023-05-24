@@ -29,6 +29,15 @@ func NewWatcherWithControllerUnavailableChan(db db.Database, dialer Dialer, pubs
 	}
 }
 
+func NewWatcherWithDeltaProcessedChannel(db db.Database, dialer Dialer, pubsub Publisher, testChannel chan bool) *Watcher {
+	return &Watcher{
+		Pubsub:             pubsub,
+		Database:           db,
+		Dialer:             dialer,
+		deltaProcessedChan: testChannel,
+	}
+}
+
 func (j *JIMM) ListApplicationOfferUsers(ctx context.Context, offer names.ApplicationOfferTag, user *dbmodel.User, accessLevel string) ([]jujuparams.OfferUserDetails, error) {
 	return j.listApplicationOfferUsers(ctx, offer, user, accessLevel)
 }

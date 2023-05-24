@@ -38,6 +38,7 @@ type Watcher struct {
 	Pubsub Publisher
 
 	controllerUnavailableChan chan error
+	deltaProcessedChan        chan bool
 }
 
 // Watch starts the watcher which connects to all known controllers and
@@ -197,6 +198,15 @@ func (w *Watcher) checkControllerModels(ctx context.Context, ctl *dbmodel.Contro
 		return nil, errors.E(op, err)
 	}
 	return modelStates, nil
+}
+
+func (w *Watcher) deltaProcessedNotification() {
+	if w.deltaProcessedChan != nil {
+		select {
+		case w.deltaProcessedChan <- true:
+		default:
+		}
+	}
 }
 
 // watchController connects to the given controller and watches for model
@@ -429,6 +439,7 @@ func (w *Watcher) watchAllModelSummaries(ctx context.Context, ctl *dbmodel.Contr
 }
 
 func (w *Watcher) handleDelta(ctx context.Context, modelIDf func(string) *modelState, d jujuparams.Delta) error {
+	defer w.deltaProcessedNotification()
 	eid := d.Entity.EntityId()
 	state := modelIDf(eid.ModelUUID)
 	if state == nil {
