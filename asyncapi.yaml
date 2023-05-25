@@ -1,0 +1,697 @@
+asyncapi: 2.6.0
+info:
+  title: Juju Intelligent Model Manager
+  version: '1.1.5'
+servers:
+  private:
+    url: jimm.staging.jujucharms.com # Not actually correct...
+    protocol: wss
+    description: |
+      JIMM requires authentication and authorisation.
+      Once the socket is open you can subscribe to private-data channels by 
+      sending an authenticated subscribe request message.
+
+      This spec is written slightly differently than what was intended by the authors of
+      AsyncAPI, where we have channel identifiers under each "channels" block, instead
+      of an endpoint (like wss://.../my/endpoint) we have facade/method, as our calls, 
+      despite being async, operate on a specific request/response mechanism. As such, 
+      you can think of each channel as the facade endpoint.
+      
+
+      To login, a message of the following must be sent:
+      ```
+      {
+          "request-id": <id>,
+          "type": "Admin",
+          "version": 3,
+          "request": "Login",
+          "params": {
+              "auth-tag": "<user tag>",
+              "credentials": "<password>",
+              "macaroons": [<auth macaroons>]
+          }
+      }
+      ```
+
+      Once logged in, the following facades (aka channels) will be available.
+channels:
+  api/uuid:
+    publish:
+      summary: The primary channel to publish to the JIMM controller
+      operationId: publishToJIMM
+      tags:
+        - name: controllers
+      message:
+        oneOf:
+          - $ref: '#/components/messages/AddController'
+          - $ref: '#/components/messages/RemoveController'
+          - $ref: '#/components/messages/ListControllers'
+          - $ref: '#/components/messages/SetControllerDeprecated'
+          - $ref: '#/components/messages/AddCloudToController'
+          - $ref: '#/components/messages/RemoveCloudFromController'
+          - $ref: '#/components/messages/DisableControllerUUIDMasking'
+          - $ref: '#/components/messages/GrantAuditLogAccess'
+          - $ref: '#/components/messages/RevokeAuditLogAccess'
+          - $ref: '#/components/messages/FindAuditEvents'
+          - $ref: '#/components/messages/FullModelStatus'
+          - $ref: '#/components/messages/ImportModel'
+          - $ref: '#/components/messages/UpdateMigratedModel'
+          - $ref: '#/components/messages/AddGroup'
+          - $ref: '#/components/messages/RenameGroup'
+          - $ref: '#/components/messages/RemoveGroup'
+          - $ref: '#/components/messages/ListGroups'
+          - $ref: '#/components/messages/AddRelation'
+          - $ref: '#/components/messages/RemoveRelation'
+          - $ref: '#/components/messages/CheckRelation'
+          - $ref: '#/components/messages/ListRelationshipTuples'
+          - $ref: '#/components/messages/CrossModelQuery'
+    subscribe:
+      summary: Remove a controller from JIMM.
+      operationId: subscribeToJIMM
+      tags:
+        - name: controllers
+      message:
+        oneOf:
+          - $ref: '#/components/messages/AddControllerResponse'
+          - $ref: '#/components/messages/RemoveControllerResponse'
+          - $ref: '#/components/messages/ListControllersResponse'
+          - $ref: '#/components/messages/SetControllerDeprecatedResponse'
+          - $ref: '#/components/messages/AddCloudToControllerResponse'
+          - $ref: '#/components/messages/RemoveCloudFromControllerResponse'
+          - $ref: '#/components/messages/DisableControllerUUIDMaskingResponse'
+          - $ref: '#/components/messages/GrantAuditLogAccessResponse'
+          - $ref: '#/components/messages/RevokeAuditLogAccessResponse'
+          # - $ref: '#/components/messages/FindAuditEventsResponse'
+          - $ref: '#/components/messages/FullModelStatusResponse'
+          - $ref: '#/components/messages/ImportModelResponse'
+          - $ref: '#/components/messages/UpdateMigratedModelResponse'
+          - $ref: '#/components/messages/AddGroupResponse'
+          - $ref: '#/components/messages/RenameGroupResponse'
+          # - $ref: '#/components/messages/RemoveGroup'
+          - $ref: '#/components/messages/ListGroupsResponse'
+          - $ref: '#/components/messages/AddRelationResponse'
+          - $ref: '#/components/messages/RemoveRelationResponse'
+          - $ref: '#/components/messages/CheckRelationResponse'
+          - $ref: '#/components/messages/ListRelationshipTuplesResponse'
+          - $ref: '#/components/messages/CrossModelQueryResponse'
+
+components:
+  messages:
+    AddController:
+      summary: TODO
+      description: TODO
+      payload:
+        $ref: '#/components/schemas/AddControllerRequestParams'
+    RemoveController:
+      summary: TODO
+      description: TODO
+      payload:
+        $ref: '#/components/schemas/RemoveControllerRequestParams'
+    ListControllers:
+      summary: TODO
+      description: TODO
+    SetControllerDeprecated:
+      summary: TODO
+      description: TODO
+      payload:
+        $ref: '#/components/schemas/SetControllerDeprecatedRequestParams'
+    AddCloudToController:
+      summary: TODO
+      description: TODO
+      payload:
+        $ref: '#/components/schemas/AddCloudToControllerRequestParams'
+    RemoveCloudFromController:
+      summary: TODO
+      description: TODO
+      payload:  
+        $ref: '#/components/schemas/RemoveCloudFromControllerRequestParams'
+    DisableControllerUUIDMasking:
+      summary: TODO
+      description: TODO
+    GrantAuditLogAccess:
+      summary: TODO
+      description: TODO
+    RevokeAuditLogAccess:
+      summary: TODO
+      description: TODO
+      payload:
+        $ref: '#/components/schemas/RevokeAuditLogAccessRequestParams'
+    FindAuditEvents:
+      summary: TODO
+      description: TODO
+    FullModelStatus:
+      summary: TODO
+      description: TODO
+      payload:
+        $ref: '#/components/schemas/FullModelStatusRequestParams'
+    ImportModel:
+      summary: TODO
+      description: TODO
+      payload:
+        $ref: '#/components/schemas/ImportModelRequestParams'
+    UpdateMigratedModel:
+      summary: TODO
+      description: TODO
+      payload:
+        $ref: '#/components/schemas/UpdateMigratedModelRequestParams'
+    AddGroup:
+      summary: TODO
+      description: TODO
+      payload:
+        $ref: '#/components/schemas/AddGroupRequestParams'
+    RenameGroup:
+      summary: TODO
+      description: TODO
+      payload:
+        $ref: '#/components/schemas/RenameGroupRequestParams'
+    RemoveGroup:
+      summary: TODO
+      description: TODO
+      payload:
+        $ref: '#/components/schemas/RemoveGroupRequestParams'
+    ListGroups:
+      summary: TODO
+      description: TODO
+    AddRelation:
+      summary: TODO
+      description: TODO
+      payload:
+        $ref: '#/components/schemas/AddRelationRequestParams'
+    RemoveRelation:
+      summary: TODO
+      description: TODO
+      payload:
+        $ref: '#/components/schemas/RemoveRelationRequestParams'
+    CheckRelation:
+      summary: TODO
+      description: TODO
+      payload:
+        $ref: '#/components/schemas/CheckRelationRequestParams'
+    ListRelationshipTuples:
+      summary: TODO
+      description: TODO
+      payload:
+        $ref: '#/components/schemas/ListRelationshipTuplesRequestParams'
+    CrossModelQuery:
+      summary: TODO
+      description: TODO
+      payload:
+        $ref: '#/components/schemas/CrossModelQueryRequestParams'
+    AddControllerResponse:
+      summary: TODO
+      description: TODO
+      payload:
+        oneOf:
+          - $ref: '#/components/schemas/ControllerInfo'
+          - $ref: '#/components/schemas/JIMMError'
+    RemoveControllerResponse:
+      summary: TODO
+      description: TODO
+      payload:
+        oneOf:
+          - $ref: '#/components/schemas/ControllerInfo'
+          - $ref: '#/components/schemas/JIMMError'
+    ListControllersResponse:
+      summary: TODO
+      description: TODO
+      payload:
+        oneOf:
+          - type: array
+            items:
+              $ref: '#/components/schemas/ControllerInfo'
+          - $ref: '#/components/schemas/JIMMError'
+    SetControllerDeprecatedResponse:
+      summary: TODO
+      description: TODO
+      payload:
+        oneOf:
+          - $ref: '#/components/schemas/ControllerInfo'
+          - $ref: '#/components/schemas/JIMMError'
+    AddCloudToControllerResponse: 
+      summary: TODO
+      description: TODO
+      payload:
+        $ref: '#/components/schemas/JIMMError'
+    RemoveCloudFromControllerResponse:
+      summary: TODO
+      description: TODO
+      payload:
+        $ref: '#/components/schemas/JIMMError'
+    DisableControllerUUIDMaskingResponse:
+      summary: TODO
+      description: TODO
+      payload:
+        $ref: '#/components/schemas/JIMMError' 
+    GrantAuditLogAccessResponse: 
+      summary: TODO
+      description: TODO
+      payload:
+        $ref: '#/components/schemas/JIMMError'
+    RevokeAuditLogAccessResponse: 
+      summary: TODO
+      description: TODO
+      payload:
+        $ref: '#/components/schemas/JIMMError'
+    # FindAuditEventsResponse: needs updating to be new way, @kian please do this.
+    FullModelStatusResponse:
+      summary: TODO
+      description: TODO
+      payload:
+        oneOf:
+          - $ref: '#/components/schemas/JujuFullStatus'
+          - $ref: '#/components/schemas/JIMMError'
+    ImportModelResponse: 
+      summary: TODO
+      description: TODO
+      payload:
+        $ref: '#/components/schemas/JIMMError'
+    UpdateMigratedModelResponse:
+      summary: TODO
+      description: TODO
+      payload:
+        $ref: '#/components/schemas/JIMMError'
+    AddGroupResponse:
+      summary: TODO
+      description: TODO
+      payload:
+        $ref: '#/components/schemas/JIMMError'
+    RenameGroupResponse:
+      summary: TODO
+      description: TODO
+      payload:
+        $ref: '#/components/schemas/JIMMError'
+    ListGroupsResponse:
+      summary: TODO
+      description: TODO
+      payload:
+        oneOf:
+          - $ref: '#/components/schemas/JIMMError'
+    AddRelationResponse:
+      summary: TODO
+      description: TODO
+      payload:
+        $ref: '#/components/schemas/JIMMError'
+    RemoveRelationResponse:
+      summary: TODO
+      description: TODO
+      payload:
+        $ref: '#/components/schemas/JIMMError'
+    CheckRelationResponse:
+      summary: TODO
+      description: TODO
+      payload:
+        oneOf:
+          - $ref: '#/components/schemas/JIMMError'
+    ListRelationshipTuplesResponse:
+      summary: TODO
+      description: TODO
+      payload:
+        oneOf:
+          - $ref: '#/components/schemas/JIMMError'
+          - type: object
+            properties: 
+              tuples:
+                type: array
+                items: 
+                  $ref: '#/components/schemas/RelationshipTuple'
+              continuation:
+                type: string
+                description: A token to continue pagination.
+    CrossModelQueryResponse:
+      summary: TODO
+      description: TODO
+      payload:
+        oneOf:
+          - $ref: '#/components/schemas/JIMMError'
+          - type: object
+            properties: 
+              results:
+                type: object
+                description: The query results in a map of [model uuid]:json status.
+              errors:
+                type: object
+                description: The query errors in a map of [model uuid]:errors.
+  schemas:
+    # Request
+    AddControllerRequestParams:
+      type: object
+      properties:
+        name:
+          type: string
+          description: The controller name.
+        public-address:
+          type: string
+          description: The public address of this controller.
+        api-addresses:
+          type: [string]
+          description: The currently known API addresses for this controller.
+        ca-certificate:
+          type: string
+          description: >
+            The CA certificate to use to validate the
+            connection to the controller. This is not needed if certificate is
+            signed by a public CA.
+        username:
+          type: string
+          description: The username that JIMM should use to connect to the controller.
+        password: 
+          type: string
+          description: The password that JIMM should use to connect to the controller.
+    RemoveControllerRequestParams:
+      type: object
+      properties:
+        name:
+          type: string
+          description: The name of the controller to remove.
+        force:
+          type: boolean
+          description: Whether to forcefully remove the controller.
+    SetControllerDeprecatedRequestParams:
+      type: object
+      properties:
+        name:
+          type: string
+          description: The name of the controller to set deprecated.
+        deprecated:
+          type: boolean
+          descrption: Whether to set the controller deprecated.
+    AddCloudToControllerRequestParams:
+      type: object
+      properties:
+        controller-name:
+          type: string
+          description: The controller name to add the cloud to.
+        name:
+          type: string
+          description: The cloud name.
+        force:
+          type: boolean
+          description: TODO
+        cloud:
+          type: object
+          properties:
+            type:
+              type: string
+              description: The cloud type.
+            host-cloud-region:
+              type: string
+              description: The region of this cloud.
+            auth-types:
+              type: [string]
+              description: The authz/authn types of this cloud.
+            endpoint:
+              type: string
+              description: The endpoint for this cloud.
+            identity-endpoint:
+              type: string
+              description: The identity endpoint for this cloud.
+            storage-endpoint:
+              description: The storage endpoint for this cloud.
+            regions:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: The region name.
+                endpoint:
+                  type: string
+                  description: The endpoint for this region.
+                identity-endpoint:
+                  type: string
+                  description: The identity endpoint for this region.
+                storage-endpoint:
+                  description: The storage endpoint for this region.
+            ca-certificates:
+              type: [string]
+              description: An array of certificates for this cloud.
+            skip-tls-verify:
+              type: boolean
+              description: Whether to skip TLS verification when connecting to this cloud.
+            config:
+              type: object
+              description: The config to pass on this cloud request. 
+            region-config:
+              type: object
+              description: The config to pass on this region request.
+            is-controller-cloud:
+              type: boolean
+              description: Whether this is a cloud containing a controller.
+    RemoveCloudFromControllerRequestParams:
+      type: object
+      properties:
+        cloud-tag:
+          type: string
+          description: The tag of the cloud this controller is running in.
+        controller-name:
+          type: string
+          description: The name of the controller from which the cloud should be removed.
+    GrantAditLogAccessRequestParams:
+      type: object
+      properties:
+        user-tag:
+          type: string
+          description: User tag is the user who's audit-log access is being modified.
+        level:
+          type: string
+          description: The access level being granted, the only level is "read".
+    RevokeAuditLogAccessRequestParams:
+      type: object
+      properties:
+        user-tag:
+          type: string
+          description: User tag is the user who's audit-log access is being modified.
+        level:
+          type: string
+          description: The access level being granted, the only level is "read".
+    FindAuditEventsRequestParams:
+      type: object
+      properties:
+        after:
+          type: string
+          format: date-time
+          description: Get events after this time.
+        before:
+          type: string
+          format: date-time
+          description: Get events before this time.
+        user-tag:
+          type: string
+          description: Filter by specific user name.
+        model:
+          type: string
+          description: Filter by specific model name.
+        method: 
+          type: string
+          description: Filter by specific facade method name.
+        offset: 
+          type: integer
+          description: The offset to begin at when returning results.
+        limit:
+          type: integer
+          description: The maximum audit events to return.
+    FullModelStatusRequestParams:  
+      type: object
+      properties:
+        ModelTag:
+          type: string
+          description: The model tag to get the status from.
+        Patterns:
+          type: string
+          description: TODO (also these fields have no go json tags)
+    ImportModelRequestParams:
+      type: object
+      properties:
+        controller:
+          type: string
+          description: The controller name where the model resides.
+        model-tag:
+          type: string
+          description: The model tag of the model to import.
+    UpdateMigratedModelRequestParams:
+      type: object
+      properties:
+        model-tag:
+          type: string
+          description: The model tag of the model that has been migrated.
+        target-controller:
+          type: string
+          description: The name of the controller the model has been migrated to.
+    AddGroupRequestParams:
+      type: object
+      properties:
+        name:
+          type: string
+          description: The name of the group to add.
+    RenameGroupRequestParams:
+      type: object
+      properties:
+        name:
+          type: string
+          description: The name of the group to rename.
+        new-name:
+          type: string
+          description: The new name for this group.
+    RemoveGroupRequestParams:
+      type: object
+      properties:
+        name:
+          type: string
+          description: The name of the group to remove.
+    AddRelationRequestParams:
+      type: array
+      items:
+        $ref: '#/components/schemas/RelationshipTuple'
+    RemoveRelationRequestParams:
+      type: array
+      items:
+        $ref: '#/components/schemas/RelationshipTuple'
+    CheckRelationRequestParams:
+      description: >
+        Contains the object, target object and relation
+        to be checked for reachability in OpenFGA.
+      $ref: '#/components/schemas/RelationshipTuple'
+    ListRelationshipTuplesRequestParams:
+      type: object
+      properties:
+        tuple: 
+          $ref: '#/components/schemas/RelationshipTuple'
+        page_size:
+          type: integer
+          description: The page size when listing tuples.
+        continuation_token:
+          type: string
+          description: A token to continue reading from the previous paginated offset.
+    CrossModelQueryRequestParams:
+      type: object
+      properties:
+        type:
+          type: string
+          description: The type of query to perform. Currently only jq is supported.
+        query:
+          type: string
+          description: The query string.
+    # General schemas
+    ControllerInfo:
+      type: object
+      properties:
+        name:
+          type: string
+          description: The controller name.
+        uuid:
+          type: string
+          description: The controller UUID.
+        public-address:
+          type: string
+          description: The public address of the controller, normally a DNS name.
+        api-addresses:
+          type: array
+          items:
+            type: string
+            description: A currently know API address for the controller.
+        ca-certificate:
+          type: string
+          description: The certificate for this controller.
+        cloud-tag:
+          type: string
+          description: The tag of the cloud this controller is running in.
+        cloud-region:
+          type: string
+          description: The region that this controller is running in.
+        username:
+          type: string
+          description: The username that JIMM uses to connect to this controller.
+        agent-version:
+          type: string
+          description: The version of the juju agent running on the controller.
+        status:
+          $ref: '#/components/schemas/JujuEntityStatus'
+    JujuEntityStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          description: Represents the status of an entity, but also applies to "workloads".
+        info:
+          type: string
+          description: Info on this status.
+        data:
+          type: object
+        since:
+          type: string
+          format: date-time
+          description: How long this entity has been running.
+    JujuFullStatus:
+      type: object
+      description: Holds a juju FullStatus, WIP
+      properties:
+        model:
+          type: object
+          properties:
+            name:
+              type: string
+            type:
+              type: string
+            cloud-tag:
+              type: string
+            region:
+              type: string
+            version:
+              type: string
+            available-version:
+              type: string
+            model-status:
+                $ref: '#/components/schemas/JujuDetailedStatus'
+            meter-status:
+              type: object
+              properties:
+                color:
+                  type: string
+                message:
+                  type: string
+            sla:
+              type: string
+        # machines:
+        # applications:
+        # remote-applications:
+        # offers:
+        # relations:
+        # controller-timestamp:
+        # branches:
+    JujuDetailedStatus:
+      type: object
+      properties:
+        status:
+          type: string
+        info:
+          type: string
+        data:
+          type: object
+        since:
+          type: string
+          format: date-time
+        kind:
+          type: string
+        version:
+          life: string
+        err:
+          type: string
+    RelationshipTuple:
+      type: object
+      properties:
+        tuple:
+          type: object
+          description: The relationship tuples to target.
+          properties:
+            object:
+              type: string
+              description: The base object to relate from.
+            relation:
+              type: string
+              description: The type of relation to use.
+            target_object: 
+              type: string
+              description: The target object to relate to.
+    JIMMError:
+      type: object
+      description: An error returned by JIMM on a facade call.
+      
