@@ -1,29 +1,17 @@
 package names
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/juju/names/v4"
 )
 
-// validKinds holds the valid tags for JIMM
-func validKinds(kind string) bool {
-	switch kind {
-	case GroupTagKind:
-		return true
-	case ApplicationOfferTagKind:
-		return true
-	}
-	return false
-}
-
 // TagKind returns one of the *TagKind constants for the given tag, or
 // an error if none matches.
 func TagKind(tag string) (string, error) {
 	i := strings.Index(tag, "-")
-	if i <= 0 || !validKinds(tag[:i]) {
+	if i <= 0 {
 		return "", fmt.Errorf("%q is not a valid tag", tag)
 	}
 	return tag[:i], nil
@@ -57,8 +45,9 @@ func ParseTag(tag string) (names.Tag, error) {
 			return nil, invalidTagError(tag, kind)
 		}
 		return NewApplicationOfferTag(id), nil
+	default:
+		return names.ParseTag(tag)
 	}
-	return nil, errors.New("couldn't parse tag")
 }
 
 func invalidTagError(tag, kind string) error {
