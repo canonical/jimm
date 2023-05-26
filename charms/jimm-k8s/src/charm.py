@@ -27,10 +27,7 @@ from charms.data_platform_libs.v0.database_requires import (
     DatabaseEvent,
     DatabaseRequires,
 )
-from charms.openfga_k8s.v0.openfga import (
-    OpenFGARequires,
-    OpenFGAStoreCreateEvent,
-)
+from charms.openfga_k8s.v0.openfga import OpenFGARequires, OpenFGAStoreCreateEvent
 from charms.tls_certificates_interface.v1.tls_certificates import (
     CertificateAvailableEvent,
     CertificateExpiringEvent,
@@ -55,6 +52,7 @@ from ops.model import (
     ModelError,
     WaitingStatus,
 )
+
 from state import PeerRelationState, RelationNotReadyError
 
 logger = logging.getLogger(__name__)
@@ -90,9 +88,7 @@ class JimmOperatorCharm(CharmBase):
 
     def __init__(self, *args):
         super().__init__(*args)
-        self.framework.observe(
-            self.on.jimm_pebble_ready, self._on_jimm_pebble_ready
-        )
+        self.framework.observe(self.on.jimm_pebble_ready, self._on_jimm_pebble_ready)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
         self.framework.observe(self.on.update_status, self._on_update_status)
         self.framework.observe(self.on.leader_elected, self._on_leader_elected)
@@ -126,9 +122,7 @@ class JimmOperatorCharm(CharmBase):
         # Ingress relation
         self.ingress = IngressPerAppRequirer(self, port=8080)
         self.framework.observe(self.ingress.on.ready, self._on_ingress_ready)
-        self.framework.observe(
-            self.ingress.on.revoked, self._on_ingress_revoked
-        )
+        self.framework.observe(self.ingress.on.revoked, self._on_ingress_revoked)
 
         # Database relation
         self.database = DatabaseRequires(
@@ -276,6 +270,8 @@ class JimmOperatorCharm(CharmBase):
             "OPENFGA_SCHEME": openfga_scheme,
             "OPENFGA_TOKEN": openfga_token,
             "OPENFGA_PORT": openfga_port,
+            "PRIVATE_KEY": self.config.get("private-key", ""),
+            "PUBLIC_KEY": self.config.get("public-key", ""),
         }
         if dsn:
             config_values["JIMM_DSN"] = dsn
@@ -296,9 +292,7 @@ class JimmOperatorCharm(CharmBase):
             config_values["JIMM_DASHBOARD_LOCATION"] = self._dashboard_path
 
         # remove empty configuration values
-        config_values = {
-            key: value for key, value in config_values.items() if value
-        }
+        config_values = {key: value for key, value in config_values.items() if value}
 
         pebble_layer = {
             "summary": "jimm layer",
@@ -493,9 +487,7 @@ class JimmOperatorCharm(CharmBase):
         container.make_dir(self._dashboard_path, make_parents=True)
 
         with open(dashboard_file, "rb") as f:
-            container.push(
-                os.path.join(self._dashboard_path, "dashboard.tar.bz2"), f
-            )
+            container.push(os.path.join(self._dashboard_path, "dashboard.tar.bz2"), f)
 
         process = container.exec(
             [
@@ -517,9 +509,7 @@ class JimmOperatorCharm(CharmBase):
             for line in e.stderr.splitlines():
                 logger.error("    %s", line)
 
-        self._push_to_workload(
-            self._dashboard_hash_path, dashboard_hash, event
-        )
+        self._push_to_workload(self._dashboard_hash_path, dashboard_hash, event)
 
     def _get_network_address(self, event):
         return str(
@@ -529,12 +519,8 @@ class JimmOperatorCharm(CharmBase):
         )
 
     def _on_vault_relation_joined(self, event):
-        event.relation.data[self.unit]["secret_backend"] = json.dumps(
-            self._vault_path
-        )
-        event.relation.data[self.unit]["hostname"] = json.dumps(
-            socket.gethostname()
-        )
+        event.relation.data[self.unit]["secret_backend"] = json.dumps(self._vault_path)
+        event.relation.data[self.unit]["hostname"] = json.dumps(socket.gethostname())
         event.relation.data[self.unit]["access_address"] = json.dumps(
             self._get_network_address(event)
         )
@@ -588,9 +574,7 @@ class JimmOperatorCharm(CharmBase):
 
         container = self.unit.get_container(WORKLOAD_CONTAINER)
         if container.can_connect():
-            logger.info(
-                "pushing file {} to the workload containe".format(filename)
-            )
+            logger.info("pushing file {} to the workload containe".format(filename))
             container.push(filename, content, make_dirs=True)
         else:
             logger.info("workload container not ready - defering")
@@ -625,9 +609,7 @@ class JimmOperatorCharm(CharmBase):
 
         self._update_workload(event)
 
-    def _on_certificates_relation_joined(
-        self, event: RelationJoinedEvent
-    ) -> None:
+    def _on_certificates_relation_joined(self, event: RelationJoinedEvent) -> None:
         if not self.unit.is_leader():
             return
 
@@ -655,9 +637,7 @@ class JimmOperatorCharm(CharmBase):
             event.defer()
             return
 
-    def _on_certificate_available(
-        self, event: CertificateAvailableEvent
-    ) -> None:
+    def _on_certificate_available(self, event: CertificateAvailableEvent) -> None:
         if self.unit.is_leader():
             try:
                 self.state.set(STATE_KEY_CERTIFICATE, event.certificate)
@@ -670,9 +650,7 @@ class JimmOperatorCharm(CharmBase):
 
         self._update_workload(event)
 
-    def _on_certificate_expiring(
-        self, event: CertificateExpiringEvent
-    ) -> None:
+    def _on_certificate_expiring(self, event: CertificateExpiringEvent) -> None:
         if self.unit.is_leader():
             old_csr = ""
             private_key = ""
@@ -730,9 +708,7 @@ class JimmOperatorCharm(CharmBase):
             )
             try:
                 self.state.set(STATE_KEY_CSR, new_csr.decode())
-                self.state.unset(
-                    STATE_KEY_CERTIFICATE, STATE_KEY_CA, STATE_KEY_CHAIN
-                )
+                self.state.unset(STATE_KEY_CERTIFICATE, STATE_KEY_CA, STATE_KEY_CHAIN)
             except RelationNotReadyError:
                 event.defer()
                 return

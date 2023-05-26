@@ -15,7 +15,10 @@ import urllib
 
 import hvac
 from charmhelpers.contrib.charmsupport.nrpe import NRPE
-from charms.openfga_k8s.v0.openfga import OpenFGARequires, OpenFGAStoreCreateEvent
+from charms.openfga_k8s.v0.openfga import (
+    OpenFGARequires,
+    OpenFGAStoreCreateEvent,
+)
 from jinja2 import Environment, FileSystemLoader
 from ops.main import main
 from ops.model import (
@@ -25,7 +28,6 @@ from ops.model import (
     ModelError,
     WaitingStatus,
 )
-
 from systemd import SystemdCharm
 
 logger = logging.getLogger(__name__)
@@ -59,7 +61,8 @@ class JimmCharm(SystemdCharm):
             self.on.vault_relation_changed, self._on_vault_relation_changed
         )
         self.framework.observe(
-            self.on.dashboard_relation_joined, self._on_dashboard_relation_joined
+            self.on.dashboard_relation_joined,
+            self._on_dashboard_relation_joined,
         )
         self._agent_filename = "/var/snap/jimm/common/agent.json"
         self._vault_secret_filename = "/var/snap/jimm/common/vault_secret.json"
@@ -111,6 +114,8 @@ class JimmCharm(SystemdCharm):
             "log_level": self.config.get("log-level"),
             "uuid": self.config.get("uuid"),
             "dashboard_location": self.config.get("juju-dashboard-location"),
+            "public_key": self.config.get("public-key"),
+            "private_key": self.config.get("private-key"),
         }
         if os.path.exists(self._dashboard_path):
             args["dashboard_location"] = self._dashboard_path
@@ -209,7 +214,9 @@ class JimmCharm(SystemdCharm):
         event.relation.data[self.unit]["secret_backend"] = json.dumps(
             "charm-jimm-creds"
         )
-        event.relation.data[self.unit]["hostname"] = json.dumps(socket.gethostname())
+        event.relation.data[self.unit]["hostname"] = json.dumps(
+            socket.gethostname()
+        )
         event.relation.data[self.unit]["access_address"] = json.dumps(
             str(
                 self.model.get_binding(event.relation)
@@ -294,7 +301,8 @@ class JimmCharm(SystemdCharm):
             self._logrotate_conf_path,
         )
         shutil.copy(
-            os.path.join(self.charm_dir, "files", "rsyslog"), self._rsyslog_conf_path
+            os.path.join(self.charm_dir, "files", "rsyslog"),
+            self._rsyslog_conf_path,
         )
         self._systemctl("restart", "rsyslog")
 

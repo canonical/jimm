@@ -3,12 +3,13 @@
 type: "charm"
 parts:
   charm:
-    charm-python-packages: [setuptools]
+    charm-python-packages: [setuptools, pyopenssl]
     build-packages:
       - libffi-dev
       - libssl-dev
       - rustc
       - cargo
+      - pkg-config
 bases:
   - build-on:
       - name: "ubuntu"

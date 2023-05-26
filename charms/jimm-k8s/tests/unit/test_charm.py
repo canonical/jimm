@@ -12,12 +12,15 @@ import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
 
-from charm import JimmOperatorCharm
 from ops.testing import Harness
+
+from charm import JimmOperatorCharm
 
 MINIMAL_CONFIG = {
     "uuid": "1234567890",
     "candid-url": "test-candid-url",
+    "public-key": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
+    "private-key": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
 }
 
 
@@ -38,9 +41,7 @@ class TestCharm(unittest.TestCase):
 
         self.tempdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.tempdir.cleanup)
-        self.harness.charm.framework.charm_dir = pathlib.Path(
-            self.tempdir.name
-        )
+        self.harness.charm.framework.charm_dir = pathlib.Path(self.tempdir.name)
 
         self.harness.container_pebble_ready("jimm")
 
@@ -74,6 +75,8 @@ class TestCharm(unittest.TestCase):
                             "JIMM_LOG_LEVEL": "info",
                             "JIMM_UUID": "1234567890",
                             "JIMM_WATCH_CONTROLLERS": "1",
+                            "PRIVATE_KEY": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
+                            "PUBLIC_KEY": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
                         },
                     }
                 }
@@ -109,6 +112,8 @@ class TestCharm(unittest.TestCase):
                             "JIMM_LOG_LEVEL": "info",
                             "JIMM_UUID": "1234567890",
                             "JIMM_WATCH_CONTROLLERS": "1",
+                            "PRIVATE_KEY": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
+                            "PUBLIC_KEY": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
                         },
                     }
                 }
@@ -126,6 +131,8 @@ class TestCharm(unittest.TestCase):
                 "candid-agent-username": "test-username",
                 "candid-agent-public-key": "test-public-key",
                 "candid-agent-private-key": "test-private-key",
+                "public-key": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
+                "private-key": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
             }
         )
 
@@ -151,6 +158,8 @@ class TestCharm(unittest.TestCase):
                             "JIMM_LISTEN_ADDR": ":8080",
                             "JIMM_LOG_LEVEL": "info",
                             "JIMM_UUID": "1234567890",
+                            "PRIVATE_KEY": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
+                            "PUBLIC_KEY": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
                         },
                     }
                 }
@@ -165,9 +174,7 @@ class TestCharm(unittest.TestCase):
                     "public": "test-public-key",
                     "private": "test-private-key",
                 },
-                "agents": [
-                    {"url": "test-candid-url", "username": "test-username"}
-                ],
+                "agents": [{"url": "test-candid-url", "username": "test-username"}],
             },
         )
 
@@ -199,6 +206,8 @@ class TestCharm(unittest.TestCase):
                             "JIMM_DNS_NAME": "juju-jimm-k8s-0.juju-jimm-k8s-endpoints.None.svc.cluster.local",
                             "JIMM_LOG_LEVEL": "info",
                             "JIMM_UUID": "1234567890",
+                            "PRIVATE_KEY": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
+                            "PUBLIC_KEY": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
                         },
                     }
                 }
@@ -207,9 +216,7 @@ class TestCharm(unittest.TestCase):
 
         self.assertEqual(container.exists("/root/dashboard"), True)
         self.assertEqual(container.isdir("/root/dashboard"), True)
-        self.assertEqual(
-            container.exists("/root/dashboard/dashboard.tar.bz2"), True
-        )
+        self.assertEqual(container.exists("/root/dashboard/dashboard.tar.bz2"), True)
         self.assertEqual(container.exists("/root/dashboard/hash"), True)
 
     def dashboard_tarfile(self):
@@ -256,9 +263,7 @@ class TestCharm(unittest.TestCase):
             data["controller-url"],
             "juju-jimm-k8s-0.juju-jimm-k8s-endpoints.None.svc.cluster.local",
         )
-        self.assertEqual(
-            data["identity-provider-url"], "https://candid.example.com"
-        )
+        self.assertEqual(data["identity-provider-url"], "https://candid.example.com")
         self.assertEqual(data["is-juju"], "False")
 
     @patch("charm.JimmOperatorCharm._get_network_address")
