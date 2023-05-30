@@ -52,7 +52,6 @@ require (
 	github.com/itchyny/gojq v0.12.12
 	github.com/juju/charm/v10 v10.0.0
 	github.com/juju/clock v1.0.3
-	github.com/juju/http v0.0.0-20201019013536-69ae1d429836
 	github.com/juju/retry v1.0.0
 	github.com/lestrrat-go/jwx/v2 v2.0.9
 	github.com/oklog/ulid/v2 v2.1.0

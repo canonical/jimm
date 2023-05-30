@@ -1,9 +1,0 @@
-hostname: localhost
-uuid: <uuid of the proxy service>
-ca-cert-file: <CA cert file path>
-cert-file: <cert file path>
-key-file: <key file path>
-controller:
-  uuid: <uuid of the controller>
-  api-endpoints: [<list of endpoints - from controllers.yaml file>]
-  ca-cert: <controller's ca cert>
