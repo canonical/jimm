@@ -116,6 +116,7 @@ func (jwks *JWKSService) StartJWKSRotator(ctx context.Context, checkRotateRequir
 	//
 	// In this case we generate a new set, which should expire in 3 months.
 	go func() {
+		defer close(errorChan)
 		for {
 			select {
 			case <-checkRotateRequired:
@@ -127,20 +128,20 @@ func (jwks *JWKSService) StartJWKSRotator(ctx context.Context, checkRotateRequir
 				zapctx.Debug(ctx, "Shutdown for JWKS rotator complete.")
 				return
 			}
-
 		}
 	}()
 
 	// If for any reason the rotator has an error, we simply receive the error
 	// in another routine dedicated to logging said errors.
 	go func(errChan <-chan error) {
-		err := <-errChan
-		zapctx.Error(
-			ctx,
-			"security failure",
-			zap.Any("op", op),
-			zap.NamedError("jwks-error", err),
-		)
+		for err := range errChan {
+			zapctx.Error(
+				ctx,
+				"security failure",
+				zap.Any("op", op),
+				zap.NamedError("jwks-error", err),
+			)
+		}
 	}(errorChan)
 
 	return nil
