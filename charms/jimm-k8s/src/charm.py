@@ -287,6 +287,7 @@ class JimmOperatorCharm(CharmBase):
 
         if self.model.unit.is_leader():
             config_values["JIMM_WATCH_CONTROLLERS"] = "1"
+            config_values["JIMM_ENABLE_JWKS_ROTATOR"] = "1"
 
         if container.exists(self._dashboard_path):
             config_values["JIMM_DASHBOARD_LOCATION"] = self._dashboard_path
