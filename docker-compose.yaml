@@ -51,6 +51,7 @@ services:
       JIMM_LISTEN_ADDR: "0.0.0.0:80"
       JIMM_TEST_PGXDSN: ""
       JIMM_JWT_EXPIRY: 30s
+      JIMM_ENABLE_JWKS_ROTATOR: "1"
       TEST_LOGGING_CONFIG: ""
       PUBLIC_KEY: "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk="
       PRIVATE_KEY: "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc="

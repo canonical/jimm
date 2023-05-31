@@ -144,6 +144,7 @@ class JimmCharm(SystemdCharm):
         args = {"jimm_watch_controllers": ""}
         if self.model.unit.is_leader():
             args["jimm_watch_controllers"] = "1"
+            args["jimm_enable_jwks_rotator"] = "1"
         with open(self._env_filename("leader"), "wt") as f:
             f.write(self._render_template("jimm-leader.env", **args))
         if self._ready():
