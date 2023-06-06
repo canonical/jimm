@@ -201,11 +201,19 @@ func (s *Service) PollModels(ctx context.Context) error {
 
 // StartJWKSRotator see internal/jimmjwx/jwks.go for details.
 func (s *Service) StartJWKSRotator(ctx context.Context, checkRotateRequired <-chan time.Time, initialRotateRequiredTime time.Time) error {
+	if s.jimm.JWKService == nil {
+		zapctx.Warn(ctx, "not starting JWKS rotation")
+		return nil
+	}
 	return s.jimm.JWKService.StartJWKSRotator(ctx, checkRotateRequired, initialRotateRequiredTime)
 }
 
 // RegisterJwksCache registers the JWKS Cache with JIMM's JWT service.
 func (s *Service) RegisterJwksCache(ctx context.Context) {
+	if s.jimm.JWTService == nil {
+		zapctx.Warn(ctx, "skipping JWKS cache registration - service not available")
+		return
+	}
 	tlsConfig := &tls.Config{
 		InsecureSkipVerify: true,
 	}
