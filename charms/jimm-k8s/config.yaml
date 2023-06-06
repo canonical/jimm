@@ -60,3 +60,6 @@ options:
   private-key:
     type: string
     description: The private part of JIMM's macaroon bakery keypair.
+  dns-name:
+    type: string
+    description: DNS hostname that JIMM is being served from.
