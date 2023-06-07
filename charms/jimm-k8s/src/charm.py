@@ -52,6 +52,9 @@ from ops.model import (
     ModelError,
     WaitingStatus,
 )
+from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
+from charms.loki_k8s.v0.loki_push_api import LogProxyConsumer
+from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 
 from state import PeerRelationState, RelationNotReadyError
 
@@ -81,6 +84,10 @@ OPENFGA_ADDRESS = "openfga-address"
 OPENFGA_PORT = "openfga-port"
 OPENFGA_SCHEME = "openfga-scheme"
 OPENFGA_AUTH_MODEL_ID = "openfga-auth-model"
+
+LOG_FILE = "/var/log/jimm"
+# This likely will just be JIMM's port.
+PROMETHEUS_PORT = 8080
 
 
 class JimmOperatorCharm(CharmBase):
@@ -154,6 +161,27 @@ class JimmOperatorCharm(CharmBase):
         )
         self.framework.observe(
             self.on.vault_relation_changed, self._on_vault_relation_changed
+        )
+
+        # Grafana relation
+        self._grafana_dashboards = GrafanaDashboardProvider(
+            self, 
+            relation_name="grafana-dashboard"
+        )
+
+        # Loki relation
+        self._log_proxy = LogProxyConsumer(
+            self, 
+            log_files=[LOG_FILE], 
+            relation_name="log-proxy"
+        )
+
+        # Prometheus relation
+        self._prometheus_scraping = MetricsEndpointProvider(
+            self,
+            relation_name="metrics-endpoint",
+            jobs=[{"static_configs": [{"targets": [f"*:{PROMETHEUS_PORT}"]}]}],
+            refresh_event=self.on.config_changed,
         )
 
         # create-authorization-model action

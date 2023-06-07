@@ -61,3 +61,7 @@ resources:
   jimm-image:
     type: oci-image
     description: OCI image for JIMM.
+  promtail-bin:
+    type: file
+    description: Promtail binary for logging
+    filename: promtail-linux
