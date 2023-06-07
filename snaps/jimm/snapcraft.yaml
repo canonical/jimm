@@ -9,6 +9,7 @@ adopt-info: jimmsrv # Version our app via set-version within an override
 apps:
   jimm:
     command: bin/jimmsrv
+    daemon: simple
     plugs:
       - network
       - network-bind

@@ -85,11 +85,10 @@ jimm-image:
 	--build-arg="VERSION=$(GIT_VERSION)" \
 	--tag jimm-image:latest .
 
-jimm-build-image:
-	docker build --target build-env \
-	--build-arg="GIT_COMMIT=$(GIT_COMMIT)" \
-	--build-arg="VERSION=$(GIT_VERSION)" \
-	--tag jimm-build-image:latest .
+jimm-snap:
+	mkdir -p ./snap
+	cp ./snaps/jimm/snapcraft.yaml ./snap/
+	snapcraft 
 
 pull/candid:
 	-git clone https://github.com/canonical/candid.git ./tmp/candid
