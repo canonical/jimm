@@ -20,7 +20,7 @@ APP_NAME = "juju-jimm-k8s"
 
 
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test: OpsTest):
+async def test_build_and_deploy_with_ngingx(ops_test: OpsTest):
     """Build the charm-under-test and deploy it together with related charms.
 
     Assert on the unit status before any relations/configurations take place.
@@ -35,20 +35,18 @@ async def test_build_and_deploy(ops_test: OpsTest):
         charm,
         resources=resources,
         application_name=APP_NAME,
-        series="focal",
+        series="focal", 
         config={
             "uuid": "f4dec11e-e2b6-40bb-871a-cc38e958af49",
+            "dns-name": "test.jimm.local",
             "candid-url": "https://api.jujucharms.com/identity",
             "public-key": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
             "private-key": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
         },
     )
-    traefik_app = await ops_test.model.deploy(
-        "traefik-k8s",
-        application_name="traefik",
-        config= {
-            "external_hostname": "traefik.test.canonical.com",
-        },
+    nginx_app = await ops_test.model.deploy(
+        "nginx-ingress-integrator",
+        application_name="nginx",
     )
     await asyncio.gather(
         ops_test.model.deploy(
@@ -65,14 +63,14 @@ async def test_build_and_deploy(ops_test: OpsTest):
 
     logger.info("waiting for postgresql")
     await ops_test.model.wait_for_idle(
-        apps=["postgresql", "traefik"],
+        apps=["postgresql", "nginx"],
         status="active",
         raise_on_blocked=True,
         timeout=40000,
     )
 
-    logger.info("adding traefik relation")
-    await ops_test.model.relate("{}:ingress".format(APP_NAME), "traefik")
+    logger.info("adding ingress relation")
+    await ops_test.model.relate("{}:nginx-route".format(APP_NAME), "nginx")
 
     logger.info("adding openfga postgresql relation")
     await ops_test.model.relate("openfga:database", "postgresql:database")
@@ -88,7 +86,9 @@ async def test_build_and_deploy(ops_test: OpsTest):
     for i in range(10):
         action: Action = await openfga_unit.run_action("schema-upgrade")
         result = await action.wait()
-        logger.info("attempt {} -> action result {} {}".format(i, result.status, result.results))
+        logger.info(
+            "attempt {} -> action result {} {}".format(i, result.status, result.results)
+        )
         if result.results == {"result": "done", "return-code": 0}:
             break
         time.sleep(2)
@@ -117,7 +117,11 @@ async def test_build_and_deploy(ops_test: OpsTest):
                 model=model_data,
             )
             result = await action.wait()
-            logger.info("attempt {} -> action result {} {}".format(i, result.status, result.results))
+            logger.info(
+                "attempt {} -> action result {} {}".format(
+                    i, result.status, result.results
+                )
+            )
             if result.results == {"return-code": 0}:
                 break
             time.sleep(2)
