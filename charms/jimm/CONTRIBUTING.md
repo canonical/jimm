@@ -28,11 +28,9 @@ pip install tox
 ```
 
 The charm additionally requires the following relations:
-- ingress, interface: ingress
-- database, interface: postgresql_client
+- db, interface: pgsql
 - vault, interface: vault-kv
 - openfga, interface: openfga
-- certificates, interface: tls-certificates
 
 ### Testing
 
@@ -61,5 +59,5 @@ juju add-model dev
 # Enable DEBUG logging
 juju model-config logging-config="<root>=INFO;unit=DEBUG"
 # Deploy the charm
-juju deploy ./juju-jimm-k8s_ubuntu-22.04-amd64.charm
+juju deploy ./juju-jimm_ubuntu-22.04-amd64.charm
 ```

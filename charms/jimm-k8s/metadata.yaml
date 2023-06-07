@@ -1,16 +1,28 @@
-# Copyright 2022 Canonical Ltd
-# See LICENSE file for licensing details.
+# Copyright 2023 Canonical Ltd
+# This file populates the Overview on Charmhub.
+# See https://juju.is/docs/sdk/metadata-reference for a checklist and guidance.
 
-# For a complete list of supported options, see:
-# https://juju.is/docs/sdk/metadata-reference
+# The charm package name, no spaces (required)
+# See https://juju.is/docs/sdk/naming#heading--naming-charms for guidance.
 name: juju-jimm-k8s
-display-name: |
-  JIMM
+
+# The following metadata are human-readable and will be published prominently on Charmhub.
+
+# (Recommended)
+display-name: JIMM-K8S
+
+# (Required)
+summary: Juju Intelligent Model Manager provides a convient way to manage all of your models!
+
+maintiners:
+  - JAAS Crew (jaas-crew@lists.canonical.com)
+website: https://github.com/canonical/jimm
+source: https://github.com/canonical/jimm
+issues: https://github.com/canonical/jimm/issues
+
 description: |
-  Juju controller used by the JAAS service to manage models across a 
-  number of clouds.
-summary: |
-  JAAS Intelligent Model Manager.
+  JIMM is a juju controller, used in conjunction with the JaaS dashboard to provide a seamless way
+  to manage models, regardless of where their controllers reside or what cloud they may be running on. 
 
 peers:
   jimm:
