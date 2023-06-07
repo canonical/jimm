@@ -23,7 +23,7 @@ jobs:
     needs:
       - ci-tests
       - charm-tests
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-20.04
     timeout-minutes: 60
     steps:
       - name: Checkout
@@ -45,7 +45,7 @@ jobs:
       - ci-tests
       - charm-tests
       - snap-build
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-20.04
     timeout-minutes: 60
     steps:
       - name: Checkout
