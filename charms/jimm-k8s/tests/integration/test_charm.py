@@ -46,7 +46,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
     traefik_app = await ops_test.model.deploy(
         "traefik-k8s",
         application_name="traefik",
-        config= {
+        config={
             "external_hostname": "traefik.test.canonical.com",
         },
     )

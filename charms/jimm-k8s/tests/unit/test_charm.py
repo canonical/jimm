@@ -12,8 +12,9 @@ import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
 
-from charm import JimmOperatorCharm
 from ops.testing import Harness
+
+from charm import JimmOperatorCharm
 
 MINIMAL_CONFIG = {
     "uuid": "1234567890",
@@ -38,7 +39,7 @@ class TestCharm(unittest.TestCase):
         self.harness.set_can_connect("jimm", True)
         self.harness.set_leader(True)
         self.harness.begin()
-      
+
         self.tempdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.tempdir.cleanup)
         self.harness.charm.framework.charm_dir = pathlib.Path(self.tempdir.name)
@@ -48,8 +49,8 @@ class TestCharm(unittest.TestCase):
 
         rel_id = self.harness.add_relation("ingress", "nginx-ingress")
         self.harness.add_relation_unit(rel_id, "nginx-ingress/0")
-    
-    #import ipdb; ipdb.set_trace()
+
+    # import ipdb; ipdb.set_trace()
     def test_on_pebble_ready(self):
         self.harness.update_config(MINIMAL_CONFIG)
 
@@ -158,11 +159,11 @@ class TestCharm(unittest.TestCase):
                             "CANDID_URL": "test-candid-url",
                             "JIMM_DASHBOARD_LOCATION": "https://jaas.ai/models",
                             "JIMM_DNS_NAME": "juju-jimm-k8s-0.juju-jimm-k8s-endpoints.None.svc.cluster.local",
-                            'JIMM_ENABLE_JWKS_ROTATOR': '1', 
+                            "JIMM_ENABLE_JWKS_ROTATOR": "1",
                             "JIMM_LISTEN_ADDR": ":8080",
                             "JIMM_LOG_LEVEL": "info",
                             "JIMM_UUID": "1234567890",
-                            'JIMM_WATCH_CONTROLLERS': '1',
+                            "JIMM_WATCH_CONTROLLERS": "1",
                             "PRIVATE_KEY": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
                             "PUBLIC_KEY": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
                         },
@@ -209,10 +210,10 @@ class TestCharm(unittest.TestCase):
                             "JIMM_LISTEN_ADDR": ":8080",
                             "JIMM_DASHBOARD_LOCATION": "/root/dashboard",
                             "JIMM_DNS_NAME": "juju-jimm-k8s-0.juju-jimm-k8s-endpoints.None.svc.cluster.local",
-                            'JIMM_ENABLE_JWKS_ROTATOR': '1',
+                            "JIMM_ENABLE_JWKS_ROTATOR": "1",
                             "JIMM_LOG_LEVEL": "info",
                             "JIMM_UUID": "1234567890",
-                            'JIMM_WATCH_CONTROLLERS': '1',
+                            "JIMM_WATCH_CONTROLLERS": "1",
                             "PRIVATE_KEY": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
                             "PUBLIC_KEY": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
                         },

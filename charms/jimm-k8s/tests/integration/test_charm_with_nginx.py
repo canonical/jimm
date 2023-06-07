@@ -35,7 +35,7 @@ async def test_build_and_deploy_with_ngingx(ops_test: OpsTest):
         charm,
         resources=resources,
         application_name=APP_NAME,
-        series="focal", 
+        series="focal",
         config={
             "uuid": "f4dec11e-e2b6-40bb-871a-cc38e958af49",
             "dns-name": "test.jimm.local",
@@ -86,9 +86,7 @@ async def test_build_and_deploy_with_ngingx(ops_test: OpsTest):
     for i in range(10):
         action: Action = await openfga_unit.run_action("schema-upgrade")
         result = await action.wait()
-        logger.info(
-            "attempt {} -> action result {} {}".format(i, result.status, result.results)
-        )
+        logger.info("attempt {} -> action result {} {}".format(i, result.status, result.results))
         if result.results == {"result": "done", "return-code": 0}:
             break
         time.sleep(2)
@@ -117,11 +115,7 @@ async def test_build_and_deploy_with_ngingx(ops_test: OpsTest):
                 model=model_data,
             )
             result = await action.wait()
-            logger.info(
-                "attempt {} -> action result {} {}".format(
-                    i, result.status, result.results
-                )
-            )
+            logger.info("attempt {} -> action result {} {}".format(i, result.status, result.results))
             if result.results == {"return-code": 0}:
                 break
             time.sleep(2)
