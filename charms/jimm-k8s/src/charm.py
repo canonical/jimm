@@ -43,7 +43,6 @@ from charms.traefik_k8s.v1.ingress import (
 )
 from ops import pebble
 from ops.charm import ActionEvent, CharmBase, RelationJoinedEvent
-from ops.framework import StoredState
 from ops.main import main
 from ops.model import (
     ActiveStatus,
@@ -130,16 +129,12 @@ class JimmOperatorCharm(CharmBase):
             relation_name="database",
             database_name="jimm",
         )
-        self.framework.observe(
-            self.database.on.database_created, self._on_database_event
-        )
+        self.framework.observe(self.database.on.database_created, self._on_database_event)
         self.framework.observe(
             self.database.on.endpoints_changed,
             self._on_database_event,
         )
-        self.framework.observe(
-            self.on.database_relation_broken, self._on_database_relation_broken
-        )
+        self.framework.observe(self.on.database_relation_broken, self._on_database_relation_broken)
 
         # OpenFGA relation
         self.openfga = OpenFGARequires(self, "jimm")
@@ -149,12 +144,8 @@ class JimmOperatorCharm(CharmBase):
         )
 
         # Vault relation
-        self.framework.observe(
-            self.on.vault_relation_joined, self._on_vault_relation_joined
-        )
-        self.framework.observe(
-            self.on.vault_relation_changed, self._on_vault_relation_changed
-        )
+        self.framework.observe(self.on.vault_relation_joined, self._on_vault_relation_joined)
+        self.framework.observe(self.on.vault_relation_changed, self._on_vault_relation_changed)
 
         # create-authorization-model action
         self.framework.observe(
@@ -216,9 +207,7 @@ class JimmOperatorCharm(CharmBase):
 
         container = self.unit.get_container(WORKLOAD_CONTAINER)
         if not container.can_connect():
-            logger.info(
-                "cannot connect to the workload container - deferring the event"
-            )
+            logger.info("cannot connect to the workload container - deferring the event")
             event.defer()
             return
 
@@ -260,9 +249,7 @@ class JimmOperatorCharm(CharmBase):
             "JIMM_DNS_NAME": dnsname,
             "JIMM_LOG_LEVEL": self.config.get("log-level", ""),
             "JIMM_UUID": self.config.get("uuid", ""),
-            "JIMM_DASHBOARD_LOCATION": self.config.get(
-                "juju-dashboard-location", "https://jaas.ai/models"
-            ),
+            "JIMM_DASHBOARD_LOCATION": self.config.get("juju-dashboard-location", "https://jaas.ai/models"),
             "JIMM_LISTEN_ADDR": ":8080",
             "OPENFGA_STORE": openfga_store_id,
             "OPENFGA_AUTH_MODEL": openfga_auth_model_id,
@@ -502,29 +489,19 @@ class JimmOperatorCharm(CharmBase):
         try:
             process.wait_output()
         except pebble.ExecError as e:
-            logger.error(
-                "error running untaring the dashboard. error code {}".format(
-                    e.exit_code
-                )
-            )
+            logger.error("error running untaring the dashboard. error code {}".format(e.exit_code))
             for line in e.stderr.splitlines():
                 logger.error("    %s", line)
 
         self._push_to_workload(self._dashboard_hash_path, dashboard_hash, event)
 
     def _get_network_address(self, event):
-        return str(
-            self.model.get_binding(event.relation)
-            .network.egress_subnets[0]
-            .network_address
-        )
+        return str(self.model.get_binding(event.relation).network.egress_subnets[0].network_address)
 
     def _on_vault_relation_joined(self, event):
         event.relation.data[self.unit]["secret_backend"] = json.dumps(self._vault_path)
         event.relation.data[self.unit]["hostname"] = json.dumps(socket.gethostname())
-        event.relation.data[self.unit]["access_address"] = json.dumps(
-            self._get_network_address(event)
-        )
+        event.relation.data[self.unit]["access_address"] = json.dumps(self._get_network_address(event))
         event.relation.data[self.unit]["isolated"] = json.dumps(False)
 
     def _on_vault_relation_changed(self, event):
@@ -582,12 +559,12 @@ class JimmOperatorCharm(CharmBase):
             event.defer()
 
     def _hash(self, filename):
-        BUF_SIZE = 65536
+        buffer_size = 65536
         md5 = hashlib.md5()
 
         with open(filename, "rb") as f:
             while True:
-                data = f.read(BUF_SIZE)
+                data = f.read(buffer_size)
                 if not data:
                     break
                 md5.update(data)
@@ -631,9 +608,7 @@ class JimmOperatorCharm(CharmBase):
 
             self.state.set(STATE_KEY_CSR, csr.decode())
 
-            self.certificates.request_certificate_creation(
-                certificate_signing_request=csr
-            )
+            self.certificates.request_certificate_creation(certificate_signing_request=csr)
         except RelationNotReadyError:
             event.defer()
             return
@@ -742,7 +717,7 @@ class JimmOperatorCharm(CharmBase):
         if not model:
             event.fail("authorization model not specified")
             return
-        modelJSON = json.loads(model)
+        model_json = json.loads(model)
 
         try:
             openfga_store_id = self.state.get(OPENFGA_STORE_ID)
@@ -775,25 +750,19 @@ class JimmOperatorCharm(CharmBase):
             logger.info("posting to {}, with headers {}".format(url, headers))
             response = requests.post(
                 url,
-                json=modelJSON,
+                json=model_json,
                 headers=headers,
                 verify=False,
             )
             if not response.ok:
                 event.fail(
-                    "failed to create the authorization model: {}".format(
-                        response.text
-                    ),
+                    "failed to create the authorization model: {}".format(response.text),
                 )
                 return
             data = response.json()
             authorization_model_id = data.get("authorization_model_id", "")
             if not authorization_model_id:
-                event.fail(
-                    "response does not contain authorization model id: {}".format(
-                        response.text
-                    )
-                )
+                event.fail("response does not contain authorization model id: {}".format(response.text))
                 return
             self.state.set(OPENFGA_AUTH_MODEL_ID, authorization_model_id)
             self._update_workload(event)

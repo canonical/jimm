@@ -95,9 +95,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
     for i in range(10):
         action: Action = await openfga_unit.run_action("schema-upgrade")
         result = await action.wait()
-        logger.info(
-            "attempt {} -> action result {} {}".format(i, result.status, result.results)
-        )
+        logger.info("attempt {} -> action result {} {}".format(i, result.status, result.results))
         if result.results == {"result": "done", "return-code": 0}:
             break
         time.sleep(2)
@@ -126,11 +124,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
                 model=model_data,
             )
             result = await action.wait()
-            logger.info(
-                "attempt {} -> action result {} {}".format(
-                    i, result.status, result.results
-                )
-            )
+            logger.info("attempt {} -> action result {} {}".format(i, result.status, result.results))
             if result.results == {"return-code": 0}:
                 break
             time.sleep(2)

@@ -24,7 +24,7 @@ MINIMAL_CONFIG = {
 }
 
 
-class mockExec:
+class MockExec:
     def wait_output():
         return True
 
@@ -180,7 +180,7 @@ class TestCharm(unittest.TestCase):
 
     @patch("ops.model.Container.exec")
     def test_install_dashboard(self, exec):
-        exec.unwrap.return_value = mockExec()
+        exec.unwrap.return_value = MockExec()
 
         container = self.harness.model.unit.get_container("jimm")
 
@@ -269,9 +269,7 @@ class TestCharm(unittest.TestCase):
     @patch("charm.JimmOperatorCharm._get_network_address")
     @patch("socket.gethostname")
     @patch("hvac.Client.sys")
-    def test_vault_relation_joined(
-        self, hvac_client_sys, gethostname, get_network_address
-    ):
+    def test_vault_relation_joined(self, hvac_client_sys, gethostname, get_network_address):
         get_network_address.return_value = "127.0.0.1:8080"
         gethostname.return_value = "test-hostname"
         hvac_client_sys.unwrap.return_value = {

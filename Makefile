@@ -6,7 +6,7 @@ export GO111MODULE=on
 PROJECT := github.com/CanonicalLtd/jimm
 
 GIT_COMMIT := $(shell git rev-parse --verify HEAD)
-GIT_VERSION := $(shell git describe --dirty)
+GIT_VERSION := $(shell git describe --abbrev=0 --dirty)
 
 ifeq ($(shell uname -p | sed -r 's/.*(x86|armel|armhf).*/golang/'), golang)
 	GO_C := golang
@@ -78,6 +78,18 @@ jimm-$(GIT_VERSION).tar.xz: jimm-release/bin/jimmsrv
 jimm-release/bin/jimmsrv: jimmsrv
 	mkdir -p jimm-release/bin
 	cp jemd jimm-release/bin
+
+jimm-image:
+	docker build --target deploy-env \
+	--build-arg="GIT_COMMIT=$(GIT_COMMIT)" \
+	--build-arg="VERSION=$(GIT_VERSION)" \
+	--tag jimm-image:latest .
+
+jimm-build-image:
+	docker build --target build-env \
+	--build-arg="GIT_COMMIT=$(GIT_COMMIT)" \
+	--build-arg="VERSION=$(GIT_VERSION)" \
+	--tag jimm-build-image:latest .
 
 pull/candid:
 	-git clone https://github.com/canonical/candid.git ./tmp/candid
