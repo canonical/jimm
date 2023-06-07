@@ -748,7 +748,7 @@ class JimmOperatorCharm(CharmBase):
         logger.info("posting to {}, with headers {}".format(url, headers))
         response = requests.post(
             url,
-            json=modelJSON,
+            json=model_json,
             headers=headers,
             verify=False,
         )

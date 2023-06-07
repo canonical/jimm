@@ -10,11 +10,11 @@ import pathlib
 import tarfile
 import tempfile
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from ops.testing import Harness
 
-from charm import JimmOperatorCharm
+from src.charm import JimmOperatorCharm
 
 MINIMAL_CONFIG = {
     "uuid": "1234567890",
@@ -274,7 +274,7 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(data["identity-provider-url"], "https://candid.example.com")
         self.assertEqual(data["is-juju"], "False")
 
-    @patch("charm.JimmOperatorCharm._get_network_address")
+    @patch("src.charm.JimmOperatorCharm._get_network_address")
     @patch("socket.gethostname")
     @patch("hvac.Client.sys")
     def test_vault_relation_joined(self, hvac_client_sys, gethostname, get_network_address):

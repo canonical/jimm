@@ -31,7 +31,7 @@ async def test_build_and_deploy_with_ngingx(ops_test: OpsTest):
 
     # Deploy the charm and wait for active/idle status
     logger.debug("deploying charms")
-    jimm_app = await ops_test.model.deploy(
+    await ops_test.model.deploy(
         charm,
         resources=resources,
         application_name=APP_NAME,
@@ -44,7 +44,7 @@ async def test_build_and_deploy_with_ngingx(ops_test: OpsTest):
             "private-key": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
         },
     )
-    nginx_app = await ops_test.model.deploy(
+    await ops_test.model.deploy(
         "nginx-ingress-integrator",
         application_name="nginx",
     )
