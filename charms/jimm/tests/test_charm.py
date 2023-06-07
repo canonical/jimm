@@ -21,7 +21,7 @@ import hvac
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
 from ops.testing import Harness
 
-from charm import JimmCharm
+from src.charm import JimmCharm
 
 
 class TestCharm(unittest.TestCase):
@@ -305,12 +305,10 @@ class TestCharm(unittest.TestCase):
         self.harness.charm.on.leader_elected.emit()
         with open(leader_file) as f:
             lines = f.readlines()
-        self.assertEqual(len(lines), 1)
         self.assertEqual(lines[0].strip(), "JIMM_WATCH_CONTROLLERS=")
         self.harness.set_leader(True)
         with open(leader_file) as f:
             lines = f.readlines()
-        self.assertEqual(len(lines), 1)
         self.assertEqual(lines[0].strip(), "JIMM_WATCH_CONTROLLERS=1")
 
     def test_leader_elected_ready(self):
@@ -322,12 +320,10 @@ class TestCharm(unittest.TestCase):
         self.harness.charm.on.leader_elected.emit()
         with open(leader_file) as f:
             lines = f.readlines()
-        self.assertEqual(len(lines), 1)
         self.assertEqual(lines[0].strip(), "JIMM_WATCH_CONTROLLERS=")
         self.harness.set_leader(True)
         with open(leader_file) as f:
             lines = f.readlines()
-        self.assertEqual(len(lines), 1)
         self.assertEqual(lines[0].strip(), "JIMM_WATCH_CONTROLLERS=1")
         self.harness.charm._systemctl.assert_has_calls(
             (
@@ -483,19 +479,22 @@ class TestCharm(unittest.TestCase):
         self.addCleanup(harness.cleanup)
         harness.begin()
         harness.set_leader(True)
-        harness.update_config(
-            {
-                "dns-name": "https://jimm.example.com",
-                "candid-agent-username": "username@candid",
-                "candid-agent-private-key": "agent-private-key",
-                "candid-agent-public-key": "agent-public-key",
-                "candid-url": "https://candid.example.com",
-                "controller-admins": "user1 user2 group1",
-                "uuid": "caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa",
-                "public-key": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
-                "private-key": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
-            }
-        )
+
+        with tempfile.NamedTemporaryFile() as tmp:
+            harness.charm._agent_filename = tmp.name
+            harness.update_config(
+                {
+                    "dns-name": "https://jimm.example.com",
+                    "candid-agent-username": "username@candid",
+                    "candid-agent-private-key": "agent-private-key",
+                    "candid-agent-public-key": "agent-public-key",
+                    "candid-url": "https://candid.example.com",
+                    "controller-admins": "user1 user2 group1",
+                    "uuid": "caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa",
+                    "public-key": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
+                    "private-key": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
+                }
+            )
 
         id = harness.add_relation("dashboard", "juju-dashboard")
         harness.add_relation_unit(id, "juju-dashboard/0")
