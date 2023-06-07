@@ -1,68 +1,66 @@
-#!/usr/bin/env python3
-# Copyright 2022 Canonical Ltd.
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License version 3, as
-# published by the Free Software Foundation.
-#
-# This program is distributed in the hope that it will be useful, but
-# WITHOUT ANY WARRANTY; without even the implied warranties of
-# MERCHANTABILITY, SATISFACTORY QUALITY, or FITNESS FOR A PARTICULAR
-# PURPOSE.  See the GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program. If not, see <http://www.gnu.org/licenses/>.
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
 
-from ops.model import Application, Model, Relation
+"""Manager for handling charm state."""
+
+import json
 
 
-class RelationNotReadyError(Exception):
-    pass
+class State:
+    """A magic state that uses a relation as the data store.
 
+    The get_relation callable is used to retrieve the relation.
+    As relation data values must be strings, all values are JSON encoded.
+    """
 
-class PeerRelationState:
-    """RelationState uses the peer relation to store the state of the charm."""
+    def __init__(self, app, get_relation):
+        """Construct.
 
-    def __init__(
-        self,
-        model: Model,
-        app: Application,
-        relation_name: str,
-        defaults: dict = None,
-    ):
-        self._model = model
-        self._app = app
-        self._relation_name = relation_name
+        Args:
+            app: workload application
+            get_relation: get peer relation method
+        """
+        # Use __dict__ to avoid calling __setattr__ and subsequent infinite recursion.
+        self.__dict__["_app"] = app
+        self.__dict__["_get_relation"] = get_relation
 
-        if defaults:
-            relation = self._model.get_relation(relation_name)
-            if not relation:
-                raise RelationNotReadyError
-            else:
-                relation.data[self._app].update(defaults)
+    def __setattr__(self, name, value):
+        """Set a value in the store with the given name.
 
-    def _get_relation(self) -> Relation:
-        relation = self._model.get_relation(self._relation_name)
-        return relation
+        Args:
+            name: name of value to set in store.
+            value: value to set in store.
+        """
+        v = json.dumps(value)
+        self._get_relation().data[self._app].update({name: v})
 
-    def set(self, key: str, value: str) -> None:
-        relation = self._get_relation()
-        if not relation:
-            raise RelationNotReadyError
-        else:
-            relation.data[self._app].update({key: value})
+    def __getattr__(self, name):
+        """Get from the store the value with the given name, or None.
 
-    def unset(self, *keys) -> None:
-        relation = self._get_relation()
-        if not relation:
-            raise RelationNotReadyError
-        else:
-            for key in keys:
-                relation.data[self._app].pop(key, None)
+        Args:
+            name: name of value to get from store.
 
-    def get(self, key: str) -> str:
-        relation = self._get_relation()
-        if not relation:
-            return ""
-        else:
-            return relation.data[self._app].get(key, "")
+        Returns:
+            value from store with given name.
+        """
+        v = self._get_relation().data[self._app].get(name, "null")
+        return json.loads(v)
+
+    def __delattr__(self, name):
+        """Delete the value with the given name from the store, if it exists.
+
+        Args:
+            name: name of value to delete from store.
+
+        Returns:
+            deleted value from store.
+        """
+        return self._get_relation().data[self._app].pop(name, None)
+
+    def is_ready(self):
+        """Report whether the relation is ready to be used.
+
+        Returns:
+            A boolean representing whether the relation is ready to be used or not.
+        """
+        return bool(self._get_relation())
