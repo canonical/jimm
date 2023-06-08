@@ -20,13 +20,17 @@ APP_NAME = "juju-jimm-k8s"
 
 
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy_with_ngingx(ops_test: OpsTest):
+async def test_build_and_deploy_with_ngingx(ops_test: OpsTest, local_charm):
     """Build the charm-under-test and deploy it together with related charms.
 
     Assert on the unit status before any relations/configurations take place.
     """
     # Build and deploy charm from local source folder
-    charm = await ops_test.build_charm(".")
+    # (Optionally build) and deploy charm from local source folder
+    if local_charm:
+        charm = Path(utils.get_local_charm()).resolve()
+    else:
+        charm = await ops_test.build_charm(".")
     resources = {"jimm-image": "localhost:32000/jimm:latest"}
 
     # Deploy the charm and wait for active/idle status

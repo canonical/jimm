@@ -7,6 +7,9 @@ on:
       - charms/**
 
 jobs:
+  charm-build:
+    uses: ./.github/workflows/charm-build.yaml
+
   lint:
     name: Lint
     runs-on: ubuntu-latest
@@ -41,6 +44,8 @@ jobs:
         run: tox -e unit
   integration-tests:
     name: Integration tests
+    needs:
+      - charm-build
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -58,7 +63,12 @@ jobs:
           provider: microk8s
           microk8s-addons: "ingress storage dns rbac registry"
           channel: 1.27/stable
+      # Download the charm from the build to speed up integration tests.
+      - uses: actions/download-artifact@master
+        with:
+          name: jimm-k8s-charm
+          path: ./charms/${{ matrix.charm-type }}
       - name: Install dependencies
         run: python -m pip install tox
       - name: Integration tests
-        run: tox -e integration
+        run: tox -e integration -- --localCharm
