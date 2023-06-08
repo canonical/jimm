@@ -16,7 +16,7 @@ jobs:
       - uses: actions/checkout@v3
       - run: git fetch --prune --unshallow
       - run: sudo snap install charmcraft --channel=2.x/stable --classic
-      - run: charmcraft pack --project-dir ./charms/${{ matrix.charm-type }} --destructive-mode
+      - run: sudo charmcraft pack --project-dir ./charms/${{ matrix.charm-type }} --destructive-mode
       - uses: actions/upload-artifact@v3
         with:
           name: ${{ matrix.charm-type }}-charm
