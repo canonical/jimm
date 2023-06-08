@@ -63,7 +63,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
         ),
     )
 
-    logger.info("waiting for postgresql")
+    logger.info("waiting for postgresql and traefik")
     await ops_test.model.wait_for_idle(
         apps=["postgresql", "traefik"],
         status="active",
