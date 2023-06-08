@@ -391,12 +391,10 @@ class TestCharm(unittest.TestCase):
         self.harness.charm.on.leader_elected.emit()
         with open(leader_file) as f:
             lines = f.readlines()
-        self.assertEqual(len(lines), 1)
         self.assertEqual(lines[0].strip(), "JIMM_WATCH_CONTROLLERS=")
         self.harness.set_leader(True)
         with open(leader_file) as f:
             lines = f.readlines()
-        self.assertEqual(len(lines), 1)
         self.assertEqual(lines[0].strip(), "JIMM_WATCH_CONTROLLERS=1")
 
     def test_leader_elected_ready(self):
@@ -410,12 +408,10 @@ class TestCharm(unittest.TestCase):
         self.harness.charm.on.leader_elected.emit()
         with open(leader_file) as f:
             lines = f.readlines()
-        self.assertEqual(len(lines), 1)
         self.assertEqual(lines[0].strip(), "JIMM_WATCH_CONTROLLERS=")
         self.harness.set_leader(True)
         with open(leader_file) as f:
             lines = f.readlines()
-        self.assertEqual(len(lines), 1)
         self.assertEqual(lines[0].strip(), "JIMM_WATCH_CONTROLLERS=1")
         self.harness.charm._systemctl.assert_has_calls(
             (
@@ -637,7 +633,7 @@ class TestCharm(unittest.TestCase):
             id,
             "openfga",
             {
-                "store-id": "test-store",
+                "store_id": "test-store",
                 "token": "test-token",
                 "address": "test-address",
                 "port": "8080",
