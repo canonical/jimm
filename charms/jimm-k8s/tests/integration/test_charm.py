@@ -57,12 +57,13 @@ async def test_build_and_deploy(ops_test: OpsTest, local_charm):
         ops_test.model.deploy(
             "postgresql-k8s",
             application_name="postgresql",
-            channel="edge",
+            channel="14/stable",
+            trust=True
         ),
         ops_test.model.deploy(
             "openfga-k8s",
             application_name="openfga",
-            channel="edge",
+            channel="latest/edge",
         ),
     )
 
