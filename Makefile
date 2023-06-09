@@ -83,12 +83,16 @@ jimm-image:
 	docker build --target deploy-env \
 	--build-arg="GIT_COMMIT=$(GIT_COMMIT)" \
 	--build-arg="VERSION=$(GIT_VERSION)" \
-	--tag jimm-image:latest .
+	--tag jimm:latest .
 
 jimm-snap:
 	mkdir -p ./snap
 	cp ./snaps/jimm/snapcraft.yaml ./snap/
 	snapcraft 
+
+push-microk8s: jimm-image
+	docker tag jimm:latest localhost:32000/jimm:latest
+	docker push localhost:32000/jimm:latest
 
 pull/candid:
 	-git clone https://github.com/canonical/candid.git ./tmp/candid

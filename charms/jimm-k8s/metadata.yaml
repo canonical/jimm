@@ -63,4 +63,4 @@ resources:
   jimm-image:
     type: oci-image
     description: OCI image for JIMM.
-    upstream-source: jimm-image:latest
+    upstream-source: jimm:latest

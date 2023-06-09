@@ -54,12 +54,7 @@ async def test_build_and_deploy(ops_test: OpsTest, local_charm):
         },
     )
     await asyncio.gather(
-        ops_test.model.deploy(
-            "postgresql-k8s",
-            application_name="postgresql",
-            channel="14/stable",
-            trust=True
-        ),
+        ops_test.model.deploy("postgresql-k8s", application_name="postgresql", channel="14/stable", trust=True),
         ops_test.model.deploy(
             "openfga-k8s",
             application_name="openfga",
