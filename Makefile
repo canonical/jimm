@@ -2,6 +2,7 @@
 # Makefile for the JIMM service.
 
 export GO111MODULE=on
+export DOCKER_BUILDKIT=1
 
 PROJECT := github.com/CanonicalLtd/jimm
 
