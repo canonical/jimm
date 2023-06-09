@@ -9,6 +9,8 @@ parts:
     - README.md
     charm-python-packages: [setuptools]
 bases:
+  # Ensure run-on is the same or newer than build-on
+  # since jimm-server is a Go binary using CGO dependencies
   - build-on:
     - name: "ubuntu"
       channel: "20.04"

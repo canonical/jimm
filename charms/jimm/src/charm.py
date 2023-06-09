@@ -15,10 +15,7 @@ import urllib
 
 import hvac
 from charmhelpers.contrib.charmsupport.nrpe import NRPE
-from charms.openfga_k8s.v0.openfga import (
-    OpenFGARequires,
-    OpenFGAStoreCreateEvent,
-)
+from charms.openfga_k8s.v0.openfga import OpenFGARequires, OpenFGAStoreCreateEvent
 from jinja2 import Environment, FileSystemLoader
 from ops.main import main
 from ops.model import (
@@ -28,6 +25,7 @@ from ops.model import (
     ModelError,
     WaitingStatus,
 )
+
 from systemd import SystemdCharm
 
 logger = logging.getLogger(__name__)
@@ -39,27 +37,17 @@ class JimmCharm(SystemdCharm):
     def __init__(self, *args):
         super().__init__(*args)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
-        self.framework.observe(
-            self.on.db_relation_changed, self._on_db_relation_changed
-        )
+        self.framework.observe(self.on.db_relation_changed, self._on_db_relation_changed)
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.leader_elected, self._on_leader_elected)
         self.framework.observe(self.on.start, self._on_start)
         self.framework.observe(self.on.stop, self._on_stop)
         self.framework.observe(self.on.update_status, self._on_update_status)
         self.framework.observe(self.on.upgrade_charm, self._on_upgrade_charm)
-        self.framework.observe(
-            self.on.nrpe_relation_joined, self._on_nrpe_relation_joined
-        )
-        self.framework.observe(
-            self.on.website_relation_joined, self._on_website_relation_joined
-        )
-        self.framework.observe(
-            self.on.vault_relation_joined, self._on_vault_relation_joined
-        )
-        self.framework.observe(
-            self.on.vault_relation_changed, self._on_vault_relation_changed
-        )
+        self.framework.observe(self.on.nrpe_relation_joined, self._on_nrpe_relation_joined)
+        self.framework.observe(self.on.website_relation_joined, self._on_website_relation_joined)
+        self.framework.observe(self.on.vault_relation_joined, self._on_vault_relation_joined)
+        self.framework.observe(self.on.vault_relation_changed, self._on_vault_relation_changed)
         self.framework.observe(
             self.on.dashboard_relation_joined,
             self._on_dashboard_relation_joined,
@@ -212,18 +200,10 @@ class JimmCharm(SystemdCharm):
         event.relation.data[self.unit]["port"] = "8080"
 
     def _on_vault_relation_joined(self, event):
-        event.relation.data[self.unit]["secret_backend"] = json.dumps(
-            "charm-jimm-creds"
-        )
-        event.relation.data[self.unit]["hostname"] = json.dumps(
-            socket.gethostname()
-        )
+        event.relation.data[self.unit]["secret_backend"] = json.dumps("charm-jimm-creds")
+        event.relation.data[self.unit]["hostname"] = json.dumps(socket.gethostname())
         event.relation.data[self.unit]["access_address"] = json.dumps(
-            str(
-                self.model.get_binding(event.relation)
-                .network.egress_subnets[0]
-                .network_address
-            )
+            str(self.model.get_binding(event.relation).network.egress_subnets[0].network_address)
         )
         event.relation.data[self.unit]["isolated"] = json.dumps(False)
 
