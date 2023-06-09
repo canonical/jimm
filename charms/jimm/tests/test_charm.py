@@ -512,7 +512,7 @@ class TestCharm(unittest.TestCase):
             id,
             "openfga",
             {
-                "store-id": "test-store",
+                "store_id": "test-store",
                 "token": "test-token",
                 "address": "test-address",
                 "port": "8080",

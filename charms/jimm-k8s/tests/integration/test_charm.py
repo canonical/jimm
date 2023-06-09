@@ -75,10 +75,10 @@ async def test_build_and_deploy(ops_test: OpsTest, local_charm):
     )
 
     logger.info("adding traefik relation")
-    await ops_test.model.relate("{}:ingress".format(APP_NAME), "traefik")
+    await ops_test.model.integrate("{}:ingress".format(APP_NAME), "traefik")
 
     logger.info("adding openfga postgresql relation")
-    await ops_test.model.relate("openfga:database", "postgresql:database")
+    await ops_test.model.integrate("openfga:database", "postgresql:database")
 
     logger.info("waiting for openfga")
     await ops_test.model.wait_for_idle(
@@ -97,10 +97,10 @@ async def test_build_and_deploy(ops_test: OpsTest, local_charm):
         time.sleep(2)
 
     logger.info("adding openfga relation")
-    await ops_test.model.relate(APP_NAME, "openfga")
+    await ops_test.model.integrate(APP_NAME, "openfga")
 
     logger.info("adding postgresql relation")
-    await ops_test.model.relate(APP_NAME, "postgresql:database")
+    await ops_test.model.integrate(APP_NAME, "postgresql:database")
 
     logger.info("waiting for jimm")
     await ops_test.model.wait_for_idle(
