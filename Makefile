@@ -2,11 +2,12 @@
 # Makefile for the JIMM service.
 
 export GO111MODULE=on
+export DOCKER_BUILDKIT=1
 
 PROJECT := github.com/CanonicalLtd/jimm
 
 GIT_COMMIT := $(shell git rev-parse --verify HEAD)
-GIT_VERSION := $(shell git describe --dirty)
+GIT_VERSION := $(shell git describe --abbrev=0 --dirty)
 
 ifeq ($(shell uname -p | sed -r 's/.*(x86|armel|armhf).*/golang/'), golang)
 	GO_C := golang
@@ -78,6 +79,21 @@ jimm-$(GIT_VERSION).tar.xz: jimm-release/bin/jimmsrv
 jimm-release/bin/jimmsrv: jimmsrv
 	mkdir -p jimm-release/bin
 	cp jemd jimm-release/bin
+
+jimm-image:
+	docker build --target deploy-env \
+	--build-arg="GIT_COMMIT=$(GIT_COMMIT)" \
+	--build-arg="VERSION=$(GIT_VERSION)" \
+	--tag jimm:latest .
+
+jimm-snap:
+	mkdir -p ./snap
+	cp ./snaps/jimm/snapcraft.yaml ./snap/
+	snapcraft 
+
+push-microk8s: jimm-image
+	docker tag jimm:latest localhost:32000/jimm:latest
+	docker push localhost:32000/jimm:latest
 
 pull/candid:
 	-git clone https://github.com/canonical/candid.git ./tmp/candid

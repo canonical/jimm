@@ -27,6 +27,7 @@ from charms.data_platform_libs.v0.database_requires import (
     DatabaseEvent,
     DatabaseRequires,
 )
+from charms.nginx_ingress_integrator.v0.nginx_route import require_nginx_route
 from charms.openfga_k8s.v0.openfga import OpenFGARequires, OpenFGAStoreCreateEvent
 from charms.tls_certificates_interface.v1.tls_certificates import (
     CertificateAvailableEvent,
@@ -43,7 +44,6 @@ from charms.traefik_k8s.v1.ingress import (
 )
 from ops import pebble
 from ops.charm import ActionEvent, CharmBase, RelationJoinedEvent
-from ops.framework import StoredState
 from ops.main import main
 from ops.model import (
     ActiveStatus,
@@ -56,7 +56,7 @@ from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.loki_k8s.v0.loki_push_api import LogProxyConsumer
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 
-from state import PeerRelationState, RelationNotReadyError
+from state import State
 
 logger = logging.getLogger(__name__)
 
@@ -64,37 +64,22 @@ WORKLOAD_CONTAINER = "jimm"
 
 REQUIRED_SETTINGS = [
     "JIMM_UUID",
-    "JIMM_DNS_NAME",
     "JIMM_DSN",
     "CANDID_URL",
 ]
 
-STATE_KEY_CA = "ca"
-STATE_KEY_CERTIFICATE = "certificate"
-STATE_KEY_CHAIN = "chain"
-STATE_KEY_CSR = "csr"
-STATE_KEY_DSN = "dsn"
-STATE_KEY_DNS_NAME = "dns"
-STATE_KEY_PRIVATE_KEY = "private-key"
-STATE_KEY_VAULT_ADDRESS = "vault-address"
-
-OPENFGA_STORE_ID = "openfga-store-id"
-OPENFGA_TOKEN = "openfga-token"
-OPENFGA_ADDRESS = "openfga-address"
-OPENFGA_PORT = "openfga-port"
-OPENFGA_SCHEME = "openfga-scheme"
-OPENFGA_AUTH_MODEL_ID = "openfga-auth-model"
-
 LOG_FILE = "/var/log/jimm"
 # This likely will just be JIMM's port.
 PROMETHEUS_PORT = 8080
-
 
 class JimmOperatorCharm(CharmBase):
     """JIMM Operator Charm."""
 
     def __init__(self, *args):
         super().__init__(*args)
+
+        self._state = State(self.app, lambda: self.model.get_relation("jimm"))
+
         self.framework.observe(self.on.jimm_pebble_ready, self._on_jimm_pebble_ready)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
         self.framework.observe(self.on.update_status, self._on_update_status)
@@ -126,10 +111,22 @@ class JimmOperatorCharm(CharmBase):
             self._on_certificate_revoked,
         )
 
-        # Ingress relation
-        self.ingress = IngressPerAppRequirer(self, port=8080)
+        # Traefik ingress relation
+        self.ingress = IngressPerAppRequirer(
+            self,
+            relation_name="ingress",
+            port=8080,
+        )
         self.framework.observe(self.ingress.on.ready, self._on_ingress_ready)
-        self.framework.observe(self.ingress.on.revoked, self._on_ingress_revoked)
+        self.framework.observe(
+            self.ingress.on.revoked,
+            self._on_ingress_revoked,
+        )
+
+        # Nginx ingress relation
+        require_nginx_route(
+            charm=self, service_hostname=self.config.get("dns-name", ""), service_name=self.app.name, service_port=8080
+        )
 
         # Database relation
         self.database = DatabaseRequires(
@@ -137,16 +134,12 @@ class JimmOperatorCharm(CharmBase):
             relation_name="database",
             database_name="jimm",
         )
-        self.framework.observe(
-            self.database.on.database_created, self._on_database_event
-        )
+        self.framework.observe(self.database.on.database_created, self._on_database_event)
         self.framework.observe(
             self.database.on.endpoints_changed,
             self._on_database_event,
         )
-        self.framework.observe(
-            self.on.database_relation_broken, self._on_database_relation_broken
-        )
+        self.framework.observe(self.on.database_relation_broken, self._on_database_relation_broken)
 
         # OpenFGA relation
         self.openfga = OpenFGARequires(self, "jimm")
@@ -156,12 +149,8 @@ class JimmOperatorCharm(CharmBase):
         )
 
         # Vault relation
-        self.framework.observe(
-            self.on.vault_relation_joined, self._on_vault_relation_joined
-        )
-        self.framework.observe(
-            self.on.vault_relation_changed, self._on_vault_relation_changed
-        )
+        self.framework.observe(self.on.vault_relation_joined, self._on_vault_relation_joined)
+        self.framework.observe(self.on.vault_relation_changed, self._on_vault_relation_changed)
 
         # Grafana relation
         self._grafana_dashboards = GrafanaDashboardProvider(
@@ -198,8 +187,6 @@ class JimmOperatorCharm(CharmBase):
         self._dashboard_path = "/root/dashboard"
         self._dashboard_hash_path = "/root/dashboard/hash"
 
-        self.state = PeerRelationState(self.model, self.app, "jimm")
-
     def _on_jimm_pebble_ready(self, event):
         self._update_workload(event)
 
@@ -207,17 +194,14 @@ class JimmOperatorCharm(CharmBase):
         self._update_workload(event)
 
     def _on_leader_elected(self, event):
-        if self.unit.is_leader():
-            try:
-                # generate the private key if one is not present in the
-                # application data bucket of the peer relation
-                if not self.state.get(STATE_KEY_PRIVATE_KEY):
-                    private_key: bytes = generate_private_key(key_size=4096)
-                    self.state.set(STATE_KEY_PRIVATE_KEY, private_key.decode())
+        if not self._state.is_ready():
+            event.defer()
+            logger.warning("State is not ready")
+            return
 
-            except RelationNotReadyError:
-                event.defer()
-                return
+        if self.unit.is_leader() and not self._state.private_key:
+            private_key: bytes = generate_private_key(key_size=4096)
+            self._state.private_key = private_key.decode()
 
         self._update_workload(event)
 
@@ -242,73 +226,52 @@ class JimmOperatorCharm(CharmBase):
         """' Update workload with all available configuration
         data."""
 
+        if not self._state.is_ready():
+            event.defer()
+            print(self._state.is_ready())
+            logger.warning("State is not ready")
+            return
+
         container = self.unit.get_container(WORKLOAD_CONTAINER)
         if not container.can_connect():
-            logger.info(
-                "cannot connect to the workload container - deferring the event"
-            )
+            logger.info("cannot connect to the workload container - deferring the event")
             event.defer()
             return
 
         self._ensure_bakery_agent_file(event)
         self._install_dashboard(event)
 
-        dnsname = "{}.{}-endpoints.{}.svc.cluster.local".format(
-            self.unit.name.replace("/", "-"), self.app.name, self.model.name
-        )
-        dsn = ""
-        openfga_store_id = ""
-        openfga_auth_model_id = ""
-        openfga_token = ""
-        openfga_address = ""
-        openfga_port = ""
-        openfga_scheme = ""
-        vault_address = ""
-        try:
-            if self.state.get(STATE_KEY_DNS_NAME):
-                dnsname = self.state.get(STATE_KEY_DNS_NAME)
-            dsn = self.state.get(STATE_KEY_DSN)
-
-            openfga_store_id = self.state.get(OPENFGA_STORE_ID)
-            openfga_auth_model_id = self.state.get(OPENFGA_AUTH_MODEL_ID)
-            openfga_token = self.state.get(OPENFGA_TOKEN)
-            openfga_address = self.state.get(OPENFGA_ADDRESS)
-            openfga_port = self.state.get(OPENFGA_PORT)
-            openfga_scheme = self.state.get(OPENFGA_SCHEME)
-            vault_address = self.state.get(STATE_KEY_VAULT_ADDRESS)
-
-        except RelationNotReadyError:
-            event.defer()
+        dns_name = self._get_dns_name(event)
+        if not dns_name:
+            logger.warning("dns name not set")
             return
 
         config_values = {
             "CANDID_PUBLIC_KEY": self.config.get("candid-public-key", ""),
             "CANDID_URL": self.config.get("candid-url", ""),
             "JIMM_ADMINS": self.config.get("controller-admins", ""),
-            "JIMM_DNS_NAME": dnsname,
+            "JIMM_DNS_NAME": dns_name,
             "JIMM_LOG_LEVEL": self.config.get("log-level", ""),
             "JIMM_UUID": self.config.get("uuid", ""),
-            "JIMM_DASHBOARD_LOCATION": self.config.get(
-                "juju-dashboard-location", "https://jaas.ai/models"
-            ),
+            "JIMM_DASHBOARD_LOCATION": self.config.get("juju-dashboard-location", "https://jaas.ai/models"),
             "JIMM_LISTEN_ADDR": ":8080",
-            "OPENFGA_STORE": openfga_store_id,
-            "OPENFGA_AUTH_MODEL": openfga_auth_model_id,
-            "OPENFGA_HOST": openfga_address,
-            "OPENFGA_SCHEME": openfga_scheme,
-            "OPENFGA_TOKEN": openfga_token,
-            "OPENFGA_PORT": openfga_port,
+            "OPENFGA_STORE": self._state.openfga_store_id,
+            "OPENFGA_AUTH_MODEL": self._state.openfga_auth_model_id,
+            "OPENFGA_HOST": self._state.openfga_address,
+            "OPENFGA_SCHEME": self._state.openfga_scheme,
+            "OPENFGA_TOKEN": self._state.openfga_token,
+            "OPENFGA_PORT": self._state.openfga_port,
             "PRIVATE_KEY": self.config.get("private-key", ""),
             "PUBLIC_KEY": self.config.get("public-key", ""),
         }
-        if dsn:
-            config_values["JIMM_DSN"] = dsn
+        if self._state.dsn:
+            config_values["JIMM_DSN"] = self._state.dsn
 
         if container.exists(self._agent_filename):
             config_values["BAKERY_AGENT_FILE"] = self._agent_filename
 
         if container.exists(self._vault_secret_filename):
-            config_values["VAULT_ADDR"] = vault_address
+            config_values["VAULT_ADDR"] = self._state.vault_address
             config_values["VAULT_PATH"] = self._vault_path
             config_values["VAULT_SECRET_FILE"] = self._vault_secret_filename
             config_values["VAULT_AUTH_PATH"] = "/auth/approle/login"
@@ -358,7 +321,7 @@ class JimmOperatorCharm(CharmBase):
         if dashboard_relation and self.unit.is_leader():
             dashboard_relation.data[self.app].update(
                 {
-                    "controller-url": dnsname,
+                    "controller-url": dns_name,
                     "identity-provider-url": self.config.get("candid-url"),
                     "is-juju": str(False),
                 }
@@ -380,19 +343,21 @@ class JimmOperatorCharm(CharmBase):
         self._ready()
 
     def _on_dashboard_relation_joined(self, event: RelationJoinedEvent):
-        dnsname = "{}.{}-endpoints.{}.svc.cluster.local".format(
-            self.unit.name.replace("/", "-"), self.app.name, self.model.name
-        )
-        try:
-            if self.state.get(STATE_KEY_DNS_NAME):
-                dnsname = self.state.get(STATE_KEY_DNS_NAME)
-        except RelationNotReadyError:
+        if not self.unit.is_leader():
+            return
+
+        if not self._state.is_ready():
             event.defer()
+            logger.warning("State is not ready")
+            return
+
+        dns_name = self._get_dns_name(event)
+        if not dns_name:
             return
 
         event.relation.data[self.app].update(
             {
-                "controller-url": dnsname,
+                "controller-url": dns_name,
                 "identity-provider-url": self.config["candid-url"],
                 "is-juju": str(False),
             }
@@ -401,32 +366,35 @@ class JimmOperatorCharm(CharmBase):
     def _on_database_event(self, event: DatabaseEvent) -> None:
         """Database event handler."""
 
+        if not self._state.is_ready():
+            event.defer()
+            logger.warning("State is not ready")
+            return
+
         # get the first endpoint from a comma separate list
         ep = event.endpoints.split(",", 1)[0]
         # compose the db connection string
         uri = f"postgresql://{event.username}:{event.password}@{ep}/jimm"
 
         logger.info("received database uri: {}".format(uri))
+
         # record the connection string
-        try:
-            self.state.set(STATE_KEY_DSN, uri)
-        except RelationNotReadyError:
-            event.defer()
-            return
+        self._state.dsn = uri
 
         self._update_workload(event)
 
     def _on_database_relation_broken(self, event: DatabaseEvent) -> None:
         """Database relation broken handler."""
+        if not self._state.is_ready():
+            event.defer()
+            logger.warning("State is not ready")
+            return
 
         # when the database relation is broken, we unset the
         # connection string and schema-created from the application
         # bucket of the peer relation
-        try:
-            self.state.unset(STATE_KEY_DSN)
-        except RelationNotReadyError:
-            event.defer()
-            return
+        del self._state.dsn
+
         self._update_workload(event)
 
     def _ready(self):
@@ -530,32 +498,27 @@ class JimmOperatorCharm(CharmBase):
         try:
             process.wait_output()
         except pebble.ExecError as e:
-            logger.error(
-                "error running untaring the dashboard. error code {}".format(
-                    e.exit_code
-                )
-            )
+            logger.error("error running untaring the dashboard. error code {}".format(e.exit_code))
             for line in e.stderr.splitlines():
                 logger.error("    %s", line)
 
         self._push_to_workload(self._dashboard_hash_path, dashboard_hash, event)
 
     def _get_network_address(self, event):
-        return str(
-            self.model.get_binding(event.relation)
-            .network.egress_subnets[0]
-            .network_address
-        )
+        return str(self.model.get_binding(event.relation).network.egress_subnets[0].network_address)
 
     def _on_vault_relation_joined(self, event):
         event.relation.data[self.unit]["secret_backend"] = json.dumps(self._vault_path)
         event.relation.data[self.unit]["hostname"] = json.dumps(socket.gethostname())
-        event.relation.data[self.unit]["access_address"] = json.dumps(
-            self._get_network_address(event)
-        )
+        event.relation.data[self.unit]["access_address"] = json.dumps(self._get_network_address(event))
         event.relation.data[self.unit]["isolated"] = json.dumps(False)
 
     def _on_vault_relation_changed(self, event):
+        if not self._state.is_ready():
+            event.defer()
+            logger.warning("State is not ready")
+            return
+
         container = self.unit.get_container(WORKLOAD_CONTAINER)
 
         # if we can't connect to the container we should defer
@@ -583,11 +546,7 @@ class JimmOperatorCharm(CharmBase):
         secret_data = json.dumps(secret)
         self._push_to_workload(self._vault_secret_filename, secret_data, event)
 
-        try:
-            self.state.set(STATE_KEY_VAULT_ADDRESS, addr)
-        except RelationNotReadyError:
-            event.defer()
-            return
+        self._state.vault_address = addr
 
     def _path_exists_in_workload(self, path: str):
         """Returns true if the specified path exists in the
@@ -610,224 +569,228 @@ class JimmOperatorCharm(CharmBase):
             event.defer()
 
     def _hash(self, filename):
-        BUF_SIZE = 65536
+        buffer_size = 65536
         md5 = hashlib.md5()
 
         with open(filename, "rb") as f:
             while True:
-                data = f.read(BUF_SIZE)
+                data = f.read(buffer_size)
                 if not data:
                     break
                 md5.update(data)
             return md5.hexdigest()
 
     def _on_openfga_store_created(self, event: OpenFGAStoreCreateEvent):
+        if not self.unit.is_leader():
+            return
+
+        if not self._state.is_ready():
+            event.defer()
+            logger.warning("State is not ready")
+            return
+
         if not event.store_id:
             return
 
-        if self.unit.is_leader():
-            try:
-                self.state.set(OPENFGA_STORE_ID, event.store_id)
-                self.state.set(OPENFGA_TOKEN, event.token)
-                self.state.set(OPENFGA_ADDRESS, event.address)
-                self.state.set(OPENFGA_PORT, event.port)
-                self.state.set(OPENFGA_SCHEME, event.scheme)
-            except RelationNotReadyError:
-                event.defer()
-                return
+        self._state.openfga_store_id = event.store_id
+        self._state.openfga_token = event.token
+        self._state.openfga_address = event.address
+        self._state.openfga_port = event.port
+        self._state.openfga_scheme = event.scheme
 
         self._update_workload(event)
+
+    def _get_dns_name(self, event):
+        if not self._state.is_ready():
+            event.defer()
+            logger.warning("State is not ready")
+            return
+
+        default_dns_name = "{}.{}-endpoints.{}.svc.cluster.local".format(
+            self.unit.name.replace("/", "-"),
+            self.app.name,
+            self.model.name,
+        )
+        dns_name = self.config.get("dns-name", default_dns_name)
+        if self._state.dns_name:
+            dns_name = self._state.dns_name
+
+        return dns_name
 
     def _on_certificates_relation_joined(self, event: RelationJoinedEvent) -> None:
         if not self.unit.is_leader():
             return
 
-        dnsname = "{}.{}-endpoints.{}.svc.cluster.local".format(
-            self.unit.name.replace("/", "-"),
-            self.app.name,
-            self.model.name,
-        )
-        try:
-            if self.state.get(STATE_KEY_DNS_NAME):
-                dnsname = self.state.get(STATE_KEY_DNS_NAME)
-
-            private_key = self.state.get(STATE_KEY_PRIVATE_KEY)
-            csr = generate_csr(
-                private_key=private_key.encode(),
-                subject=dnsname,
-            )
-
-            self.state.set(STATE_KEY_CSR, csr.decode())
-
-            self.certificates.request_certificate_creation(
-                certificate_signing_request=csr
-            )
-        except RelationNotReadyError:
+        if not self._state.is_ready():
             event.defer()
+            logger.warning("State is not ready")
             return
 
-    def _on_certificate_available(self, event: CertificateAvailableEvent) -> None:
-        if self.unit.is_leader():
-            try:
-                self.state.set(STATE_KEY_CERTIFICATE, event.certificate)
-                self.state.set(STATE_KEY_CA, event.ca)
-                self.state.set(STATE_KEY_CHAIN, event.chain)
+        dns_name = self._get_dns_name(event)
+        if not dns_name:
+            return
 
-            except RelationNotReadyError:
-                event.defer()
-                return
+        csr = generate_csr(
+            private_key=self._state.private_key.encode(),
+            subject=dns_name,
+        )
+
+        self._state.csr = csr.decode()
+
+        self.certificates.request_certificate_creation(certificate_signing_request=csr)
+
+    def _on_certificate_available(self, event: CertificateAvailableEvent) -> None:
+        if not self.unit.is_leader():
+            return
+
+        if not self._state.is_ready():
+            event.defer()
+            logger.warning("State is not ready")
+            return
+
+        self._state.certificate = event.certificate
+        self._state.ca = event.ca
+        self._state.chain = event.chain
 
         self._update_workload(event)
 
     def _on_certificate_expiring(self, event: CertificateExpiringEvent) -> None:
-        if self.unit.is_leader():
-            old_csr = ""
-            private_key = ""
-            dnsname = "{}.{}-endpoints.{}.svc.cluster.local".format(
-                self.unit.name.replace("/", "-"),
-                self.app.name,
-                self.model.name,
-            )
-            try:
-                old_csr = self.state.get(STATE_KEY_CSR)
-                private_key = self.state.get(STATE_KEY_PRIVATE_KEY)
-                if self.state.get(STATE_KEY_DNS_NAME):
-                    dnsname = self.state.get(STATE_KEY_DNS_NAME)
+        if not self.unit.is_leader():
+            return
 
-                new_csr = generate_csr(
-                    private_key=private_key.encode(),
-                    subject=dnsname,
-                )
-                self.certificates.request_certificate_renewal(
-                    old_certificate_signing_request=old_csr,
-                    new_certificate_signing_request=new_csr,
-                )
-                self.state.set(STATE_KEY_CSR, new_csr.decode())
-            except RelationNotReadyError:
-                event.defer()
-                return
+        if not self._state.is_ready():
+            event.defer()
+            logger.warning("State is not ready")
+            return
+
+        old_csr = self._state.csr
+        private_key = self._state.private_key
+        dns_name = self._get_dns_name(event)
+        if not dns_name:
+            return
+
+        new_csr = generate_csr(
+            private_key=private_key.encode(),
+            subject=self.dns_name,
+        )
+        self.certificates.request_certificate_renewal(
+            old_certificate_signing_request=old_csr,
+            new_certificate_signing_request=new_csr,
+        )
+        self._state.csr = new_csr.decode()
 
         self._update_workload()
 
     def _on_certificate_revoked(self, event: CertificateRevokedEvent) -> None:
-        if self.unit.is_leader():
-            old_csr = ""
-            private_key = ""
-            dnsname = "{}.{}-endpoints.{}.svc.cluster.local".format(
-                self.unit.name.replace("/", "-"),
-                self.app.name,
-                self.model.name,
-            )
-            try:
-                old_csr = self.state.get(STATE_KEY_CSR)
-                private_key = self.state.get(STATE_KEY_PRIVATE_KEY)
-                if self.state.get(STATE_KEY_DNS_NAME):
-                    dnsname = self.state.get(STATE_KEY_DNS_NAME)
-            except RelationNotReadyError:
-                event.defer()
-                return
+        if not self.unit.is_leader():
+            return
 
-            new_csr = generate_csr(
-                private_key=private_key.encode(),
-                subject=dnsname,
-            )
-            self.certificates.request_certificate_renewal(
-                old_certificate_signing_request=old_csr,
-                new_certificate_signing_request=new_csr,
-            )
-            try:
-                self.state.set(STATE_KEY_CSR, new_csr.decode())
-                self.state.unset(STATE_KEY_CERTIFICATE, STATE_KEY_CA, STATE_KEY_CHAIN)
-            except RelationNotReadyError:
-                event.defer()
-                return
+        if not self._state.is_ready():
+            event.defer()
+            logger.warning("State is not ready")
+            return
+
+        old_csr = self._state.csr
+        private_key = self._state.private_key
+        dns_name = self._get_dns_name(event)
+        if not dns_name:
+            return
+
+        new_csr = generate_csr(
+            private_key=private_key.encode(),
+            subject=dns_name,
+        )
+        self.certificates.request_certificate_renewal(
+            old_certificate_signing_request=old_csr,
+            new_certificate_signing_request=new_csr,
+        )
+
+        self._state.csr = new_csr.decode()
+        del self._state.certificate
+        del self._state.ca
+        del self._state.chain
 
         self.unit.status = WaitingStatus("Waiting for new certificate")
         self._update_workload()
 
     def _on_ingress_ready(self, event: IngressPerAppReadyEvent):
-        if self.unit.is_leader():
-            try:
-                self.state.set(STATE_KEY_DNS_NAME, event.url)
-            except RelationNotReadyError:
-                event.defer()
-                return
+        if not self.unit.is_leader():
+            return
+
+        if not self._state.is_ready():
+            event.defer()
+            logger.warning("State is not ready")
+            return
+
+        self._state.dns_name = event.url
 
         self._update_workload(event)
 
     def _on_ingress_revoked(self, event: IngressPerAppRevokedEvent):
-        if self.unit.is_leader():
-            try:
-                self.state.unset(STATE_KEY_DNS_NAME)
-            except RelationNotReadyError:
-                event.defer()
-                return
+        if not self.unit.is_leader():
+            return
+
+        if not self._state.is_ready():
+            event.defer()
+            logger.warning("State is not ready")
+            return
+
+        del self._state.dns_name
 
         self._update_workload(event)
 
     def _on_create_authorization_model_action(self, event: ActionEvent):
+        if not self._state.is_ready():
+            event.defer()
+            logger.warning("State is not ready")
+            return
+
         model = event.params["model"]
         if not model:
             event.fail("authorization model not specified")
             return
-        modelJSON = json.loads(model)
+        model_json = json.loads(model)
 
-        try:
-            openfga_store_id = self.state.get(OPENFGA_STORE_ID)
-            openfga_token = self.state.get(OPENFGA_TOKEN)
-            openfga_address = self.state.get(OPENFGA_ADDRESS)
-            openfga_port = self.state.get(OPENFGA_PORT)
-            openfga_scheme = self.state.get(OPENFGA_SCHEME)
+        openfga_store_id = self._state.openfga_store_id
+        openfga_token = self._state.openfga_token
+        openfga_address = self._state.openfga_address
+        openfga_port = self._state.openfga_port
+        openfga_scheme = self._state.openfga_scheme
 
-            if (
-                not openfga_address
-                or not openfga_port
-                or not openfga_scheme
-                or not openfga_token
-                or not openfga_store_id
-            ):
-                event.fail("missing openfga relation")
-                return
-
-            url = "{}://{}:{}/stores/{}/authorization-models".format(
-                openfga_scheme,
-                openfga_address,
-                openfga_port,
-                openfga_store_id,
-            )
-            headers = {"Content-Type": "application/json"}
-            if openfga_token:
-                headers["Authorization"] = "Bearer {}".format(openfga_token)
-
-            # do the post request
-            logger.info("posting to {}, with headers {}".format(url, headers))
-            response = requests.post(
-                url,
-                json=modelJSON,
-                headers=headers,
-                verify=False,
-            )
-            if not response.ok:
-                event.fail(
-                    "failed to create the authorization model: {}".format(
-                        response.text
-                    ),
-                )
-                return
-            data = response.json()
-            authorization_model_id = data.get("authorization_model_id", "")
-            if not authorization_model_id:
-                event.fail(
-                    "response does not contain authorization model id: {}".format(
-                        response.text
-                    )
-                )
-                return
-            self.state.set(OPENFGA_AUTH_MODEL_ID, authorization_model_id)
-            self._update_workload(event)
-        except RelationNotReadyError:
-            event.defer()
+        if not openfga_address or not openfga_port or not openfga_scheme or not openfga_token or not openfga_store_id:
+            event.fail("missing openfga relation")
             return
+
+        url = "{}://{}:{}/stores/{}/authorization-models".format(
+            openfga_scheme,
+            openfga_address,
+            openfga_port,
+            openfga_store_id,
+        )
+        headers = {"Content-Type": "application/json"}
+        if openfga_token:
+            headers["Authorization"] = "Bearer {}".format(openfga_token)
+
+        # do the post request
+        logger.info("posting to {}, with headers {}".format(url, headers))
+        response = requests.post(
+            url,
+            json=model_json,
+            headers=headers,
+            verify=False,
+        )
+        if not response.ok:
+            event.fail(
+                "failed to create the authorization model: {}".format(response.text),
+            )
+            return
+        data = response.json()
+        authorization_model_id = data.get("authorization_model_id", "")
+        if not authorization_model_id:
+            event.fail("response does not contain authorization model id: {}".format(response.text))
+            return
+        self._state.openfga_auth_model_id = authorization_model_id
+        self._update_workload(event)
 
 
 def _json_data(event, key):

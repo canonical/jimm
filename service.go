@@ -292,6 +292,8 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	if s.jimm.CredentialStore != nil {
 		s.jimm.JWKService = jimmjwx.NewJWKSService(s.jimm.CredentialStore)
 		s.jimm.JWTService = jimmjwx.NewJWTService(p.PublicDNSName, s.jimm.CredentialStore, false)
+	} else {
+		zapctx.Warn(ctx, "not starting JWKS service - vault not available")
 	}
 
 	mountHandler := func(path string, h jimmhttp.JIMMHttpHandler) {

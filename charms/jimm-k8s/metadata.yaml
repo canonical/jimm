@@ -36,6 +36,8 @@ requires:
   ingress:
     interface: ingress
     limit: 1
+  nginx-route:
+    interface: nginx-route
   database:
     interface: postgresql_client
     limit: 1
@@ -61,6 +63,7 @@ resources:
   jimm-image:
     type: oci-image
     description: OCI image for JIMM.
+    upstream-source: jimm:latest
   promtail-bin:
     type: file
     description: Promtail binary for logging
