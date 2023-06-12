@@ -154,17 +154,10 @@ class JimmOperatorCharm(CharmBase):
         self.framework.observe(self.on.vault_relation_changed, self._on_vault_relation_changed)
 
         # Grafana relation
-        self._grafana_dashboards = GrafanaDashboardProvider(
-            self,
-            relation_name="grafana-dashboard"
-        )
+        self._grafana_dashboards = GrafanaDashboardProvider(self, relation_name="grafana-dashboard")
 
         # Loki relation
-        self._log_proxy = LogProxyConsumer(
-            self,
-            log_files=[LOG_FILE],
-            relation_name="log-proxy"
-        )
+        self._log_proxy = LogProxyConsumer(self, log_files=[LOG_FILE], relation_name="log-proxy")
 
         # Prometheus relation
         self._prometheus_scraping = MetricsEndpointProvider(
