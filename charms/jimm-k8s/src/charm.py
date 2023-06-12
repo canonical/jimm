@@ -72,6 +72,7 @@ LOG_FILE = "/var/log/jimm"
 # This likely will just be JIMM's port.
 PROMETHEUS_PORT = 8080
 
+
 class JimmOperatorCharm(CharmBase):
     """JIMM Operator Charm."""
 
@@ -154,14 +155,14 @@ class JimmOperatorCharm(CharmBase):
 
         # Grafana relation
         self._grafana_dashboards = GrafanaDashboardProvider(
-            self, 
+            self,
             relation_name="grafana-dashboard"
         )
 
         # Loki relation
         self._log_proxy = LogProxyConsumer(
-            self, 
-            log_files=[LOG_FILE], 
+            self,
+            log_files=[LOG_FILE],
             relation_name="log-proxy"
         )
 

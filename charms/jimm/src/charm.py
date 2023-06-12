@@ -15,10 +15,6 @@ import urllib
 
 import hvac
 from charmhelpers.contrib.charmsupport.nrpe import NRPE
-from charms.openfga_k8s.v0.openfga import (
-    OpenFGARequires,
-    OpenFGAStoreCreateEvent,
-)
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from charms.openfga_k8s.v0.openfga import OpenFGARequires, OpenFGAStoreCreateEvent
 from jinja2 import Environment, FileSystemLoader
