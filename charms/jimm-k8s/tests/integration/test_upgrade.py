@@ -145,9 +145,7 @@ async def test_upgrade_running_application(ops_test: OpsTest):
     assert ops_test.model.applications[APP_NAME].status == "active"
 
     logger.info("checking status of the running unit")
-    upgraded_jimm_unit = await utils.get_unit_by_name(
-        APP_NAME, "0", ops_test.model.units
-    )
+    upgraded_jimm_unit = await utils.get_unit_by_name(APP_NAME, "0", ops_test.model.units)
 
     health = await upgraded_jimm_unit.run("curl -i http://localhost:8080/debug/status")
     await health.wait()
