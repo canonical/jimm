@@ -31,6 +31,10 @@ peers:
 provides:
   dashboard:
     interface: juju-dashboard
+  grafana-dashboard:
+    interface: grafana_dashboard
+  metrics-endpoint:
+    interface: prometheus_scrape
 
 requires:
   ingress:
@@ -50,6 +54,10 @@ requires:
   vault:
     interface: vault-kv
     optional: true
+  log-proxy:
+    interface: loki_push_api
+    optional: true
+    limit: 1
 
 containers:
   jimm:
