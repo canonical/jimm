@@ -44,7 +44,6 @@ from charms.traefik_k8s.v1.ingress import (
 )
 from ops import pebble
 from ops.charm import ActionEvent, CharmBase, RelationJoinedEvent
-from ops.framework import StoredState
 from ops.main import main
 from ops.model import (
     ActiveStatus,
@@ -53,6 +52,7 @@ from ops.model import (
     ModelError,
     WaitingStatus,
 )
+
 from state import State
 
 logger = logging.getLogger(__name__)
@@ -65,12 +65,13 @@ REQUIRED_SETTINGS = [
     "CANDID_URL",
 ]
 
+
 class JimmOperatorCharm(CharmBase):
     """JIMM Operator Charm."""
 
     def __init__(self, *args):
         super().__init__(*args)
-        
+
         self._state = State(self.app, lambda: self.model.get_relation("jimm"))
 
         self.framework.observe(self.on.jimm_pebble_ready, self._on_jimm_pebble_ready)
@@ -106,7 +107,7 @@ class JimmOperatorCharm(CharmBase):
 
         # Traefik ingress relation
         self.ingress = IngressPerAppRequirer(
-            self, 
+            self,
             relation_name="ingress",
             port=8080,
         )
@@ -118,10 +119,7 @@ class JimmOperatorCharm(CharmBase):
 
         # Nginx ingress relation
         require_nginx_route(
-            charm=self,
-            service_hostname=self.config.get("dns-name", ""),
-            service_name=self.app.name,
-            service_port=8080
+            charm=self, service_hostname=self.config.get("dns-name", ""), service_name=self.app.name, service_port=8080
         )
 
         # Database relation
@@ -130,16 +128,12 @@ class JimmOperatorCharm(CharmBase):
             relation_name="database",
             database_name="jimm",
         )
-        self.framework.observe(
-            self.database.on.database_created, self._on_database_event
-        )
+        self.framework.observe(self.database.on.database_created, self._on_database_event)
         self.framework.observe(
             self.database.on.endpoints_changed,
             self._on_database_event,
         )
-        self.framework.observe(
-            self.on.database_relation_broken, self._on_database_relation_broken
-        )
+        self.framework.observe(self.on.database_relation_broken, self._on_database_relation_broken)
 
         # OpenFGA relation
         self.openfga = OpenFGARequires(self, "jimm")
@@ -149,12 +143,8 @@ class JimmOperatorCharm(CharmBase):
         )
 
         # Vault relation
-        self.framework.observe(
-            self.on.vault_relation_joined, self._on_vault_relation_joined
-        )
-        self.framework.observe(
-            self.on.vault_relation_changed, self._on_vault_relation_changed
-        )
+        self.framework.observe(self.on.vault_relation_joined, self._on_vault_relation_joined)
+        self.framework.observe(self.on.vault_relation_changed, self._on_vault_relation_changed)
 
         # create-authorization-model action
         self.framework.observe(
@@ -181,7 +171,7 @@ class JimmOperatorCharm(CharmBase):
             event.defer()
             logger.warning("State is not ready")
             return
-        
+
         if self.unit.is_leader() and not self._state.private_key:
             private_key: bytes = generate_private_key(key_size=4096)
             self._state.private_key = private_key.decode()
@@ -214,12 +204,10 @@ class JimmOperatorCharm(CharmBase):
             print(self._state.is_ready())
             logger.warning("State is not ready")
             return
-        
+
         container = self.unit.get_container(WORKLOAD_CONTAINER)
         if not container.can_connect():
-            logger.info(
-                "cannot connect to the workload container - deferring the event"
-            )
+            logger.info("cannot connect to the workload container - deferring the event")
             event.defer()
             return
 
@@ -238,11 +226,9 @@ class JimmOperatorCharm(CharmBase):
             "JIMM_DNS_NAME": dns_name,
             "JIMM_LOG_LEVEL": self.config.get("log-level", ""),
             "JIMM_UUID": self.config.get("uuid", ""),
-            "JIMM_DASHBOARD_LOCATION": self.config.get(
-                "juju-dashboard-location", "https://jaas.ai/models"
-            ),
+            "JIMM_DASHBOARD_LOCATION": self.config.get("juju-dashboard-location", "https://jaas.ai/models"),
             "JIMM_LISTEN_ADDR": ":8080",
-            "OPENFGA_STORE":  self._state.openfga_store_id,
+            "OPENFGA_STORE": self._state.openfga_store_id,
             "OPENFGA_AUTH_MODEL": self._state.openfga_auth_model_id,
             "OPENFGA_HOST": self._state.openfga_address,
             "OPENFGA_SCHEME": self._state.openfga_scheme,
@@ -271,9 +257,7 @@ class JimmOperatorCharm(CharmBase):
             config_values["JIMM_DASHBOARD_LOCATION"] = self._dashboard_path
 
         # remove empty configuration values
-        config_values = {
-            key: value for key, value in config_values.items() if value
-        }
+        config_values = {key: value for key, value in config_values.items() if value}
 
         pebble_layer = {
             "summary": "jimm layer",
@@ -334,12 +318,12 @@ class JimmOperatorCharm(CharmBase):
     def _on_dashboard_relation_joined(self, event: RelationJoinedEvent):
         if not self.unit.is_leader():
             return
-      
+
         if not self._state.is_ready():
             event.defer()
             logger.warning("State is not ready")
             return
-       
+
         dns_name = self._get_dns_name(event)
         if not dns_name:
             return
@@ -366,7 +350,7 @@ class JimmOperatorCharm(CharmBase):
         uri = f"postgresql://{event.username}:{event.password}@{ep}/jimm"
 
         logger.info("received database uri: {}".format(uri))
-        
+
         # record the connection string
         self._state.dsn = uri
 
@@ -378,7 +362,7 @@ class JimmOperatorCharm(CharmBase):
             event.defer()
             logger.warning("State is not ready")
             return
-        
+
         # when the database relation is broken, we unset the
         # connection string and schema-created from the application
         # bucket of the peer relation
@@ -487,33 +471,19 @@ class JimmOperatorCharm(CharmBase):
         try:
             process.wait_output()
         except pebble.ExecError as e:
-            logger.error(
-                "error running untaring the dashboard. error code {}".format(
-                    e.exit_code
-                )
-            )
+            logger.error("error running untaring the dashboard. error code {}".format(e.exit_code))
             for line in e.stderr.splitlines():
                 logger.error("    %s", line)
 
         self._push_to_workload(self._dashboard_hash_path, dashboard_hash, event)
 
     def _get_network_address(self, event):
-        return str(
-            self.model.get_binding(event.relation)
-            .network.egress_subnets[0]
-            .network_address
-        )
+        return str(self.model.get_binding(event.relation).network.egress_subnets[0].network_address)
 
     def _on_vault_relation_joined(self, event):
-        event.relation.data[self.unit]["secret_backend"] = json.dumps(
-            self._vault_path
-        )
-        event.relation.data[self.unit]["hostname"] = json.dumps(
-            socket.gethostname()
-        )
-        event.relation.data[self.unit]["access_address"] = json.dumps(
-            self._get_network_address(event)
-        )
+        event.relation.data[self.unit]["secret_backend"] = json.dumps(self._vault_path)
+        event.relation.data[self.unit]["hostname"] = json.dumps(socket.gethostname())
+        event.relation.data[self.unit]["access_address"] = json.dumps(self._get_network_address(event))
         event.relation.data[self.unit]["isolated"] = json.dumps(False)
 
     def _on_vault_relation_changed(self, event):
@@ -523,7 +493,7 @@ class JimmOperatorCharm(CharmBase):
             return
 
         container = self.unit.get_container(WORKLOAD_CONTAINER)
-        
+
         # if we can't connect to the container we should defer
         # this event.
         if not container.can_connect():
@@ -572,12 +542,12 @@ class JimmOperatorCharm(CharmBase):
             event.defer()
 
     def _hash(self, filename):
-        BUF_SIZE = 65536
+        buffer_size = 65536
         md5 = hashlib.md5()
 
         with open(filename, "rb") as f:
             while True:
-                data = f.read(BUF_SIZE)
+                data = f.read(buffer_size)
                 if not data:
                     break
                 md5.update(data)
@@ -586,7 +556,7 @@ class JimmOperatorCharm(CharmBase):
     def _on_openfga_store_created(self, event: OpenFGAStoreCreateEvent):
         if not self.unit.is_leader():
             return
-       
+
         if not self._state.is_ready():
             event.defer()
             logger.warning("State is not ready")
@@ -596,10 +566,10 @@ class JimmOperatorCharm(CharmBase):
             return
 
         self._state.openfga_store_id = event.store_id
-        self._state.openfga_token =  event.token
-        self._state.openfga_address =  event.address
+        self._state.openfga_token = event.token
+        self._state.openfga_address = event.address
         self._state.openfga_port = event.port
-        self._state.openfga_scheme =  event.scheme
+        self._state.openfga_scheme = event.scheme
 
         self._update_workload(event)
 
@@ -616,19 +586,19 @@ class JimmOperatorCharm(CharmBase):
         )
         dns_name = self.config.get("dns-name", default_dns_name)
         if self._state.dns_name:
-            dns_name = self._state.dns_name            
-        
+            dns_name = self._state.dns_name
+
         return dns_name
 
     def _on_certificates_relation_joined(self, event: RelationJoinedEvent) -> None:
         if not self.unit.is_leader():
             return
-        
+
         if not self._state.is_ready():
             event.defer()
             logger.warning("State is not ready")
             return
- 
+
         dns_name = self._get_dns_name(event)
         if not dns_name:
             return
@@ -640,15 +610,12 @@ class JimmOperatorCharm(CharmBase):
 
         self._state.csr = csr.decode()
 
-        self.certificates.request_certificate_creation(
-            certificate_signing_request=csr
-        )
-
+        self.certificates.request_certificate_creation(certificate_signing_request=csr)
 
     def _on_certificate_available(self, event: CertificateAvailableEvent) -> None:
         if not self.unit.is_leader():
             return
-        
+
         if not self._state.is_ready():
             event.defer()
             logger.warning("State is not ready")
@@ -663,7 +630,7 @@ class JimmOperatorCharm(CharmBase):
     def _on_certificate_expiring(self, event: CertificateExpiringEvent) -> None:
         if not self.unit.is_leader():
             return
-       
+
         if not self._state.is_ready():
             event.defer()
             logger.warning("State is not ready")
@@ -673,8 +640,8 @@ class JimmOperatorCharm(CharmBase):
         private_key = self._state.private_key
         dns_name = self._get_dns_name(event)
         if not dns_name:
-            return 
-        
+            return
+
         new_csr = generate_csr(
             private_key=private_key.encode(),
             subject=self.dns_name,
@@ -690,7 +657,7 @@ class JimmOperatorCharm(CharmBase):
     def _on_certificate_revoked(self, event: CertificateRevokedEvent) -> None:
         if not self.unit.is_leader():
             return
-        
+
         if not self._state.is_ready():
             event.defer()
             logger.warning("State is not ready")
@@ -715,19 +682,19 @@ class JimmOperatorCharm(CharmBase):
         del self._state.certificate
         del self._state.ca
         del self._state.chain
-    
+
         self.unit.status = WaitingStatus("Waiting for new certificate")
         self._update_workload()
 
     def _on_ingress_ready(self, event: IngressPerAppReadyEvent):
         if not self.unit.is_leader():
             return
-        
+
         if not self._state.is_ready():
             event.defer()
             logger.warning("State is not ready")
             return
-        
+
         self._state.dns_name = event.url
 
         self._update_workload(event)
@@ -735,12 +702,12 @@ class JimmOperatorCharm(CharmBase):
     def _on_ingress_revoked(self, event: IngressPerAppRevokedEvent):
         if not self.unit.is_leader():
             return
-        
+
         if not self._state.is_ready():
             event.defer()
             logger.warning("State is not ready")
             return
-        
+
         del self._state.dns_name
 
         self._update_workload(event)
@@ -750,12 +717,12 @@ class JimmOperatorCharm(CharmBase):
             event.defer()
             logger.warning("State is not ready")
             return
-        
+
         model = event.params["model"]
         if not model:
             event.fail("authorization model not specified")
             return
-        modelJSON = json.loads(model)
+        model_json = json.loads(model)
 
         openfga_store_id = self._state.openfga_store_id
         openfga_token = self._state.openfga_token
@@ -763,13 +730,7 @@ class JimmOperatorCharm(CharmBase):
         openfga_port = self._state.openfga_port
         openfga_scheme = self._state.openfga_scheme
 
-        if (
-            not openfga_address
-            or not openfga_port
-            or not openfga_scheme
-            or not openfga_token
-            or not openfga_store_id
-        ):
+        if not openfga_address or not openfga_port or not openfga_scheme or not openfga_token or not openfga_store_id:
             event.fail("missing openfga relation")
             return
 
@@ -787,29 +748,22 @@ class JimmOperatorCharm(CharmBase):
         logger.info("posting to {}, with headers {}".format(url, headers))
         response = requests.post(
             url,
-            json=modelJSON,
+            json=model_json,
             headers=headers,
             verify=False,
         )
         if not response.ok:
             event.fail(
-                "failed to create the authorization model: {}".format(
-                    response.text
-                ),
+                "failed to create the authorization model: {}".format(response.text),
             )
             return
         data = response.json()
         authorization_model_id = data.get("authorization_model_id", "")
         if not authorization_model_id:
-            event.fail(
-                "response does not contain authorization model id: {}".format(
-                    response.text
-                )
-            )
+            event.fail("response does not contain authorization model id: {}".format(response.text))
             return
         self._state.openfga_auth_model_id = authorization_model_id
         self._update_workload(event)
-
 
 
 def _json_data(event, key):

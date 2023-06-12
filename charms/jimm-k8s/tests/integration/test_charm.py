@@ -20,18 +20,21 @@ APP_NAME = "juju-jimm-k8s"
 
 
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test: OpsTest):
+async def test_build_and_deploy(ops_test: OpsTest, local_charm):
     """Build the charm-under-test and deploy it together with related charms.
 
     Assert on the unit status before any relations/configurations take place.
     """
-    # Build and deploy charm from local source folder
-    charm = await ops_test.build_charm(".")
+    # (Optionally build) and deploy charm from local source folder
+    if local_charm:
+        charm = Path(utils.get_local_charm()).resolve()
+    else:
+        charm = await ops_test.build_charm(".")
     resources = {"jimm-image": "localhost:32000/jimm:latest"}
 
     # Deploy the charm and wait for active/idle status
     logger.debug("deploying charms")
-    jimm_app = await ops_test.model.deploy(
+    await ops_test.model.deploy(
         charm,
         resources=resources,
         application_name=APP_NAME,
@@ -43,23 +46,19 @@ async def test_build_and_deploy(ops_test: OpsTest):
             "private-key": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
         },
     )
-    traefik_app = await ops_test.model.deploy(
+    await ops_test.model.deploy(
         "traefik-k8s",
         application_name="traefik",
-        config= {
+        config={
             "external_hostname": "traefik.test.canonical.com",
         },
     )
     await asyncio.gather(
-        ops_test.model.deploy(
-            "postgresql-k8s",
-            application_name="postgresql",
-            channel="edge",
-        ),
+        ops_test.model.deploy("postgresql-k8s", application_name="postgresql", channel="14/stable", trust=True),
         ops_test.model.deploy(
             "openfga-k8s",
             application_name="openfga",
-            channel="edge",
+            channel="latest/edge",
         ),
     )
 
@@ -72,10 +71,10 @@ async def test_build_and_deploy(ops_test: OpsTest):
     )
 
     logger.info("adding traefik relation")
-    await ops_test.model.relate("{}:ingress".format(APP_NAME), "traefik")
+    await ops_test.model.integrate("{}:ingress".format(APP_NAME), "traefik")
 
     logger.info("adding openfga postgresql relation")
-    await ops_test.model.relate("openfga:database", "postgresql:database")
+    await ops_test.model.integrate("openfga:database", "postgresql:database")
 
     logger.info("waiting for openfga")
     await ops_test.model.wait_for_idle(
@@ -88,18 +87,16 @@ async def test_build_and_deploy(ops_test: OpsTest):
     for i in range(10):
         action: Action = await openfga_unit.run_action("schema-upgrade")
         result = await action.wait()
-        logger.info(
-            "attempt {} -> action result {} {}".format(i, result.status, result.results)
-        )
+        logger.info("attempt {} -> action result {} {}".format(i, result.status, result.results))
         if result.results == {"result": "done", "return-code": 0}:
             break
         time.sleep(2)
 
     logger.info("adding openfga relation")
-    await ops_test.model.relate(APP_NAME, "openfga")
+    await ops_test.model.integrate(APP_NAME, "openfga")
 
     logger.info("adding postgresql relation")
-    await ops_test.model.relate(APP_NAME, "postgresql:database")
+    await ops_test.model.integrate(APP_NAME, "postgresql:database")
 
     logger.info("waiting for jimm")
     await ops_test.model.wait_for_idle(
@@ -119,11 +116,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
                 model=model_data,
             )
             result = await action.wait()
-            logger.info(
-                "attempt {} -> action result {} {}".format(
-                    i, result.status, result.results
-                )
-            )
+            logger.info("attempt {} -> action result {} {}".format(i, result.status, result.results))
             if result.results == {"return-code": 0}:
                 break
             time.sleep(2)

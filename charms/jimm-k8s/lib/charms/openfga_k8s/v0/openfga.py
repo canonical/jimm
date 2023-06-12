@@ -71,7 +71,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 1
+LIBPATCH = 2
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +83,7 @@ class OpenFGAEvent(RelationEvent):
 
     @property
     def store_id(self):
-        return self.relation.data[self.relation.app].get("store-id")
+        return self.relation.data[self.relation.app].get("store_id")
 
     @property
     def token(self):
@@ -143,7 +143,7 @@ class OpenFGARequires(Object):
         """Handle the relation-joined event."""
         # `self.unit` isn't available here, so use `self.model.unit`.
         if self.model.unit.is_leader():
-            event.relation.data[self.model.app]["store-name"] = self.store_name
+            event.relation.data[self.model.app]["store_name"] = self.store_name
 
     def _on_relation_changed(self, event: RelationChangedEvent):
         """Handle the relation-changed event."""
