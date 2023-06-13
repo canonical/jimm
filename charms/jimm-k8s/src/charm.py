@@ -65,6 +65,7 @@ REQUIRED_SETTINGS = [
     "CANDID_URL",
 ]
 
+DATABASE_NAME = "jimm"
 
 class JimmOperatorCharm(CharmBase):
     """JIMM Operator Charm."""
@@ -126,7 +127,7 @@ class JimmOperatorCharm(CharmBase):
         self.database = DatabaseRequires(
             self,
             relation_name="database",
-            database_name="jimm",
+            database_name=DATABASE_NAME,
         )
         self.framework.observe(self.database.on.database_created, self._on_database_event)
         self.framework.observe(
@@ -347,7 +348,7 @@ class JimmOperatorCharm(CharmBase):
         # get the first endpoint from a comma separate list
         ep = event.endpoints.split(",", 1)[0]
         # compose the db connection string
-        uri = f"postgresql://{event.username}:{event.password}@{ep}/jimm"
+        uri = f"postgresql://{event.username}:{event.password}@{ep}/{DATABASE_NAME}"
 
         logger.info("received database uri: {}".format(uri))
 
