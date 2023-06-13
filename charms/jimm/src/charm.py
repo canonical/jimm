@@ -30,6 +30,7 @@ from systemd import SystemdCharm
 
 logger = logging.getLogger(__name__)
 
+OPENFGA_STORE_NAME = "jimm"
 
 class JimmCharm(SystemdCharm):
     """Charm for the JIMM service."""
@@ -59,7 +60,7 @@ class JimmCharm(SystemdCharm):
         self._rsyslog_conf_path = "/etc/rsyslog.d/10-jimm.conf"
         self._logrotate_conf_path = "/etc/logrotate.d/jimm"
 
-        self.openfga = OpenFGARequires(self, "jimm")
+        self.openfga = OpenFGARequires(self, OPENFGA_STORE_NAME)
         self.framework.observe(
             self.openfga.on.openfga_store_created,
             self._on_openfga_store_created,
