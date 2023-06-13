@@ -332,9 +332,9 @@ class TestCharm(unittest.TestCase):
             )
         )
 
-    def test_db_relation_changed(self):
+    def test_database_relation_changed(self):
         db_file = os.path.join(self.harness.charm.charm_dir, "juju-jimm-db.env")
-        id = self.harness.add_relation("db", "postgresql")
+        id = self.harness.add_relation("database", "postgresql")
         self.harness.add_relation_unit(id, "postgresql/0")
         self.harness.update_relation_data(id, "postgresql/0", {"master": "host=localhost port=5432"})
         with open(db_file) as f:
@@ -347,11 +347,11 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(len(lines), 1)
         self.assertEqual(lines[0].strip(), "JIMM_DSN=pgx:host=localhost port=5432")
 
-    def test_db_relation_changed_ready(self):
+    def test_database_relation_changed_ready(self):
         db_file = os.path.join(self.harness.charm.charm_dir, "juju-jimm-db.env")
         with open(self.harness.charm._env_filename(), "wt") as f:
             f.write("test")
-        id = self.harness.add_relation("db", "postgresql")
+        id = self.harness.add_relation("database", "postgresql")
         self.harness.add_relation_unit(id, "postgresql/0")
         self.harness.update_relation_data(id, "postgresql/0", {"master": "host=localhost port=5432"})
         with open(db_file) as f:
@@ -455,7 +455,7 @@ class TestCharm(unittest.TestCase):
             self.harness.charm.unit.status,
             BlockedStatus("waiting for database"),
         )
-        id = self.harness.add_relation("db", "postgresql")
+        id = self.harness.add_relation("database", "postgresql")
         self.harness.add_relation_unit(id, "postgresql/0")
         self.harness.charm.on.update_status.emit()
         self.assertEqual(
