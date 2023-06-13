@@ -66,6 +66,7 @@ REQUIRED_SETTINGS = [
 ]
 
 DATABASE_NAME = "jimm"
+OPENFGA_STORE_NAME = "jimm"
 
 class JimmOperatorCharm(CharmBase):
     """JIMM Operator Charm."""
@@ -137,7 +138,7 @@ class JimmOperatorCharm(CharmBase):
         self.framework.observe(self.on.database_relation_broken, self._on_database_relation_broken)
 
         # OpenFGA relation
-        self.openfga = OpenFGARequires(self, "jimm")
+        self.openfga = OpenFGARequires(self, OPENFGA_STORE_NAME)
         self.framework.observe(
             self.openfga.on.openfga_store_created,
             self._on_openfga_store_created,
