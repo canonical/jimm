@@ -20,7 +20,7 @@ APP_NAME = "juju-jimm-k8s"
 
 
 @pytest.mark.abort_on_fail
-async def test_upgrade_running_application(ops_test: OpsTest):
+async def test_upgrade_running_application(ops_test: OpsTest, local_charm):
     """Deploy latest published charm and upgrade it with charm-under-test.
 
     Assert on the application status and health check endpoint after upgrade/refresh took place.
@@ -123,7 +123,11 @@ async def test_upgrade_running_application(ops_test: OpsTest):
     # Build and deploy charm from local source folder
     logger.info("building local charm")
 
-    charm = await ops_test.build_charm(".")
+    # (Optionally build) and deploy charm from local source folder
+    if local_charm:
+        charm = Path(utils.get_local_charm()).resolve()
+    else:
+        charm = await ops_test.build_charm(".")
     resources = {"jimm-image": "localhost:32000/jimm:latest"}
 
     # Deploy the charm and wait for active/idle status
