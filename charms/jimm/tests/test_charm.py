@@ -306,10 +306,12 @@ class TestCharm(unittest.TestCase):
         with open(leader_file) as f:
             lines = f.readlines()
         self.assertEqual(lines[0].strip(), "JIMM_WATCH_CONTROLLERS=")
+        self.assertEqual(lines[1].strip(), "JIMM_ENABLE_JWKS_ROTATOR=")
         self.harness.set_leader(True)
         with open(leader_file) as f:
             lines = f.readlines()
         self.assertEqual(lines[0].strip(), "JIMM_WATCH_CONTROLLERS=1")
+        self.assertEqual(lines[1].strip(), "JIMM_ENABLE_JWKS_ROTATOR=1")
 
     def test_leader_elected_ready(self):
         leader_file = os.path.join(self.harness.charm.charm_dir, "juju-jimm-leader.env")
