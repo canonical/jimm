@@ -166,7 +166,7 @@ class JimmCharm(SystemdCharm):
         if not os.path.exists(self._workload_filename):
             self.unit.status = BlockedStatus("waiting for jimm-snap resource")
             return
-        if not self.model.get_relation("db"):
+        if not self.model.get_relation("database"):
             self.unit.status = BlockedStatus("waiting for database")
             return
         if not os.path.exists(self._env_filename("db")):
