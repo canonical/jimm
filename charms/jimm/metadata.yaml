@@ -31,6 +31,9 @@ provides:
     interface: nrpe-external-master
   dashboard:
     interface: juju-dashboard
+  cos-agent:
+    interface: cos_agent
+    limit: 1
 
 requires:
   db:

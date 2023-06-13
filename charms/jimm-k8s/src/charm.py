@@ -27,8 +27,11 @@ from charms.data_platform_libs.v0.database_requires import (
     DatabaseEvent,
     DatabaseRequires,
 )
+from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
+from charms.loki_k8s.v0.loki_push_api import LogProxyConsumer
 from charms.nginx_ingress_integrator.v0.nginx_route import require_nginx_route
 from charms.openfga_k8s.v0.openfga import OpenFGARequires, OpenFGAStoreCreateEvent
+from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from charms.tls_certificates_interface.v1.tls_certificates import (
     CertificateAvailableEvent,
     CertificateExpiringEvent,
@@ -64,6 +67,10 @@ REQUIRED_SETTINGS = [
     "JIMM_DSN",
     "CANDID_URL",
 ]
+
+LOG_FILE = "/var/log/jimm"
+# This likely will just be JIMM's port.
+PROMETHEUS_PORT = 8080
 
 
 class JimmOperatorCharm(CharmBase):
@@ -145,6 +152,20 @@ class JimmOperatorCharm(CharmBase):
         # Vault relation
         self.framework.observe(self.on.vault_relation_joined, self._on_vault_relation_joined)
         self.framework.observe(self.on.vault_relation_changed, self._on_vault_relation_changed)
+
+        # Grafana relation
+        self._grafana_dashboards = GrafanaDashboardProvider(self, relation_name="grafana-dashboard")
+
+        # Loki relation
+        self._log_proxy = LogProxyConsumer(self, log_files=[LOG_FILE], relation_name="log-proxy")
+
+        # Prometheus relation
+        self._prometheus_scraping = MetricsEndpointProvider(
+            self,
+            relation_name="metrics-endpoint",
+            jobs=[{"static_configs": [{"targets": [f"*:{PROMETHEUS_PORT}"]}]}],
+            refresh_event=self.on.config_changed,
+        )
 
         # create-authorization-model action
         self.framework.observe(
