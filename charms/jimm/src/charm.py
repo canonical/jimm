@@ -37,6 +37,7 @@ logger = logging.getLogger(__name__)
 DATABASE_NAME = "jimm"
 OPENFGA_STORE_NAME = "jimm"
 
+
 class JimmCharm(SystemdCharm):
     """Charm for the JIMM service."""
 
