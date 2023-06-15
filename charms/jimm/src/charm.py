@@ -19,6 +19,7 @@ from charms.data_platform_libs.v0.data_interfaces import (
     DatabaseRequires,
     DatabaseRequiresEvent,
 )
+from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from charms.openfga_k8s.v0.openfga import OpenFGARequires, OpenFGAStoreCreateEvent
 from jinja2 import Environment, FileSystemLoader
 from ops.main import main
@@ -81,6 +82,19 @@ class JimmCharm(SystemdCharm):
         self.framework.observe(
             self.openfga.on.openfga_store_created,
             self._on_openfga_store_created,
+        )
+
+        # Grafana agent relation
+        self._grafana_agent = COSAgentProvider(
+            self,
+            relation_name="cos-agent",
+            metrics_endpoints=[
+                {"path": "/metrics", "port": 8080},
+            ],
+            metrics_rules_dir="./src/alert_rules/prometheus",
+            logs_rules_dir="./src/alert_rules/loki",
+            recurse_rules_dirs=True,
+            dashboard_dirs=["./src/grafana_dashboards"],
         )
 
     def _on_install(self, _):
