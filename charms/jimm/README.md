@@ -16,14 +16,31 @@ juju deploy ./jimm.charm --resource jimm-snap=jimm.snap
 To upgrade the workload attach a new version of the snap:
 
 ```
-juju attach jimm jimm-snap=jimm.snap
+juju attach juju-jimm jimm-snap=jimm.snap
 ```
+## Dependencies
+
+### Postgresql
 
 JIMM requires a postgresql database for data storage:
 
 ```
 juju deploy postgresql
-juju add-relation jimm:db postgresql:db
+juju add-relation juju-jimm:database postgresql:database
+```
+
+### OpenFGA
+
+JIMM requires a OpenFGA store for access control data storage:
+
+<!-- TODO (@babakks) This is not accurate/working. We need to elaborate on
+this because there's no machine charm for OpenFGA, and the user needs to create
+a cross-model relation to a k8s model running OpenFGA.
+-->
+
+```
+juju deploy openfga
+juju add-relation juju-jimm:openfga postgresql:openfga
 ```
 
 ## Developing
