@@ -24,8 +24,8 @@ import socket
 import hvac
 import requests
 from charms.data_platform_libs.v0.database_requires import (
+    DatabaseEvent,
     DatabaseRequires,
-    DatabaseRequiresEvent,
 )
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.loki_k8s.v0.loki_push_api import LogProxyConsumer
@@ -359,7 +359,7 @@ class JimmOperatorCharm(CharmBase):
             }
         )
 
-    def _on_database_event(self, event: DatabaseRequiresEvent) -> None:
+    def _on_database_event(self, event: DatabaseEvent) -> None:
         """Database event handler."""
 
         if not self._state.is_ready():
@@ -379,7 +379,7 @@ class JimmOperatorCharm(CharmBase):
 
         self._update_workload(event)
 
-    def _on_database_relation_broken(self, event: DatabaseRequiresEvent) -> None:
+    def _on_database_relation_broken(self, event: DatabaseEvent) -> None:
         """Database relation broken handler."""
         if not self._state.is_ready():
             event.defer()
