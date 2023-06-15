@@ -24,8 +24,8 @@ import socket
 import hvac
 import requests
 from charms.data_platform_libs.v0.database_requires import (
-    DatabaseRequiresEvent,
     DatabaseRequires,
+    DatabaseRequiresEvent,
 )
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.loki_k8s.v0.loki_push_api import LogProxyConsumer
