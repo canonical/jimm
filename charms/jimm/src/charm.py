@@ -183,6 +183,7 @@ class JimmCharm(SystemdCharm):
             event.defer()
             logger.warning("Unit is not ready")
             return
+        logger.info("database relation removed")
         self._on_update_status(None)
 
     def _on_stop(self, _):
