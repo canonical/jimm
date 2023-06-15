@@ -68,15 +68,12 @@ REQUIRED_SETTINGS = [
     "CANDID_URL",
 ]
 
-<<<<<<< HEAD
 DATABASE_NAME = "jimm"
 OPENFGA_STORE_NAME = "jimm"
-=======
 LOG_FILE = "/var/log/jimm"
 # This likely will just be JIMM's port.
 PROMETHEUS_PORT = 8080
 
->>>>>>> feature-rebac
 
 class JimmOperatorCharm(CharmBase):
     """JIMM Operator Charm."""
