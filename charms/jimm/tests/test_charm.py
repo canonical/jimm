@@ -338,16 +338,24 @@ class TestCharm(unittest.TestCase):
         db_file = os.path.join(self.harness.charm.charm_dir, "juju-jimm-db.env")
         id = self.harness.add_relation("database", "postgresql")
         self.harness.add_relation_unit(id, "postgresql/0")
-        self.harness.update_relation_data(id, "postgresql/0", {"master": "host=localhost port=5432"})
+        self.harness.update_relation_data(
+            id,
+            "postgresql",
+            {
+                "username": "some-username",
+                "password": "some-password",
+                "endpoints": "some.database.host,some.other.database.host",
+            },
+        )
         with open(db_file) as f:
             lines = f.readlines()
         self.assertEqual(len(lines), 1)
-        self.assertEqual(lines[0].strip(), "JIMM_DSN=pgx:host=localhost port=5432")
-        self.harness.update_relation_data(id, "postgresql/0", {"master": ""})
+        self.assertEqual(lines[0].strip(), "JIMM_DSN=postgresql://some-username:some-password@some.database.host/jimm")
+        self.harness.update_relation_data(id, "postgresql", {})
         with open(db_file) as f:
             lines = f.readlines()
         self.assertEqual(len(lines), 1)
-        self.assertEqual(lines[0].strip(), "JIMM_DSN=pgx:host=localhost port=5432")
+        self.assertEqual(lines[0].strip(), "JIMM_DSN=postgresql://some-username:some-password@some.database.host/jimm")
 
     def test_database_relation_changed_ready(self):
         db_file = os.path.join(self.harness.charm.charm_dir, "juju-jimm-db.env")
@@ -355,16 +363,24 @@ class TestCharm(unittest.TestCase):
             f.write("test")
         id = self.harness.add_relation("database", "postgresql")
         self.harness.add_relation_unit(id, "postgresql/0")
-        self.harness.update_relation_data(id, "postgresql/0", {"master": "host=localhost port=5432"})
+        self.harness.update_relation_data(
+            id,
+            "postgresql",
+            {
+                "username": "some-username",
+                "password": "some-password",
+                "endpoints": "some.database.host,some.other.database.host",
+            },
+        )
         with open(db_file) as f:
             lines = f.readlines()
         self.assertEqual(len(lines), 1)
-        self.assertEqual(lines[0].strip(), "JIMM_DSN=pgx:host=localhost port=5432")
-        self.harness.update_relation_data(id, "postgresql/0", {"master": ""})
+        self.assertEqual(lines[0].strip(), "JIMM_DSN=postgresql://some-username:some-password@some.database.host/jimm")
+        self.harness.update_relation_data(id, "postgresql", {})
         with open(db_file) as f:
             lines = f.readlines()
         self.assertEqual(len(lines), 1)
-        self.assertEqual(lines[0].strip(), "JIMM_DSN=pgx:host=localhost port=5432")
+        self.assertEqual(lines[0].strip(), "JIMM_DSN=postgresql://some-username:some-password@some.database.host/jimm")
         self.harness.charm._systemctl.assert_has_calls(
             (
                 call("is-enabled", self.harness.charm.service),
@@ -464,7 +480,15 @@ class TestCharm(unittest.TestCase):
             self.harness.charm.unit.status,
             WaitingStatus("waiting for database"),
         )
-        self.harness.update_relation_data(id, "postgresql/0", {"master": "host=localhost port=5432"})
+        self.harness.update_relation_data(
+            id,
+            "postgresql",
+            {
+                "username": "some-username",
+                "password": "some-password",
+                "endpoints": "some.database.host,some.other.database.host",
+            },
+        )
         self.harness.charm.on.update_status.emit()
         self.assertEqual(self.harness.charm.unit.status, MaintenanceStatus("starting"))
         s = HTTPServer(("", 8080), VersionHTTPRequestHandler)
