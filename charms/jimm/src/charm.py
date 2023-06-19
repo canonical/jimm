@@ -15,6 +15,10 @@ import urllib
 
 import hvac
 from charmhelpers.contrib.charmsupport.nrpe import NRPE
+from charms.data_platform_libs.v0.data_interfaces import (
+    DatabaseRequires,
+    DatabaseRequiresEvent,
+)
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from charms.openfga_k8s.v0.openfga import OpenFGARequires, OpenFGAStoreCreateEvent
 from jinja2 import Environment, FileSystemLoader
@@ -31,6 +35,9 @@ from systemd import SystemdCharm
 
 logger = logging.getLogger(__name__)
 
+DATABASE_NAME = "jimm"
+OPENFGA_STORE_NAME = "jimm"
+
 
 class JimmCharm(SystemdCharm):
     """Charm for the JIMM service."""
@@ -38,7 +45,6 @@ class JimmCharm(SystemdCharm):
     def __init__(self, *args):
         super().__init__(*args)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
-        self.framework.observe(self.on.db_relation_changed, self._on_db_relation_changed)
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.leader_elected, self._on_leader_elected)
         self.framework.observe(self.on.start, self._on_start)
@@ -60,7 +66,19 @@ class JimmCharm(SystemdCharm):
         self._rsyslog_conf_path = "/etc/rsyslog.d/10-jimm.conf"
         self._logrotate_conf_path = "/etc/logrotate.d/jimm"
 
-        self.openfga = OpenFGARequires(self, "jimm")
+        self.database = DatabaseRequires(
+            self,
+            relation_name="database",
+            database_name=DATABASE_NAME,
+        )
+        self.framework.observe(self.database.on.database_created, self._on_database_event)
+        self.framework.observe(
+            self.database.on.endpoints_changed,
+            self._on_database_event,
+        )
+        self.framework.observe(self.on.database_relation_broken, self._on_database_relation_broken)
+
+        self.openfga = OpenFGARequires(self, OPENFGA_STORE_NAME)
         self.framework.observe(
             self.openfga.on.openfga_store_created,
             self._on_openfga_store_created,
@@ -153,18 +171,34 @@ class JimmCharm(SystemdCharm):
             self.restart()
         self._on_update_status(None)
 
-    def _on_db_relation_changed(self, event):
-        """Update the JIMM configuration that comes from database
-        relations."""
+    def _on_database_event(self, event: DatabaseRequiresEvent):
+        """Handle database event"""
 
-        dsn = event.relation.data[event.unit].get("master")
-        if not dsn:
+        if not event.endpoints:
+            logger.info("received empty database host address")
+            event.defer()
             return
-        args = {"dsn": "pgx:" + dsn}
+
+        # get the first endpoint from a comma separate list
+        host = event.endpoints.split(",", 1)[0]
+        # compose the db connection string
+        uri = f"postgresql://{event.username}:{event.password}@{host}/{DATABASE_NAME}"
+        logger.info("received database uri: {}".format(uri))
+
+        args = {"dsn": uri}
         with open(self._env_filename("db"), "wt") as f:
             f.write(self._render_template("jimm-db.env", **args))
         if self._ready():
             self.restart()
+        self._on_update_status(None)
+
+    def _on_database_relation_broken(self, event) -> None:
+        """Database relation broken handler."""
+        if not self._ready():
+            event.defer()
+            logger.warning("Unit is not ready")
+            return
+        logger.info("database relation removed")
         self._on_update_status(None)
 
     def _on_stop(self, _):
@@ -179,7 +213,7 @@ class JimmCharm(SystemdCharm):
         if not os.path.exists(self._workload_filename):
             self.unit.status = BlockedStatus("waiting for jimm-snap resource")
             return
-        if not self.model.get_relation("db"):
+        if not self.model.get_relation("database"):
             self.unit.status = BlockedStatus("waiting for database")
             return
         if not os.path.exists(self._env_filename("db")):

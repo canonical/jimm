@@ -68,6 +68,8 @@ REQUIRED_SETTINGS = [
     "CANDID_URL",
 ]
 
+DATABASE_NAME = "jimm"
+OPENFGA_STORE_NAME = "jimm"
 LOG_FILE = "/var/log/jimm"
 # This likely will just be JIMM's port.
 PROMETHEUS_PORT = 8080
@@ -133,7 +135,7 @@ class JimmOperatorCharm(CharmBase):
         self.database = DatabaseRequires(
             self,
             relation_name="database",
-            database_name="jimm",
+            database_name=DATABASE_NAME,
         )
         self.framework.observe(self.database.on.database_created, self._on_database_event)
         self.framework.observe(
@@ -143,7 +145,7 @@ class JimmOperatorCharm(CharmBase):
         self.framework.observe(self.on.database_relation_broken, self._on_database_relation_broken)
 
         # OpenFGA relation
-        self.openfga = OpenFGARequires(self, "jimm")
+        self.openfga = OpenFGARequires(self, OPENFGA_STORE_NAME)
         self.framework.observe(
             self.openfga.on.openfga_store_created,
             self._on_openfga_store_created,
@@ -368,7 +370,7 @@ class JimmOperatorCharm(CharmBase):
         # get the first endpoint from a comma separate list
         ep = event.endpoints.split(",", 1)[0]
         # compose the db connection string
-        uri = f"postgresql://{event.username}:{event.password}@{ep}/jimm"
+        uri = f"postgresql://{event.username}:{event.password}@{ep}/{DATABASE_NAME}"
 
         logger.info("received database uri: {}".format(uri))
 
