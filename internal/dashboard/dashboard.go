@@ -17,7 +17,6 @@ import (
 	"text/template"
 	"time"
 
-	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/version/v2"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
@@ -119,8 +118,21 @@ func Handler(ctx context.Context, loc string) http.Handler {
 				)
 				continue
 			}
-			versions := jujuparams.GUIArchiveResponse{
-				Versions: []jujuparams.GUIArchiveVersion{{
+			type guiArchiveVersion struct {
+				// Version holds the Juju GUI version number.
+				Version version.Number `json:"version"`
+				// SHA256 holds the SHA256 hash of the GUI tar.bz2 archive.
+				SHA256 string `json:"sha256"`
+				// Current holds whether this specific version is the current one served
+				// by the controller.
+				Current bool `json:"current"`
+			}
+			type guiArchiveResponse struct {
+				Versions []guiArchiveVersion `json:"versions"`
+			}
+
+			versions := guiArchiveResponse{
+				Versions: []guiArchiveVersion{{
 					Version: ver,
 					SHA256:  fVersion.GitSHA,
 					Current: true,

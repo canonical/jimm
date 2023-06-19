@@ -11,8 +11,8 @@ import (
 	"time"
 
 	qt "github.com/frankban/quicktest"
-	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/core/instance"
+	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 
 	"github.com/CanonicalLtd/jimm/internal/db"
@@ -521,11 +521,13 @@ func TestWatcher(t *testing.T) {
 			nextC := make(chan []jujuparams.Delta)
 			var stopped uint32
 
-			w := &jimm.Watcher{
-				Database: db.Database{
+			deltaProcessedChannel := make(chan bool, len(test.deltas))
+
+			w := jimm.NewWatcherWithDeltaProcessedChannel(
+				db.Database{
 					DB: jimmtest.MemoryDB(c, nil),
 				},
-				Dialer: &jimmtest.Dialer{
+				&jimmtest.Dialer{
 					API: &jimmtest.API{
 						AllModelWatcherNext_: func(ctx context.Context, id string) ([]jujuparams.Delta, error) {
 							if id != test.name {
@@ -569,7 +571,8 @@ func TestWatcher(t *testing.T) {
 						},
 					},
 				},
-			}
+				deltaProcessedChannel,
+			)
 
 			env := jimmtest.ParseEnvironment(c, testWatcherEnv)
 			err := w.Database.Migrate(ctx, false)
@@ -588,13 +591,26 @@ func TestWatcher(t *testing.T) {
 				c.Check(err, qt.ErrorMatches, `context canceled`, qt.Commentf("unexpected error %s (%#v)", err, err))
 			}()
 
+			validDeltas := 0
 			for _, d := range test.deltas {
 				select {
 				case nextC <- d:
+					if d != nil {
+						validDeltas++
+					}
 				case <-ctx.Done():
 					c.Fatal("context closed prematurely")
 				}
 			}
+
+			for i := 0; i < validDeltas; i++ {
+				select {
+				case <-deltaProcessedChannel:
+				case <-ctx.Done():
+					c.Fatal("context closed prematurely")
+				}
+			}
+
 			close(nextC)
 			wg.Wait()
 

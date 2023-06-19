@@ -51,9 +51,9 @@ func (c Connection) CheckCredentialModels(ctx context.Context, cred jujuparams.T
 // CheckCredentialModels should be used first.
 //
 // This method will call the first available procedure from:
-//     - Cloud(7).UpdateCredentialsCheckModels
-//     - Cloud(3).UpdateCredentialsCheckModels
-//     - Cloud(1).UpdateCredentials
+//   - Cloud(7).UpdateCredentialsCheckModels
+//   - Cloud(3).UpdateCredentialsCheckModels
+//   - Cloud(1).UpdateCredentials
 //
 // Any error that represents a Juju API failure will be of type
 // *APIError.
@@ -77,7 +77,7 @@ func (c Connection) UpdateCredential(ctx context.Context, cred jujuparams.Tagged
 	// jujuparams.UpdateCredentialsResults, but the former will still
 	// unmarshal correctly into the latter so there is no need to use
 	// a different response type.
-	if err := c.CallHighestFacadeVersion(ctx, "Cloud", []int{7, 3, 1}, "", "UpdateCredentialsCheckModels", &update, &out); err != nil {
+	if err := c.CallHighestFacadeVersion(ctx, "Cloud", []int{7, 3}, "", "UpdateCredentialsCheckModels", &update, &out); err != nil {
 		return nil, errors.E(op, jujuerrors.Cause(err))
 	}
 	if out.Results[0].Error != nil {
@@ -93,8 +93,8 @@ func (c Connection) UpdateCredential(ctx context.Context, cred jujuparams.Tagged
 // CheckCredentialModels should be used first.
 //
 // This method will call the first available procedure from:
-//     - Cloud(3).RevokeCredentialsCheckModels
-//     - Cloud(1).RevokeCredentials
+//   - Cloud(3).RevokeCredentialsCheckModels
+//   - Cloud(1).RevokeCredentials
 //
 // Any error that represents a Juju API failure will be of type
 // *APIError.
@@ -143,7 +143,7 @@ func (c Connection) Cloud(ctx context.Context, tag names.CloudTag, cloud *jujupa
 			Cloud: cloud,
 		}},
 	}
-	if err := c.CallHighestFacadeVersion(ctx, "Cloud", []int{7, 1}, "", "Cloud", &args, &resp); err != nil {
+	if err := c.CallHighestFacadeVersion(ctx, "Cloud", []int{7, 3}, "", "Cloud", &args, &resp); err != nil {
 		return errors.E(op, jujuerrors.Cause(err))
 	}
 	if resp.Results[0].Error != nil {
@@ -157,7 +157,7 @@ func (c Connection) Cloud(ctx context.Context, tag names.CloudTag, cloud *jujupa
 func (c Connection) Clouds(ctx context.Context) (map[names.CloudTag]jujuparams.Cloud, error) {
 	const op = errors.Op("jujuclient.Clouds")
 	var resp jujuparams.CloudsResult
-	if err := c.CallHighestFacadeVersion(ctx, "Cloud", []int{7, 1}, "", "Clouds", nil, &resp); err != nil {
+	if err := c.CallHighestFacadeVersion(ctx, "Cloud", []int{7, 3}, "", "Clouds", nil, &resp); err != nil {
 		return nil, errors.E(op, jujuerrors.Cause(err))
 	}
 
@@ -181,7 +181,7 @@ func (c Connection) AddCloud(ctx context.Context, tag names.CloudTag, cloud juju
 		Cloud: cloud,
 		Name:  tag.Id(),
 	}
-	if err := c.CallHighestFacadeVersion(ctx, "Cloud", []int{7, 2}, "", "AddCloud", &args, nil); err != nil {
+	if err := c.CallHighestFacadeVersion(ctx, "Cloud", []int{7, 3}, "", "AddCloud", &args, nil); err != nil {
 		return errors.E(op, jujuerrors.Cause(err))
 	}
 	return nil
@@ -199,7 +199,7 @@ func (c Connection) RemoveCloud(ctx context.Context, tag names.CloudTag) error {
 	resp := jujuparams.ErrorResults{
 		Results: make([]jujuparams.ErrorResult, 1),
 	}
-	if err := c.CallHighestFacadeVersion(ctx, "Cloud", []int{7, 2}, "", "RemoveClouds", &args, &resp); err != nil {
+	if err := c.CallHighestFacadeVersion(ctx, "Cloud", []int{7, 3}, "", "RemoveClouds", &args, &resp); err != nil {
 		return errors.E(op, jujuerrors.Cause(err))
 	}
 	if resp.Results[0].Error != nil {
@@ -275,7 +275,7 @@ func (c Connection) CloudInfo(ctx context.Context, tag names.CloudTag, ci *jujup
 			Result: ci,
 		}},
 	}
-	err := c.CallHighestFacadeVersion(ctx, "Cloud", []int{7, 2}, "", "CloudInfo", &args, &resp)
+	err := c.CallHighestFacadeVersion(ctx, "Cloud", []int{7, 3}, "", "CloudInfo", &args, &resp)
 	if err != nil {
 		return errors.E(op, jujuerrors.Cause(err))
 	}
@@ -299,7 +299,7 @@ func (c Connection) UpdateCloud(ctx context.Context, tag names.CloudTag, cloud j
 	resp := jujuparams.ErrorResults{
 		Results: make([]jujuparams.ErrorResult, 1),
 	}
-	err := c.CallHighestFacadeVersion(ctx, "Cloud", []int{7, 4}, "", "UpdateCloud", &args, &resp)
+	err := c.CallHighestFacadeVersion(ctx, "Cloud", []int{7, 3}, "", "UpdateCloud", &args, &resp)
 	if err != nil {
 		return errors.E(op, jujuerrors.Cause(err))
 	}

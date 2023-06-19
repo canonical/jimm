@@ -36,6 +36,17 @@ type Watcher struct {
 	// Pubsub is a pub-sub hub used to publish and subscribe
 	// model summaries.
 	Pubsub Publisher
+
+	deltaProcessedChan chan bool
+}
+
+func (w *Watcher) deltaProcessedNotification() {
+	if w.deltaProcessedChan != nil {
+		select {
+		case w.deltaProcessedChan <- true:
+		default:
+		}
+	}
 }
 
 // Watch starts the watcher which connects to all known controllers and
@@ -413,6 +424,7 @@ func (w *Watcher) watchAllModelSummaries(ctx context.Context, ctl *dbmodel.Contr
 }
 
 func (w *Watcher) handleDelta(ctx context.Context, modelIDf func(string) *modelState, d jujuparams.Delta) error {
+	defer w.deltaProcessedNotification()
 	eid := d.Entity.EntityId()
 	state := modelIDf(eid.ModelUUID)
 	if state == nil {

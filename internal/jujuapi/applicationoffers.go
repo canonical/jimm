@@ -7,8 +7,8 @@ import (
 	"fmt"
 
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
-	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/core/crossmodel"
+	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
@@ -60,7 +60,7 @@ func init() {
 		r.AddMethod("ApplicationOffers", 4, "FindApplicationOffers", findOffersMethod)
 		r.AddMethod("ApplicationOffers", 4, "ApplicationOffers", applicationOffersMethod)
 
-		return []int{1, 2, 3}
+		return []int{1, 2, 3, 4}
 	}
 }
 

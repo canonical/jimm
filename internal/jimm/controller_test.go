@@ -10,9 +10,9 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/core/life"
 	"github.com/juju/juju/core/status"
+	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 	semversion "github.com/juju/version"
 
@@ -694,7 +694,6 @@ func TestImportModel(t *testing.T) {
 				ModelUUID:   "00000002-0000-0000-0000-000000000001",
 				Name:        "app-1/1",
 				Application: "app-1",
-				Series:      "warty",
 				CharmURL:    "cs:app-1",
 				Life:        "starting",
 				MachineId:   "machine-1",
