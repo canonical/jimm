@@ -42,8 +42,6 @@ async def test_build_and_deploy(ops_test: OpsTest, local_charm):
         config={
             "uuid": "f4dec11e-e2b6-40bb-871a-cc38e958af49",
             "candid-url": "https://api.jujucharms.com/identity",
-            "public-key": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
-            "private-key": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
         },
     )
     await ops_test.model.deploy(

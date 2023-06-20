@@ -25,6 +25,7 @@ from ops.model import (
     ModelError,
     WaitingStatus,
 )
+
 from systemd import SystemdCharm
 
 logger = logging.getLogger(__name__)
@@ -36,9 +37,7 @@ class JimmCharm(SystemdCharm):
     def __init__(self, *args):
         super().__init__(*args)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
-        self.framework.observe(
-            self.on.db_relation_changed, self._on_db_relation_changed
-        )
+        self.framework.observe(self.on.db_relation_changed, self._on_db_relation_changed)
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.leader_elected, self._on_leader_elected)
         self.framework.observe(self.on.start, self._on_start)
@@ -137,7 +136,6 @@ class JimmCharm(SystemdCharm):
         args = {"jimm_watch_controllers": ""}
         if self.model.unit.is_leader():
             args["jimm_watch_controllers"] = "1"
-            args["jimm_enable_jwks_rotator"] = "1"
         with open(self._env_filename("leader"), "wt") as f:
             f.write(self._render_template("jimm-leader.env", **args))
         if self._ready():

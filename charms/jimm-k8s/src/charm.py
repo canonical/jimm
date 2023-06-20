@@ -22,7 +22,6 @@ import os
 import socket
 
 import hvac
-import requests
 from charms.data_platform_libs.v0.database_requires import (
     DatabaseEvent,
     DatabaseRequires,
@@ -45,7 +44,7 @@ from charms.traefik_k8s.v1.ingress import (
     IngressPerAppRevokedEvent,
 )
 from ops import pebble
-from ops.charm import ActionEvent, CharmBase, RelationJoinedEvent
+from ops.charm import CharmBase, RelationJoinedEvent
 from ops.main import main
 from ops.model import (
     ActiveStatus,
@@ -159,12 +158,6 @@ class JimmOperatorCharm(CharmBase):
             refresh_event=self.on.config_changed,
         )
 
-        # create-authorization-model action
-        self.framework.observe(
-            self.on.create_authorization_model_action,
-            self._on_create_authorization_model_action,
-        )
-
         self._local_agent_filename = "agent.json"
         self._local_vault_secret_filename = "vault_secret.js"
         self._agent_filename = "/root/config/agent.json"
@@ -256,7 +249,6 @@ class JimmOperatorCharm(CharmBase):
 
         if self.model.unit.is_leader():
             config_values["JIMM_WATCH_CONTROLLERS"] = "1"
-            config_values["JIMM_ENABLE_JWKS_ROTATOR"] = "1"
 
         if container.exists(self._dashboard_path):
             config_values["JIMM_DASHBOARD_LOCATION"] = self._dashboard_path
@@ -696,6 +688,7 @@ class JimmOperatorCharm(CharmBase):
         del self._state.dns_name
 
         self._update_workload(event)
+
 
 def _json_data(event, key):
     logger.debug("getting relation data {}".format(key))

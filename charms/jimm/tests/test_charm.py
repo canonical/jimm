@@ -144,7 +144,7 @@ class TestCharm(unittest.TestCase):
         with open(config_file) as f:
             lines = f.readlines()
         os.unlink(config_file)
-        self.assertEqual(len(lines), 16)
+        self.assertEqual(len(lines), 11)
         self.assertEqual(lines[0].strip(), "BAKERY_AGENT_FILE=")
         self.assertEqual(lines[1].strip(), "CANDID_URL=https://candid.example.com")
         self.assertEqual(lines[2].strip(), "JIMM_ADMINS=user1 user2 group1")
@@ -234,7 +234,7 @@ class TestCharm(unittest.TestCase):
 
         with open(config_file) as f:
             lines = f.readlines()
-        self.assertEqual(len(lines), 14)
+        self.assertEqual(len(lines), 9)
         self.assertEqual(
             lines[0].strip(),
             "BAKERY_AGENT_FILE=" + self.harness.charm._agent_filename,
@@ -467,6 +467,7 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(data["controller-url"], "https://jimm.example.com")
         self.assertEqual(data["identity-provider-url"], "https://candid.example.com")
         self.assertEqual(data["is-juju"], "False")
+
 
 class VersionHTTPRequestHandler(BaseHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
