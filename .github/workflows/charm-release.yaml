@@ -35,7 +35,7 @@ jobs:
         with:
           credentials: "${{ secrets.CHARMHUB_TOKEN }}"
           github-token: "${{ secrets.GITHUB_TOKEN }}"
-          channel: "latest/edge"
+          channel: "v1/edge"
           charm-path: "./charms/jimm-k8s"
           local-image: "true"
 
@@ -64,5 +64,5 @@ jobs:
         with:
           credentials: "${{ secrets.CHARMHUB_TOKEN }}"
           github-token: "${{ secrets.GITHUB_TOKEN }}"
-          channel: "latest/edge"
+          channel: "v1/edge"
           charm-path: "./charms/jimm"
