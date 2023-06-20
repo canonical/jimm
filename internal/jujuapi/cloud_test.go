@@ -571,7 +571,7 @@ func (s *cloudSuite) TestAddCloudNoHostCloudRegion(c *gc.C) {
 		StorageEndpoint:  "https://0.1.2.3:5680",
 	}, false)
 	c.Assert(err, gc.ErrorMatches, `cloud host region not specified \(cloud region required\)`)
-	c.Assert(jujuparams.IsCodeCloudRegionRequired(err), gc.Equals, true)
+	c.Assert(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeCloudRegionRequired)
 }
 
 func (s *cloudSuite) TestAddCloudBadName(c *gc.C) {

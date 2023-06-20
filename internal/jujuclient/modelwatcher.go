@@ -28,7 +28,7 @@ func (c Connection) WatchAll(ctx context.Context) (string, error) {
 func (c Connection) ModelWatcherNext(ctx context.Context, id string) ([]jujuparams.Delta, error) {
 	const op = errors.Op("jujuclient.ModelWatcherNext")
 	var resp jujuparams.AllWatcherNextResults
-	if err := c.CallHighestFacadeVersion(ctx, "AllWatcher", []int{2, 1}, id, "Next", nil, &resp); err != nil {
+	if err := c.CallHighestFacadeVersion(ctx, "AllWatcher", []int{3, 2, 1}, id, "Next", nil, &resp); err != nil {
 		return nil, errors.E(op, jujuerrors.Cause(err))
 	}
 	return resp.Deltas, nil
@@ -38,7 +38,7 @@ func (c Connection) ModelWatcherNext(ctx context.Context, id string) ([]jujupara
 // uses the Stop method on the AllWatcher facade version 1.
 func (c Connection) ModelWatcherStop(ctx context.Context, id string) error {
 	const op = errors.Op("jujuclient.ModelWatcherStop")
-	if err := c.CallHighestFacadeVersion(ctx, "AllWatcher", []int{2, 1}, id, "Stop", nil, nil); err != nil {
+	if err := c.CallHighestFacadeVersion(ctx, "AllWatcher", []int{3, 2, 1}, id, "Stop", nil, nil); err != nil {
 		return errors.E(op, jujuerrors.Cause(err))
 	}
 	return nil

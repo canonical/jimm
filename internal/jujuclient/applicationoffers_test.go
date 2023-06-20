@@ -8,8 +8,8 @@ import (
 
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/core/crossmodel"
+	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/testing/factory"
 	"github.com/juju/names/v4"
 	jc "github.com/juju/testing/checkers"
@@ -391,7 +391,7 @@ func (s *applicationoffersSuite) TestGetApplicationOffer(c *gc.C) {
 	sort.Slice(info.Users, func(i, j int) bool {
 		return info.Users[i].UserName < info.Users[j].UserName
 	})
-	c.Check(info.CharmURL, gc.Matches, `cs:quantal/wordpress-[0-9]*`)
+	c.Check(info.CharmURL, gc.Matches, `ch:amd64/quantal/wordpress-[0-9]*`)
 	info.CharmURL = ""
 	c.Check(info, jc.DeepEquals, jujuparams.ApplicationOfferAdminDetails{
 		ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
@@ -476,7 +476,7 @@ func (s *applicationoffersSuite) TestGrantApplicationOfferAccess(c *gc.C) {
 	sort.Slice(info.Users, func(i, j int) bool {
 		return info.Users[i].UserName < info.Users[j].UserName
 	})
-	c.Check(info.CharmURL, gc.Matches, `cs:quantal/wordpress-[0-9]*`)
+	c.Check(info.CharmURL, gc.Matches, `ch:amd64/quantal/wordpress-[0-9]*`)
 	info.CharmURL = ""
 	c.Check(info, jc.DeepEquals, jujuparams.ApplicationOfferAdminDetails{
 		ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
@@ -564,7 +564,7 @@ func (s *applicationoffersSuite) TestRevokeApplicationOfferAccess(c *gc.C) {
 	sort.Slice(info.Users, func(i, j int) bool {
 		return info.Users[i].UserName < info.Users[j].UserName
 	})
-	c.Check(info.CharmURL, gc.Matches, `cs:quantal/wordpress-[0-9]*`)
+	c.Check(info.CharmURL, gc.Matches, `ch:amd64/quantal/wordpress-[0-9]*`)
 	info.CharmURL = ""
 	c.Check(info, jc.DeepEquals, jujuparams.ApplicationOfferAdminDetails{
 		ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
@@ -603,7 +603,7 @@ func (s *applicationoffersSuite) TestRevokeApplicationOfferAccess(c *gc.C) {
 	sort.Slice(info.Users, func(i, j int) bool {
 		return info.Users[i].UserName < info.Users[j].UserName
 	})
-	c.Check(info.CharmURL, gc.Matches, `cs:quantal/wordpress-[0-9]*`)
+	c.Check(info.CharmURL, gc.Matches, `ch:amd64/quantal/wordpress-[0-9]*`)
 	info.CharmURL = ""
 	c.Check(info, jc.DeepEquals, jujuparams.ApplicationOfferAdminDetails{
 		ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
