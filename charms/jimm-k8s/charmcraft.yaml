@@ -3,13 +3,15 @@
 type: "charm"
 parts:
   charm:
-    charm-python-packages: [setuptools, pyopenssl]
-    build-packages:
-      - libffi-dev
-      - libssl-dev
-      - rustc
-      - cargo
-      - pkg-config
+    charm-python-packages: [setuptools]
+    charm-binary-python-packages:
+    - cryptography
+    - jsonschema
+    - PyYAML
+    - attrs
+    - importlib-resources
+    - urllib3
+    - zipp
 bases:
   # This run-on is not as strict as the machine charm
   # as the jimm-server runs in a container.
