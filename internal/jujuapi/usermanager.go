@@ -36,7 +36,15 @@ func init() {
 		r.AddMethod("UserManager", 2, "UserInfo", userInfoMethod)
 		r.AddMethod("UserManager", 2, "ResetPassword", resetPasswordMethod)
 
-		return []int{1}
+		r.AddMethod("UserManager", 3, "AddUser", addUserMethod)
+		r.AddMethod("UserManager", 3, "DisableUser", disableUserMethod)
+		r.AddMethod("UserManager", 3, "EnableUser", enableUserMethod)
+		r.AddMethod("UserManager", 3, "RemoveUser", removeUserMethod)
+		r.AddMethod("UserManager", 3, "SetPassword", setPasswordMethod)
+		r.AddMethod("UserManager", 3, "UserInfo", userInfoMethod)
+		r.AddMethod("UserManager", 3, "ResetPassword", resetPasswordMethod)
+
+		return []int{1, 2, 3}
 	}
 }
 

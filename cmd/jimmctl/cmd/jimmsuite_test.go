@@ -184,5 +184,8 @@ func (s *jimmSuite) AddModel(c *gc.C, owner names.UserTag, name string, cloud na
 		CloudCredential: cred,
 	})
 	c.Assert(err, gc.Equals, nil)
+
+	s.WaitForModelWatchersIdle(c, mi.UUID)
+
 	return names.NewModelTag(mi.UUID)
 }

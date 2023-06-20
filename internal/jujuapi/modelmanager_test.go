@@ -30,7 +30,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/kubetest"
 )
 
-const jujuVersion = "2.9.42"
+const jujuVersion = "3.1.4"
 
 type modelManagerSuite struct {
 	websocketSuite
@@ -58,7 +58,7 @@ func (s *modelManagerSuite) TestListModelSummaries(c *gc.C) {
 		UUID:            s.Model.UUID.String,
 		ControllerUUID:  "914487b5-60e7-42bb-bd63-1adc3fd3a388",
 		ProviderType:    jimmtest.TestProviderType,
-		DefaultSeries:   "focal",
+		DefaultSeries:   "jammy",
 		Cloud:           jimmtest.TestCloudName,
 		CloudRegion:     jimmtest.TestCloudRegionName,
 		CloudCredential: jimmtest.TestCloudName + "/bob@external/cred",
@@ -89,7 +89,7 @@ func (s *modelManagerSuite) TestListModelSummaries(c *gc.C) {
 		UUID:            s.Model3.UUID.String,
 		ControllerUUID:  "914487b5-60e7-42bb-bd63-1adc3fd3a388",
 		ProviderType:    jimmtest.TestProviderType,
-		DefaultSeries:   "focal",
+		DefaultSeries:   "jammy",
 		Cloud:           jimmtest.TestCloudName,
 		CloudRegion:     jimmtest.TestCloudRegionName,
 		CloudCredential: jimmtest.TestCloudName + "/charlie@external/cred",
@@ -138,7 +138,7 @@ func (s *modelManagerSuite) TestListModelSummariesWithoutControllerUUIDMasking(c
 		UUID:            s.Model.UUID.String,
 		ControllerUUID:  "deadbeef-1bad-500d-9000-4b1d0d06f00d",
 		ProviderType:    jimmtest.TestProviderType,
-		DefaultSeries:   "focal",
+		DefaultSeries:   "jammy",
 		Cloud:           jimmtest.TestCloudName,
 		CloudRegion:     jimmtest.TestCloudRegionName,
 		CloudCredential: jimmtest.TestCloudName + "/bob@external/cred",
@@ -169,7 +169,7 @@ func (s *modelManagerSuite) TestListModelSummariesWithoutControllerUUIDMasking(c
 		UUID:            s.Model3.UUID.String,
 		ControllerUUID:  "deadbeef-1bad-500d-9000-4b1d0d06f00d",
 		ProviderType:    jimmtest.TestProviderType,
-		DefaultSeries:   "focal",
+		DefaultSeries:   "jammy",
 		Cloud:           jimmtest.TestCloudName,
 		CloudRegion:     jimmtest.TestCloudRegionName,
 		CloudCredential: jimmtest.TestCloudName + "/charlie@external/cred",
@@ -305,6 +305,7 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 				Description: "the version of Juju used by the model",
 				Version:     jujuVersion,
 			}},
+			DefaultBase: "ubuntu@22.04/stable",
 		},
 	}, {
 		Error: &jujuparams.Error{
@@ -340,6 +341,7 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 				Description: "the version of Juju used by the model",
 				Version:     jujuVersion,
 			}},
+			DefaultBase: "ubuntu@22.04/stable",
 		},
 	}, {
 		Result: &jujuparams.ModelInfo{
@@ -391,6 +393,7 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 				Description: "the version of Juju used by the model",
 				Version:     jujuVersion,
 			}},
+			DefaultBase: "ubuntu@22.04/stable",
 		},
 	}, {
 		Result: &jujuparams.ModelInfo{
@@ -425,6 +428,7 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 				Description: "the version of Juju used by the model",
 				Version:     jujuVersion,
 			}},
+			DefaultBase: "ubuntu@22.04/stable",
 		},
 	}, {
 		Error: &jujuparams.Error{
@@ -518,6 +522,7 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 				Description: "the version of Juju used by the model",
 				Version:     jujuVersion,
 			}},
+			DefaultBase: "ubuntu@22.04/stable",
 		},
 	}, {
 		Result: &jujuparams.ModelInfo{
@@ -549,6 +554,7 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 				Description: "the version of Juju used by the model",
 				Version:     jujuVersion,
 			}},
+			DefaultBase: "ubuntu@22.04/stable",
 		},
 	}, {
 		Result: &jujuparams.ModelInfo{
@@ -604,6 +610,7 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 				Description: "the version of Juju used by the model",
 				Version:     jujuVersion,
 			}},
+			DefaultBase: "ubuntu@22.04/stable",
 		},
 	}, {
 		Result: &jujuparams.ModelInfo{
@@ -656,6 +663,7 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 				Description: "the version of Juju used by the model",
 				Version:     jujuVersion,
 			}},
+			DefaultBase: "ubuntu@22.04/stable",
 		},
 	}, {
 		Result: &jujuparams.ModelInfo{
@@ -687,6 +695,7 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 				Description: "the version of Juju used by the model",
 				Version:     jujuVersion,
 			}},
+			DefaultBase: "ubuntu@22.04/stable",
 		},
 	}, {
 		Error: &jujuparams.Error{
@@ -1142,6 +1151,7 @@ func (s *modelManagerSuite) TestChangeModelCredentialLocalUserCredential(c *gc.C
 }
 
 func (s *modelManagerSuite) TestValidateModelUpgrades(c *gc.C) {
+	c.Skip("juju 3.x no longer implements this method")
 	conn := s.open(c, nil, "alice")
 	defer conn.Close()
 
@@ -1321,7 +1331,7 @@ func (s *caasModelManagerSuite) TestListCAASModelSummaries(c *gc.C) {
 		UUID:            mi.UUID,
 		ControllerUUID:  "914487b5-60e7-42bb-bd63-1adc3fd3a388",
 		ProviderType:    "kubernetes",
-		DefaultSeries:   "focal",
+		DefaultSeries:   "jammy",
 		Cloud:           "bob-cloud",
 		CloudRegion:     "default",
 		CloudCredential: s.cred.Id(),
@@ -1353,7 +1363,7 @@ func (s *caasModelManagerSuite) TestListCAASModelSummaries(c *gc.C) {
 		Type:            "iaas",
 		ControllerUUID:  "914487b5-60e7-42bb-bd63-1adc3fd3a388",
 		ProviderType:    jimmtest.TestProviderType,
-		DefaultSeries:   "focal",
+		DefaultSeries:   "jammy",
 		Cloud:           jimmtest.TestCloudName,
 		CloudRegion:     jimmtest.TestCloudRegionName,
 		CloudCredential: jimmtest.TestCloudName + "/bob@external/cred",
@@ -1375,7 +1385,7 @@ func (s *caasModelManagerSuite) TestListCAASModelSummaries(c *gc.C) {
 		Type:            "iaas",
 		ControllerUUID:  "914487b5-60e7-42bb-bd63-1adc3fd3a388",
 		ProviderType:    jimmtest.TestProviderType,
-		DefaultSeries:   "focal",
+		DefaultSeries:   "jammy",
 		Cloud:           jimmtest.TestCloudName,
 		CloudRegion:     jimmtest.TestCloudRegionName,
 		CloudCredential: jimmtest.TestCloudName + "/charlie@external/cred",
