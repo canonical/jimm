@@ -28,9 +28,8 @@ pip install tox
 ```
 
 The charm additionally requires the following relations:
-- db, interface: pgsql
+- database, interface: postgresql_client
 - vault, interface: vault-kv
-- openfga, interface: openfga
 
 ### Testing
 

@@ -36,8 +36,8 @@ provides:
     limit: 1
 
 requires:
-  db:
-    interface: pgsql
+  database:
+    interface: postgresql_client
   vault:
     interface: vault-kv
     optional: true
