@@ -3,11 +3,21 @@
 type: "charm"
 parts:
   charm:
-    charm-python-packages: [setuptools]
+    charm-python-packages: [setuptools, pyopenssl]
+    build-packages:
+      - libffi-dev
+      - libssl-dev
+      - rustc
+      - cargo
+      - pkg-config
 bases:
+  # This run-on is not as strict as the machine charm
+  # as the jimm-server runs in a container.
+  # So the only restriction for build-on vs run-on is 
+  # the charm code.
   - build-on:
-    - name: "ubuntu"
-      channel: "20.04"
+      - name: "ubuntu"
+        channel: "20.04"
     run-on:
-    - name: "ubuntu"
-      channel: "20.04"
+      - name: "ubuntu"
+        channel: "20.04"

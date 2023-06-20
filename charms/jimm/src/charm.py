@@ -15,6 +15,7 @@ import urllib
 
 import hvac
 from charmhelpers.contrib.charmsupport.nrpe import NRPE
+from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from jinja2 import Environment, FileSystemLoader
 from ops.main import main
 from ops.model import (
@@ -44,18 +45,10 @@ class JimmCharm(SystemdCharm):
         self.framework.observe(self.on.stop, self._on_stop)
         self.framework.observe(self.on.update_status, self._on_update_status)
         self.framework.observe(self.on.upgrade_charm, self._on_upgrade_charm)
-        self.framework.observe(
-            self.on.nrpe_relation_joined, self._on_nrpe_relation_joined
-        )
-        self.framework.observe(
-            self.on.website_relation_joined, self._on_website_relation_joined
-        )
-        self.framework.observe(
-            self.on.vault_relation_joined, self._on_vault_relation_joined
-        )
-        self.framework.observe(
-            self.on.vault_relation_changed, self._on_vault_relation_changed
-        )
+        self.framework.observe(self.on.nrpe_relation_joined, self._on_nrpe_relation_joined)
+        self.framework.observe(self.on.website_relation_joined, self._on_website_relation_joined)
+        self.framework.observe(self.on.vault_relation_joined, self._on_vault_relation_joined)
+        self.framework.observe(self.on.vault_relation_changed, self._on_vault_relation_changed)
         self.framework.observe(
             self.on.dashboard_relation_joined,
             self._on_dashboard_relation_joined,
@@ -66,6 +59,19 @@ class JimmCharm(SystemdCharm):
         self._dashboard_path = "/var/snap/jimm/common/dashboard"
         self._rsyslog_conf_path = "/etc/rsyslog.d/10-jimm.conf"
         self._logrotate_conf_path = "/etc/logrotate.d/jimm"
+
+        # Grafana agent relation
+        self._grafana_agent = COSAgentProvider(
+            self,
+            relation_name="cos-agent",
+            metrics_endpoints=[
+                {"path": "/metrics", "port": 8080},
+            ],
+            metrics_rules_dir="./src/alert_rules/prometheus",
+            logs_rules_dir="./src/alert_rules/loki",
+            recurse_rules_dirs=True,
+            dashboard_dirs=["./src/grafana_dashboards"],
+        )
 
     def _on_install(self, _):
         """Install the JIMM software."""
@@ -107,6 +113,7 @@ class JimmCharm(SystemdCharm):
         }
         if os.path.exists(self._dashboard_path):
             args["dashboard_location"] = self._dashboard_path
+
         with open(self._env_filename(), "wt") as f:
             f.write(self._render_template("jimm.env", **args))
         if self._ready():
@@ -117,9 +124,7 @@ class JimmCharm(SystemdCharm):
         if dashboard_relation:
             dashboard_relation.data[self.app].update(
                 {
-                    "controller-url": "wss://{}".format(
-                        self.config["dns-name"]
-                    ),
+                    "controller-url": self.config["dns-name"],
                     "identity-provider-url": self.config["candid-url"],
                     "is-juju": str(False),
                 }
@@ -132,6 +137,7 @@ class JimmCharm(SystemdCharm):
         args = {"jimm_watch_controllers": ""}
         if self.model.unit.is_leader():
             args["jimm_watch_controllers"] = "1"
+            args["jimm_enable_jwks_rotator"] = "1"
         with open(self._env_filename("leader"), "wt") as f:
             f.write(self._render_template("jimm-leader.env", **args))
         if self._ready():
@@ -199,18 +205,10 @@ class JimmCharm(SystemdCharm):
         event.relation.data[self.unit]["port"] = "8080"
 
     def _on_vault_relation_joined(self, event):
-        event.relation.data[self.unit]["secret_backend"] = json.dumps(
-            "charm-jimm-creds"
-        )
-        event.relation.data[self.unit]["hostname"] = json.dumps(
-            socket.gethostname()
-        )
+        event.relation.data[self.unit]["secret_backend"] = json.dumps("charm-jimm-creds")
+        event.relation.data[self.unit]["hostname"] = json.dumps(socket.gethostname())
         event.relation.data[self.unit]["access_address"] = json.dumps(
-            str(
-                self.model.get_binding(event.relation)
-                .network.egress_subnets[0]
-                .network_address
-            )
+            str(self.model.get_binding(event.relation).network.egress_subnets[0].network_address)
         )
         event.relation.data[self.unit]["isolated"] = json.dumps(False)
 
@@ -259,9 +257,6 @@ class JimmCharm(SystemdCharm):
         if not path:
             self.unit.status = BlockedStatus("waiting for jimm-snap resource")
             return
-
-        if self._is_snap_installed():
-            self._snap("remove", "jimm")
         self._snap("install", "--dangerous", path)
 
     def _install_dashboard(self):
@@ -367,7 +362,7 @@ class JimmCharm(SystemdCharm):
     def _on_dashboard_relation_joined(self, event):
         event.relation.data[self.app].update(
             {
-                "controller-url": "wss://{}".format(self.config["dns-name"]),
+                "controller-url": self.config["dns-name"],
                 "identity-provider-url": self.config["candid-url"],
                 "is-juju": str(False),
             }

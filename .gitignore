@@ -11,4 +11,12 @@
 /version/commit.txt
 /version/version.txt
 /tmp
-/local/vault/approle.yaml
+/local/vault/approle.json
+local/vault/approle.json
+local/vault/roleid.txt
+
+*.crt
+*.key
+*.csr
+jimmctl
+qa-controller

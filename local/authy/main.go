@@ -25,7 +25,7 @@ import (
 // incoming response and perform queries in order to return the final
 // response to the caller. The final response should not have its body
 // closed.
-type ResponseHandler func(*http.Client, *http.Response) (*http.Response, error)
+type responseHandler func(*http.Client, *http.Response) (*http.Response, error)
 
 // OpenWebBrowser returns a function that simulates opening a web browser
 // to complete a login. This function only returns a non-nil error to its
@@ -33,7 +33,7 @@ type ResponseHandler func(*http.Client, *http.Response) (*http.Response, error)
 // it will be called with the *http.Response that was received by the
 // client. This handler should arrange for any required further
 // processing and return the result.
-func OpenWebBrowser(rh ResponseHandler) func(u *url.URL) error {
+func openWebBrowser(rh responseHandler) func(u *url.URL) error {
 	return func(u *url.URL) error {
 		jar, err := cookiejar.New(nil)
 		if err != nil {
@@ -67,7 +67,7 @@ func OpenWebBrowser(rh ResponseHandler) func(u *url.URL) error {
 // login methods in the incoming response and performs a GET on that URL.
 // If rh is non-nil it will be used to further process the response
 // before returning to the caller.
-func SelectInteractiveLogin(rh ResponseHandler) ResponseHandler {
+func selectInteractiveLogin(rh responseHandler) responseHandler {
 	return func(client *http.Client, resp *http.Response) (*http.Response, error) {
 		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
@@ -112,7 +112,7 @@ func SelectInteractiveLogin(rh ResponseHandler) ResponseHandler {
 }
 
 // LoginFormAction gets the action parameter (POST URL) of a login form.
-func LoginFormAction(resp *http.Response) (string, error) {
+func loginFormAction(resp *http.Response) (string, error) {
 	form := bufio.NewScanner(resp.Body)
 	for form.Scan() {
 		if strings.Contains(form.Text(), "http://") {
@@ -128,10 +128,10 @@ func LoginFormAction(resp *http.Response) (string, error) {
 // PostLoginForm returns a ResponseHandler that can be passed to
 // OpenWebBrowser which will complete a login form with the given
 // Username and Password, and return the result.
-func PostLoginForm(username, password string) ResponseHandler {
+func postLoginForm(username, password string) responseHandler {
 	return func(client *http.Client, resp *http.Response) (*http.Response, error) {
 		defer resp.Body.Close()
-		purl, err := LoginFormAction(resp)
+		purl, err := loginFormAction(resp)
 		if err != nil {
 			return nil, errgo.Mask(err)
 		}
@@ -149,7 +149,7 @@ func PostLoginForm(username, password string) ResponseHandler {
 func main() {
 	rpcclient, err := (&rpc.Dialer{}).Dial(context.TODO(), "ws://0.0.0.0:17070/api")
 	if err != nil {
-		log.Fatal("oh noes, ", err)
+		log.Fatal("failed to dial controller:", err)
 	}
 	respres := jujuparams.LoginResult{}
 
@@ -163,7 +163,7 @@ func main() {
 	bakeryclient := httpbakery.NewClient()
 
 	bakeryclient.AddInteractor(httpbakery.WebBrowserInteractor{
-		OpenWebBrowser: OpenWebBrowser(SelectInteractiveLogin(PostLoginForm("jimm", "jimm"))),
+		OpenWebBrowser: openWebBrowser(selectInteractiveLogin(postLoginForm("jimm", "jimm"))),
 	})
 
 	discharged, err := bakeryclient.DischargeAll(context.TODO(), macaroon)

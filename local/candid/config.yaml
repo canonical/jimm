@@ -17,6 +17,7 @@ identity-providers:
 - type: static
   name: static
   description: Default identity provider
+  domain: candid.localhost
   users:
     jimm:
       name: JIMM User
