@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"strings"
 
 	"github.com/CanonicalLtd/jimm/api/params"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
@@ -16,6 +15,7 @@ import (
 	"github.com/juju/juju/cmd/juju/status"
 	"github.com/juju/juju/cmd/juju/storage"
 	rpcparams "github.com/juju/juju/rpc/params"
+	"github.com/juju/names/v4"
 	"github.com/juju/zaputil/zapctx"
 )
 
@@ -39,9 +39,9 @@ func (j *JIMM) QueryModelsJq(ctx context.Context, modelUUIDs []string, jqQuery s
 
 	// We remove "model:" from the UUIDs, unfortunately that's what OpenFGA returns now after
 	// recent versions.
-	for i := range modelUUIDs {
-		modelUUIDs[i] = strings.Split(modelUUIDs[i], ":")[1]
-	}
+	// for i := range modelUUIDs {
+	// 	modelUUIDs[i] = strings.Split(modelUUIDs[i], ":")[1]
+	// }
 
 	// Set up a formatterParamsRetriever to handle the heavy lifting
 	// of each facade call and type conversion.
@@ -171,7 +171,11 @@ func (f *formatterParamsRetriever) loadModel(ctx context.Context, modelUUID stri
 
 // dialModel dials the model currently loaded into the formatterParamsRetriever.
 func (f *formatterParamsRetriever) dialModel(ctx context.Context) error {
-	api, err := f.jimm.dial(ctx, &f.model.Controller, f.model.ResourceTag())
+	modelTag, ok := f.model.Tag().(names.ModelTag)
+	if !ok {
+		return errors.E(errors.Op("failed to parse model tag"))
+	}
+	api, err := f.jimm.dial(ctx, &f.model.Controller, modelTag)
 	if err != nil {
 		zapctx.Error(ctx, "failed to dial controller for model", zap.String("controller-uuid", f.model.Controller.UUID), zap.String("model-uuid", f.model.UUID.String), zap.Error(err))
 	}

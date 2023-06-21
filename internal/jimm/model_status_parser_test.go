@@ -10,17 +10,11 @@ import (
 	"github.com/juju/juju/core/life"
 	"github.com/juju/juju/core/status"
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
 
 	"github.com/CanonicalLtd/jimm/internal/db"
-	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/jimm"
 	"github.com/CanonicalLtd/jimm/internal/jimmtest"
-	"github.com/CanonicalLtd/jimm/internal/openfga"
-	ofga "github.com/CanonicalLtd/jimm/internal/openfga"
-	ofganames "github.com/CanonicalLtd/jimm/internal/openfga/names"
-	jimmnames "github.com/CanonicalLtd/jimm/pkg/names"
 )
 
 var now = (time.Time{}).UTC().Round(time.Millisecond)
@@ -58,6 +52,9 @@ models:
     status: available
     info: "OK!"
     since: 2020-02-20T20:02:20Z
+  users:
+  - user: alice@external
+    access: admin
 - name: model-2
   type: iaas
   uuid: 20000000-0000-0000-0000-000000000000
@@ -72,6 +69,9 @@ models:
     status: available
     info: "OK!"
     since: 2020-02-20T20:02:20Z
+  users:
+  - user: alice@external
+    access: admin
 - name: model-3
   type: iaas
   uuid: 30000000-0000-0000-0000-000000000000
@@ -86,6 +86,9 @@ models:
     status: available
     info: "OK!"
     since: 2020-02-20T20:02:20Z
+  users:
+  - user: alice@external
+    access: admin
 - name: model-5
   type: iaas
   uuid: 50000000-0000-0000-0000-000000000000
@@ -299,16 +302,11 @@ func TestQueryModelsJq(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
-	// Test setup
-	_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name())
-	c.Assert(err, qt.IsNil)
-
 	j := &jimm.JIMM{
 		UUID: uuid.NewString(),
 		Database: db.Database{
 			DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
 		},
-		OpenFGAClient: client,
 		Dialer: jimmtest.ModelDialerMap{
 			"10000000-0000-0000-0000-000000000000": &jimmtest.Dialer{
 				API: &jimmtest.API{
@@ -405,76 +403,28 @@ func TestQueryModelsJq(t *testing.T) {
 		},
 	}
 
-	err = j.Database.Migrate(ctx, false)
+	err := j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
 	env := jimmtest.ParseEnvironment(c, crossModelQueryEnv)
-	env.PopulateDB(c, j.Database, nil)
+	env.PopulateDB(c, j.Database)
+
+	user := env.User("alice@external").DBObject(c, j.Database)
 
 	modelUUIDs := []string{
 		"10000000-0000-0000-0000-000000000000",
 		"20000000-0000-0000-0000-000000000000",
 		"30000000-0000-0000-0000-000000000000",
-		"40000000-0000-0000-0000-000000000000", // Erroneous model (doesn't exist).
 		"50000000-0000-0000-0000-000000000000", // Erroneous model (storage errors).
 	}
 
-	c.Assert(j.OpenFGAClient.AddRelations(ctx,
-		[]ofga.Tuple{
-			// Reader to model via direct relation
-			{
-				Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
-				Relation: ofganames.ReaderRelation,
-				Target:   ofganames.ConvertTag(names.NewModelTag(modelUUIDs[0])),
-			},
-			{
-				Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
-				Relation: ofganames.ReaderRelation,
-				Target:   ofganames.ConvertTag(names.NewModelTag(modelUUIDs[4])),
-			},
-			// Reader to model via group
-			{
-				Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
-				Relation: ofganames.MemberRelation,
-				Target:   ofganames.ConvertTag(jimmnames.NewGroupTag("1")),
-			},
-			{
-				Object:   ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag("1"), ofganames.MemberRelation),
-				Relation: ofganames.ReaderRelation,
-				Target:   ofganames.ConvertTag(names.NewModelTag(modelUUIDs[1])),
-			},
-			// Reader to model via administrator of controller
-			{
-				Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
-				Relation: ofganames.AdministratorRelation,
-				Target:   ofganames.ConvertTag(names.NewControllerTag("00000000-0000-0000-0000-000000000000")),
-			},
-			{
-				Object:   ofganames.ConvertTag(names.NewControllerTag("00000000-0000-0000-0000-000000000000")),
-				Relation: ofganames.ControllerRelation,
-				Target:   ofganames.ConvertTag(names.NewModelTag(modelUUIDs[2])),
-			},
-			// Reader to model via direct relation that does NOT exist
-			{
-				Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
-				Relation: ofganames.ReaderRelation,
-				Target:   ofganames.ConvertTag(names.NewModelTag(modelUUIDs[3])),
-			},
-		}...,
-	), qt.Equals, nil)
-
-	alice := openfga.NewUser(
-		&dbmodel.User{
-			Username: "alice@external",
-		},
-		client,
-	)
-
-	// Tests:
-
 	// Query for all models only.
-	userModelUUIDs, err := alice.ListModels(ctx)
+	userModels, err := j.Database.GetUserModels(ctx, &user)
 	c.Assert(err, qt.IsNil)
+	userModelUUIDs := make([]string, len(userModels))
+	for i, m := range userModels {
+		userModelUUIDs[i] = m.Model_.UUID.String
+	}
 
 	res, err := j.QueryModelsJq(ctx, userModelUUIDs, ".model")
 	c.Assert(err, qt.IsNil)
@@ -528,9 +478,6 @@ func TestQueryModelsJq(t *testing.T) {
 			]
 		},
 		"errors": {
-			"40000000-0000-0000-0000-000000000000": [
-				"model not found"
-			],
 			"50000000-0000-0000-0000-000000000000": [
 				"forcing an error on model 5"
 			]
@@ -539,8 +486,10 @@ func TestQueryModelsJq(t *testing.T) {
 	`, qt.JSONEquals, res)
 
 	// Query all applications across all models.
-	userModelUUIDs, err = alice.ListModels(ctx)
-	c.Assert(err, qt.IsNil)
+	// Reset the model UUID for test (as it mutates the slice)
+	for i, m := range userModels {
+		userModelUUIDs[i] = m.Model_.UUID.String
+	}
 
 	res, err = j.QueryModelsJq(ctx, userModelUUIDs, ".applications")
 	c.Assert(err, qt.IsNil)
@@ -678,9 +627,6 @@ func TestQueryModelsJq(t *testing.T) {
 		  ]
 		},
 		"errors": {
-			"40000000-0000-0000-0000-000000000000": [
-				"model not found"
-			],
 			"50000000-0000-0000-0000-000000000000": [
 				"forcing an error on model 5"
 			]
@@ -689,8 +635,10 @@ func TestQueryModelsJq(t *testing.T) {
 	`, qt.JSONEquals, res)
 
 	// Query specifically for models including the app "nginx-ingress-integrator"
-	userModelUUIDs, err = alice.ListModels(ctx)
-	c.Assert(err, qt.IsNil)
+	// Reset the model UUID for test (as it mutates the slice)
+	for i, m := range userModels {
+		userModelUUIDs[i] = m.Model_.UUID.String
+	}
 
 	res, err = j.QueryModelsJq(ctx, userModelUUIDs, ".applications | with_entries(select(.key==\"nginx-ingress-integrator\"))")
 	c.Assert(err, qt.IsNil)
@@ -746,9 +694,6 @@ func TestQueryModelsJq(t *testing.T) {
 		  ]
 		},
 		"errors": {
-			"40000000-0000-0000-0000-000000000000": [
-				"model not found"
-			],
 			"50000000-0000-0000-0000-000000000000": [
 				"forcing an error on model 5"
 			]
@@ -757,8 +702,10 @@ func TestQueryModelsJq(t *testing.T) {
 	`, qt.JSONEquals, res)
 
 	// Query specifically for storage on this model.
-	userModelUUIDs, err = alice.ListModels(ctx)
-	c.Assert(err, qt.IsNil)
+	// Reset the model UUID for test (as it mutates the slice)
+	for i, m := range userModels {
+		userModelUUIDs[i] = m.Model_.UUID.String
+	}
 
 	res, err = j.QueryModelsJq(ctx, userModelUUIDs, ".storage")
 	c.Assert(err, qt.IsNil)
@@ -805,9 +752,6 @@ func TestQueryModelsJq(t *testing.T) {
 		  ]
 		},
 		"errors": {
-		  "40000000-0000-0000-0000-000000000000": [
-			"model not found"
-		  ],
 		  "50000000-0000-0000-0000-000000000000": [
 			"forcing an error on model 5"
 		]
