@@ -115,6 +115,8 @@ func getFullStatus(
 	modelName string,
 	applications map[string]jujuparams.ApplicationStatus,
 	remoteApps map[string]jujuparams.RemoteApplicationStatus,
+	modelRelations []jujuparams.RelationStatus,
+
 ) jujuparams.FullStatus {
 	return jujuparams.FullStatus{
 		Model: jujuparams.ModelStatusInfo{
@@ -136,7 +138,7 @@ func getFullStatus(
 		Applications:       applications,
 		RemoteApplications: remoteApps,
 		Offers:             map[string]jujuparams.ApplicationOfferStatus{},
-		Relations:          []jujuparams.RelationStatus(nil),
+		Relations:          modelRelations,
 		Branches:           map[string]jujuparams.BranchStatus{},
 	}
 }
@@ -198,6 +200,22 @@ var model1 = getFullStatus("model-1", map[string]jujuparams.ApplicationStatus{
 				Status: "active",
 				Info:   "Live master (12.14)",
 				Since:  &now,
+			},
+		},
+	},
+	[]jujuparams.RelationStatus{
+		{
+			Id:        0,
+			Key:       "myapp",
+			Interface: "db",
+			Scope:     "regular",
+			Endpoints: []jujuparams.EndpointStatus{
+				{
+					ApplicationName: "myapp",
+					Name:            "db",
+					Role:            "myrole",
+					Subordinate:     false,
+				},
 			},
 		},
 	},
@@ -286,15 +304,18 @@ var model2 = getFullStatus("model-2", map[string]jujuparams.ApplicationStatus{
 	},
 },
 	nil,
+	nil,
 )
 
 // Model3 holds an empty model
 var model3 = getFullStatus("model-3", map[string]jujuparams.ApplicationStatus{},
 	nil,
+	nil,
 )
 
 // Model5 holds an empty model, but it's API returns an error for storage
 var model5 = getFullStatus("model-5", map[string]jujuparams.ApplicationStatus{},
+	nil,
 	nil,
 )
 
@@ -518,7 +539,11 @@ func TestQueryModelsJq(t *testing.T) {
 				"provider-id": "10000000-0000-0000-0000-000000000000",
 				"relations": {
 				  "db": [
-					"myapp"
+					{
+						"interface": "db",
+						"related-application": "myapp",
+						"scope": "regular"
+					}
 				  ]
 				},
 				"scale": 1,
@@ -754,9 +779,8 @@ func TestQueryModelsJq(t *testing.T) {
 		"errors": {
 		  "50000000-0000-0000-0000-000000000000": [
 			"forcing an error on model 5"
-		]
+		  ]
 		}
 	}
 	`, qt.JSONEquals, res)
-
 }
