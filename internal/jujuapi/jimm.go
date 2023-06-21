@@ -4,6 +4,7 @@ package jujuapi
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/juju/juju/core/network"
@@ -35,6 +36,7 @@ func init() {
 		updateMigratedModelMethod := rpc.Method(r.UpdateMigratedModel)
 		addCloudToControllerMethod := rpc.Method(r.AddCloudToController)
 		removeCloudFromControllerMethod := rpc.Method(r.RemoveCloudFromController)
+		crossModelQueryMethod := rpc.Method(r.CrossModelQuery)
 
 		r.AddMethod("JIMM", 2, "DisableControllerUUIDMasking", disableControllerUUIDMaskingMethod)
 		r.AddMethod("JIMM", 2, "ListControllers", listControllersMethod)
@@ -52,6 +54,7 @@ func init() {
 		r.AddMethod("JIMM", 3, "UpdateMigratedModel", updateMigratedModelMethod)
 		r.AddMethod("JIMM", 3, "AddCloudToController", addCloudToControllerMethod)
 		r.AddMethod("JIMM", 3, "RemoveCloudFromController", removeCloudFromControllerMethod)
+		r.AddMethod("JIMM", 3, "CrossModelQuery", crossModelQueryMethod)
 
 		return []int{2, 3}
 	}
@@ -440,4 +443,30 @@ func (r *controllerRoot) RemoveCloudFromController(ctx context.Context, req apip
 		return errors.E(op, err)
 	}
 	return nil
+}
+
+// CrossModelQuery enables users to query all of their available models and each entity within the model.
+//
+// The query will run against output exactly like "juju status --format json", but for each of their models.
+func (r *controllerRoot) CrossModelQuery(ctx context.Context, req apiparams.CrossModelQueryRequest) (apiparams.CrossModelQueryResponse, error) {
+	const op = errors.Op("jujuapi.CrossModelQuery")
+
+	models, err := r.jimm.Database.GetUserModels(ctx, r.user)
+	modelUUIDs := make([]string, len(models))
+
+	for i, m := range models {
+		modelUUIDs[i] = m.Model_.UUID.String
+	}
+
+	if err != nil {
+		return apiparams.CrossModelQueryResponse{}, errors.E(op, errors.Code("failed to get models for user"))
+	}
+	switch strings.TrimSpace(strings.ToLower(req.Type)) {
+	case "jq":
+		return r.jimm.QueryModelsJq(ctx, modelUUIDs, req.Query)
+	case "jimmsql":
+		return apiparams.CrossModelQueryResponse{}, errors.E(op, errors.CodeNotImplemented)
+	default:
+		return apiparams.CrossModelQueryResponse{}, errors.E(op, errors.Code("invalid query type"), "unable to query models")
+	}
 }
