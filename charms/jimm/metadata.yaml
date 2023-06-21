@@ -17,7 +17,7 @@ provides:
 
 requires:
   db:
-    interface: pgsql
+    interface: postgresql_client
   vault:
     interface: vault-kv
     optional: true
