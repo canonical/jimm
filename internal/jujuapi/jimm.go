@@ -479,9 +479,13 @@ func (r *controllerRoot) RemoveCloudFromController(ctx context.Context, req apip
 // The query will run against output exactly like "juju status --format json", but for each of their models.
 func (r *controllerRoot) CrossModelQuery(ctx context.Context, req apiparams.CrossModelQueryRequest) (apiparams.CrossModelQueryResponse, error) {
 	const op = errors.Op("jujuapi.CrossModelQuery")
+	modelUUIDs, err := r.user.ListModels(ctx)
+	if err != nil {
+		return apiparams.CrossModelQueryResponse{}, errors.E(op, errors.Code("failed to get models for user"))
+	}
 	switch strings.TrimSpace(strings.ToLower(req.Type)) {
 	case "jq":
-		return r.jimm.QueryModelsJq(ctx, r.user, req.Query)
+		return r.jimm.QueryModelsJq(ctx, modelUUIDs, req.Query)
 	case "jimmsql":
 		return apiparams.CrossModelQueryResponse{}, errors.E(op, errors.CodeNotImplemented)
 	default:
