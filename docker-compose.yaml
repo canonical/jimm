@@ -1,38 +1,62 @@
 version: "3.9"
 
 services:
+  traefik:
+    image: "traefik:2.9"
+    container_name: traefik
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8089:8080"
+    volumes:
+      - ./local/traefik/traefik.yaml:/etc/traefik/traefik.yaml
+      - ./local/traefik/certs:/certs/
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: 
+        - CMD
+        - traefik
+        - healthcheck
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    
   jimm:
     image: cosmtrek/air
+    profiles: ["dev"]
+    # extra_hosts:
+    # - "host.docker.internal:host-gateway"
     # working_dir value has to be the same of mapped volume
+    hostname: jimm.localhost
     working_dir: /jimm
     container_name: jimmy
     ports:
-      - 17070:8080
+      - 17070:80
     environment:
-      JIMM_UUID: "diglett-123-diglett-456-diglett"
+      JIMM_UUID: "3217dbc9-8ea9-4381-9e97-01eab0b3f6bb"
       JIMM_DSN: "postgresql://jimm:jimm@db/jimm"
       CANDID_URL: "http://0.0.0.0:8081" # For external client redirects (in the case of compose and running outside)
       # Hardcoded pre-generated key, see ./local/candid/config.yaml
       CANDID_PUBLIC_KEY: "CIdWcEUN+0OZnKW9KwruRQnQDY/qqzVdD30CijwiWCk="
       # Not needed for local test (yet).
       # BAKERY_AGENT_FILE: ""
-      JIMM_ADMINS: "jimm"
+      JIMM_ADMINS: "jimm@candid.localhost"
       VAULT_ADDR: "http://vault:8200"
       VAULT_PATH: "/jimm-kv/"
-      VAULT_SECRET_FILE: "/vault/approle.yaml"
+      VAULT_SECRET_FILE: "/vault/approle.json"
       VAULT_AUTH_PATH: "/auth/approle/login"
-      # Where we gonna grab this?...
       # JIMM_DASHBOARD_LOCATION: ""
-      JIMM_DNS_NAME: "127.0.0.1:17070"
+      JIMM_DNS_NAME: "jimm.localhost"
       JIMM_WATCH_CONTROLLERS: ""
-      JIMM_LISTEN_ADDR: "0.0.0.0:8080"
+      JIMM_LISTEN_ADDR: "0.0.0.0:80"
       JIMM_TEST_PGXDSN: ""
       TEST_LOGGING_CONFIG: ""
     volumes:
       - ./:/jimm/
-      - ./local/vault/approle.yaml:/vault/approle.yaml:rw
+      - ./local/vault/approle.json:/vault/approle.json:rw
+      - ./local/vault/roleid.txt:/vault/roleid.txt:rw
     healthcheck:
-      test: [ "CMD", "curl", "http://localhost:8080" ]
+      test: [ "CMD", "curl", "http://jimm.localhost:80" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -88,7 +112,8 @@ services:
       - ./local/vault/vault.hcl:/vault/config/vault.hcl
       - ./local/vault/init.sh:/vault/init.sh
       - ./local/vault/policy.hcl:/vault/policy.hcl
-      - ./local/vault/approle.yaml:/vault/approle.yaml
+      - ./local/vault/approle.json:/vault/approle.json
+      - ./local/vault/roleid.txt:/vault/roleid.txt:rw
     command: /vault/init.sh
     depends_on:
       db:

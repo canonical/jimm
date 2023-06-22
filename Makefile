@@ -2,11 +2,12 @@
 # Makefile for the JIMM service.
 
 export GO111MODULE=on
+export DOCKER_BUILDKIT=1
 
 PROJECT := github.com/CanonicalLtd/jimm
 
 GIT_COMMIT := $(shell git rev-parse --verify HEAD)
-GIT_VERSION := $(shell git describe --dirty)
+GIT_VERSION := $(shell git describe --abbrev=0 --dirty)
 
 ifeq ($(shell uname -p | sed -r 's/.*(x86|armel|armhf).*/golang/'), golang)
 	GO_C := golang
@@ -79,9 +80,24 @@ jimm-release/bin/jimmsrv: jimmsrv
 	mkdir -p jimm-release/bin
 	cp jemd jimm-release/bin
 
+jimm-image:
+	docker build --target deploy-env \
+	--build-arg="GIT_COMMIT=$(GIT_COMMIT)" \
+	--build-arg="VERSION=$(GIT_VERSION)" \
+	--tag jimm:latest .
+
+jimm-snap:
+	mkdir -p ./snap
+	cp ./snaps/jimm/snapcraft.yaml ./snap/
+	snapcraft 
+
+push-microk8s: jimm-image
+	docker tag jimm:latest localhost:32000/jimm:latest
+	docker push localhost:32000/jimm:latest
+
 pull/candid:
 	-git clone https://github.com/canonical/candid.git ./tmp/candid
-	(cd ./tmp/candid && make image auth=pat)
+	(cd ./tmp/candid && make image)
 	docker image ls candid
 
 get-local-auth:
@@ -98,6 +114,7 @@ ifeq ($(shell lsb_release -cs|sed -r 's/precise|quantal|raring/old/'),old)
 endif
 	@echo Installing dependencies
 	@sudo apt-get update
+	@sudo snap install juju-db --channel 4.4/stable 
 	@sudo apt-get --yes install $(strip $(DEPENDENCIES)) \
 	  $(shell apt-cache madison juju-mongodb mongodb-server | head -1 | cut -d '|' -f1)
 else
