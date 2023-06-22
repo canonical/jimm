@@ -14,6 +14,10 @@ import tarfile
 import urllib
 
 import hvac
+from charms.data_platform_libs.v0.data_interfaces import (
+    DatabaseRequires,
+    DatabaseRequiresEvent,
+)
 from charmhelpers.contrib.charmsupport.nrpe import NRPE
 from jinja2 import Environment, FileSystemLoader
 from ops.main import main
@@ -28,6 +32,7 @@ from systemd import SystemdCharm
 
 logger = logging.getLogger(__name__)
 
+DATABASE_NAME = "jimm"
 
 class JimmCharm(SystemdCharm):
     """Charm for the JIMM service."""
@@ -35,9 +40,6 @@ class JimmCharm(SystemdCharm):
     def __init__(self, *args):
         super().__init__(*args)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
-        self.framework.observe(
-            self.on.db_relation_changed, self._on_db_relation_changed
-        )
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.leader_elected, self._on_leader_elected)
         self.framework.observe(self.on.start, self._on_start)
@@ -60,6 +62,18 @@ class JimmCharm(SystemdCharm):
             self.on.dashboard_relation_joined,
             self._on_dashboard_relation_joined,
         )
+
+        self.database = DatabaseRequires(
+            self,
+            relation_name="db",
+            database_name=DATABASE_NAME,
+        )
+        self.framework.observe(self.database.on.database_created, self._on_database_event)
+        self.framework.observe(
+            self.database.on.endpoints_changed,
+            self._on_database_event,
+        )
+
         self._agent_filename = "/var/snap/jimm/common/agent.json"
         self._vault_secret_filename = "/var/snap/jimm/common/vault_secret.json"
         self._workload_filename = "/snap/bin/jimm"
@@ -125,6 +139,7 @@ class JimmCharm(SystemdCharm):
                 }
             )
 
+
     def _on_leader_elected(self, _):
         """Update the JIMM configuration that comes from unit
         leadership."""
@@ -138,19 +153,28 @@ class JimmCharm(SystemdCharm):
             self.restart()
         self._on_update_status(None)
 
-    def _on_db_relation_changed(self, event):
-        """Update the JIMM configuration that comes from database
-        relations."""
 
-        dsn = event.relation.data[event.unit].get("master")
-        if not dsn:
+    def _on_database_event(self, event: DatabaseRequiresEvent):
+        """Handle database event"""
+
+        if not event.endpoints:
+            logger.info("received empty database host address")
+            event.defer()
             return
-        args = {"dsn": "pgx:" + dsn}
+
+        # get the first endpoint from a comma separate list
+        host = event.endpoints.split(",", 1)[0]
+        # compose the db connection string
+        uri = f"postgresql://{event.username}:{event.password}@{host}/{DATABASE_NAME}"
+        logger.info("received database uri: {}".format(uri))
+
+        args = {"dsn": uri}
         with open(self._env_filename("db"), "wt") as f:
             f.write(self._render_template("jimm-db.env", **args))
         if self._ready():
             self.restart()
         self._on_update_status(None)
+
 
     def _on_stop(self, _):
         """Stop the JIMM service."""
