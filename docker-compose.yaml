@@ -39,6 +39,13 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      traefik:
+        condition: service_healthy
+    labels:
+      traefik.enable: true
+      traefik.http.routers.httpd.rule: Host(`jimm.localhost`)
+      traefik.http.routers.httpd.entrypoints: websecure
+      traefik.http.routers.httpd.tls: true
 
   db:
     image: postgres
@@ -103,32 +110,15 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      traefik:
+          condition: service_healthy
     healthcheck:
       test: [ "CMD", "curl", "http://localhost:8081/debug/status" ]
       interval: 5s
       timeout: 5s
       retries: 5
-
-  migrateopenfga:
-    image: openfga/openfga:latest
-    container_name: migrateopenfga
-    command: migrate --datastore-engine postgres --datastore-uri 'postgresql://jimm:jimm@db/jimm?sslmode=disable'
-    depends_on:
-      db:
-        condition: service_healthy
-
-  openfga:
-    image: openfga/openfga:latest
-    container_name: openfga
-    command: run --datastore-engine postgres --datastore-uri 'postgresql://jimm:jimm@db/jimm?sslmode=disable'
-    ports:
-      - 8080:8080
-      - 3000:3000
-    depends_on:
-      migrateopenfga:
-        condition: service_completed_successfully
-    healthcheck:
-      test: [ "CMD", "curl", "http://localhost:8080/healthz" ]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+    labels:
+      traefik.enable: true
+      traefik.http.routers.httpd.rule: Host(`candid.localhost`)
+      traefik.http.routers.httpd.entrypoints: websecure
+      traefik.http.routers.httpd.tls: true
