@@ -10,41 +10,17 @@
 #
 # Requirements to run this script:
 # - yq (snap)
+set -ux
 
-JIMM_CONTROLLER_NAME=$1
-CONTROLLER_NAME=$2
-CONTROLLER_YAML_PATH=$3
-CLIENT_CREDENTIAL_NAME=$4
-
-echo "Checking environment..."
-if [ -z "$JIMM_CONTROLLER_NAME" ];
-then
-    echo "- JIMM controller name NOT SET, setting it to 'jimm-dev'"
-    JIMM_CONTROLLER_NAME="jimm-dev"
-fi
-
-if [ -z "$CONTROLLER_NAME" ];
-then
-    echo "- Controller name NOT SET, setting it to 'qa-controller'"
-    CONTROLLER_NAME="qa-controller"
-fi
-
-if [ -z "$CONTROLLER_YAML_PATH" ];
-then
-    echo "- Controller YAML path NOT SET, setting it to './qa-controller'"
-    CONTROLLER_YAML_PATH="./qa-controller"
-fi
-
-if [ -z "$CLIENT_CREDENTIAL_NAME" ];
-then
-    echo "- Client credential name NOT SET, setting it to 'microk8s'"
-    CLIENT_CREDENTIAL_NAME="localhost"
-fi
+JIMM_CONTROLLER_NAME="${1:-jimm-dev}"
+CONTROLLER_NAME="${2:-qa-controller}"
+CONTROLLER_YAML_PATH="${3:-qa-controller.yaml}"
+CLIENT_CREDENTIAL_NAME="${4:-localhost}"
 
 echo
 echo "JIMM controller name is: $JIMM_CONTROLLER_NAME"
-echo "Targ controller name is: $CONTROLLER_NAME"
-echo "Targ controller path is: $CONTROLLER_YAML_PATH"
+echo "Target controller name is: $CONTROLLER_NAME"
+echo "Target controller path is: $CONTROLLER_YAML_PATH"
 echo
 echo "Building jimmctl..."
 # Build jimmctl so we may add a controller.
