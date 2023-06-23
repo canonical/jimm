@@ -26,16 +26,6 @@ The services included are:
 to re-run the compose continuously, but note, if you do bring the compose down, remove the volumes otherwise
 vault will not behave correctly, this can be done via `docker compose down -v`
 
-If all was successful, you should seen an output similar to:
-```
-NAME                COMMAND                  SERVICE             STATUS                PORTS
-candid              candid:latest       "/candid.sh"             candid              About a minute ago   Up About a minute (healthy)     ...
-jimmy               cosmtrek/air        "/go/bin/air"            jimm                About a minute ago   Up 54 seconds (healthy)         ...
-postgres            postgres            "docker-entrypoint.s…"   db                  About a minute ago   Up About a minute (healthy)     ...
-traefik             traefik:2.9         "/entrypoint.sh trae…"   traefik             About a minute ago   Up About a minute (healthy)     ...
-vault               vault:latest        "docker-entrypoint.s…"   vault               About a minute ago   Up About a minute (unhealthy)   ...
-```
-
 Now please checkout the [Authentication Steps](#authentication-steps) to authenticate postman for local testing & Q/A.
 
 # Q/A Using Postman
@@ -54,12 +44,7 @@ The `request name` represents the literal WS endpoint, i.e., `API = /api`.
 
 # Q/A Using jimmctl
 
-## Prerequisited
-
-1. Make sure you are using latest juju from their develop branch (at the moment, we're using 3.2-beta1).
-2. change jujuClientVersion in `internal/jujuclient/dial.go` to **3.2-beta1** by running: ``sed -i 's/jujuClientVersion = "2.9.42"/jujuClientVersion = "3.2-beta1"/g' ./internal/jujuclient/dial.go``
-
-Steps:
+## Prerequisites
 
 1. `juju unregister jimm-dev`                                       - Unregister any other local JIMM you have.
 2. `juju login jimm.localhost -c jimm-dev`                          - Login to local JIMM. (If you name the controller jimm-dev, the script will pick it up!)

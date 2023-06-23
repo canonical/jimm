@@ -12,10 +12,10 @@
 # - yq (snap)
 set -ux
 
-JIMM_CONTROLLER_NAME="${1:-jimm-dev}"
-CONTROLLER_NAME="${2:-qa-controller}"
-CONTROLLER_YAML_PATH="${3:-qa-controller.yaml}"
-CLIENT_CREDENTIAL_NAME="${4:-localhost}"
+JIMM_CONTROLLER_NAME="${JIMM_CONTROLLER_NAME:-jimm-dev}"
+CONTROLLER_NAME="${CONTROLLER_NAME:-qa-controller}"
+CONTROLLER_YAML_PATH="${CONTROLLER_YAML_PATH:-qa-controller.yaml}"
+CLIENT_CREDENTIAL_NAME="${CLIENT_CREDENTIAL_NAME:-localhost}"
 
 echo
 echo "JIMM controller name is: $JIMM_CONTROLLER_NAME"
