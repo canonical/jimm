@@ -10,11 +10,11 @@
 #
 # Requirements to run this script:
 # - yq (snap)
-set -ux
+set -eux
 
 JIMM_CONTROLLER_NAME="${JIMM_CONTROLLER_NAME:-jimm-dev}"
 CONTROLLER_NAME="${CONTROLLER_NAME:-qa-controller}"
-CONTROLLER_YAML_PATH="${CONTROLLER_YAML_PATH:-qa-controller.yaml}"
+CONTROLLER_YAML_PATH="${CONTROLLER_NAME}".yaml
 CLIENT_CREDENTIAL_NAME="${CLIENT_CREDENTIAL_NAME:-localhost}"
 
 echo
@@ -38,16 +38,6 @@ else
     echo "Controller info couldn't be created, exiting..."
     exit 1
 fi
-echo
-echo "Retrieving controller address"
-CONTROLLER_ADDRESS=$(cat "$CONTROLLER_YAML_PATH" | yq '.public-address' |  cut -d ":" -f 1)
-echo "Controller address is: $CONTROLLER_ADDRESS" 
-echo
-echo "Updating $CONTROLLER_YAML_PATH public-address..."
-yq -i e '.public-address |= "juju-apiserver:17070"' "$CONTROLLER_YAML_PATH"
-echo
-echo "Updating containers /etc/hosts..."
-docker compose exec -w /etc --no-TTY jimm bash -c "echo '$CONTROLLER_ADDRESS juju-apiserver' >> hosts"
 echo
 echo "Adding controller from path: $CONTROLLER_YAML_PATH"
 ./jimmctl add-controller "$CONTROLLER_YAML_PATH"

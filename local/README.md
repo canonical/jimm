@@ -10,8 +10,8 @@ used for integration testing within the JIMM test suite.
 3. Run `make pull/candid` to get a local image of candid (this is subject to change!)
 4. Run `cd local/traefik/certs; ./certs.sh; cd -`, this will setup some self signed certs and add them to your cert pool.
 5. Run `touch ./local/vault/approle.json && touch ./local/vault/roleid.txt`
-6. Run `make version/commit.txt` to populate the repo with the git commit info.
-7. Run `make version/version.txt` to populate the repo with the git version info.
+6. Run `make version/commit.txt && make version/version.txt` to populate the repo with the git commit and version info.
+7. Run `go mod vendor` to vendor JIMM's dependencies and reduce repeated setup time.
 8. `docker compose --profile dev up` if you encounter an error like "Error response from daemon: network ... not found" then the command `docker compose --profile dev up --force-recreate` should help.
 
 After this initial setup, subsequent use of the compose can be done with `docker compose --profile dev up --force-recreate`
@@ -45,6 +45,11 @@ The `request name` represents the literal WS endpoint, i.e., `API = /api`.
 # Q/A Using jimmctl
 
 ## Prerequisites
+
+// TODO(): Ipv6 network on the Juju container don't work with JIMM. Figure out how to disable these at the container level so that the controller.yaml file doesn't present ipv6 at all. For now one can remove this by hand.
+
+Note that you can export an environment variable `CONTROLLER_NAME` and re-run steps 3. and 4. below to create multiple Juju
+controllers that will be controlled by JIMM.
 
 1. `juju unregister jimm-dev`                                       - Unregister any other local JIMM you have.
 2. `juju login jimm.localhost -c jimm-dev`                          - Login to local JIMM. (If you name the controller jimm-dev, the script will pick it up!)
