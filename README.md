@@ -31,11 +31,35 @@ them in `$GOPATH/bin`. This is the list of the installed commands:
 - jemd: start the JIMM server;
 - jaas-admin: perform admin commands on JIMM;
 
-### Docker-compose:
+### Docker compose:
 See [here](./local/README.md) on how to get started.
 
 ## Testing
 
+### Pre-requisite
+As the juju controller internal suites start their our mongod instances, it is required to have juju-db (mongod).
+This can be installed via: `sudo snap install juju-db`.
+The latest JIMM has an upgraded dependency on Juju which requires in turn requires juju-db from channel `4.4/stable`,
+ this can be installed with `sudo snap install juju-db --channel=4.4/stable`
+
+The rest of the suite relies on PostgreSQL, OpenFGA and Hashicorp Vault which are dockerised
+and as such you may simple run `docker compose up` to be integration test ready.
+The above command won't start a dockerised instance of JIMM as tests are normally run locally. Instead, to start a 
+dockerised JIMM that will auto-reload on code changes, simply run `docker compose --profile dev up`.
+
+### Manual commands
+The tests utilise [go.check](http://labix.org/gocheck) for suites and you may run tests individually like so: 
+```bash
+$ go test -check.f dialSuite.TestDialWithCredentialsStoredInVault`
+$ go test -check.f MyTestSuite
+$ go test -check.f "Test.*Works"
+$ go test -check.f "MyTestSuite.Test.*Works"
+```
+
+For more verbose output, use `-check.v` and `-check.vv`
+
+
+### Make
 Run `make check` to test the application.
 Run `make help` to display help about all the available make targets.
 

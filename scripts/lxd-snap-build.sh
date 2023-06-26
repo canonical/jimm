@@ -5,7 +5,7 @@ set -eu
 
 snap_name=${snap_name:-jimm}
 image=${image:-ubuntu:20.04}
-container=${container:-${snap_name}-snap-`uuidgen`}
+container=${container:-${snap_name}-snap}
 
 lxd_exec() {
 	lxc exec \
@@ -34,6 +34,7 @@ lxd_exec sh -c 'while [ ! -f /var/lib/cloud/instance/boot-finished ]; do sleep 0
 
 lxd_exec apt-get update -q -y
 lxd_exec apt-get upgrade -q -y
+lxd_exec apt-get install build-essential -q -y
 if [ -n "${http_proxy:-}" ]; then
 	lxd_exec snap set system proxy.http=${http_proxy:-}
 	lxd_exec snap set system proxy.https=${https_proxy:-${http_proxy:-}}
