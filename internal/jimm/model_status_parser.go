@@ -19,7 +19,7 @@ import (
 	"github.com/juju/zaputil/zapctx"
 )
 
-// QueryModels queries every model available to a given user.
+// QueryModels queries every specified model in modelUUIDs.
 //
 // The jqQuery must be a valid jq query and can return every result, even iterative listings.
 // If a result is erroneous, for example, bad data type parsing, the resulting struct field
@@ -36,12 +36,6 @@ func (j *JIMM) QueryModelsJq(ctx context.Context, modelUUIDs []string, jqQuery s
 	if err != nil {
 		return results, errors.E(op, err)
 	}
-
-	// We remove "model:" from the UUIDs, unfortunately that's what OpenFGA returns now after
-	// recent versions.
-	// for i := range modelUUIDs {
-	// 	modelUUIDs[i] = strings.Split(modelUUIDs[i], ":")[1]
-	// }
 
 	// Set up a formatterParamsRetriever to handle the heavy lifting
 	// of each facade call and type conversion.
