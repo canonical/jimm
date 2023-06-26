@@ -33,7 +33,7 @@ func (j *JIMM) QueryModelsJq(ctx context.Context, models []dbmodel.Model, jqQuer
 
 	query, err := gojq.Parse(jqQuery)
 	if err != nil {
-		return results, errors.E(op, err)
+		return results, errors.E(op, "failed to parse jq query", err)
 	}
 
 	// Set up a formatterParamsRetriever to handle the heavy lifting
