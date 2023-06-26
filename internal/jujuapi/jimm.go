@@ -451,19 +451,17 @@ func (r *controllerRoot) RemoveCloudFromController(ctx context.Context, req apip
 func (r *controllerRoot) CrossModelQuery(ctx context.Context, req apiparams.CrossModelQueryRequest) (apiparams.CrossModelQueryResponse, error) {
 	const op = errors.Op("jujuapi.CrossModelQuery")
 
-	models, err := r.jimm.Database.GetUserModels(ctx, r.user)
-	modelUUIDs := make([]string, len(models))
-
-	for i, m := range models {
-		modelUUIDs[i] = m.Model_.UUID.String
-	}
-
+	usersModels, err := r.jimm.Database.GetUserModels(ctx, r.user)
 	if err != nil {
 		return apiparams.CrossModelQueryResponse{}, errors.E(op, errors.Code("failed to get models for user"))
 	}
+	models := make([]dbmodel.Model, len(usersModels))
+	for i, m := range usersModels {
+		models[i] = m.Model_
+	}
 	switch strings.TrimSpace(strings.ToLower(req.Type)) {
 	case "jq":
-		return r.jimm.QueryModelsJq(ctx, modelUUIDs, req.Query)
+		return r.jimm.QueryModelsJq(ctx, models, req.Query)
 	case "jimmsql":
 		return apiparams.CrossModelQueryResponse{}, errors.E(op, errors.CodeNotImplemented)
 	default:

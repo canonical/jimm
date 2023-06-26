@@ -12,6 +12,7 @@ import (
 	jujuparams "github.com/juju/juju/rpc/params"
 
 	"github.com/CanonicalLtd/jimm/internal/db"
+	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/jimm"
 	"github.com/CanonicalLtd/jimm/internal/jimmtest"
@@ -440,14 +441,14 @@ func TestQueryModelsJq(t *testing.T) {
 	}
 
 	// Query for all models only.
-	userModels, err := j.Database.GetUserModels(ctx, &user)
+	usersModels, err := j.Database.GetUserModels(ctx, &user)
 	c.Assert(err, qt.IsNil)
-	userModelUUIDs := make([]string, len(userModels))
-	for i, m := range userModels {
-		userModelUUIDs[i] = m.Model_.UUID.String
+	models := make([]dbmodel.Model, len(usersModels))
+	for i, m := range usersModels {
+		models[i] = m.Model_
 	}
 
-	res, err := j.QueryModelsJq(ctx, userModelUUIDs, ".model")
+	res, err := j.QueryModelsJq(ctx, models, ".model")
 	c.Assert(err, qt.IsNil)
 	c.Assert(`
 	{
@@ -507,12 +508,7 @@ func TestQueryModelsJq(t *testing.T) {
 	`, qt.JSONEquals, res)
 
 	// Query all applications across all models.
-	// Reset the model UUID for test (as it mutates the slice)
-	for i, m := range userModels {
-		userModelUUIDs[i] = m.Model_.UUID.String
-	}
-
-	res, err = j.QueryModelsJq(ctx, userModelUUIDs, ".applications")
+	res, err = j.QueryModelsJq(ctx, models, ".applications")
 	c.Assert(err, qt.IsNil)
 	c.Assert(`
 	{
@@ -660,12 +656,7 @@ func TestQueryModelsJq(t *testing.T) {
 	`, qt.JSONEquals, res)
 
 	// Query specifically for models including the app "nginx-ingress-integrator"
-	// Reset the model UUID for test (as it mutates the slice)
-	for i, m := range userModels {
-		userModelUUIDs[i] = m.Model_.UUID.String
-	}
-
-	res, err = j.QueryModelsJq(ctx, userModelUUIDs, ".applications | with_entries(select(.key==\"nginx-ingress-integrator\"))")
+	res, err = j.QueryModelsJq(ctx, models, ".applications | with_entries(select(.key==\"nginx-ingress-integrator\"))")
 	c.Assert(err, qt.IsNil)
 	c.Assert(`
 	{
@@ -727,12 +718,7 @@ func TestQueryModelsJq(t *testing.T) {
 	`, qt.JSONEquals, res)
 
 	// Query specifically for storage on this model.
-	// Reset the model UUID for test (as it mutates the slice)
-	for i, m := range userModels {
-		userModelUUIDs[i] = m.Model_.UUID.String
-	}
-
-	res, err = j.QueryModelsJq(ctx, userModelUUIDs, ".storage")
+	res, err = j.QueryModelsJq(ctx, models, ".storage")
 	c.Assert(err, qt.IsNil)
 
 	// Not the cleanest thing in the world, but this field needs ignoring,
