@@ -112,3 +112,12 @@ func (c *Client) ImportModel(req *params.ImportModelRequest) error {
 func (c *Client) UpdateMigratedModel(req *params.UpdateMigratedModelRequest) error {
 	return c.caller.APICall("JIMM", 3, "", "UpdateMigratedModel", req, nil)
 }
+
+// CrossModelQuery enables users to query all of their available models and each entity within the model.
+//
+// The query will run against output exactly like "juju status --format json", but for each of their models.
+func (c *Client) CrossModelQuery(req *params.CrossModelQueryRequest) (*params.CrossModelQueryResponse, error) {
+	var response params.CrossModelQueryResponse
+	err := c.caller.APICall("JIMM", 4, "", "CrossModelQuery", req, &response)
+	return &response, err
+}

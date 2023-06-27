@@ -237,3 +237,19 @@ type ImportModelRequest struct {
 	// ModelTag is the tag of the model that is to be imported.
 	ModelTag string `json:"model-tag"`
 }
+
+// CrossModelQueryRequest holds the parameters to perform a cross model query against
+// JSON model statuses for every model this user has access to.
+type CrossModelQueryRequest struct {
+	Type  string `json:"type"`
+	Query string `json:"query"`
+}
+
+// CrossModelJqQueryResponse holds results for a cross-model query that has been filtered utilising JQ.
+// It has two fields:
+//   - Results - A map of each iterated JQ output result. The key for this map is the model UUID.
+//   - Errors - A map of each iterated JQ *or* Status call error. The key for this map is the model UUID.
+type CrossModelQueryResponse struct {
+	Results map[string][]any    `json:"results"`
+	Errors  map[string][]string `json:"errors"`
+}
