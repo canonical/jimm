@@ -1,22 +1,5 @@
 JAAS Documenation
 ==========================
 
-This directory holds the JAAS documentation:
-
-- tutorials
-- how-tos
-- reference
-- explanations
-
-How to use 
-----------
-
-To compile the documentation locally run: 
-
-`` make install``
-
-followed by:
-
-``make run``
-
-and then visit http://127.0.0.1:8000
+Public JAAS documentation can be found at https://canonical-jaas-documentation.readthedocs-hosted.com/en/latest/
+Source code for the docs can be found at https://github.com/canonical/jaas-documentation
