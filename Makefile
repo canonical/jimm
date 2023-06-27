@@ -47,7 +47,7 @@ clean:
 	-$(RM) -r jimm-release/
 	-$(RM) jimm-*.tar.xz
 
-# Reformat source files.
+# Reformat all source files.
 format:
 	gofmt -w -l .
 
