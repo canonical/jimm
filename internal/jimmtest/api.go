@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
-	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/core/crossmodel"
+	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/version"
 	"github.com/juju/names/v4"
 
@@ -86,11 +86,23 @@ func (w apiWrapper) Close() error {
 	return w.API.Close()
 }
 
+// ModelDialerMap enables the dialing of many models on the same controller,
+// it is designed such that should you need to query multiple models, you can.
+type ModelDialerMap map[string]jimm.Dialer
+
+// Dial implements jimm.Dialer.
+func (m ModelDialerMap) Dial(ctx context.Context, ctl *dbmodel.Controller, mt names.ModelTag) (jimm.API, error) {
+	if d, ok := m[mt.Id()]; ok {
+		return d.Dial(ctx, ctl, mt)
+	}
+	return nil, errors.E(fmt.Sprintf("dialer not configured for controller %s", ctl.Name))
+}
+
 // A DialerMap implements a jimm.Dialer that uses a different Dialer for
 // each controller. The DialerMap is keyed by controller name.
 type DialerMap map[string]jimm.Dialer
 
-// Dialer implements jimm.Dialer.
+// Dial implements jimm.Dialer.
 func (m DialerMap) Dial(ctx context.Context, ctl *dbmodel.Controller, mt names.ModelTag) (jimm.API, error) {
 	if d, ok := m[ctl.Name]; ok {
 		return d.Dial(ctx, ctl, mt)
@@ -149,6 +161,9 @@ type API struct {
 	WatchAll_                          func(context.Context) (string, error)
 	WatchAllModelSummaries_            func(context.Context) (string, error)
 	WatchAllModels_                    func(context.Context) (string, error)
+	ListFilesystems_                   func(ctx context.Context, machines []string) ([]jujuparams.FilesystemDetailsListResult, error)
+	ListVolumes_                       func(ctx context.Context, machines []string) ([]jujuparams.VolumeDetailsListResult, error)
+	ListStorageDetails_                func(ctx context.Context) ([]jujuparams.StorageDetails, error)
 }
 
 func (a *API) AddCloud(ctx context.Context, tag names.CloudTag, cld jujuparams.Cloud) error {
@@ -462,6 +477,27 @@ func (a *API) WatchAll(ctx context.Context) (string, error) {
 		return "", errors.E(errors.CodeNotImplemented)
 	}
 	return a.WatchAll_(ctx)
+}
+
+func (a *API) ListFilesystems(ctx context.Context, machines []string) ([]jujuparams.FilesystemDetailsListResult, error) {
+	if a.ListFilesystems_ == nil {
+		return nil, errors.E(errors.CodeNotImplemented)
+	}
+	return a.ListFilesystems_(ctx, machines)
+}
+
+func (a *API) ListVolumes(ctx context.Context, machines []string) ([]jujuparams.VolumeDetailsListResult, error) {
+	if a.ListVolumes_ == nil {
+		return nil, errors.E(errors.CodeNotImplemented)
+	}
+	return a.ListVolumes_(ctx, machines)
+}
+
+func (a *API) ListStorageDetails(ctx context.Context) ([]jujuparams.StorageDetails, error) {
+	if a.ListStorageDetails_ == nil {
+		return nil, errors.E(errors.CodeNotImplemented)
+	}
+	return a.ListStorageDetails_(ctx)
 }
 
 var _ jimm.API = &API{}
