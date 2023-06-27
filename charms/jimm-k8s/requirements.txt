@@ -1,5 +1,5 @@
 Jinja2 >= 2.11.3
-ops >= 1.5.2
+ops >= 2.0.0
 charmhelpers >= 0.20.22
 jsonschema >= 3.2.0
 cryptography >= 3.4.8

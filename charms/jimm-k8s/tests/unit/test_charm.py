@@ -44,7 +44,7 @@ class TestCharm(unittest.TestCase):
         self.addCleanup(self.tempdir.cleanup)
         self.harness.charm.framework.charm_dir = pathlib.Path(self.tempdir.name)
 
-        self.harness.add_relation("jimm", "jimm")
+        self.harness.add_relation("peer", "jimm")
         self.harness.container_pebble_ready("jimm")
 
         rel_id = self.harness.add_relation("ingress", "nginx-ingress")
@@ -247,7 +247,7 @@ class TestCharm(unittest.TestCase):
         harness = Harness(JimmOperatorCharm)
         self.addCleanup(harness.cleanup)
 
-        id = harness.add_relation("jimm", "juju-jimm-k8s")
+        id = harness.add_relation("peer", "juju-jimm-k8s")
         harness.add_relation_unit(id, "juju-jimm-k8s/1")
         harness.begin()
         harness.set_leader(True)
@@ -288,7 +288,7 @@ class TestCharm(unittest.TestCase):
         harness = Harness(JimmOperatorCharm)
         self.addCleanup(harness.cleanup)
 
-        jimm_id = harness.add_relation("jimm", "juju-jimm-k8s")
+        jimm_id = harness.add_relation("peer", "juju-jimm-k8s")
         harness.add_relation_unit(jimm_id, "juju-jimm-k8s/1")
 
         dashboard_id = harness.add_relation("dashboard", "juju-dashboard")
