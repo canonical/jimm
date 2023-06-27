@@ -56,7 +56,7 @@ jobs:
       - name: Install charmcraft
         run: sudo snap install charmcraft --channel=2.x/stable --classic
       - name: Publish Charm Resource
-        run: charmcraft upload-resource juju-jimm jimm-snap --filepath ./jimm-snap
+        run: charmcraft upload-resource juju-jimm jimm-snap --filepath ./jimm.snap
         env:
           CHARMCRAFT_AUTH: "${{ secrets.CHARMHUB_TOKEN }}"
       - name: Upload charm to charmhub
