@@ -20,7 +20,6 @@ import json
 import logging
 import os
 import socket
-import functools
 
 import hvac
 import requests
@@ -89,7 +88,7 @@ class JimmOperatorCharm(CharmBase):
         super().__init__(*args)
 
         self._state = State(self.app, lambda: self.model.get_relation("peer"))
-        
+
         self.framework.observe(self.on.peer_relation_changed, self._on_peer_relation_changed)
         self.framework.observe(self.on.jimm_pebble_ready, self._on_jimm_pebble_ready)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
@@ -342,7 +341,6 @@ class JimmOperatorCharm(CharmBase):
 
     @requires_state_setter
     def _on_dashboard_relation_joined(self, event: RelationJoinedEvent):
-
         dns_name = self._get_dns_name(event)
         if not dns_name:
             return
@@ -500,7 +498,6 @@ class JimmOperatorCharm(CharmBase):
 
     @requires_state_setter
     def _on_vault_relation_changed(self, event):
-
         container = self.unit.get_container(WORKLOAD_CONTAINER)
 
         # if we can't connect to the container we should defer
@@ -564,7 +561,6 @@ class JimmOperatorCharm(CharmBase):
 
     @requires_state_setter
     def _on_openfga_store_created(self, event: OpenFGAStoreCreateEvent):
-
         if not event.store_id:
             return
 
@@ -572,7 +568,7 @@ class JimmOperatorCharm(CharmBase):
         # secret_content = secret.get_content()
 
         self._state.openfga_store_id = event.store_id
-        self._state.openfga_token = event.token # secret_content["token"]
+        self._state.openfga_token = event.token  # secret_content["token"]
         self._state.openfga_address = event.address
         self._state.openfga_port = event.port
         self._state.openfga_scheme = event.scheme
@@ -599,7 +595,6 @@ class JimmOperatorCharm(CharmBase):
 
     @requires_state_setter
     def _on_certificates_relation_joined(self, event: RelationJoinedEvent) -> None:
-
         dns_name = self._get_dns_name(event)
         if not dns_name:
             return
@@ -615,7 +610,6 @@ class JimmOperatorCharm(CharmBase):
 
     @requires_state_setter
     def _on_certificate_available(self, event: CertificateAvailableEvent) -> None:
- 
         self._state.certificate = event.certificate
         self._state.ca = event.ca
         self._state.chain = event.chain
@@ -624,7 +618,6 @@ class JimmOperatorCharm(CharmBase):
 
     @requires_state_setter
     def _on_certificate_expiring(self, event: CertificateExpiringEvent) -> None:
-
         old_csr = self._state.csr
         private_key = self._state.private_key
         dns_name = self._get_dns_name(event)
@@ -645,7 +638,6 @@ class JimmOperatorCharm(CharmBase):
 
     @requires_state_setter
     def _on_certificate_revoked(self, event: CertificateRevokedEvent) -> None:
-
         old_csr = self._state.csr
         private_key = self._state.private_key
         dns_name = self._get_dns_name(event)
@@ -671,21 +663,18 @@ class JimmOperatorCharm(CharmBase):
 
     @requires_state_setter
     def _on_ingress_ready(self, event: IngressPerAppReadyEvent):
-
         self._state.dns_name = event.url
 
         self._update_workload(event)
 
     @requires_state_setter
     def _on_ingress_revoked(self, event: IngressPerAppRevokedEvent):
-
         del self._state.dns_name
 
         self._update_workload(event)
 
     @requires_state_setter
     def _on_create_authorization_model_action(self, event: ActionEvent):
-
         model = event.params["model"]
         if not model:
             event.fail("authorization model not specified")
