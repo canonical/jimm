@@ -67,4 +67,4 @@ jobs:
           github-token: "${{ secrets.GITHUB_TOKEN }}"
           channel: "2/edge"
           charm-path: "./charms/jimm"
-          tag-prefix: "v2-k8s"
+          tag-prefix: "v2-machine"
