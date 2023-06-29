@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     tags:
-      - 'v*'
+      - 'v1*'
 
 # Note this workflow requires a Github secret to provide auth against charmhub.
 # This can be generated with the following command
