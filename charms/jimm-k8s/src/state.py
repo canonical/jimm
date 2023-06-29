@@ -7,7 +7,6 @@ import functools
 import json
 
 
-
 def requires_state_setter(func):
     @functools.wraps(func)
     def wrapper(self, event):

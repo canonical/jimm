@@ -417,7 +417,7 @@ class JimmCharm(SystemdCharm):
             "openfga_port": event.port,
             "openfga_scheme": event.scheme,
             "openfga_store": event.store_id,
-            "openfga_token": event.token # secret_content["token"],
+            "openfga_token": event.token,  # secret_content["token"],
         }
 
         with open(self._env_filename("openfga"), "wt") as f:
