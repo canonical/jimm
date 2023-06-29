@@ -20,6 +20,7 @@ import json
 import logging
 import os
 import socket
+import functools
 
 import hvac
 import requests
@@ -56,7 +57,7 @@ from ops.model import (
     WaitingStatus,
 )
 
-from state import State
+from state import State, requires_state, requires_state_setter
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +67,12 @@ REQUIRED_SETTINGS = [
     "JIMM_UUID",
     "JIMM_DSN",
     "CANDID_URL",
+    "OPENFGA_STORE",
+    "OPENFGA_AUTH_MODEL",
+    "OPENFGA_HOST",
+    "OPENFGA_SCHEME",
+    "OPENFGA_TOKEN",
+    "OPENFGA_PORT",
 ]
 
 DATABASE_NAME = "jimm"
@@ -81,8 +88,9 @@ class JimmOperatorCharm(CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
 
-        self._state = State(self.app, lambda: self.model.get_relation("jimm"))
-
+        self._state = State(self.app, lambda: self.model.get_relation("peer"))
+        
+        self.framework.observe(self.on.peer_relation_changed, self._on_peer_relation_changed)
         self.framework.observe(self.on.jimm_pebble_ready, self._on_jimm_pebble_ready)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
         self.framework.observe(self.on.update_status, self._on_update_status)
@@ -183,19 +191,18 @@ class JimmOperatorCharm(CharmBase):
         self._dashboard_path = "/root/dashboard"
         self._dashboard_hash_path = "/root/dashboard/hash"
 
+    def _on_peer_relation_changed(self, event):
+        self._update_workload(event)
+
     def _on_jimm_pebble_ready(self, event):
         self._update_workload(event)
 
     def _on_config_changed(self, event):
         self._update_workload(event)
 
+    @requires_state_setter
     def _on_leader_elected(self, event):
-        if not self._state.is_ready():
-            event.defer()
-            logger.warning("State is not ready")
-            return
-
-        if self.unit.is_leader() and not self._state.private_key:
+        if not self._state.private_key:
             private_key: bytes = generate_private_key(key_size=4096)
             self._state.private_key = private_key.decode()
 
@@ -218,15 +225,10 @@ class JimmOperatorCharm(CharmBase):
 
             self._push_to_workload(self._agent_filename, agent_data, event)
 
+    @requires_state
     def _update_workload(self, event):
         """' Update workload with all available configuration
         data."""
-
-        if not self._state.is_ready():
-            event.defer()
-            print(self._state.is_ready())
-            logger.warning("State is not ready")
-            return
 
         container = self.unit.get_container(WORKLOAD_CONTAINER)
         if not container.can_connect():
@@ -338,14 +340,8 @@ class JimmOperatorCharm(CharmBase):
         """Update the status of the charm."""
         self._ready()
 
+    @requires_state_setter
     def _on_dashboard_relation_joined(self, event: RelationJoinedEvent):
-        if not self.unit.is_leader():
-            return
-
-        if not self._state.is_ready():
-            event.defer()
-            logger.warning("State is not ready")
-            return
 
         dns_name = self._get_dns_name(event)
         if not dns_name:
@@ -359,13 +355,9 @@ class JimmOperatorCharm(CharmBase):
             }
         )
 
+    @requires_state_setter
     def _on_database_event(self, event: DatabaseEvent) -> None:
         """Database event handler."""
-
-        if not self._state.is_ready():
-            event.defer()
-            logger.warning("State is not ready")
-            return
 
         # get the first endpoint from a comma separate list
         ep = event.endpoints.split(",", 1)[0]
@@ -379,12 +371,9 @@ class JimmOperatorCharm(CharmBase):
 
         self._update_workload(event)
 
+    @requires_state_setter
     def _on_database_relation_broken(self, event: DatabaseEvent) -> None:
         """Database relation broken handler."""
-        if not self._state.is_ready():
-            event.defer()
-            logger.warning("State is not ready")
-            return
 
         # when the database relation is broken, we unset the
         # connection string and schema-created from the application
@@ -509,11 +498,8 @@ class JimmOperatorCharm(CharmBase):
         event.relation.data[self.unit]["access_address"] = json.dumps(self._get_network_address(event))
         event.relation.data[self.unit]["isolated"] = json.dumps(False)
 
+    @requires_state_setter
     def _on_vault_relation_changed(self, event):
-        if not self._state.is_ready():
-            event.defer()
-            logger.warning("State is not ready")
-            return
 
         container = self.unit.get_container(WORKLOAD_CONTAINER)
 
@@ -576,26 +562,24 @@ class JimmOperatorCharm(CharmBase):
                 md5.update(data)
             return md5.hexdigest()
 
+    @requires_state_setter
     def _on_openfga_store_created(self, event: OpenFGAStoreCreateEvent):
-        if not self.unit.is_leader():
-            return
-
-        if not self._state.is_ready():
-            event.defer()
-            logger.warning("State is not ready")
-            return
 
         if not event.store_id:
             return
 
+        # secret = self.model.get_secret(id=event.token_secret_id)
+        # secret_content = secret.get_content()
+
         self._state.openfga_store_id = event.store_id
-        self._state.openfga_token = event.token
+        self._state.openfga_token = event.token # secret_content["token"]
         self._state.openfga_address = event.address
         self._state.openfga_port = event.port
         self._state.openfga_scheme = event.scheme
 
         self._update_workload(event)
 
+    @requires_state
     def _get_dns_name(self, event):
         if not self._state.is_ready():
             event.defer()
@@ -613,14 +597,8 @@ class JimmOperatorCharm(CharmBase):
 
         return dns_name
 
+    @requires_state_setter
     def _on_certificates_relation_joined(self, event: RelationJoinedEvent) -> None:
-        if not self.unit.is_leader():
-            return
-
-        if not self._state.is_ready():
-            event.defer()
-            logger.warning("State is not ready")
-            return
 
         dns_name = self._get_dns_name(event)
         if not dns_name:
@@ -635,29 +613,17 @@ class JimmOperatorCharm(CharmBase):
 
         self.certificates.request_certificate_creation(certificate_signing_request=csr)
 
+    @requires_state_setter
     def _on_certificate_available(self, event: CertificateAvailableEvent) -> None:
-        if not self.unit.is_leader():
-            return
-
-        if not self._state.is_ready():
-            event.defer()
-            logger.warning("State is not ready")
-            return
-
+ 
         self._state.certificate = event.certificate
         self._state.ca = event.ca
         self._state.chain = event.chain
 
         self._update_workload(event)
 
+    @requires_state_setter
     def _on_certificate_expiring(self, event: CertificateExpiringEvent) -> None:
-        if not self.unit.is_leader():
-            return
-
-        if not self._state.is_ready():
-            event.defer()
-            logger.warning("State is not ready")
-            return
 
         old_csr = self._state.csr
         private_key = self._state.private_key
@@ -677,14 +643,8 @@ class JimmOperatorCharm(CharmBase):
 
         self._update_workload()
 
+    @requires_state_setter
     def _on_certificate_revoked(self, event: CertificateRevokedEvent) -> None:
-        if not self.unit.is_leader():
-            return
-
-        if not self._state.is_ready():
-            event.defer()
-            logger.warning("State is not ready")
-            return
 
         old_csr = self._state.csr
         private_key = self._state.private_key
@@ -709,37 +669,22 @@ class JimmOperatorCharm(CharmBase):
         self.unit.status = WaitingStatus("Waiting for new certificate")
         self._update_workload()
 
+    @requires_state_setter
     def _on_ingress_ready(self, event: IngressPerAppReadyEvent):
-        if not self.unit.is_leader():
-            return
-
-        if not self._state.is_ready():
-            event.defer()
-            logger.warning("State is not ready")
-            return
 
         self._state.dns_name = event.url
 
         self._update_workload(event)
 
+    @requires_state_setter
     def _on_ingress_revoked(self, event: IngressPerAppRevokedEvent):
-        if not self.unit.is_leader():
-            return
-
-        if not self._state.is_ready():
-            event.defer()
-            logger.warning("State is not ready")
-            return
 
         del self._state.dns_name
 
         self._update_workload(event)
 
+    @requires_state_setter
     def _on_create_authorization_model_action(self, event: ActionEvent):
-        if not self._state.is_ready():
-            event.defer()
-            logger.warning("State is not ready")
-            return
 
         model = event.params["model"]
         if not model:

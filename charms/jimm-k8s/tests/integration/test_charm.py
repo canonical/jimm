@@ -44,6 +44,7 @@ async def test_build_and_deploy(ops_test: OpsTest, local_charm):
             "candid-url": "https://api.jujucharms.com/identity",
             "public-key": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
             "private-key": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
+            "dns-name": "jimm.test.canonical.com",
         },
     )
     await ops_test.model.deploy(

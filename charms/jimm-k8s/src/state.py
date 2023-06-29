@@ -3,7 +3,32 @@
 
 """Manager for handling charm state."""
 
+import functools
 import json
+
+
+
+def requires_state_setter(func):
+    @functools.wraps(func)
+    def wrapper(self, event):
+        if self.unit.is_leader() and self._state.is_ready():
+            return func(self, event)
+        else:
+            return
+
+    return wrapper
+
+
+def requires_state(func):
+    @functools.wraps(func)
+    def wrapper(self, event):
+        if self._state.is_ready():
+            return func(self, event)
+        else:
+            event.defer()
+            return
+
+    return wrapper
 
 
 class State:

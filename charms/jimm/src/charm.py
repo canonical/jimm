@@ -409,12 +409,15 @@ class JimmCharm(SystemdCharm):
         if not event.store_id:
             return
 
+        # secret = self.model.get_secret(id=event.token_secret_id)
+        # secret_content = secret.get_content()
+
         args = {
             "openfga_host": event.address,
             "openfga_port": event.port,
             "openfga_scheme": event.scheme,
             "openfga_store": event.store_id,
-            "openfga_token": event.token,
+            "openfga_token": event.token # secret_content["token"],
         }
 
         with open(self._env_filename("openfga"), "wt") as f:
