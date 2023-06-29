@@ -568,11 +568,11 @@ class JimmOperatorCharm(CharmBase):
         if not event.store_id:
             return
 
-        secret = self.model.get_secret(id=event.token_secret_id)
-        secret_content = secret.get_content()
+        # secret = self.model.get_secret(id=event.token_secret_id)
+        # secret_content = secret.get_content()
 
         self._state.openfga_store_id = event.store_id
-        self._state.openfga_token = secret_content["token"]
+        self._state.openfga_token = event.token # secret_content["token"]
         self._state.openfga_address = event.address
         self._state.openfga_port = event.port
         self._state.openfga_scheme = event.scheme
