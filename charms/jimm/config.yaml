@@ -16,7 +16,7 @@ options:
       Name of the agent user for accessing the candid API.
   candid-url:
     type: string
-    description: URL of candid server 
+    description: URL of candid server
   controller-admins:
     type: string
     description: |
@@ -47,11 +47,16 @@ options:
     description: |
       A comma-separated list of nagios servicegroups.
       If left empty, the nagios_context will be used as the servicegroup
-  uuid: 
+  uuid:
     type: string
     description: The UUID advertised by the JIMM controller.
   juju-dashboard-location:
     type: string
     default: https://jaas.ai/models
     description: URL of the Juju Dashboard for this controller.
-
+  public-key:
+    type: string
+    description: The public part of JIMM's macaroon bakery keypair.
+  private-key:
+    type: string
+    description: The private part of JIMM's macaroon bakery keypair.

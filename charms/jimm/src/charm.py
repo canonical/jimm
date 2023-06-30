@@ -14,11 +14,12 @@ import tarfile
 import urllib
 
 import hvac
+from charmhelpers.contrib.charmsupport.nrpe import NRPE
 from charms.data_platform_libs.v0.data_interfaces import (
     DatabaseRequires,
     DatabaseRequiresEvent,
 )
-from charmhelpers.contrib.charmsupport.nrpe import NRPE
+from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from jinja2 import Environment, FileSystemLoader
 from ops.main import main
 from ops.model import (
@@ -28,11 +29,13 @@ from ops.model import (
     ModelError,
     WaitingStatus,
 )
+
 from systemd import SystemdCharm
 
 logger = logging.getLogger(__name__)
 
 DATABASE_NAME = "jimm"
+
 
 class JimmCharm(SystemdCharm):
     """Charm for the JIMM service."""
@@ -46,26 +49,24 @@ class JimmCharm(SystemdCharm):
         self.framework.observe(self.on.stop, self._on_stop)
         self.framework.observe(self.on.update_status, self._on_update_status)
         self.framework.observe(self.on.upgrade_charm, self._on_upgrade_charm)
-        self.framework.observe(
-            self.on.nrpe_relation_joined, self._on_nrpe_relation_joined
-        )
-        self.framework.observe(
-            self.on.website_relation_joined, self._on_website_relation_joined
-        )
-        self.framework.observe(
-            self.on.vault_relation_joined, self._on_vault_relation_joined
-        )
-        self.framework.observe(
-            self.on.vault_relation_changed, self._on_vault_relation_changed
-        )
+        self.framework.observe(self.on.nrpe_relation_joined, self._on_nrpe_relation_joined)
+        self.framework.observe(self.on.website_relation_joined, self._on_website_relation_joined)
+        self.framework.observe(self.on.vault_relation_joined, self._on_vault_relation_joined)
+        self.framework.observe(self.on.vault_relation_changed, self._on_vault_relation_changed)
         self.framework.observe(
             self.on.dashboard_relation_joined,
             self._on_dashboard_relation_joined,
         )
+        self._agent_filename = "/var/snap/jimm/common/agent.json"
+        self._vault_secret_filename = "/var/snap/jimm/common/vault_secret.json"
+        self._workload_filename = "/snap/bin/jimm"
+        self._dashboard_path = "/var/snap/jimm/common/dashboard"
+        self._rsyslog_conf_path = "/etc/rsyslog.d/10-jimm.conf"
+        self._logrotate_conf_path = "/etc/logrotate.d/jimm"
 
         self.database = DatabaseRequires(
             self,
-            relation_name="db",
+            relation_name="database",
             database_name=DATABASE_NAME,
         )
         self.framework.observe(self.database.on.database_created, self._on_database_event)
@@ -73,13 +74,20 @@ class JimmCharm(SystemdCharm):
             self.database.on.endpoints_changed,
             self._on_database_event,
         )
+        self.framework.observe(self.on.database_relation_broken, self._on_database_relation_broken)
 
-        self._agent_filename = "/var/snap/jimm/common/agent.json"
-        self._vault_secret_filename = "/var/snap/jimm/common/vault_secret.json"
-        self._workload_filename = "/snap/bin/jimm"
-        self._dashboard_path = "/var/snap/jimm/common/dashboard"
-        self._rsyslog_conf_path = "/etc/rsyslog.d/10-jimm.conf"
-        self._logrotate_conf_path = "/etc/logrotate.d/jimm"
+        # Grafana agent relation
+        self._grafana_agent = COSAgentProvider(
+            self,
+            relation_name="cos-agent",
+            metrics_endpoints=[
+                {"path": "/metrics", "port": 8080},
+            ],
+            metrics_rules_dir="./src/alert_rules/prometheus",
+            logs_rules_dir="./src/alert_rules/loki",
+            recurse_rules_dirs=True,
+            dashboard_dirs=["./src/grafana_dashboards"],
+        )
 
     def _on_install(self, _):
         """Install the JIMM software."""
@@ -118,11 +126,15 @@ class JimmCharm(SystemdCharm):
             "log_level": self.config.get("log-level"),
             "uuid": self.config.get("uuid"),
             "dashboard_location": self.config.get("juju-dashboard-location"),
+            "public_key": self.config.get("public-key"),
+            "private_key": self.config.get("private-key"),
         }
         if os.path.exists(self._dashboard_path):
             args["dashboard_location"] = self._dashboard_path
+
         with open(self._env_filename(), "wt") as f:
             f.write(self._render_template("jimm.env", **args))
+
         if self._ready():
             self.restart()
         self._on_update_status(None)
@@ -131,14 +143,11 @@ class JimmCharm(SystemdCharm):
         if dashboard_relation:
             dashboard_relation.data[self.app].update(
                 {
-                    "controller-url": "wss://{}".format(
-                        self.config["dns-name"]
-                    ),
+                    "controller-url": "wss://{}".format(self.config["dns-name"]),
                     "identity-provider-url": self.config["candid-url"],
                     "is-juju": str(False),
                 }
             )
-
 
     def _on_leader_elected(self, _):
         """Update the JIMM configuration that comes from unit
@@ -147,12 +156,12 @@ class JimmCharm(SystemdCharm):
         args = {"jimm_watch_controllers": ""}
         if self.model.unit.is_leader():
             args["jimm_watch_controllers"] = "1"
+            args["jimm_enable_jwks_rotator"] = "1"
         with open(self._env_filename("leader"), "wt") as f:
             f.write(self._render_template("jimm-leader.env", **args))
         if self._ready():
             self.restart()
         self._on_update_status(None)
-
 
     def _on_database_event(self, event: DatabaseRequiresEvent):
         """Handle database event"""
@@ -175,6 +184,14 @@ class JimmCharm(SystemdCharm):
             self.restart()
         self._on_update_status(None)
 
+    def _on_database_relation_broken(self, event) -> None:
+        """Database relation broken handler."""
+        if not self._ready():
+            event.defer()
+            logger.warning("Unit is not ready")
+            return
+        logger.info("database relation removed")
+        self._on_update_status(None)
 
     def _on_stop(self, _):
         """Stop the JIMM service."""
@@ -188,7 +205,7 @@ class JimmCharm(SystemdCharm):
         if not os.path.exists(self._workload_filename):
             self.unit.status = BlockedStatus("waiting for jimm-snap resource")
             return
-        if not self.model.get_relation("db"):
+        if not self.model.get_relation("database"):
             self.unit.status = BlockedStatus("waiting for database")
             return
         if not os.path.exists(self._env_filename("db")):
@@ -223,18 +240,10 @@ class JimmCharm(SystemdCharm):
         event.relation.data[self.unit]["port"] = "8080"
 
     def _on_vault_relation_joined(self, event):
-        event.relation.data[self.unit]["secret_backend"] = json.dumps(
-            "charm-jimm-creds"
-        )
-        event.relation.data[self.unit]["hostname"] = json.dumps(
-            socket.gethostname()
-        )
+        event.relation.data[self.unit]["secret_backend"] = json.dumps("charm-jimm-creds")
+        event.relation.data[self.unit]["hostname"] = json.dumps(socket.gethostname())
         event.relation.data[self.unit]["access_address"] = json.dumps(
-            str(
-                self.model.get_binding(event.relation)
-                .network.egress_subnets[0]
-                .network_address
-            )
+            str(self.model.get_binding(event.relation).network.egress_subnets[0].network_address)
         )
         event.relation.data[self.unit]["isolated"] = json.dumps(False)
 
@@ -267,13 +276,6 @@ class JimmCharm(SystemdCharm):
         with open(self._env_filename("vault"), "wt") as f:
             f.write(self._render_template("jimm-vault.env", **args))
 
-    def _is_snap_installed(self):
-        returncode = 1
-        try:
-            return self._snap("list", "jimm") is None
-        except subprocess.CalledProcessError as cpe:
-            return False if cpe.returncode == returncode else True
-
     def _install_snap(self):
         self.unit.status = MaintenanceStatus("installing snap")
         try:
@@ -283,9 +285,6 @@ class JimmCharm(SystemdCharm):
         if not path:
             self.unit.status = BlockedStatus("waiting for jimm-snap resource")
             return
-
-        if self._is_snap_installed():
-            self._snap("remove", "jimm")
         self._snap("install", "--dangerous", path)
 
     def _install_dashboard(self):

@@ -15,19 +15,36 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 
-import functools
 import hashlib
 import json
 import logging
 import os
+import socket
 
 import hvac
-import pgsql
-from charmhelpers.contrib.charmsupport.nrpe import NRPE
-from charms.nginx_ingress_integrator.v0.ingress import IngressRequires
+from charms.data_platform_libs.v0.database_requires import (
+    DatabaseEvent,
+    DatabaseRequires,
+)
+from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
+from charms.loki_k8s.v0.loki_push_api import LogProxyConsumer
+from charms.nginx_ingress_integrator.v0.nginx_route import require_nginx_route
+from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
+from charms.tls_certificates_interface.v1.tls_certificates import (
+    CertificateAvailableEvent,
+    CertificateExpiringEvent,
+    CertificateRevokedEvent,
+    TLSCertificatesRequiresV1,
+    generate_csr,
+    generate_private_key,
+)
+from charms.traefik_k8s.v1.ingress import (
+    IngressPerAppReadyEvent,
+    IngressPerAppRequirer,
+    IngressPerAppRevokedEvent,
+)
 from ops import pebble
-from ops.charm import CharmBase
-from ops.framework import StoredState
+from ops.charm import CharmBase, RelationJoinedEvent
 from ops.main import main
 from ops.model import (
     ActiveStatus,
@@ -37,113 +54,136 @@ from ops.model import (
     WaitingStatus,
 )
 
+from state import State, requires_state, requires_state_setter
+
 logger = logging.getLogger(__name__)
 
 WORKLOAD_CONTAINER = "jimm"
 
-REQUIRED_SETTINGS = ["JIMM_UUID", "JIMM_DNS_NAME", "JIMM_DSN", "CANDID_URL"]
+REQUIRED_SETTINGS = [
+    "JIMM_UUID",
+    "JIMM_DSN",
+    "CANDID_URL",
+]
 
-
-def log_event_handler(method):
-    @functools.wraps(method)
-    def decorated(self, event):
-        logger.debug("running {}".format(method.__name__))
-        try:
-            return method(self, event)
-        finally:
-            logger.debug("completed {}".format(method.__name__))
-
-    return decorated
+DATABASE_NAME = "jimm"
+LOG_FILE = "/var/log/jimm"
+# This likely will just be JIMM's port.
+PROMETHEUS_PORT = 8080
 
 
 class JimmOperatorCharm(CharmBase):
     """JIMM Operator Charm."""
 
-    _stored = StoredState()
-
     def __init__(self, *args):
         super().__init__(*args)
-        self.framework.observe(
-            self.on.jimm_pebble_ready, self._on_jimm_pebble_ready
-        )
+
+        self._state = State(self.app, lambda: self.model.get_relation("peer"))
+
+        self.framework.observe(self.on.peer_relation_changed, self._on_peer_relation_changed)
+        self.framework.observe(self.on.jimm_pebble_ready, self._on_jimm_pebble_ready)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
         self.framework.observe(self.on.update_status, self._on_update_status)
         self.framework.observe(self.on.leader_elected, self._on_leader_elected)
         self.framework.observe(self.on.start, self._on_start)
         self.framework.observe(self.on.stop, self._on_stop)
-        self.framework.observe(
-            self.on.nrpe_relation_joined, self._on_nrpe_relation_joined
-        )
-        self.framework.observe(
-            self.on.website_relation_joined, self._on_website_relation_joined
-        )
+
         self.framework.observe(
             self.on.dashboard_relation_joined,
             self._on_dashboard_relation_joined,
         )
 
-        # ingress relation
-        self.ingress = IngressRequires(
+        # Certificates relation
+        self.certificates = TLSCertificatesRequiresV1(self, "certificates")
+        self.framework.observe(
+            self.on.certificates_relation_joined,
+            self._on_certificates_relation_joined,
+        )
+        self.framework.observe(
+            self.certificates.on.certificate_available,
+            self._on_certificate_available,
+        )
+        self.framework.observe(
+            self.certificates.on.certificate_expiring,
+            self._on_certificate_expiring,
+        )
+        self.framework.observe(
+            self.certificates.on.certificate_revoked,
+            self._on_certificate_revoked,
+        )
+
+        # Traefik ingress relation
+        self.ingress = IngressPerAppRequirer(
             self,
-            {
-                "service-hostname": self.config.get("dns-name", ""),
-                "service-name": self.app.name,
-                "service-port": 8080,
-            },
+            relation_name="ingress",
+            port=8080,
+        )
+        self.framework.observe(self.ingress.on.ready, self._on_ingress_ready)
+        self.framework.observe(
+            self.ingress.on.revoked,
+            self._on_ingress_revoked,
         )
 
-        self._stored.set_default(db_uri=None)
-
-        # database relation
-        self.db = pgsql.PostgreSQLClient(self, "db")
-        self.framework.observe(
-            self.db.on.database_relation_joined,
-            self._on_database_relation_joined,
+        # Nginx ingress relation
+        require_nginx_route(
+            charm=self, service_hostname=self.config.get("dns-name", ""), service_name=self.app.name, service_port=8080
         )
+
+        # Database relation
+        self.database = DatabaseRequires(
+            self,
+            relation_name="database",
+            database_name=DATABASE_NAME,
+        )
+        self.framework.observe(self.database.on.database_created, self._on_database_event)
         self.framework.observe(
-            self.db.on.master_changed, self._on_master_changed
+            self.database.on.endpoints_changed,
+            self._on_database_event,
+        )
+        self.framework.observe(self.on.database_relation_broken, self._on_database_relation_broken)
+
+        # Vault relation
+        self.framework.observe(self.on.vault_relation_joined, self._on_vault_relation_joined)
+        self.framework.observe(self.on.vault_relation_changed, self._on_vault_relation_changed)
+
+        # Grafana relation
+        self._grafana_dashboards = GrafanaDashboardProvider(self, relation_name="grafana-dashboard")
+
+        # Loki relation
+        self._log_proxy = LogProxyConsumer(self, log_files=[LOG_FILE], relation_name="log-proxy")
+
+        # Prometheus relation
+        self._prometheus_scraping = MetricsEndpointProvider(
+            self,
+            relation_name="metrics-endpoint",
+            jobs=[{"static_configs": [{"targets": [f"*:{PROMETHEUS_PORT}"]}]}],
+            refresh_event=self.on.config_changed,
         )
 
         self._local_agent_filename = "agent.json"
         self._local_vault_secret_filename = "vault_secret.js"
         self._agent_filename = "/root/config/agent.json"
         self._vault_secret_filename = "/root/config/vault_secret.json"
+        self._vault_path = "charm-jimm-k8s-creds"
         self._dashboard_path = "/root/dashboard"
         self._dashboard_hash_path = "/root/dashboard/hash"
 
-    @log_event_handler
+    def _on_peer_relation_changed(self, event):
+        self._update_workload(event)
+
     def _on_jimm_pebble_ready(self, event):
         self._update_workload(event)
 
-    @log_event_handler
     def _on_config_changed(self, event):
         self._update_workload(event)
 
-    @log_event_handler
+    @requires_state_setter
     def _on_leader_elected(self, event):
+        if not self._state.private_key:
+            private_key: bytes = generate_private_key(key_size=4096)
+            self._state.private_key = private_key.decode()
+
         self._update_workload(event)
-
-    @log_event_handler
-    def _on_website_relation_joined(self, event):
-        """Connect a website relation."""
-
-        # we set the port in the unit bucket.
-        event.relation.data[self.unit]["port"] = "8080"
-
-    @log_event_handler
-    def _on_nrpe_relation_joined(self, event):
-        """Connect a NRPE relation."""
-
-        # use the nrpe library to handle the relation.
-        nrpe = NRPE()
-        nrpe.add_check(
-            shortname="JIMM",
-            description="check JIMM running",
-            check_cmd="check_http -w 2 -c 10 -I {} -p 8080 -u /debug/info".format(
-                self.model.get_binding(event.relation).network.ingress_address,
-            ),
-        )
-        nrpe.write()
 
     def _ensure_bakery_agent_file(self, event):
         # we create the file containing agent keys if needed.
@@ -162,82 +202,58 @@ class JimmOperatorCharm(CharmBase):
 
             self._push_to_workload(self._agent_filename, agent_data, event)
 
-    def _ensure_vault_config(self, event):
-        addr = self.config.get("vault-url", "")
-        if not addr:
-            return
-
-        # we create the file containing vault secretes if needed.
-        if not self._path_exists_in_workload(self._vault_secret_filename):
-            role_id = self.config.get("vault-role-id", "")
-            if not role_id:
-                return
-            token = self.config.get("vault-token", "")
-            if not token:
-                return
-            client = hvac.Client(url=addr, token=token)
-            secret = client.sys.unwrap()
-            secret["data"]["role_id"] = role_id
-
-            secret_data = json.dumps(secret)
-            self._push_to_workload(
-                self._vault_secret_filename, secret_data, event
-            )
-
+    @requires_state
     def _update_workload(self, event):
         """' Update workload with all available configuration
         data."""
 
         container = self.unit.get_container(WORKLOAD_CONTAINER)
         if not container.can_connect():
-            logger.info(
-                "cannot connect to the workload container - deffering the event"
-            )
+            logger.info("cannot connect to the workload container - deferring the event")
             event.defer()
             return
 
         self._ensure_bakery_agent_file(event)
-        self._ensure_vault_config(event)
         self._install_dashboard(event)
 
-        self.ingress.update_config(
-            {"service-hostname": self.config.get("dns-name", "")}
-        )
+        dns_name = self._get_dns_name(event)
+        if not dns_name:
+            logger.warning("dns name not set")
+            return
 
         config_values = {
             "CANDID_PUBLIC_KEY": self.config.get("candid-public-key", ""),
             "CANDID_URL": self.config.get("candid-url", ""),
             "JIMM_ADMINS": self.config.get("controller-admins", ""),
-            "JIMM_DNS_NAME": self.config.get("dns-name", ""),
+            "JIMM_DNS_NAME": dns_name,
             "JIMM_LOG_LEVEL": self.config.get("log-level", ""),
             "JIMM_UUID": self.config.get("uuid", ""),
-            "JIMM_DASHBOARD_LOCATION": self.config.get(
-                "juju-dashboard-location", "https://jaas.ai/models"
-            ),
+            "JIMM_DASHBOARD_LOCATION": self.config.get("juju-dashboard-location", "https://jaas.ai/models"),
             "JIMM_LISTEN_ADDR": ":8080",
+            "PRIVATE_KEY": self.config.get("private-key", ""),
+            "PUBLIC_KEY": self.config.get("public-key", ""),
         }
-        if self._stored.db_uri:
-            config_values["JIMM_DSN"] = "pgx:{}".format(self._stored.db_uri)
+        if self._state.dsn:
+            config_values["JIMM_DSN"] = self._state.dsn
 
         if container.exists(self._agent_filename):
             config_values["BAKERY_AGENT_FILE"] = self._agent_filename
 
         if container.exists(self._vault_secret_filename):
-            config_values["VAULT_ADDR"] = self.config.get("vault-url", "")
-            config_values["VAULT_PATH"] = "charm-jimm-creds"
+            config_values["VAULT_ADDR"] = self._state.vault_address
+            config_values["VAULT_PATH"] = self._vault_path
             config_values["VAULT_SECRET_FILE"] = self._vault_secret_filename
             config_values["VAULT_AUTH_PATH"] = "/auth/approle/login"
 
         if self.model.unit.is_leader():
             config_values["JIMM_WATCH_CONTROLLERS"] = "1"
+            config_values["JIMM_ENABLE_JWKS_ROTATOR"] = "1"
 
         if container.exists(self._dashboard_path):
             config_values["JIMM_DASHBOARD_LOCATION"] = self._dashboard_path
 
         # remove empty configuration values
-        config_values = {
-            key: value for key, value in config_values.items() if value
-        }
+        config_values = {key: value for key, value in config_values.items() if value}
 
         pebble_layer = {
             "summary": "jimm layer",
@@ -271,36 +287,19 @@ class JimmOperatorCharm(CharmBase):
             event.defer()
 
         dashboard_relation = self.model.get_relation("dashboard")
-        if dashboard_relation:
+        if dashboard_relation and self.unit.is_leader():
             dashboard_relation.data[self.app].update(
                 {
-                    "controller-url": self.config["dns-name"],
-                    "identity-provider-url": self.config["candid-url"],
+                    "controller-url": dns_name,
+                    "identity-provider-url": self.config.get("candid-url"),
                     "is-juju": str(False),
                 }
             )
 
-    @log_event_handler
-    def _on_start(self, _):
+    def _on_start(self, event):
         """Start JIMM."""
-        container = self.unit.get_container(WORKLOAD_CONTAINER)
-        if container.can_connect():
-            plan = container.get_plan()
-            if plan.services.get("jimm") is None:
-                logger.error("waiting for service")
-                self.unit.status = WaitingStatus("waiting for service")
-                return False
+        self._update_workload(event)
 
-            env_vars = plan.services.get("jimm").environment
-            for setting in REQUIRED_SETTINGS:
-                if not env_vars.get(setting, ""):
-                    self.unit.status = BlockedStatus(
-                        "{} configuration value not set".format(setting),
-                    )
-                    return False
-            container.start("jimm")
-
-    @log_event_handler
     def _on_stop(self, _):
         """Stop JIMM."""
         container = self.unit.get_container(WORKLOAD_CONTAINER)
@@ -308,48 +307,50 @@ class JimmOperatorCharm(CharmBase):
             container.stop()
         self._ready()
 
-    @log_event_handler
     def _on_update_status(self, _):
         """Update the status of the charm."""
         self._ready()
 
-    @log_event_handler
-    def _on_dashboard_relation_joined(self, event):
+    @requires_state_setter
+    def _on_dashboard_relation_joined(self, event: RelationJoinedEvent):
+        dns_name = self._get_dns_name(event)
+        if not dns_name:
+            return
+
         event.relation.data[self.app].update(
             {
-                "controller-url": self.config["dns-name"],
+                "controller-url": dns_name,
                 "identity-provider-url": self.config["candid-url"],
                 "is-juju": str(False),
             }
         )
 
-    def _on_database_relation_joined(
-        self, event: pgsql.DatabaseRelationJoinedEvent
-    ) -> None:
-        """
-        Handles determining if the database has finished setup, once setup is complete
-        a master/standby may join / change in consequent events.
-        """
-        logging.info("(postgresql) RELATION_JOINED event fired.")
+    @requires_state_setter
+    def _on_database_event(self, event: DatabaseEvent) -> None:
+        """Database event handler."""
 
-        if self.model.unit.is_leader():
-            event.database = "jimm"
-        elif event.database != "jimm":
-            event.defer()
+        # get the first endpoint from a comma separate list
+        ep = event.endpoints.split(",", 1)[0]
+        # compose the db connection string
+        uri = f"postgresql://{event.username}:{event.password}@{ep}/{DATABASE_NAME}"
 
-    def _on_master_changed(self, event: pgsql.MasterChangedEvent) -> None:
-        """
-        Handles master units of postgres joining / changing.
-        The internal snap configuration is updated to reflect this.
-        """
-        logging.info("(postgresql) MASTER_CHANGED event fired.")
+        logger.info("received database uri: {}".format(uri))
 
-        if event.database != "jimm":
-            logging.debug("Database setup not complete yet, returning.")
-            return
+        # record the connection string
+        self._state.dsn = uri
 
-        if event.master:
-            self._stored.db_uri = str(event.master.uri)
+        self._update_workload(event)
+
+    @requires_state_setter
+    def _on_database_relation_broken(self, event: DatabaseEvent) -> None:
+        """Database relation broken handler."""
+
+        # when the database relation is broken, we unset the
+        # connection string and schema-created from the application
+        # bucket of the peer relation
+        del self._state.dsn
+
+        self._update_workload(event)
 
     def _ready(self):
         container = self.unit.get_container(WORKLOAD_CONTAINER)
@@ -438,9 +439,7 @@ class JimmOperatorCharm(CharmBase):
         container.make_dir(self._dashboard_path, make_parents=True)
 
         with open(dashboard_file, "rb") as f:
-            container.push(
-                os.path.join(self._dashboard_path, "dashboard.tar.bz2"), f
-            )
+            container.push(os.path.join(self._dashboard_path, "dashboard.tar.bz2"), f)
 
         process = container.exec(
             [
@@ -454,17 +453,51 @@ class JimmOperatorCharm(CharmBase):
         try:
             process.wait_output()
         except pebble.ExecError as e:
-            logger.error(
-                "error running untaring the dashboard. error code {}".format(
-                    e.exit_code
-                )
-            )
+            logger.error("error running untaring the dashboard. error code {}".format(e.exit_code))
             for line in e.stderr.splitlines():
                 logger.error("    %s", line)
 
-        self._push_to_workload(
-            self._dashboard_hash_path, dashboard_hash, event
-        )
+        self._push_to_workload(self._dashboard_hash_path, dashboard_hash, event)
+
+    def _get_network_address(self, event):
+        return str(self.model.get_binding(event.relation).network.egress_subnets[0].network_address)
+
+    def _on_vault_relation_joined(self, event):
+        event.relation.data[self.unit]["secret_backend"] = json.dumps(self._vault_path)
+        event.relation.data[self.unit]["hostname"] = json.dumps(socket.gethostname())
+        event.relation.data[self.unit]["access_address"] = json.dumps(self._get_network_address(event))
+        event.relation.data[self.unit]["isolated"] = json.dumps(False)
+
+    @requires_state_setter
+    def _on_vault_relation_changed(self, event):
+        container = self.unit.get_container(WORKLOAD_CONTAINER)
+
+        # if we can't connect to the container we should defer
+        # this event.
+        if not container.can_connect():
+            event.defer()
+            return
+
+        if container.exists(self._vault_secret_filename):
+            container.remove_path(self._vault_secret_filename)
+
+        addr = _json_data(event, "vault_url")
+        if not addr:
+            return
+        role_id = _json_data(event, "{}_role_id".format(self.unit.name))
+        if not role_id:
+            return
+        token = _json_data(event, "{}_token".format(self.unit.name))
+        if not token:
+            return
+        client = hvac.Client(url=addr, token=token)
+        secret = client.sys.unwrap()
+        secret["data"]["role_id"] = role_id
+
+        secret_data = json.dumps(secret)
+        self._push_to_workload(self._vault_secret_filename, secret_data, event)
+
+        self._state.vault_address = addr
 
     def _path_exists_in_workload(self, path: str):
         """Returns true if the specified path exists in the
@@ -480,25 +513,129 @@ class JimmOperatorCharm(CharmBase):
 
         container = self.unit.get_container(WORKLOAD_CONTAINER)
         if container.can_connect():
-            logger.info(
-                "pushing file {} to the workload containe".format(filename)
-            )
+            logger.info("pushing file {} to the workload containe".format(filename))
             container.push(filename, content, make_dirs=True)
         else:
             logger.info("workload container not ready - defering")
             event.defer()
 
     def _hash(self, filename):
-        BUF_SIZE = 65536
+        buffer_size = 65536
         md5 = hashlib.md5()
 
         with open(filename, "rb") as f:
             while True:
-                data = f.read(BUF_SIZE)
+                data = f.read(buffer_size)
                 if not data:
                     break
                 md5.update(data)
             return md5.hexdigest()
+
+    @requires_state
+    def _get_dns_name(self, event):
+        if not self._state.is_ready():
+            event.defer()
+            logger.warning("State is not ready")
+            return
+
+        default_dns_name = "{}.{}-endpoints.{}.svc.cluster.local".format(
+            self.unit.name.replace("/", "-"),
+            self.app.name,
+            self.model.name,
+        )
+        dns_name = self.config.get("dns-name", default_dns_name)
+        if self._state.dns_name:
+            dns_name = self._state.dns_name
+
+        return dns_name
+
+    @requires_state_setter
+    def _on_certificates_relation_joined(self, event: RelationJoinedEvent) -> None:
+        dns_name = self._get_dns_name(event)
+        if not dns_name:
+            return
+
+        csr = generate_csr(
+            private_key=self._state.private_key.encode(),
+            subject=dns_name,
+        )
+
+        self._state.csr = csr.decode()
+
+        self.certificates.request_certificate_creation(certificate_signing_request=csr)
+
+    @requires_state_setter
+    def _on_certificate_available(self, event: CertificateAvailableEvent) -> None:
+        self._state.certificate = event.certificate
+        self._state.ca = event.ca
+        self._state.chain = event.chain
+
+        self._update_workload(event)
+
+    @requires_state_setter
+    def _on_certificate_expiring(self, event: CertificateExpiringEvent) -> None:
+        old_csr = self._state.csr
+        private_key = self._state.private_key
+        dns_name = self._get_dns_name(event)
+        if not dns_name:
+            return
+
+        new_csr = generate_csr(
+            private_key=private_key.encode(),
+            subject=self.dns_name,
+        )
+        self.certificates.request_certificate_renewal(
+            old_certificate_signing_request=old_csr,
+            new_certificate_signing_request=new_csr,
+        )
+        self._state.csr = new_csr.decode()
+
+        self._update_workload()
+
+    @requires_state_setter
+    def _on_certificate_revoked(self, event: CertificateRevokedEvent) -> None:
+        old_csr = self._state.csr
+        private_key = self._state.private_key
+        dns_name = self._get_dns_name(event)
+        if not dns_name:
+            return
+
+        new_csr = generate_csr(
+            private_key=private_key.encode(),
+            subject=dns_name,
+        )
+        self.certificates.request_certificate_renewal(
+            old_certificate_signing_request=old_csr,
+            new_certificate_signing_request=new_csr,
+        )
+
+        self._state.csr = new_csr.decode()
+        del self._state.certificate
+        del self._state.ca
+        del self._state.chain
+
+        self.unit.status = WaitingStatus("Waiting for new certificate")
+        self._update_workload()
+
+    @requires_state_setter
+    def _on_ingress_ready(self, event: IngressPerAppReadyEvent):
+        self._state.dns_name = event.url
+
+        self._update_workload(event)
+
+    @requires_state_setter
+    def _on_ingress_revoked(self, event: IngressPerAppRevokedEvent):
+        del self._state.dns_name
+
+        self._update_workload(event)
+
+
+def _json_data(event, key):
+    logger.debug("getting relation data {}".format(key))
+    try:
+        return json.loads(event.relation.data[event.unit][key])
+    except KeyError:
+        return None
 
 
 if __name__ == "__main__":
