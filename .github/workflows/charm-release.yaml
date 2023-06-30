@@ -38,6 +38,7 @@ jobs:
           channel: "1/edge"
           charm-path: "./charms/jimm-k8s"
           local-image: "true"
+          tag-prefix: "v1-k8s"
 
   release-machine-charm:
     name: Release machine charm
@@ -66,3 +67,4 @@ jobs:
           github-token: "${{ secrets.GITHUB_TOKEN }}"
           channel: "1/edge"
           charm-path: "./charms/jimm"
+          tag-prefix: "v1-machine"
