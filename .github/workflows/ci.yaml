@@ -1,8 +1,11 @@
 name: CI
 on:
   pull_request:
+    paths-ignore:
+      - '.github/**'  # Skip this workflow if the only change was inside the .github folder
   workflow_call:
   workflow_dispatch:
+
 
 jobs:
   # lint:
