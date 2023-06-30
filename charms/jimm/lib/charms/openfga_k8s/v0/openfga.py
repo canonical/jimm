@@ -49,6 +49,11 @@ class SomeCharm(CharmBase):
         logger.info("address {}".format(event.address))
         logger.info("port {}".format(event.port))
         logger.info("scheme {}".format(event.scheme))
+
+        if event.token_secret_id:
+            secret = self.model.get_secret(id=event.token_secret_id)
+            content = secret.get_content()
+            # and get the token with content["token"]
 ```
 
 """
@@ -71,7 +76,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 2
+LIBPATCH = 3
 
 logger = logging.getLogger(__name__)
 
@@ -86,8 +91,8 @@ class OpenFGAEvent(RelationEvent):
         return self.relation.data[self.relation.app].get("store_id")
 
     @property
-    def token(self):
-        return self.relation.data[self.relation.app].get("token")
+    def token_secret_id(self):
+        return self.relation.data[self.relation.app].get("token_secret_id")
 
     @property
     def address(self):
@@ -149,5 +154,7 @@ class OpenFGARequires(Object):
         """Handle the relation-changed event."""
         if self.model.unit.is_leader():
             self.on.openfga_store_created.emit(
-                event.relation, app=event.app, unit=event.unit
+                event.relation,
+                app=event.app,
+                unit=event.unit,
             )

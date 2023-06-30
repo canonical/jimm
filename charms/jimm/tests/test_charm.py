@@ -534,12 +534,15 @@ class TestCharm(unittest.TestCase):
         id = self.harness.add_relation("openfga", "openfga")
         self.harness.add_relation_unit(id, "openfga/0")
 
+        ofga = self.harness.model.get_app("openfga")
+        secret = ofga.add_secret({"token": "test-secret-token"})
+
         self.harness.update_relation_data(
             id,
             "openfga",
             {
                 "store_id": "test-store",
-                "token": "test-token",
+                "token_secret_id": secret.id,
                 "address": "test-address",
                 "port": "8080",
                 "scheme": "http",
@@ -556,7 +559,7 @@ class TestCharm(unittest.TestCase):
             self.assertEqual(lines[1].strip(), "OPENFGA_PORT=8080")
             self.assertEqual(lines[2].strip(), "OPENFGA_SCHEME=http")
             self.assertEqual(lines[3].strip(), "OPENFGA_STORE=test-store")
-            self.assertEqual(lines[4].strip(), "OPENFGA_TOKEN=test-token")
+            self.assertEqual(lines[4].strip(), "OPENFGA_TOKEN=test-secret-token")
 
 
 class VersionHTTPRequestHandler(BaseHTTPRequestHandler):
