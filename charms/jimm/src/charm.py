@@ -126,15 +126,12 @@ class JimmCharm(SystemdCharm):
             "log_level": self.config.get("log-level"),
             "uuid": self.config.get("uuid"),
             "dashboard_location": self.config.get("juju-dashboard-location"),
-            "public_key": self.config.get("public-key"),
-            "private_key": self.config.get("private-key"),
         }
         if os.path.exists(self._dashboard_path):
             args["dashboard_location"] = self._dashboard_path
 
         with open(self._env_filename(), "wt") as f:
             f.write(self._render_template("jimm.env", **args))
-
         if self._ready():
             self.restart()
         self._on_update_status(None)
@@ -143,7 +140,7 @@ class JimmCharm(SystemdCharm):
         if dashboard_relation:
             dashboard_relation.data[self.app].update(
                 {
-                    "controller-url": "wss://{}".format(self.config["dns-name"]),
+                    "controller-url": self.config["dns-name"],
                     "identity-provider-url": self.config["candid-url"],
                     "is-juju": str(False),
                 }
@@ -156,7 +153,6 @@ class JimmCharm(SystemdCharm):
         args = {"jimm_watch_controllers": ""}
         if self.model.unit.is_leader():
             args["jimm_watch_controllers"] = "1"
-            args["jimm_enable_jwks_rotator"] = "1"
         with open(self._env_filename("leader"), "wt") as f:
             f.write(self._render_template("jimm-leader.env", **args))
         if self._ready():
@@ -390,7 +386,7 @@ class JimmCharm(SystemdCharm):
     def _on_dashboard_relation_joined(self, event):
         event.relation.data[self.app].update(
             {
-                "controller-url": "wss://{}".format(self.config["dns-name"]),
+                "controller-url": self.config["dns-name"],
                 "identity-provider-url": self.config["candid-url"],
                 "is-juju": str(False),
             }
