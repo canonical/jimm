@@ -25,9 +25,6 @@ options:
     description: |
       Whitespace separated list of candid users (or groups) that are
       made controller admins by default.
-  dns-name:
-    type: string
-    description: Public DNS hostname that JIMM is being served from.
   log-level:
     type: string
     description: |
@@ -53,16 +50,10 @@ options:
   uuid:
     type: string
     description: The UUID advertised by the JIMM controller.
-  vault-url:
-    type: string
-    description: Vault URL.
-  vault-role-id:
-    type: string
-    description: Vault Role ID.
-  vault-token:
-    type: string
-    description: Vault Token.
   juju-dashboard-location:
     type: string
     default: https://jaas.ai/models
     description: URL of the Juju Dashboard for this controller.
+  dns-name:
+    type: string
+    description: DNS hostname that JIMM is being served from.

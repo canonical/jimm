@@ -16,15 +16,19 @@ juju deploy ./jimm.charm --resource jimm-snap=jimm.snap
 To upgrade the workload attach a new version of the snap:
 
 ```
-juju attach jimm jimm-snap=jimm.snap
+juju attach juju-jimm jimm-snap=jimm.snap
 ```
+## Dependencies
+
+### Postgresql
 
 JIMM requires a postgresql database for data storage:
 
 ```
 juju deploy postgresql
-juju add-relation jimm:db postgresql:db
+juju add-relation juju-jimm:database postgresql:database
 ```
+
 
 ## Developing
 
