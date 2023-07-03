@@ -230,8 +230,6 @@ class JimmOperatorCharm(CharmBase):
             "JIMM_UUID": self.config.get("uuid", ""),
             "JIMM_DASHBOARD_LOCATION": self.config.get("juju-dashboard-location", "https://jaas.ai/models"),
             "JIMM_LISTEN_ADDR": ":8080",
-            "PRIVATE_KEY": self.config.get("private-key", ""),
-            "PUBLIC_KEY": self.config.get("public-key", ""),
         }
         if self._state.dsn:
             config_values["JIMM_DSN"] = self._state.dsn
@@ -247,7 +245,6 @@ class JimmOperatorCharm(CharmBase):
 
         if self.model.unit.is_leader():
             config_values["JIMM_WATCH_CONTROLLERS"] = "1"
-            config_values["JIMM_ENABLE_JWKS_ROTATOR"] = "1"
 
         if container.exists(self._dashboard_path):
             config_values["JIMM_DASHBOARD_LOCATION"] = self._dashboard_path
