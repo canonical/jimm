@@ -290,7 +290,7 @@ class JimmOperatorCharm(CharmBase):
         if dashboard_relation and self.unit.is_leader():
             dashboard_relation.data[self.app].update(
                 {
-                    "controller-url": dns_name,
+                    "controller-url": "wss://{}".format(dns_name),
                     "identity-provider-url": self.config.get("candid-url"),
                     "is-juju": str(False),
                 }
@@ -319,7 +319,7 @@ class JimmOperatorCharm(CharmBase):
 
         event.relation.data[self.app].update(
             {
-                "controller-url": dns_name,
+                "controller-url": "wss://{}".format(dns_name),
                 "identity-provider-url": self.config["candid-url"],
                 "is-juju": str(False),
             }

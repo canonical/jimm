@@ -269,7 +269,7 @@ class TestCharm(unittest.TestCase):
         self.assertTrue(data)
         self.assertEqual(
             data["controller-url"],
-            "juju-jimm-k8s-0.juju-jimm-k8s-endpoints.None.svc.cluster.local",
+            "wss://juju-jimm-k8s-0.juju-jimm-k8s-endpoints.None.svc.cluster.local",
         )
         self.assertEqual(data["identity-provider-url"], "https://candid.example.com")
         self.assertEqual(data["is-juju"], "False")
