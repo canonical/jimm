@@ -465,7 +465,7 @@ func newVaultStore(ctx context.Context, p Params) (jimmcreds.CredentialStore, er
 	}
 	defer f.Close()
 	s, err := vaultapi.ParseSecret(f)
-	if err != nil {
+	if err != nil || s == nil {
 		zapctx.Error(ctx, "failed to parse vault secret from file")
 		return nil, err
 	}

@@ -60,7 +60,7 @@ func init() {
 		r.AddMethod("ApplicationOffers", 4, "FindApplicationOffers", findOffersMethod)
 		r.AddMethod("ApplicationOffers", 4, "ApplicationOffers", applicationOffersMethod)
 
-		return []int{1, 2, 3}
+		return []int{1, 2, 3, 4}
 	}
 }
 

@@ -4,16 +4,21 @@ type: "charm"
 parts:
   charm:
     prime:
-    - ./templates
-    - ./files
-    - README.md
+      - ./templates
+      - ./files
+      - README.md
     charm-python-packages: [setuptools]
+    charm-binary-python-packages:
+      - Jinja2 >= 2.11.3
+      - markupsafe >= 2.0.1
+      - pydantic
+      - cosl
 bases:
   # Ensure run-on is the same or newer than build-on
   # since jimm-server is a Go binary using CGO dependencies
   - build-on:
-    - name: "ubuntu"
-      channel: "20.04"
+      - name: "ubuntu"
+        channel: "20.04"
     run-on:
-    - name: "ubuntu"
-      channel: "20.04"
+      - name: "ubuntu"
+        channel: "20.04"

@@ -43,6 +43,7 @@ juju deploy openfga
 juju add-relation juju-jimm:openfga postgresql:openfga
 ```
 
+
 ## Developing
 
 Create and activate a virtualenv with the development requirements:

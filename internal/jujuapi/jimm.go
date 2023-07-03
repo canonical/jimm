@@ -63,6 +63,7 @@ func init() {
 		r.AddMethod("JIMM", 3, "UpdateMigratedModel", updateMigratedModelMethod)
 		r.AddMethod("JIMM", 3, "AddCloudToController", addCloudToControllerMethod)
 		r.AddMethod("JIMM", 3, "RemoveCloudFromController", removeCloudFromControllerMethod)
+		r.AddMethod("JIMM", 3, "CrossModelQuery", crossModelQueryMethod)
 
 		// JIMM Generic RPC
 		r.AddMethod("JIMM", 4, "AddController", addControllerMethod)

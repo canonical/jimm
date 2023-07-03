@@ -29,6 +29,7 @@ tmp_dir = "tmp"
 
 [log]
   time = false
+  main_only = true
 
 [misc]
   clean_on_exit = false

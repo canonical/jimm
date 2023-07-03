@@ -183,7 +183,6 @@ func TestGUIArchiveEndpoint(t *testing.T) {
 	c.Check(resp.StatusCode, qt.Equals, http.StatusOK)
 	buf, err := io.ReadAll(resp.Body)
 	c.Assert(err, qt.IsNil)
-
 	c.Check(
 		string(buf),
 		qt.Equals,

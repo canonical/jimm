@@ -22,7 +22,7 @@ issues: https://github.com/canonical/jimm/issues
 
 description: |
   JIMM is a juju controller, used in conjunction with the JaaS dashboard to provide a seamless way
-  to manage models, regardless of where their controllers reside or what cloud they may be running on. 
+  to manage models, regardless of where their controllers reside or what cloud they may be running on.
 
 provides:
   website:

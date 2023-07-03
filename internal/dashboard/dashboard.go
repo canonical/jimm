@@ -118,7 +118,6 @@ func Handler(ctx context.Context, loc string) http.Handler {
 				)
 				continue
 			}
-
 			type guiArchiveVersion struct {
 				// Version holds the Juju GUI version number.
 				Version version.Number `json:"version"`
