@@ -79,6 +79,7 @@ class JimmOperatorCharm(CharmBase):
         super().__init__(*args)
 
         self._state = State(self.app, lambda: self.model.get_relation("peer"))
+        self._unit_state = State(self.unit, lambda: self.model.get_relation("peer"))
 
         self.framework.observe(self.on.peer_relation_changed, self._on_peer_relation_changed)
         self.framework.observe(self.on.jimm_pebble_ready, self._on_jimm_pebble_ready)
@@ -214,6 +215,7 @@ class JimmOperatorCharm(CharmBase):
             return
 
         self._ensure_bakery_agent_file(event)
+        self._ensure_vault_file(event)
         self._install_dashboard(event)
 
         dns_name = self._get_dns_name(event)
@@ -282,6 +284,7 @@ class JimmOperatorCharm(CharmBase):
         else:
             logger.info("workload container not ready - defering")
             event.defer()
+            return
 
         dashboard_relation = self.model.get_relation("dashboard")
         if dashboard_relation and self.unit.is_leader():
@@ -385,6 +388,7 @@ class JimmOperatorCharm(CharmBase):
         # this event.
         if not container.can_connect():
             event.defer()
+            return
 
         # fetch the resource filename
         try:
@@ -465,9 +469,13 @@ class JimmOperatorCharm(CharmBase):
         event.relation.data[self.unit]["access_address"] = json.dumps(self._get_network_address(event))
         event.relation.data[self.unit]["isolated"] = json.dumps(False)
 
-    @requires_state_setter
-    def _on_vault_relation_changed(self, event):
+    def _ensure_vault_file(self, event):
         container = self.unit.get_container(WORKLOAD_CONTAINER)
+
+        if not self._unit_state.is_ready():
+            logger.info("unit state not ready")
+            event.defer()
+            return
 
         # if we can't connect to the container we should defer
         # this event.
@@ -477,6 +485,16 @@ class JimmOperatorCharm(CharmBase):
 
         if container.exists(self._vault_secret_filename):
             container.remove_path(self._vault_secret_filename)
+
+        secret_data = self._unit_state.vault_secret_data
+        if secret_data:
+            self._push_to_workload(self._vault_secret_filename, secret_data, event)
+
+    def _on_vault_relation_changed(self, event):
+        if not self._unit_state.is_ready() or not self._state.is_ready():
+            logger.info("state not ready")
+            event.defer()
+            return
 
         addr = _json_data(event, "vault_url")
         if not addr:
@@ -492,9 +510,13 @@ class JimmOperatorCharm(CharmBase):
         secret["data"]["role_id"] = role_id
 
         secret_data = json.dumps(secret)
-        self._push_to_workload(self._vault_secret_filename, secret_data, event)
 
-        self._state.vault_address = addr
+        logger.error("setting unit state data {}".format(secret_data))
+        self._unit_state.vault_secret_data = secret_data
+        if self.unit.is_leader():
+            self._state.vault_address = addr
+
+        self._update_workload(event)
 
     def _path_exists_in_workload(self, path: str):
         """Returns true if the specified path exists in the
