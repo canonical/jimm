@@ -11,7 +11,7 @@ parts:
     charm-binary-python-packages:
       - Jinja2 >= 2.11.3
       - markupsafe >= 2.0.1
-      - pydantic
+      - pydantic == 1.10.*
       - cosl
 bases:
   # Ensure run-on is the same or newer than build-on
