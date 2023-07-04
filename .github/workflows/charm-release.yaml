@@ -1,10 +1,10 @@
-name: Release to latest/edge
+name: Release to v1/edge
 
 on:
   workflow_dispatch:
   push:
     tags:
-      - 'v*'
+      - 'v1*'
 
 # Note this workflow requires a Github secret to provide auth against charmhub.
 # This can be generated with the following command
@@ -35,9 +35,10 @@ jobs:
         with:
           credentials: "${{ secrets.CHARMHUB_TOKEN }}"
           github-token: "${{ secrets.GITHUB_TOKEN }}"
-          channel: "v1/edge"
+          channel: "1/edge"
           charm-path: "./charms/jimm-k8s"
           local-image: "true"
+          tag-prefix: "v1-k8s"
 
   release-machine-charm:
     name: Release machine charm
@@ -54,9 +55,9 @@ jobs:
         with:
           name: jimm-snap
       - name: Install charmcraft
-        run: sudo snap install charmcraft --channel=2.x/stable
+        run: sudo snap install charmcraft --channel=2.x/stable --classic
       - name: Publish Charm Resource
-        run: charmcraft upload-resource juju-jimm jimm-snap --filepath ./jimm-snap
+        run: charmcraft upload-resource juju-jimm jimm-snap --filepath ./jimm.snap
         env:
           CHARMCRAFT_AUTH: "${{ secrets.CHARMHUB_TOKEN }}"
       - name: Upload charm to charmhub
@@ -64,5 +65,6 @@ jobs:
         with:
           credentials: "${{ secrets.CHARMHUB_TOKEN }}"
           github-token: "${{ secrets.GITHUB_TOKEN }}"
-          channel: "v1/edge"
+          channel: "1/edge"
           charm-path: "./charms/jimm"
+          tag-prefix: "v1-machine"

@@ -1,8 +1,8 @@
 # Copyright 2021 Canonical Ltd
 # See LICENSE file for licensing details.
 
-import pathlib
 import logging
+import pathlib
 import subprocess
 
 from ops.charm import CharmBase
@@ -61,7 +61,7 @@ class SystemdCharm(CharmBase):
 
     def _systemctl(self, *args):
         """Run the requested systemctl command."""
-        cmd = ['systemctl']
+        cmd = ["systemctl"]
         cmd.extend(args)
         logger.debug("running: %s", " ".join(cmd))
         subprocess.run(cmd, capture_output=True, check=True)

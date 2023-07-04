@@ -18,7 +18,7 @@ jobs:
       - run: sudo snap install snapcraft --channel=7.x/stable --classic
       - run: mkdir -p snap
       - run: cp ./snaps/jimm/snapcraft.yaml ./snap/snapcraft.yaml
-      - run: snapcraft --destructive-mode
+      - run: snapcraft snap --destructive-mode --output jimm.snap
       - uses: actions/upload-artifact@v3
         with:
           name: jimm-snap

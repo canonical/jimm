@@ -4,10 +4,22 @@ type: "charm"
 parts:
   charm:
     charm-python-packages: [setuptools]
+    charm-binary-python-packages:
+    - cryptography
+    - jsonschema
+    - PyYAML
+    - attrs
+    - importlib-resources
+    - urllib3
+    - zipp
 bases:
+  # This run-on is not as strict as the machine charm
+  # as the jimm-server runs in a container.
+  # So the only restriction for build-on vs run-on is 
+  # the charm code.
   - build-on:
-    - name: "ubuntu"
-      channel: "20.04"
+      - name: "ubuntu"
+        channel: "20.04"
     run-on:
-    - name: "ubuntu"
-      channel: "20.04"
+      - name: "ubuntu"
+        channel: "20.04"

@@ -20,7 +20,7 @@ COPY . .
 RUN echo "${GIT_COMMIT}" | tee ./version/commit.txt
 RUN echo "${VERSION}" | tee ./version/version.txt
 RUN --mount=type=ssh source /root/.gvm/scripts/gvm && go mod vendor
-RUN --mount=type=ssh source /root/.gvm/scripts/gvm && go build -o jimmsrv -race -v -a -mod vendor ./cmd/jimmsrv
+RUN --mount=type=ssh source /root/.gvm/scripts/gvm && go build -tags version -o jimmsrv -v -a -mod vendor ./cmd/jimmsrv
 
 # Define a smaller single process image for deployment
 FROM ${DOCKER_REGISTRY}ubuntu:20.04 AS deploy-env
