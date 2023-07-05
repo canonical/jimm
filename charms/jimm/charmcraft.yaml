@@ -9,7 +9,7 @@ parts:
       - README.md
     charm-python-packages: [setuptools]
     charm-binary-python-packages:
-      - pydantic
+      - pydantic == 1.10.10
       - cosl
 bases:
   # Ensure run-on is the same or newer than build-on
