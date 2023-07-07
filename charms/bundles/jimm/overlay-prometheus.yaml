@@ -1,0 +1,19 @@
+applications:
+  prometheus:
+    charm: cs:prometheus2
+    num_units: 1
+    constraints: cpu-cores=2 mem=8G root-disk=50G
+    expose: true
+    options:
+      daemon-args: --storage.tsdb.retention=30d
+  telegraf-haproxy:
+    charm: cs:telegraf
+  telegraf-jimm:
+    charm: cs:telegraf
+relations:
+  - ["ntp", "prometheus"]
+  - ["prometheus:target", "jimm"]
+  - ["prometheus:target", "telegraf-haproxy:prometheus-client"]
+  - ["prometheus:target", "telegraf-jimm:prometheus-client"]
+  - ["telegraf-haproxy:haproxy", "haproxy:statistics"]
+  - ["telegraf-jimm", "jimm"]
