@@ -386,9 +386,9 @@ class JimmCharm(SystemdCharm):
     def _on_dashboard_relation_joined(self, event):
         event.relation.data[self.app].update(
             {
-                "controller-url": "wss://{}".format(self.config["dns-name"]),
-                "identity-provider-url": self.config["candid-url"],
-                "is-juju": str(False),
+                "controller_url": "wss://{}".format(self.config["dns-name"]),
+                "identity_provider_url": self.config["candid-url"],
+                "is_juju": str(False),
             }
         )
 
