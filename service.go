@@ -239,7 +239,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	// If the request is not for a known path assume it is part of the dashboard.
 	// If dashboard location env var is not defined, do not handle a dashboard.
 	if p.DashboardLocation != "" {
-		s.mux.Handle("/", dashboard.Handler(ctx, p.DashboardLocation))
+		s.mux.Handle("/", dashboard.Handler(ctx, p.DashboardLocation, p.PublicDNSName))
 	}
 
 	return s, nil
