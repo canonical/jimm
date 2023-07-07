@@ -76,7 +76,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 3
+LIBPATCH = 4
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +93,10 @@ class OpenFGAEvent(RelationEvent):
     @property
     def token_secret_id(self):
         return self.relation.data[self.relation.app].get("token_secret_id")
+    
+    @property
+    def token(self):
+        return self.relation.data[self.relation.app].get("token")
 
     @property
     def address(self):
