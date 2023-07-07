@@ -6,6 +6,7 @@ import (
 	"context"
 
 	"github.com/canonical/candid/candidtest"
+	cofga "github.com/canonical/ofga"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/identchecker"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
@@ -14,7 +15,6 @@ import (
 	corejujutesting "github.com/juju/juju/juju/testing"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
-	openfga "github.com/openfga/go-sdk"
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/jimm/internal/auth"
@@ -47,19 +47,21 @@ type JIMMSuite struct {
 	// Authenticator configured.
 	JIMM *jimm.JIMM
 
-	AdminUser  *dbmodel.User
-	OFGAApi    openfga.OpenFgaApi
-	OFGAClient *jimmopenfga.OFGAClient
-	OFGAConfig *openfga.Configuration
+	AdminUser *dbmodel.User
+	// TBD
+	// OFGAApi     openfga.OpenFgaApi
+	OFGAClient  *jimmopenfga.OFGAClient
+	COFGAClient *cofga.Client
+	COFGAParams *cofga.OpenFGAParams
 }
 
 func (s *JIMMSuite) SetUpTest(c *gc.C) {
-	ofgaAPI, ofgaClient, ofgaConfig, err := SetupTestOFGAClient(c.TestName())
+	ofgaClient, cofgaClient, cofgaConfig, err := SetupTestOFGAClient(c.TestName())
 	c.Assert(err, gc.IsNil)
 
-	s.OFGAApi = ofgaAPI
 	s.OFGAClient = ofgaClient
-	s.OFGAConfig = ofgaConfig
+	s.COFGAClient = cofgaClient
+	s.COFGAParams = cofgaConfig
 
 	// Setup OpenFGA.
 	s.JIMM = &jimm.JIMM{
@@ -176,7 +178,7 @@ type CandidSuite struct {
 func (s *CandidSuite) SetUpTest(c *gc.C) {
 	s.Candid = candidtest.NewServer()
 	s.Candid.AddUser("agent-user", candidtest.GroupListGroup)
-	_, ofgaClient, _, err := SetupTestOFGAClient(c.TestName())
+	ofgaClient, _, _, err := SetupTestOFGAClient(c.TestName())
 	c.Assert(err, gc.IsNil)
 	s.Authenticator = auth.JujuAuthenticator{
 		Client: ofgaClient,

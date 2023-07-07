@@ -6,9 +6,9 @@ import (
 	"context"
 	"sort"
 
+	cofga "github.com/canonical/ofga"
 	"github.com/google/uuid"
 	"github.com/juju/names/v4"
-	openfga "github.com/openfga/go-sdk"
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
@@ -19,16 +19,16 @@ import (
 )
 
 type userTestSuite struct {
-	ofgaClient *ofga.OFGAClient
-	ofgaApi    openfga.OpenFgaApi
+	ofgaClient  *ofga.OFGAClient
+	cofgaClient *cofga.Client
 }
 
 var _ = gc.Suite(&userTestSuite{})
 
 func (s *userTestSuite) SetUpTest(c *gc.C) {
-	api, client, _, err := jimmtest.SetupTestOFGAClient(c.TestName())
+	client, cofgaClient, _, err := jimmtest.SetupTestOFGAClient(c.TestName())
 	c.Assert(err, gc.IsNil)
-	s.ofgaApi = api
+	s.cofgaClient = cofgaClient
 	s.ofgaClient = client
 }
 func (s *userTestSuite) TestIsAdministrator(c *gc.C) {

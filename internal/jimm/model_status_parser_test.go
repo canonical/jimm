@@ -300,7 +300,7 @@ func TestQueryModelsJq(t *testing.T) {
 	ctx := context.Background()
 
 	// Test setup
-	_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
 	j := &jimm.JIMM{

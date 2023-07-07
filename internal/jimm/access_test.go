@@ -27,7 +27,7 @@ import (
 // func TestJwtGenerator(t *testing.T) {
 // 	c := qt.New(t)
 
-// 	_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+// 	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
 // 	c.Assert(err, qt.IsNil)
 
 // 	j := &jimm.JIMM{
@@ -51,7 +51,7 @@ import (
 func TestAuditLogAccess(t *testing.T) {
 	c := qt.New(t)
 
-	_, ofgaClient, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+	ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
 	now := time.Now().UTC().Round(time.Millisecond)

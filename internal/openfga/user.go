@@ -4,12 +4,10 @@ package openfga
 
 import (
 	"context"
-	"encoding/json"
 	"strings"
 
 	"github.com/juju/names/v4"
 	"github.com/juju/zaputil/zapctx"
-	openfga "github.com/openfga/go-sdk"
 	"go.uber.org/zap"
 
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
@@ -335,200 +333,216 @@ func unsetResourceAccess[T ofganames.ResourceTagger](ctx context.Context, user *
 
 // ListUsersWithAccess lists all users that have the specified relation to the resource.
 func ListUsersWithAccess[T ofganames.ResourceTagger](ctx context.Context, client *OFGAClient, resource T, relation ofganames.Relation) ([]*User, error) {
-	t := createTupleKey(Tuple{
+	entities, err := client.cofgaClient.FindUsersByRelation(ctx, Tuple{
 		Relation: relation,
 		Target:   ofganames.ConvertTag(resource),
-	})
+	}, 999)
 
-	list, err := listUsersWithAccess(ctx, client, t)
 	if err != nil {
-		zapctx.Error(ctx, "failed to list related users", zap.Error(err))
-		return nil, errors.E(err)
-	}
-
-	users := make([]*User, len(list))
-	for i, user := range list {
-		users[i] = NewUser(
-			&dbmodel.User{
-				Username: strings.TrimPrefix(user, "user:"),
-			},
-			client,
-		)
-
-	}
-	return users, nil
-
-}
-
-func listUsersWithAccess(ctx context.Context, client *OFGAClient, tuple openfga.TupleKey) ([]string, error) {
-	// we create an expand request
-	er := openfga.NewExpandRequest(tuple)
-	er.SetAuthorizationModelId(client.AuthModelId)
-
-	res, _, err := client.api.Expand(ctx).Body(*er).Execute()
-	if err != nil {
-		zapctx.Error(ctx, "failed to query for related object", zap.Error(err))
 		return nil, err
 	}
 
-	// and process the returned tree
-	tree := res.GetTree()
-	if !tree.HasRoot() {
-		return nil, errors.E("unexpected tree structure")
-	}
-	root := tree.GetRoot()
-	rootUsers, err := traverseTree(ctx, client, &root)
-	if err != nil {
-		return nil, errors.E(err)
-	}
-	var users []string
-	for username, _ := range rootUsers {
-		users = append(users, username)
+	users := make([]*User, len(entities))
+	for i, entity := range entities {
+		users[i] = NewUser(&dbmodel.User{Username: entity.ID}, client)
 	}
 	return users, nil
+
+	// TBD
+	// t := createTupleKey(Tuple{
+	// 	Relation: relation,
+	// 	Target:   ofganames.ConvertTag(resource),
+	// })
+
+	// list, err := listUsersWithAccess(ctx, client, t)
+	// if err != nil {
+	// 	zapctx.Error(ctx, "failed to list related users", zap.Error(err))
+	// 	return nil, errors.E(err)
+	// }
+
+	// users := make([]*User, len(list))
+	// for i, user := range list {
+	// 	users[i] = NewUser(
+	// 		&dbmodel.User{
+	// 			Username: strings.TrimPrefix(user, "user:"),
+	// 		},
+	// 		client,
+	// 	)
+
+	// }
+	// return users, nil
 }
 
-// traverseTree will explore the tree returned by openfga Expand call
-// to find all users that have access to the resource.
-func traverseTree(ctx context.Context, client *OFGAClient, node *openfga.Node) (map[string]bool, error) {
-	logError := func(message, nodeType string, n interface{}) {
-		data, _ := json.Marshal(n)
-		zapctx.Error(ctx, message, zap.String(nodeType, string(data)))
-	}
+// TBD
+// func listUsersWithAccess(ctx context.Context, client *OFGAClient, tuple openfga.TupleKey) ([]string, error) {
+// 	// we create an expand request
+// 	er := openfga.NewExpandRequest(tuple)
+// 	er.SetAuthorizationModelId(client.AuthModelId)
 
-	// If this is a union node, we traverse all child nodes and
-	// join the results.
-	if node.HasUnion() {
-		union := node.GetUnion()
-		users := make(map[string]bool)
-		for _, childNode := range union.GetNodes() {
-			nodeUsers, err := traverseTree(ctx, client, &childNode)
-			if err != nil {
-				return nil, errors.E(err)
-			}
-			for nodeUser, _ := range nodeUsers {
-				users[nodeUser] = true
-			}
-		}
-		return users, nil
-	}
-	// A-ha! a leaf node!
-	if node.HasLeaf() {
-		leaf := node.GetLeaf()
+// 	res, _, err := client.api.Expand(ctx).Body(*er).Execute()
+// 	if err != nil {
+// 		zapctx.Error(ctx, "failed to query for related object", zap.Error(err))
+// 		return nil, err
+// 	}
 
-		// A leaf node may list users: in this case we still need
-		// to run the list through expandList.
-		if leaf.HasUsers() {
-			leafUsers, err := expandList(ctx, client, *leaf.Users.Users)
-			if err != nil {
-				return nil, errors.E(err)
-			}
-			return leafUsers, nil
-		} else if leaf.HasComputed() {
-			computed := leaf.GetComputed()
-			// A computed leaf node needs to have a userset
-			// (e.g. applicationoffer:a8513c54-6eb0-4058-84c7-225e03c4d0b5#consumer)
-			if computed.HasUserset() {
-				userset := computed.GetUserset()
-				computedUsers, err := expandUserset(ctx, client, userset)
-				if err != nil {
-					return nil, errors.E(err)
-				}
-				return computedUsers, nil
-			} else {
-				logError("missing userset", "leaf", leaf)
-				return nil, errors.E("missing userset")
-			}
-		} else if leaf.HasTupleToUserset() {
-			tupleToUserset := leaf.GetTupleToUserset()
-			if tupleToUserset.HasComputed() {
-				computedList := tupleToUserset.GetComputed()
-				users := make(map[string]bool)
-				// We're interested in the list of computed nodes
-				// this TupleToUserset contains -  we need to get a list
-				// of users that have access to each of these and join the list.
-				for _, computed := range computedList {
-					if computed.HasUserset() {
-						userset := computed.GetUserset()
-						computedUsers, err := expandUserset(ctx, client, userset)
-						if err != nil {
-							return nil, errors.E(err)
-						}
-						for computedUser, _ := range computedUsers {
-							users[computedUser] = true
-						}
-					} else {
-						logError("tupleToUserset: missing userset", "leaf", leaf)
-						return nil, errors.E("missing userset")
-					}
-				}
-				return users, nil
-			}
-		} else {
-			logError("unknown leaf type", "leaf", leaf)
-			return nil, errors.E("unknown leaf type")
-		}
-	}
-	logError("unknown node type", "node", node)
-	return nil, errors.E("unknown node type")
-}
+// 	// and process the returned tree
+// 	tree := res.GetTree()
+// 	if !tree.HasRoot() {
+// 		return nil, errors.E("unexpected tree structure")
+// 	}
+// 	root := tree.GetRoot()
+// 	rootUsers, err := traverseTree(ctx, client, &root)
+// 	if err != nil {
+// 		return nil, errors.E(err)
+// 	}
+// 	var users []string
+// 	for username, _ := range rootUsers {
+// 		users = append(users, username)
+// 	}
+// 	return users, nil
+// }
 
-// expandUserset expects to receive a userset of the
-// "entity#relation" format and will recursively call listUsersWithAccess
-// to expand the userset get the users that have the specified
-// relation to the entity contained in the userset.
-func expandUserset(ctx context.Context, client *OFGAClient, userset string) (map[string]bool, error) {
-	tokens := strings.Split(userset, "#")
-	if len(tokens) != 2 {
-		zapctx.Error(ctx, "unexpected userset", zap.String("userset", userset))
-		return nil, errors.E("unexpected userset")
-	}
-	computedTuple := openfga.NewTupleKey()
-	computedTuple.SetRelation(tokens[1])
-	computedTuple.SetObject(tokens[0])
-	users, err := listUsersWithAccess(ctx, client, *computedTuple)
-	if err != nil {
-		return nil, errors.E(err)
-	}
-	computedUsers, err := expandList(ctx, client, users)
-	if err != nil {
-		return nil, errors.E(err)
-	}
-	return computedUsers, nil
-}
+// // traverseTree will explore the tree returned by openfga Expand call
+// // to find all users that have access to the resource.
+// func traverseTree(ctx context.Context, client *OFGAClient, node *openfga.Node) (map[string]bool, error) {
+// 	logError := func(message, nodeType string, n interface{}) {
+// 		data, _ := json.Marshal(n)
+// 		zapctx.Error(ctx, message, zap.String(nodeType, string(data)))
+// 	}
 
-// expandList checks all entities in the list
-//   - an entity may be a username, in that case it is direcly added to the list
-//   - or it may tell us that users with a certain kind of relation
-//     to the specified entity have access to the resource: e.g. group#members or
-//     model#administrator
-func expandList(ctx context.Context, client *OFGAClient, entities []string) (map[string]bool, error) {
-	users := make(map[string]bool)
-	for _, entity := range entities {
-		tokens := strings.Split(entity, "#")
-		switch len(tokens) {
-		case 1:
-			// entity does not contain a # so it is a username
-			// - we add it to the map
-			users[entity] = true
-		case 2:
-			// ok, we need to check users that have relation
-			// specified in tokens[1] to resource specified
-			// in tokens[0]
-			t := openfga.NewTupleKey()
-			t.SetRelation(tokens[1])
-			t.SetObject(tokens[0])
-			newUsers, err := listUsersWithAccess(ctx, client, *t)
-			if err != nil {
-				return nil, errors.E(err)
-			}
-			for _, username := range newUsers {
-				users[username] = true
-			}
-		default:
-			zapctx.Error(ctx, "unknown entity type", zap.String("entity", entity))
-			return nil, errors.E("unknown entity type")
-		}
-	}
-	return users, nil
-}
+// 	// If this is a union node, we traverse all child nodes and
+// 	// join the results.
+// 	if node.HasUnion() {
+// 		union := node.GetUnion()
+// 		users := make(map[string]bool)
+// 		for _, childNode := range union.GetNodes() {
+// 			nodeUsers, err := traverseTree(ctx, client, &childNode)
+// 			if err != nil {
+// 				return nil, errors.E(err)
+// 			}
+// 			for nodeUser, _ := range nodeUsers {
+// 				users[nodeUser] = true
+// 			}
+// 		}
+// 		return users, nil
+// 	}
+// 	// A-ha! a leaf node!
+// 	if node.HasLeaf() {
+// 		leaf := node.GetLeaf()
+
+// 		// A leaf node may list users: in this case we still need
+// 		// to run the list through expandList.
+// 		if leaf.HasUsers() {
+// 			leafUsers, err := expandList(ctx, client, *leaf.Users.Users)
+// 			if err != nil {
+// 				return nil, errors.E(err)
+// 			}
+// 			return leafUsers, nil
+// 		} else if leaf.HasComputed() {
+// 			computed := leaf.GetComputed()
+// 			// A computed leaf node needs to have a userset
+// 			// (e.g. applicationoffer:a8513c54-6eb0-4058-84c7-225e03c4d0b5#consumer)
+// 			if computed.HasUserset() {
+// 				userset := computed.GetUserset()
+// 				computedUsers, err := expandUserset(ctx, client, userset)
+// 				if err != nil {
+// 					return nil, errors.E(err)
+// 				}
+// 				return computedUsers, nil
+// 			} else {
+// 				logError("missing userset", "leaf", leaf)
+// 				return nil, errors.E("missing userset")
+// 			}
+// 		} else if leaf.HasTupleToUserset() {
+// 			tupleToUserset := leaf.GetTupleToUserset()
+// 			if tupleToUserset.HasComputed() {
+// 				computedList := tupleToUserset.GetComputed()
+// 				users := make(map[string]bool)
+// 				// We're interested in the list of computed nodes
+// 				// this TupleToUserset contains -  we need to get a list
+// 				// of users that have access to each of these and join the list.
+// 				for _, computed := range computedList {
+// 					if computed.HasUserset() {
+// 						userset := computed.GetUserset()
+// 						computedUsers, err := expandUserset(ctx, client, userset)
+// 						if err != nil {
+// 							return nil, errors.E(err)
+// 						}
+// 						for computedUser, _ := range computedUsers {
+// 							users[computedUser] = true
+// 						}
+// 					} else {
+// 						logError("tupleToUserset: missing userset", "leaf", leaf)
+// 						return nil, errors.E("missing userset")
+// 					}
+// 				}
+// 				return users, nil
+// 			}
+// 		} else {
+// 			logError("unknown leaf type", "leaf", leaf)
+// 			return nil, errors.E("unknown leaf type")
+// 		}
+// 	}
+// 	logError("unknown node type", "node", node)
+// 	return nil, errors.E("unknown node type")
+// }
+
+// // expandUserset expects to receive a userset of the
+// // "entity#relation" format and will recursively call listUsersWithAccess
+// // to expand the userset get the users that have the specified
+// // relation to the entity contained in the userset.
+// func expandUserset(ctx context.Context, client *OFGAClient, userset string) (map[string]bool, error) {
+// 	tokens := strings.Split(userset, "#")
+// 	if len(tokens) != 2 {
+// 		zapctx.Error(ctx, "unexpected userset", zap.String("userset", userset))
+// 		return nil, errors.E("unexpected userset")
+// 	}
+// 	computedTuple := openfga.NewTupleKey()
+// 	computedTuple.SetRelation(tokens[1])
+// 	computedTuple.SetObject(tokens[0])
+// 	users, err := listUsersWithAccess(ctx, client, *computedTuple)
+// 	if err != nil {
+// 		return nil, errors.E(err)
+// 	}
+// 	computedUsers, err := expandList(ctx, client, users)
+// 	if err != nil {
+// 		return nil, errors.E(err)
+// 	}
+// 	return computedUsers, nil
+// }
+
+// // expandList checks all entities in the list
+// //   - an entity may be a username, in that case it is direcly added to the list
+// //   - or it may tell us that users with a certain kind of relation
+// //     to the specified entity have access to the resource: e.g. group#members or
+// //     model#administrator
+// func expandList(ctx context.Context, client *OFGAClient, entities []string) (map[string]bool, error) {
+// 	users := make(map[string]bool)
+// 	for _, entity := range entities {
+// 		tokens := strings.Split(entity, "#")
+// 		switch len(tokens) {
+// 		case 1:
+// 			// entity does not contain a # so it is a username
+// 			// - we add it to the map
+// 			users[entity] = true
+// 		case 2:
+// 			// ok, we need to check users that have relation
+// 			// specified in tokens[1] to resource specified
+// 			// in tokens[0]
+// 			t := openfga.NewTupleKey()
+// 			t.SetRelation(tokens[1])
+// 			t.SetObject(tokens[0])
+// 			newUsers, err := listUsersWithAccess(ctx, client, *t)
+// 			if err != nil {
+// 				return nil, errors.E(err)
+// 			}
+// 			for _, username := range newUsers {
+// 				users[username] = true
+// 			}
+// 		default:
+// 			zapctx.Error(ctx, "unknown entity type", zap.String("entity", entity))
+// 			return nil, errors.E("unknown entity type")
+// 		}
+// 	}
+// 	return users, nil
+// }

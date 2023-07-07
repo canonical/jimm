@@ -6,14 +6,13 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
-	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/canonical/candid/candidclient"
+	cofga "github.com/canonical/ofga"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/checkers"
@@ -25,8 +24,6 @@ import (
 	vaultapi "github.com/hashicorp/vault/api"
 	"github.com/juju/names/v4"
 	"github.com/juju/zaputil/zapctx"
-	openfga "github.com/openfga/go-sdk"
-	"github.com/openfga/go-sdk/credentials"
 	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
@@ -45,6 +42,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/jujuapi"
 	"github.com/CanonicalLtd/jimm/internal/jujuclient"
 	"github.com/CanonicalLtd/jimm/internal/logger"
+	"github.com/CanonicalLtd/jimm/internal/openfga"
 	internalopenfga "github.com/CanonicalLtd/jimm/internal/openfga"
 	ofgaClient "github.com/CanonicalLtd/jimm/internal/openfga"
 	ofganames "github.com/CanonicalLtd/jimm/internal/openfga/names"
@@ -255,7 +253,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		return nil, errors.E(op, err)
 	}
 
-	openFGAclient, err := newOpenFGAClient(ctx, p)
+	openFGAclient, err := newOpenFGAClient(ctx, p.OpenFGAParams)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
@@ -488,53 +486,66 @@ func newVaultStore(ctx context.Context, p Params) (jimmcreds.CredentialStore, er
 	}, nil
 }
 
-func newOpenFGAClient(ctx context.Context, p Params) (*ofgaClient.OFGAClient, error) {
-	if p.OpenFGAParams.Host == "" {
-		return nil, errors.E("missing OpenFGA configuration")
-	}
-	zapctx.Info(ctx, "configuring OpenFGA client",
-		zap.String("OpenFGA host", p.OpenFGAParams.Host),
-		zap.String("OpenFGA scheme", p.OpenFGAParams.Scheme),
-		zap.String("OpenFGA store", p.OpenFGAParams.Store),
-	)
-
-	config := openfga.Configuration{
-		ApiScheme: p.OpenFGAParams.Scheme,
-		ApiHost:   fmt.Sprintf("%s:%s", p.OpenFGAParams.Host, p.OpenFGAParams.Port), // required, define without the scheme (e.g. api.fga.example instead of https://api.fga.example)
-		StoreId:   p.OpenFGAParams.Store,
-	}
-	if p.OpenFGAParams.Token != "" {
-		config.Credentials = &credentials.Credentials{
-			Method: credentials.CredentialsMethodApiToken,
-			Config: &credentials.Config{
-				ApiToken: p.OpenFGAParams.Token,
-			},
-		}
-	}
-	configuration, err := openfga.NewConfiguration(config)
+func newOpenFGAClient(ctx context.Context, p OpenFGAParams) (*ofgaClient.OFGAClient, error) {
+	cofgaClient, err := cofga.NewClient(ctx, cofga.OpenFGAParams{
+		Scheme:      p.Scheme,
+		Host:        p.Host,
+		Token:       p.Token,
+		Port:        p.Port,
+		StoreID:     p.Store,
+		AuthModelID: p.AuthModel,
+	})
 	if err != nil {
-		return nil, err
+		return nil, errors.E(err, "failed to create ofga client")
 	}
-	client := openfga.NewAPIClient(configuration)
-	api := client.OpenFgaApi
+	return openfga.NewOpenFGAClient(cofgaClient), nil
 
-	_, response, err := api.ListStores(ctx).Execute()
-	if err != nil {
-		return nil, err
-	}
-	body, _ := io.ReadAll(response.Body)
-	if response.StatusCode != http.StatusOK {
-		return nil, errors.E("failed to contact the OpenFga server: received %v: %s", response.StatusCode, string(body))
-	}
+	// if p.Host == "" {
+	// 	return nil, errors.E("missing OpenFGA configuration")
+	// }
+	// zapctx.Info(ctx, "configuring OpenFGA client",
+	// 	zap.String("OpenFGA host", p.Host),
+	// 	zap.String("OpenFGA scheme", p.Scheme),
+	// 	zap.String("OpenFGA store", p.Store),
+	// )
 
-	storeResp, _, err := api.GetStore(ctx).Execute()
-	if err != nil {
-		zapctx.Error(ctx, "could not retrieve store.", zap.Error(err))
-		return nil, errors.E("could not retrieve store")
-	} else {
-		zapctx.Info(ctx, "store appears to exist", zap.String("store-name", *storeResp.Name))
-	}
-	return ofgaClient.NewOpenFGAClient(client.OpenFgaApi, p.OpenFGAParams.AuthModel), nil
+	// config := openfga.Configuration{
+	// 	ApiScheme: p.Scheme,
+	// 	ApiHost:   fmt.Sprintf("%s:%s", p.Host, p.Port), // required, define without the scheme (e.g. api.fga.example instead of https://api.fga.example)
+	// 	StoreId:   p.Store,
+	// }
+	// if p.Token != "" {
+	// 	config.Credentials = &credentials.Credentials{
+	// 		Method: credentials.CredentialsMethodApiToken,
+	// 		Config: &credentials.Config{
+	// 			ApiToken: p.Token,
+	// 		},
+	// 	}
+	// }
+	// configuration, err := openfga.NewConfiguration(config)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// client := openfga.NewAPIClient(configuration)
+	// api := client.OpenFgaApi
+
+	// _, response, err := api.ListStores(ctx).Execute()
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// body, _ := io.ReadAll(response.Body)
+	// if response.StatusCode != http.StatusOK {
+	// 	return nil, errors.E("failed to contact the OpenFga server: received %v: %s", response.StatusCode, string(body))
+	// }
+
+	// storeResp, _, err := api.GetStore(ctx).Execute()
+	// if err != nil {
+	// 	zapctx.Error(ctx, "could not retrieve store.", zap.Error(err))
+	// 	return nil, errors.E("could not retrieve store")
+	// } else {
+	// 	zapctx.Info(ctx, "store appears to exist", zap.String("store-name", *storeResp.Name))
+	// }
+	// return ofgaClient.NewOpenFGAClient(client.OpenFgaApi, p.AuthModel), nil
 }
 
 // ensureControllerAdministrators ensures that listed users have admin access to the JIMM controller.

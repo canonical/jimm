@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	cofga "github.com/canonical/ofga"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/google/uuid"
@@ -20,16 +21,16 @@ import (
 )
 
 type openFGATestSuite struct {
-	ofgaClient *ofga.OFGAClient
-	ofgaApi    openfga.OpenFgaApi
+	ofgaClient  *ofga.OFGAClient
+	cofgaClient *cofga.Client
 }
 
 var _ = gc.Suite(&openFGATestSuite{})
 
 func (s *openFGATestSuite) SetUpTest(c *gc.C) {
-	api, client, _, err := jimmtest.SetupTestOFGAClient(c.TestName())
+	client, cofgaClient, _, err := jimmtest.SetupTestOFGAClient(c.TestName())
 	c.Assert(err, gc.IsNil)
-	s.ofgaApi = api
+	s.cofgaClient = cofgaClient
 	s.ofgaClient = client
 }
 
@@ -56,8 +57,9 @@ func (s *openFGATestSuite) TestWritingTuplesToOFGASucceeds(c *gc.C) {
 
 	err := s.ofgaClient.AddRelations(ctx, key1, key2)
 	c.Assert(err, gc.IsNil)
-	changes, _, err := s.ofgaApi.ReadChanges(ctx).Type_("group").Execute()
+	changes, err := s.cofgaClient.ReadChanges(ctx, "group", 99, "")
 	c.Assert(err, gc.IsNil)
+	c.Assert(changes.ContinuationToken, gc.Equals, "", gc.Commentf("there are still more changes to fetch"))
 
 	secondToLastInsertedTuple := changes.GetChanges()[len(changes.GetChanges())-2].GetTupleKey()
 	c.Assert(ofganames.ConvertTag(user1).String(), gc.Equals, secondToLastInsertedTuple.GetUser())
@@ -96,8 +98,9 @@ func (suite *openFGATestSuite) TestRemovingTuplesFromOFGASucceeds(c *gc.C) {
 	//Delete after insert should succeed.
 	err = suite.ofgaClient.RemoveRelation(ctx, key1, key2)
 	c.Assert(err, gc.IsNil)
-	changes, _, err := suite.ofgaApi.ReadChanges(ctx).Type_("group").Execute()
+	changes, err := suite.cofgaClient.ReadChanges(ctx, "group", 99, "")
 	c.Assert(err, gc.IsNil)
+	c.Assert(changes.ContinuationToken, gc.Equals, "", gc.Commentf("there are still more changes to fetch"))
 
 	secondToLastInsertedTuple := changes.GetChanges()[len(changes.GetChanges())-2]
 	secondLastKey := secondToLastInsertedTuple.GetTupleKey()
@@ -163,9 +166,10 @@ func (s *openFGATestSuite) TestRemoveTuplesSucceeds(c *gc.C) {
 	c.Logf("checking for tuple %v\n", checkKey)
 	err := s.ofgaClient.RemoveTuples(context.Background(), &checkKey)
 	c.Assert(err, gc.IsNil)
-	res, err := s.ofgaClient.ReadRelatedObjects(context.Background(), nil, 50, "")
+	tuples, ct, err := s.ofgaClient.ReadRelatedObjects(context.Background(), nil, 50, "")
 	c.Assert(err, gc.IsNil)
-	c.Assert(len(res.Tuples), gc.Equals, 0)
+	c.Assert(ct, gc.Equals, "")
+	c.Assert(len(tuples), gc.Equals, 0)
 
 }
 

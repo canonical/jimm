@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/canonical/candid/candidtest"
+	cofga "github.com/canonical/ofga"
 	qt "github.com/frankban/quicktest"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/checkers"
@@ -41,17 +42,11 @@ func TestMain(m *testing.M) {
 func TestDefaultService(t *testing.T) {
 	c := qt.New(t)
 
-	_, ofgaClient, cfg, err := jimmtest.SetupTestOFGAClient(c.Name())
+	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
 	svc, err := jimm.NewService(context.Background(), jimm.Params{
-		OpenFGAParams: jimm.OpenFGAParams{
-			Scheme:    cfg.ApiScheme,
-			Host:      cfg.ApiHost,
-			Store:     cfg.StoreId,
-			Token:     cfg.Credentials.Config.ApiToken,
-			AuthModel: ofgaClient.AuthModelId,
-		},
+		OpenFGAParams: cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
 	})
 	c.Assert(err, qt.IsNil)
 	rr := httptest.NewRecorder()
@@ -65,19 +60,13 @@ func TestDefaultService(t *testing.T) {
 func TestAuthenticator(t *testing.T) {
 	c := qt.New(t)
 
-	_, ofgaClient, cfg, err := jimmtest.SetupTestOFGAClient(c.Name())
+	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
 	p := jimm.Params{
 		ControllerUUID:   "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
 		ControllerAdmins: []string{"admin"},
-		OpenFGAParams: jimm.OpenFGAParams{
-			Scheme:    cfg.ApiScheme,
-			Host:      cfg.ApiHost,
-			Store:     cfg.StoreId,
-			Token:     cfg.Credentials.Config.ApiToken,
-			AuthModel: ofgaClient.AuthModelId,
-		},
+		OpenFGAParams:    cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
 	}
 	candid := startCandid(c, &p)
 	svc, err := jimm.NewService(context.Background(), p)
@@ -123,7 +112,7 @@ func TestAuthenticator(t *testing.T) {
 func TestVault(t *testing.T) {
 	c := qt.New(t)
 
-	_, ofgaClient, cfg, err := jimmtest.SetupTestOFGAClient(c.Name())
+	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
 	p := jimm.Params{
@@ -132,13 +121,7 @@ func TestVault(t *testing.T) {
 		VaultAuthPath:   "/auth/approle/login",
 		VaultPath:       "/jimm-kv/",
 		VaultSecretFile: "./local/vault/approle.json",
-		OpenFGAParams: jimm.OpenFGAParams{
-			Scheme:    cfg.ApiScheme,
-			Host:      cfg.ApiHost,
-			Store:     cfg.StoreId,
-			Token:     cfg.Credentials.Config.ApiToken,
-			AuthModel: ofgaClient.AuthModelId,
-		},
+		OpenFGAParams:   cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
 	}
 	candid := startCandid(c, &p)
 	vaultClient, _, creds, _ := jimmtest.VaultClient(c, ".")
@@ -190,18 +173,12 @@ func TestVault(t *testing.T) {
 func TestOpenFGA(t *testing.T) {
 	c := qt.New(t)
 
-	_, ofgaClient, cfg, err := jimmtest.SetupTestOFGAClient(c.Name())
+	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
 	p := jimm.Params{
-		ControllerUUID: "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
-		OpenFGAParams: jimm.OpenFGAParams{
-			Scheme:    cfg.ApiScheme,
-			Host:      cfg.ApiHost,
-			Store:     cfg.StoreId,
-			Token:     cfg.Credentials.Config.ApiToken,
-			AuthModel: ofgaClient.AuthModelId,
-		},
+		ControllerUUID:   "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
+		OpenFGAParams:    cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
 		ControllerAdmins: []string{"alice", "eve"},
 	}
 	candid := startCandid(c, &p)
@@ -225,7 +202,7 @@ func TestOpenFGA(t *testing.T) {
 		}
 	})
 
-	client, err := jimm.NewOpenFGAClient(context.Background(), p)
+	client, err := jimm.NewOpenFGAClient(context.Background(), p.OpenFGAParams)
 	c.Assert(err, qt.IsNil)
 
 	// assert controller admins have been created in openfga
@@ -243,18 +220,12 @@ func TestOpenFGA(t *testing.T) {
 func TestPublicKey(t *testing.T) {
 	c := qt.New(t)
 
-	_, ofgaClient, cfg, err := jimmtest.SetupTestOFGAClient(c.Name())
+	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
 	p := jimm.Params{
-		ControllerUUID: "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
-		OpenFGAParams: jimm.OpenFGAParams{
-			Scheme:    cfg.ApiScheme,
-			Host:      cfg.ApiHost,
-			Store:     cfg.StoreId,
-			Token:     cfg.Credentials.Config.ApiToken,
-			AuthModel: ofgaClient.AuthModelId,
-		},
+		ControllerUUID:   "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
+		OpenFGAParams:    cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
 		ControllerAdmins: []string{"alice", "eve"},
 		PrivateKey:       "c1VkV05+iWzCxMwMVcWbr0YJWQSEO62v+z3EQ2BhFMw=",
 		PublicKey:        "pC8MEk9MS9S8fhyRnOJ4qARTcTAwoM9L1nH/Yq0MwWU=",
@@ -393,18 +364,12 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 	}}
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
-			_, ofgaClient, cfg, err := jimmtest.SetupTestOFGAClient(c.Name())
+			ofgaClient, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 			c.Assert(err, qt.IsNil)
 
 			p := jimm.Params{
-				ControllerUUID: "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
-				OpenFGAParams: jimm.OpenFGAParams{
-					Scheme:    cfg.ApiScheme,
-					Host:      cfg.ApiHost,
-					Store:     cfg.StoreId,
-					Token:     cfg.Credentials.Config.ApiToken,
-					AuthModel: ofgaClient.AuthModelId,
-				},
+				ControllerUUID:   "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
+				OpenFGAParams:    cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
 				ControllerAdmins: []string{"alice", "eve"},
 				PrivateKey:       "c1VkV05+iWzCxMwMVcWbr0YJWQSEO62v+z3EQ2BhFMw=",
 				PublicKey:        "pC8MEk9MS9S8fhyRnOJ4qARTcTAwoM9L1nH/Yq0MwWU=",
@@ -498,5 +463,15 @@ func key(candid *candidtest.Server, user string) *bakery.KeyPair {
 	return &bakery.KeyPair{
 		Public:  bakery.PublicKey{Key: bakery.Key(key.Public.Key)},
 		Private: bakery.PrivateKey{Key: bakery.Key(key.Private.Key)},
+	}
+}
+
+func cofgaParamsToJIMMOpenFGAParams(cofgaParams cofga.OpenFGAParams) jimm.OpenFGAParams {
+	return jimm.OpenFGAParams{
+		Scheme:    cofgaParams.Scheme,
+		Host:      cofgaParams.Host,
+		Store:     cofgaParams.StoreID,
+		Token:     cofgaParams.Token,
+		AuthModel: cofgaParams.AuthModelID,
 	}
 }

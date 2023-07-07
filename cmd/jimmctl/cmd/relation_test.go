@@ -86,9 +86,10 @@ func (s *relationSuite) TestAddRelationSuperuser(c *gc.C) {
 			c.Assert(strings.Contains(err.Error(), tc.message), gc.Equals, true)
 		} else {
 			c.Assert(err, gc.IsNil)
-			resp, err := s.jimmSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), nil, 50, "")
+			tuples, ct, err := s.jimmSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), nil, 50, "")
 			c.Assert(err, gc.IsNil)
-			c.Assert(len(resp.Tuples), gc.Equals, i+3)
+			c.Assert(ct, gc.Equals, "")
+			c.Assert(len(tuples), gc.Equals, i+3)
 		}
 	}
 
@@ -131,9 +132,10 @@ func (s *relationSuite) TestAddRelationViaFileSuperuser(c *gc.C) {
 	_, err = cmdtesting.RunCommand(c, cmd.NewAddRelationCommandForTesting(s.ClientStore(), bClient), "-f", file.Name())
 	c.Assert(err, gc.IsNil)
 
-	resp, err := s.jimmSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), nil, 50, "")
+	tuples, ct, err := s.jimmSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), nil, 50, "")
 	c.Assert(err, gc.IsNil)
-	c.Assert(len(resp.Tuples), gc.Equals, 4)
+	c.Assert(ct, gc.Equals, "")
+	c.Assert(len(tuples), gc.Equals, 4)
 }
 
 func (s *relationSuite) TestAddRelationRejectsUnauthorisedUsers(c *gc.C) {
@@ -180,10 +182,11 @@ func (s *relationSuite) TestRemoveRelationSuperuser(c *gc.C) {
 			c.Assert(err, gc.ErrorMatches, tc.message)
 		} else {
 			c.Assert(err, gc.IsNil)
-			resp, err := s.jimmSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), nil, 50, "")
+			tuples, ct, err := s.jimmSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), nil, 50, "")
 			c.Assert(err, gc.IsNil)
+			c.Assert(ct, gc.Equals, "")
 			totalKeys--
-			c.Assert(len(resp.Tuples), gc.Equals, totalKeys)
+			c.Assert(len(tuples), gc.Equals, totalKeys)
 		}
 	}
 }
@@ -214,11 +217,12 @@ func (s *relationSuite) TestRemoveRelationViaFileSuperuser(c *gc.C) {
 	_, err = cmdtesting.RunCommand(c, cmd.NewRemoveRelationCommandForTesting(s.ClientStore(), bClient), "-f", file.Name())
 	c.Assert(err, gc.IsNil)
 
-	resp, err := s.jimmSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), nil, 50, "")
+	tuples, ct, err := s.jimmSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), nil, 50, "")
 	c.Assert(err, gc.IsNil)
-	c.Logf("existing relations %v", resp.Tuples)
+	c.Assert(ct, gc.Equals, "")
+	c.Logf("existing relations %v", tuples)
 	// Only two relations exist.
-	c.Assert(resp.Tuples, gc.DeepEquals, []ofga.Tuple{{
+	c.Assert(tuples, gc.DeepEquals, []ofga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("admin")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewControllerTag(s.Params.ControllerUUID)),

@@ -57,11 +57,11 @@ func (s *jimmSuite) SetUpTest(c *gc.C) {
 	s.CandidSuite.SetUpTest(c)
 	s.JujuConnSuite.SetUpTest(c)
 
-	ofgaAPI, ofgaClient, cfg, err := jimmtest.SetupTestOFGAClient(c.TestName())
+	ofgaClient, cofgaClient, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.TestName())
 	c.Assert(err, gc.Equals, nil)
-	s.OFGAApi = ofgaAPI
 	s.OFGAClient = ofgaClient
-	s.OFGAConfig = cfg
+	s.COFGAClient = cofgaClient
+	s.COFGAParams = cofgaParams
 
 	s.JIMM = &jimm.JIMM{
 		UUID: "914487b5-60e7-42bb-bd63-1adc3fd3a388",
@@ -81,11 +81,11 @@ func (s *jimmSuite) SetUpTest(c *gc.C) {
 		ControllerAdmins: []string{"admin"},
 		DSN:              fmt.Sprintf("file:%s?mode=memory&cache=shared", c.TestName()),
 		OpenFGAParams: service.OpenFGAParams{
-			Scheme:    cfg.ApiScheme,
-			Host:      cfg.ApiHost,
-			Store:     cfg.StoreId,
-			Token:     cfg.Credentials.Config.ApiToken,
-			AuthModel: ofgaClient.AuthModelId,
+			Scheme:    cofgaParams.Scheme,
+			Host:      cofgaParams.Host,
+			Store:     cofgaParams.StoreID,
+			Token:     cofgaParams.Token,
+			AuthModel: cofgaParams.AuthModelID,
 		},
 	}
 	srv, err := service.NewService(ctx, s.Params)

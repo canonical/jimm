@@ -2,7 +2,6 @@ package jimmtest
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -11,10 +10,10 @@ import (
 	"strings"
 	"sync"
 
+	cofga "github.com/canonical/ofga"
 	"github.com/jackc/pgx/v4"
 	"github.com/oklog/ulid/v2"
 	openfga "github.com/openfga/go-sdk"
-	"github.com/openfga/go-sdk/credentials"
 
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	ofga "github.com/CanonicalLtd/jimm/internal/openfga"
@@ -33,9 +32,12 @@ func init() {
 }
 
 type testSetup struct {
-	client     openfga.OpenFgaApi
-	ofgaClient *ofga.OFGAClient
-	config     *openfga.Configuration
+	// TBD
+	// config      *openfga.Configuration
+	//client      openfga.OpenFgaApi
+	client      *ofga.OFGAClient
+	cofgaClient *cofga.Client
+	cofgaParams *cofga.OpenFGAParams
 }
 
 func getAuthModelDefinition() (_ []openfga.TypeDefinition, err error) {
@@ -75,25 +77,14 @@ func getAuthModelDefinition() (_ []openfga.TypeDefinition, err error) {
 		if err != nil {
 			return
 		}
-		wrapper := make(map[string]interface{})
-		err = json.Unmarshal(b, &wrapper)
-		if err != nil {
-			return
-		}
 
-		b, err = json.Marshal(wrapper["type_definitions"])
-		if err != nil {
-			return
-		}
-
-		err = json.Unmarshal(b, &authDefinitions)
+		authDefinitions, err = cofga.AuthModelFromJSON(b)
 		if err != nil {
 			return
 		}
 	})
 
 	return authDefinitions, err
-
 }
 
 // SetupTestOFGAClient is intended to be used per test, in that it
@@ -102,7 +93,7 @@ func getAuthModelDefinition() (_ []openfga.TypeDefinition, err error) {
 //
 // The benefit of not cleaning up the store immediately afterwards,
 // enables the debugging of created tuples in test development.
-func SetupTestOFGAClient(names ...string) (openfga.OpenFgaApi, *ofga.OFGAClient, *openfga.Configuration, error) {
+func SetupTestOFGAClient(names ...string) (*ofga.OFGAClient, *cofga.Client, *cofga.OpenFGAParams, error) {
 	ctx := context.Background()
 
 	testName := strings.NewReplacer(" ", "_", "'", "_").Replace(strings.Join(names, "_"))
@@ -111,60 +102,75 @@ func SetupTestOFGAClient(names ...string) (openfga.OpenFgaApi, *ofga.OFGAClient,
 	defer setupsMu.Unlock()
 	setup, ok := setups[testName]
 	if ok {
-		return setup.client, setup.ofgaClient, setup.config, nil
+		return setup.client, setup.cofgaClient, setup.cofgaParams, nil
 	}
 
-	openFGATestConfig := openfga.Configuration{
-		ApiScheme: "http",
-		ApiHost:   "localhost:8080",
-		Credentials: &credentials.Credentials{
-			Method: credentials.CredentialsMethodApiToken,
-			Config: &credentials.Config{
-				ApiToken: "jimm",
-			},
-		},
-	}
 	err := RemoveStore(ctx, testName)
 	if err != nil {
 		return nil, nil, nil, err
 	}
 
-	uuid := ulid.Make().String()
-	err = CreateStore(ctx, testName, uuid)
+	storeID := ulid.Make().String()
+	err = CreateStore(ctx, testName, storeID)
 	if err != nil {
 		return nil, nil, nil, err
 	}
 
-	cfg, err := openfga.NewConfiguration(openFGATestConfig)
+	cofgaParams := cofga.OpenFGAParams{
+		Scheme:  "http",
+		Host:    "localhost:8080",
+		Token:   "jimm",
+		Port:    "8080",
+		StoreID: storeID,
+	}
+	cofgaClient, err := cofga.NewClient(ctx, cofgaParams)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, errors.E(err, "failed to create ofga client")
 	}
 
-	client := openfga.NewAPIClient(cfg)
+	// TBD
+	// cfg, err := openfga.NewConfiguration(openFGATestConfig)
+	// if err != nil {
+	// 	return nil, nil, nil, err
+	// }
 
-	client.SetStoreId(uuid)
-	api := client.OpenFgaApi
+	// client := openfga.NewAPIClient(cfg)
+
+	// client.SetStoreId(storeID)
+	// api := client.OpenFgaApi
 
 	typeDefinitions, err := getAuthModelDefinition()
-	ar := openfga.NewWriteAuthorizationModelRequest(typeDefinitions)
 	if err != nil {
 		return nil, nil, nil, err
 	}
 
-	amr, _, err := api.WriteAuthorizationModel(ctx).Body(*ar).Execute()
-	if err != nil {
-		return nil, nil, nil, err
-	}
+	// TBD
+	// ar := openfga.NewWriteAuthorizationModelRequest(typeDefinitions)
+	// if err != nil {
+	// 	return nil, nil, nil, err
+	// }
 
-	wrapperClient := ofga.NewOpenFGAClient(client.OpenFgaApi, amr.GetAuthorizationModelId())
-	cfg.StoreId = uuid
+	// amr, _, err := api.WriteAuthorizationModel(ctx).Body(*ar).Execute()
+	// if err != nil {
+	// 	return nil, nil, nil, err
+	// }
+
+	authModelID, err := cofgaClient.CreateAuthModel(ctx, typeDefinitions)
+	cofgaClient.AuthModelId = authModelID
+	cofgaParams.AuthModelID = authModelID
+
+	client := ofga.NewOpenFGAClient(cofgaClient)
+
+	// TBD
+	// wrapperClient := ofga.NewOpenFGAClient(client.OpenFgaApi, amr.GetAuthorizationModelId())
+	// cfg.StoreId = storeID
 
 	setups[testName] = testSetup{
-		client:     client.OpenFgaApi,
-		ofgaClient: wrapperClient,
-		config:     cfg,
+		client:      client,
+		cofgaClient: cofgaClient,
+		cofgaParams: &cofgaParams,
 	}
-	return client.OpenFgaApi, wrapperClient, cfg, nil
+	return client, cofgaClient, &cofgaParams, nil
 }
 
 // RemoveStore removes an OpenFGA store (via db) by NAME.

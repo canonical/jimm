@@ -5,21 +5,18 @@
 package names
 
 import (
-	"strings"
-
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	jimmnames "github.com/CanonicalLtd/jimm/pkg/names"
+	cofga "github.com/canonical/ofga"
 	"github.com/juju/juju/core/permission"
 	"github.com/juju/names/v4"
 )
 
-// Relation holds the type of tag relation.
-type Relation string
+// Kind represents the type of a tag kind.
+type Kind = cofga.Kind
 
-// String implements the Stringer interface.
-func (r Relation) String() string {
-	return string(r)
-}
+// Relation holds the type of tag relation.
+type Relation = cofga.Relation
 
 var (
 	// MemberRelation represents a member relation between entities.
@@ -44,35 +41,8 @@ var (
 	NoRelation Relation = ""
 )
 
-// Tag represents a an entity tag as used by JIMM in OpenFGA.
-type Tag struct {
-	kind     string
-	id       string
-	relation Relation
-}
-
-// String returns a string representation of the tag.
-func (t *Tag) String() string {
-	if t.relation == "" {
-		return string(t.kind) + ":" + t.id
-	}
-	return t.kind + ":" + t.id + "#" + t.relation.String()
-}
-
-// Id returns the tag id.
-func (t *Tag) Id() string {
-	return t.id
-}
-
-// Kind returns the tag kind.
-func (t *Tag) Kind() string {
-	return t.kind
-}
-
-// Relation returns the tag relation.
-func (t *Tag) Relation() string {
-	return t.relation.String()
-}
+// Tag represents an entity tag as used by JIMM in OpenFGA.
+type Tag = cofga.Entity
 
 // ResourceTagger represents an entity tag that implements
 // a method returning entity's id and kind.
@@ -93,7 +63,7 @@ type ResourceTagger interface {
 // and adds a relation to it.
 func ConvertTagWithRelation[RT ResourceTagger](t RT, relation Relation) *Tag {
 	tag := ConvertTag(t)
-	tag.relation = relation
+	tag.Relation = relation
 	return tag
 }
 
@@ -101,8 +71,8 @@ func ConvertTagWithRelation[RT ResourceTagger](t RT, relation Relation) *Tag {
 // specific types of tags.
 func ConvertTag[RT ResourceTagger](t RT) *Tag {
 	tag := &Tag{
-		id:   t.Id(),
-		kind: t.Kind(),
+		ID:   t.Id(),
+		Kind: cofga.Kind(t.Kind()),
 	}
 	return tag
 }
@@ -110,41 +80,48 @@ func ConvertTag[RT ResourceTagger](t RT) *Tag {
 // ConvertGenericTag converts any tag implementing the names.tag interface to an OpenFGA tag.
 func ConvertGenericTag(t names.Tag) *Tag {
 	tag := &Tag{
-		id:   t.Id(),
-		kind: t.Kind(),
+		ID:   t.Id(),
+		Kind: cofga.Kind(t.Kind()),
 	}
 	return tag
 }
 
 // TagFromString converts an entity tag to an OpenFGA tag.
 func TagFromString(t string) (*Tag, error) {
-	tokens := strings.Split(t, ":")
-	if len(tokens) != 2 {
-		return nil, errors.E("unexpected tag format")
+	entity, err := cofga.ParseEntity(t)
+	if err != nil {
+		return nil, err
 	}
-	idTokens := strings.Split(tokens[1], "#")
-	switch tokens[0] {
-	case names.UserTagKind, jimmnames.GroupTagKind,
-		names.ControllerTagKind, names.ModelTagKind,
-		names.ApplicationOfferTagKind, names.CloudTagKind:
-		switch len(idTokens) {
-		case 1:
-			return &Tag{
-				kind: tokens[0],
-				id:   tokens[1],
-			}, nil
-		case 2:
-			return &Tag{
-				kind:     tokens[0],
-				id:       idTokens[0],
-				relation: Relation(idTokens[1]),
-			}, nil
-		default:
-			return nil, errors.E("invalid relation specifier")
-		}
-	default:
-		return nil, errors.E("unknown tag kind")
-	}
+	return &entity, nil
+
+	// TBD
+	// tokens := strings.Split(t, ":")
+	// if len(tokens) != 2 {
+	// 	return nil, errors.E("unexpected tag format")
+	// }
+	// idTokens := strings.Split(tokens[1], "#")
+	// switch tokens[0] {
+	// case names.UserTagKind, jimmnames.GroupTagKind,
+	// 	names.ControllerTagKind, names.ModelTagKind,
+	// 	names.ApplicationOfferTagKind, names.CloudTagKind:
+	// 	switch len(idTokens) {
+	// 	case 1:
+	// 		return &Tag{
+	// 			kind: tokens[0],
+	// 			id:   tokens[1],
+	// 		}, nil
+	// 	case 2:
+	// 		return &Tag{
+	// 			kind:     tokens[0],
+	// 			id:       idTokens[0],
+	// 			relation: Relation(idTokens[1]),
+	// 		}, nil
+	// 	default:
+	// 		return nil, errors.E("invalid relation specifier")
+	// 	}
+	// default:
+	// 	return nil, errors.E("unknown tag kind")
+	// }
 }
 
 // BlankKindTag returns a tag of the specified kind with a blank id.
@@ -157,7 +134,7 @@ func BlankKindTag(kind string) (*Tag, error) {
 		names.ControllerTagKind, names.ModelTagKind,
 		names.ApplicationOfferTagKind, names.CloudTagKind:
 		return &Tag{
-			kind: kind,
+			Kind: cofga.Kind(kind),
 		}, nil
 	default:
 		return nil, errors.E("unknown tag kind")
