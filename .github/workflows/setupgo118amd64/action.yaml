@@ -21,5 +21,7 @@ runs:
         cache: true
     - run: git config --global url.https://${{ inputs.user }}:${{ inputs.pat }}@github.com/.insteadOf https://github.com/
       shell: bash
+    - run: make go-env
+      shell: bash
     - run: go mod vendor
       shell: bash
