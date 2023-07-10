@@ -40,7 +40,7 @@ func (s *openFGATestSuite) TestWritingTuplesToOFGASucceeds(c *gc.C) {
 
 	uuid1, _ := uuid.NewRandom()
 	user1 := names.NewUserTag(uuid1.String())
-	key1 := ofga.Tuple{
+	tuple1 := ofga.Tuple{
 		Object:   ofganames.ConvertTag(user1),
 		Relation: "member",
 		Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(groupid)),
@@ -48,13 +48,13 @@ func (s *openFGATestSuite) TestWritingTuplesToOFGASucceeds(c *gc.C) {
 
 	uuid2, _ := uuid.NewRandom()
 	user2 := names.NewUserTag(uuid2.String())
-	key2 := ofga.Tuple{
+	tuple2 := ofga.Tuple{
 		Object:   ofganames.ConvertTag(user2),
 		Relation: "member",
 		Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(groupid)),
 	}
 
-	err := s.ofgaClient.AddRelation(ctx, key1, key2)
+	err := s.ofgaClient.AddRelation(ctx, tuple1, tuple2)
 	c.Assert(err, gc.IsNil)
 	changes, err := s.cofgaClient.ReadChanges(ctx, "group", 99, "")
 	c.Assert(err, gc.IsNil)
@@ -73,28 +73,28 @@ func (suite *openFGATestSuite) TestRemovingTuplesFromOFGASucceeds(c *gc.C) {
 
 	//Create tuples before writing to db
 	user1 := ofganames.ConvertTag(names.NewUserTag("bob"))
-	key1 := ofga.Tuple{
+	tuple1 := ofga.Tuple{
 		Object:   user1,
 		Relation: "member",
 		Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(groupid)),
 	}
 
 	user2 := ofganames.ConvertTag(names.NewUserTag("alice"))
-	key2 := ofga.Tuple{
+	tuple2 := ofga.Tuple{
 		Object:   user2,
 		Relation: "member",
 		Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(groupid)),
 	}
 
 	//Delete before insert should fail
-	err := suite.ofgaClient.RemoveRelation(ctx, key1, key2)
+	err := suite.ofgaClient.RemoveRelation(ctx, tuple1, tuple2)
 	c.Assert(strings.Contains(err.Error(), "cannot delete a tuple which does not exist"), gc.Equals, true)
 
-	err = suite.ofgaClient.AddRelation(ctx, key1, key2)
+	err = suite.ofgaClient.AddRelation(ctx, tuple1, tuple2)
 	c.Assert(err, gc.IsNil)
 
 	//Delete after insert should succeed.
-	err = suite.ofgaClient.RemoveRelation(ctx, key1, key2)
+	err = suite.ofgaClient.RemoveRelation(ctx, tuple1, tuple2)
 	c.Assert(err, gc.IsNil)
 	changes, err := suite.cofgaClient.ReadChanges(ctx, "group", 99, "")
 	c.Assert(err, gc.IsNil)
@@ -147,20 +147,20 @@ func (s *openFGATestSuite) TestRemoveTuplesSucceeds(c *gc.C) {
 
 	// Test a large number of tuples
 	for i := 0; i < 150; i++ {
-		key := ofga.Tuple{
+		tuple := ofga.Tuple{
 			Object:   ofganames.ConvertTag(names.NewUserTag("test" + strconv.Itoa(i))),
 			Relation: "member",
 			Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(groupid)),
 		}
-		err := s.ofgaClient.AddRelation(context.Background(), key)
+		err := s.ofgaClient.AddRelation(context.Background(), tuple)
 		c.Assert(err, gc.IsNil)
 	}
 
-	checkKey := ofga.Tuple{
+	checkTuple := ofga.Tuple{
 		Target: ofganames.ConvertTag(jimmnames.NewGroupTag(groupid)),
 	}
-	c.Logf("checking for tuple %v\n", checkKey)
-	err := s.ofgaClient.RemoveTuples(context.Background(), checkKey)
+	c.Logf("checking for tuple %v\n", checkTuple)
+	err := s.ofgaClient.RemoveTuples(context.Background(), checkTuple)
 	c.Assert(err, gc.IsNil)
 	tuples, ct, err := s.ofgaClient.ReadRelatedObjects(context.Background(), ofga.Tuple{}, 50, "")
 	c.Assert(err, gc.IsNil)
@@ -181,12 +181,12 @@ func (s *openFGATestSuite) TestAddControllerModel(c *gc.C) {
 	err = s.ofgaClient.AddControllerModel(context.Background(), controller, model)
 	c.Assert(err, gc.IsNil)
 
-	key := ofga.Tuple{
+	tuple := ofga.Tuple{
 		Object:   ofganames.ConvertTag(controller),
 		Relation: "controller",
 		Target:   ofganames.ConvertTag(model),
 	}
-	allowed, err := s.ofgaClient.CheckRelation(context.Background(), key, false)
+	allowed, err := s.ofgaClient.CheckRelation(context.Background(), tuple, false)
 	c.Assert(err, gc.IsNil)
 	c.Assert(allowed, gc.Equals, true)
 }
@@ -203,19 +203,19 @@ func (s *openFGATestSuite) TestRemoveModel(c *gc.C) {
 	err = s.ofgaClient.AddControllerModel(context.Background(), controller, model)
 	c.Assert(err, gc.IsNil)
 
-	key := ofga.Tuple{
+	tuple := ofga.Tuple{
 		Object:   ofganames.ConvertTag(controller),
 		Relation: "controller",
 		Target:   ofganames.ConvertTag(model),
 	}
-	allowed, err := s.ofgaClient.CheckRelation(context.Background(), key, false)
+	allowed, err := s.ofgaClient.CheckRelation(context.Background(), tuple, false)
 	c.Assert(err, gc.IsNil)
 	c.Assert(allowed, gc.Equals, true)
 
 	err = s.ofgaClient.RemoveModel(context.Background(), model)
 	c.Assert(err, gc.IsNil)
 
-	allowed, err = s.ofgaClient.CheckRelation(context.Background(), key, false)
+	allowed, err = s.ofgaClient.CheckRelation(context.Background(), tuple, false)
 	c.Assert(err, gc.IsNil)
 	c.Assert(allowed, gc.Equals, false)
 }
@@ -232,12 +232,12 @@ func (s *openFGATestSuite) TestAddModelApplicationOffer(c *gc.C) {
 	err = s.ofgaClient.AddModelApplicationOffer(context.Background(), model, offer)
 	c.Assert(err, gc.IsNil)
 
-	key := ofga.Tuple{
+	tuple := ofga.Tuple{
 		Object:   ofganames.ConvertTag(model),
 		Relation: "model",
 		Target:   ofganames.ConvertTag(offer),
 	}
-	allowed, err := s.ofgaClient.CheckRelation(context.Background(), key, false)
+	allowed, err := s.ofgaClient.CheckRelation(context.Background(), tuple, false)
 	c.Assert(err, gc.IsNil)
 	c.Assert(allowed, gc.Equals, true)
 }
@@ -254,19 +254,19 @@ func (s *openFGATestSuite) TestRemoveApplicationOffer(c *gc.C) {
 	err = s.ofgaClient.AddModelApplicationOffer(context.Background(), model, offer)
 	c.Assert(err, gc.IsNil)
 
-	key := ofga.Tuple{
+	tuple := ofga.Tuple{
 		Object:   ofganames.ConvertTag(model),
 		Relation: "model",
 		Target:   ofganames.ConvertTag(offer),
 	}
-	allowed, err := s.ofgaClient.CheckRelation(context.Background(), key, false)
+	allowed, err := s.ofgaClient.CheckRelation(context.Background(), tuple, false)
 	c.Assert(err, gc.IsNil)
 	c.Assert(allowed, gc.Equals, true)
 
 	err = s.ofgaClient.RemoveApplicationOffer(context.Background(), offer)
 	c.Assert(err, gc.IsNil)
 
-	allowed, err = s.ofgaClient.CheckRelation(context.Background(), key, false)
+	allowed, err = s.ofgaClient.CheckRelation(context.Background(), tuple, false)
 	c.Assert(err, gc.IsNil)
 	c.Assert(allowed, gc.Equals, false)
 }

@@ -59,8 +59,6 @@ func NewOpenFGAClient(cofgaClient *cofga.Client) *OFGAClient {
 // getRelatedObjects returns all objects where the user has a valid relation to them.
 // Such as all the groups a user resides in.
 //
-// The underlying tuple is managed by this method and as such you need only provide the "tuple_key" segment. See CreateTupleKey
-//
 // The results may be paginated via a pageSize and the initial returned continuation token from the first request.
 func (o *OFGAClient) getRelatedObjects(ctx context.Context, tuple Tuple, pageSize int32, continuationToken string) ([]Tuple, string, error) {
 	timestampedTuples, ct, err := o.cofgaClient.FindMatchingTuples(ctx, tuple, pageSize, continuationToken)
@@ -101,12 +99,12 @@ func (o *OFGAClient) listObjects(ctx context.Context, user string, relation stri
 	return result, nil
 }
 
-// AddRelation creates a tuple(s) from the provided keys. See CreateTupleKey for creating keys.
+// AddRelation adds given relations (tuples).
 func (o *OFGAClient) AddRelation(ctx context.Context, tuples ...Tuple) error {
 	return o.cofgaClient.AddRelation(ctx, tuples...)
 }
 
-// RemoveRelation creates a tuple(s) from the provided keys. See CreateTupleKey for creating keys.
+// RemoveRelation removes given relations (tuples).
 func (o *OFGAClient) RemoveRelation(ctx context.Context, tuples ...Tuple) error {
 	return o.cofgaClient.RemoveRelation(ctx, tuples...)
 }
@@ -116,11 +114,9 @@ func (o *OFGAClient) ListObjects(ctx context.Context, user string, relation stri
 	return o.listObjects(ctx, user, relation, objType, contextualTuples)
 }
 
-// ReadRelations reads a relation(s) from the provided key where a match can be found.
+// ReadRelations reads a relation(s) from the provided tuple where a match can be found.
 //
 // See: https://openfga.dev/api/service#/Relationship%20Tuples/Read
-//
-// See: CreateTupleKey for creating keys.
 //
 // You may read via pagination utilising the continuation token returned from the request.
 func (o *OFGAClient) ReadRelatedObjects(ctx context.Context, tuple Tuple, pageSize int32, continuationToken string) ([]Tuple, string, error) {
@@ -137,7 +133,7 @@ func (o *OFGAClient) CheckRelation(ctx context.Context, tuple Tuple, trace bool)
 	return o.cofgaClient.CheckRelation(ctx, tuple)
 }
 
-// removeTuples iteratively reads through all the tuples with the parameters as supplied by key and deletes them.
+// removeTuples iteratively reads through all the tuples with the parameters as supplied by tuple and deletes them.
 func (o *OFGAClient) removeTuples(ctx context.Context, tuple Tuple) error {
 	pageSize := 50
 	for {
@@ -233,11 +229,11 @@ func (o *OFGAClient) RemoveGroup(ctx context.Context, group jimmnames.GroupTag) 
 		if err != nil {
 			return errors.E(err)
 		}
-		newKey := Tuple{
+		newTuple := Tuple{
 			Object: ofganames.ConvertTagWithRelation(group, ofganames.MemberRelation),
 			Target: kt,
 		}
-		err = o.removeTuples(ctx, newKey)
+		err = o.removeTuples(ctx, newTuple)
 		if err != nil {
 			return errors.E(err)
 		}
