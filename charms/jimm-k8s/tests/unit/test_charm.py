@@ -269,11 +269,11 @@ class TestCharm(unittest.TestCase):
 
         self.assertTrue(data)
         self.assertEqual(
-            data["controller-url"],
+            data["controller_url"],
             "wss://juju-jimm-k8s-0.juju-jimm-k8s-endpoints.None.svc.cluster.local",
         )
-        self.assertEqual(data["identity-provider-url"], "https://candid.example.com")
-        self.assertEqual(data["is-juju"], "False")
+        self.assertEqual(data["identity_provider_url"], "https://candid.example.com")
+        self.assertEqual(data["is_juju"], "False")
 
     @patch("src.charm.JimmOperatorCharm._get_network_address")
     @patch("socket.gethostname")

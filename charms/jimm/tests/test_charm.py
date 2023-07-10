@@ -526,9 +526,9 @@ class TestCharm(unittest.TestCase):
         harness.add_relation_unit(id, "juju-dashboard/0")
         data = harness.get_relation_data(id, "juju-jimm")
         self.assertTrue(data)
-        self.assertEqual(data["controller-url"], "wss://jimm.example.com")
-        self.assertEqual(data["identity-provider-url"], "https://candid.example.com")
-        self.assertEqual(data["is-juju"], "False")
+        self.assertEqual(data["controller_url"], "wss://jimm.example.com")
+        self.assertEqual(data["identity_provider_url"], "https://candid.example.com")
+        self.assertEqual(data["is_juju"], "False")
 
     def test_openfga_relation_changed(self):
         id = self.harness.add_relation("openfga", "openfga")

@@ -411,12 +411,14 @@ func (j *JIMM) AddHostedCloud(ctx context.Context, user *openfga.User, tag names
 	}
 	// Update the cloud in the database.
 	dbCloud.FromJujuCloud(*ccloud)
+	zapctx.Debug(ctx, "received cloud info from controller", zap.Any("cloud", dbCloud))
 	for i := range dbCloud.Regions {
 		dbCloud.Regions[i].Controllers = []dbmodel.CloudRegionControllerPriority{{
-			ControllerID: region.Controllers[0].ID,
+			ControllerID: controller.ID,
 			Priority:     dbmodel.CloudRegionControllerPrioritySupported,
 		}}
 	}
+	zapctx.Debug(ctx, "received cloud info from controller", zap.Any("cloud", dbCloud))
 
 	if err := j.Database.UpdateCloud(ctx, &dbCloud); err != nil {
 		// At this point the cloud has been created on the
