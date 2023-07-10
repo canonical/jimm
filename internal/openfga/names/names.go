@@ -86,45 +86,6 @@ func ConvertGenericTag(t names.Tag) *Tag {
 	return tag
 }
 
-// TBD
-// TagFromString converts an entity tag to an OpenFGA tag.
-// func TagFromString(t string) (*Tag, error) {
-// 	entity, err := cofga.ParseEntity(t)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	return &entity, nil
-
-// TBD
-// tokens := strings.Split(t, ":")
-// if len(tokens) != 2 {
-// 	return nil, errors.E("unexpected tag format")
-// }
-// idTokens := strings.Split(tokens[1], "#")
-// switch tokens[0] {
-// case names.UserTagKind, jimmnames.GroupTagKind,
-// 	names.ControllerTagKind, names.ModelTagKind,
-// 	names.ApplicationOfferTagKind, names.CloudTagKind:
-// 	switch len(idTokens) {
-// 	case 1:
-// 		return &Tag{
-// 			kind: tokens[0],
-// 			id:   tokens[1],
-// 		}, nil
-// 	case 2:
-// 		return &Tag{
-// 			kind:     tokens[0],
-// 			id:       idTokens[0],
-// 			relation: Relation(idTokens[1]),
-// 		}, nil
-// 	default:
-// 		return nil, errors.E("invalid relation specifier")
-// 	}
-// default:
-// 	return nil, errors.E("unknown tag kind")
-// }
-// }
-
 // BlankKindTag returns a tag of the specified kind with a blank id.
 // This function should only be used when removing relations to a specific
 // resource (e.g. we want to remove all controller relations to a specific

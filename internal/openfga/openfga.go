@@ -24,11 +24,6 @@ type Tuple = cofga.Tuple
 type Tag = ofganames.Tag
 type Kind = ofganames.Kind
 
-// TBD
-// func (t Tuple) toOpenFGATuple() openfga.TupleKey {
-// 	return createTupleKey(t)
-// }
-
 // ReadResponse takes what is necessary from the underlying OFGA ReadResponse and simplifies it
 // into a safe ready-to-use response.
 type ReadResponse struct {
@@ -51,9 +46,6 @@ type ReadResponse struct {
 // In the above scenario, alex becomes an administrator due the the 'user' aka group:yellow being
 // an administrator.
 type OFGAClient struct {
-	// TBD
-	// api         openfga.OpenFgaApi
-	// AuthModelId string
 	cofgaClient *cofga.Client
 }
 
@@ -78,26 +70,6 @@ func (o *OFGAClient) getRelatedObjects(ctx context.Context, tuple Tuple, pageSiz
 		tuples[i] = tt.Tuple
 	}
 	return tuples, ct, nil
-
-	// TBD
-	// rr := openfga.NewReadRequest()
-
-	// if pageSize != 0 {
-	// 	rr.SetPageSize(pageSize)
-	// }
-
-	// if paginationToken != "" {
-	// 	rr.SetContinuationToken(paginationToken)
-	// }
-
-	// if tuple != nil {
-	// 	rr.SetTupleKey(tuple.toOpenFGATuple())
-	// }
-	// readres, _, err := o.api.Read(ctx).Body(*rr).Execute()
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// return &readres, nil
 }
 
 // listObjects lists all the object IDs a user has access to via the specified relation
@@ -125,51 +97,7 @@ func (o *OFGAClient) listObjects(ctx context.Context, user string, relation stri
 		result[i] = entity.String()
 	}
 	return result, nil
-
-	// TBD
-	// zapctx.Debug(
-	// 	ctx,
-	// 	"list request internal",
-	// )
-	// lor := openfga.NewListObjectsRequest(objType, relation, user)
-	// lor.SetAuthorizationModelId(o.AuthModelId)
-
-	// if len(contextualTuples) > 0 {
-	// 	keys := make([]openfga.TupleKey, len(contextualTuples))
-
-	// 	for i, ct := range contextualTuples {
-	// 		keys[i] = ct.toOpenFGATuple()
-	// 	}
-
-	// 	lor.SetContextualTuples(*openfga.NewContextualTupleKeys(keys))
-	// }
-
-	// listres, httpres, err := o.api.ListObjects(ctx).Body(*lor).Execute()
-	// if err != nil {
-	// 	return
-	// }
-
-	// zapctx.Debug(ctx, "list request internal resp code", zap.Int("code", httpres.StatusCode))
-	// objectIds = listres.GetObjects()
-	// return
 }
-
-// TBD
-// // createTuple wraps the underlying ofga tuple into a convenient ease-of-use method
-// func createTupleKey(tuple Tuple) openfga.TupleKey {
-// 	// TBD
-// 	k := openfga.NewTupleKey()
-// 	// in some cases specifying the object is not required
-// 	if tuple.Object != nil {
-// 		k.SetUser(tuple.Object.String())
-// 	}
-// 	// in some cases specifying the relation is not required
-// 	if tuple.Relation != "" {
-// 		k.SetRelation(string(tuple.Relation))
-// 	}
-// 	k.SetObject(tuple.Target.String())
-// 	return *k
-// }
 
 // AddRelations creates a tuple(s) from the provided keys. See CreateTupleKey for creating keys.
 func (o *OFGAClient) AddRelations(ctx context.Context, tuples ...Tuple) error {
@@ -195,41 +123,6 @@ func (o *OFGAClient) ListObjects(ctx context.Context, user string, relation stri
 // You may read via pagination utilising the continuation token returned from the request.
 func (o *OFGAClient) ReadRelatedObjects(ctx context.Context, tuple Tuple, pageSize int32, continuationToken string) ([]Tuple, string, error) {
 	return o.getRelatedObjects(ctx, tuple, pageSize, continuationToken)
-	// keys := []Tuple{}
-	// res, ct, err := o.getRelatedObjects(ctx, tuple, pageSize, paginationToken)
-	// if err != nil {
-	// 	return nil, errors.E(err)
-	// }
-	// tuples, ok := res.GetTuplesOk()
-	// if ok {
-	// 	t := *tuples
-	// 	for i := 0; i < len(t); i++ {
-	// 		key, ok := t[i].GetKeyOk()
-	// 		if ok {
-	// 			user, err := ofganames.TagFromString(key.GetUser())
-	// 			if err != nil {
-	// 				return nil, errors.E(err)
-	// 			}
-	// 			target, err := ofganames.TagFromString(key.GetObject())
-	// 			if err != nil {
-	// 				return nil, errors.E(err)
-	// 			}
-	// 			keys = append(keys, Tuple{
-	// 				Object:   user,
-	// 				Relation: ofganames.Relation(key.GetRelation()),
-	// 				Target:   target,
-	// 			})
-	// 		}
-	// 	}
-	// }
-
-	// token := ""
-	// t, ok := res.GetContinuationTokenOk()
-	// if ok {
-	// 	token = *t
-	// }
-
-	// return &ReadResponse{Tuples: keys, PaginationToken: token}, nil
 }
 
 // CheckRelation verifies that a user (or object) is allowed to access the target object by the specified relation.

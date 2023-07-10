@@ -33,9 +33,6 @@ func init() {
 }
 
 type testSetup struct {
-	// TBD
-	// config      *openfga.Configuration
-	//client      openfga.OpenFgaApi
 	client      *ofga.OFGAClient
 	cofgaClient *cofga.Client
 	cofgaParams *cofga.OpenFGAParams
@@ -129,42 +126,16 @@ func SetupTestOFGAClient(names ...string) (*ofga.OFGAClient, *cofga.Client, *cof
 		return nil, nil, nil, errgo.Notef(err, "failed to create ofga client")
 	}
 
-	// TBD
-	// cfg, err := openfga.NewConfiguration(openFGATestConfig)
-	// if err != nil {
-	// 	return nil, nil, nil, err
-	// }
-
-	// client := openfga.NewAPIClient(cfg)
-
-	// client.SetStoreId(storeID)
-	// api := client.OpenFgaApi
-
 	typeDefinitions, err := getAuthModelDefinition()
 	if err != nil {
 		return nil, nil, nil, err
 	}
-
-	// TBD
-	// ar := openfga.NewWriteAuthorizationModelRequest(typeDefinitions)
-	// if err != nil {
-	// 	return nil, nil, nil, err
-	// }
-
-	// amr, _, err := api.WriteAuthorizationModel(ctx).Body(*ar).Execute()
-	// if err != nil {
-	// 	return nil, nil, nil, err
-	// }
 
 	authModelID, err := cofgaClient.CreateAuthModel(ctx, typeDefinitions)
 	cofgaClient.AuthModelId = authModelID
 	cofgaParams.AuthModelID = authModelID
 
 	client := ofga.NewOpenFGAClient(cofgaClient)
-
-	// TBD
-	// wrapperClient := ofga.NewOpenFGAClient(client.OpenFgaApi, amr.GetAuthorizationModelId())
-	// cfg.StoreId = storeID
 
 	setups[testName] = testSetup{
 		client:      client,

@@ -430,21 +430,6 @@ user-eve@external   	administrator	applicationoffer-test-controller-1:alice@exte
 	)
 }
 
-// TBD
-// func createTupleKey(object, relation, target string) openfga.TupleKey {
-// 	k := openfga.NewTupleKey()
-// 	// in some cases specifying the object is not required
-// 	if object != "" {
-// 		k.SetUser(object)
-// 	}
-// 	// in some cases specifying the relation is not required
-// 	if relation != "" {
-// 		k.SetRelation(relation)
-// 	}
-// 	k.SetObject(target)
-// 	return *k
-// }
-
 // TODO: remove boilerplate of env setup and use initialiseEnvironment
 func (s *relationSuite) TestCheckRelationViaSuperuser(c *gc.C) {
 	ctx := context.TODO()

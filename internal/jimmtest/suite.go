@@ -47,9 +47,7 @@ type JIMMSuite struct {
 	// Authenticator configured.
 	JIMM *jimm.JIMM
 
-	AdminUser *dbmodel.User
-	// TBD
-	// OFGAApi     openfga.OpenFgaApi
+	AdminUser   *dbmodel.User
 	OFGAClient  *jimmopenfga.OFGAClient
 	COFGAClient *cofga.Client
 	COFGAParams *cofga.OpenFGAParams

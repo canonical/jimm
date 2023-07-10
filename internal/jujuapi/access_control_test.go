@@ -14,7 +14,6 @@ import (
 	"github.com/juju/juju/core/crossmodel"
 	"github.com/juju/names/v4"
 	jc "github.com/juju/testing/checkers"
-	openfga "github.com/openfga/go-sdk"
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/jimm/api"
@@ -221,19 +220,6 @@ func createTuple(object, relation, target string) ofga.Tuple {
 		Relation: ofganames.Relation(relation),
 		Target:   &targetEntity,
 	}
-
-	// TBD
-	// k := openfga.NewTupleKey()
-	// // in some cases specifying the object is not required
-	// if object != "" {
-	// 	k.SetUser(object)
-	// }
-	// // in some cases specifying the relation is not required
-	// if relation != "" {
-	// 	k.SetRelation(relation)
-	// }
-	// k.SetObject(target)
-	// return *k
 }
 
 func stringGroupID(id uint) string {
@@ -454,12 +440,6 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 	for i, tc := range tagTests {
 		c.Logf("running test %d", i)
 		if i != 0 {
-			// TBD
-			// wr := openfga.NewWriteRequest()
-			// keys := openfga.NewTupleKeysWithDefaults()
-			// keys.SetTupleKeys([]openfga.TupleKey{tagTests[i].want})
-			// wr.SetDeletes(*keys)
-			// s.OFGAApi.Write(context.Background()).Body(*wr).Execute()
 			s.COFGAClient.RemoveRelation(ctx, tc.want)
 		}
 		err := client.AddRelation(&apiparams.AddRelationRequest{
@@ -778,7 +758,7 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 			c.Assert(changes.ContinuationToken, gc.Equals, "")
 			change := changes.GetChanges()[len(changes.GetChanges())-1]
 			operation := change.GetOperation()
-			c.Assert(operation, gc.Equals, openfga.DELETE)
+			c.Assert(operation, gc.Equals, "TUPLE_OPERATION_DELETE")
 			key := change.GetTupleKey()
 			c.Assert(key, gc.DeepEquals, tc.want)
 		}

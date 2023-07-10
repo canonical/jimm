@@ -11,7 +11,6 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/google/uuid"
 	"github.com/juju/names/v4"
-	openfga "github.com/openfga/go-sdk"
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/jimm/internal/jimmtest"
@@ -103,12 +102,12 @@ func (suite *openFGATestSuite) TestRemovingTuplesFromOFGASucceeds(c *gc.C) {
 	secondToLastInsertedTuple := changes.GetChanges()[len(changes.GetChanges())-2]
 	secondLastKey := secondToLastInsertedTuple.GetTupleKey()
 	c.Assert(user1.String(), gc.Equals, secondLastKey.GetUser())
-	c.Assert(openfga.DELETE, gc.Equals, secondToLastInsertedTuple.GetOperation())
+	c.Assert("TUPLE_OPERATION_DELETE", gc.Equals, secondToLastInsertedTuple.GetOperation())
 
 	lastInsertedTuple := changes.GetChanges()[len(changes.GetChanges())-1]
 	lastKey := lastInsertedTuple.GetTupleKey()
 	c.Assert(user2.String(), gc.Equals, lastKey.GetUser())
-	c.Assert(openfga.DELETE, gc.Equals, lastInsertedTuple.GetOperation())
+	c.Assert("TUPLE_OPERATION_DELETE", gc.Equals, lastInsertedTuple.GetOperation())
 }
 
 func (s *openFGATestSuite) TestCheckRelationSucceeds(c *gc.C) {
