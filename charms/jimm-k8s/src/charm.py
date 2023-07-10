@@ -436,7 +436,7 @@ class JimmOperatorCharm(CharmBase):
 
         # remove the existing dashboard from the workload/
         if container.exists(self._dashboard_path):
-            container.remove_path(self._dashboard_path)
+            container.remove_path(self._dashboard_path, recursive=True)
 
         container.make_dir(self._dashboard_path, make_parents=True)
 
