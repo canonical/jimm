@@ -333,9 +333,12 @@ class JimmOperatorCharm(CharmBase):
 
     def _on_stop(self, _):
         """Stop JIMM."""
-        container = self.unit.get_container(WORKLOAD_CONTAINER)
-        if container.can_connect():
-            container.stop("jimm")
+        try:
+            container = self.unit.get_container(WORKLOAD_CONTAINER)
+            if container.can_connect():
+                container.stop("jimm")
+        except Exception as e:
+            logger.info("failed to stop the jimm service: {}".format(e))
         self._ready()
 
     def _on_update_status(self, _):
