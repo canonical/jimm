@@ -83,6 +83,7 @@ func (s *jimmSuite) SetUpTest(c *gc.C) {
 		OpenFGAParams: service.OpenFGAParams{
 			Scheme:    cofgaParams.Scheme,
 			Host:      cofgaParams.Host,
+			Port:      cofgaParams.Port,
 			Store:     cofgaParams.StoreID,
 			Token:     cofgaParams.Token,
 			AuthModel: cofgaParams.AuthModelID,

@@ -223,7 +223,7 @@ func checkPermission(ctx context.Context, user *openfga.User, cachedPerms map[st
 			if err != nil {
 				return cachedPerms, errors.E(op, fmt.Sprintf("failed to parse relation %s", stringVal), err)
 			}
-			check, _, err := openfga.CheckRelation(ctx, user, tag, relation)
+			check, err := openfga.CheckRelation(ctx, user, tag, relation)
 			if err != nil {
 				return cachedPerms, errors.E(op, err)
 			}

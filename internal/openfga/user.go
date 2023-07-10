@@ -34,7 +34,7 @@ type User struct {
 // IsAllowedAddModed returns true if the user is allowed to add a model on the
 // specified cloud.
 func (u *User) IsAllowedAddModel(ctx context.Context, resource names.CloudTag) (bool, error) {
-	allowed, _, err := checkRelation(ctx, u, resource, ofganames.CanAddModelRelation)
+	allowed, err := checkRelation(ctx, u, resource, ofganames.CanAddModelRelation)
 	if err != nil {
 		return false, errors.E(err)
 	}
@@ -43,7 +43,7 @@ func (u *User) IsAllowedAddModel(ctx context.Context, resource names.CloudTag) (
 
 // IsApplicationOfferConsumer returns true if user has consumer relation to the application offer.
 func (u *User) IsApplicationOfferConsumer(ctx context.Context, resource names.ApplicationOfferTag) (bool, error) {
-	isConsumer, _, err := checkRelation(ctx, u, resource, ofganames.ConsumerRelation)
+	isConsumer, err := checkRelation(ctx, u, resource, ofganames.ConsumerRelation)
 	if err != nil {
 		return false, errors.E(err)
 	}
@@ -52,7 +52,7 @@ func (u *User) IsApplicationOfferConsumer(ctx context.Context, resource names.Ap
 
 // IsApplicationOfferReader returns true if user has reader relation to the application offer.
 func (u *User) IsApplicationOfferReader(ctx context.Context, resource names.ApplicationOfferTag) (bool, error) {
-	isReader, _, err := checkRelation(ctx, u, resource, ofganames.ReaderRelation)
+	isReader, err := checkRelation(ctx, u, resource, ofganames.ReaderRelation)
 	if err != nil {
 		return false, errors.E(err)
 	}
@@ -61,7 +61,7 @@ func (u *User) IsApplicationOfferReader(ctx context.Context, resource names.Appl
 
 // IsModelReader returns true if user has reader relation to the model.
 func (u *User) IsModelReader(ctx context.Context, resource names.ModelTag) (bool, error) {
-	isReader, _, err := checkRelation(ctx, u, resource, ofganames.ReaderRelation)
+	isReader, err := checkRelation(ctx, u, resource, ofganames.ReaderRelation)
 	if err != nil {
 		return false, errors.E(err)
 	}
@@ -70,7 +70,7 @@ func (u *User) IsModelReader(ctx context.Context, resource names.ModelTag) (bool
 
 // IsModelWriter returns true if user has writer relation to the model.
 func (u *User) IsModelWriter(ctx context.Context, resource names.ModelTag) (bool, error) {
-	isWriter, _, err := checkRelation(ctx, u, resource, ofganames.WriterRelation)
+	isWriter, err := checkRelation(ctx, u, resource, ofganames.WriterRelation)
 	if err != nil {
 		return false, errors.E(err)
 	}
@@ -101,7 +101,7 @@ func (u *User) GetCloudAccess(ctx context.Context, resource names.CloudTag) ofga
 
 // GetAuditLogViewerAccess returns if the user has audit log viewer relation with the given controller.
 func (u *User) GetAuditLogViewerAccess(ctx context.Context, resource names.ControllerTag) ofganames.Relation {
-	hasAccess, _, err := checkRelation(ctx, u, resource, ofganames.AuditLogViewerRelation)
+	hasAccess, err := checkRelation(ctx, u, resource, ofganames.AuditLogViewerRelation)
 	if err != nil {
 		zapctx.Error(ctx, "openfga check failed", zap.Error(err))
 		return ofganames.NoRelation
@@ -228,8 +228,8 @@ type administratorT interface {
 	String() string
 }
 
-func checkRelation[T ofganames.ResourceTagger](ctx context.Context, u *User, resource T, relation ofganames.Relation) (bool, string, error) {
-	isAllowed, resolution, err := u.client.checkRelation(
+func checkRelation[T ofganames.ResourceTagger](ctx context.Context, u *User, resource T, relation ofganames.Relation) (bool, error) {
+	isAllowed, err := u.client.CheckRelation(
 		ctx,
 		Tuple{
 			Object:   ofganames.ConvertTag(u.ResourceTag()),
@@ -239,20 +239,20 @@ func checkRelation[T ofganames.ResourceTagger](ctx context.Context, u *User, res
 		true,
 	)
 	if err != nil {
-		return false, "", errors.E(err)
+		return false, errors.E(err)
 	}
 
-	return isAllowed, resolution, nil
+	return isAllowed, nil
 }
 
 // CheckRelation accepts a resource as a tag and checks if the user has the specified relation to the resource.
 // The resource string will be converted to a tag. In cases where one already has a resource tag, consider using
 // the convenience functions like `IsModelWriter` or `IsApplicationOfferConsumer`.
-func CheckRelation(ctx context.Context, u *User, resource names.Tag, relation ofganames.Relation) (bool, string, error) {
+func CheckRelation(ctx context.Context, u *User, resource names.Tag, relation ofganames.Relation) (bool, error) {
 	var tag *ofganames.Tag
 	var err error
 	tag = ofganames.ConvertGenericTag(resource)
-	isAllowed, resolution, err := u.client.checkRelation(
+	isAllowed, err := u.client.CheckRelation(
 		ctx,
 		Tuple{
 			Object:   ofganames.ConvertTag(u.ResourceTag()),
@@ -262,15 +262,15 @@ func CheckRelation(ctx context.Context, u *User, resource names.Tag, relation of
 		true,
 	)
 	if err != nil {
-		return false, "", errors.E(err)
+		return false, errors.E(err)
 	}
 
-	return isAllowed, resolution, nil
+	return isAllowed, nil
 }
 
 // IsAdministrator returns true if user has administrator access to the resource.
 func IsAdministrator[T administratorT](ctx context.Context, u *User, resource T) (bool, error) {
-	isAdmin, resolution, err := checkRelation(ctx, u, resource, ofganames.AdministratorRelation)
+	isAdmin, err := checkRelation(ctx, u, resource, ofganames.AdministratorRelation)
 	if err != nil {
 		zapctx.Error(
 			ctx,
@@ -287,14 +287,13 @@ func IsAdministrator[T administratorT](ctx context.Context, u *User, resource T)
 			"user is resource administrator",
 			zap.String("user", u.Tag().String()),
 			zap.String("resource", resource.String()),
-			zap.Any("resolution", resolution),
 		)
 	}
 	return isAdmin, nil
 }
 
 func setResourceAccess[T ofganames.ResourceTagger](ctx context.Context, user *User, resource T, relation ofganames.Relation) error {
-	err := user.client.addRelation(ctx, Tuple{
+	err := user.client.AddRelations(ctx, Tuple{
 		Object:   ofganames.ConvertTag(user.ResourceTag()),
 		Relation: relation,
 		Target:   ofganames.ConvertTag(resource),
@@ -312,7 +311,7 @@ func setResourceAccess[T ofganames.ResourceTagger](ctx context.Context, user *Us
 }
 
 func unsetResourceAccess[T ofganames.ResourceTagger](ctx context.Context, user *User, resource T, relation ofganames.Relation, ignoreMissingRelation bool) error {
-	err := user.client.removeRelation(ctx, Tuple{
+	err := user.client.RemoveRelation(ctx, Tuple{
 		Object:   ofganames.ConvertTag(user.ResourceTag()),
 		Relation: relation,
 		Target:   ofganames.ConvertTag(resource),

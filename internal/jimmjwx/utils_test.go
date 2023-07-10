@@ -101,6 +101,7 @@ func setupService(ctx context.Context, c *qt.C) (*jimm.Service, *httptest.Server
 		OpenFGAParams: jimm.OpenFGAParams{
 			Scheme:    cofgaParams.Scheme,
 			Host:      cofgaParams.Host,
+			Port:      cofgaParams.Port,
 			Store:     cofgaParams.StoreID,
 			Token:     cofgaParams.Token,
 			AuthModel: cofgaParams.AuthModelID,

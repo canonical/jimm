@@ -59,7 +59,6 @@ func (s *openFGATestSuite) TestWritingTuplesToOFGASucceeds(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	changes, err := s.cofgaClient.ReadChanges(ctx, "group", 99, "")
 	c.Assert(err, gc.IsNil)
-	c.Assert(changes.ContinuationToken, gc.Equals, "", gc.Commentf("there are still more changes to fetch"))
 
 	secondToLastInsertedTuple := changes.GetChanges()[len(changes.GetChanges())-2].GetTupleKey()
 	c.Assert(ofganames.ConvertTag(user1).String(), gc.Equals, secondToLastInsertedTuple.GetUser())
@@ -100,7 +99,6 @@ func (suite *openFGATestSuite) TestRemovingTuplesFromOFGASucceeds(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	changes, err := suite.cofgaClient.ReadChanges(ctx, "group", 99, "")
 	c.Assert(err, gc.IsNil)
-	c.Assert(changes.ContinuationToken, gc.Equals, "", gc.Commentf("there are still more changes to fetch"))
 
 	secondToLastInsertedTuple := changes.GetChanges()[len(changes.GetChanges())-2]
 	secondLastKey := secondToLastInsertedTuple.GetTupleKey()
@@ -140,10 +138,9 @@ func (s *openFGATestSuite) TestCheckRelationSucceeds(c *gc.C) {
 		Relation: "administrator",
 		Target:   ofganames.ConvertTag(controller),
 	}
-	allowed, resoution, err := s.ofgaClient.CheckRelation(ctx, checkTuple, true)
+	allowed, err := s.ofgaClient.CheckRelation(ctx, checkTuple, true)
 	c.Assert(err, gc.IsNil)
 	c.Assert(allowed, gc.Equals, true)
-	c.Assert(resoution, gc.Equals, ".union.0(direct).group:"+groupid+"#member.(direct).")
 }
 
 func (s *openFGATestSuite) TestRemoveTuplesSucceeds(c *gc.C) {
@@ -164,9 +161,9 @@ func (s *openFGATestSuite) TestRemoveTuplesSucceeds(c *gc.C) {
 		Target: ofganames.ConvertTag(jimmnames.NewGroupTag(groupid)),
 	}
 	c.Logf("checking for tuple %v\n", checkKey)
-	err := s.ofgaClient.RemoveTuples(context.Background(), &checkKey)
+	err := s.ofgaClient.RemoveTuples(context.Background(), checkKey)
 	c.Assert(err, gc.IsNil)
-	tuples, ct, err := s.ofgaClient.ReadRelatedObjects(context.Background(), nil, 50, "")
+	tuples, ct, err := s.ofgaClient.ReadRelatedObjects(context.Background(), ofga.Tuple{}, 50, "")
 	c.Assert(err, gc.IsNil)
 	c.Assert(ct, gc.Equals, "")
 	c.Assert(len(tuples), gc.Equals, 0)
@@ -190,7 +187,7 @@ func (s *openFGATestSuite) TestAddControllerModel(c *gc.C) {
 		Relation: "controller",
 		Target:   ofganames.ConvertTag(model),
 	}
-	allowed, _, err := s.ofgaClient.CheckRelation(context.Background(), key, false)
+	allowed, err := s.ofgaClient.CheckRelation(context.Background(), key, false)
 	c.Assert(err, gc.IsNil)
 	c.Assert(allowed, gc.Equals, true)
 }
@@ -212,14 +209,14 @@ func (s *openFGATestSuite) TestRemoveModel(c *gc.C) {
 		Relation: "controller",
 		Target:   ofganames.ConvertTag(model),
 	}
-	allowed, _, err := s.ofgaClient.CheckRelation(context.Background(), key, false)
+	allowed, err := s.ofgaClient.CheckRelation(context.Background(), key, false)
 	c.Assert(err, gc.IsNil)
 	c.Assert(allowed, gc.Equals, true)
 
 	err = s.ofgaClient.RemoveModel(context.Background(), model)
 	c.Assert(err, gc.IsNil)
 
-	allowed, _, err = s.ofgaClient.CheckRelation(context.Background(), key, false)
+	allowed, err = s.ofgaClient.CheckRelation(context.Background(), key, false)
 	c.Assert(err, gc.IsNil)
 	c.Assert(allowed, gc.Equals, false)
 }
@@ -241,7 +238,7 @@ func (s *openFGATestSuite) TestAddModelApplicationOffer(c *gc.C) {
 		Relation: "model",
 		Target:   ofganames.ConvertTag(offer),
 	}
-	allowed, _, err := s.ofgaClient.CheckRelation(context.Background(), key, false)
+	allowed, err := s.ofgaClient.CheckRelation(context.Background(), key, false)
 	c.Assert(err, gc.IsNil)
 	c.Assert(allowed, gc.Equals, true)
 }
@@ -263,14 +260,14 @@ func (s *openFGATestSuite) TestRemoveApplicationOffer(c *gc.C) {
 		Relation: "model",
 		Target:   ofganames.ConvertTag(offer),
 	}
-	allowed, _, err := s.ofgaClient.CheckRelation(context.Background(), key, false)
+	allowed, err := s.ofgaClient.CheckRelation(context.Background(), key, false)
 	c.Assert(err, gc.IsNil)
 	c.Assert(allowed, gc.Equals, true)
 
 	err = s.ofgaClient.RemoveApplicationOffer(context.Background(), offer)
 	c.Assert(err, gc.IsNil)
 
-	allowed, _, err = s.ofgaClient.CheckRelation(context.Background(), key, false)
+	allowed, err = s.ofgaClient.CheckRelation(context.Background(), key, false)
 	c.Assert(err, gc.IsNil)
 	c.Assert(allowed, gc.Equals, false)
 }
@@ -298,7 +295,7 @@ func (s *openFGATestSuite) TestRemoveGroup(c *gc.C) {
 	err := s.ofgaClient.AddRelations(context.Background(), tuples...)
 	c.Assert(err, gc.Equals, nil)
 
-	allowed, _, err := s.ofgaClient.CheckRelation(
+	allowed, err := s.ofgaClient.CheckRelation(
 		context.TODO(),
 		ofga.Tuple{
 			Object:   ofganames.ConvertTag(alice),
@@ -316,7 +313,7 @@ func (s *openFGATestSuite) TestRemoveGroup(c *gc.C) {
 	err = s.ofgaClient.RemoveGroup(context.Background(), group1)
 	c.Assert(err, gc.Equals, nil)
 
-	allowed, _, err = s.ofgaClient.CheckRelation(
+	allowed, err = s.ofgaClient.CheckRelation(
 		context.TODO(),
 		ofga.Tuple{
 			Object:   ofganames.ConvertTag(alice),
@@ -362,7 +359,7 @@ func (s *openFGATestSuite) TestRemoveCloud(c *gc.C) {
 		Target:   ofganames.ConvertTag(cloud1),
 	}}
 	for _, check := range checks {
-		allowed, _, err := s.ofgaClient.CheckRelation(context.TODO(), check, false)
+		allowed, err := s.ofgaClient.CheckRelation(context.TODO(), check, false)
 		c.Assert(err, gc.Equals, nil)
 		c.Assert(allowed, gc.Equals, true)
 	}
@@ -374,7 +371,7 @@ func (s *openFGATestSuite) TestRemoveCloud(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	for _, check := range checks {
-		allowed, _, err := s.ofgaClient.CheckRelation(context.TODO(), check, false)
+		allowed, err := s.ofgaClient.CheckRelation(context.TODO(), check, false)
 		c.Assert(err, gc.Equals, nil)
 		c.Assert(allowed, gc.Equals, false)
 	}
@@ -390,7 +387,7 @@ func (s *openFGATestSuite) TestAddCloudController(c *gc.C) {
 		Target:   ofganames.ConvertTag(cloud),
 	}
 
-	allowed, _, err := s.ofgaClient.CheckRelation(context.Background(), check, false)
+	allowed, err := s.ofgaClient.CheckRelation(context.Background(), check, false)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(allowed, gc.Equals, false)
 
@@ -400,7 +397,7 @@ func (s *openFGATestSuite) TestAddCloudController(c *gc.C) {
 	err = s.ofgaClient.AddCloudController(context.Background(), cloud, controller)
 	c.Assert(err, gc.Equals, nil)
 
-	allowed, _, err = s.ofgaClient.CheckRelation(context.Background(), check, false)
+	allowed, err = s.ofgaClient.CheckRelation(context.Background(), check, false)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(allowed, gc.Equals, true)
 }
@@ -415,7 +412,7 @@ func (s *openFGATestSuite) TestAddController(c *gc.C) {
 		Target:   ofganames.ConvertTag(controller),
 	}
 
-	allowed, _, err := s.ofgaClient.CheckRelation(context.Background(), check, false)
+	allowed, err := s.ofgaClient.CheckRelation(context.Background(), check, false)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(allowed, gc.Equals, false)
 
@@ -425,7 +422,7 @@ func (s *openFGATestSuite) TestAddController(c *gc.C) {
 	err = s.ofgaClient.AddController(context.Background(), jimm, controller)
 	c.Assert(err, gc.Equals, nil)
 
-	allowed, _, err = s.ofgaClient.CheckRelation(context.Background(), check, false)
+	allowed, err = s.ofgaClient.CheckRelation(context.Background(), check, false)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(allowed, gc.Equals, true)
 }

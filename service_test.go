@@ -470,6 +470,7 @@ func cofgaParamsToJIMMOpenFGAParams(cofgaParams cofga.OpenFGAParams) jimm.OpenFG
 	return jimm.OpenFGAParams{
 		Scheme:    cofgaParams.Scheme,
 		Host:      cofgaParams.Host,
+		Port:      cofgaParams.Port,
 		Store:     cofgaParams.StoreID,
 		Token:     cofgaParams.Token,
 		AuthModel: cofgaParams.AuthModelID,

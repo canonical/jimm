@@ -19,8 +19,6 @@ dependencies. **Note: Go 1.11 or greater needed.**
 
 ### Local:
 
-To configure Go development environment, make sure to run `make go-env` first.
-
 A couple of system packages are required in order to set up a development
 environment. To install them, run the following:
 `make sysdeps`

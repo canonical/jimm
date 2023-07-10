@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v4"
 	"github.com/oklog/ulid/v2"
 	openfga "github.com/openfga/go-sdk"
+	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	ofga "github.com/CanonicalLtd/jimm/internal/openfga"
@@ -118,14 +119,14 @@ func SetupTestOFGAClient(names ...string) (*ofga.OFGAClient, *cofga.Client, *cof
 
 	cofgaParams := cofga.OpenFGAParams{
 		Scheme:  "http",
-		Host:    "localhost:8080",
+		Host:    "localhost",
 		Token:   "jimm",
 		Port:    "8080",
 		StoreID: storeID,
 	}
 	cofgaClient, err := cofga.NewClient(ctx, cofgaParams)
 	if err != nil {
-		return nil, nil, nil, errors.E(err, "failed to create ofga client")
+		return nil, nil, nil, errgo.Notef(err, "failed to create ofga client")
 	}
 
 	// TBD

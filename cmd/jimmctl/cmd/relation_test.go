@@ -16,7 +16,6 @@ import (
 	"github.com/juju/cmd/v3/cmdtesting"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
-	openfga "github.com/openfga/go-sdk"
 	gc "gopkg.in/check.v1"
 	yamlv2 "gopkg.in/yaml.v2"
 	"gopkg.in/yaml.v3"
@@ -86,7 +85,7 @@ func (s *relationSuite) TestAddRelationSuperuser(c *gc.C) {
 			c.Assert(strings.Contains(err.Error(), tc.message), gc.Equals, true)
 		} else {
 			c.Assert(err, gc.IsNil)
-			tuples, ct, err := s.jimmSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), nil, 50, "")
+			tuples, ct, err := s.jimmSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), ofga.Tuple{}, 50, "")
 			c.Assert(err, gc.IsNil)
 			c.Assert(ct, gc.Equals, "")
 			c.Assert(len(tuples), gc.Equals, i+3)
@@ -132,7 +131,7 @@ func (s *relationSuite) TestAddRelationViaFileSuperuser(c *gc.C) {
 	_, err = cmdtesting.RunCommand(c, cmd.NewAddRelationCommandForTesting(s.ClientStore(), bClient), "-f", file.Name())
 	c.Assert(err, gc.IsNil)
 
-	tuples, ct, err := s.jimmSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), nil, 50, "")
+	tuples, ct, err := s.jimmSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), ofga.Tuple{}, 50, "")
 	c.Assert(err, gc.IsNil)
 	c.Assert(ct, gc.Equals, "")
 	c.Assert(len(tuples), gc.Equals, 4)
@@ -182,7 +181,7 @@ func (s *relationSuite) TestRemoveRelationSuperuser(c *gc.C) {
 			c.Assert(err, gc.ErrorMatches, tc.message)
 		} else {
 			c.Assert(err, gc.IsNil)
-			tuples, ct, err := s.jimmSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), nil, 50, "")
+			tuples, ct, err := s.jimmSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), ofga.Tuple{}, 50, "")
 			c.Assert(err, gc.IsNil)
 			c.Assert(ct, gc.Equals, "")
 			totalKeys--
@@ -217,7 +216,7 @@ func (s *relationSuite) TestRemoveRelationViaFileSuperuser(c *gc.C) {
 	_, err = cmdtesting.RunCommand(c, cmd.NewRemoveRelationCommandForTesting(s.ClientStore(), bClient), "-f", file.Name())
 	c.Assert(err, gc.IsNil)
 
-	tuples, ct, err := s.jimmSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), nil, 50, "")
+	tuples, ct, err := s.jimmSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), ofga.Tuple{}, 50, "")
 	c.Assert(err, gc.IsNil)
 	c.Assert(ct, gc.Equals, "")
 	c.Logf("existing relations %v", tuples)
@@ -431,19 +430,20 @@ user-eve@external   	administrator	applicationoffer-test-controller-1:alice@exte
 	)
 }
 
-func createTupleKey(object, relation, target string) openfga.TupleKey {
-	k := openfga.NewTupleKey()
-	// in some cases specifying the object is not required
-	if object != "" {
-		k.SetUser(object)
-	}
-	// in some cases specifying the relation is not required
-	if relation != "" {
-		k.SetRelation(relation)
-	}
-	k.SetObject(target)
-	return *k
-}
+// TBD
+// func createTupleKey(object, relation, target string) openfga.TupleKey {
+// 	k := openfga.NewTupleKey()
+// 	// in some cases specifying the object is not required
+// 	if object != "" {
+// 		k.SetUser(object)
+// 	}
+// 	// in some cases specifying the relation is not required
+// 	if relation != "" {
+// 		k.SetRelation(relation)
+// 	}
+// 	k.SetObject(target)
+// 	return *k
+// }
 
 // TODO: remove boilerplate of env setup and use initialiseEnvironment
 func (s *relationSuite) TestCheckRelationViaSuperuser(c *gc.C) {

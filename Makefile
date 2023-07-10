@@ -26,9 +26,6 @@ endef
 
 default: build
 
-go-env:
-	go env -w GOPRIVATE=github.com/canonical/ofga
-
 build: version/commit.txt version/version.txt
 	go build -tags version $(PROJECT)/...
 

@@ -395,7 +395,7 @@ func (r *controllerRoot) CheckRelation(ctx context.Context, req apiparams.CheckR
 		return checkResp, errors.E(op, errors.CodeFailedToParseTupleKey, err)
 	}
 
-	allowed, resolution, err := r.jimm.OpenFGAClient.CheckRelation(ctx, *parsedTuple, false)
+	allowed, err := r.jimm.OpenFGAClient.CheckRelation(ctx, *parsedTuple, false)
 	if err != nil {
 		zapctx.Error(ctx, "failed to check relation", zap.NamedError("check-relation-error", err))
 		return checkResp, errors.E(op, errors.CodeOpenFGARequestFailed, err)
@@ -403,7 +403,7 @@ func (r *controllerRoot) CheckRelation(ctx context.Context, req apiparams.CheckR
 	if allowed {
 		checkResp.Allowed = allowed
 	}
-	zapctx.Debug(ctx, "check request", zap.String("allowed", strconv.FormatBool(allowed)), zap.String("reason", resolution))
+	zapctx.Debug(ctx, "check request", zap.String("allowed", strconv.FormatBool(allowed)))
 	return checkResp, nil
 }
 
@@ -564,7 +564,7 @@ func (r *controllerRoot) ListRelationshipTuples(ctx context.Context, req apipara
 		return returnValue, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
-	var key *openfga.Tuple
+	key := &openfga.Tuple{}
 	if req.Tuple.TargetObject != "" {
 		key, err = r.parseTuple(ctx, req.Tuple)
 		if err != nil {
@@ -574,7 +574,7 @@ func (r *controllerRoot) ListRelationshipTuples(ctx context.Context, req apipara
 			return returnValue, errors.E(op, err)
 		}
 	}
-	responseTuples, ct, err := r.jimm.OpenFGAClient.ReadRelatedObjects(ctx, key, req.PageSize, req.ContinuationToken)
+	responseTuples, ct, err := r.jimm.OpenFGAClient.ReadRelatedObjects(ctx, *key, req.PageSize, req.ContinuationToken)
 	if err != nil {
 		return returnValue, errors.E(op, err)
 	}

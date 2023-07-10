@@ -629,7 +629,7 @@ func (s *Service) thirdPartyCaveatCheckerFunction(ofgaClient *internalopenfga.OF
 			ofgaClient,
 		)
 
-		allowed, _, err := internalopenfga.CheckRelation(ctx, user, objectTag, relation)
+		allowed, err := internalopenfga.CheckRelation(ctx, user, objectTag, relation)
 		if err != nil {
 			return nil, errors.E(err)
 		}

@@ -19,7 +19,6 @@ SHELL ["/bin/bash", "-c"]
 COPY . .
 RUN echo "${GIT_COMMIT}" | tee ./version/commit.txt
 RUN echo "${VERSION}" | tee ./version/version.txt
-ENV GOPRIVATE=github.com/canonical/ofga
 RUN --mount=type=ssh source /root/.gvm/scripts/gvm && go mod vendor
 RUN --mount=type=ssh source /root/.gvm/scripts/gvm && go build -o jimmsrv -race -v -a -mod vendor ./cmd/jimmsrv
 

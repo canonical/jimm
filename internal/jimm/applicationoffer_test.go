@@ -2157,7 +2157,7 @@ func TestOfferAssertOpenFGARelationsExist(t *testing.T) {
 	c.Assert(offer, qt.CmpEquals(cmpopts.EquateEmpty(), cmpopts.IgnoreTypes(time.Time{}, gorm.Model{}), cmpopts.IgnoreTypes(dbmodel.Model{})), expectedOffer)
 
 	// check the controller relation was created
-	exists, _, err := client.CheckRelation(
+	exists, err := client.CheckRelation(
 		context.Background(),
 		openfga.Tuple{
 			Object:   ofganames.ConvertTag(offerArgs.ModelTag),
@@ -2170,7 +2170,7 @@ func TestOfferAssertOpenFGARelationsExist(t *testing.T) {
 	c.Assert(exists, qt.IsTrue)
 
 	// check the user has administrator rights on the offer
-	exists, _, err = client.CheckRelation(
+	exists, err = client.CheckRelation(
 		context.Background(),
 		openfga.Tuple{
 			Object:   ofganames.ConvertTag(u.ResourceTag()),

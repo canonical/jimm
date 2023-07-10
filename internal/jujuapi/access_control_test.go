@@ -1392,9 +1392,9 @@ func (s *accessControlSuite) TestParseTag(c *gc.C) {
 	// JIMM tag syntax for models
 	tag, err := jujuapi.ParseTag(ctx, db, jimmTag)
 	c.Assert(err, gc.IsNil)
-	c.Assert(tag.Kind, gc.Equals, names.ModelTagKind)
+	c.Assert(tag.Kind.String(), gc.Equals, names.ModelTagKind)
 	c.Assert(tag.ID, gc.Equals, model.UUID.String)
-	c.Assert(tag.Relation, gc.Equals, "administrator")
+	c.Assert(tag.Relation.String(), gc.Equals, "administrator")
 
 	jujuTag := "model-" + model.UUID.String + "#administrator"
 
@@ -1402,8 +1402,8 @@ func (s *accessControlSuite) TestParseTag(c *gc.C) {
 	tag, err = jujuapi.ParseTag(ctx, db, jujuTag)
 	c.Assert(err, gc.IsNil)
 	c.Assert(tag.ID, gc.Equals, model.UUID.String)
-	c.Assert(tag.Kind, gc.Equals, names.ModelTagKind)
-	c.Assert(tag.Relation, gc.Equals, "administrator")
+	c.Assert(tag.Kind.String(), gc.Equals, names.ModelTagKind)
+	c.Assert(tag.Relation.String(), gc.Equals, "administrator")
 }
 
 // createTestControllerEnvironment is a utility function creating the necessary components of adding a:
