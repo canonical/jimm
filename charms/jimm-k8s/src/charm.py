@@ -62,17 +62,17 @@ logger = logging.getLogger(__name__)
 
 WORKLOAD_CONTAINER = "jimm"
 
-REQUIRED_SETTINGS = [
-    "JIMM_UUID",
-    "JIMM_DSN",
-    "CANDID_URL",
-    "OPENFGA_STORE",
-    "OPENFGA_AUTH_MODEL",
-    "OPENFGA_HOST",
-    "OPENFGA_SCHEME",
-    "OPENFGA_TOKEN",
-    "OPENFGA_PORT",
-]
+REQUIRED_SETTINGS = {
+    "JIMM_UUID": "missing uuid configuration",
+    "JIMM_DSN": "missing postgresql relation",
+    "CANDID_URL": "missing candid-url configuration",
+    "OPENFGA_STORE": "missing openfga relation",
+    "OPENFGA_AUTH_MODEL": "run create-authorization-model action",
+    "OPENFGA_HOST": "missing openfga relation",
+    "OPENFGA_SCHEME": "missing openfga relation",
+    "OPENFGA_TOKEN": "missing openfga relation",
+    "OPENFGA_PORT": "missing openfga relation",
+}
 
 JIMM_SERVICE_NAME = "jimm"
 DATABASE_NAME = "jimm"
@@ -334,9 +334,12 @@ class JimmOperatorCharm(CharmBase):
 
     def _on_stop(self, _):
         """Stop JIMM."""
-        container = self.unit.get_container(WORKLOAD_CONTAINER)
-        if container.can_connect():
-            container.stop(JIMM_SERVICE_NAME)
+        try:
+            container = self.unit.get_container(WORKLOAD_CONTAINER)
+            if container.can_connect():
+                container.stop(JIMM_SERVICE_NAME)
+        except Exception as e:
+            logger.info("failed to stop the jimm service: {}".format(e))
         self._ready()
 
     def _on_update_status(self, _):
@@ -396,10 +399,10 @@ class JimmOperatorCharm(CharmBase):
 
             env_vars = plan.services.get(JIMM_SERVICE_NAME).environment
 
-            for setting in REQUIRED_SETTINGS:
+            for setting, message in REQUIRED_SETTINGS.items():
                 if not env_vars.get(setting, ""):
                     self.unit.status = BlockedStatus(
-                        "{} configuration value not set".format(setting),
+                        "{} configuration value not set: {}".format(setting, message),
                     )
                     return False
 
@@ -587,11 +590,14 @@ class JimmOperatorCharm(CharmBase):
         if not event.store_id:
             return
 
-        # secret = self.model.get_secret(id=event.token_secret_id)
-        # secret_content = secret.get_content()
+        token = event.token
+        if event.token_secret_id:
+            secret = self.model.get_secret(id=event.token_secret_id)
+            secret_content = secret.get_content()
+            token = secret_content["token"]
 
         self._state.openfga_store_id = event.store_id
-        self._state.openfga_token = event.token  # secret_content["token"]
+        self._state.openfga_token = token
         self._state.openfga_address = event.address
         self._state.openfga_port = event.port
         self._state.openfga_scheme = event.scheme
