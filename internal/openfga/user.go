@@ -78,7 +78,7 @@ func (u *User) IsModelWriter(ctx context.Context, resource names.ModelTag) (bool
 }
 
 // GetCloudAccess returns the relation the user has to the specified cloud.
-func (u *User) GetCloudAccess(ctx context.Context, resource names.CloudTag) ofganames.Relation {
+func (u *User) GetCloudAccess(ctx context.Context, resource names.CloudTag) Relation {
 	isCloudAdmin, err := IsAdministrator(ctx, u, resource)
 	if err != nil {
 		zapctx.Error(ctx, "openfga check failed", zap.Error(err))
@@ -100,7 +100,7 @@ func (u *User) GetCloudAccess(ctx context.Context, resource names.CloudTag) ofga
 }
 
 // GetAuditLogViewerAccess returns if the user has audit log viewer relation with the given controller.
-func (u *User) GetAuditLogViewerAccess(ctx context.Context, resource names.ControllerTag) ofganames.Relation {
+func (u *User) GetAuditLogViewerAccess(ctx context.Context, resource names.ControllerTag) Relation {
 	hasAccess, err := checkRelation(ctx, u, resource, ofganames.AuditLogViewerRelation)
 	if err != nil {
 		zapctx.Error(ctx, "openfga check failed", zap.Error(err))
@@ -113,7 +113,7 @@ func (u *User) GetAuditLogViewerAccess(ctx context.Context, resource names.Contr
 }
 
 // GetControllerAccess returns the relation the user has with the specified controller.
-func (u *User) GetControllerAccess(ctx context.Context, resource names.ControllerTag) ofganames.Relation {
+func (u *User) GetControllerAccess(ctx context.Context, resource names.ControllerTag) Relation {
 	isAdmin, err := IsAdministrator(ctx, u, resource)
 	if err != nil {
 		zapctx.Error(ctx, "openfga check failed", zap.Error(err))
@@ -126,7 +126,7 @@ func (u *User) GetControllerAccess(ctx context.Context, resource names.Controlle
 }
 
 // GetModelAccess returns the relation the user has with the specified model.
-func (u *User) GetModelAccess(ctx context.Context, resource names.ModelTag) ofganames.Relation {
+func (u *User) GetModelAccess(ctx context.Context, resource names.ModelTag) Relation {
 	isAdmin, err := IsAdministrator(ctx, u, resource)
 	if err != nil {
 		zapctx.Error(ctx, "openfga check failed", zap.Error(err))
@@ -156,7 +156,7 @@ func (u *User) GetModelAccess(ctx context.Context, resource names.ModelTag) ofga
 }
 
 // GetApplicationOfferAccess returns the relation the user has with the specified application offer.
-func (u *User) GetApplicationOfferAccess(ctx context.Context, resource names.ApplicationOfferTag) ofganames.Relation {
+func (u *User) GetApplicationOfferAccess(ctx context.Context, resource names.ApplicationOfferTag) Relation {
 	isAdmin, err := IsAdministrator(ctx, u, resource)
 	if err != nil {
 		zapctx.Error(ctx, "openfga check failed", zap.Error(err))
@@ -186,12 +186,12 @@ func (u *User) GetApplicationOfferAccess(ctx context.Context, resource names.App
 }
 
 // SetModelAccess adds a direct relation between the user and the model.
-func (u *User) SetModelAccess(ctx context.Context, resource names.ModelTag, relation ofganames.Relation) error {
+func (u *User) SetModelAccess(ctx context.Context, resource names.ModelTag, relation Relation) error {
 	return setResourceAccess(ctx, u, resource, relation)
 }
 
 // SetControllerAccess adds a direct relation between the user and the controller.
-func (u *User) SetControllerAccess(ctx context.Context, resource names.ControllerTag, relation ofganames.Relation) error {
+func (u *User) SetControllerAccess(ctx context.Context, resource names.ControllerTag, relation Relation) error {
 	return setResourceAccess(ctx, u, resource, relation)
 }
 
@@ -201,17 +201,17 @@ func (u *User) UnsetAuditLogViewerAccess(ctx context.Context, resource names.Con
 }
 
 // SetCloudAccess adds a direct relation between the user and the cloud.
-func (u *User) SetCloudAccess(ctx context.Context, resource names.CloudTag, relation ofganames.Relation) error {
+func (u *User) SetCloudAccess(ctx context.Context, resource names.CloudTag, relation Relation) error {
 	return setResourceAccess(ctx, u, resource, relation)
 }
 
 // SetApplicationOfferAccess adds a direct relation between the user and the application offer.
-func (u *User) SetApplicationOfferAccess(ctx context.Context, resource names.ApplicationOfferTag, relation ofganames.Relation) error {
+func (u *User) SetApplicationOfferAccess(ctx context.Context, resource names.ApplicationOfferTag, relation Relation) error {
 	return setResourceAccess(ctx, u, resource, relation)
 }
 
 // UnsetApplicationOfferAccess removes a direct relation between the user and the application offer.
-func (u *User) UnsetApplicationOfferAccess(ctx context.Context, resource names.ApplicationOfferTag, relation ofganames.Relation, ignoreMissingRelation bool) error {
+func (u *User) UnsetApplicationOfferAccess(ctx context.Context, resource names.ApplicationOfferTag, relation Relation, ignoreMissingRelation bool) error {
 	return unsetResourceAccess(ctx, u, resource, relation, ignoreMissingRelation)
 }
 
@@ -228,7 +228,7 @@ type administratorT interface {
 	String() string
 }
 
-func checkRelation[T ofganames.ResourceTagger](ctx context.Context, u *User, resource T, relation ofganames.Relation) (bool, error) {
+func checkRelation[T ofganames.ResourceTagger](ctx context.Context, u *User, resource T, relation Relation) (bool, error) {
 	isAllowed, err := u.client.CheckRelation(
 		ctx,
 		Tuple{
@@ -248,7 +248,7 @@ func checkRelation[T ofganames.ResourceTagger](ctx context.Context, u *User, res
 // CheckRelation accepts a resource as a tag and checks if the user has the specified relation to the resource.
 // The resource string will be converted to a tag. In cases where one already has a resource tag, consider using
 // the convenience functions like `IsModelWriter` or `IsApplicationOfferConsumer`.
-func CheckRelation(ctx context.Context, u *User, resource names.Tag, relation ofganames.Relation) (bool, error) {
+func CheckRelation(ctx context.Context, u *User, resource names.Tag, relation Relation) (bool, error) {
 	var tag *ofganames.Tag
 	var err error
 	tag = ofganames.ConvertGenericTag(resource)
@@ -292,7 +292,7 @@ func IsAdministrator[T administratorT](ctx context.Context, u *User, resource T)
 	return isAdmin, nil
 }
 
-func setResourceAccess[T ofganames.ResourceTagger](ctx context.Context, user *User, resource T, relation ofganames.Relation) error {
+func setResourceAccess[T ofganames.ResourceTagger](ctx context.Context, user *User, resource T, relation Relation) error {
 	err := user.client.AddRelations(ctx, Tuple{
 		Object:   ofganames.ConvertTag(user.ResourceTag()),
 		Relation: relation,
@@ -310,7 +310,7 @@ func setResourceAccess[T ofganames.ResourceTagger](ctx context.Context, user *Us
 	return nil
 }
 
-func unsetResourceAccess[T ofganames.ResourceTagger](ctx context.Context, user *User, resource T, relation ofganames.Relation, ignoreMissingRelation bool) error {
+func unsetResourceAccess[T ofganames.ResourceTagger](ctx context.Context, user *User, resource T, relation Relation, ignoreMissingRelation bool) error {
 	err := user.client.RemoveRelation(ctx, Tuple{
 		Object:   ofganames.ConvertTag(user.ResourceTag()),
 		Relation: relation,
@@ -331,7 +331,7 @@ func unsetResourceAccess[T ofganames.ResourceTagger](ctx context.Context, user *
 }
 
 // ListUsersWithAccess lists all users that have the specified relation to the resource.
-func ListUsersWithAccess[T ofganames.ResourceTagger](ctx context.Context, client *OFGAClient, resource T, relation ofganames.Relation) ([]*User, error) {
+func ListUsersWithAccess[T ofganames.ResourceTagger](ctx context.Context, client *OFGAClient, resource T, relation Relation) ([]*User, error) {
 	entities, err := client.cofgaClient.FindUsersByRelation(ctx, Tuple{
 		Relation: relation,
 		Target:   ofganames.ConvertTag(resource),

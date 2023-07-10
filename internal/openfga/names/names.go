@@ -12,33 +12,27 @@ import (
 	"github.com/juju/names/v4"
 )
 
-// Kind represents the type of a tag kind.
-type Kind = cofga.Kind
-
-// Relation holds the type of tag relation.
-type Relation = cofga.Relation
-
 var (
 	// MemberRelation represents a member relation between entities.
-	MemberRelation Relation = "member"
+	MemberRelation cofga.Relation = "member"
 	// AdministratorRelation represents an administrator relation between entities.
-	AdministratorRelation Relation = "administrator"
+	AdministratorRelation cofga.Relation = "administrator"
 	// ControllerRelation represents a controller relation between entities.
-	ControllerRelation Relation = "controller"
+	ControllerRelation cofga.Relation = "controller"
 	// ModelRelation represents a model relation between entities.
-	ModelRelation Relation = "model"
+	ModelRelation cofga.Relation = "model"
 	// ConsumerRelation represents a consumer relation between entities.
-	ConsumerRelation Relation = "consumer"
+	ConsumerRelation cofga.Relation = "consumer"
 	// ReaderRelation represents a reader relation between entities.
-	ReaderRelation Relation = "reader"
+	ReaderRelation cofga.Relation = "reader"
 	// WriterRelation represents a writer relation between entities.
-	WriterRelation Relation = "writer"
+	WriterRelation cofga.Relation = "writer"
 	// CanAddModelRelation represents a can_addmodel relation between entities.
-	CanAddModelRelation Relation = "can_addmodel"
+	CanAddModelRelation cofga.Relation = "can_addmodel"
 	// AuditLogViewer represents an audit_log_viewer relation between entities.
-	AuditLogViewerRelation Relation = "audit_log_viewer"
+	AuditLogViewerRelation cofga.Relation = "audit_log_viewer"
 	// NoRelation is returned when there is no relation.
-	NoRelation Relation = ""
+	NoRelation cofga.Relation = ""
 )
 
 // Tag represents an entity tag as used by JIMM in OpenFGA.
@@ -61,7 +55,7 @@ type ResourceTagger interface {
 
 // ConvertTagWithRelation converts a resource tag to an OpenFGA tag
 // and adds a relation to it.
-func ConvertTagWithRelation[RT ResourceTagger](t RT, relation Relation) *Tag {
+func ConvertTagWithRelation[RT ResourceTagger](t RT, relation cofga.Relation) *Tag {
 	tag := ConvertTag(t)
 	tag.Relation = relation
 	return tag
@@ -105,7 +99,7 @@ func BlankKindTag(kind string) (*Tag, error) {
 
 // ConvertJujuRelation takes a juju relation string and converts it to
 // one appropriate for use with OpenFGA.
-func ConvertJujuRelation(relation string) (Relation, error) {
+func ConvertJujuRelation(relation string) (cofga.Relation, error) {
 	switch relation {
 	case string(permission.AdminAccess):
 		return AdministratorRelation, nil
@@ -129,10 +123,10 @@ func ConvertJujuRelation(relation string) (Relation, error) {
 }
 
 // ParseRelation parses the relation string
-func ParseRelation(relationString string) (Relation, error) {
+func ParseRelation(relationString string) (cofga.Relation, error) {
 	switch relationString {
 	case "":
-		return Relation(""), nil
+		return cofga.Relation(""), nil
 	case MemberRelation.String():
 		return MemberRelation, nil
 	case AdministratorRelation.String():
@@ -146,7 +140,7 @@ func ParseRelation(relationString string) (Relation, error) {
 	case CanAddModelRelation.String():
 		return CanAddModelRelation, nil
 	default:
-		return Relation(""), errors.E("unknown relation")
+		return cofga.Relation(""), errors.E("unknown relation")
 
 	}
 }

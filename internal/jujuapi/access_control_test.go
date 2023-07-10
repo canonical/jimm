@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"time"
 
-	cofga "github.com/canonical/ofga"
 	petname "github.com/dustinkirkland/golang-petname"
 	"github.com/google/uuid"
 	"github.com/juju/juju/core/crossmodel"
@@ -21,6 +20,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/jimmtest"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi"
+	"github.com/CanonicalLtd/jimm/internal/openfga"
 	ofga "github.com/CanonicalLtd/jimm/internal/openfga"
 	ofganames "github.com/CanonicalLtd/jimm/internal/openfga/names"
 	jimmnames "github.com/CanonicalLtd/jimm/pkg/names"
@@ -213,11 +213,11 @@ func (s *accessControlSuite) TestListGroups(c *gc.C) {
 
 // createTuple wraps the underlying ofga tuple into a convenient ease-of-use method
 func createTuple(object, relation, target string) ofga.Tuple {
-	objectEntity, _ := cofga.ParseEntity(object)
-	targetEntity, _ := cofga.ParseEntity(target)
+	objectEntity, _ := openfga.ParseTag(object)
+	targetEntity, _ := openfga.ParseTag(target)
 	return ofga.Tuple{
 		Object:   &objectEntity,
-		Relation: ofganames.Relation(relation),
+		Relation: ofga.Relation(relation),
 		Target:   &targetEntity,
 	}
 }

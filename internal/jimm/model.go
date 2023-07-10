@@ -702,7 +702,7 @@ func (j *JIMM) ModelInfo(ctx context.Context, u *openfga.User, mt names.ModelTag
 
 	userAccess := make(map[string]string)
 
-	for _, relation := range []ofganames.Relation{
+	for _, relation := range []openfga.Relation{
 		// Here we list possible relation in decreasing level
 		// of access privilege.
 		ofganames.AdministratorRelation,

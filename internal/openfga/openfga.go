@@ -21,15 +21,17 @@ var (
 // Tuple represents a relation between an object and a target.
 type Tuple = cofga.Tuple
 
-type Tag = ofganames.Tag
-type Kind = ofganames.Kind
+// Tag represents an entity tag as used by JIMM in OpenFGA.
+type Tag = cofga.Entity
 
-// ReadResponse takes what is necessary from the underlying OFGA ReadResponse and simplifies it
-// into a safe ready-to-use response.
-type ReadResponse struct {
-	Tuples          []Tuple
-	PaginationToken string
-}
+// ParseTag parses an entity tag from string representation.
+var ParseTag = cofga.ParseEntity
+
+// Kind represents the type of a tag kind.
+type Kind = cofga.Kind
+
+// Relation holds the type of tag relation.
+type Relation = cofga.Relation
 
 // OFGAClient contains convenient utility methods for interacting
 // with OpenFGA from OUR usecase. It wraps the provided pre-generated client
