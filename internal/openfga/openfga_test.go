@@ -54,7 +54,7 @@ func (s *openFGATestSuite) TestWritingTuplesToOFGASucceeds(c *gc.C) {
 		Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(groupid)),
 	}
 
-	err := s.ofgaClient.AddRelations(ctx, key1, key2)
+	err := s.ofgaClient.AddRelation(ctx, key1, key2)
 	c.Assert(err, gc.IsNil)
 	changes, err := s.cofgaClient.ReadChanges(ctx, "group", 99, "")
 	c.Assert(err, gc.IsNil)
@@ -90,7 +90,7 @@ func (suite *openFGATestSuite) TestRemovingTuplesFromOFGASucceeds(c *gc.C) {
 	err := suite.ofgaClient.RemoveRelation(ctx, key1, key2)
 	c.Assert(strings.Contains(err.Error(), "cannot delete a tuple which does not exist"), gc.Equals, true)
 
-	err = suite.ofgaClient.AddRelations(ctx, key1, key2)
+	err = suite.ofgaClient.AddRelation(ctx, key1, key2)
 	c.Assert(err, gc.IsNil)
 
 	//Delete after insert should succeed.
@@ -129,7 +129,7 @@ func (s *openFGATestSuite) TestCheckRelationSucceeds(c *gc.C) {
 		Target:   ofganames.ConvertTag(controller),
 	}
 
-	err := s.ofgaClient.AddRelations(ctx, userToGroup, groupToController)
+	err := s.ofgaClient.AddRelation(ctx, userToGroup, groupToController)
 	c.Assert(err, gc.IsNil)
 
 	checkTuple := ofga.Tuple{
@@ -152,7 +152,7 @@ func (s *openFGATestSuite) TestRemoveTuplesSucceeds(c *gc.C) {
 			Relation: "member",
 			Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(groupid)),
 		}
-		err := s.ofgaClient.AddRelations(context.Background(), key)
+		err := s.ofgaClient.AddRelation(context.Background(), key)
 		c.Assert(err, gc.IsNil)
 	}
 
@@ -291,7 +291,7 @@ func (s *openFGATestSuite) TestRemoveGroup(c *gc.C) {
 		Target:   ofganames.ConvertTag(group2),
 	}}
 
-	err := s.ofgaClient.AddRelations(context.Background(), tuples...)
+	err := s.ofgaClient.AddRelation(context.Background(), tuples...)
 	c.Assert(err, gc.Equals, nil)
 
 	allowed, err := s.ofgaClient.CheckRelation(
@@ -341,7 +341,7 @@ func (s *openFGATestSuite) TestRemoveCloud(c *gc.C) {
 		Target:   ofganames.ConvertTag(cloud1),
 	}}
 
-	err := s.ofgaClient.AddRelations(context.Background(), tuples...)
+	err := s.ofgaClient.AddRelation(context.Background(), tuples...)
 	c.Assert(err, gc.Equals, nil)
 
 	checks := []ofga.Tuple{{
@@ -494,7 +494,7 @@ func (s *openFGATestSuite) TestListObjectsWithPeristedTuples(c *gc.C) {
 		expected[i] = "model:" + v
 	}
 
-	c.Assert(s.ofgaClient.AddRelations(ctx,
+	c.Assert(s.ofgaClient.AddRelation(ctx,
 		[]ofga.Tuple{
 			{
 				Object:   ofganames.ConvertTag(names.NewUserTag("alice")),

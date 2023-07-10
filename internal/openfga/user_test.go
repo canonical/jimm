@@ -50,7 +50,7 @@ func (s *userTestSuite) TestIsAdministrator(c *gc.C) {
 		Target:   ofganames.ConvertTag(controller),
 	}
 
-	err := s.ofgaClient.AddRelations(ctx, userToGroup, groupToController)
+	err := s.ofgaClient.AddRelation(ctx, userToGroup, groupToController)
 	c.Assert(err, gc.IsNil)
 
 	u := ofga.NewUser(
@@ -99,7 +99,7 @@ func (s *userTestSuite) TestModelAccess(c *gc.C) {
 		Relation: ofganames.WriterRelation,
 		Target:   ofganames.ConvertTag(model),
 	}}
-	err = s.ofgaClient.AddRelations(ctx, tuples...)
+	err = s.ofgaClient.AddRelation(ctx, tuples...)
 	c.Assert(err, gc.IsNil)
 
 	adamUser := ofga.NewUser(&dbmodel.User{Username: "adam"}, s.ofgaClient)
@@ -194,7 +194,7 @@ func (s *userTestSuite) TestCloudAccess(c *gc.C) {
 		Relation: ofganames.CanAddModelRelation,
 		Target:   ofganames.ConvertTag(cloud),
 	}}
-	err = s.ofgaClient.AddRelations(ctx, tuples...)
+	err = s.ofgaClient.AddRelation(ctx, tuples...)
 	c.Assert(err, gc.IsNil)
 
 	adamUser := ofga.NewUser(&dbmodel.User{Username: "adam"}, s.ofgaClient)
@@ -270,7 +270,7 @@ func (s *userTestSuite) TestControllerAccess(c *gc.C) {
 		Relation: ofganames.AuditLogViewerRelation,
 		Target:   ofganames.ConvertTag(controller),
 	}}
-	err = s.ofgaClient.AddRelations(ctx, tuples...)
+	err = s.ofgaClient.AddRelation(ctx, tuples...)
 	c.Assert(err, gc.IsNil)
 
 	adamUser := ofga.NewUser(&dbmodel.User{Username: "adam"}, s.ofgaClient)
@@ -346,7 +346,7 @@ func (s *userTestSuite) TestUnsetAuditLogViewerAccess(c *gc.C) {
 		Relation: ofganames.AuditLogViewerRelation,
 		Target:   ofganames.ConvertTag(controller),
 	}}
-	err = s.ofgaClient.AddRelations(ctx, tuples...)
+	err = s.ofgaClient.AddRelation(ctx, tuples...)
 	c.Assert(err, gc.IsNil)
 
 	relation := aliceUser.GetAuditLogViewerAccess(ctx, controller)
@@ -422,7 +422,7 @@ func (s *userTestSuite) TestListRelatedUsers(c *gc.C) {
 		Relation: ofganames.MemberRelation,
 		Target:   ofganames.ConvertTag(group),
 	}}
-	err = s.ofgaClient.AddRelations(ctx, tuples...)
+	err = s.ofgaClient.AddRelation(ctx, tuples...)
 	c.Assert(err, gc.IsNil)
 
 	eveUser := ofga.NewUser(&dbmodel.User{Username: "eve"}, s.ofgaClient)

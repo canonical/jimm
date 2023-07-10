@@ -131,7 +131,7 @@ func (s *accessControlSuite) TestRemoveGroupRemovesTuples(c *gc.C) {
 	checkAccessTupleController := apiparams.RelationshipTuple{Object: u, Relation: "administrator", TargetObject: "controller-" + controller.UUID}
 	checkAccessTupleModel := apiparams.RelationshipTuple{Object: u, Relation: "writer", TargetObject: "model-" + model.UUID.String}
 
-	err = s.JIMM.OpenFGAClient.AddRelations(context.Background(), tuples...)
+	err = s.JIMM.OpenFGAClient.AddRelation(context.Background(), tuples...)
 	c.Assert(err, gc.IsNil)
 	//Check user has access to model and controller through group2
 	checkResp, err := client.CheckRelation(&apiparams.CheckRelationRequest{Tuple: checkAccessTupleController})
@@ -731,7 +731,7 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 	for i, tc := range tagTests {
 		c.Logf("running test %d", i)
 		ofgaClient := s.JIMM.OpenFGAClient
-		err := ofgaClient.AddRelations(context.Background(), tc.toAdd)
+		err := ofgaClient.AddRelation(context.Background(), tc.toAdd)
 		c.Check(err, gc.IsNil)
 		changes, err := s.COFGAClient.ReadChanges(ctx, tc.changesType, 99, "")
 		c.Assert(err, gc.IsNil)
@@ -882,7 +882,7 @@ func (s *accessControlSuite) TestCheckRelationOfferReaderFlow(c *gc.C) {
 		Target:   offerTag,
 	} // Make group members reader of offer via member union
 
-	err := ofgaClient.AddRelations(
+	err := ofgaClient.AddRelation(
 		ctx,
 		userToGroupOfferReader,
 		groupToOfferReader,
@@ -950,7 +950,7 @@ func (s *accessControlSuite) TestCheckRelationOfferConsumerFlow(c *gc.C) {
 		Target:   offerTag,
 	} // Make group members consumer of offer via member union
 
-	err := ofgaClient.AddRelations(
+	err := ofgaClient.AddRelation(
 		ctx,
 		userToGroupMember,
 		groupToOfferConsumer,
@@ -1019,7 +1019,7 @@ func (s *accessControlSuite) TestCheckRelationModelReaderFlow(c *gc.C) {
 		Target:   modelTag,
 	} // Make group members writer of model via member union
 
-	err := ofgaClient.AddRelations(
+	err := ofgaClient.AddRelation(
 		ctx,
 		userToGroupMember,
 		groupToModelReader,
@@ -1086,7 +1086,7 @@ func (s *accessControlSuite) TestCheckRelationModelWriterFlow(c *gc.C) {
 	userJAASKey := "user-" + user.Username
 	modelJAASKey := "model-" + controller.Name + ":" + user.Username + "/" + model.Name
 
-	err := ofgaClient.AddRelations(
+	err := ofgaClient.AddRelation(
 		ctx,
 		userToGroupMember,
 		groupToModelWriter,
@@ -1171,7 +1171,7 @@ func (s *accessControlSuite) TestCheckRelationControllerAdministratorFlow(c *gc.
 		Target:   offerTag,
 	} // Make controller administrators admin of appoffers via administrator union
 
-	err := ofgaClient.AddRelations(
+	err := ofgaClient.AddRelation(
 		ctx,
 		userToGroup,
 		groupToControllerAdmin,

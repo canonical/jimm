@@ -504,7 +504,7 @@ func (s *relationSuite) TestCheckRelationViaSuperuser(c *gc.C) {
 	err = db.AddModel(ctx, &model)
 	c.Assert(err, gc.IsNil)
 
-	err = ofgaClient.AddRelations(ctx,
+	err = ofgaClient.AddRelation(ctx,
 		ofga.Tuple{
 			Object:   ofganames.ConvertTag(u.ResourceTag()),
 			Relation: "member",

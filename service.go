@@ -573,7 +573,7 @@ func ensureControllerAdministrators(ctx context.Context, client *ofgaClient.OFGA
 	if len(tuples) == 0 {
 		return nil
 	}
-	return client.AddRelations(ctx, tuples...)
+	return client.AddRelation(ctx, tuples...)
 }
 
 var defaultDischargeExpiry = 15 * time.Minute

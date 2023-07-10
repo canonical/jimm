@@ -2995,7 +2995,7 @@ func TestListApplicationOffers(t *testing.T) {
 		Relation: ofganames.ConsumerRelation,
 		Target:   ofganames.ConvertTag(names.NewApplicationOfferTag("00000012-0000-0000-0000-000000000003")),
 	}}
-	err = client.AddRelations(context.Background(), tuples...)
+	err = client.AddRelation(context.Background(), tuples...)
 	c.Assert(err, qt.IsNil)
 
 	u := env.User("alice@external").DBObject(c, db, client)

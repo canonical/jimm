@@ -133,7 +133,7 @@ func (s *modelManagerSuite) TestListModelSummariesWithoutControllerUUIDMasking(c
 	defer conn.Close()
 
 	// we need to make bob jimm admin to disable controller UUID masking
-	err = s.OFGAClient.AddRelations(context.Background(),
+	err = s.OFGAClient.AddRelation(context.Background(),
 		openfga.Tuple{
 			Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
 			Relation: ofganames.AdministratorRelation,

@@ -101,8 +101,8 @@ func (o *OFGAClient) listObjects(ctx context.Context, user string, relation stri
 	return result, nil
 }
 
-// AddRelations creates a tuple(s) from the provided keys. See CreateTupleKey for creating keys.
-func (o *OFGAClient) AddRelations(ctx context.Context, tuples ...Tuple) error {
+// AddRelation creates a tuple(s) from the provided keys. See CreateTupleKey for creating keys.
+func (o *OFGAClient) AddRelation(ctx context.Context, tuples ...Tuple) error {
 	return o.cofgaClient.AddRelation(ctx, tuples...)
 }
 
@@ -161,7 +161,7 @@ func (o *OFGAClient) removeTuples(ctx context.Context, tuple Tuple) error {
 
 // AddControllerModel adds a relation between a controller and a model.
 func (o *OFGAClient) AddControllerModel(ctx context.Context, controller names.ControllerTag, model names.ModelTag) error {
-	if err := o.AddRelations(
+	if err := o.AddRelation(
 		ctx,
 		Tuple{
 			Object:   ofganames.ConvertTag(controller),
@@ -189,7 +189,7 @@ func (o *OFGAClient) RemoveModel(ctx context.Context, model names.ModelTag) erro
 
 // AddModelApplicationOffer adds a relation between a model and an application offer.
 func (o *OFGAClient) AddModelApplicationOffer(ctx context.Context, model names.ModelTag, offer names.ApplicationOfferTag) error {
-	if err := o.AddRelations(
+	if err := o.AddRelation(
 		ctx,
 		Tuple{
 			Object:   ofganames.ConvertTag(model),
@@ -261,7 +261,7 @@ func (o *OFGAClient) RemoveCloud(ctx context.Context, cloud names.CloudTag) erro
 // AddCloudController adds a controller relation between a controller and
 // a cloud.
 func (o *OFGAClient) AddCloudController(ctx context.Context, cloud names.CloudTag, controller names.ControllerTag) error {
-	if err := o.AddRelations(ctx, Tuple{
+	if err := o.AddRelation(ctx, Tuple{
 		Object:   ofganames.ConvertTag(controller),
 		Relation: ofganames.ControllerRelation,
 		Target:   ofganames.ConvertTag(cloud),
@@ -278,7 +278,7 @@ func (o *OFGAClient) AddCloudController(ctx context.Context, cloud names.CloudTa
 // AddController adds a controller relation between JIMM and the added controller. Meaning
 // JIMM admins also have administrator access to the added controller
 func (o *OFGAClient) AddController(ctx context.Context, jimm names.ControllerTag, controller names.ControllerTag) error {
-	if err := o.AddRelations(ctx, Tuple{
+	if err := o.AddRelation(ctx, Tuple{
 		Object:   ofganames.ConvertTag(jimm),
 		Relation: ofganames.ControllerRelation,
 		Target:   ofganames.ConvertTag(controller),

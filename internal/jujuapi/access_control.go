@@ -341,7 +341,7 @@ func (r *controllerRoot) AddRelation(ctx context.Context, req apiparams.AddRelat
 	if err != nil {
 		return errors.E(err)
 	}
-	err = r.jimm.OpenFGAClient.AddRelations(ctx, keys...)
+	err = r.jimm.OpenFGAClient.AddRelation(ctx, keys...)
 	if err != nil {
 		zapctx.Error(ctx, "failed to add tuple(s)", zap.NamedError("add-relation-error", err))
 		return errors.E(op, errors.CodeOpenFGARequestFailed, err)

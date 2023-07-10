@@ -293,7 +293,7 @@ func IsAdministrator[T administratorT](ctx context.Context, u *User, resource T)
 }
 
 func setResourceAccess[T ofganames.ResourceTagger](ctx context.Context, user *User, resource T, relation Relation) error {
-	err := user.client.AddRelations(ctx, Tuple{
+	err := user.client.AddRelation(ctx, Tuple{
 		Object:   ofganames.ConvertTag(user.ResourceTag()),
 		Relation: relation,
 		Target:   ofganames.ConvertTag(resource),

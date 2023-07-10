@@ -419,7 +419,7 @@ func TestQueryModelsJq(t *testing.T) {
 		"50000000-0000-0000-0000-000000000000", // Erroneous model (storage errors).
 	}
 
-	c.Assert(j.OpenFGAClient.AddRelations(ctx,
+	c.Assert(j.OpenFGAClient.AddRelation(ctx,
 		[]ofga.Tuple{
 			// Reader to model via direct relation
 			{
