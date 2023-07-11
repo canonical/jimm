@@ -63,16 +63,15 @@ func (c *controllerInfoCommand) Info() *cmd.Info {
 // SetFlags implements Command.SetFlags.
 func (c *controllerInfoCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.CommandBase.SetFlags(f)
-	f.StringVar(&c.publicAddress, "public-address", "", "The preferred controller address for public access.")
 }
 
 // Init implements the cmd.Command interface.
 func (c *controllerInfoCommand) Init(args []string) error {
-	if len(args) < 2 {
-		return errors.New("controller name or filename not specified")
+	if len(args) < 3 {
+		return errors.New("controller name, filename or public address not specified")
 	}
-	c.controllerName, c.file.Path = args[0], args[1]
-	if len(args) > 2 {
+	c.controllerName, c.file.Path, c.publicAddress = args[0], args[1], args[2]
+	if len(args) > 3 {
 		return errors.New("too many args")
 	}
 	return nil
@@ -96,11 +95,8 @@ func (c *controllerInfoCommand) Run(ctxt *cmd.Context) error {
 	}
 	if c.publicAddress != "" {
 		info.PublicAddress = c.publicAddress
-	} else if controller.PublicDNSName != "" {
-		info.PublicAddress = controller.PublicDNSName
 	} else {
-		info.PublicAddress = controller.APIEndpoints[0]
-		info.CACertificate = controller.CACert
+		return errors.New("public address must be set")
 	}
 	data, err := yaml.Marshal(info)
 	if err != nil {
