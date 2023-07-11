@@ -458,9 +458,10 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 			c.Assert(err, gc.IsNil)
 			changes, err := s.COFGAClient.ReadChanges(ctx, tc.changesType, 99, "")
 			c.Assert(err, gc.IsNil)
-			c.Assert(changes.ContinuationToken, gc.Equals, "")
 			key := changes.GetChanges()[len(changes.GetChanges())-1].GetTupleKey()
-			c.Assert(key, gc.DeepEquals, tc.want)
+			c.Assert(*key.User, gc.DeepEquals, tc.want.Object.String())
+			c.Assert(*key.Relation, gc.DeepEquals, tc.want.Relation.String())
+			c.Assert(*key.Object, gc.DeepEquals, tc.want.Target.String())
 		}
 	}
 }
@@ -735,9 +736,10 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 		c.Check(err, gc.IsNil)
 		changes, err := s.COFGAClient.ReadChanges(ctx, tc.changesType, 99, "")
 		c.Assert(err, gc.IsNil)
-		c.Assert(changes.ContinuationToken, gc.Equals, "")
 		key := changes.GetChanges()[len(changes.GetChanges())-1].GetTupleKey()
-		c.Assert(key, gc.DeepEquals, tc.want)
+		c.Assert(*key.User, gc.DeepEquals, tc.want.Object.String())
+		c.Assert(*key.Relation, gc.DeepEquals, tc.want.Relation.String())
+		c.Assert(*key.Object, gc.DeepEquals, tc.want.Target.String())
 
 		err = client.RemoveRelation(&apiparams.RemoveRelationRequest{
 			Tuples: []apiparams.RelationshipTuple{
@@ -755,12 +757,13 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 			c.Assert(err, gc.IsNil)
 			changes, err := s.COFGAClient.ReadChanges(ctx, tc.changesType, 99, "")
 			c.Assert(err, gc.IsNil)
-			c.Assert(changes.ContinuationToken, gc.Equals, "")
 			change := changes.GetChanges()[len(changes.GetChanges())-1]
 			operation := change.GetOperation()
-			c.Assert(operation, gc.Equals, "TUPLE_OPERATION_DELETE")
+			c.Assert(string(operation), gc.Equals, "TUPLE_OPERATION_DELETE")
 			key := change.GetTupleKey()
-			c.Assert(key, gc.DeepEquals, tc.want)
+			c.Assert(*key.User, gc.DeepEquals, tc.want.Object.String())
+			c.Assert(*key.Relation, gc.DeepEquals, tc.want.Relation.String())
+			c.Assert(*key.Object, gc.DeepEquals, tc.want.Target.String())
 		}
 	}
 }
@@ -860,7 +863,7 @@ func (s *accessControlSuite) TestCheckRelationOfferReaderFlow(c *gc.C) {
 	user, group, controller, model, offer, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
 	defer closeClient()
 
-	// Some keys to assist in the creation of tuples within OpenFGA (such that they can be tested against)
+	// Some tags (tuples) to assist in the creation of tuples within OpenFGA (such that they can be tested against)
 	userTag := ofganames.ConvertTag(user.ResourceTag())
 	groupTag := ofganames.ConvertTag(group.ResourceTag())
 	offerTag := ofganames.ConvertTag(offer.ResourceTag())
@@ -890,7 +893,7 @@ func (s *accessControlSuite) TestCheckRelationOfferReaderFlow(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	type test struct {
-		input ofga.Tuple
+		input apiparams.RelationshipTuple
 		want  bool
 	}
 
@@ -898,24 +901,26 @@ func (s *accessControlSuite) TestCheckRelationOfferReaderFlow(c *gc.C) {
 
 		// Test user-> reader -> aoffer (due to direct relation from group)
 		{
-			input: createTuple(userJAASKey, "reader", offerJAASKey),
-			want:  true,
+			input: apiparams.RelationshipTuple{
+				Object:       userJAASKey,
+				Relation:     "reader",
+				TargetObject: offerJAASKey,
+			},
+			want: true,
 		},
 		// Test user -> consumer -> offer (FAILS as there is no union or direct relation to writer)
 		{
-			input: createTuple(userJAASKey, "consumer", offerJAASKey),
-			want:  false,
+			input: apiparams.RelationshipTuple{
+				Object:       userJAASKey,
+				Relation:     "consumer",
+				TargetObject: offerJAASKey,
+			},
+			want: false,
 		},
 	}
 
 	for _, tc := range tests {
-		req := apiparams.CheckRelationRequest{
-			Tuple: apiparams.RelationshipTuple{
-				Object:       tc.input.Object.String(),
-				Relation:     tc.input.Relation.String(),
-				TargetObject: tc.input.Target.String(),
-			},
-		}
+		req := apiparams.CheckRelationRequest{Tuple: tc.input}
 		res, err := client.CheckRelation(&req)
 		c.Assert(err, gc.IsNil)
 		c.Assert(res.Allowed, gc.Equals, tc.want)
@@ -958,31 +963,33 @@ func (s *accessControlSuite) TestCheckRelationOfferConsumerFlow(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	type test struct {
-		input ofga.Tuple
+		input apiparams.RelationshipTuple
 		want  bool
 	}
 
 	tests := []test{
 		// Test user:dugtrio -> consumer -> applicationoffer:test-offer-2 (due to direct relation from group)
 		{
-			input: createTuple(userJAASKey, "consumer", offerJAASKey),
-			want:  true,
+			input: apiparams.RelationshipTuple{
+				Object:       userJAASKey,
+				Relation:     "consumer",
+				TargetObject: offerJAASKey,
+			},
+			want: true,
 		},
 		// Test user:dugtrio -> reader -> applicationoffer:test-offer-2 (due to direct relation from group and union from consumer to reader)
 		{
-			input: createTuple(userJAASKey, "reader", offerJAASKey),
-			want:  true,
+			input: apiparams.RelationshipTuple{
+				Object:       userJAASKey,
+				Relation:     "reader",
+				TargetObject: offerJAASKey,
+			},
+			want: true,
 		},
 	}
 
 	for _, tc := range tests {
-		req := apiparams.CheckRelationRequest{
-			Tuple: apiparams.RelationshipTuple{
-				Object:       tc.input.Object.String(),
-				Relation:     tc.input.Relation.String(),
-				TargetObject: tc.input.Target.String(),
-			},
-		}
+		req := apiparams.CheckRelationRequest{Tuple: tc.input}
 		res, err := client.CheckRelation(&req)
 		c.Assert(err, gc.IsNil)
 		c.Assert(res.Allowed, gc.Equals, tc.want)
@@ -1027,31 +1034,33 @@ func (s *accessControlSuite) TestCheckRelationModelReaderFlow(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	type test struct {
-		input ofga.Tuple
+		input apiparams.RelationshipTuple
 		want  bool
 	}
 
 	tests := []test{
 		// Test user -> reader -> model (due to direct relation from group)
 		{
-			input: createTuple(userJAASKey, "reader", modelJAASKey),
-			want:  true,
+			input: apiparams.RelationshipTuple{
+				Object:       userJAASKey,
+				Relation:     "reader",
+				TargetObject: modelJAASKey,
+			},
+			want: true,
 		},
 		// Test user -> writer -> model (FAILS as there is no union or direct relation to writer)
 		{
-			input: createTuple(userJAASKey, "writer", modelJAASKey),
-			want:  false,
+			input: apiparams.RelationshipTuple{
+				Object:       userJAASKey,
+				Relation:     "writer",
+				TargetObject: modelJAASKey,
+			},
+			want: false,
 		},
 	}
 
 	for _, tc := range tests {
-		req := apiparams.CheckRelationRequest{
-			Tuple: apiparams.RelationshipTuple{
-				Object:       tc.input.Object.String(),
-				Relation:     tc.input.Relation.String(),
-				TargetObject: tc.input.Target.String(),
-			},
-		}
+		req := apiparams.CheckRelationRequest{Tuple: tc.input}
 		res, err := client.CheckRelation(&req)
 		c.Assert(err, gc.IsNil)
 		c.Assert(res.Allowed, gc.Equals, tc.want)
@@ -1094,31 +1103,33 @@ func (s *accessControlSuite) TestCheckRelationModelWriterFlow(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	type test struct {
-		input ofga.Tuple
+		input apiparams.RelationshipTuple
 		want  bool
 	}
 
 	tests := []test{
 		// Test user-> writer -> model
 		{
-			input: createTuple(userJAASKey, "writer", modelJAASKey),
-			want:  true,
+			input: apiparams.RelationshipTuple{
+				Object:       userJAASKey,
+				Relation:     "writer",
+				TargetObject: modelJAASKey,
+			},
+			want: true,
 		},
 		// Test user-> reader -> model(due to union from writer to reader)
 		{
-			input: createTuple(userJAASKey, "reader", modelJAASKey),
-			want:  true,
+			input: apiparams.RelationshipTuple{
+				Object:       userJAASKey,
+				Relation:     "reader",
+				TargetObject: modelJAASKey,
+			},
+			want: true,
 		},
 	}
 
 	for _, tc := range tests {
-		req := apiparams.CheckRelationRequest{
-			Tuple: apiparams.RelationshipTuple{
-				Object:       tc.input.Object.String(),
-				Relation:     tc.input.Relation.String(),
-				TargetObject: tc.input.Target.String(),
-			},
-		}
+		req := apiparams.CheckRelationRequest{Tuple: tc.input}
 		res, err := client.CheckRelation(&req)
 		c.Assert(err, gc.IsNil)
 		c.Assert(res.Allowed, gc.Equals, tc.want)
@@ -1181,51 +1192,69 @@ func (s *accessControlSuite) TestCheckRelationControllerAdministratorFlow(c *gc.
 	c.Assert(err, gc.IsNil)
 
 	type test struct {
-		input ofga.Tuple
+		input apiparams.RelationshipTuple
 		want  bool
 	}
 
 	tests := []test{
 		// Test user -> member -> group
 		{
-			input: createTuple(userJAASKey, "member", groupJAASKey),
-			want:  true,
+			input: apiparams.RelationshipTuple{
+				Object:       userJAASKey,
+				Relation:     "member",
+				TargetObject: groupJAASKey,
+			},
+			want: true,
 		},
 		// Test user-> member -> controller
 		{
-			input: createTuple(userJAASKey, "administrator", controllerJAASKey),
-			want:  true,
+			input: apiparams.RelationshipTuple{
+				Object:       userJAASKey,
+				Relation:     "administrator",
+				TargetObject: controllerJAASKey,
+			},
+			want: true,
 		},
 		// Test user-> administrator -> model
 		{
-			input: createTuple(userJAASKey, "administrator", modelJAASKey),
-			want:  true,
+			input: apiparams.RelationshipTuple{
+				Object:       userJAASKey,
+				Relation:     "administrator",
+				TargetObject: modelJAASKey,
+			},
+			want: true,
 		},
 		// Test user -> reader -> model (due to group#member -> controller#admin unioned to model #admin)
 		{
-			input: createTuple(userJAASKey, "reader", modelJAASKey),
-			want:  true,
+			input: apiparams.RelationshipTuple{
+				Object:       userJAASKey,
+				Relation:     "reader",
+				TargetObject: modelJAASKey,
+			},
+			want: true,
 		},
 		// Test user-> writer -> model (due to group#member -> controller#admin unioned to model #admin)
 		{
-			input: createTuple(userJAASKey, "writer", modelJAASKey),
-			want:  true,
+			input: apiparams.RelationshipTuple{
+				Object:       userJAASKey,
+				Relation:     "writer",
+				TargetObject: modelJAASKey,
+			},
+			want: true,
 		},
 		// Test user -> administrator -> offer
 		{
-			input: createTuple(userJAASKey, "administrator", offerJAASKey),
-			want:  true,
+			input: apiparams.RelationshipTuple{
+				Object:       userJAASKey,
+				Relation:     "administrator",
+				TargetObject: offerJAASKey,
+			},
+			want: true,
 		},
 	}
 
 	for _, tc := range tests {
-		req := apiparams.CheckRelationRequest{
-			Tuple: apiparams.RelationshipTuple{
-				Object:       tc.input.Object.String(),
-				Relation:     tc.input.Relation.String(),
-				TargetObject: tc.input.Target.String(),
-			},
-		}
+		req := apiparams.CheckRelationRequest{Tuple: tc.input}
 		res, err := client.CheckRelation(&req)
 		c.Assert(err, gc.IsNil)
 		c.Assert(res.Allowed, gc.Equals, tc.want)

@@ -102,12 +102,12 @@ func (suite *openFGATestSuite) TestRemovingTuplesFromOFGASucceeds(c *gc.C) {
 	secondToLastInsertedTuple := changes.GetChanges()[len(changes.GetChanges())-2]
 	secondLastKey := secondToLastInsertedTuple.GetTupleKey()
 	c.Assert(user1.String(), gc.Equals, secondLastKey.GetUser())
-	c.Assert("TUPLE_OPERATION_DELETE", gc.Equals, secondToLastInsertedTuple.GetOperation())
+	c.Assert(string(secondToLastInsertedTuple.GetOperation()), gc.Equals, "TUPLE_OPERATION_DELETE")
 
 	lastInsertedTuple := changes.GetChanges()[len(changes.GetChanges())-1]
 	lastKey := lastInsertedTuple.GetTupleKey()
 	c.Assert(user2.String(), gc.Equals, lastKey.GetUser())
-	c.Assert("TUPLE_OPERATION_DELETE", gc.Equals, lastInsertedTuple.GetOperation())
+	c.Assert(string(lastInsertedTuple.GetOperation()), gc.Equals, "TUPLE_OPERATION_DELETE")
 }
 
 func (s *openFGATestSuite) TestCheckRelationSucceeds(c *gc.C) {
