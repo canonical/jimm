@@ -30,7 +30,7 @@ require (
 	github.com/juju/version/v2 v2.0.1
 	github.com/juju/zaputil v0.0.0-20190326175239-ef53049637ac
 	github.com/mattn/go-sqlite3 v2.0.3+incompatible
-	github.com/openfga/go-sdk v0.2.1
+	github.com/openfga/go-sdk v0.2.2
 	github.com/prometheus/client_golang v1.14.0
 	github.com/rogpeppe/fastuuid v1.2.0
 	go.uber.org/zap v1.24.0

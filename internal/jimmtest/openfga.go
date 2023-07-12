@@ -22,6 +22,7 @@ import (
 
 var (
 	authDefinitions    = []openfga.TypeDefinition{}
+	schemaVersion      string
 	calcDefinitionOnce sync.Once
 
 	setups   map[string]testSetup
@@ -78,6 +79,13 @@ func getAuthModelDefinition() (_ []openfga.TypeDefinition, err error) {
 		wrapper := make(map[string]interface{})
 		err = json.Unmarshal(b, &wrapper)
 		if err != nil {
+			return
+		}
+
+		var ok bool
+		schemaVersion, ok = wrapper["schema_version"].(string)
+		if !ok {
+			err = errors.E("Schema version not found in auth model")
 			return
 		}
 
@@ -150,6 +158,7 @@ func SetupTestOFGAClient(names ...string) (openfga.OpenFgaApi, *ofga.OFGAClient,
 	if err != nil {
 		return nil, nil, nil, err
 	}
+	ar.SetSchemaVersion(schemaVersion)
 
 	amr, _, err := api.WriteAuthorizationModel(ctx).Body(*ar).Execute()
 	if err != nil {
