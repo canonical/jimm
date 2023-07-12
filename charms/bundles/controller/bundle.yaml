@@ -1,0 +1,20 @@
+applications:
+  controller:
+    charm: ch:juju-controller
+  haproxy:
+    charm: ch:haproxy
+    num_units: 1
+    constraints: cores=1 mem=4G root-disk=30G
+    expose: true
+    series: focal
+    options:
+      default_mode: tcp
+      enable_monitoring: True
+      services: include-file://config/haproxy.yaml
+      peering_mode: active-active
+  ntp:
+    charm: ch:ntp
+relations:
+  - ["ntp", "haproxy"]
+  - ["ntp", "controller"]
+  - ["controller", "haproxy"]
