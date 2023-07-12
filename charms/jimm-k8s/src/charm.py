@@ -18,7 +18,6 @@
 import hashlib
 import json
 import logging
-import os
 import socket
 
 import hvac
@@ -43,16 +42,9 @@ from charms.traefik_k8s.v1.ingress import (
     IngressPerAppRequirer,
     IngressPerAppRevokedEvent,
 )
-from ops import pebble
 from ops.charm import CharmBase, RelationJoinedEvent
 from ops.main import main
-from ops.model import (
-    ActiveStatus,
-    BlockedStatus,
-    MaintenanceStatus,
-    ModelError,
-    WaitingStatus,
-)
+from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
 
 from state import State, requires_state, requires_state_setter
 
@@ -167,8 +159,6 @@ class JimmOperatorCharm(CharmBase):
         self._agent_filename = "/root/config/agent.json"
         self._vault_secret_filename = "/root/config/vault_secret.json"
         self._vault_path = "charm-jimm-k8s-creds"
-        self._dashboard_path = "/root/dashboard"
-        self._dashboard_hash_path = "/root/dashboard/hash"
 
     def _on_peer_relation_changed(self, event):
         self._update_workload(event)
@@ -217,7 +207,6 @@ class JimmOperatorCharm(CharmBase):
 
         self._ensure_bakery_agent_file(event)
         self._ensure_vault_file(event)
-        self._install_dashboard(event)
 
         dns_name = self._get_dns_name(event)
         if not dns_name:
@@ -248,9 +237,6 @@ class JimmOperatorCharm(CharmBase):
 
         if self.model.unit.is_leader():
             config_values["JIMM_WATCH_CONTROLLERS"] = "1"
-
-        if container.exists(self._dashboard_path):
-            config_values["JIMM_DASHBOARD_LOCATION"] = self._dashboard_path
 
         # remove empty configuration values
         config_values = {key: value for key, value in config_values.items() if value}
@@ -381,85 +367,6 @@ class JimmOperatorCharm(CharmBase):
             logger.error("cannot connect to workload container")
             self.unit.status = WaitingStatus("waiting for jimm workload")
             return False
-
-    def _install_dashboard(self, event):
-        container = self.unit.get_container(WORKLOAD_CONTAINER)
-
-        # if we can't connect to the container we should defer
-        # this event.
-        if not container.can_connect():
-            event.defer()
-            return
-
-        # fetch the resource filename
-        try:
-            dashboard_file = self.model.resources.fetch("dashboard")
-        except ModelError:
-            dashboard_file = None
-
-        # if the resource is not specified, we can return
-        # as there is nothing to install.
-        if not dashboard_file:
-            return
-
-        # if the resource file is empty, we can return
-        # as there is nothing to install.
-        if os.path.getsize(dashboard_file) == 0:
-            return
-
-        dashboard_changed = False
-
-        # compute the hash of the dashboard tarball.
-        dashboard_hash = self._hash(dashboard_file)
-
-        # check if we the file containing the dashboard
-        # hash exists.
-        if container.exists(self._dashboard_hash_path):
-            # if it does, compare the stored hash with the
-            # hash of the dashboard tarball.
-            hash = container.pull(self._dashboard_hash_path)
-            existing_hash = str(hash.read())
-            # if the two hashes do not match
-            # the resource must have changed.
-            if not dashboard_hash == existing_hash:
-                dashboard_changed = True
-        else:
-            dashboard_changed = True
-
-        # if the resource file has not changed, we can
-        # return as there is no need to push the same
-        # dashboard content to the container.
-        if not dashboard_changed:
-            return
-
-        self.unit.status = MaintenanceStatus("installing dashboard")
-
-        # remove the existing dashboard from the workload/
-        if container.exists(self._dashboard_path):
-            container.remove_path(self._dashboard_path)
-
-        container.make_dir(self._dashboard_path, make_parents=True)
-
-        with open(dashboard_file, "rb") as f:
-            container.push(os.path.join(self._dashboard_path, "dashboard.tar.bz2"), f)
-
-        process = container.exec(
-            [
-                "tar",
-                "xvf",
-                os.path.join(self._dashboard_path, "dashboard.tar.bz2"),
-                "-C",
-                self._dashboard_path,
-            ]
-        )
-        try:
-            process.wait_output()
-        except pebble.ExecError as e:
-            logger.error("error running untaring the dashboard. error code {}".format(e.exit_code))
-            for line in e.stderr.splitlines():
-                logger.error("    %s", line)
-
-        self._push_to_workload(self._dashboard_hash_path, dashboard_hash, event)
 
     def _get_network_address(self, event):
         return str(self.model.get_binding(event.relation).network.egress_subnets[0].network_address)
