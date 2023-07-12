@@ -99,15 +99,17 @@ func (c *controllerInfoCommand) Run(ctxt *cmd.Context) error {
 		Username:     account.User,
 		Password:     account.Password,
 	}
+
+	info.PublicAddress = c.publicAddress
 	if c.local {
 		info.PublicAddress = controller.APIEndpoints[0]
 		info.CACertificate = controller.CACert
-	} else {
-		if c.publicAddress != "" {
-			info.PublicAddress = c.publicAddress
-		} else {
-			return errors.New("public address must be set")
-		}
+	}
+	if info.PublicAddress == "" {
+		return errors.New("public address must be set")
+	}
+	if c.local && len(c.publicAddress) > 0 {
+		return errors.New("please do not set both the address argument and the local flag")
 	}
 
 	data, err := yaml.Marshal(info)
