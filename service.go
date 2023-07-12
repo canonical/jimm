@@ -499,53 +499,6 @@ func newOpenFGAClient(ctx context.Context, p OpenFGAParams) (*ofgaClient.OFGACli
 		return nil, errors.E(err, "failed to create ofga client")
 	}
 	return openfga.NewOpenFGAClient(cofgaClient), nil
-
-	// if p.Host == "" {
-	// 	return nil, errors.E("missing OpenFGA configuration")
-	// }
-	// zapctx.Info(ctx, "configuring OpenFGA client",
-	// 	zap.String("OpenFGA host", p.Host),
-	// 	zap.String("OpenFGA scheme", p.Scheme),
-	// 	zap.String("OpenFGA store", p.Store),
-	// )
-
-	// config := openfga.Configuration{
-	// 	ApiScheme: p.Scheme,
-	// 	ApiHost:   fmt.Sprintf("%s:%s", p.Host, p.Port), // required, define without the scheme (e.g. api.fga.example instead of https://api.fga.example)
-	// 	StoreId:   p.Store,
-	// }
-	// if p.Token != "" {
-	// 	config.Credentials = &credentials.Credentials{
-	// 		Method: credentials.CredentialsMethodApiToken,
-	// 		Config: &credentials.Config{
-	// 			ApiToken: p.Token,
-	// 		},
-	// 	}
-	// }
-	// configuration, err := openfga.NewConfiguration(config)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// client := openfga.NewAPIClient(configuration)
-	// api := client.OpenFgaApi
-
-	// _, response, err := api.ListStores(ctx).Execute()
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// body, _ := io.ReadAll(response.Body)
-	// if response.StatusCode != http.StatusOK {
-	// 	return nil, errors.E("failed to contact the OpenFga server: received %v: %s", response.StatusCode, string(body))
-	// }
-
-	// storeResp, _, err := api.GetStore(ctx).Execute()
-	// if err != nil {
-	// 	zapctx.Error(ctx, "could not retrieve store.", zap.Error(err))
-	// 	return nil, errors.E("could not retrieve store")
-	// } else {
-	// 	zapctx.Info(ctx, "store appears to exist", zap.String("store-name", *storeResp.Name))
-	// }
-	// return ofgaClient.NewOpenFGAClient(client.OpenFgaApi, p.AuthModel), nil
 }
 
 // ensureControllerAdministrators ensures that listed users have admin access to the JIMM controller.
