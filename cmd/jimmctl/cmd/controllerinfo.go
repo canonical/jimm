@@ -21,13 +21,14 @@ var (
 	controller-info command writes controller information contained
 	in the juju client store to a yaml file.
 
-	If a --public-address flag is specified the output controller
-	information will include this public address. The controller
-	information will also omit the ca-certrificate.
+	If a --local flag is specified, the output controller
+	public address will use the first available local API address
+	and the local CA cert of the controller, see examples below
+	for usage.
 
-	Example:
-		jimmctl controller-info <name> <filename> 
-		jimmctl controller-info --public-address=<dns-name>:443 <name> <filename> 
+	Examples:
+		jimmctl controller-info <name> <filename> <public address> 
+		jimmctl controller-info <name> <filename> --local
 `
 )
 
@@ -50,6 +51,7 @@ type controllerInfoCommand struct {
 	controllerName string
 	publicAddress  string
 	file           cmd.FileVar
+	local          bool
 }
 
 func (c *controllerInfoCommand) Info() *cmd.Info {
@@ -63,7 +65,7 @@ func (c *controllerInfoCommand) Info() *cmd.Info {
 // SetFlags implements Command.SetFlags.
 func (c *controllerInfoCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.CommandBase.SetFlags(f)
-	f.StringVar(&c.publicAddress, "public-address", "", "The preferred controller address for public access.")
+	f.BoolVar(&c.local, "local", false, "If local flag is specified, then the local API address and CA cert of the controller will be used.")
 }
 
 // Init implements the cmd.Command interface.
@@ -72,7 +74,10 @@ func (c *controllerInfoCommand) Init(args []string) error {
 		return errors.New("controller name or filename not specified")
 	}
 	c.controllerName, c.file.Path = args[0], args[1]
-	if len(args) > 2 {
+	if len(args) == 3 {
+		c.publicAddress = args[2]
+	}
+	if len(args) > 3 {
 		return errors.New("too many args")
 	}
 	return nil
@@ -94,14 +99,19 @@ func (c *controllerInfoCommand) Run(ctxt *cmd.Context) error {
 		Username:     account.User,
 		Password:     account.Password,
 	}
-	if c.publicAddress != "" {
-		info.PublicAddress = c.publicAddress
-	} else if controller.PublicDNSName != "" {
-		info.PublicAddress = controller.PublicDNSName
-	} else {
+
+	info.PublicAddress = c.publicAddress
+	if c.local {
 		info.PublicAddress = controller.APIEndpoints[0]
 		info.CACertificate = controller.CACert
 	}
+	if info.PublicAddress == "" {
+		return errors.New("public address must be set")
+	}
+	if c.local && len(c.publicAddress) > 0 {
+		return errors.New("please do not set both the address argument and the local flag")
+	}
+
 	data, err := yaml.Marshal(info)
 	if err != nil {
 		return errors.Mask(err)
