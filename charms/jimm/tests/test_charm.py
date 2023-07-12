@@ -510,7 +510,7 @@ class TestCharm(unittest.TestCase):
             harness.charm._agent_filename = tmp.name
             harness.update_config(
                 {
-                    "dns-name": "https://jimm.example.com",
+                    "dns-name": "jimm.example.com",
                     "candid-agent-username": "username@candid",
                     "candid-agent-private-key": "agent-private-key",
                     "candid-agent-public-key": "agent-public-key",
@@ -526,9 +526,9 @@ class TestCharm(unittest.TestCase):
         harness.add_relation_unit(id, "juju-dashboard/0")
         data = harness.get_relation_data(id, "juju-jimm")
         self.assertTrue(data)
-        self.assertEqual(data["controller-url"], "https://jimm.example.com")
-        self.assertEqual(data["identity-provider-url"], "https://candid.example.com")
-        self.assertEqual(data["is-juju"], "False")
+        self.assertEqual(data["controller_url"], "wss://jimm.example.com")
+        self.assertEqual(data["identity_provider_url"], "https://candid.example.com")
+        self.assertEqual(data["is_juju"], "False")
 
     def test_openfga_relation_changed(self):
         id = self.harness.add_relation("openfga", "openfga")

@@ -31,7 +31,7 @@ const (
 // handler will redirect to that URL. If the location is a path on the disk
 // then the handler will serve the files from that path. Otherwise a
 // NotFoundHandler will be returned.
-func Handler(ctx context.Context, loc string) http.Handler {
+func Handler(ctx context.Context, loc string, publicDNSname string) http.Handler {
 	mux := http.NewServeMux()
 
 	u, err := url.Parse(loc)
@@ -85,6 +85,7 @@ func Handler(ctx context.Context, loc string) http.Handler {
 				continue
 			}
 			var w bytes.Buffer
+			configParams["baseControllerURL"] = publicDNSname
 			if err := t.Execute(&w, configParams); err != nil {
 				zapctx.Error(ctx, "error executing config.js.go", zap.Error(err))
 				continue
@@ -118,7 +119,6 @@ func Handler(ctx context.Context, loc string) http.Handler {
 				)
 				continue
 			}
-
 			type guiArchiveVersion struct {
 				// Version holds the Juju GUI version number.
 				Version version.Number `json:"version"`

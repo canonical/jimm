@@ -74,6 +74,7 @@ REQUIRED_SETTINGS = {
     "OPENFGA_PORT": "missing openfga relation",
 }
 
+JIMM_SERVICE_NAME = "jimm"
 DATABASE_NAME = "jimm"
 OPENFGA_STORE_NAME = "jimm"
 LOG_FILE = "/var/log/jimm"
@@ -289,7 +290,7 @@ class JimmOperatorCharm(CharmBase):
             "summary": "jimm layer",
             "description": "pebble config layer for jimm",
             "services": {
-                "jimm": {
+                JIMM_SERVICE_NAME: {
                     "override": "merge",
                     "summary": "JAAS Intelligent Model Manager",
                     "command": "/root/jimmsrv",
@@ -307,10 +308,10 @@ class JimmOperatorCharm(CharmBase):
         }
         container.add_layer("jimm", pebble_layer, combine=True)
         if self._ready():
-            if container.get_service("jimm").is_running():
+            if container.get_service(JIMM_SERVICE_NAME).is_running():
                 container.replan()
             else:
-                container.start("jimm")
+                container.start(JIMM_SERVICE_NAME)
             self.unit.status = ActiveStatus("running")
         else:
             logger.info("workload container not ready - defering")
@@ -321,9 +322,9 @@ class JimmOperatorCharm(CharmBase):
         if dashboard_relation and self.unit.is_leader():
             dashboard_relation.data[self.app].update(
                 {
-                    "controller-url": dns_name,
-                    "identity-provider-url": self.config.get("candid-url"),
-                    "is-juju": str(False),
+                    "controller_url": "wss://{}".format(dns_name),
+                    "identity_provider_url": self.config.get("candid-url"),
+                    "is_juju": str(False),
                 }
             )
 
@@ -336,7 +337,7 @@ class JimmOperatorCharm(CharmBase):
         try:
             container = self.unit.get_container(WORKLOAD_CONTAINER)
             if container.can_connect():
-                container.stop("jimm")
+                container.stop(JIMM_SERVICE_NAME)
         except Exception as e:
             logger.info("failed to stop the jimm service: {}".format(e))
         self._ready()
@@ -353,9 +354,9 @@ class JimmOperatorCharm(CharmBase):
 
         event.relation.data[self.app].update(
             {
-                "controller-url": dns_name,
-                "identity-provider-url": self.config["candid-url"],
-                "is-juju": str(False),
+                "controller_url": "wss://{}".format(dns_name),
+                "identity_provider_url": self.config["candid-url"],
+                "is_juju": str(False),
             }
         )
 
@@ -391,12 +392,12 @@ class JimmOperatorCharm(CharmBase):
 
         if container.can_connect():
             plan = container.get_plan()
-            if plan.services.get("jimm") is None:
+            if plan.services.get(JIMM_SERVICE_NAME) is None:
                 logger.error("waiting for service")
                 self.unit.status = WaitingStatus("waiting for service")
                 return False
 
-            env_vars = plan.services.get("jimm").environment
+            env_vars = plan.services.get(JIMM_SERVICE_NAME).environment
 
             for setting, message in REQUIRED_SETTINGS.items():
                 if not env_vars.get(setting, ""):
@@ -405,7 +406,7 @@ class JimmOperatorCharm(CharmBase):
                     )
                     return False
 
-            if container.get_service("jimm").is_running():
+            if container.get_service(JIMM_SERVICE_NAME).is_running():
                 self.unit.status = ActiveStatus("running")
             else:
                 self.unit.status = WaitingStatus("stopped")
@@ -608,7 +609,7 @@ class JimmOperatorCharm(CharmBase):
         if not self._state.is_ready():
             event.defer()
             logger.warning("State is not ready")
-            return
+            return None
 
         default_dns_name = "{}.{}-endpoints.{}.svc.cluster.local".format(
             self.unit.name.replace("/", "-"),
@@ -654,7 +655,7 @@ class JimmOperatorCharm(CharmBase):
 
         new_csr = generate_csr(
             private_key=private_key.encode(),
-            subject=self.dns_name,
+            subject=dns_name,
         )
         self.certificates.request_certificate_renewal(
             old_certificate_signing_request=old_csr,
@@ -662,7 +663,7 @@ class JimmOperatorCharm(CharmBase):
         )
         self._state.csr = new_csr.decode()
 
-        self._update_workload()
+        self._update_workload(event)
 
     @requires_state_setter
     def _on_certificate_revoked(self, event: CertificateRevokedEvent) -> None:
@@ -687,7 +688,7 @@ class JimmOperatorCharm(CharmBase):
         del self._state.chain
 
         self.unit.status = WaitingStatus("Waiting for new certificate")
-        self._update_workload()
+        self._update_workload(event)
 
     @requires_state_setter
     def _on_ingress_ready(self, event: IngressPerAppReadyEvent):
