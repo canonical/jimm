@@ -38,28 +38,28 @@ relation command enables relation management for jimm
 The object and target object must be of the form <tag>-<objectname> or <tag>-<object-uuid>
 E.g. "user-Alice" or "controller-MyController"
 
--f		Read from a file where filename is the location of a JSON encoded file of the form:
-	[
-		{
-			"object":"user-mike",
-			"relation":"member",
-			"target_object":"group-yellow"
-		},
-		{
-			"object":"user-alice",
-			"relation":"member",
-			"target_object":"group-yellow"
-		}
-	]
+-f    Read from a file where filename is the location of a JSON encoded file of the form:
+    [
+        {
+            "object":"user-mike",
+            "relation":"member",
+            "target_object":"group-yellow"
+        },
+        {
+            "object":"user-alice",
+            "relation":"member",
+            "target_object":"group-yellow"
+        }
+    ]
 
 Certain constraints apply when creating/removing a relation, namely:
 Object may be one of:
 
-	user tag				= "user-<name>"
-	group tag				= "group-<name>"
-	controller tag			= "controller-<name>"
-	model tag				= "model-<name>"
-	application offer tag	= "offer-<name>"
+	user tag                = "user-<name>"
+	group tag               = "group-<name>"
+	controller tag          = "controller-<name>"
+	model tag               = "model-<name>"
+	application offer tag   = "offer-<name>"
 
 If target_object is a group, the relation can only be:
 
@@ -83,11 +83,10 @@ If target_object is an application offer, the relation can be one of:
 	administrator
 
 
-Additionally, if the object is a group, a userset can be applied by adding #member as follows:
+Additionally, if the object is a group, a userset can be applied by adding #member as follows.
+This will grant/revoke the relation to all users within TeamA:
 
 	group-TeamA#member administrator controller-MyController
-
-This will grant/revoke the relation to all users within TeamA.
 `
 
 	addRelationDoc = `
@@ -131,15 +130,17 @@ list relations known to jimm. Using the "target", "relation"
 and "object" flags, only those relations matching the filter
 will be returned.
 Example:
-		jimmctl auth relation list
-		returns the list of all relations
-		jimmctl auth relation list --target <target_object>
-		returns the list of relations, where target object
-		matches the specified one
-		jimmctl auth relation list --target <target_object>  --relation <relation
-		returns the list of relations, where target object
-		and relation match the specified ones
-		`
+	jimmctl auth relation list
+	returns the list of all relations
+
+	jimmctl auth relation list --target <target_object>
+	returns the list of relations, where target object
+	matches the specified one
+
+	jimmctl auth relation list --target <target_object>  --relation <relation
+	returns the list of relations, where target object
+	and relation match the specified ones
+`
 )
 
 // NewRelationCommand returns a command for relation management.
