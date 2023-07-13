@@ -275,6 +275,9 @@ class JimmCharm(SystemdCharm):
         if not path:
             self.unit.status = BlockedStatus("waiting for jimm-snap resource")
             return
+        # remove the jimm snap if it is already installed.
+        self._snap("remove", "jimm")
+        # install the new jimm snap.
         self._snap("install", "--dangerous", path)
 
     def _setup_logging(self):
