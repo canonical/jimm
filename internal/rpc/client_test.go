@@ -15,8 +15,8 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/gorilla/websocket"
 
-	"github.com/CanonicalLtd/jimm/internal/errors"
-	"github.com/CanonicalLtd/jimm/internal/rpc"
+	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/rpc"
 )
 
 func TestDialError(t *testing.T) {

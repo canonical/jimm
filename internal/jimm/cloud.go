@@ -13,10 +13,10 @@ import (
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
-	"github.com/CanonicalLtd/jimm/internal/auth"
-	"github.com/CanonicalLtd/jimm/internal/db"
-	"github.com/CanonicalLtd/jimm/internal/dbmodel"
-	"github.com/CanonicalLtd/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/auth"
+	"github.com/canonical/jimm/internal/db"
+	"github.com/canonical/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/errors"
 )
 
 // GetCloud retrieves the cloud for the given cloud tag. If the cloud

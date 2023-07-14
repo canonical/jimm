@@ -7,13 +7,13 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/CanonicalLtd/jimm/internal/dbmodel"
-	"github.com/CanonicalLtd/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/errors"
 )
 
 // AddModel stores the model information.
-// - returns an error with code errors.CodeAlreadyExists if
-//   model with the same name already exists.
+//   - returns an error with code errors.CodeAlreadyExists if
+//     model with the same name already exists.
 func (d *Database) AddModel(ctx context.Context, model *dbmodel.Model) error {
 	const op = errors.Op("db.AddModel")
 	if err := d.ready(); err != nil {

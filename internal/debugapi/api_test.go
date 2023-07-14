@@ -11,9 +11,9 @@ import (
 
 	qt "github.com/frankban/quicktest"
 
-	"github.com/CanonicalLtd/jimm/internal/debugapi"
-	"github.com/CanonicalLtd/jimm/internal/errors"
-	"github.com/CanonicalLtd/jimm/version"
+	"github.com/canonical/jimm/internal/debugapi"
+	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/version"
 )
 
 func TestDebugInfo(t *testing.T) {

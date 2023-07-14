@@ -8,7 +8,7 @@ import (
 	qt "github.com/frankban/quicktest"
 	jujuparams "github.com/juju/juju/rpc/params"
 
-	"github.com/CanonicalLtd/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/dbmodel"
 )
 
 func TestStringsGormDataType(t *testing.T) {

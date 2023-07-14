@@ -12,7 +12,7 @@ import (
 	"github.com/hashicorp/vault/api"
 	"github.com/juju/names/v4"
 
-	"github.com/CanonicalLtd/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/errors"
 )
 
 const (

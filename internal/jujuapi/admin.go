@@ -11,9 +11,9 @@ import (
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 
-	"github.com/CanonicalLtd/jimm/internal/auth"
-	"github.com/CanonicalLtd/jimm/internal/errors"
-	"github.com/CanonicalLtd/jimm/internal/servermon"
+	"github.com/canonical/jimm/internal/auth"
+	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/servermon"
 )
 
 // unsupportedLogin returns an appropriate error for login attempts using
