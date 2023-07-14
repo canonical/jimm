@@ -163,6 +163,7 @@ class JimmOperatorCharm(CharmBase):
         # Vault relation
         self.framework.observe(self.on.vault_relation_joined, self._on_vault_relation_joined)
         self.framework.observe(self.on.vault_relation_changed, self._on_vault_relation_changed)
+        self.framework.observe(self.on.vault_relation_departed, self._on_vault_relation_departed)
 
         # Grafana relation
         self._grafana_dashboards = GrafanaDashboardProvider(self, relation_name="grafana-dashboard")
@@ -239,6 +240,10 @@ class JimmOperatorCharm(CharmBase):
 
         self._ensure_bakery_agent_file(event)
         self._ensure_vault_file(event)
+        if "vault" in self.model.relations and not container.exists(self._vault_secret_filename):
+            logger.warning("Vault relation present but vault setup is not ready yet")
+            self.unit.status = BlockedStatus("Vault relation present but vault setup is not ready yet")
+            return
         self._install_dashboard(event)
 
         dns_name = self._get_dns_name(event)
@@ -309,12 +314,14 @@ class JimmOperatorCharm(CharmBase):
         container.add_layer("jimm", pebble_layer, combine=True)
         if self._ready():
             if container.get_service(JIMM_SERVICE_NAME).is_running():
+                logger.info("replanning service")
                 container.replan()
             else:
+                logger.info("starting service")
                 container.start(JIMM_SERVICE_NAME)
             self.unit.status = ActiveStatus("running")
         else:
-            logger.info("workload container not ready - defering")
+            logger.info("workload container not ready - deferring")
             event.defer()
             return
 
@@ -393,7 +400,7 @@ class JimmOperatorCharm(CharmBase):
         if container.can_connect():
             plan = container.get_plan()
             if plan.services.get(JIMM_SERVICE_NAME) is None:
-                logger.error("waiting for service")
+                logger.warning("waiting for service")
                 self.unit.status = WaitingStatus("waiting for service")
                 return False
 
@@ -525,20 +532,55 @@ class JimmOperatorCharm(CharmBase):
         if secret_data:
             self._push_to_workload(self._vault_secret_filename, secret_data, event)
 
+    def _on_vault_relation_departed(self, event):
+        if self._unit_state.vault_secret_data is not None:
+            logger.info("secret data found will remove")
+            self._unit_state.vault_secret_data = None
+
+        container = self.unit.get_container(WORKLOAD_CONTAINER)
+        if not container.can_connect():
+            logger.info("cannot connect to the workload container - deferring the event")
+            event.defer()
+            return
+        
+        if container.exists(self._vault_secret_filename):
+            logger.info("Removing vault secret from workload container")
+            container.remove_path(self._vault_secret_filename)
+
     def _on_vault_relation_changed(self, event):
         if not self._unit_state.is_ready() or not self._state.is_ready():
             logger.info("state not ready")
             event.defer()
             return
-
-        addr = _json_data(event, "vault_url")
+        
+        if self._unit_state.vault_secret_data is not None:
+            return
+        
+        addr = None
+        role_id = None
+        token = None
+        try:
+            logger.info(f"Received vault data: {event.relation.data[event.unit]}")
+            for key, value in event.relation.data[event.unit].items():
+                logger.info(f"Key: {key}, Value: {value}")
+                value = value.strip("\"")
+                if "vault_url" in key:
+                    addr = value
+                if "_role_id" in key:
+                    role_id = value
+                if "_token" in key:
+                    token = value
+        except Exception:
+            logger.warning("Vault relation not ready")
+            return
         if not addr:
+            logger.warning("Vault address not received")
             return
-        role_id = _json_data(event, "{}_role_id".format(self.unit.name))
         if not role_id:
+            logger.warning("Vault roleid not received")
             return
-        token = _json_data(event, "{}_token".format(self.unit.name))
         if not token:
+            logger.warning("Vault token not received")
             return
         client = hvac.Client(url=addr, token=token)
         secret = client.sys.unwrap()
@@ -546,7 +588,7 @@ class JimmOperatorCharm(CharmBase):
 
         secret_data = json.dumps(secret)
 
-        logger.error("setting unit state data {}".format(secret_data))
+        logger.info("setting unit state data {}".format(secret_data))
         self._unit_state.vault_secret_data = secret_data
         if self.unit.is_leader():
             self._state.vault_address = addr

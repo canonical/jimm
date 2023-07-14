@@ -75,10 +75,14 @@ func (j *JWTService) RegisterJWKSCache(ctx context.Context, client *http.Client)
 		Clock:    clock.WallClock,
 		Stop:     ctx.Done(),
 	})
-	if err != nil {
-		panic(err.Error())
+	select {
+	case <-ctx.Done():
+		zapctx.Info(ctx, "context cancelled stopping jwks registration gracefully", zap.Error(err))
+	default:
+		if err != nil {
+			panic(err.Error())
+		}
 	}
-
 }
 
 // NewJWT creates a new JWT to represent a users access within a controller.

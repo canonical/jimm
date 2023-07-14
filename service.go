@@ -276,6 +276,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	}
 	vs, err := newVaultStore(ctx, p)
 	if err != nil {
+		zapctx.Error(ctx, "Vault Store error", zap.Error(err))
 		return nil, errors.E(op, err)
 	}
 	if vs != nil {
