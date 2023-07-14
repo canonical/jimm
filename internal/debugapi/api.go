@@ -10,7 +10,7 @@ import (
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
-	"github.com/CanonicalLtd/jimm/version"
+	"github.com/canonical/jimm/version"
 )
 
 // Handler returns an http.Handler to handle requests for /debug endpoints.

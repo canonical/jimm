@@ -14,8 +14,8 @@ import (
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
-	"github.com/CanonicalLtd/jimm"
-	"github.com/CanonicalLtd/jimm/version"
+	"github.com/canonical/jimm"
+	"github.com/canonical/jimm/version"
 )
 
 func main() {

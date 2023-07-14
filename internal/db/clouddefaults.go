@@ -8,8 +8,8 @@ import (
 	"github.com/juju/names/v4"
 	"gorm.io/gorm/clause"
 
-	"github.com/CanonicalLtd/jimm/internal/dbmodel"
-	"github.com/CanonicalLtd/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/errors"
 )
 
 // SetCloudDefaults sets default model setting values for the specified cloud/region.

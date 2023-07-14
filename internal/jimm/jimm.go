@@ -17,10 +17,10 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/CanonicalLtd/jimm/internal/db"
-	"github.com/CanonicalLtd/jimm/internal/dbmodel"
-	"github.com/CanonicalLtd/jimm/internal/errors"
-	"github.com/CanonicalLtd/jimm/internal/pubsub"
+	"github.com/canonical/jimm/internal/db"
+	"github.com/canonical/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/pubsub"
 )
 
 // A CredentialStore is a store for the attributes of a

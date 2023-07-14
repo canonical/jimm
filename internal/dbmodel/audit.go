@@ -7,7 +7,7 @@ import (
 
 	"gorm.io/gorm"
 
-	apiparams "github.com/CanonicalLtd/jimm/api/params"
+	apiparams "github.com/canonical/jimm/api/params"
 )
 
 // An AuditLogEntry is an entry in the audit log.

@@ -13,8 +13,8 @@ import (
 	jujuparams "github.com/juju/juju/rpc/params"
 	"sigs.k8s.io/yaml"
 
-	"github.com/CanonicalLtd/jimm/internal/db"
-	"github.com/CanonicalLtd/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/db"
+	"github.com/canonical/jimm/internal/dbmodel"
 )
 
 const (

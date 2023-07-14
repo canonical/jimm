@@ -11,9 +11,9 @@ import (
 	"github.com/juju/juju/jujuclient"
 	"sigs.k8s.io/yaml"
 
-	"github.com/CanonicalLtd/jimm/api"
-	apiparams "github.com/CanonicalLtd/jimm/api/params"
-	"github.com/CanonicalLtd/jimm/internal/errors"
+	"github.com/canonical/jimm/api"
+	apiparams "github.com/canonical/jimm/api/params"
+	"github.com/canonical/jimm/internal/errors"
 )
 
 var (

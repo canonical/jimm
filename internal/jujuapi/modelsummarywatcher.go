@@ -14,9 +14,9 @@ import (
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
-	"github.com/CanonicalLtd/jimm/internal/errors"
-	"github.com/CanonicalLtd/jimm/internal/jujuapi/rpc"
-	"github.com/CanonicalLtd/jimm/internal/pubsub"
+	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/jujuapi/rpc"
+	"github.com/canonical/jimm/internal/pubsub"
 )
 
 func init() {

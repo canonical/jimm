@@ -14,7 +14,7 @@ import (
 	"github.com/juju/juju/jujuclient"
 	"github.com/juju/names/v4"
 
-	"github.com/CanonicalLtd/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/errors"
 )
 
 const importCloudCredentialsDoc = `

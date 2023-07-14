@@ -18,8 +18,8 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
-	"github.com/CanonicalLtd/jimm/internal/db"
-	"github.com/CanonicalLtd/jimm/internal/jimmtest"
+	"github.com/canonical/jimm/internal/db"
+	"github.com/canonical/jimm/internal/jimmtest"
 )
 
 func TestPostgres(t *testing.T) {

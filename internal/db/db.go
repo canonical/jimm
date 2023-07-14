@@ -13,8 +13,8 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/CanonicalLtd/jimm/internal/dbmodel"
-	"github.com/CanonicalLtd/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/errors"
 )
 
 // A Database provides access to the database model. A Database instance
