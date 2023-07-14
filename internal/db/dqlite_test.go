@@ -4,7 +4,6 @@
 // the libsqlite3 tag.
 // +build libsqlite3
 //go:build libsqlite3
-// +build libsqlite3
 
 package db_test
 
