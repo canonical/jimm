@@ -37,14 +37,10 @@ jobs:
       - name: Remove installed mongodb
         run: sudo apt purge mongodb-org && sudo apt autoremove
       - run: sudo snap install juju-db --channel 4.4/stable
-      - name: Add volume files
-        run: |
-          touch ./local/vault/approle.json
-          touch ./local/vault/roleid.txt
       - name: Start test environment
         run: docker compose up -d
       - name: Build and Test
-        run: go test -mod readonly ./...
+        run: go test -mod readonly -count=1 ./...
         env:
           JIMM_DSN: postgresql://jimm:jimm@localhost:5432/jimm
           PGHOST: localhost
