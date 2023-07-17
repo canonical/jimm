@@ -37,15 +37,6 @@ jobs:
       - name: Remove installed mongodb
         run: sudo apt purge mongodb-org && sudo apt autoremove
       - run: sudo snap install juju-db --channel 4.4/stable
-      - name: Pull candid repo for test environment
-        run: |
-          git clone https://github.com/canonical/candid.git ./tmp/candid
-          cd ./tmp/candid
-          DOCKER_BUILDKIT=1 \
-          docker build \
-          --cache-from candid:latest \
-          . -f ./Dockerfile -t candid
-          docker image ls candid
       - name: Add volume files
         run: |
           touch ./local/vault/approle.json
