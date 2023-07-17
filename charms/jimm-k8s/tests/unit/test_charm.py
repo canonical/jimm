@@ -12,6 +12,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from ops.model import BlockedStatus
 from ops.testing import Harness
 
 from src.charm import JimmOperatorCharm
@@ -345,4 +346,16 @@ class TestCharm(unittest.TestCase):
                     "role_id": "juju-jimm-k8s-0-test-role-id",
                 },
             },
+        )
+
+    def test_app_enters_blocked_state_if_vault_related_but_not_ready(self):
+        self.harness.update_config(MINIMAL_CONFIG)
+        container = self.harness.model.unit.get_container("jimm")
+        # Emit the pebble-ready event for jimm
+        self.harness.add_relation("vault", "remote-app-name")
+        self.harness.charm.on.jimm_pebble_ready.emit(container)
+
+        self.assertEqual(self.harness.charm.unit.status.name, BlockedStatus.name)
+        self.assertEqual(
+            self.harness.charm.unit.status.message, "Vault relation present but vault setup is not ready yet"
         )

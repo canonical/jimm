@@ -240,7 +240,7 @@ class JimmOperatorCharm(CharmBase):
 
         self._ensure_bakery_agent_file(event)
         self._ensure_vault_file(event)
-        if "vault" in self.model.relations and not container.exists(self._vault_secret_filename):
+        if self.model.get_relation("vault") and not container.exists(self._vault_secret_filename):
             logger.warning("Vault relation present but vault setup is not ready yet")
             self.unit.status = BlockedStatus("Vault relation present but vault setup is not ready yet")
             return
@@ -401,7 +401,8 @@ class JimmOperatorCharm(CharmBase):
             plan = container.get_plan()
             if plan.services.get(JIMM_SERVICE_NAME) is None:
                 logger.warning("waiting for service")
-                self.unit.status = WaitingStatus("waiting for service")
+                if self.unit.status.message == "":
+                    self.unit.status = WaitingStatus("waiting for service")
                 return False
 
             env_vars = plan.services.get(JIMM_SERVICE_NAME).environment
@@ -542,7 +543,7 @@ class JimmOperatorCharm(CharmBase):
             logger.info("cannot connect to the workload container - deferring the event")
             event.defer()
             return
-        
+
         if container.exists(self._vault_secret_filename):
             logger.info("Removing vault secret from workload container")
             container.remove_path(self._vault_secret_filename)
@@ -552,10 +553,10 @@ class JimmOperatorCharm(CharmBase):
             logger.info("state not ready")
             event.defer()
             return
-        
+
         if self._unit_state.vault_secret_data is not None:
             return
-        
+
         addr = None
         role_id = None
         token = None
@@ -563,7 +564,7 @@ class JimmOperatorCharm(CharmBase):
             logger.info(f"Received vault data: {event.relation.data[event.unit]}")
             for key, value in event.relation.data[event.unit].items():
                 logger.info(f"Key: {key}, Value: {value}")
-                value = value.strip("\"")
+                value = value.strip('"')
                 if "vault_url" in key:
                     addr = value
                 if "_role_id" in key:
