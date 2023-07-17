@@ -565,7 +565,6 @@ class JimmOperatorCharm(CharmBase):
         role_id = None
         token = None
         try:
-            logger.info(f"Received vault data: {event.relation.data[event.unit]}")
             for key, value in event.relation.data[event.unit].items():
                 value = value.strip('"')
                 if "vault_url" in key:

@@ -68,3 +68,4 @@ options:
     description: |
       The source address for the connection to Vault. 
       This should be a single IP with no CIDR.
+      E.g. 10.1.2.123
