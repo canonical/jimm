@@ -8,7 +8,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - run: git fetch --prune --unshallow
-      - uses: magnetikonline/action-golang-cache@v4
+      - uses: actions/setup-go@v4
         with:
           go-version-file: 'go.mod'
       - uses: docker/setup-qemu-action@v2
