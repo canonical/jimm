@@ -129,7 +129,7 @@ Example:
 list relations known to jimm. Using the "target", "relation"
 and "object" flags, only those relations matching the filter
 will be returned.
-Example:
+Examples:
 	jimmctl auth relation list
 	returns the list of all relations
 
