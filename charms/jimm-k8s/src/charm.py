@@ -507,9 +507,13 @@ class JimmOperatorCharm(CharmBase):
         return str(self.model.get_binding(event.relation).network.egress_subnets[0].network_address)
 
     def _on_vault_relation_joined(self, event):
+        if self.config.get("vault-access-address") is None:
+            logger.error("Missing config vault-access-address for vault relation")
+            raise ValueError("Missing config vault-access-address for vault relation")
+
         event.relation.data[self.unit]["secret_backend"] = json.dumps(self._vault_path)
         event.relation.data[self.unit]["hostname"] = json.dumps(socket.gethostname())
-        event.relation.data[self.unit]["access_address"] = json.dumps(self._get_network_address(event))
+        event.relation.data[self.unit]["access_address"] = self.config["vault-access-address"]
         event.relation.data[self.unit]["isolated"] = json.dumps(False)
 
     def _ensure_vault_file(self, event):
@@ -563,7 +567,6 @@ class JimmOperatorCharm(CharmBase):
         try:
             logger.info(f"Received vault data: {event.relation.data[event.unit]}")
             for key, value in event.relation.data[event.unit].items():
-                logger.info(f"Key: {key}, Value: {value}")
                 value = value.strip('"')
                 if "vault_url" in key:
                     addr = value

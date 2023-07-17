@@ -63,3 +63,8 @@ options:
   dns-name:
     type: string
     description: DNS hostname that JIMM is being served from.
+  vault-access-address:
+    type: string
+    description: |
+      The source address for the connection to Vault. 
+      This should be a single IP with no CIDR.
