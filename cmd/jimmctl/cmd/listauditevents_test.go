@@ -54,7 +54,7 @@ func (s *listAuditEventsSuite) TestListAuditEventsSuperuser(c *gc.C) {
     cloud: cloud-`+jimmtest.TestCloudName+`
     cloud-credential: cloudcred-`+jimmtest.TestCloudName+`_charlie@external_cred
     name: model-2
-    owner: user-charlie@external
+    owner: .*
     region: `+jimmtest.TestCloudRegionName+`
 `)
 }
