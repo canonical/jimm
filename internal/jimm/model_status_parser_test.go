@@ -434,9 +434,9 @@ func TestQueryModelsJq(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	env := jimmtest.ParseEnvironment(c, crossModelQueryEnv)
-	env.PopulateDB(c, j.Database)
+	env.PopulateDB(c, j.Database, nil)
 
-	user := env.User("alice@external").DBObject(c, j.Database)
+	user := env.User("alice@external").DBObject(c, j.Database, nil)
 
 	modelUUIDs := []string{
 		"10000000-0000-0000-0000-000000000000",
