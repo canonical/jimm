@@ -10,7 +10,7 @@ import (
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
-	apiparams "github.com/CanonicalLtd/jimm/api/params"
+	apiparams "github.com/canonical/jimm/api/params"
 )
 
 // An Error is an error in the JIMM system.
@@ -56,11 +56,11 @@ func (e *Error) ErrorCode() string {
 // is constructed by processing the given arguments. The meaning of the
 // arguments is as follows:
 //
-//     errors.Op   - string representation of the operation being
-//                   performed.
-//     errors.Code - string code classifying the error.
-//     error       - underlying error that caused the new error.
-//     string      - A human readable message describing the error.
+//	errors.Op   - string representation of the operation being
+//	              performed.
+//	errors.Code - string code classifying the error.
+//	error       - underlying error that caused the new error.
+//	string      - A human readable message describing the error.
 //
 // E will panic if no arguments are provided.
 func E(args ...interface{}) error {

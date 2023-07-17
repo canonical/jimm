@@ -12,9 +12,9 @@ import (
 
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/jimm/cmd/jimmctl/cmd"
-	"github.com/CanonicalLtd/jimm/internal/dbmodel"
-	"github.com/CanonicalLtd/jimm/internal/errors"
+	"github.com/canonical/jimm/cmd/jimmctl/cmd"
+	"github.com/canonical/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/errors"
 )
 
 type addCloudToControllerSuite struct {

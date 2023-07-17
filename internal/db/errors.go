@@ -8,7 +8,7 @@ import (
 	sqlite3 "github.com/mattn/go-sqlite3"
 	"gorm.io/gorm"
 
-	"github.com/CanonicalLtd/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/errors"
 )
 
 // postgresql error codes from

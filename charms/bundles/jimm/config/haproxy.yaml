@@ -1,0 +1,18 @@
+- service_name: app-jimm
+  service_host: "0.0.0.0"
+  service_port: 443
+  service_options:
+    - mode http
+    - balance leastconn
+    - cookie SRVNAME insert
+    - option httpchk GET /debug/info HTTP/1.0
+    - acl metrics path -i /metrics
+    - http-request deny if metrics
+  server_options: check inter 2000 rise 2 fall 5 maxconn 4096
+  crts: [DEFAULT]
+- service_name: api_http
+  service_host: "0.0.0.0"
+  service_port: 80
+  service_options:
+    - mode http
+    - http-request redirect scheme https

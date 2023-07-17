@@ -6,8 +6,8 @@ import (
 	"database/sql"
 	"testing"
 
-	apiparams "github.com/CanonicalLtd/jimm/api/params"
-	"github.com/CanonicalLtd/jimm/internal/dbmodel"
+	apiparams "github.com/canonical/jimm/api/params"
+	"github.com/canonical/jimm/internal/dbmodel"
 	qt "github.com/frankban/quicktest"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"

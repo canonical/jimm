@@ -14,7 +14,7 @@ import (
 	"github.com/gorilla/websocket"
 	jujuparams "github.com/juju/juju/rpc/params"
 
-	"github.com/CanonicalLtd/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/errors"
 )
 
 // An Error represents an error sent in an RPC response.

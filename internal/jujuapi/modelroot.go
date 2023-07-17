@@ -5,8 +5,8 @@ package jujuapi
 import (
 	jujuparams "github.com/juju/juju/rpc/params"
 
-	"github.com/CanonicalLtd/jimm/internal/jimm"
-	"github.com/CanonicalLtd/jimm/internal/jujuapi/rpc"
+	"github.com/canonical/jimm/internal/jimm"
+	"github.com/canonical/jimm/internal/jujuapi/rpc"
 )
 
 // modelRoot is the root for endpoints served on model connections.

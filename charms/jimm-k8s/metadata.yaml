@@ -61,10 +61,6 @@ containers:
     resource: jimm-image
 
 resources:
-  dashboard:
-    type: file
-    filename: dashboard.tar.xz
-    description: "juju dashboard tarball."
   jimm-image:
     type: oci-image
     description: OCI image for JIMM.

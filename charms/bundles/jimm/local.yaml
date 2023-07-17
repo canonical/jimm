@@ -1,0 +1,39 @@
+# Local configuration settings for JIMM.
+# These values will need to be supplied before a JIMM deployment
+# will succeed.
+applications:
+  jimm:
+    options:
+      # charmstore-location contains the address of the charmstore that
+      # provides charms for this JAAS system.
+      charmstore-location: https://api.jujucharms.com/charmstore
+      #
+      # identity-location contains the address of the candid that
+      # provides authentication for this JAAS system.
+      identity-location:
+      #
+      # controller-admin is the name of a candid group the members of
+      # which can administer controllers in this JAAS system.
+      controller-admin:
+      #
+      # controller-uuid contains the UUID reported by the JAAS controller.
+      controller-uuid:
+      #
+      # Secrets:
+      #
+      # agent-username contains the username of the candid agent that
+      # JIMM should use to interrogate user information from candid.
+      # By default this will be loaded from ./LOCAL/agent-username.
+      agent-username: include-file://LOCAL/agent-username
+      #
+      # agent-private-key contains the (base64 encoded) private key
+      # of the candid agent that JIMM should use to interrogate user
+      # information from candid. By default this will be loaded from
+      # ./LOCAL/agent-private-key.
+      agent-private-key: include-file://LOCAL/agent-private-key
+      #
+      # agent-public-key contains the (base64 encoded) private key
+      # of the candid agent that JIMM should use to interrogate user
+      # information from candid. By default this will be loaded from
+      # ./LOCAL/agent-public-key.
+      agent-public-key: include-file://LOCAL/agent-public-key

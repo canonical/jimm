@@ -6,14 +6,14 @@ import (
 	"database/sql"
 	"time"
 
-	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/core/life"
 	"github.com/juju/juju/core/status"
+	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 	"github.com/juju/version/v2"
 	"gorm.io/gorm"
 
-	"github.com/CanonicalLtd/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/errors"
 )
 
 // A Model is a juju model.

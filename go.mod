@@ -1,4 +1,4 @@
-module github.com/CanonicalLtd/jimm
+module github.com/canonical/jimm
 
 go 1.20
 
