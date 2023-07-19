@@ -36,6 +36,7 @@ func NewSuperCommand() *jujucmd.SuperCommand {
 	jimmcmd.Register(cmd.NewRemoveCloudFromControllerCommand())
 	jimmcmd.Register(cmd.NewAuthCommand())
 	jimmcmd.Register(cmd.NewCrossModelQueryCommand())
+	jimmcmd.Register(cmd.NewPurgeLogsCommand())
 	return jimmcmd
 }
 

@@ -354,3 +354,11 @@ type CrossModelQueryResponse struct {
 	Results map[string][]any    `json:"results"`
 	Errors  map[string][]string `json:"errors"`
 }
+
+type PurgeLogsRequest struct {
+	Date string `json:"date"`
+}
+
+type PurgeLogsResponse struct {
+	DeletedCount int64 `json:"deleted"`
+}

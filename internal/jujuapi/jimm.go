@@ -498,3 +498,15 @@ func (r *controllerRoot) CrossModelQuery(ctx context.Context, req apiparams.Cros
 		return apiparams.CrossModelQueryResponse{}, errors.E(op, errors.Code("invalid query type"), "unable to query models")
 	}
 }
+
+func (r *controllerRoot) PurgeLogs(ctx context.Context, req apiparams.PurgeLogsRequest) (apiparams.PurgeLogsResponse, error) {
+	const op = errors.Op("jujuapi.PurgeLogs")
+
+	deleted_count, err := r.jimm.PurgeLogs(ctx, r.user, req.Date)
+	if err != nil {
+		return apiparams.PurgeLogsResponse{}, errors.E(op, err)
+	}
+	return apiparams.PurgeLogsResponse{
+		DeletedCount: deleted_count,
+	}, nil
+}
