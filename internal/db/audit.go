@@ -103,3 +103,13 @@ func (d *Database) ForEachAuditLogEntry(ctx context.Context, filter AuditLogFilt
 	}
 	return nil
 }
+
+func (d *Database) CleanupAuditLogs(ctx context.Context, auditLogRetentionPeriod int) (int64, error) {
+	retentionDate := time.Now().AddDate(0, 0, -(auditLogRetentionPeriod))
+	tx := d.DB.
+		WithContext(ctx).
+		Unscoped().
+		Where("time < ?", retentionDate).
+		Delete(&dbmodel.AuditLogEntry{})
+	return tx.RowsAffected, tx.Error
+}

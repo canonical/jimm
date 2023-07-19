@@ -149,3 +149,53 @@ func (s *dbSuite) TestForEachAuditLogEntry(c *qt.C) {
 	c.Check(calls, qt.Equals, 1)
 	c.Check(err, qt.DeepEquals, testError)
 }
+
+func (s *dbSuite) TestCleanupAuditLogs(c *qt.C) {
+	ctx := context.Background()
+	now := time.Now()
+
+	err := s.Database.AddAuditLogEntry(ctx, &dbmodel.AuditLogEntry{
+		Time: now.AddDate(0, 0, -1),
+	})
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
+
+	err = s.Database.Migrate(context.Background(), true)
+	c.Assert(err, qt.IsNil)
+
+	// A log from 1 day ago
+	c.Assert(s.Database.AddAuditLogEntry(ctx, &dbmodel.AuditLogEntry{
+		Time: now.AddDate(0, 0, -1),
+	}), qt.IsNil)
+
+	// A log from 2 days ago
+	c.Assert(s.Database.AddAuditLogEntry(ctx, &dbmodel.AuditLogEntry{
+		Time: now.AddDate(0, 0, -2),
+	}), qt.IsNil)
+
+	// A log from 3 days ago
+	c.Assert(s.Database.AddAuditLogEntry(ctx, &dbmodel.AuditLogEntry{
+		Time: now.AddDate(0, 0, -3),
+	}), qt.IsNil)
+
+	var count int64
+	err = s.Database.DB.WithContext(ctx).Model(&dbmodel.AuditLogEntry{}).Count(&count).Error
+	c.Assert(err, qt.IsNil)
+	c.Assert(
+		count,
+		qt.Equals,
+		int64(3),
+	)
+
+	// Delete all 2 or more days older, leaving 1 log left
+	deleted, err := s.Database.CleanupAuditLogs(ctx, 2)
+	c.Assert(err, qt.IsNil)
+
+	// Check that 2 were infact deleted
+	c.Assert(deleted, qt.Equals, int64(2))
+
+	// Check only 1 remains
+	logs := make([]dbmodel.AuditLogEntry, 0)
+	err = s.Database.DB.Find(&logs).Error
+	c.Assert(err, qt.IsNil)
+	c.Assert(logs, qt.HasLen, 1)
+}

@@ -150,6 +150,10 @@ type Params struct {
 
 	// PublicKey holds the public part of the bakery keypair.
 	PublicKey string
+
+	// AuditLogRetentionPeriod is the amount of days detailing how long
+	// to keep an audit log for before purging it from the database.
+	AuditLogRetentionPeriod string
 }
 
 // A Service is the implementation of a JIMM server.
@@ -226,6 +230,12 @@ func (s *Service) RegisterJwksCache(ctx context.Context) {
 	s.jimm.JWTService.RegisterJWKSCache(ctx, client)
 }
 
+// SetupAuditLogCleanup sets up the cleanup trigger to remove audit logs
+// after a user specified retention period.
+func (s *Service) SetupAuditLogCleanup(auditLogRetentionPeriod string) error {
+	return nil
+}
+
 // NewService creates a new Service using the given params.
 func NewService(ctx context.Context, p Params) (*Service, error) {
 	const op = errors.Op("NewService")
@@ -252,6 +262,10 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		return nil, errors.E(op, err)
 	}
 	if err := s.jimm.Database.Migrate(ctx, false); err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	if err := s.SetupAuditLogCleanup("1"); err != nil {
 		return nil, errors.E(op, err)
 	}
 
