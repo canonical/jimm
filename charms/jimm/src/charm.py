@@ -136,6 +136,7 @@ class JimmCharm(SystemdCharm):
             "dashboard_location": self.config.get("juju-dashboard-location"),
             "public_key": self.config.get("public-key"),
             "private_key": self.config.get("private-key"),
+            "audit_rentention_period": self.config.get("audit-log-retention-period", "30")
         }
         if os.path.exists(self._dashboard_path):
             args["dashboard_location"] = self._dashboard_path

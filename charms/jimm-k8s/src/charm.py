@@ -249,6 +249,7 @@ class JimmOperatorCharm(CharmBase):
         config_values = {
             "CANDID_PUBLIC_KEY": self.config.get("candid-public-key", ""),
             "CANDID_URL": self.config.get("candid-url", ""),
+            "JIMM_AUDIT_LOG_RETENTION_PERIOD": self.config.get("audit-log-retention-period", "30"),
             "JIMM_ADMINS": self.config.get("controller-admins", ""),
             "JIMM_DNS_NAME": dns_name,
             "JIMM_LOG_LEVEL": self.config.get("log-level", ""),
@@ -262,7 +263,7 @@ class JimmOperatorCharm(CharmBase):
             "OPENFGA_TOKEN": self._state.openfga_token,
             "OPENFGA_PORT": self._state.openfga_port,
             "PRIVATE_KEY": self.config.get("private-key", ""),
-            "PUBLIC_KEY": self.config.get("public-key", ""),
+            "PUBLIC_KEY": self.config.get("public-key", "")
         }
         if self._state.dsn:
             config_values["JIMM_DSN"] = self._state.dsn
