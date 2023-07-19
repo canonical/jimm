@@ -1,0 +1,10 @@
+# overlay-certbot.yaml
+# Overlay for deploying certbot to manage TLS certificates for candid.
+applications:
+  certbot:
+    charm: ch:certbot
+    options:
+      combined-path: /var/lib/haproxy/default.pem
+      deploy-command: systemctl reload haproxy
+relations:
+  - ["certbot", "haproxy"]

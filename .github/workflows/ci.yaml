@@ -13,7 +13,9 @@ jobs:
   #   continue-on-error: true
   #   steps:
   #     - uses: actions/checkout@v3
-  #     - uses: ./.github/workflows/setupgo118amd64
+  #     - uses: actions/setup-go@v4
+  #       with:
+  #         go-version-file: 'go.mod'
   #     - name: golangci-lint
   #       uses: golangci/golangci-lint-action@v3
   #       with:
@@ -27,21 +29,14 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3
-      - uses: ./.github/workflows/setupgo118amd64
+      - uses: actions/setup-go@v4
+        with:
+          go-version-file: 'go.mod'
       - name: Install dependencies
         run: sudo apt-get update -y && sudo apt-get install -y gcc git-core gnupg build-essential
       - name: Remove installed mongodb
         run: sudo apt purge mongodb-org && sudo apt autoremove
       - run: sudo snap install juju-db --channel 4.4/stable
-      - name: Pull candid repo for test environment
-        run: |
-          git clone https://github.com/canonical/candid.git ./tmp/candid
-          cd ./tmp/candid
-          DOCKER_BUILDKIT=1 \
-          docker build \
-          --cache-from candid:latest \
-          . -f ./Dockerfile -t candid
-          docker image ls candid
       - name: Add volume files
         run: |
           touch ./local/vault/approle.json

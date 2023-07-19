@@ -25,12 +25,12 @@ import (
 	jujucloud "github.com/juju/juju/cloud"
 	"github.com/juju/names/v4"
 
-	"github.com/CanonicalLtd/jimm"
-	"github.com/CanonicalLtd/jimm/internal/dbmodel"
-	"github.com/CanonicalLtd/jimm/internal/jimmtest"
-	"github.com/CanonicalLtd/jimm/internal/openfga"
-	ofganames "github.com/CanonicalLtd/jimm/internal/openfga/names"
-	"github.com/CanonicalLtd/jimm/internal/vault"
+	"github.com/canonical/jimm"
+	"github.com/canonical/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/jimmtest"
+	"github.com/canonical/jimm/internal/openfga"
+	ofganames "github.com/canonical/jimm/internal/openfga/names"
+	"github.com/canonical/jimm/internal/vault"
 )
 
 func TestMain(m *testing.M) {

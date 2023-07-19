@@ -1,4 +1,4 @@
-// Copyright 2023 CanonicalLtd.
+// Copyright 2023 canonical.
 
 // Package names holds functions used by other jimm components to
 // create valid OpenFGA tags.
@@ -7,8 +7,8 @@ package names
 import (
 	"strings"
 
-	"github.com/CanonicalLtd/jimm/internal/errors"
-	jimmnames "github.com/CanonicalLtd/jimm/pkg/names"
+	"github.com/canonical/jimm/internal/errors"
+	jimmnames "github.com/canonical/jimm/pkg/names"
 	"github.com/juju/juju/core/permission"
 	"github.com/juju/names/v4"
 )

@@ -9,8 +9,8 @@ import (
 	"github.com/juju/names/v4"
 	"gorm.io/gorm"
 
-	apiparams "github.com/CanonicalLtd/jimm/api/params"
-	jimmnames "github.com/CanonicalLtd/jimm/pkg/names"
+	apiparams "github.com/canonical/jimm/api/params"
+	jimmnames "github.com/canonical/jimm/pkg/names"
 )
 
 // A GroupEntry holds information about a user group.

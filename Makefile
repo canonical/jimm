@@ -4,7 +4,7 @@
 export GO111MODULE=on
 export DOCKER_BUILDKIT=1
 
-PROJECT := github.com/CanonicalLtd/jimm
+PROJECT := github.com/canonical/jimm
 
 GIT_COMMIT := $(shell git rev-parse --verify HEAD)
 GIT_VERSION := $(shell git describe --abbrev=0 --dirty)
@@ -47,7 +47,7 @@ clean:
 	-$(RM) -r jimm-release/
 	-$(RM) jimm-*.tar.xz
 
-# Reformat source files.
+# Reformat all source files.
 format:
 	gofmt -w -l .
 

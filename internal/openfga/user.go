@@ -1,4 +1,4 @@
-// Copyright 2023 CanonicalLtd.
+// Copyright 2023 canonical.
 
 package openfga
 
@@ -12,9 +12,9 @@ import (
 	openfga "github.com/openfga/go-sdk"
 	"go.uber.org/zap"
 
-	"github.com/CanonicalLtd/jimm/internal/dbmodel"
-	"github.com/CanonicalLtd/jimm/internal/errors"
-	ofganames "github.com/CanonicalLtd/jimm/internal/openfga/names"
+	"github.com/canonical/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/errors"
+	ofganames "github.com/canonical/jimm/internal/openfga/names"
 )
 
 // NewUser returns a new user structure that can be used to check

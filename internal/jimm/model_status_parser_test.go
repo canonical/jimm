@@ -12,15 +12,14 @@ import (
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 
-	"github.com/CanonicalLtd/jimm/internal/db"
-	"github.com/CanonicalLtd/jimm/internal/dbmodel"
-	"github.com/CanonicalLtd/jimm/internal/errors"
-	"github.com/CanonicalLtd/jimm/internal/jimm"
-	"github.com/CanonicalLtd/jimm/internal/jimmtest"
-	"github.com/CanonicalLtd/jimm/internal/openfga"
-	ofga "github.com/CanonicalLtd/jimm/internal/openfga"
-	ofganames "github.com/CanonicalLtd/jimm/internal/openfga/names"
-	jimmnames "github.com/CanonicalLtd/jimm/pkg/names"
+	"github.com/canonical/jimm/internal/db"
+	"github.com/canonical/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/jimm"
+	"github.com/canonical/jimm/internal/jimmtest"
+	ofga "github.com/canonical/jimm/internal/openfga"
+	ofganames "github.com/canonical/jimm/internal/openfga/names"
+	jimmnames "github.com/canonical/jimm/pkg/names"
 )
 
 var now = (time.Time{}).UTC().Round(time.Millisecond)
@@ -58,6 +57,9 @@ models:
     status: available
     info: "OK!"
     since: 2020-02-20T20:02:20Z
+  users:
+  - user: alice@external
+    access: admin
 - name: model-2
   type: iaas
   uuid: 20000000-0000-0000-0000-000000000000
@@ -72,6 +74,9 @@ models:
     status: available
     info: "OK!"
     since: 2020-02-20T20:02:20Z
+  users:
+  - user: alice@external
+    access: admin
 - name: model-3
   type: iaas
   uuid: 30000000-0000-0000-0000-000000000000
@@ -86,6 +91,9 @@ models:
     status: available
     info: "OK!"
     since: 2020-02-20T20:02:20Z
+  users:
+  - user: alice@external
+    access: admin
 - name: model-5
   type: iaas
   uuid: 50000000-0000-0000-0000-000000000000
@@ -112,6 +120,8 @@ func getFullStatus(
 	modelName string,
 	applications map[string]jujuparams.ApplicationStatus,
 	remoteApps map[string]jujuparams.RemoteApplicationStatus,
+	modelRelations []jujuparams.RelationStatus,
+
 ) jujuparams.FullStatus {
 	return jujuparams.FullStatus{
 		Model: jujuparams.ModelStatusInfo{
@@ -133,7 +143,7 @@ func getFullStatus(
 		Applications:       applications,
 		RemoteApplications: remoteApps,
 		Offers:             map[string]jujuparams.ApplicationOfferStatus{},
-		Relations:          []jujuparams.RelationStatus(nil),
+		Relations:          modelRelations,
 		Branches:           map[string]jujuparams.BranchStatus{},
 	}
 }
@@ -195,6 +205,22 @@ var model1 = getFullStatus("model-1", map[string]jujuparams.ApplicationStatus{
 				Status: "active",
 				Info:   "Live master (12.14)",
 				Since:  &now,
+			},
+		},
+	},
+	[]jujuparams.RelationStatus{
+		{
+			Id:        0,
+			Key:       "myapp",
+			Interface: "db",
+			Scope:     "regular",
+			Endpoints: []jujuparams.EndpointStatus{
+				{
+					ApplicationName: "myapp",
+					Name:            "db",
+					Role:            "myrole",
+					Subordinate:     false,
+				},
 			},
 		},
 	},
@@ -283,15 +309,18 @@ var model2 = getFullStatus("model-2", map[string]jujuparams.ApplicationStatus{
 	},
 },
 	nil,
+	nil,
 )
 
 // Model3 holds an empty model
 var model3 = getFullStatus("model-3", map[string]jujuparams.ApplicationStatus{},
 	nil,
+	nil,
 )
 
 // Model5 holds an empty model, but it's API returns an error for storage
 var model5 = getFullStatus("model-5", map[string]jujuparams.ApplicationStatus{},
+	nil,
 	nil,
 )
 
@@ -411,6 +440,8 @@ func TestQueryModelsJq(t *testing.T) {
 	env := jimmtest.ParseEnvironment(c, crossModelQueryEnv)
 	env.PopulateDB(c, j.Database, nil)
 
+	user := env.User("alice@external").DBObject(c, j.Database, nil)
+
 	modelUUIDs := []string{
 		"10000000-0000-0000-0000-000000000000",
 		"20000000-0000-0000-0000-000000000000",
@@ -463,20 +494,17 @@ func TestQueryModelsJq(t *testing.T) {
 		}...,
 	), qt.Equals, nil)
 
-	alice := openfga.NewUser(
-		&dbmodel.User{
-			Username: "alice@external",
-		},
-		client,
-	)
-
 	// Tests:
 
 	// Query for all models only.
-	userModelUUIDs, err := alice.ListModels(ctx)
+	usersModels, err := j.Database.GetUserModels(ctx, &user)
 	c.Assert(err, qt.IsNil)
+	models := make([]dbmodel.Model, len(usersModels))
+	for i, m := range usersModels {
+		models[i] = m.Model_
+	}
 
-	res, err := j.QueryModelsJq(ctx, userModelUUIDs, ".model")
+	res, err := j.QueryModelsJq(ctx, models, ".model")
 	c.Assert(err, qt.IsNil)
 	c.Assert(`
 	{
@@ -528,9 +556,6 @@ func TestQueryModelsJq(t *testing.T) {
 			]
 		},
 		"errors": {
-			"40000000-0000-0000-0000-000000000000": [
-				"model not found"
-			],
 			"50000000-0000-0000-0000-000000000000": [
 				"forcing an error on model 5"
 			]
@@ -539,10 +564,7 @@ func TestQueryModelsJq(t *testing.T) {
 	`, qt.JSONEquals, res)
 
 	// Query all applications across all models.
-	userModelUUIDs, err = alice.ListModels(ctx)
-	c.Assert(err, qt.IsNil)
-
-	res, err = j.QueryModelsJq(ctx, userModelUUIDs, ".applications")
+	res, err = j.QueryModelsJq(ctx, models, ".applications")
 	c.Assert(err, qt.IsNil)
 	c.Assert(`
 	{
@@ -678,9 +700,6 @@ func TestQueryModelsJq(t *testing.T) {
 		  ]
 		},
 		"errors": {
-			"40000000-0000-0000-0000-000000000000": [
-				"model not found"
-			],
 			"50000000-0000-0000-0000-000000000000": [
 				"forcing an error on model 5"
 			]
@@ -689,10 +708,7 @@ func TestQueryModelsJq(t *testing.T) {
 	`, qt.JSONEquals, res)
 
 	// Query specifically for models including the app "nginx-ingress-integrator"
-	userModelUUIDs, err = alice.ListModels(ctx)
-	c.Assert(err, qt.IsNil)
-
-	res, err = j.QueryModelsJq(ctx, userModelUUIDs, ".applications | with_entries(select(.key==\"nginx-ingress-integrator\"))")
+	res, err = j.QueryModelsJq(ctx, models, ".applications | with_entries(select(.key==\"nginx-ingress-integrator\"))")
 	c.Assert(err, qt.IsNil)
 	c.Assert(`
 	{
@@ -746,9 +762,6 @@ func TestQueryModelsJq(t *testing.T) {
 		  ]
 		},
 		"errors": {
-			"40000000-0000-0000-0000-000000000000": [
-				"model not found"
-			],
 			"50000000-0000-0000-0000-000000000000": [
 				"forcing an error on model 5"
 			]
@@ -757,10 +770,7 @@ func TestQueryModelsJq(t *testing.T) {
 	`, qt.JSONEquals, res)
 
 	// Query specifically for storage on this model.
-	userModelUUIDs, err = alice.ListModels(ctx)
-	c.Assert(err, qt.IsNil)
-
-	res, err = j.QueryModelsJq(ctx, userModelUUIDs, ".storage")
+	res, err = j.QueryModelsJq(ctx, models, ".storage")
 	c.Assert(err, qt.IsNil)
 
 	// Not the cleanest thing in the world, but this field needs ignoring,
@@ -805,14 +815,10 @@ func TestQueryModelsJq(t *testing.T) {
 		  ]
 		},
 		"errors": {
-		  "40000000-0000-0000-0000-000000000000": [
-			"model not found"
-		  ],
 		  "50000000-0000-0000-0000-000000000000": [
 			"forcing an error on model 5"
-		]
+		  ]
 		}
 	}
 	`, qt.JSONEquals, res)
-
 }

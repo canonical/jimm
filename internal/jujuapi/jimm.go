@@ -13,12 +13,12 @@ import (
 	"github.com/juju/zaputil"
 	"github.com/juju/zaputil/zapctx"
 
-	apiparams "github.com/CanonicalLtd/jimm/api/params"
-	"github.com/CanonicalLtd/jimm/internal/db"
-	"github.com/CanonicalLtd/jimm/internal/dbmodel"
-	"github.com/CanonicalLtd/jimm/internal/errors"
-	"github.com/CanonicalLtd/jimm/internal/jujuapi/rpc"
-	"github.com/CanonicalLtd/jimm/internal/openfga"
+	apiparams "github.com/canonical/jimm/api/params"
+	"github.com/canonical/jimm/internal/db"
+	"github.com/canonical/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/jujuapi/rpc"
+	"github.com/canonical/jimm/internal/openfga"
 )
 
 func init() {
@@ -480,13 +480,18 @@ func (r *controllerRoot) RemoveCloudFromController(ctx context.Context, req apip
 // The query will run against output exactly like "juju status --format json", but for each of their models.
 func (r *controllerRoot) CrossModelQuery(ctx context.Context, req apiparams.CrossModelQueryRequest) (apiparams.CrossModelQueryResponse, error) {
 	const op = errors.Op("jujuapi.CrossModelQuery")
-	modelUUIDs, err := r.user.ListModels(ctx)
+
+	usersModels, err := r.jimm.Database.GetUserModels(ctx, r.user.User)
 	if err != nil {
 		return apiparams.CrossModelQueryResponse{}, errors.E(op, errors.Code("failed to get models for user"))
 	}
+	models := make([]dbmodel.Model, len(usersModels))
+	for i, m := range usersModels {
+		models[i] = m.Model_
+	}
 	switch strings.TrimSpace(strings.ToLower(req.Type)) {
 	case "jq":
-		return r.jimm.QueryModelsJq(ctx, modelUUIDs, req.Query)
+		return r.jimm.QueryModelsJq(ctx, models, req.Query)
 	case "jimmsql":
 		return apiparams.CrossModelQueryResponse{}, errors.E(op, errors.CodeNotImplemented)
 	default:

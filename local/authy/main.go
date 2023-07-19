@@ -13,7 +13,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/CanonicalLtd/jimm/internal/rpc"
+	"github.com/canonical/jimm/internal/rpc"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"gopkg.in/errgo.v1"
