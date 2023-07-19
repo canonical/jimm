@@ -1,4 +1,4 @@
-// Copyright 2023 CanonicalLtd.
+// Copyright 2023 canonical.
 package wellknownapi_test
 
 import (
@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CanonicalLtd/jimm/internal/errors"
-	"github.com/CanonicalLtd/jimm/internal/jimmtest"
-	"github.com/CanonicalLtd/jimm/internal/vault"
-	"github.com/CanonicalLtd/jimm/internal/wellknownapi"
+	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/jimmtest"
+	"github.com/canonical/jimm/internal/vault"
+	"github.com/canonical/jimm/internal/wellknownapi"
 	qt "github.com/frankban/quicktest"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 )

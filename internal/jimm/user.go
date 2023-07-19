@@ -7,10 +7,10 @@ import (
 
 	jujuparams "github.com/juju/juju/rpc/params"
 
-	"github.com/CanonicalLtd/jimm/internal/db"
-	"github.com/CanonicalLtd/jimm/internal/dbmodel"
-	"github.com/CanonicalLtd/jimm/internal/errors"
-	"github.com/CanonicalLtd/jimm/internal/openfga"
+	"github.com/canonical/jimm/internal/db"
+	"github.com/canonical/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/openfga"
 )
 
 // Authenticate processes the given LoginRequest using the configured

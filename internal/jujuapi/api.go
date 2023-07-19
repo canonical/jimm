@@ -7,8 +7,8 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/CanonicalLtd/jimm/internal/jimm"
-	"github.com/CanonicalLtd/jimm/internal/jimmhttp"
+	"github.com/canonical/jimm/internal/jimm"
+	"github.com/canonical/jimm/internal/jimmhttp"
 )
 
 // A Params object holds the paramaters needed to configure the API

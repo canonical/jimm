@@ -10,8 +10,8 @@ import (
 	"github.com/juju/cmd/v3/cmdtesting"
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/jimm/cmd/jimmctl/cmd"
-	"github.com/CanonicalLtd/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/cmd/jimmctl/cmd"
+	"github.com/canonical/jimm/internal/dbmodel"
 )
 
 type groupSuite struct {

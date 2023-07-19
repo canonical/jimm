@@ -8,7 +8,7 @@ import (
 	jujuerrors "github.com/juju/errors"
 	jujuparams "github.com/juju/juju/rpc/params"
 
-	"github.com/CanonicalLtd/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/errors"
 )
 
 // Status returns the status of the juju model.

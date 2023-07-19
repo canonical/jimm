@@ -6,8 +6,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/CanonicalLtd/jimm/internal/dbmodel"
-	"github.com/CanonicalLtd/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/errors"
 )
 
 // AddAuditLogEntry adds a new entry to the audit log.
