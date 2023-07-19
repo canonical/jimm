@@ -296,7 +296,7 @@ class JimmOperatorCharm(CharmBase):
             "description": "pebble config layer for jimm",
             "services": {
                 JIMM_SERVICE_NAME: {
-                    "override": "merge",
+                    "override": "replace",
                     "summary": "JAAS Intelligent Model Manager",
                     "command": "/root/jimmsrv",
                     "startup": "disabled",
