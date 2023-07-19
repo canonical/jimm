@@ -10,6 +10,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from ops.model import BlockedStatus
 from ops.testing import Harness
 
 from src.charm import JimmOperatorCharm
@@ -19,6 +20,7 @@ MINIMAL_CONFIG = {
     "candid-url": "test-candid-url",
     "public-key": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
     "private-key": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
+    "vault-access-address": "10.0.1.123",
 }
 
 
@@ -66,7 +68,7 @@ class TestCharm(unittest.TestCase):
                     "jimm": {
                         "summary": "JAAS Intelligent Model Manager",
                         "startup": "disabled",
-                        "override": "merge",
+                        "override": "replace",
                         "command": "/root/jimmsrv",
                         "environment": {
                             "CANDID_URL": "test-candid-url",
@@ -104,7 +106,7 @@ class TestCharm(unittest.TestCase):
                     "jimm": {
                         "summary": "JAAS Intelligent Model Manager",
                         "startup": "disabled",
-                        "override": "merge",
+                        "override": "replace",
                         "command": "/root/jimmsrv",
                         "environment": {
                             "CANDID_URL": "test-candid-url",
@@ -151,7 +153,7 @@ class TestCharm(unittest.TestCase):
                     "jimm": {
                         "summary": "JAAS Intelligent Model Manager",
                         "startup": "disabled",
-                        "override": "merge",
+                        "override": "replace",
                         "command": "/root/jimmsrv",
                         "environment": {
                             "BAKERY_AGENT_FILE": "/root/config/agent.json",
@@ -214,11 +216,9 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(data["identity_provider_url"], "https://candid.example.com")
         self.assertEqual(data["is_juju"], "False")
 
-    @patch("src.charm.JimmOperatorCharm._get_network_address")
     @patch("socket.gethostname")
     @patch("hvac.Client.sys")
-    def test_vault_relation_joined(self, hvac_client_sys, gethostname, get_network_address):
-        get_network_address.return_value = "127.0.0.1:8080"
+    def test_vault_relation_joined(self, hvac_client_sys, gethostname):
         gethostname.return_value = "test-hostname"
         hvac_client_sys.unwrap.return_value = {
             "key1": "value1",
@@ -242,6 +242,7 @@ class TestCharm(unittest.TestCase):
                 "candid-url": "https://candid.example.com",
                 "controller-admins": "user1 user2 group1",
                 "uuid": "caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa",
+                "vault-access-address": "10.0.1.123",
             }
         )
         harness.set_leader(True)
@@ -261,7 +262,7 @@ class TestCharm(unittest.TestCase):
             '"charm-jimm-k8s-creds"',
         )
         self.assertEqual(data["hostname"], '"test-hostname"')
-        self.assertEqual(data["access_address"], '"127.0.0.1:8080"')
+        self.assertEqual(data["access_address"], "10.0.1.123")
 
         harness.update_relation_data(
             id,
@@ -285,3 +286,25 @@ class TestCharm(unittest.TestCase):
                 },
             },
         )
+
+    def test_app_enters_blocked_state_if_vault_related_but_not_ready(self):
+        self.harness.update_config(MINIMAL_CONFIG)
+        container = self.harness.model.unit.get_container("jimm")
+        # Emit the pebble-ready event for jimm
+        self.harness.add_relation("vault", "remote-app-name")
+        self.harness.charm.on.jimm_pebble_ready.emit(container)
+
+        self.assertEqual(self.harness.charm.unit.status.name, BlockedStatus.name)
+        self.assertEqual(
+            self.harness.charm.unit.status.message, "Vault relation present but vault setup is not ready yet"
+        )
+
+    def test_app_raises_error_without_vault_config(self):
+        self.harness.enable_hooks()
+        minim_config_no_vault_config = MINIMAL_CONFIG.copy()
+        del minim_config_no_vault_config["vault-access-address"]
+        self.harness.update_config(minim_config_no_vault_config)
+        id = self.harness.add_relation("vault", "vault")
+        with self.assertRaises(ValueError) as e:
+            self.harness.add_relation_unit(id, "vault/0")
+            self.assertEqual(e, "Missing config vault-access-address for vault relation")
