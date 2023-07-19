@@ -81,8 +81,11 @@ func start(ctx context.Context, s *service.Service) error {
 	s.Go(func() error { return jimmsvc.WatchModelSummaries(ctx) })
 
 	if os.Getenv("JIMM_ENABLE_JWKS_ROTATOR") != "" {
+		zapctx.Info(ctx, "attempting to start JWKS rotator")
 		s.Go(func() error {
-			return jimmsvc.StartJWKSRotator(ctx, time.NewTicker(time.Hour).C, time.Now().UTC().AddDate(0, 3, 0))
+			err := jimmsvc.StartJWKSRotator(ctx, time.NewTicker(time.Hour).C, time.Now().UTC().AddDate(0, 3, 0))
+			zapctx.Error(ctx, "failed to start JWKS rotator", zap.Error(err))
+			return err
 		})
 	}
 
@@ -93,6 +96,7 @@ func start(ctx context.Context, s *service.Service) error {
 	s.OnShutdown(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
+		zapctx.Warn(ctx, "server shutdown triggered")
 		httpsrv.Shutdown(ctx)
 	})
 	s.Go(httpsrv.ListenAndServe)

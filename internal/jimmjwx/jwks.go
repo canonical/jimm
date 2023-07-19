@@ -107,6 +107,7 @@ func (jwks *JWKSService) StartJWKSRotator(ctx context.Context, checkRotateRequir
 	errorChan := make(chan error, 8)
 
 	if err := rotateJWKS(ctx, credStore, initialRotateRequiredTime); err != nil {
+		zapctx.Error(ctx, "Rotate JWKS error", zap.Error(err))
 		return errors.E(op, err)
 	}
 
