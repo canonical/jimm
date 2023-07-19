@@ -105,7 +105,6 @@ services:
   vault:
     image: hashicorp/vault:latest
     container_name: vault
-    profiles: ["dev"]
     ports:
       - 8200:8200
     environment:
