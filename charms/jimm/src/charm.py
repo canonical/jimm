@@ -161,6 +161,11 @@ class JimmCharm(SystemdCharm):
             event.defer()
             return
 
+        if event.username is None:
+            event.defer()
+            logger.info("(postgresql) Relation data is not complete (missing `username` field); deferring the event.")
+            return
+
         # get the first endpoint from a comma separate list
         host = event.endpoints.split(",", 1)[0]
         # compose the db connection string
