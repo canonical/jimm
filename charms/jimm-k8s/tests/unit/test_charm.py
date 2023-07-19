@@ -70,7 +70,7 @@ class TestCharm(unittest.TestCase):
                     "jimm": {
                         "summary": "JAAS Intelligent Model Manager",
                         "startup": "disabled",
-                        "override": "merge",
+                        "override": "replace",
                         "command": "/root/jimmsrv",
                         "environment": {
                             "CANDID_URL": "test-candid-url",
@@ -108,7 +108,7 @@ class TestCharm(unittest.TestCase):
                     "jimm": {
                         "summary": "JAAS Intelligent Model Manager",
                         "startup": "disabled",
-                        "override": "merge",
+                        "override": "replace",
                         "command": "/root/jimmsrv",
                         "environment": {
                             "CANDID_URL": "test-candid-url",
@@ -155,7 +155,7 @@ class TestCharm(unittest.TestCase):
                     "jimm": {
                         "summary": "JAAS Intelligent Model Manager",
                         "startup": "disabled",
-                        "override": "merge",
+                        "override": "replace",
                         "command": "/root/jimmsrv",
                         "environment": {
                             "BAKERY_AGENT_FILE": "/root/config/agent.json",
@@ -206,7 +206,7 @@ class TestCharm(unittest.TestCase):
                     "jimm": {
                         "summary": "JAAS Intelligent Model Manager",
                         "startup": "disabled",
-                        "override": "merge",
+                        "override": "replace",
                         "command": "/root/jimmsrv",
                         "environment": {
                             "CANDID_URL": "test-candid-url",
