@@ -177,14 +177,11 @@ func (s *dbSuite) TestCleanupAuditLogs(c *qt.C) {
 		Time: now.AddDate(0, 0, -3),
 	}), qt.IsNil)
 
-	var count int64
-	err = s.Database.DB.WithContext(ctx).Model(&dbmodel.AuditLogEntry{}).Count(&count).Error
+	// Ensure 3 exist
+	logs := make([]dbmodel.AuditLogEntry, 0)
+	err = s.Database.DB.Find(&logs).Error
 	c.Assert(err, qt.IsNil)
-	c.Assert(
-		count,
-		qt.Equals,
-		int64(3),
-	)
+	c.Assert(logs, qt.HasLen, 3)
 
 	// Delete all 2 or more days older, leaving 1 log left
 	deleted, err := s.Database.CleanupAuditLogs(ctx, 2)
@@ -194,7 +191,7 @@ func (s *dbSuite) TestCleanupAuditLogs(c *qt.C) {
 	c.Assert(deleted, qt.Equals, int64(2))
 
 	// Check only 1 remains
-	logs := make([]dbmodel.AuditLogEntry, 0)
+	logs = make([]dbmodel.AuditLogEntry, 0)
 	err = s.Database.DB.Find(&logs).Error
 	c.Assert(err, qt.IsNil)
 	c.Assert(logs, qt.HasLen, 1)

@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -230,12 +231,6 @@ func (s *Service) RegisterJwksCache(ctx context.Context) {
 	s.jimm.JWTService.RegisterJWKSCache(ctx, client)
 }
 
-// SetupAuditLogCleanup sets up the cleanup trigger to remove audit logs
-// after a user specified retention period.
-func (s *Service) SetupAuditLogCleanup(auditLogRetentionPeriod string) error {
-	return nil
-}
-
 // NewService creates a new Service using the given params.
 func NewService(ctx context.Context, p Params) (*Service, error) {
 	const op = errors.Op("NewService")
@@ -265,9 +260,11 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		return nil, errors.E(op, err)
 	}
 
-	if err := s.SetupAuditLogCleanup("1"); err != nil {
-		return nil, errors.E(op, err)
+	period, err := strconv.Atoi(p.AuditLogRetentionPeriod)
+	if err != nil {
+		return nil, errors.E(op, "failed to parse audit log retention period")
 	}
+	jimm.NewAuditLogCleanupService(ctx, s.jimm.Database, period).Start()
 
 	openFGAclient, err := newOpenFGAClient(ctx, p)
 	if err != nil {

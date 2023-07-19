@@ -15,6 +15,7 @@ import (
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
+	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/servermon"
 )
@@ -126,4 +127,76 @@ func (o recorder) HandleReply(r rpc.Request, header *rpc.Header, body interface{
 	d := time.Since(o.start)
 	servermon.WebsocketRequestDuration.WithLabelValues(r.Type, r.Action).Observe(float64(d) / float64(time.Second))
 	return o.logger.LogResponse(r, header, body)
+}
+
+// AuditLogCleanupService is a service capable of cleaning up audit logs
+// on a defined retention period. The retention period is in DAYS.
+type auditLogCleanupService struct {
+	ctx                     context.Context
+	auditLogRetentionPeriod int
+	db                      db.Database
+}
+
+// pollTimeOfDay holds the time hour, minutes and seconds to poll at.
+type pollTimeOfDay struct {
+	Hours   int
+	Minutes int
+	Seconds int
+}
+
+var pollDuration = pollTimeOfDay{
+	Hours: 9,
+}
+
+// NewAuditLogCleanupService returns a service capable of cleaning up audit logs
+// on a defined retention period. The retention period is in DAYS.
+func NewAuditLogCleanupService(ctx context.Context, db db.Database, auditLogRetentionPeriod int) *auditLogCleanupService {
+	return &auditLogCleanupService{
+		ctx:                     ctx,
+		auditLogRetentionPeriod: auditLogRetentionPeriod,
+		db:                      db,
+	}
+}
+
+// Start begins a routine which checks daily for any logs
+// needed to be cleaned up.
+func (a *auditLogCleanupService) Start() {
+	go a.poll()
+}
+
+// calculateNextPollDuration returns the next duration to poll on.
+// We recalculate each time and not rely on running every 24 hours
+// for absolute consistency within ns apart.
+func (a *auditLogCleanupService) calculateNextPollDuration() time.Duration {
+	now := time.Now().UTC()
+	midDayUTC := time.Date(
+		now.Year(),
+		now.Month(),
+		now.Day(),
+		pollDuration.Hours,
+		pollDuration.Minutes,
+		pollDuration.Seconds,
+		0,
+		now.Location(),
+	)
+	return midDayUTC.Sub(now)
+}
+
+// poll is designed to be run in a routine where it can be cancelled safely
+// from the service's context. It calculates the poll duration at 9am each day
+// UTC.
+func (a *auditLogCleanupService) poll() {
+	for {
+		select {
+		case <-time.After(a.calculateNextPollDuration()):
+			deleted, err := a.db.CleanupAuditLogs(a.ctx, a.auditLogRetentionPeriod)
+			if err != nil {
+				zapctx.Error(a.ctx, "failed to cleanup audit logs", zap.Error(err))
+				continue
+			}
+			zapctx.Debug(a.ctx, "audit log cleanup run successfully", zap.Int64("count", deleted))
+		case <-a.ctx.Done():
+			return
+		}
+	}
 }
