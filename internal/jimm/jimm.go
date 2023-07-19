@@ -18,14 +18,14 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/CanonicalLtd/jimm/internal/db"
-	"github.com/CanonicalLtd/jimm/internal/dbmodel"
-	"github.com/CanonicalLtd/jimm/internal/errors"
-	"github.com/CanonicalLtd/jimm/internal/jimm/credentials"
-	"github.com/CanonicalLtd/jimm/internal/jimmjwx"
-	"github.com/CanonicalLtd/jimm/internal/openfga"
-	ofganames "github.com/CanonicalLtd/jimm/internal/openfga/names"
-	"github.com/CanonicalLtd/jimm/internal/pubsub"
+	"github.com/canonical/jimm/internal/db"
+	"github.com/canonical/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/jimm/credentials"
+	"github.com/canonical/jimm/internal/jimmjwx"
+	"github.com/canonical/jimm/internal/openfga"
+	ofganames "github.com/canonical/jimm/internal/openfga/names"
+	"github.com/canonical/jimm/internal/pubsub"
 )
 
 // A JIMM provides the business logic for managing resources in the JAAS

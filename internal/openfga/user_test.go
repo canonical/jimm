@@ -1,4 +1,4 @@
-// Copyright 2023 CanonicalLtd.
+// Copyright 2023 canonical.
 
 package openfga_test
 
@@ -11,11 +11,11 @@ import (
 	openfga "github.com/openfga/go-sdk"
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/jimm/internal/dbmodel"
-	"github.com/CanonicalLtd/jimm/internal/jimmtest"
-	ofga "github.com/CanonicalLtd/jimm/internal/openfga"
-	ofganames "github.com/CanonicalLtd/jimm/internal/openfga/names"
-	jimmnames "github.com/CanonicalLtd/jimm/pkg/names"
+	"github.com/canonical/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/jimmtest"
+	ofga "github.com/canonical/jimm/internal/openfga"
+	ofganames "github.com/canonical/jimm/internal/openfga/names"
+	jimmnames "github.com/canonical/jimm/pkg/names"
 )
 
 type userTestSuite struct {

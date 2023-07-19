@@ -1,4 +1,4 @@
-// Copyright 2023 CanonicalLtd.
+// Copyright 2023 canonical.
 
 package jimmjwx
 
@@ -16,8 +16,8 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"go.uber.org/zap"
 
-	"github.com/CanonicalLtd/jimm/internal/errors"
-	"github.com/CanonicalLtd/jimm/internal/jimm/credentials"
+	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/jimm/credentials"
 )
 
 // JWKSService handles the creation, rotation and retrieval of JWKS for JIMM.

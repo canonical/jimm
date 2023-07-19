@@ -1,4 +1,4 @@
-// Copyright 2023 CanonicalLtd.
+// Copyright 2023 canonical.
 
 package openfga
 
@@ -11,9 +11,9 @@ import (
 	openfga "github.com/openfga/go-sdk"
 	"go.uber.org/zap"
 
-	"github.com/CanonicalLtd/jimm/internal/errors"
-	ofganames "github.com/CanonicalLtd/jimm/internal/openfga/names"
-	jimmnames "github.com/CanonicalLtd/jimm/pkg/names"
+	"github.com/canonical/jimm/internal/errors"
+	ofganames "github.com/canonical/jimm/internal/openfga/names"
+	jimmnames "github.com/canonical/jimm/pkg/names"
 )
 
 var (
