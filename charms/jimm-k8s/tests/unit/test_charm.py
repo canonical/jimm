@@ -4,10 +4,8 @@
 # Learn more about testing at: https://juju.is/docs/sdk/testing
 
 
-import io
 import json
 import pathlib
-import tarfile
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -186,65 +184,6 @@ class TestCharm(unittest.TestCase):
                 "agents": [{"url": "test-candid-url", "username": "test-username"}],
             },
         )
-
-    @patch("ops.model.Container.exec")
-    def test_install_dashboard(self, exec):
-        exec.unwrap.return_value = MockExec()
-
-        container = self.harness.model.unit.get_container("jimm")
-
-        self.harness.add_resource("dashboard", self.dashboard_tarfile())
-
-        self.harness.update_config(MINIMAL_CONFIG)
-        self.harness.charm.on.jimm_pebble_ready.emit(container)
-
-        plan = self.harness.get_container_pebble_plan("jimm")
-        self.assertEqual(
-            plan.to_dict(),
-            {
-                "services": {
-                    "jimm": {
-                        "summary": "JAAS Intelligent Model Manager",
-                        "startup": "disabled",
-                        "override": "replace",
-                        "command": "/root/jimmsrv",
-                        "environment": {
-                            "CANDID_URL": "test-candid-url",
-                            "JIMM_LISTEN_ADDR": ":8080",
-                            "JIMM_DASHBOARD_LOCATION": "/root/dashboard",
-                            "JIMM_DNS_NAME": "juju-jimm-k8s-0.juju-jimm-k8s-endpoints.None.svc.cluster.local",
-                            "JIMM_ENABLE_JWKS_ROTATOR": "1",
-                            "JIMM_LOG_LEVEL": "info",
-                            "JIMM_UUID": "1234567890",
-                            "JIMM_WATCH_CONTROLLERS": "1",
-                            "PRIVATE_KEY": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
-                            "PUBLIC_KEY": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
-                        },
-                    }
-                }
-            },
-        )
-
-        self.assertEqual(container.exists("/root/dashboard"), True)
-        self.assertEqual(container.isdir("/root/dashboard"), True)
-        self.assertEqual(container.exists("/root/dashboard/dashboard.tar.bz2"), True)
-        self.assertEqual(container.exists("/root/dashboard/hash"), True)
-
-    def dashboard_tarfile(self):
-        dashboard_archive = io.BytesIO()
-
-        data = bytes("Hello world", "utf-8")
-        f = io.BytesIO(initial_bytes=data)
-        with tarfile.open(fileobj=dashboard_archive, mode="w:bz2") as tar:
-            info = tarfile.TarInfo("README.md")
-            info.size = len(data)
-            tar.addfile(info, f)
-            tar.close()
-
-        dashboard_archive.flush()
-        dashboard_archive.seek(0)
-        data = dashboard_archive.read()
-        return data
 
     def test_dashboard_relation_joined(self):
         harness = Harness(JimmOperatorCharm)

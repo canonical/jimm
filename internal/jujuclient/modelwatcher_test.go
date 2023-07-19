@@ -5,8 +5,8 @@ package jujuclient_test
 import (
 	"context"
 
-	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/core/network"
+	jujuparams "github.com/juju/juju/rpc/params"
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/internal/dbmodel"
