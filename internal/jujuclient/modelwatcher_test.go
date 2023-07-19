@@ -5,14 +5,14 @@ package jujuclient_test
 import (
 	"context"
 
-	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/core/network"
+	jujuparams "github.com/juju/juju/rpc/params"
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/jimm/internal/dbmodel"
-	"github.com/CanonicalLtd/jimm/internal/jimm"
-	"github.com/CanonicalLtd/jimm/internal/jimmtest"
-	"github.com/CanonicalLtd/jimm/internal/jujuclient"
+	"github.com/canonical/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/jimm"
+	"github.com/canonical/jimm/internal/jimmtest"
+	"github.com/canonical/jimm/internal/jujuclient"
 )
 
 type modelWatcherSuite struct {

@@ -4,6 +4,7 @@ services:
   traefik:
     image: "traefik:2.9"
     container_name: traefik
+    profiles: ["dev"]
     ports:
       - "80:80"
       - "443:443"
@@ -104,6 +105,7 @@ services:
   vault:
     image: hashicorp/vault:latest
     container_name: vault
+    profiles: ["dev"]
     ports:
       - 8200:8200
     environment:
@@ -135,6 +137,7 @@ services:
     image: candid:latest
     container_name: candid
     entrypoint: "/candid.sh"
+    profiles: ["dev"]
     expose:
       - 8081
     ports:

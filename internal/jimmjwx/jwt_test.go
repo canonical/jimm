@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CanonicalLtd/jimm/internal/jimmjwx"
+	"github.com/canonical/jimm/internal/jimmjwx"
 	qt "github.com/frankban/quicktest"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 )

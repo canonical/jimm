@@ -12,10 +12,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - run: git fetch --prune --unshallow
-      - uses: ./.github/workflows/setupgo118amd64
+      - uses: actions/setup-go@v4
         with:
-          user: ${{ secrets.GH_USER }}
-          pat: ${{ secrets.GH_AUTH }}
+          go-version-file: 'go.mod'
       - run: sudo snap install snapcraft --channel=7.x/stable --classic
       - run: mkdir -p snap
       - run: cp ./snaps/jimm/snapcraft.yaml ./snap/snapcraft.yaml

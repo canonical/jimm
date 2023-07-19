@@ -16,8 +16,8 @@ import (
 	openfga "github.com/openfga/go-sdk"
 	"github.com/openfga/go-sdk/credentials"
 
-	"github.com/CanonicalLtd/jimm/internal/errors"
-	ofga "github.com/CanonicalLtd/jimm/internal/openfga"
+	"github.com/canonical/jimm/internal/errors"
+	ofga "github.com/canonical/jimm/internal/openfga"
 )
 
 var (
