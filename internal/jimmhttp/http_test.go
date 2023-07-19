@@ -9,7 +9,7 @@ import (
 
 	qt "github.com/frankban/quicktest"
 
-	"github.com/CanonicalLtd/jimm/internal/jimmhttp"
+	"github.com/canonical/jimm/internal/jimmhttp"
 )
 
 var stripPathElementTests = []struct {

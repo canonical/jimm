@@ -7,7 +7,7 @@ import (
 
 	jujuparams "github.com/juju/juju/rpc/params"
 
-	"github.com/CanonicalLtd/jimm/internal/openfga"
+	"github.com/canonical/jimm/internal/openfga"
 )
 
 // An Authenticator is an implementation of jimm.Authenticator that returns

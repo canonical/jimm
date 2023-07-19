@@ -11,7 +11,7 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 
-	"github.com/CanonicalLtd/jimm/internal/jimmjwx"
+	"github.com/canonical/jimm/internal/jimmjwx"
 )
 
 func TestMain(m *testing.M) {

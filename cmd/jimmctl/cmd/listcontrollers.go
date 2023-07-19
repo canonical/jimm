@@ -10,8 +10,8 @@ import (
 	"github.com/juju/juju/cmd/modelcmd"
 	"github.com/juju/juju/jujuclient"
 
-	"github.com/CanonicalLtd/jimm/api"
-	"github.com/CanonicalLtd/jimm/internal/errors"
+	"github.com/canonical/jimm/api"
+	"github.com/canonical/jimm/internal/errors"
 )
 
 var listControllersComandDoc = `

@@ -5,9 +5,9 @@ package jujuapi
 import (
 	"context"
 
-	"github.com/CanonicalLtd/jimm/internal/db"
-	"github.com/CanonicalLtd/jimm/internal/jimm"
-	ofganames "github.com/CanonicalLtd/jimm/internal/openfga/names"
+	"github.com/canonical/jimm/internal/db"
+	"github.com/canonical/jimm/internal/jimm"
+	ofganames "github.com/canonical/jimm/internal/openfga/names"
 	jujuparams "github.com/juju/juju/rpc/params"
 )
 

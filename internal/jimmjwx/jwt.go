@@ -11,8 +11,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/CanonicalLtd/jimm/internal/errors"
-	"github.com/CanonicalLtd/jimm/internal/jimm/credentials"
+	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/jimm/credentials"
 	"github.com/google/uuid"
 	"github.com/juju/clock"
 	"github.com/juju/retry"
