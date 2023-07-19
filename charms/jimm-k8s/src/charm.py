@@ -44,7 +44,7 @@ from charms.traefik_k8s.v1.ingress import (
     IngressPerAppRequirer,
     IngressPerAppRevokedEvent,
 )
-from ops.charm import CharmBase, RelationJoinedEvent
+from ops.charm import ActionEvent, CharmBase, RelationJoinedEvent
 from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
 
