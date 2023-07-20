@@ -5,8 +5,8 @@ package jimm
 import (
 	"context"
 
-	"github.com/CanonicalLtd/jimm/internal/errors"
-	"github.com/CanonicalLtd/jimm/internal/openfga"
+	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/openfga"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 )

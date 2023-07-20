@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/CanonicalLtd/jimm/api"
-	apiparams "github.com/CanonicalLtd/jimm/api/params"
-	"github.com/CanonicalLtd/jimm/internal/errors"
+	"github.com/canonical/jimm/api"
+	apiparams "github.com/canonical/jimm/api/params"
+	"github.com/canonical/jimm/internal/errors"
 	"github.com/juju/cmd/v3"
 	jujuapi "github.com/juju/juju/api"
 	jujucmd "github.com/juju/juju/cmd"
