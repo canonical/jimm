@@ -1,6 +1,8 @@
 package cmd_test
 
 import (
+	"bytes"
+
 	"github.com/juju/cmd/v3/cmdtesting"
 	gc "gopkg.in/check.v1"
 
@@ -17,8 +19,11 @@ func (s *purgeLogsSuite) TestPurgeLogsSuperuser(c *gc.C) {
 	// alice is superuser
 	bClient := s.userBakeryClient("alice")
 	datastring := "2021-01-01T00:00:00Z"
-	_, err := cmdtesting.RunCommand(c, cmd.NewPurgeLogsCommandForTesting(s.ClientStore(), bClient), datastring)
+	cmdCtx, err := cmdtesting.RunCommand(c, cmd.NewPurgeLogsCommandForTesting(s.ClientStore(), bClient), datastring)
 	c.Assert(err, gc.IsNil)
+	expected := "Deleted 0 logs\n"
+	actual := cmdCtx.Stdout.(*bytes.Buffer).String()
+	c.Assert(actual, gc.Equals, expected)
 }
 
 func (s *purgeLogsSuite) TestInvalidISO8601Date(c *gc.C) {
@@ -27,6 +32,7 @@ func (s *purgeLogsSuite) TestInvalidISO8601Date(c *gc.C) {
 	datastring := "13/01/2021"
 	_, err := cmdtesting.RunCommand(c, cmd.NewPurgeLogsCommandForTesting(s.ClientStore(), bClient), datastring)
 	c.Assert(err, gc.ErrorMatches, `invalid date. Expected ISO8601 date`)
+
 }
 
 func (s *purgeLogsSuite) TestPurgeLogs(c *gc.C) {
