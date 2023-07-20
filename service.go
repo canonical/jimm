@@ -32,27 +32,27 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
-	"github.com/CanonicalLtd/jimm/internal/auth"
-	"github.com/CanonicalLtd/jimm/internal/dashboard"
-	"github.com/CanonicalLtd/jimm/internal/db"
-	"github.com/CanonicalLtd/jimm/internal/dbmodel"
-	"github.com/CanonicalLtd/jimm/internal/debugapi"
-	"github.com/CanonicalLtd/jimm/internal/errors"
-	"github.com/CanonicalLtd/jimm/internal/jimm"
-	jimmcreds "github.com/CanonicalLtd/jimm/internal/jimm/credentials"
-	"github.com/CanonicalLtd/jimm/internal/jimmhttp"
-	"github.com/CanonicalLtd/jimm/internal/jimmjwx"
-	"github.com/CanonicalLtd/jimm/internal/jujuapi"
-	"github.com/CanonicalLtd/jimm/internal/jujuclient"
-	"github.com/CanonicalLtd/jimm/internal/logger"
-	internalopenfga "github.com/CanonicalLtd/jimm/internal/openfga"
-	ofgaClient "github.com/CanonicalLtd/jimm/internal/openfga"
-	ofganames "github.com/CanonicalLtd/jimm/internal/openfga/names"
-	"github.com/CanonicalLtd/jimm/internal/pubsub"
-	"github.com/CanonicalLtd/jimm/internal/servermon"
-	"github.com/CanonicalLtd/jimm/internal/vault"
-	"github.com/CanonicalLtd/jimm/internal/wellknownapi"
-	jimmnames "github.com/CanonicalLtd/jimm/pkg/names"
+	"github.com/canonical/jimm/internal/auth"
+	"github.com/canonical/jimm/internal/dashboard"
+	"github.com/canonical/jimm/internal/db"
+	"github.com/canonical/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/debugapi"
+	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/jimm"
+	jimmcreds "github.com/canonical/jimm/internal/jimm/credentials"
+	"github.com/canonical/jimm/internal/jimmhttp"
+	"github.com/canonical/jimm/internal/jimmjwx"
+	"github.com/canonical/jimm/internal/jujuapi"
+	"github.com/canonical/jimm/internal/jujuclient"
+	"github.com/canonical/jimm/internal/logger"
+	internalopenfga "github.com/canonical/jimm/internal/openfga"
+	ofgaClient "github.com/canonical/jimm/internal/openfga"
+	ofganames "github.com/canonical/jimm/internal/openfga/names"
+	"github.com/canonical/jimm/internal/pubsub"
+	"github.com/canonical/jimm/internal/servermon"
+	"github.com/canonical/jimm/internal/vault"
+	"github.com/canonical/jimm/internal/wellknownapi"
+	jimmnames "github.com/canonical/jimm/pkg/names"
 )
 
 const (
@@ -276,6 +276,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	}
 	vs, err := newVaultStore(ctx, p)
 	if err != nil {
+		zapctx.Error(ctx, "Vault Store error", zap.Error(err))
 		return nil, errors.E(op, err)
 	}
 	if vs != nil {

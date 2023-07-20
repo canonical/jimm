@@ -3,14 +3,12 @@
 #
 # Learn more about testing at: https://juju.is/docs/sdk/testing
 
-import io
 import ipaddress
 import json
 import os
 import pathlib
 import shutil
 import socket
-import tarfile
 import tempfile
 import unittest
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -47,26 +45,9 @@ class TestCharm(unittest.TestCase):
         )
         self.harness.charm.framework.charm_dir = pathlib.Path(self.tempdir.name)
 
-    def dashboard_tarfile(self):
-        dashboard_archive = io.BytesIO()
-
-        data = bytes("Hello world", "utf-8")
-        f = io.BytesIO(initial_bytes=data)
-        with tarfile.open(fileobj=dashboard_archive, mode="w:bz2") as tar:
-            info = tarfile.TarInfo("README.md")
-            info.size = len(data)
-            tar.addfile(info, f)
-            tar.close()
-
-        dashboard_archive.flush()
-        dashboard_archive.seek(0)
-        data = dashboard_archive.read()
-        return data
-
     def test_install(self):
         service_file = os.path.join(self.harness.charm.charm_dir, "juju-jimm.service")
         self.harness.add_resource("jimm-snap", "Test data")
-        self.harness.add_resource("dashboard", self.dashboard_tarfile())
         self.harness.charm.on.install.emit()
         self.assertTrue(os.path.exists(service_file))
         self.assertTrue(os.path.exists(self.harness.charm._logrotate_conf_path))
@@ -75,7 +56,6 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(self.harness.charm._snap.call_args.args[0], "install")
         self.assertEqual(self.harness.charm._snap.call_args.args[1], "--dangerous")
         self.assertTrue(str(self.harness.charm._snap.call_args.args[2]).endswith("jimm.snap"))
-        self.chownmock.assert_has_calls([call(self.tempdir.name + "/dashboard.new/README.md", 0, 0)])
 
     def test_start(self):
         self.harness.charm.on.start.emit()
@@ -98,7 +78,6 @@ class TestCharm(unittest.TestCase):
     def test_upgrade_charm(self):
         service_file = os.path.join(self.harness.charm.charm_dir, "juju-jimm.service")
         self.harness.add_resource("jimm-snap", "Test data")
-        self.harness.add_resource("dashboard", self.dashboard_tarfile())
         self.harness.charm.on.upgrade_charm.emit()
         self.assertTrue(os.path.exists(service_file))
         self.assertTrue(os.path.exists(self.harness.charm._logrotate_conf_path))
@@ -107,7 +86,6 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(self.harness.charm._snap.call_args.args[0], "install")
         self.assertEqual(self.harness.charm._snap.call_args.args[1], "--dangerous")
         self.assertTrue(str(self.harness.charm._snap.call_args.args[2]).endswith("jimm.snap"))
-        self.chownmock.assert_has_calls([call(self.tempdir.name + "/dashboard.new/README.md", 0, 0)])
 
     def test_upgrade_charm_ready(self):
         service_file = os.path.join(self.harness.charm.charm_dir, "juju-jimm.service")
@@ -130,7 +108,6 @@ class TestCharm(unittest.TestCase):
 
     def test_config_changed(self):
         config_file = os.path.join(self.harness.charm.charm_dir, "juju-jimm.env")
-        os.mkdir(self.tempdir.name + "/dashboard")
         self.harness.update_config(
             {
                 "candid-url": "https://candid.example.com",
@@ -152,7 +129,7 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(lines[2].strip(), "JIMM_ADMINS=user1 user2 group1")
         self.assertEqual(
             lines[4].strip(),
-            "JIMM_DASHBOARD_LOCATION=" + self.tempdir.name + "/dashboard",
+            "JIMM_DASHBOARD_LOCATION=https://jaas.ai/models",
         )
         self.assertEqual(lines[7].strip(), "JIMM_DNS_NAME=" + "jimm.example.com")
         self.assertEqual(lines[9].strip(), "JIMM_LOG_LEVEL=debug")
@@ -206,7 +183,6 @@ class TestCharm(unittest.TestCase):
 
     def test_config_changed_ready(self):
         config_file = os.path.join(self.harness.charm.charm_dir, "juju-jimm.env")
-        os.mkdir(self.tempdir.name + "/dashboard")
         with open(self.harness.charm._env_filename("db"), "wt") as f:
             f.write("test")
         self.harness.update_config(
@@ -228,7 +204,7 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(lines[2].strip(), "JIMM_ADMINS=user1 user2 group1")
         self.assertEqual(
             lines[4].strip(),
-            "JIMM_DASHBOARD_LOCATION=" + self.tempdir.name + "/dashboard",
+            "JIMM_DASHBOARD_LOCATION=https://jaas.ai/models",
         )
         self.assertEqual(lines[7].strip(), "JIMM_LOG_LEVEL=info")
         self.assertEqual(lines[8].strip(), "JIMM_UUID=caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa")

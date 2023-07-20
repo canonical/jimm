@@ -12,7 +12,7 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/gorilla/websocket"
 
-	"github.com/CanonicalLtd/jimm/internal/jimmhttp"
+	"github.com/canonical/jimm/internal/jimmhttp"
 )
 
 func TestWSHandler(t *testing.T) {

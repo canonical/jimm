@@ -1,0 +1,17 @@
+# overlay-certificate.yaml
+# Overlay for configuring TLS certificates in JIMM.
+applications:
+  haproxy:
+    options:
+      # Only the required options are included here, for the full set
+      # of available options see https://jaas.ai/haproxy.
+      #
+      # ssl_cert contains the certificate chain for JIMM. The file
+      # (./LOCAL/jimm.crt by default) should contain the PEM encoded host
+      # certificate followed by any necessary intermediate certificates.
+      ssl_cert: include-base64://LOCAL/jimm.crt
+      #
+      # ssl_key contains the PEM encoded private key that is signed in
+      # the host certificate provided in ssl_cert. This private key must
+      # be un-encrypted.
+      ssl_key: include-base64://LOCAL/jimm.key

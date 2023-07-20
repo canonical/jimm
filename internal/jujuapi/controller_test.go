@@ -16,8 +16,8 @@ import (
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/jimm/internal/pubsub"
-	jimmversion "github.com/CanonicalLtd/jimm/version"
+	"github.com/canonical/jimm/internal/pubsub"
+	jimmversion "github.com/canonical/jimm/version"
 )
 
 type controllerSuite struct {

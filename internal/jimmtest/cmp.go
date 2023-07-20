@@ -9,7 +9,7 @@ import (
 	gc "gopkg.in/check.v1"
 	"gorm.io/gorm"
 
-	"github.com/CanonicalLtd/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/dbmodel"
 )
 
 // CloudTagComparer is a function that can be used with gocmp.Compare

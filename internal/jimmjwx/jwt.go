@@ -11,8 +11,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/CanonicalLtd/jimm/internal/errors"
-	"github.com/CanonicalLtd/jimm/internal/jimm/credentials"
+	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/jimm/credentials"
 	"github.com/google/uuid"
 	"github.com/juju/clock"
 	"github.com/juju/retry"
@@ -75,10 +75,14 @@ func (j *JWTService) RegisterJWKSCache(ctx context.Context, client *http.Client)
 		Clock:    clock.WallClock,
 		Stop:     ctx.Done(),
 	})
-	if err != nil {
-		panic(err.Error())
+	select {
+	case <-ctx.Done():
+		zapctx.Info(ctx, "context cancelled stopping jwks registration gracefully", zap.Error(err))
+	default:
+		if err != nil {
+			panic(err.Error())
+		}
 	}
-
 }
 
 // NewJWT creates a new JWT to represent a users access within a controller.

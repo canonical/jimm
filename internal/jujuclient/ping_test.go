@@ -5,7 +5,7 @@ package jujuclient_test
 import (
 	"context"
 
-	"github.com/CanonicalLtd/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/juju/names/v4"
 	gc "gopkg.in/check.v1"
 )

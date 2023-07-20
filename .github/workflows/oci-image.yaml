@@ -8,7 +8,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - run: git fetch --prune --unshallow
-      - uses: ./.github/workflows/setupgo118amd64
+      - uses: actions/setup-go@v4
+        with:
+          go-version-file: 'go.mod'
       - uses: docker/setup-qemu-action@v2
       - uses: docker/setup-buildx-action@v2
       - name: Setup version and commit
