@@ -297,3 +297,15 @@ func NewCrossModelQueryCommandForTesting(store jujuclient.ClientStore, bClient *
 
 	return modelcmd.WrapBase(cmd)
 }
+
+func NewPurgeLogsCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
+	cmd := &purgeLogsCommand{
+		store: store,
+		dialOpts: &jujuapi.DialOpts{
+			InsecureSkipVerify: true,
+			BakeryClient:       bClient,
+		},
+	}
+
+	return modelcmd.WrapBase(cmd)
+}
