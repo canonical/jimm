@@ -4,10 +4,14 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/CanonicalLtd/jimm/api"
+	apiparams "github.com/CanonicalLtd/jimm/api/params"
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/juju/cmd/v3"
+	jujuapi "github.com/juju/juju/api"
 	jujucmd "github.com/juju/juju/cmd"
 	"github.com/juju/juju/cmd/modelcmd"
+	"github.com/juju/juju/jujuclient"
 )
 
 const purgeLogsDoc = `
@@ -26,7 +30,9 @@ func NewPurgeLogsCommand() cmd.Command {
 // purgeLogsCommand purges logs.
 type purgeLogsCommand struct {
 	modelcmd.ControllerCommandBase
-	out cmd.Output
+	store    jujuclient.ClientStore
+	dialOpts *jujuapi.DialOpts
+	out      cmd.Output
 
 	date string
 }
@@ -86,5 +92,23 @@ func (c *purgeLogsCommand) validateDate(date string) error {
 // Run implements Command.Run. It purges logs from the database before the given
 // date.
 func (c *purgeLogsCommand) Run(ctx *cmd.Context) error {
+	currentController, err := c.store.CurrentController()
+	if err != nil {
+		return errors.E(err, "could not determine controller")
+	}
+
+	apiCaller, err := c.NewAPIRootWithDialOpts(c.store, currentController, "", c.dialOpts)
+	if err != nil {
+		return err
+	}
+
+	client := api.NewClient(apiCaller)
+	response, err := client.PurgeLogs(&apiparams.PurgeLogsRequest{
+		Date: c.date,
+	})
+	if err != nil {
+		return errors.E(err)
+	}
+	fmt.Fprintf(ctx.Stdout, "Deleted %d logs\n", response.DeletedCount)
 	return nil
 }
