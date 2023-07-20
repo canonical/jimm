@@ -21,6 +21,14 @@ func (s *purgeLogsSuite) TestPurgeLogsSuperuser(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 }
 
+func (s *purgeLogsSuite) TestInvalidISO8601Date(c *gc.C) {
+	// alice is superuser
+	bClient := s.userBakeryClient("alice")
+	datastring := "13/01/2021"
+	_, err := cmdtesting.RunCommand(c, cmd.NewPurgeLogsCommandForTesting(s.ClientStore(), bClient), datastring)
+	c.Assert(err, gc.ErrorMatches, `invalid date. Expected ISO8601 date`)
+}
+
 func (s *purgeLogsSuite) TestPurgeLogs(c *gc.C) {
 	// bob is not superuser
 	bClient := s.userBakeryClient("bob")
