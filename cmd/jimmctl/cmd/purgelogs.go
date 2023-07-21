@@ -1,13 +1,13 @@
 package cmd
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/canonical/jimm/api"
 	apiparams "github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/juju/cmd/v3"
+	"github.com/juju/gnuflag"
 	jujuapi "github.com/juju/juju/api"
 	jujucmd "github.com/juju/juju/cmd"
 	"github.com/juju/juju/cmd/modelcmd"
@@ -66,6 +66,15 @@ func (c *purgeLogsCommand) Init(args []string) error {
 	return nil
 }
 
+// SetFlags implements Command.SetFlags.
+func (c *purgeLogsCommand) SetFlags(f *gnuflag.FlagSet) {
+	c.CommandBase.SetFlags(f)
+	c.out.AddFlags(f, "yaml", map[string]cmd.Formatter{
+		"yaml": cmd.FormatYaml,
+		"json": cmd.FormatJson,
+	})
+}
+
 // validateDate validates the date string is in ISO8601 format. If it is, it
 // sets the date field in the command.
 func (c *purgeLogsCommand) validateDate(date string) error {
@@ -114,6 +123,9 @@ func (c *purgeLogsCommand) Run(ctx *cmd.Context) error {
 	if err != nil {
 		return errors.E(err)
 	}
-	fmt.Fprintf(ctx.Stdout, "Deleted %d logs\n", response.DeletedCount)
+	err = c.out.Write(ctx, response)
+	if err != nil {
+		return errors.E(err)
+	}
 	return nil
 }

@@ -24,7 +24,7 @@ func (s *purgeLogsSuite) TestPurgeLogsSuperuser(c *gc.C) {
 	datastring := "2021-01-01T00:00:00Z"
 	cmdCtx, err := cmdtesting.RunCommand(c, cmd.NewPurgeLogsCommandForTesting(s.ClientStore(), bClient), datastring)
 	c.Assert(err, gc.IsNil)
-	expected := "Deleted 0 logs\n"
+	expected := "deleted-count: 0\n"
 	actual := cmdCtx.Stdout.(*bytes.Buffer).String()
 	c.Assert(actual, gc.Equals, expected)
 }
@@ -77,7 +77,7 @@ func (s *purgeLogsSuite) TestPurgeLogsFromDb(c *gc.C) {
 	cmdCtx, err := cmdtesting.RunCommand(c, cmd.NewPurgeLogsCommandForTesting(s.ClientStore(), bClient), tomorrow.Format(time.RFC3339))
 	c.Assert(err, gc.IsNil)
 	// check that logs have been deleted
-	expectedOutput := "Deleted 2 logs\n"
+	expectedOutput := "deleted-count: 2\n"
 	actual := cmdCtx.Stdout.(*bytes.Buffer).String()
 	c.Assert(actual, gc.Equals, expectedOutput)
 
