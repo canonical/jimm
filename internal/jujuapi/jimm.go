@@ -501,6 +501,7 @@ func (r *controllerRoot) CrossModelQuery(ctx context.Context, req apiparams.Cros
 	}
 }
 
+// PurgeLogs removes all audit log entries older than the specified date.
 func (r *controllerRoot) PurgeLogs(ctx context.Context, req apiparams.PurgeLogsRequest) (apiparams.PurgeLogsResponse, error) {
 	const op = errors.Op("jujuapi.PurgeLogs")
 

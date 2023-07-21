@@ -18,7 +18,11 @@ const purgeLogsDoc = `
 	purge-logs purges logs from the database before the given date.
 
 	Example:
-		jimmctl purge-logs 2021-01-01T00:00:00Z
+		jimmctl purge-logs 2021-02-03
+		jimmctl purge-logs 2021-02-03T00
+		jimmctl purge-logs 2021-02-03T15:04:05Z	
+
+		
 `
 
 // NewPurgeLogsCommand returns a command to purge logs.
@@ -37,6 +41,7 @@ type purgeLogsCommand struct {
 	date string
 }
 
+// Info implements Command.Info. It returns the command information.
 func (c *purgeLogsCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
 		Name:    "purge-logs",
@@ -85,7 +90,7 @@ func (c *purgeLogsCommand) validateDate(date string) error {
 	}
 
 	// If none of the layouts match, the date is not in the correct format
-	return fmt.Errorf("invalid date. Expected ISO8601 date")
+	return errors.E("invalid date. Expected ISO8601 date")
 
 }
 

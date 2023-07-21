@@ -355,10 +355,16 @@ type CrossModelQueryResponse struct {
 	Errors  map[string][]string `json:"errors"`
 }
 
+// PurgeLogsRequest is the request used to purge logs.
+// It has one field:
+// - Date - the date before which logs should be purged.
 type PurgeLogsRequest struct {
 	Date string `json:"date"`
 }
 
+// PurgeLogsResponse is the response returned by the PurgeLogs method.
+// It has one field:
+// - DeletedCount - the number of logs that were deleted.
 type PurgeLogsResponse struct {
 	DeletedCount int64 `json:"deleted"`
 }

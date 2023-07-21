@@ -103,3 +103,18 @@ func (d *Database) ForEachAuditLogEntry(ctx context.Context, filter AuditLogFilt
 	}
 	return nil
 }
+
+// DeleteAuditLogsBefore executres the query that deletes all audit logs before the given timestamp.
+// Returns the number of logs deleted.
+func (d *Database) DeleteAuditLogsBefore(ctx context.Context, before string) (int64, error) {
+	const op = errors.Op("db.DeleteAuditLogsBefore")
+	if err := d.ready(); err != nil {
+		return 0, errors.E(op, err)
+	}
+
+	result := d.DB.WithContext(ctx).Unscoped().Where("time < ?", before).Delete(&dbmodel.AuditLogEntry{})
+	if result.Error != nil {
+		return 0, errors.E(op, dbError(result.Error))
+	}
+	return result.RowsAffected, nil
+}

@@ -97,18 +97,6 @@ func (d *Database) DeleteApplicationOffer(ctx context.Context, offer *dbmodel.Ap
 	return nil
 }
 
-func (d *Database) DeleteAuditLogsBefore(ctx context.Context, before string) (int64, error) {
-	const op = errors.Op("db.DeleteAuditLogsBefore")
-	if err := d.ready(); err != nil {
-		return 0, errors.E(op, err)
-	}
-
-	result := d.DB.WithContext(ctx).Unscoped().Where("time < ?", before).Delete(&dbmodel.AuditLogEntry{})
-	if result.Error != nil {
-		return 0, errors.E(op, dbError(result.Error))
-	}
-	return result.RowsAffected, nil
-}
 
 // ApplicationOfferFilter can be used to find application offers that match certain criteria.
 type ApplicationOfferFilter func(*gorm.DB) *gorm.DB

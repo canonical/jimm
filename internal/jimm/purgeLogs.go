@@ -11,6 +11,9 @@ import (
 	"go.uber.org/zap"
 )
 
+// PurgeLogs removes all audit logs before the given timestamp. Only JIMM
+// administrators can perform this operation. The number of logs purged is
+// returned.
 func (j *JIMM) PurgeLogs(ctx context.Context, user *openfga.User, before string) (int64, error) {
 	op := errors.Op("jimm.PurgeLogs")
 	isJIMMAdmin, err := openfga.IsAdministrator(ctx, user, j.ResourceTag())
