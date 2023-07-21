@@ -149,3 +149,35 @@ func (s *dbSuite) TestForEachAuditLogEntry(c *qt.C) {
 	c.Check(calls, qt.Equals, 1)
 	c.Check(err, qt.DeepEquals, testError)
 }
+
+func (s *dbSuite) TestPurgeLogsFromDb(c *qt.C) {
+
+	ctx := context.Background()
+	relativeNow := time.Now().AddDate(-1, 0, 0)
+	ale := dbmodel.AuditLogEntry{
+		Time:    relativeNow.UTC().Round(time.Millisecond),
+		UserTag: names.NewUserTag("alice@external").String(),
+	}
+	ale_past := dbmodel.AuditLogEntry{
+		Time:    relativeNow.AddDate(0, 0, -1).UTC().Round(time.Millisecond),
+		UserTag: names.NewUserTag("alice@external").String(),
+	}
+	ale_future := dbmodel.AuditLogEntry{
+		Time:    relativeNow.AddDate(0, 0, 5).UTC().Round(time.Millisecond),
+		UserTag: names.NewUserTag("alice@external").String(),
+	}
+
+	err := s.Database.Migrate(context.Background(), false)
+	c.Assert(err, qt.IsNil)
+	err = s.Database.AddAuditLogEntry(ctx, &ale)
+	c.Assert(err, qt.IsNil)
+	err = s.Database.AddAuditLogEntry(ctx, &ale_past)
+	c.Assert(err, qt.IsNil)
+	err = s.Database.AddAuditLogEntry(ctx, &ale_future)
+	c.Assert(err, qt.IsNil)
+	tomorrow := relativeNow.AddDate(0, 0, 1)
+	deleted_count, err := s.Database.DeleteAuditLogsBefore(ctx, tomorrow.Format(time.RFC3339))
+	// check that logs have been deleted
+	c.Assert(err, qt.IsNil)
+	c.Assert(deleted_count, qt.Equals, int64(2))
+}
