@@ -152,9 +152,9 @@ type Params struct {
 	// PublicKey holds the public part of the bakery keypair.
 	PublicKey string
 
-	// AuditLogRetentionPeriod is the amount of days detailing how long
+	// auditLogRetentionPeriodInDays is the number of days detailing how long
 	// to keep an audit log for before purging it from the database.
-	AuditLogRetentionPeriod string
+	AuditLogRetentionPeriodInDays string
 }
 
 // A Service is the implementation of a JIMM server.
@@ -260,11 +260,18 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		return nil, errors.E(op, err)
 	}
 
-	period, err := strconv.Atoi(p.AuditLogRetentionPeriod)
-	if err != nil {
-		return nil, errors.E(op, "failed to parse audit log retention period")
+	if p.AuditLogRetentionPeriodInDays != "" {
+		period, err := strconv.Atoi(p.AuditLogRetentionPeriodInDays)
+		if err != nil {
+			return nil, errors.E(op, "failed to parse audit log retention period")
+		}
+		if period < 0 {
+			return nil, errors.E(op, "retention period cannot be less than 0")
+		}
+		if period != 0 {
+			jimm.NewAuditLogCleanupService(s.jimm.Database, period).Start(ctx)
+		}
 	}
-	jimm.NewAuditLogCleanupService(ctx, s.jimm.Database, period).Start()
 
 	openFGAclient, err := newOpenFGAClient(ctx, p)
 	if err != nil {

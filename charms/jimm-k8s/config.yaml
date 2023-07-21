@@ -6,7 +6,9 @@ options:
     type: string
     description: |
       How long to hold audit logs for in days, i.e., 10 = 10 days.
-      Logs are purged at 9AM UTC. Defaults to 30 days.
+      If the value 0 is used, the logs will never be purged.
+      Logs are purged at 9AM UTC. Defaults to 0 days.
+    default: "0"
   candid-agent-private-key:
     type: string
     description: |

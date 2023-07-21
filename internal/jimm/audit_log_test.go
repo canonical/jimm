@@ -7,12 +7,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CanonicalLtd/jimm/internal/db"
-	"github.com/CanonicalLtd/jimm/internal/dbmodel"
-	"github.com/CanonicalLtd/jimm/internal/errors"
-	"github.com/CanonicalLtd/jimm/internal/jimm"
-	"github.com/CanonicalLtd/jimm/internal/jimmtest"
 	qt "github.com/frankban/quicktest"
+
+	"github.com/canonical/jimm/internal/db"
+	"github.com/canonical/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/jimm"
+	"github.com/canonical/jimm/internal/jimmtest"
 )
 
 func TestAuditLogCleanupServicePurgesLogs(t *testing.T) {
@@ -57,8 +58,8 @@ func TestAuditLogCleanupServicePurgesLogs(t *testing.T) {
 	jimm.PollDuration.Hours = now.Hour()
 	jimm.PollDuration.Minutes = now.Minute()
 	jimm.PollDuration.Seconds = now.Second() + 2
-	svc := jimm.NewAuditLogCleanupService(ctx, db, 1)
-	svc.Start()
+	svc := jimm.NewAuditLogCleanupService(db, 1)
+	svc.Start(ctx)
 
 	// Check 2 were purged
 	logs = make([]dbmodel.AuditLogEntry, 0)

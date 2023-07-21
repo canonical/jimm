@@ -8,6 +8,7 @@ import (
 
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/servermon"
 )
 
 // AddAuditLogEntry adds a new entry to the audit log.
@@ -104,12 +105,16 @@ func (d *Database) ForEachAuditLogEntry(ctx context.Context, filter AuditLogFilt
 	return nil
 }
 
-func (d *Database) CleanupAuditLogs(ctx context.Context, auditLogRetentionPeriod int) (int64, error) {
-	retentionDate := time.Now().AddDate(0, 0, -(auditLogRetentionPeriod))
+// CleanupAuditLogs cleans up audit logs after the auditLogRetentionPeriodInDays,
+// HARD deleting them from the database.
+func (d *Database) CleanupAuditLogs(ctx context.Context, auditLogRetentionPeriodInDays int) (int64, error) {
+	retentionDate := time.Now().AddDate(0, 0, -(auditLogRetentionPeriodInDays))
+	duration := time.Since(time.Now())
 	tx := d.DB.
 		WithContext(ctx).
 		Unscoped().
 		Where("time < ?", retentionDate).
 		Delete(&dbmodel.AuditLogEntry{})
+	servermon.QueryTimeAuditLogCleanUpHistogram.Observe(duration.Seconds())
 	return tx.RowsAffected, tx.Error
 }
