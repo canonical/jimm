@@ -117,6 +117,7 @@ class TestCharm(unittest.TestCase):
                 "uuid": "caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa",
                 "public-key": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
                 "private-key": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
+                "audit-log-retention-period": "10",
             }
         )
         self.assertTrue(os.path.exists(config_file))
@@ -141,6 +142,10 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(
             lines[15].strip(),
             "PUBLIC_KEY=izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
+        )
+        self.assertEqual(
+            lines[17].strip(),
+            "JIMM_AUDIT_LOG_RETENTION_PERIOD_IN_DAYS=10",
         )
 
     def test_config_changed_redirect_to_dashboard(self):
@@ -180,6 +185,10 @@ class TestCharm(unittest.TestCase):
             lines[15].strip(),
             "PUBLIC_KEY=izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
         )
+        self.assertEqual(
+            lines[17].strip(),
+            "JIMM_AUDIT_LOG_RETENTION_PERIOD_IN_DAYS=10",
+        )
 
     def test_config_changed_ready(self):
         config_file = os.path.join(self.harness.charm.charm_dir, "juju-jimm.env")
@@ -215,6 +224,10 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(
             lines[13].strip(),
             "PUBLIC_KEY=izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
+        )
+        self.assertEqual(
+            lines[17].strip(),
+            "JIMM_AUDIT_LOG_RETENTION_PERIOD_IN_DAYS=10",
         )
 
     def test_config_changed_with_agent(self):
