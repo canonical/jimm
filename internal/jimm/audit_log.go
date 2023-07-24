@@ -166,18 +166,19 @@ func (a *auditLogCleanupService) Start(ctx context.Context) {
 // We recalculate each time and not rely on running every 24 hours
 // for absolute consistency within ns apart.
 func (a *auditLogCleanupService) calculateNextPollDuration() time.Duration {
-	now := time.Now().UTC()
-	pollDateUTC := time.Date(
-		now.Year(),
-		now.Month(),
-		now.Day(),
-		pollDuration.Hours,
-		pollDuration.Minutes,
-		pollDuration.Seconds,
-		0,
-		now.Location(),
-	)
-	return pollDateUTC.Sub(now)
+	now := time.Now()
+	nineAM := time.Date(now.Year(), now.Month(), now.Day(), pollDuration.Hours, 0, 0, 0, time.UTC)
+	nineAMDuration := nineAM.Sub(now)
+	d := time.Hour
+	// If 9am is behind the current time, i.e., 1pm
+	if nineAMDuration < 0 {
+		// Add 24 hours, flip it to an absolute duration, i.e., -10h == 10h
+		// and subtract it from 24 hours to calculate 9am tomorrow
+		d = time.Hour*24 - nineAMDuration.Abs()
+	} else {
+		d = nineAMDuration.Abs()
+	}
+	return d
 }
 
 // poll is designed to be run in a routine where it can be cancelled safely
