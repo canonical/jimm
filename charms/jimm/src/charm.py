@@ -132,7 +132,7 @@ class JimmCharm(SystemdCharm):
             "dashboard_location": self.config.get("juju-dashboard-location"),
             "public_key": self.config.get("public-key"),
             "private_key": self.config.get("private-key"),
-            "audit_retention_period": self.config.get("audit-log-retention-period", ""),
+            "audit_retention_period": self.config.get("audit-log-retention-period-in-days", ""),
         }
 
         with open(self._env_filename(), "wt") as f:

@@ -243,7 +243,7 @@ class JimmOperatorCharm(CharmBase):
         config_values = {
             "CANDID_PUBLIC_KEY": self.config.get("candid-public-key", ""),
             "CANDID_URL": self.config.get("candid-url", ""),
-            "JIMM_AUDIT_LOG_RETENTION_PERIOD_IN_DAYS": self.config.get("audit-log-retention-period", ""),
+            "JIMM_AUDIT_LOG_RETENTION_PERIOD_IN_DAYS": self.config.get("audit-log-retention-period-in-days", ""),
             "JIMM_ADMINS": self.config.get("controller-admins", ""),
             "JIMM_DNS_NAME": dns_name,
             "JIMM_LOG_LEVEL": self.config.get("log-level", ""),

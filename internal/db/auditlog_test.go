@@ -162,6 +162,11 @@ func (s *dbSuite) TestCleanupAuditLogs(c *qt.C) {
 	err = s.Database.Migrate(context.Background(), true)
 	c.Assert(err, qt.IsNil)
 
+	// Delete all when none exist
+	deleted, err := s.Database.CleanupAuditLogs(ctx, 2)
+	c.Assert(err, qt.IsNil)
+	c.Assert(deleted, qt.Equals, int64(0))
+
 	// A log from 1 day ago
 	c.Assert(s.Database.AddAuditLogEntry(ctx, &dbmodel.AuditLogEntry{
 		Time: now.AddDate(0, 0, -1),
@@ -184,7 +189,7 @@ func (s *dbSuite) TestCleanupAuditLogs(c *qt.C) {
 	c.Assert(logs, qt.HasLen, 3)
 
 	// Delete all 2 or more days older, leaving 1 log left
-	deleted, err := s.Database.CleanupAuditLogs(ctx, 2)
+	deleted, err = s.Database.CleanupAuditLogs(ctx, 2)
 	c.Assert(err, qt.IsNil)
 
 	// Check that 2 were infact deleted

@@ -117,7 +117,7 @@ class TestCharm(unittest.TestCase):
                 "uuid": "caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa",
                 "public-key": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
                 "private-key": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
-                "audit-log-retention-period": "10",
+                "audit-log-retention-period-in-days": "10",
             }
         )
         self.assertTrue(os.path.exists(config_file))
@@ -160,7 +160,7 @@ class TestCharm(unittest.TestCase):
                 "juju-dashboard-location": "https://test.jaas.ai/models",
                 "public-key": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
                 "private-key": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
-                "audit-log-retention-period": "10",
+                "audit-log-retention-period-in-days": "10",
             }
         )
         self.assertTrue(os.path.exists(config_file))
@@ -202,7 +202,7 @@ class TestCharm(unittest.TestCase):
                 "uuid": "caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa",
                 "public-key": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
                 "private-key": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
-                "audit-log-retention-period": "10",
+                "audit-log-retention-period-in-days": "10",
             }
         )
         self.assertTrue(os.path.exists(config_file))

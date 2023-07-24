@@ -21,7 +21,7 @@ MINIMAL_CONFIG = {
     "public-key": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
     "private-key": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
     "vault-access-address": "10.0.1.123",
-    "audit-log-retention-period": "10",
+    "audit-log-retention-period-in-days": "10",
 }
 
 
