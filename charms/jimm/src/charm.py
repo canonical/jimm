@@ -161,7 +161,7 @@ class JimmCharm(SystemdCharm):
             event.defer()
             return
 
-        if event.username is None:
+        if event.username is None or event.password is None:
             event.defer()
             logger.info("(postgresql) Relation data is not complete (missing `username` field); deferring the event.")
             return
