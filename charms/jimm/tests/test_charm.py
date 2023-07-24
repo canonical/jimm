@@ -124,7 +124,7 @@ class TestCharm(unittest.TestCase):
         with open(config_file) as f:
             lines = f.readlines()
         os.unlink(config_file)
-        self.assertEqual(len(lines), 16)
+        self.assertEqual(len(lines), 18)
         self.assertEqual(lines[0].strip(), "BAKERY_AGENT_FILE=")
         self.assertEqual(lines[1].strip(), "CANDID_URL=https://candid.example.com")
         self.assertEqual(lines[2].strip(), "JIMM_ADMINS=user1 user2 group1")
@@ -166,7 +166,7 @@ class TestCharm(unittest.TestCase):
         with open(config_file) as f:
             lines = f.readlines()
         os.unlink(config_file)
-        self.assertEqual(len(lines), 16)
+        self.assertEqual(len(lines), 18)
         self.assertEqual(lines[0].strip(), "BAKERY_AGENT_FILE=")
         self.assertEqual(lines[1].strip(), "CANDID_URL=https://candid.example.com")
         self.assertEqual(lines[2].strip(), "JIMM_ADMINS=user1 user2 group1")
@@ -255,7 +255,7 @@ class TestCharm(unittest.TestCase):
 
         with open(config_file) as f:
             lines = f.readlines()
-        self.assertEqual(len(lines), 14)
+        self.assertEqual(len(lines), 18)
         self.assertEqual(
             lines[0].strip(),
             "BAKERY_AGENT_FILE=" + self.harness.charm._agent_filename,
