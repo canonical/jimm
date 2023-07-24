@@ -163,7 +163,10 @@ class JimmCharm(SystemdCharm):
 
         if event.username is None or event.password is None:
             event.defer()
-            logger.info("(postgresql) Relation data is not complete (missing `username` field); deferring the event.")
+            logger.info(
+                "(postgresql) Relation data is not complete (missing `username` or `password` field); "
+                "deferring the event."
+            )
             return
 
         # get the first endpoint from a comma separate list
