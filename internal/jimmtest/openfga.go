@@ -158,7 +158,6 @@ func SetupTestOFGAClient(names ...string) (openfga.OpenFgaApi, *ofga.OFGAClient,
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	ar.SetSchemaVersion(schemaVersion)
 	amr, _, err := api.WriteAuthorizationModel(ctx).Body(*ar).Execute()
 	if err != nil {
 		return nil, nil, nil, err
