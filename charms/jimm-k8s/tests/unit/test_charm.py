@@ -162,6 +162,7 @@ class TestCharm(unittest.TestCase):
                             "BAKERY_AGENT_FILE": "/root/config/agent.json",
                             "CANDID_URL": "test-candid-url",
                             "JIMM_DASHBOARD_LOCATION": "https://jaas.ai/models",
+                            "JIMM_AUDIT_LOG_RETENTION_PERIOD_IN_DAYS": "0",
                             "JIMM_DNS_NAME": "juju-jimm-k8s-0.juju-jimm-k8s-endpoints.None.svc.cluster.local",
                             "JIMM_ENABLE_JWKS_ROTATOR": "1",
                             "JIMM_LISTEN_ADDR": ":8080",
