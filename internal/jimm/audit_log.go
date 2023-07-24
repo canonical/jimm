@@ -162,11 +162,31 @@ func (a *auditLogCleanupService) Start(ctx context.Context) {
 	go a.poll(ctx)
 }
 
+// poll is designed to be run in a routine where it can be cancelled safely
+// from the service's context. It calculates the poll duration at 9am each day
+// UTC.
+func (a *auditLogCleanupService) poll(ctx context.Context) {
+	for {
+		select {
+		case <-time.After(calculateNextPollDuration(time.Now().UTC())):
+			deleted, err := a.db.CleanupAuditLogs(ctx, a.auditLogRetentionPeriodInDays)
+			if err != nil {
+				zapctx.Error(ctx, "failed to cleanup audit logs", zap.Error(err))
+				continue
+			}
+			zapctx.Debug(ctx, "audit log cleanup run successfully", zap.Int64("count", deleted))
+		case <-ctx.Done():
+			zapctx.Debug(ctx, "exiting audit log cleanup polling")
+			return
+		}
+	}
+}
+
 // calculateNextPollDuration returns the next duration to poll on.
 // We recalculate each time and not rely on running every 24 hours
 // for absolute consistency within ns apart.
-func (a *auditLogCleanupService) calculateNextPollDuration() time.Duration {
-	now := time.Now().UTC()
+func calculateNextPollDuration(startingTime time.Time) time.Duration {
+	now := startingTime
 	nineAM := time.Date(now.Year(), now.Month(), now.Day(), pollDuration.Hours, 0, 0, 0, time.UTC)
 	nineAMDuration := nineAM.Sub(now)
 	d := time.Hour
@@ -179,24 +199,4 @@ func (a *auditLogCleanupService) calculateNextPollDuration() time.Duration {
 		d = nineAMDuration.Abs()
 	}
 	return d
-}
-
-// poll is designed to be run in a routine where it can be cancelled safely
-// from the service's context. It calculates the poll duration at 9am each day
-// UTC.
-func (a *auditLogCleanupService) poll(ctx context.Context) {
-	for {
-		select {
-		case <-time.After(a.calculateNextPollDuration()):
-			deleted, err := a.db.CleanupAuditLogs(ctx, a.auditLogRetentionPeriodInDays)
-			if err != nil {
-				zapctx.Error(ctx, "failed to cleanup audit logs", zap.Error(err))
-				continue
-			}
-			zapctx.Debug(ctx, "audit log cleanup run successfully", zap.Int64("count", deleted))
-		case <-ctx.Done():
-			zapctx.Debug(ctx, "exiting audit log cleanup polling")
-			return
-		}
-	}
 }

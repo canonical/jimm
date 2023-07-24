@@ -67,3 +67,17 @@ func TestAuditLogCleanupServicePurgesLogs(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(logs, qt.HasLen, 3)
 }
+
+func TestCalculateNextPollDuration(t *testing.T) {
+	c := qt.New(t)
+
+	// Test where 9am is behind 12pm
+	startingTime := time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC)
+	d := jimm.CalculateNextPollDuration(startingTime)
+	c.Assert(d, qt.Equals, time.Hour*21)
+
+	// Test where 9am is ahead of 7pm
+	startingTime = time.Date(2023, 1, 1, 7, 0, 0, 0, time.UTC)
+	d = jimm.CalculateNextPollDuration(startingTime)
+	c.Assert(d, qt.Equals, time.Hour*2)
+}
