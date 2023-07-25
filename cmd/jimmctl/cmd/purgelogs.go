@@ -15,14 +15,12 @@ import (
 )
 
 const purgeLogsDoc = `
-	purge-logs purges logs from the database before the given date.
+	purge-audit-logs purges logs from the database before the given date.
 
-	Example:
-		jimmctl purge-logs 2021-02-03
-		jimmctl purge-logs 2021-02-03T00
-		jimmctl purge-logs 2021-02-03T15:04:05Z	
-
-		
+	Examples:
+		jimmctl purge-audit-logs 2021-02-03
+		jimmctl purge-audit-logs 2021-02-03T00
+		jimmctl purge-audit-logs 2021-02-03T15:04:05Z	
 `
 
 // NewPurgeLogsCommand returns a command to purge logs.
@@ -44,9 +42,9 @@ type purgeLogsCommand struct {
 // Info implements Command.Info. It returns the command information.
 func (c *purgeLogsCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:    "purge-logs",
+		Name:    "purge-audit-logs",
 		Args:    "<ISO8601 date>",
-		Purpose: "purge logs from the database before the given date",
+		Purpose: "purges audit logs from the database before the given date",
 		Doc:     purgeLogsDoc,
 	})
 }
@@ -58,8 +56,8 @@ func (c *purgeLogsCommand) Init(args []string) error {
 		return errors.E("expected one argument (ISO8601 date)")
 	}
 	// validate date
-	date, err := parseDate(args[0])
-	c.date = date
+	var err error
+	c.date, err = parseDate(args[0])
 	if err != nil {
 		return errors.E("invalid date. Expected ISO8601 date")
 	}
@@ -126,5 +124,4 @@ func parseDate(date string) (string, error) {
 
 	// If none of the layouts match, the date is not in the correct format
 	return "", errors.E("invalid date. Expected ISO8601 date")
-
 }
