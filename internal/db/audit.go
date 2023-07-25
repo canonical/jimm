@@ -107,14 +107,17 @@ func (d *Database) ForEachAuditLogEntry(ctx context.Context, filter AuditLogFilt
 
 // CleanupAuditLogs cleans up audit logs after the auditLogRetentionPeriodInDays,
 // HARD deleting them from the database.
-func (d *Database) CleanupAuditLogs(ctx context.Context, auditLogRetentionPeriodInDays int) (int64, error) {
-	retentionDate := time.Now().AddDate(0, 0, -(auditLogRetentionPeriodInDays))
+func (d *Database) DeleteAuditLogsBefore(ctx context.Context, before time.Time) (int64, error) {
+	const op = errors.Op("db.DeleteAuditLogsBefore")
 	now := time.Now()
 	tx := d.DB.
 		WithContext(ctx).
 		Unscoped().
-		Where("time < ?", retentionDate).
+		Where("time < ?", before).
 		Delete(&dbmodel.AuditLogEntry{})
 	servermon.QueryTimeAuditLogCleanUpHistogram.Observe(time.Since(now).Seconds())
-	return tx.RowsAffected, tx.Error
+	if tx.Error != nil {
+		return 0, errors.E(op, dbError(tx.Error))
+	}
+	return tx.RowsAffected, nil
 }
