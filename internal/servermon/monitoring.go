@@ -10,6 +10,12 @@ import (
 )
 
 var (
+	QueryTimeAuditLogCleanUpHistogram = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: "jem",
+		Name:      "db_query_audit_clean_up_duration_seconds",
+		Help:      "Histogram of query time for audit_log clean up in seconds",
+		Buckets:   []float64{.005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10},
+	})
 	AuthenticationFailCount = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: "jem",
 		Subsystem: "auth",
