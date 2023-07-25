@@ -285,5 +285,5 @@ CREATE TABLE IF NOT EXISTS groups (
 CREATE INDEX IF NOT EXISTS idx_group_deleted_at ON groups (deleted_at);
 CREATE INDEX IF NOT EXISTS idx_group_name ON groups (name);
 
-UPDATE versions SET major=1, minor=0 WHERE component='jimmdb';
+UPDATE versions SET major=1, minor=1 WHERE component='jimmdb';
 

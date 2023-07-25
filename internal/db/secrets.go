@@ -15,9 +15,8 @@ import (
 
 const (
 	// These keys provide consistency across get/put methods.
-	usernameKey   = "username"
-	passwordKey   = "password"
-	jwksExpiryKey = "expiry"
+	usernameKey = "username"
+	passwordKey = "password"
 
 	// These constants are used to create the appropriate identifiers for JWKS related data.
 	jwksKind          = "jwks"
@@ -26,16 +25,16 @@ const (
 	jwksExpiryTag     = "jwksExpiry"
 )
 
-// AddSecret stores secret information.
-//   - returns an error with code errors.CodeAlreadyExists if
-//     secret with the same type+tag already exists.
-func (d *Database) AddSecret(ctx context.Context, secret *dbmodel.Secret) error {
+// InsertOrUpdateSecret stores secret information.
+//   - updates the secret if it already exists
+//
+// TODO(Kian): Confirm upsert
+func (d *Database) InsertOrUpdateSecret(ctx context.Context, secret *dbmodel.Secret) error {
 	const op = errors.Op("db.AddSecret")
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
 	}
 	db := d.DB.WithContext(ctx)
-
 	if err := db.Create(secret).Error; err != nil {
 		return errors.E(op, dbError(err))
 	}
@@ -125,7 +124,7 @@ func (d *Database) Put(ctx context.Context, tag names.CloudCredentialTag, attr m
 		return errors.E(op, err, "failed to marshal secret data")
 	}
 	secret := newSecret(tag.Kind(), tag.String(), dataJson)
-	return d.AddSecret(ctx, &secret)
+	return d.InsertOrUpdateSecret(ctx, &secret)
 }
 
 // delete removes the attributes associated with the cloud-credential in
@@ -172,7 +171,7 @@ func (d *Database) PutControllerCredentials(ctx context.Context, controllerName 
 		return errors.E(op, err, "failed to marshal secret data")
 	}
 	secret := newSecret(names.ControllerTagKind, controllerName, dataJson)
-	return d.AddSecret(ctx, &secret)
+	return d.InsertOrUpdateSecret(ctx, &secret)
 }
 
 // CleanupJWKS removes all secrets associated with the JWKS process.
@@ -200,12 +199,17 @@ func (d *Database) GetJWKS(ctx context.Context) (jwk.Set, error) {
 // GetJWKSPrivateKey returns the current private key for the active JWKS
 func (d *Database) GetJWKSPrivateKey(ctx context.Context) ([]byte, error) {
 	const op = errors.Op("database.GetJWKSPrivateKey")
-	secret := newSecret(jwksKind, jwksPublicKeyTag, nil)
+	secret := newSecret(jwksKind, jwksPrivateKeyTag, nil)
 	err := d.GetSecret(ctx, &secret)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
-	return secret.Data, nil
+	var pem []byte
+	err = json.Unmarshal(secret.Data, &pem)
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+	return pem, nil
 }
 
 // GetJWKSExpiry returns the expiry of the active JWKS.
@@ -216,16 +220,12 @@ func (d *Database) GetJWKSExpiry(ctx context.Context) (time.Time, error) {
 	if err != nil {
 		return time.Time{}, errors.E(op, err)
 	}
-	var secretData map[string]time.Time
-	err = json.Unmarshal(secret.Data, &secretData)
+	var expiryTime time.Time
+	err = json.Unmarshal(secret.Data, &expiryTime)
 	if err != nil {
 		return time.Time{}, errors.E(op, err)
 	}
-	expiry, ok := secretData[jwksExpiryKey]
-	if !ok {
-		return time.Time{}, errors.E(op, "failed to retrieve expiry")
-	}
-	return expiry, nil
+	return expiryTime, nil
 }
 
 // PutJWKS puts a JWKS into the credential store.
@@ -236,25 +236,28 @@ func (d *Database) PutJWKS(ctx context.Context, jwks jwk.Set) error {
 		return errors.E(op, err, "failed to marshal jwks data")
 	}
 	secret := newSecret(jwksKind, jwksPublicKeyTag, jwksJson)
-	return d.AddSecret(ctx, &secret)
+	return d.InsertOrUpdateSecret(ctx, &secret)
 
 }
 
 // PutJWKSPrivateKey persists the private key associated with the current JWKS within the store.
 func (d *Database) PutJWKSPrivateKey(ctx context.Context, pem []byte) error {
 	const op = errors.Op("database.PutJWKSPrivateKey")
-	secret := newSecret(jwksKind, jwksPrivateKeyTag, pem)
-	return d.AddSecret(ctx, &secret)
+	privateKeyJson, err := json.Marshal(pem)
+	if err != nil {
+		return errors.E(op, err, "failed to marshal jwks private key")
+	}
+	secret := newSecret(jwksKind, jwksPrivateKeyTag, privateKeyJson)
+	return d.InsertOrUpdateSecret(ctx, &secret)
 }
 
 // PutJWKSExpiry sets the expiry time for the current JWKS within the store.
 func (d *Database) PutJWKSExpiry(ctx context.Context, expiry time.Time) error {
 	const op = errors.Op("database.PutJWKSExpiry")
-	expiryMap := map[string]time.Time{jwksExpiryKey: expiry}
-	expiryJson, err := json.Marshal(expiryMap)
+	expiryJson, err := json.Marshal(expiry)
 	if err != nil {
 		return errors.E(op, err, "failed to marshal jwks data")
 	}
 	secret := newSecret(jwksKind, jwksExpiryTag, expiryJson)
-	return d.AddSecret(ctx, &secret)
+	return d.InsertOrUpdateSecret(ctx, &secret)
 }

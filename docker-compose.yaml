@@ -43,10 +43,12 @@ services:
       # Not needed for local test (yet).
       # BAKERY_AGENT_FILE: ""
       JIMM_ADMINS: "jimm@candid.localhost"
-      VAULT_ADDR: "http://vault:8200"
-      VAULT_PATH: "/jimm-kv/"
-      VAULT_SECRET_FILE: "/vault/approle.json"
-      VAULT_AUTH_PATH: "/auth/approle/login"
+      # Note: You can comment out the Vault ENV vars below and instead use INSECURE_SECRET_STORAGE to place secrets in Postgres.
+      # VAULT_ADDR: "http://vault:8200"
+      # VAULT_PATH: "/jimm-kv/"
+      # VAULT_SECRET_FILE: "/vault/approle.json"
+      # VAULT_AUTH_PATH: "/auth/approle/login"
+      INSECURE_SECRET_STORAGE: "enabled"
       # JIMM_DASHBOARD_LOCATION: ""
       JIMM_DNS_NAME: "jimm.localhost"
       JIMM_WATCH_CONTROLLERS: ""
