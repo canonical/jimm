@@ -23,6 +23,19 @@ MINIMAL_CONFIG = {
     "vault-access-address": "10.0.1.123",
 }
 
+EXPECTED_ENV = {
+    "CANDID_URL": "test-candid-url",
+    "JIMM_DASHBOARD_LOCATION": "https://jaas.ai/models",
+    "JIMM_DNS_NAME": "juju-jimm-k8s-0.juju-jimm-k8s-endpoints.None.svc.cluster.local",
+    "JIMM_ENABLE_JWKS_ROTATOR": "1",
+    "JIMM_LISTEN_ADDR": ":8080",
+    "JIMM_LOG_LEVEL": "info",
+    "JIMM_UUID": "1234567890",
+    "JIMM_WATCH_CONTROLLERS": "1",
+    "PRIVATE_KEY": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
+    "PUBLIC_KEY": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
+}
+
 
 class MockExec:
     def wait_output():
@@ -70,18 +83,7 @@ class TestCharm(unittest.TestCase):
                         "startup": "disabled",
                         "override": "replace",
                         "command": "/root/jimmsrv",
-                        "environment": {
-                            "CANDID_URL": "test-candid-url",
-                            "JIMM_DASHBOARD_LOCATION": "https://jaas.ai/models",
-                            "JIMM_DNS_NAME": "juju-jimm-k8s-0.juju-jimm-k8s-endpoints.None.svc.cluster.local",
-                            "JIMM_ENABLE_JWKS_ROTATOR": "1",
-                            "JIMM_LISTEN_ADDR": ":8080",
-                            "JIMM_LOG_LEVEL": "info",
-                            "JIMM_UUID": "1234567890",
-                            "JIMM_WATCH_CONTROLLERS": "1",
-                            "PRIVATE_KEY": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
-                            "PUBLIC_KEY": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
-                        },
+                        "environment": EXPECTED_ENV,
                     }
                 }
             },
@@ -108,18 +110,37 @@ class TestCharm(unittest.TestCase):
                         "startup": "disabled",
                         "override": "replace",
                         "command": "/root/jimmsrv",
-                        "environment": {
-                            "CANDID_URL": "test-candid-url",
-                            "JIMM_DASHBOARD_LOCATION": "https://jaas.ai/models",
-                            "JIMM_DNS_NAME": "juju-jimm-k8s-0.juju-jimm-k8s-endpoints.None.svc.cluster.local",
-                            "JIMM_ENABLE_JWKS_ROTATOR": "1",
-                            "JIMM_LISTEN_ADDR": ":8080",
-                            "JIMM_LOG_LEVEL": "info",
-                            "JIMM_UUID": "1234567890",
-                            "JIMM_WATCH_CONTROLLERS": "1",
-                            "PRIVATE_KEY": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
-                            "PUBLIC_KEY": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
-                        },
+                        "environment": EXPECTED_ENV,
+                    }
+                }
+            },
+        )
+
+    def test_postgres_secret_storage_config(self):
+        container = self.harness.model.unit.get_container("jimm")
+        self.harness.charm.on.jimm_pebble_ready.emit(container)
+
+        self.harness.update_config(MINIMAL_CONFIG)
+        self.harness.update_config({"postgres-secret-storage": True})
+        self.harness.set_leader(True)
+
+        # Emit the pebble-ready event for jimm
+        self.harness.charm.on.jimm_pebble_ready.emit(container)
+
+        # Check the that the plan was updated
+        plan = self.harness.get_container_pebble_plan("jimm")
+        expected_env = EXPECTED_ENV.copy()
+        expected_env.update({"INSECURE_SECRET_STORAGE": "enabled"})
+        self.assertEqual(
+            plan.to_dict(),
+            {
+                "services": {
+                    "jimm": {
+                        "summary": "JAAS Intelligent Model Manager",
+                        "startup": "disabled",
+                        "override": "replace",
+                        "command": "/root/jimmsrv",
+                        "environment": expected_env,
                     }
                 }
             },
@@ -143,7 +164,8 @@ class TestCharm(unittest.TestCase):
 
         # Emit the pebble-ready event for jimm
         self.harness.charm.on.jimm_pebble_ready.emit(container)
-
+        expected_env = EXPECTED_ENV.copy()
+        expected_env.update({"BAKERY_AGENT_FILE": "/root/config/agent.json"})
         # Check the that the plan was updated
         plan = self.harness.get_container_pebble_plan("jimm")
         self.assertEqual(
@@ -155,19 +177,7 @@ class TestCharm(unittest.TestCase):
                         "startup": "disabled",
                         "override": "replace",
                         "command": "/root/jimmsrv",
-                        "environment": {
-                            "BAKERY_AGENT_FILE": "/root/config/agent.json",
-                            "CANDID_URL": "test-candid-url",
-                            "JIMM_DASHBOARD_LOCATION": "https://jaas.ai/models",
-                            "JIMM_DNS_NAME": "juju-jimm-k8s-0.juju-jimm-k8s-endpoints.None.svc.cluster.local",
-                            "JIMM_ENABLE_JWKS_ROTATOR": "1",
-                            "JIMM_LISTEN_ADDR": ":8080",
-                            "JIMM_LOG_LEVEL": "info",
-                            "JIMM_UUID": "1234567890",
-                            "JIMM_WATCH_CONTROLLERS": "1",
-                            "PRIVATE_KEY": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
-                            "PUBLIC_KEY": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
-                        },
+                        "environment": expected_env,
                     }
                 }
             },
