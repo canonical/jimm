@@ -75,10 +75,10 @@ func (d *Database) DeleteSecret(ctx context.Context, secret *dbmodel.Secret) err
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
 	}
-	db := d.DB.WithContext(ctx)
 	if secret.Tag == "" || secret.Type == "" {
 		return errors.E(op, "missing secret tag and type", errors.CodeBadRequest)
 	}
+	db := d.DB.WithContext(ctx)
 
 	if err := db.Unscoped().Where("tag = ? AND type = ?", secret.Tag, secret.Type).Delete(&dbmodel.Secret{}).Error; err != nil {
 		return errors.E(op, dbError(err))
