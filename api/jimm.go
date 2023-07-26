@@ -176,3 +176,10 @@ func (c *Client) CrossModelQuery(req *params.CrossModelQueryRequest) (*params.Cr
 	err := c.caller.APICall("JIMM", 4, "", "CrossModelQuery", req, &response)
 	return &response, err
 }
+
+// PurgeLogs purges logs from the database before the given date.
+func (c *Client) PurgeLogs(req *params.PurgeLogsRequest) (*params.PurgeLogsResponse, error) {
+	var response params.PurgeLogsResponse
+	err := c.caller.APICall("JIMM", 4, "", "PurgeLogs", req, &response)
+	return &response, err
+}
