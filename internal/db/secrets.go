@@ -10,7 +10,9 @@ import (
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/juju/names/v4"
+	"github.com/juju/zaputil/zapctx"
 	"github.com/lestrrat-go/jwx/v2/jwk"
+	"go.uber.org/zap"
 	"gorm.io/gorm/clause"
 )
 
@@ -46,7 +48,7 @@ func (d *Database) UpsertSecret(ctx context.Context, secret *dbmodel.Secret) err
 
 // GetSecret gets the secret with the specified type and tag.
 func (d *Database) GetSecret(ctx context.Context, secret *dbmodel.Secret) error {
-	const op = errors.Op("db.AddSecret")
+	const op = errors.Op("db.GetSecret")
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
 	}
@@ -90,11 +92,13 @@ func (d *Database) Get(ctx context.Context, tag names.CloudCredentialTag) (map[s
 	secret := dbmodel.NewSecret(tag.Kind(), tag.String(), nil)
 	err := d.GetSecret(ctx, &secret)
 	if err != nil {
+		zapctx.Error(ctx, "failed to get secret data", zap.Error(err))
 		return nil, errors.E(op, err)
 	}
 	var attr map[string]string
 	err = json.Unmarshal(secret.Data, &attr)
 	if err != nil {
+		zapctx.Error(ctx, "failed to unmarshal secret data", zap.Error(err))
 		return nil, errors.E(op, err)
 	}
 	return attr, nil
@@ -108,6 +112,7 @@ func (d *Database) Put(ctx context.Context, tag names.CloudCredentialTag, attr m
 	}
 	dataJson, err := json.Marshal(attr)
 	if err != nil {
+		zapctx.Error(ctx, "failed to marshal secret data", zap.Error(err))
 		return errors.E(op, err, "failed to marshal secret data")
 	}
 	secret := dbmodel.NewSecret(tag.Kind(), tag.String(), dataJson)
@@ -126,11 +131,13 @@ func (d *Database) GetControllerCredentials(ctx context.Context, controllerName 
 	secret := dbmodel.NewSecret(names.ControllerTagKind, controllerName, nil)
 	err := d.GetSecret(ctx, &secret)
 	if err != nil {
+		zapctx.Error(ctx, "failed to get secret data", zap.Error(err))
 		return "", "", errors.E(op, err)
 	}
 	var secretData map[string]string
 	err = json.Unmarshal(secret.Data, &secretData)
 	if err != nil {
+		zapctx.Error(ctx, "failed to unmarshal secret data", zap.Error(err))
 		return "", "", errors.E(op, err)
 	}
 	username, ok := secretData[usernameKey]
@@ -152,6 +159,7 @@ func (d *Database) PutControllerCredentials(ctx context.Context, controllerName 
 	secretData[passwordKey] = password
 	dataJson, err := json.Marshal(secretData)
 	if err != nil {
+		zapctx.Error(ctx, "failed to unmarshal secret data", zap.Error(err))
 		return errors.E(op, err, "failed to marshal secret data")
 	}
 	secret := dbmodel.NewSecret(names.ControllerTagKind, controllerName, dataJson)
@@ -162,7 +170,24 @@ func (d *Database) PutControllerCredentials(ctx context.Context, controllerName 
 func (d *Database) CleanupJWKS(ctx context.Context) error {
 	const op = errors.Op("database.CleanupJWKS")
 	secret := dbmodel.NewSecret(jwksKind, jwksPublicKeyTag, nil)
-	return d.DeleteSecret(ctx, &secret)
+	err := d.DeleteSecret(ctx, &secret)
+	if err != nil {
+		zapctx.Error(ctx, "failed to cleanup jwks public key", zap.Error(err))
+		return errors.E(op, err, "failed to cleanup jwks public key")
+	}
+	secret = dbmodel.NewSecret(jwksKind, jwksPrivateKeyTag, nil)
+	err = d.DeleteSecret(ctx, &secret)
+	if err != nil {
+		zapctx.Error(ctx, "failed to cleanup jwks private key", zap.Error(err))
+		return errors.E(op, err, "failed to cleanup jwks private key")
+	}
+	secret = dbmodel.NewSecret(jwksKind, jwksExpiryTag, nil)
+	err = d.DeleteSecret(ctx, &secret)
+	if err != nil {
+		zapctx.Error(ctx, "failed to cleanup jwks expiry info", zap.Error(err))
+		return errors.E(op, err, "failed to cleanup jwks expiry info")
+	}
+	return nil
 }
 
 // GetJWKS returns the current key set stored within the DB.
@@ -171,10 +196,12 @@ func (d *Database) GetJWKS(ctx context.Context) (jwk.Set, error) {
 	secret := dbmodel.NewSecret(jwksKind, jwksPublicKeyTag, nil)
 	err := d.GetSecret(ctx, &secret)
 	if err != nil {
+		zapctx.Error(ctx, "failed to get jwks data", zap.Error(err))
 		return nil, errors.E(op, err)
 	}
 	ks, err := jwk.ParseString(string(secret.Data))
 	if err != nil {
+		zapctx.Error(ctx, "failed to parse jwk data", zap.Error(err))
 		return nil, errors.E(op, err)
 	}
 	return ks, nil
@@ -186,11 +213,13 @@ func (d *Database) GetJWKSPrivateKey(ctx context.Context) ([]byte, error) {
 	secret := dbmodel.NewSecret(jwksKind, jwksPrivateKeyTag, nil)
 	err := d.GetSecret(ctx, &secret)
 	if err != nil {
+		zapctx.Error(ctx, "failed to get jwks jwks private key", zap.Error(err))
 		return nil, errors.E(op, err)
 	}
 	var pem []byte
 	err = json.Unmarshal(secret.Data, &pem)
 	if err != nil {
+		zapctx.Error(ctx, "failed to unmarshal pem data data", zap.Error(err))
 		return nil, errors.E(op, err)
 	}
 	return pem, nil
@@ -202,11 +231,13 @@ func (d *Database) GetJWKSExpiry(ctx context.Context) (time.Time, error) {
 	secret := dbmodel.NewSecret(jwksKind, jwksExpiryTag, nil)
 	err := d.GetSecret(ctx, &secret)
 	if err != nil {
+		zapctx.Error(ctx, "failed to get jwks expiry", zap.Error(err))
 		return time.Time{}, errors.E(op, err)
 	}
 	var expiryTime time.Time
 	err = json.Unmarshal(secret.Data, &expiryTime)
 	if err != nil {
+		zapctx.Error(ctx, "failed to unmarshal jwks expiry data", zap.Error(err))
 		return time.Time{}, errors.E(op, err)
 	}
 	return expiryTime, nil
@@ -217,6 +248,7 @@ func (d *Database) PutJWKS(ctx context.Context, jwks jwk.Set) error {
 	const op = errors.Op("database.PutJWKS")
 	jwksJson, err := json.Marshal(jwks)
 	if err != nil {
+		zapctx.Error(ctx, "failed to marshal jwks", zap.Error(err))
 		return errors.E(op, err, "failed to marshal jwks data")
 	}
 	secret := dbmodel.NewSecret(jwksKind, jwksPublicKeyTag, jwksJson)
@@ -229,6 +261,7 @@ func (d *Database) PutJWKSPrivateKey(ctx context.Context, pem []byte) error {
 	const op = errors.Op("database.PutJWKSPrivateKey")
 	privateKeyJson, err := json.Marshal(pem)
 	if err != nil {
+		zapctx.Error(ctx, "failed to marshal pem data", zap.Error(err))
 		return errors.E(op, err, "failed to marshal jwks private key")
 	}
 	secret := dbmodel.NewSecret(jwksKind, jwksPrivateKeyTag, privateKeyJson)
@@ -240,6 +273,7 @@ func (d *Database) PutJWKSExpiry(ctx context.Context, expiry time.Time) error {
 	const op = errors.Op("database.PutJWKSExpiry")
 	expiryJson, err := json.Marshal(expiry)
 	if err != nil {
+		zapctx.Error(ctx, "failed to marshal jwks expiry data", zap.Error(err))
 		return errors.E(op, err, "failed to marshal jwks data")
 	}
 	secret := dbmodel.NewSecret(jwksKind, jwksExpiryTag, expiryJson)

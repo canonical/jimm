@@ -302,6 +302,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	} else {
 		// Only enable Postgres storage for secrets if explictly enabled.
 		if _, ok := os.LookupEnv("INSECURE_SECRET_STORAGE"); ok {
+			zapctx.Warn(ctx, "using plaintext postgres for secret storage")
 			s.jimm.CredentialStore = &s.jimm.Database
 		}
 	}
