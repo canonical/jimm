@@ -11,6 +11,7 @@ import (
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/juju/names/v4"
 	"github.com/lestrrat-go/jwx/v2/jwk"
+	"gorm.io/gorm/clause"
 )
 
 const (
@@ -25,16 +26,18 @@ const (
 	jwksExpiryTag     = "jwksExpiry"
 )
 
-// InsertOrUpdateSecret stores secret information.
+// UpsertSecret stores secret information.
 //   - updates the secret if it already exists
-//
-// TODO(Kian): Confirm upsert
-func (d *Database) InsertOrUpdateSecret(ctx context.Context, secret *dbmodel.Secret) error {
+func (d *Database) UpsertSecret(ctx context.Context, secret *dbmodel.Secret) error {
 	const op = errors.Op("db.AddSecret")
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
 	}
-	db := d.DB.WithContext(ctx)
+	// On conflict perform an upset to make the operation resemble a Put.
+	db := d.DB.WithContext(ctx).Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "type"}, {Name: "tag"}},
+		DoUpdates: clause.AssignmentColumns([]string{"time", "data"}),
+	})
 	if err := db.Create(secret).Error; err != nil {
 		return errors.E(op, dbError(err))
 	}
@@ -69,22 +72,12 @@ func (d *Database) DeleteSecret(ctx context.Context, secret *dbmodel.Secret) err
 		return errors.E(op, err)
 	}
 	db := d.DB.WithContext(ctx)
+	if secret.Tag == "" || secret.Type == "" {
+		return errors.E(op, "missing secret tag and type", errors.CodeBadRequest)
+	}
 
 	if err := db.Unscoped().Where("tag = ?", secret.Tag).Where("type = ?", secret.Type).Delete(&dbmodel.Secret{}).Error; err != nil {
 		return errors.E(op, dbError(err))
-	}
-	return nil
-}
-
-func (d *Database) UpdateSecret(ctx context.Context, secret *dbmodel.Secret) error {
-	const op = errors.Op("db.UpdateSecret")
-	if err := d.ready(); err != nil {
-		return errors.E(op, err)
-	}
-	db := d.DB.WithContext(ctx)
-	db = db.Save(secret)
-	if db.Error != nil {
-		return errors.E(op, dbError(db.Error))
 	}
 	return nil
 }
@@ -124,7 +117,7 @@ func (d *Database) Put(ctx context.Context, tag names.CloudCredentialTag, attr m
 		return errors.E(op, err, "failed to marshal secret data")
 	}
 	secret := newSecret(tag.Kind(), tag.String(), dataJson)
-	return d.InsertOrUpdateSecret(ctx, &secret)
+	return d.UpsertSecret(ctx, &secret)
 }
 
 // delete removes the attributes associated with the cloud-credential in
@@ -171,7 +164,7 @@ func (d *Database) PutControllerCredentials(ctx context.Context, controllerName 
 		return errors.E(op, err, "failed to marshal secret data")
 	}
 	secret := newSecret(names.ControllerTagKind, controllerName, dataJson)
-	return d.InsertOrUpdateSecret(ctx, &secret)
+	return d.UpsertSecret(ctx, &secret)
 }
 
 // CleanupJWKS removes all secrets associated with the JWKS process.
@@ -236,7 +229,7 @@ func (d *Database) PutJWKS(ctx context.Context, jwks jwk.Set) error {
 		return errors.E(op, err, "failed to marshal jwks data")
 	}
 	secret := newSecret(jwksKind, jwksPublicKeyTag, jwksJson)
-	return d.InsertOrUpdateSecret(ctx, &secret)
+	return d.UpsertSecret(ctx, &secret)
 
 }
 
@@ -248,7 +241,7 @@ func (d *Database) PutJWKSPrivateKey(ctx context.Context, pem []byte) error {
 		return errors.E(op, err, "failed to marshal jwks private key")
 	}
 	secret := newSecret(jwksKind, jwksPrivateKeyTag, privateKeyJson)
-	return d.InsertOrUpdateSecret(ctx, &secret)
+	return d.UpsertSecret(ctx, &secret)
 }
 
 // PutJWKSExpiry sets the expiry time for the current JWKS within the store.
@@ -259,5 +252,5 @@ func (d *Database) PutJWKSExpiry(ctx context.Context, expiry time.Time) error {
 		return errors.E(op, err, "failed to marshal jwks data")
 	}
 	secret := newSecret(jwksKind, jwksExpiryTag, expiryJson)
-	return d.InsertOrUpdateSecret(ctx, &secret)
+	return d.UpsertSecret(ctx, &secret)
 }
