@@ -358,7 +358,7 @@ type CrossModelQueryResponse struct {
 // PurgeLogsRequest is the request used to purge logs.
 type PurgeLogsRequest struct {
 	// Date is the date before which logs should be purged.
-	Date string `json:"date"`
+	Date time.Time `json:"date"`
 }
 
 // PurgeLogsResponse is the response returned by the PurgeLogs method.

@@ -36,7 +36,7 @@ type purgeLogsCommand struct {
 	dialOpts *jujuapi.DialOpts
 	out      cmd.Output
 
-	date string
+	date time.Time
 }
 
 // Info implements Command.Info. It returns the command information.
@@ -102,7 +102,7 @@ func (c *purgeLogsCommand) Run(ctx *cmd.Context) error {
 
 // parseDate validates the date string is in ISO8601 format. If it is, it
 // sets the date field in the command.
-func parseDate(date string) (string, error) {
+func parseDate(date string) (time.Time, error) {
 	// Define the possible ISO8601 date layouts
 	layouts := []string{
 		"2006-01-02T15:04:05-0700",
@@ -114,14 +114,14 @@ func parseDate(date string) (string, error) {
 
 	// Try to parse the date string using the defined layouts
 	for _, layout := range layouts {
-		_, err := time.Parse(layout, date)
+		date_time, err := time.Parse(layout, date)
 		if err == nil {
 			// If parsing was successful, the date is valid
 			// You can use the parsed time t if needed
-			return date, nil
+			return date_time, nil
 		}
 	}
 
 	// If none of the layouts match, the date is not in the correct format
-	return "", errors.E("invalid date. Expected ISO8601 date")
+	return time.Time{}, errors.E("invalid date. Expected ISO8601 date")
 }
