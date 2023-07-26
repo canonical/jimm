@@ -34,6 +34,7 @@ EXPECTED_ENV = {
     "JIMM_WATCH_CONTROLLERS": "1",
     "PRIVATE_KEY": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
     "PUBLIC_KEY": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
+    "JIMM_AUDIT_LOG_RETENTION_PERIOD_IN_DAYS": "0",
 }
 
 
@@ -192,6 +193,34 @@ class TestCharm(unittest.TestCase):
                     "private": "test-private-key",
                 },
                 "agents": [{"url": "test-candid-url", "username": "test-username"}],
+            },
+        )
+
+    def test_audit_log_retention_config(self):
+        container = self.harness.model.unit.get_container("jimm")
+        self.harness.charm.on.jimm_pebble_ready.emit(container)
+
+        self.harness.update_config(MINIMAL_CONFIG)
+        self.harness.update_config({"audit-log-retention-period-in-days": "10"})
+
+        # Emit the pebble-ready event for jimm
+        self.harness.charm.on.jimm_pebble_ready.emit(container)
+        expected_env = EXPECTED_ENV.copy()
+        expected_env.update({"JIMM_AUDIT_LOG_RETENTION_PERIOD_IN_DAYS": "10"})
+        # Check the that the plan was updated
+        plan = self.harness.get_container_pebble_plan("jimm")
+        self.assertEqual(
+            plan.to_dict(),
+            {
+                "services": {
+                    "jimm": {
+                        "summary": "JAAS Intelligent Model Manager",
+                        "startup": "disabled",
+                        "override": "replace",
+                        "command": "/root/jimmsrv",
+                        "environment": expected_env,
+                    }
+                }
             },
         )
 
