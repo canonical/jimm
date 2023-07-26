@@ -1,4 +1,4 @@
--- 0_0.sql initialises an empty database.
+-- 1_1.sql initialises an empty database.
 
 CREATE TABLE audit_log (
 	id INTEGER PRIMARY KEY,

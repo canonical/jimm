@@ -109,8 +109,8 @@ func (s *dbSuite) TestDeleteSecret(c *qt.C) {
 	secret := dbmodel.Secret{Type: "generic", Tag: "123"}
 	c.Assert(s.Database.DeleteSecret(ctx, &secret), qt.IsNil)
 	var count int64
-	c.Assert(s.Database.DB.Count(&count).Error, qt.IsNil)
-	c.Assert(count, qt.Equals, 0)
+	c.Assert(s.Database.DB.Model(&dbmodel.Secret{}).Count(&count).Error, qt.IsNil)
+	c.Assert(count, qt.Equals, int64(0))
 }
 
 func (s *dbSuite) TestPutAndGetCloudCredential(c *qt.C) {

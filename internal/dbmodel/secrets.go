@@ -19,3 +19,9 @@ type Secret struct {
 	// Contains the secret data.
 	Data JSON
 }
+
+// newSecret creates a secret object with the time set to the current time
+// and the type and tag fields set from the tag object
+func NewSecret(secretType string, secretTag string, data []byte) Secret {
+	return Secret{Time: time.Now(), Type: secretType, Tag: secretTag, Data: data}
+}

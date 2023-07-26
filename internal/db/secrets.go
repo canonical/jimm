@@ -50,12 +50,12 @@ func (d *Database) GetSecret(ctx context.Context, secret *dbmodel.Secret) error 
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
 	}
-	db := d.DB.WithContext(ctx)
 	if secret.Tag == "" || secret.Type == "" {
 		return errors.E(op, "missing secret tag and type", errors.CodeBadRequest)
 	}
+	db := d.DB.WithContext(ctx)
 
-	db = db.Where("tag = ?", secret.Tag).Where("type = ?", secret.Type)
+	db = db.Where("tag = ? AND type = ?", secret.Tag, secret.Type)
 
 	if err := db.First(&secret).Error; err != nil {
 		err = dbError(err)
@@ -78,22 +78,16 @@ func (d *Database) DeleteSecret(ctx context.Context, secret *dbmodel.Secret) err
 		return errors.E(op, "missing secret tag and type", errors.CodeBadRequest)
 	}
 
-	if err := db.Unscoped().Where("tag = ?", secret.Tag).Where("type = ?", secret.Type).Delete(&dbmodel.Secret{}).Error; err != nil {
+	if err := db.Unscoped().Where("tag = ? AND type = ?", secret.Tag, secret.Type).Delete(&dbmodel.Secret{}).Error; err != nil {
 		return errors.E(op, dbError(err))
 	}
 	return nil
 }
 
-// newSecret creates a secret object with the time set to the current time
-// and the type and tag fields set from the tag object
-func newSecret(secretType string, secretTag string, data []byte) dbmodel.Secret {
-	return dbmodel.Secret{Time: time.Now(), Type: secretType, Tag: secretTag, Data: data}
-}
-
 // Get retrieves the attributes for the given cloud credential from the DB.
 func (d *Database) Get(ctx context.Context, tag names.CloudCredentialTag) (map[string]string, error) {
 	const op = errors.Op("database.Get")
-	secret := newSecret(tag.Kind(), tag.String(), nil)
+	secret := dbmodel.NewSecret(tag.Kind(), tag.String(), nil)
 	err := d.GetSecret(ctx, &secret)
 	if err != nil {
 		return nil, errors.E(op, err)
@@ -110,26 +104,26 @@ func (d *Database) Get(ctx context.Context, tag names.CloudCredentialTag) (map[s
 func (d *Database) Put(ctx context.Context, tag names.CloudCredentialTag, attr map[string]string) error {
 	const op = errors.Op("database.Put")
 	if len(attr) == 0 {
-		return d.delete(ctx, tag)
+		return d.deleteCloudCredential(ctx, tag)
 	}
 	dataJson, err := json.Marshal(attr)
 	if err != nil {
 		return errors.E(op, err, "failed to marshal secret data")
 	}
-	secret := newSecret(tag.Kind(), tag.String(), dataJson)
+	secret := dbmodel.NewSecret(tag.Kind(), tag.String(), dataJson)
 	return d.UpsertSecret(ctx, &secret)
 }
 
-// delete removes the attributes associated with the cloud-credential in the DB.
-func (d *Database) delete(ctx context.Context, tag names.CloudCredentialTag) error {
-	secret := newSecret(tag.Kind(), tag.String(), nil)
+// deleteCloudCredential removes the attributes associated with the cloud-credential in the DB.
+func (d *Database) deleteCloudCredential(ctx context.Context, tag names.CloudCredentialTag) error {
+	secret := dbmodel.NewSecret(tag.Kind(), tag.String(), nil)
 	return d.DeleteSecret(ctx, &secret)
 }
 
 // GetControllerCredentials retrieves the credentials for the given controller from the DB.
 func (d *Database) GetControllerCredentials(ctx context.Context, controllerName string) (string, string, error) {
 	const op = errors.Op("database.GetControllerCredentials")
-	secret := newSecret(names.ControllerTagKind, controllerName, nil)
+	secret := dbmodel.NewSecret(names.ControllerTagKind, controllerName, nil)
 	err := d.GetSecret(ctx, &secret)
 	if err != nil {
 		return "", "", errors.E(op, err)
@@ -160,21 +154,21 @@ func (d *Database) PutControllerCredentials(ctx context.Context, controllerName 
 	if err != nil {
 		return errors.E(op, err, "failed to marshal secret data")
 	}
-	secret := newSecret(names.ControllerTagKind, controllerName, dataJson)
+	secret := dbmodel.NewSecret(names.ControllerTagKind, controllerName, dataJson)
 	return d.UpsertSecret(ctx, &secret)
 }
 
 // CleanupJWKS removes all secrets associated with the JWKS process.
 func (d *Database) CleanupJWKS(ctx context.Context) error {
 	const op = errors.Op("database.CleanupJWKS")
-	secret := newSecret(jwksKind, jwksPublicKeyTag, nil)
+	secret := dbmodel.NewSecret(jwksKind, jwksPublicKeyTag, nil)
 	return d.DeleteSecret(ctx, &secret)
 }
 
 // GetJWKS returns the current key set stored within the DB.
 func (d *Database) GetJWKS(ctx context.Context) (jwk.Set, error) {
 	const op = errors.Op("database.GetJWKS")
-	secret := newSecret(jwksKind, jwksPublicKeyTag, nil)
+	secret := dbmodel.NewSecret(jwksKind, jwksPublicKeyTag, nil)
 	err := d.GetSecret(ctx, &secret)
 	if err != nil {
 		return nil, errors.E(op, err)
@@ -189,7 +183,7 @@ func (d *Database) GetJWKS(ctx context.Context) (jwk.Set, error) {
 // GetJWKSPrivateKey returns the current private key for the active JWKS
 func (d *Database) GetJWKSPrivateKey(ctx context.Context) ([]byte, error) {
 	const op = errors.Op("database.GetJWKSPrivateKey")
-	secret := newSecret(jwksKind, jwksPrivateKeyTag, nil)
+	secret := dbmodel.NewSecret(jwksKind, jwksPrivateKeyTag, nil)
 	err := d.GetSecret(ctx, &secret)
 	if err != nil {
 		return nil, errors.E(op, err)
@@ -205,7 +199,7 @@ func (d *Database) GetJWKSPrivateKey(ctx context.Context) ([]byte, error) {
 // GetJWKSExpiry returns the expiry of the active JWKS.
 func (d *Database) GetJWKSExpiry(ctx context.Context) (time.Time, error) {
 	const op = errors.Op("database.GetJWKSExpiry")
-	secret := newSecret(jwksKind, jwksExpiryTag, nil)
+	secret := dbmodel.NewSecret(jwksKind, jwksExpiryTag, nil)
 	err := d.GetSecret(ctx, &secret)
 	if err != nil {
 		return time.Time{}, errors.E(op, err)
@@ -225,7 +219,7 @@ func (d *Database) PutJWKS(ctx context.Context, jwks jwk.Set) error {
 	if err != nil {
 		return errors.E(op, err, "failed to marshal jwks data")
 	}
-	secret := newSecret(jwksKind, jwksPublicKeyTag, jwksJson)
+	secret := dbmodel.NewSecret(jwksKind, jwksPublicKeyTag, jwksJson)
 	return d.UpsertSecret(ctx, &secret)
 
 }
@@ -237,7 +231,7 @@ func (d *Database) PutJWKSPrivateKey(ctx context.Context, pem []byte) error {
 	if err != nil {
 		return errors.E(op, err, "failed to marshal jwks private key")
 	}
-	secret := newSecret(jwksKind, jwksPrivateKeyTag, privateKeyJson)
+	secret := dbmodel.NewSecret(jwksKind, jwksPrivateKeyTag, privateKeyJson)
 	return d.UpsertSecret(ctx, &secret)
 }
 
@@ -248,6 +242,6 @@ func (d *Database) PutJWKSExpiry(ctx context.Context, expiry time.Time) error {
 	if err != nil {
 		return errors.E(op, err, "failed to marshal jwks data")
 	}
-	secret := newSecret(jwksKind, jwksExpiryTag, expiryJson)
+	secret := dbmodel.NewSecret(jwksKind, jwksExpiryTag, expiryJson)
 	return d.UpsertSecret(ctx, &secret)
 }

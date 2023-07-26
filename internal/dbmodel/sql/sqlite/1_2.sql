@@ -1,4 +1,4 @@
--- 0_1.sql is a migration that adds a secrets table.
+-- 1_2.sql is a migration that adds a secrets table.
 
 CREATE TABLE IF NOT EXISTS secrets (
 	id INTEGER PRIMARY KEY,
