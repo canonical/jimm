@@ -21,6 +21,7 @@ MINIMAL_CONFIG = {
     "public-key": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
     "private-key": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
     "vault-access-address": "10.0.1.123",
+    "audit-log-retention-period-in-days": "10",
 }
 
 
@@ -79,6 +80,7 @@ class TestCharm(unittest.TestCase):
                             "JIMM_LOG_LEVEL": "info",
                             "JIMM_UUID": "1234567890",
                             "JIMM_WATCH_CONTROLLERS": "1",
+                            "JIMM_AUDIT_LOG_RETENTION_PERIOD_IN_DAYS": "10",
                             "PRIVATE_KEY": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
                             "PUBLIC_KEY": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
                         },
@@ -117,6 +119,7 @@ class TestCharm(unittest.TestCase):
                             "JIMM_LOG_LEVEL": "info",
                             "JIMM_UUID": "1234567890",
                             "JIMM_WATCH_CONTROLLERS": "1",
+                            "JIMM_AUDIT_LOG_RETENTION_PERIOD_IN_DAYS": "10",
                             "PRIVATE_KEY": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
                             "PUBLIC_KEY": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
                         },
@@ -159,6 +162,7 @@ class TestCharm(unittest.TestCase):
                             "BAKERY_AGENT_FILE": "/root/config/agent.json",
                             "CANDID_URL": "test-candid-url",
                             "JIMM_DASHBOARD_LOCATION": "https://jaas.ai/models",
+                            "JIMM_AUDIT_LOG_RETENTION_PERIOD_IN_DAYS": "0",
                             "JIMM_DNS_NAME": "juju-jimm-k8s-0.juju-jimm-k8s-endpoints.None.svc.cluster.local",
                             "JIMM_ENABLE_JWKS_ROTATOR": "1",
                             "JIMM_LISTEN_ADDR": ":8080",

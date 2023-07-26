@@ -14,6 +14,8 @@ import (
 
 var (
 	DetermineAccessLevelAfterGrant = determineAccessLevelAfterGrant
+	PollDuration                   = pollDuration
+	CalculateNextPollDuration      = calculateNextPollDuration
 )
 
 func (w *Watcher) PollControllerModels(ctx context.Context, ctl *dbmodel.Controller) {
