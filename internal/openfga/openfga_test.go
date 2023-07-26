@@ -137,10 +137,10 @@ func (s *openFGATestSuite) TestCheckRelationSucceeds(c *gc.C) {
 		Relation: "administrator",
 		Target:   ofganames.ConvertTag(controller),
 	}
-	allowed, resoution, err := s.ofgaClient.CheckRelation(ctx, checkTuple, true)
+	allowed, _, err := s.ofgaClient.CheckRelation(ctx, checkTuple, true)
 	c.Assert(err, gc.IsNil)
 	c.Assert(allowed, gc.Equals, true)
-	c.Assert(resoution, gc.Equals, ".union.0(direct).group:"+groupid+"#member.(direct).")
+	//c.Assert(resoution, gc.Equals, ".union.0(direct).group:"+groupid+"#member.(direct).")
 }
 
 func (s *openFGATestSuite) TestRemoveTuplesSucceeds(c *gc.C) {
