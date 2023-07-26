@@ -204,7 +204,7 @@ func (s *relationSuite) TestRemoveRelationViaFileSuperuser(c *gc.C) {
 	file, err := os.CreateTemp(".", "relations.json")
 	c.Assert(err, gc.IsNil)
 	defer os.Remove(file.Name())
-	testRelations := `[{"object":"group-` + group2 + `#member","relation":"member","target_object":"group-` + group3 + `"}]`
+	testRelations := `[{"object":"group-` + group1 + `#member","relation":"member","target_object":"group-` + group3 + `"},{"object":"group-` + group2 + `#member","relation":"member","target_object":"group-` + group3 + `"}]`
 	_, err = file.Write([]byte(testRelations))
 	c.Assert(err, gc.IsNil)
 
