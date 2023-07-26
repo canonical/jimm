@@ -229,8 +229,7 @@ func (s *dbSuite) TestPurgeLogsFromDb(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 	err = s.Database.AddAuditLogEntry(ctx, &ale_future)
 	c.Assert(err, qt.IsNil)
-	tomorrow := relativeNow.AddDate(0, 0, 1)
-	deleted_count, err := s.Database.DeleteAuditLogsBefore(ctx, tomorrow.Format(time.RFC3339))
+	deleted_count, err := s.Database.DeleteAuditLogsBefore(ctx, relativeNow.AddDate(0, 0, 1))
 	// check that logs have been deleted
 	c.Assert(err, qt.IsNil)
 	c.Assert(deleted_count, qt.Equals, int64(2))
