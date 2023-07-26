@@ -27,7 +27,7 @@ const (
 )
 
 // UpsertSecret stores secret information.
-//   - updates the secret if it already exists
+//   - updates the secret's time and data if it already exists
 func (d *Database) UpsertSecret(ctx context.Context, secret *dbmodel.Secret) error {
 	const op = errors.Op("db.AddSecret")
 	if err := d.ready(); err != nil {
@@ -44,6 +44,7 @@ func (d *Database) UpsertSecret(ctx context.Context, secret *dbmodel.Secret) err
 	return nil
 }
 
+// GetSecret gets the secret with the specified type and tag.
 func (d *Database) GetSecret(ctx context.Context, secret *dbmodel.Secret) error {
 	const op = errors.Op("db.AddSecret")
 	if err := d.ready(); err != nil {
@@ -66,6 +67,7 @@ func (d *Database) GetSecret(ctx context.Context, secret *dbmodel.Secret) error 
 	return nil
 }
 
+// Delete secret deletes the secret with the specified type and tag.
 func (d *Database) DeleteSecret(ctx context.Context, secret *dbmodel.Secret) error {
 	const op = errors.Op("db.DeleteSecret")
 	if err := d.ready(); err != nil {
@@ -88,8 +90,7 @@ func newSecret(secretType string, secretTag string, data []byte) dbmodel.Secret 
 	return dbmodel.Secret{Time: time.Now(), Type: secretType, Tag: secretTag, Data: data}
 }
 
-// Get retrieves the attributes for the given cloud credential from a vault
-// service.
+// Get retrieves the attributes for the given cloud credential from the DB.
 func (d *Database) Get(ctx context.Context, tag names.CloudCredentialTag) (map[string]string, error) {
 	const op = errors.Op("database.Get")
 	secret := newSecret(tag.Kind(), tag.String(), nil)
@@ -105,8 +106,7 @@ func (d *Database) Get(ctx context.Context, tag names.CloudCredentialTag) (map[s
 	return attr, nil
 }
 
-// Put stores the attributes associated with a cloud-credential in a vault
-// service.
+// Put stores the attributes associated with a cloud-credential in the DB.
 func (d *Database) Put(ctx context.Context, tag names.CloudCredentialTag, attr map[string]string) error {
 	const op = errors.Op("database.Put")
 	if len(attr) == 0 {
@@ -120,15 +120,13 @@ func (d *Database) Put(ctx context.Context, tag names.CloudCredentialTag, attr m
 	return d.UpsertSecret(ctx, &secret)
 }
 
-// delete removes the attributes associated with the cloud-credential in
-// the database.
+// delete removes the attributes associated with the cloud-credential in the DB.
 func (d *Database) delete(ctx context.Context, tag names.CloudCredentialTag) error {
 	secret := newSecret(tag.Kind(), tag.String(), nil)
 	return d.DeleteSecret(ctx, &secret)
 }
 
-// GetControllerCredentials retrieves the credentials for the given controller from a vault
-// service.
+// GetControllerCredentials retrieves the credentials for the given controller from the DB.
 func (d *Database) GetControllerCredentials(ctx context.Context, controllerName string) (string, string, error) {
 	const op = errors.Op("database.GetControllerCredentials")
 	secret := newSecret(names.ControllerTagKind, controllerName, nil)
@@ -152,8 +150,7 @@ func (d *Database) GetControllerCredentials(ctx context.Context, controllerName 
 	return username, password, nil
 }
 
-// PutControllerCredentials stores the controller credentials in a vault
-// service.
+// PutControllerCredentials stores the controller credentials in the DB.
 func (d *Database) PutControllerCredentials(ctx context.Context, controllerName string, username string, password string) error {
 	const op = errors.Op("database.PutControllerCredentials")
 	secretData := make(map[string]string)
@@ -174,7 +171,7 @@ func (d *Database) CleanupJWKS(ctx context.Context) error {
 	return d.DeleteSecret(ctx, &secret)
 }
 
-// GetJWKS returns the current key set stored within the credential store.
+// GetJWKS returns the current key set stored within the DB.
 func (d *Database) GetJWKS(ctx context.Context) (jwk.Set, error) {
 	const op = errors.Op("database.GetJWKS")
 	secret := newSecret(jwksKind, jwksPublicKeyTag, nil)
@@ -221,7 +218,7 @@ func (d *Database) GetJWKSExpiry(ctx context.Context) (time.Time, error) {
 	return expiryTime, nil
 }
 
-// PutJWKS puts a JWKS into the credential store.
+// PutJWKS puts a JWKS into the DB.
 func (d *Database) PutJWKS(ctx context.Context, jwks jwk.Set) error {
 	const op = errors.Op("database.PutJWKS")
 	jwksJson, err := json.Marshal(jwks)
@@ -233,7 +230,7 @@ func (d *Database) PutJWKS(ctx context.Context, jwks jwk.Set) error {
 
 }
 
-// PutJWKSPrivateKey persists the private key associated with the current JWKS within the store.
+// PutJWKSPrivateKey persists the private key associated with the current JWKS within the DB.
 func (d *Database) PutJWKSPrivateKey(ctx context.Context, pem []byte) error {
 	const op = errors.Op("database.PutJWKSPrivateKey")
 	privateKeyJson, err := json.Marshal(pem)
@@ -244,7 +241,7 @@ func (d *Database) PutJWKSPrivateKey(ctx context.Context, pem []byte) error {
 	return d.UpsertSecret(ctx, &secret)
 }
 
-// PutJWKSExpiry sets the expiry time for the current JWKS within the store.
+// PutJWKSExpiry sets the expiry time for the current JWKS within the DB.
 func (d *Database) PutJWKSExpiry(ctx context.Context, expiry time.Time) error {
 	const op = errors.Op("database.PutJWKSExpiry")
 	expiryJson, err := json.Marshal(expiry)
