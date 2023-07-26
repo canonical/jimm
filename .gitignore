@@ -18,5 +18,5 @@ local/vault/roleid.txt
 *.crt
 *.key
 *.csr
-jimmctl
+/jimmctl
 qa-controller
