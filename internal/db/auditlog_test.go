@@ -150,6 +150,60 @@ func (s *dbSuite) TestForEachAuditLogEntry(c *qt.C) {
 	c.Check(err, qt.DeepEquals, testError)
 }
 
+func (s *dbSuite) TestDeleteAuditLogsBefore(c *qt.C) {
+	ctx := context.Background()
+	now := time.Now()
+
+	err := s.Database.AddAuditLogEntry(ctx, &dbmodel.AuditLogEntry{
+		Time: now.AddDate(0, 0, -1),
+	})
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
+
+	err = s.Database.Migrate(context.Background(), true)
+	c.Assert(err, qt.IsNil)
+
+	// Delete all when none exist
+	retentionDate := time.Now()
+	deleted, err := s.Database.DeleteAuditLogsBefore(ctx, retentionDate)
+	c.Assert(err, qt.IsNil)
+	c.Assert(deleted, qt.Equals, int64(0))
+
+	// A log from 1 day ago
+	c.Assert(s.Database.AddAuditLogEntry(ctx, &dbmodel.AuditLogEntry{
+		Time: now.AddDate(0, 0, -1),
+	}), qt.IsNil)
+
+	// A log from 2 days ago
+	c.Assert(s.Database.AddAuditLogEntry(ctx, &dbmodel.AuditLogEntry{
+		Time: now.AddDate(0, 0, -2),
+	}), qt.IsNil)
+
+	// A log from 3 days ago
+	c.Assert(s.Database.AddAuditLogEntry(ctx, &dbmodel.AuditLogEntry{
+		Time: now.AddDate(0, 0, -3),
+	}), qt.IsNil)
+
+	// Ensure 3 exist
+	logs := make([]dbmodel.AuditLogEntry, 0)
+	err = s.Database.DB.Find(&logs).Error
+	c.Assert(err, qt.IsNil)
+	c.Assert(logs, qt.HasLen, 3)
+
+	// Delete all 2 or more days older, leaving 1 log left
+	retentionDate = time.Now().AddDate(0, 0, -(2))
+	deleted, err = s.Database.DeleteAuditLogsBefore(ctx, retentionDate)
+	c.Assert(err, qt.IsNil)
+
+	// Check that 2 were infact deleted
+	c.Assert(deleted, qt.Equals, int64(2))
+
+	// Check only 1 remains
+	logs = make([]dbmodel.AuditLogEntry, 0)
+	err = s.Database.DB.Find(&logs).Error
+	c.Assert(err, qt.IsNil)
+	c.Assert(logs, qt.HasLen, 1)
+}
+
 func (s *dbSuite) TestPurgeLogsFromDb(c *qt.C) {
 
 	ctx := context.Background()

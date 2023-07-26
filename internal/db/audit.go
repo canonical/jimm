@@ -8,6 +8,7 @@ import (
 
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/servermon"
 )
 
 // AddAuditLogEntry adds a new entry to the audit log.
@@ -104,17 +105,19 @@ func (d *Database) ForEachAuditLogEntry(ctx context.Context, filter AuditLogFilt
 	return nil
 }
 
-// DeleteAuditLogsBefore executres the query that deletes all audit logs before the given timestamp.
-// Returns the number of logs deleted.
-func (d *Database) DeleteAuditLogsBefore(ctx context.Context, before string) (int64, error) {
+// CleanupAuditLogs cleans up audit logs after the auditLogRetentionPeriodInDays,
+// HARD deleting them from the database.
+func (d *Database) DeleteAuditLogsBefore(ctx context.Context, before time.Time) (int64, error) {
 	const op = errors.Op("db.DeleteAuditLogsBefore")
-	if err := d.ready(); err != nil {
-		return 0, errors.E(op, err)
+	now := time.Now()
+	tx := d.DB.
+		WithContext(ctx).
+		Unscoped().
+		Where("time < ?", before).
+		Delete(&dbmodel.AuditLogEntry{})
+	servermon.QueryTimeAuditLogCleanUpHistogram.Observe(time.Since(now).Seconds())
+	if tx.Error != nil {
+		return 0, errors.E(op, dbError(tx.Error))
 	}
-
-	result := d.DB.WithContext(ctx).Unscoped().Where("time < ?", before).Delete(&dbmodel.AuditLogEntry{})
-	if result.Error != nil {
-		return 0, errors.E(op, dbError(result.Error))
-	}
-	return result.RowsAffected, nil
+	return tx.RowsAffected, nil
 }
