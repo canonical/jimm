@@ -85,7 +85,9 @@ func start(ctx context.Context, s *service.Service) error {
 		zapctx.Info(ctx, "attempting to start JWKS rotator")
 		s.Go(func() error {
 			err := jimmsvc.StartJWKSRotator(ctx, time.NewTicker(time.Hour).C, time.Now().UTC().AddDate(0, 3, 0))
-			zapctx.Error(ctx, "failed to start JWKS rotator", zap.Error(err))
+			if err != nil {
+				zapctx.Error(ctx, "failed to start JWKS rotator", zap.Error(err))
+			}
 			return err
 		})
 	}

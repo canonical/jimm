@@ -70,7 +70,7 @@ func (d *Database) Migrate(ctx context.Context, force bool) error {
 	}
 
 	for {
-		v := dbmodel.Version{Component: dbmodel.Component}
+		v := dbmodel.Version{Component: dbmodel.Component, Major: 1, Minor: 0}
 		if err := db.FirstOrCreate(&v).Error; err != nil {
 			return errors.E(op, dbError(err))
 		}
@@ -80,10 +80,11 @@ func (d *Database) Migrate(ctx context.Context, force bool) error {
 			atomic.StoreUint32(&d.migrated, 1)
 			return nil
 		}
-		if v.Major != dbmodel.Major && !force && v.Major != 0 {
+		if v.Major != dbmodel.Major && !force {
 			return errors.E(op, errors.CodeServerConfiguration, fmt.Sprintf("database has incompatible version %d.%d", v.Major, v.Minor))
 		}
 		// The major versions are unchanged, the database can be migrated.
+		v.Minor += 1
 		schema, err := dbmodel.SQL.ReadFile(path.Join("sql", db.Name(), fmt.Sprintf("%d_%d.sql", v.Major, v.Minor)))
 		if err != nil {
 			return errors.E(op, err)

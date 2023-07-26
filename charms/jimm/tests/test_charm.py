@@ -552,6 +552,34 @@ class TestCharm(unittest.TestCase):
             self.assertEqual(lines[3].strip(), "OPENFGA_STORE=test-store")
             self.assertEqual(lines[4].strip(), "OPENFGA_TOKEN=test-secret-token")
 
+    def test_insecure_secret_storage(self):
+        """Test that the flag for insecure secret storage is only generated when explictly requested."""
+        config_file = os.path.join(self.harness.charm.charm_dir, "juju-jimm.env")
+        self.harness.update_config(
+            {
+                "candid-url": "https://candid.example.com",
+                "controller-admins": "user1 user2 group1",
+                "dns-name": "jimm.example.com",
+                "log-level": "debug",
+                "uuid": "caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa",
+                "public-key": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
+                "private-key": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
+            }
+        )
+        self.assertTrue(os.path.exists(config_file))
+        with open(config_file) as f:
+            lines = f.readlines()
+        os.unlink(config_file)
+        self.assertEqual(len(lines), 18)
+        self.assertEqual(len([match for match in lines if "INSECURE_SECRET_STORAGE" in match]), 0)
+        self.harness.update_config({"postgres-secret-storage": True})
+        self.assertTrue(os.path.exists(config_file))
+        with open(config_file) as f:
+            lines = f.readlines()
+        os.unlink(config_file)
+        self.assertEqual(len(lines), 19)
+        self.assertEqual(len([match for match in lines if "INSECURE_SECRET_STORAGE" in match]), 1)
+
 
 class VersionHTTPRequestHandler(BaseHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
