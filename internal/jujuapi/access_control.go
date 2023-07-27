@@ -52,7 +52,7 @@ var (
 	// (1)[group](2)[-](3)[alices-wonderland](10)[#member]
 	// So if a group, user, UUID, controller name comes in, it will always be index 3 for them
 	// and if a relation specifier is present, it will always be index 10
-	jujuURIMatcher = regexp.MustCompile(`([a-zA-Z0-9]*)(\-|\z)([a-zA-Z0-9-@]*)(\:|)([a-zA-Z0-9-@]*)(\/|)([a-zA-Z0-9-]*)(\.|)([a-zA-Z0-9-]*)([a-zA-Z#]*|\z)\z`)
+	jujuURIMatcher = regexp.MustCompile(`([a-zA-Z0-9]*)(\-|\z)([a-zA-Z0-9-@.]*)(\:|)([a-zA-Z0-9-@]*)(\/|)([a-zA-Z0-9-]*)(\.|)([a-zA-Z0-9-]*)([a-zA-Z#]*|\z)\z`)
 )
 
 // AddGroup creates a group within JIMMs DB for reference by OpenFGA.
@@ -178,6 +178,8 @@ func (r *controllerRoot) ListGroups(ctx context.Context) (apiparams.ListGroupRes
 func resolveTag(db db.Database, tag string) (*ofganames.Tag, error) {
 	ctx := context.Background()
 	matches := jujuURIMatcher.FindStringSubmatch(tag)
+	fmt.Println("mina says the matches are: ", matches)
+
 	resourceUUID := ""
 	trailer := ""
 	// We first attempt to see if group3 is a uuid
@@ -311,11 +313,16 @@ func parseTag(ctx context.Context, db db.Database, key string) (*ofganames.Tag, 
 	op := errors.Op("jujuapi.parseTag")
 	tupleKeySplit := strings.SplitN(key, "-", 2)
 	if len(tupleKeySplit) < 2 {
+		fmt.Println("Mina says the length of the tuple key split is: ", len(tupleKeySplit))
 		return nil, errors.E(op, errors.CodeFailedToParseTupleKey, "tag does not have tuple key delimiter")
 	}
+	fmt.Println("Mina says the tuple key split is: ", tupleKeySplit)
 	tagString := key
+	fmt.Println("Mina says the tag string is: ", tagString)
+
 	tag, err := resolveTag(db, tagString)
 	if err != nil {
+		fmt.Println("Mina says the error is after resolve Tag: ", err)
 		zapctx.Debug(ctx, "failed to resolve tuple object", zap.Error(err))
 		return nil, errors.E(op, errors.CodeFailedToResolveTupleResource, err)
 	}
@@ -431,6 +438,7 @@ func (r *controllerRoot) parseTuple(ctx context.Context, tuple apiparams.Relatio
 	if err != nil {
 		return nil, errors.E(op, err, errors.CodeBadRequest)
 	}
+	fmt.Println("Mina says successfull parsed relation")
 	t := openfga.Tuple{
 		Relation: relation,
 	}
@@ -444,18 +452,22 @@ func (r *controllerRoot) parseTuple(ctx context.Context, tuple apiparams.Relatio
 	}
 
 	if tuple.TargetObject == "" {
+		fmt.Println("Mina says target object is empty")
 		return nil, errors.E(op, errors.CodeBadRequest, "target object not specified")
 	}
 	if tuple.TargetObject != "" {
 		targetTag, err := parseTag(ctx, r.jimm.Database, tuple.TargetObject)
 		if err != nil {
+			fmt.Println("Mina says failed to parse target object: ", tuple.TargetObject)
 			return nil, parseTagError("failed to parse tuple target object key", tuple.TargetObject, err)
 		}
 		t.Target = targetTag
+		fmt.Println("Mina says successfull parsed target object")
 	}
 	if tuple.Object != "" {
 		objectTag, err := parseTag(ctx, r.jimm.Database, tuple.Object)
 		if err != nil {
+			fmt.Println("Mina says failed to parse object: ", tuple.Object, " error: ", err)
 			return nil, parseTagError("failed to parse tuple object key", tuple.Object, err)
 		}
 		t.Object = objectTag
