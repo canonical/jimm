@@ -121,8 +121,8 @@ Example:
 jimmctl auth relation check user-alice@external administrator controller-aws-controller-1
 
 Example:
-	jimmctl auth relation add <object> <relation> <target_object>
-	jimmctl auth relation add -f <filename>
+	jimmctl auth relation check <object> <relation> <target_object>
+	jimmctl auth relation check -f <filename>
 	`
 
 	listRelationsDoc = `
