@@ -31,8 +31,15 @@ services:
     hostname: jimm.localhost
     working_dir: /jimm
     container_name: jimmy
+    entrypoint:
+      - bash
+      - -c
+      - >-
+        go install github.com/go-delve/delve/cmd/dlv@latest
+        && air
     ports:
       - 17070:80
+      - 2345:2345
     environment:
       JIMM_LOG_LEVEL: "debug"
       JIMM_UUID: "3217dbc9-8ea9-4381-9e97-01eab0b3f6bb"
