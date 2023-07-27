@@ -305,9 +305,9 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 		},
 		//Test group -> controller
 		{
-			input: tuple{"group-" + "test-group", "administrator", "controller-" + controller.UUID},
+			input: tuple{"group-" + "test-group#member", "administrator", "controller-" + controller.UUID},
 			want: createTupleKey(
-				"group:"+strconv.FormatUint(uint64(group.ID), 10),
+				"group:"+strconv.FormatUint(uint64(group.ID), 10)+"#member",
 				"administrator",
 				"controller:"+controller.UUID,
 			),

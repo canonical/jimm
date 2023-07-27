@@ -2,6 +2,14 @@
 # See LICENSE file for licensing details.
 
 options:
+  audit-log-retention-period-in-days:
+    type: string
+    description: |
+      How long to hold audit logs for in days, i.e., 10 = 10 days.
+      If the value 0 is used, the logs will never be purged.
+      Logs are purged at 9AM UTC. Defaults to 0, which means by 
+      default logs are never purged.
+    default: "0"
   candid-agent-private-key:
     type: string
     description: |
@@ -54,6 +62,10 @@ options:
     type: string
     default: https://jaas.ai/models
     description: URL of the Juju Dashboard for this controller.
+  postgres-secret-storage:
+    default: false
+    type: boolean
+    description: Enables the use of Postgres for secret storage if Vault is not related.
   public-key:
     type: string
     description: The public part of JIMM's macaroon bakery keypair.

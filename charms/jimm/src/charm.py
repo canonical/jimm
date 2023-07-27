@@ -132,7 +132,11 @@ class JimmCharm(SystemdCharm):
             "dashboard_location": self.config.get("juju-dashboard-location"),
             "public_key": self.config.get("public-key"),
             "private_key": self.config.get("private-key"),
+            "audit_retention_period": self.config.get("audit-log-retention-period-in-days", ""),
         }
+
+        if self.config.get("postgres-secret-storage", False):
+            args["insecure_secret_storage"] = "enabled"  # Value doesn't matter, only checks env var exists.
 
         with open(self._env_filename(), "wt") as f:
             f.write(self._render_template("jimm.env", **args))

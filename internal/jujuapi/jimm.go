@@ -46,6 +46,7 @@ func init() {
 		checkRelationMethod := rpc.Method(r.CheckRelation)
 		listRelationshipTuplesMethod := rpc.Method(r.ListRelationshipTuples)
 		crossModelQueryMethod := rpc.Method(r.CrossModelQuery)
+		purgeLogsMethod := rpc.Method(r.PurgeLogs)
 
 		r.AddMethod("JIMM", 2, "DisableControllerUUIDMasking", disableControllerUUIDMaskingMethod)
 		r.AddMethod("JIMM", 2, "ListControllers", listControllersMethod)
@@ -79,6 +80,7 @@ func init() {
 		r.AddMethod("JIMM", 4, "UpdateMigratedModel", updateMigratedModelMethod)
 		r.AddMethod("JIMM", 4, "AddCloudToController", addCloudToControllerMethod)
 		r.AddMethod("JIMM", 4, "RemoveCloudFromController", removeCloudFromControllerMethod)
+		r.AddMethod("JIMM", 4, "PurgeLogs", purgeLogsMethod)
 		// JIMM ReBAC RPC
 		r.AddMethod("JIMM", 4, "AddGroup", addGroupMethod)
 		r.AddMethod("JIMM", 4, "RenameGroup", renameGroupMethod)
@@ -497,4 +499,17 @@ func (r *controllerRoot) CrossModelQuery(ctx context.Context, req apiparams.Cros
 	default:
 		return apiparams.CrossModelQueryResponse{}, errors.E(op, errors.Code("invalid query type"), "unable to query models")
 	}
+}
+
+// PurgeLogs removes all audit log entries older than the specified date.
+func (r *controllerRoot) PurgeLogs(ctx context.Context, req apiparams.PurgeLogsRequest) (apiparams.PurgeLogsResponse, error) {
+	const op = errors.Op("jujuapi.PurgeLogs")
+
+	deleted_count, err := r.jimm.PurgeLogs(ctx, r.user, req.Date)
+	if err != nil {
+		return apiparams.PurgeLogsResponse{}, errors.E(op, err)
+	}
+	return apiparams.PurgeLogsResponse{
+		DeletedCount: deleted_count,
+	}, nil
 }
