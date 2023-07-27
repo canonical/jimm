@@ -10,6 +10,24 @@
             "request": "launch",
             "mode": "auto",
             "program": "${fileDirname}"
+        },
+        {
+            "name": "Attach to container",
+            "type": "go",
+            "request": "attach",
+            "mode": "remote",
+            "remotePath": "/jimm/",
+            "substitutePath": [
+                {
+                    "from": "${workspaceFolder}/",
+                    "to": "/jimm/",
+                },
+            ],
+            "port": 2345,
+            "host": "127.0.0.1",
+            "showLog": true,
+            "apiVersion": 2,
+            "trace": "verbose"
         }
     ]
 }
