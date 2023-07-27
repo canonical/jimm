@@ -178,7 +178,6 @@ func (r *controllerRoot) ListGroups(ctx context.Context) (apiparams.ListGroupRes
 func resolveTag(db db.Database, tag string) (*ofganames.Tag, error) {
 	ctx := context.Background()
 	matches := jujuURIMatcher.FindStringSubmatch(tag)
-
 	resourceUUID := ""
 	trailer := ""
 	// We first attempt to see if group3 is a uuid
@@ -315,7 +314,6 @@ func parseTag(ctx context.Context, db db.Database, key string) (*ofganames.Tag, 
 		return nil, errors.E(op, errors.CodeFailedToParseTupleKey, "tag does not have tuple key delimiter")
 	}
 	tagString := key
-
 	tag, err := resolveTag(db, tagString)
 	if err != nil {
 		zapctx.Debug(ctx, "failed to resolve tuple object", zap.Error(err))
