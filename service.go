@@ -480,8 +480,9 @@ func (s *Service) setupCredentialStore(ctx context.Context, p Params) error {
 		s.jimm.CredentialStore = &s.jimm.Database
 		return nil
 	}
-
-	return errors.E(op, "no credential store setup")
+	// Currently jimm will start without a credential store but
+	// functionality will be limited.
+	return nil
 }
 
 func newVaultStore(ctx context.Context, p Params) (jimmcreds.CredentialStore, error) {
