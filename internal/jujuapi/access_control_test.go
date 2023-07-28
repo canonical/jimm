@@ -303,6 +303,17 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 			err:         false,
 			changesType: "group",
 		},
+		//Test username with dots and @ -> group
+		{
+			input: tuple{"user-" + "kelvin.lina.test@external", "member", "group-" + group.Name},
+			want: createTupleKey(
+				"user:"+"kelvin.lina.test@external",
+				"member",
+				"group:"+strconv.FormatUint(uint64(group.ID), 10),
+			),
+			err:         false,
+			changesType: "group",
+		},
 		//Test group -> controller
 		{
 			input: tuple{"group-" + "test-group#member", "administrator", "controller-" + controller.UUID},
