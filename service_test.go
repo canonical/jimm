@@ -62,7 +62,7 @@ func TestDefaultService(t *testing.T) {
 	c.Check(resp.StatusCode, qt.Equals, http.StatusOK)
 }
 
-func TestServiceFailsToStartWithoutSecretStore(t *testing.T) {
+func TestServiceStartsWithoutSecretStore(t *testing.T) {
 	c := qt.New(t)
 
 	_, ofgaClient, cfg, err := jimmtest.SetupTestOFGAClient(c.Name())
@@ -76,7 +76,7 @@ func TestServiceFailsToStartWithoutSecretStore(t *testing.T) {
 			AuthModel: ofgaClient.AuthModelId,
 		},
 	})
-	c.Assert(err, qt.ErrorMatches, "no credential store setup")
+	c.Assert(err, qt.IsNil)
 }
 
 func TestAuthenticator(t *testing.T) {
