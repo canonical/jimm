@@ -46,7 +46,7 @@ from charms.traefik_k8s.v1.ingress import (
 )
 from ops.charm import ActionEvent, CharmBase, RelationJoinedEvent
 from ops.main import main
-from ops.model import ActiveStatus, BlockedStatus, WaitingStatus, ErrorStatus
+from ops.model import ActiveStatus, BlockedStatus, ErrorStatus, WaitingStatus
 
 from state import State, requires_state, requires_state_setter
 
@@ -73,9 +73,12 @@ LOG_FILE = "/var/log/jimm"
 # This likely will just be JIMM's port.
 PROMETHEUS_PORT = 8080
 
-class DeferException(Exception):
+
+class DeferRequiredError(Exception):
     """Used to indicate to the calling function that an event should be deferred."""
+
     pass
+
 
 class JimmOperatorCharm(CharmBase):
     """JIMM Operator Charm."""
@@ -319,7 +322,7 @@ class JimmOperatorCharm(CharmBase):
             else:
                 logger.info("workload not ready - returning")
                 return
-        except DeferException:
+        except DeferRequiredError:
             logger.info("workload container not ready - deferring")
             event.defer()
             return
@@ -348,7 +351,7 @@ class JimmOperatorCharm(CharmBase):
             logger.info("failed to stop the jimm service: {}".format(e))
         try:
             self._ready()
-        except DeferException:
+        except DeferRequiredError:
             logger.info("workload not ready")
             return
 
@@ -360,7 +363,7 @@ class JimmOperatorCharm(CharmBase):
             return
         try:
             self._ready()
-        except DeferException:
+        except DeferRequiredError:
             logger.info("workload not ready")
             return
 
@@ -431,7 +434,7 @@ class JimmOperatorCharm(CharmBase):
                 self.unit.status = WaitingStatus("stopped")
             return True
         else:
-            raise DeferException
+            raise DeferRequiredError
 
     def _get_network_address(self, event):
         return str(self.model.get_binding(event.relation).network.egress_subnets[0].network_address)
