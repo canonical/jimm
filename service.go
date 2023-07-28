@@ -293,7 +293,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		return nil, errors.E(op, err)
 	}
 
-	if err := s.setupSecretStore(ctx, p); err != nil {
+	if err := s.setupCredentialStore(ctx, p); err != nil {
 		return nil, errors.E(op, err)
 	}
 
@@ -462,7 +462,7 @@ func newAuthenticator(ctx context.Context, db *db.Database, client *ofgaClient.O
 	}, nil
 }
 
-func (s *Service) setupSecretStore(ctx context.Context, p Params) error {
+func (s *Service) setupCredentialStore(ctx context.Context, p Params) error {
 	const op = errors.Op("newSecretStore")
 	vs, err := newVaultStore(ctx, p)
 	if err != nil {
@@ -471,17 +471,17 @@ func (s *Service) setupSecretStore(ctx context.Context, p Params) error {
 	}
 	if vs != nil {
 		s.jimm.CredentialStore = vs
-	} else {
-		// Only enable Postgres storage for secrets if explictly enabled.
-		if _, ok := os.LookupEnv("INSECURE_SECRET_STORAGE"); ok {
-			zapctx.Warn(ctx, "using plaintext postgres for secret storage")
-			s.jimm.CredentialStore = &s.jimm.Database
-		}
+		return nil
 	}
-	if s.jimm.CredentialStore == nil {
-		return errors.E(op, "no credential store setup")
+
+	// Only enable Postgres storage for secrets if explicitly enabled.
+	if _, ok := os.LookupEnv("INSECURE_SECRET_STORAGE"); ok {
+		zapctx.Warn(ctx, "using plaintext postgres for secret storage")
+		s.jimm.CredentialStore = &s.jimm.Database
+		return nil
 	}
-	return nil
+
+	return errors.E(op, "no credential store setup")
 }
 
 func newVaultStore(ctx context.Context, p Params) (jimmcreds.CredentialStore, error) {
