@@ -43,7 +43,7 @@ func TestDefaultService(t *testing.T) {
 
 	_, ofgaClient, cfg, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
-
+	os.Setenv("INSECURE_SECRET_STORAGE", "enable")
 	svc, err := jimm.NewService(context.Background(), jimm.Params{
 		OpenFGAParams: jimm.OpenFGAParams{
 			Scheme:    cfg.ApiScheme,
@@ -60,6 +60,23 @@ func TestDefaultService(t *testing.T) {
 	svc.ServeHTTP(rr, req)
 	resp := rr.Result()
 	c.Check(resp.StatusCode, qt.Equals, http.StatusOK)
+}
+
+func TestServiceFailsToStartWithoutSecretStore(t *testing.T) {
+	c := qt.New(t)
+
+	_, ofgaClient, cfg, err := jimmtest.SetupTestOFGAClient(c.Name())
+	c.Assert(err, qt.IsNil)
+	_, err = jimm.NewService(context.Background(), jimm.Params{
+		OpenFGAParams: jimm.OpenFGAParams{
+			Scheme:    cfg.ApiScheme,
+			Host:      cfg.ApiHost,
+			Store:     cfg.StoreId,
+			Token:     cfg.Credentials.Config.ApiToken,
+			AuthModel: ofgaClient.AuthModelId,
+		},
+	})
+	c.Assert(err, qt.ErrorMatches, "no credential store setup")
 }
 
 func TestAuthenticator(t *testing.T) {
@@ -80,6 +97,7 @@ func TestAuthenticator(t *testing.T) {
 		},
 	}
 	candid := startCandid(c, &p)
+	os.Setenv("INSECURE_SECRET_STORAGE", "enable")
 	svc, err := jimm.NewService(context.Background(), p)
 	c.Assert(err, qt.IsNil)
 
@@ -185,6 +203,27 @@ func TestVault(t *testing.T) {
 		"username": "test-user",
 		"password": "test-secret",
 	})
+}
+
+func TestPostgresSecretStore(t *testing.T) {
+	c := qt.New(t)
+
+	_, ofgaClient, cfg, err := jimmtest.SetupTestOFGAClient(c.Name())
+	c.Assert(err, qt.IsNil)
+
+	p := jimm.Params{
+		ControllerUUID: "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
+		OpenFGAParams: jimm.OpenFGAParams{
+			Scheme:    cfg.ApiScheme,
+			Host:      cfg.ApiHost,
+			Store:     cfg.StoreId,
+			Token:     cfg.Credentials.Config.ApiToken,
+			AuthModel: ofgaClient.AuthModelId,
+		},
+	}
+	os.Setenv("INSECURE_SECRET_STORAGE", "enable")
+	_, err = jimm.NewService(context.Background(), p)
+	c.Assert(err, qt.IsNil)
 }
 
 func TestOpenFGA(t *testing.T) {
