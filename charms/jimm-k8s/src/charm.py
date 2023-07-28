@@ -46,7 +46,7 @@ from charms.traefik_k8s.v1.ingress import (
 )
 from ops.charm import ActionEvent, CharmBase, RelationJoinedEvent
 from ops.main import main
-from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
+from ops.model import ActiveStatus, BlockedStatus, ErrorStatus, WaitingStatus
 
 from state import State, requires_state, requires_state_setter
 
@@ -72,6 +72,13 @@ OPENFGA_STORE_NAME = "jimm"
 LOG_FILE = "/var/log/jimm"
 # This likely will just be JIMM's port.
 PROMETHEUS_PORT = 8080
+
+
+class DeferError(Exception):
+    """Used to indicate to the calling function that an event could be deferred
+    if the hook needs to be retried."""
+
+    pass
 
 
 class JimmOperatorCharm(CharmBase):
@@ -302,15 +309,21 @@ class JimmOperatorCharm(CharmBase):
             },
         }
         container.add_layer("jimm", pebble_layer, combine=True)
-        if self._ready():
-            if container.get_service(JIMM_SERVICE_NAME).is_running():
-                logger.info("replanning service")
-                container.replan()
+        try:
+            if self._ready():
+                if container.get_service(JIMM_SERVICE_NAME).is_running():
+                    logger.info("replanning service")
+                    container.replan()
+                else:
+                    logger.info("starting service")
+                    container.start(JIMM_SERVICE_NAME)
+                self.unit.status = ActiveStatus("running")
+                if self.unit.is_leader():
+                    self.app.status = ActiveStatus()
             else:
-                logger.info("starting service")
-                container.start(JIMM_SERVICE_NAME)
-            self.unit.status = ActiveStatus("running")
-        else:
+                logger.info("workload not ready - returning")
+                return
+        except DeferError:
             logger.info("workload container not ready - deferring")
             event.defer()
             return
@@ -337,11 +350,23 @@ class JimmOperatorCharm(CharmBase):
                 container.stop(JIMM_SERVICE_NAME)
         except Exception as e:
             logger.info("failed to stop the jimm service: {}".format(e))
-        self._ready()
+        try:
+            self._ready()
+        except DeferError:
+            logger.info("workload not ready")
+            return
 
     def _on_update_status(self, _):
         """Update the status of the charm."""
-        self._ready()
+        if self.unit.status.name == ErrorStatus.name:
+            # Skip ready check if unit in error to allow for error resolution.
+            logger.info("unit in error status, skipping ready check")
+            return
+        try:
+            self._ready()
+        except DeferError:
+            logger.info("workload not ready")
+            return
 
     @requires_state_setter
     def _on_dashboard_relation_joined(self, event: RelationJoinedEvent):
@@ -410,9 +435,7 @@ class JimmOperatorCharm(CharmBase):
                 self.unit.status = WaitingStatus("stopped")
             return True
         else:
-            logger.error("cannot connect to workload container")
-            self.unit.status = WaitingStatus("waiting for jimm workload")
-            return False
+            raise DeferError
 
     def _get_network_address(self, event):
         return str(self.model.get_binding(event.relation).network.egress_subnets[0].network_address)
@@ -562,11 +585,6 @@ class JimmOperatorCharm(CharmBase):
 
     @requires_state
     def _get_dns_name(self, event):
-        if not self._state.is_ready():
-            event.defer()
-            logger.warning("State is not ready")
-            return None
-
         default_dns_name = "{}.{}-endpoints.{}.svc.cluster.local".format(
             self.unit.name.replace("/", "-"),
             self.app.name,
