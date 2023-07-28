@@ -124,7 +124,7 @@ func (s *relationSuite) TestAddRelationViaFileSuperuser(c *gc.C) {
 	file, err := os.CreateTemp(".", "relations.json")
 	c.Assert(err, gc.IsNil)
 	defer os.Remove(file.Name())
-	testRelations := `[{"object":"group-` + group1 + `","relation":"member","target_object":"group-` + group3 + `"},{"object":"group-` + group2 + `","relation":"member","target_object":"group-` + group3 + `"}]`
+	testRelations := `[{"object":"user-alice","relation":"member","target_object":"group-` + group3 + `"},{"object":"group-` + group2 + `#member","relation":"member","target_object":"group-` + group3 + `"}]`
 	_, err = file.Write([]byte(testRelations))
 	c.Assert(err, gc.IsNil)
 
@@ -204,7 +204,7 @@ func (s *relationSuite) TestRemoveRelationViaFileSuperuser(c *gc.C) {
 	file, err := os.CreateTemp(".", "relations.json")
 	c.Assert(err, gc.IsNil)
 	defer os.Remove(file.Name())
-	testRelations := `[{"object":"group-` + group1 + `","relation":"member","target_object":"group-` + group3 + `"},{"object":"group-` + group2 + `","relation":"member","target_object":"group-` + group3 + `"}]`
+	testRelations := `[{"object":"group-` + group1 + `#member","relation":"member","target_object":"group-` + group3 + `"},{"object":"group-` + group2 + `#member","relation":"member","target_object":"group-` + group3 + `"}]`
 	_, err = file.Write([]byte(testRelations))
 	c.Assert(err, gc.IsNil)
 
@@ -232,7 +232,7 @@ func (s *relationSuite) TestRemoveRelationViaFileSuperuser(c *gc.C) {
 func (s *relationSuite) TestRemoveRelation(c *gc.C) {
 	// bob is not superuser
 	bClient := s.userBakeryClient("bob")
-	_, err := cmdtesting.RunCommand(c, cmd.NewRemoveRelationCommandForTesting(s.ClientStore(), bClient), "test-group1", "member", "test-group2")
+	_, err := cmdtesting.RunCommand(c, cmd.NewRemoveRelationCommandForTesting(s.ClientStore(), bClient), "test-group1#member", "member", "test-group2")
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
 

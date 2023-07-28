@@ -18,7 +18,7 @@ local/vault/roleid.txt
 *.crt
 *.key
 *.csr
-jimmctl
+/jimmctl
 qa-controller
 
 /cloudinit.temp.yaml

@@ -68,8 +68,9 @@ func start(ctx context.Context, s *service.Service) error {
 			Token:     os.Getenv("OPENFGA_TOKEN"),
 			Port:      os.Getenv("OPENFGA_PORT"),
 		},
-		PrivateKey: os.Getenv("BAKERY_PRIVATE_KEY"),
-		PublicKey:  os.Getenv("BAKERY_PUBLIC_KEY"),
+		PrivateKey:                    os.Getenv("BAKERY_PRIVATE_KEY"),
+		PublicKey:                     os.Getenv("BAKERY_PUBLIC_KEY"),
+		AuditLogRetentionPeriodInDays: os.Getenv("JIMM_AUDIT_LOG_RETENTION_PERIOD_IN_DAYS"),
 	})
 	if err != nil {
 		return err
@@ -84,7 +85,9 @@ func start(ctx context.Context, s *service.Service) error {
 		zapctx.Info(ctx, "attempting to start JWKS rotator")
 		s.Go(func() error {
 			err := jimmsvc.StartJWKSRotator(ctx, time.NewTicker(time.Hour).C, time.Now().UTC().AddDate(0, 3, 0))
-			zapctx.Error(ctx, "failed to start JWKS rotator", zap.Error(err))
+			if err != nil {
+				zapctx.Error(ctx, "failed to start JWKS rotator", zap.Error(err))
+			}
 			return err
 		})
 	}

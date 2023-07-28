@@ -97,6 +97,7 @@ func (d *Database) DeleteApplicationOffer(ctx context.Context, offer *dbmodel.Ap
 	return nil
 }
 
+
 // ApplicationOfferFilter can be used to find application offers that match certain criteria.
 type ApplicationOfferFilter func(*gorm.DB) *gorm.DB
 

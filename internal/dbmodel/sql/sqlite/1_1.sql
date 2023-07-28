@@ -1,4 +1,4 @@
--- 0_0.sql initialises an empty database.
+-- 1_1.sql initialises an empty database.
 
 CREATE TABLE audit_log (
 	id INTEGER PRIMARY KEY,
@@ -283,4 +283,4 @@ CREATE TABLE groups (
 
 CREATE INDEX idx_group_deleted_at ON groups (deleted_at);
 
-UPDATE versions SET major=1, minor=0 WHERE component='jimmdb';
+UPDATE versions SET major=1, minor=1 WHERE component='jimmdb';
