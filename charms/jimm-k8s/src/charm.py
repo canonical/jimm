@@ -74,8 +74,9 @@ LOG_FILE = "/var/log/jimm"
 PROMETHEUS_PORT = 8080
 
 
-class DeferRequiredError(Exception):
-    """Used to indicate to the calling function that an event should be deferred."""
+class DeferError(Exception):
+    """Used to indicate to the calling function that an event could be deferred
+    if the hook needs to be retried."""
 
     pass
 
@@ -322,7 +323,7 @@ class JimmOperatorCharm(CharmBase):
             else:
                 logger.info("workload not ready - returning")
                 return
-        except DeferRequiredError:
+        except DeferError:
             logger.info("workload container not ready - deferring")
             event.defer()
             return
@@ -351,7 +352,7 @@ class JimmOperatorCharm(CharmBase):
             logger.info("failed to stop the jimm service: {}".format(e))
         try:
             self._ready()
-        except DeferRequiredError:
+        except DeferError:
             logger.info("workload not ready")
             return
 
@@ -363,7 +364,7 @@ class JimmOperatorCharm(CharmBase):
             return
         try:
             self._ready()
-        except DeferRequiredError:
+        except DeferError:
             logger.info("workload not ready")
             return
 
@@ -434,7 +435,7 @@ class JimmOperatorCharm(CharmBase):
                 self.unit.status = WaitingStatus("stopped")
             return True
         else:
-            raise DeferRequiredError
+            raise DeferError
 
     def _get_network_address(self, event):
         return str(self.model.get_binding(event.relation).network.egress_subnets[0].network_address)
