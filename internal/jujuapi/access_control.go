@@ -19,9 +19,9 @@ import (
 	"gorm.io/gorm"
 
 	apiparams "github.com/canonical/jimm/api/params"
-	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/jimm"
 	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 	jimmnames "github.com/canonical/jimm/pkg/names"
@@ -53,6 +53,10 @@ var (
 	// So if a group, user, UUID, controller name comes in, it will always be index 3 for them
 	// and if a relation specifier is present, it will always be index 10
 	jujuURIMatcher = regexp.MustCompile(`([a-zA-Z0-9]*)(\-|\z)([a-zA-Z0-9-@.]*)(\:|)([a-zA-Z0-9-@]*)(\/|)([a-zA-Z0-9-]*)(\.|)([a-zA-Z0-9-]*)([a-zA-Z#]*|\z)\z`)
+)
+
+const (
+	jimmControllerName = "jimm"
 )
 
 // AddGroup creates a group within JIMMs DB for reference by OpenFGA.
@@ -89,6 +93,7 @@ func (r *controllerRoot) RenameGroup(ctx context.Context, req apiparams.RenameGr
 
 	isAdmin, err := openfga.IsAdministrator(ctx, r.user, r.jimm.ResourceTag())
 	if err != nil {
+
 		zapctx.Error(ctx, "openfga check failed", zap.Error(err))
 		return errors.E(op, err)
 	}
@@ -175,7 +180,7 @@ func (r *controllerRoot) ListGroups(ctx context.Context) (apiparams.ListGroupRes
 // If the JIMM tag is aleady of juju string tag form, the transformation is left alone.
 //
 // In both cases though, the resource the tag pertains to is validated to exist within the database.
-func resolveTag(db db.Database, tag string) (*ofganames.Tag, error) {
+func resolveTag(j *jimm.JIMM, tag string) (*ofganames.Tag, error) {
 	ctx := context.Background()
 	matches := jujuURIMatcher.FindStringSubmatch(tag)
 	resourceUUID := ""
@@ -219,7 +224,7 @@ func resolveTag(db db.Database, tag string) (*ofganames.Tag, error) {
 		entry := &dbmodel.GroupEntry{
 			Name: trailer,
 		}
-		err := db.GetGroup(ctx, entry)
+		err := j.Database.GetGroup(ctx, entry)
 		if err != nil {
 			return nil, errors.E("group not found")
 		}
@@ -235,6 +240,9 @@ func resolveTag(db db.Database, tag string) (*ofganames.Tag, error) {
 		if resourceUUID != "" {
 			controller.UUID = resourceUUID
 		} else if controllerName != "" {
+			if controllerName == jimmControllerName {
+				return ofganames.ConvertTagWithRelation(names.NewControllerTag(j.UUID), relation), nil
+			}
 			controller.Name = controllerName
 		}
 
@@ -242,7 +250,7 @@ func resolveTag(db db.Database, tag string) (*ofganames.Tag, error) {
 		// controller-jimm case - jimm controller does not exist
 		// in the database, but has a clearly defined UUID?
 
-		err := db.GetController(ctx, &controller)
+		err := j.Database.GetController(ctx, &controller)
 		if err != nil {
 			return nil, errors.E("controller not found")
 		}
@@ -259,7 +267,7 @@ func resolveTag(db db.Database, tag string) (*ofganames.Tag, error) {
 			model.UUID = sql.NullString{String: resourceUUID, Valid: true}
 		} else if controllerName != "" && userName != "" && modelName != "" {
 			controller := dbmodel.Controller{Name: controllerName}
-			err := db.GetController(ctx, &controller)
+			err := j.Database.GetController(ctx, &controller)
 			if err != nil {
 				return nil, errors.E("controller not found")
 			}
@@ -268,7 +276,7 @@ func resolveTag(db db.Database, tag string) (*ofganames.Tag, error) {
 			model.Name = modelName
 		}
 
-		err := db.GetModel(ctx, &model)
+		err := j.Database.GetModel(ctx, &model)
 		if err != nil {
 			return nil, errors.E("model not found")
 		}
@@ -293,7 +301,7 @@ func resolveTag(db db.Database, tag string) (*ofganames.Tag, error) {
 			offer.URL = offerURL.String()
 		}
 
-		err := db.GetApplicationOffer(ctx, &offer)
+		err := j.Database.GetApplicationOffer(ctx, &offer)
 		if err != nil {
 			return nil, errors.E("application offer not found")
 		}
@@ -307,14 +315,14 @@ func resolveTag(db db.Database, tag string) (*ofganames.Tag, error) {
 // ensuring the resource exists for said tag.
 //
 // This key may be in the form of either a JIMM tag string or Juju tag string.
-func parseTag(ctx context.Context, db db.Database, key string) (*ofganames.Tag, error) {
+func parseTag(ctx context.Context, j *jimm.JIMM, key string) (*ofganames.Tag, error) {
 	op := errors.Op("jujuapi.parseTag")
 	tupleKeySplit := strings.SplitN(key, "-", 2)
 	if len(tupleKeySplit) < 2 {
 		return nil, errors.E(op, errors.CodeFailedToParseTupleKey, "tag does not have tuple key delimiter")
 	}
 	tagString := key
-	tag, err := resolveTag(db, tagString)
+	tag, err := resolveTag(j, tagString)
 	if err != nil {
 		zapctx.Debug(ctx, "failed to resolve tuple object", zap.Error(err))
 		return nil, errors.E(op, errors.CodeFailedToResolveTupleResource, err)
@@ -447,14 +455,14 @@ func (r *controllerRoot) parseTuple(ctx context.Context, tuple apiparams.Relatio
 		return nil, errors.E(op, errors.CodeBadRequest, "target object not specified")
 	}
 	if tuple.TargetObject != "" {
-		targetTag, err := parseTag(ctx, r.jimm.Database, tuple.TargetObject)
+		targetTag, err := parseTag(ctx, r.jimm, tuple.TargetObject)
 		if err != nil {
 			return nil, parseTagError("failed to parse tuple target object key", tuple.TargetObject, err)
 		}
 		t.Target = targetTag
 	}
 	if tuple.Object != "" {
-		objectTag, err := parseTag(ctx, r.jimm.Database, tuple.Object)
+		objectTag, err := parseTag(ctx, r.jimm, tuple.Object)
 		if err != nil {
 			return nil, parseTagError("failed to parse tuple object key", tuple.Object, err)
 		}
