@@ -292,23 +292,13 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
-	vs, err := newVaultStore(ctx, p)
-	if err != nil {
-		zapctx.Error(ctx, "Vault Store error", zap.Error(err))
+
+	if err := s.setupCredentialStore(ctx, p); err != nil {
 		return nil, errors.E(op, err)
-	}
-	if vs != nil {
-		s.jimm.CredentialStore = vs
-	} else {
-		// Only enable Postgres storage for secrets if explictly enabled.
-		if _, ok := os.LookupEnv("INSECURE_SECRET_STORAGE"); ok {
-			zapctx.Warn(ctx, "using plaintext postgres for secret storage")
-			s.jimm.CredentialStore = &s.jimm.Database
-		}
 	}
 
 	s.jimm.Dialer = &jujuclient.Dialer{
-		ControllerCredentialsStore: vs,
+		ControllerCredentialsStore: s.jimm.CredentialStore,
 	}
 	if !p.DisableConnectionCache {
 		s.jimm.Dialer = jimm.CacheDialer(s.jimm.Dialer)
@@ -470,6 +460,29 @@ func newAuthenticator(ctx context.Context, db *db.Database, client *ofgaClient.O
 		ControllerAdmins: p.ControllerAdmins,
 		Client:           client,
 	}, nil
+}
+
+func (s *Service) setupCredentialStore(ctx context.Context, p Params) error {
+	const op = errors.Op("newSecretStore")
+	vs, err := newVaultStore(ctx, p)
+	if err != nil {
+		zapctx.Error(ctx, "Vault Store error", zap.Error(err))
+		return errors.E(op, err)
+	}
+	if vs != nil {
+		s.jimm.CredentialStore = vs
+		return nil
+	}
+
+	// Only enable Postgres storage for secrets if explicitly enabled.
+	if _, ok := os.LookupEnv("INSECURE_SECRET_STORAGE"); ok {
+		zapctx.Warn(ctx, "using plaintext postgres for secret storage")
+		s.jimm.CredentialStore = &s.jimm.Database
+		return nil
+	}
+	// Currently jimm will start without a credential store but
+	// functionality will be limited.
+	return nil
 }
 
 func newVaultStore(ctx context.Context, p Params) (jimmcreds.CredentialStore, error) {

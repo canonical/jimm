@@ -120,6 +120,11 @@ func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag nam
 		}
 	}
 
+	if username == "" || password == "" {
+		zapctx.Error(ctx, "empty username or password")
+		return nil, errors.E(op, errors.CodeNotFound, "missing controller username or password")
+	}
+
 	args := jujuparams.LoginRequest{
 		AuthTag:       names.NewUserTag(username).String(),
 		Credentials:   password,
