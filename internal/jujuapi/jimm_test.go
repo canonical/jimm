@@ -194,6 +194,11 @@ func (s *jimmSuite) TestAddController(c *gc.C) {
 	_, err = client.AddController(&acr)
 	c.Check(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 	c.Check(jujuparams.IsCodeUnauthorized(err), gc.Equals, true)
+
+	acr.Name = "jimm"
+	_, err = client.AddController(&acr)
+	c.Check(err, gc.ErrorMatches, `cannot add a controller with name "jimm" \(bad request\)`)
+	c.Check(jujuparams.IsBadRequest(err), gc.Equals, true)
 }
 
 func (s *jimmSuite) TestRemoveController(c *gc.C) {
