@@ -62,6 +62,15 @@ func (s *relationSuite) TestAddRelationSuperuser(c *gc.C) {
 			err: false,
 		},
 		{
+			testName: "Add admin relation to controller-jimm",
+			input: tuple{
+				user:     "group-" + group1 + "#member",
+				relation: "administrator",
+				target:   "controller-jimm",
+			},
+			err: false,
+		},
+		{
 			testName: "Invalid Relation",
 			input: tuple{
 				user:     "group-" + group1 + "#member",
@@ -88,6 +97,9 @@ func (s *relationSuite) TestAddRelationSuperuser(c *gc.C) {
 			c.Assert(err, gc.IsNil)
 			resp, err := s.jimmSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), nil, 50, "")
 			c.Assert(err, gc.IsNil)
+			// NOTE: this is a bad test because it relies on the number of related objects. So all the
+			// non-failing test cases must be executed before any of the failing tests - failing tests
+			// do not add any tuples therefore the following assertion fails.
 			c.Assert(len(resp.Tuples), gc.Equals, i+3)
 		}
 	}
