@@ -81,3 +81,8 @@ options:
       The source address for the connection to Vault. 
       This should be a single IP with no CIDR.
       E.g. 10.1.2.123
+  jwt-expiry:
+    type: string
+    description: |
+      Duration for the JWT expiry (defaults to 5 minutes).
+    default: 5m
