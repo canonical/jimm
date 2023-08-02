@@ -4,6 +4,7 @@ package jujuapi
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -213,6 +214,10 @@ func (r *controllerRoot) AddCloudToController(ctx context.Context, req apiparams
 // available to JIMM.
 func (r *controllerRoot) AddController(ctx context.Context, req apiparams.AddControllerRequest) (apiparams.ControllerInfo, error) {
 	const op = errors.Op("jujuapi.AddController")
+
+	if req.Name == jimmControllerName {
+		return apiparams.ControllerInfo{}, errors.E(op, errors.CodeBadRequest, fmt.Sprintf("cannot add a controller with name %q", jimmControllerName))
+	}
 
 	ctl := dbmodel.Controller{
 		Name:          req.Name,
