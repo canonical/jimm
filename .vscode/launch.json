@@ -1,0 +1,33 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Launch Package",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${fileDirname}"
+        },
+        {
+            "name": "Attach to container",
+            "type": "go",
+            "request": "attach",
+            "mode": "remote",
+            "remotePath": "/jimm/",
+            "substitutePath": [
+                {
+                    "from": "${workspaceFolder}/",
+                    "to": "/jimm/",
+                },
+            ],
+            "port": 2345,
+            "host": "127.0.0.1",
+            "showLog": true,
+            "apiVersion": 2,
+            "trace": "verbose"
+        }
+    ]
+}
