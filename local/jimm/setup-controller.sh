@@ -15,7 +15,7 @@ trap finish EXIT
 CONTROLLER_NAME="${CONTROLLER_NAME:-qa-controller}"
 CLOUDINIT_TEMPLATE=$'cloudinit-userdata: |
   preruncmd:
-    - echo "%s    jimm.localhost" >> /etc/hosts
+    - echo "%s    candid.localhost" >> /etc/hosts
   ca-certs:
     trusted:
       - |\n%s'
