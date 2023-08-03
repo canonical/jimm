@@ -28,6 +28,7 @@ EXPECTED_ENV = {
     "JIMM_DASHBOARD_LOCATION": "https://jaas.ai/models",
     "JIMM_DNS_NAME": "juju-jimm-k8s-0.juju-jimm-k8s-endpoints.None.svc.cluster.local",
     "JIMM_ENABLE_JWKS_ROTATOR": "1",
+    "JIMM_JWT_EXPIRY": "5m",
     "JIMM_LISTEN_ADDR": ":8080",
     "JIMM_LOG_LEVEL": "info",
     "JIMM_UUID": "1234567890",

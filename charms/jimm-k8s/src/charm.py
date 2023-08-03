@@ -265,6 +265,7 @@ class JimmOperatorCharm(CharmBase):
             "OPENFGA_PORT": self._state.openfga_port,
             "PRIVATE_KEY": self.config.get("private-key", ""),
             "PUBLIC_KEY": self.config.get("public-key", ""),
+            "JIMM_JWT_EXPIRY": self.config.get("jwt-expiry", "5m"),
         }
         if self._state.dsn:
             config_values["JIMM_DSN"] = self._state.dsn
