@@ -83,6 +83,10 @@ func TestCloudCredentialsCascadeOnDelete(t *testing.T) {
 	c.Assert(result.Error, qt.IsNil)
 	c.Check(result.RowsAffected, qt.Equals, int64(1))
 
-	result = db.Find(&cred)
-	c.Assert(result.Error, qt.IsNotNil)
+	deletedCred := dbmodel.CloudCredential{
+		Name: "test-credential",
+	}
+	result = db.Find(&deletedCred)
+	c.Assert(result.Error, qt.IsNil)
+	c.Assert(result.RowsAffected, qt.Equals, int64(0))
 }
