@@ -6,6 +6,7 @@
 PRAGMA schema_version;
 PRAGMA writable_schema=ON;
 UPDATE sqlite_schema SET sql=REPLACE(sql,'cloud_name TEXT NOT NULL REFERENCES clouds (name)','cloud_name TEXT NOT NULL REFERENCES clouds (name) ON DELETE CASCADE') WHERE type='table' AND name='cloud_credentials';
+PRAGMA schema_version=44;
 PRAGMA writable_schema=OFF;
 PRAGMA integrity_check;
 
