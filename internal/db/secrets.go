@@ -130,6 +130,10 @@ func (d *Database) GetControllerCredentials(ctx context.Context, controllerName 
 	const op = errors.Op("database.GetControllerCredentials")
 	secret := dbmodel.NewSecret(names.ControllerTagKind, controllerName, nil)
 	err := d.GetSecret(ctx, &secret)
+	// It is expected for this interface that a non-existent controller credential return empty username/password.
+	if errors.ErrorCode(err) == errors.CodeNotFound {
+		return "", "", nil
+	}
 	if err != nil {
 		zapctx.Error(ctx, "failed to get secret data", zap.Error(err))
 		return "", "", errors.E(op, err)

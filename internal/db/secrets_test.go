@@ -158,6 +158,18 @@ func (s *dbSuite) TestPutAndGetControllerCredential(c *qt.C) {
 	c.Assert(password, qt.Equals, "pass")
 }
 
+func (s *dbSuite) TestGetMissingControllerCredentialDoesNotError(c *qt.C) {
+	err := s.Database.Migrate(context.Background(), true)
+	c.Assert(err, qt.Equals, nil)
+	ctx := context.Background()
+	controllerName := "beef1beef2-0000-0000-000011112222"
+	// Get ControllerCred
+	username, password, err := s.Database.GetControllerCredentials(ctx, controllerName)
+	c.Assert(err, qt.IsNil)
+	c.Assert(username, qt.Equals, "")
+	c.Assert(password, qt.Equals, "")
+}
+
 func getJWKS(c *qt.C) jwk.Set {
 	set, err := jwk.ParseString(`
 	{
