@@ -58,7 +58,7 @@ type AuditLogFilter struct {
 
 	// SortTime will sort by most recent first (time descending) when true.
 	// When false no explicit ordering will be applied.
-	SortTime bool `json:"sort,omitempty"`
+	SortTime bool `json:"sortTime,omitempty"`
 }
 
 // ForEachAuditLogEntry iterates through all audit log entries that match
