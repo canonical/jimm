@@ -64,7 +64,6 @@ type AuditLogFilter struct {
 // ForEachAuditLogEntry iterates through all audit log entries that match
 // the given filter calling f for each entry. If f returns an error
 // iteration stops immediately and the error is retuned unmodified.
-// Entries are sorted by time in descending order.
 func (d *Database) ForEachAuditLogEntry(ctx context.Context, filter AuditLogFilter, f func(*dbmodel.AuditLogEntry) error) error {
 	const op = errors.Op("db.ForEachAuditLogEntry")
 	if err := d.ready(); err != nil {
