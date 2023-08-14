@@ -400,6 +400,15 @@ func (s *jimmSuite) TestAuditLog(c *gc.C) {
 	c.Check(evs, jc.DeepEquals, expectedEvents)
 }
 
+func (s *jimmSuite) TestAuditLogFilterByMethod(c *gc.C) {
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+	client := api.NewClient(conn)
+	evs, err := client.FindAuditEvents(&apiparams.FindAuditEventsRequest{Method: "Deploy"})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(len(evs.Events), gc.Equals, 0)
+}
+
 func (s *jimmSuite) TestFullModelStatus(c *gc.C) {
 	s.AddController(c, "controller-2", s.APIInfo(c))
 	mt := s.AddModel(c, names.NewUserTag("charlie@external"), "model-1", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, s.Model2.CloudCredential.ResourceTag())
