@@ -63,6 +63,7 @@ func init() {
 		r.AddMethod("JIMM", 3, "UpdateMigratedModel", updateMigratedModelMethod)
 		r.AddMethod("JIMM", 3, "AddCloudToController", addCloudToControllerMethod)
 		r.AddMethod("JIMM", 3, "RemoveCloudFromController", removeCloudFromControllerMethod)
+		r.AddMethod("JIMM", 3, "CrossModelQuery", crossModelQueryMethod)
 
 		// JIMM Generic RPC
 		r.AddMethod("JIMM", 4, "AddController", addControllerMethod)
@@ -479,13 +480,18 @@ func (r *controllerRoot) RemoveCloudFromController(ctx context.Context, req apip
 // The query will run against output exactly like "juju status --format json", but for each of their models.
 func (r *controllerRoot) CrossModelQuery(ctx context.Context, req apiparams.CrossModelQueryRequest) (apiparams.CrossModelQueryResponse, error) {
 	const op = errors.Op("jujuapi.CrossModelQuery")
-	modelUUIDs, err := r.user.ListModels(ctx)
+
+	usersModels, err := r.jimm.Database.GetUserModels(ctx, r.user.User)
 	if err != nil {
 		return apiparams.CrossModelQueryResponse{}, errors.E(op, errors.Code("failed to get models for user"))
 	}
+	models := make([]dbmodel.Model, len(usersModels))
+	for i, m := range usersModels {
+		models[i] = m.Model_
+	}
 	switch strings.TrimSpace(strings.ToLower(req.Type)) {
 	case "jq":
-		return r.jimm.QueryModelsJq(ctx, modelUUIDs, req.Query)
+		return r.jimm.QueryModelsJq(ctx, models, req.Query)
 	case "jimmsql":
 		return apiparams.CrossModelQueryResponse{}, errors.E(op, errors.CodeNotImplemented)
 	default:

@@ -322,7 +322,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	// If the request is not for a known path assume it is part of the dashboard.
 	// If dashboard location env var is not defined, do not handle a dashboard.
 	if p.DashboardLocation != "" {
-		s.mux.Handle("/", dashboard.Handler(ctx, p.DashboardLocation))
+		s.mux.Handle("/", dashboard.Handler(ctx, p.DashboardLocation, p.PublicDNSName))
 	}
 
 	return s, nil
@@ -463,7 +463,7 @@ func newVaultStore(ctx context.Context, p Params) (jimmcreds.CredentialStore, er
 	}
 	defer f.Close()
 	s, err := vaultapi.ParseSecret(f)
-	if err != nil {
+	if err != nil || s == nil {
 		zapctx.Error(ctx, "failed to parse vault secret from file")
 		return nil, err
 	}

@@ -10,41 +10,17 @@
 #
 # Requirements to run this script:
 # - yq (snap)
+set -eux
 
-JIMM_CONTROLLER_NAME=$1
-CONTROLLER_NAME=$2
-CONTROLLER_YAML_PATH=$3
-CLIENT_CREDENTIAL_NAME=$4
-
-echo "Checking environment..."
-if [ -z "$JIMM_CONTROLLER_NAME" ];
-then
-    echo "- JIMM controller name NOT SET, setting it to 'jimm-dev'"
-    JIMM_CONTROLLER_NAME="jimm-dev"
-fi
-
-if [ -z "$CONTROLLER_NAME" ];
-then
-    echo "- Controller name NOT SET, setting it to 'qa-controller'"
-    CONTROLLER_NAME="qa-controller"
-fi
-
-if [ -z "$CONTROLLER_YAML_PATH" ];
-then
-    echo "- Controller YAML path NOT SET, setting it to './qa-controller'"
-    CONTROLLER_YAML_PATH="./qa-controller"
-fi
-
-if [ -z "$CLIENT_CREDENTIAL_NAME" ];
-then
-    echo "- Client credential name NOT SET, setting it to 'microk8s'"
-    CLIENT_CREDENTIAL_NAME="localhost"
-fi
+JIMM_CONTROLLER_NAME="${JIMM_CONTROLLER_NAME:-jimm-dev}"
+CONTROLLER_NAME="${CONTROLLER_NAME:-qa-controller}"
+CONTROLLER_YAML_PATH="${CONTROLLER_NAME}".yaml
+CLIENT_CREDENTIAL_NAME="${CLIENT_CREDENTIAL_NAME:-localhost}"
 
 echo
 echo "JIMM controller name is: $JIMM_CONTROLLER_NAME"
-echo "Targ controller name is: $CONTROLLER_NAME"
-echo "Targ controller path is: $CONTROLLER_YAML_PATH"
+echo "Target controller name is: $CONTROLLER_NAME"
+echo "Target controller path is: $CONTROLLER_YAML_PATH"
 echo
 echo "Building jimmctl..."
 # Build jimmctl so we may add a controller.
@@ -62,16 +38,6 @@ else
     echo "Controller info couldn't be created, exiting..."
     exit 1
 fi
-echo
-echo "Retrieving controller address"
-CONTROLLER_ADDRESS=$(cat "$CONTROLLER_YAML_PATH" | yq '.public-address' |  cut -d ":" -f 1)
-echo "Controller address is: $CONTROLLER_ADDRESS" 
-echo
-echo "Updating $CONTROLLER_YAML_PATH public-address..."
-yq -i e '.public-address |= "juju-apiserver:17070"' "$CONTROLLER_YAML_PATH"
-echo
-echo "Updating containers /etc/hosts..."
-docker compose exec -w /etc --no-TTY jimm bash -c "echo '$CONTROLLER_ADDRESS juju-apiserver' >> hosts"
 echo
 echo "Adding controller from path: $CONTROLLER_YAML_PATH"
 ./jimmctl add-controller "$CONTROLLER_YAML_PATH"

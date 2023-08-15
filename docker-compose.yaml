@@ -33,6 +33,7 @@ services:
     ports:
       - 17070:80
     environment:
+      JIMM_LOG_LEVEL: "debug"
       JIMM_UUID: "3217dbc9-8ea9-4381-9e97-01eab0b3f6bb"
       JIMM_DSN: "postgresql://jimm:jimm@db/jimm"
       CANDID_URL: "http://0.0.0.0:8081" # For external client redirects (in the case of compose and running outside)
@@ -78,9 +79,9 @@ services:
         condition: service_healthy
     labels:
       traefik.enable: true
-      traefik.http.routers.httpd.rule: Host(`jimm.localhost`)
-      traefik.http.routers.httpd.entrypoints: websecure
-      traefik.http.routers.httpd.tls: true
+      traefik.http.routers.jimm.rule: Host(`jimm.localhost`)
+      traefik.http.routers.jimm.entrypoints: websecure
+      traefik.http.routers.jimm.tls: true
 
   db:
     image: postgres
@@ -134,8 +135,6 @@ services:
     image: candid:latest
     container_name: candid
     entrypoint: "/candid.sh"
-    command: ""
-    # command: "/etc/candid/config.yaml && echo 'hi' && ls"
     expose:
       - 8081
     ports:

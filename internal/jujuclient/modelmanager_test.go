@@ -183,7 +183,6 @@ func (s *modelmanagerSuite) TestRevokeModelAccessError(c *gc.C) {
 
 func (s *modelmanagerSuite) TestValidateModelUpgrade(c *gc.C) {
 	c.Skip("juju 3.x no longer implements this method")
-
 	ctx := context.Background()
 
 	args := jujuparams.ModelCreateArgs{

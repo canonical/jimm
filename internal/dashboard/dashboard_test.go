@@ -19,7 +19,7 @@ import (
 const (
 	configFile = `var jujuDashboardConfig = {
   // API host to allow app to connect and retrieve models
-  baseControllerURL: null,
+  baseControllerURL: "{{.baseControllerURL}}",
   // Configurable base url to allow deploying to different paths.
   baseAppURL: "{{.baseAppURL}}",
   // If true then identity will be provided by a third party provider.
@@ -38,7 +38,7 @@ const (
 func TestDashboardNotConfigured(t *testing.T) {
 	c := qt.New(t)
 
-	hnd := dashboard.Handler(context.Background(), "")
+	hnd := dashboard.Handler(context.Background(), "", "")
 	rr := httptest.NewRecorder()
 	req, err := http.NewRequest("GET", "/dashboard", nil)
 	c.Assert(err, qt.IsNil)
@@ -50,7 +50,7 @@ func TestDashboardNotConfigured(t *testing.T) {
 func TestDashboardRedirect(t *testing.T) {
 	c := qt.New(t)
 
-	hnd := dashboard.Handler(context.Background(), "https://example.com/dashboard")
+	hnd := dashboard.Handler(context.Background(), "https://example.com/dashboard", "http://jimm.canonical.com")
 	rr := httptest.NewRecorder()
 	req, err := http.NewRequest("GET", "/dashboard", nil)
 	c.Assert(err, qt.IsNil)
@@ -71,7 +71,7 @@ func TestDashboardFromPath(t *testing.T) {
 	err = os.WriteFile(filepath.Join(dir, "test"), []byte(testFile), 0444)
 	c.Assert(err, qt.Equals, nil)
 
-	hnd := dashboard.Handler(context.Background(), dir)
+	hnd := dashboard.Handler(context.Background(), dir, "http://jimm.canonical.com")
 	rr := httptest.NewRecorder()
 	req, err := http.NewRequest("GET", "/dashboard", nil)
 	c.Assert(err, qt.IsNil)
@@ -100,7 +100,7 @@ func TestDashboardFromPath(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Check(string(buf), qt.Equals, `var jujuDashboardConfig = {
   // API host to allow app to connect and retrieve models
-  baseControllerURL: null,
+  baseControllerURL: "http://jimm.canonical.com",
   // Configurable base url to allow deploying to different paths.
   baseAppURL: "/",
   // If true then identity will be provided by a third party provider.
@@ -136,7 +136,7 @@ func TestDashboardFromPath(t *testing.T) {
 func TestInvalidLocation(t *testing.T) {
 	c := qt.New(t)
 
-	hnd := dashboard.Handler(context.Background(), ":::")
+	hnd := dashboard.Handler(context.Background(), ":::", "http://jimm.canonical.com")
 	rr := httptest.NewRecorder()
 	req, err := http.NewRequest("GET", "/dashboard", nil)
 	c.Assert(err, qt.IsNil)
@@ -152,7 +152,7 @@ func TestLocationNotDirectory(t *testing.T) {
 	err := os.WriteFile(filepath.Join(dir, "test"), []byte(testFile), 0444)
 	c.Assert(err, qt.Equals, nil)
 
-	hnd := dashboard.Handler(context.Background(), filepath.Join(dir, "test"))
+	hnd := dashboard.Handler(context.Background(), filepath.Join(dir, "test"), "http://jimm.canonical.com")
 	rr := httptest.NewRecorder()
 	req, err := http.NewRequest("GET", "/dashboard", nil)
 	c.Assert(err, qt.IsNil)
@@ -174,7 +174,7 @@ func TestGUIArchiveEndpoint(t *testing.T) {
 	err = os.WriteFile(filepath.Join(dir, "version.json"), []byte(versionFile), 0444)
 	c.Assert(err, qt.Equals, nil)
 
-	hnd := dashboard.Handler(context.Background(), dir)
+	hnd := dashboard.Handler(context.Background(), dir, "http://jimm.canonical.com")
 	rr := httptest.NewRecorder()
 	req, err := http.NewRequest("GET", "/gui-archive", nil)
 	c.Assert(err, qt.IsNil)
@@ -183,7 +183,6 @@ func TestGUIArchiveEndpoint(t *testing.T) {
 	c.Check(resp.StatusCode, qt.Equals, http.StatusOK)
 	buf, err := io.ReadAll(resp.Body)
 	c.Assert(err, qt.IsNil)
-
 	c.Check(
 		string(buf),
 		qt.Equals,

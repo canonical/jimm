@@ -15,6 +15,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/CanonicalLtd/jimm"
+	"github.com/CanonicalLtd/jimm/version"
 )
 
 func main() {
@@ -32,6 +33,10 @@ func main() {
 
 // start initialises the jimmsrv service.
 func start(ctx context.Context, s *service.Service) error {
+	zapctx.Info(ctx, "jimm info",
+		zap.String("version", version.VersionInfo.Version),
+		zap.String("commit", version.VersionInfo.GitCommit),
+	)
 	if logLevel := os.Getenv("JIMM_LOG_LEVEL"); logLevel != "" {
 		if err := zapctx.LogLevel.UnmarshalText([]byte(logLevel)); err != nil {
 			zapctx.Error(ctx, "cannot set log level", zap.Error(err))
