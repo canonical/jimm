@@ -55,6 +55,10 @@ type AuditLogFilter struct {
 	// Limit is the maximum number of audit events to return.
 	// A value of zero will ignore the limit.
 	Limit int `json:"limit,omitempty"`
+
+	// SortTime will sort by most recent first (time descending) when true.
+	// When false no explicit ordering will be applied.
+	SortTime bool `json:"sortTime,omitempty"`
 }
 
 // ForEachAuditLogEntry iterates through all audit log entries that match
@@ -81,6 +85,9 @@ func (d *Database) ForEachAuditLogEntry(ctx context.Context, filter AuditLogFilt
 	}
 	if filter.Method != "" {
 		db = db.Where("facade_method = ?", filter.Method)
+	}
+	if filter.SortTime {
+		db = db.Order("time DESC")
 	}
 	db = db.Limit(filter.Limit)
 	db = db.Offset(filter.Offset)

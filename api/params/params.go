@@ -204,6 +204,10 @@ type FindAuditEventsRequest struct {
 
 	// Limit is the maximum number of audit events to return.
 	Limit int `json:"limit,omitempty"`
+
+	// SortTime will sort by most recent (time descending) when true.
+	// When false no explicit ordering will be applied.
+	SortTime bool `json:"sortTime,omitempty"`
 }
 
 // A ListControllersResponse is the response that is sent in a

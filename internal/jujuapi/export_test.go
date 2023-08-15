@@ -16,6 +16,9 @@ var (
 	ParseTag              = parseTag
 	ResolveTag            = resolveTag
 	ModelInfoFromPath     = modelInfoFromPath
+	AuditParamsToFilter   = auditParamsToFilter
+	AuditLogDefaultLimit  = limitDefault
+	AuditLogUpperLimit    = maxLimit
 )
 
 func NewModelSummaryWatcher() *modelSummaryWatcher {
