@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"io/ioutil"
 	"os"
 	"path"
@@ -22,12 +23,9 @@ import (
 )
 
 var (
-	authDefinitions    = []openfga.TypeDefinition{}
-	schemaVersion      string
-	calcDefinitionOnce sync.Once
-
-	setups   map[string]testSetup
-	setupsMu sync.Mutex
+	authTypeDefinitions []openfga.TypeDefinition
+	setups              map[string]testSetup
+	setupsMu            sync.Mutex
 )
 
 func init() {
@@ -41,67 +39,65 @@ type testSetup struct {
 }
 
 func getAuthModelDefinition() (authDefinitions []openfga.TypeDefinition, schemaVersion string, err error) {
-	calcDefinitionOnce.Do(func() {
-		desiredFolder := "local"
-		authPath := ""
-		var pwd string
-		pwd, err = os.Getwd()
+	desiredFolder := "local"
+	authPath := ""
+	var pwd string
+	pwd, err = os.Getwd()
+	if err != nil {
+		return
+	}
+	for ok := true; ok; {
+		if pwd == "/" {
+			break
+		}
+		var files []fs.FileInfo
+		files, err = ioutil.ReadDir(pwd)
 		if err != nil {
 			return
 		}
-		for ok := true; ok; {
-			if pwd == "/" {
-				break
+
+		for _, f := range files {
+			if f.Name() == desiredFolder {
+				ok = true
+				authPath = pwd
 			}
-			files, err := ioutil.ReadDir(pwd)
-			if err != nil {
-				return
-			}
+		}
+		// Move up a directory
+		pwd = filepath.Dir(pwd)
+	}
+	if authPath == "" {
+		err = fmt.Errorf("auth path is empty")
+		return
+	}
 
-			for _, f := range files {
-				if f.Name() == desiredFolder {
-					ok = true
-					authPath = pwd
-				}
-			}
-			// Move up a directory
-			pwd = filepath.Dir(pwd)
-		}
-		if authPath == "" {
-			err = fmt.Errorf("auth path is empty")
-			return
-		}
+	b, err := os.ReadFile(path.Join(authPath, "/local/openfga/authorisation_model.json"))
+	if err != nil {
+		return
+	}
 
-		var b []byte
-		b, err := os.ReadFile(path.Join(authPath, "/local/openfga/authorisation_model.json"))
-		if err != nil {
-			return
-		}
+	wrapper := map[string]interface{}{}
+	err = json.Unmarshal(b, &wrapper)
+	if err != nil {
+		return
+	}
 
-		wrapper := map[string]interface{}{}
-		err = json.Unmarshal(b, &wrapper)
-		if err != nil {
-			return
-		}
+	// TODO (babakks): If we can omit schema_version, these should be deleted:
+	var ok bool
+	schemaVersion, ok = wrapper["schema_version"].(string)
+	if !ok {
+		err = errors.E("schema_version not found in auth model")
+		return
+	}
 
-		// TODO (babakks): If we can omit schema_version, these should be deleted:
-		var ok bool
-		schemaVersion, ok = wrapper["schema_version"].(string)
-		if !ok {
-			err = errors.E("schema_version not found in auth model")
-			return
-		}
+	b, err = json.Marshal(wrapper["type_definitions"])
+	if err != nil {
+		return
+	}
 
-		b, err = json.Marshal(wrapper["type_definitions"])
-		if err != nil {
-			return
-		}
-
-		err = json.Unmarshal(b, &authDefinitions)
-		if err != nil {
-			return
-		}
-	})
+	err = json.Unmarshal(b, &authDefinitions)
+	if err != nil {
+		return
+	}
 	return
 }
 
@@ -146,12 +142,18 @@ func SetupTestOFGAClient(names ...string) (*ofga.OFGAClient, *cofga.Client, *cof
 		return nil, nil, nil, errgo.Notef(err, "failed to create ofga client")
 	}
 
-	typeDefinitions, _, err := getAuthModelDefinition()
-	if err != nil {
-		return nil, nil, nil, err
+	if authTypeDefinitions == nil {
+		authTypeDefinitions, _, err = getAuthModelDefinition()
+		if err != nil {
+			return nil, nil, nil, errgo.Notef(err, "failed to read authorization model definition")
+		}
 	}
 
-	authModelID, err := cofgaClient.CreateAuthModel(ctx, typeDefinitions)
+	authModelID, err := cofgaClient.CreateAuthModel(ctx, authTypeDefinitions)
+	if err != nil {
+		return nil, nil, nil, errgo.Notef(err, "failed to create authorization model")
+	}
+
 	cofgaClient.AuthModelId = authModelID
 	cofgaParams.AuthModelID = authModelID
 
