@@ -60,16 +60,10 @@ func TestDefaultService(t *testing.T) {
 func TestServiceStartsWithoutSecretStore(t *testing.T) {
 	c := qt.New(t)
 
-	_, ofgaClient, cfg, err := jimmtest.SetupTestOFGAClient(c.Name())
+	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 	_, err = jimm.NewService(context.Background(), jimm.Params{
-		OpenFGAParams: jimm.OpenFGAParams{
-			Scheme:    cfg.ApiScheme,
-			Host:      cfg.ApiHost,
-			Store:     cfg.StoreId,
-			Token:     cfg.Credentials.Config.ApiToken,
-			AuthModel: ofgaClient.AuthModelId,
-		},
+		OpenFGAParams: cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
 	})
 	c.Assert(err, qt.IsNil)
 }
@@ -191,18 +185,12 @@ func TestVault(t *testing.T) {
 func TestPostgresSecretStore(t *testing.T) {
 	c := qt.New(t)
 
-	_, ofgaClient, cfg, err := jimmtest.SetupTestOFGAClient(c.Name())
+	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
 	p := jimm.Params{
 		ControllerUUID: "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
-		OpenFGAParams: jimm.OpenFGAParams{
-			Scheme:    cfg.ApiScheme,
-			Host:      cfg.ApiHost,
-			Store:     cfg.StoreId,
-			Token:     cfg.Credentials.Config.ApiToken,
-			AuthModel: ofgaClient.AuthModelId,
-		},
+		OpenFGAParams:  cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
 	}
 	os.Setenv("INSECURE_SECRET_STORAGE", "enable")
 	_, err = jimm.NewService(context.Background(), p)
