@@ -284,7 +284,7 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 		// Test user -> controller jimm
 		{
 			input: tuple{"user-" + user.Username, "administrator", "controller-jimm"},
-			want: createTupleKey(
+			want: createTuple(
 				"user:"+user.Username,
 				"administrator",
 				"controller:"+s.JIMM.UUID,

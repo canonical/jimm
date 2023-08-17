@@ -102,6 +102,7 @@ func getAuthModelDefinition() (authDefinitions []openfga.TypeDefinition, schemaV
 			return
 		}
 	})
+	return
 }
 
 // SetupTestOFGAClient is intended to be used per test, in that it
