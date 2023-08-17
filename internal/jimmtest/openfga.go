@@ -183,6 +183,10 @@ func RemoveStore(ctx context.Context, name string) error {
 		return errors.E(err)
 	}
 	defer conn.Close(ctx)
+	_, err = conn.Exec(ctx, fmt.Sprintf("DELETE FROM authorization_model WHERE store = (SELECT id FROM store WHERE name = '%s')", name))
+	if err != nil {
+		return errors.E(err)
+	}
 	_, err = conn.Exec(ctx, fmt.Sprintf("DELETE FROM store WHERE name = '%s';", name))
 	if err != nil {
 		return errors.E(err)
