@@ -14,7 +14,7 @@ import (
 	jujurpc "github.com/juju/juju/rpc"
 	"github.com/juju/juju/rpc/jsoncodec"
 
-	"github.com/CanonicalLtd/jimm/internal/jujuapi/rpc"
+	"github.com/canonical/jimm/internal/jujuapi/rpc"
 )
 
 func TestRPC(t *testing.T) {

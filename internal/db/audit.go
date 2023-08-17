@@ -6,8 +6,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/CanonicalLtd/jimm/internal/dbmodel"
-	"github.com/CanonicalLtd/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/servermon"
 )
 
 // AddAuditLogEntry adds a new entry to the audit log.
@@ -54,6 +55,10 @@ type AuditLogFilter struct {
 	// Limit is the maximum number of audit events to return.
 	// A value of zero will ignore the limit.
 	Limit int `json:"limit,omitempty"`
+
+	// SortTime will sort by most recent first (time descending) when true.
+	// When false no explicit ordering will be applied.
+	SortTime bool `json:"sortTime,omitempty"`
 }
 
 // ForEachAuditLogEntry iterates through all audit log entries that match
@@ -81,6 +86,9 @@ func (d *Database) ForEachAuditLogEntry(ctx context.Context, filter AuditLogFilt
 	if filter.Method != "" {
 		db = db.Where("facade_method = ?", filter.Method)
 	}
+	if filter.SortTime {
+		db = db.Order("time DESC")
+	}
 	db = db.Limit(filter.Limit)
 	db = db.Offset(filter.Offset)
 
@@ -102,4 +110,21 @@ func (d *Database) ForEachAuditLogEntry(ctx context.Context, filter AuditLogFilt
 		return errors.E(op, rows.Err())
 	}
 	return nil
+}
+
+// CleanupAuditLogs cleans up audit logs after the auditLogRetentionPeriodInDays,
+// HARD deleting them from the database.
+func (d *Database) DeleteAuditLogsBefore(ctx context.Context, before time.Time) (int64, error) {
+	const op = errors.Op("db.DeleteAuditLogsBefore")
+	now := time.Now()
+	tx := d.DB.
+		WithContext(ctx).
+		Unscoped().
+		Where("time < ?", before).
+		Delete(&dbmodel.AuditLogEntry{})
+	servermon.QueryTimeAuditLogCleanUpHistogram.Observe(time.Since(now).Seconds())
+	if tx.Error != nil {
+		return 0, errors.E(op, dbError(tx.Error))
+	}
+	return tx.RowsAffected, nil
 }

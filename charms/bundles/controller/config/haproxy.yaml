@@ -1,0 +1,16 @@
+- service_name: app-controller
+  service_host: "0.0.0.0"
+  service_port: 443
+  service_options:
+    - mode http
+    - balance leastconn
+    - option httpchk GET / HTTP/1.1\r\nHost:\ juju-apiserver\r\nConnection:\ Upgrade\r\nUpgrade:\ websocket\r\nSec-WebSocket-Key:\ aGFwcm94eQ==\r\nSec-WebSocket-Version:\ 13\r\nSec-WebSocket-Protocol:\ echo-protocol
+    - http-check expect status 101
+  server_options: ssl verify none check
+  crts: [DEFAULT]
+- service_name: api_http
+  service_host: "0.0.0.0"
+  service_port: 80
+  service_options:
+    - mode http
+    - http-request redirect scheme https

@@ -1,4 +1,4 @@
-// Copyright 2023 CanonicalLtd.
+// Copyright 2023 canonical.
 
 package openfga
 

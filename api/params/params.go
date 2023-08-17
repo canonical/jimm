@@ -204,6 +204,10 @@ type FindAuditEventsRequest struct {
 
 	// Limit is the maximum number of audit events to return.
 	Limit int `json:"limit,omitempty"`
+
+	// SortTime will sort by most recent (time descending) when true.
+	// When false no explicit ordering will be applied.
+	SortTime bool `json:"sortTime,omitempty"`
 }
 
 // A ListControllersResponse is the response that is sent in a
@@ -353,4 +357,17 @@ type CrossModelQueryRequest struct {
 type CrossModelQueryResponse struct {
 	Results map[string][]any    `json:"results"`
 	Errors  map[string][]string `json:"errors"`
+}
+
+// PurgeLogsRequest is the request used to purge logs.
+type PurgeLogsRequest struct {
+	// Date is the date before which logs should be purged.
+	Date time.Time `json:"date"`
+}
+
+// PurgeLogsResponse is the response returned by the PurgeLogs method.
+// It has one field:
+// - DeletedCount - the number of logs that were deleted.
+type PurgeLogsResponse struct {
+	DeletedCount int64 `json:"deleted-count" yaml:"deleted-count"`
 }

@@ -6,9 +6,8 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
-	"gorm.io/gorm"
 
-	"github.com/CanonicalLtd/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/dbmodel"
 )
 
 func TestVersion(t *testing.T) {
@@ -17,21 +16,18 @@ func TestVersion(t *testing.T) {
 
 	var v0 dbmodel.Version
 	result := db.First(&v0, "component = ?", dbmodel.Component)
-	c.Check(result.Error, qt.Equals, gorm.ErrRecordNotFound)
+	c.Check(result.Error, qt.IsNil)
+	c.Check(v0.Major, qt.DeepEquals, dbmodel.Major)
+	c.Check(v0.Minor, qt.Equals, dbmodel.Minor)
 
 	v1 := dbmodel.Version{
 		Component: dbmodel.Component,
 		Major:     dbmodel.Major,
 		Minor:     dbmodel.Minor,
 	}
-	result = db.Create(&v1)
+	result = db.First(&v1, "component = ?", dbmodel.Component)
 	c.Assert(result.Error, qt.IsNil)
-	c.Check(result.RowsAffected, qt.Equals, int64(1))
-
-	var v2 dbmodel.Version
-	result = db.First(&v2, "component = ?", dbmodel.Component)
-	c.Assert(result.Error, qt.IsNil)
-	c.Check(v2, qt.DeepEquals, v1)
+	c.Check(v1, qt.DeepEquals, v1)
 
 	v3 := dbmodel.Version{
 		Component: dbmodel.Component,

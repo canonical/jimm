@@ -7,8 +7,8 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/CanonicalLtd/jimm/internal/dbmodel"
-	"github.com/CanonicalLtd/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/errors"
 )
 
 // AddApplicationOffer stores the application offer information.
@@ -96,6 +96,7 @@ func (d *Database) DeleteApplicationOffer(ctx context.Context, offer *dbmodel.Ap
 	}
 	return nil
 }
+
 
 // ApplicationOfferFilter can be used to find application offers that match certain criteria.
 type ApplicationOfferFilter func(*gorm.DB) *gorm.DB

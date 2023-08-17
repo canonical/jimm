@@ -14,8 +14,8 @@ import (
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
-	"github.com/CanonicalLtd/jimm"
-	"github.com/CanonicalLtd/jimm/version"
+	"github.com/canonical/jimm"
+	"github.com/canonical/jimm/version"
 )
 
 func main() {
@@ -68,8 +68,9 @@ func start(ctx context.Context, s *service.Service) error {
 			Token:     os.Getenv("OPENFGA_TOKEN"),
 			Port:      os.Getenv("OPENFGA_PORT"),
 		},
-		PrivateKey: os.Getenv("BAKERY_PRIVATE_KEY"),
-		PublicKey:  os.Getenv("BAKERY_PUBLIC_KEY"),
+		PrivateKey:                    os.Getenv("BAKERY_PRIVATE_KEY"),
+		PublicKey:                     os.Getenv("BAKERY_PUBLIC_KEY"),
+		AuditLogRetentionPeriodInDays: os.Getenv("JIMM_AUDIT_LOG_RETENTION_PERIOD_IN_DAYS"),
 	})
 	if err != nil {
 		return err
@@ -81,8 +82,13 @@ func start(ctx context.Context, s *service.Service) error {
 	s.Go(func() error { return jimmsvc.WatchModelSummaries(ctx) })
 
 	if os.Getenv("JIMM_ENABLE_JWKS_ROTATOR") != "" {
+		zapctx.Info(ctx, "attempting to start JWKS rotator")
 		s.Go(func() error {
-			return jimmsvc.StartJWKSRotator(ctx, time.NewTicker(time.Hour).C, time.Now().UTC().AddDate(0, 3, 0))
+			err := jimmsvc.StartJWKSRotator(ctx, time.NewTicker(time.Hour).C, time.Now().UTC().AddDate(0, 3, 0))
+			if err != nil {
+				zapctx.Error(ctx, "failed to start JWKS rotator", zap.Error(err))
+			}
+			return err
 		})
 	}
 
@@ -93,6 +99,7 @@ func start(ctx context.Context, s *service.Service) error {
 	s.OnShutdown(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
+		zapctx.Warn(ctx, "server shutdown triggered")
 		httpsrv.Shutdown(ctx)
 	})
 	s.Go(httpsrv.ListenAndServe)

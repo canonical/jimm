@@ -3,14 +3,12 @@
 #
 # Learn more about testing at: https://juju.is/docs/sdk/testing
 
-import io
 import ipaddress
 import json
 import os
 import pathlib
 import shutil
 import socket
-import tarfile
 import tempfile
 import unittest
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -47,26 +45,9 @@ class TestCharm(unittest.TestCase):
         )
         self.harness.charm.framework.charm_dir = pathlib.Path(self.tempdir.name)
 
-    def dashboard_tarfile(self):
-        dashboard_archive = io.BytesIO()
-
-        data = bytes("Hello world", "utf-8")
-        f = io.BytesIO(initial_bytes=data)
-        with tarfile.open(fileobj=dashboard_archive, mode="w:bz2") as tar:
-            info = tarfile.TarInfo("README.md")
-            info.size = len(data)
-            tar.addfile(info, f)
-            tar.close()
-
-        dashboard_archive.flush()
-        dashboard_archive.seek(0)
-        data = dashboard_archive.read()
-        return data
-
     def test_install(self):
         service_file = os.path.join(self.harness.charm.charm_dir, "juju-jimm.service")
         self.harness.add_resource("jimm-snap", "Test data")
-        self.harness.add_resource("dashboard", self.dashboard_tarfile())
         self.harness.charm.on.install.emit()
         self.assertTrue(os.path.exists(service_file))
         self.assertTrue(os.path.exists(self.harness.charm._logrotate_conf_path))
@@ -75,7 +56,6 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(self.harness.charm._snap.call_args.args[0], "install")
         self.assertEqual(self.harness.charm._snap.call_args.args[1], "--dangerous")
         self.assertTrue(str(self.harness.charm._snap.call_args.args[2]).endswith("jimm.snap"))
-        self.chownmock.assert_has_calls([call(self.tempdir.name + "/dashboard.new/README.md", 0, 0)])
 
     def test_start(self):
         self.harness.charm.on.start.emit()
@@ -98,7 +78,6 @@ class TestCharm(unittest.TestCase):
     def test_upgrade_charm(self):
         service_file = os.path.join(self.harness.charm.charm_dir, "juju-jimm.service")
         self.harness.add_resource("jimm-snap", "Test data")
-        self.harness.add_resource("dashboard", self.dashboard_tarfile())
         self.harness.charm.on.upgrade_charm.emit()
         self.assertTrue(os.path.exists(service_file))
         self.assertTrue(os.path.exists(self.harness.charm._logrotate_conf_path))
@@ -107,7 +86,6 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(self.harness.charm._snap.call_args.args[0], "install")
         self.assertEqual(self.harness.charm._snap.call_args.args[1], "--dangerous")
         self.assertTrue(str(self.harness.charm._snap.call_args.args[2]).endswith("jimm.snap"))
-        self.chownmock.assert_has_calls([call(self.tempdir.name + "/dashboard.new/README.md", 0, 0)])
 
     def test_upgrade_charm_ready(self):
         service_file = os.path.join(self.harness.charm.charm_dir, "juju-jimm.service")
@@ -130,7 +108,6 @@ class TestCharm(unittest.TestCase):
 
     def test_config_changed(self):
         config_file = os.path.join(self.harness.charm.charm_dir, "juju-jimm.env")
-        os.mkdir(self.tempdir.name + "/dashboard")
         self.harness.update_config(
             {
                 "candid-url": "https://candid.example.com",
@@ -140,19 +117,21 @@ class TestCharm(unittest.TestCase):
                 "uuid": "caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa",
                 "public-key": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
                 "private-key": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
+                "audit-log-retention-period-in-days": "10",
+                "jwt-expiry": "10m",
             }
         )
         self.assertTrue(os.path.exists(config_file))
         with open(config_file) as f:
             lines = f.readlines()
         os.unlink(config_file)
-        self.assertEqual(len(lines), 16)
+        self.assertEqual(len(lines), 19)
         self.assertEqual(lines[0].strip(), "BAKERY_AGENT_FILE=")
         self.assertEqual(lines[1].strip(), "CANDID_URL=https://candid.example.com")
         self.assertEqual(lines[2].strip(), "JIMM_ADMINS=user1 user2 group1")
         self.assertEqual(
             lines[4].strip(),
-            "JIMM_DASHBOARD_LOCATION=" + self.tempdir.name + "/dashboard",
+            "JIMM_DASHBOARD_LOCATION=https://jaas.ai/models",
         )
         self.assertEqual(lines[7].strip(), "JIMM_DNS_NAME=" + "jimm.example.com")
         self.assertEqual(lines[9].strip(), "JIMM_LOG_LEVEL=debug")
@@ -164,6 +143,14 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(
             lines[15].strip(),
             "PUBLIC_KEY=izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
+        )
+        self.assertEqual(
+            lines[17].strip(),
+            "JIMM_AUDIT_LOG_RETENTION_PERIOD_IN_DAYS=10",
+        )
+        self.assertEqual(
+            lines[18].strip(),
+            "JIMM_JWT_EXPIRY=10m",
         )
 
     def test_config_changed_redirect_to_dashboard(self):
@@ -178,13 +165,14 @@ class TestCharm(unittest.TestCase):
                 "juju-dashboard-location": "https://test.jaas.ai/models",
                 "public-key": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
                 "private-key": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
+                "audit-log-retention-period-in-days": "10",
             }
         )
         self.assertTrue(os.path.exists(config_file))
         with open(config_file) as f:
             lines = f.readlines()
         os.unlink(config_file)
-        self.assertEqual(len(lines), 16)
+        self.assertEqual(len(lines), 19)
         self.assertEqual(lines[0].strip(), "BAKERY_AGENT_FILE=")
         self.assertEqual(lines[1].strip(), "CANDID_URL=https://candid.example.com")
         self.assertEqual(lines[2].strip(), "JIMM_ADMINS=user1 user2 group1")
@@ -203,10 +191,17 @@ class TestCharm(unittest.TestCase):
             lines[15].strip(),
             "PUBLIC_KEY=izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
         )
+        self.assertEqual(
+            lines[17].strip(),
+            "JIMM_AUDIT_LOG_RETENTION_PERIOD_IN_DAYS=10",
+        )
+        self.assertEqual(
+            lines[18].strip(),
+            "JIMM_JWT_EXPIRY=5m",
+        )
 
     def test_config_changed_ready(self):
         config_file = os.path.join(self.harness.charm.charm_dir, "juju-jimm.env")
-        os.mkdir(self.tempdir.name + "/dashboard")
         with open(self.harness.charm._env_filename("db"), "wt") as f:
             f.write("test")
         self.harness.update_config(
@@ -216,19 +211,20 @@ class TestCharm(unittest.TestCase):
                 "uuid": "caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa",
                 "public-key": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
                 "private-key": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
+                "audit-log-retention-period-in-days": "10",
             }
         )
         self.assertTrue(os.path.exists(config_file))
         with open(config_file) as f:
             lines = f.readlines()
         os.unlink(config_file)
-        self.assertEqual(len(lines), 14)
+        self.assertEqual(len(lines), 17)
         self.assertEqual(lines[0].strip(), "BAKERY_AGENT_FILE=")
         self.assertEqual(lines[1].strip(), "CANDID_URL=https://candid.example.com")
         self.assertEqual(lines[2].strip(), "JIMM_ADMINS=user1 user2 group1")
         self.assertEqual(
             lines[4].strip(),
-            "JIMM_DASHBOARD_LOCATION=" + self.tempdir.name + "/dashboard",
+            "JIMM_DASHBOARD_LOCATION=https://jaas.ai/models",
         )
         self.assertEqual(lines[7].strip(), "JIMM_LOG_LEVEL=info")
         self.assertEqual(lines[8].strip(), "JIMM_UUID=caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa")
@@ -239,6 +235,14 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(
             lines[13].strip(),
             "PUBLIC_KEY=izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
+        )
+        self.assertEqual(
+            lines[15].strip(),
+            "JIMM_AUDIT_LOG_RETENTION_PERIOD_IN_DAYS=10",
+        )
+        self.assertEqual(
+            lines[16].strip(),
+            "JIMM_JWT_EXPIRY=5m",
         )
 
     def test_config_changed_with_agent(self):
@@ -266,7 +270,7 @@ class TestCharm(unittest.TestCase):
 
         with open(config_file) as f:
             lines = f.readlines()
-        self.assertEqual(len(lines), 14)
+        self.assertEqual(len(lines), 17)
         self.assertEqual(
             lines[0].strip(),
             "BAKERY_AGENT_FILE=" + self.harness.charm._agent_filename,
@@ -292,7 +296,7 @@ class TestCharm(unittest.TestCase):
         )
         with open(config_file) as f:
             lines = f.readlines()
-        self.assertEqual(len(lines), 14)
+        self.assertEqual(len(lines), 17)
         self.assertEqual(lines[0].strip(), "BAKERY_AGENT_FILE=")
         self.assertEqual(lines[1].strip(), "CANDID_URL=https://candid.example.com")
         self.assertEqual(lines[2].strip(), "JIMM_ADMINS=user1 user2 group1")
@@ -560,6 +564,34 @@ class TestCharm(unittest.TestCase):
             self.assertEqual(lines[2].strip(), "OPENFGA_SCHEME=http")
             self.assertEqual(lines[3].strip(), "OPENFGA_STORE=test-store")
             self.assertEqual(lines[4].strip(), "OPENFGA_TOKEN=test-secret-token")
+
+    def test_insecure_secret_storage(self):
+        """Test that the flag for insecure secret storage is only generated when explictly requested."""
+        config_file = os.path.join(self.harness.charm.charm_dir, "juju-jimm.env")
+        self.harness.update_config(
+            {
+                "candid-url": "https://candid.example.com",
+                "controller-admins": "user1 user2 group1",
+                "dns-name": "jimm.example.com",
+                "log-level": "debug",
+                "uuid": "caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa",
+                "public-key": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
+                "private-key": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
+            }
+        )
+        self.assertTrue(os.path.exists(config_file))
+        with open(config_file) as f:
+            lines = f.readlines()
+        os.unlink(config_file)
+        self.assertEqual(len(lines), 19)
+        self.assertEqual(len([match for match in lines if "INSECURE_SECRET_STORAGE" in match]), 0)
+        self.harness.update_config({"postgres-secret-storage": True})
+        self.assertTrue(os.path.exists(config_file))
+        with open(config_file) as f:
+            lines = f.readlines()
+        os.unlink(config_file)
+        self.assertEqual(len(lines), 21)
+        self.assertEqual(len([match for match in lines if "INSECURE_SECRET_STORAGE" in match]), 1)
 
 
 class VersionHTTPRequestHandler(BaseHTTPRequestHandler):

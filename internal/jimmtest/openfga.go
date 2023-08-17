@@ -2,6 +2,7 @@ package jimmtest
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -16,12 +17,13 @@ import (
 	openfga "github.com/openfga/go-sdk"
 	"gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/jimm/internal/errors"
-	ofga "github.com/CanonicalLtd/jimm/internal/openfga"
+	"github.com/canonical/jimm/internal/errors"
+	ofga "github.com/canonical/jimm/internal/openfga"
 )
 
 var (
 	authDefinitions    = []openfga.TypeDefinition{}
+	schemaVersion      string
 	calcDefinitionOnce sync.Once
 
 	setups   map[string]testSetup
@@ -38,7 +40,7 @@ type testSetup struct {
 	cofgaParams *cofga.OpenFGAParams
 }
 
-func getAuthModelDefinition() (_ []openfga.TypeDefinition, err error) {
+func getAuthModelDefinition() (authDefinitions []openfga.TypeDefinition, schemaVersion string, err error) {
 	calcDefinitionOnce.Do(func() {
 		desiredFolder := "local"
 		authPath := ""
@@ -71,18 +73,35 @@ func getAuthModelDefinition() (_ []openfga.TypeDefinition, err error) {
 		}
 
 		var b []byte
-		b, err = os.ReadFile(path.Join(authPath, "/local/openfga/authorisation_model.json"))
+		b, err := os.ReadFile(path.Join(authPath, "/local/openfga/authorisation_model.json"))
 		if err != nil {
 			return
 		}
 
-		authDefinitions, err = cofga.AuthModelFromJSON(b)
+		wrapper := map[string]interface{}{}
+		err = json.Unmarshal(b, &wrapper)
+		if err != nil {
+			return
+		}
+
+		// TODO (babakks): If we can omit schema_version, these should be deleted:
+		var ok bool
+		schemaVersion, ok = wrapper["schema_version"].(string)
+		if !ok {
+			err = errors.E("schema_version not found in auth model")
+			return
+		}
+
+		b, err = json.Marshal(wrapper["type_definitions"])
+		if err != nil {
+			return
+		}
+
+		err = json.Unmarshal(b, &authDefinitions)
 		if err != nil {
 			return
 		}
 	})
-
-	return authDefinitions, err
 }
 
 // SetupTestOFGAClient is intended to be used per test, in that it
@@ -126,7 +145,7 @@ func SetupTestOFGAClient(names ...string) (*ofga.OFGAClient, *cofga.Client, *cof
 		return nil, nil, nil, errgo.Notef(err, "failed to create ofga client")
 	}
 
-	typeDefinitions, err := getAuthModelDefinition()
+	typeDefinitions, _, err := getAuthModelDefinition()
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -134,6 +153,13 @@ func SetupTestOFGAClient(names ...string) (*ofga.OFGAClient, *cofga.Client, *cof
 	authModelID, err := cofgaClient.CreateAuthModel(ctx, typeDefinitions)
 	cofgaClient.AuthModelId = authModelID
 	cofgaParams.AuthModelID = authModelID
+
+	// TODO (babakks): check if we can omit setting schema version.
+	// ar.SetSchemaVersion(schemaVersion)
+	// amr, _, err := api.WriteAuthorizationModel(ctx).Body(*ar).Execute()
+	// if err != nil {
+	// 	return nil, nil, nil, err
+	// }
 
 	client := ofga.NewOpenFGAClient(cofgaClient)
 

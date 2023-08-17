@@ -4,8 +4,10 @@ package jujuapi_test
 
 import (
 	"context"
+	"testing"
 	"time"
 
+	qt "github.com/frankban/quicktest"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/juju/juju/api/client/modelmanager"
 	"github.com/juju/juju/apiserver/common"
@@ -16,12 +18,13 @@ import (
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/jimm/api"
-	apiparams "github.com/CanonicalLtd/jimm/api/params"
-	"github.com/CanonicalLtd/jimm/internal/dbmodel"
-	"github.com/CanonicalLtd/jimm/internal/jimmtest"
-	"github.com/CanonicalLtd/jimm/internal/jujuapi"
-	"github.com/CanonicalLtd/jimm/internal/openfga"
+	"github.com/canonical/jimm/api"
+	apiparams "github.com/canonical/jimm/api/params"
+	"github.com/canonical/jimm/internal/db"
+	"github.com/canonical/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/jimmtest"
+	"github.com/canonical/jimm/internal/jujuapi"
+	"github.com/canonical/jimm/internal/openfga"
 )
 
 type jimmSuite struct {
@@ -194,6 +197,11 @@ func (s *jimmSuite) TestAddController(c *gc.C) {
 	_, err = client.AddController(&acr)
 	c.Check(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 	c.Check(jujuparams.IsCodeUnauthorized(err), gc.Equals, true)
+
+	acr.Name = "jimm"
+	_, err = client.AddController(&acr)
+	c.Check(err, gc.ErrorMatches, `cannot add a controller with name "jimm" \(bad request\)`)
+	c.Check(jujuparams.IsBadRequest(err), gc.Equals, true)
 }
 
 func (s *jimmSuite) TestRemoveController(c *gc.C) {
@@ -393,6 +401,77 @@ func (s *jimmSuite) TestAuditLog(c *gc.C) {
 	evs.Events = truncatedEvents
 	c.Assert(err, gc.Equals, nil)
 	c.Check(evs, jc.DeepEquals, expectedEvents)
+}
+
+func (s *jimmSuite) TestAuditLogFilterByMethod(c *gc.C) {
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+	client := api.NewClient(conn)
+	evs, err := client.FindAuditEvents(&apiparams.FindAuditEventsRequest{Method: "Deploy"})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(len(evs.Events), gc.Equals, 0)
+}
+
+// TestAuditLogAPIParamsConversion tests the conversion of API params to a AuditLogFilter struct.
+// Note that this test doesn't require a running Juju/JIMM controller so it doesn't use gc + the jimmSuite.
+func TestAuditLogAPIParamsConversion(t *testing.T) {
+	c := qt.New(t)
+	testCases := []struct {
+		about   string
+		request apiparams.FindAuditEventsRequest
+		result  db.AuditLogFilter
+		err     error
+	}{
+		{
+			about: "Test basic conversion",
+			request: apiparams.FindAuditEventsRequest{
+				After:    "2023-08-14T00:00:00Z",
+				Before:   "2023-08-14T00:00:00Z",
+				UserTag:  "user-alice",
+				Model:    "123",
+				Method:   "Deploy",
+				Offset:   10,
+				Limit:    10,
+				SortTime: false,
+			},
+			result: db.AuditLogFilter{
+				Start:    time.Date(2023, 8, 14, 0, 0, 0, 0, time.UTC),
+				End:      time.Date(2023, 8, 14, 0, 0, 0, 0, time.UTC),
+				UserTag:  "user-alice",
+				Model:    "123",
+				Method:   "Deploy",
+				Offset:   10,
+				Limit:    10,
+				SortTime: false,
+			},
+		}, {
+			about: "Test limit lower bound",
+			request: apiparams.FindAuditEventsRequest{
+				Limit: 0,
+			},
+			result: db.AuditLogFilter{
+				Limit: jujuapi.AuditLogDefaultLimit,
+			},
+		}, {
+			about: "Test limit upper bound",
+			request: apiparams.FindAuditEventsRequest{
+				Limit: jujuapi.AuditLogUpperLimit + 1,
+			},
+			result: db.AuditLogFilter{
+				Limit: jujuapi.AuditLogUpperLimit,
+			},
+		},
+	}
+	for _, test := range testCases {
+		c.Log(test.about)
+		res, err := jujuapi.AuditParamsToFilter(test.request)
+		if test.err == nil {
+			c.Assert(err, qt.IsNil)
+			c.Assert(res, qt.DeepEquals, test.result)
+		} else {
+			c.Assert(err, qt.ErrorMatches, test.err)
+		}
+	}
 }
 
 func (s *jimmSuite) TestFullModelStatus(c *gc.C) {

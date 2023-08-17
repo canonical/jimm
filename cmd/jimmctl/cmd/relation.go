@@ -16,9 +16,9 @@ import (
 	"github.com/juju/juju/cmd/modelcmd"
 	"github.com/juju/juju/jujuclient"
 
-	"github.com/CanonicalLtd/jimm/api"
-	apiparams "github.com/CanonicalLtd/jimm/api/params"
-	"github.com/CanonicalLtd/jimm/internal/errors"
+	"github.com/canonical/jimm/api"
+	apiparams "github.com/canonical/jimm/api/params"
+	"github.com/canonical/jimm/internal/errors"
 )
 
 const (
@@ -121,8 +121,8 @@ Example:
 jimmctl auth relation check user-alice@external administrator controller-aws-controller-1
 
 Example:
-	jimmctl auth relation add <object> <relation> <target_object>
-	jimmctl auth relation add -f <filename>
+	jimmctl auth relation check <object> <relation> <target_object>
+	jimmctl auth relation check -f <filename>
 	`
 
 	listRelationsDoc = `

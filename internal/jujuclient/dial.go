@@ -27,10 +27,10 @@ import (
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
-	"github.com/CanonicalLtd/jimm/internal/dbmodel"
-	"github.com/CanonicalLtd/jimm/internal/errors"
-	"github.com/CanonicalLtd/jimm/internal/jimm"
-	"github.com/CanonicalLtd/jimm/internal/rpc"
+	"github.com/canonical/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/jimm"
+	"github.com/canonical/jimm/internal/rpc"
 )
 
 const (
@@ -118,6 +118,11 @@ func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag nam
 		if p != "" {
 			password = p
 		}
+	}
+
+	if username == "" || password == "" {
+		zapctx.Error(ctx, "empty username or password")
+		return nil, errors.E(op, errors.CodeNotFound, "missing controller username or password")
 	}
 
 	args := jujuparams.LoginRequest{

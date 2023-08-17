@@ -15,12 +15,12 @@ import (
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 
-	"github.com/CanonicalLtd/jimm/internal/db"
-	"github.com/CanonicalLtd/jimm/internal/dbmodel"
-	"github.com/CanonicalLtd/jimm/internal/jimm"
-	"github.com/CanonicalLtd/jimm/internal/jimmtest"
-	"github.com/CanonicalLtd/jimm/internal/openfga"
-	ofganames "github.com/CanonicalLtd/jimm/internal/openfga/names"
+	"github.com/canonical/jimm/internal/db"
+	"github.com/canonical/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/jimm"
+	"github.com/canonical/jimm/internal/jimmtest"
+	"github.com/canonical/jimm/internal/openfga"
+	ofganames "github.com/canonical/jimm/internal/openfga/names"
 )
 
 func TestFindAuditEvents(t *testing.T) {
@@ -114,6 +114,14 @@ func TestFindAuditEvents(t *testing.T) {
 			Model: "TestModel",
 		},
 		expectedEvents: []dbmodel.AuditLogEntry{events[2], events[3]},
+	}, {
+		about: "admin/privileged user is allowed to find audit events by model and sort by time",
+		users: []*openfga.User{admin, privileged},
+		filter: db.AuditLogFilter{
+			Model:    "TestModel",
+			SortTime: true,
+		},
+		expectedEvents: []dbmodel.AuditLogEntry{events[3], events[2]},
 	}, {
 		about: "admin/privileged user is allowed to find audit events with limit/offset",
 		users: []*openfga.User{admin, privileged},

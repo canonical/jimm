@@ -5,8 +5,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CanonicalLtd/jimm/internal/errors"
-	"github.com/CanonicalLtd/jimm/internal/jimm/credentials"
+	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/jimm/credentials"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 )
 

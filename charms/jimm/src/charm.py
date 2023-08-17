@@ -10,7 +10,6 @@ import os
 import shutil
 import socket
 import subprocess
-import tarfile
 import urllib
 
 import hvac
@@ -62,7 +61,6 @@ class JimmCharm(SystemdCharm):
         self._agent_filename = "/var/snap/jimm/common/agent.json"
         self._vault_secret_filename = "/var/snap/jimm/common/vault_secret.json"
         self._workload_filename = "/snap/bin/jimm"
-        self._dashboard_path = "/var/snap/jimm/common/dashboard"
         self._rsyslog_conf_path = "/etc/rsyslog.d/10-jimm.conf"
         self._logrotate_conf_path = "/etc/logrotate.d/jimm"
 
@@ -101,7 +99,6 @@ class JimmCharm(SystemdCharm):
         """Install the JIMM software."""
         self._write_service_file()
         self._install_snap()
-        self._install_dashboard()
         self._setup_logging()
         self._on_update_status(None)
 
@@ -116,7 +113,6 @@ class JimmCharm(SystemdCharm):
         """Upgrade the charm software."""
         self._write_service_file()
         self._install_snap()
-        self._install_dashboard()
         self._setup_logging()
         if self._ready():
             self.restart()
@@ -136,9 +132,12 @@ class JimmCharm(SystemdCharm):
             "dashboard_location": self.config.get("juju-dashboard-location"),
             "public_key": self.config.get("public-key"),
             "private_key": self.config.get("private-key"),
+            "audit_retention_period": self.config.get("audit-log-retention-period-in-days", ""),
+            "jwt_expiry": self.config.get("jwt-expiry", "5m"),
         }
-        if os.path.exists(self._dashboard_path):
-            args["dashboard_location"] = self._dashboard_path
+
+        if self.config.get("postgres-secret-storage", False):
+            args["insecure_secret_storage"] = "enabled"  # Value doesn't matter, only checks env var exists.
 
         with open(self._env_filename(), "wt") as f:
             f.write(self._render_template("jimm.env", **args))
@@ -176,6 +175,14 @@ class JimmCharm(SystemdCharm):
         if not event.endpoints:
             logger.info("received empty database host address")
             event.defer()
+            return
+
+        if event.username is None or event.password is None:
+            event.defer()
+            logger.info(
+                "(postgresql) Relation data is not complete (missing `username` or `password` field); "
+                "deferring the event."
+            )
             return
 
         # get the first endpoint from a comma separate list
@@ -292,35 +299,10 @@ class JimmCharm(SystemdCharm):
         if not path:
             self.unit.status = BlockedStatus("waiting for jimm-snap resource")
             return
+        # remove the jimm snap if it is already installed.
+        self._snap("remove", "jimm")
+        # install the new jimm snap.
         self._snap("install", "--dangerous", path)
-
-    def _install_dashboard(self):
-        try:
-            path = self.model.resources.fetch("dashboard")
-        except ModelError:
-            path = None
-
-        if not path:
-            return
-
-        if self._dashboard_resource_nonempty():
-            new_dashboard_path = self._dashboard_path + ".new"
-            old_dashboard_path = self._dashboard_path + ".old"
-            shutil.rmtree(new_dashboard_path, ignore_errors=True)
-            shutil.rmtree(old_dashboard_path, ignore_errors=True)
-            os.mkdir(new_dashboard_path)
-
-            self.unit.status = MaintenanceStatus("installing dashboard")
-            with tarfile.open(path, mode="r:bz2") as tf:
-                tf.extractall(new_dashboard_path)
-
-                # Change the owner/group of all extracted files to root/wheel.
-                for name in tf.getnames():
-                    os.chown(os.path.join(new_dashboard_path, name), 0, 0)
-
-            if os.path.exists(self._dashboard_path):
-                os.rename(self._dashboard_path, old_dashboard_path)
-            os.rename(new_dashboard_path, self._dashboard_path)
 
     def _setup_logging(self):
         """Install the logging configuration."""
@@ -333,12 +315,6 @@ class JimmCharm(SystemdCharm):
             self._rsyslog_conf_path,
         )
         self._systemctl("restart", "rsyslog")
-
-    def _dashboard_resource_nonempty(self):
-        dashboard_file = self.model.resources.fetch("dashboard")
-        if dashboard_file:
-            return os.path.getsize(dashboard_file) != 0
-        return False
 
     def _bakery_agent_file(self):
         url = self.config.get("candid-url", "")

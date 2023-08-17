@@ -9,7 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
 
-	"github.com/CanonicalLtd/jimm/version"
+	"github.com/canonical/jimm/version"
 )
 
 // DebugHandler holds the grouped router to be mounted and

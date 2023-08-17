@@ -8,12 +8,14 @@ import (
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 
-	"github.com/CanonicalLtd/jimm/internal/db"
-	"github.com/CanonicalLtd/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/db"
+	"github.com/canonical/jimm/internal/dbmodel"
 )
 
 var (
 	DetermineAccessLevelAfterGrant = determineAccessLevelAfterGrant
+	PollDuration                   = pollDuration
+	CalculateNextPollDuration      = calculateNextPollDuration
 )
 
 func (w *Watcher) PollControllerModels(ctx context.Context, ctl *dbmodel.Controller) {

@@ -4,6 +4,7 @@ package jujuapi
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -13,12 +14,12 @@ import (
 	"github.com/juju/zaputil"
 	"github.com/juju/zaputil/zapctx"
 
-	apiparams "github.com/CanonicalLtd/jimm/api/params"
-	"github.com/CanonicalLtd/jimm/internal/db"
-	"github.com/CanonicalLtd/jimm/internal/dbmodel"
-	"github.com/CanonicalLtd/jimm/internal/errors"
-	"github.com/CanonicalLtd/jimm/internal/jujuapi/rpc"
-	"github.com/CanonicalLtd/jimm/internal/openfga"
+	apiparams "github.com/canonical/jimm/api/params"
+	"github.com/canonical/jimm/internal/db"
+	"github.com/canonical/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/jujuapi/rpc"
+	"github.com/canonical/jimm/internal/openfga"
 )
 
 func init() {
@@ -46,6 +47,7 @@ func init() {
 		checkRelationMethod := rpc.Method(r.CheckRelation)
 		listRelationshipTuplesMethod := rpc.Method(r.ListRelationshipTuples)
 		crossModelQueryMethod := rpc.Method(r.CrossModelQuery)
+		purgeLogsMethod := rpc.Method(r.PurgeLogs)
 
 		r.AddMethod("JIMM", 2, "DisableControllerUUIDMasking", disableControllerUUIDMaskingMethod)
 		r.AddMethod("JIMM", 2, "ListControllers", listControllersMethod)
@@ -79,6 +81,7 @@ func init() {
 		r.AddMethod("JIMM", 4, "UpdateMigratedModel", updateMigratedModelMethod)
 		r.AddMethod("JIMM", 4, "AddCloudToController", addCloudToControllerMethod)
 		r.AddMethod("JIMM", 4, "RemoveCloudFromController", removeCloudFromControllerMethod)
+		r.AddMethod("JIMM", 4, "PurgeLogs", purgeLogsMethod)
 		// JIMM ReBAC RPC
 		r.AddMethod("JIMM", 4, "AddGroup", addGroupMethod)
 		r.AddMethod("JIMM", 4, "RenameGroup", renameGroupMethod)
@@ -212,6 +215,10 @@ func (r *controllerRoot) AddCloudToController(ctx context.Context, req apiparams
 func (r *controllerRoot) AddController(ctx context.Context, req apiparams.AddControllerRequest) (apiparams.ControllerInfo, error) {
 	const op = errors.Op("jujuapi.AddController")
 
+	if req.Name == jimmControllerName {
+		return apiparams.ControllerInfo{}, errors.E(op, errors.CodeBadRequest, fmt.Sprintf("cannot add a controller with name %q", jimmControllerName))
+	}
+
 	ctl := dbmodel.Controller{
 		Name:          req.Name,
 		PublicAddress: req.PublicAddress,
@@ -317,32 +324,32 @@ func (r *controllerRoot) SetControllerDeprecated(ctx context.Context, req apipar
 const maxLimit = 1000
 const limitDefault = 50
 
-// FindAuditEvents finds the audit-log entries that match the given filter.
-func (r *controllerRoot) FindAuditEvents(ctx context.Context, req apiparams.FindAuditEventsRequest) (apiparams.AuditEvents, error) {
-	const op = errors.Op("jujuapi.FindAuditEvents")
-
+func auditParamsToFilter(req apiparams.FindAuditEventsRequest) (db.AuditLogFilter, error) {
 	var filter db.AuditLogFilter
 	var err error
+	filter.Method = req.Method
+	filter.Model = req.Model
+	filter.SortTime = req.SortTime
+
 	if req.After != "" {
 		filter.Start, err = time.Parse(time.RFC3339, req.After)
 		if err != nil {
-			return apiparams.AuditEvents{}, errors.E(op, err, errors.CodeBadRequest, `invalid "after" filter`)
+			return filter, errors.E(err, errors.CodeBadRequest, `invalid "after" filter`)
 		}
 	}
 	if req.Before != "" {
 		filter.End, err = time.Parse(time.RFC3339, req.Before)
 		if err != nil {
-			return apiparams.AuditEvents{}, errors.E(op, err, errors.CodeBadRequest, `invalid "before" filter`)
+			return filter, errors.E(err, errors.CodeBadRequest, `invalid "before" filter`)
 		}
 	}
 	if req.UserTag != "" {
 		tag, err := names.ParseUserTag(req.UserTag)
 		if err != nil {
-			return apiparams.AuditEvents{}, errors.E(op, err, errors.CodeBadRequest, `invalid "user-tag" filter`)
+			return filter, errors.E(err, errors.CodeBadRequest, `invalid "user-tag" filter`)
 		}
 		filter.UserTag = tag.String()
 	}
-	filter.Model = req.Model
 
 	limit := int(req.Limit)
 	if limit < 1 {
@@ -357,7 +364,16 @@ func (r *controllerRoot) FindAuditEvents(ctx context.Context, req apiparams.Find
 		offset = 0
 	}
 	filter.Offset = offset
+	return filter, nil
+}
 
+// FindAuditEvents finds the audit-log entries that match the given filter.
+func (r *controllerRoot) FindAuditEvents(ctx context.Context, req apiparams.FindAuditEventsRequest) (apiparams.AuditEvents, error) {
+	const op = errors.Op("jujuapi.FindAuditEvents")
+	filter, err := auditParamsToFilter(req)
+	if err != nil {
+		return apiparams.AuditEvents{}, errors.E(op, err)
+	}
 	entries, err := r.jimm.FindAuditEvents(ctx, r.user, filter)
 	if err != nil {
 		return apiparams.AuditEvents{}, errors.E(op, err)
@@ -497,4 +513,17 @@ func (r *controllerRoot) CrossModelQuery(ctx context.Context, req apiparams.Cros
 	default:
 		return apiparams.CrossModelQueryResponse{}, errors.E(op, errors.Code("invalid query type"), "unable to query models")
 	}
+}
+
+// PurgeLogs removes all audit log entries older than the specified date.
+func (r *controllerRoot) PurgeLogs(ctx context.Context, req apiparams.PurgeLogsRequest) (apiparams.PurgeLogsResponse, error) {
+	const op = errors.Op("jujuapi.PurgeLogs")
+
+	deleted_count, err := r.jimm.PurgeLogs(ctx, r.user, req.Date)
+	if err != nil {
+		return apiparams.PurgeLogsResponse{}, errors.E(op, err)
+	}
+	return apiparams.PurgeLogsResponse{
+		DeletedCount: deleted_count,
+	}, nil
 }

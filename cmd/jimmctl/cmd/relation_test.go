@@ -20,13 +20,13 @@ import (
 	yamlv2 "gopkg.in/yaml.v2"
 	"gopkg.in/yaml.v3"
 
-	apiparams "github.com/CanonicalLtd/jimm/api/params"
-	"github.com/CanonicalLtd/jimm/cmd/jimmctl/cmd"
-	"github.com/CanonicalLtd/jimm/internal/db"
-	"github.com/CanonicalLtd/jimm/internal/dbmodel"
-	ofga "github.com/CanonicalLtd/jimm/internal/openfga"
-	ofganames "github.com/CanonicalLtd/jimm/internal/openfga/names"
-	jimmnames "github.com/CanonicalLtd/jimm/pkg/names"
+	apiparams "github.com/canonical/jimm/api/params"
+	"github.com/canonical/jimm/cmd/jimmctl/cmd"
+	"github.com/canonical/jimm/internal/db"
+	"github.com/canonical/jimm/internal/dbmodel"
+	ofga "github.com/canonical/jimm/internal/openfga"
+	ofganames "github.com/canonical/jimm/internal/openfga/names"
+	jimmnames "github.com/canonical/jimm/pkg/names"
 )
 
 type relationSuite struct {
@@ -61,6 +61,15 @@ func (s *relationSuite) TestAddRelationSuperuser(c *gc.C) {
 			err: false,
 		},
 		{
+			testName: "Add admin relation to controller-jimm",
+			input: tuple{
+				user:     "group-" + group1 + "#member",
+				relation: "administrator",
+				target:   "controller-jimm",
+			},
+			err: false,
+		},
+		{
 			testName: "Invalid Relation",
 			input: tuple{
 				user:     "group-" + group1 + "#member",
@@ -88,6 +97,9 @@ func (s *relationSuite) TestAddRelationSuperuser(c *gc.C) {
 			tuples, ct, err := s.jimmSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), ofga.Tuple{}, 50, "")
 			c.Assert(err, gc.IsNil)
 			c.Assert(ct, gc.Equals, "")
+			// NOTE: this is a bad test because it relies on the number of related objects. So all the
+			// non-failing test cases must be executed before any of the failing tests - failing tests
+			// do not add any tuples therefore the following assertion fails.
 			c.Assert(len(tuples), gc.Equals, i+3)
 		}
 	}
@@ -124,7 +136,7 @@ func (s *relationSuite) TestAddRelationViaFileSuperuser(c *gc.C) {
 	file, err := os.CreateTemp(".", "relations.json")
 	c.Assert(err, gc.IsNil)
 	defer os.Remove(file.Name())
-	testRelations := `[{"object":"group-` + group1 + `","relation":"member","target_object":"group-` + group3 + `"},{"object":"group-` + group2 + `","relation":"member","target_object":"group-` + group3 + `"}]`
+	testRelations := `[{"object":"user-alice","relation":"member","target_object":"group-` + group3 + `"},{"object":"group-` + group2 + `#member","relation":"member","target_object":"group-` + group3 + `"}]`
 	_, err = file.Write([]byte(testRelations))
 	c.Assert(err, gc.IsNil)
 
@@ -206,7 +218,7 @@ func (s *relationSuite) TestRemoveRelationViaFileSuperuser(c *gc.C) {
 	file, err := os.CreateTemp(".", "relations.json")
 	c.Assert(err, gc.IsNil)
 	defer os.Remove(file.Name())
-	testRelations := `[{"object":"group-` + group1 + `","relation":"member","target_object":"group-` + group3 + `"},{"object":"group-` + group2 + `","relation":"member","target_object":"group-` + group3 + `"}]`
+	testRelations := `[{"object":"group-` + group1 + `#member","relation":"member","target_object":"group-` + group3 + `"},{"object":"group-` + group2 + `#member","relation":"member","target_object":"group-` + group3 + `"}]`
 	_, err = file.Write([]byte(testRelations))
 	c.Assert(err, gc.IsNil)
 
@@ -235,7 +247,7 @@ func (s *relationSuite) TestRemoveRelationViaFileSuperuser(c *gc.C) {
 func (s *relationSuite) TestRemoveRelation(c *gc.C) {
 	// bob is not superuser
 	bClient := s.userBakeryClient("bob")
-	_, err := cmdtesting.RunCommand(c, cmd.NewRemoveRelationCommandForTesting(s.ClientStore(), bClient), "test-group1", "member", "test-group2")
+	_, err := cmdtesting.RunCommand(c, cmd.NewRemoveRelationCommandForTesting(s.ClientStore(), bClient), "test-group1#member", "member", "test-group2")
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
 

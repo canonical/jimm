@@ -8,7 +8,7 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/juju/names/v4"
 
-	"github.com/CanonicalLtd/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/dbmodel"
 )
 
 func TestCloudCredentialTag(t *testing.T) {
@@ -50,4 +50,43 @@ func TestCloudCredential(t *testing.T) {
 	c.Assert(result.Error, qt.IsNil)
 	c.Check(cred.CloudName, qt.Equals, cred.Cloud.Name)
 	c.Check(cred.OwnerUsername, qt.Equals, cred.Owner.Username)
+}
+
+// TestCloudCredentialsCascadeOnDelete As of database version 1.3 (see migrations),
+// the foreign key relationship to the clouds, should be a cascade-on-delete relationship.
+func TestCloudCredentialsCascadeOnDelete(t *testing.T) {
+	c := qt.New(t)
+	db := gormDB(c)
+
+	cloud := dbmodel.Cloud{
+		Name: "test-cloud",
+		Type: "test-provider",
+	}
+	result := db.Create(&cloud)
+	c.Assert(result.Error, qt.IsNil)
+	c.Check(result.RowsAffected, qt.Equals, int64(1))
+
+	cred := dbmodel.CloudCredential{
+		Name:  "test-credential",
+		Cloud: cloud,
+		Owner: dbmodel.User{
+			Username: "bob@external",
+		},
+	}
+	result = db.Create(&cred)
+	c.Assert(result.Error, qt.IsNil)
+	c.Check(result.RowsAffected, qt.Equals, int64(1))
+	c.Check(cred.CloudName, qt.Equals, "test-cloud")
+	c.Check(cred.OwnerUsername, qt.Equals, "bob@external")
+
+	result = db.Delete(&cloud)
+	c.Assert(result.Error, qt.IsNil)
+	c.Check(result.RowsAffected, qt.Equals, int64(1))
+
+	deletedCred := dbmodel.CloudCredential{
+		Name: "test-credential",
+	}
+	result = db.Find(&deletedCred)
+	c.Assert(result.Error, qt.IsNil)
+	c.Assert(result.RowsAffected, qt.Equals, int64(0))
 }

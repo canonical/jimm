@@ -4,14 +4,13 @@
 # Learn more about testing at: https://juju.is/docs/sdk/testing
 
 
-import io
 import json
 import pathlib
-import tarfile
 import tempfile
 import unittest
 from unittest.mock import patch
 
+from ops.model import BlockedStatus
 from ops.testing import Harness
 
 from src.charm import JimmOperatorCharm
@@ -21,6 +20,22 @@ MINIMAL_CONFIG = {
     "candid-url": "test-candid-url",
     "public-key": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
     "private-key": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
+    "vault-access-address": "10.0.1.123",
+}
+
+EXPECTED_ENV = {
+    "CANDID_URL": "test-candid-url",
+    "JIMM_DASHBOARD_LOCATION": "https://jaas.ai/models",
+    "JIMM_DNS_NAME": "juju-jimm-k8s-0.juju-jimm-k8s-endpoints.None.svc.cluster.local",
+    "JIMM_ENABLE_JWKS_ROTATOR": "1",
+    "JIMM_JWT_EXPIRY": "5m",
+    "JIMM_LISTEN_ADDR": ":8080",
+    "JIMM_LOG_LEVEL": "info",
+    "JIMM_UUID": "1234567890",
+    "JIMM_WATCH_CONTROLLERS": "1",
+    "PRIVATE_KEY": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
+    "PUBLIC_KEY": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
+    "JIMM_AUDIT_LOG_RETENTION_PERIOD_IN_DAYS": "0",
 }
 
 
@@ -68,20 +83,9 @@ class TestCharm(unittest.TestCase):
                     "jimm": {
                         "summary": "JAAS Intelligent Model Manager",
                         "startup": "disabled",
-                        "override": "merge",
+                        "override": "replace",
                         "command": "/root/jimmsrv",
-                        "environment": {
-                            "CANDID_URL": "test-candid-url",
-                            "JIMM_DASHBOARD_LOCATION": "https://jaas.ai/models",
-                            "JIMM_DNS_NAME": "juju-jimm-k8s-0.juju-jimm-k8s-endpoints.None.svc.cluster.local",
-                            "JIMM_ENABLE_JWKS_ROTATOR": "1",
-                            "JIMM_LISTEN_ADDR": ":8080",
-                            "JIMM_LOG_LEVEL": "info",
-                            "JIMM_UUID": "1234567890",
-                            "JIMM_WATCH_CONTROLLERS": "1",
-                            "PRIVATE_KEY": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
-                            "PUBLIC_KEY": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
-                        },
+                        "environment": EXPECTED_ENV,
                     }
                 }
             },
@@ -106,20 +110,39 @@ class TestCharm(unittest.TestCase):
                     "jimm": {
                         "summary": "JAAS Intelligent Model Manager",
                         "startup": "disabled",
-                        "override": "merge",
+                        "override": "replace",
                         "command": "/root/jimmsrv",
-                        "environment": {
-                            "CANDID_URL": "test-candid-url",
-                            "JIMM_DASHBOARD_LOCATION": "https://jaas.ai/models",
-                            "JIMM_DNS_NAME": "juju-jimm-k8s-0.juju-jimm-k8s-endpoints.None.svc.cluster.local",
-                            "JIMM_ENABLE_JWKS_ROTATOR": "1",
-                            "JIMM_LISTEN_ADDR": ":8080",
-                            "JIMM_LOG_LEVEL": "info",
-                            "JIMM_UUID": "1234567890",
-                            "JIMM_WATCH_CONTROLLERS": "1",
-                            "PRIVATE_KEY": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
-                            "PUBLIC_KEY": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
-                        },
+                        "environment": EXPECTED_ENV,
+                    }
+                }
+            },
+        )
+
+    def test_postgres_secret_storage_config(self):
+        container = self.harness.model.unit.get_container("jimm")
+        self.harness.charm.on.jimm_pebble_ready.emit(container)
+
+        self.harness.update_config(MINIMAL_CONFIG)
+        self.harness.update_config({"postgres-secret-storage": True})
+        self.harness.set_leader(True)
+
+        # Emit the pebble-ready event for jimm
+        self.harness.charm.on.jimm_pebble_ready.emit(container)
+
+        # Check the that the plan was updated
+        plan = self.harness.get_container_pebble_plan("jimm")
+        expected_env = EXPECTED_ENV.copy()
+        expected_env.update({"INSECURE_SECRET_STORAGE": "enabled"})
+        self.assertEqual(
+            plan.to_dict(),
+            {
+                "services": {
+                    "jimm": {
+                        "summary": "JAAS Intelligent Model Manager",
+                        "startup": "disabled",
+                        "override": "replace",
+                        "command": "/root/jimmsrv",
+                        "environment": expected_env,
                     }
                 }
             },
@@ -143,7 +166,8 @@ class TestCharm(unittest.TestCase):
 
         # Emit the pebble-ready event for jimm
         self.harness.charm.on.jimm_pebble_ready.emit(container)
-
+        expected_env = EXPECTED_ENV.copy()
+        expected_env.update({"BAKERY_AGENT_FILE": "/root/config/agent.json"})
         # Check the that the plan was updated
         plan = self.harness.get_container_pebble_plan("jimm")
         self.assertEqual(
@@ -153,21 +177,9 @@ class TestCharm(unittest.TestCase):
                     "jimm": {
                         "summary": "JAAS Intelligent Model Manager",
                         "startup": "disabled",
-                        "override": "merge",
+                        "override": "replace",
                         "command": "/root/jimmsrv",
-                        "environment": {
-                            "BAKERY_AGENT_FILE": "/root/config/agent.json",
-                            "CANDID_URL": "test-candid-url",
-                            "JIMM_DASHBOARD_LOCATION": "https://jaas.ai/models",
-                            "JIMM_DNS_NAME": "juju-jimm-k8s-0.juju-jimm-k8s-endpoints.None.svc.cluster.local",
-                            "JIMM_ENABLE_JWKS_ROTATOR": "1",
-                            "JIMM_LISTEN_ADDR": ":8080",
-                            "JIMM_LOG_LEVEL": "info",
-                            "JIMM_UUID": "1234567890",
-                            "JIMM_WATCH_CONTROLLERS": "1",
-                            "PRIVATE_KEY": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
-                            "PUBLIC_KEY": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
-                        },
+                        "environment": expected_env,
                     }
                 }
             },
@@ -185,17 +197,18 @@ class TestCharm(unittest.TestCase):
             },
         )
 
-    @patch("ops.model.Container.exec")
-    def test_install_dashboard(self, exec):
-        exec.unwrap.return_value = MockExec()
-
+    def test_audit_log_retention_config(self):
         container = self.harness.model.unit.get_container("jimm")
-
-        self.harness.add_resource("dashboard", self.dashboard_tarfile())
-
-        self.harness.update_config(MINIMAL_CONFIG)
         self.harness.charm.on.jimm_pebble_ready.emit(container)
 
+        self.harness.update_config(MINIMAL_CONFIG)
+        self.harness.update_config({"audit-log-retention-period-in-days": "10"})
+
+        # Emit the pebble-ready event for jimm
+        self.harness.charm.on.jimm_pebble_ready.emit(container)
+        expected_env = EXPECTED_ENV.copy()
+        expected_env.update({"JIMM_AUDIT_LOG_RETENTION_PERIOD_IN_DAYS": "10"})
+        # Check the that the plan was updated
         plan = self.harness.get_container_pebble_plan("jimm")
         self.assertEqual(
             plan.to_dict(),
@@ -204,45 +217,13 @@ class TestCharm(unittest.TestCase):
                     "jimm": {
                         "summary": "JAAS Intelligent Model Manager",
                         "startup": "disabled",
-                        "override": "merge",
+                        "override": "replace",
                         "command": "/root/jimmsrv",
-                        "environment": {
-                            "CANDID_URL": "test-candid-url",
-                            "JIMM_LISTEN_ADDR": ":8080",
-                            "JIMM_DASHBOARD_LOCATION": "/root/dashboard",
-                            "JIMM_DNS_NAME": "juju-jimm-k8s-0.juju-jimm-k8s-endpoints.None.svc.cluster.local",
-                            "JIMM_ENABLE_JWKS_ROTATOR": "1",
-                            "JIMM_LOG_LEVEL": "info",
-                            "JIMM_UUID": "1234567890",
-                            "JIMM_WATCH_CONTROLLERS": "1",
-                            "PRIVATE_KEY": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
-                            "PUBLIC_KEY": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
-                        },
+                        "environment": expected_env,
                     }
                 }
             },
         )
-
-        self.assertEqual(container.exists("/root/dashboard"), True)
-        self.assertEqual(container.isdir("/root/dashboard"), True)
-        self.assertEqual(container.exists("/root/dashboard/dashboard.tar.bz2"), True)
-        self.assertEqual(container.exists("/root/dashboard/hash"), True)
-
-    def dashboard_tarfile(self):
-        dashboard_archive = io.BytesIO()
-
-        data = bytes("Hello world", "utf-8")
-        f = io.BytesIO(initial_bytes=data)
-        with tarfile.open(fileobj=dashboard_archive, mode="w:bz2") as tar:
-            info = tarfile.TarInfo("README.md")
-            info.size = len(data)
-            tar.addfile(info, f)
-            tar.close()
-
-        dashboard_archive.flush()
-        dashboard_archive.seek(0)
-        data = dashboard_archive.read()
-        return data
 
     def test_dashboard_relation_joined(self):
         harness = Harness(JimmOperatorCharm)
@@ -275,11 +256,9 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(data["identity_provider_url"], "https://candid.example.com")
         self.assertEqual(data["is_juju"], "False")
 
-    @patch("src.charm.JimmOperatorCharm._get_network_address")
     @patch("socket.gethostname")
     @patch("hvac.Client.sys")
-    def test_vault_relation_joined(self, hvac_client_sys, gethostname, get_network_address):
-        get_network_address.return_value = "127.0.0.1:8080"
+    def test_vault_relation_joined(self, hvac_client_sys, gethostname):
         gethostname.return_value = "test-hostname"
         hvac_client_sys.unwrap.return_value = {
             "key1": "value1",
@@ -303,6 +282,7 @@ class TestCharm(unittest.TestCase):
                 "candid-url": "https://candid.example.com",
                 "controller-admins": "user1 user2 group1",
                 "uuid": "caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa",
+                "vault-access-address": "10.0.1.123",
             }
         )
         harness.set_leader(True)
@@ -322,7 +302,7 @@ class TestCharm(unittest.TestCase):
             '"charm-jimm-k8s-creds"',
         )
         self.assertEqual(data["hostname"], '"test-hostname"')
-        self.assertEqual(data["access_address"], '"127.0.0.1:8080"')
+        self.assertEqual(data["access_address"], "10.0.1.123")
 
         harness.update_relation_data(
             id,
@@ -346,3 +326,25 @@ class TestCharm(unittest.TestCase):
                 },
             },
         )
+
+    def test_app_enters_blocked_state_if_vault_related_but_not_ready(self):
+        self.harness.update_config(MINIMAL_CONFIG)
+        container = self.harness.model.unit.get_container("jimm")
+        # Emit the pebble-ready event for jimm
+        self.harness.add_relation("vault", "remote-app-name")
+        self.harness.charm.on.jimm_pebble_ready.emit(container)
+
+        self.assertEqual(self.harness.charm.unit.status.name, BlockedStatus.name)
+        self.assertEqual(
+            self.harness.charm.unit.status.message, "Vault relation present but vault setup is not ready yet"
+        )
+
+    def test_app_raises_error_without_vault_config(self):
+        self.harness.enable_hooks()
+        minim_config_no_vault_config = MINIMAL_CONFIG.copy()
+        del minim_config_no_vault_config["vault-access-address"]
+        self.harness.update_config(minim_config_no_vault_config)
+        id = self.harness.add_relation("vault", "vault")
+        with self.assertRaises(ValueError) as e:
+            self.harness.add_relation_unit(id, "vault/0")
+            self.assertEqual(e, "Missing config vault-access-address for vault relation")

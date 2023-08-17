@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -29,28 +30,28 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
-	"github.com/CanonicalLtd/jimm/internal/auth"
-	"github.com/CanonicalLtd/jimm/internal/dashboard"
-	"github.com/CanonicalLtd/jimm/internal/db"
-	"github.com/CanonicalLtd/jimm/internal/dbmodel"
-	"github.com/CanonicalLtd/jimm/internal/debugapi"
-	"github.com/CanonicalLtd/jimm/internal/errors"
-	"github.com/CanonicalLtd/jimm/internal/jimm"
-	jimmcreds "github.com/CanonicalLtd/jimm/internal/jimm/credentials"
-	"github.com/CanonicalLtd/jimm/internal/jimmhttp"
-	"github.com/CanonicalLtd/jimm/internal/jimmjwx"
-	"github.com/CanonicalLtd/jimm/internal/jujuapi"
-	"github.com/CanonicalLtd/jimm/internal/jujuclient"
-	"github.com/CanonicalLtd/jimm/internal/logger"
-	"github.com/CanonicalLtd/jimm/internal/openfga"
-	internalopenfga "github.com/CanonicalLtd/jimm/internal/openfga"
-	ofgaClient "github.com/CanonicalLtd/jimm/internal/openfga"
-	ofganames "github.com/CanonicalLtd/jimm/internal/openfga/names"
-	"github.com/CanonicalLtd/jimm/internal/pubsub"
-	"github.com/CanonicalLtd/jimm/internal/servermon"
-	"github.com/CanonicalLtd/jimm/internal/vault"
-	"github.com/CanonicalLtd/jimm/internal/wellknownapi"
-	jimmnames "github.com/CanonicalLtd/jimm/pkg/names"
+	"github.com/canonical/jimm/internal/auth"
+	"github.com/canonical/jimm/internal/dashboard"
+	"github.com/canonical/jimm/internal/db"
+	"github.com/canonical/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/debugapi"
+	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/jimm"
+	jimmcreds "github.com/canonical/jimm/internal/jimm/credentials"
+	"github.com/canonical/jimm/internal/jimmhttp"
+	"github.com/canonical/jimm/internal/jimmjwx"
+	"github.com/canonical/jimm/internal/jujuapi"
+	"github.com/canonical/jimm/internal/jujuclient"
+	"github.com/canonical/jimm/internal/logger"
+	"github.com/canonical/jimm/internal/openfga"
+	internalopenfga "github.com/canonical/jimm/internal/openfga"
+	ofgaClient "github.com/canonical/jimm/internal/openfga"
+	ofganames "github.com/canonical/jimm/internal/openfga/names"
+	"github.com/canonical/jimm/internal/pubsub"
+	"github.com/canonical/jimm/internal/servermon"
+	"github.com/canonical/jimm/internal/vault"
+	"github.com/canonical/jimm/internal/wellknownapi"
+	jimmnames "github.com/canonical/jimm/pkg/names"
 )
 
 const (
@@ -148,6 +149,10 @@ type Params struct {
 
 	// PublicKey holds the public part of the bakery keypair.
 	PublicKey string
+
+	// auditLogRetentionPeriodInDays is the number of days detailing how long
+	// to keep an audit log for before purging it from the database.
+	AuditLogRetentionPeriodInDays string
 }
 
 // A Service is the implementation of a JIMM server.
@@ -253,6 +258,19 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		return nil, errors.E(op, err)
 	}
 
+	if p.AuditLogRetentionPeriodInDays != "" {
+		period, err := strconv.Atoi(p.AuditLogRetentionPeriodInDays)
+		if err != nil {
+			return nil, errors.E(op, "failed to parse audit log retention period")
+		}
+		if period < 0 {
+			return nil, errors.E(op, "retention period cannot be less than 0")
+		}
+		if period != 0 {
+			jimm.NewAuditLogCleanupService(s.jimm.Database, period).Start(ctx)
+		}
+	}
+
 	openFGAclient, err := newOpenFGAClient(ctx, p.OpenFGAParams)
 	if err != nil {
 		return nil, errors.E(op, err)
@@ -272,16 +290,13 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
-	vs, err := newVaultStore(ctx, p)
-	if err != nil {
+
+	if err := s.setupCredentialStore(ctx, p); err != nil {
 		return nil, errors.E(op, err)
-	}
-	if vs != nil {
-		s.jimm.CredentialStore = vs
 	}
 
 	s.jimm.Dialer = &jujuclient.Dialer{
-		ControllerCredentialsStore: vs,
+		ControllerCredentialsStore: s.jimm.CredentialStore,
 	}
 	if !p.DisableConnectionCache {
 		s.jimm.Dialer = jimm.CacheDialer(s.jimm.Dialer)
@@ -443,6 +458,29 @@ func newAuthenticator(ctx context.Context, db *db.Database, client *ofgaClient.O
 		ControllerAdmins: p.ControllerAdmins,
 		Client:           client,
 	}, nil
+}
+
+func (s *Service) setupCredentialStore(ctx context.Context, p Params) error {
+	const op = errors.Op("newSecretStore")
+	vs, err := newVaultStore(ctx, p)
+	if err != nil {
+		zapctx.Error(ctx, "Vault Store error", zap.Error(err))
+		return errors.E(op, err)
+	}
+	if vs != nil {
+		s.jimm.CredentialStore = vs
+		return nil
+	}
+
+	// Only enable Postgres storage for secrets if explicitly enabled.
+	if _, ok := os.LookupEnv("INSECURE_SECRET_STORAGE"); ok {
+		zapctx.Warn(ctx, "using plaintext postgres for secret storage")
+		s.jimm.CredentialStore = &s.jimm.Database
+		return nil
+	}
+	// Currently jimm will start without a credential store but
+	// functionality will be limited.
+	return nil
 }
 
 func newVaultStore(ctx context.Context, p Params) (jimmcreds.CredentialStore, error) {

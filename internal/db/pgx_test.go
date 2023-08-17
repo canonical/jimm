@@ -19,8 +19,8 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
-	"github.com/CanonicalLtd/jimm/internal/db"
-	"github.com/CanonicalLtd/jimm/internal/jimmtest"
+	"github.com/canonical/jimm/internal/db"
+	"github.com/canonical/jimm/internal/jimmtest"
 )
 
 func TestPostgres(t *testing.T) {

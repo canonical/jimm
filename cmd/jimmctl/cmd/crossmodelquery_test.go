@@ -5,8 +5,8 @@ package cmd_test
 import (
 	"encoding/json"
 
-	"github.com/CanonicalLtd/jimm/cmd/jimmctl/cmd"
-	"github.com/CanonicalLtd/jimm/internal/jimmtest"
+	"github.com/canonical/jimm/cmd/jimmctl/cmd"
+	"github.com/canonical/jimm/internal/jimmtest"
 	"github.com/juju/cmd/v3/cmdtesting"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/testing/factory"

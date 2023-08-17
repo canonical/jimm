@@ -5,7 +5,7 @@ package api
 import (
 	jujuparams "github.com/juju/juju/rpc/params"
 
-	"github.com/CanonicalLtd/jimm/api/params"
+	"github.com/canonical/jimm/api/params"
 )
 
 // An APICaller implements the interface required to make API calls.
@@ -174,5 +174,12 @@ func (c *Client) ListRelationshipTuples(req *params.ListRelationshipTuplesReques
 func (c *Client) CrossModelQuery(req *params.CrossModelQueryRequest) (*params.CrossModelQueryResponse, error) {
 	var response params.CrossModelQueryResponse
 	err := c.caller.APICall("JIMM", 4, "", "CrossModelQuery", req, &response)
+	return &response, err
+}
+
+// PurgeLogs purges logs from the database before the given date.
+func (c *Client) PurgeLogs(req *params.PurgeLogsRequest) (*params.PurgeLogsResponse, error) {
+	var response params.PurgeLogsResponse
+	err := c.caller.APICall("JIMM", 4, "", "PurgeLogs", req, &response)
 	return &response, err
 }
