@@ -23,9 +23,9 @@ import (
 )
 
 var (
-	authTypeDefinitions []openfga.TypeDefinition
-	setups              map[string]testSetup
-	setupsMu            sync.Mutex
+	authModel *openfga.AuthorizationModel
+	setups    map[string]testSetup
+	setupsMu  sync.Mutex
 )
 
 func init() {
@@ -38,13 +38,13 @@ type testSetup struct {
 	cofgaParams *cofga.OpenFGAParams
 }
 
-func getAuthModelDefinition() (authDefinitions []openfga.TypeDefinition, schemaVersion string, err error) {
+func getAuthModelDefinition() (*openfga.AuthorizationModel, error) {
 	desiredFolder := "local"
 	authPath := ""
 	var pwd string
-	pwd, err = os.Getwd()
+	pwd, err := os.Getwd()
 	if err != nil {
-		return
+		return nil, err
 	}
 	for ok := true; ok; {
 		if pwd == "/" {
@@ -53,7 +53,7 @@ func getAuthModelDefinition() (authDefinitions []openfga.TypeDefinition, schemaV
 		var files []fs.FileInfo
 		files, err = ioutil.ReadDir(pwd)
 		if err != nil {
-			return
+			return nil, err
 		}
 
 		for _, f := range files {
@@ -67,38 +67,20 @@ func getAuthModelDefinition() (authDefinitions []openfga.TypeDefinition, schemaV
 	}
 	if authPath == "" {
 		err = fmt.Errorf("auth path is empty")
-		return
+		return nil, err
 	}
 
 	b, err := os.ReadFile(path.Join(authPath, "/local/openfga/authorisation_model.json"))
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	wrapper := map[string]interface{}{}
-	err = json.Unmarshal(b, &wrapper)
+	authModel := openfga.AuthorizationModel{}
+	err = json.Unmarshal(b, &authModel)
 	if err != nil {
-		return
+		return nil, err
 	}
-
-	// TODO (babakks): If we can omit schema_version, these should be deleted:
-	var ok bool
-	schemaVersion, ok = wrapper["schema_version"].(string)
-	if !ok {
-		err = errors.E("schema_version not found in auth model")
-		return
-	}
-
-	b, err = json.Marshal(wrapper["type_definitions"])
-	if err != nil {
-		return
-	}
-
-	err = json.Unmarshal(b, &authDefinitions)
-	if err != nil {
-		return
-	}
-	return
+	return &authModel, nil
 }
 
 // SetupTestOFGAClient is intended to be used per test, in that it
@@ -142,27 +124,20 @@ func SetupTestOFGAClient(names ...string) (*ofga.OFGAClient, *cofga.Client, *cof
 		return nil, nil, nil, errgo.Notef(err, "failed to create ofga client")
 	}
 
-	if len(authTypeDefinitions) == 0 {
-		authTypeDefinitions, _, err = getAuthModelDefinition()
+	if authModel == nil {
+		authModel, err = getAuthModelDefinition()
 		if err != nil {
 			return nil, nil, nil, errgo.Notef(err, "failed to read authorization model definition")
 		}
 	}
 
-	authModelID, err := cofgaClient.CreateAuthModel(ctx, authTypeDefinitions)
+	authModelID, err := cofgaClient.CreateAuthModel(ctx, authModel)
 	if err != nil {
 		return nil, nil, nil, errgo.Notef(err, "failed to create authorization model")
 	}
 
 	cofgaClient.AuthModelId = authModelID
 	cofgaParams.AuthModelID = authModelID
-
-	// TODO (babakks): check if we can omit setting schema version.
-	// ar.SetSchemaVersion(schemaVersion)
-	// amr, _, err := api.WriteAuthorizationModel(ctx).Body(*ar).Execute()
-	// if err != nil {
-	// 	return nil, nil, nil, err
-	// }
 
 	client := ofga.NewOpenFGAClient(cofgaClient)
 
