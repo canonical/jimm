@@ -84,3 +84,4 @@ following commands:
 
     juju bootstrap --config identity-url=https://api.staging.jujucharms.com/identity --config allow-model-access=true <cloud>/<region> <controller-name>
     jaas-admin --jimm-url https://localhost:8082 add-controller <owner>/<controller-name>
+
