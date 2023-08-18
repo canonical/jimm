@@ -6,7 +6,7 @@ require (
 	github.com/canonical/candid v1.12.2
 	github.com/canonical/go-dqlite v1.11.9
 	github.com/canonical/go-service v1.0.0
-	github.com/frankban/quicktest v1.14.5
+	github.com/frankban/quicktest v1.14.6
 	github.com/go-macaroon-bakery/macaroon-bakery/v3 v3.0.1
 	github.com/gobwas/glob v0.2.4-0.20181002190808-e7a84e9525fe // indirect
 	github.com/google/go-cmp v0.5.9
