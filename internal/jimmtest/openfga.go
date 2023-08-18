@@ -142,7 +142,7 @@ func SetupTestOFGAClient(names ...string) (*ofga.OFGAClient, *cofga.Client, *cof
 		return nil, nil, nil, errgo.Notef(err, "failed to create ofga client")
 	}
 
-	if authTypeDefinitions == nil {
+	if len(authTypeDefinitions) == 0 {
 		authTypeDefinitions, _, err = getAuthModelDefinition()
 		if err != nil {
 			return nil, nil, nil, errgo.Notef(err, "failed to read authorization model definition")
