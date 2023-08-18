@@ -324,32 +324,32 @@ func (r *controllerRoot) SetControllerDeprecated(ctx context.Context, req apipar
 const maxLimit = 1000
 const limitDefault = 50
 
-// FindAuditEvents finds the audit-log entries that match the given filter.
-func (r *controllerRoot) FindAuditEvents(ctx context.Context, req apiparams.FindAuditEventsRequest) (apiparams.AuditEvents, error) {
-	const op = errors.Op("jujuapi.FindAuditEvents")
-
+func auditParamsToFilter(req apiparams.FindAuditEventsRequest) (db.AuditLogFilter, error) {
 	var filter db.AuditLogFilter
 	var err error
+	filter.Method = req.Method
+	filter.Model = req.Model
+	filter.SortTime = req.SortTime
+
 	if req.After != "" {
 		filter.Start, err = time.Parse(time.RFC3339, req.After)
 		if err != nil {
-			return apiparams.AuditEvents{}, errors.E(op, err, errors.CodeBadRequest, `invalid "after" filter`)
+			return filter, errors.E(err, errors.CodeBadRequest, `invalid "after" filter`)
 		}
 	}
 	if req.Before != "" {
 		filter.End, err = time.Parse(time.RFC3339, req.Before)
 		if err != nil {
-			return apiparams.AuditEvents{}, errors.E(op, err, errors.CodeBadRequest, `invalid "before" filter`)
+			return filter, errors.E(err, errors.CodeBadRequest, `invalid "before" filter`)
 		}
 	}
 	if req.UserTag != "" {
 		tag, err := names.ParseUserTag(req.UserTag)
 		if err != nil {
-			return apiparams.AuditEvents{}, errors.E(op, err, errors.CodeBadRequest, `invalid "user-tag" filter`)
+			return filter, errors.E(err, errors.CodeBadRequest, `invalid "user-tag" filter`)
 		}
 		filter.UserTag = tag.String()
 	}
-	filter.Model = req.Model
 
 	limit := int(req.Limit)
 	if limit < 1 {
@@ -364,7 +364,16 @@ func (r *controllerRoot) FindAuditEvents(ctx context.Context, req apiparams.Find
 		offset = 0
 	}
 	filter.Offset = offset
+	return filter, nil
+}
 
+// FindAuditEvents finds the audit-log entries that match the given filter.
+func (r *controllerRoot) FindAuditEvents(ctx context.Context, req apiparams.FindAuditEventsRequest) (apiparams.AuditEvents, error) {
+	const op = errors.Op("jujuapi.FindAuditEvents")
+	filter, err := auditParamsToFilter(req)
+	if err != nil {
+		return apiparams.AuditEvents{}, errors.E(op, err)
+	}
 	entries, err := r.jimm.FindAuditEvents(ctx, r.user, filter)
 	if err != nil {
 		return apiparams.AuditEvents{}, errors.E(op, err)

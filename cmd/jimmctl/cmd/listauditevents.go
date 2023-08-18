@@ -73,6 +73,8 @@ func (c *listAuditEventsCommand) SetFlags(f *gnuflag.FlagSet) {
 	f.StringVar(&c.args.Model, "model", "", "display events for a specific model (model name is controller/model)")
 	f.IntVar(&c.args.Limit, "offset", 0, "offset the set of returned audit events")
 	f.IntVar(&c.args.Limit, "limit", 0, "limit the maximum number of returned audit events")
+	f.BoolVar(&c.args.SortTime, "reverse", false, "reverse the order of logs, showing the most recent first")
+
 }
 
 // Init implements the cmd.Command interface.
