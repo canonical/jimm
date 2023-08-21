@@ -493,6 +493,9 @@ func key(candid *candidtest.Server, user string) *bakery.KeyPair {
 	}
 }
 
+// cofgaParamsToJIMMOpenFGAParams To avoid circular references, the test setup function (jimmtest.SetupTestOFGAClient)
+// does not provide us with an instance of `jimm.OpenFGAParams`, so it just returns a `cofga.OpenFGAParams` instance.
+// This method reshapes the later into the former.
 func cofgaParamsToJIMMOpenFGAParams(cofgaParams cofga.OpenFGAParams) jimm.OpenFGAParams {
 	return jimm.OpenFGAParams{
 		Scheme:    cofgaParams.Scheme,
