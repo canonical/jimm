@@ -122,6 +122,7 @@ class JimmCharm(SystemdCharm):
             "log_level": self.config.get("log-level"),
             "uuid": self.config.get("uuid"),
             "dashboard_location": self.config.get("juju-dashboard-location"),
+            "macaroon_expiry_duration": self.config.get("macaroon-expiry-duration"),
         }
 
         with open(self._env_filename(), "wt") as f:

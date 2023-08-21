@@ -54,3 +54,7 @@ options:
     type: string
     default: https://jaas.ai/models
     description: URL of the Juju Dashboard for this controller.
+  macaroon-expiry-duration:
+    type: string
+    default: 24h
+    description: Expiry duration for authentication macaroons.

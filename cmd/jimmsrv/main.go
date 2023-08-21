@@ -43,19 +43,29 @@ func start(ctx context.Context, s *service.Service) error {
 		}
 	}
 
+	macaroonExpiryDuration := 24 * time.Hour
+	durationString := os.Getenv("JIMM_MACAROON_EXPIRY_DURATION")
+	if durationString != "" {
+		expiry, err := time.ParseDuration(durationString)
+		if err != nil {
+			zapctx.Error(ctx, "failed to parse macaroon expiry duration", zap.Error(err))
+		}
+		macaroonExpiryDuration = expiry
+	}
 	jimmsvc, err := jimm.NewService(ctx, jimm.Params{
-		ControllerUUID:    os.Getenv("JIMM_UUID"),
-		DSN:               os.Getenv("JIMM_DSN"),
-		CandidURL:         os.Getenv("CANDID_URL"),
-		CandidPublicKey:   os.Getenv("CANDID_PUBLIC_KEY"),
-		BakeryAgentFile:   os.Getenv("BAKERY_AGENT_FILE"),
-		ControllerAdmins:  strings.Fields(os.Getenv("JIMM_ADMINS")),
-		VaultSecretFile:   os.Getenv("VAULT_SECRET_FILE"),
-		VaultAddress:      os.Getenv("VAULT_ADDR"),
-		VaultAuthPath:     os.Getenv("VAULT_AUTH_PATH"),
-		VaultPath:         os.Getenv("VAULT_PATH"),
-		DashboardLocation: os.Getenv("JIMM_DASHBOARD_LOCATION"),
-		PublicDNSName:     os.Getenv("JIMM_DNS_NAME"),
+		ControllerUUID:         os.Getenv("JIMM_UUID"),
+		DSN:                    os.Getenv("JIMM_DSN"),
+		CandidURL:              os.Getenv("CANDID_URL"),
+		CandidPublicKey:        os.Getenv("CANDID_PUBLIC_KEY"),
+		BakeryAgentFile:        os.Getenv("BAKERY_AGENT_FILE"),
+		ControllerAdmins:       strings.Fields(os.Getenv("JIMM_ADMINS")),
+		VaultSecretFile:        os.Getenv("VAULT_SECRET_FILE"),
+		VaultAddress:           os.Getenv("VAULT_ADDR"),
+		VaultAuthPath:          os.Getenv("VAULT_AUTH_PATH"),
+		VaultPath:              os.Getenv("VAULT_PATH"),
+		DashboardLocation:      os.Getenv("JIMM_DASHBOARD_LOCATION"),
+		PublicDNSName:          os.Getenv("JIMM_DNS_NAME"),
+		MacaroonExpiryDuration: macaroonExpiryDuration,
 	})
 	if err != nil {
 		return err

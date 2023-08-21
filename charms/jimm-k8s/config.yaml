@@ -57,3 +57,7 @@ options:
   dns-name:
     type: string
     description: DNS hostname that JIMM is being served from.
+  macaroon-expiry-duration:
+    type: string
+    default: 24h
+    description: Expiry duration for authentication macaroons.

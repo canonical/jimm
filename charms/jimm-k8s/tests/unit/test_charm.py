@@ -17,6 +17,7 @@ from src.charm import JimmOperatorCharm
 MINIMAL_CONFIG = {
     "uuid": "1234567890",
     "candid-url": "test-candid-url",
+    "macaroon-expiry-duration": "48h",
 }
 
 
@@ -72,6 +73,7 @@ class TestCharm(unittest.TestCase):
                             "JIMM_DNS_NAME": "juju-jimm-k8s-0.juju-jimm-k8s-endpoints.None.svc.cluster.local",
                             "JIMM_LISTEN_ADDR": ":8080",
                             "JIMM_LOG_LEVEL": "info",
+                            "JIMM_MACAROON_EXPIRY_DURATION": "48h",
                             "JIMM_UUID": "1234567890",
                             "JIMM_WATCH_CONTROLLERS": "1",
                         },
@@ -107,6 +109,7 @@ class TestCharm(unittest.TestCase):
                             "JIMM_DNS_NAME": "juju-jimm-k8s-0.juju-jimm-k8s-endpoints.None.svc.cluster.local",
                             "JIMM_LISTEN_ADDR": ":8080",
                             "JIMM_LOG_LEVEL": "info",
+                            "JIMM_MACAROON_EXPIRY_DURATION": "48h",
                             "JIMM_UUID": "1234567890",
                             "JIMM_WATCH_CONTROLLERS": "1",
                         },
@@ -150,6 +153,7 @@ class TestCharm(unittest.TestCase):
                             "JIMM_DNS_NAME": "juju-jimm-k8s-0.juju-jimm-k8s-endpoints.None.svc.cluster.local",
                             "JIMM_LISTEN_ADDR": ":8080",
                             "JIMM_LOG_LEVEL": "info",
+                            "JIMM_MACAROON_EXPIRY_DURATION": "24h",
                             "JIMM_UUID": "1234567890",
                             "JIMM_WATCH_CONTROLLERS": "1",
                         },
