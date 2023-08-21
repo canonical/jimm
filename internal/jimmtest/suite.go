@@ -48,18 +48,15 @@ type JIMMSuite struct {
 	JIMM *jimm.JIMM
 
 	AdminUser   *dbmodel.User
-	OFGAClient  *jimmopenfga.OFGAClient
+	OFGAClient  *ofga.OFGAClient
 	COFGAClient *cofga.Client
 	COFGAParams *cofga.OpenFGAParams
 }
 
 func (s *JIMMSuite) SetUpTest(c *gc.C) {
-	ofgaClient, cofgaClient, cofgaConfig, err := SetupTestOFGAClient(c.TestName())
+	var err error
+	s.OFGAClient, s.COFGAClient, s.COFGAParams, err = SetupTestOFGAClient(c.TestName())
 	c.Assert(err, gc.IsNil)
-
-	s.OFGAClient = ofgaClient
-	s.COFGAClient = cofgaClient
-	s.COFGAParams = cofgaConfig
 
 	// Setup OpenFGA.
 	s.JIMM = &jimm.JIMM{
@@ -69,7 +66,7 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 		Dialer:        &jujuclient.Dialer{},
 		Pubsub:        new(pubsub.Hub),
 		UUID:          ControllerUUID,
-		OpenFGAClient: ofgaClient,
+		OpenFGAClient: s.OFGAClient,
 	}
 	ctx := context.Background()
 	err = s.JIMM.Database.Migrate(ctx, false)
