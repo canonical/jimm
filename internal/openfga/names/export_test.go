@@ -2,10 +2,12 @@
 
 package names
 
+import cofga "github.com/canonical/ofga"
+
 func NewTag(id, kind, relation string) *Tag {
 	return &Tag{
-		id:       id,
-		relation: Relation(relation),
-		kind:     kind,
+		ID:       id,
+		Relation: cofga.Relation(relation),
+		Kind:     cofga.Kind(kind),
 	}
 }

@@ -6,8 +6,6 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
-	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"strconv"
@@ -15,6 +13,7 @@ import (
 	"time"
 
 	"github.com/canonical/candid/candidclient"
+	cofga "github.com/canonical/ofga"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/checkers"
@@ -26,8 +25,6 @@ import (
 	vaultapi "github.com/hashicorp/vault/api"
 	"github.com/juju/names/v4"
 	"github.com/juju/zaputil/zapctx"
-	openfga "github.com/openfga/go-sdk"
-	"github.com/openfga/go-sdk/credentials"
 	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
@@ -46,8 +43,7 @@ import (
 	"github.com/canonical/jimm/internal/jujuapi"
 	"github.com/canonical/jimm/internal/jujuclient"
 	"github.com/canonical/jimm/internal/logger"
-	internalopenfga "github.com/canonical/jimm/internal/openfga"
-	ofgaClient "github.com/canonical/jimm/internal/openfga"
+	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 	"github.com/canonical/jimm/internal/pubsub"
 	"github.com/canonical/jimm/internal/servermon"
@@ -273,7 +269,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		}
 	}
 
-	openFGAclient, err := newOpenFGAClient(ctx, p)
+	openFGAclient, err := newOpenFGAClient(ctx, p.OpenFGAParams)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
@@ -348,7 +344,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 // setupDischarger set JIMM up as a discharger of 3rd party caveats addressed to it. This is intended
 // to enable Juju controllers to check for permissions using a macaroon-based workflow (atm only
 // for cross model relations).
-func (s *Service) setupDischarger(p Params, openFGAclient *internalopenfga.OFGAClient) (*bakery.KeyPair, *http.ServeMux, error) {
+func (s *Service) setupDischarger(p Params, openFGAclient *openfga.OFGAClient) (*bakery.KeyPair, *http.ServeMux, error) {
 	var kp bakery.KeyPair
 	if p.PublicKey == "" || p.PrivateKey == "" {
 		generatedKP, err := bakery.GenerateKey()
@@ -395,7 +391,7 @@ func openDB(ctx context.Context, dsn string) (*gorm.DB, error) {
 	})
 }
 
-func newAuthenticator(ctx context.Context, db *db.Database, client *ofgaClient.OFGAClient, key *bakery.KeyPair, p Params) (jimm.Authenticator, error) {
+func newAuthenticator(ctx context.Context, db *db.Database, client *openfga.OFGAClient, key *bakery.KeyPair, p Params) (jimm.Authenticator, error) {
 	if p.CandidURL == "" {
 		// No authenticator configured
 		return nil, nil
@@ -526,71 +522,37 @@ func newVaultStore(ctx context.Context, p Params) (jimmcreds.CredentialStore, er
 	}, nil
 }
 
-func newOpenFGAClient(ctx context.Context, p Params) (*ofgaClient.OFGAClient, error) {
-	if p.OpenFGAParams.Host == "" {
-		return nil, errors.E("missing OpenFGA configuration")
-	}
-	zapctx.Info(ctx, "configuring OpenFGA client",
-		zap.String("OpenFGA host", p.OpenFGAParams.Host),
-		zap.String("OpenFGA scheme", p.OpenFGAParams.Scheme),
-		zap.String("OpenFGA store", p.OpenFGAParams.Store),
-	)
-
-	config := openfga.Configuration{
-		ApiScheme: p.OpenFGAParams.Scheme,
-		ApiHost:   fmt.Sprintf("%s:%s", p.OpenFGAParams.Host, p.OpenFGAParams.Port), // required, define without the scheme (e.g. api.fga.example instead of https://api.fga.example)
-		StoreId:   p.OpenFGAParams.Store,
-	}
-	if p.OpenFGAParams.Token != "" {
-		config.Credentials = &credentials.Credentials{
-			Method: credentials.CredentialsMethodApiToken,
-			Config: &credentials.Config{
-				ApiToken: p.OpenFGAParams.Token,
-			},
-		}
-	}
-	configuration, err := openfga.NewConfiguration(config)
+func newOpenFGAClient(ctx context.Context, p OpenFGAParams) (*openfga.OFGAClient, error) {
+	cofgaClient, err := cofga.NewClient(ctx, cofga.OpenFGAParams{
+		Scheme:      p.Scheme,
+		Host:        p.Host,
+		Token:       p.Token,
+		Port:        p.Port,
+		StoreID:     p.Store,
+		AuthModelID: p.AuthModel,
+	})
 	if err != nil {
-		return nil, err
+		return nil, errors.E(err, "failed to create ofga client")
 	}
-	client := openfga.NewAPIClient(configuration)
-	api := client.OpenFgaApi
-
-	_, response, err := api.ListStores(ctx).Execute()
-	if err != nil {
-		return nil, err
-	}
-	body, _ := io.ReadAll(response.Body)
-	if response.StatusCode != http.StatusOK {
-		return nil, errors.E("failed to contact the OpenFga server: received %v: %s", response.StatusCode, string(body))
-	}
-
-	storeResp, _, err := api.GetStore(ctx).Execute()
-	if err != nil {
-		zapctx.Error(ctx, "could not retrieve store.", zap.Error(err))
-		return nil, errors.E("could not retrieve store")
-	} else {
-		zapctx.Info(ctx, "store appears to exist", zap.String("store-name", *storeResp.Name))
-	}
-	return ofgaClient.NewOpenFGAClient(client.OpenFgaApi, p.OpenFGAParams.AuthModel), nil
+	return openfga.NewOpenFGAClient(cofgaClient), nil
 }
 
 // ensureControllerAdministrators ensures that listed users have admin access to the JIMM controller.
 // This method checks if these users already have administrator access to the JIMM controller,
 // otherwise it will add a direct administrator relation between each user and the JIMM
 // controller.
-func ensureControllerAdministrators(ctx context.Context, client *ofgaClient.OFGAClient, controllerUUID string, admins []string) error {
+func ensureControllerAdministrators(ctx context.Context, client *openfga.OFGAClient, controllerUUID string, admins []string) error {
 	controller := names.NewControllerTag(controllerUUID)
-	tuples := []ofgaClient.Tuple{}
+	tuples := []openfga.Tuple{}
 	for _, username := range admins {
 		userTag := names.NewUserTag(username)
-		user := ofgaClient.NewUser(&dbmodel.User{Username: userTag.Id()}, client)
-		isAdmin, err := ofgaClient.IsAdministrator(ctx, user, controller)
+		user := openfga.NewUser(&dbmodel.User{Username: userTag.Id()}, client)
+		isAdmin, err := openfga.IsAdministrator(ctx, user, controller)
 		if err != nil {
 			return errors.E(err)
 		}
 		if !isAdmin {
-			tuples = append(tuples, ofgaClient.Tuple{
+			tuples = append(tuples, openfga.Tuple{
 				Object:   ofganames.ConvertTag(userTag),
 				Relation: ofganames.AdministratorRelation,
 				Target:   ofganames.ConvertTag(controller),
@@ -600,7 +562,7 @@ func ensureControllerAdministrators(ctx context.Context, client *ofgaClient.OFGA
 	if len(tuples) == 0 {
 		return nil
 	}
-	return client.AddRelations(ctx, tuples...)
+	return client.AddRelation(ctx, tuples...)
 }
 
 var defaultDischargeExpiry = 15 * time.Minute
@@ -620,7 +582,7 @@ var defaultDischargeExpiry = 15 * time.Minute
 //	is-writer <user tag> <model tag containing uuid>
 //	is-admininistrator <user tag> <model tag containing uuid>
 //	is-admininistrator <user tag> <controller tag containing uuid>
-func (s *Service) thirdPartyCaveatCheckerFunction(ofgaClient *internalopenfga.OFGAClient) func(ctx context.Context, req *http.Request, cavInfo *bakery.ThirdPartyCaveatInfo, _ *httpbakery.DischargeToken) ([]checkers.Caveat, error) {
+func (s *Service) thirdPartyCaveatCheckerFunction(ofgaClient *openfga.OFGAClient) func(ctx context.Context, req *http.Request, cavInfo *bakery.ThirdPartyCaveatInfo, _ *httpbakery.DischargeToken) ([]checkers.Caveat, error) {
 	return func(ctx context.Context, req *http.Request, cavInfo *bakery.ThirdPartyCaveatInfo, _ *httpbakery.DischargeToken) ([]checkers.Caveat, error) {
 		caveatTokens := strings.Split(string(cavInfo.Condition), " ")
 		if len(caveatTokens) != 3 {
@@ -649,14 +611,14 @@ func (s *Service) thirdPartyCaveatCheckerFunction(ofgaClient *internalopenfga.OF
 			return nil, checkers.ErrCaveatNotRecognized
 		}
 
-		user := internalopenfga.NewUser(
+		user := openfga.NewUser(
 			&dbmodel.User{
 				Username: userTag.Id(),
 			},
 			ofgaClient,
 		)
 
-		allowed, _, err := internalopenfga.CheckRelation(ctx, user, objectTag, relation)
+		allowed, err := openfga.CheckRelation(ctx, user, objectTag, relation)
 		if err != nil {
 			return nil, errors.E(err)
 		}

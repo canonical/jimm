@@ -4,6 +4,6 @@ package openfga
 
 import "context"
 
-func (o *OFGAClient) RemoveTuples(ctx context.Context, tuple *Tuple) error {
+func (o *OFGAClient) RemoveTuples(ctx context.Context, tuple Tuple) error {
 	return o.removeTuples(ctx, tuple)
 }

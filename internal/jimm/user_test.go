@@ -16,7 +16,7 @@ import (
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/jimm"
 	"github.com/canonical/jimm/internal/jimmtest"
-	openfga "github.com/canonical/jimm/internal/openfga"
+	"github.com/canonical/jimm/internal/openfga"
 )
 
 func TestAuthenticateNoAuthenticator(t *testing.T) {

@@ -6,7 +6,7 @@ require (
 	github.com/canonical/candid v1.12.2
 	github.com/canonical/go-dqlite v1.11.9
 	github.com/canonical/go-service v1.0.0
-	github.com/frankban/quicktest v1.14.4
+	github.com/frankban/quicktest v1.14.6
 	github.com/go-macaroon-bakery/macaroon-bakery/v3 v3.0.1
 	github.com/gobwas/glob v0.2.4-0.20181002190808-e7a84e9525fe // indirect
 	github.com/google/go-cmp v0.5.9
@@ -46,6 +46,7 @@ require (
 )
 
 require (
+	github.com/canonical/ofga v0.5.0
 	github.com/dustinkirkland/golang-petname v0.0.0-20191129215211-8e5a1ed0cff0
 	github.com/go-chi/chi/v5 v5.0.8
 	github.com/go-chi/render v1.0.2

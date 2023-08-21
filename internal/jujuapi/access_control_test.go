@@ -13,7 +13,6 @@ import (
 	"github.com/juju/juju/core/crossmodel"
 	"github.com/juju/names/v4"
 	jc "github.com/juju/testing/checkers"
-	openfga "github.com/openfga/go-sdk"
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/api"
@@ -21,7 +20,7 @@ import (
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/jimmtest"
 	"github.com/canonical/jimm/internal/jujuapi"
-	ofga "github.com/canonical/jimm/internal/openfga"
+	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 	jimmnames "github.com/canonical/jimm/pkg/names"
 )
@@ -96,7 +95,7 @@ func (s *accessControlSuite) TestRemoveGroupRemovesTuples(c *gc.C) {
 	err := db.GetGroup(ctx, group2)
 	c.Assert(err, gc.IsNil)
 
-	tuples := []ofga.Tuple{
+	tuples := []openfga.Tuple{
 		//This tuple should remain as it has no relation to group2
 		{
 			Object:   ofganames.ConvertTag(user.ResourceTag()),
@@ -131,7 +130,7 @@ func (s *accessControlSuite) TestRemoveGroupRemovesTuples(c *gc.C) {
 	checkAccessTupleController := apiparams.RelationshipTuple{Object: u, Relation: "administrator", TargetObject: "controller-" + controller.UUID}
 	checkAccessTupleModel := apiparams.RelationshipTuple{Object: u, Relation: "writer", TargetObject: "model-" + model.UUID.String}
 
-	err = s.JIMM.OpenFGAClient.AddRelations(context.Background(), tuples...)
+	err = s.JIMM.OpenFGAClient.AddRelation(context.Background(), tuples...)
 	c.Assert(err, gc.IsNil)
 	//Check user has access to model and controller through group2
 	checkResp, err := client.CheckRelation(&apiparams.CheckRelationRequest{Tuple: checkAccessTupleController})
@@ -212,18 +211,18 @@ func (s *accessControlSuite) TestListGroups(c *gc.C) {
 */
 
 // createTuple wraps the underlying ofga tuple into a convenient ease-of-use method
-func createTupleKey(object, relation, target string) openfga.TupleKey {
-	k := openfga.NewTupleKey()
-	// in some cases specifying the object is not required
-	if object != "" {
-		k.SetUser(object)
+func createTuple(object, relation, target string) openfga.Tuple {
+	objectEntity, _ := openfga.ParseTag(object)
+	targetEntity, _ := openfga.ParseTag(target)
+	return openfga.Tuple{
+		Object:   &objectEntity,
+		Relation: openfga.Relation(relation),
+		Target:   &targetEntity,
 	}
-	// in some cases specifying the relation is not required
-	if relation != "" {
-		k.SetRelation(relation)
-	}
-	k.SetObject(target)
-	return *k
+}
+
+func stringGroupID(id uint) string {
+	return strconv.FormatUint(uint64(id), 10)
 }
 
 // TestAddRelation currently verifies the following test cases,
@@ -258,13 +257,13 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 
 	c.Assert(err, gc.IsNil)
 	type tuple struct {
-		user     string
-		relation string
 		object   string
+		relation string
+		target   string
 	}
 	type tagTest struct {
 		input       tuple
-		want        openfga.TupleKey
+		want        openfga.Tuple
 		err         bool
 		changesType string
 	}
@@ -273,7 +272,7 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 		// Test user -> controller by name
 		{
 			input: tuple{"user-" + user.Username, "administrator", "controller-" + controller.Name},
-			want: createTupleKey(
+			want: createTuple(
 				"user:"+user.Username,
 				"administrator",
 				"controller:"+controller.UUID,
@@ -284,7 +283,7 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 		// Test user -> controller jimm
 		{
 			input: tuple{"user-" + user.Username, "administrator", "controller-jimm"},
-			want: createTupleKey(
+			want: createTuple(
 				"user:"+user.Username,
 				"administrator",
 				"controller:"+s.JIMM.UUID,
@@ -295,7 +294,7 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 		// Test user -> controller by UUID
 		{
 			input: tuple{"user-" + user.Username, "administrator", "controller-" + controller.UUID},
-			want: createTupleKey(
+			want: createTuple(
 				"user:"+user.Username,
 				"administrator",
 				"controller:"+controller.UUID,
@@ -306,10 +305,10 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 		//Test user -> group
 		{
 			input: tuple{"user-" + user.Username, "member", "group-" + group.Name},
-			want: createTupleKey(
+			want: createTuple(
 				"user:"+user.Username,
 				"member",
-				"group:"+strconv.FormatUint(uint64(group.ID), 10),
+				"group:"+stringGroupID(group.ID),
 			),
 			err:         false,
 			changesType: "group",
@@ -317,10 +316,10 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 		//Test username with dots and @ -> group
 		{
 			input: tuple{"user-" + "kelvin.lina.test@external", "member", "group-" + group.Name},
-			want: createTupleKey(
+			want: createTuple(
 				"user:"+"kelvin.lina.test@external",
 				"member",
-				"group:"+strconv.FormatUint(uint64(group.ID), 10),
+				"group:"+stringGroupID(group.ID),
 			),
 			err:         false,
 			changesType: "group",
@@ -328,8 +327,8 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 		//Test group -> controller
 		{
 			input: tuple{"group-" + "test-group#member", "administrator", "controller-" + controller.UUID},
-			want: createTupleKey(
-				"group:"+strconv.FormatUint(uint64(group.ID), 10)+"#member",
+			want: createTuple(
+				"group:"+stringGroupID(group.ID)+"#member",
 				"administrator",
 				"controller:"+controller.UUID,
 			),
@@ -339,7 +338,7 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 		//Test user -> model by name
 		{
 			input: tuple{"user-" + user.Username, "writer", "model-" + controller.Name + ":" + user.Username + "/" + model.Name},
-			want: createTupleKey(
+			want: createTuple(
 				"user:"+user.Username,
 				"writer",
 				"model:"+model.UUID.String,
@@ -350,7 +349,7 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 		// Test user -> model by UUID
 		{
 			input: tuple{"user-" + user.Username, "writer", "model-" + model.UUID.String},
-			want: createTupleKey(
+			want: createTuple(
 				"user:"+user.Username,
 				"writer",
 				"model:"+model.UUID.String,
@@ -361,7 +360,7 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 		// Test user -> applicationoffer by name
 		{
 			input: tuple{"user-" + user.Username, "consumer", "applicationoffer-" + controller.Name + ":" + user.Username + "/" + model.Name + "." + offer.Name},
-			want: createTupleKey(
+			want: createTuple(
 				"user:"+user.Username,
 				"consumer",
 				"applicationoffer:"+offer.UUID,
@@ -372,7 +371,7 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 		// Test user -> applicationoffer by UUID
 		{
 			input: tuple{"user-" + user.Username, "consumer", "applicationoffer-" + offer.UUID},
-			want: createTupleKey(
+			want: createTuple(
 				"user:"+user.Username,
 				"consumer",
 				"applicationoffer:"+offer.UUID,
@@ -383,8 +382,8 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 		// Test group -> controller by name
 		{
 			input: tuple{"group-" + group.Name + "#member", "administrator", "controller-" + controller.Name},
-			want: createTupleKey(
-				"group:"+strconv.FormatUint(uint64(group.ID), 10)+"#member",
+			want: createTuple(
+				"group:"+stringGroupID(group.ID)+"#member",
 				"administrator",
 				"controller:"+controller.UUID,
 			),
@@ -394,8 +393,8 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 		// Test group -> controller by UUID
 		{
 			input: tuple{"group-" + group.Name + "#member", "administrator", "controller-" + controller.UUID},
-			want: createTupleKey(
-				"group:"+strconv.FormatUint(uint64(group.ID), 10)+"#member",
+			want: createTuple(
+				"group:"+stringGroupID(group.ID)+"#member",
 				"administrator",
 				"controller:"+controller.UUID,
 			),
@@ -405,8 +404,8 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 		// Test group -> model by name
 		{
 			input: tuple{"group-" + group.Name + "#member", "writer", "model-" + controller.Name + ":" + user.Username + "/" + model.Name},
-			want: createTupleKey(
-				"group:"+strconv.FormatUint(uint64(group.ID), 10)+"#member",
+			want: createTuple(
+				"group:"+stringGroupID(group.ID)+"#member",
 				"writer",
 				"model:"+model.UUID.String,
 			),
@@ -416,8 +415,8 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 		// Test group -> model by UUID
 		{
 			input: tuple{"group-" + group.Name + "#member", "writer", "model-" + model.UUID.String},
-			want: createTupleKey(
-				"group:"+strconv.FormatUint(uint64(group.ID), 10)+"#member",
+			want: createTuple(
+				"group:"+stringGroupID(group.ID)+"#member",
 				"writer",
 				"model:"+model.UUID.String,
 			),
@@ -427,8 +426,8 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 		// Test group -> applicationoffer by name
 		{
 			input: tuple{"group-" + group.Name + "#member", "consumer", "applicationoffer-" + controller.Name + ":" + user.Username + "/" + model.Name + "." + offer.Name},
-			want: createTupleKey(
-				"group:"+strconv.FormatUint(uint64(group.ID), 10)+"#member",
+			want: createTuple(
+				"group:"+stringGroupID(group.ID)+"#member",
 				"consumer",
 				"applicationoffer:"+offer.UUID,
 			),
@@ -438,26 +437,22 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 		// Test group -> applicationoffer by UUID
 		{
 			input: tuple{"group-" + group.Name + "#member", "consumer", "applicationoffer-" + offer.UUID},
-			want: func() openfga.TupleKey {
-				return createTupleKey(
-					"group:"+strconv.FormatUint(uint64(group.ID), 10)+"#member",
-					"consumer",
-					"applicationoffer:"+offer.UUID,
-				)
-			}(),
+			want: createTuple(
+				"group:"+stringGroupID(group.ID)+"#member",
+				"consumer",
+				"applicationoffer:"+offer.UUID,
+			),
 			err:         false,
 			changesType: "applicationoffer",
 		},
 		// Test group -> group
 		{
 			input: tuple{"group-" + group.Name + "#member", "member", "group-" + group2.Name},
-			want: func() openfga.TupleKey {
-				k := openfga.NewTupleKey()
-				k.SetUser("group:" + strconv.FormatUint(uint64(group.ID), 10) + "#member")
-				k.SetRelation("member")
-				k.SetObject("group:" + strconv.FormatUint(uint64(group2.ID), 10))
-				return *k
-			}(),
+			want: createTuple(
+				"group:"+stringGroupID(group.ID)+"#member",
+				"member",
+				"group:"+stringGroupID(group2.ID),
+			),
 			err:         false,
 			changesType: "group",
 		},
@@ -466,18 +461,14 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 	for i, tc := range tagTests {
 		c.Logf("running test %d", i)
 		if i != 0 {
-			wr := openfga.NewWriteRequest()
-			keys := openfga.NewTupleKeysWithDefaults()
-			keys.SetTupleKeys([]openfga.TupleKey{tagTests[i].want})
-			wr.SetDeletes(*keys)
-			s.OFGAApi.Write(context.Background()).Body(*wr).Execute()
+			s.COFGAClient.RemoveRelation(ctx, tc.want)
 		}
 		err := client.AddRelation(&apiparams.AddRelationRequest{
 			Tuples: []apiparams.RelationshipTuple{
 				{
-					Object:       tc.input.user,
+					Object:       tc.input.object,
 					Relation:     tc.input.relation,
-					TargetObject: tc.input.object,
+					TargetObject: tc.input.target,
 				},
 			},
 		})
@@ -486,10 +477,12 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 			c.Assert(err, gc.ErrorMatches, tc.want)
 		} else {
 			c.Assert(err, gc.IsNil)
-			changes, _, err := s.OFGAApi.ReadChanges(ctx).Type_(tc.changesType).Execute()
+			changes, err := s.COFGAClient.ReadChanges(ctx, tc.changesType, 99, "")
 			c.Assert(err, gc.IsNil)
 			key := changes.GetChanges()[len(changes.GetChanges())-1].GetTupleKey()
-			c.Assert(key, gc.DeepEquals, tc.want)
+			c.Assert(*key.User, gc.DeepEquals, tc.want.Object.String())
+			c.Assert(*key.Relation, gc.DeepEquals, tc.want.Relation.String())
+			c.Assert(*key.Object, gc.DeepEquals, tc.want.Target.String())
 		}
 	}
 }
@@ -523,9 +516,9 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 		object   string
 	}
 	type tagTest struct {
-		toAdd       ofga.Tuple
+		toAdd       openfga.Tuple
 		toRemove    tuple
-		want        openfga.TupleKey
+		want        openfga.Tuple
 		err         bool
 		changesType string
 	}
@@ -533,13 +526,13 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 	tagTests := []tagTest{
 		// Test user -> controller by name
 		{
-			toAdd: ofga.Tuple{
+			toAdd: openfga.Tuple{
 				Object:   ofganames.ConvertTag(user.ResourceTag()),
 				Relation: "administrator",
 				Target:   ofganames.ConvertTag(controller.ResourceTag()),
 			},
 			toRemove: tuple{"user-" + user.Username, "administrator", "controller-" + controller.Name},
-			want: createTupleKey(
+			want: createTuple(
 				"user:"+user.Username,
 				"administrator",
 				"controller:"+controller.UUID,
@@ -549,13 +542,13 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 		},
 		// Test user -> controller by UUID
 		{
-			toAdd: ofga.Tuple{
+			toAdd: openfga.Tuple{
 				Object:   ofganames.ConvertTag(user.ResourceTag()),
 				Relation: "administrator",
 				Target:   ofganames.ConvertTag(controller.ResourceTag()),
 			},
 			toRemove: tuple{"user-" + user.Username, "administrator", "controller-" + controller.UUID},
-			want: createTupleKey(
+			want: createTuple(
 				"user:"+user.Username,
 				"administrator",
 				"controller:"+controller.UUID,
@@ -565,30 +558,30 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 		},
 		//Test user -> group
 		{
-			toAdd: ofga.Tuple{
+			toAdd: openfga.Tuple{
 				Object:   ofganames.ConvertTag(user.ResourceTag()),
 				Relation: "member",
 				Target:   ofganames.ConvertTag(group.ResourceTag()),
 			},
 			toRemove: tuple{"user-" + user.Username, "member", "group-" + group.Name},
-			want: createTupleKey(
+			want: createTuple(
 				"user:"+user.Username,
 				"member",
-				"group:"+strconv.FormatUint(uint64(group.ID), 10),
+				"group:"+stringGroupID(group.ID),
 			),
 			err:         false,
 			changesType: "group",
 		},
 		//Test group -> controller
 		{
-			toAdd: ofga.Tuple{
+			toAdd: openfga.Tuple{
 				Object:   ofganames.ConvertTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
 				Relation: "administrator",
 				Target:   ofganames.ConvertTag(controller.ResourceTag()),
 			},
 			toRemove: tuple{"group-" + group.Name + "#member", "administrator", "controller-" + controller.UUID},
-			want: createTupleKey(
-				"group:"+strconv.FormatUint(uint64(group.ID), 10)+"#member",
+			want: createTuple(
+				"group:"+stringGroupID(group.ID)+"#member",
 				"administrator",
 				"controller:"+controller.UUID,
 			),
@@ -597,13 +590,13 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 		},
 		//Test user -> model by name
 		{
-			toAdd: ofga.Tuple{
+			toAdd: openfga.Tuple{
 				Object:   ofganames.ConvertTag(user.ResourceTag()),
 				Relation: "writer",
 				Target:   ofganames.ConvertTag(model.ResourceTag()),
 			},
 			toRemove: tuple{"user-" + user.Username, "writer", "model-" + controller.Name + ":" + user.Username + "/" + model.Name},
-			want: createTupleKey(
+			want: createTuple(
 				"user:"+user.Username,
 				"writer",
 				"model:"+model.UUID.String,
@@ -613,13 +606,13 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 		},
 		// Test user -> model by UUID
 		{
-			toAdd: ofga.Tuple{
+			toAdd: openfga.Tuple{
 				Object:   ofganames.ConvertTag(user.ResourceTag()),
 				Relation: "writer",
 				Target:   ofganames.ConvertTag(model.ResourceTag()),
 			},
 			toRemove: tuple{"user-" + user.Username, "writer", "model-" + model.UUID.String},
-			want: createTupleKey(
+			want: createTuple(
 				"user:"+user.Username,
 				"writer",
 				"model:"+model.UUID.String,
@@ -629,13 +622,13 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 		},
 		// Test user -> applicationoffer by name
 		{
-			toAdd: ofga.Tuple{
+			toAdd: openfga.Tuple{
 				Object:   ofganames.ConvertTag(user.ResourceTag()),
 				Relation: "consumer",
 				Target:   ofganames.ConvertTag(offer.ResourceTag()),
 			},
 			toRemove: tuple{"user-" + user.Username, "consumer", "applicationoffer-" + controller.Name + ":" + user.Username + "/" + model.Name + "." + offer.Name},
-			want: createTupleKey(
+			want: createTuple(
 				"user:"+user.Username,
 				"consumer",
 				"applicationoffer:"+offer.UUID,
@@ -645,13 +638,13 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 		},
 		// Test user -> applicationoffer by UUID
 		{
-			toAdd: ofga.Tuple{
+			toAdd: openfga.Tuple{
 				Object:   ofganames.ConvertTag(user.ResourceTag()),
 				Relation: "consumer",
 				Target:   ofganames.ConvertTag(offer.ResourceTag()),
 			},
 			toRemove: tuple{"user-" + user.Username, "consumer", "applicationoffer-" + offer.UUID},
-			want: createTupleKey(
+			want: createTuple(
 				"user:"+user.Username,
 				"consumer",
 				"applicationoffer:"+offer.UUID,
@@ -661,14 +654,14 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 		},
 		// Test group -> controller by name
 		{
-			toAdd: ofga.Tuple{
+			toAdd: openfga.Tuple{
 				Object:   ofganames.ConvertTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
 				Relation: "administrator",
 				Target:   ofganames.ConvertTag(controller.ResourceTag()),
 			},
 			toRemove: tuple{"group-" + group.Name + "#member", "administrator", "controller-" + controller.Name},
-			want: createTupleKey(
-				"group:"+strconv.FormatUint(uint64(group.ID), 10)+"#member",
+			want: createTuple(
+				"group:"+stringGroupID(group.ID)+"#member",
 				"administrator",
 				"controller:"+controller.UUID,
 			),
@@ -677,14 +670,14 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 		},
 		// Test group -> controller by UUID
 		{
-			toAdd: ofga.Tuple{
+			toAdd: openfga.Tuple{
 				Object:   ofganames.ConvertTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
 				Relation: "administrator",
 				Target:   ofganames.ConvertTag(controller.ResourceTag()),
 			},
 			toRemove: tuple{"group-" + group.Name + "#member", "administrator", "controller-" + controller.UUID},
-			want: createTupleKey(
-				"group:"+strconv.FormatUint(uint64(group.ID), 10)+"#member",
+			want: createTuple(
+				"group:"+stringGroupID(group.ID)+"#member",
 				"administrator",
 				"controller:"+controller.UUID,
 			),
@@ -693,14 +686,14 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 		},
 		// Test group -> model by name
 		{
-			toAdd: ofga.Tuple{
+			toAdd: openfga.Tuple{
 				Object:   ofganames.ConvertTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
 				Relation: "writer",
 				Target:   ofganames.ConvertTag(model.ResourceTag()),
 			},
 			toRemove: tuple{"group-" + group.Name + "#member", "writer", "model-" + controller.Name + ":" + user.Username + "/" + model.Name},
-			want: createTupleKey(
-				"group:"+strconv.FormatUint(uint64(group.ID), 10)+"#member",
+			want: createTuple(
+				"group:"+stringGroupID(group.ID)+"#member",
 				"writer",
 				"model:"+model.UUID.String,
 			),
@@ -709,14 +702,14 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 		},
 		// Test group -> model by UUID
 		{
-			toAdd: ofga.Tuple{
+			toAdd: openfga.Tuple{
 				Object:   ofganames.ConvertTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
 				Relation: "writer",
 				Target:   ofganames.ConvertTag(model.ResourceTag()),
 			},
 			toRemove: tuple{"group-" + group.Name + "#member", "writer", "model-" + model.UUID.String},
-			want: createTupleKey(
-				"group:"+strconv.FormatUint(uint64(group.ID), 10)+"#member",
+			want: createTuple(
+				"group:"+stringGroupID(group.ID)+"#member",
 				"writer",
 				"model:"+model.UUID.String,
 			),
@@ -725,14 +718,14 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 		},
 		// Test group -> applicationoffer by name
 		{
-			toAdd: ofga.Tuple{
+			toAdd: openfga.Tuple{
 				Object:   ofganames.ConvertTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
 				Relation: "consumer",
 				Target:   ofganames.ConvertTag(offer.ResourceTag()),
 			},
 			toRemove: tuple{"group-" + group.Name + "#member", "consumer", "applicationoffer-" + controller.Name + ":" + user.Username + "/" + model.Name + "." + offer.Name},
-			want: createTupleKey(
-				"group:"+strconv.FormatUint(uint64(group.ID), 10)+"#member",
+			want: createTuple(
+				"group:"+stringGroupID(group.ID)+"#member",
 				"consumer",
 				"applicationoffer:"+offer.UUID,
 			),
@@ -741,19 +734,17 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 		},
 		// Test group -> applicationoffer by UUID
 		{
-			toAdd: ofga.Tuple{
+			toAdd: openfga.Tuple{
 				Object:   ofganames.ConvertTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
 				Relation: "consumer",
 				Target:   ofganames.ConvertTag(offer.ResourceTag()),
 			},
 			toRemove: tuple{"group-" + group.Name + "#member", "consumer", "applicationoffer-" + offer.UUID},
-			want: func() openfga.TupleKey {
-				return createTupleKey(
-					"group:"+strconv.FormatUint(uint64(group.ID), 10)+"#member",
-					"consumer",
-					"applicationoffer:"+offer.UUID,
-				)
-			}(),
+			want: createTuple(
+				"group:"+stringGroupID(group.ID)+"#member",
+				"consumer",
+				"applicationoffer:"+offer.UUID,
+			),
 			err:         false,
 			changesType: "applicationoffer",
 		},
@@ -762,12 +753,14 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 	for i, tc := range tagTests {
 		c.Logf("running test %d", i)
 		ofgaClient := s.JIMM.OpenFGAClient
-		err := ofgaClient.AddRelations(context.Background(), tc.toAdd)
+		err := ofgaClient.AddRelation(context.Background(), tc.toAdd)
 		c.Check(err, gc.IsNil)
-		changes, _, err := s.OFGAApi.ReadChanges(ctx).Type_(tc.changesType).Execute()
+		changes, err := s.COFGAClient.ReadChanges(ctx, tc.changesType, 99, "")
 		c.Assert(err, gc.IsNil)
 		key := changes.GetChanges()[len(changes.GetChanges())-1].GetTupleKey()
-		c.Assert(key, gc.DeepEquals, tc.want)
+		c.Assert(*key.User, gc.DeepEquals, tc.want.Object.String())
+		c.Assert(*key.Relation, gc.DeepEquals, tc.want.Relation.String())
+		c.Assert(*key.Object, gc.DeepEquals, tc.want.Target.String())
 
 		err = client.RemoveRelation(&apiparams.RemoveRelationRequest{
 			Tuples: []apiparams.RelationshipTuple{
@@ -783,13 +776,15 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 			c.Assert(err, gc.ErrorMatches, tc.want)
 		} else {
 			c.Assert(err, gc.IsNil)
-			changes, _, err := s.OFGAApi.ReadChanges(ctx).Type_(tc.changesType).Execute()
+			changes, err := s.COFGAClient.ReadChanges(ctx, tc.changesType, 99, "")
 			c.Assert(err, gc.IsNil)
 			change := changes.GetChanges()[len(changes.GetChanges())-1]
 			operation := change.GetOperation()
-			c.Assert(operation, gc.Equals, openfga.DELETE)
+			c.Assert(string(operation), gc.Equals, "TUPLE_OPERATION_DELETE")
 			key := change.GetTupleKey()
-			c.Assert(key, gc.DeepEquals, tc.want)
+			c.Assert(*key.User, gc.DeepEquals, tc.want.Object.String())
+			c.Assert(*key.Relation, gc.DeepEquals, tc.want.Relation.String())
+			c.Assert(*key.Object, gc.DeepEquals, tc.want.Target.String())
 		}
 	}
 }
@@ -889,7 +884,7 @@ func (s *accessControlSuite) TestCheckRelationOfferReaderFlow(c *gc.C) {
 	user, group, controller, model, offer, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
 	defer closeClient()
 
-	// Some keys to assist in the creation of tuples within OpenFGA (such that they can be tested against)
+	// Some tags (tuples) to assist in the creation of tuples within OpenFGA (such that they can be tested against)
 	userTag := ofganames.ConvertTag(user.ResourceTag())
 	groupTag := ofganames.ConvertTag(group.ResourceTag())
 	offerTag := ofganames.ConvertTag(offer.ResourceTag())
@@ -900,18 +895,18 @@ func (s *accessControlSuite) TestCheckRelationOfferReaderFlow(c *gc.C) {
 
 	// Test direct relation to an applicationoffer from a user of a group via "reader" relation
 
-	userToGroupOfferReader := ofga.Tuple{
+	userToGroupOfferReader := openfga.Tuple{
 		Object:   userTag,
 		Relation: "member",
 		Target:   groupTag,
 	} // Make user member of group
-	groupToOfferReader := ofga.Tuple{
+	groupToOfferReader := openfga.Tuple{
 		Object:   ofganames.ConvertTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
 		Relation: "reader",
 		Target:   offerTag,
 	} // Make group members reader of offer via member union
 
-	err := ofgaClient.AddRelations(
+	err := ofgaClient.AddRelation(
 		ctx,
 		userToGroupOfferReader,
 		groupToOfferReader,
@@ -919,7 +914,7 @@ func (s *accessControlSuite) TestCheckRelationOfferReaderFlow(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	type test struct {
-		input openfga.TupleKey
+		input apiparams.RelationshipTuple
 		want  bool
 	}
 
@@ -927,24 +922,26 @@ func (s *accessControlSuite) TestCheckRelationOfferReaderFlow(c *gc.C) {
 
 		// Test user-> reader -> aoffer (due to direct relation from group)
 		{
-			input: createTupleKey(userJAASKey, "reader", offerJAASKey),
-			want:  true,
+			input: apiparams.RelationshipTuple{
+				Object:       userJAASKey,
+				Relation:     "reader",
+				TargetObject: offerJAASKey,
+			},
+			want: true,
 		},
 		// Test user -> consumer -> offer (FAILS as there is no union or direct relation to writer)
 		{
-			input: createTupleKey(userJAASKey, "consumer", offerJAASKey),
-			want:  false,
+			input: apiparams.RelationshipTuple{
+				Object:       userJAASKey,
+				Relation:     "consumer",
+				TargetObject: offerJAASKey,
+			},
+			want: false,
 		},
 	}
 
 	for _, tc := range tests {
-		req := apiparams.CheckRelationRequest{
-			Tuple: apiparams.RelationshipTuple{
-				Object:       *tc.input.User,
-				Relation:     *tc.input.Relation,
-				TargetObject: *tc.input.Object,
-			},
-		}
+		req := apiparams.CheckRelationRequest{Tuple: tc.input}
 		res, err := client.CheckRelation(&req)
 		c.Assert(err, gc.IsNil)
 		c.Assert(res.Allowed, gc.Equals, tc.want)
@@ -968,18 +965,18 @@ func (s *accessControlSuite) TestCheckRelationOfferConsumerFlow(c *gc.C) {
 	offerJAASKey := "applicationoffer-" + controller.Name + ":" + user.Username + "/" + model.Name + "." + offer.Name
 
 	// Test direct relation to an applicationoffer from a user of a group via "consumer" relation
-	userToGroupMember := ofga.Tuple{
+	userToGroupMember := openfga.Tuple{
 		Object:   userTag,
 		Relation: "member",
 		Target:   groupTag,
 	} // Make user member of group
-	groupToOfferConsumer := ofga.Tuple{
+	groupToOfferConsumer := openfga.Tuple{
 		Object:   ofganames.ConvertTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
 		Relation: "consumer",
 		Target:   offerTag,
 	} // Make group members consumer of offer via member union
 
-	err := ofgaClient.AddRelations(
+	err := ofgaClient.AddRelation(
 		ctx,
 		userToGroupMember,
 		groupToOfferConsumer,
@@ -987,31 +984,33 @@ func (s *accessControlSuite) TestCheckRelationOfferConsumerFlow(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	type test struct {
-		input openfga.TupleKey
+		input apiparams.RelationshipTuple
 		want  bool
 	}
 
 	tests := []test{
 		// Test user:dugtrio -> consumer -> applicationoffer:test-offer-2 (due to direct relation from group)
 		{
-			input: createTupleKey(userJAASKey, "consumer", offerJAASKey),
-			want:  true,
+			input: apiparams.RelationshipTuple{
+				Object:       userJAASKey,
+				Relation:     "consumer",
+				TargetObject: offerJAASKey,
+			},
+			want: true,
 		},
 		// Test user:dugtrio -> reader -> applicationoffer:test-offer-2 (due to direct relation from group and union from consumer to reader)
 		{
-			input: createTupleKey(userJAASKey, "reader", offerJAASKey),
-			want:  true,
+			input: apiparams.RelationshipTuple{
+				Object:       userJAASKey,
+				Relation:     "reader",
+				TargetObject: offerJAASKey,
+			},
+			want: true,
 		},
 	}
 
 	for _, tc := range tests {
-		req := apiparams.CheckRelationRequest{
-			Tuple: apiparams.RelationshipTuple{
-				Object:       *tc.input.User,
-				Relation:     *tc.input.Relation,
-				TargetObject: *tc.input.Object,
-			},
-		}
+		req := apiparams.CheckRelationRequest{Tuple: tc.input}
 		res, err := client.CheckRelation(&req)
 		c.Assert(err, gc.IsNil)
 		c.Assert(res.Allowed, gc.Equals, tc.want)
@@ -1037,18 +1036,18 @@ func (s *accessControlSuite) TestCheckRelationModelReaderFlow(c *gc.C) {
 	modelJAASKey := "model-" + controller.Name + ":" + user.Username + "/" + model.Name
 
 	// Test direct relation to a model from a user of a group via "reader" relation
-	userToGroupMember := ofga.Tuple{
+	userToGroupMember := openfga.Tuple{
 		Object:   userTag,
 		Relation: "member",
 		Target:   groupTag,
 	} // Make user member of group
-	groupToModelReader := ofga.Tuple{
+	groupToModelReader := openfga.Tuple{
 		Object:   ofganames.ConvertTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
 		Relation: "reader",
 		Target:   modelTag,
 	} // Make group members writer of model via member union
 
-	err := ofgaClient.AddRelations(
+	err := ofgaClient.AddRelation(
 		ctx,
 		userToGroupMember,
 		groupToModelReader,
@@ -1056,31 +1055,33 @@ func (s *accessControlSuite) TestCheckRelationModelReaderFlow(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	type test struct {
-		input openfga.TupleKey
+		input apiparams.RelationshipTuple
 		want  bool
 	}
 
 	tests := []test{
 		// Test user -> reader -> model (due to direct relation from group)
 		{
-			input: createTupleKey(userJAASKey, "reader", modelJAASKey),
-			want:  true,
+			input: apiparams.RelationshipTuple{
+				Object:       userJAASKey,
+				Relation:     "reader",
+				TargetObject: modelJAASKey,
+			},
+			want: true,
 		},
 		// Test user -> writer -> model (FAILS as there is no union or direct relation to writer)
 		{
-			input: createTupleKey(userJAASKey, "writer", modelJAASKey),
-			want:  false,
+			input: apiparams.RelationshipTuple{
+				Object:       userJAASKey,
+				Relation:     "writer",
+				TargetObject: modelJAASKey,
+			},
+			want: false,
 		},
 	}
 
 	for _, tc := range tests {
-		req := apiparams.CheckRelationRequest{
-			Tuple: apiparams.RelationshipTuple{
-				Object:       *tc.input.User,
-				Relation:     *tc.input.Relation,
-				TargetObject: *tc.input.Object,
-			},
-		}
+		req := apiparams.CheckRelationRequest{Tuple: tc.input}
 		res, err := client.CheckRelation(&req)
 		c.Assert(err, gc.IsNil)
 		c.Assert(res.Allowed, gc.Equals, tc.want)
@@ -1100,12 +1101,12 @@ func (s *accessControlSuite) TestCheckRelationModelWriterFlow(c *gc.C) {
 	modelTag := ofganames.ConvertTag(model.ResourceTag())
 
 	// Test direct relation to a model from a user of a group via "writer" relation
-	userToGroupMember := ofga.Tuple{
+	userToGroupMember := openfga.Tuple{
 		Object:   userTag,
 		Relation: "member",
 		Target:   groupTag,
 	} // Make user member of group
-	groupToModelWriter := ofga.Tuple{
+	groupToModelWriter := openfga.Tuple{
 		Object:   ofganames.ConvertTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
 		Relation: "writer",
 		Target:   modelTag,
@@ -1115,7 +1116,7 @@ func (s *accessControlSuite) TestCheckRelationModelWriterFlow(c *gc.C) {
 	userJAASKey := "user-" + user.Username
 	modelJAASKey := "model-" + controller.Name + ":" + user.Username + "/" + model.Name
 
-	err := ofgaClient.AddRelations(
+	err := ofgaClient.AddRelation(
 		ctx,
 		userToGroupMember,
 		groupToModelWriter,
@@ -1123,31 +1124,33 @@ func (s *accessControlSuite) TestCheckRelationModelWriterFlow(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	type test struct {
-		input openfga.TupleKey
+		input apiparams.RelationshipTuple
 		want  bool
 	}
 
 	tests := []test{
 		// Test user-> writer -> model
 		{
-			input: createTupleKey(userJAASKey, "writer", modelJAASKey),
-			want:  true,
+			input: apiparams.RelationshipTuple{
+				Object:       userJAASKey,
+				Relation:     "writer",
+				TargetObject: modelJAASKey,
+			},
+			want: true,
 		},
 		// Test user-> reader -> model(due to union from writer to reader)
 		{
-			input: createTupleKey(userJAASKey, "reader", modelJAASKey),
-			want:  true,
+			input: apiparams.RelationshipTuple{
+				Object:       userJAASKey,
+				Relation:     "reader",
+				TargetObject: modelJAASKey,
+			},
+			want: true,
 		},
 	}
 
 	for _, tc := range tests {
-		req := apiparams.CheckRelationRequest{
-			Tuple: apiparams.RelationshipTuple{
-				Object:       *tc.input.User,
-				Relation:     *tc.input.Relation,
-				TargetObject: *tc.input.Object,
-			},
-		}
+		req := apiparams.CheckRelationRequest{Tuple: tc.input}
 		res, err := client.CheckRelation(&req)
 		c.Assert(err, gc.IsNil)
 		c.Assert(res.Allowed, gc.Equals, tc.want)
@@ -1176,12 +1179,12 @@ func (s *accessControlSuite) TestCheckRelationControllerAdministratorFlow(c *gc.
 	offerJAASKey := "applicationoffer-" + controller.Name + ":" + user.Username + "/" + model.Name + "." + offer.Name
 
 	// Test the administrator flow of a group user being related to a controller via administrator relation
-	userToGroup := ofga.Tuple{
+	userToGroup := openfga.Tuple{
 		Object:   userTag,
 		Relation: "member",
 		Target:   groupTag,
 	} // Make user member of group
-	groupToControllerAdmin := ofga.Tuple{
+	groupToControllerAdmin := openfga.Tuple{
 		Object:   ofganames.ConvertTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
 		Relation: "administrator",
 		Target:   controllerTag,
@@ -1189,18 +1192,18 @@ func (s *accessControlSuite) TestCheckRelationControllerAdministratorFlow(c *gc.
 
 	// NOTE (alesstimec) these two shouldn't really be necessary as they should be automatically
 	// created.
-	controllerToModelAdmin := ofga.Tuple{
+	controllerToModelAdmin := openfga.Tuple{
 		Object:   controllerTag,
 		Relation: "controller",
 		Target:   modelTag,
 	} // Make controller administrators admins of model via administrator union
-	modelToAppOfferAdmin := ofga.Tuple{
+	modelToAppOfferAdmin := openfga.Tuple{
 		Object:   modelTag,
 		Relation: "model",
 		Target:   offerTag,
 	} // Make controller administrators admin of appoffers via administrator union
 
-	err := ofgaClient.AddRelations(
+	err := ofgaClient.AddRelation(
 		ctx,
 		userToGroup,
 		groupToControllerAdmin,
@@ -1210,51 +1213,69 @@ func (s *accessControlSuite) TestCheckRelationControllerAdministratorFlow(c *gc.
 	c.Assert(err, gc.IsNil)
 
 	type test struct {
-		input openfga.TupleKey
+		input apiparams.RelationshipTuple
 		want  bool
 	}
 
 	tests := []test{
 		// Test user -> member -> group
 		{
-			input: createTupleKey(userJAASKey, "member", groupJAASKey),
-			want:  true,
+			input: apiparams.RelationshipTuple{
+				Object:       userJAASKey,
+				Relation:     "member",
+				TargetObject: groupJAASKey,
+			},
+			want: true,
 		},
 		// Test user-> member -> controller
 		{
-			input: createTupleKey(userJAASKey, "administrator", controllerJAASKey),
-			want:  true,
+			input: apiparams.RelationshipTuple{
+				Object:       userJAASKey,
+				Relation:     "administrator",
+				TargetObject: controllerJAASKey,
+			},
+			want: true,
 		},
 		// Test user-> administrator -> model
 		{
-			input: createTupleKey(userJAASKey, "administrator", modelJAASKey),
-			want:  true,
+			input: apiparams.RelationshipTuple{
+				Object:       userJAASKey,
+				Relation:     "administrator",
+				TargetObject: modelJAASKey,
+			},
+			want: true,
 		},
 		// Test user -> reader -> model (due to group#member -> controller#admin unioned to model #admin)
 		{
-			input: createTupleKey(userJAASKey, "reader", modelJAASKey),
-			want:  true,
+			input: apiparams.RelationshipTuple{
+				Object:       userJAASKey,
+				Relation:     "reader",
+				TargetObject: modelJAASKey,
+			},
+			want: true,
 		},
 		// Test user-> writer -> model (due to group#member -> controller#admin unioned to model #admin)
 		{
-			input: createTupleKey(userJAASKey, "writer", modelJAASKey),
-			want:  true,
+			input: apiparams.RelationshipTuple{
+				Object:       userJAASKey,
+				Relation:     "writer",
+				TargetObject: modelJAASKey,
+			},
+			want: true,
 		},
 		// Test user -> administrator -> offer
 		{
-			input: createTupleKey(userJAASKey, "administrator", offerJAASKey),
-			want:  true,
+			input: apiparams.RelationshipTuple{
+				Object:       userJAASKey,
+				Relation:     "administrator",
+				TargetObject: offerJAASKey,
+			},
+			want: true,
 		},
 	}
 
 	for _, tc := range tests {
-		req := apiparams.CheckRelationRequest{
-			Tuple: apiparams.RelationshipTuple{
-				Object:       *tc.input.User,
-				Relation:     *tc.input.Relation,
-				TargetObject: *tc.input.Object,
-			},
-		}
+		req := apiparams.CheckRelationRequest{Tuple: tc.input}
 		res, err := client.CheckRelation(&req)
 		c.Assert(err, gc.IsNil)
 		c.Assert(res.Allowed, gc.Equals, tc.want)
@@ -1403,18 +1424,18 @@ func (s *accessControlSuite) TestParseTag(c *gc.C) {
 	// JIMM tag syntax for models
 	tag, err := jujuapi.ParseTag(ctx, s.JIMM, jimmTag)
 	c.Assert(err, gc.IsNil)
-	c.Assert(tag.Kind(), gc.Equals, names.ModelTagKind)
-	c.Assert(tag.Id(), gc.Equals, model.UUID.String)
-	c.Assert(tag.Relation(), gc.Equals, "administrator")
+	c.Assert(tag.Kind.String(), gc.Equals, names.ModelTagKind)
+	c.Assert(tag.ID, gc.Equals, model.UUID.String)
+	c.Assert(tag.Relation.String(), gc.Equals, "administrator")
 
 	jujuTag := "model-" + model.UUID.String + "#administrator"
 
 	// Juju tag syntax for models
 	tag, err = jujuapi.ParseTag(ctx, s.JIMM, jujuTag)
 	c.Assert(err, gc.IsNil)
-	c.Assert(tag.Id(), gc.Equals, model.UUID.String)
-	c.Assert(tag.Kind(), gc.Equals, names.ModelTagKind)
-	c.Assert(tag.Relation(), gc.Equals, "administrator")
+	c.Assert(tag.ID, gc.Equals, model.UUID.String)
+	c.Assert(tag.Kind.String(), gc.Equals, names.ModelTagKind)
+	c.Assert(tag.Relation.String(), gc.Equals, "administrator")
 }
 
 // createTestControllerEnvironment is a utility function creating the necessary components of adding a:

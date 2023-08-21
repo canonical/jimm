@@ -26,7 +26,7 @@ import (
 func TestGetCloud(t *testing.T) {
 	c := qt.New(t)
 
-	_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
 	ctx := context.Background()
@@ -254,7 +254,7 @@ func TestGetCloud(t *testing.T) {
 func TestForEachCloud(t *testing.T) {
 	c := qt.New(t)
 
-	_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
 	ctx := context.Background()
@@ -878,7 +878,7 @@ func TestAddHostedCloud(t *testing.T) {
 		c.Run(test.name, func(c *qt.C) {
 			ctx := context.Background()
 
-			_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.name)
+			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.name)
 			c.Assert(err, qt.IsNil)
 
 			api := &jimmtest.API{
@@ -1168,7 +1168,7 @@ func TestAddCloudToController(t *testing.T) {
 		c.Run(test.name, func(c *qt.C) {
 			ctx := context.Background()
 
-			_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.name)
+			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.name)
 			c.Assert(err, qt.IsNil)
 
 			api := &jimmtest.API{
@@ -1732,7 +1732,7 @@ func TestRemoveCloud(t *testing.T) {
 		c.Run(test.name, func(c *qt.C) {
 			ctx := context.Background()
 
-			_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.name)
+			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.name)
 			c.Assert(err, qt.IsNil)
 
 			env := jimmtest.ParseEnvironment(c, test.env)
@@ -1987,7 +1987,7 @@ func TestUpdateCloud(t *testing.T) {
 		c.Run(test.name, func(c *qt.C) {
 			ctx := context.Background()
 
-			_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.name)
+			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.name)
 			c.Assert(err, qt.IsNil)
 
 			env := jimmtest.ParseEnvironment(c, test.env)
@@ -2183,7 +2183,7 @@ func TestRemoveFromControllerCloud(t *testing.T) {
 		c.Run(test.name, func(c *qt.C) {
 			ctx := context.Background()
 
-			_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.name)
+			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.name)
 			c.Assert(err, qt.IsNil)
 
 			env := jimmtest.ParseEnvironment(c, test.env)

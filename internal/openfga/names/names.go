@@ -5,74 +5,39 @@
 package names
 
 import (
-	"strings"
-
 	"github.com/canonical/jimm/internal/errors"
 	jimmnames "github.com/canonical/jimm/pkg/names"
+	cofga "github.com/canonical/ofga"
+
 	"github.com/juju/juju/core/permission"
 	"github.com/juju/names/v4"
 )
 
-// Relation holds the type of tag relation.
-type Relation string
-
-// String implements the Stringer interface.
-func (r Relation) String() string {
-	return string(r)
-}
-
 var (
 	// MemberRelation represents a member relation between entities.
-	MemberRelation Relation = "member"
+	MemberRelation cofga.Relation = "member"
 	// AdministratorRelation represents an administrator relation between entities.
-	AdministratorRelation Relation = "administrator"
+	AdministratorRelation cofga.Relation = "administrator"
 	// ControllerRelation represents a controller relation between entities.
-	ControllerRelation Relation = "controller"
+	ControllerRelation cofga.Relation = "controller"
 	// ModelRelation represents a model relation between entities.
-	ModelRelation Relation = "model"
+	ModelRelation cofga.Relation = "model"
 	// ConsumerRelation represents a consumer relation between entities.
-	ConsumerRelation Relation = "consumer"
+	ConsumerRelation cofga.Relation = "consumer"
 	// ReaderRelation represents a reader relation between entities.
-	ReaderRelation Relation = "reader"
+	ReaderRelation cofga.Relation = "reader"
 	// WriterRelation represents a writer relation between entities.
-	WriterRelation Relation = "writer"
+	WriterRelation cofga.Relation = "writer"
 	// CanAddModelRelation represents a can_addmodel relation between entities.
-	CanAddModelRelation Relation = "can_addmodel"
+	CanAddModelRelation cofga.Relation = "can_addmodel"
 	// AuditLogViewer represents an audit_log_viewer relation between entities.
-	AuditLogViewerRelation Relation = "audit_log_viewer"
+	AuditLogViewerRelation cofga.Relation = "audit_log_viewer"
 	// NoRelation is returned when there is no relation.
-	NoRelation Relation = ""
+	NoRelation cofga.Relation = ""
 )
 
-// Tag represents a an entity tag as used by JIMM in OpenFGA.
-type Tag struct {
-	kind     string
-	id       string
-	relation Relation
-}
-
-// String returns a string representation of the tag.
-func (t *Tag) String() string {
-	if t.relation == "" {
-		return string(t.kind) + ":" + t.id
-	}
-	return t.kind + ":" + t.id + "#" + t.relation.String()
-}
-
-// Id returns the tag id.
-func (t *Tag) Id() string {
-	return t.id
-}
-
-// Kind returns the tag kind.
-func (t *Tag) Kind() string {
-	return t.kind
-}
-
-// Relation returns the tag relation.
-func (t *Tag) Relation() string {
-	return t.relation.String()
-}
+// Tag represents an entity tag as used by JIMM in OpenFGA.
+type Tag = cofga.Entity
 
 // ResourceTagger represents an entity tag that implements
 // a method returning entity's id and kind.
@@ -91,9 +56,9 @@ type ResourceTagger interface {
 
 // ConvertTagWithRelation converts a resource tag to an OpenFGA tag
 // and adds a relation to it.
-func ConvertTagWithRelation[RT ResourceTagger](t RT, relation Relation) *Tag {
+func ConvertTagWithRelation[RT ResourceTagger](t RT, relation cofga.Relation) *Tag {
 	tag := ConvertTag(t)
-	tag.relation = relation
+	tag.Relation = relation
 	return tag
 }
 
@@ -101,8 +66,8 @@ func ConvertTagWithRelation[RT ResourceTagger](t RT, relation Relation) *Tag {
 // specific types of tags.
 func ConvertTag[RT ResourceTagger](t RT) *Tag {
 	tag := &Tag{
-		id:   t.Id(),
-		kind: t.Kind(),
+		ID:   t.Id(),
+		Kind: cofga.Kind(t.Kind()),
 	}
 	return tag
 }
@@ -110,41 +75,10 @@ func ConvertTag[RT ResourceTagger](t RT) *Tag {
 // ConvertGenericTag converts any tag implementing the names.tag interface to an OpenFGA tag.
 func ConvertGenericTag(t names.Tag) *Tag {
 	tag := &Tag{
-		id:   t.Id(),
-		kind: t.Kind(),
+		ID:   t.Id(),
+		Kind: cofga.Kind(t.Kind()),
 	}
 	return tag
-}
-
-// TagFromString converts an entity tag to an OpenFGA tag.
-func TagFromString(t string) (*Tag, error) {
-	tokens := strings.Split(t, ":")
-	if len(tokens) != 2 {
-		return nil, errors.E("unexpected tag format")
-	}
-	idTokens := strings.Split(tokens[1], "#")
-	switch tokens[0] {
-	case names.UserTagKind, jimmnames.GroupTagKind,
-		names.ControllerTagKind, names.ModelTagKind,
-		names.ApplicationOfferTagKind, names.CloudTagKind:
-		switch len(idTokens) {
-		case 1:
-			return &Tag{
-				kind: tokens[0],
-				id:   tokens[1],
-			}, nil
-		case 2:
-			return &Tag{
-				kind:     tokens[0],
-				id:       idTokens[0],
-				relation: Relation(idTokens[1]),
-			}, nil
-		default:
-			return nil, errors.E("invalid relation specifier")
-		}
-	default:
-		return nil, errors.E("unknown tag kind")
-	}
 }
 
 // BlankKindTag returns a tag of the specified kind with a blank id.
@@ -157,7 +91,7 @@ func BlankKindTag(kind string) (*Tag, error) {
 		names.ControllerTagKind, names.ModelTagKind,
 		names.ApplicationOfferTagKind, names.CloudTagKind:
 		return &Tag{
-			kind: kind,
+			Kind: cofga.Kind(kind),
 		}, nil
 	default:
 		return nil, errors.E("unknown tag kind")
@@ -166,7 +100,7 @@ func BlankKindTag(kind string) (*Tag, error) {
 
 // ConvertJujuRelation takes a juju relation string and converts it to
 // one appropriate for use with OpenFGA.
-func ConvertJujuRelation(relation string) (Relation, error) {
+func ConvertJujuRelation(relation string) (cofga.Relation, error) {
 	switch relation {
 	case string(permission.AdminAccess):
 		return AdministratorRelation, nil
@@ -190,10 +124,10 @@ func ConvertJujuRelation(relation string) (Relation, error) {
 }
 
 // ParseRelation parses the relation string
-func ParseRelation(relationString string) (Relation, error) {
+func ParseRelation(relationString string) (cofga.Relation, error) {
 	switch relationString {
 	case "":
-		return Relation(""), nil
+		return cofga.Relation(""), nil
 	case MemberRelation.String():
 		return MemberRelation, nil
 	case AdministratorRelation.String():
@@ -207,7 +141,7 @@ func ParseRelation(relationString string) (Relation, error) {
 	case CanAddModelRelation.String():
 		return CanAddModelRelation, nil
 	default:
-		return Relation(""), errors.E("unknown relation")
+		return cofga.Relation(""), errors.E("unknown relation")
 
 	}
 }

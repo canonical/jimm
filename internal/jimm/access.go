@@ -17,7 +17,7 @@ import (
 )
 
 // ToOfferAccessString maps relation to an application offer access string.
-func ToOfferAccessString(relation ofganames.Relation) string {
+func ToOfferAccessString(relation openfga.Relation) string {
 	switch relation {
 	case ofganames.AdministratorRelation:
 		return string(jujuparams.OfferAdminAccess)
@@ -31,7 +31,7 @@ func ToOfferAccessString(relation ofganames.Relation) string {
 }
 
 // ToCloudAccessString maps relation to a cloud access string.
-func ToCloudAccessString(relation ofganames.Relation) string {
+func ToCloudAccessString(relation openfga.Relation) string {
 	switch relation {
 	case ofganames.AdministratorRelation:
 		return "admin"
@@ -43,7 +43,7 @@ func ToCloudAccessString(relation ofganames.Relation) string {
 }
 
 // ToModelAccessString maps relation to a model access string.
-func ToModelAccessString(relation ofganames.Relation) string {
+func ToModelAccessString(relation openfga.Relation) string {
 	switch relation {
 	case ofganames.AdministratorRelation:
 		return "admin"
@@ -57,7 +57,7 @@ func ToModelAccessString(relation ofganames.Relation) string {
 }
 
 // ToModelAccessString maps relation to a controller access string.
-func ToControllerAccessString(relation ofganames.Relation) string {
+func ToControllerAccessString(relation openfga.Relation) string {
 	switch relation {
 	case ofganames.AdministratorRelation:
 		return "superuser"
@@ -70,7 +70,7 @@ func ToControllerAccessString(relation ofganames.Relation) string {
 // string can be either "admin", in which case the administrator relation
 // is returned, or "add-model", in which case the can_addmodel relation is
 // returned.
-func ToCloudRelation(accessLevel string) (ofganames.Relation, error) {
+func ToCloudRelation(accessLevel string) (openfga.Relation, error) {
 	switch accessLevel {
 	case "admin":
 		return ofganames.AdministratorRelation, nil
@@ -82,7 +82,7 @@ func ToCloudRelation(accessLevel string) (ofganames.Relation, error) {
 }
 
 // ToModelRelation returns a valid relation for the model.
-func ToModelRelation(accessLevel string) (ofganames.Relation, error) {
+func ToModelRelation(accessLevel string) (openfga.Relation, error) {
 	switch accessLevel {
 	case "admin":
 		return ofganames.AdministratorRelation, nil
@@ -96,7 +96,7 @@ func ToModelRelation(accessLevel string) (ofganames.Relation, error) {
 }
 
 // ToOfferRelation returns a valid relation for the application offer.
-func ToOfferRelation(accessLevel string) (ofganames.Relation, error) {
+func ToOfferRelation(accessLevel string) (openfga.Relation, error) {
 	switch accessLevel {
 	case "":
 		return ofganames.NoRelation, nil
@@ -223,7 +223,7 @@ func checkPermission(ctx context.Context, user *openfga.User, cachedPerms map[st
 			if err != nil {
 				return cachedPerms, errors.E(op, fmt.Sprintf("failed to parse relation %s", stringVal), err)
 			}
-			check, _, err := openfga.CheckRelation(ctx, user, tag, relation)
+			check, err := openfga.CheckRelation(ctx, user, tag, relation)
 			if err != nil {
 				return cachedPerms, errors.E(op, err)
 			}

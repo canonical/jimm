@@ -25,7 +25,7 @@ import (
 func TestAuthenticateLogin(t *testing.T) {
 	c := qt.New(t)
 
-	_, ofgaclient, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+	ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
 	discharger := bakerytest.NewDischarger(nil)
@@ -36,7 +36,7 @@ func TestAuthenticateLogin(t *testing.T) {
 		},
 	)
 	authenticator := auth.JujuAuthenticator{
-		Client: ofgaclient,
+		Client: ofgaClient,
 		Bakery: identchecker.NewBakery(identchecker.BakeryParams{
 			Locator:        discharger,
 			Key:            bakery.MustGenerateKey(),
@@ -68,7 +68,7 @@ func TestAuthenticateLogin(t *testing.T) {
 func TestAuthenticateLoginWithDomain(t *testing.T) {
 	c := qt.New(t)
 
-	_, ofgaclient, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+	ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
 	discharger := bakerytest.NewDischarger(nil)
@@ -79,7 +79,7 @@ func TestAuthenticateLoginWithDomain(t *testing.T) {
 		},
 	)
 	authenticator := auth.JujuAuthenticator{
-		Client: ofgaclient,
+		Client: ofgaClient,
 		Bakery: identchecker.NewBakery(identchecker.BakeryParams{
 			Locator:        discharger,
 			Key:            bakery.MustGenerateKey(),
@@ -111,7 +111,7 @@ func TestAuthenticateLoginWithDomain(t *testing.T) {
 func TestAuthenticateLoginSuperuser(t *testing.T) {
 	c := qt.New(t)
 
-	_, ofgaclient, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+	ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
 	discharger := bakerytest.NewDischarger(nil)
@@ -122,7 +122,7 @@ func TestAuthenticateLoginSuperuser(t *testing.T) {
 		},
 	)
 	authenticator := auth.JujuAuthenticator{
-		Client: ofgaclient,
+		Client: ofgaClient,
 		Bakery: identchecker.NewBakery(identchecker.BakeryParams{
 			Locator:        discharger,
 			Key:            bakery.MustGenerateKey(),
@@ -156,7 +156,7 @@ func TestAuthenticateLoginSuperuser(t *testing.T) {
 func TestAuthenticateLoginInvalidUsernameDeclared(t *testing.T) {
 	c := qt.New(t)
 
-	_, ofgaclient, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+	ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
 	discharger := bakerytest.NewDischarger(nil)
@@ -167,7 +167,7 @@ func TestAuthenticateLoginInvalidUsernameDeclared(t *testing.T) {
 		},
 	)
 	authenticator := auth.JujuAuthenticator{
-		Client: ofgaclient,
+		Client: ofgaClient,
 		Bakery: identchecker.NewBakery(identchecker.BakeryParams{
 			Locator:        discharger,
 			Key:            bakery.MustGenerateKey(),

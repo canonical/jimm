@@ -260,7 +260,7 @@ func (j *JIMM) listApplicationOfferUsers(ctx context.Context, offer names.Applic
 	users := make(map[string]string)
 
 	// we loop through relations in a decreasing order of access
-	for _, relation := range []ofganames.Relation{
+	for _, relation := range []openfga.Relation{
 		ofganames.AdministratorRelation,
 		ofganames.ConsumerRelation,
 		ofganames.ReaderRelation,
