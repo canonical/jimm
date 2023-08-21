@@ -21,7 +21,6 @@ import (
 	"github.com/canonical/jimm/internal/jimmtest"
 	"github.com/canonical/jimm/internal/jujuapi"
 	"github.com/canonical/jimm/internal/openfga"
-	ofga "github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 	jimmnames "github.com/canonical/jimm/pkg/names"
 )
@@ -96,7 +95,7 @@ func (s *accessControlSuite) TestRemoveGroupRemovesTuples(c *gc.C) {
 	err := db.GetGroup(ctx, group2)
 	c.Assert(err, gc.IsNil)
 
-	tuples := []ofga.Tuple{
+	tuples := []openfga.Tuple{
 		//This tuple should remain as it has no relation to group2
 		{
 			Object:   ofganames.ConvertTag(user.ResourceTag()),
@@ -212,12 +211,12 @@ func (s *accessControlSuite) TestListGroups(c *gc.C) {
 */
 
 // createTuple wraps the underlying ofga tuple into a convenient ease-of-use method
-func createTuple(object, relation, target string) ofga.Tuple {
+func createTuple(object, relation, target string) openfga.Tuple {
 	objectEntity, _ := openfga.ParseTag(object)
 	targetEntity, _ := openfga.ParseTag(target)
-	return ofga.Tuple{
+	return openfga.Tuple{
 		Object:   &objectEntity,
-		Relation: ofga.Relation(relation),
+		Relation: openfga.Relation(relation),
 		Target:   &targetEntity,
 	}
 }
@@ -264,7 +263,7 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 	}
 	type tagTest struct {
 		input       tuple
-		want        ofga.Tuple
+		want        openfga.Tuple
 		err         bool
 		changesType string
 	}
@@ -517,9 +516,9 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 		object   string
 	}
 	type tagTest struct {
-		toAdd       ofga.Tuple
+		toAdd       openfga.Tuple
 		toRemove    tuple
-		want        ofga.Tuple
+		want        openfga.Tuple
 		err         bool
 		changesType string
 	}
@@ -527,7 +526,7 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 	tagTests := []tagTest{
 		// Test user -> controller by name
 		{
-			toAdd: ofga.Tuple{
+			toAdd: openfga.Tuple{
 				Object:   ofganames.ConvertTag(user.ResourceTag()),
 				Relation: "administrator",
 				Target:   ofganames.ConvertTag(controller.ResourceTag()),
@@ -543,7 +542,7 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 		},
 		// Test user -> controller by UUID
 		{
-			toAdd: ofga.Tuple{
+			toAdd: openfga.Tuple{
 				Object:   ofganames.ConvertTag(user.ResourceTag()),
 				Relation: "administrator",
 				Target:   ofganames.ConvertTag(controller.ResourceTag()),
@@ -559,7 +558,7 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 		},
 		//Test user -> group
 		{
-			toAdd: ofga.Tuple{
+			toAdd: openfga.Tuple{
 				Object:   ofganames.ConvertTag(user.ResourceTag()),
 				Relation: "member",
 				Target:   ofganames.ConvertTag(group.ResourceTag()),
@@ -575,7 +574,7 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 		},
 		//Test group -> controller
 		{
-			toAdd: ofga.Tuple{
+			toAdd: openfga.Tuple{
 				Object:   ofganames.ConvertTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
 				Relation: "administrator",
 				Target:   ofganames.ConvertTag(controller.ResourceTag()),
@@ -591,7 +590,7 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 		},
 		//Test user -> model by name
 		{
-			toAdd: ofga.Tuple{
+			toAdd: openfga.Tuple{
 				Object:   ofganames.ConvertTag(user.ResourceTag()),
 				Relation: "writer",
 				Target:   ofganames.ConvertTag(model.ResourceTag()),
@@ -607,7 +606,7 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 		},
 		// Test user -> model by UUID
 		{
-			toAdd: ofga.Tuple{
+			toAdd: openfga.Tuple{
 				Object:   ofganames.ConvertTag(user.ResourceTag()),
 				Relation: "writer",
 				Target:   ofganames.ConvertTag(model.ResourceTag()),
@@ -623,7 +622,7 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 		},
 		// Test user -> applicationoffer by name
 		{
-			toAdd: ofga.Tuple{
+			toAdd: openfga.Tuple{
 				Object:   ofganames.ConvertTag(user.ResourceTag()),
 				Relation: "consumer",
 				Target:   ofganames.ConvertTag(offer.ResourceTag()),
@@ -639,7 +638,7 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 		},
 		// Test user -> applicationoffer by UUID
 		{
-			toAdd: ofga.Tuple{
+			toAdd: openfga.Tuple{
 				Object:   ofganames.ConvertTag(user.ResourceTag()),
 				Relation: "consumer",
 				Target:   ofganames.ConvertTag(offer.ResourceTag()),
@@ -655,7 +654,7 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 		},
 		// Test group -> controller by name
 		{
-			toAdd: ofga.Tuple{
+			toAdd: openfga.Tuple{
 				Object:   ofganames.ConvertTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
 				Relation: "administrator",
 				Target:   ofganames.ConvertTag(controller.ResourceTag()),
@@ -671,7 +670,7 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 		},
 		// Test group -> controller by UUID
 		{
-			toAdd: ofga.Tuple{
+			toAdd: openfga.Tuple{
 				Object:   ofganames.ConvertTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
 				Relation: "administrator",
 				Target:   ofganames.ConvertTag(controller.ResourceTag()),
@@ -687,7 +686,7 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 		},
 		// Test group -> model by name
 		{
-			toAdd: ofga.Tuple{
+			toAdd: openfga.Tuple{
 				Object:   ofganames.ConvertTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
 				Relation: "writer",
 				Target:   ofganames.ConvertTag(model.ResourceTag()),
@@ -703,7 +702,7 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 		},
 		// Test group -> model by UUID
 		{
-			toAdd: ofga.Tuple{
+			toAdd: openfga.Tuple{
 				Object:   ofganames.ConvertTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
 				Relation: "writer",
 				Target:   ofganames.ConvertTag(model.ResourceTag()),
@@ -719,7 +718,7 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 		},
 		// Test group -> applicationoffer by name
 		{
-			toAdd: ofga.Tuple{
+			toAdd: openfga.Tuple{
 				Object:   ofganames.ConvertTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
 				Relation: "consumer",
 				Target:   ofganames.ConvertTag(offer.ResourceTag()),
@@ -735,7 +734,7 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 		},
 		// Test group -> applicationoffer by UUID
 		{
-			toAdd: ofga.Tuple{
+			toAdd: openfga.Tuple{
 				Object:   ofganames.ConvertTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
 				Relation: "consumer",
 				Target:   ofganames.ConvertTag(offer.ResourceTag()),
@@ -896,12 +895,12 @@ func (s *accessControlSuite) TestCheckRelationOfferReaderFlow(c *gc.C) {
 
 	// Test direct relation to an applicationoffer from a user of a group via "reader" relation
 
-	userToGroupOfferReader := ofga.Tuple{
+	userToGroupOfferReader := openfga.Tuple{
 		Object:   userTag,
 		Relation: "member",
 		Target:   groupTag,
 	} // Make user member of group
-	groupToOfferReader := ofga.Tuple{
+	groupToOfferReader := openfga.Tuple{
 		Object:   ofganames.ConvertTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
 		Relation: "reader",
 		Target:   offerTag,
@@ -966,12 +965,12 @@ func (s *accessControlSuite) TestCheckRelationOfferConsumerFlow(c *gc.C) {
 	offerJAASKey := "applicationoffer-" + controller.Name + ":" + user.Username + "/" + model.Name + "." + offer.Name
 
 	// Test direct relation to an applicationoffer from a user of a group via "consumer" relation
-	userToGroupMember := ofga.Tuple{
+	userToGroupMember := openfga.Tuple{
 		Object:   userTag,
 		Relation: "member",
 		Target:   groupTag,
 	} // Make user member of group
-	groupToOfferConsumer := ofga.Tuple{
+	groupToOfferConsumer := openfga.Tuple{
 		Object:   ofganames.ConvertTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
 		Relation: "consumer",
 		Target:   offerTag,
@@ -1037,12 +1036,12 @@ func (s *accessControlSuite) TestCheckRelationModelReaderFlow(c *gc.C) {
 	modelJAASKey := "model-" + controller.Name + ":" + user.Username + "/" + model.Name
 
 	// Test direct relation to a model from a user of a group via "reader" relation
-	userToGroupMember := ofga.Tuple{
+	userToGroupMember := openfga.Tuple{
 		Object:   userTag,
 		Relation: "member",
 		Target:   groupTag,
 	} // Make user member of group
-	groupToModelReader := ofga.Tuple{
+	groupToModelReader := openfga.Tuple{
 		Object:   ofganames.ConvertTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
 		Relation: "reader",
 		Target:   modelTag,
@@ -1102,12 +1101,12 @@ func (s *accessControlSuite) TestCheckRelationModelWriterFlow(c *gc.C) {
 	modelTag := ofganames.ConvertTag(model.ResourceTag())
 
 	// Test direct relation to a model from a user of a group via "writer" relation
-	userToGroupMember := ofga.Tuple{
+	userToGroupMember := openfga.Tuple{
 		Object:   userTag,
 		Relation: "member",
 		Target:   groupTag,
 	} // Make user member of group
-	groupToModelWriter := ofga.Tuple{
+	groupToModelWriter := openfga.Tuple{
 		Object:   ofganames.ConvertTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
 		Relation: "writer",
 		Target:   modelTag,
@@ -1180,12 +1179,12 @@ func (s *accessControlSuite) TestCheckRelationControllerAdministratorFlow(c *gc.
 	offerJAASKey := "applicationoffer-" + controller.Name + ":" + user.Username + "/" + model.Name + "." + offer.Name
 
 	// Test the administrator flow of a group user being related to a controller via administrator relation
-	userToGroup := ofga.Tuple{
+	userToGroup := openfga.Tuple{
 		Object:   userTag,
 		Relation: "member",
 		Target:   groupTag,
 	} // Make user member of group
-	groupToControllerAdmin := ofga.Tuple{
+	groupToControllerAdmin := openfga.Tuple{
 		Object:   ofganames.ConvertTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
 		Relation: "administrator",
 		Target:   controllerTag,
@@ -1193,12 +1192,12 @@ func (s *accessControlSuite) TestCheckRelationControllerAdministratorFlow(c *gc.
 
 	// NOTE (alesstimec) these two shouldn't really be necessary as they should be automatically
 	// created.
-	controllerToModelAdmin := ofga.Tuple{
+	controllerToModelAdmin := openfga.Tuple{
 		Object:   controllerTag,
 		Relation: "controller",
 		Target:   modelTag,
 	} // Make controller administrators admins of model via administrator union
-	modelToAppOfferAdmin := ofga.Tuple{
+	modelToAppOfferAdmin := openfga.Tuple{
 		Object:   modelTag,
 		Relation: "model",
 		Target:   offerTag,

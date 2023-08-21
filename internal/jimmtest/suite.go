@@ -22,7 +22,7 @@ import (
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/jimm"
 	"github.com/canonical/jimm/internal/jujuclient"
-	jimmopenfga "github.com/canonical/jimm/internal/openfga"
+	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 	"github.com/canonical/jimm/internal/pubsub"
 )
@@ -48,7 +48,7 @@ type JIMMSuite struct {
 	JIMM *jimm.JIMM
 
 	AdminUser   *dbmodel.User
-	OFGAClient  *ofga.OFGAClient
+	OFGAClient  *openfga.OFGAClient
 	COFGAClient *cofga.Client
 	COFGAParams *cofga.OpenFGAParams
 }
@@ -79,7 +79,7 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 	err = s.JIMM.Database.GetUser(ctx, s.AdminUser)
 	c.Assert(err, gc.Equals, nil)
 
-	adminUser := jimmopenfga.NewUser(s.AdminUser, s.OFGAClient)
+	adminUser := openfga.NewUser(s.AdminUser, s.OFGAClient)
 	err = adminUser.SetControllerAccess(ctx, s.JIMM.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, gc.Equals, nil)
 
@@ -94,8 +94,8 @@ func (s *JIMMSuite) TearDownTest(c *gc.C) {
 	}
 }
 
-func (s *JIMMSuite) NewUser(u *dbmodel.User) *jimmopenfga.User {
-	return jimmopenfga.NewUser(u, s.OFGAClient)
+func (s *JIMMSuite) NewUser(u *dbmodel.User) *openfga.User {
+	return openfga.NewUser(u, s.OFGAClient)
 }
 
 func (s *JIMMSuite) AddController(c *gc.C, name string, info *api.Info) {

@@ -44,8 +44,6 @@ import (
 	"github.com/canonical/jimm/internal/jujuclient"
 	"github.com/canonical/jimm/internal/logger"
 	"github.com/canonical/jimm/internal/openfga"
-	internalopenfga "github.com/canonical/jimm/internal/openfga"
-	ofgaClient "github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 	"github.com/canonical/jimm/internal/pubsub"
 	"github.com/canonical/jimm/internal/servermon"
@@ -346,7 +344,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 // setupDischarger set JIMM up as a discharger of 3rd party caveats addressed to it. This is intended
 // to enable Juju controllers to check for permissions using a macaroon-based workflow (atm only
 // for cross model relations).
-func (s *Service) setupDischarger(p Params, openFGAclient *internalopenfga.OFGAClient) (*bakery.KeyPair, *http.ServeMux, error) {
+func (s *Service) setupDischarger(p Params, openFGAclient *openfga.OFGAClient) (*bakery.KeyPair, *http.ServeMux, error) {
 	var kp bakery.KeyPair
 	if p.PublicKey == "" || p.PrivateKey == "" {
 		generatedKP, err := bakery.GenerateKey()
@@ -393,7 +391,7 @@ func openDB(ctx context.Context, dsn string) (*gorm.DB, error) {
 	})
 }
 
-func newAuthenticator(ctx context.Context, db *db.Database, client *ofgaClient.OFGAClient, key *bakery.KeyPair, p Params) (jimm.Authenticator, error) {
+func newAuthenticator(ctx context.Context, db *db.Database, client *openfga.OFGAClient, key *bakery.KeyPair, p Params) (jimm.Authenticator, error) {
 	if p.CandidURL == "" {
 		// No authenticator configured
 		return nil, nil
@@ -524,7 +522,7 @@ func newVaultStore(ctx context.Context, p Params) (jimmcreds.CredentialStore, er
 	}, nil
 }
 
-func newOpenFGAClient(ctx context.Context, p OpenFGAParams) (*ofgaClient.OFGAClient, error) {
+func newOpenFGAClient(ctx context.Context, p OpenFGAParams) (*openfga.OFGAClient, error) {
 	cofgaClient, err := cofga.NewClient(ctx, cofga.OpenFGAParams{
 		Scheme:      p.Scheme,
 		Host:        p.Host,
@@ -543,18 +541,18 @@ func newOpenFGAClient(ctx context.Context, p OpenFGAParams) (*ofgaClient.OFGACli
 // This method checks if these users already have administrator access to the JIMM controller,
 // otherwise it will add a direct administrator relation between each user and the JIMM
 // controller.
-func ensureControllerAdministrators(ctx context.Context, client *ofgaClient.OFGAClient, controllerUUID string, admins []string) error {
+func ensureControllerAdministrators(ctx context.Context, client *openfga.OFGAClient, controllerUUID string, admins []string) error {
 	controller := names.NewControllerTag(controllerUUID)
-	tuples := []ofgaClient.Tuple{}
+	tuples := []openfga.Tuple{}
 	for _, username := range admins {
 		userTag := names.NewUserTag(username)
-		user := ofgaClient.NewUser(&dbmodel.User{Username: userTag.Id()}, client)
-		isAdmin, err := ofgaClient.IsAdministrator(ctx, user, controller)
+		user := openfga.NewUser(&dbmodel.User{Username: userTag.Id()}, client)
+		isAdmin, err := openfga.IsAdministrator(ctx, user, controller)
 		if err != nil {
 			return errors.E(err)
 		}
 		if !isAdmin {
-			tuples = append(tuples, ofgaClient.Tuple{
+			tuples = append(tuples, openfga.Tuple{
 				Object:   ofganames.ConvertTag(userTag),
 				Relation: ofganames.AdministratorRelation,
 				Target:   ofganames.ConvertTag(controller),
@@ -584,7 +582,7 @@ var defaultDischargeExpiry = 15 * time.Minute
 //	is-writer <user tag> <model tag containing uuid>
 //	is-admininistrator <user tag> <model tag containing uuid>
 //	is-admininistrator <user tag> <controller tag containing uuid>
-func (s *Service) thirdPartyCaveatCheckerFunction(ofgaClient *internalopenfga.OFGAClient) func(ctx context.Context, req *http.Request, cavInfo *bakery.ThirdPartyCaveatInfo, _ *httpbakery.DischargeToken) ([]checkers.Caveat, error) {
+func (s *Service) thirdPartyCaveatCheckerFunction(ofgaClient *openfga.OFGAClient) func(ctx context.Context, req *http.Request, cavInfo *bakery.ThirdPartyCaveatInfo, _ *httpbakery.DischargeToken) ([]checkers.Caveat, error) {
 	return func(ctx context.Context, req *http.Request, cavInfo *bakery.ThirdPartyCaveatInfo, _ *httpbakery.DischargeToken) ([]checkers.Caveat, error) {
 		caveatTokens := strings.Split(string(cavInfo.Condition), " ")
 		if len(caveatTokens) != 3 {
@@ -613,14 +611,14 @@ func (s *Service) thirdPartyCaveatCheckerFunction(ofgaClient *internalopenfga.OF
 			return nil, checkers.ErrCaveatNotRecognized
 		}
 
-		user := internalopenfga.NewUser(
+		user := openfga.NewUser(
 			&dbmodel.User{
 				Username: userTag.Id(),
 			},
 			ofgaClient,
 		)
 
-		allowed, err := internalopenfga.CheckRelation(ctx, user, objectTag, relation)
+		allowed, err := openfga.CheckRelation(ctx, user, objectTag, relation)
 		if err != nil {
 			return nil, errors.E(err)
 		}

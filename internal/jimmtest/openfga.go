@@ -15,15 +15,15 @@ import (
 	cofga "github.com/canonical/ofga"
 	"github.com/jackc/pgx/v4"
 	"github.com/oklog/ulid/v2"
-	openfga "github.com/openfga/go-sdk"
+	sdk "github.com/openfga/go-sdk"
 	"gopkg.in/errgo.v1"
 
 	"github.com/canonical/jimm/internal/errors"
-	ofga "github.com/canonical/jimm/internal/openfga"
+	"github.com/canonical/jimm/internal/openfga"
 )
 
 var (
-	authModel *openfga.AuthorizationModel
+	authModel *sdk.AuthorizationModel
 	setups    map[string]testSetup
 	setupsMu  sync.Mutex
 )
@@ -33,12 +33,12 @@ func init() {
 }
 
 type testSetup struct {
-	client      *ofga.OFGAClient
+	client      *openfga.OFGAClient
 	cofgaClient *cofga.Client
 	cofgaParams *cofga.OpenFGAParams
 }
 
-func getAuthModelDefinition() (*openfga.AuthorizationModel, error) {
+func getAuthModelDefinition() (*sdk.AuthorizationModel, error) {
 	desiredFolder := "local"
 	authPath := ""
 	var pwd string
@@ -75,7 +75,7 @@ func getAuthModelDefinition() (*openfga.AuthorizationModel, error) {
 		return nil, err
 	}
 
-	authModel := openfga.AuthorizationModel{}
+	authModel := sdk.AuthorizationModel{}
 	err = json.Unmarshal(b, &authModel)
 	if err != nil {
 		return nil, err
@@ -89,7 +89,7 @@ func getAuthModelDefinition() (*openfga.AuthorizationModel, error) {
 //
 // The benefit of not cleaning up the store immediately afterwards,
 // enables the debugging of created tuples in test development.
-func SetupTestOFGAClient(names ...string) (*ofga.OFGAClient, *cofga.Client, *cofga.OpenFGAParams, error) {
+func SetupTestOFGAClient(names ...string) (*openfga.OFGAClient, *cofga.Client, *cofga.OpenFGAParams, error) {
 	ctx := context.Background()
 
 	testName := strings.NewReplacer(" ", "_", "'", "_").Replace(strings.Join(names, "_"))
@@ -139,7 +139,7 @@ func SetupTestOFGAClient(names ...string) (*ofga.OFGAClient, *cofga.Client, *cof
 	cofgaClient.AuthModelId = authModelID
 	cofgaParams.AuthModelID = authModelID
 
-	client := ofga.NewOpenFGAClient(cofgaClient)
+	client := openfga.NewOpenFGAClient(cofgaClient)
 
 	setups[testName] = testSetup{
 		client:      client,

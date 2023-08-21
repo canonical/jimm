@@ -24,7 +24,7 @@ import (
 	"github.com/canonical/jimm/cmd/jimmctl/cmd"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
-	ofga "github.com/canonical/jimm/internal/openfga"
+	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 	jimmnames "github.com/canonical/jimm/pkg/names"
 )
@@ -94,7 +94,7 @@ func (s *relationSuite) TestAddRelationSuperuser(c *gc.C) {
 			c.Assert(strings.Contains(err.Error(), tc.message), gc.Equals, true)
 		} else {
 			c.Assert(err, gc.IsNil)
-			tuples, ct, err := s.jimmSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), ofga.Tuple{}, 50, "")
+			tuples, ct, err := s.jimmSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), openfga.Tuple{}, 50, "")
 			c.Assert(err, gc.IsNil)
 			c.Assert(ct, gc.Equals, "")
 			// NOTE: this is a bad test because it relies on the number of related objects. So all the
@@ -143,7 +143,7 @@ func (s *relationSuite) TestAddRelationViaFileSuperuser(c *gc.C) {
 	_, err = cmdtesting.RunCommand(c, cmd.NewAddRelationCommandForTesting(s.ClientStore(), bClient), "-f", file.Name())
 	c.Assert(err, gc.IsNil)
 
-	tuples, ct, err := s.jimmSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), ofga.Tuple{}, 50, "")
+	tuples, ct, err := s.jimmSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), openfga.Tuple{}, 50, "")
 	c.Assert(err, gc.IsNil)
 	c.Assert(ct, gc.Equals, "")
 	c.Assert(len(tuples), gc.Equals, 4)
@@ -193,7 +193,7 @@ func (s *relationSuite) TestRemoveRelationSuperuser(c *gc.C) {
 			c.Assert(err, gc.ErrorMatches, tc.message)
 		} else {
 			c.Assert(err, gc.IsNil)
-			tuples, ct, err := s.jimmSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), ofga.Tuple{}, 50, "")
+			tuples, ct, err := s.jimmSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), openfga.Tuple{}, 50, "")
 			c.Assert(err, gc.IsNil)
 			c.Assert(ct, gc.Equals, "")
 			totalKeys--
@@ -228,12 +228,12 @@ func (s *relationSuite) TestRemoveRelationViaFileSuperuser(c *gc.C) {
 	_, err = cmdtesting.RunCommand(c, cmd.NewRemoveRelationCommandForTesting(s.ClientStore(), bClient), "-f", file.Name())
 	c.Assert(err, gc.IsNil)
 
-	tuples, ct, err := s.jimmSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), ofga.Tuple{}, 50, "")
+	tuples, ct, err := s.jimmSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), openfga.Tuple{}, 50, "")
 	c.Assert(err, gc.IsNil)
 	c.Assert(ct, gc.Equals, "")
 	c.Logf("existing relations %v", tuples)
 	// Only two relations exist.
-	c.Assert(tuples, gc.DeepEquals, []ofga.Tuple{{
+	c.Assert(tuples, gc.DeepEquals, []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("admin")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewControllerTag(s.Params.ControllerUUID)),
@@ -517,12 +517,12 @@ func (s *relationSuite) TestCheckRelationViaSuperuser(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	err = ofgaClient.AddRelation(ctx,
-		ofga.Tuple{
+		openfga.Tuple{
 			Object:   ofganames.ConvertTag(u.ResourceTag()),
 			Relation: "member",
 			Target:   ofganames.ConvertTag(group.Tag().(jimmnames.GroupTag)),
 		},
-		ofga.Tuple{
+		openfga.Tuple{
 			Object:   ofganames.ConvertTagWithRelation(group.Tag().(jimmnames.GroupTag), ofganames.MemberRelation),
 			Relation: "reader",
 			Target:   ofganames.ConvertTag(model.ResourceTag()),

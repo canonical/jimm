@@ -17,7 +17,7 @@ import (
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/jimm"
 	"github.com/canonical/jimm/internal/jimmtest"
-	ofga "github.com/canonical/jimm/internal/openfga"
+	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 	jimmnames "github.com/canonical/jimm/pkg/names"
 )
@@ -451,7 +451,7 @@ func TestQueryModelsJq(t *testing.T) {
 	}
 
 	c.Assert(j.OpenFGAClient.AddRelation(ctx,
-		[]ofga.Tuple{
+		[]openfga.Tuple{
 			// Reader to model via direct relation
 			{
 				Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),

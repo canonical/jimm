@@ -14,13 +14,13 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/internal/jimmtest"
-	ofga "github.com/canonical/jimm/internal/openfga"
+	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 	jimmnames "github.com/canonical/jimm/pkg/names"
 )
 
 type openFGATestSuite struct {
-	ofgaClient  *ofga.OFGAClient
+	ofgaClient  *openfga.OFGAClient
 	cofgaClient *cofga.Client
 }
 
@@ -40,7 +40,7 @@ func (s *openFGATestSuite) TestWritingTuplesToOFGASucceeds(c *gc.C) {
 
 	uuid1, _ := uuid.NewRandom()
 	user1 := names.NewUserTag(uuid1.String())
-	tuple1 := ofga.Tuple{
+	tuple1 := openfga.Tuple{
 		Object:   ofganames.ConvertTag(user1),
 		Relation: "member",
 		Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(groupid)),
@@ -48,7 +48,7 @@ func (s *openFGATestSuite) TestWritingTuplesToOFGASucceeds(c *gc.C) {
 
 	uuid2, _ := uuid.NewRandom()
 	user2 := names.NewUserTag(uuid2.String())
-	tuple2 := ofga.Tuple{
+	tuple2 := openfga.Tuple{
 		Object:   ofganames.ConvertTag(user2),
 		Relation: "member",
 		Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(groupid)),
@@ -73,14 +73,14 @@ func (suite *openFGATestSuite) TestRemovingTuplesFromOFGASucceeds(c *gc.C) {
 
 	//Create tuples before writing to db
 	user1 := ofganames.ConvertTag(names.NewUserTag("bob"))
-	tuple1 := ofga.Tuple{
+	tuple1 := openfga.Tuple{
 		Object:   user1,
 		Relation: "member",
 		Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(groupid)),
 	}
 
 	user2 := ofganames.ConvertTag(names.NewUserTag("alice"))
-	tuple2 := ofga.Tuple{
+	tuple2 := openfga.Tuple{
 		Object:   user2,
 		Relation: "member",
 		Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(groupid)),
@@ -118,12 +118,12 @@ func (s *openFGATestSuite) TestCheckRelationSucceeds(c *gc.C) {
 	controller := names.NewControllerTag(controllerUUID.String())
 
 	user := ofganames.ConvertTag(names.NewUserTag("eve"))
-	userToGroup := ofga.Tuple{
+	userToGroup := openfga.Tuple{
 		Object:   user,
 		Relation: "member",
 		Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(groupid)),
 	}
-	groupToController := ofga.Tuple{
+	groupToController := openfga.Tuple{
 		Object:   ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag(groupid), ofganames.MemberRelation),
 		Relation: "administrator",
 		Target:   ofganames.ConvertTag(controller),
@@ -132,7 +132,7 @@ func (s *openFGATestSuite) TestCheckRelationSucceeds(c *gc.C) {
 	err := s.ofgaClient.AddRelation(ctx, userToGroup, groupToController)
 	c.Assert(err, gc.IsNil)
 
-	checkTuple := ofga.Tuple{
+	checkTuple := openfga.Tuple{
 		Object:   user,
 		Relation: "administrator",
 		Target:   ofganames.ConvertTag(controller),
@@ -147,7 +147,7 @@ func (s *openFGATestSuite) TestRemoveTuplesSucceeds(c *gc.C) {
 
 	// Test a large number of tuples
 	for i := 0; i < 150; i++ {
-		tuple := ofga.Tuple{
+		tuple := openfga.Tuple{
 			Object:   ofganames.ConvertTag(names.NewUserTag("test" + strconv.Itoa(i))),
 			Relation: "member",
 			Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(groupid)),
@@ -156,13 +156,13 @@ func (s *openFGATestSuite) TestRemoveTuplesSucceeds(c *gc.C) {
 		c.Assert(err, gc.IsNil)
 	}
 
-	checkTuple := ofga.Tuple{
+	checkTuple := openfga.Tuple{
 		Target: ofganames.ConvertTag(jimmnames.NewGroupTag(groupid)),
 	}
 	c.Logf("checking for tuple %v\n", checkTuple)
 	err := s.ofgaClient.RemoveTuples(context.Background(), checkTuple)
 	c.Assert(err, gc.IsNil)
-	tuples, ct, err := s.ofgaClient.ReadRelatedObjects(context.Background(), ofga.Tuple{}, 50, "")
+	tuples, ct, err := s.ofgaClient.ReadRelatedObjects(context.Background(), openfga.Tuple{}, 50, "")
 	c.Assert(err, gc.IsNil)
 	c.Assert(ct, gc.Equals, "")
 	c.Assert(len(tuples), gc.Equals, 0)
@@ -181,7 +181,7 @@ func (s *openFGATestSuite) TestAddControllerModel(c *gc.C) {
 	err = s.ofgaClient.AddControllerModel(context.Background(), controller, model)
 	c.Assert(err, gc.IsNil)
 
-	tuple := ofga.Tuple{
+	tuple := openfga.Tuple{
 		Object:   ofganames.ConvertTag(controller),
 		Relation: "controller",
 		Target:   ofganames.ConvertTag(model),
@@ -203,7 +203,7 @@ func (s *openFGATestSuite) TestRemoveModel(c *gc.C) {
 	err = s.ofgaClient.AddControllerModel(context.Background(), controller, model)
 	c.Assert(err, gc.IsNil)
 
-	tuple := ofga.Tuple{
+	tuple := openfga.Tuple{
 		Object:   ofganames.ConvertTag(controller),
 		Relation: "controller",
 		Target:   ofganames.ConvertTag(model),
@@ -232,7 +232,7 @@ func (s *openFGATestSuite) TestAddModelApplicationOffer(c *gc.C) {
 	err = s.ofgaClient.AddModelApplicationOffer(context.Background(), model, offer)
 	c.Assert(err, gc.IsNil)
 
-	tuple := ofga.Tuple{
+	tuple := openfga.Tuple{
 		Object:   ofganames.ConvertTag(model),
 		Relation: "model",
 		Target:   ofganames.ConvertTag(offer),
@@ -254,7 +254,7 @@ func (s *openFGATestSuite) TestRemoveApplicationOffer(c *gc.C) {
 	err = s.ofgaClient.AddModelApplicationOffer(context.Background(), model, offer)
 	c.Assert(err, gc.IsNil)
 
-	tuple := ofga.Tuple{
+	tuple := openfga.Tuple{
 		Object:   ofganames.ConvertTag(model),
 		Relation: "model",
 		Target:   ofganames.ConvertTag(offer),
@@ -277,7 +277,7 @@ func (s *openFGATestSuite) TestRemoveGroup(c *gc.C) {
 	alice := names.NewUserTag("alice@external")
 	adam := names.NewUserTag("adam@external")
 
-	tuples := []ofga.Tuple{{
+	tuples := []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(alice),
 		Relation: ofganames.MemberRelation,
 		Target:   ofganames.ConvertTag(group1),
@@ -296,7 +296,7 @@ func (s *openFGATestSuite) TestRemoveGroup(c *gc.C) {
 
 	allowed, err := s.ofgaClient.CheckRelation(
 		context.TODO(),
-		ofga.Tuple{
+		openfga.Tuple{
 			Object:   ofganames.ConvertTag(alice),
 			Relation: ofganames.MemberRelation,
 			Target:   ofganames.ConvertTag(group2),
@@ -314,7 +314,7 @@ func (s *openFGATestSuite) TestRemoveGroup(c *gc.C) {
 
 	allowed, err = s.ofgaClient.CheckRelation(
 		context.TODO(),
-		ofga.Tuple{
+		openfga.Tuple{
 			Object:   ofganames.ConvertTag(alice),
 			Relation: ofganames.MemberRelation,
 			Target:   ofganames.ConvertTag(group2),
@@ -331,7 +331,7 @@ func (s *openFGATestSuite) TestRemoveCloud(c *gc.C) {
 	alice := names.NewUserTag("alice@external")
 	adam := names.NewUserTag("adam@external")
 
-	tuples := []ofga.Tuple{{
+	tuples := []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(alice),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(cloud1),
@@ -344,7 +344,7 @@ func (s *openFGATestSuite) TestRemoveCloud(c *gc.C) {
 	err := s.ofgaClient.AddRelation(context.Background(), tuples...)
 	c.Assert(err, gc.Equals, nil)
 
-	checks := []ofga.Tuple{{
+	checks := []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(alice),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(cloud1),
@@ -380,7 +380,7 @@ func (s *openFGATestSuite) TestAddCloudController(c *gc.C) {
 	cloud := names.NewCloudTag("cloud-1")
 	controller := names.NewControllerTag(uuid.NewString())
 
-	check := ofga.Tuple{
+	check := openfga.Tuple{
 		Object:   ofganames.ConvertTag(controller),
 		Relation: ofganames.ControllerRelation,
 		Target:   ofganames.ConvertTag(cloud),
@@ -405,7 +405,7 @@ func (s *openFGATestSuite) TestAddController(c *gc.C) {
 	jimm := names.NewControllerTag(uuid.NewString())
 	controller := names.NewControllerTag(uuid.NewString())
 
-	check := ofga.Tuple{
+	check := openfga.Tuple{
 		Object:   ofganames.ConvertTag(jimm),
 		Relation: ofganames.ControllerRelation,
 		Target:   ofganames.ConvertTag(controller),
@@ -440,7 +440,7 @@ func (s *openFGATestSuite) TestListObjectsWithContextualTuples(c *gc.C) {
 		expected[i] = "model:" + v
 	}
 
-	ids, err := s.ofgaClient.ListObjects(ctx, "user:alice", "reader", "model", []ofga.Tuple{
+	ids, err := s.ofgaClient.ListObjects(ctx, "user:alice", "reader", "model", []openfga.Tuple{
 		{
 			Object:   ofganames.ConvertTag(names.NewUserTag("alice")),
 			Relation: ofganames.ReaderRelation,
@@ -495,7 +495,7 @@ func (s *openFGATestSuite) TestListObjectsWithPeristedTuples(c *gc.C) {
 	}
 
 	c.Assert(s.ofgaClient.AddRelation(ctx,
-		[]ofga.Tuple{
+		[]openfga.Tuple{
 			{
 				Object:   ofganames.ConvertTag(names.NewUserTag("alice")),
 				Relation: ofganames.ReaderRelation,
