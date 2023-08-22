@@ -22,7 +22,7 @@ apps:
 parts:
   jimmctl:
     plugin: go
-    source: cmd/jimmctl
+    source: ../../cmd/jimmctl/
     prime:
     - bin/jimmctl
     override-build: |
