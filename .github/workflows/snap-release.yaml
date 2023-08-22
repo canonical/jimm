@@ -2,19 +2,11 @@ name: Release jimmctl snap
 
 on:
   workflow_dispatch:
-    inputs:
-      channel:
-        description: 'Release Channel'
-        required: true
-        type: choice
-        options:
-          - '1'
-          - '2'
   push:
   pull_request:
     types:
       - opened
-  
+
 
 # Note this workflow requires a Github secret to provide auth against snapstore.
 # snapcraft export-login --snaps=PACKAGE_NAME --acls package_access,package_push,package_update,package_release exported.txt
@@ -53,5 +45,5 @@ jobs:
       with:
         store_login: ${{ secrets.STORE_LOGIN }}
         snap: ${{needs.build.outputs.snap}}
-        release: ${{ inputs.channel }}
+        release: 1
 
