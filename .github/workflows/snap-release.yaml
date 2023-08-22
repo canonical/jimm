@@ -30,7 +30,6 @@ jobs:
       with:
         fetch-depth: 0
     - name: scripts
-      working-directory: ./snaps/jimmctl
       run: |
         mkdir -p ./snap
         cp ./snaps/jimmctl/snapcraft.yaml ./snap/
