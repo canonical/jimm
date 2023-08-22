@@ -163,7 +163,6 @@ func (s *dbSuite) TestGetMissingControllerCredentialDoesNotError(c *qt.C) {
 	c.Assert(err, qt.Equals, nil)
 	ctx := context.Background()
 	controllerName := "beef1beef2-0000-0000-000011112222"
-	// Get ControllerCred
 	username, password, err := s.Database.GetControllerCredentials(ctx, controllerName)
 	c.Assert(err, qt.IsNil)
 	c.Assert(username, qt.Equals, "")
