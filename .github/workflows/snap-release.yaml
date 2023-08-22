@@ -37,7 +37,7 @@ jobs:
       id: snapcraft
     - uses: actions/upload-artifact@v2
       with:
-        name: manual-${{ steps.snapcraft.outputs.snap }}
+        name: ${{ steps.snapcraft.outputs.snap }} 
         path: ${{ steps.snapcraft.outputs.snap }}
    
   publish:
