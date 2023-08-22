@@ -10,6 +10,9 @@ on:
         options:
           - '1'
           - '2'
+  pull_request:
+    types:
+      - opened
   
 
 # Note this workflow requires a Github secret to provide auth against snapstore.
