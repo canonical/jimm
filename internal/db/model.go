@@ -174,6 +174,7 @@ func (d *Database) FetchModelsByUUID(ctx context.Context, modelUUIDs []string) (
 	}
 	var models []dbmodel.Model
 	db := d.DB.WithContext(ctx)
+	db = preloadModel("", db)
 	err := db.Where("uuid IN ?", modelUUIDs).Find(&models).Error
 	if err != nil {
 		err = dbError(err)

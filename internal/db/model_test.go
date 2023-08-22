@@ -798,6 +798,9 @@ func (s *dbSuite) TestFetchModelsByUUID(c *qt.C) {
 		return models[i].UUID.String < models[j].UUID.String
 	})
 	c.Check(models[0].UUID.String, qt.Equals, "00000002-0000-0000-0000-000000000001")
+	c.Check(models[0].Controller.Name, qt.Not(qt.Equals), "")
 	c.Check(models[1].UUID.String, qt.Equals, "00000002-0000-0000-0000-000000000002")
+	c.Check(models[1].Controller.Name, qt.Not(qt.Equals), "")
 	c.Check(models[2].UUID.String, qt.Equals, "00000002-0000-0000-0000-000000000003")
+	c.Check(models[2].Controller.Name, qt.Not(qt.Equals), "")
 }
