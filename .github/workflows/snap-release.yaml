@@ -10,6 +10,7 @@ on:
         options:
           - '1'
           - '2'
+  push:
   pull_request:
     types:
       - opened
