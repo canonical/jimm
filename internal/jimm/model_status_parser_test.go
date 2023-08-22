@@ -17,7 +17,7 @@ import (
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/jimm"
 	"github.com/canonical/jimm/internal/jimmtest"
-	ofga "github.com/canonical/jimm/internal/openfga"
+	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 	jimmnames "github.com/canonical/jimm/pkg/names"
 )
@@ -329,7 +329,7 @@ func TestQueryModelsJq(t *testing.T) {
 	ctx := context.Background()
 
 	// Test setup
-	_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
 	j := &jimm.JIMM{
@@ -450,8 +450,8 @@ func TestQueryModelsJq(t *testing.T) {
 		"50000000-0000-0000-0000-000000000000", // Erroneous model (storage errors).
 	}
 
-	c.Assert(j.OpenFGAClient.AddRelations(ctx,
-		[]ofga.Tuple{
+	c.Assert(j.OpenFGAClient.AddRelation(ctx,
+		[]openfga.Tuple{
 			// Reader to model via direct relation
 			{
 				Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),

@@ -28,7 +28,7 @@ func TestFindAuditEvents(t *testing.T) {
 
 	now := time.Now().UTC()
 
-	_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
 	j := &jimm.JIMM{
@@ -200,7 +200,7 @@ func TestListControllers(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now().UTC().Round(time.Millisecond)
 
-	_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
 	j := &jimm.JIMM{
@@ -285,7 +285,7 @@ func TestSetControllerDeprecated(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now().UTC().Round(time.Millisecond)
 
-	_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
 	j := &jimm.JIMM{
@@ -429,7 +429,7 @@ func TestRemoveController(t *testing.T) {
 
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
-			_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
 			c.Assert(err, qt.IsNil)
 
 			j := &jimm.JIMM{
@@ -594,7 +594,7 @@ func TestFullModelStatus(t *testing.T) {
 				Status_: test.statusFunc,
 			}
 
-			_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
 			c.Assert(err, qt.IsNil)
 
 			j := &jimm.JIMM{

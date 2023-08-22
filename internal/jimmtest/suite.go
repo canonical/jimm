@@ -6,6 +6,7 @@ import (
 	"context"
 
 	"github.com/canonical/candid/candidtest"
+	cofga "github.com/canonical/ofga"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/identchecker"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
@@ -14,7 +15,6 @@ import (
 	corejujutesting "github.com/juju/juju/juju/testing"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
-	openfga "github.com/openfga/go-sdk"
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/internal/auth"
@@ -22,7 +22,7 @@ import (
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/jimm"
 	"github.com/canonical/jimm/internal/jujuclient"
-	jimmopenfga "github.com/canonical/jimm/internal/openfga"
+	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 	"github.com/canonical/jimm/internal/pubsub"
 )
@@ -47,19 +47,16 @@ type JIMMSuite struct {
 	// Authenticator configured.
 	JIMM *jimm.JIMM
 
-	AdminUser  *dbmodel.User
-	OFGAApi    openfga.OpenFgaApi
-	OFGAClient *jimmopenfga.OFGAClient
-	OFGAConfig *openfga.Configuration
+	AdminUser   *dbmodel.User
+	OFGAClient  *openfga.OFGAClient
+	COFGAClient *cofga.Client
+	COFGAParams *cofga.OpenFGAParams
 }
 
 func (s *JIMMSuite) SetUpTest(c *gc.C) {
-	ofgaAPI, ofgaClient, ofgaConfig, err := SetupTestOFGAClient(c.TestName())
+	var err error
+	s.OFGAClient, s.COFGAClient, s.COFGAParams, err = SetupTestOFGAClient(c.TestName())
 	c.Assert(err, gc.IsNil)
-
-	s.OFGAApi = ofgaAPI
-	s.OFGAClient = ofgaClient
-	s.OFGAConfig = ofgaConfig
 
 	// Setup OpenFGA.
 	s.JIMM = &jimm.JIMM{
@@ -69,7 +66,7 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 		Dialer:        &jujuclient.Dialer{},
 		Pubsub:        new(pubsub.Hub),
 		UUID:          ControllerUUID,
-		OpenFGAClient: ofgaClient,
+		OpenFGAClient: s.OFGAClient,
 	}
 	ctx := context.Background()
 	err = s.JIMM.Database.Migrate(ctx, false)
@@ -82,7 +79,7 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 	err = s.JIMM.Database.GetUser(ctx, s.AdminUser)
 	c.Assert(err, gc.Equals, nil)
 
-	adminUser := jimmopenfga.NewUser(s.AdminUser, s.OFGAClient)
+	adminUser := openfga.NewUser(s.AdminUser, s.OFGAClient)
 	err = adminUser.SetControllerAccess(ctx, s.JIMM.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, gc.Equals, nil)
 
@@ -97,8 +94,8 @@ func (s *JIMMSuite) TearDownTest(c *gc.C) {
 	}
 }
 
-func (s *JIMMSuite) NewUser(u *dbmodel.User) *jimmopenfga.User {
-	return jimmopenfga.NewUser(u, s.OFGAClient)
+func (s *JIMMSuite) NewUser(u *dbmodel.User) *openfga.User {
+	return openfga.NewUser(u, s.OFGAClient)
 }
 
 func (s *JIMMSuite) AddController(c *gc.C, name string, info *api.Info) {
@@ -176,7 +173,7 @@ type CandidSuite struct {
 func (s *CandidSuite) SetUpTest(c *gc.C) {
 	s.Candid = candidtest.NewServer()
 	s.Candid.AddUser("agent-user", candidtest.GroupListGroup)
-	_, ofgaClient, _, err := SetupTestOFGAClient(c.TestName())
+	ofgaClient, _, _, err := SetupTestOFGAClient(c.TestName())
 	c.Assert(err, gc.IsNil)
 	s.Authenticator = auth.JujuAuthenticator{
 		Client: ofgaClient,

@@ -797,7 +797,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 				},
 			}
 
-			_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
 			c.Assert(err, qt.IsNil)
 
 			j := &jimm.JIMM{
@@ -843,7 +843,7 @@ func TestUpdateCloudCredentialForUnknownUser(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
-	_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
 	env := jimmtest.ParseEnvironment(c, `clouds:
@@ -1278,7 +1278,7 @@ func TestRevokeCloudCredential(t *testing.T) {
 				},
 			}
 
-			_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.about)
+			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.about)
 			c.Assert(err, qt.IsNil)
 
 			j := &jimm.JIMM{
@@ -1417,7 +1417,7 @@ func TestGetCloudCredential(t *testing.T) {
 	}}
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
-			_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.about)
+			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.about)
 			c.Assert(err, qt.IsNil)
 
 			j := &jimm.JIMM{
@@ -1524,7 +1524,7 @@ func TestForEachUserCloudCredential(t *testing.T) {
 		c.Run(test.name, func(c *qt.C) {
 			ctx := context.Background()
 
-			_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.name)
+			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.name)
 			c.Assert(err, qt.IsNil)
 
 			env := jimmtest.ParseEnvironment(c, test.env)
@@ -1644,7 +1644,7 @@ func TestGetCloudCredentialAttributes(t *testing.T) {
 		c.Run(test.name, func(c *qt.C) {
 			ctx := context.Background()
 
-			_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.name)
+			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.name)
 			c.Assert(err, qt.IsNil)
 
 			env := jimmtest.ParseEnvironment(c, getCloudCredentialAttributesEnv)
@@ -1685,7 +1685,7 @@ func TestCloudCredentialAttributeStore(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
-	_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
 	attrStore := testCloudCredentialAttributeStore{

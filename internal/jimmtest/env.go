@@ -253,7 +253,7 @@ func (cl *Cloud) DBObject(c *qt.C, db db.Database, client *openfga.OFGAClient) d
 			User:   dbUser,
 			Access: u.Access,
 		})
-		var relation ofganames.Relation
+		var relation openfga.Relation
 		switch u.Access {
 		case "admin":
 			relation = ofganames.AdministratorRelation
@@ -425,7 +425,7 @@ func (m *Model) DBObject(c *qt.C, db db.Database, client *openfga.OFGAClient) db
 		}
 		m.dbo.Users = append(m.dbo.Users, uma)
 
-		var relation ofganames.Relation
+		var relation openfga.Relation
 		switch u.Access {
 		case "admin":
 			relation = ofganames.AdministratorRelation

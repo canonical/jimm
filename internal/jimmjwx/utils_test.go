@@ -89,7 +89,7 @@ func setupService(ctx context.Context, c *qt.C) (*jimm.Service, *httptest.Server
 	err := store.CleanupJWKS(ctx)
 	c.Assert(err, qt.IsNil)
 
-	_, ofgaClient, cfg, err := jimmtest.SetupTestOFGAClient(c.Name())
+	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
 	svc, err := jimm.NewService(context.Background(), jimm.Params{
@@ -99,14 +99,14 @@ func setupService(ctx context.Context, c *qt.C) (*jimm.Service, *httptest.Server
 		VaultPath:       "/jimm-kv/",
 		VaultSecretFile: "../../local/vault/approle.json",
 		OpenFGAParams: jimm.OpenFGAParams{
-			Scheme:    cfg.ApiScheme,
-			Host:      cfg.ApiHost,
-			Store:     cfg.StoreId,
-			Token:     cfg.Credentials.Config.ApiToken,
-			AuthModel: ofgaClient.AuthModelId,
+			Scheme:    cofgaParams.Scheme,
+			Host:      cofgaParams.Host,
+			Port:      cofgaParams.Port,
+			Store:     cofgaParams.StoreID,
+			Token:     cofgaParams.Token,
+			AuthModel: cofgaParams.AuthModelID,
 		},
-	},
-	)
+	})
 	c.Assert(err, qt.IsNil)
 
 	srv := httptest.NewTLSServer(svc)

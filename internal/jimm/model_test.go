@@ -837,7 +837,7 @@ func TestAddModel(t *testing.T) {
 				CreateModel_:         test.createModel,
 			}
 
-			_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.name)
+			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.name)
 			c.Assert(err, qt.IsNil)
 
 			j := &jimm.JIMM{
@@ -1134,7 +1134,7 @@ func TestModelInfo(t *testing.T) {
 		c.Run(test.name, func(c *qt.C) {
 			ctx := context.Background()
 
-			_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.name)
+			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.name)
 			c.Assert(err, qt.IsNil)
 
 			j := &jimm.JIMM{
@@ -1328,7 +1328,7 @@ func TestModelStatus(t *testing.T) {
 				},
 			}
 
-			_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.name)
+			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.name)
 			c.Assert(err, qt.IsNil)
 
 			j := &jimm.JIMM{
@@ -1479,7 +1479,7 @@ func TestForEachUserModel(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
-	_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
 	j := &jimm.JIMM{
@@ -1620,7 +1620,7 @@ func TestForEachModel(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
-	_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
 	j := &jimm.JIMM{
@@ -2369,7 +2369,7 @@ func TestDestroyModel(t *testing.T) {
 				Err: test.dialError,
 			}
 
-			_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.name)
+			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.name)
 			c.Assert(err, qt.IsNil)
 
 			j := &jimm.JIMM{
@@ -2489,7 +2489,7 @@ func TestDumpModel(t *testing.T) {
 		c.Run(test.name, func(c *qt.C) {
 			ctx := context.Background()
 
-			_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.name)
+			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.name)
 			c.Assert(err, qt.IsNil)
 
 			dialer := &jimmtest.Dialer{
@@ -2603,7 +2603,7 @@ func TestDumpModelDB(t *testing.T) {
 		c.Run(test.name, func(c *qt.C) {
 			ctx := context.Background()
 
-			_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.name)
+			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.name)
 			c.Assert(err, qt.IsNil)
 
 			dialer := &jimmtest.Dialer{
@@ -2722,7 +2722,7 @@ func TestValidateModelUpgrade(t *testing.T) {
 		c.Run(test.name, func(c *qt.C) {
 			ctx := context.Background()
 
-			_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.name)
+			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.name)
 			c.Assert(err, qt.IsNil)
 
 			dialer := &jimmtest.Dialer{
@@ -2959,7 +2959,7 @@ func TestUpdateModelCredential(t *testing.T) {
 		c.Run(test.name, func(c *qt.C) {
 			ctx := context.Background()
 
-			_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.name)
+			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.name)
 			c.Assert(err, qt.IsNil)
 
 			dialer := &jimmtest.Dialer{
@@ -3039,7 +3039,7 @@ users:
 `[1:]),
 	}
 
-	_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
 	j := &jimm.JIMM{

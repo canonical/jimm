@@ -349,7 +349,7 @@ func (r *controllerRoot) AddRelation(ctx context.Context, req apiparams.AddRelat
 	if err != nil {
 		return errors.E(err)
 	}
-	err = r.jimm.OpenFGAClient.AddRelations(ctx, keys...)
+	err = r.jimm.OpenFGAClient.AddRelation(ctx, keys...)
 	if err != nil {
 		zapctx.Error(ctx, "failed to add tuple(s)", zap.NamedError("add-relation-error", err))
 		return errors.E(op, errors.CodeOpenFGARequestFailed, err)
@@ -403,7 +403,7 @@ func (r *controllerRoot) CheckRelation(ctx context.Context, req apiparams.CheckR
 		return checkResp, errors.E(op, errors.CodeFailedToParseTupleKey, err)
 	}
 
-	allowed, resolution, err := r.jimm.OpenFGAClient.CheckRelation(ctx, *parsedTuple, false)
+	allowed, err := r.jimm.OpenFGAClient.CheckRelation(ctx, *parsedTuple, false)
 	if err != nil {
 		zapctx.Error(ctx, "failed to check relation", zap.NamedError("check-relation-error", err))
 		return checkResp, errors.E(op, errors.CodeOpenFGARequestFailed, err)
@@ -411,7 +411,7 @@ func (r *controllerRoot) CheckRelation(ctx context.Context, req apiparams.CheckR
 	if allowed {
 		checkResp.Allowed = allowed
 	}
-	zapctx.Debug(ctx, "check request", zap.String("allowed", strconv.FormatBool(allowed)), zap.String("reason", resolution))
+	zapctx.Debug(ctx, "check request", zap.String("allowed", strconv.FormatBool(allowed)))
 	return checkResp, nil
 }
 
@@ -473,29 +473,29 @@ func (r *controllerRoot) parseTuple(ctx context.Context, tuple apiparams.Relatio
 }
 
 func (r *controllerRoot) toJAASTag(ctx context.Context, tag *ofganames.Tag) (string, error) {
-	switch tag.Kind() {
+	switch tag.Kind {
 	case names.UserTagKind:
-		return names.UserTagKind + "-" + tag.Id(), nil
+		return names.UserTagKind + "-" + tag.ID, nil
 	case names.ControllerTagKind:
-		if tag.Id() == r.jimm.ResourceTag().Id() {
+		if tag.ID == r.jimm.ResourceTag().Id() {
 			return "controller-jimm", nil
 		}
 		controller := dbmodel.Controller{
-			UUID: tag.Id(),
+			UUID: tag.ID,
 		}
 		err := r.jimm.Database.GetController(ctx, &controller)
 		if err != nil {
 			return "", errors.E(err, fmt.Sprintf("failed to fetch controller information: %s", controller.UUID))
 		}
 		controllerString := names.ControllerTagKind + "-" + controller.Name
-		if tag.Relation() != "" {
-			controllerString = controllerString + "#" + tag.Relation()
+		if tag.Relation.String() != "" {
+			controllerString = controllerString + "#" + tag.Relation.String()
 		}
 		return controllerString, nil
 	case names.ModelTagKind:
 		model := dbmodel.Model{
 			UUID: sql.NullString{
-				String: tag.Id(),
+				String: tag.ID,
 				Valid:  true,
 			},
 		}
@@ -504,27 +504,27 @@ func (r *controllerRoot) toJAASTag(ctx context.Context, tag *ofganames.Tag) (str
 			return "", errors.E(err, "failed to fetch model information")
 		}
 		modelString := names.ModelTagKind + "-" + model.Controller.Name + ":" + model.OwnerUsername + "/" + model.Name
-		if tag.Relation() != "" {
-			modelString = modelString + "#" + tag.Relation()
+		if tag.Relation.String() != "" {
+			modelString = modelString + "#" + tag.Relation.String()
 		}
 		return modelString, nil
 	case names.ApplicationOfferTagKind:
 		ao := dbmodel.ApplicationOffer{
-			UUID: tag.Id(),
+			UUID: tag.ID,
 		}
 		err := r.jimm.Database.GetApplicationOffer(ctx, &ao)
 		if err != nil {
 			return "", errors.E(err, "failed to fetch application offer information")
 		}
 		aoString := names.ApplicationOfferTagKind + "-" + ao.Model.Controller.Name + ":" + ao.Model.OwnerUsername + "/" + ao.Model.Name + "." + ao.Name
-		if tag.Relation() != "" {
-			aoString = aoString + "#" + tag.Relation()
+		if tag.Relation.String() != "" {
+			aoString = aoString + "#" + tag.Relation.String()
 		}
 		return aoString, nil
 	case jimmnames.GroupTagKind:
-		id, err := strconv.ParseUint(tag.Id(), 10, 32)
+		id, err := strconv.ParseUint(tag.ID, 10, 32)
 		if err != nil {
-			return "", errors.E(err, fmt.Sprintf("failed to parse group id: %v", tag.Id()))
+			return "", errors.E(err, fmt.Sprintf("failed to parse group id: %v", tag.ID))
 		}
 		group := dbmodel.GroupEntry{
 			Model: gorm.Model{
@@ -536,25 +536,25 @@ func (r *controllerRoot) toJAASTag(ctx context.Context, tag *ofganames.Tag) (str
 			return "", errors.E(err, "failed to fetch group information")
 		}
 		groupString := jimmnames.GroupTagKind + "-" + group.Name
-		if tag.Relation() != "" {
-			groupString = groupString + "#" + tag.Relation()
+		if tag.Relation.String() != "" {
+			groupString = groupString + "#" + tag.Relation.String()
 		}
 		return groupString, nil
 	case names.CloudTagKind:
 		cloud := dbmodel.Cloud{
-			Name: tag.Id(),
+			Name: tag.ID,
 		}
 		err := r.jimm.Database.GetCloud(ctx, &cloud)
 		if err != nil {
 			return "", errors.E(err, "failed to fetch group information")
 		}
 		cloudString := names.CloudTagKind + "-" + cloud.Name
-		if tag.Relation() != "" {
-			cloudString = cloudString + "#" + tag.Relation()
+		if tag.Relation.String() != "" {
+			cloudString = cloudString + "#" + tag.Relation.String()
 		}
 		return cloudString, nil
 	default:
-		return "", errors.E(fmt.Sprintf("unexpected tag kind: %v", tag.Kind()))
+		return "", errors.E(fmt.Sprintf("unexpected tag kind: %v", tag.Kind))
 	}
 }
 
@@ -572,7 +572,7 @@ func (r *controllerRoot) ListRelationshipTuples(ctx context.Context, req apipara
 		return returnValue, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
-	var key *openfga.Tuple
+	key := &openfga.Tuple{}
 	if req.Tuple.TargetObject != "" {
 		key, err = r.parseTuple(ctx, req.Tuple)
 		if err != nil {
@@ -582,12 +582,12 @@ func (r *controllerRoot) ListRelationshipTuples(ctx context.Context, req apipara
 			return returnValue, errors.E(op, err)
 		}
 	}
-	response, err := r.jimm.OpenFGAClient.ReadRelatedObjects(ctx, key, req.PageSize, req.ContinuationToken)
+	responseTuples, ct, err := r.jimm.OpenFGAClient.ReadRelatedObjects(ctx, *key, req.PageSize, req.ContinuationToken)
 	if err != nil {
 		return returnValue, errors.E(op, err)
 	}
-	tuples := make([]apiparams.RelationshipTuple, len(response.Tuples))
-	for i, t := range response.Tuples {
+	tuples := make([]apiparams.RelationshipTuple, len(responseTuples))
+	for i, t := range responseTuples {
 		object, err := r.toJAASTag(ctx, t.Object)
 		if err != nil {
 			return returnValue, errors.E(op, err)
@@ -604,6 +604,6 @@ func (r *controllerRoot) ListRelationshipTuples(ctx context.Context, req apipara
 	}
 	return apiparams.ListRelationshipTuplesResponse{
 		Tuples:            tuples,
-		ContinuationToken: response.PaginationToken,
+		ContinuationToken: ct,
 	}, nil
 }

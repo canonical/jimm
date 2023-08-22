@@ -366,7 +366,7 @@ func TestRevokeOfferAccess(t *testing.T) {
 			err := db.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 
-			_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.about)
+			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.about)
 			c.Assert(err, qt.IsNil)
 
 			jimmUUID := uuid.NewString()
@@ -535,7 +535,7 @@ func TestGrantOfferAccess(t *testing.T) {
 			err := db.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 
-			_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.about)
+			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.about)
 			c.Assert(err, qt.IsNil)
 
 			jimmUUID := uuid.NewString()
@@ -573,7 +573,7 @@ func TestGrantOfferAccess(t *testing.T) {
 func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 	c := qt.New(t)
 
-	_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
 	ctx := context.Background()
@@ -878,7 +878,7 @@ func TestGetApplicationOffer(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now().UTC().Round(time.Millisecond)
 
-	_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
 	j := &jimm.JIMM{
@@ -1910,7 +1910,7 @@ func TestOffer(t *testing.T) {
 				Offer_:                       test.offer,
 			}
 
-			_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.about)
+			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.about)
 			c.Assert(err, qt.IsNil)
 
 			j := &jimm.JIMM{
@@ -2126,7 +2126,7 @@ func TestOfferAssertOpenFGARelationsExist(t *testing.T) {
 		},
 	}
 
-	_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
 	j := &jimm.JIMM{
@@ -2157,7 +2157,7 @@ func TestOfferAssertOpenFGARelationsExist(t *testing.T) {
 	c.Assert(offer, qt.CmpEquals(cmpopts.EquateEmpty(), cmpopts.IgnoreTypes(time.Time{}, gorm.Model{}), cmpopts.IgnoreTypes(dbmodel.Model{})), expectedOffer)
 
 	// check the controller relation was created
-	exists, _, err := client.CheckRelation(
+	exists, err := client.CheckRelation(
 		context.Background(),
 		openfga.Tuple{
 			Object:   ofganames.ConvertTag(offerArgs.ModelTag),
@@ -2170,7 +2170,7 @@ func TestOfferAssertOpenFGARelationsExist(t *testing.T) {
 	c.Assert(exists, qt.IsTrue)
 
 	// check the user has administrator rights on the offer
-	exists, _, err = client.CheckRelation(
+	exists, err = client.CheckRelation(
 		context.Background(),
 		openfga.Tuple{
 			Object:   ofganames.ConvertTag(u.ResourceTag()),
@@ -2321,7 +2321,7 @@ func TestDestroyOffer(t *testing.T) {
 			err := db.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 
-			_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.about)
+			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.about)
 			c.Assert(err, qt.IsNil)
 
 			jimmUUID := uuid.NewString()
@@ -2476,7 +2476,7 @@ func TestUpdateOffer(t *testing.T) {
 			err := db.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 
-			_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.about)
+			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.about)
 			c.Assert(err, qt.IsNil)
 
 			jimmUUID := uuid.NewString()
@@ -2645,7 +2645,7 @@ func TestFindApplicationOffers(t *testing.T) {
 			err := db.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 
-			_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.about)
+			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.about)
 			c.Assert(err, qt.IsNil)
 
 			jimmUUID := uuid.NewString()
@@ -2793,7 +2793,7 @@ func TestListApplicationOffers(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now().UTC().Round(time.Millisecond)
 
-	_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
 	db := db.Database{
@@ -2995,7 +2995,7 @@ func TestListApplicationOffers(t *testing.T) {
 		Relation: ofganames.ConsumerRelation,
 		Target:   ofganames.ConvertTag(names.NewApplicationOfferTag("00000012-0000-0000-0000-000000000003")),
 	}}
-	err = client.AddRelations(context.Background(), tuples...)
+	err = client.AddRelation(context.Background(), tuples...)
 	c.Assert(err, qt.IsNil)
 
 	u := env.User("alice@external").DBObject(c, db, client)

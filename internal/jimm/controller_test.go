@@ -121,7 +121,7 @@ func TestAddController(t *testing.T) {
 		},
 	}
 
-	_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
 	j := &jimm.JIMM{
@@ -287,7 +287,7 @@ func TestAddControllerWithVault(t *testing.T) {
 		},
 	}
 
-	_, ofgaClient, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+	ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
 	j := &jimm.JIMM{
@@ -396,7 +396,7 @@ func TestEarliestControllerVersion(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now().UTC().Round(time.Millisecond)
 
-	_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
 	j := &jimm.JIMM{
@@ -907,7 +907,7 @@ func TestImportModel(t *testing.T) {
 				},
 			}
 
-			_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.about)
+			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.about)
 			c.Assert(err, qt.IsNil)
 
 			j := &jimm.JIMM{
@@ -1010,7 +1010,7 @@ func TestSetControllerConfig(t *testing.T) {
 
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
-			_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.about)
+			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.about)
 			c.Assert(err, qt.IsNil)
 
 			j := &jimm.JIMM{
@@ -1086,7 +1086,7 @@ func TestGetControllerConfig(t *testing.T) {
 
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
-			_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.about)
+			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.about)
 			c.Assert(err, qt.IsNil)
 
 			j := &jimm.JIMM{
@@ -1232,7 +1232,7 @@ func TestUpdateMigratedModel(t *testing.T) {
 
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
-			_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.about)
+			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.about)
 			c.Assert(err, qt.IsNil)
 
 			j := &jimm.JIMM{
@@ -1291,7 +1291,7 @@ users:
 func TestGetControllerAccess(t *testing.T) {
 	c := qt.New(t)
 
-	_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
 	j := &jimm.JIMM{
