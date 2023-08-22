@@ -115,13 +115,14 @@ class TestCharm(unittest.TestCase):
                 "dns-name": "jimm.example.com",
                 "log-level": "debug",
                 "uuid": "caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa",
+                "macaroon-expiry-duration": "48h",
             }
         )
         self.assertTrue(os.path.exists(config_file))
         with open(config_file) as f:
             lines = f.readlines()
         os.unlink(config_file)
-        self.assertEqual(len(lines), 11)
+        self.assertEqual(len(lines), 12)
         self.assertEqual(lines[0].strip(), "BAKERY_AGENT_FILE=")
         self.assertEqual(lines[1].strip(), "CANDID_URL=https://candid.example.com")
         self.assertEqual(lines[2].strip(), "JIMM_ADMINS=user1 user2 group1")
@@ -132,6 +133,7 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(lines[7].strip(), "JIMM_DNS_NAME=" + "jimm.example.com")
         self.assertEqual(lines[9].strip(), "JIMM_LOG_LEVEL=debug")
         self.assertEqual(lines[10].strip(), "JIMM_UUID=caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa")
+        self.assertEqual(lines[11].strip(), "JIMM_MACAROON_EXPIRY_DURATION=48h")
 
     def test_config_changed_redirect_to_dashboard(self):
         config_file = os.path.join(self.harness.charm.charm_dir, "juju-jimm.env")
@@ -143,13 +145,14 @@ class TestCharm(unittest.TestCase):
                 "log-level": "debug",
                 "uuid": "caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa",
                 "juju-dashboard-location": "https://test.jaas.ai/models",
+                "macaroon-expiry-duration": "48h",
             }
         )
         self.assertTrue(os.path.exists(config_file))
         with open(config_file) as f:
             lines = f.readlines()
         os.unlink(config_file)
-        self.assertEqual(len(lines), 11)
+        self.assertEqual(len(lines), 12)
         self.assertEqual(lines[0].strip(), "BAKERY_AGENT_FILE=")
         self.assertEqual(lines[1].strip(), "CANDID_URL=https://candid.example.com")
         self.assertEqual(lines[2].strip(), "JIMM_ADMINS=user1 user2 group1")
@@ -160,6 +163,7 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(lines[7].strip(), "JIMM_DNS_NAME=" + "jimm.example.com")
         self.assertEqual(lines[9].strip(), "JIMM_LOG_LEVEL=debug")
         self.assertEqual(lines[10].strip(), "JIMM_UUID=caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa")
+        self.assertEqual(lines[11].strip(), "JIMM_MACAROON_EXPIRY_DURATION=48h")
 
     def test_config_changed_ready(self):
         config_file = os.path.join(self.harness.charm.charm_dir, "juju-jimm.env")
@@ -170,13 +174,14 @@ class TestCharm(unittest.TestCase):
                 "candid-url": "https://candid.example.com",
                 "controller-admins": "user1 user2 group1",
                 "uuid": "caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa",
+                "macaroon-expiry-duration": "48h",
             }
         )
         self.assertTrue(os.path.exists(config_file))
         with open(config_file) as f:
             lines = f.readlines()
         os.unlink(config_file)
-        self.assertEqual(len(lines), 9)
+        self.assertEqual(len(lines), 10)
         self.assertEqual(lines[0].strip(), "BAKERY_AGENT_FILE=")
         self.assertEqual(lines[1].strip(), "CANDID_URL=https://candid.example.com")
         self.assertEqual(lines[2].strip(), "JIMM_ADMINS=user1 user2 group1")
@@ -186,6 +191,7 @@ class TestCharm(unittest.TestCase):
         )
         self.assertEqual(lines[7].strip(), "JIMM_LOG_LEVEL=info")
         self.assertEqual(lines[8].strip(), "JIMM_UUID=caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa")
+        self.assertEqual(lines[9].strip(), "JIMM_MACAROON_EXPIRY_DURATION=48h")
 
     def test_config_changed_with_agent(self):
         config_file = os.path.join(self.harness.charm.charm_dir, "juju-jimm.env")
@@ -210,7 +216,7 @@ class TestCharm(unittest.TestCase):
 
         with open(config_file) as f:
             lines = f.readlines()
-        self.assertEqual(len(lines), 9)
+        self.assertEqual(len(lines), 10)
         self.assertEqual(
             lines[0].strip(),
             "BAKERY_AGENT_FILE=" + self.harness.charm._agent_filename,
@@ -220,6 +226,7 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(lines[4].strip(), "JIMM_DASHBOARD_LOCATION=https://jaas.ai/models")
         self.assertEqual(lines[7].strip(), "JIMM_LOG_LEVEL=info")
         self.assertEqual(lines[8].strip(), "JIMM_UUID=caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa")
+        self.assertEqual(lines[9].strip(), "JIMM_MACAROON_EXPIRY_DURATION=24h")
 
         self.harness.charm._agent_filename = os.path.join(self.tempdir.name, "no-such-dir", "agent.json")
         self.harness.update_config(
@@ -234,13 +241,14 @@ class TestCharm(unittest.TestCase):
         )
         with open(config_file) as f:
             lines = f.readlines()
-        self.assertEqual(len(lines), 9)
+        self.assertEqual(len(lines), 10)
         self.assertEqual(lines[0].strip(), "BAKERY_AGENT_FILE=")
         self.assertEqual(lines[1].strip(), "CANDID_URL=https://candid.example.com")
         self.assertEqual(lines[2].strip(), "JIMM_ADMINS=user1 user2 group1")
         self.assertEqual(lines[4].strip(), "JIMM_DASHBOARD_LOCATION=https://jaas.ai/models")
         self.assertEqual(lines[7].strip(), "JIMM_LOG_LEVEL=info")
         self.assertEqual(lines[8].strip(), "JIMM_UUID=caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa")
+        self.assertEqual(lines[9].strip(), "JIMM_MACAROON_EXPIRY_DURATION=24h")
 
     def test_leader_elected(self):
         leader_file = os.path.join(self.harness.charm.charm_dir, "juju-jimm-leader.env")

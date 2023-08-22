@@ -129,6 +129,9 @@ type Params struct {
 	// PublicDNSName is the name to advertise as the public address of
 	// the juju controller.
 	PublicDNSName string
+
+	// MacaroonExpiryDuration holds the expiry duration of authentication macaroons.
+	MacaroonExpiryDuration time.Duration
 }
 
 // A Service is the implementation of a JIMM server.
@@ -319,11 +322,19 @@ func newAuthenticator(ctx context.Context, db *db.Database, p Params) (jimm.Auth
 	if err != nil {
 		return nil, err
 	}
+
+	if p.MacaroonExpiryDuration == 0 {
+		p.MacaroonExpiryDuration = 24 * time.Hour
+	}
+
 	return auth.JujuAuthenticator{
 		Bakery: identchecker.NewBakery(identchecker.BakeryParams{
-			RootKeyStore: dbrootkeystore.NewRootKeys(100, nil).NewStore(db, dbrootkeystore.Policy{
-				ExpiryDuration: 24 * time.Hour,
-			}),
+			RootKeyStore: dbrootkeystore.NewRootKeys(100, nil).NewStore(
+				db,
+				dbrootkeystore.Policy{
+					ExpiryDuration: p.MacaroonExpiryDuration,
+				},
+			),
 			Locator:        httpbakery.NewThirdPartyLocator(nil, tps),
 			Key:            key,
 			IdentityClient: candidClient,
