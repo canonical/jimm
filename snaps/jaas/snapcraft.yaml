@@ -23,6 +23,7 @@ parts:
   jimmctl:
     plugin: go
     source: ../../cmd/jimmctl/
+    source-type: local
     prime:
     - bin/jimmctl
     override-build: |
