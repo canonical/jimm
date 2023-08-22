@@ -22,8 +22,7 @@ apps:
 parts:
   jimmctl:
     plugin: go
-    source: github.com/canonical/jimm/cmd/jimmctl
-    source-type: git
+    source: cmd/jimmctl
     prime:
     - bin/jimmctl
     override-build: |
