@@ -497,14 +497,15 @@ func (r *controllerRoot) RemoveCloudFromController(ctx context.Context, req apip
 func (r *controllerRoot) CrossModelQuery(ctx context.Context, req apiparams.CrossModelQueryRequest) (apiparams.CrossModelQueryResponse, error) {
 	const op = errors.Op("jujuapi.CrossModelQuery")
 
-	usersModels, err := r.jimm.Database.GetUserModels(ctx, r.user.User)
+	modelUUIDs, err := r.user.ListModels(ctx)
+	if err != nil {
+		return apiparams.CrossModelQueryResponse{}, errors.E(op, errors.Code("failed to list user's model access"))
+	}
+	models, err := r.jimm.Database.FetchModelsByUUID(ctx, modelUUIDs)
 	if err != nil {
 		return apiparams.CrossModelQueryResponse{}, errors.E(op, errors.Code("failed to get models for user"))
 	}
-	models := make([]dbmodel.Model, len(usersModels))
-	for i, m := range usersModels {
-		models[i] = m.Model_
-	}
+
 	switch strings.TrimSpace(strings.ToLower(req.Type)) {
 	case "jq":
 		return r.jimm.QueryModelsJq(ctx, models, req.Query)

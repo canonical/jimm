@@ -5,6 +5,7 @@ package db_test
 import (
 	"context"
 	"database/sql"
+	"sort"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
@@ -717,4 +718,86 @@ func (s *dbSuite) TestForEachModel(c *qt.C) {
 		"00000002-0000-0000-0000-000000000002",
 		"00000002-0000-0000-0000-000000000003",
 	})
+}
+
+const testFetchModelsByUUIDEnv = `clouds:
+- name: test
+  type: test
+  regions:
+  - name: test-region
+cloud-credentials:
+- name: test-cred
+  cloud: test
+  owner: alice@external
+  type: empty
+controllers:
+- name: test
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test
+  region: test-region
+models:
+- name: test-1
+  uuid: 00000002-0000-0000-0000-000000000001
+  owner: alice@external
+  cloud: test
+  region: test-region
+  cloud-credential: test-cred
+  controller: test
+  users:
+  - user: alice@external
+    access: admin
+  - user: bob@external
+    access: write
+- name: test-2
+  uuid: 00000002-0000-0000-0000-000000000002
+  owner: bob@external
+  cloud: test
+  region: test-region
+  cloud-credential: test-cred
+  controller: test
+  users:
+  - user: bob@external
+    access: admin
+- name: test-3
+  uuid: 00000002-0000-0000-0000-000000000003
+  owner: bob@external
+  cloud: test
+  region: test-region
+  cloud-credential: test-cred
+  controller: test
+  users:
+  - user: bob@external
+    access: admin
+`
+
+func TestFetchModelsByUUIDlUnconfiguredDatabase(t *testing.T) {
+	c := qt.New(t)
+
+	var d db.Database
+	_, err := d.FetchModelsByUUID(context.Background(), nil)
+	c.Check(err, qt.ErrorMatches, `database not configured`)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeServerConfiguration)
+}
+
+func (s *dbSuite) TestFetchModelsByUUID(c *qt.C) {
+	ctx := context.Background()
+	err := s.Database.Migrate(context.Background(), true)
+	c.Assert(err, qt.Equals, nil)
+
+	env := jimmtest.ParseEnvironment(c, testFetchModelsByUUIDEnv)
+	env.PopulateDB(c, *s.Database, nil)
+
+	modelUUIDs := []string{
+		"00000002-0000-0000-0000-000000000001",
+		"00000002-0000-0000-0000-000000000002",
+		"00000002-0000-0000-0000-000000000003",
+	}
+	models, err := s.Database.FetchModelsByUUID(ctx, modelUUIDs)
+	c.Assert(err, qt.IsNil)
+	sort.Slice(models, func(i, j int) bool {
+		return models[i].UUID.String < models[j].UUID.String
+	})
+	c.Check(models[0].UUID.String, qt.Equals, "00000002-0000-0000-0000-000000000001")
+	c.Check(models[1].UUID.String, qt.Equals, "00000002-0000-0000-0000-000000000002")
+	c.Check(models[2].UUID.String, qt.Equals, "00000002-0000-0000-0000-000000000003")
 }
