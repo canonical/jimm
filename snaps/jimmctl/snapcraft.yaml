@@ -35,6 +35,7 @@ parts:
   files:
     plugin: dump
     source: snaps/jimmctl/files
+    source-type: local
     organize:
       jimmctl.wrapper: bin/wrappers/jimmctl
     prime:
