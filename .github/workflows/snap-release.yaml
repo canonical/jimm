@@ -1,4 +1,4 @@
-name: Release to v1/edge
+name: Release jimmctl snap
 
 on:
   workflow_dispatch:
