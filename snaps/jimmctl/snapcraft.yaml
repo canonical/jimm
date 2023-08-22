@@ -1,6 +1,6 @@
-name: jaas
+name: jimmctl
 version: git
-summary: JAAS client
+summary: jimmctl client
 description: Client for controlling JAAS multi-cloud juju controllers.
 grade: stable
 base: core20
