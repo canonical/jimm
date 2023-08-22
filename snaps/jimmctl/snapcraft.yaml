@@ -1,0 +1,41 @@
+name: jaas
+version: git
+summary: JAAS client
+description: Client for controlling JAAS multi-cloud juju controllers.
+grade: stable
+base: core20
+confinement: strict
+
+plugs:
+  dot-local-share-juju:
+    interface: personal-files
+    read:
+    - $HOME/.local/share/juju
+
+apps:
+  jimmctl:
+    command: bin/wrappers/jimmctl
+    plugs:
+     - dot-local-share-juju
+     - network
+
+
+parts:
+  jimmctl:
+    plugin: go
+    source: ./
+    source-type: git
+    prime:
+    - bin/jimmctl
+    override-build: |
+      set -e
+      go install -mod readonly -ldflags '-linkmode=external' github.com/canonical/jimm/cmd/jimmctl
+      
+
+  files:
+    plugin: dump
+    source: snaps/jimmctl/files
+    organize:
+      jimmctl.wrapper: bin/wrappers/jimmctl
+    prime:
+    - bin/wrappers/jimmctl
