@@ -35,8 +35,6 @@ jobs:
         cp ./snaps/jimmctl/snapcraft.yaml ./snap/
     - uses: snapcore/action-build@v1
       id: snapcraft
-      with:
-        path: snaps/jimmctl/
     - uses: actions/upload-artifact@v2
       with:
         name: manual-${{ steps.snapcraft.outputs.snap }}
