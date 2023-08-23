@@ -3,8 +3,6 @@ name: Release jimmctl snap
 on:
   workflow_dispatch:
   push:
-    branches:
-        - main
     tags:
         - 'v1*'
 
@@ -46,5 +44,5 @@ jobs:
       with:
         store_login: ${{ secrets.STORE_LOGIN }}
         snap: ${{needs.build.outputs.snap}}
-        release: 1
+        release: '1/edge'
 
