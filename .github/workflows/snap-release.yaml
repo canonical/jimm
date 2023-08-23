@@ -3,8 +3,6 @@ name: Release jimmctl snap
 on:
   workflow_dispatch:
   push:
-    branches:
-      - feature-rebac
     tags:
       - 'v2*'
 
@@ -45,5 +43,5 @@ jobs:
       with:
         store_login: ${{ secrets.STORE_LOGIN }}
         snap: ${{needs.build.outputs.snap}}
-        release: 2
+        release: '2/edge'
 
