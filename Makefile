@@ -8,6 +8,7 @@ PROJECT := github.com/canonical/jimm
 
 GIT_COMMIT := $(shell git rev-parse --verify HEAD)
 GIT_VERSION := $(shell git describe --abbrev=0 --dirty)
+GO_VERSION := $(shell cat go.mod | sed -n "/^go/p" | cut -d ' ' -f 2)
 
 ifeq ($(shell uname -p | sed -r 's/.*(x86|armel|armhf).*/golang/'), golang)
 	GO_C := golang
@@ -84,6 +85,7 @@ jimm-image:
 	docker build --target deploy-env \
 	--build-arg="GIT_COMMIT=$(GIT_COMMIT)" \
 	--build-arg="VERSION=$(GIT_VERSION)" \
+	--build-arg="GO_VERSION=$(GO_VERSION)" \
 	--tag jimm:latest .
 
 jimm-snap:
