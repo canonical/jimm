@@ -505,7 +505,7 @@ func (r *controllerRoot) CrossModelQuery(ctx context.Context, req apiparams.Cros
 	for i, uuid := range modelUUIDs {
 		modelUUIDs[i] = strings.Split(uuid, ":")[1]
 	}
-	models, err := r.jimm.Database.FetchModelsByUUID(ctx, modelUUIDs)
+	models, err := r.jimm.Database.GetModelsByUUID(ctx, modelUUIDs)
 	if err != nil {
 		return apiparams.CrossModelQueryResponse{}, errors.E(op, errors.Code("failed to get models for user"))
 	}

@@ -166,8 +166,10 @@ func (d *Database) ForEachModel(ctx context.Context, f func(m *dbmodel.Model) er
 	return nil
 }
 
-func (d *Database) FetchModelsByUUID(ctx context.Context, modelUUIDs []string) ([]dbmodel.Model, error) {
-	const op = errors.Op("db.ForEachModel")
+// GetModelsByUUID retrieves a list of models where the model UUIDs are in
+// the provided modelUUIDs slice.
+func (d *Database) GetModelsByUUID(ctx context.Context, modelUUIDs []string) ([]dbmodel.Model, error) {
+	const op = errors.Op("db.GetModelsByUUID")
 
 	if err := d.ready(); err != nil {
 		return nil, errors.E(op, err)

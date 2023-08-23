@@ -720,7 +720,7 @@ func (s *dbSuite) TestForEachModel(c *qt.C) {
 	})
 }
 
-const testFetchModelsByUUIDEnv = `clouds:
+const testGetModelsByUUIDEnv = `clouds:
 - name: test
   type: test
   regions:
@@ -770,21 +770,21 @@ models:
     access: admin
 `
 
-func TestFetchModelsByUUIDlUnconfiguredDatabase(t *testing.T) {
+func TestGetModelsByUUIDlUnconfiguredDatabase(t *testing.T) {
 	c := qt.New(t)
 
 	var d db.Database
-	_, err := d.FetchModelsByUUID(context.Background(), nil)
+	_, err := d.GetModelsByUUID(context.Background(), nil)
 	c.Check(err, qt.ErrorMatches, `database not configured`)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeServerConfiguration)
 }
 
-func (s *dbSuite) TestFetchModelsByUUID(c *qt.C) {
+func (s *dbSuite) TestGetModelsByUUID(c *qt.C) {
 	ctx := context.Background()
 	err := s.Database.Migrate(context.Background(), true)
 	c.Assert(err, qt.Equals, nil)
 
-	env := jimmtest.ParseEnvironment(c, testFetchModelsByUUIDEnv)
+	env := jimmtest.ParseEnvironment(c, testGetModelsByUUIDEnv)
 	env.PopulateDB(c, *s.Database, nil)
 
 	modelUUIDs := []string{
@@ -792,7 +792,7 @@ func (s *dbSuite) TestFetchModelsByUUID(c *qt.C) {
 		"00000002-0000-0000-0000-000000000002",
 		"00000002-0000-0000-0000-000000000003",
 	}
-	models, err := s.Database.FetchModelsByUUID(ctx, modelUUIDs)
+	models, err := s.Database.GetModelsByUUID(ctx, modelUUIDs)
 	c.Assert(err, qt.IsNil)
 	sort.Slice(models, func(i, j int) bool {
 		return models[i].UUID.String < models[j].UUID.String
