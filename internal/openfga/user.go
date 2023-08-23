@@ -217,7 +217,15 @@ func (u *User) UnsetApplicationOfferAccess(ctx context.Context, resource names.A
 
 // ListModels returns a slice of model UUIDs this user has at least reader access to.
 func (u *User) ListModels(ctx context.Context) ([]string, error) {
-	return u.client.ListObjects(ctx, ofganames.ConvertTag(u.ResourceTag()).String(), ofganames.ReaderRelation.String(), "model", nil)
+	entities, err := u.client.ListObjects(ctx, ofganames.ConvertTag(u.ResourceTag()).String(), ofganames.ReaderRelation.String(), "model", nil)
+	if err != nil {
+		return nil, err
+	}
+	modelUUIDs := make([]string, len(entities))
+	for i, model := range entities {
+		modelUUIDs[i] = model.ID
+	}
+	return modelUUIDs, err
 }
 
 type administratorT interface {
