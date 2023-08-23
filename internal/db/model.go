@@ -166,6 +166,28 @@ func (d *Database) ForEachModel(ctx context.Context, f func(m *dbmodel.Model) er
 	return nil
 }
 
+// GetModelsByUUID retrieves a list of models where the model UUIDs are in
+// the provided modelUUIDs slice.
+func (d *Database) GetModelsByUUID(ctx context.Context, modelUUIDs []string) ([]dbmodel.Model, error) {
+	const op = errors.Op("db.GetModelsByUUID")
+
+	if err := d.ready(); err != nil {
+		return nil, errors.E(op, err)
+	}
+	var models []dbmodel.Model
+	db := d.DB.WithContext(ctx)
+	db = preloadModel("", db)
+	err := db.Where("uuid IN ?", modelUUIDs).Find(&models).Error
+	if err != nil {
+		err = dbError(err)
+		if errors.ErrorCode(err) == errors.CodeNotFound {
+			return nil, errors.E(op, err, "model not found")
+		}
+		return nil, errors.E(op, dbError(err))
+	}
+	return models, nil
+}
+
 func preloadModel(prefix string, db *gorm.DB) *gorm.DB {
 	if len(prefix) > 0 && prefix[len(prefix)-1] != '.' {
 		prefix += "."
