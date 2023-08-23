@@ -222,6 +222,7 @@ class JimmOperatorCharm(CharmBase):
             "JIMM_UUID": self.config.get("uuid", ""),
             "JIMM_DASHBOARD_LOCATION": self.config.get("juju-dashboard-location", "https://jaas.ai/models"),
             "JIMM_LISTEN_ADDR": ":8080",
+            "JIMM_MACAROON_EXPIRY_DURATION": self.config.get("macaroon-expiry-duration", "24h"),
         }
         if self._state.dsn:
             config_values["JIMM_DSN"] = self._state.dsn
