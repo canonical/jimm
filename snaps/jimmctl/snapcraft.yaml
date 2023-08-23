@@ -1,4 +1,4 @@
-name: jaas
+name: jimmctl
 version: git
 summary: JAAS client
 description: Client for controlling JAAS multi-cloud juju controllers.
@@ -22,17 +22,18 @@ apps:
 parts:
   jimmctl:
     plugin: go
-    source: ../..
+    source: ./
     source-type: git
     prime:
     - bin/jimmctl
     override-build: |
       set -e
-      go install -mod readonly -p 16 -ldflags '-linkmode=external' github.com/canonical/jimm/cmd/jimmctl
+      go install -mod readonly -ldflags '-linkmode=external' github.com/canonical/jimm/cmd/jimmctl
 
   files:
     plugin: dump
-    source: files
+    source: snaps/jimmctl/files
+    source-type: local
     organize:
       jimmctl.wrapper: bin/wrappers/jimmctl
     prime:
