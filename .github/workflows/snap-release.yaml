@@ -5,11 +5,8 @@ on:
   push:
     branches:
         - main
-  pull_request:
-    branches:
-      - main
-    types:
-      - opened
+    tags:
+        - 'v1*'
 
 
 # Note this workflow requires a Github secret to provide auth against snapstore.
