@@ -80,7 +80,7 @@ func (o *OFGAClient) getRelatedObjects(ctx context.Context, tuple Tuple, pageSiz
 // must NOT include the ID, i.e.,
 //
 //   - "group:" vs "group:mygroup", where "mygroup" is the ID and the correct objType would be "group".
-func (o *OFGAClient) listObjects(ctx context.Context, user string, relation string, objType string, contextualTuples []Tuple) (objectIds []cofga.Entity, err error) {
+func (o *OFGAClient) listObjects(ctx context.Context, user string, relation string, objType string, contextualTuples []Tuple) (objectIds []Tag, err error) {
 	userEntity, err := cofga.ParseEntity(user)
 	if err != nil {
 		return nil, err
@@ -88,7 +88,7 @@ func (o *OFGAClient) listObjects(ctx context.Context, user string, relation stri
 	entities, err := o.cofgaClient.FindAccessibleObjectsByRelation(ctx, Tuple{
 		Object:   &userEntity,
 		Relation: cofga.Relation(relation),
-		Target:   &cofga.Entity{Kind: cofga.Kind(objType)},
+		Target:   &Tag{Kind: cofga.Kind(objType)},
 	}, contextualTuples...)
 	if err != nil {
 		return nil, err
@@ -107,7 +107,7 @@ func (o *OFGAClient) RemoveRelation(ctx context.Context, tuples ...Tuple) error 
 }
 
 // ListObjects returns all object IDs of <objType> that a user has the relation <relation> to.
-func (o *OFGAClient) ListObjects(ctx context.Context, user string, relation string, objType string, contextualTuples []Tuple) ([]cofga.Entity, error) {
+func (o *OFGAClient) ListObjects(ctx context.Context, user string, relation string, objType string, contextualTuples []Tuple) ([]Tag, error) {
 	return o.listObjects(ctx, user, relation, objType, contextualTuples)
 }
 

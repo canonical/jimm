@@ -435,9 +435,9 @@ func (s *openFGATestSuite) TestListObjectsWithContextualTuples(c *gc.C) {
 		"30000000-0000-0000-0000-000000000000",
 	}
 
-	expected := make([]cofga.Entity, len(modelUUIDs))
+	expected := make([]openfga.Tag, len(modelUUIDs))
 	for i, v := range modelUUIDs {
-		expected[i] = cofga.Entity{
+		expected[i] = openfga.Tag{
 			Kind: "model",
 			ID:   v,
 		}
@@ -477,7 +477,7 @@ func (s *openFGATestSuite) TestListObjectsWithContextualTuples(c *gc.C) {
 	c.Assert(cmp.Equal(
 		ids,
 		expected,
-		cmpopts.SortSlices(func(want cofga.Entity, expected cofga.Entity) bool {
+		cmpopts.SortSlices(func(want openfga.Tag, expected openfga.Tag) bool {
 			return want.ID < expected.ID
 		}),
 	), gc.Equals, true)
@@ -492,9 +492,9 @@ func (s *openFGATestSuite) TestListObjectsWithPeristedTuples(c *gc.C) {
 		"30000000-0000-0000-0000-000000000000",
 	}
 
-	expected := make([]cofga.Entity, len(modelUUIDs))
+	expected := make([]openfga.Tag, len(modelUUIDs))
 	for i, v := range modelUUIDs {
-		expected[i] = cofga.Entity{
+		expected[i] = openfga.Tag{
 			Kind: "model",
 			ID:   v,
 		}
@@ -537,7 +537,7 @@ func (s *openFGATestSuite) TestListObjectsWithPeristedTuples(c *gc.C) {
 	c.Assert(cmp.Equal(
 		ids,
 		expected,
-		cmpopts.SortSlices(func(want cofga.Entity, expected cofga.Entity) bool {
+		cmpopts.SortSlices(func(want openfga.Tag, expected openfga.Tag) bool {
 			return want.ID < expected.ID
 		}),
 	), gc.Equals, true)
