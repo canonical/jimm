@@ -1,4 +1,4 @@
-name: jimmctl
+name: jimm
 summary: Juju Intelligent Model Manager
 description: Multi-cloud controller for managing JAAS models.
 grade: stable
