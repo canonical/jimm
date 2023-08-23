@@ -435,9 +435,12 @@ func (s *openFGATestSuite) TestListObjectsWithContextualTuples(c *gc.C) {
 		"30000000-0000-0000-0000-000000000000",
 	}
 
-	expected := make([]string, len(modelUUIDs))
+	expected := make([]cofga.Entity, len(modelUUIDs))
 	for i, v := range modelUUIDs {
-		expected[i] = "model:" + v
+		expected[i] = cofga.Entity{
+			Kind: "model",
+			ID:   v,
+		}
 	}
 
 	ids, err := s.ofgaClient.ListObjects(ctx, "user:alice", "reader", "model", []openfga.Tuple{
