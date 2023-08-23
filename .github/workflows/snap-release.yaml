@@ -5,12 +5,8 @@ on:
   push:
     branches:
       - feature-rebac
-  pull_request:
-    branches:
-      - feature-rebac
-    types:
-      - opened
-
+    tags:
+      - 'v2*'
 
 # Note this workflow requires a Github secret to provide auth against snapstore.
 # snapcraft export-login --snaps=PACKAGE_NAME --acls package_access,package_push,package_update,package_release exported.txt
