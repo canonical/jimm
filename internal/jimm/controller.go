@@ -551,8 +551,12 @@ func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName 
 
 	for i, userAccess := range model.Users {
 		u := userAccess.User
-		err = j.Database.GetUser(ctx, &u)
-		if err != nil {
+		if !strings.Contains(u.Username, "@") {
+			// If the username doesn't contain an "@" the user is local
+			// to the controller and we don't want to propagate it.
+			continue
+		}
+		if err = j.Database.GetUser(ctx, &u); err != nil {
 			return errors.E(op, err)
 		}
 		model.Users[i].Username = u.Username
