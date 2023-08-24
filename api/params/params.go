@@ -236,6 +236,9 @@ type ImportModelRequest struct {
 
 	// ModelTag is the tag of the model that is to be imported.
 	ModelTag string `json:"model-tag"`
+
+	// SwitchOwner will switch the owner of the model to the current user.
+	SwitchOwner bool `json:"switch-owner"`
 }
 
 // CrossModelQueryRequest holds the parameters to perform a cross model query against

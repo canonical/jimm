@@ -416,7 +416,7 @@ func (j *JIMM) GetControllerAccess(ctx context.Context, user *dbmodel.User, tag 
 }
 
 // ImportModel imports model with the specified uuid from the controller.
-func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName string, modelTag names.ModelTag) error {
+func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName string, modelTag names.ModelTag, switchOwner bool) error {
 	const op = errors.Op("jimm.ImportModel")
 
 	ale := dbmodel.AuditLogEntry{
@@ -471,33 +471,60 @@ func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName 
 	model.ControllerID = controller.ID
 	model.Controller = controller
 
-	// fetch the model owner user
-	ownerTag, err := names.ParseUserTag(modelInfo.OwnerTag)
-	if err != nil {
-		return errors.E(op, err)
-	}
-	owner := dbmodel.User{}
-	owner.SetTag(ownerTag)
-	err = j.Database.GetUser(ctx, &owner)
-	if err != nil {
-		return errors.E(op, err)
-	}
-	model.OwnerUsername = owner.Username
-	model.Owner = owner
+	var cloudCredential *dbmodel.CloudCredential
+	if switchOwner {
+		// Switch the model to be owned by the user making the request.
+		model.OwnerUsername = u.Username
+		model.Owner = *u
+		cloudTag, err := names.ParseCloudTag(modelInfo.CloudTag)
+		if err != nil {
+			return err
+		}
+		allCredentials, err := j.Database.GetUserCloudCredentials(ctx, u, cloudTag.Id())
+		if err != nil {
+			return err
+		}
+		zapctx.Debug(ctx, "user credentials", zap.Any("all creds", allCredentials))
+		for _, cred := range allCredentials {
+			if cred.CloudName == cloudTag.Id() {
+				cloudCredential = &cred
+				break
+			}
+		}
+		if cloudCredential == nil {
+			return errors.E(op, errors.CodeNotFound, fmt.Sprintf("Failed to find user credential for cloud %s", cloudTag.Id()))
+		}
+	} else {
+		// fetch the model owner user
+		ownerTag, err := names.ParseUserTag(modelInfo.OwnerTag)
+		if err != nil {
+			return errors.E(op, err)
+		}
+		owner := dbmodel.User{}
+		owner.SetTag(ownerTag)
+		err = j.Database.GetUser(ctx, &owner)
+		if err != nil {
+			return errors.E(op, err)
+		}
+		model.OwnerUsername = owner.Username
+		model.Owner = owner
 
-	// fetch cloud credential used by the model
-	credentialTag, err := names.ParseCloudCredentialTag(modelInfo.CloudCredentialTag)
-	if err != nil {
-		return errors.E(op, err)
+		// fetch cloud credential used by the model
+		credentialTag, err := names.ParseCloudCredentialTag(modelInfo.CloudCredentialTag)
+		if err != nil {
+			return errors.E(op, err)
+		}
+		cred := dbmodel.CloudCredential{}
+		cred.SetTag(credentialTag)
+		err = j.Database.GetCloudCredential(ctx, &cred)
+		if err != nil {
+			return errors.E(op, err)
+		}
+		cloudCredential = &cred
 	}
-	cloudCredential := dbmodel.CloudCredential{}
-	cloudCredential.SetTag(credentialTag)
-	err = j.Database.GetCloudCredential(ctx, &cloudCredential)
-	if err != nil {
-		return errors.E(op, err)
-	}
+
 	model.CloudCredentialID = cloudCredential.ID
-	model.CloudCredential = cloudCredential
+	model.CloudCredential = *cloudCredential
 
 	// fetch the cloud used by the model
 	cloud := dbmodel.Cloud{
@@ -505,6 +532,7 @@ func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName 
 	}
 	err = j.Database.GetCloud(ctx, &cloud)
 	if err != nil {
+		zapctx.Error(ctx, "failed to get cloud", zap.Any("cloud credential", cloudCredential))
 		return errors.E(op, err)
 	}
 
