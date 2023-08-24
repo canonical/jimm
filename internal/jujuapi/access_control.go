@@ -576,9 +576,6 @@ func (r *controllerRoot) ListRelationshipTuples(ctx context.Context, req apipara
 	if req.Tuple.TargetObject != "" {
 		key, err = r.parseTuple(ctx, req.Tuple)
 		if err != nil {
-			if errors.ErrorCode(err) == errors.CodeFailedToParseTupleKey {
-				return returnValue, errors.E(op, errors.CodeBadRequest, "failed to parse the tuple key")
-			}
 			return returnValue, errors.E(op, err)
 		}
 	}
