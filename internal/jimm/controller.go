@@ -461,7 +461,7 @@ func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName 
 	if err != nil {
 		return errors.E(op, err)
 	}
-
+	zapctx.Debug(ctx, "modelInfo", zap.Any("Info", modelInfo))
 	model := dbmodel.Model{}
 	// fill in data from model info
 	err = model.FromJujuModelInfo(modelInfo)
@@ -471,29 +471,48 @@ func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName 
 	model.ControllerID = controller.ID
 	model.Controller = controller
 
-	var cloudCredential *dbmodel.CloudCredential
-	if switchOwner {
+	userHasModelAccess := false
+	for _, user := range model.Users {
+		if user.User.Username == u.Username {
+			userHasModelAccess = true
+			break
+		}
+	}
+	if !userHasModelAccess {
+		zapctx.Debug(ctx, "User doesn't have model access, adding it")
+		// Ensure the current user has access to the model
+		// This will be applied to JIMM's access table lower down.
+		model.Users = append(model.Users, dbmodel.UserModelAccess{User: *u, Access: string(jujuparams.ModelAdminAccess)})
+	}
+
+	var cloudCredential dbmodel.CloudCredential
+	originalOwnerIsLocalUser := !strings.Contains(modelInfo.OwnerTag, "@")
+	if originalOwnerIsLocalUser || switchOwner {
 		// Switch the model to be owned by the user making the request.
 		model.OwnerUsername = u.Username
 		model.Owner = *u
+		for _, user := range model.Users {
+			if user.User.Username == u.Username {
+				userHasModelAccess = true
+				break
+			}
+		}
+
 		cloudTag, err := names.ParseCloudTag(modelInfo.CloudTag)
 		if err != nil {
 			return err
 		}
+		// Note that the model already has a cloud credential configured which it will use when deploying new
+		// applications. JIMM needs some cloud credential reference to be able to import the model so use any
+		// arbitrary credential, it is not actually used beyond model creation.
 		allCredentials, err := j.Database.GetUserCloudCredentials(ctx, u, cloudTag.Id())
 		if err != nil {
 			return err
 		}
-		zapctx.Debug(ctx, "user credentials", zap.Any("all creds", allCredentials))
-		for _, cred := range allCredentials {
-			if cred.CloudName == cloudTag.Id() {
-				cloudCredential = &cred
-				break
-			}
+		if len(allCredentials) == 0 {
+			return errors.E(op, errors.CodeNotFound, fmt.Sprintf("Failed to find cloud credentials for user %s", u.Username))
 		}
-		if cloudCredential == nil {
-			return errors.E(op, errors.CodeNotFound, fmt.Sprintf("Failed to find user credential for cloud %s", cloudTag.Id()))
-		}
+		cloudCredential = allCredentials[0]
 	} else {
 		// fetch the model owner user
 		ownerTag, err := names.ParseUserTag(modelInfo.OwnerTag)
@@ -520,11 +539,11 @@ func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName 
 		if err != nil {
 			return errors.E(op, err)
 		}
-		cloudCredential = &cred
+		cloudCredential = cred
 	}
 
 	model.CloudCredentialID = cloudCredential.ID
-	model.CloudCredential = *cloudCredential
+	model.CloudCredential = cloudCredential
 
 	// fetch the cloud used by the model
 	cloud := dbmodel.Cloud{
@@ -548,6 +567,7 @@ func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName 
 	if !regionFound {
 		return errors.E(op, "cloud region not found")
 	}
+	// zapctx.Debug(ctx, "model user access", zap.Any("users", model.Users))
 
 	for i, userAccess := range model.Users {
 		u := userAccess.User
@@ -569,6 +589,19 @@ func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName 
 			return errors.E(op, err, "model already exists")
 		}
 		return errors.E(op, err)
+	}
+
+	if !userHasModelAccess {
+		// Here we finally grant the user doing the import, access to the underlying model.
+		err = j.doModelAdmin(ctx, u, modelTag, func(m *dbmodel.Model, api API) error {
+			if err := api.GrantModelAccess(ctx, modelTag, u.Tag().(names.UserTag), jujuparams.ModelAdminAccess); err != nil {
+				return err
+			}
+			return nil
+		})
+		if err != nil {
+			return errors.E(op, err, "Failed to grant user %s admin access on the model", u.Username)
+		}
 	}
 
 	modelAPI, err := j.dial(ctx, &controller, modelTag)
