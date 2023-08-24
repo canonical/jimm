@@ -486,9 +486,9 @@ func (j *JIMM) doCloudAdmin(ctx context.Context, u *dbmodel.User, ct names.Cloud
 	// Ensure we always have at least 1 region for the cloud with at least 1 controller
 	// managing that region.
 	if len(c.Regions) < 1 || len(c.Regions[0].Controllers) < 1 {
-		zapctx.Error(ctx, "cloud regions check", zap.Int("regions", len(c.Regions)))
+		zapctx.Error(ctx, "number of regions available in cloud", zap.String("cloud", c.Name), zap.Int("regions", len(c.Regions)))
 		if len(c.Regions) > 0 {
-			zapctx.Error(ctx, "region controllers check", zap.Int("controllers", len(c.Regions[0].Controllers)))
+			zapctx.Error(ctx, "number of controllers available for cloud/region", zap.Int("controllers", len(c.Regions[0].Controllers)))
 		}
 		return errors.E(op, fmt.Sprintf("cloud administration not available for %s", ct.Id()))
 	}
