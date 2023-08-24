@@ -82,7 +82,7 @@ func (r *controllerRoot) masquerade(ctx context.Context, userTag string) (*openf
 func parseUserTag(tag string) (names.UserTag, error) {
 	ut, err := names.ParseUserTag(tag)
 	if err != nil {
-		return names.UserTag{}, errors.E(errors.CodeBadRequest, err)
+		return names.UserTag{}, errors.E(errors.CodeBadRequest, err, "invalid user tag")
 	}
 	if ut.IsLocal() {
 		return names.UserTag{}, errors.E(errors.CodeBadRequest, "unsupported local user")
