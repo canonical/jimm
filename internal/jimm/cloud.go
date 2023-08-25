@@ -483,11 +483,15 @@ func (j *JIMM) doCloudAdmin(ctx context.Context, u *dbmodel.User, ct names.Cloud
 		// an unauthorized error.
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
-
-	if len(c.Regions) != 1 || len(c.Regions[0].Controllers) != 1 {
-		return errors.E(op, "cloud administration not available for %s", ct.Id())
+	// Ensure we always have at least 1 region for the cloud with at least 1 controller
+	// managing that region.
+	if len(c.Regions) < 1 || len(c.Regions[0].Controllers) < 1 {
+		zapctx.Error(ctx, "number of regions available in cloud", zap.String("cloud", c.Name), zap.Int("regions", len(c.Regions)))
+		if len(c.Regions) > 0 {
+			zapctx.Error(ctx, "number of controllers available for cloud/region", zap.Int("controllers", len(c.Regions[0].Controllers)))
+		}
+		return errors.E(op, fmt.Sprintf("cloud administration not available for %s", ct.Id()))
 	}
-
 	api, err := j.dial(ctx, &c.Regions[0].Controllers[0].Controller, names.ModelTag{})
 	if err != nil {
 		return errors.E(op, err)
