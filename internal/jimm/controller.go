@@ -461,7 +461,6 @@ func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName 
 	if err != nil {
 		return errors.E(op, err)
 	}
-	zapctx.Debug(ctx, "modelInfo", zap.Any("Info", modelInfo))
 	model := dbmodel.Model{}
 	// fill in data from model info
 	err = model.FromJujuModelInfo(modelInfo)
