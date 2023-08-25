@@ -772,16 +772,7 @@ func TestImportModel(t *testing.T) {
 			}},
 		},
 	}, {
-		about:          "model not found",
-		user:           "alice@external",
-		controllerName: "test-controller",
-		modelUUID:      "00000002-0000-0000-0000-000000000001",
-		modelInfo: func(_ context.Context, info *jujuparams.ModelInfo) error {
-			return errors.E(errors.CodeNotFound, "model not found")
-		},
-		expectedError: "model not found",
-	}, {
-		about:          "cloud credentials not found",
+		about:          "model from local user imported",
 		user:           "alice@external",
 		controllerName: "test-controller",
 		modelUUID:      "00000002-0000-0000-0000-000000000001",
@@ -793,215 +784,20 @@ func TestImportModel(t *testing.T) {
 			info.DefaultSeries = "test-series"
 			info.CloudTag = names.NewCloudTag("test-cloud").String()
 			info.CloudRegion = "test-region"
-			info.CloudCredentialTag = names.NewCloudCredentialTag("test-cloud/alice@external/unknown-credential").String()
+			info.CloudCredentialTag = names.NewCloudCredentialTag("test-cloud/local-user/test-credential").String()
 			info.CloudCredentialValidity = &trueValue
-			info.OwnerTag = names.NewUserTag("alice@external").String()
-			return nil
-		},
-		expectedError: `cloudcredential "test-cloud/alice@external/unknown-credential" not found`,
-	}, {
-		about:          "cloud region not found",
-		user:           "alice@external",
-		controllerName: "test-controller",
-		modelUUID:      "00000002-0000-0000-0000-000000000001",
-		modelInfo: func(_ context.Context, info *jujuparams.ModelInfo) error {
-			info.Name = "test-model"
-			info.Type = "test-type"
-			info.UUID = "00000002-0000-0000-0000-000000000001"
-			info.ControllerUUID = "00000001-0000-0000-0000-000000000001"
-			info.DefaultSeries = "test-series"
-			info.CloudTag = names.NewCloudTag("test-cloud").String()
-			info.CloudRegion = "unknown-region"
-			info.CloudCredentialTag = names.NewCloudCredentialTag("test-cloud/alice@external/test-credential").String()
-			info.CloudCredentialValidity = &trueValue
-			info.OwnerTag = names.NewUserTag("alice@external").String()
-			return nil
-		},
-		expectedError: `cloud region not found`,
-	}, {
-		about:          "not allowed if not superuser",
-		user:           "bob@external",
-		controllerName: "test-controller",
-		modelUUID:      "00000002-0000-0000-0000-000000000001",
-		modelInfo: func(_ context.Context, info *jujuparams.ModelInfo) error {
-			info.Name = "test-model"
-			info.Type = "test-type"
-			info.UUID = "00000002-0000-0000-0000-000000000001"
-			info.ControllerUUID = "00000001-0000-0000-0000-000000000001"
-			info.DefaultSeries = "test-series"
-			info.CloudTag = names.NewCloudTag("test-cloud").String()
-			info.CloudRegion = "test-region"
-			info.CloudCredentialTag = names.NewCloudCredentialTag("test-cloud/alice@external/test-credential").String()
-			info.CloudCredentialValidity = &trueValue
-			info.OwnerTag = names.NewUserTag("alice@external").String()
-			return nil
-		},
-		expectedError: `unauthorized`,
-	}, {
-		about:          "model already exists",
-		user:           "alice@external",
-		controllerName: "test-controller",
-		modelUUID:      "00000002-0000-0000-0000-000000000002",
-		modelInfo: func(_ context.Context, info *jujuparams.ModelInfo) error {
-			info.Name = "model-1"
-			info.Type = "test-type"
-			info.UUID = "00000002-0000-0000-0000-000000000001"
-			info.ControllerUUID = "00000001-0000-0000-0000-000000000001"
-			info.DefaultSeries = "test-series"
-			info.CloudTag = names.NewCloudTag("test-cloud").String()
-			info.CloudRegion = "test-region"
-			info.CloudCredentialTag = names.NewCloudCredentialTag("test-cloud/alice@external/test-credential").String()
-			info.CloudCredentialValidity = &trueValue
-			info.OwnerTag = names.NewUserTag("alice@external").String()
-			return nil
-		},
-		expectedError: `model already exists`,
-	}}
-
-	for _, test := range tests {
-		c.Run(test.about, func(c *qt.C) {
-			api := &jimmtest.API{
-				ModelInfo_: test.modelInfo,
-				ModelWatcherNext_: func(ctx context.Context, id string) ([]jujuparams.Delta, error) {
-					if id != test.about {
-						return nil, errors.E("incorrect id")
-					}
-					return test.deltas, nil
-				},
-				ModelWatcherStop_: func(ctx context.Context, id string) error {
-					if id != test.about {
-						return errors.E("incorrect id")
-					}
-					return nil
-				},
-				WatchAll_: func(context.Context) (string, error) {
-					return test.about, nil
-				},
-			}
-
-			j := &jimm.JIMM{
-				Database: db.Database{
-					DB: jimmtest.MemoryDB(c, nil),
-				},
-				Dialer: &jimmtest.Dialer{
-					API: api,
-				},
-			}
-			ctx := context.Background()
-			err := j.Database.Migrate(ctx, false)
-			c.Assert(err, qt.IsNil)
-
-			env := jimmtest.ParseEnvironment(c, testImportModelEnv)
-			env.PopulateDB(c, j.Database)
-
-			user := env.User(test.user).DBObject(c, j.Database)
-			err = j.ImportModel(ctx, &user, test.controllerName, names.NewModelTag(test.modelUUID), false)
-			if test.expectedError == "" {
-				c.Assert(err, qt.IsNil)
-
-				m1 := dbmodel.Model{
-					UUID: test.expectedModel.UUID,
-				}
-				err = j.Database.GetModel(ctx, &m1)
-				c.Assert(err, qt.IsNil)
-				c.Assert(m1, jimmtest.DBObjectEquals, test.expectedModel)
-			} else {
-				c.Assert(err, qt.ErrorMatches, test.expectedError)
-			}
-		})
-	}
-}
-
-// testImportModelEnvAndChangeOwner tests the case where a model is imported
-// into JIMM which has local users instead of external users.
-const testImportModelEnvAndChangeOwner = `
-users:
-- username: alice
-  display-name: Alice
-  controller-access: superuser
-- username: bob@external
-  display-name: Bob
-  controller-access: login
-clouds:
-- name: test-cloud
-  type: test
-  regions:
-  - name: test-region
-controllers:
-- name: test-controller
-  uuid: 00000001-0000-0000-0000-000000000001
-  cloud: test-cloud
-  region: test-region-1
-  agent-version: 3.2.1
-models:
-- name: model-1
-  type: iaas
-  uuid: 00000002-0000-0000-0000-000000000002
-  controller: test-controller
-  default-series: warty
-  cloud: test-cloud
-  region: test-region
-  cloud-credential: test-credential
-  owner: alice
-  life: alive
-  status:
-    status: available
-    info: "OK!"
-    since: 2020-02-20T20:02:20Z
-  users:
-  - user: alice
-    access: admin
-  - user: bob
-    access: write
-  - user: charlie
-    access: read
-  sla:
-    level: unsupported
-  agent-version: 1.2.3
-`
-
-func TestImportModelAndChangeOwner(t *testing.T) {
-	c := qt.New(t)
-	trueValue := true
-
-	now := time.Now().UTC().Truncate(time.Millisecond)
-
-	tests := []struct {
-		about          string
-		user           string
-		controllerName string
-		modelUUID      string
-		modelInfo      func(context.Context, *jujuparams.ModelInfo) error
-		expectedModel  dbmodel.Model
-		expectedError  string
-		deltas         []jujuparams.Delta
-	}{{
-		about:          "model imported",
-		user:           "alice@external",
-		controllerName: "test-controller",
-		modelUUID:      "00000002-0000-0000-0000-000000000001",
-		modelInfo: func(_ context.Context, info *jujuparams.ModelInfo) error {
-			info.Name = "test-model"
-			info.Type = "test-type"
-			info.UUID = "00000002-0000-0000-0000-000000000001"
-			info.ControllerUUID = "00000001-0000-0000-0000-000000000001"
-			info.DefaultSeries = "test-series"
-			info.CloudTag = names.NewCloudTag("test-cloud").String()
-			info.CloudRegion = "test-region"
-			info.CloudCredentialTag = names.NewCloudCredentialTag("test-cloud/alice@external/test-credential").String()
-			info.CloudCredentialValidity = &trueValue
-			info.OwnerTag = names.NewUserTag("alice@external").String()
+			info.OwnerTag = names.NewUserTag("local-user").String()
 			info.Life = life.Alive
 			info.Status = jujuparams.EntityStatus{
-				Status: status.Status("ok"),
+				Status: status.Status("available"),
 				Info:   "test-info",
 				Since:  &now,
 			}
 			info.Users = []jujuparams.ModelUserInfo{{
-				UserName: "alice@external",
+				UserName: "local-user",
 				Access:   jujuparams.ModelAdminAccess,
 			}, {
-				UserName: "bob@external",
+				UserName: "another-user",
 				Access:   jujuparams.ModelReadAccess,
 			}}
 			info.Machines = []jujuparams.ModelMachineInfo{{
@@ -1012,68 +808,11 @@ func TestImportModelAndChangeOwner(t *testing.T) {
 			}}
 			info.SLA = &jujuparams.ModelSLAInfo{
 				Level: "essential",
-				Owner: "alice@external",
+				Owner: "local-user",
 			}
 			info.AgentVersion = newVersion("2.1.0")
 			return nil
 		},
-		deltas: []jujuparams.Delta{{
-			Entity: &jujuparams.ModelUpdate{
-				ModelUUID:      "00000002-0000-0000-0000-000000000001",
-				Name:           "test-model",
-				Owner:          "alice@external",
-				Life:           "alive",
-				ControllerUUID: "00000001-0000-0000-0000-000000000001",
-				Status: jujuparams.StatusInfo{
-					Current: "available",
-					Message: "updated status message",
-					Version: "1.2.3",
-					Since:   &now,
-				},
-				SLA: jujuparams.ModelSLAInfo{
-					Level: "1",
-					Owner: "me",
-				},
-			},
-		}, {
-			Entity: &jujuparams.ApplicationInfo{
-				ModelUUID:       "00000002-0000-0000-0000-000000000001",
-				Name:            "app-1",
-				Exposed:         true,
-				CharmURL:        "cs:app-1",
-				Life:            "alive",
-				MinUnits:        1,
-				WorkloadVersion: "2",
-			},
-		}, {
-			Entity: &jujuparams.MachineInfo{
-				ModelUUID: "00000002-0000-0000-0000-000000000001",
-				Id:        "machine-1",
-				Life:      "alive",
-				Hostname:  "test-machine-1",
-			},
-		}, {
-			Entity: &jujuparams.UnitInfo{
-				ModelUUID:   "00000002-0000-0000-0000-000000000001",
-				Name:        "app-1/1",
-				Application: "app-1",
-				CharmURL:    "cs:app-1",
-				Life:        "starting",
-				MachineId:   "machine-1",
-			},
-		}, {
-			// TODO (ashipika) ApplicationOfferInfo is currently ignored. Consider
-			// fetching application offer details from the controller.
-			Entity: &jujuparams.ApplicationOfferInfo{
-				ModelUUID:            "00000002-0000-0000-0000-000000000001",
-				OfferName:            "test-offer-1",
-				OfferUUID:            "00000003-0000-0000-0000-000000000001",
-				ApplicationName:      "app-1",
-				CharmName:            "cs:~test-charmers/test-charm",
-				TotalConnectedCount:  17,
-				ActiveConnectedCount: 7,
-			},
-		}},
 		expectedModel: dbmodel.Model{
 			Name: "test-model",
 			UUID: sql.NullString{
@@ -1081,7 +820,7 @@ func TestImportModelAndChangeOwner(t *testing.T) {
 				Valid:  true,
 			},
 			Owner: dbmodel.User{
-				Username:         "alice@external",
+				Username:         "alice@external", // Owner will switch to the user doing the import
 				DisplayName:      "Alice",
 				ControllerAccess: "superuser",
 			},
@@ -1107,16 +846,16 @@ func TestImportModelAndChangeOwner(t *testing.T) {
 			Life:          "alive",
 			Status: dbmodel.Status{
 				Status: "available",
-				Info:   "updated status message",
+				Info:   "test-info",
 				Since: sql.NullTime{
 					Valid: true,
 					Time:  now,
 				},
-				Version: "1.2.3",
+				Version: "2.1.0",
 			},
 			SLA: dbmodel.SLA{
-				Level: "1",
-				Owner: "me",
+				Level: "essential",
+				Owner: "local-user",
 			},
 			Users: []dbmodel.UserModelAccess{{
 				User: dbmodel.User{
@@ -1125,13 +864,6 @@ func TestImportModelAndChangeOwner(t *testing.T) {
 					ControllerAccess: "superuser",
 				},
 				Access: "admin",
-			}, {
-				User: dbmodel.User{
-					Username:         "bob@external",
-					DisplayName:      "Bob",
-					ControllerAccess: "login",
-				},
-				Access: "read",
 			}},
 		},
 	}, {
@@ -1254,7 +986,7 @@ func TestImportModelAndChangeOwner(t *testing.T) {
 			err := j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 
-			env := jimmtest.ParseEnvironment(c, testImportModelEnvAndChangeOwner)
+			env := jimmtest.ParseEnvironment(c, testImportModelEnv)
 			env.PopulateDB(c, j.Database)
 
 			user := env.User(test.user).DBObject(c, j.Database)
@@ -1416,7 +1148,7 @@ func TestGetControllerConfig(t *testing.T) {
 			err := j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 
-			env := jimmtest.ParseEnvironment(c, testImportModelEnvAndChangeOwner)
+			env := jimmtest.ParseEnvironment(c, testImportModelEnv)
 			env.PopulateDB(c, j.Database)
 
 			superuser := env.User("alice@external").DBObject(c, j.Database)

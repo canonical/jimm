@@ -479,7 +479,7 @@ func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName 
 	}
 	if !userHasModelAccess {
 		zapctx.Debug(ctx, "User doesn't have model access, adding it")
-		// Ensure the current user has access to the model
+		// Ensure the current user gets access to the model
 		// This will be applied to JIMM's access table lower down.
 		model.Users = append(model.Users, dbmodel.UserModelAccess{User: *u, Access: string(jujuparams.ModelAdminAccess)})
 	}
@@ -503,13 +503,15 @@ func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName 
 		}
 		// Note that the model already has a cloud credential configured which it will use when deploying new
 		// applications. JIMM needs some cloud credential reference to be able to import the model so use any
-		// arbitrary credential, it is not actually used beyond model creation.
+		// credential against the cloud the model is deployed against. Even using the correct cloud for the
+		// credential is not strictly necessary, but will help prevent the user think they can create new
+		// models on the incoming cloud.
 		allCredentials, err := j.Database.GetUserCloudCredentials(ctx, u, cloudTag.Id())
 		if err != nil {
 			return err
 		}
 		if len(allCredentials) == 0 {
-			return errors.E(op, errors.CodeNotFound, fmt.Sprintf("Failed to find cloud credentials for user %s", u.Username))
+			return errors.E(op, errors.CodeNotFound, fmt.Sprintf("Failed to find cloud credential for user %s on cloud %s", u.Username, cloudTag.Id()))
 		}
 		cloudCredential = allCredentials[0]
 	} else {
@@ -566,15 +568,20 @@ func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName 
 	if !regionFound {
 		return errors.E(op, "cloud region not found")
 	}
-	// zapctx.Debug(ctx, "model user access", zap.Any("users", model.Users))
 
-	for i, userAccess := range model.Users {
-		u := userAccess.User
-		if !strings.Contains(u.Username, "@") {
+	var usersExcludingLocalUsers []dbmodel.UserModelAccess
+	for _, userAccess := range model.Users {
+		if !strings.Contains(userAccess.User.Username, "@") {
 			// If the username doesn't contain an "@" the user is local
 			// to the controller and we don't want to propagate it.
 			continue
 		}
+		usersExcludingLocalUsers = append(usersExcludingLocalUsers, userAccess)
+	}
+	model.Users = usersExcludingLocalUsers
+
+	for i, userAccess := range model.Users {
+		u := userAccess.User
 		if err = j.Database.GetUser(ctx, &u); err != nil {
 			return errors.E(op, err)
 		}
