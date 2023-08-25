@@ -396,7 +396,7 @@ func (r *controllerRoot) GrantAuditLogAccess(ctx context.Context, req apiparams.
 
 	ut, err := parseUserTag(req.UserTag)
 	if err != nil {
-		return errors.E(op, err, errors.CodeBadRequest, "invalid user tag")
+		return errors.E(op, err, errors.CodeBadRequest)
 	}
 
 	err = r.jimm.GrantAuditLogAccess(ctx, r.user, ut)
@@ -414,7 +414,7 @@ func (r *controllerRoot) RevokeAuditLogAccess(ctx context.Context, req apiparams
 
 	ut, err := parseUserTag(req.UserTag)
 	if err != nil {
-		return errors.E(op, err, errors.CodeBadRequest, "invalid user tag")
+		return errors.E(op, err, errors.CodeBadRequest)
 	}
 
 	err = r.jimm.RevokeAuditLogAccess(ctx, r.user, ut)
