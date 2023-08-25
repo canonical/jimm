@@ -895,7 +895,7 @@ func TestImportModel(t *testing.T) {
 			env.PopulateDB(c, j.Database)
 
 			user := env.User(test.user).DBObject(c, j.Database)
-			err = j.ImportModel(ctx, &user, test.controllerName, names.NewModelTag(test.modelUUID))
+			err = j.ImportModel(ctx, &user, test.controllerName, names.NewModelTag(test.modelUUID), false)
 			if test.expectedError == "" {
 				c.Assert(err, qt.IsNil)
 
