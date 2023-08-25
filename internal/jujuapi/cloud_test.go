@@ -116,7 +116,7 @@ func (s *cloudSuite) TestUserCredentialsErrors(c *gc.C) {
 	var resp jujuparams.StringsResults
 	err := conn.APICall("Cloud", 1, "", "UserCredentials", req, &resp)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(resp.Results[0].Error, gc.ErrorMatches, `invalid user tag`)
+	c.Assert(resp.Results[0].Error, gc.ErrorMatches, `"not-a-user-tag" is not a valid tag`)
 	c.Assert(resp.Results, gc.HasLen, 1)
 }
 
