@@ -425,7 +425,7 @@ func (r *controllerRoot) ImportModel(ctx context.Context, req apiparams.ImportMo
 		return errors.E(op, err, errors.CodeBadRequest)
 	}
 
-	err = r.jimm.ImportModel(ctx, r.user, req.Controller, mt, req.SwitchOwner)
+	err = r.jimm.ImportModel(ctx, r.user, req.Controller, mt)
 	if err != nil {
 		return errors.E(op, err)
 	}

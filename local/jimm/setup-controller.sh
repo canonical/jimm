@@ -20,7 +20,7 @@ CLOUDINIT_TEMPLATE=$'cloudinit-userdata: |
     trusted:
       - |\n%s'
 
-printf "$CLOUDINIT_TEMPLATE" "$(lxc network get lxdbr0 ipv4.address | cut -f1 -d/)" "$(cat local/traefik/certs/server.crt | sed -e 's/^/        /')" > "${CLOUDINIT_FILE}"
+printf "$CLOUDINIT_TEMPLATE" "$(lxc network get lxdbr0 ipv4.address | cut -f1 -d/)" "$(cat local/traefik/certs/ca.crt | sed -e 's/^/        /')" > "${CLOUDINIT_FILE}"
 
 echo "Bootstrapping controller"
 juju bootstrap localhost "${CONTROLLER_NAME}" --config allow-model-access=true --config "${CLOUDINIT_FILE}" --config identity-url=https://candid.localhost

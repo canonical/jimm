@@ -416,7 +416,7 @@ func (j *JIMM) GetControllerAccess(ctx context.Context, user *dbmodel.User, tag 
 }
 
 // ImportModel imports model with the specified uuid from the controller.
-func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName string, modelTag names.ModelTag, switchOwner bool) error {
+func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName string, modelTag names.ModelTag) error {
 	const op = errors.Op("jimm.ImportModel")
 
 	ale := dbmodel.AuditLogEntry{
@@ -486,7 +486,7 @@ func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName 
 
 	var cloudCredential dbmodel.CloudCredential
 	originalOwnerIsLocalUser := !strings.Contains(modelInfo.OwnerTag, "@")
-	if originalOwnerIsLocalUser || switchOwner {
+	if originalOwnerIsLocalUser {
 		// Switch the model to be owned by the user making the request.
 		model.OwnerUsername = u.Username
 		model.Owner = *u
