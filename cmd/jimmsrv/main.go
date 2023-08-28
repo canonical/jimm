@@ -47,6 +47,15 @@ func start(ctx context.Context, s *service.Service) error {
 	if addr == "" {
 		addr = ":http-alt"
 	}
+	macaroonExpiryDuration := 24 * time.Hour
+	durationString := os.Getenv("JIMM_MACAROON_EXPIRY_DURATION")
+	if durationString != "" {
+		expiry, err := time.ParseDuration(durationString)
+		if err != nil {
+			zapctx.Error(ctx, "failed to parse macaroon expiry duration", zap.Error(err))
+		}
+		macaroonExpiryDuration = expiry
+	}
 	jimmsvc, err := jimm.NewService(ctx, jimm.Params{
 		ControllerUUID:    os.Getenv("JIMM_UUID"),
 		DSN:               os.Getenv("JIMM_DSN"),
@@ -71,6 +80,7 @@ func start(ctx context.Context, s *service.Service) error {
 		PrivateKey:                    os.Getenv("BAKERY_PRIVATE_KEY"),
 		PublicKey:                     os.Getenv("BAKERY_PUBLIC_KEY"),
 		AuditLogRetentionPeriodInDays: os.Getenv("JIMM_AUDIT_LOG_RETENTION_PERIOD_IN_DAYS"),
+		MacaroonExpiryDuration:        macaroonExpiryDuration,
 	})
 	if err != nil {
 		return err

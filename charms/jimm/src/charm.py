@@ -134,6 +134,7 @@ class JimmCharm(SystemdCharm):
             "private_key": self.config.get("private-key"),
             "audit_retention_period": self.config.get("audit-log-retention-period-in-days", ""),
             "jwt_expiry": self.config.get("jwt-expiry", "5m"),
+            "macaroon_expiry_duration": self.config.get("macaroon-expiry-duration"),
         }
 
         if self.config.get("postgres-secret-storage", False):

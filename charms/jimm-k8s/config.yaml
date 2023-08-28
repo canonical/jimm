@@ -86,3 +86,7 @@ options:
     description: |
       Duration for the JWT expiry (defaults to 5 minutes).
     default: 5m
+  macaroon-expiry-duration:
+    type: string
+    default: 24h
+    description: Expiry duration for authentication macaroons.
