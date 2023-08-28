@@ -1126,6 +1126,7 @@ const grantCloudAccessTestEnv = `clouds:
   host-cloud-region: test-cloud/test-cloud-region
   regions:
   - name: default
+  - name: region2
   users:
   - user: alice@external
     access: admin
@@ -1140,6 +1141,9 @@ controllers:
     priority: 10
   - cloud: test
     region: default
+    priority: 1
+  - cloud: test
+    region: region2
     priority: 1
 `
 
@@ -1188,6 +1192,17 @@ var grantCloudAccessTests = []struct {
 		HostCloudRegion: "test-cloud/test-cloud-region",
 		Regions: []dbmodel.CloudRegion{{
 			Name: "default",
+			Controllers: []dbmodel.CloudRegionControllerPriority{{
+				Controller: dbmodel.Controller{
+					Name:        "controller-1",
+					UUID:        "00000001-0000-0000-0000-000000000001",
+					CloudName:   "test-cloud",
+					CloudRegion: "test-cloud-region",
+				},
+				Priority: 1,
+			}},
+		}, {
+			Name: "region2",
 			Controllers: []dbmodel.CloudRegionControllerPriority{{
 				Controller: dbmodel.Controller{
 					Name:        "controller-1",
