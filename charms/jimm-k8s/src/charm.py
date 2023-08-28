@@ -266,6 +266,7 @@ class JimmOperatorCharm(CharmBase):
             "PRIVATE_KEY": self.config.get("private-key", ""),
             "PUBLIC_KEY": self.config.get("public-key", ""),
             "JIMM_JWT_EXPIRY": self.config.get("jwt-expiry", "5m"),
+            "JIMM_MACAROON_EXPIRY_DURATION": self.config.get("macaroon-expiry-duration", "24h"),
         }
         if self._state.dsn:
             config_values["JIMM_DSN"] = self._state.dsn
