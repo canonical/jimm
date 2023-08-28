@@ -82,7 +82,7 @@ services:
       test: [ "CMD", "curl", "http://jimm.localhost:80" ]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 15
     depends_on:
       db:
         condition: service_healthy
@@ -90,6 +90,8 @@ services:
         condition: service_healthy
       traefik:
         condition: service_healthy
+      insert-hardcoded-auth-model:
+        condition: service_completed_successfully
     labels:
       traefik.enable: true
       traefik.http.routers.jimm.rule: Host(`jimm.localhost`)
@@ -128,11 +130,6 @@ services:
       VAULT_DEV_ROOT_TOKEN_ID: "token"
     cap_add:
       - IPC_LOCK
-    healthcheck:
-      test: [ "CMD", "curl", "http://127.0.0.1:8200/v1/sys/health" ]
-      interval: 5s
-      timeout: 5s
-      retries: 10
     volumes:
       - ./local/vault/vault.hcl:/vault/config/vault.hcl
       - ./local/vault/init.sh:/vault/init.sh

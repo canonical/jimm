@@ -52,3 +52,26 @@ jobs:
           PGSSLMODE: disable
           PGUSER: jimm
           PGPORT: 5432
+
+  smoke_test:
+    name: Smoke Test
+    runs-on: ubuntu-20.04
+    # The docker compose has a healthcheck on the JIMM container.
+    # So if the compose returns with exit code 0 then the JIMM server successfully started.
+    steps:
+      - uses: actions/checkout@v3
+      - name: Pull candid repo for test environment
+        run: |
+          git clone https://github.com/canonical/candid.git ./tmp/candid
+          cd ./tmp/candid
+          DOCKER_BUILDKIT=1 \
+          docker build \
+          --cache-from candid:latest \
+          . -f ./Dockerfile -t candid
+          docker image ls candid
+      - name: Add volume files
+        run: |
+          touch ./local/vault/approle.json
+          touch ./local/vault/roleid.txt
+      - run: go mod vendor
+      - run: docker compose --profile dev up -d --wait
