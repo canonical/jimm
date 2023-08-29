@@ -82,7 +82,7 @@ services:
       test: [ "CMD", "curl", "http://jimm.localhost:80" ]
       interval: 5s
       timeout: 5s
-      retries: 20
+      retries: 25
     depends_on:
       db:
         condition: service_healthy

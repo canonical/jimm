@@ -71,4 +71,4 @@ jobs:
           touch ./local/vault/approle.json
           touch ./local/vault/roleid.txt
       - run: go mod vendor
-      - run: docker compose --profile dev up -d --wait
+      - run: docker compose --profile dev up -d --wait --timestamps
