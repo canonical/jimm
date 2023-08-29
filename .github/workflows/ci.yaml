@@ -64,10 +64,7 @@ jobs:
         run: |
           git clone https://github.com/canonical/candid.git ./tmp/candid
           cd ./tmp/candid
-          DOCKER_BUILDKIT=1 \
-          docker build \
-          --cache-from candid:latest \
-          . -f ./Dockerfile -t candid
+          make image
           docker image ls candid
       - name: Add volume files
         run: |
