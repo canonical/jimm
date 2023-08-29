@@ -534,6 +534,7 @@ func newVaultStore(ctx context.Context, p Params) (jimmcreds.CredentialStore, er
 }
 
 func newOpenFGAClient(ctx context.Context, p OpenFGAParams) (*openfga.OFGAClient, error) {
+	const op = errors.Op("newOpenFGAClient")
 	cofgaClient, err := cofga.NewClient(ctx, cofga.OpenFGAParams{
 		Scheme:      p.Scheme,
 		Host:        p.Host,
@@ -543,7 +544,7 @@ func newOpenFGAClient(ctx context.Context, p OpenFGAParams) (*openfga.OFGAClient
 		AuthModelID: p.AuthModel,
 	})
 	if err != nil {
-		return nil, errors.E(err, "failed to create ofga client")
+		return nil, errors.E(op, err)
 	}
 	return openfga.NewOpenFGAClient(cofgaClient), nil
 }
