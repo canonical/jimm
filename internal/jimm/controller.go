@@ -507,7 +507,7 @@ func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName 
 	// fetch cloud credential used by the model
 	cloudTag, err := names.ParseCloudTag(modelInfo.CloudTag)
 	if err != nil {
-		return err
+		errors.E(op, err)
 	}
 	// Note that the model already has a cloud credential configured which it will use when deploying new
 	// applications. JIMM needs some cloud credential reference to be able to import the model so use any
@@ -516,7 +516,7 @@ func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName 
 	// models on the incoming cloud.
 	allCredentials, err := j.Database.GetUserCloudCredentials(ctx, u, cloudTag.Id())
 	if err != nil {
-		return err
+		errors.E(op, err)
 	}
 	if len(allCredentials) == 0 {
 		return errors.E(op, errors.CodeNotFound, fmt.Sprintf("Failed to find cloud credential for user %s on cloud %s", u.Username, cloudTag.Id()))
@@ -532,7 +532,7 @@ func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName 
 	}
 	err = j.Database.GetCloud(ctx, &cloud)
 	if err != nil {
-		zapctx.Error(ctx, "failed to get cloud", zap.Any("cloud credential", cloudCredential))
+		zapctx.Error(ctx, "failed to get cloud", zap.String("cloud", cloud.Name))
 		return errors.E(op, err)
 	}
 
