@@ -609,6 +609,7 @@ func TestImportModel(t *testing.T) {
 		controllerName string
 		modelUUID      string
 		modelInfo      func(context.Context, *jujuparams.ModelInfo) error
+		newOwner       string
 		expectedModel  dbmodel.Model
 		expectedError  string
 		deltas         []jujuparams.Delta
@@ -616,6 +617,7 @@ func TestImportModel(t *testing.T) {
 		about:          "model imported",
 		user:           "alice@external",
 		controllerName: "test-controller",
+		newOwner:       "",
 		modelUUID:      "00000002-0000-0000-0000-000000000001",
 		modelInfo: func(_ context.Context, info *jujuparams.ModelInfo) error {
 			info.Name = "test-model"
@@ -775,6 +777,7 @@ func TestImportModel(t *testing.T) {
 		about:          "model from local user imported",
 		user:           "alice@external",
 		controllerName: "test-controller",
+		newOwner:       "alice@external",
 		modelUUID:      "00000002-0000-0000-0000-000000000001",
 		modelInfo: func(_ context.Context, info *jujuparams.ModelInfo) error {
 			info.Name = "test-model"
@@ -870,6 +873,7 @@ func TestImportModel(t *testing.T) {
 		about:          "model not found",
 		user:           "alice@external",
 		controllerName: "test-controller",
+		newOwner:       "",
 		modelUUID:      "00000002-0000-0000-0000-000000000001",
 		modelInfo: func(_ context.Context, info *jujuparams.ModelInfo) error {
 			return errors.E(errors.CodeNotFound, "model not found")
@@ -879,6 +883,7 @@ func TestImportModel(t *testing.T) {
 		about:          "cloud credentials not found",
 		user:           "alice@external",
 		controllerName: "test-controller",
+		newOwner:       "",
 		modelUUID:      "00000002-0000-0000-0000-000000000001",
 		modelInfo: func(_ context.Context, info *jujuparams.ModelInfo) error {
 			info.Name = "test-model"
@@ -886,18 +891,19 @@ func TestImportModel(t *testing.T) {
 			info.UUID = "00000002-0000-0000-0000-000000000001"
 			info.ControllerUUID = "00000001-0000-0000-0000-000000000001"
 			info.DefaultSeries = "test-series"
-			info.CloudTag = names.NewCloudTag("test-cloud").String()
+			info.CloudTag = names.NewCloudTag("invalid-cloud").String()
 			info.CloudRegion = "test-region"
-			info.CloudCredentialTag = names.NewCloudCredentialTag("test-cloud/alice@external/unknown-credential").String()
+			info.CloudCredentialTag = names.NewCloudCredentialTag("invalid-cloud/alice@external/unknown-credential").String()
 			info.CloudCredentialValidity = &trueValue
 			info.OwnerTag = names.NewUserTag("alice@external").String()
 			return nil
 		},
-		expectedError: `cloudcredential "test-cloud/alice@external/unknown-credential" not found`,
+		expectedError: `Failed to find cloud credential for user alice@external on cloud invalid-cloud`,
 	}, {
 		about:          "cloud region not found",
 		user:           "alice@external",
 		controllerName: "test-controller",
+		newOwner:       "",
 		modelUUID:      "00000002-0000-0000-0000-000000000001",
 		modelInfo: func(_ context.Context, info *jujuparams.ModelInfo) error {
 			info.Name = "test-model"
@@ -917,6 +923,7 @@ func TestImportModel(t *testing.T) {
 		about:          "not allowed if not superuser",
 		user:           "bob@external",
 		controllerName: "test-controller",
+		newOwner:       "",
 		modelUUID:      "00000002-0000-0000-0000-000000000001",
 		modelInfo: func(_ context.Context, info *jujuparams.ModelInfo) error {
 			info.Name = "test-model"
@@ -936,6 +943,7 @@ func TestImportModel(t *testing.T) {
 		about:          "model already exists",
 		user:           "alice@external",
 		controllerName: "test-controller",
+		newOwner:       "",
 		modelUUID:      "00000002-0000-0000-0000-000000000002",
 		modelInfo: func(_ context.Context, info *jujuparams.ModelInfo) error {
 			info.Name = "model-1"
@@ -956,6 +964,9 @@ func TestImportModel(t *testing.T) {
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
 			api := &jimmtest.API{
+				GrantModelAccess_: func(ctx context.Context, mt names.ModelTag, ut names.UserTag, uap jujuparams.UserAccessPermission) error {
+					return nil
+				},
 				ModelInfo_: test.modelInfo,
 				ModelWatcherNext_: func(ctx context.Context, id string) ([]jujuparams.Delta, error) {
 					if id != test.about {
@@ -990,7 +1001,7 @@ func TestImportModel(t *testing.T) {
 			env.PopulateDB(c, j.Database)
 
 			user := env.User(test.user).DBObject(c, j.Database)
-			err = j.ImportModel(ctx, &user, test.controllerName, names.NewModelTag(test.modelUUID))
+			err = j.ImportModel(ctx, &user, test.controllerName, names.NewModelTag(test.modelUUID), test.newOwner)
 			if test.expectedError == "" {
 				c.Assert(err, qt.IsNil)
 

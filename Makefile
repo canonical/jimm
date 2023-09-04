@@ -34,7 +34,7 @@ build/server: version/commit.txt version/version.txt
 	go build -tags version ./cmd/jimmsrv
 
 check: version/commit.txt version/version.txt
-	go test -p 1 -timeout 30m -tags version $(PROJECT)/...
+	go test -timeout 30m $(PROJECT)/... -coverprofile cover.out
 
 install: version/commit.txt version/version.txt
 	go install -tags version $(INSTALL_FLAGS) -v $(PROJECT)/...

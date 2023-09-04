@@ -4,6 +4,7 @@ package cmd
 
 import (
 	"github.com/juju/cmd/v3"
+	"github.com/juju/gnuflag"
 	jujuapi "github.com/juju/juju/api"
 	jujucmd "github.com/juju/juju/cmd"
 	"github.com/juju/juju/cmd/modelcmd"
@@ -20,6 +21,7 @@ const importModelCommandDoc = `
 
 	Example:
 		jimmctl import-model <controller name> <model-uuid>
+		jimmctl import-model <controller name> <model-uuid> --owner <username>
 `
 
 // NewImportModelCommand returns a command to import a model.
@@ -48,6 +50,11 @@ func (c *importModelCommand) Info() *cmd.Info {
 		Purpose: "Import a model to jimm",
 		Doc:     importModelCommandDoc,
 	})
+}
+
+// SetFlags implements Command.SetFlags.
+func (c *importModelCommand) SetFlags(f *gnuflag.FlagSet) {
+	f.StringVar(&c.req.Owner, "owner", "", "switch the model owner to the desired user")
 }
 
 // Init implements the cmd.Command interface.

@@ -416,7 +416,7 @@ func (j *JIMM) GetControllerAccess(ctx context.Context, user *dbmodel.User, tag 
 }
 
 // ImportModel imports model with the specified uuid from the controller.
-func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName string, modelTag names.ModelTag) error {
+func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName string, modelTag names.ModelTag, newOwner string) error {
 	const op = errors.Op("jimm.ImportModel")
 
 	ale := dbmodel.AuditLogEntry{
@@ -470,78 +470,58 @@ func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName 
 	model.ControllerID = controller.ID
 	model.Controller = controller
 
-	userHasModelAccess := false
+	var ownerString string
+	if newOwner != "" {
+		// Switch the model to be owned by the specified user.
+		ownerString = names.UserTagKind + "-" + newOwner
+	} else {
+		// Use the model owner user
+		ownerString = modelInfo.OwnerTag
+	}
+	ownerTag, err := names.ParseUserTag(ownerString)
+	if err != nil {
+		return errors.E(op, err)
+	}
+	owner := dbmodel.User{}
+	owner.SetTag(ownerTag)
+	err = j.Database.GetUser(ctx, &owner)
+	if err != nil {
+		return errors.E(op, err)
+	}
+	model.SwitchOwner(&owner)
+
+	ownerHasModelAccess := false
 	for _, user := range model.Users {
-		if user.User.Username == u.Username {
-			userHasModelAccess = true
+		if user.User.Username == owner.Username {
+			ownerHasModelAccess = true
 			break
 		}
 	}
-	if !userHasModelAccess {
+	if !ownerHasModelAccess {
 		zapctx.Debug(ctx, "User doesn't have model access, adding it")
 		// Ensure the current user gets access to the model
 		// This will be applied to JIMM's access table lower down.
 		model.Users = append(model.Users, dbmodel.UserModelAccess{User: *u, Access: string(jujuparams.ModelAdminAccess)})
 	}
 
-	var cloudCredential dbmodel.CloudCredential
-	originalOwnerIsLocalUser := !strings.Contains(modelInfo.OwnerTag, "@")
-	if originalOwnerIsLocalUser {
-		// Switch the model to be owned by the user making the request.
-		model.OwnerUsername = u.Username
-		model.Owner = *u
-		for _, user := range model.Users {
-			if user.User.Username == u.Username {
-				userHasModelAccess = true
-				break
-			}
-		}
-
-		cloudTag, err := names.ParseCloudTag(modelInfo.CloudTag)
-		if err != nil {
-			return err
-		}
-		// Note that the model already has a cloud credential configured which it will use when deploying new
-		// applications. JIMM needs some cloud credential reference to be able to import the model so use any
-		// credential against the cloud the model is deployed against. Even using the correct cloud for the
-		// credential is not strictly necessary, but will help prevent the user think they can create new
-		// models on the incoming cloud.
-		allCredentials, err := j.Database.GetUserCloudCredentials(ctx, u, cloudTag.Id())
-		if err != nil {
-			return err
-		}
-		if len(allCredentials) == 0 {
-			return errors.E(op, errors.CodeNotFound, fmt.Sprintf("Failed to find cloud credential for user %s on cloud %s", u.Username, cloudTag.Id()))
-		}
-		cloudCredential = allCredentials[0]
-	} else {
-		// fetch the model owner user
-		ownerTag, err := names.ParseUserTag(modelInfo.OwnerTag)
-		if err != nil {
-			return errors.E(op, err)
-		}
-		owner := dbmodel.User{}
-		owner.SetTag(ownerTag)
-		err = j.Database.GetUser(ctx, &owner)
-		if err != nil {
-			return errors.E(op, err)
-		}
-		model.OwnerUsername = owner.Username
-		model.Owner = owner
-
-		// fetch cloud credential used by the model
-		credentialTag, err := names.ParseCloudCredentialTag(modelInfo.CloudCredentialTag)
-		if err != nil {
-			return errors.E(op, err)
-		}
-		cred := dbmodel.CloudCredential{}
-		cred.SetTag(credentialTag)
-		err = j.Database.GetCloudCredential(ctx, &cred)
-		if err != nil {
-			return errors.E(op, err)
-		}
-		cloudCredential = cred
+	// fetch cloud credential used by the model
+	cloudTag, err := names.ParseCloudTag(modelInfo.CloudTag)
+	if err != nil {
+		return err
 	}
+	// Note that the model already has a cloud credential configured which it will use when deploying new
+	// applications. JIMM needs some cloud credential reference to be able to import the model so use any
+	// credential against the cloud the model is deployed against. Even using the correct cloud for the
+	// credential is not strictly necessary, but will help prevent the user think they can create new
+	// models on the incoming cloud.
+	allCredentials, err := j.Database.GetUserCloudCredentials(ctx, u, cloudTag.Id())
+	if err != nil {
+		return err
+	}
+	if len(allCredentials) == 0 {
+		return errors.E(op, errors.CodeNotFound, fmt.Sprintf("Failed to find cloud credential for user %s on cloud %s", u.Username, cloudTag.Id()))
+	}
+	cloudCredential := allCredentials[0]
 
 	model.CloudCredentialID = cloudCredential.ID
 	model.CloudCredential = cloudCredential
@@ -597,16 +577,16 @@ func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName 
 		return errors.E(op, err)
 	}
 
-	if !userHasModelAccess {
-		// Here we finally grant the user doing the import, access to the underlying model.
+	if !ownerHasModelAccess {
+		// Here we finally grant the model owner, access to the underlying model.
 		err = j.doModelAdmin(ctx, u, modelTag, func(m *dbmodel.Model, api API) error {
-			if err := api.GrantModelAccess(ctx, modelTag, u.Tag().(names.UserTag), jujuparams.ModelAdminAccess); err != nil {
+			if err := api.GrantModelAccess(ctx, modelTag, owner.Tag().(names.UserTag), jujuparams.ModelAdminAccess); err != nil {
 				return err
 			}
 			return nil
 		})
 		if err != nil {
-			return errors.E(op, err, "Failed to grant user %s admin access on the model", u.Username)
+			return errors.E(op, err, fmt.Sprintf("Failed to grant user %s admin access on the model", u.Username))
 		}
 	}
 

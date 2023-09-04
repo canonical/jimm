@@ -236,6 +236,10 @@ type ImportModelRequest struct {
 
 	// ModelTag is the tag of the model that is to be imported.
 	ModelTag string `json:"model-tag"`
+
+	// Owner specifies the new owner of the model after import.
+	// Can be empty to skip switching the owner.
+	Owner string `json:"owner"`
 }
 
 // CrossModelQueryRequest holds the parameters to perform a cross model query against
