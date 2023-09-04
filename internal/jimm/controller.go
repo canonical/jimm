@@ -482,17 +482,17 @@ func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName 
 	if err != nil {
 		return errors.E(op, err)
 	}
-	owner := dbmodel.User{}
-	owner.SetTag(ownerTag)
-	err = j.Database.GetUser(ctx, &owner)
+	ownerUser := dbmodel.User{}
+	ownerUser.SetTag(ownerTag)
+	err = j.Database.GetUser(ctx, &ownerUser)
 	if err != nil {
 		return errors.E(op, err)
 	}
-	model.SwitchOwner(&owner)
+	model.SwitchOwner(&ownerUser)
 
 	ownerHasModelAccess := false
 	for _, user := range model.Users {
-		if user.User.Username == owner.Username {
+		if user.User.Username == ownerUser.Username {
 			ownerHasModelAccess = true
 			break
 		}
@@ -514,7 +514,7 @@ func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName 
 	// credential against the cloud the model is deployed against. Even using the correct cloud for the
 	// credential is not strictly necessary, but will help prevent the user think they can create new
 	// models on the incoming cloud.
-	allCredentials, err := j.Database.GetUserCloudCredentials(ctx, u, cloudTag.Id())
+	allCredentials, err := j.Database.GetUserCloudCredentials(ctx, &ownerUser, cloudTag.Id())
 	if err != nil {
 		errors.E(op, err)
 	}
@@ -580,13 +580,13 @@ func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName 
 	if !ownerHasModelAccess {
 		// Here we finally grant the model owner, access to the underlying model.
 		err = j.doModelAdmin(ctx, u, modelTag, func(m *dbmodel.Model, api API) error {
-			if err := api.GrantModelAccess(ctx, modelTag, owner.Tag().(names.UserTag), jujuparams.ModelAdminAccess); err != nil {
+			if err := api.GrantModelAccess(ctx, modelTag, ownerUser.Tag().(names.UserTag), jujuparams.ModelAdminAccess); err != nil {
 				return err
 			}
 			return nil
 		})
 		if err != nil {
-			return errors.E(op, err, fmt.Sprintf("Failed to grant user %s admin access on the model", u.Username))
+			return errors.E(op, err, fmt.Sprintf("Failed to grant user %s admin access on the model", ownerUser.Username))
 		}
 	}
 

@@ -11,7 +11,6 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/cmd/jimmctl/cmd"
-	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/jimmtest"
 )
@@ -45,24 +44,20 @@ func (s *importModelSuite) TestImportModelSuperuser(c *gc.C) {
 	err = s.JIMM.Database.GetModel(context.Background(), &model2)
 	c.Assert(err, gc.Equals, nil)
 	c.Check(model2.CreatedAt.After(model.CreatedAt), gc.Equals, true)
+	c.Check(model2.OwnerUsername, gc.Equals, "charlie@external")
 }
 
 func (s *importModelSuite) TestImportModelFromLocalUser(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
-
-	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/local-user/cred")
+	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@external/cred")
 	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{AuthType: "empty"})
-	s.AdminUser = &dbmodel.User{
-		Username:         "local-user",
-		ControllerAccess: "superuser",
-		LastLogin:        db.Now(),
-	}
-	err := s.JIMM.Database.GetUser(context.Background(), s.AdminUser)
-	c.Assert(err, gc.Equals, nil)
-	mt := s.AddModel(c, names.NewUserTag("local-user"), "model-2", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, cct)
+	// Add credentials for Alice on the test cloud, they are needed for the Alice user to become the new model owner
+	cctAlice := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/alice@external/cred")
+	s.UpdateCloudCredential(c, cctAlice, jujuparams.CloudCredential{AuthType: "empty"})
+	mt := s.AddModel(c, names.NewUserTag("charlie@external"), "model-2", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, cct)
 	var model dbmodel.Model
 	model.SetTag(mt)
-	err = s.JIMM.Database.GetModel(context.Background(), &model)
+	err := s.JIMM.Database.GetModel(context.Background(), &model)
 	c.Assert(err, gc.Equals, nil)
 	err = s.JIMM.Database.DeleteModel(context.Background(), &model)
 	c.Assert(err, gc.Equals, nil)
@@ -77,6 +72,7 @@ func (s *importModelSuite) TestImportModelFromLocalUser(c *gc.C) {
 	err = s.JIMM.Database.GetModel(context.Background(), &model2)
 	c.Assert(err, gc.Equals, nil)
 	c.Check(model2.CreatedAt.After(model.CreatedAt), gc.Equals, true)
+	c.Check(model2.OwnerUsername, gc.Equals, "alice@external")
 }
 
 func (s *importModelSuite) TestImportModelUnauthorized(c *gc.C) {
