@@ -21,13 +21,14 @@ func (s *pingSuite) TestPing(c *gc.C) {
 
 	info := s.APIInfo(c)
 	ctl := dbmodel.Controller{
+		UUID:          s.ControllerConfig.ControllerUUID(),
 		Name:          s.ControllerConfig.ControllerName(),
 		CACertificate: info.CACert,
 		AdminUser:     info.Tag.Id(),
 		AdminPassword: info.Password,
 		PublicAddress: info.Addrs[0],
 	}
-	api, err := s.Dialer.Dial(ctx, &ctl, names.ModelTag{})
+	api, err := s.Dialer.Dial(ctx, &ctl, names.ModelTag{}, nil)
 	c.Assert(err, gc.Equals, nil)
 	defer api.Close()
 

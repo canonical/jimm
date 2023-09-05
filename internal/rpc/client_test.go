@@ -146,7 +146,10 @@ func TestCallErrorResponse(t *testing.T) {
 	var res string
 	err = conn.Call(context.Background(), "test", 0, "1234", "Test", "SUCCESS", &res)
 	c.Check(err, qt.ErrorMatches, `test error \(test error code\)`)
-	e := err.(*rpc.Error)
+	e, ok := err.(*rpc.Error)
+	c.Logf("expected %T, received %T", e, err)
+	c.Assert(ok, qt.IsTrue)
+
 	c.Check(e.ErrorCode(), qt.Equals, "test error code")
 	c.Check(e.Info, qt.DeepEquals, map[string]interface{}{
 		"k1": "v1",

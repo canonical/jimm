@@ -38,10 +38,10 @@ type cacheDialer struct {
 }
 
 // Dial implements Dialer.Dial.
-func (d *cacheDialer) Dial(ctx context.Context, ctl *dbmodel.Controller, mt names.ModelTag) (API, error) {
+func (d *cacheDialer) Dial(ctx context.Context, ctl *dbmodel.Controller, mt names.ModelTag, requiredPermissions map[string]string) (API, error) {
 	if mt.Id() != "" {
 		// connections to models are rare, so we don't cache them.
-		return d.dialer.Dial(ctx, ctl, mt)
+		return d.dialer.Dial(ctx, ctl, mt, requiredPermissions)
 	}
 	rc := d.sfg.DoChan(ctl.Name, func() (interface{}, error) {
 		return d.dial(ctx, ctl)
@@ -73,7 +73,7 @@ func (d *cacheDialer) dial(ctx context.Context, ctl *dbmodel.Controller) (interf
 	d.mu.Unlock()
 
 	// We don't have a working connection to the controller, so dial one.
-	api, err := d.dialer.Dial(ctx, ctl, names.ModelTag{})
+	api, err := d.dialer.Dial(ctx, ctl, names.ModelTag{}, nil)
 	if err != nil {
 		return nil, err
 	}

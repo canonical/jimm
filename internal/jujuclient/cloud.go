@@ -51,9 +51,9 @@ func (c Connection) CheckCredentialModels(ctx context.Context, cred jujuparams.T
 // CheckCredentialModels should be used first.
 //
 // This method will call the first available procedure from:
-//     - Cloud(7).UpdateCredentialsCheckModels
-//     - Cloud(3).UpdateCredentialsCheckModels
-//     - Cloud(1).UpdateCredentials
+//   - Cloud(7).UpdateCredentialsCheckModels
+//   - Cloud(3).UpdateCredentialsCheckModels
+//   - Cloud(1).UpdateCredentials
 //
 // Any error that represents a Juju API failure will be of type
 // *APIError.
@@ -93,8 +93,8 @@ func (c Connection) UpdateCredential(ctx context.Context, cred jujuparams.Tagged
 // CheckCredentialModels should be used first.
 //
 // This method will call the first available procedure from:
-//     - Cloud(3).RevokeCredentialsCheckModels
-//     - Cloud(1).RevokeCredentials
+//   - Cloud(3).RevokeCredentialsCheckModels
+//   - Cloud(1).RevokeCredentials
 //
 // Any error that represents a Juju API failure will be of type
 // *APIError.
@@ -119,7 +119,7 @@ func (c Connection) RevokeCredential(ctx context.Context, cred names.CloudCreden
 				Tag: cred.String(),
 			}},
 		}
-		if err := c.client.Call(ctx, "Cloud", 1, "", "RevokeCredentials", &in, &out); err != nil {
+		if err := c.Call(ctx, "Cloud", 1, "", "RevokeCredentials", &in, &out); err != nil {
 			return errors.E(op, jujuerrors.Cause(err))
 		}
 	}

@@ -3,7 +3,6 @@
 package cmd_test
 
 import (
-	"io/ioutil"
 	"os"
 	"path"
 
@@ -23,8 +22,9 @@ var _ = gc.Suite(&controllerInfoSuite{})
 func (s *controllerInfoSuite) TestControllerInfo(c *gc.C) {
 	store := s.ClientStore()
 	store.Controllers["controller-1"] = jujuclient.ControllerDetails{
-		APIEndpoints:  []string{"127.0.0.1:17070"},
-		PublicDNSName: "controller1.example.com",
+		ControllerUUID: "982b16d9-a945-4762-b684-fd4fd885aa11",
+		APIEndpoints:   []string{"127.0.0.1:17070"},
+		PublicDNSName:  "controller1.example.com",
 		CACert: `-----BEGIN CERTIFICATE-----
   MIID/jCCAmagAwIBAgIVANxsMrzsXrdpjjUoxWQm1RCkmWcqMA0GCSqGSIb3DQEB
   CwUAMCYxDTALBgNVBAoTBEp1anUxFTATBgNVBAMTDGp1anUgdGVzdGluZzAeFw0y
@@ -50,12 +50,7 @@ func (s *controllerInfoSuite) TestControllerInfo(c *gc.C) {
   LQRNNlaY2ajLt0paowf/Xxb8
   -----END CERTIFICATE-----`,
 	}
-	store.Accounts["controller-1"] = jujuclient.AccountDetails{
-		User:     "test-user",
-		Password: "super-secret-password",
-	}
-
-	dir, err := ioutil.TempDir("", "controller-info-test")
+	dir, err := os.MkdirTemp("", "controller-info-test")
 	c.Assert(err, gc.Equals, nil)
 	defer os.RemoveAll(dir)
 
@@ -64,22 +59,22 @@ func (s *controllerInfoSuite) TestControllerInfo(c *gc.C) {
 	_, err = cmdtesting.RunCommand(c, cmd.NewControllerInfoCommandForTesting(store), "controller-1", fname, "controller1.example.com")
 	c.Assert(err, gc.IsNil)
 
-	data, err := ioutil.ReadFile(fname)
+	data, err := os.ReadFile(fname)
 	c.Assert(err, gc.IsNil)
 	c.Assert(string(data), gc.Matches, `api-addresses:
 - 127.0.0.1:17070
 name: controller-1
-password: super-secret-password
 public-address: controller1.example.com
-username: test-user
+uuid: 982b16d9-a945-4762-b684-fd4fd885aa11
 `)
 }
 
 func (s *controllerInfoSuite) TestControllerInfoWithLocalFlag(c *gc.C) {
 	store := s.ClientStore()
 	store.Controllers["controller-1"] = jujuclient.ControllerDetails{
-		APIEndpoints:  []string{"127.0.0.1:17070"},
-		PublicDNSName: "controller1.example.com",
+		ControllerUUID: "982b16d9-a945-4762-b684-fd4fd885aa11",
+		APIEndpoints:   []string{"127.0.0.1:17070"},
+		PublicDNSName:  "controller1.example.com",
 		CACert: `-----BEGIN CERTIFICATE-----
   MIID/jCCAmagAwIBAgIVANxsMrzsXrdpjjUoxWQm1RCkmWcqMA0GCSqGSIb3DQEB
   CwUAMCYxDTALBgNVBAoTBEp1anUxFTATBgNVBAMTDGp1anUgdGVzdGluZzAeFw0y
@@ -105,12 +100,8 @@ func (s *controllerInfoSuite) TestControllerInfoWithLocalFlag(c *gc.C) {
   LQRNNlaY2ajLt0paowf/Xxb8
   -----END CERTIFICATE-----`,
 	}
-	store.Accounts["controller-1"] = jujuclient.AccountDetails{
-		User:     "test-user",
-		Password: "super-secret-password",
-	}
 
-	dir, err := ioutil.TempDir("", "controller-info-test")
+	dir, err := os.MkdirTemp("", "controller-info-test")
 	c.Assert(err, gc.Equals, nil)
 	defer os.RemoveAll(dir)
 
@@ -119,7 +110,7 @@ func (s *controllerInfoSuite) TestControllerInfoWithLocalFlag(c *gc.C) {
 	_, err = cmdtesting.RunCommand(c, cmd.NewControllerInfoCommandForTesting(store), "controller-1", fname, "--local")
 	c.Assert(err, gc.IsNil)
 
-	data, err := ioutil.ReadFile(fname)
+	data, err := os.ReadFile(fname)
 	c.Assert(err, gc.IsNil)
 	c.Assert(string(data), gc.Matches, `api-addresses:
 - 127.0.0.1:17070
@@ -149,17 +140,17 @@ ca-certificate: |-
   LQRNNlaY2ajLt0paowf/Xxb8
   -----END CERTIFICATE-----
 name: controller-1
-password: super-secret-password
 public-address: 127.0.0.1:17070
-username: test-user
+uuid: 982b16d9-a945-4762-b684-fd4fd885aa11
 `)
 }
 
 func (s *controllerInfoSuite) TestControllerInfoMissingPublicAddressAndNoLocalFlag(c *gc.C) {
 	store := s.ClientStore()
 	store.Controllers["controller-1"] = jujuclient.ControllerDetails{
-		APIEndpoints:  []string{"127.0.0.1:17070"},
-		PublicDNSName: "controller1.example.com",
+		ControllerUUID: "982b16d9-a945-4762-b684-fd4fd885aa11",
+		APIEndpoints:   []string{"127.0.0.1:17070"},
+		PublicDNSName:  "controller1.example.com",
 		CACert: `-----BEGIN CERTIFICATE-----
   MIID/jCCAmagAwIBAgIVANxsMrzsXrdpjjUoxWQm1RCkmWcqMA0GCSqGSIb3DQEB
   CwUAMCYxDTALBgNVBAoTBEp1anUxFTATBgNVBAMTDGp1anUgdGVzdGluZzAeFw0y
@@ -185,12 +176,7 @@ func (s *controllerInfoSuite) TestControllerInfoMissingPublicAddressAndNoLocalFl
   LQRNNlaY2ajLt0paowf/Xxb8
   -----END CERTIFICATE-----`,
 	}
-	store.Accounts["controller-1"] = jujuclient.AccountDetails{
-		User:     "test-user",
-		Password: "super-secret-password",
-	}
-
-	dir, err := ioutil.TempDir("", "controller-info-test")
+	dir, err := os.MkdirTemp("", "controller-info-test")
 	c.Assert(err, gc.Equals, nil)
 	defer os.RemoveAll(dir)
 
@@ -203,8 +189,9 @@ func (s *controllerInfoSuite) TestControllerInfoMissingPublicAddressAndNoLocalFl
 func (s *controllerInfoSuite) TestControllerInfoCannotProvideAddrAndLocalFlag(c *gc.C) {
 	store := s.ClientStore()
 	store.Controllers["controller-1"] = jujuclient.ControllerDetails{
-		APIEndpoints:  []string{"127.0.0.1:17070"},
-		PublicDNSName: "controller1.example.com",
+		ControllerUUID: "982b16d9-a945-4762-b684-fd4fd885aa11",
+		APIEndpoints:   []string{"127.0.0.1:17070"},
+		PublicDNSName:  "controller1.example.com",
 		CACert: `-----BEGIN CERTIFICATE-----
   MIID/jCCAmagAwIBAgIVANxsMrzsXrdpjjUoxWQm1RCkmWcqMA0GCSqGSIb3DQEB
   CwUAMCYxDTALBgNVBAoTBEp1anUxFTATBgNVBAMTDGp1anUgdGVzdGluZzAeFw0y
@@ -230,12 +217,8 @@ func (s *controllerInfoSuite) TestControllerInfoCannotProvideAddrAndLocalFlag(c 
   LQRNNlaY2ajLt0paowf/Xxb8
   -----END CERTIFICATE-----`,
 	}
-	store.Accounts["controller-1"] = jujuclient.AccountDetails{
-		User:     "test-user",
-		Password: "super-secret-password",
-	}
 
-	dir, err := ioutil.TempDir("", "controller-info-test")
+	dir, err := os.MkdirTemp("", "controller-info-test")
 	c.Assert(err, gc.Equals, nil)
 	defer os.RemoveAll(dir)
 

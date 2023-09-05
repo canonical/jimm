@@ -10,7 +10,6 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/juju/juju/api/client/modelmanager"
-	"github.com/juju/juju/apiserver/common"
 	"github.com/juju/juju/cloud"
 	jujuparams "github.com/juju/juju/rpc/params"
 	jujuversion "github.com/juju/juju/version"
@@ -105,7 +104,6 @@ func (s *jimmSuite) TestListControllersV3(c *gc.C) {
 		CACertificate: s.APIInfo(c).CACert,
 		CloudTag:      names.NewCloudTag(jimmtest.TestCloudName).String(),
 		CloudRegion:   jimmtest.TestCloudRegionName,
-		Username:      "admin",
 		AgentVersion:  s.Model.Controller.AgentVersion,
 		Status: jujuparams.EntityStatus{
 			Status: "available",
@@ -117,7 +115,6 @@ func (s *jimmSuite) TestListControllersV3(c *gc.C) {
 		CACertificate: s.APIInfo(c).CACert,
 		CloudTag:      names.NewCloudTag(jimmtest.TestCloudName).String(),
 		CloudRegion:   jimmtest.TestCloudRegionName,
-		Username:      "admin",
 		AgentVersion:  s.Model.Controller.AgentVersion,
 		Status: jujuparams.EntityStatus{
 			Status: "available",
@@ -129,7 +126,6 @@ func (s *jimmSuite) TestListControllersV3(c *gc.C) {
 		CACertificate: s.APIInfo(c).CACert,
 		CloudTag:      names.NewCloudTag(jimmtest.TestCloudName).String(),
 		CloudRegion:   jimmtest.TestCloudRegionName,
-		Username:      "admin",
 		AgentVersion:  s.Model.Controller.AgentVersion,
 		Status: jujuparams.EntityStatus{
 			Status: "available",
@@ -162,24 +158,24 @@ func (s *jimmSuite) TestAddController(c *gc.C) {
 	defer conn.Close()
 	client := api.NewClient(conn)
 
+	info := s.APIInfo(c)
+
 	acr := apiparams.AddControllerRequest{
+		UUID:          info.ControllerUUID,
 		Name:          "controller-2",
-		APIAddresses:  s.APIInfo(c).Addrs,
-		CACertificate: s.APIInfo(c).CACert,
-		Username:      s.APIInfo(c).Tag.Id(),
-		Password:      s.APIInfo(c).Password,
+		APIAddresses:  info.Addrs,
+		CACertificate: info.CACert,
 	}
 
 	ci, err := client.AddController(&acr)
 	c.Assert(err, gc.Equals, nil)
-	c.Check(ci, jc.DeepEquals, apiparams.ControllerInfo{
+	c.Assert(ci, jc.DeepEquals, apiparams.ControllerInfo{
 		Name:          "controller-2",
-		UUID:          s.Model.Controller.UUID,
-		APIAddresses:  s.APIInfo(c).Addrs,
-		CACertificate: s.APIInfo(c).CACert,
+		UUID:          info.ControllerUUID,
+		APIAddresses:  info.Addrs,
+		CACertificate: info.CACert,
 		CloudTag:      names.NewCloudTag(jimmtest.TestCloudName).String(),
 		CloudRegion:   jimmtest.TestCloudRegionName,
-		Username:      s.APIInfo(c).Tag.Id(),
 		AgentVersion:  s.Model.Controller.AgentVersion,
 		Status: jujuparams.EntityStatus{
 			Status: "available",
@@ -187,21 +183,21 @@ func (s *jimmSuite) TestAddController(c *gc.C) {
 	})
 
 	_, err = client.AddController(&acr)
-	c.Check(err, gc.ErrorMatches, `controller "controller-2" already exists \(already exists\)`)
-	c.Check(jujuparams.IsCodeAlreadyExists(err), gc.Equals, true)
+	c.Assert(err, gc.ErrorMatches, `controller "controller-2" already exists \(already exists\)`)
+	c.Assert(jujuparams.IsCodeAlreadyExists(err), gc.Equals, true)
 
 	conn = s.open(c, nil, "bob")
 	defer conn.Close()
 	client = api.NewClient(conn)
-	acr.Name = "controller-3"
+	acr.Name = "controller-2"
 	_, err = client.AddController(&acr)
-	c.Check(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
-	c.Check(jujuparams.IsCodeUnauthorized(err), gc.Equals, true)
+	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
+	c.Assert(jujuparams.IsCodeUnauthorized(err), gc.Equals, true)
 
 	acr.Name = "jimm"
 	_, err = client.AddController(&acr)
-	c.Check(err, gc.ErrorMatches, `cannot add a controller with name "jimm" \(bad request\)`)
-	c.Check(jujuparams.IsBadRequest(err), gc.Equals, true)
+	c.Assert(err, gc.ErrorMatches, `cannot add a controller with name "jimm" \(bad request\)`)
+	c.Assert(jujuparams.IsBadRequest(err), gc.Equals, true)
 }
 
 func (s *jimmSuite) TestRemoveController(c *gc.C) {
@@ -237,7 +233,6 @@ func (s *jimmSuite) TestRemoveController(c *gc.C) {
 		CACertificate: s.APIInfo(c).CACert,
 		CloudTag:      names.NewCloudTag(jimmtest.TestCloudName).String(),
 		CloudRegion:   jimmtest.TestCloudRegionName,
-		Username:      s.APIInfo(c).Tag.Id(),
 		AgentVersion:  s.Model.Controller.AgentVersion,
 		Status: jujuparams.EntityStatus{
 			Status: "available",
@@ -262,7 +257,6 @@ func (s *jimmSuite) TestSetControllerDeprecated(c *gc.C) {
 		CACertificate: s.APIInfo(c).CACert,
 		CloudTag:      names.NewCloudTag(jimmtest.TestCloudName).String(),
 		CloudRegion:   jimmtest.TestCloudRegionName,
-		Username:      s.APIInfo(c).Tag.Id(),
 		AgentVersion:  s.Model.Controller.AgentVersion,
 		Status: jujuparams.EntityStatus{
 			Status: "deprecated",
@@ -281,7 +275,6 @@ func (s *jimmSuite) TestSetControllerDeprecated(c *gc.C) {
 		CACertificate: s.APIInfo(c).CACert,
 		CloudTag:      names.NewCloudTag(jimmtest.TestCloudName).String(),
 		CloudRegion:   jimmtest.TestCloudRegionName,
-		Username:      s.APIInfo(c).Tag.Id(),
 		AgentVersion:  s.Model.Controller.AgentVersion,
 		Status: jujuparams.EntityStatus{
 			Status: "available",
@@ -316,7 +309,8 @@ func (s *jimmSuite) TestAuditLog(c *gc.C) {
 	c.Check(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeUnauthorized)
 
 	mmclient := modelmanager.NewClient(conn)
-	err = mmclient.DestroyModel(s.Model.ResourceTag(), nil, nil, nil, time.Duration(0))
+	zeroDuration := time.Duration(0)
+	err = mmclient.DestroyModel(s.Model.ResourceTag(), nil, nil, nil, &zeroDuration)
 	c.Assert(err, gc.Equals, nil)
 
 	conn2 := s.open(c, nil, "alice")
@@ -599,7 +593,7 @@ func (s *jimmSuite) TestAddCloudToController(c *gc.C) {
 		ControllerName: "controller-1",
 		AddCloudArgs: jujuparams.AddCloudArgs{
 			Name: "test-cloud",
-			Cloud: common.CloudToParams(cloud.Cloud{
+			Cloud: jujuapi.CloudToParams(cloud.Cloud{
 				Name:             "test-cloud",
 				Type:             "kubernetes",
 				AuthTypes:        cloud.AuthTypes{cloud.CertificateAuthType},
@@ -636,7 +630,7 @@ func (s *jimmSuite) TestRemoveCloudFromController(c *gc.C) {
 		ControllerName: "controller-1",
 		AddCloudArgs: jujuparams.AddCloudArgs{
 			Name: "test-cloud",
-			Cloud: common.CloudToParams(cloud.Cloud{
+			Cloud: jujuapi.CloudToParams(cloud.Cloud{
 				Name:             "test-cloud",
 				Type:             "kubernetes",
 				AuthTypes:        cloud.AuthTypes{cloud.CertificateAuthType},

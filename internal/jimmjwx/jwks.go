@@ -142,6 +142,11 @@ func (jwks *JWKSService) StartJWKSRotator(ctx context.Context, checkRotateRequir
 				zap.Any("op", op),
 				zap.NamedError("jwks-error", err),
 			)
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
 		}
 	}(errorChan)
 

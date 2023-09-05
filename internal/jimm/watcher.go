@@ -133,7 +133,7 @@ func (w *Watcher) dialController(ctx context.Context, ctl *dbmodel.Controller) (
 	const op = errors.Op("jimm.dialController")
 
 	// connect to the controller
-	api, err := w.Dialer.Dial(ctx, ctl, names.ModelTag{})
+	api, err := w.Dialer.Dial(ctx, ctl, names.ModelTag{}, nil)
 	if err != nil {
 		if !ctl.UnavailableSince.Valid {
 			ctl.UnavailableSince = db.Now()

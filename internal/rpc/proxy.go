@@ -20,6 +20,10 @@ import (
 	"github.com/canonical/jimm/internal/utils"
 )
 
+const (
+	accessRequiredErrorCode = "access required"
+)
+
 // TokenGenerator authenticates a user and generates a JWT token.
 type TokenGenerator interface {
 	// MakeToken authorizes a user if initialLogin is set to true using the information in req.
@@ -291,7 +295,7 @@ func (p *controllerProxy) start(ctx context.Context) error {
 			return err
 		}
 		zapctx.Debug(ctx, "Received message from controller", zap.Any("Message", msg))
-		permissionsRequired, err := p.checkPermissionsRequired(ctx, msg)
+		permissionsRequired, err := checkPermissionsRequired(ctx, msg)
 		if err != nil {
 			zapctx.Error(ctx, "failed to determine if more permissions required", zap.Error(err))
 			p.handleError(msg, err)
@@ -334,19 +338,34 @@ func (p *controllerProxy) handleError(msg *message, err error) {
 }
 
 // checkPermissionsRequired returns a nil map if no permissions are required.
-func (p *controllerProxy) checkPermissionsRequired(ctx context.Context, msg *message) (map[string]any, error) {
+func checkPermissionsRequired(ctx context.Context, msg *message) (map[string]any, error) {
+	// Instantiate later because we won't always need the map.
+	var permissionMap map[string]any
+
+	// Check for errors that may be a result of a normal request.
+	if msg.ErrorCode == accessRequiredErrorCode {
+		permissionMap = msg.ErrorInfo
+		return permissionMap, nil
+	}
+
+	// if the message response is empty, this is clearly not a permission
+	// check required error and we return an empty map of required
+	// permissions
+	if msg.Response == nil || string(msg.Response) == "" {
+		return permissionMap, nil
+	}
+
 	var er params.ErrorResults
 	err := json.Unmarshal(msg.Response, &er)
 	if err != nil {
 		zapctx.Error(ctx, "failed to read response error")
-		return nil, errors.E(err, "failed to read response errors")
+		return permissionMap, nil
 	}
-	// Instantiate later because we won't always need the map.
-	var permissionMap map[string]any
+
 	// Check for errors that may be a result of a bulk request.
 	for _, e := range er.Results {
 		zapctx.Debug(ctx, "received error", zap.Any("error", e))
-		if e.Error != nil && e.Error.Code == "access required" {
+		if e.Error != nil && e.Error.Code == accessRequiredErrorCode {
 			for k, v := range e.Error.Info {
 				accessLevel, ok := v.(string)
 				if !ok {
@@ -358,13 +377,6 @@ func (p *controllerProxy) checkPermissionsRequired(ctx context.Context, msg *mes
 				permissionMap[k] = accessLevel
 			}
 		}
-	}
-	// Check for errors that may be a result of a normal request.
-	if msg.ErrorCode == "access required" {
-		if permissionMap != nil {
-			zapctx.Error(ctx, "detected access required error in two places")
-		}
-		permissionMap = msg.ErrorInfo
 	}
 	return permissionMap, nil
 }

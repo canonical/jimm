@@ -12,6 +12,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/base64"
 	"fmt"
 	"net/url"
 	"path"
@@ -30,12 +31,13 @@ import (
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/jimm"
+	"github.com/canonical/jimm/internal/jimmjwx"
 	"github.com/canonical/jimm/internal/rpc"
 )
 
 const (
-	// JIMM claims to be a 3.2-beta2 client.
-	jujuClientVersion = "3.2-beta2"
+	// JIMM claims to be a 3.2.4 client.
+	jujuClientVersion = "3.2.4"
 )
 
 // A ControllerCredentialsStore is a store for controller credentials.
@@ -52,11 +54,11 @@ type ControllerCredentialsStore interface {
 // A Dialer is an implementation of a jimm.Dialer that adapts a juju API
 // connection to provide a jimm API.
 type Dialer struct {
-	ControllerCredentialsStore ControllerCredentialsStore
+	JWTService *jimmjwx.JWTService
 }
 
 // Dial implements jimm.Dialer.
-func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag) (jimm.API, error) {
+func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, requiredPermissions map[string]string) (jimm.API, error) {
 	const op = errors.Op("jujuclient.Dial")
 
 	var tlsConfig *tls.Config
@@ -105,30 +107,30 @@ func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag nam
 		return nil, errors.E(op, errors.CodeConnectionFailed, err)
 	}
 
-	username := ctl.AdminUser
-	password := ctl.AdminPassword
-	if d.ControllerCredentialsStore != nil {
-		u, p, err := d.ControllerCredentialsStore.GetControllerCredentials(ctx, ctl.Name)
-		if err != nil {
-			return nil, errors.E(op, errors.CodeNotFound)
-		}
-		if u != "" {
-			username = u
-		}
-		if p != "" {
-			password = p
-		}
+	// JIMM is automatically given all required permissions
+	permissions := requiredPermissions
+	if permissions == nil {
+		permissions = make(map[string]string)
+	}
+	permissions[ctl.ResourceTag().String()] = "superuser"
+	if modelTag.Id() != "" {
+		permissions[modelTag.String()] = "admin"
 	}
 
-	if username == "" || password == "" {
-		zapctx.Error(ctx, "empty username or password")
-		return nil, errors.E(op, errors.CodeNotFound, "missing controller username or password")
+	jwt, err := d.JWTService.NewJWT(ctx, jimmjwx.JWTParams{
+		Controller: ctl.UUID,
+		User:       names.NewUserTag("admin").String(),
+		Access:     permissions,
+	})
+	if err != nil {
+		return nil, errors.E(op, err)
 	}
+	jwtString := base64.StdEncoding.EncodeToString(jwt)
 
 	args := jujuparams.LoginRequest{
-		AuthTag:       names.NewUserTag(username).String(),
-		Credentials:   password,
+		AuthTag:       names.NewUserTag("admin").String(),
 		ClientVersion: jujuClientVersion,
+		Token:         jwtString,
 	}
 
 	var res jujuparams.LoginResult
@@ -161,6 +163,9 @@ func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag nam
 		facadeVersions: facades,
 		monitorC:       monitorC,
 		broken:         broken,
+		dialer:         d,
+		ctl:            ctl,
+		mt:             modelTag,
 	}, nil
 }
 
@@ -338,16 +343,21 @@ type Connection struct {
 
 	monitorC chan struct{}
 	broken   *uint32
+
+	dialer      *Dialer
+	redialCount atomic.Int32
+	ctl         *dbmodel.Controller
+	mt          names.ModelTag
 }
 
 // Close closes the connection.
-func (c Connection) Close() error {
+func (c *Connection) Close() error {
 	close(c.monitorC)
 	return c.client.Close()
 }
 
 // IsBroken returns true if the connection has failed.
-func (c Connection) IsBroken() bool {
+func (c *Connection) IsBroken() bool {
 	if atomic.LoadUint32(c.broken) != 0 {
 		return true
 	}
@@ -356,18 +366,71 @@ func (c Connection) IsBroken() bool {
 
 // hasFacadeVersion returns whether the connection supports the given
 // facade at the given version.
-func (c Connection) hasFacadeVersion(facade string, version int) bool {
+func (c *Connection) hasFacadeVersion(facade string, version int) bool {
 	return c.facadeVersions[fmt.Sprintf("%s\x1f%d", facade, version)]
+}
+
+func (c *Connection) redial(ctx context.Context, requiredPermissions map[string]string) error {
+	const op = errors.Op("jujuclient.redial")
+	dialCount := c.redialCount.Add(1)
+	if dialCount > 10 {
+		return errors.E(op, "dial count exceeded")
+	}
+	api, err := c.dialer.Dial(ctx, c.ctl, c.mt, requiredPermissions)
+	if err != nil {
+		return errors.E(op, err)
+	}
+	if err = c.Close(); err != nil {
+		return errors.E(op, err)
+	}
+	conn := api.(*Connection)
+	c.client = conn.client
+	c.userTag = conn.userTag
+	c.facadeVersions = conn.facadeVersions
+	c.monitorC = conn.monitorC
+	c.broken = conn.broken
+	return nil
+}
+
+// Call makes an RPC call to the server. Call sends the request message to
+// the server and waits for the response to be returned or the context to
+// be canceled.
+func (c *Connection) Call(ctx context.Context, facade string, version int, id, method string, args, resp interface{}) error {
+	err := c.client.Call(ctx, facade, version, id, method, args, resp)
+	if err != nil {
+		if rpcErr, ok := err.(*rpc.Error); ok {
+			// if we get a permission check required error, we redial the controller
+			// and amend permissions to include any required permissions as
+			// JIMM should be allowed to access anything in the JIMM system.
+			if rpcErr.Code == rpc.PermissionCheckRequiredErrorCode {
+				requiredPermissions := make(map[string]string)
+				for k, v := range rpcErr.Info {
+					vString, ok := v.(string)
+					if !ok {
+						return errors.E(fmt.Sprintf("expected %T, received %T", vString, v))
+					}
+					requiredPermissions[k] = vString
+				}
+				if err = c.redial(ctx, requiredPermissions); err != nil {
+					return err
+				}
+
+				return c.Call(ctx, facade, version, id, method, args, resp)
+			}
+		}
+		return err
+	}
+	return nil
 }
 
 // CallHighestFacadeVersion calls the specified method on the highest supported version of
 // the facade.
-func (c Connection) CallHighestFacadeVersion(ctx context.Context, facade string, versions []int, id, method string, args, resp interface{}) error {
+func (c *Connection) CallHighestFacadeVersion(ctx context.Context, facade string, versions []int, id, method string, args, resp interface{}) error {
 	sort.Sort(sort.Reverse(sort.IntSlice(versions)))
 
 	for _, version := range versions {
 		if c.hasFacadeVersion(facade, version) {
-			return c.client.Call(ctx, facade, version, id, method, args, resp)
+			return c.Call(ctx, facade, version, id, method, args, resp)
 		}
 	}
 	return errors.E(fmt.Sprintf("facade %v version %v not supported", facade, versions))

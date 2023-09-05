@@ -9,7 +9,6 @@ import (
 	"github.com/juju/cmd/v3"
 	"github.com/juju/gnuflag"
 	jujuapi "github.com/juju/juju/api"
-	"github.com/juju/juju/apiserver/common"
 	"github.com/juju/juju/cloud"
 	jujucmd "github.com/juju/juju/cmd"
 	jujucmdcloud "github.com/juju/juju/cmd/juju/cloud"
@@ -21,8 +20,8 @@ import (
 
 	"github.com/canonical/jimm/api"
 	apiparams "github.com/canonical/jimm/api/params"
-
 	"github.com/canonical/jimm/internal/errors"
+	jimmjujuapi "github.com/canonical/jimm/internal/jujuapi"
 )
 
 var (
@@ -157,7 +156,7 @@ func (c *addCloudToControllerCommand) addCloudToController(ctxt *cmd.Context, cl
 		ControllerName: c.dstControllerName,
 		AddCloudArgs: params.AddCloudArgs{
 			Name:  c.cloudName,
-			Cloud: common.CloudToParams(*cloud),
+			Cloud: jimmjujuapi.CloudToParams(*cloud),
 		},
 	}
 

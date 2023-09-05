@@ -7,8 +7,10 @@ import (
 	"context"
 	"encoding/pem"
 	"fmt"
+	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"time"
 
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
@@ -25,7 +27,6 @@ import (
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/jimm"
 	"github.com/canonical/jimm/internal/jimmtest"
-	"github.com/canonical/jimm/internal/jujuclient"
 	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 )
@@ -48,14 +49,18 @@ type jimmSuite struct {
 	AdminUser   *dbmodel.User
 	ClientStore func() *jjclient.MemStore
 	JIMM        *jimm.JIMM
+	cancel      context.CancelFunc
 }
 
 func (s *jimmSuite) SetUpTest(c *gc.C) {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	s.cancel = cancel
 
-	s.ControllerAdmins = []string{"controller-admin"}
 	s.CandidSuite.SetUpTest(c)
-	s.JujuConnSuite.SetUpTest(c)
+
+	s.HTTP = httptest.NewUnstartedServer(nil)
+	u, err := url.Parse("https://" + s.HTTP.Listener.Addr().String())
+	c.Assert(err, gc.Equals, nil)
 
 	ofgaClient, cofgaClient, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.TestName())
 	c.Assert(err, gc.Equals, nil)
@@ -63,19 +68,9 @@ func (s *jimmSuite) SetUpTest(c *gc.C) {
 	s.COFGAClient = cofgaClient
 	s.COFGAParams = cofgaParams
 
-	s.JIMM = &jimm.JIMM{
-		UUID: "914487b5-60e7-42bb-bd63-1adc3fd3a388",
-		Database: db.Database{
-			DB: jimmtest.MemoryDB(&gcTester{c}, nil),
-		},
-		Dialer:        &jujuclient.Dialer{},
-		OpenFGAClient: ofgaClient,
-	}
-	err = s.JIMM.Database.Migrate(context.Background(), true)
-	c.Assert(err, gc.Equals, nil)
-
 	s.Params = service.Params{
-		ControllerUUID:   s.JIMM.UUID,
+		PublicDNSName:    u.Host,
+		ControllerUUID:   "914487b5-60e7-42bb-bd63-1adc3fd3a388",
 		CandidURL:        s.Candid.URL.String(),
 		CandidPublicKey:  s.CandidPublicKey,
 		ControllerAdmins: []string{"admin"},
@@ -88,12 +83,28 @@ func (s *jimmSuite) SetUpTest(c *gc.C) {
 			Token:     cofgaParams.Token,
 			AuthModel: cofgaParams.AuthModelID,
 		},
+		JWTExpiryDuration:     time.Minute,
+		InsecureSecretStorage: true,
 	}
 	srv, err := service.NewService(ctx, s.Params)
 	c.Assert(err, gc.Equals, nil)
 	s.Service = srv
+	s.JIMM = srv.JIMM()
+	s.HTTP.Config = &http.Server{Handler: srv}
 
-	s.HTTP = httptest.NewTLSServer(srv)
+	err = s.Service.StartJWKSRotator(ctx, time.NewTicker(time.Hour).C, time.Now().UTC().AddDate(0, 3, 0))
+	c.Assert(err, gc.Equals, nil)
+
+	s.HTTP.StartTLS()
+
+	s.Service.RegisterJwksCache(ctx)
+
+	// NOW we can set up the  juju conn suites
+	s.ControllerConfigAttrs = map[string]interface{}{
+		"login-token-refresh-url": u.String() + "/.well-known/jwks.json",
+	}
+	s.ControllerAdmins = []string{"controller-admin"}
+	s.JujuConnSuite.SetUpTest(c)
 
 	s.AdminUser = &dbmodel.User{
 		Username:         "alice@external",
@@ -108,9 +119,6 @@ func (s *jimmSuite) SetUpTest(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	s.Candid.AddUser("alice")
-
-	u, err := url.Parse(s.HTTP.URL)
-	c.Assert(err, gc.IsNil)
 
 	w := new(bytes.Buffer)
 	err = pem.Encode(w, &pem.Block{
@@ -133,6 +141,9 @@ func (s *jimmSuite) SetUpTest(c *gc.C) {
 }
 
 func (s *jimmSuite) TearDownTest(c *gc.C) {
+	if s.cancel != nil {
+		s.cancel()
+	}
 	if s.HTTP != nil {
 		s.HTTP.Close()
 	}
@@ -160,9 +171,8 @@ func (s *jimmSuite) userBakeryClient(username string) *httpbakery.Client {
 
 func (s *jimmSuite) AddController(c *gc.C, name string, info *api.Info) {
 	ctl := &dbmodel.Controller{
+		UUID:          info.ControllerUUID,
 		Name:          name,
-		AdminUser:     info.Tag.Id(),
-		AdminPassword: info.Password,
 		CACertificate: info.CACert,
 		Addresses:     nil,
 	}

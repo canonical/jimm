@@ -5,14 +5,11 @@ package jujuapi_test
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
 	"encoding/pem"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
-	"time"
 
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
@@ -20,12 +17,9 @@ import (
 	"github.com/juju/juju/api"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
-	"github.com/juju/zaputil/zapctx"
-	"go.uber.org/zap"
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/internal/dbmodel"
-	"github.com/canonical/jimm/internal/jimmjwx"
 	"github.com/canonical/jimm/internal/jimmtest"
 	"github.com/canonical/jimm/internal/jujuapi"
 	"github.com/canonical/jimm/internal/openfga"
@@ -37,18 +31,20 @@ type websocketSuite struct {
 	jimmtest.CandidSuite
 	jimmtest.BootstrapSuite
 
-	InMemoryStore jimmtest.InMemoryCredentialStore
-	Params        jujuapi.Params
-	APIHandler    http.Handler
-	HTTP          *httptest.Server
+	Params     jujuapi.Params
+	APIHandler http.Handler
+	HTTP       *httptest.Server
 
 	Credential2 *dbmodel.CloudCredential
 	Model2      *dbmodel.Model
 	Model3      *dbmodel.Model
+
+	cancelFnc context.CancelFunc
 }
 
 func (s *websocketSuite) SetUpTest(c *gc.C) {
-	ctx := context.Background()
+	ctx, cancelFnc := context.WithCancel(context.Background())
+	s.cancelFnc = cancelFnc
 
 	s.ControllerAdmins = []string{"controller-admin"}
 
@@ -56,7 +52,6 @@ func (s *websocketSuite) SetUpTest(c *gc.C) {
 	s.BootstrapSuite.SetUpTest(c)
 
 	s.JIMM.Authenticator = s.Authenticator
-	s.JIMM.JWKService = jimmjwx.NewJWKSService(&s.InMemoryStore)
 
 	s.Params.ControllerUUID = "914487b5-60e7-42bb-bd63-1adc3fd3a388"
 	s.Params.IdentityLocation = s.Candid.URL.String()
@@ -64,7 +59,7 @@ func (s *websocketSuite) SetUpTest(c *gc.C) {
 	mux := http.NewServeMux()
 	mux.Handle("/api", jujuapi.APIHandler(ctx, s.JIMM, s.Params))
 	mux.Handle("/model/", jujuapi.ModelHandler(ctx, s.JIMM, s.Params))
-	jwks := wellknownapi.NewWellKnownHandler(&s.InMemoryStore)
+	jwks := wellknownapi.NewWellKnownHandler(s.JIMM.CredentialStore)
 	mux.HandleFunc("/.well-known/jwks.json", jwks.JWKS)
 
 	s.APIHandler = mux
@@ -91,25 +86,23 @@ func (s *websocketSuite) SetUpTest(c *gc.C) {
 	err = s.JIMM.Database.GetModel(ctx, s.Model3)
 	c.Assert(err, gc.Equals, nil)
 
-	// TODO (alesstimec) granting model access will be implemented in a followup
-	//conn := s.open(c, nil, "charlie")
-	//defer conn.Close()
-	//client := modelmanager.NewClient(conn)
-	//
-	//err = client.GrantModel("bob@external", "read", mt.Id())
-	//c.Assert(err, gc.Equals, nil)
-
 	bob := openfga.NewUser(
 		&dbmodel.User{
 			Username: "bob@external",
 		},
 		s.OFGAClient,
 	)
-	err = bob.SetModelAccess(context.Background(), s.Model3.ResourceTag(), ofganames.ReaderRelation)
+	err = bob.SetModelAccess(ctx, s.Model3.ResourceTag(), ofganames.ReaderRelation)
 	c.Assert(err, gc.Equals, nil)
 }
 
 func (s *websocketSuite) TearDownTest(c *gc.C) {
+	if s.cancelFnc != nil {
+		s.cancelFnc()
+	}
+	if s.HTTP != nil {
+		s.HTTP.Close()
+	}
 	s.BootstrapSuite.TearDownTest(c)
 	s.CandidSuite.TearDownTest(c)
 }
@@ -164,45 +157,9 @@ func (s *websocketSuite) open(c *gc.C, info *api.Info, username string) api.Conn
 
 type proxySuite struct {
 	websocketSuite
-	cancelJwkRotator context.CancelFunc
 }
 
 var _ = gc.Suite(&proxySuite{})
-
-func (s *proxySuite) SetUpTest(c *gc.C) {
-	s.websocketSuite.SetUpTest(c)
-	ctx, cancel := context.WithCancel(context.Background())
-	s.cancelJwkRotator = cancel
-	// This suite sets up the JWT service which allows JIMM to mint JWTs
-	// We don't set it up in the websocket suite to speed up tests that don't need it.
-	go func() error {
-		return s.JIMM.JWKService.StartJWKSRotator(ctx, time.NewTicker(time.Hour).C, time.Now().UTC().AddDate(0, 3, 0))
-	}()
-	zapctx.Debug(ctx, "URL", zap.String("URL", s.HTTP.URL))
-	url, err := url.Parse(s.HTTP.URL)
-	c.Assert(err, gc.IsNil)
-	c.Assert(os.Setenv("JIMM_JWT_EXPIRY", "30s"), gc.IsNil)
-	c.Assert(os.Setenv("JIMM_DNS_NAME", url.Host), gc.IsNil)
-	s.JIMM.JWTService = jimmjwx.NewJWTService(url.Host, &s.InMemoryStore, true)
-	tlsConfig := &tls.Config{
-		InsecureSkipVerify: true,
-	}
-	client := &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: tlsConfig,
-		},
-		Timeout: 15 * time.Second,
-	}
-	s.JIMM.JWTService.RegisterJWKSCache(ctx, client)
-}
-
-func (s *proxySuite) TearDownTest(c *gc.C) {
-	os.Clearenv()
-	if s.cancelJwkRotator != nil {
-		s.cancelJwkRotator()
-	}
-	s.websocketSuite.TearDownTest(c)
-}
 
 func (s *proxySuite) TestConnectToModel(c *gc.C) {
 	conn := s.open(c, &api.Info{
@@ -215,9 +172,6 @@ func (s *proxySuite) TestConnectToModel(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `no such request - method Admin.TestMethod is not implemented \(not implemented\)`)
 }
 
-// TODO(Kian): Once JIMM Tests run against Juju 3.2 this test should no longer return an error.
-// This tests makes a connection to the proxy service, mints a JWT and passes the modified login
-// request to the controller.
 func (s *proxySuite) TestConnectToModelAndLogin(c *gc.C) {
 	ctx := context.Background()
 	alice := names.NewUserTag("alice")
@@ -231,7 +185,7 @@ func (s *proxySuite) TestConnectToModelAndLogin(c *gc.C) {
 	if err == nil {
 		defer conn.Close()
 	}
-	c.Assert(err, gc.ErrorMatches, `parsing request authToken: no jwt authToken parser configured`)
+	c.Assert(err, gc.Equals, nil)
 }
 
 // TestConnectToModelNoBakeryClient ensures that authentication is in fact
