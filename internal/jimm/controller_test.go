@@ -823,7 +823,7 @@ func TestImportModel(t *testing.T) {
 				Valid:  true,
 			},
 			Owner: dbmodel.User{
-				Username:         "alice@external", // Owner will switch to the user doing the import
+				Username:         "alice@external",
 				DisplayName:      "Alice",
 				ControllerAccess: "superuser",
 			},

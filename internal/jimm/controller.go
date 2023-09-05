@@ -522,7 +522,7 @@ func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName 
 		errors.E(op, err)
 	}
 	if len(allCredentials) == 0 {
-		return errors.E(op, errors.CodeNotFound, fmt.Sprintf("Failed to find cloud credential for user %s on cloud %s", u.Username, cloudTag.Id()))
+		return errors.E(op, errors.CodeNotFound, fmt.Sprintf("Failed to find cloud credential for user %s on cloud %s", ownerUser.Username, cloudTag.Id()))
 	}
 	cloudCredential := allCredentials[0]
 
