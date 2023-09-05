@@ -37,6 +37,7 @@ func (s *postgresSuite) Init(c *qt.C) {
 	dsn := os.Getenv("JIMM_TEST_PGXDSN")
 	if dsn == "" {
 		c.Skip("postgresql not configured")
+		return
 	}
 
 	connCfg, err := pgx.ParseConfig(dsn)
