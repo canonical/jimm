@@ -504,6 +504,9 @@ func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName 
 		model.Users = append(model.Users, dbmodel.UserModelAccess{User: *u, Access: string(jujuparams.ModelAdminAccess)})
 	}
 
+	// TODO(CSS-5458): Remove the below section on cloud credentials once we no longer persist the relation between
+	// cloud credentials and models
+
 	// fetch cloud credential used by the model
 	cloudTag, err := names.ParseCloudTag(modelInfo.CloudTag)
 	if err != nil {
