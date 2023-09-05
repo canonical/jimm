@@ -25,10 +25,9 @@ var _ = gc.Suite(&addControllerSuite{})
 func (s *addControllerSuite) TestAddControllerSuperuser(c *gc.C) {
 	info := s.APIInfo(c)
 	params := apiparams.AddControllerRequest{
+		UUID:          info.ControllerUUID,
 		Name:          "controller-1",
 		CACertificate: info.CACert,
-		Username:      info.Tag.Id(),
-		Password:      info.Password,
 		APIAddresses:  info.Addrs,
 	}
 	tmpdir, tmpfile := writeYAMLTempFile(c, params)
@@ -85,8 +84,6 @@ func (s *addControllerSuite) TestAddController(c *gc.C) {
 	params := apiparams.AddControllerRequest{
 		Name:          "controller-1",
 		CACertificate: info.CACert,
-		Username:      info.Tag.Id(),
-		Password:      info.Password,
 		APIAddresses:  info.Addrs,
 	}
 	tmpdir, tmpfile := writeYAMLTempFile(c, params)

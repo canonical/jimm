@@ -45,9 +45,9 @@ func TestDefaultService(t *testing.T) {
 
 	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
-	os.Setenv("INSECURE_SECRET_STORAGE", "enable")
 	svc, err := jimm.NewService(context.Background(), jimm.Params{
-		OpenFGAParams: cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
+		OpenFGAParams:         cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
+		InsecureSecretStorage: true,
 	})
 	c.Assert(err, qt.IsNil)
 	rr := httptest.NewRecorder()
@@ -76,12 +76,12 @@ func TestAuthenticator(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	p := jimm.Params{
-		ControllerUUID:   "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
-		ControllerAdmins: []string{"admin"},
-		OpenFGAParams:    cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
+		ControllerUUID:        "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
+		ControllerAdmins:      []string{"admin"},
+		OpenFGAParams:         cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
+		InsecureSecretStorage: true,
 	}
 	candid := startCandid(c, &p)
-	os.Setenv("INSECURE_SECRET_STORAGE", "enable")
 	svc, err := jimm.NewService(context.Background(), p)
 	c.Assert(err, qt.IsNil)
 
@@ -190,10 +190,10 @@ func TestPostgresSecretStore(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	p := jimm.Params{
-		ControllerUUID: "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
-		OpenFGAParams:  cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
+		ControllerUUID:        "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
+		OpenFGAParams:         cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
+		InsecureSecretStorage: true,
 	}
-	os.Setenv("INSECURE_SECRET_STORAGE", "enable")
 	_, err = jimm.NewService(context.Background(), p)
 	c.Assert(err, qt.IsNil)
 }

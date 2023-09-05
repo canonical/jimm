@@ -72,7 +72,7 @@ func (d *Database) ForEachCloudCredential(ctx context.Context, username, cloud s
 	}
 
 	db := d.DB.WithContext(ctx)
-	mdb := db.Model(dbmodel.CloudCredential{}).Preload("Cloud")
+	mdb := db.Model(dbmodel.CloudCredential{})
 	if cloud == "" {
 		mdb = mdb.Where("owner_username = ?", username)
 	} else {
@@ -87,6 +87,10 @@ func (d *Database) ForEachCloudCredential(ctx context.Context, username, cloud s
 		var cred dbmodel.CloudCredential
 		if err := db.ScanRows(rows, &cred); err != nil {
 			return errors.E(op, dbError(err))
+		}
+		err = d.GetCloudCredential(ctx, &cred)
+		if err != nil {
+			return err
 		}
 		if err := f(&cred); err != nil {
 			return err

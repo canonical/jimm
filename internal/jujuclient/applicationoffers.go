@@ -21,14 +21,13 @@ func (c Connection) Offer(ctx context.Context, offerURL crossmodel.OfferURL, off
 	args := jujuparams.AddApplicationOffers{
 		Offers: []jujuparams.AddApplicationOffer{offer},
 	}
-
 	resp := jujuparams.ErrorResults{
 		Results: make([]jujuparams.ErrorResult, 1),
 	}
 	if c.hasFacadeVersion("ApplicationOffers", 4) {
 		// Facade call version 4 will grant owner admin access to the
 		// created offer
-		err := c.client.Call(ctx, "ApplicationOffers", 4, "", "Offer", &args, &resp)
+		err := c.Call(ctx, "ApplicationOffers", 4, "", "Offer", &args, &resp)
 		if err != nil {
 			return errors.E(op, jujuerrors.Cause(err))
 		}
@@ -43,7 +42,7 @@ func (c Connection) Offer(ctx context.Context, offerURL crossmodel.OfferURL, off
 
 		// Facade call version 2 will not grant owner admin access, so
 		// we have to do it ourselves.
-		err = c.client.Call(ctx, "ApplicationOffers", 2, "", "Offer", &args, &resp)
+		err = c.Call(ctx, "ApplicationOffers", 2, "", "Offer", &args, &resp)
 		if err != nil {
 			return errors.E(op, jujuerrors.Cause(err))
 		}

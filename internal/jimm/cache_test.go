@@ -29,7 +29,7 @@ func TestCacheDialerDialError(t *testing.T) {
 	ctl := dbmodel.Controller{
 		Name: "test-controller",
 	}
-	_, err := dialer.Dial(context.Background(), &ctl, names.ModelTag{})
+	_, err := dialer.Dial(context.Background(), &ctl, names.ModelTag{}, nil)
 	c.Check(err, qt.Equals, testError)
 
 	testAPI := jimmtest.API{
@@ -37,7 +37,7 @@ func TestCacheDialerDialError(t *testing.T) {
 	}
 	testDialer.Err = nil
 	testDialer.API = &testAPI
-	api, err := dialer.Dial(context.Background(), &ctl, names.ModelTag{})
+	api, err := dialer.Dial(context.Background(), &ctl, names.ModelTag{}, nil)
 	c.Assert(err, qt.IsNil)
 	c.Check(api.SupportsCheckCredentialModels(), qt.Equals, true)
 }
@@ -56,7 +56,7 @@ func TestCacheDialerDialModel(t *testing.T) {
 		Name: "test-controller",
 	}
 	mt := names.NewModelTag("00000002-0000-0000-0000-000000000001")
-	api, err := dialer.Dial(context.Background(), &ctl, mt)
+	api, err := dialer.Dial(context.Background(), &ctl, mt, nil)
 	c.Assert(err, qt.IsNil)
 	c.Check(api.SupportsCheckCredentialModels(), qt.Equals, true)
 
@@ -64,7 +64,7 @@ func TestCacheDialerDialModel(t *testing.T) {
 		SupportsModelSummaryWatcher_: true,
 	}
 	testDialer.API = &testAPI2
-	api, err = dialer.Dial(context.Background(), &ctl, mt)
+	api, err = dialer.Dial(context.Background(), &ctl, mt, nil)
 	c.Assert(err, qt.IsNil)
 	c.Check(api.SupportsModelSummaryWatcher(), qt.Equals, true)
 }
@@ -89,7 +89,7 @@ func TestCacheDialerConcurrentConnections(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		go func() {
 			defer wg.Done()
-			api, err := dialer.Dial(context.Background(), &ctl, names.ModelTag{})
+			api, err := dialer.Dial(context.Background(), &ctl, names.ModelTag{}, nil)
 			c.Check(err, qt.IsNil)
 			defer api.Close()
 			c.Check(api.SupportsCheckCredentialModels(), qt.Equals, true)
@@ -101,7 +101,7 @@ func TestCacheDialerConcurrentConnections(t *testing.T) {
 	}
 	wg.Wait()
 	// Get a connection from the cache.
-	api, err := dialer.Dial(context.Background(), &ctl, names.ModelTag{})
+	api, err := dialer.Dial(context.Background(), &ctl, names.ModelTag{}, nil)
 	c.Check(err, qt.IsNil)
 	c.Check(api.SupportsCheckCredentialModels(), qt.Equals, true)
 	err = api.Close()
@@ -138,11 +138,11 @@ func TestCacheDialerCloseBrokenConnection(t *testing.T) {
 		Name: "test-controller",
 	}
 
-	api, err := dialer.Dial(context.Background(), &ctl, names.ModelTag{})
+	api, err := dialer.Dial(context.Background(), &ctl, names.ModelTag{}, nil)
 	c.Assert(err, qt.IsNil)
 	err = api.Close()
 	c.Assert(err, qt.IsNil)
-	api2, err := dialer.Dial(context.Background(), &ctl, names.ModelTag{})
+	api2, err := dialer.Dial(context.Background(), &ctl, names.ModelTag{}, nil)
 	c.Assert(err, qt.IsNil)
 	err = api2.Close()
 	c.Assert(err, qt.IsNil)
@@ -156,9 +156,9 @@ type countingDialer struct {
 	count  int64
 }
 
-func (d *countingDialer) Dial(ctx context.Context, ctl *dbmodel.Controller, mt names.ModelTag) (jimm.API, error) {
+func (d *countingDialer) Dial(ctx context.Context, ctl *dbmodel.Controller, mt names.ModelTag, requiredPermissions map[string]string) (jimm.API, error) {
 	atomic.AddInt64(&d.count, 1)
-	return d.dialer.Dial(ctx, ctl, mt)
+	return d.dialer.Dial(ctx, ctl, mt, requiredPermissions)
 }
 
 type closeCountingAPI struct {
@@ -176,22 +176,23 @@ func TestCacheDialerContextCanceled(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	doneC := make(chan struct{})
-	dialer := jimm.CacheDialer(dialerFunc(func(context.Context, *dbmodel.Controller, names.ModelTag) (jimm.API, error) {
+	dialer := jimm.CacheDialer(dialerFunc(func(context.Context, *dbmodel.Controller, names.ModelTag, map[string]string) (jimm.API, error) {
 		cancel()
 		<-doneC
 		return nil, errors.E("dial error")
 	}))
 	ctl := dbmodel.Controller{
+		UUID: jimmtest.ControllerUUID,
 		Name: "test-controller",
 	}
-	api, err := dialer.Dial(ctx, &ctl, names.ModelTag{})
+	api, err := dialer.Dial(ctx, &ctl, names.ModelTag{}, nil)
 	c.Check(err, qt.Equals, context.Canceled)
 	c.Check(api, qt.IsNil)
 	close(doneC)
 }
 
-type dialerFunc func(context.Context, *dbmodel.Controller, names.ModelTag) (jimm.API, error)
+type dialerFunc func(context.Context, *dbmodel.Controller, names.ModelTag, map[string]string) (jimm.API, error)
 
-func (f dialerFunc) Dial(ctx context.Context, ctl *dbmodel.Controller, mt names.ModelTag) (jimm.API, error) {
-	return f(ctx, ctl, mt)
+func (f dialerFunc) Dial(ctx context.Context, ctl *dbmodel.Controller, mt names.ModelTag, requiredPermissions map[string]string) (jimm.API, error) {
+	return f(ctx, ctl, mt, requiredPermissions)
 }

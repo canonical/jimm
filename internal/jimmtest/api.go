@@ -49,7 +49,7 @@ type Dialer struct {
 }
 
 // Dialer implements jimm.Dialer.
-func (d *Dialer) Dial(_ context.Context, ctl *dbmodel.Controller, _ names.ModelTag) (jimm.API, error) {
+func (d *Dialer) Dial(_ context.Context, ctl *dbmodel.Controller, _ names.ModelTag, _ map[string]string) (jimm.API, error) {
 	if d.Err != nil {
 		return nil, d.Err
 	}
@@ -91,9 +91,9 @@ func (w apiWrapper) Close() error {
 type ModelDialerMap map[string]jimm.Dialer
 
 // Dial implements jimm.Dialer.
-func (m ModelDialerMap) Dial(ctx context.Context, ctl *dbmodel.Controller, mt names.ModelTag) (jimm.API, error) {
+func (m ModelDialerMap) Dial(ctx context.Context, ctl *dbmodel.Controller, mt names.ModelTag, _ map[string]string) (jimm.API, error) {
 	if d, ok := m[mt.Id()]; ok {
-		return d.Dial(ctx, ctl, mt)
+		return d.Dial(ctx, ctl, mt, nil)
 	}
 	return nil, errors.E(fmt.Sprintf("dialer not configured for controller %s", ctl.Name))
 }
@@ -103,9 +103,9 @@ func (m ModelDialerMap) Dial(ctx context.Context, ctl *dbmodel.Controller, mt na
 type DialerMap map[string]jimm.Dialer
 
 // Dial implements jimm.Dialer.
-func (m DialerMap) Dial(ctx context.Context, ctl *dbmodel.Controller, mt names.ModelTag) (jimm.API, error) {
+func (m DialerMap) Dial(ctx context.Context, ctl *dbmodel.Controller, mt names.ModelTag, _ map[string]string) (jimm.API, error) {
 	if d, ok := m[ctl.Name]; ok {
-		return d.Dial(ctx, ctl, mt)
+		return d.Dial(ctx, ctl, mt, nil)
 	}
 	return nil, errors.E(fmt.Sprintf("dialer not configured for controller %s", ctl.Name))
 }

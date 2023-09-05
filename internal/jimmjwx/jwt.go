@@ -8,7 +8,6 @@ import (
 	"encoding/pem"
 	"fmt"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/canonical/jimm/internal/errors"
@@ -23,13 +22,19 @@ import (
 	"go.uber.org/zap"
 )
 
-// JWTService manages the creation of JWTs that are inteded to be issued
+type JWTServiceParams struct {
+	Host   string
+	Secure bool
+	Store  credentials.CredentialStore
+	Expiry time.Duration
+}
+
+// JWTService manages the creation of JWTs that are intended to be issued
 // by JIMM.
 type JWTService struct {
+	JWTServiceParams
+
 	Cache *jwk.Cache
-	host  string
-	https bool
-	store credentials.CredentialStore
 }
 
 // JWTParams are the necessary params to issue a ready-to-go JWT targeted
@@ -44,8 +49,8 @@ type JWTParams struct {
 }
 
 // NewJWTService returns a new JWT service for handling JIMMs JWTs.
-func NewJWTService(host string, store credentials.CredentialStore, https bool) *JWTService {
-	return &JWTService{host: host, store: store, https: https}
+func NewJWTService(p JWTServiceParams) *JWTService {
+	return &JWTService{JWTServiceParams: p}
 }
 
 // RegisterJWKSCache registers a cache to refresh the public key persisted by JIMM's
@@ -54,7 +59,7 @@ func NewJWTService(host string, store credentials.CredentialStore, https bool) *
 func (j *JWTService) RegisterJWKSCache(ctx context.Context, client *http.Client) {
 	j.Cache = jwk.NewCache(ctx)
 
-	_ = j.Cache.Register(j.getJWKSEndpoint(j.https), jwk.WithHTTPClient(client))
+	_ = j.Cache.Register(j.getJWKSEndpoint(j.Secure), jwk.WithHTTPClient(client))
 
 	err := retry.Call(retry.CallArgs{
 		Func: func() error {
@@ -64,8 +69,8 @@ func (j *JWTService) RegisterJWKSCache(ctx context.Context, client *http.Client)
 				return nil
 			default:
 			}
-			if _, err := j.Cache.Refresh(ctx, j.getJWKSEndpoint(j.https)); err != nil {
-				zapctx.Debug(ctx, "Refresh error", zap.Error(err), zap.String("URL", j.getJWKSEndpoint(j.https)))
+			if _, err := j.Cache.Refresh(ctx, j.getJWKSEndpoint(j.Secure)); err != nil {
+				zapctx.Debug(ctx, "Refresh error", zap.Error(err), zap.String("URL", j.getJWKSEndpoint(j.Secure)))
 				return err
 			}
 			return nil
@@ -106,7 +111,7 @@ func (j *JWTService) NewJWT(ctx context.Context, params JWTParams) ([]byte, erro
 		return nil, errors.E("nil pointer in JWT service")
 	}
 
-	jwkSet, err := j.Cache.Get(ctx, j.getJWKSEndpoint(j.https))
+	jwkSet, err := j.Cache.Get(ctx, j.getJWKSEndpoint(j.Secure))
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +121,7 @@ func (j *JWTService) NewJWT(ctx context.Context, params JWTParams) ([]byte, erro
 		zapctx.Error(ctx, "no jwk found")
 		return nil, errors.E("no jwk found")
 	}
-	pkeyPem, err := j.store.GetJWKSPrivateKey(ctx)
+	pkeyPem, err := j.Store.GetJWKSPrivateKey(ctx)
 	if err != nil {
 		zapctx.Error(ctx, "failed to retrieve private key", zap.Error(err))
 		return nil, err
@@ -136,22 +141,16 @@ func (j *JWTService) NewJWT(ctx context.Context, params JWTParams) ([]byte, erro
 		return nil, err
 	}
 
-	expiryDuration, err := time.ParseDuration(os.Getenv("JIMM_JWT_EXPIRY"))
-	if err != nil {
-		zapctx.Error(ctx, "failed to get JIMM_JWT_EXPIRY environment variable", zap.Error(err))
-		return nil, err
-	}
-
 	signingKey.Set(jwk.AlgorithmKey, jwa.RS256)
 	signingKey.Set(jwk.KeyIDKey, pubKey.KeyID())
 
 	token, err := jwt.NewBuilder().
 		Audience([]string{params.Controller}).
 		Subject(params.User).
-		Issuer(os.Getenv("JIMM_DNS_NAME")).
+		Issuer(j.Host).
 		JwtID(jti).
 		Claim("access", params.Access).
-		Expiration(time.Now().Add(expiryDuration)).
+		Expiration(time.Now().Add(j.Expiry)).
 		Build()
 	if err != nil {
 		zapctx.Error(ctx, "failed to create token", zap.Error(err))
@@ -186,5 +185,5 @@ func (j *JWTService) getJWKSEndpoint(secure bool) string {
 	if !secure {
 		scheme = "http://"
 	}
-	return scheme + j.host + "/.well-known/jwks.json"
+	return scheme + j.Host + "/.well-known/jwks.json"
 }

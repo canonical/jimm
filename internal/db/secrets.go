@@ -107,9 +107,6 @@ func (d *Database) Get(ctx context.Context, tag names.CloudCredentialTag) (map[s
 // Put stores the attributes associated with a cloud-credential in the DB.
 func (d *Database) Put(ctx context.Context, tag names.CloudCredentialTag, attr map[string]string) error {
 	const op = errors.Op("database.Put")
-	if len(attr) == 0 {
-		return d.deleteCloudCredential(ctx, tag)
-	}
 	dataJson, err := json.Marshal(attr)
 	if err != nil {
 		zapctx.Error(ctx, "failed to marshal secret data", zap.Error(err))

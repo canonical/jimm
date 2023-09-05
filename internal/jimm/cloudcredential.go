@@ -238,7 +238,6 @@ func (j *JIMM) updateCredential(ctx context.Context, credential *dbmodel.CloudCr
 		zapctx.Error(ctx, "failed to store credential id", zap.Error(err))
 		return errors.E(op, err)
 	}
-
 	if err := j.CredentialStore.Put(ctx, credential.ResourceTag(), credential.Attributes); err != nil {
 		zapctx.Error(ctx, "failed to store credentials", zap.Error(err))
 		return errors.E(op, err)

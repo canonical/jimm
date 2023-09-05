@@ -6,7 +6,9 @@ import (
 	"context"
 
 	"github.com/juju/cmd/v3/cmdtesting"
+	jjcloud "github.com/juju/juju/cloud"
 	jujuparams "github.com/juju/juju/rpc/params"
+	"github.com/juju/juju/testing/factory"
 	"github.com/juju/names/v4"
 	gc "gopkg.in/check.v1"
 
@@ -25,25 +27,29 @@ func (s *importModelSuite) TestImportModelSuperuser(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
 
 	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@external/cred")
-	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{AuthType: "empty"})
-	mt := s.AddModel(c, names.NewUserTag("charlie@external"), "model-2", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, cct)
-	var model dbmodel.Model
-	model.SetTag(mt)
-	err := s.JIMM.Database.GetModel(context.Background(), &model)
+	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{AuthType: "empty", Attributes: map[string]string{"key": "value"}})
+
+	err := s.BackingState.UpdateCloudCredential(cct, jjcloud.NewCredential(jjcloud.EmptyAuthType, map[string]string{"key": "value"}))
 	c.Assert(err, gc.Equals, nil)
-	err = s.JIMM.Database.DeleteModel(context.Background(), &model)
-	c.Assert(err, gc.Equals, nil)
+
+	m := s.Factory.MakeModel(c, &factory.ModelParams{
+		Name:            "model-2",
+		Owner:           names.NewUserTag("charlie@external"),
+		CloudName:       jimmtest.TestCloudName,
+		CloudRegion:     jimmtest.TestCloudRegionName,
+		CloudCredential: cct,
+	})
+	defer m.Close()
 
 	// alice is superuser
 	bClient := s.userBakeryClient("alice")
-	_, err = cmdtesting.RunCommand(c, cmd.NewImportModelCommandForTesting(s.ClientStore(), bClient), "controller-1", mt.Id())
+	_, err = cmdtesting.RunCommand(c, cmd.NewImportModelCommandForTesting(s.ClientStore(), bClient), "controller-1", m.ModelUUID())
 	c.Assert(err, gc.IsNil)
 
 	var model2 dbmodel.Model
-	model2.SetTag(mt)
+	model2.SetTag(names.NewModelTag(m.ModelUUID()))
 	err = s.JIMM.Database.GetModel(context.Background(), &model2)
 	c.Assert(err, gc.Equals, nil)
-	c.Check(model2.CreatedAt.After(model.CreatedAt), gc.Equals, true)
 }
 
 func (s *importModelSuite) TestImportModelUnauthorized(c *gc.C) {
@@ -51,17 +57,22 @@ func (s *importModelSuite) TestImportModelUnauthorized(c *gc.C) {
 
 	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@external/cred")
 	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{AuthType: "empty"})
-	mt := s.AddModel(c, names.NewUserTag("charlie@external"), "model-2", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, cct)
-	var model dbmodel.Model
-	model.SetTag(mt)
-	err := s.JIMM.Database.GetModel(context.Background(), &model)
+
+	err := s.BackingState.UpdateCloudCredential(cct, jjcloud.NewCredential(jjcloud.EmptyAuthType, map[string]string{"key": "value"}))
 	c.Assert(err, gc.Equals, nil)
-	err = s.JIMM.Database.DeleteModel(context.Background(), &model)
-	c.Assert(err, gc.Equals, nil)
+
+	m := s.Factory.MakeModel(c, &factory.ModelParams{
+		Name:            "model-2",
+		Owner:           names.NewUserTag("charlie@external"),
+		CloudName:       jimmtest.TestCloudName,
+		CloudRegion:     jimmtest.TestCloudRegionName,
+		CloudCredential: cct,
+	})
+	defer m.Close()
 
 	// bob is not superuser
 	bClient := s.userBakeryClient("bob")
-	_, err = cmdtesting.RunCommand(c, cmd.NewImportModelCommandForTesting(s.ClientStore(), bClient), "controller-1", mt.Id())
+	_, err = cmdtesting.RunCommand(c, cmd.NewImportModelCommandForTesting(s.ClientStore(), bClient), "controller-1", m.ModelUUID())
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
 

@@ -11,13 +11,13 @@ import (
 	gc "gopkg.in/check.v1"
 )
 
-type usermanagerSuite struct {
+type userManagerSuite struct {
 	websocketSuite
 }
 
-var _ = gc.Suite(&usermanagerSuite{})
+var _ = gc.Suite(&userManagerSuite{})
 
-func (s *usermanagerSuite) TestAddUser(c *gc.C) {
+func (s *userManagerSuite) TestAddUser(c *gc.C) {
 	conn := s.open(c, nil, "alice")
 	defer conn.Close()
 
@@ -26,7 +26,7 @@ func (s *usermanagerSuite) TestAddUser(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
 
-func (s *usermanagerSuite) TestRemoveUser(c *gc.C) {
+func (s *userManagerSuite) TestRemoveUser(c *gc.C) {
 	conn := s.open(c, nil, "alice")
 	defer conn.Close()
 
@@ -35,7 +35,7 @@ func (s *usermanagerSuite) TestRemoveUser(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
 
-func (s *usermanagerSuite) TestEnableUser(c *gc.C) {
+func (s *userManagerSuite) TestEnableUser(c *gc.C) {
 	conn := s.open(c, nil, "alice")
 	defer conn.Close()
 
@@ -44,7 +44,7 @@ func (s *usermanagerSuite) TestEnableUser(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
 
-func (s *usermanagerSuite) TestDisableUser(c *gc.C) {
+func (s *userManagerSuite) TestDisableUser(c *gc.C) {
 	conn := s.open(c, nil, "alice")
 	defer conn.Close()
 
@@ -53,7 +53,7 @@ func (s *usermanagerSuite) TestDisableUser(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
 
-func (s *usermanagerSuite) TestUserInfoAllUsers(c *gc.C) {
+func (s *userManagerSuite) TestUserInfoAllUsers(c *gc.C) {
 	conn := s.open(c, nil, "alice")
 	defer conn.Close()
 
@@ -63,7 +63,7 @@ func (s *usermanagerSuite) TestUserInfoAllUsers(c *gc.C) {
 	c.Assert(len(users), gc.Equals, 0)
 }
 
-func (s *usermanagerSuite) TestUserInfoSpecifiedUser(c *gc.C) {
+func (s *userManagerSuite) TestUserInfoSpecifiedUser(c *gc.C) {
 	conn := s.open(c, nil, "alice")
 	defer conn.Close()
 
@@ -81,7 +81,7 @@ func (s *usermanagerSuite) TestUserInfoSpecifiedUser(c *gc.C) {
 	})
 }
 
-func (s *usermanagerSuite) TestUserInfoSpecifiedUsers(c *gc.C) {
+func (s *userManagerSuite) TestUserInfoSpecifiedUsers(c *gc.C) {
 	conn := s.open(c, nil, "alice")
 	defer conn.Close()
 
@@ -91,7 +91,7 @@ func (s *usermanagerSuite) TestUserInfoSpecifiedUsers(c *gc.C) {
 	c.Assert(users, gc.HasLen, 0)
 }
 
-func (s *usermanagerSuite) TestUserInfoWithDomain(c *gc.C) {
+func (s *userManagerSuite) TestUserInfoWithDomain(c *gc.C) {
 	conn := s.open(c, nil, "alice@mydomain")
 	defer conn.Close()
 
@@ -108,7 +108,7 @@ func (s *usermanagerSuite) TestUserInfoWithDomain(c *gc.C) {
 	})
 }
 
-func (s *usermanagerSuite) TestUserInfoInvalidUsername(c *gc.C) {
+func (s *userManagerSuite) TestUserInfoInvalidUsername(c *gc.C) {
 	conn := s.open(c, nil, "alice")
 	defer conn.Close()
 
@@ -118,7 +118,7 @@ func (s *usermanagerSuite) TestUserInfoInvalidUsername(c *gc.C) {
 	c.Assert(users, gc.HasLen, 0)
 }
 
-func (s *usermanagerSuite) TestUserInfoLocalUsername(c *gc.C) {
+func (s *userManagerSuite) TestUserInfoLocalUsername(c *gc.C) {
 	conn := s.open(c, nil, "alice")
 	defer conn.Close()
 
@@ -128,7 +128,7 @@ func (s *usermanagerSuite) TestUserInfoLocalUsername(c *gc.C) {
 	c.Assert(users, gc.HasLen, 0)
 }
 
-func (s *usermanagerSuite) TestSetPassword(c *gc.C) {
+func (s *userManagerSuite) TestSetPassword(c *gc.C) {
 	conn := s.open(c, nil, "alice")
 	defer conn.Close()
 

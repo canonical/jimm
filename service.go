@@ -152,6 +152,13 @@ type Params struct {
 
 	// MacaroonExpiryDuration holds the expiry duration of authentication macaroons.
 	MacaroonExpiryDuration time.Duration
+
+	// JWTExpiryDuration holds the expiry duration for issued JWTs.
+	JWTExpiryDuration time.Duration
+
+	// InsecureSecretStorage instructs JIMM to store secrets in its database
+	// instead of dedicated secure storage. SHOULD NOT BE USED IN PRODUCTION.
+	InsecureSecretStorage bool
 }
 
 // A Service is the implementation of a JIMM server.
@@ -159,6 +166,10 @@ type Service struct {
 	jimm jimm.JIMM
 
 	mux *chi.Mux
+}
+
+func (s *Service) JIMM() *jimm.JIMM {
+	return &s.jimm
 }
 
 // ServeHTTP implements http.Handler.
@@ -294,18 +305,23 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		return nil, errors.E(op, err)
 	}
 
-	s.jimm.Dialer = &jujuclient.Dialer{
-		ControllerCredentialsStore: s.jimm.CredentialStore,
-	}
-	if !p.DisableConnectionCache {
-		s.jimm.Dialer = jimm.CacheDialer(s.jimm.Dialer)
+	if p.JWTExpiryDuration == 0 {
+		p.JWTExpiryDuration = 24 * time.Hour
 	}
 
-	if s.jimm.CredentialStore != nil {
-		s.jimm.JWKService = jimmjwx.NewJWKSService(s.jimm.CredentialStore)
-		s.jimm.JWTService = jimmjwx.NewJWTService(p.PublicDNSName, s.jimm.CredentialStore, false)
-	} else {
-		zapctx.Warn(ctx, "not starting JWKS service - vault not available")
+	s.jimm.JWKService = jimmjwx.NewJWKSService(s.jimm.CredentialStore)
+	s.jimm.JWTService = jimmjwx.NewJWTService(jimmjwx.JWTServiceParams{
+		Host:   p.PublicDNSName,
+		Secure: true,
+		Store:  s.jimm.CredentialStore,
+		Expiry: p.JWTExpiryDuration,
+	})
+	s.jimm.Dialer = &jujuclient.Dialer{
+		JWTService: s.jimm.JWTService,
+	}
+
+	if !p.DisableConnectionCache {
+		s.jimm.Dialer = jimm.CacheDialer(s.jimm.Dialer)
 	}
 
 	mountHandler := func(path string, h jimmhttp.JIMMHttpHandler) {
@@ -470,7 +486,7 @@ func (s *Service) setupCredentialStore(ctx context.Context, p Params) error {
 	}
 
 	// Only enable Postgres storage for secrets if explicitly enabled.
-	if _, ok := os.LookupEnv("INSECURE_SECRET_STORAGE"); ok {
+	if p.InsecureSecretStorage {
 		zapctx.Warn(ctx, "using plaintext postgres for secret storage")
 		s.jimm.CredentialStore = &s.jimm.Database
 		return nil

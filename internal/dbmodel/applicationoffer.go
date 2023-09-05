@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/juju/charm/v10"
+	"github.com/juju/charm/v11"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 	"gorm.io/gorm"

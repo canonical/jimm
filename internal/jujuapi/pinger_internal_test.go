@@ -15,6 +15,7 @@ func TestControllerPing(t *testing.T) {
 	c := qt.New(t)
 
 	r := newControllerRoot(nil, Params{})
+	defer r.cleanup()
 	var calls uint32
 	r.setPingF(func() { atomic.AddUint32(&calls, 1) })
 	m, err := r.FindMethod("Pinger", 1, "Ping")

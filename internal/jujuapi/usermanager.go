@@ -20,6 +20,7 @@ func init() {
 		setPasswordMethod := rpc.Method(r.SetPassword)
 		userInfoMethod := rpc.Method(r.UserInfo)
 		resetPasswordMethod := rpc.Method(r.ResetPassword)
+		modelUserInfoMethod := rpc.Method(r.ModelUserInfo)
 
 		r.AddMethod("UserManager", 1, "AddUser", addUserMethod)
 		r.AddMethod("UserManager", 1, "DisableUser", disableUserMethod)
@@ -36,7 +37,16 @@ func init() {
 		r.AddMethod("UserManager", 2, "UserInfo", userInfoMethod)
 		r.AddMethod("UserManager", 2, "ResetPassword", resetPasswordMethod)
 
-		return []int{1}
+		r.AddMethod("UserManager", 3, "AddUser", addUserMethod)
+		r.AddMethod("UserManager", 3, "DisableUser", disableUserMethod)
+		r.AddMethod("UserManager", 3, "EnableUser", enableUserMethod)
+		r.AddMethod("UserManager", 3, "RemoveUser", removeUserMethod)
+		r.AddMethod("UserManager", 3, "SetPassword", setPasswordMethod)
+		r.AddMethod("UserManager", 3, "UserInfo", userInfoMethod)
+		r.AddMethod("UserManager", 3, "ResetPassword", resetPasswordMethod)
+		r.AddMethod("UserManager", 3, "ModelUserInfo", modelUserInfoMethod)
+
+		return []int{3, 2, 1}
 	}
 }
 
@@ -58,6 +68,11 @@ func (r *controllerRoot) EnableUser(jujuparams.Entities) (jujuparams.ErrorResult
 // DisableUser implements the UserManager facade's DisableUser method.
 func (r *controllerRoot) DisableUser(jujuparams.Entities) (jujuparams.ErrorResults, error) {
 	return jujuparams.ErrorResults{}, errors.E(errors.CodeUnauthorized, "unauthorized")
+}
+
+// ModelUserInfo returns information on all users in the model.
+func (r *controllerRoot) ModelUserInfo(args jujuparams.Entities) (jujuparams.ModelUserInfoResults, error) {
+	return jujuparams.ModelUserInfoResults{}, errors.E(errors.CodeNotImplemented, "not implements")
 }
 
 // UserInfo implements the UserManager facade's UserInfo method.

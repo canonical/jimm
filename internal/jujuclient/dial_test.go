@@ -17,7 +17,6 @@ import (
 	"github.com/canonical/jimm/internal/jimm"
 	"github.com/canonical/jimm/internal/jimmtest"
 	"github.com/canonical/jimm/internal/jujuclient"
-	"github.com/canonical/jimm/internal/vault"
 )
 
 type jujuclientSuite struct {
@@ -28,9 +27,9 @@ type jujuclientSuite struct {
 }
 
 func (s *jujuclientSuite) SetUpTest(c *gc.C) {
-	s.JujuConnSuite.SetUpTest(c)
+	s.JujuSuite.SetUpTest(c)
 
-	s.Dialer = &jujuclient.Dialer{}
+	s.Dialer = s.JIMM.Dialer
 	var err error
 	info := s.APIInfo(c)
 	hpss := make(dbmodel.HostPorts, 0, len(info.Addrs))
@@ -45,13 +44,12 @@ func (s *jujuclientSuite) SetUpTest(c *gc.C) {
 		}})
 	}
 	ctl := dbmodel.Controller{
+		UUID:          s.ControllerConfig.ControllerUUID(),
 		Name:          s.ControllerConfig.ControllerName(),
 		CACertificate: info.CACert,
-		AdminUser:     info.Tag.Id(),
-		AdminPassword: info.Password,
 		Addresses:     hpss,
 	}
-	s.API, err = s.Dialer.Dial(context.Background(), &ctl, names.ModelTag{})
+	s.API, err = s.Dialer.Dial(context.Background(), &ctl, names.ModelTag{}, nil)
 	c.Assert(err, gc.Equals, nil)
 }
 
@@ -73,13 +71,14 @@ var _ = gc.Suite(&dialSuite{})
 func (s *dialSuite) TestDial(c *gc.C) {
 	info := s.APIInfo(c)
 	ctl := dbmodel.Controller{
+		UUID:          s.ControllerConfig.ControllerUUID(),
 		Name:          s.ControllerConfig.ControllerName(),
 		CACertificate: info.CACert,
 		AdminUser:     info.Tag.Id(),
 		AdminPassword: info.Password,
 		PublicAddress: info.Addrs[0],
 	}
-	api, err := s.Dialer.Dial(context.Background(), &ctl, names.ModelTag{})
+	api, err := s.Dialer.Dial(context.Background(), &ctl, names.ModelTag{}, nil)
 	c.Assert(err, gc.Equals, nil)
 	defer api.Close()
 	c.Check(ctl.UUID, gc.Equals, "deadbeef-1bad-500d-9000-4b1d0d06f00d")
@@ -99,42 +98,23 @@ func (t *cExtended) Name() string {
 	return t.TestName()
 }
 
-func (s *dialSuite) TestDialWithCredentialsStoredInVault(c *gc.C) {
+func (s *dialSuite) TestDialWithJWT(c *gc.C) {
 	ctx := context.Background()
-	client, path, creds, ok := jimmtest.VaultClient(&cExtended{c}, "../../")
-	if !ok {
-		c.Skip("vault not available")
-	}
-	store := &vault.VaultStore{
-		Client:     client,
-		AuthSecret: creds,
-		AuthPath:   "/auth/approle/login",
-		KVPath:     path,
-	}
 
 	info := s.APIInfo(c)
 	ctl := dbmodel.Controller{
+		UUID:          info.ControllerUUID,
 		Name:          s.ControllerConfig.ControllerName(),
 		CACertificate: info.CACert,
 		PublicAddress: info.Addrs[0],
-		AdminUser:     info.Tag.Id(),
-		AdminPassword: info.Password,
 	}
 
-	err := store.PutControllerCredentials(
-		ctx,
-		ctl.Name,
-		info.Tag.Id(),
-		info.Password,
-	)
-	c.Assert(err, gc.IsNil)
-
 	dialer := &jujuclient.Dialer{
-		ControllerCredentialsStore: store,
+		JWTService: s.JIMM.JWTService,
 	}
 
 	// Check dial is OK
-	api, err := dialer.Dial(ctx, &ctl, names.ModelTag{})
+	api, err := dialer.Dial(ctx, &ctl, names.ModelTag{}, nil)
 	c.Assert(err, gc.Equals, nil)
 	defer api.Close()
 	// Check UUID matches expected
@@ -146,10 +126,4 @@ func (s *dialSuite) TestDialWithCredentialsStoredInVault(c *gc.C) {
 		addrs[i] = fmt.Sprintf("%s:%d", addr[0].Value, addr[0].Port)
 	}
 	c.Check(addrs, gc.DeepEquals, info.Addrs)
-
-	// Gather credentials from vault
-	usr, pwd, err := store.GetControllerCredentials(ctx, ctl.Name)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(usr, gc.Equals, info.Tag.Id())
-	c.Assert(pwd, gc.Equals, info.Password)
 }
