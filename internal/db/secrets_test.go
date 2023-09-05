@@ -32,7 +32,7 @@ func (s *dbSuite) TestInsertSecret(c *qt.C) {
 	secret := dbmodel.Secret{}
 	tx := s.Database.DB.First(&secret)
 	c.Assert(tx.Error, qt.IsNil)
-	c.Assert(secret.Time, qt.Equals, testTime)
+	c.Assert(secret.Time, qt.DeepEquals, testTime)
 	c.Assert(secret.Type, qt.Equals, "generic")
 	c.Assert(secret.Tag, qt.Equals, "123")
 	c.Assert(secret.Data, qt.IsNil)
@@ -61,7 +61,7 @@ func (s *dbSuite) TestUpsertSecret(c *qt.C) {
 	secret := dbmodel.Secret{}
 	tx := s.Database.DB.First(&secret)
 	c.Assert(tx.Error, qt.IsNil)
-	c.Assert(secret.Time, qt.Equals, newTime)
+	c.Assert(secret.Time, qt.DeepEquals, newTime)
 	c.Assert([]byte(secret.Data), qt.DeepEquals, []byte("123"))
 }
 
@@ -79,7 +79,7 @@ func (s *dbSuite) TestGetSecret(c *qt.C) {
 	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
 	secret := dbmodel.Secret{Type: "generic", Tag: "123"}
 	c.Assert(s.Database.GetSecret(ctx, &secret), qt.IsNil)
-	c.Assert(secret.Time, qt.Equals, testTime)
+	c.Assert(secret.Time, qt.DeepEquals, testTime)
 	c.Assert(secret.Type, qt.Equals, "generic")
 	c.Assert(secret.Tag, qt.Equals, "123")
 }
