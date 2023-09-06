@@ -26,5 +26,12 @@ identity-providers:
       groups:
        - group1
        - group2
+    joe:
+      name: Joe user (non superuser)
+      email: joe.user@example.com
+      password: joe
+      groups:
+       - group1
+       - group2
   hidden: false
   require-mfa: false

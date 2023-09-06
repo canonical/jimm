@@ -416,7 +416,7 @@ func (j *JIMM) GetControllerAccess(ctx context.Context, user *dbmodel.User, tag 
 }
 
 // ImportModel imports model with the specified uuid from the controller.
-func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName string, modelTag names.ModelTag) error {
+func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName string, modelTag names.ModelTag, newOwner string) error {
 	const op = errors.Op("jimm.ImportModel")
 
 	ale := dbmodel.AuditLogEntry{
@@ -461,7 +461,6 @@ func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName 
 	if err != nil {
 		return errors.E(op, err)
 	}
-
 	model := dbmodel.Model{}
 	// fill in data from model info
 	err = model.FromJujuModelInfo(modelInfo)
@@ -471,31 +470,65 @@ func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName 
 	model.ControllerID = controller.ID
 	model.Controller = controller
 
-	// fetch the model owner user
-	ownerTag, err := names.ParseUserTag(modelInfo.OwnerTag)
+	var ownerString string
+	if newOwner != "" {
+		// Switch the model to be owned by the specified user.
+		ownerString = names.UserTagKind + "-" + newOwner
+	} else {
+		// Use the model owner user
+		ownerString = modelInfo.OwnerTag
+	}
+	ownerTag, err := names.ParseUserTag(ownerString)
 	if err != nil {
 		return errors.E(op, err)
 	}
-	owner := dbmodel.User{}
-	owner.SetTag(ownerTag)
-	err = j.Database.GetUser(ctx, &owner)
+	if ownerTag.IsLocal() {
+		return errors.E(op, "cannot import model from local user, try --owner to switch the model owner")
+	}
+	ownerUser := dbmodel.User{}
+	ownerUser.SetTag(ownerTag)
+	err = j.Database.GetUser(ctx, &ownerUser)
 	if err != nil {
 		return errors.E(op, err)
 	}
-	model.OwnerUsername = owner.Username
-	model.Owner = owner
+	model.SwitchOwner(&ownerUser)
+
+	ownerHasModelAccess := false
+	for _, user := range model.Users {
+		if user.User.Username == ownerUser.Username {
+			ownerHasModelAccess = true
+			break
+		}
+	}
+	if !ownerHasModelAccess {
+		zapctx.Debug(ctx, "User doesn't have model access, adding it")
+		// Ensure the current user gets access to the model
+		// This will be applied to JIMM's access table lower down.
+		model.Users = append(model.Users, dbmodel.UserModelAccess{User: *u, Access: string(jujuparams.ModelAdminAccess)})
+	}
+
+	// TODO(CSS-5458): Remove the below section on cloud credentials once we no longer persist the relation between
+	// cloud credentials and models
 
 	// fetch cloud credential used by the model
-	credentialTag, err := names.ParseCloudCredentialTag(modelInfo.CloudCredentialTag)
+	cloudTag, err := names.ParseCloudTag(modelInfo.CloudTag)
+	if err != nil {
+		errors.E(op, err)
+	}
+	// Note that the model already has a cloud credential configured which it will use when deploying new
+	// applications. JIMM needs some cloud credential reference to be able to import the model so use any
+	// credential against the cloud the model is deployed against. Even using the correct cloud for the
+	// credential is not strictly necessary, but will help prevent the user think they can create new
+	// models on the incoming cloud.
+	allCredentials, err := j.Database.GetUserCloudCredentials(ctx, &ownerUser, cloudTag.Id())
 	if err != nil {
 		return errors.E(op, err)
 	}
-	cloudCredential := dbmodel.CloudCredential{}
-	cloudCredential.SetTag(credentialTag)
-	err = j.Database.GetCloudCredential(ctx, &cloudCredential)
-	if err != nil {
-		return errors.E(op, err)
+	if len(allCredentials) == 0 {
+		return errors.E(op, errors.CodeNotFound, fmt.Sprintf("Failed to find cloud credential for user %s on cloud %s", ownerUser.Username, cloudTag.Id()))
 	}
+	cloudCredential := allCredentials[0]
+
 	model.CloudCredentialID = cloudCredential.ID
 	model.CloudCredential = cloudCredential
 
@@ -505,6 +538,7 @@ func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName 
 	}
 	err = j.Database.GetCloud(ctx, &cloud)
 	if err != nil {
+		zapctx.Error(ctx, "failed to get cloud", zap.String("cloud", cloud.Name))
 		return errors.E(op, err)
 	}
 
@@ -521,10 +555,24 @@ func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName 
 		return errors.E(op, "cloud region not found")
 	}
 
+	var usersExcludingLocalUsers []dbmodel.UserModelAccess
+	for _, userAccess := range model.Users {
+		userTag, ok := userAccess.User.Tag().(names.UserTag)
+		if !ok {
+			zapctx.Error(ctx, "failed to extract user tag", zap.String("username", userAccess.User.Username))
+			continue
+		}
+		if userTag.IsLocal() {
+			// Don't propogate local users into JIMM.
+			continue
+		}
+		usersExcludingLocalUsers = append(usersExcludingLocalUsers, userAccess)
+	}
+	model.Users = usersExcludingLocalUsers
+
 	for i, userAccess := range model.Users {
 		u := userAccess.User
-		err = j.Database.GetUser(ctx, &u)
-		if err != nil {
+		if err = j.Database.GetUser(ctx, &u); err != nil {
 			return errors.E(op, err)
 		}
 		model.Users[i].Username = u.Username
@@ -537,6 +585,19 @@ func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName 
 			return errors.E(op, err, "model already exists")
 		}
 		return errors.E(op, err)
+	}
+
+	if !ownerHasModelAccess {
+		// Here we finally grant the model owner, access to the underlying model.
+		err = j.doModelAdmin(ctx, u, modelTag, func(m *dbmodel.Model, api API) error {
+			if err := api.GrantModelAccess(ctx, modelTag, ownerUser.Tag().(names.UserTag), jujuparams.ModelAdminAccess); err != nil {
+				return err
+			}
+			return nil
+		})
+		if err != nil {
+			return errors.E(op, err, fmt.Sprintf("Failed to grant user %s admin access on the model", ownerUser.Username))
+		}
 	}
 
 	modelAPI, err := j.dial(ctx, &controller, modelTag)
