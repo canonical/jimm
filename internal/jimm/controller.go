@@ -482,6 +482,9 @@ func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName 
 	if err != nil {
 		return errors.E(op, err)
 	}
+	if ownerTag.IsLocal() {
+		return errors.E(op, "cannot import model from local user, try --owner to switch the model owner")
+	}
 	ownerUser := dbmodel.User{}
 	ownerUser.SetTag(ownerTag)
 	err = j.Database.GetUser(ctx, &ownerUser)
@@ -554,9 +557,13 @@ func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName 
 
 	var usersExcludingLocalUsers []dbmodel.UserModelAccess
 	for _, userAccess := range model.Users {
-		if !strings.Contains(userAccess.User.Username, "@") {
-			// If the username doesn't contain an "@" the user is local
-			// to the controller and we don't want to propagate it.
+		username, err := names.ParseUserTag(userAccess.User.Username)
+		if err != nil {
+			zapctx.Error(ctx, "failed to parse user tag", zap.String("username", userAccess.User.Username))
+			continue
+		}
+		if username.IsLocal() {
+			// Don't propogate local users into JIMM.
 			continue
 		}
 		usersExcludingLocalUsers = append(usersExcludingLocalUsers, userAccess)
