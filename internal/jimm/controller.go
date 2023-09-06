@@ -557,12 +557,12 @@ func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName 
 
 	var usersExcludingLocalUsers []dbmodel.UserModelAccess
 	for _, userAccess := range model.Users {
-		username, err := names.ParseUserTag("user" + "-" + userAccess.User.Username)
-		if err != nil {
-			zapctx.Error(ctx, "failed to parse user tag", zap.String("username", userAccess.User.Username))
+		userTag, ok := userAccess.User.Tag().(names.UserTag)
+		if !ok {
+			zapctx.Error(ctx, "failed to extract user tag", zap.String("username", userAccess.User.Username))
 			continue
 		}
-		if username.IsLocal() {
+		if userTag.IsLocal() {
 			// Don't propogate local users into JIMM.
 			continue
 		}
