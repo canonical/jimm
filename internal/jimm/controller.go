@@ -522,7 +522,7 @@ func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName 
 	// models on the incoming cloud.
 	allCredentials, err := j.Database.GetUserCloudCredentials(ctx, &ownerUser, cloudTag.Id())
 	if err != nil {
-		errors.E(op, err)
+		return errors.E(op, err)
 	}
 	if len(allCredentials) == 0 {
 		return errors.E(op, errors.CodeNotFound, fmt.Sprintf("Failed to find cloud credential for user %s on cloud %s", ownerUser.Username, cloudTag.Id()))
@@ -557,7 +557,7 @@ func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName 
 
 	var usersExcludingLocalUsers []dbmodel.UserModelAccess
 	for _, userAccess := range model.Users {
-		username, err := names.ParseUserTag(userAccess.User.Username)
+		username, err := names.ParseUserTag("user" + "-" + userAccess.User.Username)
 		if err != nil {
 			zapctx.Error(ctx, "failed to parse user tag", zap.String("username", userAccess.User.Username))
 			continue

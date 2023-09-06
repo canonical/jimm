@@ -880,6 +880,26 @@ func TestImportModel(t *testing.T) {
 		},
 		expectedError: "model not found",
 	}, {
+		about:          "fail import from local user without newOwner flag",
+		user:           "alice@external",
+		controllerName: "test-controller",
+		newOwner:       "",
+		modelUUID:      "00000002-0000-0000-0000-000000000001",
+		modelInfo: func(_ context.Context, info *jujuparams.ModelInfo) error {
+			info.Name = "test-model"
+			info.Type = "test-type"
+			info.UUID = "00000002-0000-0000-0000-000000000001"
+			info.ControllerUUID = "00000001-0000-0000-0000-000000000001"
+			info.DefaultSeries = "test-series"
+			info.CloudTag = names.NewCloudTag("test-cloud").String()
+			info.CloudRegion = "test-region"
+			info.CloudCredentialTag = names.NewCloudCredentialTag("test-cloud/alice@external/unknown-credential").String()
+			info.CloudCredentialValidity = &trueValue
+			info.OwnerTag = names.NewUserTag("local-user").String()
+			return nil
+		},
+		expectedError: `cannot import model from local user, try --owner to switch the model owner`,
+	}, {
 		about:          "cloud credentials not found",
 		user:           "alice@external",
 		controllerName: "test-controller",
