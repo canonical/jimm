@@ -186,7 +186,7 @@ func (p *clientProxy) start(ctx context.Context) error {
 		zapctx.Debug(ctx, "Reading on client connection")
 		msg := new(message)
 		if err := p.src.readJson(&msg); err != nil {
-			zapctx.Error(ctx, "clientProxy error reading from src", zap.Error(err))
+			// Error reading on the socket implies it is closed, simply return.
 			return err
 		}
 		zapctx.Debug(ctx, "Read message from client", zap.Any("message", msg))
@@ -286,7 +286,6 @@ func (p *controllerProxy) start(ctx context.Context) error {
 		zapctx.Debug(ctx, "Reading on controller connection")
 		msg := new(message)
 		if err := p.src.readJson(msg); err != nil {
-			zapctx.Error(ctx, "controllerProxy error reading from src", zap.Error(err))
 			// Error reading on the socket implies it is closed, simply return.
 			return err
 		}
