@@ -598,6 +598,7 @@ func (s *Service) thirdPartyCaveatCheckerFunction(ofgaClient *openfga.OFGAClient
 	return func(ctx context.Context, req *http.Request, cavInfo *bakery.ThirdPartyCaveatInfo, _ *httpbakery.DischargeToken) ([]checkers.Caveat, error) {
 		caveatTokens := strings.Split(string(cavInfo.Condition), " ")
 		if len(caveatTokens) != 3 {
+			zapctx.Error(ctx, "caveat token length incorrect", zap.Int("length", len(caveatTokens)))
 			return nil, checkers.ErrCaveatNotRecognized
 		}
 		relationString := caveatTokens[0]
@@ -605,21 +606,25 @@ func (s *Service) thirdPartyCaveatCheckerFunction(ofgaClient *openfga.OFGAClient
 		objectTagString := caveatTokens[2]
 
 		if !strings.HasPrefix(relationString, "is-") {
+			zapctx.Error(ctx, "caveat token relation string missing prefix")
 			return nil, checkers.ErrCaveatNotRecognized
 		}
 		relationString = strings.TrimPrefix(relationString, "is-")
 		relation, err := ofganames.ParseRelation(relationString)
 		if err != nil {
+			zapctx.Error(ctx, "caveat token relation invalid", zap.Error(err))
 			return nil, checkers.ErrCaveatNotRecognized
 		}
 
 		userTag, err := names.ParseUserTag(userTagString)
 		if err != nil {
+			zapctx.Error(ctx, "failed to parse caveat user tag", zap.Error(err))
 			return nil, checkers.ErrCaveatNotRecognized
 		}
 
 		objectTag, err := jimmnames.ParseTag(objectTagString)
 		if err != nil {
+			zapctx.Error(ctx, "failed to parse caveat object tag", zap.Error(err))
 			return nil, checkers.ErrCaveatNotRecognized
 		}
 
@@ -632,6 +637,7 @@ func (s *Service) thirdPartyCaveatCheckerFunction(ofgaClient *openfga.OFGAClient
 
 		allowed, err := openfga.CheckRelation(ctx, user, objectTag, relation)
 		if err != nil {
+			zapctx.Error(ctx, "failed to check request caveat relation", zap.Error(err))
 			return nil, errors.E(err)
 		}
 
@@ -640,6 +646,7 @@ func (s *Service) thirdPartyCaveatCheckerFunction(ofgaClient *openfga.OFGAClient
 				checkers.TimeBeforeCaveat(time.Now().Add(defaultDischargeExpiry)),
 			}, nil
 		}
+		zapctx.Debug(ctx, "macaroon dishcharge denied", zap.String("user", user.Username), zap.String("object", objectTag.Id()))
 		return nil, httpbakery.ErrPermissionDenied
 	}
 }
