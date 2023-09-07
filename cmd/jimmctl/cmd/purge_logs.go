@@ -25,7 +25,9 @@ const purgeLogsDoc = `
 
 // NewPurgeLogsCommand returns a command to purge logs.
 func NewPurgeLogsCommand() cmd.Command {
-	cmd := &purgeLogsCommand{}
+	cmd := &purgeLogsCommand{
+		store: jujuclient.NewFileClientStore(),
+	}
 	return modelcmd.WrapBase(cmd)
 }
 
