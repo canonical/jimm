@@ -93,6 +93,11 @@ jimm-snap:
 	cp ./snaps/jimm/snapcraft.yaml ./snap/
 	snapcraft 
 
+jimmctl-snap:
+	mkdir -p ./snap
+	cp -R ./snaps/jimmctl/* ./snap/
+	snapcraft
+
 push-microk8s: jimm-image
 	docker tag jimm:latest localhost:32000/jimm:latest
 	docker push localhost:32000/jimm:latest
