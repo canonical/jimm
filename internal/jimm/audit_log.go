@@ -4,8 +4,6 @@ package jimm
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"time"
 
@@ -18,6 +16,7 @@ import (
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/servermon"
+	"github.com/canonical/jimm/internal/utils"
 )
 
 type DbAuditLogger struct {
@@ -26,19 +25,11 @@ type DbAuditLogger struct {
 	getUser        func() names.UserTag
 }
 
-// newConversationID generates a unique ID that is used for the
-// lifetime of a websocket connection.
-func newConversationID() string {
-	buf := make([]byte, 8)
-	rand.Read(buf) // Can't fail
-	return hex.EncodeToString(buf)
-}
-
 // NewDbAuditLogger returns a new audit logger that logs to the database.
 func NewDbAuditLogger(j *JIMM, getUserFunc func() names.UserTag) DbAuditLogger {
 	logger := DbAuditLogger{
 		jimm:           j,
-		conversationId: newConversationID(),
+		conversationId: utils.NewConversationID(),
 		getUser:        getUserFunc,
 	}
 	return logger
@@ -112,7 +103,7 @@ type recorder struct {
 func NewRecorder(logger DbAuditLogger) recorder {
 	return recorder{
 		start:          time.Now(),
-		conversationId: newConversationID(),
+		conversationId: utils.NewConversationID(),
 		logger:         logger,
 	}
 }
@@ -166,11 +157,11 @@ func (a *auditLogCleanupService) Start(ctx context.Context) {
 // from the service's context. It calculates the poll duration at 9am each day
 // UTC.
 func (a *auditLogCleanupService) poll(ctx context.Context) {
-	retentionDate := time.Now().AddDate(0, 0, -(a.auditLogRetentionPeriodInDays))
 
 	for {
 		select {
 		case <-time.After(calculateNextPollDuration(time.Now().UTC())):
+			retentionDate := time.Now().AddDate(0, 0, -(a.auditLogRetentionPeriodInDays))
 			deleted, err := a.db.DeleteAuditLogsBefore(ctx, retentionDate)
 			if err != nil {
 				zapctx.Error(ctx, "failed to cleanup audit logs", zap.Error(err))

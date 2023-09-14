@@ -100,32 +100,32 @@ type AuditEvent struct {
 	MessageId uint64 `json:"message-id" yaml:"message-id"`
 
 	// FacadeName contains the request facade name.
-	FacadeName string `json:"facade-name" yaml:"facade-name"`
+	FacadeName string `json:"facade-name,omitempty" yaml:"facade-name,omitempty"`
 
 	// FacadeMethod contains the specific method to be executed on the facade.
-	FacadeMethod string `json:"facade-method" yaml:"facade-method"`
+	FacadeMethod string `json:"facade-method,omitempty" yaml:"facade-method,omitempty"`
 
 	// FacadeVersion contains the requested version for the facade method.
-	FacadeVersion int `json:"facade-version" yaml:"facade-version"`
+	FacadeVersion int `json:"facade-version,omitempty" yaml:"facade-version,omitempty"`
 
 	// ObjectId contains the object id to act on, only used by certain facades.
-	ObjectId string `json:"object-id" yaml:"object-id"`
+	ObjectId string `json:"object-id,omitempty" yaml:"object-id,omitempty"`
 
 	// UserTag contains the user tag of authenticated user that performed
 	// the action.
-	UserTag string `json:"user-tag" yaml:"user-tag"`
+	UserTag string `json:"user-tag,omitempty" yaml:"user-tag,omitempty"`
 
 	// Model contains the name of the model the event was performed against.
-	Model string `json:"model" yaml:"model"`
+	Model string `json:"model,omitempty" yaml:"model,omitempty"`
 
 	// IsResponse indicates whether the message is a request/response.
 	IsResponse bool `json:"is-response" yaml:"is-response"`
 
 	// Params contains client request parameters.
-	Params map[string]any `json:"params" yaml:"params"`
+	Params map[string]any `json:"params,omitempty" yaml:"params,omitempty"`
 
 	// Errors contains error info received from the controller.
-	Errors map[string]any `json:"error" yaml:"errors"`
+	Errors map[string]any `json:"error,omitempty" yaml:"errors,omitempty"`
 }
 
 // An AuditEvents contains events from the audit log.

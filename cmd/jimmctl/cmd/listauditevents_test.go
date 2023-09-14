@@ -37,24 +37,18 @@ func (s *listAuditEventsSuite) TestListAuditEventsSuperuser(c *gc.C) {
   facade-name: Admin
   facade-method: Login
   facade-version: \d
-  object-id: ""
   user-tag: user-
-  model: ""
   is-response: false
   params:
     params: redacted
-  errors: .*
 - time: .*
   conversation-id: .*
   message-id: 1
   facade-name: Admin
   facade-method: Login
   facade-version: \d
-  object-id: ""
   user-tag: user-
-  model: ""
   is-response: true
-  params: {}
   errors:
     results:
     - error:

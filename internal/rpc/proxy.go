@@ -17,6 +17,7 @@ import (
 	"github.com/canonical/jimm/internal/auth"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/utils"
 )
 
 // TokenGenerator authenticates a user and generates a JWT token.
@@ -459,10 +460,11 @@ func ProxySockets(ctx context.Context, helpers ProxyHelpers) error {
 	// after the first message has been received so that any errors can be properly sent back to the client.
 	clProxy := clientProxy{
 		modelProxy: modelProxy{
-			src:      &client,
-			msgs:     &msgInFlight,
-			tokenGen: helpers.TokenGen,
-			auditLog: helpers.AuditLog,
+			src:            &client,
+			msgs:           &msgInFlight,
+			tokenGen:       helpers.TokenGen,
+			auditLog:       helpers.AuditLog,
+			conversationId: utils.NewConversationID(),
 		},
 		errChan:              errChan,
 		createControllerConn: helpers.ConnectController,
