@@ -1,16 +1,26 @@
 name: jimmctl
-version: git
 summary: JAAS client
 description: Client for controlling JAAS multi-cloud juju controllers.
+version: git
 grade: stable
 base: core20
 confinement: strict
 
 plugs:
+  # We use personal-files instead of the home interface
+  # as the home interface does not permit access to hidden files/directories.
+  # See: https://askubuntu.com/questions/1238211/how-to-make-snaps-access-hidden-files-and-folders-in-home
+  # And: https://snapcraft.io/docs/personal-files-interface
+  #
+  # The personal-files interface is also a none auto-connect, and must
+  # typically be connected via: snap connect jimmctl:dot-local-share-juju
+  #
+  # In our scenario, we are going to request auto-connect.
   dot-local-share-juju:
     interface: personal-files
     read:
     - $HOME/.local/share/juju
+    - $HOME/.local/share/juju/cookies
 
 apps:
   jimmctl:
@@ -18,7 +28,6 @@ apps:
     plugs:
      - dot-local-share-juju
      - network
-
 
 parts:
   jimmctl:
@@ -30,11 +39,10 @@ parts:
     override-build: |
       set -e
       go install -mod readonly -ldflags '-linkmode=external' github.com/canonical/jimm/cmd/jimmctl
-      
 
-  files:
+  wrapper:
     plugin: dump
-    source: snaps/jimmctl/files/
+    source: snaps/jimmctl/local/
     source-type: local
     organize:
       jimmctl.wrapper: bin/wrappers/jimmctl
