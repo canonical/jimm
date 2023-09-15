@@ -1,0 +1,3 @@
+#!/bin/sh
+
+JUJU_DATA=$SNAP_REAL_HOME/.local/share/juju "$SNAP"/bin/jimmctl "$@"
