@@ -5,7 +5,7 @@
 /access.log
 /parts/
 /prime/
-/snap/.snapcraft/
+/snap/
 /stage/
 /vendor
 /version/commit.txt
