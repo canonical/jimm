@@ -24,6 +24,7 @@ import (
 	"github.com/juju/juju/api"
 	"github.com/juju/juju/api/client/cloud"
 	jujucloud "github.com/juju/juju/cloud"
+	"github.com/juju/juju/core/macaroon"
 	"github.com/juju/names/v4"
 
 	"github.com/canonical/jimm"
@@ -296,10 +297,11 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 	ctx := context.Background()
 
 	tests := []struct {
-		about         string
-		setup         func(c *qt.C, ofgaClient *openfga.OFGAClient, user *dbmodel.User)
-		caveats       []string
-		expectedError string
+		about          string
+		setup          func(c *qt.C, ofgaClient *openfga.OFGAClient, user *dbmodel.User)
+		caveats        []string
+		expectDeclared map[string]string
+		expectedError  string
 	}{{
 		about:         "unknown caveats",
 		caveats:       []string{"unknown-caveat"},
@@ -315,7 +317,8 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 			err := u.SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.ReaderRelation)
 			c.Assert(err, qt.IsNil)
 		},
-		caveats: []string{fmt.Sprintf("is-reader %s %s", user.ResourceTag(), offer.ResourceTag())},
+		caveats:        []string{fmt.Sprintf("is-reader %s %s", user.ResourceTag(), offer.ResourceTag())},
+		expectDeclared: map[string]string{"reader": offer.ResourceTag().String()},
 	}, {
 		about:         "user is not an offer consumer",
 		caveats:       []string{fmt.Sprintf("is-consumer %s %s", user.ResourceTag(), offer.ResourceTag())},
@@ -327,7 +330,8 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 			err := u.SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.ConsumerRelation)
 			c.Assert(err, qt.IsNil)
 		},
-		caveats: []string{fmt.Sprintf("is-consumer %s %s", user.ResourceTag(), offer.ResourceTag())},
+		caveats:        []string{fmt.Sprintf("is-consumer %s %s", user.ResourceTag(), offer.ResourceTag())},
+		expectDeclared: map[string]string{"consumer": offer.ResourceTag().String()},
 	}, {
 		about:         "user is not an offer administrator",
 		caveats:       []string{fmt.Sprintf("is-administrator %s %s", user.ResourceTag(), offer.ResourceTag())},
@@ -339,7 +343,8 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 			err := u.SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 		},
-		caveats: []string{fmt.Sprintf("is-administrator %s %s", user.ResourceTag(), offer.ResourceTag())},
+		caveats:        []string{fmt.Sprintf("is-administrator %s %s", user.ResourceTag(), offer.ResourceTag())},
+		expectDeclared: map[string]string{"administrator": offer.ResourceTag().String()},
 	}, {
 		about:         "user is not a model administrator",
 		caveats:       []string{fmt.Sprintf("is-administrator %s %s", user.ResourceTag(), model.ResourceTag())},
@@ -351,7 +356,8 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 			err := u.SetModelAccess(ctx, model.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 		},
-		caveats: []string{fmt.Sprintf("is-administrator %s %s", user.ResourceTag(), model.ResourceTag())},
+		caveats:        []string{fmt.Sprintf("is-administrator %s %s", user.ResourceTag(), model.ResourceTag())},
+		expectDeclared: map[string]string{"administrator": model.ResourceTag().String()},
 	}, {
 		about:         "user is not a model reader",
 		caveats:       []string{fmt.Sprintf("is-reader %s %s", user.ResourceTag(), model.ResourceTag())},
@@ -363,7 +369,8 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 			err := u.SetModelAccess(ctx, model.ResourceTag(), ofganames.ReaderRelation)
 			c.Assert(err, qt.IsNil)
 		},
-		caveats: []string{fmt.Sprintf("is-reader %s %s", user.ResourceTag(), model.ResourceTag())},
+		caveats:        []string{fmt.Sprintf("is-reader %s %s", user.ResourceTag(), model.ResourceTag())},
+		expectDeclared: map[string]string{"reader": model.ResourceTag().String()},
 	}, {
 		about:         "user is not a model writer",
 		caveats:       []string{fmt.Sprintf("is-writer %s %s", user.ResourceTag(), model.ResourceTag())},
@@ -375,7 +382,8 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 			err := u.SetModelAccess(ctx, model.ResourceTag(), ofganames.WriterRelation)
 			c.Assert(err, qt.IsNil)
 		},
-		caveats: []string{fmt.Sprintf("is-writer %s %s", user.ResourceTag(), model.ResourceTag())},
+		caveats:        []string{fmt.Sprintf("is-writer %s %s", user.ResourceTag(), model.ResourceTag())},
+		expectDeclared: map[string]string{"writer": model.ResourceTag().String()},
 	}, {
 		about:         "user is not a controller administrator",
 		caveats:       []string{fmt.Sprintf("is-administrator %s %s", user.ResourceTag(), controller.ResourceTag())},
@@ -387,7 +395,8 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 			err := u.SetControllerAccess(ctx, controller.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 		},
-		caveats: []string{fmt.Sprintf("is-administrator %s %s", user.ResourceTag(), controller.ResourceTag())},
+		caveats:        []string{fmt.Sprintf("is-administrator %s %s", user.ResourceTag(), controller.ResourceTag())},
+		expectDeclared: map[string]string{"administrator": controller.ResourceTag().String()},
 	}}
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
@@ -422,10 +431,17 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 				test.setup(c, ofgaClient, &user)
 			}
 
-			m, err := bakery.NewMacaroon([]byte("root key"), []byte("id"), "location", bakery.LatestVersion, nil)
+			m, err := bakery.NewMacaroon(
+				[]byte("root key"),
+				[]byte("id"),
+				"location",
+				bakery.LatestVersion,
+				macaroon.MacaroonNamespace,
+			)
 			c.Assert(err, qt.IsNil)
 
 			kp := bakery.MustGenerateKey()
+
 			for _, caveat := range test.caveats {
 				err = m.AddCaveat(context.TODO(), checkers.Caveat{
 					Location:  srv.URL + "/macaroons",
@@ -440,7 +456,11 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 				c.Assert(err, qt.ErrorMatches, test.expectedError)
 			} else {
 				c.Assert(err, qt.IsNil)
-				c.Check(ms, qt.HasLen, 2)
+				c.Assert(ms, qt.HasLen, 2)
+
+				declaredCaveats := checkers.InferDeclared(macaroon.MacaroonNamespace, ms)
+				c.Logf("declared caveats %v", declaredCaveats)
+				c.Assert(declaredCaveats, qt.DeepEquals, test.expectDeclared)
 			}
 		})
 	}
