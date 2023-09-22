@@ -16,7 +16,6 @@ import (
 	cofga "github.com/canonical/ofga"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
-	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/checkers"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/dbrootkeystore"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/identchecker"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
@@ -49,7 +48,6 @@ import (
 	"github.com/canonical/jimm/internal/servermon"
 	"github.com/canonical/jimm/internal/vault"
 	"github.com/canonical/jimm/internal/wellknownapi"
-	jimmnames "github.com/canonical/jimm/pkg/names"
 )
 
 const (
@@ -348,31 +346,21 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 // to enable Juju controllers to check for permissions using a macaroon-based workflow (atm only
 // for cross model relations).
 func (s *Service) setupDischarger(p Params, openFGAclient *openfga.OFGAClient) (*bakery.KeyPair, *http.ServeMux, error) {
-	var kp bakery.KeyPair
-	if p.PublicKey == "" || p.PrivateKey == "" {
-		generatedKP, err := bakery.GenerateKey()
-		if err != nil {
-			return nil, nil, errors.E(err, "failed to generate a bakery keypair")
-		}
-		kp = *generatedKP
-	} else {
-		if err := kp.Private.UnmarshalText([]byte(p.PrivateKey)); err != nil {
-			return nil, nil, errors.E(err, "cannot unmarshal private key")
-		}
-		if err := kp.Public.UnmarshalText([]byte(p.PublicKey)); err != nil {
-			return nil, nil, errors.E(err, "cannot unmarshal public key")
-		}
+	macaroonDischarger, err := newMacaroonDischarger(p, &s.jimm.Database, openFGAclient)
+	if err != nil {
+		return nil, nil, errors.E(err)
 	}
+
 	discharger := httpbakery.NewDischarger(
 		httpbakery.DischargerParams{
-			Key:     &kp,
-			Checker: httpbakery.ThirdPartyCaveatCheckerFunc(s.thirdPartyCaveatCheckerFunction(openFGAclient)),
+			Key:     &macaroonDischarger.kp,
+			Checker: httpbakery.ThirdPartyCaveatCheckerFunc(macaroonDischarger.checkThirdPartyCaveat),
 		},
 	)
 	dischargeMux := http.NewServeMux()
 	discharger.AddMuxHandlers(dischargeMux, localDischargePath)
 
-	return &kp, dischargeMux, nil
+	return &macaroonDischarger.kp, dischargeMux, nil
 }
 
 func openDB(ctx context.Context, dsn string) (*gorm.DB, error) {
@@ -575,78 +563,4 @@ func ensureControllerAdministrators(ctx context.Context, client *openfga.OFGACli
 		return nil
 	}
 	return client.AddRelation(ctx, tuples...)
-}
-
-var defaultDischargeExpiry = 15 * time.Minute
-
-// thirdPartyCaveatCheckerFunction returns a function that
-// checks third party caveats addressed to this service.
-// Caveat format is:
-//
-//	is-<relation name> <user tag> <resource tag>
-//
-// Examples of caveats are:
-//
-//	is-reader <user tag> <offer tag containing uuid>
-//	is-consumer <user tag> <offer tag containing uuid>
-//	is-administrator <user tag> <offer tag containing uuid>
-//	is-reader <user tag> <model tag containing uuid>
-//	is-writer <user tag> <model tag containing uuid>
-//	is-admininistrator <user tag> <model tag containing uuid>
-//	is-admininistrator <user tag> <controller tag containing uuid>
-func (s *Service) thirdPartyCaveatCheckerFunction(ofgaClient *openfga.OFGAClient) func(ctx context.Context, req *http.Request, cavInfo *bakery.ThirdPartyCaveatInfo, _ *httpbakery.DischargeToken) ([]checkers.Caveat, error) {
-	return func(ctx context.Context, req *http.Request, cavInfo *bakery.ThirdPartyCaveatInfo, _ *httpbakery.DischargeToken) ([]checkers.Caveat, error) {
-		caveatTokens := strings.Split(string(cavInfo.Condition), " ")
-		if len(caveatTokens) != 3 {
-			zapctx.Error(ctx, "caveat token length incorrect", zap.Int("length", len(caveatTokens)))
-			return nil, checkers.ErrCaveatNotRecognized
-		}
-		relationString := caveatTokens[0]
-		userTagString := caveatTokens[1]
-		objectTagString := caveatTokens[2]
-
-		if !strings.HasPrefix(relationString, "is-") {
-			zapctx.Error(ctx, "caveat token relation string missing prefix")
-			return nil, checkers.ErrCaveatNotRecognized
-		}
-		relationString = strings.TrimPrefix(relationString, "is-")
-		relation, err := ofganames.ParseRelation(relationString)
-		if err != nil {
-			zapctx.Error(ctx, "caveat token relation invalid", zap.Error(err))
-			return nil, checkers.ErrCaveatNotRecognized
-		}
-
-		userTag, err := names.ParseUserTag(userTagString)
-		if err != nil {
-			zapctx.Error(ctx, "failed to parse caveat user tag", zap.Error(err))
-			return nil, checkers.ErrCaveatNotRecognized
-		}
-
-		objectTag, err := jimmnames.ParseTag(objectTagString)
-		if err != nil {
-			zapctx.Error(ctx, "failed to parse caveat object tag", zap.Error(err))
-			return nil, checkers.ErrCaveatNotRecognized
-		}
-
-		user := openfga.NewUser(
-			&dbmodel.User{
-				Username: userTag.Id(),
-			},
-			ofgaClient,
-		)
-
-		allowed, err := openfga.CheckRelation(ctx, user, objectTag, relation)
-		if err != nil {
-			zapctx.Error(ctx, "failed to check request caveat relation", zap.Error(err))
-			return nil, errors.E(err)
-		}
-
-		if allowed {
-			return []checkers.Caveat{
-				checkers.TimeBeforeCaveat(time.Now().Add(defaultDischargeExpiry)),
-			}, nil
-		}
-		zapctx.Debug(ctx, "macaroon dishcharge denied", zap.String("user", user.Username), zap.String("object", objectTag.Id()))
-		return nil, httpbakery.ErrPermissionDenied
-	}
 }
