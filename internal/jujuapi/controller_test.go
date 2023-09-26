@@ -16,7 +16,6 @@ import (
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 
-	"github.com/canonical/jimm/internal/pubsub"
 	jimmversion "github.com/canonical/jimm/version"
 )
 
@@ -221,14 +220,7 @@ type watcherSuite struct {
 
 var _ = gc.Suite(&watcherSuite{})
 
-func (s *watcherSuite) SetUpTest(c *gc.C) {
-	s.websocketSuite.SetUpTest(c)
-	s.JIMM.Pubsub = &pubsub.Hub{MaxConcurrency: 10}
-}
-
 func (s *watcherSuite) TestWatchModelSummaries(c *gc.C) {
-	c.Logf("models: %v %v", s.Model.UUID.String, s.Model3.UUID.String)
-
 	done := s.JIMM.Pubsub.Publish(s.Model.UUID.String, jujuparams.ModelAbstract{
 		UUID:  s.Model.UUID.String,
 		Cloud: "test-cloud",
@@ -283,8 +275,6 @@ func (s *watcherSuite) TestWatchModelSummaries(c *gc.C) {
 }
 
 func (s *watcherSuite) TestWatchAllModelSummaries(c *gc.C) {
-	c.Logf("models: %v %v", s.Model.UUID.String, s.Model3.UUID.String)
-
 	done := s.JIMM.Pubsub.Publish(s.Model.UUID.String, jujuparams.ModelAbstract{
 		UUID:  s.Model.UUID.String,
 		Cloud: "test-cloud",

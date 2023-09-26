@@ -23,9 +23,11 @@ type modelWatcherSuite struct {
 }
 
 func (s *modelWatcherSuite) SetUpTest(c *gc.C) {
-	s.JujuConnSuite.SetUpTest(c)
+	s.JujuSuite.SetUpTest(c)
 
-	s.Dialer = &jujuclient.Dialer{}
+	s.Dialer = &jujuclient.Dialer{
+		JWTService: s.JIMM.JWTService,
+	}
 	var err error
 	info := s.APIInfo(c)
 	hpss := make(dbmodel.HostPorts, 0, len(info.Addrs))
@@ -40,6 +42,7 @@ func (s *modelWatcherSuite) SetUpTest(c *gc.C) {
 		}})
 	}
 	ctl := dbmodel.Controller{
+		UUID:          s.ControllerConfig.ControllerUUID(),
 		Name:          s.ControllerConfig.ControllerName(),
 		CACertificate: info.CACert,
 		AdminUser:     info.Tag.Id(),
@@ -47,7 +50,7 @@ func (s *modelWatcherSuite) SetUpTest(c *gc.C) {
 		Addresses:     hpss,
 	}
 
-	s.API, err = s.Dialer.Dial(context.Background(), &ctl, s.Model.ModelTag())
+	s.API, err = s.Dialer.Dial(context.Background(), &ctl, s.Model.ModelTag(), nil)
 	c.Assert(err, gc.Equals, nil)
 }
 
@@ -57,7 +60,7 @@ func (s *modelWatcherSuite) TearDownTest(c *gc.C) {
 		s.API = nil
 		c.Assert(err, gc.Equals, nil)
 	}
-	s.JujuConnSuite.TearDownTest(c)
+	s.JujuSuite.TearDownTest(c)
 }
 
 var _ = gc.Suite(&modelWatcherSuite{})

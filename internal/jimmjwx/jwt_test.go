@@ -26,7 +26,12 @@ func TestRegisterJWKSCacheRegistersTheCacheSuccessfully(t *testing.T) {
 	startAndTestRotator(c, ctx, store, jwksService)
 	// Setup JWTService
 	u, _ := url.Parse(srv.URL)
-	jwtService := jimmjwx.NewJWTService(u.Host, store, true)
+	jwtService := jimmjwx.NewJWTService(jimmjwx.JWTServiceParams{
+		Host:   u.Host,
+		Store:  store,
+		Secure: true,
+		Expiry: time.Minute,
+	})
 
 	// Test RegisterJWKSCache does register the public key just setup
 	jwtService.RegisterJWKSCache(ctx, srv.Client())
@@ -57,7 +62,12 @@ func TestNewJWTIsParsableByExponent(t *testing.T) {
 	startAndTestRotator(c, ctx, store, jwksService)
 	// Setup JWTService
 	u, _ := url.Parse(srv.URL)
-	jwtService := jimmjwx.NewJWTService(u.Host, store, true)
+	jwtService := jimmjwx.NewJWTService(jimmjwx.JWTServiceParams{
+		Host:   u.Host,
+		Store:  store,
+		Secure: true,
+		Expiry: time.Minute,
+	})
 	// Setup JWKS Cache
 	jwtService.RegisterJWKSCache(ctx, srv.Client())
 
@@ -92,7 +102,7 @@ func TestNewJWTIsParsableByExponent(t *testing.T) {
 		"controller": "superuser",
 		"model":      "administrator",
 	})
-	c.Assert(token.Issuer(), qt.Equals, "127.0.0.1:17070")
+	c.Assert(token.Issuer(), qt.Equals, u.Host)
 }
 
 func TestNewJWTExpires(t *testing.T) {
@@ -116,7 +126,12 @@ func TestNewJWTExpires(t *testing.T) {
 	startAndTestRotator(c, ctx, store, jwksService)
 	// Setup JWTService
 	u, _ := url.Parse(srv.URL)
-	jwtService := jimmjwx.NewJWTService(u.Host, store, true)
+	jwtService := jimmjwx.NewJWTService(jimmjwx.JWTServiceParams{
+		Host:   u.Host,
+		Store:  store,
+		Secure: true,
+		Expiry: time.Nanosecond,
+	})
 	// Setup JWKS Cache
 	jwtService.RegisterJWKSCache(ctx, srv.Client())
 

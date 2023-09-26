@@ -10,7 +10,6 @@ import (
 	"github.com/juju/cmd/v3/cmdtesting"
 	"github.com/juju/juju/cloud"
 	"github.com/juju/names/v4"
-
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/cmd/jimmctl/cmd"
@@ -62,14 +61,10 @@ func (s *addCloudToControllerSuite) SetUpTest(c *gc.C) {
 	err = bob.SetCloudAccess(context.Background(), names.NewCloudTag("test-cloud"), ofganames.AdministratorRelation)
 	c.Assert(err, gc.IsNil)
 
-	// We add two controllers controller-1 and controller-2 using the
-	// test-cloud.
 	err = s.JIMM.Database.AddController(context.Background(), &dbmodel.Controller{
 		Name:          "controller-1",
 		CACertificate: info.CACert,
-		AdminUser:     info.Tag.Id(),
-		AdminPassword: info.Password,
-		UUID:          "00000001-0000-0000-0000-000000000001",
+		UUID:          info.ControllerUUID,
 		PublicAddress: info.Addrs[0],
 		CloudName:     "test-cloud",
 		CloudRegion:   "default",
@@ -80,26 +75,7 @@ func (s *addCloudToControllerSuite) SetUpTest(c *gc.C) {
 	})
 	c.Assert(err, gc.IsNil)
 
-	err = s.JIMM.OpenFGAClient.AddController(context.Background(), s.JIMM.ResourceTag(), names.NewControllerTag("00000001-0000-0000-0000-000000000001"))
-	c.Assert(err, gc.IsNil)
-
-	err = s.JIMM.Database.AddController(context.Background(), &dbmodel.Controller{
-		Name:          "controller-2",
-		CACertificate: info.CACert,
-		AdminUser:     info.Tag.Id(),
-		AdminPassword: info.Password,
-		UUID:          "00000001-0000-0000-0000-000000000002",
-		PublicAddress: info.Addrs[0],
-		CloudName:     "test-cloud",
-		CloudRegion:   "default",
-		CloudRegions: []dbmodel.CloudRegionControllerPriority{{
-			CloudRegion: *region,
-			Priority:    10,
-		}},
-	})
-	c.Assert(err, gc.IsNil)
-
-	err = s.JIMM.OpenFGAClient.AddController(context.Background(), s.JIMM.ResourceTag(), names.NewControllerTag("00000001-0000-0000-0000-000000000002"))
+	err = s.JIMM.OpenFGAClient.AddController(context.Background(), s.JIMM.ResourceTag(), names.NewControllerTag(info.ControllerUUID))
 	c.Assert(err, gc.IsNil)
 }
 

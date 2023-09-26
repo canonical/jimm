@@ -1,6 +1,6 @@
 // Copyright 2020 Canonical Ltd.
 
-// Package pubsub contains an implentation of a simple pubsub
+// Package pubsub contains an implementation of a simple pubsub
 // mechanism that passes messages about models between
 // producers and subscribers.
 package pubsub

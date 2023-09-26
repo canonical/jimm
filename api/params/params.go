@@ -31,6 +31,9 @@ type RemoveCloudFromControllerRequest struct {
 // An AddControllerRequest is the request sent when adding a new controller
 // to JIMM.
 type AddControllerRequest struct {
+	// UUID of the controller.
+	UUID string `json:"uuid"`
+
 	// Name is the name to give to the controller, all controllers must
 	// have a unique name.
 	Name string `json:"name"`
@@ -49,14 +52,6 @@ type AddControllerRequest struct {
 	// connection to the controller. This is not needed if certificate is
 	// signed by a public CA.
 	CACertificate string `json:"ca-certificate,omitempty"`
-
-	// Username contains the username that JIMM should use to connect to
-	// the controller.
-	Username string `json:"username"`
-
-	// Password contains the password that JIMM should use to connect to
-	// the controller.
-	Password string `json:"password"`
 }
 
 // AuditLogAccessRequest is the request used to modify a user's access

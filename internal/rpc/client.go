@@ -19,6 +19,10 @@ import (
 	"github.com/canonical/jimm/internal/errors"
 )
 
+const (
+	PermissionCheckRequiredErrorCode = "permission check required"
+)
+
 // An Error represents an error sent in an RPC response.
 type Error struct {
 	Message string
@@ -224,6 +228,16 @@ func (c *Client) Call(ctx context.Context, facade string, version int, id, metho
 	select {
 	case <-ch:
 		if respMsg != nil {
+			permissionsRequired, err := checkPermissionsRequired(ctx, *respMsg)
+			if err != nil {
+				return err
+			}
+			if permissionsRequired != nil {
+				return &Error{
+					Code: PermissionCheckRequiredErrorCode,
+					Info: permissionsRequired,
+				}
+			}
 			if (*respMsg).Error != "" {
 				return &Error{
 					Message: (*respMsg).Error,

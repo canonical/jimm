@@ -4,9 +4,13 @@ package jimmtest
 
 import (
 	"context"
+	"net/http/httptest"
+	"net/url"
+	"time"
 
 	"github.com/canonical/candid/candidtest"
 	cofga "github.com/canonical/ofga"
+	"github.com/go-chi/chi/v5"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/identchecker"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
@@ -21,10 +25,13 @@ import (
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/jimm"
+	"github.com/canonical/jimm/internal/jimmhttp"
+	"github.com/canonical/jimm/internal/jimmjwx"
 	"github.com/canonical/jimm/internal/jujuclient"
 	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 	"github.com/canonical/jimm/internal/pubsub"
+	"github.com/canonical/jimm/internal/wellknownapi"
 )
 
 // ControllerUUID is the UUID of the JIMM controller used in tests.
@@ -51,6 +58,9 @@ type JIMMSuite struct {
 	OFGAClient  *openfga.OFGAClient
 	COFGAClient *cofga.Client
 	COFGAParams *cofga.OpenFGAParams
+
+	Server *httptest.Server
+	cancel context.CancelFunc
 }
 
 func (s *JIMMSuite) SetUpTest(c *gc.C) {
@@ -63,12 +73,14 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 		Database: db.Database{
 			DB: MemoryDB(cTester{c}, nil),
 		},
-		Dialer:        &jujuclient.Dialer{},
-		Pubsub:        new(pubsub.Hub),
-		UUID:          ControllerUUID,
-		OpenFGAClient: s.OFGAClient,
+		CredentialStore: &InMemoryCredentialStore{},
+		Pubsub:          &pubsub.Hub{MaxConcurrency: 10},
+		UUID:            ControllerUUID,
+		OpenFGAClient:   s.OFGAClient,
 	}
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	s.cancel = cancel
+
 	err = s.JIMM.Database.Migrate(ctx, false)
 	c.Assert(err, gc.Equals, nil)
 	s.AdminUser = &dbmodel.User{
@@ -84,13 +96,45 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	// add jimmtest.DefaultControllerUUID as a controller to JIMM
-	err = s.OFGAClient.AddController(context.Background(), s.JIMM.ResourceTag(), names.NewControllerTag("982b16d9-a945-4762-b684-fd4fd885aa10"))
+	err = s.OFGAClient.AddController(ctx, s.JIMM.ResourceTag(), names.NewControllerTag("982b16d9-a945-4762-b684-fd4fd885aa10"))
 	c.Assert(err, gc.Equals, nil)
+
+	mux := chi.NewRouter()
+	mountHandler := func(path string, h jimmhttp.JIMMHttpHandler) {
+		mux.Mount(path, h.Routes())
+	}
+
+	mountHandler(
+		"/.well-known",
+		wellknownapi.NewWellKnownHandler(s.JIMM.CredentialStore),
+	)
+
+	s.Server = httptest.NewServer(mux)
+
+	s.JIMM.JWKService = jimmjwx.NewJWKSService(s.JIMM.CredentialStore)
+	err = s.JIMM.JWKService.StartJWKSRotator(ctx, time.NewTicker(time.Hour).C, time.Now().UTC().AddDate(0, 3, 0))
+	c.Assert(err, gc.Equals, nil)
+
+	u, _ := url.Parse(s.Server.URL)
+
+	s.JIMM.JWTService = jimmjwx.NewJWTService(jimmjwx.JWTServiceParams{
+		Host:   u.Host,
+		Store:  s.JIMM.CredentialStore,
+		Secure: false,
+		Expiry: time.Minute,
+	})
+	s.JIMM.JWTService.RegisterJWKSCache(ctx, s.Server.Client())
+	s.JIMM.Dialer = &jujuclient.Dialer{
+		JWTService: s.JIMM.JWTService,
+	}
 }
 
 func (s *JIMMSuite) TearDownTest(c *gc.C) {
-	if s.JIMM != nil {
-		s.JIMM = nil
+	if s.cancel != nil {
+		s.cancel()
+	}
+	if s.Server != nil {
+		s.Server.Close()
 	}
 }
 
@@ -100,9 +144,8 @@ func (s *JIMMSuite) NewUser(u *dbmodel.User) *openfga.User {
 
 func (s *JIMMSuite) AddController(c *gc.C, name string, info *api.Info) {
 	ctl := &dbmodel.Controller{
+		UUID:          info.ControllerUUID,
 		Name:          name,
-		AdminUser:     info.Tag.Id(),
-		AdminPassword: info.Password,
 		CACertificate: info.CACert,
 		Addresses:     nil,
 	}
@@ -204,9 +247,9 @@ func (s *CandidSuite) TearDownTest(c *gc.C) {
 // A JujuSuite is a suite that intialises a JIMM and adds the testing juju
 // controller.
 type JujuSuite struct {
+	JIMMSuite
 	corejujutesting.JujuConnSuite
 	LoggingSuite
-	JIMMSuite
 }
 
 func (s *JujuSuite) SetUpSuite(c *gc.C) {
@@ -220,17 +263,20 @@ func (s *JujuSuite) TearDownSuite(c *gc.C) {
 }
 
 func (s *JujuSuite) SetUpTest(c *gc.C) {
+	s.JIMMSuite.SetUpTest(c)
+	s.ControllerConfigAttrs = map[string]interface{}{
+		"login-token-refresh-url": s.Server.URL + "/.well-known/jwks.json",
+	}
 	s.JujuConnSuite.SetUpTest(c)
 	s.LoggingSuite.SetUpTest(c)
-	s.JIMMSuite.SetUpTest(c)
 
 	s.AddController(c, "controller-1", s.APIInfo(c))
 }
 
 func (s *JujuSuite) TearDownTest(c *gc.C) {
-	s.JIMMSuite.TearDownTest(c)
 	s.LoggingSuite.TearDownTest(c)
 	s.JujuConnSuite.TearDownTest(c)
+	s.JIMMSuite.TearDownTest(c)
 }
 
 type BootstrapSuite struct {

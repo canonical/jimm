@@ -294,11 +294,11 @@ func (r *controllerRoot) DestroyModelsV4(ctx context.Context, args jujuparams.De
 
 // ModifyModelAccess implements the ModelManager facade's ModifyModelAccess method.
 func (r *controllerRoot) ModifyModelAccess(ctx context.Context, args jujuparams.ModifyModelAccessRequest) (jujuparams.ErrorResults, error) {
-	const op = errors.Op("jujuapi.ModifyModelAccess")
-
 	// TODO (alesstimec) granting and revoking access tbd in a followup
 	return jujuparams.ErrorResults{}, errors.E(errors.CodeNotImplemented)
 	/*
+		const op = errors.Op("jujuapi.ModifyModelAccess")
+
 		ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 		defer cancel()
 		results := make([]jujuparams.ErrorResult, len(args.Changes))

@@ -56,6 +56,20 @@ func start(ctx context.Context, s *service.Service) error {
 		}
 		macaroonExpiryDuration = expiry
 	}
+	jwtExpiryDuration := 24 * time.Hour
+	durationString = os.Getenv("JIMM_MACAROON_EXPIRY_DURATION")
+	if durationString != "" {
+		expiry, err := time.ParseDuration(durationString)
+		if err != nil {
+			zapctx.Error(ctx, "failed to parse macaroon expiry duration", zap.Error(err))
+		} else {
+			jwtExpiryDuration = expiry
+		}
+	}
+	insecureSecretStorage := false
+	if _, ok := os.LookupEnv("INSECURE_SECRET_STORAGE"); ok {
+		insecureSecretStorage = true
+	}
 	jimmsvc, err := jimm.NewService(ctx, jimm.Params{
 		ControllerUUID:    os.Getenv("JIMM_UUID"),
 		DSN:               os.Getenv("JIMM_DSN"),
@@ -81,10 +95,13 @@ func start(ctx context.Context, s *service.Service) error {
 		PublicKey:                     os.Getenv("BAKERY_PUBLIC_KEY"),
 		AuditLogRetentionPeriodInDays: os.Getenv("JIMM_AUDIT_LOG_RETENTION_PERIOD_IN_DAYS"),
 		MacaroonExpiryDuration:        macaroonExpiryDuration,
+		JWTExpiryDuration:             jwtExpiryDuration,
+		InsecureSecretStorage:         insecureSecretStorage,
 	})
 	if err != nil {
 		return err
 	}
+
 	if os.Getenv("JIMM_WATCH_CONTROLLERS") != "" {
 		s.Go(func() error { return jimmsvc.WatchControllers(ctx) }) // Deletes dead/dying models, updates model config.
 		s.Go(func() error { return jimmsvc.PollModels(ctx) })       // Poll for access control changes on the controller.

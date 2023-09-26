@@ -8,6 +8,7 @@ import (
 
 	jujuerrors "github.com/juju/errors"
 	apiservererrors "github.com/juju/juju/apiserver/errors"
+	"github.com/juju/juju/cloud"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 
@@ -488,11 +489,12 @@ func (r *controllerRoot) ModifyCloudAccess(ctx context.Context, args jujuparams.
 }
 
 func (r *controllerRoot) modifyCloudAccess(ctx context.Context, change jujuparams.ModifyCloudAccess) error {
-	const op = errors.Op("jujuapi.ModiftCloudAccess")
 	// TODO (alesstimec) granting and revoking access tbd in a followup
 	return errors.E(errors.CodeNotImplemented)
 
 	/*
+		const op = errors.Op("jujuapi.ModifyCloudAccess")
+
 		user, err := parseUserTag(change.UserTag)
 		if err != nil {
 			return errors.E(op, err)
@@ -626,4 +628,42 @@ func (r *controllerRoot) ListCloudInfo(ctx context.Context, args jujuparams.List
 	return jujuparams.ListCloudInfoResults{
 		Results: results,
 	}, nil
+}
+
+// CloudToParams converts cloud information to the juju parameters type.
+func CloudToParams(cloud cloud.Cloud) jujuparams.Cloud {
+	authTypes := make([]string, len(cloud.AuthTypes))
+	for i, authType := range cloud.AuthTypes {
+		authTypes[i] = string(authType)
+	}
+	regions := make([]jujuparams.CloudRegion, len(cloud.Regions))
+	for i, region := range cloud.Regions {
+		regions[i] = jujuparams.CloudRegion{
+			Name:             region.Name,
+			Endpoint:         region.Endpoint,
+			IdentityEndpoint: region.IdentityEndpoint,
+			StorageEndpoint:  region.StorageEndpoint,
+		}
+	}
+	var regionConfig map[string]map[string]interface{}
+	for r, attr := range cloud.RegionConfig {
+		if regionConfig == nil {
+			regionConfig = make(map[string]map[string]interface{})
+		}
+		regionConfig[r] = attr
+	}
+	return jujuparams.Cloud{
+		Type:              cloud.Type,
+		HostCloudRegion:   cloud.HostCloudRegion,
+		AuthTypes:         authTypes,
+		Endpoint:          cloud.Endpoint,
+		IdentityEndpoint:  cloud.IdentityEndpoint,
+		StorageEndpoint:   cloud.StorageEndpoint,
+		Regions:           regions,
+		CACertificates:    cloud.CACertificates,
+		SkipTLSVerify:     cloud.SkipTLSVerify,
+		Config:            cloud.Config,
+		RegionConfig:      regionConfig,
+		IsControllerCloud: cloud.IsControllerCloud,
+	}
 }

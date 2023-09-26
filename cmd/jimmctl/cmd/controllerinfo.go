@@ -3,7 +3,7 @@
 package cmd
 
 import (
-	"io/ioutil"
+	"os"
 
 	"github.com/juju/cmd/v3"
 	"github.com/juju/errors"
@@ -89,15 +89,11 @@ func (c *controllerInfoCommand) Run(ctxt *cmd.Context) error {
 	if err != nil {
 		return errors.Mask(err)
 	}
-	account, err := c.store.AccountDetails(c.controllerName)
-	if err != nil {
-		return errors.Mask(err)
-	}
+
 	info := apiparams.AddControllerRequest{
+		UUID:         controller.ControllerUUID,
 		Name:         c.controllerName,
 		APIAddresses: controller.APIEndpoints,
-		Username:     account.User,
-		Password:     account.Password,
 	}
 
 	info.PublicAddress = c.publicAddress
@@ -116,7 +112,7 @@ func (c *controllerInfoCommand) Run(ctxt *cmd.Context) error {
 	if err != nil {
 		return errors.Mask(err)
 	}
-	err = ioutil.WriteFile(c.file.Path, data, 0666)
+	err = os.WriteFile(c.file.Path, data, 0666)
 	if err != nil {
 		return errors.Mask(err)
 	}

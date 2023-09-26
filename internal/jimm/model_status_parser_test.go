@@ -591,7 +591,11 @@ func TestQueryModelsJq(t *testing.T) {
 				"provider-id": "10000000-0000-0000-0000-000000000000",
 				"relations": {
 				  "db": [
-					"myapp"
+					{
+						"interface": "db",
+						"related-application": "myapp",
+						"scope": "regular"
+					}
 				  ]
 				},
 				"scale": 1,

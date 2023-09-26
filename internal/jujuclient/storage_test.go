@@ -35,6 +35,7 @@ func (s *storageSuite) TestListFilesystems(c *gc.C) {
 
 	info := s.APIInfo(c)
 	ctl := dbmodel.Controller{
+		UUID:          s.ControllerConfig.ControllerUUID(),
 		Name:          s.ControllerConfig.ControllerName(),
 		CACertificate: info.CACert,
 		AdminUser:     info.Tag.Id(),
@@ -55,7 +56,7 @@ func (s *storageSuite) TestListFilesystems(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	uuid := modelInfo.UUID
 
-	api, err := s.Dialer.Dial(context.Background(), &ctl, names.NewModelTag(uuid))
+	api, err := s.Dialer.Dial(context.Background(), &ctl, names.NewModelTag(uuid), nil)
 	c.Assert(err, gc.IsNil)
 	_, err = api.ListFilesystems(ctx, nil)
 	c.Assert(err, gc.IsNil)
@@ -80,6 +81,7 @@ func (s *storageSuite) TestListVolumes(c *gc.C) {
 
 	info := s.APIInfo(c)
 	ctl := dbmodel.Controller{
+		UUID:          s.ControllerConfig.ControllerUUID(),
 		Name:          s.ControllerConfig.ControllerName(),
 		CACertificate: info.CACert,
 		AdminUser:     info.Tag.Id(),
@@ -100,7 +102,7 @@ func (s *storageSuite) TestListVolumes(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	uuid := modelInfo.UUID
 
-	api, err := s.Dialer.Dial(context.Background(), &ctl, names.NewModelTag(uuid))
+	api, err := s.Dialer.Dial(context.Background(), &ctl, names.NewModelTag(uuid), nil)
 	c.Assert(err, gc.IsNil)
 	_, err = api.ListVolumes(ctx, nil)
 	c.Assert(err, gc.IsNil)
@@ -125,6 +127,7 @@ func (s *storageSuite) TestListStorageDetails(c *gc.C) {
 
 	info := s.APIInfo(c)
 	ctl := dbmodel.Controller{
+		UUID:          s.ControllerConfig.ControllerUUID(),
 		Name:          s.ControllerConfig.ControllerName(),
 		CACertificate: info.CACert,
 		AdminUser:     info.Tag.Id(),
@@ -145,7 +148,7 @@ func (s *storageSuite) TestListStorageDetails(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	uuid := modelInfo.UUID
 
-	api, err := s.Dialer.Dial(context.Background(), &ctl, names.NewModelTag(uuid))
+	api, err := s.Dialer.Dial(context.Background(), &ctl, names.NewModelTag(uuid), nil)
 	c.Assert(err, gc.IsNil)
 	_, err = api.ListStorageDetails(ctx)
 	c.Assert(err, gc.IsNil)

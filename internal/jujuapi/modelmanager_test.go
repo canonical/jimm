@@ -33,7 +33,7 @@ import (
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 )
 
-const jujuVersion = "3.2-beta2"
+const jujuVersion = "3.2.4"
 
 type modelManagerSuite struct {
 	websocketSuite
@@ -1057,6 +1057,8 @@ func (s *modelManagerSuite) TestModifyModelAccessErrors(c *gc.C) {
 	*/
 }
 
+var zeroDuration = time.Duration(0)
+
 func (s *modelManagerSuite) TestDestroyModel(c *gc.C) {
 	ctx := context.Background()
 
@@ -1065,7 +1067,7 @@ func (s *modelManagerSuite) TestDestroyModel(c *gc.C) {
 
 	client := modelmanager.NewClient(conn)
 	tag := s.Model.ResourceTag()
-	err := client.DestroyModel(tag, nil, nil, nil, time.Duration(0))
+	err := client.DestroyModel(tag, nil, nil, nil, &zeroDuration)
 	c.Assert(err, gc.Equals, nil)
 
 	// Check the model is now dying.
@@ -1080,7 +1082,7 @@ func (s *modelManagerSuite) TestDestroyModel(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	// Make sure it's not an error if you destroy a model that't not there.
-	err = client.DestroyModel(s.Model.ResourceTag(), nil, nil, nil, time.Duration(0))
+	err = client.DestroyModel(s.Model.ResourceTag(), nil, nil, nil, &zeroDuration)
 	c.Assert(err, gc.Equals, nil)
 }
 
@@ -1281,7 +1283,7 @@ func (s *modelManagerStorageSuite) TestDestroyModelWithStorageError(c *gc.C) {
 
 	tag := s.Model.ResourceTag()
 	client := modelmanager.NewClient(conn)
-	err := client.DestroyModel(tag, nil, nil, nil, time.Duration(0))
+	err := client.DestroyModel(tag, nil, nil, nil, &zeroDuration)
 	c.Assert(err, jc.Satisfies, jujuparams.IsCodeHasPersistentStorage)
 
 	// Check the model is not now dying.
@@ -1298,7 +1300,7 @@ func (s *modelManagerStorageSuite) TestDestroyModelWithStorageDestroyStorageTrue
 
 	tag := s.Model.ResourceTag()
 	client := modelmanager.NewClient(conn)
-	err := client.DestroyModel(tag, newBool(true), nil, nil, time.Duration(0))
+	err := client.DestroyModel(tag, newBool(true), nil, nil, &zeroDuration)
 	c.Assert(err, gc.Equals, nil)
 
 	// Check the model is not now dying.
@@ -1315,7 +1317,7 @@ func (s *modelManagerStorageSuite) TestDestroyModelWithStorageDestroyStorageFals
 
 	tag := s.Model.ResourceTag()
 	client := modelmanager.NewClient(conn)
-	err := client.DestroyModel(tag, newBool(false), nil, nil, time.Duration(0))
+	err := client.DestroyModel(tag, newBool(false), nil, nil, &zeroDuration)
 	c.Assert(err, gc.Equals, nil)
 
 	// Check the model is not now dying.
