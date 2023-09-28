@@ -153,6 +153,50 @@ func (s *jimmSuite) TestListControllersV3Unauthorized(c *gc.C) {
 	}})
 }
 
+func (s *jimmSuite) TestAddControllerPublicAddressWithoutPort(c *gc.C) {
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+	client := api.NewClient(conn)
+
+	tests := []struct {
+		req           apiparams.AddControllerRequest
+		expectedError string
+	}{{
+		req: apiparams.AddControllerRequest{
+			Name:          "controller-2",
+			PublicAddress: "controller.test.com",
+			CACertificate: s.APIInfo(c).CACert,
+			Username:      s.APIInfo(c).Tag.Id(),
+			Password:      s.APIInfo(c).Password,
+		},
+		expectedError: `address controller.test.com: missing port in address \(bad request\)`,
+	}, {
+		req: apiparams.AddControllerRequest{
+			Name:          "controller-2",
+			PublicAddress: ":8080",
+			CACertificate: s.APIInfo(c).CACert,
+			Username:      s.APIInfo(c).Tag.Id(),
+			Password:      s.APIInfo(c).Password,
+		},
+		expectedError: `address :8080: host not specified in public address \(bad request\)`,
+	}, {
+		req: apiparams.AddControllerRequest{
+			Name:          "controller-2",
+			PublicAddress: "localhost:",
+			CACertificate: s.APIInfo(c).CACert,
+			Username:      s.APIInfo(c).Tag.Id(),
+			Password:      s.APIInfo(c).Password,
+		},
+		expectedError: `address localhost:: port not specified in public address \(bad request\)`,
+	}}
+
+	for _, test := range tests {
+		ci, err := client.AddController(&test.req)
+		c.Assert(err, gc.ErrorMatches, test.expectedError)
+		c.Check(ci, jc.DeepEquals, apiparams.ControllerInfo{})
+	}
+}
+
 func (s *jimmSuite) TestAddController(c *gc.C) {
 	conn := s.open(c, nil, "alice")
 	defer conn.Close()
