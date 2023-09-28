@@ -4,6 +4,8 @@ package jujuapi
 
 import (
 	"context"
+	"fmt"
+	"net"
 	"strings"
 	"time"
 
@@ -168,6 +170,19 @@ func (r *controllerRoot) AddCloudToController(ctx context.Context, req apiparams
 // available to JIMM.
 func (r *controllerRoot) AddController(ctx context.Context, req apiparams.AddControllerRequest) (apiparams.ControllerInfo, error) {
 	const op = errors.Op("jujuapi.AddController")
+
+	if req.PublicAddress != "" {
+		host, port, err := net.SplitHostPort(req.PublicAddress)
+		if err != nil {
+			return apiparams.ControllerInfo{}, errors.E(op, err, errors.CodeBadRequest)
+		}
+		if host == "" {
+			return apiparams.ControllerInfo{}, errors.E(op, fmt.Sprintf("address %s: host not specified in public address", req.PublicAddress), errors.CodeBadRequest)
+		}
+		if port == "" {
+			return apiparams.ControllerInfo{}, errors.E(op, fmt.Sprintf("address %s: port not specified in public address", req.PublicAddress), errors.CodeBadRequest)
+		}
+	}
 
 	ctl := dbmodel.Controller{
 		Name:          req.Name,
