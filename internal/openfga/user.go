@@ -186,31 +186,44 @@ func (u *User) GetApplicationOfferAccess(ctx context.Context, resource names.App
 }
 
 // SetModelAccess adds a direct relation between the user and the model.
+// Note that the action is idempotent (does not return error if the relation already exists).
 func (u *User) SetModelAccess(ctx context.Context, resource names.ModelTag, relation Relation) error {
 	return setResourceAccess(ctx, u, resource, relation)
 }
 
 // SetControllerAccess adds a direct relation between the user and the controller.
+// Note that the action is idempotent (does not return error if the relation already exists).
 func (u *User) SetControllerAccess(ctx context.Context, resource names.ControllerTag, relation Relation) error {
 	return setResourceAccess(ctx, u, resource, relation)
 }
 
 // UnsetAuditLogViewerAccess removes a direct audit log viewer relation between the user and a controller.
+// Note that the action is idempotent (i.e., does not return error if the relation does not exist).
 func (u *User) UnsetAuditLogViewerAccess(ctx context.Context, resource names.ControllerTag) error {
 	return unsetResourceAccess(ctx, u, resource, ofganames.AuditLogViewerRelation, true)
 }
 
 // SetCloudAccess adds a direct relation between the user and the cloud.
+// Note that the action is idempotent (does not return error if the relation already exists).
 func (u *User) SetCloudAccess(ctx context.Context, resource names.CloudTag, relation Relation) error {
 	return setResourceAccess(ctx, u, resource, relation)
 }
 
+// UnsetCloudAccess removes a direct relation between the user and the cloud.
+// Note that the action is idempotent (i.e., does not return error if the relation does not exist).
+func (u *User) UnsetCloudAccess(ctx context.Context, resource names.CloudTag, relation Relation) error {
+	return unsetResourceAccess(ctx, u, resource, relation, true)
+}
+
 // SetApplicationOfferAccess adds a direct relation between the user and the application offer.
+// Note that the action is idempotent (does not return error if the relation already exists).
 func (u *User) SetApplicationOfferAccess(ctx context.Context, resource names.ApplicationOfferTag, relation Relation) error {
 	return setResourceAccess(ctx, u, resource, relation)
 }
 
 // UnsetApplicationOfferAccess removes a direct relation between the user and the application offer.
+// Note that if the `ignoreMissingRelation` is set to `true`, then the action will be idempotent (i.e., does not return
+// error if the relation does not exist).
 func (u *User) UnsetApplicationOfferAccess(ctx context.Context, resource names.ApplicationOfferTag, relation Relation, ignoreMissingRelation bool) error {
 	return unsetResourceAccess(ctx, u, resource, relation, ignoreMissingRelation)
 }
@@ -300,6 +313,8 @@ func IsAdministrator[T administratorT](ctx context.Context, u *User, resource T)
 	return isAdmin, nil
 }
 
+// setResourceAccess creates a relation to model the requested resource access.
+// Note that the action is idempotent (does not return error if the relation already exists).
 func setResourceAccess[T ofganames.ResourceTagger](ctx context.Context, user *User, resource T, relation Relation) error {
 	err := user.client.AddRelation(ctx, Tuple{
 		Object:   ofganames.ConvertTag(user.ResourceTag()),
@@ -318,6 +333,9 @@ func setResourceAccess[T ofganames.ResourceTagger](ctx context.Context, user *Us
 	return nil
 }
 
+// unsetResourceAccess delete a relation that corresponds to the requested resource access.
+// Note that if the `ignoreMissingRelation` argument is set to `true`, then the action will be idempotent (i.e., does
+// not return error if the relation does not exist).
 func unsetResourceAccess[T ofganames.ResourceTagger](ctx context.Context, user *User, resource T, relation Relation, ignoreMissingRelation bool) error {
 	err := user.client.RemoveRelation(ctx, Tuple{
 		Object:   ofganames.ConvertTag(user.ResourceTag()),
