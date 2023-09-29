@@ -36,6 +36,8 @@ var (
 	NoRelation cofga.Relation = ""
 )
 
+var AllRelations = []cofga.Relation{MemberRelation, AdministratorRelation, ControllerRelation, ModelRelation, ConsumerRelation, ReaderRelation, WriterRelation, CanAddModelRelation, AuditLogViewerRelation, NoRelation}
+
 // Tag represents an entity tag as used by JIMM in OpenFGA.
 type Tag = cofga.Entity
 
@@ -128,6 +130,10 @@ func ParseRelation(relationString string) (cofga.Relation, error) {
 	switch relationString {
 	case "":
 		return cofga.Relation(""), nil
+	case ControllerRelation.String():
+		return ControllerRelation, nil
+	case ModelRelation.String():
+		return ModelRelation, nil
 	case MemberRelation.String():
 		return MemberRelation, nil
 	case AdministratorRelation.String():
@@ -140,6 +146,8 @@ func ParseRelation(relationString string) (cofga.Relation, error) {
 		return WriterRelation, nil
 	case CanAddModelRelation.String():
 		return CanAddModelRelation, nil
+	case AuditLogViewerRelation.String():
+		return AuditLogViewerRelation, nil
 	default:
 		return cofga.Relation(""), errors.E("unknown relation")
 
