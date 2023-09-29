@@ -76,3 +76,11 @@ func (s *namesSuite) TestConvertJujuRelation(c *gc.C) {
 		}
 	}
 }
+
+func (s *namesSuite) TestParseRelations(c *gc.C) {
+	for _, relation := range ofganames.AllRelations {
+		res, err := ofganames.ParseRelation(relation.String())
+		c.Assert(err, gc.IsNil, gc.Commentf("testing relation %s", relation))
+		c.Assert(res, gc.Equals, relation, gc.Commentf("testing relation %s", relation))
+	}
+}
