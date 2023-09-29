@@ -159,6 +159,10 @@ type Params struct {
 	// InsecureSecretStorage instructs JIMM to store secrets in its database
 	// instead of dedicated secure storage. SHOULD NOT BE USED IN PRODUCTION.
 	InsecureSecretStorage bool
+
+	// InsecureJwksLookup instructs JIMM to lookup its JWKS value via
+	// http instead of https. Useful when running JIMM in a docker compose.
+	InsecureJwksLookup bool
 }
 
 // A Service is the implementation of a JIMM server.
@@ -312,7 +316,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	s.jimm.JWKService = jimmjwx.NewJWKSService(s.jimm.CredentialStore)
 	s.jimm.JWTService = jimmjwx.NewJWTService(jimmjwx.JWTServiceParams{
 		Host:   p.PublicDNSName,
-		Secure: true,
+		Secure: !p.InsecureJwksLookup,
 		Store:  s.jimm.CredentialStore,
 		Expiry: p.JWTExpiryDuration,
 	})

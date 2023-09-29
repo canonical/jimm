@@ -5,6 +5,8 @@
 package names
 
 import (
+	"fmt"
+
 	"github.com/canonical/jimm/internal/errors"
 	jimmnames "github.com/canonical/jimm/pkg/names"
 	cofga "github.com/canonical/ofga"
@@ -105,6 +107,7 @@ func BlankKindTag(kind string) (*Tag, error) {
 // ConvertJujuRelation takes a juju relation string and converts it to
 // one appropriate for use with OpenFGA.
 func ConvertJujuRelation(relation string) (cofga.Relation, error) {
+	const op = errors.Op("ConvertJujuRelation")
 	switch relation {
 	case string(permission.AdminAccess):
 		return AdministratorRelation, nil
@@ -119,16 +122,17 @@ func ConvertJujuRelation(relation string) (cofga.Relation, error) {
 	// Below are controller specific permissions that
 	// are not represented in JIMM's OpenFGA model.
 	case string(permission.LoginAccess):
-		return NoRelation, errors.E("login access unused")
+		return NoRelation, errors.E(op, "login access unused")
 	case string(permission.SuperuserAccess):
-		return NoRelation, errors.E("superuser access unused")
+		return NoRelation, errors.E(op, "superuser access unused")
 	default:
-		return NoRelation, errors.E("unknown relation")
+		return NoRelation, errors.E(op, "unknown relation")
 	}
 }
 
 // ParseRelation parses the relation string
 func ParseRelation(relationString string) (cofga.Relation, error) {
+	const op = errors.Op("ParseRelation")
 	switch relationString {
 	case "":
 		return cofga.Relation(""), nil
@@ -151,7 +155,7 @@ func ParseRelation(relationString string) (cofga.Relation, error) {
 	case AuditLogViewerRelation.String():
 		return AuditLogViewerRelation, nil
 	default:
-		return cofga.Relation(""), errors.E("unknown relation")
+		return cofga.Relation(""), errors.E(op, fmt.Sprintf("unknown relation %s", relationString))
 
 	}
 }
