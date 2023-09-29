@@ -36,6 +36,8 @@ var (
 	NoRelation cofga.Relation = ""
 )
 
+// AllRelations contains a slice of all valid relations.
+// NB: Add any new relations from the above to this slice.
 var AllRelations = []cofga.Relation{MemberRelation, AdministratorRelation, ControllerRelation, ModelRelation, ConsumerRelation, ReaderRelation, WriterRelation, CanAddModelRelation, AuditLogViewerRelation, NoRelation}
 
 // Tag represents an entity tag as used by JIMM in OpenFGA.
