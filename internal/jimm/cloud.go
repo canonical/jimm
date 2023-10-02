@@ -552,124 +552,123 @@ func (j *JIMM) doCloudAdmin(ctx context.Context, u *openfga.User, ct names.Cloud
 // given user. If the cloud is not found then an error with the code
 // CodeNotFound is returned. If the authenticated user does not have admin
 // access to the cloud then an error with the code CodeUnauthorized is
-// returned. If the ModifyCloudAccess API call retuns an error the error
-// code is not masked.
-func (j *JIMM) GrantCloudAccess(ctx context.Context, u *dbmodel.User, ct names.CloudTag, ut names.UserTag, access string) error {
+// returned. If the ModifyCloudAccess API call returns an error, the error is
+// returned with the error code unmasked.
+func (j *JIMM) GrantCloudAccess(ctx context.Context, user *openfga.User, ct names.CloudTag, ut names.UserTag, access string) error {
 	const op = errors.Op("jimm.GrantCloudAccess")
 
-	// TODO (alesstimec) granting and revoking access tbd in a followup
-	return errors.E(errors.CodeNotImplemented)
-	/*
-		ale := dbmodel.AuditLogEntry{
-			Time:    time.Now().UTC().Round(time.Millisecond),
-			Tag:     ct.String(),
-			UserTag: u.Tag().String(),
-			Action:  "grant",
-			Params: dbmodel.StringMap{
-				"user":   ut.String(),
-				"access": access,
-			},
-		}
-		defer j.addAuditLogEntry(&ale)
+	targetRelation, err := cloudAccessToRelation(access)
+	if err != nil {
+		return errors.E(op, errors.CodeBadRequest, "failed to recognize given access", err)
+	}
 
-		err := j.doCloudAdmin(ctx, u, ct, func(c *dbmodel.Cloud, api API) error {
-			targetUser := dbmodel.User{
-				Username: ut.Id(),
-			}
-			if err := j.Database.GetUser(ctx, &targetUser); err != nil {
-				return err
-			}
-			if err := api.GrantCloudAccess(ctx, ct, ut, access); err != nil {
-				return err
-			}
-			var uca dbmodel.UserCloudAccess
-			for _, a := range c.Users {
-				if a.Username == targetUser.Username {
-					uca = a
-					break
+	err = j.doCloudAdmin(ctx, user, ct, func(c *dbmodel.Cloud, api API) error {
+		targetUser := &dbmodel.User{}
+		targetUser.SetTag(ut)
+		err := j.Database.GetUser(ctx, targetUser)
+		if err != nil {
+			return err
+		}
+		targetOfgaUser := openfga.NewUser(targetUser, j.OpenFGAClient)
+
+		currentRelation := targetOfgaUser.GetCloudAccess(ctx, ct)
+		if currentRelation != ofganames.NoRelation {
+			if targetRelation == ofganames.CanAddModelRelation {
+				return nil
+			} else if targetRelation == ofganames.AdministratorRelation {
+				if currentRelation == ofganames.AdministratorRelation {
+					return nil
 				}
 			}
-			uca.User = targetUser
-			uca.Cloud = *c
-			uca.Access = access
-
-			if err := j.Database.UpdateUserCloudAccess(ctx, &uca); err != nil {
-				return errors.E(op, err, "cannot update database after updating controller")
-			}
-			return nil
-		})
-		if err != nil {
-			ale.Params["err"] = err.Error()
-			return errors.E(op, err)
 		}
-		ale.Success = true
+
+		if err := api.GrantCloudAccess(ctx, ct, ut, access); err != nil {
+			return err
+		}
+
+		err = targetOfgaUser.SetCloudAccess(ctx, ct, targetRelation)
+		if err != nil {
+			return errors.E(err, "cannot update OpenFGA record after updating cloud")
+		}
 		return nil
-	*/
+	})
+
+	if err != nil {
+		return errors.E(op, err)
+	}
+	return nil
 }
 
 // RevokeCloudAccess revokes the given access level on the given cloud from
 // the given user. If the cloud is not found then an error with the code
 // CodeNotFound is returned. If the authenticated user does not have admin
 // access to the cloud then an error with the code CodeUnauthorized is
-// returned. If the ModifyCloudAccess API call retuns an error the error
-// code is not masked.
-func (j *JIMM) RevokeCloudAccess(ctx context.Context, u *dbmodel.User, ct names.CloudTag, ut names.UserTag, access string) error {
+// returned. If the ModifyCloudAccess API call returns an error, the error
+// is returned with the code unmasked.
+func (j *JIMM) RevokeCloudAccess(ctx context.Context, user *openfga.User, ct names.CloudTag, ut names.UserTag, access string) error {
 	const op = errors.Op("jimm.RevokeCloudAccess")
 
-	// TODO (alesstimec) granting and revoking access tbd in a followup
-	return errors.E(errors.CodeNotImplemented)
+	targetRelation, err := cloudAccessToRelation(access)
+	if err != nil {
+		return errors.E(op, errors.CodeBadRequest, "failed to recognize given access", err)
+	}
 
-	/*
-		ale := dbmodel.AuditLogEntry{
-			Time:    time.Now().UTC().Round(time.Millisecond),
-			Tag:     ct.String(),
-			UserTag: u.Tag().String(),
-			Action:  "revoke",
-			Params: dbmodel.StringMap{
-				"user":   ut.String(),
-				"access": access,
-			},
-		}
-		defer j.addAuditLogEntry(&ale)
-
-		err := j.doCloudAdmin(ctx, u, ct, func(c *dbmodel.Cloud, api API) error {
-			targetUser := dbmodel.User{
-				Username: ut.Id(),
-			}
-			if err := j.Database.GetUser(ctx, &targetUser); err != nil {
-				return err
-			}
-			if err := api.RevokeCloudAccess(ctx, ct, ut, access); err != nil {
-				return err
-			}
-			var uca dbmodel.UserCloudAccess
-			for _, a := range c.Users {
-				if a.Username == targetUser.Username {
-					uca = a
-					break
-				}
-			}
-			uca.User = targetUser
-			uca.Cloud = *c
-			switch access {
-			case "admin":
-				uca.Access = "add-model"
-			default:
-				uca.Access = ""
-			}
-
-			if err := j.Database.UpdateUserCloudAccess(ctx, &uca); err != nil {
-				return errors.E(op, err, "cannot update database after updating controller")
-			}
-			return nil
-		})
+	err = j.doCloudAdmin(ctx, user, ct, func(c *dbmodel.Cloud, api API) error {
+		targetUser := &dbmodel.User{}
+		targetUser.SetTag(ut)
+		err := j.Database.GetUser(ctx, targetUser)
 		if err != nil {
-			ale.Params["err"] = err.Error()
-			return errors.E(op, err)
+			return err
 		}
-		ale.Success = true
+		targetOfgaUser := openfga.NewUser(targetUser, j.OpenFGAClient)
+
+		currentRelation := targetOfgaUser.GetCloudAccess(ctx, ct)
+		if currentRelation == ofganames.NoRelation {
+			return nil
+		}
+
+		var relationsToRevoke []openfga.Relation
+		if targetRelation == ofganames.CanAddModelRelation {
+			// If we're revoking "add-model" access, in addition to the "add-model" relation, we should also revoke the
+			// "admin" relation. That's because having an "admin" relation indirectly grants the "add-model" permission
+			// to the user.
+			relationsToRevoke = []openfga.Relation{
+				ofganames.CanAddModelRelation,
+				ofganames.AdministratorRelation,
+			}
+		} else if targetRelation == ofganames.AdministratorRelation {
+			if currentRelation == ofganames.CanAddModelRelation {
+				return nil
+			}
+			relationsToRevoke = []openfga.Relation{
+				ofganames.AdministratorRelation,
+			}
+		}
+
+		if err := api.RevokeCloudAccess(ctx, ct, ut, access); err != nil {
+			return err
+		}
+
+		err = targetOfgaUser.UnsetCloudAccess(ctx, ct, relationsToRevoke...)
+		if err != nil {
+			return errors.E(err, "cannot update OpenFGA record after updating cloud")
+		}
 		return nil
-	*/
+	})
+
+	if err != nil {
+		return errors.E(op, err)
+	}
+	return nil
+}
+
+func cloudAccessToRelation(access string) (openfga.Relation, error) {
+	if access == "admin" {
+		return ofganames.AdministratorRelation, nil
+	} else if access == "add-model" {
+		return ofganames.CanAddModelRelation, nil
+	}
+	return ofganames.NoRelation, errors.E(fmt.Sprintf("unknown access: %q", access))
 }
 
 // RemoveCloud removes the given cloud from JAAS If the cloud is not found
