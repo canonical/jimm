@@ -209,10 +209,10 @@ func (u *User) SetCloudAccess(ctx context.Context, resource names.CloudTag, rela
 	return setResourceAccess(ctx, u, resource, relation)
 }
 
-// UnsetCloudAccess removes a direct relation between the user and the cloud.
+// UnsetCloudAccess removes direct relations between the user and the cloud.
 // Note that the action is idempotent (i.e., does not return error if the relation does not exist).
-func (u *User) UnsetCloudAccess(ctx context.Context, resource names.CloudTag, relation Relation) error {
-	return unsetResourceAccess(ctx, u, resource, relation, true)
+func (u *User) UnsetCloudAccess(ctx context.Context, resource names.CloudTag, relations ...Relation) error {
+	return unsetMultipleResourceAccesses(ctx, u, resource, relations)
 }
 
 // SetApplicationOfferAccess adds a direct relation between the user and the application offer.
@@ -333,7 +333,54 @@ func setResourceAccess[T ofganames.ResourceTagger](ctx context.Context, user *Us
 	return nil
 }
 
-// unsetResourceAccess delete a relation that corresponds to the requested resource access.
+// unsetMultipleResourceAccesses deletes relations that correspond to the requested resource access, atomically.
+// Note that the action is idempotent (i.e., does not return error if any of the relations does not exist).
+func unsetMultipleResourceAccesses[T ofganames.ResourceTagger](ctx context.Context, user *User, resource T, relations []Relation) error {
+	tupleObject := ofganames.ConvertTag(user.ResourceTag())
+	tupleTarget := ofganames.ConvertTag(resource)
+
+	lastCT := ""
+	existingRelations := map[Relation]interface{}{}
+	for {
+		tts, ct, err := user.client.cofgaClient.FindMatchingTuples(ctx, Tuple{
+			Object: tupleObject,
+			Target: tupleTarget,
+		}, 0, lastCT)
+
+		if err != nil {
+			return errors.E(err, "failed to retrieve existing relations")
+		}
+
+		for _, tt := range tts {
+			existingRelations[tt.Tuple.Relation] = nil
+		}
+
+		if ct == lastCT {
+			break
+		}
+		lastCT = ct
+	}
+
+	tuplesToRemove := make([]Tuple, 0, len(relations))
+	for _, relation := range relations {
+		if _, ok := existingRelations[relation]; !ok {
+			continue
+		}
+		tuplesToRemove = append(tuplesToRemove, Tuple{
+			Object:   tupleObject,
+			Relation: relation,
+			Target:   tupleTarget,
+		})
+	}
+
+	err := user.client.RemoveRelation(ctx, tuplesToRemove...)
+	if err != nil {
+		return errors.E(err, "failed to remove relations")
+	}
+	return nil
+}
+
+// unsetResourceAccess deletes a relation that corresponds to the requested resource access.
 // Note that if the `ignoreMissingRelation` argument is set to `true`, then the action will be idempotent (i.e., does
 // not return error if the relation does not exist).
 func unsetResourceAccess[T ofganames.ResourceTagger](ctx context.Context, user *User, resource T, relation Relation, ignoreMissingRelation bool) error {
