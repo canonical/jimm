@@ -1224,7 +1224,6 @@ func TestAddCloudToController(t *testing.T) {
 	}
 }
 
-/*
 const grantCloudAccessTestEnv = `clouds:
 - name: test-cloud
   type: test-provider
@@ -1265,7 +1264,7 @@ var grantCloudAccessTests = []struct {
 	cloud            string
 	targetUsername   string
 	access           string
-	expectCloud      dbmodel.Cloud
+	expectTuples     []openfga.Tuple
 	expectError      string
 	expectErrorCode  errors.Code
 }{{
@@ -1277,7 +1276,35 @@ var grantCloudAccessTests = []struct {
 	expectError:     `cloud "test2" not found`,
 	expectErrorCode: errors.CodeNotFound,
 }, {
-	name: "Success",
+	name: "Admin grants admin access",
+	env:  grantCloudAccessTestEnv,
+	grantCloudAccess: func(_ context.Context, ct names.CloudTag, ut names.UserTag, access string) error {
+		if ct.Id() != "test" {
+			return errors.E("bad cloud tag")
+		}
+		if ut.Id() != "bob@external" {
+			return errors.E("bad user tag")
+		}
+		if access != "admin" {
+			return errors.E("bad permission")
+		}
+		return nil
+	},
+	username:       "alice@external",
+	cloud:          "test",
+	targetUsername: "bob@external",
+	access:         "admin",
+	expectTuples: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
+	}},
+}, {
+	name: "Admin grants add-model access",
 	env:  grantCloudAccessTestEnv,
 	grantCloudAccess: func(_ context.Context, ct names.CloudTag, ut names.UserTag, access string) error {
 		if ct.Id() != "test" {
@@ -1295,51 +1322,15 @@ var grantCloudAccessTests = []struct {
 	cloud:          "test",
 	targetUsername: "bob@external",
 	access:         "add-model",
-	expectCloud: dbmodel.Cloud{
-		Name:            "test",
-		Type:            "kubernetes",
-		HostCloudRegion: "test-cloud/test-cloud-region",
-		Regions: []dbmodel.CloudRegion{{
-			Name: "default",
-			Controllers: []dbmodel.CloudRegionControllerPriority{{
-				Controller: dbmodel.Controller{
-					Name:        "controller-1",
-					UUID:        "00000001-0000-0000-0000-000000000001",
-					CloudName:   "test-cloud",
-					CloudRegion: "test-cloud-region",
-				},
-				Priority: 1,
-			}},
-		}, {
-			Name: "region2",
-			Controllers: []dbmodel.CloudRegionControllerPriority{{
-				Controller: dbmodel.Controller{
-					Name:        "controller-1",
-					UUID:        "00000001-0000-0000-0000-000000000001",
-					CloudName:   "test-cloud",
-					CloudRegion: "test-cloud-region",
-				},
-				Priority: 1,
-			}},
-		}},
-		Users: []dbmodel.UserCloudAccess{{
-			Username: "alice@external",
-			User: dbmodel.User{
-				Username:         "alice@external",
-				ControllerAccess: "login",
-			},
-			CloudName: "test",
-			Access:    "admin",
-		}, {
-			Username: "bob@external",
-			User: dbmodel.User{
-				Username:         "bob@external",
-				ControllerAccess: "login",
-			},
-			CloudName: "test",
-			Access:    "add-model",
-		}},
-	},
+	expectTuples: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Relation: ofganames.CanAddModelRelation,
+		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
+	}},
 }, {
 	name:            "UserNotAuthorized",
 	env:             grantCloudAccessTestEnv,
@@ -1374,45 +1365,50 @@ var grantCloudAccessTests = []struct {
 func TestGrantCloudAccess(t *testing.T) {
 	c := qt.New(t)
 
-	for _, test := range grantCloudAccessTests {
-		c.Run(test.name, func(c *qt.C) {
+	for _, t := range grantCloudAccessTests {
+		tt := t
+		c.Run(tt.name, func(c *qt.C) {
 			ctx := context.Background()
 
-			env := jimmtest.ParseEnvironment(c, test.env)
+			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), tt.name)
+			c.Assert(err, qt.IsNil)
+
+			env := jimmtest.ParseEnvironment(c, tt.env)
 			dialer := &jimmtest.Dialer{
 				API: &jimmtest.API{
-					GrantCloudAccess_: test.grantCloudAccess,
+					GrantCloudAccess_: tt.grantCloudAccess,
 				},
-				Err: test.dialError,
+				Err: tt.dialError,
 			}
 			j := &jimm.JIMM{
 				Database: db.Database{
 					DB: jimmtest.MemoryDB(c, nil),
 				},
-				Dialer: dialer,
+				Dialer:        dialer,
+				OpenFGAClient: client,
 			}
-			err := j.Database.Migrate(ctx, false)
+			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
-			env.PopulateDB(c, j.Database)
+			env.PopulateDB(c, j.Database, client)
 
-			u := env.User(test.username).DBObject(c, j.Database)
+			dbUser := env.User(tt.username).DBObject(c, j.Database, client)
+			user := openfga.NewUser(&dbUser, client)
 
-			err = j.GrantCloudAccess(ctx, &u, names.NewCloudTag(test.cloud), names.NewUserTag(test.targetUsername), test.access)
+			err = j.GrantCloudAccess(ctx, user, names.NewCloudTag(tt.cloud), names.NewUserTag(tt.targetUsername), tt.access)
 			c.Assert(dialer.IsClosed(), qt.Equals, true)
-			if test.expectError != "" {
-				c.Check(err, qt.ErrorMatches, test.expectError)
-				if test.expectErrorCode != "" {
-					c.Check(errors.ErrorCode(err), qt.Equals, test.expectErrorCode)
+			if tt.expectError != "" {
+				c.Check(err, qt.ErrorMatches, tt.expectError)
+				if tt.expectErrorCode != "" {
+					c.Check(errors.ErrorCode(err), qt.Equals, tt.expectErrorCode)
 				}
 				return
 			}
 			c.Assert(err, qt.IsNil)
-			cl := dbmodel.Cloud{
-				Name: test.cloud,
+			for _, tuple := range tt.expectTuples {
+				value, err := client.CheckRelation(ctx, tuple, false)
+				c.Assert(err, qt.IsNil)
+				c.Assert(value, qt.IsTrue, qt.Commentf("expected the tuple to exist after granting"))
 			}
-			err = j.Database.GetCloud(ctx, &cl)
-			c.Assert(err, qt.IsNil)
-			c.Check(cl, jimmtest.DBObjectEquals, test.expectCloud)
 		})
 	}
 }
@@ -1422,6 +1418,9 @@ const revokeCloudAccessTestEnv = `clouds:
   type: test-provider
   regions:
   - name: test-cloud-region
+  users:
+  - user: daphne@external
+    access: admin
 - name: test
   type: kubernetes
   host-cloud-region: test-cloud/test-cloud-region
@@ -1449,17 +1448,18 @@ controllers:
 `
 
 var revokeCloudAccessTests = []struct {
-	name              string
-	env               string
-	revokeCloudAccess func(context.Context, names.CloudTag, names.UserTag, string) error
-	dialError         error
-	username          string
-	cloud             string
-	targetUsername    string
-	access            string
-	expectCloud       dbmodel.Cloud
-	expectError       string
-	expectErrorCode   errors.Code
+	name                string
+	env                 string
+	revokeCloudAccess   func(context.Context, names.CloudTag, names.UserTag, string) error
+	dialError           error
+	username            string
+	cloud               string
+	targetUsername      string
+	access              string
+	expectTuples        []openfga.Tuple
+	expectRemovedTuples []openfga.Tuple
+	expectError         string
+	expectErrorCode     errors.Code
 }{{
 	name:            "CloudNotFound",
 	username:        "alice@external",
@@ -1469,7 +1469,7 @@ var revokeCloudAccessTests = []struct {
 	expectError:     `cloud "test2" not found`,
 	expectErrorCode: errors.CodeNotFound,
 }, {
-	name: "SuccessAdmin",
+	name: "Admin revokes 'admin' from another admin",
 	env:  revokeCloudAccessTestEnv,
 	revokeCloudAccess: func(_ context.Context, ct names.CloudTag, ut names.UserTag, access string) error {
 		if ct.Id() != "test" {
@@ -1487,50 +1487,26 @@ var revokeCloudAccessTests = []struct {
 	cloud:          "test",
 	targetUsername: "bob@external",
 	access:         "admin",
-	expectCloud: dbmodel.Cloud{
-		Name:            "test",
-		Type:            "kubernetes",
-		HostCloudRegion: "test-cloud/test-cloud-region",
-		Regions: []dbmodel.CloudRegion{{
-			Name: "default",
-			Controllers: []dbmodel.CloudRegionControllerPriority{{
-				Controller: dbmodel.Controller{
-					Name:        "controller-1",
-					UUID:        "00000001-0000-0000-0000-000000000001",
-					CloudName:   "test-cloud",
-					CloudRegion: "test-cloud-region",
-				},
-				Priority: 1,
-			}},
-		}},
-		Users: []dbmodel.UserCloudAccess{{
-			Username: "alice@external",
-			User: dbmodel.User{
-				Username:         "alice@external",
-				ControllerAccess: "login",
-			},
-			CloudName: "test",
-			Access:    "admin",
-		}, {
-			Username: "bob@external",
-			User: dbmodel.User{
-				Username:         "bob@external",
-				ControllerAccess: "login",
-			},
-			CloudName: "test",
-			Access:    "add-model",
-		}, {
-			Username: "charlie@external",
-			User: dbmodel.User{
-				Username:         "charlie@external",
-				ControllerAccess: "login",
-			},
-			CloudName: "test",
-			Access:    "add-model",
-		}},
-	},
+	expectTuples: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Relation: ofganames.CanAddModelRelation,
+		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Relation: ofganames.CanAddModelRelation,
+		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
+	}},
+	expectRemovedTuples: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
+	}},
 }, {
-	name: "SuccessAddModel",
+	name: "Admin revokes 'add-model' from another admin",
 	env:  revokeCloudAccessTestEnv,
 	revokeCloudAccess: func(_ context.Context, ct names.CloudTag, ut names.UserTag, access string) error {
 		if ct.Id() != "test" {
@@ -1548,40 +1524,117 @@ var revokeCloudAccessTests = []struct {
 	cloud:          "test",
 	targetUsername: "bob@external",
 	access:         "add-model",
-	expectCloud: dbmodel.Cloud{
-		Name:            "test",
-		Type:            "kubernetes",
-		HostCloudRegion: "test-cloud/test-cloud-region",
-		Regions: []dbmodel.CloudRegion{{
-			Name: "default",
-			Controllers: []dbmodel.CloudRegionControllerPriority{{
-				Controller: dbmodel.Controller{
-					Name:        "controller-1",
-					UUID:        "00000001-0000-0000-0000-000000000001",
-					CloudName:   "test-cloud",
-					CloudRegion: "test-cloud-region",
-				},
-				Priority: 1,
-			}},
-		}},
-		Users: []dbmodel.UserCloudAccess{{
-			Username: "alice@external",
-			User: dbmodel.User{
-				Username:         "alice@external",
-				ControllerAccess: "login",
-			},
-			CloudName: "test",
-			Access:    "admin",
-		}, {
-			Username: "charlie@external",
-			User: dbmodel.User{
-				Username:         "charlie@external",
-				ControllerAccess: "login",
-			},
-			CloudName: "test",
-			Access:    "add-model",
-		}},
+	expectTuples: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Relation: ofganames.CanAddModelRelation,
+		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
+	}},
+	expectRemovedTuples: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
+	}},
+}, {
+	name: "Admin revokes 'add-model' from a user with 'add-model' access",
+	env:  revokeCloudAccessTestEnv,
+	revokeCloudAccess: func(_ context.Context, ct names.CloudTag, ut names.UserTag, access string) error {
+		if ct.Id() != "test" {
+			return errors.E("bad model tag")
+		}
+		if ut.Id() != "charlie@external" {
+			return errors.E("bad user tag")
+		}
+		if access != "add-model" {
+			return errors.E("bad permission")
+		}
+		return nil
 	},
+	username:       "alice@external",
+	cloud:          "test",
+	targetUsername: "charlie@external",
+	access:         "add-model",
+	expectTuples: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
+	}},
+	expectRemovedTuples: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Relation: ofganames.CanAddModelRelation,
+		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
+	}},
+}, {
+	name: "Admin revokes 'add-model' from a user with no access",
+	env:  revokeCloudAccessTestEnv,
+	revokeCloudAccess: func(_ context.Context, ct names.CloudTag, ut names.UserTag, access string) error {
+		if ct.Id() != "test" {
+			return errors.E("bad model tag")
+		}
+		if ut.Id() != "daphne@external" {
+			return errors.E("bad user tag")
+		}
+		if access != "add-model" {
+			return errors.E("bad permission")
+		}
+		return nil
+	},
+	username:       "alice@external",
+	cloud:          "test",
+	targetUsername: "daphne@external",
+	access:         "add-model",
+	expectTuples: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Relation: ofganames.CanAddModelRelation,
+		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
+	}},
+}, {
+	name: "Admin revokes 'admin' from a user with no access",
+	env:  revokeCloudAccessTestEnv,
+	revokeCloudAccess: func(_ context.Context, ct names.CloudTag, ut names.UserTag, access string) error {
+		if ct.Id() != "test" {
+			return errors.E("bad model tag")
+		}
+		if ut.Id() != "daphne@external" {
+			return errors.E("bad user tag")
+		}
+		if access != "add-model" {
+			return errors.E("bad permission")
+		}
+		return nil
+	},
+	username:       "alice@external",
+	cloud:          "test",
+	targetUsername: "daphne@external",
+	access:         "admin",
+	expectTuples: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Relation: ofganames.CanAddModelRelation,
+		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
+	}},
 }, {
 	name:            "UserNotAuthorized",
 	env:             revokeCloudAccessTestEnv,
@@ -1616,49 +1669,64 @@ var revokeCloudAccessTests = []struct {
 func TestRevokeCloudAccess(t *testing.T) {
 	c := qt.New(t)
 
-	for _, test := range revokeCloudAccessTests {
-		c.Run(test.name, func(c *qt.C) {
+	for _, t := range revokeCloudAccessTests {
+		tt := t
+		c.Run(tt.name, func(c *qt.C) {
 			ctx := context.Background()
 
-			env := jimmtest.ParseEnvironment(c, test.env)
+			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), tt.name)
+			c.Assert(err, qt.IsNil)
+
+			env := jimmtest.ParseEnvironment(c, tt.env)
 			dialer := &jimmtest.Dialer{
 				API: &jimmtest.API{
-					RevokeCloudAccess_: test.revokeCloudAccess,
+					RevokeCloudAccess_: tt.revokeCloudAccess,
 				},
-				Err: test.dialError,
+				Err: tt.dialError,
 			}
 			j := &jimm.JIMM{
 				Database: db.Database{
 					DB: jimmtest.MemoryDB(c, nil),
 				},
-				Dialer: dialer,
+				Dialer:        dialer,
+				OpenFGAClient: client,
 			}
-			err := j.Database.Migrate(ctx, false)
+
+			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
-			env.PopulateDB(c, j.Database)
+			env.PopulateDB(c, j.Database, client)
 
-			u := env.User(test.username).DBObject(c, j.Database)
+			if tt.expectRemovedTuples != nil {
+				for _, tuple := range tt.expectRemovedTuples {
+					value, err := client.CheckRelation(ctx, tuple, false)
+					c.Assert(err, qt.IsNil)
+					c.Assert(value, qt.IsTrue, qt.Commentf("expected the tuple to exist before revoking"))
+				}
+			}
 
-			err = j.RevokeCloudAccess(ctx, &u, names.NewCloudTag(test.cloud), names.NewUserTag(test.targetUsername), test.access)
+			dbUser := env.User(tt.username).DBObject(c, j.Database, client)
+			user := openfga.NewUser(&dbUser, client)
+
+			err = j.RevokeCloudAccess(ctx, user, names.NewCloudTag(tt.cloud), names.NewUserTag(tt.targetUsername), tt.access)
 			c.Assert(dialer.IsClosed(), qt.Equals, true)
-			if test.expectError != "" {
-				c.Check(err, qt.ErrorMatches, test.expectError)
-				if test.expectErrorCode != "" {
-					c.Check(errors.ErrorCode(err), qt.Equals, test.expectErrorCode)
+			if tt.expectError != "" {
+				c.Check(err, qt.ErrorMatches, tt.expectError)
+				if tt.expectErrorCode != "" {
+					c.Check(errors.ErrorCode(err), qt.Equals, tt.expectErrorCode)
 				}
 				return
 			}
 			c.Assert(err, qt.IsNil)
-			cl := dbmodel.Cloud{
-				Name: test.cloud,
+			if tt.expectRemovedTuples != nil {
+				for _, tuple := range tt.expectRemovedTuples {
+					value, err := client.CheckRelation(ctx, tuple, false)
+					c.Assert(err, qt.IsNil)
+					c.Assert(value, qt.IsFalse, qt.Commentf("expected the tuple to be removed after revoking"))
+				}
 			}
-			err = j.Database.GetCloud(ctx, &cl)
-			c.Assert(err, qt.IsNil)
-			c.Check(cl, jimmtest.DBObjectEquals, test.expectCloud)
 		})
 	}
 }
-*/
 
 const removeCloudTestEnv = `clouds:
 - name: test-cloud

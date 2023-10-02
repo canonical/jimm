@@ -311,6 +311,9 @@ func (s *cloudSuite) TestGrantCloudAccess(c *gc.C) {
 	c.Check(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeNotFound)
 	err = s.API.GrantCloudAccess(context.Background(), names.NewCloudTag(jimmtest.TestCloudName), names.NewUserTag("user@external"), "add-model")
 	c.Check(err, gc.Equals, nil)
+	// Re-granting should not return error
+	err = s.API.GrantCloudAccess(context.Background(), names.NewCloudTag(jimmtest.TestCloudName), names.NewUserTag("user@external"), "add-model")
+	c.Check(err, gc.Equals, nil)
 }
 
 func (s *cloudSuite) TestRevokeCloudAccess(c *gc.C) {
