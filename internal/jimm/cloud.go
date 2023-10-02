@@ -557,7 +557,7 @@ func (j *JIMM) doCloudAdmin(ctx context.Context, u *openfga.User, ct names.Cloud
 func (j *JIMM) GrantCloudAccess(ctx context.Context, user *openfga.User, ct names.CloudTag, ut names.UserTag, access string) error {
 	const op = errors.Op("jimm.GrantCloudAccess")
 
-	targetRelation, err := cloudAccessToRelation(access)
+	targetRelation, err := ToCloudRelation(access)
 	if err != nil {
 		return errors.E(op, errors.CodeBadRequest, "failed to recognize given access", err)
 	}
@@ -608,7 +608,7 @@ func (j *JIMM) GrantCloudAccess(ctx context.Context, user *openfga.User, ct name
 func (j *JIMM) RevokeCloudAccess(ctx context.Context, user *openfga.User, ct names.CloudTag, ut names.UserTag, access string) error {
 	const op = errors.Op("jimm.RevokeCloudAccess")
 
-	targetRelation, err := cloudAccessToRelation(access)
+	targetRelation, err := ToCloudRelation(access)
 	if err != nil {
 		return errors.E(op, errors.CodeBadRequest, "failed to recognize given access", err)
 	}
@@ -660,15 +660,6 @@ func (j *JIMM) RevokeCloudAccess(ctx context.Context, user *openfga.User, ct nam
 		return errors.E(op, err)
 	}
 	return nil
-}
-
-func cloudAccessToRelation(access string) (openfga.Relation, error) {
-	if access == "admin" {
-		return ofganames.AdministratorRelation, nil
-	} else if access == "add-model" {
-		return ofganames.CanAddModelRelation, nil
-	}
-	return ofganames.NoRelation, errors.E(fmt.Sprintf("unknown access: %q", access))
 }
 
 // RemoveCloud removes the given cloud from JAAS If the cloud is not found
