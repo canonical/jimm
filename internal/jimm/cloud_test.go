@@ -1677,6 +1677,50 @@ var revokeCloudAccessTests = []struct {
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
 	}},
 }, {
+	name: "Admin revokes 'admin' access from a user who has separate tuples for all accesses (add-model/admin)",
+	env:  revokeCloudAccessTestEnv,
+	revokeCloudAccess: func(_ context.Context, ct names.CloudTag, ut names.UserTag, access string) error {
+		if ct.Id() != "test" {
+			return errors.E("bad model tag")
+		}
+		if ut.Id() != "charlie@external" {
+			return errors.E("bad user tag")
+		}
+		if access != "admin" {
+			return errors.E("bad permission")
+		}
+		return nil
+	},
+	username:       "alice@external",
+	cloud:          "test",
+	targetUsername: "charlie@external",
+	access:         "admin",
+	extraInitialTuples: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
+	},
+	// No need to add the 'add-model' relation, because it's already there due to the environment setup.
+	},
+	expectRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Relation: ofganames.CanAddModelRelation,
+		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
+	}},
+	expectRemovedRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
+	}},
+}, {
 	name:            "UserNotAuthorized",
 	env:             revokeCloudAccessTestEnv,
 	username:        "charlie@external",
