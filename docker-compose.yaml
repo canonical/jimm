@@ -55,6 +55,7 @@ services:
       VAULT_PATH: "/jimm-kv/"
       VAULT_SECRET_FILE: "/vault/approle.json"
       VAULT_AUTH_PATH: "/auth/approle/login"
+      INSECURE_JWKS_LOOKUP: "enabled"
       # Note: By default we should use Vault as that is the primary means of secret storage.
       # INSECURE_SECRET_STORAGE: "enabled"
       # JIMM_DASHBOARD_LOCATION: ""
@@ -82,7 +83,7 @@ services:
       test: [ "CMD", "curl", "http://jimm.localhost:80" ]
       interval: 5s
       timeout: 5s
-      retries: 40
+      retries: 50
     depends_on:
       db:
         condition: service_healthy

@@ -70,6 +70,10 @@ func start(ctx context.Context, s *service.Service) error {
 	if _, ok := os.LookupEnv("INSECURE_SECRET_STORAGE"); ok {
 		insecureSecretStorage = true
 	}
+	insecureJwksLookup := false
+	if _, ok := os.LookupEnv("INSECURE_JWKS_LOOKUP"); ok {
+		insecureJwksLookup = true
+	}
 	jimmsvc, err := jimm.NewService(ctx, jimm.Params{
 		ControllerUUID:    os.Getenv("JIMM_UUID"),
 		DSN:               os.Getenv("JIMM_DSN"),
@@ -97,6 +101,7 @@ func start(ctx context.Context, s *service.Service) error {
 		MacaroonExpiryDuration:        macaroonExpiryDuration,
 		JWTExpiryDuration:             jwtExpiryDuration,
 		InsecureSecretStorage:         insecureSecretStorage,
+		InsecureJwksLookup:            insecureJwksLookup,
 	})
 	if err != nil {
 		return err
