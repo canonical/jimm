@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net"
+	"time"
 
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
@@ -17,7 +18,9 @@ import (
 // A controller represents a juju controller which is hosting models
 // within the JAAS system.
 type Controller struct {
-	gorm.Model
+	ID        uint `gorm:"primarykey"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
 
 	// Name is the name given to this controller.
 	Name string `gorm:"not null;uniqueIndex"`

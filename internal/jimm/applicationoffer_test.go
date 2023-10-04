@@ -2558,6 +2558,7 @@ func TestUpdateOffer(t *testing.T) {
 							cmpopts.IgnoreTypes(time.Time{}),
 							cmpopts.IgnoreTypes(gorm.Model{}),
 							cmpopts.IgnoreTypes(dbmodel.Model{}),
+							cmpopts.IgnoreFields(dbmodel.User{}, "ID", "CreatedAt", "UpdatedAt"),
 						),
 						test.expectedOffer,
 					)

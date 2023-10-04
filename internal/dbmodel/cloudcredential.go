@@ -5,14 +5,16 @@ package dbmodel
 import (
 	"database/sql"
 	"fmt"
+	"time"
 
 	"github.com/juju/names/v4"
-	"gorm.io/gorm"
 )
 
 // A CloudCredential is a credential that is used to access a cloud.
 type CloudCredential struct {
-	gorm.Model
+	ID        uint `gorm:"primaryKey"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
 
 	// Name is the name of the credential.
 	Name string

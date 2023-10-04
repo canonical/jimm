@@ -140,11 +140,9 @@ func TestGetCloud(t *testing.T) {
 			},
 			Username: "alice@external",
 			User: dbmodel.User{
-				Model: gorm.Model{
-					ID:        1,
-					CreatedAt: now,
-					UpdatedAt: now,
-				},
+				ID:               1,
+				CreatedAt:        now,
+				UpdatedAt:        now,
 				Username:         "alice@external",
 				ControllerAccess: "login",
 			},
@@ -158,11 +156,9 @@ func TestGetCloud(t *testing.T) {
 			},
 			Username: "bob@external",
 			User: dbmodel.User{
-				Model: gorm.Model{
-					ID:        2,
-					CreatedAt: now,
-					UpdatedAt: now,
-				},
+				ID:               2,
+				CreatedAt:        now,
+				UpdatedAt:        now,
 				Username:         "bob@external",
 				ControllerAccess: "login",
 			},
@@ -202,11 +198,9 @@ func TestGetCloud(t *testing.T) {
 			},
 			Username: "alice@external",
 			User: dbmodel.User{
-				Model: gorm.Model{
-					ID:        1,
-					CreatedAt: now,
-					UpdatedAt: now,
-				},
+				ID:               1,
+				CreatedAt:        now,
+				UpdatedAt:        now,
 				Username:         "alice@external",
 				ControllerAccess: "login",
 			},
@@ -220,11 +214,9 @@ func TestGetCloud(t *testing.T) {
 			},
 			Username: "bob@external",
 			User: dbmodel.User{
-				Model: gorm.Model{
-					ID:        2,
-					CreatedAt: now,
-					UpdatedAt: now,
-				},
+				ID:               2,
+				CreatedAt:        now,
+				UpdatedAt:        now,
 				Username:         "bob@external",
 				ControllerAccess: "login",
 			},
@@ -368,11 +360,9 @@ func TestForEachCloud(t *testing.T) {
 			},
 			Username: "alice@external",
 			User: dbmodel.User{
-				Model: gorm.Model{
-					ID:        1,
-					CreatedAt: now,
-					UpdatedAt: now,
-				},
+				ID:               1,
+				CreatedAt:        now,
+				UpdatedAt:        now,
 				Username:         "alice@external",
 				ControllerAccess: "login",
 			},
@@ -386,11 +376,9 @@ func TestForEachCloud(t *testing.T) {
 			},
 			Username: "bob@external",
 			User: dbmodel.User{
-				Model: gorm.Model{
-					ID:        2,
-					CreatedAt: now,
-					UpdatedAt: now,
-				},
+				ID:               2,
+				CreatedAt:        now,
+				UpdatedAt:        now,
 				Username:         "bob@external",
 				ControllerAccess: "login",
 			},
@@ -512,11 +500,9 @@ func TestForEachCloud(t *testing.T) {
 			},
 			Username: "alice@external",
 			User: dbmodel.User{
-				Model: gorm.Model{
-					ID:        1,
-					CreatedAt: now,
-					UpdatedAt: now,
-				},
+				ID:               1,
+				CreatedAt:        now,
+				UpdatedAt:        now,
 				Username:         "alice@external",
 				ControllerAccess: "login",
 			},
@@ -530,11 +516,9 @@ func TestForEachCloud(t *testing.T) {
 			},
 			Username: "bob@external",
 			User: dbmodel.User{
-				Model: gorm.Model{
-					ID:        2,
-					CreatedAt: now,
-					UpdatedAt: now,
-				},
+				ID:               2,
+				CreatedAt:        now,
+				UpdatedAt:        now,
 				Username:         "bob@external",
 				ControllerAccess: "login",
 			},
@@ -555,11 +539,9 @@ func TestForEachCloud(t *testing.T) {
 			},
 			Username: "bob@external",
 			User: dbmodel.User{
-				Model: gorm.Model{
-					ID:        2,
-					CreatedAt: now,
-					UpdatedAt: now,
-				},
+				ID:               2,
+				CreatedAt:        now,
+				UpdatedAt:        now,
 				Username:         "bob@external",
 				ControllerAccess: "login",
 			},
@@ -573,11 +555,9 @@ func TestForEachCloud(t *testing.T) {
 			},
 			Username: auth.Everyone,
 			User: dbmodel.User{
-				Model: gorm.Model{
-					ID:        3,
-					CreatedAt: now,
-					UpdatedAt: now,
-				},
+				ID:               3,
+				CreatedAt:        now,
+				UpdatedAt:        now,
 				Username:         auth.Everyone,
 				ControllerAccess: "login",
 			},
@@ -598,11 +578,9 @@ func TestForEachCloud(t *testing.T) {
 			},
 			Username: auth.Everyone,
 			User: dbmodel.User{
-				Model: gorm.Model{
-					ID:        3,
-					CreatedAt: now,
-					UpdatedAt: now,
-				},
+				ID:               3,
+				CreatedAt:        now,
+				UpdatedAt:        now,
 				Username:         auth.Everyone,
 				ControllerAccess: "login",
 			},

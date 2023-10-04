@@ -136,7 +136,7 @@ func TestSetUserModelDefaults(t *testing.T) {
 				}
 				err = j.Database.UserModelDefaults(ctx, &dbDefaults)
 				c.Assert(err, qt.Equals, nil)
-				c.Assert(&dbDefaults, qt.CmpEquals(cmpopts.IgnoreTypes(gorm.Model{})), testConfig.expectedDefaults)
+				c.Assert(&dbDefaults, jimmtest.DBObjectEquals, testConfig.expectedDefaults)
 			} else {
 				c.Assert(err, qt.ErrorMatches, testConfig.expectedError)
 			}
