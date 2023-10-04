@@ -191,6 +191,12 @@ func (u *User) SetModelAccess(ctx context.Context, resource names.ModelTag, rela
 	return setResourceAccess(ctx, u, resource, relation)
 }
 
+// UnsetModelAccess removes direct relations between the user and the model.
+// Note that the action is idempotent (i.e., does not return error if the relation does not exist).
+func (u *User) UnsetModelAccess(ctx context.Context, resource names.ModelTag, relations ...Relation) error {
+	return unsetMultipleResourceAccesses(ctx, u, resource, relations)
+}
+
 // SetControllerAccess adds a direct relation between the user and the controller.
 // Note that the action is idempotent (does not return error if the relation already exists).
 func (u *User) SetControllerAccess(ctx context.Context, resource names.ControllerTag, relation Relation) error {
