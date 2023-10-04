@@ -1706,7 +1706,7 @@ var grantModelAccessTests = []struct {
 	uuid             string
 	targetUsername   string
 	access           string
-	expectTuples     []openfga.Tuple
+	expectRelations  []openfga.Tuple
 	expectError      string
 	expectErrorCode  errors.Code
 }{{
@@ -1736,7 +1736,7 @@ var grantModelAccessTests = []struct {
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "bob@external",
 	access:         "admin",
-	expectTuples: []openfga.Tuple{{
+	expectRelations: []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
@@ -1768,7 +1768,7 @@ var grantModelAccessTests = []struct {
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "bob@external",
 	access:         "write",
-	expectTuples: []openfga.Tuple{{
+	expectRelations: []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
@@ -1800,7 +1800,7 @@ var grantModelAccessTests = []struct {
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "bob@external",
 	access:         "read",
-	expectTuples: []openfga.Tuple{{
+	expectRelations: []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
@@ -1832,7 +1832,7 @@ var grantModelAccessTests = []struct {
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "charlie@external",
 	access:         "write",
-	expectTuples: []openfga.Tuple{{
+	expectRelations: []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
@@ -1860,7 +1860,7 @@ var grantModelAccessTests = []struct {
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "charlie@external",
 	access:         "read",
-	expectTuples: []openfga.Tuple{{
+	expectRelations: []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
@@ -1888,7 +1888,7 @@ var grantModelAccessTests = []struct {
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "alice@external",
 	access:         "admin",
-	expectTuples: []openfga.Tuple{{
+	expectRelations: []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
@@ -1916,7 +1916,7 @@ var grantModelAccessTests = []struct {
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "alice@external",
 	access:         "write",
-	expectTuples: []openfga.Tuple{{
+	expectRelations: []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
@@ -1944,7 +1944,7 @@ var grantModelAccessTests = []struct {
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "alice@external",
 	access:         "read",
-	expectTuples: []openfga.Tuple{{
+	expectRelations: []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
@@ -2026,7 +2026,7 @@ func TestGrantModelAccess(t *testing.T) {
 				return
 			}
 			c.Assert(err, qt.IsNil)
-			for _, tuple := range tt.expectTuples {
+			for _, tuple := range tt.expectRelations {
 				value, err := client.CheckRelation(ctx, tuple, false)
 				c.Assert(err, qt.IsNil)
 				c.Assert(value, qt.IsTrue, qt.Commentf("expected the tuple to exist after granting"))
@@ -2081,18 +2081,19 @@ models:
 `
 
 var revokeModelAccessTests = []struct {
-	name                string
-	env                 string
-	revokeModelAccess   func(context.Context, names.ModelTag, names.UserTag, jujuparams.UserAccessPermission) error
-	dialError           error
-	username            string
-	uuid                string
-	targetUsername      string
-	access              string
-	expectTuples        []openfga.Tuple
-	expectRemovedTuples []openfga.Tuple
-	expectError         string
-	expectErrorCode     errors.Code
+	name                   string
+	env                    string
+	revokeModelAccess      func(context.Context, names.ModelTag, names.UserTag, jujuparams.UserAccessPermission) error
+	dialError              error
+	username               string
+	uuid                   string
+	targetUsername         string
+	access                 string
+	extraInitialTuples     []openfga.Tuple
+	expectRelations        []openfga.Tuple
+	expectRemovedRelations []openfga.Tuple
+	expectError            string
+	expectErrorCode        errors.Code
 }{{
 	name:            "ModelNotFound",
 	username:        "alice@external",
@@ -2120,7 +2121,7 @@ var revokeModelAccessTests = []struct {
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "bob@external",
 	access:         "admin",
-	expectTuples: []openfga.Tuple{{
+	expectRelations: []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
@@ -2133,7 +2134,7 @@ var revokeModelAccessTests = []struct {
 		Relation: ofganames.ReaderRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
-	expectRemovedTuples: []openfga.Tuple{{
+	expectRemovedRelations: []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
@@ -2157,7 +2158,7 @@ var revokeModelAccessTests = []struct {
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "bob@external",
 	access:         "write",
-	expectTuples: []openfga.Tuple{{
+	expectRelations: []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
@@ -2170,7 +2171,7 @@ var revokeModelAccessTests = []struct {
 		Relation: ofganames.ReaderRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
-	expectRemovedTuples: []openfga.Tuple{{
+	expectRemovedRelations: []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
@@ -2194,7 +2195,7 @@ var revokeModelAccessTests = []struct {
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "bob@external",
 	access:         "read",
-	expectTuples: []openfga.Tuple{{
+	expectRelations: []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
@@ -2207,7 +2208,7 @@ var revokeModelAccessTests = []struct {
 		Relation: ofganames.ReaderRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
-	expectRemovedTuples: []openfga.Tuple{{
+	expectRemovedRelations: []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
@@ -2231,7 +2232,7 @@ var revokeModelAccessTests = []struct {
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "charlie@external",
 	access:         "admin",
-	expectTuples: []openfga.Tuple{{
+	expectRelations: []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
@@ -2267,7 +2268,7 @@ var revokeModelAccessTests = []struct {
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "charlie@external",
 	access:         "write",
-	expectTuples: []openfga.Tuple{{
+	expectRelations: []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
@@ -2280,7 +2281,7 @@ var revokeModelAccessTests = []struct {
 		Relation: ofganames.ReaderRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
-	expectRemovedTuples: []openfga.Tuple{{
+	expectRemovedRelations: []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
 		Relation: ofganames.WriterRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
@@ -2304,7 +2305,7 @@ var revokeModelAccessTests = []struct {
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "charlie@external",
 	access:         "read",
-	expectTuples: []openfga.Tuple{{
+	expectRelations: []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
@@ -2317,7 +2318,7 @@ var revokeModelAccessTests = []struct {
 		Relation: ofganames.ReaderRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
-	expectRemovedTuples: []openfga.Tuple{{
+	expectRemovedRelations: []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
 		Relation: ofganames.WriterRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
@@ -2341,7 +2342,7 @@ var revokeModelAccessTests = []struct {
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "daphne@external",
 	access:         "admin",
-	expectTuples: []openfga.Tuple{{
+	expectRelations: []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
@@ -2377,7 +2378,7 @@ var revokeModelAccessTests = []struct {
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "daphne@external",
 	access:         "write",
-	expectTuples: []openfga.Tuple{{
+	expectRelations: []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
@@ -2413,7 +2414,7 @@ var revokeModelAccessTests = []struct {
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "daphne@external",
 	access:         "read",
-	expectTuples: []openfga.Tuple{{
+	expectRelations: []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
@@ -2426,7 +2427,7 @@ var revokeModelAccessTests = []struct {
 		Relation: ofganames.WriterRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
-	expectRemovedTuples: []openfga.Tuple{{
+	expectRemovedRelations: []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
 		Relation: ofganames.ReaderRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
@@ -2450,7 +2451,7 @@ var revokeModelAccessTests = []struct {
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "alice@external",
 	access:         "admin",
-	expectTuples: []openfga.Tuple{{
+	expectRelations: []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
@@ -2463,7 +2464,7 @@ var revokeModelAccessTests = []struct {
 		Relation: ofganames.ReaderRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
-	expectRemovedTuples: []openfga.Tuple{{
+	expectRemovedRelations: []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
@@ -2487,7 +2488,7 @@ var revokeModelAccessTests = []struct {
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "alice@external",
 	access:         "write",
-	expectTuples: []openfga.Tuple{{
+	expectRelations: []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
@@ -2500,7 +2501,7 @@ var revokeModelAccessTests = []struct {
 		Relation: ofganames.ReaderRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
-	expectRemovedTuples: []openfga.Tuple{{
+	expectRemovedRelations: []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
@@ -2524,7 +2525,7 @@ var revokeModelAccessTests = []struct {
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "alice@external",
 	access:         "read",
-	expectTuples: []openfga.Tuple{{
+	expectRelations: []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
@@ -2537,7 +2538,7 @@ var revokeModelAccessTests = []struct {
 		Relation: ofganames.ReaderRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
-	expectRemovedTuples: []openfga.Tuple{{
+	expectRemovedRelations: []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
@@ -2561,7 +2562,7 @@ var revokeModelAccessTests = []struct {
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "charlie@external",
 	access:         "admin",
-	expectTuples: []openfga.Tuple{{
+	expectRelations: []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
@@ -2597,7 +2598,7 @@ var revokeModelAccessTests = []struct {
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "charlie@external",
 	access:         "write",
-	expectTuples: []openfga.Tuple{{
+	expectRelations: []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
@@ -2610,7 +2611,7 @@ var revokeModelAccessTests = []struct {
 		Relation: ofganames.ReaderRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
-	expectRemovedTuples: []openfga.Tuple{{
+	expectRemovedRelations: []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
 		Relation: ofganames.WriterRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
@@ -2634,7 +2635,7 @@ var revokeModelAccessTests = []struct {
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "charlie@external",
 	access:         "read",
-	expectTuples: []openfga.Tuple{{
+	expectRelations: []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
@@ -2647,7 +2648,7 @@ var revokeModelAccessTests = []struct {
 		Relation: ofganames.ReaderRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
-	expectRemovedTuples: []openfga.Tuple{{
+	expectRemovedRelations: []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
 		Relation: ofganames.WriterRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
@@ -2671,7 +2672,7 @@ var revokeModelAccessTests = []struct {
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "daphne@external",
 	access:         "admin",
-	expectTuples: []openfga.Tuple{{
+	expectRelations: []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
@@ -2707,7 +2708,7 @@ var revokeModelAccessTests = []struct {
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "daphne@external",
 	access:         "write",
-	expectTuples: []openfga.Tuple{{
+	expectRelations: []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
@@ -2743,7 +2744,7 @@ var revokeModelAccessTests = []struct {
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "daphne@external",
 	access:         "read",
-	expectTuples: []openfga.Tuple{{
+	expectRelations: []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
@@ -2756,7 +2757,65 @@ var revokeModelAccessTests = []struct {
 		Relation: ofganames.WriterRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
-	expectRemovedTuples: []openfga.Tuple{{
+	expectRemovedRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Relation: ofganames.ReaderRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}},
+}, {
+	name: "Admin revokes 'read' access from a user who has separate tuples for all accesses (read/write/admin)",
+	env:  revokeModelAccessTestEnv,
+	revokeModelAccess: func(_ context.Context, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
+		if mt.Id() != "00000002-0000-0000-0000-000000000001" {
+			return errors.E("bad model tag")
+		}
+		if ut.Id() != "daphne@external" {
+			return errors.E("bad user tag")
+		}
+		if access != "read" {
+			return errors.E("bad permission")
+		}
+		return nil
+	},
+	username:       "alice@external",
+	uuid:           "00000002-0000-0000-0000-000000000001",
+	targetUsername: "daphne@external",
+	access:         "read",
+	extraInitialTuples: []openfga.Tuple{
+		{
+			Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+			Relation: ofganames.AdministratorRelation,
+			Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+		},
+		{
+			Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+			Relation: ofganames.WriterRelation,
+			Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+		},
+		// No need to add the 'read' relation, because it's already there due to the environment setup.
+	},
+	expectRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Relation: ofganames.WriterRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}},
+	expectRemovedRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Relation: ofganames.WriterRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
 		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
 		Relation: ofganames.ReaderRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
@@ -2821,8 +2880,13 @@ func TestRevokeModelAccess(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 			env.PopulateDB(c, j.Database, client)
 
-			if tt.expectRemovedTuples != nil {
-				for _, tuple := range tt.expectRemovedTuples {
+			if tt.extraInitialTuples != nil && len(tt.extraInitialTuples) > 0 {
+				err = client.AddRelation(ctx, tt.extraInitialTuples...)
+				c.Assert(err, qt.IsNil)
+			}
+
+			if tt.expectRemovedRelations != nil {
+				for _, tuple := range tt.expectRemovedRelations {
 					value, err := client.CheckRelation(ctx, tuple, false)
 					c.Assert(err, qt.IsNil)
 					c.Assert(value, qt.IsTrue, qt.Commentf("expected the tuple to exist before revoking"))
@@ -2842,15 +2906,15 @@ func TestRevokeModelAccess(t *testing.T) {
 				return
 			}
 			c.Assert(err, qt.IsNil)
-			if tt.expectRemovedTuples != nil {
-				for _, tuple := range tt.expectRemovedTuples {
+			if tt.expectRemovedRelations != nil {
+				for _, tuple := range tt.expectRemovedRelations {
 					value, err := client.CheckRelation(ctx, tuple, false)
 					c.Assert(err, qt.IsNil)
 					c.Assert(value, qt.IsFalse, qt.Commentf("expected the tuple to be removed after revoking"))
 				}
 			}
-			if tt.expectTuples != nil {
-				for _, tuple := range tt.expectTuples {
+			if tt.expectRelations != nil {
+				for _, tuple := range tt.expectRelations {
 					value, err := client.CheckRelation(ctx, tuple, false)
 					c.Assert(err, qt.IsNil)
 					c.Assert(value, qt.IsTrue, qt.Commentf("expected the tuple to exist after revoking"))
