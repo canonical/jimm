@@ -1492,10 +1492,6 @@ var revokeCloudAccessTests = []struct {
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
-		Relation: ofganames.CanAddModelRelation,
-		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
-	}, {
 		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
 		Relation: ofganames.CanAddModelRelation,
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
@@ -1722,6 +1718,13 @@ func TestRevokeCloudAccess(t *testing.T) {
 					value, err := client.CheckRelation(ctx, tuple, false)
 					c.Assert(err, qt.IsNil)
 					c.Assert(value, qt.IsFalse, qt.Commentf("expected the tuple to be removed after revoking"))
+				}
+			}
+			if tt.expectTuples != nil {
+				for _, tuple := range tt.expectTuples {
+					value, err := client.CheckRelation(ctx, tuple, false)
+					c.Assert(err, qt.IsNil)
+					c.Assert(value, qt.IsTrue, qt.Commentf("expected the tuple to exist after revoking"))
 				}
 			}
 		})
