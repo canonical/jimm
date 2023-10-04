@@ -1264,7 +1264,7 @@ var grantCloudAccessTests = []struct {
 	cloud            string
 	targetUsername   string
 	access           string
-	expectTuples     []openfga.Tuple
+	expectRelations  []openfga.Tuple
 	expectError      string
 	expectErrorCode  errors.Code
 }{{
@@ -1294,7 +1294,7 @@ var grantCloudAccessTests = []struct {
 	cloud:          "test",
 	targetUsername: "bob@external",
 	access:         "admin",
-	expectTuples: []openfga.Tuple{{
+	expectRelations: []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
@@ -1322,7 +1322,7 @@ var grantCloudAccessTests = []struct {
 	cloud:          "test",
 	targetUsername: "bob@external",
 	access:         "add-model",
-	expectTuples: []openfga.Tuple{{
+	expectRelations: []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
@@ -1404,7 +1404,7 @@ func TestGrantCloudAccess(t *testing.T) {
 				return
 			}
 			c.Assert(err, qt.IsNil)
-			for _, tuple := range tt.expectTuples {
+			for _, tuple := range tt.expectRelations {
 				value, err := client.CheckRelation(ctx, tuple, false)
 				c.Assert(err, qt.IsNil)
 				c.Assert(value, qt.IsTrue, qt.Commentf("expected the tuple to exist after granting"))
@@ -1448,18 +1448,19 @@ controllers:
 `
 
 var revokeCloudAccessTests = []struct {
-	name                string
-	env                 string
-	revokeCloudAccess   func(context.Context, names.CloudTag, names.UserTag, string) error
-	dialError           error
-	username            string
-	cloud               string
-	targetUsername      string
-	access              string
-	expectTuples        []openfga.Tuple
-	expectRemovedTuples []openfga.Tuple
-	expectError         string
-	expectErrorCode     errors.Code
+	name                   string
+	env                    string
+	revokeCloudAccess      func(context.Context, names.CloudTag, names.UserTag, string) error
+	dialError              error
+	username               string
+	cloud                  string
+	targetUsername         string
+	access                 string
+	extraInitialTuples     []openfga.Tuple
+	expectRelations        []openfga.Tuple
+	expectRemovedRelations []openfga.Tuple
+	expectError            string
+	expectErrorCode        errors.Code
 }{{
 	name:            "CloudNotFound",
 	username:        "alice@external",
@@ -1487,7 +1488,7 @@ var revokeCloudAccessTests = []struct {
 	cloud:          "test",
 	targetUsername: "bob@external",
 	access:         "admin",
-	expectTuples: []openfga.Tuple{{
+	expectRelations: []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
@@ -1496,7 +1497,7 @@ var revokeCloudAccessTests = []struct {
 		Relation: ofganames.CanAddModelRelation,
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
 	}},
-	expectRemovedTuples: []openfga.Tuple{{
+	expectRemovedRelations: []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
@@ -1520,7 +1521,7 @@ var revokeCloudAccessTests = []struct {
 	cloud:          "test",
 	targetUsername: "bob@external",
 	access:         "add-model",
-	expectTuples: []openfga.Tuple{{
+	expectRelations: []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
@@ -1529,7 +1530,7 @@ var revokeCloudAccessTests = []struct {
 		Relation: ofganames.CanAddModelRelation,
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
 	}},
-	expectRemovedTuples: []openfga.Tuple{{
+	expectRemovedRelations: []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
@@ -1553,7 +1554,7 @@ var revokeCloudAccessTests = []struct {
 	cloud:          "test",
 	targetUsername: "charlie@external",
 	access:         "add-model",
-	expectTuples: []openfga.Tuple{{
+	expectRelations: []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
@@ -1562,7 +1563,7 @@ var revokeCloudAccessTests = []struct {
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
 	}},
-	expectRemovedTuples: []openfga.Tuple{{
+	expectRemovedRelations: []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
 		Relation: ofganames.CanAddModelRelation,
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
@@ -1586,7 +1587,7 @@ var revokeCloudAccessTests = []struct {
 	cloud:          "test",
 	targetUsername: "daphne@external",
 	access:         "add-model",
-	expectTuples: []openfga.Tuple{{
+	expectRelations: []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
@@ -1618,12 +1619,56 @@ var revokeCloudAccessTests = []struct {
 	cloud:          "test",
 	targetUsername: "daphne@external",
 	access:         "admin",
-	expectTuples: []openfga.Tuple{{
+	expectRelations: []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
 	}, {
 		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Relation: ofganames.CanAddModelRelation,
+		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
+	}},
+}, {
+	name: "Admin revokes 'add-model' access from a user who has separate tuples for all accesses (add-model/admin)",
+	env:  revokeCloudAccessTestEnv,
+	revokeCloudAccess: func(_ context.Context, ct names.CloudTag, ut names.UserTag, access string) error {
+		if ct.Id() != "test" {
+			return errors.E("bad model tag")
+		}
+		if ut.Id() != "charlie@external" {
+			return errors.E("bad user tag")
+		}
+		if access != "add-model" {
+			return errors.E("bad permission")
+		}
+		return nil
+	},
+	username:       "alice@external",
+	cloud:          "test",
+	targetUsername: "charlie@external",
+	access:         "add-model",
+	extraInitialTuples: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
+	},
+	// No need to add the 'add-model' relation, because it's already there due to the environment setup.
+	},
+	expectRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
+	}},
+	expectRemovedRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
 	}, {
@@ -1692,8 +1737,13 @@ func TestRevokeCloudAccess(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 			env.PopulateDB(c, j.Database, client)
 
-			if tt.expectRemovedTuples != nil {
-				for _, tuple := range tt.expectRemovedTuples {
+			if tt.extraInitialTuples != nil && len(tt.extraInitialTuples) > 0 {
+				err = client.AddRelation(ctx, tt.extraInitialTuples...)
+				c.Assert(err, qt.IsNil)
+			}
+
+			if tt.expectRemovedRelations != nil {
+				for _, tuple := range tt.expectRemovedRelations {
 					value, err := client.CheckRelation(ctx, tuple, false)
 					c.Assert(err, qt.IsNil)
 					c.Assert(value, qt.IsTrue, qt.Commentf("expected the tuple to exist before revoking"))
@@ -1713,15 +1763,15 @@ func TestRevokeCloudAccess(t *testing.T) {
 				return
 			}
 			c.Assert(err, qt.IsNil)
-			if tt.expectRemovedTuples != nil {
-				for _, tuple := range tt.expectRemovedTuples {
+			if tt.expectRemovedRelations != nil {
+				for _, tuple := range tt.expectRemovedRelations {
 					value, err := client.CheckRelation(ctx, tuple, false)
 					c.Assert(err, qt.IsNil)
 					c.Assert(value, qt.IsFalse, qt.Commentf("expected the tuple to be removed after revoking"))
 				}
 			}
-			if tt.expectTuples != nil {
-				for _, tuple := range tt.expectTuples {
+			if tt.expectRelations != nil {
+				for _, tuple := range tt.expectRelations {
 					value, err := client.CheckRelation(ctx, tuple, false)
 					c.Assert(err, qt.IsNil)
 					c.Assert(value, qt.IsTrue, qt.Commentf("expected the tuple to exist after revoking"))
