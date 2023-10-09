@@ -224,7 +224,7 @@ func (j *JIMM) GetApplicationOfferConsumeDetails(ctx context.Context, user *open
 	}
 	defer api.Close()
 
-	if err := api.GetApplicationOfferConsumeDetails(ctx, names.NewUserTag(user.Username), details, v); err != nil {
+	if err := api.GetApplicationOfferConsumeDetails(ctx, names.NewUserTag("admin"), details, v); err != nil {
 		return errors.E(op, err)
 	}
 
