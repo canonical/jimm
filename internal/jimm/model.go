@@ -869,8 +869,7 @@ func (j *JIMM) GrantModelAccess(ctx context.Context, user *openfga.User, mt name
 	err = j.doModelAdmin(ctx, user, mt, func(_ *dbmodel.Model, _ API) error {
 		targetUser := &dbmodel.User{}
 		targetUser.SetTag(ut)
-		err := j.Database.GetUser(ctx, targetUser)
-		if err != nil {
+		if err := j.Database.GetUser(ctx, targetUser); err != nil {
 			return err
 		}
 		targetOfgaUser := openfga.NewUser(targetUser, j.OpenFGAClient)
@@ -900,8 +899,7 @@ func (j *JIMM) GrantModelAccess(ctx context.Context, user *openfga.User, mt name
 			}
 		}
 
-		err = targetOfgaUser.SetModelAccess(ctx, mt, targetRelation)
-		if err != nil {
+		if err := targetOfgaUser.SetModelAccess(ctx, mt, targetRelation); err != nil {
 			return errors.E(err, "failed to set model access")
 		}
 		return nil
@@ -935,8 +933,7 @@ func (j *JIMM) RevokeModelAccess(ctx context.Context, user *openfga.User, mt nam
 	err = j.doModel(ctx, user, mt, requiredAccess, func(_ *dbmodel.Model, _ API) error {
 		targetUser := &dbmodel.User{}
 		targetUser.SetTag(ut)
-		err := j.Database.GetUser(ctx, targetUser)
-		if err != nil {
+		if err := j.Database.GetUser(ctx, targetUser); err != nil {
 			return err
 		}
 		targetOfgaUser := openfga.NewUser(targetUser, j.OpenFGAClient)
@@ -977,10 +974,8 @@ func (j *JIMM) RevokeModelAccess(ctx context.Context, user *openfga.User, mt nam
 			}
 		}
 
-		err = targetOfgaUser.UnsetModelAccess(ctx, mt, relationsToRevoke...)
-		if err != nil {
+		if err := targetOfgaUser.UnsetModelAccess(ctx, mt, relationsToRevoke...); err != nil {
 			return errors.E(err, "failed to unset model access")
-
 		}
 		return nil
 	})
