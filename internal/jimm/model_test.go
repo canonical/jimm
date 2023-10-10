@@ -1698,17 +1698,16 @@ models:
 `
 
 var grantModelAccessTests = []struct {
-	name             string
-	env              string
-	grantModelAccess func(context.Context, names.ModelTag, names.UserTag, jujuparams.UserAccessPermission) error
-	dialError        error
-	username         string
-	uuid             string
-	targetUsername   string
-	access           string
-	expectRelations  []openfga.Tuple
-	expectError      string
-	expectErrorCode  errors.Code
+	name            string
+	env             string
+	dialError       error
+	username        string
+	uuid            string
+	targetUsername  string
+	access          string
+	expectRelations []openfga.Tuple
+	expectError     string
+	expectErrorCode errors.Code
 }{{
 	name:            "ModelNotFound",
 	username:        "alice@external",
@@ -1718,20 +1717,8 @@ var grantModelAccessTests = []struct {
 	expectError:     `model not found`,
 	expectErrorCode: errors.CodeNotFound,
 }, {
-	name: "Admin grants 'admin' access to a user with no access",
-	env:  grantModelAccessTestEnv,
-	grantModelAccess: func(_ context.Context, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
-		if mt.Id() != "00000002-0000-0000-0000-000000000001" {
-			return errors.E("bad model tag")
-		}
-		if ut.Id() != "bob@external" {
-			return errors.E("bad user tag")
-		}
-		if access != "admin" {
-			return errors.E("bad permission")
-		}
-		return nil
-	},
+	name:           "Admin grants 'admin' access to a user with no access",
+	env:            grantModelAccessTestEnv,
 	username:       "alice@external",
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "bob@external",
@@ -1750,20 +1737,8 @@ var grantModelAccessTests = []struct {
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
-	name: "Admin grants 'write' access to a user with no access",
-	env:  grantModelAccessTestEnv,
-	grantModelAccess: func(_ context.Context, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
-		if mt.Id() != "00000002-0000-0000-0000-000000000001" {
-			return errors.E("bad model tag")
-		}
-		if ut.Id() != "bob@external" {
-			return errors.E("bad user tag")
-		}
-		if access != "write" {
-			return errors.E("bad permission")
-		}
-		return nil
-	},
+	name:           "Admin grants 'write' access to a user with no access",
+	env:            grantModelAccessTestEnv,
 	username:       "alice@external",
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "bob@external",
@@ -1782,20 +1757,8 @@ var grantModelAccessTests = []struct {
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
-	name: "Admin grants 'read' access to a user with no access",
-	env:  grantModelAccessTestEnv,
-	grantModelAccess: func(_ context.Context, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
-		if mt.Id() != "00000002-0000-0000-0000-000000000001" {
-			return errors.E("bad model tag")
-		}
-		if ut.Id() != "bob@external" {
-			return errors.E("bad user tag")
-		}
-		if access != "read" {
-			return errors.E("bad permission")
-		}
-		return nil
-	},
+	name:           "Admin grants 'read' access to a user with no access",
+	env:            grantModelAccessTestEnv,
 	username:       "alice@external",
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "bob@external",
@@ -1814,20 +1777,8 @@ var grantModelAccessTests = []struct {
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
-	name: "Admin grants 'write' access to a user who already has 'write' access",
-	env:  grantModelAccessTestEnv,
-	grantModelAccess: func(_ context.Context, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
-		if mt.Id() != "00000002-0000-0000-0000-000000000001" {
-			return errors.E("bad model tag")
-		}
-		if ut.Id() != "charlie@external" {
-			return errors.E("bad user tag")
-		}
-		if access != "write" {
-			return errors.E("bad permission")
-		}
-		return nil
-	},
+	name:           "Admin grants 'write' access to a user who already has 'write' access",
+	env:            grantModelAccessTestEnv,
 	username:       "alice@external",
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "charlie@external",
@@ -1842,20 +1793,8 @@ var grantModelAccessTests = []struct {
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
-	name: "Admin grants 'read' access to a user who already has 'write' access",
-	env:  grantModelAccessTestEnv,
-	grantModelAccess: func(_ context.Context, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
-		if mt.Id() != "00000002-0000-0000-0000-000000000001" {
-			return errors.E("bad model tag")
-		}
-		if ut.Id() != "charlie@external" {
-			return errors.E("bad user tag")
-		}
-		if access != "read" {
-			return errors.E("bad permission")
-		}
-		return nil
-	},
+	name:           "Admin grants 'read' access to a user who already has 'write' access",
+	env:            grantModelAccessTestEnv,
 	username:       "alice@external",
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "charlie@external",
@@ -1870,20 +1809,8 @@ var grantModelAccessTests = []struct {
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
-	name: "Admin grants 'admin' access to themselves",
-	env:  grantModelAccessTestEnv,
-	grantModelAccess: func(_ context.Context, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
-		if mt.Id() != "00000002-0000-0000-0000-000000000001" {
-			return errors.E("bad model tag")
-		}
-		if ut.Id() != "alice@external" {
-			return errors.E("bad user tag")
-		}
-		if access != "read" {
-			return errors.E("bad permission")
-		}
-		return nil
-	},
+	name:           "Admin grants 'admin' access to themselves",
+	env:            grantModelAccessTestEnv,
 	username:       "alice@external",
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "alice@external",
@@ -1898,20 +1825,8 @@ var grantModelAccessTests = []struct {
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
-	name: "Admin grants 'write' access to themselves",
-	env:  grantModelAccessTestEnv,
-	grantModelAccess: func(_ context.Context, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
-		if mt.Id() != "00000002-0000-0000-0000-000000000001" {
-			return errors.E("bad model tag")
-		}
-		if ut.Id() != "alice@external" {
-			return errors.E("bad user tag")
-		}
-		if access != "write" {
-			return errors.E("bad permission")
-		}
-		return nil
-	},
+	name:           "Admin grants 'write' access to themselves",
+	env:            grantModelAccessTestEnv,
 	username:       "alice@external",
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "alice@external",
@@ -1926,20 +1841,8 @@ var grantModelAccessTests = []struct {
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
-	name: "Admin grants 'read' access to themselves",
-	env:  grantModelAccessTestEnv,
-	grantModelAccess: func(_ context.Context, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
-		if mt.Id() != "00000002-0000-0000-0000-000000000001" {
-			return errors.E("bad model tag")
-		}
-		if ut.Id() != "alice@external" {
-			return errors.E("bad user tag")
-		}
-		if access != "read" {
-			return errors.E("bad permission")
-		}
-		return nil
-	},
+	name:           "Admin grants 'read' access to themselves",
+	env:            grantModelAccessTestEnv,
 	username:       "alice@external",
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "alice@external",
@@ -1971,17 +1874,6 @@ var grantModelAccessTests = []struct {
 	targetUsername: "bob@external",
 	access:         "write",
 	expectError:    `test dial error`,
-}, {
-	name: "APIError",
-	env:  grantModelAccessTestEnv,
-	grantModelAccess: func(_ context.Context, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
-		return errors.E("test error")
-	},
-	username:       "alice@external",
-	uuid:           "00000002-0000-0000-0000-000000000001",
-	targetUsername: "bob@external",
-	access:         "write",
-	expectError:    `test error`,
 }}
 
 func TestGrantModelAccess(t *testing.T) {
@@ -1997,9 +1889,7 @@ func TestGrantModelAccess(t *testing.T) {
 
 			env := jimmtest.ParseEnvironment(c, tt.env)
 			dialer := &jimmtest.Dialer{
-				API: &jimmtest.API{
-					GrantModelAccess_: tt.grantModelAccess,
-				},
+				API: &jimmtest.API{},
 				Err: tt.dialError,
 			}
 			j := &jimm.JIMM{
@@ -2083,7 +1973,6 @@ models:
 var revokeModelAccessTests = []struct {
 	name                   string
 	env                    string
-	revokeModelAccess      func(context.Context, names.ModelTag, names.UserTag, jujuparams.UserAccessPermission) error
 	dialError              error
 	username               string
 	uuid                   string
@@ -2103,20 +1992,8 @@ var revokeModelAccessTests = []struct {
 	expectError:     `model not found`,
 	expectErrorCode: errors.CodeNotFound,
 }, {
-	name: "Admin revokes 'admin' access from another admin",
-	env:  revokeModelAccessTestEnv,
-	revokeModelAccess: func(_ context.Context, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
-		if mt.Id() != "00000002-0000-0000-0000-000000000001" {
-			return errors.E("bad model tag")
-		}
-		if ut.Id() != "bob@external" {
-			return errors.E("bad user tag")
-		}
-		if access != "admin" {
-			return errors.E("bad permission")
-		}
-		return nil
-	},
+	name:           "Admin revokes 'admin' access from another admin",
+	env:            revokeModelAccessTestEnv,
 	username:       "alice@external",
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "bob@external",
@@ -2140,20 +2017,8 @@ var revokeModelAccessTests = []struct {
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
-	name: "Admin revokes 'write' access from another admin",
-	env:  revokeModelAccessTestEnv,
-	revokeModelAccess: func(_ context.Context, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
-		if mt.Id() != "00000002-0000-0000-0000-000000000001" {
-			return errors.E("bad model tag")
-		}
-		if ut.Id() != "bob@external" {
-			return errors.E("bad user tag")
-		}
-		if access != "write" {
-			return errors.E("bad permission")
-		}
-		return nil
-	},
+	name:           "Admin revokes 'write' access from another admin",
+	env:            revokeModelAccessTestEnv,
 	username:       "alice@external",
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "bob@external",
@@ -2177,20 +2042,8 @@ var revokeModelAccessTests = []struct {
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
-	name: "Admin revokes 'read' access from another admin",
-	env:  revokeModelAccessTestEnv,
-	revokeModelAccess: func(_ context.Context, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
-		if mt.Id() != "00000002-0000-0000-0000-000000000001" {
-			return errors.E("bad model tag")
-		}
-		if ut.Id() != "bob@external" {
-			return errors.E("bad user tag")
-		}
-		if access != "read" {
-			return errors.E("bad permission")
-		}
-		return nil
-	},
+	name:           "Admin revokes 'read' access from another admin",
+	env:            revokeModelAccessTestEnv,
 	username:       "alice@external",
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "bob@external",
@@ -2214,20 +2067,8 @@ var revokeModelAccessTests = []struct {
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
-	name: "Admin revokes 'admin' access from a user who has 'write' access",
-	env:  revokeModelAccessTestEnv,
-	revokeModelAccess: func(_ context.Context, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
-		if mt.Id() != "00000002-0000-0000-0000-000000000001" {
-			return errors.E("bad model tag")
-		}
-		if ut.Id() != "charlie@external" {
-			return errors.E("bad user tag")
-		}
-		if access != "admin" {
-			return errors.E("bad permission")
-		}
-		return nil
-	},
+	name:           "Admin revokes 'admin' access from a user who has 'write' access",
+	env:            revokeModelAccessTestEnv,
 	username:       "alice@external",
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "charlie@external",
@@ -2250,20 +2091,8 @@ var revokeModelAccessTests = []struct {
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
-	name: "Admin revokes 'write' access from a user who has 'write' access",
-	env:  revokeModelAccessTestEnv,
-	revokeModelAccess: func(_ context.Context, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
-		if mt.Id() != "00000002-0000-0000-0000-000000000001" {
-			return errors.E("bad model tag")
-		}
-		if ut.Id() != "charlie@external" {
-			return errors.E("bad user tag")
-		}
-		if access != "write" {
-			return errors.E("bad permission")
-		}
-		return nil
-	},
+	name:           "Admin revokes 'write' access from a user who has 'write' access",
+	env:            revokeModelAccessTestEnv,
 	username:       "alice@external",
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "charlie@external",
@@ -2287,20 +2116,8 @@ var revokeModelAccessTests = []struct {
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
-	name: "Admin revokes 'read' access from a user who has 'write' access",
-	env:  revokeModelAccessTestEnv,
-	revokeModelAccess: func(_ context.Context, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
-		if mt.Id() != "00000002-0000-0000-0000-000000000001" {
-			return errors.E("bad model tag")
-		}
-		if ut.Id() != "charlie@external" {
-			return errors.E("bad user tag")
-		}
-		if access != "read" {
-			return errors.E("bad permission")
-		}
-		return nil
-	},
+	name:           "Admin revokes 'read' access from a user who has 'write' access",
+	env:            revokeModelAccessTestEnv,
 	username:       "alice@external",
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "charlie@external",
@@ -2324,20 +2141,8 @@ var revokeModelAccessTests = []struct {
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
-	name: "Admin revokes 'admin' access from a user who has 'read' access",
-	env:  revokeModelAccessTestEnv,
-	revokeModelAccess: func(_ context.Context, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
-		if mt.Id() != "00000002-0000-0000-0000-000000000001" {
-			return errors.E("bad model tag")
-		}
-		if ut.Id() != "daphne@external" {
-			return errors.E("bad user tag")
-		}
-		if access != "admin" {
-			return errors.E("bad permission")
-		}
-		return nil
-	},
+	name:           "Admin revokes 'admin' access from a user who has 'read' access",
+	env:            revokeModelAccessTestEnv,
 	username:       "alice@external",
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "daphne@external",
@@ -2360,20 +2165,8 @@ var revokeModelAccessTests = []struct {
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
-	name: "Admin revokes 'write' access from a user who has 'read' access",
-	env:  revokeModelAccessTestEnv,
-	revokeModelAccess: func(_ context.Context, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
-		if mt.Id() != "00000002-0000-0000-0000-000000000001" {
-			return errors.E("bad model tag")
-		}
-		if ut.Id() != "daphne@external" {
-			return errors.E("bad user tag")
-		}
-		if access != "write" {
-			return errors.E("bad permission")
-		}
-		return nil
-	},
+	name:           "Admin revokes 'write' access from a user who has 'read' access",
+	env:            revokeModelAccessTestEnv,
 	username:       "alice@external",
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "daphne@external",
@@ -2396,20 +2189,8 @@ var revokeModelAccessTests = []struct {
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
-	name: "Admin revokes 'read' access from a user who has 'read' access",
-	env:  revokeModelAccessTestEnv,
-	revokeModelAccess: func(_ context.Context, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
-		if mt.Id() != "00000002-0000-0000-0000-000000000001" {
-			return errors.E("bad model tag")
-		}
-		if ut.Id() != "daphne@external" {
-			return errors.E("bad user tag")
-		}
-		if access != "read" {
-			return errors.E("bad permission")
-		}
-		return nil
-	},
+	name:           "Admin revokes 'read' access from a user who has 'read' access",
+	env:            revokeModelAccessTestEnv,
 	username:       "alice@external",
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "daphne@external",
@@ -2433,20 +2214,8 @@ var revokeModelAccessTests = []struct {
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
-	name: "Admin revokes 'admin' access from themselves",
-	env:  revokeModelAccessTestEnv,
-	revokeModelAccess: func(_ context.Context, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
-		if mt.Id() != "00000002-0000-0000-0000-000000000001" {
-			return errors.E("bad model tag")
-		}
-		if ut.Id() != "alice@external" {
-			return errors.E("bad user tag")
-		}
-		if access != "admin" {
-			return errors.E("bad permission")
-		}
-		return nil
-	},
+	name:           "Admin revokes 'admin' access from themselves",
+	env:            revokeModelAccessTestEnv,
 	username:       "alice@external",
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "alice@external",
@@ -2470,20 +2239,8 @@ var revokeModelAccessTests = []struct {
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
-	name: "Admin revokes 'write' access from themselves",
-	env:  revokeModelAccessTestEnv,
-	revokeModelAccess: func(_ context.Context, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
-		if mt.Id() != "00000002-0000-0000-0000-000000000001" {
-			return errors.E("bad model tag")
-		}
-		if ut.Id() != "alice@external" {
-			return errors.E("bad user tag")
-		}
-		if access != "write" {
-			return errors.E("bad permission")
-		}
-		return nil
-	},
+	name:           "Admin revokes 'write' access from themselves",
+	env:            revokeModelAccessTestEnv,
 	username:       "alice@external",
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "alice@external",
@@ -2507,20 +2264,8 @@ var revokeModelAccessTests = []struct {
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
-	name: "Admin revokes 'read' access from themselves",
-	env:  revokeModelAccessTestEnv,
-	revokeModelAccess: func(_ context.Context, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
-		if mt.Id() != "00000002-0000-0000-0000-000000000001" {
-			return errors.E("bad model tag")
-		}
-		if ut.Id() != "alice@external" {
-			return errors.E("bad user tag")
-		}
-		if access != "read" {
-			return errors.E("bad permission")
-		}
-		return nil
-	},
+	name:           "Admin revokes 'read' access from themselves",
+	env:            revokeModelAccessTestEnv,
 	username:       "alice@external",
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "alice@external",
@@ -2544,20 +2289,8 @@ var revokeModelAccessTests = []struct {
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
-	name: "Writer revokes 'admin' access from themselves",
-	env:  revokeModelAccessTestEnv,
-	revokeModelAccess: func(_ context.Context, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
-		if mt.Id() != "00000002-0000-0000-0000-000000000001" {
-			return errors.E("bad model tag")
-		}
-		if ut.Id() != "charlie@external" {
-			return errors.E("bad user tag")
-		}
-		if access != "admin" {
-			return errors.E("bad permission")
-		}
-		return nil
-	},
+	name:           "Writer revokes 'admin' access from themselves",
+	env:            revokeModelAccessTestEnv,
 	username:       "charlie@external",
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "charlie@external",
@@ -2580,20 +2313,8 @@ var revokeModelAccessTests = []struct {
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
-	name: "Writer revokes 'write' access from themselves",
-	env:  revokeModelAccessTestEnv,
-	revokeModelAccess: func(_ context.Context, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
-		if mt.Id() != "00000002-0000-0000-0000-000000000001" {
-			return errors.E("bad model tag")
-		}
-		if ut.Id() != "charlie@external" {
-			return errors.E("bad user tag")
-		}
-		if access != "write" {
-			return errors.E("bad permission")
-		}
-		return nil
-	},
+	name:           "Writer revokes 'write' access from themselves",
+	env:            revokeModelAccessTestEnv,
 	username:       "charlie@external",
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "charlie@external",
@@ -2617,20 +2338,8 @@ var revokeModelAccessTests = []struct {
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
-	name: "Writer revokes 'read' access from themselves",
-	env:  revokeModelAccessTestEnv,
-	revokeModelAccess: func(_ context.Context, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
-		if mt.Id() != "00000002-0000-0000-0000-000000000001" {
-			return errors.E("bad model tag")
-		}
-		if ut.Id() != "charlie@external" {
-			return errors.E("bad user tag")
-		}
-		if access != "read" {
-			return errors.E("bad permission")
-		}
-		return nil
-	},
+	name:           "Writer revokes 'read' access from themselves",
+	env:            revokeModelAccessTestEnv,
 	username:       "charlie@external",
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "charlie@external",
@@ -2654,20 +2363,8 @@ var revokeModelAccessTests = []struct {
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
-	name: "Reader revokes 'admin' access from themselves",
-	env:  revokeModelAccessTestEnv,
-	revokeModelAccess: func(_ context.Context, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
-		if mt.Id() != "00000002-0000-0000-0000-000000000001" {
-			return errors.E("bad model tag")
-		}
-		if ut.Id() != "daphne@external" {
-			return errors.E("bad user tag")
-		}
-		if access != "admin" {
-			return errors.E("bad permission")
-		}
-		return nil
-	},
+	name:           "Reader revokes 'admin' access from themselves",
+	env:            revokeModelAccessTestEnv,
 	username:       "daphne@external",
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "daphne@external",
@@ -2690,20 +2387,8 @@ var revokeModelAccessTests = []struct {
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
-	name: "Reader revokes 'write' access from themselves",
-	env:  revokeModelAccessTestEnv,
-	revokeModelAccess: func(_ context.Context, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
-		if mt.Id() != "00000002-0000-0000-0000-000000000001" {
-			return errors.E("bad model tag")
-		}
-		if ut.Id() != "daphne@external" {
-			return errors.E("bad user tag")
-		}
-		if access != "write" {
-			return errors.E("bad permission")
-		}
-		return nil
-	},
+	name:           "Reader revokes 'write' access from themselves",
+	env:            revokeModelAccessTestEnv,
 	username:       "daphne@external",
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "daphne@external",
@@ -2726,20 +2411,8 @@ var revokeModelAccessTests = []struct {
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
-	name: "Reader revokes 'read' access from themselves",
-	env:  revokeModelAccessTestEnv,
-	revokeModelAccess: func(_ context.Context, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
-		if mt.Id() != "00000002-0000-0000-0000-000000000001" {
-			return errors.E("bad model tag")
-		}
-		if ut.Id() != "daphne@external" {
-			return errors.E("bad user tag")
-		}
-		if access != "read" {
-			return errors.E("bad permission")
-		}
-		return nil
-	},
+	name:           "Reader revokes 'read' access from themselves",
+	env:            revokeModelAccessTestEnv,
 	username:       "daphne@external",
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "daphne@external",
@@ -2763,20 +2436,8 @@ var revokeModelAccessTests = []struct {
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
-	name: "Admin revokes 'admin' access from a user who has separate tuples for all accesses (read/write/admin)",
-	env:  revokeModelAccessTestEnv,
-	revokeModelAccess: func(_ context.Context, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
-		if mt.Id() != "00000002-0000-0000-0000-000000000001" {
-			return errors.E("bad model tag")
-		}
-		if ut.Id() != "daphne@external" {
-			return errors.E("bad user tag")
-		}
-		if access != "admin" {
-			return errors.E("bad permission")
-		}
-		return nil
-	},
+	name:           "Admin revokes 'admin' access from a user who has separate tuples for all accesses (read/write/admin)",
+	env:            revokeModelAccessTestEnv,
 	username:       "alice@external",
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "daphne@external",
@@ -2819,20 +2480,8 @@ var revokeModelAccessTests = []struct {
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
-	name: "Admin revokes 'write' access from a user who has separate tuples for all accesses (read/write/admin)",
-	env:  revokeModelAccessTestEnv,
-	revokeModelAccess: func(_ context.Context, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
-		if mt.Id() != "00000002-0000-0000-0000-000000000001" {
-			return errors.E("bad model tag")
-		}
-		if ut.Id() != "daphne@external" {
-			return errors.E("bad user tag")
-		}
-		if access != "write" {
-			return errors.E("bad permission")
-		}
-		return nil
-	},
+	name:           "Admin revokes 'write' access from a user who has separate tuples for all accesses (read/write/admin)",
+	env:            revokeModelAccessTestEnv,
 	username:       "alice@external",
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "daphne@external",
@@ -2875,20 +2524,8 @@ var revokeModelAccessTests = []struct {
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
-	name: "Admin revokes 'read' access from a user who has separate tuples for all accesses (read/write/admin)",
-	env:  revokeModelAccessTestEnv,
-	revokeModelAccess: func(_ context.Context, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
-		if mt.Id() != "00000002-0000-0000-0000-000000000001" {
-			return errors.E("bad model tag")
-		}
-		if ut.Id() != "daphne@external" {
-			return errors.E("bad user tag")
-		}
-		if access != "read" {
-			return errors.E("bad permission")
-		}
-		return nil
-	},
+	name:           "Admin revokes 'read' access from a user who has separate tuples for all accesses (read/write/admin)",
+	env:            revokeModelAccessTestEnv,
 	username:       "alice@external",
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "daphne@external",
@@ -2948,17 +2585,6 @@ var revokeModelAccessTests = []struct {
 	targetUsername: "bob@external",
 	access:         "write",
 	expectError:    `test dial error`,
-}, {
-	name: "APIError",
-	env:  revokeModelAccessTestEnv,
-	revokeModelAccess: func(_ context.Context, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
-		return errors.E("test error")
-	},
-	username:       "alice@external",
-	uuid:           "00000002-0000-0000-0000-000000000001",
-	targetUsername: "bob@external",
-	access:         "write",
-	expectError:    `test error`,
 }}
 
 func TestRevokeModelAccess(t *testing.T) {
@@ -2974,9 +2600,7 @@ func TestRevokeModelAccess(t *testing.T) {
 
 			env := jimmtest.ParseEnvironment(c, tt.env)
 			dialer := &jimmtest.Dialer{
-				API: &jimmtest.API{
-					RevokeModelAccess_: tt.revokeModelAccess,
-				},
+				API: &jimmtest.API{},
 				Err: tt.dialError,
 			}
 			j := &jimm.JIMM{

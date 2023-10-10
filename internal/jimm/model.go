@@ -857,8 +857,7 @@ func (j *JIMM) ForEachModel(ctx context.Context, u *openfga.User, f func(*dbmode
 // the given user. If the model is not found then an error with the code
 // CodeNotFound is returned. If the authenticated user does not have
 // admin access to the model then an error with the code CodeUnauthorized
-// is returned. If the ModifyModelAccess API call returns an error the
-// error code is not masked.
+// is returned.
 func (j *JIMM) GrantModelAccess(ctx context.Context, user *openfga.User, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
 	const op = errors.Op("jimm.GrantModelAccess")
 
@@ -867,7 +866,7 @@ func (j *JIMM) GrantModelAccess(ctx context.Context, user *openfga.User, mt name
 		return errors.E(op, errors.CodeBadRequest, "failed to recognize given access", err)
 	}
 
-	err = j.doModelAdmin(ctx, user, mt, func(m *dbmodel.Model, api API) error {
+	err = j.doModelAdmin(ctx, user, mt, func(_ *dbmodel.Model, _ API) error {
 		targetUser := &dbmodel.User{}
 		targetUser.SetTag(ut)
 		err := j.Database.GetUser(ctx, targetUser)
@@ -901,10 +900,6 @@ func (j *JIMM) GrantModelAccess(ctx context.Context, user *openfga.User, mt name
 			}
 		}
 
-		if err := api.GrantModelAccess(ctx, mt, ut, access); err != nil {
-			return err
-		}
-
 		err = targetOfgaUser.SetModelAccess(ctx, mt, targetRelation)
 		if err != nil {
 			return errors.E(err, "cannot update OpenFGA record after updating model")
@@ -922,8 +917,7 @@ func (j *JIMM) GrantModelAccess(ctx context.Context, user *openfga.User, mt name
 // the given user. If the model is not found then an error with the code
 // CodeNotFound is returned. If the authenticated user does not have admin
 // access to the model, and is not attempting to revoke their own access,
-// then an error with the code CodeUnauthorized is returned. If the
-// ModifyModelAccess API call returns an error the error code is not masked.
+// then an error with the code CodeUnauthorized is returned.
 func (j *JIMM) RevokeModelAccess(ctx context.Context, user *openfga.User, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
 	const op = errors.Op("jimm.RevokeModelAccess")
 
@@ -938,7 +932,7 @@ func (j *JIMM) RevokeModelAccess(ctx context.Context, user *openfga.User, mt nam
 		requiredAccess = "read"
 	}
 
-	err = j.doModel(ctx, user, mt, requiredAccess, func(m *dbmodel.Model, api API) error {
+	err = j.doModel(ctx, user, mt, requiredAccess, func(_ *dbmodel.Model, _ API) error {
 		targetUser := &dbmodel.User{}
 		targetUser.SetTag(ut)
 		err := j.Database.GetUser(ctx, targetUser)
@@ -981,10 +975,6 @@ func (j *JIMM) RevokeModelAccess(ctx context.Context, user *openfga.User, mt nam
 					ofganames.AdministratorRelation,
 				}
 			}
-		}
-
-		if err := api.RevokeModelAccess(ctx, mt, ut, access); err != nil {
-			return err
 		}
 
 		err = targetOfgaUser.UnsetModelAccess(ctx, mt, relationsToRevoke...)
