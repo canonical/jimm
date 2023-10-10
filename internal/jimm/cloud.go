@@ -588,7 +588,7 @@ func (j *JIMM) GrantCloudAccess(ctx context.Context, user *openfga.User, ct name
 		}
 
 		if err := targetOfgaUser.SetCloudAccess(ctx, ct, targetRelation); err != nil {
-			return errors.E(err, "failed to set cloud access")
+			return errors.E(err, op, "failed to set cloud access")
 		}
 		return nil
 	})
@@ -649,7 +649,7 @@ func (j *JIMM) RevokeCloudAccess(ctx context.Context, user *openfga.User, ct nam
 		}
 
 		if err := targetOfgaUser.UnsetCloudAccess(ctx, ct, relationsToRevoke...); err != nil {
-			return errors.E(err, "failed to unset cloud access")
+			return errors.E(err, op, "failed to unset cloud access")
 		}
 		return nil
 	})
