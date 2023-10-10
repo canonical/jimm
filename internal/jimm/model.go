@@ -877,17 +877,27 @@ func (j *JIMM) GrantModelAccess(ctx context.Context, user *openfga.User, mt name
 		targetOfgaUser := openfga.NewUser(targetUser, j.OpenFGAClient)
 
 		currentRelation := targetOfgaUser.GetModelAccess(ctx, mt)
-		if currentRelation != ofganames.NoRelation {
-			if targetRelation == ofganames.ReaderRelation {
+		switch targetRelation {
+		case ofganames.ReaderRelation:
+			switch currentRelation {
+			case ofganames.NoRelation:
+				break
+			default:
 				return nil
-			} else if targetRelation == ofganames.WriterRelation {
-				if currentRelation == ofganames.WriterRelation || currentRelation == ofganames.AdministratorRelation {
-					return nil
-				}
-			} else if targetRelation == ofganames.AdministratorRelation {
-				if currentRelation == ofganames.AdministratorRelation {
-					return nil
-				}
+			}
+		case ofganames.WriterRelation:
+			switch currentRelation {
+			case ofganames.NoRelation, ofganames.ReaderRelation:
+				break
+			default:
+				return nil
+			}
+		case ofganames.AdministratorRelation:
+			switch currentRelation {
+			case ofganames.NoRelation, ofganames.ReaderRelation, ofganames.WriterRelation:
+				break
+			default:
+				return nil
 			}
 		}
 
@@ -938,31 +948,38 @@ func (j *JIMM) RevokeModelAccess(ctx context.Context, user *openfga.User, mt nam
 		targetOfgaUser := openfga.NewUser(targetUser, j.OpenFGAClient)
 
 		currentRelation := targetOfgaUser.GetModelAccess(ctx, mt)
-		if currentRelation == ofganames.NoRelation {
-			return nil
-		}
 
 		var relationsToRevoke []openfga.Relation
-		if targetRelation == ofganames.ReaderRelation {
-			relationsToRevoke = []openfga.Relation{
-				ofganames.ReaderRelation,
-				ofganames.WriterRelation,
-				ofganames.AdministratorRelation,
-			}
-		} else if targetRelation == ofganames.WriterRelation {
-			if currentRelation == ofganames.ReaderRelation {
+		switch targetRelation {
+		case ofganames.ReaderRelation:
+			switch currentRelation {
+			case ofganames.NoRelation:
 				return nil
+			default:
+				relationsToRevoke = []openfga.Relation{
+					ofganames.ReaderRelation,
+					ofganames.WriterRelation,
+					ofganames.AdministratorRelation,
+				}
 			}
-			relationsToRevoke = []openfga.Relation{
-				ofganames.WriterRelation,
-				ofganames.AdministratorRelation,
-			}
-		} else if targetRelation == ofganames.AdministratorRelation {
-			if currentRelation == ofganames.ReaderRelation || currentRelation == ofganames.WriterRelation {
+		case ofganames.WriterRelation:
+			switch currentRelation {
+			case ofganames.NoRelation, ofganames.ReaderRelation:
 				return nil
+			default:
+				relationsToRevoke = []openfga.Relation{
+					ofganames.WriterRelation,
+					ofganames.AdministratorRelation,
+				}
 			}
-			relationsToRevoke = []openfga.Relation{
-				ofganames.AdministratorRelation,
+		case ofganames.AdministratorRelation:
+			switch currentRelation {
+			case ofganames.NoRelation, ofganames.ReaderRelation, ofganames.WriterRelation:
+				return nil
+			default:
+				relationsToRevoke = []openfga.Relation{
+					ofganames.AdministratorRelation,
+				}
 			}
 		}
 

@@ -572,13 +572,20 @@ func (j *JIMM) GrantCloudAccess(ctx context.Context, user *openfga.User, ct name
 		targetOfgaUser := openfga.NewUser(targetUser, j.OpenFGAClient)
 
 		currentRelation := targetOfgaUser.GetCloudAccess(ctx, ct)
-		if currentRelation != ofganames.NoRelation {
-			if targetRelation == ofganames.CanAddModelRelation {
+		switch targetRelation {
+		case ofganames.CanAddModelRelation:
+			switch currentRelation {
+			case ofganames.NoRelation:
+				break
+			default:
 				return nil
-			} else if targetRelation == ofganames.AdministratorRelation {
-				if currentRelation == ofganames.AdministratorRelation {
-					return nil
-				}
+			}
+		case ofganames.AdministratorRelation:
+			switch currentRelation {
+			case ofganames.NoRelation, ofganames.CanAddModelRelation:
+				break
+			default:
+				return nil
 			}
 		}
 
@@ -623,25 +630,30 @@ func (j *JIMM) RevokeCloudAccess(ctx context.Context, user *openfga.User, ct nam
 		targetOfgaUser := openfga.NewUser(targetUser, j.OpenFGAClient)
 
 		currentRelation := targetOfgaUser.GetCloudAccess(ctx, ct)
-		if currentRelation == ofganames.NoRelation {
-			return nil
-		}
 
 		var relationsToRevoke []openfga.Relation
-		if targetRelation == ofganames.CanAddModelRelation {
-			// If we're revoking "add-model" access, in addition to the "add-model" relation, we should also revoke the
-			// "admin" relation. That's because having an "admin" relation indirectly grants the "add-model" permission
-			// to the user.
-			relationsToRevoke = []openfga.Relation{
-				ofganames.CanAddModelRelation,
-				ofganames.AdministratorRelation,
-			}
-		} else if targetRelation == ofganames.AdministratorRelation {
-			if currentRelation == ofganames.CanAddModelRelation {
+		switch targetRelation {
+		case ofganames.CanAddModelRelation:
+			switch currentRelation {
+			case ofganames.NoRelation:
 				return nil
+			default:
+				// If we're revoking "add-model" access, in addition to the "add-model" relation, we should also revoke the
+				// "admin" relation. That's because having an "admin" relation indirectly grants the "add-model" permission
+				// to the user.
+				relationsToRevoke = []openfga.Relation{
+					ofganames.CanAddModelRelation,
+					ofganames.AdministratorRelation,
+				}
 			}
-			relationsToRevoke = []openfga.Relation{
-				ofganames.AdministratorRelation,
+		case ofganames.AdministratorRelation:
+			switch currentRelation {
+			case ofganames.NoRelation, ofganames.CanAddModelRelation:
+				return nil
+			default:
+				relationsToRevoke = []openfga.Relation{
+					ofganames.AdministratorRelation,
+				}
 			}
 		}
 
