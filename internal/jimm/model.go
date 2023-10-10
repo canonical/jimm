@@ -902,7 +902,7 @@ func (j *JIMM) GrantModelAccess(ctx context.Context, user *openfga.User, mt name
 
 		err = targetOfgaUser.SetModelAccess(ctx, mt, targetRelation)
 		if err != nil {
-			return errors.E(err, "cannot update OpenFGA record after updating model")
+			return errors.E(err, "failed to set model access")
 		}
 		return nil
 	})
@@ -979,7 +979,8 @@ func (j *JIMM) RevokeModelAccess(ctx context.Context, user *openfga.User, mt nam
 
 		err = targetOfgaUser.UnsetModelAccess(ctx, mt, relationsToRevoke...)
 		if err != nil {
-			return errors.E(err, "cannot update OpenFGA record after updating model")
+			return errors.E(err, "failed to unset model access")
+
 		}
 		return nil
 	})
