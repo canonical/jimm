@@ -552,8 +552,7 @@ func (j *JIMM) doCloudAdmin(ctx context.Context, u *openfga.User, ct names.Cloud
 // given user. If the cloud is not found then an error with the code
 // CodeNotFound is returned. If the authenticated user does not have admin
 // access to the cloud then an error with the code CodeUnauthorized is
-// returned. If the ModifyCloudAccess API call returns an error, the error is
-// returned with the error code unmasked.
+// returned.
 func (j *JIMM) GrantCloudAccess(ctx context.Context, user *openfga.User, ct names.CloudTag, ut names.UserTag, access string) error {
 	const op = errors.Op("jimm.GrantCloudAccess")
 
@@ -562,7 +561,7 @@ func (j *JIMM) GrantCloudAccess(ctx context.Context, user *openfga.User, ct name
 		return errors.E(op, errors.CodeBadRequest, "failed to recognize given access", err)
 	}
 
-	err = j.doCloudAdmin(ctx, user, ct, func(c *dbmodel.Cloud, api API) error {
+	err = j.doCloudAdmin(ctx, user, ct, func(_ *dbmodel.Cloud, _ API) error {
 		targetUser := &dbmodel.User{}
 		targetUser.SetTag(ut)
 		err := j.Database.GetUser(ctx, targetUser)
@@ -589,10 +588,6 @@ func (j *JIMM) GrantCloudAccess(ctx context.Context, user *openfga.User, ct name
 			}
 		}
 
-		if err := api.GrantCloudAccess(ctx, ct, ut, access); err != nil {
-			return err
-		}
-
 		err = targetOfgaUser.SetCloudAccess(ctx, ct, targetRelation)
 		if err != nil {
 			return errors.E(err, "cannot update OpenFGA record after updating cloud")
@@ -610,8 +605,7 @@ func (j *JIMM) GrantCloudAccess(ctx context.Context, user *openfga.User, ct name
 // the given user. If the cloud is not found then an error with the code
 // CodeNotFound is returned. If the authenticated user does not have admin
 // access to the cloud then an error with the code CodeUnauthorized is
-// returned. If the ModifyCloudAccess API call returns an error, the error
-// is returned with the code unmasked.
+// returned.
 func (j *JIMM) RevokeCloudAccess(ctx context.Context, user *openfga.User, ct names.CloudTag, ut names.UserTag, access string) error {
 	const op = errors.Op("jimm.RevokeCloudAccess")
 
@@ -620,7 +614,7 @@ func (j *JIMM) RevokeCloudAccess(ctx context.Context, user *openfga.User, ct nam
 		return errors.E(op, errors.CodeBadRequest, "failed to recognize given access", err)
 	}
 
-	err = j.doCloudAdmin(ctx, user, ct, func(c *dbmodel.Cloud, api API) error {
+	err = j.doCloudAdmin(ctx, user, ct, func(_ *dbmodel.Cloud, _ API) error {
 		targetUser := &dbmodel.User{}
 		targetUser.SetTag(ut)
 		err := j.Database.GetUser(ctx, targetUser)
@@ -655,10 +649,6 @@ func (j *JIMM) RevokeCloudAccess(ctx context.Context, user *openfga.User, ct nam
 					ofganames.AdministratorRelation,
 				}
 			}
-		}
-
-		if err := api.RevokeCloudAccess(ctx, ct, ut, access); err != nil {
-			return err
 		}
 
 		err = targetOfgaUser.UnsetCloudAccess(ctx, ct, relationsToRevoke...)

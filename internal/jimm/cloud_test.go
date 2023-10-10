@@ -1256,17 +1256,16 @@ controllers:
 `
 
 var grantCloudAccessTests = []struct {
-	name             string
-	env              string
-	grantCloudAccess func(context.Context, names.CloudTag, names.UserTag, string) error
-	dialError        error
-	username         string
-	cloud            string
-	targetUsername   string
-	access           string
-	expectRelations  []openfga.Tuple
-	expectError      string
-	expectErrorCode  errors.Code
+	name            string
+	env             string
+	dialError       error
+	username        string
+	cloud           string
+	targetUsername  string
+	access          string
+	expectRelations []openfga.Tuple
+	expectError     string
+	expectErrorCode errors.Code
 }{{
 	name:            "CloudNotFound",
 	username:        "alice@external",
@@ -1276,20 +1275,8 @@ var grantCloudAccessTests = []struct {
 	expectError:     `cloud "test2" not found`,
 	expectErrorCode: errors.CodeNotFound,
 }, {
-	name: "Admin grants admin access",
-	env:  grantCloudAccessTestEnv,
-	grantCloudAccess: func(_ context.Context, ct names.CloudTag, ut names.UserTag, access string) error {
-		if ct.Id() != "test" {
-			return errors.E("bad cloud tag")
-		}
-		if ut.Id() != "bob@external" {
-			return errors.E("bad user tag")
-		}
-		if access != "admin" {
-			return errors.E("bad permission")
-		}
-		return nil
-	},
+	name:           "Admin grants admin access",
+	env:            grantCloudAccessTestEnv,
 	username:       "alice@external",
 	cloud:          "test",
 	targetUsername: "bob@external",
@@ -1304,20 +1291,8 @@ var grantCloudAccessTests = []struct {
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
 	}},
 }, {
-	name: "Admin grants add-model access",
-	env:  grantCloudAccessTestEnv,
-	grantCloudAccess: func(_ context.Context, ct names.CloudTag, ut names.UserTag, access string) error {
-		if ct.Id() != "test" {
-			return errors.E("bad cloud tag")
-		}
-		if ut.Id() != "bob@external" {
-			return errors.E("bad user tag")
-		}
-		if access != "add-model" {
-			return errors.E("bad permission")
-		}
-		return nil
-	},
+	name:           "Admin grants add-model access",
+	env:            grantCloudAccessTestEnv,
 	username:       "alice@external",
 	cloud:          "test",
 	targetUsername: "bob@external",
@@ -1349,17 +1324,6 @@ var grantCloudAccessTests = []struct {
 	targetUsername: "bob@external",
 	access:         "add-model",
 	expectError:    `test dial error`,
-}, {
-	name: "APIError",
-	env:  grantCloudAccessTestEnv,
-	grantCloudAccess: func(_ context.Context, mt names.CloudTag, ut names.UserTag, access string) error {
-		return errors.E("test error")
-	},
-	username:       "alice@external",
-	cloud:          "test",
-	targetUsername: "bob@external",
-	access:         "add-model",
-	expectError:    `test error`,
 }}
 
 func TestGrantCloudAccess(t *testing.T) {
@@ -1375,9 +1339,7 @@ func TestGrantCloudAccess(t *testing.T) {
 
 			env := jimmtest.ParseEnvironment(c, tt.env)
 			dialer := &jimmtest.Dialer{
-				API: &jimmtest.API{
-					GrantCloudAccess_: tt.grantCloudAccess,
-				},
+				API: &jimmtest.API{},
 				Err: tt.dialError,
 			}
 			j := &jimm.JIMM{
@@ -1450,7 +1412,6 @@ controllers:
 var revokeCloudAccessTests = []struct {
 	name                   string
 	env                    string
-	revokeCloudAccess      func(context.Context, names.CloudTag, names.UserTag, string) error
 	dialError              error
 	username               string
 	cloud                  string
@@ -1470,20 +1431,8 @@ var revokeCloudAccessTests = []struct {
 	expectError:     `cloud "test2" not found`,
 	expectErrorCode: errors.CodeNotFound,
 }, {
-	name: "Admin revokes 'admin' from another admin",
-	env:  revokeCloudAccessTestEnv,
-	revokeCloudAccess: func(_ context.Context, ct names.CloudTag, ut names.UserTag, access string) error {
-		if ct.Id() != "test" {
-			return errors.E("bad model tag")
-		}
-		if ut.Id() != "bob@external" {
-			return errors.E("bad user tag")
-		}
-		if access != "admin" {
-			return errors.E("bad permission")
-		}
-		return nil
-	},
+	name:           "Admin revokes 'admin' from another admin",
+	env:            revokeCloudAccessTestEnv,
 	username:       "alice@external",
 	cloud:          "test",
 	targetUsername: "bob@external",
@@ -1503,20 +1452,8 @@ var revokeCloudAccessTests = []struct {
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
 	}},
 }, {
-	name: "Admin revokes 'add-model' from another admin",
-	env:  revokeCloudAccessTestEnv,
-	revokeCloudAccess: func(_ context.Context, ct names.CloudTag, ut names.UserTag, access string) error {
-		if ct.Id() != "test" {
-			return errors.E("bad model tag")
-		}
-		if ut.Id() != "bob@external" {
-			return errors.E("bad user tag")
-		}
-		if access != "add-model" {
-			return errors.E("bad permission")
-		}
-		return nil
-	},
+	name:           "Admin revokes 'add-model' from another admin",
+	env:            revokeCloudAccessTestEnv,
 	username:       "alice@external",
 	cloud:          "test",
 	targetUsername: "bob@external",
@@ -1536,20 +1473,8 @@ var revokeCloudAccessTests = []struct {
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
 	}},
 }, {
-	name: "Admin revokes 'add-model' from a user with 'add-model' access",
-	env:  revokeCloudAccessTestEnv,
-	revokeCloudAccess: func(_ context.Context, ct names.CloudTag, ut names.UserTag, access string) error {
-		if ct.Id() != "test" {
-			return errors.E("bad model tag")
-		}
-		if ut.Id() != "charlie@external" {
-			return errors.E("bad user tag")
-		}
-		if access != "add-model" {
-			return errors.E("bad permission")
-		}
-		return nil
-	},
+	name:           "Admin revokes 'add-model' from a user with 'add-model' access",
+	env:            revokeCloudAccessTestEnv,
 	username:       "alice@external",
 	cloud:          "test",
 	targetUsername: "charlie@external",
@@ -1569,20 +1494,8 @@ var revokeCloudAccessTests = []struct {
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
 	}},
 }, {
-	name: "Admin revokes 'add-model' from a user with no access",
-	env:  revokeCloudAccessTestEnv,
-	revokeCloudAccess: func(_ context.Context, ct names.CloudTag, ut names.UserTag, access string) error {
-		if ct.Id() != "test" {
-			return errors.E("bad model tag")
-		}
-		if ut.Id() != "daphne@external" {
-			return errors.E("bad user tag")
-		}
-		if access != "add-model" {
-			return errors.E("bad permission")
-		}
-		return nil
-	},
+	name:           "Admin revokes 'add-model' from a user with no access",
+	env:            revokeCloudAccessTestEnv,
 	username:       "alice@external",
 	cloud:          "test",
 	targetUsername: "daphne@external",
@@ -1601,20 +1514,8 @@ var revokeCloudAccessTests = []struct {
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
 	}},
 }, {
-	name: "Admin revokes 'admin' from a user with no access",
-	env:  revokeCloudAccessTestEnv,
-	revokeCloudAccess: func(_ context.Context, ct names.CloudTag, ut names.UserTag, access string) error {
-		if ct.Id() != "test" {
-			return errors.E("bad model tag")
-		}
-		if ut.Id() != "daphne@external" {
-			return errors.E("bad user tag")
-		}
-		if access != "add-model" {
-			return errors.E("bad permission")
-		}
-		return nil
-	},
+	name:           "Admin revokes 'admin' from a user with no access",
+	env:            revokeCloudAccessTestEnv,
 	username:       "alice@external",
 	cloud:          "test",
 	targetUsername: "daphne@external",
@@ -1633,20 +1534,8 @@ var revokeCloudAccessTests = []struct {
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
 	}},
 }, {
-	name: "Admin revokes 'add-model' access from a user who has separate tuples for all accesses (add-model/admin)",
-	env:  revokeCloudAccessTestEnv,
-	revokeCloudAccess: func(_ context.Context, ct names.CloudTag, ut names.UserTag, access string) error {
-		if ct.Id() != "test" {
-			return errors.E("bad model tag")
-		}
-		if ut.Id() != "charlie@external" {
-			return errors.E("bad user tag")
-		}
-		if access != "add-model" {
-			return errors.E("bad permission")
-		}
-		return nil
-	},
+	name:           "Admin revokes 'add-model' access from a user who has separate tuples for all accesses (add-model/admin)",
+	env:            revokeCloudAccessTestEnv,
 	username:       "alice@external",
 	cloud:          "test",
 	targetUsername: "charlie@external",
@@ -1677,20 +1566,8 @@ var revokeCloudAccessTests = []struct {
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
 	}},
 }, {
-	name: "Admin revokes 'admin' access from a user who has separate tuples for all accesses (add-model/admin)",
-	env:  revokeCloudAccessTestEnv,
-	revokeCloudAccess: func(_ context.Context, ct names.CloudTag, ut names.UserTag, access string) error {
-		if ct.Id() != "test" {
-			return errors.E("bad model tag")
-		}
-		if ut.Id() != "charlie@external" {
-			return errors.E("bad user tag")
-		}
-		if access != "admin" {
-			return errors.E("bad permission")
-		}
-		return nil
-	},
+	name:           "Admin revokes 'admin' access from a user who has separate tuples for all accesses (add-model/admin)",
+	env:            revokeCloudAccessTestEnv,
 	username:       "alice@external",
 	cloud:          "test",
 	targetUsername: "charlie@external",
@@ -1738,17 +1615,6 @@ var revokeCloudAccessTests = []struct {
 	targetUsername: "bob@external",
 	access:         "add-model",
 	expectError:    `test dial error`,
-}, {
-	name: "APIError",
-	env:  revokeCloudAccessTestEnv,
-	revokeCloudAccess: func(_ context.Context, mt names.CloudTag, ut names.UserTag, access string) error {
-		return errors.E("test error")
-	},
-	username:       "alice@external",
-	cloud:          "test",
-	targetUsername: "bob@external",
-	access:         "add-model",
-	expectError:    `test error`,
 }}
 
 func TestRevokeCloudAccess(t *testing.T) {
@@ -1764,9 +1630,7 @@ func TestRevokeCloudAccess(t *testing.T) {
 
 			env := jimmtest.ParseEnvironment(c, tt.env)
 			dialer := &jimmtest.Dialer{
-				API: &jimmtest.API{
-					RevokeCloudAccess_: tt.revokeCloudAccess,
-				},
+				API: &jimmtest.API{},
 				Err: tt.dialError,
 			}
 			j := &jimm.JIMM{
