@@ -1874,6 +1874,14 @@ var grantModelAccessTests = []struct {
 	targetUsername: "bob@external",
 	access:         "write",
 	expectError:    `test dial error`,
+}, {
+	name:           "unknown access",
+	env:            grantModelAccessTestEnv,
+	username:       "alice@external",
+	uuid:           "00000002-0000-0000-0000-000000000001",
+	targetUsername: "bob@external",
+	access:         "some-unknown-access",
+	expectError:    `failed to recognize given access: "some-unknown-access"`,
 }}
 
 func TestGrantModelAccess(t *testing.T) {
@@ -2585,6 +2593,14 @@ var revokeModelAccessTests = []struct {
 	targetUsername: "bob@external",
 	access:         "write",
 	expectError:    `test dial error`,
+}, {
+	name:           "unknown access",
+	env:            revokeModelAccessTestEnv,
+	username:       "alice@external",
+	uuid:           "00000002-0000-0000-0000-000000000001",
+	targetUsername: "bob@external",
+	access:         "some-unknown-access",
+	expectError:    `failed to recognize given access: "some-unknown-access"`,
 }}
 
 func TestRevokeModelAccess(t *testing.T) {

@@ -1324,6 +1324,14 @@ var grantCloudAccessTests = []struct {
 	targetUsername: "bob@external",
 	access:         "add-model",
 	expectError:    `test dial error`,
+}, {
+	name:           "unknown access",
+	env:            grantCloudAccessTestEnv,
+	username:       "alice@external",
+	cloud:          "test",
+	targetUsername: "bob@external",
+	access:         "some-unknown-access",
+	expectError:    `failed to recognize given access: "some-unknown-access"`,
 }}
 
 func TestGrantCloudAccess(t *testing.T) {
@@ -1615,6 +1623,14 @@ var revokeCloudAccessTests = []struct {
 	targetUsername: "bob@external",
 	access:         "add-model",
 	expectError:    `test dial error`,
+}, {
+	name:           "unknown access",
+	env:            revokeCloudAccessTestEnv,
+	username:       "alice@external",
+	cloud:          "test",
+	targetUsername: "bob@external",
+	access:         "some-unknown-access",
+	expectError:    `failed to recognize given access: "some-unknown-access"`,
 }}
 
 func TestRevokeCloudAccess(t *testing.T) {
