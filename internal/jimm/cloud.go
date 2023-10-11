@@ -9,6 +9,7 @@ import (
 
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
+	"github.com/juju/zaputil"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
@@ -558,7 +559,13 @@ func (j *JIMM) GrantCloudAccess(ctx context.Context, user *openfga.User, ct name
 
 	targetRelation, err := ToCloudRelation(access)
 	if err != nil {
-		return errors.E(op, errors.CodeBadRequest, "failed to recognize given access", err)
+		zapctx.Debug(
+			ctx,
+			"failed to recognize given access",
+			zaputil.Error(err),
+			zap.String("access", string(access)),
+		)
+		return errors.E(op, errors.CodeBadRequest, fmt.Sprintf("failed to recognize given access: %q", access), err)
 	}
 
 	err = j.doCloudAdmin(ctx, user, ct, func(_ *dbmodel.Cloud, _ API) error {
@@ -594,6 +601,14 @@ func (j *JIMM) GrantCloudAccess(ctx context.Context, user *openfga.User, ct name
 	})
 
 	if err != nil {
+		zapctx.Error(
+			ctx,
+			"failed to grant cloud access",
+			zaputil.Error(err),
+			zap.String("targetUser", string(ut.Id())),
+			zap.String("cloud", string(ct.Id())),
+			zap.String("access", string(access)),
+		)
 		return errors.E(op, err)
 	}
 	return nil
@@ -609,7 +624,13 @@ func (j *JIMM) RevokeCloudAccess(ctx context.Context, user *openfga.User, ct nam
 
 	targetRelation, err := ToCloudRelation(access)
 	if err != nil {
-		return errors.E(op, errors.CodeBadRequest, "failed to recognize given access", err)
+		zapctx.Debug(
+			ctx,
+			"failed to recognize given access",
+			zaputil.Error(err),
+			zap.String("access", string(access)),
+		)
+		return errors.E(op, errors.CodeBadRequest, fmt.Sprintf("failed to recognize given access: %q", access), err)
 	}
 
 	err = j.doCloudAdmin(ctx, user, ct, func(_ *dbmodel.Cloud, _ API) error {
@@ -655,6 +676,14 @@ func (j *JIMM) RevokeCloudAccess(ctx context.Context, user *openfga.User, ct nam
 	})
 
 	if err != nil {
+		zapctx.Error(
+			ctx,
+			"failed to revoke cloud access",
+			zaputil.Error(err),
+			zap.String("targetUser", string(ut.Id())),
+			zap.String("cloud", string(ct.Id())),
+			zap.String("access", string(access)),
+		)
 		return errors.E(op, err)
 	}
 	return nil

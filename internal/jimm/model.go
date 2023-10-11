@@ -863,7 +863,13 @@ func (j *JIMM) GrantModelAccess(ctx context.Context, user *openfga.User, mt name
 
 	targetRelation, err := ToModelRelation(string(access))
 	if err != nil {
-		return errors.E(op, errors.CodeBadRequest, "failed to recognize given access", err)
+		zapctx.Debug(
+			ctx,
+			"failed to recognize given access",
+			zaputil.Error(err),
+			zap.String("access", string(access)),
+		)
+		return errors.E(op, errors.CodeBadRequest, fmt.Sprintf("failed to recognize given access: %q", access), err)
 	}
 
 	err = j.doModelAdmin(ctx, user, mt, func(_ *dbmodel.Model, _ API) error {
@@ -906,6 +912,14 @@ func (j *JIMM) GrantModelAccess(ctx context.Context, user *openfga.User, mt name
 	})
 
 	if err != nil {
+		zapctx.Error(
+			ctx,
+			"failed to grant model access",
+			zaputil.Error(err),
+			zap.String("targetUser", string(ut.Id())),
+			zap.String("model", string(mt.Id())),
+			zap.String("access", string(access)),
+		)
 		return errors.E(op, err)
 	}
 	return nil
@@ -921,7 +935,13 @@ func (j *JIMM) RevokeModelAccess(ctx context.Context, user *openfga.User, mt nam
 
 	targetRelation, err := ToModelRelation(string(access))
 	if err != nil {
-		return errors.E(op, errors.CodeBadRequest, "failed to recognize given access", err)
+		zapctx.Debug(
+			ctx,
+			"failed to recognize given access",
+			zaputil.Error(err),
+			zap.String("access", string(access)),
+		)
+		return errors.E(op, errors.CodeBadRequest, fmt.Sprintf("failed to recognize given access: %q", access), err)
 	}
 
 	requiredAccess := "admin"
@@ -981,6 +1001,14 @@ func (j *JIMM) RevokeModelAccess(ctx context.Context, user *openfga.User, mt nam
 	})
 
 	if err != nil {
+		zapctx.Error(
+			ctx,
+			"failed to revoke model access",
+			zaputil.Error(err),
+			zap.String("targetUser", string(ut.Id())),
+			zap.String("model", string(mt.Id())),
+			zap.String("access", string(access)),
+		)
 		return errors.E(op, err)
 	}
 	return nil
