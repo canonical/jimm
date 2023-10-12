@@ -262,20 +262,16 @@ func TestUserApplicationOffers(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	c.Check(offers, qt.DeepEquals, []dbmodel.UserApplicationOfferAccess{{
-		Model: gorm.Model{
-			ID:        m.Offers[0].Users[0].ID,
-			CreatedAt: m.Offers[0].Users[0].CreatedAt,
-			UpdatedAt: m.Offers[0].Users[0].UpdatedAt,
-		},
+		ID:                 m.Offers[0].Users[0].ID,
+		CreatedAt:          m.Offers[0].Users[0].CreatedAt,
+		UpdatedAt:          m.Offers[0].Users[0].UpdatedAt,
 		Username:           u.Username,
 		ApplicationOfferID: m.Offers[0].ID,
 		Access:             "admin",
 	}, {
-		Model: gorm.Model{
-			ID:        m.Offers[1].Users[0].ID,
-			CreatedAt: m.Offers[1].Users[0].CreatedAt,
-			UpdatedAt: m.Offers[1].Users[0].UpdatedAt,
-		},
+		ID:                 m.Offers[1].Users[0].ID,
+		CreatedAt:          m.Offers[1].Users[0].CreatedAt,
+		UpdatedAt:          m.Offers[1].Users[0].UpdatedAt,
 		Username:           u.Username,
 		ApplicationOfferID: m.Offers[1].ID,
 		Access:             "consume",
@@ -286,9 +282,7 @@ func TestUserToJujuUserInfo(t *testing.T) {
 	c := qt.New(t)
 
 	u := dbmodel.User{
-		Model: gorm.Model{
-			CreatedAt: time.Now(),
-		},
+		CreatedAt:        time.Now(),
 		Username:         "alice@external",
 		DisplayName:      "Alice",
 		ControllerAccess: "superuser",

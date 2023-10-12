@@ -10,7 +10,6 @@ import (
 
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
-	"gorm.io/gorm"
 
 	apiparams "github.com/canonical/jimm/api/params"
 )
@@ -176,7 +175,9 @@ const (
 // a controller should be chosen when deploying to a particular
 // cloud-region.
 type CloudRegionControllerPriority struct {
-	gorm.Model
+	ID        uint `gorm:"primarykey"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
 
 	// CloudRegion is the cloud-region this pertains to.
 	CloudRegionID uint
@@ -193,7 +194,9 @@ type CloudRegionControllerPriority struct {
 
 // ControllerConfig stores controller configuration.
 type ControllerConfig struct {
-	gorm.Model
+	ID        uint `gorm:"primarykey"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
 
 	// Name is the name given to this configuration.
 	Name string `gorm:"not null;uniqueIndex"`

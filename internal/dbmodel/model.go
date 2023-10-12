@@ -11,7 +11,6 @@ import (
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 	"github.com/juju/version/v2"
-	"gorm.io/gorm"
 
 	"github.com/canonical/jimm/internal/errors"
 )
@@ -250,7 +249,9 @@ func (s SLA) ToJujuModelSLAInfo() jujuparams.ModelSLAInfo {
 
 // A UserModelAccess maps the access level of a user on a model.
 type UserModelAccess struct {
-	gorm.Model
+	ID        uint `gorm:"primarykey"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
 
 	// User is the User this access is for.
 	Username string

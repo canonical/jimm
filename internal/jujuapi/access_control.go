@@ -16,7 +16,6 @@ import (
 	"github.com/juju/zaputil"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
-	"gorm.io/gorm"
 
 	apiparams "github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/internal/dbmodel"
@@ -527,9 +526,7 @@ func (r *controllerRoot) toJAASTag(ctx context.Context, tag *ofganames.Tag) (str
 			return "", errors.E(err, fmt.Sprintf("failed to parse group id: %v", tag.ID))
 		}
 		group := dbmodel.GroupEntry{
-			Model: gorm.Model{
-				ID: uint(id),
-			},
+			ID: uint(id),
 		}
 		err = r.jimm.Database.GetGroup(ctx, &group)
 		if err != nil {
