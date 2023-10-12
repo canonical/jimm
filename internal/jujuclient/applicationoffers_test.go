@@ -699,8 +699,6 @@ func (s *applicationoffersSuite) TestDestroyApplicationOffer(c *gc.C) {
 }
 
 func (s *applicationoffersSuite) TestGetApplicationOfferConsumeDetails(c *gc.C) {
-	// NOTE (alesstimec): remove the skip once that is fixed in juju
-	c.Skip("JUJU_GET_CONSUME_DETAILS")
 	modelState, err := s.StatePool.Get(s.modelInfo.UUID)
 	c.Assert(err, gc.Equals, nil)
 	defer modelState.Release()
@@ -741,7 +739,7 @@ func (s *applicationoffersSuite) TestGetApplicationOfferConsumeDetails(c *gc.C) 
 	info.Offer = &jujuparams.ApplicationOfferDetails{
 		OfferURL: offerURL.String(),
 	}
-	err = s.API.GetApplicationOfferConsumeDetails(ctx, names.NewUserTag("test-user@external"), &info, bakery.Version2)
+	err = s.API.GetApplicationOfferConsumeDetails(ctx, names.NewUserTag("admin"), &info, bakery.Version2)
 	c.Assert(err, gc.Equals, nil)
 	c.Check(info.Offer.OfferUUID, gc.Not(gc.Equals), "")
 	info.Offer.OfferUUID = ""
@@ -770,9 +768,6 @@ func (s *applicationoffersSuite) TestGetApplicationOfferConsumeDetails(c *gc.C) 
 				UserName:    auth.Everyone,
 				DisplayName: "",
 				Access:      "read",
-			}, {
-				UserName: "test-user@external",
-				Access:   "admin",
 			}},
 		},
 		ControllerInfo: &jujuparams.ExternalControllerInfo{
