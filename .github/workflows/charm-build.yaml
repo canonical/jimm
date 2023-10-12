@@ -14,7 +14,7 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
-      - run: git fetch --tags --prune --unshallow
+      - run: git fetch --prune --unshallow
       - run: sudo snap install charmcraft --channel=2.x/stable --classic
       - run: sudo charmcraft pack --project-dir ./charms/${{ matrix.charm-type }} --destructive-mode --verbosity=trace
       - uses: actions/upload-artifact@v3

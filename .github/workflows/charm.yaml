@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v4
-      - run: git fetch --tags --prune --unshallow
+      - run: git fetch --prune --unshallow
       - run: sudo snap install charmcraft --channel=2.x/stable --classic
       - run: charmcraft pack --project-dir ./charms/${{ inputs.charm }} --destructive-mode
       - uses: actions/upload-artifact@v3

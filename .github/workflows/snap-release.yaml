@@ -20,8 +20,6 @@ jobs:
       with:
         fetch-depth: 0
         fetch-tags: true
-    - name: fetch newest tags
-      run: git fetch --tags 
     - name: scripts
       run: |
         mkdir -p ./snap
