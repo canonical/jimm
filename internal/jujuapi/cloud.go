@@ -489,34 +489,30 @@ func (r *controllerRoot) ModifyCloudAccess(ctx context.Context, args jujuparams.
 }
 
 func (r *controllerRoot) modifyCloudAccess(ctx context.Context, change jujuparams.ModifyCloudAccess) error {
-	// TODO (alesstimec) granting and revoking access tbd in a followup
-	return errors.E(errors.CodeNotImplemented)
+	const op = errors.Op("jujuapi.ModifyCloudAccess")
 
-	/*
-		const op = errors.Op("jujuapi.ModifyCloudAccess")
+	ut, err := parseUserTag(change.UserTag)
+	if err != nil {
+		return errors.E(op, err)
+	}
+	ct, err := names.ParseCloudTag(change.CloudTag)
+	if err != nil {
+		return errors.E(op, errors.CodeBadRequest, err)
+	}
 
-		user, err := parseUserTag(change.UserTag)
-		if err != nil {
-			return errors.E(op, err)
-		}
-		cloudTag, err := names.ParseCloudTag(change.CloudTag)
-		if err != nil {
-			return errors.E(op, errors.CodeBadRequest, err)
-		}
-		var modifyf func(context.Context, *dbmodel.User, names.CloudTag, names.UserTag, string) error
-		switch change.Action {
-		case jujuparams.GrantCloudAccess:
-			modifyf = r.jimm.GrantCloudAccess
-		case jujuparams.RevokeCloudAccess:
-			modifyf = r.jimm.RevokeCloudAccess
-		default:
-			return errors.E(op, errors.CodeBadRequest, fmt.Sprintf("unsupported modify cloud action %q", change.Action))
-		}
-		if err := modifyf(ctx, r.user, cloudTag, user, change.Access); err != nil {
-			return errors.E(op, err)
-		}
-		return nil
-	*/
+	var modifyf func(context.Context, *openfga.User, names.CloudTag, names.UserTag, string) error
+	switch change.Action {
+	case jujuparams.GrantCloudAccess:
+		modifyf = r.jimm.GrantCloudAccess
+	case jujuparams.RevokeCloudAccess:
+		modifyf = r.jimm.RevokeCloudAccess
+	default:
+		return errors.E(op, errors.CodeBadRequest, fmt.Sprintf("unsupported modify cloud action %q", change.Action))
+	}
+	if err := modifyf(ctx, r.user, ct, ut, change.Access); err != nil {
+		return errors.E(op, err)
+	}
+	return nil
 }
 
 // UpdateCredentialsCheckModels updates a set of cloud credentials' content.
