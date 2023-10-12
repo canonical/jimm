@@ -9,6 +9,7 @@ import (
 
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
+	"github.com/juju/zaputil"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
@@ -552,124 +553,140 @@ func (j *JIMM) doCloudAdmin(ctx context.Context, u *openfga.User, ct names.Cloud
 // given user. If the cloud is not found then an error with the code
 // CodeNotFound is returned. If the authenticated user does not have admin
 // access to the cloud then an error with the code CodeUnauthorized is
-// returned. If the ModifyCloudAccess API call retuns an error the error
-// code is not masked.
-func (j *JIMM) GrantCloudAccess(ctx context.Context, u *dbmodel.User, ct names.CloudTag, ut names.UserTag, access string) error {
+// returned.
+func (j *JIMM) GrantCloudAccess(ctx context.Context, user *openfga.User, ct names.CloudTag, ut names.UserTag, access string) error {
 	const op = errors.Op("jimm.GrantCloudAccess")
 
-	// TODO (alesstimec) granting and revoking access tbd in a followup
-	return errors.E(errors.CodeNotImplemented)
-	/*
-		ale := dbmodel.AuditLogEntry{
-			Time:    time.Now().UTC().Round(time.Millisecond),
-			Tag:     ct.String(),
-			UserTag: u.Tag().String(),
-			Action:  "grant",
-			Params: dbmodel.StringMap{
-				"user":   ut.String(),
-				"access": access,
-			},
-		}
-		defer j.addAuditLogEntry(&ale)
+	targetRelation, err := ToCloudRelation(access)
+	if err != nil {
+		zapctx.Debug(
+			ctx,
+			"failed to recognize given access",
+			zaputil.Error(err),
+			zap.String("access", string(access)),
+		)
+		return errors.E(op, errors.CodeBadRequest, fmt.Sprintf("failed to recognize given access: %q", access), err)
+	}
 
-		err := j.doCloudAdmin(ctx, u, ct, func(c *dbmodel.Cloud, api API) error {
-			targetUser := dbmodel.User{
-				Username: ut.Id(),
-			}
-			if err := j.Database.GetUser(ctx, &targetUser); err != nil {
-				return err
-			}
-			if err := api.GrantCloudAccess(ctx, ct, ut, access); err != nil {
-				return err
-			}
-			var uca dbmodel.UserCloudAccess
-			for _, a := range c.Users {
-				if a.Username == targetUser.Username {
-					uca = a
-					break
-				}
-			}
-			uca.User = targetUser
-			uca.Cloud = *c
-			uca.Access = access
-
-			if err := j.Database.UpdateUserCloudAccess(ctx, &uca); err != nil {
-				return errors.E(op, err, "cannot update database after updating controller")
-			}
-			return nil
-		})
-		if err != nil {
-			ale.Params["err"] = err.Error()
-			return errors.E(op, err)
+	err = j.doCloudAdmin(ctx, user, ct, func(_ *dbmodel.Cloud, _ API) error {
+		targetUser := &dbmodel.User{}
+		targetUser.SetTag(ut)
+		if err := j.Database.GetUser(ctx, targetUser); err != nil {
+			return err
 		}
-		ale.Success = true
+		targetOfgaUser := openfga.NewUser(targetUser, j.OpenFGAClient)
+
+		currentRelation := targetOfgaUser.GetCloudAccess(ctx, ct)
+		switch targetRelation {
+		case ofganames.CanAddModelRelation:
+			switch currentRelation {
+			case ofganames.NoRelation:
+				break
+			default:
+				return nil
+			}
+		case ofganames.AdministratorRelation:
+			switch currentRelation {
+			case ofganames.NoRelation, ofganames.CanAddModelRelation:
+				break
+			default:
+				return nil
+			}
+		}
+
+		if err := targetOfgaUser.SetCloudAccess(ctx, ct, targetRelation); err != nil {
+			return errors.E(err, op, "failed to set cloud access")
+		}
 		return nil
-	*/
+	})
+
+	if err != nil {
+		zapctx.Error(
+			ctx,
+			"failed to grant cloud access",
+			zaputil.Error(err),
+			zap.String("targetUser", string(ut.Id())),
+			zap.String("cloud", string(ct.Id())),
+			zap.String("access", string(access)),
+		)
+		return errors.E(op, err)
+	}
+	return nil
 }
 
 // RevokeCloudAccess revokes the given access level on the given cloud from
 // the given user. If the cloud is not found then an error with the code
 // CodeNotFound is returned. If the authenticated user does not have admin
 // access to the cloud then an error with the code CodeUnauthorized is
-// returned. If the ModifyCloudAccess API call retuns an error the error
-// code is not masked.
-func (j *JIMM) RevokeCloudAccess(ctx context.Context, u *dbmodel.User, ct names.CloudTag, ut names.UserTag, access string) error {
+// returned.
+func (j *JIMM) RevokeCloudAccess(ctx context.Context, user *openfga.User, ct names.CloudTag, ut names.UserTag, access string) error {
 	const op = errors.Op("jimm.RevokeCloudAccess")
 
-	// TODO (alesstimec) granting and revoking access tbd in a followup
-	return errors.E(errors.CodeNotImplemented)
+	targetRelation, err := ToCloudRelation(access)
+	if err != nil {
+		zapctx.Debug(
+			ctx,
+			"failed to recognize given access",
+			zaputil.Error(err),
+			zap.String("access", string(access)),
+		)
+		return errors.E(op, errors.CodeBadRequest, fmt.Sprintf("failed to recognize given access: %q", access), err)
+	}
 
-	/*
-		ale := dbmodel.AuditLogEntry{
-			Time:    time.Now().UTC().Round(time.Millisecond),
-			Tag:     ct.String(),
-			UserTag: u.Tag().String(),
-			Action:  "revoke",
-			Params: dbmodel.StringMap{
-				"user":   ut.String(),
-				"access": access,
-			},
+	err = j.doCloudAdmin(ctx, user, ct, func(_ *dbmodel.Cloud, _ API) error {
+		targetUser := &dbmodel.User{}
+		targetUser.SetTag(ut)
+		if err := j.Database.GetUser(ctx, targetUser); err != nil {
+			return err
 		}
-		defer j.addAuditLogEntry(&ale)
+		targetOfgaUser := openfga.NewUser(targetUser, j.OpenFGAClient)
 
-		err := j.doCloudAdmin(ctx, u, ct, func(c *dbmodel.Cloud, api API) error {
-			targetUser := dbmodel.User{
-				Username: ut.Id(),
-			}
-			if err := j.Database.GetUser(ctx, &targetUser); err != nil {
-				return err
-			}
-			if err := api.RevokeCloudAccess(ctx, ct, ut, access); err != nil {
-				return err
-			}
-			var uca dbmodel.UserCloudAccess
-			for _, a := range c.Users {
-				if a.Username == targetUser.Username {
-					uca = a
-					break
+		currentRelation := targetOfgaUser.GetCloudAccess(ctx, ct)
+
+		var relationsToRevoke []openfga.Relation
+		switch targetRelation {
+		case ofganames.CanAddModelRelation:
+			switch currentRelation {
+			case ofganames.NoRelation:
+				return nil
+			default:
+				// If we're revoking "add-model" access, in addition to the "add-model" relation, we should also revoke the
+				// "admin" relation. That's because having an "admin" relation indirectly grants the "add-model" permission
+				// to the user.
+				relationsToRevoke = []openfga.Relation{
+					ofganames.CanAddModelRelation,
+					ofganames.AdministratorRelation,
 				}
 			}
-			uca.User = targetUser
-			uca.Cloud = *c
-			switch access {
-			case "admin":
-				uca.Access = "add-model"
+		case ofganames.AdministratorRelation:
+			switch currentRelation {
+			case ofganames.NoRelation, ofganames.CanAddModelRelation:
+				return nil
 			default:
-				uca.Access = ""
+				relationsToRevoke = []openfga.Relation{
+					ofganames.AdministratorRelation,
+				}
 			}
-
-			if err := j.Database.UpdateUserCloudAccess(ctx, &uca); err != nil {
-				return errors.E(op, err, "cannot update database after updating controller")
-			}
-			return nil
-		})
-		if err != nil {
-			ale.Params["err"] = err.Error()
-			return errors.E(op, err)
 		}
-		ale.Success = true
+
+		if err := targetOfgaUser.UnsetCloudAccess(ctx, ct, relationsToRevoke...); err != nil {
+			return errors.E(err, op, "failed to unset cloud access")
+		}
 		return nil
-	*/
+	})
+
+	if err != nil {
+		zapctx.Error(
+			ctx,
+			"failed to revoke cloud access",
+			zaputil.Error(err),
+			zap.String("targetUser", string(ut.Id())),
+			zap.String("cloud", string(ct.Id())),
+			zap.String("access", string(access)),
+		)
+		return errors.E(op, err)
+	}
+	return nil
 }
 
 // RemoveCloud removes the given cloud from JAAS If the cloud is not found
