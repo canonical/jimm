@@ -345,13 +345,13 @@ func unsetMultipleResourceAccesses[T ofganames.ResourceTagger](ctx context.Conte
 	tupleObject := ofganames.ConvertTag(user.ResourceTag())
 	tupleTarget := ofganames.ConvertTag(resource)
 
-	lastToken := ""
+	lastContinuationToken := ""
 	existingRelations := map[Relation]interface{}{}
 	for {
-		timestampedTuples, token, err := user.client.cofgaClient.FindMatchingTuples(ctx, Tuple{
+		timestampedTuples, continuationToken, err := user.client.cofgaClient.FindMatchingTuples(ctx, Tuple{
 			Object: tupleObject,
 			Target: tupleTarget,
-		}, 0, lastToken)
+		}, 0, lastContinuationToken)
 
 		if err != nil {
 			return errors.E(err, "failed to retrieve existing relations")
@@ -361,10 +361,10 @@ func unsetMultipleResourceAccesses[T ofganames.ResourceTagger](ctx context.Conte
 			existingRelations[timestampedTuple.Tuple.Relation] = nil
 		}
 
-		if token == lastToken {
+		if continuationToken == lastContinuationToken {
 			break
 		}
-		lastToken = token
+		lastContinuationToken = continuationToken
 	}
 
 	tuplesToRemove := make([]Tuple, 0, len(relations))
