@@ -27,9 +27,12 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          fetch-tags: true
+      - name: Get latest tags
+        run:  git fetch --tags 
       - name: Build local images
         run: make jimm-image
       - name: Upload charm to charmhub
@@ -52,9 +55,10 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          fetch-tags: true
       - uses: actions/download-artifact@master
         with:
           name: jimm-snap
