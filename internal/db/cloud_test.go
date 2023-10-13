@@ -8,7 +8,6 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"gorm.io/gorm"
 
 	"github.com/canonical/jimm/internal/auth"
 	"github.com/canonical/jimm/internal/db"
@@ -516,9 +515,7 @@ func (s *dbSuite) TestDeleteCloudRegionControllerPriority(c *qt.C) {
 	ctx := context.Background()
 
 	crp := dbmodel.CloudRegionControllerPriority{
-		Model: gorm.Model{
-			ID: 1,
-		},
+		ID: 1,
 	}
 
 	err := s.Database.DeleteCloudRegionControllerPriority(ctx, &crp)

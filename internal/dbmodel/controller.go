@@ -6,10 +6,10 @@ import (
 	"database/sql"
 	"fmt"
 	"net"
+	"time"
 
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
-	"gorm.io/gorm"
 
 	apiparams "github.com/canonical/jimm/api/params"
 )
@@ -17,7 +17,9 @@ import (
 // A controller represents a juju controller which is hosting models
 // within the JAAS system.
 type Controller struct {
-	gorm.Model
+	ID        uint `gorm:"primaryKey"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
 
 	// Name is the name given to this controller.
 	Name string `gorm:"not null;uniqueIndex"`
@@ -165,7 +167,9 @@ const (
 // a controller should be chosen when deploying to a particular
 // cloud-region.
 type CloudRegionControllerPriority struct {
-	gorm.Model
+	ID        uint `gorm:"primaryKey"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
 
 	// CloudRegion is the cloud-region this pertains to.
 	CloudRegionID uint
@@ -182,7 +186,9 @@ type CloudRegionControllerPriority struct {
 
 // ControllerConfig stores controller configuration.
 type ControllerConfig struct {
-	gorm.Model
+	ID        uint `gorm:"primaryKey"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
 
 	// Name is the name given to this configuration.
 	Name string `gorm:"not null;uniqueIndex"`

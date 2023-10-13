@@ -8,8 +8,6 @@ import (
 	"time"
 
 	qt "github.com/frankban/quicktest"
-	"github.com/google/go-cmp/cmp/cmpopts"
-	"gorm.io/gorm"
 
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
@@ -136,7 +134,7 @@ func TestSetUserModelDefaults(t *testing.T) {
 				}
 				err = j.Database.UserModelDefaults(ctx, &dbDefaults)
 				c.Assert(err, qt.Equals, nil)
-				c.Assert(&dbDefaults, qt.CmpEquals(cmpopts.IgnoreTypes(gorm.Model{})), testConfig.expectedDefaults)
+				c.Assert(&dbDefaults, jimmtest.DBObjectEquals, testConfig.expectedDefaults)
 			} else {
 				c.Assert(err, qt.ErrorMatches, testConfig.expectedError)
 			}
@@ -217,7 +215,7 @@ func TestUserModelDefaults(t *testing.T) {
 			defaults, err := j.UserModelDefaults(ctx, testConfig.user)
 			if testConfig.expectedError == "" {
 				c.Assert(err, qt.Equals, nil)
-				c.Assert(defaults, qt.CmpEquals(cmpopts.IgnoreTypes(gorm.Model{})), testConfig.expectedDefaults)
+				c.Assert(&defaults, jimmtest.DBObjectEquals, testConfig.expectedDefaults)
 			} else {
 				c.Assert(err, qt.ErrorMatches, testConfig.expectedError)
 			}

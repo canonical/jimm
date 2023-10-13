@@ -2,11 +2,13 @@
 
 package dbmodel
 
-import "gorm.io/gorm"
+import "time"
 
 // UserModelDefaults holds user's model defaults.
 type UserModelDefaults struct {
-	gorm.Model
+	ID        uint `gorm:"primaryKey"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
 
 	Username string
 	User     User `gorm:"foreignKey:Username;references:Username"`

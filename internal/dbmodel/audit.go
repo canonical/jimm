@@ -5,14 +5,14 @@ package dbmodel
 import (
 	"time"
 
-	"gorm.io/gorm"
-
 	apiparams "github.com/canonical/jimm/api/params"
 )
 
 // An AuditLogEntry is an entry in the audit log.
 type AuditLogEntry struct {
-	gorm.Model
+	ID        uint `gorm:"primaryKey"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
 
 	// Time contains the time that the event happened.
 	Time time.Time `gorm:"index"`

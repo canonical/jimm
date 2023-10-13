@@ -161,7 +161,9 @@ func (c Cloud) ToJujuCloudInfo() jujuparams.CloudInfo {
 
 // A CloudRegion is a region of a cloud.
 type CloudRegion struct {
-	gorm.Model
+	ID        uint `gorm:"primaryKey"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
 
 	// Cloud is the cloud this region belongs to.
 	CloudName string `gorm:"uniqueIndex:idx_cloud_region_cloud_name_name"`
@@ -210,7 +212,9 @@ func (cr *CloudRegion) FromJujuCloudRegion(r jujuparams.CloudRegion) {
 
 // A UserCloudAccess maps the access level of a user on a cloud.
 type UserCloudAccess struct {
-	gorm.Model
+	ID        uint `gorm:"primaryKey"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
 
 	// User is the User this access is for.
 	Username string

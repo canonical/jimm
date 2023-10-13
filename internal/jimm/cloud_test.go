@@ -10,7 +10,6 @@ import (
 	qt "github.com/frankban/quicktest"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
-	"gorm.io/gorm"
 
 	"github.com/canonical/jimm/internal/auth"
 	"github.com/canonical/jimm/internal/db"
@@ -84,36 +83,28 @@ func TestGetCloud(t *testing.T) {
 		Name:      "test-cloud-1",
 		Regions:   []dbmodel.CloudRegion{},
 		Users: []dbmodel.UserCloudAccess{{
-			Model: gorm.Model{
-				ID:        1,
-				CreatedAt: now,
-				UpdatedAt: now,
-			},
-			Username: "alice@external",
+			ID:        1,
+			CreatedAt: now,
+			UpdatedAt: now,
+			Username:  "alice@external",
 			User: dbmodel.User{
-				Model: gorm.Model{
-					ID:        1,
-					CreatedAt: now,
-					UpdatedAt: now,
-				},
+				ID:               1,
+				CreatedAt:        now,
+				UpdatedAt:        now,
 				Username:         "alice@external",
 				ControllerAccess: "login",
 			},
 			CloudName: "test-cloud-1",
 			Access:    "admin",
 		}, {
-			Model: gorm.Model{
-				ID:        2,
-				CreatedAt: now,
-				UpdatedAt: now,
-			},
-			Username: "bob@external",
+			ID:        2,
+			CreatedAt: now,
+			UpdatedAt: now,
+			Username:  "bob@external",
 			User: dbmodel.User{
-				Model: gorm.Model{
-					ID:        2,
-					CreatedAt: now,
-					UpdatedAt: now,
-				},
+				ID:               2,
+				CreatedAt:        now,
+				UpdatedAt:        now,
 				Username:         "bob@external",
 				ControllerAccess: "login",
 			},
@@ -146,36 +137,28 @@ func TestGetCloud(t *testing.T) {
 		Name:      "test-cloud-1",
 		Regions:   []dbmodel.CloudRegion{},
 		Users: []dbmodel.UserCloudAccess{{
-			Model: gorm.Model{
-				ID:        1,
-				CreatedAt: now,
-				UpdatedAt: now,
-			},
-			Username: "alice@external",
+			ID:        1,
+			CreatedAt: now,
+			UpdatedAt: now,
+			Username:  "alice@external",
 			User: dbmodel.User{
-				Model: gorm.Model{
-					ID:        1,
-					CreatedAt: now,
-					UpdatedAt: now,
-				},
+				ID:               1,
+				CreatedAt:        now,
+				UpdatedAt:        now,
 				Username:         "alice@external",
 				ControllerAccess: "login",
 			},
 			CloudName: "test-cloud-1",
 			Access:    "admin",
 		}, {
-			Model: gorm.Model{
-				ID:        2,
-				CreatedAt: now,
-				UpdatedAt: now,
-			},
-			Username: "bob@external",
+			ID:        2,
+			CreatedAt: now,
+			UpdatedAt: now,
+			Username:  "bob@external",
 			User: dbmodel.User{
-				Model: gorm.Model{
-					ID:        2,
-					CreatedAt: now,
-					UpdatedAt: now,
-				},
+				ID:               2,
+				CreatedAt:        now,
+				UpdatedAt:        now,
 				Username:         "bob@external",
 				ControllerAccess: "login",
 			},
@@ -280,36 +263,28 @@ func TestForEachCloud(t *testing.T) {
 		Name:      "test-cloud-1",
 		Regions:   []dbmodel.CloudRegion{},
 		Users: []dbmodel.UserCloudAccess{{
-			Model: gorm.Model{
-				ID:        1,
-				CreatedAt: now,
-				UpdatedAt: now,
-			},
-			Username: "alice@external",
+			ID:        1,
+			CreatedAt: now,
+			UpdatedAt: now,
+			Username:  "alice@external",
 			User: dbmodel.User{
-				Model: gorm.Model{
-					ID:        1,
-					CreatedAt: now,
-					UpdatedAt: now,
-				},
+				ID:               1,
+				CreatedAt:        now,
+				UpdatedAt:        now,
 				Username:         "alice@external",
 				ControllerAccess: "login",
 			},
 			CloudName: "test-cloud-1",
 			Access:    "admin",
 		}, {
-			Model: gorm.Model{
-				ID:        2,
-				CreatedAt: now,
-				UpdatedAt: now,
-			},
-			Username: "bob@external",
+			ID:        2,
+			CreatedAt: now,
+			UpdatedAt: now,
+			Username:  "bob@external",
 			User: dbmodel.User{
-				Model: gorm.Model{
-					ID:        2,
-					CreatedAt: now,
-					UpdatedAt: now,
-				},
+				ID:               2,
+				CreatedAt:        now,
+				UpdatedAt:        now,
 				Username:         "bob@external",
 				ControllerAccess: "login",
 			},
@@ -424,36 +399,28 @@ func TestForEachCloud(t *testing.T) {
 		Name:      "test-cloud-1",
 		Regions:   []dbmodel.CloudRegion{},
 		Users: []dbmodel.UserCloudAccess{{
-			Model: gorm.Model{
-				ID:        1,
-				CreatedAt: now,
-				UpdatedAt: now,
-			},
-			Username: "alice@external",
+			ID:        1,
+			CreatedAt: now,
+			UpdatedAt: now,
+			Username:  "alice@external",
 			User: dbmodel.User{
-				Model: gorm.Model{
-					ID:        1,
-					CreatedAt: now,
-					UpdatedAt: now,
-				},
+				ID:               1,
+				CreatedAt:        now,
+				UpdatedAt:        now,
 				Username:         "alice@external",
 				ControllerAccess: "login",
 			},
 			CloudName: "test-cloud-1",
 			Access:    "admin",
 		}, {
-			Model: gorm.Model{
-				ID:        2,
-				CreatedAt: now,
-				UpdatedAt: now,
-			},
-			Username: "bob@external",
+			ID:        2,
+			CreatedAt: now,
+			UpdatedAt: now,
+			Username:  "bob@external",
 			User: dbmodel.User{
-				Model: gorm.Model{
-					ID:        2,
-					CreatedAt: now,
-					UpdatedAt: now,
-				},
+				ID:               2,
+				CreatedAt:        now,
+				UpdatedAt:        now,
 				Username:         "bob@external",
 				ControllerAccess: "login",
 			},
@@ -467,36 +434,28 @@ func TestForEachCloud(t *testing.T) {
 		Name:      "test-cloud-2",
 		Regions:   []dbmodel.CloudRegion{},
 		Users: []dbmodel.UserCloudAccess{{
-			Model: gorm.Model{
-				ID:        3,
-				CreatedAt: now,
-				UpdatedAt: now,
-			},
-			Username: "bob@external",
+			ID:        3,
+			CreatedAt: now,
+			UpdatedAt: now,
+			Username:  "bob@external",
 			User: dbmodel.User{
-				Model: gorm.Model{
-					ID:        2,
-					CreatedAt: now,
-					UpdatedAt: now,
-				},
+				ID:               2,
+				CreatedAt:        now,
+				UpdatedAt:        now,
 				Username:         "bob@external",
 				ControllerAccess: "login",
 			},
 			CloudName: "test-cloud-2",
 			Access:    "add-model",
 		}, {
-			Model: gorm.Model{
-				ID:        4,
-				CreatedAt: now,
-				UpdatedAt: now,
-			},
-			Username: auth.Everyone,
+			ID:        4,
+			CreatedAt: now,
+			UpdatedAt: now,
+			Username:  auth.Everyone,
 			User: dbmodel.User{
-				Model: gorm.Model{
-					ID:        3,
-					CreatedAt: now,
-					UpdatedAt: now,
-				},
+				ID:               3,
+				CreatedAt:        now,
+				UpdatedAt:        now,
 				Username:         auth.Everyone,
 				ControllerAccess: "login",
 			},
@@ -510,18 +469,14 @@ func TestForEachCloud(t *testing.T) {
 		Name:      "test-cloud-3",
 		Regions:   []dbmodel.CloudRegion{},
 		Users: []dbmodel.UserCloudAccess{{
-			Model: gorm.Model{
-				ID:        5,
-				CreatedAt: now,
-				UpdatedAt: now,
-			},
-			Username: auth.Everyone,
+			ID:        5,
+			CreatedAt: now,
+			UpdatedAt: now,
+			Username:  auth.Everyone,
 			User: dbmodel.User{
-				Model: gorm.Model{
-					ID:        3,
-					CreatedAt: now,
-					UpdatedAt: now,
-				},
+				ID:               3,
+				CreatedAt:        now,
+				UpdatedAt:        now,
 				Username:         auth.Everyone,
 				ControllerAccess: "login",
 			},
