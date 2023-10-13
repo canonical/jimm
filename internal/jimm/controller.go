@@ -547,7 +547,7 @@ func (j *JIMM) ImportModel(ctx context.Context, user *openfga.User, controllerNa
 	// Note that the model already has a cloud credential configured which it will use when deploying new
 	// applications. JIMM needs some cloud credential reference to be able to import the model so use any
 	// credential against the cloud the model is deployed against. Even using the correct cloud for the
-	// credential is not strictly necessary, but will help prevent the user think they can create new
+	// credential is not strictly necessary, but will help prevent the user thinking they can create new
 	// models on the incoming cloud.
 	allCredentials, err := j.Database.GetUserCloudCredentials(ctx, &ownerUser, cloudTag.Id())
 	if err != nil {

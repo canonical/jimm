@@ -19,11 +19,11 @@ import (
 const importModelCommandDoc = `
 	import-model imports a model running on a controller to jimm.
 
-	When importing, it is necessary for JIMM to contain cloud credentials
-	for the user against the cloud the incoming model resides.
+	When importing, it is necessary for JIMM to contain a set of cloud credentials
+	that represent a user's access to the incoming model's cloud. 
 
 	The --owner command is necessary when importing a model created by a 
-	local user and will switch the model owner to the desired external user.
+	local user and it will switch the model owner to the desired external user.
 	E.g. --owner my-user@external
 
 	Example:
