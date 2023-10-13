@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/juju/cmd/v3/cmdtesting"
 	"github.com/juju/juju/cloud"
@@ -135,13 +136,14 @@ clouds:
 	c.Assert(controller.CloudRegions[1].CloudRegion.CloudName, gc.Equals, "test-hosted-cloud")
 }
 
-func (s *addCloudToControllerSuite) TestAddInvalidCloudToController(c *gc.C) {
+func (s *addCloudToControllerSuite) TestAddCloudWithoutProviderToController(c *gc.C) {
 	clouds := `
 clouds:
-  test-hosted-cloud:
-    type: unknown
-    auth-types: [certificate]
-    host-cloud-region: my-cloud/default
+    test-hosted-cloud:
+      type: unknown
+      auth-types: [oauth1]
+      regions:
+        default: {}
 `
 	tmpfile, cleanupFunc := writeTempFile(c, clouds)
 	defer cleanupFunc()
@@ -150,16 +152,28 @@ clouds:
 
 	// Running the command succeeds
 	_, err := cmdtesting.RunCommand(c, cmd.NewAddCloudToControllerCommandForTesting(s.ClientStore, bClient, nil), "controller-1", "test-hosted-cloud", "--cloud="+tmpfile)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.ErrorMatches, ".*no registered provider.*")
+}
 
-	// The cloud is there
-	cloud := dbmodel.Cloud{Name: "test-hosted-cloud"}
-	err = s.JIMM.Database.GetCloud(context.Background(), &cloud)
-	c.Assert(err, gc.IsNil)
-	controller := dbmodel.Controller{Name: "controller-1"}
-	s.JIMM.Database.GetController(context.Background(), &controller)
-	c.Assert(controller.CloudRegions, gc.HasLen, 2)
-	c.Assert(controller.CloudRegions[1].CloudRegion.CloudName, gc.Equals, "test-hosted-cloud")
+func (s *addCloudToControllerSuite) TestAddIncompatibleCloudToController(c *gc.C) {
+	clouds := `
+clouds:
+    test-hosted-cloud:
+      type: maas
+      auth-types: [oauth1]
+      regions:
+        default: {}
+`
+	tmpfile, cleanupFunc := writeTempFile(c, clouds)
+	defer cleanupFunc()
+
+	bClient := s.userBakeryClient("bob@external")
+
+	// Running the command succeeds
+	_, err := cmdtesting.RunCommand(c, cmd.NewAddCloudToControllerCommandForTesting(s.ClientStore, bClient, nil), "controller-1", "test-hosted-cloud", "--cloud="+tmpfile)
+	c.Assert(err, gc.NotNil)
+	errWithoutBreaks := strings.ReplaceAll(err.Error(), "\n", "")
+	c.Assert(errWithoutBreaks, gc.Matches, ".*incompatible clouds.*")
 }
 
 func (s *addCloudToControllerSuite) TestAddCloudToControllerExisting(c *gc.C) {
