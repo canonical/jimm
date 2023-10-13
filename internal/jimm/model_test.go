@@ -25,6 +25,7 @@ import (
 	"github.com/canonical/jimm/internal/jimm"
 	"github.com/canonical/jimm/internal/jimmtest"
 	"github.com/canonical/jimm/internal/openfga"
+	ofganames "github.com/canonical/jimm/internal/openfga/names"
 )
 
 func TestModelCreateArgs(t *testing.T) {
@@ -1667,7 +1668,6 @@ func TestForEachModel(t *testing.T) {
 	})
 }
 
-/*
 const grantModelAccessTestEnv = `clouds:
 - name: test-cloud
   type: test-provider
@@ -1698,17 +1698,16 @@ models:
 `
 
 var grantModelAccessTests = []struct {
-	name             string
-	env              string
-	grantModelAccess func(context.Context, names.ModelTag, names.UserTag, jujuparams.UserAccessPermission) error
-	dialError        error
-	username         string
-	uuid             string
-	targetUsername   string
-	access           string
-	expectModel      dbmodel.Model
-	expectError      string
-	expectErrorCode  errors.Code
+	name            string
+	env             string
+	dialError       error
+	username        string
+	uuid            string
+	targetUsername  string
+	access          string
+	expectRelations []openfga.Tuple
+	expectError     string
+	expectErrorCode errors.Code
 }{{
 	name:            "ModelNotFound",
 	username:        "alice@external",
@@ -1718,70 +1717,145 @@ var grantModelAccessTests = []struct {
 	expectError:     `model not found`,
 	expectErrorCode: errors.CodeNotFound,
 }, {
-	name: "Success",
-	env:  grantModelAccessTestEnv,
-	grantModelAccess: func(_ context.Context, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
-		if mt.Id() != "00000002-0000-0000-0000-000000000001" {
-			return errors.E("bad model tag")
-		}
-		if ut.Id() != "bob@external" {
-			return errors.E("bad user tag")
-		}
-		if access != "write" {
-			return errors.E("bad permission")
-		}
-		return nil
-	},
+	name:           "Admin grants 'admin' access to a user with no access",
+	env:            grantModelAccessTestEnv,
+	username:       "alice@external",
+	uuid:           "00000002-0000-0000-0000-000000000001",
+	targetUsername: "bob@external",
+	access:         "admin",
+	expectRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Relation: ofganames.WriterRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}},
+}, {
+	name:           "Admin grants 'write' access to a user with no access",
+	env:            grantModelAccessTestEnv,
 	username:       "alice@external",
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "bob@external",
 	access:         "write",
-	expectModel: dbmodel.Model{
-		Name: "model-1",
-		UUID: sql.NullString{
-			String: "00000002-0000-0000-0000-000000000001",
-			Valid:  true,
-		},
-		Owner: dbmodel.User{
-			Username:         "alice@external",
-			ControllerAccess: "login",
-		},
-		Controller: dbmodel.Controller{
-			Name:        "controller-1",
-			UUID:        "00000001-0000-0000-0000-000000000001",
-			CloudName:   "test-cloud",
-			CloudRegion: "test-cloud-region",
-		},
-		CloudRegion: dbmodel.CloudRegion{
-			Cloud: dbmodel.Cloud{
-				Name: "test-cloud",
-				Type: "test-provider",
-			},
-			Name: "test-cloud-region",
-		},
-		CloudCredential: dbmodel.CloudCredential{
-			Name: "cred-1",
-		},
-		Users: []dbmodel.UserModelAccess{{
-			User: dbmodel.User{
-				Username:         "alice@external",
-				ControllerAccess: "login",
-			},
-			Access: "admin",
-		}, {
-			User: dbmodel.User{
-				Username:         "charlie@external",
-				ControllerAccess: "login",
-			},
-			Access: "write",
-		}, {
-			User: dbmodel.User{
-				Username:         "bob@external",
-				ControllerAccess: "login",
-			},
-			Access: "write",
-		}},
-	},
+	expectRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Relation: ofganames.WriterRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Relation: ofganames.WriterRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}},
+}, {
+	name:           "Admin grants 'read' access to a user with no access",
+	env:            grantModelAccessTestEnv,
+	username:       "alice@external",
+	uuid:           "00000002-0000-0000-0000-000000000001",
+	targetUsername: "bob@external",
+	access:         "read",
+	expectRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Relation: ofganames.ReaderRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Relation: ofganames.WriterRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}},
+}, {
+	name:           "Admin grants 'write' access to a user who already has 'write' access",
+	env:            grantModelAccessTestEnv,
+	username:       "alice@external",
+	uuid:           "00000002-0000-0000-0000-000000000001",
+	targetUsername: "charlie@external",
+	access:         "write",
+	expectRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Relation: ofganames.WriterRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}},
+}, {
+	name:           "Admin grants 'read' access to a user who already has 'write' access",
+	env:            grantModelAccessTestEnv,
+	username:       "alice@external",
+	uuid:           "00000002-0000-0000-0000-000000000001",
+	targetUsername: "charlie@external",
+	access:         "read",
+	expectRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Relation: ofganames.WriterRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}},
+}, {
+	name:           "Admin grants 'admin' access to themselves",
+	env:            grantModelAccessTestEnv,
+	username:       "alice@external",
+	uuid:           "00000002-0000-0000-0000-000000000001",
+	targetUsername: "alice@external",
+	access:         "admin",
+	expectRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Relation: ofganames.WriterRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}},
+}, {
+	name:           "Admin grants 'write' access to themselves",
+	env:            grantModelAccessTestEnv,
+	username:       "alice@external",
+	uuid:           "00000002-0000-0000-0000-000000000001",
+	targetUsername: "alice@external",
+	access:         "write",
+	expectRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Relation: ofganames.WriterRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}},
+}, {
+	name:           "Admin grants 'read' access to themselves",
+	env:            grantModelAccessTestEnv,
+	username:       "alice@external",
+	uuid:           "00000002-0000-0000-0000-000000000001",
+	targetUsername: "alice@external",
+	access:         "read",
+	expectRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Relation: ofganames.WriterRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}},
 }, {
 	name:            "UserNotAuthorized",
 	env:             grantModelAccessTestEnv,
@@ -1801,63 +1875,60 @@ var grantModelAccessTests = []struct {
 	access:         "write",
 	expectError:    `test dial error`,
 }, {
-	name: "APIError",
-	env:  grantModelAccessTestEnv,
-	grantModelAccess: func(_ context.Context, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
-		return errors.E("test error")
-	},
+	name:           "unknown access",
+	env:            grantModelAccessTestEnv,
 	username:       "alice@external",
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "bob@external",
-	access:         "write",
-	expectError:    `test error`,
+	access:         "some-unknown-access",
+	expectError:    `failed to recognize given access: "some-unknown-access"`,
 }}
 
 func TestGrantModelAccess(t *testing.T) {
 	c := qt.New(t)
 
-	for _, test := range grantModelAccessTests {
-		c.Run(test.name, func(c *qt.C) {
+	for _, t := range grantModelAccessTests {
+		tt := t
+		c.Run(tt.name, func(c *qt.C) {
 			ctx := context.Background()
 
-			env := jimmtest.ParseEnvironment(c, test.env)
+			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), tt.name)
+			c.Assert(err, qt.IsNil)
+
+			env := jimmtest.ParseEnvironment(c, tt.env)
 			dialer := &jimmtest.Dialer{
-				API: &jimmtest.API{
-					GrantModelAccess_: test.grantModelAccess,
-				},
-				Err: test.dialError,
+				API: &jimmtest.API{},
+				Err: tt.dialError,
 			}
 			j := &jimm.JIMM{
 				Database: db.Database{
 					DB: jimmtest.MemoryDB(c, nil),
 				},
-				Dialer: dialer,
+				Dialer:        dialer,
+				OpenFGAClient: client,
 			}
-			err := j.Database.Migrate(ctx, false)
+			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
-			env.PopulateDB(c, j.Database)
+			env.PopulateDB(c, j.Database, client)
 
-			u := env.User(test.username).DBObject(c, j.Database)
+			dbUser := env.User(tt.username).DBObject(c, j.Database, client)
+			user := openfga.NewUser(&dbUser, client)
 
-			err = j.GrantModelAccess(ctx, &u, names.NewModelTag(test.uuid), names.NewUserTag(test.targetUsername), jujuparams.UserAccessPermission(test.access))
+			err = j.GrantModelAccess(ctx, user, names.NewModelTag(tt.uuid), names.NewUserTag(tt.targetUsername), jujuparams.UserAccessPermission(tt.access))
 			c.Assert(dialer.IsClosed(), qt.IsTrue)
-			if test.expectError != "" {
-				c.Check(err, qt.ErrorMatches, test.expectError)
-				if test.expectErrorCode != "" {
-					c.Check(errors.ErrorCode(err), qt.Equals, test.expectErrorCode)
+			if tt.expectError != "" {
+				c.Check(err, qt.ErrorMatches, tt.expectError)
+				if tt.expectErrorCode != "" {
+					c.Check(errors.ErrorCode(err), qt.Equals, tt.expectErrorCode)
 				}
 				return
 			}
 			c.Assert(err, qt.IsNil)
-			m := dbmodel.Model{
-				UUID: sql.NullString{
-					String: test.uuid,
-					Valid:  true,
-				},
+			for _, tuple := range tt.expectRelations {
+				value, err := client.CheckRelation(ctx, tuple, false)
+				c.Assert(err, qt.IsNil)
+				c.Assert(value, qt.IsTrue, qt.Commentf("expected the tuple to exist after granting"))
 			}
-			err = j.Database.GetModel(ctx, &m)
-			c.Assert(err, qt.IsNil)
-			c.Check(m, jimmtest.DBObjectEquals, test.expectModel)
 		})
 	}
 }
@@ -1891,20 +1962,35 @@ models:
     access: admin
   - user: charlie@external
     access: write
+  - user: daphne@external
+    access: read
+- name: model-2
+  uuid: 00000002-0000-0000-0000-000000000002
+  controller: controller-1
+  cloud: test-cloud
+  region: test-cloud-region
+  cloud-credential: cred-1
+  owner: alice@external
+  users:
+  - user: alice@external
+    access: admin
+  - user: earl@external
+    access: admin
 `
 
 var revokeModelAccessTests = []struct {
-	name              string
-	env               string
-	revokeModelAccess func(context.Context, names.ModelTag, names.UserTag, jujuparams.UserAccessPermission) error
-	dialError         error
-	username          string
-	uuid              string
-	targetUsername    string
-	access            string
-	expectModel       dbmodel.Model
-	expectError       string
-	expectErrorCode   errors.Code
+	name                   string
+	env                    string
+	dialError              error
+	username               string
+	uuid                   string
+	targetUsername         string
+	access                 string
+	extraInitialTuples     []openfga.Tuple
+	expectRelations        []openfga.Tuple
+	expectRemovedRelations []openfga.Tuple
+	expectError            string
+	expectErrorCode        errors.Code
 }{{
 	name:            "ModelNotFound",
 	username:        "alice@external",
@@ -1914,253 +2000,581 @@ var revokeModelAccessTests = []struct {
 	expectError:     `model not found`,
 	expectErrorCode: errors.CodeNotFound,
 }, {
-	name: "SuccessAdmin",
-	env:  revokeModelAccessTestEnv,
-	revokeModelAccess: func(_ context.Context, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
-		if mt.Id() != "00000002-0000-0000-0000-000000000001" {
-			return errors.E("bad model tag")
-		}
-		if ut.Id() != "bob@external" {
-			return errors.E("bad user tag")
-		}
-		if access != "admin" {
-			return errors.E("bad permission")
-		}
-		return nil
-	},
+	name:           "Admin revokes 'admin' access from another admin",
+	env:            revokeModelAccessTestEnv,
 	username:       "alice@external",
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "bob@external",
 	access:         "admin",
-	expectModel: dbmodel.Model{
-		Name: "model-1",
-		UUID: sql.NullString{
-			String: "00000002-0000-0000-0000-000000000001",
-			Valid:  true,
-		},
-		Owner: dbmodel.User{
-			Username:         "alice@external",
-			ControllerAccess: "login",
-		},
-		Controller: dbmodel.Controller{
-			Name:        "controller-1",
-			UUID:        "00000001-0000-0000-0000-000000000001",
-			CloudName:   "test-cloud",
-			CloudRegion: "test-cloud-region",
-		},
-		CloudRegion: dbmodel.CloudRegion{
-			Cloud: dbmodel.Cloud{
-				Name: "test-cloud",
-				Type: "test-provider",
-			},
-			Name: "test-cloud-region",
-		},
-		CloudCredential: dbmodel.CloudCredential{
-			Name: "cred-1",
-		},
-		Users: []dbmodel.UserModelAccess{{
-			User: dbmodel.User{
-				Username:         "alice@external",
-				ControllerAccess: "login",
-			},
-			Access: "admin",
-		}, {
-			User: dbmodel.User{
-				Username:         "bob@external",
-				ControllerAccess: "login",
-			},
-			Access: "write",
-		}, {
-			User: dbmodel.User{
-				Username:         "charlie@external",
-				ControllerAccess: "login",
-			},
-			Access: "write",
-		}},
-	},
+	expectRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Relation: ofganames.WriterRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Relation: ofganames.ReaderRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}},
+	expectRemovedRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}},
 }, {
-	name: "SuccessWrite",
-	env:  revokeModelAccessTestEnv,
-	revokeModelAccess: func(_ context.Context, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
-		if mt.Id() != "00000002-0000-0000-0000-000000000001" {
-			return errors.E("bad model tag")
-		}
-		if ut.Id() != "bob@external" {
-			return errors.E("bad user tag")
-		}
-		if access != "write" {
-			return errors.E("bad permission")
-		}
-		return nil
-	},
+	name:           "Admin revokes 'write' access from another admin",
+	env:            revokeModelAccessTestEnv,
 	username:       "alice@external",
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "bob@external",
 	access:         "write",
-	expectModel: dbmodel.Model{
-		Name: "model-1",
-		UUID: sql.NullString{
-			String: "00000002-0000-0000-0000-000000000001",
-			Valid:  true,
-		},
-		Owner: dbmodel.User{
-			Username:         "alice@external",
-			ControllerAccess: "login",
-		},
-		Controller: dbmodel.Controller{
-			Name:        "controller-1",
-			UUID:        "00000001-0000-0000-0000-000000000001",
-			CloudName:   "test-cloud",
-			CloudRegion: "test-cloud-region",
-		},
-		CloudRegion: dbmodel.CloudRegion{
-			Cloud: dbmodel.Cloud{
-				Name: "test-cloud",
-				Type: "test-provider",
-			},
-			Name: "test-cloud-region",
-		},
-		CloudCredential: dbmodel.CloudCredential{
-			Name: "cred-1",
-		},
-		Users: []dbmodel.UserModelAccess{{
-			User: dbmodel.User{
-				Username:         "alice@external",
-				ControllerAccess: "login",
-			},
-			Access: "admin",
-		}, {
-			User: dbmodel.User{
-				Username:         "bob@external",
-				ControllerAccess: "login",
-			},
-			Access: "read",
-		}, {
-			User: dbmodel.User{
-				Username:         "charlie@external",
-				ControllerAccess: "login",
-			},
-			Access: "write",
-		}},
-	},
+	expectRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Relation: ofganames.WriterRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Relation: ofganames.ReaderRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}},
+	expectRemovedRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}},
 }, {
-	name: "SuccessRead",
-	env:  revokeModelAccessTestEnv,
-	revokeModelAccess: func(_ context.Context, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
-		if mt.Id() != "00000002-0000-0000-0000-000000000001" {
-			return errors.E("bad model tag")
-		}
-		if ut.Id() != "bob@external" {
-			return errors.E("bad user tag")
-		}
-		if access != "read" {
-			return errors.E("bad permission")
-		}
-		return nil
-	},
+	name:           "Admin revokes 'read' access from another admin",
+	env:            revokeModelAccessTestEnv,
 	username:       "alice@external",
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "bob@external",
 	access:         "read",
-	expectModel: dbmodel.Model{
-		Name: "model-1",
-		UUID: sql.NullString{
-			String: "00000002-0000-0000-0000-000000000001",
-			Valid:  true,
-		},
-		Owner: dbmodel.User{
-			Username:         "alice@external",
-			ControllerAccess: "login",
-		},
-		Controller: dbmodel.Controller{
-			Name:        "controller-1",
-			UUID:        "00000001-0000-0000-0000-000000000001",
-			CloudName:   "test-cloud",
-			CloudRegion: "test-cloud-region",
-		},
-		CloudRegion: dbmodel.CloudRegion{
-			Cloud: dbmodel.Cloud{
-				Name: "test-cloud",
-				Type: "test-provider",
-			},
-			Name: "test-cloud-region",
-		},
-		CloudCredential: dbmodel.CloudCredential{
-			Name: "cred-1",
-		},
-		Users: []dbmodel.UserModelAccess{{
-			User: dbmodel.User{
-				Username:         "alice@external",
-				ControllerAccess: "login",
-			},
-			Access: "admin",
-		}, {
-			User: dbmodel.User{
-				Username:         "charlie@external",
-				ControllerAccess: "login",
-			},
-			Access: "write",
-		}},
-	},
+	expectRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Relation: ofganames.WriterRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Relation: ofganames.ReaderRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}},
+	expectRemovedRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}},
 }, {
-	name: "UserRevokingOwnAccess",
-	env:  revokeModelAccessTestEnv,
-	revokeModelAccess: func(_ context.Context, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
-		if mt.Id() != "00000002-0000-0000-0000-000000000001" {
-			return errors.E("bad model tag")
-		}
-		if ut.Id() != "charlie@external" {
-			return errors.E("bad user tag")
-		}
-		if access != "read" {
-			return errors.E("bad permission")
-		}
-		return nil
-	},
+	name:           "Admin revokes 'admin' access from a user who has 'write' access",
+	env:            revokeModelAccessTestEnv,
+	username:       "alice@external",
+	uuid:           "00000002-0000-0000-0000-000000000001",
+	targetUsername: "charlie@external",
+	access:         "admin",
+	expectRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Relation: ofganames.WriterRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Relation: ofganames.ReaderRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}},
+}, {
+	name:           "Admin revokes 'write' access from a user who has 'write' access",
+	env:            revokeModelAccessTestEnv,
+	username:       "alice@external",
+	uuid:           "00000002-0000-0000-0000-000000000001",
+	targetUsername: "charlie@external",
+	access:         "write",
+	expectRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Relation: ofganames.ReaderRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}},
+	expectRemovedRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Relation: ofganames.WriterRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}},
+}, {
+	name:           "Admin revokes 'read' access from a user who has 'write' access",
+	env:            revokeModelAccessTestEnv,
+	username:       "alice@external",
+	uuid:           "00000002-0000-0000-0000-000000000001",
+	targetUsername: "charlie@external",
+	access:         "read",
+	expectRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Relation: ofganames.ReaderRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}},
+	expectRemovedRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Relation: ofganames.WriterRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}},
+}, {
+	name:           "Admin revokes 'admin' access from a user who has 'read' access",
+	env:            revokeModelAccessTestEnv,
+	username:       "alice@external",
+	uuid:           "00000002-0000-0000-0000-000000000001",
+	targetUsername: "daphne@external",
+	access:         "admin",
+	expectRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Relation: ofganames.WriterRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Relation: ofganames.ReaderRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}},
+}, {
+	name:           "Admin revokes 'write' access from a user who has 'read' access",
+	env:            revokeModelAccessTestEnv,
+	username:       "alice@external",
+	uuid:           "00000002-0000-0000-0000-000000000001",
+	targetUsername: "daphne@external",
+	access:         "write",
+	expectRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Relation: ofganames.WriterRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Relation: ofganames.ReaderRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}},
+}, {
+	name:           "Admin revokes 'read' access from a user who has 'read' access",
+	env:            revokeModelAccessTestEnv,
+	username:       "alice@external",
+	uuid:           "00000002-0000-0000-0000-000000000001",
+	targetUsername: "daphne@external",
+	access:         "read",
+	expectRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Relation: ofganames.WriterRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}},
+	expectRemovedRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Relation: ofganames.ReaderRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}},
+}, {
+	name:           "Admin revokes 'admin' access from themselves",
+	env:            revokeModelAccessTestEnv,
+	username:       "alice@external",
+	uuid:           "00000002-0000-0000-0000-000000000001",
+	targetUsername: "alice@external",
+	access:         "admin",
+	expectRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Relation: ofganames.WriterRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Relation: ofganames.ReaderRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}},
+	expectRemovedRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}},
+}, {
+	name:           "Admin revokes 'write' access from themselves",
+	env:            revokeModelAccessTestEnv,
+	username:       "alice@external",
+	uuid:           "00000002-0000-0000-0000-000000000001",
+	targetUsername: "alice@external",
+	access:         "write",
+	expectRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Relation: ofganames.WriterRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Relation: ofganames.ReaderRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}},
+	expectRemovedRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}},
+}, {
+	name:           "Admin revokes 'read' access from themselves",
+	env:            revokeModelAccessTestEnv,
+	username:       "alice@external",
+	uuid:           "00000002-0000-0000-0000-000000000001",
+	targetUsername: "alice@external",
+	access:         "read",
+	expectRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Relation: ofganames.WriterRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Relation: ofganames.ReaderRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}},
+	expectRemovedRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}},
+}, {
+	name:           "Writer revokes 'admin' access from themselves",
+	env:            revokeModelAccessTestEnv,
+	username:       "charlie@external",
+	uuid:           "00000002-0000-0000-0000-000000000001",
+	targetUsername: "charlie@external",
+	access:         "admin",
+	expectRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Relation: ofganames.WriterRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Relation: ofganames.ReaderRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}},
+}, {
+	name:           "Writer revokes 'write' access from themselves",
+	env:            revokeModelAccessTestEnv,
+	username:       "charlie@external",
+	uuid:           "00000002-0000-0000-0000-000000000001",
+	targetUsername: "charlie@external",
+	access:         "write",
+	expectRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Relation: ofganames.ReaderRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}},
+	expectRemovedRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Relation: ofganames.WriterRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}},
+}, {
+	name:           "Writer revokes 'read' access from themselves",
+	env:            revokeModelAccessTestEnv,
 	username:       "charlie@external",
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "charlie@external",
 	access:         "read",
-	expectModel: dbmodel.Model{
-		Name: "model-1",
-		UUID: sql.NullString{
-			String: "00000002-0000-0000-0000-000000000001",
-			Valid:  true,
-		},
-		Owner: dbmodel.User{
-			Username:         "alice@external",
-			ControllerAccess: "login",
-		},
-		Controller: dbmodel.Controller{
-			Name:        "controller-1",
-			UUID:        "00000001-0000-0000-0000-000000000001",
-			CloudName:   "test-cloud",
-			CloudRegion: "test-cloud-region",
-		},
-		CloudRegion: dbmodel.CloudRegion{
-			Cloud: dbmodel.Cloud{
-				Name: "test-cloud",
-				Type: "test-provider",
-			},
-			Name: "test-cloud-region",
-		},
-		CloudCredential: dbmodel.CloudCredential{
-			Name: "cred-1",
-		},
-		Users: []dbmodel.UserModelAccess{{
-			User: dbmodel.User{
-				Username:         "alice@external",
-				ControllerAccess: "login",
-			},
-			Access: "admin",
-		}, {
-			User: dbmodel.User{
-				Username:         "bob@external",
-				ControllerAccess: "login",
-			},
-			Access: "admin",
-		}},
+	expectRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Relation: ofganames.ReaderRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}},
+	expectRemovedRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Relation: ofganames.WriterRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}},
+}, {
+	name:           "Reader revokes 'admin' access from themselves",
+	env:            revokeModelAccessTestEnv,
+	username:       "daphne@external",
+	uuid:           "00000002-0000-0000-0000-000000000001",
+	targetUsername: "daphne@external",
+	access:         "admin",
+	expectRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Relation: ofganames.WriterRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Relation: ofganames.ReaderRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}},
+}, {
+	name:           "Reader revokes 'write' access from themselves",
+	env:            revokeModelAccessTestEnv,
+	username:       "daphne@external",
+	uuid:           "00000002-0000-0000-0000-000000000001",
+	targetUsername: "daphne@external",
+	access:         "write",
+	expectRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Relation: ofganames.WriterRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Relation: ofganames.ReaderRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}},
+}, {
+	name:           "Reader revokes 'read' access from themselves",
+	env:            revokeModelAccessTestEnv,
+	username:       "daphne@external",
+	uuid:           "00000002-0000-0000-0000-000000000001",
+	targetUsername: "daphne@external",
+	access:         "read",
+	expectRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Relation: ofganames.WriterRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}},
+	expectRemovedRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Relation: ofganames.ReaderRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}},
+}, {
+	name:           "Admin revokes 'admin' access from a user who has separate tuples for all accesses (read/write/admin)",
+	env:            revokeModelAccessTestEnv,
+	username:       "alice@external",
+	uuid:           "00000002-0000-0000-0000-000000000001",
+	targetUsername: "daphne@external",
+	access:         "admin",
+	extraInitialTuples: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Relation: ofganames.WriterRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	},
+	// No need to add the 'read' relation, because it's already there due to the environment setup.
+	},
+	expectRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Relation: ofganames.WriterRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Relation: ofganames.WriterRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Relation: ofganames.ReaderRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}},
+	expectRemovedRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}},
+}, {
+	name:           "Admin revokes 'write' access from a user who has separate tuples for all accesses (read/write/admin)",
+	env:            revokeModelAccessTestEnv,
+	username:       "alice@external",
+	uuid:           "00000002-0000-0000-0000-000000000001",
+	targetUsername: "daphne@external",
+	access:         "write",
+	extraInitialTuples: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Relation: ofganames.WriterRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	},
+	// No need to add the 'read' relation, because it's already there due to the environment setup.
+	},
+	expectRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Relation: ofganames.WriterRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Relation: ofganames.ReaderRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}},
+	expectRemovedRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Relation: ofganames.WriterRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}},
+}, {
+	name:           "Admin revokes 'read' access from a user who has separate tuples for all accesses (read/write/admin)",
+	env:            revokeModelAccessTestEnv,
+	username:       "alice@external",
+	uuid:           "00000002-0000-0000-0000-000000000001",
+	targetUsername: "daphne@external",
+	access:         "read",
+	extraInitialTuples: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Relation: ofganames.WriterRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	},
+	// No need to add the 'read' relation, because it's already there due to the environment setup.
+	},
+	expectRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Relation: ofganames.WriterRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}},
+	expectRemovedRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Relation: ofganames.WriterRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Relation: ofganames.ReaderRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}},
 }, {
 	name:            "UserNotAuthorized",
 	env:             revokeModelAccessTestEnv,
@@ -2180,67 +2594,85 @@ var revokeModelAccessTests = []struct {
 	access:         "write",
 	expectError:    `test dial error`,
 }, {
-	name: "APIError",
-	env:  revokeModelAccessTestEnv,
-	revokeModelAccess: func(_ context.Context, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
-		return errors.E("test error")
-	},
+	name:           "unknown access",
+	env:            revokeModelAccessTestEnv,
 	username:       "alice@external",
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "bob@external",
-	access:         "write",
-	expectError:    `test error`,
+	access:         "some-unknown-access",
+	expectError:    `failed to recognize given access: "some-unknown-access"`,
 }}
 
 func TestRevokeModelAccess(t *testing.T) {
 	c := qt.New(t)
 
-	for _, test := range revokeModelAccessTests {
-		c.Run(test.name, func(c *qt.C) {
+	for _, t := range revokeModelAccessTests {
+		tt := t
+		c.Run(tt.name, func(c *qt.C) {
 			ctx := context.Background()
 
-			env := jimmtest.ParseEnvironment(c, test.env)
+			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), tt.name)
+			c.Assert(err, qt.IsNil)
+
+			env := jimmtest.ParseEnvironment(c, tt.env)
 			dialer := &jimmtest.Dialer{
-				API: &jimmtest.API{
-					RevokeModelAccess_: test.revokeModelAccess,
-				},
-				Err: test.dialError,
+				API: &jimmtest.API{},
+				Err: tt.dialError,
 			}
 			j := &jimm.JIMM{
 				Database: db.Database{
 					DB: jimmtest.MemoryDB(c, nil),
 				},
-				Dialer: dialer,
+				Dialer:        dialer,
+				OpenFGAClient: client,
 			}
-			err := j.Database.Migrate(ctx, false)
+			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
-			env.PopulateDB(c, j.Database)
+			env.PopulateDB(c, j.Database, client)
 
-			u := env.User(test.username).DBObject(c, j.Database)
+			if tt.extraInitialTuples != nil && len(tt.extraInitialTuples) > 0 {
+				err = client.AddRelation(ctx, tt.extraInitialTuples...)
+				c.Assert(err, qt.IsNil)
+			}
 
-			err = j.RevokeModelAccess(ctx, &u, names.NewModelTag(test.uuid), names.NewUserTag(test.targetUsername), jujuparams.UserAccessPermission(test.access))
+			if tt.expectRemovedRelations != nil {
+				for _, tuple := range tt.expectRemovedRelations {
+					value, err := client.CheckRelation(ctx, tuple, false)
+					c.Assert(err, qt.IsNil)
+					c.Assert(value, qt.IsTrue, qt.Commentf("expected the tuple to exist before revoking"))
+				}
+			}
+
+			dbUser := env.User(tt.username).DBObject(c, j.Database, client)
+			user := openfga.NewUser(&dbUser, client)
+
+			err = j.RevokeModelAccess(ctx, user, names.NewModelTag(tt.uuid), names.NewUserTag(tt.targetUsername), jujuparams.UserAccessPermission(tt.access))
 			c.Assert(dialer.IsClosed(), qt.IsTrue)
-			if test.expectError != "" {
-				c.Check(err, qt.ErrorMatches, test.expectError)
-				if test.expectErrorCode != "" {
-					c.Check(errors.ErrorCode(err), qt.Equals, test.expectErrorCode)
+			if tt.expectError != "" {
+				c.Check(err, qt.ErrorMatches, tt.expectError)
+				if tt.expectErrorCode != "" {
+					c.Check(errors.ErrorCode(err), qt.Equals, tt.expectErrorCode)
 				}
 				return
 			}
 			c.Assert(err, qt.IsNil)
-			m := dbmodel.Model{
-				UUID: sql.NullString{
-					String: test.uuid,
-					Valid:  true,
-				},
+			if tt.expectRemovedRelations != nil {
+				for _, tuple := range tt.expectRemovedRelations {
+					value, err := client.CheckRelation(ctx, tuple, false)
+					c.Assert(err, qt.IsNil)
+					c.Assert(value, qt.IsFalse, qt.Commentf("expected the tuple to be removed after revoking"))
+				}
 			}
-			err = j.Database.GetModel(ctx, &m)
-			c.Assert(err, qt.IsNil)
-			c.Check(m, jimmtest.DBObjectEquals, test.expectModel)
+			if tt.expectRelations != nil {
+				for _, tuple := range tt.expectRelations {
+					value, err := client.CheckRelation(ctx, tuple, false)
+					c.Assert(err, qt.IsNil)
+					c.Assert(value, qt.IsTrue, qt.Commentf("expected the tuple to exist after revoking"))
+				}
+			}
 		})
 	}
 }
-*/
 
 const destroyModelTestEnv = `clouds:
 - name: test-cloud

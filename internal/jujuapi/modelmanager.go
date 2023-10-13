@@ -4,6 +4,7 @@ package jujuapi
 
 import (
 	"context"
+	"fmt"
 
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
@@ -294,42 +295,38 @@ func (r *controllerRoot) DestroyModelsV4(ctx context.Context, args jujuparams.De
 
 // ModifyModelAccess implements the ModelManager facade's ModifyModelAccess method.
 func (r *controllerRoot) ModifyModelAccess(ctx context.Context, args jujuparams.ModifyModelAccessRequest) (jujuparams.ErrorResults, error) {
-	// TODO (alesstimec) granting and revoking access tbd in a followup
-	return jujuparams.ErrorResults{}, errors.E(errors.CodeNotImplemented)
-	/*
-		const op = errors.Op("jujuapi.ModifyModelAccess")
+	const op = errors.Op("jujuapi.ModifyModelAccess")
 
-		ctx, cancel := context.WithTimeout(ctx, requestTimeout)
-		defer cancel()
-		results := make([]jujuparams.ErrorResult, len(args.Changes))
-		for i, change := range args.Changes {
-			mt, err := names.ParseModelTag(change.ModelTag)
-			if err != nil {
-				results[i].Error = mapError(errors.E(op, err, errors.CodeBadRequest))
-				continue
-			}
-			user, err := parseUserTag(change.UserTag)
-			if err != nil {
-				results[i].Error = mapError(errors.E(op, err, errors.CodeBadRequest))
-				continue
-			}
-			switch change.Action {
-			case jujuparams.GrantModelAccess:
-				err = r.jimm.GrantModelAccess(ctx, r.user, mt, user, change.Access)
-			case jujuparams.RevokeModelAccess:
-				err = r.jimm.RevokeModelAccess(ctx, r.user, mt, user, change.Access)
-			default:
-				err = errors.E(op, errors.CodeBadRequest, fmt.Sprintf("invalid action %q", change.Action))
-			}
-			if errors.ErrorCode(err) == errors.CodeNotFound {
-				err = errors.E(op, errors.CodeUnauthorized, "unauthorized")
-			}
-			results[i].Error = mapError(err)
+	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
+	defer cancel()
+	results := make([]jujuparams.ErrorResult, len(args.Changes))
+	for i, change := range args.Changes {
+		mt, err := names.ParseModelTag(change.ModelTag)
+		if err != nil {
+			results[i].Error = mapError(errors.E(op, err, errors.CodeBadRequest))
+			continue
 		}
-		return jujuparams.ErrorResults{
-			Results: results,
-		}, nil
-	*/
+		user, err := parseUserTag(change.UserTag)
+		if err != nil {
+			results[i].Error = mapError(errors.E(op, err, errors.CodeBadRequest))
+			continue
+		}
+		switch change.Action {
+		case jujuparams.GrantModelAccess:
+			err = r.jimm.GrantModelAccess(ctx, r.user, mt, user, change.Access)
+		case jujuparams.RevokeModelAccess:
+			err = r.jimm.RevokeModelAccess(ctx, r.user, mt, user, change.Access)
+		default:
+			err = errors.E(op, errors.CodeBadRequest, fmt.Sprintf("invalid action %q", change.Action))
+		}
+		if errors.ErrorCode(err) == errors.CodeNotFound {
+			err = errors.E(op, errors.CodeUnauthorized, "unauthorized")
+		}
+		results[i].Error = mapError(err)
+	}
+	return jujuparams.ErrorResults{
+		Results: results,
+	}, nil
 }
 
 // DumpModelsDB implements the modelmanager facades DumpModelsDB API. The
