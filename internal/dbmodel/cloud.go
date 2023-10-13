@@ -7,7 +7,6 @@ import (
 
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
-	"gorm.io/gorm"
 )
 
 // A Cloud represents a cloud service.

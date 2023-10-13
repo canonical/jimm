@@ -50,7 +50,7 @@ func (s *dbSuite) TestAddAuditLogEntry(c *qt.C) {
 
 	var ale2 dbmodel.AuditLogEntry
 	err = s.Database.ForEachAuditLogEntry(ctx, db.AuditLogFilter{}, func(ale *dbmodel.AuditLogEntry) error {
-		if ale2.Model.ID != 0 {
+		if ale2.ID != 0 {
 			return errors.E("too many results")
 		}
 		ale2 = *ale

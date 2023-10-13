@@ -38,7 +38,9 @@ func (j *JIMM) Authenticate(ctx context.Context, req *jujuparams.LoginRequest) (
 		if err := tx.GetUser(ctx, &pu); err != nil {
 			return err
 		}
-		u.Model = pu.Model
+		u.ID = pu.ID
+		u.CreatedAt = pu.CreatedAt
+		u.UpdatedAt = pu.UpdatedAt
 		u.LastLogin = pu.LastLogin
 		if u.ControllerAccess == "" {
 			u.ControllerAccess = pu.ControllerAccess

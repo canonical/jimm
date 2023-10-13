@@ -133,13 +133,17 @@ func TestUserCloudCredentials(t *testing.T) {
 	err := db.Model(u).Association("CloudCredentials").Find(&creds)
 	c.Assert(err, qt.IsNil)
 	c.Check(creds, qt.DeepEquals, []dbmodel.CloudCredential{{
-		Model:         cred1.Model,
+		ID:            cred1.ID,
+		CreatedAt:     cred1.CreatedAt,
+		UpdatedAt:     cred1.UpdatedAt,
 		Name:          cred1.Name,
 		CloudName:     cred1.CloudName,
 		OwnerUsername: cred1.OwnerUsername,
 		AuthType:      cred1.AuthType,
 	}, {
-		Model:         cred2.Model,
+		ID:            cred2.ID,
+		CreatedAt:     cred2.CreatedAt,
+		UpdatedAt:     cred2.UpdatedAt,
 		Name:          cred2.Name,
 		CloudName:     cred2.CloudName,
 		OwnerUsername: cred2.OwnerUsername,
@@ -191,9 +195,11 @@ func TestUserModels(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	c.Check(models, qt.DeepEquals, []dbmodel.UserModelAccess{{
-		Model:    m1.Users[0].Model,
-		Username: u.Username,
-		ModelID:  m1.ID,
+		ID:        m1.Users[0].ID,
+		CreatedAt: m1.Users[0].CreatedAt,
+		UpdatedAt: m1.Users[0].UpdatedAt,
+		Username:  u.Username,
+		ModelID:   m1.ID,
 		Model_: dbmodel.Model{
 			ID:                m1.ID,
 			CreatedAt:         m1.CreatedAt,
@@ -207,9 +213,11 @@ func TestUserModels(t *testing.T) {
 		},
 		Access: "admin",
 	}, {
-		Model:    m2.Users[0].Model,
-		Username: u.Username,
-		ModelID:  m2.ID,
+		ID:        m2.Users[0].ID,
+		CreatedAt: m2.Users[0].CreatedAt,
+		UpdatedAt: m2.Users[0].UpdatedAt,
+		Username:  u.Username,
+		ModelID:   m2.ID,
 		Model_: dbmodel.Model{
 			ID:                m2.ID,
 			CreatedAt:         m2.CreatedAt,
