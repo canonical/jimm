@@ -106,6 +106,62 @@ clouds:
 	c.Assert(controller.CloudRegions[1].CloudRegion.CloudName, gc.Equals, "test-hosted-cloud")
 }
 
+func (s *addCloudToControllerSuite) TestAddMaasCloudToController(c *gc.C) {
+	clouds := `
+clouds:
+  test-hosted-cloud:
+    type: maas
+    auth-types: [oauth1]
+    regions:
+      default: {}
+`
+	tmpfile, cleanupFunc := writeTempFile(c, clouds)
+	defer cleanupFunc()
+
+	bClient := s.userBakeryClient("bob@external")
+
+	// Running the command succeeds
+	// Force is required here because the JIMM cloud is provisioned as "dummy" and so doesn't pass the default checks.
+	_, err := cmdtesting.RunCommand(c, cmd.NewAddCloudToControllerCommandForTesting(s.ClientStore, bClient, nil), "controller-1", "test-hosted-cloud", "--cloud="+tmpfile, "--force")
+	c.Assert(err, gc.IsNil)
+
+	// The cloud is there
+	cloud := dbmodel.Cloud{Name: "test-hosted-cloud"}
+	err = s.JIMM.Database.GetCloud(context.Background(), &cloud)
+	c.Assert(err, gc.IsNil)
+	controller := dbmodel.Controller{Name: "controller-1"}
+	s.JIMM.Database.GetController(context.Background(), &controller)
+	c.Assert(controller.CloudRegions, gc.HasLen, 2)
+	c.Assert(controller.CloudRegions[1].CloudRegion.CloudName, gc.Equals, "test-hosted-cloud")
+}
+
+func (s *addCloudToControllerSuite) TestAddInvalidCloudToController(c *gc.C) {
+	clouds := `
+clouds:
+  test-hosted-cloud:
+    type: unknown
+    auth-types: [certificate]
+    host-cloud-region: my-cloud/default
+`
+	tmpfile, cleanupFunc := writeTempFile(c, clouds)
+	defer cleanupFunc()
+
+	bClient := s.userBakeryClient("bob@external")
+
+	// Running the command succeeds
+	_, err := cmdtesting.RunCommand(c, cmd.NewAddCloudToControllerCommandForTesting(s.ClientStore, bClient, nil), "controller-1", "test-hosted-cloud", "--cloud="+tmpfile)
+	c.Assert(err, gc.IsNil)
+
+	// The cloud is there
+	cloud := dbmodel.Cloud{Name: "test-hosted-cloud"}
+	err = s.JIMM.Database.GetCloud(context.Background(), &cloud)
+	c.Assert(err, gc.IsNil)
+	controller := dbmodel.Controller{Name: "controller-1"}
+	s.JIMM.Database.GetController(context.Background(), &controller)
+	c.Assert(controller.CloudRegions, gc.HasLen, 2)
+	c.Assert(controller.CloudRegions[1].CloudRegion.CloudName, gc.Equals, "test-hosted-cloud")
+}
+
 func (s *addCloudToControllerSuite) TestAddCloudToControllerExisting(c *gc.C) {
 	bClient := s.userBakeryClient("bob@external")
 

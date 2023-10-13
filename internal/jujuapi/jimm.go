@@ -160,7 +160,7 @@ func (r *controllerRoot) ListControllers(ctx context.Context) (LegacyListControl
 // AddCloudToController adds the specified cloud to a specific controller.
 func (r *controllerRoot) AddCloudToController(ctx context.Context, req apiparams.AddCloudToControllerRequest) error {
 	const op = errors.Op("jujuapi.AddCloudToController")
-	if err := r.jimm.AddCloudToController(ctx, r.user, req.ControllerName, names.NewCloudTag(req.Name), req.Cloud); err != nil {
+	if err := r.jimm.AddCloudToController(ctx, r.user, req.ControllerName, names.NewCloudTag(req.Name), req.Cloud, *req.Force); err != nil {
 		return errors.E(op, err)
 	}
 	return nil

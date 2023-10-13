@@ -21,6 +21,7 @@ import (
 
 	"github.com/canonical/jimm/api"
 	apiparams "github.com/canonical/jimm/api/params"
+	_ "github.com/juju/juju/provider/all"
 
 	"github.com/canonical/jimm/internal/errors"
 )
@@ -66,6 +67,10 @@ type addCloudToControllerCommand struct {
 	// should be added to.
 	dstControllerName string
 
+	// force skips checks that verify whether the cloud that is being added is
+	// compatible with the cloud on which the controller is running.
+	force bool
+
 	cloudByNameFunc func(string) (*cloud.Cloud, error)
 	store           jujuclient.ClientStore
 	dialOpts        *jujuapi.DialOpts
@@ -88,6 +93,7 @@ func (c *addCloudToControllerCommand) SetFlags(f *gnuflag.FlagSet) {
 		"json": cmd.FormatJson,
 	})
 
+	f.BoolVar(&c.force, "force", false, "Forces the cloud to be added to the controller")
 	f.StringVar(&c.cloudDefinitionFile, "cloud", "", "The path to the cloud's definition file.")
 }
 
@@ -158,6 +164,7 @@ func (c *addCloudToControllerCommand) addCloudToController(ctxt *cmd.Context, cl
 		AddCloudArgs: params.AddCloudArgs{
 			Name:  c.cloudName,
 			Cloud: common.CloudToParams(*cloud),
+			Force: &c.force,
 		},
 	}
 

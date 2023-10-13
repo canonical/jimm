@@ -110,7 +110,7 @@ type Dialer interface {
 // An API is the interface JIMM uses to access the API on a controller.
 type API interface {
 	// AddCloud adds a new cloud.
-	AddCloud(context.Context, names.CloudTag, jujuparams.Cloud) error
+	AddCloud(context.Context, names.CloudTag, jujuparams.Cloud, bool) error
 
 	// AllModelWatcherNext returns the next set of deltas from an
 	// all-model watcher.

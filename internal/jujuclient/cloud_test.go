@@ -245,18 +245,53 @@ func (s *cloudSuite) TestCloud(c *gc.C) {
 	c.Check(cloud, jc.DeepEquals, clouds[names.NewCloudTag(jimmtest.TestCloudName)])
 }
 
-func (s *cloudSuite) TestAddCloud(c *gc.C) {
+func (s *cloudSuite) TestAddCloudFailsWithIncompatibleClouds(c *gc.C) {
 	cloud := jujuparams.Cloud{
-		Type:      "kubernetes",
+		Type:      "fake-cloud",
 		AuthTypes: []string{"empty"},
 	}
 
 	ctx := context.Background()
 
-	err := s.API.AddCloud(ctx, names.NewCloudTag(jimmtest.TestCloudName), cloud)
+	err := s.API.AddCloud(ctx, names.NewCloudTag("test-cloud"), cloud, false)
+	c.Assert(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeIncompatibleClouds)
+}
+
+func (s *cloudSuite) TestAddIncompatibleCloudByForce(c *gc.C) {
+	cloud := jujuparams.Cloud{
+		Type:      "fake-cloud",
+		AuthTypes: []string{"empty"},
+	}
+
+	ctx := context.Background()
+
+	err := s.API.AddCloud(ctx, names.NewCloudTag("test-cloud"), cloud, true)
+	c.Assert(err, gc.Equals, nil)
+
+	clouds, err := s.API.Clouds(ctx)
+	c.Assert(err, gc.Equals, nil)
+
+	c.Check(clouds[names.NewCloudTag("test-cloud")], jc.DeepEquals, jujuparams.Cloud{
+		Type:      "fake-cloud",
+		AuthTypes: []string{"empty"},
+		Regions: []jujuparams.CloudRegion{{
+			Name: "default",
+		}},
+	})
+}
+
+func (s *cloudSuite) TestAddCloudByForce(c *gc.C) {
+	cloud := jujuparams.Cloud{
+		Type:      "fake-cloud",
+		AuthTypes: []string{"empty"},
+	}
+
+	ctx := context.Background()
+
+	err := s.API.AddCloud(ctx, names.NewCloudTag(jimmtest.TestCloudName), cloud, false)
 	c.Assert(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeAlreadyExists)
 
-	err = s.API.AddCloud(ctx, names.NewCloudTag("test-cloud"), cloud)
+	err = s.API.AddCloud(ctx, names.NewCloudTag("test-cloud"), cloud, false)
 	c.Assert(err, gc.Equals, nil)
 
 	clouds, err := s.API.Clouds(ctx)
@@ -282,7 +317,7 @@ func (s *cloudSuite) TestRemoveCloud(c *gc.C) {
 	err := s.API.RemoveCloud(ctx, names.NewCloudTag("test-cloud"))
 	c.Check(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeNotFound)
 
-	err = s.API.AddCloud(ctx, names.NewCloudTag("test-cloud"), cloud)
+	err = s.API.AddCloud(ctx, names.NewCloudTag("test-cloud"), cloud, false)
 	c.Assert(err, gc.Equals, nil)
 
 	clouds, err := s.API.Clouds(ctx)
