@@ -5,9 +5,12 @@ package jimm
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
+	"github.com/juju/zaputil/zapctx"
+	"go.uber.org/zap"
 
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
@@ -111,9 +114,34 @@ func ToOfferRelation(accessLevel string) (openfga.Relation, error) {
 	}
 }
 
-// JwtGenerator provides the necessary state and methods to authorize a user and generate JWT tokens.
-type JwtGenerator struct {
-	jimm           *JIMM
+// JWTGeneratorDatabase specifies the database interface used by the
+// JWT generator.
+type JWTGeneratorDatabase interface {
+	GetController(ctx context.Context, controller *dbmodel.Controller) error
+}
+
+// JWTGeneratorAccessChecker specifies the access checker used by the JWT
+// generator to obtain user's access rights to various entities.
+type JWTGeneratorAccessChecker interface {
+	GetUserModelAccess(context.Context, *openfga.User, names.ModelTag) (string, error)
+	GetUserControllerAccess(context.Context, *openfga.User, names.ControllerTag) (string, error)
+	GetUserCloudAccess(context.Context, *openfga.User, names.CloudTag) (string, error)
+	CheckPermission(context.Context, *openfga.User, map[string]string, map[string]interface{}) (map[string]string, error)
+}
+
+// JWTService specifies the service JWT generator uses to generate JWTs.
+type JWTService interface {
+	NewJWT(context.Context, jimmjwx.JWTParams) ([]byte, error)
+}
+
+// JWTGenerator provides the necessary state and methods to authorize a user and generate JWT tokens.
+type JWTGenerator struct {
+	authenticator Authenticator
+	database      JWTGeneratorDatabase
+	accessChecker JWTGeneratorAccessChecker
+	jwtService    JWTService
+
+	mu             sync.Mutex
 	accessMapCache map[string]string
 	mt             names.ModelTag
 	ct             names.ControllerTag
@@ -121,78 +149,88 @@ type JwtGenerator struct {
 	callCount      int
 }
 
-// NewJwtGenerator returns a new JwtAuthorizer struct
-func NewJwtGenerator(jimm *JIMM) JwtGenerator {
-	return JwtGenerator{jimm: jimm}
+// NewJWTGenerator returns a new JwtAuthorizer struct
+func NewJWTGenerator(authenticator Authenticator, database JWTGeneratorDatabase, accessChecker JWTGeneratorAccessChecker, jwtService JWTService) JWTGenerator {
+	return JWTGenerator{
+		authenticator: authenticator,
+		database:      database,
+		accessChecker: accessChecker,
+		jwtService:    jwtService,
+	}
 }
 
 // SetTags implements TokenGenerator
-func (auth *JwtGenerator) SetTags(mt names.ModelTag, ct names.ControllerTag) {
+func (auth *JWTGenerator) SetTags(mt names.ModelTag, ct names.ControllerTag) {
 	auth.mt = mt
 	auth.ct = ct
 }
 
 // SetTags implements TokenGenerator
-func (auth *JwtGenerator) GetUser() names.UserTag {
+func (auth *JWTGenerator) GetUser() names.UserTag {
 	if auth.user != nil {
 		return auth.user.ResourceTag()
 	}
 	return names.UserTag{}
 }
 
-// MakeToken takes a login request and a map of needed permissions and returns a JWT token if the user satisfies
-// all the needed permissions. A loginRequest object should be provided on the first invocation of this function
-// after which point subsequent calls can provide a nil object.
-// Note that this function is not thread-safe and should only be called by a single Go routine at a time.
-func (auth *JwtGenerator) MakeToken(ctx context.Context, initialLogin bool, req *jujuparams.LoginRequest, permissionMap map[string]interface{}) ([]byte, error) {
-	const op = errors.Op("jimm.MakeToken")
+// MakeLoginToken authorizes the user based on the provided login requests and returns
+// a JWT containing claims about user's access to the controller, model (if applicable)
+// and all clouds that the controller knows about.
+func (auth *JWTGenerator) MakeLoginToken(ctx context.Context, req *jujuparams.LoginRequest) ([]byte, error) {
+	const op = errors.Op("jimm.MakeLoginToken")
 
-	if initialLogin {
-		if req == nil {
-			return nil, errors.E(op, "Missing login request.")
-		}
-		// Recreate the accessMapCache to prevent leaking permissions across multiple login requests.
-		auth.accessMapCache = make(map[string]string)
-		var authErr error
-		auth.user, authErr = auth.jimm.Authenticator.Authenticate(ctx, req)
-		if authErr != nil {
-			return nil, authErr
-		}
-		var modelAccess string
-		if auth.mt.Id() == "" {
-			return nil, errors.E(op, "Desired Model not set")
-		}
-		modelAccess, authErr = auth.jimm.GetUserModelAccess(ctx, auth.user, auth.mt)
-		if authErr != nil {
-			return nil, authErr
-		}
-		auth.accessMapCache[auth.mt.String()] = modelAccess
+	auth.mu.Lock()
+	defer auth.mu.Unlock()
 
-		if auth.ct.Id() == "" {
-			return nil, errors.E(op, "Desired Controller not set")
-		}
-		var controllerAccess string
-		controllerAccess, authErr = auth.jimm.GetControllerAccess(ctx, auth.user, auth.ct)
-		if authErr != nil {
-			return nil, authErr
-		}
-		auth.accessMapCache[auth.ct.String()] = controllerAccess
+	if req == nil {
+		return nil, errors.E(op, "missing login request.")
 	}
-	if auth.callCount >= 10 {
-		return nil, errors.E(op, "Permission check limit exceeded")
+	// Recreate the accessMapCache to prevent leaking permissions across multiple login requests.
+	auth.accessMapCache = make(map[string]string)
+	var authErr error
+	auth.user, authErr = auth.authenticator.Authenticate(ctx, req)
+	if authErr != nil {
+		zapctx.Error(ctx, "authentication failed", zap.Error(authErr))
+		return nil, authErr
 	}
-	auth.callCount++
-	if auth.user == nil {
-		return nil, errors.E(op, "User authorization missing.")
+	var modelAccess string
+	if auth.mt.Id() == "" {
+		return nil, errors.E(op, "model not set")
 	}
-	if permissionMap != nil {
-		var err error
-		auth.accessMapCache, err = checkPermission(ctx, auth.user, auth.accessMapCache, permissionMap)
+	modelAccess, authErr = auth.accessChecker.GetUserModelAccess(ctx, auth.user, auth.mt)
+	if authErr != nil {
+		zapctx.Error(ctx, "model access check failed", zap.Error(authErr))
+		return nil, authErr
+	}
+	auth.accessMapCache[auth.mt.String()] = modelAccess
+
+	if auth.ct.Id() == "" {
+		return nil, errors.E(op, "controller not set")
+	}
+	var controllerAccess string
+	controllerAccess, authErr = auth.accessChecker.GetUserControllerAccess(ctx, auth.user, auth.ct)
+	if authErr != nil {
+		return nil, authErr
+	}
+	auth.accessMapCache[auth.ct.String()] = controllerAccess
+
+	var ctl dbmodel.Controller
+	ctl.SetTag(auth.ct)
+	err := auth.database.GetController(ctx, &ctl)
+	if err != nil {
+		zapctx.Error(ctx, "failed to fetch controller", zap.Error(err))
+		return nil, errors.E(op, "failed to fetch controller", err)
+	}
+	for _, cloudRegion := range ctl.CloudRegions {
+		accessLevel, err := auth.accessChecker.GetUserCloudAccess(ctx, auth.user, cloudRegion.CloudRegion.Cloud.ResourceTag())
 		if err != nil {
-			return nil, err
+			zapctx.Error(ctx, "cloud access check failed", zap.Error(err))
+			return nil, errors.E(op, "failed to check user's cloud access", err)
 		}
+		auth.accessMapCache[cloudRegion.CloudRegion.Cloud.ResourceTag().String()] = accessLevel
 	}
-	jwt, err := auth.jimm.JWTService.NewJWT(ctx, jimmjwx.JWTParams{
+
+	jwt, err := auth.jwtService.NewJWT(ctx, jimmjwx.JWTParams{
 		Controller: auth.ct.Id(),
 		User:       auth.user.Tag().String(),
 		Access:     auth.accessMapCache,
@@ -203,12 +241,46 @@ func (auth *JwtGenerator) MakeToken(ctx context.Context, initialLogin bool, req 
 	return jwt, nil
 }
 
-// checkPermission loops over the desired permissions in desiredPerms and adds these permissions
+// MakeToken assumes MakeLoginToken has already been called and checks the permissions
+// specified in the permissionMap. If the logged in user has all those permissions
+// a JWT will be returned with assertions confirming all those permissions.
+func (auth *JWTGenerator) MakeToken(ctx context.Context, permissionMap map[string]interface{}) ([]byte, error) {
+	const op = errors.Op("jimm.MakeToken")
+
+	auth.mu.Lock()
+	defer auth.mu.Unlock()
+
+	if auth.callCount >= 10 {
+		return nil, errors.E(op, "Permission check limit exceeded")
+	}
+	auth.callCount++
+	if auth.user == nil {
+		return nil, errors.E(op, "User authorization missing.")
+	}
+	if permissionMap != nil {
+		var err error
+		auth.accessMapCache, err = auth.accessChecker.CheckPermission(ctx, auth.user, auth.accessMapCache, permissionMap)
+		if err != nil {
+			return nil, err
+		}
+	}
+	jwt, err := auth.jwtService.NewJWT(ctx, jimmjwx.JWTParams{
+		Controller: auth.ct.Id(),
+		User:       auth.user.Tag().String(),
+		Access:     auth.accessMapCache,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return jwt, nil
+}
+
+// CheckPermission loops over the desired permissions in desiredPerms and adds these permissions
 // to cachedPerms if they exist. If the user does not have any of the desired permissions then an
 // error is returned.
 // Note that cachedPerms map is modified and returned.
-func checkPermission(ctx context.Context, user *openfga.User, cachedPerms map[string]string, desiredPerms map[string]interface{}) (map[string]string, error) {
-	const op = errors.Op("jimm.checkPermission")
+func (j *JIMM) CheckPermission(ctx context.Context, user *openfga.User, cachedPerms map[string]string, desiredPerms map[string]interface{}) (map[string]string, error) {
+	const op = errors.Op("jimm.CheckPermission")
 	for key, val := range desiredPerms {
 		if _, ok := cachedPerms[key]; !ok {
 			stringVal, ok := val.(string)
