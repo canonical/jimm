@@ -9,7 +9,6 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/juju/names/v4"
-	"gorm.io/gorm"
 
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
@@ -105,16 +104,20 @@ func (s *dbSuite) TestModelDefaults(c *qt.C) {
 
 	err = s.Database.CloudDefaults(ctx, &dbDefaults)
 	c.Assert(err, qt.Equals, nil)
-	c.Assert(dbDefaults, qt.CmpEquals(cmpopts.IgnoreTypes([]dbmodel.CloudRegion{}, gorm.Model{})), dbmodel.CloudDefaults{
-		Username: u.Username,
-		User:     u,
-		CloudID:  cloud1.ID,
-		Cloud:    cloud1,
-		Region:   cloud1.Regions[0].Name,
-		Defaults: map[string]interface{}{
-			"key3": "more data",
-		},
-	})
+	c.Assert(dbDefaults, qt.CmpEquals(
+		cmpopts.IgnoreTypes([]dbmodel.CloudRegion{}),
+		cmpopts.IgnoreFields(dbmodel.CloudDefaults{}, "ID", "CreatedAt", "UpdatedAt"),
+	),
+		dbmodel.CloudDefaults{
+			Username: u.Username,
+			User:     u,
+			CloudID:  cloud1.ID,
+			Cloud:    cloud1,
+			Region:   cloud1.Regions[0].Name,
+			Defaults: map[string]interface{}{
+				"key3": "more data",
+			},
+		})
 
 	err = s.Database.UnsetCloudDefaults(ctx, &dbmodel.CloudDefaults{
 		Username: u.Username,

@@ -8,10 +8,8 @@ import (
 	"time"
 
 	qt "github.com/frankban/quicktest"
-	"github.com/google/go-cmp/cmp/cmpopts"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
-	"gorm.io/gorm"
 
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
@@ -256,7 +254,7 @@ func TestSetCloudDefaults(t *testing.T) {
 				}
 				err = j.Database.CloudDefaults(ctx, &dbDefaults)
 				c.Assert(err, qt.Equals, nil)
-				c.Assert(&dbDefaults, qt.CmpEquals(cmpopts.IgnoreTypes(gorm.Model{})), testConfig.expectedDefaults)
+				c.Assert(&dbDefaults, jimmtest.DBObjectEquals, testConfig.expectedDefaults)
 			} else {
 				c.Assert(err, qt.ErrorMatches, testConfig.expectedError)
 			}
@@ -449,7 +447,7 @@ func TestUnsetCloudDefaults(t *testing.T) {
 				}
 				err = j.Database.CloudDefaults(ctx, &dbDefaults)
 				c.Assert(err, qt.Equals, nil)
-				c.Assert(&dbDefaults, qt.CmpEquals(cmpopts.IgnoreTypes(gorm.Model{})), testConfig.expectedDefaults)
+				c.Assert(&dbDefaults, jimmtest.DBObjectEquals, testConfig.expectedDefaults)
 			} else {
 				c.Assert(err, qt.ErrorMatches, testConfig.expectedError)
 			}

@@ -8,8 +8,6 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
-	"github.com/google/go-cmp/cmp/cmpopts"
-	"gorm.io/gorm"
 
 	"github.com/canonical/jimm/internal/auth"
 	"github.com/canonical/jimm/internal/db"
@@ -157,7 +155,7 @@ func (s *dbSuite) TestGetUserClouds(c *qt.C) {
 
 	clouds, err = s.Database.GetUserClouds(ctx, &u)
 	c.Assert(err, qt.IsNil)
-	c.Check(clouds, qt.CmpEquals(cmpopts.EquateEmpty(), cmpopts.IgnoreTypes(gorm.Model{})), []dbmodel.UserCloudAccess{{
+	c.Check(clouds, jimmtest.DBObjectEquals, []dbmodel.UserCloudAccess{{
 		Username:  auth.Everyone,
 		CloudName: "test-cloud",
 		Cloud:     cl,

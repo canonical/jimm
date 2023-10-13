@@ -1938,7 +1938,15 @@ func TestOffer(t *testing.T) {
 				}
 				err = j.Database.GetApplicationOffer(ctx, &offer)
 				c.Assert(err, qt.IsNil)
-				c.Assert(offer, qt.CmpEquals(cmpopts.EquateEmpty(), cmpopts.IgnoreTypes(time.Time{}, gorm.Model{}), cmpopts.IgnoreTypes(dbmodel.Model{})), expectedOffer)
+				c.Assert(offer, qt.CmpEquals(
+					cmpopts.EquateEmpty(),
+					cmpopts.IgnoreTypes(time.Time{}, gorm.Model{}),
+					cmpopts.IgnoreTypes(dbmodel.Model{}),
+					cmpopts.IgnoreFields(dbmodel.ApplicationOfferConnection{}, "ID", "CreatedAt", "UpdatedAt"),
+					cmpopts.IgnoreFields(dbmodel.ApplicationOfferRemoteSpace{}, "ID", "CreatedAt", "UpdatedAt"),
+					cmpopts.IgnoreFields(dbmodel.ApplicationOfferRemoteEndpoint{}, "ID", "CreatedAt", "UpdatedAt"),
+				),
+					expectedOffer)
 			} else {
 				errorAssertion(c, err)
 			}
@@ -2154,7 +2162,14 @@ func TestOfferAssertOpenFGARelationsExist(t *testing.T) {
 	}
 	err = j.Database.GetApplicationOffer(ctx, &offer)
 	c.Assert(err, qt.IsNil)
-	c.Assert(offer, qt.CmpEquals(cmpopts.EquateEmpty(), cmpopts.IgnoreTypes(time.Time{}, gorm.Model{}), cmpopts.IgnoreTypes(dbmodel.Model{})), expectedOffer)
+	c.Assert(offer, qt.CmpEquals(
+		cmpopts.EquateEmpty(),
+		cmpopts.IgnoreTypes(time.Time{}),
+		cmpopts.IgnoreTypes(dbmodel.Model{}),
+		cmpopts.IgnoreFields(dbmodel.ApplicationOfferConnection{}, "ID", "CreatedAt", "UpdatedAt"),
+		cmpopts.IgnoreFields(dbmodel.ApplicationOfferRemoteSpace{}, "ID", "CreatedAt", "UpdatedAt"),
+		cmpopts.IgnoreFields(dbmodel.ApplicationOfferRemoteEndpoint{}, "ID", "CreatedAt", "UpdatedAt"),
+	), expectedOffer)
 
 	// check the controller relation was created
 	exists, err := client.CheckRelation(
@@ -2556,7 +2571,10 @@ func TestUpdateOffer(t *testing.T) {
 						qt.CmpEquals(
 							cmpopts.EquateEmpty(),
 							cmpopts.IgnoreTypes(time.Time{}),
-							cmpopts.IgnoreTypes(gorm.Model{}),
+							cmpopts.IgnoreFields(dbmodel.UserApplicationOfferAccess{}, "ID", "CreatedAt", "UpdatedAt"),
+							cmpopts.IgnoreFields(dbmodel.ApplicationOfferConnection{}, "ID", "CreatedAt", "UpdatedAt"),
+							cmpopts.IgnoreFields(dbmodel.ApplicationOfferRemoteSpace{}, "ID", "CreatedAt", "UpdatedAt"),
+							cmpopts.IgnoreFields(dbmodel.ApplicationOfferRemoteEndpoint{}, "ID", "CreatedAt", "UpdatedAt"),
 							cmpopts.IgnoreTypes(dbmodel.Model{}),
 							cmpopts.IgnoreFields(dbmodel.User{}, "ID", "CreatedAt", "UpdatedAt"),
 						),
@@ -2708,7 +2726,9 @@ func TestFindApplicationOffers(t *testing.T) {
 						qt.CmpEquals(
 							cmpopts.EquateEmpty(),
 							cmpopts.IgnoreTypes(time.Time{}),
-							cmpopts.IgnoreTypes(gorm.Model{}),
+							cmpopts.IgnoreFields(dbmodel.ApplicationOfferConnection{}, "ID", "CreatedAt", "UpdatedAt"),
+							cmpopts.IgnoreFields(dbmodel.ApplicationOfferRemoteSpace{}, "ID", "CreatedAt", "UpdatedAt"),
+							cmpopts.IgnoreFields(dbmodel.ApplicationOfferRemoteEndpoint{}, "ID", "CreatedAt", "UpdatedAt"),
 							cmpopts.IgnoreTypes(dbmodel.Model{}),
 						),
 						[]jujuparams.ApplicationOfferAdminDetails{details},
