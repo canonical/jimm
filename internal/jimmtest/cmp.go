@@ -40,21 +40,13 @@ func UserTagCompare(a, b dbmodel.User) bool {
 // metadata fields in the database objects.
 var DBObjectEquals = qt.CmpEquals(
 	cmpopts.EquateEmpty(),
-	cmpopts.IgnoreFields(dbmodel.ApplicationOffer{}, "ID", "CreatedAt", "UpdatedAt"),
-	cmpopts.IgnoreFields(dbmodel.Cloud{}, "ID", "CreatedAt", "UpdatedAt"),
-	cmpopts.IgnoreFields(dbmodel.CloudCredential{}, "ID", "CreatedAt", "UpdatedAt", "CloudName", "OwnerUsername"),
-	cmpopts.IgnoreFields(dbmodel.CloudDefaults{}, "ID", "CreatedAt", "UpdatedAt"),
-	cmpopts.IgnoreFields(dbmodel.CloudRegion{}, "CloudName", "ID", "CreatedAt", "UpdatedAt"),
-	cmpopts.IgnoreFields(dbmodel.CloudRegionControllerPriority{}, "CloudRegionID", "ControllerID", "ID", "CreatedAt", "UpdatedAt"),
-	cmpopts.IgnoreFields(dbmodel.Controller{}, "ID", "CreatedAt", "UpdatedAt"),
-	cmpopts.IgnoreFields(dbmodel.ControllerConfig{}, "ID", "CreatedAt", "UpdatedAt"),
-	cmpopts.IgnoreFields(dbmodel.Model{}, "ID", "CreatedAt", "UpdatedAt", "OwnerUsername", "ControllerID", "CloudRegionID", "CloudCredentialID"),
-	cmpopts.IgnoreFields(dbmodel.User{}, "ID", "CreatedAt", "UpdatedAt"),
-	cmpopts.IgnoreFields(dbmodel.UserCloudAccess{}, "ID", "CreatedAt", "UpdatedAt"),
-	cmpopts.IgnoreFields(dbmodel.UserModelAccess{}, "ModelID", "Username", "ID", "CreatedAt", "UpdatedAt"),
-	cmpopts.IgnoreFields(dbmodel.UserModelDefaults{}, "ID", "CreatedAt", "UpdatedAt"),
 	cmpopts.IgnoreTypes(dbmodel.ModelHardDelete{}),
 	cmpopts.IgnoreTypes(gorm.Model{}),
+	cmpopts.IgnoreFields(dbmodel.CloudCredential{}, "CloudName", "OwnerUsername"),
+	cmpopts.IgnoreFields(dbmodel.CloudRegion{}, "CloudName"),
+	cmpopts.IgnoreFields(dbmodel.CloudRegionControllerPriority{}, "CloudRegionID", "ControllerID"),
+	cmpopts.IgnoreFields(dbmodel.Model{}, "OwnerUsername", "ControllerID", "CloudRegionID", "CloudCredentialID"),
+	cmpopts.IgnoreFields(dbmodel.UserModelAccess{}, "ModelID", "Username"),
 )
 
 // CmpEquals uses cmp.Diff (see http://godoc.org/github.com/google/go-cmp/cmp#Diff)

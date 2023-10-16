@@ -1798,9 +1798,7 @@ func TestOffer(t *testing.T) {
 					cmpopts.EquateEmpty(),
 					cmpopts.IgnoreTypes(time.Time{}, gorm.Model{}),
 					cmpopts.IgnoreTypes(dbmodel.Model{}),
-					cmpopts.IgnoreFields(dbmodel.ApplicationOfferConnection{}, "ID", "CreatedAt", "UpdatedAt"),
-					cmpopts.IgnoreFields(dbmodel.ApplicationOfferRemoteSpace{}, "ID", "CreatedAt", "UpdatedAt"),
-					cmpopts.IgnoreFields(dbmodel.ApplicationOfferRemoteEndpoint{}, "ID", "CreatedAt", "UpdatedAt"),
+					cmpopts.IgnoreTypes(dbmodel.ModelHardDelete{}),
 				),
 					expectedOffer)
 			} else {
@@ -2271,9 +2269,6 @@ func TestUpdateOffer(t *testing.T) {
 							cmpopts.IgnoreTypes(gorm.Model{}),
 							cmpopts.IgnoreTypes(dbmodel.ModelHardDelete{}),
 							cmpopts.IgnoreTypes(dbmodel.Model{}),
-							cmpopts.IgnoreFields(dbmodel.ApplicationOfferConnection{}, "ID", "CreatedAt", "UpdatedAt"),
-							cmpopts.IgnoreFields(dbmodel.ApplicationOfferRemoteSpace{}, "ID", "CreatedAt", "UpdatedAt"),
-							cmpopts.IgnoreFields(dbmodel.ApplicationOfferRemoteEndpoint{}, "ID", "CreatedAt", "UpdatedAt"),
 						),
 						test.expectedOffer,
 					)
@@ -2418,9 +2413,6 @@ func TestFindApplicationOffers(t *testing.T) {
 							cmpopts.IgnoreTypes(gorm.Model{}),
 							cmpopts.IgnoreTypes(dbmodel.Model{}),
 							cmpopts.IgnoreTypes(dbmodel.ModelHardDelete{}),
-							cmpopts.IgnoreFields(dbmodel.ApplicationOfferConnection{}, "ID", "CreatedAt", "UpdatedAt"),
-							cmpopts.IgnoreFields(dbmodel.ApplicationOfferRemoteSpace{}, "ID", "CreatedAt", "UpdatedAt"),
-							cmpopts.IgnoreFields(dbmodel.ApplicationOfferRemoteEndpoint{}, "ID", "CreatedAt", "UpdatedAt"),
 						),
 						[]jujuparams.ApplicationOfferAdminDetails{details},
 					)
