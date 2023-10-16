@@ -637,6 +637,7 @@ func TestImportModel(t *testing.T) {
 		controllerName string
 		modelUUID      string
 		modelInfo      func(context.Context, *jujuparams.ModelInfo) error
+		newOwner       string
 		expectedModel  dbmodel.Model
 		expectedError  string
 		deltas         []jujuparams.Delta
@@ -644,6 +645,7 @@ func TestImportModel(t *testing.T) {
 		about:          "model imported",
 		user:           "alice@external",
 		controllerName: "test-controller",
+		newOwner:       "",
 		modelUUID:      "00000002-0000-0000-0000-000000000001",
 		modelInfo: func(_ context.Context, info *jujuparams.ModelInfo) error {
 			info.Name = "test-model"
@@ -783,35 +785,112 @@ func TestImportModel(t *testing.T) {
 				Level: "1",
 				Owner: "me",
 			},
-			Users: []dbmodel.UserModelAccess{{
-				User: dbmodel.User{
-					Username:         "alice@external",
-					DisplayName:      "Alice",
-					ControllerAccess: "superuser",
-				},
-				Access: "admin",
+			Users: nil,
+		},
+	}, {
+		about:          "model from local user imported",
+		user:           "alice@external",
+		controllerName: "test-controller",
+		newOwner:       "alice@external",
+		modelUUID:      "00000002-0000-0000-0000-000000000001",
+		modelInfo: func(_ context.Context, info *jujuparams.ModelInfo) error {
+			info.Name = "test-model"
+			info.Type = "test-type"
+			info.UUID = "00000002-0000-0000-0000-000000000001"
+			info.ControllerUUID = "00000001-0000-0000-0000-000000000001"
+			info.DefaultSeries = "test-series"
+			info.CloudTag = names.NewCloudTag("test-cloud").String()
+			info.CloudRegion = "test-region"
+			info.CloudCredentialTag = names.NewCloudCredentialTag("test-cloud/local-user/test-credential").String()
+			info.CloudCredentialValidity = &trueValue
+			info.OwnerTag = names.NewUserTag("local-user").String()
+			info.Life = life.Alive
+			info.Status = jujuparams.EntityStatus{
+				Status: status.Status("available"),
+				Info:   "test-info",
+				Since:  &now,
+			}
+			info.Users = []jujuparams.ModelUserInfo{{
+				UserName: "local-user",
+				Access:   jujuparams.ModelAdminAccess,
 			}, {
-				User: dbmodel.User{
-					Username:         "bob@external",
-					DisplayName:      "Bob",
-					ControllerAccess: "login",
+				UserName: "another-user",
+				Access:   jujuparams.ModelReadAccess,
+			}}
+			info.Machines = []jujuparams.ModelMachineInfo{{
+				Id:          "test-machine",
+				DisplayName: "Test machine",
+				Status:      "test-status",
+				Message:     "test-message",
+			}}
+			info.SLA = &jujuparams.ModelSLAInfo{
+				Level: "essential",
+				Owner: "local-user",
+			}
+			info.AgentVersion = newVersion("2.1.0")
+			return nil
+		},
+		expectedModel: dbmodel.Model{
+			Name: "test-model",
+			UUID: sql.NullString{
+				String: "00000002-0000-0000-0000-000000000001",
+				Valid:  true,
+			},
+			Owner: dbmodel.User{
+				Username:         "alice@external",
+				DisplayName:      "Alice",
+				ControllerAccess: "superuser",
+			},
+			Controller: dbmodel.Controller{
+				Name:         "test-controller",
+				UUID:         "00000001-0000-0000-0000-000000000001",
+				CloudName:    "test-cloud",
+				CloudRegion:  "test-region-1",
+				AgentVersion: "3.2.1",
+			},
+			CloudRegion: dbmodel.CloudRegion{
+				Cloud: dbmodel.Cloud{
+					Name: "test-cloud",
+					Type: "test",
 				},
-				Access: "read",
-			}},
+				Name: "test-region",
+			},
+			CloudCredential: dbmodel.CloudCredential{
+				Name: "test-credential",
+			},
+			Type:          "test-type",
+			DefaultSeries: "test-series",
+			Life:          "alive",
+			Status: dbmodel.Status{
+				Status: "available",
+				Info:   "test-info",
+				Since: sql.NullTime{
+					Valid: true,
+					Time:  now,
+				},
+				Version: "2.1.0",
+			},
+			SLA: dbmodel.SLA{
+				Level: "essential",
+				Owner: "local-user",
+			},
+			Users: nil,
 		},
 	}, {
 		about:          "model not found",
 		user:           "alice@external",
 		controllerName: "test-controller",
+		newOwner:       "",
 		modelUUID:      "00000002-0000-0000-0000-000000000001",
 		modelInfo: func(_ context.Context, info *jujuparams.ModelInfo) error {
 			return errors.E(errors.CodeNotFound, "model not found")
 		},
 		expectedError: "model not found",
 	}, {
-		about:          "cloud credentials not found",
+		about:          "fail import from local user without newOwner flag",
 		user:           "alice@external",
 		controllerName: "test-controller",
+		newOwner:       "",
 		modelUUID:      "00000002-0000-0000-0000-000000000001",
 		modelInfo: func(_ context.Context, info *jujuparams.ModelInfo) error {
 			info.Name = "test-model"
@@ -823,14 +902,35 @@ func TestImportModel(t *testing.T) {
 			info.CloudRegion = "test-region"
 			info.CloudCredentialTag = names.NewCloudCredentialTag("test-cloud/alice@external/unknown-credential").String()
 			info.CloudCredentialValidity = &trueValue
+			info.OwnerTag = names.NewUserTag("local-user").String()
+			return nil
+		},
+		expectedError: `cannot import model from local user, try --owner to switch the model owner`,
+	}, {
+		about:          "cloud credentials not found",
+		user:           "alice@external",
+		controllerName: "test-controller",
+		newOwner:       "",
+		modelUUID:      "00000002-0000-0000-0000-000000000001",
+		modelInfo: func(_ context.Context, info *jujuparams.ModelInfo) error {
+			info.Name = "test-model"
+			info.Type = "test-type"
+			info.UUID = "00000002-0000-0000-0000-000000000001"
+			info.ControllerUUID = "00000001-0000-0000-0000-000000000001"
+			info.DefaultSeries = "test-series"
+			info.CloudTag = names.NewCloudTag("invalid-cloud").String()
+			info.CloudRegion = "test-region"
+			info.CloudCredentialTag = names.NewCloudCredentialTag("invalid-cloud/alice@external/unknown-credential").String()
+			info.CloudCredentialValidity = &trueValue
 			info.OwnerTag = names.NewUserTag("alice@external").String()
 			return nil
 		},
-		expectedError: `cloudcredential "test-cloud/alice@external/unknown-credential" not found`,
+		expectedError: `Failed to find cloud credential for user alice@external on cloud invalid-cloud`,
 	}, {
 		about:          "cloud region not found",
 		user:           "alice@external",
 		controllerName: "test-controller",
+		newOwner:       "",
 		modelUUID:      "00000002-0000-0000-0000-000000000001",
 		modelInfo: func(_ context.Context, info *jujuparams.ModelInfo) error {
 			info.Name = "test-model"
@@ -850,6 +950,7 @@ func TestImportModel(t *testing.T) {
 		about:          "not allowed if not superuser",
 		user:           "bob@external",
 		controllerName: "test-controller",
+		newOwner:       "",
 		modelUUID:      "00000002-0000-0000-0000-000000000001",
 		modelInfo: func(_ context.Context, info *jujuparams.ModelInfo) error {
 			info.Name = "test-model"
@@ -869,6 +970,7 @@ func TestImportModel(t *testing.T) {
 		about:          "model already exists",
 		user:           "alice@external",
 		controllerName: "test-controller",
+		newOwner:       "",
 		modelUUID:      "00000002-0000-0000-0000-000000000002",
 		modelInfo: func(_ context.Context, info *jujuparams.ModelInfo) error {
 			info.Name = "model-1"
@@ -930,7 +1032,7 @@ func TestImportModel(t *testing.T) {
 
 			dbUser := env.User(test.user).DBObject(c, j.Database, client)
 			user := openfga.NewUser(&dbUser, client)
-			err = j.ImportModel(ctx, user, test.controllerName, names.NewModelTag(test.modelUUID))
+			err = j.ImportModel(ctx, user, test.controllerName, names.NewModelTag(test.modelUUID), test.newOwner)
 			if test.expectedError == "" {
 				c.Assert(err, qt.IsNil)
 
@@ -940,6 +1042,7 @@ func TestImportModel(t *testing.T) {
 				err = j.Database.GetModel(ctx, &m1)
 				c.Assert(err, qt.IsNil)
 				c.Assert(m1, jimmtest.DBObjectEquals, test.expectedModel)
+				c.Assert(user.GetModelAccess(ctx, names.NewModelTag(test.modelUUID)), qt.Equals, ofganames.AdministratorRelation)
 			} else {
 				c.Assert(err, qt.ErrorMatches, test.expectedError)
 			}

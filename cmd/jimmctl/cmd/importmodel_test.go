@@ -50,6 +50,35 @@ func (s *importModelSuite) TestImportModelSuperuser(c *gc.C) {
 	model2.SetTag(names.NewModelTag(m.ModelUUID()))
 	err = s.JIMM.Database.GetModel(context.Background(), &model2)
 	c.Assert(err, gc.Equals, nil)
+	c.Check(model2.OwnerUsername, gc.Equals, "charlie@external")
+}
+
+func (s *importModelSuite) TestImportModelFromLocalUser(c *gc.C) {
+	s.AddController(c, "controller-1", s.APIInfo(c))
+	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@external/cred")
+	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{AuthType: "empty"})
+	// Add credentials for Alice on the test cloud, they are needed for the Alice user to become the new model owner
+	cctAlice := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/alice@external/cred")
+	s.UpdateCloudCredential(c, cctAlice, jujuparams.CloudCredential{AuthType: "empty"})
+	mt := s.AddModel(c, names.NewUserTag("charlie@external"), "model-2", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, cct)
+	var model dbmodel.Model
+	model.SetTag(mt)
+	err := s.JIMM.Database.GetModel(context.Background(), &model)
+	c.Assert(err, gc.Equals, nil)
+	err = s.JIMM.Database.DeleteModel(context.Background(), &model)
+	c.Assert(err, gc.Equals, nil)
+
+	// alice is superuser
+	bClient := s.userBakeryClient("alice")
+	_, err = cmdtesting.RunCommand(c, cmd.NewImportModelCommandForTesting(s.ClientStore(), bClient), "controller-1", mt.Id(), "--owner", "alice@external")
+	c.Assert(err, gc.IsNil)
+
+	var model2 dbmodel.Model
+	model2.SetTag(mt)
+	err = s.JIMM.Database.GetModel(context.Background(), &model2)
+	c.Assert(err, gc.Equals, nil)
+	c.Check(model2.CreatedAt.After(model.CreatedAt), gc.Equals, true)
+	c.Check(model2.OwnerUsername, gc.Equals, "alice@external")
 }
 
 func (s *importModelSuite) TestImportModelUnauthorized(c *gc.C) {

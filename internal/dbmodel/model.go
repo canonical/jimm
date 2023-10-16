@@ -114,6 +114,12 @@ func (m *Model) UserAccess(u *User) string {
 	return ""
 }
 
+// FromModelUpdate updates the model from the given ModelUpdate.
+func (m *Model) SwitchOwner(u *User) {
+	m.OwnerUsername = u.Username
+	m.Owner = *u
+}
+
 // FromJujuModelInfo converts jujuparams.ModelInfo into Model.
 func (m *Model) FromJujuModelInfo(info jujuparams.ModelInfo) error {
 	m.Name = info.Name
