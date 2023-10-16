@@ -215,7 +215,7 @@ func TestUserModelDefaults(t *testing.T) {
 			defaults, err := j.UserModelDefaults(ctx, testConfig.user)
 			if testConfig.expectedError == "" {
 				c.Assert(err, qt.Equals, nil)
-				c.Assert(&defaults, jimmtest.DBObjectEquals, testConfig.expectedDefaults)
+				c.Assert(defaults, jimmtest.DBObjectEquals, testConfig.expectedDefaults)
 			} else {
 				c.Assert(err, qt.ErrorMatches, testConfig.expectedError)
 			}

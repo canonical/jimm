@@ -5,7 +5,6 @@ package dbmodel
 import (
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/juju/charm/v10"
 	jujuparams "github.com/juju/juju/rpc/params"
@@ -14,9 +13,7 @@ import (
 
 // An ApplicationOffer is an offer for an application.
 type ApplicationOffer struct {
-	ID        uint `gorm:"primaryKey"`
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ModelHardDelete
 
 	// Model is the model that this offer is for.
 	ModelID uint
@@ -195,9 +192,7 @@ func (o *ApplicationOffer) ToJujuApplicationOfferDetails() jujuparams.Applicatio
 
 // ApplicationOfferRemoteEndpoint represents a remote application endpoint.
 type ApplicationOfferRemoteEndpoint struct {
-	ID        uint `gorm:"primaryKey"`
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ModelHardDelete
 
 	// ApplicationOffer is the application-offer associated with this endpoint.
 	ApplicationOfferID uint
@@ -211,9 +206,7 @@ type ApplicationOfferRemoteEndpoint struct {
 
 // ApplicationOfferRemoteSpace represents a space in some remote model.
 type ApplicationOfferRemoteSpace struct {
-	ID        uint `gorm:"primaryKey"`
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ModelHardDelete
 
 	// ApplicationOffer is the application-offer associated with this space.
 	ApplicationOfferID uint
@@ -227,9 +220,7 @@ type ApplicationOfferRemoteSpace struct {
 
 // ApplicationOfferConnection holds details about a connection to an offer.
 type ApplicationOfferConnection struct {
-	ID        uint `gorm:"primaryKey"`
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ModelHardDelete
 
 	// ApplicationOffer is the application-offer associated with this connection.
 	ApplicationOfferID uint
@@ -245,9 +236,7 @@ type ApplicationOfferConnection struct {
 // A UserApplicationOfferAccess maps the access level for a user on an
 // application-offer.
 type UserApplicationOfferAccess struct {
-	ID        uint `gorm:"primaryKey"`
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ModelHardDelete
 
 	// User is the user associated with this access.
 	Username string

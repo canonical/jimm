@@ -10,9 +10,7 @@ import (
 
 // An AuditLogEntry is an entry in the audit log.
 type AuditLogEntry struct {
-	ID        uint `gorm:"primaryKey"`
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ModelHardDelete
 
 	// Time contains the time that the event happened.
 	Time time.Time `gorm:"index"`

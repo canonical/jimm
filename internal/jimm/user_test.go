@@ -61,9 +61,7 @@ func TestAuthenticate(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	c.Check(u2, qt.DeepEquals, dbmodel.User{
-		ID:               u.ID,
-		CreatedAt:        u.CreatedAt,
-		UpdatedAt:        u.UpdatedAt,
+		ModelHardDelete:  u.ModelHardDelete,
 		Username:         "bob@external",
 		DisplayName:      "Bob",
 		ControllerAccess: "login",

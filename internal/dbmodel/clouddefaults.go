@@ -2,13 +2,9 @@
 
 package dbmodel
 
-import "time"
-
 // CloudDefaults holds user's defaults for a specific cloud/region.
 type CloudDefaults struct {
-	ID        uint `gorm:"primaryKey"`
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ModelHardDelete
 
 	Username string
 	User     User `gorm:"foreignKey:Username;references:Username"`

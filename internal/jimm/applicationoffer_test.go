@@ -137,7 +137,7 @@ var initializeEnvironment = func(c *qt.C, ctx context.Context, db *db.Database) 
 	env.models = []dbmodel.Model{model}
 
 	offer := dbmodel.ApplicationOffer{
-		ID:              1,
+		ModelHardDelete: dbmodel.ModelHardDelete{ID: 1},
 		UUID:            "00000000-0000-0000-0000-0000-0000000000011",
 		URL:             "test-offer-url",
 		Name:            "test-offer",
@@ -587,7 +587,7 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 	c.Assert(err, qt.Equals, nil)
 
 	offer := dbmodel.ApplicationOffer{
-		ID:              1,
+		ModelHardDelete: dbmodel.ModelHardDelete{ID: 1},
 		URL:             "test-offer-url",
 		ModelID:         model.ID,
 		Model:           model,
@@ -933,7 +933,7 @@ func TestGetApplicationOffer(t *testing.T) {
 	c.Assert(err, qt.Equals, nil)
 
 	offer := dbmodel.ApplicationOffer{
-		ID:                     1,
+		ModelHardDelete:        dbmodel.ModelHardDelete{ID: 1},
 		ModelID:                1,
 		ApplicationName:        "test-app",
 		CharmURL:               "cs:test-app:17",
@@ -1239,7 +1239,7 @@ func TestOffer(t *testing.T) {
 			}
 
 			offer := dbmodel.ApplicationOffer{
-				ID:                     1,
+				ModelHardDelete:        dbmodel.ModelHardDelete{ID: 1},
 				ModelID:                1,
 				ApplicationName:        "test-app",
 				CharmURL:               "cs:test-app:17",
@@ -2105,7 +2105,7 @@ func TestUpdateOffer(t *testing.T) {
 			return env.applicationOffers[0].UUID, false
 		},
 		expectedOffer: dbmodel.ApplicationOffer{
-			ID:                     1,
+			ModelHardDelete:        dbmodel.ModelHardDelete{ID: 1},
 			UUID:                   "00000000-0000-0000-0000-0000-0000000000011",
 			URL:                    "test-offer-url",
 			ModelID:                1,
@@ -2269,6 +2269,7 @@ func TestUpdateOffer(t *testing.T) {
 							cmpopts.EquateEmpty(),
 							cmpopts.IgnoreTypes(time.Time{}),
 							cmpopts.IgnoreTypes(gorm.Model{}),
+							cmpopts.IgnoreTypes(dbmodel.ModelHardDelete{}),
 							cmpopts.IgnoreTypes(dbmodel.Model{}),
 							cmpopts.IgnoreFields(dbmodel.ApplicationOfferConnection{}, "ID", "CreatedAt", "UpdatedAt"),
 							cmpopts.IgnoreFields(dbmodel.ApplicationOfferRemoteSpace{}, "ID", "CreatedAt", "UpdatedAt"),
@@ -2291,11 +2292,11 @@ func TestFindApplicationOffers(t *testing.T) {
 	now := time.Now().UTC().Round(time.Millisecond)
 
 	expectedOffer := dbmodel.ApplicationOffer{
-		ID:      1,
-		UUID:    "00000000-0000-0000-0000-0000-0000000000011",
-		URL:     "test-offer-url",
-		Name:    "test-offer",
-		ModelID: 1,
+		ModelHardDelete: dbmodel.ModelHardDelete{ID: 1},
+		UUID:            "00000000-0000-0000-0000-0000-0000000000011",
+		URL:             "test-offer-url",
+		Name:            "test-offer",
+		ModelID:         1,
 		Model: dbmodel.Model{
 			UUID: sql.NullString{
 				String: "00000000-0000-0000-0000-0000-0000000000003",
@@ -2416,6 +2417,7 @@ func TestFindApplicationOffers(t *testing.T) {
 							cmpopts.IgnoreTypes(time.Time{}),
 							cmpopts.IgnoreTypes(gorm.Model{}),
 							cmpopts.IgnoreTypes(dbmodel.Model{}),
+							cmpopts.IgnoreTypes(dbmodel.ModelHardDelete{}),
 							cmpopts.IgnoreFields(dbmodel.ApplicationOfferConnection{}, "ID", "CreatedAt", "UpdatedAt"),
 							cmpopts.IgnoreFields(dbmodel.ApplicationOfferRemoteSpace{}, "ID", "CreatedAt", "UpdatedAt"),
 							cmpopts.IgnoreFields(dbmodel.ApplicationOfferRemoteEndpoint{}, "ID", "CreatedAt", "UpdatedAt"),

@@ -470,10 +470,8 @@ func (s *dbSuite) TestGetModelsUsingCredential(c *qt.C) {
 	models, err := s.Database.GetModelsUsingCredential(context.Background(), cred1.ID)
 	c.Assert(err, qt.Equals, nil)
 	c.Assert(models, qt.DeepEquals, []dbmodel.Model{{
-		ID:        model1.ID,
-		CreatedAt: model1.CreatedAt,
-		UpdatedAt: model1.UpdatedAt,
-		Name:      "test-model-1",
+		ModelHardDelete: model1.ModelHardDelete,
+		Name:            "test-model-1",
 		UUID: sql.NullString{
 			String: "00000001-0000-0000-0000-0000-000000000001",
 			Valid:  true,

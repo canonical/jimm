@@ -515,7 +515,7 @@ func (s *dbSuite) TestDeleteCloudRegionControllerPriority(c *qt.C) {
 	ctx := context.Background()
 
 	crp := dbmodel.CloudRegionControllerPriority{
-		ID: 1,
+		ModelHardDelete: dbmodel.ModelHardDelete{ID: 1},
 	}
 
 	err := s.Database.DeleteCloudRegionControllerPriority(ctx, &crp)

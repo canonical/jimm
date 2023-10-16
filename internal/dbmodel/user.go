@@ -4,7 +4,6 @@ package dbmodel
 
 import (
 	"database/sql"
-	"time"
 
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
@@ -12,9 +11,7 @@ import (
 
 // A User represents a JIMM user.
 type User struct {
-	ID        uint `gorm:"primaryKey"`
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ModelHardDelete
 
 	// Username is the username for the user. This is the juju
 	// representation of the username (i.e. with an @external suffix). The

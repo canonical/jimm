@@ -15,13 +15,17 @@ import (
 	"github.com/canonical/jimm/internal/errors"
 )
 
+type ModelHardDelete struct {
+	ID        uint `gorm:"primaryKey"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
 // A Model is a juju model.
 type Model struct {
 	// Note this cannot use the standard gorm.Model as the soft-delete does
 	// not work with the unique constraints.
-	ID        uint `gorm:"primarykey"`
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ModelHardDelete
 
 	// Name is the name of the model.
 	Name string
@@ -247,9 +251,7 @@ func (s SLA) ToJujuModelSLAInfo() jujuparams.ModelSLAInfo {
 
 // A UserModelAccess maps the access level of a user on a model.
 type UserModelAccess struct {
-	ID        uint `gorm:"primaryKey"`
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ModelHardDelete
 
 	// User is the User this access is for.
 	Username string

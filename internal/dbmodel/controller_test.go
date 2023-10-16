@@ -114,9 +114,7 @@ func TestControllerModels(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	c.Check(models, qt.DeepEquals, []dbmodel.Model{{
-		ID:                m1.ID,
-		CreatedAt:         m1.CreatedAt,
-		UpdatedAt:         m1.UpdatedAt,
+		ModelHardDelete:   m1.ModelHardDelete,
 		Name:              m1.Name,
 		UUID:              m1.UUID,
 		OwnerUsername:     m1.OwnerUsername,
@@ -124,9 +122,7 @@ func TestControllerModels(t *testing.T) {
 		CloudRegionID:     m1.CloudRegionID,
 		CloudCredentialID: m1.CloudCredentialID,
 	}, {
-		ID:                m2.ID,
-		CreatedAt:         m2.CreatedAt,
-		UpdatedAt:         m2.UpdatedAt,
+		ModelHardDelete:   m2.ModelHardDelete,
 		Name:              m2.Name,
 		UUID:              m2.UUID,
 		OwnerUsername:     m2.OwnerUsername,
