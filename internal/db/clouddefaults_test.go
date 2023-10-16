@@ -105,8 +105,9 @@ func (s *dbSuite) TestModelDefaults(c *qt.C) {
 	err = s.Database.CloudDefaults(ctx, &dbDefaults)
 	c.Assert(err, qt.Equals, nil)
 	c.Assert(dbDefaults, qt.CmpEquals(
-		cmpopts.IgnoreTypes([]dbmodel.CloudRegion{}),
-		cmpopts.IgnoreFields(dbmodel.CloudDefaults{}, "ID", "CreatedAt", "UpdatedAt"),
+		cmpopts.IgnoreTypes([]dbmodel.CloudRegion{}), 
+		cmpopts.IgnoreTypes(dbmodel.ModelHardDelete{}),
+		cmpopts.IgnoreFields(dbmodel.CloudDefaults{}, "ModelHardDelete"),
 	),
 		dbmodel.CloudDefaults{
 			Username: u.Username,

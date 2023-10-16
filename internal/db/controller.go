@@ -7,6 +7,7 @@ import (
 
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
+	"gorm.io/gorm/clause"
 )
 
 // AddController stores the controller information.
@@ -87,9 +88,9 @@ func (d *Database) DeleteController(ctx context.Context, controller *dbmodel.Con
 		}
 		return errors.E(op, err)
 	}
-	//if err := db.Select(clause.Associations).Delete(controller).Error; err != nil {
-	//	return errors.E(op, err)
-	//}
+	if err := db.Select(clause.Associations).Delete(controller).Error; err != nil {
+		return errors.E(op, err)
+	}
 	return nil
 }
 
