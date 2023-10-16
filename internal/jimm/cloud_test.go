@@ -583,7 +583,7 @@ users:
 var addHostedCloudTests = []struct {
 	name             string
 	dialError        error
-	addCloud         func(context.Context, names.CloudTag, jujuparams.Cloud) error
+	addCloud         func(context.Context, names.CloudTag, jujuparams.Cloud, bool) error
 	grantCloudAccess func(context.Context, names.CloudTag, names.UserTag, string) error
 	cloud_           func(context.Context, names.CloudTag, *jujuparams.Cloud) error
 	username         string
@@ -594,7 +594,7 @@ var addHostedCloudTests = []struct {
 	expectErrorCode  errors.Code
 }{{
 	name: "Success",
-	addCloud: func(context.Context, names.CloudTag, jujuparams.Cloud) error {
+	addCloud: func(context.Context, names.CloudTag, jujuparams.Cloud, bool) error {
 		return nil
 	},
 	grantCloudAccess: func(context.Context, names.CloudTag, names.UserTag, string) error {
@@ -774,7 +774,7 @@ var addHostedCloudTests = []struct {
 	expectError: `dial error`,
 }, {
 	name: "AddCloudError",
-	addCloud: func(context.Context, names.CloudTag, jujuparams.Cloud) error {
+	addCloud: func(context.Context, names.CloudTag, jujuparams.Cloud, bool) error {
 		return errors.E("addcloud error")
 	},
 	username:  "bob@external",
@@ -822,7 +822,7 @@ func TestAddHostedCloud(t *testing.T) {
 
 			u := env.User(test.username).DBObject(c, j.Database)
 
-			err = j.AddHostedCloud(ctx, &u, names.NewCloudTag(test.cloudName), test.cloud)
+			err = j.AddHostedCloud(ctx, &u, names.NewCloudTag(test.cloudName), test.cloud, false)
 			c.Assert(dialer.IsClosed(), qt.Equals, true)
 			if test.expectError != "" {
 				c.Check(err, qt.ErrorMatches, test.expectError)
@@ -841,7 +841,7 @@ func TestAddHostedCloud(t *testing.T) {
 var addHostedCloudToControllerTests = []struct {
 	name             string
 	dialError        error
-	addCloud         func(context.Context, names.CloudTag, jujuparams.Cloud) error
+	addCloud         func(context.Context, names.CloudTag, jujuparams.Cloud, bool) error
 	grantCloudAccess func(context.Context, names.CloudTag, names.UserTag, string) error
 	cloud_           func(context.Context, names.CloudTag, *jujuparams.Cloud) error
 	username         string
@@ -853,7 +853,7 @@ var addHostedCloudToControllerTests = []struct {
 	expectErrorCode  errors.Code
 }{{
 	name: "Success",
-	addCloud: func(context.Context, names.CloudTag, jujuparams.Cloud) error {
+	addCloud: func(context.Context, names.CloudTag, jujuparams.Cloud, bool) error {
 		return nil
 	},
 	grantCloudAccess: func(context.Context, names.CloudTag, names.UserTag, string) error {
@@ -921,7 +921,7 @@ var addHostedCloudToControllerTests = []struct {
 	},
 }, {
 	name: "Controller not found",
-	addCloud: func(context.Context, names.CloudTag, jujuparams.Cloud) error {
+	addCloud: func(context.Context, names.CloudTag, jujuparams.Cloud, bool) error {
 		return nil
 	},
 	grantCloudAccess: func(context.Context, names.CloudTag, names.UserTag, string) error {
@@ -1049,7 +1049,7 @@ var addHostedCloudToControllerTests = []struct {
 	expectError: `dial error`,
 }, {
 	name: "AddCloudError",
-	addCloud: func(context.Context, names.CloudTag, jujuparams.Cloud) error {
+	addCloud: func(context.Context, names.CloudTag, jujuparams.Cloud, bool) error {
 		return errors.E("addcloud error")
 	},
 	username:       "alice@external",
@@ -1098,7 +1098,8 @@ func TestAddCloudToController(t *testing.T) {
 
 			u := env.User(test.username).DBObject(c, j.Database)
 
-			err = j.AddCloudToController(ctx, &u, test.controllerName, names.NewCloudTag(test.cloudName), test.cloud)
+			// Note that the force flag has no effect here because the Juju responses are mocked.
+			err = j.AddCloudToController(ctx, &u, test.controllerName, names.NewCloudTag(test.cloudName), test.cloud, false)
 			c.Assert(dialer.IsClosed(), qt.Equals, true)
 			if test.expectError != "" {
 				c.Check(err, qt.ErrorMatches, test.expectError)

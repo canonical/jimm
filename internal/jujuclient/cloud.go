@@ -175,11 +175,12 @@ func (c Connection) Clouds(ctx context.Context) (map[names.CloudTag]jujuparams.C
 
 // AddCloud adds the given cloud to a controller with the given name.
 // AddCloud uses the AddCloud procedure on the Cloud facade.
-func (c Connection) AddCloud(ctx context.Context, tag names.CloudTag, cloud jujuparams.Cloud) error {
+func (c Connection) AddCloud(ctx context.Context, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error {
 	const op = errors.Op("jujuclient.AddCloud")
 	args := jujuparams.AddCloudArgs{
 		Cloud: cloud,
 		Name:  tag.Id(),
+		Force: &force,
 	}
 	if err := c.CallHighestFacadeVersion(ctx, "Cloud", []int{7, 3}, "", "AddCloud", &args, nil); err != nil {
 		return errors.E(op, jujuerrors.Cause(err))
