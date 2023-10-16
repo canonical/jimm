@@ -474,7 +474,7 @@ func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName 
 	if newOwner != "" {
 		// Switch the model to be owned by the specified user.
 		if !names.IsValidUser(newOwner) {
-			return errors.E(op, "invalid new username for new model owner")
+			return errors.E(op, errors.CodeBadRequest, "invalid new username for new model owner")
 		}
 		ownerTag = names.NewUserTag(newOwner)
 	} else {
