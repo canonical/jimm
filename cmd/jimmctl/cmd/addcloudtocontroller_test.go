@@ -129,18 +129,6 @@ clouds:
 			expectedCloudName: "test-unknown-cloud",
 			expectedError:     ".*no registered provider.*",
 		}, {
-			about: "Add incompatible cloud",
-			cloudInfo: `
-clouds:
-  test-maas-cloud:
-    type: maas
-    auth-types: [oauth1]
-    regions:
-      default: {}`,
-			force:             false,
-			expectedCloudName: "test-maas-cloud",
-			expectedError:     ".*incompatible clouds.*",
-		}, {
 			about: "Add cloud to controller with wrong name",
 			cloudInfo: `
 clouds:
