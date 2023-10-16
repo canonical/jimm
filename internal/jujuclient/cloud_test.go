@@ -245,6 +245,32 @@ func (s *cloudSuite) TestCloud(c *gc.C) {
 	c.Check(cloud, jc.DeepEquals, clouds[names.NewCloudTag(jimmtest.TestCloudName)])
 }
 
+func (s *cloudSuite) TestAddCloud(c *gc.C) {
+	cloud := jujuparams.Cloud{
+		Type:      "kubernetes",
+		AuthTypes: []string{"empty"},
+	}
+
+	ctx := context.Background()
+
+	err := s.API.AddCloud(ctx, names.NewCloudTag(jimmtest.TestCloudName), cloud, false)
+	c.Assert(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeAlreadyExists)
+
+	err = s.API.AddCloud(ctx, names.NewCloudTag("test-cloud"), cloud, false)
+	c.Assert(err, gc.Equals, nil)
+
+	clouds, err := s.API.Clouds(ctx)
+	c.Assert(err, gc.Equals, nil)
+
+	c.Check(clouds[names.NewCloudTag("test-cloud")], jc.DeepEquals, jujuparams.Cloud{
+		Type:      "kubernetes",
+		AuthTypes: []string{"empty"},
+		Regions: []jujuparams.CloudRegion{{
+			Name: "default",
+		}},
+	})
+}
+
 func (s *cloudSuite) TestAddCloudFailsWithIncompatibleClouds(c *gc.C) {
 	cloud := jujuparams.Cloud{
 		Type:      "fake-cloud",
@@ -273,32 +299,6 @@ func (s *cloudSuite) TestAddIncompatibleCloudByForce(c *gc.C) {
 
 	c.Check(clouds[names.NewCloudTag("test-cloud")], jc.DeepEquals, jujuparams.Cloud{
 		Type:      "fake-cloud",
-		AuthTypes: []string{"empty"},
-		Regions: []jujuparams.CloudRegion{{
-			Name: "default",
-		}},
-	})
-}
-
-func (s *cloudSuite) TestAddCloudByForce(c *gc.C) {
-	cloud := jujuparams.Cloud{
-		Type:      "fake-cloud",
-		AuthTypes: []string{"empty"},
-	}
-
-	ctx := context.Background()
-
-	err := s.API.AddCloud(ctx, names.NewCloudTag(jimmtest.TestCloudName), cloud, false)
-	c.Assert(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeAlreadyExists)
-
-	err = s.API.AddCloud(ctx, names.NewCloudTag("test-cloud"), cloud, false)
-	c.Assert(err, gc.Equals, nil)
-
-	clouds, err := s.API.Clouds(ctx)
-	c.Assert(err, gc.Equals, nil)
-
-	c.Check(clouds[names.NewCloudTag("test-cloud")], jc.DeepEquals, jujuparams.Cloud{
-		Type:      "kubernetes",
 		AuthTypes: []string{"empty"},
 		Regions: []jujuparams.CloudRegion{{
 			Name: "default",
