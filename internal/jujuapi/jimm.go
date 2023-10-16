@@ -5,6 +5,7 @@ package jujuapi
 import (
 	"context"
 	"fmt"
+	"net"
 	"strings"
 	"time"
 
@@ -217,6 +218,18 @@ func (r *controllerRoot) AddController(ctx context.Context, req apiparams.AddCon
 
 	if req.Name == jimmControllerName {
 		return apiparams.ControllerInfo{}, errors.E(op, errors.CodeBadRequest, fmt.Sprintf("cannot add a controller with name %q", jimmControllerName))
+	}
+	if req.PublicAddress != "" {
+		host, port, err := net.SplitHostPort(req.PublicAddress)
+		if err != nil {
+			return apiparams.ControllerInfo{}, errors.E(op, err, errors.CodeBadRequest)
+		}
+		if host == "" {
+			return apiparams.ControllerInfo{}, errors.E(op, fmt.Sprintf("address %s: host not specified in public address", req.PublicAddress), errors.CodeBadRequest)
+		}
+		if port == "" {
+			return apiparams.ControllerInfo{}, errors.E(op, fmt.Sprintf("address %s: port not specified in public address", req.PublicAddress), errors.CodeBadRequest)
+		}
 	}
 
 	ctl := dbmodel.Controller{
@@ -470,7 +483,7 @@ func (r *controllerRoot) ImportModel(ctx context.Context, req apiparams.ImportMo
 		return errors.E(op, err, errors.CodeBadRequest)
 	}
 
-	err = r.jimm.ImportModel(ctx, r.user, req.Controller, mt)
+	err = r.jimm.ImportModel(ctx, r.user, req.Controller, mt, req.Owner)
 	if err != nil {
 		return errors.E(op, err)
 	}
