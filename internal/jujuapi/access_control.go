@@ -526,7 +526,7 @@ func (r *controllerRoot) toJAASTag(ctx context.Context, tag *ofganames.Tag) (str
 			return "", errors.E(err, fmt.Sprintf("failed to parse group id: %v", tag.ID))
 		}
 		group := dbmodel.GroupEntry{
-			ID: uint(id),
+			ModelHardDelete: dbmodel.ModelHardDelete{ID: uint(id)},
 		}
 		err = r.jimm.Database.GetGroup(ctx, &group)
 		if err != nil {

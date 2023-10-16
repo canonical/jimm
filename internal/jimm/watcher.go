@@ -312,7 +312,7 @@ func (w *Watcher) watchController(ctx context.Context, ctl *dbmodel.Controller) 
 				// Update changed model.
 				err := w.Database.Transaction(func(tx *db.Database) error {
 					m := dbmodel.Model{
-						ID: v.id,
+						ModelHardDelete: dbmodel.ModelHardDelete{ID: v.id},
 					}
 					if err := tx.GetModel(ctx, &m); err != nil {
 						return err
@@ -469,7 +469,7 @@ func (w *Watcher) handleDelta(ctx context.Context, modelIDf func(string) *modelS
 		}
 	case "model":
 		model := dbmodel.Model{
-			ID: state.id,
+			ModelHardDelete: dbmodel.ModelHardDelete{ID: state.id},
 		}
 		if d.Removed {
 			return w.deleteModel(ctx, &model)
@@ -531,7 +531,7 @@ func (w *Watcher) updateModel(ctx context.Context, model *dbmodel.Model, info *j
 func (w *Watcher) updateApplication(ctx context.Context, modelID uint, info *jujuparams.ApplicationInfo) error {
 	err := w.Database.Transaction(func(tx *db.Database) error {
 		m := dbmodel.Model{
-			ID: modelID,
+			ModelHardDelete: dbmodel.ModelHardDelete{ID: modelID},
 		}
 		if err := tx.GetModel(ctx, &m); err != nil {
 			return err

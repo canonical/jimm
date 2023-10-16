@@ -329,7 +329,7 @@ func initializeEnvironment(c *gc.C, ctx context.Context, db *db.Database, u dbmo
 	env.models = []dbmodel.Model{model}
 
 	offer := dbmodel.ApplicationOffer{
-		ID:              1,
+		ModelHardDelete: dbmodel.ModelHardDelete{ID: 1},
 		UUID:            "436b2264-d8f8-4e24-b16f-dd43c4116528",
 		URL:             env.controllers[0].Name + ":" + env.models[0].OwnerUsername + "/" + env.models[0].Name + ".testoffer1",
 		Name:            "testoffer1",

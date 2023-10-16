@@ -14,9 +14,7 @@ import (
 
 // A GroupEntry holds information about a user group.
 type GroupEntry struct {
-	ID        uint `gorm:"primaryKey"`
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ModelHardDelete
 
 	// Name holds the name of the group.
 	Name string `gorm:"index;column:name"`

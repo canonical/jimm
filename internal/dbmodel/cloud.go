@@ -3,17 +3,13 @@
 package dbmodel
 
 import (
-	"time"
-
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 )
 
 // A Cloud represents a cloud service.
 type Cloud struct {
-	ID        uint `gorm:"primarykey"`
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ModelHardDelete
 
 	// Name is the name of the cloud.
 	Name string `gorm:"not null;uniqueIndex"`
@@ -168,9 +164,7 @@ func (c Cloud) ToJujuCloudInfo() jujuparams.CloudInfo {
 
 // A CloudRegion is a region of a cloud.
 type CloudRegion struct {
-	ID        uint `gorm:"primarykey"`
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ModelHardDelete
 
 	// Cloud is the cloud this region belongs to.
 	CloudName string `gorm:"uniqueIndex:idx_cloud_region_cloud_name_name"`
@@ -219,9 +213,7 @@ func (cr *CloudRegion) FromJujuCloudRegion(r jujuparams.CloudRegion) {
 
 // A UserCloudAccess maps the access level of a user on a cloud.
 type UserCloudAccess struct {
-	ID        uint `gorm:"primarykey"`
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ModelHardDelete
 
 	// User is the User this access is for.
 	Username string

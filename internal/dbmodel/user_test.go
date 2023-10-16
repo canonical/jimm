@@ -133,17 +133,17 @@ func TestUserCloudCredentials(t *testing.T) {
 	err := db.Model(u).Association("CloudCredentials").Find(&creds)
 	c.Assert(err, qt.IsNil)
 	c.Check(creds, qt.DeepEquals, []dbmodel.CloudCredential{{
-		Model:         cred1.Model,
-		Name:          cred1.Name,
-		CloudName:     cred1.CloudName,
-		OwnerUsername: cred1.OwnerUsername,
-		AuthType:      cred1.AuthType,
+		ModelHardDelete: cred1.ModelHardDelete,
+		Name:            cred1.Name,
+		CloudName:       cred1.CloudName,
+		OwnerUsername:   cred1.OwnerUsername,
+		AuthType:        cred1.AuthType,
 	}, {
-		Model:         cred2.Model,
-		Name:          cred2.Name,
-		CloudName:     cred2.CloudName,
-		OwnerUsername: cred2.OwnerUsername,
-		AuthType:      cred2.AuthType,
+		ModelHardDelete: cred2.ModelHardDelete,
+		Name:            cred2.Name,
+		CloudName:       cred2.CloudName,
+		OwnerUsername:   cred2.OwnerUsername,
+		AuthType:        cred2.AuthType,
 	}})
 }
 
@@ -191,13 +191,11 @@ func TestUserModels(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	c.Check(models, qt.DeepEquals, []dbmodel.UserModelAccess{{
-		Model:    m1.Users[0].Model,
-		Username: u.Username,
-		ModelID:  m1.ID,
+		ModelHardDelete: m1.Users[0].ModelHardDelete,
+		Username:        u.Username,
+		ModelID:         m1.ID,
 		Model_: dbmodel.Model{
-			ID:                m1.ID,
-			CreatedAt:         m1.CreatedAt,
-			UpdatedAt:         m1.UpdatedAt,
+			ModelHardDelete:   dbmodel.ModelHardDelete{ID: m1.ID, CreatedAt: m1.CreatedAt, UpdatedAt: m1.UpdatedAt},
 			Name:              m1.Name,
 			OwnerUsername:     m1.OwnerUsername,
 			UUID:              m1.UUID,
@@ -207,13 +205,11 @@ func TestUserModels(t *testing.T) {
 		},
 		Access: "admin",
 	}, {
-		Model:    m2.Users[0].Model,
-		Username: u.Username,
-		ModelID:  m2.ID,
+		ModelHardDelete: m2.Users[0].ModelHardDelete,
+		Username:        u.Username,
+		ModelID:         m2.ID,
 		Model_: dbmodel.Model{
-			ID:                m2.ID,
-			CreatedAt:         m2.CreatedAt,
-			UpdatedAt:         m2.UpdatedAt,
+			ModelHardDelete:   dbmodel.ModelHardDelete{ID: m2.ID, CreatedAt: m2.CreatedAt, UpdatedAt: m2.UpdatedAt},
 			Name:              m2.Name,
 			OwnerUsername:     m2.OwnerUsername,
 			UUID:              m2.UUID,
@@ -262,16 +258,12 @@ func TestUserApplicationOffers(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	c.Check(offers, qt.DeepEquals, []dbmodel.UserApplicationOfferAccess{{
-		ID:                 m.Offers[0].Users[0].ID,
-		CreatedAt:          m.Offers[0].Users[0].CreatedAt,
-		UpdatedAt:          m.Offers[0].Users[0].UpdatedAt,
+		ModelHardDelete:    m.Offers[0].Users[0].ModelHardDelete,
 		Username:           u.Username,
 		ApplicationOfferID: m.Offers[0].ID,
 		Access:             "admin",
 	}, {
-		ID:                 m.Offers[1].Users[0].ID,
-		CreatedAt:          m.Offers[1].Users[0].CreatedAt,
-		UpdatedAt:          m.Offers[1].Users[0].UpdatedAt,
+		ModelHardDelete:    m.Offers[1].Users[0].ModelHardDelete,
 		Username:           u.Username,
 		ApplicationOfferID: m.Offers[1].ID,
 		Access:             "consume",
@@ -282,7 +274,7 @@ func TestUserToJujuUserInfo(t *testing.T) {
 	c := qt.New(t)
 
 	u := dbmodel.User{
-		CreatedAt:        time.Now(),
+		ModelHardDelete:  dbmodel.ModelHardDelete{CreatedAt: time.Now()},
 		Username:         "alice@external",
 		DisplayName:      "Alice",
 		ControllerAccess: "superuser",
