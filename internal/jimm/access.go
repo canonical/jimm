@@ -221,13 +221,17 @@ func (auth *JWTGenerator) MakeLoginToken(ctx context.Context, req *jujuparams.Lo
 		zapctx.Error(ctx, "failed to fetch controller", zap.Error(err))
 		return nil, errors.E(op, "failed to fetch controller", err)
 	}
+	clouds := make(map[names.CloudTag]bool)
 	for _, cloudRegion := range ctl.CloudRegions {
-		accessLevel, err := auth.accessChecker.GetUserCloudAccess(ctx, auth.user, cloudRegion.CloudRegion.Cloud.ResourceTag())
+		clouds[cloudRegion.CloudRegion.Cloud.ResourceTag()] = true
+	}
+	for cloudTag, _ := range clouds {
+		accessLevel, err := auth.accessChecker.GetUserCloudAccess(ctx, auth.user, cloudTag)
 		if err != nil {
 			zapctx.Error(ctx, "cloud access check failed", zap.Error(err))
 			return nil, errors.E(op, "failed to check user's cloud access", err)
 		}
-		auth.accessMapCache[cloudRegion.CloudRegion.Cloud.ResourceTag().String()] = accessLevel
+		auth.accessMapCache[cloudTag.String()] = accessLevel
 	}
 
 	jwt, err := auth.jwtService.NewJWT(ctx, jimmjwx.JWTParams{
