@@ -132,7 +132,7 @@ CREATE TABLE models (
 	owner_username TEXT NOT NULL REFERENCES users (username),
 	controller_id INTEGER REFERENCES controllers (id) ON DELETE CASCADE,
 	cloud_region_id INTEGER REFERENCES cloud_regions (id),
-	cloud_credential_id INTEGER REFERENCES cloud_credentials (id) ON DELETE RESTRICT,
+	cloud_credential_id INTEGER REFERENCES cloud_credentials (id) ON DELETE CASCADE,
 	type TEXT NOT NULL,
 	is_controller INTEGER NOT NULL,
 	default_series TEXT NOT NULL,
