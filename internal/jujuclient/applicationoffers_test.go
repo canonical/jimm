@@ -784,7 +784,5 @@ func (s *applicationoffersSuite) TestGetApplicationOfferConsumeDetailsNotFound(c
 		OfferURL: "test-user@external/test-model.test-offer",
 	}
 	err := s.API.GetApplicationOfferConsumeDetails(context.Background(), names.NewUserTag("test-user@external"), &info, bakery.Version2)
-	// NOTE: the error message returned by juju has changes and is something
-	// they need to fix in the jwt authorization flow.
-	c.Check(err, gc.ErrorMatches, `.*\(unauthorized access\)`) //`application offer "test-user@external/test-model.test-offer" not found`)
+	c.Check(err, gc.ErrorMatches, `application offer "test-user@external/test-model.test-offer" not found`)
 }
