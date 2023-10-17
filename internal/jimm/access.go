@@ -234,15 +234,11 @@ func (auth *JWTGenerator) MakeLoginToken(ctx context.Context, req *jujuparams.Lo
 		auth.accessMapCache[cloudTag.String()] = accessLevel
 	}
 
-	jwt, err := auth.jwtService.NewJWT(ctx, jimmjwx.JWTParams{
+	return auth.jwtService.NewJWT(ctx, jimmjwx.JWTParams{
 		Controller: auth.ct.Id(),
 		User:       auth.user.Tag().String(),
 		Access:     auth.accessMapCache,
 	})
-	if err != nil {
-		return nil, err
-	}
-	return jwt, nil
 }
 
 // MakeToken assumes MakeLoginToken has already been called and checks the permissions
