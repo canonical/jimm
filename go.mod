@@ -19,7 +19,7 @@ require (
 	github.com/juju/cmd/v3 v3.0.13
 	github.com/juju/errors v1.0.0
 	github.com/juju/gnuflag v1.0.0
-	github.com/juju/juju v0.0.0-20230921011740-34a3a7080ec7
+	github.com/juju/juju v0.0.0-20231016012854-17c74445a4bb
 	github.com/juju/loggo v1.0.0
 	github.com/juju/mgomonitor v0.0.0-20181029151116-52206bb0cd31
 	github.com/juju/names/v4 v4.0.0
