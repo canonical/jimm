@@ -189,7 +189,7 @@ var DefaultReservedCloudNames = []string{
 // code of CodeIncompatibleClouds will be returned. If there is an error
 // returned by the controller when creating the cloud then that error code
 // will be preserved.
-func (j *JIMM) AddCloudToController(ctx context.Context, u *dbmodel.User, controllerName string, tag names.CloudTag, cloud jujuparams.Cloud) error {
+func (j *JIMM) AddCloudToController(ctx context.Context, u *dbmodel.User, controllerName string, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error {
 	const op = errors.Op("jimm.AddCloudToController")
 
 	ale := dbmodel.AuditLogEntry{
@@ -276,7 +276,7 @@ func (j *JIMM) AddCloudToController(ctx context.Context, u *dbmodel.User, contro
 		return fail(errors.E(op, errors.CodeNotFound, "controller not found"))
 	}
 
-	ccloud, err := j.addControllerCloud(ctx, &controller, u.Tag().(names.UserTag), tag, cloud)
+	ccloud, err := j.addControllerCloud(ctx, &controller, u.Tag().(names.UserTag), tag, cloud, force)
 	if err != nil {
 		return fail(errors.E(op, err))
 	}
@@ -306,7 +306,7 @@ func (j *JIMM) AddCloudToController(ctx context.Context, u *dbmodel.User, contro
 // code of CodeIncompatibleClouds will be returned. If there is an error
 // returned by the controller when creating the cloud then that error code
 // will be preserved.
-func (j *JIMM) AddHostedCloud(ctx context.Context, u *dbmodel.User, tag names.CloudTag, cloud jujuparams.Cloud) error {
+func (j *JIMM) AddHostedCloud(ctx context.Context, u *dbmodel.User, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error {
 	const op = errors.Op("jimm.AddHostedCloud")
 
 	ale := dbmodel.AuditLogEntry{
@@ -386,7 +386,7 @@ func (j *JIMM) AddHostedCloud(ctx context.Context, u *dbmodel.User, tag names.Cl
 	shuffleRegionControllers(region.Controllers)
 	controller := region.Controllers[0].Controller
 
-	ccloud, err := j.addControllerCloud(ctx, &controller, u.Tag().(names.UserTag), tag, cloud)
+	ccloud, err := j.addControllerCloud(ctx, &controller, u.Tag().(names.UserTag), tag, cloud, force)
 	if err != nil {
 		// TODO(mhilton) remove the added cloud if adding it to the controller failed.
 		return fail(errors.E(op, err))
@@ -436,7 +436,7 @@ func findController(controllerName string) func(controllers []dbmodel.CloudRegio
 // to the user identified by the given user tag. On success
 // addControllerCloud returns the definition of the cloud retrieved from
 // the controller.
-func (j *JIMM) addControllerCloud(ctx context.Context, ctl *dbmodel.Controller, ut names.UserTag, tag names.CloudTag, cloud jujuparams.Cloud) (*jujuparams.Cloud, error) {
+func (j *JIMM) addControllerCloud(ctx context.Context, ctl *dbmodel.Controller, ut names.UserTag, tag names.CloudTag, cloud jujuparams.Cloud, force bool) (*jujuparams.Cloud, error) {
 	const op = errors.Op("jimm.addControllerCloud")
 
 	api, err := j.dial(ctx, ctl, names.ModelTag{})
@@ -444,7 +444,7 @@ func (j *JIMM) addControllerCloud(ctx context.Context, ctl *dbmodel.Controller, 
 		return nil, errors.E(op, err)
 	}
 	defer api.Close()
-	if err := api.AddCloud(ctx, tag, cloud); err != nil {
+	if err := api.AddCloud(ctx, tag, cloud, force); err != nil {
 		return nil, errors.E(op, err)
 	}
 	if err := api.GrantCloudAccess(ctx, tag, ut, "admin"); err != nil {

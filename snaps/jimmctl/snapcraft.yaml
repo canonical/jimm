@@ -20,7 +20,6 @@ plugs:
     interface: personal-files
     read:
     - $HOME/.local/share/juju
-    - $HOME/.local/share/juju/cookies
 
 apps:
   jimmctl:

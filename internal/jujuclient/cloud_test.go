@@ -3,6 +3,7 @@ package jujuclient_test
 import (
 	"context"
 	"sort"
+	"strings"
 
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
@@ -246,24 +247,112 @@ func (s *cloudSuite) TestCloud(c *gc.C) {
 }
 
 func (s *cloudSuite) TestAddCloud(c *gc.C) {
+	tests := []struct {
+		about             string
+		cloudInfo         jujuparams.Cloud
+		force             bool
+		cloudName         string
+		expectedError     string
+		expectedCloudInfo jujuparams.Cloud
+	}{
+		{
+			about: "Add cloud",
+			cloudInfo: jujuparams.Cloud{
+				Type:      "kubernetes",
+				AuthTypes: []string{"empty"},
+			},
+			force:     false,
+			cloudName: "test-cloud",
+			expectedCloudInfo: jujuparams.Cloud{
+				Type:      "kubernetes",
+				AuthTypes: []string{"empty"},
+				Regions: []jujuparams.CloudRegion{{
+					Name: "default",
+				}},
+			},
+		}, {
+			about: "Add existing cloud",
+			cloudInfo: jujuparams.Cloud{
+				Type:      "kubernetes",
+				AuthTypes: []string{"empty"},
+			},
+			force:         false,
+			cloudName:     jimmtest.TestCloudName,
+			expectedError: ".*already exists.*",
+		}, {
+			about: "Add incompatible cloud",
+			cloudInfo: jujuparams.Cloud{
+				Type:      "fake-cloud",
+				AuthTypes: []string{"empty"},
+			},
+			force:         false,
+			cloudName:     "fake-cloud",
+			expectedError: ".*incompatible clouds.*",
+		}, {
+			about: "Add incompatible cloud by force",
+			cloudInfo: jujuparams.Cloud{
+				Type:      "fake-cloud",
+				AuthTypes: []string{"empty"},
+			},
+			force:     true,
+			cloudName: "fake-cloud-2",
+			expectedCloudInfo: jujuparams.Cloud{
+				Type:      "fake-cloud",
+				AuthTypes: []string{"empty"},
+				Regions: []jujuparams.CloudRegion{{
+					Name: "default",
+				}},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		c.Log(test.about)
+		ctx := context.Background()
+		err := s.API.AddCloud(ctx, names.NewCloudTag(test.cloudName), test.cloudInfo, test.force)
+		if test.expectedError != "" {
+			c.Assert(err, gc.NotNil)
+			errWithoutBreaks := strings.ReplaceAll(err.Error(), "\n", "")
+			c.Assert(errWithoutBreaks, gc.Matches, test.expectedError)
+			c.Assert(errWithoutBreaks, gc.Matches, test.expectedError)
+		} else {
+			c.Assert(err, gc.IsNil)
+			clouds, err := s.API.Clouds(ctx)
+			c.Assert(err, gc.Equals, nil)
+			c.Check(clouds[names.NewCloudTag(test.cloudName)], jc.DeepEquals, test.expectedCloudInfo)
+		}
+	}
+
+}
+
+func (s *cloudSuite) TestAddCloudFailsWithIncompatibleClouds(c *gc.C) {
 	cloud := jujuparams.Cloud{
-		Type:      "kubernetes",
+		Type:      "fake-cloud",
 		AuthTypes: []string{"empty"},
 	}
 
 	ctx := context.Background()
 
-	err := s.API.AddCloud(ctx, names.NewCloudTag(jimmtest.TestCloudName), cloud)
-	c.Assert(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeAlreadyExists)
+	err := s.API.AddCloud(ctx, names.NewCloudTag("test-cloud"), cloud, false)
+	c.Assert(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeIncompatibleClouds)
+}
 
-	err = s.API.AddCloud(ctx, names.NewCloudTag("test-cloud"), cloud)
+func (s *cloudSuite) TestAddIncompatibleCloudByForce(c *gc.C) {
+	cloud := jujuparams.Cloud{
+		Type:      "fake-cloud",
+		AuthTypes: []string{"empty"},
+	}
+
+	ctx := context.Background()
+
+	err := s.API.AddCloud(ctx, names.NewCloudTag("test-cloud"), cloud, true)
 	c.Assert(err, gc.Equals, nil)
 
 	clouds, err := s.API.Clouds(ctx)
 	c.Assert(err, gc.Equals, nil)
 
 	c.Check(clouds[names.NewCloudTag("test-cloud")], jc.DeepEquals, jujuparams.Cloud{
-		Type:      "kubernetes",
+		Type:      "fake-cloud",
 		AuthTypes: []string{"empty"},
 		Regions: []jujuparams.CloudRegion{{
 			Name: "default",
@@ -282,7 +371,7 @@ func (s *cloudSuite) TestRemoveCloud(c *gc.C) {
 	err := s.API.RemoveCloud(ctx, names.NewCloudTag("test-cloud"))
 	c.Check(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeNotFound)
 
-	err = s.API.AddCloud(ctx, names.NewCloudTag("test-cloud"), cloud)
+	err = s.API.AddCloud(ctx, names.NewCloudTag("test-cloud"), cloud, false)
 	c.Assert(err, gc.Equals, nil)
 
 	clouds, err := s.API.Clouds(ctx)

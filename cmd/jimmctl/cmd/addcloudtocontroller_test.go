@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 
 	"github.com/juju/cmd/v3/cmdtesting"
 	"github.com/juju/juju/cloud"
@@ -80,72 +82,118 @@ func (s *addCloudToControllerSuite) SetUpTest(c *gc.C) {
 }
 
 func (s *addCloudToControllerSuite) TestAddCloudToController(c *gc.C) {
-	clouds := `
+	tests := []struct {
+		about             string
+		cloudInfo         string
+		force             bool
+		cloudByNameFunc   func(cloudName string) (*cloud.Cloud, error)
+		expectedCloudName string
+		expectedIndex     int
+		expectedError     string
+	}{
+		{
+			about: "Add Kubernetes Cloud",
+			cloudInfo: `
 clouds:
   test-hosted-cloud:
     type: kubernetes
     auth-types: [certificate]
-    host-cloud-region: kubernetes/default
-`
-	tmpfile, cleanupFunc := writeTempFile(c, clouds)
-	defer cleanupFunc()
-
-	bClient := s.userBakeryClient("bob@external")
-
-	// Running the command succeeds
-	_, err := cmdtesting.RunCommand(c, cmd.NewAddCloudToControllerCommandForTesting(s.ClientStore, bClient, nil), "controller-1", "test-hosted-cloud", "--cloud="+tmpfile)
-	c.Assert(err, gc.IsNil)
-
-	// The cloud is there
-	cloud := dbmodel.Cloud{Name: "test-hosted-cloud"}
-	err = s.JIMM.Database.GetCloud(context.Background(), &cloud)
-	c.Assert(err, gc.IsNil)
-	controller := dbmodel.Controller{Name: "controller-1"}
-	s.JIMM.Database.GetController(context.Background(), &controller)
-	c.Assert(controller.CloudRegions, gc.HasLen, 2)
-	c.Assert(controller.CloudRegions[1].CloudRegion.CloudName, gc.Equals, "test-hosted-cloud")
-}
-
-func (s *addCloudToControllerSuite) TestAddCloudToControllerExisting(c *gc.C) {
-	bClient := s.userBakeryClient("bob@external")
-
-	// Running the command with an existing cloud works
-	cloudByNameFunc := func(cloudName string) (*cloud.Cloud, error) {
-		return &cloud.Cloud{
-			Name:            "test-hosted-cloud-2",
-			Type:            "kubernetes",
-			AuthTypes:       []cloud.AuthType{"certificate"},
-			HostCloudRegion: "kubernetes/default",
-		}, nil
-	}
-	_, err := cmdtesting.RunCommand(c, cmd.NewAddCloudToControllerCommandForTesting(s.ClientStore, bClient, cloudByNameFunc), "controller-1", "test-hosted-cloud-2")
-	c.Assert(err, gc.IsNil)
-}
-
-func (s *addCloudToControllerSuite) TestAddCloudToControllerExistingNotFound(c *gc.C) {
-	cloudByNameFunc := func(cloudName string) (*cloud.Cloud, error) {
-		return nil, errors.E("not found")
-	}
-	bClient := s.userBakeryClient("bob")
-	_, err := cmdtesting.RunCommand(c, cmd.NewAddCloudToControllerCommandForTesting(s.ClientStore, bClient, cloudByNameFunc), "controller-1", "test-cloud")
-	c.Assert(err, gc.ErrorMatches, "could not find existing cloud, please provide a cloud file")
-}
-
-func (s *addCloudToControllerSuite) TestAddCloudToControllerWrongName(c *gc.C) {
-	clouds := `
+    host-cloud-region: kubernetes/default`,
+			force:             false,
+			expectedCloudName: "test-hosted-cloud",
+			expectedIndex:     1,
+			expectedError:     "",
+		}, {
+			about: "Add MAAS Cloud",
+			cloudInfo: `
+clouds:
+  test-maas-cloud:
+    type: maas
+    auth-types: [oauth1]
+    regions:
+      default: {}`,
+			force:             true,
+			expectedCloudName: "test-maas-cloud",
+			expectedIndex:     2,
+			expectedError:     "",
+		}, {
+			about: "Add cloud with unknown provider",
+			cloudInfo: `
+clouds:
+  test-unknown-cloud:
+    type: unknown
+    auth-types: [oauth1]
+    regions:
+      default: {}`,
+			force:             false,
+			expectedCloudName: "test-unknown-cloud",
+			expectedError:     ".*no registered provider.*",
+		}, {
+			about: "Add cloud to controller with wrong name",
+			cloudInfo: `
 clouds:
   test-hosted-cloud-2:
     type: kubernetes
     auth-types: [certificate]
-    host-cloud-region: kubernetes/default
-`
+    host-cloud-region: kubernetes/default`,
+			force:             false,
+			expectedCloudName: "test-cloud",
+			expectedError:     ".* cloud .* not found in file .*",
+		}, {
+			about: "Add existing cloud to controller",
+			cloudByNameFunc: func(cloudName string) (*cloud.Cloud, error) {
+				return &cloud.Cloud{
+					Name:            "test-hosted-cloud-2",
+					Type:            "kubernetes",
+					AuthTypes:       []cloud.AuthType{"certificate"},
+					HostCloudRegion: "kubernetes/default",
+				}, nil
+			},
+			force:             false,
+			expectedCloudName: "test-hosted-cloud-2",
+			expectedIndex:     3,
+			expectedError:     "",
+		}, {
+			about: "Add existing cloud to controller where existing cloud is not found",
+			cloudByNameFunc: func(cloudName string) (*cloud.Cloud, error) {
+				return nil, errors.E("not found")
+			},
+			force:             false,
+			expectedCloudName: "test-cloud",
+			expectedError:     "could not find existing cloud, please provide a cloud file",
+		},
+	}
 
-	tmpfile, cleanupFunc := writeTempFile(c, clouds)
-	defer cleanupFunc()
+	for _, test := range tests {
+		c.Log(test.about)
+		tmpfile, cleanupFunc := writeTempFile(c, test.cloudInfo)
 
-	bClient := s.userBakeryClient("bob")
-	_, err := cmdtesting.RunCommand(c, cmd.NewAddCloudToControllerCommandForTesting(s.ClientStore, bClient, nil), "controller-1", "test-cloud", "--cloud="+tmpfile)
-	c.Assert(err, gc.ErrorMatches, ".* cloud .* not found in file .*")
+		bClient := s.userBakeryClient("bob@external")
+		// Running the command succeeds
+		newCmd := cmd.NewAddCloudToControllerCommandForTesting(s.ClientStore, bClient, test.cloudByNameFunc)
+		var err error
+		if test.cloudInfo != "" {
+			_, err = cmdtesting.RunCommand(c, newCmd, "controller-1", test.expectedCloudName, "--cloud="+tmpfile, "--force="+strconv.FormatBool(test.force))
+		} else {
+			_, err = cmdtesting.RunCommand(c, newCmd, "controller-1", test.expectedCloudName, "--force="+strconv.FormatBool(test.force))
+		}
+
+		if test.expectedError != "" {
+			c.Assert(err, gc.NotNil)
+			errWithoutBreaks := strings.ReplaceAll(err.Error(), "\n", "")
+			c.Assert(errWithoutBreaks, gc.Matches, test.expectedError)
+		} else {
+			c.Assert(err, gc.IsNil)
+			cloud := dbmodel.Cloud{Name: test.expectedCloudName}
+			err = s.JIMM.Database.GetCloud(context.Background(), &cloud)
+			c.Assert(err, gc.IsNil)
+			controller := dbmodel.Controller{Name: "controller-1"}
+			s.JIMM.Database.GetController(context.Background(), &controller)
+			c.Assert(controller.CloudRegions[test.expectedIndex].CloudRegion.CloudName, gc.Equals, test.expectedCloudName)
+		}
+		cleanupFunc()
+		s.RefreshControllerAddress(c)
+	}
 }
 
 func writeTempFile(c *gc.C, content string) (string, func()) {
