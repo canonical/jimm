@@ -435,7 +435,9 @@ func findController(controllerName string) func(controllers []dbmodel.CloudRegio
 // jujuparams cloud definition. Admin access to the cloud will be granted
 // to the user identified by the given user tag. On success
 // addControllerCloud returns the definition of the cloud retrieved from
-// the controller.
+// the controller. If the cloud already exists on the controller or the user
+// already has access to the cloud, then no error will be thrown and the
+// method will continue and return the desired cloud.
 func (j *JIMM) addControllerCloud(ctx context.Context, ctl *dbmodel.Controller, ut names.UserTag, tag names.CloudTag, cloud jujuparams.Cloud, force bool) (*jujuparams.Cloud, error) {
 	const op = errors.Op("jimm.addControllerCloud")
 
