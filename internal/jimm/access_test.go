@@ -21,15 +21,107 @@ import (
 	"github.com/juju/names/v4"
 )
 
-/*
-TODO: (CSS-5247) We could use a test as below to unit test the
-auth function returned by JwtGenerator and ensure it correctly
-generates a JWT. The JWTGenerator requires the JIMM server to have
-a JWT service and cache setup, so we could either turn this into
-an interface and mock it or have the test start a full JIMM server.
-Also required an interface for authentication, mocked or Candid.
-This is already tested in an integration test in jujuapi/websocket_test.go
-*/
+// testAuthenticator is an authenticator implementation intended
+// for testing the token generator.
+type testAuthenticator struct {
+	username string
+	err      error
+}
+
+// Authenticate implements the Authenticate method of the Authenticator interface.
+func (ta *testAuthenticator) Authenticate(ctx context.Context, req *jujuparams.LoginRequest) (*openfga.User, error) {
+	if ta.err != nil {
+		return nil, ta.err
+	}
+	return &openfga.User{
+		User: &dbmodel.User{
+			Username: ta.username,
+		},
+	}, nil
+}
+
+// testDatabase is a database implementation intended for testing the token generator.
+type testDatabase struct {
+	ctl dbmodel.Controller
+	err error
+}
+
+// GetController implements the GetController method of the JWTGeneratorDatabase interface.
+func (tdb *testDatabase) GetController(ctx context.Context, controller *dbmodel.Controller) error {
+	if tdb.err != nil {
+		return tdb.err
+	}
+	*controller = tdb.ctl
+	return nil
+}
+
+// testAccessChecker is an access checker implementation intended for testing the
+// token generator.
+type testAccessChecker struct {
+	controllerAccess         map[string]string
+	controllerAccessCheckErr error
+	modelAccess              map[string]string
+	modelAccessCheckErr      error
+	cloudAccess              map[string]string
+	cloudAccessCheckErr      error
+	permissions              map[string]string
+	permissionCheckErr       error
+}
+
+// GetUserModelAccess implements the GetUserModelAccess method of the JWTGeneratorAccessChecker interface.
+func (tac *testAccessChecker) GetUserModelAccess(ctx context.Context, user *openfga.User, mt names.ModelTag) (string, error) {
+	if tac.modelAccessCheckErr != nil {
+		return "", tac.modelAccessCheckErr
+	}
+	return tac.modelAccess[mt.String()], nil
+}
+
+// GetUserControllerAccess implements the GetUserControllerAccess method of the JWTGeneratorAccessChecker interface.
+func (tac *testAccessChecker) GetUserControllerAccess(ctx context.Context, user *openfga.User, ct names.ControllerTag) (string, error) {
+	if tac.controllerAccessCheckErr != nil {
+		return "", tac.controllerAccessCheckErr
+	}
+	return tac.controllerAccess[ct.String()], nil
+}
+
+// GetUserCloudAccess implements the GetUserCloudAccess method of the JWTGeneratorAccessChecker interface.
+func (tac *testAccessChecker) GetUserCloudAccess(ctx context.Context, user *openfga.User, ct names.CloudTag) (string, error) {
+	if tac.cloudAccessCheckErr != nil {
+		return "", tac.cloudAccessCheckErr
+	}
+	return tac.cloudAccess[ct.String()], nil
+}
+
+// CheckPermission implements the CheckPermission methods of the JWTGeneratorAccessChecker interface.
+func (tac *testAccessChecker) CheckPermission(ctx context.Context, user *openfga.User, accessMap map[string]string, permissions map[string]interface{}) (map[string]string, error) {
+	if tac.permissionCheckErr != nil {
+		return nil, tac.permissionCheckErr
+	}
+	access := make(map[string]string)
+	for k, v := range accessMap {
+		access[k] = v
+	}
+	for k, v := range tac.permissions {
+		access[k] = v
+	}
+	return access, nil
+}
+
+// testJWTService is a jwt service implementation intended for testing the token generator.
+type testJWTService struct {
+	newJWTError error
+
+	params jimmjwx.JWTParams
+}
+
+// NewJWT implements the NewJWT methods of the JWTService interface.
+func (t *testJWTService) NewJWT(ctx context.Context, params jimmjwx.JWTParams) ([]byte, error) {
+	if t.newJWTError != nil {
+		return nil, t.newJWTError
+	}
+	t.params = params
+	return []byte("test jwt"), nil
+}
 
 func TestAuditLogAccess(t *testing.T) {
 	c := qt.New(t)
@@ -356,100 +448,4 @@ func TestJWTGeneratorMakeToken(t *testing.T) {
 			c.Assert(test.jwtService.params, qt.DeepEquals, test.expectedJWTParams)
 		}
 	}
-}
-
-type testAuthenticator struct {
-	username string
-	err      error
-}
-
-// Authenticate implements the Authenticate method of the Authenticator interface.
-func (ta *testAuthenticator) Authenticate(ctx context.Context, req *jujuparams.LoginRequest) (*openfga.User, error) {
-	if ta.err != nil {
-		return nil, ta.err
-	}
-	return &openfga.User{
-		User: &dbmodel.User{
-			Username: ta.username,
-		},
-	}, nil
-}
-
-type testDatabase struct {
-	ctl dbmodel.Controller
-	err error
-}
-
-// GetController implements the GetController method of the JWTGeneratorDatabase interface.
-func (tdb *testDatabase) GetController(ctx context.Context, controller *dbmodel.Controller) error {
-	if tdb.err != nil {
-		return tdb.err
-	}
-	*controller = tdb.ctl
-	return nil
-}
-
-type testAccessChecker struct {
-	controllerAccess         map[string]string
-	controllerAccessCheckErr error
-	modelAccess              map[string]string
-	modelAccessCheckErr      error
-	cloudAccess              map[string]string
-	cloudAccessCheckErr      error
-	permissions              map[string]string
-	permissionCheckErr       error
-}
-
-// GetUserModelAccess implements the GetUserModelAccess method of the JWTGeneratorAccessChecker interface.
-func (tac *testAccessChecker) GetUserModelAccess(ctx context.Context, user *openfga.User, mt names.ModelTag) (string, error) {
-	if tac.modelAccessCheckErr != nil {
-		return "", tac.modelAccessCheckErr
-	}
-	return tac.modelAccess[mt.String()], nil
-}
-
-// GetUserControllerAccess implements the GetUserControllerAccess method of the JWTGeneratorAccessChecker interface.
-func (tac *testAccessChecker) GetUserControllerAccess(ctx context.Context, user *openfga.User, ct names.ControllerTag) (string, error) {
-	if tac.controllerAccessCheckErr != nil {
-		return "", tac.controllerAccessCheckErr
-	}
-	return tac.controllerAccess[ct.String()], nil
-}
-
-// GetUserCloudAccess implements the GetUserCloudAccess method of the JWTGeneratorAccessChecker interface.
-func (tac *testAccessChecker) GetUserCloudAccess(ctx context.Context, user *openfga.User, ct names.CloudTag) (string, error) {
-	if tac.cloudAccessCheckErr != nil {
-		return "", tac.cloudAccessCheckErr
-	}
-	return tac.cloudAccess[ct.String()], nil
-}
-
-// CheckPermission implements the CheckPermission methods of the JWTGeneratorAccessChecker interface.
-func (tac *testAccessChecker) CheckPermission(ctx context.Context, user *openfga.User, accessMap map[string]string, permissions map[string]interface{}) (map[string]string, error) {
-	if tac.permissionCheckErr != nil {
-		return nil, tac.permissionCheckErr
-	}
-	access := make(map[string]string)
-	for k, v := range accessMap {
-		access[k] = v
-	}
-	for k, v := range tac.permissions {
-		access[k] = v
-	}
-	return access, nil
-}
-
-type testJWTService struct {
-	newJWTError error
-
-	params jimmjwx.JWTParams
-}
-
-// NewJWT implements the NewJWT methods of the JWTService interface.
-func (t *testJWTService) NewJWT(ctx context.Context, params jimmjwx.JWTParams) ([]byte, error) {
-	if t.newJWTError != nil {
-		return nil, t.newJWTError
-	}
-	t.params = params
-	return []byte("test jwt"), nil
 }
