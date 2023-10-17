@@ -10,7 +10,7 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
-      - run: git fetch --prune --unshallow
+      - run: git fetch --prune 
       - uses: actions/setup-go@v4
         with:
           go-version-file: 'go.mod'
