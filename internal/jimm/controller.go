@@ -408,7 +408,7 @@ func (j *JIMM) RevokeControllerAccess(ctx context.Context, u *dbmodel.User, acce
 // GetJimmControllerAccess returns the JIMM controller access level for the
 // requested user.
 func (j *JIMM) GetJimmControllerAccess(ctx context.Context, user *openfga.User, tag names.UserTag) (string, error) {
-	const op = errors.Op("jimm.GetControllerAccess")
+	const op = errors.Op("jimm.GetJIMMControllerAccess")
 
 	// First we check if the authenticated user is a JIMM administrator.
 	isControllerAdmin, err := openfga.IsAdministrator(ctx, user, j.ResourceTag())
@@ -451,8 +451,8 @@ func (j *JIMM) GetJimmControllerAccess(ctx context.Context, user *openfga.User, 
 	return "login", nil
 }
 
-// GetControllerAccess returns the user's level of access to the desired controller.
-func (j *JIMM) GetControllerAccess(ctx context.Context, user *openfga.User, controller names.ControllerTag) (string, error) {
+// GetUserControllerAccess returns the user's level of access to the desired controller.
+func (j *JIMM) GetUserControllerAccess(ctx context.Context, user *openfga.User, controller names.ControllerTag) (string, error) {
 	accessLevel := user.GetControllerAccess(ctx, controller)
 	return ToControllerAccessString(accessLevel), nil
 }

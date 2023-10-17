@@ -26,10 +26,14 @@ const (
 
 // TokenGenerator authenticates a user and generates a JWT token.
 type TokenGenerator interface {
-	// MakeToken authorizes a user if initialLogin is set to true using the information in req.
-	// It then checks that a user has all the default permissions rquired and then checks for
-	// permissions as required by permissionMap. It then returns a JWT token.
-	MakeToken(ctx context.Context, initialLogin bool, req *params.LoginRequest, permissionMap map[string]interface{}) ([]byte, error)
+	// MakeLoginToken authorizes the user based on the provided login requests and returns
+	// a JWT containing claims about user's access to the controller, model (if applicable)
+	// and all clouds that the controller knows about.
+	MakeLoginToken(ctx context.Context, req *params.LoginRequest) ([]byte, error)
+	// MakeToken assumes MakeLoginToken has already been called and checks the permissions
+	// specified in the permissionMap. If the logged in user has all those permissions
+	// a JWT will be returned with assertions confirming all those permissions.
+	MakeToken(ctx context.Context, permissionMap map[string]interface{}) ([]byte, error)
 	// SetTags sets the desired model and controller tags that this TokenGenerator is valid for.
 	SetTags(mt names.ModelTag, ct names.ControllerTag)
 	// GetUser returns the authenticated user.
@@ -414,10 +418,20 @@ func addJWT(ctx context.Context, initialLogin bool, msg *message, permissions ma
 	if err := json.Unmarshal(msg.Params, &lr); err != nil {
 		return errors.E(op, err)
 	}
-	jwt, err := tokenGen.MakeToken(ctx, initialLogin, &lr, permissions)
-	if err != nil {
-		zapctx.Error(ctx, "failed to make token", zap.Error(err))
-		return errors.E(op, err)
+	var jwt []byte
+	var err error
+	if initialLogin {
+		jwt, err = tokenGen.MakeLoginToken(ctx, &lr)
+		if err != nil {
+			zapctx.Error(ctx, "failed to make token", zap.Error(err))
+			return errors.E(op, err)
+		}
+	} else {
+		jwt, err = tokenGen.MakeToken(ctx, permissions)
+		if err != nil {
+			zapctx.Error(ctx, "failed to make token", zap.Error(err))
+			return errors.E(op, err)
+		}
 	}
 	jwtString := base64.StdEncoding.EncodeToString(jwt)
 	// Add the JWT as base64 encoded string.

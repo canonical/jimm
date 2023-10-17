@@ -131,7 +131,7 @@ func modelInfoFromPath(path string) (uuid string, finalPath string, err error) {
 
 // ServeWS implements jimmhttp.WSServer.
 func (s modelProxyServer) ServeWS(ctx context.Context, clientConn *websocket.Conn) {
-	jwtGenerator := jimm.NewJwtGenerator(s.jimm)
+	jwtGenerator := jimm.NewJWTGenerator(s.jimm.Authenticator, &s.jimm.Database, s.jimm, s.jimm.JWTService)
 	connectionFunc := controllerConnectionFunc(s, &jwtGenerator)
 	zapctx.Debug(ctx, "Starting proxier")
 	auditLogger := s.jimm.AddAuditLogEntry
@@ -146,7 +146,7 @@ func (s modelProxyServer) ServeWS(ctx context.Context, clientConn *websocket.Con
 
 // controllerConnectionFunc returns a function that will be used to
 // connect to a controller when a client makes a request.
-func controllerConnectionFunc(s modelProxyServer, jwtGenerator *jimm.JwtGenerator) func(context.Context) (*websocket.Conn, string, error) {
+func controllerConnectionFunc(s modelProxyServer, jwtGenerator *jimm.JWTGenerator) func(context.Context) (*websocket.Conn, string, error) {
 	connectToControllerFunc := func(ctx context.Context) (*websocket.Conn, string, error) {
 		const op = errors.Op("proxy.controllerConnectionFunc")
 		path := jimmhttp.PathElementFromContext(ctx, "path")

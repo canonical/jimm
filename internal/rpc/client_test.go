@@ -225,7 +225,11 @@ func TestClientReceiveInvalidMessage(t *testing.T) {
 
 type testTokenGenerator struct{}
 
-func (p *testTokenGenerator) MakeToken(ctx context.Context, initialLogin bool, req *params.LoginRequest, permissionMap map[string]interface{}) ([]byte, error) {
+func (p *testTokenGenerator) MakeLoginToken(ctx context.Context, req *params.LoginRequest) ([]byte, error) {
+	return nil, nil
+}
+
+func (p *testTokenGenerator) MakeToken(ctx context.Context, permissionMap map[string]interface{}) ([]byte, error) {
 	return nil, nil
 }
 
