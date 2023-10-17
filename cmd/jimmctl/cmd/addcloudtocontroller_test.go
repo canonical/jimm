@@ -192,6 +192,7 @@ clouds:
 			c.Assert(controller.CloudRegions[test.expectedIndex].CloudRegion.CloudName, gc.Equals, test.expectedCloudName)
 		}
 		cleanupFunc()
+		// Needed for JIMM CLI table tests
 		s.RefreshControllerAddress(c)
 	}
 }

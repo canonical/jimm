@@ -226,12 +226,12 @@ func (j *JIMM) AddCloudToController(ctx context.Context, u *dbmodel.User, contro
 	if cloud.HostCloudRegion != "" {
 		parts := strings.SplitN(cloud.HostCloudRegion, "/", 2)
 		if len(parts) != 2 || parts[0] == "" {
-			return fail(errors.E(op, errors.CodeIncompatibleClouds, fmt.Sprintf("unsupported cloud host region %q", cloud.HostCloudRegion)))
+			return fail(errors.E(op, errors.CodeIncompatibleClouds, fmt.Sprintf("cloud host region %q has invalid cloud/region format", cloud.HostCloudRegion)))
 		}
 		region, err := j.Database.FindRegion(ctx, parts[0], parts[1])
 		if err != nil {
 			if errors.ErrorCode(err) == errors.CodeNotFound {
-				return fail(errors.E(op, err, errors.CodeIncompatibleClouds, fmt.Sprintf("unsupported cloud host region %q", cloud.HostCloudRegion)))
+				return fail(errors.E(op, err, errors.CodeIncompatibleClouds, fmt.Sprintf("unable to find cloud/region %q", cloud.HostCloudRegion)))
 			}
 			return fail(errors.E(op, err))
 		}
@@ -239,13 +239,13 @@ func (j *JIMM) AddCloudToController(ctx context.Context, u *dbmodel.User, contro
 		switch cloudUserAccess(u, &region.Cloud) {
 		case "admin", "add-model":
 		default:
-			return fail(errors.E(op, errors.CodeIncompatibleClouds, fmt.Sprintf("unsupported cloud host region %q", cloud.HostCloudRegion)))
+			return fail(errors.E(op, errors.CodeUnauthorized, fmt.Sprintf("missing access to %q", cloud.HostCloudRegion)))
 		}
 
 		if region.Cloud.HostCloudRegion != "" {
 			// Do not support creating a new cloud on an already hosted
 			// cloud.
-			return fail(errors.E(op, errors.CodeIncompatibleClouds, fmt.Sprintf("unsupported cloud host region %q", cloud.HostCloudRegion)))
+			return fail(errors.E(op, errors.CodeIncompatibleClouds, fmt.Sprintf("cloud already hosted %q", cloud.HostCloudRegion)))
 		}
 
 		found := false
@@ -445,10 +445,14 @@ func (j *JIMM) addControllerCloud(ctx context.Context, ctl *dbmodel.Controller, 
 	}
 	defer api.Close()
 	if err := api.AddCloud(ctx, tag, cloud, force); err != nil {
-		return nil, errors.E(op, err)
+		if errors.ErrorCode(err) != errors.CodeAlreadyExists {
+			return nil, errors.E(op, err)
+		}
 	}
 	if err := api.GrantCloudAccess(ctx, tag, ut, "admin"); err != nil {
-		return nil, errors.E(op, err)
+		if !strings.Contains(err.Error(), "already has") {
+			return nil, errors.E(op, err)
+		}
 	}
 	var result jujuparams.Cloud
 	if err := api.Cloud(ctx, tag, &result); err != nil {
