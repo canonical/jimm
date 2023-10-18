@@ -774,110 +774,106 @@ func (s *cloudSuite) TestRemoveCloudNotFound(c *gc.C) {
 }
 
 func (s *cloudSuite) TestModifyCloudAccess(c *gc.C) {
-	/*
-		conn := s.open(c, nil, "test")
-		defer conn.Close()
-		client := cloudapi.NewClient(conn)
-		err := client.AddCloud(cloud.Cloud{
-			Name:             "test-cloud",
-			Type:             "kubernetes",
-			AuthTypes:        cloud.AuthTypes{cloud.CertificateAuthType},
-			Endpoint:         "https://0.1.2.3:5678",
-			IdentityEndpoint: "https://0.1.2.3:5679",
-			StorageEndpoint:  "https://0.1.2.3:5680",
-			HostCloudRegion:  jimmtest.TestCloudName + "/" + jimmtest.TestCloudRegionName,
-		}, false)
-		c.Assert(err, gc.Equals, nil)
-		clouds, err := client.Clouds()
-		c.Assert(err, gc.Equals, nil)
-		c.Assert(clouds[names.NewCloudTag("test-cloud")], jc.DeepEquals, cloud.Cloud{
-			Name:             "test-cloud",
-			Type:             "kubernetes",
-			AuthTypes:        cloud.AuthTypes{"certificate"},
-			Endpoint:         "https://0.1.2.3:5678",
-			IdentityEndpoint: "https://0.1.2.3:5679",
-			StorageEndpoint:  "https://0.1.2.3:5680",
-			Regions: []cloud.Region{{
-				Name: "default",
-			}},
-		})
+	conn := s.open(c, nil, "test")
+	defer conn.Close()
+	client := cloudapi.NewClient(conn)
+	err := client.AddCloud(cloud.Cloud{
+		Name:             "test-cloud",
+		Type:             "kubernetes",
+		AuthTypes:        cloud.AuthTypes{cloud.CertificateAuthType},
+		Endpoint:         "https://0.1.2.3:5678",
+		IdentityEndpoint: "https://0.1.2.3:5679",
+		StorageEndpoint:  "https://0.1.2.3:5680",
+		HostCloudRegion:  jimmtest.TestCloudName + "/" + jimmtest.TestCloudRegionName,
+	}, false)
+	c.Assert(err, gc.Equals, nil)
+	clouds, err := client.Clouds()
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(clouds[names.NewCloudTag("test-cloud")], jc.DeepEquals, cloud.Cloud{
+		Name:             "test-cloud",
+		Type:             "kubernetes",
+		AuthTypes:        cloud.AuthTypes{"certificate"},
+		Endpoint:         "https://0.1.2.3:5678",
+		IdentityEndpoint: "https://0.1.2.3:5679",
+		StorageEndpoint:  "https://0.1.2.3:5680",
+		Regions: []cloud.Region{{
+			Name: "default",
+		}},
+	})
 
-		// Check that alice@external does not yet have access
-		conn2 := s.open(c, nil, "alice")
-		defer conn2.Close()
-		client2 := cloudapi.NewClient(conn2)
-		clouds, err = client2.Clouds()
-		c.Assert(err, gc.Equals, nil)
-		_, ok := clouds[names.NewCloudTag("test-cloud")]
-		c.Assert(ok, gc.Equals, false, gc.Commentf("clouds: %#v", clouds))
+	// Check that alice@external does not yet have access
+	conn2 := s.open(c, nil, "bob")
+	defer conn2.Close()
+	client2 := cloudapi.NewClient(conn2)
+	clouds, err = client2.Clouds()
+	c.Assert(err, gc.Equals, nil)
+	_, ok := clouds[names.NewCloudTag("test-cloud")]
+	c.Assert(ok, gc.Equals, false, gc.Commentf("clouds: %#v", clouds))
 
-		err = client.GrantCloud("alice@external", "add-model", "test-cloud")
-		c.Assert(err, gc.Equals, nil)
+	err = client.GrantCloud("bob@external", "add-model", "test-cloud")
+	c.Assert(err, gc.Equals, nil)
 
-		clouds, err = client2.Clouds()
-		c.Assert(err, gc.Equals, nil)
-		c.Assert(clouds[names.NewCloudTag("test-cloud")], jc.DeepEquals, cloud.Cloud{
-			Name:             "test-cloud",
-			Type:             "kubernetes",
-			AuthTypes:        cloud.AuthTypes{"certificate"},
-			Endpoint:         "https://0.1.2.3:5678",
-			IdentityEndpoint: "https://0.1.2.3:5679",
-			StorageEndpoint:  "https://0.1.2.3:5680",
-			Regions: []cloud.Region{{
-				Name: "default",
-			}},
-		})
+	clouds, err = client2.Clouds()
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(clouds[names.NewCloudTag("test-cloud")], jc.DeepEquals, cloud.Cloud{
+		Name:             "test-cloud",
+		Type:             "kubernetes",
+		AuthTypes:        cloud.AuthTypes{"certificate"},
+		Endpoint:         "https://0.1.2.3:5678",
+		IdentityEndpoint: "https://0.1.2.3:5679",
+		StorageEndpoint:  "https://0.1.2.3:5680",
+		Regions: []cloud.Region{{
+			Name: "default",
+		}},
+	})
 
-		err = client.RevokeCloud("alice@external", "add-model", "test-cloud")
-		c.Assert(err, gc.Equals, nil)
-		clouds, err = client2.Clouds()
-		c.Assert(err, gc.Equals, nil)
-		_, ok = clouds[names.NewCloudTag("test-cloud")]
-		c.Assert(ok, gc.Equals, false, gc.Commentf("clouds: %#v", clouds))
-	*/
+	err = client.RevokeCloud("bob@external", "add-model", "test-cloud")
+	c.Assert(err, gc.Equals, nil)
+	clouds, err = client2.Clouds()
+	c.Assert(err, gc.Equals, nil)
+	_, ok = clouds[names.NewCloudTag("test-cloud")]
+	c.Assert(ok, gc.Equals, false, gc.Commentf("clouds: %#v", clouds))
 }
 
 func (s *cloudSuite) TestModifyCloudAccessUnauthorized(c *gc.C) {
-	/*
-		conn := s.open(c, nil, "test")
-		defer conn.Close()
-		client := cloudapi.NewClient(conn)
-		err := client.AddCloud(cloud.Cloud{
-			Name:             "test-cloud",
-			Type:             "kubernetes",
-			AuthTypes:        cloud.AuthTypes{cloud.CertificateAuthType},
-			Endpoint:         "https://0.1.2.3:5678",
-			IdentityEndpoint: "https://0.1.2.3:5679",
-			StorageEndpoint:  "https://0.1.2.3:5680",
-			HostCloudRegion:  jimmtest.TestCloudName + "/" + jimmtest.TestCloudRegionName,
-		}, false)
-		c.Assert(err, gc.Equals, nil)
-		clouds, err := client.Clouds()
-		c.Assert(err, gc.Equals, nil)
-		c.Assert(clouds[names.NewCloudTag("test-cloud")], jc.DeepEquals, cloud.Cloud{
-			Name:             "test-cloud",
-			Type:             "kubernetes",
-			AuthTypes:        cloud.AuthTypes{"certificate"},
-			Endpoint:         "https://0.1.2.3:5678",
-			IdentityEndpoint: "https://0.1.2.3:5679",
-			StorageEndpoint:  "https://0.1.2.3:5680",
-			Regions: []cloud.Region{{
-				Name: "default",
-			}},
-		})
+	conn := s.open(c, nil, "test")
+	defer conn.Close()
+	client := cloudapi.NewClient(conn)
+	err := client.AddCloud(cloud.Cloud{
+		Name:             "test-cloud",
+		Type:             "kubernetes",
+		AuthTypes:        cloud.AuthTypes{cloud.CertificateAuthType},
+		Endpoint:         "https://0.1.2.3:5678",
+		IdentityEndpoint: "https://0.1.2.3:5679",
+		StorageEndpoint:  "https://0.1.2.3:5680",
+		HostCloudRegion:  jimmtest.TestCloudName + "/" + jimmtest.TestCloudRegionName,
+	}, false)
+	c.Assert(err, gc.Equals, nil)
+	clouds, err := client.Clouds()
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(clouds[names.NewCloudTag("test-cloud")], jc.DeepEquals, cloud.Cloud{
+		Name:             "test-cloud",
+		Type:             "kubernetes",
+		AuthTypes:        cloud.AuthTypes{"certificate"},
+		Endpoint:         "https://0.1.2.3:5678",
+		IdentityEndpoint: "https://0.1.2.3:5679",
+		StorageEndpoint:  "https://0.1.2.3:5680",
+		Regions: []cloud.Region{{
+			Name: "default",
+		}},
+	})
 
-		// Check that charlie@external does not yet have access
-		conn2 := s.open(c, nil, "charlie")
-		defer conn2.Close()
-		client2 := cloudapi.NewClient(conn2)
-		clouds, err = client2.Clouds()
-		c.Assert(err, gc.Equals, nil)
-		_, ok := clouds[names.NewCloudTag("test-cloud")]
-		c.Assert(ok, gc.Equals, false, gc.Commentf("clouds: %#v", clouds))
+	// Check that charlie@external does not yet have access
+	conn2 := s.open(c, nil, "charlie")
+	defer conn2.Close()
+	client2 := cloudapi.NewClient(conn2)
+	clouds, err = client2.Clouds()
+	c.Assert(err, gc.Equals, nil)
+	_, ok := clouds[names.NewCloudTag("test-cloud")]
+	c.Assert(ok, gc.Equals, false, gc.Commentf("clouds: %#v", clouds))
 
-		err = client2.GrantCloud("charlie@external", "add-model", "test-cloud")
-		c.Assert(err, gc.ErrorMatches, `unauthorized`)
-	*/
+	err = client2.GrantCloud("charlie@external", "add-model", "test-cloud")
+	c.Assert(err, gc.ErrorMatches, `unauthorized`)
 }
 
 func (s *cloudSuite) TestUpdateCloud(c *gc.C) {
