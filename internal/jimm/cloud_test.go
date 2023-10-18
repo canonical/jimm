@@ -985,7 +985,7 @@ var addHostedCloudToControllerTests = []struct {
 		IdentityEndpoint: "https://example.com/identity",
 		StorageEndpoint:  "https://example.com/storage",
 	},
-	expectError:     `unsupported cloud host region "ec2/default"`,
+	expectError:     `unable to find cloud/region "ec2/default"`,
 	expectErrorCode: errors.CodeIncompatibleClouds,
 }, {
 	name:           "InvalidHostCloudRegion",
@@ -1000,7 +1000,7 @@ var addHostedCloudToControllerTests = []struct {
 		IdentityEndpoint: "https://example.com/identity",
 		StorageEndpoint:  "https://example.com/storage",
 	},
-	expectError:     `unsupported cloud host region "ec2"`,
+	expectError:     `cloud host region "ec2" has invalid cloud/region format`,
 	expectErrorCode: errors.CodeIncompatibleClouds,
 }, {
 	name:           "UserHasNoCloudAccess",
@@ -1015,7 +1015,7 @@ var addHostedCloudToControllerTests = []struct {
 		IdentityEndpoint: "https://example.com/identity",
 		StorageEndpoint:  "https://example.com/storage",
 	},
-	expectError:     `unsupported cloud host region "test-provider3/test-region-3"`,
+	expectError:     `unable to find cloud/region "test-provider3/test-region-3"`,
 	expectErrorCode: errors.CodeIncompatibleClouds,
 }, {
 	name:           "HostCloudIsHosted",
@@ -1030,7 +1030,7 @@ var addHostedCloudToControllerTests = []struct {
 		IdentityEndpoint: "https://example.com/identity",
 		StorageEndpoint:  "https://example.com/storage",
 	},
-	expectError:     `unsupported cloud host region "kubernetes/default"`,
+	expectError:     `cloud already hosted "kubernetes/default"`,
 	expectErrorCode: errors.CodeIncompatibleClouds,
 }, {
 	name:           "DialError",

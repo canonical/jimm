@@ -9,6 +9,8 @@ import (
 	"sync"
 
 	"github.com/juju/rpcreflect"
+	"github.com/juju/zaputil/zapctx"
+	"go.uber.org/zap"
 )
 
 // A Root provides the root of an RPC server connection.
@@ -41,6 +43,7 @@ func (r *Root) RemoveMethod(rootName string, version int, methodName string) {
 // FindMethod implements rpc.Root.
 func (r *Root) FindMethod(rootName string, version int, methodName string) (rpcreflect.MethodCaller, error) {
 	key := fmt.Sprintf("%s-%d-%s", rootName, version, methodName)
+	zapctx.Debug(context.Background(), "finding method", zap.String("root", rootName), zap.Int("version", version), zap.String("methodName", methodName))
 	r.methodMu.RLock()
 	defer r.methodMu.RUnlock()
 	if caller, ok := r.methods[key]; ok {
