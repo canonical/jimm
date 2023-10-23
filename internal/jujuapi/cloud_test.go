@@ -801,7 +801,7 @@ func (s *cloudSuite) TestModifyCloudAccess(c *gc.C) {
 		}},
 	})
 
-	// Check that alice@external does not yet have access
+	// Check that bob@external does not yet have access
 	conn2 := s.open(c, nil, "bob")
 	defer conn2.Close()
 	client2 := cloudapi.NewClient(conn2)
