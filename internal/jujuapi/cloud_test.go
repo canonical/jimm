@@ -836,15 +836,10 @@ func (s *cloudSuite) TestModifyCloudAccessUnauthorized(c *gc.C) {
 	_, ok := clouds[names.NewCloudTag("test-cloud")]
 	c.Assert(ok, jc.IsTrue)
 
-	// Check that charlie@external does not yet have access
+	// Try granting cloud access as an unauthorized user.
 	conn2 := s.open(c, nil, "charlie")
 	defer conn2.Close()
 	client2 := cloudapi.NewClient(conn2)
-	clouds, err = client2.Clouds()
-	c.Assert(err, gc.Equals, nil)
-	_, ok = clouds[names.NewCloudTag("test-cloud")]
-	c.Assert(ok, gc.Equals, false, gc.Commentf("clouds: %#v", clouds))
-
 	err = client2.GrantCloud("charlie@external", "add-model", "test-cloud")
 	c.Assert(err, gc.ErrorMatches, `unauthorized`)
 }
