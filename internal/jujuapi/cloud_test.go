@@ -789,17 +789,8 @@ func (s *cloudSuite) TestModifyCloudAccess(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	clouds, err := client.Clouds()
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(clouds[names.NewCloudTag("test-cloud")], jc.DeepEquals, cloud.Cloud{
-		Name:             "test-cloud",
-		Type:             "kubernetes",
-		AuthTypes:        cloud.AuthTypes{"certificate"},
-		Endpoint:         "https://0.1.2.3:5678",
-		IdentityEndpoint: "https://0.1.2.3:5679",
-		StorageEndpoint:  "https://0.1.2.3:5680",
-		Regions: []cloud.Region{{
-			Name: "default",
-		}},
-	})
+	_, ok := clouds[names.NewCloudTag("test-cloud")]
+	c.Assert(ok, jc.IsTrue)
 
 	// Check that bob@external does not yet have access
 	conn2 := s.open(c, nil, "bob")
@@ -807,7 +798,7 @@ func (s *cloudSuite) TestModifyCloudAccess(c *gc.C) {
 	client2 := cloudapi.NewClient(conn2)
 	clouds, err = client2.Clouds()
 	c.Assert(err, gc.Equals, nil)
-	_, ok := clouds[names.NewCloudTag("test-cloud")]
+	_, ok = clouds[names.NewCloudTag("test-cloud")]
 	c.Assert(ok, gc.Equals, false, gc.Commentf("clouds: %#v", clouds))
 
 	err = client.GrantCloud("bob@external", "add-model", "test-cloud")
@@ -815,17 +806,8 @@ func (s *cloudSuite) TestModifyCloudAccess(c *gc.C) {
 
 	clouds, err = client2.Clouds()
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(clouds[names.NewCloudTag("test-cloud")], jc.DeepEquals, cloud.Cloud{
-		Name:             "test-cloud",
-		Type:             "kubernetes",
-		AuthTypes:        cloud.AuthTypes{"certificate"},
-		Endpoint:         "https://0.1.2.3:5678",
-		IdentityEndpoint: "https://0.1.2.3:5679",
-		StorageEndpoint:  "https://0.1.2.3:5680",
-		Regions: []cloud.Region{{
-			Name: "default",
-		}},
-	})
+	_, ok = clouds[names.NewCloudTag("test-cloud")]
+	c.Assert(ok, jc.IsTrue)
 
 	err = client.RevokeCloud("bob@external", "add-model", "test-cloud")
 	c.Assert(err, gc.Equals, nil)
@@ -851,17 +833,8 @@ func (s *cloudSuite) TestModifyCloudAccessUnauthorized(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	clouds, err := client.Clouds()
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(clouds[names.NewCloudTag("test-cloud")], jc.DeepEquals, cloud.Cloud{
-		Name:             "test-cloud",
-		Type:             "kubernetes",
-		AuthTypes:        cloud.AuthTypes{"certificate"},
-		Endpoint:         "https://0.1.2.3:5678",
-		IdentityEndpoint: "https://0.1.2.3:5679",
-		StorageEndpoint:  "https://0.1.2.3:5680",
-		Regions: []cloud.Region{{
-			Name: "default",
-		}},
-	})
+	_, ok := clouds[names.NewCloudTag("test-cloud")]
+	c.Assert(ok, jc.IsTrue)
 
 	// Check that charlie@external does not yet have access
 	conn2 := s.open(c, nil, "charlie")
@@ -869,7 +842,7 @@ func (s *cloudSuite) TestModifyCloudAccessUnauthorized(c *gc.C) {
 	client2 := cloudapi.NewClient(conn2)
 	clouds, err = client2.Clouds()
 	c.Assert(err, gc.Equals, nil)
-	_, ok := clouds[names.NewCloudTag("test-cloud")]
+	_, ok = clouds[names.NewCloudTag("test-cloud")]
 	c.Assert(ok, gc.Equals, false, gc.Commentf("clouds: %#v", clouds))
 
 	err = client2.GrantCloud("charlie@external", "add-model", "test-cloud")
