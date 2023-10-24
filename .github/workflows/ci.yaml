@@ -44,7 +44,7 @@ jobs:
       - name: Start test environment
         run: docker compose up -d
       - name: Build and Test
-        run: go test -mod readonly ./... -timeout 30m
+        run: go test -mod readonly ./... -timeout 30m -cover
         env:
           JIMM_DSN: postgresql://jimm:jimm@localhost:5432/jimm
           JIMM_TEST_PGXDSN: postgresql://jimm:jimm@localhost:5432/jimm

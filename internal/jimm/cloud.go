@@ -21,7 +21,8 @@ import (
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 )
 
-func (j *JIMM) getUserCloudAccess(ctx context.Context, user *openfga.User, cloud names.CloudTag) (string, error) {
+// GetUserCloudAccess returns users access level for the specified cloud.
+func (j *JIMM) GetUserCloudAccess(ctx context.Context, user *openfga.User, cloud names.CloudTag) (string, error) {
 	accessLevel := user.GetCloudAccess(ctx, cloud)
 	if accessLevel == ofganames.NoRelation {
 		everyoneTag := names.NewUserTag(auth.Everyone)
@@ -52,7 +53,7 @@ func (j *JIMM) GetCloud(ctx context.Context, u *openfga.User, tag names.CloudTag
 		return cl, errors.E(op, err)
 	}
 
-	accessLevel, err := j.getUserCloudAccess(ctx, u, tag)
+	accessLevel, err := j.GetUserCloudAccess(ctx, u, tag)
 	if err != nil {
 		if err != nil {
 			return dbmodel.Cloud{}, errors.E(op, err)
@@ -735,7 +736,7 @@ func (j *JIMM) UpdateCloud(ctx context.Context, u *openfga.User, ct names.CloudT
 	if err := j.Database.GetCloud(ctx, &c); err != nil {
 		return errors.E(op, err)
 	}
-	cloudAccess, err := j.getUserCloudAccess(ctx, u, c.ResourceTag())
+	cloudAccess, err := j.GetUserCloudAccess(ctx, u, c.ResourceTag())
 	if err != nil {
 		return errors.E(op, err)
 	}
