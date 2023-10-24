@@ -903,158 +903,153 @@ func (s *modelManagerSuite) TestCreateModel(c *gc.C) {
 }
 
 func (s *modelManagerSuite) TestGrantAndRevokeModel(c *gc.C) {
-	/*
-	   conn := s.open(c, nil, "bob")
-	   defer conn.Close()
-	   client := modelmanager.NewClient(conn)
+	conn := s.open(c, nil, "bob")
+	defer conn.Close()
+	client := modelmanager.NewClient(conn)
 
-	   conn2 := s.open(c, nil, "charlie")
-	   defer conn2.Close()
-	   client2 := modelmanager.NewClient(conn2)
+	conn2 := s.open(c, nil, "charlie")
+	defer conn2.Close()
+	client2 := modelmanager.NewClient(conn2)
 
-	   res, err := client2.ModelInfo([]names.ModelTag{s.Model.ResourceTag()})
-	   c.Assert(err, gc.Equals, nil)
-	   c.Assert(res, gc.HasLen, 1)
-	   c.Assert(res[0].Error, gc.ErrorMatches, "unauthorized")
+	res, err := client2.ModelInfo([]names.ModelTag{s.Model.ResourceTag()})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(res, gc.HasLen, 1)
+	c.Assert(res[0].Error, gc.ErrorMatches, "unauthorized")
 
-	   err = client.GrantModel("charlie@external", "write", s.Model.UUID.String)
-	   c.Assert(err, gc.Equals, nil)
+	err = client.GrantModel("charlie@external", "write", s.Model.UUID.String)
+	c.Assert(err, gc.Equals, nil)
 
-	   res, err = client2.ModelInfo([]names.ModelTag{s.Model.ResourceTag()})
-	   c.Assert(err, gc.Equals, nil)
-	   c.Assert(res, gc.HasLen, 1)
-	   c.Assert(res[0].Error, gc.IsNil)
-	   c.Assert(res[0].Result.UUID, gc.Equals, s.Model.UUID.String)
+	res, err = client2.ModelInfo([]names.ModelTag{s.Model.ResourceTag()})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(res, gc.HasLen, 1)
+	c.Assert(res[0].Error, gc.IsNil)
+	c.Assert(res[0].Result.UUID, gc.Equals, s.Model.UUID.String)
 
-	   err = client.RevokeModel("charlie@external", "read", s.Model.UUID.String)
-	   c.Assert(err, gc.Equals, nil)
+	err = client.RevokeModel("charlie@external", "read", s.Model.UUID.String)
+	c.Assert(err, gc.Equals, nil)
 
-	   res, err = client2.ModelInfo([]names.ModelTag{s.Model.ResourceTag()})
-	   c.Assert(err, gc.Equals, nil)
-	   c.Assert(res, gc.HasLen, 1)
-	   c.Assert(res[0].Error, gc.Not(gc.IsNil))
-	   c.Assert(res[0].Error, gc.ErrorMatches, "unauthorized")
-	*/
+	res, err = client2.ModelInfo([]names.ModelTag{s.Model.ResourceTag()})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(res, gc.HasLen, 1)
+	c.Assert(res[0].Error, gc.Not(gc.IsNil))
+	c.Assert(res[0].Error, gc.ErrorMatches, "unauthorized")
 }
 
 func (s *modelManagerSuite) TestUserRevokeOwnAccess(c *gc.C) {
-	/*
-		conn := s.open(c, nil, "bob")
-		defer conn.Close()
-		client := modelmanager.NewClient(conn)
 
-		conn2 := s.open(c, nil, "charlie")
-		defer conn2.Close()
-		client2 := modelmanager.NewClient(conn2)
+	conn := s.open(c, nil, "bob")
+	defer conn.Close()
+	client := modelmanager.NewClient(conn)
 
-		err := client.GrantModel("charlie@external", "read", s.Model.UUID.String)
-		c.Assert(err, gc.Equals, nil)
+	conn2 := s.open(c, nil, "charlie")
+	defer conn2.Close()
+	client2 := modelmanager.NewClient(conn2)
 
-		res, err := client2.ModelInfo([]names.ModelTag{names.NewModelTag(s.Model.UUID.String)})
-		c.Assert(err, gc.Equals, nil)
-		c.Assert(res, gc.HasLen, 1)
-		c.Assert(res[0].Error, gc.IsNil)
-		c.Assert(res[0].Result.UUID, gc.Equals, s.Model.UUID.String)
+	err := client.GrantModel("charlie@external", "read", s.Model.UUID.String)
+	c.Assert(err, gc.Equals, nil)
 
-		err = client2.RevokeModel("charlie@external", "read", s.Model.UUID.String)
-		c.Assert(err, gc.Equals, nil)
+	res, err := client2.ModelInfo([]names.ModelTag{names.NewModelTag(s.Model.UUID.String)})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(res, gc.HasLen, 1)
+	c.Assert(res[0].Error, gc.IsNil)
+	c.Assert(res[0].Result.UUID, gc.Equals, s.Model.UUID.String)
 
-		res, err = client2.ModelInfo([]names.ModelTag{names.NewModelTag(s.Model.UUID.String)})
-		c.Assert(err, gc.Equals, nil)
-		c.Assert(res, gc.HasLen, 1)
-		c.Assert(res[0].Error, gc.Not(gc.IsNil))
-		c.Assert(res[0].Error, gc.ErrorMatches, "unauthorized")
-	*/
+	err = client2.RevokeModel("charlie@external", "read", s.Model.UUID.String)
+	c.Assert(err, gc.Equals, nil)
+
+	res, err = client2.ModelInfo([]names.ModelTag{names.NewModelTag(s.Model.UUID.String)})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(res, gc.HasLen, 1)
+	c.Assert(res[0].Error, gc.Not(gc.IsNil))
+	c.Assert(res[0].Error, gc.ErrorMatches, "unauthorized")
 }
 
 func (s *modelManagerSuite) TestModifyModelAccessErrors(c *gc.C) {
-	/*
-		conn := s.open(c, nil, "bob")
-		defer conn.Close()
+	conn := s.open(c, nil, "bob")
+	defer conn.Close()
 
-		modifyModelAccessErrorTests := []struct {
-			about             string
-			modifyModelAccess jujuparams.ModifyModelAccess
-			expectError       string
-		}{{
-			about: "unauthorized",
-			modifyModelAccess: jujuparams.ModifyModelAccess{
-				UserTag:  names.NewUserTag("eve@external").String(),
-				Action:   jujuparams.GrantModelAccess,
-				Access:   jujuparams.ModelReadAccess,
-				ModelTag: s.Model2.Tag().String(),
-			},
-			expectError: `unauthorized`,
-		}, {
-			about: "bad user domain",
-			modifyModelAccess: jujuparams.ModifyModelAccess{
-				UserTag:  names.NewUserTag("eve@local").String(),
-				Action:   jujuparams.GrantModelAccess,
-				Access:   jujuparams.ModelReadAccess,
-				ModelTag: s.Model.Tag().String(),
-			},
-			expectError: `unsupported local user`,
-		}, {
-			about: "no such model",
-			modifyModelAccess: jujuparams.ModifyModelAccess{
-				UserTag:  names.NewUserTag("eve@external").String(),
-				Action:   jujuparams.GrantModelAccess,
-				Access:   jujuparams.ModelReadAccess,
-				ModelTag: names.NewModelTag("00000000-0000-0000-0000-000000000000").String(),
-			},
-			expectError: `unauthorized`,
-		}, {
-			about: "invalid model tag",
-			modifyModelAccess: jujuparams.ModifyModelAccess{
-				UserTag:  names.NewUserTag("eve@external").String(),
-				Action:   jujuparams.GrantModelAccess,
-				Access:   jujuparams.ModelReadAccess,
-				ModelTag: "not-a-model-tag",
-			},
-			expectError: `"not-a-model-tag" is not a valid tag`,
-		}, {
-			about: "invalid user tag",
-			modifyModelAccess: jujuparams.ModifyModelAccess{
-				UserTag:  "not-a-user-tag",
-				Action:   jujuparams.GrantModelAccess,
-				Access:   jujuparams.ModelReadAccess,
-				ModelTag: s.Model.Tag().String(),
-			},
-			expectError: `"not-a-user-tag" is not a valid tag`,
-		}, {
-			about: "unknown action",
-			modifyModelAccess: jujuparams.ModifyModelAccess{
-				UserTag:  names.NewUserTag("eve@external").String(),
-				Action:   "not-an-action",
-				Access:   jujuparams.ModelReadAccess,
-				ModelTag: s.Model.Tag().String(),
-			},
-			expectError: `invalid action "not-an-action"`,
-		}, {
-			about: "invalid access",
-			modifyModelAccess: jujuparams.ModifyModelAccess{
-				UserTag:  names.NewUserTag("eve@external").String(),
-				Action:   jujuparams.GrantModelAccess,
-				Access:   "not-an-access",
-				ModelTag: s.Model.Tag().String(),
-			},
-			expectError: `could not modify model access: "not-an-access" model access not valid`,
-		}}
+	modifyModelAccessErrorTests := []struct {
+		about             string
+		modifyModelAccess jujuparams.ModifyModelAccess
+		expectError       string
+	}{{
+		about: "unauthorized",
+		modifyModelAccess: jujuparams.ModifyModelAccess{
+			UserTag:  names.NewUserTag("eve@external").String(),
+			Action:   jujuparams.GrantModelAccess,
+			Access:   jujuparams.ModelReadAccess,
+			ModelTag: s.Model2.Tag().String(),
+		},
+		expectError: `unauthorized`,
+	}, {
+		about: "bad user domain",
+		modifyModelAccess: jujuparams.ModifyModelAccess{
+			UserTag:  names.NewUserTag("eve@local").String(),
+			Action:   jujuparams.GrantModelAccess,
+			Access:   jujuparams.ModelReadAccess,
+			ModelTag: s.Model.Tag().String(),
+		},
+		expectError: `unsupported local user`,
+	}, {
+		about: "no such model",
+		modifyModelAccess: jujuparams.ModifyModelAccess{
+			UserTag:  names.NewUserTag("eve@external").String(),
+			Action:   jujuparams.GrantModelAccess,
+			Access:   jujuparams.ModelReadAccess,
+			ModelTag: names.NewModelTag("00000000-0000-0000-0000-000000000000").String(),
+		},
+		expectError: `unauthorized`,
+	}, {
+		about: "invalid model tag",
+		modifyModelAccess: jujuparams.ModifyModelAccess{
+			UserTag:  names.NewUserTag("eve@external").String(),
+			Action:   jujuparams.GrantModelAccess,
+			Access:   jujuparams.ModelReadAccess,
+			ModelTag: "not-a-model-tag",
+		},
+		expectError: `"not-a-model-tag" is not a valid tag`,
+	}, {
+		about: "invalid user tag",
+		modifyModelAccess: jujuparams.ModifyModelAccess{
+			UserTag:  "not-a-user-tag",
+			Action:   jujuparams.GrantModelAccess,
+			Access:   jujuparams.ModelReadAccess,
+			ModelTag: s.Model.Tag().String(),
+		},
+		expectError: `"not-a-user-tag" is not a valid tag`,
+	}, {
+		about: "unknown action",
+		modifyModelAccess: jujuparams.ModifyModelAccess{
+			UserTag:  names.NewUserTag("eve@external").String(),
+			Action:   "not-an-action",
+			Access:   jujuparams.ModelReadAccess,
+			ModelTag: s.Model.Tag().String(),
+		},
+		expectError: `invalid action "not-an-action"`,
+	}, {
+		about: "invalid access",
+		modifyModelAccess: jujuparams.ModifyModelAccess{
+			UserTag:  names.NewUserTag("eve@external").String(),
+			Action:   jujuparams.GrantModelAccess,
+			Access:   "not-an-access",
+			ModelTag: s.Model.Tag().String(),
+		},
+		expectError: `failed to recognize given access: "not-an-access"`,
+	}}
 
-		for i, test := range modifyModelAccessErrorTests {
-			c.Logf("%d. %s", i, test.about)
-			var res jujuparams.ErrorResults
-			req := jujuparams.ModifyModelAccessRequest{
-				Changes: []jujuparams.ModifyModelAccess{
-					test.modifyModelAccess,
-				},
-			}
-			err := conn.APICall("ModelManager", 2, "", "ModifyModelAccess", req, &res)
-			c.Assert(err, gc.Equals, nil)
-			c.Assert(res.Results, gc.HasLen, 1)
-			c.Assert(res.Results[0].Error, gc.ErrorMatches, test.expectError)
+	for i, test := range modifyModelAccessErrorTests {
+		c.Logf("%d. %s", i, test.about)
+		var res jujuparams.ErrorResults
+		req := jujuparams.ModifyModelAccessRequest{
+			Changes: []jujuparams.ModifyModelAccess{
+				test.modifyModelAccess,
+			},
 		}
-	*/
+		err := conn.APICall("ModelManager", 2, "", "ModifyModelAccess", req, &res)
+		c.Assert(err, gc.Equals, nil)
+		c.Assert(res.Results, gc.HasLen, 1)
+		c.Assert(res.Results[0].Error, gc.ErrorMatches, test.expectError)
+	}
 }
 
 var zeroDuration = time.Duration(0)
