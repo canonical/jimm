@@ -28,7 +28,6 @@ from ops.model import (
     ModelError,
     WaitingStatus,
 )
-
 from systemd import SystemdCharm
 
 logger = logging.getLogger(__name__)
@@ -48,10 +47,18 @@ class JimmCharm(SystemdCharm):
         self.framework.observe(self.on.stop, self._on_stop)
         self.framework.observe(self.on.update_status, self._on_update_status)
         self.framework.observe(self.on.upgrade_charm, self._on_upgrade_charm)
-        self.framework.observe(self.on.nrpe_relation_joined, self._on_nrpe_relation_joined)
-        self.framework.observe(self.on.website_relation_joined, self._on_website_relation_joined)
-        self.framework.observe(self.on.vault_relation_joined, self._on_vault_relation_joined)
-        self.framework.observe(self.on.vault_relation_changed, self._on_vault_relation_changed)
+        self.framework.observe(
+            self.on.nrpe_relation_joined, self._on_nrpe_relation_joined
+        )
+        self.framework.observe(
+            self.on.website_relation_joined, self._on_website_relation_joined
+        )
+        self.framework.observe(
+            self.on.vault_relation_joined, self._on_vault_relation_joined
+        )
+        self.framework.observe(
+            self.on.vault_relation_changed, self._on_vault_relation_changed
+        )
         self.framework.observe(
             self.on.dashboard_relation_joined,
             self._on_dashboard_relation_joined,
@@ -67,12 +74,16 @@ class JimmCharm(SystemdCharm):
             relation_name="database",
             database_name=DATABASE_NAME,
         )
-        self.framework.observe(self.database.on.database_created, self._on_database_event)
+        self.framework.observe(
+            self.database.on.database_created, self._on_database_event
+        )
         self.framework.observe(
             self.database.on.endpoints_changed,
             self._on_database_event,
         )
-        self.framework.observe(self.on.database_relation_broken, self._on_database_relation_broken)
+        self.framework.observe(
+            self.on.database_relation_broken, self._on_database_relation_broken
+        )
 
         # Grafana agent relation
         self._grafana_agent = COSAgentProvider(
@@ -122,7 +133,9 @@ class JimmCharm(SystemdCharm):
             "log_level": self.config.get("log-level"),
             "uuid": self.config.get("uuid"),
             "dashboard_location": self.config.get("juju-dashboard-location"),
-            "macaroon_expiry_duration": self.config.get("macaroon-expiry-duration"),
+            "macaroon_expiry_duration": self.config.get(
+                "macaroon-expiry-duration"
+            ),
         }
 
         with open(self._env_filename(), "wt") as f:
@@ -135,7 +148,9 @@ class JimmCharm(SystemdCharm):
         if dashboard_relation:
             dashboard_relation.data[self.app].update(
                 {
-                    "controller-url": "wss://{}".format(self.config["dns-name"]),
+                    "controller-url": "wss://{}".format(
+                        self.config["dns-name"]
+                    ),
                     "identity-provider-url": self.config["candid-url"],
                     "is-juju": str(False),
                 }
@@ -239,10 +254,18 @@ class JimmCharm(SystemdCharm):
         event.relation.data[self.unit]["port"] = "8080"
 
     def _on_vault_relation_joined(self, event):
-        event.relation.data[self.unit]["secret_backend"] = json.dumps("charm-jimm-creds")
-        event.relation.data[self.unit]["hostname"] = json.dumps(socket.gethostname())
+        event.relation.data[self.unit]["secret_backend"] = json.dumps(
+            "charm-jimm-creds"
+        )
+        event.relation.data[self.unit]["hostname"] = json.dumps(
+            socket.gethostname()
+        )
         event.relation.data[self.unit]["access_address"] = json.dumps(
-            str(self.model.get_binding(event.relation).network.egress_subnets[0].network_address)
+            str(
+                self.model.get_binding(event.relation)
+                .network.egress_subnets[0]
+                .network_address
+            )
         )
         event.relation.data[self.unit]["isolated"] = json.dumps(False)
 
@@ -356,13 +379,16 @@ class JimmCharm(SystemdCharm):
         subprocess.run(cmd, capture_output=True, check=True)
 
     def _on_dashboard_relation_joined(self, event):
-        event.relation.data[self.app].update(
-            {
-                "controller_url": "wss://{}".format(self.config["dns-name"]),
-                "identity_provider_url": self.config["candid-url"],
-                "is_juju": str(False),
-            }
-        )
+        if self.model.unit.is_leader():
+            event.relation.data[self.app].update(
+                {
+                    "controller_url": "wss://{}".format(
+                        self.config["dns-name"]
+                    ),
+                    "identity_provider_url": self.config["candid-url"],
+                    "is_juju": str(False),
+                }
+            )
 
 
 def _json_data(event, key):
