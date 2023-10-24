@@ -1,6 +1,10 @@
 applications:
   controller:
     charm: ch:juju-controller
+    to:
+      - 0
+    num_units: 1
+    series: focal
   haproxy:
     charm: ch:haproxy
     num_units: 1
@@ -18,3 +22,5 @@ relations:
   - ["ntp", "haproxy"]
   - ["ntp", "controller"]
   - ["controller", "haproxy"]
+machines:
+  0:
