@@ -20,9 +20,9 @@ import (
 	bakeryv2 "gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon.v2"
 
-	"github.com/CanonicalLtd/jimm/internal/auth"
-	"github.com/CanonicalLtd/jimm/internal/jemtest"
-	"github.com/CanonicalLtd/jimm/params"
+	"github.com/canonical/jimm/internal/auth"
+	"github.com/canonical/jimm/internal/jemtest"
+	"github.com/canonical/jimm/params"
 )
 
 type authSuite struct {

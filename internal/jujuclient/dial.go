@@ -23,11 +23,11 @@ import (
 	"github.com/juju/names/v4"
 	"go.uber.org/zap"
 
-	"github.com/CanonicalLtd/jimm/internal/dbmodel"
-	"github.com/CanonicalLtd/jimm/internal/errors"
-	"github.com/CanonicalLtd/jimm/internal/jimm"
-	"github.com/CanonicalLtd/jimm/internal/rpc"
-	"github.com/CanonicalLtd/jimm/internal/zapctx"
+	"github.com/canonical/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/jimm"
+	"github.com/canonical/jimm/internal/rpc"
+	"github.com/canonical/jimm/internal/zapctx"
 )
 
 // A Dialer is an implementation of a jimm.Dialer that adapts a juju API

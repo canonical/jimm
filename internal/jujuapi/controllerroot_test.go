@@ -14,7 +14,7 @@ import (
 	"github.com/juju/version/v2"
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/jimm/internal/jujuapi"
+	"github.com/canonical/jimm/internal/jujuapi"
 )
 
 type controllerrootSuite struct {

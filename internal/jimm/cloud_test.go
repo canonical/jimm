@@ -12,11 +12,11 @@ import (
 	"github.com/juju/names/v4"
 	"gorm.io/gorm"
 
-	"github.com/CanonicalLtd/jimm/internal/db"
-	"github.com/CanonicalLtd/jimm/internal/dbmodel"
-	"github.com/CanonicalLtd/jimm/internal/errors"
-	"github.com/CanonicalLtd/jimm/internal/jimm"
-	"github.com/CanonicalLtd/jimm/internal/jimmtest"
+	"github.com/canonical/jimm/internal/db"
+	"github.com/canonical/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/jimm"
+	"github.com/canonical/jimm/internal/jimmtest"
 )
 
 func TestGetCloud(t *testing.T) {

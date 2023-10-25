@@ -7,10 +7,10 @@ import (
 	"github.com/juju/juju/cloud"
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/jimm/internal/jem"
-	"github.com/CanonicalLtd/jimm/internal/mgosession"
-	"github.com/CanonicalLtd/jimm/internal/mongodoc"
-	"github.com/CanonicalLtd/jimm/params"
+	"github.com/canonical/jimm/internal/jem"
+	"github.com/canonical/jimm/internal/mgosession"
+	"github.com/canonical/jimm/internal/mongodoc"
+	"github.com/canonical/jimm/params"
 )
 
 const (

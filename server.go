@@ -14,12 +14,12 @@ import (
 	"gopkg.in/errgo.v1"
 	bakeryv2 "gopkg.in/macaroon-bakery.v2/bakery"
 
-	"github.com/CanonicalLtd/jimm/internal/debugapi"
-	"github.com/CanonicalLtd/jimm/internal/jemserver"
-	"github.com/CanonicalLtd/jimm/internal/jujuapi"
-	"github.com/CanonicalLtd/jimm/internal/pubsub"
-	v2 "github.com/CanonicalLtd/jimm/internal/v2"
-	"github.com/CanonicalLtd/jimm/params"
+	"github.com/canonical/jimm/internal/debugapi"
+	"github.com/canonical/jimm/internal/jemserver"
+	"github.com/canonical/jimm/internal/jujuapi"
+	"github.com/canonical/jimm/internal/pubsub"
+	v2 "github.com/canonical/jimm/internal/v2"
+	"github.com/canonical/jimm/params"
 )
 
 var versions = map[string]jemserver.NewAPIHandlerFunc{

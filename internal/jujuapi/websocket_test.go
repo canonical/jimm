@@ -12,11 +12,11 @@ import (
 	jujuparams "github.com/juju/juju/apiserver/params"
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/jimm/internal/jemtest"
-	"github.com/CanonicalLtd/jimm/internal/jemtest/apitest"
-	"github.com/CanonicalLtd/jimm/internal/jujuapi"
-	"github.com/CanonicalLtd/jimm/internal/mongodoc"
-	"github.com/CanonicalLtd/jimm/params"
+	"github.com/canonical/jimm/internal/jemtest"
+	"github.com/canonical/jimm/internal/jemtest/apitest"
+	"github.com/canonical/jimm/internal/jujuapi"
+	"github.com/canonical/jimm/internal/mongodoc"
+	"github.com/canonical/jimm/params"
 )
 
 type websocketSuite struct {

@@ -19,7 +19,7 @@ import (
 	bakeryv2 "gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/yaml.v2"
 
-	"github.com/CanonicalLtd/jimm/params"
+	"github.com/canonical/jimm/params"
 )
 
 var (

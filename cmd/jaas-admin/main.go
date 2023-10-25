@@ -8,7 +8,7 @@ import (
 	"github.com/juju/cmd"
 	"github.com/juju/juju/juju"
 
-	"github.com/CanonicalLtd/jimm/cmd/jaas-admin/admincmd"
+	"github.com/canonical/jimm/cmd/jaas-admin/admincmd"
 )
 
 func main() {

@@ -16,10 +16,10 @@ import (
 	"github.com/juju/names/v4"
 	"go.uber.org/zap"
 
-	"github.com/CanonicalLtd/jimm/internal/dbmodel"
-	"github.com/CanonicalLtd/jimm/internal/errors"
-	"github.com/CanonicalLtd/jimm/internal/zapctx"
-	"github.com/CanonicalLtd/jimm/internal/zaputil"
+	"github.com/canonical/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/zapctx"
+	"github.com/canonical/jimm/internal/zaputil"
 )
 
 // shuffle is used to randomize the order in which possible controllers

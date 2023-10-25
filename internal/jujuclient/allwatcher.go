@@ -8,7 +8,7 @@ import (
 	jujuerrors "github.com/juju/errors"
 	jujuparams "github.com/juju/juju/apiserver/params"
 
-	"github.com/CanonicalLtd/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/errors"
 )
 
 // WatchAllModels initialises a new AllModelWatcher. On success the watcher

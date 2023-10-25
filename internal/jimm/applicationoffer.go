@@ -15,12 +15,12 @@ import (
 	"github.com/juju/juju/core/crossmodel"
 	"github.com/juju/names/v4"
 
-	"github.com/CanonicalLtd/jimm/internal/apiconn"
-	"github.com/CanonicalLtd/jimm/internal/db"
-	"github.com/CanonicalLtd/jimm/internal/dbmodel"
-	"github.com/CanonicalLtd/jimm/internal/errors"
-	"github.com/CanonicalLtd/jimm/internal/zapctx"
-	"github.com/CanonicalLtd/jimm/internal/zaputil"
+	"github.com/canonical/jimm/internal/apiconn"
+	"github.com/canonical/jimm/internal/db"
+	"github.com/canonical/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/zapctx"
+	"github.com/canonical/jimm/internal/zaputil"
 )
 
 // AddApplicationOfferParams holds parameters for the Offer method.

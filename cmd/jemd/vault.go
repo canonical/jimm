@@ -11,9 +11,9 @@ import (
 	"golang.org/x/sync/errgroup"
 	"gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/jimm/config"
-	"github.com/CanonicalLtd/jimm/internal/servermon"
-	"github.com/CanonicalLtd/jimm/internal/zapctx"
+	"github.com/canonical/jimm/config"
+	"github.com/canonical/jimm/internal/servermon"
+	"github.com/canonical/jimm/internal/zapctx"
 )
 
 // startVaultClient creates a client to the configured vault server,

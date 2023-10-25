@@ -9,11 +9,11 @@ import (
 	"github.com/juju/mgo/v2"
 	"gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/jimm/internal/mgosession"
-	"github.com/CanonicalLtd/jimm/internal/servermon"
-	"github.com/CanonicalLtd/jimm/internal/zapctx"
-	"github.com/CanonicalLtd/jimm/internal/zaputil"
-	"github.com/CanonicalLtd/jimm/params"
+	"github.com/canonical/jimm/internal/mgosession"
+	"github.com/canonical/jimm/internal/servermon"
+	"github.com/canonical/jimm/internal/zapctx"
+	"github.com/canonical/jimm/internal/zaputil"
+	"github.com/canonical/jimm/params"
 )
 
 // Database wraps an mgo.DB ands adds a number of methods for

@@ -10,9 +10,9 @@ import (
 	"github.com/juju/names/v4"
 	"gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/jimm/internal/conv"
-	"github.com/CanonicalLtd/jimm/internal/jujuapi/rpc"
-	"github.com/CanonicalLtd/jimm/params"
+	"github.com/canonical/jimm/internal/conv"
+	"github.com/canonical/jimm/internal/jujuapi/rpc"
+	"github.com/canonical/jimm/params"
 )
 
 func init() {

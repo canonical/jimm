@@ -18,12 +18,12 @@ import (
 	"github.com/juju/mgo/v2"
 	gc "gopkg.in/check.v1"
 
-	jem "github.com/CanonicalLtd/jimm"
-	"github.com/CanonicalLtd/jimm/cmd/jaas-admin/admincmd"
-	"github.com/CanonicalLtd/jimm/internal/auth"
-	"github.com/CanonicalLtd/jimm/internal/jemtest"
-	"github.com/CanonicalLtd/jimm/jemclient"
-	"github.com/CanonicalLtd/jimm/params"
+	jem "github.com/canonical/jimm"
+	"github.com/canonical/jimm/cmd/jaas-admin/admincmd"
+	"github.com/canonical/jimm/internal/auth"
+	"github.com/canonical/jimm/internal/jemtest"
+	"github.com/canonical/jimm/jemclient"
+	"github.com/canonical/jimm/params"
 )
 
 var haWarning = regexp.MustCompile("(?m)^WARNING could not determine if there is a primary HA machine:.*$")

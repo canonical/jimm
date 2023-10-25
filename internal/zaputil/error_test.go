@@ -9,7 +9,7 @@ import (
 	gc "gopkg.in/check.v1"
 	errgo "gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/jimm/internal/zaputil"
+	"github.com/canonical/jimm/internal/zaputil"
 )
 
 type zaputilSuite struct{}

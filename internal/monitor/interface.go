@@ -9,8 +9,8 @@ import (
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/version/v2"
 
-	"github.com/CanonicalLtd/jimm/internal/mongodoc"
-	"github.com/CanonicalLtd/jimm/params"
+	"github.com/canonical/jimm/internal/mongodoc"
+	"github.com/canonical/jimm/params"
 )
 
 // jemInterface holds the interface required by allMonitor to

@@ -11,8 +11,8 @@ import (
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"sigs.k8s.io/yaml"
 
-	"github.com/CanonicalLtd/jimm/internal/db"
-	"github.com/CanonicalLtd/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/db"
+	"github.com/canonical/jimm/internal/dbmodel"
 )
 
 type Environment struct {

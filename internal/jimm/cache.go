@@ -10,7 +10,7 @@ import (
 	"github.com/juju/names/v4"
 	"golang.org/x/sync/singleflight"
 
-	"github.com/CanonicalLtd/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/dbmodel"
 )
 
 // CacheDialer wraps the given Dialer in a cache that will share controller

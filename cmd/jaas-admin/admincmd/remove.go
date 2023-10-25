@@ -7,7 +7,7 @@ import (
 	"github.com/juju/gnuflag"
 	"gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/jimm/params"
+	"github.com/canonical/jimm/params"
 )
 
 type removeCommand struct {

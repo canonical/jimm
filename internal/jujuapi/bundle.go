@@ -8,7 +8,7 @@ import (
 	"github.com/juju/juju/core/permission"
 	"github.com/juju/names/v4"
 
-	"github.com/CanonicalLtd/jimm/internal/jujuapi/rpc"
+	"github.com/canonical/jimm/internal/jujuapi/rpc"
 )
 
 func init() {

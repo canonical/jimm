@@ -11,8 +11,8 @@ import (
 	"github.com/juju/names/v4"
 	"gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/jimm/internal/mongodoc"
-	"github.com/CanonicalLtd/jimm/params"
+	"github.com/canonical/jimm/internal/mongodoc"
+	"github.com/canonical/jimm/params"
 )
 
 // ToCloudCredentialTag creates a juju cloud credential tag from the given

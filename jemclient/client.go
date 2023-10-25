@@ -7,10 +7,10 @@ package jemclient
 import (
 	"gopkg.in/httprequest.v1"
 
-	"github.com/CanonicalLtd/jimm/params"
+	"github.com/canonical/jimm/params"
 )
 
-//go:generate httprequest-generate-client github.com/CanonicalLtd/jimm/internal/v2 Handler client
+//go:generate httprequest-generate-client github.com/canonical/jimm/internal/v2 Handler client
 
 // Client represents the client of a JEM server.
 type Client struct {

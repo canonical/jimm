@@ -12,10 +12,10 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
-	"github.com/CanonicalLtd/jimm/internal/db"
-	"github.com/CanonicalLtd/jimm/internal/dbmodel"
-	"github.com/CanonicalLtd/jimm/internal/jimm"
-	"github.com/CanonicalLtd/jimm/internal/jimmtest"
+	"github.com/canonical/jimm/internal/db"
+	"github.com/canonical/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/jimm"
+	"github.com/canonical/jimm/internal/jimmtest"
 )
 
 func TestMain(m *testing.M) {

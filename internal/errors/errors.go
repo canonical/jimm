@@ -9,7 +9,7 @@ import (
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"go.uber.org/zap"
 
-	"github.com/CanonicalLtd/jimm/internal/zapctx"
+	"github.com/canonical/jimm/internal/zapctx"
 )
 
 // An Error is an error in the JIMM system.

@@ -26,16 +26,16 @@ import (
 	bakeryv2 "gopkg.in/macaroon-bakery.v2/bakery"
 	httpbakeryv2 "gopkg.in/macaroon-bakery.v2/httpbakery"
 
-	"github.com/CanonicalLtd/jimm/internal/auth"
-	"github.com/CanonicalLtd/jimm/internal/dashboard"
-	"github.com/CanonicalLtd/jimm/internal/jem"
-	"github.com/CanonicalLtd/jimm/internal/jemerror"
-	"github.com/CanonicalLtd/jimm/internal/mgosession"
-	"github.com/CanonicalLtd/jimm/internal/monitor"
-	"github.com/CanonicalLtd/jimm/internal/pubsub"
-	"github.com/CanonicalLtd/jimm/internal/zapctx"
-	"github.com/CanonicalLtd/jimm/internal/zaputil"
-	"github.com/CanonicalLtd/jimm/params"
+	"github.com/canonical/jimm/internal/auth"
+	"github.com/canonical/jimm/internal/dashboard"
+	"github.com/canonical/jimm/internal/jem"
+	"github.com/canonical/jimm/internal/jemerror"
+	"github.com/canonical/jimm/internal/mgosession"
+	"github.com/canonical/jimm/internal/monitor"
+	"github.com/canonical/jimm/internal/pubsub"
+	"github.com/canonical/jimm/internal/zapctx"
+	"github.com/canonical/jimm/internal/zaputil"
+	"github.com/canonical/jimm/params"
 )
 
 // NewAPIHandlerFunc is a function that returns set of httprequest

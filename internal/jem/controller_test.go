@@ -15,12 +15,12 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/jimm/internal/conv"
-	"github.com/CanonicalLtd/jimm/internal/jem"
-	"github.com/CanonicalLtd/jimm/internal/jem/jimmdb"
-	"github.com/CanonicalLtd/jimm/internal/jemtest"
-	"github.com/CanonicalLtd/jimm/internal/mongodoc"
-	"github.com/CanonicalLtd/jimm/params"
+	"github.com/canonical/jimm/internal/conv"
+	"github.com/canonical/jimm/internal/jem"
+	"github.com/canonical/jimm/internal/jem/jimmdb"
+	"github.com/canonical/jimm/internal/jemtest"
+	"github.com/canonical/jimm/internal/mongodoc"
+	"github.com/canonical/jimm/params"
 )
 
 type addControllerSuite struct {

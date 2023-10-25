@@ -17,7 +17,7 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/CanonicalLtd/jimm/internal/zapctx"
+	"github.com/canonical/jimm/internal/zapctx"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/version/v2"
 	"github.com/julienschmidt/httprouter"

@@ -6,7 +6,7 @@ import (
 	"github.com/juju/names/v4"
 	"gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/jimm/params"
+	"github.com/canonical/jimm/params"
 )
 
 // ErrLocalUser is the error returned when parsing a juju user that is

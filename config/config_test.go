@@ -13,8 +13,8 @@ import (
 	gc "gopkg.in/check.v1"
 	bakeryv2 "gopkg.in/macaroon-bakery.v2/bakery"
 
-	"github.com/CanonicalLtd/jimm/config"
-	"github.com/CanonicalLtd/jimm/params"
+	"github.com/canonical/jimm/config"
+	"github.com/canonical/jimm/params"
 )
 
 func TestPackage(t *testing.T) {

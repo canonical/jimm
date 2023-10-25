@@ -11,7 +11,7 @@ import (
 	"github.com/juju/names/v4"
 	"gorm.io/gorm"
 
-	"github.com/CanonicalLtd/jimm/internal/conv"
+	"github.com/canonical/jimm/internal/conv"
 )
 
 // An ApplicationOffer is an offer for an application.

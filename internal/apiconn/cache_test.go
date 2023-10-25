@@ -16,8 +16,8 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/jimm/internal/apiconn"
-	"github.com/CanonicalLtd/jimm/internal/jemtest"
+	"github.com/canonical/jimm/internal/apiconn"
+	"github.com/canonical/jimm/internal/jemtest"
 )
 
 type cacheSuite struct {

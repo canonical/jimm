@@ -18,14 +18,14 @@ import (
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/jimm/internal/apiconn"
-	"github.com/CanonicalLtd/jimm/internal/auth"
-	"github.com/CanonicalLtd/jimm/internal/conv"
-	"github.com/CanonicalLtd/jimm/internal/jem/jimmdb"
-	"github.com/CanonicalLtd/jimm/internal/mongodoc"
-	"github.com/CanonicalLtd/jimm/internal/zapctx"
-	"github.com/CanonicalLtd/jimm/internal/zaputil"
-	"github.com/CanonicalLtd/jimm/params"
+	"github.com/canonical/jimm/internal/apiconn"
+	"github.com/canonical/jimm/internal/auth"
+	"github.com/canonical/jimm/internal/conv"
+	"github.com/canonical/jimm/internal/jem/jimmdb"
+	"github.com/canonical/jimm/internal/mongodoc"
+	"github.com/canonical/jimm/internal/zapctx"
+	"github.com/canonical/jimm/internal/zaputil"
+	"github.com/canonical/jimm/params"
 )
 
 // ValidateModelUpgrade validates if a model is allowed to perform an upgrade.

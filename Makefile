@@ -3,7 +3,7 @@
 
 export GO111MODULE=on
 
-PROJECT := github.com/CanonicalLtd/jimm
+PROJECT := github.com/canonical/jimm
 
 GIT_COMMIT := $(shell git rev-parse --verify HEAD)
 GIT_VERSION := $(shell git describe --dirty)

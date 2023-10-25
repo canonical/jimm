@@ -3,9 +3,9 @@
 package jujuapi
 
 import (
-	"github.com/CanonicalLtd/jimm/internal/jem"
-	"github.com/CanonicalLtd/jimm/internal/jujuapi/rpc"
-	"github.com/CanonicalLtd/jimm/internal/mongodoc"
+	"github.com/canonical/jimm/internal/jem"
+	"github.com/canonical/jimm/internal/jujuapi/rpc"
+	"github.com/canonical/jimm/internal/mongodoc"
 )
 
 // modelRoot is the root for endpoints served on model connections.

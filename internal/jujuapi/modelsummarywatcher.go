@@ -13,11 +13,11 @@ import (
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/jimm/internal/jujuapi/rpc"
-	"github.com/CanonicalLtd/jimm/internal/pubsub"
-	"github.com/CanonicalLtd/jimm/internal/zapctx"
-	"github.com/CanonicalLtd/jimm/internal/zaputil"
-	"github.com/CanonicalLtd/jimm/params"
+	"github.com/canonical/jimm/internal/jujuapi/rpc"
+	"github.com/canonical/jimm/internal/pubsub"
+	"github.com/canonical/jimm/internal/zapctx"
+	"github.com/canonical/jimm/internal/zaputil"
+	"github.com/canonical/jimm/params"
 )
 
 func init() {

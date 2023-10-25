@@ -8,8 +8,8 @@ import (
 	jujutesting "github.com/juju/testing"
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/jimm/internal/jemtest"
-	"github.com/CanonicalLtd/jimm/internal/mgosession"
+	"github.com/canonical/jimm/internal/jemtest"
+	"github.com/canonical/jimm/internal/mgosession"
 )
 
 type suite struct {

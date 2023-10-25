@@ -10,8 +10,8 @@ import (
 	"github.com/juju/names/v4"
 	"go.uber.org/zap"
 
-	"github.com/CanonicalLtd/jimm/internal/errors"
-	"github.com/CanonicalLtd/jimm/internal/zapctx"
+	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/zapctx"
 )
 
 // SupportsCheckCredentialModels reports whether the controller supports

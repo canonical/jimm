@@ -9,11 +9,11 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
 
-	"github.com/CanonicalLtd/jimm/internal/auth"
-	"github.com/CanonicalLtd/jimm/internal/jem"
-	"github.com/CanonicalLtd/jimm/internal/jemerror"
-	"github.com/CanonicalLtd/jimm/internal/jemserver"
-	"github.com/CanonicalLtd/jimm/version"
+	"github.com/canonical/jimm/internal/auth"
+	"github.com/canonical/jimm/internal/jem"
+	"github.com/canonical/jimm/internal/jemerror"
+	"github.com/canonical/jimm/internal/jemserver"
+	"github.com/canonical/jimm/version"
 )
 
 // NewAPIHandler returns a new API handler that serves the /debug

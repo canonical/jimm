@@ -8,7 +8,7 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/juju/mgo/v2/bson"
 
-	"github.com/CanonicalLtd/jimm/internal/mongodoc"
+	"github.com/canonical/jimm/internal/mongodoc"
 )
 
 func TestApplicationOfferAccessMapRoundTrip(t *testing.T) {

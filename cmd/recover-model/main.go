@@ -16,11 +16,11 @@ import (
 	"github.com/juju/names/v4"
 	errgo "gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/jimm/config"
-	"github.com/CanonicalLtd/jimm/internal/jem"
-	"github.com/CanonicalLtd/jimm/internal/mgosession"
-	"github.com/CanonicalLtd/jimm/internal/mongodoc"
-	"github.com/CanonicalLtd/jimm/params"
+	"github.com/canonical/jimm/config"
+	"github.com/canonical/jimm/internal/jem"
+	"github.com/canonical/jimm/internal/mgosession"
+	"github.com/canonical/jimm/internal/mongodoc"
+	"github.com/canonical/jimm/params"
 )
 
 var configFile = flag.String("config", "config.yaml", "configuration `file` path")

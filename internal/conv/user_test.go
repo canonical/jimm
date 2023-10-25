@@ -5,8 +5,8 @@ package conv_test
 import (
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/jimm/internal/conv"
-	"github.com/CanonicalLtd/jimm/params"
+	"github.com/canonical/jimm/internal/conv"
+	"github.com/canonical/jimm/params"
 )
 
 type userSuite struct{}

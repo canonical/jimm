@@ -8,7 +8,7 @@ package mgosession
 import (
 	"context"
 
-	"github.com/CanonicalLtd/jimm/internal/zapctx"
+	"github.com/canonical/jimm/internal/zapctx"
 	"github.com/juju/mgo/v2"
 	"github.com/juju/mgosession/v2"
 )

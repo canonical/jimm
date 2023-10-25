@@ -9,8 +9,8 @@ import (
 	jujuparams "github.com/juju/juju/apiserver/params"
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/jimm/internal/apiconn"
-	"github.com/CanonicalLtd/jimm/internal/jemtest"
+	"github.com/canonical/jimm/internal/apiconn"
+	"github.com/canonical/jimm/internal/jemtest"
 )
 
 type modelSummaryWatcherSuite struct {

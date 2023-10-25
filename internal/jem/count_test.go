@@ -8,8 +8,8 @@ import (
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/jimm/internal/jem"
-	"github.com/CanonicalLtd/jimm/params"
+	"github.com/canonical/jimm/internal/jem"
+	"github.com/canonical/jimm/params"
 )
 
 type countSuite struct{}

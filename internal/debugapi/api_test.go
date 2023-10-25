@@ -9,11 +9,11 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/httprequest.v1"
 
-	"github.com/CanonicalLtd/jimm/internal/debugapi"
-	"github.com/CanonicalLtd/jimm/internal/jemtest"
-	"github.com/CanonicalLtd/jimm/internal/jemtest/apitest"
-	"github.com/CanonicalLtd/jimm/params"
-	"github.com/CanonicalLtd/jimm/version"
+	"github.com/canonical/jimm/internal/debugapi"
+	"github.com/canonical/jimm/internal/jemtest"
+	"github.com/canonical/jimm/internal/jemtest/apitest"
+	"github.com/canonical/jimm/params"
+	"github.com/canonical/jimm/version"
 )
 
 type APISuite struct {

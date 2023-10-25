@@ -11,7 +11,7 @@ import (
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/jimm/internal/jujuapi"
+	"github.com/canonical/jimm/internal/jujuapi"
 )
 
 type modelSummaryWatcherSuite struct{}

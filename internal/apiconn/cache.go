@@ -9,8 +9,8 @@ import (
 	"golang.org/x/sync/singleflight"
 	"gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/jimm/internal/zapctx"
-	"github.com/CanonicalLtd/jimm/internal/zaputil"
+	"github.com/canonical/jimm/internal/zapctx"
+	"github.com/canonical/jimm/internal/zaputil"
 )
 
 // Cache holds a cache of connections to API servers.

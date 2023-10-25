@@ -15,8 +15,8 @@ import (
 	cookiejar "github.com/juju/persistent-cookiejar"
 	"gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/jimm/jemclient"
-	"github.com/CanonicalLtd/jimm/params"
+	"github.com/canonical/jimm/jemclient"
+	"github.com/canonical/jimm/params"
 )
 
 // jujuLoggingConfigEnvKey matches osenv.JujuLoggingConfigEnvKey

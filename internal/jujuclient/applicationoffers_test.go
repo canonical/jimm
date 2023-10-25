@@ -14,8 +14,8 @@ import (
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/jimm/internal/conv"
-	"github.com/CanonicalLtd/jimm/internal/jemtest"
+	"github.com/canonical/jimm/internal/conv"
+	"github.com/canonical/jimm/internal/jemtest"
 )
 
 type applicationoffersSuite struct {

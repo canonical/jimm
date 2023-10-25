@@ -8,7 +8,7 @@ considered a work in progress.
 To start using JIMM, first ensure you have a valid Go environment,
 then run the following:
 
-    go get github.com/CanonicalLtd/jimm
+    go get github.com/canonical/jimm
 
 ## Go dependencies
 

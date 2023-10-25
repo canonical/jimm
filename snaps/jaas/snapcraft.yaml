@@ -10,14 +10,14 @@ plugs:
   dot-local-share-juju:
     interface: personal-files
     read:
-    - $HOME/.local/share/juju
+      - $HOME/.local/share/juju
 
 apps:
   jaas:
     command: bin/wrappers/jaas
     plugs:
-     - dot-local-share-juju
-     - network
+      - dot-local-share-juju
+      - network
 
 parts:
   jaas:
@@ -25,11 +25,11 @@ parts:
     source: ../..
     source-type: git
     go-packages:
-    - github.com/CanonicalLtd/jimm/cmd/jaas-admin
+      - github.com/canonical/jimm/cmd/jaas-admin
     go-private:
-    - github.com/CanonicalLtd
+      - github.com/canonical
     prime:
-     - bin/jaas-admin
+      - bin/jaas-admin
     override-build: |
       set -ex
       GIT_COMMIT=`git -C $SNAPCRAFT_PART_SRC rev-parse --verify HEAD`

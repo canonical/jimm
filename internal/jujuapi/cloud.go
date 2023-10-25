@@ -12,13 +12,13 @@ import (
 	"github.com/juju/names/v4"
 	"gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/jimm/internal/apiconn"
-	"github.com/CanonicalLtd/jimm/internal/cloudcred"
-	"github.com/CanonicalLtd/jimm/internal/conv"
-	"github.com/CanonicalLtd/jimm/internal/jem"
-	"github.com/CanonicalLtd/jimm/internal/jujuapi/rpc"
-	"github.com/CanonicalLtd/jimm/internal/mongodoc"
-	"github.com/CanonicalLtd/jimm/params"
+	"github.com/canonical/jimm/internal/apiconn"
+	"github.com/canonical/jimm/internal/cloudcred"
+	"github.com/canonical/jimm/internal/conv"
+	"github.com/canonical/jimm/internal/jem"
+	"github.com/canonical/jimm/internal/jujuapi/rpc"
+	"github.com/canonical/jimm/internal/mongodoc"
+	"github.com/canonical/jimm/params"
 )
 
 func init() {

@@ -2,7 +2,7 @@
 
 package jimm
 
-import "github.com/CanonicalLtd/jimm/internal/dbmodel"
+import "github.com/canonical/jimm/internal/dbmodel"
 
 var (
 	DetermineAccessLevelAfterRevoke = determineAccessLevelAfterRevoke

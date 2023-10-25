@@ -5,8 +5,8 @@ package jem
 import (
 	"time"
 
-	"github.com/CanonicalLtd/jimm/internal/mongodoc"
-	"github.com/CanonicalLtd/jimm/params"
+	"github.com/canonical/jimm/internal/mongodoc"
+	"github.com/canonical/jimm/params"
 )
 
 // UpdateCount updates the count document to record the count

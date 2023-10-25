@@ -10,7 +10,7 @@ import (
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
 
-	"github.com/CanonicalLtd/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/errors"
 )
 
 // CreateModel creates a new model as specified by the given model

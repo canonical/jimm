@@ -9,8 +9,8 @@ import (
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/jimm/internal/conv"
-	"github.com/CanonicalLtd/jimm/params"
+	"github.com/canonical/jimm/internal/conv"
+	"github.com/canonical/jimm/params"
 )
 
 // Offer creates a new ApplicationOffer on the controller. Offer uses the

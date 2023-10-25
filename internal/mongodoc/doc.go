@@ -16,7 +16,7 @@ import (
 	"github.com/juju/version/v2"
 	"gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/jimm/params"
+	"github.com/canonical/jimm/params"
 )
 
 // Controller holds information on a given controller.

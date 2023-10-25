@@ -8,7 +8,7 @@ import (
 	"github.com/juju/juju/api"
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/jimm/internal/jujuapi"
+	"github.com/canonical/jimm/internal/jujuapi"
 )
 
 type pingerSuite struct {

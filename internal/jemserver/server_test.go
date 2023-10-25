@@ -19,14 +19,14 @@ import (
 	"gopkg.in/httprequest.v1"
 	bakeryv2 "gopkg.in/macaroon-bakery.v2/bakery"
 
-	"github.com/CanonicalLtd/jimm/internal/auth"
-	"github.com/CanonicalLtd/jimm/internal/debugapi"
-	"github.com/CanonicalLtd/jimm/internal/jem"
-	"github.com/CanonicalLtd/jimm/internal/jemserver"
-	"github.com/CanonicalLtd/jimm/internal/jemtest"
-	"github.com/CanonicalLtd/jimm/internal/mgosession"
-	"github.com/CanonicalLtd/jimm/internal/mongodoc"
-	"github.com/CanonicalLtd/jimm/params"
+	"github.com/canonical/jimm/internal/auth"
+	"github.com/canonical/jimm/internal/debugapi"
+	"github.com/canonical/jimm/internal/jem"
+	"github.com/canonical/jimm/internal/jemserver"
+	"github.com/canonical/jimm/internal/jemtest"
+	"github.com/canonical/jimm/internal/mgosession"
+	"github.com/canonical/jimm/internal/mongodoc"
+	"github.com/canonical/jimm/params"
 )
 
 var testContext = context.Background()

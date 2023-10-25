@@ -14,12 +14,12 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/tomb.v2"
 
-	"github.com/CanonicalLtd/jimm/internal/jem"
-	"github.com/CanonicalLtd/jimm/internal/mongodoc"
-	"github.com/CanonicalLtd/jimm/internal/servermon"
-	"github.com/CanonicalLtd/jimm/internal/zapctx"
-	"github.com/CanonicalLtd/jimm/internal/zaputil"
-	"github.com/CanonicalLtd/jimm/params"
+	"github.com/canonical/jimm/internal/jem"
+	"github.com/canonical/jimm/internal/mongodoc"
+	"github.com/canonical/jimm/internal/servermon"
+	"github.com/canonical/jimm/internal/zapctx"
+	"github.com/canonical/jimm/internal/zaputil"
+	"github.com/canonical/jimm/params"
 )
 
 var errControllerRemoved = errgo.New("controller has been removed")

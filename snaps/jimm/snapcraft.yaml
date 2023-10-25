@@ -1,5 +1,5 @@
 name: jimm
-version: '0.26.0'
+version: "0.26.0"
 summary: Juju Intelligent Model Manager
 description: Multi-cloud controller for managing JAAS models.
 grade: stable
@@ -11,19 +11,19 @@ apps:
     command: bin/wrappers/jimm
     daemon: simple
     plugs:
-     - network
-     - network-bind
+      - network
+      - network-bind
 
 parts:
   jimm:
     plugin: go
     source: .
     go-packages:
-    - github.com/CanonicalLtd/jimm
-    go-importpath: github.com/CanonicalLtd/jimm
+      - github.com/canonical/jimm
+    go-importpath: github.com/canonical/jimm
     build-packages:
-    - git
-    - gcc
+      - git
+      - gcc
     override-build: |-
       set -ex
       ls -lah ~/src
@@ -32,7 +32,7 @@ parts:
       GIT_VERSION=`git -C $SNAPCRAFT_PART_SRC describe --dirty --abbrev=0`
       cp ~/src/version/init.go.tmpl ~/src/version/init.go
       gofmt -w -r "unknownVersion -> Version{GitCommit: \"${GIT_COMMIT}\", Version: \"${GIT_VERSION}\",}" ~/src/version/init.go
-      go build -a github.com/CanonicalLtd/jimm/cmd/jemd
+      go build -a github.com/canonical/jimm/cmd/jemd
 
   files:
     plugin: dump
@@ -41,5 +41,5 @@ parts:
       config.yaml: etc/jimm/config.yaml
       jimm.wrapper: bin/wrappers/jimm
     prime:
-    - etc/jimm/config.yaml
-    - bin/wrappers/jimm
+      - etc/jimm/config.yaml
+      - bin/wrappers/jimm

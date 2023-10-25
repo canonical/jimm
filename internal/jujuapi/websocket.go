@@ -13,16 +13,16 @@ import (
 	"github.com/juju/juju/rpc/jsoncodec"
 	"gopkg.in/errgo.v1"
 
-	apiparams "github.com/CanonicalLtd/jimm/api/params"
-	"github.com/CanonicalLtd/jimm/internal/apiconn"
-	"github.com/CanonicalLtd/jimm/internal/auth"
-	"github.com/CanonicalLtd/jimm/internal/conv"
-	"github.com/CanonicalLtd/jimm/internal/jem"
-	"github.com/CanonicalLtd/jimm/internal/jemserver"
-	"github.com/CanonicalLtd/jimm/internal/servermon"
-	"github.com/CanonicalLtd/jimm/internal/zapctx"
-	"github.com/CanonicalLtd/jimm/internal/zaputil"
-	"github.com/CanonicalLtd/jimm/params"
+	apiparams "github.com/canonical/jimm/api/params"
+	"github.com/canonical/jimm/internal/apiconn"
+	"github.com/canonical/jimm/internal/auth"
+	"github.com/canonical/jimm/internal/conv"
+	"github.com/canonical/jimm/internal/jem"
+	"github.com/canonical/jimm/internal/jemserver"
+	"github.com/canonical/jimm/internal/servermon"
+	"github.com/canonical/jimm/internal/zapctx"
+	"github.com/canonical/jimm/internal/zaputil"
+	"github.com/canonical/jimm/params"
 )
 
 const (

@@ -11,10 +11,10 @@ import (
 	"github.com/rogpeppe/fastuuid"
 	"gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/jimm/internal/jujuapi/rpc"
-	"github.com/CanonicalLtd/jimm/internal/mongodoc"
-	"github.com/CanonicalLtd/jimm/params"
-	jimmversion "github.com/CanonicalLtd/jimm/version"
+	"github.com/canonical/jimm/internal/jujuapi/rpc"
+	"github.com/canonical/jimm/internal/mongodoc"
+	"github.com/canonical/jimm/params"
+	jimmversion "github.com/canonical/jimm/version"
 )
 
 func init() {

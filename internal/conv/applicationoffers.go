@@ -5,7 +5,7 @@ package conv
 import (
 	"github.com/juju/juju/core/crossmodel"
 
-	"github.com/CanonicalLtd/jimm/params"
+	"github.com/canonical/jimm/params"
 )
 
 // ToOfferURL creates an offer URL for the given model and offer name.

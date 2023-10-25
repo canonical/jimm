@@ -18,16 +18,16 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
 
-	"github.com/CanonicalLtd/jimm/internal/auth"
-	"github.com/CanonicalLtd/jimm/internal/jem"
-	"github.com/CanonicalLtd/jimm/internal/jem/jimmdb"
-	"github.com/CanonicalLtd/jimm/internal/jemerror"
-	"github.com/CanonicalLtd/jimm/internal/jemserver"
-	"github.com/CanonicalLtd/jimm/internal/mongodoc"
-	"github.com/CanonicalLtd/jimm/internal/servermon"
-	"github.com/CanonicalLtd/jimm/internal/zapctx"
-	"github.com/CanonicalLtd/jimm/internal/zaputil"
-	"github.com/CanonicalLtd/jimm/params"
+	"github.com/canonical/jimm/internal/auth"
+	"github.com/canonical/jimm/internal/jem"
+	"github.com/canonical/jimm/internal/jem/jimmdb"
+	"github.com/canonical/jimm/internal/jemerror"
+	"github.com/canonical/jimm/internal/jemserver"
+	"github.com/canonical/jimm/internal/mongodoc"
+	"github.com/canonical/jimm/internal/servermon"
+	"github.com/canonical/jimm/internal/zapctx"
+	"github.com/canonical/jimm/internal/zaputil"
+	"github.com/canonical/jimm/params"
 )
 
 const (
