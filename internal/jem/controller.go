@@ -407,3 +407,28 @@ func (j *JEM) UpdateMigratedModel(ctx context.Context, id identchecker.ACLIdenti
 
 	return nil
 }
+
+func (j *JEM) InitiateMigration(ctx context.Context, id identchecker.ACLIdentity, spec jujuparams.MigrationSpec) (*jujuparams.InitiateMigrationResult, error) {
+	mt, err := names.ParseModelTag(spec.ModelTag)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+
+	model := mongodoc.Model{UUID: mt.Id()}
+	if err := j.GetModel(ctx, id, jujuparams.ModelAdminAccess, &model); err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
+	}
+
+	ctl := mongodoc.Controller{Path: model.Controller}
+	if err := j.DB.GetController(ctx, &ctl); err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+
+	conn, err := j.OpenAPIFromDoc(ctx, &ctl)
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(ErrAPIConnection))
+	}
+	defer conn.Close()
+
+	return conn.InitiateMigration(ctx, spec)
+}

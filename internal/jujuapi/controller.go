@@ -119,7 +119,7 @@ func (r *controllerRoot) ControllerVersion(ctx context.Context) (jujuparams.Cont
 }
 
 func (r *controllerRoot) WatchModelSummaries(ctx context.Context) (jujuparams.SummaryWatcherID, error) {
-	// TODO(mhilton) move this somewhere where it will be reused accross connections
+	// TODO(mhilton) move this somewhere where it will be reused across connections
 	r.mu.Lock()
 	if r.generator == nil {
 		var err error
@@ -203,4 +203,23 @@ func (r *controllerRoot) ModelConfig() (jujuparams.ModelConfigResults, error) {
 		Code:    jujuparams.CodeUnauthorized,
 		Message: "permission denied",
 	}
+}
+
+// InitiateMigration attempts to begin the migration of one or
+// more models to other controllers.
+func (r *controllerRoot) InitiateMigration(req jujuparams.InitiateMigrationArgs) (
+	jujuparams.InitiateMigrationResults, error,
+) {
+	results := jujuparams.InitiateMigrationResults{
+		Results: make([]jujuparams.InitiateMigrationResult, len(req.Specs)),
+	}
+	for i, spec := range req.Specs {
+		migrationResult, err := r.jem.InitiateMigration(context.Background(), r.identity, spec)
+		if err != nil {
+			results.Results[i].Error = mapError(err)
+		} else {
+			results.Results[i] = *migrationResult
+		}
+	}
+	return results, nil
 }
