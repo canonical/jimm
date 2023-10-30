@@ -499,17 +499,19 @@ func (j *JIMM) ImportModel(ctx context.Context, user *openfga.User, controllerNa
 	model.ControllerID = controller.ID
 	model.Controller = controller
 
-	var ownerString string
+	var ownerTag names.UserTag
 	if newOwner != "" {
 		// Switch the model to be owned by the specified user.
-		ownerString = names.UserTagKind + "-" + newOwner
+		if !names.IsValidUser(newOwner) {
+			return errors.E(op, errors.CodeBadRequest, "invalid new username for new model owner")
+		}
+		ownerTag = names.NewUserTag(newOwner)
 	} else {
 		// Use the model owner user
-		ownerString = modelInfo.OwnerTag
-	}
-	ownerTag, err := names.ParseUserTag(ownerString)
-	if err != nil {
-		return errors.E(op, err)
+		ownerTag, err = names.ParseUserTag(modelInfo.OwnerTag)
+		if err != nil {
+			return errors.E(op, fmt.Sprintf("invalid username %s from original model owner", modelInfo.OwnerTag))
+		}
 	}
 	if ownerTag.IsLocal() {
 		return errors.E(op, "cannot import model from local user, try --owner to switch the model owner")

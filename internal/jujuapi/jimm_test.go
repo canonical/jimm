@@ -21,6 +21,7 @@ import (
 	apiparams "github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/jimmtest"
 	"github.com/canonical/jimm/internal/jujuapi"
 	"github.com/canonical/jimm/internal/openfga"
@@ -652,6 +653,54 @@ func (s *jimmSuite) TestAddCloudToController(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	c.Assert(cloud.Name, gc.DeepEquals, "test-cloud")
 	c.Assert(cloud.Type, gc.DeepEquals, "kubernetes")
+}
+
+func (s *jimmSuite) TestAddExistingCloudToController(c *gc.C) {
+	ctx := context.Background()
+	u := dbmodel.User{
+		Username: "alice@external",
+	}
+	err := s.JIMM.Database.GetUser(ctx, &u)
+	c.Assert(err, gc.IsNil)
+
+	conn := s.open(c, nil, "alice@external")
+	defer conn.Close()
+
+	force := true
+	req := apiparams.AddCloudToControllerRequest{
+		ControllerName: "controller-1",
+		AddCloudArgs: jujuparams.AddCloudArgs{
+			Name: "test-cloud",
+			Cloud: jujuapi.CloudToParams(cloud.Cloud{
+				Name:             "test-cloud",
+				Type:             "MAAS",
+				AuthTypes:        cloud.AuthTypes{cloud.OAuth1AuthType},
+				Endpoint:         "https://0.1.2.3:5678",
+				IdentityEndpoint: "https://0.1.2.3:5679",
+				StorageEndpoint:  "https://0.1.2.3:5680",
+			}),
+			Force: &force,
+		},
+	}
+	err = conn.APICall("JIMM", 3, "", "AddCloudToController", &req, nil)
+	c.Assert(err, gc.Equals, nil)
+	user := openfga.NewUser(&u, s.OFGAClient)
+	cloud, err := s.JIMM.GetCloud(context.Background(), user, names.NewCloudTag("test-cloud"))
+	c.Assert(err, gc.IsNil)
+	c.Assert(cloud.Name, gc.DeepEquals, "test-cloud")
+	c.Assert(cloud.Type, gc.DeepEquals, "MAAS")
+	// Simulate the cloud being present on the Juju controller but not in JIMM.
+	err = s.JIMM.Database.DeleteCloud(ctx, &cloud)
+	c.Assert(err, gc.IsNil)
+	cloud, err = s.JIMM.GetCloud(context.Background(), user, names.NewCloudTag("test-cloud"))
+	c.Assert(err, gc.NotNil)
+	c.Assert(errors.ErrorCode(err), gc.Equals, errors.CodeNotFound)
+	err = conn.APICall("JIMM", 3, "", "AddCloudToController", &req, nil)
+	c.Assert(err, gc.Equals, nil)
+	cloud, err = s.JIMM.GetCloud(context.Background(), user, names.NewCloudTag("test-cloud"))
+	c.Assert(err, gc.IsNil)
+	c.Assert(cloud.Name, gc.DeepEquals, "test-cloud")
+	c.Assert(cloud.Type, gc.DeepEquals, "MAAS")
 }
 
 func (s *jimmSuite) TestRemoveCloudFromController(c *gc.C) {

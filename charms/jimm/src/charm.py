@@ -27,6 +27,7 @@ from ops.model import (
     BlockedStatus,
     MaintenanceStatus,
     ModelError,
+    Relation,
     WaitingStatus,
 )
 
@@ -148,13 +149,7 @@ class JimmCharm(SystemdCharm):
 
         dashboard_relation = self.model.get_relation("dashboard")
         if dashboard_relation:
-            dashboard_relation.data[self.app].update(
-                {
-                    "controller-url": "wss://{}".format(self.config["dns-name"]),
-                    "identity-provider-url": self.config["candid-url"],
-                    "is-juju": str(False),
-                }
-            )
+            self._update_dashboard_relation(dashboard_relation)
 
     def _on_leader_elected(self, _):
         """Update the JIMM configuration that comes from unit
@@ -373,13 +368,18 @@ class JimmCharm(SystemdCharm):
         subprocess.run(cmd, capture_output=True, check=True)
 
     def _on_dashboard_relation_joined(self, event):
-        event.relation.data[self.app].update(
-            {
-                "controller_url": "wss://{}".format(self.config["dns-name"]),
-                "identity_provider_url": self.config["candid-url"],
-                "is_juju": str(False),
-            }
-        )
+        if self.model.unit.is_leader():
+            self._update_dashboard_relation(event.relation)
+
+    def _update_dashboard_relation(self, relation: Relation):
+        if self.model.unit.is_leader():
+            relation.data[self.app].update(
+                {
+                    "controller_url": "wss://{}".format(self.config["dns-name"]),
+                    "identity_provider_url": self.config["candid-url"],
+                    "is_juju": str(False),
+                }
+            )
 
     def _on_openfga_store_created(self, event: OpenFGAStoreCreateEvent):
         if not event.store_id:
