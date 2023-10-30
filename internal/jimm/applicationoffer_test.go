@@ -971,9 +971,6 @@ func TestGetApplicationOffer(t *testing.T) {
 		Regions: []dbmodel.CloudRegion{{
 			Name: "test-region-1",
 		}},
-		Users: []dbmodel.UserCloudAccess{{
-			Username: u.Username,
-		}},
 	}
 	c.Assert(j.Database.DB.Create(&cloud).Error, qt.IsNil)
 
@@ -1274,9 +1271,6 @@ func TestOffer(t *testing.T) {
 				Regions: []dbmodel.CloudRegion{{
 					Name: "test-region-1",
 				}},
-				Users: []dbmodel.UserCloudAccess{{
-					Username: u.Username,
-				}},
 			}
 			c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
 
@@ -1403,9 +1397,6 @@ func TestOffer(t *testing.T) {
 				Type: "test-provider",
 				Regions: []dbmodel.CloudRegion{{
 					Name: "test-region-1",
-				}},
-				Users: []dbmodel.UserCloudAccess{{
-					Username: u.Username,
 				}},
 			}
 			c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
@@ -1534,9 +1525,6 @@ func TestOffer(t *testing.T) {
 				Regions: []dbmodel.CloudRegion{{
 					Name: "test-region-1",
 				}},
-				Users: []dbmodel.UserCloudAccess{{
-					Username: u.Username,
-				}},
 			}
 			c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
 
@@ -1637,9 +1625,6 @@ func TestOffer(t *testing.T) {
 				Regions: []dbmodel.CloudRegion{{
 					Name: "test-region-1",
 				}},
-				Users: []dbmodel.UserCloudAccess{{
-					Username: u.Username,
-				}},
 			}
 			c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
 
@@ -1733,9 +1718,6 @@ func TestOffer(t *testing.T) {
 				Regions: []dbmodel.CloudRegion{{
 					Name: "test-region-1",
 				}},
-				Users: []dbmodel.UserCloudAccess{{
-					Username: u.Username,
-				}},
 			}
 			c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
 
@@ -1828,9 +1810,6 @@ func TestOffer(t *testing.T) {
 				Type: "test-provider",
 				Regions: []dbmodel.CloudRegion{{
 					Name: "test-region-1",
-				}},
-				Users: []dbmodel.UserCloudAccess{{
-					Username: u.Username,
 				}},
 			}
 			c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
@@ -1966,9 +1945,6 @@ func TestOfferAssertOpenFGARelationsExist(t *testing.T) {
 			Type: "test-provider",
 			Regions: []dbmodel.CloudRegion{{
 				Name: "test-region-1",
-			}},
-			Users: []dbmodel.UserCloudAccess{{
-				Username: u.Username,
 			}},
 		}
 		c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)

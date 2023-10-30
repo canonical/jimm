@@ -49,9 +49,6 @@ type Cloud struct {
 
 	// Config contains the configuration associated with this cloud.
 	Config Map
-
-	// Users contains the users that are authorized on this cloud.
-	Users []UserCloudAccess `gorm:"foreignkey:CloudName;references:Name"`
 }
 
 // Tag returns a names.Tag for this cloud.
@@ -70,16 +67,6 @@ func (c Cloud) ResourceTag() names.CloudTag {
 // SetTag sets the name of the cloud to the value from the given cloud tag.
 func (c *Cloud) SetTag(t names.CloudTag) {
 	c.Name = t.Id()
-}
-
-// UserAccess returns the access level of the given user on the cloud.
-func (c Cloud) UserAccess(user *User) string {
-	for _, u := range c.Users {
-		if u.Username == user.Username {
-			return u.Access
-		}
-	}
-	return ""
 }
 
 // Region returns the cloud region with the given name. If there is no
@@ -160,10 +147,9 @@ func (c Cloud) ToJujuCloudDetails() jujuparams.CloudDetails {
 func (c Cloud) ToJujuCloudInfo() jujuparams.CloudInfo {
 	var ci jujuparams.CloudInfo
 	ci.CloudDetails = c.ToJujuCloudDetails()
-	ci.Users = make([]jujuparams.CloudUserInfo, len(c.Users))
-	for i, u := range c.Users {
-		ci.Users[i] = u.ToJujuCloudUserInfo()
-	}
+	// TODO(Kian) CSS-6040 Determine whether to combine OpenFGA Tuples
+	// with Postgres data objects for a consolidated view.
+	ci.Users = nil
 	return ci
 }
 

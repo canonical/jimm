@@ -66,12 +66,6 @@ func (j *JIMM) GetCloud(ctx context.Context, u *openfga.User, tag names.CloudTag
 	case "admin":
 		return cl, nil
 	default:
-		// at this point the user must have add-model permission on the cloud
-		cl.Users = []dbmodel.UserCloudAccess{{
-			Username: u.Username,
-			User:     *u.User,
-			Access:   "add-model",
-		}}
 		return cl, nil
 	}
 }
@@ -99,14 +93,6 @@ func (j *JIMM) ForEachUserCloud(ctx context.Context, user *openfga.User, f func(
 			// we skip this cloud.
 			continue
 		}
-		// If user is not a cloud admin they will only see themselves as users.
-		if userAccess != "admin" {
-			cloud.Users = []dbmodel.UserCloudAccess{{
-				Username: user.Username,
-				User:     *user.User,
-				Access:   userAccess,
-			}}
-		}
 		if err := f(&cloud); err != nil {
 			return err
 		}
@@ -129,12 +115,6 @@ func (j *JIMM) ForEachUserCloud(ctx context.Context, user *openfga.User, f func(
 			// we skip this cloud
 			continue
 		}
-		// For public clouds a user can only ever see themselves.
-		cloud.Users = []dbmodel.UserCloudAccess{{
-			Username: user.Username,
-			User:     *user.User,
-			Access:   userAccess,
-		}}
 		if err := f(&cloud); err != nil {
 			return err
 		}
@@ -199,7 +179,7 @@ var DefaultReservedCloudNames = []string{
 // controller running on the requested host cloud-region and the cloud
 // created there. If the controller does not host the cloud-regions
 // an error with code of CodeNotFound will be returned. If the given
-// user does not have add-model access to JAAS then an error with a code of
+// user does not have admin access to JAAS then an error with a code of
 // CodeUnauthorized will be returned (please note this differs from juju
 // which requires admin controller access to create clouds). If the
 // requested cloud cannot be created on this JAAS system an error with a
@@ -217,12 +197,6 @@ func (j *JIMM) AddCloudToController(ctx context.Context, user *openfga.User, con
 		return errors.E(op, errors.CodeNotFound, "controller not found")
 	}
 
-	// NOTE (alesstimec) Previously the code checked:
-	//  u.ControllerAccess != "login" && u.ControllerAccess != "superuser"
-	// I have changed this to require the user to be controller administrator
-	// which contradicts the godoc of this method. We will need to
-	// reconsider which is the right approach and either change this
-	// check or the godoc.
 	isAdministrator, err := openfga.IsAdministrator(ctx, user, controller.ResourceTag())
 	if err != nil {
 		return errors.E(op, err)
@@ -285,11 +259,6 @@ func (j *JIMM) AddCloudToController(ctx context.Context, user *openfga.User, con
 	var dbCloud dbmodel.Cloud
 	dbCloud.FromJujuCloud(cloud)
 	dbCloud.Name = tag.Id()
-	// TODO (alesstimec) remove as this will no longer be needed.
-	dbCloud.Users = []dbmodel.UserCloudAccess{{
-		User:   *user.User,
-		Access: "admin",
-	}}
 
 	ccloud, err := j.addControllerCloud(ctx, &controller, user.ResourceTag(), tag, cloud, force)
 	if err != nil {
@@ -393,11 +362,6 @@ func (j *JIMM) AddHostedCloud(ctx context.Context, user *openfga.User, tag names
 	var dbCloud dbmodel.Cloud
 	dbCloud.FromJujuCloud(cloud)
 	dbCloud.Name = tag.Id()
-	// NOTE (alesstimec) this will no longer be needed.
-	dbCloud.Users = []dbmodel.UserCloudAccess{{
-		User:   *user.User,
-		Access: "admin",
-	}}
 	if err := j.Database.AddCloud(ctx, &dbCloud); err != nil {
 		return errors.E(op, err)
 	}

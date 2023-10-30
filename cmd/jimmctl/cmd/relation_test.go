@@ -276,9 +276,6 @@ func initializeEnvironment(c *gc.C, ctx context.Context, db *db.Database, u dbmo
 		Regions: []dbmodel.CloudRegion{{
 			Name: "test-region-1",
 		}},
-		Users: []dbmodel.UserCloudAccess{{
-			Username: u.Username,
-		}},
 	}
 	c.Assert(db.DB.Create(&cloud).Error, gc.IsNil)
 	env.clouds = []dbmodel.Cloud{cloud}

@@ -151,28 +151,6 @@ func (d *Database) FindRegion(ctx context.Context, providerType, name string) (*
 	return &region, nil
 }
 
-// UpdateUserCloudAccess updates the given UserCloudAccess record. If the
-// specified access is changed to "" (no access) then the record is
-// removed.
-func (d *Database) UpdateUserCloudAccess(ctx context.Context, a *dbmodel.UserCloudAccess) error {
-	const op = errors.Op("db.UpdateUserCloudAccess")
-
-	if err := d.ready(); err != nil {
-		return errors.E(op, err)
-	}
-
-	db := d.DB.WithContext(ctx)
-	if a.Access == "" {
-		db = db.Delete(a)
-	} else {
-		db = db.Save(a)
-	}
-	if db.Error != nil {
-		return errors.E(op, dbError(db.Error))
-	}
-	return nil
-}
-
 // DeleteCloud deletes the given cloud.
 func (d *Database) DeleteCloud(ctx context.Context, c *dbmodel.Cloud) error {
 	const op = errors.Op("db.DeleteCloud")

@@ -15,7 +15,6 @@ import (
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
-	"github.com/canonical/jimm/internal/auth"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
@@ -69,33 +68,9 @@ func (j *JIMM) AddController(ctx context.Context, u *openfga.User, ctl *dbmodel.
 
 	var dbClouds []dbmodel.Cloud
 	for tag, cld := range clouds {
-		ctx := zapctx.WithFields(ctx, zap.Stringer("tag", tag))
-
 		var cloud dbmodel.Cloud
 		cloud.FromJujuCloud(cld)
 		cloud.Name = tag.Id()
-
-		// If this cloud is not the one used by the controller model then
-		// it is only available to a subset of users.
-		if tag.String() != ms.CloudTag {
-			var err error
-			cloud.Users, err = cloudUsers(ctx, api, tag)
-			if err != nil {
-				// If there is an error getting the users, log the failure
-				// but carry on, this will prevent anyone trying to add a
-				// cloud with the same name. The user access can be fixed
-				// later.
-				zapctx.Error(ctx, "cannot get cloud users", zap.Error(err))
-			}
-		} else {
-			cloud.Users = []dbmodel.UserCloudAccess{{
-				Username: auth.Everyone,
-				User: dbmodel.User{
-					Username: auth.Everyone,
-				},
-				Access: "add-model",
-			}}
-		}
 		dbClouds = append(dbClouds, cloud)
 	}
 
@@ -138,18 +113,6 @@ func (j *JIMM) AddController(ctx context.Context, u *openfga.User, ctl *dbmodel.
 					return err
 				}
 				cloud.Regions = append(cloud.Regions, reg)
-			}
-			for _, uca := range dbClouds[i].Users {
-				if cloud.UserAccess(&uca.User) != "" {
-					continue
-				}
-				uca.Username = uca.User.Username
-				uca.CloudName = cloud.Name
-				if err := tx.UpdateUserCloudAccess(ctx, &uca); err != nil {
-					zapctx.Error(ctx, "failed to update user cloud access", zaputil.Error(err))
-					return err
-				}
-				cloud.Users = append(cloud.Users, uca)
 			}
 			for _, cr := range dbClouds[i].Regions {
 				reg := cloud.Region(cr.Name)
@@ -195,35 +158,6 @@ func (j *JIMM) AddController(ctx context.Context, u *openfga.User, ctl *dbmodel.
 				zap.String("cloud", cloud.ResourceTag().Id()),
 				zap.Error(err),
 			)
-		}
-
-		for _, uca := range cloud.Users {
-			cloudUser := openfga.NewUser(
-				&dbmodel.User{
-					Username: uca.Username,
-				},
-				j.OpenFGAClient,
-			)
-			relation, err := ToCloudRelation(uca.Access)
-			if err != nil {
-				zapctx.Error(
-					ctx,
-					"failed to parse user cloud access",
-					zap.String("user", uca.Username),
-					zap.String("access", uca.Access),
-					zap.Error(err),
-				)
-			} else {
-				if err := cloudUser.SetCloudAccess(ctx, cloud.ResourceTag(), relation); err != nil {
-					zapctx.Error(
-						ctx,
-						"failed to set cloud access",
-						zap.String("user", uca.Username),
-						zap.String("access", uca.Access),
-						zap.Error(err),
-					)
-				}
-			}
 		}
 	}
 

@@ -146,10 +146,6 @@ func (s *dbSuite) TestGetUserClouds(c *qt.C) {
 			Name: "test-cloud-region",
 		}},
 		CACertificates: dbmodel.Strings{"CACERT 1", "CACERT 2"},
-		Users: []dbmodel.UserCloudAccess{{
-			User:   u,
-			Access: "add-model",
-		}},
 	}
 
 	err = s.Database.AddCloud(ctx, &cl)

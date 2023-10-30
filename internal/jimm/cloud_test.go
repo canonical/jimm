@@ -11,7 +11,6 @@ import (
 	"github.com/google/uuid"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
-	"gorm.io/gorm"
 
 	"github.com/canonical/jimm/internal/auth"
 	"github.com/canonical/jimm/internal/db"
@@ -80,13 +79,6 @@ func TestGetCloud(t *testing.T) {
 
 	cloud := &dbmodel.Cloud{
 		Name: "test-cloud-1",
-		Users: []dbmodel.UserCloudAccess{{
-			User:   *alice.User,
-			Access: "admin",
-		}, {
-			User:   *bob.User,
-			Access: "add-model",
-		}},
 	}
 	err = j.Database.AddCloud(ctx, cloud)
 	c.Assert(err, qt.IsNil)
@@ -102,12 +94,6 @@ func TestGetCloud(t *testing.T) {
 
 	cloud2 := &dbmodel.Cloud{
 		Name: "test-cloud-2",
-		Users: []dbmodel.UserCloudAccess{{
-			User: dbmodel.User{
-				Username: auth.Everyone,
-			},
-			Access: "add-model",
-		}},
 	}
 	err = j.Database.AddCloud(ctx, cloud2)
 	c.Assert(err, qt.IsNil)
@@ -132,43 +118,6 @@ func TestGetCloud(t *testing.T) {
 		UpdatedAt: now,
 		Name:      "test-cloud-1",
 		Regions:   []dbmodel.CloudRegion{},
-		Users: []dbmodel.UserCloudAccess{{
-			Model: gorm.Model{
-				ID:        1,
-				CreatedAt: now,
-				UpdatedAt: now,
-			},
-			Username: "alice@external",
-			User: dbmodel.User{
-				Model: gorm.Model{
-					ID:        1,
-					CreatedAt: now,
-					UpdatedAt: now,
-				},
-				Username:         "alice@external",
-				ControllerAccess: "login",
-			},
-			CloudName: "test-cloud-1",
-			Access:    "admin",
-		}, {
-			Model: gorm.Model{
-				ID:        2,
-				CreatedAt: now,
-				UpdatedAt: now,
-			},
-			Username: "bob@external",
-			User: dbmodel.User{
-				Model: gorm.Model{
-					ID:        2,
-					CreatedAt: now,
-					UpdatedAt: now,
-				},
-				Username:         "bob@external",
-				ControllerAccess: "login",
-			},
-			CloudName: "test-cloud-1",
-			Access:    "add-model",
-		}},
 	})
 
 	cld, err = j.GetCloud(ctx, bob, names.NewCloudTag("test-cloud-1"))
@@ -179,11 +128,6 @@ func TestGetCloud(t *testing.T) {
 		UpdatedAt: now,
 		Name:      "test-cloud-1",
 		Regions:   []dbmodel.CloudRegion{},
-		Users: []dbmodel.UserCloudAccess{{
-			Username: "bob@external",
-			User:     *bob.User,
-			Access:   "add-model",
-		}},
 	})
 
 	cld, err = j.GetCloud(ctx, daphne, names.NewCloudTag("test-cloud-1"))
@@ -194,43 +138,6 @@ func TestGetCloud(t *testing.T) {
 		UpdatedAt: now,
 		Name:      "test-cloud-1",
 		Regions:   []dbmodel.CloudRegion{},
-		Users: []dbmodel.UserCloudAccess{{
-			Model: gorm.Model{
-				ID:        1,
-				CreatedAt: now,
-				UpdatedAt: now,
-			},
-			Username: "alice@external",
-			User: dbmodel.User{
-				Model: gorm.Model{
-					ID:        1,
-					CreatedAt: now,
-					UpdatedAt: now,
-				},
-				Username:         "alice@external",
-				ControllerAccess: "login",
-			},
-			CloudName: "test-cloud-1",
-			Access:    "admin",
-		}, {
-			Model: gorm.Model{
-				ID:        2,
-				CreatedAt: now,
-				UpdatedAt: now,
-			},
-			Username: "bob@external",
-			User: dbmodel.User{
-				Model: gorm.Model{
-					ID:        2,
-					CreatedAt: now,
-					UpdatedAt: now,
-				},
-				Username:         "bob@external",
-				ControllerAccess: "login",
-			},
-			CloudName: "test-cloud-1",
-			Access:    "add-model",
-		}},
 	})
 
 	cld, err = j.GetCloud(ctx, charlie, names.NewCloudTag("test-cloud-2"))
@@ -241,13 +148,6 @@ func TestGetCloud(t *testing.T) {
 		UpdatedAt: now,
 		Name:      "test-cloud-2",
 		Regions:   []dbmodel.CloudRegion{},
-		Users: []dbmodel.UserCloudAccess{{
-			Username: "charlie@external",
-			User: dbmodel.User{
-				Username: "charlie@external",
-			},
-			Access: "add-model",
-		}},
 	})
 }
 
@@ -297,13 +197,6 @@ func TestForEachCloud(t *testing.T) {
 
 	cloud := &dbmodel.Cloud{
 		Name: "test-cloud-1",
-		Users: []dbmodel.UserCloudAccess{{
-			User:   *alice.User,
-			Access: "admin",
-		}, {
-			User:   *bob.User,
-			Access: "add-model",
-		}},
 	}
 	err = j.Database.AddCloud(ctx, cloud)
 	c.Assert(err, qt.IsNil)
@@ -315,15 +208,6 @@ func TestForEachCloud(t *testing.T) {
 
 	cloud2 := &dbmodel.Cloud{
 		Name: "test-cloud-2",
-		Users: []dbmodel.UserCloudAccess{{
-			User:   *bob.User,
-			Access: "add-model",
-		}, {
-			User: dbmodel.User{
-				Username: auth.Everyone,
-			},
-			Access: "add-model",
-		}},
 	}
 	err = j.Database.AddCloud(ctx, cloud2)
 	c.Assert(err, qt.IsNil)
@@ -335,12 +219,6 @@ func TestForEachCloud(t *testing.T) {
 
 	cloud3 := &dbmodel.Cloud{
 		Name: "test-cloud-3",
-		Users: []dbmodel.UserCloudAccess{{
-			User: dbmodel.User{
-				Username: auth.Everyone,
-			},
-			Access: "add-model",
-		}},
 	}
 	err = j.Database.AddCloud(ctx, cloud3)
 	c.Assert(err, qt.IsNil)
@@ -360,65 +238,18 @@ func TestForEachCloud(t *testing.T) {
 		UpdatedAt: now,
 		Name:      "test-cloud-1",
 		Regions:   []dbmodel.CloudRegion{},
-		Users: []dbmodel.UserCloudAccess{{
-			Model: gorm.Model{
-				ID:        1,
-				CreatedAt: now,
-				UpdatedAt: now,
-			},
-			Username: "alice@external",
-			User: dbmodel.User{
-				Model: gorm.Model{
-					ID:        1,
-					CreatedAt: now,
-					UpdatedAt: now,
-				},
-				Username:         "alice@external",
-				ControllerAccess: "login",
-			},
-			CloudName: "test-cloud-1",
-			Access:    "admin",
-		}, {
-			Model: gorm.Model{
-				ID:        2,
-				CreatedAt: now,
-				UpdatedAt: now,
-			},
-			Username: "bob@external",
-			User: dbmodel.User{
-				Model: gorm.Model{
-					ID:        2,
-					CreatedAt: now,
-					UpdatedAt: now,
-				},
-				Username:         "bob@external",
-				ControllerAccess: "login",
-			},
-			CloudName: "test-cloud-1",
-			Access:    "add-model",
-		}},
 	}, {
 		ID:        2,
 		CreatedAt: now,
 		UpdatedAt: now,
 		Name:      "test-cloud-2",
 		Regions:   []dbmodel.CloudRegion{},
-		Users: []dbmodel.UserCloudAccess{{
-			Username: "alice@external",
-			User:     *alice.User,
-			Access:   "add-model",
-		}},
 	}, {
 		ID:        3,
 		CreatedAt: now,
 		UpdatedAt: now,
 		Name:      "test-cloud-3",
 		Regions:   []dbmodel.CloudRegion{},
-		Users: []dbmodel.UserCloudAccess{{
-			Username: "alice@external",
-			User:     *alice.User,
-			Access:   "add-model",
-		}},
 	}})
 
 	clds = clds[:0]
@@ -433,33 +264,18 @@ func TestForEachCloud(t *testing.T) {
 		UpdatedAt: now,
 		Name:      "test-cloud-1",
 		Regions:   []dbmodel.CloudRegion{},
-		Users: []dbmodel.UserCloudAccess{{
-			Username: "bob@external",
-			User:     *bob.User,
-			Access:   "add-model",
-		}},
 	}, {
 		ID:        2,
 		CreatedAt: now,
 		UpdatedAt: now,
 		Name:      "test-cloud-2",
 		Regions:   []dbmodel.CloudRegion{},
-		Users: []dbmodel.UserCloudAccess{{
-			Username: "bob@external",
-			User:     *bob.User,
-			Access:   "add-model",
-		}},
 	}, {
 		ID:        3,
 		CreatedAt: now,
 		UpdatedAt: now,
 		Name:      "test-cloud-3",
 		Regions:   []dbmodel.CloudRegion{},
-		Users: []dbmodel.UserCloudAccess{{
-			Username: "bob@external",
-			User:     *bob.User,
-			Access:   "add-model",
-		}},
 	}})
 
 	clds = clds[:0]
@@ -474,22 +290,12 @@ func TestForEachCloud(t *testing.T) {
 		UpdatedAt: now,
 		Name:      "test-cloud-2",
 		Regions:   []dbmodel.CloudRegion{},
-		Users: []dbmodel.UserCloudAccess{{
-			Username: "charlie@external",
-			User:     *charlie.User,
-			Access:   "add-model",
-		}},
 	}, {
 		ID:        3,
 		CreatedAt: now,
 		UpdatedAt: now,
 		Name:      "test-cloud-3",
 		Regions:   []dbmodel.CloudRegion{},
-		Users: []dbmodel.UserCloudAccess{{
-			Username: "charlie@external",
-			User:     *charlie.User,
-			Access:   "add-model",
-		}},
 	}})
 
 	clds = clds[:0]
@@ -504,111 +310,18 @@ func TestForEachCloud(t *testing.T) {
 		UpdatedAt: now,
 		Name:      "test-cloud-1",
 		Regions:   []dbmodel.CloudRegion{},
-		Users: []dbmodel.UserCloudAccess{{
-			Model: gorm.Model{
-				ID:        1,
-				CreatedAt: now,
-				UpdatedAt: now,
-			},
-			Username: "alice@external",
-			User: dbmodel.User{
-				Model: gorm.Model{
-					ID:        1,
-					CreatedAt: now,
-					UpdatedAt: now,
-				},
-				Username:         "alice@external",
-				ControllerAccess: "login",
-			},
-			CloudName: "test-cloud-1",
-			Access:    "admin",
-		}, {
-			Model: gorm.Model{
-				ID:        2,
-				CreatedAt: now,
-				UpdatedAt: now,
-			},
-			Username: "bob@external",
-			User: dbmodel.User{
-				Model: gorm.Model{
-					ID:        2,
-					CreatedAt: now,
-					UpdatedAt: now,
-				},
-				Username:         "bob@external",
-				ControllerAccess: "login",
-			},
-			CloudName: "test-cloud-1",
-			Access:    "add-model",
-		}},
 	}, {
 		ID:        2,
 		CreatedAt: now,
 		UpdatedAt: now,
 		Name:      "test-cloud-2",
 		Regions:   []dbmodel.CloudRegion{},
-		Users: []dbmodel.UserCloudAccess{{
-			Model: gorm.Model{
-				ID:        3,
-				CreatedAt: now,
-				UpdatedAt: now,
-			},
-			Username: "bob@external",
-			User: dbmodel.User{
-				Model: gorm.Model{
-					ID:        2,
-					CreatedAt: now,
-					UpdatedAt: now,
-				},
-				Username:         "bob@external",
-				ControllerAccess: "login",
-			},
-			CloudName: "test-cloud-2",
-			Access:    "add-model",
-		}, {
-			Model: gorm.Model{
-				ID:        4,
-				CreatedAt: now,
-				UpdatedAt: now,
-			},
-			Username: auth.Everyone,
-			User: dbmodel.User{
-				Model: gorm.Model{
-					ID:        3,
-					CreatedAt: now,
-					UpdatedAt: now,
-				},
-				Username:         auth.Everyone,
-				ControllerAccess: "login",
-			},
-			CloudName: "test-cloud-2",
-			Access:    "add-model",
-		}},
 	}, {
 		ID:        3,
 		CreatedAt: now,
 		UpdatedAt: now,
 		Name:      "test-cloud-3",
 		Regions:   []dbmodel.CloudRegion{},
-		Users: []dbmodel.UserCloudAccess{{
-			Model: gorm.Model{
-				ID:        5,
-				CreatedAt: now,
-				UpdatedAt: now,
-			},
-			Username: auth.Everyone,
-			User: dbmodel.User{
-				Model: gorm.Model{
-					ID:        3,
-					CreatedAt: now,
-					UpdatedAt: now,
-				},
-				Username:         auth.Everyone,
-				ControllerAccess: "login",
-			},
-			CloudName: "test-cloud-3",
-			Access:    "add-model",
-		}},
 	}})
 }
 
@@ -731,15 +444,6 @@ var addHostedCloudTests = []struct {
 		}},
 		CACertificates: dbmodel.Strings{"CACERT"},
 		Config:         dbmodel.Map{"A": string("a")},
-		Users: []dbmodel.UserCloudAccess{{
-			Username: "bob@external",
-			User: dbmodel.User{
-				Username:         "bob@external",
-				ControllerAccess: "login",
-			},
-			CloudName: "new-cloud",
-			Access:    "admin",
-		}},
 	},
 }, {
 	name:      "CloudWithReservedName",
@@ -1004,15 +708,6 @@ var addHostedCloudToControllerTests = []struct {
 		}},
 		CACertificates: dbmodel.Strings{"CACERT"},
 		Config:         dbmodel.Map{"A": string("a")},
-		Users: []dbmodel.UserCloudAccess{{
-			Username: "alice@external",
-			User: dbmodel.User{
-				Username:         "alice@external",
-				ControllerAccess: "superuser",
-			},
-			CloudName: "new-cloud",
-			Access:    "admin",
-		}},
 	},
 }, {
 	name: "Controller not found",
@@ -1997,23 +1692,6 @@ var updateCloudTests = []struct {
 					},
 					Priority: 1,
 				}},
-			}},
-			Users: []dbmodel.UserCloudAccess{{
-				Username: "alice@external",
-				User: dbmodel.User{
-					Username:         "alice@external",
-					ControllerAccess: "superuser",
-				},
-				CloudName: "test",
-				Access:    "admin",
-			}, {
-				Username: "bob@external",
-				User: dbmodel.User{
-					Username:         "bob@external",
-					ControllerAccess: "login",
-				},
-				CloudName: "test",
-				Access:    "admin",
 			}},
 		},
 	}, {

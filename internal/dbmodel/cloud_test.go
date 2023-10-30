@@ -224,19 +224,6 @@ func TestToJujuCloudInfo(t *testing.T) {
 			"k2": "A",
 			"k3": map[string]interface{}{"k": []interface{}{"v"}},
 		},
-		Users: []dbmodel.UserCloudAccess{{
-			User: dbmodel.User{
-				Username:    "alice@external",
-				DisplayName: "Alice",
-			},
-			Access: "admin",
-		}, {
-			User: dbmodel.User{
-				Username:    "bob@external",
-				DisplayName: "Bob",
-			},
-			Access: "add-model",
-		}},
 	}
 	pci := cl.ToJujuCloudInfo()
 	c.Check(pci, qt.DeepEquals, jujuparams.CloudInfo{
