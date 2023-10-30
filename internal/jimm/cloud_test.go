@@ -500,7 +500,7 @@ var addHostedCloudTests = []struct {
 		StorageEndpoint:  "https://example.com/storage",
 	},
 	expectError:     `unable to find cloud/region "ec2/default"`,
-	expectErrorCode: errors.CodeIncompatibleClouds,
+	expectErrorCode: errors.CodeNotFound,
 }, {
 	name:      "InvalidHostCloudRegion",
 	username:  "bob@external",
@@ -514,7 +514,7 @@ var addHostedCloudTests = []struct {
 		StorageEndpoint:  "https://example.com/storage",
 	},
 	expectError:     `invalid cloud/region format "ec2"`,
-	expectErrorCode: errors.CodeIncompatibleClouds,
+	expectErrorCode: errors.CodeBadRequest,
 }, {
 	name:      "UserHasNoCloudAccess",
 	username:  "bob@external",
@@ -528,7 +528,7 @@ var addHostedCloudTests = []struct {
 		StorageEndpoint:  "https://example.com/storage",
 	},
 	expectError:     `missing add-model access on "test-provider2/test-region"`,
-	expectErrorCode: errors.CodeIncompatibleClouds,
+	expectErrorCode: errors.CodeUnauthorized,
 }, {
 	name:      "HostCloudIsHosted",
 	username:  "alice@external",
