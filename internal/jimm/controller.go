@@ -14,6 +14,7 @@ import (
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
+	"github.com/canonical/jimm/internal/auth"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
@@ -147,6 +148,21 @@ func (j *JIMM) AddController(ctx context.Context, u *openfga.User, ctl *dbmodel.
 	}
 
 	for _, cloud := range dbClouds {
+		// If this cloud is the one used by the controller model then
+		// it is available to all users. Other clouds require `juju grant-cloud` to add permissions.
+		if cloud.ResourceTag().String() == ms.CloudTag {
+			everyoneTag := names.NewUserTag(auth.Everyone)
+			everyone := openfga.NewUser(
+				&dbmodel.User{
+					Username: everyoneTag.Id(),
+				},
+				j.OpenFGAClient,
+			)
+			if err := everyone.SetCloudAccess(ctx, cloud.ResourceTag(), ofganames.CanAddModelRelation); err != nil {
+				zapctx.Error(ctx, "failed to grant everyone add-model access", zap.Error(err))
+			}
+		}
+
 		// Add controller relation between the cloud and the added controller.
 		err = j.OpenFGAClient.AddCloudController(ctx, cloud.ResourceTag(), ctl.ResourceTag())
 		if err != nil {
