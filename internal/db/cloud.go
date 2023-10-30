@@ -108,7 +108,6 @@ func preloadCloud(prefix string, db *gorm.DB) *gorm.DB {
 		prefix += "."
 	}
 	db = db.Preload(prefix + "Regions").Preload(prefix + "Regions.Controllers").Preload(prefix + "Regions.Controllers.Controller")
-	db = db.Preload(prefix + "Users").Preload(prefix + "Users.User")
 	return db
 }
 
