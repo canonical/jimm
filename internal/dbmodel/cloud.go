@@ -201,36 +201,3 @@ func (cr *CloudRegion) FromJujuCloudRegion(r jujuparams.CloudRegion) {
 	cr.IdentityEndpoint = r.IdentityEndpoint
 	cr.StorageEndpoint = r.StorageEndpoint
 }
-
-// A UserCloudAccess maps the access level of a user on a cloud.
-type UserCloudAccess struct {
-	gorm.Model
-
-	// User is the User this access is for.
-	Username string
-	User     User `gorm:"foreignKey:Username;references:Username"`
-
-	// Cloud is the Cloud this access is for.
-	CloudName string
-	Cloud     Cloud `gorm:"foreignKey:CloudName;references:Name"`
-
-	// Access is the access level of the user on the cloud.
-	Access string `gorm:"not null"`
-}
-
-// TableName overrides the table name gorm will use to find
-// UserCloudAccess records.
-func (UserCloudAccess) TableName() string {
-	return "user_cloud_access"
-}
-
-// ToJujuCloudUserInfo convert a UserCloudAccess into a
-// jujuparams.CloudUserInfo. The UserCloudAccess must have its user
-// association filled out.
-func (a UserCloudAccess) ToJujuCloudUserInfo() jujuparams.CloudUserInfo {
-	var cui jujuparams.CloudUserInfo
-	cui.UserName = a.User.Username
-	cui.DisplayName = a.User.DisplayName
-	cui.Access = a.Access
-	return cui
-}

@@ -6,7 +6,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"strings"
 
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
@@ -173,32 +172,6 @@ func (j *JIMM) AddController(ctx context.Context, u *openfga.User, ctl *dbmodel.
 	}
 
 	return nil
-}
-
-// cloudUsers determines the users that can access a cloud.
-func cloudUsers(ctx context.Context, api API, tag names.CloudTag) ([]dbmodel.UserCloudAccess, error) {
-	const op = errors.Op("jimm.cloudUsers")
-	var ci jujuparams.CloudInfo
-	if err := api.CloudInfo(ctx, tag, &ci); err != nil {
-		return nil, errors.E(op, err)
-	}
-	var users []dbmodel.UserCloudAccess
-	for _, u := range ci.Users {
-		if !strings.Contains(u.UserName, "@") {
-			// If the username doesn't contain an "@" the user is local
-			// to the controller and we don't want to propagate it.
-			continue
-		}
-		users = append(users, dbmodel.UserCloudAccess{
-			Username: u.UserName,
-			User: dbmodel.User{
-				Username:    u.UserName,
-				DisplayName: u.DisplayName,
-			},
-			Access: u.Access,
-		})
-	}
-	return users, nil
 }
 
 // EarliestControllerVersion returns the earliest agent version
