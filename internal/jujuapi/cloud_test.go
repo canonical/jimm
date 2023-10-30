@@ -907,11 +907,6 @@ func (s *cloudSuite) TestCloudInfo(c *gc.C) {
 					IdentityEndpoint: jimmtest.TestCloudIdentityEndpoint,
 					StorageEndpoint:  jimmtest.TestCloudStorageEndpoint,
 				},
-				Users: []jujuparams.CloudUserInfo{{
-					UserName:    "bob@external",
-					DisplayName: "bob",
-					Access:      "add-model",
-				}},
 			},
 		}, {
 			Error: &jujuparams.Error{

@@ -139,8 +139,8 @@ func TestWellknownAPIJWKSJSONHandles200(t *testing.T) {
 	b, err := io.ReadAll(resp.Body)
 
 	c.Assert(err, qt.IsNil)
-	c.Assert(code, qt.Equals, http.StatusOK)
 	c.Assert(b, qt.JSONEquals, jwks)
+	c.Assert(code, qt.Equals, http.StatusOK)
 	c.Assert(resp.Header.Get("Cache-Control"), qt.Equals, fmt.Sprintf("must-revalidate, max-age=%d, immutable", secondsToExpiry))
 	c.Assert(resp.Header.Get("Expires"), qt.Equals, expiry.Format(time.RFC1123))
 }
