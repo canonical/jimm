@@ -239,15 +239,6 @@ func TestToJujuCloudInfo(t *testing.T) {
 				StorageEndpoint:  "https://storage.region.example.com",
 			}},
 		},
-		Users: []jujuparams.CloudUserInfo{{
-			UserName:    "alice@external",
-			DisplayName: "Alice",
-			Access:      "admin",
-		}, {
-			UserName:    "bob@external",
-			DisplayName: "Bob",
-			Access:      "add-model",
-		}},
 	})
 }
 

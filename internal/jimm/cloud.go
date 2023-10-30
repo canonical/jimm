@@ -328,11 +328,11 @@ func (j *JIMM) AddHostedCloud(ctx context.Context, user *openfga.User, tag names
 	}
 	parts := strings.SplitN(cloud.HostCloudRegion, "/", 2)
 	if len(parts) != 2 || parts[0] == "" {
-		return errors.E(op, errors.CodeIncompatibleClouds, fmt.Sprintf("unsupported cloud host region %q", cloud.HostCloudRegion))
+		return errors.E(op, errors.CodeBadRequest, fmt.Sprintf("invalid cloud/region format %q", cloud.HostCloudRegion))
 	}
 	region, err := j.Database.FindRegion(ctx, parts[0], parts[1])
 	if errors.ErrorCode(err) == errors.CodeNotFound {
-		return errors.E(op, err, errors.CodeIncompatibleClouds, fmt.Sprintf("unsupported cloud host region %q", cloud.HostCloudRegion))
+		return errors.E(op, err, errors.CodeNotFound, fmt.Sprintf("unable to find cloud/region %q", cloud.HostCloudRegion))
 	} else if err != nil {
 		return errors.E(op, err)
 	}
@@ -348,14 +348,14 @@ func (j *JIMM) AddHostedCloud(ctx context.Context, user *openfga.User, tag names
 			return errors.E(op, err)
 		}
 		if !everyonewAllowedAddModel {
-			return errors.E(op, errors.CodeIncompatibleClouds, fmt.Sprintf("unsupported cloud host region %q", cloud.HostCloudRegion))
+			return errors.E(op, errors.CodeUnauthorized, fmt.Sprintf("missing add-model access on %q", cloud.HostCloudRegion))
 		}
 	}
 
 	if region.Cloud.HostCloudRegion != "" {
 		// Do not support creating a new cloud on an already hosted
 		// cloud.
-		return errors.E(op, errors.CodeIncompatibleClouds, fmt.Sprintf("unsupported cloud host region %q", cloud.HostCloudRegion))
+		return errors.E(op, errors.CodeIncompatibleClouds, fmt.Sprintf("cloud already hosted %q", cloud.HostCloudRegion))
 	}
 
 	// Create the cloud locally, to reserve the name.

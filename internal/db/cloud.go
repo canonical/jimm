@@ -140,7 +140,7 @@ func (d *Database) FindRegion(ctx context.Context, providerType, name string) (*
 	}
 
 	db := d.DB.WithContext(ctx)
-	db = db.Preload("Cloud").Preload("Cloud.Users").Preload("Controllers").Preload("Controllers.Controller")
+	db = db.Preload("Cloud").Preload("Controllers").Preload("Controllers.Controller")
 	db = db.Model(dbmodel.CloudRegion{}).Joins("INNER JOIN clouds ON clouds.name = cloud_regions.cloud_name").Where("clouds.type = ? AND cloud_regions.name = ?", providerType, name)
 
 	var region dbmodel.CloudRegion
