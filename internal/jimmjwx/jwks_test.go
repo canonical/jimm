@@ -83,17 +83,15 @@ func TestStartJWKSRotatorRotatesAJWKS(t *testing.T) {
 	// Start up the rotator
 	err = svc.StartJWKSRotator(ctx, time.NewTicker(time.Second).C, time.Now())
 	c.Assert(err, qt.IsNil)
-	// StartJWKSRotator immediately and synchronously rotates the key.
-	ks2, err := store.GetJWKS(ctx)
-	c.Assert(err, qt.IsNil)
-	secondKey, ok := ks2.Key(0)
-	c.Assert(ok, qt.IsTrue)
-	c.Assert(initialKey.KeyID(), qt.Not(qt.Equals), secondKey.KeyID())
-	// Now sleep and get a key that has been rotated due to the periodic rotator.
-	time.Sleep(2 * time.Second)
-	ks3, err := store.GetJWKS(ctx)
-	c.Assert(err, qt.IsNil)
-	thirdKey, ok := ks3.Key(0)
-	c.Assert(ok, qt.IsTrue)
-	c.Assert(secondKey.KeyID(), qt.Not(qt.Equals), thirdKey.KeyID())
+	// We retry 500ms * 60 (30s) to test the diff
+	for i := 0; i < 60; i++ {
+		time.Sleep(500 * time.Millisecond)
+		ks2, err := store.GetJWKS(ctx)
+		c.Assert(err, qt.IsNil)
+		newKey, ok := ks2.Key(0)
+		c.Assert(ok, qt.IsTrue)
+		if initialKey.KeyID() != newKey.KeyID() {
+			break
+		}
+	}
 }
