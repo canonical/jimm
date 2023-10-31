@@ -88,7 +88,7 @@ func (s *dbSuite) TestAddModel(c *qt.C) {
 	c.Assert(err, qt.Equals, nil)
 
 	var dbModel dbmodel.Model
-	result := s.Database.DB.Where("uuid = ?", model.UUID).Preload("Users").First(&dbModel)
+	result := s.Database.DB.Where("uuid = ?", model.UUID).First(&dbModel)
 	c.Assert(result.Error, qt.Equals, nil)
 	c.Assert(dbModel, qt.DeepEquals, model)
 
@@ -263,7 +263,7 @@ func (s *dbSuite) TestUpdateModel(c *qt.C) {
 	c.Assert(err, qt.Equals, nil)
 
 	var dbModel dbmodel.Model
-	result := s.Database.DB.Where("uuid = ?", model.UUID).Preload("Users").First(&dbModel)
+	result := s.Database.DB.Where("uuid = ?", model.UUID).First(&dbModel)
 	c.Assert(result.Error, qt.Equals, nil)
 	c.Assert(dbModel, qt.DeepEquals, model)
 }
