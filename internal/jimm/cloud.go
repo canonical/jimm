@@ -180,12 +180,10 @@ var DefaultReservedCloudNames = []string{
 // created there. If the controller does not host the cloud-regions
 // an error with code of CodeNotFound will be returned. If the given
 // user does not have admin access to JAAS then an error with a code of
-// CodeUnauthorized will be returned (please note this differs from juju
-// which requires admin controller access to create clouds). If the
-// requested cloud cannot be created on this JAAS system an error with a
-// code of CodeIncompatibleClouds will be returned. If there is an error
-// returned by the controller when creating the cloud then that error code
-// will be preserved.
+// CodeUnauthorized will be returned. If the requested cloud cannot be
+// created on this JAAS system an error with a code of CodeIncompatibleClouds
+// will be returned. If there is an error returned by the controller when
+// creating the cloud then that error code will be preserved.
 func (j *JIMM) AddCloudToController(ctx context.Context, user *openfga.User, controllerName string, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error {
 	const op = errors.Op("jimm.AddCloudToController")
 
