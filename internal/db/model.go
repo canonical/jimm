@@ -105,28 +105,6 @@ func (d *Database) DeleteModel(ctx context.Context, model *dbmodel.Model) error 
 	return nil
 }
 
-// UpdateUserModelAccess updates the given UserModelAccess record. If the
-// specified access is changed to "" (no access) then the record is
-// removed.
-func (d *Database) UpdateUserModelAccess(ctx context.Context, a *dbmodel.UserModelAccess) error {
-	const op = errors.Op("db.UpdateUserModelAccess")
-
-	if err := d.ready(); err != nil {
-		return errors.E(op, err)
-	}
-
-	db := d.DB.WithContext(ctx)
-	if a.Access == "" {
-		db = db.Delete(a)
-	} else {
-		db = db.Save(a)
-	}
-	if db.Error != nil {
-		return errors.E(op, dbError(db.Error))
-	}
-	return nil
-}
-
 // ForEachModel iterates through every model calling the given function
 // for each one. If the given function returns an error the iteration
 // will stop immediately and the error will be returned unmodified.

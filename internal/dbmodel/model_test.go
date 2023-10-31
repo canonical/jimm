@@ -91,10 +91,6 @@ func TestModel(t *testing.T) {
 		SLA: dbmodel.SLA{
 			Level: "unsupported",
 		},
-		Users: []dbmodel.UserModelAccess{{
-			User:   u,
-			Access: "admin",
-		}},
 	}
 	c.Assert(db.Create(&m).Error, qt.IsNil)
 
@@ -162,10 +158,6 @@ func TestModelUniqueConstraint(t *testing.T) {
 		SLA: dbmodel.SLA{
 			Level: "unsupported",
 		},
-		Users: []dbmodel.UserModelAccess{{
-			User:   u,
-			Access: "admin",
-		}},
 	}
 	c.Assert(db.Create(&m1).Error, qt.IsNil)
 
@@ -193,10 +185,6 @@ func TestModelUniqueConstraint(t *testing.T) {
 		SLA: dbmodel.SLA{
 			Level: "unsupported",
 		},
-		Users: []dbmodel.UserModelAccess{{
-			User:   u,
-			Access: "admin",
-		}},
 	}
 	c.Assert(db.Create(&m2).Error, qt.IsNil)
 
@@ -245,11 +233,6 @@ func TestToJujuModel(t *testing.T) {
 		SLA: dbmodel.SLA{
 			Level: "unsupported",
 		},
-		Users: []dbmodel.UserModelAccess{{
-			Username: u.Username,
-			User:     u,
-			Access:   "admin",
-		}},
 	}
 	m.CloudRegion.Cloud = cl
 
@@ -292,11 +275,6 @@ func TestUserModelAccessToJujuUserModel(t *testing.T) {
 		SLA: dbmodel.SLA{
 			Level: "unsupported",
 		},
-		Users: []dbmodel.UserModelAccess{{
-			Username: u.Username,
-			User:     u,
-			Access:   "admin",
-		}},
 	}
 	m.CloudRegion.Cloud = cl
 
@@ -351,10 +329,6 @@ func TestToJujuModelSummary(t *testing.T) {
 		SLA: dbmodel.SLA{
 			Level: "unsupported",
 		},
-		Users: []dbmodel.UserModelAccess{{
-			Username: u.Username,
-			Access:   "admin",
-		}},
 		Machines: 1,
 		Cores:    2,
 		Units:    3,
@@ -424,10 +398,6 @@ func TestUserModelAccessToJujuModelSummary(t *testing.T) {
 		SLA: dbmodel.SLA{
 			Level: "unsupported",
 		},
-		Users: []dbmodel.UserModelAccess{{
-			Username: u.Username,
-			Access:   "admin",
-		}},
 		Machines: 1,
 		Cores:    2,
 		Units:    3,
@@ -599,13 +569,6 @@ func TestModelFromJujuModelInfo(t *testing.T) {
 		SLA: dbmodel.SLA{
 			Level: "unsupported",
 		},
-		Users: []dbmodel.UserModelAccess{{
-			Access: "admin",
-			User: dbmodel.User{
-				Username:    "bob@external",
-				DisplayName: "Bobby The Tester",
-			},
-		}},
 	})
 }
 

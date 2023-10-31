@@ -358,12 +358,6 @@ func (b *modelBuilder) UpdateDatabaseModel() *modelBuilder {
 	b.model.CloudCredential = dbmodel.CloudCredential{}
 	b.model.CloudRegion = dbmodel.CloudRegion{}
 
-	err = b.filterModelUserAccesses()
-	if err != nil {
-		b.err = errors.E(err)
-		return b
-	}
-
 	err = b.jimm.Database.UpdateModel(b.ctx, b.model)
 	if err != nil {
 		b.err = errors.E(err, "failed to store model information")
@@ -419,26 +413,6 @@ func (b *modelBuilder) selectCloudCredentials() error {
 		return nil
 	}
 	return errors.E("valid cloud credentials not found")
-}
-
-func (b *modelBuilder) filterModelUserAccesses() error {
-	a := []dbmodel.UserModelAccess{}
-	for _, access := range b.model.Users {
-		access := access
-
-		// JIMM users will contain an @ sign in the username
-		if !strings.Contains(access.User.Username, "@") {
-			continue
-		}
-
-		// fetch user information
-		if err := b.jimm.Database.GetUser(b.ctx, &access.User); err != nil {
-			return errors.E(err)
-		}
-		a = append(a, access)
-	}
-	b.model.Users = a
-	return nil
 }
 
 // CreateControllerModel uses provided information to create a new

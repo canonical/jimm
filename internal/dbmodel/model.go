@@ -102,17 +102,6 @@ func (m *Model) SetTag(t names.ModelTag) {
 	m.UUID.Valid = true
 }
 
-// UserAccess returns the access level of the given user on the model. If
-// the user has no access then an empty string is returned.
-func (m *Model) UserAccess(u *User) string {
-	for _, mu := range m.Users {
-		if u.Username == mu.Username {
-			return mu.Access
-		}
-	}
-	return ""
-}
-
 // FromModelUpdate updates the model from the given ModelUpdate.
 func (m *Model) SwitchOwner(u *User) {
 	m.OwnerUsername = u.Username
@@ -135,11 +124,6 @@ func (m *Model) FromJujuModelInfo(info jujuparams.ModelInfo) error {
 	}
 	m.Life = string(info.Life)
 	m.Status.FromJujuEntityStatus(info.Status)
-
-	m.Users = make([]UserModelAccess, len(info.Users))
-	for i, u := range info.Users {
-		m.Users[i].FromJujuModelUserInfo(u)
-	}
 
 	m.CloudRegion.Name = info.CloudRegion
 	if info.CloudTag != "" {

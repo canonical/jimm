@@ -633,7 +633,6 @@ func TestImportModel(t *testing.T) {
 				Level: "1",
 				Owner: "me",
 			},
-			Users: nil,
 		},
 	}, {
 		about:          "model from local user imported",
@@ -722,7 +721,6 @@ func TestImportModel(t *testing.T) {
 				Level: "essential",
 				Owner: "local-user",
 			},
-			Users: nil,
 		},
 	}, {
 		about:          "new model owner is local user",

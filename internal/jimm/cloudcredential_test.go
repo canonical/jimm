@@ -147,7 +147,6 @@ func TestUpdateCloudCredential(t *testing.T) {
 			m.Controller = dbmodel.Controller{}
 			m.CloudCredential = dbmodel.CloudCredential{}
 			m.CloudRegion = dbmodel.CloudRegion{}
-			m.Users[0].User = dbmodel.User{}
 
 			expectedCredential.Models = []dbmodel.Model{m}
 
@@ -430,7 +429,6 @@ func TestUpdateCloudCredential(t *testing.T) {
 			m.Controller = dbmodel.Controller{}
 			m.CloudCredential = dbmodel.CloudCredential{}
 			m.CloudRegion = dbmodel.CloudRegion{}
-			m.Users[0].User = dbmodel.User{}
 
 			return &u, arg, dbmodel.CloudCredential{
 				Name:      "test-credential-1",
@@ -558,7 +556,6 @@ func TestUpdateCloudCredential(t *testing.T) {
 			m.Controller = dbmodel.Controller{}
 			m.CloudCredential = dbmodel.CloudCredential{}
 			m.CloudRegion = dbmodel.CloudRegion{}
-			m.Users[0].User = dbmodel.User{}
 			expectedCredential.Models = []dbmodel.Model{m}
 
 			return &u, arg, expectedCredential, ""
@@ -665,7 +662,6 @@ func TestUpdateCloudCredential(t *testing.T) {
 			m.Controller = dbmodel.Controller{}
 			m.CloudCredential = dbmodel.CloudCredential{}
 			m.CloudRegion = dbmodel.CloudRegion{}
-			m.Users[0].User = dbmodel.User{}
 			cred.Models = []dbmodel.Model{m}
 
 			return &u, arg, cred, ""

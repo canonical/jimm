@@ -93,10 +93,6 @@ func initTestEnvironment(c *qt.C, db *db.Database) testEnvironment {
 		SLA: dbmodel.SLA{
 			Level: "unsupported",
 		},
-		Users: []dbmodel.UserModelAccess{{
-			User:   env.u,
-			Access: "admin",
-		}},
 	}
 	c.Assert(db.DB.Create(&env.model).Error, qt.IsNil)
 

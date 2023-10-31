@@ -256,13 +256,6 @@ users:
 			Status: "started",
 			Info:   "running a test",
 		},
-		Users: []dbmodel.UserModelAccess{{
-			User: dbmodel.User{
-				Username:         "alice@external",
-				ControllerAccess: "login",
-			},
-			Access: "admin",
-		}},
 	},
 }, {
 	name: "CreateModelWithoutCloudRegion",
@@ -374,13 +367,6 @@ users:
 			Status: "started",
 			Info:   "running a test",
 		},
-		Users: []dbmodel.UserModelAccess{{
-			User: dbmodel.User{
-				Username:         "alice@external",
-				ControllerAccess: "login",
-			},
-			Access: "admin",
-		}},
 	},
 }, {
 	name: "CreateModelWithCloud",
@@ -471,13 +457,6 @@ users:
 			Status: "started",
 			Info:   "running a test",
 		},
-		Users: []dbmodel.UserModelAccess{{
-			User: dbmodel.User{
-				Username:         "alice@external",
-				ControllerAccess: "login",
-			},
-			Access: "admin",
-		}},
 	},
 }, {
 	name: "CreateModelInOtherNamespaceAsSuperUser",
@@ -573,13 +552,6 @@ users:
 			Status: "started",
 			Info:   "running a test",
 		},
-		Users: []dbmodel.UserModelAccess{{
-			User: dbmodel.User{
-				Username:         "alice@external",
-				ControllerAccess: "superuser",
-			},
-			Access: "admin",
-		}},
 	},
 }, {
 	name: "CreateModelInOtherNamespace",
@@ -3288,19 +3260,6 @@ var updateModelCredentialTests = []struct {
 		CloudCredential: dbmodel.CloudCredential{
 			Name: "cred-2",
 		},
-		Users: []dbmodel.UserModelAccess{{
-			User: dbmodel.User{
-				Username:         "alice@external",
-				ControllerAccess: "login",
-			},
-			Access: "admin",
-		}, {
-			User: dbmodel.User{
-				Username:         "charlie@external",
-				ControllerAccess: "login",
-			},
-			Access: "write",
-		}},
 	},
 }, {
 	name: "user not admin",

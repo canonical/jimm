@@ -141,10 +141,6 @@ var initializeEnvironment = func(c *qt.C, ctx context.Context, db *db.Database, 
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
 		CloudCredentialID: cred.ID,
-		Users: []dbmodel.UserModelAccess{{
-			Username: u.Username,
-			Access:   "admin",
-		}},
 	}
 	err = db.AddModel(ctx, &model)
 	c.Assert(err, qt.IsNil)
@@ -1310,10 +1306,6 @@ func TestOffer(t *testing.T) {
 				ControllerID:      controller.ID,
 				CloudRegionID:     cloud.Regions[0].ID,
 				CloudCredentialID: cred.ID,
-				Users: []dbmodel.UserModelAccess{{
-					User:   u,
-					Access: "admin",
-				}},
 			}
 			err = db.AddModel(ctx, &model)
 			c.Assert(err, qt.IsNil)
@@ -1437,10 +1429,6 @@ func TestOffer(t *testing.T) {
 				ControllerID:      controller.ID,
 				CloudRegionID:     cloud.Regions[0].ID,
 				CloudCredentialID: cred.ID,
-				Users: []dbmodel.UserModelAccess{{
-					User:   u,
-					Access: "admin",
-				}},
 			}
 			err = db.AddModel(ctx, &model)
 			c.Assert(err, qt.IsNil)
@@ -1564,10 +1552,6 @@ func TestOffer(t *testing.T) {
 				ControllerID:      controller.ID,
 				CloudRegionID:     cloud.Regions[0].ID,
 				CloudCredentialID: cred.ID,
-				Users: []dbmodel.UserModelAccess{{
-					User:   u,
-					Access: "admin",
-				}},
 			}
 			err = db.AddModel(ctx, &model)
 			c.Assert(err, qt.IsNil)
@@ -1664,10 +1648,6 @@ func TestOffer(t *testing.T) {
 				ControllerID:      controller.ID,
 				CloudRegionID:     cloud.Regions[0].ID,
 				CloudCredentialID: cred.ID,
-				Users: []dbmodel.UserModelAccess{{
-					User:   u,
-					Access: "admin",
-				}},
 			}
 			err = db.AddModel(ctx, &model)
 			c.Assert(err, qt.IsNil)
@@ -1757,10 +1737,6 @@ func TestOffer(t *testing.T) {
 				ControllerID:      controller.ID,
 				CloudRegionID:     cloud.Regions[0].ID,
 				CloudCredentialID: cred.ID,
-				Users: []dbmodel.UserModelAccess{{
-					User:   u,
-					Access: "admin",
-				}},
 			}
 			err = db.AddModel(ctx, &model)
 			c.Assert(err, qt.IsNil)
@@ -1850,10 +1826,6 @@ func TestOffer(t *testing.T) {
 				ControllerID:      controller.ID,
 				CloudRegionID:     cloud.Regions[0].ID,
 				CloudCredentialID: cred.ID,
-				Users: []dbmodel.UserModelAccess{{
-					User:   u,
-					Access: "admin",
-				}},
 			}
 			err = db.AddModel(ctx, &model)
 			c.Assert(err, qt.IsNil)
@@ -1985,10 +1957,6 @@ func TestOfferAssertOpenFGARelationsExist(t *testing.T) {
 			ControllerID:      controller.ID,
 			CloudRegionID:     cloud.Regions[0].ID,
 			CloudCredentialID: cred.ID,
-			Users: []dbmodel.UserModelAccess{{
-				User:   u,
-				Access: "admin",
-			}},
 		}
 		err = db.AddModel(ctx, &model)
 		c.Assert(err, qt.IsNil)
