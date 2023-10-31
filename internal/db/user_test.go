@@ -4,7 +4,6 @@ package db_test
 
 import (
 	"context"
-	"database/sql"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
@@ -81,21 +80,8 @@ func (s *dbSuite) TestUpdateUser(c *qt.C) {
 	c.Check(u.ControllerAccess, qt.Equals, "login")
 
 	u.ControllerAccess = "superuser"
-	u.Models = []dbmodel.UserModelAccess{{
-		Model_: dbmodel.Model{
-			Name:  "model-1",
-			Owner: u,
-			UUID: sql.NullString{
-				String: "00000001-0000-0000-0000-0000-00000000001",
-				Valid:  true,
-			},
-		},
-		Access: "admin",
-	}}
 	err = s.Database.UpdateUser(ctx, &u)
 	c.Assert(err, qt.IsNil)
-
-	u.Models = nil
 
 	u2 := dbmodel.User{
 		Username: u.Username,

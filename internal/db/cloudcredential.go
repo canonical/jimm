@@ -49,7 +49,7 @@ func (d *Database) GetCloudCredential(ctx context.Context, cred *dbmodel.CloudCr
 	}
 	db := d.DB.WithContext(ctx)
 	db = db.Preload("Cloud")
-	db = db.Preload("Models").Preload("Models.Users")
+	db = db.Preload("Models")
 	if err := db.Where("cloud_name = ? AND owner_username = ? AND name = ?", cred.CloudName, cred.OwnerUsername, cred.Name).First(&cred).Error; err != nil {
 		err := dbError(err)
 		if errors.ErrorCode(err) == errors.CodeNotFound {

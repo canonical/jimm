@@ -213,8 +213,8 @@ func (r *controllerRoot) WatchAllModelSummaries(ctx context.Context) (jujuparams
 
 	getAllModels := func(ctx context.Context) ([]string, error) {
 		var modelUUIDs []string
-		err := r.jimm.ForEachModel(ctx, r.user, func(uma *dbmodel.UserModelAccess) error {
-			modelUUIDs = append(modelUUIDs, uma.ToJujuUserModel().UUID)
+		err := r.jimm.ForEachModel(ctx, r.user, func(m *dbmodel.Model, _ jujuparams.UserAccessPermission) error {
+			modelUUIDs = append(modelUUIDs, m.UUID.String)
 			return nil
 		})
 		if err != nil {
@@ -244,8 +244,11 @@ func (r *controllerRoot) allModels(ctx context.Context) (jujuparams.UserModelLis
 	const op = errors.Op("jujuapi.AllModels")
 
 	var models []jujuparams.UserModel
-	err := r.jimm.ForEachUserModel(ctx, r.user, func(uma *dbmodel.UserModelAccess) error {
-		models = append(models, uma.ToJujuUserModel())
+	err := r.jimm.ForEachUserModel(ctx, r.user, func(m *dbmodel.Model, _ jujuparams.UserAccessPermission) error {
+		// TODO(Kian) CSS-6040 Refactor the below to use a better abstraction for Postgres/OpenFGA to Juju types.
+		var um jujuparams.UserModel
+		um.Model = m.ToJujuModel()
+		models = append(models, um)
 		return nil
 	})
 	if err != nil {

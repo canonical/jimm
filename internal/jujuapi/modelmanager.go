@@ -183,8 +183,10 @@ func (r *controllerRoot) ListModelSummaries(ctx context.Context, _ jujuparams.Mo
 	const op = errors.Op("jujuapi.ListModelSummaries")
 
 	var results []jujuparams.ModelSummaryResult
-	err := r.jimm.ForEachUserModel(ctx, r.user, func(uma *dbmodel.UserModelAccess) error {
-		ms := uma.ToJujuModelSummary()
+	err := r.jimm.ForEachUserModel(ctx, r.user, func(m *dbmodel.Model, access jujuparams.UserAccessPermission) error {
+		// TODO(Kian) CSS-6040 Refactor the below to use a better abstraction for Postgres/OpenFGA to Juju types.
+		ms := m.ToJujuModelSummary()
+		ms.UserAccess = access
 		if r.controllerUUIDMasking {
 			ms.ControllerUUID = r.params.ControllerUUID
 		}
