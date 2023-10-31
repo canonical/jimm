@@ -206,7 +206,7 @@ var DefaultReservedCloudNames = []string{
 // code of CodeIncompatibleClouds will be returned. If there is an error
 // returned by the controller when creating the cloud then that error code
 // will be preserved.
-func (j *JIMM) AddCloudToController(ctx context.Context, user *openfga.User, controllerName string, tag names.CloudTag, cloud jujuparams.Cloud) error {
+func (j *JIMM) AddCloudToController(ctx context.Context, user *openfga.User, controllerName string, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error {
 	const op = errors.Op("jimm.AddCloudToController")
 
 	controller := dbmodel.Controller{
@@ -246,12 +246,12 @@ func (j *JIMM) AddCloudToController(ctx context.Context, user *openfga.User, con
 	if cloud.HostCloudRegion != "" {
 		parts := strings.SplitN(cloud.HostCloudRegion, "/", 2)
 		if len(parts) != 2 || parts[0] == "" {
-			return errors.E(op, errors.CodeIncompatibleClouds, fmt.Sprintf("unsupported cloud host region %q", cloud.HostCloudRegion))
+			return errors.E(op, errors.CodeIncompatibleClouds, fmt.Sprintf("cloud host region %q has invalid cloud/region format", cloud.HostCloudRegion))
 		}
 		region, err := j.Database.FindRegion(ctx, parts[0], parts[1])
 		if err != nil {
 			if errors.ErrorCode(err) == errors.CodeNotFound {
-				return errors.E(op, err, errors.CodeIncompatibleClouds, fmt.Sprintf("unsupported cloud host region %q", cloud.HostCloudRegion))
+				return errors.E(op, err, errors.CodeIncompatibleClouds, fmt.Sprintf("unable to find cloud/region %q", cloud.HostCloudRegion))
 			}
 			return errors.E(op, err)
 		}
@@ -261,13 +261,13 @@ func (j *JIMM) AddCloudToController(ctx context.Context, user *openfga.User, con
 		}
 
 		if !allowedAddModel {
-			return errors.E(op, errors.CodeIncompatibleClouds, fmt.Sprintf("unsupported cloud host region %q", cloud.HostCloudRegion))
+			return errors.E(op, errors.CodeUnauthorized, fmt.Sprintf("missing access to %q", cloud.HostCloudRegion))
 		}
 
 		if region.Cloud.HostCloudRegion != "" {
 			// Do not support creating a new cloud on an already hosted
 			// cloud.
-			return errors.E(op, errors.CodeIncompatibleClouds, fmt.Sprintf("unsupported cloud host region %q", cloud.HostCloudRegion))
+			return errors.E(op, errors.CodeIncompatibleClouds, fmt.Sprintf("cloud already hosted %q", cloud.HostCloudRegion))
 		}
 
 		found := false
@@ -291,7 +291,7 @@ func (j *JIMM) AddCloudToController(ctx context.Context, user *openfga.User, con
 		Access: "admin",
 	}}
 
-	ccloud, err := j.addControllerCloud(ctx, &controller, user.ResourceTag(), tag, cloud)
+	ccloud, err := j.addControllerCloud(ctx, &controller, user.ResourceTag(), tag, cloud, force)
 	if err != nil {
 		return errors.E(op, err)
 	}
@@ -331,7 +331,7 @@ func (j *JIMM) AddCloudToController(ctx context.Context, user *openfga.User, con
 // code of CodeIncompatibleClouds will be returned. If there is an error
 // returned by the controller when creating the cloud then that error code
 // will be preserved.
-func (j *JIMM) AddHostedCloud(ctx context.Context, user *openfga.User, tag names.CloudTag, cloud jujuparams.Cloud) error {
+func (j *JIMM) AddHostedCloud(ctx context.Context, user *openfga.User, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error {
 	const op = errors.Op("jimm.AddHostedCloud")
 
 	// NOTE (alesstimec) The default JIMM access right for every user is
@@ -406,7 +406,7 @@ func (j *JIMM) AddHostedCloud(ctx context.Context, user *openfga.User, tag names
 	shuffleRegionControllers(region.Controllers)
 	controller := region.Controllers[0].Controller
 
-	ccloud, err := j.addControllerCloud(ctx, &controller, user.ResourceTag(), tag, cloud)
+	ccloud, err := j.addControllerCloud(ctx, &controller, user.ResourceTag(), tag, cloud, force)
 	if err != nil {
 		// TODO(mhilton) remove the added cloud if adding it to the controller failed.
 		return errors.E(op, err)
@@ -475,8 +475,10 @@ func findController(controllerName string) func(controllers []dbmodel.CloudRegio
 // jujuparams cloud definition. Admin access to the cloud will be granted
 // to the user identified by the given user tag. On success
 // addControllerCloud returns the definition of the cloud retrieved from
-// the controller.
-func (j *JIMM) addControllerCloud(ctx context.Context, ctl *dbmodel.Controller, ut names.UserTag, tag names.CloudTag, cloud jujuparams.Cloud) (*jujuparams.Cloud, error) {
+// the controller. If the cloud already exists on the controller or the user
+// already has access to the cloud, then no error will be thrown and the
+// method will continue and return the desired cloud.
+func (j *JIMM) addControllerCloud(ctx context.Context, ctl *dbmodel.Controller, ut names.UserTag, tag names.CloudTag, cloud jujuparams.Cloud, force bool) (*jujuparams.Cloud, error) {
 	const op = errors.Op("jimm.addControllerCloud")
 
 	api, err := j.dial(ctx, ctl, names.ModelTag{})
@@ -484,12 +486,16 @@ func (j *JIMM) addControllerCloud(ctx context.Context, ctl *dbmodel.Controller, 
 		return nil, errors.E(op, err)
 	}
 	defer api.Close()
-	if err := api.AddCloud(ctx, tag, cloud); err != nil {
-		return nil, errors.E(op, err)
+	if err := api.AddCloud(ctx, tag, cloud, force); err != nil {
+		if errors.ErrorCode(err) != errors.CodeAlreadyExists {
+			return nil, errors.E(op, err)
+		}
 	}
 	// TODO (alesstimec) This will no longer be needed.
 	if err := api.GrantCloudAccess(ctx, tag, ut, "admin"); err != nil {
-		return nil, errors.E(op, err)
+		if !strings.Contains(err.Error(), "already has") {
+			return nil, errors.E(op, err)
+		}
 	}
 	var result jujuparams.Cloud
 	if err := api.Cloud(ctx, tag, &result); err != nil {

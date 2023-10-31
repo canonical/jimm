@@ -664,7 +664,7 @@ users:
 var addHostedCloudTests = []struct {
 	name             string
 	dialError        error
-	addCloud         func(context.Context, names.CloudTag, jujuparams.Cloud) error
+	addCloud         func(context.Context, names.CloudTag, jujuparams.Cloud, bool) error
 	grantCloudAccess func(context.Context, names.CloudTag, names.UserTag, string) error
 	cloud_           func(context.Context, names.CloudTag, *jujuparams.Cloud) error
 	username         string
@@ -675,7 +675,7 @@ var addHostedCloudTests = []struct {
 	expectErrorCode  errors.Code
 }{{
 	name: "Success",
-	addCloud: func(context.Context, names.CloudTag, jujuparams.Cloud) error {
+	addCloud: func(context.Context, names.CloudTag, jujuparams.Cloud, bool) error {
 		return nil
 	},
 	grantCloudAccess: func(context.Context, names.CloudTag, names.UserTag, string) error {
@@ -855,7 +855,7 @@ var addHostedCloudTests = []struct {
 	expectError: `dial error`,
 }, {
 	name: "AddCloudError",
-	addCloud: func(context.Context, names.CloudTag, jujuparams.Cloud) error {
+	addCloud: func(context.Context, names.CloudTag, jujuparams.Cloud, bool) error {
 		return errors.E("addcloud error")
 	},
 	username:  "alice@external",
@@ -916,7 +916,7 @@ func TestAddHostedCloud(t *testing.T) {
 			dbUser := env.User(test.username).DBObject(c, j.Database, client)
 			user := openfga.NewUser(&dbUser, client)
 
-			err = j.AddHostedCloud(ctx, user, names.NewCloudTag(test.cloudName), test.cloud)
+			err = j.AddHostedCloud(ctx, user, names.NewCloudTag(test.cloudName), test.cloud, false)
 			c.Assert(dialer.IsClosed(), qt.Equals, true)
 			if test.expectError != "" {
 				c.Assert(err, qt.ErrorMatches, test.expectError)
@@ -936,7 +936,7 @@ func TestAddHostedCloud(t *testing.T) {
 var addHostedCloudToControllerTests = []struct {
 	name             string
 	dialError        error
-	addCloud         func(context.Context, names.CloudTag, jujuparams.Cloud) error
+	addCloud         func(context.Context, names.CloudTag, jujuparams.Cloud, bool) error
 	grantCloudAccess func(context.Context, names.CloudTag, names.UserTag, string) error
 	cloud_           func(context.Context, names.CloudTag, *jujuparams.Cloud) error
 	username         string
@@ -948,7 +948,7 @@ var addHostedCloudToControllerTests = []struct {
 	expectErrorCode  errors.Code
 }{{
 	name: "Success",
-	addCloud: func(context.Context, names.CloudTag, jujuparams.Cloud) error {
+	addCloud: func(context.Context, names.CloudTag, jujuparams.Cloud, bool) error {
 		return nil
 	},
 	grantCloudAccess: func(context.Context, names.CloudTag, names.UserTag, string) error {
@@ -1016,7 +1016,7 @@ var addHostedCloudToControllerTests = []struct {
 	},
 }, {
 	name: "Controller not found",
-	addCloud: func(context.Context, names.CloudTag, jujuparams.Cloud) error {
+	addCloud: func(context.Context, names.CloudTag, jujuparams.Cloud, bool) error {
 		return nil
 	},
 	grantCloudAccess: func(context.Context, names.CloudTag, names.UserTag, string) error {
@@ -1080,7 +1080,7 @@ var addHostedCloudToControllerTests = []struct {
 		IdentityEndpoint: "https://example.com/identity",
 		StorageEndpoint:  "https://example.com/storage",
 	},
-	expectError:     `unsupported cloud host region "ec2/default"`,
+	expectError:     `unable to find cloud/region "ec2/default"`,
 	expectErrorCode: errors.CodeIncompatibleClouds,
 }, {
 	name:           "InvalidHostCloudRegion",
@@ -1095,7 +1095,7 @@ var addHostedCloudToControllerTests = []struct {
 		IdentityEndpoint: "https://example.com/identity",
 		StorageEndpoint:  "https://example.com/storage",
 	},
-	expectError:     `unsupported cloud host region "ec2"`,
+	expectError:     `cloud host region "ec2" has invalid cloud/region format`,
 	expectErrorCode: errors.CodeIncompatibleClouds,
 }, {
 	name:           "UserHasNoCloudAccess",
@@ -1110,7 +1110,7 @@ var addHostedCloudToControllerTests = []struct {
 		IdentityEndpoint: "https://example.com/identity",
 		StorageEndpoint:  "https://example.com/storage",
 	},
-	expectError:     `unsupported cloud host region "test-provider3/test-region-3"`,
+	expectError:     `unable to find cloud/region "test-provider3/test-region-3"`,
 	expectErrorCode: errors.CodeIncompatibleClouds,
 }, {
 	name:           "HostCloudIsHosted",
@@ -1125,7 +1125,7 @@ var addHostedCloudToControllerTests = []struct {
 		IdentityEndpoint: "https://example.com/identity",
 		StorageEndpoint:  "https://example.com/storage",
 	},
-	expectError:     `unsupported cloud host region "kubernetes/default"`,
+	expectError:     `cloud already hosted "kubernetes/default"`,
 	expectErrorCode: errors.CodeIncompatibleClouds,
 }, {
 	name:           "DialError",
@@ -1144,7 +1144,7 @@ var addHostedCloudToControllerTests = []struct {
 	expectError: `dial error`,
 }, {
 	name: "AddCloudError",
-	addCloud: func(context.Context, names.CloudTag, jujuparams.Cloud) error {
+	addCloud: func(context.Context, names.CloudTag, jujuparams.Cloud, bool) error {
 		return errors.E("addcloud error")
 	},
 	username:       "alice@external",
@@ -1206,7 +1206,8 @@ func TestAddCloudToController(t *testing.T) {
 			dbUser := env.User(test.username).DBObject(c, j.Database, client)
 			user := openfga.NewUser(&dbUser, client)
 
-			err = j.AddCloudToController(ctx, user, test.controllerName, names.NewCloudTag(test.cloudName), test.cloud)
+			// Note that the force flag has no effect here because the Juju responses are mocked.
+			err = j.AddCloudToController(ctx, user, test.controllerName, names.NewCloudTag(test.cloudName), test.cloud, false)
 			c.Assert(dialer.IsClosed(), qt.Equals, true)
 			if test.expectError != "" {
 				c.Check(err, qt.ErrorMatches, test.expectError)

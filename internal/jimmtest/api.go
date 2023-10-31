@@ -115,7 +115,7 @@ func (m DialerMap) Dial(ctx context.Context, ctl *dbmodel.Controller, mt names.M
 // will delegate to the requested function or if the function is nil return
 // a NotImplemented error.
 type API struct {
-	AddCloud_                          func(context.Context, names.CloudTag, jujuparams.Cloud) error
+	AddCloud_                          func(context.Context, names.CloudTag, jujuparams.Cloud, bool) error
 	AllModelWatcherNext_               func(context.Context, string) ([]jujuparams.Delta, error)
 	AllModelWatcherStop_               func(context.Context, string) error
 	ChangeModelCredential_             func(context.Context, names.ModelTag, names.CloudCredentialTag) error
@@ -166,11 +166,11 @@ type API struct {
 	ListStorageDetails_                func(ctx context.Context) ([]jujuparams.StorageDetails, error)
 }
 
-func (a *API) AddCloud(ctx context.Context, tag names.CloudTag, cld jujuparams.Cloud) error {
+func (a *API) AddCloud(ctx context.Context, tag names.CloudTag, cld jujuparams.Cloud, force bool) error {
 	if a.AddCloud_ == nil {
 		return errors.E(errors.CodeNotImplemented)
 	}
-	return a.AddCloud_(ctx, tag, cld)
+	return a.AddCloud_(ctx, tag, cld, force)
 }
 
 func (a *API) AllModelWatcherNext(ctx context.Context, id string) ([]jujuparams.Delta, error) {
