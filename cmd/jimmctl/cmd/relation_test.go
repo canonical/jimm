@@ -14,7 +14,6 @@ import (
 	petname "github.com/dustinkirkland/golang-petname"
 	"github.com/google/uuid"
 	"github.com/juju/cmd/v3/cmdtesting"
-	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 	gc "gopkg.in/check.v1"
 	yamlv2 "gopkg.in/yaml.v2"
@@ -337,10 +336,6 @@ func initializeEnvironment(c *gc.C, ctx context.Context, db *db.Database, u dbmo
 		Model:           model,
 		ApplicationName: "test-app",
 		CharmURL:        "cs:test-app:17",
-		Users: []dbmodel.UserApplicationOfferAccess{{
-			Username: u1.Username,
-			Access:   string(jujuparams.OfferAdminAccess),
-		}},
 	}
 	err = db.AddApplicationOffer(ctx, &offer)
 	c.Assert(err, gc.IsNil)
