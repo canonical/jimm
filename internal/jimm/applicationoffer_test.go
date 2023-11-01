@@ -162,19 +162,6 @@ var initializeEnvironment = func(c *qt.C, ctx context.Context, db *db.Database, 
 		Model:           model,
 		ApplicationName: "test-app",
 		CharmURL:        "cs:test-app:17",
-		Users: []dbmodel.UserApplicationOfferAccess{{
-			Username: u1.Username,
-			Access:   string(jujuparams.OfferAdminAccess),
-		}, {
-			Username: u2.Username,
-			Access:   string(jujuparams.OfferConsumeAccess),
-		}, {
-			Username: u3.Username,
-			Access:   string(jujuparams.OfferReadAccess),
-		}, {
-			Username: u5.Username,
-			Access:   string(jujuparams.OfferAdminAccess),
-		}},
 	}
 	err = db.AddApplicationOffer(ctx, &offer)
 	c.Assert(err, qt.IsNil)
@@ -1042,13 +1029,6 @@ func TestGetApplicationOffer(t *testing.T) {
 			RelationID:         1,
 			Username:           "unknown",
 			Endpoint:           "test-endpoint",
-		}},
-		Users: []dbmodel.UserApplicationOfferAccess{{
-			Username: u.Username,
-			Access:   string(jujuparams.OfferAdminAccess),
-		}, {
-			Username: u1.Username,
-			Access:   string(jujuparams.OfferReadAccess),
 		}},
 	}
 	err = j.Database.AddApplicationOffer(ctx, &offer)
@@ -2364,39 +2344,6 @@ func TestUpdateOffer(t *testing.T) {
 				Interface:          "unknown",
 				Limit:              1,
 			}},
-			Users: []dbmodel.UserApplicationOfferAccess{{
-				Username: "eve@external",
-				User: dbmodel.User{
-					Username:         "eve@external",
-					ControllerAccess: "login",
-				},
-				ApplicationOfferID: 1,
-				Access:             "admin",
-			}, {
-				Username: "bob@external",
-				User: dbmodel.User{
-					Username:         "bob@external",
-					ControllerAccess: "login",
-				},
-				ApplicationOfferID: 1,
-				Access:             "consume",
-			}, {
-				Username: "fred@external",
-				User: dbmodel.User{
-					Username:         "fred@external",
-					ControllerAccess: "login",
-				},
-				ApplicationOfferID: 1,
-				Access:             "read",
-			}, {
-				Username: "jane@external",
-				User: dbmodel.User{
-					Username:         "jane@external",
-					ControllerAccess: "login",
-				},
-				ApplicationOfferID: 1,
-				Access:             "admin",
-			}},
 		},
 	}, {
 		about: "offer removed",
@@ -2540,48 +2487,53 @@ func TestFindApplicationOffers(t *testing.T) {
 		parameterFunc func(*environment) (dbmodel.User, string, []jujuparams.OfferFilter)
 		expectedError string
 		expectedOffer *dbmodel.ApplicationOffer
-	}{
-		// TODO(Kian) CSS-6045 Uncomment this test as part of applicationoffer refactoring to only use OpenFGA.
-		// 	{
-		// 	about: "find an offer as model admin",
-		// 	parameterFunc: func(env *environment) (dbmodel.User, string, []jujuparams.OfferFilter) {
-		// 		return env.users[0], "admin", []jujuparams.OfferFilter{{
-		// 			OfferName: "test-offer",
-		// 		}}
-		// 	},
-		// 	expectedOffer: &expectedOffer,
-		// },
-		{
-			about: "find an offer as offer admin",
-			parameterFunc: func(env *environment) (dbmodel.User, string, []jujuparams.OfferFilter) {
-				return env.users[5], "admin", []jujuparams.OfferFilter{{
-					OfferName: "test-offer",
-				}}
-			},
-			expectedOffer: &expectedOffer,
-		}, {
-			about: "find an offer as superuser",
-			parameterFunc: func(env *environment) (dbmodel.User, string, []jujuparams.OfferFilter) {
-				return env.users[6], "admin", []jujuparams.OfferFilter{{
-					OfferName: "test-offer",
-				}}
-			},
-			expectedOffer: &expectedOffer,
-		}, {
-			about: "offer not found",
-			parameterFunc: func(env *environment) (dbmodel.User, string, []jujuparams.OfferFilter) {
-				return env.users[0], "admin", []jujuparams.OfferFilter{{
-					OfferName: "no-such-offer",
-				}}
-			},
-		}, {
-			about: "user without access cannot find offers",
-			parameterFunc: func(env *environment) (dbmodel.User, string, []jujuparams.OfferFilter) {
-				return env.users[4], "", []jujuparams.OfferFilter{{
-					OfferName: "test-offer",
-				}}
-			},
-		}}
+	}{{
+		about: "find an offer as an offer consumer",
+		parameterFunc: func(env *environment) (dbmodel.User, string, []jujuparams.OfferFilter) {
+			return env.users[2], "consume", []jujuparams.OfferFilter{{
+				OfferName: "test-offer",
+			}}
+		},
+		expectedOffer: &expectedOffer,
+	}, {
+		about: "find an offer as model admin",
+		parameterFunc: func(env *environment) (dbmodel.User, string, []jujuparams.OfferFilter) {
+			return env.users[0], "admin", []jujuparams.OfferFilter{{
+				OfferName: "test-offer",
+			}}
+		},
+		expectedOffer: &expectedOffer,
+	}, {
+		about: "find an offer as offer admin",
+		parameterFunc: func(env *environment) (dbmodel.User, string, []jujuparams.OfferFilter) {
+			return env.users[5], "admin", []jujuparams.OfferFilter{{
+				OfferName: "test-offer",
+			}}
+		},
+		expectedOffer: &expectedOffer,
+	}, {
+		about: "find an offer as superuser",
+		parameterFunc: func(env *environment) (dbmodel.User, string, []jujuparams.OfferFilter) {
+			return env.users[6], "admin", []jujuparams.OfferFilter{{
+				OfferName: "test-offer",
+			}}
+		},
+		expectedOffer: &expectedOffer,
+	}, {
+		about: "offer not found",
+		parameterFunc: func(env *environment) (dbmodel.User, string, []jujuparams.OfferFilter) {
+			return env.users[0], "admin", []jujuparams.OfferFilter{{
+				OfferName: "no-such-offer",
+			}}
+		},
+	}, {
+		about: "user without access cannot find offers",
+		parameterFunc: func(env *environment) (dbmodel.User, string, []jujuparams.OfferFilter) {
+			return env.users[4], "", []jujuparams.OfferFilter{{
+				OfferName: "test-offer",
+			}}
+		},
+	}}
 
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {

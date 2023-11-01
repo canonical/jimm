@@ -119,63 +119,6 @@ func TestUserCloudCredentials(t *testing.T) {
 	}})
 }
 
-func TestUserApplicationOffers(t *testing.T) {
-	c := qt.New(t)
-	db := gormDB(c)
-	cl, cred, ctl, u := initModelEnv(c, db)
-
-	m := dbmodel.Model{
-		Name:            "test-model",
-		Owner:           u,
-		Controller:      ctl,
-		CloudRegion:     cl.Regions[0],
-		CloudCredential: cred,
-		Offers: []dbmodel.ApplicationOffer{{
-			Name: "offer-1",
-			UUID: "00000004-0000-0000-0000-0000-000000000001",
-			Users: []dbmodel.UserApplicationOfferAccess{{
-				User:   u,
-				Access: "admin",
-			}},
-			ApplicationName: "app-1",
-		}, {
-			Name: "offer-1",
-			UUID: "00000004-0000-0000-0000-0000-000000000002",
-			Users: []dbmodel.UserApplicationOfferAccess{{
-				User:   u,
-				Access: "consume",
-			}},
-			ApplicationName: "app-2",
-		}},
-	}
-
-	c.Assert(db.Create(&m).Error, qt.IsNil)
-
-	var offers []dbmodel.UserApplicationOfferAccess
-	err := db.Model(&u).Association("ApplicationOffers").Find(&offers)
-	c.Assert(err, qt.IsNil)
-
-	c.Check(offers, qt.DeepEquals, []dbmodel.UserApplicationOfferAccess{{
-		Model: gorm.Model{
-			ID:        m.Offers[0].Users[0].ID,
-			CreatedAt: m.Offers[0].Users[0].CreatedAt,
-			UpdatedAt: m.Offers[0].Users[0].UpdatedAt,
-		},
-		Username:           u.Username,
-		ApplicationOfferID: m.Offers[0].ID,
-		Access:             "admin",
-	}, {
-		Model: gorm.Model{
-			ID:        m.Offers[1].Users[0].ID,
-			CreatedAt: m.Offers[1].Users[0].CreatedAt,
-			UpdatedAt: m.Offers[1].Users[0].UpdatedAt,
-		},
-		Username:           u.Username,
-		ApplicationOfferID: m.Offers[1].ID,
-		Access:             "consume",
-	}})
-}
-
 func TestUserToJujuUserInfo(t *testing.T) {
 	c := qt.New(t)
 

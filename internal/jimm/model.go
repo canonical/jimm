@@ -676,6 +676,10 @@ func (j *JIMM) ModelInfo(ctx context.Context, u *openfga.User, mt names.ModelTag
 
 	userAccess := make(map[string]string)
 
+	// TODO(Kian) CSS-6040 Consider refactoring the below to use OpenFGAClient.ReadRelatedObjects
+	// (and possibly creating a wrapper for that) to read only direct relations to the model instead
+	// of expanding the entire user list. Then we would instead return groups and users with direct
+	// access instead of including users with indirect access.
 	for _, relation := range []openfga.Relation{
 		// Here we list possible relation in decreasing level
 		// of access privilege.
