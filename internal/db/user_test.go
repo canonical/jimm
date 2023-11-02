@@ -40,7 +40,6 @@ func (s *dbSuite) TestGetUser(c *qt.C) {
 	}
 	err = s.Database.GetUser(ctx, &u)
 	c.Assert(err, qt.IsNil)
-	c.Check(u.ControllerAccess, qt.Equals, "login")
 
 	u2 := dbmodel.User{
 		Username: u.Username,
@@ -77,9 +76,7 @@ func (s *dbSuite) TestUpdateUser(c *qt.C) {
 	}
 	err = s.Database.GetUser(ctx, &u)
 	c.Assert(err, qt.IsNil)
-	c.Check(u.ControllerAccess, qt.Equals, "login")
 
-	u.ControllerAccess = "superuser"
 	err = s.Database.UpdateUser(ctx, &u)
 	c.Assert(err, qt.IsNil)
 

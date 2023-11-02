@@ -200,11 +200,16 @@ func (r *controllerRoot) WatchModelSummaries(ctx context.Context) (jujuparams.Su
 func (r *controllerRoot) WatchAllModelSummaries(ctx context.Context) (jujuparams.SummaryWatcherID, error) {
 	const op = errors.Op("jujuapi.WatchAllModelSummaries")
 
-	if r.user.ControllerAccess != "superuser" {
-		return jujuparams.SummaryWatcherID{}, errors.E(errors.CodeUnauthorized, "permission denied")
+	isControllerAdmin, err := openfga.IsAdministrator(ctx, r.user, r.jimm.ResourceTag())
+	if err != nil {
+		zapctx.Error(ctx, "failed to check for controller admin access", zap.Error(err))
+		return jujuparams.SummaryWatcherID{}, errors.E(op, err)
+	}
+	if !isControllerAdmin {
+		return jujuparams.SummaryWatcherID{}, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
-	err := r.setupUUIDGenerator()
+	err = r.setupUUIDGenerator()
 	if err != nil {
 		return jujuparams.SummaryWatcherID{}, errors.E(op, err)
 	}

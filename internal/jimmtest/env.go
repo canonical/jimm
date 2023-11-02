@@ -463,7 +463,6 @@ func (u *User) DBObject(c *qt.C, db db.Database, client *openfga.OFGAClient) dbm
 	}
 	u.dbo.Username = u.Username
 	u.dbo.DisplayName = u.DisplayName
-	u.dbo.ControllerAccess = u.ControllerAccess
 
 	err := db.UpdateUser(context.Background(), &u.dbo)
 	c.Assert(err, qt.IsNil)

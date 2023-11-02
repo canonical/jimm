@@ -84,9 +84,8 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 	err = s.JIMM.Database.Migrate(ctx, false)
 	c.Assert(err, gc.Equals, nil)
 	s.AdminUser = &dbmodel.User{
-		Username:         "alice@external",
-		ControllerAccess: "superuser",
-		LastLogin:        db.Now(),
+		Username:  "alice@external",
+		LastLogin: db.Now(),
 	}
 	err = s.JIMM.Database.GetUser(ctx, s.AdminUser)
 	c.Assert(err, gc.Equals, nil)

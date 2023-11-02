@@ -30,7 +30,6 @@ func TestUser(t *testing.T) {
 	result = db.Create(&u1)
 	c.Assert(result.Error, qt.IsNil)
 	c.Check(result.RowsAffected, qt.Equals, int64(1))
-	c.Check(u1.ControllerAccess, qt.Equals, "login")
 
 	var u2 dbmodel.User
 	result = db.Where("username = ?", "bob@external").First(&u2)
@@ -126,15 +125,14 @@ func TestUserToJujuUserInfo(t *testing.T) {
 		Model: gorm.Model{
 			CreatedAt: time.Now(),
 		},
-		Username:         "alice@external",
-		DisplayName:      "Alice",
-		ControllerAccess: "superuser",
+		Username:    "alice@external",
+		DisplayName: "Alice",
 	}
 	ui := u.ToJujuUserInfo()
 	c.Check(ui, qt.DeepEquals, jujuparams.UserInfo{
 		Username:    "alice@external",
 		DisplayName: "Alice",
-		Access:      "superuser",
+		Access:      "",
 		DateCreated: u.CreatedAt,
 	})
 
@@ -146,7 +144,7 @@ func TestUserToJujuUserInfo(t *testing.T) {
 	c.Check(ui, qt.DeepEquals, jujuparams.UserInfo{
 		Username:       "alice@external",
 		DisplayName:    "Alice",
-		Access:         "superuser",
+		Access:         "",
 		DateCreated:    u.CreatedAt,
 		LastConnection: &u.LastLogin.Time,
 	})

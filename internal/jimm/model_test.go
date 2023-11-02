@@ -231,8 +231,7 @@ users:
 			Valid:  true,
 		},
 		Owner: dbmodel.User{
-			Username:         "alice@external",
-			ControllerAccess: "login",
+			Username: "alice@external",
 		},
 		Controller: dbmodel.Controller{
 			Name:        "controller-2",
@@ -342,8 +341,7 @@ users:
 			Valid:  true,
 		},
 		Owner: dbmodel.User{
-			Username:         "alice@external",
-			ControllerAccess: "login",
+			Username: "alice@external",
 		},
 		Controller: dbmodel.Controller{
 			Name:        "controller-2",
@@ -432,8 +430,7 @@ users:
 			Valid:  true,
 		},
 		Owner: dbmodel.User{
-			Username:         "alice@external",
-			ControllerAccess: "login",
+			Username: "alice@external",
 		},
 		Controller: dbmodel.Controller{
 			Name:        "controller-2",
@@ -527,8 +524,7 @@ users:
 			Valid:  true,
 		},
 		Owner: dbmodel.User{
-			Username:         "bob@external",
-			ControllerAccess: "login",
+			Username: "bob@external",
 		},
 		Controller: dbmodel.Controller{
 			Name:        "controller-2",
@@ -3241,8 +3237,7 @@ var updateModelCredentialTests = []struct {
 			Valid:  true,
 		},
 		Owner: dbmodel.User{
-			Username:         "alice@external",
-			ControllerAccess: "login",
+			Username: "alice@external",
 		},
 		Controller: dbmodel.Controller{
 			Name:        "controller-1",

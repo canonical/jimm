@@ -14,6 +14,7 @@ import (
 	"github.com/juju/names/v4"
 	"github.com/juju/zaputil"
 	"github.com/juju/zaputil/zapctx"
+	"go.uber.org/zap"
 
 	apiparams "github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/internal/db"
@@ -463,7 +464,12 @@ func (r *controllerRoot) FullModelStatus(ctx context.Context, req apiparams.Full
 func (r *controllerRoot) UpdateMigratedModel(ctx context.Context, req apiparams.UpdateMigratedModelRequest) error {
 	const op = errors.Op("jujuapi.UpdateMigratedModel")
 
-	if r.user.ControllerAccess != "superuser" {
+	isControllerAdmin, err := openfga.IsAdministrator(ctx, r.user, r.jimm.ResourceTag())
+	if err != nil {
+		zapctx.Error(ctx, "failed to check for controller admin access", zap.Error(err))
+		return errors.E(op, err)
+	}
+	if !isControllerAdmin {
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
