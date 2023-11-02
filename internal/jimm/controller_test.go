@@ -413,7 +413,7 @@ func TestEarliestControllerVersion(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	env := jimmtest.ParseEnvironment(c, testEarliestControllerVersionEnv)
-	env.PopulateDB(c, j.Database, client)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
 
 	v, err := j.EarliestControllerVersion(ctx)
 	c.Assert(err, qt.Equals, nil)
@@ -913,10 +913,9 @@ func TestImportModel(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 
 			env := jimmtest.ParseEnvironment(c, testImportModelEnv)
-			env.PopulateDB(c, j.Database, client)
-			env.AddJIMMRelations(c, j.ResourceTag(), j.Database, client)
+			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
 
-			dbUser := env.User(test.user).DBObject(c, j.Database, client)
+			dbUser := env.User(test.user).DBObject(c, j.Database)
 			user := openfga.NewUser(&dbUser, client)
 			err = j.ImportModel(ctx, user, test.controllerName, names.NewModelTag(test.modelUUID), test.newOwner)
 			if test.expectedError == "" {
@@ -1014,10 +1013,9 @@ func TestSetControllerConfig(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 
 			env := jimmtest.ParseEnvironment(c, testControllerConfigEnv)
-			env.PopulateDB(c, j.Database, client)
-			env.AddJIMMRelations(c, j.ResourceTag(), j.Database, client)
+			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
 
-			dbUser := env.User(test.user).DBObject(c, j.Database, client)
+			dbUser := env.User(test.user).DBObject(c, j.Database)
 			user := openfga.NewUser(&dbUser, client)
 			err = j.SetControllerConfig(ctx, user, test.args)
 			if test.expectedError == "" {
@@ -1090,13 +1088,12 @@ func TestGetControllerConfig(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 
 			env := jimmtest.ParseEnvironment(c, testImportModelEnv)
-			env.PopulateDB(c, j.Database, client)
-			env.AddJIMMRelations(c, j.ResourceTag(), j.Database, client)
+			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
 
-			dbSuperuser := env.User("alice@external").DBObject(c, j.Database, client)
+			dbSuperuser := env.User("alice@external").DBObject(c, j.Database)
 			superuser := openfga.NewUser(&dbSuperuser, client)
 
-			dbUser := env.User(test.user).DBObject(c, j.Database, client)
+			dbUser := env.User(test.user).DBObject(c, j.Database)
 			user := openfga.NewUser(&dbUser, client)
 
 			err = j.SetControllerConfig(ctx, superuser, jujuparams.ControllerConfigSet{
@@ -1241,10 +1238,9 @@ func TestUpdateMigratedModel(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 
 			env := jimmtest.ParseEnvironment(c, testUpdateMigratedModelEnv)
-			env.PopulateDB(c, j.Database, client)
-			env.AddJIMMRelations(c, j.ResourceTag(), j.Database, client)
+			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
 
-			dbUser := env.User(test.user).DBObject(c, j.Database, client)
+			dbUser := env.User(test.user).DBObject(c, j.Database)
 			user := openfga.NewUser(&dbUser, client)
 
 			err = j.UpdateMigratedModel(ctx, user, test.model, test.targetController)
@@ -1295,10 +1291,9 @@ func TestGetControllerAccess(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	env := jimmtest.ParseEnvironment(c, testGetControllerAccessEnv)
-	env.PopulateDB(c, j.Database, client)
-	env.AddJIMMRelations(c, j.ResourceTag(), j.Database, client)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
 
-	dbUser := env.User("alice@external").DBObject(c, j.Database, client)
+	dbUser := env.User("alice@external").DBObject(c, j.Database)
 	alice := openfga.NewUser(&dbUser, client)
 
 	access, err := j.GetJimmControllerAccess(ctx, alice, names.NewUserTag("alice@external"))
@@ -1313,7 +1308,7 @@ func TestGetControllerAccess(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Check(access, qt.Equals, "login")
 
-	dbUser = env.User("bob@external").DBObject(c, j.Database, client)
+	dbUser = env.User("bob@external").DBObject(c, j.Database)
 	alice = openfga.NewUser(&dbUser, client)
 	access, err = j.GetJimmControllerAccess(ctx, alice, names.NewUserTag("bob@external"))
 	c.Assert(err, qt.IsNil)

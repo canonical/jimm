@@ -613,10 +613,9 @@ func TestAddHostedCloud(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 
 			env := jimmtest.ParseEnvironment(c, addHostedCloudTestEnv)
-			env.PopulateDB(c, j.Database, client)
-			env.AddJIMMRelations(c, j.ResourceTag(), j.Database, client)
+			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
 
-			dbUser := env.User(test.username).DBObject(c, j.Database, client)
+			dbUser := env.User(test.username).DBObject(c, j.Database)
 			user := openfga.NewUser(&dbUser, client)
 
 			err = j.AddHostedCloud(ctx, user, names.NewCloudTag(test.cloudName), test.cloud, false)
@@ -894,10 +893,9 @@ func TestAddCloudToController(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 
 			env := jimmtest.ParseEnvironment(c, addHostedCloudTestEnv)
-			env.PopulateDB(c, j.Database, client)
-			env.AddJIMMRelations(c, j.ResourceTag(), j.Database, client)
+			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
 
-			dbUser := env.User(test.username).DBObject(c, j.Database, client)
+			dbUser := env.User(test.username).DBObject(c, j.Database)
 			user := openfga.NewUser(&dbUser, client)
 
 			// Note that the force flag has no effect here because the Juju responses are mocked.
@@ -1054,9 +1052,9 @@ func TestGrantCloudAccess(t *testing.T) {
 			}
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
-			env.PopulateDB(c, j.Database, client)
+			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
 
-			dbUser := env.User(tt.username).DBObject(c, j.Database, client)
+			dbUser := env.User(tt.username).DBObject(c, j.Database)
 			user := openfga.NewUser(&dbUser, client)
 
 			err = j.GrantCloudAccess(ctx, user, names.NewCloudTag(tt.cloud), names.NewUserTag(tt.targetUsername), tt.access)
@@ -1354,7 +1352,7 @@ func TestRevokeCloudAccess(t *testing.T) {
 
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
-			env.PopulateDB(c, j.Database, client)
+			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
 
 			if tt.extraInitialTuples != nil && len(tt.extraInitialTuples) > 0 {
 				err = client.AddRelation(ctx, tt.extraInitialTuples...)
@@ -1369,7 +1367,7 @@ func TestRevokeCloudAccess(t *testing.T) {
 				}
 			}
 
-			dbUser := env.User(tt.username).DBObject(c, j.Database, client)
+			dbUser := env.User(tt.username).DBObject(c, j.Database)
 			user := openfga.NewUser(&dbUser, client)
 
 			err = j.RevokeCloudAccess(ctx, user, names.NewCloudTag(tt.cloud), names.NewUserTag(tt.targetUsername), tt.access)
@@ -1507,9 +1505,9 @@ func TestRemoveCloud(t *testing.T) {
 			}
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
-			env.PopulateDB(c, j.Database, client)
+			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
 
-			dbUser := env.User(test.username).DBObject(c, j.Database, client)
+			dbUser := env.User(test.username).DBObject(c, j.Database)
 			user := openfga.NewUser(&dbUser, client)
 
 			err = j.RemoveCloud(ctx, user, names.NewCloudTag(test.cloud))
@@ -1747,9 +1745,9 @@ func TestUpdateCloud(t *testing.T) {
 			}
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
-			env.PopulateDB(c, j.Database, client)
+			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
 
-			dbUser := env.User(test.username).DBObject(c, j.Database, client)
+			dbUser := env.User(test.username).DBObject(c, j.Database)
 			user := openfga.NewUser(&dbUser, client)
 
 			tag := names.NewCloudTag(test.cloud)
@@ -1941,9 +1939,9 @@ func TestRemoveFromControllerCloud(t *testing.T) {
 			}
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
-			env.PopulateDB(c, j.Database, client)
+			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
 
-			dbUser := env.User(test.username).DBObject(c, j.Database, client)
+			dbUser := env.User(test.username).DBObject(c, j.Database)
 			user := openfga.NewUser(&dbUser, client)
 
 			err = j.RemoveCloudFromController(ctx, user, test.controllerName, names.NewCloudTag(test.cloud))
