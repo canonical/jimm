@@ -61,8 +61,9 @@ func (r *controllerRoot) Login(ctx context.Context, req jujuparams.LoginRequest)
 		return jujuparams.LoginResult{}, errors.E(op, err)
 	}
 	aui := jujuparams.AuthUserInfo{
-		DisplayName:      u.DisplayName,
-		Identity:         u.Tag().String(),
+		DisplayName: u.DisplayName,
+		Identity:    u.Tag().String(),
+		// TODO(Kian) CSS-6040 improve combining Postgres and OpenFGA info
 		ControllerAccess: u.GetControllerAccess(ctx, r.jimm.ResourceTag()).String(),
 	}
 	if u.LastLogin.Valid {

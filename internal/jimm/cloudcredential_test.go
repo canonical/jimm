@@ -1648,6 +1648,7 @@ func TestGetCloudCredentialAttributes(t *testing.T) {
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 			env.PopulateDB(c, j.Database, client)
+			env.AddJIMMRelations(c, j.ResourceTag(), j.Database, client)
 			u := env.User("bob@external").DBObject(c, j.Database, client)
 			userBob := openfga.NewUser(&u, client)
 			cred, err := j.GetCloudCredential(ctx, userBob, names.NewCloudCredentialTag("test-cloud/bob@external/cred-1"))
