@@ -104,7 +104,7 @@ func TestAuthenticator(t *testing.T) {
 
 	c.Check(conn.ControllerTag(), qt.Equals, names.NewControllerTag("6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11"))
 	c.Check(conn.AuthTag(), qt.Equals, names.NewUserTag("alice@external"))
-	c.Check(conn.ControllerAccess(), qt.Equals, "superuser")
+	c.Check(conn.ControllerAccess(), qt.Equals, "")
 
 	conn, err = api.Open(&info, api.DialOpts{
 		BakeryClient:       userClient(candid, "bob"),
@@ -119,7 +119,7 @@ func TestAuthenticator(t *testing.T) {
 
 	c.Check(conn.ControllerTag(), qt.Equals, names.NewControllerTag("6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11"))
 	c.Check(conn.AuthTag(), qt.Equals, names.NewUserTag("bob@external"))
-	c.Check(conn.ControllerAccess(), qt.Equals, "login")
+	c.Check(conn.ControllerAccess(), qt.Equals, "")
 }
 
 func TestVault(t *testing.T) {
