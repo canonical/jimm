@@ -130,7 +130,7 @@ func ApplicationOfferFilterByApplication(applicationName string) ApplicationOffe
 // ApplicationOfferFilterByUUID filters application offers by UUID.
 func ApplicationOfferFilterByUUID(uuids []string) ApplicationOfferFilter {
 	return func(db *gorm.DB) *gorm.DB {
-		db = db.Where("UUID IN ?", uuids)
+		db = db.Where("offers.uuid IN ?", uuids)
 		return db
 	}
 }

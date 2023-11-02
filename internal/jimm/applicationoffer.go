@@ -573,6 +573,19 @@ func (j *JIMM) getUserOfferAccess(ctx context.Context, user *openfga.User, offer
 	return "", nil
 }
 
+// TODO(Kian) CSS-6080 Remove the below helper function when refactoring everyone@external usage.
+func removeDuplicateStr(strSlice []string) []string {
+	allKeys := make(map[string]bool)
+	list := []string{}
+	for _, item := range strSlice {
+		if _, value := allKeys[item]; !value {
+			allKeys[item] = true
+			list = append(list, item)
+		}
+	}
+	return list
+}
+
 // FindApplicationOffers returns details of offers matching the specified filter.
 func (j *JIMM) FindApplicationOffers(ctx context.Context, user *openfga.User, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetails, error) {
 	const op = errors.Op("jimm.FindApplicationOffers")
@@ -585,11 +598,19 @@ func (j *JIMM) FindApplicationOffers(ctx context.Context, user *openfga.User, fi
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
-	offerUUIDs, err := user.ListApplicationOffers(ctx, ofganames.ReaderRelation)
+	// TODO(Kian) CSS-6080 Refactor the below to eliminate the use of everyone@external
+	userOfferUUIDs, err := user.ListApplicationOffers(ctx, ofganames.ReaderRelation)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
-	offerFilters = append(offerFilters, db.ApplicationOfferFilterByUUID(offerUUIDs))
+	everyone := openfga.NewUser(&dbmodel.User{Username: auth.Everyone}, j.OpenFGAClient)
+	everyoneOfferUUIDs, err := everyone.ListApplicationOffers(ctx, ofganames.ReaderRelation)
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+	allOfferUUIDs := append(userOfferUUIDs, everyoneOfferUUIDs...)
+	allOfferUUIDs = removeDuplicateStr(allOfferUUIDs)
+	offerFilters = append(offerFilters, db.ApplicationOfferFilterByUUID(allOfferUUIDs))
 	offers, err := j.Database.FindApplicationOffers(ctx, offerFilters...)
 	if err != nil {
 		return nil, errors.E(op, err)

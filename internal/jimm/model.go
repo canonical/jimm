@@ -527,6 +527,8 @@ func (j *JIMM) AddModel(ctx context.Context, u *openfga.User, args *ModelCreateA
 		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
+	// TODO(Kian) CSS-6081 Missing check for add-model access on the desired cloud.
+
 	builder := newModelBuilder(ctx, j)
 	builder = builder.WithOwner(&owner)
 	builder = builder.WithName(args.Name)
