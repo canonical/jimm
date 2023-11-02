@@ -36,10 +36,6 @@ type User struct {
 	// controller. By default all users have "add-model" access.
 	ControllerAccess string `gorm:"not null;default:'login'"`
 
-	// AuditLogAccess is the access level this user has on the JIMM audit
-	// log.
-	AuditLogAccess string `gorm:"not null;default:''"`
-
 	// Clouds are the clouds accessible to this user.
 	Clouds []UserCloudAccess `gorm:"foreignKey:Username;references:Username"`
 
