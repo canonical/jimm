@@ -549,7 +549,7 @@ func (r *controllerRoot) updateCredential(ctx context.Context, cred jujuparams.T
 	if err != nil {
 		return nil, errors.E(err, errors.CodeBadRequest)
 	}
-	return r.jimm.UpdateCloudCredential(ctx, r.user.User, jimm.UpdateCloudCredentialArgs{
+	return r.jimm.UpdateCloudCredential(ctx, r.user, jimm.UpdateCloudCredentialArgs{
 		CredentialTag: tag,
 		Credential:    cred.Credential,
 		SkipCheck:     skipCheck,

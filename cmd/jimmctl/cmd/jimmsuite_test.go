@@ -207,9 +207,10 @@ func (s *jimmSuite) UpdateCloudCredential(c *gc.C, tag names.CloudCredentialTag,
 	u := dbmodel.User{
 		Username: tag.Owner().Id(),
 	}
+	user := openfga.NewUser(&u, s.JIMM.OpenFGAClient)
 	err := s.JIMM.Database.GetUser(ctx, &u)
 	c.Assert(err, gc.Equals, nil)
-	_, err = s.JIMM.UpdateCloudCredential(ctx, &u, jimm.UpdateCloudCredentialArgs{
+	_, err = s.JIMM.UpdateCloudCredential(ctx, user, jimm.UpdateCloudCredentialArgs{
 		CredentialTag: tag,
 		Credential:    cred,
 		SkipCheck:     true,
