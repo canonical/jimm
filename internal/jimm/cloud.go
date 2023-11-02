@@ -179,7 +179,7 @@ var DefaultReservedCloudNames = []string{
 // controller running on the requested host cloud-region and the cloud
 // created there. If the controller does not host the cloud-regions
 // an error with code of CodeNotFound will be returned. If the given
-// user does not have admin access to JAAS then an error with a code of
+// user does not have admin access to the controller then an error with a code of
 // CodeUnauthorized will be returned. If the requested cloud cannot be
 // created on this JAAS system an error with a code of CodeIncompatibleClouds
 // will be returned. If there is an error returned by the controller when
