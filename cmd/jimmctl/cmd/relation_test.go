@@ -457,8 +457,7 @@ func (s *relationSuite) TestCheckRelationViaSuperuser(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	u := dbmodel.User{
-		Username:         petname.Generate(2, "-") + "@external",
-		ControllerAccess: "superuser",
+		Username: petname.Generate(2, "-") + "@external",
 	}
 	c.Assert(db.DB.Create(&u).Error, gc.IsNil)
 

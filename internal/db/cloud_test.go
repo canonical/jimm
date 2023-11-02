@@ -370,24 +370,21 @@ func (s *dbSuite) TestUpdateUserCloudAccess(c *qt.C) {
 	c.Check(cld.Users, jimmtest.DBObjectEquals, []dbmodel.UserCloudAccess{{
 		Username: "alice@external",
 		User: dbmodel.User{
-			Username:         "alice@external",
-			ControllerAccess: "login",
+			Username: "alice@external",
 		},
 		CloudName: "test-hosted",
 		Access:    "admin",
 	}, {
 		Username: "bob@external",
 		User: dbmodel.User{
-			Username:         "bob@external",
-			ControllerAccess: "login",
+			Username: "bob@external",
 		},
 		CloudName: "test-hosted",
 		Access:    "add-model",
 	}, {
 		Username: "charlie@external",
 		User: dbmodel.User{
-			Username:         "charlie@external",
-			ControllerAccess: "login",
+			Username: "charlie@external",
 		},
 		CloudName: "test-hosted",
 		Access:    "add-model",
@@ -403,24 +400,21 @@ func (s *dbSuite) TestUpdateUserCloudAccess(c *qt.C) {
 	c.Check(cld.Users, jimmtest.DBObjectEquals, []dbmodel.UserCloudAccess{{
 		Username: "alice@external",
 		User: dbmodel.User{
-			Username:         "alice@external",
-			ControllerAccess: "login",
+			Username: "alice@external",
 		},
 		CloudName: "test-hosted",
 		Access:    "admin",
 	}, {
 		Username: "bob@external",
 		User: dbmodel.User{
-			Username:         "bob@external",
-			ControllerAccess: "login",
+			Username: "bob@external",
 		},
 		CloudName: "test-hosted",
 		Access:    "admin",
 	}, {
 		Username: "charlie@external",
 		User: dbmodel.User{
-			Username:         "charlie@external",
-			ControllerAccess: "login",
+			Username: "charlie@external",
 		},
 		CloudName: "test-hosted",
 		Access:    "add-model",
@@ -436,16 +430,14 @@ func (s *dbSuite) TestUpdateUserCloudAccess(c *qt.C) {
 	c.Check(cld.Users, jimmtest.DBObjectEquals, []dbmodel.UserCloudAccess{{
 		Username: "alice@external",
 		User: dbmodel.User{
-			Username:         "alice@external",
-			ControllerAccess: "login",
+			Username: "alice@external",
 		},
 		CloudName: "test-hosted",
 		Access:    "admin",
 	}, {
 		Username: "charlie@external",
 		User: dbmodel.User{
-			Username:         "charlie@external",
-			ControllerAccess: "login",
+			Username: "charlie@external",
 		},
 		CloudName: "test-hosted",
 		Access:    "add-model",

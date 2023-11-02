@@ -32,9 +32,8 @@ func (s *addCloudToControllerSuite) SetUpTest(c *gc.C) {
 
 	// We add user bob, who is a JIMM administrator.
 	err := s.JIMM.Database.UpdateUser(context.Background(), &dbmodel.User{
-		DisplayName:      "Bob",
-		Username:         "bob@external",
-		ControllerAccess: "superuser",
+		DisplayName: "Bob",
+		Username:    "bob@external",
 	})
 	c.Assert(err, gc.IsNil)
 

@@ -32,10 +32,6 @@ type User struct {
 	// users are not allowed to authenticate.
 	Disabled bool `gorm:"not null;default:FALSE"`
 
-	// ControllerAccess is the access level this user has on the JIMM
-	// controller. By default all users have "add-model" access.
-	ControllerAccess string `gorm:"not null;default:'login'"`
-
 	// AuditLogAccess is the access level this user has on the JIMM audit
 	// log.
 	AuditLogAccess string `gorm:"not null;default:''"`
@@ -77,7 +73,7 @@ func (u User) ToJujuUserInfo() jujuparams.UserInfo {
 	var ui jujuparams.UserInfo
 	ui.Username = u.Username
 	ui.DisplayName = u.DisplayName
-	ui.Access = u.ControllerAccess
+	ui.Access = "" //TODO(Kian) CSS-6040 Handle merging OpenFGA and Postgres information
 	ui.DateCreated = u.CreatedAt
 	if u.LastLogin.Valid {
 		ui.LastConnection = &u.LastLogin.Time

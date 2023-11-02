@@ -107,9 +107,8 @@ func (s *jimmSuite) SetUpTest(c *gc.C) {
 	s.JujuConnSuite.SetUpTest(c)
 
 	s.AdminUser = &dbmodel.User{
-		Username:         "alice@external",
-		ControllerAccess: "superuser",
-		LastLogin:        db.Now(),
+		Username:  "alice@external",
+		LastLogin: db.Now(),
 	}
 	err = s.JIMM.Database.GetUser(ctx, s.AdminUser)
 	c.Assert(err, gc.Equals, nil)

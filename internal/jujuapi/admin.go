@@ -63,7 +63,7 @@ func (r *controllerRoot) Login(ctx context.Context, req jujuparams.LoginRequest)
 	aui := jujuparams.AuthUserInfo{
 		DisplayName:      u.DisplayName,
 		Identity:         u.Tag().String(),
-		ControllerAccess: u.ControllerAccess,
+		ControllerAccess: u.GetControllerAccess(ctx, r.jimm.ResourceTag()).String(),
 	}
 	if u.LastLogin.Valid {
 		aui.LastConnection = &u.LastLogin.Time

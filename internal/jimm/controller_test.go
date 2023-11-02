@@ -140,8 +140,7 @@ func TestAddController(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	u := dbmodel.User{
-		Username:         "alice@external",
-		ControllerAccess: "superuser",
+		Username: "alice@external",
 	}
 
 	alice := openfga.NewUser(&u, client)
@@ -307,8 +306,7 @@ func TestAddControllerWithVault(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	u := dbmodel.User{
-		Username:         "alice@external",
-		ControllerAccess: "superuser",
+		Username: "alice@external",
 	}
 	alice := openfga.NewUser(&u, ofgaClient)
 
@@ -592,9 +590,8 @@ func TestImportModel(t *testing.T) {
 				Valid:  true,
 			},
 			Owner: dbmodel.User{
-				Username:         "alice@external",
-				DisplayName:      "Alice",
-				ControllerAccess: "superuser",
+				Username:    "alice@external",
+				DisplayName: "Alice",
 			},
 			Controller: dbmodel.Controller{
 				Name:         "test-controller",
@@ -681,9 +678,8 @@ func TestImportModel(t *testing.T) {
 				Valid:  true,
 			},
 			Owner: dbmodel.User{
-				Username:         "alice@external",
-				DisplayName:      "Alice",
-				ControllerAccess: "superuser",
+				Username:    "alice@external",
+				DisplayName: "Alice",
 			},
 			Controller: dbmodel.Controller{
 				Name:         "test-controller",

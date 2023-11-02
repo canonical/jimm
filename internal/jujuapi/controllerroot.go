@@ -7,7 +7,9 @@ import (
 	"sync"
 
 	"github.com/juju/names/v4"
+	"github.com/juju/zaputil/zapctx"
 	"github.com/rogpeppe/fastuuid"
+	"go.uber.org/zap"
 
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
@@ -65,8 +67,13 @@ func (r *controllerRoot) masquerade(ctx context.Context, userTag string) (*openf
 		// allow anyone to masquarade as themselves.
 		return r.user, nil
 	}
-	if r.user.ControllerAccess != "superuser" {
-		return nil, errors.E(errors.CodeUnauthorized, "permission denied")
+	isControllerAdmin, err := openfga.IsAdministrator(ctx, r.user, r.jimm.ResourceTag())
+	if err != nil {
+		zapctx.Error(ctx, "failed to check for controller admin access", zap.Error(err))
+		return nil, errors.E(err)
+	}
+	if !isControllerAdmin {
+		return nil, errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
 	user := dbmodel.User{
 		Username: ut.Id(),

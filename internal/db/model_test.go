@@ -567,20 +567,17 @@ func (s *dbSuite) TestUpdateUserModelAccess(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 	c.Check(m.Users, jimmtest.DBObjectEquals, []dbmodel.UserModelAccess{{
 		User: dbmodel.User{
-			Username:         "alice@external",
-			ControllerAccess: "login",
+			Username: "alice@external",
 		},
 		Access: "admin",
 	}, {
 		User: dbmodel.User{
-			Username:         "bob@external",
-			ControllerAccess: "login",
+			Username: "bob@external",
 		},
 		Access: "write",
 	}, {
 		User: dbmodel.User{
-			Username:         "charlie@external",
-			ControllerAccess: "login",
+			Username: "charlie@external",
 		},
 		Access: "read",
 	}})
@@ -594,20 +591,17 @@ func (s *dbSuite) TestUpdateUserModelAccess(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 	c.Check(m.Users, jimmtest.DBObjectEquals, []dbmodel.UserModelAccess{{
 		User: dbmodel.User{
-			Username:         "alice@external",
-			ControllerAccess: "login",
+			Username: "alice@external",
 		},
 		Access: "admin",
 	}, {
 		User: dbmodel.User{
-			Username:         "bob@external",
-			ControllerAccess: "login",
+			Username: "bob@external",
 		},
 		Access: "read",
 	}, {
 		User: dbmodel.User{
-			Username:         "charlie@external",
-			ControllerAccess: "login",
+			Username: "charlie@external",
 		},
 		Access: "read",
 	}})
@@ -621,14 +615,12 @@ func (s *dbSuite) TestUpdateUserModelAccess(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 	c.Check(m.Users, jimmtest.DBObjectEquals, []dbmodel.UserModelAccess{{
 		User: dbmodel.User{
-			Username:         "alice@external",
-			ControllerAccess: "login",
+			Username: "alice@external",
 		},
 		Access: "admin",
 	}, {
 		User: dbmodel.User{
-			Username:         "charlie@external",
-			ControllerAccess: "login",
+			Username: "charlie@external",
 		},
 		Access: "read",
 	}})
