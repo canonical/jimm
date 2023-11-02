@@ -140,6 +140,19 @@ func (s *jimmSuite) SetUpTest(c *gc.C) {
 	}
 }
 
+// RefreshControllerAddress is a useful helper function when writing table tests for JIMM CLI
+// commands that use NewAPIRootWithDialOpts. Each invocation of the NewAPIRootWithDialOpts function
+// updates the ClientStore and removes local IPs thus removing JIMM's IP.
+// Call this function in your table tests after each test run.
+func (s *jimmSuite) RefreshControllerAddress(c *gc.C) {
+	jimm, ok := s.ClientStore().Controllers["JIMM"]
+	c.Assert(ok, gc.Equals, true)
+	u, err := url.Parse(s.HTTP.URL)
+	c.Assert(err, gc.IsNil)
+	jimm.APIEndpoints = []string{u.Host}
+	s.ClientStore().Controllers["JIMM"] = jimm
+}
+
 func (s *jimmSuite) TearDownTest(c *gc.C) {
 	if s.cancel != nil {
 		s.cancel()

@@ -90,7 +90,9 @@ require (
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.1.41 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.4.35 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/ini v1.3.42 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ec2 v1.113.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ecr v1.19.2 // indirect
+	github.com/aws/aws-sdk-go-v2/service/iam v1.22.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.9.35 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sso v1.13.5 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.15.5 // indirect
@@ -126,11 +128,13 @@ require (
 	github.com/fxamacker/cbor/v2 v2.4.0 // indirect
 	github.com/gdamore/encoding v1.0.0 // indirect
 	github.com/gdamore/tcell/v2 v2.5.1 // indirect
+	github.com/go-goose/goose/v5 v5.0.0-20230421180421-abaee9096e3a // indirect
 	github.com/go-logr/logr v1.2.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-macaroon-bakery/macaroonpb v1.0.0 // indirect
 	github.com/goccy/go-json v0.10.2 // indirect
 	github.com/godbus/dbus/v5 v5.0.4 // indirect
+	github.com/gofrs/flock v0.8.1 // indirect
 	github.com/gofrs/uuid v4.2.0+incompatible // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
@@ -142,6 +146,9 @@ require (
 	github.com/google/certificate-transparency-go v1.1.2-0.20210511102531-373a877eec92 // indirect
 	github.com/google/gofuzz v1.1.0 // indirect
 	github.com/google/renameio v1.0.1 // indirect
+	github.com/google/s2a-go v0.1.4 // indirect
+	github.com/googleapis/enterprise-certificate-proxy v0.2.3 // indirect
+	github.com/googleapis/gax-go/v2 v2.11.0 // indirect
 	github.com/googleapis/gnostic v0.5.5 // indirect
 	github.com/gorilla/schema v1.2.0 // indirect
 	github.com/gorilla/securecookie v1.1.1 // indirect
@@ -192,6 +199,7 @@ require (
 	github.com/juju/gojsonpointer v0.0.0-20150204194629-afe8b77aa08f // indirect
 	github.com/juju/gojsonreference v0.0.0-20150204194633-f0d24ac5ee33 // indirect
 	github.com/juju/gojsonschema v1.0.0 // indirect
+	github.com/juju/gomaasapi/v2 v2.2.0 // indirect
 	github.com/juju/http/v2 v2.0.0 // indirect
 	github.com/juju/httpprof v0.0.0-20141217160036-14bf14c30767 // indirect
 	github.com/juju/idmclient/v2 v2.0.0 // indirect
@@ -269,6 +277,8 @@ require (
 	github.com/oklog/run v1.0.0 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
+	github.com/oracle/oci-go-sdk/v65 v65.34.0 // indirect
+	github.com/packethost/packngo v0.28.1 // indirect
 	github.com/pborman/uuid v1.2.1 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.8 // indirect
 	github.com/pierrec/lz4 v2.6.1+incompatible // indirect
@@ -291,6 +301,7 @@ require (
 	github.com/sergi/go-diff v1.2.0 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/soheilhy/cmux v0.1.5 // indirect
+	github.com/sony/gobreaker v0.5.0 // indirect
 	github.com/spf13/afero v1.9.5 // indirect
 	github.com/spf13/cast v1.5.1 // indirect
 	github.com/spf13/cobra v1.7.0 // indirect
@@ -302,6 +313,7 @@ require (
 	github.com/urfave/cli v1.22.5 // indirect
 	github.com/vishvananda/netlink v1.2.1-beta.2 // indirect
 	github.com/vishvananda/netns v0.0.4 // indirect
+	github.com/vmware/govmomi v0.21.1-0.20191008161538-40aebf13ba45 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xdg-go/stringprep v1.0.4 // indirect
 	github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2 // indirect
@@ -319,6 +331,7 @@ require (
 	go.etcd.io/etcd/server/v3 v3.5.0-alpha.0 // indirect
 	go.etcd.io/etcd/tests/v3 v3.5.0-alpha.0 // indirect
 	go.etcd.io/etcd/v3 v3.5.0-alpha.0 // indirect
+	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/otel v1.16.0 // indirect
 	go.opentelemetry.io/otel/metric v1.16.0 // indirect
 	go.opentelemetry.io/otel/trace v1.16.0 // indirect
@@ -333,6 +346,7 @@ require (
 	golang.org/x/text v0.13.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.11.0 // indirect
+	google.golang.org/api v0.126.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20230706204954-ccb25ca9f130 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20230629202037-9506855d4529 // indirect

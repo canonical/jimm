@@ -721,6 +721,50 @@ func TestImportModel(t *testing.T) {
 			Users: nil,
 		},
 	}, {
+		about:          "new model owner is local user",
+		user:           "alice@external",
+		controllerName: "test-controller",
+		newOwner:       "bob",
+		modelUUID:      "00000002-0000-0000-0000-000000000001",
+		expectedError:  "cannot import model from local user, try --owner to switch the model owner",
+		modelInfo: func(_ context.Context, info *jujuparams.ModelInfo) error {
+			info.Name = "test-model"
+			info.Type = "test-type"
+			info.UUID = "00000002-0000-0000-0000-000000000001"
+			info.ControllerUUID = "00000001-0000-0000-0000-000000000001"
+			info.DefaultSeries = "test-series"
+			info.CloudTag = names.NewCloudTag("test-cloud").String()
+			info.CloudRegion = "test-region"
+			info.CloudCredentialTag = names.NewCloudCredentialTag("test-cloud/local-user/test-credential").String()
+			info.CloudCredentialValidity = &trueValue
+			info.OwnerTag = names.NewUserTag("local-user").String()
+			info.Life = life.Alive
+			info.Status = jujuparams.EntityStatus{
+				Status: status.Status("available"),
+				Info:   "test-info",
+				Since:  &now,
+			}
+			info.Users = []jujuparams.ModelUserInfo{{
+				UserName: "local-user",
+				Access:   jujuparams.ModelAdminAccess,
+			}, {
+				UserName: "another-user",
+				Access:   jujuparams.ModelReadAccess,
+			}}
+			info.Machines = []jujuparams.ModelMachineInfo{{
+				Id:          "test-machine",
+				DisplayName: "Test machine",
+				Status:      "test-status",
+				Message:     "test-message",
+			}}
+			info.SLA = &jujuparams.ModelSLAInfo{
+				Level: "essential",
+				Owner: "local-user",
+			}
+			info.AgentVersion = newVersion("2.1.0")
+			return nil
+		},
+	}, {
 		about:          "model not found",
 		user:           "alice@external",
 		controllerName: "test-controller",

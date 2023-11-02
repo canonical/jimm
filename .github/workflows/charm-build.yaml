@@ -10,8 +10,11 @@ jobs:
       matrix:
         charm-type: ["jimm","jimm-k8s"]
     steps:
-      - uses: actions/checkout@v3
-      - run: git fetch --prune --unshallow
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - run: git fetch --prune 
       - run: sudo snap install charmcraft --channel=2.x/stable --classic
       - run: sudo charmcraft pack --project-dir ./charms/${{ matrix.charm-type }} --destructive-mode --verbosity=trace
       - uses: actions/upload-artifact@v3
