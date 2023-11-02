@@ -863,6 +863,7 @@ users:
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 	env.PopulateDB(c, j.Database, client)
+	env.AddJIMMRelations(c, j.ResourceTag(), j.Database, client)
 	u := env.User("alice@external").DBObject(c, j.Database, client)
 	user := openfga.NewUser(&u, client)
 	_, err = j.UpdateCloudCredential(ctx, user, jimm.UpdateCloudCredentialArgs{
