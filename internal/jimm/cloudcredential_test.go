@@ -834,9 +834,8 @@ users:
 
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
-	env.PopulateDB(c, j.Database, client)
-	env.AddJIMMRelations(c, j.ResourceTag(), j.Database, client)
-	u := env.User("alice@external").DBObject(c, j.Database, client)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
+	u := env.User("alice@external").DBObject(c, j.Database)
 	user := openfga.NewUser(&u, client)
 	_, err = j.UpdateCloudCredential(ctx, user, jimm.UpdateCloudCredentialArgs{
 		CredentialTag: names.NewCloudCredentialTag("test-cloud/bob@external/test"),
@@ -1481,8 +1480,8 @@ func TestForEachUserCloudCredential(t *testing.T) {
 			}
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
-			env.PopulateDB(c, j.Database, client)
-			u := env.User(test.username).DBObject(c, j.Database, client)
+			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
+			u := env.User(test.username).DBObject(c, j.Database)
 
 			var credentials []string
 			if test.f == nil {
@@ -1601,14 +1600,13 @@ func TestGetCloudCredentialAttributes(t *testing.T) {
 			}
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
-			env.PopulateDB(c, j.Database, client)
-			env.AddJIMMRelations(c, j.ResourceTag(), j.Database, client)
-			u := env.User("bob@external").DBObject(c, j.Database, client)
+			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
+			u := env.User("bob@external").DBObject(c, j.Database)
 			userBob := openfga.NewUser(&u, client)
 			cred, err := j.GetCloudCredential(ctx, userBob, names.NewCloudCredentialTag("test-cloud/bob@external/cred-1"))
 			c.Assert(err, qt.IsNil)
 
-			u = env.User(test.username).DBObject(c, j.Database, client)
+			u = env.User(test.username).DBObject(c, j.Database)
 			userTest := openfga.NewUser(&u, client)
 			attr, redacted, err := j.GetCloudCredentialAttributes(ctx, userTest, cred, test.hidden)
 			if test.expectError != "" {
@@ -1654,9 +1652,9 @@ func TestCloudCredentialAttributeStore(t *testing.T) {
   regions:
   - name: test-region
 `)
-	env.PopulateDB(c, j.Database, client)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
 
-	u := env.User("alice@external").DBObject(c, j.Database, client)
+	u := env.User("alice@external").DBObject(c, j.Database)
 	user := openfga.NewUser(&u, client)
 	args := jimm.UpdateCloudCredentialArgs{
 		CredentialTag: names.NewCloudCredentialTag("test/alice@external/cred-1"),

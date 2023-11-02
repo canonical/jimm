@@ -244,7 +244,7 @@ controllers:
     region: test-region
     priority: 1
 `)
-	env.PopulateDB(c, *s.Database, nil)
+	env.PopulateDB(c, *s.Database)
 
 	cr, err := s.Database.FindRegion(ctx, "testp", "test-region")
 	c.Assert(err, qt.IsNil)
@@ -363,7 +363,7 @@ controllers:
     region: test-region-2
     priority: 1
 `)
-	env.PopulateDB(c, *s.Database, nil)
+	env.PopulateDB(c, *s.Database)
 
 	cl := dbmodel.Cloud{
 		Name: "test-cloud-1",

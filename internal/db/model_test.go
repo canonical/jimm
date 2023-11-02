@@ -537,7 +537,7 @@ func (s *dbSuite) TestForEachModel(c *qt.C) {
 	c.Assert(err, qt.Equals, nil)
 
 	env := jimmtest.ParseEnvironment(c, testForEachModelEnv)
-	env.PopulateDB(c, *s.Database, nil)
+	env.PopulateDB(c, *s.Database)
 
 	testError := errors.E("test error")
 	err = s.Database.ForEachModel(ctx, func(m *dbmodel.Model) error {
@@ -623,7 +623,7 @@ func (s *dbSuite) TestGetModelsByUUID(c *qt.C) {
 	c.Assert(err, qt.Equals, nil)
 
 	env := jimmtest.ParseEnvironment(c, testGetModelsByUUIDEnv)
-	env.PopulateDB(c, *s.Database, nil)
+	env.PopulateDB(c, *s.Database)
 
 	modelUUIDs := []string{
 		"00000002-0000-0000-0000-000000000001",
