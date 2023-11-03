@@ -145,6 +145,11 @@ func (s *openFGATestSuite) TestCheckRelationSucceeds(c *gc.C) {
 func (s *openFGATestSuite) TestRemoveTuplesSucceeds(c *gc.C) {
 	groupid := "4"
 
+	// Note (babakks): OpenFGA only supports a limited number of write operation
+	// per request (default is 100). That's why we're testing with a large number
+	// of tuples (more than 100) to make sure everything works fine despite the
+	// limits.
+
 	// Test a large number of tuples
 	for i := 0; i < 150; i++ {
 		tuple := openfga.Tuple{
