@@ -16,9 +16,6 @@ import (
 	"github.com/canonical/ofga"
 )
 
-// EveryoneUser is the juju username that represents all users.
-const EveryoneUser = "everyone@external"
-
 type EntityAccess struct {
 	Entity Tag
 	Access Relation
