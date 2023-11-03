@@ -381,3 +381,5 @@ replace (
 )
 
 replace github.com/mattn/go-sqlite3 => github.com/mattn/go-sqlite3 v1.14.5
+
+replace github.com/canonical/ofga => /home/kian/Source/Work/ofga/
