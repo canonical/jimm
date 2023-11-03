@@ -130,7 +130,7 @@ func (s *applicationOffersSuite) TestGetConsumeDetails(c *gc.C) {
 				UserName: "bob@external",
 				Access:   "admin",
 			}, {
-				UserName: auth.Everyone,
+				UserName: auth.EveryoneUser,
 				Access:   "read",
 			}},
 		},
@@ -174,7 +174,7 @@ func (s *applicationOffersSuite) TestGetConsumeDetails(c *gc.C) {
 				UserName: "bob@external",
 				Access:   "admin",
 			}, {
-				UserName: auth.Everyone,
+				UserName: auth.EveryoneUser,
 				Access:   "read",
 			}},
 		},
@@ -252,7 +252,7 @@ func (s *applicationOffersSuite) TestListApplicationOffers(c *gc.C) {
 			UserName: "bob@external",
 			Access:   "admin",
 		}, {
-			UserName: auth.Everyone,
+			UserName: auth.EveryoneUser,
 			Access:   "read",
 		}},
 	}})
@@ -441,7 +441,7 @@ func (s *applicationOffersSuite) TestFindApplicationOffers(c *gc.C) {
 			UserName: "bob@external",
 			Access:   "admin",
 		}, {
-			UserName: auth.Everyone,
+			UserName: auth.EveryoneUser,
 			Access:   "read",
 		}},
 	}})
@@ -474,7 +474,7 @@ func (s *applicationOffersSuite) TestFindApplicationOffers(c *gc.C) {
 			Interface: "http",
 		}},
 		Users: []crossmodel.OfferUserDetails{{
-			UserName: auth.Everyone,
+			UserName: auth.EveryoneUser,
 			Access:   "read",
 		}},
 	}})
@@ -523,7 +523,7 @@ func (s *applicationOffersSuite) TestApplicationOffers(c *gc.C) {
 			UserName: "bob@external",
 			Access:   "admin",
 		}, {
-			UserName: auth.Everyone,
+			UserName: auth.EveryoneUser,
 			Access:   "read",
 		}},
 	})
@@ -550,7 +550,7 @@ func (s *applicationOffersSuite) TestApplicationOffers(c *gc.C) {
 			Interface: "http",
 		}},
 		Users: []crossmodel.OfferUserDetails{{
-			UserName: auth.Everyone,
+			UserName: auth.EveryoneUser,
 			Access:   "read",
 		}},
 	})

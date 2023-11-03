@@ -151,7 +151,7 @@ func (j *JIMM) AddController(ctx context.Context, u *openfga.User, ctl *dbmodel.
 		// If this cloud is the one used by the controller model then
 		// it is available to all users. Other clouds require `juju grant-cloud` to add permissions.
 		if cloud.ResourceTag().String() == ms.CloudTag {
-			everyoneTag := names.NewUserTag(auth.Everyone)
+			everyoneTag := names.NewUserTag(auth.EveryoneUser)
 			everyone := openfga.NewUser(
 				&dbmodel.User{
 					Username: everyoneTag.Id(),

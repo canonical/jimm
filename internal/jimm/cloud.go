@@ -25,7 +25,7 @@ import (
 func (j *JIMM) GetUserCloudAccess(ctx context.Context, user *openfga.User, cloud names.CloudTag) (string, error) {
 	accessLevel := user.GetCloudAccess(ctx, cloud)
 	if accessLevel == ofganames.NoRelation {
-		everyoneTag := names.NewUserTag(auth.Everyone)
+		everyoneTag := names.NewUserTag(auth.EveryoneUser)
 		everyone := openfga.NewUser(
 			&dbmodel.User{
 				Username: everyoneTag.Id(),
@@ -101,7 +101,7 @@ func (j *JIMM) ForEachUserCloud(ctx context.Context, user *openfga.User, f func(
 
 	// Also include "public" clouds
 	everyoneDB := dbmodel.User{
-		Username: auth.Everyone,
+		Username: auth.EveryoneUser,
 	}
 	everyone := openfga.NewUser(&everyoneDB, j.OpenFGAClient)
 
@@ -342,7 +342,7 @@ func (j *JIMM) AddHostedCloud(ctx context.Context, user *openfga.User, tag names
 		return errors.E(op, err)
 	}
 	if !allowedAddModel {
-		everyone := openfga.NewUser(&dbmodel.User{Username: auth.Everyone}, j.OpenFGAClient)
+		everyone := openfga.NewUser(&dbmodel.User{Username: auth.EveryoneUser}, j.OpenFGAClient)
 		everyonewAllowedAddModel, err := everyone.IsAllowedAddModel(ctx, region.Cloud.ResourceTag())
 		if err != nil {
 			return errors.E(op, err)

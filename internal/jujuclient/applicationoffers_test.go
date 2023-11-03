@@ -410,7 +410,7 @@ func (s *applicationoffersSuite) TestGetApplicationOffer(c *gc.C) {
 				DisplayName: "admin",
 				Access:      string(jujuparams.OfferAdminAccess),
 			}, {
-				UserName: auth.Everyone,
+				UserName: auth.EveryoneUser,
 				Access:   string(jujuparams.OfferReadAccess),
 			}},
 		},
@@ -495,7 +495,7 @@ func (s *applicationoffersSuite) TestGrantApplicationOfferAccess(c *gc.C) {
 				DisplayName: "admin",
 				Access:      string(jujuparams.OfferAdminAccess),
 			}, {
-				UserName: auth.Everyone,
+				UserName: auth.EveryoneUser,
 				Access:   string(jujuparams.OfferReadAccess),
 			}, {
 				UserName: "test-user-2@external",
@@ -583,7 +583,7 @@ func (s *applicationoffersSuite) TestRevokeApplicationOfferAccess(c *gc.C) {
 				DisplayName: "admin",
 				Access:      string(jujuparams.OfferAdminAccess),
 			}, {
-				UserName: auth.Everyone,
+				UserName: auth.EveryoneUser,
 				Access:   string(jujuparams.OfferReadAccess),
 			}, {
 				UserName: "test-user-2@external",
@@ -622,7 +622,7 @@ func (s *applicationoffersSuite) TestRevokeApplicationOfferAccess(c *gc.C) {
 				DisplayName: "admin",
 				Access:      string(jujuparams.OfferAdminAccess),
 			}, {
-				UserName: auth.Everyone,
+				UserName: auth.EveryoneUser,
 				Access:   string(jujuparams.OfferReadAccess),
 			}, {
 				UserName: "test-user-2@external",
@@ -765,7 +765,7 @@ func (s *applicationoffersSuite) TestGetApplicationOfferConsumeDetails(c *gc.C) 
 				DisplayName: "admin",
 				Access:      "admin",
 			}, {
-				UserName:    auth.Everyone,
+				UserName:    auth.EveryoneUser,
 				DisplayName: "",
 				Access:      "read",
 			}},

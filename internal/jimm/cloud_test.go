@@ -71,7 +71,7 @@ func TestGetCloud(t *testing.T) {
 
 	everyone := openfga.NewUser(
 		&dbmodel.User{
-			Username: auth.Everyone,
+			Username: auth.EveryoneUser,
 		},
 		client,
 	)
@@ -189,7 +189,7 @@ func TestForEachCloud(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	everyone := openfga.NewUser(
 		&dbmodel.User{
-			Username: auth.Everyone,
+			Username: auth.EveryoneUser,
 		},
 		client,
 	)
