@@ -237,7 +237,7 @@ func (u *User) UnsetApplicationOfferAccess(ctx context.Context, resource names.A
 
 // ListModels returns a slice of model UUIDs that this user has the relation <relation> to.
 func (u *User) ListModels(ctx context.Context, relation ofga.Relation) ([]string, error) {
-	entities, err := u.client.ListObjects(ctx, ofganames.ConvertTag(u.ResourceTag()).String(), relation.String(), ofganames.ModelType.String(), nil)
+	entities, err := u.client.ListObjects(ctx, ofganames.ConvertTag(u.ResourceTag()), relation, ModelType, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -250,7 +250,7 @@ func (u *User) ListModels(ctx context.Context, relation ofga.Relation) ([]string
 
 // ListApplicationOffers returns a slice of application offer UUIDs that a user has the relation <relation> to.
 func (u *User) ListApplicationOffers(ctx context.Context, relation ofga.Relation) ([]string, error) {
-	entities, err := u.client.ListObjects(ctx, ofganames.ConvertTag(u.ResourceTag()).String(), relation.String(), ofganames.ApplicationOfferType.String(), nil)
+	entities, err := u.client.ListObjects(ctx, ofganames.ConvertTag(u.ResourceTag()), relation, ApplicationOfferType, nil)
 	if err != nil {
 		return nil, err
 	}

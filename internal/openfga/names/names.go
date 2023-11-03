@@ -43,28 +43,6 @@ var (
 // NB: Add any new relations from the above to this slice.
 var allRelations = []cofga.Relation{MemberRelation, AdministratorRelation, ControllerRelation, ModelRelation, ConsumerRelation, ReaderRelation, WriterRelation, CanAddModelRelation, AuditLogViewerRelation, NoRelation}
 
-// Object Types
-var (
-	// ModelType represents a model object.
-	ModelType ObjType = "model"
-	// ApplicationOfferType represents an application offer object.
-	ApplicationOfferType ObjType = "applicationoffer"
-	// CloudType represents a cloud object.
-	CloudType ObjType = "cloud"
-	// ControllerType represents a controller object.
-	ControllerType ObjType = "controller"
-	// GroupType represents a group object.
-	GroupType ObjType = "group"
-	// UserType represents a user object.
-	UserType ObjType = "user"
-)
-
-type ObjType string
-
-func (o ObjType) String() string {
-	return string(o)
-}
-
 // Tag represents an entity tag as used by JIMM in OpenFGA.
 type Tag = cofga.Entity
 
