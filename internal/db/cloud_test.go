@@ -10,7 +10,6 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"gorm.io/gorm"
 
-	"github.com/canonical/jimm/internal/auth"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
@@ -39,13 +38,6 @@ func (s *dbSuite) TestAddCloud(c *qt.C) {
 			Name: "test-cloud-region",
 		}},
 		CACertificates: dbmodel.Strings{"CACERT 1", "CACERT 2"},
-		Users: []dbmodel.UserCloudAccess{{
-			User: dbmodel.User{
-				Username:    auth.Everyone,
-				DisplayName: "everyone",
-			},
-			Access: "add-model",
-		}},
 	}
 
 	err := s.Database.AddCloud(ctx, &cl)
@@ -107,13 +99,6 @@ func (s *dbSuite) TestGetCloud(c *qt.C) {
 			Name: "test-cloud-region",
 		}},
 		CACertificates: dbmodel.Strings{"CACERT 1", "CACERT 2"},
-		Users: []dbmodel.UserCloudAccess{{
-			User: dbmodel.User{
-				Username:    auth.Everyone,
-				DisplayName: "everyone",
-			},
-			Access: "add-model",
-		}},
 	}
 
 	err = s.Database.AddCloud(ctx, &cl2)
@@ -155,13 +140,6 @@ func (s *dbSuite) TestGetClouds(c *qt.C) {
 			Name: "test-cloud-region",
 		}},
 		CACertificates: dbmodel.Strings{"CACERT 1", "CACERT 2"},
-		Users: []dbmodel.UserCloudAccess{{
-			User: dbmodel.User{
-				Username:    auth.Everyone,
-				DisplayName: "everyone",
-			},
-			Access: "add-model",
-		}},
 	}
 
 	err = s.Database.AddCloud(ctx, &cl)
@@ -194,19 +172,6 @@ func (s *dbSuite) TestUpdateCloud(c *qt.C) {
 			Name: "test-cloud-region",
 		}},
 		CACertificates: dbmodel.Strings{"CACERT 1", "CACERT 2"},
-		Users: []dbmodel.UserCloudAccess{{
-			User: dbmodel.User{
-				Username:    auth.Everyone,
-				DisplayName: "everyone",
-			},
-			Access: "add-model",
-		}, {
-			User: dbmodel.User{
-				Username:    "alice@external",
-				DisplayName: "Alice",
-			},
-			Access: "add-model",
-		}},
 	}
 
 	err := s.Database.UpdateCloud(ctx, &cl)
@@ -304,154 +269,6 @@ controllers:
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 }
 
-func TestUpdateUserCloudAccessUnconfiguredDatabase(t *testing.T) {
-	c := qt.New(t)
-
-	var d db.Database
-	err := d.UpdateUserCloudAccess(context.Background(), nil)
-	c.Check(err, qt.ErrorMatches, `database not configured`)
-	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeServerConfiguration)
-}
-
-const testUpdateUserCloudAccessEnv = `clouds:
-- name: test
-  type: test
-  regions:
-  - name: test-region
-- name: test-hosted
-  type: kubernetes
-  host-cloud-region: test/test-region
-  regions:
-  - name: default
-  users:
-  - user: alice@external
-    access: admin
-  - user: bob@external
-    access: add-model
-controllers:
-- name: test
-  uuid: 00000001-0000-0000-0000-000000000001
-  cloud: test
-  region: test-region
-  cloud-regions:
-  - cloud: test
-    region: test-region
-    priority: 10
-  - cloud: test-hosted
-    region: default
-    priority: 1
-`
-
-func (s *dbSuite) TestUpdateUserCloudAccess(c *qt.C) {
-	ctx := context.Background()
-	err := s.Database.Migrate(context.Background(), true)
-	c.Assert(err, qt.Equals, nil)
-
-	env := jimmtest.ParseEnvironment(c, testUpdateUserCloudAccessEnv)
-	env.PopulateDB(c, *s.Database, nil)
-
-	cld := dbmodel.Cloud{
-		Name: "test-hosted",
-	}
-	err = s.Database.GetCloud(ctx, &cld)
-	c.Assert(err, qt.IsNil)
-
-	charlie := env.User("charlie@external").DBObject(c, *s.Database, nil)
-
-	// Add a new user
-	err = s.Database.UpdateUserCloudAccess(ctx, &dbmodel.UserCloudAccess{
-		User:   charlie,
-		Cloud:  cld,
-		Access: "add-model",
-	})
-	c.Assert(err, qt.Equals, nil)
-	err = s.Database.GetCloud(ctx, &cld)
-	c.Assert(err, qt.IsNil)
-	c.Check(cld.Users, jimmtest.DBObjectEquals, []dbmodel.UserCloudAccess{{
-		Username: "alice@external",
-		User: dbmodel.User{
-			Username:         "alice@external",
-			ControllerAccess: "login",
-		},
-		CloudName: "test-hosted",
-		Access:    "admin",
-	}, {
-		Username: "bob@external",
-		User: dbmodel.User{
-			Username:         "bob@external",
-			ControllerAccess: "login",
-		},
-		CloudName: "test-hosted",
-		Access:    "add-model",
-	}, {
-		Username: "charlie@external",
-		User: dbmodel.User{
-			Username:         "charlie@external",
-			ControllerAccess: "login",
-		},
-		CloudName: "test-hosted",
-		Access:    "add-model",
-	}})
-
-	// Update an existing user
-	uca := cld.Users[1]
-	uca.Access = "admin"
-	err = s.Database.UpdateUserCloudAccess(ctx, &uca)
-	c.Assert(err, qt.Equals, nil)
-	err = s.Database.GetCloud(ctx, &cld)
-	c.Assert(err, qt.IsNil)
-	c.Check(cld.Users, jimmtest.DBObjectEquals, []dbmodel.UserCloudAccess{{
-		Username: "alice@external",
-		User: dbmodel.User{
-			Username:         "alice@external",
-			ControllerAccess: "login",
-		},
-		CloudName: "test-hosted",
-		Access:    "admin",
-	}, {
-		Username: "bob@external",
-		User: dbmodel.User{
-			Username:         "bob@external",
-			ControllerAccess: "login",
-		},
-		CloudName: "test-hosted",
-		Access:    "admin",
-	}, {
-		Username: "charlie@external",
-		User: dbmodel.User{
-			Username:         "charlie@external",
-			ControllerAccess: "login",
-		},
-		CloudName: "test-hosted",
-		Access:    "add-model",
-	}})
-
-	// Remove a user
-	uca = cld.Users[1]
-	uca.Access = ""
-	err = s.Database.UpdateUserCloudAccess(ctx, &uca)
-	c.Assert(err, qt.Equals, nil)
-	err = s.Database.GetCloud(ctx, &cld)
-	c.Assert(err, qt.IsNil)
-	c.Check(cld.Users, jimmtest.DBObjectEquals, []dbmodel.UserCloudAccess{{
-		Username: "alice@external",
-		User: dbmodel.User{
-			Username:         "alice@external",
-			ControllerAccess: "login",
-		},
-		CloudName: "test-hosted",
-		Access:    "admin",
-	}, {
-		Username: "charlie@external",
-		User: dbmodel.User{
-			Username:         "charlie@external",
-			ControllerAccess: "login",
-		},
-		CloudName: "test-hosted",
-		Access:    "add-model",
-	}})
-}
-
 func TestDeleteCloudUnconfiguredDatabase(t *testing.T) {
 	c := qt.New(t)
 
@@ -474,13 +291,6 @@ func (s *dbSuite) TestDeleteCloud(c *qt.C) {
 			Name: "test-cloud-region",
 		}},
 		CACertificates: dbmodel.Strings{"CACERT 1", "CACERT 2"},
-		Users: []dbmodel.UserCloudAccess{{
-			User: dbmodel.User{
-				Username:    auth.Everyone,
-				DisplayName: "everyone",
-			},
-			Access: "add-model",
-		}},
 	}
 
 	err := s.Database.DeleteCloud(ctx, &cl)

@@ -89,6 +89,8 @@ func TestAddController(t *testing.T) {
 			ci.Regions = []jujuparams.CloudRegion{{
 				Name: "default",
 			}}
+			// TODO(Kian) We can remove these returned users, we ignore them when importing a
+			// controller into JIMM.
 			ci.Users = []jujuparams.CloudUserInfo{{
 				UserName:    "alice@external",
 				DisplayName: "Alice",
@@ -255,6 +257,8 @@ func TestAddControllerWithVault(t *testing.T) {
 			ci.Regions = []jujuparams.CloudRegion{{
 				Name: "default",
 			}}
+			// TODO(Kian) We can remove these returned users, we ignore them when importing a
+			// controller into JIMM.
 			ci.Users = []jujuparams.CloudUserInfo{{
 				UserName:    "alice@external",
 				DisplayName: "Alice",

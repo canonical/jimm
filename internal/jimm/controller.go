@@ -6,7 +6,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"strings"
 
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
@@ -69,33 +68,9 @@ func (j *JIMM) AddController(ctx context.Context, u *openfga.User, ctl *dbmodel.
 
 	var dbClouds []dbmodel.Cloud
 	for tag, cld := range clouds {
-		ctx := zapctx.WithFields(ctx, zap.Stringer("tag", tag))
-
 		var cloud dbmodel.Cloud
 		cloud.FromJujuCloud(cld)
 		cloud.Name = tag.Id()
-
-		// If this cloud is not the one used by the controller model then
-		// it is only available to a subset of users.
-		if tag.String() != ms.CloudTag {
-			var err error
-			cloud.Users, err = cloudUsers(ctx, api, tag)
-			if err != nil {
-				// If there is an error getting the users, log the failure
-				// but carry on, this will prevent anyone trying to add a
-				// cloud with the same name. The user access can be fixed
-				// later.
-				zapctx.Error(ctx, "cannot get cloud users", zap.Error(err))
-			}
-		} else {
-			cloud.Users = []dbmodel.UserCloudAccess{{
-				Username: auth.Everyone,
-				User: dbmodel.User{
-					Username: auth.Everyone,
-				},
-				Access: "add-model",
-			}}
-		}
 		dbClouds = append(dbClouds, cloud)
 	}
 
@@ -139,18 +114,6 @@ func (j *JIMM) AddController(ctx context.Context, u *openfga.User, ctl *dbmodel.
 				}
 				cloud.Regions = append(cloud.Regions, reg)
 			}
-			for _, uca := range dbClouds[i].Users {
-				if cloud.UserAccess(&uca.User) != "" {
-					continue
-				}
-				uca.Username = uca.User.Username
-				uca.CloudName = cloud.Name
-				if err := tx.UpdateUserCloudAccess(ctx, &uca); err != nil {
-					zapctx.Error(ctx, "failed to update user cloud access", zaputil.Error(err))
-					return err
-				}
-				cloud.Users = append(cloud.Users, uca)
-			}
 			for _, cr := range dbClouds[i].Regions {
 				reg := cloud.Region(cr.Name)
 				priority := dbmodel.CloudRegionControllerPrioritySupported
@@ -185,6 +148,21 @@ func (j *JIMM) AddController(ctx context.Context, u *openfga.User, ctl *dbmodel.
 	}
 
 	for _, cloud := range dbClouds {
+		// If this cloud is the one used by the controller model then
+		// it is available to all users. Other clouds require `juju grant-cloud` to add permissions.
+		if cloud.ResourceTag().String() == ms.CloudTag {
+			everyoneTag := names.NewUserTag(auth.Everyone)
+			everyone := openfga.NewUser(
+				&dbmodel.User{
+					Username: everyoneTag.Id(),
+				},
+				j.OpenFGAClient,
+			)
+			if err := everyone.SetCloudAccess(ctx, cloud.ResourceTag(), ofganames.CanAddModelRelation); err != nil {
+				zapctx.Error(ctx, "failed to grant everyone add-model access", zap.Error(err))
+			}
+		}
+
 		// Add controller relation between the cloud and the added controller.
 		err = j.OpenFGAClient.AddCloudController(ctx, cloud.ResourceTag(), ctl.ResourceTag())
 		if err != nil {
@@ -195,35 +173,6 @@ func (j *JIMM) AddController(ctx context.Context, u *openfga.User, ctl *dbmodel.
 				zap.String("cloud", cloud.ResourceTag().Id()),
 				zap.Error(err),
 			)
-		}
-
-		for _, uca := range cloud.Users {
-			cloudUser := openfga.NewUser(
-				&dbmodel.User{
-					Username: uca.Username,
-				},
-				j.OpenFGAClient,
-			)
-			relation, err := ToCloudRelation(uca.Access)
-			if err != nil {
-				zapctx.Error(
-					ctx,
-					"failed to parse user cloud access",
-					zap.String("user", uca.Username),
-					zap.String("access", uca.Access),
-					zap.Error(err),
-				)
-			} else {
-				if err := cloudUser.SetCloudAccess(ctx, cloud.ResourceTag(), relation); err != nil {
-					zapctx.Error(
-						ctx,
-						"failed to set cloud access",
-						zap.String("user", uca.Username),
-						zap.String("access", uca.Access),
-						zap.Error(err),
-					)
-				}
-			}
 		}
 	}
 
@@ -239,32 +188,6 @@ func (j *JIMM) AddController(ctx context.Context, u *openfga.User, ctl *dbmodel.
 	}
 
 	return nil
-}
-
-// cloudUsers determines the users that can access a cloud.
-func cloudUsers(ctx context.Context, api API, tag names.CloudTag) ([]dbmodel.UserCloudAccess, error) {
-	const op = errors.Op("jimm.cloudUsers")
-	var ci jujuparams.CloudInfo
-	if err := api.CloudInfo(ctx, tag, &ci); err != nil {
-		return nil, errors.E(op, err)
-	}
-	var users []dbmodel.UserCloudAccess
-	for _, u := range ci.Users {
-		if !strings.Contains(u.UserName, "@") {
-			// If the username doesn't contain an "@" the user is local
-			// to the controller and we don't want to propagate it.
-			continue
-		}
-		users = append(users, dbmodel.UserCloudAccess{
-			Username: u.UserName,
-			User: dbmodel.User{
-				Username:    u.UserName,
-				DisplayName: u.DisplayName,
-			},
-			Access: u.Access,
-		})
-	}
-	return users, nil
 }
 
 // EarliestControllerVersion returns the earliest agent version

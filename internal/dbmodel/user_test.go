@@ -67,34 +67,6 @@ func TestUserTag(t *testing.T) {
 	c.Check(u2, qt.DeepEquals, u)
 }
 
-func TestUserClouds(t *testing.T) {
-	c := qt.New(t)
-
-	db := gormDB(c)
-
-	cl := dbmodel.Cloud{
-		Name: "test-cloud",
-		Users: []dbmodel.UserCloudAccess{{
-			User: dbmodel.User{
-				Username:    "bob@external",
-				DisplayName: "bob",
-			},
-			Access: "add-model",
-		}},
-	}
-	result := db.Create(&cl)
-	c.Assert(result.Error, qt.IsNil)
-
-	var u dbmodel.User
-	result = db.Preload("Clouds").Where("username = ?", "bob@external").First(&u)
-	c.Assert(result.Error, qt.IsNil)
-
-	c.Assert(u.Clouds, qt.HasLen, 1)
-	c.Check(u.Clouds[0].Username, qt.Equals, u.Username)
-	c.Check(u.Clouds[0].CloudName, qt.Equals, cl.Name)
-	c.Check(u.Clouds[0].Access, qt.Equals, "add-model")
-}
-
 func TestUserCloudCredentials(t *testing.T) {
 	c := qt.New(t)
 	db := gormDB(c)

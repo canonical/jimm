@@ -58,10 +58,6 @@ func TestUpdateCloudCredential(t *testing.T) {
 				Regions: []dbmodel.CloudRegion{{
 					Name: "test-region-1",
 				}},
-				Users: []dbmodel.UserCloudAccess{{
-					Username: u.Username,
-					Access:   "admin",
-				}},
 			}
 			c.Assert(j.Database.DB.Create(&cloud).Error, qt.IsNil)
 
@@ -178,10 +174,6 @@ func TestUpdateCloudCredential(t *testing.T) {
 				Regions: []dbmodel.CloudRegion{{
 					Name: "test-region-1",
 				}},
-				Users: []dbmodel.UserCloudAccess{{
-					Username: u.Username,
-					Access:   "admin",
-				}},
 			}
 			c.Assert(j.Database.DB.Create(&cloud).Error, qt.IsNil)
 
@@ -273,10 +265,6 @@ func TestUpdateCloudCredential(t *testing.T) {
 				Regions: []dbmodel.CloudRegion{{
 					Name: "test-region-1",
 				}},
-				Users: []dbmodel.UserCloudAccess{{
-					Username: u.Username,
-					Access:   "admin",
-				}},
 			}
 			c.Assert(j.Database.DB.Create(&cloud).Error, qt.IsNil)
 
@@ -365,10 +353,6 @@ func TestUpdateCloudCredential(t *testing.T) {
 				Type: "test-provider",
 				Regions: []dbmodel.CloudRegion{{
 					Name: "test-region-1",
-				}},
-				Users: []dbmodel.UserCloudAccess{{
-					Username: u.Username,
-					Access:   "admin",
 				}},
 			}
 			c.Assert(j.Database.DB.Create(&cloud).Error, qt.IsNil)
@@ -485,10 +469,6 @@ func TestUpdateCloudCredential(t *testing.T) {
 				Regions: []dbmodel.CloudRegion{{
 					Name: "test-region-1",
 				}},
-				Users: []dbmodel.UserCloudAccess{{
-					Username: u.Username,
-					Access:   "admin",
-				}},
 			}
 			c.Assert(j.Database.DB.Create(&cloud).Error, qt.IsNil)
 
@@ -602,10 +582,6 @@ func TestUpdateCloudCredential(t *testing.T) {
 				Type: "test-provider",
 				Regions: []dbmodel.CloudRegion{{
 					Name: "test-region-1",
-				}},
-				Users: []dbmodel.UserCloudAccess{{
-					Username: u.Username,
-					Access:   "admin",
 				}},
 			}
 			c.Assert(j.Database.DB.Create(&cloud).Error, qt.IsNil)
@@ -912,10 +888,6 @@ func TestRevokeCloudCredential(t *testing.T) {
 				Regions: []dbmodel.CloudRegion{{
 					Name: "test-region-1",
 				}},
-				Users: []dbmodel.UserCloudAccess{{
-					Username: u.Username,
-					Access:   "admin",
-				}},
 			}
 			c.Assert(j.Database.DB.Create(&cloud).Error, qt.IsNil)
 
@@ -991,10 +963,6 @@ func TestRevokeCloudCredential(t *testing.T) {
 				Regions: []dbmodel.CloudRegion{{
 					Name: "test-region-1",
 				}},
-				Users: []dbmodel.UserCloudAccess{{
-					Username: u.Username,
-					Access:   "admin",
-				}},
 			}
 			c.Assert(j.Database.DB.Create(&cloud).Error, qt.IsNil)
 
@@ -1065,10 +1033,6 @@ func TestRevokeCloudCredential(t *testing.T) {
 				Type: "test-provider",
 				Regions: []dbmodel.CloudRegion{{
 					Name: "test-region-1",
-				}},
-				Users: []dbmodel.UserCloudAccess{{
-					Username: u.Username,
-					Access:   "admin",
 				}},
 			}
 			c.Assert(j.Database.DB.Create(&cloud).Error, qt.IsNil)
@@ -1164,10 +1128,6 @@ func TestRevokeCloudCredential(t *testing.T) {
 				Type: "test-provider",
 				Regions: []dbmodel.CloudRegion{{
 					Name: "test-region-1",
-				}},
-				Users: []dbmodel.UserCloudAccess{{
-					Username: u.Username,
-					Access:   "admin",
 				}},
 			}
 			c.Assert(j.Database.DB.Create(&cloud).Error, qt.IsNil)
@@ -1341,9 +1301,6 @@ func TestGetCloudCredential(t *testing.T) {
 				Type: "test-provider",
 				Regions: []dbmodel.CloudRegion{{
 					Name: "test-region-1",
-				}},
-				Users: []dbmodel.UserCloudAccess{{
-					Username: u.Username,
 				}},
 			}
 			c.Assert(j.Database.DB.Create(&cloud).Error, qt.IsNil)
