@@ -17,11 +17,8 @@ import (
 	"github.com/canonical/jimm/internal/servermon"
 )
 
-// EveryoneUser is the juju username that represents all users.
-const EveryoneUser = identchecker.Everyone + "@external"
-
 // PublicTag is the name to use when creating OpenFGA that should be accesible by all users.
-const PublicTag = "*"
+// const PublicTag = "*"
 
 // An AuthenticationError is the error returned when the requested
 // authentication has failed.

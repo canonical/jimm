@@ -1,7 +1,63 @@
 {
+    "schema_version": "1.1",
     "type_definitions": [
         {
-            "type": "applicationoffer",
+            "metadata": {
+                "relations": {
+                    "administrator": {
+                        "directly_related_user_types": [
+                            {
+                                "type": "user"
+                            },
+                            {
+                                "type": "user",
+                                "wildcard": {}
+                            },
+                            {
+                                "relation": "member",
+                                "type": "group"
+                            }
+                        ]
+                    },
+                    "consumer": {
+                        "directly_related_user_types": [
+                            {
+                                "type": "user"
+                            },
+                            {
+                                "type": "user",
+                                "wildcard": {}
+                            },
+                            {
+                                "relation": "member",
+                                "type": "group"
+                            }
+                        ]
+                    },
+                    "model": {
+                        "directly_related_user_types": [
+                            {
+                                "type": "model"
+                            }
+                        ]
+                    },
+                    "reader": {
+                        "directly_related_user_types": [
+                            {
+                                "type": "user"
+                            },
+                            {
+                                "type": "user",
+                                "wildcard": {}
+                            },
+                            {
+                                "relation": "member",
+                                "type": "group"
+                            }
+                        ]
+                    }
+                }
+            },
             "relations": {
                 "administrator": {
                     "union": {
@@ -11,13 +67,11 @@
                             },
                             {
                                 "tupleToUserset": {
-                                    "tupleset": {
-                                        "object": "",
-                                        "relation": "model"
-                                    },
                                     "computedUserset": {
-                                        "object": "",
                                         "relation": "administrator"
+                                    },
+                                    "tupleset": {
+                                        "relation": "model"
                                     }
                                 }
                             }
@@ -32,7 +86,6 @@
                             },
                             {
                                 "computedUserset": {
-                                    "object": "",
                                     "relation": "administrator"
                                 }
                             }
@@ -50,7 +103,6 @@
                             },
                             {
                                 "computedUserset": {
-                                    "object": "",
                                     "relation": "consumer"
                                 }
                             }
@@ -58,6 +110,9 @@
                     }
                 }
             },
+            "type": "applicationoffer"
+        },
+        {
             "metadata": {
                 "relations": {
                     "administrator": {
@@ -66,45 +121,39 @@
                                 "type": "user"
                             },
                             {
-                                "type": "group",
-                                "relation": "member"
+                                "type": "user",
+                                "wildcard": {}
+                            },
+                            {
+                                "relation": "member",
+                                "type": "group"
                             }
                         ]
                     },
-                    "consumer": {
+                    "can_addmodel": {
                         "directly_related_user_types": [
                             {
                                 "type": "user"
                             },
                             {
-                                "type": "group",
-                                "relation": "member"
-                            }
-                        ]
-                    },
-                    "model": {
-                        "directly_related_user_types": [
-                            {
-                                "type": "model"
-                            }
-                        ]
-                    },
-                    "reader": {
-                        "directly_related_user_types": [
-                            {
-                                "type": "user"
+                                "type": "user",
+                                "wildcard": {}
                             },
                             {
-                                "type": "group",
-                                "relation": "member"
+                                "relation": "member",
+                                "type": "group"
+                            }
+                        ]
+                    },
+                    "controller": {
+                        "directly_related_user_types": [
+                            {
+                                "type": "controller"
                             }
                         ]
                     }
                 }
-            }
-        },
-        {
-            "type": "cloud",
+            },
             "relations": {
                 "administrator": {
                     "union": {
@@ -114,13 +163,11 @@
                             },
                             {
                                 "tupleToUserset": {
-                                    "tupleset": {
-                                        "object": "",
-                                        "relation": "controller"
-                                    },
                                     "computedUserset": {
-                                        "object": "",
                                         "relation": "administrator"
+                                    },
+                                    "tupleset": {
+                                        "relation": "controller"
                                     }
                                 }
                             }
@@ -135,7 +182,6 @@
                             },
                             {
                                 "computedUserset": {
-                                    "object": "",
                                     "relation": "administrator"
                                 }
                             }
@@ -146,6 +192,9 @@
                     "this": {}
                 }
             },
+            "type": "cloud"
+        },
+        {
             "metadata": {
                 "relations": {
                     "administrator": {
@@ -154,19 +203,27 @@
                                 "type": "user"
                             },
                             {
-                                "type": "group",
-                                "relation": "member"
+                                "type": "user",
+                                "wildcard": {}
+                            },
+                            {
+                                "relation": "member",
+                                "type": "group"
                             }
                         ]
                     },
-                    "can_addmodel": {
+                    "audit_log_viewer": {
                         "directly_related_user_types": [
                             {
                                 "type": "user"
                             },
                             {
-                                "type": "group",
-                                "relation": "member"
+                                "type": "user",
+                                "wildcard": {}
+                            },
+                            {
+                                "relation": "member",
+                                "type": "group"
                             }
                         ]
                     },
@@ -178,10 +235,7 @@
                         ]
                     }
                 }
-            }
-        },
-        {
-            "type": "controller",
+            },
             "relations": {
                 "administrator": {
                     "union": {
@@ -191,13 +245,11 @@
                             },
                             {
                                 "tupleToUserset": {
-                                    "tupleset": {
-                                        "object": "",
-                                        "relation": "controller"
-                                    },
                                     "computedUserset": {
-                                        "object": "",
                                         "relation": "administrator"
+                                    },
+                                    "tupleset": {
+                                        "relation": "controller"
                                     }
                                 }
                             }
@@ -212,7 +264,6 @@
                             },
                             {
                                 "computedUserset": {
-                                    "object": "",
                                     "relation": "administrator"
                                 }
                             }
@@ -223,6 +274,36 @@
                     "this": {}
                 }
             },
+            "type": "controller"
+        },
+        {
+            "metadata": {
+                "relations": {
+                    "member": {
+                        "directly_related_user_types": [
+                            {
+                                "type": "user"
+                            },
+                            {
+                                "type": "user",
+                                "wildcard": {}
+                            },
+                            {
+                                "relation": "member",
+                                "type": "group"
+                            }
+                        ]
+                    }
+                }
+            },
+            "relations": {
+                "member": {
+                    "this": {}
+                }
+            },
+            "type": "group"
+        },
+        {
             "metadata": {
                 "relations": {
                     "administrator": {
@@ -231,19 +312,12 @@
                                 "type": "user"
                             },
                             {
-                                "type": "group",
-                                "relation": "member"
-                            }
-                        ]
-                    },
-                    "audit_log_viewer": {
-                        "directly_related_user_types": [
-                            {
-                                "type": "user"
+                                "type": "user",
+                                "wildcard": {}
                             },
                             {
-                                "type": "group",
-                                "relation": "member"
+                                "relation": "member",
+                                "type": "group"
                             }
                         ]
                     },
@@ -253,35 +327,39 @@
                                 "type": "controller"
                             }
                         ]
-                    }
-                }
-            }
-        },
-        {
-            "type": "group",
-            "relations": {
-                "member": {
-                    "this": {}
-                }
-            },
-            "metadata": {
-                "relations": {
-                    "member": {
+                    },
+                    "reader": {
                         "directly_related_user_types": [
                             {
                                 "type": "user"
                             },
                             {
-                                "type": "group",
-                                "relation": "member"
+                                "type": "user",
+                                "wildcard": {}
+                            },
+                            {
+                                "relation": "member",
+                                "type": "group"
+                            }
+                        ]
+                    },
+                    "writer": {
+                        "directly_related_user_types": [
+                            {
+                                "type": "user"
+                            },
+                            {
+                                "type": "user",
+                                "wildcard": {}
+                            },
+                            {
+                                "relation": "member",
+                                "type": "group"
                             }
                         ]
                     }
                 }
-            }
-        },
-        {
-            "type": "model",
+            },
             "relations": {
                 "administrator": {
                     "union": {
@@ -291,13 +369,11 @@
                             },
                             {
                                 "tupleToUserset": {
-                                    "tupleset": {
-                                        "object": "",
-                                        "relation": "controller"
-                                    },
                                     "computedUserset": {
-                                        "object": "",
                                         "relation": "administrator"
+                                    },
+                                    "tupleset": {
+                                        "relation": "controller"
                                     }
                                 }
                             }
@@ -315,7 +391,6 @@
                             },
                             {
                                 "computedUserset": {
-                                    "object": "",
                                     "relation": "writer"
                                 }
                             }
@@ -330,7 +405,6 @@
                             },
                             {
                                 "computedUserset": {
-                                    "object": "",
                                     "relation": "administrator"
                                 }
                             }
@@ -338,55 +412,10 @@
                     }
                 }
             },
-            "metadata": {
-                "relations": {
-                    "administrator": {
-                        "directly_related_user_types": [
-                            {
-                                "type": "user"
-                            },
-                            {
-                                "type": "group",
-                                "relation": "member"
-                            }
-                        ]
-                    },
-                    "controller": {
-                        "directly_related_user_types": [
-                            {
-                                "type": "controller"
-                            }
-                        ]
-                    },
-                    "reader": {
-                        "directly_related_user_types": [
-                            {
-                                "type": "user"
-                            },
-                            {
-                                "type": "group",
-                                "relation": "member"
-                            }
-                        ]
-                    },
-                    "writer": {
-                        "directly_related_user_types": [
-                            {
-                                "type": "user"
-                            },
-                            {
-                                "type": "group",
-                                "relation": "member"
-                            }
-                        ]
-                    }
-                }
-            }
+            "type": "model"
         },
         {
-            "type": "user",
-            "relations": {}
+            "type": "user"
         }
-    ],
-    "schema_version": "1.1"
+    ]
 }

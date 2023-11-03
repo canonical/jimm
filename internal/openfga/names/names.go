@@ -43,6 +43,8 @@ var (
 // NB: Add any new relations from the above to this slice.
 var allRelations = []cofga.Relation{MemberRelation, AdministratorRelation, ControllerRelation, ModelRelation, ConsumerRelation, ReaderRelation, WriterRelation, CanAddModelRelation, AuditLogViewerRelation, NoRelation}
 
+const EveryoneUser = "everyone@external"
+
 // Tag represents an entity tag as used by JIMM in OpenFGA.
 type Tag = cofga.Entity
 
@@ -72,8 +74,15 @@ func ConvertTagWithRelation[RT ResourceTagger](t RT, relation cofga.Relation) *T
 // ConvertTag converts a resource tag to an OpenFGA tag where the resource tag is limited to
 // specific types of tags.
 func ConvertTag[RT ResourceTagger](t RT) *Tag {
+	id := t.Id()
+	if id == "everyone@external" {
+		// A user with ID "*" represents "everyone" in OpenFGA and allows checks like
+		// `user:bob reader type:my-resource` to return true without a separate query
+		// for the user:everyone@external user.
+		id = "*"
+	}
 	tag := &Tag{
-		ID:   t.Id(),
+		ID:   id,
 		Kind: cofga.Kind(t.Kind()),
 	}
 	return tag

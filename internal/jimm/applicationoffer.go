@@ -16,7 +16,6 @@ import (
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
-	"github.com/canonical/jimm/internal/auth"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
@@ -156,7 +155,7 @@ func (j *JIMM) Offer(ctx context.Context, user *openfga.User, offer AddApplicati
 
 	everyone := openfga.NewUser(
 		&dbmodel.User{
-			Username: auth.PublicTag,
+			Username: ofganames.EveryoneUser,
 		},
 		j.OpenFGAClient,
 	)
@@ -244,39 +243,26 @@ func (j *JIMM) GetApplicationOfferConsumeDetails(ctx context.Context, user *open
 // TODO(Kian) CSS-6040 Consider changing wherever this function is used to
 // better encapsulate transforming Postgres/OpenFGA objects into Juju objects.
 func (j *JIMM) listApplicationOfferUsers(ctx context.Context, offer names.ApplicationOfferTag, user *dbmodel.User, accessLevel string) ([]jujuparams.OfferUserDetails, error) {
-	users := make(map[string]string)
-
-	// we loop through relations in a decreasing order of access
-	for _, relation := range []openfga.Relation{
-		ofganames.AdministratorRelation,
-		ofganames.ConsumerRelation,
-		ofganames.ReaderRelation,
-	} {
-		usersWithRelation, err := openfga.ListUsersWithAccess(ctx, j.OpenFGAClient, offer, relation)
-		if err != nil {
-			return nil, errors.E(err)
-		}
-		for _, user := range usersWithRelation {
-			// if the user is in the users map, it must already have a higher
-			// access level - we skip this user
-			if users[user.Username] != "" {
-				continue
-			}
-			users[user.Username] = ToOfferAccessString(relation)
-		}
+	etAccess, err := openfga.ListEntitiesWithAccess(ctx, j.OpenFGAClient, offer)
+	if err != nil {
+		return nil, errors.E(err)
 	}
 
 	userDetails := []jujuparams.OfferUserDetails{}
-	for username, level := range users {
+	for _, et := range etAccess {
+		// TODO(Kian) Determine if we can return group info to Juju clients.
+		if et.Entity.Kind != openfga.Kind("user") {
+			continue
+		}
 		// non-admin users should only see their own access level
 		// and access level of "everyone@external" - meaning the access
 		// level everybody has.
-		if accessLevel != string(jujuparams.OfferAdminAccess) && username != auth.PublicTag && username != user.Username {
+		if accessLevel != string(jujuparams.OfferAdminAccess) && et.Entity.ID != ofganames.EveryoneUser && et.Entity.ID != user.Username {
 			continue
 		}
 		userDetails = append(userDetails, jujuparams.OfferUserDetails{
-			UserName: username,
-			Access:   level,
+			UserName: et.Entity.ID,
+			Access:   ToOfferAccessString(et.Access),
 			// TODO (alesstimec) this is missing the DisplayName - we could
 			// fetch it from the DB if it is REALLY important.
 		})

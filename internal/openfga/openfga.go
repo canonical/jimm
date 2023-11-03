@@ -84,6 +84,9 @@ func (o *OFGAClient) getRelatedObjects(ctx context.Context, tuple Tuple, pageSiz
 	}
 	tuples := make([]Tuple, len(timestampedTuples))
 	for i, tt := range timestampedTuples {
+		if tt.Tuple.Object.IsPublicAccess() {
+			tt.Tuple.Object.ID = ofganames.EveryoneUser
+		}
 		tuples[i] = tt.Tuple
 	}
 	return tuples, ct, nil
@@ -130,6 +133,28 @@ func (o *OFGAClient) ListObjects(ctx context.Context, user *Tag, relation Relati
 // You may read via pagination utilising the continuation token returned from the request.
 func (o *OFGAClient) ReadRelatedObjects(ctx context.Context, tuple Tuple, pageSize int32, continuationToken string) ([]Tuple, string, error) {
 	return o.getRelatedObjects(ctx, tuple, pageSize, continuationToken)
+}
+
+// ReadAllRelatedObjects is similar to ReadRelatedObjects but pages through all results
+// and returns the entire set.
+func (o *OFGAClient) ReadAllRelatedObjects(ctx context.Context, tuple Tuple) ([]Tuple, error) {
+	allTuples := []Tuple{}
+	var tuples []Tuple
+	var err error
+	ct := ""
+	for {
+		tuples, ct, err = o.ReadRelatedObjects(ctx, tuple, 20, ct)
+		if err != nil {
+			return nil, err
+		}
+		if len(tuples) > 0 {
+			allTuples = append(allTuples, tuples...)
+		}
+		if ct == "" {
+			break
+		}
+	}
+	return allTuples, nil
 }
 
 // CheckRelation verifies that a user (or object) is allowed to access the target object by the specified relation.

@@ -13,7 +13,6 @@ import (
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
-	"github.com/canonical/jimm/internal/auth"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
@@ -25,7 +24,7 @@ import (
 func (j *JIMM) GetUserCloudAccess(ctx context.Context, user *openfga.User, cloud names.CloudTag) (string, error) {
 	accessLevel := user.GetCloudAccess(ctx, cloud)
 	if accessLevel == ofganames.NoRelation {
-		everyoneTag := names.NewUserTag(auth.EveryoneUser)
+		everyoneTag := names.NewUserTag(ofganames.EveryoneUser)
 		everyone := openfga.NewUser(
 			&dbmodel.User{
 				Username: everyoneTag.Id(),
@@ -101,7 +100,7 @@ func (j *JIMM) ForEachUserCloud(ctx context.Context, user *openfga.User, f func(
 
 	// Also include "public" clouds
 	everyoneDB := dbmodel.User{
-		Username: auth.EveryoneUser,
+		Username: ofganames.EveryoneUser,
 	}
 	everyone := openfga.NewUser(&everyoneDB, j.OpenFGAClient)
 
@@ -342,14 +341,7 @@ func (j *JIMM) AddHostedCloud(ctx context.Context, user *openfga.User, tag names
 		return errors.E(op, err)
 	}
 	if !allowedAddModel {
-		everyone := openfga.NewUser(&dbmodel.User{Username: auth.EveryoneUser}, j.OpenFGAClient)
-		everyonewAllowedAddModel, err := everyone.IsAllowedAddModel(ctx, region.Cloud.ResourceTag())
-		if err != nil {
-			return errors.E(op, err)
-		}
-		if !everyonewAllowedAddModel {
-			return errors.E(op, errors.CodeUnauthorized, fmt.Sprintf("missing add-model access on %q", cloud.HostCloudRegion))
-		}
+		return errors.E(op, errors.CodeUnauthorized, fmt.Sprintf("missing add-model access on %q", cloud.HostCloudRegion))
 	}
 
 	if region.Cloud.HostCloudRegion != "" {

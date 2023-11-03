@@ -12,7 +12,6 @@ import (
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 
-	"github.com/canonical/jimm/internal/auth"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
@@ -71,7 +70,7 @@ func TestGetCloud(t *testing.T) {
 
 	everyone := openfga.NewUser(
 		&dbmodel.User{
-			Username: auth.EveryoneUser,
+			Username: ofganames.EveryoneUser,
 		},
 		client,
 	)
@@ -189,7 +188,7 @@ func TestForEachCloud(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	everyone := openfga.NewUser(
 		&dbmodel.User{
-			Username: auth.EveryoneUser,
+			Username: ofganames.EveryoneUser,
 		},
 		client,
 	)

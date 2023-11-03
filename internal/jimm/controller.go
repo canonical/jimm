@@ -14,7 +14,6 @@ import (
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
-	"github.com/canonical/jimm/internal/auth"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
@@ -151,7 +150,7 @@ func (j *JIMM) AddController(ctx context.Context, u *openfga.User, ctl *dbmodel.
 		// If this cloud is the one used by the controller model then
 		// it is available to all users. Other clouds require `juju grant-cloud` to add permissions.
 		if cloud.ResourceTag().String() == ms.CloudTag {
-			everyoneTag := names.NewUserTag(auth.EveryoneUser)
+			everyoneTag := names.NewUserTag(ofganames.EveryoneUser)
 			everyone := openfga.NewUser(
 				&dbmodel.User{
 					Username: everyoneTag.Id(),

@@ -682,26 +682,26 @@ func (j *JIMM) ModelInfo(ctx context.Context, u *openfga.User, mt names.ModelTag
 	// (and possibly creating a wrapper for that) to read only direct relations to the model instead
 	// of expanding the entire user list. Then we would instead return groups and users with direct
 	// access instead of including users with indirect access.
-	for _, relation := range []openfga.Relation{
-		// Here we list possible relation in decreasing level
-		// of access privilege.
-		ofganames.AdministratorRelation,
-		ofganames.WriterRelation,
-		ofganames.ReaderRelation,
-	} {
-		usersWithSpecifiedRelation, err := openfga.ListUsersWithAccess(ctx, j.OpenFGAClient, mt, relation)
-		if err != nil {
-			return nil, errors.E(op, err)
-		}
-		for _, user := range usersWithSpecifiedRelation {
-			// Since we are checking user relations in decreasing level of
-			// access privilege, we want to make sure the user has not
-			// already been recorded with a higher access level.
-			if _, ok := userAccess[user.Username]; !ok {
-				userAccess[user.Username] = ToModelAccessString(relation)
-			}
-		}
-	}
+	// for _, relation := range []openfga.Relation{
+	// 	// Here we list possible relation in decreasing level
+	// 	// of access privilege.
+	// 	ofganames.AdministratorRelation,
+	// 	ofganames.WriterRelation,
+	// 	ofganames.ReaderRelation,
+	// } {
+	// 	usersWithSpecifiedRelation, err := openfga.ListEntitiesWithAccess(ctx, j.OpenFGAClient, mt)
+	// 	if err != nil {
+	// 		return nil, errors.E(op, err)
+	// 	}
+	// 	for _, user := range usersWithSpecifiedRelation {
+	// 		// Since we are checking user relations in decreasing level of
+	// 		// access privilege, we want to make sure the user has not
+	// 		// already been recorded with a higher access level.
+	// 		if _, ok := userAccess[user.Username]; !ok {
+	// 			userAccess[user.Username] = ToModelAccessString(relation)
+	// 		}
+	// 	}
+	// }
 
 	users := make([]jujuparams.ModelUserInfo, 0, len(userAccess))
 	for username, access := range userAccess {

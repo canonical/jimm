@@ -16,6 +16,14 @@ import (
 	"github.com/canonical/ofga"
 )
 
+// EveryoneUser is the juju username that represents all users.
+const EveryoneUser = "everyone@external"
+
+type EntityAccess struct {
+	Entity Tag
+	Access Relation
+}
+
 // NewUser returns a new user structure that can be used to check
 // user's access rights to various resources.
 func NewUser(u *dbmodel.User, client *OFGAClient) *User {
@@ -423,20 +431,19 @@ func unsetResourceAccess[T ofganames.ResourceTagger](ctx context.Context, user *
 	return nil
 }
 
-// ListUsersWithAccess lists all users that have the specified relation to the resource.
-func ListUsersWithAccess[T ofganames.ResourceTagger](ctx context.Context, client *OFGAClient, resource T, relation Relation) ([]*User, error) {
-	entities, err := client.cofgaClient.FindUsersByRelation(ctx, Tuple{
-		Relation: relation,
-		Target:   ofganames.ConvertTag(resource),
-	}, 999)
-
+// ListEntitiesWithAccess lists all entities that have a relation to the resource.
+func ListEntitiesWithAccess[T ofganames.ResourceTagger](ctx context.Context, client *OFGAClient, resource T) ([]EntityAccess, error) {
+	t := Tuple{Target: ofganames.ConvertTag(resource)}
+	tuples, err := client.ReadAllRelatedObjects(ctx, t)
 	if err != nil {
-		return nil, err
+		return nil, errors.E(err)
 	}
-
-	users := make([]*User, len(entities))
-	for i, entity := range entities {
-		users[i] = NewUser(&dbmodel.User{Username: entity.ID}, client)
+	et := make([]EntityAccess, len(tuples))
+	for i, tuple := range tuples {
+		et[i] = EntityAccess{
+			Entity: *tuple.Object,
+			Access: tuple.Relation,
+		}
 	}
-	return users, nil
+	return et, nil
 }
