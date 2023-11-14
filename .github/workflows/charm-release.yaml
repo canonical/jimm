@@ -38,6 +38,8 @@ jobs:
         with:
           credentials: "${{ secrets.CHARMHUB_TOKEN }}"
           github-token: "${{ secrets.GITHUB_TOKEN }}"
+          # TODO: Update the "2" below to 3 once new tracks are created
+          # https://discourse.charmhub.io/t/request-new-track-for-jimm-charms/12553
           channel: "2/edge"
           charm-path: "./charms/jimm-k8s"
           pull-image: "false"
@@ -71,6 +73,8 @@ jobs:
         with:
           credentials: "${{ secrets.CHARMHUB_TOKEN }}"
           github-token: "${{ secrets.GITHUB_TOKEN }}"
+          # TODO: Update the "2" below to 3 once new tracks are created
+          # https://discourse.charmhub.io/t/request-new-track-for-jimm-charms/12553
           channel: "2/edge"
           charm-path: "./charms/jimm"
           tag-prefix: "v2-machine"
