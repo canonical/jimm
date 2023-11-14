@@ -34,13 +34,13 @@ jobs:
       - name: Build local images
         run: make jimm-image
       - name: Upload charm to charmhub
-        uses: kian99/charming-actions/upload-charm@add-local-image-option
+        uses: canonical/charming-actions/upload-charm@2.4.0
         with:
           credentials: "${{ secrets.CHARMHUB_TOKEN }}"
           github-token: "${{ secrets.GITHUB_TOKEN }}"
           channel: "2/edge"
           charm-path: "./charms/jimm-k8s"
-          local-image: "true"
+          pull-image: "false"
           tag-prefix: "v2-k8s"
 
   release-machine-charm:
