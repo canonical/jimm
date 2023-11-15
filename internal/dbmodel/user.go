@@ -32,10 +32,6 @@ type User struct {
 	// users are not allowed to authenticate.
 	Disabled bool `gorm:"not null;default:FALSE"`
 
-	// AuditLogAccess is the access level this user has on the JIMM audit
-	// log.
-	AuditLogAccess string `gorm:"not null;default:''"`
-
 	// CloudCredentials are the cloud credentials owned by this user.
 	CloudCredentials []CloudCredential `gorm:"foreignKey:OwnerUsername;references:Username"`
 }
