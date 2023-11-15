@@ -21,46 +21,21 @@ func init() {
 	facadeInit["ApplicationOffers"] = func(r *controllerRoot) []int {
 		offerMethod := rpc.Method(r.Offer)
 		getConsumeDetailsMethod := rpc.Method(r.GetConsumeDetails)
-		getConsumeDetailsMethodV3 := rpc.Method(r.GetConsumeDetailsV3)
 		listOffersMethod := rpc.Method(r.ListApplicationOffers)
 		modifyOfferAccessMethod := rpc.Method(r.ModifyOfferAccess)
 		destroyOffersMethod := rpc.Method(r.DestroyOffers)
 		findOffersMethod := rpc.Method(r.FindApplicationOffers)
 		applicationOffersMethod := rpc.Method(r.ApplicationOffers)
 
-		r.AddMethod("ApplicationOffers", 1, "Offer", offerMethod)
-		r.AddMethod("ApplicationOffers", 1, "GetConsumeDetails", getConsumeDetailsMethod)
-		r.AddMethod("ApplicationOffers", 1, "ListApplicationOffers", listOffersMethod)
-		r.AddMethod("ApplicationOffers", 1, "ModifyOfferAccess", modifyOfferAccessMethod)
-		r.AddMethod("ApplicationOffers", 1, "DestroyOffers", destroyOffersMethod)
-		r.AddMethod("ApplicationOffers", 1, "FindApplicationOffers", findOffersMethod)
-		r.AddMethod("ApplicationOffers", 1, "ApplicationOffers", applicationOffersMethod)
-
-		r.AddMethod("ApplicationOffers", 2, "Offer", offerMethod)
-		r.AddMethod("ApplicationOffers", 2, "GetConsumeDetails", getConsumeDetailsMethod)
-		r.AddMethod("ApplicationOffers", 2, "ListApplicationOffers", listOffersMethod)
-		r.AddMethod("ApplicationOffers", 2, "ModifyOfferAccess", modifyOfferAccessMethod)
-		r.AddMethod("ApplicationOffers", 2, "DestroyOffers", destroyOffersMethod)
-		r.AddMethod("ApplicationOffers", 2, "FindApplicationOffers", findOffersMethod)
-		r.AddMethod("ApplicationOffers", 2, "ApplicationOffers", applicationOffersMethod)
-
-		r.AddMethod("ApplicationOffers", 3, "Offer", offerMethod)
-		r.AddMethod("ApplicationOffers", 3, "GetConsumeDetails", getConsumeDetailsMethodV3)
-		r.AddMethod("ApplicationOffers", 3, "ListApplicationOffers", listOffersMethod)
-		r.AddMethod("ApplicationOffers", 3, "ModifyOfferAccess", modifyOfferAccessMethod)
-		r.AddMethod("ApplicationOffers", 3, "DestroyOffers", destroyOffersMethod)
-		r.AddMethod("ApplicationOffers", 3, "FindApplicationOffers", findOffersMethod)
-		r.AddMethod("ApplicationOffers", 3, "ApplicationOffers", applicationOffersMethod)
-
 		r.AddMethod("ApplicationOffers", 4, "Offer", offerMethod)
-		r.AddMethod("ApplicationOffers", 4, "GetConsumeDetails", getConsumeDetailsMethodV3)
+		r.AddMethod("ApplicationOffers", 4, "GetConsumeDetails", getConsumeDetailsMethod)
 		r.AddMethod("ApplicationOffers", 4, "ListApplicationOffers", listOffersMethod)
 		r.AddMethod("ApplicationOffers", 4, "ModifyOfferAccess", modifyOfferAccessMethod)
 		r.AddMethod("ApplicationOffers", 4, "DestroyOffers", destroyOffersMethod)
 		r.AddMethod("ApplicationOffers", 4, "FindApplicationOffers", findOffersMethod)
 		r.AddMethod("ApplicationOffers", 4, "ApplicationOffers", applicationOffersMethod)
 
-		return []int{1, 2, 3, 4}
+		return []int{4}
 	}
 }
 
@@ -101,22 +76,8 @@ func (r *controllerRoot) offer(ctx context.Context, args jujuparams.AddApplicati
 }
 
 // GetConsumeDetails implements the GetConsumeDetails procedure of the
-// ApplicationOffers facade (version 1 & 2).
-func (r *controllerRoot) GetConsumeDetails(ctx context.Context, args jujuparams.OfferURLs) (jujuparams.ConsumeOfferDetailsResults, error) {
-	results := jujuparams.ConsumeOfferDetailsResults{
-		Results: make([]jujuparams.ConsumeOfferDetailsResult, len(args.OfferURLs)),
-	}
-	for i, offerURL := range args.OfferURLs {
-		var err error
-		results.Results[i].ConsumeOfferDetails, err = r.getConsumeDetails(ctx, r.user, args.BakeryVersion, offerURL)
-		results.Results[i].Error = mapError(err)
-	}
-	return results, nil
-}
-
-// GetConsumeDetailsV3 implements the GetConsumeDetails procedure of the
 // ApplicationOffers facade (version 3).
-func (r *controllerRoot) GetConsumeDetailsV3(ctx context.Context, args jujuparams.ConsumeOfferDetailsArg) (jujuparams.ConsumeOfferDetailsResults, error) {
+func (r *controllerRoot) GetConsumeDetails(ctx context.Context, args jujuparams.ConsumeOfferDetailsArg) (jujuparams.ConsumeOfferDetailsResults, error) {
 	results := jujuparams.ConsumeOfferDetailsResults{
 		Results: make([]jujuparams.ConsumeOfferDetailsResult, len(args.OfferURLs.OfferURLs)),
 	}

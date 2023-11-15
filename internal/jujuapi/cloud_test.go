@@ -114,7 +114,7 @@ func (s *cloudSuite) TestUserCredentialsErrors(c *gc.C) {
 		}},
 	}
 	var resp jujuparams.StringsResults
-	err := conn.APICall("Cloud", 1, "", "UserCredentials", req, &resp)
+	err := conn.APICall("Cloud", 7, "", "UserCredentials", req, &resp)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(resp.Results[0].Error, gc.ErrorMatches, `"not-a-user-tag" is not a valid tag`)
 	c.Assert(resp.Results, gc.HasLen, 1)
@@ -177,7 +177,7 @@ func (s *cloudSuite) TestUpdateCloudCredentialsErrors(c *gc.C) {
 		}},
 	}
 	var resp jujuparams.ErrorResults
-	err := conn.APICall("Cloud", 1, "", "UpdateCredentials", req, &resp)
+	err := conn.APICall("Cloud", 7, "", "UpdateCredentialsCheckModels", req, &resp)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(resp.Results, gc.HasLen, 3)
 	c.Assert(resp.Results[0].Error, gc.ErrorMatches, `"not-a-cloud-credentials-tag" is not a valid tag`)
@@ -211,7 +211,7 @@ func (s *cloudSuite) TestUpdateCloudCredentialsForce(c *gc.C) {
 	}
 	// First try without Force to check that it fails.
 	var resp jujuparams.UpdateCredentialResults
-	err = conn.APICall("Cloud", 3, "", "UpdateCredentialsCheckModels", args, &resp)
+	err = conn.APICall("Cloud", 7, "", "UpdateCredentialsCheckModels", args, &resp)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(resp.Results[0].Error, gc.ErrorMatches, `some models are no longer visible`)
 
@@ -231,7 +231,7 @@ func (s *cloudSuite) TestUpdateCloudCredentialsForce(c *gc.C) {
 	}})
 
 	args.Force = true
-	err = conn.APICall("Cloud", 3, "", "UpdateCredentialsCheckModels", args, &resp)
+	err = conn.APICall("Cloud", 7, "", "UpdateCredentialsCheckModels", args, &resp)
 	c.Assert(err, gc.Equals, nil)
 	c.Check(resp.Results[0].Error, gc.ErrorMatches, `updating cloud credentials: validating credential "`+jimmtest.TestCloudName+`/test@external/cred3" for cloud "`+jimmtest.TestCloudName+`": supported auth-types \["empty" "userpass"\], "badauthtype" not supported`)
 
@@ -270,7 +270,7 @@ func (s *cloudSuite) TestCheckCredentialsModels(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	var resp jujuparams.UpdateCredentialResults
-	err = conn.APICall("Cloud", 3, "", "CheckCredentialsModels", jujuparams.TaggedCredentials{
+	err = conn.APICall("Cloud", 7, "", "CheckCredentialsModels", jujuparams.TaggedCredentials{
 		Credentials: []jujuparams.TaggedCredential{{
 			Tag: credTag.String(),
 			Credential: jujuparams.CloudCredential{
@@ -320,7 +320,7 @@ func (s *cloudSuite) TestCheckCredentialsModelsInvalidCreds(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	var resp jujuparams.UpdateCredentialResults
-	err = conn.APICall("Cloud", 3, "", "CheckCredentialsModels", jujuparams.TaggedCredentials{
+	err = conn.APICall("Cloud", 7, "", "CheckCredentialsModels", jujuparams.TaggedCredentials{
 		Credentials: []jujuparams.TaggedCredential{{
 			Tag: credTag.String(),
 			Credential: jujuparams.CloudCredential{
@@ -515,7 +515,7 @@ func (s *cloudSuite) TestRevokeCredentialsCheckModels(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	var resp jujuparams.ErrorResults
-	err = conn.APICall("Cloud", 3, "", "RevokeCredentialsCheckModels", jujuparams.RevokeCredentialArgs{
+	err = conn.APICall("Cloud", 7, "", "RevokeCredentialsCheckModels", jujuparams.RevokeCredentialArgs{
 		Credentials: []jujuparams.RevokeCredentialArg{{
 			Tag:   credTag.String(),
 			Force: false,
@@ -525,7 +525,7 @@ func (s *cloudSuite) TestRevokeCredentialsCheckModels(c *gc.C) {
 	c.Assert(resp.Results[0].Error, gc.ErrorMatches, `cloud credential still used by 1 model\(s\)`)
 
 	resp.Results = nil
-	err = conn.APICall("Cloud", 3, "", "RevokeCredentialsCheckModels", jujuparams.RevokeCredentialArgs{
+	err = conn.APICall("Cloud", 7, "", "RevokeCredentialsCheckModels", jujuparams.RevokeCredentialArgs{
 		Credentials: []jujuparams.RevokeCredentialArg{{
 			Tag:   credTag.String(),
 			Force: true,
@@ -889,7 +889,7 @@ func (s *cloudSuite) TestCloudInfo(c *gc.C) {
 		}},
 	}
 	var result jujuparams.CloudInfoResults
-	err = conn.APICall("Cloud", 5, "", "CloudInfo", args, &result)
+	err = conn.APICall("Cloud", 7, "", "CloudInfo", args, &result)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(result, jc.DeepEquals, jujuparams.CloudInfoResults{
 		Results: []jujuparams.CloudInfoResult{{
@@ -961,7 +961,7 @@ func (s *cloudSuite) TestListCloudInfo(c *gc.C) {
 		All:     false,
 	}
 	var result jujuparams.ListCloudInfoResults
-	err = conn.APICall("Cloud", 5, "", "ListCloudInfo", args, &result)
+	err = conn.APICall("Cloud", 7, "", "ListCloudInfo", args, &result)
 	c.Assert(err, gc.Equals, nil)
 	sort.Slice(result.Results, func(i, j int) bool {
 		return result.Results[i].Result.Type > result.Results[j].Result.Type
@@ -1009,7 +1009,7 @@ func (s *cloudSuite) TestListCloudInfo(c *gc.C) {
 		All:     false,
 	}
 	result.Results = nil
-	err = conn.APICall("Cloud", 5, "", "ListCloudInfo", args, &result)
+	err = conn.APICall("Cloud", 7, "", "ListCloudInfo", args, &result)
 	c.Assert(err, gc.Equals, nil)
 
 	sort.Slice(result.Results, func(i, j int) bool {
