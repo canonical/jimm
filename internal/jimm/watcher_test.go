@@ -576,7 +576,7 @@ func TestWatcher(t *testing.T) {
 			env := jimmtest.ParseEnvironment(c, testWatcherEnv)
 			err := w.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
-			env.PopulateDB(c, w.Database, nil)
+			env.PopulateDB(c, w.Database)
 
 			if test.initDB != nil {
 				test.initDB(c, w.Database)
@@ -736,7 +736,7 @@ func TestModelSummaryWatcher(t *testing.T) {
 			env := jimmtest.ParseEnvironment(c, testWatcherEnv)
 			err := w.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
-			env.PopulateDB(c, w.Database, nil)
+			env.PopulateDB(c, w.Database)
 
 			var wg sync.WaitGroup
 			wg.Add(1)
@@ -782,7 +782,7 @@ func TestWatcherSetsControllerUnavailable(t *testing.T) {
 	env := jimmtest.ParseEnvironment(c, testWatcherEnv)
 	err := w.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
-	env.PopulateDB(c, w.Database, nil)
+	env.PopulateDB(c, w.Database)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -846,7 +846,7 @@ func TestWatcherRemoveDyingModelsOnStartup(t *testing.T) {
 	env := jimmtest.ParseEnvironment(c, testWatcherEnv)
 	err := w.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
-	env.PopulateDB(c, w.Database, nil)
+	env.PopulateDB(c, w.Database)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -948,7 +948,7 @@ func TestWatcherIgnoreDeltasForModelsFromIncorrectController(t *testing.T) {
 	env := jimmtest.ParseEnvironment(c, testWatcherIgnoreDeltasForModelsFromIncorrectControllerEnv)
 	err := w.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
-	env.PopulateDB(c, w.Database, nil)
+	env.PopulateDB(c, w.Database)
 
 	m1 := dbmodel.Model{
 		UUID: sql.NullString{
