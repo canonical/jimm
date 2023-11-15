@@ -104,6 +104,7 @@ func (c Controller) ToAPIControllerInfo() apiparams.ControllerInfo {
 	var ci apiparams.ControllerInfo
 	ci.Name = c.Name
 	ci.UUID = c.UUID
+	ci.Username = c.AdminUser
 	ci.PublicAddress = c.PublicAddress
 	for _, hps := range c.Addresses {
 		for _, hp := range hps {

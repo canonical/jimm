@@ -52,6 +52,14 @@ type AddControllerRequest struct {
 	// connection to the controller. This is not needed if certificate is
 	// signed by a public CA.
 	CACertificate string `json:"ca-certificate,omitempty"`
+
+	// Username contains the username that JIMM should use to connect to
+	// the controller.
+	Username string `json:"username"`
+
+	// Password contains the password that JIMM should use to connect to
+	// the controller.
+	Password string `json:"password"`
 }
 
 // AuditLogAccessRequest is the request used to modify a user's access

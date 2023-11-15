@@ -149,6 +149,8 @@ func (s *jimmSuite) TestAddController(c *gc.C) {
 		Name:          "controller-2",
 		APIAddresses:  info.Addrs,
 		CACertificate: info.CACert,
+		Username:      info.Tag.Id(),
+		Password:      info.Password,
 	}
 
 	ci, err := client.AddController(&acr)
