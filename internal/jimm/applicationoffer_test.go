@@ -141,10 +141,6 @@ var initializeEnvironment = func(c *qt.C, ctx context.Context, db *db.Database, 
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
 		CloudCredentialID: cred.ID,
-		Users: []dbmodel.UserModelAccess{{
-			Username: u.Username,
-			Access:   "admin",
-		}},
 	}
 	err = db.AddModel(ctx, &model)
 	c.Assert(err, qt.IsNil)
@@ -1310,10 +1306,6 @@ func TestOffer(t *testing.T) {
 				ControllerID:      controller.ID,
 				CloudRegionID:     cloud.Regions[0].ID,
 				CloudCredentialID: cred.ID,
-				Users: []dbmodel.UserModelAccess{{
-					User:   u,
-					Access: "admin",
-				}},
 			}
 			err = db.AddModel(ctx, &model)
 			c.Assert(err, qt.IsNil)
@@ -1437,10 +1429,6 @@ func TestOffer(t *testing.T) {
 				ControllerID:      controller.ID,
 				CloudRegionID:     cloud.Regions[0].ID,
 				CloudCredentialID: cred.ID,
-				Users: []dbmodel.UserModelAccess{{
-					User:   u,
-					Access: "admin",
-				}},
 			}
 			err = db.AddModel(ctx, &model)
 			c.Assert(err, qt.IsNil)
@@ -1564,10 +1552,6 @@ func TestOffer(t *testing.T) {
 				ControllerID:      controller.ID,
 				CloudRegionID:     cloud.Regions[0].ID,
 				CloudCredentialID: cred.ID,
-				Users: []dbmodel.UserModelAccess{{
-					User:   u,
-					Access: "admin",
-				}},
 			}
 			err = db.AddModel(ctx, &model)
 			c.Assert(err, qt.IsNil)
@@ -1664,10 +1648,6 @@ func TestOffer(t *testing.T) {
 				ControllerID:      controller.ID,
 				CloudRegionID:     cloud.Regions[0].ID,
 				CloudCredentialID: cred.ID,
-				Users: []dbmodel.UserModelAccess{{
-					User:   u,
-					Access: "admin",
-				}},
 			}
 			err = db.AddModel(ctx, &model)
 			c.Assert(err, qt.IsNil)
@@ -1757,10 +1737,6 @@ func TestOffer(t *testing.T) {
 				ControllerID:      controller.ID,
 				CloudRegionID:     cloud.Regions[0].ID,
 				CloudCredentialID: cred.ID,
-				Users: []dbmodel.UserModelAccess{{
-					User:   u,
-					Access: "admin",
-				}},
 			}
 			err = db.AddModel(ctx, &model)
 			c.Assert(err, qt.IsNil)
@@ -1850,10 +1826,6 @@ func TestOffer(t *testing.T) {
 				ControllerID:      controller.ID,
 				CloudRegionID:     cloud.Regions[0].ID,
 				CloudCredentialID: cred.ID,
-				Users: []dbmodel.UserModelAccess{{
-					User:   u,
-					Access: "admin",
-				}},
 			}
 			err = db.AddModel(ctx, &model)
 			c.Assert(err, qt.IsNil)
@@ -1985,10 +1957,6 @@ func TestOfferAssertOpenFGARelationsExist(t *testing.T) {
 			ControllerID:      controller.ID,
 			CloudRegionID:     cloud.Regions[0].ID,
 			CloudCredentialID: cred.ID,
-			Users: []dbmodel.UserModelAccess{{
-				User:   u,
-				Access: "admin",
-			}},
 		}
 		err = db.AddModel(ctx, &model)
 		c.Assert(err, qt.IsNil)
@@ -2572,45 +2540,48 @@ func TestFindApplicationOffers(t *testing.T) {
 		parameterFunc func(*environment) (dbmodel.User, string, []jujuparams.OfferFilter)
 		expectedError string
 		expectedOffer *dbmodel.ApplicationOffer
-	}{{
-		about: "find an offer as model admin",
-		parameterFunc: func(env *environment) (dbmodel.User, string, []jujuparams.OfferFilter) {
-			return env.users[0], "admin", []jujuparams.OfferFilter{{
-				OfferName: "test-offer",
-			}}
-		},
-		expectedOffer: &expectedOffer,
-	}, {
-		about: "find an offer as offer admin",
-		parameterFunc: func(env *environment) (dbmodel.User, string, []jujuparams.OfferFilter) {
-			return env.users[5], "admin", []jujuparams.OfferFilter{{
-				OfferName: "test-offer",
-			}}
-		},
-		expectedOffer: &expectedOffer,
-	}, {
-		about: "find an offer as superuser",
-		parameterFunc: func(env *environment) (dbmodel.User, string, []jujuparams.OfferFilter) {
-			return env.users[6], "admin", []jujuparams.OfferFilter{{
-				OfferName: "test-offer",
-			}}
-		},
-		expectedOffer: &expectedOffer,
-	}, {
-		about: "offer not found",
-		parameterFunc: func(env *environment) (dbmodel.User, string, []jujuparams.OfferFilter) {
-			return env.users[0], "admin", []jujuparams.OfferFilter{{
-				OfferName: "no-such-offer",
-			}}
-		},
-	}, {
-		about: "user without access cannot find offers",
-		parameterFunc: func(env *environment) (dbmodel.User, string, []jujuparams.OfferFilter) {
-			return env.users[4], "", []jujuparams.OfferFilter{{
-				OfferName: "test-offer",
-			}}
-		},
-	}}
+	}{
+		// TODO(Kian) CSS-6045 Uncomment this test as part of applicationoffer refactoring to only use OpenFGA.
+		// 	{
+		// 	about: "find an offer as model admin",
+		// 	parameterFunc: func(env *environment) (dbmodel.User, string, []jujuparams.OfferFilter) {
+		// 		return env.users[0], "admin", []jujuparams.OfferFilter{{
+		// 			OfferName: "test-offer",
+		// 		}}
+		// 	},
+		// 	expectedOffer: &expectedOffer,
+		// },
+		{
+			about: "find an offer as offer admin",
+			parameterFunc: func(env *environment) (dbmodel.User, string, []jujuparams.OfferFilter) {
+				return env.users[5], "admin", []jujuparams.OfferFilter{{
+					OfferName: "test-offer",
+				}}
+			},
+			expectedOffer: &expectedOffer,
+		}, {
+			about: "find an offer as superuser",
+			parameterFunc: func(env *environment) (dbmodel.User, string, []jujuparams.OfferFilter) {
+				return env.users[6], "admin", []jujuparams.OfferFilter{{
+					OfferName: "test-offer",
+				}}
+			},
+			expectedOffer: &expectedOffer,
+		}, {
+			about: "offer not found",
+			parameterFunc: func(env *environment) (dbmodel.User, string, []jujuparams.OfferFilter) {
+				return env.users[0], "admin", []jujuparams.OfferFilter{{
+					OfferName: "no-such-offer",
+				}}
+			},
+		}, {
+			about: "user without access cannot find offers",
+			parameterFunc: func(env *environment) (dbmodel.User, string, []jujuparams.OfferFilter) {
+				return env.users[4], "", []jujuparams.OfferFilter{{
+					OfferName: "test-offer",
+				}}
+			},
+		}}
 
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {

@@ -69,7 +69,7 @@ func (d *Database) GetApplicationOffer(ctx context.Context, offer *dbmodel.Appli
 	}
 	db = db.Preload("Connections")
 	db = db.Preload("Endpoints")
-	db = db.Preload("Model").Preload("Model.Controller").Preload("Model.Users")
+	db = db.Preload("Model").Preload("Model.Controller")
 	db = db.Preload("Spaces")
 	db = db.Preload("Users").Preload("Users.User")
 	if err := db.First(&offer).Error; err != nil {
@@ -96,7 +96,6 @@ func (d *Database) DeleteApplicationOffer(ctx context.Context, offer *dbmodel.Ap
 	}
 	return nil
 }
-
 
 // ApplicationOfferFilter can be used to find application offers that match certain criteria.
 type ApplicationOfferFilter func(*gorm.DB) *gorm.DB
@@ -130,6 +129,7 @@ func ApplicationOfferFilterByApplication(applicationName string) ApplicationOffe
 }
 
 // ApplicationOfferFilterByUser filters application offer accessible by the user.
+// TODO(Kian) CSS-6045 remove this as part of application offer access in Postgres cleanup.
 func ApplicationOfferFilterByUser(username string) ApplicationOfferFilter {
 	return func(db *gorm.DB) *gorm.DB {
 		db = db.Joins("LEFT JOIN user_application_offer_access AS offer_users ON offer_users.application_offer_id = offers.id AND offer_users.username = ?", username)

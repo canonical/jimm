@@ -316,10 +316,6 @@ func initializeEnvironment(c *gc.C, ctx context.Context, db *db.Database, u dbmo
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
 		CloudCredentialID: cred.ID,
-		Users: []dbmodel.UserModelAccess{{
-			Username: u.Username,
-			Access:   "admin",
-		}},
 	}
 	err = db.AddModel(ctx, &model)
 	c.Assert(err, gc.IsNil)

@@ -358,12 +358,6 @@ func (b *modelBuilder) UpdateDatabaseModel() *modelBuilder {
 	b.model.CloudCredential = dbmodel.CloudCredential{}
 	b.model.CloudRegion = dbmodel.CloudRegion{}
 
-	err = b.filterModelUserAccesses()
-	if err != nil {
-		b.err = errors.E(err)
-		return b
-	}
-
 	err = b.jimm.Database.UpdateModel(b.ctx, b.model)
 	if err != nil {
 		b.err = errors.E(err, "failed to store model information")
@@ -419,26 +413,6 @@ func (b *modelBuilder) selectCloudCredentials() error {
 		return nil
 	}
 	return errors.E("valid cloud credentials not found")
-}
-
-func (b *modelBuilder) filterModelUserAccesses() error {
-	a := []dbmodel.UserModelAccess{}
-	for _, access := range b.model.Users {
-		access := access
-
-		// JIMM users will contain an @ sign in the username
-		if !strings.Contains(access.User.Username, "@") {
-			continue
-		}
-
-		// fetch user information
-		if err := b.jimm.Database.GetUser(b.ctx, &access.User); err != nil {
-			return errors.E(err)
-		}
-		a = append(a, access)
-	}
-	b.model.Users = a
-	return nil
 }
 
 // CreateControllerModel uses provided information to create a new
@@ -777,7 +751,7 @@ func (j *JIMM) ModelStatus(ctx context.Context, u *openfga.User, mt names.ModelT
 // the system. If the given function returns an error the error will be
 // returned unmodified and iteration will stop immediately. The given
 // function should not update the database.
-func (j *JIMM) ForEachUserModel(ctx context.Context, u *openfga.User, f func(*dbmodel.UserModelAccess) error) error {
+func (j *JIMM) ForEachUserModel(ctx context.Context, u *openfga.User, f func(*dbmodel.Model, jujuparams.UserAccessPermission) error) error {
 	const op = errors.Op("jimm.ForEachUserModel")
 
 	errStop := errors.E("stop")
@@ -790,11 +764,7 @@ func (j *JIMM) ForEachUserModel(ctx context.Context, u *openfga.User, f func(*db
 			return errors.E(op, err)
 		}
 		if access == "read" || access == "write" || access == "admin" {
-			uma := dbmodel.UserModelAccess{
-				Access: access,
-				Model_: model,
-			}
-			if err := f(&uma); err != nil {
+			if err := f(&model, jujuparams.UserAccessPermission(access)); err != nil {
 				iterErr = err
 				return errStop
 			}
@@ -819,7 +789,7 @@ func (j *JIMM) ForEachUserModel(ctx context.Context, u *openfga.User, f func(*db
 // the user is not a controller admin. If the given function returns an
 // error the error will be returned unmodified and iteration will stop
 // immediately. The given function should not update the database.
-func (j *JIMM) ForEachModel(ctx context.Context, u *openfga.User, f func(*dbmodel.UserModelAccess) error) error {
+func (j *JIMM) ForEachModel(ctx context.Context, u *openfga.User, f func(*dbmodel.Model, jujuparams.UserAccessPermission) error) error {
 	const op = errors.Op("jimm.ForEachModel")
 
 	isControllerAdmin, err := openfga.IsAdministrator(ctx, u, j.ResourceTag())
@@ -833,11 +803,7 @@ func (j *JIMM) ForEachModel(ctx context.Context, u *openfga.User, f func(*dbmode
 	errStop := errors.E("stop")
 	var iterErr error
 	err = j.Database.ForEachModel(ctx, func(m *dbmodel.Model) error {
-		uma := dbmodel.UserModelAccess{
-			Access: "admin",
-			Model_: *m,
-		}
-		if err := f(&uma); err != nil {
+		if err := f(m, jujuparams.UserAccessPermission("admin")); err != nil {
 			iterErr = err
 			return errStop
 		}

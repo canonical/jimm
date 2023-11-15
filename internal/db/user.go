@@ -99,22 +99,3 @@ func (d *Database) GetUserCloudCredentials(ctx context.Context, u *dbmodel.User,
 	}
 	return credentials, nil
 }
-
-// GetUserModels retrives all the models that the given user has been
-// granted access to.
-func (d *Database) GetUserModels(ctx context.Context, u *dbmodel.User) ([]dbmodel.UserModelAccess, error) {
-	const op = errors.Op("db.GetUserModels")
-	if err := d.ready(); err != nil {
-		return nil, errors.E(op, err)
-	}
-
-	var umas []dbmodel.UserModelAccess
-	db := d.DB.WithContext(ctx)
-	db = preloadModel("Model_", db).Model(u)
-	db = db.Joins("JOIN models ON models.id = user_model_access.model_id")
-	db = db.Order("models.owner_username, models.name ASC")
-	if err := db.Association("Models").Find(&umas); err != nil {
-		return nil, errors.E(op, err)
-	}
-	return umas, nil
-}

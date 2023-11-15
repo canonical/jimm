@@ -93,10 +93,6 @@ func initTestEnvironment(c *qt.C, db *db.Database) testEnvironment {
 		SLA: dbmodel.SLA{
 			Level: "unsupported",
 		},
-		Users: []dbmodel.UserModelAccess{{
-			User:   env.u,
-			Access: "admin",
-		}},
 	}
 	c.Assert(db.DB.Create(&env.model).Error, qt.IsNil)
 
@@ -388,112 +384,115 @@ func (s *dbSuite) TestFindApplicationOffers(c *qt.C) {
 			db.ApplicationOfferFilterByUser(u.Username),
 		},
 		expectedOffers: []dbmodel.ApplicationOffer{offer2, offer3},
-	}, {
-		about: "filter by model admin user",
-		filters: []db.ApplicationOfferFilter{
-			db.ApplicationOfferFilterByUser(env.u.Username),
-		},
-		expectedOffers: []dbmodel.ApplicationOffer{offer1, offer2, offer3},
-	}, {
-		about: "filter by user - not found",
-		filters: []db.ApplicationOfferFilter{
-			db.ApplicationOfferFilterByUser("no such user"),
-		},
-		expectedOffers: []dbmodel.ApplicationOffer{},
-	}, {
-		about: "filter by endpoint interface",
-		filters: []db.ApplicationOfferFilter{
-			db.ApplicationOfferFilterByEndpoint(dbmodel.ApplicationOfferRemoteEndpoint{
-				Interface: "db",
-			}),
-		},
-		expectedOffers: []dbmodel.ApplicationOffer{offer2},
-	}, {
-		about: "filter by endpoint interface - not found",
-		filters: []db.ApplicationOfferFilter{
-			db.ApplicationOfferFilterByEndpoint(dbmodel.ApplicationOfferRemoteEndpoint{
-				Interface: "no-such-interface",
-			}),
-		},
-		expectedOffers: []dbmodel.ApplicationOffer{},
-	}, {
-		about: "filter by endpoint role",
-		filters: []db.ApplicationOfferFilter{
-			db.ApplicationOfferFilterByEndpoint(dbmodel.ApplicationOfferRemoteEndpoint{
-				Role: "provider",
-			}),
-		},
-		expectedOffers: []dbmodel.ApplicationOffer{offer1},
-	}, {
-		about: "filter by endpoint role - not found",
-		filters: []db.ApplicationOfferFilter{
-			db.ApplicationOfferFilterByEndpoint(dbmodel.ApplicationOfferRemoteEndpoint{
-				Role: "no-such-role",
-			}),
-		},
-		expectedOffers: []dbmodel.ApplicationOffer{},
-	}, {
-		about: "filter by endpoint name",
-		filters: []db.ApplicationOfferFilter{
-			db.ApplicationOfferFilterByEndpoint(dbmodel.ApplicationOfferRemoteEndpoint{
-				Name: "test-endpoint-2",
-			}),
-		},
-		expectedOffers: []dbmodel.ApplicationOffer{offer2},
-	}, {
-		about: "filter by endpoint name - not found",
-		filters: []db.ApplicationOfferFilter{
-			db.ApplicationOfferFilterByEndpoint(dbmodel.ApplicationOfferRemoteEndpoint{
-				Name: "no-such-endpoint",
-			}),
-		},
-		expectedOffers: []dbmodel.ApplicationOffer{},
-	}, {
-		about: "filter by endpoint name and role",
-		filters: []db.ApplicationOfferFilter{
-			db.ApplicationOfferFilterByEndpoint(dbmodel.ApplicationOfferRemoteEndpoint{
-				Name: "test-endpoint-2",
-				Role: "requirer",
-			}),
-		},
-		expectedOffers: []dbmodel.ApplicationOffer{offer2},
-	}, {
-		about: "filter by model and application",
-		filters: []db.ApplicationOfferFilter{
-			db.ApplicationOfferFilterByModel(env.model.Name),
-			db.ApplicationOfferFilterByApplication("app-1"),
-		},
-		expectedOffers: []dbmodel.ApplicationOffer{offer1, offer2, offer3},
-	}, {
-		about: "filter by consumer",
-		filters: []db.ApplicationOfferFilter{
-			db.ApplicationOfferFilterByConsumer(u.Username),
-		},
-		expectedOffers: []dbmodel.ApplicationOffer{offer2, offer3},
-	}, {
-		about: "filter by user - not found",
-		filters: []db.ApplicationOfferFilter{
-			db.ApplicationOfferFilterByConsumer("no such user"),
-		},
-		expectedOffers: []dbmodel.ApplicationOffer{},
-	}, {
-		about: "filter by user and consumer",
-		filters: []db.ApplicationOfferFilter{
-			db.ApplicationOfferFilterByUser(u.Username),
-			db.ApplicationOfferFilterByConsumer(u.Username),
-		},
-		expectedOffers: []dbmodel.ApplicationOffer{offer2, offer3},
-	}, {
-		about: "filter by consumer and endpoint",
-		filters: []db.ApplicationOfferFilter{
-			db.ApplicationOfferFilterByConsumer(u.Username),
-			db.ApplicationOfferFilterByEndpoint(dbmodel.ApplicationOfferRemoteEndpoint{
-				Role:      "requirer",
-				Interface: "http",
-			}),
-		},
-		expectedOffers: []dbmodel.ApplicationOffer{offer3},
-	}}
+	},
+		// TODO(Kian) CSS-6045 Uncomment this test as part of applicationoffer refactoring to only use OpenFGA.
+		// {
+		// 	about: "filter by model admin user",
+		// 	filters: []db.ApplicationOfferFilter{
+		// 		db.ApplicationOfferFilterByUser(env.u.Username),
+		// 	},
+		// 	expectedOffers: []dbmodel.ApplicationOffer{offer1, offer2, offer3},
+		// },
+		{
+			about: "filter by user - not found",
+			filters: []db.ApplicationOfferFilter{
+				db.ApplicationOfferFilterByUser("no such user"),
+			},
+			expectedOffers: []dbmodel.ApplicationOffer{},
+		}, {
+			about: "filter by endpoint interface",
+			filters: []db.ApplicationOfferFilter{
+				db.ApplicationOfferFilterByEndpoint(dbmodel.ApplicationOfferRemoteEndpoint{
+					Interface: "db",
+				}),
+			},
+			expectedOffers: []dbmodel.ApplicationOffer{offer2},
+		}, {
+			about: "filter by endpoint interface - not found",
+			filters: []db.ApplicationOfferFilter{
+				db.ApplicationOfferFilterByEndpoint(dbmodel.ApplicationOfferRemoteEndpoint{
+					Interface: "no-such-interface",
+				}),
+			},
+			expectedOffers: []dbmodel.ApplicationOffer{},
+		}, {
+			about: "filter by endpoint role",
+			filters: []db.ApplicationOfferFilter{
+				db.ApplicationOfferFilterByEndpoint(dbmodel.ApplicationOfferRemoteEndpoint{
+					Role: "provider",
+				}),
+			},
+			expectedOffers: []dbmodel.ApplicationOffer{offer1},
+		}, {
+			about: "filter by endpoint role - not found",
+			filters: []db.ApplicationOfferFilter{
+				db.ApplicationOfferFilterByEndpoint(dbmodel.ApplicationOfferRemoteEndpoint{
+					Role: "no-such-role",
+				}),
+			},
+			expectedOffers: []dbmodel.ApplicationOffer{},
+		}, {
+			about: "filter by endpoint name",
+			filters: []db.ApplicationOfferFilter{
+				db.ApplicationOfferFilterByEndpoint(dbmodel.ApplicationOfferRemoteEndpoint{
+					Name: "test-endpoint-2",
+				}),
+			},
+			expectedOffers: []dbmodel.ApplicationOffer{offer2},
+		}, {
+			about: "filter by endpoint name - not found",
+			filters: []db.ApplicationOfferFilter{
+				db.ApplicationOfferFilterByEndpoint(dbmodel.ApplicationOfferRemoteEndpoint{
+					Name: "no-such-endpoint",
+				}),
+			},
+			expectedOffers: []dbmodel.ApplicationOffer{},
+		}, {
+			about: "filter by endpoint name and role",
+			filters: []db.ApplicationOfferFilter{
+				db.ApplicationOfferFilterByEndpoint(dbmodel.ApplicationOfferRemoteEndpoint{
+					Name: "test-endpoint-2",
+					Role: "requirer",
+				}),
+			},
+			expectedOffers: []dbmodel.ApplicationOffer{offer2},
+		}, {
+			about: "filter by model and application",
+			filters: []db.ApplicationOfferFilter{
+				db.ApplicationOfferFilterByModel(env.model.Name),
+				db.ApplicationOfferFilterByApplication("app-1"),
+			},
+			expectedOffers: []dbmodel.ApplicationOffer{offer1, offer2, offer3},
+		}, {
+			about: "filter by consumer",
+			filters: []db.ApplicationOfferFilter{
+				db.ApplicationOfferFilterByConsumer(u.Username),
+			},
+			expectedOffers: []dbmodel.ApplicationOffer{offer2, offer3},
+		}, {
+			about: "filter by user - not found",
+			filters: []db.ApplicationOfferFilter{
+				db.ApplicationOfferFilterByConsumer("no such user"),
+			},
+			expectedOffers: []dbmodel.ApplicationOffer{},
+		}, {
+			about: "filter by user and consumer",
+			filters: []db.ApplicationOfferFilter{
+				db.ApplicationOfferFilterByUser(u.Username),
+				db.ApplicationOfferFilterByConsumer(u.Username),
+			},
+			expectedOffers: []dbmodel.ApplicationOffer{offer2, offer3},
+		}, {
+			about: "filter by consumer and endpoint",
+			filters: []db.ApplicationOfferFilter{
+				db.ApplicationOfferFilterByConsumer(u.Username),
+				db.ApplicationOfferFilterByEndpoint(dbmodel.ApplicationOfferRemoteEndpoint{
+					Role:      "requirer",
+					Interface: "http",
+				}),
+			},
+			expectedOffers: []dbmodel.ApplicationOffer{offer3},
+		}}
 
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
