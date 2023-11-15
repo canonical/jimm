@@ -75,7 +75,7 @@ func ConvertTagWithRelation[RT ResourceTagger](t RT, relation cofga.Relation) *T
 // specific types of tags.
 func ConvertTag[RT ResourceTagger](t RT) *Tag {
 	id := t.Id()
-	if id == "everyone@external" {
+	if id == EveryoneUser {
 		// A user with ID "*" represents "everyone" in OpenFGA and allows checks like
 		// `user:bob reader type:my-resource` to return true without a separate query
 		// for the user:everyone@external user.
