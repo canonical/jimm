@@ -231,8 +231,7 @@ users:
 			Valid:  true,
 		},
 		Owner: dbmodel.User{
-			Username:         "alice@external",
-			ControllerAccess: "login",
+			Username: "alice@external",
 		},
 		Controller: dbmodel.Controller{
 			Name:        "controller-2",
@@ -256,13 +255,6 @@ users:
 			Status: "started",
 			Info:   "running a test",
 		},
-		Users: []dbmodel.UserModelAccess{{
-			User: dbmodel.User{
-				Username:         "alice@external",
-				ControllerAccess: "login",
-			},
-			Access: "admin",
-		}},
 	},
 }, {
 	name: "CreateModelWithoutCloudRegion",
@@ -349,8 +341,7 @@ users:
 			Valid:  true,
 		},
 		Owner: dbmodel.User{
-			Username:         "alice@external",
-			ControllerAccess: "login",
+			Username: "alice@external",
 		},
 		Controller: dbmodel.Controller{
 			Name:        "controller-2",
@@ -374,13 +365,6 @@ users:
 			Status: "started",
 			Info:   "running a test",
 		},
-		Users: []dbmodel.UserModelAccess{{
-			User: dbmodel.User{
-				Username:         "alice@external",
-				ControllerAccess: "login",
-			},
-			Access: "admin",
-		}},
 	},
 }, {
 	name: "CreateModelWithCloud",
@@ -446,8 +430,7 @@ users:
 			Valid:  true,
 		},
 		Owner: dbmodel.User{
-			Username:         "alice@external",
-			ControllerAccess: "login",
+			Username: "alice@external",
 		},
 		Controller: dbmodel.Controller{
 			Name:        "controller-2",
@@ -471,13 +454,6 @@ users:
 			Status: "started",
 			Info:   "running a test",
 		},
-		Users: []dbmodel.UserModelAccess{{
-			User: dbmodel.User{
-				Username:         "alice@external",
-				ControllerAccess: "login",
-			},
-			Access: "admin",
-		}},
 	},
 }, {
 	name: "CreateModelInOtherNamespaceAsSuperUser",
@@ -548,8 +524,7 @@ users:
 			Valid:  true,
 		},
 		Owner: dbmodel.User{
-			Username:         "bob@external",
-			ControllerAccess: "login",
+			Username: "bob@external",
 		},
 		Controller: dbmodel.Controller{
 			Name:        "controller-2",
@@ -573,13 +548,6 @@ users:
 			Status: "started",
 			Info:   "running a test",
 		},
-		Users: []dbmodel.UserModelAccess{{
-			User: dbmodel.User{
-				Username:         "alice@external",
-				ControllerAccess: "superuser",
-			},
-			Access: "admin",
-		}},
 	},
 }, {
 	name: "CreateModelInOtherNamespace",
@@ -1505,9 +1473,9 @@ func TestForEachUserModel(t *testing.T) {
 	user := openfga.NewUser(&dbUser, client)
 
 	var res []jujuparams.ModelSummaryResult
-	err = j.ForEachUserModel(ctx, user, func(uma *dbmodel.UserModelAccess) error {
-		s := uma.Model_.ToJujuModelSummary()
-		s.UserAccess = jujuparams.UserAccessPermission(uma.Access)
+	err = j.ForEachUserModel(ctx, user, func(m *dbmodel.Model, access jujuparams.UserAccessPermission) error {
+		s := m.ToJujuModelSummary()
+		s.UserAccess = access
 		res = append(res, jujuparams.ModelSummaryResult{Result: &s})
 		return nil
 	})
@@ -1644,7 +1612,7 @@ func TestForEachModel(t *testing.T) {
 	dbUser := env.User("bob@external").DBObject(c, j.Database, client)
 	bob := openfga.NewUser(&dbUser, client)
 
-	err = j.ForEachModel(ctx, bob, func(uma *dbmodel.UserModelAccess) error {
+	err = j.ForEachModel(ctx, bob, func(_ *dbmodel.Model, _ jujuparams.UserAccessPermission) error {
 		return errors.E("function called unexpectedly")
 	})
 	c.Check(err, qt.ErrorMatches, `unauthorized`)
@@ -1654,9 +1622,9 @@ func TestForEachModel(t *testing.T) {
 	alice := openfga.NewUser(&dbUser, client)
 
 	var models []string
-	err = j.ForEachModel(ctx, alice, func(uma *dbmodel.UserModelAccess) error {
-		c.Check(uma.Access, qt.Equals, "admin")
-		models = append(models, uma.Model_.UUID.String)
+	err = j.ForEachModel(ctx, alice, func(m *dbmodel.Model, access jujuparams.UserAccessPermission) error {
+		c.Check(access, qt.Equals, jujuparams.UserAccessPermission("admin"))
+		models = append(models, m.UUID.String)
 		return nil
 	})
 	c.Assert(err, qt.IsNil)
@@ -3269,8 +3237,7 @@ var updateModelCredentialTests = []struct {
 			Valid:  true,
 		},
 		Owner: dbmodel.User{
-			Username:         "alice@external",
-			ControllerAccess: "login",
+			Username: "alice@external",
 		},
 		Controller: dbmodel.Controller{
 			Name:        "controller-1",
@@ -3288,19 +3255,6 @@ var updateModelCredentialTests = []struct {
 		CloudCredential: dbmodel.CloudCredential{
 			Name: "cred-2",
 		},
-		Users: []dbmodel.UserModelAccess{{
-			User: dbmodel.User{
-				Username:         "alice@external",
-				ControllerAccess: "login",
-			},
-			Access: "admin",
-		}, {
-			User: dbmodel.User{
-				Username:         "charlie@external",
-				ControllerAccess: "login",
-			},
-			Access: "write",
-		}},
 	},
 }, {
 	name: "user not admin",

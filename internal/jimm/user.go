@@ -40,9 +40,6 @@ func (j *JIMM) Authenticate(ctx context.Context, req *jujuparams.LoginRequest) (
 		}
 		u.Model = pu.Model
 		u.LastLogin = pu.LastLogin
-		if u.ControllerAccess == "" {
-			u.ControllerAccess = pu.ControllerAccess
-		}
 		if u.AuditLogAccess == "" {
 			u.AuditLogAccess = pu.AuditLogAccess
 		}

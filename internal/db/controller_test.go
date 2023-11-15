@@ -161,10 +161,6 @@ func (s *dbSuite) TestGetControllerWithModels(c *qt.C) {
 		SLA: dbmodel.SLA{
 			Level: "unsupported",
 		},
-		Users: []dbmodel.UserModelAccess{{
-			User:   u,
-			Access: "admin",
-		}},
 	}, {
 		Name: "test-model-2",
 		UUID: sql.NullString{
@@ -189,10 +185,6 @@ func (s *dbSuite) TestGetControllerWithModels(c *qt.C) {
 		SLA: dbmodel.SLA{
 			Level: "unsupported",
 		},
-		Users: []dbmodel.UserModelAccess{{
-			User:   u,
-			Access: "admin",
-		}},
 	}}
 	for _, m := range models {
 		c.Assert(s.Database.DB.Create(&m).Error, qt.IsNil)
