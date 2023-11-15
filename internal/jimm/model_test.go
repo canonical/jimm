@@ -231,8 +231,7 @@ users:
 			Valid:  true,
 		},
 		Owner: dbmodel.User{
-			Username:         "alice@external",
-			ControllerAccess: "login",
+			Username: "alice@external",
 		},
 		Controller: dbmodel.Controller{
 			Name:        "controller-2",
@@ -256,13 +255,6 @@ users:
 			Status: "started",
 			Info:   "running a test",
 		},
-		Users: []dbmodel.UserModelAccess{{
-			User: dbmodel.User{
-				Username:         "alice@external",
-				ControllerAccess: "login",
-			},
-			Access: "admin",
-		}},
 	},
 }, {
 	name: "CreateModelWithoutCloudRegion",
@@ -349,8 +341,7 @@ users:
 			Valid:  true,
 		},
 		Owner: dbmodel.User{
-			Username:         "alice@external",
-			ControllerAccess: "login",
+			Username: "alice@external",
 		},
 		Controller: dbmodel.Controller{
 			Name:        "controller-2",
@@ -374,13 +365,6 @@ users:
 			Status: "started",
 			Info:   "running a test",
 		},
-		Users: []dbmodel.UserModelAccess{{
-			User: dbmodel.User{
-				Username:         "alice@external",
-				ControllerAccess: "login",
-			},
-			Access: "admin",
-		}},
 	},
 }, {
 	name: "CreateModelWithCloud",
@@ -446,8 +430,7 @@ users:
 			Valid:  true,
 		},
 		Owner: dbmodel.User{
-			Username:         "alice@external",
-			ControllerAccess: "login",
+			Username: "alice@external",
 		},
 		Controller: dbmodel.Controller{
 			Name:        "controller-2",
@@ -471,13 +454,6 @@ users:
 			Status: "started",
 			Info:   "running a test",
 		},
-		Users: []dbmodel.UserModelAccess{{
-			User: dbmodel.User{
-				Username:         "alice@external",
-				ControllerAccess: "login",
-			},
-			Access: "admin",
-		}},
 	},
 }, {
 	name: "CreateModelInOtherNamespaceAsSuperUser",
@@ -548,8 +524,7 @@ users:
 			Valid:  true,
 		},
 		Owner: dbmodel.User{
-			Username:         "bob@external",
-			ControllerAccess: "login",
+			Username: "bob@external",
 		},
 		Controller: dbmodel.Controller{
 			Name:        "controller-2",
@@ -573,13 +548,6 @@ users:
 			Status: "started",
 			Info:   "running a test",
 		},
-		Users: []dbmodel.UserModelAccess{{
-			User: dbmodel.User{
-				Username:         "alice@external",
-				ControllerAccess: "superuser",
-			},
-			Access: "admin",
-		}},
 	},
 }, {
 	name: "CreateModelInOtherNamespace",
@@ -856,10 +824,9 @@ func TestAddModel(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 
 			env := jimmtest.ParseEnvironment(c, test.env)
-			env.PopulateDB(c, j.Database, client)
-			env.AddJIMMRelations(c, j.ResourceTag(), j.Database, client)
+			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
 
-			dbUser := env.User(test.username).DBObject(c, j.Database, client)
+			dbUser := env.User(test.username).DBObject(c, j.Database)
 			user := openfga.NewUser(&dbUser, client)
 
 			args := jimm.ModelCreateArgs{}
@@ -1202,8 +1169,7 @@ func TestModelInfo(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 
 			env := jimmtest.ParseEnvironment(c, test.env)
-			env.PopulateDB(c, j.Database, client)
-			env.AddJIMMRelations(c, j.ResourceTag(), j.Database, client)
+			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
 
 			dbUser := &dbmodel.User{
 				Username: test.username,
@@ -1344,10 +1310,9 @@ func TestModelStatus(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 
 			env := jimmtest.ParseEnvironment(c, test.env)
-			env.PopulateDB(c, j.Database, client)
-			env.AddJIMMRelations(c, j.ResourceTag(), j.Database, client)
+			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
 
-			dbUser := env.User(test.username).DBObject(c, j.Database, client)
+			dbUser := env.User(test.username).DBObject(c, j.Database)
 			user := openfga.NewUser(&dbUser, client)
 
 			ms, err := j.ModelStatus(context.Background(), user, names.NewModelTag(test.uuid))
@@ -1498,16 +1463,15 @@ func TestForEachUserModel(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	env := jimmtest.ParseEnvironment(c, forEachModelTestEnv)
-	env.PopulateDB(c, j.Database, client)
-	env.AddJIMMRelations(c, j.ResourceTag(), j.Database, client)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
 
-	dbUser := env.User("bob@external").DBObject(c, j.Database, client)
+	dbUser := env.User("bob@external").DBObject(c, j.Database)
 	user := openfga.NewUser(&dbUser, client)
 
 	var res []jujuparams.ModelSummaryResult
-	err = j.ForEachUserModel(ctx, user, func(uma *dbmodel.UserModelAccess) error {
-		s := uma.Model_.ToJujuModelSummary()
-		s.UserAccess = jujuparams.UserAccessPermission(uma.Access)
+	err = j.ForEachUserModel(ctx, user, func(m *dbmodel.Model, access jujuparams.UserAccessPermission) error {
+		s := m.ToJujuModelSummary()
+		s.UserAccess = access
 		res = append(res, jujuparams.ModelSummaryResult{Result: &s})
 		return nil
 	})
@@ -1638,25 +1602,24 @@ func TestForEachModel(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	env := jimmtest.ParseEnvironment(c, forEachModelTestEnv)
-	env.PopulateDB(c, j.Database, client)
-	env.AddJIMMRelations(c, j.ResourceTag(), j.Database, client)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
 
-	dbUser := env.User("bob@external").DBObject(c, j.Database, client)
+	dbUser := env.User("bob@external").DBObject(c, j.Database)
 	bob := openfga.NewUser(&dbUser, client)
 
-	err = j.ForEachModel(ctx, bob, func(uma *dbmodel.UserModelAccess) error {
+	err = j.ForEachModel(ctx, bob, func(_ *dbmodel.Model, _ jujuparams.UserAccessPermission) error {
 		return errors.E("function called unexpectedly")
 	})
 	c.Check(err, qt.ErrorMatches, `unauthorized`)
 	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeUnauthorized)
 
-	dbUser = env.User("alice@external").DBObject(c, j.Database, client)
+	dbUser = env.User("alice@external").DBObject(c, j.Database)
 	alice := openfga.NewUser(&dbUser, client)
 
 	var models []string
-	err = j.ForEachModel(ctx, alice, func(uma *dbmodel.UserModelAccess) error {
-		c.Check(uma.Access, qt.Equals, "admin")
-		models = append(models, uma.Model_.UUID.String)
+	err = j.ForEachModel(ctx, alice, func(m *dbmodel.Model, access jujuparams.UserAccessPermission) error {
+		c.Check(access, qt.Equals, jujuparams.UserAccessPermission("admin"))
+		models = append(models, m.UUID.String)
 		return nil
 	})
 	c.Assert(err, qt.IsNil)
@@ -1909,9 +1872,9 @@ func TestGrantModelAccess(t *testing.T) {
 			}
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
-			env.PopulateDB(c, j.Database, client)
+			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
 
-			dbUser := env.User(tt.username).DBObject(c, j.Database, client)
+			dbUser := env.User(tt.username).DBObject(c, j.Database)
 			user := openfga.NewUser(&dbUser, client)
 
 			err = j.GrantModelAccess(ctx, user, names.NewModelTag(tt.uuid), names.NewUserTag(tt.targetUsername), jujuparams.UserAccessPermission(tt.access))
@@ -2628,7 +2591,7 @@ func TestRevokeModelAccess(t *testing.T) {
 			}
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
-			env.PopulateDB(c, j.Database, client)
+			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
 
 			if tt.extraInitialTuples != nil && len(tt.extraInitialTuples) > 0 {
 				err = client.AddRelation(ctx, tt.extraInitialTuples...)
@@ -2643,7 +2606,7 @@ func TestRevokeModelAccess(t *testing.T) {
 				}
 			}
 
-			dbUser := env.User(tt.username).DBObject(c, j.Database, client)
+			dbUser := env.User(tt.username).DBObject(c, j.Database)
 			user := openfga.NewUser(&dbUser, client)
 
 			err = j.RevokeModelAccess(ctx, user, names.NewModelTag(tt.uuid), names.NewUserTag(tt.targetUsername), jujuparams.UserAccessPermission(tt.access))
@@ -2816,10 +2779,9 @@ func TestDestroyModel(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 
 			env := jimmtest.ParseEnvironment(c, test.env)
-			env.PopulateDB(c, j.Database, client)
-			env.AddJIMMRelations(c, j.ResourceTag(), j.Database, client)
+			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
 
-			dbUser := env.User(test.username).DBObject(c, j.Database, client)
+			dbUser := env.User(test.username).DBObject(c, j.Database)
 			user := openfga.NewUser(&dbUser, client)
 
 			err = j.DestroyModel(ctx, user, names.NewModelTag(test.uuid), test.destroyStorage, test.force, test.maxWait, test.timeout)
@@ -2943,10 +2905,9 @@ func TestDumpModel(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 
 			env := jimmtest.ParseEnvironment(c, test.env)
-			env.PopulateDB(c, j.Database, client)
-			env.AddJIMMRelations(c, j.ResourceTag(), j.Database, client)
+			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
 
-			dbUser := env.User(test.username).DBObject(c, j.Database, client)
+			dbUser := env.User(test.username).DBObject(c, j.Database)
 			user := openfga.NewUser(&dbUser, client)
 
 			s, err := j.DumpModel(ctx, user, names.NewModelTag(test.uuid), test.simplified)
@@ -3057,10 +3018,9 @@ func TestDumpModelDB(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 
 			env := jimmtest.ParseEnvironment(c, test.env)
-			env.PopulateDB(c, j.Database, client)
-			env.AddJIMMRelations(c, j.ResourceTag(), j.Database, client)
+			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
 
-			dbUser := env.User(test.username).DBObject(c, j.Database, client)
+			dbUser := env.User(test.username).DBObject(c, j.Database)
 			user := openfga.NewUser(&dbUser, client)
 
 			dump, err := j.DumpModelDB(ctx, user, names.NewModelTag(test.uuid))
@@ -3177,10 +3137,9 @@ func TestValidateModelUpgrade(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 
 			env := jimmtest.ParseEnvironment(c, test.env)
-			env.PopulateDB(c, j.Database, client)
-			env.AddJIMMRelations(c, j.ResourceTag(), j.Database, client)
+			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
 
-			dbUser := env.User(test.username).DBObject(c, j.Database, client)
+			dbUser := env.User(test.username).DBObject(c, j.Database)
 			user := openfga.NewUser(&dbUser, client)
 
 			err = j.ValidateModelUpgrade(ctx, user, names.NewModelTag(test.uuid), test.force)
@@ -3269,8 +3228,7 @@ var updateModelCredentialTests = []struct {
 			Valid:  true,
 		},
 		Owner: dbmodel.User{
-			Username:         "alice@external",
-			ControllerAccess: "login",
+			Username: "alice@external",
 		},
 		Controller: dbmodel.Controller{
 			Name:        "controller-1",
@@ -3288,19 +3246,6 @@ var updateModelCredentialTests = []struct {
 		CloudCredential: dbmodel.CloudCredential{
 			Name: "cred-2",
 		},
-		Users: []dbmodel.UserModelAccess{{
-			User: dbmodel.User{
-				Username:         "alice@external",
-				ControllerAccess: "login",
-			},
-			Access: "admin",
-		}, {
-			User: dbmodel.User{
-				Username:         "charlie@external",
-				ControllerAccess: "login",
-			},
-			Access: "write",
-		}},
 	},
 }, {
 	name: "user not admin",
@@ -3413,10 +3358,9 @@ func TestUpdateModelCredential(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 
 			env := jimmtest.ParseEnvironment(c, test.env)
-			env.PopulateDB(c, j.Database, client)
-			env.AddJIMMRelations(c, j.ResourceTag(), j.Database, client)
+			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
 
-			dbUser := env.User(test.username).DBObject(c, j.Database, client)
+			dbUser := env.User(test.username).DBObject(c, j.Database)
 			user := openfga.NewUser(&dbUser, client)
 
 			err = j.ChangeModelCredential(
@@ -3530,10 +3474,9 @@ controllers:
     priority: 1
 `
 	env := jimmtest.ParseEnvironment(c, envDefinition)
-	env.PopulateDB(c, j.Database, client)
-	env.AddJIMMRelations(c, j.ResourceTag(), j.Database, client)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
 
-	dbUser := env.User("alice@external").DBObject(c, j.Database, client)
+	dbUser := env.User("alice@external").DBObject(c, j.Database)
 	user := openfga.NewUser(&dbUser, client)
 
 	controller := dbmodel.Controller{

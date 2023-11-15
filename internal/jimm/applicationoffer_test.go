@@ -75,8 +75,7 @@ var initializeEnvironment = func(c *qt.C, ctx context.Context, db *db.Database, 
 
 	// Joe is a superuser, but not a model or offer admin.
 	u6 := dbmodel.User{
-		Username:         "joe@external",
-		ControllerAccess: "superuser",
+		Username: "joe@external",
 	}
 	c.Assert(db.DB.Create(&u6).Error, qt.IsNil)
 
@@ -141,10 +140,6 @@ var initializeEnvironment = func(c *qt.C, ctx context.Context, db *db.Database, 
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
 		CloudCredentialID: cred.ID,
-		Users: []dbmodel.UserModelAccess{{
-			Username: u.Username,
-			Access:   "admin",
-		}},
 	}
 	err = db.AddModel(ctx, &model)
 	c.Assert(err, qt.IsNil)
@@ -166,19 +161,6 @@ var initializeEnvironment = func(c *qt.C, ctx context.Context, db *db.Database, 
 		Model:           model,
 		ApplicationName: "test-app",
 		CharmURL:        "cs:test-app:17",
-		Users: []dbmodel.UserApplicationOfferAccess{{
-			Username: u1.Username,
-			Access:   string(jujuparams.OfferAdminAccess),
-		}, {
-			Username: u2.Username,
-			Access:   string(jujuparams.OfferConsumeAccess),
-		}, {
-			Username: u3.Username,
-			Access:   string(jujuparams.OfferReadAccess),
-		}, {
-			Username: u5.Username,
-			Access:   string(jujuparams.OfferAdminAccess),
-		}},
 	}
 	err = db.AddApplicationOffer(ctx, &offer)
 	c.Assert(err, qt.IsNil)
@@ -586,20 +568,17 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	u := dbmodel.User{
-		Username:         "alice@external",
-		ControllerAccess: "superuser",
+		Username: "alice@external",
 	}
 	c.Assert(db.DB.Create(&u).Error, qt.IsNil)
 
 	u1 := dbmodel.User{
-		Username:         "eve@external",
-		ControllerAccess: "superuser",
+		Username: "eve@external",
 	}
 	c.Assert(db.DB.Create(&u1).Error, qt.IsNil)
 
 	u2 := dbmodel.User{
-		Username:         "bob@external",
-		ControllerAccess: "superuser",
+		Username: "bob@external",
 	}
 	c.Assert(db.DB.Create(&u2).Error, qt.IsNil)
 
@@ -948,20 +927,17 @@ func TestGetApplicationOffer(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	u := dbmodel.User{
-		Username:         "alice@external",
-		ControllerAccess: "superuser",
+		Username: "alice@external",
 	}
 	c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
 
 	u1 := dbmodel.User{
-		Username:         "eve@external",
-		ControllerAccess: "superuser",
+		Username: "eve@external",
 	}
 	c.Assert(j.Database.DB.Create(&u1).Error, qt.IsNil)
 
 	u2 := dbmodel.User{
-		Username:         "bob@external",
-		ControllerAccess: "superuser",
+		Username: "bob@external",
 	}
 	c.Assert(j.Database.DB.Create(&u2).Error, qt.IsNil)
 
@@ -1046,13 +1022,6 @@ func TestGetApplicationOffer(t *testing.T) {
 			RelationID:         1,
 			Username:           "unknown",
 			Endpoint:           "test-endpoint",
-		}},
-		Users: []dbmodel.UserApplicationOfferAccess{{
-			Username: u.Username,
-			Access:   string(jujuparams.OfferAdminAccess),
-		}, {
-			Username: u1.Username,
-			Access:   string(jujuparams.OfferReadAccess),
 		}},
 	}
 	err = j.Database.AddApplicationOffer(ctx, &offer)
@@ -1260,8 +1229,7 @@ func TestOffer(t *testing.T) {
 			ctx := context.Background()
 
 			u := dbmodel.User{
-				Username:         "alice@external",
-				ControllerAccess: "superuser",
+				Username: "alice@external",
 			}
 			c.Assert(db.DB.Create(&u).Error, qt.IsNil)
 
@@ -1310,10 +1278,6 @@ func TestOffer(t *testing.T) {
 				ControllerID:      controller.ID,
 				CloudRegionID:     cloud.Regions[0].ID,
 				CloudCredentialID: cred.ID,
-				Users: []dbmodel.UserModelAccess{{
-					User:   u,
-					Access: "admin",
-				}},
 			}
 			err = db.AddModel(ctx, &model)
 			c.Assert(err, qt.IsNil)
@@ -1387,8 +1351,7 @@ func TestOffer(t *testing.T) {
 			ctx := context.Background()
 
 			u := dbmodel.User{
-				Username:         "alice@external",
-				ControllerAccess: "superuser",
+				Username: "alice@external",
 			}
 			c.Assert(db.DB.Create(&u).Error, qt.IsNil)
 
@@ -1437,10 +1400,6 @@ func TestOffer(t *testing.T) {
 				ControllerID:      controller.ID,
 				CloudRegionID:     cloud.Regions[0].ID,
 				CloudCredentialID: cred.ID,
-				Users: []dbmodel.UserModelAccess{{
-					User:   u,
-					Access: "admin",
-				}},
 			}
 			err = db.AddModel(ctx, &model)
 			c.Assert(err, qt.IsNil)
@@ -1478,8 +1437,7 @@ func TestOffer(t *testing.T) {
 		},
 		createEnv: func(c *qt.C, db db.Database, client *openfga.OFGAClient) (dbmodel.User, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
 			u := dbmodel.User{
-				Username:         "alice@external",
-				ControllerAccess: "superuser",
+				Username: "alice@external",
 			}
 
 			c.Assert(db.DB.Create(&u).Error, qt.IsNil)
@@ -1514,8 +1472,7 @@ func TestOffer(t *testing.T) {
 			ctx := context.Background()
 
 			u := dbmodel.User{
-				Username:         "alice@external",
-				ControllerAccess: "superuser",
+				Username: "alice@external",
 			}
 			c.Assert(db.DB.Create(&u).Error, qt.IsNil)
 
@@ -1564,10 +1521,6 @@ func TestOffer(t *testing.T) {
 				ControllerID:      controller.ID,
 				CloudRegionID:     cloud.Regions[0].ID,
 				CloudCredentialID: cred.ID,
-				Users: []dbmodel.UserModelAccess{{
-					User:   u,
-					Access: "admin",
-				}},
 			}
 			err = db.AddModel(ctx, &model)
 			c.Assert(err, qt.IsNil)
@@ -1608,14 +1561,12 @@ func TestOffer(t *testing.T) {
 			ctx := context.Background()
 
 			u := dbmodel.User{
-				Username:         "alice@external",
-				ControllerAccess: "superuser",
+				Username: "alice@external",
 			}
 			c.Assert(db.DB.Create(&u).Error, qt.IsNil)
 
 			u1 := dbmodel.User{
-				Username:         "eve@external",
-				ControllerAccess: "superuser",
+				Username: "eve@external",
 			}
 			c.Assert(db.DB.Create(&u1).Error, qt.IsNil)
 
@@ -1664,10 +1615,6 @@ func TestOffer(t *testing.T) {
 				ControllerID:      controller.ID,
 				CloudRegionID:     cloud.Regions[0].ID,
 				CloudCredentialID: cred.ID,
-				Users: []dbmodel.UserModelAccess{{
-					User:   u,
-					Access: "admin",
-				}},
 			}
 			err = db.AddModel(ctx, &model)
 			c.Assert(err, qt.IsNil)
@@ -1707,8 +1654,7 @@ func TestOffer(t *testing.T) {
 			ctx := context.Background()
 
 			u := dbmodel.User{
-				Username:         "alice@external",
-				ControllerAccess: "superuser",
+				Username: "alice@external",
 			}
 			c.Assert(db.DB.Create(&u).Error, qt.IsNil)
 
@@ -1757,10 +1703,6 @@ func TestOffer(t *testing.T) {
 				ControllerID:      controller.ID,
 				CloudRegionID:     cloud.Regions[0].ID,
 				CloudCredentialID: cred.ID,
-				Users: []dbmodel.UserModelAccess{{
-					User:   u,
-					Access: "admin",
-				}},
 			}
 			err = db.AddModel(ctx, &model)
 			c.Assert(err, qt.IsNil)
@@ -1800,8 +1742,7 @@ func TestOffer(t *testing.T) {
 			ctx := context.Background()
 
 			u := dbmodel.User{
-				Username:         "alice@external",
-				ControllerAccess: "superuser",
+				Username: "alice@external",
 			}
 			c.Assert(db.DB.Create(&u).Error, qt.IsNil)
 
@@ -1850,10 +1791,6 @@ func TestOffer(t *testing.T) {
 				ControllerID:      controller.ID,
 				CloudRegionID:     cloud.Regions[0].ID,
 				CloudCredentialID: cred.ID,
-				Users: []dbmodel.UserModelAccess{{
-					User:   u,
-					Access: "admin",
-				}},
 			}
 			err = db.AddModel(ctx, &model)
 			c.Assert(err, qt.IsNil)
@@ -1935,8 +1872,7 @@ func TestOfferAssertOpenFGARelationsExist(t *testing.T) {
 		ctx := context.Background()
 
 		u := dbmodel.User{
-			Username:         "alice@external",
-			ControllerAccess: "superuser",
+			Username: "alice@external",
 		}
 		c.Assert(db.DB.Create(&u).Error, qt.IsNil)
 
@@ -1985,10 +1921,6 @@ func TestOfferAssertOpenFGARelationsExist(t *testing.T) {
 			ControllerID:      controller.ID,
 			CloudRegionID:     cloud.Regions[0].ID,
 			CloudCredentialID: cred.ID,
-			Users: []dbmodel.UserModelAccess{{
-				User:   u,
-				Access: "admin",
-			}},
 		}
 		err = db.AddModel(ctx, &model)
 		c.Assert(err, qt.IsNil)
@@ -2396,39 +2328,6 @@ func TestUpdateOffer(t *testing.T) {
 				Interface:          "unknown",
 				Limit:              1,
 			}},
-			Users: []dbmodel.UserApplicationOfferAccess{{
-				Username: "eve@external",
-				User: dbmodel.User{
-					Username:         "eve@external",
-					ControllerAccess: "login",
-				},
-				ApplicationOfferID: 1,
-				Access:             "admin",
-			}, {
-				Username: "bob@external",
-				User: dbmodel.User{
-					Username:         "bob@external",
-					ControllerAccess: "login",
-				},
-				ApplicationOfferID: 1,
-				Access:             "consume",
-			}, {
-				Username: "fred@external",
-				User: dbmodel.User{
-					Username:         "fred@external",
-					ControllerAccess: "login",
-				},
-				ApplicationOfferID: 1,
-				Access:             "read",
-			}, {
-				Username: "jane@external",
-				User: dbmodel.User{
-					Username:         "jane@external",
-					ControllerAccess: "login",
-				},
-				ApplicationOfferID: 1,
-				Access:             "admin",
-			}},
 		},
 	}, {
 		about: "offer removed",
@@ -2573,6 +2472,14 @@ func TestFindApplicationOffers(t *testing.T) {
 		expectedError string
 		expectedOffer *dbmodel.ApplicationOffer
 	}{{
+		about: "find an offer as an offer consumer",
+		parameterFunc: func(env *environment) (dbmodel.User, string, []jujuparams.OfferFilter) {
+			return env.users[2], "consume", []jujuparams.OfferFilter{{
+				OfferName: "test-offer",
+			}}
+		},
+		expectedOffer: &expectedOffer,
+	}, {
 		about: "find an offer as model admin",
 		parameterFunc: func(env *environment) (dbmodel.User, string, []jujuparams.OfferFilter) {
 			return env.users[0], "admin", []jujuparams.OfferFilter{{
@@ -2778,7 +2685,6 @@ func TestListApplicationOffers(t *testing.T) {
 	err = db.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 	env := jimmtest.ParseEnvironment(c, listApplicationsTestEnv)
-	env.PopulateDB(c, db, client)
 
 	j := &jimm.JIMM{
 		UUID:          uuid.NewString(),
@@ -2933,7 +2839,7 @@ func TestListApplicationOffers(t *testing.T) {
 			},
 		},
 	}
-
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), db, client)
 	tuples := []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
 		Relation: ofganames.AdministratorRelation,
@@ -2974,7 +2880,7 @@ func TestListApplicationOffers(t *testing.T) {
 	err = client.AddRelation(context.Background(), tuples...)
 	c.Assert(err, qt.IsNil)
 
-	u := env.User("alice@external").DBObject(c, db, client)
+	u := env.User("alice@external").DBObject(c, db)
 	_, err = j.ListApplicationOffers(ctx, openfga.NewUser(&u, client))
 	c.Assert(err, qt.ErrorMatches, `at least one filter must be specified`)
 

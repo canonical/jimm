@@ -40,17 +40,6 @@ const (
 	jujuClientVersion = "3.2.4"
 )
 
-// A ControllerCredentialsStore is a store for controller credentials.
-type ControllerCredentialsStore interface {
-	// GetControllerCredentials retrieves the credentials for the given controller from a vault
-	// service.
-	GetControllerCredentials(ctx context.Context, controllerName string) (string, string, error)
-
-	// PutControllerCredentials stores the controller credentials in a vault
-	// service.
-	PutControllerCredentials(ctx context.Context, controllerName string, username string, password string) error
-}
-
 // A Dialer is an implementation of a jimm.Dialer that adapts a juju API
 // connection to provide a jimm API.
 type Dialer struct {

@@ -90,10 +90,17 @@ func (c *controllerInfoCommand) Run(ctxt *cmd.Context) error {
 		return errors.Mask(err)
 	}
 
+	accountDetails, err := c.store.AccountDetails(c.controllerName)
+	if err != nil {
+		return errors.Mask(err)
+	}
+
 	info := apiparams.AddControllerRequest{
 		UUID:         controller.ControllerUUID,
 		Name:         c.controllerName,
 		APIAddresses: controller.APIEndpoints,
+		Username:     accountDetails.User,
+		Password:     accountDetails.Password,
 	}
 
 	info.PublicAddress = c.publicAddress

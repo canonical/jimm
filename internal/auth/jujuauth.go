@@ -78,10 +78,8 @@ func (a JujuAuthenticator) Authenticate(ctx context.Context, req *jujuparams.Log
 		Username:    ut.Id(),
 		DisplayName: ut.Name(),
 	}
-	if id, ok := authInfo.Identity.(identchecker.ACLIdentity); ok {
-		if ok, _ := id.Allow(ctx, a.ControllerAdmins); ok {
-			u.ControllerAccess = "superuser"
-		}
-	}
+	// Note: Previously here we would grant a user superuser permission if they were part of
+	// a Launchpad group configurd in JIMM's config to grant superuser permission.
+	// We can no longer do this in the same way with OpenFGA.
 	return openfga.NewUser(u, a.Client), nil
 }

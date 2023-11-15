@@ -117,11 +117,6 @@ func (j *JIMM) Offer(ctx context.Context, user *openfga.User, offer AddApplicati
 		if err := db.AddApplicationOffer(ctx, &doc); err != nil {
 			return err
 		}
-		for _, u := range doc.Users {
-			if err := db.UpdateUserApplicationOfferAccess(ctx, &u); err != nil {
-				return err
-			}
-		}
 		return nil
 	})
 	if err != nil {
@@ -256,6 +251,8 @@ func (j *JIMM) GetApplicationOfferConsumeDetails(ctx context.Context, user *open
 // to be suitable for the given user at the given access level. All juju-
 // local users are omitted, and if the user is not an admin then they can
 // only see themselves.
+// TODO(Kian) CSS-6040 Consider changing wherever this function is used to
+// better encapsulate transforming Postgres/OpenFGA objects into Juju objects.
 func (j *JIMM) listApplicationOfferUsers(ctx context.Context, offer names.ApplicationOfferTag, user *dbmodel.User, accessLevel string) ([]jujuparams.OfferUserDetails, error) {
 	users := make(map[string]string)
 
@@ -576,6 +573,19 @@ func (j *JIMM) getUserOfferAccess(ctx context.Context, user *openfga.User, offer
 	return "", nil
 }
 
+// TODO(Kian) CSS-6080 Remove the below helper function when refactoring everyone@external usage.
+func removeDuplicateStr(strSlice []string) []string {
+	allKeys := make(map[string]bool)
+	list := []string{}
+	for _, item := range strSlice {
+		if _, value := allKeys[item]; !value {
+			allKeys[item] = true
+			list = append(list, item)
+		}
+	}
+	return list
+}
+
 // FindApplicationOffers returns details of offers matching the specified filter.
 func (j *JIMM) FindApplicationOffers(ctx context.Context, user *openfga.User, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetails, error) {
 	const op = errors.Op("jimm.FindApplicationOffers")
@@ -588,7 +598,19 @@ func (j *JIMM) FindApplicationOffers(ctx context.Context, user *openfga.User, fi
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
-	offerFilters = append(offerFilters, db.ApplicationOfferFilterByUser(user.Username))
+	// TODO(Kian) CSS-6080 Refactor the below to eliminate the use of everyone@external
+	userOfferUUIDs, err := user.ListApplicationOffers(ctx, ofganames.ReaderRelation)
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+	everyone := openfga.NewUser(&dbmodel.User{Username: auth.Everyone}, j.OpenFGAClient)
+	everyoneOfferUUIDs, err := everyone.ListApplicationOffers(ctx, ofganames.ReaderRelation)
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+	allOfferUUIDs := append(userOfferUUIDs, everyoneOfferUUIDs...)
+	allOfferUUIDs = removeDuplicateStr(allOfferUUIDs)
+	offerFilters = append(offerFilters, db.ApplicationOfferFilterByUUID(allOfferUUIDs))
 	offers, err := j.Database.FindApplicationOffers(ctx, offerFilters...)
 	if err != nil {
 		return nil, errors.E(op, err)
@@ -659,16 +681,17 @@ func (j *JIMM) applicationOfferFilters(ctx context.Context, jujuFilters ...jujup
 		}
 		if len(f.AllowedConsumerTags) > 0 {
 			for _, u := range f.AllowedConsumerTags {
-				user := dbmodel.User{
+				dbUser := dbmodel.User{
 					Username: u,
 				}
-				err := j.Database.GetUser(ctx, &user)
+				ofgaUser := openfga.NewUser(&dbUser, j.OpenFGAClient)
+				offerUUIDs, err := ofgaUser.ListApplicationOffers(ctx, ofganames.ConsumerRelation)
 				if err != nil {
 					return nil, errors.E(err)
 				}
 				filters = append(
 					filters,
-					db.ApplicationOfferFilterByConsumer(user.Username),
+					db.ApplicationOfferFilterByUUID(offerUUIDs),
 				)
 			}
 		}

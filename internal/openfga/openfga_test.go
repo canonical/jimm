@@ -448,7 +448,7 @@ func (s *openFGATestSuite) TestListObjectsWithContextualTuples(c *gc.C) {
 		}
 	}
 
-	ids, err := s.ofgaClient.ListObjects(ctx, "user:alice", "reader", "model", []openfga.Tuple{
+	ids, err := s.ofgaClient.ListObjects(ctx, ofganames.ConvertTag(names.NewUserTag("alice")), "reader", "model", []openfga.Tuple{
 		{
 			Object:   ofganames.ConvertTag(names.NewUserTag("alice")),
 			Relation: ofganames.ReaderRelation,
@@ -537,7 +537,7 @@ func (s *openFGATestSuite) TestListObjectsWithPeristedTuples(c *gc.C) {
 		}...,
 	), gc.Equals, nil)
 
-	ids, err := s.ofgaClient.ListObjects(ctx, "user:alice", "reader", "model", nil)
+	ids, err := s.ofgaClient.ListObjects(ctx, ofganames.ConvertTag(names.NewUserTag("alice")), "reader", "model", nil)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(cmp.Equal(
 		ids,

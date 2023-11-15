@@ -147,9 +147,8 @@ func TestAuthenticateLoginSuperuser(t *testing.T) {
 	c.Check(u.LastLogin.Valid, qt.Equals, false)
 	u.LastLogin = sql.NullTime{}
 	c.Check(u.User, qt.DeepEquals, &dbmodel.User{
-		Username:         "bob@external",
-		DisplayName:      "bob",
-		ControllerAccess: "superuser",
+		Username:    "bob@external",
+		DisplayName: "bob",
 	})
 }
 

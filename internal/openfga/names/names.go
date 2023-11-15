@@ -15,6 +15,7 @@ import (
 	"github.com/juju/names/v4"
 )
 
+// Relation Types
 var (
 	// MemberRelation represents a member relation between entities.
 	MemberRelation cofga.Relation = "member"
