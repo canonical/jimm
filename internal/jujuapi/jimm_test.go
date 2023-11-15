@@ -37,61 +37,6 @@ func (s *jimmSuite) TestListControllers(c *gc.C) {
 	s.AddController(c, "controller-0", s.APIInfo(c))
 	s.AddController(c, "controller-2", s.APIInfo(c))
 
-	// Open the API connection as user "alice".
-	conn := s.open(c, nil, "alice")
-	defer conn.Close()
-	var resp jujuapi.LegacyListControllerResponse
-	err := conn.APICall("JIMM", 2, "", "ListControllers", nil, &resp)
-	c.Assert(err, gc.Equals, nil)
-
-	c.Assert(resp, jc.DeepEquals, jujuapi.LegacyListControllerResponse{
-		Controllers: []jujuapi.LegacyControllerResponse{{
-			Path:     "admin/controller-0",
-			Location: map[string]string{"cloud": jimmtest.TestCloudName, "region": jimmtest.TestCloudRegionName},
-			Public:   true,
-			UUID:     s.Model.Controller.UUID,
-			Version:  s.Model.Controller.AgentVersion,
-		}, {
-			Path:     "admin/controller-1",
-			Location: map[string]string{"cloud": jimmtest.TestCloudName, "region": jimmtest.TestCloudRegionName},
-			Public:   true,
-			UUID:     s.Model.Controller.UUID,
-			Version:  s.Model.Controller.AgentVersion,
-		}, {
-			Path:     "admin/controller-2",
-			Location: map[string]string{"cloud": jimmtest.TestCloudName, "region": jimmtest.TestCloudRegionName},
-			Public:   true,
-			UUID:     s.Model.Controller.UUID,
-			Version:  s.Model.Controller.AgentVersion,
-		}},
-	})
-}
-
-func (s *jimmSuite) TestListControllersUnauthorizedUser(c *gc.C) {
-	s.AddController(c, "controller-0", s.APIInfo(c))
-	s.AddController(c, "controller-2", s.APIInfo(c))
-
-	// Open the API connection as user "bob".
-	conn := s.open(c, nil, "bob")
-	defer conn.Close()
-	var resp jujuapi.LegacyListControllerResponse
-	err := conn.APICall("JIMM", 2, "", "ListControllers", nil, &resp)
-	c.Assert(err, gc.Equals, nil)
-
-	c.Assert(resp, jc.DeepEquals, jujuapi.LegacyListControllerResponse{
-		Controllers: []jujuapi.LegacyControllerResponse{{
-			Path:    "admin/jaas",
-			Public:  true,
-			UUID:    "914487b5-60e7-42bb-bd63-1adc3fd3a388",
-			Version: jujuversion.Current.String(),
-		}},
-	})
-}
-
-func (s *jimmSuite) TestListControllersV3(c *gc.C) {
-	s.AddController(c, "controller-0", s.APIInfo(c))
-	s.AddController(c, "controller-2", s.APIInfo(c))
-
 	conn := s.open(c, nil, "alice")
 	defer conn.Close()
 
@@ -134,7 +79,7 @@ func (s *jimmSuite) TestListControllersV3(c *gc.C) {
 	}})
 }
 
-func (s *jimmSuite) TestListControllersV3Unauthorized(c *gc.C) {
+func (s *jimmSuite) TestListControllersUnauthorized(c *gc.C) {
 	s.AddController(c, "controller-0", s.APIInfo(c))
 	s.AddController(c, "controller-2", s.APIInfo(c))
 
@@ -559,7 +504,7 @@ func (s *jimmSuite) TestUpdateMigratedModel(c *gc.C) {
 		ModelTag:         names.NewModelTag(s.Model2.UUID.String).String(),
 		TargetController: "controller-1",
 	}
-	err := conn.APICall("JIMM", 3, "", "UpdateMigratedModel", &req, nil)
+	err := conn.APICall("JIMM", 4, "", "UpdateMigratedModel", &req, nil)
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 
 	// Open the API connection as user "alice".
@@ -570,14 +515,14 @@ func (s *jimmSuite) TestUpdateMigratedModel(c *gc.C) {
 		ModelTag:         names.NewModelTag(s.Model2.UUID.String).String(),
 		TargetController: "controller-1",
 	}
-	err = conn.APICall("JIMM", 3, "", "UpdateMigratedModel", &req, nil)
+	err = conn.APICall("JIMM", 4, "", "UpdateMigratedModel", &req, nil)
 	c.Assert(err, gc.Equals, nil)
 
 	req = apiparams.UpdateMigratedModelRequest{
 		ModelTag:         "invalid-model-tag",
 		TargetController: "controller-1",
 	}
-	err = conn.APICall("JIMM", 3, "", "UpdateMigratedModel", &req, nil)
+	err = conn.APICall("JIMM", 4, "", "UpdateMigratedModel", &req, nil)
 	c.Assert(err, gc.ErrorMatches, `"invalid-model-tag" is not a valid tag \(bad request\)`)
 }
 
@@ -594,14 +539,14 @@ func (s *jimmSuite) TestImportModel(c *gc.C) {
 		ModelTag:   s.Model2.Tag().String(),
 		Owner:      "",
 	}
-	err = conn.APICall("JIMM", 3, "", "ImportModel", &req, nil)
+	err = conn.APICall("JIMM", 4, "", "ImportModel", &req, nil)
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 
 	// Open the API connection as user "alice".
 	conn = s.open(c, nil, "alice")
 	defer conn.Close()
 
-	err = conn.APICall("JIMM", 3, "", "ImportModel", &req, nil)
+	err = conn.APICall("JIMM", 4, "", "ImportModel", &req, nil)
 	c.Assert(err, gc.Equals, nil)
 
 	var model2 dbmodel.Model
@@ -614,7 +559,7 @@ func (s *jimmSuite) TestImportModel(c *gc.C) {
 		Controller: "controller-1",
 		ModelTag:   "invalid-model-tag",
 	}
-	err = conn.APICall("JIMM", 3, "", "ImportModel", &req, nil)
+	err = conn.APICall("JIMM", 4, "", "ImportModel", &req, nil)
 	c.Assert(err, gc.ErrorMatches, `"invalid-model-tag" is not a valid tag \(bad request\)`)
 }
 
@@ -644,7 +589,7 @@ func (s *jimmSuite) TestAddCloudToController(c *gc.C) {
 			}),
 		},
 	}
-	err = conn.APICall("JIMM", 3, "", "AddCloudToController", &req, nil)
+	err = conn.APICall("JIMM", 4, "", "AddCloudToController", &req, nil)
 	c.Assert(err, gc.Equals, nil)
 
 	user := openfga.NewUser(&u, s.OFGAClient)
@@ -682,7 +627,7 @@ func (s *jimmSuite) TestAddExistingCloudToController(c *gc.C) {
 			Force: &force,
 		},
 	}
-	err = conn.APICall("JIMM", 3, "", "AddCloudToController", &req, nil)
+	err = conn.APICall("JIMM", 4, "", "AddCloudToController", &req, nil)
 	c.Assert(err, gc.Equals, nil)
 	user := openfga.NewUser(&u, s.OFGAClient)
 	cloud, err := s.JIMM.GetCloud(context.Background(), user, names.NewCloudTag("test-cloud"))
@@ -695,7 +640,7 @@ func (s *jimmSuite) TestAddExistingCloudToController(c *gc.C) {
 	cloud, err = s.JIMM.GetCloud(context.Background(), user, names.NewCloudTag("test-cloud"))
 	c.Assert(err, gc.NotNil)
 	c.Assert(errors.ErrorCode(err), gc.Equals, errors.CodeNotFound)
-	err = conn.APICall("JIMM", 3, "", "AddCloudToController", &req, nil)
+	err = conn.APICall("JIMM", 4, "", "AddCloudToController", &req, nil)
 	c.Assert(err, gc.Equals, nil)
 	cloud, err = s.JIMM.GetCloud(context.Background(), user, names.NewCloudTag("test-cloud"))
 	c.Assert(err, gc.IsNil)
@@ -729,7 +674,7 @@ func (s *jimmSuite) TestRemoveCloudFromController(c *gc.C) {
 			}),
 		},
 	}
-	err = conn.APICall("JIMM", 3, "", "AddCloudToController", &req, nil)
+	err = conn.APICall("JIMM", 4, "", "AddCloudToController", &req, nil)
 	c.Assert(err, gc.Equals, nil)
 
 	user := openfga.NewUser(&u, s.OFGAClient)
@@ -741,7 +686,7 @@ func (s *jimmSuite) TestRemoveCloudFromController(c *gc.C) {
 		CloudTag:       names.NewCloudTag("test-cloud").String(),
 		ControllerName: "controller-1",
 	}
-	err = conn.APICall("JIMM", 3, "", "RemoveCloudFromController", &req1, nil)
+	err = conn.APICall("JIMM", 4, "", "RemoveCloudFromController", &req1, nil)
 	c.Assert(err, gc.Equals, nil)
 
 	_, err = s.JIMM.GetCloud(context.Background(), user, names.NewCloudTag("test-cloud"))

@@ -6,13 +6,15 @@ used for integration testing within the JIMM test suite.
 
 # Starting the environment
 1. Ensure you have docker above v18, confirm this with `docker --version`
-2. Ensure you are in the root JIMM directory.
-3. Run `make pull/candid` to get a local image of candid (this is subject to change!)
-4. Run `cd local/traefik/certs; ./certs.sh; cd -`, this will setup some self signed certs and add them to your cert pool.
-5. Run `touch ./local/vault/approle.json && touch ./local/vault/roleid.txt`
-6. Run `make version/commit.txt && make version/version.txt` to populate the repo with the git commit and version info.
-7. Run `go mod vendor` to vendor JIMM's dependencies and reduce repeated setup time.
-8. `docker compose --profile dev up` if you encounter an error like "Error response from daemon: network ... not found" then the command `docker compose --profile dev up --force-recreate` should help.
+2. Ensure you have Go installed, confirm this with `go version` or install it with `sudo snap install go --classic`
+3. Install build-essentials to build the jimmctl tool (this tool is used to communicate with the JIMM server), `sudo apt install -y build-essential`
+4. Ensure you are in the root JIMM directory.
+5. Run `make pull/candid` to get a local image of candid (this is subject to change!)
+6. Run `cd local/traefik/certs; ./certs.sh; cd -`, this will setup some self signed certs and add them to your cert pool.
+7. Run `touch ./local/vault/approle.json && touch ./local/vault/roleid.txt`
+8. Run `make version/commit.txt && make version/version.txt` to populate the repo with the git commit and version info.
+9. Run `go mod vendor` to vendor JIMM's dependencies and reduce repeated setup time.
+10. `docker compose --profile dev up` if you encounter an error like "Error response from daemon: network ... not found" then the command `docker compose --profile dev up --force-recreate` should help.
 
 After this initial setup, subsequent use of the compose can be done with `docker compose --profile dev up --force-recreate`
 

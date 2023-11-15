@@ -15,6 +15,14 @@ then run the following:
 The project uses Go modules (https://golang.org/cmd/go/#hdr-Module_maintenance) to manage Go
 dependencies. **Note: Go 1.11 or greater needed.**
 
+## JIMM versioning
+
+JIMM v0 and v1 follow a different versioning strategy than future releases. JIMM v0 was the initial release and used MongoDB to store state.
+JIMM v1 was an upgrade that switched to using PostgreSQL for storing state but still retained similar functionality to v0.
+These versions worked with Juju v2 and v3.
+
+Since a refresh of the project, there was an addition of delegated authorization in JIMM. This means that users are authenticated and authorized in JIMM before requests are forwarded to Juju. This work encompassed a breaking change and required changes in Juju (requiring a Juju controller of at least version 3.3). To better align JIMM with Juju it was decided to switch our versioning strategy to align with Juju. As a result of this, there is no JIMM v2 and instead from JIMM v3, the versioning strategy we follow is to match JIMM's to the Juju major versions we support. As an example, JIMM v3 can speak to Juju v3 controllers AND the last minor version of the previous major (Juju v2.9) for migration purposes.
+
 ## Development environment
 
 ### Local:

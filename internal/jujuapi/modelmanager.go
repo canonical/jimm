@@ -21,7 +21,6 @@ func init() {
 		changeModelCredentialMethod := rpc.Method(r.ChangeModelCredential)
 		createModelMethod := rpc.Method(r.CreateModel)
 		destroyModelsMethod := rpc.Method(r.DestroyModels)
-		destroyModelsV4Method := rpc.Method(r.DestroyModelsV4)
 		dumpModelsMethod := rpc.Method(r.DumpModels)
 		dumpModelsDBMethod := rpc.Method(r.DumpModelsDB)
 		listModelSummariesMethod := rpc.Method(r.ListModelSummaries)
@@ -34,96 +33,9 @@ func init() {
 		unsetModelDefaultsMethod := rpc.Method(r.UnsetModelDefaults)
 		modelDefaultsForCloudsMethod := rpc.Method(r.ModelDefaultsForClouds)
 
-		r.AddMethod("ModelManager", 2, "CreateModel", createModelMethod)
-		r.AddMethod("ModelManager", 2, "DestroyModels", destroyModelsMethod)
-		r.AddMethod("ModelManager", 2, "DumpModelsDB", dumpModelsDBMethod)
-		r.AddMethod("ModelManager", 2, "ListModels", listModelsMethod)
-		r.AddMethod("ModelManager", 2, "ModelStatus", modelStatusMethod)
-		r.AddMethod("ModelManager", 2, "ModifyModelAccess", modifyModelAccessMethod)
-		r.AddMethod("ModelManager", 2, "SetModelDefaults", setModelDefaultsMethod)
-		r.AddMethod("ModelManager", 2, "UnsetModelDefaults", unsetModelDefaultsMethod)
-
-		r.AddMethod("ModelManager", 3, "CreateModel", createModelMethod)
-		r.AddMethod("ModelManager", 3, "DestroyModels", destroyModelsMethod)
-		r.AddMethod("ModelManager", 3, "DumpModels", dumpModelsMethod)
-		r.AddMethod("ModelManager", 3, "DumpModelsDB", dumpModelsDBMethod)
-		r.AddMethod("ModelManager", 3, "ListModels", listModelsMethod)
-		r.AddMethod("ModelManager", 3, "ModelInfo", modelInfoMethod)
-		r.AddMethod("ModelManager", 3, "ModelStatus", modelStatusMethod)
-		r.AddMethod("ModelManager", 3, "ModifyModelAccess", modifyModelAccessMethod)
-		r.AddMethod("ModelManager", 3, "SetModelDefaults", setModelDefaultsMethod)
-		r.AddMethod("ModelManager", 3, "UnsetModelDefaults", unsetModelDefaultsMethod)
-
-		r.AddMethod("ModelManager", 4, "CreateModel", createModelMethod)
-		r.AddMethod("ModelManager", 4, "DestroyModels", destroyModelsV4Method)
-		r.AddMethod("ModelManager", 4, "DumpModels", dumpModelsMethod)
-		r.AddMethod("ModelManager", 4, "DumpModelsDB", dumpModelsDBMethod)
-		r.AddMethod("ModelManager", 4, "ListModelSummaries", listModelSummariesMethod)
-		r.AddMethod("ModelManager", 4, "ListModels", listModelsMethod)
-		r.AddMethod("ModelManager", 4, "ModelInfo", modelInfoMethod)
-		r.AddMethod("ModelManager", 4, "ModelStatus", modelStatusMethod)
-		r.AddMethod("ModelManager", 4, "ModifyModelAccess", modifyModelAccessMethod)
-		r.AddMethod("ModelManager", 4, "SetModelDefaults", setModelDefaultsMethod)
-		r.AddMethod("ModelManager", 4, "UnsetModelDefaults", unsetModelDefaultsMethod)
-
-		r.AddMethod("ModelManager", 5, "ChangeModelCredential", changeModelCredentialMethod)
-		r.AddMethod("ModelManager", 5, "CreateModel", createModelMethod)
-		r.AddMethod("ModelManager", 5, "DestroyModels", destroyModelsV4Method)
-		r.AddMethod("ModelManager", 5, "DumpModels", dumpModelsMethod)
-		r.AddMethod("ModelManager", 5, "DumpModelsDB", dumpModelsDBMethod)
-		r.AddMethod("ModelManager", 5, "ListModelSummaries", listModelSummariesMethod)
-		r.AddMethod("ModelManager", 5, "ListModels", listModelsMethod)
-		r.AddMethod("ModelManager", 5, "ModelInfo", modelInfoMethod)
-		r.AddMethod("ModelManager", 5, "ModelStatus", modelStatusMethod)
-		r.AddMethod("ModelManager", 5, "ModifyModelAccess", modifyModelAccessMethod)
-		r.AddMethod("ModelManager", 5, "SetModelDefaults", setModelDefaultsMethod)
-		r.AddMethod("ModelManager", 5, "UnsetModelDefaults", unsetModelDefaultsMethod)
-
-		r.AddMethod("ModelManager", 6, "ChangeModelCredential", changeModelCredentialMethod)
-		r.AddMethod("ModelManager", 6, "CreateModel", createModelMethod)
-		r.AddMethod("ModelManager", 6, "DestroyModels", destroyModelsV4Method)
-		r.AddMethod("ModelManager", 6, "DumpModels", dumpModelsMethod)
-		r.AddMethod("ModelManager", 6, "DumpModelsDB", dumpModelsDBMethod)
-		r.AddMethod("ModelManager", 6, "ListModelSummaries", listModelSummariesMethod)
-		r.AddMethod("ModelManager", 6, "ListModels", listModelsMethod)
-		r.AddMethod("ModelManager", 6, "ModelInfo", modelInfoMethod)
-		r.AddMethod("ModelManager", 6, "ModelStatus", modelStatusMethod)
-		r.AddMethod("ModelManager", 6, "ModifyModelAccess", modifyModelAccessMethod)
-		r.AddMethod("ModelManager", 6, "SetModelDefaults", setModelDefaultsMethod)
-		r.AddMethod("ModelManager", 6, "UnsetModelDefaults", unsetModelDefaultsMethod)
-		r.AddMethod("ModelManager", 6, "ModelDefaultsForClouds", modelDefaultsForCloudsMethod)
-
-		r.AddMethod("ModelManager", 7, "ChangeModelCredential", changeModelCredentialMethod)
-		r.AddMethod("ModelManager", 7, "CreateModel", createModelMethod)
-		r.AddMethod("ModelManager", 7, "DestroyModels", destroyModelsV4Method)
-		r.AddMethod("ModelManager", 7, "DumpModels", dumpModelsMethod)
-		r.AddMethod("ModelManager", 7, "DumpModelsDB", dumpModelsDBMethod)
-		r.AddMethod("ModelManager", 7, "ListModelSummaries", listModelSummariesMethod)
-		r.AddMethod("ModelManager", 7, "ListModels", listModelsMethod)
-		r.AddMethod("ModelManager", 7, "ModelInfo", modelInfoMethod)
-		r.AddMethod("ModelManager", 7, "ModelStatus", modelStatusMethod)
-		r.AddMethod("ModelManager", 7, "ModifyModelAccess", modifyModelAccessMethod)
-		r.AddMethod("ModelManager", 7, "SetModelDefaults", setModelDefaultsMethod)
-		r.AddMethod("ModelManager", 7, "UnsetModelDefaults", unsetModelDefaultsMethod)
-		r.AddMethod("ModelManager", 7, "ModelDefaultsForClouds", modelDefaultsForCloudsMethod)
-
-		r.AddMethod("ModelManager", 8, "ChangeModelCredential", changeModelCredentialMethod)
-		r.AddMethod("ModelManager", 8, "CreateModel", createModelMethod)
-		r.AddMethod("ModelManager", 8, "DestroyModels", destroyModelsV4Method)
-		r.AddMethod("ModelManager", 8, "DumpModels", dumpModelsMethod)
-		r.AddMethod("ModelManager", 8, "DumpModelsDB", dumpModelsDBMethod)
-		r.AddMethod("ModelManager", 8, "ListModelSummaries", listModelSummariesMethod)
-		r.AddMethod("ModelManager", 8, "ListModels", listModelsMethod)
-		r.AddMethod("ModelManager", 8, "ModelInfo", modelInfoMethod)
-		r.AddMethod("ModelManager", 8, "ModelStatus", modelStatusMethod)
-		r.AddMethod("ModelManager", 8, "ModifyModelAccess", modifyModelAccessMethod)
-		r.AddMethod("ModelManager", 8, "SetModelDefaults", setModelDefaultsMethod)
-		r.AddMethod("ModelManager", 8, "UnsetModelDefaults", unsetModelDefaultsMethod)
-		r.AddMethod("ModelManager", 8, "ModelDefaultsForClouds", modelDefaultsForCloudsMethod)
-
 		r.AddMethod("ModelManager", 9, "ChangeModelCredential", changeModelCredentialMethod)
 		r.AddMethod("ModelManager", 9, "CreateModel", createModelMethod)
-		r.AddMethod("ModelManager", 9, "DestroyModels", destroyModelsV4Method)
+		r.AddMethod("ModelManager", 9, "DestroyModels", destroyModelsMethod)
 		r.AddMethod("ModelManager", 9, "DumpModels", dumpModelsMethod)
 		r.AddMethod("ModelManager", 9, "DumpModelsDB", dumpModelsDBMethod)
 		r.AddMethod("ModelManager", 9, "ListModelSummaries", listModelSummariesMethod)
@@ -136,7 +48,7 @@ func init() {
 		r.AddMethod("ModelManager", 9, "UnsetModelDefaults", unsetModelDefaultsMethod)
 		r.AddMethod("ModelManager", 9, "ModelDefaultsForClouds", modelDefaultsForCloudsMethod)
 
-		return []int{2, 3, 4, 5, 6, 7, 8, 9}
+		return []int{9}
 	}
 }
 
@@ -162,19 +74,6 @@ func (r *controllerRoot) DumpModels(ctx context.Context, args jujuparams.DumpMod
 	return jujuparams.StringResults{
 		Results: results,
 	}
-}
-
-func (r *controllerRoot) DestroyModels(ctx context.Context, args jujuparams.Entities) (jujuparams.ErrorResults, error) {
-	// This is the default behviour for model manager V3 and below.
-	destroyStorage := true
-	models := make([]jujuparams.DestroyModelParams, len(args.Entities))
-	for i, ent := range args.Entities {
-		models[i] = jujuparams.DestroyModelParams{
-			ModelTag:       ent.Tag,
-			DestroyStorage: &destroyStorage,
-		}
-	}
-	return r.DestroyModelsV4(ctx, jujuparams.DestroyModelsParams{Models: models})
 }
 
 // ListModelSummaries returns summaries for all the models that that
@@ -265,9 +164,9 @@ func (r *controllerRoot) CreateModel(ctx context.Context, args jujuparams.ModelC
 	return jujuparams.ModelInfo{}, errors.E(op, err)
 }
 
-// DestroyModelsV4 implements the ModelManager facade's DestroyModels
+// DestroyModels implements the ModelManager facade's DestroyModels
 // method used in version 4 onwards.
-func (r *controllerRoot) DestroyModelsV4(ctx context.Context, args jujuparams.DestroyModelsParams) (jujuparams.ErrorResults, error) {
+func (r *controllerRoot) DestroyModels(ctx context.Context, args jujuparams.DestroyModelsParams) (jujuparams.ErrorResults, error) {
 	const op = errors.Op("jujuapi.DestroyModel")
 
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
