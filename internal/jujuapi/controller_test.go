@@ -35,7 +35,7 @@ func (s *controllerSuite) TestControllerConfig(c *gc.C) {
 
 	adminConn := s.open(c, nil, "alice")
 	defer adminConn.Close()
-	err = adminConn.APICall("Controller", 9, "", "ConfigSet", jujuparams.ControllerConfigSet{
+	err = adminConn.APICall("Controller", 11, "", "ConfigSet", jujuparams.ControllerConfigSet{
 		Config: map[string]interface{}{
 			"key1":           "value1",
 			"key2":           "value2",
@@ -139,19 +139,13 @@ func (s *controllerSuite) TestConfigSet(c *gc.C) {
 	conn := s.open(c, nil, "alice")
 	defer conn.Close()
 
-	err := conn.APICall("Controller", 5, "", "ConfigSet", jujuparams.ControllerConfigSet{}, nil)
-	c.Assert(err, jc.ErrorIsNil)
-
-	err = conn.APICall("Controller", 9, "", "ConfigSet", jujuparams.ControllerConfigSet{}, nil)
+	err := conn.APICall("Controller", 11, "", "ConfigSet", jujuparams.ControllerConfigSet{}, nil)
 	c.Assert(err, jc.ErrorIsNil)
 
 	conn1 := s.open(c, nil, "bob")
 	defer conn1.Close()
 
-	err = conn1.APICall("Controller", 5, "", "ConfigSet", jujuparams.ControllerConfigSet{}, nil)
-	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
-
-	err = conn1.APICall("Controller", 9, "", "ConfigSet", jujuparams.ControllerConfigSet{}, nil)
+	err = conn1.APICall("Controller", 11, "", "ConfigSet", jujuparams.ControllerConfigSet{}, nil)
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
 
@@ -160,11 +154,7 @@ func (s *controllerSuite) TestIdentityProviderURL(c *gc.C) {
 	defer conn.Close()
 
 	var result jujuparams.StringResult
-	err := conn.APICall("Controller", 7, "", "IdentityProviderURL", nil, &result)
-	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(result.Result, gc.Matches, `https://127\.0\.0\.1.*`)
-
-	err = conn.APICall("Controller", 9, "", "IdentityProviderURL", nil, &result)
+	err := conn.APICall("Controller", 11, "", "IdentityProviderURL", nil, &result)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(result.Result, gc.Matches, `https://127\.0\.0\.1.*`)
 }
@@ -174,14 +164,7 @@ func (s *controllerSuite) TestControllerVersion(c *gc.C) {
 	defer conn.Close()
 
 	var result jujuparams.ControllerVersionResults
-	err := conn.APICall("Controller", 8, "", "ControllerVersion", nil, &result)
-	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(result, jc.DeepEquals, jujuparams.ControllerVersionResults{
-		Version:   jujuversion.Current.String(),
-		GitCommit: jimmversion.VersionInfo.GitCommit,
-	})
-
-	err = conn.APICall("Controller", 9, "", "ControllerVersion", nil, &result)
+	err := conn.APICall("Controller", 11, "", "ControllerVersion", nil, &result)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(result, jc.DeepEquals, jujuparams.ControllerVersionResults{
 		Version:   jujuversion.Current.String(),
@@ -259,7 +242,7 @@ func (s *watcherSuite) TestWatchModelSummaries(c *gc.C) {
 	defer conn.Close()
 
 	var watcherID jujuparams.SummaryWatcherID
-	err := conn.APICall("Controller", 9, "", "WatchModelSummaries", nil, &watcherID)
+	err := conn.APICall("Controller", 11, "", "WatchModelSummaries", nil, &watcherID)
 	c.Assert(err, jc.ErrorIsNil)
 
 	var summaries jujuparams.SummaryWatcherNextResults
@@ -313,7 +296,7 @@ func (s *watcherSuite) TestWatchAllModelSummaries(c *gc.C) {
 	defer conn.Close()
 
 	var watcherID jujuparams.SummaryWatcherID
-	err := conn.APICall("Controller", 9, "", "WatchAllModelSummaries", nil, &watcherID)
+	err := conn.APICall("Controller", 11, "", "WatchAllModelSummaries", nil, &watcherID)
 	c.Assert(err, jc.ErrorIsNil)
 
 	var summaries jujuparams.SummaryWatcherNextResults

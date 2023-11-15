@@ -124,7 +124,7 @@ func (s *modelManagerSuite) TestListModelSummaries(c *gc.C) {
 func (s *modelManagerSuite) TestListModelSummariesWithoutControllerUUIDMasking(c *gc.C) {
 	conn1 := s.open(c, nil, "charlie")
 	defer conn1.Close()
-	err := conn1.APICall("JIMM", 2, "", "DisableControllerUUIDMasking", nil, nil)
+	err := conn1.APICall("JIMM", 4, "", "DisableControllerUUIDMasking", nil, nil)
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 
 	s.Candid.AddUser("adam", "controller-admin")
@@ -142,7 +142,7 @@ func (s *modelManagerSuite) TestListModelSummariesWithoutControllerUUIDMasking(c
 	)
 	c.Assert(err, gc.Equals, nil)
 
-	err = conn.APICall("JIMM", 2, "", "DisableControllerUUIDMasking", nil, nil)
+	err = conn.APICall("JIMM", 4, "", "DisableControllerUUIDMasking", nil, nil)
 	c.Assert(err, gc.Equals, nil)
 
 	// now that UUID masking has been disabled for the duration of this
@@ -518,7 +518,7 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 	defer conn.Close()
 	client := modelmanager.NewClient(conn)
 
-	err = conn.APICall("JIMM", 2, "", "DisableControllerUUIDMasking", nil, nil)
+	err = conn.APICall("JIMM", 4, "", "DisableControllerUUIDMasking", nil, nil)
 	c.Assert(err, gc.Equals, nil)
 
 	models, err := client.ModelInfo([]names.ModelTag{
@@ -867,7 +867,7 @@ func (s *modelManagerSuite) TestCreateModel(c *gc.C) {
 	for i, test := range createModelTests {
 		c.Logf("test %d. %s", i, test.about)
 		var mi jujuparams.ModelInfo
-		err := conn.APICall("ModelManager", 2, "", "CreateModel", jujuparams.ModelCreateArgs{
+		err := conn.APICall("ModelManager", 9, "", "CreateModel", jujuparams.ModelCreateArgs{
 			Name:               test.name,
 			OwnerTag:           test.ownerTag,
 			Config:             test.config,
@@ -1045,7 +1045,7 @@ func (s *modelManagerSuite) TestModifyModelAccessErrors(c *gc.C) {
 				test.modifyModelAccess,
 			},
 		}
-		err := conn.APICall("ModelManager", 2, "", "ModifyModelAccess", req, &res)
+		err := conn.APICall("ModelManager", 9, "", "ModifyModelAccess", req, &res)
 		c.Assert(err, gc.Equals, nil)
 		c.Assert(res.Results, gc.HasLen, 1)
 		c.Assert(res.Results[0].Error, gc.ErrorMatches, test.expectError)
@@ -1079,30 +1079,6 @@ func (s *modelManagerSuite) TestDestroyModel(c *gc.C) {
 	// Make sure it's not an error if you destroy a model that't not there.
 	err = client.DestroyModel(s.Model.ResourceTag(), nil, nil, nil, &zeroDuration)
 	c.Assert(err, gc.Equals, nil)
-}
-
-func (s *modelManagerSuite) TestDestroyModelV3(c *gc.C) {
-	conn := s.open(c, nil, "bob")
-	defer conn.Close()
-
-	tag := s.Model.ResourceTag()
-	var results jujuparams.ErrorResults
-	err := conn.APICall("ModelManager", 3, "", "DestroyModels", jujuparams.Entities{
-		Entities: []jujuparams.Entity{{
-			Tag: tag.String(),
-		}},
-	}, &results)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(results.Results, gc.HasLen, 1)
-	c.Assert(results.Results[0].Error, gc.Equals, (*jujuparams.Error)(nil))
-
-	// Check the model is now dying.
-	client := modelmanager.NewClient(conn)
-	mis, err := client.ModelInfo([]names.ModelTag{tag})
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(mis, gc.HasLen, 1)
-	c.Assert(mis[0].Error, gc.Equals, (*jujuparams.Error)(nil))
-	c.Assert(mis[0].Result.Life, gc.Equals, life.Dying)
 }
 
 func (s *modelManagerSuite) TestDumpModel(c *gc.C) {
