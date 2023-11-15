@@ -50,6 +50,10 @@ func (s *controllerInfoSuite) TestControllerInfo(c *gc.C) {
   LQRNNlaY2ajLt0paowf/Xxb8
   -----END CERTIFICATE-----`,
 	}
+	store.Accounts["controller-1"] = jujuclient.AccountDetails{
+		User:     "test-user",
+		Password: "super-secret-password",
+	}
 	dir, err := os.MkdirTemp("", "controller-info-test")
 	c.Assert(err, gc.Equals, nil)
 	defer os.RemoveAll(dir)
@@ -64,7 +68,9 @@ func (s *controllerInfoSuite) TestControllerInfo(c *gc.C) {
 	c.Assert(string(data), gc.Matches, `api-addresses:
 - 127.0.0.1:17070
 name: controller-1
+password: super-secret-password
 public-address: controller1.example.com
+username: test-user
 uuid: 982b16d9-a945-4762-b684-fd4fd885aa11
 `)
 }
@@ -100,7 +106,10 @@ func (s *controllerInfoSuite) TestControllerInfoWithLocalFlag(c *gc.C) {
   LQRNNlaY2ajLt0paowf/Xxb8
   -----END CERTIFICATE-----`,
 	}
-
+	store.Accounts["controller-1"] = jujuclient.AccountDetails{
+		User:     "test-user",
+		Password: "super-secret-password",
+	}
 	dir, err := os.MkdirTemp("", "controller-info-test")
 	c.Assert(err, gc.Equals, nil)
 	defer os.RemoveAll(dir)
@@ -140,7 +149,9 @@ ca-certificate: |-
   LQRNNlaY2ajLt0paowf/Xxb8
   -----END CERTIFICATE-----
 name: controller-1
+password: super-secret-password
 public-address: 127.0.0.1:17070
+username: test-user
 uuid: 982b16d9-a945-4762-b684-fd4fd885aa11
 `)
 }
@@ -175,6 +186,10 @@ func (s *controllerInfoSuite) TestControllerInfoMissingPublicAddressAndNoLocalFl
   hZuWHpuOT120okoutwuUSU9448cXLGZfoCZjjdMKXmOj8EEec1diDP4mhegYGezD
   LQRNNlaY2ajLt0paowf/Xxb8
   -----END CERTIFICATE-----`,
+	}
+	store.Accounts["controller-1"] = jujuclient.AccountDetails{
+		User:     "test-user",
+		Password: "super-secret-password",
 	}
 	dir, err := os.MkdirTemp("", "controller-info-test")
 	c.Assert(err, gc.Equals, nil)
@@ -217,7 +232,10 @@ func (s *controllerInfoSuite) TestControllerInfoCannotProvideAddrAndLocalFlag(c 
   LQRNNlaY2ajLt0paowf/Xxb8
   -----END CERTIFICATE-----`,
 	}
-
+	store.Accounts["controller-1"] = jujuclient.AccountDetails{
+		User:     "test-user",
+		Password: "super-secret-password",
+	}
 	dir, err := os.MkdirTemp("", "controller-info-test")
 	c.Assert(err, gc.Equals, nil)
 	defer os.RemoveAll(dir)
