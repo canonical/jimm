@@ -47,8 +47,7 @@ func main() {
 	}
 
 	u := dbmodel.User{
-		Username:         petname.Generate(2, "-") + "@external",
-		ControllerAccess: "superuser",
+		Username: petname.Generate(2, "-") + "@external",
 	}
 	if err = db.DB.Create(&u).Error; err != nil {
 		fmt.Println("failed to add user to db ", err)

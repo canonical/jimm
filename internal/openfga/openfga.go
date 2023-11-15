@@ -34,6 +34,22 @@ type Kind = cofga.Kind
 // Relation holds the type of tag relation.
 type Relation = cofga.Relation
 
+// Object Kinds
+var (
+	// ModelType represents a model object.
+	ModelType Kind = "model"
+	// ApplicationOfferType represents an application offer object.
+	ApplicationOfferType Kind = "applicationoffer"
+	// CloudType represents a cloud object.
+	CloudType Kind = "cloud"
+	// ControllerType represents a controller object.
+	ControllerType Kind = "controller"
+	// GroupType represents a group object.
+	GroupType Kind = "group"
+	// UserType represents a user object.
+	UserType Kind = "user"
+)
+
 // OFGAClient contains convenient utility methods for interacting
 // with OpenFGA from OUR usecase. It wraps the provided pre-generated client
 // from OpenFGA.
@@ -80,15 +96,11 @@ func (o *OFGAClient) getRelatedObjects(ctx context.Context, tuple Tuple, pageSiz
 // must NOT include the ID, i.e.,
 //
 //   - "group:" vs "group:mygroup", where "mygroup" is the ID and the correct objType would be "group".
-func (o *OFGAClient) listObjects(ctx context.Context, user string, relation string, objType string, contextualTuples []Tuple) (objectIds []Tag, err error) {
-	userEntity, err := cofga.ParseEntity(user)
-	if err != nil {
-		return nil, err
-	}
+func (o *OFGAClient) listObjects(ctx context.Context, user *Tag, relation Relation, objType Kind, contextualTuples []Tuple) (objectIds []Tag, err error) {
 	entities, err := o.cofgaClient.FindAccessibleObjectsByRelation(ctx, Tuple{
-		Object:   &userEntity,
-		Relation: cofga.Relation(relation),
-		Target:   &Tag{Kind: cofga.Kind(objType)},
+		Object:   user,
+		Relation: relation,
+		Target:   &Tag{Kind: objType},
 	}, contextualTuples...)
 	if err != nil {
 		return nil, err
@@ -107,7 +119,7 @@ func (o *OFGAClient) RemoveRelation(ctx context.Context, tuples ...Tuple) error 
 }
 
 // ListObjects returns all object IDs of <objType> that a user has the relation <relation> to.
-func (o *OFGAClient) ListObjects(ctx context.Context, user string, relation string, objType string, contextualTuples []Tuple) ([]Tag, error) {
+func (o *OFGAClient) ListObjects(ctx context.Context, user *Tag, relation Relation, objType Kind, contextualTuples []Tuple) ([]Tag, error) {
 	return o.listObjects(ctx, user, relation, objType, contextualTuples)
 }
 

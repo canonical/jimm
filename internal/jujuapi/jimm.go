@@ -14,6 +14,7 @@ import (
 	"github.com/juju/names/v4"
 	"github.com/juju/zaputil"
 	"github.com/juju/zaputil/zapctx"
+	"go.uber.org/zap"
 
 	apiparams "github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/internal/db"
@@ -21,6 +22,7 @@ import (
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/jujuapi/rpc"
 	"github.com/canonical/jimm/internal/openfga"
+	ofganames "github.com/canonical/jimm/internal/openfga/names"
 )
 
 func init() {
@@ -394,7 +396,12 @@ func (r *controllerRoot) FullModelStatus(ctx context.Context, req apiparams.Full
 func (r *controllerRoot) UpdateMigratedModel(ctx context.Context, req apiparams.UpdateMigratedModelRequest) error {
 	const op = errors.Op("jujuapi.UpdateMigratedModel")
 
-	if r.user.ControllerAccess != "superuser" {
+	isControllerAdmin, err := openfga.IsAdministrator(ctx, r.user, r.jimm.ResourceTag())
+	if err != nil {
+		zapctx.Error(ctx, "failed to check for controller admin access", zap.Error(err))
+		return errors.E(op, err)
+	}
+	if !isControllerAdmin {
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
@@ -445,7 +452,7 @@ func (r *controllerRoot) RemoveCloudFromController(ctx context.Context, req apip
 func (r *controllerRoot) CrossModelQuery(ctx context.Context, req apiparams.CrossModelQueryRequest) (apiparams.CrossModelQueryResponse, error) {
 	const op = errors.Op("jujuapi.CrossModelQuery")
 
-	modelUUIDs, err := r.user.ListModels(ctx)
+	modelUUIDs, err := r.user.ListModels(ctx, ofganames.ReaderRelation)
 	if err != nil {
 		return apiparams.CrossModelQueryResponse{}, errors.E(op, errors.Code("failed to list user's model access"))
 	}
