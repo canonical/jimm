@@ -215,8 +215,7 @@ func TestListControllers(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	env := jimmtest.ParseEnvironment(c, testListCoControllersEnv)
-	env.PopulateDB(c, j.Database, client)
-	env.AddJIMMRelations(c, j.ResourceTag(), j.Database, client)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
 
 	tests := []struct {
 		about               string
@@ -225,19 +224,19 @@ func TestListControllers(t *testing.T) {
 		expectedError       string
 	}{{
 		about: "superuser can list controllers",
-		user:  env.User("alice@external").DBObject(c, j.Database, client),
+		user:  env.User("alice@external").DBObject(c, j.Database),
 		expectedControllers: []dbmodel.Controller{
-			env.Controller("test1").DBObject(c, j.Database, client),
-			env.Controller("test2").DBObject(c, j.Database, client),
-			env.Controller("test3").DBObject(c, j.Database, client),
+			env.Controller("test1").DBObject(c, j.Database),
+			env.Controller("test2").DBObject(c, j.Database),
+			env.Controller("test3").DBObject(c, j.Database),
 		},
 	}, {
 		about:         "add-model user can not list controllers",
-		user:          env.User("bob@external").DBObject(c, j.Database, client),
+		user:          env.User("bob@external").DBObject(c, j.Database),
 		expectedError: "unauthorized",
 	}, {
 		about:         "user withouth access rights cannot list controllers",
-		user:          env.User("eve@external").DBObject(c, j.Database, client),
+		user:          env.User("eve@external").DBObject(c, j.Database),
 		expectedError: "unauthorized",
 	}}
 
@@ -300,8 +299,7 @@ func TestSetControllerDeprecated(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	env := jimmtest.ParseEnvironment(c, testSetControllerDeprecatedEnv)
-	env.PopulateDB(c, j.Database, client)
-	env.AddJIMMRelations(c, j.ResourceTag(), j.Database, client)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
 
 	tests := []struct {
 		about         string
@@ -310,15 +308,15 @@ func TestSetControllerDeprecated(t *testing.T) {
 		expectedError string
 	}{{
 		about:      "superuser can deprecate a controller",
-		user:       env.User("alice@external").DBObject(c, j.Database, client),
+		user:       env.User("alice@external").DBObject(c, j.Database),
 		deprecated: true,
 	}, {
 		about:      "superuser can deprecate a controller",
-		user:       env.User("alice@external").DBObject(c, j.Database, client),
+		user:       env.User("alice@external").DBObject(c, j.Database),
 		deprecated: false,
 	}, {
 		about:         "user withouth access rights cannot deprecate a controller",
-		user:          env.User("eve@external").DBObject(c, j.Database, client),
+		user:          env.User("eve@external").DBObject(c, j.Database),
 		expectedError: "unauthorized",
 		deprecated:    true,
 	}}
@@ -444,15 +442,14 @@ func TestRemoveController(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 
 			env := jimmtest.ParseEnvironment(c, removeControllerTestEnv)
-			env.PopulateDB(c, j.Database, client)
-			env.AddJIMMRelations(c, j.ResourceTag(), j.Database, client)
+			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
 
-			dbUser := env.User(test.user).DBObject(c, j.Database, client)
+			dbUser := env.User(test.user).DBObject(c, j.Database)
 			user := openfga.NewUser(&dbUser, client)
 
 			if test.unavailableSince != nil {
 				// make the controller unavailable
-				controller := env.Controller("controller-1").DBObject(c, j.Database, client)
+				controller := env.Controller("controller-1").DBObject(c, j.Database)
 				controller.UnavailableSince = sql.NullTime{
 					Valid: true,
 					Time:  *test.unavailableSince,
@@ -612,10 +609,9 @@ func TestFullModelStatus(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 
 			env := jimmtest.ParseEnvironment(c, fullModelStatusTestEnv)
-			env.PopulateDB(c, j.Database, client)
-			env.AddJIMMRelations(c, j.ResourceTag(), j.Database, client)
+			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
 
-			dbUser := env.User(test.user).DBObject(c, j.Database, client)
+			dbUser := env.User(test.user).DBObject(c, j.Database)
 			user := openfga.NewUser(&dbUser, client)
 
 			status, err := j.FullModelStatus(ctx, user, names.NewModelTag(test.modelUUID), nil)

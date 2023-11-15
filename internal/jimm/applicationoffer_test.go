@@ -2685,7 +2685,6 @@ func TestListApplicationOffers(t *testing.T) {
 	err = db.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 	env := jimmtest.ParseEnvironment(c, listApplicationsTestEnv)
-	env.PopulateDB(c, db, client)
 
 	j := &jimm.JIMM{
 		UUID:          uuid.NewString(),
@@ -2840,7 +2839,7 @@ func TestListApplicationOffers(t *testing.T) {
 			},
 		},
 	}
-
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), db, client)
 	tuples := []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
 		Relation: ofganames.AdministratorRelation,
@@ -2881,7 +2880,7 @@ func TestListApplicationOffers(t *testing.T) {
 	err = client.AddRelation(context.Background(), tuples...)
 	c.Assert(err, qt.IsNil)
 
-	u := env.User("alice@external").DBObject(c, db, client)
+	u := env.User("alice@external").DBObject(c, db)
 	_, err = j.ListApplicationOffers(ctx, openfga.NewUser(&u, client))
 	c.Assert(err, qt.ErrorMatches, `at least one filter must be specified`)
 
