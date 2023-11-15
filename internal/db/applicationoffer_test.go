@@ -93,10 +93,6 @@ func initTestEnvironment(c *qt.C, db *db.Database) testEnvironment {
 		SLA: dbmodel.SLA{
 			Level: "unsupported",
 		},
-		Users: []dbmodel.UserModelAccess{{
-			User:   env.u,
-			Access: "admin",
-		}},
 	}
 	c.Assert(db.DB.Create(&env.model).Error, qt.IsNil)
 
@@ -137,14 +133,9 @@ func (s *dbSuite) TestGetApplicationOffer(c *qt.C) {
 		UUID:            "00000000-0000-0000-0000-000000000001",
 		ModelID:         env.model.ID,
 		ApplicationName: "app-1",
-		Users: []dbmodel.UserApplicationOfferAccess{{
-			Username: env.u.Username,
-			User:     env.u,
-			Access:   "admin",
-		}},
-		Endpoints:   []dbmodel.ApplicationOfferRemoteEndpoint{},
-		Spaces:      []dbmodel.ApplicationOfferRemoteSpace{},
-		Connections: []dbmodel.ApplicationOfferConnection{},
+		Endpoints:       []dbmodel.ApplicationOfferRemoteEndpoint{},
+		Spaces:          []dbmodel.ApplicationOfferRemoteSpace{},
+		Connections:     []dbmodel.ApplicationOfferConnection{},
 	}
 	err := s.Database.AddApplicationOffer(context.Background(), &offer)
 	c.Assert(err, qt.Equals, nil)
@@ -171,7 +162,6 @@ func (s *dbSuite) TestUpdateApplicationOffer(c *qt.C) {
 		UUID:            "00000000-0000-0000-0000-000000000001",
 		ModelID:         env.model.ID,
 		ApplicationName: "app-1",
-		Users:           []dbmodel.UserApplicationOfferAccess{},
 		Endpoints:       []dbmodel.ApplicationOfferRemoteEndpoint{},
 		Spaces:          []dbmodel.ApplicationOfferRemoteSpace{},
 		Connections:     []dbmodel.ApplicationOfferConnection{},
@@ -184,13 +174,13 @@ func (s *dbSuite) TestUpdateApplicationOffer(c *qt.C) {
 	}
 	err = s.Database.GetApplicationOffer(context.Background(), &dbOffer)
 	c.Assert(err, qt.Equals, nil)
-	c.Logf("%#v %#v", dbOffer.Users, offer.Users)
 	c.Assert(dbOffer, qt.CmpEquals(cmpopts.EquateEmpty(), cmpopts.IgnoreTypes(dbmodel.Model{})), offer)
 
 	offer1 := offer
-	offer1.Users = []dbmodel.UserApplicationOfferAccess{{
-		Username: env.u.Username,
-		Access:   "read",
+	offer1.Endpoints = []dbmodel.ApplicationOfferRemoteEndpoint{{
+		ApplicationOfferID: 1,
+		ApplicationOffer:   dbmodel.ApplicationOffer{},
+		Name:               "test",
 	}}
 	err = s.Database.UpdateApplicationOffer(context.Background(), &offer1)
 	c.Assert(err, qt.Equals, nil)
@@ -201,18 +191,6 @@ func (s *dbSuite) TestUpdateApplicationOffer(c *qt.C) {
 	err = s.Database.GetApplicationOffer(context.Background(), &dbOffer)
 	c.Assert(err, qt.Equals, nil)
 	c.Assert(dbOffer, qt.DeepEquals, offer1)
-
-	offer2 := offer
-	offer2.Users = []dbmodel.UserApplicationOfferAccess{{
-		Username: env.u.Username,
-		Access:   "admin",
-	}}
-	err = s.Database.UpdateApplicationOffer(context.Background(), &offer2)
-	c.Assert(err, qt.Equals, nil)
-
-	err = s.Database.GetApplicationOffer(context.Background(), &dbOffer)
-	c.Assert(err, qt.Equals, nil)
-	c.Assert(dbOffer, qt.DeepEquals, offer2)
 
 	offer3 := dbmodel.ApplicationOffer{
 		UUID:            "00000000-0000-0000-0000-000000000002",
@@ -238,8 +216,7 @@ func (s *dbSuite) TestDeleteApplicationOffer(c *qt.C) {
 	c.Assert(err, qt.Equals, nil)
 
 	dbOffer := dbmodel.ApplicationOffer{
-		UUID:  "00000000-0000-0000-0000-000000000001",
-		Users: nil,
+		UUID: "00000000-0000-0000-0000-000000000001",
 	}
 	err = s.Database.GetApplicationOffer(context.Background(), &dbOffer)
 	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
@@ -254,11 +231,6 @@ func (s *dbSuite) TestFindApplicationOffers(c *qt.C) {
 		ModelID:                env.model.ID,
 		ApplicationName:        "app-1",
 		ApplicationDescription: "this is a test application description",
-		Users: []dbmodel.UserApplicationOfferAccess{{
-			Username: env.u.Username,
-			User:     env.u,
-			Access:   "read",
-		}},
 		Endpoints: []dbmodel.ApplicationOfferRemoteEndpoint{{
 			Name:      "test-endpoint-1",
 			Role:      "provider",
@@ -279,15 +251,6 @@ func (s *dbSuite) TestFindApplicationOffers(c *qt.C) {
 		ModelID:                env.model.ID,
 		ApplicationName:        "app-1",
 		ApplicationDescription: "this is another test offer",
-		Users: []dbmodel.UserApplicationOfferAccess{{
-			Username: env.u.Username,
-			User:     env.u,
-			Access:   "consume",
-		}, {
-			Username: u.Username,
-			User:     u,
-			Access:   "admin",
-		}},
 		Endpoints: []dbmodel.ApplicationOfferRemoteEndpoint{{
 			Name:      "test-endpoint-2",
 			Role:      "requirer",
@@ -303,11 +266,6 @@ func (s *dbSuite) TestFindApplicationOffers(c *qt.C) {
 		ModelID:                env.model.ID,
 		ApplicationName:        "app-1",
 		ApplicationDescription: "this is yet another application offer",
-		Users: []dbmodel.UserApplicationOfferAccess{{
-			Username: u.Username,
-			User:     u,
-			Access:   "consume",
-		}},
 		Endpoints: []dbmodel.ApplicationOfferRemoteEndpoint{{
 			Name:      "test-endpoint-3",
 			Role:      "requirer",
@@ -383,21 +341,54 @@ func (s *dbSuite) TestFindApplicationOffers(c *qt.C) {
 		},
 		expectedOffers: []dbmodel.ApplicationOffer{},
 	}, {
-		about: "filter by user",
+		about: "filter by UUID",
 		filters: []db.ApplicationOfferFilter{
-			db.ApplicationOfferFilterByUser(u.Username),
+			db.ApplicationOfferFilterByUUID(
+				[]string{
+					"00000000-0000-0000-0000-000000000002",
+					"00000000-0000-0000-0000-000000000003",
+				}),
 		},
 		expectedOffers: []dbmodel.ApplicationOffer{offer2, offer3},
 	}, {
-		about: "filter by model admin user",
+		about: "filter by UUID and endpoint interface",
 		filters: []db.ApplicationOfferFilter{
-			db.ApplicationOfferFilterByUser(env.u.Username),
+			db.ApplicationOfferFilterByUUID(
+				[]string{
+					"00000000-0000-0000-0000-000000000002",
+					"00000000-0000-0000-0000-000000000003",
+				}),
+			db.ApplicationOfferFilterByEndpoint(dbmodel.ApplicationOfferRemoteEndpoint{
+				Interface: "db",
+			}),
 		},
-		expectedOffers: []dbmodel.ApplicationOffer{offer1, offer2, offer3},
+		expectedOffers: []dbmodel.ApplicationOffer{offer2},
 	}, {
-		about: "filter by user - not found",
+		about: "filter by UUID twice (ensure filters are AND)",
 		filters: []db.ApplicationOfferFilter{
-			db.ApplicationOfferFilterByUser("no such user"),
+			db.ApplicationOfferFilterByUUID(
+				[]string{
+					"00000000-0000-0000-0000-000000000002",
+					"00000000-0000-0000-0000-000000000003",
+				}),
+			db.ApplicationOfferFilterByUUID(
+				[]string{
+					"00000000-0000-0000-0000-000000000002",
+				}),
+		},
+		expectedOffers: []dbmodel.ApplicationOffer{offer2},
+	}, {
+		about: "filter by UUID twice (ensure filters are AND without replacement)",
+		filters: []db.ApplicationOfferFilter{
+			db.ApplicationOfferFilterByUUID(
+				[]string{
+					"00000000-0000-0000-0000-000000000001",
+					"00000000-0000-0000-0000-000000000003",
+				}),
+			db.ApplicationOfferFilterByUUID(
+				[]string{
+					"00000000-0000-0000-0000-000000000002",
+				}),
 		},
 		expectedOffers: []dbmodel.ApplicationOffer{},
 	}, {
@@ -464,35 +455,6 @@ func (s *dbSuite) TestFindApplicationOffers(c *qt.C) {
 			db.ApplicationOfferFilterByApplication("app-1"),
 		},
 		expectedOffers: []dbmodel.ApplicationOffer{offer1, offer2, offer3},
-	}, {
-		about: "filter by consumer",
-		filters: []db.ApplicationOfferFilter{
-			db.ApplicationOfferFilterByConsumer(u.Username),
-		},
-		expectedOffers: []dbmodel.ApplicationOffer{offer2, offer3},
-	}, {
-		about: "filter by user - not found",
-		filters: []db.ApplicationOfferFilter{
-			db.ApplicationOfferFilterByConsumer("no such user"),
-		},
-		expectedOffers: []dbmodel.ApplicationOffer{},
-	}, {
-		about: "filter by user and consumer",
-		filters: []db.ApplicationOfferFilter{
-			db.ApplicationOfferFilterByUser(u.Username),
-			db.ApplicationOfferFilterByConsumer(u.Username),
-		},
-		expectedOffers: []dbmodel.ApplicationOffer{offer2, offer3},
-	}, {
-		about: "filter by consumer and endpoint",
-		filters: []db.ApplicationOfferFilter{
-			db.ApplicationOfferFilterByConsumer(u.Username),
-			db.ApplicationOfferFilterByEndpoint(dbmodel.ApplicationOfferRemoteEndpoint{
-				Role:      "requirer",
-				Interface: "http",
-			}),
-		},
-		expectedOffers: []dbmodel.ApplicationOffer{offer3},
 	}}
 
 	for _, test := range tests {

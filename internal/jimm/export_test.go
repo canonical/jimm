@@ -18,10 +18,6 @@ var (
 	CalculateNextPollDuration      = calculateNextPollDuration
 )
 
-func (w *Watcher) PollControllerModels(ctx context.Context, ctl *dbmodel.Controller) {
-	w.pollControllerModels(ctx, ctl)
-}
-
 func NewWatcherWithControllerUnavailableChan(db db.Database, dialer Dialer, pubsub Publisher, testChannel chan error) *Watcher {
 	return &Watcher{
 		Pubsub:                    pubsub,

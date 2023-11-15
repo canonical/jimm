@@ -4,10 +4,8 @@ package jimmtest
 
 import (
 	"context"
-	"database/sql"
 	"strconv"
 	"strings"
-	"time"
 
 	qt "github.com/frankban/quicktest"
 	jujuparams "github.com/juju/juju/rpc/params"
@@ -407,20 +405,7 @@ func (m *Model) DBObject(c *qt.C, db db.Database, client *openfga.OFGAClient) db
 
 	m.dbo.Controller = m.env.Controller(m.Controller).DBObject(c, db, client)
 	for _, u := range m.Users {
-		uma := dbmodel.UserModelAccess{
-			User:   m.env.User(u.User).DBObject(c, db, client),
-			Access: u.Access,
-		}
-		if u.LastConnection != "" {
-			if t, err := time.Parse(time.RFC3339, u.LastConnection); err == nil {
-				uma.LastConnection = sql.NullTime{
-					Time:  t,
-					Valid: true,
-				}
-			}
-		}
-		m.dbo.Users = append(m.dbo.Users, uma)
-
+		user := m.env.User(u.User).DBObject(c, db, client)
 		var relation openfga.Relation
 		switch u.Access {
 		case "admin":
@@ -430,10 +415,10 @@ func (m *Model) DBObject(c *qt.C, db db.Database, client *openfga.OFGAClient) db
 		case "read":
 			relation = ofganames.ReaderRelation
 		default:
-			c.Fatalf("unknown model access: %s %s", uma.User.Username, u.Access)
+			c.Fatalf("unknown model access: %s %s", user.Username, u.Access)
 		}
 		if client != nil {
-			user := openfga.NewUser(&uma.User, client)
+			user := openfga.NewUser(&user, client)
 			err := user.SetModelAccess(context.Background(), m.dbo.ResourceTag(), relation)
 			c.Assert(err, qt.IsNil)
 		}
@@ -478,7 +463,6 @@ func (u *User) DBObject(c *qt.C, db db.Database, client *openfga.OFGAClient) dbm
 	}
 	u.dbo.Username = u.Username
 	u.dbo.DisplayName = u.DisplayName
-	u.dbo.ControllerAccess = u.ControllerAccess
 
 	err := db.UpdateUser(context.Background(), &u.dbo)
 	c.Assert(err, qt.IsNil)

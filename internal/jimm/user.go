@@ -40,9 +40,7 @@ func (j *JIMM) Authenticate(ctx context.Context, req *jujuparams.LoginRequest) (
 		}
 		u.Model = pu.Model
 		u.LastLogin = pu.LastLogin
-		if u.ControllerAccess == "" {
-			u.ControllerAccess = pu.ControllerAccess
-		}
+
 		// TODO(mhilton) support disabled users.
 		if u.DisplayName != "" {
 			pu.DisplayName = u.DisplayName

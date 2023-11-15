@@ -3,8 +3,6 @@
 package dbmodel
 
 import (
-	"sort"
-	"strings"
 	"time"
 
 	"github.com/juju/charm/v11"
@@ -36,9 +34,6 @@ type ApplicationOffer struct {
 
 	// Application offer URL.
 	URL string
-
-	// Users contains the users with access to the application offer.
-	Users []UserApplicationOfferAccess `gorm:"foreignKey:ApplicationOfferID;references:ID"`
 
 	// Endpoints contains remote endpoints for the application offer.
 	Endpoints []ApplicationOfferRemoteEndpoint
@@ -74,16 +69,6 @@ func (o *ApplicationOffer) SetTag(t names.ApplicationOfferTag) {
 	o.UUID = t.Id()
 }
 
-// UserAccess returns the access level for the specified user.
-func (o *ApplicationOffer) UserAccess(u *User) string {
-	for _, ou := range o.Users {
-		if u.Username == ou.Username {
-			return ou.Access
-		}
-	}
-	return ""
-}
-
 // FromJujuApplicationOfferAdminDetails fills in the information from jujuparams ApplicationOfferAdminDetails.
 func (o *ApplicationOffer) FromJujuApplicationOfferAdminDetails(offerDetails jujuparams.ApplicationOfferAdminDetails) {
 	o.ApplicationName = offerDetails.ApplicationName
@@ -102,21 +87,6 @@ func (o *ApplicationOffer) FromJujuApplicationOfferAdminDetails(offerDetails juj
 			Interface: endpoint.Interface,
 			Limit:     endpoint.Limit,
 		}
-	}
-
-	o.Users = []UserApplicationOfferAccess{}
-	for _, user := range offerDetails.Users {
-		if strings.IndexByte(user.UserName, '@') < 0 {
-			// skip controller local users.
-			continue
-		}
-		o.Users = append(o.Users, UserApplicationOfferAccess{
-			Username: user.UserName,
-			User: User{
-				Username: user.UserName,
-			},
-			Access: user.Access,
-		})
 	}
 
 	o.Spaces = make([]ApplicationOfferRemoteSpace, len(offerDetails.Spaces))
@@ -161,18 +131,6 @@ func (o *ApplicationOffer) ToJujuApplicationOfferDetails() jujuparams.Applicatio
 			ProviderAttributes: space.ProviderAttributes,
 		}
 	}
-	users := make([]jujuparams.OfferUserDetails, len(o.Users))
-	for i, ua := range o.Users {
-		users[i] = jujuparams.OfferUserDetails{
-			UserName:    ua.User.Username,
-			DisplayName: ua.User.DisplayName,
-			Access:      ua.Access,
-		}
-
-	}
-	sort.Slice(users, func(i, j int) bool {
-		return users[i].UserName < users[j].UserName
-	})
 
 	connections := make([]jujuparams.OfferConnection, len(o.Connections))
 	for i, connection := range o.Connections {
@@ -194,7 +152,8 @@ func (o *ApplicationOffer) ToJujuApplicationOfferDetails() jujuparams.Applicatio
 			Endpoints:              endpoints,
 			Spaces:                 spaces,
 			Bindings:               o.Bindings,
-			Users:                  users,
+			//TODO(Kian) CSS-6040 Refactor the below to use a better abstraction for Postgres/OpenFGA to Juju types
+			Users: nil,
 		},
 		ApplicationName: o.ApplicationName,
 		CharmURL:        o.CharmURL,
@@ -243,28 +202,4 @@ type ApplicationOfferConnection struct {
 	Username       string
 	Endpoint       string
 	IngressSubnets Strings
-}
-
-// A UserApplicationOfferAccess maps the access level for a user on an
-// application-offer.
-type UserApplicationOfferAccess struct {
-	gorm.Model
-
-	// User is the user associated with this access.
-	Username string
-	User     User `gorm:"foreignKey:Username;references:Username"`
-
-	// ApplicationOffer is the application-offer associated with this
-	// access.
-	ApplicationOfferID uint
-	ApplicationOffer   ApplicationOffer `gorm:"foreignKey:ApplicationOfferID;references:ID"`
-
-	// Access is the access level for to the application offer to the user.
-	Access string
-}
-
-// TableName overrides the table name gorm will use to find
-// UserApplicationOfferAccess records.
-func (UserApplicationOfferAccess) TableName() string {
-	return "user_application_offer_access"
 }

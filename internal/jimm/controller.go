@@ -383,7 +383,6 @@ func (j *JIMM) ImportModel(ctx context.Context, user *openfga.User, controllerNa
 
 	// Note that only the new owner is given access. All previous users that had access according to Juju
 	// are discarded as access must now be governed by JIMM and OpenFGA.
-	model.Users = nil
 	ofgaUser := openfga.NewUser(&ownerUser, j.OpenFGAClient)
 	if err := ofgaUser.SetModelAccess(ctx, modelTag, ofganames.AdministratorRelation); err != nil {
 		zapctx.Error(

@@ -77,7 +77,7 @@ func (s *userManagerSuite) TestUserInfoSpecifiedUser(c *gc.C) {
 	c.Assert(users[0], jc.DeepEquals, jujuparams.UserInfo{
 		Username:    "alice@external",
 		DisplayName: "alice",
-		Access:      "superuser",
+		Access:      "",
 	})
 }
 
@@ -104,7 +104,7 @@ func (s *userManagerSuite) TestUserInfoWithDomain(c *gc.C) {
 	c.Assert(users[0], jc.DeepEquals, jujuparams.UserInfo{
 		Username:    "alice@mydomain",
 		DisplayName: "alice",
-		Access:      "login",
+		Access:      "",
 	})
 }
 
