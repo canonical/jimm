@@ -120,7 +120,7 @@ type AuditEvent struct {
 	Params map[string]any `json:"params,omitempty" yaml:"params,omitempty"`
 
 	// Errors contains error info received from the controller.
-	Errors map[string]any `json:"error,omitempty" yaml:"errors,omitempty"`
+	Errors map[string]any `json:"errors,omitempty" yaml:"errors,omitempty"`
 }
 
 // An AuditEvents contains events from the audit log.
