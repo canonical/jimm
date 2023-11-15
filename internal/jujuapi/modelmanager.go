@@ -47,6 +47,9 @@ func init() {
 		r.AddMethod("ModelManager", 9, "SetModelDefaults", setModelDefaultsMethod)
 		r.AddMethod("ModelManager", 9, "UnsetModelDefaults", unsetModelDefaultsMethod)
 		r.AddMethod("ModelManager", 9, "ModelDefaultsForClouds", modelDefaultsForCloudsMethod)
+		//TODO(Kian) Investigate the following methods that no longer exist in Juju
+		// - ModelStatus
+		// - ValidateModelUpgrades
 
 		return []int{9}
 	}

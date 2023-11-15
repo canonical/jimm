@@ -2,6 +2,8 @@ module github.com/canonical/jimm
 
 go 1.21
 
+toolchain go1.21.3
+
 require (
 	github.com/canonical/candid v1.12.2
 	github.com/canonical/go-dqlite v1.20.0
@@ -16,10 +18,10 @@ require (
 	github.com/hashicorp/vault/api v1.8.2
 	github.com/jackc/pgconn v1.13.0
 	github.com/jackc/pgx/v4 v4.17.2
-	github.com/juju/cmd/v3 v3.0.13
+	github.com/juju/cmd/v3 v3.0.14
 	github.com/juju/errors v1.0.0
 	github.com/juju/gnuflag v1.0.0
-	github.com/juju/juju v0.0.0-20231016012854-17c74445a4bb
+	github.com/juju/juju v0.0.0-20231110092546-f835120f6974
 	github.com/juju/loggo v1.0.0
 	github.com/juju/mgomonitor v0.0.0-20181029151116-52206bb0cd31
 	github.com/juju/names/v4 v4.0.0
@@ -193,7 +195,7 @@ require (
 	github.com/juju/ansiterm v1.0.0 // indirect
 	github.com/juju/blobstore/v3 v3.0.2 // indirect
 	github.com/juju/collections v1.0.4 // indirect
-	github.com/juju/description/v4 v4.0.10 // indirect
+	github.com/juju/description/v4 v4.0.11 // indirect
 	github.com/juju/featureflag v1.0.0 // indirect
 	github.com/juju/go4 v0.0.0-20160222163258-40d72ab9641a // indirect
 	github.com/juju/gojsonpointer v0.0.0-20150204194629-afe8b77aa08f // indirect
@@ -277,7 +279,7 @@ require (
 	github.com/oklog/run v1.0.0 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
-	github.com/oracle/oci-go-sdk/v65 v65.34.0 // indirect
+	github.com/oracle/oci-go-sdk/v65 v65.49.0 // indirect
 	github.com/packethost/packngo v0.28.1 // indirect
 	github.com/pborman/uuid v1.2.1 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.8 // indirect
@@ -351,7 +353,7 @@ require (
 	google.golang.org/genproto v0.0.0-20230706204954-ccb25ca9f130 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20230629202037-9506855d4529 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20230711160842-782d3b101e98 // indirect
-	google.golang.org/grpc v1.56.2 // indirect
+	google.golang.org/grpc v1.56.3 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
 	gopkg.in/cheggaaa/pb.v1 v1.0.28 // indirect
 	gopkg.in/gobwas/glob.v0 v0.2.3 // indirect

@@ -43,6 +43,17 @@ func init() {
 		r.AddMethod("Controller", 11, "MongoVersion", mongoVersionMethod)
 		r.AddMethod("Controller", 11, "WatchModelSummaries", watchModelSummariesMethod)
 		r.AddMethod("Controller", 11, "WatchAllModelSummaries", watchAllModelSummariesMethod)
+		// TODO(Kian) Check missing methods
+		// - DashboardConnectionInfo
+		// - ListBlockedModels
+		// - HostedModelConfig
+		// - RemoveBlocks
+		// - WatchAllModels
+		// - initiateMigration
+		// - ModifyControllerAccess
+		// Methods that no longer exist:
+		// - ControllerConfig
+		// - ModelStatus
 
 		return []int{11}
 	}
