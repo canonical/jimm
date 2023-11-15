@@ -30,7 +30,6 @@ func TestUser(t *testing.T) {
 	result = db.Create(&u1)
 	c.Assert(result.Error, qt.IsNil)
 	c.Check(result.RowsAffected, qt.Equals, int64(1))
-	c.Check(u1.ControllerAccess, qt.Equals, "login")
 
 	var u2 dbmodel.User
 	result = db.Where("username = ?", "bob@external").First(&u2)
@@ -119,141 +118,6 @@ func TestUserCloudCredentials(t *testing.T) {
 	}})
 }
 
-func TestUserModels(t *testing.T) {
-	c := qt.New(t)
-	db := gormDB(c)
-	cl, cred, ctl, u := initModelEnv(c, db)
-
-	m1 := dbmodel.Model{
-		Name:  "test-model-1",
-		Owner: u,
-		UUID: sql.NullString{
-			String: "00000001-0000-0000-0000-0000-000000000001",
-			Valid:  true,
-		},
-		Controller:      ctl,
-		CloudRegion:     cl.Regions[0],
-		CloudCredential: cred,
-		Users: []dbmodel.UserModelAccess{{
-			User:   u,
-			Access: "admin",
-		}},
-	}
-	c.Assert(db.Create(&m1).Error, qt.IsNil)
-
-	m2 := dbmodel.Model{
-		Name:  "test-model-2",
-		Owner: u,
-		UUID: sql.NullString{
-			String: "00000001-0000-0000-0000-0000-000000000002",
-			Valid:  true,
-		},
-		Controller:      ctl,
-		CloudRegion:     cl.Regions[0],
-		CloudCredential: cred,
-		Users: []dbmodel.UserModelAccess{{
-			User:   u,
-			Access: "write",
-		}},
-	}
-	c.Assert(db.Create(&m2).Error, qt.IsNil)
-
-	var models []dbmodel.UserModelAccess
-	err := db.Model(&u).Preload("Model_").Association("Models").Find(&models)
-	c.Assert(err, qt.IsNil)
-
-	c.Check(models, qt.DeepEquals, []dbmodel.UserModelAccess{{
-		Model:    m1.Users[0].Model,
-		Username: u.Username,
-		ModelID:  m1.ID,
-		Model_: dbmodel.Model{
-			ID:                m1.ID,
-			CreatedAt:         m1.CreatedAt,
-			UpdatedAt:         m1.UpdatedAt,
-			Name:              m1.Name,
-			OwnerUsername:     m1.OwnerUsername,
-			UUID:              m1.UUID,
-			ControllerID:      m1.ControllerID,
-			CloudRegionID:     m1.CloudRegionID,
-			CloudCredentialID: m1.CloudCredentialID,
-		},
-		Access: "admin",
-	}, {
-		Model:    m2.Users[0].Model,
-		Username: u.Username,
-		ModelID:  m2.ID,
-		Model_: dbmodel.Model{
-			ID:                m2.ID,
-			CreatedAt:         m2.CreatedAt,
-			UpdatedAt:         m2.UpdatedAt,
-			Name:              m2.Name,
-			OwnerUsername:     m2.OwnerUsername,
-			UUID:              m2.UUID,
-			ControllerID:      m2.ControllerID,
-			CloudRegionID:     m2.CloudRegionID,
-			CloudCredentialID: m2.CloudCredentialID,
-		},
-		Access: "write",
-	}})
-}
-
-func TestUserApplicationOffers(t *testing.T) {
-	c := qt.New(t)
-	db := gormDB(c)
-	cl, cred, ctl, u := initModelEnv(c, db)
-
-	m := dbmodel.Model{
-		Name:            "test-model",
-		Owner:           u,
-		Controller:      ctl,
-		CloudRegion:     cl.Regions[0],
-		CloudCredential: cred,
-		Offers: []dbmodel.ApplicationOffer{{
-			Name: "offer-1",
-			UUID: "00000004-0000-0000-0000-0000-000000000001",
-			Users: []dbmodel.UserApplicationOfferAccess{{
-				User:   u,
-				Access: "admin",
-			}},
-			ApplicationName: "app-1",
-		}, {
-			Name: "offer-1",
-			UUID: "00000004-0000-0000-0000-0000-000000000002",
-			Users: []dbmodel.UserApplicationOfferAccess{{
-				User:   u,
-				Access: "consume",
-			}},
-			ApplicationName: "app-2",
-		}},
-	}
-
-	c.Assert(db.Create(&m).Error, qt.IsNil)
-
-	var offers []dbmodel.UserApplicationOfferAccess
-	err := db.Model(&u).Association("ApplicationOffers").Find(&offers)
-	c.Assert(err, qt.IsNil)
-
-	c.Check(offers, qt.DeepEquals, []dbmodel.UserApplicationOfferAccess{{
-		Model: gorm.Model{
-			ID:        m.Offers[0].Users[0].ID,
-			CreatedAt: m.Offers[0].Users[0].CreatedAt,
-			UpdatedAt: m.Offers[0].Users[0].UpdatedAt,
-		},
-		Username:           u.Username,
-		ApplicationOfferID: m.Offers[0].ID,
-		Access:             "admin",
-	}, {
-		Model: gorm.Model{
-			ID:        m.Offers[1].Users[0].ID,
-			CreatedAt: m.Offers[1].Users[0].CreatedAt,
-			UpdatedAt: m.Offers[1].Users[0].UpdatedAt,
-		},
-		Username:           u.Username,
-		ApplicationOfferID: m.Offers[1].ID,
-		Access:             "consume",
-	}})
-}
-
 func TestUserToJujuUserInfo(t *testing.T) {
 	c := qt.New(t)
 
@@ -261,15 +125,14 @@ func TestUserToJujuUserInfo(t *testing.T) {
 		Model: gorm.Model{
 			CreatedAt: time.Now(),
 		},
-		Username:         "alice@external",
-		DisplayName:      "Alice",
-		ControllerAccess: "superuser",
+		Username:    "alice@external",
+		DisplayName: "Alice",
 	}
 	ui := u.ToJujuUserInfo()
 	c.Check(ui, qt.DeepEquals, jujuparams.UserInfo{
 		Username:    "alice@external",
 		DisplayName: "Alice",
-		Access:      "superuser",
+		Access:      "",
 		DateCreated: u.CreatedAt,
 	})
 
@@ -281,7 +144,7 @@ func TestUserToJujuUserInfo(t *testing.T) {
 	c.Check(ui, qt.DeepEquals, jujuparams.UserInfo{
 		Username:       "alice@external",
 		DisplayName:    "Alice",
-		Access:         "superuser",
+		Access:         "",
 		DateCreated:    u.CreatedAt,
 		LastConnection: &u.LastLogin.Time,
 	})

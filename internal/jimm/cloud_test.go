@@ -58,8 +58,7 @@ func TestGetCloud(t *testing.T) {
 	// daphne is a jimm administrator
 	daphne := openfga.NewUser(
 		&dbmodel.User{
-			Username:         "daphne@external",
-			ControllerAccess: "superuser",
+			Username: "daphne@external",
 		},
 		client,
 	)
@@ -183,7 +182,7 @@ func TestForEachCloud(t *testing.T) {
 		client,
 	)
 	daphne := openfga.NewUser(
-		&dbmodel.User{Username: "daphne@external", ControllerAccess: "superuser"},
+		&dbmodel.User{Username: "daphne@external"},
 		client,
 	)
 	err = daphne.SetControllerAccess(context.Background(), names.NewControllerTag(j.UUID), ofganames.AdministratorRelation)

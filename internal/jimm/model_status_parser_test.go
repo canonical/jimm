@@ -10,16 +10,11 @@ import (
 	"github.com/juju/juju/core/life"
 	"github.com/juju/juju/core/status"
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
 
 	"github.com/canonical/jimm/internal/db"
-	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/jimm"
 	"github.com/canonical/jimm/internal/jimmtest"
-	"github.com/canonical/jimm/internal/openfga"
-	ofganames "github.com/canonical/jimm/internal/openfga/names"
-	jimmnames "github.com/canonical/jimm/pkg/names"
 )
 
 var now = (time.Time{}).UTC().Round(time.Millisecond)
@@ -440,8 +435,6 @@ func TestQueryModelsJq(t *testing.T) {
 	env := jimmtest.ParseEnvironment(c, crossModelQueryEnv)
 	env.PopulateDB(c, j.Database, nil)
 
-	user := env.User("alice@external").DBObject(c, j.Database, nil)
-
 	modelUUIDs := []string{
 		"10000000-0000-0000-0000-000000000000",
 		"20000000-0000-0000-0000-000000000000",
@@ -450,60 +443,13 @@ func TestQueryModelsJq(t *testing.T) {
 		"50000000-0000-0000-0000-000000000000", // Erroneous model (storage errors).
 	}
 
-	c.Assert(j.OpenFGAClient.AddRelation(ctx,
-		[]openfga.Tuple{
-			// Reader to model via direct relation
-			{
-				Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
-				Relation: ofganames.ReaderRelation,
-				Target:   ofganames.ConvertTag(names.NewModelTag(modelUUIDs[0])),
-			},
-			{
-				Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
-				Relation: ofganames.ReaderRelation,
-				Target:   ofganames.ConvertTag(names.NewModelTag(modelUUIDs[4])),
-			},
-			// Reader to model via group
-			{
-				Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
-				Relation: ofganames.MemberRelation,
-				Target:   ofganames.ConvertTag(jimmnames.NewGroupTag("1")),
-			},
-			{
-				Object:   ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag("1"), ofganames.MemberRelation),
-				Relation: ofganames.ReaderRelation,
-				Target:   ofganames.ConvertTag(names.NewModelTag(modelUUIDs[1])),
-			},
-			// Reader to model via administrator of controller
-			{
-				Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
-				Relation: ofganames.AdministratorRelation,
-				Target:   ofganames.ConvertTag(names.NewControllerTag("00000000-0000-0000-0000-000000000000")),
-			},
-			{
-				Object:   ofganames.ConvertTag(names.NewControllerTag("00000000-0000-0000-0000-000000000000")),
-				Relation: ofganames.ControllerRelation,
-				Target:   ofganames.ConvertTag(names.NewModelTag(modelUUIDs[2])),
-			},
-			// Reader to model via direct relation that does NOT exist
-			{
-				Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
-				Relation: ofganames.ReaderRelation,
-				Target:   ofganames.ConvertTag(names.NewModelTag(modelUUIDs[3])),
-			},
-		}...,
-	), qt.Equals, nil)
-
 	// Tests:
 
-	// Query for all models only.
-	usersModels, err := j.Database.GetUserModels(ctx, &user)
+	// Fetch all models and reuse throughout the test.
+	models, err := j.Database.GetModelsByUUID(ctx, modelUUIDs)
 	c.Assert(err, qt.IsNil)
-	models := make([]dbmodel.Model, len(usersModels))
-	for i, m := range usersModels {
-		models[i] = m.Model_
-	}
 
+	// Query for all models only.
 	res, err := j.QueryModelsJq(ctx, models, ".model")
 	c.Assert(err, qt.IsNil)
 	c.Assert(`

@@ -200,14 +200,14 @@ func (r *controllerRoot) credential(ctx context.Context, cloudCredentialTag stri
 		return nil, errors.E(op, err, errors.CodeBadRequest)
 	}
 
-	cred, err := r.jimm.GetCloudCredential(ctx, r.user.User, cct)
+	cred, err := r.jimm.GetCloudCredential(ctx, r.user, cct)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
 	cc := jujuparams.CloudCredential{
 		AuthType: cred.AuthType,
 	}
-	cc.Attributes, cc.Redacted, err = r.jimm.GetCloudCredentialAttributes(ctx, r.user.User, cred, false)
+	cc.Attributes, cc.Redacted, err = r.jimm.GetCloudCredentialAttributes(ctx, r.user, cred, false)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
@@ -310,7 +310,7 @@ func (r *controllerRoot) CredentialContents(ctx context.Context, args jujuparams
 			content.Valid = &c.Valid.Bool
 		}
 		var err error
-		content.Attributes, _, err = r.jimm.GetCloudCredentialAttributes(ctx, r.user.User, c, args.IncludeSecrets)
+		content.Attributes, _, err = r.jimm.GetCloudCredentialAttributes(ctx, r.user, c, args.IncludeSecrets)
 		if err != nil {
 			return nil, errors.E(err)
 		}
@@ -334,7 +334,7 @@ func (r *controllerRoot) CredentialContents(ctx context.Context, args jujuparams
 	results := make([]jujuparams.CredentialContentResult, len(args.Credentials))
 	for i, arg := range args.Credentials {
 		cct := names.NewCloudCredentialTag(fmt.Sprintf("%s/%s/%s", arg.CloudName, r.user.Username, arg.CredentialName))
-		cred, err := r.jimm.GetCloudCredential(ctx, r.user.User, cct)
+		cred, err := r.jimm.GetCloudCredential(ctx, r.user, cct)
 		if err != nil {
 			results[i].Error = mapError(errors.E(op, err))
 			continue
@@ -458,7 +458,7 @@ func (r *controllerRoot) updateCredential(ctx context.Context, cred jujuparams.T
 	if err != nil {
 		return nil, errors.E(err, errors.CodeBadRequest)
 	}
-	return r.jimm.UpdateCloudCredential(ctx, r.user.User, jimm.UpdateCloudCredentialArgs{
+	return r.jimm.UpdateCloudCredential(ctx, r.user, jimm.UpdateCloudCredentialArgs{
 		CredentialTag: tag,
 		Credential:    cred.Credential,
 		SkipCheck:     skipCheck,

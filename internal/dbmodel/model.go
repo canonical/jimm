@@ -11,7 +11,6 @@ import (
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 	"github.com/juju/version/v2"
-	"gorm.io/gorm"
 
 	"github.com/canonical/jimm/internal/errors"
 )
@@ -75,9 +74,6 @@ type Model struct {
 
 	// Offers are the ApplicationOffers attached to the model.
 	Offers []ApplicationOffer
-
-	// Users are the users that can access the model.
-	Users []UserModelAccess
 }
 
 // Tag returns a names.Tag for the model.
@@ -102,17 +98,6 @@ func (m *Model) SetTag(t names.ModelTag) {
 	m.UUID.Valid = true
 }
 
-// UserAccess returns the access level of the given user on the model. If
-// the user has no access then an empty string is returned.
-func (m *Model) UserAccess(u *User) string {
-	for _, mu := range m.Users {
-		if u.Username == mu.Username {
-			return mu.Access
-		}
-	}
-	return ""
-}
-
 // FromModelUpdate updates the model from the given ModelUpdate.
 func (m *Model) SwitchOwner(u *User) {
 	m.OwnerUsername = u.Username
@@ -135,11 +120,6 @@ func (m *Model) FromJujuModelInfo(info jujuparams.ModelInfo) error {
 	}
 	m.Life = string(info.Life)
 	m.Status.FromJujuEntityStatus(info.Status)
-
-	m.Users = make([]UserModelAccess, len(info.Users))
-	for i, u := range info.Users {
-		m.Users[i].FromJujuModelUserInfo(u)
-	}
 
 	m.CloudRegion.Name = info.CloudRegion
 	if info.CloudTag != "" {
@@ -252,89 +232,6 @@ func (s SLA) ToJujuModelSLAInfo() jujuparams.ModelSLAInfo {
 	msi.Level = s.Level
 	msi.Owner = s.Owner
 	return msi
-}
-
-// A UserModelAccess maps the access level of a user on a model.
-type UserModelAccess struct {
-	gorm.Model
-
-	// User is the User this access is for.
-	Username string
-	User     User `gorm:"foreignKey:Username;references:Username"`
-
-	// Model is the Model this access is for.
-	ModelID uint
-	Model_  Model `gorm:"foreignKey:ModelID"`
-
-	// Access is the access level of the user on the model.
-	Access string `gorm:"not null"`
-
-	// LastConnection holds the last time the user connected to the model.
-	LastConnection sql.NullTime
-}
-
-// TableName overrides the table name gorm will use to find
-// UserModelAccess records.
-func (UserModelAccess) TableName() string {
-	return "user_model_access"
-}
-
-// FromJujuModelUserInfo converts jujuparams.ModelUserInfo into a User.
-func (a *UserModelAccess) FromJujuModelUserInfo(u jujuparams.ModelUserInfo) {
-	a.User = User{
-		Username:    u.UserName,
-		DisplayName: u.DisplayName,
-	}
-	a.Access = string(u.Access)
-	if u.LastConnection != nil {
-		a.LastConnection = sql.NullTime{
-			Time:  *u.LastConnection,
-			Valid: true,
-		}
-	}
-}
-
-// ToJujuModelUserInfo converts a UserModelAccess into a
-// jujuparams.ModelUserInfo. The UserModelAccess must have its User
-// association loaded.
-func (a UserModelAccess) ToJujuModelUserInfo() jujuparams.ModelUserInfo {
-	var mui jujuparams.ModelUserInfo
-	mui.UserName = a.User.Username
-	mui.DisplayName = a.User.DisplayName
-	if a.LastConnection.Valid {
-		mui.LastConnection = &a.LastConnection.Time
-	} else {
-		mui.LastConnection = nil
-	}
-	mui.Access = jujuparams.UserAccessPermission(a.Access)
-	return mui
-}
-
-// ToUserModel converts a UserModelAccess into a jujuparams.ModelUserInfo.
-// The UserModelAccess must have its Model_ association loaded.
-func (a UserModelAccess) ToJujuUserModel() jujuparams.UserModel {
-	var um jujuparams.UserModel
-	um.Model = a.Model_.ToJujuModel()
-	if a.LastConnection.Valid {
-		um.LastConnection = &a.LastConnection.Time
-	} else {
-		um.LastConnection = nil
-	}
-	return um
-}
-
-// ToJujuModelSummary converts a UserModelAccess to a
-// jujuparams.ModelSummary. The UserModelAccess must have its Model_
-// association filled out.
-func (a UserModelAccess) ToJujuModelSummary() jujuparams.ModelSummary {
-	ms := a.Model_.ToJujuModelSummary()
-	ms.UserAccess = jujuparams.UserAccessPermission(a.Access)
-	if a.LastConnection.Valid {
-		ms.UserLastConnection = &a.LastConnection.Time
-	} else {
-		ms.UserLastConnection = nil
-	}
-	return ms
 }
 
 // A Status holds the entity status of an object.
