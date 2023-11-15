@@ -5,18 +5,22 @@ with the local Q/A environment. This environment is additionally
 used for integration testing within the JIMM test suite.
 
 # Starting the environment
-1. Ensure you have docker above v18, confirm this with `docker --version`
+1. Ensure you have docker above v18, confirm this with `docker --version` or
+   [install it](https://docs.docker.com/engine/install/ubuntu/#installation-methods) (you
+   may need to log out and back in to proceed without sudo).
 2. Ensure you have Go installed, confirm this with `go version` or install it with `sudo snap install go --classic`
 3. Install build-essentials to build the jimmctl tool (this tool is used to communicate with the JIMM server), `sudo apt install -y build-essential`
-4. Ensure you are in the root JIMM directory.
-5. Run `make pull/candid` to get a local image of candid (this is subject to change!)
-6. Run `cd local/traefik/certs; ./certs.sh; cd -`, this will setup some self signed certs and add them to your cert pool.
-7. Run `touch ./local/vault/approle.json && touch ./local/vault/roleid.txt`
-8. Run `make version/commit.txt && make version/version.txt` to populate the repo with the git commit and version info.
-9. Run `go mod vendor` to vendor JIMM's dependencies and reduce repeated setup time.
-10. `docker compose --profile dev up` if you encounter an error like "Error response from daemon: network ... not found" then the command `docker compose --profile dev up --force-recreate` should help.
+5. Ensure you are in the root JIMM directory.
+6. Run `make pull/candid` to get a local image of candid (this is subject to change!)
+7. Run `cd local/traefik/certs; ./certs.sh; cd -`, this will setup some self signed certs and add them to your cert pool.
+8. Run `touch ./local/vault/approle.json && touch ./local/vault/roleid.txt`
+9. Run `make version/commit.txt && make version/version.txt` to populate the repo with the git commit and version info.
+10. Run `go mod vendor` to vendor JIMM's dependencies and reduce repeated setup time.
+11. `docker compose --profile dev up` if you encounter an error like "Error response from daemon: network ... not found" then the command `docker compose --profile dev up --force-recreate` should help.
 
-After this initial setup, subsequent use of the compose can be done with `docker compose --profile dev up --force-recreate`
+After this initial setup, subsequent use of the compose can be done with `docker
+compose --profile dev up --force-recreate` (it may be necessary to run `docker
+compose down -v --remove-orphans` first).
 
 The services included are:
 - JIMM (only started in the dev profile)
@@ -50,6 +54,14 @@ The `request name` represents the literal WS endpoint, i.e., `API = /api`.
 ## Prerequisites
 
 // TODO(): Ipv6 network on the Juju container don't work with JIMM. Figure out how to disable these at the container level so that the controller.yaml file doesn't present ipv6 at all. For now one can remove this by hand.
+
+1. The following commands might need to be run to work around an [LXC networking
+   issue](https://github.com/docker/for-linux/issues/103#issuecomment-383607773):
+   `sudo iptables -F FORWARD && sudo iptables -P FORWARD ACCEPT`.
+2. Install Juju: `sudo snap install juju`.
+3. Install JQ: `sudo snap install jq`.
+
+## Controller set up
 
 Note that you can export an environment variable `CONTROLLER_NAME` and re-run steps 3. and 4. below to create multiple Juju
 controllers that will be controlled by JIMM.
