@@ -22,21 +22,6 @@ func init() {
 		resetPasswordMethod := rpc.Method(r.ResetPassword)
 		modelUserInfoMethod := rpc.Method(r.ModelUserInfo)
 
-		r.AddMethod("UserManager", 1, "AddUser", addUserMethod)
-		r.AddMethod("UserManager", 1, "DisableUser", disableUserMethod)
-		r.AddMethod("UserManager", 1, "EnableUser", enableUserMethod)
-		r.AddMethod("UserManager", 1, "RemoveUser", removeUserMethod)
-		r.AddMethod("UserManager", 1, "SetPassword", setPasswordMethod)
-		r.AddMethod("UserManager", 1, "UserInfo", userInfoMethod)
-
-		r.AddMethod("UserManager", 2, "AddUser", addUserMethod)
-		r.AddMethod("UserManager", 2, "DisableUser", disableUserMethod)
-		r.AddMethod("UserManager", 2, "EnableUser", enableUserMethod)
-		r.AddMethod("UserManager", 2, "RemoveUser", removeUserMethod)
-		r.AddMethod("UserManager", 2, "SetPassword", setPasswordMethod)
-		r.AddMethod("UserManager", 2, "UserInfo", userInfoMethod)
-		r.AddMethod("UserManager", 2, "ResetPassword", resetPasswordMethod)
-
 		r.AddMethod("UserManager", 3, "AddUser", addUserMethod)
 		r.AddMethod("UserManager", 3, "DisableUser", disableUserMethod)
 		r.AddMethod("UserManager", 3, "EnableUser", enableUserMethod)
@@ -46,7 +31,7 @@ func init() {
 		r.AddMethod("UserManager", 3, "ResetPassword", resetPasswordMethod)
 		r.AddMethod("UserManager", 3, "ModelUserInfo", modelUserInfoMethod)
 
-		return []int{3, 2, 1}
+		return []int{3}
 	}
 }
 

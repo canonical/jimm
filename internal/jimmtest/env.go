@@ -249,10 +249,6 @@ func (cl *Cloud) DBObject(c *qt.C, db db.Database, client *openfga.OFGAClient) d
 	}
 	for _, u := range cl.Users {
 		dbUser := cl.env.User(u.User).DBObject(c, db, client)
-		cl.dbo.Users = append(cl.dbo.Users, dbmodel.UserCloudAccess{
-			User:   dbUser,
-			Access: u.Access,
-		})
 		var relation openfga.Relation
 		switch u.Access {
 		case "admin":

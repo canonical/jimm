@@ -57,23 +57,6 @@ func (d *Database) FetchUser(ctx context.Context, u *dbmodel.User) error {
 	return nil
 }
 
-// GetUserClouds gets all the UserCloudAccess records associated with the
-// given user.
-func (d *Database) GetUserClouds(ctx context.Context, u *dbmodel.User) ([]dbmodel.UserCloudAccess, error) {
-	const op = errors.Op("db.GetUserClouds")
-	if err := d.ready(); err != nil {
-		return nil, errors.E(op, err)
-	}
-
-	var ucas []dbmodel.UserCloudAccess
-	db := d.DB.WithContext(ctx)
-	db = preloadCloud("Cloud", db)
-	if err := db.Model(u).Association("Clouds").Find(&ucas); err != nil {
-		return nil, errors.E(op, err)
-	}
-	return ucas, nil
-}
-
 // UpdateUser updates the given user record. UpdateUser will not store any
 // changes to a user's ApplicationOffers, Clouds, CloudCredentials, or
 // Models. These should be updated through the object in question.

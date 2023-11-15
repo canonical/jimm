@@ -1,7 +1,8 @@
 #!/bin/sh
 
 # Grab JQ for ease of use.
-wget -O jq https://github.com/stedolan/jq/releases/download/jq-1.5/jq-linux64
+ARCH=$(arch | sed s/aarch64/arm64/ | sed s/x86_64/amd64/)
+wget -O jq https://github.com/jqlang/jq/releases/download/jq-1.7/jq-linux-$ARCH
 chmod +x ./jq
 cp jq /usr/bin
 

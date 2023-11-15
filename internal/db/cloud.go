@@ -108,7 +108,6 @@ func preloadCloud(prefix string, db *gorm.DB) *gorm.DB {
 		prefix += "."
 	}
 	db = db.Preload(prefix + "Regions").Preload(prefix + "Regions.Controllers").Preload(prefix + "Regions.Controllers.Controller")
-	db = db.Preload(prefix + "Users").Preload(prefix + "Users.User")
 	return db
 }
 
@@ -141,7 +140,7 @@ func (d *Database) FindRegion(ctx context.Context, providerType, name string) (*
 	}
 
 	db := d.DB.WithContext(ctx)
-	db = db.Preload("Cloud").Preload("Cloud.Users").Preload("Controllers").Preload("Controllers.Controller")
+	db = db.Preload("Cloud").Preload("Controllers").Preload("Controllers.Controller")
 	db = db.Model(dbmodel.CloudRegion{}).Joins("INNER JOIN clouds ON clouds.name = cloud_regions.cloud_name").Where("clouds.type = ? AND cloud_regions.name = ?", providerType, name)
 
 	var region dbmodel.CloudRegion
@@ -149,28 +148,6 @@ func (d *Database) FindRegion(ctx context.Context, providerType, name string) (*
 		return nil, errors.E(op, dbError(err))
 	}
 	return &region, nil
-}
-
-// UpdateUserCloudAccess updates the given UserCloudAccess record. If the
-// specified access is changed to "" (no access) then the record is
-// removed.
-func (d *Database) UpdateUserCloudAccess(ctx context.Context, a *dbmodel.UserCloudAccess) error {
-	const op = errors.Op("db.UpdateUserCloudAccess")
-
-	if err := d.ready(); err != nil {
-		return errors.E(op, err)
-	}
-
-	db := d.DB.WithContext(ctx)
-	if a.Access == "" {
-		db = db.Delete(a)
-	} else {
-		db = db.Save(a)
-	}
-	if db.Error != nil {
-		return errors.E(op, dbError(db.Error))
-	}
-	return nil
 }
 
 // DeleteCloud deletes the given cloud.

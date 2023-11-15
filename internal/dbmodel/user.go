@@ -36,9 +36,6 @@ type User struct {
 	// controller. By default all users have "add-model" access.
 	ControllerAccess string `gorm:"not null;default:'login'"`
 
-	// Clouds are the clouds accessible to this user.
-	Clouds []UserCloudAccess `gorm:"foreignKey:Username;references:Username"`
-
 	// CloudCredentials are the cloud credentials owned by this user.
 	CloudCredentials []CloudCredential `gorm:"foreignKey:OwnerUsername;references:Username"`
 

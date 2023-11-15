@@ -49,9 +49,6 @@ type Cloud struct {
 
 	// Config contains the configuration associated with this cloud.
 	Config Map
-
-	// Users contains the users that are authorized on this cloud.
-	Users []UserCloudAccess `gorm:"foreignkey:CloudName;references:Name"`
 }
 
 // Tag returns a names.Tag for this cloud.
@@ -70,16 +67,6 @@ func (c Cloud) ResourceTag() names.CloudTag {
 // SetTag sets the name of the cloud to the value from the given cloud tag.
 func (c *Cloud) SetTag(t names.CloudTag) {
 	c.Name = t.Id()
-}
-
-// UserAccess returns the access level of the given user on the cloud.
-func (c Cloud) UserAccess(user *User) string {
-	for _, u := range c.Users {
-		if u.Username == user.Username {
-			return u.Access
-		}
-	}
-	return ""
 }
 
 // Region returns the cloud region with the given name. If there is no
@@ -160,10 +147,9 @@ func (c Cloud) ToJujuCloudDetails() jujuparams.CloudDetails {
 func (c Cloud) ToJujuCloudInfo() jujuparams.CloudInfo {
 	var ci jujuparams.CloudInfo
 	ci.CloudDetails = c.ToJujuCloudDetails()
-	ci.Users = make([]jujuparams.CloudUserInfo, len(c.Users))
-	for i, u := range c.Users {
-		ci.Users[i] = u.ToJujuCloudUserInfo()
-	}
+	// TODO(Kian) CSS-6040 Determine whether to combine OpenFGA Tuples
+	// with Postgres data objects for a consolidated view.
+	ci.Users = nil
 	return ci
 }
 
@@ -214,37 +200,4 @@ func (cr *CloudRegion) FromJujuCloudRegion(r jujuparams.CloudRegion) {
 	cr.Endpoint = r.Endpoint
 	cr.IdentityEndpoint = r.IdentityEndpoint
 	cr.StorageEndpoint = r.StorageEndpoint
-}
-
-// A UserCloudAccess maps the access level of a user on a cloud.
-type UserCloudAccess struct {
-	gorm.Model
-
-	// User is the User this access is for.
-	Username string
-	User     User `gorm:"foreignKey:Username;references:Username"`
-
-	// Cloud is the Cloud this access is for.
-	CloudName string
-	Cloud     Cloud `gorm:"foreignKey:CloudName;references:Name"`
-
-	// Access is the access level of the user on the cloud.
-	Access string `gorm:"not null"`
-}
-
-// TableName overrides the table name gorm will use to find
-// UserCloudAccess records.
-func (UserCloudAccess) TableName() string {
-	return "user_cloud_access"
-}
-
-// ToJujuCloudUserInfo convert a UserCloudAccess into a
-// jujuparams.CloudUserInfo. The UserCloudAccess must have its user
-// association filled out.
-func (a UserCloudAccess) ToJujuCloudUserInfo() jujuparams.CloudUserInfo {
-	var cui jujuparams.CloudUserInfo
-	cui.UserName = a.User.Username
-	cui.DisplayName = a.User.DisplayName
-	cui.Access = a.Access
-	return cui
 }

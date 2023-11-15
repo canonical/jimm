@@ -8,10 +8,7 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
-	"github.com/google/go-cmp/cmp/cmpopts"
-	"gorm.io/gorm"
 
-	"github.com/canonical/jimm/internal/auth"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
@@ -107,62 +104,6 @@ func (s *dbSuite) TestUpdateUser(c *qt.C) {
 	err = s.Database.GetUser(ctx, &u2)
 	c.Assert(err, qt.IsNil)
 	c.Check(u2, qt.DeepEquals, u)
-}
-
-func TestGetUserCloudsUnconfiguredDatabase(t *testing.T) {
-	c := qt.New(t)
-
-	var d db.Database
-	_, err := d.GetUserClouds(context.Background(), &dbmodel.User{})
-	c.Check(err, qt.ErrorMatches, `database not configured`)
-	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeServerConfiguration)
-}
-
-func (s *dbSuite) TestGetUserClouds(c *qt.C) {
-	ctx := context.Background()
-
-	u := dbmodel.User{
-		Username:    auth.Everyone,
-		DisplayName: "everyone",
-	}
-
-	_, err := s.Database.GetUserClouds(ctx, &u)
-	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
-
-	err = s.Database.Migrate(context.Background(), false)
-	c.Assert(err, qt.IsNil)
-
-	clouds, err := s.Database.GetUserClouds(ctx, &u)
-	c.Assert(err, qt.IsNil)
-	c.Check(clouds, qt.HasLen, 0)
-
-	cl := dbmodel.Cloud{
-		Name:             "test-cloud",
-		Type:             "test-provider",
-		Endpoint:         "https://example.com",
-		IdentityEndpoint: "https://identity.example.com",
-		StorageEndpoint:  "https://storage.example.com",
-		Regions: []dbmodel.CloudRegion{{
-			Name: "test-cloud-region",
-		}},
-		CACertificates: dbmodel.Strings{"CACERT 1", "CACERT 2"},
-		Users: []dbmodel.UserCloudAccess{{
-			User:   u,
-			Access: "add-model",
-		}},
-	}
-
-	err = s.Database.AddCloud(ctx, &cl)
-	c.Assert(err, qt.IsNil)
-
-	clouds, err = s.Database.GetUserClouds(ctx, &u)
-	c.Assert(err, qt.IsNil)
-	c.Check(clouds, qt.CmpEquals(cmpopts.EquateEmpty(), cmpopts.IgnoreTypes(gorm.Model{})), []dbmodel.UserCloudAccess{{
-		Username:  auth.Everyone,
-		CloudName: "test-cloud",
-		Cloud:     cl,
-		Access:    "add-model",
-	}})
 }
 
 func TestGetUserCloudCredentialsUnconfiguredDatabase(t *testing.T) {

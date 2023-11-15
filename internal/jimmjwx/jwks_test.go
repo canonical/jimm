@@ -83,7 +83,6 @@ func TestStartJWKSRotatorRotatesAJWKS(t *testing.T) {
 	// Start up the rotator
 	err = svc.StartJWKSRotator(ctx, time.NewTicker(time.Second).C, time.Now())
 	c.Assert(err, qt.IsNil)
-
 	// We retry 500ms * 60 (30s) to test the diff
 	for i := 0; i < 60; i++ {
 		time.Sleep(500 * time.Millisecond)
@@ -91,7 +90,7 @@ func TestStartJWKSRotatorRotatesAJWKS(t *testing.T) {
 		c.Assert(err, qt.IsNil)
 		newKey, ok := ks2.Key(0)
 		c.Assert(ok, qt.IsTrue)
-		if initialKey.KeyID() == newKey.KeyID() {
+		if initialKey.KeyID() != newKey.KeyID() {
 			break
 		}
 	}
