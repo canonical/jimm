@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     tags:
-      - 'v2*'
+      - 'v3*'
 
 # Note this workflow requires a Github secret to provide auth against charmhub.
 # This can be generated with the following command
@@ -34,13 +34,15 @@ jobs:
       - name: Build local images
         run: make jimm-image
       - name: Upload charm to charmhub
-        uses: kian99/charming-actions/upload-charm@add-local-image-option
+        uses: canonical/charming-actions/upload-charm@2.4.0
         with:
           credentials: "${{ secrets.CHARMHUB_TOKEN }}"
           github-token: "${{ secrets.GITHUB_TOKEN }}"
+          # TODO: Update the "2" below to 3 once new tracks are created
+          # https://discourse.charmhub.io/t/request-new-track-for-jimm-charms/12553
           channel: "2/edge"
           charm-path: "./charms/jimm-k8s"
-          local-image: "true"
+          pull-image: "false"
           tag-prefix: "v2-k8s"
 
   release-machine-charm:
@@ -71,6 +73,8 @@ jobs:
         with:
           credentials: "${{ secrets.CHARMHUB_TOKEN }}"
           github-token: "${{ secrets.GITHUB_TOKEN }}"
+          # TODO: Update the "2" below to 3 once new tracks are created
+          # https://discourse.charmhub.io/t/request-new-track-for-jimm-charms/12553
           channel: "2/edge"
           charm-path: "./charms/jimm"
           tag-prefix: "v2-machine"

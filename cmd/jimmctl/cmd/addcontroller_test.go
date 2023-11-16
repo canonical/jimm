@@ -3,6 +3,7 @@
 package cmd_test
 
 import (
+	"context"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -29,15 +30,17 @@ func (s *addControllerSuite) TestAddControllerSuperuser(c *gc.C) {
 		Name:          "controller-1",
 		CACertificate: info.CACert,
 		APIAddresses:  info.Addrs,
+		Username:      info.Tag.Id(),
+		Password:      info.Password,
 	}
 	tmpdir, tmpfile := writeYAMLTempFile(c, params)
 	defer os.RemoveAll(tmpdir)
 
 	// alice is superuser
 	bClient := s.userBakeryClient("alice")
-	context, err := cmdtesting.RunCommand(c, cmd.NewAddControllerCommandForTesting(s.ClientStore(), bClient), tmpfile)
+	ctx, err := cmdtesting.RunCommand(c, cmd.NewAddControllerCommandForTesting(s.ClientStore(), bClient), tmpfile)
 	c.Assert(err, gc.IsNil)
-	c.Assert(cmdtesting.Stdout(context), gc.Matches, `name: controller-1
+	c.Assert(cmdtesting.Stdout(ctx), gc.Matches, `name: controller-1
 uuid: deadbeef-1bad-500d-9000-4b1d0d06f00d
 publicaddress: \"\"
 apiaddresses:
@@ -77,6 +80,11 @@ status:
   data: .*
   since: null
 `)
+
+	username, password, err := s.JIMM.CredentialStore.GetControllerCredentials(context.Background(), "controller-1")
+	c.Assert(err, gc.IsNil)
+	c.Assert(username, gc.Equals, info.Tag.Id())
+	c.Assert(password, gc.Equals, info.Password)
 }
 
 func (s *addControllerSuite) TestAddController(c *gc.C) {
@@ -85,6 +93,8 @@ func (s *addControllerSuite) TestAddController(c *gc.C) {
 		Name:          "controller-1",
 		CACertificate: info.CACert,
 		APIAddresses:  info.Addrs,
+		Username:      info.Tag.Id(),
+		Password:      info.Password,
 	}
 	tmpdir, tmpfile := writeYAMLTempFile(c, params)
 	defer os.RemoveAll(tmpdir)

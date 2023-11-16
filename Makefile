@@ -9,6 +9,7 @@ PROJECT := github.com/canonical/jimm
 GIT_COMMIT := $(shell git rev-parse --verify HEAD)
 GIT_VERSION := $(shell git describe --abbrev=0 --dirty)
 GO_VERSION := $(shell go list -f {{.GoVersion}} -m)
+ARCH := $(shell dpkg --print-architecture)
 
 ifeq ($(shell uname -p | sed -r 's/.*(x86|armel|armhf).*/golang/'), golang)
 	GO_C := golang
@@ -86,6 +87,7 @@ jimm-image:
 	--build-arg="GIT_COMMIT=$(GIT_COMMIT)" \
 	--build-arg="VERSION=$(GIT_VERSION)" \
 	--build-arg="GO_VERSION=$(GO_VERSION)" \
+	--build-arg="ARCH=$(ARCH)" \
 	--tag jimm:latest .
 
 jimm-snap:

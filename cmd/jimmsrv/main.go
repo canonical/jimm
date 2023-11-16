@@ -109,7 +109,6 @@ func start(ctx context.Context, s *service.Service) error {
 
 	if os.Getenv("JIMM_WATCH_CONTROLLERS") != "" {
 		s.Go(func() error { return jimmsvc.WatchControllers(ctx) }) // Deletes dead/dying models, updates model config.
-		s.Go(func() error { return jimmsvc.PollModels(ctx) })       // Poll for access control changes on the controller.
 	}
 	s.Go(func() error { return jimmsvc.WatchModelSummaries(ctx) })
 

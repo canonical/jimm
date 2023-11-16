@@ -13,6 +13,7 @@ import (
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
+	"github.com/canonical/ofga"
 )
 
 // NewUser returns a new user structure that can be used to check
@@ -234,9 +235,9 @@ func (u *User) UnsetApplicationOfferAccess(ctx context.Context, resource names.A
 	return unsetResourceAccess(ctx, u, resource, relation, ignoreMissingRelation)
 }
 
-// ListModels returns a slice of model UUIDs this user has at least reader access to.
-func (u *User) ListModels(ctx context.Context) ([]string, error) {
-	entities, err := u.client.ListObjects(ctx, ofganames.ConvertTag(u.ResourceTag()).String(), ofganames.ReaderRelation.String(), "model", nil)
+// ListModels returns a slice of model UUIDs that this user has the relation <relation> to.
+func (u *User) ListModels(ctx context.Context, relation ofga.Relation) ([]string, error) {
+	entities, err := u.client.ListObjects(ctx, ofganames.ConvertTag(u.ResourceTag()), relation, ModelType, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -245,6 +246,19 @@ func (u *User) ListModels(ctx context.Context) ([]string, error) {
 		modelUUIDs[i] = model.ID
 	}
 	return modelUUIDs, err
+}
+
+// ListApplicationOffers returns a slice of application offer UUIDs that a user has the relation <relation> to.
+func (u *User) ListApplicationOffers(ctx context.Context, relation ofga.Relation) ([]string, error) {
+	entities, err := u.client.ListObjects(ctx, ofganames.ConvertTag(u.ResourceTag()), relation, ApplicationOfferType, nil)
+	if err != nil {
+		return nil, err
+	}
+	appOfferUUIDs := make([]string, len(entities))
+	for i, offer := range entities {
+		appOfferUUIDs[i] = offer.ID
+	}
+	return appOfferUUIDs, err
 }
 
 type administratorT interface {

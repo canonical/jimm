@@ -32,75 +32,6 @@ func init() {
 		watchModelSummariesMethod := rpc.Method(r.WatchModelSummaries)
 		watchAllModelSummariesMethod := rpc.Method(r.WatchAllModelSummaries)
 
-		r.AddMethod("Controller", 3, "AllModels", allModelsMethod)
-		r.AddMethod("Controller", 3, "ControllerConfig", controllerConfigMethod)
-		r.AddMethod("Controller", 3, "GetControllerAccess", getControllerAccessMethod)
-		r.AddMethod("Controller", 3, "ModelConfig", modelConfigMethod)
-		r.AddMethod("Controller", 3, "ModelStatus", modelStatusMethod)
-
-		r.AddMethod("Controller", 4, "AllModels", allModelsMethod)
-		r.AddMethod("Controller", 4, "ControllerConfig", controllerConfigMethod)
-		r.AddMethod("Controller", 4, "GetControllerAccess", getControllerAccessMethod)
-		r.AddMethod("Controller", 4, "ModelConfig", modelConfigMethod)
-		r.AddMethod("Controller", 4, "ModelStatus", modelStatusMethod)
-
-		r.AddMethod("Controller", 5, "AllModels", allModelsMethod)
-		r.AddMethod("Controller", 5, "ConfigSet", configSetMethod)
-		r.AddMethod("Controller", 5, "ControllerConfig", controllerConfigMethod)
-		r.AddMethod("Controller", 5, "GetControllerAccess", getControllerAccessMethod)
-		r.AddMethod("Controller", 5, "ModelConfig", modelConfigMethod)
-		r.AddMethod("Controller", 5, "ModelStatus", modelStatusMethod)
-
-		r.AddMethod("Controller", 6, "AllModels", allModelsMethod)
-		r.AddMethod("Controller", 6, "ConfigSet", configSetMethod)
-		r.AddMethod("Controller", 6, "ControllerConfig", controllerConfigMethod)
-		r.AddMethod("Controller", 6, "GetControllerAccess", getControllerAccessMethod)
-		r.AddMethod("Controller", 6, "ModelConfig", modelConfigMethod)
-		r.AddMethod("Controller", 6, "ModelStatus", modelStatusMethod)
-		r.AddMethod("Controller", 6, "MongoVersion", mongoVersionMethod)
-
-		r.AddMethod("Controller", 7, "AllModels", allModelsMethod)
-		r.AddMethod("Controller", 7, "ConfigSet", configSetMethod)
-		r.AddMethod("Controller", 7, "ControllerConfig", controllerConfigMethod)
-		r.AddMethod("Controller", 7, "GetControllerAccess", getControllerAccessMethod)
-		r.AddMethod("Controller", 7, "IdentityProviderURL", identityProviderURLMethod)
-		r.AddMethod("Controller", 7, "ModelConfig", modelConfigMethod)
-		r.AddMethod("Controller", 7, "ModelStatus", modelStatusMethod)
-		r.AddMethod("Controller", 7, "MongoVersion", mongoVersionMethod)
-
-		r.AddMethod("Controller", 8, "AllModels", allModelsMethod)
-		r.AddMethod("Controller", 8, "ConfigSet", configSetMethod)
-		r.AddMethod("Controller", 8, "ControllerConfig", controllerConfigMethod)
-		r.AddMethod("Controller", 8, "ControllerVersion", controllerVersionMethod)
-		r.AddMethod("Controller", 8, "GetControllerAccess", getControllerAccessMethod)
-		r.AddMethod("Controller", 8, "IdentityProviderURL", identityProviderURLMethod)
-		r.AddMethod("Controller", 8, "ModelConfig", modelConfigMethod)
-		r.AddMethod("Controller", 8, "ModelStatus", modelStatusMethod)
-		r.AddMethod("Controller", 8, "MongoVersion", mongoVersionMethod)
-
-		r.AddMethod("Controller", 9, "AllModels", allModelsMethod)
-		r.AddMethod("Controller", 9, "ConfigSet", configSetMethod)
-		r.AddMethod("Controller", 9, "ControllerConfig", controllerConfigMethod)
-		r.AddMethod("Controller", 9, "ControllerVersion", controllerVersionMethod)
-		r.AddMethod("Controller", 9, "GetControllerAccess", getControllerAccessMethod)
-		r.AddMethod("Controller", 9, "IdentityProviderURL", identityProviderURLMethod)
-		r.AddMethod("Controller", 9, "ModelConfig", modelConfigMethod)
-		r.AddMethod("Controller", 9, "ModelStatus", modelStatusMethod)
-		r.AddMethod("Controller", 9, "MongoVersion", mongoVersionMethod)
-		r.AddMethod("Controller", 9, "WatchModelSummaries", watchModelSummariesMethod)
-		r.AddMethod("Controller", 9, "WatchAllModelSummaries", watchAllModelSummariesMethod)
-
-		r.AddMethod("Controller", 10, "AllModels", allModelsMethod)
-		r.AddMethod("Controller", 10, "ConfigSet", configSetMethod)
-		r.AddMethod("Controller", 10, "ControllerConfig", controllerConfigMethod)
-		r.AddMethod("Controller", 10, "ControllerVersion", controllerVersionMethod)
-		r.AddMethod("Controller", 10, "GetControllerAccess", getControllerAccessMethod)
-		r.AddMethod("Controller", 10, "IdentityProviderURL", identityProviderURLMethod)
-		r.AddMethod("Controller", 10, "ModelConfig", modelConfigMethod)
-		r.AddMethod("Controller", 10, "ModelStatus", modelStatusMethod)
-		r.AddMethod("Controller", 10, "MongoVersion", mongoVersionMethod)
-		r.AddMethod("Controller", 10, "WatchModelSummaries", watchModelSummariesMethod)
-
 		r.AddMethod("Controller", 11, "AllModels", allModelsMethod)
 		r.AddMethod("Controller", 11, "ConfigSet", configSetMethod)
 		r.AddMethod("Controller", 11, "ControllerConfig", controllerConfigMethod)
@@ -111,8 +42,9 @@ func init() {
 		r.AddMethod("Controller", 11, "ModelStatus", modelStatusMethod)
 		r.AddMethod("Controller", 11, "MongoVersion", mongoVersionMethod)
 		r.AddMethod("Controller", 11, "WatchModelSummaries", watchModelSummariesMethod)
+		r.AddMethod("Controller", 11, "WatchAllModelSummaries", watchAllModelSummariesMethod)
 
-		return []int{3, 4, 5, 6, 7, 8, 9, 10, 11}
+		return []int{11}
 	}
 }
 
@@ -200,11 +132,16 @@ func (r *controllerRoot) WatchModelSummaries(ctx context.Context) (jujuparams.Su
 func (r *controllerRoot) WatchAllModelSummaries(ctx context.Context) (jujuparams.SummaryWatcherID, error) {
 	const op = errors.Op("jujuapi.WatchAllModelSummaries")
 
-	if r.user.ControllerAccess != "superuser" {
-		return jujuparams.SummaryWatcherID{}, errors.E(errors.CodeUnauthorized, "permission denied")
+	isControllerAdmin, err := openfga.IsAdministrator(ctx, r.user, r.jimm.ResourceTag())
+	if err != nil {
+		zapctx.Error(ctx, "failed to check for controller admin access", zap.Error(err))
+		return jujuparams.SummaryWatcherID{}, errors.E(op, err)
+	}
+	if !isControllerAdmin {
+		return jujuparams.SummaryWatcherID{}, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
-	err := r.setupUUIDGenerator()
+	err = r.setupUUIDGenerator()
 	if err != nil {
 		return jujuparams.SummaryWatcherID{}, errors.E(op, err)
 	}
@@ -213,8 +150,8 @@ func (r *controllerRoot) WatchAllModelSummaries(ctx context.Context) (jujuparams
 
 	getAllModels := func(ctx context.Context) ([]string, error) {
 		var modelUUIDs []string
-		err := r.jimm.ForEachModel(ctx, r.user, func(uma *dbmodel.UserModelAccess) error {
-			modelUUIDs = append(modelUUIDs, uma.ToJujuUserModel().UUID)
+		err := r.jimm.ForEachModel(ctx, r.user, func(m *dbmodel.Model, _ jujuparams.UserAccessPermission) error {
+			modelUUIDs = append(modelUUIDs, m.UUID.String)
 			return nil
 		})
 		if err != nil {
@@ -244,8 +181,11 @@ func (r *controllerRoot) allModels(ctx context.Context) (jujuparams.UserModelLis
 	const op = errors.Op("jujuapi.AllModels")
 
 	var models []jujuparams.UserModel
-	err := r.jimm.ForEachUserModel(ctx, r.user, func(uma *dbmodel.UserModelAccess) error {
-		models = append(models, uma.ToJujuUserModel())
+	err := r.jimm.ForEachUserModel(ctx, r.user, func(m *dbmodel.Model, _ jujuparams.UserAccessPermission) error {
+		// TODO(Kian) CSS-6040 Refactor the below to use a better abstraction for Postgres/OpenFGA to Juju types.
+		var um jujuparams.UserModel
+		um.Model = m.ToJujuModel()
+		models = append(models, um)
 		return nil
 	})
 	if err != nil {

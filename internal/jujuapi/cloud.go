@@ -29,104 +29,13 @@ func init() {
 		cloudsMethod := rpc.Method(r.Clouds)
 		credentialMethod := rpc.Method(r.Credential)
 		credentialContentsMethod := rpc.Method(r.CredentialContents)
-		defaultCloudMethod := rpc.Method(r.DefaultCloud)
 		listCloudInfoMethod := rpc.Method(r.ListCloudInfo)
 		modifyCloudAccessMethod := rpc.Method(r.ModifyCloudAccess)
 		removeCloudsMethod := rpc.Method(r.RemoveClouds)
-		revokeCredentialsMethod := rpc.Method(r.RevokeCredentials)
 		revokeCredentialsCheckModelsMethod := rpc.Method(r.RevokeCredentialsCheckModels)
 		updateCloudMethod := rpc.Method(r.UpdateCloud)
 		updateCredentialsCheckModelsMethod := rpc.Method(r.UpdateCredentialsCheckModels)
 		userCredentialsMethod := rpc.Method(r.UserCredentials)
-
-		r.AddMethod("Cloud", 1, "Cloud", cloudMethod)
-		r.AddMethod("Cloud", 1, "Clouds", cloudsMethod)
-		r.AddMethod("Cloud", 1, "Credential", credentialMethod)
-		r.AddMethod("Cloud", 1, "DefaultCloud", defaultCloudMethod)
-		r.AddMethod("Cloud", 1, "RevokeCredentials", revokeCredentialsMethod)
-		// In JIMM UpdateCredentials behaves in the way AddCredentials is
-		// documented to. Presumably in juju UpdateCredentials works
-		// slightly differently.
-		r.AddMethod("Cloud", 1, "UpdateCredentials", addCredentialsMethod)
-		r.AddMethod("Cloud", 1, "UserCredentials", userCredentialsMethod)
-
-		r.AddMethod("Cloud", 2, "AddCloud", addCloudMethod)
-		r.AddMethod("Cloud", 2, "AddCredentials", addCredentialsMethod)
-		r.AddMethod("Cloud", 2, "Cloud", cloudMethod)
-		r.AddMethod("Cloud", 2, "Clouds", cloudsMethod)
-		r.AddMethod("Cloud", 2, "Credential", credentialMethod)
-		r.AddMethod("Cloud", 2, "CredentialContents", credentialContentsMethod)
-		r.AddMethod("Cloud", 2, "DefaultCloud", defaultCloudMethod)
-		r.AddMethod("Cloud", 2, "RemoveClouds", removeCloudsMethod)
-		r.AddMethod("Cloud", 2, "RevokeCredentials", revokeCredentialsMethod)
-		// In JIMM UpdateCredentials behaves in the way AddCredentials is
-		// documented to. Presumably in juju UpdateCredentials works
-		// slightly differently.
-		r.AddMethod("Cloud", 2, "UpdateCredentials", addCredentialsMethod)
-		r.AddMethod("Cloud", 2, "UserCredentials", userCredentialsMethod)
-
-		r.AddMethod("Cloud", 3, "AddCloud", addCloudMethod)
-		r.AddMethod("Cloud", 3, "AddCredentials", addCredentialsMethod)
-		r.AddMethod("Cloud", 3, "CheckCredentialsModels", checkCredentialsModelsMethod)
-		r.AddMethod("Cloud", 3, "Cloud", cloudMethod)
-		r.AddMethod("Cloud", 3, "Clouds", cloudsMethod)
-		r.AddMethod("Cloud", 3, "Credential", credentialMethod)
-		r.AddMethod("Cloud", 3, "CredentialContents", credentialContentsMethod)
-		r.AddMethod("Cloud", 3, "ModifyCloudAccess", modifyCloudAccessMethod)
-		r.AddMethod("Cloud", 3, "DefaultCloud", defaultCloudMethod)
-		r.AddMethod("Cloud", 3, "RemoveClouds", removeCloudsMethod)
-		r.AddMethod("Cloud", 3, "RevokeCredentialsCheckModels", revokeCredentialsCheckModelsMethod)
-		r.AddMethod("Cloud", 3, "UpdateCredentialsCheckModels", updateCredentialsCheckModelsMethod)
-		r.AddMethod("Cloud", 3, "UserCredentials", userCredentialsMethod)
-
-		r.AddMethod("Cloud", 4, "AddCloud", addCloudMethod)
-		r.AddMethod("Cloud", 4, "AddCredentials", addCredentialsMethod)
-		r.AddMethod("Cloud", 4, "CheckCredentialsModels", checkCredentialsModelsMethod)
-		r.AddMethod("Cloud", 4, "Cloud", cloudMethod)
-		r.AddMethod("Cloud", 4, "Clouds", cloudsMethod)
-		r.AddMethod("Cloud", 4, "Credential", credentialMethod)
-		r.AddMethod("Cloud", 4, "CredentialContents", credentialContentsMethod)
-		r.AddMethod("Cloud", 4, "DefaultCloud", defaultCloudMethod)
-		r.AddMethod("Cloud", 4, "ModifyCloudAccess", modifyCloudAccessMethod)
-		r.AddMethod("Cloud", 4, "RemoveClouds", removeCloudsMethod)
-		r.AddMethod("Cloud", 4, "RevokeCredentialsCheckModels", revokeCredentialsCheckModelsMethod)
-		r.AddMethod("Cloud", 4, "UpdateCloud", updateCloudMethod)
-
-		r.AddMethod("Cloud", 4, "UpdateCredentialsCheckModels", updateCredentialsCheckModelsMethod)
-		r.AddMethod("Cloud", 4, "UserCredentials", userCredentialsMethod)
-
-		r.AddMethod("Cloud", 5, "AddCloud", addCloudMethod)
-		r.AddMethod("Cloud", 5, "AddCredentials", addCredentialsMethod)
-		r.AddMethod("Cloud", 5, "CheckCredentialsModels", checkCredentialsModelsMethod)
-		r.AddMethod("Cloud", 5, "Cloud", cloudMethod)
-		r.AddMethod("Cloud", 5, "CloudInfo", cloudInfoMethod)
-		r.AddMethod("Cloud", 5, "Clouds", cloudsMethod)
-		r.AddMethod("Cloud", 5, "Credential", credentialMethod)
-		r.AddMethod("Cloud", 5, "CredentialContents", credentialContentsMethod)
-		// Version 5 removed DefaultCloud
-		r.AddMethod("Cloud", 5, "ListCloudInfo", listCloudInfoMethod)
-		r.AddMethod("Cloud", 5, "ModifyCloudAccess", modifyCloudAccessMethod)
-		r.AddMethod("Cloud", 5, "RemoveClouds", removeCloudsMethod)
-		r.AddMethod("Cloud", 5, "RevokeCredentialsCheckModels", revokeCredentialsCheckModelsMethod)
-		r.AddMethod("Cloud", 5, "UpdateCloud", updateCloudMethod)
-		r.AddMethod("Cloud", 5, "UpdateCredentialsCheckModels", updateCredentialsCheckModelsMethod)
-		r.AddMethod("Cloud", 5, "UserCredentials", userCredentialsMethod)
-
-		r.AddMethod("Cloud", 6, "AddCloud", addCloudMethod)
-		r.AddMethod("Cloud", 6, "AddCredentials", addCredentialsMethod)
-		r.AddMethod("Cloud", 6, "CheckCredentialsModels", checkCredentialsModelsMethod)
-		r.AddMethod("Cloud", 6, "Cloud", cloudMethod)
-		r.AddMethod("Cloud", 6, "CloudInfo", cloudInfoMethod)
-		r.AddMethod("Cloud", 6, "Clouds", cloudsMethod)
-		r.AddMethod("Cloud", 6, "Credential", credentialMethod)
-		r.AddMethod("Cloud", 6, "CredentialContents", credentialContentsMethod)
-		r.AddMethod("Cloud", 6, "ListCloudInfo", listCloudInfoMethod)
-		r.AddMethod("Cloud", 6, "ModifyCloudAccess", modifyCloudAccessMethod)
-		r.AddMethod("Cloud", 6, "RemoveClouds", removeCloudsMethod)
-		r.AddMethod("Cloud", 6, "RevokeCredentialsCheckModels", revokeCredentialsCheckModelsMethod)
-		r.AddMethod("Cloud", 6, "UpdateCloud", updateCloudMethod)
-		r.AddMethod("Cloud", 6, "UpdateCredentialsCheckModels", updateCredentialsCheckModelsMethod)
-		r.AddMethod("Cloud", 6, "UserCredentials", userCredentialsMethod)
 
 		r.AddMethod("Cloud", 7, "AddCloud", addCloudMethod)
 		r.AddMethod("Cloud", 7, "AddCredentials", addCredentialsMethod)
@@ -144,7 +53,7 @@ func init() {
 		r.AddMethod("Cloud", 7, "UpdateCredentialsCheckModels", updateCredentialsCheckModelsMethod)
 		r.AddMethod("Cloud", 7, "UserCredentials", userCredentialsMethod)
 
-		return []int{1, 2, 3, 4, 5, 6, 7}
+		return []int{7}
 	}
 }
 
@@ -291,14 +200,14 @@ func (r *controllerRoot) credential(ctx context.Context, cloudCredentialTag stri
 		return nil, errors.E(op, err, errors.CodeBadRequest)
 	}
 
-	cred, err := r.jimm.GetCloudCredential(ctx, r.user.User, cct)
+	cred, err := r.jimm.GetCloudCredential(ctx, r.user, cct)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
 	cc := jujuparams.CloudCredential{
 		AuthType: cred.AuthType,
 	}
-	cc.Attributes, cc.Redacted, err = r.jimm.GetCloudCredentialAttributes(ctx, r.user.User, cred, false)
+	cc.Attributes, cc.Redacted, err = r.jimm.GetCloudCredentialAttributes(ctx, r.user, cred, false)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
@@ -401,7 +310,7 @@ func (r *controllerRoot) CredentialContents(ctx context.Context, args jujuparams
 			content.Valid = &c.Valid.Bool
 		}
 		var err error
-		content.Attributes, _, err = r.jimm.GetCloudCredentialAttributes(ctx, r.user.User, c, args.IncludeSecrets)
+		content.Attributes, _, err = r.jimm.GetCloudCredentialAttributes(ctx, r.user, c, args.IncludeSecrets)
 		if err != nil {
 			return nil, errors.E(err)
 		}
@@ -425,7 +334,7 @@ func (r *controllerRoot) CredentialContents(ctx context.Context, args jujuparams
 	results := make([]jujuparams.CredentialContentResult, len(args.Credentials))
 	for i, arg := range args.Credentials {
 		cct := names.NewCloudCredentialTag(fmt.Sprintf("%s/%s/%s", arg.CloudName, r.user.Username, arg.CredentialName))
-		cred, err := r.jimm.GetCloudCredential(ctx, r.user.User, cct)
+		cred, err := r.jimm.GetCloudCredential(ctx, r.user, cct)
 		if err != nil {
 			results[i].Error = mapError(errors.E(op, err))
 			continue
@@ -549,7 +458,7 @@ func (r *controllerRoot) updateCredential(ctx context.Context, cred jujuparams.T
 	if err != nil {
 		return nil, errors.E(err, errors.CodeBadRequest)
 	}
-	return r.jimm.UpdateCloudCredential(ctx, r.user.User, jimm.UpdateCloudCredentialArgs{
+	return r.jimm.UpdateCloudCredential(ctx, r.user, jimm.UpdateCloudCredentialArgs{
 		CredentialTag: tag,
 		Credential:    cred.Credential,
 		SkipCheck:     skipCheck,

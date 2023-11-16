@@ -161,10 +161,6 @@ func (s *dbSuite) TestGetControllerWithModels(c *qt.C) {
 		SLA: dbmodel.SLA{
 			Level: "unsupported",
 		},
-		Users: []dbmodel.UserModelAccess{{
-			User:   u,
-			Access: "admin",
-		}},
 	}, {
 		Name: "test-model-2",
 		UUID: sql.NullString{
@@ -189,10 +185,6 @@ func (s *dbSuite) TestGetControllerWithModels(c *qt.C) {
 		SLA: dbmodel.SLA{
 			Level: "unsupported",
 		},
-		Users: []dbmodel.UserModelAccess{{
-			User:   u,
-			Access: "admin",
-		}},
 	}}
 	for _, m := range models {
 		c.Assert(s.Database.DB.Create(&m).Error, qt.IsNil)
@@ -249,7 +241,7 @@ func (s *dbSuite) TestForEachController(c *qt.C) {
 	c.Assert(err, qt.Equals, nil)
 
 	env := jimmtest.ParseEnvironment(c, testForEachControllerEnv)
-	env.PopulateDB(c, *s.Database, nil)
+	env.PopulateDB(c, *s.Database)
 
 	testError := errors.E("test error")
 	err = s.Database.ForEachController(ctx, func(controller *dbmodel.Controller) error {
@@ -434,9 +426,9 @@ func (s *dbSuite) TestForEachControllerModel(c *qt.C) {
 	c.Assert(err, qt.Equals, nil)
 
 	env := jimmtest.ParseEnvironment(c, testForEachControllerModelEnv)
-	env.PopulateDB(c, *s.Database, nil)
+	env.PopulateDB(c, *s.Database)
 
-	ctl := env.Controller("test").DBObject(c, *s.Database, nil)
+	ctl := env.Controller("test").DBObject(c, *s.Database)
 	testError := errors.E("test error")
 	err = s.Database.ForEachControllerModel(ctx, &ctl, func(_ *dbmodel.Model) error {
 		return testError

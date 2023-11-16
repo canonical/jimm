@@ -82,17 +82,13 @@ func (s *dbSuite) TestAddModel(c *qt.C) {
 		SLA: dbmodel.SLA{
 			Level: "unsupported",
 		},
-		Users: []dbmodel.UserModelAccess{{
-			Username: u.Username,
-			Access:   "admin",
-		}},
 	}
 	m1 := model
 	err = s.Database.AddModel(context.Background(), &model)
 	c.Assert(err, qt.Equals, nil)
 
 	var dbModel dbmodel.Model
-	result := s.Database.DB.Where("uuid = ?", model.UUID).Preload("Users").First(&dbModel)
+	result := s.Database.DB.Where("uuid = ?", model.UUID).First(&dbModel)
 	c.Assert(result.Error, qt.Equals, nil)
 	c.Assert(dbModel, qt.DeepEquals, model)
 
@@ -163,11 +159,6 @@ func (s *dbSuite) TestGetModel(c *qt.C) {
 		SLA: dbmodel.SLA{
 			Level: "unsupported",
 		},
-		Users: []dbmodel.UserModelAccess{{
-			Username: u.Username,
-			User:     u,
-			Access:   "admin",
-		}},
 	}
 	model.CloudCredential.Cloud = dbmodel.Cloud{}
 	model.CloudCredential.Owner = dbmodel.User{}
@@ -260,10 +251,6 @@ func (s *dbSuite) TestUpdateModel(c *qt.C) {
 		SLA: dbmodel.SLA{
 			Level: "unsupported",
 		},
-		Users: []dbmodel.UserModelAccess{{
-			Username: u.Username,
-			Access:   "admin",
-		}},
 	}
 	err = s.Database.AddModel(context.Background(), &model)
 	c.Assert(err, qt.Equals, nil)
@@ -276,7 +263,7 @@ func (s *dbSuite) TestUpdateModel(c *qt.C) {
 	c.Assert(err, qt.Equals, nil)
 
 	var dbModel dbmodel.Model
-	result := s.Database.DB.Where("uuid = ?", model.UUID).Preload("Users").First(&dbModel)
+	result := s.Database.DB.Where("uuid = ?", model.UUID).First(&dbModel)
 	c.Assert(result.Error, qt.Equals, nil)
 	c.Assert(dbModel, qt.DeepEquals, model)
 }
@@ -343,11 +330,6 @@ func (s *dbSuite) TestDeleteModel(c *qt.C) {
 		SLA: dbmodel.SLA{
 			Level: "unsupported",
 		},
-		Users: []dbmodel.UserModelAccess{{
-			Username: u.Username,
-			User:     u,
-			Access:   "admin",
-		}},
 	}
 
 	// model does not exist
@@ -365,7 +347,7 @@ func (s *dbSuite) TestDeleteModel(c *qt.C) {
 	c.Assert(err, qt.Equals, nil)
 
 	var dbModel dbmodel.Model
-	result := s.Database.DB.Where("uuid = ?", model.UUID).Preload("Users").First(&dbModel)
+	result := s.Database.DB.Where("uuid = ?", model.UUID).First(&dbModel)
 	c.Assert(result.Error, qt.Equals, gorm.ErrRecordNotFound)
 }
 
@@ -432,10 +414,6 @@ func (s *dbSuite) TestGetModelsUsingCredential(c *qt.C) {
 		SLA: dbmodel.SLA{
 			Level: "unsupported",
 		},
-		Users: []dbmodel.UserModelAccess{{
-			Username: u.Username,
-			Access:   "admin",
-		}},
 	}
 	err = s.Database.AddModel(context.Background(), &model1)
 	c.Assert(err, qt.Equals, nil)
@@ -460,10 +438,6 @@ func (s *dbSuite) TestGetModelsUsingCredential(c *qt.C) {
 		SLA: dbmodel.SLA{
 			Level: "unsupported",
 		},
-		Users: []dbmodel.UserModelAccess{{
-			Username: u.Username,
-			Access:   "admin",
-		}},
 	}
 	err = s.Database.AddModel(context.Background(), &model2)
 	c.Assert(err, qt.Equals, nil)
@@ -496,142 +470,6 @@ func (s *dbSuite) TestGetModelsUsingCredential(c *qt.C) {
 	models, err = s.Database.GetModelsUsingCredential(context.Background(), 0)
 	c.Assert(err, qt.IsNil)
 	c.Assert(models, qt.HasLen, 0)
-}
-
-func TestUpdateUserModelAccessUnconfiguredDatabase(t *testing.T) {
-	c := qt.New(t)
-
-	var d db.Database
-	err := d.UpdateUserModelAccess(context.Background(), &dbmodel.UserModelAccess{})
-	c.Check(err, qt.ErrorMatches, `database not configured`)
-	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeServerConfiguration)
-}
-
-const testUpdateUserModelAccessEnv = `clouds:
-- name: test
-  type: test
-  regions:
-  - name: test-region
-cloud-credentials:
-- name: test-cred
-  cloud: test
-  owner: alice@external
-  type: empty
-controllers:
-- name: test
-  uuid: 00000001-0000-0000-0000-000000000001
-  cloud: test
-  region: test-region
-models:
-- name: test
-  uuid: 00000002-0000-0000-0000-000000000001
-  owner: alice@external
-  cloud: test
-  region: test-region
-  cloud-credential: test-cred
-  controller: test
-  users:
-  - user: alice@external
-    access: admin
-  - user: bob@external
-    access: write
-`
-
-func (s *dbSuite) TestUpdateUserModelAccess(c *qt.C) {
-	ctx := context.Background()
-	err := s.Database.Migrate(context.Background(), true)
-	c.Assert(err, qt.Equals, nil)
-
-	env := jimmtest.ParseEnvironment(c, testUpdateUserModelAccessEnv)
-	env.PopulateDB(c, *s.Database, nil)
-
-	m := dbmodel.Model{
-		UUID: sql.NullString{
-			String: "00000002-0000-0000-0000-000000000001",
-			Valid:  true,
-		},
-	}
-	err = s.Database.GetModel(ctx, &m)
-	c.Assert(err, qt.IsNil)
-
-	charlie := env.User("charlie@external").DBObject(c, *s.Database, nil)
-
-	// Add a new user
-	err = s.Database.UpdateUserModelAccess(ctx, &dbmodel.UserModelAccess{
-		User:   charlie,
-		Model_: m,
-		Access: "read",
-	})
-	c.Assert(err, qt.Equals, nil)
-	err = s.Database.GetModel(ctx, &m)
-	c.Assert(err, qt.IsNil)
-	c.Check(m.Users, jimmtest.DBObjectEquals, []dbmodel.UserModelAccess{{
-		User: dbmodel.User{
-			Username:         "alice@external",
-			ControllerAccess: "login",
-		},
-		Access: "admin",
-	}, {
-		User: dbmodel.User{
-			Username:         "bob@external",
-			ControllerAccess: "login",
-		},
-		Access: "write",
-	}, {
-		User: dbmodel.User{
-			Username:         "charlie@external",
-			ControllerAccess: "login",
-		},
-		Access: "read",
-	}})
-
-	// Update an existing user
-	uma := m.Users[1]
-	uma.Access = "read"
-	err = s.Database.UpdateUserModelAccess(ctx, &uma)
-	c.Assert(err, qt.Equals, nil)
-	err = s.Database.GetModel(ctx, &m)
-	c.Assert(err, qt.IsNil)
-	c.Check(m.Users, jimmtest.DBObjectEquals, []dbmodel.UserModelAccess{{
-		User: dbmodel.User{
-			Username:         "alice@external",
-			ControllerAccess: "login",
-		},
-		Access: "admin",
-	}, {
-		User: dbmodel.User{
-			Username:         "bob@external",
-			ControllerAccess: "login",
-		},
-		Access: "read",
-	}, {
-		User: dbmodel.User{
-			Username:         "charlie@external",
-			ControllerAccess: "login",
-		},
-		Access: "read",
-	}})
-
-	// Remove a user
-	uma = m.Users[1]
-	uma.Access = ""
-	err = s.Database.UpdateUserModelAccess(ctx, &uma)
-	c.Assert(err, qt.Equals, nil)
-	err = s.Database.GetModel(ctx, &m)
-	c.Assert(err, qt.IsNil)
-	c.Check(m.Users, jimmtest.DBObjectEquals, []dbmodel.UserModelAccess{{
-		User: dbmodel.User{
-			Username:         "alice@external",
-			ControllerAccess: "login",
-		},
-		Access: "admin",
-	}, {
-		User: dbmodel.User{
-			Username:         "charlie@external",
-			ControllerAccess: "login",
-		},
-		Access: "read",
-	}})
 }
 
 func TestForEachModelUnconfiguredDatabase(t *testing.T) {
@@ -699,7 +537,7 @@ func (s *dbSuite) TestForEachModel(c *qt.C) {
 	c.Assert(err, qt.Equals, nil)
 
 	env := jimmtest.ParseEnvironment(c, testForEachModelEnv)
-	env.PopulateDB(c, *s.Database, nil)
+	env.PopulateDB(c, *s.Database)
 
 	testError := errors.E("test error")
 	err = s.Database.ForEachModel(ctx, func(m *dbmodel.Model) error {
@@ -785,7 +623,7 @@ func (s *dbSuite) TestGetModelsByUUID(c *qt.C) {
 	c.Assert(err, qt.Equals, nil)
 
 	env := jimmtest.ParseEnvironment(c, testGetModelsByUUIDEnv)
-	env.PopulateDB(c, *s.Database, nil)
+	env.PopulateDB(c, *s.Database)
 
 	modelUUIDs := []string{
 		"00000002-0000-0000-0000-000000000001",

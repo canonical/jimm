@@ -205,17 +205,6 @@ func (s *Service) WatchModelSummaries(ctx context.Context) error {
 	return w.WatchAllModelSummaries(ctx, 10*time.Minute)
 }
 
-// PollModels regularly polls each known model to get required data not
-// included in the multiwatcher deltas. PollModels finishes when the given
-// context is canceled, or there is a fatal error polling models.
-func (s *Service) PollModels(ctx context.Context) error {
-	w := jimm.Watcher{
-		Database: s.jimm.Database,
-		Dialer:   s.jimm.Dialer,
-	}
-	return w.PollModels(ctx, 10*time.Minute)
-}
-
 // StartJWKSRotator see internal/jimmjwx/jwks.go for details.
 func (s *Service) StartJWKSRotator(ctx context.Context, checkRotateRequired <-chan time.Time, initialRotateRequiredTime time.Time) error {
 	if s.jimm.JWKService == nil {

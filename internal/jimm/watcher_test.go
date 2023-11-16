@@ -387,7 +387,6 @@ var watcherTests = []struct {
 		model.CloudCredential = dbmodel.CloudCredential{}
 		model.CloudRegion = dbmodel.CloudRegion{}
 		model.Controller = dbmodel.Controller{}
-		model.Users = nil
 		c.Check(model, jimmtest.DBObjectEquals, dbmodel.Model{
 			UUID: sql.NullString{
 				String: "00000002-0000-0000-0000-000000000001",
@@ -484,7 +483,6 @@ var watcherTests = []struct {
 		model.CloudCredential = dbmodel.CloudCredential{}
 		model.CloudRegion = dbmodel.CloudRegion{}
 		model.Controller = dbmodel.Controller{}
-		model.Users = nil
 		c.Check(model, jimmtest.DBObjectEquals, dbmodel.Model{
 			UUID: sql.NullString{
 				String: "00000002-0000-0000-0000-000000000001",
@@ -578,7 +576,7 @@ func TestWatcher(t *testing.T) {
 			env := jimmtest.ParseEnvironment(c, testWatcherEnv)
 			err := w.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
-			env.PopulateDB(c, w.Database, nil)
+			env.PopulateDB(c, w.Database)
 
 			if test.initDB != nil {
 				test.initDB(c, w.Database)
@@ -738,7 +736,7 @@ func TestModelSummaryWatcher(t *testing.T) {
 			env := jimmtest.ParseEnvironment(c, testWatcherEnv)
 			err := w.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
-			env.PopulateDB(c, w.Database, nil)
+			env.PopulateDB(c, w.Database)
 
 			var wg sync.WaitGroup
 			wg.Add(1)
@@ -784,7 +782,7 @@ func TestWatcherSetsControllerUnavailable(t *testing.T) {
 	env := jimmtest.ParseEnvironment(c, testWatcherEnv)
 	err := w.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
-	env.PopulateDB(c, w.Database, nil)
+	env.PopulateDB(c, w.Database)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -848,7 +846,7 @@ func TestWatcherRemoveDyingModelsOnStartup(t *testing.T) {
 	env := jimmtest.ParseEnvironment(c, testWatcherEnv)
 	err := w.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
-	env.PopulateDB(c, w.Database, nil)
+	env.PopulateDB(c, w.Database)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -950,7 +948,7 @@ func TestWatcherIgnoreDeltasForModelsFromIncorrectController(t *testing.T) {
 	env := jimmtest.ParseEnvironment(c, testWatcherIgnoreDeltasForModelsFromIncorrectControllerEnv)
 	err := w.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
-	env.PopulateDB(c, w.Database, nil)
+	env.PopulateDB(c, w.Database)
 
 	m1 := dbmodel.Model{
 		UUID: sql.NullString{
@@ -1010,172 +1008,6 @@ func TestWatcherIgnoreDeltasForModelsFromIncorrectController(t *testing.T) {
 	err = w.Database.GetModel(context.Background(), &m2)
 	c.Assert(err, qt.IsNil)
 	c.Check(m2, qt.DeepEquals, m1)
-}
-
-const pollControllerModelEnv = `clouds:
-- name: test-cloud
-  type: test-provider
-  regions:
-  - name: test-cloud-region
-cloud-credentials:
-- owner: alice@external
-  name: cred-1
-  cloud: test-cloud
-controllers:
-- name: controller-1
-  uuid: 00000001-0000-0000-0000-000000000001
-  cloud: test-cloud
-  region: test-cloud-region
-models:
-- name: model-1
-  type: iaas
-  uuid: 00000002-0000-0000-0000-000000000001
-  controller: controller-1
-  default-series: warty
-  cloud: test-cloud
-  region: test-cloud-region
-  cloud-credential: cred-1
-  owner: alice@external
-  life: alive
-  status:
-    status: available
-    info: "OK!"
-    since: 2020-02-20T20:02:20Z
-  users:
-  - user: alice@external
-    access: admin
-  - user: bob@external
-    access: write
-  - user: charlie@external
-    access: read
-  - user: dawn@external
-    access: read
-- name: model-2
-  type: iaas
-  uuid: 00000002-0000-0000-0000-000000000002
-  controller: controller-1
-  default-series: warty
-  cloud: test-cloud
-  region: test-cloud-region
-  cloud-credential: cred-1
-  owner: alice@external
-  life: alive
-  status:
-    status: available
-    info: "OK!"
-    since: 2020-02-20T20:02:20Z
-  users:
-  - user: alice@external
-    access: admin
-    last-connection: 2020-02-20T01:02:03Z
-  - user: bob@external
-    access: write
-    last-connection: 2020-02-20T01:02:03Z
-  - user: charlie@external
-    access: read
-    last-connection: 2020-02-20T01:02:03Z
-  - user: dawn@external
-    access: read
-`
-
-func TestPollControllerModel(t *testing.T) {
-	c := qt.New(t)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	t0 := time.Date(2020, time.February, 20, 1, 2, 3, 0, time.UTC)
-	t1 := time.Date(2020, time.February, 20, 2, 2, 3, 0, time.UTC)
-	t2 := time.Date(2020, time.February, 20, 0, 2, 3, 0, time.UTC)
-
-	w := &jimm.Watcher{
-		Database: db.Database{
-			DB: jimmtest.MemoryDB(c, nil),
-		},
-		Dialer: &jimmtest.Dialer{
-			API: &jimmtest.API{
-				ModelInfo_: func(_ context.Context, mi *jujuparams.ModelInfo) error {
-					mi.Users = []jujuparams.ModelUserInfo{{
-						UserName: "alice@external",
-						Access:   "admin",
-					}, {
-						UserName:       "bob@external",
-						Access:         "write",
-						LastConnection: &t1,
-					}, {
-						UserName:       "charlie@external",
-						Access:         "read",
-						LastConnection: &t2,
-					}, {
-						UserName: "dawn@external",
-						Access:   "read",
-					}}
-					return nil
-				},
-			},
-		},
-	}
-
-	env := jimmtest.ParseEnvironment(c, pollControllerModelEnv)
-	err := w.Database.Migrate(ctx, false)
-	c.Assert(err, qt.IsNil)
-	env.PopulateDB(c, w.Database, nil)
-
-	ctl := env.Controller("controller-1").DBObject(c, w.Database, nil)
-	w.PollControllerModels(ctx, &ctl)
-
-	m1 := dbmodel.Model{
-		UUID: sql.NullString{
-			String: "00000002-0000-0000-0000-000000000001",
-			Valid:  true,
-		},
-	}
-	m2 := dbmodel.Model{
-		UUID: sql.NullString{
-			String: "00000002-0000-0000-0000-000000000002",
-			Valid:  true,
-		},
-	}
-	err = w.Database.GetModel(ctx, &m1)
-	c.Assert(err, qt.IsNil)
-	err = w.Database.GetModel(ctx, &m2)
-	c.Assert(err, qt.IsNil)
-
-	c.Check(m1.Users[0].LastConnection.Valid, qt.Equals, false)
-	c.Check(m1.Users[1].LastConnection.Valid, qt.Equals, true)
-	c.Check(m1.Users[1].LastConnection.Time, qt.Equals, t1)
-	c.Check(m1.Users[2].LastConnection.Valid, qt.Equals, true)
-	c.Check(m1.Users[2].LastConnection.Time, qt.Equals, t2)
-	c.Check(m1.Users[3].LastConnection.Valid, qt.Equals, false)
-	c.Check(m2.Users[0].LastConnection.Valid, qt.Equals, true)
-	c.Check(m2.Users[0].LastConnection.Time, qt.Equals, t0)
-	c.Check(m2.Users[1].LastConnection.Valid, qt.Equals, true)
-	c.Check(m2.Users[1].LastConnection.Time, qt.Equals, t1)
-	c.Check(m2.Users[2].LastConnection.Valid, qt.Equals, true)
-	c.Check(m2.Users[2].LastConnection.Time, qt.Equals, t0)
-	c.Check(m2.Users[3].LastConnection.Valid, qt.Equals, false)
-}
-
-func TestPollModelsStops(t *testing.T) {
-	c := qt.New(t)
-
-	w := &jimm.Watcher{
-		Database: db.Database{
-			DB: jimmtest.MemoryDB(c, nil),
-		},
-	}
-
-	err := w.Database.Migrate(context.Background(), false)
-	c.Assert(err, qt.IsNil)
-
-	now := time.Now()
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-	defer cancel()
-	err = w.PollModels(ctx, time.Minute)
-	c.Check(time.Since(now), qt.Satisfies, func(d time.Duration) bool {
-		return d < time.Second
-	})
-	c.Check(err, qt.ErrorMatches, `context deadline exceeded`)
 }
 
 type testPublisher struct {

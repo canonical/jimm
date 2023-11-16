@@ -439,3 +439,87 @@ func (s *userTestSuite) TestListRelatedUsers(c *gc.C) {
 	sort.Strings(usernames)
 	c.Assert(usernames, gc.DeepEquals, []string{"adam", "alice", "eve"})
 }
+
+func (s *userTestSuite) TestListModels(c *gc.C) {
+	ctx := context.Background()
+
+	model1UUID, err := uuid.NewRandom()
+	c.Assert(err, gc.IsNil)
+	model1 := names.NewModelTag(model1UUID.String())
+
+	model2UUID, err := uuid.NewRandom()
+	c.Assert(err, gc.IsNil)
+	model2 := names.NewModelTag(model2UUID.String())
+
+	model3UUID, err := uuid.NewRandom()
+	c.Assert(err, gc.IsNil)
+	model3 := names.NewModelTag(model3UUID.String())
+
+	adam := names.NewUserTag("adam")
+
+	tuples := []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(adam),
+		Relation: ofganames.ReaderRelation,
+		Target:   ofganames.ConvertTag(model1),
+	}, {
+		Object:   ofganames.ConvertTag(adam),
+		Relation: ofganames.WriterRelation,
+		Target:   ofganames.ConvertTag(model2),
+	}, {
+		Object:   ofganames.ConvertTag(adam),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(model3),
+	}}
+	err = s.ofgaClient.AddRelation(ctx, tuples...)
+	c.Assert(err, gc.IsNil)
+
+	adamUser := openfga.NewUser(&dbmodel.User{Username: adam.Name()}, s.ofgaClient)
+	modelUUIDs, err := adamUser.ListModels(ctx, ofganames.ReaderRelation)
+	c.Assert(err, gc.IsNil)
+	wantUUIDs := []string{model1UUID.String(), model2UUID.String(), model3UUID.String()}
+	sort.Strings(wantUUIDs)
+	sort.Strings(modelUUIDs)
+	c.Assert(modelUUIDs, gc.DeepEquals, wantUUIDs)
+}
+
+func (s *userTestSuite) TestListApplicationOffers(c *gc.C) {
+	ctx := context.Background()
+
+	offer1UUID, err := uuid.NewRandom()
+	c.Assert(err, gc.IsNil)
+	offer1 := names.NewApplicationOfferTag(offer1UUID.String())
+
+	offer2UUID, err := uuid.NewRandom()
+	c.Assert(err, gc.IsNil)
+	offer2 := names.NewApplicationOfferTag(offer2UUID.String())
+
+	offer3UUID, err := uuid.NewRandom()
+	c.Assert(err, gc.IsNil)
+	offer3 := names.NewApplicationOfferTag(offer3UUID.String())
+
+	adam := names.NewUserTag("adam")
+
+	tuples := []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(adam),
+		Relation: ofganames.ReaderRelation,
+		Target:   ofganames.ConvertTag(offer1),
+	}, {
+		Object:   ofganames.ConvertTag(adam),
+		Relation: ofganames.ConsumerRelation,
+		Target:   ofganames.ConvertTag(offer2),
+	}, {
+		Object:   ofganames.ConvertTag(adam),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(offer3),
+	}}
+	err = s.ofgaClient.AddRelation(ctx, tuples...)
+	c.Assert(err, gc.IsNil)
+
+	adamUser := openfga.NewUser(&dbmodel.User{Username: adam.Name()}, s.ofgaClient)
+	offerUUIDs, err := adamUser.ListApplicationOffers(ctx, ofganames.ReaderRelation)
+	c.Assert(err, gc.IsNil)
+	wantUUIDs := []string{offer1UUID.String(), offer2UUID.String(), offer3UUID.String()}
+	sort.Strings(wantUUIDs)
+	sort.Strings(offerUUIDs)
+	c.Assert(offerUUIDs, gc.DeepEquals, wantUUIDs)
+}
