@@ -428,7 +428,7 @@ func unsetResourceAccess[T ofganames.ResourceTagger](ctx context.Context, user *
 	return nil
 }
 
-// ListEntitiesWithAccess lists all entities that have a relation to the resource.
+// ListEntitiesWithAccess lists all entities that have a direct relation to the resource.
 func ListEntitiesWithAccess[T ofganames.ResourceTagger](ctx context.Context, client *OFGAClient, resource T) ([]EntityAccess, error) {
 	t := Tuple{Target: ofganames.ConvertTag(resource)}
 	tuples, err := client.ReadAllRelatedObjects(ctx, t)

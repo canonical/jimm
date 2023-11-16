@@ -250,7 +250,8 @@ func (j *JIMM) listApplicationOfferUsers(ctx context.Context, offer names.Applic
 
 	userDetails := []jujuparams.OfferUserDetails{}
 	for _, et := range etAccess {
-		// TODO(Kian) Determine if we can return group info to Juju clients.
+		// Skip entities that are not users, like groups.
+		// TODO(Kian) CSS-xxx return group info once Juju supports it.
 		if et.Entity.Kind != openfga.Kind("user") {
 			continue
 		}

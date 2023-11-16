@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"math/rand"
 	"sort"
-	"strings"
 	"time"
 
 	jujuparams "github.com/juju/juju/rpc/params"
@@ -676,46 +675,23 @@ func (j *JIMM) ModelInfo(ctx context.Context, u *openfga.User, mt names.ModelTag
 		return nil, errors.E(op, err)
 	}
 
-	userAccess := make(map[string]string)
+	etWithSpecifiedRelation, err := openfga.ListEntitiesWithAccess(ctx, j.OpenFGAClient, mt)
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
 
-	// TODO(Kian) CSS-6040 Consider refactoring the below to use OpenFGAClient.ReadRelatedObjects
-	// (and possibly creating a wrapper for that) to read only direct relations to the model instead
-	// of expanding the entire user list. Then we would instead return groups and users with direct
-	// access instead of including users with indirect access.
-	// for _, relation := range []openfga.Relation{
-	// 	// Here we list possible relation in decreasing level
-	// 	// of access privilege.
-	// 	ofganames.AdministratorRelation,
-	// 	ofganames.WriterRelation,
-	// 	ofganames.ReaderRelation,
-	// } {
-	// 	usersWithSpecifiedRelation, err := openfga.ListEntitiesWithAccess(ctx, j.OpenFGAClient, mt)
-	// 	if err != nil {
-	// 		return nil, errors.E(op, err)
-	// 	}
-	// 	for _, user := range usersWithSpecifiedRelation {
-	// 		// Since we are checking user relations in decreasing level of
-	// 		// access privilege, we want to make sure the user has not
-	// 		// already been recorded with a higher access level.
-	// 		if _, ok := userAccess[user.Username]; !ok {
-	// 			userAccess[user.Username] = ToModelAccessString(relation)
-	// 		}
-	// 	}
-	// }
-
-	users := make([]jujuparams.ModelUserInfo, 0, len(userAccess))
-	for username, access := range userAccess {
-		// If the user does not contain an "@" sign (no domain), it means
-		// this is a local user of this controller and JIMM does not
-		// care or know about local users - only Candid users are
-		// relevant.
-		if !strings.Contains(username, "@") {
+	users := make([]jujuparams.ModelUserInfo, 0, len(etWithSpecifiedRelation))
+	for _, et := range etWithSpecifiedRelation {
+		// Skip entities that are not users, like groups.
+		// TODO(Kian) CSS-xxx return group info once Juju supports it.
+		if et.Entity.Kind != openfga.Kind("user") {
 			continue
 		}
+		username := et.Entity.ID
 		if modelAccess == "admin" || username == u.Username {
 			users = append(users, jujuparams.ModelUserInfo{
 				UserName: username,
-				Access:   jujuparams.UserAccessPermission(access),
+				Access:   jujuparams.UserAccessPermission(ToModelAccessString(et.Access)),
 			})
 		}
 	}
