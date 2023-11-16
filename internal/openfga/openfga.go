@@ -144,6 +144,12 @@ func (o *OFGAClient) CheckRelation(ctx context.Context, tuple Tuple, trace bool)
 
 // removeTuples iteratively reads through all the tuples with the parameters as supplied by tuple and deletes them.
 func (o *OFGAClient) removeTuples(ctx context.Context, tuple Tuple) error {
+	// Note (babakks): an obvious improvement to this function is to make it work
+	// atomically and remove all the tuples in a transaction. At the moment, it's
+	// not simple, because OpenFGA supports limited number of write operation per
+	// request (default is 100):
+	// > "The number of write operations exceeds the allowed limit of 100"
+
 	pageSize := 50
 	for {
 		// Since we're deleting the returned tuples, it's best to avoid pagination,
