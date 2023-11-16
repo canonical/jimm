@@ -444,3 +444,21 @@ func ListEntitiesWithAccess[T ofganames.ResourceTagger](ctx context.Context, cli
 	}
 	return et, nil
 }
+
+// ListUsersWithAccess lists all users that have the specified relation to the resource.
+func ListUsersWithAccess[T ofganames.ResourceTagger](ctx context.Context, client *OFGAClient, resource T, relation Relation) ([]*User, error) {
+	entities, err := client.cofgaClient.FindUsersByRelation(ctx, Tuple{
+		Relation: relation,
+		Target:   ofganames.ConvertTag(resource),
+	}, 999)
+
+	if err != nil {
+		return nil, err
+	}
+
+	users := make([]*User, len(entities))
+	for i, entity := range entities {
+		users[i] = NewUser(&dbmodel.User{Username: entity.ID}, client)
+	}
+	return users, nil
+}
