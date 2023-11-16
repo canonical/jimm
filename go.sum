@@ -308,6 +308,8 @@ github.com/canonical/lxd v0.0.0-20230712132802-8d2a42545fd0 h1:1JfA4hOWjPoF18ebp
 github.com/canonical/lxd v0.0.0-20230712132802-8d2a42545fd0/go.mod h1:BAaklWDYuotKE0eQnwO6NArKc6rEwnTheuOPrtlLBYA=
 github.com/canonical/ofga v0.9.0 h1:LLX2XCqjcaJ0mv12XAgmKhVMiReI+gPSJ0JP9Am1SoU=
 github.com/canonical/ofga v0.9.0/go.mod h1:u4Ou8dbIhO7FmVlT7W3rX2roD9AOGz/CqmGh7AdF0Lo=
+github.com/canonical/ofga v0.10.0 h1:DHXhG/DAXWWQT/I+2jzr4qm0uTIYrILmtMxd6ZqmEzE=
+github.com/canonical/ofga v0.10.0/go.mod h1:u4Ou8dbIhO7FmVlT7W3rX2roD9AOGz/CqmGh7AdF0Lo=
 github.com/casbin/casbin/v2 v2.1.2/go.mod h1:YcPU1XXisHhLzuxH9coDNf2FbKpjGlbCg3n9yuLkIJQ=
 github.com/cavaliercoder/go-cpio v0.0.0-20180626203310-925f9528c45e/go.mod h1:oDpT4efm8tSYHXV5tHSdRvBet/b/QzxZ+XyyPehvm3A=
 github.com/cenkalti/backoff v2.2.1+incompatible h1:tNowT99t7UNflLxfYYSlKYsBpXdEet03Pg2g16Swow4=
