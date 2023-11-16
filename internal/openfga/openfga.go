@@ -73,6 +73,9 @@ func NewOpenFGAClient(cofgaClient *cofga.Client) *OFGAClient {
 	return &OFGAClient{cofgaClient: cofgaClient}
 }
 
+// translateSpecialTuples handles cases where tuples need to be transformed before being
+// returned to the application layer. Currently the wildcard tuple * for users is replaced
+// with the everyone@external user.
 func translateSpecialTuples(timestampedTuples []cofga.TimestampedTuple) {
 	for i, tt := range timestampedTuples {
 		if tt.Tuple.Object.Kind == UserType && tt.Tuple.Object.IsPublicAccess() {

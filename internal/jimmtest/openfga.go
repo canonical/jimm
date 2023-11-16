@@ -135,8 +135,8 @@ func SetupTestOFGAClient(names ...string) (*openfga.OFGAClient, *cofga.Client, *
 	if err != nil {
 		return nil, nil, nil, errgo.Notef(err, "failed to create authorization model")
 	}
+	cofgaClient.SetAuthModelID(authModelID)
 
-	cofgaClient.AuthModelId = authModelID
 	cofgaParams.AuthModelID = authModelID
 
 	client := openfga.NewOpenFGAClient(cofgaClient)
