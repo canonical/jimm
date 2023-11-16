@@ -428,7 +428,30 @@ func unsetResourceAccess[T ofganames.ResourceTagger](ctx context.Context, user *
 	return nil
 }
 
+// ListUsersWithAccess lists all users that have the specified relation to the resource.
+func ListUsersWithAccess[T ofganames.ResourceTagger](ctx context.Context, client *OFGAClient, resource T, relation Relation) ([]*User, error) {
+	entities, err := client.cofgaClient.FindUsersByRelation(ctx, Tuple{
+		Relation: relation,
+		Target:   ofganames.ConvertTag(resource),
+	}, 999)
+
+	if err != nil {
+		return nil, err
+	}
+
+	users := make([]*User, len(entities))
+	for i, entity := range entities {
+		if entity.ID == "*" {
+			entity.ID = ofganames.EveryoneUser
+		}
+		users[i] = NewUser(&dbmodel.User{Username: entity.ID}, client)
+	}
+	return users, nil
+}
+
 // ListEntitiesWithAccess lists all entities that have a direct relation to the resource.
+// TODO(Kian): When Juju adds groups, use this to return access information instead of expanding the
+// access tree.
 func ListEntitiesWithAccess[T ofganames.ResourceTagger](ctx context.Context, client *OFGAClient, resource T) ([]EntityAccess, error) {
 	t := Tuple{Target: ofganames.ConvertTag(resource)}
 	tuples, err := client.ReadAllRelatedObjects(ctx, t)
@@ -443,22 +466,4 @@ func ListEntitiesWithAccess[T ofganames.ResourceTagger](ctx context.Context, cli
 		}
 	}
 	return et, nil
-}
-
-// ListUsersWithAccess lists all users that have the specified relation to the resource.
-func ListUsersWithAccess[T ofganames.ResourceTagger](ctx context.Context, client *OFGAClient, resource T, relation Relation) ([]*User, error) {
-	entities, err := client.cofgaClient.FindUsersByRelation(ctx, Tuple{
-		Relation: relation,
-		Target:   ofganames.ConvertTag(resource),
-	}, 999)
-
-	if err != nil {
-		return nil, err
-	}
-
-	users := make([]*User, len(entities))
-	for i, entity := range entities {
-		users[i] = NewUser(&dbmodel.User{Username: entity.ID}, client)
-	}
-	return users, nil
 }

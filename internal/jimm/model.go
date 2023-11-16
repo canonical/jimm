@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/rand"
 	"sort"
+	"strings"
 	"time"
 
 	jujuparams "github.com/juju/juju/rpc/params"
@@ -675,23 +676,42 @@ func (j *JIMM) ModelInfo(ctx context.Context, u *openfga.User, mt names.ModelTag
 		return nil, errors.E(op, err)
 	}
 
-	etWithSpecifiedRelation, err := openfga.ListEntitiesWithAccess(ctx, j.OpenFGAClient, mt)
-	if err != nil {
-		return nil, errors.E(op, err)
+	userAccess := make(map[string]string)
+
+	for _, relation := range []openfga.Relation{
+		// Here we list possible relation in decreasing level
+		// of access privilege.
+		ofganames.AdministratorRelation,
+		ofganames.WriterRelation,
+		ofganames.ReaderRelation,
+	} {
+		usersWithSpecifiedRelation, err := openfga.ListUsersWithAccess(ctx, j.OpenFGAClient, mt, relation)
+		if err != nil {
+			return nil, errors.E(op, err)
+		}
+		for _, user := range usersWithSpecifiedRelation {
+			// Since we are checking user relations in decreasing level of
+			// access privilege, we want to make sure the user has not
+			// already been recorded with a higher access level.
+			if _, ok := userAccess[user.Username]; !ok {
+				userAccess[user.Username] = ToModelAccessString(relation)
+			}
+		}
 	}
 
-	users := make([]jujuparams.ModelUserInfo, 0, len(etWithSpecifiedRelation))
-	for _, et := range etWithSpecifiedRelation {
-		// Skip entities that are not users, like groups.
-		// TODO(Kian) CSS-xxx return group info once Juju supports it.
-		if et.Entity.Kind != openfga.Kind("user") {
+	users := make([]jujuparams.ModelUserInfo, 0, len(userAccess))
+	for username, access := range userAccess {
+		// If the user does not contain an "@" sign (no domain), it means
+		// this is a local user of this controller and JIMM does not
+		// care or know about local users - only Candid users are
+		// relevant.
+		if !strings.Contains(username, "@") {
 			continue
 		}
-		username := et.Entity.ID
-		if modelAccess == "admin" || username == u.Username {
+		if modelAccess == "admin" || username == u.Username || username == ofganames.EveryoneUser {
 			users = append(users, jujuparams.ModelUserInfo{
 				UserName: username,
-				Access:   jujuparams.UserAccessPermission(ToModelAccessString(et.Access)),
+				Access:   jujuparams.UserAccessPermission(access),
 			})
 		}
 	}

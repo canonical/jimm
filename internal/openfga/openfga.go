@@ -73,6 +73,14 @@ func NewOpenFGAClient(cofgaClient *cofga.Client) *OFGAClient {
 	return &OFGAClient{cofgaClient: cofgaClient}
 }
 
+func translateSpecialTuples(timestampedTuples []cofga.TimestampedTuple) {
+	for i, tt := range timestampedTuples {
+		if tt.Tuple.Object.Kind == UserType && tt.Tuple.Object.IsPublicAccess() {
+			timestampedTuples[i].Tuple.Object.ID = ofganames.EveryoneUser
+		}
+	}
+}
+
 // getRelatedObjects returns all objects where the user has a valid relation to them.
 // Such as all the groups a user resides in.
 //
@@ -82,6 +90,7 @@ func (o *OFGAClient) getRelatedObjects(ctx context.Context, tuple Tuple, pageSiz
 	if err != nil {
 		return nil, "", err
 	}
+	translateSpecialTuples(timestampedTuples)
 	tuples := make([]Tuple, len(timestampedTuples))
 	for i, tt := range timestampedTuples {
 		if tt.Tuple.Object.IsPublicAccess() {

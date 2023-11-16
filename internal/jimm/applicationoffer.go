@@ -243,27 +243,38 @@ func (j *JIMM) GetApplicationOfferConsumeDetails(ctx context.Context, user *open
 // TODO(Kian) CSS-6040 Consider changing wherever this function is used to
 // better encapsulate transforming Postgres/OpenFGA objects into Juju objects.
 func (j *JIMM) listApplicationOfferUsers(ctx context.Context, offer names.ApplicationOfferTag, user *dbmodel.User, accessLevel string) ([]jujuparams.OfferUserDetails, error) {
-	etAccess, err := openfga.ListEntitiesWithAccess(ctx, j.OpenFGAClient, offer)
-	if err != nil {
-		return nil, errors.E(err)
+	users := make(map[string]string)
+	// we loop through relations in a decreasing order of access
+	for _, relation := range []openfga.Relation{
+		ofganames.AdministratorRelation,
+		ofganames.ConsumerRelation,
+		ofganames.ReaderRelation,
+	} {
+		usersWithRelation, err := openfga.ListUsersWithAccess(ctx, j.OpenFGAClient, offer, relation)
+		if err != nil {
+			return nil, errors.E(err)
+		}
+		for _, user := range usersWithRelation {
+			// if the user is in the users map, it must already have a higher
+			// access level - we skip this user
+			if users[user.Username] != "" {
+				continue
+			}
+			users[user.Username] = ToOfferAccessString(relation)
+		}
 	}
 
 	userDetails := []jujuparams.OfferUserDetails{}
-	for _, et := range etAccess {
-		// Skip entities that are not users, like groups.
-		// TODO(Kian) CSS-xxx return group info once Juju supports it.
-		if et.Entity.Kind != openfga.Kind("user") {
-			continue
-		}
+	for username, level := range users {
 		// non-admin users should only see their own access level
 		// and access level of "everyone@external" - meaning the access
 		// level everybody has.
-		if accessLevel != string(jujuparams.OfferAdminAccess) && et.Entity.ID != ofganames.EveryoneUser && et.Entity.ID != user.Username {
+		if accessLevel != string(jujuparams.OfferAdminAccess) && username != ofganames.EveryoneUser && username != user.Username {
 			continue
 		}
 		userDetails = append(userDetails, jujuparams.OfferUserDetails{
-			UserName: et.Entity.ID,
-			Access:   ToOfferAccessString(et.Access),
+			UserName: username,
+			Access:   level,
 			// TODO (alesstimec) this is missing the DisplayName - we could
 			// fetch it from the DB if it is REALLY important.
 		})

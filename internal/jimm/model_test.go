@@ -900,6 +900,7 @@ func assertConfig(config map[string]interface{}, fnc func(context.Context, *juju
 
 }
 
+// Note that this env does not give the everyone@external user access to the model.
 const modelInfoTestEnv = `clouds:
 - name: test-cloud
   type: test-provider
@@ -929,6 +930,9 @@ models:
     status: available
     info: "OK!"
     since: 2020-02-20T20:02:20Z
+  sla:
+    level: unsupported
+  agent-version: 1.2.3
   users:
   - user: alice@external
     access: admin
@@ -936,9 +940,12 @@ models:
     access: write
   - user: charlie@external
     access: read
-  sla:
-    level: unsupported
-  agent-version: 1.2.3
+`
+
+// This env extends the one above to provide the everyone@external user with access to the model.
+const modelInfoTestEnvWithEveryoneAccess = modelInfoTestEnv + `
+  - user: everyone@external
+    access: read
 `
 
 var modelInfoTests = []struct {
@@ -1093,7 +1100,39 @@ var modelInfoTests = []struct {
 	username:    "alice@external",
 	uuid:        "00000002-0000-0000-0000-000000000002",
 	expectError: "model not found",
-}}
+}, {
+	name:     "Access through everyone user",
+	env:      modelInfoTestEnvWithEveryoneAccess,
+	username: "diane@external",
+	uuid:     "00000002-0000-0000-0000-000000000001",
+	expectModelInfo: &jujuparams.ModelInfo{
+		Name:               "model-1",
+		Type:               "iaas",
+		UUID:               "00000002-0000-0000-0000-000000000001",
+		ControllerUUID:     "00000001-0000-0000-0000-000000000001",
+		ProviderType:       "test-provider",
+		DefaultSeries:      "warty",
+		CloudTag:           names.NewCloudTag("test-cloud").String(),
+		CloudRegion:        "test-cloud-region",
+		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/cred-1").String(),
+		OwnerTag:           names.NewUserTag("alice@external").String(),
+		Life:               "alive",
+		Status: jujuparams.EntityStatus{
+			Status: "available",
+			Info:   "OK!",
+			Since:  newDate(2020, 2, 20, 20, 2, 20, 0, time.UTC),
+		},
+		Users: []jujuparams.ModelUserInfo{{
+			UserName: "everyone@external",
+			Access:   "read",
+		}},
+		SLA: &jujuparams.ModelSLAInfo{
+			Level: "unsupported",
+		},
+		AgentVersion: newVersion("1.2.3"),
+	},
+},
+}
 
 func TestModelInfo(t *testing.T) {
 	c := qt.New(t)
@@ -1129,16 +1168,8 @@ func TestModelInfo(t *testing.T) {
 								Info:   "OK!",
 								Since:  newDate(2020, 2, 20, 20, 2, 20, 0, time.UTC),
 							}
-							mi.Users = []jujuparams.ModelUserInfo{{
-								UserName: "alice@external",
-								Access:   "admin",
-							}, {
-								UserName: "bob@external",
-								Access:   "write",
-							}, {
-								UserName: "charlie@external",
-								Access:   "read",
-							}}
+							// Note that users are populated from OpenFGA
+							mi.Users = []jujuparams.ModelUserInfo{}
 							mi.Machines = []jujuparams.ModelMachineInfo{{
 								Id:          "0",
 								Hardware:    jimmtest.ParseMachineHardware("arch=amd64 mem=8096 root-disk=10240 cores=1"),
