@@ -78,6 +78,7 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 		UUID:            ControllerUUID,
 		OpenFGAClient:   s.OFGAClient,
 	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
 

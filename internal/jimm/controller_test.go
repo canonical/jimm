@@ -5,17 +5,22 @@ package jimm_test
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
+	"sync"
 	"testing"
 	"time"
 
 	qt "github.com/frankban/quicktest"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/google/uuid"
+	"github.com/juju/juju/api/base"
+	"github.com/juju/juju/api/controller/controller"
 	"github.com/juju/juju/core/life"
 	"github.com/juju/juju/core/status"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 	semversion "github.com/juju/version"
+	"gopkg.in/macaroon.v2"
 
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
@@ -1331,4 +1336,315 @@ func TestGetControllerAccess(t *testing.T) {
 
 	_, err = j.GetJimmControllerAccess(ctx, alice, names.NewUserTag("alice@external"))
 	c.Assert(err, qt.ErrorMatches, "unauthorized")
+}
+
+const testInitiateMigrationEnv = `clouds:
+- name: test-cloud
+  type: test
+  regions:
+  - name: test-region-1
+cloud-credentials:
+- name: test-cred
+  cloud: test-cloud
+  owner: alice@external
+  type: empty
+controllers:
+- name: controller-1
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test-cloud
+  region: test-region-1
+  agent-version: 3.3
+- name: controller-2
+  uuid: 00000001-0000-0000-0000-000000000002
+  cloud: test-cloud
+  region: test-region-2
+  agent-version: 3.3
+models:
+- name: model-1
+  type: iaas
+  uuid: 00000002-0000-0000-0000-000000000003
+  controller: controller-1
+  default-series: mantic
+  cloud: test-cloud
+  region: test-region-1
+  cloud-credential: test-cred
+  owner: alice@external
+  life: alive
+  status:
+    status: available
+    info: "OK!"
+    since: 2020-02-20T20:02:20Z
+  users:
+  - user: alice@external
+    access: admin
+  - user: bob@external
+    access: write
+  - user: charlie@external
+    access: read
+  sla:
+    level: unsupported
+  agent-version: 3.3
+- name: model-2
+  type: iaas
+  uuid: 00000002-0000-0000-0000-000000000004
+  controller: controller-2
+  default-series: mantic
+  cloud: test-cloud
+  region: test-region-1
+  cloud-credential: test-cred
+  owner: alice@external
+  life: alive
+  status:
+    status: available
+    info: "OK!"
+    since: 2020-02-20T20:02:20Z
+  users:
+  - user: alice@external
+    access: admin
+  - user: bob@external
+    access: write
+  - user: charlie@external
+    access: read
+  sla:
+    level: unsupported
+  agent-version: 3.3
+`
+
+func TestInitiateMigration(t *testing.T) {
+	c := qt.New(t)
+
+	mt1 := names.NewModelTag("00000002-0000-0000-0000-000000000003")
+	//mt2 := names.NewModelTag("00000002-0000-0000-0000-000000000004")
+
+	migrationId1 := uuid.New().String()
+
+	m, err := macaroon.New([]byte("root key"), []byte("id"), "", macaroon.V2)
+	c.Assert(err, qt.IsNil)
+
+	macaroonData, err := json.Marshal([]macaroon.Slice{[]*macaroon.Macaroon{m}})
+	c.Assert(err, qt.IsNil)
+
+	tests := []struct {
+		about                    string
+		initiateMigrationResults []result
+		user                     func(*openfga.OFGAClient) *openfga.User
+		spec                     jujuparams.MigrationSpec
+		expectedError            string
+		expectedResult           jujuparams.InitiateMigrationResult
+	}{{
+		about: "all is well",
+		user: func(client *openfga.OFGAClient) *openfga.User {
+			return openfga.NewUser(
+				&dbmodel.User{
+					Username: "alice@external",
+				},
+				client,
+			)
+		},
+		spec: jujuparams.MigrationSpec{
+			ModelTag: mt1.String(),
+			TargetInfo: jujuparams.MigrationTargetInfo{
+				ControllerTag: names.NewControllerTag(uuid.NewString()).String(),
+				AuthTag:       names.NewUserTag("target-user@external").String(),
+				Macaroons:     string(macaroonData),
+			},
+		},
+		initiateMigrationResults: []result{{
+			result: migrationId1,
+		}},
+		expectedResult: jujuparams.InitiateMigrationResult{
+			ModelTag:    mt1.String(),
+			MigrationId: migrationId1,
+		},
+	}, {
+		about: "InitiateMigration call fails",
+		user: func(client *openfga.OFGAClient) *openfga.User {
+			return openfga.NewUser(
+				&dbmodel.User{
+					Username: "alice@external",
+				},
+				client,
+			)
+		},
+		spec: jujuparams.MigrationSpec{
+			ModelTag: mt1.String(),
+			TargetInfo: jujuparams.MigrationTargetInfo{
+				ControllerTag: names.NewControllerTag(uuid.NewString()).String(),
+				AuthTag:       names.NewUserTag("target-user@external").String(),
+			},
+		},
+		initiateMigrationResults: []result{{
+			err: errors.E("a silly error"),
+		}},
+		expectedError: "a silly error",
+	}, {
+		about: "non-admin-user gets unauthorized error",
+		user: func(client *openfga.OFGAClient) *openfga.User {
+			return openfga.NewUser(
+				&dbmodel.User{
+					Username: "bob@external",
+				},
+				client,
+			)
+		},
+		spec: jujuparams.MigrationSpec{
+			ModelTag: mt1.String(),
+			TargetInfo: jujuparams.MigrationTargetInfo{
+				ControllerTag: names.NewControllerTag(uuid.NewString()).String(),
+				AuthTag:       names.NewUserTag("target-user@external").String(),
+			},
+		},
+		initiateMigrationResults: []result{{}},
+		expectedError:            "unauthorized access",
+	}, {
+		about: "invalid model tag",
+		user: func(client *openfga.OFGAClient) *openfga.User {
+			return openfga.NewUser(
+				&dbmodel.User{
+					Username: "alice@external",
+				},
+				client,
+			)
+		},
+		spec: jujuparams.MigrationSpec{
+			ModelTag: "invalid-model-tag",
+			TargetInfo: jujuparams.MigrationTargetInfo{
+				ControllerTag: names.NewControllerTag(uuid.NewString()).String(),
+				AuthTag:       names.NewUserTag("target-user@external").String(),
+			},
+		},
+		initiateMigrationResults: []result{{}},
+		expectedError:            `"invalid-model-tag" is not a valid tag`,
+	}, {
+		about: "invalid target controller tag",
+		user: func(client *openfga.OFGAClient) *openfga.User {
+			return openfga.NewUser(
+				&dbmodel.User{
+					Username: "alice@external",
+				},
+				client,
+			)
+		},
+		spec: jujuparams.MigrationSpec{
+			ModelTag: mt1.String(),
+			TargetInfo: jujuparams.MigrationTargetInfo{
+				ControllerTag: "invalid-controller-tag",
+				AuthTag:       names.NewUserTag("target-user@external").String(),
+			},
+		},
+		initiateMigrationResults: []result{{}},
+		expectedError:            `"invalid-controller-tag" is not a valid tag`,
+	}, {
+		about: "invalid target user tag",
+		user: func(client *openfga.OFGAClient) *openfga.User {
+			return openfga.NewUser(
+				&dbmodel.User{
+					Username: "alice@external",
+				},
+				client,
+			)
+		},
+		spec: jujuparams.MigrationSpec{
+			ModelTag: mt1.String(),
+			TargetInfo: jujuparams.MigrationTargetInfo{
+				ControllerTag: names.NewControllerTag(uuid.NewString()).String(),
+				AuthTag:       "invalid-user-tag",
+			},
+		},
+		initiateMigrationResults: []result{{}},
+		expectedError:            `"invalid-user-tag" is not a valid tag`,
+	}, {
+		about: "invalid macaroon data",
+		user: func(client *openfga.OFGAClient) *openfga.User {
+			return openfga.NewUser(
+				&dbmodel.User{
+					Username: "alice@external",
+				},
+				client,
+			)
+		},
+		spec: jujuparams.MigrationSpec{
+			ModelTag: mt1.String(),
+			TargetInfo: jujuparams.MigrationTargetInfo{
+				ControllerTag: names.NewControllerTag(uuid.NewString()).String(),
+				AuthTag:       names.NewUserTag("target-user@external").String(),
+				Macaroons:     "invalid-macaroon-data",
+			},
+		},
+		initiateMigrationResults: []result{{}},
+		expectedError:            "failed to unmarshal macaroons",
+	}}
+
+	for _, test := range tests {
+		c.Run(test.about, func(c *qt.C) {
+			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+			c.Assert(err, qt.IsNil)
+
+			j := &jimm.JIMM{
+				UUID: uuid.NewString(),
+				Database: db.Database{
+					DB: jimmtest.MemoryDB(c, nil),
+				},
+				OpenFGAClient: client,
+				Dialer:        &testDialer{},
+			}
+
+			ctx := context.Background()
+			err = j.Database.Migrate(ctx, false)
+			c.Assert(err, qt.IsNil)
+
+			env := jimmtest.ParseEnvironment(c, testInitiateMigrationEnv)
+			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
+
+			c.Patch(jimm.NewControllerClient, func(api base.APICallCloser) jimm.ControllerClient {
+				return &testControllerClient{
+					initiateMigrationResults: test.initiateMigrationResults,
+				}
+			})
+
+			user := test.user(client)
+
+			result, err := j.InitiateMigration(context.Background(), user, test.spec)
+			if test.expectedError == "" {
+				c.Assert(err, qt.IsNil)
+				c.Assert(result, qt.DeepEquals, test.expectedResult)
+			} else {
+				c.Assert(err, qt.ErrorMatches, test.expectedError)
+			}
+		})
+	}
+}
+
+type testDialer struct{}
+
+func (d *testDialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, requiredPermissions map[string]string) (jimm.API, error) {
+	return (jimm.API)(nil), nil
+}
+
+type result struct {
+	err    error
+	result any
+}
+
+type testControllerClient struct {
+	mu                       sync.Mutex
+	initiateMigrationResults []result
+}
+
+func (c *testControllerClient) InitiateMigration(spec controller.MigrationSpec) (string, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if len(c.initiateMigrationResults) == 0 {
+		return "", errors.E(errors.CodeNotImplemented)
+	}
+	var result result
+	result, c.initiateMigrationResults = c.initiateMigrationResults[0], c.initiateMigrationResults[1:]
+	if result.err != nil {
+		return "", result.err
+	}
+	return result.result.(string), nil
+}
+
+func (c *testControllerClient) Close() error {
+	return nil
 }
