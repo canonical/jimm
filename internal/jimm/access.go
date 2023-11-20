@@ -279,7 +279,7 @@ func (auth *JWTGenerator) MakeToken(ctx context.Context, permissionMap map[strin
 // to cachedPerms if they exist. If the user does not have any of the desired permissions then an
 // error is returned.
 // Note that cachedPerms map is modified and returned.
-func (j *JIMM) CheckPermission(ctx context.Context, user *openfga.User, cachedPerms map[string]string, desiredPerms map[string]interface{}) (map[string]string, error) {
+func (j *JIMM) CheckPermission(ctx context.Context, u *openfga.User, cachedPerms map[string]string, desiredPerms map[string]interface{}) (map[string]string, error) {
 	const op = errors.Op("jimm.CheckPermission")
 	for key, val := range desiredPerms {
 		if _, ok := cachedPerms[key]; !ok {
@@ -295,7 +295,7 @@ func (j *JIMM) CheckPermission(ctx context.Context, user *openfga.User, cachedPe
 			if err != nil {
 				return cachedPerms, errors.E(op, fmt.Sprintf("failed to parse relation %s", stringVal), err)
 			}
-			check, err := openfga.CheckRelation(ctx, user, tag, relation)
+			check, err := openfga.CheckRelation(ctx, u, tag, relation)
 			if err != nil {
 				return cachedPerms, errors.E(op, err)
 			}
@@ -309,10 +309,10 @@ func (j *JIMM) CheckPermission(ctx context.Context, user *openfga.User, cachedPe
 }
 
 // GrantAuditLogAccess grants audit log access for the target user.
-func (j *JIMM) GrantAuditLogAccess(ctx context.Context, user *openfga.User, targetUserTag names.UserTag) error {
+func (j *JIMM) GrantAuditLogAccess(ctx context.Context, u *openfga.User, targetUserTag names.UserTag) error {
 	const op = errors.Op("jimm.GrantAuditLogAccess")
 
-	access := user.GetControllerAccess(ctx, j.ResourceTag())
+	access := u.GetControllerAccess(ctx, j.ResourceTag())
 	if access != ofganames.AdministratorRelation {
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
@@ -332,10 +332,10 @@ func (j *JIMM) GrantAuditLogAccess(ctx context.Context, user *openfga.User, targ
 }
 
 // RevokeAuditLogAccess revokes audit log access for the target user.
-func (j *JIMM) RevokeAuditLogAccess(ctx context.Context, user *openfga.User, targetUserTag names.UserTag) error {
+func (j *JIMM) RevokeAuditLogAccess(ctx context.Context, u *openfga.User, targetUserTag names.UserTag) error {
 	const op = errors.Op("jimm.RevokeAuditLogAccess")
 
-	access := user.GetControllerAccess(ctx, j.ResourceTag())
+	access := u.GetControllerAccess(ctx, j.ResourceTag())
 	if access != ofganames.AdministratorRelation {
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}

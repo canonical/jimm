@@ -14,14 +14,12 @@ import (
 	"github.com/juju/names/v4"
 	"github.com/juju/zaputil"
 	"github.com/juju/zaputil/zapctx"
-	"go.uber.org/zap"
 
 	apiparams "github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/jujuapi/rpc"
-	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 )
 
@@ -88,11 +86,7 @@ func init() {
 func (r *controllerRoot) DisableControllerUUIDMasking(ctx context.Context) error {
 	const op = errors.Op("jujuapi.DisableControllerUUIDMasking")
 
-	isControllerAdmin, err := openfga.IsAdministrator(ctx, r.user, names.NewControllerTag(r.jimm.UUID))
-	if err != nil {
-		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
-	}
-	if !isControllerAdmin {
+	if !r.user.JimmAdmin {
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 	r.controllerUUIDMasking = false
@@ -199,11 +193,7 @@ func (r *controllerRoot) AddController(ctx context.Context, req apiparams.AddCon
 func (r *controllerRoot) ListControllers(ctx context.Context) (apiparams.ListControllersResponse, error) {
 	const op = errors.Op("jujuapi.ListControllersV3")
 
-	isControllerAdmin, err := openfga.IsAdministrator(ctx, r.user, names.NewControllerTag(r.jimm.UUID))
-	if err != nil {
-		return apiparams.ListControllersResponse{}, errors.E(op, errors.CodeUnauthorized, "unauthorized")
-	}
-	if !isControllerAdmin {
+	if !r.user.JimmAdmin {
 		// if the user isn't a controller admin return JAAS
 		// itself as the only controller.
 		srvVersion, err := r.jimm.EarliestControllerVersion(ctx)
@@ -224,7 +214,7 @@ func (r *controllerRoot) ListControllers(ctx context.Context) (apiparams.ListCon
 	}
 
 	var controllers []apiparams.ControllerInfo
-	err = r.jimm.Database.ForEachController(ctx, func(ctl *dbmodel.Controller) error {
+	err := r.jimm.Database.ForEachController(ctx, func(ctl *dbmodel.Controller) error {
 		controllers = append(controllers, ctl.ToAPIControllerInfo())
 		return nil
 	})
@@ -396,12 +386,7 @@ func (r *controllerRoot) FullModelStatus(ctx context.Context, req apiparams.Full
 func (r *controllerRoot) UpdateMigratedModel(ctx context.Context, req apiparams.UpdateMigratedModelRequest) error {
 	const op = errors.Op("jujuapi.UpdateMigratedModel")
 
-	isControllerAdmin, err := openfga.IsAdministrator(ctx, r.user, r.jimm.ResourceTag())
-	if err != nil {
-		zapctx.Error(ctx, "failed to check for controller admin access", zap.Error(err))
-		return errors.E(op, err)
-	}
-	if !isControllerAdmin {
+	if !r.user.JimmAdmin {
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 

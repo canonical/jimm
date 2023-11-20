@@ -29,7 +29,8 @@ func NewUser(u *dbmodel.User, client *OFGAClient) *User {
 // to check user's access rights to various resources.
 type User struct {
 	*dbmodel.User
-	client *OFGAClient
+	client    *OFGAClient
+	JimmAdmin bool
 }
 
 // IsAllowedAddModed returns true if the user is allowed to add a model on the
@@ -115,12 +116,12 @@ func (u *User) GetAuditLogViewerAccess(ctx context.Context, resource names.Contr
 
 // GetControllerAccess returns the relation the user has with the specified controller.
 func (u *User) GetControllerAccess(ctx context.Context, resource names.ControllerTag) Relation {
-	isAdmin, err := IsAdministrator(ctx, u, resource)
+	isControllerAdmin, err := IsAdministrator(ctx, u, resource)
 	if err != nil {
 		zapctx.Error(ctx, "openfga check failed", zap.Error(err))
 		return ofganames.NoRelation
 	}
-	if isAdmin {
+	if isControllerAdmin {
 		return ofganames.AdministratorRelation
 	}
 	return ofganames.NoRelation
@@ -128,12 +129,12 @@ func (u *User) GetControllerAccess(ctx context.Context, resource names.Controlle
 
 // GetModelAccess returns the relation the user has with the specified model.
 func (u *User) GetModelAccess(ctx context.Context, resource names.ModelTag) Relation {
-	isAdmin, err := IsAdministrator(ctx, u, resource)
+	isModelAdmin, err := IsAdministrator(ctx, u, resource)
 	if err != nil {
 		zapctx.Error(ctx, "openfga check failed", zap.Error(err))
 		return ofganames.NoRelation
 	}
-	if isAdmin {
+	if isModelAdmin {
 		return ofganames.AdministratorRelation
 	}
 	isModelWriter, err := u.IsModelWriter(ctx, resource)
@@ -158,12 +159,12 @@ func (u *User) GetModelAccess(ctx context.Context, resource names.ModelTag) Rela
 
 // GetApplicationOfferAccess returns the relation the user has with the specified application offer.
 func (u *User) GetApplicationOfferAccess(ctx context.Context, resource names.ApplicationOfferTag) Relation {
-	isAdmin, err := IsAdministrator(ctx, u, resource)
+	isOfferAdmin, err := IsAdministrator(ctx, u, resource)
 	if err != nil {
 		zapctx.Error(ctx, "openfga check failed", zap.Error(err))
 		return ofganames.NoRelation
 	}
-	if isAdmin {
+	if isOfferAdmin {
 		return ofganames.AdministratorRelation
 	}
 	isConsumer, err := u.IsApplicationOfferConsumer(ctx, resource)

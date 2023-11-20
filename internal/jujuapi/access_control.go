@@ -67,12 +67,7 @@ func (r *controllerRoot) AddGroup(ctx context.Context, req apiparams.AddGroupReq
 		return errors.E(op, errors.CodeBadRequest, "invalid group name")
 	}
 
-	isAdmin, err := openfga.IsAdministrator(ctx, r.user, r.jimm.ResourceTag())
-	if err != nil {
-		zapctx.Error(ctx, "openfga check failed", zap.Error(err))
-		return errors.E(op, err)
-	}
-	if !isAdmin {
+	if !r.user.JimmAdmin {
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
@@ -91,20 +86,14 @@ func (r *controllerRoot) RenameGroup(ctx context.Context, req apiparams.RenameGr
 		return errors.E(op, errors.CodeBadRequest, "invalid group name")
 	}
 
-	isAdmin, err := openfga.IsAdministrator(ctx, r.user, r.jimm.ResourceTag())
-	if err != nil {
-
-		zapctx.Error(ctx, "openfga check failed", zap.Error(err))
-		return errors.E(op, err)
-	}
-	if !isAdmin {
+	if !r.user.JimmAdmin {
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
 	group := &dbmodel.GroupEntry{
 		Name: req.Name,
 	}
-	err = r.jimm.Database.GetGroup(ctx, group)
+	err := r.jimm.Database.GetGroup(ctx, group)
 	if err != nil {
 		return errors.E(op, err)
 	}
@@ -121,19 +110,14 @@ func (r *controllerRoot) RenameGroup(ctx context.Context, req apiparams.RenameGr
 func (r *controllerRoot) RemoveGroup(ctx context.Context, req apiparams.RemoveGroupRequest) error {
 	const op = errors.Op("jujuapi.RemoveGroup")
 
-	isAdmin, err := openfga.IsAdministrator(ctx, r.user, r.jimm.ResourceTag())
-	if err != nil {
-		zapctx.Error(ctx, "openfga check failed", zap.Error(err))
-		return errors.E(op, err)
-	}
-	if !isAdmin {
+	if !r.user.JimmAdmin {
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
 	group := &dbmodel.GroupEntry{
 		Name: req.Name,
 	}
-	err = r.jimm.Database.GetGroup(ctx, group)
+	err := r.jimm.Database.GetGroup(ctx, group)
 	if err != nil {
 		return errors.E(op, err)
 	}
@@ -153,17 +137,12 @@ func (r *controllerRoot) RemoveGroup(ctx context.Context, req apiparams.RemoveGr
 func (r *controllerRoot) ListGroups(ctx context.Context) (apiparams.ListGroupResponse, error) {
 	const op = errors.Op("jujuapi.ListGroups")
 
-	isAdmin, err := openfga.IsAdministrator(ctx, r.user, r.jimm.ResourceTag())
-	if err != nil {
-		zapctx.Error(ctx, "openfga check failed", zap.Error(err))
-		return apiparams.ListGroupResponse{}, errors.E(op, err)
-	}
-	if !isAdmin {
+	if !r.user.JimmAdmin {
 		return apiparams.ListGroupResponse{}, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
 	var groups []apiparams.Group
-	err = r.jimm.Database.ForEachGroup(ctx, func(ctl *dbmodel.GroupEntry) error {
+	err := r.jimm.Database.ForEachGroup(ctx, func(ctl *dbmodel.GroupEntry) error {
 		groups = append(groups, ctl.ToAPIGroupEntry())
 		return nil
 	})
@@ -337,12 +316,7 @@ func parseTag(ctx context.Context, j *jimm.JIMM, key string) (*ofganames.Tag, er
 func (r *controllerRoot) AddRelation(ctx context.Context, req apiparams.AddRelationRequest) error {
 	const op = errors.Op("jujuapi.AddRelation")
 
-	isAdmin, err := openfga.IsAdministrator(ctx, r.user, r.jimm.ResourceTag())
-	if err != nil {
-		zapctx.Error(ctx, "openfga check failed", zap.Error(err))
-		return errors.E(op, err)
-	}
-	if !isAdmin {
+	if !r.user.JimmAdmin {
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 	keys, err := r.parseTuples(ctx, req.Tuples)
@@ -362,12 +336,7 @@ func (r *controllerRoot) AddRelation(ctx context.Context, req apiparams.AddRelat
 func (r *controllerRoot) RemoveRelation(ctx context.Context, req apiparams.RemoveRelationRequest) error {
 	const op = errors.Op("jujuapi.RemoveRelation")
 
-	isAdmin, err := openfga.IsAdministrator(ctx, r.user, r.jimm.ResourceTag())
-	if err != nil {
-		zapctx.Error(ctx, "openfga check failed", zap.Error(err))
-		return errors.E(op, err)
-	}
-	if !isAdmin {
+	if !r.user.JimmAdmin {
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 	keys, err := r.parseTuples(ctx, req.Tuples)
@@ -389,12 +358,7 @@ func (r *controllerRoot) CheckRelation(ctx context.Context, req apiparams.CheckR
 	const op = errors.Op("jujuapi.CheckRelation")
 	checkResp := apiparams.CheckRelationResponse{Allowed: false}
 
-	isAdmin, err := openfga.IsAdministrator(ctx, r.user, r.jimm.ResourceTag())
-	if err != nil {
-		zapctx.Error(ctx, "openfga check failed", zap.Error(err))
-		return checkResp, errors.E(op, err)
-	}
-	if !isAdmin {
+	if !r.user.JimmAdmin {
 		return checkResp, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
@@ -563,16 +527,12 @@ func (r *controllerRoot) ListRelationshipTuples(ctx context.Context, req apipara
 	const op = errors.Op("jujuapi.ListRelationshipTuples")
 	var returnValue apiparams.ListRelationshipTuplesResponse
 
-	isAdmin, err := openfga.IsAdministrator(ctx, r.user, r.jimm.ResourceTag())
-	if err != nil {
-		zapctx.Error(ctx, "openfga check failed", zap.Error(err))
-		return returnValue, errors.E(op, err)
-	}
-	if !isAdmin {
+	if !r.user.JimmAdmin {
 		return returnValue, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
 	key := &openfga.Tuple{}
+	var err error
 	if req.Tuple.TargetObject != "" {
 		key, err = r.parseTuple(ctx, req.Tuple)
 		if err != nil {

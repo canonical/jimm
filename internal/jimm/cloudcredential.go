@@ -27,21 +27,17 @@ import (
 // of CodeNotFound will be returned. If the given user is not a controller
 // superuser or the owner of the credentials then an error with a code of
 // CodeUnauthorized will be returned.
-func (j *JIMM) GetCloudCredential(ctx context.Context, user *openfga.User, tag names.CloudCredentialTag) (*dbmodel.CloudCredential, error) {
+func (j *JIMM) GetCloudCredential(ctx context.Context, u *openfga.User, tag names.CloudCredentialTag) (*dbmodel.CloudCredential, error) {
 	const op = errors.Op("jimm.GetCloudCredential")
 
-	isJIMMAdmin, err := openfga.IsAdministrator(ctx, user, j.ResourceTag())
-	if err != nil {
-		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
-	}
-	if !isJIMMAdmin && user.Username != tag.Owner().Id() {
+	if !u.JimmAdmin && u.Username != tag.Owner().Id() {
 		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
 	var credential dbmodel.CloudCredential
 	credential.SetTag(tag)
 
-	err = j.Database.GetCloudCredential(ctx, &credential)
+	err := j.Database.GetCloudCredential(ctx, &credential)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
@@ -140,11 +136,7 @@ func (j *JIMM) UpdateCloudCredential(ctx context.Context, u *openfga.User, args 
 	var resultMu sync.Mutex
 	var result []jujuparams.UpdateCredentialModelResult
 	if u.Tag() != args.CredentialTag.Owner() {
-		isJIMMAdmin, err := openfga.IsAdministrator(ctx, u, j.ResourceTag())
-		if err != nil {
-			return result, errors.E(op, errors.CodeUnauthorized, "unauthorized")
-		}
-		if !isJIMMAdmin {
+		if !u.JimmAdmin {
 			return result, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 		}
 		// ensure the user we are adding the credential for exists.
@@ -327,19 +319,13 @@ func (j *JIMM) ForEachUserCloudCredential(ctx context.Context, u *dbmodel.User, 
 func (j *JIMM) GetCloudCredentialAttributes(ctx context.Context, u *openfga.User, cred *dbmodel.CloudCredential, hidden bool) (attrs map[string]string, redacted []string, err error) {
 	const op = errors.Op("jimm.GetCloudCredentialAttributes")
 
-	isControllerAdmin, err := openfga.IsAdministrator(ctx, u, j.ResourceTag())
-	if err != nil {
-		zapctx.Error(ctx, "failed to check for controller admin access", zap.Error(err))
-		return nil, nil, errors.E(op, err)
-	}
-
 	if hidden {
 		// Controller superusers cannot read hidden credential attributes.
 		if u.Username != cred.OwnerUsername {
 			return nil, nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 		}
 	} else {
-		if !isControllerAdmin && u.Username != cred.OwnerUsername {
+		if !u.JimmAdmin && u.Username != cred.OwnerUsername {
 			return nil, nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 		}
 	}

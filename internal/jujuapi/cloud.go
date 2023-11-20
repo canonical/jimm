@@ -270,22 +270,22 @@ func (r *controllerRoot) AddCredentials(ctx context.Context, args jujuparams.Tag
 	return results, nil
 }
 
-func userModelAccess(ctx context.Context, user *openfga.User, model names.ModelTag) (string, error) {
-	isAdmin, err := openfga.IsAdministrator(ctx, user, model)
+func userModelAccess(ctx context.Context, u *openfga.User, model names.ModelTag) (string, error) {
+	isModelAdmin, err := openfga.IsAdministrator(ctx, u, model)
 	if err != nil {
 		return "", errors.E(err)
 	}
-	if isAdmin {
+	if isModelAdmin {
 		return "admin", nil
 	}
-	hasWriteAccess, err := user.IsModelWriter(ctx, model)
+	hasWriteAccess, err := u.IsModelWriter(ctx, model)
 	if err != nil {
 		return "", errors.E(err)
 	}
 	if hasWriteAccess {
 		return "write", nil
 	}
-	hasReadAccess, err := user.IsModelReader(ctx, model)
+	hasReadAccess, err := u.IsModelReader(ctx, model)
 	if err != nil {
 		return "", errors.E(err)
 	}

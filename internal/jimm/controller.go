@@ -32,11 +32,7 @@ import (
 func (j *JIMM) AddController(ctx context.Context, u *openfga.User, ctl *dbmodel.Controller) error {
 	const op = errors.Op("jimm.AddController")
 
-	isJIMMAdmin, err := openfga.IsAdministrator(ctx, u, j.ResourceTag())
-	if err != nil {
-		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
-	}
-	if !isJIMMAdmin {
+	if !u.JimmAdmin {
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
@@ -263,22 +259,15 @@ func (a controllerAccessLevel) value() int {
 
 // GetJimmControllerAccess returns the JIMM controller access level for the
 // requested user.
-func (j *JIMM) GetJimmControllerAccess(ctx context.Context, user *openfga.User, tag names.UserTag) (string, error) {
+func (j *JIMM) GetJimmControllerAccess(ctx context.Context, u *openfga.User, tag names.UserTag) (string, error) {
 	const op = errors.Op("jimm.GetJIMMControllerAccess")
-
-	// First we check if the authenticated user is a JIMM administrator.
-	isControllerAdmin, err := openfga.IsAdministrator(ctx, user, j.ResourceTag())
-	if err != nil {
-		zapctx.Error(ctx, "failed to check access rights", zap.Error(err))
-		return "", errors.E(op, errors.CodeUnauthorized, "unauthorized")
-	}
 
 	// If the authenticated user is requesting the access level
 	// for him/her-self then we return that - either the user
 	// is a JIMM admin (aka "superuser"), or they have a "login"
 	// access level.
-	if user.Username == tag.Id() {
-		if isControllerAdmin {
+	if u.Username == tag.Id() {
+		if u.JimmAdmin {
 			return "superuser", nil
 		}
 		return "login", nil
@@ -286,13 +275,13 @@ func (j *JIMM) GetJimmControllerAccess(ctx context.Context, user *openfga.User, 
 
 	// Only JIMM administrators are allowed to see the access
 	// level of somebody else.
-	if !isControllerAdmin {
+	if !u.JimmAdmin {
 		return "", errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
-	var u dbmodel.User
-	u.SetTag(tag)
-	tagUser := openfga.NewUser(&u, j.OpenFGAClient)
+	var user dbmodel.User
+	user.SetTag(tag)
+	tagUser := openfga.NewUser(&user, j.OpenFGAClient)
 
 	// Check if the user is jimm administrator.
 	isAdmin, err := openfga.IsAdministrator(ctx, tagUser, j.ResourceTag())
@@ -308,27 +297,23 @@ func (j *JIMM) GetJimmControllerAccess(ctx context.Context, user *openfga.User, 
 }
 
 // GetUserControllerAccess returns the user's level of access to the desired controller.
-func (j *JIMM) GetUserControllerAccess(ctx context.Context, user *openfga.User, controller names.ControllerTag) (string, error) {
-	accessLevel := user.GetControllerAccess(ctx, controller)
+func (j *JIMM) GetUserControllerAccess(ctx context.Context, u *openfga.User, controller names.ControllerTag) (string, error) {
+	accessLevel := u.GetControllerAccess(ctx, controller)
 	return ToControllerAccessString(accessLevel), nil
 }
 
 // ImportModel imports model with the specified uuid from the controller.
-func (j *JIMM) ImportModel(ctx context.Context, user *openfga.User, controllerName string, modelTag names.ModelTag, newOwner string) error {
+func (j *JIMM) ImportModel(ctx context.Context, u *openfga.User, controllerName string, modelTag names.ModelTag, newOwner string) error {
 	const op = errors.Op("jimm.ImportModel")
 
-	isJIMMAdmin, err := openfga.IsAdministrator(ctx, user, j.ResourceTag())
-	if err != nil {
-		return errors.E(op, err)
-	}
-	if !isJIMMAdmin {
+	if !u.JimmAdmin {
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
 	controller := dbmodel.Controller{
 		Name: controllerName,
 	}
-	err = j.Database.GetController(ctx, &controller)
+	err := j.Database.GetController(ctx, &controller)
 	if err != nil {
 		return errors.E(op, err)
 	}
@@ -494,15 +479,11 @@ func (j *JIMM) ImportModel(ctx context.Context, user *openfga.User, controllerNa
 func (j *JIMM) SetControllerConfig(ctx context.Context, u *openfga.User, args jujuparams.ControllerConfigSet) error {
 	const op = errors.Op("jimm.SetControllerConfig")
 
-	isControllerAdmin, err := openfga.IsAdministrator(ctx, u, j.ResourceTag())
-	if err != nil {
-		return errors.E(op, err)
-	}
-	if !isControllerAdmin {
+	if !u.JimmAdmin {
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
-	err = j.Database.Transaction(func(tx *db.Database) error {
+	err := j.Database.Transaction(func(tx *db.Database) error {
 		config := dbmodel.ControllerConfig{
 			Name: "jimm",
 		}
@@ -543,14 +524,10 @@ func (j *JIMM) GetControllerConfig(ctx context.Context, u *dbmodel.User) (*dbmod
 
 // UpdateMigratedModel asserts that the model has been migrated to the
 // specified controller and updates the internal model representation.
-func (j *JIMM) UpdateMigratedModel(ctx context.Context, user *openfga.User, modelTag names.ModelTag, targetControllerName string) error {
+func (j *JIMM) UpdateMigratedModel(ctx context.Context, u *openfga.User, modelTag names.ModelTag, targetControllerName string) error {
 	const op = errors.Op("jimm.UpdateMigratedModel")
 
-	isControllerAdmin, err := openfga.IsAdministrator(ctx, user, j.ResourceTag())
-	if err != nil {
-		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
-	}
-	if !isControllerAdmin {
+	if !u.JimmAdmin {
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
@@ -560,7 +537,7 @@ func (j *JIMM) UpdateMigratedModel(ctx context.Context, user *openfga.User, mode
 			Valid:  true,
 		},
 	}
-	err = j.Database.GetModel(ctx, &model)
+	err := j.Database.GetModel(ctx, &model)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.CodeNotFound {
 			return errors.E(op, "model not found", errors.CodeModelNotFound)
