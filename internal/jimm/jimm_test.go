@@ -398,54 +398,59 @@ func TestRemoveController(t *testing.T) {
 		user             string
 		unavailableSince *time.Time
 		force            bool
+		jimmAdmin        bool
 		expectedError    string
 	}{{
 		about:            "superuser can remove an unavailable controller",
 		user:             "alice@external",
 		unavailableSince: &now,
 		force:            true,
+		jimmAdmin:        true,
 	}, {
-		about: "superuser can remove a live controller with force",
-		user:  "alice@external",
-		force: true,
+		about:     "superuser can remove a live controller with force",
+		user:      "alice@external",
+		force:     true,
+		jimmAdmin: true,
 	}, {
 		about:         "superuser cannot remove a live controller",
 		user:          "alice@external",
 		force:         false,
+		jimmAdmin:     true,
 		expectedError: "controller is still alive",
 	}, {
 		about:         "add-model user cannot remove a controller",
 		user:          "bob@external",
 		expectedError: "unauthorized",
+		jimmAdmin:     false,
 		force:         false,
 	}, {
 		about:         "user withouth access rights cannot remove a controller",
 		user:          "eve@external",
 		expectedError: "unauthorized",
+		jimmAdmin:     false,
 		force:         false,
 	}}
 
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
-			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
-			c.Assert(err, qt.IsNil)
 
 			j := &jimm.JIMM{
 				UUID: uuid.NewString(),
 				Database: db.Database{
 					DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
 				},
-				OpenFGAClient: client,
 			}
 
-			err = j.Database.Migrate(ctx, false)
+			err := j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 
 			env := jimmtest.ParseEnvironment(c, removeControllerTestEnv)
-			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
+			env.PopulateDB(c, j.Database)
+			// env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
 
 			dbUser := env.User(test.user).DBObject(c, j.Database)
-			user := openfga.NewUser(&dbUser, client)
+			user := openfga.NewUser(&dbUser, nil)
+			user.JimmAdmin = test.jimmAdmin
 
 			if test.unavailableSince != nil {
 				// make the controller unavailable
@@ -540,6 +545,7 @@ func TestFullModelStatus(t *testing.T) {
 		about          string
 		user           string
 		modelUUID      string
+		jimmAdmin      bool
 		statusFunc     func(context.Context, []string) (*jujuparams.FullStatus, error)
 		expectedStatus jujuparams.FullStatus
 		expectedError  string
@@ -547,6 +553,7 @@ func TestFullModelStatus(t *testing.T) {
 		about:     "superuser allowed to see full model status",
 		user:      "alice@external",
 		modelUUID: "00000002-0000-0000-0000-000000000001",
+		jimmAdmin: true,
 		statusFunc: func(_ context.Context, _ []string) (*jujuparams.FullStatus, error) {
 			return &fullStatus, nil
 		},
@@ -555,6 +562,7 @@ func TestFullModelStatus(t *testing.T) {
 		about:     "model not found",
 		user:      "alice@external",
 		modelUUID: "00000002-0000-0000-0000-000000000002",
+		jimmAdmin: true,
 		statusFunc: func(_ context.Context, _ []string) (*jujuparams.FullStatus, error) {
 			return &fullStatus, nil
 		},
@@ -563,6 +571,7 @@ func TestFullModelStatus(t *testing.T) {
 		about:     "controller returns an error",
 		user:      "alice@external",
 		modelUUID: "00000002-0000-0000-0000-000000000001",
+		jimmAdmin: true,
 		statusFunc: func(_ context.Context, _ []string) (*jujuparams.FullStatus, error) {
 			return nil, errors.New("an error")
 		},
@@ -571,6 +580,7 @@ func TestFullModelStatus(t *testing.T) {
 		about:     "add-model user not allowed to see full model status",
 		user:      "bob@external",
 		modelUUID: "00000002-0000-0000-0000-000000000001",
+		jimmAdmin: false,
 		statusFunc: func(_ context.Context, _ []string) (*jujuparams.FullStatus, error) {
 			return &fullStatus, nil
 		},
@@ -579,6 +589,7 @@ func TestFullModelStatus(t *testing.T) {
 		about:     "no-access user not allowed to see full model status",
 		user:      "eve@external",
 		modelUUID: "00000002-0000-0000-0000-000000000001",
+		jimmAdmin: false,
 		statusFunc: func(_ context.Context, _ []string) (*jujuparams.FullStatus, error) {
 			return &fullStatus, nil
 		},
@@ -591,9 +602,6 @@ func TestFullModelStatus(t *testing.T) {
 				Status_: test.statusFunc,
 			}
 
-			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
-			c.Assert(err, qt.IsNil)
-
 			j := &jimm.JIMM{
 				UUID: uuid.NewString(),
 				Database: db.Database{
@@ -602,17 +610,17 @@ func TestFullModelStatus(t *testing.T) {
 				Dialer: &jimmtest.Dialer{
 					API: api,
 				},
-				OpenFGAClient: client,
 			}
 
-			err = j.Database.Migrate(ctx, false)
+			err := j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 
 			env := jimmtest.ParseEnvironment(c, fullModelStatusTestEnv)
-			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
+			env.PopulateDB(c, j.Database)
 
 			dbUser := env.User(test.user).DBObject(c, j.Database)
-			user := openfga.NewUser(&dbUser, client)
+			user := openfga.NewUser(&dbUser, nil)
+			user.JimmAdmin = test.jimmAdmin
 
 			status, err := j.FullModelStatus(ctx, user, names.NewModelTag(test.modelUUID), nil)
 			if test.expectedError != "" {

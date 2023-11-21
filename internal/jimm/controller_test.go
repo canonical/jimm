@@ -484,6 +484,7 @@ func TestImportModel(t *testing.T) {
 		modelUUID      string
 		modelInfo      func(context.Context, *jujuparams.ModelInfo) error
 		newOwner       string
+		jimmAdmin      bool
 		expectedModel  dbmodel.Model
 		expectedError  string
 		deltas         []jujuparams.Delta
@@ -493,6 +494,7 @@ func TestImportModel(t *testing.T) {
 		controllerName: "test-controller",
 		newOwner:       "",
 		modelUUID:      "00000002-0000-0000-0000-000000000001",
+		jimmAdmin:      true,
 		modelInfo: func(_ context.Context, info *jujuparams.ModelInfo) error {
 			info.Name = "test-model"
 			info.Type = "test-type"
@@ -637,6 +639,7 @@ func TestImportModel(t *testing.T) {
 		controllerName: "test-controller",
 		newOwner:       "alice@external",
 		modelUUID:      "00000002-0000-0000-0000-000000000001",
+		jimmAdmin:      true,
 		modelInfo: func(_ context.Context, info *jujuparams.ModelInfo) error {
 			info.Name = "test-model"
 			info.Type = "test-type"
@@ -725,6 +728,7 @@ func TestImportModel(t *testing.T) {
 		newOwner:       "bob",
 		modelUUID:      "00000002-0000-0000-0000-000000000001",
 		expectedError:  "cannot import model from local user, try --owner to switch the model owner",
+		jimmAdmin:      true,
 		modelInfo: func(_ context.Context, info *jujuparams.ModelInfo) error {
 			info.Name = "test-model"
 			info.Type = "test-type"
@@ -768,6 +772,7 @@ func TestImportModel(t *testing.T) {
 		controllerName: "test-controller",
 		newOwner:       "",
 		modelUUID:      "00000002-0000-0000-0000-000000000001",
+		jimmAdmin:      true,
 		modelInfo: func(_ context.Context, info *jujuparams.ModelInfo) error {
 			return errors.E(errors.CodeNotFound, "model not found")
 		},
@@ -778,6 +783,7 @@ func TestImportModel(t *testing.T) {
 		controllerName: "test-controller",
 		newOwner:       "",
 		modelUUID:      "00000002-0000-0000-0000-000000000001",
+		jimmAdmin:      true,
 		modelInfo: func(_ context.Context, info *jujuparams.ModelInfo) error {
 			info.Name = "test-model"
 			info.Type = "test-type"
@@ -798,6 +804,7 @@ func TestImportModel(t *testing.T) {
 		controllerName: "test-controller",
 		newOwner:       "",
 		modelUUID:      "00000002-0000-0000-0000-000000000001",
+		jimmAdmin:      true,
 		modelInfo: func(_ context.Context, info *jujuparams.ModelInfo) error {
 			info.Name = "test-model"
 			info.Type = "test-type"
@@ -818,6 +825,7 @@ func TestImportModel(t *testing.T) {
 		controllerName: "test-controller",
 		newOwner:       "",
 		modelUUID:      "00000002-0000-0000-0000-000000000001",
+		jimmAdmin:      true,
 		modelInfo: func(_ context.Context, info *jujuparams.ModelInfo) error {
 			info.Name = "test-model"
 			info.Type = "test-type"
@@ -838,6 +846,7 @@ func TestImportModel(t *testing.T) {
 		controllerName: "test-controller",
 		newOwner:       "",
 		modelUUID:      "00000002-0000-0000-0000-000000000001",
+		jimmAdmin:      false,
 		modelInfo: func(_ context.Context, info *jujuparams.ModelInfo) error {
 			info.Name = "test-model"
 			info.Type = "test-type"
@@ -858,6 +867,7 @@ func TestImportModel(t *testing.T) {
 		controllerName: "test-controller",
 		newOwner:       "",
 		modelUUID:      "00000002-0000-0000-0000-000000000002",
+		jimmAdmin:      true,
 		modelInfo: func(_ context.Context, info *jujuparams.ModelInfo) error {
 			info.Name = "model-1"
 			info.Type = "test-type"
@@ -917,6 +927,8 @@ func TestImportModel(t *testing.T) {
 
 			dbUser := env.User(test.user).DBObject(c, j.Database)
 			user := openfga.NewUser(&dbUser, client)
+			user.JimmAdmin = test.jimmAdmin
+
 			err = j.ImportModel(ctx, user, test.controllerName, names.NewModelTag(test.modelUUID), test.newOwner)
 			if test.expectedError == "" {
 				c.Assert(err, qt.IsNil)
@@ -938,11 +950,8 @@ func TestImportModel(t *testing.T) {
 const testControllerConfigEnv = `
 users:
 - username: alice@external
-  controller-access: superuser
 - username: eve@external
-  controller-access: login
 - username: fred@external
-  controller-access: login
 `
 
 func TestSetControllerConfig(t *testing.T) {
@@ -952,6 +961,7 @@ func TestSetControllerConfig(t *testing.T) {
 		about          string
 		user           string
 		args           jujuparams.ControllerConfigSet
+		jimmAdmin      bool
 		expectedError  string
 		expectedConfig dbmodel.ControllerConfig
 	}{{
@@ -964,6 +974,7 @@ func TestSetControllerConfig(t *testing.T) {
 				"key3": "value3",
 			},
 		},
+		jimmAdmin: true,
 		expectedConfig: dbmodel.ControllerConfig{
 			Name: "jimm",
 			Config: map[string]interface{}{
@@ -998,25 +1009,23 @@ func TestSetControllerConfig(t *testing.T) {
 
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
-			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.about)
-			c.Assert(err, qt.IsNil)
-
 			j := &jimm.JIMM{
 				UUID: uuid.NewString(),
 				Database: db.Database{
 					DB: jimmtest.MemoryDB(c, nil),
 				},
-				OpenFGAClient: client,
 			}
 			ctx := context.Background()
-			err = j.Database.Migrate(ctx, false)
+			err := j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 
 			env := jimmtest.ParseEnvironment(c, testControllerConfigEnv)
-			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
+			env.PopulateDB(c, j.Database)
 
 			dbUser := env.User(test.user).DBObject(c, j.Database)
-			user := openfga.NewUser(&dbUser, client)
+			user := openfga.NewUser(&dbUser, nil)
+			user.JimmAdmin = test.jimmAdmin
+
 			err = j.SetControllerConfig(ctx, user, test.args)
 			if test.expectedError == "" {
 				c.Assert(err, qt.IsNil)
@@ -1040,11 +1049,13 @@ func TestGetControllerConfig(t *testing.T) {
 	tests := []struct {
 		about          string
 		user           string
+		jimmAdmin      bool
 		expectedError  string
 		expectedConfig dbmodel.ControllerConfig
 	}{{
-		about: "admin allowed to set config",
-		user:  "alice@external",
+		about:     "admin allowed to set config",
+		user:      "alice@external",
+		jimmAdmin: true,
 		expectedConfig: dbmodel.ControllerConfig{
 			Name: "jimm",
 			Config: map[string]interface{}{
@@ -1052,8 +1063,9 @@ func TestGetControllerConfig(t *testing.T) {
 			},
 		},
 	}, {
-		about: "add-model user - unauthorized",
-		user:  "eve@external",
+		about:     "add-model user - unauthorized",
+		user:      "eve@external",
+		jimmAdmin: false,
 		expectedConfig: dbmodel.ControllerConfig{
 			Name: "jimm",
 			Config: map[string]interface{}{
@@ -1061,8 +1073,9 @@ func TestGetControllerConfig(t *testing.T) {
 			},
 		},
 	}, {
-		about: "login user - unauthorized",
-		user:  "fred@external",
+		about:     "login user - unauthorized",
+		user:      "fred@external",
+		jimmAdmin: false,
 		expectedConfig: dbmodel.ControllerConfig{
 			Name: "jimm",
 			Config: map[string]interface{}{
@@ -1073,28 +1086,26 @@ func TestGetControllerConfig(t *testing.T) {
 
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
-			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.about)
-			c.Assert(err, qt.IsNil)
-
 			j := &jimm.JIMM{
 				UUID: uuid.NewString(),
 				Database: db.Database{
 					DB: jimmtest.MemoryDB(c, nil),
 				},
-				OpenFGAClient: client,
 			}
 			ctx := context.Background()
-			err = j.Database.Migrate(ctx, false)
+			err := j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 
 			env := jimmtest.ParseEnvironment(c, testImportModelEnv)
-			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
+			env.PopulateDB(c, j.Database)
 
 			dbSuperuser := env.User("alice@external").DBObject(c, j.Database)
-			superuser := openfga.NewUser(&dbSuperuser, client)
+			superuser := openfga.NewUser(&dbSuperuser, nil)
+			superuser.JimmAdmin = true
 
 			dbUser := env.User(test.user).DBObject(c, j.Database)
-			user := openfga.NewUser(&dbUser, client)
+			user := openfga.NewUser(&dbUser, nil)
+			user.JimmAdmin = test.jimmAdmin
 
 			err = j.SetControllerConfig(ctx, superuser, jujuparams.ControllerConfigSet{
 				Config: map[string]interface{}{
@@ -1181,6 +1192,7 @@ func TestUpdateMigratedModel(t *testing.T) {
 		modelInfo        func(context.Context, *jujuparams.ModelInfo) error
 		model            names.ModelTag
 		targetController string
+		jimmAdmin        bool
 		expectedError    string
 	}{{
 		about:         "add-model user not allowed to update migrated model",
@@ -1191,12 +1203,14 @@ func TestUpdateMigratedModel(t *testing.T) {
 		user:          "alice@external",
 		model:         names.NewModelTag("unknown-model"),
 		expectedError: "model not found",
+		jimmAdmin:     true,
 	}, {
 		about:            "controller not found",
 		user:             "alice@external",
 		model:            names.NewModelTag("00000002-0000-0000-0000-000000000002"),
 		targetController: "no-such-controller",
 		expectedError:    "controller not found",
+		jimmAdmin:        true,
 	}, {
 		about:            "api returns an error",
 		user:             "alice@external",
@@ -1206,6 +1220,7 @@ func TestUpdateMigratedModel(t *testing.T) {
 			return errors.E("an error")
 		},
 		expectedError: "an error",
+		jimmAdmin:     true,
 	}, {
 		about:            "all ok",
 		user:             "alice@external",
@@ -1214,13 +1229,11 @@ func TestUpdateMigratedModel(t *testing.T) {
 		modelInfo: func(context.Context, *jujuparams.ModelInfo) error {
 			return nil
 		},
+		jimmAdmin: true,
 	}}
 
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
-			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.about)
-			c.Assert(err, qt.IsNil)
-
 			j := &jimm.JIMM{
 				UUID: uuid.NewString(),
 				Database: db.Database{
@@ -1231,17 +1244,17 @@ func TestUpdateMigratedModel(t *testing.T) {
 						ModelInfo_: test.modelInfo,
 					},
 				},
-				OpenFGAClient: client,
 			}
 			ctx := context.Background()
-			err = j.Database.Migrate(ctx, false)
+			err := j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 
 			env := jimmtest.ParseEnvironment(c, testUpdateMigratedModelEnv)
-			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
+			env.PopulateDB(c, j.Database)
 
 			dbUser := env.User(test.user).DBObject(c, j.Database)
-			user := openfga.NewUser(&dbUser, client)
+			user := openfga.NewUser(&dbUser, nil)
+			user.JimmAdmin = test.jimmAdmin
 
 			err = j.UpdateMigratedModel(ctx, user, test.model, test.targetController)
 			if test.expectedError != "" {
