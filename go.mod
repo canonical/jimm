@@ -2,8 +2,6 @@ module github.com/canonical/jimm
 
 go 1.21
 
-toolchain go1.21.3
-
 require (
 	github.com/canonical/candid v1.12.2
 	github.com/canonical/go-dqlite v1.20.0
