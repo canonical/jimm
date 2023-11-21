@@ -96,9 +96,6 @@ func (o *OFGAClient) getRelatedObjects(ctx context.Context, tuple Tuple, pageSiz
 	translateSpecialTuples(timestampedTuples)
 	tuples := make([]Tuple, len(timestampedTuples))
 	for i, tt := range timestampedTuples {
-		if tt.Tuple.Object.IsPublicAccess() {
-			tt.Tuple.Object.ID = ofganames.EveryoneUser
-		}
 		tuples[i] = tt.Tuple
 	}
 	return tuples, ct, nil
