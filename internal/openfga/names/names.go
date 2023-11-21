@@ -43,6 +43,7 @@ var (
 // NB: Add any new relations from the above to this slice.
 var allRelations = []cofga.Relation{MemberRelation, AdministratorRelation, ControllerRelation, ModelRelation, ConsumerRelation, ReaderRelation, WriterRelation, CanAddModelRelation, AuditLogViewerRelation, NoRelation}
 
+// EveryoneUser this username represents all users and is treated uniquely when tuples are created using it.
 const EveryoneUser = "everyone@external"
 
 // Tag represents an entity tag as used by JIMM in OpenFGA.

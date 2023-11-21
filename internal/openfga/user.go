@@ -16,11 +16,6 @@ import (
 	"github.com/canonical/ofga"
 )
 
-type EntityAccess struct {
-	Entity Tag
-	Access Relation
-}
-
 // NewUser returns a new user structure that can be used to check
 // user's access rights to various resources.
 func NewUser(u *dbmodel.User, client *OFGAClient) *User {
@@ -447,23 +442,4 @@ func ListUsersWithAccess[T ofganames.ResourceTagger](ctx context.Context, client
 		users[i] = NewUser(&dbmodel.User{Username: entity.ID}, client)
 	}
 	return users, nil
-}
-
-// ListEntitiesWithAccess lists all entities that have a direct relation to the resource.
-// TODO(Kian): When Juju adds groups, use this to return access information instead of expanding the
-// access tree.
-func ListEntitiesWithAccess[T ofganames.ResourceTagger](ctx context.Context, client *OFGAClient, resource T) ([]EntityAccess, error) {
-	t := Tuple{Target: ofganames.ConvertTag(resource)}
-	tuples, err := client.ReadAllRelatedObjects(ctx, t)
-	if err != nil {
-		return nil, errors.E(err)
-	}
-	et := make([]EntityAccess, len(tuples))
-	for i, tuple := range tuples {
-		et[i] = EntityAccess{
-			Entity: *tuple.Object,
-			Access: tuple.Relation,
-		}
-	}
-	return et, nil
 }
