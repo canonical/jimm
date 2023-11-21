@@ -43,17 +43,6 @@ func init() {
 		r.AddMethod("Controller", 11, "MongoVersion", mongoVersionMethod)
 		r.AddMethod("Controller", 11, "WatchModelSummaries", watchModelSummariesMethod)
 		r.AddMethod("Controller", 11, "WatchAllModelSummaries", watchAllModelSummariesMethod)
-		// TODO(Kian) Check missing methods (present in Juju but not JIMM)
-		// - DashboardConnectionInfo
-		// - ListBlockedModels
-		// - HostedModelConfig
-		// - RemoveBlocks
-		// - WatchAllModels
-		// - initiateMigration
-		// - ModifyControllerAccess
-		// Methods that no longer exist in Juju or have been moved:
-		// - ControllerConfig
-		// - ModelStatus
 
 		return []int{11}
 	}

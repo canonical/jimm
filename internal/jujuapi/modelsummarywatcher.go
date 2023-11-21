@@ -26,8 +26,6 @@ func init() {
 
 		r.AddMethod("ModelSummaryWatcher", 1, "Next", nextMethod)
 		r.AddMethod("ModelSummaryWatcher", 1, "Stop", stopMethod)
-		//TODO(Kian) Investigate the following methods that no longer exist in Juju
-		// - Stop
 
 		return []int{1}
 	}

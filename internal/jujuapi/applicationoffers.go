@@ -34,7 +34,6 @@ func init() {
 		r.AddMethod("ApplicationOffers", 4, "DestroyOffers", destroyOffersMethod)
 		r.AddMethod("ApplicationOffers", 4, "FindApplicationOffers", findOffersMethod)
 		r.AddMethod("ApplicationOffers", 4, "ApplicationOffers", applicationOffersMethod)
-		//TODO(Kian) Investigate missing RemoteApplicationInfo method.
 
 		return []int{4}
 	}
