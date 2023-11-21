@@ -220,11 +220,13 @@ func TestListControllers(t *testing.T) {
 	tests := []struct {
 		about               string
 		user                dbmodel.User
+		jimmAdmin           bool
 		expectedControllers []dbmodel.Controller
 		expectedError       string
 	}{{
-		about: "superuser can list controllers",
-		user:  env.User("alice@external").DBObject(c, j.Database),
+		about:     "superuser can list controllers",
+		user:      env.User("alice@external").DBObject(c, j.Database),
+		jimmAdmin: true,
 		expectedControllers: []dbmodel.Controller{
 			env.Controller("test1").DBObject(c, j.Database),
 			env.Controller("test2").DBObject(c, j.Database),
@@ -242,7 +244,9 @@ func TestListControllers(t *testing.T) {
 
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
-			controllers, err := j.ListControllers(ctx, openfga.NewUser(&test.user, client))
+			user := openfga.NewUser(&test.user, client)
+			user.JimmAdmin = test.jimmAdmin
+			controllers, err := j.ListControllers(ctx, user)
 			if test.expectedError != "" {
 				c.Assert(err, qt.ErrorMatches, test.expectedError)
 			} else {
@@ -304,15 +308,18 @@ func TestSetControllerDeprecated(t *testing.T) {
 	tests := []struct {
 		about         string
 		user          dbmodel.User
+		jimmAdmin     bool
 		deprecated    bool
 		expectedError string
 	}{{
 		about:      "superuser can deprecate a controller",
 		user:       env.User("alice@external").DBObject(c, j.Database),
+		jimmAdmin:  true,
 		deprecated: true,
 	}, {
 		about:      "superuser can deprecate a controller",
 		user:       env.User("alice@external").DBObject(c, j.Database),
+		jimmAdmin:  true,
 		deprecated: false,
 	}, {
 		about:         "user withouth access rights cannot deprecate a controller",
@@ -323,7 +330,9 @@ func TestSetControllerDeprecated(t *testing.T) {
 
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
-			err := j.SetControllerDeprecated(ctx, openfga.NewUser(&test.user, client), "test1", test.deprecated)
+			user := openfga.NewUser(&test.user, client)
+			user.JimmAdmin = test.jimmAdmin
+			err := j.SetControllerDeprecated(ctx, user, "test1", test.deprecated)
 			if test.expectedError != "" {
 				c.Assert(err, qt.ErrorMatches, test.expectedError)
 			} else {

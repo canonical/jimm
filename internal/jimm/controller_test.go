@@ -146,7 +146,7 @@ func TestAddController(t *testing.T) {
 	}
 
 	alice := openfga.NewUser(&u, client)
-
+	alice.JimmAdmin = true
 	err = alice.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, qt.IsNil)
 
@@ -313,6 +313,7 @@ func TestAddControllerWithVault(t *testing.T) {
 		Username: "alice@external",
 	}
 	alice := openfga.NewUser(&u, ofgaClient)
+	alice.JimmAdmin = true
 
 	err = alice.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, qt.IsNil)
@@ -1308,6 +1309,7 @@ func TestGetControllerAccess(t *testing.T) {
 
 	dbUser := env.User("alice@external").DBObject(c, j.Database)
 	alice := openfga.NewUser(&dbUser, client)
+	alice.JimmAdmin = true
 
 	access, err := j.GetJimmControllerAccess(ctx, alice, names.NewUserTag("alice@external"))
 	c.Assert(err, qt.IsNil)
