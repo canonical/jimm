@@ -73,15 +73,14 @@ func NewOpenFGAClient(cofgaClient *cofga.Client) *OFGAClient {
 	return &OFGAClient{cofgaClient: cofgaClient}
 }
 
-// translateSpecialTuples handles cases where tuples need to be transformed before being
-// returned to the application layer. Currently the wildcard tuple * for users is replaced
+// publicAccessAdaptor handles cases where a tuple need to be transformed before being
+// returned to the application layer. The wildcard tuple * for users is replaced
 // with the everyone@external user.
-func translateSpecialTuples(timestampedTuples []cofga.TimestampedTuple) {
-	for i, tt := range timestampedTuples {
-		if tt.Tuple.Object.Kind == UserType && tt.Tuple.Object.IsPublicAccess() {
-			timestampedTuples[i].Tuple.Object.ID = ofganames.EveryoneUser
-		}
+func publicAccessAdaptor(tt cofga.TimestampedTuple) cofga.TimestampedTuple {
+	if tt.Tuple.Object.Kind == UserType && tt.Tuple.Object.IsPublicAccess() {
+		tt.Tuple.Object.ID = ofganames.EveryoneUser
 	}
+	return tt
 }
 
 // getRelatedObjects returns all objects where the user has a valid relation to them.
@@ -93,9 +92,9 @@ func (o *OFGAClient) getRelatedObjects(ctx context.Context, tuple Tuple, pageSiz
 	if err != nil {
 		return nil, "", err
 	}
-	translateSpecialTuples(timestampedTuples)
 	tuples := make([]Tuple, len(timestampedTuples))
 	for i, tt := range timestampedTuples {
+		tt := publicAccessAdaptor(tt)
 		tuples[i] = tt.Tuple
 	}
 	return tuples, ct, nil
@@ -142,28 +141,6 @@ func (o *OFGAClient) ListObjects(ctx context.Context, user *Tag, relation Relati
 // You may read via pagination utilising the continuation token returned from the request.
 func (o *OFGAClient) ReadRelatedObjects(ctx context.Context, tuple Tuple, pageSize int32, continuationToken string) ([]Tuple, string, error) {
 	return o.getRelatedObjects(ctx, tuple, pageSize, continuationToken)
-}
-
-// ReadAllRelatedObjects is similar to ReadRelatedObjects but pages through all results
-// and returns the entire set.
-func (o *OFGAClient) ReadAllRelatedObjects(ctx context.Context, tuple Tuple) ([]Tuple, error) {
-	allTuples := []Tuple{}
-	var tuples []Tuple
-	var err error
-	ct := ""
-	for {
-		tuples, ct, err = o.ReadRelatedObjects(ctx, tuple, 20, ct)
-		if err != nil {
-			return nil, err
-		}
-		if len(tuples) > 0 {
-			allTuples = append(allTuples, tuples...)
-		}
-		if ct == "" {
-			break
-		}
-	}
-	return allTuples, nil
 }
 
 // CheckRelation verifies that a user (or object) is allowed to access the target object by the specified relation.
