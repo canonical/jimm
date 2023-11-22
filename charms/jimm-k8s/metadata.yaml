@@ -14,7 +14,7 @@ display-name: JIMM-K8S
 # (Required)
 summary: Juju Intelligent Model Manager provides a convient way to manage all of your models!
 
-maintiners:
+maintainers:
   - JAAS Crew (jaas-crew@lists.canonical.com)
 website: https://github.com/canonical/jimm
 source: https://github.com/canonical/jimm
