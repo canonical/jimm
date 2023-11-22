@@ -69,7 +69,10 @@ func (o *ApplicationOffer) SetTag(t names.ApplicationOfferTag) {
 // UserAccess returns the access level for the specified user.
 func (o *ApplicationOffer) UserAccess(u *User) string {
 	for _, ou := range o.Users {
-		if u.Username == ou.Username {
+		// NOTE (alesstimec) remove this once juju decides that
+		// users are allowed to have upper case characters in
+		// usernames (see https://bugs.launchpad.net/juju/+bug/1959584)
+		if strings.ToLower(u.Username) == strings.ToLower(ou.Username) {
 			return ou.Access
 		}
 	}

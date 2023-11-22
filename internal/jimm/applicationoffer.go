@@ -165,7 +165,6 @@ func (j *JIMM) GetApplicationOfferConsumeDetails(ctx context.Context, user *dbmo
 	if accessLevel == "" {
 		accessLevel = offer.UserAccess(&dbmodel.User{Username: auth.Everyone})
 	}
-
 	switch accessLevel {
 	case string(jujuparams.OfferAdminAccess):
 	case string(jujuparams.OfferConsumeAccess):
