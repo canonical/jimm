@@ -657,6 +657,15 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 	err = openfga.NewUser(&u2, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.ConsumerRelation)
 	c.Assert(err, qt.IsNil)
 
+	everyoneTag := names.NewUserTag(ofganames.EveryoneUser)
+	uAll := dbmodel.User{
+		Username: everyoneTag.Id(),
+	}
+	c.Assert(db.DB.Create(&uAll).Error, qt.IsNil)
+	// user uAll is reader of the test offer
+	err = openfga.NewUser(&uAll, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.ReaderRelation)
+	c.Assert(err, qt.IsNil)
+
 	j := &jimm.JIMM{
 		UUID:          uuid.NewString(),
 		OpenFGAClient: client,
@@ -757,6 +766,9 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 				}, {
 					UserName: "eve@external",
 					Access:   "read",
+				}, {
+					UserName: "everyone@external",
+					Access:   "read",
 				}},
 				Spaces: []jujuparams.RemoteSpace{{
 					CloudType:  "test-cloud-type",
@@ -803,6 +815,9 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 				Users: []jujuparams.OfferUserDetails{{
 					UserName: "bob@external",
 					Access:   "consume",
+				}, {
+					UserName: "everyone@external",
+					Access:   "read",
 				}},
 				Spaces: []jujuparams.RemoteSpace{{
 					CloudType:  "test-cloud-type",

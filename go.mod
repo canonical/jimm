@@ -46,7 +46,7 @@ require (
 )
 
 require (
-	github.com/canonical/ofga v0.5.0
+	github.com/canonical/ofga v0.10.0
 	github.com/dustinkirkland/golang-petname v0.0.0-20230626224747-e794b9370d49
 	github.com/go-chi/chi/v5 v5.0.8
 	github.com/go-chi/render v1.0.2
