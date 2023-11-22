@@ -73,6 +73,16 @@ func NewOpenFGAClient(cofgaClient *cofga.Client) *OFGAClient {
 	return &OFGAClient{cofgaClient: cofgaClient}
 }
 
+// publicAccessAdaptor handles cases where a tuple need to be transformed before being
+// returned to the application layer. The wildcard tuple * for users is replaced
+// with the everyone@external user.
+func publicAccessAdaptor(tt cofga.TimestampedTuple) cofga.TimestampedTuple {
+	if tt.Tuple.Object.Kind == UserType && tt.Tuple.Object.IsPublicAccess() {
+		tt.Tuple.Object.ID = ofganames.EveryoneUser
+	}
+	return tt
+}
+
 // getRelatedObjects returns all objects where the user has a valid relation to them.
 // Such as all the groups a user resides in.
 //
@@ -84,6 +94,7 @@ func (o *OFGAClient) getRelatedObjects(ctx context.Context, tuple Tuple, pageSiz
 	}
 	tuples := make([]Tuple, len(timestampedTuples))
 	for i, tt := range timestampedTuples {
+		tt := publicAccessAdaptor(tt)
 		tuples[i] = tt.Tuple
 	}
 	return tuples, ct, nil

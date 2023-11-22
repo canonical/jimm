@@ -40,6 +40,9 @@ offers: {}
 relations: \[\]
 controllertimestamp: .*
 branches: {}
+storage: \[\]
+filesystems: \[\]
+volumes: \[\]
 `
 )
 

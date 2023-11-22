@@ -16,7 +16,6 @@ import (
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
-	"github.com/canonical/jimm/internal/auth"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
@@ -156,7 +155,7 @@ func (j *JIMM) Offer(ctx context.Context, user *openfga.User, offer AddApplicati
 
 	everyone := openfga.NewUser(
 		&dbmodel.User{
-			Username: auth.Everyone,
+			Username: ofganames.EveryoneUser,
 		},
 		j.OpenFGAClient,
 	)
@@ -190,16 +189,6 @@ func (j *JIMM) GetApplicationOfferConsumeDetails(ctx context.Context, user *open
 	accessLevel, err := j.getUserOfferAccess(ctx, user, &offer)
 	if err != nil {
 		return errors.E(op, err)
-	}
-	if accessLevel == "" {
-		accessLevel, err = j.getUserOfferAccess(
-			ctx,
-			openfga.NewUser(&dbmodel.User{Username: auth.Everyone}, j.OpenFGAClient),
-			&offer,
-		)
-		if err != nil {
-			return errors.E(op, err)
-		}
 	}
 
 	switch accessLevel {
@@ -255,7 +244,6 @@ func (j *JIMM) GetApplicationOfferConsumeDetails(ctx context.Context, user *open
 // better encapsulate transforming Postgres/OpenFGA objects into Juju objects.
 func (j *JIMM) listApplicationOfferUsers(ctx context.Context, offer names.ApplicationOfferTag, user *dbmodel.User, accessLevel string) ([]jujuparams.OfferUserDetails, error) {
 	users := make(map[string]string)
-
 	// we loop through relations in a decreasing order of access
 	for _, relation := range []openfga.Relation{
 		ofganames.AdministratorRelation,
@@ -281,7 +269,7 @@ func (j *JIMM) listApplicationOfferUsers(ctx context.Context, offer names.Applic
 		// non-admin users should only see their own access level
 		// and access level of "everyone@external" - meaning the access
 		// level everybody has.
-		if accessLevel != string(jujuparams.OfferAdminAccess) && username != auth.Everyone && username != user.Username {
+		if accessLevel != string(jujuparams.OfferAdminAccess) && username != ofganames.EveryoneUser && username != user.Username {
 			continue
 		}
 		userDetails = append(userDetails, jujuparams.OfferUserDetails{
@@ -313,17 +301,8 @@ func (j *JIMM) GetApplicationOffer(ctx context.Context, user *openfga.User, offe
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
-	// if the user has no access, we check if "everyone" has access
-	if accessLevel == "" {
-		al, err := j.getUserOfferAccess(ctx, openfga.NewUser(&dbmodel.User{Username: auth.Everyone}, j.OpenFGAClient), &offer)
-		if err != nil {
-			return nil, errors.E(op, err)
-		}
-		// set access level to the access level of "everyone"
-		accessLevel = al
-	}
 
-	// if this user (or everyone) does not have access to this application offer
+	// if this user does not have access to this application offer
 	// we return a not found error.
 	if accessLevel == "" {
 		return nil, errors.E(op, errors.CodeNotFound, "application offer not found")
@@ -573,19 +552,6 @@ func (j *JIMM) getUserOfferAccess(ctx context.Context, user *openfga.User, offer
 	return "", nil
 }
 
-// TODO(Kian) CSS-6080 Remove the below helper function when refactoring everyone@external usage.
-func removeDuplicateStr(strSlice []string) []string {
-	allKeys := make(map[string]bool)
-	list := []string{}
-	for _, item := range strSlice {
-		if _, value := allKeys[item]; !value {
-			allKeys[item] = true
-			list = append(list, item)
-		}
-	}
-	return list
-}
-
 // FindApplicationOffers returns details of offers matching the specified filter.
 func (j *JIMM) FindApplicationOffers(ctx context.Context, user *openfga.User, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetails, error) {
 	const op = errors.Op("jimm.FindApplicationOffers")
@@ -598,19 +564,11 @@ func (j *JIMM) FindApplicationOffers(ctx context.Context, user *openfga.User, fi
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
-	// TODO(Kian) CSS-6080 Refactor the below to eliminate the use of everyone@external
 	userOfferUUIDs, err := user.ListApplicationOffers(ctx, ofganames.ReaderRelation)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
-	everyone := openfga.NewUser(&dbmodel.User{Username: auth.Everyone}, j.OpenFGAClient)
-	everyoneOfferUUIDs, err := everyone.ListApplicationOffers(ctx, ofganames.ReaderRelation)
-	if err != nil {
-		return nil, errors.E(op, err)
-	}
-	allOfferUUIDs := append(userOfferUUIDs, everyoneOfferUUIDs...)
-	allOfferUUIDs = removeDuplicateStr(allOfferUUIDs)
-	offerFilters = append(offerFilters, db.ApplicationOfferFilterByUUID(allOfferUUIDs))
+	offerFilters = append(offerFilters, db.ApplicationOfferFilterByUUID(userOfferUUIDs))
 	offers, err := j.Database.FindApplicationOffers(ctx, offerFilters...)
 	if err != nil {
 		return nil, errors.E(op, err)

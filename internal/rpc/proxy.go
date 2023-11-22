@@ -40,12 +40,6 @@ type TokenGenerator interface {
 	GetUser() names.UserTag
 }
 
-// TODO(Kian): Remove this once we update our Juju library.
-type loginRequest struct {
-	params.LoginRequest
-	Token string `json:"token"`
-}
-
 // writeLockConn provides a websocket connection that is safe for concurrent writes.
 type writeLockConn struct {
 	mu   sync.Mutex
@@ -435,12 +429,9 @@ func addJWT(ctx context.Context, initialLogin bool, msg *message, permissions ma
 	}
 	jwtString := base64.StdEncoding.EncodeToString(jwt)
 	// Add the JWT as base64 encoded string.
-	loginRequest := loginRequest{
-		LoginRequest: lr,
-		Token:        jwtString,
-	}
+	lr.Token = jwtString
 	// Marshal it again to JSON.
-	data, err := json.Marshal(loginRequest)
+	data, err := json.Marshal(lr)
 	if err != nil {
 		return errors.E(op, err)
 	}

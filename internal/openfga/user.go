@@ -436,6 +436,9 @@ func ListUsersWithAccess[T ofganames.ResourceTagger](ctx context.Context, client
 
 	users := make([]*User, len(entities))
 	for i, entity := range entities {
+		if entity.ID == "*" {
+			entity.ID = ofganames.EveryoneUser
+		}
 		users[i] = NewUser(&dbmodel.User{Username: entity.ID}, client)
 	}
 	return users, nil
