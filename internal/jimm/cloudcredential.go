@@ -27,10 +27,10 @@ import (
 // of CodeNotFound will be returned. If the given user is not a controller
 // superuser or the owner of the credentials then an error with a code of
 // CodeUnauthorized will be returned.
-func (j *JIMM) GetCloudCredential(ctx context.Context, u *openfga.User, tag names.CloudCredentialTag) (*dbmodel.CloudCredential, error) {
+func (j *JIMM) GetCloudCredential(ctx context.Context, user *openfga.User, tag names.CloudCredentialTag) (*dbmodel.CloudCredential, error) {
 	const op = errors.Op("jimm.GetCloudCredential")
 
-	if !u.JimmAdmin && u.Username != tag.Owner().Id() {
+	if !user.JimmAdmin && user.Username != tag.Owner().Id() {
 		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
@@ -130,13 +130,13 @@ type UpdateCloudCredentialArgs struct {
 // UpdateCloudCredential checks that the credential can be updated
 // and updates it in the local database and all controllers
 // to which it is deployed.
-func (j *JIMM) UpdateCloudCredential(ctx context.Context, u *openfga.User, args UpdateCloudCredentialArgs) ([]jujuparams.UpdateCredentialModelResult, error) {
+func (j *JIMM) UpdateCloudCredential(ctx context.Context, user *openfga.User, args UpdateCloudCredentialArgs) ([]jujuparams.UpdateCredentialModelResult, error) {
 	const op = errors.Op("jimm.UpdateCloudCredential")
 
 	var resultMu sync.Mutex
 	var result []jujuparams.UpdateCredentialModelResult
-	if u.Tag() != args.CredentialTag.Owner() {
-		if !u.JimmAdmin {
+	if user.Tag() != args.CredentialTag.Owner() {
+		if !user.JimmAdmin {
 			return result, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 		}
 		// ensure the user we are adding the credential for exists.
@@ -316,16 +316,16 @@ func (j *JIMM) ForEachUserCloudCredential(ctx context.Context, u *dbmodel.User, 
 // returned. Only the credential owner can retrieve hidden attributes any
 // other user, including controller superusers, will recieve an error with
 // the code CodeUnauthorized.
-func (j *JIMM) GetCloudCredentialAttributes(ctx context.Context, u *openfga.User, cred *dbmodel.CloudCredential, hidden bool) (attrs map[string]string, redacted []string, err error) {
+func (j *JIMM) GetCloudCredentialAttributes(ctx context.Context, user *openfga.User, cred *dbmodel.CloudCredential, hidden bool) (attrs map[string]string, redacted []string, err error) {
 	const op = errors.Op("jimm.GetCloudCredentialAttributes")
 
 	if hidden {
 		// Controller superusers cannot read hidden credential attributes.
-		if u.Username != cred.OwnerUsername {
+		if user.Username != cred.OwnerUsername {
 			return nil, nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 		}
 	} else {
-		if !u.JimmAdmin && u.Username != cred.OwnerUsername {
+		if !user.JimmAdmin && user.Username != cred.OwnerUsername {
 			return nil, nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 		}
 	}

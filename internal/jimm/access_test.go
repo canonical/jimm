@@ -69,7 +69,7 @@ type testAccessChecker struct {
 }
 
 // GetUserModelAccess implements the GetUserModelAccess method of the JWTGeneratorAccessChecker interface.
-func (tac *testAccessChecker) GetUserModelAccess(ctx context.Context, u *openfga.User, mt names.ModelTag) (string, error) {
+func (tac *testAccessChecker) GetUserModelAccess(ctx context.Context, user *openfga.User, mt names.ModelTag) (string, error) {
 	if tac.modelAccessCheckErr != nil {
 		return "", tac.modelAccessCheckErr
 	}
@@ -77,7 +77,7 @@ func (tac *testAccessChecker) GetUserModelAccess(ctx context.Context, u *openfga
 }
 
 // GetUserControllerAccess implements the GetUserControllerAccess method of the JWTGeneratorAccessChecker interface.
-func (tac *testAccessChecker) GetUserControllerAccess(ctx context.Context, u *openfga.User, ct names.ControllerTag) (string, error) {
+func (tac *testAccessChecker) GetUserControllerAccess(ctx context.Context, user *openfga.User, ct names.ControllerTag) (string, error) {
 	if tac.controllerAccessCheckErr != nil {
 		return "", tac.controllerAccessCheckErr
 	}
@@ -85,7 +85,7 @@ func (tac *testAccessChecker) GetUserControllerAccess(ctx context.Context, u *op
 }
 
 // GetUserCloudAccess implements the GetUserCloudAccess method of the JWTGeneratorAccessChecker interface.
-func (tac *testAccessChecker) GetUserCloudAccess(ctx context.Context, u *openfga.User, ct names.CloudTag) (string, error) {
+func (tac *testAccessChecker) GetUserCloudAccess(ctx context.Context, user *openfga.User, ct names.CloudTag) (string, error) {
 	if tac.cloudAccessCheckErr != nil {
 		return "", tac.cloudAccessCheckErr
 	}
@@ -93,7 +93,7 @@ func (tac *testAccessChecker) GetUserCloudAccess(ctx context.Context, u *openfga
 }
 
 // CheckPermission implements the CheckPermission methods of the JWTGeneratorAccessChecker interface.
-func (tac *testAccessChecker) CheckPermission(ctx context.Context, u *openfga.User, accessMap map[string]string, permissions map[string]interface{}) (map[string]string, error) {
+func (tac *testAccessChecker) CheckPermission(ctx context.Context, user *openfga.User, accessMap map[string]string, permissions map[string]interface{}) (map[string]string, error) {
 	if tac.permissionCheckErr != nil {
 		return nil, tac.permissionCheckErr
 	}

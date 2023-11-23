@@ -15,9 +15,9 @@ import (
 // PurgeLogs removes all audit logs before the given timestamp. Only JIMM
 // administrators can perform this operation. The number of logs purged is
 // returned.
-func (j *JIMM) PurgeLogs(ctx context.Context, u *openfga.User, before time.Time) (int64, error) {
+func (j *JIMM) PurgeLogs(ctx context.Context, user *openfga.User, before time.Time) (int64, error) {
 	op := errors.Op("jimm.PurgeLogs")
-	if !u.JimmAdmin {
+	if !user.JimmAdmin {
 		return 0, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 	count, err := j.Database.DeleteAuditLogsBefore(ctx, before)

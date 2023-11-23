@@ -322,10 +322,10 @@ func redactSensitiveParams(ale *dbmodel.AuditLogEntry) {
 }
 
 // FindAuditEvents returns audit events matching the given filter.
-func (j *JIMM) FindAuditEvents(ctx context.Context, u *openfga.User, filter db.AuditLogFilter) ([]dbmodel.AuditLogEntry, error) {
+func (j *JIMM) FindAuditEvents(ctx context.Context, user *openfga.User, filter db.AuditLogFilter) ([]dbmodel.AuditLogEntry, error) {
 	const op = errors.Op("jimm.FindAuditEvents")
 
-	access := u.GetAuditLogViewerAccess(ctx, j.ResourceTag())
+	access := user.GetAuditLogViewerAccess(ctx, j.ResourceTag())
 	if access != ofganames.AuditLogViewerRelation {
 		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
@@ -343,10 +343,10 @@ func (j *JIMM) FindAuditEvents(ctx context.Context, u *openfga.User, filter db.A
 }
 
 // ListControllers returns a list of controllers the user has access to.
-func (j *JIMM) ListControllers(ctx context.Context, u *openfga.User) ([]dbmodel.Controller, error) {
+func (j *JIMM) ListControllers(ctx context.Context, user *openfga.User) ([]dbmodel.Controller, error) {
 	const op = errors.Op("jimm.ListControllers")
 
-	if !u.JimmAdmin {
+	if !user.JimmAdmin {
 		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
@@ -364,10 +364,10 @@ func (j *JIMM) ListControllers(ctx context.Context, u *openfga.User) ([]dbmodel.
 
 // SetControllerDeprecated records if the controller is to be deprecated.
 // No new models or clouds can be added to a deprecated controller.
-func (j *JIMM) SetControllerDeprecated(ctx context.Context, u *openfga.User, controllerName string, deprecated bool) error {
+func (j *JIMM) SetControllerDeprecated(ctx context.Context, user *openfga.User, controllerName string, deprecated bool) error {
 	const op = errors.Op("jimm.SetControllerDeprecated")
 
-	if !u.JimmAdmin {
+	if !user.JimmAdmin {
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
@@ -392,10 +392,10 @@ func (j *JIMM) SetControllerDeprecated(ctx context.Context, u *openfga.User, con
 }
 
 // RemoveController removes a controller.
-func (j *JIMM) RemoveController(ctx context.Context, u *openfga.User, controllerName string, force bool) error {
+func (j *JIMM) RemoveController(ctx context.Context, user *openfga.User, controllerName string, force bool) error {
 	const op = errors.Op("jimm.RemoveController")
 
-	if !u.JimmAdmin {
+	if !user.JimmAdmin {
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
@@ -436,10 +436,10 @@ func (j *JIMM) RemoveController(ctx context.Context, u *openfga.User, controller
 }
 
 // FullModelStatus returns the full status of the juju model.
-func (j *JIMM) FullModelStatus(ctx context.Context, u *openfga.User, modelTag names.ModelTag, patterns []string) (*jujuparams.FullStatus, error) {
+func (j *JIMM) FullModelStatus(ctx context.Context, user *openfga.User, modelTag names.ModelTag, patterns []string) (*jujuparams.FullStatus, error) {
 	const op = errors.Op("jimm.RemoveController")
 
-	if !u.JimmAdmin {
+	if !user.JimmAdmin {
 		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
