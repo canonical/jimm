@@ -1,0 +1,26 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+name: check license headers 
+
+on:
+  pull_request_target:
+  pull_request:
+
+jobs:
+  license-headers-check:
+    name: Check license headers
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4.1.1
+      - name: Check .licenserc.yaml exists
+        id: licenserc-yaml
+        run: echo "exists=$([ -f .licenserc.yaml ] && echo "true" || echo "false")" >> $GITHUB_OUTPUT
+      - name: Get default license configuration
+        if: steps.licenserc-yaml.outputs.exists == 'false'
+        run: |
+          curl -fLsSo .licenserc.yaml https://raw.githubusercontent.com/canonical/operator-workflows/main/.github/files/.licenserc.yaml
+      - name: Check license headers
+        uses: apache/skywalking-eyes/header@main
+        with:
+          config: .licenserc.yaml
