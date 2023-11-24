@@ -17,6 +17,8 @@ var (
 	PollDuration                   = pollDuration
 	CalculateNextPollDuration      = calculateNextPollDuration
 	NewControllerClient            = &newControllerClient
+	FillMigrationTarget            = fillMigrationTarget
+	InitiateMigration              = &initiateMigration
 )
 
 func NewWatcherWithControllerUnavailableChan(db db.Database, dialer Dialer, pubsub Publisher, testChannel chan error) *Watcher {

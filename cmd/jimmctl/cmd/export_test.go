@@ -309,3 +309,15 @@ func NewPurgeLogsCommandForTesting(store jujuclient.ClientStore, bClient *httpba
 
 	return modelcmd.WrapBase(cmd)
 }
+
+func NewMigrateModelCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
+	cmd := &migrateModelCommand{
+		store: store,
+		dialOpts: &jujuapi.DialOpts{
+			InsecureSkipVerify: true,
+			BakeryClient:       bClient,
+		},
+	}
+
+	return modelcmd.WrapBase(cmd)
+}
