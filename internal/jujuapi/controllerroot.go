@@ -32,7 +32,6 @@ type JIMM interface {
 	Authenticate(ctx context.Context, req *jujuparams.LoginRequest) (*openfga.User, error)
 	AuthorizationClient() *openfga.OFGAClient
 	ChangeModelCredential(ctx context.Context, user *openfga.User, modelTag names.ModelTag, cloudCredentialTag names.CloudCredentialTag) error
-	CheckPermission(ctx context.Context, user *openfga.User, cachedPerms map[string]string, desiredPerms map[string]interface{}) (map[string]string, error)
 	DB() *db.Database
 	DestroyModel(ctx context.Context, u *openfga.User, mt names.ModelTag, destroyStorage *bool, force *bool, maxWait *time.Duration, timeout *time.Duration) error
 	DestroyOffer(ctx context.Context, user *openfga.User, offerURL string, force bool) error
@@ -64,12 +63,11 @@ type JIMM interface {
 	ImportModel(ctx context.Context, user *openfga.User, controllerName string, modelTag names.ModelTag, newOwner string) error
 	InitiateMigration(ctx context.Context, user *openfga.User, spec jujuparams.MigrationSpec) (jujuparams.InitiateMigrationResult, error)
 	ListApplicationOffers(ctx context.Context, user *openfga.User, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetails, error)
-	ListControllers(ctx context.Context, user *openfga.User) ([]dbmodel.Controller, error)
 	ModelDefaultsForCloud(ctx context.Context, user *dbmodel.User, cloudTag names.CloudTag) (jujuparams.ModelDefaultsResult, error)
 	ModelInfo(ctx context.Context, u *openfga.User, mt names.ModelTag) (*jujuparams.ModelInfo, error)
 	ModelStatus(ctx context.Context, u *openfga.User, mt names.ModelTag) (*jujuparams.ModelStatus, error)
 	Offer(ctx context.Context, user *openfga.User, offer jimm.AddApplicationOfferParams) error
-	PubsubHub() *pubsub.Hub
+	PubSubHub() *pubsub.Hub
 	PurgeLogs(ctx context.Context, user *openfga.User, before time.Time) (int64, error)
 	QueryModelsJq(ctx context.Context, models []dbmodel.Model, jqQuery string) (params.CrossModelQueryResponse, error)
 	RemoveCloud(ctx context.Context, u *openfga.User, ct names.CloudTag) error

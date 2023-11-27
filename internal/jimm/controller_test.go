@@ -1432,7 +1432,7 @@ func TestInitiateMigration(t *testing.T) {
 		expectedError            string
 		expectedResult           jujuparams.InitiateMigrationResult
 	}{{
-		about: "all is well",
+		about: "model migration initiated successfully",
 		user: func(client *openfga.OFGAClient) *openfga.User {
 			return openfga.NewUser(
 				&dbmodel.User{
@@ -1457,6 +1457,26 @@ func TestInitiateMigration(t *testing.T) {
 			MigrationId: migrationId1,
 		},
 	}, {
+		about: "model not found",
+		user: func(client *openfga.OFGAClient) *openfga.User {
+			return openfga.NewUser(
+				&dbmodel.User{
+					Username: "alice@external",
+				},
+				client,
+			)
+		},
+		spec: jujuparams.MigrationSpec{
+			ModelTag: names.NewModelTag(uuid.NewString()).String(),
+			TargetInfo: jujuparams.MigrationTargetInfo{
+				ControllerTag: names.NewControllerTag(uuid.NewString()).String(),
+				AuthTag:       names.NewUserTag("target-user@external").String(),
+				Macaroons:     string(macaroonData),
+			},
+		},
+		initiateMigrationResults: []result{{}},
+		expectedError:            "unauthorized access",
+	}, {
 		about: "InitiateMigration call fails",
 		user: func(client *openfga.OFGAClient) *openfga.User {
 			return openfga.NewUser(
@@ -1476,7 +1496,7 @@ func TestInitiateMigration(t *testing.T) {
 		initiateMigrationResults: []result{{
 			err: errors.E("a silly error"),
 		}},
-		expectedError: "a silly error",
+		expectedError: "failed to initiate migration",
 	}, {
 		about: "non-admin-user gets unauthorized error",
 		user: func(client *openfga.OFGAClient) *openfga.User {

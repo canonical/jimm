@@ -74,7 +74,7 @@ type JIMM struct {
 	ModelInfo_                         func(ctx context.Context, u *openfga.User, mt names.ModelTag) (*jujuparams.ModelInfo, error)
 	ModelStatus_                       func(ctx context.Context, u *openfga.User, mt names.ModelTag) (*jujuparams.ModelStatus, error)
 	Offer_                             func(ctx context.Context, user *openfga.User, offer jimm.AddApplicationOfferParams) error
-	PubsubHub_                         func() *pubsub.Hub
+	PubSubHub_                         func() *pubsub.Hub
 	PurgeLogs_                         func(ctx context.Context, user *openfga.User, before time.Time) (int64, error)
 	QueryModelsJq_                     func(ctx context.Context, models []dbmodel.Model, jqQuery string) (params.CrossModelQueryResponse, error)
 	RemoveCloud_                       func(ctx context.Context, u *openfga.User, ct names.CloudTag) error
@@ -370,11 +370,11 @@ func (j *JIMM) Offer(ctx context.Context, user *openfga.User, offer jimm.AddAppl
 	}
 	return j.Offer_(ctx, user, offer)
 }
-func (j *JIMM) PubsubHub() *pubsub.Hub {
-	if j.PubsubHub_ == nil {
+func (j *JIMM) PubSubHub() *pubsub.Hub {
+	if j.PubSubHub_ == nil {
 		panic("not implemented")
 	}
-	return j.PubsubHub_()
+	return j.PubSubHub_()
 }
 func (j *JIMM) PurgeLogs(ctx context.Context, user *openfga.User, before time.Time) (int64, error) {
 	if j.PurgeLogs_ == nil {

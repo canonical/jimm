@@ -86,7 +86,7 @@ func (j *JIMM) DB() *db.Database {
 }
 
 // PubsubHub returns the pub-sub hub used for buffering model summaries.
-func (j *JIMM) PubsubHub() *pubsub.Hub {
+func (j *JIMM) PubSubHub() *pubsub.Hub {
 	return j.Pubsub
 }
 
@@ -125,6 +125,8 @@ type Dialer interface {
 
 // An API is the interface JIMM uses to access the API on a controller.
 type API interface {
+	// API implements the base.APICallCloser so that we can
+	// use the juju api clients to interact with juju controllers.
 	base.APICallCloser
 
 	// AddCloud adds a new cloud.

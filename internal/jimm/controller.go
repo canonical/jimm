@@ -25,7 +25,7 @@ import (
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 )
 
-// ControllerClient defines and interface of the juju controller api client
+// ControllerClient defines an interface of the juju controller api client
 // used by JIMM to interact with the Controller facade of Juju controllers.
 type ControllerClient interface {
 	// InitiateMigration attempts to begin the migration of one or
@@ -601,8 +601,7 @@ func (j *JIMM) UpdateMigratedModel(ctx context.Context, user *openfga.User, mode
 	return nil
 }
 
-// UpdateMigratedModel asserts that the model has been migrated to the
-// specified controller and updates the internal model representation.
+// InitiateMigration triggers the migration of the specified model to a target controller.
 func (j *JIMM) InitiateMigration(ctx context.Context, user *openfga.User, spec jujuparams.MigrationSpec) (jujuparams.InitiateMigrationResult, error) {
 	const op = errors.Op("jimm.InitiateMigration")
 
@@ -616,7 +615,6 @@ func (j *JIMM) InitiateMigration(ctx context.Context, user *openfga.User, spec j
 	isAdministrator, err := openfga.IsAdministrator(ctx, user, mt)
 	if err != nil {
 		return result, errors.E(op, err, errors.CodeOpenFGARequestFailed)
-
 	}
 	if !isAdministrator {
 		return result, errors.E(op, errors.CodeUnauthorized)
@@ -644,12 +642,12 @@ func (j *JIMM) InitiateMigration(ctx context.Context, user *openfga.User, spec j
 	model.SetTag(mt)
 	err = j.Database.GetModel(ctx, &model)
 	if err != nil {
-		return result, errors.E(op, err)
+		return result, errors.E(op, "failed to retrieve the model from the database", err)
 	}
 
 	api, err := j.dial(ctx, &model.Controller, names.ModelTag{})
 	if err != nil {
-		return result, errors.E(op, err)
+		return result, errors.E(op, "failed to dial the controller", err)
 	}
 
 	client := newControllerClient(api)
@@ -666,7 +664,7 @@ func (j *JIMM) InitiateMigration(ctx context.Context, user *openfga.User, spec j
 		TargetMacaroons:       targetMacaroons,
 	})
 	if err != nil {
-		return result, errors.E(op, err)
+		return result, errors.E(op, "failed to initiate migration", err)
 	}
 
 	return result, nil

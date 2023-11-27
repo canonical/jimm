@@ -332,7 +332,7 @@ func TestInitiateMigration(t *testing.T) {
 		expectedError     string
 		expectedResult    jujuparams.InitiateMigrationResults
 	}{{
-		about: "all is well",
+		about: "model migration initiated successfully",
 		initiateMigration: func(ctx context.Context, user *openfga.User, spec jujuparams.MigrationSpec) (jujuparams.InitiateMigrationResult, error) {
 			return jujuparams.InitiateMigrationResult{
 				ModelTag:    mt.String(),
@@ -370,6 +370,7 @@ func TestInitiateMigration(t *testing.T) {
 	}}
 
 	for _, test := range tests {
+		test := test
 		c.Run(test.about, func(c *qt.C) {
 			jimm := &jimmtest.JIMM{
 				InitiateMigration_: test.initiateMigration,
