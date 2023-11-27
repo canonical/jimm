@@ -5,7 +5,6 @@ package jujuapi_test
 import (
 	"context"
 	"sort"
-	"sync"
 	"testing"
 	"time"
 
@@ -22,6 +21,7 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/jimmtest"
 	"github.com/canonical/jimm/internal/jujuapi"
 	"github.com/canonical/jimm/internal/openfga"
 	jimmversion "github.com/canonical/jimm/version"
@@ -326,18 +326,18 @@ func TestInitiateMigration(t *testing.T) {
 	migrationID := uuid.New().String()
 
 	tests := []struct {
-		about                    string
-		initiateMigrationResults []result
-		args                     jujuparams.InitiateMigrationArgs
-		expectedError            string
-		expectedResult           jujuparams.InitiateMigrationResults
+		about             string
+		initiateMigration func(ctx context.Context, user *openfga.User, spec jujuparams.MigrationSpec) (jujuparams.InitiateMigrationResult, error)
+		args              jujuparams.InitiateMigrationArgs
+		expectedError     string
+		expectedResult    jujuparams.InitiateMigrationResults
 	}{{
 		about: "all is well",
-		initiateMigrationResults: []result{{
-			result: jujuparams.InitiateMigrationResult{
+		initiateMigration: func(ctx context.Context, user *openfga.User, spec jujuparams.MigrationSpec) (jujuparams.InitiateMigrationResult, error) {
+			return jujuparams.InitiateMigrationResult{
 				ModelTag:    mt.String(),
 				MigrationId: migrationID,
-			}},
+			}, nil
 		},
 		args: jujuparams.InitiateMigrationArgs{
 			Specs: []jujuparams.MigrationSpec{{
@@ -351,30 +351,17 @@ func TestInitiateMigration(t *testing.T) {
 			}},
 		},
 	}, {
-		about: "second migration errors",
-		initiateMigrationResults: []result{{
-			result: jujuparams.InitiateMigrationResult{
-				ModelTag:    mt.String(),
-				MigrationId: migrationID,
-			},
-		}, {
-			result: jujuparams.InitiateMigrationResult{
-				ModelTag: mt.String(),
-			},
-			err: errors.E("a silly error"),
-		}},
+		about: "controller returns an error",
+		initiateMigration: func(ctx context.Context, user *openfga.User, spec jujuparams.MigrationSpec) (jujuparams.InitiateMigrationResult, error) {
+			return jujuparams.InitiateMigrationResult{}, errors.E("a silly error")
+		},
 		args: jujuparams.InitiateMigrationArgs{
 			Specs: []jujuparams.MigrationSpec{{
-				ModelTag: mt.String(),
-			}, {
 				ModelTag: mt.String(),
 			}},
 		},
 		expectedResult: jujuparams.InitiateMigrationResults{
 			Results: []jujuparams.InitiateMigrationResult{{
-				ModelTag:    mt.String(),
-				MigrationId: migrationID,
-			}, {
 				Error: &jujuparams.Error{
 					Message: "a silly error",
 				},
@@ -384,8 +371,8 @@ func TestInitiateMigration(t *testing.T) {
 
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
-			jimm := &testJIMM{
-				initiateMigrationResults: test.initiateMigrationResults,
+			jimm := &jimmtest.JIMM{
+				InitiateMigration_: test.initiateMigration,
 			}
 			cr := jujuapi.NewControllerRoot(jimm, jujuapi.Params{})
 
@@ -398,33 +385,4 @@ func TestInitiateMigration(t *testing.T) {
 			}
 		})
 	}
-}
-
-type result struct {
-	err    error
-	result any
-}
-
-type testJIMM struct {
-	jujuapi.JIMM
-
-	mu                       sync.Mutex
-	initiateMigrationResults []result
-}
-
-// InitiateMigration implements the InitiateMigration method of the jujuapi.JIMM interface.
-func (j *testJIMM) InitiateMigration(ctx context.Context, user *openfga.User, spec jujuparams.MigrationSpec) (jujuparams.InitiateMigrationResult, error) {
-	j.mu.Lock()
-	defer j.mu.Unlock()
-
-	if len(j.initiateMigrationResults) == 0 {
-		return jujuparams.InitiateMigrationResult{}, errors.E(errors.CodeNotImplemented)
-	}
-
-	var r result
-	r, j.initiateMigrationResults = j.initiateMigrationResults[0], j.initiateMigrationResults[1:]
-	if r.err != nil {
-		return jujuparams.InitiateMigrationResult{}, r.err
-	}
-	return r.result.(jujuparams.InitiateMigrationResult), nil
 }
