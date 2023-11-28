@@ -664,7 +664,7 @@ func (j *JIMM) InitiateMigration(ctx context.Context, user *openfga.User, spec j
 		TargetMacaroons:       targetMacaroons,
 	})
 	if err != nil {
-		return result, errors.E(op, "failed to initiate migration", err)
+		return result, errors.E(op, err)
 	}
 
 	return result, nil

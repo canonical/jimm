@@ -674,7 +674,7 @@ func TestFillMigrationTarget(t *testing.T) {
 		expectedInfo: jujuparams.MigrationTargetInfo{
 			ControllerTag: "controller-00000001-0000-0000-0000-000000000001",
 			Addrs:         nil,
-			AuthTag:       "admin",
+			AuthTag:       "user-admin",
 			Password:      "test-secret",
 		},
 	}, {

@@ -517,7 +517,7 @@ func fillMigrationTarget(db db.Database, credStore credentials.CredentialStore, 
 		Addrs:         apiControllerInfo.APIAddresses,
 		CACert:        dbController.CACertificate,
 		// The target user must be the admin user as external users don't have username/password credentials.
-		AuthTag:  dbController.AdminUser,
+		AuthTag:  names.NewUserTag(dbController.AdminUser).String(),
 		Password: dbController.AdminPassword,
 	}
 	return targetInfo, nil
