@@ -42,7 +42,7 @@ func (j *JIMM) GetUserCloudAccess(ctx context.Context, user *openfga.User, cloud
 // error with a code of CodeUnauthorized is returned. If the user only has
 // add-model access to the cloud then the returned Users field will only
 // contain the authentcated user.
-func (j *JIMM) GetCloud(ctx context.Context, u *openfga.User, tag names.CloudTag) (dbmodel.Cloud, error) {
+func (j *JIMM) GetCloud(ctx context.Context, user *openfga.User, tag names.CloudTag) (dbmodel.Cloud, error) {
 	const op = errors.Op("jimm.GetCloud")
 
 	var cl dbmodel.Cloud
@@ -52,7 +52,7 @@ func (j *JIMM) GetCloud(ctx context.Context, u *openfga.User, tag names.CloudTag
 		return cl, errors.E(op, err)
 	}
 
-	accessLevel, err := j.GetUserCloudAccess(ctx, u, tag)
+	accessLevel, err := j.GetUserCloudAccess(ctx, user, tag)
 	if err != nil {
 		if err != nil {
 			return dbmodel.Cloud{}, errors.E(op, err)
@@ -130,11 +130,7 @@ func (j *JIMM) ForEachUserCloud(ctx context.Context, user *openfga.User, f func(
 func (j *JIMM) ForEachCloud(ctx context.Context, user *openfga.User, f func(*dbmodel.Cloud) error) error {
 	const op = errors.Op("jimm.ForEachCloud")
 
-	isControllerAdmin, err := openfga.IsAdministrator(ctx, user, j.ResourceTag())
-	if err != nil {
-		return errors.E(op, err)
-	}
-	if !isControllerAdmin {
+	if !user.JimmAdmin {
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
@@ -473,7 +469,7 @@ func (j *JIMM) addControllerCloud(ctx context.Context, ctl *dbmodel.Controller, 
 // the cloud then the returned error will have the same code as the error
 // returned from the dial operation. If the given function returns an error
 // that error will be returned with the code unmasked.
-func (j *JIMM) doCloudAdmin(ctx context.Context, u *openfga.User, ct names.CloudTag, f func(*dbmodel.Cloud, API) error) error {
+func (j *JIMM) doCloudAdmin(ctx context.Context, user *openfga.User, ct names.CloudTag, f func(*dbmodel.Cloud, API) error) error {
 	const op = errors.Op("jimm.doCloudAdmin")
 
 	var c dbmodel.Cloud
@@ -483,7 +479,7 @@ func (j *JIMM) doCloudAdmin(ctx context.Context, u *openfga.User, ct names.Cloud
 		return errors.E(op, err)
 	}
 
-	isCloudAdministrator, err := openfga.IsAdministrator(ctx, u, c.ResourceTag())
+	isCloudAdministrator, err := openfga.IsAdministrator(ctx, user, c.ResourceTag())
 	if err != nil {
 		return errors.E(op, err)
 	}
@@ -657,10 +653,10 @@ func (j *JIMM) RevokeCloudAccess(ctx context.Context, user *openfga.User, ct nam
 // authenticated user does not have admin access to the cloud then an error
 // with the code CodeUnauthorized is returned. If the RemoveClouds API call
 // retuns an error the error code is not masked.
-func (j *JIMM) RemoveCloud(ctx context.Context, u *openfga.User, ct names.CloudTag) error {
+func (j *JIMM) RemoveCloud(ctx context.Context, user *openfga.User, ct names.CloudTag) error {
 	const op = errors.Op("jimm.RemoveCloud")
 
-	err := j.doCloudAdmin(ctx, u, ct, func(c *dbmodel.Cloud, api API) error {
+	err := j.doCloudAdmin(ctx, user, ct, func(c *dbmodel.Cloud, api API) error {
 		// Note: JIMM doesn't attempt to determine if the cloud is
 		// used by any models before attempting to remove it. JIMM
 		// relies on the controller failing the RemoveClouds API
@@ -689,7 +685,7 @@ func (j *JIMM) RemoveCloud(ctx context.Context, u *openfga.User, ct names.CloudT
 // an admin on the cloud an error is returned with a code of
 // CodeUnauthorized. If the cloud with the given name cannot be found then
 // an error with the code CodeNotFound is returned.
-func (j *JIMM) UpdateCloud(ctx context.Context, u *openfga.User, ct names.CloudTag, cloud jujuparams.Cloud) error {
+func (j *JIMM) UpdateCloud(ctx context.Context, user *openfga.User, ct names.CloudTag, cloud jujuparams.Cloud) error {
 	const op = errors.Op("jimm.UpdateCloud")
 
 	var c dbmodel.Cloud
@@ -698,7 +694,7 @@ func (j *JIMM) UpdateCloud(ctx context.Context, u *openfga.User, ct names.CloudT
 	if err := j.Database.GetCloud(ctx, &c); err != nil {
 		return errors.E(op, err)
 	}
-	cloudAccess, err := j.GetUserCloudAccess(ctx, u, c.ResourceTag())
+	cloudAccess, err := j.GetUserCloudAccess(ctx, user, c.ResourceTag())
 	if err != nil {
 		return errors.E(op, err)
 	}
@@ -762,7 +758,7 @@ func (j *JIMM) UpdateCloud(ctx context.Context, u *openfga.User, ct names.CloudT
 // CodeNotFound is returned. If the authenticated user does not have admin
 // access to the cloud then an error with the code CodeUnauthorized is returned.
 // If the RemoveClouds API call retuns an error the error code is not masked.
-func (j *JIMM) RemoveCloudFromController(ctx context.Context, u *openfga.User, controllerName string, ct names.CloudTag) error {
+func (j *JIMM) RemoveCloudFromController(ctx context.Context, user *openfga.User, controllerName string, ct names.CloudTag) error {
 	const op = errors.Op("jimm.RemoveCloudFromController")
 
 	var cloud dbmodel.Cloud
@@ -772,7 +768,7 @@ func (j *JIMM) RemoveCloudFromController(ctx context.Context, u *openfga.User, c
 		return errors.E(op, err)
 	}
 
-	isAdministrator, err := openfga.IsAdministrator(ctx, u, ct)
+	isAdministrator, err := openfga.IsAdministrator(ctx, user, ct)
 	if err != nil {
 		return errors.E(op, err, errors.CodeUnauthorized, "unauthorized")
 	}

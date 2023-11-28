@@ -144,6 +144,7 @@ var addModelTests = []struct {
 	grantJIMMModelAdmin func(context.Context, names.ModelTag) error
 	createModel         func(ctx context.Context, args *jujuparams.ModelCreateArgs, mi *jujuparams.ModelInfo) error
 	username            string
+	jimmAdmin           bool
 	args                jujuparams.ModelCreateArgs
 	expectModel         dbmodel.Model
 	expectError         string
@@ -216,7 +217,8 @@ users:
 - user: bob
   access: read
 `[1:])),
-	username: "alice@external",
+	username:  "alice@external",
+	jimmAdmin: true,
 	args: jujuparams.ModelCreateArgs{
 		Name:               "test-model",
 		OwnerTag:           names.NewUserTag("alice@external").String(),
@@ -325,7 +327,8 @@ users:
 - user: bob
   access: read
 `[1:])),
-	username: "alice@external",
+	username:  "alice@external",
+	jimmAdmin: true,
 	args: jujuparams.ModelCreateArgs{
 		Name:     "test-model",
 		OwnerTag: names.NewUserTag("alice@external").String(),
@@ -415,7 +418,8 @@ users:
 - user: bob
   access: read
 `[1:]),
-	username: "alice@external",
+	username:  "alice@external",
+	jimmAdmin: true,
 	args: jujuparams.ModelCreateArgs{
 		Name:               "test-model",
 		OwnerTag:           names.NewUserTag("alice@external").String(),
@@ -509,7 +513,8 @@ users:
 - user: bob
   access: read
 `[1:]),
-	username: "alice@external",
+	username:  "alice@external",
+	jimmAdmin: true,
 	args: jujuparams.ModelCreateArgs{
 		Name:               "test-model",
 		OwnerTag:           names.NewUserTag("bob@external").String(),
@@ -652,7 +657,8 @@ controllers:
 	createModel: func(ctx context.Context, args *jujuparams.ModelCreateArgs, mi *jujuparams.ModelInfo) error {
 		return errors.E("a test error")
 	},
-	username: "alice@external",
+	username:  "alice@external",
+	jimmAdmin: true,
 	args: jujuparams.ModelCreateArgs{
 		Name:               "test-model",
 		OwnerTag:           names.NewUserTag("alice@external").String(),
@@ -726,7 +732,8 @@ users:
 - user: bob
   access: read
 `[1:]),
-	username: "alice@external",
+	username:  "alice@external",
+	jimmAdmin: true,
 	args: jujuparams.ModelCreateArgs{
 		Name:               "test-model",
 		OwnerTag:           names.NewUserTag("alice@external").String(),
@@ -784,7 +791,8 @@ users:
 - user: bob
   access: read
 `[1:]),
-	username: "alice@external",
+	username:  "alice@external",
+	jimmAdmin: true,
 	args: jujuparams.ModelCreateArgs{
 		Name:               "test-model",
 		OwnerTag:           names.NewUserTag("alice@external").String(),
@@ -828,6 +836,7 @@ func TestAddModel(t *testing.T) {
 
 			dbUser := env.User(test.username).DBObject(c, j.Database)
 			user := openfga.NewUser(&dbUser, client)
+			user.JimmAdmin = test.jimmAdmin
 
 			args := jimm.ModelCreateArgs{}
 			err = args.FromJujuModelCreateArgs(&test.args)
@@ -1646,6 +1655,7 @@ func TestForEachModel(t *testing.T) {
 
 	dbUser = env.User("alice@external").DBObject(c, j.Database)
 	alice := openfga.NewUser(&dbUser, client)
+	alice.JimmAdmin = true
 
 	var models []string
 	err = j.ForEachModel(ctx, alice, func(m *dbmodel.Model, access jujuparams.UserAccessPermission) error {

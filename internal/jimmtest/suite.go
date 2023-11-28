@@ -157,7 +157,9 @@ func (s *JIMMSuite) AddController(c *gc.C, name string, info *api.Info) {
 			Port:    hp.Port(),
 		}})
 	}
-	err := s.JIMM.AddController(context.Background(), s.NewUser(s.AdminUser), ctl)
+	adminUser := s.NewUser(s.AdminUser)
+	adminUser.JimmAdmin = true
+	err := s.JIMM.AddController(context.Background(), adminUser, ctl)
 	c.Assert(err, gc.Equals, nil)
 }
 

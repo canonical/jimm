@@ -132,16 +132,11 @@ func (r *controllerRoot) WatchModelSummaries(ctx context.Context) (jujuparams.Su
 func (r *controllerRoot) WatchAllModelSummaries(ctx context.Context) (jujuparams.SummaryWatcherID, error) {
 	const op = errors.Op("jujuapi.WatchAllModelSummaries")
 
-	isControllerAdmin, err := openfga.IsAdministrator(ctx, r.user, r.jimm.ResourceTag())
-	if err != nil {
-		zapctx.Error(ctx, "failed to check for controller admin access", zap.Error(err))
-		return jujuparams.SummaryWatcherID{}, errors.E(op, err)
-	}
-	if !isControllerAdmin {
+	if !r.user.JimmAdmin {
 		return jujuparams.SummaryWatcherID{}, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
-	err = r.setupUUIDGenerator()
+	err := r.setupUUIDGenerator()
 	if err != nil {
 		return jujuparams.SummaryWatcherID{}, errors.E(op, err)
 	}
@@ -225,11 +220,7 @@ func (r *controllerRoot) ModelStatus(ctx context.Context, args jujuparams.Entiti
 func (r *controllerRoot) ControllerConfig(ctx context.Context) (jujuparams.ControllerConfigResult, error) {
 	const op = errors.Op("jujuapi.ControllerConfig")
 
-	isAdmin, err := openfga.IsAdministrator(ctx, r.user, r.jimm.ResourceTag())
-	if err != nil {
-		zapctx.Error(ctx, "failed to check access rights", zap.Error(err))
-		return jujuparams.ControllerConfigResult{}, errors.E(op, errors.CodeUnauthorized, "unauthorized")
-	}
+	isAdmin := r.user.JimmAdmin
 	if !isAdmin {
 		isControllerAdmin, err := openfga.IsAdministrator(ctx, r.user, names.NewControllerTag(r.params.ControllerUUID))
 		if err != nil {

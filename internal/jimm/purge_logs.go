@@ -17,12 +17,7 @@ import (
 // returned.
 func (j *JIMM) PurgeLogs(ctx context.Context, user *openfga.User, before time.Time) (int64, error) {
 	op := errors.Op("jimm.PurgeLogs")
-	isJIMMAdmin, err := openfga.IsAdministrator(ctx, user, j.ResourceTag())
-	if err != nil {
-		zapctx.Error(ctx, "failed administrator check", zap.Error(err))
-		return 0, errors.E(op, "failed administrator check", err)
-	}
-	if !isJIMMAdmin {
+	if !user.JimmAdmin {
 		return 0, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 	count, err := j.Database.DeleteAuditLogsBefore(ctx, before)

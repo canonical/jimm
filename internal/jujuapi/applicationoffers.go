@@ -99,7 +99,7 @@ func (r *controllerRoot) GetConsumeDetails(ctx context.Context, args jujuparams.
 	return results, nil
 }
 
-func (r *controllerRoot) getConsumeDetails(ctx context.Context, u *openfga.User, v bakery.Version, offerURL string) (jujuparams.ConsumeOfferDetails, error) {
+func (r *controllerRoot) getConsumeDetails(ctx context.Context, user *openfga.User, v bakery.Version, offerURL string) (jujuparams.ConsumeOfferDetails, error) {
 	const op = errors.Op("jujuapi.GetConsumeDetails")
 
 	ourl, err := crossmodel.ParseOfferURL(offerURL)
@@ -110,7 +110,7 @@ func (r *controllerRoot) getConsumeDetails(ctx context.Context, u *openfga.User,
 	// Ensure the path is normalised.
 	if ourl.User == "" {
 		// If the model owner is not specified use the specified user.
-		ourl.User = u.Username
+		ourl.User = user.Username
 	}
 
 	details := jujuparams.ConsumeOfferDetails{
@@ -118,7 +118,7 @@ func (r *controllerRoot) getConsumeDetails(ctx context.Context, u *openfga.User,
 			OfferURL: ourl.AsLocal().Path(),
 		},
 	}
-	if err := r.jimm.GetApplicationOfferConsumeDetails(ctx, u, &details, v); err != nil {
+	if err := r.jimm.GetApplicationOfferConsumeDetails(ctx, user, &details, v); err != nil {
 		return jujuparams.ConsumeOfferDetails{}, errors.E(op, err)
 	}
 	return details, nil

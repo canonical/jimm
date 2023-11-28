@@ -337,10 +337,10 @@ func (j *JIMM) GetApplicationOffer(ctx context.Context, user *openfga.User, offe
 }
 
 // GrantOfferAccess grants rights for an application offer.
-func (j *JIMM) GrantOfferAccess(ctx context.Context, u *openfga.User, offerURL string, ut names.UserTag, access jujuparams.OfferAccessPermission) error {
+func (j *JIMM) GrantOfferAccess(ctx context.Context, user *openfga.User, offerURL string, ut names.UserTag, access jujuparams.OfferAccessPermission) error {
 	const op = errors.Op("jimm.GrantOfferAccess")
 
-	err := j.doApplicationOfferAdmin(ctx, u, offerURL, func(offer *dbmodel.ApplicationOffer, api API) error {
+	err := j.doApplicationOfferAdmin(ctx, user, offerURL, func(offer *dbmodel.ApplicationOffer, api API) error {
 		tUser := openfga.NewUser(&dbmodel.User{Username: ut.Id()}, j.OpenFGAClient)
 		currentRelation := tUser.GetApplicationOfferAccess(ctx, offer.ResourceTag())
 		currentAccessLevel := ToOfferAccessString(currentRelation)
@@ -720,21 +720,17 @@ func (j *JIMM) ListApplicationOffers(ctx context.Context, user *openfga.User, fi
 	return offers, nil
 }
 
-func (j *JIMM) listApplicationOffersForModel(ctx context.Context, u *openfga.User, m *dbmodel.Model, filters []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetails, error) {
+func (j *JIMM) listApplicationOffersForModel(ctx context.Context, user *openfga.User, m *dbmodel.Model, filters []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetails, error) {
 	const op = errors.Op("jimm.listApplicationOffersForModel")
 
 	if err := j.Database.GetModel(ctx, m); err != nil {
 		return nil, errors.E(op, err)
 	}
-	isControllerAdmin, err := openfga.IsAdministrator(ctx, u, j.ResourceTag())
+	isModelAdmin, err := openfga.IsAdministrator(ctx, user, m.ResourceTag())
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
-	isModelAdmin, err := openfga.IsAdministrator(ctx, u, m.ResourceTag())
-	if err != nil {
-		return nil, errors.E(op, err)
-	}
-	if !isControllerAdmin && !isModelAdmin {
+	if !user.JimmAdmin && !isModelAdmin {
 		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 	api, err := j.dial(ctx, &m.Controller, names.ModelTag{})
@@ -756,7 +752,7 @@ func (j *JIMM) listApplicationOffersForModel(ctx context.Context, u *openfga.Use
 // Note: The user does not need to have any access level on the offer itself.
 // As long as they are model admins or controller superusers they can also
 // manipulate the application offer as admins.
-func (j *JIMM) doApplicationOfferAdmin(ctx context.Context, u *openfga.User, offerURL string, f func(offer *dbmodel.ApplicationOffer, api API) error) error {
+func (j *JIMM) doApplicationOfferAdmin(ctx context.Context, user *openfga.User, offerURL string, f func(offer *dbmodel.ApplicationOffer, api API) error) error {
 	const op = errors.Op("jimm.doApplicationOfferAdmin")
 
 	offer := dbmodel.ApplicationOffer{
@@ -766,7 +762,7 @@ func (j *JIMM) doApplicationOfferAdmin(ctx context.Context, u *openfga.User, off
 		return errors.E(op, err)
 	}
 
-	isOfferAdmin, err := openfga.IsAdministrator(ctx, u, offer.ResourceTag())
+	isOfferAdmin, err := openfga.IsAdministrator(ctx, user, offer.ResourceTag())
 	if err != nil {
 		return errors.E(op, err)
 	}

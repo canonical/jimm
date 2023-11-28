@@ -184,8 +184,8 @@ func TestForEachCloud(t *testing.T) {
 		&dbmodel.User{Username: "daphne@external"},
 		client,
 	)
-	err = daphne.SetControllerAccess(context.Background(), names.NewControllerTag(j.UUID), ofganames.AdministratorRelation)
-	c.Assert(err, qt.IsNil)
+	daphne.JimmAdmin = true
+
 	everyone := openfga.NewUser(
 		&dbmodel.User{
 			Username: ofganames.EveryoneUser,

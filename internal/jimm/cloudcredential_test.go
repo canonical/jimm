@@ -38,9 +38,11 @@ func TestUpdateCloudCredential(t *testing.T) {
 		about                  string
 		checkCredentialErrors  []error
 		updateCredentialErrors []error
+		jimmAdmin              bool
 		createEnv              func(*qt.C, *jimm.JIMM, *openfga.OFGAClient) (*dbmodel.User, jimm.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string)
 	}{{
-		about: "all ok",
+		about:     "all ok",
+		jimmAdmin: true,
 		createEnv: func(c *qt.C, j *jimm.JIMM, client *openfga.OFGAClient) (*dbmodel.User, jimm.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
 			u := dbmodel.User{
 				Username: "alice@external",
@@ -153,6 +155,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 		},
 	}, {
 		about:                  "update credential error returned by controller",
+		jimmAdmin:              true,
 		updateCredentialErrors: []error{nil, errors.E("test error")},
 		createEnv: func(c *qt.C, j *jimm.JIMM, client *openfga.OFGAClient) (*dbmodel.User, jimm.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
 			u := dbmodel.User{
@@ -242,6 +245,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 		},
 	}, {
 		about:                  "check credential error returned by controller",
+		jimmAdmin:              true,
 		checkCredentialErrors:  []error{errors.E("test error")},
 		updateCredentialErrors: []error{nil},
 		createEnv: func(c *qt.C, j *jimm.JIMM, client *openfga.OFGAClient) (*dbmodel.User, jimm.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
@@ -326,7 +330,8 @@ func TestUpdateCloudCredential(t *testing.T) {
 			return &u, arg, dbmodel.CloudCredential{}, "test error"
 		},
 	}, {
-		about: "user is controller superuser",
+		about:     "user is controller superuser",
+		jimmAdmin: true,
 		createEnv: func(c *qt.C, j *jimm.JIMM, client *openfga.OFGAClient) (*dbmodel.User, jimm.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
 			u := dbmodel.User{
 				Username: "alice@external",
@@ -334,6 +339,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 			c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
 
 			alice := openfga.NewUser(&u, client)
+			alice.JimmAdmin = true
 
 			err := alice.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
@@ -445,6 +451,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 	}, {
 		about:                 "skip check, which would return an error",
 		checkCredentialErrors: []error{errors.E("test error")},
+		jimmAdmin:             true,
 		createEnv: func(c *qt.C, j *jimm.JIMM, client *openfga.OFGAClient) (*dbmodel.User, jimm.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
 			u := dbmodel.User{
 				Username: "alice@external",
@@ -556,7 +563,8 @@ func TestUpdateCloudCredential(t *testing.T) {
 			return &u, arg, expectedCredential, ""
 		},
 	}, {
-		about: "skip update",
+		about:     "skip update",
+		jimmAdmin: true,
 		createEnv: func(c *qt.C, j *jimm.JIMM, client *openfga.OFGAClient) (*dbmodel.User, jimm.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
 			u := dbmodel.User{
 				Username: "alice@external",
@@ -783,6 +791,8 @@ func TestUpdateCloudCredential(t *testing.T) {
 
 			u, arg, expectedCredential, expectedError := test.createEnv(c, j, client)
 			user := openfga.NewUser(u, client)
+			user.JimmAdmin = test.jimmAdmin
+
 			result, err := j.UpdateCloudCredential(ctx, user, arg)
 			if expectedError == "" {
 				c.Assert(err, qt.Equals, nil)
@@ -837,6 +847,7 @@ users:
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
 	u := env.User("alice@external").DBObject(c, j.Database)
 	user := openfga.NewUser(&u, client)
+	user.JimmAdmin = true
 	_, err = j.UpdateCloudCredential(ctx, user, jimm.UpdateCloudCredentialArgs{
 		CredentialTag: names.NewCloudCredentialTag("test-cloud/bob@external/test"),
 		Credential: jujuparams.CloudCredential{
@@ -1532,13 +1543,15 @@ var getCloudCredentialAttributesTests = []struct {
 	name             string
 	username         string
 	hidden           bool
+	jimmAdmin        bool
 	expectAttributes map[string]string
 	expectRedacted   []string
 	expectError      string
 	expectErrorCode  errors.Code
 }{{
-	name:     "OwnerNoHidden",
-	username: "bob@external",
+	name:      "OwnerNoHidden",
+	username:  "bob@external",
+	jimmAdmin: true,
 	expectAttributes: map[string]string{
 		"client-email": "bob@example.com",
 		"client-id":    "1234",
@@ -1556,8 +1569,9 @@ var getCloudCredentialAttributesTests = []struct {
 		"project-id":   "5678",
 	},
 }, {
-	name:     "SuperUserNoHidden",
-	username: "alice@external",
+	name:      "SuperUserNoHidden",
+	username:  "alice@external",
+	jimmAdmin: true,
 	expectAttributes: map[string]string{
 		"client-email": "bob@example.com",
 		"client-id":    "1234",
@@ -1568,6 +1582,7 @@ var getCloudCredentialAttributesTests = []struct {
 	name:            "SuperUserWithHiddenUnauthorized",
 	username:        "alice@external",
 	hidden:          true,
+	jimmAdmin:       true,
 	expectError:     `unauthorized`,
 	expectErrorCode: errors.CodeUnauthorized,
 }, {
@@ -1608,6 +1623,7 @@ func TestGetCloudCredentialAttributes(t *testing.T) {
 
 			u = env.User(test.username).DBObject(c, j.Database)
 			userTest := openfga.NewUser(&u, client)
+			userTest.JimmAdmin = test.jimmAdmin
 			attr, redacted, err := j.GetCloudCredentialAttributes(ctx, userTest, cred, test.hidden)
 			if test.expectError != "" {
 				c.Check(err, qt.ErrorMatches, test.expectError)

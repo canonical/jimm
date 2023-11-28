@@ -17,9 +17,9 @@ import (
 // authenticator, it then retrieves the user information from the database.
 // If the authenticated user does not yet exist in the database it will be
 // created using the values returned from the authenticator as the user's
-// details. If the authenticator returns a user with ControllerAccess set
-// to "superuser" then the authenticated user will be considered a
-// superuser for this session, this will not be persisted.
+// details. Finally we check if the user is a administrator of JIMM and set
+// the JimmAdmin field if this is true which will persist for the duration
+// of the websocket connection.
 func (j *JIMM) Authenticate(ctx context.Context, req *jujuparams.LoginRequest) (*openfga.User, error) {
 	const op = errors.Op("jimm.Authenticate")
 	if j == nil || j.Authenticator == nil {
@@ -52,5 +52,10 @@ func (j *JIMM) Authenticate(ctx context.Context, req *jujuparams.LoginRequest) (
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
+	isJimmAdmin, err := openfga.IsAdministrator(ctx, u, j.ResourceTag())
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+	u.JimmAdmin = isJimmAdmin
 	return u, nil
 }

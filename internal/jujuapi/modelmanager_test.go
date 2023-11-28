@@ -129,9 +129,6 @@ func (s *modelManagerSuite) TestListModelSummariesWithoutControllerUUIDMasking(c
 
 	s.Candid.AddUser("adam", "controller-admin")
 
-	conn := s.open(c, nil, "bob")
-	defer conn.Close()
-
 	// we need to make bob jimm admin to disable controller UUID masking
 	err = s.OFGAClient.AddRelation(context.Background(),
 		openfga.Tuple{
@@ -141,6 +138,9 @@ func (s *modelManagerSuite) TestListModelSummariesWithoutControllerUUIDMasking(c
 		},
 	)
 	c.Assert(err, gc.Equals, nil)
+
+	conn := s.open(c, nil, "bob")
+	defer conn.Close()
 
 	err = conn.APICall("JIMM", 4, "", "DisableControllerUUIDMasking", nil, nil)
 	c.Assert(err, gc.Equals, nil)

@@ -271,11 +271,11 @@ func (r *controllerRoot) AddCredentials(ctx context.Context, args jujuparams.Tag
 }
 
 func userModelAccess(ctx context.Context, user *openfga.User, model names.ModelTag) (string, error) {
-	isAdmin, err := openfga.IsAdministrator(ctx, user, model)
+	isModelAdmin, err := openfga.IsAdministrator(ctx, user, model)
 	if err != nil {
 		return "", errors.E(err)
 	}
-	if isAdmin {
+	if isModelAdmin {
 		return "admin", nil
 	}
 	hasWriteAccess, err := user.IsModelWriter(ctx, model)

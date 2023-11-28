@@ -197,8 +197,9 @@ func (s *jimmSuite) AddController(c *gc.C, name string, info *api.Info) {
 			Port:    hp.Port(),
 		}})
 	}
-	user := openfga.NewUser(s.AdminUser, s.OFGAClient)
-	err := s.JIMM.AddController(context.Background(), user, ctl)
+	adminUser := openfga.NewUser(s.AdminUser, s.OFGAClient)
+	adminUser.JimmAdmin = true
+	err := s.JIMM.AddController(context.Background(), adminUser, ctl)
 	c.Assert(err, gc.Equals, nil)
 }
 
