@@ -26,7 +26,6 @@ import (
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
 	"github.com/canonical/jimm/internal/auth"
@@ -250,8 +249,9 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	s.jimm.Pubsub = &pubsub.Hub{MaxConcurrency: 50}
 
 	if p.DSN == "" {
-		p.DSN = "file::memory:?mode=memory&cache=shared"
+		return nil, errors.E(op, "missing DSN")
 	}
+
 	var err error
 	s.jimm.Database.DB, err = openDB(ctx, p.DSN)
 	if err != nil {
@@ -381,8 +381,6 @@ func openDB(ctx context.Context, dsn string) (*gorm.DB, error) {
 		dialect = postgres.Open(strings.TrimPrefix(dsn, "pgx:"))
 	case strings.HasPrefix(dsn, "postgres:") || strings.HasPrefix(dsn, "postgresql:"):
 		dialect = postgres.Open(dsn)
-	case strings.HasPrefix(dsn, "file:"):
-		dialect = sqlite.Open(dsn)
 	default:
 		return nil, errors.E(errors.CodeServerConfiguration, "unsupported DSN")
 	}
