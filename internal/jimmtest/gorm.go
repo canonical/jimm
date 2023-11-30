@@ -7,12 +7,16 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"regexp"
+	"strings"
 	"time"
 
-	"gorm.io/driver/sqlite"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
+
+const defaultDSN = "postgresql://jimm:jimm@127.0.0.1:5432/jimm"
 
 // A Tester is the test interface required by this package.
 type Tester interface {
@@ -67,8 +71,7 @@ func (l gormLogger) Trace(ctx context.Context, begin time.Time, fc func() (strin
 
 var _ logger.Interface = gormLogger{}
 
-// MemoryDB returns an in-memory gorm.DB for use in tests. The underlying
-// SQL database is an in-memory SQLite database.
+// MemoryDB returns a PostgreSQL database instance for tests.
 func MemoryDB(t Tester, nowFunc func() time.Time) *gorm.DB {
 	_, present := os.LookupEnv("TERSE")
 	logLevel := logger.Info
@@ -79,16 +82,31 @@ func MemoryDB(t Tester, nowFunc func() time.Time) *gorm.DB {
 		Logger:  NewGormLogger(t, logLevel),
 		NowFunc: nowFunc,
 	}
-	dsn := fmt.Sprintf("file:%s?mode=memory&cache=shared", t.Name())
-	gdb, err := gorm.Open(sqlite.Open(dsn), &cfg)
+
+	unsafeCharsPattern, _ := regexp.Compile("[ .:;`'\"|<>~/\\?!@#$%^&*()[\\]{}=+-]")
+	schemaName := "test_" + strings.ToLower(unsafeCharsPattern.ReplaceAllString(t.Name(), "_"))
+
+	dsn := defaultDSN
+	if envTestDSN, exists := os.LookupEnv("JIMM_TEST_DSN"); exists {
+		dsn = envTestDSN
+	} else if envDSN, exists := os.LookupEnv("JIMM_DSN"); exists {
+		dsn = envDSN
+	}
+
+	gdb, err := gorm.Open(postgres.Open(dsn), &cfg)
 	if err != nil {
 		t.Fatalf("error opening database: %s", err)
 	}
-	// Enable foreign key constraints in SQLite, which are disabled by
-	// default. This makes the encoded foreign key constraints behave as
-	// expected.
-	if err = gdb.Exec("PRAGMA foreign_keys=ON").Error; err != nil {
-		t.Fatalf("cannot enable foreign keys: %s", err)
+
+	createSchemaCommand := fmt.Sprintf(`
+		DROP SCHEMA IF EXISTS %[1]s;
+		CREATE SCHEMA %[1]s;
+		SET search_path TO %[1]s`, // Make it as the default schema.
+		schemaName,
+	)
+	if err := gdb.Exec(createSchemaCommand).Error; err != nil {
+		t.Fatalf("error creating schema (%s): %s", schemaName, err)
 	}
+
 	return gdb
 }
