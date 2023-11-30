@@ -19,7 +19,7 @@ import (
 )
 
 var migrateModelCommandDoc = `
-	migrate-model command migrates a model(s) to a new controller.
+	The migrate command migrates a model(s) to a new controller.
 	A model-tag is of the form "model-<UUID>" while a controller-name is
 	simply the name of the controller.
 
@@ -27,8 +27,8 @@ var migrateModelCommandDoc = `
 	multiple model tags.
 
 	Example:
-		jimmctl migrate-model <model-tag> --controller <controller-name>
-		jimmctl migrate-model <model-tag> <model-tag> <model-tag> --controller <controller-name>
+		jimmctl migrate <model-tag> --controller <controller-name>
+		jimmctl migrate <model-tag> <model-tag> <model-tag> --controller <controller-name>
 `
 
 // NewMigrateModelCommand returns a command to migrate models.
@@ -53,7 +53,7 @@ type migrateModelCommand struct {
 
 func (c *migrateModelCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:    "migrate-model",
+		Name:    "migrate",
 		Purpose: "Begin model migration",
 		Doc:     migrateModelCommandDoc,
 	})

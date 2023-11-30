@@ -37,7 +37,7 @@ var migrationResultRegex = `results:
 // Because our test suite only spins up 1 controller the furthest we can go is reaching Juju pre-checks which
 // detect that a model with the same UUID already exists on the target controller.
 // This functionality is already tested in jujuapi and ideally this test would only test the CLI functionality
-// but our CLI tests and currently integration based.
+// but our CLI tests are currently integration based.
 func (s *migrateModelSuite) TestMigrateModelCommandSuperuser(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
 	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@external/cred")
