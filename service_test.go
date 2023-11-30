@@ -46,6 +46,7 @@ func TestDefaultService(t *testing.T) {
 	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 	svc, err := jimm.NewService(context.Background(), jimm.Params{
+		DSN:                   jimmtest.CreateEmptyDatabase(c),
 		OpenFGAParams:         cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
 		InsecureSecretStorage: true,
 	})
@@ -64,6 +65,7 @@ func TestServiceStartsWithoutSecretStore(t *testing.T) {
 	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 	_, err = jimm.NewService(context.Background(), jimm.Params{
+		DSN:           jimmtest.CreateEmptyDatabase(c),
 		OpenFGAParams: cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
 	})
 	c.Assert(err, qt.IsNil)
@@ -77,6 +79,7 @@ func TestAuthenticator(t *testing.T) {
 
 	p := jimm.Params{
 		ControllerUUID:        "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
+		DSN:                   jimmtest.CreateEmptyDatabase(c),
 		ControllerAdmins:      []string{"admin"},
 		OpenFGAParams:         cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
 		InsecureSecretStorage: true,
@@ -130,6 +133,7 @@ func TestVault(t *testing.T) {
 
 	p := jimm.Params{
 		ControllerUUID:  "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
+		DSN:             jimmtest.CreateEmptyDatabase(c),
 		VaultAddress:    "http://localhost:8200",
 		VaultAuthPath:   "/auth/approle/login",
 		VaultPath:       "/jimm-kv/",
@@ -191,6 +195,7 @@ func TestPostgresSecretStore(t *testing.T) {
 
 	p := jimm.Params{
 		ControllerUUID:        "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
+		DSN:                   jimmtest.CreateEmptyDatabase(c),
 		OpenFGAParams:         cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
 		InsecureSecretStorage: true,
 	}
@@ -206,6 +211,7 @@ func TestOpenFGA(t *testing.T) {
 
 	p := jimm.Params{
 		ControllerUUID:   "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
+		DSN:              jimmtest.CreateEmptyDatabase(c),
 		OpenFGAParams:    cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
 		ControllerAdmins: []string{"alice", "eve"},
 	}
@@ -253,6 +259,7 @@ func TestPublicKey(t *testing.T) {
 
 	p := jimm.Params{
 		ControllerUUID:   "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
+		DSN:              jimmtest.CreateEmptyDatabase(c),
 		OpenFGAParams:    cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
 		ControllerAdmins: []string{"alice", "eve"},
 		PrivateKey:       "c1VkV05+iWzCxMwMVcWbr0YJWQSEO62v+z3EQ2BhFMw=",
@@ -405,6 +412,7 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 
 			p := jimm.Params{
 				ControllerUUID:   "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
+				DSN:              jimmtest.CreateEmptyDatabase(c),
 				OpenFGAParams:    cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
 				ControllerAdmins: []string{"alice", "eve"},
 				PrivateKey:       "c1VkV05+iWzCxMwMVcWbr0YJWQSEO62v+z3EQ2BhFMw=",
