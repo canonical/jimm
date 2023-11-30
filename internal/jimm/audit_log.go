@@ -19,16 +19,22 @@ import (
 	"github.com/canonical/jimm/internal/utils"
 )
 
+// AuditLoggerBackend defines the interface used by the DbAuditLogger to store
+// audit events.
+type AuditLoggerBackend interface {
+	AddAuditLogEntry(*dbmodel.AuditLogEntry)
+}
+
 type DbAuditLogger struct {
-	jimm           *JIMM
+	backend        AuditLoggerBackend
 	conversationId string
 	getUser        func() names.UserTag
 }
 
 // NewDbAuditLogger returns a new audit logger that logs to the database.
-func NewDbAuditLogger(j *JIMM, getUserFunc func() names.UserTag) DbAuditLogger {
+func NewDbAuditLogger(backend AuditLoggerBackend, getUserFunc func() names.UserTag) DbAuditLogger {
 	logger := DbAuditLogger{
-		jimm:           j,
+		backend:        backend,
 		conversationId: utils.NewConversationID(),
 		getUser:        getUserFunc,
 	}
@@ -60,7 +66,7 @@ func (r DbAuditLogger) LogRequest(header *rpc.Header, body interface{}) error {
 		}
 		ale.Params = jsonBody
 	}
-	r.jimm.AddAuditLogEntry(&ale)
+	r.backend.AddAuditLogEntry(&ale)
 	return nil
 }
 
@@ -88,7 +94,7 @@ func (o DbAuditLogger) LogResponse(r rpc.Request, header *rpc.Header, body inter
 	ale.FacadeVersion = r.Version
 	ale.Errors = jsonErr
 	ale.IsResponse = true
-	o.jimm.AddAuditLogEntry(&ale)
+	o.backend.AddAuditLogEntry(&ale)
 	return nil
 }
 
