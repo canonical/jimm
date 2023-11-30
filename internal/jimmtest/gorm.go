@@ -87,10 +87,8 @@ func MemoryDB(t Tester, nowFunc func() time.Time) *gorm.DB {
 	schemaName := "test_" + strings.ToLower(unsafeCharsPattern.ReplaceAllString(t.Name(), "_"))
 
 	dsn := defaultDSN
-	if envTestDSN, exists := os.LookupEnv("JIMM_TEST_DSN"); exists {
+	if envTestDSN, exists := os.LookupEnv("JIMM_TEST_PGXDSN"); exists {
 		dsn = envTestDSN
-	} else if envDSN, exists := os.LookupEnv("JIMM_DSN"); exists {
-		dsn = envDSN
 	}
 
 	gdb, err := gorm.Open(postgres.Open(dsn), &cfg)
