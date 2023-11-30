@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"strings"
 	"time"
 
 	"gorm.io/driver/postgres"
@@ -85,7 +86,7 @@ func MemoryDB(t Tester, nowFunc func() time.Time) *gorm.DB {
 	}
 
 	re, _ := regexp.Compile("[ .:;`'\"|<>~/\\?!@#$%^&*()[\\]{}=+-]")
-	schemaName := "test_" + re.ReplaceAllString(t.Name(), "_")
+	schemaName := strings.ToLower("test_" + re.ReplaceAllString(t.Name(), "_"))
 
 	dsn := defaultDSN
 	if envTestDSN, exists := os.LookupEnv("JIMM_TEST_PGXDSN"); exists {
@@ -113,7 +114,7 @@ func MemoryDB(t Tester, nowFunc func() time.Time) *gorm.DB {
 // CreateNewTestDatabase creates an empty Postgres database and returns the DSN.
 func CreateEmptyDatabase(t Tester) string {
 	re, _ := regexp.Compile(unsafeCharsPattern)
-	dbName := "jimm_test_" + re.ReplaceAllString(t.Name(), "_")
+	dbName := strings.ToLower("jimm_test_" + re.ReplaceAllString(t.Name(), "_"))
 
 	dsn := defaultDSN
 	if envTestDSN, exists := os.LookupEnv("JIMM_TEST_PGXDSN"); exists {
