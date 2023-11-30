@@ -150,6 +150,14 @@ func createDatabase(suggestedName string, templateName string) (string, string, 
 		return "", "", errors.E(err, fmt.Sprintf("error creating database: (%s)", databaseName))
 	}
 
+	sqlDB, err := gdb.DB()
+	if err != nil {
+		return "", "", errors.E(err, "failed to get the internal DB object")
+	}
+	if err := sqlDB.Close(); err != nil {
+		return "", "", errors.E(err, "failed to close database connection")
+	}
+
 	u.Path = databaseName
 	return databaseName, u.String(), nil
 }
