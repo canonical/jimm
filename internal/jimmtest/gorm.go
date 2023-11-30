@@ -6,9 +6,9 @@ package jimmtest
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"regexp"
-	"strings"
 	"time"
 
 	"gorm.io/driver/postgres"
@@ -108,4 +108,38 @@ func MemoryDB(t Tester, nowFunc func() time.Time) *gorm.DB {
 	}
 
 	return gdb
+}
+
+// CreateNewTestDatabase creates an empty Postgres database and returns the DSN.
+func CreateEmptyDatabase(t Tester) string {
+	re, _ := regexp.Compile(unsafeCharsPattern)
+	dbName := "jimm_test_" + re.ReplaceAllString(t.Name(), "_")
+
+	dsn := defaultDSN
+	if envTestDSN, exists := os.LookupEnv("JIMM_TEST_PGXDSN"); exists {
+		dsn = envTestDSN
+	}
+
+	u, err := url.Parse(dsn)
+	if err != nil {
+		t.Fatalf("error parsing DSN as a URI: %s", err)
+	}
+
+	gdb, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("error opening database: %s", err)
+	}
+
+	dropDatabaseCommand := fmt.Sprintf("DROP DATABASE IF EXISTS %[1]s", dbName)
+	if err := gdb.Exec(dropDatabaseCommand).Error; err != nil {
+		t.Fatalf("error dropping exisiting database (%s): %s", dbName, err)
+	}
+
+	createDatabaseCommand := fmt.Sprintf("CREATE DATABASE %[1]s", dbName)
+	if err := gdb.Exec(createDatabaseCommand).Error; err != nil {
+		t.Fatalf("error creating database (%s): %s", dbName, err)
+	}
+
+	u.Path = dbName
+	return u.String()
 }
