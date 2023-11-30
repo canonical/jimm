@@ -135,6 +135,9 @@ func (s *JIMMSuite) TearDownTest(c *gc.C) {
 	if s.Server != nil {
 		s.Server.Close()
 	}
+	if err := s.JIMM.Database.Close(); err != nil {
+		c.Logf("failed to close database connections at tear down: %s", err)
+	}
 }
 
 func (s *JIMMSuite) NewUser(u *dbmodel.User) *openfga.User {
