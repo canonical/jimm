@@ -133,7 +133,7 @@ func CreateEmptyDatabase(t Tester) string {
 
 	dropDatabaseCommand := fmt.Sprintf(`DROP DATABASE IF EXISTS "%[1]s"`, dbName)
 	if err := gdb.Exec(dropDatabaseCommand).Error; err != nil {
-		t.Fatalf("error dropping exisiting database (%s): %s", dbName, err)
+		t.Fatalf("error dropping existing database (%s): %s", dbName, err)
 	}
 
 	createDatabaseCommand := fmt.Sprintf(`CREATE DATABASE "%[1]s"`, dbName)
