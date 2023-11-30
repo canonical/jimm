@@ -13,6 +13,7 @@ import (
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
+	"github.com/canonical/jimm/internal/constants"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
@@ -230,7 +231,7 @@ func (w *Watcher) watchController(ctx context.Context, ctl *dbmodel.Controller) 
 	checkMigratingModel := func(m *dbmodel.Model) error {
 		// models that were in the migrating state may no longer be on
 		// the controller, here we will update them once migration has completed.
-		modelMigrating := m.Life == "migrating-away" || m.Life == "migrating-internal"
+		modelMigrating := m.Life == constants.MIGRATING_AWAY.String() || m.Life == constants.MIGRATING_INTERNAL.String()
 		if !modelMigrating {
 			return nil
 		}
@@ -249,7 +250,7 @@ func (w *Watcher) watchController(ctx context.Context, ctl *dbmodel.Controller) 
 				if migrationPhase == migration.ABORTDONE || migrationPhase == migration.REAPFAILED {
 					// Clean up migration info
 					m.NewControllerID = sql.NullInt32{Int32: 0, Valid: false}
-					m.Life = "alive"
+					m.Life = constants.ALIVE.String()
 					if err := w.Database.UpdateModel(ctx, m); err != nil {
 						zapctx.Error(ctx, "failed to update migrating model info", zap.Error(err))
 						return errors.E(op, err)
@@ -265,10 +266,10 @@ func (w *Watcher) watchController(ctx context.Context, ctl *dbmodel.Controller) 
 				return nil
 			}
 			// Model undergoing internal migration needs an update to its parent controller.
-			if m.Life == "migrating-internal" {
+			if m.Life == constants.MIGRATING_INTERNAL.String() {
 				m.ControllerID = uint(m.NewControllerID.Int32)
 				m.NewControllerID = sql.NullInt32{Int32: 0, Valid: false}
-				m.Life = "alive"
+				m.Life = constants.ALIVE.String()
 				if err := w.Database.UpdateModel(ctx, m); err != nil {
 					zapctx.Error(ctx, "failed to update migrating model info", zap.Error(err))
 					return errors.E(op, err)
@@ -286,7 +287,7 @@ func (w *Watcher) watchController(ctx context.Context, ctl *dbmodel.Controller) 
 	}
 
 	checkDyingModel := func(m *dbmodel.Model) error {
-		if m.Life == "dying" || m.Life == "dead" {
+		if m.Life == constants.DYING.String() || m.Life == constants.DEAD.String() {
 			// models that were in the dying state may no
 			// longer be on the controller, check if it should
 			// be immediately deleted.

@@ -18,6 +18,7 @@ import (
 	"go.uber.org/zap"
 	"gopkg.in/macaroon.v2"
 
+	"github.com/canonical/jimm/internal/constants"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
@@ -670,9 +671,9 @@ func (j *JIMM) InitiateMigration(ctx context.Context, user *openfga.User, spec j
 	}
 	// Track the model migration info
 	if newControllerID == 0 {
-		model.Life = "migratingAway"
+		model.Life = constants.MIGRATING_AWAY.String()
 	} else {
-		model.Life = "migratingInternal"
+		model.Life = constants.MIGRATING_INTERNAL.String()
 		model.NewControllerID = sql.NullInt32{Int32: int32(newControllerID), Valid: true}
 	}
 	err = j.Database.UpdateModel(ctx, &model)
