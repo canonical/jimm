@@ -699,7 +699,8 @@ func TestFillMigrationTarget(t *testing.T) {
 			env := jimmtest.ParseEnvironment(c, fillMigrationTargetTestEnv)
 			env.PopulateDB(c, db)
 
-			res, err := jimm.FillMigrationTarget(db, store, test.controllerName)
+			res, controllerID, err := jimm.FillMigrationTarget(db, store, test.controllerName)
+			c.Assert(controllerID, qt.Equals, env.Controllers[0].DBObject(c, db).ID)
 			if test.expectedError != "" {
 				c.Assert(err, qt.ErrorMatches, test.expectedError)
 			} else {

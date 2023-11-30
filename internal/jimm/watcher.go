@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/juju/juju/core/migration"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 	"github.com/juju/zaputil/zapctx"
@@ -226,6 +227,64 @@ func (w *Watcher) watchController(ctx context.Context, ctl *dbmodel.Controller) 
 	}
 	defer api.AllModelWatcherStop(ctx, id)
 
+	checkMigratingModel := func(m *dbmodel.Model) error {
+		// models that were in the migrating state may no longer be on
+		// the controller, here we will update them once migration has completed.
+		modelMigrating := m.Life == "migrating-away" || m.Life == "migrating-internal"
+		if !modelMigrating {
+			return nil
+		}
+		mi := jujuparams.ModelInfo{
+			UUID: m.UUID.String,
+		}
+		if err := api.ModelInfo(ctx, &mi); err == nil {
+			if mi.Migration != nil {
+				migrationPhase, ok := migration.ParsePhase(mi.Migration.Status)
+				if !ok {
+					zapctx.Error(ctx, "invalid phase received", zap.String("phase", mi.Migration.Status))
+					return nil
+				}
+				// Without a clean way to check for migration failure, we opt to check for these two states
+				// which are currently the final states for any failed migrations.
+				if migrationPhase == migration.ABORTDONE || migrationPhase == migration.REAPFAILED {
+					// Clean up migration info
+					m.NewControllerID = sql.NullInt32{Int32: 0, Valid: false}
+					m.Life = "alive"
+					if err := w.Database.UpdateModel(ctx, m); err != nil {
+						zapctx.Error(ctx, "failed to update migrating model info", zap.Error(err))
+						return errors.E(op, err)
+					}
+					return nil
+				}
+				zapctx.Info(ctx, "model migration in progress", zap.String("model", m.Name), zap.String("phase", migrationPhase.String()))
+			}
+		} else {
+			// If we get an error then we have reached migration completion.
+			misingOrRedirectError := errors.ErrorCode(err) == errors.CodeNotFound || errors.ErrorCode(err) == errors.CodeRedirect
+			if !misingOrRedirectError {
+				return nil
+			}
+			// Model undergoing internal migration needs an update to its parent controller.
+			if m.Life == "migrating-internal" {
+				m.ControllerID = uint(m.NewControllerID.Int32)
+				m.NewControllerID = sql.NullInt32{Int32: 0, Valid: false}
+				m.Life = "alive"
+				if err := w.Database.UpdateModel(ctx, m); err != nil {
+					zapctx.Error(ctx, "failed to update migrating model info", zap.Error(err))
+					return errors.E(op, err)
+				}
+				return nil
+			} else {
+				// Model migrating to controller not managed by JIMM should now be deleted.
+				if err := w.Database.DeleteModel(ctx, m); err != nil {
+					return errors.E(op, err)
+				}
+				return nil
+			}
+		}
+		return nil
+	}
+
 	checkDyingModel := func(m *dbmodel.Model) error {
 		if m.Life == "dying" || m.Life == "dead" {
 			// models that were in the dying state may no
@@ -253,7 +312,7 @@ func (w *Watcher) watchController(ctx context.Context, ctl *dbmodel.Controller) 
 	// modelStates contains the set of models running on the
 	// controller that JIMM is interested in. The function also
 	// check for any dying models and deletes them where necessary.
-	modelStates, err := w.checkControllerModels(ctx, ctl, checkDyingModel)
+	modelStates, err := w.checkControllerModels(ctx, ctl, checkDyingModel, checkMigratingModel)
 	if err != nil {
 		return errors.E(op, err)
 	}

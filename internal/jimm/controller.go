@@ -602,7 +602,9 @@ func (j *JIMM) UpdateMigratedModel(ctx context.Context, user *openfga.User, mode
 }
 
 // InitiateMigration triggers the migration of the specified model to a target controller.
-func (j *JIMM) InitiateMigration(ctx context.Context, user *openfga.User, spec jujuparams.MigrationSpec) (jujuparams.InitiateMigrationResult, error) {
+// externalMigration indicates whether this model is moving to a controller managed by
+// JIMM or not.
+func (j *JIMM) InitiateMigration(ctx context.Context, user *openfga.User, spec jujuparams.MigrationSpec, newControllerID uint) (jujuparams.InitiateMigrationResult, error) {
 	const op = errors.Op("jimm.InitiateMigration")
 
 	result := jujuparams.InitiateMigrationResult{
@@ -665,6 +667,18 @@ func (j *JIMM) InitiateMigration(ctx context.Context, user *openfga.User, spec j
 	})
 	if err != nil {
 		return result, errors.E(op, err)
+	}
+	// Track the model migration info
+	if newControllerID == 0 {
+		model.Life = "migratingAway"
+	} else {
+		model.Life = "migratingInternal"
+		model.NewControllerID = sql.NullInt32{Int32: int32(newControllerID), Valid: true}
+	}
+	err = j.Database.UpdateModel(ctx, &model)
+	if err != nil {
+		zapctx.Error(ctx, "failed to update model with migration info", zap.Error(err))
+		return result, errors.E(op, fmt.Sprintf("migration started but failed to queue JIMM automatic update\n migration ID = %s\n", result.MigrationId), err)
 	}
 
 	return result, nil

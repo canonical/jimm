@@ -4,6 +4,7 @@ package jimmtest
 
 import (
 	"context"
+	"database/sql"
 	"strconv"
 	"strings"
 
@@ -419,6 +420,7 @@ type Model struct {
 	Owner           string       `json:"owner"`
 	UUID            string       `json:"uuid"`
 	Controller      string       `json:"controller"`
+	NewController   string       `json:"new-controller"`
 	Cloud           string       `json:"cloud"`
 	CloudRegion     string       `json:"region"`
 	CloudCredential string       `json:"cloud-credential"`
@@ -449,6 +451,13 @@ func (m *Model) DBObject(c *qt.C, db db.Database) dbmodel.Model {
 		m.dbo.UUID.Valid = true
 	}
 	m.dbo.Controller = m.env.Controller(m.Controller).DBObject(c, db)
+	m.env.Controller(m.Controller)
+	newControllerID := sql.NullInt32{}
+	if m.NewController != "" {
+		newControllerID.Int32 = int32(m.env.Controller(m.NewController).dbo.ID)
+		newControllerID.Valid = true
+	}
+	m.dbo.NewControllerID = newControllerID
 	m.dbo.CloudRegion = m.env.Cloud(m.Cloud).DBObject(c, db).Region(m.CloudRegion)
 	m.dbo.CloudCredential = m.env.CloudCredential(m.Owner, m.Cloud, m.CloudCredential).DBObject(c, db)
 
