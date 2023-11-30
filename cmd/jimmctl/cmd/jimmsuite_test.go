@@ -30,14 +30,6 @@ import (
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 )
 
-type gcTester struct {
-	*gc.C
-}
-
-func (t *gcTester) Name() string {
-	return t.C.TestName()
-}
-
 type jimmSuite struct {
 	jimmtest.CandidSuite
 	jimmtest.JujuSuite
@@ -73,7 +65,7 @@ func (s *jimmSuite) SetUpTest(c *gc.C) {
 		CandidURL:        s.Candid.URL.String(),
 		CandidPublicKey:  s.CandidPublicKey,
 		ControllerAdmins: []string{"admin"},
-		DSN:              jimmtest.CreateEmptyDatabase(&gcTester{c}),
+		DSN:              jimmtest.CreateEmptyDatabase(&jimmtest.GocheckTester{c}),
 		OpenFGAParams: service.OpenFGAParams{
 			Scheme:    cofgaParams.Scheme,
 			Host:      cofgaParams.Host,
@@ -157,6 +149,9 @@ func (s *jimmSuite) TearDownTest(c *gc.C) {
 	}
 	if s.HTTP != nil {
 		s.HTTP.Close()
+	}
+	if err := s.JIMM.Database.Close(); err != nil {
+		c.Logf("failed to close database connections at tear down: %s", err)
 	}
 	s.CandidSuite.TearDownTest(c)
 	s.JujuConnSuite.TearDownTest(c)

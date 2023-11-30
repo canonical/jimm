@@ -37,14 +37,18 @@ import (
 // ControllerUUID is the UUID of the JIMM controller used in tests.
 const ControllerUUID = "c1991ce8-96c2-497d-8e2a-e0cc42ca3aca"
 
-// A cTester adapts a gc.C to the Tester interface.
-type cTester struct {
+// A GocheckTester adapts a gc.C to the Tester interface.
+type GocheckTester struct {
 	*gc.C
 }
 
 // Name implements Tester.Name.
-func (t cTester) Name() string {
+func (t GocheckTester) Name() string {
 	return t.C.TestName()
+}
+
+func (t GocheckTester) Cleanup(f func()) {
+	t.C.Logf("warning: gocheck does not support Cleanup functions; make sure you're using suite's tear-down method")
 }
 
 // A JIMMSuite is a suite that initialises a JIMM.
@@ -71,7 +75,7 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 	// Setup OpenFGA.
 	s.JIMM = &jimm.JIMM{
 		Database: db.Database{
-			DB: MemoryDB(cTester{c}, nil),
+			DB: MemoryDB(GocheckTester{c}, nil),
 		},
 		CredentialStore: &InMemoryCredentialStore{},
 		Pubsub:          &pubsub.Hub{MaxConcurrency: 10},

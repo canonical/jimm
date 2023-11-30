@@ -25,6 +25,7 @@ type Tester interface {
 	Fatalf(format string, args ...interface{})
 	Logf(format string, args ...interface{})
 	Name() string
+	Cleanup(f func())
 }
 
 // A gormLogger is a gorm.Logger that is used in tests. It logs everything
@@ -104,6 +105,16 @@ func MemoryDB(t Tester, nowFunc func() time.Time) *gorm.DB {
 	if err != nil {
 		t.Fatalf("error opening database: %s", err)
 	}
+
+	t.Cleanup(func() {
+		sqlDB, err := gdb.DB()
+		if err != nil {
+			t.Logf("failed to get the internal DB object: %s", err)
+		}
+		if err := sqlDB.Close(); err != nil {
+			t.Logf("failed to close database connection: %s", err)
+		}
+	})
 
 	return gdb
 }
