@@ -16,6 +16,7 @@ import (
 	"gorm.io/gorm/logger"
 )
 
+const unsafeCharsPattern = "[ .:;`'\"|<>~/\\?!@#$%^&*()[\\]{}=+-]"
 const defaultDSN = "postgresql://jimm:jimm@127.0.0.1:5432/jimm"
 
 // A Tester is the test interface required by this package.
@@ -83,8 +84,8 @@ func MemoryDB(t Tester, nowFunc func() time.Time) *gorm.DB {
 		NowFunc: nowFunc,
 	}
 
-	unsafeCharsPattern, _ := regexp.Compile("[ .:;`'\"|<>~/\\?!@#$%^&*()[\\]{}=+-]")
-	schemaName := "test_" + strings.ToLower(unsafeCharsPattern.ReplaceAllString(t.Name(), "_"))
+	re, _ := regexp.Compile("[ .:;`'\"|<>~/\\?!@#$%^&*()[\\]{}=+-]")
+	schemaName := "test_" + re.ReplaceAllString(t.Name(), "_")
 
 	dsn := defaultDSN
 	if envTestDSN, exists := os.LookupEnv("JIMM_TEST_PGXDSN"); exists {
