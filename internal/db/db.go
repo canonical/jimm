@@ -123,3 +123,15 @@ func Now() sql.NullTime {
 		Valid: true,
 	}
 }
+
+// Close closes open connections to the underlying database backend.
+func (d *Database) Close() error {
+	sqlDB, err := d.DB.DB()
+	if err != nil {
+		return errors.E(err, "failed to get the internal DB object")
+	}
+	if err := sqlDB.Close(); err != nil {
+		return errors.E(err, "failed to close template database connection")
+	}
+	return nil
+}
