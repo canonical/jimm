@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/pem"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -74,7 +73,7 @@ func (s *jimmSuite) SetUpTest(c *gc.C) {
 		CandidURL:        s.Candid.URL.String(),
 		CandidPublicKey:  s.CandidPublicKey,
 		ControllerAdmins: []string{"admin"},
-		DSN:              fmt.Sprintf("file:%s?mode=memory&cache=shared", c.TestName()),
+		DSN:              jimmtest.CreateEmptyDatabase(&gcTester{c}),
 		OpenFGAParams: service.OpenFGAParams{
 			Scheme:    cofgaParams.Scheme,
 			Host:      cofgaParams.Host,
