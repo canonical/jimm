@@ -700,10 +700,11 @@ func TestFillMigrationTarget(t *testing.T) {
 			env.PopulateDB(c, db)
 
 			res, controllerID, err := jimm.FillMigrationTarget(db, store, test.controllerName)
-			c.Assert(controllerID, qt.Equals, env.Controllers[0].DBObject(c, db).ID)
 			if test.expectedError != "" {
 				c.Assert(err, qt.ErrorMatches, test.expectedError)
+				c.Assert(controllerID, qt.Equals, uint(0))
 			} else {
+				c.Assert(controllerID, qt.Equals, env.Controllers[0].DBObject(c, db).ID)
 				c.Assert(err, qt.IsNil)
 				c.Assert(res, qt.DeepEquals, test.expectedInfo)
 			}
