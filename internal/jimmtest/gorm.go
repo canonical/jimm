@@ -98,9 +98,9 @@ func MemoryDB(t Tester, nowFunc func() time.Time) *gorm.DB {
 	}
 
 	createSchemaCommand := fmt.Sprintf(`
-		DROP SCHEMA IF EXISTS %[1]s;
-		CREATE SCHEMA %[1]s;
-		SET search_path TO %[1]s`, // Make it as the default schema.
+		DROP SCHEMA IF EXISTS "%[1]s";
+		CREATE SCHEMA "%[1]s";
+		SET search_path TO "%[1]s"`, // Make it as the default schema.
 		schemaName,
 	)
 	if err := gdb.Exec(createSchemaCommand).Error; err != nil {
@@ -130,12 +130,12 @@ func CreateEmptyDatabase(t Tester) string {
 		t.Fatalf("error opening database: %s", err)
 	}
 
-	dropDatabaseCommand := fmt.Sprintf("DROP DATABASE IF EXISTS %[1]s", dbName)
+	dropDatabaseCommand := fmt.Sprintf(`DROP DATABASE IF EXISTS "%[1]s"`, dbName)
 	if err := gdb.Exec(dropDatabaseCommand).Error; err != nil {
 		t.Fatalf("error dropping exisiting database (%s): %s", dbName, err)
 	}
 
-	createDatabaseCommand := fmt.Sprintf("CREATE DATABASE %[1]s", dbName)
+	createDatabaseCommand := fmt.Sprintf(`CREATE DATABASE "%[1]s"`, dbName)
 	if err := gdb.Exec(createDatabaseCommand).Error; err != nil {
 		t.Fatalf("error creating database (%s): %s", dbName, err)
 	}
