@@ -502,13 +502,18 @@ func fillMigrationTarget(db db.Database, credStore credentials.CredentialStore, 
 	if err != nil {
 		return jujuparams.MigrationTargetInfo{}, err
 	}
-	if dbController.AdminPassword == "" {
+	adminUser := dbController.AdminUser
+	adminPass := dbController.AdminPassword
+	if adminPass == "" {
 		u, p, err := credStore.GetControllerCredentials(ctx, controllerName)
 		if err != nil {
 			return jujuparams.MigrationTargetInfo{}, err
 		}
-		dbController.AdminUser = u
-		dbController.AdminPassword = p
+		adminUser = u
+		adminPass = p
+	}
+	if adminUser == "" || adminPass == "" {
+		return jujuparams.MigrationTargetInfo{}, errors.E("missing target controller credentials")
 	}
 	// Should we verify controller can access the cloud where the model is currently hosted?
 	apiControllerInfo := dbController.ToAPIControllerInfo()
@@ -517,8 +522,8 @@ func fillMigrationTarget(db db.Database, credStore credentials.CredentialStore, 
 		Addrs:         apiControllerInfo.APIAddresses,
 		CACert:        dbController.CACertificate,
 		// The target user must be the admin user as external users don't have username/password credentials.
-		AuthTag:  names.NewUserTag(dbController.AdminUser).String(),
-		Password: dbController.AdminPassword,
+		AuthTag:  names.NewUserTag(adminUser).String(),
+		Password: adminPass,
 	}
 	return targetInfo, nil
 }

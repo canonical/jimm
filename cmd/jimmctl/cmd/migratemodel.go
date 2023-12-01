@@ -1,4 +1,4 @@
-// Copyright 2021 Canonical Ltd.
+// Copyright 2023 Canonical Ltd.
 
 package cmd
 
@@ -19,16 +19,17 @@ import (
 )
 
 var migrateModelCommandDoc = `
-	The migrate command migrates a model(s) to a new controller.
-	A model-tag is of the form "model-<UUID>" while a controller-name is
+	The migrate command migrates a model(s) to a new controller. Specify
+	a model-tag to migrate and the destination controller name.
+	A model-tag is of the form "model-<UUID>" while a controller name is
 	simply the name of the controller.
 
 	Note that multiple models can be targeted for migration by supplying
 	multiple model tags.
 
 	Example:
-		jimmctl migrate <model-tag> --controller <controller-name>
-		jimmctl migrate <model-tag> <model-tag> <model-tag> --controller <controller-name>
+		jimmctl migrate <controller-name> <model-tag> 
+		jimmctl migrate <controller-name> <model-tag> <model-tag> <model-tag>
 `
 
 // NewMigrateModelCommand returns a command to migrate models.
@@ -54,7 +55,7 @@ type migrateModelCommand struct {
 func (c *migrateModelCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
 		Name:    "migrate",
-		Purpose: "Begin model migration",
+		Purpose: "Migrate models to the target controller",
 		Doc:     migrateModelCommandDoc,
 	})
 }
@@ -66,12 +67,18 @@ func (c *migrateModelCommand) SetFlags(f *gnuflag.FlagSet) {
 		"yaml": cmd.FormatYaml,
 		"json": cmd.FormatJson,
 	})
-	f.StringVar(&c.targetController, "controller", "", "destination controller name")
 }
 
 // Init implements the cmd.Command interface.
 func (c *migrateModelCommand) Init(args []string) error {
-	for _, arg := range args {
+	if len(args) < 2 {
+		return errors.E("Missing controller and model tag arguments")
+	}
+	for i, arg := range args {
+		if i == 0 {
+			c.targetController = arg
+			continue
+		}
 		_, err := names.ParseModelTag(arg)
 		if err != nil {
 			return errors.E(err, fmt.Sprintf("%s is not a valid model tag", arg))
@@ -101,12 +108,12 @@ func (c *migrateModelCommand) Run(ctxt *cmd.Context) error {
 	req := apiparams.MigrateModelRequest{Specs: specs}
 	events, err := client.MigrateModel(&req)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	err = c.out.Write(ctxt, events)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 	return nil
 }

@@ -47,7 +47,7 @@ func (s *migrateModelSuite) TestMigrateModelCommandSuperuser(c *gc.C) {
 
 	// alice is superuser
 	bClient := s.userBakeryClient("alice")
-	context, err := cmdtesting.RunCommand(c, cmd.NewMigrateModelCommandForTesting(s.ClientStore(), bClient), mt.String(), mt2.String(), "--controller", "controller-1")
+	context, err := cmdtesting.RunCommand(c, cmd.NewMigrateModelCommandForTesting(s.ClientStore(), bClient), "controller-1", mt.String(), mt2.String())
 	c.Assert(err, gc.IsNil)
 	c.Assert(cmdtesting.Stdout(context), gc.Matches, migrationResultRegex)
 }
@@ -61,6 +61,12 @@ func (s *migrateModelSuite) TestMigrateModelCommandFailsWithInvalidModelTag(c *g
 
 	// alice is superuser
 	bClient := s.userBakeryClient("alice")
-	_, err := cmdtesting.RunCommand(c, cmd.NewMigrateModelCommandForTesting(s.ClientStore(), bClient), "model-001", "model-002", "--controller", "myController")
+	_, err := cmdtesting.RunCommand(c, cmd.NewMigrateModelCommandForTesting(s.ClientStore(), bClient), "controller-1", "model-001", "model-002")
 	c.Assert(err, gc.ErrorMatches, ".* is not a valid model tag")
+}
+
+func (s *migrateModelSuite) TestMigrateModelCommandFailsWithMissingArgs(c *gc.C) {
+	bClient := s.userBakeryClient("alice")
+	_, err := cmdtesting.RunCommand(c, cmd.NewMigrateModelCommandForTesting(s.ClientStore(), bClient), "myController")
+	c.Assert(err, gc.ErrorMatches, "Missing controller and model tag arguments")
 }
