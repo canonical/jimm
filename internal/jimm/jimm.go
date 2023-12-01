@@ -29,6 +29,12 @@ import (
 	"github.com/canonical/jimm/internal/pubsub"
 )
 
+var (
+	initiateMigration = func(ctx context.Context, j *JIMM, user *openfga.User, spec jujuparams.MigrationSpec) (jujuparams.InitiateMigrationResult, error) {
+		return j.InitiateMigration(ctx, user, spec)
+	}
+)
+
 // A JIMM provides the business logic for managing resources in the JAAS
 // system. A single JIMM instance is shared by all concurrent API
 // connections therefore the JIMM object itself does not contain any per-
@@ -485,4 +491,66 @@ func (j *JIMM) FullModelStatus(ctx context.Context, user *openfga.User, modelTag
 	}
 
 	return status, nil
+}
+
+func fillMigrationTarget(db db.Database, credStore credentials.CredentialStore, controllerName string) (jujuparams.MigrationTargetInfo, error) {
+	dbController := dbmodel.Controller{
+		Name: controllerName,
+	}
+	ctx := context.Background()
+	err := db.GetController(ctx, &dbController)
+	if err != nil {
+		return jujuparams.MigrationTargetInfo{}, err
+	}
+	adminUser := dbController.AdminUser
+	adminPass := dbController.AdminPassword
+	if adminPass == "" {
+		u, p, err := credStore.GetControllerCredentials(ctx, controllerName)
+		if err != nil {
+			return jujuparams.MigrationTargetInfo{}, err
+		}
+		adminUser = u
+		adminPass = p
+	}
+	if adminUser == "" || adminPass == "" {
+		return jujuparams.MigrationTargetInfo{}, errors.E("missing target controller credentials")
+	}
+	// Should we verify controller can access the cloud where the model is currently hosted?
+	apiControllerInfo := dbController.ToAPIControllerInfo()
+	targetInfo := jujuparams.MigrationTargetInfo{
+		ControllerTag: dbController.ResourceTag().String(),
+		Addrs:         apiControllerInfo.APIAddresses,
+		CACert:        dbController.CACertificate,
+		// The target user must be the admin user as external users don't have username/password credentials.
+		AuthTag:  names.NewUserTag(adminUser).String(),
+		Password: adminPass,
+	}
+	return targetInfo, nil
+}
+
+// InitiateInternalMigration initiates a model migration between two controllers within JIMM.
+func (j *JIMM) InitiateInternalMigration(ctx context.Context, user *openfga.User, modelTag names.ModelTag, targetController string) (jujuparams.InitiateMigrationResult, error) {
+	const op = errors.Op("jimm.InitiateInternalMigration")
+
+	migrationTarget, err := fillMigrationTarget(j.Database, j.CredentialStore, targetController)
+	if err != nil {
+		return jujuparams.InitiateMigrationResult{}, errors.E(op, err)
+	}
+	// Check that the model exists
+	model := dbmodel.Model{
+		UUID: sql.NullString{
+			String: modelTag.Id(),
+			Valid:  true,
+		},
+	}
+	err = j.Database.GetModel(ctx, &model)
+	if err != nil {
+		return jujuparams.InitiateMigrationResult{}, errors.E(op, err)
+	}
+	spec := jujuparams.MigrationSpec{ModelTag: modelTag.String(), TargetInfo: migrationTarget}
+	result, err := initiateMigration(ctx, j, user, spec)
+	if err != nil {
+		return jujuparams.InitiateMigrationResult{}, errors.E(op, err)
+	}
+	return result, nil
 }

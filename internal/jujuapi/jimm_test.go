@@ -767,3 +767,57 @@ func (s *jimmSuite) TestCrossModelQuery(c *gc.C) {
 	c.Assert(res.Results, gc.HasLen, 2)
 	c.Assert(res.Errors, gc.HasLen, 0)
 }
+
+// TestJimmModelMigration tests that a migration request makes it through to the Juju controller.
+// Because our test suite only spins up 1 controller the further we can go is reaching Juju pre-checks which
+// detect that a model with the same UUID already exists on the target controller.
+func (s *jimmSuite) TestJimmModelMigrationSuperuser(c *gc.C) {
+	mt := s.AddModel(
+		c,
+		names.NewUserTag("charlie@external"),
+		"model-20",
+		names.NewCloudTag(jimmtest.TestCloudName),
+		jimmtest.TestCloudRegionName,
+		s.Model2.CloudCredential.ResourceTag(),
+	)
+
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+	client := api.NewClient(conn)
+
+	res, err := client.MigrateModel(&apiparams.MigrateModelRequest{
+		Specs: []apiparams.MigrateModelInfo{
+			{ModelTag: mt.String(), TargetController: "controller-1"},
+		},
+	})
+	c.Assert(err, gc.IsNil)
+	c.Assert(res.Results, gc.HasLen, 1)
+	for _, item := range res.Results {
+		c.Assert(item.Error.Message, gc.Matches, "target prechecks failed: model with same UUID already exists .*")
+	}
+}
+
+func (s *jimmSuite) TestJimmModelMigrationNonSuperuser(c *gc.C) {
+	mt := s.AddModel(
+		c,
+		names.NewUserTag("charlie@external"),
+		"model-20",
+		names.NewCloudTag(jimmtest.TestCloudName),
+		jimmtest.TestCloudRegionName,
+		s.Model2.CloudCredential.ResourceTag(),
+	)
+
+	conn := s.open(c, nil, "bob")
+	defer conn.Close()
+	client := api.NewClient(conn)
+
+	res, err := client.MigrateModel(&apiparams.MigrateModelRequest{
+		Specs: []apiparams.MigrateModelInfo{
+			{ModelTag: mt.String(), TargetController: "controller-1"},
+		},
+	})
+	c.Assert(err, gc.IsNil)
+	c.Assert(res.Results, gc.HasLen, 1)
+	item := res.Results[0]
+	c.Assert(item.Error.Message, gc.Matches, "unauthorized access")
+}

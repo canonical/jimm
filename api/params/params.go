@@ -378,3 +378,18 @@ type PurgeLogsRequest struct {
 type PurgeLogsResponse struct {
 	DeletedCount int64 `json:"deleted-count" yaml:"deleted-count"`
 }
+
+// MigrateModelInfo represents a single migration where a source model
+// target controller must be specified with both the source model and
+// target controller residing within JIMM.
+type MigrateModelInfo struct {
+	// ModelTag is a tag of the form "model-<UIID>"
+	ModelTag string `json:"model-tag"`
+	// TargetController is the controller name of the form "<name>"
+	TargetController string `json:"target-controller"`
+}
+
+// MigrateModelRequest allows for multiple migration requests to be made.
+type MigrateModelRequest struct {
+	Specs []MigrateModelInfo `json:"specs"`
+}

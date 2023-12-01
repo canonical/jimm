@@ -15,6 +15,7 @@ import (
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 
+	"github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/jimm"
@@ -637,6 +638,165 @@ func TestFullModelStatus(t *testing.T) {
 			} else {
 				c.Assert(err, qt.Equals, nil)
 				c.Assert(status, qt.DeepEquals, &test.expectedStatus)
+			}
+		})
+	}
+}
+
+const fillMigrationTargetTestEnv = `clouds:
+- name: test-cloud
+  type: test-provider
+  regions:
+  - name: test-cloud-region
+controllers:
+- name: controller-1
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test-cloud
+  region: test-cloud-region
+`
+
+func TestFillMigrationTarget(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := context.Background()
+	now := time.Now().UTC().Round(time.Millisecond)
+
+	tests := []struct {
+		about          string
+		userTag        string
+		controllerName string
+		expectedInfo   jujuparams.MigrationTargetInfo
+		expectedError  string
+	}{{
+		about:          "controller exists",
+		userTag:        "alice@external",
+		controllerName: "controller-1",
+		expectedInfo: jujuparams.MigrationTargetInfo{
+			ControllerTag: "controller-00000001-0000-0000-0000-000000000001",
+			Addrs:         nil,
+			AuthTag:       "user-admin",
+			Password:      "test-secret",
+		},
+	}, {
+		about:          "controller doesn't exist",
+		userTag:        "alice@external",
+		controllerName: "controller-2",
+		expectedError:  "controller not found",
+	},
+	}
+	for _, test := range tests {
+		c.Run(test.about, func(c *qt.C) {
+			db := db.Database{
+				DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
+			}
+			err := db.Migrate(ctx, false)
+			c.Assert(err, qt.IsNil)
+
+			store := &jimmtest.InMemoryCredentialStore{}
+			err = store.PutControllerCredentials(context.Background(), test.controllerName, "admin", "test-secret")
+			c.Assert(err, qt.IsNil)
+
+			env := jimmtest.ParseEnvironment(c, fillMigrationTargetTestEnv)
+			env.PopulateDB(c, db)
+
+			res, err := jimm.FillMigrationTarget(db, store, test.controllerName)
+			if test.expectedError != "" {
+				c.Assert(err, qt.ErrorMatches, test.expectedError)
+			} else {
+				c.Assert(err, qt.IsNil)
+				c.Assert(res, qt.DeepEquals, test.expectedInfo)
+			}
+
+		})
+	}
+}
+
+const InitiateMigrationTestEnv = `clouds:
+- name: test-cloud
+  type: test-provider
+  regions:
+  - name: test-cloud-region
+cloud-credentials:
+  - owner: alice@external
+    name: cred-1
+    cloud: test-cloud
+controllers:
+- name: myController
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test-cloud
+  region: test-cloud-region
+models:
+  - name: model-1
+    type: iaas
+    uuid: 00000002-0000-0000-0000-000000000001
+    controller: myController
+    default-series: warty
+    cloud: test-cloud
+    region: test-cloud-region
+    cloud-credential: cred-1
+    owner: alice@external
+    life: alive
+users:
+  - username: alice@external
+    controller-access: superuser
+`
+
+func TestInitiateInternalMigration(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := context.Background()
+	now := time.Now().UTC().Round(time.Millisecond)
+
+	tests := []struct {
+		about         string
+		user          string
+		migrateInfo   params.MigrateModelInfo
+		expectedError string
+	}{{
+		about:       "success",
+		user:        "alice@external",
+		migrateInfo: params.MigrateModelInfo{ModelTag: "model-00000002-0000-0000-0000-000000000001", TargetController: "myController"},
+	}, {
+		about:         "model doesn't exist",
+		user:          "alice@external",
+		migrateInfo:   params.MigrateModelInfo{ModelTag: "model-00000002-0000-0000-0000-000000000002", TargetController: "myController"},
+		expectedError: "model not found",
+	},
+	}
+	for _, test := range tests {
+		c.Run(test.about, func(c *qt.C) {
+
+			c.Patch(jimm.InitiateMigration, func(ctx context.Context, j *jimm.JIMM, user *openfga.User, spec jujuparams.MigrationSpec) (jujuparams.InitiateMigrationResult, error) {
+				return jujuparams.InitiateMigrationResult{}, nil
+			})
+			store := &jimmtest.InMemoryCredentialStore{}
+			err := store.PutControllerCredentials(context.Background(), test.migrateInfo.TargetController, "admin", "test-secret")
+			c.Assert(err, qt.IsNil)
+
+			j := &jimm.JIMM{
+				UUID: uuid.NewString(),
+				Database: db.Database{
+					DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
+				},
+				CredentialStore: store,
+			}
+			err = j.Database.Migrate(ctx, false)
+			c.Assert(err, qt.IsNil)
+
+			env := jimmtest.ParseEnvironment(c, InitiateMigrationTestEnv)
+			env.PopulateDB(c, j.Database)
+			err = j.Database.Migrate(ctx, false)
+			c.Assert(err, qt.IsNil)
+			dbUser := env.User(test.user).DBObject(c, j.Database)
+			user := openfga.NewUser(&dbUser, nil)
+			mt, err := names.ParseModelTag(test.migrateInfo.ModelTag)
+			c.Assert(err, qt.IsNil)
+			res, err := j.InitiateInternalMigration(ctx, user, mt, test.migrateInfo.TargetController)
+			if test.expectedError != "" {
+				c.Assert(err, qt.ErrorMatches, test.expectedError)
+			} else {
+				c.Assert(err, qt.IsNil)
+				c.Assert(res, qt.DeepEquals, jujuparams.InitiateMigrationResult{})
 			}
 		})
 	}
