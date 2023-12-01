@@ -47,3 +47,7 @@ func ToJAASTag(db db.Database, tag *ofganames.Tag) (string, error) {
 	}
 	return c.toJAASTag(context.Background(), tag)
 }
+
+func NewControllerRoot(j JIMM, p Params) *controllerRoot {
+	return newControllerRoot(j, p)
+}

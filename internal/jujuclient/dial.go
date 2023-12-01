@@ -14,6 +14,7 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"fmt"
+	"net/http"
 	"net/url"
 	"path"
 	"sort"
@@ -21,12 +22,15 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	"github.com/gorilla/websocket"
+	"github.com/juju/juju/api/base"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 	"github.com/juju/zaputil"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
+	"gopkg.in/httprequest.v1"
 
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
@@ -137,24 +141,30 @@ func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag nam
 	}
 	ctl.Addresses = dbmodel.HostPorts(res.Servers)
 	facades := make(map[string]bool)
+	bestFacadeVersions := make(map[string]int)
 	for _, fv := range res.Facades {
+		sort.Sort(sort.Reverse(sort.IntSlice(fv.Versions)))
+		bestFacadeVersions[fv.Name] = fv.Versions[0]
 		for _, v := range fv.Versions {
 			facades[fmt.Sprintf("%s\x1f%d", fv.Name, v)] = true
 		}
 	}
+	zapctx.Error(ctx, "facades", zap.Any("version", bestFacadeVersions))
 
 	monitorC := make(chan struct{})
 	broken := new(uint32)
 	go monitor(client, monitorC, broken)
 	return &Connection{
-		client:         client,
-		userTag:        args.AuthTag,
-		facadeVersions: facades,
-		monitorC:       monitorC,
-		broken:         broken,
-		dialer:         d,
-		ctl:            ctl,
-		mt:             modelTag,
+		ctx:                ctx,
+		client:             client,
+		userTag:            args.AuthTag,
+		facadeVersions:     facades,
+		bestFacadeVersions: bestFacadeVersions,
+		monitorC:           monitorC,
+		broken:             broken,
+		dialer:             d,
+		ctl:                ctl,
+		mt:                 modelTag,
 	}, nil
 }
 
@@ -326,9 +336,11 @@ func monitor(client *rpc.Client, doneC <-chan struct{}, broken *uint32) {
 // fall-back to earlier versions with slightly degraded functionality if
 // possible.
 type Connection struct {
-	client         *rpc.Client
-	userTag        string
-	facadeVersions map[string]bool
+	ctx                context.Context
+	client             *rpc.Client
+	userTag            string
+	facadeVersions     map[string]bool
+	bestFacadeVersions map[string]int
 
 	monitorC chan struct{}
 	broken   *uint32
@@ -423,4 +435,58 @@ func (c *Connection) CallHighestFacadeVersion(ctx context.Context, facade string
 		}
 	}
 	return errors.E(fmt.Sprintf("facade %v version %v not supported", facade, versions))
+}
+
+// BestFacadeVersion returns the newest version of 'objType' that this
+// client can use with the current API server.
+func (c *Connection) BestFacadeVersion(facade string) int {
+	return c.bestFacadeVersions[facade]
+}
+
+// ModelTag returns the tag of the model the client is connected
+// to if there is one. It returns false for a controller-only connection.
+func (c *Connection) ModelTag() (names.ModelTag, bool) {
+	return c.mt, c.mt.Id() != ""
+}
+
+// HTTPClient returns a httprequest.Client that can be used
+// to make HTTP requests to the API. URLs passed to the client
+// will be made relative to the API host and the current model.
+func (c *Connection) HTTPClient() (*httprequest.Client, error) {
+	return nil, errors.E(errors.CodeNotImplemented)
+}
+
+// BakeryClient returns the bakery client for this connection.
+func (c *Connection) BakeryClient() base.MacaroonDischarger {
+	return httpbakery.NewClient()
+}
+
+// APICall makes a call to the API server with the given object type,
+// id, request and parameters. The response is filled in with the
+// call's result if the call is successful.
+func (c *Connection) APICall(objType string, version int, id, request string, params, response interface{}) error {
+	return c.Call(c.ctx, objType, version, id, request, params, response)
+}
+
+// Context returns the standard context for this connection.
+func (c *Connection) Context() context.Context {
+	return c.ctx
+}
+
+// ConnectStream connects to the given HTTP websocket
+// endpoint path (interpreted relative to the receiver's
+// model) and returns the resulting connection.
+// The given parameters are used as URL query values
+// when making the initial HTTP request.
+func (c *Connection) ConnectStream(path string, attrs url.Values) (base.Stream, error) {
+	return nil, errors.E(errors.CodeNotImplemented)
+}
+
+// ConnectControllerStream connects to the given HTTP websocket
+// endpoint path and returns the resulting connection. The given
+// values are used as URL query values when making the initial
+// HTTP request. Headers passed in will be added to the HTTP
+// request.
+func (c *Connection) ConnectControllerStream(path string, attrs url.Values, headers http.Header) (base.Stream, error) {
+	return nil, errors.E(errors.CodeNotImplemented)
 }

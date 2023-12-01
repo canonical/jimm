@@ -16,6 +16,7 @@ var (
 	DetermineAccessLevelAfterGrant = determineAccessLevelAfterGrant
 	PollDuration                   = pollDuration
 	CalculateNextPollDuration      = calculateNextPollDuration
+	NewControllerClient            = &newControllerClient
 )
 
 func NewWatcherWithControllerUnavailableChan(db db.Database, dialer Dialer, pubsub Publisher, testChannel chan error) *Watcher {

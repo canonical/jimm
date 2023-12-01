@@ -5,20 +5,40 @@ package jimm
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 
+	"github.com/juju/juju/api/base"
+	"github.com/juju/juju/api/controller/controller"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 	"github.com/juju/version"
 	"github.com/juju/zaputil"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
+	"gopkg.in/macaroon.v2"
 
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
+)
+
+// ControllerClient defines an interface of the juju controller api client
+// used by JIMM to interact with the Controller facade of Juju controllers.
+type ControllerClient interface {
+	// InitiateMigration attempts to begin the migration of one or
+	// more models to other controllers.
+	InitiateMigration(controller.MigrationSpec) (string, error)
+	// Close closes the connection to the API server.
+	Close() error
+}
+
+var (
+	newControllerClient = func(api base.APICallCloser) ControllerClient {
+		return controller.NewClient(api)
+	}
 )
 
 // AddController adds the specified controller to JIMM. Only
@@ -579,4 +599,73 @@ func (j *JIMM) UpdateMigratedModel(ctx context.Context, user *openfga.User, mode
 	}
 
 	return nil
+}
+
+// InitiateMigration triggers the migration of the specified model to a target controller.
+func (j *JIMM) InitiateMigration(ctx context.Context, user *openfga.User, spec jujuparams.MigrationSpec) (jujuparams.InitiateMigrationResult, error) {
+	const op = errors.Op("jimm.InitiateMigration")
+
+	result := jujuparams.InitiateMigrationResult{
+		ModelTag: spec.ModelTag,
+	}
+	mt, err := names.ParseModelTag(spec.ModelTag)
+	if err != nil {
+		return result, errors.E(op, err, errors.CodeBadRequest)
+	}
+	isAdministrator, err := openfga.IsAdministrator(ctx, user, mt)
+	if err != nil {
+		return result, errors.E(op, err, errors.CodeOpenFGARequestFailed)
+	}
+	if !isAdministrator {
+		return result, errors.E(op, errors.CodeUnauthorized)
+	}
+
+	targetControllerTag, err := names.ParseControllerTag(spec.TargetInfo.ControllerTag)
+	if err != nil {
+		return result, errors.E(op, err, errors.CodeBadRequest)
+	}
+
+	targetUserTag, err := names.ParseUserTag(spec.TargetInfo.AuthTag)
+	if err != nil {
+		return result, errors.E(op, err, errors.CodeBadRequest)
+	}
+
+	var targetMacaroons []macaroon.Slice
+	if spec.TargetInfo.Macaroons != "" {
+		err = json.Unmarshal([]byte(spec.TargetInfo.Macaroons), &targetMacaroons)
+		if err != nil {
+			return result, errors.E(op, err, "failed to unmarshal macaroons", errors.CodeBadRequest)
+		}
+	}
+
+	model := dbmodel.Model{}
+	model.SetTag(mt)
+	err = j.Database.GetModel(ctx, &model)
+	if err != nil {
+		return result, errors.E(op, "failed to retrieve the model from the database", err)
+	}
+
+	api, err := j.dial(ctx, &model.Controller, names.ModelTag{})
+	if err != nil {
+		return result, errors.E(op, "failed to dial the controller", err)
+	}
+
+	client := newControllerClient(api)
+	defer client.Close()
+
+	result.MigrationId, err = client.InitiateMigration(controller.MigrationSpec{
+		ModelUUID:             mt.Id(),
+		TargetControllerUUID:  targetControllerTag.Id(),
+		TargetControllerAlias: spec.TargetInfo.ControllerAlias,
+		TargetAddrs:           spec.TargetInfo.Addrs,
+		TargetCACert:          spec.TargetInfo.CACert,
+		TargetUser:            targetUserTag.Id(),
+		TargetPassword:        spec.TargetInfo.Password,
+		TargetMacaroons:       targetMacaroons,
+	})
+	if err != nil {
+		return result, errors.E(op, "failed to initiate migration", err)
+	}
+
+	return result, nil
 }

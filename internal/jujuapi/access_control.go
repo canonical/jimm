@@ -19,9 +19,9 @@ import (
 	"gorm.io/gorm"
 
 	apiparams "github.com/canonical/jimm/api/params"
+	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
-	"github.com/canonical/jimm/internal/jimm"
 	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 	jimmnames "github.com/canonical/jimm/pkg/names"
@@ -71,7 +71,7 @@ func (r *controllerRoot) AddGroup(ctx context.Context, req apiparams.AddGroupReq
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
-	if err := r.jimm.Database.AddGroup(ctx, req.Name); err != nil {
+	if err := r.jimm.DB().AddGroup(ctx, req.Name); err != nil {
 		zapctx.Error(ctx, "failed to add group", zaputil.Error(err))
 		return errors.E(op, err)
 	}
@@ -93,13 +93,13 @@ func (r *controllerRoot) RenameGroup(ctx context.Context, req apiparams.RenameGr
 	group := &dbmodel.GroupEntry{
 		Name: req.Name,
 	}
-	err := r.jimm.Database.GetGroup(ctx, group)
+	err := r.jimm.DB().GetGroup(ctx, group)
 	if err != nil {
 		return errors.E(op, err)
 	}
 	group.Name = req.NewName
 
-	if err := r.jimm.Database.UpdateGroup(ctx, group); err != nil {
+	if err := r.jimm.DB().UpdateGroup(ctx, group); err != nil {
 		zapctx.Error(ctx, "failed to rename group", zaputil.Error(err))
 		return errors.E(op, err)
 	}
@@ -117,16 +117,16 @@ func (r *controllerRoot) RemoveGroup(ctx context.Context, req apiparams.RemoveGr
 	group := &dbmodel.GroupEntry{
 		Name: req.Name,
 	}
-	err := r.jimm.Database.GetGroup(ctx, group)
+	err := r.jimm.DB().GetGroup(ctx, group)
 	if err != nil {
 		return errors.E(op, err)
 	}
-	err = r.jimm.OpenFGAClient.RemoveGroup(ctx, group.ResourceTag())
+	err = r.jimm.AuthorizationClient().RemoveGroup(ctx, group.ResourceTag())
 	if err != nil {
 		return errors.E(op, err)
 	}
 
-	if err := r.jimm.Database.RemoveGroup(ctx, group); err != nil {
+	if err := r.jimm.DB().RemoveGroup(ctx, group); err != nil {
 		zapctx.Error(ctx, "failed to remove group", zaputil.Error(err))
 		return errors.E(op, err)
 	}
@@ -142,7 +142,7 @@ func (r *controllerRoot) ListGroups(ctx context.Context) (apiparams.ListGroupRes
 	}
 
 	var groups []apiparams.Group
-	err := r.jimm.Database.ForEachGroup(ctx, func(ctl *dbmodel.GroupEntry) error {
+	err := r.jimm.DB().ForEachGroup(ctx, func(ctl *dbmodel.GroupEntry) error {
 		groups = append(groups, ctl.ToAPIGroupEntry())
 		return nil
 	})
@@ -159,7 +159,7 @@ func (r *controllerRoot) ListGroups(ctx context.Context) (apiparams.ListGroupRes
 // If the JIMM tag is aleady of juju string tag form, the transformation is left alone.
 //
 // In both cases though, the resource the tag pertains to is validated to exist within the database.
-func resolveTag(j *jimm.JIMM, tag string) (*ofganames.Tag, error) {
+func resolveTag(jimmUUID string, db *db.Database, tag string) (*ofganames.Tag, error) {
 	ctx := context.Background()
 	matches := jujuURIMatcher.FindStringSubmatch(tag)
 	resourceUUID := ""
@@ -203,7 +203,7 @@ func resolveTag(j *jimm.JIMM, tag string) (*ofganames.Tag, error) {
 		entry := &dbmodel.GroupEntry{
 			Name: trailer,
 		}
-		err := j.Database.GetGroup(ctx, entry)
+		err := db.GetGroup(ctx, entry)
 		if err != nil {
 			return nil, errors.E("group not found")
 		}
@@ -220,7 +220,7 @@ func resolveTag(j *jimm.JIMM, tag string) (*ofganames.Tag, error) {
 			controller.UUID = resourceUUID
 		} else if controllerName != "" {
 			if controllerName == jimmControllerName {
-				return ofganames.ConvertTagWithRelation(names.NewControllerTag(j.UUID), relation), nil
+				return ofganames.ConvertTagWithRelation(names.NewControllerTag(jimmUUID), relation), nil
 			}
 			controller.Name = controllerName
 		}
@@ -229,7 +229,7 @@ func resolveTag(j *jimm.JIMM, tag string) (*ofganames.Tag, error) {
 		// controller-jimm case - jimm controller does not exist
 		// in the database, but has a clearly defined UUID?
 
-		err := j.Database.GetController(ctx, &controller)
+		err := db.GetController(ctx, &controller)
 		if err != nil {
 			return nil, errors.E("controller not found")
 		}
@@ -246,7 +246,7 @@ func resolveTag(j *jimm.JIMM, tag string) (*ofganames.Tag, error) {
 			model.UUID = sql.NullString{String: resourceUUID, Valid: true}
 		} else if controllerName != "" && userName != "" && modelName != "" {
 			controller := dbmodel.Controller{Name: controllerName}
-			err := j.Database.GetController(ctx, &controller)
+			err := db.GetController(ctx, &controller)
 			if err != nil {
 				return nil, errors.E("controller not found")
 			}
@@ -255,7 +255,7 @@ func resolveTag(j *jimm.JIMM, tag string) (*ofganames.Tag, error) {
 			model.Name = modelName
 		}
 
-		err := j.Database.GetModel(ctx, &model)
+		err := db.GetModel(ctx, &model)
 		if err != nil {
 			return nil, errors.E("model not found")
 		}
@@ -280,7 +280,7 @@ func resolveTag(j *jimm.JIMM, tag string) (*ofganames.Tag, error) {
 			offer.URL = offerURL.String()
 		}
 
-		err := j.Database.GetApplicationOffer(ctx, &offer)
+		err := db.GetApplicationOffer(ctx, &offer)
 		if err != nil {
 			return nil, errors.E("application offer not found")
 		}
@@ -294,14 +294,14 @@ func resolveTag(j *jimm.JIMM, tag string) (*ofganames.Tag, error) {
 // ensuring the resource exists for said tag.
 //
 // This key may be in the form of either a JIMM tag string or Juju tag string.
-func parseTag(ctx context.Context, j *jimm.JIMM, key string) (*ofganames.Tag, error) {
+func parseTag(ctx context.Context, jimmUUID string, db *db.Database, key string) (*ofganames.Tag, error) {
 	op := errors.Op("jujuapi.parseTag")
 	tupleKeySplit := strings.SplitN(key, "-", 2)
 	if len(tupleKeySplit) < 2 {
 		return nil, errors.E(op, errors.CodeFailedToParseTupleKey, "tag does not have tuple key delimiter")
 	}
 	tagString := key
-	tag, err := resolveTag(j, tagString)
+	tag, err := resolveTag(jimmUUID, db, tagString)
 	if err != nil {
 		zapctx.Debug(ctx, "failed to resolve tuple object", zap.Error(err))
 		return nil, errors.E(op, errors.CodeFailedToResolveTupleResource, err)
@@ -323,7 +323,7 @@ func (r *controllerRoot) AddRelation(ctx context.Context, req apiparams.AddRelat
 	if err != nil {
 		return errors.E(err)
 	}
-	err = r.jimm.OpenFGAClient.AddRelation(ctx, keys...)
+	err = r.jimm.AuthorizationClient().AddRelation(ctx, keys...)
 	if err != nil {
 		zapctx.Error(ctx, "failed to add tuple(s)", zap.NamedError("add-relation-error", err))
 		return errors.E(op, errors.CodeOpenFGARequestFailed, err)
@@ -343,7 +343,7 @@ func (r *controllerRoot) RemoveRelation(ctx context.Context, req apiparams.Remov
 	if err != nil {
 		return errors.E(op, err)
 	}
-	err = r.jimm.OpenFGAClient.RemoveRelation(ctx, keys...)
+	err = r.jimm.AuthorizationClient().RemoveRelation(ctx, keys...)
 	if err != nil {
 		zapctx.Error(ctx, "failed to delete tuple(s)", zap.NamedError("remove-relation-error", err))
 		return errors.E(op, err)
@@ -367,7 +367,7 @@ func (r *controllerRoot) CheckRelation(ctx context.Context, req apiparams.CheckR
 		return checkResp, errors.E(op, errors.CodeFailedToParseTupleKey, err)
 	}
 
-	allowed, err := r.jimm.OpenFGAClient.CheckRelation(ctx, *parsedTuple, false)
+	allowed, err := r.jimm.AuthorizationClient().CheckRelation(ctx, *parsedTuple, false)
 	if err != nil {
 		zapctx.Error(ctx, "failed to check relation", zap.NamedError("check-relation-error", err))
 		return checkResp, errors.E(op, errors.CodeOpenFGARequestFailed, err)
@@ -419,14 +419,14 @@ func (r *controllerRoot) parseTuple(ctx context.Context, tuple apiparams.Relatio
 		return nil, errors.E(op, errors.CodeBadRequest, "target object not specified")
 	}
 	if tuple.TargetObject != "" {
-		targetTag, err := parseTag(ctx, r.jimm, tuple.TargetObject)
+		targetTag, err := parseTag(ctx, r.jimm.ResourceTag().Id(), r.jimm.DB(), tuple.TargetObject)
 		if err != nil {
 			return nil, parseTagError("failed to parse tuple target object key", tuple.TargetObject, err)
 		}
 		t.Target = targetTag
 	}
 	if tuple.Object != "" {
-		objectTag, err := parseTag(ctx, r.jimm, tuple.Object)
+		objectTag, err := parseTag(ctx, r.jimm.ResourceTag().Id(), r.jimm.DB(), tuple.Object)
 		if err != nil {
 			return nil, parseTagError("failed to parse tuple object key", tuple.Object, err)
 		}
@@ -447,7 +447,7 @@ func (r *controllerRoot) toJAASTag(ctx context.Context, tag *ofganames.Tag) (str
 		controller := dbmodel.Controller{
 			UUID: tag.ID,
 		}
-		err := r.jimm.Database.GetController(ctx, &controller)
+		err := r.jimm.DB().GetController(ctx, &controller)
 		if err != nil {
 			return "", errors.E(err, fmt.Sprintf("failed to fetch controller information: %s", controller.UUID))
 		}
@@ -463,7 +463,7 @@ func (r *controllerRoot) toJAASTag(ctx context.Context, tag *ofganames.Tag) (str
 				Valid:  true,
 			},
 		}
-		err := r.jimm.Database.GetModel(ctx, &model)
+		err := r.jimm.DB().GetModel(ctx, &model)
 		if err != nil {
 			return "", errors.E(err, "failed to fetch model information")
 		}
@@ -476,7 +476,7 @@ func (r *controllerRoot) toJAASTag(ctx context.Context, tag *ofganames.Tag) (str
 		ao := dbmodel.ApplicationOffer{
 			UUID: tag.ID,
 		}
-		err := r.jimm.Database.GetApplicationOffer(ctx, &ao)
+		err := r.jimm.DB().GetApplicationOffer(ctx, &ao)
 		if err != nil {
 			return "", errors.E(err, "failed to fetch application offer information")
 		}
@@ -495,7 +495,7 @@ func (r *controllerRoot) toJAASTag(ctx context.Context, tag *ofganames.Tag) (str
 				ID: uint(id),
 			},
 		}
-		err = r.jimm.Database.GetGroup(ctx, &group)
+		err = r.jimm.DB().GetGroup(ctx, &group)
 		if err != nil {
 			return "", errors.E(err, "failed to fetch group information")
 		}
@@ -508,7 +508,7 @@ func (r *controllerRoot) toJAASTag(ctx context.Context, tag *ofganames.Tag) (str
 		cloud := dbmodel.Cloud{
 			Name: tag.ID,
 		}
-		err := r.jimm.Database.GetCloud(ctx, &cloud)
+		err := r.jimm.DB().GetCloud(ctx, &cloud)
 		if err != nil {
 			return "", errors.E(err, "failed to fetch group information")
 		}
@@ -539,7 +539,7 @@ func (r *controllerRoot) ListRelationshipTuples(ctx context.Context, req apipara
 			return returnValue, errors.E(op, err)
 		}
 	}
-	responseTuples, ct, err := r.jimm.OpenFGAClient.ReadRelatedObjects(ctx, *key, req.PageSize, req.ContinuationToken)
+	responseTuples, ct, err := r.jimm.AuthorizationClient().ReadRelatedObjects(ctx, *key, req.PageSize, req.ContinuationToken)
 	if err != nil {
 		return returnValue, errors.E(op, err)
 	}

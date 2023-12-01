@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
+	"github.com/juju/juju/api/base"
 	"github.com/juju/juju/core/crossmodel"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/version"
@@ -115,6 +116,8 @@ func (m DialerMap) Dial(ctx context.Context, ctl *dbmodel.Controller, mt names.M
 // will delegate to the requested function or if the function is nil return
 // a NotImplemented error.
 type API struct {
+	base.APICaller
+
 	AddCloud_                          func(context.Context, names.CloudTag, jujuparams.Cloud, bool) error
 	AllModelWatcherNext_               func(context.Context, string) ([]jujuparams.Delta, error)
 	AllModelWatcherStop_               func(context.Context, string) error

@@ -1330,13 +1330,13 @@ func (s *accessControlSuite) TestResolveTupleObjectHandlesErrors(c *gc.C) {
 		},
 	}
 	for _, tc := range tests {
-		_, err := jujuapi.ResolveTag(s.JIMM, tc.input)
+		_, err := jujuapi.ResolveTag(s.JIMM.UUID, s.JIMM.DB(), tc.input)
 		c.Assert(err, gc.ErrorMatches, tc.want)
 	}
 }
 
 func (s *accessControlSuite) TestResolveTagObjectMapsUsers(c *gc.C) {
-	tag, err := jujuapi.ResolveTag(s.JIMM, "user-alex@externally-werly#member")
+	tag, err := jujuapi.ResolveTag(s.JIMM.UUID, s.JIMM.DB(), "user-alex@externally-werly#member")
 	c.Assert(err, gc.IsNil)
 	c.Assert(tag, gc.DeepEquals, ofganames.ConvertTagWithRelation(names.NewUserTag("alex@externally-werly"), ofganames.MemberRelation))
 }
@@ -1350,7 +1350,7 @@ func (s *accessControlSuite) TestResolveTupleObjectMapsGroups(c *gc.C) {
 	}
 	err = s.JIMM.Database.GetGroup(ctx, group)
 	c.Assert(err, gc.IsNil)
-	tag, err := jujuapi.ResolveTag(s.JIMM, "group-"+group.Name+"#member")
+	tag, err := jujuapi.ResolveTag(s.JIMM.UUID, s.JIMM.DB(), "group-"+group.Name+"#member")
 	c.Assert(err, gc.IsNil)
 	c.Assert(tag, gc.DeepEquals, ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag("1"), ofganames.MemberRelation))
 }
@@ -1373,7 +1373,7 @@ func (s *accessControlSuite) TestResolveTupleObjectMapsControllerUUIDs(c *gc.C) 
 	err = s.JIMM.Database.AddController(ctx, &controller)
 	c.Assert(err, gc.IsNil)
 
-	tag, err := jujuapi.ResolveTag(s.JIMM, "controller-mycontroller#administrator")
+	tag, err := jujuapi.ResolveTag(s.JIMM.UUID, s.JIMM.DB(), "controller-mycontroller#administrator")
 	c.Assert(err, gc.IsNil)
 	c.Assert(tag, gc.DeepEquals, ofganames.ConvertTagWithRelation(names.NewControllerTag(uuid.String()), ofganames.AdministratorRelation))
 }
@@ -1386,7 +1386,7 @@ func (s *accessControlSuite) TestResolveTupleObjectMapsModelUUIDs(c *gc.C) {
 
 	jimmTag := "model-" + controller.Name + ":" + user.Username + "/" + model.Name + "#administrator"
 
-	tag, err := jujuapi.ResolveTag(s.JIMM, jimmTag)
+	tag, err := jujuapi.ResolveTag(s.JIMM.UUID, s.JIMM.DB(), jimmTag)
 	c.Assert(err, gc.IsNil)
 	c.Assert(tag, gc.DeepEquals, ofganames.ConvertTagWithRelation(names.NewModelTag(model.UUID.String), ofganames.AdministratorRelation))
 
@@ -1400,7 +1400,7 @@ func (s *accessControlSuite) TestResolveTupleObjectMapsApplicationOffersUUIDs(c 
 
 	jimmTag := "applicationoffer-" + controller.Name + ":" + user.Username + "/" + model.Name + "." + offer.Name + "#administrator"
 
-	jujuTag, err := jujuapi.ResolveTag(s.JIMM, jimmTag)
+	jujuTag, err := jujuapi.ResolveTag(s.JIMM.UUID, s.JIMM.DB(), jimmTag)
 	c.Assert(err, gc.IsNil)
 	c.Assert(jujuTag, gc.DeepEquals, ofganames.ConvertTagWithRelation(names.NewApplicationOfferTag(offer.UUID), ofganames.AdministratorRelation))
 }
@@ -1408,7 +1408,7 @@ func (s *accessControlSuite) TestResolveTupleObjectMapsApplicationOffersUUIDs(c 
 func (s *accessControlSuite) TestResolveJIMM(c *gc.C) {
 	jimmTag := "controller-jimm"
 
-	jujuTag, err := jujuapi.ResolveTag(s.JIMM, jimmTag)
+	jujuTag, err := jujuapi.ResolveTag(s.JIMM.UUID, s.JIMM.DB(), jimmTag)
 	c.Assert(err, gc.IsNil)
 	c.Assert(jujuTag, gc.DeepEquals, ofganames.ConvertTag(names.NewControllerTag(s.JIMM.UUID)))
 }
@@ -1422,7 +1422,7 @@ func (s *accessControlSuite) TestParseTag(c *gc.C) {
 	jimmTag := "model-" + controller.Name + ":" + user.Username + "/" + model.Name + "#administrator"
 
 	// JIMM tag syntax for models
-	tag, err := jujuapi.ParseTag(ctx, s.JIMM, jimmTag)
+	tag, err := jujuapi.ParseTag(ctx, s.JIMM.UUID, s.JIMM.DB(), jimmTag)
 	c.Assert(err, gc.IsNil)
 	c.Assert(tag.Kind.String(), gc.Equals, names.ModelTagKind)
 	c.Assert(tag.ID, gc.Equals, model.UUID.String)
@@ -1431,7 +1431,7 @@ func (s *accessControlSuite) TestParseTag(c *gc.C) {
 	jujuTag := "model-" + model.UUID.String + "#administrator"
 
 	// Juju tag syntax for models
-	tag, err = jujuapi.ParseTag(ctx, s.JIMM, jujuTag)
+	tag, err = jujuapi.ParseTag(ctx, s.JIMM.UUID, s.JIMM.DB(), jujuTag)
 	c.Assert(err, gc.IsNil)
 	c.Assert(tag.ID, gc.Equals, model.UUID.String)
 	c.Assert(tag.Kind.String(), gc.Equals, names.ModelTagKind)

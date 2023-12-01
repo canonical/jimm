@@ -214,7 +214,7 @@ func (r *controllerRoot) ListControllers(ctx context.Context) (apiparams.ListCon
 	}
 
 	var controllers []apiparams.ControllerInfo
-	err := r.jimm.Database.ForEachController(ctx, func(ctl *dbmodel.Controller) error {
+	err := r.jimm.DB().ForEachController(ctx, func(ctl *dbmodel.Controller) error {
 		controllers = append(controllers, ctl.ToAPIControllerInfo())
 		return nil
 	})
@@ -233,7 +233,7 @@ func (r *controllerRoot) RemoveController(ctx context.Context, req apiparams.Rem
 	ctl := dbmodel.Controller{
 		Name: req.Name,
 	}
-	if err := r.jimm.Database.GetController(ctx, &ctl); err != nil {
+	if err := r.jimm.DB().GetController(ctx, &ctl); err != nil {
 		return apiparams.ControllerInfo{}, errors.E(op, err)
 	}
 
@@ -253,7 +253,7 @@ func (r *controllerRoot) SetControllerDeprecated(ctx context.Context, req apipar
 	ctl := dbmodel.Controller{
 		Name: req.Name,
 	}
-	if err := r.jimm.Database.GetController(ctx, &ctl); err != nil {
+	if err := r.jimm.DB().GetController(ctx, &ctl); err != nil {
 		return apiparams.ControllerInfo{}, errors.E(op, err)
 	}
 	return ctl.ToAPIControllerInfo(), nil
@@ -441,7 +441,7 @@ func (r *controllerRoot) CrossModelQuery(ctx context.Context, req apiparams.Cros
 	if err != nil {
 		return apiparams.CrossModelQueryResponse{}, errors.E(op, errors.Code("failed to list user's model access"))
 	}
-	models, err := r.jimm.Database.GetModelsByUUID(ctx, modelUUIDs)
+	models, err := r.jimm.DB().GetModelsByUUID(ctx, modelUUIDs)
 	if err != nil {
 		return apiparams.CrossModelQueryResponse{}, errors.E(op, errors.Code("failed to get models for user"))
 	}

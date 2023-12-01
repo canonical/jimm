@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
+	"github.com/juju/juju/api/base"
 	"github.com/juju/juju/core/crossmodel"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
@@ -79,6 +80,21 @@ func (j *JIMM) ResourceTag() names.ControllerTag {
 	return names.NewControllerTag(j.UUID)
 }
 
+// DB returns the database used by JIMM.
+func (j *JIMM) DB() *db.Database {
+	return &j.Database
+}
+
+// PubsubHub returns the pub-sub hub used for buffering model summaries.
+func (j *JIMM) PubSubHub() *pubsub.Hub {
+	return j.Pubsub
+}
+
+// AuthorizationClient return the OpenFGA client used by JIMM.
+func (j *JIMM) AuthorizationClient() *openfga.OFGAClient {
+	return j.OpenFGAClient
+}
+
 // An Authenticator authenticates login requests.
 type Authenticator interface {
 	// Authenticate processes the given LoginRequest and returns the user
@@ -109,6 +125,10 @@ type Dialer interface {
 
 // An API is the interface JIMM uses to access the API on a controller.
 type API interface {
+	// API implements the base.APICallCloser so that we can
+	// use the juju api clients to interact with juju controllers.
+	base.APICallCloser
+
 	// AddCloud adds a new cloud.
 	AddCloud(context.Context, names.CloudTag, jujuparams.Cloud, bool) error
 

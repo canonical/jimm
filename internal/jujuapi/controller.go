@@ -31,6 +31,7 @@ func init() {
 		mongoVersionMethod := rpc.Method(r.MongoVersion)
 		watchModelSummariesMethod := rpc.Method(r.WatchModelSummaries)
 		watchAllModelSummariesMethod := rpc.Method(r.WatchAllModelSummaries)
+		initiateMigrationMethod := rpc.Method(r.InitiateMigration)
 
 		r.AddMethod("Controller", 11, "AllModels", allModelsMethod)
 		r.AddMethod("Controller", 11, "ConfigSet", configSetMethod)
@@ -43,6 +44,7 @@ func init() {
 		r.AddMethod("Controller", 11, "MongoVersion", mongoVersionMethod)
 		r.AddMethod("Controller", 11, "WatchModelSummaries", watchModelSummariesMethod)
 		r.AddMethod("Controller", 11, "WatchAllModelSummaries", watchAllModelSummariesMethod)
+		r.AddMethod("Controller", 11, "InitiateMigration", initiateMigrationMethod)
 
 		return []int{11}
 	}
@@ -116,7 +118,7 @@ func (r *controllerRoot) WatchModelSummaries(ctx context.Context) (jujuparams.Su
 		}
 		return modelUUIDs, nil
 	}
-	watcher, err := newModelSummaryWatcher(ctx, id, r, r.jimm.Pubsub, getModels)
+	watcher, err := newModelSummaryWatcher(ctx, id, r, r.jimm.PubSubHub(), getModels)
 	if err != nil {
 		return jujuparams.SummaryWatcherID{}, errors.E(op, err)
 	}
@@ -155,7 +157,7 @@ func (r *controllerRoot) WatchAllModelSummaries(ctx context.Context) (jujuparams
 		return modelUUIDs, nil
 	}
 
-	watcher, err := newModelSummaryWatcher(ctx, id, r, r.jimm.Pubsub, getAllModels)
+	watcher, err := newModelSummaryWatcher(ctx, id, r, r.jimm.PubSubHub(), getAllModels)
 	if err != nil {
 		return jujuparams.SummaryWatcherID{}, errors.E(op, err)
 	}
@@ -284,6 +286,26 @@ func (r *controllerRoot) GetControllerAccess(ctx context.Context, args jujuparam
 	}
 
 	return jujuparams.UserAccessResults{
+		Results: results,
+	}, nil
+}
+
+// InitiateMigration attempts to begin the migration of one or
+// more models to other controllers.
+func (r *controllerRoot) InitiateMigration(ctx context.Context, args jujuparams.InitiateMigrationArgs) (jujuparams.InitiateMigrationResults, error) {
+	const op = errors.Op("jujuapi.InitiateMigration")
+
+	results := make([]jujuparams.InitiateMigrationResult, len(args.Specs))
+	for i, spec := range args.Specs {
+		result, err := r.jimm.InitiateMigration(ctx, r.user, spec)
+		if err != nil {
+			results[i].Error = mapError(errors.E(op, err))
+			continue
+		}
+		results[i] = result
+	}
+
+	return jujuparams.InitiateMigrationResults{
 		Results: results,
 	}, nil
 }
