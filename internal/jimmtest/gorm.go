@@ -255,8 +255,8 @@ func createEmptyDatabase(suggestedName string) (string, string, error) {
 }
 
 func createTemplateDatabase() (string, string, error) {
-	// Template databases should use unique names, in case the multiple tests
-	// run at the same time.
+	// Template databases should use unique names, in case multiple tests run at
+	// the same time.
 	suggestedName := fmt.Sprintf("jimm_template_%s", uuid.New().String()[0:8])
 	templateName, templateDSN, err := createEmptyDatabase(suggestedName)
 	if err != nil {
