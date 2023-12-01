@@ -96,7 +96,7 @@ func MemoryDB(t Tester, nowFunc func() time.Time) *gorm.DB {
 	}
 
 	suggestedName := "jimm_test_" + t.Name()
-	_, dsn, err := createDatabase(suggestedName, templateDatabaseName)
+	_, dsn, err := createDatabaseFromTemplate(suggestedName, templateDatabaseName)
 	if err != nil {
 		t.Fatalf("error creating database (%s): %s", suggestedName, err)
 	}
@@ -122,12 +122,16 @@ func MemoryDB(t Tester, nowFunc func() time.Time) *gorm.DB {
 const unsafeCharsPattern = "[ .:;`'\"|<>~/\\?!@#$%^&*()[\\]{}=+-]"
 const defaultDSN = "postgresql://jimm:jimm@127.0.0.1:5432/jimm"
 
-// createDatabase creates a Postgres database and returns the created database
-// name (which may be different than the requested name due to sanitization) and
-// DSN. Note that:
-//   - If `templateName` was empty, an empty database will be created.
-//   - If the database was already exist, it'll be dropped and re-created.
-func createDatabase(suggestedName string, templateName string) (string, string, error) {
+// createDatabaseMutex to avoid issues at the time of creating databases, it's
+// best to synchronize them to happen sequentially (specially, when creating a
+// database from a template).
+var createDatabaseMutex = sync.Mutex{}
+
+// createDatabaseFromTemplate creates a Postgres database from a given template
+// and returns the created database name (which may be different than the
+// requested name due to sanitization) and DSN.
+// If the database was already exist, it'll be dropped and re-created.
+func createDatabaseFromTemplate(suggestedName string, templateName string) (string, string, error) {
 	re, _ := regexp.Compile(unsafeCharsPattern)
 	databaseName := strings.ToLower(re.ReplaceAllString(suggestedName, "_"))
 
@@ -141,6 +145,9 @@ func createDatabase(suggestedName string, templateName string) (string, string, 
 		return "", "", errors.E("error parsing DSN as a URI: %s", err)
 	}
 
+	createDatabaseMutex.Lock()
+	defer createDatabaseMutex.Unlock()
+
 	gdb, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		return "", "", errors.E(err, "error opening database")
@@ -151,12 +158,55 @@ func createDatabase(suggestedName string, templateName string) (string, string, 
 		return "", "", errors.E(err, fmt.Sprintf("error dropping existing database: %s", databaseName))
 	}
 
-	var createDatabaseCommand string
-	if templateName != "" {
-		createDatabaseCommand = fmt.Sprintf(`CREATE DATABASE "%s" TEMPLATE "%s"`, databaseName, templateName)
-	} else {
-		createDatabaseCommand = fmt.Sprintf(`CREATE DATABASE "%s"`, databaseName)
+	createDatabaseCommand := fmt.Sprintf(`CREATE DATABASE "%s" TEMPLATE "%s"`, databaseName, templateName)
+	if err := gdb.Exec(createDatabaseCommand).Error; err != nil {
+		return "", "", errors.E(err, fmt.Sprintf("error creating database: (%s)", databaseName))
 	}
+
+	sqlDB, err := gdb.DB()
+	if err != nil {
+		return "", "", errors.E(err, "failed to get the internal DB object")
+	}
+	if err := sqlDB.Close(); err != nil {
+		return "", "", errors.E(err, "failed to close database connection")
+	}
+
+	u.Path = databaseName
+	return databaseName, u.String(), nil
+}
+
+// createDatabase creates an empty Postgres database and returns the created
+// database name (which may be different than the requested name due to
+// sanitization) and DSN.
+// If the database was already exist, it'll be dropped and re-created.
+func createEmptyDatabase(suggestedName string) (string, string, error) {
+	re, _ := regexp.Compile(unsafeCharsPattern)
+	databaseName := strings.ToLower(re.ReplaceAllString(suggestedName, "_"))
+
+	dsn := defaultDSN
+	if envTestDSN, exists := os.LookupEnv("JIMM_TEST_PGXDSN"); exists {
+		dsn = envTestDSN
+	}
+
+	u, err := url.Parse(dsn)
+	if err != nil {
+		return "", "", errors.E("error parsing DSN as a URI: %s", err)
+	}
+
+	createDatabaseMutex.Lock()
+	defer createDatabaseMutex.Unlock()
+
+	gdb, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	if err != nil {
+		return "", "", errors.E(err, "error opening database")
+	}
+
+	dropDatabaseCommand := fmt.Sprintf(`DROP DATABASE IF EXISTS "%s"`, databaseName)
+	if err := gdb.Exec(dropDatabaseCommand).Error; err != nil {
+		return "", "", errors.E(err, fmt.Sprintf("error dropping existing database: %s", databaseName))
+	}
+
+	createDatabaseCommand := fmt.Sprintf(`CREATE DATABASE "%s"`, databaseName)
 	if err := gdb.Exec(createDatabaseCommand).Error; err != nil {
 		return "", "", errors.E(err, fmt.Sprintf("error creating database: (%s)", databaseName))
 	}
@@ -174,7 +224,7 @@ func createDatabase(suggestedName string, templateName string) (string, string, 
 }
 
 func createTemplateDatabase() (string, string, error) {
-	templateName, templateDSN, err := createDatabase("jimm_template", "")
+	templateName, templateDSN, err := createEmptyDatabase("jimm_template")
 	if err != nil {
 		return "", "", errors.E(err, "failed to create the template database")
 	}
@@ -222,9 +272,9 @@ func getOrCreateTemplateDatabase() (string, string, error) {
 	return templateDatabaseName, templateDatabaseDSN, nil
 }
 
-// CreateNewTestDatabase creates an empty Postgres database and returns the DSN.
+// CreateEmptyDatabase creates an empty Postgres database and returns the DSN.
 func CreateEmptyDatabase(t Tester) string {
-	_, dsn, err := createDatabase(t.Name(), "")
+	_, dsn, err := createEmptyDatabase("jimm_test_" + t.Name())
 	if err != nil {
 		t.Fatalf("error creating empty database: %s", err)
 	}
