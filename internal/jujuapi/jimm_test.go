@@ -792,9 +792,10 @@ func (s *jimmSuite) TestJimmModelMigrationSuperuser(c *gc.C) {
 	})
 	c.Assert(err, gc.IsNil)
 	c.Assert(res.Results, gc.HasLen, 1)
-	for _, item := range res.Results {
-		c.Assert(item.Error.Message, gc.Matches, "target prechecks failed: model with same UUID already exists .*")
-	}
+	item := res.Results[0]
+	c.Assert(item.ModelTag, gc.Equals, mt.String())
+	c.Assert(item.MigrationId, gc.Equals, "")
+	c.Assert(item.Error.Message, gc.Matches, "target prechecks failed: model with same UUID already exists .*")
 }
 
 func (s *jimmSuite) TestJimmModelMigrationNonSuperuser(c *gc.C) {

@@ -679,7 +679,7 @@ func (j *JIMM) InitiateMigration(ctx context.Context, user *openfga.User, spec j
 	err = j.Database.UpdateModel(ctx, &model)
 	if err != nil {
 		zapctx.Error(ctx, "failed to update model with migration info", zap.Error(err))
-		return result, errors.E(op, fmt.Sprintf("migration started but failed to queue JIMM automatic update\n migration ID = %s\n", result.MigrationId), err)
+		return result, errors.E(op, "migration started but failed to queue JIMM automatic update", err)
 	}
 
 	return result, nil

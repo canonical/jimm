@@ -550,7 +550,7 @@ func (j *JIMM) InitiateInternalMigration(ctx context.Context, user *openfga.User
 	spec := jujuparams.MigrationSpec{ModelTag: modelTag.String(), TargetInfo: migrationTarget}
 	result, err := initiateMigration(ctx, j, user, spec, controllerID)
 	if err != nil {
-		return jujuparams.InitiateMigrationResult{}, errors.E(op, err)
+		return result, errors.E(op, err)
 	}
 	return result, nil
 }
