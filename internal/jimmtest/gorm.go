@@ -5,6 +5,8 @@ package jimmtest
 
 import (
 	"context"
+	"crypto/sha1"
+	"encoding/base64"
 	"fmt"
 	"net/url"
 	"os"
@@ -122,6 +124,36 @@ func MemoryDB(t Tester, nowFunc func() time.Time) *gorm.DB {
 const unsafeCharsPattern = "[ .:;`'\"|<>~/\\?!@#$%^&*()[\\]{}=+-]"
 const defaultDSN = "postgresql://jimm:jimm@127.0.0.1:5432/jimm"
 
+// maxDatabaseNameLength Postgres's limit on database name length.
+const maxDatabaseNameLength = 63
+
+// computeSafeDatabaseName returns a database-safe name based on the given suggestion.
+// Since there's a length limit of 63 chars for database names in Postgres, this
+// method truncates longer names and also appends a hash at the end of it to make
+// sure no name collisions occur and also future calls with the same suggested
+// database name results in the same safe name.
+func computeSafeDatabaseName(suggestedName string) string {
+	re, _ := regexp.Compile(unsafeCharsPattern)
+	safeName := strings.ToLower(re.ReplaceAllString(suggestedName, "_"))
+
+	if len(safeName) <= maxDatabaseNameLength {
+		return safeName
+	}
+
+	hasher := sha1.New()
+	hasher.Write([]byte(suggestedName))
+	sha := base64.URLEncoding.EncodeToString(hasher.Sum(nil))
+
+	// Note that when using `base64.URLEncoding` the result may include a hyphen (-)
+	// which is not a safe character for a database name, so we have to replace it.
+	// See this for the table of chars when using `base64.URLEncoding`:
+	//   - https://www.rfc-editor.org/rfc/rfc4648.html#section-5
+	shaSafe := strings.ReplaceAll(strings.ReplaceAll(sha, "-", "_"), "=", "")
+
+	safeNameWithHash := strings.ToLower(safeName[0:54] + "_" + shaSafe[0:8])
+	return safeNameWithHash
+}
+
 // createDatabaseMutex to avoid issues at the time of creating databases, it's
 // best to synchronize them to happen sequentially (specially, when creating a
 // database from a template).
@@ -132,8 +164,7 @@ var createDatabaseMutex = sync.Mutex{}
 // requested name due to sanitization) and DSN.
 // If the database was already exist, it'll be dropped and re-created.
 func createDatabaseFromTemplate(suggestedName string, templateName string) (string, string, error) {
-	re, _ := regexp.Compile(unsafeCharsPattern)
-	databaseName := strings.ToLower(re.ReplaceAllString(suggestedName, "_"))
+	databaseName := computeSafeDatabaseName(suggestedName)
 
 	dsn := defaultDSN
 	if envTestDSN, exists := os.LookupEnv("JIMM_TEST_PGXDSN"); exists {
@@ -180,8 +211,7 @@ func createDatabaseFromTemplate(suggestedName string, templateName string) (stri
 // sanitization) and DSN.
 // If the database was already exist, it'll be dropped and re-created.
 func createEmptyDatabase(suggestedName string) (string, string, error) {
-	re, _ := regexp.Compile(unsafeCharsPattern)
-	databaseName := strings.ToLower(re.ReplaceAllString(suggestedName, "_"))
+	databaseName := computeSafeDatabaseName(suggestedName)
 
 	dsn := defaultDSN
 	if envTestDSN, exists := os.LookupEnv("JIMM_TEST_PGXDSN"); exists {
