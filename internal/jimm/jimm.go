@@ -513,7 +513,7 @@ func fillMigrationTarget(db db.Database, credStore credentials.CredentialStore, 
 		adminPass = p
 	}
 	if adminUser == "" || adminPass == "" {
-		return jujuparams.MigrationTargetInfo{}, errors.E("missing target controller credentials")
+		return jujuparams.MigrationTargetInfo{}, 0, errors.E("missing target controller credentials")
 	}
 	// Should we verify controller can access the cloud where the model is currently hosted?
 	apiControllerInfo := dbController.ToAPIControllerInfo()

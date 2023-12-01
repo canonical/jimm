@@ -239,25 +239,26 @@ func (w *Watcher) watchController(ctx context.Context, ctl *dbmodel.Controller) 
 			UUID: m.UUID.String,
 		}
 		if err := api.ModelInfo(ctx, &mi); err == nil {
-			if mi.Migration != nil {
-				migrationPhase, ok := migration.ParsePhase(mi.Migration.Status)
-				if !ok {
-					zapctx.Error(ctx, "invalid phase received", zap.String("phase", mi.Migration.Status))
-					return nil
+			if mi.Migration == nil {
+				return nil
+			}
+			migrationPhase, ok := migration.ParsePhase(mi.Migration.Status)
+			if !ok {
+				zapctx.Error(ctx, "invalid phase received", zap.String("phase", mi.Migration.Status))
+				return nil
+			}
+			zapctx.Info(ctx, "model migration in progress", zap.String("model", m.Name), zap.String("phase", migrationPhase.String()))
+			// Without a clean way to check for migration failure, we opt to check for these two states
+			// which are currently the final states for any failed migrations.
+			if migrationPhase == migration.ABORTDONE || migrationPhase == migration.REAPFAILED {
+				// Clean up migration info
+				m.NewControllerID = sql.NullInt32{Int32: 0, Valid: false}
+				m.Life = constants.ALIVE.String()
+				if err := w.Database.UpdateModel(ctx, m); err != nil {
+					zapctx.Error(ctx, "failed to update migrating model info", zap.Error(err))
+					return errors.E(op, err)
 				}
-				// Without a clean way to check for migration failure, we opt to check for these two states
-				// which are currently the final states for any failed migrations.
-				if migrationPhase == migration.ABORTDONE || migrationPhase == migration.REAPFAILED {
-					// Clean up migration info
-					m.NewControllerID = sql.NullInt32{Int32: 0, Valid: false}
-					m.Life = constants.ALIVE.String()
-					if err := w.Database.UpdateModel(ctx, m); err != nil {
-						zapctx.Error(ctx, "failed to update migrating model info", zap.Error(err))
-						return errors.E(op, err)
-					}
-					return nil
-				}
-				zapctx.Info(ctx, "model migration in progress", zap.String("model", m.Name), zap.String("phase", migrationPhase.String()))
+				return nil
 			}
 		} else {
 			// If we get an error then we have reached migration completion.
