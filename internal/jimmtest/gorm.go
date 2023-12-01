@@ -17,6 +17,7 @@ import (
 
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/errors"
+	"github.com/google/uuid"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -254,7 +255,10 @@ func createEmptyDatabase(suggestedName string) (string, string, error) {
 }
 
 func createTemplateDatabase() (string, string, error) {
-	templateName, templateDSN, err := createEmptyDatabase("jimm_template")
+	// Template databases should use unique names, in case the multiple tests
+	// run at the same time.
+	suggestedName := fmt.Sprintf("jimm_template_%s", uuid.New().String()[0:8])
+	templateName, templateDSN, err := createEmptyDatabase(suggestedName)
 	if err != nil {
 		return "", "", errors.E(err, "failed to create the template database")
 	}
