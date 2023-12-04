@@ -674,7 +674,7 @@ func (j *JIMM) InitiateMigration(ctx context.Context, user *openfga.User, spec j
 		model.Life = constants.MIGRATING_AWAY.String()
 	} else {
 		model.Life = constants.MIGRATING_INTERNAL.String()
-		model.NewControllerID = sql.NullInt32{Int32: int32(newControllerID), Valid: true}
+		model.MigrationControllerID = sql.NullInt32{Int32: int32(newControllerID), Valid: true}
 	}
 	err = j.Database.UpdateModel(ctx, &model)
 	if err != nil {

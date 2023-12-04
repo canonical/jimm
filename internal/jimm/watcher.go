@@ -252,7 +252,7 @@ func (w *Watcher) watchController(ctx context.Context, ctl *dbmodel.Controller) 
 			// which are currently the final states for any failed migrations.
 			if migrationPhase == migration.ABORTDONE || migrationPhase == migration.REAPFAILED {
 				// Clean up migration info
-				m.NewControllerID = sql.NullInt32{Int32: 0, Valid: false}
+				m.MigrationControllerID = sql.NullInt32{Int32: 0, Valid: false}
 				m.Life = constants.ALIVE.String()
 				if err := w.Database.UpdateModel(ctx, m); err != nil {
 					zapctx.Error(ctx, "failed to update migrating model info", zap.Error(err))
@@ -268,8 +268,8 @@ func (w *Watcher) watchController(ctx context.Context, ctl *dbmodel.Controller) 
 			}
 			// Model undergoing internal migration needs an update to its parent controller.
 			if m.Life == constants.MIGRATING_INTERNAL.String() {
-				m.ControllerID = uint(m.NewControllerID.Int32)
-				m.NewControllerID = sql.NullInt32{Int32: 0, Valid: false}
+				m.ControllerID = uint(m.MigrationControllerID.Int32)
+				m.MigrationControllerID = sql.NullInt32{Int32: 0, Valid: false}
 				m.Life = constants.ALIVE.String()
 				if err := w.Database.UpdateModel(ctx, m); err != nil {
 					zapctx.Error(ctx, "failed to update migrating model info", zap.Error(err))

@@ -416,15 +416,15 @@ type CloudRegionControllerPriority struct {
 
 // A Model represents the definition of a model in a test environment.
 type Model struct {
-	Name            string       `json:"name"`
-	Owner           string       `json:"owner"`
-	UUID            string       `json:"uuid"`
-	Controller      string       `json:"controller"`
-	NewController   string       `json:"new-controller"`
-	Cloud           string       `json:"cloud"`
-	CloudRegion     string       `json:"region"`
-	CloudCredential string       `json:"cloud-credential"`
-	Users           []UserAccess `json:"users"`
+	Name                string       `json:"name"`
+	Owner               string       `json:"owner"`
+	UUID                string       `json:"uuid"`
+	Controller          string       `json:"controller"`
+	MigrationController string       `json:"migration-controller"`
+	Cloud               string       `json:"cloud"`
+	CloudRegion         string       `json:"region"`
+	CloudCredential     string       `json:"cloud-credential"`
+	Users               []UserAccess `json:"users"`
 
 	Type          string                   `json:"type"`
 	DefaultSeries string                   `json:"default-series"`
@@ -452,12 +452,12 @@ func (m *Model) DBObject(c *qt.C, db db.Database) dbmodel.Model {
 	}
 	m.dbo.Controller = m.env.Controller(m.Controller).DBObject(c, db)
 	m.env.Controller(m.Controller)
-	newControllerID := sql.NullInt32{}
-	if m.NewController != "" {
-		newControllerID.Int32 = int32(m.env.Controller(m.NewController).dbo.ID)
-		newControllerID.Valid = true
+	migrationControllerID := sql.NullInt32{}
+	if m.MigrationController != "" {
+		migrationControllerID.Int32 = int32(m.env.Controller(m.MigrationController).dbo.ID)
+		migrationControllerID.Valid = true
 	}
-	m.dbo.NewControllerID = newControllerID
+	m.dbo.MigrationControllerID = migrationControllerID
 	m.dbo.CloudRegion = m.env.Cloud(m.Cloud).DBObject(c, db).Region(m.CloudRegion)
 	m.dbo.CloudCredential = m.env.CloudCredential(m.Owner, m.Cloud, m.CloudCredential).DBObject(c, db)
 

@@ -891,7 +891,7 @@ models:
   type: iaas
   uuid: 00000002-0000-0000-0000-000000000001
   controller: controller-1
-  new-controller: controller-2
+  migration-controller: controller-2
   default-series: warty
   cloud: test-cloud
   region: test-cloud-region
@@ -1001,7 +1001,7 @@ models:
   type: iaas
   uuid: 00000002-0000-0000-0000-000000000001
   controller: controller-1
-  new-controller: controller-2
+  migration-controller: controller-2
   default-series: warty
   cloud: test-cloud
   region: test-cloud-region
@@ -1068,7 +1068,7 @@ func TestWatcherCleansFailedMigrations(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(modelInternalMigrated.Controller.Name, qt.Equals, "controller-1")
 	c.Assert(modelInternalMigrated.Life, qt.Equals, "alive")
-	c.Assert(modelInternalMigrated.NewControllerID, qt.Equals, sql.NullInt32{})
+	c.Assert(modelInternalMigrated.MigrationControllerID, qt.Equals, sql.NullInt32{})
 }
 
 const testWatcherIgnoreDeltasForModelsFromIncorrectControllerEnv = `clouds:

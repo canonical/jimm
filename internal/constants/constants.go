@@ -5,12 +5,12 @@ package constants
 
 // The constants below can be split out once we have more.
 
-// Life values specify model life status
-type Life int
+// ModelLife values specify model life status
+type ModelLife int
 
 // Enumerate all possible migration phases.
 const (
-	UNKNOWN Life = iota
+	UNKNOWN ModelLife = iota
 	ALIVE
 	DEAD
 	DYING
@@ -24,11 +24,11 @@ var lifeNames = []string{
 	"dead",
 	"dying",
 	"migrating-internal",
-	"migrating-way",
+	"migrating-away",
 }
 
 // String returns the name of an model life constant.
-func (p Life) String() string {
+func (p ModelLife) String() string {
 	i := int(p)
 	if i >= 0 && i < len(lifeNames) {
 		return lifeNames[i]
@@ -38,10 +38,10 @@ func (p Life) String() string {
 
 // Parselife converts a string model life name
 // to its constant value.
-func ParseLife(target string) (Life, bool) {
+func ParseModelLife(target string) (ModelLife, bool) {
 	for p, name := range lifeNames {
 		if target == name {
-			return Life(p), true
+			return ModelLife(p), true
 		}
 	}
 	return UNKNOWN, false
