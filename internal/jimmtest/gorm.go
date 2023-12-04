@@ -135,11 +135,8 @@ const maxDatabaseNameLength = 63
 // database name results in the same safe name.
 func computeSafeDatabaseName(suggestedName string) string {
 	re, _ := regexp.Compile(unsafeCharsPattern)
-	safeName := strings.ToLower(re.ReplaceAllString(suggestedName, "_"))
+	safeName := re.ReplaceAllString(suggestedName, "_")
 
-	if len(safeName) <= maxDatabaseNameLength {
-		return safeName
-	}
 
 	hasher := sha1.New()
 	hasher.Write([]byte(suggestedName))
@@ -150,9 +147,13 @@ func computeSafeDatabaseName(suggestedName string) string {
 	// See this for the table of chars when using `base64.URLEncoding`:
 	//   - https://www.rfc-editor.org/rfc/rfc4648.html#section-5
 	shaSafe := strings.ReplaceAll(strings.ReplaceAll(sha, "-", "_"), "=", "")
+	shaSuffix := "_" + shaSafe[0:8]
 
-	safeNameWithHash := strings.ToLower(safeName[0:54] + "_" + shaSafe[0:8])
-	return safeNameWithHash
+	safeNameWithHash := strings.ToLower(safeName + shaSuffix)
+	if len(safeNameWithHash) <= maxDatabaseNameLength {
+		return safeNameWithHash
+	}
+	return strings.ToLower(safeName[:maxDatabaseNameLength-len(shaSuffix)] + shaSuffix)
 }
 
 // createDatabaseMutex to avoid issues at the time of creating databases, it's
