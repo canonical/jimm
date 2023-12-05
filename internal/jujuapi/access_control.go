@@ -358,13 +358,15 @@ func (r *controllerRoot) CheckRelation(ctx context.Context, req apiparams.CheckR
 	const op = errors.Op("jujuapi.CheckRelation")
 	checkResp := apiparams.CheckRelationResponse{Allowed: false}
 
-	if !r.user.JimmAdmin {
-		return checkResp, errors.E(op, errors.CodeUnauthorized, "unauthorized")
-	}
-
 	parsedTuple, err := r.parseTuple(ctx, req.Tuple)
 	if err != nil {
 		return checkResp, errors.E(op, errors.CodeFailedToParseTupleKey, err)
+	}
+
+	userCheckingSelf := parsedTuple.Object.Kind == openfga.UserType && parsedTuple.Object.ID == r.user.Username
+
+	if !r.user.JimmAdmin && !userCheckingSelf {
+		return checkResp, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
 	allowed, err := r.jimm.AuthorizationClient().CheckRelation(ctx, *parsedTuple, false)

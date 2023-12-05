@@ -827,7 +827,6 @@ func (s *accessControlSuite) TestJAASTag(c *gc.C) {
 			c.Assert(err, gc.IsNil)
 			c.Assert(t, gc.Equals, test.expectedJAASTag)
 		}
-
 	}
 }
 
@@ -875,6 +874,34 @@ func (s *accessControlSuite) TestListRelationshipTuples(c *gc.C) {
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(response.Tuples, jc.DeepEquals, []apiparams.RelationshipTuple{tuples[3]})
 
+}
+
+func (s *accessControlSuite) TestCheckRelationAsNonAdmin(c *gc.C) {
+	conn := s.open(c, nil, "bob")
+	defer conn.Close()
+	client := api.NewClient(conn)
+
+	userAliceKey := "user-alice@external"
+	userBobKey := "user-bob@external"
+
+	// Verify Bob checking for Alice's permission fails
+	input := apiparams.RelationshipTuple{
+		Object:       userAliceKey,
+		Relation:     "administrator",
+		TargetObject: "controller-jimm",
+	}
+	req := apiparams.CheckRelationRequest{Tuple: input}
+	_, err := client.CheckRelation(&req)
+	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
+	// Verify Bob can check for his own permission.
+	input = apiparams.RelationshipTuple{
+		Object:       userBobKey,
+		Relation:     "administrator",
+		TargetObject: "controller-jimm",
+	}
+	req = apiparams.CheckRelationRequest{Tuple: input}
+	_, err = client.CheckRelation(&req)
+	c.Assert(err, gc.IsNil)
 }
 
 func (s *accessControlSuite) TestCheckRelationOfferReaderFlow(c *gc.C) {
