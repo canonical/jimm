@@ -88,14 +88,19 @@ func MemoryDB(t Tester, nowFunc func() time.Time) *gorm.DB {
 	if present {
 		logLevel = logger.Warn
 	}
-	if nowFunc == nil {
-		nowFunc = func() time.Time {
-			return time.Now().Truncate(time.Microsecond)
+
+	wrappedNowFunc := func() time.Time {
+		var now time.Time
+		if nowFunc != nil {
+			now = nowFunc()
+		} else {
+			now = time.Now()
 		}
+		return now.Truncate(time.Microsecond)
 	}
 	cfg := gorm.Config{
 		Logger:  NewGormLogger(t, logLevel),
-		NowFunc: nowFunc,
+		NowFunc: wrappedNowFunc,
 	}
 
 	templateDatabaseName, _, err := getOrCreateTemplateDatabase()
