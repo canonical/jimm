@@ -84,7 +84,7 @@ func TestModel(t *testing.T) {
 		Status: dbmodel.Status{
 			Status: "available",
 			Since: sql.NullTime{
-				Time:  time.Now(),
+				Time:  time.Now().Truncate(time.Millisecond),
 				Valid: true,
 			},
 		},
@@ -150,7 +150,7 @@ func TestModelUniqueConstraint(t *testing.T) {
 		Status: dbmodel.Status{
 			Status: "available",
 			Since: sql.NullTime{
-				Time:  time.Now(),
+				Time:  time.Now().Truncate(time.Millisecond),
 				Valid: true,
 			},
 		},
@@ -177,7 +177,7 @@ func TestModelUniqueConstraint(t *testing.T) {
 		Status: dbmodel.Status{
 			Status: "available",
 			Since: sql.NullTime{
-				Time:  time.Now(),
+				Time:  time.Now().Truncate(time.Millisecond),
 				Valid: true,
 			},
 		},
@@ -205,7 +205,7 @@ func TestToJujuModel(t *testing.T) {
 	c := qt.New(t)
 	db := gormDB(c)
 	cl, cred, ctl, u := initModelEnv(c, db)
-	now := time.Now()
+	now := time.Now().Truncate(time.Millisecond)
 	m := dbmodel.Model{
 		Name: "test-model",
 		UUID: sql.NullString{
@@ -247,7 +247,7 @@ func TestToJujuModelSummary(t *testing.T) {
 	c := qt.New(t)
 	db := gormDB(c)
 	cl, cred, ctl, u := initModelEnv(c, db)
-	now := time.Now()
+	now := time.Now().Truncate(time.Millisecond)
 	m := dbmodel.Model{
 		Name: "test-model",
 		UUID: sql.NullString{
