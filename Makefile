@@ -42,7 +42,7 @@ dev-env-setup: sysdeps pull/candid
 	@make version/commit.txt && make version/version.txt
 	@go mod vendor
 
-dev-env: dev-env-setup
+dev-env:
 	@docker compose --profile dev up --force-recreate
 
 dev-env-cleanup:
