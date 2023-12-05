@@ -386,6 +386,10 @@ func openDB(ctx context.Context, dsn string) (*gorm.DB, error) {
 	}
 	return gorm.Open(dialect, &gorm.Config{
 		Logger: logger.GormLogger{},
+		NowFunc: func() time.Time {
+			// This is to set the timestamp precision at the service level.
+			return time.Now().Truncate(time.Microsecond)
+		},
 	})
 }
 
