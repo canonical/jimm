@@ -74,7 +74,7 @@ func (s *dbSuite) TestAddModel(c *qt.C) {
 		CloudCredentialID: cred.ID,
 		Type:              "iaas",
 		DefaultSeries:     "warty",
-		Life:              "alive",
+		Life:              constants.ALIVE.String(),
 		Status: dbmodel.Status{
 			Status: "available",
 			Since:  db.Now(),
@@ -151,7 +151,7 @@ func (s *dbSuite) TestGetModel(c *qt.C) {
 		CloudCredential:   cred,
 		Type:              "iaas",
 		DefaultSeries:     "warty",
-		Life:              "alive",
+		Life:              constants.ALIVE.String(),
 		Status: dbmodel.Status{
 			Status: "available",
 			Since:  db.Now(),
@@ -243,7 +243,7 @@ func (s *dbSuite) TestUpdateModel(c *qt.C) {
 		CloudCredentialID: cred.ID,
 		Type:              "iaas",
 		DefaultSeries:     "warty",
-		Life:              "alive",
+		Life:              constants.ALIVE.String(),
 		Status: dbmodel.Status{
 			Status: "available",
 			Since:  db.Now(),
@@ -322,7 +322,7 @@ func (s *dbSuite) TestDeleteModel(c *qt.C) {
 		CloudCredentialID: cred.ID,
 		Type:              "iaas",
 		DefaultSeries:     "warty",
-		Life:              "alive",
+		Life:              constants.ALIVE.String(),
 		Status: dbmodel.Status{
 			Status: "available",
 			Since:  db.Now(),
@@ -406,7 +406,7 @@ func (s *dbSuite) TestGetModelsUsingCredential(c *qt.C) {
 		CloudCredentialID: cred1.ID,
 		Type:              "iaas",
 		DefaultSeries:     "warty",
-		Life:              "alive",
+		Life:              constants.ALIVE.String(),
 		Status: dbmodel.Status{
 			Status: "available",
 			Since:  db.Now(),
@@ -430,7 +430,7 @@ func (s *dbSuite) TestGetModelsUsingCredential(c *qt.C) {
 		CloudCredentialID: cred2.ID,
 		Type:              "iaas",
 		DefaultSeries:     "warty",
-		Life:              "alive",
+		Life:              constants.ALIVE.String(),
 		Status: dbmodel.Status{
 			Status: "available",
 			Since:  db.Now(),
@@ -460,7 +460,7 @@ func (s *dbSuite) TestGetModelsUsingCredential(c *qt.C) {
 		CloudCredentialID: cred1.ID,
 		Type:              "iaas",
 		DefaultSeries:     "warty",
-		Life:              "alive",
+		Life:              constants.ALIVE.String(),
 		Status:            model1.Status,
 		SLA: dbmodel.SLA{
 			Level: "unsupported",

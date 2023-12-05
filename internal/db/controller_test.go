@@ -150,7 +150,7 @@ func (s *dbSuite) TestGetControllerWithModels(c *qt.C) {
 		Type:            "iaas",
 		IsController:    true,
 		DefaultSeries:   "warty",
-		Life:            "alive",
+		Life:            constants.ALIVE.String(),
 		Status: dbmodel.Status{
 			Status: "available",
 			Since: sql.NullTime{
@@ -174,7 +174,7 @@ func (s *dbSuite) TestGetControllerWithModels(c *qt.C) {
 		Type:            "iaas",
 		IsController:    false,
 		DefaultSeries:   "warty",
-		Life:            "alive",
+		Life:            constants.ALIVE.String(),
 		Status: dbmodel.Status{
 			Status: "available",
 			Since: sql.NullTime{

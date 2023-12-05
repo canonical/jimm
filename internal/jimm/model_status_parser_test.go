@@ -11,6 +11,7 @@ import (
 	"github.com/juju/juju/core/status"
 	jujuparams "github.com/juju/juju/rpc/params"
 
+	"github.com/canonical/jimm/internal/constants"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/jimm"
@@ -362,7 +363,7 @@ func TestQueryModelsJq(t *testing.T) {
 													MountPoint: "/home/ubuntu/myapp/.data",
 													ReadOnly:   false,
 												},
-												Life: "alive",
+												Life: constants.ALIVE.String(),
 											},
 										},
 									},
@@ -738,13 +739,13 @@ func TestQueryModelsJq(t *testing.T) {
 				  "Attachments": {
 					"containers": {
 					  "myapp/0/1": {
-						"life": "alive",
+						"life": constants.ALIVE.String(),
 						"mount-point": "/home/ubuntu/myapp/.data",
 						"read-only": false
 					  }
 					}
 				  },
-				  "life": "alive",
+				  "life": constants.ALIVE.String(),
 				  "pool": "pool-1",
 				  "provider-id": "da64ec3c-0cf7-42f2-9951-35a5a3eaadc1",
 				  "size": 4096,

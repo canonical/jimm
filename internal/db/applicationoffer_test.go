@@ -82,7 +82,7 @@ func initTestEnvironment(c *qt.C, db *db.Database) testEnvironment {
 		Type:            "iaas",
 		IsController:    false,
 		DefaultSeries:   "warty",
-		Life:            "alive",
+		Life:            constants.ALIVE.String(),
 		Status: dbmodel.Status{
 			Status: "available",
 			Since: sql.NullTime{

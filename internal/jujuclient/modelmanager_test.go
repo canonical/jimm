@@ -38,7 +38,7 @@ func (s *modelmanagerSuite) TestCreateModel(c *gc.C) {
 	c.Check(info.CloudTag, gc.Equals, names.NewCloudTag(jimmtest.TestCloudName).String())
 	c.Check(info.CloudRegion, gc.Equals, jimmtest.TestCloudRegionName)
 	c.Check(info.DefaultSeries, gc.Equals, "jammy")
-	c.Check(string(info.Life), gc.Equals, "alive")
+	c.Check(string(info.Life), gc.Equals, constants.ALIVE.String())
 	c.Check(string(info.Status.Status), gc.Equals, "available")
 	c.Check(info.Status.Data, gc.IsNil)
 	c.Check(info.Status.Since.After(time.Now().Add(-10*time.Second)), gc.Equals, true)

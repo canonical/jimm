@@ -1519,7 +1519,7 @@ func createTestControllerEnvironment(ctx context.Context, c *gc.C, s *accessCont
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
 		CloudCredentialID: cred.ID,
-		Life:              "alive",
+		Life:              constants.ALIVE.String(),
 		Status: dbmodel.Status{
 			Status: "available",
 			Since: sql.NullTime{

@@ -121,7 +121,7 @@ func (s *controllerSuite) TestModelStatus(c *gc.C) {
 		c.Assert(models, gc.HasLen, 2)
 		c.Check(models[0], jc.DeepEquals, base.ModelStatus{
 			UUID:               s.Model.UUID.String,
-			Life:               "alive",
+			Life:               constants.ALIVE.String(),
 			Owner:              "bob@external",
 			TotalMachineCount:  0,
 			CoreCount:          0,
