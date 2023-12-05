@@ -88,9 +88,7 @@ CREATE TABLE users (
 	username TEXT NOT NULL UNIQUE,
 	display_name TEXT NOT NULL,
 	last_login DATETIME,
-	disabled INTEGER,
-	controller_access TEXT NOT NULL DEFAULT 'login',
-	audit_log_access TEXT NOT NULL DEFAULT ''
+	disabled INTEGER
 );
 CREATE INDEX idx_users_deleted_at ON users (deleted_at);
 

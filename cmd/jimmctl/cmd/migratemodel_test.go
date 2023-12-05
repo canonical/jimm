@@ -19,13 +19,13 @@ type migrateModelSuite struct {
 var _ = gc.Suite(&migrateModelSuite{})
 
 var migrationResultRegex = `results:
-- modeltag: ""
+- modeltag: model-.*
   error:
     message: 'target prechecks failed: model with same UUID already exists (.*)'
     code: ""
     info: {}
   migrationid: ""
-- modeltag: ""
+- modeltag: model-.*
   error:
     message: 'target prechecks failed: model with same UUID already exists (.*)'
     code: ""

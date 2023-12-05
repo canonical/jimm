@@ -37,6 +37,10 @@ type Model struct {
 	ControllerID uint
 	Controller   Controller
 
+	// MigrationControllerID is the controller that a model is migrating to.
+	// This is only filled if the new controller is outside JIMM.
+	MigrationControllerID sql.NullInt32
+
 	// CloudRegion is the cloud-region hosting the model.
 	CloudRegionID uint
 	CloudRegion   CloudRegion

@@ -1624,7 +1624,7 @@ func TestInitiateMigration(t *testing.T) {
 
 			user := test.user(client)
 
-			result, err := j.InitiateMigration(context.Background(), user, test.spec)
+			result, err := j.InitiateMigration(context.Background(), user, test.spec, 0)
 			if test.expectedError == "" {
 				c.Assert(err, qt.IsNil)
 				c.Assert(result, qt.DeepEquals, test.expectedResult)

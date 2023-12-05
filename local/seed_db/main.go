@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/canonical/jimm/internal/constants"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/logger"
@@ -103,7 +104,7 @@ func main() {
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
 		CloudCredentialID: cred.ID,
-		Life:              "alive",
+		Life:              constants.ALIVE.String(),
 		Status: dbmodel.Status{
 			Status: "available",
 			Since: sql.NullTime{
