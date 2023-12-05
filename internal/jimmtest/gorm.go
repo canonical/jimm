@@ -147,7 +147,6 @@ func computeSafeDatabaseName(suggestedName string) string {
 	re, _ := regexp.Compile(unsafeCharsPattern)
 	safeName := re.ReplaceAllString(suggestedName, "_")
 
-
 	hasher := sha1.New()
 	hasher.Write([]byte(suggestedName))
 	sha := base64.URLEncoding.EncodeToString(hasher.Sum(nil))
