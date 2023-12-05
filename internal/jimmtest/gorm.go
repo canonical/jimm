@@ -88,6 +88,11 @@ func MemoryDB(t Tester, nowFunc func() time.Time) *gorm.DB {
 	if present {
 		logLevel = logger.Warn
 	}
+	if nowFunc == nil {
+		nowFunc = func() time.Time {
+			return time.Now().Truncate(time.Microsecond)
+		}
+	}
 	cfg := gorm.Config{
 		Logger:  NewGormLogger(t, logLevel),
 		NowFunc: nowFunc,
