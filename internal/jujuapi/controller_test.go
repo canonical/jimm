@@ -327,13 +327,13 @@ func TestInitiateMigration(t *testing.T) {
 
 	tests := []struct {
 		about             string
-		initiateMigration func(ctx context.Context, user *openfga.User, spec jujuparams.MigrationSpec) (jujuparams.InitiateMigrationResult, error)
+		initiateMigration func(ctx context.Context, user *openfga.User, spec jujuparams.MigrationSpec, targetControllerID uint) (jujuparams.InitiateMigrationResult, error)
 		args              jujuparams.InitiateMigrationArgs
 		expectedError     string
 		expectedResult    jujuparams.InitiateMigrationResults
 	}{{
 		about: "model migration initiated successfully",
-		initiateMigration: func(ctx context.Context, user *openfga.User, spec jujuparams.MigrationSpec) (jujuparams.InitiateMigrationResult, error) {
+		initiateMigration: func(ctx context.Context, user *openfga.User, spec jujuparams.MigrationSpec, targetControllerID uint) (jujuparams.InitiateMigrationResult, error) {
 			return jujuparams.InitiateMigrationResult{
 				ModelTag:    mt.String(),
 				MigrationId: migrationID,
@@ -352,7 +352,7 @@ func TestInitiateMigration(t *testing.T) {
 		},
 	}, {
 		about: "controller returns an error",
-		initiateMigration: func(ctx context.Context, user *openfga.User, spec jujuparams.MigrationSpec) (jujuparams.InitiateMigrationResult, error) {
+		initiateMigration: func(ctx context.Context, user *openfga.User, spec jujuparams.MigrationSpec, targetControllerID uint) (jujuparams.InitiateMigrationResult, error) {
 			return jujuparams.InitiateMigrationResult{}, errors.E("a silly error")
 		},
 		args: jujuparams.InitiateMigrationArgs{

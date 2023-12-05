@@ -30,8 +30,8 @@ import (
 )
 
 var (
-	initiateMigration = func(ctx context.Context, j *JIMM, user *openfga.User, spec jujuparams.MigrationSpec) (jujuparams.InitiateMigrationResult, error) {
-		return j.InitiateMigration(ctx, user, spec)
+	initiateMigration = func(ctx context.Context, j *JIMM, user *openfga.User, spec jujuparams.MigrationSpec, targetControllerID uint) (jujuparams.InitiateMigrationResult, error) {
+		return j.InitiateMigration(ctx, user, spec, targetControllerID)
 	}
 )
 
@@ -493,27 +493,29 @@ func (j *JIMM) FullModelStatus(ctx context.Context, user *openfga.User, modelTag
 	return status, nil
 }
 
-func fillMigrationTarget(db db.Database, credStore credentials.CredentialStore, controllerName string) (jujuparams.MigrationTargetInfo, error) {
+type migrationControllerID = uint
+
+func fillMigrationTarget(db db.Database, credStore credentials.CredentialStore, controllerName string) (jujuparams.MigrationTargetInfo, migrationControllerID, error) {
 	dbController := dbmodel.Controller{
 		Name: controllerName,
 	}
 	ctx := context.Background()
 	err := db.GetController(ctx, &dbController)
 	if err != nil {
-		return jujuparams.MigrationTargetInfo{}, err
+		return jujuparams.MigrationTargetInfo{}, 0, err
 	}
 	adminUser := dbController.AdminUser
 	adminPass := dbController.AdminPassword
 	if adminPass == "" {
 		u, p, err := credStore.GetControllerCredentials(ctx, controllerName)
 		if err != nil {
-			return jujuparams.MigrationTargetInfo{}, err
+			return jujuparams.MigrationTargetInfo{}, 0, err
 		}
 		adminUser = u
 		adminPass = p
 	}
 	if adminUser == "" || adminPass == "" {
-		return jujuparams.MigrationTargetInfo{}, errors.E("missing target controller credentials")
+		return jujuparams.MigrationTargetInfo{}, 0, errors.E("missing target controller credentials")
 	}
 	// Should we verify controller can access the cloud where the model is currently hosted?
 	apiControllerInfo := dbController.ToAPIControllerInfo()
@@ -525,14 +527,14 @@ func fillMigrationTarget(db db.Database, credStore credentials.CredentialStore, 
 		AuthTag:  names.NewUserTag(adminUser).String(),
 		Password: adminPass,
 	}
-	return targetInfo, nil
+	return targetInfo, dbController.ID, nil
 }
 
 // InitiateInternalMigration initiates a model migration between two controllers within JIMM.
 func (j *JIMM) InitiateInternalMigration(ctx context.Context, user *openfga.User, modelTag names.ModelTag, targetController string) (jujuparams.InitiateMigrationResult, error) {
 	const op = errors.Op("jimm.InitiateInternalMigration")
 
-	migrationTarget, err := fillMigrationTarget(j.Database, j.CredentialStore, targetController)
+	migrationTarget, controllerID, err := fillMigrationTarget(j.Database, j.CredentialStore, targetController)
 	if err != nil {
 		return jujuparams.InitiateMigrationResult{}, errors.E(op, err)
 	}
@@ -548,9 +550,9 @@ func (j *JIMM) InitiateInternalMigration(ctx context.Context, user *openfga.User
 		return jujuparams.InitiateMigrationResult{}, errors.E(op, err)
 	}
 	spec := jujuparams.MigrationSpec{ModelTag: modelTag.String(), TargetInfo: migrationTarget}
-	result, err := initiateMigration(ctx, j, user, spec)
+	result, err := initiateMigration(ctx, j, user, spec, controllerID)
 	if err != nil {
-		return jujuparams.InitiateMigrationResult{}, errors.E(op, err)
+		return result, errors.E(op, err)
 	}
 	return result, nil
 }
