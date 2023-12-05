@@ -587,7 +587,7 @@ func TestWatcher(t *testing.T) {
 			go func() {
 				defer wg.Done()
 				err := w.Watch(ctx, time.Millisecond)
-				c.Check(err, qt.ErrorMatches, `context canceled`, qt.Commentf("unexpected error %s (%#v)", err, err))
+				c.Check(err, qt.ErrorMatches, `.*context canceled.*`, qt.Commentf("unexpected error %s (%#v)", err, err))
 			}()
 
 			validDeltas := 0
@@ -743,7 +743,7 @@ func TestModelSummaryWatcher(t *testing.T) {
 			go func() {
 				defer wg.Done()
 				err := w.WatchAllModelSummaries(ctx, time.Millisecond)
-				c.Check(err, qt.ErrorMatches, `context canceled`, qt.Commentf("unexpected error %s (%#v)", err, err))
+				c.Check(err, qt.ErrorMatches, `.*context canceled.*`, qt.Commentf("unexpected error %s (%#v)", err, err))
 			}()
 
 			for _, summary := range test.summaries {
@@ -789,7 +789,7 @@ func TestWatcherSetsControllerUnavailable(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		err := w.Watch(ctx, time.Millisecond)
-		c.Check(err, qt.ErrorMatches, `context canceled`, qt.Commentf("unexpected error %s (%#v)", err, err))
+		c.Check(err, qt.ErrorMatches, `.*context canceled.*`, qt.Commentf("unexpected error %s (%#v)", err, err))
 	}()
 
 	// it appears that the jimm code does not treat failing to
@@ -964,7 +964,7 @@ func TestWatcherIgnoreDeltasForModelsFromIncorrectController(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		err := w.Watch(ctx, time.Millisecond)
-		c.Check(err, qt.ErrorMatches, `context canceled`, qt.Commentf("unexpected error %s (%#v)", err, err))
+		c.Check(err, qt.ErrorMatches, `.*context canceled.*`, qt.Commentf("unexpected error %s (%#v)", err, err))
 	}()
 
 	nextC <- []jujuparams.Delta{{

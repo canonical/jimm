@@ -110,7 +110,7 @@ func TestSetUserModelDefaults(t *testing.T) {
 			return testConfig{
 				user:          &user,
 				defaults:      defaults,
-				expectedError: `FOREIGN KEY constraint failed`,
+				expectedError: `.*violates foreign key constraint.*`,
 			}
 		},
 	}, {

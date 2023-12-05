@@ -50,7 +50,7 @@ func TestUser(t *testing.T) {
 		DisplayName: "bob",
 	}
 	result = db.Create(&u4)
-	c.Check(result.Error, qt.ErrorMatches, "UNIQUE constraint failed: users.username")
+	c.Check(result.Error, qt.ErrorMatches, `.*violates unique constraint "users_username_key".*`)
 }
 
 func TestUserTag(t *testing.T) {
