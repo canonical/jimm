@@ -11,21 +11,6 @@ GIT_VERSION := $(shell git describe --abbrev=0 --dirty)
 GO_VERSION := $(shell go list -f {{.GoVersion}} -m)
 ARCH := $(shell dpkg --print-architecture)
 
-ifeq ($(shell uname -p | sed -r 's/.*(x86|armel|armhf).*/golang/'), golang)
-	GO_C := golang
-	INSTALL_FLAGS :=
-else
-	GO_C := gccgo-4.9 gccgo-go
-	INSTALL_FLAGS := -gccgoflags=-static-libgo
-endif
-
-# bzr and git are installed so that 'go get' will work with those VCS.
-define DEPENDENCIES
-  bzr
-  git
-  $(GO_C)
-endef
-
 default: build
 
 build: version/commit.txt version/version.txt
@@ -37,17 +22,31 @@ build/server: version/commit.txt version/version.txt
 check: version/commit.txt version/version.txt
 	go test -timeout 30m $(PROJECT)/... -cover
 
-install: version/commit.txt version/version.txt
-	go install -tags version $(INSTALL_FLAGS) -v $(PROJECT)/...
-
-release: jimm-$(GIT_VERSION).tar.xz
-
 clean:
 	go clean $(PROJECT)/...
 	-$(RM) version/commit.txt version/version.txt
 	-$(RM) jimmsrv
 	-$(RM) -r jimm-release/
 	-$(RM) jimm-*.tar.xz
+
+test-env: sysdeps
+	@touch ./local/vault/approle.json && touch ./local/vault/roleid.txt
+	@docker compose up --force-recreate
+
+test-env-cleanup:
+	@docker compose down -v --remove-orphans
+
+dev-env-setup: sysdeps pull/candid
+	@cd local/traefik/certs; ./certs.sh; cd -
+	@touch ./local/vault/approle.json && touch ./local/vault/roleid.txt
+	@make version/commit.txt && make version/version.txt
+	@go mod vendor
+
+dev-env: dev-env-setup
+	@docker compose --profile dev up --force-recreate
+
+dev-env-cleanup:
+	@docker compose down -v --remove-orphans
 
 # Reformat all source files.
 format:
@@ -56,10 +55,6 @@ format:
 # Reformat and simplify source files.
 simplify:
 	gofmt -w -l -s .
-
-# Run the JIMM server.
-server: install
-	jemd cmd/jemd/config.yaml
 
 # Generate version information
 version/commit.txt: FORCE
@@ -74,13 +69,6 @@ version/version.txt: FORCE
 
 jimmsrv: version/commit.txt version/version.txt
 	go build -tags release -v $(PROJECT)/cmd/jemd
-
-jimm-$(GIT_VERSION).tar.xz: jimm-release/bin/jimmsrv
-	tar c -C jimm-release . | xz > $@
-
-jimm-release/bin/jimmsrv: jimmsrv
-	mkdir -p jimm-release/bin
-	cp jemd jimm-release/bin
 
 jimm-image:
 	docker build --target deploy-env \
@@ -112,20 +100,24 @@ pull/candid:
 get-local-auth:
 	@go run ./local/authy
 
+define check_dep
+    if ! which $(1) > /dev/null; then\
+		echo "$(2)";\
+	else\
+		echo "Detected $(1)";\
+	fi
+endef
+
 # Install packages required to develop JIMM and run tests.
 APT_BASED := $(shell command -v apt-get >/dev/null; echo $$?)
 sysdeps:
 ifeq ($(APT_BASED),0)
-ifeq ($(shell lsb_release -cs|sed -r 's/precise|quantal|raring/old/'),old)
-	@echo Adding PPAs for golang and mongodb
-	@sudo apt-add-repository --yes ppa:juju/golang
-	@sudo apt-add-repository --yes ppa:juju/stable
-endif
-	@echo Installing dependencies
-	@sudo apt-get update
-	@sudo snap install juju-db --channel 4.4/stable 
-	@sudo apt-get --yes install $(strip $(DEPENDENCIES)) \
-	  $(shell apt-cache madison juju-mongodb mongodb-server | head -1 | cut -d '|' -f1)
+	@$(call check_dep,go,Missing Go - install from https://go.dev/doc/install or 'sudo snap install go')
+	@$(call check_dep,git,Missing Git - install with 'sudo apt install git')
+	@$(call check_dep,gcc,Missing gcc - install with 'sudo apt install build-essentials')
+	@$(call check_dep,docker,Missing Docker - install from https://docs.docker.com/engine/install/')
+	@$(call check_dep,docker-compose,Missing Docker Compose - install from https://docs.docker.com/engine/install/')
+	@$(call check_dep,juju-db.mongo,Missing juju-db - install with 'sudo snap install juju-db --channel=4.4/stable')
 else
 	@echo sysdeps runs only on systems with apt-get
 	@echo on OS X with homebrew try: brew install bazaar mongodb
