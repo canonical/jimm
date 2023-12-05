@@ -14,6 +14,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/google/uuid"
+	"github.com/juju/juju/core/life"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 	"github.com/juju/version/v2"
@@ -981,7 +982,7 @@ var modelInfoTests = []struct {
 		CloudRegion:        "test-cloud-region",
 		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/cred-1").String(),
 		OwnerTag:           names.NewUserTag("alice@external").String(),
-		Life:               constants.ALIVE.String(),
+		Life:               life.Value(constants.ALIVE.String()),
 		Status: jujuparams.EntityStatus{
 			Status: "available",
 			Info:   "OK!",
@@ -1035,7 +1036,7 @@ var modelInfoTests = []struct {
 		CloudRegion:        "test-cloud-region",
 		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/cred-1").String(),
 		OwnerTag:           names.NewUserTag("alice@external").String(),
-		Life:               constants.ALIVE.String(),
+		Life:               life.Value(constants.ALIVE.String()),
 		Status: jujuparams.EntityStatus{
 			Status: "available",
 			Info:   "OK!",
@@ -1083,7 +1084,7 @@ var modelInfoTests = []struct {
 		CloudRegion:        "test-cloud-region",
 		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/cred-1").String(),
 		OwnerTag:           names.NewUserTag("alice@external").String(),
-		Life:               constants.ALIVE.String(),
+		Life:               life.Value(constants.ALIVE.String()),
 		Status: jujuparams.EntityStatus{
 			Status: "available",
 			Info:   "OK!",
@@ -1126,7 +1127,7 @@ var modelInfoTests = []struct {
 		CloudRegion:        "test-cloud-region",
 		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/cred-1").String(),
 		OwnerTag:           names.NewUserTag("alice@external").String(),
-		Life:               constants.ALIVE.String(),
+		Life:               life.Value(constants.ALIVE.String()),
 		Status: jujuparams.EntityStatus{
 			Status: "available",
 			Info:   "OK!",
@@ -1172,7 +1173,7 @@ func TestModelInfo(t *testing.T) {
 							mi.CloudRegion = "test-cloud-region"
 							mi.CloudCredentialTag = names.NewCloudCredentialTag("test-cloud/alice@external/cred-1").String()
 							mi.OwnerTag = names.NewUserTag("alice@external").String()
-							mi.Life = constants.ALIVE.String()
+							mi.Life = life.Value(constants.ALIVE.String())
 							mi.Status = jujuparams.EntityStatus{
 								Status: "available",
 								Info:   "OK!",
@@ -1293,7 +1294,7 @@ var modelStatusTests = []struct {
 		if ms.ModelTag != names.NewModelTag("00000002-0000-0000-0000-000000000001").String() {
 			return errors.E("incorrect model tag")
 		}
-		ms.Life = constants.ALIVE.String()
+		ms.Life = life.Value(constants.ALIVE.String())
 		ms.Type = "iaas"
 		ms.HostedMachineCount = 10
 		ms.ApplicationCount = 3
@@ -1305,7 +1306,7 @@ var modelStatusTests = []struct {
 	uuid:     "00000002-0000-0000-0000-000000000001",
 	expectModelStatus: &jujuparams.ModelStatus{
 		ModelTag:           names.NewModelTag("00000002-0000-0000-0000-000000000001").String(),
-		Life:               constants.ALIVE.String(),
+		Life:               life.Value(constants.ALIVE.String()),
 		Type:               "iaas",
 		HostedMachineCount: 10,
 		ApplicationCount:   3,
@@ -1529,7 +1530,7 @@ func TestForEachUserModel(t *testing.T) {
 			CloudRegion:        "test-cloud-region",
 			CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/cred-1").String(),
 			OwnerTag:           names.NewUserTag("alice@external").String(),
-			Life:               constants.ALIVE.String(),
+			Life:               life.Value(constants.ALIVE.String()),
 			Status: jujuparams.EntityStatus{
 				Status: "available",
 				Info:   "OK!",
@@ -1563,7 +1564,7 @@ func TestForEachUserModel(t *testing.T) {
 			CloudRegion:        "test-cloud-region",
 			CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/cred-1").String(),
 			OwnerTag:           names.NewUserTag("alice@external").String(),
-			Life:               constants.ALIVE.String(),
+			Life:               life.Value(constants.ALIVE.String()),
 			Status: jujuparams.EntityStatus{
 				Status: "available",
 				Info:   "OK!",
@@ -1597,7 +1598,7 @@ func TestForEachUserModel(t *testing.T) {
 			CloudRegion:        "test-cloud-region",
 			CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/cred-1").String(),
 			OwnerTag:           names.NewUserTag("alice@external").String(),
-			Life:               constants.ALIVE.String(),
+			Life:               life.Value(constants.ALIVE.String()),
 			Status: jujuparams.EntityStatus{
 				Status: "available",
 				Info:   "OK!",

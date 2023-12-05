@@ -14,12 +14,14 @@ import (
 	"github.com/juju/juju/api/client/modelmanager"
 	controllerapi "github.com/juju/juju/api/controller/controller"
 	"github.com/juju/juju/controller"
+	"github.com/juju/juju/core/life"
 	jujuparams "github.com/juju/juju/rpc/params"
 	jujuversion "github.com/juju/juju/version"
 	"github.com/juju/names/v4"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 
+	"github.com/canonical/jimm/internal/constants"
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/jimmtest"
 	"github.com/canonical/jimm/internal/jujuapi"
@@ -121,7 +123,7 @@ func (s *controllerSuite) TestModelStatus(c *gc.C) {
 		c.Assert(models, gc.HasLen, 2)
 		c.Check(models[0], jc.DeepEquals, base.ModelStatus{
 			UUID:               s.Model.UUID.String,
-			Life:               constants.ALIVE.String(),
+			Life:               life.Value(constants.ALIVE.String()),
 			Owner:              "bob@external",
 			TotalMachineCount:  0,
 			CoreCount:          0,

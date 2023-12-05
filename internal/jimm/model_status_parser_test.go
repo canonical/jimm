@@ -363,7 +363,7 @@ func TestQueryModelsJq(t *testing.T) {
 													MountPoint: "/home/ubuntu/myapp/.data",
 													ReadOnly:   false,
 												},
-												Life: constants.ALIVE.String(),
+												Life: life.Value(constants.ALIVE.String()),
 											},
 										},
 									},

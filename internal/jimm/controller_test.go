@@ -119,7 +119,7 @@ func TestAddController(t *testing.T) {
 			ms.CloudTag = "cloud-aws"
 			ms.CloudRegion = "eu-west-1"
 			ms.OwnerTag = "user-admin"
-			ms.Life = constants.ALIVE.String()
+			ms.Life = life.Value(constants.ALIVE.String())
 			ms.Status = jujuparams.EntityStatus{
 				Status: "available",
 			}
@@ -286,7 +286,7 @@ func TestAddControllerWithVault(t *testing.T) {
 			ms.CloudTag = "cloud-aws"
 			ms.CloudRegion = "eu-west-1"
 			ms.OwnerTag = "user-admin"
-			ms.Life = constants.ALIVE.String()
+			ms.Life = life.Value(constants.ALIVE.String())
 			ms.Status = jujuparams.EntityStatus{
 				Status: "available",
 			}
@@ -544,7 +544,7 @@ func TestImportModel(t *testing.T) {
 				ModelUUID:      "00000002-0000-0000-0000-000000000001",
 				Name:           "test-model",
 				Owner:          "alice@external",
-				Life:           constants.ALIVE.String(),
+				Life:           life.Value(constants.ALIVE.String()),
 				ControllerUUID: "00000001-0000-0000-0000-000000000001",
 				Status: jujuparams.StatusInfo{
 					Current: "available",
@@ -563,7 +563,7 @@ func TestImportModel(t *testing.T) {
 				Name:            "app-1",
 				Exposed:         true,
 				CharmURL:        "cs:app-1",
-				Life:            constants.ALIVE.String(),
+				Life:            life.Value(constants.ALIVE.String()),
 				MinUnits:        1,
 				WorkloadVersion: "2",
 			},
@@ -571,7 +571,7 @@ func TestImportModel(t *testing.T) {
 			Entity: &jujuparams.MachineInfo{
 				ModelUUID: "00000002-0000-0000-0000-000000000001",
 				Id:        "machine-1",
-				Life:      constants.ALIVE.String(),
+				Life:      life.Value(constants.ALIVE.String()),
 				Hostname:  "test-machine-1",
 			},
 		}, {

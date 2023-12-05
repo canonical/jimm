@@ -11,6 +11,7 @@ import (
 	qt "github.com/frankban/quicktest"
 	"gorm.io/gorm"
 
+	"github.com/canonical/jimm/internal/constants"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"

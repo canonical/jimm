@@ -12,6 +12,7 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"github.com/juju/juju/core/instance"
+	"github.com/juju/juju/core/life"
 	"github.com/juju/juju/core/migration"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
@@ -217,7 +218,7 @@ var watcherTests = []struct {
 				Name:            "app-1",
 				Exposed:         true,
 				CharmURL:        "cs:app-1",
-				Life:            constants.ALIVE.String(),
+				Life:            life.Value(constants.ALIVE.String()),
 				MinUnits:        1,
 				WorkloadVersion: "2",
 			},
@@ -357,7 +358,7 @@ var watcherTests = []struct {
 				ModelUUID:      "00000002-0000-0000-0000-000000000001",
 				Name:           "model-1",
 				Owner:          "alice@external",
-				Life:           constants.ALIVE.String(),
+				Life:           life.Value(constants.ALIVE.String()),
 				ControllerUUID: "00000001-0000-0000-0000-000000000001",
 				Status: jujuparams.StatusInfo{
 					Current: "available",
@@ -1177,7 +1178,7 @@ func TestWatcherIgnoreDeltasForModelsFromIncorrectController(t *testing.T) {
 			ModelUUID: "00000002-0000-0000-0000-000000000001",
 			Name:      "model-1",
 			Owner:     "alice@external",
-			Life:      constants.ALIVE.String(),
+			Life:      life.Value(constants.ALIVE.String()),
 			Status: jujuparams.StatusInfo{
 				Current: "busy",
 			},

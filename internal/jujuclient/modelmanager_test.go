@@ -15,6 +15,7 @@ import (
 	"github.com/juju/utils/v2"
 	gc "gopkg.in/check.v1"
 
+	"github.com/canonical/jimm/internal/constants"
 	"github.com/canonical/jimm/internal/jimmtest"
 )
 

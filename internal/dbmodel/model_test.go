@@ -8,10 +8,12 @@ import (
 	"time"
 
 	qt "github.com/frankban/quicktest"
+	"github.com/juju/juju/core/life"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 	"gorm.io/gorm"
 
+	"github.com/canonical/jimm/internal/constants"
 	"github.com/canonical/jimm/internal/dbmodel"
 )
 
@@ -291,7 +293,7 @@ func TestToJujuModelSummary(t *testing.T) {
 		CloudRegion:        "test-region",
 		CloudCredentialTag: "cloudcred-test-cloud_bob@external_test-cred",
 		OwnerTag:           "user-bob@external",
-		Life:               constants.ALIVE.String(),
+		Life:               life.Value(constants.ALIVE.String()),
 		Status: jujuparams.EntityStatus{
 			Status: "available",
 			Since:  &now,
@@ -367,7 +369,7 @@ func TestModelFromJujuModelInfo(t *testing.T) {
 		CloudCredentialTag:      "cloudcred-test-cloud_bob@external_test-cred",
 		CloudCredentialValidity: nil,
 		OwnerTag:                "user-bob@external",
-		Life:                    constants.ALIVE.String(),
+		Life:                    life.Value(constants.ALIVE.String()),
 		Status: jujuparams.EntityStatus{
 			Status: "available",
 			Since:  &now,
@@ -440,7 +442,7 @@ func TestModelFromJujuModelUpdate(t *testing.T) {
 
 	info := jujuparams.ModelUpdate{
 		Name: "test-model",
-		Life: constants.ALIVE.String(),
+		Life: life.Value(constants.ALIVE.String()),
 		Status: jujuparams.StatusInfo{
 			Current: "available",
 			Since:   &now,
