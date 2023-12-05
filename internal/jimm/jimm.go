@@ -493,7 +493,9 @@ func (j *JIMM) FullModelStatus(ctx context.Context, user *openfga.User, modelTag
 	return status, nil
 }
 
-func fillMigrationTarget(db db.Database, credStore credentials.CredentialStore, controllerName string) (jujuparams.MigrationTargetInfo, uint, error) {
+type migrationControllerID = uint
+
+func fillMigrationTarget(db db.Database, credStore credentials.CredentialStore, controllerName string) (jujuparams.MigrationTargetInfo, migrationControllerID, error) {
 	dbController := dbmodel.Controller{
 		Name: controllerName,
 	}
