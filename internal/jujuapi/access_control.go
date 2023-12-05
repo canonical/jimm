@@ -365,7 +365,7 @@ func (r *controllerRoot) CheckRelation(ctx context.Context, req apiparams.CheckR
 
 	userCheckingSelf := parsedTuple.Object.Kind == openfga.UserType && parsedTuple.Object.ID == r.user.Username
 
-	if !r.user.JimmAdmin && !userCheckingSelf {
+	if !(r.user.JimmAdmin || userCheckingSelf) {
 		return checkResp, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
