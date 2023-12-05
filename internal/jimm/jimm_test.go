@@ -26,7 +26,7 @@ import (
 func TestFindAuditEvents(t *testing.T) {
 	c := qt.New(t)
 
-	now := time.Now().UTC()
+	now := time.Now().UTC().Truncate(time.Microsecond)
 
 	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
