@@ -1494,9 +1494,9 @@ func TestInitiateMigration(t *testing.T) {
 			},
 		},
 		initiateMigrationResults: []result{{
-			err: errors.E("a silly error"),
+			err: errors.E("mocked error"),
 		}},
-		expectedError: "failed to initiate migration",
+		expectedError: "mocked error",
 	}, {
 		about: "non-admin-user gets unauthorized error",
 		user: func(client *openfga.OFGAClient) *openfga.User {
@@ -1624,7 +1624,7 @@ func TestInitiateMigration(t *testing.T) {
 
 			user := test.user(client)
 
-			result, err := j.InitiateMigration(context.Background(), user, test.spec)
+			result, err := j.InitiateMigration(context.Background(), user, test.spec, 0)
 			if test.expectedError == "" {
 				c.Assert(err, qt.IsNil)
 				c.Assert(result, qt.DeepEquals, test.expectedResult)

@@ -37,6 +37,7 @@ func NewSuperCommand() *jujucmd.SuperCommand {
 	jimmcmd.Register(cmd.NewAuthCommand())
 	jimmcmd.Register(cmd.NewCrossModelQueryCommand())
 	jimmcmd.Register(cmd.NewPurgeLogsCommand())
+	jimmcmd.Register(cmd.NewMigrateModelCommand())
 	return jimmcmd
 }
 

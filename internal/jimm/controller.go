@@ -18,6 +18,7 @@ import (
 	"go.uber.org/zap"
 	"gopkg.in/macaroon.v2"
 
+	"github.com/canonical/jimm/internal/constants"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
@@ -602,7 +603,9 @@ func (j *JIMM) UpdateMigratedModel(ctx context.Context, user *openfga.User, mode
 }
 
 // InitiateMigration triggers the migration of the specified model to a target controller.
-func (j *JIMM) InitiateMigration(ctx context.Context, user *openfga.User, spec jujuparams.MigrationSpec) (jujuparams.InitiateMigrationResult, error) {
+// externalMigration indicates whether this model is moving to a controller managed by
+// JIMM or not.
+func (j *JIMM) InitiateMigration(ctx context.Context, user *openfga.User, spec jujuparams.MigrationSpec, newControllerID uint) (jujuparams.InitiateMigrationResult, error) {
 	const op = errors.Op("jimm.InitiateMigration")
 
 	result := jujuparams.InitiateMigrationResult{
@@ -664,7 +667,19 @@ func (j *JIMM) InitiateMigration(ctx context.Context, user *openfga.User, spec j
 		TargetMacaroons:       targetMacaroons,
 	})
 	if err != nil {
-		return result, errors.E(op, "failed to initiate migration", err)
+		return result, errors.E(op, err)
+	}
+	// Track the model migration info
+	if newControllerID == 0 {
+		model.Life = constants.MIGRATING_AWAY.String()
+	} else {
+		model.Life = constants.MIGRATING_INTERNAL.String()
+		model.MigrationControllerID = sql.NullInt32{Int32: int32(newControllerID), Valid: true}
+	}
+	err = j.Database.UpdateModel(ctx, &model)
+	if err != nil {
+		zapctx.Error(ctx, "failed to update model with migration info", zap.Error(err))
+		return result, errors.E(op, "migration started but failed to queue JIMM automatic update", err)
 	}
 
 	return result, nil

@@ -153,6 +153,8 @@ func (s *JIMMSuite) AddController(c *gc.C, name string, info *api.Info) {
 	ctl := &dbmodel.Controller{
 		UUID:          info.ControllerUUID,
 		Name:          name,
+		AdminUser:     info.Tag.Id(),
+		AdminPassword: info.Password,
 		CACertificate: info.CACert,
 		Addresses:     nil,
 	}

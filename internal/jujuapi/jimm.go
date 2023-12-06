@@ -48,6 +48,7 @@ func init() {
 		listRelationshipTuplesMethod := rpc.Method(r.ListRelationshipTuples)
 		crossModelQueryMethod := rpc.Method(r.CrossModelQuery)
 		purgeLogsMethod := rpc.Method(r.PurgeLogs)
+		migrateModel := rpc.Method(r.MigrateModel)
 
 		// JIMM Generic RPC
 		r.AddMethod("JIMM", 4, "AddController", addControllerMethod)
@@ -64,6 +65,7 @@ func init() {
 		r.AddMethod("JIMM", 4, "AddCloudToController", addCloudToControllerMethod)
 		r.AddMethod("JIMM", 4, "RemoveCloudFromController", removeCloudFromControllerMethod)
 		r.AddMethod("JIMM", 4, "PurgeLogs", purgeLogsMethod)
+		r.AddMethod("JIMM", 4, "MigrateModel", migrateModel)
 		// JIMM ReBAC RPC
 		r.AddMethod("JIMM", 4, "AddGroup", addGroupMethod)
 		r.AddMethod("JIMM", 4, "RenameGroup", renameGroupMethod)
@@ -466,5 +468,30 @@ func (r *controllerRoot) PurgeLogs(ctx context.Context, req apiparams.PurgeLogsR
 	}
 	return apiparams.PurgeLogsResponse{
 		DeletedCount: deleted_count,
+	}, nil
+}
+
+// MigrateModel is a JIMM specific method for migrating models between two controllers that
+// are already attached to JIMM. See InitiateMigration in controller.go to migrate a model
+// in a controller attached to JIMM to one not managed by JIMM.
+func (r *controllerRoot) MigrateModel(ctx context.Context, args apiparams.MigrateModelRequest) (jujuparams.InitiateMigrationResults, error) {
+	const op = errors.Op("jujuapi.MigrateModel")
+
+	results := make([]jujuparams.InitiateMigrationResult, len(args.Specs))
+	for i, arg := range args.Specs {
+		mt, err := names.ParseModelTag(arg.ModelTag)
+		if err != nil {
+			results[i].Error = mapError(errors.E(op, err))
+			continue
+		}
+		result, err := r.jimm.InitiateInternalMigration(ctx, r.user, mt, arg.TargetController)
+		if err != nil {
+			result.Error = mapError(errors.E(op, err))
+		}
+		results[i] = result
+	}
+
+	return jujuparams.InitiateMigrationResults{
+		Results: results,
 	}, nil
 }

@@ -183,3 +183,10 @@ func (c *Client) PurgeLogs(req *params.PurgeLogsRequest) (*params.PurgeLogsRespo
 	err := c.caller.APICall("JIMM", 4, "", "PurgeLogs", req, &response)
 	return &response, err
 }
+
+// MigrateModel migrates a model between two controllers that are attached to JIMM.
+func (c *Client) MigrateModel(req *params.MigrateModelRequest) (*jujuparams.InitiateMigrationResults, error) {
+	var response jujuparams.InitiateMigrationResults
+	err := c.caller.APICall("JIMM", 4, "", "MigrateModel", req, &response)
+	return &response, err
+}
