@@ -61,7 +61,12 @@ jobs:
     # The docker compose has a healthcheck on the JIMM container.
     # So if the compose returns with exit code 0 then the JIMM server successfully started.
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+      # Specify a specific version of Go until GH runners no longer comes with anything below 1.21
+      - name: Setup Go 1.21.x
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21.x'
       - name: Pull candid repo for test environment
         run: |
           git clone https://github.com/canonical/candid.git ./tmp/candid
