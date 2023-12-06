@@ -125,10 +125,17 @@ func TestAuthenticator(t *testing.T) {
 	c.Check(conn.ControllerAccess(), qt.Equals, "")
 }
 
+const testVaultEnv = `clouds:
+- name: test
+  type: test
+  regions:
+  - name: test-region
+`
+
 func TestVault(t *testing.T) {
 	c := qt.New(t)
 
-	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
+	ofgaClient, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
 	p := jimm.Params{
@@ -145,6 +152,9 @@ func TestVault(t *testing.T) {
 
 	svc, err := jimm.NewService(context.Background(), p)
 	c.Assert(err, qt.IsNil)
+
+	env := jimmtest.ParseEnvironment(c, testVaultEnv)
+	env.PopulateDBAndPermissions(c, names.NewControllerTag(p.ControllerUUID), svc.JIMM().Database, ofgaClient)
 
 	srv := httptest.NewTLSServer(svc)
 	c.Cleanup(srv.Close)
@@ -164,7 +174,8 @@ func TestVault(t *testing.T) {
 	})
 
 	cloudClient := cloud.NewClient(conn)
-	tag := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/bob@external/test-1").String()
+
+	tag := names.NewCloudCredentialTag("test/bob@external/test-1").String()
 	_, err = cloudClient.UpdateCloudsCredentials(map[string]jujucloud.Credential{
 		tag: jujucloud.NewCredential(jujucloud.UserPassAuthType, map[string]string{
 			"username": "test-user",
@@ -179,7 +190,7 @@ func TestVault(t *testing.T) {
 		AuthPath:   p.VaultAuthPath,
 		KVPath:     p.VaultPath,
 	}
-	attr, err := store.Get(context.Background(), names.NewCloudCredentialTag(jimmtest.TestCloudName+"/bob@external/test-1"))
+	attr, err := store.Get(context.Background(), names.NewCloudCredentialTag("test/bob@external/test-1"))
 	c.Assert(err, qt.IsNil)
 	c.Check(attr, qt.DeepEquals, map[string]string{
 		"username": "test-user",
