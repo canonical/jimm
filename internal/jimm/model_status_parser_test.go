@@ -739,13 +739,13 @@ func TestQueryModelsJq(t *testing.T) {
 				  "Attachments": {
 					"containers": {
 					  "myapp/0/1": {
-						"life": constants.ALIVE.String(),
+						"life": "alive",
 						"mount-point": "/home/ubuntu/myapp/.data",
 						"read-only": false
 					  }
 					}
 				  },
-				  "life": constants.ALIVE.String(),
+				  "life": "alive",
 				  "pool": "pool-1",
 				  "provider-id": "da64ec3c-0cf7-42f2-9951-35a5a3eaadc1",
 				  "size": 4096,
