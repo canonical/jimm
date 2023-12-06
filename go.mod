@@ -1,6 +1,6 @@
 module github.com/canonical/jimm
 
-go 1.21.5
+go 1.21.3
 
 require (
 	github.com/canonical/candid v1.12.2
