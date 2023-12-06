@@ -612,9 +612,9 @@ func (s *relationSuite) TestCheckRelation(c *gc.C) {
 	_, err := cmdtesting.RunCommand(
 		c,
 		cmd.NewCheckRelationCommandForTesting(s.ClientStore(), bClient),
-		"diglett",
+		"user-diglett",
 		"reader",
-		"dugtrio",
+		"controller-jimm",
 	)
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }

@@ -486,8 +486,7 @@ func (r *controllerRoot) MigrateModel(ctx context.Context, args apiparams.Migrat
 		}
 		result, err := r.jimm.InitiateInternalMigration(ctx, r.user, mt, arg.TargetController)
 		if err != nil {
-			results[i].Error = mapError(errors.E(op, err))
-			continue
+			result.Error = mapError(errors.E(op, err))
 		}
 		results[i] = result
 	}
