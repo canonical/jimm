@@ -11,11 +11,13 @@ import (
 	"net/url"
 	"time"
 
+	cofga "github.com/canonical/ofga"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery/agent"
 	"github.com/juju/juju/api"
 	"github.com/juju/juju/core/network"
+	corejujutesting "github.com/juju/juju/juju/testing"
 	jjclient "github.com/juju/juju/jujuclient"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
@@ -32,7 +34,7 @@ import (
 
 type jimmSuite struct {
 	jimmtest.CandidSuite
-	jimmtest.JujuSuite
+	corejujutesting.JujuConnSuite
 
 	Params      service.Params
 	HTTP        *httptest.Server
@@ -41,6 +43,10 @@ type jimmSuite struct {
 	ClientStore func() *jjclient.MemStore
 	JIMM        *jimm.JIMM
 	cancel      context.CancelFunc
+
+	OFGAClient  *openfga.OFGAClient
+	COFGAClient *cofga.Client
+	COFGAParams *cofga.OpenFGAParams
 }
 
 func (s *jimmSuite) SetUpTest(c *gc.C) {
