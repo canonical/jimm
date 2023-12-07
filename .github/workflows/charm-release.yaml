@@ -1,4 +1,4 @@
-name: Release to v2/edge
+name: Release to v3/edge
 
 on:
   workflow_dispatch:
@@ -41,7 +41,7 @@ jobs:
           channel: "3/edge"
           charm-path: "./charms/jimm-k8s"
           pull-image: "false"
-          tag-prefix: "v2-k8s"
+          tag-prefix: "v3-k8s"
 
   release-machine-charm:
     name: Release machine charm
@@ -73,4 +73,4 @@ jobs:
           github-token: "${{ secrets.GITHUB_TOKEN }}"
           channel: "3/edge"
           charm-path: "./charms/jimm"
-          tag-prefix: "v2-machine"
+          tag-prefix: "v3-machine"

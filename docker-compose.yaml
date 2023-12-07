@@ -23,7 +23,7 @@ services:
       retries: 3
     
   jimm:
-    image: cosmtrek/air
+    image: cosmtrek/air:latest
     profiles: ["dev"]
     # extra_hosts:
     # - "host.docker.internal:host-gateway"
@@ -83,7 +83,7 @@ services:
       test: [ "CMD", "curl", "http://jimm.localhost:80" ]
       interval: 5s
       timeout: 5s
-      retries: 50
+      retries: 50 # Should fail after approximately (interval*retry) seconds
     depends_on:
       db:
         condition: service_healthy
