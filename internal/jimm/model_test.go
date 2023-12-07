@@ -14,11 +14,13 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/google/uuid"
+	"github.com/juju/juju/core/life"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 	"github.com/juju/version/v2"
 	"sigs.k8s.io/yaml"
 
+	"github.com/canonical/jimm/internal/constants"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
@@ -252,7 +254,7 @@ users:
 			Name:     "test-credential-1",
 			AuthType: "empty",
 		},
-		Life: "alive",
+		Life: constants.ALIVE.String(),
 		Status: dbmodel.Status{
 			Status: "started",
 			Info:   "running a test",
@@ -363,7 +365,7 @@ users:
 			Name:     "test-credential-1",
 			AuthType: "empty",
 		},
-		Life: "alive",
+		Life: constants.ALIVE.String(),
 		Status: dbmodel.Status{
 			Status: "started",
 			Info:   "running a test",
@@ -453,7 +455,7 @@ users:
 			Name:     "test-credential-1",
 			AuthType: "empty",
 		},
-		Life: "alive",
+		Life: constants.ALIVE.String(),
 		Status: dbmodel.Status{
 			Status: "started",
 			Info:   "running a test",
@@ -548,7 +550,7 @@ users:
 			Name:     "test-credential-1",
 			AuthType: "empty",
 		},
-		Life: "alive",
+		Life: constants.ALIVE.String(),
 		Status: dbmodel.Status{
 			Status: "started",
 			Info:   "running a test",
@@ -980,7 +982,7 @@ var modelInfoTests = []struct {
 		CloudRegion:        "test-cloud-region",
 		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/cred-1").String(),
 		OwnerTag:           names.NewUserTag("alice@external").String(),
-		Life:               "alive",
+		Life:               life.Value(constants.ALIVE.String()),
 		Status: jujuparams.EntityStatus{
 			Status: "available",
 			Info:   "OK!",
@@ -1034,7 +1036,7 @@ var modelInfoTests = []struct {
 		CloudRegion:        "test-cloud-region",
 		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/cred-1").String(),
 		OwnerTag:           names.NewUserTag("alice@external").String(),
-		Life:               "alive",
+		Life:               life.Value(constants.ALIVE.String()),
 		Status: jujuparams.EntityStatus{
 			Status: "available",
 			Info:   "OK!",
@@ -1082,7 +1084,7 @@ var modelInfoTests = []struct {
 		CloudRegion:        "test-cloud-region",
 		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/cred-1").String(),
 		OwnerTag:           names.NewUserTag("alice@external").String(),
-		Life:               "alive",
+		Life:               life.Value(constants.ALIVE.String()),
 		Status: jujuparams.EntityStatus{
 			Status: "available",
 			Info:   "OK!",
@@ -1125,7 +1127,7 @@ var modelInfoTests = []struct {
 		CloudRegion:        "test-cloud-region",
 		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/cred-1").String(),
 		OwnerTag:           names.NewUserTag("alice@external").String(),
-		Life:               "alive",
+		Life:               life.Value(constants.ALIVE.String()),
 		Status: jujuparams.EntityStatus{
 			Status: "available",
 			Info:   "OK!",
@@ -1171,7 +1173,7 @@ func TestModelInfo(t *testing.T) {
 							mi.CloudRegion = "test-cloud-region"
 							mi.CloudCredentialTag = names.NewCloudCredentialTag("test-cloud/alice@external/cred-1").String()
 							mi.OwnerTag = names.NewUserTag("alice@external").String()
-							mi.Life = "alive"
+							mi.Life = life.Value(constants.ALIVE.String())
 							mi.Status = jujuparams.EntityStatus{
 								Status: "available",
 								Info:   "OK!",
@@ -1292,7 +1294,7 @@ var modelStatusTests = []struct {
 		if ms.ModelTag != names.NewModelTag("00000002-0000-0000-0000-000000000001").String() {
 			return errors.E("incorrect model tag")
 		}
-		ms.Life = "alive"
+		ms.Life = life.Value(constants.ALIVE.String())
 		ms.Type = "iaas"
 		ms.HostedMachineCount = 10
 		ms.ApplicationCount = 3
@@ -1304,7 +1306,7 @@ var modelStatusTests = []struct {
 	uuid:     "00000002-0000-0000-0000-000000000001",
 	expectModelStatus: &jujuparams.ModelStatus{
 		ModelTag:           names.NewModelTag("00000002-0000-0000-0000-000000000001").String(),
-		Life:               "alive",
+		Life:               life.Value(constants.ALIVE.String()),
 		Type:               "iaas",
 		HostedMachineCount: 10,
 		ApplicationCount:   3,
@@ -1528,7 +1530,7 @@ func TestForEachUserModel(t *testing.T) {
 			CloudRegion:        "test-cloud-region",
 			CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/cred-1").String(),
 			OwnerTag:           names.NewUserTag("alice@external").String(),
-			Life:               "alive",
+			Life:               life.Value(constants.ALIVE.String()),
 			Status: jujuparams.EntityStatus{
 				Status: "available",
 				Info:   "OK!",
@@ -1562,7 +1564,7 @@ func TestForEachUserModel(t *testing.T) {
 			CloudRegion:        "test-cloud-region",
 			CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/cred-1").String(),
 			OwnerTag:           names.NewUserTag("alice@external").String(),
-			Life:               "alive",
+			Life:               life.Value(constants.ALIVE.String()),
 			Status: jujuparams.EntityStatus{
 				Status: "available",
 				Info:   "OK!",
@@ -1596,7 +1598,7 @@ func TestForEachUserModel(t *testing.T) {
 			CloudRegion:        "test-cloud-region",
 			CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/cred-1").String(),
 			OwnerTag:           names.NewUserTag("alice@external").String(),
-			Life:               "alive",
+			Life:               life.Value(constants.ALIVE.String()),
 			Status: jujuparams.EntityStatus{
 				Status: "available",
 				Info:   "OK!",
@@ -2843,7 +2845,7 @@ func TestDestroyModel(t *testing.T) {
 			}
 			err = j.Database.GetModel(ctx, &m)
 			c.Assert(err, qt.IsNil)
-			c.Check(m.Life, qt.Equals, "dying")
+			c.Check(m.Life, qt.Equals, constants.DYING.String())
 		})
 	}
 }

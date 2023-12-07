@@ -558,7 +558,7 @@ func (w *Watcher) deleteModel(ctx context.Context, model *dbmodel.Model) error {
 				return err
 			}
 		}
-		if model.Life != "dying" && model.Life != "dead" {
+		if !(model.Life == constants.DYING.String() || model.Life == constants.DEAD.String()) {
 			// If the model hasn't been marked as dying, don't remove it.
 			return nil
 		}
