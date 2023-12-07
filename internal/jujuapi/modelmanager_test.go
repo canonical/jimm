@@ -56,7 +56,12 @@ func (s *modelManagerSuite) TestListModelSummaries(c *gc.C) {
 	client := modelmanager.NewClient(conn)
 	models, err := client.ListModelSummaries("bob@external", false)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(models, jimmtest.CmpEquals(cmpopts.IgnoreTypes(&time.Time{})), []base.UserModelSummary{{
+	c.Assert(models, jimmtest.CmpEquals(
+		cmpopts.IgnoreTypes(&time.Time{}),
+		cmpopts.SortSlices(func(a, b base.UserModelSummary) bool {
+			return a.Name < b.Name
+		}),
+	), []base.UserModelSummary{{
 		Name:            "model-1",
 		UUID:            s.Model.UUID.String,
 		ControllerUUID:  "914487b5-60e7-42bb-bd63-1adc3fd3a388",
@@ -159,7 +164,12 @@ func (s *modelManagerSuite) TestListModelSummariesWithoutControllerUUIDMasking(c
 	client := modelmanager.NewClient(conn)
 	models, err := client.ListModelSummaries("bob", false)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(models, jimmtest.CmpEquals(cmpopts.IgnoreTypes(&time.Time{})), []base.UserModelSummary{{
+	c.Assert(models, jimmtest.CmpEquals(
+		cmpopts.IgnoreTypes(&time.Time{}),
+		cmpopts.SortSlices(func(a, b base.UserModelSummary) bool {
+			return a.Name < b.Name
+		}),
+	), []base.UserModelSummary{{
 		Name:            "model-1",
 		UUID:            s.Model.UUID.String,
 		ControllerUUID:  "deadbeef-1bad-500d-9000-4b1d0d06f00d",
@@ -231,7 +241,7 @@ func (s *modelManagerSuite) TestListModels(c *gc.C) {
 	client := modelmanager.NewClient(conn)
 	models, err := client.ListModels("bob")
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(models, jc.DeepEquals, []base.UserModel{{
+	c.Assert(models, jc.SameContents, []base.UserModel{{
 		Name:  "model-1",
 		UUID:  s.Model.UUID.String,
 		Owner: "bob@external",
@@ -1374,7 +1384,12 @@ func (s *caasModelManagerSuite) TestListCAASModelSummaries(c *gc.C) {
 
 	models, err := client.ListModelSummaries("bob", false)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(models, jimmtest.CmpEquals(cmpopts.IgnoreTypes(&time.Time{})), []base.UserModelSummary{{
+	c.Assert(models, jimmtest.CmpEquals(
+		cmpopts.IgnoreTypes(&time.Time{}),
+		cmpopts.SortSlices(func(a, b base.UserModelSummary) bool {
+			return a.Name < b.Name
+		}),
+	), []base.UserModelSummary{{
 		Name:            "k8s-model-1",
 		UUID:            mi.UUID,
 		ControllerUUID:  "914487b5-60e7-42bb-bd63-1adc3fd3a388",
@@ -1465,7 +1480,7 @@ func (s *caasModelManagerSuite) TestListCAASModels(c *gc.C) {
 
 	models, err := client.ListModels("bob")
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(models, jc.DeepEquals, []base.UserModel{{
+	c.Assert(models, jc.SameContents, []base.UserModel{{
 		Name:  "k8s-model-1",
 		UUID:  mi.UUID,
 		Owner: "bob@external",
