@@ -20,6 +20,7 @@ import (
 	"gopkg.in/macaroon.v2"
 	"gorm.io/gorm"
 
+	"github.com/canonical/jimm/internal/constants"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
@@ -914,7 +915,7 @@ func TestGetApplicationOffer(t *testing.T) {
 							Subnets: []jujuparams.Subnet{{
 								SpaceTag: "test-remote-space",
 								VLANTag:  1024,
-								Status:   "dead",
+								Status:   constants.DEAD.String(),
 							}},
 						}},
 						Bindings: map[string]string{
@@ -1094,7 +1095,7 @@ func TestGetApplicationOffer(t *testing.T) {
 					Subnets: []jujuparams.Subnet{{
 						SpaceTag: "test-remote-space",
 						VLANTag:  1024,
-						Status:   "dead",
+						Status:   constants.DEAD.String(),
 					}},
 				}},
 			},
@@ -1142,7 +1143,7 @@ func TestGetApplicationOffer(t *testing.T) {
 					Subnets: []jujuparams.Subnet{{
 						SpaceTag: "test-remote-space",
 						VLANTag:  1024,
-						Status:   "dead",
+						Status:   constants.DEAD.String(),
 					}},
 				}},
 			},
@@ -1219,7 +1220,7 @@ func TestOffer(t *testing.T) {
 					Subnets: []jujuparams.Subnet{{
 						SpaceTag: "test-remote-space",
 						VLANTag:  1024,
-						Status:   "alive",
+						Status:   constants.ALIVE.String(),
 					}},
 				}},
 				Bindings: map[string]string{
@@ -2026,7 +2027,7 @@ func TestOfferAssertOpenFGARelationsExist(t *testing.T) {
 					Subnets: []jujuparams.Subnet{{
 						SpaceTag: "test-remote-space",
 						VLANTag:  1024,
-						Status:   "alive",
+						Status:   constants.ALIVE.String(),
 					}},
 				}},
 				Bindings: map[string]string{
@@ -2410,7 +2411,7 @@ func TestUpdateOffer(t *testing.T) {
 									Subnets: []jujuparams.Subnet{{
 										SpaceTag: "test-remote-space",
 										VLANTag:  1024,
-										Status:   "dead",
+										Status:   constants.DEAD.String(),
 									}},
 								}},
 								Bindings: map[string]string{

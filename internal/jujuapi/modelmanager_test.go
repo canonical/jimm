@@ -26,6 +26,7 @@ import (
 	"github.com/juju/utils/v2"
 	gc "gopkg.in/check.v1"
 
+	"github.com/canonical/jimm/internal/constants"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/jimmtest"
 	"github.com/canonical/jimm/internal/kubetest"
@@ -71,7 +72,7 @@ func (s *modelManagerSuite) TestListModelSummaries(c *gc.C) {
 		CloudRegion:     jimmtest.TestCloudRegionName,
 		CloudCredential: jimmtest.TestCloudName + "/bob@external/cred",
 		Owner:           "bob@external",
-		Life:            "alive",
+		Life:            life.Value(constants.ALIVE.String()),
 		Status: base.Status{
 			Status: status.Available,
 			Data:   map[string]interface{}{},
@@ -102,7 +103,7 @@ func (s *modelManagerSuite) TestListModelSummaries(c *gc.C) {
 		CloudRegion:     jimmtest.TestCloudRegionName,
 		CloudCredential: jimmtest.TestCloudName + "/charlie@external/cred",
 		Owner:           "charlie@external",
-		Life:            "alive",
+		Life:            life.Value(constants.ALIVE.String()),
 		Status: base.Status{
 			Status: status.Available,
 			Data:   map[string]interface{}{},
@@ -179,7 +180,7 @@ func (s *modelManagerSuite) TestListModelSummariesWithoutControllerUUIDMasking(c
 		CloudRegion:     jimmtest.TestCloudRegionName,
 		CloudCredential: jimmtest.TestCloudName + "/bob@external/cred",
 		Owner:           "bob@external",
-		Life:            "alive",
+		Life:            life.Value(constants.ALIVE.String()),
 		Status: base.Status{
 			Status: status.Available,
 			Data:   map[string]interface{}{},
@@ -210,7 +211,7 @@ func (s *modelManagerSuite) TestListModelSummariesWithoutControllerUUIDMasking(c
 		CloudRegion:     jimmtest.TestCloudRegionName,
 		CloudCredential: jimmtest.TestCloudName + "/charlie@external/cred",
 		Owner:           "charlie@external",
-		Life:            "alive",
+		Life:            life.Value(constants.ALIVE.String()),
 		Status: base.Status{
 			Status: status.Available,
 			Data:   map[string]interface{}{},
@@ -1399,7 +1400,7 @@ func (s *caasModelManagerSuite) TestListCAASModelSummaries(c *gc.C) {
 		CloudRegion:     "default",
 		CloudCredential: s.cred.Id(),
 		Owner:           "bob@external",
-		Life:            "alive",
+		Life:            life.Value(constants.ALIVE.String()),
 		Status: base.Status{
 			Status: status.Available,
 			Data:   map[string]interface{}{},
@@ -1431,7 +1432,7 @@ func (s *caasModelManagerSuite) TestListCAASModelSummaries(c *gc.C) {
 		CloudRegion:     jimmtest.TestCloudRegionName,
 		CloudCredential: jimmtest.TestCloudName + "/bob@external/cred",
 		Owner:           "bob@external",
-		Life:            "alive",
+		Life:            life.Value(constants.ALIVE.String()),
 		Status: base.Status{
 			Status: status.Available,
 			Data:   map[string]interface{}{},
@@ -1453,7 +1454,7 @@ func (s *caasModelManagerSuite) TestListCAASModelSummaries(c *gc.C) {
 		CloudRegion:     jimmtest.TestCloudRegionName,
 		CloudCredential: jimmtest.TestCloudName + "/charlie@external/cred",
 		Owner:           "charlie@external",
-		Life:            "alive",
+		Life:            life.Value(constants.ALIVE.String()),
 		Status: base.Status{
 			Status: status.Available,
 			Data:   map[string]interface{}{},

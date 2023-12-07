@@ -12,10 +12,12 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"github.com/juju/juju/core/instance"
+	"github.com/juju/juju/core/life"
 	"github.com/juju/juju/core/migration"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 
+	"github.com/canonical/jimm/internal/constants"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
@@ -216,7 +218,7 @@ var watcherTests = []struct {
 				Name:            "app-1",
 				Exposed:         true,
 				CharmURL:        "cs:app-1",
-				Life:            "alive",
+				Life:            life.Value(constants.ALIVE.String()),
 				MinUnits:        1,
 				WorkloadVersion: "2",
 			},
@@ -356,7 +358,7 @@ var watcherTests = []struct {
 				ModelUUID:      "00000002-0000-0000-0000-000000000001",
 				Name:           "model-1",
 				Owner:          "alice@external",
-				Life:           "alive",
+				Life:           life.Value(constants.ALIVE.String()),
 				ControllerUUID: "00000001-0000-0000-0000-000000000001",
 				Status: jujuparams.StatusInfo{
 					Current: "available",
@@ -396,7 +398,7 @@ var watcherTests = []struct {
 			Name:          "model-1",
 			Type:          "iaas",
 			DefaultSeries: "warty",
-			Life:          "alive",
+			Life:          constants.ALIVE.String(),
 			Status: dbmodel.Status{
 				Status:  "available",
 				Info:    "updated status message",
@@ -492,7 +494,7 @@ var watcherTests = []struct {
 			Name:          "model-1",
 			Type:          "iaas",
 			DefaultSeries: "warty",
-			Life:          "alive",
+			Life:          constants.ALIVE.String(),
 			Status: dbmodel.Status{
 				Status: "available",
 				Info:   "OK!",
@@ -1067,7 +1069,7 @@ func TestWatcherCleansFailedMigrations(t *testing.T) {
 	err = w.Database.GetModel(context.Background(), &modelInternalMigrated)
 	c.Assert(err, qt.IsNil)
 	c.Assert(modelInternalMigrated.Controller.Name, qt.Equals, "controller-1")
-	c.Assert(modelInternalMigrated.Life, qt.Equals, "alive")
+	c.Assert(modelInternalMigrated.Life, qt.Equals, constants.ALIVE.String())
 	c.Assert(modelInternalMigrated.MigrationControllerID, qt.Equals, sql.NullInt32{})
 }
 
@@ -1176,7 +1178,7 @@ func TestWatcherIgnoreDeltasForModelsFromIncorrectController(t *testing.T) {
 			ModelUUID: "00000002-0000-0000-0000-000000000001",
 			Name:      "model-1",
 			Owner:     "alice@external",
-			Life:      "alive",
+			Life:      life.Value(constants.ALIVE.String()),
 			Status: jujuparams.StatusInfo{
 				Current: "busy",
 			},

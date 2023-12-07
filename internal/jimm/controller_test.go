@@ -22,6 +22,7 @@ import (
 	semversion "github.com/juju/version"
 	"gopkg.in/macaroon.v2"
 
+	"github.com/canonical/jimm/internal/constants"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
@@ -118,7 +119,7 @@ func TestAddController(t *testing.T) {
 			ms.CloudTag = "cloud-aws"
 			ms.CloudRegion = "eu-west-1"
 			ms.OwnerTag = "user-admin"
-			ms.Life = "alive"
+			ms.Life = life.Value(constants.ALIVE.String())
 			ms.Status = jujuparams.EntityStatus{
 				Status: "available",
 			}
@@ -285,7 +286,7 @@ func TestAddControllerWithVault(t *testing.T) {
 			ms.CloudTag = "cloud-aws"
 			ms.CloudRegion = "eu-west-1"
 			ms.OwnerTag = "user-admin"
-			ms.Life = "alive"
+			ms.Life = life.Value(constants.ALIVE.String())
 			ms.Status = jujuparams.EntityStatus{
 				Status: "available",
 			}
@@ -543,7 +544,7 @@ func TestImportModel(t *testing.T) {
 				ModelUUID:      "00000002-0000-0000-0000-000000000001",
 				Name:           "test-model",
 				Owner:          "alice@external",
-				Life:           "alive",
+				Life:           life.Value(constants.ALIVE.String()),
 				ControllerUUID: "00000001-0000-0000-0000-000000000001",
 				Status: jujuparams.StatusInfo{
 					Current: "available",
@@ -562,7 +563,7 @@ func TestImportModel(t *testing.T) {
 				Name:            "app-1",
 				Exposed:         true,
 				CharmURL:        "cs:app-1",
-				Life:            "alive",
+				Life:            life.Value(constants.ALIVE.String()),
 				MinUnits:        1,
 				WorkloadVersion: "2",
 			},
@@ -570,7 +571,7 @@ func TestImportModel(t *testing.T) {
 			Entity: &jujuparams.MachineInfo{
 				ModelUUID: "00000002-0000-0000-0000-000000000001",
 				Id:        "machine-1",
-				Life:      "alive",
+				Life:      life.Value(constants.ALIVE.String()),
 				Hostname:  "test-machine-1",
 			},
 		}, {
@@ -624,7 +625,7 @@ func TestImportModel(t *testing.T) {
 			},
 			Type:          "test-type",
 			DefaultSeries: "test-series",
-			Life:          "alive",
+			Life:          constants.ALIVE.String(),
 			Status: dbmodel.Status{
 				Status: "available",
 				Info:   "updated status message",
@@ -712,7 +713,7 @@ func TestImportModel(t *testing.T) {
 			},
 			Type:          "test-type",
 			DefaultSeries: "test-series",
-			Life:          "alive",
+			Life:          constants.ALIVE.String(),
 			Status: dbmodel.Status{
 				Status: "available",
 				Info:   "test-info",

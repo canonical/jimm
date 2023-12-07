@@ -5,24 +5,13 @@ with the local Q/A environment. This environment is additionally
 used for integration testing within the JIMM test suite.
 
 # Starting the environment
-1. Ensure you have docker above v18, confirm this with `docker --version` or
-   [install it](https://docs.docker.com/engine/install/ubuntu/#installation-methods) (you
-   may need to log out and back in to proceed without sudo).
-2. Ensure you have Go installed, confirm this with `go version` or install it with `sudo snap install go --classic`
-3. Install build-essentials to build the jimmctl tool (this tool is used to communicate with the JIMM server), `sudo apt install -y build-essential`
-4. Ensure you are in the root JIMM directory.
-5. Run `make pull/candid` to get a local image of candid (this is subject to change!)
-6. Run `cd local/traefik/certs; ./certs.sh; cd -`, this will setup some self signed certs and add them to your cert pool.
-7. Run `touch ./local/vault/approle.json && touch ./local/vault/roleid.txt`
-8. Run `make version/commit.txt && make version/version.txt` to populate the repo with the git commit and version info.
-9. Run `go mod vendor` to vendor JIMM's dependencies and reduce repeated setup time.
-10. `docker compose --profile dev up` if you encounter an error like "Error response from daemon: network ... not found" then the command `docker compose --profile dev up --force-recreate` should help.
+1. Ensure you have `make` installed `sudo apt install make`
+2. Check for system dependecies with `make sys-deps` this will inform you of any missing dependies and how to install them.
+3. Set up necessary prequisites with `make dev-env-setup`
+4. Start the dev env `make dev-env`, going forward you can skip steps 1-3.
+5. To teardown the dev env `make dev-env-cleanup`
 
-After this initial setup, subsequent use of the compose can be done with `docker
-compose --profile dev up --force-recreate` (it may be necessary to run `docker
-compose down -v --remove-orphans` first).
-
-The services included are:
+The service is started using Docker Compose, the following services should be started:
 - JIMM (only started in the dev profile)
 - Vault
 - Postgres
