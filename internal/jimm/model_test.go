@@ -158,6 +158,9 @@ clouds:
   type: test-provider
   regions:
   - name: test-region-1
+  users:
+  - user: alice@external
+    access: add-model
 user-defaults:
 - user: alice@external
   defaults:
@@ -268,6 +271,9 @@ clouds:
   type: test-provider
   regions:
   - name: test-region-1
+  users:
+  - user: alice@external
+    access: add-model
 user-defaults:
 - user: alice@external
   defaults:
@@ -379,6 +385,9 @@ clouds:
   type: test-provider
   regions:
   - name: test-region-1
+  users:
+  - user: alice@external
+    access: add-model
 cloud-credentials:
 - name: test-credential-1
   owner: alice@external
@@ -469,6 +478,11 @@ clouds:
   type: test-provider
   regions:
   - name: test-region-1
+  users:
+  - user: alice@external
+    access: admin
+  - user: bob@external
+    access: add-model
 cloud-credentials:
 - name: test-credential-1
   owner: alice@external
@@ -564,6 +578,9 @@ clouds:
   type: test-provider
   regions:
   - name: test-region-1
+  users:
+  - user: alice@external
+    access: add-model
 cloud-credentials:
 - name: test-credential-1
   owner: alice@external
@@ -627,6 +644,9 @@ clouds:
   type: test-provider
   regions:
   - name: test-region-1
+  users:
+  - user: alice@external
+    access: add-model
 cloud-credentials:
 - name: test-credential-1
   owner: alice@external
@@ -677,6 +697,9 @@ clouds:
   type: test-provider
   regions:
   - name: test-region-1
+  users:
+  - user: alice@external
+    access: add-model
 - name: test-cloud-2
   type: test-provider
   regions:
@@ -752,6 +775,9 @@ clouds:
   type: test-provider
   regions:
   - name: test-region-1
+  users:
+  - user: alice@external
+    access: add-model
 cloud-credentials:
 - name: test-credential-1
   owner: alice@external
@@ -803,6 +829,63 @@ users:
 		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1").String(),
 	},
 	expectError: "failed to update cloud credential: a silly error",
+}, {
+	name: "UserWithoutAddModelPermission",
+	env: `
+clouds:
+- name: test-cloud
+  type: test-provider
+  regions:
+  - name: test-region-1
+cloud-credentials:
+- name: test-credential-1
+  owner: alice@external
+  cloud: test-cloud
+  auth-type: empty
+controllers:
+- name: controller-1
+  uuid: 00000000-0000-0000-0000-0000-0000000000001
+  cloud: test-cloud
+  region: test-region-1
+  cloud-regions:
+  - cloud: test-cloud
+    region: test-region-1
+    priority: 0
+- name: controller-2
+  uuid: 00000000-0000-0000-0000-0000-0000000000002
+  cloud: test-cloud
+  region: test-region-1
+  cloud-regions:
+  - cloud: test-cloud
+    region: test-region-1
+    priority: 1
+`[1:],
+	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
+		return nil, nil
+	},
+	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
+		return nil
+	},
+	createModel: createModel(`
+uuid: 00000001-0000-0000-0000-0000-000000000001
+status:
+  status: started
+  info: running a test
+life: alive
+users:
+- user: alice@external
+  access: admin
+`[1:]),
+	username:  "alice@external",
+	jimmAdmin: true,
+	args: jujuparams.ModelCreateArgs{
+		Name:               "test-model",
+		OwnerTag:           names.NewUserTag("alice@external").String(),
+		CloudTag:           names.NewCloudTag("test-cloud").String(),
+		CloudRegion:        "test-region-1",
+		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1").String(),
+	},
+	expectError: "unauthorized",
 }}
 
 func TestAddModel(t *testing.T) {
@@ -3482,6 +3565,9 @@ clouds:
   regions:
   - name: test-region-1
   - name: test-region-2
+  users:
+  - user: alice@external
+    access: add-model
 user-defaults:
 - user: alice@external
   controller-access: superuser

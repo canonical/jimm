@@ -255,6 +255,7 @@ func (b *modelBuilder) WithCloudCredential(credentialTag names.CloudCredentialTa
 		b.err = errors.E(err, fmt.Sprintf("failed to fetch cloud credentials %s", credential.Path()))
 	}
 	b.credential = &credential
+
 	return b
 }
 
@@ -509,10 +510,10 @@ func (b *modelBuilder) JujuModelInfo() *jujuparams.ModelInfo {
 func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCreateArgs) (_ *jujuparams.ModelInfo, err error) {
 	const op = errors.Op("jimm.AddModel")
 
-	owner := dbmodel.User{
+	owner := &dbmodel.User{
 		Username: args.Owner.Id(),
 	}
-	err = j.Database.GetUser(ctx, &owner)
+	err = j.Database.GetUser(ctx, owner)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
@@ -522,10 +523,8 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
-	// TODO(Kian) CSS-6081 Missing check for add-model access on the desired cloud.
-
 	builder := newModelBuilder(ctx, j)
-	builder = builder.WithOwner(&owner)
+	builder = builder.WithOwner(owner)
 	builder = builder.WithName(args.Name)
 	if err := builder.Error(); err != nil {
 		return nil, errors.E(op, err)
@@ -562,6 +561,16 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 	builder = builder.WithCloudRegion(args.CloudRegion)
 	if err := builder.Error(); err != nil {
 		return nil, errors.E(op, err)
+	}
+
+	// at this point we know which cloud will host the model and
+	// we must check the user has add-model permission on the cloud
+	canAddModel, err := openfga.NewUser(owner, j.OpenFGAClient).IsAllowedAddModel(ctx, builder.cloud.ResourceTag())
+	if err != nil {
+		return nil, errors.E(op, "permission check failed")
+	}
+	if !canAddModel {
+		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
 	// fetch cloud region defaults
@@ -620,7 +629,7 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 			zap.String("model", builder.model.UUID.String),
 		)
 	}
-	err = openfga.NewUser(&owner, j.OpenFGAClient).SetModelAccess(ctx, names.NewModelTag(mi.UUID), ofganames.AdministratorRelation)
+	err = openfga.NewUser(owner, j.OpenFGAClient).SetModelAccess(ctx, names.NewModelTag(mi.UUID), ofganames.AdministratorRelation)
 	if err != nil {
 		zapctx.Error(
 			ctx,

@@ -21,9 +21,9 @@ var _ = gc.Suite(&storageSuite{})
 func (s *storageSuite) TestListFilesystems(c *gc.C) {
 	ctx := context.Background()
 
-	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/bob@external/pw1").String()
+	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/bob@external/pw1")
 	cred := jujuparams.TaggedCredential{
-		Tag: cct,
+		Tag: cct.String(),
 		Credential: jujuparams.CloudCredential{
 			AuthType: "userpass",
 			Attributes: map[string]string{
@@ -51,7 +51,7 @@ func (s *storageSuite) TestListFilesystems(c *gc.C) {
 	err = s.API.CreateModel(ctx, &jujuparams.ModelCreateArgs{
 		Name:               "model-1",
 		OwnerTag:           names.NewUserTag("bob@external").String(),
-		CloudCredentialTag: cct,
+		CloudCredentialTag: cct.String(),
 	}, &modelInfo)
 	c.Assert(err, gc.Equals, nil)
 	uuid := modelInfo.UUID

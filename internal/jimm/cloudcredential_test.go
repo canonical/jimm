@@ -361,6 +361,10 @@ func TestUpdateCloudCredential(t *testing.T) {
 			err = alice.SetCloudAccess(context.Background(), cloud.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 
+			e := openfga.NewUser(&eve, client)
+			err = e.SetCloudAccess(context.Background(), cloud.ResourceTag(), ofganames.CanAddModelRelation)
+			c.Assert(err, qt.IsNil)
+
 			controller1 := dbmodel.Controller{
 				Name:        "test-controller-1",
 				UUID:        "00000000-0000-0000-0000-0000-0000000000001",
