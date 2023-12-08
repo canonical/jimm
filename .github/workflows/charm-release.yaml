@@ -31,6 +31,9 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true 
+      - uses: actions/setup-go@v4
+        with:
+          go-version-file: 'go.mod'
       - name: Build local images
         run: make jimm-image
       - name: Upload charm to charmhub
