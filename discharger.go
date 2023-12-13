@@ -76,32 +76,12 @@ type macaroonDischarger struct {
 // checks third party caveats addressed to this service.
 // Caveat format is:
 //
-//	is-<relation name> <user tag> <resource tag>
-//
-// Examples of caveats are:
-//
-//	is-reader <user tag> <offer tag containing uuid>
-//	is-consumer <user tag> <offer tag containing uuid>
-//	is-administrator <user tag> <offer tag containing uuid>
-//	is-reader <user tag> <model tag containing uuid>
-//	is-writer <user tag> <model tag containing uuid>
-//	is-admininistrator <user tag> <model tag containing uuid>
-//	is-admininistrator <user tag> <controller tag containing uuid>
+//	is-consumer <user tag> <offer uuid>
 //
 // The discharged macaroon will contain a time-before first party caveat and
-// a declared caveat declaring relation to the required entity in form of:
+// a declared caveat declaring offer uuid:
 //
-//	<relation> <entity tag>
-//
-// Example:
-//  1. if the third party caveat condition is:
-//     is-reader <user tag> <offer tag containing uuid>
-//     the declared caveat will contain
-//     reader <offer tag>
-//  2. if the third party caveat condition is:
-//     is-writer <user tag> <model tag containing uuid>
-//     the declared caveat will contain
-//     writer <model tag>
+//	declared offer-uuid <offer uuid>
 func (md *macaroonDischarger) checkThirdPartyCaveat(ctx context.Context, req *http.Request, cavInfo *bakery.ThirdPartyCaveatInfo, _ *httpbakery.DischargeToken) ([]checkers.Caveat, error) {
 	caveatTokens := strings.Split(string(cavInfo.Condition), " ")
 	if len(caveatTokens) != 3 {
@@ -110,16 +90,10 @@ func (md *macaroonDischarger) checkThirdPartyCaveat(ctx context.Context, req *ht
 	}
 	relationString := caveatTokens[0]
 	userTagString := caveatTokens[1]
-	objectTagString := caveatTokens[2]
+	offerUUID := caveatTokens[2]
 
-	if !strings.HasPrefix(relationString, "is-") {
-		zapctx.Error(ctx, "caveat token relation string missing prefix")
-		return nil, checkers.ErrCaveatNotRecognized
-	}
-	relationString = strings.TrimPrefix(relationString, "is-")
-	relation, err := ofganames.ParseRelation(relationString)
-	if err != nil {
-		zapctx.Error(ctx, "caveat token relation invalid", zap.Error(err))
+	if relationString != "is-consumer" {
+		zapctx.Error(ctx, "unknown third party caveat", zap.String("condition", relationString))
 		return nil, checkers.ErrCaveatNotRecognized
 	}
 
@@ -129,11 +103,7 @@ func (md *macaroonDischarger) checkThirdPartyCaveat(ctx context.Context, req *ht
 		return nil, checkers.ErrCaveatNotRecognized
 	}
 
-	objectTag, err := jimmnames.ParseTag(objectTagString)
-	if err != nil {
-		zapctx.Error(ctx, "failed to parse caveat object tag", zap.Error(err))
-		return nil, checkers.ErrCaveatNotRecognized
-	}
+	offerTag := jimmnames.NewApplicationOfferTag(offerUUID)
 
 	user := openfga.NewUser(
 		&dbmodel.User{
@@ -142,7 +112,7 @@ func (md *macaroonDischarger) checkThirdPartyCaveat(ctx context.Context, req *ht
 		md.ofgaClient,
 	)
 
-	allowed, err := openfga.CheckRelation(ctx, user, objectTag, relation)
+	allowed, err := openfga.CheckRelation(ctx, user, offerTag, ofganames.ConsumerRelation)
 	if err != nil {
 		zapctx.Error(ctx, "failed to check request caveat relation", zap.Error(err))
 		return nil, errors.E(err)
@@ -150,10 +120,10 @@ func (md *macaroonDischarger) checkThirdPartyCaveat(ctx context.Context, req *ht
 
 	if allowed {
 		return []checkers.Caveat{
-			checkers.DeclaredCaveat(relationString, objectTagString),
+			checkers.DeclaredCaveat("offer-uuid", offerUUID),
 			checkers.TimeBeforeCaveat(time.Now().Add(defaultDischargeExpiry)),
 		}, nil
 	}
-	zapctx.Debug(ctx, "macaroon dishcharge denied", zap.String("user", user.Username), zap.String("object", objectTag.Id()))
+	zapctx.Debug(ctx, "macaroon dishcharge denied", zap.String("user", user.Username), zap.String("offer", offerUUID))
 	return nil, httpbakery.ErrPermissionDenied
 }
