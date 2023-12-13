@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	jujupermission "github.com/juju/juju/core/permission"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 	"github.com/juju/zaputil"
@@ -428,7 +429,15 @@ func (b *modelBuilder) CreateControllerModel() *modelBuilder {
 		return b
 	}
 
-	api, err := b.jimm.dial(b.ctx, b.controller, names.ModelTag{})
+	api, err := b.jimm.dial(
+		b.ctx,
+		b.controller,
+		names.ModelTag{},
+		permission{
+			resource: b.cloud.ResourceTag().String(),
+			relation: string(jujupermission.AddModelAccess),
+		},
+	)
 	if err != nil {
 		b.err = errors.E(err)
 		return b
