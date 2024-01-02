@@ -526,7 +526,7 @@ func TestWatcher(t *testing.T) {
 
 			w := jimm.NewWatcherWithDeltaProcessedChannel(
 				db.Database{
-					DB: jimmtest.MemoryDB(c, nil),
+					DB: jimmtest.PostgresDB(c, nil),
 				},
 				&jimmtest.Dialer{
 					API: &jimmtest.API{
@@ -690,7 +690,7 @@ func TestModelSummaryWatcher(t *testing.T) {
 			w := &jimm.Watcher{
 				Pubsub: publisher,
 				Database: db.Database{
-					DB: jimmtest.MemoryDB(c, nil),
+					DB: jimmtest.PostgresDB(c, nil),
 				},
 				Dialer: &jimmtest.Dialer{
 					API: &jimmtest.API{
@@ -773,7 +773,7 @@ func TestWatcherSetsControllerUnavailable(t *testing.T) {
 	controllerUnavailableChannel := make(chan error, 1)
 	w := jimm.NewWatcherWithControllerUnavailableChan(
 		db.Database{
-			DB: jimmtest.MemoryDB(c, nil),
+			DB: jimmtest.PostgresDB(c, nil),
 		},
 		&jimmtest.Dialer{
 			Err: errors.E("test error"),
@@ -822,7 +822,7 @@ func TestWatcherRemoveDyingModelsOnStartup(t *testing.T) {
 	w := &jimm.Watcher{
 		Pubsub: &testPublisher{},
 		Database: db.Database{
-			DB: jimmtest.MemoryDB(c, nil),
+			DB: jimmtest.PostgresDB(c, nil),
 		},
 		Dialer: &jimmtest.Dialer{
 			API: &jimmtest.API{
@@ -921,7 +921,7 @@ func TestWatcherRemoveMigratingModels(t *testing.T) {
 	w := &jimm.Watcher{
 		Pubsub: &testPublisher{},
 		Database: db.Database{
-			DB: jimmtest.MemoryDB(c, nil),
+			DB: jimmtest.PostgresDB(c, nil),
 		},
 		Dialer: &jimmtest.Dialer{
 			API: &jimmtest.API{
@@ -1021,7 +1021,7 @@ func TestWatcherCleansFailedMigrations(t *testing.T) {
 	w := &jimm.Watcher{
 		Pubsub: &testPublisher{},
 		Database: db.Database{
-			DB: jimmtest.MemoryDB(c, nil),
+			DB: jimmtest.PostgresDB(c, nil),
 		},
 		Dialer: &jimmtest.Dialer{
 			API: &jimmtest.API{
@@ -1114,7 +1114,7 @@ func TestWatcherIgnoreDeltasForModelsFromIncorrectController(t *testing.T) {
 	w := &jimm.Watcher{
 		Pubsub: &testPublisher{},
 		Database: db.Database{
-			DB: jimmtest.MemoryDB(c, nil),
+			DB: jimmtest.PostgresDB(c, nil),
 		},
 		Dialer: jimmtest.DialerMap{
 			"controller-1": &jimmtest.Dialer{

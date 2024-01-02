@@ -33,7 +33,7 @@ func TestGetCloud(t *testing.T) {
 		UUID:          uuid.NewString(),
 		OpenFGAClient: client,
 		Database: db.Database{
-			DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
+			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 		},
 	}
 
@@ -161,7 +161,7 @@ func TestForEachCloud(t *testing.T) {
 		UUID:          "test-jimm-uuid",
 		OpenFGAClient: client,
 		Database: db.Database{
-			DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
+			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 		},
 	}
 
@@ -596,7 +596,7 @@ func TestAddHostedCloud(t *testing.T) {
 			j := &jimm.JIMM{
 				UUID: uuid.NewString(),
 				Database: db.Database{
-					DB: jimmtest.MemoryDB(c, nil),
+					DB: jimmtest.PostgresDB(c, nil),
 				},
 				Dialer:        dialer,
 				OpenFGAClient: client,
@@ -876,7 +876,7 @@ func TestAddCloudToController(t *testing.T) {
 			j := &jimm.JIMM{
 				UUID: uuid.NewString(),
 				Database: db.Database{
-					DB: jimmtest.MemoryDB(c, nil),
+					DB: jimmtest.PostgresDB(c, nil),
 				},
 				Dialer:        dialer,
 				OpenFGAClient: client,
@@ -1044,7 +1044,7 @@ func TestGrantCloudAccess(t *testing.T) {
 			}
 			j := &jimm.JIMM{
 				Database: db.Database{
-					DB: jimmtest.MemoryDB(c, nil),
+					DB: jimmtest.PostgresDB(c, nil),
 				},
 				Dialer:        dialer,
 				OpenFGAClient: client,
@@ -1343,7 +1343,7 @@ func TestRevokeCloudAccess(t *testing.T) {
 			}
 			j := &jimm.JIMM{
 				Database: db.Database{
-					DB: jimmtest.MemoryDB(c, nil),
+					DB: jimmtest.PostgresDB(c, nil),
 				},
 				Dialer:        dialer,
 				OpenFGAClient: client,
@@ -1497,7 +1497,7 @@ func TestRemoveCloud(t *testing.T) {
 			j := &jimm.JIMM{
 				UUID: uuid.NewString(),
 				Database: db.Database{
-					DB: jimmtest.MemoryDB(c, nil),
+					DB: jimmtest.PostgresDB(c, nil),
 				},
 				Dialer:        dialer,
 				OpenFGAClient: client,
@@ -1737,7 +1737,7 @@ func TestUpdateCloud(t *testing.T) {
 			j := &jimm.JIMM{
 				UUID: uuid.NewString(),
 				Database: db.Database{
-					DB: jimmtest.MemoryDB(c, nil),
+					DB: jimmtest.PostgresDB(c, nil),
 				},
 				Dialer:        dialer,
 				OpenFGAClient: client,
@@ -1931,7 +1931,7 @@ func TestRemoveFromControllerCloud(t *testing.T) {
 			j := &jimm.JIMM{
 				UUID: uuid.NewString(),
 				Database: db.Database{
-					DB: jimmtest.MemoryDB(c, nil),
+					DB: jimmtest.PostgresDB(c, nil),
 				},
 				Dialer:        dialer,
 				OpenFGAClient: client,

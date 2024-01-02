@@ -17,7 +17,7 @@ import (
 // If any objects are specified the database automatically performs the
 // migrations for those objects.
 func gormDB(t testing.TB) *gorm.DB {
-	database := db.Database{DB: jimmtest.MemoryDB(t, nil)}
+	database := db.Database{DB: jimmtest.PostgresDB(t, nil)}
 	database.Migrate(context.Background(), false)
 	return database.DB
 }

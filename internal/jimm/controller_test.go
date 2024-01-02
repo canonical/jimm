@@ -135,7 +135,7 @@ func TestAddController(t *testing.T) {
 	j := &jimm.JIMM{
 		UUID: uuid.NewString(),
 		Database: db.Database{
-			DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
+			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 		},
 		Dialer: &jimmtest.Dialer{
 			API: api,
@@ -302,7 +302,7 @@ func TestAddControllerWithVault(t *testing.T) {
 	j := &jimm.JIMM{
 		UUID: uuid.NewString(),
 		Database: db.Database{
-			DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
+			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 		},
 		Dialer: &jimmtest.Dialer{
 			API: api,
@@ -411,7 +411,7 @@ func TestEarliestControllerVersion(t *testing.T) {
 	j := &jimm.JIMM{
 		UUID: uuid.NewString(),
 		Database: db.Database{
-			DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
+			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 		},
 		OpenFGAClient: client,
 	}
@@ -918,7 +918,7 @@ func TestImportModel(t *testing.T) {
 			j := &jimm.JIMM{
 				UUID: uuid.NewString(),
 				Database: db.Database{
-					DB: jimmtest.MemoryDB(c, nil),
+					DB: jimmtest.PostgresDB(c, nil),
 				},
 				Dialer: &jimmtest.Dialer{
 					API: api,
@@ -1019,7 +1019,7 @@ func TestSetControllerConfig(t *testing.T) {
 			j := &jimm.JIMM{
 				UUID: uuid.NewString(),
 				Database: db.Database{
-					DB: jimmtest.MemoryDB(c, nil),
+					DB: jimmtest.PostgresDB(c, nil),
 				},
 			}
 			ctx := context.Background()
@@ -1096,7 +1096,7 @@ func TestGetControllerConfig(t *testing.T) {
 			j := &jimm.JIMM{
 				UUID: uuid.NewString(),
 				Database: db.Database{
-					DB: jimmtest.MemoryDB(c, nil),
+					DB: jimmtest.PostgresDB(c, nil),
 				},
 			}
 			ctx := context.Background()
@@ -1244,7 +1244,7 @@ func TestUpdateMigratedModel(t *testing.T) {
 			j := &jimm.JIMM{
 				UUID: uuid.NewString(),
 				Database: db.Database{
-					DB: jimmtest.MemoryDB(c, nil),
+					DB: jimmtest.PostgresDB(c, nil),
 				},
 				Dialer: &jimmtest.Dialer{
 					API: &jimmtest.API{
@@ -1302,7 +1302,7 @@ func TestGetControllerAccess(t *testing.T) {
 	j := &jimm.JIMM{
 		UUID: uuid.NewString(),
 		Database: db.Database{
-			DB: jimmtest.MemoryDB(c, nil),
+			DB: jimmtest.PostgresDB(c, nil),
 		},
 		OpenFGAClient: client,
 	}
@@ -1604,7 +1604,7 @@ func TestInitiateMigration(t *testing.T) {
 			j := &jimm.JIMM{
 				UUID: uuid.NewString(),
 				Database: db.Database{
-					DB: jimmtest.MemoryDB(c, nil),
+					DB: jimmtest.PostgresDB(c, nil),
 				},
 				OpenFGAClient: client,
 				Dialer:        &testDialer{},

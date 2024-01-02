@@ -35,7 +35,7 @@ func TestFindAuditEvents(t *testing.T) {
 	j := &jimm.JIMM{
 		UUID: uuid.NewString(),
 		Database: db.Database{
-			DB: jimmtest.MemoryDB(c, nil),
+			DB: jimmtest.PostgresDB(c, nil),
 		},
 		OpenFGAClient: client,
 	}
@@ -207,7 +207,7 @@ func TestListControllers(t *testing.T) {
 	j := &jimm.JIMM{
 		UUID: uuid.NewString(),
 		Database: db.Database{
-			DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
+			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 		},
 		OpenFGAClient: client,
 	}
@@ -295,7 +295,7 @@ func TestSetControllerDeprecated(t *testing.T) {
 	j := &jimm.JIMM{
 		UUID: uuid.NewString(),
 		Database: db.Database{
-			DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
+			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 		},
 		OpenFGAClient: client,
 	}
@@ -447,7 +447,7 @@ func TestRemoveController(t *testing.T) {
 			j := &jimm.JIMM{
 				UUID: uuid.NewString(),
 				Database: db.Database{
-					DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
+					DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 				},
 			}
 
@@ -615,7 +615,7 @@ func TestFullModelStatus(t *testing.T) {
 			j := &jimm.JIMM{
 				UUID: uuid.NewString(),
 				Database: db.Database{
-					DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
+					DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 				},
 				Dialer: &jimmtest.Dialer{
 					API: api,
@@ -687,7 +687,7 @@ func TestFillMigrationTarget(t *testing.T) {
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
 			db := db.Database{
-				DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
+				DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 			}
 			err := db.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
@@ -778,7 +778,7 @@ func TestInitiateInternalMigration(t *testing.T) {
 			j := &jimm.JIMM{
 				UUID: uuid.NewString(),
 				Database: db.Database{
-					DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
+					DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 				},
 				CredentialStore: store,
 			}

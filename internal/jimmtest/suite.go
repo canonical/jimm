@@ -75,7 +75,7 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 	// Setup OpenFGA.
 	s.JIMM = &jimm.JIMM{
 		Database: db.Database{
-			DB: MemoryDB(GocheckTester{c}, nil),
+			DB: PostgresDB(GocheckTester{c}, nil),
 		},
 		CredentialStore: &InMemoryCredentialStore{},
 		Pubsub:          &pubsub.Hub{MaxConcurrency: 10},

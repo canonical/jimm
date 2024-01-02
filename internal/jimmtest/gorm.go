@@ -77,12 +77,12 @@ func (l gormLogger) Trace(ctx context.Context, begin time.Time, fc func() (strin
 
 var _ logger.Interface = gormLogger{}
 
-// MemoryDB returns a PostgreSQL database instance for tests. To improve
+// PostgresDB returns a PostgreSQL database instance for tests. To improve
 // performance it creates a new database from a template (which has no data but
 // is already-migrated).
 // In cases where you need an entirely empty database, you should use
 // `CreateEmptyDatabase` function in this package.
-func MemoryDB(t Tester, nowFunc func() time.Time) *gorm.DB {
+func PostgresDB(t Tester, nowFunc func() time.Time) *gorm.DB {
 	_, present := os.LookupEnv("TERSE")
 	logLevel := logger.Info
 	if present {
