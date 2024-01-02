@@ -98,7 +98,7 @@ func (s *controllerSuite) TestAllModels(c *gc.C) {
 
 	models, err := client.AllModels()
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(models, jc.DeepEquals, []base.UserModel{{
+	c.Assert(models, jc.SameContents, []base.UserModel{{
 		Name:           "model-1",
 		UUID:           s.Model.UUID.String,
 		Owner:          "bob@external",

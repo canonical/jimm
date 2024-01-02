@@ -4,7 +4,7 @@ go 1.21.3
 
 require (
 	github.com/canonical/candid v1.12.2
-	github.com/canonical/go-dqlite v1.20.0
+	github.com/canonical/go-dqlite v1.20.0 // indirect
 	github.com/canonical/go-service v1.0.0
 	github.com/frankban/quicktest v1.14.6
 	github.com/go-macaroon-bakery/macaroon-bakery/v3 v3.0.1
@@ -29,7 +29,7 @@ require (
 	github.com/juju/version v0.0.0-20210303051006-2015802527a8
 	github.com/juju/version/v2 v2.0.1
 	github.com/juju/zaputil v0.0.0-20190326175239-ef53049637ac
-	github.com/mattn/go-sqlite3 v2.0.3+incompatible
+	github.com/mattn/go-sqlite3 v2.0.3+incompatible // indirect
 	github.com/openfga/go-sdk v0.2.2
 	github.com/prometheus/client_golang v1.14.0
 	github.com/rogpeppe/fastuuid v1.2.0
@@ -40,7 +40,6 @@ require (
 	gopkg.in/macaroon-bakery.v2 v2.3.0
 	gopkg.in/macaroon.v2 v2.1.0
 	gorm.io/driver/postgres v1.0.5
-	gorm.io/driver/sqlite v1.1.4-0.20201029040614-e1caf3738eb9
 	gorm.io/gorm v1.20.6
 	sigs.k8s.io/yaml v1.3.0
 )

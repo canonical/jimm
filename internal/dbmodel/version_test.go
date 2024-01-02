@@ -35,7 +35,7 @@ func TestVersion(t *testing.T) {
 		Minor:     v1.Minor + 1,
 	}
 	result = db.Create(&v3)
-	c.Check(result.Error, qt.ErrorMatches, "UNIQUE constraint failed: versions.component")
+	c.Check(result.Error, qt.ErrorMatches, `.*violates unique constraint "versions_pkey".*`)
 	result = db.Save(&v3)
 	c.Assert(result.Error, qt.IsNil)
 

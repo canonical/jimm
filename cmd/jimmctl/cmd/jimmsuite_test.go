@@ -6,17 +6,18 @@ import (
 	"bytes"
 	"context"
 	"encoding/pem"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"time"
 
+	cofga "github.com/canonical/ofga"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery/agent"
 	"github.com/juju/juju/api"
 	"github.com/juju/juju/core/network"
+	corejujutesting "github.com/juju/juju/juju/testing"
 	jjclient "github.com/juju/juju/jujuclient"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
@@ -31,17 +32,9 @@ import (
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 )
 
-type gcTester struct {
-	*gc.C
-}
-
-func (t *gcTester) Name() string {
-	return t.C.TestName()
-}
-
 type jimmSuite struct {
 	jimmtest.CandidSuite
-	jimmtest.JujuSuite
+	corejujutesting.JujuConnSuite
 
 	Params      service.Params
 	HTTP        *httptest.Server
@@ -50,6 +43,10 @@ type jimmSuite struct {
 	ClientStore func() *jjclient.MemStore
 	JIMM        *jimm.JIMM
 	cancel      context.CancelFunc
+
+	OFGAClient  *openfga.OFGAClient
+	COFGAClient *cofga.Client
+	COFGAParams *cofga.OpenFGAParams
 }
 
 func (s *jimmSuite) SetUpTest(c *gc.C) {
@@ -74,7 +71,7 @@ func (s *jimmSuite) SetUpTest(c *gc.C) {
 		CandidURL:        s.Candid.URL.String(),
 		CandidPublicKey:  s.CandidPublicKey,
 		ControllerAdmins: []string{"admin"},
-		DSN:              fmt.Sprintf("file:%s?mode=memory&cache=shared", c.TestName()),
+		DSN:              jimmtest.CreateEmptyDatabase(&jimmtest.GocheckTester{c}),
 		OpenFGAParams: service.OpenFGAParams{
 			Scheme:    cofgaParams.Scheme,
 			Host:      cofgaParams.Host,
@@ -158,6 +155,9 @@ func (s *jimmSuite) TearDownTest(c *gc.C) {
 	}
 	if s.HTTP != nil {
 		s.HTTP.Close()
+	}
+	if err := s.JIMM.Database.Close(); err != nil {
+		c.Logf("failed to close database connections at tear down: %s", err)
 	}
 	s.CandidSuite.TearDownTest(c)
 	s.JujuConnSuite.TearDownTest(c)
