@@ -46,7 +46,7 @@ type ModelCreateArgs struct {
 	CloudCredential names.CloudCredentialTag
 }
 
-// FromJujuModelCreateArgs convers jujuparams.ModelCreateArgs into AddModelArgs.
+// FromJujuModelCreateArgs converts jujuparams.ModelCreateArgs into AddModelArgs.
 func (a *ModelCreateArgs) FromJujuModelCreateArgs(args *jujuparams.ModelCreateArgs) error {
 	if args.Name == "" {
 		return errors.E("name not specified")
@@ -111,7 +111,7 @@ type modelBuilder struct {
 	modelInfo     *jujuparams.ModelInfo
 }
 
-// Error returns the error that occured in the process
+// Error returns the error that occurred in the process
 // of adding a new model.
 func (b *modelBuilder) Error() error {
 	return b.err

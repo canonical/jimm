@@ -8,7 +8,7 @@ import (
 	"github.com/canonical/jimm/internal/errors"
 )
 
-// Ping sends a ping message accross the connection and waits for a
+// Ping sends a ping message across the connection and waits for a
 // response.
 func (c Connection) Ping(ctx context.Context) error {
 	const op = errors.Op("jujuclient.Ping")

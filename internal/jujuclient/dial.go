@@ -4,7 +4,7 @@
 // controllers. The jujuclient uses the juju RPC API directly using
 // API-native types, mostly those coming from github.com/juju/names and
 // github.com/juju/juju/apiserver/params. The rationale for this being that
-// as JIMM both sends and receives messages accross this API it should
+// as JIMM both sends and receives messages across this API it should
 // perform as little format conversion as possible.
 package jujuclient
 

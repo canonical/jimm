@@ -1063,7 +1063,7 @@ class TLSCertificatesProvidesV1(Object):
     def _revoke_certificates_for_which_no_csr_exists(self, relation_id: int) -> None:
         """Revokes certificates for which no unit has a CSR.
 
-        Goes through all generated certificates and compare agains the list of CSRS for all units
+        Goes through all generated certificates and compare against the list of CSRS for all units
         of a given relationship.
 
         Args:
