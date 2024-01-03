@@ -526,7 +526,7 @@ func TestWatcher(t *testing.T) {
 
 			w := jimm.NewWatcherWithDeltaProcessedChannel(
 				db.Database{
-					DB: jimmtest.MemoryDB(c, nil),
+					DB: jimmtest.PostgresDB(c, nil),
 				},
 				&jimmtest.Dialer{
 					API: &jimmtest.API{
@@ -590,7 +590,7 @@ func TestWatcher(t *testing.T) {
 			go func() {
 				defer wg.Done()
 				err := w.Watch(ctx, time.Millisecond)
-				c.Check(err, qt.ErrorMatches, `context canceled`, qt.Commentf("unexpected error %s (%#v)", err, err))
+				checkIfContextCanceled(c, ctx, err)
 			}()
 
 			validDeltas := 0
@@ -690,7 +690,7 @@ func TestModelSummaryWatcher(t *testing.T) {
 			w := &jimm.Watcher{
 				Pubsub: publisher,
 				Database: db.Database{
-					DB: jimmtest.MemoryDB(c, nil),
+					DB: jimmtest.PostgresDB(c, nil),
 				},
 				Dialer: &jimmtest.Dialer{
 					API: &jimmtest.API{
@@ -746,7 +746,7 @@ func TestModelSummaryWatcher(t *testing.T) {
 			go func() {
 				defer wg.Done()
 				err := w.WatchAllModelSummaries(ctx, time.Millisecond)
-				c.Check(err, qt.ErrorMatches, `context canceled`, qt.Commentf("unexpected error %s (%#v)", err, err))
+				checkIfContextCanceled(c, ctx, err)
 			}()
 
 			for _, summary := range test.summaries {
@@ -773,7 +773,7 @@ func TestWatcherSetsControllerUnavailable(t *testing.T) {
 	controllerUnavailableChannel := make(chan error, 1)
 	w := jimm.NewWatcherWithControllerUnavailableChan(
 		db.Database{
-			DB: jimmtest.MemoryDB(c, nil),
+			DB: jimmtest.PostgresDB(c, nil),
 		},
 		&jimmtest.Dialer{
 			Err: errors.E("test error"),
@@ -792,7 +792,7 @@ func TestWatcherSetsControllerUnavailable(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		err := w.Watch(ctx, time.Millisecond)
-		c.Check(err, qt.ErrorMatches, `context canceled`, qt.Commentf("unexpected error %s (%#v)", err, err))
+		checkIfContextCanceled(c, ctx, err)
 	}()
 
 	// it appears that the jimm code does not treat failing to
@@ -822,7 +822,7 @@ func TestWatcherRemoveDyingModelsOnStartup(t *testing.T) {
 	w := &jimm.Watcher{
 		Pubsub: &testPublisher{},
 		Database: db.Database{
-			DB: jimmtest.MemoryDB(c, nil),
+			DB: jimmtest.PostgresDB(c, nil),
 		},
 		Dialer: &jimmtest.Dialer{
 			API: &jimmtest.API{
@@ -856,7 +856,7 @@ func TestWatcherRemoveDyingModelsOnStartup(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		err := w.Watch(ctx, time.Millisecond)
-		c.Check(err, qt.ErrorMatches, `context canceled`, qt.Commentf("unexpected error %s (%#v)", err, err))
+		checkIfContextCanceled(c, ctx, err)
 	}()
 	wg.Wait()
 
@@ -921,7 +921,7 @@ func TestWatcherRemoveMigratingModels(t *testing.T) {
 	w := &jimm.Watcher{
 		Pubsub: &testPublisher{},
 		Database: db.Database{
-			DB: jimmtest.MemoryDB(c, nil),
+			DB: jimmtest.PostgresDB(c, nil),
 		},
 		Dialer: &jimmtest.Dialer{
 			API: &jimmtest.API{
@@ -956,7 +956,7 @@ func TestWatcherRemoveMigratingModels(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		err := jimm.WatchController(w, ctx, &ctl)
-		c.Check(err, qt.ErrorMatches, `context canceled`, qt.Commentf("unexpected error %s (%#v)", err, err))
+		checkIfContextCanceled(c, ctx, err)
 	}()
 	wg.Wait()
 
@@ -1021,7 +1021,7 @@ func TestWatcherCleansFailedMigrations(t *testing.T) {
 	w := &jimm.Watcher{
 		Pubsub: &testPublisher{},
 		Database: db.Database{
-			DB: jimmtest.MemoryDB(c, nil),
+			DB: jimmtest.PostgresDB(c, nil),
 		},
 		Dialer: &jimmtest.Dialer{
 			API: &jimmtest.API{
@@ -1056,7 +1056,7 @@ func TestWatcherCleansFailedMigrations(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		err := jimm.WatchController(w, ctx, &ctl)
-		c.Check(err, qt.ErrorMatches, `context canceled`, qt.Commentf("unexpected error %s (%#v)", err, err))
+		checkIfContextCanceled(c, ctx, err)
 	}()
 	wg.Wait()
 
@@ -1114,7 +1114,7 @@ func TestWatcherIgnoreDeltasForModelsFromIncorrectController(t *testing.T) {
 	w := &jimm.Watcher{
 		Pubsub: &testPublisher{},
 		Database: db.Database{
-			DB: jimmtest.MemoryDB(c, nil),
+			DB: jimmtest.PostgresDB(c, nil),
 		},
 		Dialer: jimmtest.DialerMap{
 			"controller-1": &jimmtest.Dialer{
@@ -1170,7 +1170,7 @@ func TestWatcherIgnoreDeltasForModelsFromIncorrectController(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		err := w.Watch(ctx, time.Millisecond)
-		c.Check(err, qt.ErrorMatches, `context canceled`, qt.Commentf("unexpected error %s (%#v)", err, err))
+		checkIfContextCanceled(c, ctx, err)
 	}()
 
 	nextC <- []jujuparams.Delta{{
@@ -1214,6 +1214,18 @@ func TestWatcherIgnoreDeltasForModelsFromIncorrectController(t *testing.T) {
 	err = w.Database.GetModel(context.Background(), &m2)
 	c.Assert(err, qt.IsNil)
 	c.Check(m2, qt.DeepEquals, m1)
+}
+
+func checkIfContextCanceled(c *qt.C, ctx context.Context, err error) {
+	errorToCheck := err
+	if ctx.Err() != nil {
+		errorToCheck = ctx.Err()
+	}
+	c.Check(
+		errorToCheck,
+		qt.ErrorMatches,
+		`.*(context canceled|operation was canceled).*`, qt.Commentf("unexpected error %s (%#v)", err, err),
+	)
 }
 
 type testPublisher struct {

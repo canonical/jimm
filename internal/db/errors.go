@@ -3,9 +3,7 @@
 package db
 
 import (
-	dqlitedriver "github.com/canonical/go-dqlite/driver"
 	"github.com/jackc/pgconn"
-	sqlite3 "github.com/mattn/go-sqlite3"
 	"gorm.io/gorm"
 
 	"github.com/canonical/jimm/internal/errors"
@@ -24,15 +22,6 @@ func dbError(err error) error {
 		code = errors.CodeNotFound
 	}
 	switch e := err.(type) {
-	case sqlite3.Error:
-		if e.ExtendedCode == sqlite3.ErrConstraintUnique {
-			code = errors.CodeAlreadyExists
-		}
-		if e.Code == sqlite3.ErrLocked {
-			code = errors.CodeDatabaseLocked
-		}
-	case dqlitedriver.Error:
-		// TODO(mhilton) work out how to decode dqlite errors.
 	case *pgconn.PgError:
 		if e.Code == pgUniqueViolation {
 			code = errors.CodeAlreadyExists

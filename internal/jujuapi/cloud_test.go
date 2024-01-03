@@ -382,7 +382,7 @@ func (s *cloudSuite) TestCredential(c *gc.C) {
 		}
 		sort.Strings(creds[i].Result.Redacted)
 	}
-	c.Assert(creds, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
+	c.Assert(creds, jc.SameContents, []jujuparams.CloudCredentialResult{{
 		Result: &jujuparams.CloudCredential{
 			AuthType: "userpass",
 			Attributes: map[string]string{

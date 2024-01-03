@@ -57,7 +57,7 @@ func TestRecreateDeletedModel(t *testing.T) {
 		CloudRegion:     cl.Regions[0],
 		CloudCredential: cred,
 	}
-	c.Check(db.Create(&m2).Error, qt.ErrorMatches, `UNIQUE constraint failed: models.controller_id, models.owner_username, models.name`)
+	c.Check(db.Create(&m2).Error, qt.ErrorMatches, `.*violates unique constraint "models_controller_id_owner_username_name_key".*`)
 
 	c.Assert(db.Delete(&m1).Error, qt.IsNil)
 	c.Check(db.First(&m1).Error, qt.Equals, gorm.ErrRecordNotFound)
@@ -86,7 +86,7 @@ func TestModel(t *testing.T) {
 		Status: dbmodel.Status{
 			Status: "available",
 			Since: sql.NullTime{
-				Time:  time.Now(),
+				Time:  time.Now().Truncate(time.Millisecond),
 				Valid: true,
 			},
 		},
@@ -152,7 +152,7 @@ func TestModelUniqueConstraint(t *testing.T) {
 		Status: dbmodel.Status{
 			Status: "available",
 			Since: sql.NullTime{
-				Time:  time.Now(),
+				Time:  time.Now().Truncate(time.Millisecond),
 				Valid: true,
 			},
 		},
@@ -179,7 +179,7 @@ func TestModelUniqueConstraint(t *testing.T) {
 		Status: dbmodel.Status{
 			Status: "available",
 			Since: sql.NullTime{
-				Time:  time.Now(),
+				Time:  time.Now().Truncate(time.Millisecond),
 				Valid: true,
 			},
 		},
@@ -207,7 +207,7 @@ func TestToJujuModel(t *testing.T) {
 	c := qt.New(t)
 	db := gormDB(c)
 	cl, cred, ctl, u := initModelEnv(c, db)
-	now := time.Now()
+	now := time.Now().Truncate(time.Millisecond)
 	m := dbmodel.Model{
 		Name: "test-model",
 		UUID: sql.NullString{
@@ -249,7 +249,7 @@ func TestToJujuModelSummary(t *testing.T) {
 	c := qt.New(t)
 	db := gormDB(c)
 	cl, cred, ctl, u := initModelEnv(c, db)
-	now := time.Now()
+	now := time.Now().Truncate(time.Millisecond)
 	m := dbmodel.Model{
 		Name: "test-model",
 		UUID: sql.NullString{

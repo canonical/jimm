@@ -114,6 +114,18 @@ func (d *Database) ready() error {
 	return nil
 }
 
+// Close closes open connections to the underlying database backend.
+func (d *Database) Close() error {
+	sqlDB, err := d.DB.DB()
+	if err != nil {
+		return errors.E(err, "failed to get the internal DB object")
+	}
+	if err := sqlDB.Close(); err != nil {
+		return errors.E(err, "failed to close database connection")
+	}
+	return nil
+}
+
 // Now returns the current time as a valid sql.NullTime. The time that is
 // returned is in UTC and is truncated to milliseconds which is the
 // resolution supported on all databases.
