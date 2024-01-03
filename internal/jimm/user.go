@@ -59,3 +59,25 @@ func (j *JIMM) Authenticate(ctx context.Context, req *jujuparams.LoginRequest) (
 	u.JimmAdmin = isJimmAdmin
 	return u, nil
 }
+
+// GetUser fetches the user specified by the username and returns
+// an openfga User that can be used to verify user's permissions.
+func (j *JIMM) GetUser(ctx context.Context, username string) (*openfga.User, error) {
+	const op = errors.Op("jimm.GetUser")
+
+	user := dbmodel.User{
+		Username: username,
+	}
+	if err := j.Database.GetUser(ctx, &user); err != nil {
+		return nil, err
+	}
+	u := openfga.NewUser(&user, j.OpenFGAClient)
+
+	isJimmAdmin, err := openfga.IsAdministrator(ctx, u, j.ResourceTag())
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+	u.JimmAdmin = isJimmAdmin
+
+	return u, nil
+}
