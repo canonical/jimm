@@ -23,7 +23,7 @@ func TestGroupEntry(t *testing.T) {
 	ge1 := dbmodel.GroupEntry{
 		Name: "test-group-1",
 	}
-	c.Assert(db.Create(&ge1).Error, qt.ErrorMatches, "UNIQUE constraint failed: groups.name")
+	c.Assert(db.Create(&ge1).Error, qt.ErrorMatches, `.*violates unique constraint "groups_name_key".*`)
 
 	var ge2 dbmodel.GroupEntry
 	c.Assert(db.First(&ge2).Error, qt.IsNil)

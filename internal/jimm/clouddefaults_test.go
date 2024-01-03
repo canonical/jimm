@@ -236,7 +236,7 @@ func TestSetCloudDefaults(t *testing.T) {
 		c.Run(test.about, func(c *qt.C) {
 			j := &jimm.JIMM{
 				Database: db.Database{
-					DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
+					DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 				},
 			}
 			err := j.Database.Migrate(ctx, true)
@@ -429,7 +429,7 @@ func TestUnsetCloudDefaults(t *testing.T) {
 		c.Run(test.about, func(c *qt.C) {
 			j := &jimm.JIMM{
 				Database: db.Database{
-					DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
+					DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 				},
 			}
 			err := j.Database.Migrate(ctx, true)
@@ -465,7 +465,7 @@ func TestModelDefaultsForCloud(t *testing.T) {
 
 	j := &jimm.JIMM{
 		Database: db.Database{
-			DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
+			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 		},
 	}
 	err := j.Database.Migrate(ctx, true)

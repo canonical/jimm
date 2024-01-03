@@ -34,11 +34,8 @@ type postgresSuite struct {
 }
 
 func (s *postgresSuite) Init(c *qt.C) {
-	dsn := os.Getenv("JIMM_TEST_PGXDSN")
-	if dsn == "" {
-		c.Skip("postgresql not configured")
-		return
-	}
+	dsn, exists := os.LookupEnv("JIMM_TEST_PGXDSN")
+	c.Assert(exists, qt.IsTrue, qt.Commentf("env var JIMM_TEST_PGXDSN is not assigned"))
 
 	connCfg, err := pgx.ParseConfig(dsn)
 	c.Assert(err, qt.IsNil)

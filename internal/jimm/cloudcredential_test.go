@@ -777,7 +777,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 			j := &jimm.JIMM{
 				UUID: uuid.NewString(),
 				Database: db.Database{
-					DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
+					DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 				},
 				Dialer: &jimmtest.Dialer{
 					API: api,
@@ -834,7 +834,7 @@ users:
 	j := &jimm.JIMM{
 		UUID: uuid.NewString(),
 		Database: db.Database{
-			DB: jimmtest.MemoryDB(c, nil),
+			DB: jimmtest.PostgresDB(c, nil),
 		},
 		Dialer: &jimmtest.Dialer{
 			API: &jimmtest.API{},
@@ -1240,7 +1240,7 @@ func TestRevokeCloudCredential(t *testing.T) {
 			j := &jimm.JIMM{
 				UUID: uuid.NewString(),
 				Database: db.Database{
-					DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
+					DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 				},
 				Dialer: &jimmtest.Dialer{
 					API: api,
@@ -1374,7 +1374,7 @@ func TestGetCloudCredential(t *testing.T) {
 			j := &jimm.JIMM{
 				UUID: uuid.NewString(),
 				Database: db.Database{
-					DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
+					DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 				},
 				OpenFGAClient: client,
 			}
@@ -1482,7 +1482,7 @@ func TestForEachUserCloudCredential(t *testing.T) {
 			j := &jimm.JIMM{
 				UUID: uuid.NewString(),
 				Database: db.Database{
-					DB: jimmtest.MemoryDB(c, nil),
+					DB: jimmtest.PostgresDB(c, nil),
 				},
 				Dialer: &jimmtest.Dialer{
 					API: &jimmtest.API{},
@@ -1606,7 +1606,7 @@ func TestGetCloudCredentialAttributes(t *testing.T) {
 			j := &jimm.JIMM{
 				UUID: uuid.NewString(),
 				Database: db.Database{
-					DB: jimmtest.MemoryDB(c, nil),
+					DB: jimmtest.PostgresDB(c, nil),
 				},
 				Dialer: &jimmtest.Dialer{
 					API: &jimmtest.API{},
@@ -1652,7 +1652,7 @@ func TestCloudCredentialAttributeStore(t *testing.T) {
 	j := &jimm.JIMM{
 		UUID: uuid.NewString(),
 		Database: db.Database{
-			DB: jimmtest.MemoryDB(c, nil),
+			DB: jimmtest.PostgresDB(c, nil),
 		},
 		Dialer: &jimmtest.Dialer{
 			API: &jimmtest.API{},
