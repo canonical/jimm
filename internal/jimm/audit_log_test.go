@@ -23,7 +23,7 @@ func TestAuditLogCleanupServicePurgesLogs(t *testing.T) {
 	now := time.Now().UTC().Round(time.Millisecond)
 
 	db := db.Database{
-		DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
+		DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 	}
 
 	err := db.AddAuditLogEntry(ctx, &dbmodel.AuditLogEntry{

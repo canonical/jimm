@@ -13,11 +13,11 @@ import (
 )
 
 // gormDB creates a new *gorm.DB for use in tests. The newly created DB
-// will be an in-memory SQLite database that logs to the given test with
-// debug enabled. If any objects are specified the database automatically
-// performs the migrations for those objects.
+// will be a Postgres database that logs to the given test with debug enabled.
+// If any objects are specified the database automatically performs the
+// migrations for those objects.
 func gormDB(t testing.TB) *gorm.DB {
-	database := db.Database{DB: jimmtest.MemoryDB(t, nil)}
+	database := db.Database{DB: jimmtest.PostgresDB(t, nil)}
 	database.Migrate(context.Background(), false)
 	return database.DB
 }

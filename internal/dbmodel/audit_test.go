@@ -23,7 +23,7 @@ func TestAuditLogEntry(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	ale := dbmodel.AuditLogEntry{
-		Time:           time.Now(),
+		Time:           time.Now().Truncate(time.Second),
 		ConversationId: "1234",
 		MessageId:      9876,
 		FacadeName:     "JIMM",
@@ -50,7 +50,7 @@ func TestToAPIAuditEvent(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	ale := dbmodel.AuditLogEntry{
-		Time:           time.Now(),
+		Time:           time.Now().Truncate(time.Second),
 		ConversationId: "1234",
 		MessageId:      9876,
 		FacadeName:     "JIMM",

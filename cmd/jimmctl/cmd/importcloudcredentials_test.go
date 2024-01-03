@@ -43,8 +43,22 @@ const creds = `{
 }`
 
 func (s *importCloudCredentialsSuite) TestImportCloudCredentials(c *gc.C) {
+	err := s.JIMM.Database.AddCloud(context.Background(), &dbmodel.Cloud{
+		Name:    "aws",
+		Type:    "kubernetes",
+		Regions: []dbmodel.CloudRegion{{Name: "default", CloudName: "test-cloud"}},
+	})
+	c.Assert(err, gc.IsNil)
+
+	err = s.JIMM.Database.AddCloud(context.Background(), &dbmodel.Cloud{
+		Name:    "gce",
+		Type:    "kubernetes",
+		Regions: []dbmodel.CloudRegion{{Name: "default", CloudName: "test-cloud"}},
+	})
+	c.Assert(err, gc.IsNil)
+
 	tmpfile := filepath.Join(c.MkDir(), "test.json")
-	err := os.WriteFile(tmpfile, []byte(creds), 0660)
+	err = os.WriteFile(tmpfile, []byte(creds), 0660)
 	c.Assert(err, gc.IsNil)
 
 	// alice is superuser

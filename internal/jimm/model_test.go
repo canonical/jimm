@@ -822,7 +822,7 @@ func TestAddModel(t *testing.T) {
 			j := &jimm.JIMM{
 				UUID: uuid.NewString(),
 				Database: db.Database{
-					DB: jimmtest.MemoryDB(c, nil),
+					DB: jimmtest.PostgresDB(c, nil),
 				},
 				Dialer: &jimmtest.Dialer{
 					API: api,
@@ -1159,7 +1159,7 @@ func TestModelInfo(t *testing.T) {
 				UUID:          uuid.NewString(),
 				OpenFGAClient: client,
 				Database: db.Database{
-					DB: jimmtest.MemoryDB(c, nil),
+					DB: jimmtest.PostgresDB(c, nil),
 				},
 				Dialer: &jimmtest.Dialer{
 					API: &jimmtest.API{
@@ -1344,7 +1344,7 @@ func TestModelStatus(t *testing.T) {
 				UUID:          uuid.NewString(),
 				OpenFGAClient: client,
 				Database: db.Database{
-					DB: jimmtest.MemoryDB(c, nil),
+					DB: jimmtest.PostgresDB(c, nil),
 				},
 				Dialer: dialer,
 			}
@@ -1494,7 +1494,7 @@ func TestForEachUserModel(t *testing.T) {
 		UUID:          uuid.NewString(),
 		OpenFGAClient: client,
 		Database: db.Database{
-			DB: jimmtest.MemoryDB(c, nil),
+			DB: jimmtest.PostgresDB(c, nil),
 		},
 		Dialer: &jimmtest.Dialer{
 			API: &jimmtest.API{},
@@ -1634,7 +1634,7 @@ func TestForEachModel(t *testing.T) {
 		UUID:          uuid.NewString(),
 		OpenFGAClient: client,
 		Database: db.Database{
-			DB: jimmtest.MemoryDB(c, nil),
+			DB: jimmtest.PostgresDB(c, nil),
 		},
 		Dialer: &jimmtest.Dialer{
 			API: &jimmtest.API{},
@@ -1908,7 +1908,7 @@ func TestGrantModelAccess(t *testing.T) {
 			}
 			j := &jimm.JIMM{
 				Database: db.Database{
-					DB: jimmtest.MemoryDB(c, nil),
+					DB: jimmtest.PostgresDB(c, nil),
 				},
 				Dialer:        dialer,
 				OpenFGAClient: client,
@@ -2627,7 +2627,7 @@ func TestRevokeModelAccess(t *testing.T) {
 			}
 			j := &jimm.JIMM{
 				Database: db.Database{
-					DB: jimmtest.MemoryDB(c, nil),
+					DB: jimmtest.PostgresDB(c, nil),
 				},
 				Dialer:        dialer,
 				OpenFGAClient: client,
@@ -2814,7 +2814,7 @@ func TestDestroyModel(t *testing.T) {
 				UUID:          uuid.NewString(),
 				OpenFGAClient: client,
 				Database: db.Database{
-					DB: jimmtest.MemoryDB(c, nil),
+					DB: jimmtest.PostgresDB(c, nil),
 				},
 				Dialer: dialer,
 			}
@@ -2939,7 +2939,7 @@ func TestDumpModel(t *testing.T) {
 				UUID:          uuid.NewString(),
 				OpenFGAClient: client,
 				Database: db.Database{
-					DB: jimmtest.MemoryDB(c, nil),
+					DB: jimmtest.PostgresDB(c, nil),
 				},
 				Dialer: dialer,
 			}
@@ -3052,7 +3052,7 @@ func TestDumpModelDB(t *testing.T) {
 				UUID:          uuid.NewString(),
 				OpenFGAClient: client,
 				Database: db.Database{
-					DB: jimmtest.MemoryDB(c, nil),
+					DB: jimmtest.PostgresDB(c, nil),
 				},
 				Dialer: dialer,
 			}
@@ -3171,7 +3171,7 @@ func TestValidateModelUpgrade(t *testing.T) {
 				UUID:          uuid.NewString(),
 				OpenFGAClient: client,
 				Database: db.Database{
-					DB: jimmtest.MemoryDB(c, nil),
+					DB: jimmtest.PostgresDB(c, nil),
 				},
 				Dialer: dialer,
 			}
@@ -3393,7 +3393,7 @@ func TestUpdateModelCredential(t *testing.T) {
 				UUID:          uuid.NewString(),
 				OpenFGAClient: client,
 				Database: db.Database{
-					DB: jimmtest.MemoryDB(c, nil),
+					DB: jimmtest.PostgresDB(c, nil),
 				},
 				Dialer: dialer,
 			}
@@ -3465,7 +3465,7 @@ users:
 		UUID:          uuid.NewString(),
 		OpenFGAClient: client,
 		Database: db.Database{
-			DB: jimmtest.MemoryDB(c, nil),
+			DB: jimmtest.PostgresDB(c, nil),
 		},
 		Dialer: &jimmtest.Dialer{
 			API: api,
