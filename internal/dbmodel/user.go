@@ -54,7 +54,7 @@ func (u *User) SetTag(t names.UserTag) {
 	u.Username = t.Id()
 }
 
-// ToJujuUserInfo convers a User into a juju UserInfo value.
+// ToJujuUserInfo converts a User into a juju UserInfo value.
 func (u User) ToJujuUserInfo() jujuparams.UserInfo {
 	var ui jujuparams.UserInfo
 	ui.Username = u.Username

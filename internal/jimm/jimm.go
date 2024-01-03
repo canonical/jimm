@@ -317,7 +317,7 @@ type API interface {
 // given list concurrently and then the given function is called with the
 // controller and API connection to use to perform the controller
 // operation. ForEachConnection waits until all operations have finished
-// before returning, any error returned will be ther first error
+// before returning, any error returned will be the first error
 // encountered when connecting to the controller or returned from the given
 // function.
 func (j *JIMM) forEachController(ctx context.Context, controllers []dbmodel.Controller, f func(*dbmodel.Controller, API) error) error {

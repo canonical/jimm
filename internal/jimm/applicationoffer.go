@@ -770,7 +770,7 @@ func (j *JIMM) listApplicationOffersForModel(ctx context.Context, user *openfga.
 	return offers, nil
 }
 
-// doApplicationOfferAdmin performs the given function on an applicaiton offer
+// doApplicationOfferAdmin performs the given function on an application offer
 // only if the given user has admin access on the model of the offer, or is a
 // controller superuser. Otherwise an unauthorized error is returned.
 //
