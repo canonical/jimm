@@ -44,5 +44,5 @@ jobs:
       with:
         store_login: ${{ secrets.STORE_LOGIN }}
         snap: ${{needs.build.outputs.snap}}
-        release: '2/edge'
+        release: '3/edge'
 
