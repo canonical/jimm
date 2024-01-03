@@ -94,6 +94,7 @@ func setupService(ctx context.Context, c *qt.C) (*jimm.Service, *httptest.Server
 
 	svc, err := jimm.NewService(context.Background(), jimm.Params{
 		ControllerUUID:  "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
+		DSN:             jimmtest.CreateEmptyDatabase(c),
 		VaultAddress:    "http://localhost:8200",
 		VaultAuthPath:   "/auth/approle/login",
 		VaultPath:       "/jimm-kv/",

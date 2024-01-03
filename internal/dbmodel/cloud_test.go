@@ -73,7 +73,7 @@ func TestCloud(t *testing.T) {
 		Name: "test-cloud",
 	}
 	result = db.Create(&cl4)
-	c.Check(result.Error, qt.ErrorMatches, `UNIQUE constraint failed: clouds.name`)
+	c.Check(result.Error, qt.ErrorMatches, `.*violates unique constraint "clouds_name_key".*`)
 }
 
 func TestToJujuCloud(t *testing.T) {
@@ -412,7 +412,7 @@ func TestReuseDeletedCloudName(t *testing.T) {
 		Name: "test-cloud",
 	}
 	result = db.Create(&cl2)
-	c.Check(result.Error, qt.ErrorMatches, `UNIQUE constraint failed: clouds.name`)
+	c.Check(result.Error, qt.ErrorMatches, `.*violates unique constraint "clouds_name_key".*`)
 
 	result = db.Delete(&cl1)
 	c.Assert(result.Error, qt.IsNil)

@@ -344,7 +344,7 @@ func TestRevokeOfferAccess(t *testing.T) {
 		c.Run(test.about, func(c *qt.C) {
 
 			db := db.Database{
-				DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
+				DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 			}
 			err := db.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
@@ -513,7 +513,7 @@ func TestGrantOfferAccess(t *testing.T) {
 		c.Run(test.about, func(c *qt.C) {
 
 			db := db.Database{
-				DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
+				DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 			}
 			err := db.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
@@ -563,7 +563,7 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 	now := time.Now().UTC().Round(time.Millisecond)
 
 	db := db.Database{
-		DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
+		DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 	}
 	err = db.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
@@ -880,7 +880,7 @@ func TestGetApplicationOffer(t *testing.T) {
 		UUID:          uuid.NewString(),
 		OpenFGAClient: client,
 		Database: db.Database{
-			DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
+			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 		},
 		Dialer: &jimmtest.Dialer{
 			API: &jimmtest.API{
@@ -1847,7 +1847,7 @@ func TestOffer(t *testing.T) {
 
 			j := &jimm.JIMM{
 				Database: db.Database{
-					DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
+					DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 				},
 				Dialer: &jimmtest.Dialer{
 					API: api,
@@ -2056,7 +2056,7 @@ func TestOfferAssertOpenFGARelationsExist(t *testing.T) {
 	j := &jimm.JIMM{
 		UUID: uuid.NewString(),
 		Database: db.Database{
-			DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
+			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 		},
 		Dialer: &jimmtest.Dialer{
 			API:  api,
@@ -2240,7 +2240,7 @@ func TestDestroyOffer(t *testing.T) {
 		c.Run(test.about, func(c *qt.C) {
 
 			db := db.Database{
-				DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
+				DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 			}
 			err := db.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
@@ -2362,7 +2362,7 @@ func TestUpdateOffer(t *testing.T) {
 		c.Run(test.about, func(c *qt.C) {
 
 			db := db.Database{
-				DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
+				DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 			}
 			err := db.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
@@ -2539,7 +2539,7 @@ func TestFindApplicationOffers(t *testing.T) {
 		c.Run(test.about, func(c *qt.C) {
 
 			db := db.Database{
-				DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
+				DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 			}
 			err := db.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
@@ -2696,7 +2696,7 @@ func TestListApplicationOffers(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	db := db.Database{
-		DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
+		DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 	}
 	err = db.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)

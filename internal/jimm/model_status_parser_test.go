@@ -331,7 +331,7 @@ func TestQueryModelsJq(t *testing.T) {
 	j := &jimm.JIMM{
 		UUID: uuid.NewString(),
 		Database: db.Database{
-			DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
+			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 		},
 		OpenFGAClient: client,
 		Dialer: jimmtest.ModelDialerMap{
