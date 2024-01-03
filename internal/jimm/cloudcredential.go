@@ -314,7 +314,7 @@ func (j *JIMM) ForEachUserCloudCredential(ctx context.Context, u *dbmodel.User, 
 // credential. If hidden is true then returned credentials will include
 // hidden attributes, otherwise a list of redacted attributes will be
 // returned. Only the credential owner can retrieve hidden attributes any
-// other user, including controller superusers, will recieve an error with
+// other user, including controller superusers, will receive an error with
 // the code CodeUnauthorized.
 func (j *JIMM) GetCloudCredentialAttributes(ctx context.Context, user *openfga.User, cred *dbmodel.CloudCredential, hidden bool) (attrs map[string]string, redacted []string, err error) {
 	const op = errors.Op("jimm.GetCloudCredentialAttributes")

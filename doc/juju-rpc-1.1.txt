@@ -70,7 +70,7 @@
 
       The params field is a free-form field that contains the
       parameters to pass to the procedure being called. A request
-      MAY omit the params field if there are no paramters to pass to
+      MAY omit the params field if there are no parameters to pass to
       the procedure.
 
 3.2. Response Message

@@ -652,7 +652,7 @@ func (j *JIMM) RevokeCloudAccess(ctx context.Context, user *openfga.User, ct nam
 // then an error with the code CodeNotFound is returned. If the
 // authenticated user does not have admin access to the cloud then an error
 // with the code CodeUnauthorized is returned. If the RemoveClouds API call
-// retuns an error the error code is not masked.
+// returns an error the error code is not masked.
 func (j *JIMM) RemoveCloud(ctx context.Context, user *openfga.User, ct names.CloudTag) error {
 	const op = errors.Op("jimm.RemoveCloud")
 
@@ -757,7 +757,7 @@ func (j *JIMM) UpdateCloud(ctx context.Context, user *openfga.User, ct names.Clo
 // If the cloud or the controller are not found then an error with the code
 // CodeNotFound is returned. If the authenticated user does not have admin
 // access to the cloud then an error with the code CodeUnauthorized is returned.
-// If the RemoveClouds API call retuns an error the error code is not masked.
+// If the RemoveClouds API call returns an error the error code is not masked.
 func (j *JIMM) RemoveCloudFromController(ctx context.Context, user *openfga.User, controllerName string, ct names.CloudTag) error {
 	const op = errors.Op("jimm.RemoveCloudFromController")
 

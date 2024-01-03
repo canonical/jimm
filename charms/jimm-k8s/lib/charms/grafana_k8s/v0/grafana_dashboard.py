@@ -862,7 +862,7 @@ def _modify_panel(panel: dict, topology: dict, transformer: "CosTool") -> dict:
         replacement = transformer.inject_label_matchers(expr, topology, querytype)
 
         if replacement == target["expr"]:
-            # promql-tranform caught an error. Move on
+            # promql-transform caught an error. Move on
             continue
 
         # Go back and substitute values in [] which were pulled out

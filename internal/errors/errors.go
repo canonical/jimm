@@ -88,7 +88,7 @@ func E(args ...interface{}) error {
 	if setCode {
 		return &e
 	}
-	// the caller didn't explicitely set the code for this error, attempt
+	// the caller didn't explicitly set the code for this error, attempt
 	// to copy the code from the wrapped error. The interface used to
 	// extract error codes is compatible with both the Error type and juju
 	// API Error types.

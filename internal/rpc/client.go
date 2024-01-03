@@ -173,7 +173,7 @@ func (c *Client) Call(ctx context.Context, facade string, version int, id, metho
 	}
 	c.reqID++
 	// For anyone else as curious as me, one would need to send over
-	// half a million messages per millisecond for a millenium before
+	// half a million messages per millisecond for a millennium before
 	// this will wrap. So probably don't worry about checking for it.
 	req.RequestID = c.reqID
 	if err := c.conn.WriteJSON(req); err != nil {

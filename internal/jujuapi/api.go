@@ -11,7 +11,7 @@ import (
 	"github.com/canonical/jimm/internal/jimmhttp"
 )
 
-// A Params object holds the paramaters needed to configure the API
+// A Params object holds the parameters needed to configure the API
 // servers.
 type Params struct {
 	// ControllerUUID is the UUID of the JIMM controller.

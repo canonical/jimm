@@ -9,7 +9,7 @@ package rpc
 
 import "encoding/json"
 
-// A message encodes a single message sent, or recieved, over an RPC
+// A message encodes a single message sent, or received, over an RPC
 // connection. It contains the union of fields in a request or response
 // message.
 type message struct {
