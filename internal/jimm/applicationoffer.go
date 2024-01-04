@@ -21,6 +21,7 @@ import (
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
+	jimmnames "github.com/canonical/jimm/pkg/names"
 )
 
 // AddApplicationOfferParams holds parameters for the Offer method.
@@ -202,7 +203,15 @@ func (j *JIMM) GetApplicationOfferConsumeDetails(ctx context.Context, user *open
 		return errors.E(op, errors.CodeNotFound)
 	}
 
-	api, err := j.dial(ctx, &offer.Model.Controller, names.ModelTag{})
+	api, err := j.dial(
+		ctx,
+		&offer.Model.Controller,
+		names.ModelTag{},
+		permission{
+			resource: jimmnames.NewApplicationOfferTag(offer.UUID).String(),
+			relation: accessLevel,
+		},
+	)
 	if err != nil {
 		return errors.E(op, err)
 	}
@@ -312,7 +321,15 @@ func (j *JIMM) GetApplicationOffer(ctx context.Context, user *openfga.User, offe
 	// controller. The all-watcher events do not include enough
 	// information to reasonably keep the local database up-to-date,
 	// and it would be non-trivial to make it do so.
-	api, err := j.dial(ctx, &offer.Model.Controller, names.ModelTag{})
+	api, err := j.dial(
+		ctx,
+		&offer.Model.Controller,
+		names.ModelTag{},
+		permission{
+			resource: jimmnames.NewApplicationOfferTag(offer.UUID).String(),
+			relation: accessLevel,
+		},
+	)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
@@ -498,7 +515,15 @@ func (j *JIMM) UpdateApplicationOffer(ctx context.Context, controller *dbmodel.C
 		return nil
 	}
 
-	api, err := j.dial(ctx, controller, offer.Model.ResourceTag())
+	api, err := j.dial(
+		ctx,
+		&offer.Model.Controller,
+		names.ModelTag{},
+		permission{
+			resource: jimmnames.NewApplicationOfferTag(offer.UUID).String(),
+			relation: string(jujuparams.OfferAdminAccess),
+		},
+	)
 	if err != nil {
 		return errors.E(op, err)
 	}
@@ -745,7 +770,7 @@ func (j *JIMM) listApplicationOffersForModel(ctx context.Context, user *openfga.
 	return offers, nil
 }
 
-// doApplicationOfferAdmin performs the given function on an applicaiton offer
+// doApplicationOfferAdmin performs the given function on an application offer
 // only if the given user has admin access on the model of the offer, or is a
 // controller superuser. Otherwise an unauthorized error is returned.
 //
@@ -769,7 +794,16 @@ func (j *JIMM) doApplicationOfferAdmin(ctx context.Context, user *openfga.User, 
 	if !isOfferAdmin {
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
-	api, err := j.dial(ctx, &offer.Model.Controller, names.ModelTag{})
+	// add offer admin claim
+	api, err := j.dial(
+		ctx,
+		&offer.Model.Controller,
+		names.ModelTag{},
+		permission{
+			resource: jimmnames.NewApplicationOfferTag(offer.UUID).String(),
+			relation: string(jujuparams.OfferAdminAccess),
+		},
+	)
 	if err != nil {
 		return errors.E(op, err)
 	}

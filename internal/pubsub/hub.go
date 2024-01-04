@@ -115,7 +115,7 @@ func (h *Hub) SubscribeMatch(modelMatcher func(string) bool, handler HandlerFunc
 	h.subscribers[idx] = s
 
 	// check if there are any messages for matching models and
-	// call the handler function if apropriate.
+	// call the handler function if appropriate.
 	for model, content := range h.messages {
 		if modelMatcher(model) {
 			handler(model, content)

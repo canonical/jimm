@@ -21,7 +21,6 @@ import (
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/jimm"
 	"github.com/canonical/jimm/internal/jimmhttp"
-	"github.com/canonical/jimm/internal/jujuclient"
 	jimmRPC "github.com/canonical/jimm/internal/rpc"
 )
 
@@ -169,7 +168,7 @@ func controllerConnectionFunc(s modelProxyServer, jwtGenerator *jimm.JWTGenerato
 		jwtGenerator.SetTags(m.ResourceTag(), m.Controller.ResourceTag())
 		mt := m.ResourceTag()
 		zapctx.Debug(ctx, "Dialing Controller", zap.String("path", path))
-		controllerConn, err := jujuclient.ProxyDial(ctx, &m.Controller, mt, finalPath)
+		controllerConn, err := jimmRPC.Dial(ctx, &m.Controller, mt, finalPath)
 		if err != nil {
 			zapctx.Error(ctx, "cannot dial controller", zap.String("controller", m.Controller.Name), zap.Error(err))
 			return nil, "", err
@@ -181,7 +180,7 @@ func controllerConnectionFunc(s modelProxyServer, jwtGenerator *jimm.JWTGenerato
 }
 
 // Use a 64k frame size for the websockets while we need to deal
-// with x/net/websocket connections that don't deal with recieving
+// with x/net/websocket connections that don't deal with receiving
 // fragmented messages.
 const websocketFrameSize = 65536
 
