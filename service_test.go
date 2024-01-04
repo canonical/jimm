@@ -4,7 +4,6 @@ package jimm_test
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -293,17 +292,6 @@ func TestPublicKey(t *testing.T) {
 func TestThirdPartyCaveatDischarge(t *testing.T) {
 	c := qt.New(t)
 
-	controller := dbmodel.Controller{
-		UUID: "7e4e7ffb-5116-4544-a400-f584d08c410e",
-		Name: "test-controller",
-	}
-	model := dbmodel.Model{
-		UUID: sql.NullString{
-			String: "7e4e7ffb-5116-4544-a400-f584d08c410e",
-			Valid:  true,
-		},
-		Name: "test-model",
-	}
 	offer := dbmodel.ApplicationOffer{
 		UUID: "7e4e7ffb-5116-4544-a400-f584d08c410e",
 		Name: "test-application-offer",
@@ -325,21 +313,17 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 		caveats:       []string{"unknown-caveat"},
 		expectedError: ".*third party refused discharge: cannot discharge: caveat not recognized",
 	}, {
-		about:         "user is not an offer reader",
-		caveats:       []string{fmt.Sprintf("is-reader %s %s", user.ResourceTag(), offer.ResourceTag())},
-		expectedError: ".*cannot discharge: permission denied",
-	}, {
 		about: "user is an offer reader",
 		setup: func(c *qt.C, ofgaClient *openfga.OFGAClient, user *dbmodel.User) {
 			u := openfga.NewUser(user, ofgaClient)
 			err := u.SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.ReaderRelation)
 			c.Assert(err, qt.IsNil)
 		},
-		caveats:        []string{fmt.Sprintf("is-reader %s %s", user.ResourceTag(), offer.ResourceTag())},
-		expectDeclared: map[string]string{"reader": offer.ResourceTag().String()},
+		caveats:       []string{fmt.Sprintf("is-consumer %s %s", user.ResourceTag(), offer.UUID)},
+		expectedError: ".*cannot discharge: permission denied",
 	}, {
 		about:         "user is not an offer consumer",
-		caveats:       []string{fmt.Sprintf("is-consumer %s %s", user.ResourceTag(), offer.ResourceTag())},
+		caveats:       []string{fmt.Sprintf("is-consumer %s %s", user.ResourceTag(), offer.UUID)},
 		expectedError: ".*cannot discharge: permission denied",
 	}, {
 		about: "user is an offer consumer",
@@ -348,12 +332,8 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 			err := u.SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.ConsumerRelation)
 			c.Assert(err, qt.IsNil)
 		},
-		caveats:        []string{fmt.Sprintf("is-consumer %s %s", user.ResourceTag(), offer.ResourceTag())},
-		expectDeclared: map[string]string{"consumer": offer.ResourceTag().String()},
-	}, {
-		about:         "user is not an offer administrator",
-		caveats:       []string{fmt.Sprintf("is-administrator %s %s", user.ResourceTag(), offer.ResourceTag())},
-		expectedError: ".*cannot discharge: permission denied",
+		caveats:        []string{fmt.Sprintf("is-consumer %s %s", user.ResourceTag(), offer.UUID)},
+		expectDeclared: map[string]string{"offer-uuid": offer.UUID},
 	}, {
 		about: "user is an offer administrator",
 		setup: func(c *qt.C, ofgaClient *openfga.OFGAClient, user *dbmodel.User) {
@@ -361,60 +341,8 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 			err := u.SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 		},
-		caveats:        []string{fmt.Sprintf("is-administrator %s %s", user.ResourceTag(), offer.ResourceTag())},
-		expectDeclared: map[string]string{"administrator": offer.ResourceTag().String()},
-	}, {
-		about:         "user is not a model administrator",
-		caveats:       []string{fmt.Sprintf("is-administrator %s %s", user.ResourceTag(), model.ResourceTag())},
-		expectedError: ".*cannot discharge: permission denied",
-	}, {
-		about: "user is a model administrator",
-		setup: func(c *qt.C, ofgaClient *openfga.OFGAClient, user *dbmodel.User) {
-			u := openfga.NewUser(user, ofgaClient)
-			err := u.SetModelAccess(ctx, model.ResourceTag(), ofganames.AdministratorRelation)
-			c.Assert(err, qt.IsNil)
-		},
-		caveats:        []string{fmt.Sprintf("is-administrator %s %s", user.ResourceTag(), model.ResourceTag())},
-		expectDeclared: map[string]string{"administrator": model.ResourceTag().String()},
-	}, {
-		about:         "user is not a model reader",
-		caveats:       []string{fmt.Sprintf("is-reader %s %s", user.ResourceTag(), model.ResourceTag())},
-		expectedError: ".*cannot discharge: permission denied",
-	}, {
-		about: "user is a model reader",
-		setup: func(c *qt.C, ofgaClient *openfga.OFGAClient, user *dbmodel.User) {
-			u := openfga.NewUser(user, ofgaClient)
-			err := u.SetModelAccess(ctx, model.ResourceTag(), ofganames.ReaderRelation)
-			c.Assert(err, qt.IsNil)
-		},
-		caveats:        []string{fmt.Sprintf("is-reader %s %s", user.ResourceTag(), model.ResourceTag())},
-		expectDeclared: map[string]string{"reader": model.ResourceTag().String()},
-	}, {
-		about:         "user is not a model writer",
-		caveats:       []string{fmt.Sprintf("is-writer %s %s", user.ResourceTag(), model.ResourceTag())},
-		expectedError: ".*cannot discharge: permission denied",
-	}, {
-		about: "user is a model writer",
-		setup: func(c *qt.C, ofgaClient *openfga.OFGAClient, user *dbmodel.User) {
-			u := openfga.NewUser(user, ofgaClient)
-			err := u.SetModelAccess(ctx, model.ResourceTag(), ofganames.WriterRelation)
-			c.Assert(err, qt.IsNil)
-		},
-		caveats:        []string{fmt.Sprintf("is-writer %s %s", user.ResourceTag(), model.ResourceTag())},
-		expectDeclared: map[string]string{"writer": model.ResourceTag().String()},
-	}, {
-		about:         "user is not a controller administrator",
-		caveats:       []string{fmt.Sprintf("is-administrator %s %s", user.ResourceTag(), controller.ResourceTag())},
-		expectedError: ".*cannot discharge: permission denied",
-	}, {
-		about: "user is a controller administrator",
-		setup: func(c *qt.C, ofgaClient *openfga.OFGAClient, user *dbmodel.User) {
-			u := openfga.NewUser(user, ofgaClient)
-			err := u.SetControllerAccess(ctx, controller.ResourceTag(), ofganames.AdministratorRelation)
-			c.Assert(err, qt.IsNil)
-		},
-		caveats:        []string{fmt.Sprintf("is-administrator %s %s", user.ResourceTag(), controller.ResourceTag())},
-		expectDeclared: map[string]string{"administrator": controller.ResourceTag().String()},
+		caveats:        []string{fmt.Sprintf("is-consumer %s %s", user.ResourceTag(), offer.UUID)},
+		expectDeclared: map[string]string{"offer-uuid": offer.UUID},
 	}}
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
