@@ -4,7 +4,6 @@ package rpc
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -13,8 +12,6 @@ import (
 
 	"github.com/gorilla/websocket"
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/zaputil/zapctx"
-	"go.uber.org/zap"
 
 	"github.com/canonical/jimm/internal/errors"
 )
@@ -42,36 +39,6 @@ func (e *Error) Error() string {
 // ErrorCode returns the error's code.
 func (e *Error) ErrorCode() string {
 	return e.Code
-}
-
-// A Dialer is used to create client connections to an RPC URL.
-type Dialer struct {
-	// TLSConfig is used to configure TLS for the client connection.
-	TLSConfig *tls.Config
-}
-
-// Dial establishes a new client RPC connection to the given URL.
-func (d Dialer) Dial(ctx context.Context, url string) (*Client, error) {
-	conn, err := d.DialWebsocket(ctx, url)
-	if err != nil {
-		return nil, err
-	}
-	return NewClient(conn), nil
-}
-
-// DialWebsocket dials a url and returns a websocket.
-func (d Dialer) DialWebsocket(ctx context.Context, url string) (*websocket.Conn, error) {
-	const op = errors.Op("rpc.BasicDial")
-
-	dialer := websocket.Dialer{
-		TLSClientConfig: d.TLSConfig,
-	}
-	conn, _, err := dialer.DialContext(context.Background(), url, nil)
-	if err != nil {
-		zapctx.Error(ctx, "BasicDial failed", zap.Error(err))
-		return nil, errors.E(op, err)
-	}
-	return conn, nil
 }
 
 // NewClient takes a websocket connection and returns an RPC client.
@@ -206,7 +173,7 @@ func (c *Client) Call(ctx context.Context, facade string, version int, id, metho
 	}
 	c.reqID++
 	// For anyone else as curious as me, one would need to send over
-	// half a million messages per millisecond for a millenium before
+	// half a million messages per millisecond for a millennium before
 	// this will wrap. So probably don't worry about checking for it.
 	req.RequestID = c.reqID
 	if err := c.conn.WriteJSON(req); err != nil {

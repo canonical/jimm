@@ -4,7 +4,6 @@ package jimm_test
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -46,6 +45,7 @@ func TestDefaultService(t *testing.T) {
 	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 	svc, err := jimm.NewService(context.Background(), jimm.Params{
+		DSN:                   jimmtest.CreateEmptyDatabase(c),
 		OpenFGAParams:         cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
 		InsecureSecretStorage: true,
 	})
@@ -64,6 +64,7 @@ func TestServiceStartsWithoutSecretStore(t *testing.T) {
 	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 	_, err = jimm.NewService(context.Background(), jimm.Params{
+		DSN:           jimmtest.CreateEmptyDatabase(c),
 		OpenFGAParams: cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
 	})
 	c.Assert(err, qt.IsNil)
@@ -77,6 +78,7 @@ func TestAuthenticator(t *testing.T) {
 
 	p := jimm.Params{
 		ControllerUUID:        "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
+		DSN:                   jimmtest.CreateEmptyDatabase(c),
 		ControllerAdmins:      []string{"admin"},
 		OpenFGAParams:         cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
 		InsecureSecretStorage: true,
@@ -122,14 +124,22 @@ func TestAuthenticator(t *testing.T) {
 	c.Check(conn.ControllerAccess(), qt.Equals, "")
 }
 
+const testVaultEnv = `clouds:
+- name: test
+  type: test
+  regions:
+  - name: test-region
+`
+
 func TestVault(t *testing.T) {
 	c := qt.New(t)
 
-	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
+	ofgaClient, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
 	p := jimm.Params{
 		ControllerUUID:  "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
+		DSN:             jimmtest.CreateEmptyDatabase(c),
 		VaultAddress:    "http://localhost:8200",
 		VaultAuthPath:   "/auth/approle/login",
 		VaultPath:       "/jimm-kv/",
@@ -141,6 +151,9 @@ func TestVault(t *testing.T) {
 
 	svc, err := jimm.NewService(context.Background(), p)
 	c.Assert(err, qt.IsNil)
+
+	env := jimmtest.ParseEnvironment(c, testVaultEnv)
+	env.PopulateDBAndPermissions(c, names.NewControllerTag(p.ControllerUUID), svc.JIMM().Database, ofgaClient)
 
 	srv := httptest.NewTLSServer(svc)
 	c.Cleanup(srv.Close)
@@ -160,7 +173,8 @@ func TestVault(t *testing.T) {
 	})
 
 	cloudClient := cloud.NewClient(conn)
-	tag := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/bob@external/test-1").String()
+
+	tag := names.NewCloudCredentialTag("test/bob@external/test-1").String()
 	_, err = cloudClient.UpdateCloudsCredentials(map[string]jujucloud.Credential{
 		tag: jujucloud.NewCredential(jujucloud.UserPassAuthType, map[string]string{
 			"username": "test-user",
@@ -175,7 +189,7 @@ func TestVault(t *testing.T) {
 		AuthPath:   p.VaultAuthPath,
 		KVPath:     p.VaultPath,
 	}
-	attr, err := store.Get(context.Background(), names.NewCloudCredentialTag(jimmtest.TestCloudName+"/bob@external/test-1"))
+	attr, err := store.Get(context.Background(), names.NewCloudCredentialTag("test/bob@external/test-1"))
 	c.Assert(err, qt.IsNil)
 	c.Check(attr, qt.DeepEquals, map[string]string{
 		"username": "test-user",
@@ -191,6 +205,7 @@ func TestPostgresSecretStore(t *testing.T) {
 
 	p := jimm.Params{
 		ControllerUUID:        "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
+		DSN:                   jimmtest.CreateEmptyDatabase(c),
 		OpenFGAParams:         cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
 		InsecureSecretStorage: true,
 	}
@@ -206,6 +221,7 @@ func TestOpenFGA(t *testing.T) {
 
 	p := jimm.Params{
 		ControllerUUID:   "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
+		DSN:              jimmtest.CreateEmptyDatabase(c),
 		OpenFGAParams:    cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
 		ControllerAdmins: []string{"alice", "eve"},
 	}
@@ -253,6 +269,7 @@ func TestPublicKey(t *testing.T) {
 
 	p := jimm.Params{
 		ControllerUUID:   "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
+		DSN:              jimmtest.CreateEmptyDatabase(c),
 		OpenFGAParams:    cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
 		ControllerAdmins: []string{"alice", "eve"},
 		PrivateKey:       "c1VkV05+iWzCxMwMVcWbr0YJWQSEO62v+z3EQ2BhFMw=",
@@ -275,17 +292,6 @@ func TestPublicKey(t *testing.T) {
 func TestThirdPartyCaveatDischarge(t *testing.T) {
 	c := qt.New(t)
 
-	controller := dbmodel.Controller{
-		UUID: "7e4e7ffb-5116-4544-a400-f584d08c410e",
-		Name: "test-controller",
-	}
-	model := dbmodel.Model{
-		UUID: sql.NullString{
-			String: "7e4e7ffb-5116-4544-a400-f584d08c410e",
-			Valid:  true,
-		},
-		Name: "test-model",
-	}
 	offer := dbmodel.ApplicationOffer{
 		UUID: "7e4e7ffb-5116-4544-a400-f584d08c410e",
 		Name: "test-application-offer",
@@ -307,21 +313,17 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 		caveats:       []string{"unknown-caveat"},
 		expectedError: ".*third party refused discharge: cannot discharge: caveat not recognized",
 	}, {
-		about:         "user is not an offer reader",
-		caveats:       []string{fmt.Sprintf("is-reader %s %s", user.ResourceTag(), offer.ResourceTag())},
-		expectedError: ".*cannot discharge: permission denied",
-	}, {
 		about: "user is an offer reader",
 		setup: func(c *qt.C, ofgaClient *openfga.OFGAClient, user *dbmodel.User) {
 			u := openfga.NewUser(user, ofgaClient)
 			err := u.SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.ReaderRelation)
 			c.Assert(err, qt.IsNil)
 		},
-		caveats:        []string{fmt.Sprintf("is-reader %s %s", user.ResourceTag(), offer.ResourceTag())},
-		expectDeclared: map[string]string{"reader": offer.ResourceTag().String()},
+		caveats:       []string{fmt.Sprintf("is-consumer %s %s", user.ResourceTag(), offer.UUID)},
+		expectedError: ".*cannot discharge: permission denied",
 	}, {
 		about:         "user is not an offer consumer",
-		caveats:       []string{fmt.Sprintf("is-consumer %s %s", user.ResourceTag(), offer.ResourceTag())},
+		caveats:       []string{fmt.Sprintf("is-consumer %s %s", user.ResourceTag(), offer.UUID)},
 		expectedError: ".*cannot discharge: permission denied",
 	}, {
 		about: "user is an offer consumer",
@@ -330,12 +332,8 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 			err := u.SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.ConsumerRelation)
 			c.Assert(err, qt.IsNil)
 		},
-		caveats:        []string{fmt.Sprintf("is-consumer %s %s", user.ResourceTag(), offer.ResourceTag())},
-		expectDeclared: map[string]string{"consumer": offer.ResourceTag().String()},
-	}, {
-		about:         "user is not an offer administrator",
-		caveats:       []string{fmt.Sprintf("is-administrator %s %s", user.ResourceTag(), offer.ResourceTag())},
-		expectedError: ".*cannot discharge: permission denied",
+		caveats:        []string{fmt.Sprintf("is-consumer %s %s", user.ResourceTag(), offer.UUID)},
+		expectDeclared: map[string]string{"offer-uuid": offer.UUID},
 	}, {
 		about: "user is an offer administrator",
 		setup: func(c *qt.C, ofgaClient *openfga.OFGAClient, user *dbmodel.User) {
@@ -343,60 +341,8 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 			err := u.SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 		},
-		caveats:        []string{fmt.Sprintf("is-administrator %s %s", user.ResourceTag(), offer.ResourceTag())},
-		expectDeclared: map[string]string{"administrator": offer.ResourceTag().String()},
-	}, {
-		about:         "user is not a model administrator",
-		caveats:       []string{fmt.Sprintf("is-administrator %s %s", user.ResourceTag(), model.ResourceTag())},
-		expectedError: ".*cannot discharge: permission denied",
-	}, {
-		about: "user is a model administrator",
-		setup: func(c *qt.C, ofgaClient *openfga.OFGAClient, user *dbmodel.User) {
-			u := openfga.NewUser(user, ofgaClient)
-			err := u.SetModelAccess(ctx, model.ResourceTag(), ofganames.AdministratorRelation)
-			c.Assert(err, qt.IsNil)
-		},
-		caveats:        []string{fmt.Sprintf("is-administrator %s %s", user.ResourceTag(), model.ResourceTag())},
-		expectDeclared: map[string]string{"administrator": model.ResourceTag().String()},
-	}, {
-		about:         "user is not a model reader",
-		caveats:       []string{fmt.Sprintf("is-reader %s %s", user.ResourceTag(), model.ResourceTag())},
-		expectedError: ".*cannot discharge: permission denied",
-	}, {
-		about: "user is a model reader",
-		setup: func(c *qt.C, ofgaClient *openfga.OFGAClient, user *dbmodel.User) {
-			u := openfga.NewUser(user, ofgaClient)
-			err := u.SetModelAccess(ctx, model.ResourceTag(), ofganames.ReaderRelation)
-			c.Assert(err, qt.IsNil)
-		},
-		caveats:        []string{fmt.Sprintf("is-reader %s %s", user.ResourceTag(), model.ResourceTag())},
-		expectDeclared: map[string]string{"reader": model.ResourceTag().String()},
-	}, {
-		about:         "user is not a model writer",
-		caveats:       []string{fmt.Sprintf("is-writer %s %s", user.ResourceTag(), model.ResourceTag())},
-		expectedError: ".*cannot discharge: permission denied",
-	}, {
-		about: "user is a model writer",
-		setup: func(c *qt.C, ofgaClient *openfga.OFGAClient, user *dbmodel.User) {
-			u := openfga.NewUser(user, ofgaClient)
-			err := u.SetModelAccess(ctx, model.ResourceTag(), ofganames.WriterRelation)
-			c.Assert(err, qt.IsNil)
-		},
-		caveats:        []string{fmt.Sprintf("is-writer %s %s", user.ResourceTag(), model.ResourceTag())},
-		expectDeclared: map[string]string{"writer": model.ResourceTag().String()},
-	}, {
-		about:         "user is not a controller administrator",
-		caveats:       []string{fmt.Sprintf("is-administrator %s %s", user.ResourceTag(), controller.ResourceTag())},
-		expectedError: ".*cannot discharge: permission denied",
-	}, {
-		about: "user is a controller administrator",
-		setup: func(c *qt.C, ofgaClient *openfga.OFGAClient, user *dbmodel.User) {
-			u := openfga.NewUser(user, ofgaClient)
-			err := u.SetControllerAccess(ctx, controller.ResourceTag(), ofganames.AdministratorRelation)
-			c.Assert(err, qt.IsNil)
-		},
-		caveats:        []string{fmt.Sprintf("is-administrator %s %s", user.ResourceTag(), controller.ResourceTag())},
-		expectDeclared: map[string]string{"administrator": controller.ResourceTag().String()},
+		caveats:        []string{fmt.Sprintf("is-consumer %s %s", user.ResourceTag(), offer.UUID)},
+		expectDeclared: map[string]string{"offer-uuid": offer.UUID},
 	}}
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
@@ -405,6 +351,7 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 
 			p := jimm.Params{
 				ControllerUUID:   "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
+				DSN:              jimmtest.CreateEmptyDatabase(c),
 				OpenFGAParams:    cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
 				ControllerAdmins: []string{"alice", "eve"},
 				PrivateKey:       "c1VkV05+iWzCxMwMVcWbr0YJWQSEO62v+z3EQ2BhFMw=",

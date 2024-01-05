@@ -93,7 +93,7 @@ above and we can proceede setting up out LDAP instance.
 
     cd /etc/ldap
 
-Create file certinfo.ldif with the folowing content
+Create file certinfo.ldif with the following content
 
     dn: cn=config
     replace: olcTLSCACertificateFile
@@ -217,7 +217,7 @@ Then we need to set identity-providers configuration option to
 ### Azure Identity Provider
 
 If, for some reason you want to add Azure an identity provider go to the
-[Azure portal](https://portal.azure.com/) and find **App Registraion**. 
+[Azure portal](https://portal.azure.com/) and find **App Registration**. 
 Fill in the name (e.g. Development Candid). 
 For **Supported account types** select **Accounts in any organizational directory (Any Azure AD directory - Multitenant) and personal Microsoft accounts (e.g. Skype, Xbox)**. 
 For **Redirect URI** select **Web** and enter

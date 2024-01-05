@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -232,6 +233,9 @@ func (s *relationSuite) TestRemoveRelationViaFileSuperuser(c *gc.C) {
 	c.Assert(ct, gc.Equals, "")
 	c.Logf("existing relations %v", tuples)
 	// Only two relations exist.
+	sort.Slice(tuples, func(i, j int) bool {
+		return tuples[i].Object.ID < tuples[j].Object.ID
+	})
 	c.Assert(tuples, gc.DeepEquals, []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("admin")),
 		Relation: ofganames.AdministratorRelation,

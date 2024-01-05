@@ -224,7 +224,7 @@ type SLA struct {
 	Owner string
 }
 
-// FromJujuModelSLAInfo convers jujuparams.ModelSLAInfo into SLA.
+// FromJujuModelSLAInfo converts jujuparams.ModelSLAInfo into SLA.
 func (s *SLA) FromJujuModelSLAInfo(js jujuparams.ModelSLAInfo) {
 	s.Level = js.Level
 	s.Owner = js.Owner

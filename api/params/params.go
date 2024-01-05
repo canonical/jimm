@@ -325,7 +325,7 @@ type RemoveRelationRequest struct {
 	Tuples []RelationshipTuple `json:"tuples"`
 }
 
-// CheckRelationRequest holds a tuple containg the object, target object and relation that we wish
+// CheckRelationRequest holds a tuple containing the object, target object and relation that we wish
 // verify authorisation with.
 type CheckRelationRequest struct {
 	Tuple RelationshipTuple `json:"tuple"`

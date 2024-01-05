@@ -1,0 +1,167 @@
+// Copyright 2023 Canonical Ltd.
+
+package rpc
+
+import (
+	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"fmt"
+	"net/url"
+	"path"
+	"sync"
+
+	"github.com/gorilla/websocket"
+	"github.com/juju/names/v4"
+	"github.com/juju/zaputil"
+	"github.com/juju/zaputil/zapctx"
+	"go.uber.org/zap"
+
+	"github.com/canonical/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/errors"
+)
+
+// A Dialer is used to create client connections to an RPC URL.
+type Dialer struct {
+	// TLSConfig is used to configure TLS for the client connection.
+	TLSConfig *tls.Config
+}
+
+// Dial establishes a new client RPC connection to the given URL.
+func (d Dialer) Dial(ctx context.Context, url string) (*Client, error) {
+	conn, err := d.DialWebsocket(ctx, url)
+	if err != nil {
+		return nil, err
+	}
+	return NewClient(conn), nil
+}
+
+// DialWebsocket dials a url and returns a websocket.
+func (d Dialer) DialWebsocket(ctx context.Context, url string) (*websocket.Conn, error) {
+	const op = errors.Op("rpc.BasicDial")
+
+	dialer := websocket.Dialer{
+		TLSClientConfig: d.TLSConfig,
+	}
+	conn, _, err := dialer.DialContext(context.Background(), url, nil)
+	if err != nil {
+		zapctx.Error(ctx, "BasicDial failed", zap.Error(err))
+		return nil, errors.E(op, err)
+	}
+	return conn, nil
+}
+
+// Dial connects to the controller/model and returns a raw websocket
+// that can be used as is.
+// It accepts the endpoints to dial, normally /api or /commands.
+func Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, finalPath string) (*websocket.Conn, error) {
+	var tlsConfig *tls.Config
+	if ctl.CACertificate != "" {
+		cp := x509.NewCertPool()
+		ok := cp.AppendCertsFromPEM([]byte(ctl.CACertificate))
+		if !ok {
+			zapctx.Warn(ctx, "no CA certificates added")
+		}
+		tlsConfig = &tls.Config{
+			RootCAs: cp,
+		}
+	}
+	dialer := Dialer{
+		TLSConfig: tlsConfig,
+	}
+
+	if ctl.PublicAddress != "" {
+		// If there is a public-address configured it is almost
+		// certainly the one we want to use, try it first.
+		conn, err := dialer.DialWebsocket(ctx, websocketURL(ctl.PublicAddress, modelTag, finalPath))
+		if err != nil {
+			zapctx.Error(ctx, "failed to dial public address", zaputil.Error(err))
+		} else {
+			return conn, nil
+		}
+	}
+	var urls []string
+	for _, hps := range ctl.Addresses {
+		for _, hp := range hps {
+			if hp.Scope != "public" && hp.Scope != "" {
+				continue
+			}
+			urls = append(urls, websocketURL(fmt.Sprintf("%s:%d", hp.Value, hp.Port), modelTag, finalPath))
+		}
+	}
+	zapctx.Debug(ctx, "Dialling all URLs", zap.Any("urls", urls))
+	conn, err := dialAll(ctx, &dialer, urls)
+	if err != nil {
+		return nil, err
+	}
+	return conn, nil
+}
+
+func websocketURL(s string, mt names.ModelTag, finalPath string) string {
+	u := url.URL{
+		Scheme: "wss",
+		Host:   s,
+	}
+	if mt.Id() != "" {
+		u.Path = path.Join(u.Path, "model", mt.Id())
+	}
+	if finalPath == "" {
+		u.Path = path.Join(u.Path, "api")
+	} else {
+		u.Path = path.Join(u.Path, finalPath)
+	}
+	return u.String()
+}
+
+// dialAll simultaneously dials all given urls and returns the first
+// connection.
+func dialAll(ctx context.Context, dialer *Dialer, urls []string) (*websocket.Conn, error) {
+	if len(urls) == 0 {
+		return nil, errors.E("no urls to dial")
+	}
+	conn, err := dialAllHelper(ctx, dialer, urls)
+	if err != nil {
+		return nil, err
+	}
+	return conn, nil
+}
+
+// dialAllHelper simultaneously dials all given urls and returns the first successful websocket connection.
+func dialAllHelper(ctx context.Context, dialer *Dialer, urls []string) (*websocket.Conn, error) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	var clientOnce, errOnce sync.Once
+	var err error
+	var wg sync.WaitGroup
+	var res *websocket.Conn
+	for _, url := range urls {
+		zapctx.Info(ctx, "dialing", zap.String("url", url))
+		url := url
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			conn, dErr := dialer.DialWebsocket(ctx, url)
+			if dErr != nil {
+				errOnce.Do(func() {
+					err = dErr
+				})
+				return
+			}
+			var keep bool
+			clientOnce.Do(func() {
+				res = conn
+				keep = true
+				cancel()
+			})
+			if !keep {
+				conn.Close()
+			}
+		}()
+	}
+	wg.Wait()
+	if res != nil {
+		return res, nil
+	}
+	return nil, err
+}

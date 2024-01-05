@@ -108,21 +108,34 @@ type Authenticator interface {
 	Authenticate(ctx context.Context, req *jujuparams.LoginRequest) (*openfga.User, error)
 }
 
+type permission struct {
+	resource string
+	relation string
+}
+
 // dial dials the controller and model specified by the given Controller
 // and ModelTag. If no Dialer has been configured then an error with a
 // code of CodeConnectionFailed will be returned.
-func (j *JIMM) dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag) (API, error) {
+func (j *JIMM) dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, permissons ...permission) (API, error) {
 	if j == nil || j.Dialer == nil {
 		return nil, errors.E(errors.CodeConnectionFailed, "no dialer configured")
 	}
-	return j.Dialer.Dial(ctx, ctl, modelTag, nil)
+	var permissionMap map[string]string
+	if len(permissons) > 0 {
+		permissionMap = make(map[string]string, len(permissons))
+		for _, p := range permissons {
+			permissionMap[p.resource] = p.relation
+		}
+	}
+
+	return j.Dialer.Dial(ctx, ctl, modelTag, permissionMap)
 }
 
 // A Dialer provides a connection to a controller.
 type Dialer interface {
 	// Dial creates an API connection to a controller. If the given
 	// model-tag is non-zero the connection will be to that model,
-	// otherwise the connection is to the controller. After sucessfully
+	// otherwise the connection is to the controller. After successfully
 	// dialing the controller the UUID, AgentVersion and HostPorts fields
 	// in the given controller should be updated to the values provided
 	// by the controller.
@@ -304,7 +317,7 @@ type API interface {
 // given list concurrently and then the given function is called with the
 // controller and API connection to use to perform the controller
 // operation. ForEachConnection waits until all operations have finished
-// before returning, any error returned will be ther first error
+// before returning, any error returned will be the first error
 // encountered when connecting to the controller or returned from the given
 // function.
 func (j *JIMM) forEachController(ctx context.Context, controllers []dbmodel.Controller, f func(*dbmodel.Controller, API) error) error {

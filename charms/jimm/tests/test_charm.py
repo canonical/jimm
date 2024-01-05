@@ -574,7 +574,7 @@ class TestCharm(unittest.TestCase):
             self.assertEqual(lines[4].strip(), "OPENFGA_TOKEN=test-secret-token")
 
     def test_insecure_secret_storage(self):
-        """Test that the flag for insecure secret storage is only generated when explictly requested."""
+        """Test that the flag for insecure secret storage is only generated when explicitly requested."""
         config_file = os.path.join(self.harness.charm.charm_dir, "juju-jimm.env")
         self.harness.update_config(
             {

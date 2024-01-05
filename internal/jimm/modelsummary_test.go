@@ -69,7 +69,7 @@ func TestWatchAllModelSummaries(t *testing.T) {
 
 	j := &jimm.JIMM{
 		Database: db.Database{
-			DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
+			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 		},
 		Dialer: &jimmtest.Dialer{
 			API: api,

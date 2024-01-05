@@ -1,4 +1,4 @@
-// Copyright 2021 Canoncial Ltd.
+// Copyright 2021 Canonical Ltd.
 
 package dbmodel
 
