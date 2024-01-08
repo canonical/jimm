@@ -93,6 +93,8 @@ services:
         condition: service_healthy
       insert-hardcoded-auth-model:
         condition: service_completed_successfully
+      keycloak:
+        condition: service_healthy
     labels:
       traefik.enable: true
       traefik.http.routers.jimm.rule: Host(`jimm.localhost`)
@@ -222,3 +224,22 @@ services:
     depends_on:
       openfga:
         condition: service_healthy
+
+  keycloak:
+    image: docker.io/bitnami/keycloak:23
+    environment:
+      KEYCLOAK_ENABLE_HEALTH_ENDPOINTS: true
+      KEYCLOAK_CREATE_ADMIN_USER: true
+      KEYCLOAK_ADMIN_USER: jimm
+      KEYCLOAK_ADMIN_PASSWORD: jimm
+      KEYCLOAK_DATABASE_VENDOR: dev-mem
+      KEYCLOAK_EXTRA_ARGS: "-Dkeycloak.migration.action=import -Dkeycloak.migration.provider=singleFile -Dkeycloak.migration.file=/bitnami/keycloak/data/import/realm.json -Dkeycloak.migration.replace-placeholders=true -Dkeycloak.profile.feature.upload_scripts=enabled"
+    volumes:
+      - ./local/keycloak/jimm-realm.json:/bitnami/keycloak/data/import/realm.json:ro
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: [ "CMD", "curl", "http://0.0.0.0:8080/health/started" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
