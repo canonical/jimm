@@ -228,6 +228,7 @@ services:
   keycloak:
     image: docker.io/bitnami/keycloak:23
     environment:
+      KEYCLOAK_HTTP_PORT: 8082
       KEYCLOAK_ENABLE_HEALTH_ENDPOINTS: true
       KEYCLOAK_CREATE_ADMIN_USER: true
       KEYCLOAK_ADMIN_USER: jimm
@@ -237,9 +238,9 @@ services:
     volumes:
       - ./local/keycloak/jimm-realm.json:/bitnami/keycloak/data/import/realm.json:ro
     ports:
-      - "8080:8080"
+      - "8082:8082"
     healthcheck:
-      test: [ "CMD", "curl", "http://0.0.0.0:8080/health/started" ]
+      test: [ "CMD", "curl", "http://0.0.0.0:8082/health/started" ]
       interval: 5s
       timeout: 5s
       retries: 10
