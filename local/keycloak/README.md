@@ -1,7 +1,7 @@
 # Keycloak
 
 ## Why Keycloak?
-As of 9th Jan, 2024, the companies desired OAuth2.0 server does NOT support the device OAuth2.0 flow, and it is required for JIMM to migrate away from Macaroons. As such, for local development, Keycloak has been chosen as it supports the device flow out of the box, including ALL other OAuth2.0 standard and extension grants and flows.
+As of 9th Jan, 2024, the company's desired OAuth2.0 server does NOT support the OAuth2.0 device flow, and it is required for JIMM to migrate away from Macaroons. As such, for local development, Keycloak has been chosen as it supports the device flow out of the box, including ALL other OAuth2.0 standard and extension grants and flows.
 
 ## What is Keycloak?
 Keycloak is an open-source identity and access management tool that supports standard IAM protocols such as OAuth 2.0, OpenID Connect, and SAML. It enables the creation of OAuth 2.0 clients for secure authorisation and authentication.
@@ -24,4 +24,17 @@ Here are some synonymous terms:
 - Keycloak Clients (SAML, OIDC, JWT, etc.) -> Hydra OAuth2.0 Client
 - Keycloak Role Mappings -> Hydra Trait Mapping
 - Keycloak Realm -> Ory Project
+
+## Further reading
+
+Keycloak:
+- [Getting Started](https://www.keycloak.org/guides#getting-started)
+- [Server Administration](https://www.keycloak.org/docs/latest/server_admin/index.html)
+
+Kratos:
+- [Kratos Summary](https://www.ory.sh/docs/ecosystem/projects#ory-kratos)
+
+Hydra:
+- [Quickstart](https://www.ory.sh/docs/hydra/5min-tutorial)
+- [Hydra Summary](https://www.ory.sh/docs/ecosystem/projects#ory-hydra)
 
