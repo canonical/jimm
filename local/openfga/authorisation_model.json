@@ -7,10 +7,17 @@
                     "administrator": {
                         "directly_related_user_types": [
                             {
-                                "type": "identity"
+                                "type": "serviceaccount"
                             },
                             {
-                                "type": "identity",
+                                "type": "serviceaccount",
+                                "wildcard": {}
+                            },
+                            {
+                                "type": "user"
+                            },
+                            {
+                                "type": "user",
                                 "wildcard": {}
                             },
                             {
@@ -22,10 +29,17 @@
                     "consumer": {
                         "directly_related_user_types": [
                             {
-                                "type": "identity"
+                                "type": "serviceaccount"
                             },
                             {
-                                "type": "identity",
+                                "type": "serviceaccount",
+                                "wildcard": {}
+                            },
+                            {
+                                "type": "user"
+                            },
+                            {
+                                "type": "user",
                                 "wildcard": {}
                             },
                             {
@@ -34,20 +48,27 @@
                             }
                         ]
                     },
-                    "modely": {
+                    "model": {
                         "directly_related_user_types": [
                             {
-                                "type": "modely"
+                                "type": "model"
                             }
                         ]
                     },
                     "reader": {
                         "directly_related_user_types": [
                             {
-                                "type": "identity"
+                                "type": "serviceaccount"
                             },
                             {
-                                "type": "identity",
+                                "type": "serviceaccount",
+                                "wildcard": {}
+                            },
+                            {
+                                "type": "user"
+                            },
+                            {
+                                "type": "user",
                                 "wildcard": {}
                             },
                             {
@@ -71,7 +92,7 @@
                                         "relation": "administrator"
                                     },
                                     "tupleset": {
-                                        "relation": "modely"
+                                        "relation": "model"
                                     }
                                 }
                             }
@@ -92,7 +113,7 @@
                         ]
                     }
                 },
-                "modely": {
+                "model": {
                     "this": {}
                 },
                 "reader": {
@@ -118,10 +139,17 @@
                     "administrator": {
                         "directly_related_user_types": [
                             {
-                                "type": "identity"
+                                "type": "serviceaccount"
                             },
                             {
-                                "type": "identity",
+                                "type": "serviceaccount",
+                                "wildcard": {}
+                            },
+                            {
+                                "type": "user"
+                            },
+                            {
+                                "type": "user",
                                 "wildcard": {}
                             },
                             {
@@ -133,10 +161,17 @@
                     "can_addmodel": {
                         "directly_related_user_types": [
                             {
-                                "type": "identity"
+                                "type": "serviceaccount"
                             },
                             {
-                                "type": "identity",
+                                "type": "serviceaccount",
+                                "wildcard": {}
+                            },
+                            {
+                                "type": "user"
+                            },
+                            {
+                                "type": "user",
                                 "wildcard": {}
                             },
                             {
@@ -200,10 +235,10 @@
                     "administrator": {
                         "directly_related_user_types": [
                             {
-                                "type": "identity"
+                                "type": "user"
                             },
                             {
-                                "type": "identity",
+                                "type": "user",
                                 "wildcard": {}
                             },
                             {
@@ -215,10 +250,10 @@
                     "audit_log_viewer": {
                         "directly_related_user_types": [
                             {
-                                "type": "identity"
+                                "type": "user"
                             },
                             {
-                                "type": "identity",
+                                "type": "user",
                                 "wildcard": {}
                             },
                             {
@@ -282,10 +317,10 @@
                     "member": {
                         "directly_related_user_types": [
                             {
-                                "type": "identity"
+                                "type": "user"
                             },
                             {
-                                "type": "identity",
+                                "type": "user",
                                 "wildcard": {}
                             },
                             {
@@ -309,10 +344,17 @@
                     "administrator": {
                         "directly_related_user_types": [
                             {
-                                "type": "identity"
+                                "type": "serviceaccount"
                             },
                             {
-                                "type": "identity",
+                                "type": "serviceaccount",
+                                "wildcard": {}
+                            },
+                            {
+                                "type": "user"
+                            },
+                            {
+                                "type": "user",
                                 "wildcard": {}
                             },
                             {
@@ -331,10 +373,17 @@
                     "reader": {
                         "directly_related_user_types": [
                             {
-                                "type": "identity"
+                                "type": "serviceaccount"
                             },
                             {
-                                "type": "identity",
+                                "type": "serviceaccount",
+                                "wildcard": {}
+                            },
+                            {
+                                "type": "user"
+                            },
+                            {
+                                "type": "user",
                                 "wildcard": {}
                             },
                             {
@@ -346,10 +395,17 @@
                     "writer": {
                         "directly_related_user_types": [
                             {
-                                "type": "identity"
+                                "type": "serviceaccount"
                             },
                             {
-                                "type": "identity",
+                                "type": "serviceaccount",
+                                "wildcard": {}
+                            },
+                            {
+                                "type": "user"
+                            },
+                            {
+                                "type": "user",
                                 "wildcard": {}
                             },
                             {
@@ -412,15 +468,29 @@
                     }
                 }
             },
-            "type": "modely"
+            "type": "model"
+        },
+        {
+            "type": "user"
         },
         {
             "metadata": {
                 "relations": {
-                    "administrator": {
+                    "administator": {
                         "directly_related_user_types": [
                             {
-                                "type": "identity"
+                                "type": "serviceaccount"
+                            },
+                            {
+                                "type": "serviceaccount",
+                                "wildcard": {}
+                            },
+                            {
+                                "type": "user"
+                            },
+                            {
+                                "type": "user",
+                                "wildcard": {}
                             },
                             {
                                 "relation": "member",
@@ -431,14 +501,11 @@
                 }
             },
             "relations": {
-                "administrator": {
+                "administator": {
                     "this": {}
                 }
             },
             "type": "serviceaccount"
-        },
-        {
-            "type": "identity"
         }
     ]
 }
