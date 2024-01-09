@@ -16,7 +16,7 @@ import (
 
 var (
 	// resourceTypes contains a list of all resource kinds (i.e. tags) used throughout JIMM.
-	resourceTypes = [...]string{names.UserTagKind, names.ModelTagKind, names.ControllerTagKind, names.ApplicationOfferTagKind, jimmnames.GroupTagKind}
+	resourceTypes = [...]string{names.UserTagKind, names.ModelTagKind, names.ControllerTagKind, names.ApplicationOfferTagKind, jimmnames.GroupTagKind, jimmnames.ServiceAccountTagKind}
 )
 
 // Tuple represents a relation between an object and a target.
@@ -34,20 +34,24 @@ type Kind = cofga.Kind
 // Relation holds the type of tag relation.
 type Relation = cofga.Relation
 
-// Object Kinds
+// Object Kinds, these are OpenFGA object Kinds that reference
+// Juju/JIMM objects. These are included here for ease of use
+// and avoiding string constants.
 var (
 	// ModelType represents a model object.
-	ModelType Kind = "model"
+	ModelType Kind = names.ModelTagKind
 	// ApplicationOfferType represents an application offer object.
-	ApplicationOfferType Kind = "applicationoffer"
+	ApplicationOfferType Kind = jimmnames.ApplicationOfferTagKind
 	// CloudType represents a cloud object.
-	CloudType Kind = "cloud"
+	CloudType Kind = names.CloudTagKind
 	// ControllerType represents a controller object.
-	ControllerType Kind = "controller"
+	ControllerType Kind = names.ControllerTagKind
 	// GroupType represents a group object.
-	GroupType Kind = "group"
+	GroupType Kind = jimmnames.GroupTagKind
 	// UserType represents a user object.
-	UserType Kind = "user"
+	UserType Kind = names.UserTagKind
+	// ServiceAccountType represents a service account
+	ServiceAccountType Kind = jimmnames.ServiceAccountTagKind
 )
 
 // OFGAClient contains convenient utility methods for interacting
