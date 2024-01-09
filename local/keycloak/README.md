@@ -19,7 +19,7 @@ In the context of OpenID Connect, scopes are used to request specific sets of us
 ## How does Keycloak differ from Hydra and Kratos?
 Keycloak is considered an all-in-one solution, where as Kratos is strictly an Identity provider and Hydra is an OAuth2.0 server AND provider. For all intents and purposes, they are the same, but some language is different.
 
-Here are some synoynmous terms:
+Here are some synonymous terms:
 - Keycloak Users -> Kratos Identites
 - Keycloak Clients (SAML, OIDC, JWT, etc.) -> Hydra OAuth2.0 Client
 - Keycloak Role Mappings -> Hydra Trait Mapping
