@@ -13,7 +13,7 @@ import (
 
 // AddServiceAccount checks that a user doesn't already own the service account
 // and then adds a relation between the user and the service account.
-func (j *JIMM) AddServiceAccount(ctx context.Context, u *openfga.User, clientId string) (err error) {
+func (j *JIMM) AddServiceAccount(ctx context.Context, u *openfga.User, clientId string) error {
 	op := errors.Op("jimm.AddServiceAccount")
 	svcTag := names.NewServiceAccountTag(clientId)
 	key := openfga.Tuple{
@@ -25,7 +25,7 @@ func (j *JIMM) AddServiceAccount(ctx context.Context, u *openfga.User, clientId 
 		return errors.E(op, err)
 	}
 	if len(tuples) > 0 {
-		return errors.E(op, "service account already owned by another user")
+		return errors.E(op, "service account already owned")
 	}
 	addTuple := openfga.Tuple{
 		Object:   ofganames.ConvertTag(u.ResourceTag()),
