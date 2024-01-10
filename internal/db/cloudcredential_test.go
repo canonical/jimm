@@ -15,7 +15,6 @@ import (
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/jimmtest"
-	"github.com/canonical/jimm/pkg/util"
 )
 
 func TestSetCloudCredentialUnconfiguredDatabase(t *testing.T) {
@@ -47,7 +46,7 @@ func (s *dbSuite) TestSetCloudCredentialInvalidTag(c *qt.C) {
 
 	cred := dbmodel.CloudCredential{
 		Name:          "test-cred",
-		OwnerUsername: util.ToStringPtr(u.Username),
+		OwnerUsername: &u.Username,
 		AuthType:      "empty",
 	}
 	err = s.Database.SetCloudCredential(context.Background(), &cred)
@@ -76,7 +75,7 @@ func (s *dbSuite) TestSetCloudCredential(c *qt.C) {
 	cred := dbmodel.CloudCredential{
 		Name:          "test-cred",
 		CloudName:     cloud.Name,
-		OwnerUsername: util.ToStringPtr(u.Username),
+		OwnerUsername: &u.Username,
 		AuthType:      "empty",
 	}
 	c1 := cred
@@ -113,7 +112,7 @@ func (s *dbSuite) TestSetCloudCredentialUpdate(c *qt.C) {
 	cred := dbmodel.CloudCredential{
 		Name:          "test-cred",
 		CloudName:     cloud.Name,
-		OwnerUsername: util.ToStringPtr(u.Username),
+		OwnerUsername: &u.Username,
 		AuthType:      "empty",
 	}
 	err = s.Database.SetCloudCredential(context.Background(), &cred)
@@ -137,7 +136,7 @@ func (s *dbSuite) TestSetCloudCredentialUpdate(c *qt.C) {
 
 	dbCred := dbmodel.CloudCredential{
 		CloudName:     cloud.Name,
-		OwnerUsername: util.ToStringPtr(u.Username),
+		OwnerUsername: &u.Username,
 		Name:          cred.Name,
 	}
 	err = s.Database.GetCloudCredential(context.Background(), &dbCred)
@@ -183,7 +182,7 @@ func (s *dbSuite) TestGetCloudCredential(c *qt.C) {
 	cred := dbmodel.CloudCredential{
 		Name:          "test-cred",
 		CloudName:     cloud.Name,
-		OwnerUsername: util.ToStringPtr(u.Username),
+		OwnerUsername: &u.Username,
 		AuthType:      "empty",
 	}
 	cred.Cloud.Regions = nil
@@ -195,7 +194,7 @@ func (s *dbSuite) TestGetCloudCredential(c *qt.C) {
 
 	dbCred := dbmodel.CloudCredential{
 		CloudName:     cloud.Name,
-		OwnerUsername: util.ToStringPtr(u.Username),
+		OwnerUsername: &u.Username,
 		Name:          cred.Name,
 	}
 	err = s.Database.GetCloudCredential(context.Background(), &dbCred)
