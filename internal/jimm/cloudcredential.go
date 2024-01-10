@@ -135,6 +135,10 @@ func (j *JIMM) UpdateCloudCredential(ctx context.Context, user *openfga.User, ar
 
 	var resultMu sync.Mutex
 	var result []jujuparams.UpdateCredentialModelResult
+	// TODO(ale8k): Update to check if if user tag matches owner, OR
+	// the client id matches client id on credential. If it does, let it update
+	// the credential. But let's also check that both don't exist too for completeness
+	// sake. Or in the identity interface, maybe just Identity.Identifier() or something.
 	if user.Tag() != args.CredentialTag.Owner() {
 		if !user.JimmAdmin {
 			return result, errors.E(op, errors.CodeUnauthorized, "unauthorized")

@@ -436,6 +436,8 @@ func (r *controllerRoot) UpdateCredentialsCheckModels(ctx context.Context, args 
 	return r.updateCredentials(ctx, args.Credentials, args.Force, false)
 }
 
+// updateCredentials wraps updateCredential to run the update against multiple credentials.
+// See updateCredential for details on where it updates the cloud credential.
 func (r *controllerRoot) updateCredentials(ctx context.Context, args []jujuparams.TaggedCredential, skipCheck, skipUpdate bool) (jujuparams.UpdateCredentialResults, error) {
 	results := jujuparams.UpdateCredentialResults{
 		Results: make([]jujuparams.UpdateCredentialResult, len(args)),
@@ -453,11 +455,14 @@ func (r *controllerRoot) updateCredentials(ctx context.Context, args []jujuparam
 	return results, nil
 }
 
+// updateCredential updates the cloud credential in JIMM's local database and all controllers
+// it is currently used in.
 func (r *controllerRoot) updateCredential(ctx context.Context, cred jujuparams.TaggedCredential, skipCheck, skipUpdate bool) ([]jujuparams.UpdateCredentialModelResult, error) {
 	tag, err := names.ParseCloudCredentialTag(cred.Tag)
 	if err != nil {
 		return nil, errors.E(err, errors.CodeBadRequest)
 	}
+	// TODO(ale8k): Replace me with identity r.Identity() when interface added
 	return r.jimm.UpdateCloudCredential(ctx, r.user, jimm.UpdateCloudCredentialArgs{
 		CredentialTag: tag,
 		Credential:    cred.Credential,

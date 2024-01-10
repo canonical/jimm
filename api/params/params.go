@@ -5,6 +5,7 @@ package params
 import (
 	"time"
 
+	jujucloud "github.com/juju/juju/cloud"
 	jujuparams "github.com/juju/juju/rpc/params"
 )
 
@@ -392,4 +393,15 @@ type MigrateModelInfo struct {
 // MigrateModelRequest allows for multiple migration requests to be made.
 type MigrateModelRequest struct {
 	Specs []MigrateModelInfo `json:"specs"`
+}
+
+// Service Account related request parameters
+
+// UpdateCloudCredentialsForServiceAccountRequest updates a cloud credential for a service account.
+type UpdateCloudCredentialsForServiceAccountRequest struct {
+	// ID holds the client id of the service account.
+	ID string `json:"id"`
+
+	// Credential holds the credential to be updated or added.
+	Credential jujucloud.Credential
 }

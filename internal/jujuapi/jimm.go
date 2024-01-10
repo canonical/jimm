@@ -50,6 +50,9 @@ func init() {
 		purgeLogsMethod := rpc.Method(r.PurgeLogs)
 		migrateModel := rpc.Method(r.MigrateModel)
 
+		addServiceAccountCredentials := rpc.Method(r.AddServiceAccountCredentials)
+		updateServiceAccountCredentialsCheckModels := rpc.Method(r.UpdateServiceAccountCredentialsCheckModels)
+
 		// JIMM Generic RPC
 		r.AddMethod("JIMM", 4, "AddController", addControllerMethod)
 		r.AddMethod("JIMM", 4, "DisableControllerUUIDMasking", disableControllerUUIDMaskingMethod)
@@ -77,6 +80,9 @@ func init() {
 		r.AddMethod("JIMM", 4, "ListRelationshipTuples", listRelationshipTuplesMethod)
 		// JIMM Cross-model queries
 		r.AddMethod("JIMM", 4, "CrossModelQuery", crossModelQueryMethod)
+		// JIMM Service-accounts
+		r.AddMethod("JIMM", 4, "AddServiceAccountCredentials", addServiceAccountCredentials)
+		r.AddMethod("JIMM", 4, "UpdateServiceAccountCredentialsCheckModels", updateServiceAccountCredentialsCheckModels)
 
 		return []int{4}
 	}
