@@ -21,7 +21,7 @@ var (
 )
 
 // ServiceAccount represents a service account where id is the client ID.
-// Implements juju names.Tag
+// Implements juju names.Tag.
 type ServiceAccountTag struct {
 	id string
 }
@@ -29,10 +29,10 @@ type ServiceAccountTag struct {
 // Id implements juju names.Tag.
 func (t ServiceAccountTag) Id() string { return t.id }
 
-// Kind implements juju names.Tag
+// Kind implements juju names.Tag.
 func (t ServiceAccountTag) Kind() string { return ServiceAccountTagKind }
 
-// String implements juju names.Tag
+// String implements juju names.Tag.
 func (t ServiceAccountTag) String() string { return ServiceAccountTagKind + "-" + t.Id() }
 
 // NewServiceAccountTag creates a valid ServiceAccountTag if it is possible to parse

@@ -50,7 +50,7 @@ var (
 	GroupType Kind = jimmnames.GroupTagKind
 	// UserType represents a user object.
 	UserType Kind = names.UserTagKind
-	// ServiceAccountType represents a service account
+	// ServiceAccountType represents a service account.
 	ServiceAccountType Kind = jimmnames.ServiceAccountTagKind
 )
 
