@@ -28,7 +28,6 @@ import (
 	"github.com/canonical/jimm/internal/jimmtest"
 	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
-	"github.com/canonical/jimm/pkg/util"
 )
 
 type environment struct {
@@ -125,7 +124,7 @@ var initializeEnvironment = func(c *qt.C, ctx context.Context, db *db.Database, 
 	cred := dbmodel.CloudCredential{
 		Name:          "test-credential-1",
 		CloudName:     cloud.Name,
-		OwnerUsername: util.ToStringPtr(u.Username),
+		OwnerUsername: &u.Username,
 		AuthType:      "empty",
 	}
 	err = db.SetCloudCredential(ctx, &cred)
@@ -615,7 +614,7 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 	cred := dbmodel.CloudCredential{
 		Name:          "test-credential-1",
 		CloudName:     cloud.Name,
-		OwnerUsername: util.ToStringPtr(u.Username),
+		OwnerUsername: &u.Username,
 		AuthType:      "empty",
 	}
 	err = db.SetCloudCredential(ctx, &cred)
@@ -983,7 +982,7 @@ func TestGetApplicationOffer(t *testing.T) {
 	cred := dbmodel.CloudCredential{
 		Name:          "test-credential-1",
 		CloudName:     cloud.Name,
-		OwnerUsername: util.ToStringPtr(u.Username),
+		OwnerUsername: &u.Username,
 		AuthType:      "empty",
 	}
 	err = j.Database.SetCloudCredential(ctx, &cred)
@@ -1279,7 +1278,7 @@ func TestOffer(t *testing.T) {
 			cred := dbmodel.CloudCredential{
 				Name:          "test-credential-1",
 				CloudName:     cloud.Name,
-				OwnerUsername: util.ToStringPtr(u.Username),
+				OwnerUsername: &u.Username,
 				AuthType:      "empty",
 			}
 			err = db.SetCloudCredential(ctx, &cred)
@@ -1401,7 +1400,7 @@ func TestOffer(t *testing.T) {
 			cred := dbmodel.CloudCredential{
 				Name:          "test-credential-1",
 				CloudName:     cloud.Name,
-				OwnerUsername: util.ToStringPtr(u.Username),
+				OwnerUsername: &u.Username,
 				AuthType:      "empty",
 			}
 			err = db.SetCloudCredential(ctx, &cred)
@@ -1522,7 +1521,7 @@ func TestOffer(t *testing.T) {
 			cred := dbmodel.CloudCredential{
 				Name:          "test-credential-1",
 				CloudName:     cloud.Name,
-				OwnerUsername: util.ToStringPtr(u.Username),
+				OwnerUsername: &u.Username,
 				AuthType:      "empty",
 			}
 			err = db.SetCloudCredential(ctx, &cred)
@@ -1616,7 +1615,7 @@ func TestOffer(t *testing.T) {
 			cred := dbmodel.CloudCredential{
 				Name:          "test-credential-1",
 				CloudName:     cloud.Name,
-				OwnerUsername: util.ToStringPtr(u.Username),
+				OwnerUsername: &u.Username,
 				AuthType:      "empty",
 			}
 			err = db.SetCloudCredential(ctx, &cred)
@@ -1704,7 +1703,7 @@ func TestOffer(t *testing.T) {
 			cred := dbmodel.CloudCredential{
 				Name:          "test-credential-1",
 				CloudName:     cloud.Name,
-				OwnerUsername: util.ToStringPtr(u.Username),
+				OwnerUsername: &u.Username,
 				AuthType:      "empty",
 			}
 			err = db.SetCloudCredential(ctx, &cred)
@@ -1792,7 +1791,7 @@ func TestOffer(t *testing.T) {
 			cred := dbmodel.CloudCredential{
 				Name:          "test-credential-1",
 				CloudName:     cloud.Name,
-				OwnerUsername: util.ToStringPtr(u.Username),
+				OwnerUsername: &u.Username,
 				AuthType:      "empty",
 			}
 			err = db.SetCloudCredential(ctx, &cred)
@@ -1922,7 +1921,7 @@ func TestOfferAssertOpenFGARelationsExist(t *testing.T) {
 		cred := dbmodel.CloudCredential{
 			Name:          "test-credential-1",
 			CloudName:     cloud.Name,
-			OwnerUsername: util.ToStringPtr(u.Username),
+			OwnerUsername: &u.Username,
 			AuthType:      "empty",
 		}
 		err = db.SetCloudCredential(ctx, &cred)

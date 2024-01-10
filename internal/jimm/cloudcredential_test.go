@@ -97,7 +97,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 			cred := dbmodel.CloudCredential{
 				Name:          "test-credential-1",
 				CloudName:     cloud.Name,
-				OwnerUsername: util.ToStringPtr(u.Username),
+				OwnerUsername: &u.Username,
 				AuthType:      "empty",
 			}
 			err = j.Database.SetCloudCredential(context.Background(), &cred)
@@ -212,7 +212,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 			cred := dbmodel.CloudCredential{
 				Name:          "test-credential-1",
 				CloudName:     cloud.Name,
-				OwnerUsername: util.ToStringPtr(u.Username),
+				OwnerUsername: &u.Username,
 				AuthType:      "empty",
 			}
 			err = j.Database.SetCloudCredential(context.Background(), &cred)
@@ -303,7 +303,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 			cred := dbmodel.CloudCredential{
 				Name:          "test-credential-1",
 				CloudName:     cloud.Name,
-				OwnerUsername: util.ToStringPtr(u.Username),
+				OwnerUsername: &u.Username,
 				AuthType:      "empty",
 			}
 			err = j.Database.SetCloudCredential(context.Background(), &cred)
@@ -397,7 +397,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 			cred := dbmodel.CloudCredential{
 				Name:          "test-credential-1",
 				CloudName:     cloud.Name,
-				OwnerUsername: util.ToStringPtr(eve.Username),
+				OwnerUsername: &eve.Username,
 				AuthType:      "empty",
 			}
 			err = j.Database.SetCloudCredential(context.Background(), &cred)
@@ -444,7 +444,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 					Name: cloud.Name,
 					Type: cloud.Type,
 				},
-				OwnerUsername: util.ToStringPtr(eve.Username),
+				OwnerUsername: &eve.Username,
 				Attributes: map[string]string{
 					"key1": "value1",
 					"key2": "value2",
@@ -511,7 +511,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 			cred := dbmodel.CloudCredential{
 				Name:          "test-credential-1",
 				CloudName:     cloud.Name,
-				OwnerUsername: util.ToStringPtr(u.Username),
+				OwnerUsername: &u.Username,
 				AuthType:      "empty",
 			}
 			err = j.Database.SetCloudCredential(context.Background(), &cred)
@@ -624,7 +624,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 			cred := dbmodel.CloudCredential{
 				Name:          "test-credential-1",
 				CloudName:     cloud.Name,
-				OwnerUsername: util.ToStringPtr(u.Username),
+				OwnerUsername: &u.Username,
 				AuthType:      "empty",
 			}
 			err = j.Database.SetCloudCredential(context.Background(), &cred)
@@ -930,7 +930,7 @@ func TestRevokeCloudCredential(t *testing.T) {
 			cred := dbmodel.CloudCredential{
 				Name:          "test-credential-1",
 				CloudName:     cloud.Name,
-				OwnerUsername: util.ToStringPtr(u.Username),
+				OwnerUsername: &u.Username,
 				AuthType:      "empty",
 			}
 			err = j.Database.SetCloudCredential(context.Background(), &cred)
@@ -1004,7 +1004,7 @@ func TestRevokeCloudCredential(t *testing.T) {
 			cred := dbmodel.CloudCredential{
 				Name:          "test-credential-1",
 				CloudName:     cloud.Name,
-				OwnerUsername: util.ToStringPtr(u.Username),
+				OwnerUsername: &u.Username,
 				AuthType:      "empty",
 			}
 			err = j.Database.SetCloudCredential(context.Background(), &cred)
@@ -1074,7 +1074,7 @@ func TestRevokeCloudCredential(t *testing.T) {
 			cred := dbmodel.CloudCredential{
 				Name:          "test-credential-1",
 				CloudName:     cloud.Name,
-				OwnerUsername: util.ToStringPtr(u.Username),
+				OwnerUsername: &u.Username,
 				AuthType:      "empty",
 			}
 			err = j.Database.SetCloudCredential(context.Background(), &cred)
@@ -1167,7 +1167,7 @@ func TestRevokeCloudCredential(t *testing.T) {
 			cred := dbmodel.CloudCredential{
 				Name:          "test-credential-1",
 				CloudName:     cloud.Name,
-				OwnerUsername: util.ToStringPtr(u.Username),
+				OwnerUsername: &u.Username,
 				AuthType:      "empty",
 			}
 			err = j.Database.SetCloudCredential(context.Background(), &cred)
@@ -1343,7 +1343,7 @@ func TestGetCloudCredential(t *testing.T) {
 					Name: cloud.Name,
 					Type: cloud.Type,
 				},
-				OwnerUsername: util.ToStringPtr(u.Username),
+				OwnerUsername: &u.Username,
 				AuthType:      "empty",
 			}
 			err = j.Database.SetCloudCredential(context.Background(), &cred)

@@ -11,7 +11,6 @@ import (
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/logger"
-	"github.com/canonical/jimm/pkg/util"
 	petname "github.com/dustinkirkland/golang-petname"
 	"github.com/google/uuid"
 	"github.com/juju/juju/core/crossmodel"
@@ -87,7 +86,7 @@ func main() {
 	cred := dbmodel.CloudCredential{
 		Name:          petname.Generate(2, "-"),
 		CloudName:     cloud.Name,
-		OwnerUsername: util.ToStringPtr(u.Username),
+		OwnerUsername: &u.Username,
 		AuthType:      "empty",
 	}
 	if err = db.SetCloudCredential(ctx, &cred); err != nil {

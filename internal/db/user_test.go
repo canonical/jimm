@@ -11,7 +11,6 @@ import (
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
-	"github.com/canonical/jimm/pkg/util"
 )
 
 func TestGetUserUnconfiguredDatabase(t *testing.T) {
@@ -130,7 +129,7 @@ func (s *dbSuite) TestGetUserCloudCredentials(c *qt.C) {
 	cred1 := dbmodel.CloudCredential{
 		Name:          "test-cred-1",
 		CloudName:     cloud.Name,
-		OwnerUsername: util.ToStringPtr(u.Username),
+		OwnerUsername: &u.Username,
 		AuthType:      "empty",
 	}
 	err = s.Database.SetCloudCredential(context.Background(), &cred1)
@@ -139,7 +138,7 @@ func (s *dbSuite) TestGetUserCloudCredentials(c *qt.C) {
 	cred2 := dbmodel.CloudCredential{
 		Name:          "test-cred-2",
 		CloudName:     cloud.Name,
-		OwnerUsername: util.ToStringPtr(u.Username),
+		OwnerUsername: &u.Username,
 		AuthType:      "empty",
 	}
 	err = s.Database.SetCloudCredential(context.Background(), &cred2)
