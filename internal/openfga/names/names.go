@@ -77,18 +77,22 @@ func IsIdentifierType(t string) bool {
 	return t == names.UserTagKind || t == jimmnames.ServiceAccountTagKind
 }
 
+// convertID transforms tags that represent the public access wildcard "*".
+// A user with ID "*" represents "everyone" in OpenFGA and allows checks like
+// `user:bob reader type:my-resource` to return true without a separate query
+// for the user:everyone@external user.
+func convertID(id, kind string) string {
+	if IsIdentifierType(kind) && id == EveryoneUser {
+		return "*"
+	}
+	return id
+}
+
 // ConvertTag converts a resource tag to an OpenFGA tag where the resource tag is limited to
 // specific types of tags.
 func ConvertTag[RT ResourceTagger](t RT) *Tag {
-	id := t.Id()
-	if IsIdentifierType(t.Kind()) && id == EveryoneUser {
-		// A user with ID "*" represents "everyone" in OpenFGA and allows checks like
-		// `user:bob reader type:my-resource` to return true without a separate query
-		// for the user:everyone@external user.
-		id = "*"
-	}
 	tag := &Tag{
-		ID:   id,
+		ID:   convertID(t.Id(), t.Kind()),
 		Kind: cofga.Kind(t.Kind()),
 	}
 	return tag
@@ -97,7 +101,7 @@ func ConvertTag[RT ResourceTagger](t RT) *Tag {
 // ConvertGenericTag converts any tag implementing the names.tag interface to an OpenFGA tag.
 func ConvertGenericTag(t names.Tag) *Tag {
 	tag := &Tag{
-		ID:   t.Id(),
+		ID:   convertID(t.Id(), t.Kind()),
 		Kind: cofga.Kind(t.Kind()),
 	}
 	return tag
