@@ -37,6 +37,9 @@ func (d *Database) GetServiceAccount(ctx context.Context, sa *dbmodel.ServiceAcc
 // FetchServiceAccount loads the details for the service account identified by
 // ClientID. It will not create a service account if it was not found.
 //
+// GetServiceAccount does not fill out the service account's CloudCredentials.
+// Use GetServiceAccountCloudCredentials to retrieve this information.
+//
 // FetchServiceAccount returns an error with CodeNotFound if the ClientID is invalid.
 func (d *Database) FetchServiceAccount(ctx context.Context, sa *dbmodel.ServiceAccount) error {
 	const op = errors.Op("db.FetchServiceAccount")
