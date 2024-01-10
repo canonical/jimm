@@ -22,8 +22,12 @@ type CloudCredential struct {
 	Cloud     Cloud `gorm:"foreignKey:CloudName;references:Name;constraint:OnDelete:CASCADE"`
 
 	// Owner is the user that owns this credential.
-	OwnerUsername string
-	Owner         User `gorm:"foreignKey:OwnerUsername;references:Username"`
+	Owner         *User `gorm:"foreignKey:OwnerUsername;references:Username"`
+	OwnerUsername *string
+
+	// OwnerServiceAccount is the service account that owns this credential.
+	OwnerServiceAccount *ServiceAccount `gorm:"foreignKey:OwnerClientID;references:ClientID"`
+	OwnerClientID       *string
 
 	// AuthType is the type of the credential.
 	AuthType string
@@ -55,17 +59,24 @@ func (c CloudCredential) Tag() names.Tag {
 // a concrete type names.CloudCredentialTag instead of the
 // names.Tag interface.
 func (c CloudCredential) ResourceTag() names.CloudCredentialTag {
-	return names.NewCloudCredentialTag(fmt.Sprintf("%s/%s/%s", c.CloudName, c.OwnerUsername, c.Name))
+	// TODO (babakks): we should use the correct owner (user or service account).
+	// For now we just assume the owner is a User (not a service account).
+	return names.NewCloudCredentialTag(fmt.Sprintf("%s/%s/%s", c.CloudName, *c.OwnerUsername, c.Name))
 }
 
 // SetTag sets the Name, CloudName and Username fields from the given tag.
 func (c *CloudCredential) SetTag(t names.CloudCredentialTag) {
 	c.CloudName = t.Cloud().Id()
 	c.Name = t.Name()
-	c.OwnerUsername = t.Owner().Id()
+	// TODO (babakks): we should set the Owner based on the tag's Owner field; which can be a user or service account.
+	// For now we just assume the owner is a User (not a service account).
+	owner := t.Owner().Id()
+	c.OwnerUsername = &owner
 }
 
 // Path returns a juju style cloud credential path.
 func (c CloudCredential) Path() string {
-	return fmt.Sprintf("%s/%s/%s", c.CloudName, c.OwnerUsername, c.Name)
+	// TODO (babakks): we should use the correct owner (user or service account).
+	// For now we just assume the owner is a User (not a service account).
+	return fmt.Sprintf("%s/%s/%s", c.CloudName, *c.OwnerUsername, c.Name)
 }

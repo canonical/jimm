@@ -321,11 +321,16 @@ func (j *JIMM) GetCloudCredentialAttributes(ctx context.Context, user *openfga.U
 
 	if hidden {
 		// Controller superusers cannot read hidden credential attributes.
-		if user.Username != cred.OwnerUsername {
+
+		// TODO (babakks): what if the credential was owned by a service account?
+		// Here we assume the credential could only be owned by a User.
+		if cred.OwnerUsername != nil && user.Username != *cred.OwnerUsername {
 			return nil, nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 		}
 	} else {
-		if !user.JimmAdmin && user.Username != cred.OwnerUsername {
+		// TODO (babakks): what if the credential was owned by a service account?
+		// Here we assume the credential could only be owned by a User.
+		if !user.JimmAdmin && (cred.OwnerUsername == nil || user.Username != *cred.OwnerUsername) {
 			return nil, nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 		}
 	}
