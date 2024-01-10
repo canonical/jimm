@@ -363,15 +363,14 @@ func setResourceAccess[T ofganames.ResourceTagger](ctx context.Context, user *Us
 	// If the requested user is "everyone" then we need to add a tuple for users and service accounts.
 	if ofganames.IsIdentifierType(t.Kind()) && t.Id() == ofganames.EveryoneUser {
 		for _, name := range allIdentifiers {
-			err := addRelation(ofganames.ConvertTag(name))
+			err := addRelation(ofganames.ConvertGenericTag(name))
 			if err != nil {
 				return err
 			}
 		}
 		return nil
-	} else {
-		return addRelation(ofganames.ConvertTag(t))
 	}
+	return addRelation(ofganames.ConvertTag(t))
 }
 
 // unsetMultipleResourceAccesses deletes relations that correspond to the requested resource access, atomically.
@@ -425,15 +424,14 @@ func unsetMultipleResourceAccesses[T ofganames.ResourceTagger](ctx context.Conte
 	// If the requested user is "everyone" then we need to remove access for users and service accounts.
 	if ofganames.IsIdentifierType(t.Kind()) && t.Id() == ofganames.EveryoneUser {
 		for _, name := range allIdentifiers {
-			err := unsetAccess(ofganames.ConvertTag(name))
+			err := unsetAccess(ofganames.ConvertGenericTag(name))
 			if err != nil {
 				return err
 			}
 		}
 		return nil
-	} else {
-		return unsetAccess(ofganames.ConvertTag(t))
 	}
+	return unsetAccess(ofganames.ConvertTag(t))
 }
 
 // unsetResourceAccess deletes a relation that corresponds to the requested resource access.
@@ -462,15 +460,14 @@ func unsetResourceAccess[T ofganames.ResourceTagger](ctx context.Context, user *
 	// If the requested user is "everyone" then we need to remove access for users and service accounts.
 	if ofganames.IsIdentifierType(t.Kind()) && t.Id() == ofganames.EveryoneUser {
 		for _, name := range allIdentifiers {
-			err := unsetAccess(ofganames.ConvertTag(name))
+			err := unsetAccess(ofganames.ConvertGenericTag(name))
 			if err != nil {
 				return err
 			}
 		}
 		return nil
-	} else {
-		return unsetAccess(ofganames.ConvertTag(t))
 	}
+	return unsetAccess(ofganames.ConvertTag(t))
 }
 
 // ListUsersWithAccess lists all users that have the specified relation to the resource.
