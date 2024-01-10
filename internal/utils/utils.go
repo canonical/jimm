@@ -12,3 +12,9 @@ func NewConversationID() string {
 	rand.Read(buf) // Can't fail
 	return hex.EncodeToString(buf)
 }
+
+// ToStringPtr returns a pointer to given string value. This should only be used
+// as a helper function to get pointers to literals or function call return values.
+func ToStringPtr(value string) *string {
+	return &value
+}
