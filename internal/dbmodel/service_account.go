@@ -8,6 +8,7 @@ import (
 	"gorm.io/gorm"
 )
 
+// ServiceAccount represents a service account, an OIDC/OAUTH concept.
 type ServiceAccount struct {
 	gorm.Model
 
