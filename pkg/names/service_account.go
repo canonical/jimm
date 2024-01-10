@@ -1,3 +1,5 @@
+// Copyright 2024 canonical.
+
 // Service accounts are an OIDC/OAuth concept which allows for machine<->machine communication.
 // Service accounts are identified by their client ID.
 package names
@@ -24,7 +26,7 @@ type ServiceAccountTag struct {
 	id string
 }
 
-// Id implements juju names.Tag
+// Id implements juju names.Tag.
 func (t ServiceAccountTag) Id() string { return t.id }
 
 // Kind implements juju names.Tag
