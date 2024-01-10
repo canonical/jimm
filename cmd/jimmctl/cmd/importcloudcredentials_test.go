@@ -12,7 +12,7 @@ import (
 
 	"github.com/canonical/jimm/cmd/jimmctl/cmd"
 	"github.com/canonical/jimm/internal/dbmodel"
-	"github.com/canonical/jimm/pkg/util"
+	"github.com/canonical/jimm/internal/utils"
 )
 
 type importCloudCredentialsSuite struct {
@@ -69,7 +69,7 @@ func (s *importCloudCredentialsSuite) TestImportCloudCredentials(c *gc.C) {
 
 	cred1 := dbmodel.CloudCredential{
 		CloudName:     "aws",
-		OwnerUsername: util.ToStringPtr("alice@external"),
+		OwnerUsername: utils.ToStringPtr("alice@external"),
 		Name:          "test1",
 	}
 	err = s.JIMM.Database.GetCloudCredential(context.Background(), &cred1)
@@ -78,7 +78,7 @@ func (s *importCloudCredentialsSuite) TestImportCloudCredentials(c *gc.C) {
 
 	cred2 := dbmodel.CloudCredential{
 		CloudName:     "aws",
-		OwnerUsername: util.ToStringPtr("bob@external"),
+		OwnerUsername: utils.ToStringPtr("bob@external"),
 		Name:          "test1",
 	}
 	err = s.JIMM.Database.GetCloudCredential(context.Background(), &cred2)
@@ -87,7 +87,7 @@ func (s *importCloudCredentialsSuite) TestImportCloudCredentials(c *gc.C) {
 
 	cred3 := dbmodel.CloudCredential{
 		CloudName:     "gce",
-		OwnerUsername: util.ToStringPtr("charlie@external"),
+		OwnerUsername: utils.ToStringPtr("charlie@external"),
 		Name:          "test1",
 	}
 	err = s.JIMM.Database.GetCloudCredential(context.Background(), &cred3)

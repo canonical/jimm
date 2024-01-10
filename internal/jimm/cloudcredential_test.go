@@ -24,7 +24,7 @@ import (
 	"github.com/canonical/jimm/internal/jimmtest"
 	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
-	"github.com/canonical/jimm/pkg/util"
+	"github.com/canonical/jimm/internal/utils"
 )
 
 func TestUpdateCloudCredential(t *testing.T) {
@@ -1691,14 +1691,14 @@ func TestCloudCredentialAttributeStore(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	cred := dbmodel.CloudCredential{
-		OwnerUsername: util.ToStringPtr("alice@external"),
+		OwnerUsername: utils.ToStringPtr("alice@external"),
 		Name:          "cred-1",
 		CloudName:     "test",
 	}
 	err = j.Database.GetCloudCredential(ctx, &cred)
 	c.Assert(err, qt.IsNil)
 	c.Check(cred, jimmtest.DBObjectEquals, dbmodel.CloudCredential{
-		OwnerUsername: util.ToStringPtr("alice@external"),
+		OwnerUsername: utils.ToStringPtr("alice@external"),
 		Name:          "cred-1",
 		CloudName:     "test",
 		AuthType:      "userpass",

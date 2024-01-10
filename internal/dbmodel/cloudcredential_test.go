@@ -9,7 +9,7 @@ import (
 	"github.com/juju/names/v4"
 
 	"github.com/canonical/jimm/internal/dbmodel"
-	"github.com/canonical/jimm/pkg/util"
+	"github.com/canonical/jimm/internal/utils"
 )
 
 func TestCloudCredentialTag(t *testing.T) {
@@ -18,7 +18,7 @@ func TestCloudCredentialTag(t *testing.T) {
 	cred := dbmodel.CloudCredential{
 		Name:          "test-credential",
 		CloudName:     "test-cloud",
-		OwnerUsername: util.ToStringPtr("test-user"),
+		OwnerUsername: utils.ToStringPtr("test-user"),
 	}
 	tag := cred.Tag()
 	c.Check(tag.String(), qt.Equals, "cloudcred-test-cloud_test-user_test-credential")

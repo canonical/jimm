@@ -22,7 +22,7 @@ import (
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
-	"github.com/canonical/jimm/pkg/util"
+	"github.com/canonical/jimm/internal/utils"
 )
 
 // shuffle is used to randomize the order in which possible controllers
@@ -250,7 +250,7 @@ func (b *modelBuilder) WithCloudCredential(credentialTag names.CloudCredentialTa
 	credential := dbmodel.CloudCredential{
 		Name:          credentialTag.Name(),
 		CloudName:     credentialTag.Cloud().Id(),
-		OwnerUsername: util.ToStringPtr(credentialTag.Owner().Id()),
+		OwnerUsername: utils.ToStringPtr(credentialTag.Owner().Id()),
 	}
 	err := b.jimm.Database.GetCloudCredential(b.ctx, &credential)
 	if err != nil {
