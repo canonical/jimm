@@ -9,9 +9,8 @@ import (
 
 const (
 	// ServiceAccountTagKind represents the resource "kind" that service accounts
-	// act as towards Juju. Because Juju only recognises users, service accounts
-	// are represented as users.
-	ServiceAccountTagKind = "user"
+	// are represented as.
+	ServiceAccountTagKind = "serviceaccount"
 )
 
 var (
