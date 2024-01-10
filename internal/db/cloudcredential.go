@@ -124,7 +124,7 @@ func cloudCredentialOwnerString(cred *dbmodel.CloudCredential) string {
 func (d *Database) ForEachCloudCredential(ctx context.Context, username, cloud string, f func(*dbmodel.CloudCredential) error) error {
 	const op = errors.Op("db.ForEachCloudCredential")
 
-	// TODO (babakks): this method queries for User-owned credentials. We might
+	// TODO (CSS-6785): this method queries for User-owned credentials. We might
 	// need to update this, or add another method to support credentials owned
 	// by service accounts.
 

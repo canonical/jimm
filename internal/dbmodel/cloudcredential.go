@@ -59,7 +59,7 @@ func (c CloudCredential) Tag() names.Tag {
 // a concrete type names.CloudCredentialTag instead of the
 // names.Tag interface.
 func (c CloudCredential) ResourceTag() names.CloudCredentialTag {
-	// TODO (babakks): we should use the correct owner (user or service account).
+	// TODO (CSS-6785): we should use the correct owner (user or service account).
 	// For now we just assume the owner is a User (not a service account).
 	return names.NewCloudCredentialTag(fmt.Sprintf("%s/%s/%s", c.CloudName, *c.OwnerUsername, c.Name))
 }
@@ -68,7 +68,7 @@ func (c CloudCredential) ResourceTag() names.CloudCredentialTag {
 func (c *CloudCredential) SetTag(t names.CloudCredentialTag) {
 	c.CloudName = t.Cloud().Id()
 	c.Name = t.Name()
-	// TODO (babakks): we should set the Owner based on the tag's Owner field; which can be a user or service account.
+	// TODO (CSS-6785): we should set the Owner based on the tag's Owner field; which can be a user or service account.
 	// For now we just assume the owner is a User (not a service account).
 	owner := t.Owner().Id()
 	c.OwnerUsername = &owner
@@ -76,7 +76,7 @@ func (c *CloudCredential) SetTag(t names.CloudCredentialTag) {
 
 // Path returns a juju style cloud credential path.
 func (c CloudCredential) Path() string {
-	// TODO (babakks): we should use the correct owner (user or service account).
+	// TODO (CSS-6785): we should use the correct owner (user or service account).
 	// For now we just assume the owner is a User (not a service account).
 	return fmt.Sprintf("%s/%s/%s", c.CloudName, *c.OwnerUsername, c.Name)
 }

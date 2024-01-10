@@ -141,7 +141,7 @@ func (m *Model) FromJujuModelInfo(info jujuparams.ModelInfo) error {
 		m.CloudCredential.Name = cct.Name()
 		m.CloudCredential.CloudName = cct.Cloud().Id()
 
-		// TODO (babakks): could a cloud-credentials taken from a Juju model be owned by a service account?
+		// TODO (CSS-6785): could a cloud-credentials taken from a Juju model be owned by a service account?
 		// currently, we assume the answer is "No", and populate the `Owner` (User) field.
 		if m.CloudCredential.Owner == nil {
 			m.CloudCredential.Owner = &User{}
