@@ -51,7 +51,6 @@ type Tag = cofga.Entity
 
 // ResourceTagger represents an entity tag that implements
 // a method returning entity's id and kind.
-// TODO(ale8k): Rename this to remove the "er", "er" should only apply to interfaces with a single method.
 type ResourceTagger interface {
 	names.UserTag |
 		jimmnames.GroupTag |
@@ -73,11 +72,16 @@ func ConvertTagWithRelation[RT ResourceTagger](t RT, relation cofga.Relation) *T
 	return tag
 }
 
+// IsIdentifierType indicates whether the kind is one that identifies a user/service account.
+func IsIdentifierType(t string) bool {
+	return t == names.UserTagKind || t == jimmnames.ServiceAccountTagKind
+}
+
 // ConvertTag converts a resource tag to an OpenFGA tag where the resource tag is limited to
 // specific types of tags.
 func ConvertTag[RT ResourceTagger](t RT) *Tag {
 	id := t.Id()
-	if t.Kind() == names.UserTagKind && id == EveryoneUser {
+	if IsIdentifierType(t.Kind()) && id == EveryoneUser {
 		// A user with ID "*" represents "everyone" in OpenFGA and allows checks like
 		// `user:bob reader type:my-resource` to return true without a separate query
 		// for the user:everyone@external user.

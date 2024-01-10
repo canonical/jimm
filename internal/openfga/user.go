@@ -13,6 +13,7 @@ import (
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
+	jimmnames "github.com/canonical/jimm/pkg/names"
 	"github.com/canonical/ofga"
 )
 
@@ -263,7 +264,7 @@ func (u *User) ListApplicationOffers(ctx context.Context, relation ofga.Relation
 }
 
 type administratorT interface {
-	names.ControllerTag | names.ModelTag | names.ApplicationOfferTag | names.CloudTag
+	names.ControllerTag | names.ModelTag | names.ApplicationOfferTag | names.CloudTag | jimmnames.ServiceAccountTag
 
 	Id() string
 	Kind() string
@@ -334,94 +335,142 @@ func IsAdministrator[T administratorT](ctx context.Context, u *User, resource T)
 	return isAdmin, nil
 }
 
+var (
+	// ToDo(Kian): CSS-6703 Add a service account tag below once an identifier interface is created.
+	allIdentifiers = []names.UserTag{names.NewUserTag(ofganames.EveryoneUser)}
+)
+
 // setResourceAccess creates a relation to model the requested resource access.
 // Note that the action is idempotent (does not return error if the relation already exists).
 func setResourceAccess[T ofganames.ResourceTagger](ctx context.Context, user *User, resource T, relation Relation) error {
-	err := user.client.AddRelation(ctx, Tuple{
-		Object:   ofganames.ConvertTag(user.ResourceTag()),
-		Relation: relation,
-		Target:   ofganames.ConvertTag(resource),
-	})
-	if err != nil {
-		// if the tuple already exist we don't return an error.
-		// TODO we should opt to check against specific errors via checking their code/metadata.
-		if strings.Contains(err.Error(), "cannot write a tuple which already exists") {
-			return nil
+	addRelation := func(tag *Tag) error {
+		err := user.client.AddRelation(ctx, Tuple{
+			Object:   tag,
+			Relation: relation,
+			Target:   ofganames.ConvertTag(resource),
+		})
+		if err != nil {
+			// if the tuple already exist we don't return an error.
+			// TODO we should opt to check against specific errors via checking their code/metadata.
+			if strings.Contains(err.Error(), "cannot write a tuple which already exists") {
+				return nil
+			}
+			return errors.E(err)
 		}
-		return errors.E(err)
+		return nil
 	}
-
-	return nil
+	t := user.ResourceTag()
+	// If the requested user is "everyone" then we need to add a tuple for users and service accounts.
+	if ofganames.IsIdentifierType(t.Kind()) && t.Id() == ofganames.EveryoneUser {
+		for _, name := range allIdentifiers {
+			err := addRelation(ofganames.ConvertTag(name))
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	} else {
+		return addRelation(ofganames.ConvertTag(t))
+	}
 }
 
 // unsetMultipleResourceAccesses deletes relations that correspond to the requested resource access, atomically.
 // Note that the action is idempotent (i.e., does not return error if any of the relations does not exist).
 func unsetMultipleResourceAccesses[T ofganames.ResourceTagger](ctx context.Context, user *User, resource T, relations []Relation) error {
-	tupleObject := ofganames.ConvertTag(user.ResourceTag())
-	tupleTarget := ofganames.ConvertTag(resource)
+	unsetAccess := func(userTag *Tag) error {
+		tupleObject := userTag
+		tupleTarget := ofganames.ConvertTag(resource)
 
-	lastContinuationToken := ""
-	existingRelations := map[Relation]interface{}{}
-	for {
-		timestampedTuples, continuationToken, err := user.client.cofgaClient.FindMatchingTuples(ctx, Tuple{
-			Object: tupleObject,
-			Target: tupleTarget,
-		}, 0, lastContinuationToken)
+		lastContinuationToken := ""
+		existingRelations := map[Relation]interface{}{}
+		for {
+			timestampedTuples, continuationToken, err := user.client.cofgaClient.FindMatchingTuples(ctx, Tuple{
+				Object: tupleObject,
+				Target: tupleTarget,
+			}, 0, lastContinuationToken)
 
+			if err != nil {
+				return errors.E(err, "failed to retrieve existing relations")
+			}
+
+			for _, timestampedTuple := range timestampedTuples {
+				existingRelations[timestampedTuple.Tuple.Relation] = nil
+			}
+
+			if continuationToken == lastContinuationToken {
+				break
+			}
+			lastContinuationToken = continuationToken
+		}
+
+		tuplesToRemove := make([]Tuple, 0, len(relations))
+		for _, relation := range relations {
+			if _, ok := existingRelations[relation]; !ok {
+				continue
+			}
+			tuplesToRemove = append(tuplesToRemove, Tuple{
+				Object:   tupleObject,
+				Relation: relation,
+				Target:   tupleTarget,
+			})
+		}
+
+		err := user.client.RemoveRelation(ctx, tuplesToRemove...)
 		if err != nil {
-			return errors.E(err, "failed to retrieve existing relations")
+			return errors.E(err, "failed to remove relations")
 		}
-
-		for _, timestampedTuple := range timestampedTuples {
-			existingRelations[timestampedTuple.Tuple.Relation] = nil
-		}
-
-		if continuationToken == lastContinuationToken {
-			break
-		}
-		lastContinuationToken = continuationToken
+		return nil
 	}
-
-	tuplesToRemove := make([]Tuple, 0, len(relations))
-	for _, relation := range relations {
-		if _, ok := existingRelations[relation]; !ok {
-			continue
+	t := user.ResourceTag()
+	// If the requested user is "everyone" then we need to remove access for users and service accounts.
+	if ofganames.IsIdentifierType(t.Kind()) && t.Id() == ofganames.EveryoneUser {
+		for _, name := range allIdentifiers {
+			err := unsetAccess(ofganames.ConvertTag(name))
+			if err != nil {
+				return err
+			}
 		}
-		tuplesToRemove = append(tuplesToRemove, Tuple{
-			Object:   tupleObject,
-			Relation: relation,
-			Target:   tupleTarget,
-		})
+		return nil
+	} else {
+		return unsetAccess(ofganames.ConvertTag(t))
 	}
-
-	err := user.client.RemoveRelation(ctx, tuplesToRemove...)
-	if err != nil {
-		return errors.E(err, "failed to remove relations")
-	}
-	return nil
 }
 
 // unsetResourceAccess deletes a relation that corresponds to the requested resource access.
 // Note that if the `ignoreMissingRelation` argument is set to `true`, then the action will be idempotent (i.e., does
 // not return error if the relation does not exist).
 func unsetResourceAccess[T ofganames.ResourceTagger](ctx context.Context, user *User, resource T, relation Relation, ignoreMissingRelation bool) error {
-	err := user.client.RemoveRelation(ctx, Tuple{
-		Object:   ofganames.ConvertTag(user.ResourceTag()),
-		Relation: relation,
-		Target:   ofganames.ConvertTag(resource),
-	})
-	if err != nil {
-		if ignoreMissingRelation {
-			// if the tuple does not exist we don't return an error.
-			// TODO we should opt to check against specific errors via checking their code/metadata.
-			if strings.Contains(err.Error(), "cannot delete a tuple which does not exist") {
-				return nil
+	unsetAccess := func(tag *Tag) error {
+		err := user.client.RemoveRelation(ctx, Tuple{
+			Object:   tag,
+			Relation: relation,
+			Target:   ofganames.ConvertTag(resource),
+		})
+		if err != nil {
+			if ignoreMissingRelation {
+				// if the tuple does not exist we don't return an error.
+				// TODO we should opt to check against specific errors via checking their code/metadata.
+				if strings.Contains(err.Error(), "cannot delete a tuple which does not exist") {
+					return nil
+				}
+			}
+			return errors.E(err)
+		}
+		return nil
+	}
+	t := user.ResourceTag()
+	// If the requested user is "everyone" then we need to remove access for users and service accounts.
+	if ofganames.IsIdentifierType(t.Kind()) && t.Id() == ofganames.EveryoneUser {
+		for _, name := range allIdentifiers {
+			err := unsetAccess(ofganames.ConvertTag(name))
+			if err != nil {
+				return err
 			}
 		}
-		return errors.E(err)
+		return nil
+	} else {
+		return unsetAccess(ofganames.ConvertTag(t))
 	}
-
-	return nil
 }
 
 // ListUsersWithAccess lists all users that have the specified relation to the resource.

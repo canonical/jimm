@@ -114,6 +114,15 @@ func ToOfferRelation(accessLevel string) (openfga.Relation, error) {
 	}
 }
 
+// identifierToUserString converts an OpenFGA user to a user string
+// to ensure that both users and service accounts are presented as users
+// to Juju. This is necessary as Juju's token authenticator verifies
+// the subject JWT token is of the form user-<name>.
+// TODO(Kian): CSS-6703 this will change to accept users and service accounts.
+func identifierToUserString(u openfga.User) string {
+	return names.NewUserTag(u.Username).String()
+}
+
 // JWTGeneratorDatabase specifies the database interface used by the
 // JWT generator.
 type JWTGeneratorDatabase interface {
@@ -236,7 +245,7 @@ func (auth *JWTGenerator) MakeLoginToken(ctx context.Context, req *jujuparams.Lo
 
 	return auth.jwtService.NewJWT(ctx, jimmjwx.JWTParams{
 		Controller: auth.ct.Id(),
-		User:       auth.user.Tag().String(),
+		User:       identifierToUserString(*auth.user),
 		Access:     auth.accessMapCache,
 	})
 }
@@ -266,7 +275,7 @@ func (auth *JWTGenerator) MakeToken(ctx context.Context, permissionMap map[strin
 	}
 	jwt, err := auth.jwtService.NewJWT(ctx, jimmjwx.JWTParams{
 		Controller: auth.ct.Id(),
-		User:       auth.user.Tag().String(),
+		User:       identifierToUserString(*auth.user),
 		Access:     auth.accessMapCache,
 	})
 	if err != nil {
