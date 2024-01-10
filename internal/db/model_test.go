@@ -162,7 +162,7 @@ func (s *dbSuite) TestGetModel(c *qt.C) {
 		},
 	}
 	model.CloudCredential.Cloud = dbmodel.Cloud{}
-	model.CloudCredential.Owner = &dbmodel.User{}
+	model.CloudCredential.Owner = nil
 	err = s.Database.AddModel(context.Background(), &model)
 	c.Assert(err, qt.Equals, nil)
 
