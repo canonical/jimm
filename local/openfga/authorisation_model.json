@@ -7,6 +7,13 @@
                     "administrator": {
                         "directly_related_user_types": [
                             {
+                                "type": "serviceaccount"
+                            },
+                            {
+                                "type": "serviceaccount",
+                                "wildcard": {}
+                            },
+                            {
                                 "type": "user"
                             },
                             {
@@ -21,6 +28,13 @@
                     },
                     "consumer": {
                         "directly_related_user_types": [
+                            {
+                                "type": "serviceaccount"
+                            },
+                            {
+                                "type": "serviceaccount",
+                                "wildcard": {}
+                            },
                             {
                                 "type": "user"
                             },
@@ -43,6 +57,13 @@
                     },
                     "reader": {
                         "directly_related_user_types": [
+                            {
+                                "type": "serviceaccount"
+                            },
+                            {
+                                "type": "serviceaccount",
+                                "wildcard": {}
+                            },
                             {
                                 "type": "user"
                             },
@@ -118,6 +139,13 @@
                     "administrator": {
                         "directly_related_user_types": [
                             {
+                                "type": "serviceaccount"
+                            },
+                            {
+                                "type": "serviceaccount",
+                                "wildcard": {}
+                            },
+                            {
                                 "type": "user"
                             },
                             {
@@ -132,6 +160,13 @@
                     },
                     "can_addmodel": {
                         "directly_related_user_types": [
+                            {
+                                "type": "serviceaccount"
+                            },
+                            {
+                                "type": "serviceaccount",
+                                "wildcard": {}
+                            },
                             {
                                 "type": "user"
                             },
@@ -309,6 +344,13 @@
                     "administrator": {
                         "directly_related_user_types": [
                             {
+                                "type": "serviceaccount"
+                            },
+                            {
+                                "type": "serviceaccount",
+                                "wildcard": {}
+                            },
+                            {
                                 "type": "user"
                             },
                             {
@@ -331,6 +373,13 @@
                     "reader": {
                         "directly_related_user_types": [
                             {
+                                "type": "serviceaccount"
+                            },
+                            {
+                                "type": "serviceaccount",
+                                "wildcard": {}
+                            },
+                            {
                                 "type": "user"
                             },
                             {
@@ -345,6 +394,13 @@
                     },
                     "writer": {
                         "directly_related_user_types": [
+                            {
+                                "type": "serviceaccount"
+                            },
+                            {
+                                "type": "serviceaccount",
+                                "wildcard": {}
+                            },
                             {
                                 "type": "user"
                             },
@@ -416,6 +472,40 @@
         },
         {
             "type": "user"
+        },
+        {
+            "metadata": {
+                "relations": {
+                    "administator": {
+                        "directly_related_user_types": [
+                            {
+                                "type": "serviceaccount"
+                            },
+                            {
+                                "type": "serviceaccount",
+                                "wildcard": {}
+                            },
+                            {
+                                "type": "user"
+                            },
+                            {
+                                "type": "user",
+                                "wildcard": {}
+                            },
+                            {
+                                "relation": "member",
+                                "type": "group"
+                            }
+                        ]
+                    }
+                }
+            },
+            "relations": {
+                "administator": {
+                    "this": {}
+                }
+            },
+            "type": "serviceaccount"
         }
     ]
 }
