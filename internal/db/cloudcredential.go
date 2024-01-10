@@ -26,7 +26,7 @@ func (d *Database) SetCloudCredential(ctx context.Context, cred *dbmodel.CloudCr
 	// Note that cred.OwnerUsername and cred.OwnerClientID are mutually exclusive.
 	hasNoOwner := cred.OwnerUsername == nil && cred.OwnerClientID == nil
 	if hasNoOwner {
-		return errors.E(op, errors.CodeBadRequest, fmt.Sprintf("invalid cloudcredential tag; no owner: %q", cred.CloudName+"/?/"+cred.Name))
+		return errors.E(op, errors.CodeBadRequest, fmt.Sprintf("invalid cloudcredential tag; no owner: %q", cred.CloudName+"/unknown/"+cred.Name))
 	}
 
 	hasMultipleOwners := cred.OwnerUsername != nil && cred.OwnerClientID != nil
@@ -73,7 +73,7 @@ func (d *Database) GetCloudCredential(ctx context.Context, cred *dbmodel.CloudCr
 
 	hasNoOwner := cred.OwnerUsername == nil && cred.OwnerClientID == nil
 	if hasNoOwner {
-		return errors.E(op, errors.CodeBadRequest, fmt.Sprintf("cloudcredential requires owner: %q", cred.CloudName+"/?/"+cred.Name))
+		return errors.E(op, errors.CodeBadRequest, fmt.Sprintf("cloudcredential requires owner: %q", cred.CloudName+"/unknown/"+cred.Name))
 	}
 
 	hasMultipleOwners := cred.OwnerUsername != nil && cred.OwnerClientID != nil
@@ -108,7 +108,7 @@ func (d *Database) GetCloudCredential(ctx context.Context, cred *dbmodel.CloudCr
 // for error message formatting.
 func cloudCredentialOwnerString(cred *dbmodel.CloudCredential) string {
 	if cred.OwnerUsername == nil && cred.OwnerClientID == nil {
-		return "?"
+		return "unknown"
 	} else if cred.OwnerUsername != nil && cred.OwnerClientID != nil {
 		return "(" + *cred.OwnerUsername + "|" + *cred.OwnerClientID + ")"
 	} else if cred.OwnerUsername != nil {
