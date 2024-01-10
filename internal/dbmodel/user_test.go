@@ -85,7 +85,7 @@ func TestUserCloudCredentials(t *testing.T) {
 	cred1 := dbmodel.CloudCredential{
 		Name:     "test-cred-1",
 		Cloud:    cl,
-		Owner:    u,
+		Owner:    &u,
 		AuthType: "empty",
 	}
 	result = db.Create(&cred1)
@@ -94,7 +94,7 @@ func TestUserCloudCredentials(t *testing.T) {
 	cred2 := dbmodel.CloudCredential{
 		Name:     "test-cred-2",
 		Cloud:    cl,
-		Owner:    u,
+		Owner:    &u,
 		AuthType: "empty",
 	}
 	result = db.Create(&cred2)

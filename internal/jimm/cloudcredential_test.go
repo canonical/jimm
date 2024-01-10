@@ -24,6 +24,7 @@ import (
 	"github.com/canonical/jimm/internal/jimmtest"
 	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
+	"github.com/canonical/jimm/pkg/util"
 )
 
 func TestUpdateCloudCredential(t *testing.T) {
@@ -96,7 +97,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 			cred := dbmodel.CloudCredential{
 				Name:          "test-credential-1",
 				CloudName:     cloud.Name,
-				OwnerUsername: u.Username,
+				OwnerUsername: util.ToStringPtr(u.Username),
 				AuthType:      "empty",
 			}
 			err = j.Database.SetCloudCredential(context.Background(), &cred)
@@ -211,7 +212,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 			cred := dbmodel.CloudCredential{
 				Name:          "test-credential-1",
 				CloudName:     cloud.Name,
-				OwnerUsername: u.Username,
+				OwnerUsername: util.ToStringPtr(u.Username),
 				AuthType:      "empty",
 			}
 			err = j.Database.SetCloudCredential(context.Background(), &cred)
@@ -302,7 +303,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 			cred := dbmodel.CloudCredential{
 				Name:          "test-credential-1",
 				CloudName:     cloud.Name,
-				OwnerUsername: u.Username,
+				OwnerUsername: util.ToStringPtr(u.Username),
 				AuthType:      "empty",
 			}
 			err = j.Database.SetCloudCredential(context.Background(), &cred)
@@ -396,7 +397,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 			cred := dbmodel.CloudCredential{
 				Name:          "test-credential-1",
 				CloudName:     cloud.Name,
-				OwnerUsername: eve.Username,
+				OwnerUsername: util.ToStringPtr(eve.Username),
 				AuthType:      "empty",
 			}
 			err = j.Database.SetCloudCredential(context.Background(), &cred)
@@ -443,7 +444,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 					Name: cloud.Name,
 					Type: cloud.Type,
 				},
-				OwnerUsername: eve.Username,
+				OwnerUsername: util.ToStringPtr(eve.Username),
 				Attributes: map[string]string{
 					"key1": "value1",
 					"key2": "value2",
@@ -510,7 +511,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 			cred := dbmodel.CloudCredential{
 				Name:          "test-credential-1",
 				CloudName:     cloud.Name,
-				OwnerUsername: u.Username,
+				OwnerUsername: util.ToStringPtr(u.Username),
 				AuthType:      "empty",
 			}
 			err = j.Database.SetCloudCredential(context.Background(), &cred)
@@ -623,7 +624,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 			cred := dbmodel.CloudCredential{
 				Name:          "test-credential-1",
 				CloudName:     cloud.Name,
-				OwnerUsername: u.Username,
+				OwnerUsername: util.ToStringPtr(u.Username),
 				AuthType:      "empty",
 			}
 			err = j.Database.SetCloudCredential(context.Background(), &cred)
@@ -929,7 +930,7 @@ func TestRevokeCloudCredential(t *testing.T) {
 			cred := dbmodel.CloudCredential{
 				Name:          "test-credential-1",
 				CloudName:     cloud.Name,
-				OwnerUsername: u.Username,
+				OwnerUsername: util.ToStringPtr(u.Username),
 				AuthType:      "empty",
 			}
 			err = j.Database.SetCloudCredential(context.Background(), &cred)
@@ -1003,7 +1004,7 @@ func TestRevokeCloudCredential(t *testing.T) {
 			cred := dbmodel.CloudCredential{
 				Name:          "test-credential-1",
 				CloudName:     cloud.Name,
-				OwnerUsername: u.Username,
+				OwnerUsername: util.ToStringPtr(u.Username),
 				AuthType:      "empty",
 			}
 			err = j.Database.SetCloudCredential(context.Background(), &cred)
@@ -1073,7 +1074,7 @@ func TestRevokeCloudCredential(t *testing.T) {
 			cred := dbmodel.CloudCredential{
 				Name:          "test-credential-1",
 				CloudName:     cloud.Name,
-				OwnerUsername: u.Username,
+				OwnerUsername: util.ToStringPtr(u.Username),
 				AuthType:      "empty",
 			}
 			err = j.Database.SetCloudCredential(context.Background(), &cred)
@@ -1166,7 +1167,7 @@ func TestRevokeCloudCredential(t *testing.T) {
 			cred := dbmodel.CloudCredential{
 				Name:          "test-credential-1",
 				CloudName:     cloud.Name,
-				OwnerUsername: u.Username,
+				OwnerUsername: util.ToStringPtr(u.Username),
 				AuthType:      "empty",
 			}
 			err = j.Database.SetCloudCredential(context.Background(), &cred)
@@ -1342,7 +1343,7 @@ func TestGetCloudCredential(t *testing.T) {
 					Name: cloud.Name,
 					Type: cloud.Type,
 				},
-				OwnerUsername: u.Username,
+				OwnerUsername: util.ToStringPtr(u.Username),
 				AuthType:      "empty",
 			}
 			err = j.Database.SetCloudCredential(context.Background(), &cred)
@@ -1690,14 +1691,14 @@ func TestCloudCredentialAttributeStore(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	cred := dbmodel.CloudCredential{
-		OwnerUsername: "alice@external",
+		OwnerUsername: util.ToStringPtr("alice@external"),
 		Name:          "cred-1",
 		CloudName:     "test",
 	}
 	err = j.Database.GetCloudCredential(ctx, &cred)
 	c.Assert(err, qt.IsNil)
 	c.Check(cred, jimmtest.DBObjectEquals, dbmodel.CloudCredential{
-		OwnerUsername: "alice@external",
+		OwnerUsername: util.ToStringPtr("alice@external"),
 		Name:          "cred-1",
 		CloudName:     "test",
 		AuthType:      "userpass",

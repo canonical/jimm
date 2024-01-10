@@ -130,7 +130,7 @@ func (s *dbSuite) TestGetControllerWithModels(c *qt.C) {
 	cred := dbmodel.CloudCredential{
 		Name:     "test-cred",
 		Cloud:    cloud,
-		Owner:    u,
+		Owner:    &u,
 		AuthType: "empty",
 	}
 	c.Assert(s.Database.DB.Create(&cred).Error, qt.IsNil)

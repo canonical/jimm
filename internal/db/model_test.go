@@ -48,7 +48,7 @@ func (s *dbSuite) TestAddModel(c *qt.C) {
 	cred := dbmodel.CloudCredential{
 		Name:     "test-cred",
 		Cloud:    cloud,
-		Owner:    u,
+		Owner:    &u,
 		AuthType: "empty",
 	}
 	c.Assert(s.Database.DB.Create(&cred).Error, qt.IsNil)
@@ -121,7 +121,7 @@ func (s *dbSuite) TestGetModel(c *qt.C) {
 	cred := dbmodel.CloudCredential{
 		Name:     "test-cred",
 		Cloud:    cloud,
-		Owner:    u,
+		Owner:    &u,
 		AuthType: "empty",
 	}
 	c.Assert(s.Database.DB.Create(&cred).Error, qt.IsNil)
@@ -162,7 +162,7 @@ func (s *dbSuite) TestGetModel(c *qt.C) {
 		},
 	}
 	model.CloudCredential.Cloud = dbmodel.Cloud{}
-	model.CloudCredential.Owner = dbmodel.User{}
+	model.CloudCredential.Owner = &dbmodel.User{}
 	err = s.Database.AddModel(context.Background(), &model)
 	c.Assert(err, qt.Equals, nil)
 
@@ -221,7 +221,7 @@ func (s *dbSuite) TestUpdateModel(c *qt.C) {
 	cred := dbmodel.CloudCredential{
 		Name:     "test-cred",
 		Cloud:    cloud,
-		Owner:    u,
+		Owner:    &u,
 		AuthType: "empty",
 	}
 	c.Assert(s.Database.DB.Create(&cred).Error, qt.IsNil)
@@ -299,7 +299,7 @@ func (s *dbSuite) TestDeleteModel(c *qt.C) {
 	cred := dbmodel.CloudCredential{
 		Name:     "test-cred",
 		Cloud:    cloud,
-		Owner:    u,
+		Owner:    &u,
 		AuthType: "empty",
 	}
 	c.Assert(s.Database.DB.Create(&cred).Error, qt.IsNil)
@@ -373,7 +373,7 @@ func (s *dbSuite) TestGetModelsUsingCredential(c *qt.C) {
 	cred1 := dbmodel.CloudCredential{
 		Name:     "test-cred-1",
 		Cloud:    cloud,
-		Owner:    u,
+		Owner:    &u,
 		AuthType: "empty",
 	}
 	c.Assert(s.Database.DB.Create(&cred1).Error, qt.IsNil)
@@ -381,7 +381,7 @@ func (s *dbSuite) TestGetModelsUsingCredential(c *qt.C) {
 	cred2 := dbmodel.CloudCredential{
 		Name:     "test-cred-2",
 		Cloud:    cloud,
-		Owner:    u,
+		Owner:    &u,
 		AuthType: "empty",
 	}
 	c.Assert(s.Database.DB.Create(&cred2).Error, qt.IsNil)

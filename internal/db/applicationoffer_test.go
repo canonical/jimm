@@ -57,7 +57,7 @@ func initTestEnvironment(c *qt.C, db *db.Database) testEnvironment {
 	env.cred = dbmodel.CloudCredential{
 		Name:     "test-cred",
 		Cloud:    env.cloud,
-		Owner:    env.u,
+		Owner:    &env.u,
 		AuthType: "empty",
 	}
 	c.Assert(db.DB.Create(&env.cred).Error, qt.IsNil)

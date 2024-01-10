@@ -17,6 +17,7 @@ import (
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
+	"github.com/canonical/jimm/pkg/util"
 )
 
 const (
@@ -354,8 +355,9 @@ func (cc *CloudCredential) DBObject(c *qt.C, db db.Database) dbmodel.CloudCreden
 	cc.dbo.Name = cc.Name
 	cc.dbo.Cloud = cc.env.Cloud(cc.Cloud).DBObject(c, db)
 	cc.dbo.CloudName = cc.dbo.Cloud.Name
-	cc.dbo.Owner = cc.env.User(cc.Owner).DBObject(c, db)
-	cc.dbo.OwnerUsername = cc.dbo.Owner.Username
+	owner := cc.env.User(cc.Owner).DBObject(c, db)
+	cc.dbo.Owner = &owner
+	cc.dbo.OwnerUsername = util.ToStringPtr(cc.dbo.Owner.Username)
 	cc.dbo.AuthType = cc.AuthType
 	cc.dbo.Attributes = cc.Attributes
 

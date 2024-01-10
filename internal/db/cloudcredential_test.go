@@ -15,6 +15,7 @@ import (
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/jimmtest"
+	"github.com/canonical/jimm/pkg/util"
 )
 
 func TestSetCloudCredentialUnconfiguredDatabase(t *testing.T) {
@@ -46,11 +47,11 @@ func (s *dbSuite) TestSetCloudCredentialInvalidTag(c *qt.C) {
 
 	cred := dbmodel.CloudCredential{
 		Name:          "test-cred",
-		OwnerUsername: u.Username,
+		OwnerUsername: util.ToStringPtr(u.Username),
 		AuthType:      "empty",
 	}
 	err = s.Database.SetCloudCredential(context.Background(), &cred)
-	c.Check(err, qt.ErrorMatches, fmt.Sprintf("invalid cloudcredential tag %q", cred.CloudName+"/"+cred.OwnerUsername+"/"+cred.Name))
+	c.Check(err, qt.ErrorMatches, fmt.Sprintf("invalid cloudcredential tag %q", cred.CloudName+"/"+*cred.OwnerUsername+"/"+cred.Name))
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeBadRequest)
 }
 
@@ -75,7 +76,7 @@ func (s *dbSuite) TestSetCloudCredential(c *qt.C) {
 	cred := dbmodel.CloudCredential{
 		Name:          "test-cred",
 		CloudName:     cloud.Name,
-		OwnerUsername: u.Username,
+		OwnerUsername: util.ToStringPtr(u.Username),
 		AuthType:      "empty",
 	}
 	c1 := cred
@@ -112,7 +113,7 @@ func (s *dbSuite) TestSetCloudCredentialUpdate(c *qt.C) {
 	cred := dbmodel.CloudCredential{
 		Name:          "test-cred",
 		CloudName:     cloud.Name,
-		OwnerUsername: u.Username,
+		OwnerUsername: util.ToStringPtr(u.Username),
 		AuthType:      "empty",
 	}
 	err = s.Database.SetCloudCredential(context.Background(), &cred)
@@ -136,7 +137,7 @@ func (s *dbSuite) TestSetCloudCredentialUpdate(c *qt.C) {
 
 	dbCred := dbmodel.CloudCredential{
 		CloudName:     cloud.Name,
-		OwnerUsername: u.Username,
+		OwnerUsername: util.ToStringPtr(u.Username),
 		Name:          cred.Name,
 	}
 	err = s.Database.GetCloudCredential(context.Background(), &dbCred)
@@ -182,7 +183,7 @@ func (s *dbSuite) TestGetCloudCredential(c *qt.C) {
 	cred := dbmodel.CloudCredential{
 		Name:          "test-cred",
 		CloudName:     cloud.Name,
-		OwnerUsername: u.Username,
+		OwnerUsername: util.ToStringPtr(u.Username),
 		AuthType:      "empty",
 	}
 	cred.Cloud.Regions = nil
@@ -194,7 +195,7 @@ func (s *dbSuite) TestGetCloudCredential(c *qt.C) {
 
 	dbCred := dbmodel.CloudCredential{
 		CloudName:     cloud.Name,
-		OwnerUsername: u.Username,
+		OwnerUsername: util.ToStringPtr(u.Username),
 		Name:          cred.Name,
 	}
 	err = s.Database.GetCloudCredential(context.Background(), &dbCred)

@@ -122,7 +122,7 @@ func TestModelUniqueConstraint(t *testing.T) {
 	cred2 := dbmodel.CloudCredential{
 		Name:     "test-cred-2",
 		Cloud:    cl2,
-		Owner:    u,
+		Owner:    &u,
 		AuthType: "empty",
 	}
 	c.Assert(db.Create(&cred2).Error, qt.IsNil)
@@ -334,7 +334,7 @@ func initModelEnv(c *qt.C, db *gorm.DB) (dbmodel.Cloud, dbmodel.CloudCredential,
 	cred := dbmodel.CloudCredential{
 		Name:     "test-cred",
 		Cloud:    cl,
-		Owner:    u,
+		Owner:    &u,
 		AuthType: "empty",
 	}
 	c.Assert(db.Create(&cred).Error, qt.IsNil)
@@ -414,7 +414,7 @@ func TestModelFromJujuModelInfo(t *testing.T) {
 		CloudCredential: dbmodel.CloudCredential{
 			Name:      "test-cred",
 			CloudName: "test-cloud",
-			Owner: dbmodel.User{
+			Owner: &dbmodel.User{
 				Username: "bob@external",
 			},
 		},

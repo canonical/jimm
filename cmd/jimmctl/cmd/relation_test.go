@@ -27,6 +27,7 @@ import (
 	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 	jimmnames "github.com/canonical/jimm/pkg/names"
+	"github.com/canonical/jimm/pkg/util"
 )
 
 type relationSuite struct {
@@ -302,7 +303,7 @@ func initializeEnvironment(c *gc.C, ctx context.Context, db *db.Database, u dbmo
 	cred := dbmodel.CloudCredential{
 		Name:          "test-credential-1",
 		CloudName:     cloud.Name,
-		OwnerUsername: u.Username,
+		OwnerUsername: util.ToStringPtr(u.Username),
 		AuthType:      "empty",
 	}
 	err = db.SetCloudCredential(ctx, &cred)
@@ -478,7 +479,7 @@ func (s *relationSuite) TestCheckRelationViaSuperuser(c *gc.C) {
 	cred := dbmodel.CloudCredential{
 		Name:          petname.Generate(2, "-"),
 		CloudName:     cloud.Name,
-		OwnerUsername: u.Username,
+		OwnerUsername: util.ToStringPtr(u.Username),
 		AuthType:      "empty",
 	}
 	err = db.SetCloudCredential(ctx, &cred)
