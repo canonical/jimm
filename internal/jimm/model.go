@@ -528,7 +528,7 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 	}
 
 	// Only JIMM admins are able to add models on behalf of other users.
-	if owner.Username != user.Username && !user.JimmAdmin {
+	if owner.Username != user.Name() && !user.JimmAdmin {
 		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
@@ -540,7 +540,7 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 	}
 
 	// fetch user model defaults
-	userConfig, err := j.UserModelDefaults(ctx, user.User)
+	userConfig, err := j.UserModelDefaults(ctx, user)
 	if err != nil && errors.ErrorCode(err) != errors.CodeNotFound {
 		return nil, errors.E(op, "failed to fetch cloud defaults")
 	}
@@ -549,7 +549,7 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 	// fetch cloud defaults
 	if args.Cloud != (names.CloudTag{}) {
 		cloudDefaults := dbmodel.CloudDefaults{
-			Username: user.Username,
+			Username: user.Name(),
 			Cloud: dbmodel.Cloud{
 				Name: args.Cloud.Id(),
 			},
@@ -585,7 +585,7 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 	// fetch cloud region defaults
 	if args.Cloud != (names.CloudTag{}) && builder.cloudRegion != "" {
 		cloudRegionDefaults := dbmodel.CloudDefaults{
-			Username: user.Username,
+			Username: user.Name(),
 			Cloud: dbmodel.Cloud{
 				Name: args.Cloud.Id(),
 			},
@@ -706,8 +706,8 @@ func (j *JIMM) ModelInfo(ctx context.Context, user *openfga.User, mt names.Model
 			// Since we are checking user relations in decreasing level of
 			// access privilege, we want to make sure the user has not
 			// already been recorded with a higher access level.
-			if _, ok := userAccess[u.Username]; !ok {
-				userAccess[u.Username] = ToModelAccessString(relation)
+			if _, ok := userAccess[u.Name()]; !ok {
+				userAccess[u.Name()] = ToModelAccessString(relation)
 			}
 		}
 	}
@@ -721,7 +721,7 @@ func (j *JIMM) ModelInfo(ctx context.Context, user *openfga.User, mt names.Model
 		if !strings.Contains(username, "@") {
 			continue
 		}
-		if modelAccess == "admin" || username == user.Username || username == ofganames.EveryoneUser {
+		if modelAccess == "admin" || username == user.Name() || username == ofganames.EveryoneUser {
 			users = append(users, jujuparams.ModelUserInfo{
 				UserName: username,
 				Access:   jujuparams.UserAccessPermission(access),
@@ -835,7 +835,7 @@ func (j *JIMM) ForEachModel(ctx context.Context, user *openfga.User, f func(*dbm
 // CodeNotFound is returned. If the authenticated user does not have
 // admin access to the model then an error with the code CodeUnauthorized
 // is returned.
-func (j *JIMM) GrantModelAccess(ctx context.Context, user *openfga.User, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
+func (j *JIMM) GrantModelAccess(ctx context.Context, user *openfga.User, mt names.ModelTag, ut names.Tag, access jujuparams.UserAccessPermission) error {
 	const op = errors.Op("jimm.GrantModelAccess")
 
 	targetRelation, err := ToModelRelation(string(access))
@@ -907,7 +907,7 @@ func (j *JIMM) GrantModelAccess(ctx context.Context, user *openfga.User, mt name
 // CodeNotFound is returned. If the authenticated user does not have admin
 // access to the model, and is not attempting to revoke their own access,
 // then an error with the code CodeUnauthorized is returned.
-func (j *JIMM) RevokeModelAccess(ctx context.Context, user *openfga.User, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
+func (j *JIMM) RevokeModelAccess(ctx context.Context, user *openfga.User, mt names.ModelTag, ut names.Tag, access jujuparams.UserAccessPermission) error {
 	const op = errors.Op("jimm.RevokeModelAccess")
 
 	targetRelation, err := ToModelRelation(string(access))

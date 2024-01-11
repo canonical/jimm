@@ -342,7 +342,7 @@ func (s *userTestSuite) TestUnsetAuditLogViewerAccess(c *gc.C) {
 	aliceUser := openfga.NewUser(&dbmodel.User{Username: "alice"}, s.ofgaClient)
 
 	tuples := []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(aliceUser.User.ResourceTag()),
+		Object:   ofganames.ConvertTag(aliceUser.Tag()),
 		Relation: ofganames.AuditLogViewerRelation,
 		Target:   ofganames.ConvertTag(controller),
 	}}

@@ -1121,7 +1121,7 @@ func TestGetControllerConfig(t *testing.T) {
 			})
 			c.Assert(err, qt.Equals, nil)
 
-			cfg, err := j.GetControllerConfig(ctx, user.User)
+			cfg, err := j.GetControllerConfig(ctx)
 			if test.expectedError == "" {
 				c.Assert(err, qt.IsNil)
 				c.Assert(cfg, jimmtest.DBObjectEquals, &test.expectedConfig)

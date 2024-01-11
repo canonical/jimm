@@ -4,7 +4,6 @@ package auth_test
 
 import (
 	"context"
-	"database/sql"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
@@ -17,7 +16,6 @@ import (
 	"gopkg.in/macaroon.v2"
 
 	"github.com/canonical/jimm/internal/auth"
-	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/jimmtest"
 )
@@ -57,12 +55,8 @@ func TestAuthenticateLogin(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	u, err = authenticator.Authenticate(ctx, &jujuparams.LoginRequest{Macaroons: []macaroon.Slice{ms}})
 	c.Assert(err, qt.IsNil)
-	c.Check(u.LastLogin.Valid, qt.Equals, false)
-	u.LastLogin = sql.NullTime{}
-	c.Check(u.User, qt.DeepEquals, &dbmodel.User{
-		Username:    "alice@external",
-		DisplayName: "alice",
-	})
+	c.Check(u.RecentLogin().Valid, qt.Equals, false)
+	c.Check(u.Name(), qt.DeepEquals, "alice@external")
 }
 
 func TestAuthenticateLoginWithDomain(t *testing.T) {
@@ -100,12 +94,8 @@ func TestAuthenticateLoginWithDomain(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	u, err = authenticator.Authenticate(ctx, &jujuparams.LoginRequest{Macaroons: []macaroon.Slice{ms}})
 	c.Assert(err, qt.IsNil)
-	c.Check(u.LastLogin.Valid, qt.Equals, false)
-	u.LastLogin = sql.NullTime{}
-	c.Check(u.User, qt.DeepEquals, &dbmodel.User{
-		Username:    "alice@mydomain",
-		DisplayName: "alice",
-	})
+	c.Check(u.RecentLogin().Valid, qt.Equals, false)
+	c.Check(u.Name(), qt.DeepEquals, "alice@mydomain")
 }
 
 func TestAuthenticateLoginSuperuser(t *testing.T) {
@@ -144,12 +134,8 @@ func TestAuthenticateLoginSuperuser(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	u, err = authenticator.Authenticate(ctx, &jujuparams.LoginRequest{Macaroons: []macaroon.Slice{ms}})
 	c.Assert(err, qt.IsNil)
-	c.Check(u.LastLogin.Valid, qt.Equals, false)
-	u.LastLogin = sql.NullTime{}
-	c.Check(u.User, qt.DeepEquals, &dbmodel.User{
-		Username:    "bob@external",
-		DisplayName: "bob",
-	})
+	c.Check(u.RecentLogin().Valid, qt.Equals, false)
+	c.Check(u.Name(), qt.DeepEquals, "bob@external")
 }
 
 func TestAuthenticateLoginInvalidUsernameDeclared(t *testing.T) {

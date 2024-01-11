@@ -363,7 +363,7 @@ func (r *controllerRoot) CheckRelation(ctx context.Context, req apiparams.CheckR
 		return checkResp, errors.E(op, errors.CodeFailedToParseTupleKey, err)
 	}
 
-	userCheckingSelf := parsedTuple.Object.Kind == openfga.UserType && parsedTuple.Object.ID == r.user.Username
+	userCheckingSelf := parsedTuple.Object.Kind == openfga.UserType && parsedTuple.Object.ID == r.user.Name()
 	// Admins can check any relation, non-admins can only check their own.
 	if !(r.user.JimmAdmin || userCheckingSelf) {
 		return checkResp, errors.E(op, errors.CodeUnauthorized, "unauthorized")

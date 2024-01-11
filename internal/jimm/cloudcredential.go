@@ -30,7 +30,7 @@ import (
 func (j *JIMM) GetCloudCredential(ctx context.Context, user *openfga.User, tag names.CloudCredentialTag) (*dbmodel.CloudCredential, error) {
 	const op = errors.Op("jimm.GetCloudCredential")
 
-	if !user.JimmAdmin && user.Username != tag.Owner().Id() {
+	if !user.JimmAdmin && user.Name() != tag.Owner().Id() {
 		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
@@ -48,10 +48,10 @@ func (j *JIMM) GetCloudCredential(ctx context.Context, user *openfga.User, tag n
 
 // RevokeCloudCredential checks that the credential with the given path
 // can be revoked  and revokes the credential.
-func (j *JIMM) RevokeCloudCredential(ctx context.Context, user *dbmodel.User, tag names.CloudCredentialTag, force bool) error {
+func (j *JIMM) RevokeCloudCredential(ctx context.Context, user *openfga.User, tag names.CloudCredentialTag, force bool) error {
 	const op = errors.Op("jimm.RevokeCloudCredential")
 
-	if user.Username != tag.Owner().Id() {
+	if user.Name() != tag.Owner().Id() {
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
@@ -284,7 +284,7 @@ func (j *JIMM) updateControllerCloudCredential(
 // calling the function will not contain any attributes,
 // GetCloudCredentialAttributes should be used to retrive the credential
 // attributes if needed. The given function should not update the database.
-func (j *JIMM) ForEachUserCloudCredential(ctx context.Context, u *dbmodel.User, ct names.CloudTag, f func(cred *dbmodel.CloudCredential) error) error {
+func (j *JIMM) ForEachUserCloudCredential(ctx context.Context, u *openfga.User, ct names.CloudTag, f func(cred *dbmodel.CloudCredential) error) error {
 	const op = errors.Op("jimm.ForEachUserCloudCredential")
 
 	var cloud string
@@ -294,7 +294,7 @@ func (j *JIMM) ForEachUserCloudCredential(ctx context.Context, u *dbmodel.User, 
 
 	errStop := errors.E("stop")
 	var iterErr error
-	err := j.Database.ForEachCloudCredential(ctx, u.Username, cloud, func(cred *dbmodel.CloudCredential) error {
+	err := j.Database.ForEachCloudCredential(ctx, u.Name(), cloud, func(cred *dbmodel.CloudCredential) error {
 		cred.Attributes = nil
 		iterErr = f(cred)
 		if iterErr != nil {
@@ -321,11 +321,11 @@ func (j *JIMM) GetCloudCredentialAttributes(ctx context.Context, user *openfga.U
 
 	if hidden {
 		// Controller superusers cannot read hidden credential attributes.
-		if user.Username != cred.OwnerUsername {
+		if user.Name() != cred.OwnerUsername {
 			return nil, nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 		}
 	} else {
-		if !user.JimmAdmin && user.Username != cred.OwnerUsername {
+		if !user.JimmAdmin && user.Name() != cred.OwnerUsername {
 			return nil, nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 		}
 	}

@@ -60,7 +60,7 @@ func TestAuthenticate(t *testing.T) {
 	)
 	u, err := j.Authenticate(ctx, nil)
 	c.Assert(err, qt.IsNil)
-	c.Check(u.Username, qt.Equals, "bob@external")
+	c.Check(u.Name(), qt.Equals, "bob@external")
 	c.Check(u.JimmAdmin, qt.IsFalse)
 
 	err = auth.User.SetControllerAccess(
@@ -72,7 +72,7 @@ func TestAuthenticate(t *testing.T) {
 
 	u, err = j.Authenticate(ctx, nil)
 	c.Assert(err, qt.IsNil)
-	c.Check(u.Username, qt.Equals, "bob@external")
+	c.Check(u.Name(), qt.Equals, "bob@external")
 	c.Check(u.JimmAdmin, qt.IsTrue)
 
 	u2 := dbmodel.User{
@@ -81,8 +81,11 @@ func TestAuthenticate(t *testing.T) {
 	err = j.Database.GetUser(ctx, &u2)
 	c.Assert(err, qt.IsNil)
 
+	userModel, ok := u.Identifier.(dbmodel.User)
+	c.Assert(ok, qt.IsTrue)
+
 	c.Check(u2, qt.DeepEquals, dbmodel.User{
-		Model:       u.Model,
+		Model:       userModel.Model,
 		Username:    "bob@external",
 		DisplayName: "Bob",
 		LastLogin: sql.NullTime{

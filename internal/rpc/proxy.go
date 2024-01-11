@@ -37,7 +37,7 @@ type TokenGenerator interface {
 	// SetTags sets the desired model and controller tags that this TokenGenerator is valid for.
 	SetTags(mt names.ModelTag, ct names.ControllerTag)
 	// GetUser returns the authenticated user.
-	GetUser() names.UserTag
+	GetUser() string
 }
 
 // writeLockConn provides a websocket connection that is safe for concurrent writes.
@@ -124,7 +124,7 @@ func (p *modelProxy) auditLogMessage(msg *message, isResponse bool) error {
 	ale := dbmodel.AuditLogEntry{
 		Time:           time.Now().UTC().Round(time.Millisecond),
 		MessageId:      msg.RequestID,
-		UserTag:        p.tokenGen.GetUser().String(),
+		UserTag:        p.tokenGen.GetUser(),
 		Model:          p.modelName,
 		ConversationId: p.conversationId,
 		FacadeName:     msg.Type,

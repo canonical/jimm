@@ -280,14 +280,14 @@ func (a controllerAccessLevel) value() int {
 
 // GetJimmControllerAccess returns the JIMM controller access level for the
 // requested user.
-func (j *JIMM) GetJimmControllerAccess(ctx context.Context, user *openfga.User, tag names.UserTag) (string, error) {
+func (j *JIMM) GetJimmControllerAccess(ctx context.Context, user *openfga.User, tag names.Tag) (string, error) {
 	const op = errors.Op("jimm.GetJIMMControllerAccess")
 
 	// If the authenticated user is requesting the access level
 	// for him/her-self then we return that - either the user
 	// is a JIMM admin (aka "superuser"), or they have a "login"
 	// access level.
-	if user.Username == tag.Id() {
+	if user.Name() == tag.Id() {
 		if user.JimmAdmin {
 			return "superuser", nil
 		}
@@ -527,7 +527,7 @@ func (j *JIMM) SetControllerConfig(ctx context.Context, user *openfga.User, args
 }
 
 // GetControllerConfig returns jimm's controller config.
-func (j *JIMM) GetControllerConfig(ctx context.Context, u *dbmodel.User) (*dbmodel.ControllerConfig, error) {
+func (j *JIMM) GetControllerConfig(ctx context.Context) (*dbmodel.ControllerConfig, error) {
 	const op = errors.Op("jimm.GetControllerConfig")
 	config := dbmodel.ControllerConfig{
 		Name:   "jimm",

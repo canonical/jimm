@@ -674,7 +674,7 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 		Dialer: &jimmtest.Dialer{
 			UUID: "00000000-0000-0000-0000-0000-0000000000001",
 			API: &jimmtest.API{
-				GetApplicationOfferConsumeDetails_: func(ctx context.Context, user names.UserTag, details *jujuparams.ConsumeOfferDetails, v bakery.Version) error {
+				GetApplicationOfferConsumeDetails_: func(ctx context.Context, user names.Tag, details *jujuparams.ConsumeOfferDetails, v bakery.Version) error {
 					details.Offer = &jujuparams.ApplicationOfferDetails{
 						SourceModelTag:         names.NewModelTag(model.UUID.String).String(),
 						OfferUUID:              offer.UUID,
@@ -1185,7 +1185,7 @@ func TestOffer(t *testing.T) {
 	tests := []struct {
 		about                       string
 		getApplicationOffer         func(context.Context, *jujuparams.ApplicationOfferAdminDetails) error
-		grantApplicationOfferAccess func(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error
+		grantApplicationOfferAccess func(context.Context, string, names.Tag, jujuparams.OfferAccessPermission) error
 		offer                       func(context.Context, crossmodel.OfferURL, jujuparams.AddApplicationOffer) error
 		createEnv                   func(*qt.C, db.Database, *openfga.OFGAClient) (dbmodel.User, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error))
 	}{{
@@ -1235,7 +1235,7 @@ func TestOffer(t *testing.T) {
 			}
 			return nil
 		},
-		grantApplicationOfferAccess: func(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error {
+		grantApplicationOfferAccess: func(context.Context, string, names.Tag, jujuparams.OfferAccessPermission) error {
 			return nil
 		},
 		offer: func(context.Context, crossmodel.OfferURL, jujuparams.AddApplicationOffer) error {
@@ -1357,7 +1357,7 @@ func TestOffer(t *testing.T) {
 		getApplicationOffer: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetails) error {
 			return nil
 		},
-		grantApplicationOfferAccess: func(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error {
+		grantApplicationOfferAccess: func(context.Context, string, names.Tag, jujuparams.OfferAccessPermission) error {
 			return nil
 		},
 		offer: func(context.Context, crossmodel.OfferURL, jujuparams.AddApplicationOffer) error {
@@ -1445,7 +1445,7 @@ func TestOffer(t *testing.T) {
 		getApplicationOffer: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetails) error {
 			return nil
 		},
-		grantApplicationOfferAccess: func(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error {
+		grantApplicationOfferAccess: func(context.Context, string, names.Tag, jujuparams.OfferAccessPermission) error {
 			return nil
 		},
 		offer: func(context.Context, crossmodel.OfferURL, jujuparams.AddApplicationOffer) error {
@@ -1478,7 +1478,7 @@ func TestOffer(t *testing.T) {
 		getApplicationOffer: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetails) error {
 			return nil
 		},
-		grantApplicationOfferAccess: func(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error {
+		grantApplicationOfferAccess: func(context.Context, string, names.Tag, jujuparams.OfferAccessPermission) error {
 			return nil
 		},
 		offer: func(context.Context, crossmodel.OfferURL, jujuparams.AddApplicationOffer) error {
@@ -1567,7 +1567,7 @@ func TestOffer(t *testing.T) {
 		getApplicationOffer: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetails) error {
 			return nil
 		},
-		grantApplicationOfferAccess: func(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error {
+		grantApplicationOfferAccess: func(context.Context, string, names.Tag, jujuparams.OfferAccessPermission) error {
 			return nil
 		},
 		offer: func(context.Context, crossmodel.OfferURL, jujuparams.AddApplicationOffer) error {
@@ -1660,7 +1660,7 @@ func TestOffer(t *testing.T) {
 		getApplicationOffer: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetails) error {
 			return errors.E("a silly error")
 		},
-		grantApplicationOfferAccess: func(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error {
+		grantApplicationOfferAccess: func(context.Context, string, names.Tag, jujuparams.OfferAccessPermission) error {
 			return nil
 		},
 		offer: func(context.Context, crossmodel.OfferURL, jujuparams.AddApplicationOffer) error {
@@ -1748,7 +1748,7 @@ func TestOffer(t *testing.T) {
 		getApplicationOffer: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetails) error {
 			return nil
 		},
-		grantApplicationOfferAccess: func(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error {
+		grantApplicationOfferAccess: func(context.Context, string, names.Tag, jujuparams.OfferAccessPermission) error {
 			return nil
 		},
 		offer: func(context.Context, crossmodel.OfferURL, jujuparams.AddApplicationOffer) error {
@@ -2042,7 +2042,7 @@ func TestOfferAssertOpenFGARelationsExist(t *testing.T) {
 			}
 			return nil
 		},
-		GrantApplicationOfferAccess_: func(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error {
+		GrantApplicationOfferAccess_: func(context.Context, string, names.Tag, jujuparams.OfferAccessPermission) error {
 			return nil
 		},
 		Offer_: func(context.Context, crossmodel.OfferURL, jujuparams.AddApplicationOffer) error {

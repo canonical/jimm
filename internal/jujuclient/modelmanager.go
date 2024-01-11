@@ -134,7 +134,7 @@ func (c Connection) DumpModelDB(ctx context.Context, tag names.ModelTag) (map[st
 // GrantModelAccess gives the given user the given access level on the
 // given model. GrantModelAccess uses the ModifyModelAccess procedure
 // on the ModelManager facade.
-func (c Connection) GrantModelAccess(ctx context.Context, modelTag names.ModelTag, userTag names.UserTag, access jujuparams.UserAccessPermission) error {
+func (c Connection) GrantModelAccess(ctx context.Context, modelTag names.ModelTag, userTag names.Tag, access jujuparams.UserAccessPermission) error {
 	const op = errors.Op("jujuclient.GrantModelAccess")
 	args := jujuparams.ModifyModelAccessRequest{
 		Changes: []jujuparams.ModifyModelAccess{{
@@ -161,7 +161,7 @@ func (c Connection) GrantModelAccess(ctx context.Context, modelTag names.ModelTa
 // RevokeModelAccess removes the given access level from the given user on
 // the given model. Revoke ModelAccess uses the ModifyModelAccess procedure
 // on the ModelManager facade.
-func (c Connection) RevokeModelAccess(ctx context.Context, modelTag names.ModelTag, userTag names.UserTag, access jujuparams.UserAccessPermission) error {
+func (c Connection) RevokeModelAccess(ctx context.Context, modelTag names.ModelTag, userTag names.Tag, access jujuparams.UserAccessPermission) error {
 	const op = errors.Op("jujuclient.RevokeModelAccess")
 	args := jujuparams.ModifyModelAccessRequest{
 		Changes: []jujuparams.ModifyModelAccess{{

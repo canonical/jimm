@@ -36,6 +36,18 @@ type User struct {
 	CloudCredentials []CloudCredential `gorm:"foreignKey:OwnerUsername;references:Username"`
 }
 
+func (u User) RecentLogin() sql.NullTime {
+	return u.LastLogin
+}
+
+func (u User) Name() string {
+	return u.Username
+}
+
+func (u User) NameDisplay() string {
+	return u.DisplayName
+}
+
 // Tag returns a names.Tag for the user.
 func (u User) Tag() names.Tag {
 	return u.ResourceTag()
@@ -50,7 +62,7 @@ func (u User) ResourceTag() names.UserTag {
 }
 
 // SetTag sets the username of the user to the value from the given tag.
-func (u *User) SetTag(t names.UserTag) {
+func (u *User) SetTag(t names.Tag) {
 	u.Username = t.Id()
 }
 

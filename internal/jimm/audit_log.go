@@ -28,11 +28,11 @@ type AuditLoggerBackend interface {
 type DbAuditLogger struct {
 	backend        AuditLoggerBackend
 	conversationId string
-	getUser        func() names.UserTag
+	getUser        func() names.Tag
 }
 
 // NewDbAuditLogger returns a new audit logger that logs to the database.
-func NewDbAuditLogger(backend AuditLoggerBackend, getUserFunc func() names.UserTag) DbAuditLogger {
+func NewDbAuditLogger(backend AuditLoggerBackend, getUserFunc func() names.Tag) DbAuditLogger {
 	logger := DbAuditLogger{
 		backend:        backend,
 		conversationId: utils.NewConversationID(),

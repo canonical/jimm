@@ -57,20 +57,20 @@ func TestFindAuditEvents(t *testing.T) {
 
 	events := []dbmodel.AuditLogEntry{{
 		Time:         now,
-		UserTag:      admin.User.Tag().String(),
+		UserTag:      admin.Tag().String(),
 		FacadeMethod: "Login",
 	}, {
 		Time:         now.Add(time.Hour),
-		UserTag:      admin.User.Tag().String(),
+		UserTag:      admin.Tag().String(),
 		FacadeMethod: "AddModel",
 	}, {
 		Time:         now.Add(2 * time.Hour),
-		UserTag:      privileged.User.Tag().String(),
+		UserTag:      privileged.Tag().String(),
 		Model:        "TestModel",
 		FacadeMethod: "Deploy",
 	}, {
 		Time:         now.Add(3 * time.Hour),
-		UserTag:      privileged.User.Tag().String(),
+		UserTag:      privileged.Tag().String(),
 		Model:        "TestModel",
 		FacadeMethod: "DestroyModel",
 	}}

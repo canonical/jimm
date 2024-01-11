@@ -318,7 +318,7 @@ func (r *controllerRoot) SetModelDefaults(ctx context.Context, args jujuparams.S
 			results[i].Error = mapError(errors.E(op, err))
 			continue
 		}
-		results[i].Error = mapError(r.jimm.SetModelDefaults(ctx, r.user.User, cloudTag, config.CloudRegion, config.Config))
+		results[i].Error = mapError(r.jimm.SetModelDefaults(ctx, r.user, cloudTag, config.CloudRegion, config.Config))
 	}
 
 	return jujuparams.ErrorResults{
@@ -335,7 +335,7 @@ func (r *controllerRoot) UnsetModelDefaults(ctx context.Context, args jujuparams
 			results[i].Error = mapError(err)
 			continue
 		}
-		results[i].Error = mapError(r.jimm.UnsetModelDefaults(ctx, r.user.User, cloudTag, key.CloudRegion, key.Keys))
+		results[i].Error = mapError(r.jimm.UnsetModelDefaults(ctx, r.user, cloudTag, key.CloudRegion, key.Keys))
 	}
 
 	return jujuparams.ErrorResults{
@@ -356,7 +356,7 @@ func (r *controllerRoot) ModelDefaultsForClouds(ctx context.Context, args jujupa
 			result.Results[i].Error = mapError(errors.E(op, err))
 			continue
 		}
-		defaults, err := r.jimm.ModelDefaultsForCloud(ctx, r.user.User, cloudTag)
+		defaults, err := r.jimm.ModelDefaultsForCloud(ctx, r.user, cloudTag)
 		if err != nil {
 			result.Results[i].Error = mapError(errors.E(op, err))
 			continue

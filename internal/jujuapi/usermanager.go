@@ -83,11 +83,13 @@ func (r *controllerRoot) userInfo(ctx context.Context, entity string) (*jujupara
 	if err != nil {
 		return nil, errors.E(op, err, errors.CodeBadRequest)
 	}
-	if r.user.Username != user.Id() {
+	if r.user.Name() != user.Id() {
 		return nil, errors.E(op, errors.CodeUnauthorized)
 	}
-	ui := r.user.ToJujuUserInfo()
-	return &ui, nil
+	// TODO:(Kian) Fix the below so that the identifier interface provides a ToJujuUserInfo method()
+	// ui := r.user.ToJujuUserInfo()
+	info := jujuparams.UserInfo{}
+	return &info, nil
 }
 
 // SetPassword implements the UserManager facade's SetPassword method.

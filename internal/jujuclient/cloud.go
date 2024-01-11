@@ -212,8 +212,10 @@ func (c Connection) RemoveCloud(ctx context.Context, tag names.CloudTag) error {
 // GrantCloudAccess gives the given user the given access level on the
 // given cloud. GrantCloudAccess uses the ModifyCloudAccess procedure on
 // the Cloud facade.
-func (c Connection) GrantCloudAccess(ctx context.Context, cloudTag names.CloudTag, userTag names.UserTag, access string) error {
+func (c Connection) GrantCloudAccess(ctx context.Context, cloudTag names.CloudTag, userTag names.Tag, access string) error {
 	const op = errors.Op("jujuclient.GrantCloudAccess")
+	// TODO(Kian) This will probably break (alongside everything else in jujuclient when a serviceaccount is used
+	// as we won't be sending the correct tag kind).
 	args := jujuparams.ModifyCloudAccessRequest{
 		Changes: []jujuparams.ModifyCloudAccess{{
 			UserTag:  userTag.String(),
@@ -239,7 +241,7 @@ func (c Connection) GrantCloudAccess(ctx context.Context, cloudTag names.CloudTa
 // RevokeCloudAccess revokes the given access level on the given cloud from
 // the given user. RevokeCloudAccess uses the ModifyCloudAccess procedure
 // on the Cloud facade.
-func (c Connection) RevokeCloudAccess(ctx context.Context, cloudTag names.CloudTag, userTag names.UserTag, access string) error {
+func (c Connection) RevokeCloudAccess(ctx context.Context, cloudTag names.CloudTag, userTag names.Tag, access string) error {
 	const op = errors.Op("jujuclient.RevokeCloudAccess")
 	args := jujuparams.ModifyCloudAccessRequest{
 		Changes: []jujuparams.ModifyCloudAccess{{

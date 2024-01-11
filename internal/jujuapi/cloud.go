@@ -133,7 +133,7 @@ func (r *controllerRoot) UserCredentials(ctx context.Context, userclouds jujupar
 			results[i].Error = mapError(errors.E(op, err, errors.CodeBadRequest))
 			continue
 		}
-		err = r.jimm.ForEachUserCloudCredential(ctx, user.User, cld, func(c *dbmodel.CloudCredential) error {
+		err = r.jimm.ForEachUserCloudCredential(ctx, user, cld, func(c *dbmodel.CloudCredential) error {
 			results[i].Result = append(results[i].Result, c.Tag().String())
 			return nil
 		})
@@ -169,7 +169,7 @@ func (r *controllerRoot) revokeCredential(ctx context.Context, tag string, force
 	if err != nil {
 		return errors.E(op, err, errors.CodeBadRequest)
 	}
-	if err := r.jimm.RevokeCloudCredential(ctx, r.user.User, ct, force); err != nil {
+	if err := r.jimm.RevokeCloudCredential(ctx, r.user, ct, force); err != nil {
 		return errors.E(op, err)
 	}
 	return nil
@@ -333,7 +333,7 @@ func (r *controllerRoot) CredentialContents(ctx context.Context, args jujuparams
 
 	results := make([]jujuparams.CredentialContentResult, len(args.Credentials))
 	for i, arg := range args.Credentials {
-		cct := names.NewCloudCredentialTag(fmt.Sprintf("%s/%s/%s", arg.CloudName, r.user.Username, arg.CredentialName))
+		cct := names.NewCloudCredentialTag(fmt.Sprintf("%s/%s/%s", arg.CloudName, r.user.Name(), arg.CredentialName))
 		cred, err := r.jimm.GetCloudCredential(ctx, r.user, cct)
 		if err != nil {
 			results[i].Error = mapError(errors.E(op, err))
@@ -348,7 +348,7 @@ func (r *controllerRoot) CredentialContents(ctx context.Context, args jujuparams
 		return jujuparams.CredentialContentResults{Results: results}, nil
 	}
 
-	err := r.jimm.ForEachUserCloudCredential(ctx, r.user.User, names.CloudTag{}, func(c *dbmodel.CloudCredential) error {
+	err := r.jimm.ForEachUserCloudCredential(ctx, r.user, names.CloudTag{}, func(c *dbmodel.CloudCredential) error {
 		var result jujuparams.CredentialContentResult
 		var err error
 		result.Result, err = credentialContents(c)
@@ -413,7 +413,7 @@ func (r *controllerRoot) modifyCloudAccess(ctx context.Context, change jujuparam
 		return errors.E(op, errors.CodeBadRequest, err)
 	}
 
-	var modifyf func(context.Context, *openfga.User, names.CloudTag, names.UserTag, string) error
+	var modifyf func(context.Context, *openfga.User, names.CloudTag, names.Tag, string) error
 	switch change.Action {
 	case jujuparams.GrantCloudAccess:
 		modifyf = r.jimm.GrantCloudAccess

@@ -120,7 +120,8 @@ func ToOfferRelation(accessLevel string) (openfga.Relation, error) {
 // the subject JWT token is of the form user-<name>.
 // TODO(Kian): CSS-6703 this will change to accept users and service accounts.
 func identifierToUserString(u openfga.User) string {
-	return names.NewUserTag(u.Username).String()
+	id := u.Tag().Id()
+	return names.NewUserTag(id).String()
 }
 
 // JWTGeneratorDatabase specifies the database interface used by the
@@ -175,11 +176,11 @@ func (auth *JWTGenerator) SetTags(mt names.ModelTag, ct names.ControllerTag) {
 }
 
 // SetTags implements TokenGenerator
-func (auth *JWTGenerator) GetUser() names.UserTag {
+func (auth *JWTGenerator) GetUser() string {
 	if auth.user != nil {
-		return auth.user.ResourceTag()
+		return auth.user.Tag().String()
 	}
-	return names.UserTag{}
+	return ""
 }
 
 // MakeLoginToken authorizes the user based on the provided login requests and returns
@@ -318,7 +319,7 @@ func (j *JIMM) CheckPermission(ctx context.Context, user *openfga.User, cachedPe
 }
 
 // GrantAuditLogAccess grants audit log access for the target user.
-func (j *JIMM) GrantAuditLogAccess(ctx context.Context, user *openfga.User, targetUserTag names.UserTag) error {
+func (j *JIMM) GrantAuditLogAccess(ctx context.Context, user *openfga.User, targetUserTag names.Tag) error {
 	const op = errors.Op("jimm.GrantAuditLogAccess")
 
 	access := user.GetControllerAccess(ctx, j.ResourceTag())
@@ -341,7 +342,7 @@ func (j *JIMM) GrantAuditLogAccess(ctx context.Context, user *openfga.User, targ
 }
 
 // RevokeAuditLogAccess revokes audit log access for the target user.
-func (j *JIMM) RevokeAuditLogAccess(ctx context.Context, user *openfga.User, targetUserTag names.UserTag) error {
+func (j *JIMM) RevokeAuditLogAccess(ctx context.Context, user *openfga.User, targetUserTag names.Tag) error {
 	const op = errors.Op("jimm.RevokeAuditLogAccess")
 
 	access := user.GetControllerAccess(ctx, j.ResourceTag())

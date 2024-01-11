@@ -9,6 +9,7 @@ import (
 
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/openfga"
 )
 
 const (
@@ -16,7 +17,7 @@ const (
 )
 
 // SetModelDefaults writes new default model setting values for the specified cloud/region.
-func (j *JIMM) SetModelDefaults(ctx context.Context, user *dbmodel.User, cloudTag names.CloudTag, region string, configs map[string]interface{}) error {
+func (j *JIMM) SetModelDefaults(ctx context.Context, user *openfga.User, cloudTag names.CloudTag, region string, configs map[string]interface{}) error {
 	const op = errors.Op("jimm.SetModelDefaults")
 
 	var keys strings.Builder
@@ -54,7 +55,7 @@ func (j *JIMM) SetModelDefaults(ctx context.Context, user *dbmodel.User, cloudTa
 		}
 	}
 	err = j.Database.SetCloudDefaults(ctx, &dbmodel.CloudDefaults{
-		Username: user.Username,
+		Username: user.Name(),
 		CloudID:  cloud.ID,
 		Region:   region,
 		Defaults: configs,
@@ -66,11 +67,11 @@ func (j *JIMM) SetModelDefaults(ctx context.Context, user *dbmodel.User, cloudTa
 }
 
 // UnsetModelDefaults resets  default model setting values for the specified cloud/region.
-func (j *JIMM) UnsetModelDefaults(ctx context.Context, user *dbmodel.User, cloudTag names.CloudTag, region string, keys []string) error {
+func (j *JIMM) UnsetModelDefaults(ctx context.Context, user *openfga.User, cloudTag names.CloudTag, region string, keys []string) error {
 	const op = errors.Op("jimm.UnsetModelDefaults")
 
 	defaults := dbmodel.CloudDefaults{
-		Username: user.Username,
+		Username: user.Name(),
 		Cloud: dbmodel.Cloud{
 			Name: cloudTag.Id(),
 		},
@@ -84,7 +85,7 @@ func (j *JIMM) UnsetModelDefaults(ctx context.Context, user *dbmodel.User, cloud
 }
 
 // ModelDefaultsForCloud returns the default config values for the specified cloud.
-func (j *JIMM) ModelDefaultsForCloud(ctx context.Context, user *dbmodel.User, cloudTag names.CloudTag) (jujuparams.ModelDefaultsResult, error) {
+func (j *JIMM) ModelDefaultsForCloud(ctx context.Context, user *openfga.User, cloudTag names.CloudTag) (jujuparams.ModelDefaultsResult, error) {
 	const op = errors.Op("jimm.ModelDefaultsForCloud")
 	result := jujuparams.ModelDefaultsResult{
 		Config: make(map[string]jujuparams.ModelDefaults),

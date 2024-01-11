@@ -10,6 +10,7 @@ import (
 
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/openfga"
 )
 
 // SetCloudDefaults sets default model setting values for the specified cloud/region.
@@ -135,15 +136,16 @@ func (d *Database) CloudDefaults(ctx context.Context, defaults *dbmodel.CloudDef
 }
 
 // ModelDefaultsForCloud returns the default config values for the specified cloud.
-func (d *Database) ModelDefaultsForCloud(ctx context.Context, user *dbmodel.User, cloud names.CloudTag) ([]dbmodel.CloudDefaults, error) {
+func (d *Database) ModelDefaultsForCloud(ctx context.Context, user openfga.Identifier, cloud names.CloudTag) ([]dbmodel.CloudDefaults, error) {
 	const op = errors.Op("db.ModelDefaultsForCloud")
 
 	if err := d.ready(); err != nil {
 		return nil, errors.E(op, err)
 	}
 	db := d.DB.WithContext(ctx)
+	//TODO (Kian): Ensure this works for service accounts too.
 
-	db = db.Where("username = ?", user.Username)
+	db = db.Where("username = ?", user.Name())
 	db = db.Joins("JOIN clouds ON clouds.id = cloud_defaults.cloud_id")
 	db = db.Where("clouds.name = ?", cloud.Id())
 

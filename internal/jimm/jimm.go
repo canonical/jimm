@@ -207,20 +207,20 @@ type API interface {
 
 	// GetApplicationOfferConsumeDetails gets the details required to
 	// consume an application offer
-	GetApplicationOfferConsumeDetails(context.Context, names.UserTag, *jujuparams.ConsumeOfferDetails, bakery.Version) error
+	GetApplicationOfferConsumeDetails(context.Context, names.Tag, *jujuparams.ConsumeOfferDetails, bakery.Version) error
 
 	// GrantApplicationOfferAccess grants access to an application offer to
 	// a user.
-	GrantApplicationOfferAccess(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error
+	GrantApplicationOfferAccess(context.Context, string, names.Tag, jujuparams.OfferAccessPermission) error
 
 	// GrantCloudAccess grants cloud access to a user.
-	GrantCloudAccess(context.Context, names.CloudTag, names.UserTag, string) error
+	GrantCloudAccess(context.Context, names.CloudTag, names.Tag, string) error
 
 	// GrantJIMMModelAdmin makes the JIMM user an admin on a model.
 	GrantJIMMModelAdmin(context.Context, names.ModelTag) error
 
 	// GrantModelAccess grants model access to a user.
-	GrantModelAccess(context.Context, names.ModelTag, names.UserTag, jujuparams.UserAccessPermission) error
+	GrantModelAccess(context.Context, names.ModelTag, names.Tag, jujuparams.UserAccessPermission) error
 
 	// IsBroken returns true if the API connection has failed.
 	IsBroken() bool
@@ -260,16 +260,16 @@ type API interface {
 
 	// RevokeApplicationOfferAccess revokes access to an application offer
 	// from a user.
-	RevokeApplicationOfferAccess(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error
+	RevokeApplicationOfferAccess(context.Context, string, names.Tag, jujuparams.OfferAccessPermission) error
 
 	// RevokeCloudAccess revokes cloud access from a user.
-	RevokeCloudAccess(context.Context, names.CloudTag, names.UserTag, string) error
+	RevokeCloudAccess(context.Context, names.CloudTag, names.Tag, string) error
 
 	// RevokeCredential revokes a credential.
 	RevokeCredential(context.Context, names.CloudCredentialTag) error
 
 	// RevokeModelAccess revokes model access from a user.
-	RevokeModelAccess(context.Context, names.ModelTag, names.UserTag, jujuparams.UserAccessPermission) error
+	RevokeModelAccess(context.Context, names.ModelTag, names.Tag, jujuparams.UserAccessPermission) error
 
 	// SupportsCheckCredentialModels returns true if the
 	// CheckCredentialModels method can be used.

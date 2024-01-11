@@ -1256,7 +1256,8 @@ func TestRevokeCloudCredential(t *testing.T) {
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 
-			user, tag, expectedError := test.createEnv(c, j, client)
+			u, tag, expectedError := test.createEnv(c, j, client)
+			user := openfga.NewUser(u, client)
 
 			err = j.RevokeCloudCredential(ctx, user, tag, false)
 			if expectedError == "" {
@@ -1508,7 +1509,8 @@ func TestForEachUserCloudCredential(t *testing.T) {
 					return nil
 				}
 			}
-			err = j.ForEachUserCloudCredential(ctx, &u, test.cloudTag, test.f)
+			user := openfga.NewUser(u, client)
+			err = j.ForEachUserCloudCredential(ctx, user, test.cloudTag, test.f)
 			if test.expectError != "" {
 				c.Check(err, qt.ErrorMatches, test.expectError)
 				if test.expectErrorCode != "" {

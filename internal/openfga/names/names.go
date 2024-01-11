@@ -52,14 +52,6 @@ type Tag = cofga.Entity
 // ResourceTagger represents an entity tag that implements
 // a method returning entity's id and kind.
 type ResourceTagger interface {
-	names.UserTag |
-		jimmnames.GroupTag |
-		names.ControllerTag |
-		names.ModelTag |
-		names.ApplicationOfferTag |
-		names.CloudTag |
-		jimmnames.ServiceAccountTag
-
 	Id() string
 	Kind() string
 }
@@ -90,7 +82,7 @@ func convertID(id, kind string) string {
 
 // ConvertTag converts a resource tag to an OpenFGA tag where the resource tag is limited to
 // specific types of tags.
-func ConvertTag[RT ResourceTagger](t RT) *Tag {
+func ConvertTag(t ResourceTagger) *Tag {
 	tag := &Tag{
 		ID:   convertID(t.Id(), t.Kind()),
 		Kind: cofga.Kind(t.Kind()),

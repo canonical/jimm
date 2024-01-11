@@ -236,8 +236,8 @@ func (p *testTokenGenerator) MakeToken(ctx context.Context, permissionMap map[st
 func (p *testTokenGenerator) SetTags(names.ModelTag, names.ControllerTag) {
 }
 
-func (p *testTokenGenerator) GetUser() names.UserTag {
-	return names.NewUserTag("testUser")
+func (p *testTokenGenerator) GetUser() string {
+	return names.NewUserTag("testUser").String()
 }
 
 func TestProxySockets(t *testing.T) {

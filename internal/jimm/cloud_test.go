@@ -376,7 +376,7 @@ var addHostedCloudTests = []struct {
 	name             string
 	dialError        error
 	addCloud         func(context.Context, names.CloudTag, jujuparams.Cloud, bool) error
-	grantCloudAccess func(context.Context, names.CloudTag, names.UserTag, string) error
+	grantCloudAccess func(context.Context, names.CloudTag, names.Tag, string) error
 	cloud_           func(context.Context, names.CloudTag, *jujuparams.Cloud) error
 	username         string
 	cloudName        string
@@ -389,7 +389,7 @@ var addHostedCloudTests = []struct {
 	addCloud: func(context.Context, names.CloudTag, jujuparams.Cloud, bool) error {
 		return nil
 	},
-	grantCloudAccess: func(context.Context, names.CloudTag, names.UserTag, string) error {
+	grantCloudAccess: func(context.Context, names.CloudTag, names.Tag, string) error {
 		return nil
 	},
 	cloud_: func(_ context.Context, _ names.CloudTag, cld *jujuparams.Cloud) error {
@@ -638,7 +638,7 @@ var addHostedCloudToControllerTests = []struct {
 	name             string
 	dialError        error
 	addCloud         func(context.Context, names.CloudTag, jujuparams.Cloud, bool) error
-	grantCloudAccess func(context.Context, names.CloudTag, names.UserTag, string) error
+	grantCloudAccess func(context.Context, names.CloudTag, names.Tag, string) error
 	cloud_           func(context.Context, names.CloudTag, *jujuparams.Cloud) error
 	username         string
 	controllerName   string
@@ -652,7 +652,7 @@ var addHostedCloudToControllerTests = []struct {
 	addCloud: func(context.Context, names.CloudTag, jujuparams.Cloud, bool) error {
 		return nil
 	},
-	grantCloudAccess: func(context.Context, names.CloudTag, names.UserTag, string) error {
+	grantCloudAccess: func(context.Context, names.CloudTag, names.Tag, string) error {
 		return nil
 	},
 	cloud_: func(_ context.Context, _ names.CloudTag, cld *jujuparams.Cloud) error {
@@ -711,7 +711,7 @@ var addHostedCloudToControllerTests = []struct {
 	addCloud: func(context.Context, names.CloudTag, jujuparams.Cloud, bool) error {
 		return nil
 	},
-	grantCloudAccess: func(context.Context, names.CloudTag, names.UserTag, string) error {
+	grantCloudAccess: func(context.Context, names.CloudTag, names.Tag, string) error {
 		return nil
 	},
 	cloud_: func(_ context.Context, _ names.CloudTag, cld *jujuparams.Cloud) error {

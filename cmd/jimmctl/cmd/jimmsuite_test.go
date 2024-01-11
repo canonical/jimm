@@ -223,13 +223,14 @@ func (s *jimmSuite) UpdateCloudCredential(c *gc.C, tag names.CloudCredentialTag,
 
 func (s *jimmSuite) AddModel(c *gc.C, owner names.UserTag, name string, cloud names.CloudTag, region string, cred names.CloudCredentialTag) names.ModelTag {
 	ctx := context.Background()
+	user := &dbmodel.User{
+		Username: owner.Id(),
+	}
+	err := s.JIMM.Database.GetUser(ctx, user)
 	u := openfga.NewUser(
-		&dbmodel.User{
-			Username: owner.Id(),
-		},
+		user,
 		s.OFGAClient,
 	)
-	err := s.JIMM.Database.GetUser(ctx, u.User)
 	c.Assert(err, gc.Equals, nil)
 	mi, err := s.JIMM.AddModel(ctx, u, &jimm.ModelCreateArgs{
 		Name:            name,

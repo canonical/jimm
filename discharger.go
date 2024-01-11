@@ -124,6 +124,6 @@ func (md *macaroonDischarger) checkThirdPartyCaveat(ctx context.Context, req *ht
 			checkers.TimeBeforeCaveat(time.Now().Add(defaultDischargeExpiry)),
 		}, nil
 	}
-	zapctx.Debug(ctx, "macaroon dishcharge denied", zap.String("user", user.Username), zap.String("offer", offerUUID))
+	zapctx.Debug(ctx, "macaroon dishcharge denied", zap.String("identifier", user.Name()), zap.String("offer", offerUUID))
 	return nil, httpbakery.ErrPermissionDenied
 }

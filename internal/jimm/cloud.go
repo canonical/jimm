@@ -253,7 +253,7 @@ func (j *JIMM) AddCloudToController(ctx context.Context, user *openfga.User, con
 	dbCloud.FromJujuCloud(cloud)
 	dbCloud.Name = tag.Id()
 
-	ccloud, err := j.addControllerCloud(ctx, &controller, user.ResourceTag(), tag, cloud, force)
+	ccloud, err := j.addControllerCloud(ctx, &controller, user.Tag(), tag, cloud, force)
 	if err != nil {
 		return errors.E(op, err)
 	}
@@ -358,7 +358,7 @@ func (j *JIMM) AddHostedCloud(ctx context.Context, user *openfga.User, tag names
 	shuffleRegionControllers(region.Controllers)
 	controller := region.Controllers[0].Controller
 
-	ccloud, err := j.addControllerCloud(ctx, &controller, user.ResourceTag(), tag, cloud, force)
+	ccloud, err := j.addControllerCloud(ctx, &controller, user.Tag(), tag, cloud, force)
 	if err != nil {
 		// TODO(mhilton) remove the added cloud if adding it to the controller failed.
 		return errors.E(op, err)
@@ -396,7 +396,7 @@ func (j *JIMM) AddHostedCloud(ctx context.Context, user *openfga.User, tag names
 		zapctx.Error(
 			ctx,
 			"failed to add user as cloud admin",
-			zap.String("user", user.Username),
+			zap.String("user", user.Name()),
 			zap.String("cloud", dbCloud.ResourceTag().Id()),
 			zap.Error(err),
 		)
@@ -430,7 +430,7 @@ func findController(controllerName string) func(controllers []dbmodel.CloudRegio
 // the controller. If the cloud already exists on the controller or the user
 // already has access to the cloud, then no error will be thrown and the
 // method will continue and return the desired cloud.
-func (j *JIMM) addControllerCloud(ctx context.Context, ctl *dbmodel.Controller, ut names.UserTag, tag names.CloudTag, cloud jujuparams.Cloud, force bool) (*jujuparams.Cloud, error) {
+func (j *JIMM) addControllerCloud(ctx context.Context, ctl *dbmodel.Controller, ut names.Tag, tag names.CloudTag, cloud jujuparams.Cloud, force bool) (*jujuparams.Cloud, error) {
 	const op = errors.Op("jimm.addControllerCloud")
 
 	api, err := j.dial(ctx, ctl, names.ModelTag{})
@@ -513,7 +513,7 @@ func (j *JIMM) doCloudAdmin(ctx context.Context, user *openfga.User, ct names.Cl
 // CodeNotFound is returned. If the authenticated user does not have admin
 // access to the cloud then an error with the code CodeUnauthorized is
 // returned.
-func (j *JIMM) GrantCloudAccess(ctx context.Context, user *openfga.User, ct names.CloudTag, ut names.UserTag, access string) error {
+func (j *JIMM) GrantCloudAccess(ctx context.Context, user *openfga.User, ct names.CloudTag, ut names.Tag, access string) error {
 	const op = errors.Op("jimm.GrantCloudAccess")
 
 	targetRelation, err := ToCloudRelation(access)
@@ -578,7 +578,7 @@ func (j *JIMM) GrantCloudAccess(ctx context.Context, user *openfga.User, ct name
 // CodeNotFound is returned. If the authenticated user does not have admin
 // access to the cloud then an error with the code CodeUnauthorized is
 // returned.
-func (j *JIMM) RevokeCloudAccess(ctx context.Context, user *openfga.User, ct names.CloudTag, ut names.UserTag, access string) error {
+func (j *JIMM) RevokeCloudAccess(ctx context.Context, user *openfga.User, ct names.CloudTag, ut names.Tag, access string) error {
 	const op = errors.Op("jimm.RevokeCloudAccess")
 
 	targetRelation, err := ToCloudRelation(access)

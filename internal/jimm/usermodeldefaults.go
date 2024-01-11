@@ -7,10 +7,11 @@ import (
 
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/openfga"
 )
 
 // SetUserModelDefaults writes new default model setting values for the user.
-func (j *JIMM) SetUserModelDefaults(ctx context.Context, user *dbmodel.User, configs map[string]interface{}) error {
+func (j *JIMM) SetUserModelDefaults(ctx context.Context, user *openfga.User, configs map[string]interface{}) error {
 	const op = errors.Op("jimm.SetUserModelDefaults")
 
 	for k := range configs {
@@ -20,7 +21,7 @@ func (j *JIMM) SetUserModelDefaults(ctx context.Context, user *dbmodel.User, con
 	}
 
 	err := j.Database.SetUserModelDefaults(ctx, &dbmodel.UserModelDefaults{
-		Username: user.Username,
+		Username: user.Name(),
 		Defaults: configs,
 	})
 	if err != nil {
@@ -30,11 +31,11 @@ func (j *JIMM) SetUserModelDefaults(ctx context.Context, user *dbmodel.User, con
 }
 
 // UserModelDefaults returns the default config values for the user.
-func (j *JIMM) UserModelDefaults(ctx context.Context, user *dbmodel.User) (map[string]interface{}, error) {
+func (j *JIMM) UserModelDefaults(ctx context.Context, user *openfga.User) (map[string]interface{}, error) {
 	const op = errors.Op("jimm.UserModelDefaults")
 
 	defaults := dbmodel.UserModelDefaults{
-		Username: user.Username,
+		Username: user.Name(),
 	}
 	err := j.Database.UserModelDefaults(ctx, &defaults)
 	if err != nil {

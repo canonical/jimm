@@ -17,6 +17,7 @@ import (
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/jimm"
 	"github.com/canonical/jimm/internal/jimmtest"
+	"github.com/canonical/jimm/internal/openfga"
 )
 
 func TestSetCloudDefaults(t *testing.T) {
@@ -243,8 +244,9 @@ func TestSetCloudDefaults(t *testing.T) {
 			c.Assert(err, qt.Equals, nil)
 
 			testConfig := test.setup(c, j)
+			user := openfga.NewUser(testConfig.user, nil)
 
-			err = j.SetModelDefaults(ctx, testConfig.user, testConfig.cloud, testConfig.region, testConfig.defaults)
+			err = j.SetModelDefaults(ctx, user, testConfig.cloud, testConfig.region, testConfig.defaults)
 			if testConfig.expectedError == "" {
 				c.Assert(err, qt.Equals, nil)
 				dbDefaults := dbmodel.CloudDefaults{
@@ -436,8 +438,9 @@ func TestUnsetCloudDefaults(t *testing.T) {
 			c.Assert(err, qt.Equals, nil)
 
 			testConfig := test.setup(c, j)
+			user := openfga.NewUser(testConfig.user, nil)
 
-			err = j.UnsetModelDefaults(ctx, testConfig.user, testConfig.cloud, testConfig.region, testConfig.keys)
+			err = j.UnsetModelDefaults(ctx, user, testConfig.cloud, testConfig.region, testConfig.keys)
 			if testConfig.expectedError == "" {
 				c.Assert(err, qt.Equals, nil)
 				dbDefaults := dbmodel.CloudDefaults{
@@ -546,8 +549,9 @@ func TestModelDefaultsForCloud(t *testing.T) {
 		},
 	})
 	c.Assert(err, qt.Equals, nil)
+	OpenFGAUser := openfga.NewUser(user, nil)
 
-	result, err := j.ModelDefaultsForCloud(ctx, &user, names.NewCloudTag(cloud1.Name))
+	result, err := j.ModelDefaultsForCloud(ctx, OpenFGAUser, names.NewCloudTag(cloud1.Name))
 	c.Assert(err, qt.Equals, nil)
 	c.Assert(result, qt.DeepEquals, jujuparams.ModelDefaultsResult{
 		Config: map[string]jujuparams.ModelDefaults{
@@ -581,7 +585,7 @@ func TestModelDefaultsForCloud(t *testing.T) {
 		},
 	})
 
-	result, err = j.ModelDefaultsForCloud(ctx, &user, names.NewCloudTag(cloud2.Name))
+	result, err = j.ModelDefaultsForCloud(ctx, OpenFGAUser, names.NewCloudTag(cloud2.Name))
 	c.Assert(err, qt.Equals, nil)
 	c.Assert(result, qt.DeepEquals, jujuparams.ModelDefaultsResult{
 		Config: map[string]jujuparams.ModelDefaults{
@@ -609,8 +613,9 @@ func TestModelDefaultsForCloud(t *testing.T) {
 			},
 		},
 	})
+	openFGAUser1 := openfga.NewUser(user1, nil)
 
-	result, err = j.ModelDefaultsForCloud(ctx, &user1, names.NewCloudTag(cloud2.Name))
+	result, err = j.ModelDefaultsForCloud(ctx, openFGAUser1, names.NewCloudTag(cloud2.Name))
 	c.Assert(err, qt.Equals, nil)
 	c.Assert(result, qt.DeepEquals, jujuparams.ModelDefaultsResult{
 		Config: map[string]jujuparams.ModelDefaults{},

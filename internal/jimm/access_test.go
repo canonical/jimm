@@ -33,11 +33,10 @@ func (ta *testAuthenticator) Authenticate(ctx context.Context, req *jujuparams.L
 	if ta.err != nil {
 		return nil, ta.err
 	}
-	return &openfga.User{
-		User: &dbmodel.User{
-			Username: ta.username,
-		},
-	}, nil
+	user := &dbmodel.User{
+		Username: ta.username,
+	}
+	return openfga.NewUser(user, nil), nil
 }
 
 // testDatabase is a database implementation intended for testing the token generator.
@@ -149,33 +148,33 @@ func TestAuditLogAccess(t *testing.T) {
 	user := openfga.NewUser(&dbmodel.User{Username: "bob"}, j.OpenFGAClient)
 
 	// admin user can grant other users audit log access.
-	err = j.GrantAuditLogAccess(ctx, adminUser, user.ResourceTag())
+	err = j.GrantAuditLogAccess(ctx, adminUser, user.Tag())
 	c.Assert(err, qt.IsNil)
 
 	access := user.GetAuditLogViewerAccess(ctx, j.ResourceTag())
 	c.Assert(access, qt.Equals, ofganames.AuditLogViewerRelation)
 
 	// re-granting access does not result in error.
-	err = j.GrantAuditLogAccess(ctx, adminUser, user.ResourceTag())
+	err = j.GrantAuditLogAccess(ctx, adminUser, user.Tag())
 	c.Assert(err, qt.IsNil)
 
 	// admin user can revoke other users audit log access.
-	err = j.RevokeAuditLogAccess(ctx, adminUser, user.ResourceTag())
+	err = j.RevokeAuditLogAccess(ctx, adminUser, user.Tag())
 	c.Assert(err, qt.IsNil)
 
 	access = user.GetAuditLogViewerAccess(ctx, j.ResourceTag())
 	c.Assert(access, qt.Equals, ofganames.NoRelation)
 
 	// re-revoking access does not result in error.
-	err = j.RevokeAuditLogAccess(ctx, adminUser, user.ResourceTag())
+	err = j.RevokeAuditLogAccess(ctx, adminUser, user.Tag())
 	c.Assert(err, qt.IsNil)
 
 	// non-admin user cannot grant audit log access
-	err = j.GrantAuditLogAccess(ctx, user, adminUser.ResourceTag())
+	err = j.GrantAuditLogAccess(ctx, user, adminUser.Tag())
 	c.Assert(err, qt.ErrorMatches, "unauthorized")
 
 	// non-admin user cannot revoke audit log access
-	err = j.RevokeAuditLogAccess(ctx, user, adminUser.ResourceTag())
+	err = j.RevokeAuditLogAccess(ctx, user, adminUser.Tag())
 	c.Assert(err, qt.ErrorMatches, "unauthorized")
 }
 

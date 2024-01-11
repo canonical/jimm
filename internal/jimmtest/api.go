@@ -135,11 +135,11 @@ type API struct {
 	DumpModelDB_                       func(context.Context, names.ModelTag) (map[string]interface{}, error)
 	FindApplicationOffers_             func(context.Context, []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetails, error)
 	GetApplicationOffer_               func(context.Context, *jujuparams.ApplicationOfferAdminDetails) error
-	GetApplicationOfferConsumeDetails_ func(context.Context, names.UserTag, *jujuparams.ConsumeOfferDetails, bakery.Version) error
-	GrantApplicationOfferAccess_       func(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error
-	GrantCloudAccess_                  func(context.Context, names.CloudTag, names.UserTag, string) error
+	GetApplicationOfferConsumeDetails_ func(context.Context, names.Tag, *jujuparams.ConsumeOfferDetails, bakery.Version) error
+	GrantApplicationOfferAccess_       func(context.Context, string, names.Tag, jujuparams.OfferAccessPermission) error
+	GrantCloudAccess_                  func(context.Context, names.CloudTag, names.Tag, string) error
 	GrantJIMMModelAdmin_               func(context.Context, names.ModelTag) error
-	GrantModelAccess_                  func(context.Context, names.ModelTag, names.UserTag, jujuparams.UserAccessPermission) error
+	GrantModelAccess_                  func(context.Context, names.ModelTag, names.Tag, jujuparams.UserAccessPermission) error
 	IsBroken_                          bool
 	ListApplicationOffers_             func(context.Context, []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetails, error)
 	ModelInfo_                         func(context.Context, *jujuparams.ModelInfo) error
@@ -151,10 +151,10 @@ type API struct {
 	Offer_                             func(context.Context, crossmodel.OfferURL, jujuparams.AddApplicationOffer) error
 	Ping_                              func(context.Context) error
 	RemoveCloud_                       func(context.Context, names.CloudTag) error
-	RevokeApplicationOfferAccess_      func(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error
-	RevokeCloudAccess_                 func(context.Context, names.CloudTag, names.UserTag, string) error
+	RevokeApplicationOfferAccess_      func(context.Context, string, names.Tag, jujuparams.OfferAccessPermission) error
+	RevokeCloudAccess_                 func(context.Context, names.CloudTag, names.Tag, string) error
 	RevokeCredential_                  func(context.Context, names.CloudCredentialTag) error
-	RevokeModelAccess_                 func(context.Context, names.ModelTag, names.UserTag, jujuparams.UserAccessPermission) error
+	RevokeModelAccess_                 func(context.Context, names.ModelTag, names.Tag, jujuparams.UserAccessPermission) error
 	SupportsCheckCredentialModels_     bool
 	SupportsModelSummaryWatcher_       bool
 	Status_                            func(context.Context, []string) (*jujuparams.FullStatus, error)
@@ -281,21 +281,21 @@ func (a *API) GetApplicationOffer(ctx context.Context, offer *jujuparams.Applica
 	return a.GetApplicationOffer_(ctx, offer)
 }
 
-func (a *API) GetApplicationOfferConsumeDetails(ctx context.Context, tag names.UserTag, cod *jujuparams.ConsumeOfferDetails, v bakery.Version) error {
+func (a *API) GetApplicationOfferConsumeDetails(ctx context.Context, tag names.Tag, cod *jujuparams.ConsumeOfferDetails, v bakery.Version) error {
 	if a.GetApplicationOfferConsumeDetails_ == nil {
 		return errors.E(errors.CodeNotImplemented)
 	}
 	return a.GetApplicationOfferConsumeDetails_(ctx, tag, cod, v)
 }
 
-func (a *API) GrantApplicationOfferAccess(ctx context.Context, offerURL string, tag names.UserTag, p jujuparams.OfferAccessPermission) error {
+func (a *API) GrantApplicationOfferAccess(ctx context.Context, offerURL string, tag names.Tag, p jujuparams.OfferAccessPermission) error {
 	if a.GrantApplicationOfferAccess_ == nil {
 		return errors.E(errors.CodeNotImplemented)
 	}
 	return a.GrantApplicationOfferAccess_(ctx, offerURL, tag, p)
 }
 
-func (a *API) GrantCloudAccess(ctx context.Context, ct names.CloudTag, ut names.UserTag, access string) error {
+func (a *API) GrantCloudAccess(ctx context.Context, ct names.CloudTag, ut names.Tag, access string) error {
 	if a.GrantCloudAccess_ == nil {
 		return errors.E(errors.CodeNotImplemented)
 	}
@@ -309,7 +309,7 @@ func (a *API) GrantJIMMModelAdmin(ctx context.Context, tag names.ModelTag) error
 	return a.GrantJIMMModelAdmin_(ctx, tag)
 }
 
-func (a *API) GrantModelAccess(ctx context.Context, mt names.ModelTag, ut names.UserTag, p jujuparams.UserAccessPermission) error {
+func (a *API) GrantModelAccess(ctx context.Context, mt names.ModelTag, ut names.Tag, p jujuparams.UserAccessPermission) error {
 	if a.GrantModelAccess_ == nil {
 		return errors.E(errors.CodeNotImplemented)
 	}
@@ -376,14 +376,14 @@ func (a *API) RemoveCloud(ctx context.Context, tag names.CloudTag) error {
 	return a.RemoveCloud_(ctx, tag)
 }
 
-func (a *API) RevokeApplicationOfferAccess(ctx context.Context, offerURL string, tag names.UserTag, p jujuparams.OfferAccessPermission) error {
+func (a *API) RevokeApplicationOfferAccess(ctx context.Context, offerURL string, tag names.Tag, p jujuparams.OfferAccessPermission) error {
 	if a.RevokeApplicationOfferAccess_ == nil {
 		return errors.E(errors.CodeNotImplemented)
 	}
 	return a.RevokeApplicationOfferAccess_(ctx, offerURL, tag, p)
 }
 
-func (a *API) RevokeCloudAccess(ctx context.Context, ct names.CloudTag, ut names.UserTag, access string) error {
+func (a *API) RevokeCloudAccess(ctx context.Context, ct names.CloudTag, ut names.Tag, access string) error {
 	if a.RevokeCloudAccess_ == nil {
 		return errors.E(errors.CodeNotImplemented)
 	}
@@ -397,7 +397,7 @@ func (a *API) RevokeCredential(ctx context.Context, tag names.CloudCredentialTag
 	return a.RevokeCredential_(ctx, tag)
 }
 
-func (a *API) RevokeModelAccess(ctx context.Context, mt names.ModelTag, ut names.UserTag, p jujuparams.UserAccessPermission) error {
+func (a *API) RevokeModelAccess(ctx context.Context, mt names.ModelTag, ut names.Tag, p jujuparams.UserAccessPermission) error {
 	if a.RevokeModelAccess_ == nil {
 		return errors.E(errors.CodeNotImplemented)
 	}

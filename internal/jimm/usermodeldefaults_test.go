@@ -15,6 +15,7 @@ import (
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/jimm"
 	"github.com/canonical/jimm/internal/jimmtest"
+	"github.com/canonical/jimm/internal/openfga"
 )
 
 func TestSetUserModelDefaults(t *testing.T) {
@@ -127,8 +128,9 @@ func TestSetUserModelDefaults(t *testing.T) {
 			c.Assert(err, qt.Equals, nil)
 
 			testConfig := test.setup(c, j)
+			user := openfga.NewUser(testConfig.user, nil)
 
-			err = j.SetUserModelDefaults(ctx, testConfig.user, testConfig.defaults)
+			err = j.SetUserModelDefaults(ctx, user, testConfig.defaults)
 			if testConfig.expectedError == "" {
 				c.Assert(err, qt.Equals, nil)
 				dbDefaults := dbmodel.UserModelDefaults{
@@ -213,8 +215,9 @@ func TestUserModelDefaults(t *testing.T) {
 			c.Assert(err, qt.Equals, nil)
 
 			testConfig := test.setup(c, j)
+			user := openfga.NewUser(testConfig.user, nil)
 
-			defaults, err := j.UserModelDefaults(ctx, testConfig.user)
+			defaults, err := j.UserModelDefaults(ctx, user)
 			if testConfig.expectedError == "" {
 				c.Assert(err, qt.Equals, nil)
 				c.Assert(defaults, qt.CmpEquals(cmpopts.IgnoreTypes(gorm.Model{})), testConfig.expectedDefaults)

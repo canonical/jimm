@@ -32,21 +32,22 @@ func (j *JIMM) Authenticate(ctx context.Context, req *jujuparams.LoginRequest) (
 	}
 
 	err = j.Database.Transaction(func(tx *db.Database) error {
+		// The authenticated user u contains a partially filled Database object.
+		// Here we fetch the full object and update the authenticated user's info.
 		pu := dbmodel.User{
-			Username: u.Username,
+			Username: u.Name(),
 		}
 		if err := tx.GetUser(ctx, &pu); err != nil {
 			return err
 		}
-		u.Model = pu.Model
-		u.LastLogin = pu.LastLogin
 
 		// TODO(mhilton) support disabled users.
-		if u.DisplayName != "" {
-			pu.DisplayName = u.DisplayName
+		if u.NameDisplay() != "" {
+			pu.DisplayName = u.NameDisplay()
 		}
 		pu.LastLogin.Time = j.Database.DB.Config.NowFunc()
 		pu.LastLogin.Valid = true
+		u.Identifier = pu
 		return tx.UpdateUser(ctx, &pu)
 	})
 	if err != nil {

@@ -4,6 +4,7 @@ package openfga
 
 import (
 	"context"
+	"database/sql"
 	"strings"
 
 	"github.com/juju/names/v4"
@@ -19,17 +20,24 @@ import (
 
 // NewUser returns a new user structure that can be used to check
 // user's access rights to various resources.
-func NewUser(u *dbmodel.User, client *OFGAClient) *User {
+func NewUser(i Identifier, client *OFGAClient) *User {
 	return &User{
-		User:   u,
-		client: client,
+		Identifier: i,
+		client:     client,
 	}
+}
+
+type Identifier interface {
+	Name() string
+	NameDisplay() string
+	Tag() names.Tag
+	RecentLogin() sql.NullTime
 }
 
 // User wraps dbmodel.User and implements methods that enable us
 // to check user's access rights to various resources.
 type User struct {
-	*dbmodel.User
+	Identifier
 	client    *OFGAClient
 	JimmAdmin bool
 }
@@ -239,7 +247,7 @@ func (u *User) UnsetApplicationOfferAccess(ctx context.Context, resource names.A
 
 // ListModels returns a slice of model UUIDs that this user has the relation <relation> to.
 func (u *User) ListModels(ctx context.Context, relation ofga.Relation) ([]string, error) {
-	entities, err := u.client.ListObjects(ctx, ofganames.ConvertTag(u.ResourceTag()), relation, ModelType, nil)
+	entities, err := u.client.ListObjects(ctx, ofganames.ConvertTag(u.Tag()), relation, ModelType, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -252,7 +260,7 @@ func (u *User) ListModels(ctx context.Context, relation ofga.Relation) ([]string
 
 // ListApplicationOffers returns a slice of application offer UUIDs that a user has the relation <relation> to.
 func (u *User) ListApplicationOffers(ctx context.Context, relation ofga.Relation) ([]string, error) {
-	entities, err := u.client.ListObjects(ctx, ofganames.ConvertTag(u.ResourceTag()), relation, ApplicationOfferType, nil)
+	entities, err := u.client.ListObjects(ctx, ofganames.ConvertTag(u.Tag()), relation, ApplicationOfferType, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -275,7 +283,7 @@ func checkRelation[T ofganames.ResourceTagger](ctx context.Context, u *User, res
 	isAllowed, err := u.client.CheckRelation(
 		ctx,
 		Tuple{
-			Object:   ofganames.ConvertTag(u.ResourceTag()),
+			Object:   ofganames.ConvertTag(u.Tag()),
 			Relation: relation,
 			Target:   ofganames.ConvertTag(resource),
 		},
@@ -298,7 +306,7 @@ func CheckRelation(ctx context.Context, u *User, resource names.Tag, relation Re
 	isAllowed, err := u.client.CheckRelation(
 		ctx,
 		Tuple{
-			Object:   ofganames.ConvertTag(u.ResourceTag()),
+			Object:   ofganames.ConvertTag(u.Tag()),
 			Relation: relation,
 			Target:   tag,
 		},
@@ -319,7 +327,7 @@ func IsAdministrator[T administratorT](ctx context.Context, u *User, resource T)
 			ctx,
 			"openfga administrator check failed",
 			zap.Error(err),
-			zap.String("user", u.Username),
+			zap.String("user", u.Name()),
 			zap.String("resource", resource.String()),
 		)
 		return false, errors.E(err)
@@ -359,7 +367,7 @@ func setResourceAccess[T ofganames.ResourceTagger](ctx context.Context, user *Us
 		}
 		return nil
 	}
-	t := user.ResourceTag()
+	t := user.Tag()
 	// If the requested user is "everyone" then we need to add a tuple for users and service accounts.
 	if ofganames.IsIdentifierType(t.Kind()) && t.Id() == ofganames.EveryoneUser {
 		for _, name := range allIdentifiers {
@@ -420,7 +428,7 @@ func unsetMultipleResourceAccesses[T ofganames.ResourceTagger](ctx context.Conte
 		}
 		return nil
 	}
-	t := user.ResourceTag()
+	t := user.Tag()
 	// If the requested user is "everyone" then we need to remove access for users and service accounts.
 	if ofganames.IsIdentifierType(t.Kind()) && t.Id() == ofganames.EveryoneUser {
 		for _, name := range allIdentifiers {
@@ -456,7 +464,7 @@ func unsetResourceAccess[T ofganames.ResourceTagger](ctx context.Context, user *
 		}
 		return nil
 	}
-	t := user.ResourceTag()
+	t := user.Tag()
 	// If the requested user is "everyone" then we need to remove access for users and service accounts.
 	if ofganames.IsIdentifierType(t.Kind()) && t.Id() == ofganames.EveryoneUser {
 		for _, name := range allIdentifiers {

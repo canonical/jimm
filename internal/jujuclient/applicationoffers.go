@@ -123,7 +123,7 @@ func (c Connection) GetApplicationOffer(ctx context.Context, info *jujuparams.Ap
 // GrantApplicationOfferAccess grants the specified permission to the
 // given user on the given application offer. GrantApplicationOfferAccess
 // uses the ModifyOfferAccess procedure on the ApplicationOffers facade..
-func (c Connection) GrantApplicationOfferAccess(ctx context.Context, offerURL string, user names.UserTag, access jujuparams.OfferAccessPermission) error {
+func (c Connection) GrantApplicationOfferAccess(ctx context.Context, offerURL string, user names.Tag, access jujuparams.OfferAccessPermission) error {
 	const op = errors.Op("jujuclient.GrantApplicationOfferAccess")
 	args := jujuparams.ModifyOfferAccessRequest{
 		Changes: []jujuparams.ModifyOfferAccess{{
@@ -150,7 +150,7 @@ func (c Connection) GrantApplicationOfferAccess(ctx context.Context, offerURL st
 // RevokeApplicationOfferAccess revokes the specified permission from the
 // given user on the given application offer. RevokeApplicationOfferAccess
 // uses the ModifyOfferAccess procedure on the ApplicationOffers facade.
-func (c Connection) RevokeApplicationOfferAccess(ctx context.Context, offerURL string, user names.UserTag, access jujuparams.OfferAccessPermission) error {
+func (c Connection) RevokeApplicationOfferAccess(ctx context.Context, offerURL string, user names.Tag, access jujuparams.OfferAccessPermission) error {
 	const op = errors.Op("jujuclient.RevokeApplicationOfferAccess")
 	args := jujuparams.ModifyOfferAccessRequest{
 		Changes: []jujuparams.ModifyOfferAccess{{
@@ -202,7 +202,7 @@ func (c Connection) DestroyApplicationOffer(ctx context.Context, offer string, f
 // must include an Offer.OfferURL and the rest of the structure will be
 // filled in by the API call. GetApplicationOfferConsumeDetails uses the
 // GetConsumeDetails procedure on the ApplicationOffers facade.
-func (c Connection) GetApplicationOfferConsumeDetails(ctx context.Context, user names.UserTag, info *jujuparams.ConsumeOfferDetails, v bakery.Version) error {
+func (c Connection) GetApplicationOfferConsumeDetails(ctx context.Context, user names.Tag, info *jujuparams.ConsumeOfferDetails, v bakery.Version) error {
 	const op = errors.Op("jujuclient.GetApplicationOfferConsumeDetails")
 	args := jujuparams.ConsumeOfferDetailsArg{
 		OfferURLs: jujuparams.OfferURLs{
