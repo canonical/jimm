@@ -355,7 +355,7 @@ func (cc *CloudCredential) DBObject(c *qt.C, db db.Database) dbmodel.CloudCreden
 	cc.dbo.Cloud = cc.env.Cloud(cc.Cloud).DBObject(c, db)
 	cc.dbo.CloudName = cc.dbo.Cloud.Name
 	cc.dbo.Owner = cc.env.User(cc.Owner).DBObject(c, db)
-	cc.dbo.OwnerUsername = cc.dbo.Owner.Name
+	cc.dbo.OwnerIdentityName = cc.dbo.Owner.Name
 	cc.dbo.AuthType = cc.AuthType
 	cc.dbo.Attributes = cc.Attributes
 

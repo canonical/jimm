@@ -127,19 +127,19 @@ func (s *dbSuite) TestGetUserCloudCredentials(c *qt.C) {
 	c.Assert(s.Database.DB.Create(&cloud).Error, qt.IsNil)
 
 	cred1 := dbmodel.CloudCredential{
-		Name:          "test-cred-1",
-		CloudName:     cloud.Name,
-		OwnerUsername: u.Name,
-		AuthType:      "empty",
+		Name:              "test-cred-1",
+		CloudName:         cloud.Name,
+		OwnerIdentityName: u.Name,
+		AuthType:          "empty",
 	}
 	err = s.Database.SetCloudCredential(context.Background(), &cred1)
 	c.Assert(err, qt.Equals, nil)
 
 	cred2 := dbmodel.CloudCredential{
-		Name:          "test-cred-2",
-		CloudName:     cloud.Name,
-		OwnerUsername: u.Name,
-		AuthType:      "empty",
+		Name:              "test-cred-2",
+		CloudName:         cloud.Name,
+		OwnerIdentityName: u.Name,
+		AuthType:          "empty",
 	}
 	err = s.Database.SetCloudCredential(context.Background(), &cred2)
 	c.Assert(err, qt.Equals, nil)

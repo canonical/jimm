@@ -67,27 +67,27 @@ func (s *importCloudCredentialsSuite) TestImportCloudCredentials(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	cred1 := dbmodel.CloudCredential{
-		CloudName:     "aws",
-		OwnerUsername: "alice@external",
-		Name:          "test1",
+		CloudName:         "aws",
+		OwnerIdentityName: "alice@external",
+		Name:              "test1",
 	}
 	err = s.JIMM.Database.GetCloudCredential(context.Background(), &cred1)
 	c.Assert(err, gc.IsNil)
 	c.Check(cred1.AuthType, gc.Equals, "access-key")
 
 	cred2 := dbmodel.CloudCredential{
-		CloudName:     "aws",
-		OwnerUsername: "bob@external",
-		Name:          "test1",
+		CloudName:         "aws",
+		OwnerIdentityName: "bob@external",
+		Name:              "test1",
 	}
 	err = s.JIMM.Database.GetCloudCredential(context.Background(), &cred2)
 	c.Assert(err, gc.IsNil)
 	c.Check(cred2.AuthType, gc.Equals, "access-key")
 
 	cred3 := dbmodel.CloudCredential{
-		CloudName:     "gce",
-		OwnerUsername: "charlie@external",
-		Name:          "test1",
+		CloudName:         "gce",
+		OwnerIdentityName: "charlie@external",
+		Name:              "test1",
 	}
 	err = s.JIMM.Database.GetCloudCredential(context.Background(), &cred3)
 	c.Assert(err, gc.IsNil)

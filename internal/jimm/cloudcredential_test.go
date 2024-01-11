@@ -94,10 +94,10 @@ func TestUpdateCloudCredential(t *testing.T) {
 			c.Assert(err, qt.Equals, nil)
 
 			cred := dbmodel.CloudCredential{
-				Name:          "test-credential-1",
-				CloudName:     cloud.Name,
-				OwnerUsername: u.Name,
-				AuthType:      "empty",
+				Name:              "test-credential-1",
+				CloudName:         cloud.Name,
+				OwnerIdentityName: u.Name,
+				AuthType:          "empty",
 			}
 			err = j.Database.SetCloudCredential(context.Background(), &cred)
 			c.Assert(err, qt.Equals, nil)
@@ -209,10 +209,10 @@ func TestUpdateCloudCredential(t *testing.T) {
 			c.Assert(err, qt.Equals, nil)
 
 			cred := dbmodel.CloudCredential{
-				Name:          "test-credential-1",
-				CloudName:     cloud.Name,
-				OwnerUsername: u.Name,
-				AuthType:      "empty",
+				Name:              "test-credential-1",
+				CloudName:         cloud.Name,
+				OwnerIdentityName: u.Name,
+				AuthType:          "empty",
 			}
 			err = j.Database.SetCloudCredential(context.Background(), &cred)
 			c.Assert(err, qt.Equals, nil)
@@ -300,10 +300,10 @@ func TestUpdateCloudCredential(t *testing.T) {
 			c.Assert(err, qt.Equals, nil)
 
 			cred := dbmodel.CloudCredential{
-				Name:          "test-credential-1",
-				CloudName:     cloud.Name,
-				OwnerUsername: u.Name,
-				AuthType:      "empty",
+				Name:              "test-credential-1",
+				CloudName:         cloud.Name,
+				OwnerIdentityName: u.Name,
+				AuthType:          "empty",
 			}
 			err = j.Database.SetCloudCredential(context.Background(), &cred)
 			c.Assert(err, qt.Equals, nil)
@@ -394,10 +394,10 @@ func TestUpdateCloudCredential(t *testing.T) {
 			c.Assert(err, qt.Equals, nil)
 
 			cred := dbmodel.CloudCredential{
-				Name:          "test-credential-1",
-				CloudName:     cloud.Name,
-				OwnerUsername: eve.Name,
-				AuthType:      "empty",
+				Name:              "test-credential-1",
+				CloudName:         cloud.Name,
+				OwnerIdentityName: eve.Name,
+				AuthType:          "empty",
 			}
 			err = j.Database.SetCloudCredential(context.Background(), &cred)
 			c.Assert(err, qt.Equals, nil)
@@ -443,7 +443,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 					Name: cloud.Name,
 					Type: cloud.Type,
 				},
-				OwnerUsername: eve.Name,
+				OwnerIdentityName: eve.Name,
 				Attributes: map[string]string{
 					"key1": "value1",
 					"key2": "value2",
@@ -508,10 +508,10 @@ func TestUpdateCloudCredential(t *testing.T) {
 			c.Assert(err, qt.Equals, nil)
 
 			cred := dbmodel.CloudCredential{
-				Name:          "test-credential-1",
-				CloudName:     cloud.Name,
-				OwnerUsername: u.Name,
-				AuthType:      "empty",
+				Name:              "test-credential-1",
+				CloudName:         cloud.Name,
+				OwnerIdentityName: u.Name,
+				AuthType:          "empty",
 			}
 			err = j.Database.SetCloudCredential(context.Background(), &cred)
 			c.Assert(err, qt.Equals, nil)
@@ -621,10 +621,10 @@ func TestUpdateCloudCredential(t *testing.T) {
 			c.Assert(err, qt.Equals, nil)
 
 			cred := dbmodel.CloudCredential{
-				Name:          "test-credential-1",
-				CloudName:     cloud.Name,
-				OwnerUsername: u.Name,
-				AuthType:      "empty",
+				Name:              "test-credential-1",
+				CloudName:         cloud.Name,
+				OwnerIdentityName: u.Name,
+				AuthType:          "empty",
 			}
 			err = j.Database.SetCloudCredential(context.Background(), &cred)
 			c.Assert(err, qt.Equals, nil)
@@ -805,9 +805,9 @@ func TestUpdateCloudCredential(t *testing.T) {
 				c.Assert(result[0].ModelName, qt.Equals, "test-model")
 				c.Assert(result[0].ModelUUID, qt.Equals, "00000001-0000-0000-0000-0000-000000000001")
 				credential := dbmodel.CloudCredential{
-					Name:          expectedCredential.Name,
-					CloudName:     expectedCredential.CloudName,
-					OwnerUsername: expectedCredential.OwnerUsername,
+					Name:              expectedCredential.Name,
+					CloudName:         expectedCredential.CloudName,
+					OwnerIdentityName: expectedCredential.OwnerIdentityName,
 				}
 				err = j.Database.GetCloudCredential(ctx, &credential)
 				c.Assert(err, qt.Equals, nil)
@@ -927,10 +927,10 @@ func TestRevokeCloudCredential(t *testing.T) {
 			c.Assert(err, qt.Equals, nil)
 
 			cred := dbmodel.CloudCredential{
-				Name:          "test-credential-1",
-				CloudName:     cloud.Name,
-				OwnerUsername: u.Name,
-				AuthType:      "empty",
+				Name:              "test-credential-1",
+				CloudName:         cloud.Name,
+				OwnerIdentityName: u.Name,
+				AuthType:          "empty",
 			}
 			err = j.Database.SetCloudCredential(context.Background(), &cred)
 			c.Assert(err, qt.Equals, nil)
@@ -1001,10 +1001,10 @@ func TestRevokeCloudCredential(t *testing.T) {
 			c.Assert(err, qt.Equals, nil)
 
 			cred := dbmodel.CloudCredential{
-				Name:          "test-credential-1",
-				CloudName:     cloud.Name,
-				OwnerUsername: u.Name,
-				AuthType:      "empty",
+				Name:              "test-credential-1",
+				CloudName:         cloud.Name,
+				OwnerIdentityName: u.Name,
+				AuthType:          "empty",
 			}
 			err = j.Database.SetCloudCredential(context.Background(), &cred)
 			c.Assert(err, qt.Equals, nil)
@@ -1071,10 +1071,10 @@ func TestRevokeCloudCredential(t *testing.T) {
 			c.Assert(err, qt.Equals, nil)
 
 			cred := dbmodel.CloudCredential{
-				Name:          "test-credential-1",
-				CloudName:     cloud.Name,
-				OwnerUsername: u.Name,
-				AuthType:      "empty",
+				Name:              "test-credential-1",
+				CloudName:         cloud.Name,
+				OwnerIdentityName: u.Name,
+				AuthType:          "empty",
 			}
 			err = j.Database.SetCloudCredential(context.Background(), &cred)
 			c.Assert(err, qt.Equals, nil)
@@ -1164,10 +1164,10 @@ func TestRevokeCloudCredential(t *testing.T) {
 			c.Assert(err, qt.Equals, nil)
 
 			cred := dbmodel.CloudCredential{
-				Name:          "test-credential-1",
-				CloudName:     cloud.Name,
-				OwnerUsername: u.Name,
-				AuthType:      "empty",
+				Name:              "test-credential-1",
+				CloudName:         cloud.Name,
+				OwnerIdentityName: u.Name,
+				AuthType:          "empty",
 			}
 			err = j.Database.SetCloudCredential(context.Background(), &cred)
 			c.Assert(err, qt.Equals, nil)
@@ -1342,8 +1342,8 @@ func TestGetCloudCredential(t *testing.T) {
 					Name: cloud.Name,
 					Type: cloud.Type,
 				},
-				OwnerUsername: u.Name,
-				AuthType:      "empty",
+				OwnerIdentityName: u.Name,
+				AuthType:          "empty",
 			}
 			err = j.Database.SetCloudCredential(context.Background(), &cred)
 			c.Assert(err, qt.Equals, nil)
@@ -1690,17 +1690,17 @@ func TestCloudCredentialAttributeStore(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	cred := dbmodel.CloudCredential{
-		OwnerUsername: "alice@external",
-		Name:          "cred-1",
-		CloudName:     "test",
+		OwnerIdentityName: "alice@external",
+		Name:              "cred-1",
+		CloudName:         "test",
 	}
 	err = j.Database.GetCloudCredential(ctx, &cred)
 	c.Assert(err, qt.IsNil)
 	c.Check(cred, jimmtest.DBObjectEquals, dbmodel.CloudCredential{
-		OwnerUsername: "alice@external",
-		Name:          "cred-1",
-		CloudName:     "test",
-		AuthType:      "userpass",
+		OwnerIdentityName: "alice@external",
+		Name:              "cred-1",
+		CloudName:         "test",
+		AuthType:          "userpass",
 		Cloud: dbmodel.Cloud{
 			Name: "test",
 			Type: "test-provider",

@@ -45,12 +45,12 @@ func (s *dbSuite) TestSetCloudCredentialInvalidTag(c *qt.C) {
 	c.Assert(s.Database.DB.Create(&cloud).Error, qt.IsNil)
 
 	cred := dbmodel.CloudCredential{
-		Name:          "test-cred",
-		OwnerUsername: u.Name,
-		AuthType:      "empty",
+		Name:              "test-cred",
+		OwnerIdentityName: u.Name,
+		AuthType:          "empty",
 	}
 	err = s.Database.SetCloudCredential(context.Background(), &cred)
-	c.Check(err, qt.ErrorMatches, fmt.Sprintf("invalid cloudcredential tag %q", cred.CloudName+"/"+cred.OwnerUsername+"/"+cred.Name))
+	c.Check(err, qt.ErrorMatches, fmt.Sprintf("invalid cloudcredential tag %q", cred.CloudName+"/"+cred.OwnerIdentityName+"/"+cred.Name))
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeBadRequest)
 }
 
@@ -73,10 +73,10 @@ func (s *dbSuite) TestSetCloudCredential(c *qt.C) {
 	c.Assert(s.Database.DB.Create(&cloud).Error, qt.IsNil)
 
 	cred := dbmodel.CloudCredential{
-		Name:          "test-cred",
-		CloudName:     cloud.Name,
-		OwnerUsername: u.Name,
-		AuthType:      "empty",
+		Name:              "test-cred",
+		CloudName:         cloud.Name,
+		OwnerIdentityName: u.Name,
+		AuthType:          "empty",
 	}
 	c1 := cred
 	err = s.Database.SetCloudCredential(context.Background(), &cred)
@@ -110,10 +110,10 @@ func (s *dbSuite) TestSetCloudCredentialUpdate(c *qt.C) {
 	c.Assert(s.Database.DB.Create(&cloud).Error, qt.IsNil)
 
 	cred := dbmodel.CloudCredential{
-		Name:          "test-cred",
-		CloudName:     cloud.Name,
-		OwnerUsername: u.Name,
-		AuthType:      "empty",
+		Name:              "test-cred",
+		CloudName:         cloud.Name,
+		OwnerIdentityName: u.Name,
+		AuthType:          "empty",
 	}
 	err = s.Database.SetCloudCredential(context.Background(), &cred)
 	c.Assert(err, qt.Equals, nil)
@@ -135,9 +135,9 @@ func (s *dbSuite) TestSetCloudCredentialUpdate(c *qt.C) {
 	c.Assert(err, qt.Equals, nil)
 
 	dbCred := dbmodel.CloudCredential{
-		CloudName:     cloud.Name,
-		OwnerUsername: u.Name,
-		Name:          cred.Name,
+		CloudName:         cloud.Name,
+		OwnerIdentityName: u.Name,
+		Name:              cred.Name,
 	}
 	err = s.Database.GetCloudCredential(context.Background(), &dbCred)
 	c.Assert(err, qt.Equals, nil)
@@ -180,10 +180,10 @@ func (s *dbSuite) TestGetCloudCredential(c *qt.C) {
 	c.Assert(s.Database.DB.Create(&cloud).Error, qt.IsNil)
 
 	cred := dbmodel.CloudCredential{
-		Name:          "test-cred",
-		CloudName:     cloud.Name,
-		OwnerUsername: u.Name,
-		AuthType:      "empty",
+		Name:              "test-cred",
+		CloudName:         cloud.Name,
+		OwnerIdentityName: u.Name,
+		AuthType:          "empty",
 	}
 	cred.Cloud.Regions = nil
 	err = s.Database.SetCloudCredential(context.Background(), &cred)
@@ -193,9 +193,9 @@ func (s *dbSuite) TestGetCloudCredential(c *qt.C) {
 	cred.Cloud.Regions = nil
 
 	dbCred := dbmodel.CloudCredential{
-		CloudName:     cloud.Name,
-		OwnerUsername: u.Name,
-		Name:          cred.Name,
+		CloudName:         cloud.Name,
+		OwnerIdentityName: u.Name,
+		Name:              cred.Name,
 	}
 	err = s.Database.GetCloudCredential(context.Background(), &dbCred)
 	c.Assert(err, qt.Equals, nil)

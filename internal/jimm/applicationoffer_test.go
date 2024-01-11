@@ -122,10 +122,10 @@ var initializeEnvironment = func(c *qt.C, ctx context.Context, db *db.Database, 
 	c.Assert(err, qt.IsNil)
 
 	cred := dbmodel.CloudCredential{
-		Name:          "test-credential-1",
-		CloudName:     cloud.Name,
-		OwnerUsername: u.Name,
-		AuthType:      "empty",
+		Name:              "test-credential-1",
+		CloudName:         cloud.Name,
+		OwnerIdentityName: u.Name,
+		AuthType:          "empty",
 	}
 	err = db.SetCloudCredential(ctx, &cred)
 	c.Assert(err, qt.IsNil)
@@ -612,10 +612,10 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	cred := dbmodel.CloudCredential{
-		Name:          "test-credential-1",
-		CloudName:     cloud.Name,
-		OwnerUsername: u.Name,
-		AuthType:      "empty",
+		Name:              "test-credential-1",
+		CloudName:         cloud.Name,
+		OwnerIdentityName: u.Name,
+		AuthType:          "empty",
 	}
 	err = db.SetCloudCredential(ctx, &cred)
 	c.Assert(err, qt.IsNil)
@@ -980,10 +980,10 @@ func TestGetApplicationOffer(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	cred := dbmodel.CloudCredential{
-		Name:          "test-credential-1",
-		CloudName:     cloud.Name,
-		OwnerUsername: u.Name,
-		AuthType:      "empty",
+		Name:              "test-credential-1",
+		CloudName:         cloud.Name,
+		OwnerIdentityName: u.Name,
+		AuthType:          "empty",
 	}
 	err = j.Database.SetCloudCredential(ctx, &cred)
 	c.Assert(err, qt.IsNil)
@@ -1276,10 +1276,10 @@ func TestOffer(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 
 			cred := dbmodel.CloudCredential{
-				Name:          "test-credential-1",
-				CloudName:     cloud.Name,
-				OwnerUsername: u.Name,
-				AuthType:      "empty",
+				Name:              "test-credential-1",
+				CloudName:         cloud.Name,
+				OwnerIdentityName: u.Name,
+				AuthType:          "empty",
 			}
 			err = db.SetCloudCredential(ctx, &cred)
 			c.Assert(err, qt.IsNil)
@@ -1398,10 +1398,10 @@ func TestOffer(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 
 			cred := dbmodel.CloudCredential{
-				Name:          "test-credential-1",
-				CloudName:     cloud.Name,
-				OwnerUsername: u.Name,
-				AuthType:      "empty",
+				Name:              "test-credential-1",
+				CloudName:         cloud.Name,
+				OwnerIdentityName: u.Name,
+				AuthType:          "empty",
 			}
 			err = db.SetCloudCredential(ctx, &cred)
 			c.Assert(err, qt.IsNil)
@@ -1519,10 +1519,10 @@ func TestOffer(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 
 			cred := dbmodel.CloudCredential{
-				Name:          "test-credential-1",
-				CloudName:     cloud.Name,
-				OwnerUsername: u.Name,
-				AuthType:      "empty",
+				Name:              "test-credential-1",
+				CloudName:         cloud.Name,
+				OwnerIdentityName: u.Name,
+				AuthType:          "empty",
 			}
 			err = db.SetCloudCredential(ctx, &cred)
 			c.Assert(err, qt.IsNil)
@@ -1613,10 +1613,10 @@ func TestOffer(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 
 			cred := dbmodel.CloudCredential{
-				Name:          "test-credential-1",
-				CloudName:     cloud.Name,
-				OwnerUsername: u.Name,
-				AuthType:      "empty",
+				Name:              "test-credential-1",
+				CloudName:         cloud.Name,
+				OwnerIdentityName: u.Name,
+				AuthType:          "empty",
 			}
 			err = db.SetCloudCredential(ctx, &cred)
 			c.Assert(err, qt.IsNil)
@@ -1701,10 +1701,10 @@ func TestOffer(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 
 			cred := dbmodel.CloudCredential{
-				Name:          "test-credential-1",
-				CloudName:     cloud.Name,
-				OwnerUsername: u.Name,
-				AuthType:      "empty",
+				Name:              "test-credential-1",
+				CloudName:         cloud.Name,
+				OwnerIdentityName: u.Name,
+				AuthType:          "empty",
 			}
 			err = db.SetCloudCredential(ctx, &cred)
 			c.Assert(err, qt.IsNil)
@@ -1789,10 +1789,10 @@ func TestOffer(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 
 			cred := dbmodel.CloudCredential{
-				Name:          "test-credential-1",
-				CloudName:     cloud.Name,
-				OwnerUsername: u.Name,
-				AuthType:      "empty",
+				Name:              "test-credential-1",
+				CloudName:         cloud.Name,
+				OwnerIdentityName: u.Name,
+				AuthType:          "empty",
 			}
 			err = db.SetCloudCredential(ctx, &cred)
 			c.Assert(err, qt.IsNil)
@@ -1919,10 +1919,10 @@ func TestOfferAssertOpenFGARelationsExist(t *testing.T) {
 		c.Assert(err, qt.IsNil)
 
 		cred := dbmodel.CloudCredential{
-			Name:          "test-credential-1",
-			CloudName:     cloud.Name,
-			OwnerUsername: u.Name,
-			AuthType:      "empty",
+			Name:              "test-credential-1",
+			CloudName:         cloud.Name,
+			OwnerIdentityName: u.Name,
+			AuthType:          "empty",
 		}
 		err = db.SetCloudCredential(ctx, &cred)
 		c.Assert(err, qt.IsNil)

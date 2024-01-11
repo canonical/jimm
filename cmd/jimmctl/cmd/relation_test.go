@@ -300,10 +300,10 @@ func initializeEnvironment(c *gc.C, ctx context.Context, db *db.Database, u dbmo
 	env.controllers = []dbmodel.Controller{controller}
 
 	cred := dbmodel.CloudCredential{
-		Name:          "test-credential-1",
-		CloudName:     cloud.Name,
-		OwnerUsername: u.Name,
-		AuthType:      "empty",
+		Name:              "test-credential-1",
+		CloudName:         cloud.Name,
+		OwnerIdentityName: u.Name,
+		AuthType:          "empty",
 	}
 	err = db.SetCloudCredential(ctx, &cred)
 	c.Assert(err, gc.Equals, nil)
@@ -476,10 +476,10 @@ func (s *relationSuite) TestCheckRelationViaSuperuser(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	cred := dbmodel.CloudCredential{
-		Name:          petname.Generate(2, "-"),
-		CloudName:     cloud.Name,
-		OwnerUsername: u.Name,
-		AuthType:      "empty",
+		Name:              petname.Generate(2, "-"),
+		CloudName:         cloud.Name,
+		OwnerIdentityName: u.Name,
+		AuthType:          "empty",
 	}
 	err = db.SetCloudCredential(ctx, &cred)
 	c.Assert(err, gc.IsNil)

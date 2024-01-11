@@ -84,10 +84,10 @@ func main() {
 	}
 
 	cred := dbmodel.CloudCredential{
-		Name:          petname.Generate(2, "-"),
-		CloudName:     cloud.Name,
-		OwnerUsername: u.Name,
-		AuthType:      "empty",
+		Name:              petname.Generate(2, "-"),
+		CloudName:         cloud.Name,
+		OwnerIdentityName: u.Name,
+		AuthType:          "empty",
 	}
 	if err = db.SetCloudCredential(ctx, &cred); err != nil {
 		fmt.Println("failed to add cloud credential to db ", err)

@@ -104,17 +104,17 @@ func TestUserCloudCredentials(t *testing.T) {
 	err := db.Model(u).Association("CloudCredentials").Find(&creds)
 	c.Assert(err, qt.IsNil)
 	c.Check(creds, qt.DeepEquals, []dbmodel.CloudCredential{{
-		Model:         cred1.Model,
-		Name:          cred1.Name,
-		CloudName:     cred1.CloudName,
-		OwnerUsername: cred1.OwnerUsername,
-		AuthType:      cred1.AuthType,
+		Model:             cred1.Model,
+		Name:              cred1.Name,
+		CloudName:         cred1.CloudName,
+		OwnerIdentityName: cred1.OwnerIdentityName,
+		AuthType:          cred1.AuthType,
 	}, {
-		Model:         cred2.Model,
-		Name:          cred2.Name,
-		CloudName:     cred2.CloudName,
-		OwnerUsername: cred2.OwnerUsername,
-		AuthType:      cred2.AuthType,
+		Model:             cred2.Model,
+		Name:              cred2.Name,
+		CloudName:         cred2.CloudName,
+		OwnerIdentityName: cred2.OwnerIdentityName,
+		AuthType:          cred2.AuthType,
 	}})
 }
 

@@ -247,9 +247,9 @@ func (b *modelBuilder) WithCloudCredential(credentialTag names.CloudCredentialTa
 		return b
 	}
 	credential := dbmodel.CloudCredential{
-		Name:          credentialTag.Name(),
-		CloudName:     credentialTag.Cloud().Id(),
-		OwnerUsername: credentialTag.Owner().Id(),
+		Name:              credentialTag.Name(),
+		CloudName:         credentialTag.Cloud().Id(),
+		OwnerIdentityName: credentialTag.Owner().Id(),
 	}
 	err := b.jimm.Database.GetCloudCredential(b.ctx, &credential)
 	if err != nil {
