@@ -38,7 +38,7 @@ func TestSetUserModelDefaults(t *testing.T) {
 		about: "defaults do not exist yet - defaults created",
 		setup: func(c *qt.C, j *jimm.JIMM) testConfig {
 			user := dbmodel.Identity{
-				Username: "bob@external",
+				Name: "bob@external",
 			}
 			c.Assert(j.Database.DB.Create(&user).Error, qt.IsNil)
 
@@ -48,7 +48,7 @@ func TestSetUserModelDefaults(t *testing.T) {
 			}
 
 			expectedDefaults := dbmodel.UserModelDefaults{
-				Username: user.Username,
+				Username: user.Name,
 				User:     user,
 				Defaults: defaults,
 			}
@@ -63,12 +63,12 @@ func TestSetUserModelDefaults(t *testing.T) {
 		about: "defaults already exist - defaults updated",
 		setup: func(c *qt.C, j *jimm.JIMM) testConfig {
 			user := dbmodel.Identity{
-				Username: "bob@external",
+				Name: "bob@external",
 			}
 			c.Assert(j.Database.DB.Create(&user).Error, qt.IsNil)
 
 			j.Database.SetUserModelDefaults(ctx, &dbmodel.UserModelDefaults{
-				Username: user.Username,
+				Username: user.Name,
 				User:     user,
 				Defaults: map[string]interface{}{
 					"key1": float64(17),
@@ -83,7 +83,7 @@ func TestSetUserModelDefaults(t *testing.T) {
 			}
 
 			expectedDefaults := dbmodel.UserModelDefaults{
-				Username: user.Username,
+				Username: user.Name,
 				User:     user,
 				Defaults: defaults,
 			}
@@ -98,7 +98,7 @@ func TestSetUserModelDefaults(t *testing.T) {
 		about: "cannot set agent-version",
 		setup: func(c *qt.C, j *jimm.JIMM) testConfig {
 			user := dbmodel.Identity{
-				Username: "bob@external",
+				Name: "bob@external",
 			}
 			c.Assert(j.Database.DB.Create(&user).Error, qt.IsNil)
 
@@ -164,7 +164,7 @@ func TestUserModelDefaults(t *testing.T) {
 		about: "defaults do not exist",
 		setup: func(c *qt.C, j *jimm.JIMM) testConfig {
 			user := dbmodel.Identity{
-				Username: "bob@external",
+				Name: "bob@external",
 			}
 			c.Assert(j.Database.DB.Create(&user).Error, qt.IsNil)
 
@@ -177,12 +177,12 @@ func TestUserModelDefaults(t *testing.T) {
 		about: "defaults exist",
 		setup: func(c *qt.C, j *jimm.JIMM) testConfig {
 			user := dbmodel.Identity{
-				Username: "bob@external",
+				Name: "bob@external",
 			}
 			c.Assert(j.Database.DB.Create(&user).Error, qt.IsNil)
 
 			j.Database.SetUserModelDefaults(ctx, &dbmodel.UserModelDefaults{
-				Username: user.Username,
+				Username: user.Name,
 				User:     user,
 				Defaults: map[string]interface{}{
 					"key1": float64(42),

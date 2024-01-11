@@ -42,22 +42,22 @@ func TestGetCloud(t *testing.T) {
 
 	alice := openfga.NewUser(
 		&dbmodel.Identity{
-			Username: "alice@external",
+			Name: "alice@external",
 		},
 		client,
 	)
 	bob := openfga.NewUser(
 		&dbmodel.Identity{
-			Username: "bob@external",
+			Name: "bob@external",
 		},
 		client,
 	)
-	charlie := openfga.NewUser(&dbmodel.Identity{Username: "charlie@external"}, client)
+	charlie := openfga.NewUser(&dbmodel.Identity{Name: "charlie@external"}, client)
 
 	// daphne is a jimm administrator
 	daphne := openfga.NewUser(
 		&dbmodel.Identity{
-			Username: "daphne@external",
+			Name: "daphne@external",
 		},
 		client,
 	)
@@ -70,7 +70,7 @@ func TestGetCloud(t *testing.T) {
 
 	everyone := openfga.NewUser(
 		&dbmodel.Identity{
-			Username: ofganames.EveryoneUser,
+			Name: ofganames.EveryoneUser,
 		},
 		client,
 	)
@@ -169,26 +169,26 @@ func TestForEachCloud(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	alice := openfga.NewUser(
-		&dbmodel.Identity{Username: "alice@external"},
+		&dbmodel.Identity{Name: "alice@external"},
 		client,
 	)
 	bob := openfga.NewUser(
-		&dbmodel.Identity{Username: "bob@external"},
+		&dbmodel.Identity{Name: "bob@external"},
 		client,
 	)
 	charlie := openfga.NewUser(
-		&dbmodel.Identity{Username: "charlie@external"},
+		&dbmodel.Identity{Name: "charlie@external"},
 		client,
 	)
 	daphne := openfga.NewUser(
-		&dbmodel.Identity{Username: "daphne@external"},
+		&dbmodel.Identity{Name: "daphne@external"},
 		client,
 	)
 	daphne.JimmAdmin = true
 
 	everyone := openfga.NewUser(
 		&dbmodel.Identity{
-			Username: ofganames.EveryoneUser,
+			Name: ofganames.EveryoneUser,
 		},
 		client,
 	)

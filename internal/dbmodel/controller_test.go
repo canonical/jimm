@@ -92,7 +92,7 @@ func TestControllerModels(t *testing.T) {
 	c.Assert(db.Create(&m1).Error, qt.IsNil)
 
 	u2 := dbmodel.Identity{
-		Username: "charlie@external",
+		Name: "charlie@external",
 	}
 	c.Assert(db.Create(&u2).Error, qt.IsNil)
 

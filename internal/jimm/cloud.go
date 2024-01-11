@@ -27,7 +27,7 @@ func (j *JIMM) GetUserCloudAccess(ctx context.Context, user *openfga.User, cloud
 		everyoneTag := names.NewUserTag(ofganames.EveryoneUser)
 		everyone := openfga.NewUser(
 			&dbmodel.Identity{
-				Username: everyoneTag.Id(),
+				Name: everyoneTag.Id(),
 			},
 			j.OpenFGAClient,
 		)
@@ -100,7 +100,7 @@ func (j *JIMM) ForEachUserCloud(ctx context.Context, user *openfga.User, f func(
 
 	// Also include "public" clouds
 	everyoneDB := dbmodel.Identity{
-		Username: ofganames.EveryoneUser,
+		Name: ofganames.EveryoneUser,
 	}
 	everyone := openfga.NewUser(&everyoneDB, j.OpenFGAClient)
 
@@ -396,7 +396,7 @@ func (j *JIMM) AddHostedCloud(ctx context.Context, user *openfga.User, tag names
 		zapctx.Error(
 			ctx,
 			"failed to add user as cloud admin",
-			zap.String("user", user.Username),
+			zap.String("user", user.Name),
 			zap.String("cloud", dbCloud.ResourceTag().Id()),
 			zap.Error(err),
 		)

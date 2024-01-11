@@ -252,7 +252,7 @@ func TestOpenFGA(t *testing.T) {
 	// assert controller admins have been created in openfga
 	for _, username := range []string{"alice", "eve"} {
 		user := openfga.NewUser(
-			&dbmodel.Identity{Username: username},
+			&dbmodel.Identity{Name: username},
 			client,
 		)
 		allowed, err := openfga.IsAdministrator(context.Background(), user, names.NewControllerTag(p.ControllerUUID))
@@ -297,7 +297,7 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 		Name: "test-application-offer",
 	}
 	user := dbmodel.Identity{
-		Username: "alice@external",
+		Name: "alice@external",
 	}
 
 	ctx := context.Background()

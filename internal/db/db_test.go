@@ -62,7 +62,7 @@ func (s *dbSuite) TestTransaction(c *qt.C) {
 
 	err = s.Database.Transaction(func(d *db.Database) error {
 		c.Check(d, qt.Not(qt.Equals), s.Database)
-		return d.GetUser(context.Background(), &dbmodel.Identity{Username: "bob@external"})
+		return d.GetUser(context.Background(), &dbmodel.Identity{Name: "bob@external"})
 	})
 	c.Assert(err, qt.IsNil)
 

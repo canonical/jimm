@@ -55,7 +55,7 @@ func (s *userTestSuite) TestIsAdministrator(c *gc.C) {
 
 	u := openfga.NewUser(
 		&dbmodel.Identity{
-			Username: user.Id(),
+			Name: user.Id(),
 		},
 		s.ofgaClient,
 	)
@@ -102,9 +102,9 @@ func (s *userTestSuite) TestModelAccess(c *gc.C) {
 	err = s.ofgaClient.AddRelation(ctx, tuples...)
 	c.Assert(err, gc.IsNil)
 
-	adamUser := openfga.NewUser(&dbmodel.Identity{Username: "adam"}, s.ofgaClient)
-	eveUser := openfga.NewUser(&dbmodel.Identity{Username: eve.Id()}, s.ofgaClient)
-	aliceUser := openfga.NewUser(&dbmodel.Identity{Username: alice.Id()}, s.ofgaClient)
+	adamUser := openfga.NewUser(&dbmodel.Identity{Name: "adam"}, s.ofgaClient)
+	eveUser := openfga.NewUser(&dbmodel.Identity{Name: eve.Id()}, s.ofgaClient)
+	aliceUser := openfga.NewUser(&dbmodel.Identity{Name: alice.Id()}, s.ofgaClient)
 
 	relation := eveUser.GetModelAccess(ctx, model)
 	c.Assert(relation, gc.DeepEquals, ofganames.AdministratorRelation)
@@ -137,9 +137,9 @@ func (s *userTestSuite) TestSetModelAccess(c *gc.C) {
 	eve := names.NewUserTag("eve")
 	alice := names.NewUserTag("alice")
 
-	adamUser := openfga.NewUser(&dbmodel.Identity{Username: "adam"}, s.ofgaClient)
-	eveUser := openfga.NewUser(&dbmodel.Identity{Username: eve.Id()}, s.ofgaClient)
-	aliceUser := openfga.NewUser(&dbmodel.Identity{Username: alice.Id()}, s.ofgaClient)
+	adamUser := openfga.NewUser(&dbmodel.Identity{Name: "adam"}, s.ofgaClient)
+	eveUser := openfga.NewUser(&dbmodel.Identity{Name: eve.Id()}, s.ofgaClient)
+	aliceUser := openfga.NewUser(&dbmodel.Identity{Name: alice.Id()}, s.ofgaClient)
 
 	err = eveUser.SetModelAccess(ctx, model, ofganames.AdministratorRelation)
 	c.Assert(err, gc.IsNil)
@@ -197,9 +197,9 @@ func (s *userTestSuite) TestCloudAccess(c *gc.C) {
 	err = s.ofgaClient.AddRelation(ctx, tuples...)
 	c.Assert(err, gc.IsNil)
 
-	adamUser := openfga.NewUser(&dbmodel.Identity{Username: "adam"}, s.ofgaClient)
-	eveUser := openfga.NewUser(&dbmodel.Identity{Username: eve.Id()}, s.ofgaClient)
-	aliceUser := openfga.NewUser(&dbmodel.Identity{Username: alice.Id()}, s.ofgaClient)
+	adamUser := openfga.NewUser(&dbmodel.Identity{Name: "adam"}, s.ofgaClient)
+	eveUser := openfga.NewUser(&dbmodel.Identity{Name: eve.Id()}, s.ofgaClient)
+	aliceUser := openfga.NewUser(&dbmodel.Identity{Name: alice.Id()}, s.ofgaClient)
 
 	relation := eveUser.GetCloudAccess(ctx, cloud)
 	c.Assert(relation, gc.DeepEquals, ofganames.AdministratorRelation)
@@ -220,9 +220,9 @@ func (s *userTestSuite) TestSetCloudAccess(c *gc.C) {
 	eve := names.NewUserTag("eve")
 	alice := names.NewUserTag("alice")
 
-	adamUser := openfga.NewUser(&dbmodel.Identity{Username: "adam"}, s.ofgaClient)
-	eveUser := openfga.NewUser(&dbmodel.Identity{Username: eve.Id()}, s.ofgaClient)
-	aliceUser := openfga.NewUser(&dbmodel.Identity{Username: alice.Id()}, s.ofgaClient)
+	adamUser := openfga.NewUser(&dbmodel.Identity{Name: "adam"}, s.ofgaClient)
+	eveUser := openfga.NewUser(&dbmodel.Identity{Name: eve.Id()}, s.ofgaClient)
+	aliceUser := openfga.NewUser(&dbmodel.Identity{Name: alice.Id()}, s.ofgaClient)
 
 	err = eveUser.SetCloudAccess(ctx, cloud, ofganames.AdministratorRelation)
 	c.Assert(err, gc.IsNil)
@@ -273,9 +273,9 @@ func (s *userTestSuite) TestControllerAccess(c *gc.C) {
 	err = s.ofgaClient.AddRelation(ctx, tuples...)
 	c.Assert(err, gc.IsNil)
 
-	adamUser := openfga.NewUser(&dbmodel.Identity{Username: "adam"}, s.ofgaClient)
-	eveUser := openfga.NewUser(&dbmodel.Identity{Username: eve.Id()}, s.ofgaClient)
-	aliceUser := openfga.NewUser(&dbmodel.Identity{Username: alice.Id()}, s.ofgaClient)
+	adamUser := openfga.NewUser(&dbmodel.Identity{Name: "adam"}, s.ofgaClient)
+	eveUser := openfga.NewUser(&dbmodel.Identity{Name: eve.Id()}, s.ofgaClient)
+	aliceUser := openfga.NewUser(&dbmodel.Identity{Name: alice.Id()}, s.ofgaClient)
 
 	relation := eveUser.GetControllerAccess(ctx, controller)
 	c.Assert(relation, gc.DeepEquals, ofganames.AdministratorRelation)
@@ -302,9 +302,9 @@ func (s *userTestSuite) TestSetControllerAccess(c *gc.C) {
 	eve := names.NewUserTag("eve")
 	alice := names.NewUserTag("alice")
 
-	adamUser := openfga.NewUser(&dbmodel.Identity{Username: "adam"}, s.ofgaClient)
-	eveUser := openfga.NewUser(&dbmodel.Identity{Username: eve.Id()}, s.ofgaClient)
-	aliceUser := openfga.NewUser(&dbmodel.Identity{Username: alice.Id()}, s.ofgaClient)
+	adamUser := openfga.NewUser(&dbmodel.Identity{Name: "adam"}, s.ofgaClient)
+	eveUser := openfga.NewUser(&dbmodel.Identity{Name: eve.Id()}, s.ofgaClient)
+	aliceUser := openfga.NewUser(&dbmodel.Identity{Name: alice.Id()}, s.ofgaClient)
 
 	err = eveUser.SetControllerAccess(ctx, controller, ofganames.AdministratorRelation)
 	c.Assert(err, gc.IsNil)
@@ -339,7 +339,7 @@ func (s *userTestSuite) TestUnsetAuditLogViewerAccess(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	controller := names.NewControllerTag(controllerUUID.String())
 
-	aliceUser := openfga.NewUser(&dbmodel.Identity{Username: "alice"}, s.ofgaClient)
+	aliceUser := openfga.NewUser(&dbmodel.Identity{Name: "alice"}, s.ofgaClient)
 
 	tuples := []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(aliceUser.Identity.ResourceTag()),
@@ -425,7 +425,7 @@ func (s *userTestSuite) TestListRelatedUsers(c *gc.C) {
 	err = s.ofgaClient.AddRelation(ctx, tuples...)
 	c.Assert(err, gc.IsNil)
 
-	eveUser := openfga.NewUser(&dbmodel.Identity{Username: "eve"}, s.ofgaClient)
+	eveUser := openfga.NewUser(&dbmodel.Identity{Name: "eve"}, s.ofgaClient)
 	isAdministrator, err := openfga.IsAdministrator(ctx, eveUser, offer)
 	c.Assert(err, gc.IsNil)
 	c.Assert(isAdministrator, gc.Equals, true)
@@ -473,7 +473,7 @@ func (s *userTestSuite) TestListModels(c *gc.C) {
 	err = s.ofgaClient.AddRelation(ctx, tuples...)
 	c.Assert(err, gc.IsNil)
 
-	adamUser := openfga.NewUser(&dbmodel.Identity{Username: adam.Name()}, s.ofgaClient)
+	adamUser := openfga.NewUser(&dbmodel.Identity{Name: adam.Name()}, s.ofgaClient)
 	modelUUIDs, err := adamUser.ListModels(ctx, ofganames.ReaderRelation)
 	c.Assert(err, gc.IsNil)
 	wantUUIDs := []string{model1UUID.String(), model2UUID.String(), model3UUID.String()}
@@ -515,7 +515,7 @@ func (s *userTestSuite) TestListApplicationOffers(c *gc.C) {
 	err = s.ofgaClient.AddRelation(ctx, tuples...)
 	c.Assert(err, gc.IsNil)
 
-	adamUser := openfga.NewUser(&dbmodel.Identity{Username: adam.Name()}, s.ofgaClient)
+	adamUser := openfga.NewUser(&dbmodel.Identity{Name: adam.Name()}, s.ofgaClient)
 	offerUUIDs, err := adamUser.ListApplicationOffers(ctx, ofganames.ReaderRelation)
 	c.Assert(err, gc.IsNil)
 	wantUUIDs := []string{offer1UUID.String(), offer2UUID.String(), offer3UUID.String()}

@@ -54,7 +54,7 @@ func (j *JIMM) SetModelDefaults(ctx context.Context, user *dbmodel.Identity, clo
 		}
 	}
 	err = j.Database.SetCloudDefaults(ctx, &dbmodel.CloudDefaults{
-		Username: user.Username,
+		Username: user.Name,
 		CloudID:  cloud.ID,
 		Region:   region,
 		Defaults: configs,
@@ -70,7 +70,7 @@ func (j *JIMM) UnsetModelDefaults(ctx context.Context, user *dbmodel.Identity, c
 	const op = errors.Op("jimm.UnsetModelDefaults")
 
 	defaults := dbmodel.CloudDefaults{
-		Username: user.Username,
+		Username: user.Name,
 		Cloud: dbmodel.Cloud{
 			Name: cloudTag.Id(),
 		},

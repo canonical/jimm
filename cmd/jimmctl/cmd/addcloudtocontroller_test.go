@@ -33,7 +33,7 @@ func (s *addCloudToControllerSuite) SetUpTest(c *gc.C) {
 	// We add user bob, who is a JIMM administrator.
 	err := s.JIMM.Database.UpdateUser(context.Background(), &dbmodel.Identity{
 		DisplayName: "Bob",
-		Username:    "bob@external",
+		Name:        "bob@external",
 	})
 	c.Assert(err, gc.IsNil)
 
@@ -52,7 +52,7 @@ func (s *addCloudToControllerSuite) SetUpTest(c *gc.C) {
 	// test-cloud.
 	bob := openfga.NewUser(
 		&dbmodel.Identity{
-			Username: "bob@external",
+			Name: "bob@external",
 		},
 		s.JIMM.OpenFGAClient,
 	)

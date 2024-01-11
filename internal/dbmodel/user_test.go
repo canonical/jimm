@@ -24,7 +24,7 @@ func TestUser(t *testing.T) {
 	c.Check(result.Error, qt.Equals, gorm.ErrRecordNotFound)
 
 	u1 := dbmodel.Identity{
-		Username:    "bob@external",
+		Name:        "bob@external",
 		DisplayName: "bob",
 	}
 	result = db.Create(&u1)
@@ -46,7 +46,7 @@ func TestUser(t *testing.T) {
 	c.Check(u3, qt.DeepEquals, u2)
 
 	u4 := dbmodel.Identity{
-		Username:    "bob@external",
+		Name:        "bob@external",
 		DisplayName: "bob",
 	}
 	result = db.Create(&u4)
@@ -57,7 +57,7 @@ func TestUserTag(t *testing.T) {
 	c := qt.New(t)
 
 	u := dbmodel.Identity{
-		Username: "bob@external",
+		Name: "bob@external",
 	}
 	tag := u.Tag()
 	c.Check(tag.String(), qt.Equals, "user-bob@external")
@@ -77,7 +77,7 @@ func TestUserCloudCredentials(t *testing.T) {
 	c.Assert(result.Error, qt.IsNil)
 
 	u := dbmodel.Identity{
-		Username: "bob@external",
+		Name: "bob@external",
 	}
 	result = db.Create(&u)
 	c.Assert(result.Error, qt.IsNil)
@@ -125,7 +125,7 @@ func TestUserToJujuUserInfo(t *testing.T) {
 		Model: gorm.Model{
 			CreatedAt: time.Now(),
 		},
-		Username:    "alice@external",
+		Name:        "alice@external",
 		DisplayName: "Alice",
 	}
 	ui := u.ToJujuUserInfo()

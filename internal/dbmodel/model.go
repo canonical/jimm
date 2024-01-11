@@ -104,7 +104,7 @@ func (m *Model) SetTag(t names.ModelTag) {
 
 // FromModelUpdate updates the model from the given ModelUpdate.
 func (m *Model) SwitchOwner(u *Identity) {
-	m.OwnerUsername = u.Username
+	m.OwnerUsername = u.Name
 	m.Owner = *u
 }
 
@@ -140,7 +140,7 @@ func (m *Model) FromJujuModelInfo(info jujuparams.ModelInfo) error {
 		}
 		m.CloudCredential.Name = cct.Name()
 		m.CloudCredential.CloudName = cct.Cloud().Id()
-		m.CloudCredential.Owner.Username = cct.Owner().Id()
+		m.CloudCredential.Owner.Name = cct.Owner().Id()
 	}
 
 	if info.SLA != nil {

@@ -143,7 +143,7 @@ func (d *Database) ModelDefaultsForCloud(ctx context.Context, user *dbmodel.Iden
 	}
 	db := d.DB.WithContext(ctx)
 
-	db = db.Where("username = ?", user.Username)
+	db = db.Where("username = ?", user.Name)
 	db = db.Joins("JOIN clouds ON clouds.id = cloud_defaults.cloud_id")
 	db = db.Where("clouds.name = ?", cloud.Id())
 

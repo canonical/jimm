@@ -23,7 +23,7 @@ func (s *dbSuite) TestModelDefaults(c *qt.C) {
 	c.Assert(err, qt.Equals, nil)
 
 	u := dbmodel.Identity{
-		Username: "bob@external",
+		Name: "bob@external",
 	}
 	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
 
@@ -48,7 +48,7 @@ func (s *dbSuite) TestModelDefaults(c *qt.C) {
 	cloud := cloud1
 	cloud.Regions = nil
 	defaults := dbmodel.CloudDefaults{
-		Username: u.Username,
+		Username: u.Name,
 		User:     u,
 		CloudID:  cloud.ID,
 		Cloud:    cloud,
@@ -81,7 +81,7 @@ func (s *dbSuite) TestModelDefaults(c *qt.C) {
 	})
 
 	dbDefaults := dbmodel.CloudDefaults{
-		Username: u.Username,
+		Username: u.Name,
 		CloudID:  cloud2.ID,
 		Cloud:    cloud2,
 		Region:   cloud2.Regions[0].Name,
@@ -91,7 +91,7 @@ func (s *dbSuite) TestModelDefaults(c *qt.C) {
 	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
 	dbDefaults = dbmodel.CloudDefaults{
-		Username: u.Username,
+		Username: u.Name,
 		CloudID:  cloud1.ID,
 		Cloud:    cloud1,
 		Region:   cloud1.Regions[0].Name,
@@ -106,7 +106,7 @@ func (s *dbSuite) TestModelDefaults(c *qt.C) {
 	err = s.Database.CloudDefaults(ctx, &dbDefaults)
 	c.Assert(err, qt.Equals, nil)
 	c.Assert(dbDefaults, qt.CmpEquals(cmpopts.IgnoreTypes([]dbmodel.CloudRegion{}, gorm.Model{})), dbmodel.CloudDefaults{
-		Username: u.Username,
+		Username: u.Name,
 		User:     u,
 		CloudID:  cloud1.ID,
 		Cloud:    cloud1,
@@ -117,7 +117,7 @@ func (s *dbSuite) TestModelDefaults(c *qt.C) {
 	})
 
 	err = s.Database.UnsetCloudDefaults(ctx, &dbmodel.CloudDefaults{
-		Username: u.Username,
+		Username: u.Name,
 		CloudID:  cloud2.ID,
 		Region:   "no-such-region",
 	}, []string{"key1", "key2", "unknown-key"})

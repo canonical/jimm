@@ -72,7 +72,7 @@ func (a JujuAuthenticator) Authenticate(ctx context.Context, req *jujuparams.Log
 		ut = ut.WithDomain("external")
 	}
 	u := &dbmodel.Identity{
-		Username:    ut.Id(),
+		Name:        ut.Id(),
 		DisplayName: ut.Name(),
 	}
 	// Note: Previously here we would grant a user superuser permission if they were part of

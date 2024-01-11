@@ -238,7 +238,7 @@ users:
 			Valid:  true,
 		},
 		Owner: dbmodel.Identity{
-			Username: "alice@external",
+			Name: "alice@external",
 		},
 		Controller: dbmodel.Controller{
 			Name:        "controller-2",
@@ -352,7 +352,7 @@ users:
 			Valid:  true,
 		},
 		Owner: dbmodel.Identity{
-			Username: "alice@external",
+			Name: "alice@external",
 		},
 		Controller: dbmodel.Controller{
 			Name:        "controller-2",
@@ -445,7 +445,7 @@ users:
 			Valid:  true,
 		},
 		Owner: dbmodel.Identity{
-			Username: "alice@external",
+			Name: "alice@external",
 		},
 		Controller: dbmodel.Controller{
 			Name:        "controller-2",
@@ -545,7 +545,7 @@ users:
 			Valid:  true,
 		},
 		Owner: dbmodel.Identity{
-			Username: "bob@external",
+			Name: "bob@external",
 		},
 		Controller: dbmodel.Controller{
 			Name:        "controller-2",
@@ -946,7 +946,7 @@ func TestAddModel(t *testing.T) {
 					context.Background(),
 					openfga.NewUser(
 						&dbmodel.Identity{
-							Username: ownerId,
+							Name: ownerId,
 						},
 						client,
 					),
@@ -1297,7 +1297,7 @@ func TestModelInfo(t *testing.T) {
 			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
 
 			dbUser := &dbmodel.Identity{
-				Username: test.username,
+				Name: test.username,
 			}
 			user := openfga.NewUser(dbUser, client)
 
@@ -3354,7 +3354,7 @@ var updateModelCredentialTests = []struct {
 			Valid:  true,
 		},
 		Owner: dbmodel.Identity{
-			Username: "alice@external",
+			Name: "alice@external",
 		},
 		Controller: dbmodel.Controller{
 			Name:        "controller-1",

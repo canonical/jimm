@@ -315,7 +315,7 @@ func (b *modelBuilder) CreateDatabaseModel() *modelBuilder {
 	err := b.jimm.Database.AddModel(b.ctx, b.model)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.CodeAlreadyExists {
-			b.err = errors.E(err, fmt.Sprintf("model %s/%s already exists", b.owner.Username, b.name))
+			b.err = errors.E(err, fmt.Sprintf("model %s/%s already exists", b.owner.Name, b.name))
 			return b
 		} else {
 			zapctx.Error(b.ctx, "failed to store model information", zaputil.Error(err))
@@ -339,7 +339,7 @@ func (b *modelBuilder) Cleanup() {
 	// context expiration
 	ctx := context.Background()
 	if derr := b.jimm.Database.DeleteModel(ctx, b.model); derr != nil {
-		zapctx.Error(ctx, "failed to delete model", zap.String("model", b.model.Name), zap.String("owner", b.model.Owner.Username), zaputil.Error(derr))
+		zapctx.Error(ctx, "failed to delete model", zap.String("model", b.model.Name), zap.String("owner", b.model.Owner.Name), zaputil.Error(derr))
 	}
 }
 
@@ -520,7 +520,7 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 	const op = errors.Op("jimm.AddModel")
 
 	owner := &dbmodel.Identity{
-		Username: args.Owner.Id(),
+		Name: args.Owner.Id(),
 	}
 	err = j.Database.GetUser(ctx, owner)
 	if err != nil {
@@ -528,7 +528,7 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 	}
 
 	// Only JIMM admins are able to add models on behalf of other users.
-	if owner.Username != user.Username && !user.JimmAdmin {
+	if owner.Name != user.Name && !user.JimmAdmin {
 		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
@@ -549,7 +549,7 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 	// fetch cloud defaults
 	if args.Cloud != (names.CloudTag{}) {
 		cloudDefaults := dbmodel.CloudDefaults{
-			Username: user.Username,
+			Username: user.Name,
 			Cloud: dbmodel.Cloud{
 				Name: args.Cloud.Id(),
 			},
@@ -585,7 +585,7 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 	// fetch cloud region defaults
 	if args.Cloud != (names.CloudTag{}) && builder.cloudRegion != "" {
 		cloudRegionDefaults := dbmodel.CloudDefaults{
-			Username: user.Username,
+			Username: user.Name,
 			Cloud: dbmodel.Cloud{
 				Name: args.Cloud.Id(),
 			},
@@ -706,8 +706,8 @@ func (j *JIMM) ModelInfo(ctx context.Context, user *openfga.User, mt names.Model
 			// Since we are checking user relations in decreasing level of
 			// access privilege, we want to make sure the user has not
 			// already been recorded with a higher access level.
-			if _, ok := userAccess[u.Username]; !ok {
-				userAccess[u.Username] = ToModelAccessString(relation)
+			if _, ok := userAccess[u.Name]; !ok {
+				userAccess[u.Name] = ToModelAccessString(relation)
 			}
 		}
 	}
@@ -721,7 +721,7 @@ func (j *JIMM) ModelInfo(ctx context.Context, user *openfga.User, mt names.Model
 		if !strings.Contains(username, "@") {
 			continue
 		}
-		if modelAccess == "admin" || username == user.Username || username == ofganames.EveryoneUser {
+		if modelAccess == "admin" || username == user.Name || username == ofganames.EveryoneUser {
 			users = append(users, jujuparams.ModelUserInfo{
 				UserName: username,
 				Access:   jujuparams.UserAccessPermission(access),

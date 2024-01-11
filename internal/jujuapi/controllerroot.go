@@ -147,7 +147,7 @@ func (r *controllerRoot) masquerade(ctx context.Context, userTag string) (*openf
 		return nil, errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
 	user := dbmodel.Identity{
-		Username: ut.Id(),
+		Name: ut.Id(),
 	}
 	if err := r.jimm.DB().GetUser(ctx, &user); err != nil {
 		return nil, err

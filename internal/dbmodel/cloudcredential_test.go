@@ -37,7 +37,7 @@ func TestCloudCredential(t *testing.T) {
 			Name: "test-cloud",
 		},
 		Owner: dbmodel.Identity{
-			Username: "bob@external",
+			Name: "bob@external",
 		},
 		AuthType: "empty",
 		Label:    "test label",
@@ -49,7 +49,7 @@ func TestCloudCredential(t *testing.T) {
 	result := db.Create(&cred)
 	c.Assert(result.Error, qt.IsNil)
 	c.Check(cred.CloudName, qt.Equals, cred.Cloud.Name)
-	c.Check(cred.OwnerUsername, qt.Equals, cred.Owner.Username)
+	c.Check(cred.OwnerUsername, qt.Equals, cred.Owner.Name)
 }
 
 // TestCloudCredentialsCascadeOnDelete As of database version 1.3 (see migrations),
@@ -70,7 +70,7 @@ func TestCloudCredentialsCascadeOnDelete(t *testing.T) {
 		Name:  "test-credential",
 		Cloud: cloud,
 		Owner: dbmodel.Identity{
-			Username: "bob@external",
+			Name: "bob@external",
 		},
 	}
 	result = db.Create(&cred)

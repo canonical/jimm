@@ -89,7 +89,7 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 	err = s.JIMM.Database.Migrate(ctx, false)
 	c.Assert(err, gc.Equals, nil)
 	s.AdminUser = &dbmodel.Identity{
-		Username:  "alice@external",
+		Name:      "alice@external",
 		LastLogin: db.Now(),
 	}
 	err = s.JIMM.Database.GetUser(ctx, s.AdminUser)
@@ -176,7 +176,7 @@ func (s *JIMMSuite) AddController(c *gc.C, name string, info *api.Info) {
 func (s *JIMMSuite) UpdateCloudCredential(c *gc.C, tag names.CloudCredentialTag, cred jujuparams.CloudCredential) {
 	ctx := context.Background()
 	u := dbmodel.Identity{
-		Username: tag.Owner().Id(),
+		Name: tag.Owner().Id(),
 	}
 	user := openfga.NewUser(&u, s.JIMM.OpenFGAClient)
 	err := s.JIMM.Database.GetUser(ctx, &u)
@@ -192,7 +192,7 @@ func (s *JIMMSuite) UpdateCloudCredential(c *gc.C, tag names.CloudCredentialTag,
 func (s *JIMMSuite) AddModel(c *gc.C, owner names.UserTag, name string, cloud names.CloudTag, region string, cred names.CloudCredentialTag) names.ModelTag {
 	ctx := context.Background()
 	u := dbmodel.Identity{
-		Username: owner.Id(),
+		Name: owner.Id(),
 	}
 	err := s.JIMM.Database.GetUser(ctx, &u)
 	c.Assert(err, gc.Equals, nil)

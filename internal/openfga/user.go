@@ -318,7 +318,7 @@ func IsAdministrator[T administratorT](ctx context.Context, u *User, resource T)
 			ctx,
 			"openfga administrator check failed",
 			zap.Error(err),
-			zap.String("user", u.Username),
+			zap.String("user", u.Name),
 			zap.String("resource", resource.String()),
 		)
 		return false, errors.E(err)
@@ -440,7 +440,7 @@ func ListUsersWithAccess[T ofganames.ResourceTagger](ctx context.Context, client
 		if entity.ID == "*" {
 			entity.ID = ofganames.EveryoneUser
 		}
-		users[i] = NewUser(&dbmodel.Identity{Username: entity.ID}, client)
+		users[i] = NewUser(&dbmodel.Identity{Name: entity.ID}, client)
 	}
 	return users, nil
 }

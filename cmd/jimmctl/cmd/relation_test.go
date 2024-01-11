@@ -267,7 +267,7 @@ func initializeEnvironment(c *gc.C, ctx context.Context, db *db.Database, u dbmo
 	env := environment{}
 
 	u1 := dbmodel.Identity{
-		Username: "eve@external",
+		Name: "eve@external",
 	}
 	c.Assert(db.DB.Create(&u1).Error, gc.IsNil)
 
@@ -302,7 +302,7 @@ func initializeEnvironment(c *gc.C, ctx context.Context, db *db.Database, u dbmo
 	cred := dbmodel.CloudCredential{
 		Name:          "test-credential-1",
 		CloudName:     cloud.Name,
-		OwnerUsername: u.Username,
+		OwnerUsername: u.Name,
 		AuthType:      "empty",
 	}
 	err = db.SetCloudCredential(ctx, &cred)
@@ -315,7 +315,7 @@ func initializeEnvironment(c *gc.C, ctx context.Context, db *db.Database, u dbmo
 			String: "acdbf3e5-67e1-42a2-a2dc-64505265c030",
 			Valid:  true,
 		},
-		OwnerUsername:     u.Username,
+		OwnerUsername:     u.Name,
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
 		CloudCredentialID: cred.ID,
@@ -353,11 +353,11 @@ func (s *relationSuite) TestListRelations(c *gc.C) {
 	}
 
 	relations := []apiparams.RelationshipTuple{{
-		Object:       "user-" + env.users[0].Username,
+		Object:       "user-" + env.users[0].Name,
 		Relation:     "member",
 		TargetObject: "group-group-1",
 	}, {
-		Object:       "user-" + env.users[1].Username,
+		Object:       "user-" + env.users[1].Name,
 		Relation:     "member",
 		TargetObject: "group-group-2",
 	}, {
@@ -373,7 +373,7 @@ func (s *relationSuite) TestListRelations(c *gc.C) {
 		Relation:     "administrator",
 		TargetObject: "model-" + env.controllers[0].Name + ":" + env.models[0].OwnerUsername + "/" + env.models[0].Name,
 	}, {
-		Object:       "user-" + env.users[1].Username,
+		Object:       "user-" + env.users[1].Name,
 		Relation:     "administrator",
 		TargetObject: "applicationoffer-" + env.controllers[0].Name + ":" + env.applicationOffers[0].Model.OwnerUsername + "/" + env.applicationOffers[0].Model.Name + "." + env.applicationOffers[0].Name,
 	}}
@@ -449,7 +449,7 @@ func (s *relationSuite) TestCheckRelationViaSuperuser(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	u := dbmodel.Identity{
-		Username: petname.Generate(2, "-") + "@external",
+		Name: petname.Generate(2, "-") + "@external",
 	}
 	c.Assert(db.DB.Create(&u).Error, gc.IsNil)
 
@@ -478,7 +478,7 @@ func (s *relationSuite) TestCheckRelationViaSuperuser(c *gc.C) {
 	cred := dbmodel.CloudCredential{
 		Name:          petname.Generate(2, "-"),
 		CloudName:     cloud.Name,
-		OwnerUsername: u.Username,
+		OwnerUsername: u.Name,
 		AuthType:      "empty",
 	}
 	err = db.SetCloudCredential(ctx, &cred)
@@ -490,7 +490,7 @@ func (s *relationSuite) TestCheckRelationViaSuperuser(c *gc.C) {
 			String: id.String(),
 			Valid:  true,
 		},
-		OwnerUsername:     u.Username,
+		OwnerUsername:     u.Name,
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
 		CloudCredentialID: cred.ID,
@@ -522,8 +522,8 @@ func (s *relationSuite) TestCheckRelationViaSuperuser(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	// Test reader is OK
-	userToCheck := "user-" + u.Username
-	modelToCheck := "model-" + controller.Name + ":" + u.Username + "/" + model.Name
+	userToCheck := "user-" + u.Name
+	modelToCheck := "model-" + controller.Name + ":" + u.Name + "/" + model.Name
 	cmdCtx, err := cmdtesting.RunCommand(
 		c,
 		cmd.NewCheckRelationCommandForTesting(s.ClientStore(), bClient),

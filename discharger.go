@@ -107,7 +107,7 @@ func (md *macaroonDischarger) checkThirdPartyCaveat(ctx context.Context, req *ht
 
 	user := openfga.NewUser(
 		&dbmodel.Identity{
-			Username: userTag.Id(),
+			Name: userTag.Id(),
 		},
 		md.ofgaClient,
 	)
@@ -124,6 +124,6 @@ func (md *macaroonDischarger) checkThirdPartyCaveat(ctx context.Context, req *ht
 			checkers.TimeBeforeCaveat(time.Now().Add(defaultDischargeExpiry)),
 		}, nil
 	}
-	zapctx.Debug(ctx, "macaroon dishcharge denied", zap.String("user", user.Username), zap.String("offer", offerUUID))
+	zapctx.Debug(ctx, "macaroon dishcharge denied", zap.String("user", user.Name), zap.String("offer", offerUUID))
 	return nil, httpbakery.ErrPermissionDenied
 }

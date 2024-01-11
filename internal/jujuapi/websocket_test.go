@@ -88,7 +88,7 @@ func (s *websocketSuite) SetUpTest(c *gc.C) {
 
 	bob := openfga.NewUser(
 		&dbmodel.Identity{
-			Username: "bob@external",
+			Name: "bob@external",
 		},
 		s.OFGAClient,
 	)
@@ -175,7 +175,7 @@ func (s *proxySuite) TestConnectToModel(c *gc.C) {
 func (s *proxySuite) TestConnectToModelAndLogin(c *gc.C) {
 	ctx := context.Background()
 	alice := names.NewUserTag("alice")
-	aliceUser := openfga.NewUser(&dbmodel.Identity{Username: alice.Id()}, s.JIMM.OpenFGAClient)
+	aliceUser := openfga.NewUser(&dbmodel.Identity{Name: alice.Id()}, s.JIMM.OpenFGAClient)
 	err := aliceUser.SetControllerAccess(ctx, s.Model.Controller.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, gc.IsNil)
 	conn, err := s.openNoAssert(c, &api.Info{

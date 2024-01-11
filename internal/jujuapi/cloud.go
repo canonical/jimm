@@ -333,7 +333,7 @@ func (r *controllerRoot) CredentialContents(ctx context.Context, args jujuparams
 
 	results := make([]jujuparams.CredentialContentResult, len(args.Credentials))
 	for i, arg := range args.Credentials {
-		cct := names.NewCloudCredentialTag(fmt.Sprintf("%s/%s/%s", arg.CloudName, r.user.Username, arg.CredentialName))
+		cct := names.NewCloudCredentialTag(fmt.Sprintf("%s/%s/%s", arg.CloudName, r.user.Name, arg.CredentialName))
 		cred, err := r.jimm.GetCloudCredential(ctx, r.user, cct)
 		if err != nil {
 			results[i].Error = mapError(errors.E(op, err))

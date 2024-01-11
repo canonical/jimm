@@ -214,7 +214,7 @@ func TestToJujuModel(t *testing.T) {
 			String: "00000001-0000-0000-0000-0000-000000000001",
 			Valid:  true,
 		},
-		OwnerUsername:   u.Username,
+		OwnerUsername:   u.Name,
 		Owner:           u,
 		Controller:      ctl,
 		CloudRegion:     cl.Regions[0],
@@ -318,7 +318,7 @@ func TestToJujuModelSummary(t *testing.T) {
 // that a model can be created.
 func initModelEnv(c *qt.C, db *gorm.DB) (dbmodel.Cloud, dbmodel.CloudCredential, dbmodel.Controller, dbmodel.Identity) {
 	u := dbmodel.Identity{
-		Username: "bob@external",
+		Name: "bob@external",
 	}
 	c.Assert(db.Create(&u).Error, qt.IsNil)
 
@@ -415,7 +415,7 @@ func TestModelFromJujuModelInfo(t *testing.T) {
 			Name:      "test-cred",
 			CloudName: "test-cloud",
 			Owner: dbmodel.Identity{
-				Username: "bob@external",
+				Name: "bob@external",
 			},
 		},
 		OwnerUsername: "bob@external",

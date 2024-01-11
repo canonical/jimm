@@ -123,7 +123,7 @@ func (s *dbSuite) TestGetControllerWithModels(c *qt.C) {
 		CloudRegion: "test-region",
 	}
 	u := dbmodel.Identity{
-		Username: "bob@external",
+		Name: "bob@external",
 	}
 	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
 

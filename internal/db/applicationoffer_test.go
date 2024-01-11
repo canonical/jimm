@@ -41,7 +41,7 @@ func initTestEnvironment(c *qt.C, db *db.Database) testEnvironment {
 	env := testEnvironment{}
 
 	env.u = dbmodel.Identity{
-		Username: "bob@external",
+		Name: "bob@external",
 	}
 	c.Assert(db.DB.Create(&env.u).Error, qt.IsNil)
 
@@ -242,7 +242,7 @@ func (s *dbSuite) TestFindApplicationOffers(c *qt.C) {
 	c.Assert(err, qt.Equals, nil)
 
 	u := dbmodel.Identity{
-		Username: "alice@external",
+		Name: "alice@external",
 	}
 	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
 

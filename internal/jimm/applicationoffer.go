@@ -142,7 +142,7 @@ func (j *JIMM) Offer(ctx context.Context, user *openfga.User, offer AddApplicati
 	}
 	owner := openfga.NewUser(
 		&dbmodel.Identity{
-			Username: ownerId,
+			Name: ownerId,
 		},
 		j.OpenFGAClient,
 	)
@@ -156,7 +156,7 @@ func (j *JIMM) Offer(ctx context.Context, user *openfga.User, offer AddApplicati
 
 	everyone := openfga.NewUser(
 		&dbmodel.Identity{
-			Username: ofganames.EveryoneUser,
+			Name: ofganames.EveryoneUser,
 		},
 		j.OpenFGAClient,
 	)
@@ -266,10 +266,10 @@ func (j *JIMM) listApplicationOfferUsers(ctx context.Context, offer names.Applic
 		for _, user := range usersWithRelation {
 			// if the user is in the users map, it must already have a higher
 			// access level - we skip this user
-			if users[user.Username] != "" {
+			if users[user.Name] != "" {
 				continue
 			}
-			users[user.Username] = ToOfferAccessString(relation)
+			users[user.Name] = ToOfferAccessString(relation)
 		}
 	}
 
@@ -278,7 +278,7 @@ func (j *JIMM) listApplicationOfferUsers(ctx context.Context, offer names.Applic
 		// non-admin users should only see their own access level
 		// and access level of "everyone@external" - meaning the access
 		// level everybody has.
-		if accessLevel != string(jujuparams.OfferAdminAccess) && username != ofganames.EveryoneUser && username != user.Username {
+		if accessLevel != string(jujuparams.OfferAdminAccess) && username != ofganames.EveryoneUser && username != user.Name {
 			continue
 		}
 		userDetails = append(userDetails, jujuparams.OfferUserDetails{
@@ -358,7 +358,7 @@ func (j *JIMM) GrantOfferAccess(ctx context.Context, user *openfga.User, offerUR
 	const op = errors.Op("jimm.GrantOfferAccess")
 
 	err := j.doApplicationOfferAdmin(ctx, user, offerURL, func(offer *dbmodel.ApplicationOffer, api API) error {
-		tUser := openfga.NewUser(&dbmodel.Identity{Username: ut.Id()}, j.OpenFGAClient)
+		tUser := openfga.NewUser(&dbmodel.Identity{Name: ut.Id()}, j.OpenFGAClient)
 		currentRelation := tUser.GetApplicationOfferAccess(ctx, offer.ResourceTag())
 		currentAccessLevel := ToOfferAccessString(currentRelation)
 		targetAccessLevel := determineAccessLevelAfterGrant(currentAccessLevel, string(access))
@@ -415,7 +415,7 @@ func (j *JIMM) RevokeOfferAccess(ctx context.Context, user *openfga.User, offerU
 	const op = errors.Op("jimm.RevokeOfferAccess")
 
 	err = j.doApplicationOfferAdmin(ctx, user, offerURL, func(offer *dbmodel.ApplicationOffer, api API) error {
-		tUser := openfga.NewUser(&dbmodel.Identity{Username: ut.Id()}, j.OpenFGAClient)
+		tUser := openfga.NewUser(&dbmodel.Identity{Name: ut.Id()}, j.OpenFGAClient)
 		targetRelation, err := ToOfferRelation(string(access))
 		if err != nil {
 			return errors.E(op, err)
@@ -665,7 +665,7 @@ func (j *JIMM) applicationOfferFilters(ctx context.Context, jujuFilters ...jujup
 		if len(f.AllowedConsumerTags) > 0 {
 			for _, u := range f.AllowedConsumerTags {
 				dbUser := dbmodel.Identity{
-					Username: u,
+					Name: u,
 				}
 				ofgaUser := openfga.NewUser(&dbUser, j.OpenFGAClient)
 				offerUUIDs, err := ofgaUser.ListApplicationOffers(ctx, ofganames.ConsumerRelation)
@@ -702,7 +702,7 @@ func (j *JIMM) ListApplicationOffers(ctx context.Context, user *openfga.User, fi
 			return nil, errors.E(op, "application offer filter must specify a model name")
 		}
 		if f.OwnerName == "" {
-			f.OwnerName = user.Username
+			f.OwnerName = user.Name
 		}
 		m := modelKey{
 			name:          f.ModelName,

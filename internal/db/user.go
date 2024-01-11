@@ -25,12 +25,12 @@ func (d *Database) GetUser(ctx context.Context, u *dbmodel.Identity) error {
 		return errors.E(op, err)
 	}
 
-	if u.Username == "" {
+	if u.Name == "" {
 		return errors.E(op, errors.CodeNotFound, `invalid username ""`)
 	}
 
 	db := d.DB.WithContext(ctx)
-	if err := db.Where("username = ?", u.Username).FirstOrCreate(&u).Error; err != nil {
+	if err := db.Where("username = ?", u.Name).FirstOrCreate(&u).Error; err != nil {
 		return errors.E(op, err)
 	}
 	return nil
@@ -46,12 +46,12 @@ func (d *Database) FetchUser(ctx context.Context, u *dbmodel.Identity) error {
 		return errors.E(op, err)
 	}
 
-	if u.Username == "" {
+	if u.Name == "" {
 		return errors.E(op, errors.CodeNotFound, `invalid username ""`)
 	}
 
 	db := d.DB.WithContext(ctx)
-	if err := db.Where("username = ?", u.Username).First(&u).Error; err != nil {
+	if err := db.Where("username = ?", u.Name).First(&u).Error; err != nil {
 		return errors.E(op, err)
 	}
 	return nil
@@ -69,7 +69,7 @@ func (d *Database) UpdateUser(ctx context.Context, u *dbmodel.Identity) error {
 		return errors.E(op, err)
 	}
 
-	if u.Username == "" {
+	if u.Name == "" {
 		return errors.E(op, errors.CodeNotFound, `invalid username ""`)
 	}
 
@@ -88,7 +88,7 @@ func (d *Database) GetUserCloudCredentials(ctx context.Context, u *dbmodel.Ident
 		return nil, errors.E(op, err)
 	}
 
-	if u.Username == "" || cloud == "" {
+	if u.Name == "" || cloud == "" {
 		return nil, errors.E(op, errors.CodeNotFound, `cloudcredential not found`)
 	}
 

@@ -148,7 +148,7 @@ func TestAddController(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	u := dbmodel.Identity{
-		Username: "alice@external",
+		Name: "alice@external",
 	}
 
 	alice := openfga.NewUser(&u, client)
@@ -316,7 +316,7 @@ func TestAddControllerWithVault(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	u := dbmodel.Identity{
-		Username: "alice@external",
+		Name: "alice@external",
 	}
 	alice := openfga.NewUser(&u, ofgaClient)
 	alice.JimmAdmin = true
@@ -603,7 +603,7 @@ func TestImportModel(t *testing.T) {
 				Valid:  true,
 			},
 			Owner: dbmodel.Identity{
-				Username:    "alice@external",
+				Name:        "alice@external",
 				DisplayName: "Alice",
 			},
 			Controller: dbmodel.Controller{
@@ -691,7 +691,7 @@ func TestImportModel(t *testing.T) {
 				Valid:  true,
 			},
 			Owner: dbmodel.Identity{
-				Username:    "alice@external",
+				Name:        "alice@external",
 				DisplayName: "Alice",
 			},
 			Controller: dbmodel.Controller{
@@ -1437,7 +1437,7 @@ func TestInitiateMigration(t *testing.T) {
 		user: func(client *openfga.OFGAClient) *openfga.User {
 			return openfga.NewUser(
 				&dbmodel.Identity{
-					Username: "alice@external",
+					Name: "alice@external",
 				},
 				client,
 			)
@@ -1462,7 +1462,7 @@ func TestInitiateMigration(t *testing.T) {
 		user: func(client *openfga.OFGAClient) *openfga.User {
 			return openfga.NewUser(
 				&dbmodel.Identity{
-					Username: "alice@external",
+					Name: "alice@external",
 				},
 				client,
 			)
@@ -1482,7 +1482,7 @@ func TestInitiateMigration(t *testing.T) {
 		user: func(client *openfga.OFGAClient) *openfga.User {
 			return openfga.NewUser(
 				&dbmodel.Identity{
-					Username: "alice@external",
+					Name: "alice@external",
 				},
 				client,
 			)
@@ -1503,7 +1503,7 @@ func TestInitiateMigration(t *testing.T) {
 		user: func(client *openfga.OFGAClient) *openfga.User {
 			return openfga.NewUser(
 				&dbmodel.Identity{
-					Username: "bob@external",
+					Name: "bob@external",
 				},
 				client,
 			)
@@ -1522,7 +1522,7 @@ func TestInitiateMigration(t *testing.T) {
 		user: func(client *openfga.OFGAClient) *openfga.User {
 			return openfga.NewUser(
 				&dbmodel.Identity{
-					Username: "alice@external",
+					Name: "alice@external",
 				},
 				client,
 			)
@@ -1541,7 +1541,7 @@ func TestInitiateMigration(t *testing.T) {
 		user: func(client *openfga.OFGAClient) *openfga.User {
 			return openfga.NewUser(
 				&dbmodel.Identity{
-					Username: "alice@external",
+					Name: "alice@external",
 				},
 				client,
 			)
@@ -1560,7 +1560,7 @@ func TestInitiateMigration(t *testing.T) {
 		user: func(client *openfga.OFGAClient) *openfga.User {
 			return openfga.NewUser(
 				&dbmodel.Identity{
-					Username: "alice@external",
+					Name: "alice@external",
 				},
 				client,
 			)
@@ -1579,7 +1579,7 @@ func TestInitiateMigration(t *testing.T) {
 		user: func(client *openfga.OFGAClient) *openfga.User {
 			return openfga.NewUser(
 				&dbmodel.Identity{
-					Username: "alice@external",
+					Name: "alice@external",
 				},
 				client,
 			)

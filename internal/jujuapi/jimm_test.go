@@ -568,7 +568,7 @@ func (s *jimmSuite) TestImportModel(c *gc.C) {
 func (s *jimmSuite) TestAddCloudToController(c *gc.C) {
 	ctx := context.Background()
 	u := dbmodel.Identity{
-		Username: "alice@external",
+		Name: "alice@external",
 	}
 	err := s.JIMM.Database.GetUser(ctx, &u)
 	c.Assert(err, gc.IsNil)
@@ -605,7 +605,7 @@ func (s *jimmSuite) TestAddCloudToController(c *gc.C) {
 func (s *jimmSuite) TestAddExistingCloudToController(c *gc.C) {
 	ctx := context.Background()
 	u := dbmodel.Identity{
-		Username: "alice@external",
+		Name: "alice@external",
 	}
 	err := s.JIMM.Database.GetUser(ctx, &u)
 	c.Assert(err, gc.IsNil)
@@ -653,7 +653,7 @@ func (s *jimmSuite) TestAddExistingCloudToController(c *gc.C) {
 func (s *jimmSuite) TestRemoveCloudFromController(c *gc.C) {
 	ctx := context.Background()
 	u := dbmodel.Identity{
-		Username: "alice@external",
+		Name: "alice@external",
 	}
 	err := s.JIMM.Database.GetUser(ctx, &u)
 	c.Assert(err, gc.IsNil)

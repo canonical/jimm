@@ -44,39 +44,39 @@ var initializeEnvironment = func(c *qt.C, ctx context.Context, db *db.Database, 
 
 	// Alice is a model admin, but not a superuser or offer admin.
 	u := dbmodel.Identity{
-		Username: "alice@external",
+		Name: "alice@external",
 	}
 	c.Assert(db.DB.Create(&u).Error, qt.IsNil)
 
 	u1 := dbmodel.Identity{
-		Username: "eve@external",
+		Name: "eve@external",
 	}
 	c.Assert(db.DB.Create(&u1).Error, qt.IsNil)
 
 	u2 := dbmodel.Identity{
-		Username: "bob@external",
+		Name: "bob@external",
 	}
 	c.Assert(db.DB.Create(&u2).Error, qt.IsNil)
 
 	u3 := dbmodel.Identity{
-		Username: "fred@external",
+		Name: "fred@external",
 	}
 	c.Assert(db.DB.Create(&u3).Error, qt.IsNil)
 
 	u4 := dbmodel.Identity{
-		Username: "grant@external",
+		Name: "grant@external",
 	}
 	c.Assert(db.DB.Create(&u4).Error, qt.IsNil)
 
 	// Jane is an offer admin, but not a superuser or model admin.
 	u5 := dbmodel.Identity{
-		Username: "jane@external",
+		Name: "jane@external",
 	}
 	c.Assert(db.DB.Create(&u5).Error, qt.IsNil)
 
 	// Joe is a superuser, but not a model or offer admin.
 	u6 := dbmodel.Identity{
-		Username: "joe@external",
+		Name: "joe@external",
 	}
 	c.Assert(db.DB.Create(&u6).Error, qt.IsNil)
 
@@ -124,7 +124,7 @@ var initializeEnvironment = func(c *qt.C, ctx context.Context, db *db.Database, 
 	cred := dbmodel.CloudCredential{
 		Name:          "test-credential-1",
 		CloudName:     cloud.Name,
-		OwnerUsername: u.Username,
+		OwnerUsername: u.Name,
 		AuthType:      "empty",
 	}
 	err = db.SetCloudCredential(ctx, &cred)
@@ -137,7 +137,7 @@ var initializeEnvironment = func(c *qt.C, ctx context.Context, db *db.Database, 
 			String: "00000000-0000-0000-0000-0000-0000000000003",
 			Valid:  true,
 		},
-		OwnerUsername:     u.Username,
+		OwnerUsername:     u.Name,
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
 		CloudCredentialID: cred.ID,
@@ -569,17 +569,17 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	u := dbmodel.Identity{
-		Username: "alice@external",
+		Name: "alice@external",
 	}
 	c.Assert(db.DB.Create(&u).Error, qt.IsNil)
 
 	u1 := dbmodel.Identity{
-		Username: "eve@external",
+		Name: "eve@external",
 	}
 	c.Assert(db.DB.Create(&u1).Error, qt.IsNil)
 
 	u2 := dbmodel.Identity{
-		Username: "bob@external",
+		Name: "bob@external",
 	}
 	c.Assert(db.DB.Create(&u2).Error, qt.IsNil)
 
@@ -614,7 +614,7 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 	cred := dbmodel.CloudCredential{
 		Name:          "test-credential-1",
 		CloudName:     cloud.Name,
-		OwnerUsername: u.Username,
+		OwnerUsername: u.Name,
 		AuthType:      "empty",
 	}
 	err = db.SetCloudCredential(ctx, &cred)
@@ -626,7 +626,7 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 			String: "00000000-0000-0000-0000-0000-0000000000003",
 			Valid:  true,
 		},
-		OwnerUsername:     u.Username,
+		OwnerUsername:     u.Name,
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
 		CloudCredentialID: cred.ID,
@@ -660,7 +660,7 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 
 	everyoneTag := names.NewUserTag(ofganames.EveryoneUser)
 	uAll := dbmodel.Identity{
-		Username: everyoneTag.Id(),
+		Name: everyoneTag.Id(),
 	}
 	c.Assert(db.DB.Create(&uAll).Error, qt.IsNil)
 	// user uAll is reader of the test offer
@@ -943,17 +943,17 @@ func TestGetApplicationOffer(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	u := dbmodel.Identity{
-		Username: "alice@external",
+		Name: "alice@external",
 	}
 	c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
 
 	u1 := dbmodel.Identity{
-		Username: "eve@external",
+		Name: "eve@external",
 	}
 	c.Assert(j.Database.DB.Create(&u1).Error, qt.IsNil)
 
 	u2 := dbmodel.Identity{
-		Username: "bob@external",
+		Name: "bob@external",
 	}
 	c.Assert(j.Database.DB.Create(&u2).Error, qt.IsNil)
 
@@ -982,7 +982,7 @@ func TestGetApplicationOffer(t *testing.T) {
 	cred := dbmodel.CloudCredential{
 		Name:          "test-credential-1",
 		CloudName:     cloud.Name,
-		OwnerUsername: u.Username,
+		OwnerUsername: u.Name,
 		AuthType:      "empty",
 	}
 	err = j.Database.SetCloudCredential(ctx, &cred)
@@ -994,7 +994,7 @@ func TestGetApplicationOffer(t *testing.T) {
 			String: "00000000-0000-0000-0000-0000-0000000000003",
 			Valid:  true,
 		},
-		OwnerUsername:     u.Username,
+		OwnerUsername:     u.Name,
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
 		CloudCredentialID: cred.ID,
@@ -1245,7 +1245,7 @@ func TestOffer(t *testing.T) {
 			ctx := context.Background()
 
 			u := dbmodel.Identity{
-				Username: "alice@external",
+				Name: "alice@external",
 			}
 			c.Assert(db.DB.Create(&u).Error, qt.IsNil)
 
@@ -1278,7 +1278,7 @@ func TestOffer(t *testing.T) {
 			cred := dbmodel.CloudCredential{
 				Name:          "test-credential-1",
 				CloudName:     cloud.Name,
-				OwnerUsername: u.Username,
+				OwnerUsername: u.Name,
 				AuthType:      "empty",
 			}
 			err = db.SetCloudCredential(ctx, &cred)
@@ -1290,7 +1290,7 @@ func TestOffer(t *testing.T) {
 					String: "00000000-0000-0000-0000-0000-0000000000003",
 					Valid:  true,
 				},
-				OwnerUsername:     u.Username,
+				OwnerUsername:     u.Name,
 				ControllerID:      controller.ID,
 				CloudRegionID:     cloud.Regions[0].ID,
 				CloudCredentialID: cred.ID,
@@ -1367,7 +1367,7 @@ func TestOffer(t *testing.T) {
 			ctx := context.Background()
 
 			u := dbmodel.Identity{
-				Username: "alice@external",
+				Name: "alice@external",
 			}
 			c.Assert(db.DB.Create(&u).Error, qt.IsNil)
 
@@ -1400,7 +1400,7 @@ func TestOffer(t *testing.T) {
 			cred := dbmodel.CloudCredential{
 				Name:          "test-credential-1",
 				CloudName:     cloud.Name,
-				OwnerUsername: u.Username,
+				OwnerUsername: u.Name,
 				AuthType:      "empty",
 			}
 			err = db.SetCloudCredential(ctx, &cred)
@@ -1412,7 +1412,7 @@ func TestOffer(t *testing.T) {
 					String: "00000000-0000-0000-0000-0000-0000000000003",
 					Valid:  true,
 				},
-				OwnerUsername:     u.Username,
+				OwnerUsername:     u.Name,
 				ControllerID:      controller.ID,
 				CloudRegionID:     cloud.Regions[0].ID,
 				CloudCredentialID: cred.ID,
@@ -1453,7 +1453,7 @@ func TestOffer(t *testing.T) {
 		},
 		createEnv: func(c *qt.C, db db.Database, client *openfga.OFGAClient) (dbmodel.Identity, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
 			u := dbmodel.Identity{
-				Username: "alice@external",
+				Name: "alice@external",
 			}
 
 			c.Assert(db.DB.Create(&u).Error, qt.IsNil)
@@ -1488,7 +1488,7 @@ func TestOffer(t *testing.T) {
 			ctx := context.Background()
 
 			u := dbmodel.Identity{
-				Username: "alice@external",
+				Name: "alice@external",
 			}
 			c.Assert(db.DB.Create(&u).Error, qt.IsNil)
 
@@ -1521,7 +1521,7 @@ func TestOffer(t *testing.T) {
 			cred := dbmodel.CloudCredential{
 				Name:          "test-credential-1",
 				CloudName:     cloud.Name,
-				OwnerUsername: u.Username,
+				OwnerUsername: u.Name,
 				AuthType:      "empty",
 			}
 			err = db.SetCloudCredential(ctx, &cred)
@@ -1533,7 +1533,7 @@ func TestOffer(t *testing.T) {
 					String: "00000000-0000-0000-0000-0000-0000000000003",
 					Valid:  true,
 				},
-				OwnerUsername:     u.Username,
+				OwnerUsername:     u.Name,
 				ControllerID:      controller.ID,
 				CloudRegionID:     cloud.Regions[0].ID,
 				CloudCredentialID: cred.ID,
@@ -1577,12 +1577,12 @@ func TestOffer(t *testing.T) {
 			ctx := context.Background()
 
 			u := dbmodel.Identity{
-				Username: "alice@external",
+				Name: "alice@external",
 			}
 			c.Assert(db.DB.Create(&u).Error, qt.IsNil)
 
 			u1 := dbmodel.Identity{
-				Username: "eve@external",
+				Name: "eve@external",
 			}
 			c.Assert(db.DB.Create(&u1).Error, qt.IsNil)
 
@@ -1615,7 +1615,7 @@ func TestOffer(t *testing.T) {
 			cred := dbmodel.CloudCredential{
 				Name:          "test-credential-1",
 				CloudName:     cloud.Name,
-				OwnerUsername: u.Username,
+				OwnerUsername: u.Name,
 				AuthType:      "empty",
 			}
 			err = db.SetCloudCredential(ctx, &cred)
@@ -1627,7 +1627,7 @@ func TestOffer(t *testing.T) {
 					String: "00000000-0000-0000-0000-0000-0000000000003",
 					Valid:  true,
 				},
-				OwnerUsername:     u.Username,
+				OwnerUsername:     u.Name,
 				ControllerID:      controller.ID,
 				CloudRegionID:     cloud.Regions[0].ID,
 				CloudCredentialID: cred.ID,
@@ -1670,7 +1670,7 @@ func TestOffer(t *testing.T) {
 			ctx := context.Background()
 
 			u := dbmodel.Identity{
-				Username: "alice@external",
+				Name: "alice@external",
 			}
 			c.Assert(db.DB.Create(&u).Error, qt.IsNil)
 
@@ -1703,7 +1703,7 @@ func TestOffer(t *testing.T) {
 			cred := dbmodel.CloudCredential{
 				Name:          "test-credential-1",
 				CloudName:     cloud.Name,
-				OwnerUsername: u.Username,
+				OwnerUsername: u.Name,
 				AuthType:      "empty",
 			}
 			err = db.SetCloudCredential(ctx, &cred)
@@ -1715,7 +1715,7 @@ func TestOffer(t *testing.T) {
 					String: "00000000-0000-0000-0000-0000-0000000000003",
 					Valid:  true,
 				},
-				OwnerUsername:     u.Username,
+				OwnerUsername:     u.Name,
 				ControllerID:      controller.ID,
 				CloudRegionID:     cloud.Regions[0].ID,
 				CloudCredentialID: cred.ID,
@@ -1758,7 +1758,7 @@ func TestOffer(t *testing.T) {
 			ctx := context.Background()
 
 			u := dbmodel.Identity{
-				Username: "alice@external",
+				Name: "alice@external",
 			}
 			c.Assert(db.DB.Create(&u).Error, qt.IsNil)
 
@@ -1791,7 +1791,7 @@ func TestOffer(t *testing.T) {
 			cred := dbmodel.CloudCredential{
 				Name:          "test-credential-1",
 				CloudName:     cloud.Name,
-				OwnerUsername: u.Username,
+				OwnerUsername: u.Name,
 				AuthType:      "empty",
 			}
 			err = db.SetCloudCredential(ctx, &cred)
@@ -1803,7 +1803,7 @@ func TestOffer(t *testing.T) {
 					String: "00000000-0000-0000-0000-0000-0000000000003",
 					Valid:  true,
 				},
-				OwnerUsername:     u.Username,
+				OwnerUsername:     u.Name,
 				ControllerID:      controller.ID,
 				CloudRegionID:     cloud.Regions[0].ID,
 				CloudCredentialID: cred.ID,
@@ -1888,7 +1888,7 @@ func TestOfferAssertOpenFGARelationsExist(t *testing.T) {
 		ctx := context.Background()
 
 		u := dbmodel.Identity{
-			Username: "alice@external",
+			Name: "alice@external",
 		}
 		c.Assert(db.DB.Create(&u).Error, qt.IsNil)
 
@@ -1921,7 +1921,7 @@ func TestOfferAssertOpenFGARelationsExist(t *testing.T) {
 		cred := dbmodel.CloudCredential{
 			Name:          "test-credential-1",
 			CloudName:     cloud.Name,
-			OwnerUsername: u.Username,
+			OwnerUsername: u.Name,
 			AuthType:      "empty",
 		}
 		err = db.SetCloudCredential(ctx, &cred)
@@ -1933,7 +1933,7 @@ func TestOfferAssertOpenFGARelationsExist(t *testing.T) {
 				String: "00000000-0000-0000-0000-0000-0000000000003",
 				Valid:  true,
 			},
-			OwnerUsername:     u.Username,
+			OwnerUsername:     u.Name,
 			ControllerID:      controller.ID,
 			CloudRegionID:     cloud.Regions[0].ID,
 			CloudCredentialID: cred.ID,
@@ -2568,7 +2568,7 @@ func TestFindApplicationOffers(t *testing.T) {
 					details := test.expectedOffer.ToJujuApplicationOfferDetails()
 					if accessLevel != string(jujuparams.OfferAdminAccess) {
 						details.Users = []jujuparams.OfferUserDetails{{
-							UserName: user.Username,
+							UserName: user.Name,
 							Access:   accessLevel,
 						}}
 					} else {

@@ -167,7 +167,7 @@ func (m Model) addModelRelations(c *qt.C, jimmTag names.ControllerTag, db db.Dat
 		case "read":
 			relation = ofganames.ReaderRelation
 		default:
-			c.Fatalf("unknown model access: %s %s", dbUser.Username, u.Access)
+			c.Fatalf("unknown model access: %s %s", dbUser.Name, u.Access)
 		}
 		user := openfga.NewUser(&dbUser, client)
 		err := user.SetModelAccess(context.Background(), m.dbo.ResourceTag(), relation)
@@ -182,7 +182,7 @@ func (m Model) addModelRelations(c *qt.C, jimmTag names.ControllerTag, db db.Dat
 func (ctl Controller) addControllerRelations(c *qt.C, jimmTag names.ControllerTag, db db.Database, client *openfga.OFGAClient) {
 	if ctl.dbo.AdminUser != "" {
 		user := openfga.NewUser(&dbmodel.Identity{
-			Username: ctl.dbo.AdminUser,
+			Name: ctl.dbo.AdminUser,
 		}, client)
 		err := user.SetControllerAccess(context.Background(), ctl.dbo.ResourceTag(), ofganames.AdministratorRelation)
 		c.Assert(err, qt.IsNil)
@@ -355,7 +355,7 @@ func (cc *CloudCredential) DBObject(c *qt.C, db db.Database) dbmodel.CloudCreden
 	cc.dbo.Cloud = cc.env.Cloud(cc.Cloud).DBObject(c, db)
 	cc.dbo.CloudName = cc.dbo.Cloud.Name
 	cc.dbo.Owner = cc.env.User(cc.Owner).DBObject(c, db)
-	cc.dbo.OwnerUsername = cc.dbo.Owner.Username
+	cc.dbo.OwnerUsername = cc.dbo.Owner.Name
 	cc.dbo.AuthType = cc.AuthType
 	cc.dbo.Attributes = cc.Attributes
 
@@ -491,7 +491,7 @@ func (u *User) DBObject(c *qt.C, db db.Database) dbmodel.Identity {
 	if u.dbo.ID != 0 {
 		return u.dbo
 	}
-	u.dbo.Username = u.Username
+	u.dbo.Name = u.Username
 	u.dbo.DisplayName = u.DisplayName
 
 	err := db.UpdateUser(context.Background(), &u.dbo)

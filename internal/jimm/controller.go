@@ -170,7 +170,7 @@ func (j *JIMM) AddController(ctx context.Context, user *openfga.User, ctl *dbmod
 			everyoneTag := names.NewUserTag(ofganames.EveryoneUser)
 			everyone := openfga.NewUser(
 				&dbmodel.Identity{
-					Username: everyoneTag.Id(),
+					Name: everyoneTag.Id(),
 				},
 				j.OpenFGAClient,
 			)
@@ -287,7 +287,7 @@ func (j *JIMM) GetJimmControllerAccess(ctx context.Context, user *openfga.User, 
 	// for him/her-self then we return that - either the user
 	// is a JIMM admin (aka "superuser"), or they have a "login"
 	// access level.
-	if user.Username == tag.Id() {
+	if user.Name == tag.Id() {
 		if user.JimmAdmin {
 			return "superuser", nil
 		}
@@ -393,7 +393,7 @@ func (j *JIMM) ImportModel(ctx context.Context, user *openfga.User, controllerNa
 		zapctx.Error(
 			ctx,
 			"failed to set model admin",
-			zap.String("owner", ownerUser.Username),
+			zap.String("owner", ownerUser.Name),
 			zap.String("model", modelTag.String()),
 			zap.Error(err),
 		)
@@ -417,7 +417,7 @@ func (j *JIMM) ImportModel(ctx context.Context, user *openfga.User, controllerNa
 		return errors.E(op, err)
 	}
 	if len(allCredentials) == 0 {
-		return errors.E(op, errors.CodeNotFound, fmt.Sprintf("Failed to find cloud credential for user %s on cloud %s", ownerUser.Username, cloudTag.Id()))
+		return errors.E(op, errors.CodeNotFound, fmt.Sprintf("Failed to find cloud credential for user %s on cloud %s", ownerUser.Name, cloudTag.Id()))
 	}
 	cloudCredential := allCredentials[0]
 

@@ -36,13 +36,13 @@ func (s *dbSuite) TestGetUser(c *qt.C) {
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
 	u := dbmodel.Identity{
-		Username: "bob@external",
+		Name: "bob@external",
 	}
 	err = s.Database.GetUser(ctx, &u)
 	c.Assert(err, qt.IsNil)
 
 	u2 := dbmodel.Identity{
-		Username: u.Username,
+		Name: u.Name,
 	}
 	err = s.Database.GetUser(ctx, &u2)
 	c.Assert(err, qt.IsNil)
@@ -72,7 +72,7 @@ func (s *dbSuite) TestUpdateUser(c *qt.C) {
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
 	u := dbmodel.Identity{
-		Username: "bob@external",
+		Name: "bob@external",
 	}
 	err = s.Database.GetUser(ctx, &u)
 	c.Assert(err, qt.IsNil)
@@ -81,7 +81,7 @@ func (s *dbSuite) TestUpdateUser(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 
 	u2 := dbmodel.Identity{
-		Username: u.Username,
+		Name: u.Name,
 	}
 	err = s.Database.GetUser(ctx, &u2)
 	c.Assert(err, qt.IsNil)
@@ -108,12 +108,12 @@ func (s *dbSuite) TestGetUserCloudCredentials(c *qt.C) {
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
 	_, err = s.Database.GetUserCloudCredentials(ctx, &dbmodel.Identity{
-		Username: "test",
+		Name: "test",
 	}, "ec2")
 	c.Check(err, qt.IsNil)
 
 	u := dbmodel.Identity{
-		Username: "bob@external",
+		Name: "bob@external",
 	}
 	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
 
@@ -129,7 +129,7 @@ func (s *dbSuite) TestGetUserCloudCredentials(c *qt.C) {
 	cred1 := dbmodel.CloudCredential{
 		Name:          "test-cred-1",
 		CloudName:     cloud.Name,
-		OwnerUsername: u.Username,
+		OwnerUsername: u.Name,
 		AuthType:      "empty",
 	}
 	err = s.Database.SetCloudCredential(context.Background(), &cred1)
@@ -138,7 +138,7 @@ func (s *dbSuite) TestGetUserCloudCredentials(c *qt.C) {
 	cred2 := dbmodel.CloudCredential{
 		Name:          "test-cred-2",
 		CloudName:     cloud.Name,
-		OwnerUsername: u.Username,
+		OwnerUsername: u.Name,
 		AuthType:      "empty",
 	}
 	err = s.Database.SetCloudCredential(context.Background(), &cred2)
