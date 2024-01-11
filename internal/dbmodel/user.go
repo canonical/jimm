@@ -10,7 +10,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// A Identity represents a JIMM user.
+// A Identity represents a JIMM identity, which can be a user or a service account.
 type Identity struct {
 	gorm.Model
 
