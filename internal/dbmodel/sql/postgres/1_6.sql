@@ -14,7 +14,7 @@ ALTER TABLE IF EXISTS models RENAME COLUMN owner_username TO owner_identity_name
 ALTER TABLE IF EXISTS application_offer_connections RENAME COLUMN username TO identity_name;
 ALTER TABLE IF EXISTS user_model_defaults RENAME COLUMN username TO identity_name;
 
--- TODO (babakks): Do we need to rename these two instances as well?
+-- TODO (CSS-6701): Do we need to rename these two instances as well?
 --   - ALTER TABLE IF EXISTS controllers RENAME COLUMN admin_user TO admin_identity_name;
 --   - ALTER TABLE IF EXISTS audit_log RENAME COLUMN user_tag TO identity_tag;
 
