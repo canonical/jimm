@@ -33,7 +33,7 @@ type Identity struct {
 	Disabled bool `gorm:"not null;default:FALSE"`
 
 	// CloudCredentials are the cloud credentials owned by this identity.
-	CloudCredentials []CloudCredential `gorm:"foreignKey:OwnerUsername;references:Username"`
+	CloudCredentials []CloudCredential `gorm:"foreignKey:OwnerIdentityName;references:Name"`
 }
 
 // Tag returns a names.Tag for the identity.
