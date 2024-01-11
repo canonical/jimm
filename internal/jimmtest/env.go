@@ -285,7 +285,7 @@ func (cd *CloudDefaults) DBObject(c *qt.C, db db.Database) dbmodel.CloudDefaults
 		return cd.dbo
 	}
 
-	cd.dbo.User = cd.env.User(cd.User).DBObject(c, db)
+	cd.dbo.Identity = cd.env.User(cd.User).DBObject(c, db)
 	cd.dbo.Cloud = cd.env.Cloud(cd.Cloud).DBObject(c, db)
 	cd.dbo.Region = cd.Region
 	cd.dbo.Defaults = cd.Defaults

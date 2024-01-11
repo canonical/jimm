@@ -9,7 +9,7 @@ type CloudDefaults struct {
 	gorm.Model
 
 	IdentityName string
-	User         Identity `gorm:"foreignKey:IdentityName;references:Name"`
+	Identity     Identity `gorm:"foreignKey:IdentityName;references:Name"`
 
 	CloudID uint
 	Cloud   Cloud

@@ -63,7 +63,7 @@ func TestSetCloudDefaults(t *testing.T) {
 			cloud.Regions = nil
 			expectedDefaults := dbmodel.CloudDefaults{
 				IdentityName: user.Name,
-				User:         user,
+				Identity:     user,
 				CloudID:      cloud.ID,
 				Cloud:        cloud,
 				Region:       "test-region",
@@ -103,7 +103,7 @@ func TestSetCloudDefaults(t *testing.T) {
 			cloud.Regions = nil
 			expectedDefaults := dbmodel.CloudDefaults{
 				IdentityName: user.Name,
-				User:         user,
+				Identity:     user,
 				CloudID:      cloud.ID,
 				Cloud:        cloud,
 				Defaults:     defaults,
@@ -136,7 +136,7 @@ func TestSetCloudDefaults(t *testing.T) {
 
 			j.Database.SetCloudDefaults(ctx, &dbmodel.CloudDefaults{
 				IdentityName: user.Name,
-				User:         user,
+				Identity:     user,
 				CloudID:      cloud.ID,
 				Cloud:        cloud,
 				Region:       cloud.Regions[0].Name,
@@ -155,7 +155,7 @@ func TestSetCloudDefaults(t *testing.T) {
 			cloud.Regions = nil
 			expectedDefaults := dbmodel.CloudDefaults{
 				IdentityName: user.Name,
-				User:         user,
+				Identity:     user,
 				CloudID:      cloud.ID,
 				Cloud:        cloud,
 				Region:       "test-region",
@@ -321,7 +321,7 @@ func TestUnsetCloudDefaults(t *testing.T) {
 			cloud.Regions = nil
 			expectedDefaults := dbmodel.CloudDefaults{
 				IdentityName: user.Name,
-				User:         user,
+				Identity:     user,
 				CloudID:      cloud.ID,
 				Cloud:        cloud,
 				Region:       "test-region",
@@ -375,7 +375,7 @@ func TestUnsetCloudDefaults(t *testing.T) {
 			cloud.Regions = nil
 			expectedDefaults := dbmodel.CloudDefaults{
 				IdentityName: user.Name,
-				User:         user,
+				Identity:     user,
 				CloudID:      cloud.ID,
 				Cloud:        cloud,
 				Region:       "",

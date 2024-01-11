@@ -49,7 +49,7 @@ func (s *dbSuite) TestModelDefaults(c *qt.C) {
 	cloud.Regions = nil
 	defaults := dbmodel.CloudDefaults{
 		IdentityName: u.Name,
-		User:         u,
+		Identity:     u,
 		CloudID:      cloud.ID,
 		Cloud:        cloud,
 		Region:       cloud1.Regions[0].Name,
@@ -107,7 +107,7 @@ func (s *dbSuite) TestModelDefaults(c *qt.C) {
 	c.Assert(err, qt.Equals, nil)
 	c.Assert(dbDefaults, qt.CmpEquals(cmpopts.IgnoreTypes([]dbmodel.CloudRegion{}, gorm.Model{})), dbmodel.CloudDefaults{
 		IdentityName: u.Name,
-		User:         u,
+		Identity:     u,
 		CloudID:      cloud1.ID,
 		Cloud:        cloud1,
 		Region:       cloud1.Regions[0].Name,
