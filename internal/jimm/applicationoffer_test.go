@@ -1036,7 +1036,7 @@ func TestGetApplicationOffer(t *testing.T) {
 			ApplicationOfferID: 1,
 			SourceModelTag:     "test-model-src",
 			RelationID:         1,
-			Username:           "unknown",
+			IdentityName:       "unknown",
 			Endpoint:           "test-endpoint",
 		}},
 	}
@@ -1345,7 +1345,7 @@ func TestOffer(t *testing.T) {
 					ApplicationOfferID: 1,
 					SourceModelTag:     "test-model-src",
 					RelationID:         1,
-					Username:           "unknown",
+					IdentityName:       "unknown",
 					Endpoint:           "test-endpoint",
 				}},
 			}
@@ -1988,7 +1988,7 @@ func TestOfferAssertOpenFGARelationsExist(t *testing.T) {
 				ApplicationOfferID: 1,
 				SourceModelTag:     "test-model-src",
 				RelationID:         1,
-				Username:           "unknown",
+				IdentityName:       "unknown",
 				Endpoint:           "test-endpoint",
 			}},
 		}
@@ -2334,7 +2334,7 @@ func TestUpdateOffer(t *testing.T) {
 				ApplicationOfferID: 1,
 				SourceModelTag:     "test-model-src",
 				RelationID:         1,
-				Username:           "unknown",
+				IdentityName:       "unknown",
 				Endpoint:           "test-endpoint",
 			}},
 			Endpoints: []dbmodel.ApplicationOfferRemoteEndpoint{{
