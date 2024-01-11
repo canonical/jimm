@@ -549,7 +549,7 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 	// fetch cloud defaults
 	if args.Cloud != (names.CloudTag{}) {
 		cloudDefaults := dbmodel.CloudDefaults{
-			Username: user.Name,
+			IdentityName: user.Name,
 			Cloud: dbmodel.Cloud{
 				Name: args.Cloud.Id(),
 			},
@@ -585,7 +585,7 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 	// fetch cloud region defaults
 	if args.Cloud != (names.CloudTag{}) && builder.cloudRegion != "" {
 		cloudRegionDefaults := dbmodel.CloudDefaults{
-			Username: user.Name,
+			IdentityName: user.Name,
 			Cloud: dbmodel.Cloud{
 				Name: args.Cloud.Id(),
 			},

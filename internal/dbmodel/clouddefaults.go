@@ -8,8 +8,8 @@ import "gorm.io/gorm"
 type CloudDefaults struct {
 	gorm.Model
 
-	Username string
-	User     Identity `gorm:"foreignKey:Username;references:Username"`
+	IdentityName string
+	User         Identity `gorm:"foreignKey:IdentityName;references:Name"`
 
 	CloudID uint
 	Cloud   Cloud

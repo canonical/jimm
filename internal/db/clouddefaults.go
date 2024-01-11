@@ -20,8 +20,8 @@ func (d *Database) SetCloudDefaults(ctx context.Context, defaults *dbmodel.Cloud
 		db := d.DB.WithContext(ctx)
 
 		dbDefaults := dbmodel.CloudDefaults{
-			Username: defaults.Username,
-			CloudID:  defaults.CloudID,
+			IdentityName: defaults.IdentityName,
+			CloudID:      defaults.CloudID,
 			Cloud: dbmodel.Cloud{
 				Name: defaults.Cloud.Name,
 			},
@@ -70,8 +70,8 @@ func (d *Database) UnsetCloudDefaults(ctx context.Context, defaults *dbmodel.Clo
 		db := d.DB.WithContext(ctx)
 
 		dbDefaults := dbmodel.CloudDefaults{
-			Username: defaults.Username,
-			CloudID:  defaults.CloudID,
+			IdentityName: defaults.IdentityName,
+			CloudID:      defaults.CloudID,
 			Cloud: dbmodel.Cloud{
 				Name: defaults.Cloud.Name,
 			},
@@ -114,7 +114,7 @@ func (d *Database) CloudDefaults(ctx context.Context, defaults *dbmodel.CloudDef
 	}
 	db := d.DB.WithContext(ctx)
 
-	db = db.Where("username = ?", defaults.Username)
+	db = db.Where("username = ?", defaults.IdentityName)
 	db = db.Joins("JOIN clouds ON clouds.id = cloud_defaults.cloud_id")
 	if defaults.CloudID != 0 {
 		db = db.Where("clouds.id = ?", defaults.CloudID)
