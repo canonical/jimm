@@ -19,7 +19,7 @@ func (d *Database) SetUserModelDefaults(ctx context.Context, defaults *dbmodel.U
 		db := d.DB.WithContext(ctx)
 
 		dbDefaults := dbmodel.UserModelDefaults{
-			Username: defaults.Username,
+			IdentityName: defaults.IdentityName,
 		}
 		// try to fetch cloud defaults from the db
 		err := d.UserModelDefaults(ctx, &dbDefaults)
@@ -63,7 +63,7 @@ func (d *Database) UserModelDefaults(ctx context.Context, defaults *dbmodel.User
 	}
 	db := d.DB.WithContext(ctx)
 
-	db = db.Where("username = ?", defaults.Username)
+	db = db.Where("username = ?", defaults.IdentityName)
 
 	result := db.Preload("User").First(&defaults)
 	if result.Error != nil {

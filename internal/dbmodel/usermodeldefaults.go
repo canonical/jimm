@@ -8,8 +8,8 @@ import "gorm.io/gorm"
 type UserModelDefaults struct {
 	gorm.Model
 
-	Username string
-	User     Identity `gorm:"foreignKey:Username;references:Username"`
+	IdentityName string
+	Identity     Identity `gorm:"foreignKey:IdentityName;references:Name"`
 
 	Defaults Map
 }

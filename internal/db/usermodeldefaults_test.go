@@ -48,9 +48,9 @@ func TestSetUserModelDefaults(t *testing.T) {
 			}
 
 			expectedDefaults := dbmodel.UserModelDefaults{
-				Username: user.Name,
-				User:     user,
-				Defaults: defaults,
+				IdentityName: user.Name,
+				Identity:     user,
+				Defaults:     defaults,
 			}
 
 			return testConfig{
@@ -68,8 +68,8 @@ func TestSetUserModelDefaults(t *testing.T) {
 			c.Assert(j.Database.DB.Create(&user).Error, qt.IsNil)
 
 			j.Database.SetUserModelDefaults(ctx, &dbmodel.UserModelDefaults{
-				Username: user.Name,
-				User:     user,
+				IdentityName: user.Name,
+				Identity:     user,
 				Defaults: map[string]interface{}{
 					"key1": float64(17),
 					"key2": "a test string",
@@ -83,9 +83,9 @@ func TestSetUserModelDefaults(t *testing.T) {
 			}
 
 			expectedDefaults := dbmodel.UserModelDefaults{
-				Username: user.Name,
-				User:     user,
-				Defaults: defaults,
+				IdentityName: user.Name,
+				Identity:     user,
+				Defaults:     defaults,
 			}
 
 			return testConfig{
@@ -151,7 +151,7 @@ func TestSetUserModelDefaults(t *testing.T) {
 			if testConfig.expectedError == "" {
 				c.Assert(err, qt.Equals, nil)
 				dbDefaults := dbmodel.UserModelDefaults{
-					Username: testConfig.expectedDefaults.Username,
+					IdentityName: testConfig.expectedDefaults.IdentityName,
 				}
 				err = j.Database.UserModelDefaults(ctx, &dbDefaults)
 				c.Assert(err, qt.Equals, nil)

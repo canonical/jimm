@@ -261,7 +261,7 @@ func (cd *UserDefaults) DBObject(c *qt.C, db db.Database) dbmodel.UserModelDefau
 		return cd.dbo
 	}
 
-	cd.dbo.User = cd.env.User(cd.User).DBObject(c, db)
+	cd.dbo.Identity = cd.env.User(cd.User).DBObject(c, db)
 	cd.dbo.Defaults = cd.Defaults
 
 	err := db.SetUserModelDefaults(context.Background(), &cd.dbo)
