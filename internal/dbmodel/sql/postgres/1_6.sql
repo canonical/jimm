@@ -5,8 +5,8 @@
 --   "When renaming a constraint that has an underlying index, the index is renamed as well."
 --   (See https://www.postgresql.org/docs/current/sql-altertable.html)
 
+ALTER TABLE IF EXISTS users RENAME COLUMN username TO name;
 ALTER TABLE IF EXISTS users RENAME TO identities;
-ALTER TABLE IF EXISTS users RENAME COLUMN username TO identity_name;
 
 ALTER TABLE IF EXISTS cloud_credentials RENAME COLUMN owner_username TO owner_identity_name;
 ALTER TABLE IF EXISTS cloud_defaults RENAME COLUMN username TO identity_name;
