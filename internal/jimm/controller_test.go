@@ -147,7 +147,7 @@ func TestAddController(t *testing.T) {
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
-	u := dbmodel.User{
+	u := dbmodel.Identity{
 		Username: "alice@external",
 	}
 
@@ -315,7 +315,7 @@ func TestAddControllerWithVault(t *testing.T) {
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
-	u := dbmodel.User{
+	u := dbmodel.Identity{
 		Username: "alice@external",
 	}
 	alice := openfga.NewUser(&u, ofgaClient)
@@ -602,7 +602,7 @@ func TestImportModel(t *testing.T) {
 				String: "00000002-0000-0000-0000-000000000001",
 				Valid:  true,
 			},
-			Owner: dbmodel.User{
+			Owner: dbmodel.Identity{
 				Username:    "alice@external",
 				DisplayName: "Alice",
 			},
@@ -690,7 +690,7 @@ func TestImportModel(t *testing.T) {
 				String: "00000002-0000-0000-0000-000000000001",
 				Valid:  true,
 			},
-			Owner: dbmodel.User{
+			Owner: dbmodel.Identity{
 				Username:    "alice@external",
 				DisplayName: "Alice",
 			},
@@ -1121,7 +1121,7 @@ func TestGetControllerConfig(t *testing.T) {
 			})
 			c.Assert(err, qt.Equals, nil)
 
-			cfg, err := j.GetControllerConfig(ctx, user.User)
+			cfg, err := j.GetControllerConfig(ctx, user.Identity)
 			if test.expectedError == "" {
 				c.Assert(err, qt.IsNil)
 				c.Assert(cfg, jimmtest.DBObjectEquals, &test.expectedConfig)
@@ -1436,7 +1436,7 @@ func TestInitiateMigration(t *testing.T) {
 		about: "model migration initiated successfully",
 		user: func(client *openfga.OFGAClient) *openfga.User {
 			return openfga.NewUser(
-				&dbmodel.User{
+				&dbmodel.Identity{
 					Username: "alice@external",
 				},
 				client,
@@ -1461,7 +1461,7 @@ func TestInitiateMigration(t *testing.T) {
 		about: "model not found",
 		user: func(client *openfga.OFGAClient) *openfga.User {
 			return openfga.NewUser(
-				&dbmodel.User{
+				&dbmodel.Identity{
 					Username: "alice@external",
 				},
 				client,
@@ -1481,7 +1481,7 @@ func TestInitiateMigration(t *testing.T) {
 		about: "InitiateMigration call fails",
 		user: func(client *openfga.OFGAClient) *openfga.User {
 			return openfga.NewUser(
-				&dbmodel.User{
+				&dbmodel.Identity{
 					Username: "alice@external",
 				},
 				client,
@@ -1502,7 +1502,7 @@ func TestInitiateMigration(t *testing.T) {
 		about: "non-admin-user gets unauthorized error",
 		user: func(client *openfga.OFGAClient) *openfga.User {
 			return openfga.NewUser(
-				&dbmodel.User{
+				&dbmodel.Identity{
 					Username: "bob@external",
 				},
 				client,
@@ -1521,7 +1521,7 @@ func TestInitiateMigration(t *testing.T) {
 		about: "invalid model tag",
 		user: func(client *openfga.OFGAClient) *openfga.User {
 			return openfga.NewUser(
-				&dbmodel.User{
+				&dbmodel.Identity{
 					Username: "alice@external",
 				},
 				client,
@@ -1540,7 +1540,7 @@ func TestInitiateMigration(t *testing.T) {
 		about: "invalid target controller tag",
 		user: func(client *openfga.OFGAClient) *openfga.User {
 			return openfga.NewUser(
-				&dbmodel.User{
+				&dbmodel.Identity{
 					Username: "alice@external",
 				},
 				client,
@@ -1559,7 +1559,7 @@ func TestInitiateMigration(t *testing.T) {
 		about: "invalid target user tag",
 		user: func(client *openfga.OFGAClient) *openfga.User {
 			return openfga.NewUser(
-				&dbmodel.User{
+				&dbmodel.Identity{
 					Username: "alice@external",
 				},
 				client,
@@ -1578,7 +1578,7 @@ func TestInitiateMigration(t *testing.T) {
 		about: "invalid macaroon data",
 		user: func(client *openfga.OFGAClient) *openfga.User {
 			return openfga.NewUser(
-				&dbmodel.User{
+				&dbmodel.Identity{
 					Username: "alice@external",
 				},
 				client,

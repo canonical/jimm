@@ -39,7 +39,7 @@ type jimmSuite struct {
 	Params      service.Params
 	HTTP        *httptest.Server
 	Service     *service.Service
-	AdminUser   *dbmodel.User
+	AdminUser   *dbmodel.Identity
 	ClientStore func() *jjclient.MemStore
 	JIMM        *jimm.JIMM
 	cancel      context.CancelFunc
@@ -103,7 +103,7 @@ func (s *jimmSuite) SetUpTest(c *gc.C) {
 	s.ControllerAdmins = []string{"controller-admin"}
 	s.JujuConnSuite.SetUpTest(c)
 
-	s.AdminUser = &dbmodel.User{
+	s.AdminUser = &dbmodel.Identity{
 		Username:  "alice@external",
 		LastLogin: db.Now(),
 	}
@@ -207,7 +207,7 @@ func (s *jimmSuite) AddController(c *gc.C, name string, info *api.Info) {
 
 func (s *jimmSuite) UpdateCloudCredential(c *gc.C, tag names.CloudCredentialTag, cred jujuparams.CloudCredential) {
 	ctx := context.Background()
-	u := dbmodel.User{
+	u := dbmodel.Identity{
 		Username: tag.Owner().Id(),
 	}
 	user := openfga.NewUser(&u, s.JIMM.OpenFGAClient)
@@ -224,12 +224,12 @@ func (s *jimmSuite) UpdateCloudCredential(c *gc.C, tag names.CloudCredentialTag,
 func (s *jimmSuite) AddModel(c *gc.C, owner names.UserTag, name string, cloud names.CloudTag, region string, cred names.CloudCredentialTag) names.ModelTag {
 	ctx := context.Background()
 	u := openfga.NewUser(
-		&dbmodel.User{
+		&dbmodel.Identity{
 			Username: owner.Id(),
 		},
 		s.OFGAClient,
 	)
-	err := s.JIMM.Database.GetUser(ctx, u.User)
+	err := s.JIMM.Database.GetUser(ctx, u.Identity)
 	c.Assert(err, gc.Equals, nil)
 	mi, err := s.JIMM.AddModel(ctx, u, &jimm.ModelCreateArgs{
 		Name:            name,

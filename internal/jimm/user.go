@@ -32,7 +32,7 @@ func (j *JIMM) Authenticate(ctx context.Context, req *jujuparams.LoginRequest) (
 	}
 
 	err = j.Database.Transaction(func(tx *db.Database) error {
-		pu := dbmodel.User{
+		pu := dbmodel.Identity{
 			Username: u.Username,
 		}
 		if err := tx.GetUser(ctx, &pu); err != nil {

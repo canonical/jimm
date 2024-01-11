@@ -264,7 +264,7 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 	//client := modelmanager.NewClient(conn)
 	//err := client.GrantModel("bob@external", "write", mt4.Id())
 	//c.Assert(err, gc.Equals, nil)
-	bob := openfga.NewUser(&dbmodel.User{Username: "bob@external"}, s.OFGAClient)
+	bob := openfga.NewUser(&dbmodel.Identity{Username: "bob@external"}, s.OFGAClient)
 	err := bob.SetModelAccess(context.Background(), mt4, ofganames.WriterRelation)
 	c.Assert(err, gc.Equals, nil)
 
@@ -521,7 +521,7 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 	s.Candid.AddUser("bob", "controller-admin")
 
 	// we make bob a jimm administrator
-	bob := openfga.NewUser(&dbmodel.User{Username: "bob@external"}, s.OFGAClient)
+	bob := openfga.NewUser(&dbmodel.Identity{Username: "bob@external"}, s.OFGAClient)
 	err = bob.SetControllerAccess(context.Background(), s.JIMM.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, gc.Equals, nil)
 

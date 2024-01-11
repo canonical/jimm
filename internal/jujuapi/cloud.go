@@ -133,7 +133,7 @@ func (r *controllerRoot) UserCredentials(ctx context.Context, userclouds jujupar
 			results[i].Error = mapError(errors.E(op, err, errors.CodeBadRequest))
 			continue
 		}
-		err = r.jimm.ForEachUserCloudCredential(ctx, user.User, cld, func(c *dbmodel.CloudCredential) error {
+		err = r.jimm.ForEachUserCloudCredential(ctx, user.Identity, cld, func(c *dbmodel.CloudCredential) error {
 			results[i].Result = append(results[i].Result, c.Tag().String())
 			return nil
 		})
@@ -169,7 +169,7 @@ func (r *controllerRoot) revokeCredential(ctx context.Context, tag string, force
 	if err != nil {
 		return errors.E(op, err, errors.CodeBadRequest)
 	}
-	if err := r.jimm.RevokeCloudCredential(ctx, r.user.User, ct, force); err != nil {
+	if err := r.jimm.RevokeCloudCredential(ctx, r.user.Identity, ct, force); err != nil {
 		return errors.E(op, err)
 	}
 	return nil
@@ -348,7 +348,7 @@ func (r *controllerRoot) CredentialContents(ctx context.Context, args jujuparams
 		return jujuparams.CredentialContentResults{Results: results}, nil
 	}
 
-	err := r.jimm.ForEachUserCloudCredential(ctx, r.user.User, names.CloudTag{}, func(c *dbmodel.CloudCredential) error {
+	err := r.jimm.ForEachUserCloudCredential(ctx, r.user.Identity, names.CloudTag{}, func(c *dbmodel.CloudCredential) error {
 		var result jujuparams.CredentialContentResult
 		var err error
 		result.Result, err = credentialContents(c)

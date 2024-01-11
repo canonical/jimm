@@ -31,7 +31,7 @@ func (s *dbSuite) TestAddModel(c *qt.C) {
 	err := s.Database.Migrate(context.Background(), true)
 	c.Assert(err, qt.Equals, nil)
 
-	u := dbmodel.User{
+	u := dbmodel.Identity{
 		Username: "bob@external",
 	}
 	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
@@ -104,7 +104,7 @@ func (s *dbSuite) TestGetModel(c *qt.C) {
 	err := s.Database.Migrate(context.Background(), true)
 	c.Assert(err, qt.Equals, nil)
 
-	u := dbmodel.User{
+	u := dbmodel.Identity{
 		Username: "bob@external",
 	}
 	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
@@ -162,7 +162,7 @@ func (s *dbSuite) TestGetModel(c *qt.C) {
 		},
 	}
 	model.CloudCredential.Cloud = dbmodel.Cloud{}
-	model.CloudCredential.Owner = dbmodel.User{}
+	model.CloudCredential.Owner = dbmodel.Identity{}
 	err = s.Database.AddModel(context.Background(), &model)
 	c.Assert(err, qt.Equals, nil)
 
@@ -204,7 +204,7 @@ func (s *dbSuite) TestUpdateModel(c *qt.C) {
 	err := s.Database.Migrate(context.Background(), true)
 	c.Assert(err, qt.Equals, nil)
 
-	u := dbmodel.User{
+	u := dbmodel.Identity{
 		Username: "bob@external",
 	}
 	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
@@ -282,7 +282,7 @@ func (s *dbSuite) TestDeleteModel(c *qt.C) {
 	err := s.Database.Migrate(context.Background(), true)
 	c.Assert(err, qt.Equals, nil)
 
-	u := dbmodel.User{
+	u := dbmodel.Identity{
 		Username: "bob@external",
 	}
 	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
@@ -356,7 +356,7 @@ func (s *dbSuite) TestGetModelsUsingCredential(c *qt.C) {
 	err := s.Database.Migrate(context.Background(), true)
 	c.Assert(err, qt.Equals, nil)
 
-	u := dbmodel.User{
+	u := dbmodel.Identity{
 		Username: "bob@external",
 	}
 	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)

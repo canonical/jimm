@@ -17,31 +17,31 @@ func TestGetUserUnconfiguredDatabase(t *testing.T) {
 	c := qt.New(t)
 
 	var d db.Database
-	err := d.GetUser(context.Background(), &dbmodel.User{})
+	err := d.GetUser(context.Background(), &dbmodel.Identity{})
 	c.Check(err, qt.ErrorMatches, `database not configured`)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeServerConfiguration)
 }
 
 func (s *dbSuite) TestGetUser(c *qt.C) {
 	ctx := context.Background()
-	err := s.Database.GetUser(ctx, &dbmodel.User{})
+	err := s.Database.GetUser(ctx, &dbmodel.Identity{})
 	c.Check(err, qt.ErrorMatches, `upgrade in progress`)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
 
 	err = s.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
-	err = s.Database.GetUser(ctx, &dbmodel.User{})
+	err = s.Database.GetUser(ctx, &dbmodel.Identity{})
 	c.Check(err, qt.ErrorMatches, `invalid username ""`)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
-	u := dbmodel.User{
+	u := dbmodel.Identity{
 		Username: "bob@external",
 	}
 	err = s.Database.GetUser(ctx, &u)
 	c.Assert(err, qt.IsNil)
 
-	u2 := dbmodel.User{
+	u2 := dbmodel.Identity{
 		Username: u.Username,
 	}
 	err = s.Database.GetUser(ctx, &u2)
@@ -53,25 +53,25 @@ func TestUpdateUserUnconfiguredDatabase(t *testing.T) {
 	c := qt.New(t)
 
 	var d db.Database
-	err := d.UpdateUser(context.Background(), &dbmodel.User{})
+	err := d.UpdateUser(context.Background(), &dbmodel.Identity{})
 	c.Check(err, qt.ErrorMatches, `database not configured`)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeServerConfiguration)
 }
 
 func (s *dbSuite) TestUpdateUser(c *qt.C) {
 	ctx := context.Background()
-	err := s.Database.UpdateUser(ctx, &dbmodel.User{})
+	err := s.Database.UpdateUser(ctx, &dbmodel.Identity{})
 	c.Check(err, qt.ErrorMatches, `upgrade in progress`)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
 
 	err = s.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
-	err = s.Database.UpdateUser(ctx, &dbmodel.User{})
+	err = s.Database.UpdateUser(ctx, &dbmodel.Identity{})
 	c.Check(err, qt.ErrorMatches, `invalid username ""`)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
-	u := dbmodel.User{
+	u := dbmodel.Identity{
 		Username: "bob@external",
 	}
 	err = s.Database.GetUser(ctx, &u)
@@ -80,7 +80,7 @@ func (s *dbSuite) TestUpdateUser(c *qt.C) {
 	err = s.Database.UpdateUser(ctx, &u)
 	c.Assert(err, qt.IsNil)
 
-	u2 := dbmodel.User{
+	u2 := dbmodel.Identity{
 		Username: u.Username,
 	}
 	err = s.Database.GetUser(ctx, &u2)
@@ -92,7 +92,7 @@ func TestGetUserCloudCredentialsUnconfiguredDatabase(t *testing.T) {
 	c := qt.New(t)
 
 	var d db.Database
-	_, err := d.GetUserCloudCredentials(context.Background(), &dbmodel.User{}, "")
+	_, err := d.GetUserCloudCredentials(context.Background(), &dbmodel.Identity{}, "")
 	c.Check(err, qt.ErrorMatches, `database not configured`)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeServerConfiguration)
 }
@@ -103,16 +103,16 @@ func (s *dbSuite) TestGetUserCloudCredentials(c *qt.C) {
 	err := s.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
-	_, err = s.Database.GetUserCloudCredentials(ctx, &dbmodel.User{}, "")
+	_, err = s.Database.GetUserCloudCredentials(ctx, &dbmodel.Identity{}, "")
 	c.Check(err, qt.ErrorMatches, `cloudcredential not found`)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
-	_, err = s.Database.GetUserCloudCredentials(ctx, &dbmodel.User{
+	_, err = s.Database.GetUserCloudCredentials(ctx, &dbmodel.Identity{
 		Username: "test",
 	}, "ec2")
 	c.Check(err, qt.IsNil)
 
-	u := dbmodel.User{
+	u := dbmodel.Identity{
 		Username: "bob@external",
 	}
 	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)

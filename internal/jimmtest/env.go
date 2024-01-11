@@ -181,7 +181,7 @@ func (m Model) addModelRelations(c *qt.C, jimmTag names.ControllerTag, db db.Dat
 // addControllerRelations adds permissions the model should have and adds permissions for users to the controller.
 func (ctl Controller) addControllerRelations(c *qt.C, jimmTag names.ControllerTag, db db.Database, client *openfga.OFGAClient) {
 	if ctl.dbo.AdminUser != "" {
-		user := openfga.NewUser(&dbmodel.User{
+		user := openfga.NewUser(&dbmodel.Identity{
 			Username: ctl.dbo.AdminUser,
 		}, client)
 		err := user.SetControllerAccess(context.Background(), ctl.dbo.ResourceTag(), ofganames.AdministratorRelation)
@@ -484,10 +484,10 @@ type User struct {
 	ControllerAccess string `json:"controller-access"`
 
 	env *Environment
-	dbo dbmodel.User
+	dbo dbmodel.Identity
 }
 
-func (u *User) DBObject(c *qt.C, db db.Database) dbmodel.User {
+func (u *User) DBObject(c *qt.C, db db.Database) dbmodel.Identity {
 	if u.dbo.ID != 0 {
 		return u.dbo
 	}

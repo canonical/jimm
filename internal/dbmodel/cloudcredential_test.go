@@ -36,7 +36,7 @@ func TestCloudCredential(t *testing.T) {
 		Cloud: dbmodel.Cloud{
 			Name: "test-cloud",
 		},
-		Owner: dbmodel.User{
+		Owner: dbmodel.Identity{
 			Username: "bob@external",
 		},
 		AuthType: "empty",
@@ -69,7 +69,7 @@ func TestCloudCredentialsCascadeOnDelete(t *testing.T) {
 	cred := dbmodel.CloudCredential{
 		Name:  "test-credential",
 		Cloud: cloud,
-		Owner: dbmodel.User{
+		Owner: dbmodel.Identity{
 			Username: "bob@external",
 		},
 	}

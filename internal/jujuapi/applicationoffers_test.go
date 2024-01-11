@@ -349,7 +349,7 @@ func (s *applicationOffersSuite) TestDestroyOffers(c *gc.C) {
 	}
 	err = s.JIMM.Database.GetApplicationOffer(context.Background(), &offer)
 	c.Assert(err, gc.Equals, nil)
-	charlie := openfga.NewUser(&dbmodel.User{Username: "charlie@external"}, s.OFGAClient)
+	charlie := openfga.NewUser(&dbmodel.Identity{Username: "charlie@external"}, s.OFGAClient)
 	err = charlie.SetApplicationOfferAccess(context.Background(), offer.ResourceTag(), ofganames.ReaderRelation)
 	c.Assert(err, gc.Equals, nil)
 

@@ -34,7 +34,7 @@ func (ta *testAuthenticator) Authenticate(ctx context.Context, req *jujuparams.L
 		return nil, ta.err
 	}
 	return &openfga.User{
-		User: &dbmodel.User{
+		Identity: &dbmodel.Identity{
 			Username: ta.username,
 		},
 	}, nil
@@ -142,11 +142,11 @@ func TestAuditLogAccess(t *testing.T) {
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
-	adminUser := openfga.NewUser(&dbmodel.User{Username: "alice"}, j.OpenFGAClient)
+	adminUser := openfga.NewUser(&dbmodel.Identity{Username: "alice"}, j.OpenFGAClient)
 	err = adminUser.SetControllerAccess(ctx, j.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, qt.IsNil)
 
-	user := openfga.NewUser(&dbmodel.User{Username: "bob"}, j.OpenFGAClient)
+	user := openfga.NewUser(&dbmodel.Identity{Username: "bob"}, j.OpenFGAClient)
 
 	// admin user can grant other users audit log access.
 	err = j.GrantAuditLogAccess(ctx, adminUser, user.ResourceTag())

@@ -31,7 +31,7 @@ type Model struct {
 
 	// Owner is user that owns the model.
 	OwnerUsername string
-	Owner         User `gorm:"foreignkey:OwnerUsername;references:Username"`
+	Owner         Identity `gorm:"foreignkey:OwnerUsername;references:Username"`
 
 	// Controller is the controller that is hosting the model.
 	ControllerID uint
@@ -103,7 +103,7 @@ func (m *Model) SetTag(t names.ModelTag) {
 }
 
 // FromModelUpdate updates the model from the given ModelUpdate.
-func (m *Model) SwitchOwner(u *User) {
+func (m *Model) SwitchOwner(u *Identity) {
 	m.OwnerUsername = u.Username
 	m.Owner = *u
 }

@@ -24,7 +24,7 @@ func TestSetUserModelDefaults(t *testing.T) {
 	now := time.Now()
 
 	type testConfig struct {
-		user             *dbmodel.User
+		user             *dbmodel.Identity
 		defaults         map[string]interface{}
 		expectedError    string
 		expectedDefaults *dbmodel.UserModelDefaults
@@ -37,7 +37,7 @@ func TestSetUserModelDefaults(t *testing.T) {
 	}{{
 		about: "defaults do not exist yet - defaults created",
 		setup: func(c *qt.C, j *jimm.JIMM) testConfig {
-			user := dbmodel.User{
+			user := dbmodel.Identity{
 				Username: "bob@external",
 			}
 			c.Assert(j.Database.DB.Create(&user).Error, qt.IsNil)
@@ -62,7 +62,7 @@ func TestSetUserModelDefaults(t *testing.T) {
 	}, {
 		about: "defaults already exist - defaults updated",
 		setup: func(c *qt.C, j *jimm.JIMM) testConfig {
-			user := dbmodel.User{
+			user := dbmodel.Identity{
 				Username: "bob@external",
 			}
 			c.Assert(j.Database.DB.Create(&user).Error, qt.IsNil)
@@ -97,7 +97,7 @@ func TestSetUserModelDefaults(t *testing.T) {
 	}, {
 		about: "user does not exist",
 		setup: func(c *qt.C, j *jimm.JIMM) testConfig {
-			user := dbmodel.User{
+			user := dbmodel.Identity{
 				Username: "bob@external",
 			}
 
@@ -116,7 +116,7 @@ func TestSetUserModelDefaults(t *testing.T) {
 	}, {
 		about: "cannot set agent-version",
 		setup: func(c *qt.C, j *jimm.JIMM) testConfig {
-			user := dbmodel.User{
+			user := dbmodel.Identity{
 				Username: "bob@external",
 			}
 			c.Assert(j.Database.DB.Create(&user).Error, qt.IsNil)

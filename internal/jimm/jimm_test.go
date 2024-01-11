@@ -45,32 +45,32 @@ func TestFindAuditEvents(t *testing.T) {
 	err = j.Database.Migrate(ctx, true)
 	c.Assert(err, qt.Equals, nil)
 
-	admin := openfga.NewUser(&dbmodel.User{Username: "alice@external"}, client)
+	admin := openfga.NewUser(&dbmodel.Identity{Username: "alice@external"}, client)
 	err = admin.SetControllerAccess(ctx, j.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, qt.IsNil)
 
-	privileged := openfga.NewUser(&dbmodel.User{Username: "bob@external"}, client)
+	privileged := openfga.NewUser(&dbmodel.Identity{Username: "bob@external"}, client)
 	err = privileged.SetControllerAccess(ctx, j.ResourceTag(), ofganames.AuditLogViewerRelation)
 	c.Assert(err, qt.IsNil)
 
-	unprivileged := openfga.NewUser(&dbmodel.User{Username: "eve@external"}, client)
+	unprivileged := openfga.NewUser(&dbmodel.Identity{Username: "eve@external"}, client)
 
 	events := []dbmodel.AuditLogEntry{{
 		Time:         now,
-		UserTag:      admin.User.Tag().String(),
+		UserTag:      admin.Identity.Tag().String(),
 		FacadeMethod: "Login",
 	}, {
 		Time:         now.Add(time.Hour),
-		UserTag:      admin.User.Tag().String(),
+		UserTag:      admin.Identity.Tag().String(),
 		FacadeMethod: "AddModel",
 	}, {
 		Time:         now.Add(2 * time.Hour),
-		UserTag:      privileged.User.Tag().String(),
+		UserTag:      privileged.Identity.Tag().String(),
 		Model:        "TestModel",
 		FacadeMethod: "Deploy",
 	}, {
 		Time:         now.Add(3 * time.Hour),
-		UserTag:      privileged.User.Tag().String(),
+		UserTag:      privileged.Identity.Tag().String(),
 		Model:        "TestModel",
 		FacadeMethod: "DestroyModel",
 	}}
@@ -220,7 +220,7 @@ func TestListControllers(t *testing.T) {
 
 	tests := []struct {
 		about               string
-		user                dbmodel.User
+		user                dbmodel.Identity
 		jimmAdmin           bool
 		expectedControllers []dbmodel.Controller
 		expectedError       string
@@ -308,7 +308,7 @@ func TestSetControllerDeprecated(t *testing.T) {
 
 	tests := []struct {
 		about         string
-		user          dbmodel.User
+		user          dbmodel.Identity
 		jimmAdmin     bool
 		deprecated    bool
 		expectedError string

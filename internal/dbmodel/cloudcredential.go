@@ -23,7 +23,7 @@ type CloudCredential struct {
 
 	// Owner is the user that owns this credential.
 	OwnerUsername string
-	Owner         User `gorm:"foreignKey:OwnerUsername;references:Username"`
+	Owner         Identity `gorm:"foreignKey:OwnerUsername;references:Username"`
 
 	// AuthType is the type of the credential.
 	AuthType string

@@ -135,7 +135,7 @@ func (d *Database) CloudDefaults(ctx context.Context, defaults *dbmodel.CloudDef
 }
 
 // ModelDefaultsForCloud returns the default config values for the specified cloud.
-func (d *Database) ModelDefaultsForCloud(ctx context.Context, user *dbmodel.User, cloud names.CloudTag) ([]dbmodel.CloudDefaults, error) {
+func (d *Database) ModelDefaultsForCloud(ctx context.Context, user *dbmodel.Identity, cloud names.CloudTag) ([]dbmodel.CloudDefaults, error) {
 	const op = errors.Op("db.ModelDefaultsForCloud")
 
 	if err := d.ready(); err != nil {

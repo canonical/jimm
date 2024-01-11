@@ -71,7 +71,7 @@ func (a JujuAuthenticator) Authenticate(ctx context.Context, req *jujuparams.Log
 	if ut.IsLocal() {
 		ut = ut.WithDomain("external")
 	}
-	u := &dbmodel.User{
+	u := &dbmodel.Identity{
 		Username:    ut.Id(),
 		DisplayName: ut.Name(),
 	}

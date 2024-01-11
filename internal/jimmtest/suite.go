@@ -58,7 +58,7 @@ type JIMMSuite struct {
 	// Authenticator configured.
 	JIMM *jimm.JIMM
 
-	AdminUser   *dbmodel.User
+	AdminUser   *dbmodel.Identity
 	OFGAClient  *openfga.OFGAClient
 	COFGAClient *cofga.Client
 	COFGAParams *cofga.OpenFGAParams
@@ -88,7 +88,7 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 
 	err = s.JIMM.Database.Migrate(ctx, false)
 	c.Assert(err, gc.Equals, nil)
-	s.AdminUser = &dbmodel.User{
+	s.AdminUser = &dbmodel.Identity{
 		Username:  "alice@external",
 		LastLogin: db.Now(),
 	}
@@ -145,7 +145,7 @@ func (s *JIMMSuite) TearDownTest(c *gc.C) {
 	}
 }
 
-func (s *JIMMSuite) NewUser(u *dbmodel.User) *openfga.User {
+func (s *JIMMSuite) NewUser(u *dbmodel.Identity) *openfga.User {
 	return openfga.NewUser(u, s.OFGAClient)
 }
 
@@ -175,7 +175,7 @@ func (s *JIMMSuite) AddController(c *gc.C, name string, info *api.Info) {
 
 func (s *JIMMSuite) UpdateCloudCredential(c *gc.C, tag names.CloudCredentialTag, cred jujuparams.CloudCredential) {
 	ctx := context.Background()
-	u := dbmodel.User{
+	u := dbmodel.Identity{
 		Username: tag.Owner().Id(),
 	}
 	user := openfga.NewUser(&u, s.JIMM.OpenFGAClient)
@@ -191,7 +191,7 @@ func (s *JIMMSuite) UpdateCloudCredential(c *gc.C, tag names.CloudCredentialTag,
 
 func (s *JIMMSuite) AddModel(c *gc.C, owner names.UserTag, name string, cloud names.CloudTag, region string, cred names.CloudCredentialTag) names.ModelTag {
 	ctx := context.Background()
-	u := dbmodel.User{
+	u := dbmodel.Identity{
 		Username: owner.Id(),
 	}
 	err := s.JIMM.Database.GetUser(ctx, &u)

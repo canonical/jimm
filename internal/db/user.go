@@ -19,7 +19,7 @@ import (
 // this information.
 //
 // GetUser returns an error with CodeNotFound if the username is invalid.
-func (d *Database) GetUser(ctx context.Context, u *dbmodel.User) error {
+func (d *Database) GetUser(ctx context.Context, u *dbmodel.Identity) error {
 	const op = errors.Op("db.GetUser")
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
@@ -40,7 +40,7 @@ func (d *Database) GetUser(ctx context.Context, u *dbmodel.User) error {
 // will not create a user if the user cannot be found.
 //
 // FetchUser returns an error with CodeNotFound if the username is invalid.
-func (d *Database) FetchUser(ctx context.Context, u *dbmodel.User) error {
+func (d *Database) FetchUser(ctx context.Context, u *dbmodel.Identity) error {
 	const op = errors.Op("db.FetchUser")
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
@@ -63,7 +63,7 @@ func (d *Database) FetchUser(ctx context.Context, u *dbmodel.User) error {
 //
 // UpdateUser returns an error with CodeNotFound if the username is
 // invalid.
-func (d *Database) UpdateUser(ctx context.Context, u *dbmodel.User) error {
+func (d *Database) UpdateUser(ctx context.Context, u *dbmodel.Identity) error {
 	const op = errors.Op("db.UpdateUser")
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
@@ -82,7 +82,7 @@ func (d *Database) UpdateUser(ctx context.Context, u *dbmodel.User) error {
 }
 
 // GetUserCloudCredentials fetches user cloud credentials for the specified cloud.
-func (d *Database) GetUserCloudCredentials(ctx context.Context, u *dbmodel.User, cloud string) ([]dbmodel.CloudCredential, error) {
+func (d *Database) GetUserCloudCredentials(ctx context.Context, u *dbmodel.Identity, cloud string) ([]dbmodel.CloudCredential, error) {
 	const op = errors.Op("db.GetUserCloudCredentials")
 	if err := d.ready(); err != nil {
 		return nil, errors.E(op, err)

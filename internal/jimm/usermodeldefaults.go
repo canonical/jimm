@@ -10,7 +10,7 @@ import (
 )
 
 // SetUserModelDefaults writes new default model setting values for the user.
-func (j *JIMM) SetUserModelDefaults(ctx context.Context, user *dbmodel.User, configs map[string]interface{}) error {
+func (j *JIMM) SetUserModelDefaults(ctx context.Context, user *dbmodel.Identity, configs map[string]interface{}) error {
 	const op = errors.Op("jimm.SetUserModelDefaults")
 
 	for k := range configs {
@@ -30,7 +30,7 @@ func (j *JIMM) SetUserModelDefaults(ctx context.Context, user *dbmodel.User, con
 }
 
 // UserModelDefaults returns the default config values for the user.
-func (j *JIMM) UserModelDefaults(ctx context.Context, user *dbmodel.User) (map[string]interface{}, error) {
+func (j *JIMM) UserModelDefaults(ctx context.Context, user *dbmodel.Identity) (map[string]interface{}, error) {
 	const op = errors.Op("jimm.UserModelDefaults")
 
 	defaults := dbmodel.UserModelDefaults{

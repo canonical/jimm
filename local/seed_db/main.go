@@ -47,7 +47,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	u := dbmodel.User{
+	u := dbmodel.Identity{
 		Username: petname.Generate(2, "-") + "@external",
 	}
 	if err = db.DB.Create(&u).Error; err != nil {

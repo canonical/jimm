@@ -255,7 +255,7 @@ func (s *relationSuite) TestRemoveRelation(c *gc.C) {
 }
 
 type environment struct {
-	users             []dbmodel.User
+	users             []dbmodel.Identity
 	clouds            []dbmodel.Cloud
 	credentials       []dbmodel.CloudCredential
 	controllers       []dbmodel.Controller
@@ -263,15 +263,15 @@ type environment struct {
 	applicationOffers []dbmodel.ApplicationOffer
 }
 
-func initializeEnvironment(c *gc.C, ctx context.Context, db *db.Database, u dbmodel.User) *environment {
+func initializeEnvironment(c *gc.C, ctx context.Context, db *db.Database, u dbmodel.Identity) *environment {
 	env := environment{}
 
-	u1 := dbmodel.User{
+	u1 := dbmodel.Identity{
 		Username: "eve@external",
 	}
 	c.Assert(db.DB.Create(&u1).Error, gc.IsNil)
 
-	env.users = []dbmodel.User{u, u1}
+	env.users = []dbmodel.Identity{u, u1}
 
 	cloud := dbmodel.Cloud{
 		Name: "test-cloud",
@@ -448,7 +448,7 @@ func (s *relationSuite) TestCheckRelationViaSuperuser(c *gc.C) {
 	err = db.GetGroup(ctx, &group)
 	c.Assert(err, gc.IsNil)
 
-	u := dbmodel.User{
+	u := dbmodel.Identity{
 		Username: petname.Generate(2, "-") + "@external",
 	}
 	c.Assert(db.DB.Create(&u).Error, gc.IsNil)

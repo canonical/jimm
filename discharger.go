@@ -106,7 +106,7 @@ func (md *macaroonDischarger) checkThirdPartyCaveat(ctx context.Context, req *ht
 	offerTag := jimmnames.NewApplicationOfferTag(offerUUID)
 
 	user := openfga.NewUser(
-		&dbmodel.User{
+		&dbmodel.Identity{
 			Username: userTag.Id(),
 		},
 		md.ofgaClient,

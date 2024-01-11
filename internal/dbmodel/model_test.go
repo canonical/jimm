@@ -316,8 +316,8 @@ func TestToJujuModelSummary(t *testing.T) {
 
 // initModelEnv initialises a controller, cloud and cloud-credential so
 // that a model can be created.
-func initModelEnv(c *qt.C, db *gorm.DB) (dbmodel.Cloud, dbmodel.CloudCredential, dbmodel.Controller, dbmodel.User) {
-	u := dbmodel.User{
+func initModelEnv(c *qt.C, db *gorm.DB) (dbmodel.Cloud, dbmodel.CloudCredential, dbmodel.Controller, dbmodel.Identity) {
+	u := dbmodel.Identity{
 		Username: "bob@external",
 	}
 	c.Assert(db.Create(&u).Error, qt.IsNil)
@@ -414,7 +414,7 @@ func TestModelFromJujuModelInfo(t *testing.T) {
 		CloudCredential: dbmodel.CloudCredential{
 			Name:      "test-cred",
 			CloudName: "test-cloud",
-			Owner: dbmodel.User{
+			Owner: dbmodel.Identity{
 				Username: "bob@external",
 			},
 		},

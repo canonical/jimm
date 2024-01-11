@@ -237,7 +237,7 @@ users:
 			String: "00000001-0000-0000-0000-0000-000000000001",
 			Valid:  true,
 		},
-		Owner: dbmodel.User{
+		Owner: dbmodel.Identity{
 			Username: "alice@external",
 		},
 		Controller: dbmodel.Controller{
@@ -351,7 +351,7 @@ users:
 			String: "00000001-0000-0000-0000-0000-000000000001",
 			Valid:  true,
 		},
-		Owner: dbmodel.User{
+		Owner: dbmodel.Identity{
 			Username: "alice@external",
 		},
 		Controller: dbmodel.Controller{
@@ -444,7 +444,7 @@ users:
 			String: "00000001-0000-0000-0000-0000-000000000001",
 			Valid:  true,
 		},
-		Owner: dbmodel.User{
+		Owner: dbmodel.Identity{
 			Username: "alice@external",
 		},
 		Controller: dbmodel.Controller{
@@ -544,7 +544,7 @@ users:
 			String: "00000001-0000-0000-0000-0000-000000000001",
 			Valid:  true,
 		},
-		Owner: dbmodel.User{
+		Owner: dbmodel.Identity{
 			Username: "bob@external",
 		},
 		Controller: dbmodel.Controller{
@@ -945,7 +945,7 @@ func TestAddModel(t *testing.T) {
 				isModelAdmin, err := openfga.IsAdministrator(
 					context.Background(),
 					openfga.NewUser(
-						&dbmodel.User{
+						&dbmodel.Identity{
 							Username: ownerId,
 						},
 						client,
@@ -1296,7 +1296,7 @@ func TestModelInfo(t *testing.T) {
 			env := jimmtest.ParseEnvironment(c, test.env)
 			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
 
-			dbUser := &dbmodel.User{
+			dbUser := &dbmodel.Identity{
 				Username: test.username,
 			}
 			user := openfga.NewUser(dbUser, client)
@@ -3353,7 +3353,7 @@ var updateModelCredentialTests = []struct {
 			String: "00000002-0000-0000-0000-000000000001",
 			Valid:  true,
 		},
-		Owner: dbmodel.User{
+		Owner: dbmodel.Identity{
 			Username: "alice@external",
 		},
 		Controller: dbmodel.Controller{

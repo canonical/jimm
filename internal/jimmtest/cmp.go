@@ -32,7 +32,7 @@ func ControllerTagCompare(a, b dbmodel.Controller) bool {
 // determines if two database user objects are equal based on comparing
 // the Tag values. This is often sufficient where the objects are embedded
 // in another database object.
-func UserTagCompare(a, b dbmodel.User) bool {
+func UserTagCompare(a, b dbmodel.Identity) bool {
 	return a.Tag() == b.Tag()
 }
 

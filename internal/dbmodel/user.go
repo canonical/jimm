@@ -10,8 +10,8 @@ import (
 	"gorm.io/gorm"
 )
 
-// A User represents a JIMM user.
-type User struct {
+// A Identity represents a JIMM user.
+type Identity struct {
 	gorm.Model
 
 	// Username is the username for the user. This is the juju
@@ -37,7 +37,7 @@ type User struct {
 }
 
 // Tag returns a names.Tag for the user.
-func (u User) Tag() names.Tag {
+func (u Identity) Tag() names.Tag {
 	return u.ResourceTag()
 }
 
@@ -45,17 +45,17 @@ func (u User) Tag() names.Tag {
 // is intended to be used in places where we expect to see
 // a concrete type names.UserTag instead of the
 // names.Tag interface.
-func (u User) ResourceTag() names.UserTag {
+func (u Identity) ResourceTag() names.UserTag {
 	return names.NewUserTag(u.Username)
 }
 
 // SetTag sets the username of the user to the value from the given tag.
-func (u *User) SetTag(t names.UserTag) {
+func (u *Identity) SetTag(t names.UserTag) {
 	u.Username = t.Id()
 }
 
 // ToJujuUserInfo converts a User into a juju UserInfo value.
-func (u User) ToJujuUserInfo() jujuparams.UserInfo {
+func (u Identity) ToJujuUserInfo() jujuparams.UserInfo {
 	var ui jujuparams.UserInfo
 	ui.Username = u.Username
 	ui.DisplayName = u.DisplayName

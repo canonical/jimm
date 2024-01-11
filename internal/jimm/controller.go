@@ -169,7 +169,7 @@ func (j *JIMM) AddController(ctx context.Context, user *openfga.User, ctl *dbmod
 		if cloud.ResourceTag().String() == ms.CloudTag {
 			everyoneTag := names.NewUserTag(ofganames.EveryoneUser)
 			everyone := openfga.NewUser(
-				&dbmodel.User{
+				&dbmodel.Identity{
 					Username: everyoneTag.Id(),
 				},
 				j.OpenFGAClient,
@@ -300,7 +300,7 @@ func (j *JIMM) GetJimmControllerAccess(ctx context.Context, user *openfga.User, 
 		return "", errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
-	var targetUser dbmodel.User
+	var targetUser dbmodel.Identity
 	targetUser.SetTag(tag)
 	targetUserTag := openfga.NewUser(&targetUser, j.OpenFGAClient)
 
@@ -378,7 +378,7 @@ func (j *JIMM) ImportModel(ctx context.Context, user *openfga.User, controllerNa
 	if ownerTag.IsLocal() {
 		return errors.E(op, "cannot import model from local user, try --owner to switch the model owner")
 	}
-	ownerUser := dbmodel.User{}
+	ownerUser := dbmodel.Identity{}
 	ownerUser.SetTag(ownerTag)
 	err = j.Database.GetUser(ctx, &ownerUser)
 	if err != nil {
@@ -527,7 +527,7 @@ func (j *JIMM) SetControllerConfig(ctx context.Context, user *openfga.User, args
 }
 
 // GetControllerConfig returns jimm's controller config.
-func (j *JIMM) GetControllerConfig(ctx context.Context, u *dbmodel.User) (*dbmodel.ControllerConfig, error) {
+func (j *JIMM) GetControllerConfig(ctx context.Context, u *dbmodel.Identity) (*dbmodel.ControllerConfig, error) {
 	const op = errors.Op("jimm.GetControllerConfig")
 	config := dbmodel.ControllerConfig{
 		Name:   "jimm",

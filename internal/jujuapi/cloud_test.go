@@ -946,13 +946,13 @@ func (s *cloudSuite) TestListCloudInfo(c *gc.C) {
 		err = client.GrantCloud("bob@external", "add-model", "test-cloud")
 		c.Assert(err, gc.Equals, nil)
 	*/
-	bob := openfga.NewUser(&dbmodel.User{Username: "bob@external"}, s.OFGAClient)
+	bob := openfga.NewUser(&dbmodel.Identity{Username: "bob@external"}, s.OFGAClient)
 	err = bob.SetCloudAccess(context.Background(), names.NewCloudTag("test-cloud"), ofganames.CanAddModelRelation)
 	c.Assert(err, gc.Equals, nil)
 	err = bob.SetCloudAccess(context.Background(), names.NewCloudTag(jimmtest.TestCloudName), ofganames.CanAddModelRelation)
 	c.Assert(err, gc.Equals, nil)
 
-	alice := openfga.NewUser(&dbmodel.User{Username: "alice@external"}, s.OFGAClient)
+	alice := openfga.NewUser(&dbmodel.Identity{Username: "alice@external"}, s.OFGAClient)
 	err = alice.SetCloudAccess(context.Background(), names.NewCloudTag(jimmtest.TestCloudName), ofganames.CanAddModelRelation)
 	c.Assert(err, gc.Equals, nil)
 

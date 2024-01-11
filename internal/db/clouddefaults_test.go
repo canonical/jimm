@@ -22,7 +22,7 @@ func (s *dbSuite) TestModelDefaults(c *qt.C) {
 	err := s.Database.Migrate(ctx, true)
 	c.Assert(err, qt.Equals, nil)
 
-	u := dbmodel.User{
+	u := dbmodel.Identity{
 		Username: "bob@external",
 	}
 	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
@@ -155,7 +155,7 @@ func TestModelDefaultsForCloudUnconfiguredDatabase(t *testing.T) {
 	c := qt.New(t)
 
 	var d db.Database
-	_, err := d.ModelDefaultsForCloud(context.Background(), &dbmodel.User{}, names.NewCloudTag("test-cloud"))
+	_, err := d.ModelDefaultsForCloud(context.Background(), &dbmodel.Identity{}, names.NewCloudTag("test-cloud"))
 	c.Check(err, qt.ErrorMatches, `database not configured`)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeServerConfiguration)
 }

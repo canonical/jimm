@@ -102,7 +102,7 @@ type modelBuilder struct {
 
 	name          string
 	config        map[string]interface{}
-	owner         *dbmodel.User
+	owner         *dbmodel.Identity
 	credential    *dbmodel.CloudCredential
 	controller    *dbmodel.Controller
 	cloud         *dbmodel.Cloud
@@ -146,7 +146,7 @@ func (b *modelBuilder) jujuModelCreateArgs() (*jujuparams.ModelCreateArgs, error
 }
 
 // WithOwner returns a builder with the specified owner.
-func (b *modelBuilder) WithOwner(owner *dbmodel.User) *modelBuilder {
+func (b *modelBuilder) WithOwner(owner *dbmodel.Identity) *modelBuilder {
 	if b.err != nil {
 		return b
 	}
@@ -519,7 +519,7 @@ func (b *modelBuilder) JujuModelInfo() *jujuparams.ModelInfo {
 func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCreateArgs) (_ *jujuparams.ModelInfo, err error) {
 	const op = errors.Op("jimm.AddModel")
 
-	owner := &dbmodel.User{
+	owner := &dbmodel.Identity{
 		Username: args.Owner.Id(),
 	}
 	err = j.Database.GetUser(ctx, owner)
@@ -540,7 +540,7 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 	}
 
 	// fetch user model defaults
-	userConfig, err := j.UserModelDefaults(ctx, user.User)
+	userConfig, err := j.UserModelDefaults(ctx, user.Identity)
 	if err != nil && errors.ErrorCode(err) != errors.CodeNotFound {
 		return nil, errors.E(op, "failed to fetch cloud defaults")
 	}
@@ -850,7 +850,7 @@ func (j *JIMM) GrantModelAccess(ctx context.Context, user *openfga.User, mt name
 	}
 
 	err = j.doModelAdmin(ctx, user, mt, func(_ *dbmodel.Model, _ API) error {
-		targetUser := &dbmodel.User{}
+		targetUser := &dbmodel.Identity{}
 		targetUser.SetTag(ut)
 		if err := j.Database.GetUser(ctx, targetUser); err != nil {
 			return err
@@ -928,7 +928,7 @@ func (j *JIMM) RevokeModelAccess(ctx context.Context, user *openfga.User, mt nam
 	}
 
 	err = j.doModel(ctx, user, mt, requiredAccess, func(_ *dbmodel.Model, _ API) error {
-		targetUser := &dbmodel.User{}
+		targetUser := &dbmodel.Identity{}
 		targetUser.SetTag(ut)
 		if err := j.Database.GetUser(ctx, targetUser); err != nil {
 			return err

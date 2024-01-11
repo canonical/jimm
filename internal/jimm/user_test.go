@@ -52,7 +52,7 @@ func TestAuthenticate(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	auth.User = openfga.NewUser(
-		&dbmodel.User{
+		&dbmodel.Identity{
 			Username:    "bob@external",
 			DisplayName: "Bob",
 		},
@@ -75,13 +75,13 @@ func TestAuthenticate(t *testing.T) {
 	c.Check(u.Username, qt.Equals, "bob@external")
 	c.Check(u.JimmAdmin, qt.IsTrue)
 
-	u2 := dbmodel.User{
+	u2 := dbmodel.Identity{
 		Username: "bob@external",
 	}
 	err = j.Database.GetUser(ctx, &u2)
 	c.Assert(err, qt.IsNil)
 
-	c.Check(u2, qt.DeepEquals, dbmodel.User{
+	c.Check(u2, qt.DeepEquals, dbmodel.Identity{
 		Model:       u.Model,
 		Username:    "bob@external",
 		DisplayName: "Bob",

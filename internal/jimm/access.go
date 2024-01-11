@@ -317,7 +317,7 @@ func (j *JIMM) GrantAuditLogAccess(ctx context.Context, user *openfga.User, targ
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
-	targetUser := &dbmodel.User{}
+	targetUser := &dbmodel.Identity{}
 	targetUser.SetTag(targetUserTag)
 	err := j.Database.GetUser(ctx, targetUser)
 	if err != nil {
@@ -340,7 +340,7 @@ func (j *JIMM) RevokeAuditLogAccess(ctx context.Context, user *openfga.User, tar
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
-	targetUser := &dbmodel.User{}
+	targetUser := &dbmodel.Identity{}
 	targetUser.SetTag(targetUserTag)
 	err := j.Database.GetUser(ctx, targetUser)
 	if err != nil {
