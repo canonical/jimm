@@ -69,7 +69,7 @@ func (s *dbSuite) TestAddModel(c *qt.C) {
 			String: "00000001-0000-0000-0000-0000-000000000001",
 			Valid:  true,
 		},
-		OwnerUsername:     u.Name,
+		OwnerIdentityName: u.Name,
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
 		CloudCredentialID: cred.ID,
@@ -142,7 +142,7 @@ func (s *dbSuite) TestGetModel(c *qt.C) {
 			String: "00000001-0000-0000-0000-0000-000000000001",
 			Valid:  true,
 		},
-		OwnerUsername:     u.Name,
+		OwnerIdentityName: u.Name,
 		Owner:             u,
 		ControllerID:      controller.ID,
 		Controller:        controller,
@@ -189,8 +189,8 @@ func (s *dbSuite) TestGetModel(c *qt.C) {
 	c.Assert(eError.Code, qt.Equals, errors.CodeNotFound)
 
 	dbModel = dbmodel.Model{
-		Name:          model.Name,
-		OwnerUsername: model.OwnerUsername,
+		Name:              model.Name,
+		OwnerIdentityName: model.OwnerIdentityName,
 	}
 	err = s.Database.GetModel(context.Background(), &dbModel)
 	c.Assert(err, qt.IsNil)
@@ -238,7 +238,7 @@ func (s *dbSuite) TestUpdateModel(c *qt.C) {
 
 	model := dbmodel.Model{
 		Name:              "test-model-1",
-		OwnerUsername:     u.Name,
+		OwnerIdentityName: u.Name,
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
 		CloudCredentialID: cred.ID,
@@ -316,7 +316,7 @@ func (s *dbSuite) TestDeleteModel(c *qt.C) {
 
 	model := dbmodel.Model{
 		Name:              "test-model-1",
-		OwnerUsername:     u.Name,
+		OwnerIdentityName: u.Name,
 		ControllerID:      controller.ID,
 		Controller:        controller,
 		CloudRegionID:     cloud.Regions[0].ID,
@@ -401,7 +401,7 @@ func (s *dbSuite) TestGetModelsUsingCredential(c *qt.C) {
 			String: "00000001-0000-0000-0000-0000-000000000001",
 			Valid:  true,
 		},
-		OwnerUsername:     u.Name,
+		OwnerIdentityName: u.Name,
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
 		CloudCredentialID: cred1.ID,
@@ -425,7 +425,7 @@ func (s *dbSuite) TestGetModelsUsingCredential(c *qt.C) {
 			String: "00000001-0000-0000-0000-0000-000000000002",
 			Valid:  true,
 		},
-		OwnerUsername:     u.Name,
+		OwnerIdentityName: u.Name,
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
 		CloudCredentialID: cred2.ID,
@@ -454,7 +454,7 @@ func (s *dbSuite) TestGetModelsUsingCredential(c *qt.C) {
 			String: "00000001-0000-0000-0000-0000-000000000001",
 			Valid:  true,
 		},
-		OwnerUsername:     u.Name,
+		OwnerIdentityName: u.Name,
 		ControllerID:      controller.ID,
 		Controller:        controller,
 		CloudRegionID:     cloud.Regions[0].ID,

@@ -315,7 +315,7 @@ func initializeEnvironment(c *gc.C, ctx context.Context, db *db.Database, u dbmo
 			String: "acdbf3e5-67e1-42a2-a2dc-64505265c030",
 			Valid:  true,
 		},
-		OwnerUsername:     u.Name,
+		OwnerIdentityName: u.Name,
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
 		CloudCredentialID: cred.ID,
@@ -327,7 +327,7 @@ func initializeEnvironment(c *gc.C, ctx context.Context, db *db.Database, u dbmo
 	offer := dbmodel.ApplicationOffer{
 		ID:              1,
 		UUID:            "436b2264-d8f8-4e24-b16f-dd43c4116528",
-		URL:             env.controllers[0].Name + ":" + env.models[0].OwnerUsername + "/" + env.models[0].Name + ".testoffer1",
+		URL:             env.controllers[0].Name + ":" + env.models[0].OwnerIdentityName + "/" + env.models[0].Name + ".testoffer1",
 		Name:            "testoffer1",
 		ModelID:         model.ID,
 		Model:           model,
@@ -371,11 +371,11 @@ func (s *relationSuite) TestListRelations(c *gc.C) {
 	}, {
 		Object:       "group-group-1#member",
 		Relation:     "administrator",
-		TargetObject: "model-" + env.controllers[0].Name + ":" + env.models[0].OwnerUsername + "/" + env.models[0].Name,
+		TargetObject: "model-" + env.controllers[0].Name + ":" + env.models[0].OwnerIdentityName + "/" + env.models[0].Name,
 	}, {
 		Object:       "user-" + env.users[1].Name,
 		Relation:     "administrator",
-		TargetObject: "applicationoffer-" + env.controllers[0].Name + ":" + env.applicationOffers[0].Model.OwnerUsername + "/" + env.applicationOffers[0].Model.Name + "." + env.applicationOffers[0].Name,
+		TargetObject: "applicationoffer-" + env.controllers[0].Name + ":" + env.applicationOffers[0].Model.OwnerIdentityName + "/" + env.applicationOffers[0].Model.Name + "." + env.applicationOffers[0].Name,
 	}}
 	for _, relation := range relations {
 		_, err := cmdtesting.RunCommand(c, cmd.NewAddRelationCommandForTesting(s.ClientStore(), bClient), relation.Object, relation.Relation, relation.TargetObject)
@@ -490,7 +490,7 @@ func (s *relationSuite) TestCheckRelationViaSuperuser(c *gc.C) {
 			String: id.String(),
 			Valid:  true,
 		},
-		OwnerUsername:     u.Name,
+		OwnerIdentityName: u.Name,
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
 		CloudCredentialID: cred.ID,

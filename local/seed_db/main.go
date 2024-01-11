@@ -100,7 +100,7 @@ func main() {
 			String: id.String(),
 			Valid:  true,
 		},
-		OwnerUsername:     u.Name,
+		OwnerIdentityName: u.Name,
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
 		CloudCredentialID: cred.ID,

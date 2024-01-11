@@ -61,7 +61,7 @@ func (j *JIMM) Offer(ctx context.Context, user *openfga.User, offer AddApplicati
 	}
 
 	offerURL := crossmodel.OfferURL{
-		User:      model.OwnerUsername,
+		User:      model.OwnerIdentityName,
 		ModelName: model.Name,
 		// Confusingly the application name in the offer URL is
 		// actually the offer name.
@@ -726,8 +726,8 @@ func (j *JIMM) ListApplicationOffers(ctx context.Context, user *openfga.User, fi
 
 	for _, k := range keys {
 		m := dbmodel.Model{
-			Name:          k.name,
-			OwnerUsername: k.ownerUsername,
+			Name:              k.name,
+			OwnerIdentityName: k.ownerUsername,
 		}
 		offerDetails, err := j.listApplicationOffersForModel(ctx, user, &m, modelFilters[k])
 		if err != nil {

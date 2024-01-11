@@ -452,7 +452,7 @@ func (s *applicationOffersSuite) TestFindApplicationOffers(c *gc.C) {
 	client2 := applicationoffers.NewClient(conn2)
 
 	offers, err = client2.FindApplicationOffers(crossmodel.ApplicationOfferFilter{
-		OwnerName:       s.Model.OwnerUsername,
+		OwnerName:       s.Model.OwnerIdentityName,
 		ModelName:       s.Model.Name,
 		ApplicationName: "test-app",
 		OfferName:       "test-offer1",
