@@ -15,8 +15,8 @@ ALTER TABLE IF EXISTS application_offer_connections RENAME COLUMN username TO id
 ALTER TABLE IF EXISTS user_model_defaults RENAME COLUMN username TO identity_name;
 
 -- TODO (babakks): Do we need to rename these two instances as well?
-ALTER TABLE IF EXISTS controllers RENAME COLUMN admin_user TO admin_identity_name;
-ALTER TABLE IF EXISTS audit_log RENAME COLUMN user_tag TO identity_tag;
+--   - ALTER TABLE IF EXISTS controllers RENAME COLUMN admin_user TO admin_identity_name;
+--   - ALTER TABLE IF EXISTS audit_log RENAME COLUMN user_tag TO identity_tag;
 
 -- We don't need to rename columns in these tables, because they're already
 -- dropped in an earlier migration:
