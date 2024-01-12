@@ -45,7 +45,7 @@ func (j *JIMM) AddServiceAccount(ctx context.Context, u *openfga.User, clientId 
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(svcTag),
 	}
-	err = j.AuthorizationClient().AddRelation(ctx, addTuple)
+	err = j.OpenFGAClient.AddRelation(ctx, addTuple)
 	if err != nil {
 		return errors.E(op, err)
 	}
