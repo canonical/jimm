@@ -70,7 +70,7 @@ func (d *Database) UpdateUser(ctx context.Context, u *dbmodel.Identity) error {
 	}
 
 	if u.Name == "" {
-		return errors.E(op, errors.CodeNotFound, `invalid username ""`)
+		return errors.E(op, errors.CodeNotFound, `invalid identity name ""`)
 	}
 
 	db := d.DB.WithContext(ctx)
