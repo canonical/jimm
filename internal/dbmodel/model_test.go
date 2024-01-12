@@ -57,7 +57,7 @@ func TestRecreateDeletedModel(t *testing.T) {
 		CloudRegion:     cl.Regions[0],
 		CloudCredential: cred,
 	}
-	c.Check(db.Create(&m2).Error, qt.ErrorMatches, `.*violates unique constraint "models_controller_id_owner_username_name_key".*`)
+	c.Check(db.Create(&m2).Error, qt.ErrorMatches, `.*violates unique constraint "models_controller_id_owner_identity_name_key".*`)
 
 	c.Assert(db.Delete(&m1).Error, qt.IsNil)
 	c.Check(db.First(&m1).Error, qt.Equals, gorm.ErrRecordNotFound)

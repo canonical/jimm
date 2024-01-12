@@ -27,7 +27,7 @@ func (d *Database) SetCloudCredential(ctx context.Context, cred *dbmodel.CloudCr
 	if err := db.Clauses(clause.OnConflict{
 		Columns: []clause.Column{
 			{Name: "cloud_name"},
-			{Name: "owner_username"},
+			{Name: "owner_identity_name"},
 			{Name: "name"},
 		},
 		DoUpdates: clause.AssignmentColumns([]string{"auth_type", "label", "attributes_in_vault", "attributes", "valid"}),
