@@ -63,9 +63,9 @@ func (d *Database) UserModelDefaults(ctx context.Context, defaults *dbmodel.User
 	}
 	db := d.DB.WithContext(ctx)
 
-	db = db.Where("username = ?", defaults.IdentityName)
+	db = db.Where("identity_name = ?", defaults.IdentityName)
 
-	result := db.Preload("User").First(&defaults)
+	result := db.Preload("Identity").First(&defaults)
 	if result.Error != nil {
 		err := dbError(result.Error)
 		if errors.ErrorCode(err) == errors.CodeNotFound {

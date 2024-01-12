@@ -20,7 +20,7 @@ func TestUser(t *testing.T) {
 	db := gormDB(c)
 
 	var u0 dbmodel.Identity
-	result := db.Where("username = ?", "bob@external").First(&u0)
+	result := db.Where("name = ?", "bob@external").First(&u0)
 	c.Check(result.Error, qt.Equals, gorm.ErrRecordNotFound)
 
 	u1 := dbmodel.Identity{
@@ -32,7 +32,7 @@ func TestUser(t *testing.T) {
 	c.Check(result.RowsAffected, qt.Equals, int64(1))
 
 	var u2 dbmodel.Identity
-	result = db.Where("username = ?", "bob@external").First(&u2)
+	result = db.Where("name = ?", "bob@external").First(&u2)
 	c.Assert(result.Error, qt.IsNil)
 	c.Check(u2, qt.DeepEquals, u1)
 
@@ -41,7 +41,7 @@ func TestUser(t *testing.T) {
 	result = db.Save(&u2)
 	c.Assert(result.Error, qt.IsNil)
 	var u3 dbmodel.Identity
-	result = db.Where("username = ?", "bob@external").First(&u3)
+	result = db.Where("name = ?", "bob@external").First(&u3)
 	c.Assert(result.Error, qt.IsNil)
 	c.Check(u3, qt.DeepEquals, u2)
 
@@ -50,7 +50,7 @@ func TestUser(t *testing.T) {
 		DisplayName: "bob",
 	}
 	result = db.Create(&u4)
-	c.Check(result.Error, qt.ErrorMatches, `.*violates unique constraint "users_username_key".*`)
+	c.Check(result.Error, qt.ErrorMatches, `.*violates unique constraint "identities_name_key".*`)
 }
 
 func TestUserTag(t *testing.T) {

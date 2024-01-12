@@ -32,7 +32,7 @@ func (s *dbSuite) TestGetUser(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 
 	err = s.Database.GetUser(ctx, &dbmodel.Identity{})
-	c.Check(err, qt.ErrorMatches, `invalid username ""`)
+	c.Check(err, qt.ErrorMatches, `invalid identity name ""`)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
 	u := dbmodel.Identity{
@@ -68,7 +68,7 @@ func (s *dbSuite) TestUpdateUser(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 
 	err = s.Database.UpdateUser(ctx, &dbmodel.Identity{})
-	c.Check(err, qt.ErrorMatches, `invalid username ""`)
+	c.Check(err, qt.ErrorMatches, `invalid identity name ""`)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
 	u := dbmodel.Identity{

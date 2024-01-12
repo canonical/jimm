@@ -26,11 +26,11 @@ func (d *Database) GetUser(ctx context.Context, u *dbmodel.Identity) error {
 	}
 
 	if u.Name == "" {
-		return errors.E(op, errors.CodeNotFound, `invalid username ""`)
+		return errors.E(op, errors.CodeNotFound, `invalid identity name ""`)
 	}
 
 	db := d.DB.WithContext(ctx)
-	if err := db.Where("username = ?", u.Name).FirstOrCreate(&u).Error; err != nil {
+	if err := db.Where("name = ?", u.Name).FirstOrCreate(&u).Error; err != nil {
 		return errors.E(op, err)
 	}
 	return nil
@@ -47,11 +47,11 @@ func (d *Database) FetchUser(ctx context.Context, u *dbmodel.Identity) error {
 	}
 
 	if u.Name == "" {
-		return errors.E(op, errors.CodeNotFound, `invalid username ""`)
+		return errors.E(op, errors.CodeNotFound, `invalid identity name ""`)
 	}
 
 	db := d.DB.WithContext(ctx)
-	if err := db.Where("username = ?", u.Name).First(&u).Error; err != nil {
+	if err := db.Where("name = ?", u.Name).First(&u).Error; err != nil {
 		return errors.E(op, err)
 	}
 	return nil

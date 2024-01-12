@@ -83,7 +83,7 @@ func (s *dbSuite) TestSetCloudCredential(c *qt.C) {
 	c.Assert(err, qt.Equals, nil)
 
 	var dbCred dbmodel.CloudCredential
-	result := s.Database.DB.Where("cloud_name = ? AND owner_username = ? AND name = ?", cloud.Name, u.Name, cred.Name).First(&dbCred)
+	result := s.Database.DB.Where("cloud_name = ? AND owner_identity_name = ? AND name = ?", cloud.Name, u.Name, cred.Name).First(&dbCred)
 	c.Assert(result.Error, qt.Equals, nil)
 	c.Assert(dbCred, qt.DeepEquals, cred)
 
