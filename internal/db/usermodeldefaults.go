@@ -40,7 +40,7 @@ func (d *Database) SetUserModelDefaults(ctx context.Context, defaults *dbmodel.U
 		}
 		if err := db.Clauses(clause.OnConflict{
 			Columns: []clause.Column{
-				{Name: "username"},
+				{Name: "identity_name"},
 			},
 			DoUpdates: clause.AssignmentColumns([]string{"defaults"}),
 		}).Create(&dbDefaults).Error; err != nil {

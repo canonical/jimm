@@ -46,7 +46,7 @@ func (d *Database) SetCloudDefaults(ctx context.Context, defaults *dbmodel.Cloud
 		}
 		if err := db.Clauses(clause.OnConflict{
 			Columns: []clause.Column{
-				{Name: "username"},
+				{Name: "identity_name"},
 				{Name: "cloud_id"},
 				{Name: "region"},
 			},
@@ -89,7 +89,7 @@ func (d *Database) UnsetCloudDefaults(ctx context.Context, defaults *dbmodel.Clo
 		}
 		if err := db.Clauses(clause.OnConflict{
 			Columns: []clause.Column{
-				{Name: "username"},
+				{Name: "identity_name"},
 				{Name: "cloud_id"},
 				{Name: "region"},
 			},
