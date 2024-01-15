@@ -540,7 +540,7 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 	}
 
 	// fetch user model defaults
-	userConfig, err := j.UserModelDefaults(ctx, user.Identity)
+	userConfig, err := j.IdentityModelDefaults(ctx, user.Identity)
 	if err != nil && errors.ErrorCode(err) != errors.CodeNotFound {
 		return nil, errors.E(op, "failed to fetch cloud defaults")
 	}

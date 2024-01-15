@@ -4,8 +4,8 @@ package dbmodel
 
 import "gorm.io/gorm"
 
-// UserModelDefaults holds user's model defaults.
-type UserModelDefaults struct {
+// IdentityModelDefaults holds identities's model defaults.
+type IdentityModelDefaults struct {
 	gorm.Model
 
 	IdentityName string
