@@ -40,7 +40,7 @@ func (t ServiceAccountTag) String() string { return ServiceAccountTagKind + "-" 
 func NewServiceAccountTag(clientId string) ServiceAccountTag {
 	id := validClientId.FindString(clientId)
 
-	if id == "" {
+	if !IsValidServiceAccountId(clientId) {
 		panic(fmt.Sprintf("invalid client tag %q", clientId))
 	}
 

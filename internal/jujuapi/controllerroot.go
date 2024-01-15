@@ -130,6 +130,14 @@ func newControllerRoot(j JIMM, p Params) *controllerRoot {
 	return r
 }
 
+// SetUser sets the logged in user.
+// Exported for test purposes.
+func (r *controllerRoot) SetUser(u *openfga.User) {
+	r.mu.Lock()
+	r.user = u
+	r.mu.Unlock()
+}
+
 // masquarade allows a controller superuser to perform an action on behalf
 // of another user. masquarade checks that the authenticated user is a
 // controller user and that the requested is a valid JAAS user. If these

@@ -40,9 +40,7 @@ func (r *controllerRoot) Login(ctx context.Context, req jujuparams.LoginRequest)
 		return jujuparams.LoginResult{}, errors.E(op, err)
 	}
 
-	r.mu.Lock()
-	r.user = u
-	r.mu.Unlock()
+	r.SetUser(u)
 
 	var facades []jujuparams.FacadeVersions
 	for name, f := range facadeInit {
