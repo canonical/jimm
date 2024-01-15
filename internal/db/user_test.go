@@ -13,101 +13,101 @@ import (
 	"github.com/canonical/jimm/internal/errors"
 )
 
-func TestGetUserUnconfiguredDatabase(t *testing.T) {
+func TestGetIdentityUnconfiguredDatabase(t *testing.T) {
 	c := qt.New(t)
 
 	var d db.Database
-	err := d.GetUser(context.Background(), &dbmodel.Identity{})
+	err := d.GetIdentity(context.Background(), &dbmodel.Identity{})
 	c.Check(err, qt.ErrorMatches, `database not configured`)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeServerConfiguration)
 }
 
-func (s *dbSuite) TestGetUser(c *qt.C) {
+func (s *dbSuite) TestGetIdentity(c *qt.C) {
 	ctx := context.Background()
-	err := s.Database.GetUser(ctx, &dbmodel.Identity{})
+	err := s.Database.GetIdentity(ctx, &dbmodel.Identity{})
 	c.Check(err, qt.ErrorMatches, `upgrade in progress`)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
 
 	err = s.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
-	err = s.Database.GetUser(ctx, &dbmodel.Identity{})
+	err = s.Database.GetIdentity(ctx, &dbmodel.Identity{})
 	c.Check(err, qt.ErrorMatches, `invalid identity name ""`)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
 	u := dbmodel.Identity{
 		Name: "bob@external",
 	}
-	err = s.Database.GetUser(ctx, &u)
+	err = s.Database.GetIdentity(ctx, &u)
 	c.Assert(err, qt.IsNil)
 
 	u2 := dbmodel.Identity{
 		Name: u.Name,
 	}
-	err = s.Database.GetUser(ctx, &u2)
+	err = s.Database.GetIdentity(ctx, &u2)
 	c.Assert(err, qt.IsNil)
 	c.Check(u2, qt.DeepEquals, u)
 }
 
-func TestUpdateUserUnconfiguredDatabase(t *testing.T) {
+func TestUpdateIdentityUnconfiguredDatabase(t *testing.T) {
 	c := qt.New(t)
 
 	var d db.Database
-	err := d.UpdateUser(context.Background(), &dbmodel.Identity{})
+	err := d.UpdateIdentity(context.Background(), &dbmodel.Identity{})
 	c.Check(err, qt.ErrorMatches, `database not configured`)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeServerConfiguration)
 }
 
-func (s *dbSuite) TestUpdateUser(c *qt.C) {
+func (s *dbSuite) TestUpdateIdentity(c *qt.C) {
 	ctx := context.Background()
-	err := s.Database.UpdateUser(ctx, &dbmodel.Identity{})
+	err := s.Database.UpdateIdentity(ctx, &dbmodel.Identity{})
 	c.Check(err, qt.ErrorMatches, `upgrade in progress`)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
 
 	err = s.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
-	err = s.Database.UpdateUser(ctx, &dbmodel.Identity{})
+	err = s.Database.UpdateIdentity(ctx, &dbmodel.Identity{})
 	c.Check(err, qt.ErrorMatches, `invalid identity name ""`)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
 	u := dbmodel.Identity{
 		Name: "bob@external",
 	}
-	err = s.Database.GetUser(ctx, &u)
+	err = s.Database.GetIdentity(ctx, &u)
 	c.Assert(err, qt.IsNil)
 
-	err = s.Database.UpdateUser(ctx, &u)
+	err = s.Database.UpdateIdentity(ctx, &u)
 	c.Assert(err, qt.IsNil)
 
 	u2 := dbmodel.Identity{
 		Name: u.Name,
 	}
-	err = s.Database.GetUser(ctx, &u2)
+	err = s.Database.GetIdentity(ctx, &u2)
 	c.Assert(err, qt.IsNil)
 	c.Check(u2, qt.DeepEquals, u)
 }
 
-func TestGetUserCloudCredentialsUnconfiguredDatabase(t *testing.T) {
+func TestGetIdentityCloudCredentialsUnconfiguredDatabase(t *testing.T) {
 	c := qt.New(t)
 
 	var d db.Database
-	_, err := d.GetUserCloudCredentials(context.Background(), &dbmodel.Identity{}, "")
+	_, err := d.GetIdentityCloudCredentials(context.Background(), &dbmodel.Identity{}, "")
 	c.Check(err, qt.ErrorMatches, `database not configured`)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeServerConfiguration)
 }
 
-func (s *dbSuite) TestGetUserCloudCredentials(c *qt.C) {
+func (s *dbSuite) TestGetIdentityCloudCredentials(c *qt.C) {
 	ctx := context.Background()
 
 	err := s.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
-	_, err = s.Database.GetUserCloudCredentials(ctx, &dbmodel.Identity{}, "")
+	_, err = s.Database.GetIdentityCloudCredentials(ctx, &dbmodel.Identity{}, "")
 	c.Check(err, qt.ErrorMatches, `cloudcredential not found`)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
-	_, err = s.Database.GetUserCloudCredentials(ctx, &dbmodel.Identity{
+	_, err = s.Database.GetIdentityCloudCredentials(ctx, &dbmodel.Identity{
 		Name: "test",
 	}, "ec2")
 	c.Check(err, qt.IsNil)
@@ -144,7 +144,7 @@ func (s *dbSuite) TestGetUserCloudCredentials(c *qt.C) {
 	err = s.Database.SetCloudCredential(context.Background(), &cred2)
 	c.Assert(err, qt.Equals, nil)
 
-	credentials, err := s.Database.GetUserCloudCredentials(ctx, &u, cloud.Name)
+	credentials, err := s.Database.GetIdentityCloudCredentials(ctx, &u, cloud.Name)
 	c.Check(err, qt.IsNil)
 	c.Assert(credentials, qt.DeepEquals, []dbmodel.CloudCredential{cred1, cred2})
 }

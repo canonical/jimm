@@ -9,18 +9,18 @@ import (
 	"github.com/canonical/jimm/internal/errors"
 )
 
-// GetUser loads the user details for the user identified by username. If
-// necessary the user record will be created, in which case the user will
+// GetIdentity loads the details for the identity identified by name. If
+// necessary the identity record will be created, in which case the identity will
 // have access to no resources and the default add-model access on JIMM.
 //
-// GetUser does not fill out the user's ApplicationOffers, Clouds,
-// CloudCredentials, or Models associations. See GetUserApplicationOffers,
-// GetUserClouds, GetUserCloudCredentials, and GetUserModels to retrieve
+// GetIdentity does not fill out the identity's ApplicationOffers, Clouds,
+// CloudCredentials, or Models associations. See GetIdentityApplicationOffers,
+// GetIdentityClouds, GetIdentityCloudCredentials, and GetIdentityModels to retrieve
 // this information.
 //
-// GetUser returns an error with CodeNotFound if the username is invalid.
-func (d *Database) GetUser(ctx context.Context, u *dbmodel.Identity) error {
-	const op = errors.Op("db.GetUser")
+// GetIdentity returns an error with CodeNotFound if the identity name is invalid.
+func (d *Database) GetIdentity(ctx context.Context, u *dbmodel.Identity) error {
+	const op = errors.Op("db.GetIdentity")
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
 	}
@@ -36,12 +36,12 @@ func (d *Database) GetUser(ctx context.Context, u *dbmodel.Identity) error {
 	return nil
 }
 
-// FetchUser loads the user details for the user identified by username. It
-// will not create a user if the user cannot be found.
+// FetchIdentity loads the details for the identity identified by name. It
+// will not create an identity if the identity cannot be found.
 //
-// FetchUser returns an error with CodeNotFound if the username is invalid.
-func (d *Database) FetchUser(ctx context.Context, u *dbmodel.Identity) error {
-	const op = errors.Op("db.FetchUser")
+// FetchIdentity returns an error with CodeNotFound if the identity name is invalid.
+func (d *Database) FetchIdentity(ctx context.Context, u *dbmodel.Identity) error {
+	const op = errors.Op("db.FetchIdentity")
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
 	}
@@ -57,14 +57,14 @@ func (d *Database) FetchUser(ctx context.Context, u *dbmodel.Identity) error {
 	return nil
 }
 
-// UpdateUser updates the given user record. UpdateUser will not store any
-// changes to a user's ApplicationOffers, Clouds, CloudCredentials, or
+// UpdateIdentity updates the given identity record. UpdateIdentity will not store any
+// changes to an identity's ApplicationOffers, Clouds, CloudCredentials, or
 // Models. These should be updated through the object in question.
 //
-// UpdateUser returns an error with CodeNotFound if the username is
+// UpdateIdentity returns an error with CodeNotFound if the identity name is
 // invalid.
-func (d *Database) UpdateUser(ctx context.Context, u *dbmodel.Identity) error {
-	const op = errors.Op("db.UpdateUser")
+func (d *Database) UpdateIdentity(ctx context.Context, u *dbmodel.Identity) error {
+	const op = errors.Op("db.UpdateIdentity")
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
 	}
@@ -81,9 +81,9 @@ func (d *Database) UpdateUser(ctx context.Context, u *dbmodel.Identity) error {
 	return nil
 }
 
-// GetUserCloudCredentials fetches user cloud credentials for the specified cloud.
-func (d *Database) GetUserCloudCredentials(ctx context.Context, u *dbmodel.Identity, cloud string) ([]dbmodel.CloudCredential, error) {
-	const op = errors.Op("db.GetUserCloudCredentials")
+// GetIdentityCloudCredentials fetches identity's cloud credentials for the specified cloud.
+func (d *Database) GetIdentityCloudCredentials(ctx context.Context, u *dbmodel.Identity, cloud string) ([]dbmodel.CloudCredential, error) {
+	const op = errors.Op("db.GetIdentityCloudCredentials")
 	if err := d.ready(); err != nil {
 		return nil, errors.E(op, err)
 	}

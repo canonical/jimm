@@ -149,7 +149,7 @@ func (r *controllerRoot) masquerade(ctx context.Context, userTag string) (*openf
 	user := dbmodel.Identity{
 		Name: ut.Id(),
 	}
-	if err := r.jimm.DB().GetUser(ctx, &user); err != nil {
+	if err := r.jimm.DB().GetIdentity(ctx, &user); err != nil {
 		return nil, err
 	}
 	return openfga.NewUser(&user, r.jimm.AuthorizationClient()), nil

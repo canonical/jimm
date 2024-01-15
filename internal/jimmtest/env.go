@@ -494,7 +494,7 @@ func (u *User) DBObject(c *qt.C, db db.Database) dbmodel.Identity {
 	u.dbo.Name = u.Username
 	u.dbo.DisplayName = u.DisplayName
 
-	err := db.UpdateUser(context.Background(), &u.dbo)
+	err := db.UpdateIdentity(context.Background(), &u.dbo)
 	c.Assert(err, qt.IsNil)
 	return u.dbo
 }

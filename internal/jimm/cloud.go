@@ -530,7 +530,7 @@ func (j *JIMM) GrantCloudAccess(ctx context.Context, user *openfga.User, ct name
 	err = j.doCloudAdmin(ctx, user, ct, func(_ *dbmodel.Cloud, _ API) error {
 		targetUser := &dbmodel.Identity{}
 		targetUser.SetTag(ut)
-		if err := j.Database.GetUser(ctx, targetUser); err != nil {
+		if err := j.Database.GetIdentity(ctx, targetUser); err != nil {
 			return err
 		}
 		targetOfgaUser := openfga.NewUser(targetUser, j.OpenFGAClient)
@@ -595,7 +595,7 @@ func (j *JIMM) RevokeCloudAccess(ctx context.Context, user *openfga.User, ct nam
 	err = j.doCloudAdmin(ctx, user, ct, func(_ *dbmodel.Cloud, _ API) error {
 		targetUser := &dbmodel.Identity{}
 		targetUser.SetTag(ut)
-		if err := j.Database.GetUser(ctx, targetUser); err != nil {
+		if err := j.Database.GetIdentity(ctx, targetUser); err != nil {
 			return err
 		}
 		targetOfgaUser := openfga.NewUser(targetUser, j.OpenFGAClient)

@@ -403,7 +403,7 @@ func (b *modelBuilder) selectCloudCredentials() error {
 	if b.cloud == nil {
 		return errors.E("cloud not specified")
 	}
-	credentials, err := b.jimm.Database.GetUserCloudCredentials(b.ctx, b.owner, b.cloud.Name)
+	credentials, err := b.jimm.Database.GetIdentityCloudCredentials(b.ctx, b.owner, b.cloud.Name)
 	if err != nil {
 		return errors.E(err, "failed to fetch user cloud credentials")
 	}
@@ -522,7 +522,7 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 	owner := &dbmodel.Identity{
 		Name: args.Owner.Id(),
 	}
-	err = j.Database.GetUser(ctx, owner)
+	err = j.Database.GetIdentity(ctx, owner)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
@@ -852,7 +852,7 @@ func (j *JIMM) GrantModelAccess(ctx context.Context, user *openfga.User, mt name
 	err = j.doModelAdmin(ctx, user, mt, func(_ *dbmodel.Model, _ API) error {
 		targetUser := &dbmodel.Identity{}
 		targetUser.SetTag(ut)
-		if err := j.Database.GetUser(ctx, targetUser); err != nil {
+		if err := j.Database.GetIdentity(ctx, targetUser); err != nil {
 			return err
 		}
 		targetOfgaUser := openfga.NewUser(targetUser, j.OpenFGAClient)
@@ -930,7 +930,7 @@ func (j *JIMM) RevokeModelAccess(ctx context.Context, user *openfga.User, mt nam
 	err = j.doModel(ctx, user, mt, requiredAccess, func(_ *dbmodel.Model, _ API) error {
 		targetUser := &dbmodel.Identity{}
 		targetUser.SetTag(ut)
-		if err := j.Database.GetUser(ctx, targetUser); err != nil {
+		if err := j.Database.GetIdentity(ctx, targetUser); err != nil {
 			return err
 		}
 		targetOfgaUser := openfga.NewUser(targetUser, j.OpenFGAClient)

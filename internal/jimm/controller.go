@@ -380,7 +380,7 @@ func (j *JIMM) ImportModel(ctx context.Context, user *openfga.User, controllerNa
 	}
 	ownerUser := dbmodel.Identity{}
 	ownerUser.SetTag(ownerTag)
-	err = j.Database.GetUser(ctx, &ownerUser)
+	err = j.Database.GetIdentity(ctx, &ownerUser)
 	if err != nil {
 		return errors.E(op, err)
 	}
@@ -412,7 +412,7 @@ func (j *JIMM) ImportModel(ctx context.Context, user *openfga.User, controllerNa
 	// credential against the cloud the model is deployed against. Even using the correct cloud for the
 	// credential is not strictly necessary, but will help prevent the user thinking they can create new
 	// models on the incoming cloud.
-	allCredentials, err := j.Database.GetUserCloudCredentials(ctx, &ownerUser, cloudTag.Id())
+	allCredentials, err := j.Database.GetIdentityCloudCredentials(ctx, &ownerUser, cloudTag.Id())
 	if err != nil {
 		return errors.E(op, err)
 	}

@@ -142,7 +142,7 @@ func (j *JIMM) UpdateCloudCredential(ctx context.Context, user *openfga.User, ar
 		// ensure the user we are adding the credential for exists.
 		var u2 dbmodel.Identity
 		u2.SetTag(args.CredentialTag.Owner())
-		if err := j.Database.GetUser(ctx, &u2); err != nil {
+		if err := j.Database.GetIdentity(ctx, &u2); err != nil {
 			return result, errors.E(op, err)
 		}
 	}

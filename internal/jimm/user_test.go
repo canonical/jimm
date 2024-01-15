@@ -78,7 +78,7 @@ func TestAuthenticate(t *testing.T) {
 	u2 := dbmodel.Identity{
 		Name: "bob@external",
 	}
-	err = j.Database.GetUser(ctx, &u2)
+	err = j.Database.GetIdentity(ctx, &u2)
 	c.Assert(err, qt.IsNil)
 
 	c.Check(u2, qt.DeepEquals, dbmodel.Identity{
