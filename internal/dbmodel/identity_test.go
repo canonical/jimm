@@ -15,7 +15,7 @@ import (
 	"github.com/canonical/jimm/internal/dbmodel"
 )
 
-func TestUser(t *testing.T) {
+func TestIdentity(t *testing.T) {
 	c := qt.New(t)
 	db := gormDB(c)
 
@@ -66,7 +66,7 @@ func TestUserTag(t *testing.T) {
 	c.Check(u2, qt.DeepEquals, u)
 }
 
-func TestUserCloudCredentials(t *testing.T) {
+func TestIdentityCloudCredentials(t *testing.T) {
 	c := qt.New(t)
 	db := gormDB(c)
 
@@ -118,7 +118,7 @@ func TestUserCloudCredentials(t *testing.T) {
 	}})
 }
 
-func TestUserToJujuUserInfo(t *testing.T) {
+func TestIdentityToJujuUserInfo(t *testing.T) {
 	c := qt.New(t)
 
 	u := dbmodel.Identity{
