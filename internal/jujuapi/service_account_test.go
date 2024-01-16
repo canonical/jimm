@@ -27,7 +27,7 @@ func TestAddServiceAccount(t *testing.T) {
 			return nil
 		},
 		args: params.AddServiceAccountRequest{
-			ID: "fca1f605-736e-4d1f-bcd2-aecc726923be",
+			ClientID: "fca1f605-736e-4d1f-bcd2-aecc726923be",
 		},
 	}, {
 		about: "Invalid Client ID",
@@ -35,7 +35,7 @@ func TestAddServiceAccount(t *testing.T) {
 			return nil
 		},
 		args: params.AddServiceAccountRequest{
-			ID: "_123_",
+			ClientID: "_123_",
 		},
 		expectedError: "invalid client ID",
 	}}

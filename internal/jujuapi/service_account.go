@@ -16,9 +16,9 @@ import (
 func (r *controllerRoot) AddServiceAccount(ctx context.Context, req apiparams.AddServiceAccountRequest) error {
 	const op = errors.Op("jujuapi.AddGroup")
 
-	if !jimmnames.IsValidServiceAccountId(req.ID) {
+	if !jimmnames.IsValidServiceAccountId(req.ClientID) {
 		return errors.E(op, errors.CodeBadRequest, "invalid client ID")
 	}
 
-	return r.jimm.AddServiceAccount(ctx, r.user, req.ID)
+	return r.jimm.AddServiceAccount(ctx, r.user, req.ClientID)
 }
