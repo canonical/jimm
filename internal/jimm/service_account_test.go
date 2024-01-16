@@ -36,5 +36,14 @@ func TestAddServiceAccount(t *testing.T) {
 	err = j.AddServiceAccount(ctx, user, clientID)
 	c.Assert(err, qt.IsNil)
 	err = j.AddServiceAccount(ctx, user, clientID)
+	c.Assert(err, qt.IsNil)
+	userAlice := openfga.NewUser(
+		&dbmodel.User{
+			Username:    "alive@external",
+			DisplayName: "Alice",
+		},
+		client,
+	)
+	err = j.AddServiceAccount(ctx, userAlice, clientID)
 	c.Assert(err, qt.ErrorMatches, "service account already owned")
 }
