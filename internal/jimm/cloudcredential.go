@@ -155,6 +155,13 @@ func (j *JIMM) UpdateCloudCredential(ctx context.Context, user *openfga.User, ar
 		return result, errors.E(op, err)
 	}
 
+	// Confirm the cloud exists.
+	var cloud dbmodel.Cloud
+	cloud.SetTag(names.NewCloudTag(credential.CloudName))
+	if err = j.Database.GetCloud(ctx, &cloud); err != nil {
+		return result, errors.E(op, err)
+	}
+
 	models, err := j.Database.GetModelsUsingCredential(ctx, credential.ID)
 	if err != nil {
 		return result, errors.E(op, err)

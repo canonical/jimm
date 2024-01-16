@@ -12,6 +12,7 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/api/params"
+	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/jimm"
 	"github.com/canonical/jimm/internal/jimmtest"
@@ -175,9 +176,15 @@ func TestUpdateServiceAccountCredentials(t *testing.T) {
 		c.Run(test.about, func(c *qt.C) {
 			ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
 			c.Assert(err, qt.IsNil)
+			pgDb := db.Database{
+				DB: jimmtest.PostgresDB(c, nil),
+			}
+			err = pgDb.Migrate(context.Background(), false)
+			c.Assert(err, qt.IsNil)
 			jimm := &jimmtest.JIMM{
 				AuthorizationClient_:   func() *openfga.OFGAClient { return ofgaClient },
 				UpdateCloudCredential_: test.updateCloudCredential,
+				DB_:                    func() *db.Database { return &pgDb },
 			}
 			var u dbmodel.User
 			u.SetTag(names.NewUserTag(test.username))
@@ -220,6 +227,10 @@ func (s *serviceAccountSuite) TestUpdateServiceAccountCredentialsIntegration(c *
 	}
 
 	s.JIMM.OpenFGAClient.AddRelation(context.Background(), tuple)
+	cloud := &dbmodel.Cloud{
+		Name: "aws",
+	}
+	s.JIMM.Database.AddCloud(context.Background(), cloud)
 
 	var credResults jujuparams.UpdateCredentialResults
 	err := conn.APICall("JIMM", 4, "", "UpdateServiceAccountCredentials", params.UpdateServiceAccountCredentialsRequest{
@@ -231,7 +242,7 @@ func (s *serviceAccountSuite) TestUpdateServiceAccountCredentialsIntegration(c *
 					Credential: jujuparams.CloudCredential{Attributes: map[string]string{"foo": "bar"}},
 				},
 				{
-					Tag:        "cloudcred-azure/fca1f605-736e-4d1f-bcd2-aecc726923be/cred-name2",
+					Tag:        "cloudcred-aws/fca1f605-736e-4d1f-bcd2-aecc726923be/cred-name2",
 					Credential: jujuparams.CloudCredential{Attributes: map[string]string{"wolf": "low"}},
 				},
 			}},
@@ -245,7 +256,7 @@ func (s *serviceAccountSuite) TestUpdateServiceAccountCredentialsIntegration(c *
 				Models:        nil,
 			},
 			{
-				CredentialTag: "cloudcred-azure/fca1f605-736e-4d1f-bcd2-aecc726923be/cred-name2",
+				CredentialTag: "cloudcred-aws/fca1f605-736e-4d1f-bcd2-aecc726923be/cred-name2",
 				Error:         nil,
 				Models:        nil,
 			},

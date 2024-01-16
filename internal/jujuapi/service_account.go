@@ -58,6 +58,9 @@ func (r *controllerRoot) UpdateServiceAccountCredentials(ctx context.Context, re
 
 	var targetUserModel dbmodel.User
 	targetUserModel.SetTag(names.NewUserTag(req.ID))
+	if err := r.jimm.DB().GetUser(ctx, &targetUserModel); err != nil {
+		return jujuparams.UpdateCredentialResults{}, errors.E(op, err)
+	}
 	targetUser := openfga.NewUser(&targetUserModel, r.jimm.AuthorizationClient())
 
 	results := jujuparams.UpdateCredentialResults{
