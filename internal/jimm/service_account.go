@@ -8,14 +8,14 @@ import (
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
-	"github.com/canonical/jimm/pkg/names"
+	jimmnames "github.com/canonical/jimm/pkg/names"
 )
 
 // AddServiceAccount checks that a user doesn't already own the service account
 // and then adds a relation between the user and the service account.
 func (j *JIMM) AddServiceAccount(ctx context.Context, u *openfga.User, clientId string) error {
 	op := errors.Op("jimm.AddServiceAccount")
-	svcTag := names.NewServiceAccountTag(clientId)
+	svcTag := jimmnames.NewServiceAccountTag(clientId)
 	key := openfga.Tuple{
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(svcTag),

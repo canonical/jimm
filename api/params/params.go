@@ -398,6 +398,6 @@ type MigrateModelRequest struct {
 
 // AddServiceAccountRequest holds a request to add a service account.
 type AddServiceAccountRequest struct {
-	// id holds the client id of the service account.
-	ID string `json:"id"`
+	// ClientID holds the client id of the service account.
+	ClientID string `json:"client-id"`
 }
