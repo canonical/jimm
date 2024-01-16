@@ -15,6 +15,7 @@ import (
 	"github.com/juju/names/v4"
 	"github.com/juju/zaputil"
 	"github.com/juju/zaputil/zapctx"
+	"github.com/riverqueue/river"
 	"go.uber.org/zap"
 
 	"github.com/canonical/jimm/internal/constants"
@@ -483,17 +484,6 @@ func (b *modelBuilder) CreateControllerModel() *modelBuilder {
 		return b
 	}
 
-	// Grant JIMM admin access to the model. Note that if this fails,
-	// the local database entry will be deleted but the model
-	// will remain on the controller and will trigger the "already exists
-	// in the backend controller" message above when the user
-	// attempts to create a model with the same name again.
-	if err := api.GrantJIMMModelAdmin(b.ctx, names.NewModelTag(info.UUID)); err != nil {
-		zapctx.Error(b.ctx, "leaked model", zap.String("model", info.UUID), zaputil.Error(err))
-		b.err = errors.E(err)
-		return b
-	}
-
 	b.modelInfo = &info
 	return b
 }
@@ -625,27 +615,32 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 	}
 
 	mi := builder.JujuModelInfo()
-
-	if err := j.OpenFGAClient.AddControllerModel(
-		ctx,
-		builder.controller.ResourceTag(),
-		builder.model.ResourceTag(),
-	); err != nil {
-		zapctx.Error(
-			ctx,
-			"failed to add controller-model relation",
-			zap.String("controller", builder.controller.UUID),
-			zap.String("model", builder.model.UUID.String),
-		)
-	}
-	err = openfga.NewUser(owner, j.OpenFGAClient).SetModelAccess(ctx, names.NewModelTag(mi.UUID), ofganames.AdministratorRelation)
+	openfga_river_job_args := OpenFGAArgs{client: *j.OpenFGAClient, controller: builder.controller, model: builder.model, owner: builder.owner, modelInfo: mi}
+	_, err = j.River.Client.Insert(ctx, openfga_river_job_args, &river.InsertOpts{MaxAttempts: 10})
 	if err != nil {
-		zapctx.Error(
+		zapctx.Error(ctx, "Failed to insert river job!", zaputil.Error(err))
+		// trying without river just in case.
+		if err := j.OpenFGAClient.AddControllerModel(
 			ctx,
-			"failed to add administrator relation",
-			zap.String("user", owner.Tag().String()),
-			zap.String("model", builder.model.UUID.String),
-		)
+			builder.controller.ResourceTag(),
+			builder.model.ResourceTag(),
+		); err != nil {
+			zapctx.Error(
+				ctx,
+				"failed to add controller-model relation",
+				zap.String("controller", builder.controller.UUID),
+				zap.String("model", builder.model.UUID.String),
+			)
+		}
+		err = openfga.NewUser(owner, j.OpenFGAClient).SetModelAccess(ctx, names.NewModelTag(mi.UUID), ofganames.AdministratorRelation)
+		if err != nil {
+			zapctx.Error(
+				ctx,
+				"failed to add administrator relation",
+				zap.String("user", owner.Tag().String()),
+				zap.String("model", builder.model.UUID.String),
+			)
+		}
 	}
 
 	return mi, nil

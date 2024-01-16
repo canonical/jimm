@@ -79,6 +79,8 @@ type JIMM struct {
 	JWKService *jimmjwx.JWKSService
 
 	JWTService *jimmjwx.JWTService
+
+	River *River
 }
 
 // ResourceTag returns JIMM's controller tag stating its UUID.

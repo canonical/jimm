@@ -294,6 +294,8 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		return nil, errors.E(op, err)
 	}
 
+	s.jimm.River = jimm.NewRiver(nil, p.DSN, ctx)
+
 	if err := s.setupCredentialStore(ctx, p); err != nil {
 		return nil, errors.E(op, err)
 	}
