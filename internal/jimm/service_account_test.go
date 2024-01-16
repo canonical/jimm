@@ -23,7 +23,6 @@ func TestAddServiceAccount(t *testing.T) {
 	j := &jimm.JIMM{
 		OpenFGAClient: client,
 	}
-	// err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 	user := openfga.NewUser(
 		&dbmodel.User{
