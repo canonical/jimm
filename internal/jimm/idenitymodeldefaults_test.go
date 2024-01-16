@@ -170,7 +170,7 @@ func TestIdentityModelDefaults(t *testing.T) {
 
 			return testConfig{
 				identity:      &identity,
-				expectedError: "usermodeldefaults not found",
+				expectedError: "identitymodeldefaults not found",
 			}
 		},
 	}, {
