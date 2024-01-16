@@ -99,7 +99,7 @@ func TestUpdateServiceAccountCredentials(t *testing.T) {
 				},
 			}},
 		args: params.UpdateServiceAccountCredentialsRequest{
-			ID: "fca1f605-736e-4d1f-bcd2-aecc726923be",
+			ClientID: "fca1f605-736e-4d1f-bcd2-aecc726923be",
 			UpdateCredentialArgs: jujuparams.UpdateCredentialArgs{
 				Credentials: []jujuparams.TaggedCredential{
 					{
@@ -134,7 +134,7 @@ func TestUpdateServiceAccountCredentials(t *testing.T) {
 				},
 			}},
 		args: params.UpdateServiceAccountCredentialsRequest{
-			ID: "fca1f605-736e-4d1f-bcd2-aecc726923be",
+			ClientID: "fca1f605-736e-4d1f-bcd2-aecc726923be",
 			UpdateCredentialArgs: jujuparams.UpdateCredentialArgs{
 				Credentials: []jujuparams.TaggedCredential{
 					{
@@ -156,7 +156,7 @@ func TestUpdateServiceAccountCredentials(t *testing.T) {
 		},
 		expectedError: "unauthorized",
 		args: params.UpdateServiceAccountCredentialsRequest{
-			ID: "fca1f605-736e-4d1f-bcd2-aecc726923be",
+			ClientID: "fca1f605-736e-4d1f-bcd2-aecc726923be",
 		},
 		username: "alice",
 	}, {
@@ -166,7 +166,7 @@ func TestUpdateServiceAccountCredentials(t *testing.T) {
 		},
 		username: "alice",
 		args: params.UpdateServiceAccountCredentialsRequest{
-			ID: "_123_",
+			ClientID: "_123_",
 		},
 		expectedError: "invalid client ID",
 	}}
@@ -234,7 +234,7 @@ func (s *serviceAccountSuite) TestUpdateServiceAccountCredentialsIntegration(c *
 
 	var credResults jujuparams.UpdateCredentialResults
 	err := conn.APICall("JIMM", 4, "", "UpdateServiceAccountCredentials", params.UpdateServiceAccountCredentialsRequest{
-		ID: "fca1f605-736e-4d1f-bcd2-aecc726923be",
+		ClientID: "fca1f605-736e-4d1f-bcd2-aecc726923be",
 		UpdateCredentialArgs: jujuparams.UpdateCredentialArgs{
 			Credentials: []jujuparams.TaggedCredential{
 				{

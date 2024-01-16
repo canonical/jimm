@@ -39,14 +39,14 @@ func (r *controllerRoot) AddServiceAccount(ctx context.Context, req apiparams.Ad
 func (r *controllerRoot) UpdateServiceAccountCredentials(ctx context.Context, req apiparams.UpdateServiceAccountCredentialsRequest) (jujuparams.UpdateCredentialResults, error) {
 	const op = errors.Op("jujuapi.UpdateServiceAccountCredentials")
 
-	if !jimmnames.IsValidServiceAccountId(req.ID) {
+	if !jimmnames.IsValidServiceAccountId(req.ClientID) {
 		return jujuparams.UpdateCredentialResults{}, errors.E(op, errors.CodeBadRequest, "invalid client ID")
 	}
 
 	tuple := openfga.Tuple{
 		Object:   ofganames.ConvertTag(r.user.ResourceTag()),
 		Relation: ofganames.AdministratorRelation,
-		Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag(req.ID)),
+		Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag(req.ClientID)),
 	}
 	ok, err := r.jimm.AuthorizationClient().CheckRelation(ctx, tuple, false)
 	if err != nil {
@@ -57,7 +57,7 @@ func (r *controllerRoot) UpdateServiceAccountCredentials(ctx context.Context, re
 	}
 
 	var targetUserModel dbmodel.User
-	targetUserModel.SetTag(names.NewUserTag(req.ID))
+	targetUserModel.SetTag(names.NewUserTag(req.ClientID))
 	if err := r.jimm.DB().GetUser(ctx, &targetUserModel); err != nil {
 		return jujuparams.UpdateCredentialResults{}, errors.E(op, err)
 	}
