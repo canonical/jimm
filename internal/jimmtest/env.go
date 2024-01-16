@@ -253,10 +253,10 @@ type UserDefaults struct {
 	Defaults map[string]interface{} `json:"defaults"`
 
 	env *Environment
-	dbo dbmodel.UserModelDefaults
+	dbo dbmodel.IdentityModelDefaults
 }
 
-func (cd *UserDefaults) DBObject(c *qt.C, db db.Database) dbmodel.UserModelDefaults {
+func (cd *UserDefaults) DBObject(c *qt.C, db db.Database) dbmodel.IdentityModelDefaults {
 	if cd.dbo.ID != 0 {
 		return cd.dbo
 	}
@@ -264,7 +264,7 @@ func (cd *UserDefaults) DBObject(c *qt.C, db db.Database) dbmodel.UserModelDefau
 	cd.dbo.Identity = cd.env.User(cd.User).DBObject(c, db)
 	cd.dbo.Defaults = cd.Defaults
 
-	err := db.SetUserModelDefaults(context.Background(), &cd.dbo)
+	err := db.SetIdentityModelDefaults(context.Background(), &cd.dbo)
 	c.Assert(err, qt.IsNil)
 	return cd.dbo
 }
