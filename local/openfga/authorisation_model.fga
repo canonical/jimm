@@ -3,15 +3,15 @@ model
 
 type applicationoffer
   relations
-    define administrator: [serviceaccount, serviceaccount:*, user, user:*, group#member] or administrator from model
-    define consumer: [serviceaccount, serviceaccount:*, user, user:*, group#member] or administrator
+    define administrator: [user, user:*, group#member] or administrator from model
+    define consumer: [user, user:*, group#member] or administrator
     define model: [model]
-    define reader: [serviceaccount, serviceaccount:*, user, user:*, group#member] or consumer
+    define reader: [user, user:*, group#member] or consumer
 
 type cloud
   relations
-    define administrator: [serviceaccount, serviceaccount:*, user, user:*, group#member] or administrator from controller
-    define can_addmodel: [serviceaccount, serviceaccount:*, user, user:*, group#member] or administrator
+    define administrator: [user, user:*, group#member] or administrator from controller
+    define can_addmodel: [user, user:*, group#member] or administrator
     define controller: [controller]
 
 type controller
@@ -26,13 +26,13 @@ type group
 
 type model
   relations
-    define administrator: [serviceaccount, serviceaccount:*, user, user:*, group#member] or administrator from controller
+    define administrator: [user, user:*, group#member] or administrator from controller
     define controller: [controller]
-    define reader: [serviceaccount, serviceaccount:*, user, user:*, group#member] or writer
-    define writer: [serviceaccount, serviceaccount:*, user, user:*, group#member] or administrator
+    define reader: [user, user:*, group#member] or writer
+    define writer: [user, user:*, group#member] or administrator
 
 type user
 
 type serviceaccount
   relations
-    define administator: [serviceaccount, serviceaccount:*, user, user:*, group#member]
+    define administator: [user, user:*, group#member]
