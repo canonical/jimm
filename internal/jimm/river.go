@@ -6,10 +6,6 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/canonical/jimm/internal/db"
-	"github.com/canonical/jimm/internal/dbmodel"
-	"github.com/canonical/jimm/internal/openfga"
-	ofganames "github.com/canonical/jimm/internal/openfga/names"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/juju/names/v4"
@@ -18,6 +14,11 @@ import (
 	"github.com/riverqueue/river/riverdriver/riverpgxv5"
 	"github.com/riverqueue/river/rivermigrate"
 	"go.uber.org/zap"
+
+	"github.com/canonical/jimm/internal/db"
+	"github.com/canonical/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/openfga"
+	ofganames "github.com/canonical/jimm/internal/openfga/names"
 )
 
 // OpenFGAArgs holds the river job arguments for writing tuples to OpenFGA.
