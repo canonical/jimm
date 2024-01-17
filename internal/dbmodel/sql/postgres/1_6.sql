@@ -21,6 +21,7 @@ ALTER INDEX IF EXISTS users_pkey RENAME TO identities_pkey;
 ALTER INDEX IF EXISTS idx_users_deleted_at RENAME TO idx_identities_deleted_at;
 ALTER INDEX IF EXISTS models_controller_id_owner_username_name_key RENAME TO models_controller_id_owner_identity_name_name_key;
 ALTER INDEX IF EXISTS user_model_defaults_username_key RENAME TO user_model_defaults_identity_name_key;
+ALTER INDEX IF EXISTS user_model_defaults_username_fkey RENAME TO user_model_defaults_identity_name_fkey;
 ALTER INDEX IF EXISTS cloud_credentials_cloud_name_owner_username_name_key RENAME TO cloud_credentials_cloud_name_owner_identity_name_name_key;
 ALTER INDEX IF EXISTS cloud_defaults_username_cloud_id_region_key RENAME TO cloud_defaults_identity_name_cloud_id_region_key;
 
