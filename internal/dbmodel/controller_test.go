@@ -39,13 +39,13 @@ func TestController(t *testing.T) {
 	c.Assert(result.Error, qt.IsNil)
 
 	ctl := dbmodel.Controller{
-		Name:          "test-controller",
-		UUID:          "00000000-0000-0000-0000-000000000001",
-		AdminUser:     "admin",
-		AdminPassword: "pw",
-		CACertificate: "ca-cert",
-		PublicAddress: "controller.example.com:443",
-		CloudName:     "test-cloud",
+		Name:              "test-controller",
+		UUID:              "00000000-0000-0000-0000-000000000001",
+		AdminIdentityName: "admin",
+		AdminPassword:     "pw",
+		CACertificate:     "ca-cert",
+		PublicAddress:     "controller.example.com:443",
+		CloudName:         "test-cloud",
 		Addresses: dbmodel.HostPorts([][]jujuparams.HostPort{{{
 			Address: jujuparams.Address{
 				Value: "1.1.1.1",
@@ -166,7 +166,7 @@ func TestToAPIControllerInfo(t *testing.T) {
 		CloudRegion: cl.Regions[0],
 		Priority:    dbmodel.CloudRegionControllerPriorityDeployed,
 	}}
-	ctl.AdminUser = "admin"
+	ctl.AdminIdentityName = "admin"
 	ctl.AgentVersion = "1.2.3"
 
 	ci := ctl.ToAPIControllerInfo()

@@ -92,7 +92,7 @@ func (j *JIMM) AddController(ctx context.Context, user *openfga.User, ctl *dbmod
 
 	credentialsStored := false
 	if j.CredentialStore != nil {
-		err := j.CredentialStore.PutControllerCredentials(ctx, ctl.Name, ctl.AdminUser, ctl.AdminPassword)
+		err := j.CredentialStore.PutControllerCredentials(ctx, ctl.Name, ctl.AdminIdentityName, ctl.AdminPassword)
 		if err != nil {
 			return errors.E(op, err, "failed to store controller credentials")
 		}
@@ -145,7 +145,7 @@ func (j *JIMM) AddController(ctx context.Context, user *openfga.User, ctl *dbmod
 		// if we already stored controller credentials in CredentialStore
 		// we should not store them plain text in JIMM's DB.
 		if credentialsStored {
-			ctl.AdminUser = ""
+			ctl.AdminIdentityName = ""
 			ctl.AdminPassword = ""
 		}
 		if err := tx.AddController(ctx, ctl); err != nil {

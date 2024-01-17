@@ -180,9 +180,9 @@ func (m Model) addModelRelations(c *qt.C, jimmTag names.ControllerTag, db db.Dat
 
 // addControllerRelations adds permissions the model should have and adds permissions for users to the controller.
 func (ctl Controller) addControllerRelations(c *qt.C, jimmTag names.ControllerTag, db db.Database, client *openfga.OFGAClient) {
-	if ctl.dbo.AdminUser != "" {
+	if ctl.dbo.AdminIdentityName != "" {
 		user := openfga.NewUser(&dbmodel.Identity{
-			Name: ctl.dbo.AdminUser,
+			Name: ctl.dbo.AdminIdentityName,
 		}, client)
 		err := user.SetControllerAccess(context.Background(), ctl.dbo.ResourceTag(), ofganames.AdministratorRelation)
 		c.Assert(err, qt.IsNil)
@@ -387,7 +387,7 @@ func (ctl *Controller) DBObject(c *qt.C, db db.Database) dbmodel.Controller {
 	ctl.dbo.Name = ctl.Name
 	ctl.dbo.UUID = ctl.UUID
 	ctl.dbo.AgentVersion = ctl.AgentVersion
-	ctl.dbo.AdminUser = ctl.AdminUser
+	ctl.dbo.AdminIdentityName = ctl.AdminUser
 	ctl.dbo.AdminPassword = ctl.AdminPassword
 	ctl.dbo.CloudName = ctl.Cloud
 	ctl.dbo.CloudRegion = ctl.CloudRegion

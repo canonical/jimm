@@ -157,10 +157,10 @@ func TestAddController(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	ctl1 := dbmodel.Controller{
-		Name:          "test-controller",
-		AdminUser:     "admin",
-		AdminPassword: "5ecret",
-		PublicAddress: "example.com:443",
+		Name:              "test-controller",
+		AdminIdentityName: "admin",
+		AdminPassword:     "5ecret",
+		PublicAddress:     "example.com:443",
 	}
 	err = j.AddController(context.Background(), alice, &ctl1)
 	c.Assert(err, qt.IsNil)
@@ -173,10 +173,10 @@ func TestAddController(t *testing.T) {
 	c.Check(ctl2, qt.CmpEquals(cmpopts.EquateEmpty(), cmpopts.IgnoreTypes(dbmodel.CloudRegion{})), ctl1)
 
 	ctl3 := dbmodel.Controller{
-		Name:          "test-controller-2",
-		AdminUser:     "admin",
-		AdminPassword: "5ecret",
-		PublicAddress: "example.com:443",
+		Name:              "test-controller-2",
+		AdminIdentityName: "admin",
+		AdminPassword:     "5ecret",
+		PublicAddress:     "example.com:443",
 	}
 	err = j.AddController(context.Background(), alice, &ctl3)
 	c.Assert(err, qt.IsNil)
@@ -325,14 +325,14 @@ func TestAddControllerWithVault(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	ctl1 := dbmodel.Controller{
-		Name:          "test-controller",
-		AdminUser:     "admin",
-		AdminPassword: "5ecret",
-		PublicAddress: "example.com:443",
+		Name:              "test-controller",
+		AdminIdentityName: "admin",
+		AdminPassword:     "5ecret",
+		PublicAddress:     "example.com:443",
 	}
 	err = j.AddController(context.Background(), alice, &ctl1)
 	c.Assert(err, qt.IsNil)
-	c.Assert(ctl1.AdminUser, qt.Equals, "")
+	c.Assert(ctl1.AdminIdentityName, qt.Equals, "")
 	c.Assert(ctl1.AdminPassword, qt.Equals, "")
 
 	ctl2 := dbmodel.Controller{
@@ -348,14 +348,14 @@ func TestAddControllerWithVault(t *testing.T) {
 	c.Assert(password, qt.Equals, "5ecret")
 
 	ctl3 := dbmodel.Controller{
-		Name:          "test-controller-2",
-		AdminUser:     "admin",
-		AdminPassword: "5ecretToo",
-		PublicAddress: "example.com:443",
+		Name:              "test-controller-2",
+		AdminIdentityName: "admin",
+		AdminPassword:     "5ecretToo",
+		PublicAddress:     "example.com:443",
 	}
 	err = j.AddController(context.Background(), alice, &ctl3)
 	c.Assert(err, qt.IsNil)
-	c.Assert(ctl3.AdminUser, qt.Equals, "")
+	c.Assert(ctl3.AdminIdentityName, qt.Equals, "")
 	c.Assert(ctl3.AdminPassword, qt.Equals, "")
 
 	ctl4 := dbmodel.Controller{

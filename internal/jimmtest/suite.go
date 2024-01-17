@@ -151,12 +151,12 @@ func (s *JIMMSuite) NewUser(u *dbmodel.Identity) *openfga.User {
 
 func (s *JIMMSuite) AddController(c *gc.C, name string, info *api.Info) {
 	ctl := &dbmodel.Controller{
-		UUID:          info.ControllerUUID,
-		Name:          name,
-		AdminUser:     info.Tag.Id(),
-		AdminPassword: info.Password,
-		CACertificate: info.CACert,
-		Addresses:     nil,
+		UUID:              info.ControllerUUID,
+		Name:              name,
+		AdminIdentityName: info.Tag.Id(),
+		AdminPassword:     info.Password,
+		CACertificate:     info.CACert,
+		Addresses:         nil,
 	}
 	ctl.Addresses = make(dbmodel.HostPorts, 0, len(info.Addrs))
 	for _, addr := range info.Addrs {
