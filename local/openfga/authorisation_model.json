@@ -420,7 +420,7 @@
         {
             "metadata": {
                 "relations": {
-                    "administator": {
+                    "administrator": {
                         "directly_related_user_types": [
                             {
                                 "type": "user"
@@ -438,7 +438,7 @@
                 }
             },
             "relations": {
-                "administator": {
+                "administrator": {
                     "this": {}
                 }
             },

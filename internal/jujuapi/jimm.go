@@ -49,6 +49,7 @@ func init() {
 		crossModelQueryMethod := rpc.Method(r.CrossModelQuery)
 		purgeLogsMethod := rpc.Method(r.PurgeLogs)
 		migrateModel := rpc.Method(r.MigrateModel)
+		addServiceAccountMethod := rpc.Method(r.AddServiceAccount)
 
 		// JIMM Generic RPC
 		r.AddMethod("JIMM", 4, "AddController", addControllerMethod)
@@ -77,6 +78,8 @@ func init() {
 		r.AddMethod("JIMM", 4, "ListRelationshipTuples", listRelationshipTuplesMethod)
 		// JIMM Cross-model queries
 		r.AddMethod("JIMM", 4, "CrossModelQuery", crossModelQueryMethod)
+		// JIMM Service Accounts
+		r.AddMethod("JIMM", 4, "AddServiceAccount", addServiceAccountMethod)
 
 		return []int{4}
 	}
