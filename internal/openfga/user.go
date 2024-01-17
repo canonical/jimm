@@ -18,17 +18,17 @@ import (
 
 // NewUser returns a new user structure that can be used to check
 // user's access rights to various resources.
-func NewUser(u *dbmodel.User, client *OFGAClient) *User {
+func NewUser(u *dbmodel.Identity, client *OFGAClient) *User {
 	return &User{
-		User:   u,
-		client: client,
+		Identity: u,
+		client:   client,
 	}
 }
 
 // User wraps dbmodel.User and implements methods that enable us
 // to check user's access rights to various resources.
 type User struct {
-	*dbmodel.User
+	*dbmodel.Identity
 	client    *OFGAClient
 	JimmAdmin bool
 }
@@ -318,7 +318,7 @@ func IsAdministrator[T administratorT](ctx context.Context, u *User, resource T)
 			ctx,
 			"openfga administrator check failed",
 			zap.Error(err),
-			zap.String("user", u.Username),
+			zap.String("user", u.Name),
 			zap.String("resource", resource.String()),
 		)
 		return false, errors.E(err)
@@ -440,7 +440,7 @@ func ListUsersWithAccess[T ofganames.ResourceTagger](ctx context.Context, client
 		if entity.ID == "*" {
 			entity.ID = ofganames.EveryoneUser
 		}
-		users[i] = NewUser(&dbmodel.User{Username: entity.ID}, client)
+		users[i] = NewUser(&dbmodel.Identity{Name: entity.ID}, client)
 	}
 	return users, nil
 }

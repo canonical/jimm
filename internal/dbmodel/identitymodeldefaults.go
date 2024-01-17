@@ -4,17 +4,12 @@ package dbmodel
 
 import "gorm.io/gorm"
 
-// CloudDefaults holds user's defaults for a specific cloud/region.
-type CloudDefaults struct {
+// IdentityModelDefaults holds identities's model defaults.
+type IdentityModelDefaults struct {
 	gorm.Model
 
 	IdentityName string
 	Identity     Identity `gorm:"foreignKey:IdentityName;references:Name"`
-
-	CloudID uint
-	Cloud   Cloud
-
-	Region string
 
 	Defaults Map
 }

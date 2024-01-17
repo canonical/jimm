@@ -39,7 +39,7 @@ type jimmSuite struct {
 	Params      service.Params
 	HTTP        *httptest.Server
 	Service     *service.Service
-	AdminUser   *dbmodel.User
+	AdminUser   *dbmodel.Identity
 	ClientStore func() *jjclient.MemStore
 	JIMM        *jimm.JIMM
 	cancel      context.CancelFunc
@@ -103,11 +103,11 @@ func (s *jimmSuite) SetUpTest(c *gc.C) {
 	s.ControllerAdmins = []string{"controller-admin"}
 	s.JujuConnSuite.SetUpTest(c)
 
-	s.AdminUser = &dbmodel.User{
-		Username:  "alice@external",
+	s.AdminUser = &dbmodel.Identity{
+		Name:      "alice@external",
 		LastLogin: db.Now(),
 	}
-	err = s.JIMM.Database.GetUser(ctx, s.AdminUser)
+	err = s.JIMM.Database.GetIdentity(ctx, s.AdminUser)
 	c.Assert(err, gc.Equals, nil)
 
 	alice := openfga.NewUser(s.AdminUser, ofgaClient)
@@ -183,12 +183,12 @@ func (s *jimmSuite) userBakeryClient(username string) *httpbakery.Client {
 
 func (s *jimmSuite) AddController(c *gc.C, name string, info *api.Info) {
 	ctl := &dbmodel.Controller{
-		UUID:          info.ControllerUUID,
-		Name:          name,
-		AdminUser:     info.Tag.Id(),
-		AdminPassword: info.Password,
-		CACertificate: info.CACert,
-		Addresses:     nil,
+		UUID:              info.ControllerUUID,
+		Name:              name,
+		AdminIdentityName: info.Tag.Id(),
+		AdminPassword:     info.Password,
+		CACertificate:     info.CACert,
+		Addresses:         nil,
 	}
 	ctl.Addresses = make(dbmodel.HostPorts, 0, len(info.Addrs))
 	for _, addr := range info.Addrs {
@@ -207,11 +207,11 @@ func (s *jimmSuite) AddController(c *gc.C, name string, info *api.Info) {
 
 func (s *jimmSuite) UpdateCloudCredential(c *gc.C, tag names.CloudCredentialTag, cred jujuparams.CloudCredential) {
 	ctx := context.Background()
-	u := dbmodel.User{
-		Username: tag.Owner().Id(),
+	u := dbmodel.Identity{
+		Name: tag.Owner().Id(),
 	}
 	user := openfga.NewUser(&u, s.JIMM.OpenFGAClient)
-	err := s.JIMM.Database.GetUser(ctx, &u)
+	err := s.JIMM.Database.GetIdentity(ctx, &u)
 	c.Assert(err, gc.Equals, nil)
 	_, err = s.JIMM.UpdateCloudCredential(ctx, user, jimm.UpdateCloudCredentialArgs{
 		CredentialTag: tag,
@@ -224,12 +224,12 @@ func (s *jimmSuite) UpdateCloudCredential(c *gc.C, tag names.CloudCredentialTag,
 func (s *jimmSuite) AddModel(c *gc.C, owner names.UserTag, name string, cloud names.CloudTag, region string, cred names.CloudCredentialTag) names.ModelTag {
 	ctx := context.Background()
 	u := openfga.NewUser(
-		&dbmodel.User{
-			Username: owner.Id(),
+		&dbmodel.Identity{
+			Name: owner.Id(),
 		},
 		s.OFGAClient,
 	)
-	err := s.JIMM.Database.GetUser(ctx, u.User)
+	err := s.JIMM.Database.GetIdentity(ctx, u.Identity)
 	c.Assert(err, gc.Equals, nil)
 	mi, err := s.JIMM.AddModel(ctx, u, &jimm.ModelCreateArgs{
 		Name:            name,

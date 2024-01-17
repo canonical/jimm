@@ -39,13 +39,13 @@ func TestController(t *testing.T) {
 	c.Assert(result.Error, qt.IsNil)
 
 	ctl := dbmodel.Controller{
-		Name:          "test-controller",
-		UUID:          "00000000-0000-0000-0000-000000000001",
-		AdminUser:     "admin",
-		AdminPassword: "pw",
-		CACertificate: "ca-cert",
-		PublicAddress: "controller.example.com:443",
-		CloudName:     "test-cloud",
+		Name:              "test-controller",
+		UUID:              "00000000-0000-0000-0000-000000000001",
+		AdminIdentityName: "admin",
+		AdminPassword:     "pw",
+		CACertificate:     "ca-cert",
+		PublicAddress:     "controller.example.com:443",
+		CloudName:         "test-cloud",
 		Addresses: dbmodel.HostPorts([][]jujuparams.HostPort{{{
 			Address: jujuparams.Address{
 				Value: "1.1.1.1",
@@ -91,8 +91,8 @@ func TestControllerModels(t *testing.T) {
 	}
 	c.Assert(db.Create(&m1).Error, qt.IsNil)
 
-	u2 := dbmodel.User{
-		Username: "charlie@external",
+	u2 := dbmodel.Identity{
+		Name: "charlie@external",
 	}
 	c.Assert(db.Create(&u2).Error, qt.IsNil)
 
@@ -119,7 +119,7 @@ func TestControllerModels(t *testing.T) {
 		UpdatedAt:         m1.UpdatedAt,
 		Name:              m1.Name,
 		UUID:              m1.UUID,
-		OwnerUsername:     m1.OwnerUsername,
+		OwnerIdentityName: m1.OwnerIdentityName,
 		ControllerID:      m1.ControllerID,
 		CloudRegionID:     m1.CloudRegionID,
 		CloudCredentialID: m1.CloudCredentialID,
@@ -129,7 +129,7 @@ func TestControllerModels(t *testing.T) {
 		UpdatedAt:         m2.UpdatedAt,
 		Name:              m2.Name,
 		UUID:              m2.UUID,
-		OwnerUsername:     m2.OwnerUsername,
+		OwnerIdentityName: m2.OwnerIdentityName,
 		ControllerID:      m2.ControllerID,
 		CloudRegionID:     m2.CloudRegionID,
 		CloudCredentialID: m2.CloudCredentialID,
@@ -166,7 +166,7 @@ func TestToAPIControllerInfo(t *testing.T) {
 		CloudRegion: cl.Regions[0],
 		Priority:    dbmodel.CloudRegionControllerPriorityDeployed,
 	}}
-	ctl.AdminUser = "admin"
+	ctl.AdminIdentityName = "admin"
 	ctl.AgentVersion = "1.2.3"
 
 	ci := ctl.ToAPIControllerInfo()

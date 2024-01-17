@@ -237,7 +237,7 @@ func (r *controllerRoot) ControllerConfig(ctx context.Context) (jujuparams.Contr
 		}, nil
 	}
 
-	cfg, err := r.jimm.GetControllerConfig(ctx, r.user.User)
+	cfg, err := r.jimm.GetControllerConfig(ctx, r.user.Identity)
 	if err != nil {
 		return jujuparams.ControllerConfigResult{}, errors.E(op, err)
 	}

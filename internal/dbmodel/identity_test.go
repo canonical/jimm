@@ -15,24 +15,24 @@ import (
 	"github.com/canonical/jimm/internal/dbmodel"
 )
 
-func TestUser(t *testing.T) {
+func TestIdentity(t *testing.T) {
 	c := qt.New(t)
 	db := gormDB(c)
 
-	var u0 dbmodel.User
-	result := db.Where("username = ?", "bob@external").First(&u0)
+	var u0 dbmodel.Identity
+	result := db.Where("name = ?", "bob@external").First(&u0)
 	c.Check(result.Error, qt.Equals, gorm.ErrRecordNotFound)
 
-	u1 := dbmodel.User{
-		Username:    "bob@external",
+	u1 := dbmodel.Identity{
+		Name:        "bob@external",
 		DisplayName: "bob",
 	}
 	result = db.Create(&u1)
 	c.Assert(result.Error, qt.IsNil)
 	c.Check(result.RowsAffected, qt.Equals, int64(1))
 
-	var u2 dbmodel.User
-	result = db.Where("username = ?", "bob@external").First(&u2)
+	var u2 dbmodel.Identity
+	result = db.Where("name = ?", "bob@external").First(&u2)
 	c.Assert(result.Error, qt.IsNil)
 	c.Check(u2, qt.DeepEquals, u1)
 
@@ -40,33 +40,33 @@ func TestUser(t *testing.T) {
 	u2.LastLogin.Valid = true
 	result = db.Save(&u2)
 	c.Assert(result.Error, qt.IsNil)
-	var u3 dbmodel.User
-	result = db.Where("username = ?", "bob@external").First(&u3)
+	var u3 dbmodel.Identity
+	result = db.Where("name = ?", "bob@external").First(&u3)
 	c.Assert(result.Error, qt.IsNil)
 	c.Check(u3, qt.DeepEquals, u2)
 
-	u4 := dbmodel.User{
-		Username:    "bob@external",
+	u4 := dbmodel.Identity{
+		Name:        "bob@external",
 		DisplayName: "bob",
 	}
 	result = db.Create(&u4)
-	c.Check(result.Error, qt.ErrorMatches, `.*violates unique constraint "users_username_key".*`)
+	c.Check(result.Error, qt.ErrorMatches, `.*violates unique constraint "identities_name_key".*`)
 }
 
 func TestUserTag(t *testing.T) {
 	c := qt.New(t)
 
-	u := dbmodel.User{
-		Username: "bob@external",
+	u := dbmodel.Identity{
+		Name: "bob@external",
 	}
 	tag := u.Tag()
 	c.Check(tag.String(), qt.Equals, "user-bob@external")
-	var u2 dbmodel.User
+	var u2 dbmodel.Identity
 	u2.SetTag(tag.(names.UserTag))
 	c.Check(u2, qt.DeepEquals, u)
 }
 
-func TestUserCloudCredentials(t *testing.T) {
+func TestIdentityCloudCredentials(t *testing.T) {
 	c := qt.New(t)
 	db := gormDB(c)
 
@@ -76,8 +76,8 @@ func TestUserCloudCredentials(t *testing.T) {
 	result := db.Create(&cl)
 	c.Assert(result.Error, qt.IsNil)
 
-	u := dbmodel.User{
-		Username: "bob@external",
+	u := dbmodel.Identity{
+		Name: "bob@external",
 	}
 	result = db.Create(&u)
 	c.Assert(result.Error, qt.IsNil)
@@ -104,28 +104,28 @@ func TestUserCloudCredentials(t *testing.T) {
 	err := db.Model(u).Association("CloudCredentials").Find(&creds)
 	c.Assert(err, qt.IsNil)
 	c.Check(creds, qt.DeepEquals, []dbmodel.CloudCredential{{
-		Model:         cred1.Model,
-		Name:          cred1.Name,
-		CloudName:     cred1.CloudName,
-		OwnerUsername: cred1.OwnerUsername,
-		AuthType:      cred1.AuthType,
+		Model:             cred1.Model,
+		Name:              cred1.Name,
+		CloudName:         cred1.CloudName,
+		OwnerIdentityName: cred1.OwnerIdentityName,
+		AuthType:          cred1.AuthType,
 	}, {
-		Model:         cred2.Model,
-		Name:          cred2.Name,
-		CloudName:     cred2.CloudName,
-		OwnerUsername: cred2.OwnerUsername,
-		AuthType:      cred2.AuthType,
+		Model:             cred2.Model,
+		Name:              cred2.Name,
+		CloudName:         cred2.CloudName,
+		OwnerIdentityName: cred2.OwnerIdentityName,
+		AuthType:          cred2.AuthType,
 	}})
 }
 
-func TestUserToJujuUserInfo(t *testing.T) {
+func TestIdentityToJujuUserInfo(t *testing.T) {
 	c := qt.New(t)
 
-	u := dbmodel.User{
+	u := dbmodel.Identity{
 		Model: gorm.Model{
 			CreatedAt: time.Now(),
 		},
-		Username:    "alice@external",
+		Name:        "alice@external",
 		DisplayName: "Alice",
 	}
 	ui := u.ToJujuUserInfo()

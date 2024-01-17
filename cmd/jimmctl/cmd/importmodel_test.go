@@ -50,7 +50,7 @@ func (s *importModelSuite) TestImportModelSuperuser(c *gc.C) {
 	model2.SetTag(names.NewModelTag(m.ModelUUID()))
 	err = s.JIMM.Database.GetModel(context.Background(), &model2)
 	c.Assert(err, gc.Equals, nil)
-	c.Check(model2.OwnerUsername, gc.Equals, "charlie@external")
+	c.Check(model2.OwnerIdentityName, gc.Equals, "charlie@external")
 }
 
 func (s *importModelSuite) TestImportModelFromLocalUser(c *gc.C) {
@@ -78,7 +78,7 @@ func (s *importModelSuite) TestImportModelFromLocalUser(c *gc.C) {
 	err = s.JIMM.Database.GetModel(context.Background(), &model2)
 	c.Assert(err, gc.Equals, nil)
 	c.Check(model2.CreatedAt.After(model.CreatedAt), gc.Equals, true)
-	c.Check(model2.OwnerUsername, gc.Equals, "alice@external")
+	c.Check(model2.OwnerIdentityName, gc.Equals, "alice@external")
 }
 
 func (s *importModelSuite) TestImportModelUnauthorized(c *gc.C) {

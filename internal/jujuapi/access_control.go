@@ -251,7 +251,7 @@ func resolveTag(jimmUUID string, db *db.Database, tag string) (*ofganames.Tag, e
 				return nil, errors.E("controller not found")
 			}
 			model.ControllerID = controller.ID
-			model.OwnerUsername = userName
+			model.OwnerIdentityName = userName
 			model.Name = modelName
 		}
 
@@ -363,7 +363,7 @@ func (r *controllerRoot) CheckRelation(ctx context.Context, req apiparams.CheckR
 		return checkResp, errors.E(op, errors.CodeFailedToParseTupleKey, err)
 	}
 
-	userCheckingSelf := parsedTuple.Object.Kind == openfga.UserType && parsedTuple.Object.ID == r.user.Username
+	userCheckingSelf := parsedTuple.Object.Kind == openfga.UserType && parsedTuple.Object.ID == r.user.Name
 	// Admins can check any relation, non-admins can only check their own.
 	if !(r.user.JimmAdmin || userCheckingSelf) {
 		return checkResp, errors.E(op, errors.CodeUnauthorized, "unauthorized")
@@ -469,7 +469,7 @@ func (r *controllerRoot) toJAASTag(ctx context.Context, tag *ofganames.Tag) (str
 		if err != nil {
 			return "", errors.E(err, "failed to fetch model information")
 		}
-		modelString := names.ModelTagKind + "-" + model.Controller.Name + ":" + model.OwnerUsername + "/" + model.Name
+		modelString := names.ModelTagKind + "-" + model.Controller.Name + ":" + model.OwnerIdentityName + "/" + model.Name
 		if tag.Relation.String() != "" {
 			modelString = modelString + "#" + tag.Relation.String()
 		}
@@ -482,7 +482,7 @@ func (r *controllerRoot) toJAASTag(ctx context.Context, tag *ofganames.Tag) (str
 		if err != nil {
 			return "", errors.E(err, "failed to fetch application offer information")
 		}
-		aoString := names.ApplicationOfferTagKind + "-" + ao.Model.Controller.Name + ":" + ao.Model.OwnerUsername + "/" + ao.Model.Name + "." + ao.Name
+		aoString := names.ApplicationOfferTagKind + "-" + ao.Model.Controller.Name + ":" + ao.Model.OwnerIdentityName + "/" + ao.Model.Name + "." + ao.Name
 		if tag.Relation.String() != "" {
 			aoString = aoString + "#" + tag.Relation.String()
 		}

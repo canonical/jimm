@@ -26,7 +26,7 @@ func TestSetCloudDefaults(t *testing.T) {
 	now := time.Now()
 
 	type testConfig struct {
-		user             *dbmodel.User
+		user             *dbmodel.Identity
 		cloud            names.CloudTag
 		region           string
 		defaults         map[string]interface{}
@@ -41,8 +41,8 @@ func TestSetCloudDefaults(t *testing.T) {
 	}{{
 		about: "defaults do not exist yet - defaults created",
 		setup: func(c *qt.C, j *jimm.JIMM) testConfig {
-			user := dbmodel.User{
-				Username: "bob@external",
+			user := dbmodel.Identity{
+				Name: "bob@external",
 			}
 			c.Assert(j.Database.DB.Create(&user).Error, qt.IsNil)
 
@@ -62,12 +62,12 @@ func TestSetCloudDefaults(t *testing.T) {
 
 			cloud.Regions = nil
 			expectedDefaults := dbmodel.CloudDefaults{
-				Username: user.Username,
-				User:     user,
-				CloudID:  cloud.ID,
-				Cloud:    cloud,
-				Region:   "test-region",
-				Defaults: defaults,
+				IdentityName: user.Name,
+				Identity:     user,
+				CloudID:      cloud.ID,
+				Cloud:        cloud,
+				Region:       "test-region",
+				Defaults:     defaults,
 			}
 
 			return testConfig{
@@ -81,8 +81,8 @@ func TestSetCloudDefaults(t *testing.T) {
 	}, {
 		about: "set defaults without region - defaults created",
 		setup: func(c *qt.C, j *jimm.JIMM) testConfig {
-			user := dbmodel.User{
-				Username: "bob@external",
+			user := dbmodel.Identity{
+				Name: "bob@external",
 			}
 			c.Assert(j.Database.DB.Create(&user).Error, qt.IsNil)
 
@@ -102,11 +102,11 @@ func TestSetCloudDefaults(t *testing.T) {
 
 			cloud.Regions = nil
 			expectedDefaults := dbmodel.CloudDefaults{
-				Username: user.Username,
-				User:     user,
-				CloudID:  cloud.ID,
-				Cloud:    cloud,
-				Defaults: defaults,
+				IdentityName: user.Name,
+				Identity:     user,
+				CloudID:      cloud.ID,
+				Cloud:        cloud,
+				Defaults:     defaults,
 			}
 
 			return testConfig{
@@ -120,8 +120,8 @@ func TestSetCloudDefaults(t *testing.T) {
 	}, {
 		about: "defaults already exist - defaults updated",
 		setup: func(c *qt.C, j *jimm.JIMM) testConfig {
-			user := dbmodel.User{
-				Username: "bob@external",
+			user := dbmodel.Identity{
+				Name: "bob@external",
 			}
 			c.Assert(j.Database.DB.Create(&user).Error, qt.IsNil)
 
@@ -135,11 +135,11 @@ func TestSetCloudDefaults(t *testing.T) {
 			c.Assert(j.Database.DB.Create(&cloud).Error, qt.IsNil)
 
 			j.Database.SetCloudDefaults(ctx, &dbmodel.CloudDefaults{
-				Username: user.Username,
-				User:     user,
-				CloudID:  cloud.ID,
-				Cloud:    cloud,
-				Region:   cloud.Regions[0].Name,
+				IdentityName: user.Name,
+				Identity:     user,
+				CloudID:      cloud.ID,
+				Cloud:        cloud,
+				Region:       cloud.Regions[0].Name,
 				Defaults: map[string]interface{}{
 					"key1": float64(17),
 					"key2": "a test string",
@@ -154,12 +154,12 @@ func TestSetCloudDefaults(t *testing.T) {
 
 			cloud.Regions = nil
 			expectedDefaults := dbmodel.CloudDefaults{
-				Username: user.Username,
-				User:     user,
-				CloudID:  cloud.ID,
-				Cloud:    cloud,
-				Region:   "test-region",
-				Defaults: defaults,
+				IdentityName: user.Name,
+				Identity:     user,
+				CloudID:      cloud.ID,
+				Cloud:        cloud,
+				Region:       "test-region",
+				Defaults:     defaults,
 			}
 
 			return testConfig{
@@ -173,8 +173,8 @@ func TestSetCloudDefaults(t *testing.T) {
 	}, {
 		about: "cloudregion does not exist",
 		setup: func(c *qt.C, j *jimm.JIMM) testConfig {
-			user := dbmodel.User{
-				Username: "bob@external",
+			user := dbmodel.Identity{
+				Name: "bob@external",
 			}
 			c.Assert(j.Database.DB.Create(&user).Error, qt.IsNil)
 
@@ -203,8 +203,8 @@ func TestSetCloudDefaults(t *testing.T) {
 	}, {
 		about: "cannot set agent-version",
 		setup: func(c *qt.C, j *jimm.JIMM) testConfig {
-			user := dbmodel.User{
-				Username: "bob@external",
+			user := dbmodel.Identity{
+				Name: "bob@external",
 			}
 			c.Assert(j.Database.DB.Create(&user).Error, qt.IsNil)
 
@@ -248,7 +248,7 @@ func TestSetCloudDefaults(t *testing.T) {
 			if testConfig.expectedError == "" {
 				c.Assert(err, qt.Equals, nil)
 				dbDefaults := dbmodel.CloudDefaults{
-					Username: testConfig.expectedDefaults.Username,
+					IdentityName: testConfig.expectedDefaults.IdentityName,
 					Cloud: dbmodel.Cloud{
 						Name: testConfig.expectedDefaults.Cloud.Name,
 					},
@@ -271,7 +271,7 @@ func TestUnsetCloudDefaults(t *testing.T) {
 	now := time.Now()
 
 	type testConfig struct {
-		user             *dbmodel.User
+		user             *dbmodel.Identity
 		cloud            names.CloudTag
 		region           string
 		keys             []string
@@ -286,8 +286,8 @@ func TestUnsetCloudDefaults(t *testing.T) {
 	}{{
 		about: "all ok - keys removed from the defaults map",
 		setup: func(c *qt.C, j *jimm.JIMM) testConfig {
-			user := dbmodel.User{
-				Username: "bob@external",
+			user := dbmodel.Identity{
+				Name: "bob@external",
 			}
 			c.Assert(j.Database.DB.Create(&user).Error, qt.IsNil)
 
@@ -301,9 +301,9 @@ func TestUnsetCloudDefaults(t *testing.T) {
 			c.Assert(j.Database.DB.Create(&cloud).Error, qt.IsNil)
 
 			err := j.Database.SetCloudDefaults(ctx, &dbmodel.CloudDefaults{
-				Username: user.Username,
-				CloudID:  cloud.ID,
-				Region:   cloud.Regions[0].Name,
+				IdentityName: user.Name,
+				CloudID:      cloud.ID,
+				Region:       cloud.Regions[0].Name,
 				Defaults: map[string]interface{}{
 					"key1": float64(17),
 					"key2": "a test string",
@@ -320,11 +320,11 @@ func TestUnsetCloudDefaults(t *testing.T) {
 
 			cloud.Regions = nil
 			expectedDefaults := dbmodel.CloudDefaults{
-				Username: user.Username,
-				User:     user,
-				CloudID:  cloud.ID,
-				Cloud:    cloud,
-				Region:   "test-region",
+				IdentityName: user.Name,
+				Identity:     user,
+				CloudID:      cloud.ID,
+				Cloud:        cloud,
+				Region:       "test-region",
 				Defaults: map[string]interface{}{
 					"key2": "a test string",
 				},
@@ -341,8 +341,8 @@ func TestUnsetCloudDefaults(t *testing.T) {
 	}, {
 		about: "unset without region - keys removed from the defaults map",
 		setup: func(c *qt.C, j *jimm.JIMM) testConfig {
-			user := dbmodel.User{
-				Username: "bob@external",
+			user := dbmodel.Identity{
+				Name: "bob@external",
 			}
 			c.Assert(j.Database.DB.Create(&user).Error, qt.IsNil)
 
@@ -356,8 +356,8 @@ func TestUnsetCloudDefaults(t *testing.T) {
 			c.Assert(j.Database.DB.Create(&cloud).Error, qt.IsNil)
 
 			err := j.Database.SetCloudDefaults(ctx, &dbmodel.CloudDefaults{
-				Username: user.Username,
-				CloudID:  cloud.ID,
+				IdentityName: user.Name,
+				CloudID:      cloud.ID,
 				Defaults: map[string]interface{}{
 					"key1": float64(17),
 					"key2": "a test string",
@@ -374,11 +374,11 @@ func TestUnsetCloudDefaults(t *testing.T) {
 
 			cloud.Regions = nil
 			expectedDefaults := dbmodel.CloudDefaults{
-				Username: user.Username,
-				User:     user,
-				CloudID:  cloud.ID,
-				Cloud:    cloud,
-				Region:   "",
+				IdentityName: user.Name,
+				Identity:     user,
+				CloudID:      cloud.ID,
+				Cloud:        cloud,
+				Region:       "",
 				Defaults: map[string]interface{}{
 					"key2": "a test string",
 				},
@@ -395,8 +395,8 @@ func TestUnsetCloudDefaults(t *testing.T) {
 	}, {
 		about: "cloudregiondefaults not found",
 		setup: func(c *qt.C, j *jimm.JIMM) testConfig {
-			user := dbmodel.User{
-				Username: "bob@external",
+			user := dbmodel.Identity{
+				Name: "bob@external",
 			}
 			c.Assert(j.Database.DB.Create(&user).Error, qt.IsNil)
 
@@ -441,7 +441,7 @@ func TestUnsetCloudDefaults(t *testing.T) {
 			if testConfig.expectedError == "" {
 				c.Assert(err, qt.Equals, nil)
 				dbDefaults := dbmodel.CloudDefaults{
-					Username: testConfig.expectedDefaults.Username,
+					IdentityName: testConfig.expectedDefaults.IdentityName,
 					Cloud: dbmodel.Cloud{
 						Name: testConfig.cloud.Id(),
 					},
@@ -471,13 +471,13 @@ func TestModelDefaultsForCloud(t *testing.T) {
 	err := j.Database.Migrate(ctx, true)
 	c.Assert(err, qt.Equals, nil)
 
-	user := dbmodel.User{
-		Username: "bob@external",
+	user := dbmodel.Identity{
+		Name: "bob@external",
 	}
 	c.Assert(j.Database.DB.Create(&user).Error, qt.IsNil)
 
-	user1 := dbmodel.User{
-		Username: "alice@external",
+	user1 := dbmodel.Identity{
+		Name: "alice@external",
 	}
 	c.Assert(j.Database.DB.Create(&user1).Error, qt.IsNil)
 
@@ -502,9 +502,9 @@ func TestModelDefaultsForCloud(t *testing.T) {
 	c.Assert(j.Database.DB.Create(&cloud2).Error, qt.IsNil)
 
 	err = j.Database.SetCloudDefaults(ctx, &dbmodel.CloudDefaults{
-		Username: user.Username,
-		CloudID:  cloud1.ID,
-		Region:   cloud1.Regions[0].Name,
+		IdentityName: user.Name,
+		CloudID:      cloud1.ID,
+		Region:       cloud1.Regions[0].Name,
 		Defaults: map[string]interface{}{
 			"key1": float64(17),
 			"key2": "a test string",
@@ -514,9 +514,9 @@ func TestModelDefaultsForCloud(t *testing.T) {
 	c.Assert(err, qt.Equals, nil)
 
 	err = j.Database.SetCloudDefaults(ctx, &dbmodel.CloudDefaults{
-		Username: user.Username,
-		CloudID:  cloud1.ID,
-		Region:   cloud1.Regions[1].Name,
+		IdentityName: user.Name,
+		CloudID:      cloud1.ID,
+		Region:       cloud1.Regions[1].Name,
 		Defaults: map[string]interface{}{
 			"key2": "a different string",
 			"key4": float64(42),
@@ -525,9 +525,9 @@ func TestModelDefaultsForCloud(t *testing.T) {
 	c.Assert(err, qt.Equals, nil)
 
 	err = j.Database.SetCloudDefaults(ctx, &dbmodel.CloudDefaults{
-		Username: user.Username,
-		CloudID:  cloud2.ID,
-		Region:   cloud2.Regions[0].Name,
+		IdentityName: user.Name,
+		CloudID:      cloud2.ID,
+		Region:       cloud2.Regions[0].Name,
 		Defaults: map[string]interface{}{
 			"key2": "a different string",
 			"key4": float64(42),
@@ -537,9 +537,9 @@ func TestModelDefaultsForCloud(t *testing.T) {
 	c.Assert(err, qt.Equals, nil)
 
 	err = j.Database.SetCloudDefaults(ctx, &dbmodel.CloudDefaults{
-		Username: user.Username,
-		CloudID:  cloud2.ID,
-		Region:   "",
+		IdentityName: user.Name,
+		CloudID:      cloud2.ID,
+		Region:       "",
 		Defaults: map[string]interface{}{
 			"key1": "value",
 			"key4": float64(37),

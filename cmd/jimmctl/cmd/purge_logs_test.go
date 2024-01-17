@@ -59,16 +59,16 @@ func (s *purgeLogsSuite) TestPurgeLogsFromDb(c *gc.C) {
 		ctx := context.Background()
 		relativeNow := time.Now().AddDate(-1, 0, 0)
 		ale := dbmodel.AuditLogEntry{
-			Time:    relativeNow.UTC().Round(time.Millisecond),
-			UserTag: names.NewUserTag("alice@external").String(),
+			Time:        relativeNow.UTC().Round(time.Millisecond),
+			IdentityTag: names.NewUserTag("alice@external").String(),
 		}
 		ale_past := dbmodel.AuditLogEntry{
-			Time:    relativeNow.AddDate(0, 0, -1).UTC().Round(time.Millisecond),
-			UserTag: names.NewUserTag("alice@external").String(),
+			Time:        relativeNow.AddDate(0, 0, -1).UTC().Round(time.Millisecond),
+			IdentityTag: names.NewUserTag("alice@external").String(),
 		}
 		ale_future := dbmodel.AuditLogEntry{
-			Time:    relativeNow.AddDate(0, 0, 5).UTC().Round(time.Millisecond),
-			UserTag: names.NewUserTag("alice@external").String(),
+			Time:        relativeNow.AddDate(0, 0, 5).UTC().Round(time.Millisecond),
+			IdentityTag: names.NewUserTag("alice@external").String(),
 		}
 
 		err := s.JIMM.Database.Migrate(context.Background(), false)

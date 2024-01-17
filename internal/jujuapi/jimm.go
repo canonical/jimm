@@ -168,12 +168,12 @@ func (r *controllerRoot) AddController(ctx context.Context, req apiparams.AddCon
 	}
 
 	ctl := dbmodel.Controller{
-		UUID:          req.UUID,
-		Name:          req.Name,
-		PublicAddress: req.PublicAddress,
-		CACertificate: req.CACertificate,
-		AdminUser:     req.Username,
-		AdminPassword: req.Password,
+		UUID:              req.UUID,
+		Name:              req.Name,
+		PublicAddress:     req.PublicAddress,
+		CACertificate:     req.CACertificate,
+		AdminIdentityName: req.Username,
+		AdminPassword:     req.Password,
 	}
 	nphps, err := network.ParseProviderHostPorts(req.APIAddresses...)
 	if err != nil {
@@ -293,7 +293,7 @@ func auditParamsToFilter(req apiparams.FindAuditEventsRequest) (db.AuditLogFilte
 		if err != nil {
 			return filter, errors.E(err, errors.CodeBadRequest, `invalid "user-tag" filter`)
 		}
-		filter.UserTag = tag.String()
+		filter.IdentityTag = tag.String()
 	}
 
 	limit := int(req.Limit)
