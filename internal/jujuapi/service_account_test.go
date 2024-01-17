@@ -190,7 +190,7 @@ func TestUpdateServiceAccountCredentials(t *testing.T) {
 			u.SetTag(names.NewUserTag(test.username))
 			user := openfga.NewUser(&u, ofgaClient)
 			cr := jujuapi.NewControllerRoot(jimm, jujuapi.Params{})
-			cr.SetUser(user)
+			jujuapi.SetUser(cr, user)
 
 			if len(test.addTuples) > 0 {
 				ofgaClient.AddRelation(context.Background(), test.addTuples...)

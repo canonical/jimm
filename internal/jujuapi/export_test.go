@@ -7,6 +7,7 @@ import (
 
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/jimm"
+	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 	jujuparams "github.com/juju/juju/rpc/params"
 )
@@ -50,4 +51,10 @@ func ToJAASTag(db db.Database, tag *ofganames.Tag) (string, error) {
 
 func NewControllerRoot(j JIMM, p Params) *controllerRoot {
 	return newControllerRoot(j, p)
+}
+
+var SetUser = func(r *controllerRoot, u *openfga.User) {
+	r.mu.Lock()
+	r.user = u
+	r.mu.Unlock()
 }
