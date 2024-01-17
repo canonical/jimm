@@ -6,7 +6,6 @@ import (
 	"context"
 	"strings"
 
-	"github.com/canonical/ofga"
 	"github.com/juju/names/v4"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
@@ -15,6 +14,7 @@ import (
 	"github.com/canonical/jimm/internal/errors"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 	jimmnames "github.com/canonical/jimm/pkg/names"
+	"github.com/canonical/ofga"
 )
 
 // NewUser returns a new user structure that can be used to check
