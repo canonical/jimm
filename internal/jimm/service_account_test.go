@@ -25,8 +25,8 @@ func TestAddServiceAccount(t *testing.T) {
 	}
 	c.Assert(err, qt.IsNil)
 	user := openfga.NewUser(
-		&dbmodel.User{
-			Username:    "bob@external",
+		&dbmodel.Identity{
+			Name:        "bob@external",
 			DisplayName: "Bob",
 		},
 		client,
@@ -37,8 +37,8 @@ func TestAddServiceAccount(t *testing.T) {
 	err = j.AddServiceAccount(ctx, user, clientID)
 	c.Assert(err, qt.IsNil)
 	userAlice := openfga.NewUser(
-		&dbmodel.User{
-			Username:    "alive@external",
+		&dbmodel.Identity{
+			Name:        "alive@external",
 			DisplayName: "Alice",
 		},
 		client,
