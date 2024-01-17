@@ -6,6 +6,7 @@ import (
 	"context"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"time"
 
 	"github.com/canonical/candid/candidtest"
@@ -70,6 +71,13 @@ type JIMMSuite struct {
 func (s *JIMMSuite) SetUpTest(c *gc.C) {
 	var err error
 	s.OFGAClient, s.COFGAClient, s.COFGAParams, err = SetupTestOFGAClient(c.TestName())
+	dsn := defaultDSN
+	if envTestDSN, exists := os.LookupEnv("JIMM_TEST_PGXDSN"); exists {
+		dsn = envTestDSN
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+
+	river := jimm.NewRiver(nil, dsn, ctx)
 	c.Assert(err, gc.IsNil)
 
 	// Setup OpenFGA.
@@ -81,9 +89,9 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 		Pubsub:          &pubsub.Hub{MaxConcurrency: 10},
 		UUID:            ControllerUUID,
 		OpenFGAClient:   s.OFGAClient,
+		River:           river,
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
 
 	err = s.JIMM.Database.Migrate(ctx, false)

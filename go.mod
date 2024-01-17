@@ -2,8 +2,6 @@ module github.com/canonical/jimm
 
 go 1.21.4
 
-toolchain go1.21.6
-
 require (
 	github.com/canonical/candid v1.12.2
 	github.com/canonical/go-dqlite v1.20.0 // indirect
@@ -185,8 +183,7 @@ require (
 	github.com/jackc/pgproto3/v2 v2.3.1 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20231201235250-de7065d80cb9 // indirect
 	github.com/jackc/pgtype v1.12.0 // indirect
-	github.com/jackc/pgx v3.6.2+incompatible
-	github.com/jackc/pgx/v5 v5.5.1 // indirect
+	github.com/jackc/pgx/v5 v5.5.1
 	github.com/jackc/puddle/v2 v2.2.1 // indirect
 	github.com/jhump/protoreflect v1.8.2 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
@@ -295,9 +292,9 @@ require (
 	github.com/prometheus/client_model v0.3.0 // indirect
 	github.com/prometheus/common v0.37.0 // indirect
 	github.com/prometheus/procfs v0.11.0 // indirect
-	github.com/riverqueue/river v0.0.16 // indirect
+	github.com/riverqueue/river v0.0.16
 	github.com/riverqueue/river/riverdriver v0.0.15 // indirect
-	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.0.16 // indirect
+	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.0.16
 	github.com/rivo/tview v0.0.0-20220610163003-691f46d6f500 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect

@@ -90,11 +90,13 @@ func doMigration(ctx context.Context, dburl string) {
 	if err != nil {
 		panic(err)
 	}
-	defer tx.Rollback(ctx)
 	_, err = migrator.MigrateTx(ctx, tx, rivermigrate.DirectionUp, nil)
 	if err != nil {
 		zapctx.Error(ctx, "Failed to apply DB migration", zap.Error(err))
+		tx.Rollback(ctx)
+		panic(err)
 	}
+	tx.Commit(ctx)
 }
 
 func NewRiver(config *river.Config, db_url string, ctx context.Context) *River {
