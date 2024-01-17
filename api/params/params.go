@@ -406,6 +406,6 @@ type AddServiceAccountRequest struct {
 // a service accounts cloud credentials.
 type UpdateServiceAccountCredentialsRequest struct {
 	jujuparams.UpdateCredentialArgs
-	// id holds the client id of the service account.
+	// ClientID holds the client id of the service account.
 	ClientID string `json:"client-id"`
 }
