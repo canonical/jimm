@@ -186,7 +186,7 @@ func TestUpdateServiceAccountCredentials(t *testing.T) {
 				UpdateCloudCredential_: test.updateCloudCredential,
 				DB_:                    func() *db.Database { return &pgDb },
 			}
-			var u dbmodel.User
+			var u dbmodel.Identity
 			u.SetTag(names.NewUserTag(test.username))
 			user := openfga.NewUser(&u, ofgaClient)
 			cr := jujuapi.NewControllerRoot(jimm, jujuapi.Params{})
