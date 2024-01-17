@@ -6,12 +6,12 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 	"github.com/juju/zaputil/zapctx"
 	"github.com/riverqueue/river"
@@ -20,26 +20,47 @@ import (
 	"go.uber.org/zap"
 )
 
+// OpenFGAArgs holds the river job arguments for writing tuples to OpenFGA.
 type OpenFGAArgs struct {
-	client     openfga.OFGAClient
-	controller *dbmodel.Controller
-	model      *dbmodel.Model
-	owner      *dbmodel.User
-	modelInfo  *jujuparams.ModelInfo
+	ControllerUUID string `json:"controller_uuid"`
+	ModelId        uint   `json:"model_id"`
+	ModelInfoUUID  string `json:"model_info_uuid"`
+	OwnerName      string `json:"owner_name"`
 }
 
+// Kind returns the kind of the job to be picked up by the appropriate river workers.
+// It is the same concept as Kafka topics.
 func (OpenFGAArgs) Kind() string { return "OpenFGA" }
 
+// OpenFGAWorker is the river worker that would run the job.
 type OpenFGAWorker struct {
 	river.WorkerDefaults[OpenFGAArgs]
+	OfgaClient openfga.OFGAClient
+	Database   db.Database
 }
 
+// Work is tha function executed by the worker when it picks up the job.
 func (w *OpenFGAWorker) Work(ctx context.Context, job *river.Job[OpenFGAArgs]) error {
-	model := job.Args.model
-	controller := job.Args.controller
-	owner := job.Args.owner
-	modelInfo := job.Args.modelInfo
-	if err := job.Args.client.AddControllerModel(
+
+	controller := &dbmodel.Controller{UUID: job.Args.ControllerUUID}
+	err := w.Database.GetController(ctx, controller)
+	if err != nil {
+		return err
+	}
+
+	model := &dbmodel.Model{ID: job.Args.ModelId}
+	err = w.Database.GetModel(ctx, model)
+	if err != nil {
+		return err
+	}
+
+	owner := &dbmodel.User{Username: job.Args.OwnerName}
+	err = w.Database.GetUser(ctx, owner)
+	if err != nil {
+		return err
+	}
+
+	if err := w.OfgaClient.AddControllerModel(
 		ctx,
 		controller.ResourceTag(),
 		model.ResourceTag(),
@@ -52,7 +73,7 @@ func (w *OpenFGAWorker) Work(ctx context.Context, job *river.Job[OpenFGAArgs]) e
 		)
 		return err
 	}
-	err := openfga.NewUser(owner, &job.Args.client).SetModelAccess(ctx, names.NewModelTag(modelInfo.UUID), ofganames.AdministratorRelation)
+	err = openfga.NewUser(owner, &w.OfgaClient).SetModelAccess(ctx, names.NewModelTag(job.Args.ModelInfoUUID), ofganames.AdministratorRelation)
 	if err != nil {
 		zapctx.Error(
 			ctx,
@@ -65,65 +86,82 @@ func (w *OpenFGAWorker) Work(ctx context.Context, job *river.Job[OpenFGAArgs]) e
 	return nil
 }
 
-func RegisterJimmWorkers(ctx context.Context) *river.Workers {
+func RegisterJimmWorkers(ctx context.Context, ofgaConn openfga.OFGAClient, db db.Database) (*river.Workers, error) {
 	workers := river.NewWorkers()
-	if err := river.AddWorkerSafely(workers, &OpenFGAWorker{}); err != nil {
-		zapctx.Error(ctx, "Failed to register OpenFGA client", zap.Error(err))
+	if err := river.AddWorkerSafely(workers, &OpenFGAWorker{OfgaClient: ofgaConn, Database: db}); err != nil {
+		return nil, err
 	}
-	return workers
+	return workers, nil
 }
 
+// River is the struct that holds that Client connection to river.
 type River struct {
 	Client *river.Client[pgx.Tx]
 }
 
-func doMigration(ctx context.Context, dburl string) {
+func doMigration(ctx context.Context, dburl string) error {
 	var dbPool *pgxpool.Pool
 	migrator := rivermigrate.New(riverpgxv5.New(dbPool), nil)
 	dbPool, err := pgxpool.New(ctx, dburl)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	defer dbPool.Close()
 
 	tx, err := dbPool.Begin(ctx)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	_, err = migrator.MigrateTx(ctx, tx, rivermigrate.DirectionUp, nil)
 	if err != nil {
 		zapctx.Error(ctx, "Failed to apply DB migration", zap.Error(err))
-		tx.Rollback(ctx)
-		panic(err)
+		rollbackErr := tx.Rollback(ctx)
+		if rollbackErr != nil {
+			zapctx.Error(ctx, "Failed to rollback DB migration", zap.Error(rollbackErr))
+		}
+		return err
 	}
-	tx.Commit(ctx)
+	err = tx.Commit(ctx)
+	if err != nil {
+		zapctx.Error(ctx, "Failed to commit DB migration", zap.Error(err))
+		return err
+	}
+	return nil
 }
 
-func NewRiver(config *river.Config, db_url string, ctx context.Context) *River {
-	doMigration(ctx, db_url)
+func NewRiver(config *river.Config, db_url string, ctx context.Context, ofgaConn openfga.OFGAClient, db db.Database) (*River, error) {
+	err := doMigration(ctx, db_url)
+	if err != nil {
+		return nil, err
+	}
+
 	if config == nil {
+		workers, err := RegisterJimmWorkers(ctx, ofgaConn, db)
+		if err != nil {
+			return nil, err
+		}
 		config = &river.Config{
 			RetryPolicy: &river.DefaultClientRetryPolicy{},
 			Queues: map[string]river.QueueConfig{
 				river.QueueDefault: {MaxWorkers: 100},
 			},
 			Logger:  slog.Default(),
-			Workers: RegisterJimmWorkers(ctx),
+			Workers: workers,
 		}
 	}
 	dbPool, err := pgxpool.New(ctx, db_url)
 	if err != nil {
-		zapctx.Error(ctx, "Failed to create db pool", zap.Error(err))
+		return nil, err
 	}
 	riverClient, err := river.NewClient(riverpgxv5.New(dbPool), config)
 	if err != nil {
-		zapctx.Error(ctx, "Failed to create river client", zap.Error(err))
+		return nil, err
 	}
 	if err := riverClient.Start(ctx); err != nil {
-		zapctx.Error(ctx, "FailedFailed to start river client", zap.Error(err))
+		return nil, err
 	}
 	r := River{
 		Client: riverClient,
 	}
-	return &r
+	return &r, nil
 }

@@ -294,8 +294,6 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		return nil, errors.E(op, err)
 	}
 
-	s.jimm.River = jimm.NewRiver(nil, p.DSN, ctx)
-
 	if err := s.setupCredentialStore(ctx, p); err != nil {
 		return nil, errors.E(op, err)
 	}
@@ -317,6 +315,11 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 
 	if !p.DisableConnectionCache {
 		s.jimm.Dialer = jimm.CacheDialer(s.jimm.Dialer)
+	}
+
+	s.jimm.River, err = jimm.NewRiver(nil, p.DSN, ctx, *s.jimm.OpenFGAClient, s.jimm.Database)
+	if err != nil {
+		return nil, errors.E(op, err)
 	}
 
 	mountHandler := func(path string, h jimmhttp.JIMMHttpHandler) {

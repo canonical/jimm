@@ -71,20 +71,22 @@ type JIMMSuite struct {
 func (s *JIMMSuite) SetUpTest(c *gc.C) {
 	var err error
 	s.OFGAClient, s.COFGAClient, s.COFGAParams, err = SetupTestOFGAClient(c.TestName())
+	c.Assert(err, gc.IsNil)
+
 	dsn := defaultDSN
 	if envTestDSN, exists := os.LookupEnv("JIMM_TEST_PGXDSN"); exists {
 		dsn = envTestDSN
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-
-	river := jimm.NewRiver(nil, dsn, ctx)
+	jimm_db := db.Database{
+		DB: PostgresDB(GocheckTester{c}, nil),
+	}
+	river, err := jimm.NewRiver(nil, dsn, ctx, *s.OFGAClient, jimm_db)
 	c.Assert(err, gc.IsNil)
 
 	// Setup OpenFGA.
 	s.JIMM = &jimm.JIMM{
-		Database: db.Database{
-			DB: PostgresDB(GocheckTester{c}, nil),
-		},
+		Database:        jimm_db,
 		CredentialStore: &InMemoryCredentialStore{},
 		Pubsub:          &pubsub.Hub{MaxConcurrency: 10},
 		UUID:            ControllerUUID,

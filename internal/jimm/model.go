@@ -615,8 +615,13 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 	}
 
 	mi := builder.JujuModelInfo()
-	openfga_river_job_args := OpenFGAArgs{client: *j.OpenFGAClient, controller: builder.controller, model: builder.model, owner: builder.owner, modelInfo: mi}
-	_, err = j.River.Client.Insert(ctx, openfga_river_job_args, &river.InsertOpts{MaxAttempts: 10})
+	openfgaRiverJobArgs := OpenFGAArgs{
+		ControllerUUID: builder.controller.UUID,
+		ModelId:        builder.model.ID,
+		OwnerName:      builder.owner.Username,
+		ModelInfoUUID:  mi.UUID,
+	}
+	_, err = j.River.Client.Insert(ctx, openfgaRiverJobArgs, &river.InsertOpts{MaxAttempts: 10})
 	if err != nil {
 		zapctx.Error(ctx, "Failed to insert river job!", zaputil.Error(err))
 		// trying without river just in case.
