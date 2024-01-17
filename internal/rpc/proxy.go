@@ -124,7 +124,7 @@ func (p *modelProxy) auditLogMessage(msg *message, isResponse bool) error {
 	ale := dbmodel.AuditLogEntry{
 		Time:           time.Now().UTC().Round(time.Millisecond),
 		MessageId:      msg.RequestID,
-		UserTag:        p.tokenGen.GetUser().String(),
+		IdentityTag:    p.tokenGen.GetUser().String(),
 		Model:          p.modelName,
 		ConversationId: p.conversationId,
 		FacadeName:     msg.Type,

@@ -57,20 +57,20 @@ func TestFindAuditEvents(t *testing.T) {
 
 	events := []dbmodel.AuditLogEntry{{
 		Time:         now,
-		UserTag:      admin.Identity.Tag().String(),
+		IdentityTag:  admin.Identity.Tag().String(),
 		FacadeMethod: "Login",
 	}, {
 		Time:         now.Add(time.Hour),
-		UserTag:      admin.Identity.Tag().String(),
+		IdentityTag:  admin.Identity.Tag().String(),
 		FacadeMethod: "AddModel",
 	}, {
 		Time:         now.Add(2 * time.Hour),
-		UserTag:      privileged.Identity.Tag().String(),
+		IdentityTag:  privileged.Identity.Tag().String(),
 		Model:        "TestModel",
 		FacadeMethod: "Deploy",
 	}, {
 		Time:         now.Add(3 * time.Hour),
-		UserTag:      privileged.Identity.Tag().String(),
+		IdentityTag:  privileged.Identity.Tag().String(),
 		Model:        "TestModel",
 		FacadeMethod: "DestroyModel",
 	}}
@@ -98,7 +98,7 @@ func TestFindAuditEvents(t *testing.T) {
 		about: "admin/privileged user is allowed to find audit events by user",
 		users: []*openfga.User{admin, privileged},
 		filter: db.AuditLogFilter{
-			UserTag: admin.Tag().String(),
+			IdentityTag: admin.Tag().String(),
 		},
 		expectedEvents: []dbmodel.AuditLogEntry{events[0], events[1]},
 	}, {
@@ -135,13 +135,13 @@ func TestFindAuditEvents(t *testing.T) {
 		about: "admin/privileged user - no events found",
 		users: []*openfga.User{admin, privileged},
 		filter: db.AuditLogFilter{
-			UserTag: "no-such-user",
+			IdentityTag: "no-such-user",
 		},
 	}, {
 		about: "unprivileged user is not allowed to access audit events",
 		users: []*openfga.User{unprivileged},
 		filter: db.AuditLogFilter{
-			UserTag: admin.Tag().String(),
+			IdentityTag: admin.Tag().String(),
 		},
 		expectedError: "unauthorized",
 	}}

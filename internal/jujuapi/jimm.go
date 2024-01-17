@@ -290,7 +290,7 @@ func auditParamsToFilter(req apiparams.FindAuditEventsRequest) (db.AuditLogFilte
 		if err != nil {
 			return filter, errors.E(err, errors.CodeBadRequest, `invalid "user-tag" filter`)
 		}
-		filter.UserTag = tag.String()
+		filter.IdentityTag = tag.String()
 	}
 
 	limit := int(req.Limit)
