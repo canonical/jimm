@@ -393,3 +393,11 @@ type MigrateModelInfo struct {
 type MigrateModelRequest struct {
 	Specs []MigrateModelInfo `json:"specs"`
 }
+
+// Service Account related request parameters
+
+// AddServiceAccountRequest holds a request to add a service account.
+type AddServiceAccountRequest struct {
+	// ClientID holds the client id of the service account.
+	ClientID string `json:"client-id"`
+}

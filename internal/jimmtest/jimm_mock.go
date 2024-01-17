@@ -34,6 +34,7 @@ type JIMM struct {
 	AddController_                     func(ctx context.Context, u *openfga.User, ctl *dbmodel.Controller) error
 	AddHostedCloud_                    func(ctx context.Context, user *openfga.User, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error
 	AddModel_                          func(ctx context.Context, u *openfga.User, args *jimm.ModelCreateArgs) (*jujuparams.ModelInfo, error)
+	AddServiceAccount_                 func(ctx context.Context, u *openfga.User, clientId string) error
 	Authenticate_                      func(ctx context.Context, req *jujuparams.LoginRequest) (*openfga.User, error)
 	AuthorizationClient_               func() *openfga.OFGAClient
 	ChangeModelCredential_             func(ctx context.Context, user *openfga.User, modelTag names.ModelTag, cloudCredentialTag names.CloudCredentialTag) error
@@ -130,6 +131,14 @@ func (j *JIMM) AddModel(ctx context.Context, u *openfga.User, args *jimm.ModelCr
 	}
 	return j.AddModel_(ctx, u, args)
 }
+
+func (j *JIMM) AddServiceAccount(ctx context.Context, u *openfga.User, clientId string) error {
+	if j.AddServiceAccount_ == nil {
+		return errors.E(errors.CodeNotImplemented)
+	}
+	return j.AddServiceAccount_(ctx, u, clientId)
+}
+
 func (j *JIMM) Authenticate(ctx context.Context, req *jujuparams.LoginRequest) (*openfga.User, error) {
 	if j.Authenticate_ == nil {
 		return nil, errors.E(errors.CodeNotImplemented)
