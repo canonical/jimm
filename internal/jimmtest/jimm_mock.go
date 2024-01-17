@@ -17,7 +17,6 @@ import (
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/jimm"
-	"github.com/canonical/jimm/internal/jujuapi"
 	"github.com/canonical/jimm/internal/openfga"
 	"github.com/canonical/jimm/internal/pubsub"
 )
@@ -27,8 +26,6 @@ import (
 // will delegate to the requested funcion or if the funcion is nil return
 // a NotImplemented error.
 type JIMM struct {
-	jujuapi.JIMM
-
 	AddAuditLogEntry_                  func(ale *dbmodel.AuditLogEntry)
 	AddCloudToController_              func(ctx context.Context, user *openfga.User, controllerName string, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error
 	AddController_                     func(ctx context.Context, u *openfga.User, ctl *dbmodel.Controller) error
@@ -68,7 +65,9 @@ type JIMM struct {
 	GrantModelAccess_                  func(ctx context.Context, user *openfga.User, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error
 	GrantOfferAccess_                  func(ctx context.Context, u *openfga.User, offerURL string, ut names.UserTag, access jujuparams.OfferAccessPermission) error
 	ImportModel_                       func(ctx context.Context, user *openfga.User, controllerName string, modelTag names.ModelTag, newOwner string) error
+	IdentityModelDefaults_             func(ctx context.Context, user *dbmodel.Identity) (map[string]interface{}, error)
 	InitiateMigration_                 func(ctx context.Context, user *openfga.User, spec jujuparams.MigrationSpec, targetControllerID uint) (jujuparams.InitiateMigrationResult, error)
+	InitiateInternalMigration_         func(ctx context.Context, user *openfga.User, modelTag names.ModelTag, targetController string) (jujuparams.InitiateMigrationResult, error)
 	ListApplicationOffers_             func(ctx context.Context, user *openfga.User, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetails, error)
 	ListControllers_                   func(ctx context.Context, user *openfga.User) ([]dbmodel.Controller, error)
 	ModelDefaultsForCloud_             func(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag) (jujuparams.ModelDefaultsResult, error)
@@ -90,13 +89,13 @@ type JIMM struct {
 	SetControllerConfig_               func(ctx context.Context, u *openfga.User, args jujuparams.ControllerConfigSet) error
 	SetControllerDeprecated_           func(ctx context.Context, user *openfga.User, controllerName string, deprecated bool) error
 	SetModelDefaults_                  func(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag, region string, configs map[string]interface{}) error
-	SetUserModelDefaults_              func(ctx context.Context, user *dbmodel.Identity, configs map[string]interface{}) error
+	SetIdentityModelDefaults_          func(ctx context.Context, user *dbmodel.Identity, configs map[string]interface{}) error
 	UnsetModelDefaults_                func(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag, region string, keys []string) error
 	UpdateApplicationOffer_            func(ctx context.Context, controller *dbmodel.Controller, offerUUID string, removed bool) error
 	UpdateCloud_                       func(ctx context.Context, u *openfga.User, ct names.CloudTag, cloud jujuparams.Cloud) error
 	UpdateCloudCredential_             func(ctx context.Context, u *openfga.User, args jimm.UpdateCloudCredentialArgs) ([]jujuparams.UpdateCredentialModelResult, error)
 	UpdateMigratedModel_               func(ctx context.Context, user *openfga.User, modelTag names.ModelTag, targetControllerName string) error
-	UserModelDefaults_                 func(ctx context.Context, user *dbmodel.Identity) (map[string]interface{}, error)
+	UpdateServiceAccountCredentials_   func()
 	ValidateModelUpgrade_              func(ctx context.Context, u *openfga.User, mt names.ModelTag, force bool) error
 	WatchAllModelSummaries_            func(ctx context.Context, controller *dbmodel.Controller) (_ func() error, err error)
 }
@@ -343,6 +342,12 @@ func (j *JIMM) InitiateMigration(ctx context.Context, user *openfga.User, spec j
 	}
 	return j.InitiateMigration_(ctx, user, spec, targetControllerID)
 }
+func (j *JIMM) InitiateInternalMigration(ctx context.Context, user *openfga.User, modelTag names.ModelTag, targetController string) (jujuparams.InitiateMigrationResult, error) {
+	if j.InitiateInternalMigration_ == nil {
+		return jujuparams.InitiateMigrationResult{}, errors.E(errors.CodeNotImplemented)
+	}
+	return j.InitiateInternalMigration_(ctx, user, modelTag, targetController)
+}
 func (j *JIMM) ListApplicationOffers(ctx context.Context, user *openfga.User, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetails, error) {
 	if j.ListApplicationOffers_ == nil {
 		return nil, errors.E(errors.CodeNotImplemented)
@@ -469,11 +474,11 @@ func (j *JIMM) SetModelDefaults(ctx context.Context, user *dbmodel.Identity, clo
 	}
 	return j.SetModelDefaults_(ctx, user, cloudTag, region, configs)
 }
-func (j *JIMM) SetUserModelDefaults(ctx context.Context, user *dbmodel.Identity, configs map[string]interface{}) error {
-	if j.SetUserModelDefaults_ == nil {
+func (j *JIMM) SetIdentityModelDefaults(ctx context.Context, user *dbmodel.Identity, configs map[string]interface{}) error {
+	if j.SetIdentityModelDefaults_ == nil {
 		return errors.E(errors.CodeNotImplemented)
 	}
-	return j.SetUserModelDefaults_(ctx, user, configs)
+	return j.SetIdentityModelDefaults_(ctx, user, configs)
 }
 func (j *JIMM) UnsetModelDefaults(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag, region string, keys []string) error {
 	if j.UnsetModelDefaults_ == nil {
@@ -505,11 +510,11 @@ func (j *JIMM) UpdateMigratedModel(ctx context.Context, user *openfga.User, mode
 	}
 	return j.UpdateMigratedModel_(ctx, user, modelTag, targetControllerName)
 }
-func (j *JIMM) UserModelDefaults(ctx context.Context, user *dbmodel.Identity) (map[string]interface{}, error) {
-	if j.UserModelDefaults_ == nil {
+func (j *JIMM) IdentityModelDefaults(ctx context.Context, user *dbmodel.Identity) (map[string]interface{}, error) {
+	if j.IdentityModelDefaults_ == nil {
 		return nil, errors.E(errors.CodeNotImplemented)
 	}
-	return j.UserModelDefaults_(ctx, user)
+	return j.IdentityModelDefaults_(ctx, user)
 }
 func (j *JIMM) ValidateModelUpgrade(ctx context.Context, u *openfga.User, mt names.ModelTag, force bool) error {
 	if j.ValidateModelUpgrade_ == nil {

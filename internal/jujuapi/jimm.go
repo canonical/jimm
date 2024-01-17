@@ -50,6 +50,7 @@ func init() {
 		purgeLogsMethod := rpc.Method(r.PurgeLogs)
 		migrateModel := rpc.Method(r.MigrateModel)
 		addServiceAccountMethod := rpc.Method(r.AddServiceAccount)
+		updateServiceAccountCredentials := rpc.Method(r.UpdateServiceAccountCredentials)
 
 		// JIMM Generic RPC
 		r.AddMethod("JIMM", 4, "AddController", addControllerMethod)
@@ -80,6 +81,7 @@ func init() {
 		r.AddMethod("JIMM", 4, "CrossModelQuery", crossModelQueryMethod)
 		// JIMM Service Accounts
 		r.AddMethod("JIMM", 4, "AddServiceAccount", addServiceAccountMethod)
+		r.AddMethod("JIMM", 4, "UpdateServiceAccountCredentials", updateServiceAccountCredentials)
 
 		return []int{4}
 	}

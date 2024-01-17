@@ -237,15 +237,21 @@ func (r *controllerRoot) AddCredentials(ctx context.Context, args jujuparams.Tag
 	if err != nil {
 		return jujuparams.ErrorResults{}, errors.E(op, err)
 	}
+	results := collapseUpdateCredentialResults(args, updateResults)
+	return results, nil
+}
+
+// collapseUpdateCredentialResults returns a combined set of error results.
+// If there are any models that are using a credential and these models
+// are not going to be visible with updated credential content,
+// there will be detailed validation errors per model.
+// However, old return parameter structure could not hold this much detail and,
+// thus, per-model-per-credential errors are squashed into per-credential errors.
+func collapseUpdateCredentialResults(args jujuparams.TaggedCredentials, updateResults jujuparams.UpdateCredentialResults) jujuparams.ErrorResults {
 	results := jujuparams.ErrorResults{
 		Results: make([]jujuparams.ErrorResult, len(args.Credentials)),
 	}
 
-	// If there are any models that are using a credential and these models
-	// are not going to be visible with updated credential content,
-	// there will be detailed validation errors per model.
-	// However, old return parameter structure could not hold this much detail and,
-	// thus, per-model-per-credential errors are squashed into per-credential errors.
 	for i, result := range updateResults.Results {
 		var resultErrors []jujuparams.ErrorResult
 		if result.Error != nil {
@@ -267,7 +273,7 @@ func (r *controllerRoot) AddCredentials(ctx context.Context, args jujuparams.Tag
 			results.Results[i].Error = apiservererrors.ServerError(credentialError.Combine())
 		}
 	}
-	return results, nil
+	return results
 }
 
 func userModelAccess(ctx context.Context, user *openfga.User, model names.ModelTag) (string, error) {
