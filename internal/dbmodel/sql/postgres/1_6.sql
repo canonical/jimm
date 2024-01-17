@@ -12,7 +12,8 @@ ALTER TABLE IF EXISTS cloud_credentials RENAME COLUMN owner_username TO owner_id
 ALTER TABLE IF EXISTS cloud_defaults RENAME COLUMN username TO identity_name;
 ALTER TABLE IF EXISTS models RENAME COLUMN owner_username TO owner_identity_name;
 ALTER TABLE IF EXISTS application_offer_connections RENAME COLUMN username TO identity_name;
-ALTER TABLE IF EXISTS user_model_defaults RENAME COLUMN username TO identity_name;
+ALTER TABLE IF EXISTS user_model_defaults RENAME TO identity_model_defaults;
+ALTER TABLE IF EXISTS identity_model_defaults RENAME COLUMN username TO identity_name;
 
 -- Renaming indexes:
 ALTER INDEX IF EXISTS users_username_key RENAME TO identities_name_key;
@@ -22,7 +23,6 @@ ALTER INDEX IF EXISTS models_controller_id_owner_username_name_key RENAME TO mod
 ALTER INDEX IF EXISTS user_model_defaults_username_key RENAME TO user_model_defaults_identity_name_key;
 ALTER INDEX IF EXISTS cloud_credentials_cloud_name_owner_username_name_key RENAME TO cloud_credentials_cloud_name_owner_identity_name_name_key;
 ALTER INDEX IF EXISTS cloud_defaults_username_cloud_id_region_key RENAME TO cloud_defaults_identity_name_cloud_id_region_key;
-ALTER TABLE IF EXISTS user_model_defaults RENAME TO identity_model_defaults;
 
 -- TODO (CSS-6701): Do we need to rename these instances as well?
 --   - ALTER TABLE IF EXISTS controllers RENAME COLUMN admin_user TO admin_identity_name;
