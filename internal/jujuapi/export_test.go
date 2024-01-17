@@ -53,6 +53,10 @@ func NewControllerRoot(j JIMM, p Params) *controllerRoot {
 	return newControllerRoot(j, p)
 }
 
+func (r *controllerRoot) GetServiceAccount(ctx context.Context, clientID string) (*openfga.User, error) {
+	return r.getServiceAccount(ctx, clientID)
+}
+
 var SetUser = func(r *controllerRoot, u *openfga.User) {
 	r.mu.Lock()
 	r.user = u

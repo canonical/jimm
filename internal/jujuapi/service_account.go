@@ -13,7 +13,6 @@ import (
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/jimm"
 	"github.com/canonical/jimm/internal/openfga"
-	ofganames "github.com/canonical/jimm/internal/openfga/names"
 	jimmnames "github.com/canonical/jimm/pkg/names"
 )
 
@@ -30,6 +29,29 @@ func (r *controllerRoot) AddServiceAccount(ctx context.Context, req apiparams.Ad
 	return r.jimm.AddServiceAccount(ctx, r.user, req.ClientID)
 }
 
+// getServiceAccount validates the incoming identity has administrator permission
+// on the service account and returns the service account identity.
+func (r *controllerRoot) getServiceAccount(ctx context.Context, clientID string) (*openfga.User, error) {
+	if !jimmnames.IsValidServiceAccountId(clientID) {
+		return nil, errors.E(errors.CodeBadRequest, "invalid client ID")
+	}
+
+	ok, err := r.user.IsServiceAccountAdmin(ctx, jimmnames.NewServiceAccountTag(clientID))
+	if err != nil {
+		return nil, errors.E(err)
+	}
+	if !ok {
+		return nil, errors.E("unauthorized")
+	}
+
+	var targetIdentityModel dbmodel.Identity
+	targetIdentityModel.SetTag(names.NewUserTag(clientID))
+	if err := r.jimm.DB().GetIdentity(ctx, &targetIdentityModel); err != nil {
+		return nil, errors.E(err)
+	}
+	return openfga.NewUser(&targetIdentityModel, r.jimm.AuthorizationClient()), nil
+}
+
 // UpdateServiceAccountCredentialsCheckModels updates a set of cloud credentials' content.
 // If there are any models that are using a credential and these models
 // are not going to be visible with updated credential content,
@@ -39,29 +61,10 @@ func (r *controllerRoot) AddServiceAccount(ctx context.Context, req apiparams.Ad
 func (r *controllerRoot) UpdateServiceAccountCredentials(ctx context.Context, req apiparams.UpdateServiceAccountCredentialsRequest) (jujuparams.UpdateCredentialResults, error) {
 	const op = errors.Op("jujuapi.UpdateServiceAccountCredentials")
 
-	if !jimmnames.IsValidServiceAccountId(req.ClientID) {
-		return jujuparams.UpdateCredentialResults{}, errors.E(op, errors.CodeBadRequest, "invalid client ID")
-	}
-
-	tuple := openfga.Tuple{
-		Object:   ofganames.ConvertTag(r.user.ResourceTag()),
-		Relation: ofganames.AdministratorRelation,
-		Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag(req.ClientID)),
-	}
-	ok, err := r.jimm.AuthorizationClient().CheckRelation(ctx, tuple, false)
+	targetUser, err := r.getServiceAccount(ctx, req.ClientID)
 	if err != nil {
-		return jujuparams.UpdateCredentialResults{}, errors.E(op, errors.CodeOpenFGARequestFailed, "unable to determine permissions")
-	}
-	if !ok {
-		return jujuparams.UpdateCredentialResults{}, errors.E(op, errors.CodeUnauthorized, "unauthorized")
-	}
-
-	var targetUserModel dbmodel.Identity
-	targetUserModel.SetTag(names.NewUserTag(req.ClientID))
-	if err := r.jimm.DB().GetIdentity(ctx, &targetUserModel); err != nil {
 		return jujuparams.UpdateCredentialResults{}, errors.E(op, err)
 	}
-	targetUser := openfga.NewUser(&targetUserModel, r.jimm.AuthorizationClient())
 
 	results := jujuparams.UpdateCredentialResults{
 		Results: make([]jujuparams.UpdateCredentialResult, len(req.Credentials)),
@@ -89,4 +92,14 @@ func (r *controllerRoot) UpdateServiceAccountCredentials(ctx context.Context, re
 		results.Results[i].CredentialTag = credential.Tag
 	}
 	return results, nil
+}
+
+func (r *controllerRoot) ListServiceAccountCredentials(ctx context.Context, req apiparams.ListServiceAccountCredentialsRequest) (jujuparams.CredentialContentResults, error) {
+	const op = errors.Op("jujuapi.UpdateServiceAccountCredentials")
+
+	targetUser, err := r.getServiceAccount(ctx, req.ClientID)
+	if err != nil {
+		return jujuparams.CredentialContentResults{}, errors.E(op, err)
+	}
+	return getIdentityCredentials(ctx, targetUser, r.jimm, req.CloudCredentialArgs)
 }

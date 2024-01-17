@@ -6,6 +6,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/canonical/ofga"
 	"github.com/juju/names/v4"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
@@ -13,7 +14,7 @@ import (
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
-	"github.com/canonical/ofga"
+	jimmnames "github.com/canonical/jimm/pkg/names"
 )
 
 // NewUser returns a new user structure that can be used to check
@@ -77,6 +78,14 @@ func (u *User) IsModelWriter(ctx context.Context, resource names.ModelTag) (bool
 		return false, errors.E(err)
 	}
 	return isWriter, nil
+}
+
+func (u *User) IsServiceAccountAdmin(ctx context.Context, clientID jimmnames.ServiceAccountTag) (bool, error) {
+	isAdmin, err := checkRelation(ctx, u, clientID, ofganames.AdministratorRelation)
+	if err != nil {
+		return false, errors.E(err)
+	}
+	return isAdmin, nil
 }
 
 // GetCloudAccess returns the relation the user has to the specified cloud.
