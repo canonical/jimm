@@ -46,6 +46,7 @@ require (
 
 require (
 	github.com/canonical/ofga v0.10.0
+	github.com/coreos/go-oidc/v3 v3.9.0
 	github.com/dustinkirkland/golang-petname v0.0.0-20230626224747-e794b9370d49
 	github.com/go-chi/chi/v5 v5.0.8
 	github.com/go-chi/render v1.0.2
@@ -56,6 +57,7 @@ require (
 	github.com/lestrrat-go/jwx/v2 v2.0.11
 	github.com/oklog/ulid/v2 v2.1.0
 	github.com/stretchr/testify v1.8.4
+	golang.org/x/oauth2 v0.13.0
 	gopkg.in/errgo.v1 v1.0.1
 	gopkg.in/httprequest.v1 v1.2.1
 	gopkg.in/yaml.v2 v2.4.0
@@ -129,6 +131,7 @@ require (
 	github.com/gdamore/encoding v1.0.0 // indirect
 	github.com/gdamore/tcell/v2 v2.5.1 // indirect
 	github.com/go-goose/goose/v5 v5.0.0-20230421180421-abaee9096e3a // indirect
+	github.com/go-jose/go-jose/v3 v3.0.1 // indirect
 	github.com/go-logr/logr v1.2.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-macaroon-bakery/macaroonpb v1.0.0 // indirect
@@ -340,14 +343,13 @@ require (
 	go.uber.org/multierr v1.8.0 // indirect
 	golang.org/x/crypto v0.14.0 // indirect
 	golang.org/x/mod v0.13.0 // indirect
-	golang.org/x/oauth2 v0.13.0 // indirect
 	golang.org/x/sys v0.13.0 // indirect
 	golang.org/x/term v0.13.0 // indirect
 	golang.org/x/text v0.13.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.14.0 // indirect
 	google.golang.org/api v0.126.0 // indirect
-	google.golang.org/appengine v1.6.7 // indirect
+	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/genproto v0.0.0-20230706204954-ccb25ca9f130 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20230629202037-9506855d4529 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20230711160842-782d3b101e98 // indirect
