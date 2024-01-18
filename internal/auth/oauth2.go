@@ -4,10 +4,11 @@ package auth
 
 import (
 	"context"
-	"errors"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"golang.org/x/oauth2"
+
+	"github.com/canonical/jimm/internal/errors"
 )
 
 // AuthenticationService handles authentication within JIMM.
@@ -35,9 +36,11 @@ type AuthenticationServiceParams struct {
 // NewAuthenticationService returns a new authentication service for handling
 // authentication within JIMM.
 func NewAuthenticationService(ctx context.Context, params AuthenticationServiceParams) (*AuthenticationService, error) {
+	const op = errors.Op("auth.NewAuthenticationService")
+
 	provider, err := oidc.NewProvider(ctx, params.IssuerURL)
 	if err != nil {
-		return nil, err
+		return nil, errors.E(op, err, "failed to create oidc provider")
 	}
 
 	return &AuthenticationService{
@@ -65,7 +68,14 @@ func NewAuthenticationService(ctx context.Context, params AuthenticationServiceP
 //
 // The interval, expiry and device code and used to poll the token endpoint for completion.
 func (as *AuthenticationService) Device(ctx context.Context) (*oauth2.DeviceAuthResponse, error) {
-	return as.deviceConfig.DeviceAuth(ctx)
+	const op = errors.Op("auth.AuthenticationService.Device")
+
+	resp, err := as.deviceConfig.DeviceAuth(ctx)
+	if err != nil {
+		return nil, errors.E(op, err, "device auth call failed")
+	}
+
+	return resp, nil
 }
 
 // DeviceAccessToken continues and collect an access token during the device login flow
@@ -73,16 +83,25 @@ func (as *AuthenticationService) Device(ctx context.Context) (*oauth2.DeviceAuth
 //
 // See Device(...) godoc for more info pertaining to the fko.
 func (as *AuthenticationService) DeviceAccessToken(ctx context.Context, res *oauth2.DeviceAuthResponse) (*oauth2.Token, error) {
-	return as.deviceConfig.DeviceAccessToken(ctx, res)
+	const op = errors.Op("auth.AuthenticationService.DeviceAccessToken")
+
+	t, err := as.deviceConfig.DeviceAccessToken(ctx, res)
+	if err != nil {
+		return nil, errors.E(op, err, "device access token call failed")
+	}
+
+	return t, nil
 }
 
 // ExtractAndVerifyIDToken extracts the id token from the extras claims of an oauth2 token
 // and performs signature verification of the token.
 func (as *AuthenticationService) ExtractAndVerifyIDToken(ctx context.Context, oauth2Token *oauth2.Token) (*oidc.IDToken, error) {
+	const op = errors.Op("auth.AuthenticationService.ExtractAndVerifyIDToken")
+
 	// Extract the ID Token from oauth2 token.
 	rawIDToken, ok := oauth2Token.Extra("id_token").(string)
 	if !ok {
-		return nil, errors.New("failed to extract id token")
+		return nil, errors.E(op, "failed to extract id token")
 	}
 
 	verifier := as.provider.Verifier(&oidc.Config{
@@ -90,19 +109,29 @@ func (as *AuthenticationService) ExtractAndVerifyIDToken(ctx context.Context, oa
 	})
 
 	token, err := verifier.Verify(ctx, rawIDToken)
-	return token, err
+	if err != nil {
+		return nil, errors.E(op, err, "failed to verify id token")
+	}
+
+	return token, nil
 }
 
 // Email retrieves the users email from an id token via the email claim
 func (as *AuthenticationService) Email(idToken *oidc.IDToken) (string, error) {
+	const op = errors.Op("auth.AuthenticationService.Email")
+
 	var claims struct {
 		Email         string `json:"email"`
 		EmailVerified bool   `json:"email_verified"` // TODO(ale8k): Add verification logic
 	}
 	if idToken == nil {
-		return "", errors.New("id token is nil")
+		return "", errors.E(op, "id token is nil")
 	}
-	err := idToken.Claims(&claims)
-	return claims.Email, err
+
+	if err := idToken.Claims(&claims); err != nil {
+		return "", errors.E(op, err, "failed to extract claims")
+	}
+
+	return claims.Email, nil
 
 }

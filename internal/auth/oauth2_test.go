@@ -17,6 +17,14 @@ import (
 	qt "github.com/frankban/quicktest"
 )
 
+// TestDevice is a unique test in that it runs through the entire device oauth2.0
+// flow and additionally ensures the id token is verified and correct.
+//
+// This test requires the local docker compose to be running and keycloak
+// to be available.
+//
+// Some calls perform regexes against the response HTML forms such that we
+// can manually POST the forms throughout the flow.
 func TestDevice(t *testing.T) {
 	c := qt.New(t)
 
@@ -52,12 +60,14 @@ func TestDevice(t *testing.T) {
 
 	re := regexp.MustCompile(`action="(.*?)" method=`)
 	match := re.FindStringSubmatch(string(b))
-	loginForm := match[1]
+	loginFormUrl := match[1]
 
 	v := url.Values{}
+	// The username and password are hardcoded witih jimm-realm.json in our local
+	// keycloak configuration for the jimm realm.
 	v.Add("username", "jimm-test")
 	v.Add("password", "password")
-	loginResp, err := client.PostForm(loginForm, v)
+	loginResp, err := client.PostForm(loginFormUrl, v)
 	c.Assert(err, qt.IsNil)
 	defer loginResp.Body.Close()
 
@@ -67,22 +77,26 @@ func TestDevice(t *testing.T) {
 
 	re = regexp.MustCompile(`action="(.*?)" method=`)
 	match = re.FindStringSubmatch(string(b))
-	consentForm := match[1]
+	consentFormUri := match[1]
 	v = url.Values{}
 	v.Add("accept", "Yes")
-	consentResp, err := client.PostForm("http://localhost:8082"+consentForm, v)
+	consentResp, err := client.PostForm("http://localhost:8082"+consentFormUri, v)
 	c.Assert(err, qt.IsNil)
 	defer consentResp.Body.Close()
 
 	// Read consent resp
 	b, err = io.ReadAll(consentResp.Body)
 	c.Assert(err, qt.IsNil)
-	// TODO check page contains "Device Login Successful"
 
+	re = regexp.MustCompile(`Device Login Successful`)
+	c.Assert(re.MatchString(string(b)), qt.IsTrue)
+
+	// Retrieve access token
 	token, err := authSvc.DeviceAccessToken(ctx, res)
 	c.Assert(err, qt.IsNil)
 	c.Assert(token, qt.IsNotNil)
 
+	// Extract and verify id token
 	idToken, err := authSvc.ExtractAndVerifyIDToken(ctx, token)
 	c.Assert(err, qt.IsNil)
 	c.Assert(idToken, qt.IsNotNil)
