@@ -417,3 +417,13 @@ type ListServiceAccountCredentialsRequest struct {
 	// ClientID holds the client id of the service account.
 	ClientID string `json:"client-id"`
 }
+
+// ListServiceAccountCredentialsRequest holds a request to list
+// a service accounts cloud credentials.
+type GrantServiceAccountAccess struct {
+	// Entities holds a slice of entities (identities and groups)
+	// that should have administration access to the desired clientID.
+	Entities []string `json:"entities"`
+	// ClientID holds the client id of the service account.
+	ClientID string `json:"client-id"`
+}
