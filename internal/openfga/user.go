@@ -13,6 +13,7 @@ import (
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
+	jimmnames "github.com/canonical/jimm/pkg/names"
 	"github.com/canonical/ofga"
 )
 
@@ -77,6 +78,15 @@ func (u *User) IsModelWriter(ctx context.Context, resource names.ModelTag) (bool
 		return false, errors.E(err)
 	}
 	return isWriter, nil
+}
+
+// IsServiceAccountAdmin returns true if user has administrator relation to the service account.
+func (u *User) IsServiceAccountAdmin(ctx context.Context, clientID jimmnames.ServiceAccountTag) (bool, error) {
+	isAdmin, err := checkRelation(ctx, u, clientID, ofganames.AdministratorRelation)
+	if err != nil {
+		return false, errors.E(err)
+	}
+	return isAdmin, nil
 }
 
 // GetCloudAccess returns the relation the user has to the specified cloud.

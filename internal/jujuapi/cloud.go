@@ -304,6 +304,10 @@ func userModelAccess(ctx context.Context, user *openfga.User, model names.ModelT
 
 // CredentialContents implements the CredentialContents method of the Cloud (v5) facade.
 func (r *controllerRoot) CredentialContents(ctx context.Context, args jujuparams.CloudCredentialArgs) (jujuparams.CredentialContentResults, error) {
+	return getIdentityCredentials(ctx, r.user, r.jimm, args)
+}
+
+func getIdentityCredentials(ctx context.Context, user *openfga.User, j JIMM, args jujuparams.CloudCredentialArgs) (jujuparams.CredentialContentResults, error) {
 	const op = errors.Op("jujuapi.CredentialContents")
 
 	credentialContents := func(c *dbmodel.CloudCredential) (*jujuparams.ControllerCredentialInfo, error) {
@@ -316,13 +320,13 @@ func (r *controllerRoot) CredentialContents(ctx context.Context, args jujuparams
 			content.Valid = &c.Valid.Bool
 		}
 		var err error
-		content.Attributes, _, err = r.jimm.GetCloudCredentialAttributes(ctx, r.user, c, args.IncludeSecrets)
+		content.Attributes, _, err = j.GetCloudCredentialAttributes(ctx, user, c, args.IncludeSecrets)
 		if err != nil {
 			return nil, errors.E(err)
 		}
 		mas := make([]jujuparams.ModelAccess, len(c.Models))
 		for i, m := range c.Models {
-			userModelAccess, err := userModelAccess(ctx, r.user, m.ResourceTag())
+			userModelAccess, err := userModelAccess(ctx, user, m.ResourceTag())
 			if err != nil {
 				return nil, errors.E(err)
 			}
@@ -339,8 +343,8 @@ func (r *controllerRoot) CredentialContents(ctx context.Context, args jujuparams
 
 	results := make([]jujuparams.CredentialContentResult, len(args.Credentials))
 	for i, arg := range args.Credentials {
-		cct := names.NewCloudCredentialTag(fmt.Sprintf("%s/%s/%s", arg.CloudName, r.user.Name, arg.CredentialName))
-		cred, err := r.jimm.GetCloudCredential(ctx, r.user, cct)
+		cct := names.NewCloudCredentialTag(fmt.Sprintf("%s/%s/%s", arg.CloudName, user.Name, arg.CredentialName))
+		cred, err := j.GetCloudCredential(ctx, user, cct)
 		if err != nil {
 			results[i].Error = mapError(errors.E(op, err))
 			continue
@@ -354,7 +358,7 @@ func (r *controllerRoot) CredentialContents(ctx context.Context, args jujuparams
 		return jujuparams.CredentialContentResults{Results: results}, nil
 	}
 
-	err := r.jimm.ForEachUserCloudCredential(ctx, r.user.Identity, names.CloudTag{}, func(c *dbmodel.CloudCredential) error {
+	err := j.ForEachUserCloudCredential(ctx, user.Identity, names.CloudTag{}, func(c *dbmodel.CloudCredential) error {
 		var result jujuparams.CredentialContentResult
 		var err error
 		result.Result, err = credentialContents(c)

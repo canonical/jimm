@@ -69,6 +69,71 @@ func TestAddServiceAccount(t *testing.T) {
 	}
 }
 
+func TestGetServiceAccount(t *testing.T) {
+	c := qt.New(t)
+
+	tests := []struct {
+		about         string
+		clientID      string
+		addTuples     []openfga.Tuple
+		username      string
+		expectedError string
+	}{{
+		about:    "Valid request",
+		clientID: "fca1f605-736e-4d1f-bcd2-aecc726923be",
+		username: "alice",
+		addTuples: []openfga.Tuple{{
+			Object:   ofganames.ConvertTag(names.NewUserTag("alice")),
+			Relation: ofganames.AdministratorRelation,
+			Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag("fca1f605-736e-4d1f-bcd2-aecc726923be")),
+		}},
+	}, {
+		about:         "Missing service account administrator permission",
+		username:      "alice",
+		clientID:      "fca1f605-736e-4d1f-bcd2-aecc726923be",
+		expectedError: "unauthorized",
+	}, {
+		about:         "Invalid Client ID",
+		username:      "alice",
+		clientID:      "_123_",
+		expectedError: "invalid client ID",
+	}}
+
+	for _, test := range tests {
+		test := test
+		c.Run(test.about, func(c *qt.C) {
+			ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+			c.Assert(err, qt.IsNil)
+			pgDb := db.Database{
+				DB: jimmtest.PostgresDB(c, nil),
+			}
+			err = pgDb.Migrate(context.Background(), false)
+			c.Assert(err, qt.IsNil)
+			jimm := &jimmtest.JIMM{
+				AuthorizationClient_: func() *openfga.OFGAClient { return ofgaClient },
+				DB_:                  func() *db.Database { return &pgDb },
+			}
+			var u dbmodel.Identity
+			u.SetTag(names.NewUserTag(test.username))
+			user := openfga.NewUser(&u, ofgaClient)
+			cr := jujuapi.NewControllerRoot(jimm, jujuapi.Params{})
+			jujuapi.SetUser(cr, user)
+
+			if len(test.addTuples) > 0 {
+				ofgaClient.AddRelation(context.Background(), test.addTuples...)
+			}
+
+			res, err := cr.GetServiceAccount(context.Background(), test.clientID)
+			if test.expectedError == "" {
+				c.Assert(err, qt.IsNil)
+				c.Assert(res.Identity.Name, qt.Equals, test.clientID)
+			} else {
+				c.Assert(err, qt.ErrorMatches, test.expectedError)
+			}
+		})
+	}
+}
+
 func TestUpdateServiceAccountCredentials(t *testing.T) {
 	c := qt.New(t)
 
@@ -149,26 +214,6 @@ func TestUpdateServiceAccountCredentials(t *testing.T) {
 			Relation: ofganames.AdministratorRelation,
 			Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag("fca1f605-736e-4d1f-bcd2-aecc726923be")),
 		}},
-	}, {
-		about: "Missing service account administrator permission",
-		updateCloudCredential: func(ctx context.Context, u *openfga.User, args jimm.UpdateCloudCredentialArgs) ([]jujuparams.UpdateCredentialModelResult, error) {
-			return nil, nil
-		},
-		expectedError: "unauthorized",
-		args: params.UpdateServiceAccountCredentialsRequest{
-			ClientID: "fca1f605-736e-4d1f-bcd2-aecc726923be",
-		},
-		username: "alice",
-	}, {
-		about: "Invalid Client ID",
-		updateCloudCredential: func(ctx context.Context, u *openfga.User, args jimm.UpdateCloudCredentialArgs) ([]jujuparams.UpdateCredentialModelResult, error) {
-			return nil, nil
-		},
-		username: "alice",
-		args: params.UpdateServiceAccountCredentialsRequest{
-			ClientID: "_123_",
-		},
-		expectedError: "invalid client ID",
 	}}
 
 	for _, test := range tests {
@@ -197,6 +242,82 @@ func TestUpdateServiceAccountCredentials(t *testing.T) {
 			}
 
 			res, err := cr.UpdateServiceAccountCredentials(context.Background(), test.args)
+			if test.expectedError == "" {
+				c.Assert(err, qt.IsNil)
+				c.Assert(res, qt.DeepEquals, test.expectedResult)
+			} else {
+				c.Assert(err, qt.ErrorMatches, test.expectedError)
+			}
+		})
+	}
+}
+
+func TestListServiceAccountCredentials(t *testing.T) {
+	c := qt.New(t)
+
+	tests := []struct {
+		about                        string
+		getCloudCredential           func(ctx context.Context, user *openfga.User, tag names.CloudCredentialTag) (*dbmodel.CloudCredential, error)
+		getCloudCredentialAttributes func(ctx context.Context, u *openfga.User, cred *dbmodel.CloudCredential, hidden bool) (attrs map[string]string, redacted []string, err error)
+		ForEachUserCloudCredential   func(ctx context.Context, u *dbmodel.Identity, ct names.CloudTag, f func(cred *dbmodel.CloudCredential) error) error
+		args                         params.ListServiceAccountCredentialsRequest
+		username                     string
+		addTuples                    []openfga.Tuple
+		expectedResult               jujuparams.CredentialContentResults
+		expectedError                string
+	}{{
+		about: "Valid request",
+		ForEachUserCloudCredential: func(ctx context.Context, u *dbmodel.Identity, ct names.CloudTag, f func(cred *dbmodel.CloudCredential) error) error {
+			return nil
+		},
+		expectedResult: jujuparams.CredentialContentResults{
+			Results: []jujuparams.CredentialContentResult{}},
+		args: params.ListServiceAccountCredentialsRequest{
+			ClientID: "fca1f605-736e-4d1f-bcd2-aecc726923be",
+		},
+		getCloudCredential: func(ctx context.Context, user *openfga.User, tag names.CloudCredentialTag) (*dbmodel.CloudCredential, error) {
+			cred := &dbmodel.CloudCredential{}
+			return cred, nil
+		},
+		getCloudCredentialAttributes: func(ctx context.Context, u *openfga.User, cred *dbmodel.CloudCredential, hidden bool) (attrs map[string]string, redacted []string, err error) {
+			return nil, nil, nil
+		},
+		username: "alice",
+		addTuples: []openfga.Tuple{{
+			Object:   ofganames.ConvertTag(names.NewUserTag("alice")),
+			Relation: ofganames.AdministratorRelation,
+			Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag("fca1f605-736e-4d1f-bcd2-aecc726923be")),
+		}},
+	}}
+
+	for _, test := range tests {
+		test := test
+		c.Run(test.about, func(c *qt.C) {
+			ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+			c.Assert(err, qt.IsNil)
+			pgDb := db.Database{
+				DB: jimmtest.PostgresDB(c, nil),
+			}
+			err = pgDb.Migrate(context.Background(), false)
+			c.Assert(err, qt.IsNil)
+			jimm := &jimmtest.JIMM{
+				AuthorizationClient_:          func() *openfga.OFGAClient { return ofgaClient },
+				GetCloudCredential_:           test.getCloudCredential,
+				GetCloudCredentialAttributes_: test.getCloudCredentialAttributes,
+				ForEachUserCloudCredential_:   test.ForEachUserCloudCredential,
+				DB_:                           func() *db.Database { return &pgDb },
+			}
+			var u dbmodel.Identity
+			u.SetTag(names.NewUserTag(test.username))
+			user := openfga.NewUser(&u, ofgaClient)
+			cr := jujuapi.NewControllerRoot(jimm, jujuapi.Params{})
+			jujuapi.SetUser(cr, user)
+
+			if len(test.addTuples) > 0 {
+				ofgaClient.AddRelation(context.Background(), test.addTuples...)
+			}
+
+			res, err := cr.ListServiceAccountCredentials(context.Background(), test.args)
 			if test.expectedError == "" {
 				c.Assert(err, qt.IsNil)
 				c.Assert(res, qt.DeepEquals, test.expectedResult)

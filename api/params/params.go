@@ -409,3 +409,11 @@ type UpdateServiceAccountCredentialsRequest struct {
 	// ClientID holds the client id of the service account.
 	ClientID string `json:"client-id"`
 }
+
+// ListServiceAccountCredentialsRequest holds a request to list
+// a service accounts cloud credentials.
+type ListServiceAccountCredentialsRequest struct {
+	jujuparams.CloudCredentialArgs
+	// ClientID holds the client id of the service account.
+	ClientID string `json:"client-id"`
+}
