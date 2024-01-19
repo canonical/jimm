@@ -901,18 +901,22 @@ func TestAddModel(t *testing.T) {
 
 			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.name)
 			c.Assert(err, qt.IsNil)
+			ctx := context.Background()
+			jimm_db := db.Database{
+				DB: jimmtest.PostgresDB(c, nil),
+			}
+			// the DSN can be obtained from the global env var, there is a function that can be reused to get this.
+			river, err := jimm.NewRiver(nil, jimmtest.GetDSN(), ctx, client, jimm_db)
 
 			j := &jimm.JIMM{
-				UUID: uuid.NewString(),
-				Database: db.Database{
-					DB: jimmtest.PostgresDB(c, nil),
-				},
+				UUID:     uuid.NewString(),
+				Database: jimm_db,
 				Dialer: &jimmtest.Dialer{
 					API: api,
 				},
 				OpenFGAClient: client,
+				River:         river,
 			}
-			ctx := context.Background()
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 
@@ -958,6 +962,7 @@ func TestAddModel(t *testing.T) {
 			} else {
 				c.Assert(err, qt.ErrorMatches, test.expectError)
 			}
+			j.Cleanup(ctx)
 		})
 	}
 }
@@ -1311,6 +1316,7 @@ func TestModelInfo(t *testing.T) {
 				})
 				c.Check(mi, qt.CmpEquals(cmpopts.EquateEmpty()), test.expectModelInfo)
 			}
+			j.Cleanup(ctx)
 		})
 	}
 }
@@ -1449,6 +1455,7 @@ func TestModelStatus(t *testing.T) {
 			}
 
 			c.Check(dialer.IsClosed(), qt.IsTrue)
+			j.Cleanup(ctx)
 		})
 	}
 }
@@ -1583,6 +1590,7 @@ func TestForEachUserModel(t *testing.T) {
 			API: &jimmtest.API{},
 		},
 	}
+	defer j.Cleanup(ctx)
 
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
@@ -1723,6 +1731,7 @@ func TestForEachModel(t *testing.T) {
 			API: &jimmtest.API{},
 		},
 	}
+	defer j.Cleanup(ctx)
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
@@ -1996,6 +2005,7 @@ func TestGrantModelAccess(t *testing.T) {
 				Dialer:        dialer,
 				OpenFGAClient: client,
 			}
+			defer j.Cleanup(ctx)
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
@@ -2715,6 +2725,7 @@ func TestRevokeModelAccess(t *testing.T) {
 				Dialer:        dialer,
 				OpenFGAClient: client,
 			}
+			defer j.Cleanup(ctx)
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
@@ -2901,6 +2912,7 @@ func TestDestroyModel(t *testing.T) {
 				},
 				Dialer: dialer,
 			}
+			defer j.Cleanup(ctx)
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 
@@ -3139,7 +3151,7 @@ func TestDumpModelDB(t *testing.T) {
 				},
 				Dialer: dialer,
 			}
-
+			defer j.Cleanup(ctx)
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 
@@ -3258,6 +3270,7 @@ func TestValidateModelUpgrade(t *testing.T) {
 				},
 				Dialer: dialer,
 			}
+			defer j.Cleanup(ctx)
 
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
@@ -3480,6 +3493,7 @@ func TestUpdateModelCredential(t *testing.T) {
 				},
 				Dialer: dialer,
 			}
+			defer j.Cleanup(ctx)
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 
@@ -3555,6 +3569,7 @@ users:
 		},
 	}
 	ctx := context.Background()
+	defer j.Cleanup(ctx)
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 

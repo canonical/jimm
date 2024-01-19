@@ -317,7 +317,8 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		s.jimm.Dialer = jimm.CacheDialer(s.jimm.Dialer)
 	}
 
-	s.jimm.River, err = jimm.NewRiver(nil, p.DSN, ctx, *s.jimm.OpenFGAClient, s.jimm.Database)
+	s.jimm.River, err = jimm.NewRiver(nil, p.DSN, ctx, s.jimm.OpenFGAClient, s.jimm.Database)
+
 	if err != nil {
 		return nil, errors.E(op, err)
 	}

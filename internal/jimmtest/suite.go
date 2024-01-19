@@ -6,7 +6,6 @@ import (
 	"context"
 	"net/http/httptest"
 	"net/url"
-	"os"
 	"time"
 
 	"github.com/canonical/candid/candidtest"
@@ -72,16 +71,11 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 	var err error
 	s.OFGAClient, s.COFGAClient, s.COFGAParams, err = SetupTestOFGAClient(c.TestName())
 	c.Assert(err, gc.IsNil)
-
-	dsn := defaultDSN
-	if envTestDSN, exists := os.LookupEnv("JIMM_TEST_PGXDSN"); exists {
-		dsn = envTestDSN
-	}
 	ctx, cancel := context.WithCancel(context.Background())
 	jimm_db := db.Database{
 		DB: PostgresDB(GocheckTester{c}, nil),
 	}
-	river, err := jimm.NewRiver(nil, dsn, ctx, *s.OFGAClient, jimm_db)
+	river, err := jimm.NewRiver(nil, GetDSN(), ctx, s.OFGAClient, jimm_db)
 	c.Assert(err, gc.IsNil)
 
 	// Setup OpenFGA.
@@ -93,6 +87,7 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 		OpenFGAClient:   s.OFGAClient,
 		River:           river,
 	}
+	defer s.JIMM.Cleanup(ctx)
 
 	s.cancel = cancel
 

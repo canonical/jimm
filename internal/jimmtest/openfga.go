@@ -103,13 +103,13 @@ func SetupTestOFGAClient(names ...string) (*openfga.OFGAClient, *cofga.Client, *
 
 	err := RemoveStore(ctx, testName)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, errgo.Notef(err, "failed to remove store.")
 	}
 
 	storeID := ulid.Make().String()
 	err = CreateStore(ctx, testName, storeID)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, errgo.Notef(err, "failed to create store.")
 	}
 
 	cofgaParams := cofga.OpenFGAParams{

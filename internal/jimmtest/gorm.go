@@ -135,6 +135,14 @@ func PostgresDB(t Tester, nowFunc func() time.Time) *gorm.DB {
 const unsafeCharsPattern = "[ .:;`'\"|<>~/\\?!@#$%^&*()[\\]{}=+-]"
 const defaultDSN = "postgresql://jimm:jimm@127.0.0.1:5432/jimm"
 
+func GetDSN() string {
+	dsn := defaultDSN
+	if envTestDSN, exists := os.LookupEnv("JIMM_TEST_PGXDSN"); exists {
+		dsn = envTestDSN
+	}
+	return dsn
+}
+
 // maxDatabaseNameLength Postgres's limit on database name length.
 const maxDatabaseNameLength = 63
 

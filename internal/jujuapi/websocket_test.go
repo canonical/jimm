@@ -182,10 +182,8 @@ func (s *proxySuite) TestConnectToModelAndLogin(c *gc.C) {
 		ModelTag:  s.Model.ResourceTag(),
 		SkipLogin: false,
 	}, "alice")
-	if err == nil {
-		defer conn.Close()
-	}
 	c.Assert(err, gc.Equals, nil)
+	conn.Close()
 }
 
 // TestConnectToModelNoBakeryClient ensures that authentication is in fact

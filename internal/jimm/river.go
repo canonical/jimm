@@ -36,13 +36,12 @@ func (OpenFGAArgs) Kind() string { return "OpenFGA" }
 // OpenFGAWorker is the river worker that would run the job.
 type OpenFGAWorker struct {
 	river.WorkerDefaults[OpenFGAArgs]
-	OfgaClient openfga.OFGAClient
+	OfgaClient *openfga.OFGAClient
 	Database   db.Database
 }
 
 // Work is tha function executed by the worker when it picks up the job.
 func (w *OpenFGAWorker) Work(ctx context.Context, job *river.Job[OpenFGAArgs]) error {
-
 	controller := &dbmodel.Controller{UUID: job.Args.ControllerUUID}
 	err := w.Database.GetController(ctx, controller)
 	if err != nil {
@@ -74,7 +73,7 @@ func (w *OpenFGAWorker) Work(ctx context.Context, job *river.Job[OpenFGAArgs]) e
 		)
 		return err
 	}
-	err = openfga.NewUser(owner, &w.OfgaClient).SetModelAccess(ctx, names.NewModelTag(job.Args.ModelInfoUUID), ofganames.AdministratorRelation)
+	err = openfga.NewUser(owner, w.OfgaClient).SetModelAccess(ctx, names.NewModelTag(job.Args.ModelInfoUUID), ofganames.AdministratorRelation)
 	if err != nil {
 		zapctx.Error(
 			ctx,
@@ -87,7 +86,7 @@ func (w *OpenFGAWorker) Work(ctx context.Context, job *river.Job[OpenFGAArgs]) e
 	return nil
 }
 
-func RegisterJimmWorkers(ctx context.Context, ofgaConn openfga.OFGAClient, db db.Database) (*river.Workers, error) {
+func RegisterJimmWorkers(ctx context.Context, ofgaConn *openfga.OFGAClient, db db.Database) (*river.Workers, error) {
 	workers := river.NewWorkers()
 	if err := river.AddWorkerSafely(workers, &OpenFGAWorker{OfgaClient: ofgaConn, Database: db}); err != nil {
 		return nil, err
@@ -98,18 +97,18 @@ func RegisterJimmWorkers(ctx context.Context, ofgaConn openfga.OFGAClient, db db
 // River is the struct that holds that Client connection to river.
 type River struct {
 	Client *river.Client[pgx.Tx]
+	dbPool *pgxpool.Pool
 }
 
-func doMigration(ctx context.Context, dburl string) error {
-	var dbPool *pgxpool.Pool
-	migrator := rivermigrate.New(riverpgxv5.New(dbPool), nil)
-	dbPool, err := pgxpool.New(ctx, dburl)
-	if err != nil {
-		return err
-	}
-	defer dbPool.Close()
+func (r *River) Cleanup(ctx context.Context) error {
+	r.dbPool.Close()
+	err := r.Client.Stop(ctx)
+	return err
+}
 
-	tx, err := dbPool.Begin(ctx)
+func (r *River) doMigration(ctx context.Context) error {
+	migrator := rivermigrate.New(riverpgxv5.New(r.dbPool), nil)
+	tx, err := r.dbPool.Begin(ctx)
 	if err != nil {
 		return err
 	}
@@ -130,12 +129,9 @@ func doMigration(ctx context.Context, dburl string) error {
 	return nil
 }
 
-func NewRiver(config *river.Config, db_url string, ctx context.Context, ofgaConn openfga.OFGAClient, db db.Database) (*River, error) {
-	err := doMigration(ctx, db_url)
-	if err != nil {
-		return nil, err
-	}
-
+// NewRiver would return a new river instance, and it would apply the needed migrations to the database,
+// and open a postgres connections pool that would be opened in the Cleanup routine.
+func NewRiver(config *river.Config, db_url string, ctx context.Context, ofgaConn *openfga.OFGAClient, db db.Database) (*River, error) {
 	if config == nil {
 		workers, err := RegisterJimmWorkers(ctx, ofgaConn, db)
 		if err != nil {
@@ -161,8 +157,10 @@ func NewRiver(config *river.Config, db_url string, ctx context.Context, ofgaConn
 	if err := riverClient.Start(ctx); err != nil {
 		return nil, err
 	}
-	r := River{
-		Client: riverClient,
+	r := River{Client: riverClient, dbPool: dbPool}
+	err = r.doMigration(ctx)
+	if err != nil {
+		return nil, err
 	}
 	return &r, nil
 }
