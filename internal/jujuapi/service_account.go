@@ -105,6 +105,8 @@ func (r *controllerRoot) ListServiceAccountCredentials(ctx context.Context, req 
 	return getIdentityCredentials(ctx, targetIdentity, r.jimm, req.CloudCredentialArgs)
 }
 
+// GrantServiceAccountAccess is the method handler for granting new users/groups with access
+// to service accounts.
 func (r *controllerRoot) GrantServiceAccountAccess(ctx context.Context, req apiparams.GrantServiceAccountAccess) error {
 	const op = errors.Op("jujuapi.GrantServiceAccountAccess")
 

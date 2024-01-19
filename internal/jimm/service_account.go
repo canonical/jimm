@@ -54,6 +54,9 @@ func (j *JIMM) AddServiceAccount(ctx context.Context, u *openfga.User, clientId 
 	return nil
 }
 
+// GrantServiceAccountAccess creates an administrator relation between the tags provided
+// and the service account. The provided tags must be users or groups (with the member relation)
+// otherwise OpenFGA will report an error.
 func (j *JIMM) GrantServiceAccountAccess(ctx context.Context, u *openfga.User, svcAccTag jimmnames.ServiceAccountTag, tags []*ofganames.Tag) error {
 	op := errors.Op("jimm.GrantServiceAccountAccess")
 	tuples := make([]openfga.Tuple, 0, len(tags))
