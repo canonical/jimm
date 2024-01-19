@@ -115,7 +115,8 @@ services:
       POSTGRES_PASSWORD: jimm
     # Since it's mainly used for testing purposes, it's okay to set fsync=off for
     # improved performance.
-    command: -c fsync=off -c full_page_writes=off
+    command: -c fsync=off -c full_page_writes=off -c max_connections=200000
+
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U jimm" ]
       interval: 5s

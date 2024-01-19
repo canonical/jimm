@@ -87,7 +87,7 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 		OpenFGAClient:   s.OFGAClient,
 		River:           river,
 	}
-	defer s.JIMM.Cleanup(ctx)
+	s.JIMM.ConfigMaxConn()
 
 	s.cancel = cancel
 

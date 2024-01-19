@@ -144,6 +144,8 @@ func TestAddController(t *testing.T) {
 	}
 
 	ctx := context.Background()
+	j.ConfigMaxConn()
+	defer j.Cleanup(ctx)
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
@@ -312,6 +314,8 @@ func TestAddControllerWithVault(t *testing.T) {
 	}
 
 	ctx := context.Background()
+	j.ConfigMaxConn()
+	defer j.Cleanup(ctx)
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
@@ -415,6 +419,8 @@ func TestEarliestControllerVersion(t *testing.T) {
 		},
 		OpenFGAClient: client,
 	}
+	j.ConfigMaxConn()
+	defer j.Cleanup(ctx)
 
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
@@ -926,6 +932,8 @@ func TestImportModel(t *testing.T) {
 				OpenFGAClient: client,
 			}
 			ctx := context.Background()
+			j.ConfigMaxConn()
+			defer j.Cleanup(ctx)
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 
@@ -1023,6 +1031,8 @@ func TestSetControllerConfig(t *testing.T) {
 				},
 			}
 			ctx := context.Background()
+			j.ConfigMaxConn()
+			defer j.Cleanup(ctx)
 			err := j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 
@@ -1100,6 +1110,8 @@ func TestGetControllerConfig(t *testing.T) {
 				},
 			}
 			ctx := context.Background()
+			j.ConfigMaxConn()
+			defer j.Cleanup(ctx)
 			err := j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 
@@ -1253,6 +1265,8 @@ func TestUpdateMigratedModel(t *testing.T) {
 				},
 			}
 			ctx := context.Background()
+			j.ConfigMaxConn()
+			defer j.Cleanup(ctx)
 			err := j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 
@@ -1307,6 +1321,8 @@ func TestGetControllerAccess(t *testing.T) {
 		OpenFGAClient: client,
 	}
 	ctx := context.Background()
+	j.ConfigMaxConn()
+	defer j.Cleanup(ctx)
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
@@ -1611,6 +1627,8 @@ func TestInitiateMigration(t *testing.T) {
 			}
 
 			ctx := context.Background()
+			j.ConfigMaxConn()
+			defer j.Cleanup(ctx)
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 

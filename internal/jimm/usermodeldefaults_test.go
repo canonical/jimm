@@ -123,6 +123,7 @@ func TestSetUserModelDefaults(t *testing.T) {
 					DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 				},
 			}
+			j.ConfigMaxConn()
 			err := j.Database.Migrate(ctx, true)
 			c.Assert(err, qt.Equals, nil)
 
@@ -209,6 +210,7 @@ func TestUserModelDefaults(t *testing.T) {
 					DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 				},
 			}
+			j.ConfigMaxConn()
 			err := j.Database.Migrate(ctx, true)
 			c.Assert(err, qt.Equals, nil)
 

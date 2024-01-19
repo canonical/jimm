@@ -76,6 +76,7 @@ func TestWatchAllModelSummaries(t *testing.T) {
 		},
 		Pubsub: pubsub,
 	}
+	j.ConfigMaxConn()
 	err := j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 

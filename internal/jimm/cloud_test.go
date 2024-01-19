@@ -36,6 +36,8 @@ func TestGetCloud(t *testing.T) {
 			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 		},
 	}
+	j.ConfigMaxConn()
+	defer j.Cleanup(ctx)
 
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
@@ -164,6 +166,8 @@ func TestForEachCloud(t *testing.T) {
 			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 		},
 	}
+	j.ConfigMaxConn()
+	defer j.Cleanup(ctx)
 
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
@@ -601,6 +605,8 @@ func TestAddHostedCloud(t *testing.T) {
 				Dialer:        dialer,
 				OpenFGAClient: client,
 			}
+			j.ConfigMaxConn()
+			defer j.Cleanup(ctx)
 
 			// since dialer is set up to dial a controller with UUID set to
 			// jimmtest.DefaultControllerUUID we need to add a controller
@@ -881,6 +887,8 @@ func TestAddCloudToController(t *testing.T) {
 				Dialer:        dialer,
 				OpenFGAClient: client,
 			}
+			j.ConfigMaxConn()
+			defer j.Cleanup(ctx)
 
 			// since dialer is set up to dial a controller with UUID set to
 			// jimmtest.DefaultControllerUUID we need to add a controller
@@ -1049,6 +1057,8 @@ func TestGrantCloudAccess(t *testing.T) {
 				Dialer:        dialer,
 				OpenFGAClient: client,
 			}
+			j.ConfigMaxConn()
+			defer j.Cleanup(ctx)
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
@@ -1348,6 +1358,8 @@ func TestRevokeCloudAccess(t *testing.T) {
 				Dialer:        dialer,
 				OpenFGAClient: client,
 			}
+			j.ConfigMaxConn()
+			defer j.Cleanup(ctx)
 
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
@@ -1502,6 +1514,8 @@ func TestRemoveCloud(t *testing.T) {
 				Dialer:        dialer,
 				OpenFGAClient: client,
 			}
+			j.ConfigMaxConn()
+			defer j.Cleanup(ctx)
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
@@ -1742,6 +1756,8 @@ func TestUpdateCloud(t *testing.T) {
 				Dialer:        dialer,
 				OpenFGAClient: client,
 			}
+			j.ConfigMaxConn()
+			defer j.Cleanup(ctx)
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
@@ -1936,6 +1952,8 @@ func TestRemoveFromControllerCloud(t *testing.T) {
 				Dialer:        dialer,
 				OpenFGAClient: client,
 			}
+			j.ConfigMaxConn()
+			defer j.Cleanup(ctx)
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)

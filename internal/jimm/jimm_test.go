@@ -39,8 +39,9 @@ func TestFindAuditEvents(t *testing.T) {
 		},
 		OpenFGAClient: client,
 	}
-
 	ctx := context.Background()
+	j.ConfigMaxConn()
+	defer j.Cleanup(ctx)
 
 	err = j.Database.Migrate(ctx, true)
 	c.Assert(err, qt.Equals, nil)
@@ -215,6 +216,8 @@ func TestListControllers(t *testing.T) {
 		},
 		OpenFGAClient: client,
 	}
+	j.ConfigMaxConn()
+	defer j.Cleanup(ctx)
 
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
@@ -304,6 +307,8 @@ func TestSetControllerDeprecated(t *testing.T) {
 		OpenFGAClient: client,
 	}
 
+	j.ConfigMaxConn()
+	defer j.Cleanup(ctx)
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
@@ -454,6 +459,8 @@ func TestRemoveController(t *testing.T) {
 					DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 				},
 			}
+			j.ConfigMaxConn()
+			defer j.Cleanup(ctx)
 
 			err := j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
@@ -625,6 +632,8 @@ func TestFullModelStatus(t *testing.T) {
 					API: api,
 				},
 			}
+			j.ConfigMaxConn()
+			defer j.Cleanup(ctx)
 
 			err := j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
@@ -786,6 +795,8 @@ func TestInitiateInternalMigration(t *testing.T) {
 				},
 				CredentialStore: store,
 			}
+			j.ConfigMaxConn()
+			defer j.Cleanup(ctx)
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 

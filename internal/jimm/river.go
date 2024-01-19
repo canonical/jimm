@@ -140,7 +140,7 @@ func NewRiver(config *river.Config, db_url string, ctx context.Context, ofgaConn
 		config = &river.Config{
 			RetryPolicy: &river.DefaultClientRetryPolicy{},
 			Queues: map[string]river.QueueConfig{
-				river.QueueDefault: {MaxWorkers: 100},
+				river.QueueDefault: {MaxWorkers: 3},
 			},
 			Logger:  slog.Default(),
 			Workers: workers,
