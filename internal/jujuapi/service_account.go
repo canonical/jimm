@@ -41,7 +41,7 @@ func (r *controllerRoot) getServiceAccount(ctx context.Context, clientID string)
 		return nil, errors.E(err)
 	}
 	if !ok {
-		return nil, errors.E("unauthorized")
+		return nil, errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
 
 	var targetIdentityModel dbmodel.Identity
@@ -61,7 +61,7 @@ func (r *controllerRoot) getServiceAccount(ctx context.Context, clientID string)
 func (r *controllerRoot) UpdateServiceAccountCredentials(ctx context.Context, req apiparams.UpdateServiceAccountCredentialsRequest) (jujuparams.UpdateCredentialResults, error) {
 	const op = errors.Op("jujuapi.UpdateServiceAccountCredentials")
 
-	targetUser, err := r.getServiceAccount(ctx, req.ClientID)
+	targetIdentity, err := r.getServiceAccount(ctx, req.ClientID)
 	if err != nil {
 		return jujuparams.UpdateCredentialResults{}, errors.E(op, err)
 	}
@@ -75,7 +75,7 @@ func (r *controllerRoot) UpdateServiceAccountCredentials(ctx context.Context, re
 		var tag names.CloudCredentialTag
 		tag, err = names.ParseCloudCredentialTag(credential.Tag)
 		if err == nil {
-			res, err = r.jimm.UpdateCloudCredential(ctx, targetUser, jimm.UpdateCloudCredentialArgs{
+			res, err = r.jimm.UpdateCloudCredential(ctx, targetIdentity, jimm.UpdateCloudCredentialArgs{
 				CredentialTag: tag,
 				Credential:    credential.Credential,
 				// Check that all credentials are valid.
@@ -97,9 +97,9 @@ func (r *controllerRoot) UpdateServiceAccountCredentials(ctx context.Context, re
 func (r *controllerRoot) ListServiceAccountCredentials(ctx context.Context, req apiparams.ListServiceAccountCredentialsRequest) (jujuparams.CredentialContentResults, error) {
 	const op = errors.Op("jujuapi.UpdateServiceAccountCredentials")
 
-	targetUser, err := r.getServiceAccount(ctx, req.ClientID)
+	targetIdentity, err := r.getServiceAccount(ctx, req.ClientID)
 	if err != nil {
 		return jujuparams.CredentialContentResults{}, errors.E(op, err)
 	}
-	return getIdentityCredentials(ctx, targetUser, r.jimm, req.CloudCredentialArgs)
+	return getIdentityCredentials(ctx, targetIdentity, r.jimm, req.CloudCredentialArgs)
 }

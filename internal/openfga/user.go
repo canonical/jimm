@@ -80,6 +80,7 @@ func (u *User) IsModelWriter(ctx context.Context, resource names.ModelTag) (bool
 	return isWriter, nil
 }
 
+// IsServiceAccountAdmin returns true if user has administrator relation to the service account.
 func (u *User) IsServiceAccountAdmin(ctx context.Context, clientID jimmnames.ServiceAccountTag) (bool, error) {
 	isAdmin, err := checkRelation(ctx, u, clientID, ofganames.AdministratorRelation)
 	if err != nil {
