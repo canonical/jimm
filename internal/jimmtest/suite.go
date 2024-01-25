@@ -76,6 +76,9 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 	jimm_db := db.Database{
 		DB: PostgresDB(gcChecker, nil),
 	}
+	err = jimm_db.Migrate(ctx, false)
+	c.Assert(err, gc.Equals, nil)
+
 	river := NewRiver(gcChecker, s.OFGAClient, jimm_db)
 	c.Assert(err, gc.IsNil)
 
@@ -92,8 +95,6 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 
 	s.cancel = cancel
 
-	err = s.JIMM.Database.Migrate(ctx, false)
-	c.Assert(err, gc.Equals, nil)
 	s.AdminUser = &dbmodel.User{
 		Username:  "alice@external",
 		LastLogin: db.Now(),

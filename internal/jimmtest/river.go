@@ -14,7 +14,7 @@ import (
 // In cases where you need an entirely empty database, you should use
 // `CreateEmptyDatabase` function in this package.
 func NewRiver(t Tester, ofgaConn *openfga.OFGAClient, db db.Database) *jimm.River {
-	dsn := GetDSN()
+	dsn := getTestDBName(t)
 
 	riverClient, err := jimm.NewRiver(context.Background(), nil, dsn, ofgaConn, db)
 	if err != nil {
