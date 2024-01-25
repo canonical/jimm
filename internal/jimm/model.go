@@ -621,30 +621,23 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 		OwnerName:      builder.owner.Username,
 		ModelInfoUUID:  mi.UUID,
 	}
-	_, err = j.River.Client.Insert(ctx, openfgaRiverJobArgs, &river.InsertOpts{MaxAttempts: 10})
+	const wait = true
+	var results <-chan *river.Event
+	var cancelChannelFunc func()
+	if wait {
+		results, cancelChannelFunc = j.River.Client.Subscribe(river.EventKindJobCompleted, river.EventKindJobFailed)
+		defer cancelChannelFunc()
+	}
+	row, err := j.River.Client.Insert(ctx, openfgaRiverJobArgs, &river.InsertOpts{MaxAttempts: 1})
 	if err != nil {
-		zapctx.Error(ctx, "Failed to insert river job!", zaputil.Error(err))
-		// trying without river just in case.
-		if err := j.OpenFGAClient.AddControllerModel(
-			ctx,
-			builder.controller.ResourceTag(),
-			builder.model.ResourceTag(),
-		); err != nil {
-			zapctx.Error(
-				ctx,
-				"failed to add controller-model relation",
-				zap.String("controller", builder.controller.UUID),
-				zap.String("model", builder.model.UUID.String),
-			)
-		}
-		err = openfga.NewUser(owner, j.OpenFGAClient).SetModelAccess(ctx, names.NewModelTag(mi.UUID), ofganames.AdministratorRelation)
-		if err != nil {
-			zapctx.Error(
-				ctx,
-				"failed to add administrator relation",
-				zap.String("user", owner.Tag().String()),
-				zap.String("model", builder.model.UUID.String),
-			)
+		zapctx.Error(ctx, "failed to insert river job", zaputil.Error(err))
+		return nil, errors.E(err, op)
+	}
+	if wait {
+		for item := range results {
+			if item.Job.ID == row.ID {
+				break
+			}
 		}
 	}
 

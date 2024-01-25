@@ -41,34 +41,25 @@ type OpenFGAWorker struct {
 
 // Work is tha function executed by the worker when it picks up the job.
 func (w *OpenFGAWorker) Work(ctx context.Context, job *river.Job[OpenFGAArgs]) error {
-	controller := &dbmodel.Controller{UUID: job.Args.ControllerUUID}
-	err := w.Database.GetController(ctx, controller)
-	if err != nil {
-		return err
-	}
-
-	model := &dbmodel.Model{ID: job.Args.ModelId}
-	err = w.Database.GetModel(ctx, model)
-	if err != nil {
-		return err
-	}
+	controllerTag := names.NewControllerTag(job.Args.ControllerUUID)
+	modelTag := names.NewModelTag(job.Args.ModelInfoUUID)
 
 	owner := &dbmodel.User{Username: job.Args.OwnerName}
-	err = w.Database.GetUser(ctx, owner)
+	err := w.Database.GetUser(ctx, owner)
 	if err != nil {
 		return err
 	}
 
 	if err := w.OfgaClient.AddControllerModel(
 		ctx,
-		controller.ResourceTag(),
-		model.ResourceTag(),
+		controllerTag,
+		modelTag,
 	); err != nil {
 		zapctx.Error(
 			ctx,
 			"failed to add controller-model relation",
-			zap.String("controller", controller.UUID),
-			zap.String("model", model.UUID.String),
+			zap.String("controller", controllerTag.Id()),
+			zap.String("model", modelTag.Id()),
 		)
 		return err
 	}
@@ -78,7 +69,7 @@ func (w *OpenFGAWorker) Work(ctx context.Context, job *river.Job[OpenFGAArgs]) e
 			ctx,
 			"failed to add administrator relation",
 			zap.String("user", owner.Tag().String()),
-			zap.String("model", model.UUID.String),
+			zap.String("model", modelTag.Id()),
 		)
 		return err
 	}
@@ -149,12 +140,7 @@ func NewRiver(ctx context.Context, config *river.Config, db_url string, ofgaConn
 			Workers: workers,
 		}
 	}
-	poolConfig, err := pgxpool.ParseConfig(db_url)
-	if err != nil {
-		return nil, err
-	}
-	poolConfig.MaxConns = 1
-	dbPool, err := pgxpool.NewWithConfig(ctx, poolConfig)
+	dbPool, err := pgxpool.New(ctx, db_url)
 	if err != nil {
 		return nil, err
 	}

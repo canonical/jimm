@@ -905,6 +905,9 @@ func TestAddModel(t *testing.T) {
 			jimm_db := db.Database{
 				DB: jimmtest.PostgresDB(c, nil),
 			}
+			err = jimm_db.Migrate(ctx, false)
+			c.Assert(err, qt.IsNil)
+
 			river := jimmtest.NewRiver(c, client, jimm_db)
 
 			j := &jimm.JIMM{
@@ -916,8 +919,6 @@ func TestAddModel(t *testing.T) {
 				OpenFGAClient: client,
 				River:         river,
 			}
-			err = j.Database.Migrate(ctx, false)
-			c.Assert(err, qt.IsNil)
 
 			env := jimmtest.ParseEnvironment(c, test.env)
 			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
