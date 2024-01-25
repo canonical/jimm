@@ -87,7 +87,6 @@ func (s *jimmSuite) SetUpTest(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	s.Service = srv
 	s.JIMM = srv.JIMM()
-	s.JIMM.ConfigMaxConn()
 	s.HTTP.Config = &http.Server{Handler: srv}
 
 	err = s.Service.StartJWKSRotator(ctx, time.NewTicker(time.Hour).C, time.Now().UTC().AddDate(0, 3, 0))

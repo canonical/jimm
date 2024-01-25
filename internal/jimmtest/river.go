@@ -6,6 +6,8 @@ import (
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/jimm"
 	"github.com/canonical/jimm/internal/openfga"
+	"github.com/juju/zaputil/zapctx"
+	"go.uber.org/zap"
 )
 
 // PostgresDB returns a PostgreSQL database instance for tests. To improve
@@ -21,7 +23,10 @@ func NewRiver(t Tester, ofgaConn *openfga.OFGAClient, db db.Database) *jimm.Rive
 		t.Fatalf("failed to create river client")
 	}
 	t.Cleanup(func() {
-		riverClient.Cleanup(context.Background())
+		err := riverClient.Cleanup(context.Background())
+		if err != nil {
+			zapctx.Error(context.Background(), "failed to cleanup river client", zap.Error(err))
+		}
 	})
 
 	return riverClient

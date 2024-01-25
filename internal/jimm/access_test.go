@@ -146,8 +146,6 @@ func TestAuditLogAccess(t *testing.T) {
 		OpenFGAClient: ofgaClient,
 	}
 	ctx := context.Background()
-	j.ConfigMaxConn()
-	defer j.Cleanup(ctx)
 
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
@@ -475,8 +473,6 @@ func TestParseTag(t *testing.T) {
 		},
 		OpenFGAClient: ofgaClient,
 	}
-	j.ConfigMaxConn()
-	defer j.Cleanup(ctx)
 
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
@@ -517,8 +513,6 @@ func TestResolveJIMM(t *testing.T) {
 		},
 		OpenFGAClient: ofgaClient,
 	}
-	j.ConfigMaxConn()
-	defer j.Cleanup(ctx)
 
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
@@ -545,8 +539,6 @@ func TestResolveTupleObjectMapsApplicationOffersUUIDs(t *testing.T) {
 		},
 		OpenFGAClient: ofgaClient,
 	}
-	j.ConfigMaxConn()
-	defer j.Cleanup(ctx)
 
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
@@ -575,8 +567,6 @@ func TestResolveTupleObjectMapsModelUUIDs(t *testing.T) {
 		},
 		OpenFGAClient: ofgaClient,
 	}
-	j.ConfigMaxConn()
-	defer j.Cleanup(ctx)
 
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
@@ -605,8 +595,6 @@ func TestResolveTupleObjectMapsControllerUUIDs(t *testing.T) {
 		},
 		OpenFGAClient: ofgaClient,
 	}
-	j.ConfigMaxConn()
-	defer j.Cleanup(ctx)
 
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
@@ -646,8 +634,6 @@ func TestResolveTupleObjectMapsGroups(t *testing.T) {
 		},
 		OpenFGAClient: ofgaClient,
 	}
-	j.ConfigMaxConn()
-	defer j.Cleanup(ctx)
 
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
@@ -679,8 +665,6 @@ func TestResolveTagObjectMapsUsers(t *testing.T) {
 		},
 		OpenFGAClient: ofgaClient,
 	}
-	j.ConfigMaxConn()
-	defer j.Cleanup(ctx)
 
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
@@ -705,8 +689,6 @@ func TestResolveTupleObjectHandlesErrors(t *testing.T) {
 		},
 		OpenFGAClient: ofgaClient,
 	}
-	j.ConfigMaxConn()
-	defer j.Cleanup(ctx)
 
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
@@ -880,8 +862,6 @@ func TestAddGroup(t *testing.T) {
 		},
 		OpenFGAClient: ofgaClient,
 	}
-	j.ConfigMaxConn()
-	defer j.Cleanup(ctx)
 
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
@@ -912,8 +892,6 @@ func TestRemoveGroup(t *testing.T) {
 		},
 		OpenFGAClient: ofgaClient,
 	}
-	j.ConfigMaxConn()
-	defer j.Cleanup(ctx)
 
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
@@ -944,8 +922,6 @@ func TestRemoveGroupRemovesTuples(t *testing.T) {
 		},
 		OpenFGAClient: ofgaClient,
 	}
-	j.ConfigMaxConn()
-	defer j.Cleanup(ctx)
 
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
@@ -1030,8 +1006,6 @@ func TestRenameGroup(t *testing.T) {
 		},
 		OpenFGAClient: ofgaClient,
 	}
-	j.ConfigMaxConn()
-	defer j.Cleanup(ctx)
 
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
@@ -1124,8 +1098,6 @@ func TestListGroups(t *testing.T) {
 		},
 		OpenFGAClient: ofgaClient,
 	}
-	j.ConfigMaxConn()
-	defer j.Cleanup(ctx)
 
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)

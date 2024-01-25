@@ -83,28 +83,6 @@ type JIMM struct {
 	River *River
 }
 
-func (j *JIMM) ConfigMaxConn() {
-	return
-	dbConfig, _ := j.Database.DB.DB()
-	dbConfig.SetMaxOpenConns(0)
-	dbConfig.SetMaxIdleConns(0)
-}
-
-func (j *JIMM) Cleanup(ctx context.Context) error {
-	// err := j.Database.Close()
-	// if err != nil {
-	// 	return err
-	// }
-	// // River is not always instantiated.
-	// if j.River != nil {
-	// 	err := j.River.Cleanup(ctx)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// }
-	return nil
-}
-
 // ResourceTag returns JIMM's controller tag stating its UUID.
 func (j *JIMM) ResourceTag() names.ControllerTag {
 	return names.NewControllerTag(j.UUID)

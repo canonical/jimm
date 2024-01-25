@@ -430,8 +430,6 @@ func TestQueryModelsJq(t *testing.T) {
 		},
 	}
 
-	j.ConfigMaxConn()
-	defer j.Cleanup(ctx)
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 

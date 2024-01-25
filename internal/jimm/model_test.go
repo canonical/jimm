@@ -916,7 +916,6 @@ func TestAddModel(t *testing.T) {
 				OpenFGAClient: client,
 				River:         river,
 			}
-			j.ConfigMaxConn()
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 
@@ -962,7 +961,6 @@ func TestAddModel(t *testing.T) {
 			} else {
 				c.Assert(err, qt.ErrorMatches, test.expectError)
 			}
-			j.Cleanup(ctx)
 		})
 	}
 }
@@ -1295,7 +1293,6 @@ func TestModelInfo(t *testing.T) {
 					},
 				},
 			}
-			j.ConfigMaxConn()
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 
@@ -1317,7 +1314,6 @@ func TestModelInfo(t *testing.T) {
 				})
 				c.Check(mi, qt.CmpEquals(cmpopts.EquateEmpty()), test.expectModelInfo)
 			}
-			j.Cleanup(ctx)
 		})
 	}
 }
@@ -1438,8 +1434,6 @@ func TestModelStatus(t *testing.T) {
 				},
 				Dialer: dialer,
 			}
-			j.ConfigMaxConn()
-			defer j.Cleanup(ctx)
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 
@@ -1592,8 +1586,6 @@ func TestForEachUserModel(t *testing.T) {
 			API: &jimmtest.API{},
 		},
 	}
-	j.ConfigMaxConn()
-	defer j.Cleanup(ctx)
 
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
@@ -1734,8 +1726,6 @@ func TestForEachModel(t *testing.T) {
 			API: &jimmtest.API{},
 		},
 	}
-	j.ConfigMaxConn()
-	defer j.Cleanup(ctx)
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
@@ -2009,8 +1999,6 @@ func TestGrantModelAccess(t *testing.T) {
 				Dialer:        dialer,
 				OpenFGAClient: client,
 			}
-			j.ConfigMaxConn()
-			defer j.Cleanup(ctx)
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
@@ -2730,8 +2718,6 @@ func TestRevokeModelAccess(t *testing.T) {
 				Dialer:        dialer,
 				OpenFGAClient: client,
 			}
-			j.ConfigMaxConn()
-			defer j.Cleanup(ctx)
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
@@ -2918,8 +2904,6 @@ func TestDestroyModel(t *testing.T) {
 				},
 				Dialer: dialer,
 			}
-			j.ConfigMaxConn()
-			defer j.Cleanup(ctx)
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 
@@ -3045,7 +3029,6 @@ func TestDumpModel(t *testing.T) {
 				},
 				Dialer: dialer,
 			}
-			j.ConfigMaxConn()
 
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
@@ -3159,8 +3142,6 @@ func TestDumpModelDB(t *testing.T) {
 				},
 				Dialer: dialer,
 			}
-			j.ConfigMaxConn()
-			defer j.Cleanup(ctx)
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 
@@ -3279,8 +3260,6 @@ func TestValidateModelUpgrade(t *testing.T) {
 				},
 				Dialer: dialer,
 			}
-			j.ConfigMaxConn()
-			defer j.Cleanup(ctx)
 
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
@@ -3503,8 +3482,6 @@ func TestUpdateModelCredential(t *testing.T) {
 				},
 				Dialer: dialer,
 			}
-			j.ConfigMaxConn()
-			defer j.Cleanup(ctx)
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 
@@ -3579,9 +3556,7 @@ users:
 			API: api,
 		},
 	}
-	j.ConfigMaxConn()
 	ctx := context.Background()
-	defer j.Cleanup(ctx)
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
