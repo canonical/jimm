@@ -185,10 +185,7 @@ var createDatabaseMutex = sync.Mutex{}
 func createDatabaseFromTemplate(suggestedName string, templateName string) (string, string, error) {
 	databaseName := computeSafeDatabaseName(suggestedName)
 
-	dsn := defaultDSN
-	if envTestDSN, exists := os.LookupEnv("JIMM_TEST_PGXDSN"); exists {
-		dsn = envTestDSN
-	}
+	dsn := GetDSN()
 
 	u, err := url.Parse(dsn)
 	if err != nil {
@@ -223,6 +220,10 @@ func createDatabaseFromTemplate(suggestedName string, templateName string) (stri
 
 	u.Path = databaseName
 	return databaseName, u.String(), nil
+}
+
+func createDSNToTemplateDatabase() string {
+
 }
 
 // createDatabase creates an empty Postgres database and returns the created

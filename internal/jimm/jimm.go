@@ -84,6 +84,7 @@ type JIMM struct {
 }
 
 func (j *JIMM) ConfigMaxConn() {
+	return
 	dbConfig, _ := j.Database.DB.DB()
 	dbConfig.SetMaxOpenConns(0)
 	dbConfig.SetMaxIdleConns(0)

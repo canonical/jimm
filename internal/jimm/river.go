@@ -4,7 +4,6 @@ package jimm
 
 import (
 	"context"
-	"log/slog"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -101,9 +100,13 @@ type River struct {
 }
 
 func (r *River) Cleanup(ctx context.Context) error {
-	r.dbPool.Close()
-	err := r.Client.Stop(ctx)
-	return err
+	defer r.dbPool.Close()
+	return r.Client.Stop(ctx)
+}
+
+func (r *River) ForceCleanup(ctx context.Context) error {
+	defer r.dbPool.Close()
+	return r.Client.StopAndCancel(ctx)
 }
 
 func (r *River) doMigration(ctx context.Context) error {
@@ -130,8 +133,8 @@ func (r *River) doMigration(ctx context.Context) error {
 }
 
 // NewRiver would return a new river instance, and it would apply the needed migrations to the database,
-// and open a postgres connections pool that would be opened in the Cleanup routine.
-func NewRiver(config *river.Config, db_url string, ctx context.Context, ofgaConn *openfga.OFGAClient, db db.Database) (*River, error) {
+// and open a postgres connections pool that would be closed in the Cleanup routine.
+func NewRiver(ctx context.Context, config *river.Config, db_url string, ofgaConn *openfga.OFGAClient, db db.Database) (*River, error) {
 	if config == nil {
 		workers, err := RegisterJimmWorkers(ctx, ofgaConn, db)
 		if err != nil {
@@ -142,7 +145,7 @@ func NewRiver(config *river.Config, db_url string, ctx context.Context, ofgaConn
 			Queues: map[string]river.QueueConfig{
 				river.QueueDefault: {MaxWorkers: 3},
 			},
-			Logger:  slog.Default(),
+			// Logger:  slog.Default(),
 			Workers: workers,
 		}
 	}

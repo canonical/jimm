@@ -905,8 +905,7 @@ func TestAddModel(t *testing.T) {
 			jimm_db := db.Database{
 				DB: jimmtest.PostgresDB(c, nil),
 			}
-			// the DSN can be obtained from the global env var, there is a function that can be reused to get this.
-			river, err := jimm.NewRiver(nil, jimmtest.GetDSN(), ctx, client, jimm_db)
+			river := jimmtest.NewRiver(c, client, jimm_db)
 
 			j := &jimm.JIMM{
 				UUID:     uuid.NewString(),

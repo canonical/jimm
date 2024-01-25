@@ -72,10 +72,11 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 	s.OFGAClient, s.COFGAClient, s.COFGAParams, err = SetupTestOFGAClient(c.TestName())
 	c.Assert(err, gc.IsNil)
 	ctx, cancel := context.WithCancel(context.Background())
+	gcChecker := GocheckTester{c}
 	jimm_db := db.Database{
-		DB: PostgresDB(GocheckTester{c}, nil),
+		DB: PostgresDB(gcChecker, nil),
 	}
-	river, err := jimm.NewRiver(nil, GetDSN(), ctx, s.OFGAClient, jimm_db)
+	river := NewRiver(gcChecker, s.OFGAClient, jimm_db)
 	c.Assert(err, gc.IsNil)
 
 	// Setup OpenFGA.
@@ -147,6 +148,9 @@ func (s *JIMMSuite) TearDownTest(c *gc.C) {
 	}
 	if err := s.JIMM.Database.Close(); err != nil {
 		c.Logf("failed to close database connections at tear down: %s", err)
+	}
+	if err := s.JIMM.River.Cleanup(context.Background()); err != nil {
+		c.Logf("failed to cleanup river client: %s", err)
 	}
 }
 

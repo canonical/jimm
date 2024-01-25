@@ -781,7 +781,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 			jimm_db := db.Database{
 				DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 			}
-			river, err := jimm.NewRiver(nil, jimmtest.GetDSN(), ctx, client, jimm_db)
+			river := jimmtest.NewRiver(c, client, jimm_db)
 			j := &jimm.JIMM{
 				UUID:     uuid.NewString(),
 				Database: jimm_db,
@@ -1248,7 +1248,7 @@ func TestRevokeCloudCredential(t *testing.T) {
 			jimm_db := db.Database{
 				DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 			}
-			river, err := jimm.NewRiver(nil, jimmtest.GetDSN(), ctx, client, jimm_db)
+			river := jimmtest.NewRiver(c, client, jimm_db)
 			c.Assert(err, qt.IsNil)
 			j := &jimm.JIMM{
 				UUID:     uuid.NewString(),
