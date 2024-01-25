@@ -3545,17 +3545,21 @@ users:
 
 	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
+	jimm_db := db.Database{
+		DB: jimmtest.PostgresDB(c, nil),
+	}
+	river := jimmtest.NewRiver(c, client, jimm_db)
 
 	j := &jimm.JIMM{
-		UUID:          uuid.NewString(),
-		OpenFGAClient: client,
-		Database: db.Database{
-			DB: jimmtest.PostgresDB(c, nil),
-		},
+		UUID:     uuid.NewString(),
+		Database: jimm_db,
 		Dialer: &jimmtest.Dialer{
 			API: api,
 		},
+		OpenFGAClient: client,
+		River:         river,
 	}
+
 	ctx := context.Background()
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)

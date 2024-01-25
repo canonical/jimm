@@ -257,9 +257,6 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
-	dbConfig, _ := s.jimm.Database.DB.DB()
-	dbConfig.SetMaxOpenConns(0)
-	dbConfig.SetMaxIdleConns(0)
 
 	if err := s.jimm.Database.Migrate(ctx, false); err != nil {
 		return nil, errors.E(op, err)

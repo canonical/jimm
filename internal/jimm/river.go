@@ -149,7 +149,12 @@ func NewRiver(ctx context.Context, config *river.Config, db_url string, ofgaConn
 			Workers: workers,
 		}
 	}
-	dbPool, err := pgxpool.New(ctx, db_url)
+	poolConfig, err := pgxpool.ParseConfig(db_url)
+	if err != nil {
+		return nil, err
+	}
+	poolConfig.MaxConns = 1
+	dbPool, err := pgxpool.NewWithConfig(ctx, poolConfig)
 	if err != nil {
 		return nil, err
 	}
