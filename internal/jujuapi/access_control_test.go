@@ -1334,7 +1334,7 @@ func (s *accessControlSuite) TestResolveTupleObjectHandlesErrors(c *gc.C) {
 		// Resolves bad groups where they do not exist
 		{
 			input: "group-myspecialpokemon-his-name-is-youguessedit-diglett",
-			want:  "group not found",
+			want:  "group myspecialpokemon-his-name-is-youguessedit-diglett not found",
 		},
 		// Resolves bad controllers where they do not exist
 		{
