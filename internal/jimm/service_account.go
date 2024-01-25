@@ -9,6 +9,8 @@ import (
 	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 	jimmnames "github.com/canonical/jimm/pkg/names"
+	"github.com/juju/zaputil/zapctx"
+	"go.uber.org/zap"
 )
 
 // AddServiceAccount checks that no one owns the service account yet
@@ -48,6 +50,28 @@ func (j *JIMM) AddServiceAccount(ctx context.Context, u *openfga.User, clientId 
 	err = j.OpenFGAClient.AddRelation(ctx, addTuple)
 	if err != nil {
 		return errors.E(op, err)
+	}
+	return nil
+}
+
+// GrantServiceAccountAccess creates an administrator relation between the tags provided
+// and the service account. The provided tags must be users or groups (with the member relation)
+// otherwise OpenFGA will report an error.
+func (j *JIMM) GrantServiceAccountAccess(ctx context.Context, u *openfga.User, svcAccTag jimmnames.ServiceAccountTag, tags []*ofganames.Tag) error {
+	op := errors.Op("jimm.GrantServiceAccountAccess")
+	tuples := make([]openfga.Tuple, 0, len(tags))
+	for _, tag := range tags {
+		tuple := openfga.Tuple{
+			Object:   tag,
+			Relation: ofganames.AdministratorRelation,
+			Target:   ofganames.ConvertTag(svcAccTag),
+		}
+		tuples = append(tuples, tuple)
+	}
+	err := j.AuthorizationClient().AddRelation(ctx, tuples...)
+	if err != nil {
+		zapctx.Error(ctx, "failed to add tuple(s)", zap.NamedError("add-relation-error", err))
+		return errors.E(op, errors.CodeOpenFGARequestFailed, err)
 	}
 	return nil
 }

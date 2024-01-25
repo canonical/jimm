@@ -328,6 +328,113 @@ func TestListServiceAccountCredentials(t *testing.T) {
 	}
 }
 
+func TestGrantServiceAccountAccess(t *testing.T) {
+	c := qt.New(t)
+
+	tests := []struct {
+		about                     string
+		grantServiceAccountAccess func(ctx context.Context, user *openfga.User, svcAccTag jimmnames.ServiceAccountTag, tags []*ofganames.Tag) error
+		params                    params.GrantServiceAccountAccess
+		tags                      []string
+		username                  string
+		addTuples                 []openfga.Tuple
+		expectedError             string
+	}{{
+		about: "Valid request",
+		grantServiceAccountAccess: func(ctx context.Context, user *openfga.User, svcAccTag jimmnames.ServiceAccountTag, tags []*ofganames.Tag) error {
+			return nil
+		},
+		params: params.GrantServiceAccountAccess{
+			Entities: []string{
+				"user-alice",
+				"user-bob",
+			},
+			ClientID: "fca1f605-736e-4d1f-bcd2-aecc726923be",
+		},
+		username: "alice",
+		addTuples: []openfga.Tuple{{
+			Object:   ofganames.ConvertTag(names.NewUserTag("alice")),
+			Relation: ofganames.AdministratorRelation,
+			Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag("fca1f605-736e-4d1f-bcd2-aecc726923be")),
+		}},
+	}, {
+		about: "Group that doesn't exist",
+		grantServiceAccountAccess: func(ctx context.Context, user *openfga.User, svcAccTag jimmnames.ServiceAccountTag, tags []*ofganames.Tag) error {
+			return nil
+		},
+		params: params.GrantServiceAccountAccess{
+			Entities: []string{
+				"user-alice",
+				"user-bob",
+				// This group doesn't exist.
+				"group-bar",
+			},
+			ClientID: "fca1f605-736e-4d1f-bcd2-aecc726923be",
+		},
+		username: "alice",
+		addTuples: []openfga.Tuple{{
+			Object:   ofganames.ConvertTag(names.NewUserTag("alice")),
+			Relation: ofganames.AdministratorRelation,
+			Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag("fca1f605-736e-4d1f-bcd2-aecc726923be")),
+		}},
+		expectedError: "group bar not found",
+	}, {
+		about: "Invalid tags",
+		grantServiceAccountAccess: func(ctx context.Context, user *openfga.User, svcAccTag jimmnames.ServiceAccountTag, tags []*ofganames.Tag) error {
+			return nil
+		},
+		params: params.GrantServiceAccountAccess{
+			Entities: []string{
+				"user-alice",
+				"user-bob",
+				"controller-jimm",
+			},
+			ClientID: "fca1f605-736e-4d1f-bcd2-aecc726923be",
+		},
+		username: "alice",
+		addTuples: []openfga.Tuple{{
+			Object:   ofganames.ConvertTag(names.NewUserTag("alice")),
+			Relation: ofganames.AdministratorRelation,
+			Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag("fca1f605-736e-4d1f-bcd2-aecc726923be")),
+		}},
+		expectedError: "invalid entity - not user or group",
+	}}
+
+	for _, test := range tests {
+		test := test
+		c.Run(test.about, func(c *qt.C) {
+			ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+			c.Assert(err, qt.IsNil)
+			pgDb := db.Database{
+				DB: jimmtest.PostgresDB(c, nil),
+			}
+			err = pgDb.Migrate(context.Background(), false)
+			c.Assert(err, qt.IsNil)
+			jimm := &jimmtest.JIMM{
+				AuthorizationClient_:       func() *openfga.OFGAClient { return ofgaClient },
+				GrantServiceAccountAccess_: test.grantServiceAccountAccess,
+				DB_:                        func() *db.Database { return &pgDb },
+			}
+			var u dbmodel.Identity
+			u.SetTag(names.NewUserTag(test.username))
+			user := openfga.NewUser(&u, ofgaClient)
+			cr := jujuapi.NewControllerRoot(jimm, jujuapi.Params{})
+			jujuapi.SetUser(cr, user)
+
+			if len(test.addTuples) > 0 {
+				ofgaClient.AddRelation(context.Background(), test.addTuples...)
+			}
+
+			err = cr.GrantServiceAccountAccess(context.Background(), test.params)
+			if test.expectedError == "" {
+				c.Assert(err, qt.IsNil)
+			} else {
+				c.Assert(err, qt.ErrorMatches, test.expectedError)
+			}
+		})
+	}
+}
+
 // Integration tests below.
 type serviceAccountSuite struct {
 	websocketSuite

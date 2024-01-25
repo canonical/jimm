@@ -205,7 +205,7 @@ func resolveTag(jimmUUID string, db *db.Database, tag string) (*ofganames.Tag, e
 		}
 		err := db.GetGroup(ctx, entry)
 		if err != nil {
-			return nil, errors.E("group not found")
+			return nil, errors.E(fmt.Sprintf("group %s not found", trailer))
 		}
 		return ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag(strconv.FormatUint(uint64(entry.ID), 10)), relation), nil
 

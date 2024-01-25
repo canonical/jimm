@@ -18,7 +18,9 @@ import (
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/jimm"
 	"github.com/canonical/jimm/internal/openfga"
+	ofganames "github.com/canonical/jimm/internal/openfga/names"
 	"github.com/canonical/jimm/internal/pubsub"
+	jimmnames "github.com/canonical/jimm/pkg/names"
 )
 
 // JIMM is a default implementation of the jujuapi.JIMM interface. Every method
@@ -64,6 +66,7 @@ type JIMM struct {
 	GrantCloudAccess_                  func(ctx context.Context, user *openfga.User, ct names.CloudTag, ut names.UserTag, access string) error
 	GrantModelAccess_                  func(ctx context.Context, user *openfga.User, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error
 	GrantOfferAccess_                  func(ctx context.Context, u *openfga.User, offerURL string, ut names.UserTag, access jujuparams.OfferAccessPermission) error
+	GrantServiceAccountAccess_         func(ctx context.Context, u *openfga.User, svcAccTag jimmnames.ServiceAccountTag, tags []*ofganames.Tag) error
 	ImportModel_                       func(ctx context.Context, user *openfga.User, controllerName string, modelTag names.ModelTag, newOwner string) error
 	IdentityModelDefaults_             func(ctx context.Context, user *dbmodel.Identity) (map[string]interface{}, error)
 	InitiateMigration_                 func(ctx context.Context, user *openfga.User, spec jujuparams.MigrationSpec, targetControllerID uint) (jujuparams.InitiateMigrationResult, error)
@@ -330,6 +333,14 @@ func (j *JIMM) GrantOfferAccess(ctx context.Context, u *openfga.User, offerURL s
 	}
 	return j.GrantOfferAccess_(ctx, u, offerURL, ut, access)
 }
+
+func (j *JIMM) GrantServiceAccountAccess(ctx context.Context, u *openfga.User, svcAccTag jimmnames.ServiceAccountTag, tags []*ofganames.Tag) error {
+	if j.GrantServiceAccountAccess_ == nil {
+		return errors.E(errors.CodeNotImplemented)
+	}
+	return j.GrantServiceAccountAccess_(ctx, u, svcAccTag, tags)
+}
+
 func (j *JIMM) ImportModel(ctx context.Context, user *openfga.User, controllerName string, modelTag names.ModelTag, newOwner string) error {
 	if j.ImportModel_ == nil {
 		return errors.E(errors.CodeNotImplemented)
