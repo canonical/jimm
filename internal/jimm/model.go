@@ -16,6 +16,7 @@ import (
 	"github.com/juju/zaputil"
 	"github.com/juju/zaputil/zapctx"
 	"github.com/riverqueue/river"
+	"github.com/riverqueue/river/rivertype"
 	"go.uber.org/zap"
 
 	"github.com/canonical/jimm/internal/constants"
@@ -621,17 +622,25 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 		OwnerName:      builder.owner.Username,
 		ModelInfoUUID:  mi.UUID,
 	}
+	insertAndWait(ctx, j.River, func() (*rivertype.JobRow, error) {
+		return j.River.Client.Insert(ctx, openfgaRiverJobArgs, &river.InsertOpts{MaxAttempts: 1})
+	})
+
+	return mi, nil
+}
+
+func insertAndWait(ctx context.Context, r *River, insertFunc func() (*rivertype.JobRow, error)) error {
 	const wait = true
 	var results <-chan *river.Event
 	var cancelChannelFunc func()
 	if wait {
-		results, cancelChannelFunc = j.River.Client.Subscribe(river.EventKindJobCompleted, river.EventKindJobFailed)
+		results, cancelChannelFunc = r.Client.Subscribe(river.EventKindJobCompleted, river.EventKindJobFailed)
 		defer cancelChannelFunc()
 	}
-	row, err := j.River.Client.Insert(ctx, openfgaRiverJobArgs, &river.InsertOpts{MaxAttempts: 1})
+	row, err := insertFunc()
 	if err != nil {
 		zapctx.Error(ctx, "failed to insert river job", zaputil.Error(err))
-		return nil, errors.E(err, op)
+		return errors.E(err)
 	}
 	if wait {
 		for item := range results {
@@ -640,8 +649,7 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 			}
 		}
 	}
-
-	return mi, nil
+	return nil
 }
 
 // ModelInfo returns the model info for the model with the given ModelTag.

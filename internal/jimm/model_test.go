@@ -3549,6 +3549,9 @@ users:
 	jimm_db := db.Database{
 		DB: jimmtest.PostgresDB(c, nil),
 	}
+	ctx := context.Background()
+	err = jimm_db.Migrate(ctx, false)
+	c.Assert(err, qt.IsNil)
 	river := jimmtest.NewRiver(c, client, jimm_db)
 
 	j := &jimm.JIMM{
@@ -3560,10 +3563,6 @@ users:
 		OpenFGAClient: client,
 		River:         river,
 	}
-
-	ctx := context.Background()
-	err = j.Database.Migrate(ctx, false)
-	c.Assert(err, qt.IsNil)
 
 	envDefinition := `
 clouds:
