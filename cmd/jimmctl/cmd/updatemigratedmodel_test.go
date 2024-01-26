@@ -11,12 +11,13 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/cmd/jimmctl/cmd"
+	"github.com/canonical/jimm/internal/cmdtest"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/jimmtest"
 )
 
 type updateMigratedModelSuite struct {
-	jimmSuite
+	cmdtest.JimmSuite
 }
 
 var _ = gc.Suite(&updateMigratedModelSuite{})
@@ -34,7 +35,7 @@ func (s *updateMigratedModelSuite) TestUpdateMigratedModelSuperuser(c *gc.C) {
 	s.AddController(c, "controller-2", s.APIInfo(c))
 
 	// alice is superuser
-	bClient := s.userBakeryClient("alice")
+	bClient := s.UserBakeryClient("alice")
 	_, err = cmdtesting.RunCommand(c, cmd.NewUpdateMigratedModelCommandForTesting(s.ClientStore(), bClient), "controller-2", mt.Id())
 	c.Assert(err, gc.IsNil)
 
@@ -54,31 +55,31 @@ func (s *updateMigratedModelSuite) TestUpdateMigratedModelUnauthorized(c *gc.C) 
 	mt := s.AddModel(c, names.NewUserTag("charlie@external"), "model-2", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, cct)
 
 	// bob is not superuser
-	bClient := s.userBakeryClient("bob")
+	bClient := s.UserBakeryClient("bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewUpdateMigratedModelCommandForTesting(s.ClientStore(), bClient), "controller-1", mt.Id())
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
 
 func (s *updateMigratedModelSuite) TestUpdateMigratedModelNoController(c *gc.C) {
-	bClient := s.userBakeryClient("bob")
+	bClient := s.UserBakeryClient("bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewUpdateMigratedModelCommandForTesting(s.ClientStore(), bClient))
 	c.Assert(err, gc.ErrorMatches, `controller not specified`)
 }
 
 func (s *updateMigratedModelSuite) TestUpdateMigratedModelNoModelUUID(c *gc.C) {
-	bClient := s.userBakeryClient("bob")
+	bClient := s.UserBakeryClient("bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewUpdateMigratedModelCommandForTesting(s.ClientStore(), bClient), "controller-id")
 	c.Assert(err, gc.ErrorMatches, `model uuid not specified`)
 }
 
 func (s *updateMigratedModelSuite) TestUpdateMigratedModelInvalidModelUUID(c *gc.C) {
-	bClient := s.userBakeryClient("bob")
+	bClient := s.UserBakeryClient("bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewUpdateMigratedModelCommandForTesting(s.ClientStore(), bClient), "controller-id", "not-a-uuid")
 	c.Assert(err, gc.ErrorMatches, `invalid model uuid`)
 }
 
 func (s *updateMigratedModelSuite) TestUpdateMigratedModelTooManyArgs(c *gc.C) {
-	bClient := s.userBakeryClient("bob")
+	bClient := s.UserBakeryClient("bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewUpdateMigratedModelCommandForTesting(s.ClientStore(), bClient), "controller-id", "not-a-uuid", "spare-argument")
 	c.Assert(err, gc.ErrorMatches, `too many args`)
 }

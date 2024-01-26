@@ -11,10 +11,11 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/cmd/jimmctl/cmd"
+	"github.com/canonical/jimm/internal/cmdtest"
 )
 
 type controllerInfoSuite struct {
-	jimmSuite
+	cmdtest.JimmSuite
 }
 
 var _ = gc.Suite(&controllerInfoSuite{})

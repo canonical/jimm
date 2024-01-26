@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/canonical/jimm/cmd/serviceaccounts/cmd"
 	jujucmd "github.com/juju/cmd/v3"
 )
 
@@ -19,7 +20,7 @@ func NewSuperCommand() *jujucmd.SuperCommand {
 		Doc:  serviceAccountDoc,
 	})
 	// Register commands here:
-	// serviceAccountCmd.Register(cmd.NewCommand())
+	serviceAccountCmd.Register(cmd.NewAddServiceAccountCommand())
 	return serviceAccountCmd
 }
 

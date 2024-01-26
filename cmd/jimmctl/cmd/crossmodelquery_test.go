@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 
 	"github.com/canonical/jimm/cmd/jimmctl/cmd"
+	"github.com/canonical/jimm/internal/cmdtest"
 	"github.com/canonical/jimm/internal/jimmtest"
 	"github.com/juju/cmd/v3/cmdtesting"
 	jujuparams "github.com/juju/juju/rpc/params"
@@ -15,7 +16,7 @@ import (
 )
 
 type crossModelQuerySuite struct {
-	jimmSuite
+	cmdtest.JimmSuite
 }
 
 var _ = gc.Suite(&crossModelQuerySuite{})
@@ -23,7 +24,7 @@ var _ = gc.Suite(&crossModelQuerySuite{})
 func (s *crossModelQuerySuite) TestCrossModelQueryCommand(c *gc.C) {
 	// Test setup.
 	store := s.ClientStore()
-	bClient := s.userBakeryClient("alice")
+	bClient := s.UserBakeryClient("alice")
 
 	s.AddController(c, "controller-2", s.APIInfo(c))
 	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/alice@external/cred")

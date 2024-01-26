@@ -22,6 +22,7 @@ import (
 
 	apiparams "github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/cmd/jimmctl/cmd"
+	"github.com/canonical/jimm/internal/cmdtest"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/openfga"
@@ -30,14 +31,14 @@ import (
 )
 
 type relationSuite struct {
-	jimmSuite
+	cmdtest.JimmSuite
 }
 
 var _ = gc.Suite(&relationSuite{})
 
 func (s *relationSuite) TestAddRelationSuperuser(c *gc.C) {
 	// alice is superuser
-	bClient := s.userBakeryClient("alice")
+	bClient := s.UserBakeryClient("alice")
 	group1 := "testGroup1"
 	group2 := "testGroup2"
 	type tuple struct {
@@ -81,9 +82,9 @@ func (s *relationSuite) TestAddRelationSuperuser(c *gc.C) {
 		},
 	}
 
-	err := s.jimmSuite.JIMM.Database.AddGroup(context.Background(), group1)
+	err := s.JimmSuite.JIMM.Database.AddGroup(context.Background(), group1)
 	c.Assert(err, gc.IsNil)
-	err = s.jimmSuite.JIMM.Database.AddGroup(context.Background(), group2)
+	err = s.JimmSuite.JIMM.Database.AddGroup(context.Background(), group2)
 	c.Assert(err, gc.IsNil)
 
 	for i, tc := range tests {
@@ -94,7 +95,7 @@ func (s *relationSuite) TestAddRelationSuperuser(c *gc.C) {
 			c.Assert(strings.Contains(err.Error(), tc.message), gc.Equals, true)
 		} else {
 			c.Assert(err, gc.IsNil)
-			tuples, ct, err := s.jimmSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), openfga.Tuple{}, 50, "")
+			tuples, ct, err := s.JimmSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), openfga.Tuple{}, 50, "")
 			c.Assert(err, gc.IsNil)
 			c.Assert(ct, gc.Equals, "")
 			// NOTE: this is a bad test because it relies on the number of related objects. So all the
@@ -108,7 +109,7 @@ func (s *relationSuite) TestAddRelationSuperuser(c *gc.C) {
 
 func (s *relationSuite) TestMissingParamsAddRelationSuperuser(c *gc.C) {
 	// alice is superuser
-	bClient := s.userBakeryClient("alice")
+	bClient := s.UserBakeryClient("alice")
 
 	_, err := cmdtesting.RunCommand(c, cmd.NewAddRelationCommandForTesting(s.ClientStore(), bClient), "foo", "bar")
 	c.Assert(err, gc.ErrorMatches, "target object not specified")
@@ -121,7 +122,7 @@ func (s *relationSuite) TestMissingParamsAddRelationSuperuser(c *gc.C) {
 
 func (s *relationSuite) TestAddRelationViaFileSuperuser(c *gc.C) {
 	// alice is superuser
-	bClient := s.userBakeryClient("alice")
+	bClient := s.UserBakeryClient("alice")
 	group1 := "testGroup1"
 	group2 := "testGroup2"
 	group3 := "testGroup3"
@@ -143,21 +144,21 @@ func (s *relationSuite) TestAddRelationViaFileSuperuser(c *gc.C) {
 	_, err = cmdtesting.RunCommand(c, cmd.NewAddRelationCommandForTesting(s.ClientStore(), bClient), "-f", file.Name())
 	c.Assert(err, gc.IsNil)
 
-	tuples, ct, err := s.jimmSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), openfga.Tuple{}, 50, "")
+	tuples, ct, err := s.JimmSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), openfga.Tuple{}, 50, "")
 	c.Assert(err, gc.IsNil)
 	c.Assert(ct, gc.Equals, "")
 	c.Assert(len(tuples), gc.Equals, 4)
 }
 
 func (s *relationSuite) TestAddRelationRejectsUnauthorisedUsers(c *gc.C) {
-	bClient := s.userBakeryClient("bob")
+	bClient := s.UserBakeryClient("bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewAddRelationCommandForTesting(s.ClientStore(), bClient), "test-group1", "member", "test-group2")
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
 
 func (s *relationSuite) TestRemoveRelationSuperuser(c *gc.C) {
 	// alice is superuser
-	bClient := s.userBakeryClient("alice")
+	bClient := s.UserBakeryClient("alice")
 	group1 := "testGroup1"
 	group2 := "testGroup2"
 	type tuple struct {
@@ -175,9 +176,9 @@ func (s *relationSuite) TestRemoveRelationSuperuser(c *gc.C) {
 	}
 
 	//Create groups and relation
-	err := s.jimmSuite.JIMM.Database.AddGroup(context.Background(), group1)
+	err := s.JimmSuite.JIMM.Database.AddGroup(context.Background(), group1)
 	c.Assert(err, gc.IsNil)
-	err = s.jimmSuite.JIMM.Database.AddGroup(context.Background(), group2)
+	err = s.JimmSuite.JIMM.Database.AddGroup(context.Background(), group2)
 	c.Assert(err, gc.IsNil)
 	totalKeys := 2
 	for _, tc := range tests {
@@ -193,7 +194,7 @@ func (s *relationSuite) TestRemoveRelationSuperuser(c *gc.C) {
 			c.Assert(err, gc.ErrorMatches, tc.message)
 		} else {
 			c.Assert(err, gc.IsNil)
-			tuples, ct, err := s.jimmSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), openfga.Tuple{}, 50, "")
+			tuples, ct, err := s.JimmSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), openfga.Tuple{}, 50, "")
 			c.Assert(err, gc.IsNil)
 			c.Assert(ct, gc.Equals, "")
 			totalKeys--
@@ -203,7 +204,7 @@ func (s *relationSuite) TestRemoveRelationSuperuser(c *gc.C) {
 }
 
 func (s *relationSuite) TestRemoveRelationViaFileSuperuser(c *gc.C) {
-	bClient := s.userBakeryClient("alice")
+	bClient := s.UserBakeryClient("alice")
 	group1 := "testGroup1"
 	group2 := "testGroup2"
 	group3 := "testGroup3"
@@ -228,7 +229,7 @@ func (s *relationSuite) TestRemoveRelationViaFileSuperuser(c *gc.C) {
 	_, err = cmdtesting.RunCommand(c, cmd.NewRemoveRelationCommandForTesting(s.ClientStore(), bClient), "-f", file.Name())
 	c.Assert(err, gc.IsNil)
 
-	tuples, ct, err := s.jimmSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), openfga.Tuple{}, 50, "")
+	tuples, ct, err := s.JimmSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), openfga.Tuple{}, 50, "")
 	c.Assert(err, gc.IsNil)
 	c.Assert(ct, gc.Equals, "")
 	c.Logf("existing relations %v", tuples)
@@ -249,7 +250,7 @@ func (s *relationSuite) TestRemoveRelationViaFileSuperuser(c *gc.C) {
 
 func (s *relationSuite) TestRemoveRelation(c *gc.C) {
 	// bob is not superuser
-	bClient := s.userBakeryClient("bob")
+	bClient := s.UserBakeryClient("bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewRemoveRelationCommandForTesting(s.ClientStore(), bClient), "test-group1#member", "member", "test-group2")
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
@@ -344,7 +345,7 @@ func initializeEnvironment(c *gc.C, ctx context.Context, db *db.Database, u dbmo
 func (s *relationSuite) TestListRelations(c *gc.C) {
 	env := initializeEnvironment(c, context.Background(), &s.JIMM.Database, *s.AdminUser)
 	// alice is superuser
-	bClient := s.userBakeryClient("alice")
+	bClient := s.UserBakeryClient("alice")
 
 	groups := []string{"group-1", "group-2", "group-3"}
 	for _, group := range groups {
@@ -437,7 +438,7 @@ user-eve@external   	administrator	applicationoffer-test-controller-1:alice@exte
 // TODO: remove boilerplate of env setup and use initialiseEnvironment
 func (s *relationSuite) TestCheckRelationViaSuperuser(c *gc.C) {
 	ctx := context.TODO()
-	bClient := s.userBakeryClient("alice")
+	bClient := s.UserBakeryClient("alice")
 	ofgaClient := s.JIMM.OpenFGAClient
 
 	// Add some resources to check against
@@ -612,7 +613,7 @@ func (s *relationSuite) TestCheckRelationViaSuperuser(c *gc.C) {
 
 func (s *relationSuite) TestCheckRelation(c *gc.C) {
 	// bob is not superuser
-	bClient := s.userBakeryClient("bob")
+	bClient := s.UserBakeryClient("bob")
 	_, err := cmdtesting.RunCommand(
 		c,
 		cmd.NewCheckRelationCommandForTesting(s.ClientStore(), bClient),

@@ -7,6 +7,7 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/cmd/jimmctl/cmd"
+	"github.com/canonical/jimm/internal/cmdtest"
 	"github.com/canonical/jimm/internal/jimmtest"
 )
 
@@ -67,7 +68,7 @@ var (
 )
 
 type listControllersSuite struct {
-	jimmSuite
+	cmdtest.JimmSuite
 }
 
 var _ = gc.Suite(&listControllersSuite{})
@@ -76,7 +77,7 @@ func (s *listControllersSuite) TestListControllersSuperuser(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
 
 	// alice is superuser
-	bClient := s.userBakeryClient("alice")
+	bClient := s.UserBakeryClient("alice")
 	context, err := cmdtesting.RunCommand(c, cmd.NewListControllersCommandForTesting(s.ClientStore(), bClient))
 	c.Assert(err, gc.IsNil)
 	c.Assert(cmdtesting.Stdout(context), gc.Matches, expectedSuperuserOutput)
@@ -86,7 +87,7 @@ func (s *listControllersSuite) TestListControllers(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
 
 	// bob is not superuser
-	bClient := s.userBakeryClient("bob")
+	bClient := s.UserBakeryClient("bob")
 	context, err := cmdtesting.RunCommand(c, cmd.NewListControllersCommandForTesting(s.ClientStore(), bClient))
 	c.Assert(err, gc.IsNil)
 	c.Assert(cmdtesting.Stdout(context), gc.Matches, expectedOutput)

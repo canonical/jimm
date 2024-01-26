@@ -11,11 +11,12 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/cmd/jimmctl/cmd"
+	"github.com/canonical/jimm/internal/cmdtest"
 	"github.com/canonical/jimm/internal/dbmodel"
 )
 
 type importCloudCredentialsSuite struct {
-	jimmSuite
+	cmdtest.JimmSuite
 }
 
 var _ = gc.Suite(&importCloudCredentialsSuite{})
@@ -62,7 +63,7 @@ func (s *importCloudCredentialsSuite) TestImportCloudCredentials(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	// alice is superuser
-	bClient := s.userBakeryClient("alice")
+	bClient := s.UserBakeryClient("alice")
 	_, err = cmdtesting.RunCommand(c, cmd.NewImportCloudCredentialsCommandForTesting(s.ClientStore(), bClient), tmpfile)
 	c.Assert(err, gc.IsNil)
 

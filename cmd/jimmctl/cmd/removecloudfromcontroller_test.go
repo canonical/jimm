@@ -9,10 +9,11 @@ import (
 
 	apiparams "github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/cmd/jimmctl/cmd"
+	"github.com/canonical/jimm/internal/cmdtest"
 )
 
 type removeCloudFromControllerSuite struct {
-	jimmSuite
+	cmdtest.JimmSuite
 
 	api *fakeRemoveCloudFromControllerAPI
 }
@@ -20,12 +21,12 @@ type removeCloudFromControllerSuite struct {
 var _ = gc.Suite(&removeCloudFromControllerSuite{})
 
 func (s *removeCloudFromControllerSuite) SetUpTest(c *gc.C) {
-	s.jimmSuite.SetUpTest(c)
+	s.JimmSuite.SetUpTest(c)
 	s.api = &fakeRemoveCloudFromControllerAPI{}
 }
 
 func (s *removeCloudFromControllerSuite) TestRemoveCloudFromController(c *gc.C) {
-	bClient := s.userBakeryClient("alice@external")
+	bClient := s.UserBakeryClient("alice@external")
 
 	command := cmd.NewRemoveCloudFromControllerCommandForTesting(
 		s.ClientStore(),
@@ -47,7 +48,7 @@ func (s *removeCloudFromControllerSuite) TestRemoveCloudFromController(c *gc.C) 
 }
 
 func (s *removeCloudFromControllerSuite) TestRemoveCloudFromControllerWrongArguments(c *gc.C) {
-	bClient := s.userBakeryClient("alice@external")
+	bClient := s.UserBakeryClient("alice@external")
 
 	command := cmd.NewRemoveCloudFromControllerCommandForTesting(
 		s.ClientStore(),
@@ -62,7 +63,7 @@ func (s *removeCloudFromControllerSuite) TestRemoveCloudFromControllerWrongArgum
 }
 
 func (s *removeCloudFromControllerSuite) TestRemoveCloudFromControllerCloudNotFound(c *gc.C) {
-	bClient := s.userBakeryClient("alice@external")
+	bClient := s.UserBakeryClient("alice@external")
 
 	command := cmd.NewRemoveCloudFromControllerCommandForTesting(
 		s.ClientStore(),

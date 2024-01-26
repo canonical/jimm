@@ -17,6 +17,11 @@ import (
 // and then adds a relation between the logged in user and the service account.
 func (j *JIMM) AddServiceAccount(ctx context.Context, u *openfga.User, clientId string) error {
 	op := errors.Op("jimm.AddServiceAccount")
+
+	if !jimmnames.IsValidServiceAccountId(clientId) {
+		return errors.E(op, errors.CodeBadRequest, "invalid client ID")
+	}
+
 	svcTag := jimmnames.NewServiceAccountTag(clientId)
 	key := openfga.Tuple{
 		Relation: ofganames.AdministratorRelation,

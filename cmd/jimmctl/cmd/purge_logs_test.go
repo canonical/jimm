@@ -5,22 +5,24 @@ import (
 	"context"
 	"time"
 
-	"github.com/canonical/jimm/cmd/jimmctl/cmd"
-	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/juju/cmd/v3/cmdtesting"
 	"github.com/juju/names/v4"
 	gc "gopkg.in/check.v1"
+
+	"github.com/canonical/jimm/cmd/jimmctl/cmd"
+	"github.com/canonical/jimm/internal/cmdtest"
+	"github.com/canonical/jimm/internal/dbmodel"
 )
 
 type purgeLogsSuite struct {
-	jimmSuite
+	cmdtest.JimmSuite
 }
 
 var _ = gc.Suite(&purgeLogsSuite{})
 
 func (s *purgeLogsSuite) TestPurgeLogsSuperuser(c *gc.C) {
 	// alice is superuser
-	bClient := s.userBakeryClient("alice")
+	bClient := s.UserBakeryClient("alice")
 	datastring := "2021-01-01T00:00:00Z"
 	cmdCtx, err := cmdtesting.RunCommand(c, cmd.NewPurgeLogsCommandForTesting(s.ClientStore(), bClient), datastring)
 	c.Assert(err, gc.IsNil)
@@ -31,7 +33,7 @@ func (s *purgeLogsSuite) TestPurgeLogsSuperuser(c *gc.C) {
 
 func (s *purgeLogsSuite) TestInvalidISO8601Date(c *gc.C) {
 	// alice is superuser
-	bClient := s.userBakeryClient("alice")
+	bClient := s.UserBakeryClient("alice")
 	datastring := "13/01/2021"
 	_, err := cmdtesting.RunCommand(c, cmd.NewPurgeLogsCommandForTesting(s.ClientStore(), bClient), datastring)
 	c.Assert(err, gc.ErrorMatches, `invalid date. Expected ISO8601 date`)
@@ -40,7 +42,7 @@ func (s *purgeLogsSuite) TestInvalidISO8601Date(c *gc.C) {
 
 func (s *purgeLogsSuite) TestPurgeLogs(c *gc.C) {
 	// bob is not superuser
-	bClient := s.userBakeryClient("bob")
+	bClient := s.UserBakeryClient("bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewPurgeLogsCommandForTesting(s.ClientStore(), bClient), "2021-01-01T00:00:00Z")
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
@@ -82,7 +84,7 @@ func (s *purgeLogsSuite) TestPurgeLogsFromDb(c *gc.C) {
 
 		tomorrow := relativeNow.AddDate(0, 0, 1).Format(layout)
 		//alice is superuser
-		bClient := s.userBakeryClient("alice")
+		bClient := s.UserBakeryClient("alice")
 		cmdCtx, err := cmdtesting.RunCommand(c, cmd.NewPurgeLogsCommandForTesting(s.ClientStore(), bClient), tomorrow)
 		c.Assert(err, gc.IsNil)
 		// check that logs have been deleted

@@ -7,11 +7,12 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/cmd/jimmctl/cmd"
+	"github.com/canonical/jimm/internal/cmdtest"
 	"github.com/canonical/jimm/internal/jimmtest"
 )
 
 type setControllerDeprecatedSuite struct {
-	jimmSuite
+	cmdtest.JimmSuite
 }
 
 var _ = gc.Suite(&setControllerDeprecatedSuite{})
@@ -20,7 +21,7 @@ func (s *setControllerDeprecatedSuite) TestSetControllerDeprecatedSuperuser(c *g
 	s.AddController(c, "controller-1", s.APIInfo(c))
 
 	// alice is superuser
-	bClient := s.userBakeryClient("alice")
+	bClient := s.UserBakeryClient("alice")
 	context, err := cmdtesting.RunCommand(c, cmd.NewSetControllerDeprecatedCommandForTesting(s.ClientStore(), bClient), "controller-1")
 	c.Assert(err, gc.IsNil)
 	c.Assert(cmdtesting.Stdout(context), gc.Matches, `name: controller-1
@@ -69,7 +70,7 @@ func (s *setControllerDeprecatedSuite) TestSetControllerDeprecated(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
 
 	// bob is not superuser
-	bClient := s.userBakeryClient("bob")
+	bClient := s.UserBakeryClient("bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewSetControllerDeprecatedCommandForTesting(s.ClientStore(), bClient), "controller-1")
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }

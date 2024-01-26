@@ -1,6 +1,8 @@
 // Copyright 2021 Canonical Ltd.
 
-package cmd_test
+// Package cmdtest provides the test suite used for CLI tests
+// as well as helper functions used for integration based CLI tests.
+package cmdtest
 
 import (
 	"bytes"
@@ -32,7 +34,7 @@ import (
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 )
 
-type jimmSuite struct {
+type JimmSuite struct {
 	jimmtest.CandidSuite
 	corejujutesting.JujuConnSuite
 
@@ -49,7 +51,7 @@ type jimmSuite struct {
 	COFGAParams *cofga.OpenFGAParams
 }
 
-func (s *jimmSuite) SetUpTest(c *gc.C) {
+func (s *JimmSuite) SetUpTest(c *gc.C) {
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
 
@@ -140,7 +142,7 @@ func (s *jimmSuite) SetUpTest(c *gc.C) {
 // commands that use NewAPIRootWithDialOpts. Each invocation of the NewAPIRootWithDialOpts function
 // updates the ClientStore and removes local IPs thus removing JIMM's IP.
 // Call this function in your table tests after each test run.
-func (s *jimmSuite) RefreshControllerAddress(c *gc.C) {
+func (s *JimmSuite) RefreshControllerAddress(c *gc.C) {
 	jimm, ok := s.ClientStore().Controllers["JIMM"]
 	c.Assert(ok, gc.Equals, true)
 	u, err := url.Parse(s.HTTP.URL)
@@ -149,7 +151,7 @@ func (s *jimmSuite) RefreshControllerAddress(c *gc.C) {
 	s.ClientStore().Controllers["JIMM"] = jimm
 }
 
-func (s *jimmSuite) TearDownTest(c *gc.C) {
+func (s *JimmSuite) TearDownTest(c *gc.C) {
 	if s.cancel != nil {
 		s.cancel()
 	}
@@ -163,7 +165,7 @@ func (s *jimmSuite) TearDownTest(c *gc.C) {
 	s.JujuConnSuite.TearDownTest(c)
 }
 
-func (s *jimmSuite) userBakeryClient(username string) *httpbakery.Client {
+func (s *JimmSuite) UserBakeryClient(username string) *httpbakery.Client {
 	s.Candid.AddUser(username)
 	key := s.Candid.UserPublicKey(username)
 	bClient := httpbakery.NewClient()
@@ -181,7 +183,7 @@ func (s *jimmSuite) userBakeryClient(username string) *httpbakery.Client {
 	return bClient
 }
 
-func (s *jimmSuite) AddController(c *gc.C, name string, info *api.Info) {
+func (s *JimmSuite) AddController(c *gc.C, name string, info *api.Info) {
 	ctl := &dbmodel.Controller{
 		UUID:              info.ControllerUUID,
 		Name:              name,
@@ -205,7 +207,7 @@ func (s *jimmSuite) AddController(c *gc.C, name string, info *api.Info) {
 	c.Assert(err, gc.Equals, nil)
 }
 
-func (s *jimmSuite) UpdateCloudCredential(c *gc.C, tag names.CloudCredentialTag, cred jujuparams.CloudCredential) {
+func (s *JimmSuite) UpdateCloudCredential(c *gc.C, tag names.CloudCredentialTag, cred jujuparams.CloudCredential) {
 	ctx := context.Background()
 	u := dbmodel.Identity{
 		Name: tag.Owner().Id(),
@@ -221,7 +223,7 @@ func (s *jimmSuite) UpdateCloudCredential(c *gc.C, tag names.CloudCredentialTag,
 	c.Assert(err, gc.Equals, nil)
 }
 
-func (s *jimmSuite) AddModel(c *gc.C, owner names.UserTag, name string, cloud names.CloudTag, region string, cred names.CloudCredentialTag) names.ModelTag {
+func (s *JimmSuite) AddModel(c *gc.C, owner names.UserTag, name string, cloud names.CloudTag, region string, cred names.CloudCredentialTag) names.ModelTag {
 	ctx := context.Background()
 	u := openfga.NewUser(
 		&dbmodel.Identity{
