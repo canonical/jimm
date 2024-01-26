@@ -46,7 +46,6 @@ func TestAuthenticate(t *testing.T) {
 		Authenticator: &auth,
 		OpenFGAClient: client,
 	}
-	j.ConfigMaxConn()
 	ctx := context.Background()
 
 	err = j.Database.Migrate(ctx, false)

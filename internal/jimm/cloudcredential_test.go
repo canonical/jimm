@@ -781,7 +781,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 			jimm_db := db.Database{
 				DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 			}
-			river, err := jimm.NewRiver(nil, jimmtest.GetDSN(), ctx, client, jimm_db)
+			river := jimmtest.NewRiver(c, client, jimm_db)
 			j := &jimm.JIMM{
 				UUID:     uuid.NewString(),
 				Database: jimm_db,
@@ -791,8 +791,6 @@ func TestUpdateCloudCredential(t *testing.T) {
 				OpenFGAClient: client,
 				River:         river,
 			}
-			j.ConfigMaxConn()
-			defer j.Cleanup(ctx)
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 
@@ -848,8 +846,6 @@ users:
 		},
 		OpenFGAClient: client,
 	}
-	j.ConfigMaxConn()
-	defer j.Cleanup(ctx)
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
@@ -1248,7 +1244,7 @@ func TestRevokeCloudCredential(t *testing.T) {
 			jimm_db := db.Database{
 				DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 			}
-			river, err := jimm.NewRiver(nil, jimmtest.GetDSN(), ctx, client, jimm_db)
+			river := jimmtest.NewRiver(c, client, jimm_db)
 			c.Assert(err, qt.IsNil)
 			j := &jimm.JIMM{
 				UUID:     uuid.NewString(),
@@ -1259,8 +1255,6 @@ func TestRevokeCloudCredential(t *testing.T) {
 				OpenFGAClient: client,
 				River:         river,
 			}
-			j.ConfigMaxConn()
-			defer j.Cleanup(ctx)
 
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
@@ -1392,8 +1386,6 @@ func TestGetCloudCredential(t *testing.T) {
 				OpenFGAClient: client,
 			}
 			ctx := context.Background()
-			j.ConfigMaxConn()
-			defer j.Cleanup(ctx)
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 
@@ -1503,8 +1495,6 @@ func TestForEachUserCloudCredential(t *testing.T) {
 				},
 				OpenFGAClient: client,
 			}
-			j.ConfigMaxConn()
-			defer j.Cleanup(ctx)
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
@@ -1629,8 +1619,6 @@ func TestGetCloudCredentialAttributes(t *testing.T) {
 				},
 				OpenFGAClient: client,
 			}
-			j.ConfigMaxConn()
-			defer j.Cleanup(ctx)
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
@@ -1677,8 +1665,6 @@ func TestCloudCredentialAttributeStore(t *testing.T) {
 		},
 		CredentialStore: attrStore,
 	}
-	j.ConfigMaxConn()
-	defer j.Cleanup(ctx)
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 

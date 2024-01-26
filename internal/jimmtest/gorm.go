@@ -108,10 +108,9 @@ func PostgresDB(t Tester, nowFunc func() time.Time) *gorm.DB {
 		t.Fatalf("template database does not exist")
 	}
 
-	suggestedName := "jimm_test_" + t.Name()
-	_, dsn, err := createDatabaseFromTemplate(suggestedName, templateDatabaseName)
+	_, dsn, err := createDatabaseFromTemplate(t.Name(), templateDatabaseName)
 	if err != nil {
-		t.Fatalf("error creating database (%s): %s", suggestedName, err)
+		t.Fatalf("error creating database (test %s): %s", t.Name(), err)
 	}
 
 	gdb, err := gorm.Open(postgres.Open(dsn), &cfg)
@@ -151,12 +150,13 @@ const maxDatabaseNameLength = 63
 // method truncates longer names and also appends a hash at the end of it to make
 // sure no name collisions occur and also future calls with the same suggested
 // database name results in the same safe name.
-func computeSafeDatabaseName(suggestedName string) string {
+func computeSafeDatabaseName(testName string) string {
+	testName = "jimm_test_" + testName
 	re, _ := regexp.Compile(unsafeCharsPattern)
-	safeName := re.ReplaceAllString(suggestedName, "_")
+	safeName := re.ReplaceAllString(testName, "_")
 
 	hasher := sha1.New()
-	hasher.Write([]byte(suggestedName))
+	hasher.Write([]byte(testName))
 	sha := base64.URLEncoding.EncodeToString(hasher.Sum(nil))
 
 	// Note that when using `base64.URLEncoding` the result may include a hyphen (-)
@@ -182,18 +182,10 @@ var createDatabaseMutex = sync.Mutex{}
 // and returns the created database name (which may be different than the
 // requested name due to sanitization) and DSN.
 // If the database was already exist, it'll be dropped and re-created.
-func createDatabaseFromTemplate(suggestedName string, templateName string) (string, string, error) {
-	databaseName := computeSafeDatabaseName(suggestedName)
+func createDatabaseFromTemplate(testName string, templateName string) (string, string, error) {
+	databaseName := computeSafeDatabaseName(testName)
 
-	dsn := defaultDSN
-	if envTestDSN, exists := os.LookupEnv("JIMM_TEST_PGXDSN"); exists {
-		dsn = envTestDSN
-	}
-
-	u, err := url.Parse(dsn)
-	if err != nil {
-		return "", "", errors.E("error parsing DSN as a URI: %s", err)
-	}
+	dsn := GetDSN()
 
 	createDatabaseMutex.Lock()
 	defer createDatabaseMutex.Unlock()
@@ -221,16 +213,38 @@ func createDatabaseFromTemplate(suggestedName string, templateName string) (stri
 		return "", "", errors.E(err, "failed to close database connection")
 	}
 
+	newDSN, err := createDSNToTemplateDatabase(databaseName)
+	if err != nil {
+		return "", "", errors.E(err, "failed to create new DSN")
+	}
+	return databaseName, newDSN, nil
+}
+
+func createDSNToTemplateDatabase(databaseName string) (string, error) {
+	dsn := GetDSN()
+	u, err := url.Parse(dsn)
+	if err != nil {
+		return "", errors.E("error parsing DSN as a URI: %s", err)
+	}
 	u.Path = databaseName
-	return databaseName, u.String(), nil
+	return u.String(), nil
+}
+
+func getTestDBName(t Tester) string {
+	dbName := computeSafeDatabaseName(t.Name())
+	dsn, err := createDSNToTemplateDatabase(dbName)
+	if err != nil {
+		t.Fatalf("failed to get DSN to test DB")
+	}
+	return dsn
 }
 
 // createDatabase creates an empty Postgres database and returns the created
 // database name (which may be different than the requested name due to
 // sanitization) and DSN.
 // If the database was already exist, it'll be dropped and re-created.
-func createEmptyDatabase(suggestedName string) (string, string, error) {
-	databaseName := computeSafeDatabaseName(suggestedName)
+func createEmptyDatabase(testName string) (string, string, error) {
+	databaseName := computeSafeDatabaseName(testName)
 
 	dsn := defaultDSN
 	if envTestDSN, exists := os.LookupEnv("JIMM_TEST_PGXDSN"); exists {
@@ -326,7 +340,7 @@ func getOrCreateTemplateDatabase() (string, string, error) {
 
 // CreateEmptyDatabase creates an empty Postgres database and returns the DSN.
 func CreateEmptyDatabase(t Tester) string {
-	_, dsn, err := createEmptyDatabase("jimm_test_" + t.Name())
+	_, dsn, err := createEmptyDatabase(t.Name())
 	if err != nil {
 		t.Fatalf("error creating empty database: %s", err)
 	}

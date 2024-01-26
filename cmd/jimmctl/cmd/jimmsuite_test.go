@@ -87,7 +87,6 @@ func (s *jimmSuite) SetUpTest(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	s.Service = srv
 	s.JIMM = srv.JIMM()
-	s.JIMM.ConfigMaxConn()
 	s.HTTP.Config = &http.Server{Handler: srv}
 
 	err = s.Service.StartJWKSRotator(ctx, time.NewTicker(time.Hour).C, time.Now().UTC().AddDate(0, 3, 0))
@@ -159,6 +158,9 @@ func (s *jimmSuite) TearDownTest(c *gc.C) {
 	}
 	if err := s.JIMM.Database.Close(); err != nil {
 		c.Logf("failed to close database connections at tear down: %s", err)
+	}
+	if err := s.JIMM.River.Cleanup(context.Background()); err != nil {
+		c.Logf("failed to cleanup river client: %s", err)
 	}
 	s.CandidSuite.TearDownTest(c)
 	s.JujuConnSuite.TearDownTest(c)

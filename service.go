@@ -257,9 +257,6 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
-	dbConfig, _ := s.jimm.Database.DB.DB()
-	dbConfig.SetMaxOpenConns(0)
-	dbConfig.SetMaxIdleConns(0)
 
 	if err := s.jimm.Database.Migrate(ctx, false); err != nil {
 		return nil, errors.E(op, err)
@@ -321,8 +318,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		s.jimm.Dialer = jimm.CacheDialer(s.jimm.Dialer)
 	}
 
-	s.jimm.River, err = jimm.NewRiver(nil, p.DSN, ctx, s.jimm.OpenFGAClient, s.jimm.Database)
-
+	s.jimm.River, err = jimm.NewRiver(ctx, nil, p.DSN, s.jimm.OpenFGAClient, s.jimm.Database)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}

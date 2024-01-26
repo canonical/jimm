@@ -364,8 +364,6 @@ func TestRevokeOfferAccess(t *testing.T) {
 					API: &jimmtest.API{},
 				},
 			}
-			j.ConfigMaxConn()
-			defer j.Cleanup(ctx)
 
 			if test.setup != nil {
 				test.setup(environment, client)
@@ -536,8 +534,6 @@ func TestGrantOfferAccess(t *testing.T) {
 					API: &jimmtest.API{},
 				},
 			}
-			j.ConfigMaxConn()
-			defer j.Cleanup(ctx)
 
 			err = j.GrantOfferAccess(ctx, openfga.NewUser(&authenticatedUser, client), offerURL, offerUser.ResourceTag(), grantAccessLevel)
 			if test.expectedError == "" {
@@ -724,8 +720,6 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 			},
 		},
 	}
-	j.ConfigMaxConn()
-	defer j.Cleanup(ctx)
 	tests := []struct {
 		about                string
 		user                 *dbmodel.User
@@ -943,8 +937,6 @@ func TestGetApplicationOffer(t *testing.T) {
 			},
 		},
 	}
-	j.ConfigMaxConn()
-	defer j.Cleanup(ctx)
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
@@ -1862,8 +1854,6 @@ func TestOffer(t *testing.T) {
 			}
 
 			ctx := context.Background()
-			j.ConfigMaxConn()
-			defer j.Cleanup(ctx)
 
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
@@ -2073,8 +2063,6 @@ func TestOfferAssertOpenFGARelationsExist(t *testing.T) {
 		},
 		OpenFGAClient: client,
 	}
-	j.ConfigMaxConn()
-	defer j.Cleanup(ctx)
 
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
@@ -2281,8 +2269,6 @@ func TestDestroyOffer(t *testing.T) {
 				},
 				OpenFGAClient: client,
 			}
-			j.ConfigMaxConn()
-			defer j.Cleanup(ctx)
 
 			if test.destroyError != "" {
 				select {
@@ -2443,8 +2429,6 @@ func TestUpdateOffer(t *testing.T) {
 				},
 			}
 
-			j.ConfigMaxConn()
-			defer j.Cleanup(ctx)
 			err = j.UpdateApplicationOffer(ctx, &environment.controllers[0], offerUUID, removed)
 			if test.expectedError == "" {
 				c.Assert(err, qt.IsNil)
@@ -2575,8 +2559,6 @@ func TestFindApplicationOffers(t *testing.T) {
 				},
 				OpenFGAClient: client,
 			}
-			j.ConfigMaxConn()
-			defer j.Cleanup(ctx)
 
 			offers, err := j.FindApplicationOffers(ctx, openfga.NewUser(&user, client), filters...)
 			if test.expectedError == "" {
@@ -2872,8 +2854,6 @@ func TestListApplicationOffers(t *testing.T) {
 			},
 		},
 	}
-	j.ConfigMaxConn()
-	defer j.Cleanup(ctx)
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), db, client)
 	tuples := []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),

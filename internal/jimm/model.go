@@ -16,6 +16,7 @@ import (
 	"github.com/juju/zaputil"
 	"github.com/juju/zaputil/zapctx"
 	"github.com/riverqueue/river"
+	"github.com/riverqueue/river/rivertype"
 	"go.uber.org/zap"
 
 	"github.com/canonical/jimm/internal/constants"
@@ -621,34 +622,34 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 		OwnerName:      builder.owner.Username,
 		ModelInfoUUID:  mi.UUID,
 	}
-	_, err = j.River.Client.Insert(ctx, openfgaRiverJobArgs, &river.InsertOpts{MaxAttempts: 10})
-	if err != nil {
-		zapctx.Error(ctx, "Failed to insert river job!", zaputil.Error(err))
-		// trying without river just in case.
-		if err := j.OpenFGAClient.AddControllerModel(
-			ctx,
-			builder.controller.ResourceTag(),
-			builder.model.ResourceTag(),
-		); err != nil {
-			zapctx.Error(
-				ctx,
-				"failed to add controller-model relation",
-				zap.String("controller", builder.controller.UUID),
-				zap.String("model", builder.model.UUID.String),
-			)
-		}
-		err = openfga.NewUser(owner, j.OpenFGAClient).SetModelAccess(ctx, names.NewModelTag(mi.UUID), ofganames.AdministratorRelation)
-		if err != nil {
-			zapctx.Error(
-				ctx,
-				"failed to add administrator relation",
-				zap.String("user", owner.Tag().String()),
-				zap.String("model", builder.model.UUID.String),
-			)
-		}
-	}
+	insertAndWait(ctx, j.River, func() (*rivertype.JobRow, error) {
+		return j.River.Client.Insert(ctx, openfgaRiverJobArgs, &river.InsertOpts{MaxAttempts: 1})
+	})
 
 	return mi, nil
+}
+
+func insertAndWait(ctx context.Context, r *River, insertFunc func() (*rivertype.JobRow, error)) error {
+	const wait = true
+	var results <-chan *river.Event
+	var cancelChannelFunc func()
+	if wait {
+		results, cancelChannelFunc = r.Client.Subscribe(river.EventKindJobCompleted, river.EventKindJobFailed)
+		defer cancelChannelFunc()
+	}
+	row, err := insertFunc()
+	if err != nil {
+		zapctx.Error(ctx, "failed to insert river job", zaputil.Error(err))
+		return errors.E(err)
+	}
+	if wait {
+		for item := range results {
+			if item.Job.ID == row.ID {
+				break
+			}
+		}
+	}
+	return nil
 }
 
 // ModelInfo returns the model info for the model with the given ModelTag.

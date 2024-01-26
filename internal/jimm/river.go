@@ -4,7 +4,6 @@ package jimm
 
 import (
 	"context"
-	"log/slog"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -42,34 +41,25 @@ type OpenFGAWorker struct {
 
 // Work is tha function executed by the worker when it picks up the job.
 func (w *OpenFGAWorker) Work(ctx context.Context, job *river.Job[OpenFGAArgs]) error {
-	controller := &dbmodel.Controller{UUID: job.Args.ControllerUUID}
-	err := w.Database.GetController(ctx, controller)
-	if err != nil {
-		return err
-	}
-
-	model := &dbmodel.Model{ID: job.Args.ModelId}
-	err = w.Database.GetModel(ctx, model)
-	if err != nil {
-		return err
-	}
+	controllerTag := names.NewControllerTag(job.Args.ControllerUUID)
+	modelTag := names.NewModelTag(job.Args.ModelInfoUUID)
 
 	owner := &dbmodel.User{Username: job.Args.OwnerName}
-	err = w.Database.GetUser(ctx, owner)
+	err := w.Database.GetUser(ctx, owner)
 	if err != nil {
 		return err
 	}
 
 	if err := w.OfgaClient.AddControllerModel(
 		ctx,
-		controller.ResourceTag(),
-		model.ResourceTag(),
+		controllerTag,
+		modelTag,
 	); err != nil {
 		zapctx.Error(
 			ctx,
 			"failed to add controller-model relation",
-			zap.String("controller", controller.UUID),
-			zap.String("model", model.UUID.String),
+			zap.String("controller", controllerTag.Id()),
+			zap.String("model", modelTag.Id()),
 		)
 		return err
 	}
@@ -79,7 +69,7 @@ func (w *OpenFGAWorker) Work(ctx context.Context, job *river.Job[OpenFGAArgs]) e
 			ctx,
 			"failed to add administrator relation",
 			zap.String("user", owner.Tag().String()),
-			zap.String("model", model.UUID.String),
+			zap.String("model", modelTag.Id()),
 		)
 		return err
 	}
@@ -101,9 +91,13 @@ type River struct {
 }
 
 func (r *River) Cleanup(ctx context.Context) error {
-	r.dbPool.Close()
-	err := r.Client.Stop(ctx)
-	return err
+	defer r.dbPool.Close()
+	return r.Client.Stop(ctx)
+}
+
+func (r *River) ForceCleanup(ctx context.Context) error {
+	defer r.dbPool.Close()
+	return r.Client.StopAndCancel(ctx)
 }
 
 func (r *River) doMigration(ctx context.Context) error {
@@ -130,8 +124,8 @@ func (r *River) doMigration(ctx context.Context) error {
 }
 
 // NewRiver would return a new river instance, and it would apply the needed migrations to the database,
-// and open a postgres connections pool that would be opened in the Cleanup routine.
-func NewRiver(config *river.Config, db_url string, ctx context.Context, ofgaConn *openfga.OFGAClient, db db.Database) (*River, error) {
+// and open a postgres connections pool that would be closed in the Cleanup routine.
+func NewRiver(ctx context.Context, config *river.Config, db_url string, ofgaConn *openfga.OFGAClient, db db.Database) (*River, error) {
 	if config == nil {
 		workers, err := RegisterJimmWorkers(ctx, ofgaConn, db)
 		if err != nil {
@@ -142,7 +136,7 @@ func NewRiver(config *river.Config, db_url string, ctx context.Context, ofgaConn
 			Queues: map[string]river.QueueConfig{
 				river.QueueDefault: {MaxWorkers: 3},
 			},
-			Logger:  slog.Default(),
+			// Logger:  slog.Default(),
 			Workers: workers,
 		}
 	}

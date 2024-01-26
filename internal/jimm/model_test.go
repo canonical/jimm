@@ -905,8 +905,10 @@ func TestAddModel(t *testing.T) {
 			jimm_db := db.Database{
 				DB: jimmtest.PostgresDB(c, nil),
 			}
-			// the DSN can be obtained from the global env var, there is a function that can be reused to get this.
-			river, err := jimm.NewRiver(nil, jimmtest.GetDSN(), ctx, client, jimm_db)
+			err = jimm_db.Migrate(ctx, false)
+			c.Assert(err, qt.IsNil)
+
+			river := jimmtest.NewRiver(c, client, jimm_db)
 
 			j := &jimm.JIMM{
 				UUID:     uuid.NewString(),
@@ -917,9 +919,6 @@ func TestAddModel(t *testing.T) {
 				OpenFGAClient: client,
 				River:         river,
 			}
-			j.ConfigMaxConn()
-			err = j.Database.Migrate(ctx, false)
-			c.Assert(err, qt.IsNil)
 
 			env := jimmtest.ParseEnvironment(c, test.env)
 			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
@@ -963,7 +962,6 @@ func TestAddModel(t *testing.T) {
 			} else {
 				c.Assert(err, qt.ErrorMatches, test.expectError)
 			}
-			j.Cleanup(ctx)
 		})
 	}
 }
@@ -1296,7 +1294,6 @@ func TestModelInfo(t *testing.T) {
 					},
 				},
 			}
-			j.ConfigMaxConn()
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 
@@ -1318,7 +1315,6 @@ func TestModelInfo(t *testing.T) {
 				})
 				c.Check(mi, qt.CmpEquals(cmpopts.EquateEmpty()), test.expectModelInfo)
 			}
-			j.Cleanup(ctx)
 		})
 	}
 }
@@ -1439,8 +1435,6 @@ func TestModelStatus(t *testing.T) {
 				},
 				Dialer: dialer,
 			}
-			j.ConfigMaxConn()
-			defer j.Cleanup(ctx)
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 
@@ -1593,8 +1587,6 @@ func TestForEachUserModel(t *testing.T) {
 			API: &jimmtest.API{},
 		},
 	}
-	j.ConfigMaxConn()
-	defer j.Cleanup(ctx)
 
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
@@ -1735,8 +1727,6 @@ func TestForEachModel(t *testing.T) {
 			API: &jimmtest.API{},
 		},
 	}
-	j.ConfigMaxConn()
-	defer j.Cleanup(ctx)
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
@@ -2010,8 +2000,6 @@ func TestGrantModelAccess(t *testing.T) {
 				Dialer:        dialer,
 				OpenFGAClient: client,
 			}
-			j.ConfigMaxConn()
-			defer j.Cleanup(ctx)
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
@@ -2731,8 +2719,6 @@ func TestRevokeModelAccess(t *testing.T) {
 				Dialer:        dialer,
 				OpenFGAClient: client,
 			}
-			j.ConfigMaxConn()
-			defer j.Cleanup(ctx)
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
@@ -2919,8 +2905,6 @@ func TestDestroyModel(t *testing.T) {
 				},
 				Dialer: dialer,
 			}
-			j.ConfigMaxConn()
-			defer j.Cleanup(ctx)
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 
@@ -3046,7 +3030,6 @@ func TestDumpModel(t *testing.T) {
 				},
 				Dialer: dialer,
 			}
-			j.ConfigMaxConn()
 
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
@@ -3160,8 +3143,6 @@ func TestDumpModelDB(t *testing.T) {
 				},
 				Dialer: dialer,
 			}
-			j.ConfigMaxConn()
-			defer j.Cleanup(ctx)
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 
@@ -3280,8 +3261,6 @@ func TestValidateModelUpgrade(t *testing.T) {
 				},
 				Dialer: dialer,
 			}
-			j.ConfigMaxConn()
-			defer j.Cleanup(ctx)
 
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
@@ -3504,8 +3483,6 @@ func TestUpdateModelCredential(t *testing.T) {
 				},
 				Dialer: dialer,
 			}
-			j.ConfigMaxConn()
-			defer j.Cleanup(ctx)
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 
@@ -3569,22 +3546,23 @@ users:
 
 	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
+	jimm_db := db.Database{
+		DB: jimmtest.PostgresDB(c, nil),
+	}
+	ctx := context.Background()
+	err = jimm_db.Migrate(ctx, false)
+	c.Assert(err, qt.IsNil)
+	river := jimmtest.NewRiver(c, client, jimm_db)
 
 	j := &jimm.JIMM{
-		UUID:          uuid.NewString(),
-		OpenFGAClient: client,
-		Database: db.Database{
-			DB: jimmtest.PostgresDB(c, nil),
-		},
+		UUID:     uuid.NewString(),
+		Database: jimm_db,
 		Dialer: &jimmtest.Dialer{
 			API: api,
 		},
+		OpenFGAClient: client,
+		River:         river,
 	}
-	j.ConfigMaxConn()
-	ctx := context.Background()
-	defer j.Cleanup(ctx)
-	err = j.Database.Migrate(ctx, false)
-	c.Assert(err, qt.IsNil)
 
 	envDefinition := `
 clouds:

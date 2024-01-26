@@ -239,8 +239,6 @@ func TestSetCloudDefaults(t *testing.T) {
 					DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 				},
 			}
-			j.ConfigMaxConn()
-			defer j.Cleanup(ctx)
 			err := j.Database.Migrate(ctx, true)
 			c.Assert(err, qt.Equals, nil)
 
@@ -434,8 +432,6 @@ func TestUnsetCloudDefaults(t *testing.T) {
 					DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 				},
 			}
-			j.ConfigMaxConn()
-			defer j.Cleanup(ctx)
 			err := j.Database.Migrate(ctx, true)
 			c.Assert(err, qt.Equals, nil)
 
@@ -472,8 +468,6 @@ func TestModelDefaultsForCloud(t *testing.T) {
 			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 		},
 	}
-	j.ConfigMaxConn()
-	defer j.Cleanup(ctx)
 	err := j.Database.Migrate(ctx, true)
 	c.Assert(err, qt.Equals, nil)
 
