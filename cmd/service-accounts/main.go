@@ -7,12 +7,10 @@ import (
 	"os"
 
 	jujucmd "github.com/juju/cmd/v3"
-
-	"github.com/canonical/jimm/cmd/jimmctl/cmd"
 )
 
 var serviceAccountDoc = `
-juju service accounts enables users to manage service accounts.
+juju service-accounts enables users to manage service accounts.
 `
 
 func NewSuperCommand() *jujucmd.SuperCommand {
@@ -20,7 +18,8 @@ func NewSuperCommand() *jujucmd.SuperCommand {
 		Name: "service-accounts",
 		Doc:  serviceAccountDoc,
 	})
-	serviceAccountCmd.Register(cmd.NewAddControllerCommand())
+	// Register commands here:
+	// serviceAccountCmd.Register(cmd.NewCommand())
 	return serviceAccountCmd
 }
 
