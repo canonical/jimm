@@ -16,6 +16,7 @@ import (
 
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 )
@@ -61,7 +62,7 @@ func (w *OpenFGAWorker) Work(ctx context.Context, job *river.Job[OpenFGAArgs]) e
 			zap.String("controller", controllerTag.Id()),
 			zap.String("model", modelTag.Id()),
 		)
-		return err
+		return errors.E(err, "Failed to add the controller-model relation from the river job.")
 	}
 	err = openfga.NewUser(owner, w.OfgaClient).SetModelAccess(ctx, names.NewModelTag(job.Args.ModelInfoUUID), ofganames.AdministratorRelation)
 	if err != nil {
@@ -71,17 +72,9 @@ func (w *OpenFGAWorker) Work(ctx context.Context, job *river.Job[OpenFGAArgs]) e
 			zap.String("user", owner.Tag().String()),
 			zap.String("model", modelTag.Id()),
 		)
-		return err
+		return errors.E(err, "Failed to add the adminstrator relation from the river job.")
 	}
 	return nil
-}
-
-func RegisterJimmWorkers(ctx context.Context, ofgaConn *openfga.OFGAClient, db *db.Database) (*river.Workers, error) {
-	workers := river.NewWorkers()
-	if err := river.AddWorkerSafely(workers, &OpenFGAWorker{OfgaClient: ofgaConn, Database: *db}); err != nil {
-		return nil, err
-	}
-	return workers, nil
 }
 
 // River is the struct that holds that Client connection to river.
@@ -92,11 +85,22 @@ type River struct {
 	RetryPolicy river.ClientRetryPolicy
 }
 
+// RegisterJimmWorkers would register known workers safely and return a pointer to a river.workers struct that should be used in river creation.
+func RegisterJimmWorkers(ctx context.Context, ofgaConn *openfga.OFGAClient, db *db.Database) (*river.Workers, error) {
+	workers := river.NewWorkers()
+	if err := river.AddWorkerSafely(workers, &OpenFGAWorker{OfgaClient: ofgaConn, Database: *db}); err != nil {
+		return nil, err
+	}
+	return workers, nil
+}
+
+// Cleanup closes the pool on exit and waits for running jobs to finish before doing a graceful shutdown.
 func (r *River) Cleanup(ctx context.Context) error {
 	defer r.dbPool.Close()
 	return r.Client.Stop(ctx)
 }
 
+// ForceCleanup exits without waiting for running jobs by stopping them forefully and exits ungracefully.
 func (r *River) ForceCleanup(ctx context.Context) error {
 	defer r.dbPool.Close()
 	return r.Client.StopAndCancel(ctx)
@@ -125,6 +129,7 @@ func (r *River) doMigration(ctx context.Context) error {
 	return nil
 }
 
+// NewRiverArgs is a struct that represents
 type NewRiverArgs struct {
 	Config      *river.Config
 	Db          *db.Database
@@ -138,11 +143,11 @@ type NewRiverArgs struct {
 // and open a postgres connections pool that would be closed in the Cleanup routine.
 func NewRiver(ctx context.Context, newRiverArgs NewRiverArgs) (*River, error) {
 	maxAttempts := max(1, newRiverArgs.MaxAttempts)
+	workers, err := RegisterJimmWorkers(ctx, newRiverArgs.OfgaClient, newRiverArgs.Db)
+	if err != nil {
+		return nil, err
+	}
 	if newRiverArgs.Config == nil {
-		workers, err := RegisterJimmWorkers(ctx, newRiverArgs.OfgaClient, newRiverArgs.Db)
-		if err != nil {
-			return nil, err
-		}
 		newRiverArgs.Config = &river.Config{
 			RetryPolicy: &river.DefaultClientRetryPolicy{},
 			Queues: map[string]river.QueueConfig{
@@ -168,5 +173,6 @@ func NewRiver(ctx context.Context, newRiverArgs NewRiverArgs) (*River, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return &r, nil
 }
