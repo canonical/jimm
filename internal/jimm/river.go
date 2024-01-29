@@ -146,7 +146,7 @@ func NewRiver(ctx context.Context, newRiverArgs NewRiverArgs) (*River, error) {
 		newRiverArgs.Config = &river.Config{
 			RetryPolicy: &river.DefaultClientRetryPolicy{},
 			Queues: map[string]river.QueueConfig{
-				river.QueueDefault: {MaxWorkers: min(1, newRiverArgs.MaxWorkers)},
+				river.QueueDefault: {MaxWorkers: max(1, newRiverArgs.MaxWorkers)},
 			},
 			// Logger:  slog.Default(),
 			Workers: workers,
