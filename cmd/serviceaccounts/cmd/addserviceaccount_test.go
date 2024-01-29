@@ -33,7 +33,15 @@ func (s *addServiceAccountSuite) TestAddServiceAccount(c *gc.C) {
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag(clientID)),
 	}
+	// Check alice has access.
 	ok, err := s.JIMM.OpenFGAClient.CheckRelation(context.Background(), tuple, false)
 	c.Assert(err, gc.IsNil)
 	c.Assert(ok, gc.Equals, true)
+	// Check that re-running the command doesn't return an error for Alice.
+	_, err = cmdtesting.RunCommand(c, cmd.NewAddServiceAccountCommandForTesting(s.ClientStore(), bClient), clientID)
+	c.Assert(err, gc.IsNil)
+	// Check that re-running the command for a different user returns an error.
+	bClientBob := s.UserBakeryClient("bob")
+	_, err = cmdtesting.RunCommand(c, cmd.NewAddServiceAccountCommandForTesting(s.ClientStore(), bClientBob), clientID)
+	c.Assert(err, gc.ErrorMatches, "service account already owned")
 }
