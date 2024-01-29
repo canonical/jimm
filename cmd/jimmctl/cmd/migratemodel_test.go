@@ -14,7 +14,7 @@ import (
 )
 
 type migrateModelSuite struct {
-	cmdtest.JimmSuite
+	cmdtest.JimmCmdSuite
 }
 
 var _ = gc.Suite(&migrateModelSuite{})

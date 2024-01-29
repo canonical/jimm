@@ -12,7 +12,7 @@ import (
 )
 
 type setControllerDeprecatedSuite struct {
-	cmdtest.JimmSuite
+	cmdtest.JimmCmdSuite
 }
 
 var _ = gc.Suite(&setControllerDeprecatedSuite{})

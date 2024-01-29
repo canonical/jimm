@@ -16,7 +16,7 @@ import (
 )
 
 type importCloudCredentialsSuite struct {
-	cmdtest.JimmSuite
+	cmdtest.JimmCmdSuite
 }
 
 var _ = gc.Suite(&importCloudCredentialsSuite{})

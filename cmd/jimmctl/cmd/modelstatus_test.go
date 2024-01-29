@@ -48,7 +48,7 @@ volumes: \[\]
 )
 
 type modelStatusSuite struct {
-	cmdtest.JimmSuite
+	cmdtest.JimmCmdSuite
 }
 
 var _ = gc.Suite(&modelStatusSuite{})

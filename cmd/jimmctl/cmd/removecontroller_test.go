@@ -12,7 +12,7 @@ import (
 )
 
 type removeControllerSuite struct {
-	cmdtest.JimmSuite
+	cmdtest.JimmCmdSuite
 }
 
 var _ = gc.Suite(&removeControllerSuite{})

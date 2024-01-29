@@ -19,7 +19,7 @@ import (
 )
 
 type importModelSuite struct {
-	cmdtest.JimmSuite
+	cmdtest.JimmCmdSuite
 }
 
 var _ = gc.Suite(&importModelSuite{})

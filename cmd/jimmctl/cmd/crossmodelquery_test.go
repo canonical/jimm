@@ -16,7 +16,7 @@ import (
 )
 
 type crossModelQuerySuite struct {
-	cmdtest.JimmSuite
+	cmdtest.JimmCmdSuite
 }
 
 var _ = gc.Suite(&crossModelQuerySuite{})

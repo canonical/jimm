@@ -19,7 +19,7 @@ import (
 )
 
 type addControllerSuite struct {
-	cmdtest.JimmSuite
+	cmdtest.JimmCmdSuite
 }
 
 var _ = gc.Suite(&addControllerSuite{})

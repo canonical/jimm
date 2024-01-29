@@ -11,7 +11,7 @@ import (
 )
 
 type revokeAuditLogAccessSuite struct {
-	cmdtest.JimmSuite
+	cmdtest.JimmCmdSuite
 }
 
 // TODO (alesstimec) uncomment when grant/revoke is implemented

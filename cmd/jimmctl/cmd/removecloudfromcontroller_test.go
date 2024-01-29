@@ -13,7 +13,7 @@ import (
 )
 
 type removeCloudFromControllerSuite struct {
-	cmdtest.JimmSuite
+	cmdtest.JimmCmdSuite
 
 	api *fakeRemoveCloudFromControllerAPI
 }
@@ -21,7 +21,7 @@ type removeCloudFromControllerSuite struct {
 var _ = gc.Suite(&removeCloudFromControllerSuite{})
 
 func (s *removeCloudFromControllerSuite) SetUpTest(c *gc.C) {
-	s.JimmSuite.SetUpTest(c)
+	s.JimmCmdSuite.SetUpTest(c)
 	s.api = &fakeRemoveCloudFromControllerAPI{}
 }
 

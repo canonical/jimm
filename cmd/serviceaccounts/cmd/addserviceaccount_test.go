@@ -17,7 +17,7 @@ import (
 )
 
 type addServiceAccountSuite struct {
-	cmdtest.JimmSuite
+	cmdtest.JimmCmdSuite
 }
 
 var _ = gc.Suite(&addServiceAccountSuite{})

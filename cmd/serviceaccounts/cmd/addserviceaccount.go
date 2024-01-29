@@ -20,7 +20,7 @@ var (
 add command binds a service account to your user, giving you administrator access over the service account.
 
 Example:
-	juju service-account add <clientID> 
+	juju service-account add <client-id> 
 `
 )
 

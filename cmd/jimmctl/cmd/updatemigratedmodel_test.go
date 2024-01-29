@@ -17,7 +17,7 @@ import (
 )
 
 type updateMigratedModelSuite struct {
-	cmdtest.JimmSuite
+	cmdtest.JimmCmdSuite
 }
 
 var _ = gc.Suite(&updateMigratedModelSuite{})

@@ -14,7 +14,7 @@ import (
 )
 
 type listAuditEventsSuite struct {
-	cmdtest.JimmSuite
+	cmdtest.JimmCmdSuite
 }
 
 var _ = gc.Suite(&listAuditEventsSuite{})

@@ -15,7 +15,7 @@ import (
 )
 
 type purgeLogsSuite struct {
-	cmdtest.JimmSuite
+	cmdtest.JimmCmdSuite
 }
 
 var _ = gc.Suite(&purgeLogsSuite{})

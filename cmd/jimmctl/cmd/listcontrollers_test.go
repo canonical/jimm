@@ -68,7 +68,7 @@ var (
 )
 
 type listControllersSuite struct {
-	cmdtest.JimmSuite
+	cmdtest.JimmCmdSuite
 }
 
 var _ = gc.Suite(&listControllersSuite{})

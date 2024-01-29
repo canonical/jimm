@@ -23,13 +23,13 @@ import (
 )
 
 type addCloudToControllerSuite struct {
-	cmdtest.JimmSuite
+	cmdtest.JimmCmdSuite
 }
 
 var _ = gc.Suite(&addCloudToControllerSuite{})
 
 func (s *addCloudToControllerSuite) SetUpTest(c *gc.C) {
-	s.JimmSuite.SetUpTest(c)
+	s.JimmCmdSuite.SetUpTest(c)
 
 	// We add user bob, who is a JIMM administrator.
 	err := s.JIMM.Database.UpdateIdentity(context.Background(), &dbmodel.Identity{
