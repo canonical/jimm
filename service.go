@@ -322,7 +322,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		Config:      nil,
 		Db:          &s.jimm.Database,
 		DbUrl:       p.DSN,
-		MaxAttempts: 5, // because this is a unit test
+		MaxAttempts: 5,
 		OfgaClient:  s.jimm.OpenFGAClient,
 	}
 	s.jimm.River, err = jimm.NewRiver(ctx, riverArgs)
