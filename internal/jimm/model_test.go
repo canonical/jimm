@@ -908,7 +908,7 @@ func TestAddModel(t *testing.T) {
 			err = jimm_db.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 
-			river := jimmtest.NewRiver(c, client, jimm_db)
+			river := jimmtest.NewRiver(c, client, &jimm_db)
 
 			j := &jimm.JIMM{
 				UUID:     uuid.NewString(),
@@ -3552,7 +3552,7 @@ users:
 	ctx := context.Background()
 	err = jimm_db.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
-	river := jimmtest.NewRiver(c, client, jimm_db)
+	river := jimmtest.NewRiver(c, client, &jimm_db)
 
 	j := &jimm.JIMM{
 		UUID:     uuid.NewString(),

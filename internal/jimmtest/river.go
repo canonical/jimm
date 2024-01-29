@@ -15,10 +15,16 @@ import (
 // is already-migrated).
 // In cases where you need an entirely empty database, you should use
 // `CreateEmptyDatabase` function in this package.
-func NewRiver(t Tester, ofgaConn *openfga.OFGAClient, db db.Database) *jimm.River {
+func NewRiver(t Tester, ofgaConn *openfga.OFGAClient, db *db.Database) *jimm.River {
 	dsn := getTestDBName(t)
-
-	riverClient, err := jimm.NewRiver(context.Background(), nil, dsn, ofgaConn, db)
+	riverArgs := jimm.NewRiverArgs{
+		Config:      nil,
+		Db:          db,
+		DbUrl:       dsn,
+		MaxAttempts: 1, // because this is a unit test
+		OfgaClient:  ofgaConn,
+	}
+	riverClient, err := jimm.NewRiver(context.Background(), riverArgs)
 	if err != nil {
 		t.Fatalf("failed to create river client")
 	}

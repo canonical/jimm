@@ -623,7 +623,7 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 		ModelInfoUUID:  mi.UUID,
 	}
 	insertAndWait(ctx, j.River, func() (*rivertype.JobRow, error) {
-		return j.River.Client.Insert(ctx, openfgaRiverJobArgs, &river.InsertOpts{MaxAttempts: 1})
+		return j.River.Client.Insert(ctx, openfgaRiverJobArgs, &river.InsertOpts{MaxAttempts: min(1, int(j.River.MaxAttempts))})
 	})
 
 	return mi, nil

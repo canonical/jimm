@@ -76,9 +76,9 @@ func (w *OpenFGAWorker) Work(ctx context.Context, job *river.Job[OpenFGAArgs]) e
 	return nil
 }
 
-func RegisterJimmWorkers(ctx context.Context, ofgaConn *openfga.OFGAClient, db db.Database) (*river.Workers, error) {
+func RegisterJimmWorkers(ctx context.Context, ofgaConn *openfga.OFGAClient, db *db.Database) (*river.Workers, error) {
 	workers := river.NewWorkers()
-	if err := river.AddWorkerSafely(workers, &OpenFGAWorker{OfgaClient: ofgaConn, Database: db}); err != nil {
+	if err := river.AddWorkerSafely(workers, &OpenFGAWorker{OfgaClient: ofgaConn, Database: *db}); err != nil {
 		return nil, err
 	}
 	return workers, nil
@@ -86,8 +86,10 @@ func RegisterJimmWorkers(ctx context.Context, ofgaConn *openfga.OFGAClient, db d
 
 // River is the struct that holds that Client connection to river.
 type River struct {
-	Client *river.Client[pgx.Tx]
-	dbPool *pgxpool.Pool
+	Client      *river.Client[pgx.Tx]
+	dbPool      *pgxpool.Pool
+	MaxAttempts int
+	RetryPolicy river.ClientRetryPolicy
 }
 
 func (r *River) Cleanup(ctx context.Context) error {
@@ -123,35 +125,45 @@ func (r *River) doMigration(ctx context.Context) error {
 	return nil
 }
 
+type NewRiverArgs struct {
+	Config      *river.Config
+	Db          *db.Database
+	DbUrl       string
+	MaxAttempts int
+	MaxWorkers  int
+	OfgaClient  *openfga.OFGAClient
+}
+
 // NewRiver would return a new river instance, and it would apply the needed migrations to the database,
 // and open a postgres connections pool that would be closed in the Cleanup routine.
-func NewRiver(ctx context.Context, config *river.Config, db_url string, ofgaConn *openfga.OFGAClient, db db.Database) (*River, error) {
-	if config == nil {
-		workers, err := RegisterJimmWorkers(ctx, ofgaConn, db)
+func NewRiver(ctx context.Context, newRiverArgs NewRiverArgs) (*River, error) {
+	maxAttempts := max(1, newRiverArgs.MaxAttempts)
+	if newRiverArgs.Config == nil {
+		workers, err := RegisterJimmWorkers(ctx, newRiverArgs.OfgaClient, newRiverArgs.Db)
 		if err != nil {
 			return nil, err
 		}
-		config = &river.Config{
+		newRiverArgs.Config = &river.Config{
 			RetryPolicy: &river.DefaultClientRetryPolicy{},
 			Queues: map[string]river.QueueConfig{
-				river.QueueDefault: {MaxWorkers: 3},
+				river.QueueDefault: {MaxWorkers: min(1, newRiverArgs.MaxWorkers)},
 			},
 			// Logger:  slog.Default(),
 			Workers: workers,
 		}
 	}
-	dbPool, err := pgxpool.New(ctx, db_url)
+	dbPool, err := pgxpool.New(ctx, newRiverArgs.DbUrl)
 	if err != nil {
 		return nil, err
 	}
-	riverClient, err := river.NewClient(riverpgxv5.New(dbPool), config)
+	riverClient, err := river.NewClient(riverpgxv5.New(dbPool), newRiverArgs.Config)
 	if err != nil {
 		return nil, err
 	}
 	if err := riverClient.Start(ctx); err != nil {
 		return nil, err
 	}
-	r := River{Client: riverClient, dbPool: dbPool}
+	r := River{Client: riverClient, dbPool: dbPool, MaxAttempts: maxAttempts}
 	err = r.doMigration(ctx)
 	if err != nil {
 		return nil, err

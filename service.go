@@ -318,7 +318,14 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		s.jimm.Dialer = jimm.CacheDialer(s.jimm.Dialer)
 	}
 
-	s.jimm.River, err = jimm.NewRiver(ctx, nil, p.DSN, s.jimm.OpenFGAClient, s.jimm.Database)
+	riverArgs := jimm.NewRiverArgs{
+		Config:      nil,
+		Db:          &s.jimm.Database,
+		DbUrl:       p.DSN,
+		MaxAttempts: 5, // because this is a unit test
+		OfgaClient:  s.jimm.OpenFGAClient,
+	}
+	s.jimm.River, err = jimm.NewRiver(ctx, riverArgs)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
