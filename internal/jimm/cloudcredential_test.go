@@ -675,6 +675,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 	}}
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
+			ctx := context.Background()
 			checkErrors := test.checkCredentialErrors
 			updateErrors := test.updateCredentialErrors
 			api := &jimmtest.API{
@@ -777,7 +778,6 @@ func TestUpdateCloudCredential(t *testing.T) {
 
 			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
 			c.Assert(err, qt.IsNil)
-			ctx := context.Background()
 			jimm_db := db.Database{
 				DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 			}

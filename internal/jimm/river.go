@@ -62,7 +62,7 @@ func (w *OpenFGAWorker) Work(ctx context.Context, job *river.Job[OpenFGAArgs]) e
 			zap.String("controller", controllerTag.Id()),
 			zap.String("model", modelTag.Id()),
 		)
-		return errors.E(err, "Failed to add the controller-model relation from the river job.")
+		return errors.E(err, "failed to add the controller-model relation from the river job.")
 	}
 	err = openfga.NewUser(owner, w.OfgaClient).SetModelAccess(ctx, names.NewModelTag(job.Args.ModelInfoUUID), ofganames.AdministratorRelation)
 	if err != nil {
@@ -72,16 +72,20 @@ func (w *OpenFGAWorker) Work(ctx context.Context, job *river.Job[OpenFGAArgs]) e
 			zap.String("user", owner.Tag().String()),
 			zap.String("model", modelTag.Id()),
 		)
-		return errors.E(err, "Failed to add the adminstrator relation from the river job.")
+		return errors.E(err, "failed to add the adminstrator relation from the river job.")
 	}
 	return nil
 }
 
 // River is the struct that holds that Client connection to river.
 type River struct {
-	Client      *river.Client[pgx.Tx]
-	dbPool      *pgxpool.Pool
+	// Client is a pointer to the river client that is used to interact with the service.
+	Client *river.Client[pgx.Tx]
+	dbPool *pgxpool.Pool
+	// MaxAttempts is how many times river would retry before a job is abandoned and set as
+	// discarded. This includes the original and the retry attempts.
 	MaxAttempts int
+	// RetryPolicy determines when the next attempt for a failed jon will be run.
 	RetryPolicy river.ClientRetryPolicy
 }
 
@@ -108,33 +112,40 @@ func (r *River) doMigration(ctx context.Context) error {
 	}
 	_, err = migrator.MigrateTx(ctx, tx, rivermigrate.DirectionUp, nil)
 	if err != nil {
-		zapctx.Error(ctx, "Failed to apply DB migration", zap.Error(err))
+		zapctx.Error(ctx, "failed to apply DB migration", zap.Error(err))
 		rollbackErr := tx.Rollback(ctx)
 		if rollbackErr != nil {
-			zapctx.Error(ctx, "Failed to rollback DB migration", zap.Error(rollbackErr))
+			zapctx.Error(ctx, "failed to rollback DB migration", zap.Error(rollbackErr))
 		}
 		return err
 	}
-	err = tx.Commit(ctx)
-	if err != nil {
-		zapctx.Error(ctx, "Failed to commit DB migration", zap.Error(err))
+	if err = tx.Commit(ctx); err != nil {
+		zapctx.Error(ctx, "failed to commit DB migration", zap.Error(err))
 		return err
 	}
 	return nil
 }
 
-// NewRiverArgs is a struct that represents
+// NewRiverArgs is a struct that represents the arguments to create the River instance.
 type NewRiverArgs struct {
-	Config      *river.Config
-	Db          *db.Database
-	DbUrl       string
+	// Config is an optional river config object that includes the retry policy,
+	// the queue defaults and the maximum number of workers to create, as well as the workers themselves.
+	Config *river.Config
+	// Db holds a pointer to JIMM db.
+	Db *db.Database
+	// DbUrl is the DSN for JIMM db, which is used to create river's PG connection pool.
+	DbUrl string
+	// MaxAttempts is how many times river would retry before a job is abandoned and set as
+	// discarded. This includes the original and the retry attempts.
 	MaxAttempts int
-	MaxWorkers  int
-	OfgaClient  *openfga.OFGAClient
+	// MaxWorkers configures the maximum number of workers to create per task/job type.
+	MaxWorkers int
+	// OfgaClient holds a pointer to a valid OpenFGA client.
+	OfgaClient *openfga.OFGAClient
 }
 
-// NewRiver would return a new river instance, and it would apply the needed migrations to the database,
-// and open a postgres connections pool that would be closed in the Cleanup routine.
+// NewRiver returns a new river instance after applying the needed migrations to the database.
+// It will open a postgres connections pool that would be closed in the Cleanup routine.
 func NewRiver(ctx context.Context, newRiverArgs NewRiverArgs) (*River, error) {
 	maxAttempts := max(1, newRiverArgs.MaxAttempts)
 	workers, err := RegisterJimmWorkers(ctx, newRiverArgs.OfgaClient, newRiverArgs.Db)

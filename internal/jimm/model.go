@@ -622,7 +622,7 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 		OwnerName:      builder.owner.Username,
 		ModelInfoUUID:  mi.UUID,
 	}
-	err = insertAndWait(ctx, j.River, func() (*rivertype.JobRow, error) {
+	err = insertJobAndWait(ctx, j.River, func() (*rivertype.JobRow, error) {
 		return j.River.Client.Insert(ctx, openfgaRiverJobArgs, &river.InsertOpts{MaxAttempts: j.River.MaxAttempts})
 	})
 	if err != nil {
@@ -631,7 +631,8 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 	return mi, nil
 }
 
-func insertAndWait(ctx context.Context, r *River, insertFunc func() (*rivertype.JobRow, error)) error {
+// insertJobAndWait executes the insertion function passed to it, and then block until the job is completed or the ctx is done because of a timeout.
+func insertJobAndWait(ctx context.Context, r *River, insertFunc func() (*rivertype.JobRow, error)) error {
 	const wait = true
 	var results <-chan *river.Event
 	var cancelChannelFunc func()
