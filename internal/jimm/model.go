@@ -622,10 +622,12 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 		OwnerName:      builder.owner.Username,
 		ModelInfoUUID:  mi.UUID,
 	}
-	insertAndWait(ctx, j.River, func() (*rivertype.JobRow, error) {
-		return j.River.Client.Insert(ctx, openfgaRiverJobArgs, &river.InsertOpts{MaxAttempts: min(1, int(j.River.MaxAttempts))})
+	err = insertAndWait(ctx, j.River, func() (*rivertype.JobRow, error) {
+		return j.River.Client.Insert(ctx, openfgaRiverJobArgs, &river.InsertOpts{MaxAttempts: j.River.MaxAttempts})
 	})
-
+	if err != nil {
+		return nil, errors.E(err, "Failed to insert and wait for the river job.")
+	}
 	return mi, nil
 }
 
@@ -640,12 +642,17 @@ func insertAndWait(ctx context.Context, r *River, insertFunc func() (*rivertype.
 	row, err := insertFunc()
 	if err != nil {
 		zapctx.Error(ctx, "failed to insert river job", zaputil.Error(err))
-		return errors.E(err)
+		return errors.E(err, "Failed to insert river job.")
 	}
 	if wait {
-		for item := range results {
-			if item.Job.ID == row.ID {
-				break
+		for {
+			select {
+			case item := <-results:
+				if item.Job.ID == row.ID {
+					return nil
+				}
+			case <-ctx.Done():
+				return ctx.Err()
 			}
 		}
 	}

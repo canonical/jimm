@@ -100,12 +100,6 @@ func (r *River) Cleanup(ctx context.Context) error {
 	return r.Client.Stop(ctx)
 }
 
-// ForceCleanup exits without waiting for running jobs by stopping them forefully and exits ungracefully.
-func (r *River) ForceCleanup(ctx context.Context) error {
-	defer r.dbPool.Close()
-	return r.Client.StopAndCancel(ctx)
-}
-
 func (r *River) doMigration(ctx context.Context) error {
 	migrator := rivermigrate.New(riverpgxv5.New(r.dbPool), nil)
 	tx, err := r.dbPool.Begin(ctx)
@@ -163,14 +157,17 @@ func NewRiver(ctx context.Context, newRiverArgs NewRiverArgs) (*River, error) {
 	}
 	riverClient, err := river.NewClient(riverpgxv5.New(dbPool), newRiverArgs.Config)
 	if err != nil {
+		dbPool.Close()
 		return nil, err
 	}
 	if err := riverClient.Start(ctx); err != nil {
+		dbPool.Close()
 		return nil, err
 	}
 	r := River{Client: riverClient, dbPool: dbPool, MaxAttempts: maxAttempts}
 	err = r.doMigration(ctx)
 	if err != nil {
+		dbPool.Close()
 		return nil, err
 	}
 
