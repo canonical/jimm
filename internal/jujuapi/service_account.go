@@ -21,7 +21,7 @@ import (
 
 // AddGroup creates a group within JIMMs DB for reference by OpenFGA.
 func (r *controllerRoot) AddServiceAccount(ctx context.Context, req apiparams.AddServiceAccountRequest) error {
-	const op = errors.Op("jujuapi.AddGroup")
+	const op = errors.Op("jujuapi.AddServiceAccount")
 
 	if !jimmnames.IsValidServiceAccountId(req.ClientID) {
 		return errors.E(op, errors.CodeBadRequest, "invalid client ID")
@@ -95,8 +95,9 @@ func (r *controllerRoot) UpdateServiceAccountCredentials(ctx context.Context, re
 	return results, nil
 }
 
+// ListServiceAccountCredentials lists the cloud credentials available for a service account.
 func (r *controllerRoot) ListServiceAccountCredentials(ctx context.Context, req apiparams.ListServiceAccountCredentialsRequest) (jujuparams.CredentialContentResults, error) {
-	const op = errors.Op("jujuapi.UpdateServiceAccountCredentials")
+	const op = errors.Op("jujuapi.ListServiceAccountCredentials")
 
 	targetIdentity, err := r.getServiceAccount(ctx, req.ClientID)
 	if err != nil {
