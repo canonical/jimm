@@ -29,7 +29,7 @@ func (s *addServiceAccountSuite) TestAddServiceAccount(c *gc.C) {
 	_, err := cmdtesting.RunCommand(c, cmd.NewAddServiceAccountCommandForTesting(s.ClientStore(), bClient), clientID)
 	c.Assert(err, gc.IsNil)
 	tuple := openfga.Tuple{
-		Object:   ofganames.ConvertTag(names.NewUserTag("user-alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag(clientID)),
 	}
