@@ -1,4 +1,4 @@
-// Copyright 2021 Canonical Ltd.
+// Copyright 2024 Canonical Ltd.
 
 package cmd
 
@@ -43,6 +43,7 @@ type addServiceAccountCommand struct {
 	clientID string
 }
 
+// Info implements Command.Info.
 func (c *addServiceAccountCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
 		Name:    "add",
@@ -51,7 +52,7 @@ func (c *addServiceAccountCommand) Info() *cmd.Info {
 	})
 }
 
-// SetFlags implements Command.SetFlags.
+// SetFlags implements the cmd.Command interface.
 func (c *addServiceAccountCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.CommandBase.SetFlags(f)
 	c.out.AddFlags(f, "yaml", map[string]cmd.Formatter{
