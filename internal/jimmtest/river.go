@@ -11,16 +11,16 @@ import (
 )
 
 // NewRiver returns a River instance for tests.
-func NewRiver(t Tester, ofgaConn *openfga.OFGAClient, db *db.Database) *jimm.River {
+func NewRiver(t Tester, riverConfig *jimm.RiverConfig, ofgaConn *openfga.OFGAClient, db *db.Database) *jimm.River {
 	dsn := getTestDBName(t)
-	riverConfig := jimm.RiverConfig{
-		Config:      nil,
-		Db:          db,
-		DbUrl:       dsn,
-		MaxAttempts: 1, // because this is a unit test
-		OfgaClient:  ofgaConn,
+	if riverConfig == nil {
+		riverConfig = &jimm.RiverConfig{
+			Config:      nil,
+			DbUrl:       dsn,
+			MaxAttempts: 1, // because this is a unit test
+		}
 	}
-	riverClient, err := jimm.NewRiver(context.Background(), riverConfig)
+	riverClient, err := jimm.NewRiver(context.Background(), *riverConfig, ofgaConn, db)
 	if err != nil {
 		t.Fatalf("failed to create river client")
 	}

@@ -22,6 +22,11 @@ import (
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 )
 
+// WaitConfig is used to set the waiting duration for river jobs.
+type WaitConfig struct {
+	Duration time.Duration
+}
+
 // RiverOpenFGAArgs holds the river job arguments for writing tuples to OpenFGA.
 type RiverOpenFGAArgs struct {
 	ControllerUUID string `json:"controller_uuid"`
@@ -131,8 +136,6 @@ type RiverConfig struct {
 	// Config is an optional river config object that includes the retry policy,
 	// the queue defaults and the maximum number of workers to create, as well as the workers themselves.
 	Config *river.Config
-	// Db holds a pointer to JIMM db.
-	Db *db.Database
 	// DbUrl is the DSN for JIMM db, which is used to create river's PG connection pool.
 	DbUrl string
 	// MaxAttempts is how many times river would retry before a job is abandoned and set as
@@ -140,15 +143,13 @@ type RiverConfig struct {
 	MaxAttempts int
 	// MaxWorkers configures the maximum number of workers to create per task/job type.
 	MaxWorkers int
-	// OfgaClient holds a pointer to a valid OpenFGA client.
-	OfgaClient *openfga.OFGAClient
 }
 
 // NewRiver returns a new river instance after applying the needed migrations to the database.
 // It will open a postgres connections pool that would be closed in the Cleanup routine.
-func NewRiver(ctx context.Context, riverConfig RiverConfig) (*River, error) {
+func NewRiver(ctx context.Context, riverConfig RiverConfig, ofgaClient *openfga.OFGAClient, db *db.Database) (*River, error) {
 	maxAttempts := max(1, riverConfig.MaxAttempts)
-	workers, err := RegisterJimmWorkers(ctx, riverConfig.OfgaClient, riverConfig.Db)
+	workers, err := RegisterJimmWorkers(ctx, ofgaClient, db)
 	if err != nil {
 		return nil, err
 	}
@@ -183,8 +184,4 @@ func NewRiver(ctx context.Context, riverConfig RiverConfig) (*River, error) {
 	}
 
 	return &r, nil
-}
-
-type WaitConfig struct {
-	Duration time.Duration
 }

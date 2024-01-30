@@ -320,12 +320,10 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 
 	riverConfig := jimm.RiverConfig{
 		Config:      nil,
-		Db:          &s.jimm.Database,
 		DbUrl:       p.DSN,
 		MaxAttempts: 5,
-		OfgaClient:  s.jimm.OpenFGAClient,
 	}
-	s.jimm.River, err = jimm.NewRiver(ctx, riverConfig)
+	s.jimm.River, err = jimm.NewRiver(ctx, riverConfig, s.jimm.OpenFGAClient, &s.jimm.Database)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
