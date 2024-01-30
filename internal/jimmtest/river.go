@@ -10,21 +10,17 @@ import (
 	"go.uber.org/zap"
 )
 
-// PostgresDB returns a PostgreSQL database instance for tests. To improve
-// performance it creates a new database from a template (which has no data but
-// is already-migrated).
-// In cases where you need an entirely empty database, you should use
-// `CreateEmptyDatabase` function in this package.
+// NewRiver returns a River instance for tests.
 func NewRiver(t Tester, ofgaConn *openfga.OFGAClient, db *db.Database) *jimm.River {
 	dsn := getTestDBName(t)
-	riverArgs := jimm.NewRiverArgs{
+	riverConfig := jimm.RiverConfig{
 		Config:      nil,
 		Db:          db,
 		DbUrl:       dsn,
 		MaxAttempts: 1, // because this is a unit test
 		OfgaClient:  ofgaConn,
 	}
-	riverClient, err := jimm.NewRiver(context.Background(), riverArgs)
+	riverClient, err := jimm.NewRiver(context.Background(), riverConfig)
 	if err != nil {
 		t.Fatalf("failed to create river client")
 	}

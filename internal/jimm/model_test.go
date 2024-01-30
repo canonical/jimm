@@ -902,17 +902,17 @@ func TestAddModel(t *testing.T) {
 			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.name)
 			c.Assert(err, qt.IsNil)
 			ctx := context.Background()
-			jimm_db := db.Database{
+			jimmDb := db.Database{
 				DB: jimmtest.PostgresDB(c, nil),
 			}
-			err = jimm_db.Migrate(ctx, false)
+			err = jimmDb.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 
-			river := jimmtest.NewRiver(c, client, &jimm_db)
+			river := jimmtest.NewRiver(c, client, &jimmDb)
 
 			j := &jimm.JIMM{
 				UUID:     uuid.NewString(),
-				Database: jimm_db,
+				Database: jimmDb,
 				Dialer: &jimmtest.Dialer{
 					API: api,
 				},
@@ -3546,17 +3546,17 @@ users:
 
 	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
-	jimm_db := db.Database{
+	jimmDb := db.Database{
 		DB: jimmtest.PostgresDB(c, nil),
 	}
 	ctx := context.Background()
-	err = jimm_db.Migrate(ctx, false)
+	err = jimmDb.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
-	river := jimmtest.NewRiver(c, client, &jimm_db)
+	river := jimmtest.NewRiver(c, client, &jimmDb)
 
 	j := &jimm.JIMM{
 		UUID:     uuid.NewString(),
-		Database: jimm_db,
+		Database: jimmDb,
 		Dialer: &jimmtest.Dialer{
 			API: api,
 		},

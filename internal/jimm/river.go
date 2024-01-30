@@ -4,6 +4,7 @@ package jimm
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -21,27 +22,27 @@ import (
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 )
 
-// OpenFGAArgs holds the river job arguments for writing tuples to OpenFGA.
-type OpenFGAArgs struct {
+// RiverOpenFGAArgs holds the river job arguments for writing tuples to OpenFGA.
+type RiverOpenFGAArgs struct {
 	ControllerUUID string `json:"controller_uuid"`
 	ModelId        uint   `json:"model_id"`
 	ModelInfoUUID  string `json:"model_info_uuid"`
 	OwnerName      string `json:"owner_name"`
 }
 
-// Kind returns the kind of the job to be picked up by the appropriate river workers.
-// It is the same concept as Kafka topics.
-func (OpenFGAArgs) Kind() string { return "OpenFGA" }
+// Kind is a string that uniquely identifies the type of job to be picked up by the appropriate river workers.
+// This is required by river and must be provided on the job arguments struct to implement the JobArgs interface.
+func (RiverOpenFGAArgs) Kind() string { return "OpenFGA" }
 
 // OpenFGAWorker is the river worker that would run the job.
-type OpenFGAWorker struct {
-	river.WorkerDefaults[OpenFGAArgs]
+type RiverOpenFGAWorker struct {
+	river.WorkerDefaults[RiverOpenFGAArgs]
 	OfgaClient *openfga.OFGAClient
 	Database   db.Database
 }
 
-// Work is tha function executed by the worker when it picks up the job.
-func (w *OpenFGAWorker) Work(ctx context.Context, job *river.Job[OpenFGAArgs]) error {
+// Work is the function executed by the worker when it picks up the job.
+func (w *RiverOpenFGAWorker) Work(ctx context.Context, job *river.Job[RiverOpenFGAArgs]) error {
 	controllerTag := names.NewControllerTag(job.Args.ControllerUUID)
 	modelTag := names.NewModelTag(job.Args.ModelInfoUUID)
 
@@ -50,7 +51,6 @@ func (w *OpenFGAWorker) Work(ctx context.Context, job *river.Job[OpenFGAArgs]) e
 	if err != nil {
 		return err
 	}
-
 	if err := w.OfgaClient.AddControllerModel(
 		ctx,
 		controllerTag,
@@ -72,7 +72,7 @@ func (w *OpenFGAWorker) Work(ctx context.Context, job *river.Job[OpenFGAArgs]) e
 			zap.String("user", owner.Tag().String()),
 			zap.String("model", modelTag.Id()),
 		)
-		return errors.E(err, "failed to add the adminstrator relation from the river job.")
+		return errors.E(err, "failed to add the administrator relation from the river job.")
 	}
 	return nil
 }
@@ -85,14 +85,14 @@ type River struct {
 	// MaxAttempts is how many times river would retry before a job is abandoned and set as
 	// discarded. This includes the original and the retry attempts.
 	MaxAttempts int
-	// RetryPolicy determines when the next attempt for a failed jon will be run.
+	// RetryPolicy determines when the next attempt for a failed job will be run.
 	RetryPolicy river.ClientRetryPolicy
 }
 
 // RegisterJimmWorkers would register known workers safely and return a pointer to a river.workers struct that should be used in river creation.
 func RegisterJimmWorkers(ctx context.Context, ofgaConn *openfga.OFGAClient, db *db.Database) (*river.Workers, error) {
 	workers := river.NewWorkers()
-	if err := river.AddWorkerSafely(workers, &OpenFGAWorker{OfgaClient: ofgaConn, Database: *db}); err != nil {
+	if err := river.AddWorkerSafely(workers, &RiverOpenFGAWorker{OfgaClient: ofgaConn, Database: *db}); err != nil {
 		return nil, err
 	}
 	return workers, nil
@@ -126,8 +126,8 @@ func (r *River) doMigration(ctx context.Context) error {
 	return nil
 }
 
-// NewRiverArgs is a struct that represents the arguments to create the River instance.
-type NewRiverArgs struct {
+// RiverConfig is a struct that represents the arguments to create the River instance.
+type RiverConfig struct {
 	// Config is an optional river config object that includes the retry policy,
 	// the queue defaults and the maximum number of workers to create, as well as the workers themselves.
 	Config *river.Config
@@ -146,27 +146,27 @@ type NewRiverArgs struct {
 
 // NewRiver returns a new river instance after applying the needed migrations to the database.
 // It will open a postgres connections pool that would be closed in the Cleanup routine.
-func NewRiver(ctx context.Context, newRiverArgs NewRiverArgs) (*River, error) {
-	maxAttempts := max(1, newRiverArgs.MaxAttempts)
-	workers, err := RegisterJimmWorkers(ctx, newRiverArgs.OfgaClient, newRiverArgs.Db)
+func NewRiver(ctx context.Context, riverConfig RiverConfig) (*River, error) {
+	maxAttempts := max(1, riverConfig.MaxAttempts)
+	workers, err := RegisterJimmWorkers(ctx, riverConfig.OfgaClient, riverConfig.Db)
 	if err != nil {
 		return nil, err
 	}
-	if newRiverArgs.Config == nil {
-		newRiverArgs.Config = &river.Config{
+	if riverConfig.Config == nil {
+		riverConfig.Config = &river.Config{
 			RetryPolicy: &river.DefaultClientRetryPolicy{},
 			Queues: map[string]river.QueueConfig{
-				river.QueueDefault: {MaxWorkers: max(1, newRiverArgs.MaxWorkers)},
+				river.QueueDefault: {MaxWorkers: max(1, riverConfig.MaxWorkers)},
 			},
 			// Logger:  slog.Default(),
 			Workers: workers,
 		}
 	}
-	dbPool, err := pgxpool.New(ctx, newRiverArgs.DbUrl)
+	dbPool, err := pgxpool.New(ctx, riverConfig.DbUrl)
 	if err != nil {
 		return nil, err
 	}
-	riverClient, err := river.NewClient(riverpgxv5.New(dbPool), newRiverArgs.Config)
+	riverClient, err := river.NewClient(riverpgxv5.New(dbPool), riverConfig.Config)
 	if err != nil {
 		dbPool.Close()
 		return nil, err
@@ -183,4 +183,8 @@ func NewRiver(ctx context.Context, newRiverArgs NewRiverArgs) (*River, error) {
 	}
 
 	return &r, nil
+}
+
+type WaitConfig struct {
+	Duration time.Duration
 }

@@ -616,44 +616,68 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 	}
 
 	mi := builder.JujuModelInfo()
-	openfgaRiverJobArgs := OpenFGAArgs{
+	openfgaRiverJobArgs := RiverOpenFGAArgs{
 		ControllerUUID: builder.controller.UUID,
 		ModelId:        builder.model.ID,
 		OwnerName:      builder.owner.Username,
 		ModelInfoUUID:  mi.UUID,
 	}
-	err = insertJobAndWait(ctx, j.River, func() (*rivertype.JobRow, error) {
+	err = insertJob(ctx, &WaitConfig{Duration: 1 * time.Minute}, j.River, func() (*rivertype.JobRow, error) {
 		return j.River.Client.Insert(ctx, openfgaRiverJobArgs, &river.InsertOpts{MaxAttempts: j.River.MaxAttempts})
 	})
 	if err != nil {
-		return nil, errors.E(err, "Failed to insert and wait for the river job.")
+		return nil, errors.E(err, "failed to insert and wait for the river job")
 	}
 	return mi, nil
 }
 
-// insertJobAndWait executes the insertion function passed to it, and then block until the job is completed or the ctx is done because of a timeout.
-func insertJobAndWait(ctx context.Context, r *River, insertFunc func() (*rivertype.JobRow, error)) error {
-	const wait = true
-	var results <-chan *river.Event
-	var cancelChannelFunc func()
-	if wait {
-		results, cancelChannelFunc = r.Client.Subscribe(river.EventKindJobCompleted, river.EventKindJobFailed)
-		defer cancelChannelFunc()
+// insertJob executes the insertion function passed to it.
+// If wait is true, then it will block until the job is completed or the ctx is done because of a timeout.
+func insertJob(ctx context.Context, waitConfig *WaitConfig, r *River, insertFunc func() (*rivertype.JobRow, error)) error {
+	var completedChan <-chan *river.Event
+	var completedSubscribeCancel func()
+	var failedChan <-chan *river.Event
+	var failedSubscribeCancel func()
+	var otherChan <-chan *river.Event
+	var otherSubscribeCancel func()
+
+	if waitConfig != nil {
+		// Subscribers tell the River client the kinds of events they'd like to receive.
+		completedChan, completedSubscribeCancel = r.Client.Subscribe(river.EventKindJobCompleted)
+		defer completedSubscribeCancel()
+
+		// Multiple simultaneous subscriptions are allowed.
+		failedChan, failedSubscribeCancel = r.Client.Subscribe(river.EventKindJobFailed)
+		defer failedSubscribeCancel()
+
+		otherChan, otherSubscribeCancel = r.Client.Subscribe(river.EventKindJobCancelled, river.EventKindJobSnoozed)
+		defer otherSubscribeCancel()
 	}
+
 	row, err := insertFunc()
 	if err != nil {
 		zapctx.Error(ctx, "failed to insert river job", zaputil.Error(err))
-		return errors.E(err, "Failed to insert river job.")
+		return errors.E(err, "failed to insert river job")
 	}
-	if wait {
+	if waitConfig != nil {
 		for {
 			select {
-			case item := <-results:
+			case item := <-completedChan:
 				if item.Job.ID == row.ID {
 					return nil
 				}
+			case item := <-failedChan:
+				if item.Job.Attempt == item.Job.MaxAttempts && item.Job.FinalizedAt != nil {
+					return errors.E(fmt.Sprintf("river job %d failed after %d attempts at %s", item.Job.ID, item.Job.Attempt, item.Job.FinalizedAt))
+				}
+			case item := <-otherChan:
+				if item.Job.State == river.JobStateCancelled {
+					return errors.E(fmt.Sprintf("river job %d was cancelled", item.Job.ID))
+				}
+			case <-time.After(waitConfig.Duration):
+				return errors.E(fmt.Sprintf("timed out after %s waiting for river to process the job", waitConfig.Duration))
 			case <-ctx.Done():
-				return ctx.Err()
+				return errors.E(ctx.Err())
 			}
 		}
 	}

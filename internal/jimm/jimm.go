@@ -118,14 +118,14 @@ type permission struct {
 // dial dials the controller and model specified by the given Controller
 // and ModelTag. If no Dialer has been configured then an error with a
 // code of CodeConnectionFailed will be returned.
-func (j *JIMM) dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, permissons ...permission) (API, error) {
+func (j *JIMM) dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, permissions ...permission) (API, error) {
 	if j == nil || j.Dialer == nil {
 		return nil, errors.E(errors.CodeConnectionFailed, "no dialer configured")
 	}
 	var permissionMap map[string]string
-	if len(permissons) > 0 {
-		permissionMap = make(map[string]string, len(permissons))
-		for _, p := range permissons {
+	if len(permissions) > 0 {
+		permissionMap = make(map[string]string, len(permissions))
+		for _, p := range permissions {
 			permissionMap[p.resource] = p.relation
 		}
 	}

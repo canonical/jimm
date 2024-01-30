@@ -108,9 +108,9 @@ func PostgresDB(t Tester, nowFunc func() time.Time) *gorm.DB {
 		t.Fatalf("template database does not exist")
 	}
 
-	_, dsn, err := createDatabaseFromTemplate(t.Name(), templateDatabaseName)
+	databaseName, dsn, err := createDatabaseFromTemplate(t.Name(), templateDatabaseName)
 	if err != nil {
-		t.Fatalf("error creating database (test %s): %s", t.Name(), err)
+		t.Fatalf("error creating database %s (test %s): %s", databaseName, t.Name(), err)
 	}
 
 	gdb, err := gorm.Open(postgres.Open(dsn), &cfg)

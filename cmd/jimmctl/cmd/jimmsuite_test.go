@@ -156,11 +156,11 @@ func (s *jimmSuite) TearDownTest(c *gc.C) {
 	if s.HTTP != nil {
 		s.HTTP.Close()
 	}
-	if err := s.JIMM.Database.Close(); err != nil {
-		c.Logf("failed to close database connections at tear down: %s", err)
-	}
 	if err := s.JIMM.River.Cleanup(context.Background()); err != nil {
 		c.Logf("failed to cleanup river client: %s", err)
+	}
+	if err := s.JIMM.Database.Close(); err != nil {
+		c.Logf("failed to close database connections at tear down: %s", err)
 	}
 	s.CandidSuite.TearDownTest(c)
 	s.JujuConnSuite.TearDownTest(c)

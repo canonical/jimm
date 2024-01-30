@@ -778,13 +778,13 @@ func TestUpdateCloudCredential(t *testing.T) {
 
 			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
 			c.Assert(err, qt.IsNil)
-			jimm_db := db.Database{
+			jimmDb := db.Database{
 				DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 			}
-			river := jimmtest.NewRiver(c, client, &jimm_db)
+			river := jimmtest.NewRiver(c, client, &jimmDb)
 			j := &jimm.JIMM{
 				UUID:     uuid.NewString(),
-				Database: jimm_db,
+				Database: jimmDb,
 				Dialer: &jimmtest.Dialer{
 					API: api,
 				},
@@ -1241,14 +1241,14 @@ func TestRevokeCloudCredential(t *testing.T) {
 			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.about)
 			c.Assert(err, qt.IsNil)
 			ctx := context.Background()
-			jimm_db := db.Database{
+			jimmDb := db.Database{
 				DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 			}
-			river := jimmtest.NewRiver(c, client, &jimm_db)
+			river := jimmtest.NewRiver(c, client, &jimmDb)
 			c.Assert(err, qt.IsNil)
 			j := &jimm.JIMM{
 				UUID:     uuid.NewString(),
-				Database: jimm_db,
+				Database: jimmDb,
 				Dialer: &jimmtest.Dialer{
 					API: api,
 				},
