@@ -195,3 +195,10 @@ func (c *Client) MigrateModel(req *params.MigrateModelRequest) (*jujuparams.Init
 func (c *Client) AddServiceAccount(req *params.AddServiceAccountRequest) error {
 	return c.caller.APICall("JIMM", 4, "", "AddServiceAccount", req, nil)
 }
+
+// UpdateServiceAccountCredentials updates credentials associated with a service account.
+func (c *Client) UpdateServiceAccountCredentials(req *params.UpdateServiceAccountCredentialsRequest) (*jujuparams.UpdateCredentialResults, error) {
+	var response jujuparams.UpdateCredentialResults
+	err := c.caller.APICall("JIMM", 4, "", "UpdateServiceAccountCredentials", req, &response)
+	return &response, err
+}
