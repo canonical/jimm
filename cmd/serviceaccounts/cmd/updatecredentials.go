@@ -29,7 +29,7 @@ Example:
 `
 )
 
-// NewUpdateCredentialsCommand returns a command to add a service account
+// NewUpdateCredentialsCommand returns a command to update a service account's cloud credentials.
 func NewUpdateCredentialsCommand() cmd.Command {
 	cmd := &updateCredentialsCommand{
 		store: jujuclient.NewFileClientStore(),
@@ -38,7 +38,7 @@ func NewUpdateCredentialsCommand() cmd.Command {
 	return modelcmd.WrapBase(cmd)
 }
 
-// updateCredentialsCommand binds a service account to a user.
+// updateCredentialsCommand updates a service account's cloud credentials.
 type updateCredentialsCommand struct {
 	modelcmd.ControllerCommandBase
 	out cmd.Output
