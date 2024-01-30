@@ -14,6 +14,7 @@ import (
 
 	"github.com/canonical/candid/candidclient"
 	cofga "github.com/canonical/ofga"
+	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/dbrootkeystore"
@@ -61,6 +62,23 @@ type OpenFGAParams struct {
 	AuthModel string
 	Token     string
 	Port      string
+}
+
+// OAuthAuthenticatorParams holds parameters needed to configure an OAuthAuthenticator
+// implementation.
+type OAuthAuthenticatorParams struct {
+	// IssuerURL is the URL of the OAuth2.0 server.
+	// I.e., http://localhost:8082/realms/jimm in the case of keycloak.
+	IssuerURL string
+	// DeviceClientID holds the OAuth2.0 client id registered and configured
+	// to handle device OAuth2.0 flows. The client is NOT expected to be confidential
+	// and as such does not need a client secret (given it is configured correctly).
+	DeviceClientID string
+	// DeviceScopes holds the scopes that you wish to retrieve.
+	DeviceScopes []string
+	// AccessTokenExpiry holds the expiry duration for issued JWTs
+	// for user (CLI) to JIMM authentication.
+	AccessTokenExpiry time.Duration
 }
 
 // A Params structure contains the parameters required to initialise a new
@@ -152,7 +170,8 @@ type Params struct {
 	// MacaroonExpiryDuration holds the expiry duration of authentication macaroons.
 	MacaroonExpiryDuration time.Duration
 
-	// JWTExpiryDuration holds the expiry duration for issued JWTs.
+	// JWTExpiryDuration holds the expiry duration for issued JWTs
+	// for controller to JIMM communication ONLY.
 	JWTExpiryDuration time.Duration
 
 	// InsecureSecretStorage instructs JIMM to store secrets in its database
@@ -162,6 +181,10 @@ type Params struct {
 	// InsecureJwksLookup instructs JIMM to lookup its JWKS value via
 	// http instead of https. Useful when running JIMM in a docker compose.
 	InsecureJwksLookup bool
+
+	// OAuthAuthenticatorParams holds parameters needed to configure an OAuthAuthenticator
+	// implementation.
+	OAuthAuthenticatorParams OAuthAuthenticatorParams
 }
 
 // A Service is the implementation of a JIMM server.
@@ -289,9 +312,24 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	}
 	s.mux.Handle(localDischargePath+"/*", dischargeMux)
 
+	// Ale8k: This authenticator is old and used for macaroon auth
+	// it is still present for backwards compatibility but SHOULD
+	// be removed in the future.
 	s.jimm.Authenticator, err = newAuthenticator(ctx, &s.jimm.Database, openFGAclient, kp, p)
 	if err != nil {
 		return nil, errors.E(op, err)
+	}
+
+	s.jimm.OAuthAuthenticator, err = auth.NewAuthenticationService(
+		ctx,
+		auth.AuthenticationServiceParams{
+			IssuerURL:      "http://localhost:8082/realms/jimm",
+			DeviceClientID: "jimm-device",
+			DeviceScopes:   []string{oidc.ScopeOpenID, "profile", "email"},
+		},
+	)
+	if err != nil {
+		return nil, errors.E(op, err, "failed to setup authentication service")
 	}
 
 	if err := s.setupCredentialStore(ctx, p); err != nil {

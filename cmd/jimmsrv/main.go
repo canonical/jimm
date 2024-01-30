@@ -4,7 +4,9 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"syscall"
@@ -15,6 +17,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/canonical/jimm"
+	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/version"
 )
 
@@ -57,15 +60,55 @@ func start(ctx context.Context, s *service.Service) error {
 		macaroonExpiryDuration = expiry
 	}
 	jwtExpiryDuration := 24 * time.Hour
-	durationString = os.Getenv("JIMM_MACAROON_EXPIRY_DURATION")
+	durationString = os.Getenv("JIMM_JWT_EXPIRY")
 	if durationString != "" {
 		expiry, err := time.ParseDuration(durationString)
 		if err != nil {
-			zapctx.Error(ctx, "failed to parse macaroon expiry duration", zap.Error(err))
+			zapctx.Error(ctx, "failed to parse jwt expiry duration", zap.Error(err))
 		} else {
 			jwtExpiryDuration = expiry
 		}
 	}
+
+	accessTokenExpiryDuration := 24 * time.Hour
+	durationString = os.Getenv("JIMM_ACCESS_TOKEN_EXPIRY_DURATION")
+	if durationString != "" {
+		expiry, err := time.ParseDuration(durationString)
+		if err != nil {
+			zapctx.Error(ctx, "failed to parse access token expiry duration", zap.Error(err))
+		} else {
+			accessTokenExpiryDuration = expiry
+		}
+	}
+
+	issuerURL := os.Getenv("JIMM_OAUTH_ISSUER_URL")
+	parsedIssuerURL, err := url.Parse(issuerURL)
+	if err != nil {
+		zapctx.Error(ctx, "failed to parse oauth issuer url", zap.Error(err))
+		return err
+	}
+
+	if parsedIssuerURL.Scheme == "" {
+		fmt.Println("oauth issuer url has no scheme")
+		return errors.E("oauth issuer url has no scheme")
+	}
+
+	deviceClientID := os.Getenv("JIMM_OAUTH_DEVICE_CLIENT_ID")
+	if deviceClientID == "" {
+		fmt.Println("no oauth device client id")
+		return errors.E("no oauth device client id")
+	}
+
+	deviceScopes := os.Getenv("JIMM_OAUTH_DEVICE_SCOPES")
+	deviceScopesParsed := strings.Split(deviceScopes, ",")
+	for i, scope := range deviceScopesParsed {
+		deviceScopesParsed[i] = strings.TrimSpace(scope)
+	}
+	if len(deviceScopesParsed) == 0 {
+		fmt.Println("no oauth device client scopes present")
+		return errors.E("no oauth device client scopes present")
+	}
+
 	insecureSecretStorage := false
 	if _, ok := os.LookupEnv("INSECURE_SECRET_STORAGE"); ok {
 		insecureSecretStorage = true
@@ -102,6 +145,12 @@ func start(ctx context.Context, s *service.Service) error {
 		JWTExpiryDuration:             jwtExpiryDuration,
 		InsecureSecretStorage:         insecureSecretStorage,
 		InsecureJwksLookup:            insecureJwksLookup,
+		OAuthAuthenticatorParams: jimm.OAuthAuthenticatorParams{
+			IssuerURL:         issuerURL,
+			DeviceClientID:    os.Getenv("JIMM_UUID"),
+			DeviceScopes:      deviceScopesParsed,
+			AccessTokenExpiry: accessTokenExpiryDuration,
+		},
 	})
 	if err != nil {
 		return err
