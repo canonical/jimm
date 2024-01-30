@@ -47,7 +47,7 @@ func NewAuthenticationService(ctx context.Context, params AuthenticationServiceP
 
 	provider, err := oidc.NewProvider(ctx, params.IssuerURL)
 	if err != nil {
-		return nil, errors.E(op, "oidc-provider-failed-create", err, "failed to create oidc provider")
+		return nil, errors.E(op, errors.CodeServerConfiguration, err, "failed to create oidc provider")
 	}
 
 	return &AuthenticationService{
