@@ -120,7 +120,7 @@ func (c *listServiceAccountCredentialsCommand) Run(ctxt *cmd.Context) error {
 	if err != nil {
 		return errors.E(err)
 	}
-	svcAccCreds := credentialsMap{ServiceAccount: credentialsByCloud(*ctxt, resp.Results)}
+	svcAccCreds := credentialsMap{ServiceAccount: credentialMapByCloud(*ctxt, resp.Results)}
 
 	err = c.out.Write(ctxt, svcAccCreds)
 	if err != nil {
@@ -129,7 +129,7 @@ func (c *listServiceAccountCredentialsCommand) Run(ctxt *cmd.Context) error {
 	return nil
 }
 
-func credentialsByCloud(ctxt cmd.Context, credentials []params.CredentialContentResult) map[string]cloud.CloudCredential {
+func credentialMapByCloud(ctxt cmd.Context, credentials []params.CredentialContentResult) map[string]cloud.CloudCredential {
 	byCloud := map[string]cloud.CloudCredential{}
 	for _, credential := range credentials {
 		if credential.Error != nil {

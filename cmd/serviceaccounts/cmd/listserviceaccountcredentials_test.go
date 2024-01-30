@@ -89,6 +89,12 @@ aws    foo
 `,
 			format: "yaml",
 		},
+		{
+			about:       "JSON format output with secrets",
+			showSecrets: true,
+			expected:    `{\"controller-credentials\":{\"aws\":{\"cloud-credentials\":{\"foo\":{\"auth-type\":\"\",\"details\":{\"foo\":\"bar\"}}}}}}\n`,
+			format:      "json",
+		},
 	}
 	for _, test := range testCases {
 		c.Log(test.about)
