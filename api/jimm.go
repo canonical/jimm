@@ -202,10 +202,3 @@ func (c *Client) ListServiceAccountCredentials(req *params.ListServiceAccountCre
 	err := c.caller.APICall("JIMM", 4, "", "ListServiceAccountCredentials", req, &response)
 	return &response, err
 }
-
-// UpdateServiceAccountCredentials updates the cloud credentials belonging to a service account.
-func (c *Client) UpdateServiceAccountCredentials(req *params.UpdateServiceAccountCredentialsRequest) (*jujuparams.UpdateCredentialResults, error) {
-	var response jujuparams.UpdateCredentialResults
-	err := c.caller.APICall("JIMM", 4, "", "UpdateServiceAccountCredentials", req, &response)
-	return &response, err
-}

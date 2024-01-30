@@ -20,6 +20,7 @@ func NewSuperCommand() *jujucmd.SuperCommand {
 		Doc:  serviceAccountDoc,
 	})
 	// Register commands here:
+	serviceAccountCmd.Register(cmd.NewAddServiceAccountCommand())
 	serviceAccountCmd.Register(cmd.NewListServiceAccountCredentialsCommand())
 	return serviceAccountCmd
 }
