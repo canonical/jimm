@@ -667,11 +667,11 @@ func insertJob(ctx context.Context, waitConfig *WaitConfig, r *River, insertFunc
 					return nil
 				}
 			case item := <-failedChan:
-				if item.Job.Attempt == item.Job.MaxAttempts && item.Job.FinalizedAt != nil {
-					return errors.E(fmt.Sprintf("river job %d failed after %d attempts at %s", item.Job.ID, item.Job.Attempt, item.Job.FinalizedAt))
+				if item.Job.ID == row.ID && item.Job.Attempt == item.Job.MaxAttempts && item.Job.FinalizedAt != nil {
+					return errors.E(fmt.Sprintf("river job %d failed after %d attempts at %s. failure reason %v", item.Job.ID, item.Job.Attempt, item.Job.FinalizedAt, item.Job.Errors))
 				}
 			case item := <-otherChan:
-				if item.Job.State == river.JobStateCancelled {
+				if item.Job.ID == row.ID && item.Job.State == river.JobStateCancelled {
 					return errors.E(fmt.Sprintf("river job %d was cancelled", item.Job.ID))
 				}
 			case <-time.After(waitConfig.Duration):
