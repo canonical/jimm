@@ -781,6 +781,8 @@ func TestUpdateCloudCredential(t *testing.T) {
 			jimmDb := db.Database{
 				DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 			}
+			err = jimmDb.Migrate(ctx, false)
+			c.Assert(err, qt.IsNil)
 			river := jimmtest.NewRiver(c, nil, client, &jimmDb)
 			j := &jimm.JIMM{
 				UUID:     uuid.NewString(),
@@ -791,8 +793,6 @@ func TestUpdateCloudCredential(t *testing.T) {
 				OpenFGAClient: client,
 				River:         river,
 			}
-			err = j.Database.Migrate(ctx, false)
-			c.Assert(err, qt.IsNil)
 
 			u, arg, expectedCredential, expectedError := test.createEnv(c, j, client)
 			user := openfga.NewUser(u, client)
