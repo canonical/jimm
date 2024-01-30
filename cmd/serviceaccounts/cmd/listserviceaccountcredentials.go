@@ -3,12 +3,18 @@
 package cmd
 
 import (
+	"fmt"
+	"io"
+	"slices"
+	"strings"
+
 	"github.com/juju/cmd/v3"
 	"github.com/juju/gnuflag"
 	jujuapi "github.com/juju/juju/api"
 	jujucmd "github.com/juju/juju/cmd"
 	"github.com/juju/juju/cmd/juju/cloud"
 	"github.com/juju/juju/cmd/modelcmd"
+	"github.com/juju/juju/cmd/output"
 	"github.com/juju/juju/jujuclient"
 	"github.com/juju/juju/rpc/params"
 
@@ -59,11 +65,12 @@ func (c *listServiceAccountCredentialsCommand) Info() *cmd.Info {
 // SetFlags implements Command.SetFlags.
 func (c *listServiceAccountCredentialsCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.CommandBase.SetFlags(f)
-	c.out.AddFlags(f, "yaml", map[string]cmd.Formatter{
-		"yaml": cmd.FormatYaml,
-		"json": cmd.FormatJson,
+	c.out.AddFlags(f, "tabular", map[string]cmd.Formatter{
+		"yaml":    cmd.FormatYaml,
+		"json":    cmd.FormatJson,
+		"tabular": formatCredentialsTabular,
 	})
-	f.BoolVar(&c.showSecrets, "show-secrets", false, "Show secrets")
+	f.BoolVar(&c.showSecrets, "show-secrets", false, "Show secrets, applicable to yaml or json formats only")
 }
 
 // Init implements the cmd.Command interface.
@@ -85,6 +92,11 @@ type credentialsMap struct {
 
 // Run implements Command.Run.
 func (c *listServiceAccountCredentialsCommand) Run(ctxt *cmd.Context) error {
+	if c.showSecrets && c.out.Name() == "tabular" {
+		ctxt.Infof("secrets are not shown in tabular format")
+		c.showSecrets = false
+	}
+
 	currentController, err := c.store.CurrentController()
 	if err != nil {
 		return errors.E(err, "could not determine controller")
@@ -97,22 +109,23 @@ func (c *listServiceAccountCredentialsCommand) Run(ctxt *cmd.Context) error {
 
 	params := apiparams.ListServiceAccountCredentialsRequest{
 		ClientID:            c.clientID,
-		CloudCredentialArgs: params.CloudCredentialArgs{},
+		CloudCredentialArgs: params.CloudCredentialArgs{IncludeSecrets: c.showSecrets},
 	}
 	client := api.NewClient(apiCaller)
 	resp, err := client.ListServiceAccountCredentials(&params)
 	if err != nil {
 		return errors.E(err)
 	}
+	svcAccCreds := credentialsMap{ServiceAccount: credentialsByCloud(*ctxt, resp.Results)}
 
-	err = c.out.Write(ctxt, credentialsByCloud(*ctxt, resp.Results))
+	err = c.out.Write(ctxt, svcAccCreds)
 	if err != nil {
 		return errors.E(err)
 	}
 	return nil
 }
 
-func credentialsByName(ctxt cmd.Context, credentials []params.CredentialContentResult) map[string]cloud.CloudCredential {
+func credentialsByCloud(ctxt cmd.Context, credentials []params.CredentialContentResult) map[string]cloud.CloudCredential {
 	byCloud := map[string]cloud.CloudCredential{}
 	for _, credential := range credentials {
 		if credential.Error != nil {
@@ -131,4 +144,60 @@ func credentialsByName(ctxt cmd.Context, credentials []params.CredentialContentR
 		byCloud[remoteCredential.Cloud] = cloudCredential
 	}
 	return byCloud
+}
+
+// formatCredentialsTabular writes a tabular summary of cloud information.
+// Adapted from juju/cmd/juju/cloud/listcredentials.go
+func formatCredentialsTabular(writer io.Writer, value interface{}) error {
+	credentials, ok := value.(credentialsMap)
+	if !ok {
+		return errors.E(fmt.Sprintf("expected value of type %T, got %T", credentials, value))
+	}
+
+	if len(credentials.ServiceAccount) == 0 {
+		return nil
+	}
+
+	tw := output.TabWriter(writer)
+	w := output.Wrapper{TabWriter: tw}
+	w.SetColumnAlignRight(1)
+
+	printGroup := func(group map[string]cloud.CloudCredential) {
+		w.Println("Cloud", "Credentials")
+		// Sort alphabetically by cloud, and then by credential name.
+		var cloudNames []string
+		for name := range group {
+			cloudNames = append(cloudNames, name)
+		}
+		slices.Sort(cloudNames)
+
+		for _, cloudName := range cloudNames {
+			var haveDefault bool
+			var credentialNames []string
+			credentials := group[cloudName]
+			for credentialName := range credentials.Credentials {
+				if credentialName == credentials.DefaultCredential {
+					credentialNames = append([]string{credentialName + "*"}, credentialNames...)
+					haveDefault = true
+				} else {
+					credentialNames = append(credentialNames, credentialName)
+				}
+			}
+			if len(credentialNames) == 0 {
+				w.Println(fmt.Sprintf("No credentials to display for cloud %v", cloudName))
+				continue
+			}
+			if haveDefault {
+				slices.Sort(credentialNames[1:])
+			} else {
+				slices.Sort(credentialNames)
+			}
+			w.Println(cloudName, strings.Join(credentialNames, ", "))
+		}
+	}
+	w.Println("\nService Account Credentials:")
+	printGroup(credentials.ServiceAccount)
+
+	tw.Flush()
+	return nil
 }
