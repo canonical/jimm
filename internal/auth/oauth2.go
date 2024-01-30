@@ -4,8 +4,11 @@ package auth
 
 import (
 	"context"
+	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
+	"github.com/lestrrat-go/jwx/v2/jwa"
+	"github.com/lestrrat-go/jwx/v2/jwt"
 	"golang.org/x/oauth2"
 
 	"github.com/canonical/jimm/internal/errors"
@@ -17,6 +20,8 @@ type AuthenticationService struct {
 	// provider holds a OIDC provider wrapper for the OAuth2.0 /x/oauth package,
 	// enabling UserInfo calls, wellknown retrieval and jwks verification.
 	provider *oidc.Provider
+	// accessTokenExpiry holds the expiry time for JIMM minted access tokens (JWTs).
+	accessTokenExpiry time.Duration
 }
 
 // AuthenticationServiceParams holds the parameters to initialise
@@ -31,6 +36,8 @@ type AuthenticationServiceParams struct {
 	DeviceClientID string
 	// DeviceScopes holds the scopes that you wish to retrieve.
 	DeviceScopes []string
+	// AccessTokenExpiry holds the expiry time of minted JIMM access tokens (JWTs).
+	AccessTokenExpiry time.Duration
 }
 
 // NewAuthenticationService returns a new authentication service for handling
@@ -40,7 +47,7 @@ func NewAuthenticationService(ctx context.Context, params AuthenticationServiceP
 
 	provider, err := oidc.NewProvider(ctx, params.IssuerURL)
 	if err != nil {
-		return nil, errors.E(op, err, "failed to create oidc provider")
+		return nil, errors.E(op, "oidc-provider-failed-create", err, "failed to create oidc provider")
 	}
 
 	return &AuthenticationService{
@@ -50,6 +57,7 @@ func NewAuthenticationService(ctx context.Context, params AuthenticationServiceP
 			Endpoint: provider.Endpoint(),
 			Scopes:   params.DeviceScopes,
 		},
+		accessTokenExpiry: params.AccessTokenExpiry,
 	}, nil
 }
 
@@ -133,5 +141,40 @@ func (as *AuthenticationService) Email(idToken *oidc.IDToken) (string, error) {
 	}
 
 	return claims.Email, nil
+}
 
+// MintAccessToken mints a session access token to be used when logging into JIMM
+// via an access token. The token only contains the user's email for authentication.
+func (as *AuthenticationService) MintAccessToken(email string, secretKey string) ([]byte, error) {
+	const op = errors.Op("auth.AuthenticationService.MintAccessToken")
+
+	token, err := jwt.NewBuilder().
+		Subject(email).
+		Expiration(time.Now().Add(as.accessTokenExpiry)).
+		Build()
+	if err != nil {
+		return nil, errors.E(op, err, "failed to build access token")
+	}
+
+	freshToken, err := jwt.Sign(token, jwt.WithKey(jwa.HS256, []byte(secretKey)))
+	if err != nil {
+		return nil, errors.E(op, err, "failed to sign access token")
+	}
+	return freshToken, nil
+}
+
+// VerifyAccessToken symmetrically verifies the validty of the signature on the
+// access token JWT, returning the parsed token.
+//
+// The subject of the token contains the user's email and can be used
+// for user object creation.
+func (as *AuthenticationService) VerifyAccessToken(token []byte, secretKey string) (jwt.Token, error) {
+	const op = errors.Op("auth.AuthenticationService.VerifyAccessToken")
+
+	parsedToken, err := jwt.Parse(token, jwt.WithKey(jwa.HS256, []byte(secretKey)))
+	if err != nil {
+		return nil, errors.E(op, err, "failed to verify access token")
+	}
+
+	return parsedToken, nil
 }
