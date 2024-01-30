@@ -62,7 +62,7 @@ func (s *listServiceAccountCredentialsSuite) TestListServiceAccountCredentials(c
 			about:       "Tabular format output",
 			showSecrets: false,
 			expected: `
-Service Account Credentials:
+Controller Credentials:
 Cloud  Credentials
 aws    foo
 `,
@@ -71,7 +71,7 @@ aws    foo
 		{
 			about:       "Yaml format output with secrets",
 			showSecrets: true,
-			expected: `service-account-credentials:
+			expected: `controller-credentials:
   aws:
     foo:
       auth-type: ""
@@ -82,7 +82,7 @@ aws    foo
 		{
 			about:       "Yaml format output without secrets",
 			showSecrets: false,
-			expected: `service-account-credentials:
+			expected: `controller-credentials:
   aws:
     foo:
       auth-type: ""

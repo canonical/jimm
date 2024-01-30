@@ -27,6 +27,10 @@ var (
 	listServiceCredentialsCommandDoc = `
 list-credentials command list the cloud credentials belonging to a service account.
 
+This command only shows credentials uploaded to the controller that belong to the service account.
+
+Client credentials should be managed via juju credentials.
+
 Example:
 	juju service-account list-credentials <clientID> 
 	juju service-account list-credentials <clientID> --show-secrets
@@ -87,7 +91,7 @@ func (c *listServiceAccountCredentialsCommand) Init(args []string) error {
 
 type credentialsMap struct {
 	// ServiceAccount has a collection of all ServiceAccount credentials keyed on credential name.
-	ServiceAccount map[string]cloud.CloudCredential `yaml:"service-account-credentials,omitempty" json:"controller-credentials,omitempty"`
+	ServiceAccount map[string]cloud.CloudCredential `yaml:"controller-credentials,omitempty" json:"controller-credentials,omitempty"`
 }
 
 // Run implements Command.Run.
@@ -195,7 +199,7 @@ func formatCredentialsTabular(writer io.Writer, value interface{}) error {
 			w.Println(cloudName, strings.Join(credentialNames, ", "))
 		}
 	}
-	w.Println("\nService Account Credentials:")
+	w.Println("\nController Credentials:")
 	printGroup(credentials.ServiceAccount)
 
 	tw.Flush()
