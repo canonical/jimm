@@ -73,18 +73,18 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	ctx, cancel := context.WithCancel(context.Background())
 	gcChecker := GocheckTester{c}
-	jimm_db := db.Database{
+	jimmDb := db.Database{
 		DB: PostgresDB(gcChecker, nil),
 	}
-	err = jimm_db.Migrate(ctx, false)
+	err = jimmDb.Migrate(ctx, false)
 	c.Assert(err, gc.Equals, nil)
 
-	river := NewRiver(gcChecker, nil, s.OFGAClient, &jimm_db)
+	river := NewRiver(gcChecker, nil, s.OFGAClient, &jimmDb)
 	c.Assert(err, gc.IsNil)
 
 	// Setup OpenFGA.
 	s.JIMM = &jimm.JIMM{
-		Database:        jimm_db,
+		Database:        jimmDb,
 		CredentialStore: &InMemoryCredentialStore{},
 		Pubsub:          &pubsub.Hub{MaxConcurrency: 10},
 		UUID:            ControllerUUID,

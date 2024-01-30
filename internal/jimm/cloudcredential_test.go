@@ -1244,6 +1244,8 @@ func TestRevokeCloudCredential(t *testing.T) {
 			jimmDb := db.Database{
 				DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 			}
+			err = jimmDb.Migrate(ctx, false)
+			c.Assert(err, qt.IsNil)
 			river := jimmtest.NewRiver(c, nil, client, &jimmDb)
 			c.Assert(err, qt.IsNil)
 			j := &jimm.JIMM{
@@ -1255,9 +1257,6 @@ func TestRevokeCloudCredential(t *testing.T) {
 				OpenFGAClient: client,
 				River:         river,
 			}
-
-			err = j.Database.Migrate(ctx, false)
-			c.Assert(err, qt.IsNil)
 
 			user, tag, expectedError := test.createEnv(c, j, client)
 
