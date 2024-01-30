@@ -6,6 +6,7 @@ import (
 	"context"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -74,6 +75,14 @@ func start(ctx context.Context, s *service.Service) error {
 	if _, ok := os.LookupEnv("INSECURE_JWKS_LOOKUP"); ok {
 		insecureJwksLookup = true
 	}
+	maxAttemptsStr := os.Getenv("RIVER_MAX_ATTEMPTS")
+	maxAttempts := 5
+	if maxAttemptsStr != "" {
+		maxAttemptsInt, err := strconv.Atoi(maxAttemptsStr)
+		if err == nil {
+			maxAttempts = maxAttemptsInt
+		}
+	}
 	jimmsvc, err := jimm.NewService(ctx, jimm.Params{
 		ControllerUUID:    os.Getenv("JIMM_UUID"),
 		DSN:               os.Getenv("JIMM_DSN"),
@@ -102,6 +111,7 @@ func start(ctx context.Context, s *service.Service) error {
 		JWTExpiryDuration:             jwtExpiryDuration,
 		InsecureSecretStorage:         insecureSecretStorage,
 		InsecureJwksLookup:            insecureJwksLookup,
+		RiverMaxAttempts:              maxAttempts,
 	})
 	if err != nil {
 		return err

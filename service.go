@@ -162,6 +162,10 @@ type Params struct {
 	// InsecureJwksLookup instructs JIMM to lookup its JWKS value via
 	// http instead of https. Useful when running JIMM in a docker compose.
 	InsecureJwksLookup bool
+
+	// RiverMaxAttempts configures the maximum number of retries that river
+	// performs for each retryable job.
+	RiverMaxAttempts int
 }
 
 // A Service is the implementation of a JIMM server.
@@ -318,10 +322,14 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		s.jimm.Dialer = jimm.CacheDialer(s.jimm.Dialer)
 	}
 
+	if p.RiverMaxAttempts == 0 {
+		p.RiverMaxAttempts = 1
+	}
+
 	riverConfig := jimm.RiverConfig{
 		Config:      nil,
 		DbUrl:       p.DSN,
-		MaxAttempts: 5,
+		MaxAttempts: p.RiverMaxAttempts,
 	}
 	s.jimm.River, err = jimm.NewRiver(ctx, riverConfig, s.jimm.OpenFGAClient, &s.jimm.Database)
 	if err != nil {
