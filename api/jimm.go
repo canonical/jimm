@@ -190,3 +190,8 @@ func (c *Client) MigrateModel(req *params.MigrateModelRequest) (*jujuparams.Init
 	err := c.caller.APICall("JIMM", 4, "", "MigrateModel", req, &response)
 	return &response, err
 }
+
+// AddServiceAccount binds a service account to a user allowing them to manage it.
+func (c *Client) AddServiceAccount(req *params.AddServiceAccountRequest) error {
+	return c.caller.APICall("JIMM", 4, "", "AddServiceAccount", req, nil)
+}

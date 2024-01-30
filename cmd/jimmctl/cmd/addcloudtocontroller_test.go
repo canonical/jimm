@@ -15,6 +15,7 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/cmd/jimmctl/cmd"
+	"github.com/canonical/jimm/internal/cmdtest"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/openfga"
@@ -22,13 +23,13 @@ import (
 )
 
 type addCloudToControllerSuite struct {
-	jimmSuite
+	cmdtest.JimmCmdSuite
 }
 
 var _ = gc.Suite(&addCloudToControllerSuite{})
 
 func (s *addCloudToControllerSuite) SetUpTest(c *gc.C) {
-	s.jimmSuite.SetUpTest(c)
+	s.JimmCmdSuite.SetUpTest(c)
 
 	// We add user bob, who is a JIMM administrator.
 	err := s.JIMM.Database.UpdateIdentity(context.Background(), &dbmodel.Identity{
@@ -166,7 +167,7 @@ clouds:
 		c.Log(test.about)
 		tmpfile, cleanupFunc := writeTempFile(c, test.cloudInfo)
 
-		bClient := s.userBakeryClient("bob@external")
+		bClient := s.UserBakeryClient("bob@external")
 		// Running the command succeeds
 		newCmd := cmd.NewAddCloudToControllerCommandForTesting(s.ClientStore(), bClient, test.cloudByNameFunc)
 		var err error

@@ -51,6 +51,8 @@ func init() {
 		migrateModel := rpc.Method(r.MigrateModel)
 		addServiceAccountMethod := rpc.Method(r.AddServiceAccount)
 		updateServiceAccountCredentials := rpc.Method(r.UpdateServiceAccountCredentials)
+		listServiceAccountCredentials := rpc.Method(r.ListServiceAccountCredentials)
+		grantServiceAccountAccess := rpc.Method(r.GrantServiceAccountAccess)
 
 		// JIMM Generic RPC
 		r.AddMethod("JIMM", 4, "AddController", addControllerMethod)
@@ -82,6 +84,8 @@ func init() {
 		// JIMM Service Accounts
 		r.AddMethod("JIMM", 4, "AddServiceAccount", addServiceAccountMethod)
 		r.AddMethod("JIMM", 4, "UpdateServiceAccountCredentials", updateServiceAccountCredentials)
+		r.AddMethod("JIMM", 4, "ListServiceAccountCredentials", listServiceAccountCredentials)
+		r.AddMethod("JIMM", 4, "GrantServiceAccountAccess", grantServiceAccountAccess)
 
 		return []int{4}
 	}
