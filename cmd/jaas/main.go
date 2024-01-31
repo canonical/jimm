@@ -6,18 +6,22 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/canonical/jimm/cmd/serviceaccounts/cmd"
+	"github.com/canonical/jimm/cmd/jaas/cmd"
 	jujucmd "github.com/juju/cmd/v3"
 )
 
-var serviceAccountDoc = `
-juju service-accounts enables users to manage service accounts.
+var jaasDoc = `
+juju jaas enables users to use JAAS commands from within Juju.
+
+JAAS enables enterprise functionality on top of Juju to provide
+functionality like OIDC login, control over many controllers,
+and fine-grained authorisation.
 `
 
 func NewSuperCommand() *jujucmd.SuperCommand {
 	serviceAccountCmd := jujucmd.NewSuperCommand(jujucmd.SuperCommandParams{
-		Name: "service-accounts",
-		Doc:  serviceAccountDoc,
+		Name: "jaas",
+		Doc:  jaasDoc,
 	})
 	// Register commands here:
 	serviceAccountCmd.Register(cmd.NewAddServiceAccountCommand())

@@ -9,7 +9,7 @@ import (
 	"github.com/juju/names/v4"
 	gc "gopkg.in/check.v1"
 
-	"github.com/canonical/jimm/cmd/serviceaccounts/cmd"
+	"github.com/canonical/jimm/cmd/jaas/cmd"
 	"github.com/canonical/jimm/internal/cmdtest"
 	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
