@@ -195,3 +195,10 @@ func (c *Client) MigrateModel(req *params.MigrateModelRequest) (*jujuparams.Init
 func (c *Client) AddServiceAccount(req *params.AddServiceAccountRequest) error {
 	return c.caller.APICall("JIMM", 4, "", "AddServiceAccount", req, nil)
 }
+
+// ListServiceAccountCredentials lists the cloud credentials belonging to a service account.
+func (c *Client) ListServiceAccountCredentials(req *params.ListServiceAccountCredentialsRequest) (*jujuparams.CredentialContentResults, error) {
+	var response jujuparams.CredentialContentResults
+	err := c.caller.APICall("JIMM", 4, "", "ListServiceAccountCredentials", req, &response)
+	return &response, err
+}
