@@ -195,3 +195,8 @@ func (c *Client) MigrateModel(req *params.MigrateModelRequest) (*jujuparams.Init
 func (c *Client) AddServiceAccount(req *params.AddServiceAccountRequest) error {
 	return c.caller.APICall("JIMM", 4, "", "AddServiceAccount", req, nil)
 }
+
+// GrantServiceAccountAccess grants admin access to a service account to given groups/identities.
+func (c *Client) GrantServiceAccountAccess(req *params.GrantServiceAccountAccess) error {
+	return c.caller.APICall("JIMM", 4, "", "GrantServiceAccountAccess", req, nil)
+}
