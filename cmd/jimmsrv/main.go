@@ -4,7 +4,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"net/url"
 	"os"
@@ -70,12 +69,13 @@ func start(ctx context.Context, s *service.Service) error {
 		}
 	}
 
-	accessTokenExpiryDuration := 24 * time.Hour
+	accessTokenExpiryDuration := time.Duration(0)
 	durationString = os.Getenv("JIMM_ACCESS_TOKEN_EXPIRY_DURATION")
 	if durationString != "" {
 		expiry, err := time.ParseDuration(durationString)
 		if err != nil {
 			zapctx.Error(ctx, "failed to parse access token expiry duration", zap.Error(err))
+			return err
 		} else {
 			accessTokenExpiryDuration = expiry
 		}
@@ -89,13 +89,13 @@ func start(ctx context.Context, s *service.Service) error {
 	}
 
 	if parsedIssuerURL.Scheme == "" {
-		fmt.Println("oauth issuer url has no scheme")
+		zapctx.Error(ctx, "oauth issuer url has no scheme")
 		return errors.E("oauth issuer url has no scheme")
 	}
 
 	deviceClientID := os.Getenv("JIMM_OAUTH_DEVICE_CLIENT_ID")
 	if deviceClientID == "" {
-		fmt.Println("no oauth device client id")
+		zapctx.Error(ctx, "no oauth device client id")
 		return errors.E("no oauth device client id")
 	}
 
@@ -105,7 +105,7 @@ func start(ctx context.Context, s *service.Service) error {
 		deviceScopesParsed[i] = strings.TrimSpace(scope)
 	}
 	if len(deviceScopesParsed) == 0 {
-		fmt.Println("no oauth device client scopes present")
+		zapctx.Error(ctx, "no oauth device client scopes present")
 		return errors.E("no oauth device client scopes present")
 	}
 
