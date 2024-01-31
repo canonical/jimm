@@ -130,19 +130,16 @@ func (c *listServiceAccountCredentialsCommand) Run(ctxt *cmd.Context) error {
 }
 
 func credentialMapByCloud(ctxt cmd.Context, credentials []params.CredentialContentResult) map[string]cloud.CloudCredential {
-	byCloud := map[string]cloud.CloudCredential{}
+	byCloud := make(map[string]cloud.CloudCredential)
 	for _, credential := range credentials {
 		if credential.Error != nil {
 			ctxt.Warningf("error loading remote credential: %v", credential.Error)
 			continue
 		}
 		remoteCredential := credential.Result.Content
-		cloudCredential, ok := byCloud[remoteCredential.Cloud]
-		if !ok {
-			cloudCredential = cloud.CloudCredential{}
-		}
+		cloudCredential := byCloud[remoteCredential.Cloud]
 		if cloudCredential.Credentials == nil {
-			cloudCredential.Credentials = map[string]cloud.Credential{}
+			cloudCredential.Credentials = make(map[string]cloud.Credential)
 		}
 		cloudCredential.Credentials[remoteCredential.Name] = cloud.Credential{AuthType: remoteCredential.AuthType, Attributes: remoteCredential.Attributes}
 		byCloud[remoteCredential.Cloud] = cloudCredential
