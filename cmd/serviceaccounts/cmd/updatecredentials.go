@@ -138,7 +138,7 @@ func (c *updateCredentialsCommand) Run(ctxt *cmd.Context) error {
 func findCredentialsInLocalCache(store jujuclient.ClientStore, cloud, credentialName string) (*jujuparams.CloudCredential, error) {
 	cloudCredentials, err := store.CredentialForCloud(cloud)
 	if err != nil {
-		return nil, errors.E(err, "failed to fetch local credentials for cloud %q", cloud)
+		return nil, errors.E(err, fmt.Sprintf("failed to fetch local credentials for cloud %q", cloud))
 	}
 
 	for name, aCredential := range cloudCredentials.AuthCredentials {
@@ -150,5 +150,5 @@ func findCredentialsInLocalCache(store jujuclient.ClientStore, cloud, credential
 		}
 	}
 
-	return nil, errors.E("credential %q not found on local client; run `juju add-credential <cloud> --client` to add the credential to Juju local store first", credentialName)
+	return nil, errors.E(fmt.Sprintf("credential %q not found on local client; run `juju add-credential <cloud> --client` to add the credential to Juju local store first", credentialName))
 }
