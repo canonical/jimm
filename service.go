@@ -322,9 +322,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		s.jimm.Dialer = jimm.CacheDialer(s.jimm.Dialer)
 	}
 
-	if p.RiverMaxAttempts == 0 {
-		p.RiverMaxAttempts = 1
-	}
+	p.RiverMaxAttempts = min(30, max(1, p.RiverMaxAttempts))
 
 	riverConfig := jimm.RiverConfig{
 		Config:      nil,
