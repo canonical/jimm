@@ -901,20 +901,24 @@ func TestAddModel(t *testing.T) {
 
 			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.name)
 			c.Assert(err, qt.IsNil)
+			ctx := context.Background()
+			jimmDb := db.Database{
+				DB: jimmtest.PostgresDB(c, nil),
+			}
+			err = jimmDb.Migrate(ctx, false)
+			c.Assert(err, qt.IsNil)
+
+			river := jimmtest.NewRiver(c, nil, client, &jimmDb)
 
 			j := &jimm.JIMM{
-				UUID: uuid.NewString(),
-				Database: db.Database{
-					DB: jimmtest.PostgresDB(c, nil),
-				},
+				UUID:     uuid.NewString(),
+				Database: jimmDb,
 				Dialer: &jimmtest.Dialer{
 					API: api,
 				},
 				OpenFGAClient: client,
+				River:         river,
 			}
-			ctx := context.Background()
-			err = j.Database.Migrate(ctx, false)
-			c.Assert(err, qt.IsNil)
 
 			env := jimmtest.ParseEnvironment(c, test.env)
 			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
@@ -3139,7 +3143,6 @@ func TestDumpModelDB(t *testing.T) {
 				},
 				Dialer: dialer,
 			}
-
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 
@@ -3543,20 +3546,23 @@ users:
 
 	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
+	jimmDb := db.Database{
+		DB: jimmtest.PostgresDB(c, nil),
+	}
+	ctx := context.Background()
+	err = jimmDb.Migrate(ctx, false)
+	c.Assert(err, qt.IsNil)
+	river := jimmtest.NewRiver(c, nil, client, &jimmDb)
 
 	j := &jimm.JIMM{
-		UUID:          uuid.NewString(),
-		OpenFGAClient: client,
-		Database: db.Database{
-			DB: jimmtest.PostgresDB(c, nil),
-		},
+		UUID:     uuid.NewString(),
+		Database: jimmDb,
 		Dialer: &jimmtest.Dialer{
 			API: api,
 		},
+		OpenFGAClient: client,
+		River:         river,
 	}
-	ctx := context.Background()
-	err = j.Database.Migrate(ctx, false)
-	c.Assert(err, qt.IsNil)
 
 	envDefinition := `
 clouds:

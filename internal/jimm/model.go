@@ -15,6 +15,8 @@ import (
 	"github.com/juju/names/v4"
 	"github.com/juju/zaputil"
 	"github.com/juju/zaputil/zapctx"
+	"github.com/riverqueue/river"
+	"github.com/riverqueue/river/rivertype"
 	"go.uber.org/zap"
 
 	"github.com/canonical/jimm/internal/constants"
@@ -483,17 +485,6 @@ func (b *modelBuilder) CreateControllerModel() *modelBuilder {
 		return b
 	}
 
-	// Grant JIMM admin access to the model. Note that if this fails,
-	// the local database entry will be deleted but the model
-	// will remain on the controller and will trigger the "already exists
-	// in the backend controller" message above when the user
-	// attempts to create a model with the same name again.
-	if err := api.GrantJIMMModelAdmin(b.ctx, names.NewModelTag(info.UUID)); err != nil {
-		zapctx.Error(b.ctx, "leaked model", zap.String("model", info.UUID), zaputil.Error(err))
-		b.err = errors.E(err)
-		return b
-	}
-
 	b.modelInfo = &info
 	return b
 }
@@ -625,31 +616,21 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 	}
 
 	mi := builder.JujuModelInfo()
-
-	if err := j.OpenFGAClient.AddControllerModel(
-		ctx,
-		builder.controller.ResourceTag(),
-		builder.model.ResourceTag(),
-	); err != nil {
-		zapctx.Error(
-			ctx,
-			"failed to add controller-model relation",
-			zap.String("controller", builder.controller.UUID),
-			zap.String("model", builder.model.UUID.String),
-		)
+	openfgaRiverJobArgs := RiverOpenFGAArgs{
+		ControllerUUID: builder.controller.UUID,
+		ModelId:        builder.model.ID,
+		OwnerName:      builder.owner.Username,
+		ModelInfoUUID:  mi.UUID,
 	}
-	err = openfga.NewUser(owner, j.OpenFGAClient).SetModelAccess(ctx, names.NewModelTag(mi.UUID), ofganames.AdministratorRelation)
+	err = InsertJob(ctx, &WaitConfig{Duration: 1 * time.Minute}, j.River, func() (*rivertype.JobRow, error) {
+		return j.River.Client.Insert(ctx, openfgaRiverJobArgs, &river.InsertOpts{MaxAttempts: j.River.MaxAttempts})
+	})
 	if err != nil {
-		zapctx.Error(
-			ctx,
-			"failed to add administrator relation",
-			zap.String("user", owner.Tag().String()),
-			zap.String("model", builder.model.UUID.String),
-		)
+		return nil, errors.E(err, "failed to insert and wait for the river job")
 	}
-
 	return mi, nil
 }
+
 
 // ModelInfo returns the model info for the model with the given ModelTag.
 // The returned ModelInfo will be appropriate for the given user's

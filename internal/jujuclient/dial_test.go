@@ -59,7 +59,7 @@ func (s *jujuclientSuite) TearDownTest(c *gc.C) {
 		s.API = nil
 		c.Assert(err, gc.Equals, nil)
 	}
-	s.JujuConnSuite.TearDownTest(c)
+	s.JujuSuite.TearDownTest(c)
 }
 
 type dialSuite struct {

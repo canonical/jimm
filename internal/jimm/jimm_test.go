@@ -39,7 +39,6 @@ func TestFindAuditEvents(t *testing.T) {
 		},
 		OpenFGAClient: client,
 	}
-
 	ctx := context.Background()
 
 	err = j.Database.Migrate(ctx, true)

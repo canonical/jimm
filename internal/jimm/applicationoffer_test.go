@@ -720,7 +720,6 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 			},
 		},
 	}
-
 	tests := []struct {
 		about                string
 		user                 *dbmodel.User
@@ -938,7 +937,6 @@ func TestGetApplicationOffer(t *testing.T) {
 			},
 		},
 	}
-
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
@@ -1856,6 +1854,7 @@ func TestOffer(t *testing.T) {
 			}
 
 			ctx := context.Background()
+
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 

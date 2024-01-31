@@ -71,23 +71,29 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 	var err error
 	s.OFGAClient, s.COFGAClient, s.COFGAParams, err = SetupTestOFGAClient(c.TestName())
 	c.Assert(err, gc.IsNil)
+	ctx, cancel := context.WithCancel(context.Background())
+	gcChecker := GocheckTester{c}
+	jimmDb := db.Database{
+		DB: PostgresDB(gcChecker, nil),
+	}
+	err = jimmDb.Migrate(ctx, false)
+	c.Assert(err, gc.Equals, nil)
+
+	river := NewRiver(gcChecker, nil, s.OFGAClient, &jimmDb)
+	c.Assert(err, gc.IsNil)
 
 	// Setup OpenFGA.
 	s.JIMM = &jimm.JIMM{
-		Database: db.Database{
-			DB: PostgresDB(GocheckTester{c}, nil),
-		},
+		Database:        jimmDb,
 		CredentialStore: &InMemoryCredentialStore{},
 		Pubsub:          &pubsub.Hub{MaxConcurrency: 10},
 		UUID:            ControllerUUID,
 		OpenFGAClient:   s.OFGAClient,
+		River:           river,
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
 
-	err = s.JIMM.Database.Migrate(ctx, false)
-	c.Assert(err, gc.Equals, nil)
 	s.AdminUser = &dbmodel.User{
 		Username:  "alice@external",
 		LastLogin: db.Now(),
@@ -139,6 +145,9 @@ func (s *JIMMSuite) TearDownTest(c *gc.C) {
 	}
 	if s.Server != nil {
 		s.Server.Close()
+	}
+	if err := s.JIMM.River.Cleanup(context.Background()); err != nil {
+		c.Logf("failed to cleanup river client: %s", err)
 	}
 	if err := s.JIMM.Database.Close(); err != nil {
 		c.Logf("failed to close database connections at tear down: %s", err)
