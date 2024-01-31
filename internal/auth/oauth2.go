@@ -4,6 +4,7 @@ package auth
 
 import (
 	"context"
+	"net/mail"
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -89,7 +90,7 @@ func (as *AuthenticationService) Device(ctx context.Context) (*oauth2.DeviceAuth
 // DeviceAccessToken continues and collect an access token during the device login flow
 // and is step TWO.
 //
-// See Device(...) godoc for more info pertaining to the fko.
+// See Device(...) godoc for more info pertaining to the flow.
 func (as *AuthenticationService) DeviceAccessToken(ctx context.Context, res *oauth2.DeviceAuthResponse) (*oauth2.Token, error) {
 	const op = errors.Op("auth.AuthenticationService.DeviceAccessToken")
 
@@ -173,7 +174,11 @@ func (as *AuthenticationService) VerifyAccessToken(token []byte, secretKey strin
 
 	parsedToken, err := jwt.Parse(token, jwt.WithKey(jwa.HS256, []byte(secretKey)))
 	if err != nil {
-		return nil, errors.E(op, err, "failed to verify access token")
+		return nil, errors.E(op, err)
+	}
+
+	if _, err = mail.ParseAddress(parsedToken.Subject()); err != nil {
+		return nil, errors.E(op, "failed to parse email")
 	}
 
 	return parsedToken, nil
