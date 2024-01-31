@@ -23,6 +23,8 @@ import (
 var (
 	updateCredentialsCommandDoc = `
 update-credentials command updates the credentials associated with a service account.
+This will add the credentials to JAAS if they were not found.
+`
 
 Example:
 	juju service-account update-credentials <client-id> <cloud> <credential-name>
