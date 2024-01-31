@@ -51,6 +51,7 @@ type updateCredentialsCommand struct {
 	credentialName string
 }
 
+// Info implements Command.Info.
 func (c *updateCredentialsCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
 		Name:    "update-credentials",
