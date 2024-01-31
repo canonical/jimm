@@ -98,7 +98,7 @@ func (c *updateCredentialsCommand) Run(ctxt *cmd.Context) error {
 
 	apiCaller, err := c.NewAPIRootWithDialOpts(c.store, currentController, "", c.dialOpts)
 	if err != nil {
-		return err
+		return errors.E(err, "failed to dial the controller")
 	}
 
 	credential, err := findCredentialsInLocalCache(c.store, c.cloud, c.credentialName)
