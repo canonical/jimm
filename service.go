@@ -323,10 +323,9 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	}
 
 	p.RiverMaxAttempts = min(30, max(1, p.RiverMaxAttempts))
-
 	riverConfig := jimm.RiverConfig{
 		Config:      nil,
-		DbUrl:       p.DSN,
+		DSN:         p.DSN,
 		MaxAttempts: p.RiverMaxAttempts,
 	}
 	s.jimm.River, err = jimm.NewRiver(ctx, riverConfig, s.jimm.OpenFGAClient, &s.jimm.Database)

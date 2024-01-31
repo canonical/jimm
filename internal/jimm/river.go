@@ -57,7 +57,7 @@ func (w *RiverOpenFGAWorker) Work(ctx context.Context, job *river.Job[RiverOpenF
 	owner := &dbmodel.User{Username: job.Args.OwnerName}
 	err := w.Database.GetUser(ctx, owner)
 	if err != nil {
-		return err
+		return errors.E(err)
 	}
 	if err := w.OfgaClient.AddControllerModel(
 		ctx,
@@ -97,8 +97,8 @@ type River struct {
 	RetryPolicy river.ClientRetryPolicy
 }
 
-// RegisterJimmWorkers would register known workers safely and return a pointer to a river.workers struct that should be used in river creation.
-func RegisterJimmWorkers(ctx context.Context, ofgaConn *openfga.OFGAClient, db *db.Database) (*river.Workers, error) {
+// registerJimmWorkers would register known workers safely and return a pointer to a river.workers struct that should be used in river creation.
+func registerJimmWorkers(ctx context.Context, ofgaConn *openfga.OFGAClient, db *db.Database) (*river.Workers, error) {
 	workers := river.NewWorkers()
 	if err := river.AddWorkerSafely(workers, &RiverOpenFGAWorker{OfgaClient: ofgaConn, Database: *db}); err != nil {
 		return nil, err
@@ -139,8 +139,8 @@ type RiverConfig struct {
 	// Config is an optional river config object that includes the retry policy,
 	// the queue defaults and the maximum number of workers to create, as well as the workers themselves.
 	Config *river.Config
-	// DbUrl is the DSN for JIMM db, which is used to create river's PG connection pool.
-	DbUrl string
+	// DSN is JIMM Db's DSN, which is used to create river's PG connection pool.
+	DSN string
 	// MaxAttempts is how many times river would retry before a job is abandoned and set as
 	// discarded. This includes the original and the retry attempts.
 	MaxAttempts int
@@ -150,9 +150,9 @@ type RiverConfig struct {
 
 // NewRiver returns a new river instance after applying the needed migrations to the database.
 // It will open a postgres connections pool that would be closed in the Cleanup routine.
-func NewRiver(ctx context.Context, riverConfig RiverConfig, ofgaClient *openfga.OFGAClient, db *db.Database) (*River, error) {
+func NewRiver(ctx context.Context, riverConfig RiverConfig, ofgaClient *openfga.OFGAClient, db *db.Database) (_ *River, err error) {
 	maxAttempts := max(1, riverConfig.MaxAttempts)
-	workers, err := RegisterJimmWorkers(ctx, ofgaClient, db)
+	workers, err := registerJimmWorkers(ctx, ofgaClient, db)
 	if err != nil {
 		return nil, err
 	}
@@ -166,10 +166,15 @@ func NewRiver(ctx context.Context, riverConfig RiverConfig, ofgaClient *openfga.
 			Workers: workers,
 		}
 	}
-	dbPool, err := pgxpool.New(ctx, riverConfig.DbUrl)
+	dbPool, err := pgxpool.New(ctx, riverConfig.DSN)
 	if err != nil {
 		return nil, err
 	}
+	defer func() {
+		if err != nil {
+			dbPool.Close()
+		}
+	}()
 	riverClient, err := river.NewClient(riverpgxv5.New(dbPool), riverConfig.Config)
 	if err != nil {
 		dbPool.Close()
@@ -189,8 +194,8 @@ func NewRiver(ctx context.Context, riverConfig RiverConfig, ofgaClient *openfga.
 	return &r, nil
 }
 
-// InsertJob executes the insertion function passed to it.
-// If wait is true, then it will block until the job is completed or the ctx is done because of a timeout.
+// InsertJob performs the insertion function provided to add a job to River's job queue.
+// If waitConfig is not nil, the function blocks until the job is finished, failed, canceled, times out, or the context is done.
 func InsertJob(ctx context.Context, waitConfig *WaitConfig, r *River, insertFunc func() (*rivertype.JobRow, error)) error {
 	var completedChan <-chan *river.Event
 	var completedSubscribeCancel func()

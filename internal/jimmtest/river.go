@@ -16,7 +16,7 @@ func NewRiver(t Tester, riverConfig *jimm.RiverConfig, ofgaConn *openfga.OFGACli
 	if riverConfig == nil {
 		riverConfig = &jimm.RiverConfig{
 			Config: nil,
-			DbUrl:  dsn,
+			DSN:    dsn,
 		}
 	}
 	riverClient, err := jimm.NewRiver(context.Background(), *riverConfig, ofgaConn, db)
