@@ -146,5 +146,5 @@ func findCredentialsInLocalCache(store jujuclient.ClientStore, cloud, credential
 		}
 	}
 
-	return nil, errors.E("credential %q not found on local client", credentialName)
+	return nil, errors.E("credential %q not found on local client; run `juju add-credential <cloud> --client` to add the credential to Juju local store first", credentialName)
 }
