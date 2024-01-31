@@ -86,7 +86,7 @@ func (c *grantCommand) Run(ctxt *cmd.Context) error {
 
 	apiCaller, err := c.NewAPIRootWithDialOpts(c.store, currentController, "", c.dialOpts)
 	if err != nil {
-		return err
+		return errors.E(err, "failed to dial the controller")
 	}
 
 	params := apiparams.GrantServiceAccountAccess{
