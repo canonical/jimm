@@ -49,10 +49,9 @@ require (
 	github.com/dustinkirkland/golang-petname v0.0.0-20230626224747-e794b9370d49
 	github.com/go-chi/chi/v5 v5.0.8
 	github.com/go-chi/render v1.0.2
+	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/itchyny/gojq v0.12.12
 	github.com/juju/charm/v11 v11.0.2
-	github.com/juju/clock v1.0.3
-	github.com/juju/retry v1.0.0
 	github.com/lestrrat-go/jwx/v2 v2.0.11
 	github.com/oklog/ulid/v2 v2.1.0
 	github.com/stretchr/testify v1.8.4
@@ -192,6 +191,7 @@ require (
 	github.com/juju/aclstore/v2 v2.1.0 // indirect
 	github.com/juju/ansiterm v1.0.0 // indirect
 	github.com/juju/blobstore/v3 v3.0.2 // indirect
+	github.com/juju/clock v1.0.3 // indirect
 	github.com/juju/collections v1.0.4 // indirect
 	github.com/juju/description/v4 v4.0.11 // indirect
 	github.com/juju/featureflag v1.0.0 // indirect
@@ -217,6 +217,7 @@ require (
 	github.com/juju/pubsub/v2 v2.0.0 // indirect
 	github.com/juju/ratelimit v1.0.2 // indirect
 	github.com/juju/replicaset/v3 v3.0.1 // indirect
+	github.com/juju/retry v1.0.0 // indirect
 	github.com/juju/rfc/v2 v2.0.0 // indirect
 	github.com/juju/romulus v1.0.0 // indirect
 	github.com/juju/schema v1.0.1 // indirect
