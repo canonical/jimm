@@ -18,9 +18,9 @@ import (
 var (
 	grantCommandDoc = `
 grant command grants administrator access over a service account to the given groups/identities.
-
-Example:
-	juju service-account grant <client-id> (<user>|<group>) [(<user>|<group>) ...]
+`
+	grantCommandExamples = `
+    juju service-accounts grant 00000000-0000-0000-0000-000000000000 user-foo group-bar
 `
 )
 
@@ -47,9 +47,11 @@ type grantCommand struct {
 
 func (c *grantCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:    "grant",
-		Purpose: "Grants administrator access over a service account to the given groups/identities",
-		Doc:     grantCommandDoc,
+		Name:     "grant",
+		Args:     "<client-id> (<user>|<group>) [(<user>|<group>) ...]",
+		Purpose:  "Grants administrator access over a service account to the given groups/identities",
+		Examples: grantCommandExamples,
+		Doc:      grantCommandDoc,
 	})
 }
 
