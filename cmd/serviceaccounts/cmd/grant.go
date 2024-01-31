@@ -45,6 +45,7 @@ type grantCommand struct {
 	entities []string
 }
 
+// Info implements Command.Info.
 func (c *grantCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
 		Name:     "grant",
