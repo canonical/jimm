@@ -622,7 +622,7 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 		OwnerName:      builder.owner.Username,
 		ModelInfoUUID:  mi.UUID,
 	}
-	err = insertJob(ctx, &WaitConfig{Duration: 1 * time.Minute}, j.River, func() (*rivertype.JobRow, error) {
+	err = InsertJob(ctx, &WaitConfig{Duration: 1 * time.Minute}, j.River, func() (*rivertype.JobRow, error) {
 		return j.River.Client.Insert(ctx, openfgaRiverJobArgs, &river.InsertOpts{MaxAttempts: j.River.MaxAttempts})
 	})
 	if err != nil {
@@ -631,58 +631,6 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 	return mi, nil
 }
 
-// insertJob executes the insertion function passed to it.
-// If wait is true, then it will block until the job is completed or the ctx is done because of a timeout.
-func insertJob(ctx context.Context, waitConfig *WaitConfig, r *River, insertFunc func() (*rivertype.JobRow, error)) error {
-	var completedChan <-chan *river.Event
-	var completedSubscribeCancel func()
-	var failedChan <-chan *river.Event
-	var failedSubscribeCancel func()
-	var otherChan <-chan *river.Event
-	var otherSubscribeCancel func()
-
-	if waitConfig != nil {
-		// Subscribers tell the River client the kinds of events they'd like to receive.
-		completedChan, completedSubscribeCancel = r.Client.Subscribe(river.EventKindJobCompleted)
-		defer completedSubscribeCancel()
-
-		// Multiple simultaneous subscriptions are allowed.
-		failedChan, failedSubscribeCancel = r.Client.Subscribe(river.EventKindJobFailed)
-		defer failedSubscribeCancel()
-
-		otherChan, otherSubscribeCancel = r.Client.Subscribe(river.EventKindJobCancelled, river.EventKindJobSnoozed)
-		defer otherSubscribeCancel()
-	}
-
-	row, err := insertFunc()
-	if err != nil {
-		zapctx.Error(ctx, "failed to insert river job", zaputil.Error(err))
-		return errors.E(err, "failed to insert river job")
-	}
-	if waitConfig != nil {
-		for {
-			select {
-			case item := <-completedChan:
-				if item.Job.ID == row.ID {
-					return nil
-				}
-			case item := <-failedChan:
-				if item.Job.ID == row.ID && item.Job.Attempt == item.Job.MaxAttempts && item.Job.FinalizedAt != nil {
-					return errors.E(fmt.Sprintf("river job %d failed after %d attempts at %s. failure reason %v", item.Job.ID, item.Job.Attempt, item.Job.FinalizedAt, item.Job.Errors))
-				}
-			case item := <-otherChan:
-				if item.Job.ID == row.ID && item.Job.State == river.JobStateCancelled {
-					return errors.E(fmt.Sprintf("river job %d was cancelled", item.Job.ID))
-				}
-			case <-time.After(waitConfig.Duration):
-				return errors.E(fmt.Sprintf("timed out after %s waiting for river to process the job", waitConfig.Duration))
-			case <-ctx.Done():
-				return errors.E(ctx.Err())
-			}
-		}
-	}
-	return nil
-}
 
 // ModelInfo returns the model info for the model with the given ModelTag.
 // The returned ModelInfo will be appropriate for the given user's
