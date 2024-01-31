@@ -103,7 +103,7 @@ func (c *updateCredentialsCommand) Run(ctxt *cmd.Context) error {
 
 	credential, err := findCredentialsInLocalCache(c.store, c.cloud, c.credentialName)
 	if err != nil {
-		return err
+		return errors.E(err)
 	}
 
 	taggedCredential := jujuparams.TaggedCredential{
