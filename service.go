@@ -14,7 +14,6 @@ import (
 
 	"github.com/canonical/candid/candidclient"
 	cofga "github.com/canonical/ofga"
-	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/dbrootkeystore"
@@ -323,12 +322,13 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	s.jimm.OAuthAuthenticator, err = auth.NewAuthenticationService(
 		ctx,
 		auth.AuthenticationServiceParams{
-			IssuerURL:      "http://localhost:8082/realms/jimm",
-			DeviceClientID: "jimm-device",
-			DeviceScopes:   []string{oidc.ScopeOpenID, "profile", "email"},
+			IssuerURL:      p.OAuthAuthenticatorParams.IssuerURL,
+			DeviceClientID: p.OAuthAuthenticatorParams.DeviceClientID,
+			DeviceScopes:   p.OAuthAuthenticatorParams.DeviceScopes,
 		},
 	)
 	if err != nil {
+		zapctx.Error(ctx, "failed to setup authentication service", zap.Error(err))
 		return nil, errors.E(op, err, "failed to setup authentication service")
 	}
 

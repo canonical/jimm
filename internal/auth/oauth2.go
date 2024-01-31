@@ -8,8 +8,10 @@ import (
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
+	"github.com/juju/zaputil/zapctx"
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwt"
+	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 
 	"github.com/canonical/jimm/internal/errors"
@@ -48,6 +50,7 @@ func NewAuthenticationService(ctx context.Context, params AuthenticationServiceP
 
 	provider, err := oidc.NewProvider(ctx, params.IssuerURL)
 	if err != nil {
+		zapctx.Error(ctx, "failed to create oidc provider", zap.Error(err))
 		return nil, errors.E(op, errors.CodeServerConfiguration, err, "failed to create oidc provider")
 	}
 

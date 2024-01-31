@@ -75,7 +75,7 @@ services:
       OPENFGA_STORE: "01GP1254CHWJC1MNGVB0WDG1T0"
       OPENFGA_AUTH_MODEL: "01GP1EC038KHGB6JJ2XXXXCXKB"
       OPENFGA_TOKEN: "jimm"
-      JIMM_OAUTH_ISSUER_URL: "http://localhost:8082/realms/jimm" # Scheme required
+      JIMM_OAUTH_ISSUER_URL: "http://keycloak:8082/realms/jimm" # Scheme required
       JIMM_OAUTH_DEVICE_CLIENT_ID: "jimm-device" # Must be a public client, no client secret
       JIMM_OAUTH_DEVICE_SCOPES: "openid, profile, email" # Comma separated list of scopes
     volumes:
