@@ -6,15 +6,12 @@ import (
 	"context"
 	"crypto/x509"
 	"encoding/pem"
-	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/jimm/credentials"
 	"github.com/google/uuid"
-	"github.com/juju/clock"
-	"github.com/juju/retry"
+	"github.com/hashicorp/golang-lru/v2/expirable"
 	"github.com/juju/zaputil/zapctx"
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwk"
@@ -24,17 +21,52 @@ import (
 
 type JWTServiceParams struct {
 	Host   string
-	Secure bool
 	Store  credentials.CredentialStore
 	Expiry time.Duration
+}
+
+// JwksGetter provides a Get method to fetch the JWK set.
+type JwksGetter interface {
+	Get(ctx context.Context) (jwk.Set, error)
+}
+
+// CredentialCache provides a cache that will periodically fetch the JWK set from a credential store.
+type CredentialCache struct {
+	credentials.CredentialStore
+	c *expirable.LRU[string, jwk.Set]
+}
+
+// NewCredentialCache creates a new CredentialCache used for storing and periodically fetching
+// a JWK set from the provided credential store.
+// Note that the cache duration is configured at 1h, which should be much lower than the
+// rotation period of the JWK set.
+func NewCredentialCache(credentialStore credentials.CredentialStore) CredentialCache {
+	cache := expirable.NewLRU[string, jwk.Set](1, nil, time.Duration(1*time.Hour))
+	return CredentialCache{CredentialStore: credentialStore, c: cache}
+}
+
+const jwksCacheKey = "jwks"
+
+// Get implements JwksGetter.Get
+func (v CredentialCache) Get(ctx context.Context) (jwk.Set, error) {
+	if val, ok := v.c.Get(jwksCacheKey); ok {
+		return val, nil
+	}
+	ks, err := v.CredentialStore.GetJWKS(ctx)
+	if err != nil {
+		return nil, err
+	}
+	v.c.Add(jwksCacheKey, ks)
+	return ks, nil
 }
 
 // JWTService manages the creation of JWTs that are intended to be issued
 // by JIMM.
 type JWTService struct {
 	JWTServiceParams
-
-	Cache *jwk.Cache
+	// JWKS is the JSON Web Key Set containing the public key used for verifying
+	// signed JWT tokens.
+	JWKS JwksGetter
 }
 
 // JWTParams are the necessary params to issue a ready-to-go JWT targeted
@@ -50,44 +82,8 @@ type JWTParams struct {
 
 // NewJWTService returns a new JWT service for handling JIMMs JWTs.
 func NewJWTService(p JWTServiceParams) *JWTService {
-	return &JWTService{JWTServiceParams: p}
-}
-
-// RegisterJWKSCache registers a cache to refresh the public key persisted by JIMM's
-// JWKSService. It calls JIMM's JWKSService endpoint the same as any other ordinary
-// client would.
-func (j *JWTService) RegisterJWKSCache(ctx context.Context, client *http.Client) {
-	j.Cache = jwk.NewCache(ctx)
-
-	_ = j.Cache.Register(j.getJWKSEndpoint(j.Secure), jwk.WithHTTPClient(client))
-
-	err := retry.Call(retry.CallArgs{
-		Func: func() error {
-			zapctx.Info(ctx, "cache refresh")
-			select {
-			case <-ctx.Done():
-				return nil
-			default:
-			}
-			if _, err := j.Cache.Refresh(ctx, j.getJWKSEndpoint(j.Secure)); err != nil {
-				zapctx.Debug(ctx, "Refresh error", zap.Error(err), zap.String("URL", j.getJWKSEndpoint(j.Secure)))
-				return err
-			}
-			return nil
-		},
-		Attempts: 10,
-		Delay:    2 * time.Second,
-		Clock:    clock.WallClock,
-		Stop:     ctx.Done(),
-	})
-	select {
-	case <-ctx.Done():
-		zapctx.Info(ctx, "context cancelled stopping jwks registration gracefully", zap.Error(err))
-	default:
-		if err != nil {
-			panic(err.Error())
-		}
-	}
+	vaultCache := NewCredentialCache(p.Store)
+	return &JWTService{JWTServiceParams: p, JWKS: vaultCache}
 }
 
 // NewJWT creates a new JWT to represent a users access within a controller.
@@ -106,12 +102,8 @@ func (j *JWTService) NewJWT(ctx context.Context, params JWTParams) ([]byte, erro
 	}
 
 	zapctx.Debug(ctx, "issuing a new JWT", zap.Any("params", params))
-	if j == nil || j.Cache == nil {
-		zapctx.Debug(ctx, "JwtService struct value", zap.String("JwtService", fmt.Sprintf("%+v", j)))
-		return nil, errors.E("nil pointer in JWT service")
-	}
 
-	jwkSet, err := j.Cache.Get(ctx, j.getJWKSEndpoint(j.Secure))
+	jwkSet, err := j.JWKS.Get(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -178,12 +170,4 @@ func (j *JWTService) generateJTI(ctx context.Context) (string, error) {
 		return "", err
 	}
 	return id.String(), nil
-}
-
-func (j *JWTService) getJWKSEndpoint(secure bool) string {
-	scheme := "https://"
-	if !secure {
-		scheme = "http://"
-	}
-	return scheme + j.Host + "/.well-known/jwks.json"
 }

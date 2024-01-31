@@ -124,10 +124,8 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 	s.JIMM.JWTService = jimmjwx.NewJWTService(jimmjwx.JWTServiceParams{
 		Host:   u.Host,
 		Store:  s.JIMM.CredentialStore,
-		Secure: false,
 		Expiry: time.Minute,
 	})
-	s.JIMM.JWTService.RegisterJWKSCache(ctx, s.Server.Client())
 	s.JIMM.Dialer = &jujuclient.Dialer{
 		JWTService: s.JIMM.JWTService,
 	}
