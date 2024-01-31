@@ -154,3 +154,176 @@ func (s *updateCredentialsSuite) TestUpdateCredentialsWithExistingCredentials(c 
 		"foo": "bar",
 	})
 }
+
+func (s *updateCredentialsSuite) TestNonExistingClientID(c *gc.C) {
+	// alice is superuser
+	bClient := s.UserBakeryClient("alice")
+
+	clientStore := s.ClientStore()
+	err := clientStore.UpdateCredential("test-cloud", jujucloud.CloudCredential{
+		AuthCredentials: map[string]jujucloud.Credential{
+			"test-credentials": jujucloud.NewCredential(jujucloud.EmptyAuthType, map[string]string{
+				"foo": "bar",
+			}),
+		},
+	})
+	c.Assert(err, gc.IsNil)
+
+	_, err = cmdtesting.RunCommand(c, cmd.NewUpdateCredentialsCommandForTesting(clientStore, bClient),
+		"00000000-0000-0000-0000-000000000000",
+		"test-cloud",
+		"test-credentials",
+	)
+
+	// Note that, JIMM currently returns an `unauthorized` error when the given
+	// client ID does not exist. It's because it first looks for an OpenFGA tuple
+	// that relates the user to the requested service account (client ID). Since
+	// the service account does not exist, the tuple is not there as well and
+	// therefore an `unauthorized` error will be returned.
+	c.Assert(err, gc.ErrorMatches, "unauthorized \\(unauthorized access\\)")
+}
+
+func (s *updateCredentialsSuite) TestUnauthorizedAccess(c *gc.C) {
+	ctx := context.Background()
+
+	clientID := "abda51b2-d735-4794-a8bd-49c506baa4af"
+
+	// alice is superuser
+	bClient := s.UserBakeryClient("alice")
+
+	sa := dbmodel.Identity{
+		Name: clientID,
+	}
+	err := s.JIMM.Database.GetIdentity(ctx, &sa)
+	c.Assert(err, gc.IsNil)
+
+	// Make bob admin of the service account
+	tuple := openfga.Tuple{
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag(clientID)),
+	}
+	err = s.JIMM.OpenFGAClient.AddRelation(ctx, tuple)
+	c.Assert(err, gc.IsNil)
+
+	clientStore := s.ClientStore()
+	err = clientStore.UpdateCredential("test-cloud", jujucloud.CloudCredential{
+		AuthCredentials: map[string]jujucloud.Credential{
+			"test-credentials": jujucloud.NewCredential(jujucloud.EmptyAuthType, map[string]string{
+				"foo": "bar",
+			}),
+		},
+	})
+	c.Assert(err, gc.IsNil)
+
+	_, err = cmdtesting.RunCommand(c, cmd.NewUpdateCredentialsCommandForTesting(clientStore, bClient), clientID, "test-cloud", "test-credentials")
+	c.Assert(err, gc.ErrorMatches, "unauthorized \\(unauthorized access\\)")
+}
+
+func (s *updateCredentialsSuite) TestNonExistingCloudOnJIMM(c *gc.C) {
+	ctx := context.Background()
+
+	clientID := "abda51b2-d735-4794-a8bd-49c506baa4af"
+
+	// alice is superuser
+	bClient := s.UserBakeryClient("alice")
+
+	sa := dbmodel.Identity{
+		Name: clientID,
+	}
+	err := s.JIMM.Database.GetIdentity(ctx, &sa)
+	c.Assert(err, gc.IsNil)
+
+	// Make alice admin of the service account
+	tuple := openfga.Tuple{
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag(clientID)),
+	}
+	err = s.JIMM.OpenFGAClient.AddRelation(ctx, tuple)
+	c.Assert(err, gc.IsNil)
+
+	clientStore := s.ClientStore()
+	err = clientStore.UpdateCredential("test-cloud", jujucloud.CloudCredential{
+		AuthCredentials: map[string]jujucloud.Credential{
+			"test-credentials": jujucloud.NewCredential(jujucloud.EmptyAuthType, map[string]string{
+				"foo": "bar",
+			}),
+		},
+	})
+	c.Assert(err, gc.IsNil)
+
+	cmdContext, err := cmdtesting.RunCommand(c, cmd.NewUpdateCredentialsCommandForTesting(clientStore, bClient), clientID, "test-cloud", "test-credentials")
+	c.Assert(err, gc.IsNil)
+	c.Assert(cmdtesting.Stdout(cmdContext), gc.Equals, `results:
+- credentialtag: cloudcred-test-cloud_abda51b2-d735-4794-a8bd-49c506baa4af_test-credentials
+  error:
+    message: cloud "test-cloud" not found
+    code: not found
+    info: {}
+  models: []
+`)
+}
+
+func (s *updateCredentialsSuite) TestCloudNotInLocalStore(c *gc.C) {
+	bClient := s.UserBakeryClient("alice")
+	_, err := cmdtesting.RunCommand(c, cmd.NewUpdateCredentialsCommandForTesting(s.ClientStore(), bClient),
+		"00000000-0000-0000-0000-000000000000",
+		"non-existing-cloud",
+		"foo",
+	)
+	c.Assert(err, gc.ErrorMatches, "failed to fetch local credentials for cloud \"non-existing-cloud\"")
+}
+
+func (s *updateCredentialsSuite) TestCredentialNotInLocalStore(c *gc.C) {
+	bClient := s.UserBakeryClient("alice")
+
+	clientStore := s.ClientStore()
+	err := clientStore.UpdateCredential("some-cloud", jujucloud.CloudCredential{
+		AuthCredentials: map[string]jujucloud.Credential{
+			"some-credentials": jujucloud.NewCredential(jujucloud.EmptyAuthType, nil),
+		},
+	})
+	c.Assert(err, gc.IsNil)
+
+	_, err = cmdtesting.RunCommand(c, cmd.NewUpdateCredentialsCommandForTesting(clientStore, bClient),
+		"00000000-0000-0000-0000-000000000000",
+		"some-cloud",
+		"non-existing-credential-name",
+	)
+	c.Assert(err, gc.ErrorMatches, "credential \"non-existing-credential-name\" not found on local client.*")
+}
+
+func (s *updateCredentialsSuite) TestMissingClientIDArg(c *gc.C) {
+	bClient := s.UserBakeryClient("alice")
+	_, err := cmdtesting.RunCommand(c, cmd.NewUpdateCredentialsCommandForTesting(s.ClientStore(), bClient))
+	c.Assert(err, gc.ErrorMatches, "client ID not specified")
+}
+
+func (s *updateCredentialsSuite) TestMissingCloudArg(c *gc.C) {
+	bClient := s.UserBakeryClient("alice")
+	_, err := cmdtesting.RunCommand(c, cmd.NewUpdateCredentialsCommandForTesting(s.ClientStore(), bClient),
+		"some-client-id",
+	)
+	c.Assert(err, gc.ErrorMatches, "cloud not specified")
+}
+
+func (s *updateCredentialsSuite) TestMissingCredentialNameArg(c *gc.C) {
+	bClient := s.UserBakeryClient("alice")
+	_, err := cmdtesting.RunCommand(c, cmd.NewUpdateCredentialsCommandForTesting(s.ClientStore(), bClient),
+		"some-client-id",
+		"some-cloud",
+	)
+	c.Assert(err, gc.ErrorMatches, "credential name not specified")
+}
+
+func (s *updateCredentialsSuite) TestTooManyArgs(c *gc.C) {
+	bClient := s.UserBakeryClient("alice")
+	_, err := cmdtesting.RunCommand(c, cmd.NewUpdateCredentialsCommandForTesting(s.ClientStore(), bClient),
+		"some-client-id",
+		"some-cloud",
+		"some-credential-name",
+		"extra-arg",
+	)
+	c.Assert(err, gc.ErrorMatches, "too many args")
+}
