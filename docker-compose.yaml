@@ -244,7 +244,7 @@ services:
     ports:
       - "8082:8082"
     healthcheck:
-      test: [ "CMD", "curl", "http://0.0.0.0:8082/health/started" ]
+      test: [ "CMD", "curl", "http://localhost:8082/realms/jimm/.well-known/openid-configuration" ]
       interval: 5s
       timeout: 5s
       retries: 30

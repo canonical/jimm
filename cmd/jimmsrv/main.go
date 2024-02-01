@@ -147,7 +147,7 @@ func start(ctx context.Context, s *service.Service) error {
 		InsecureJwksLookup:            insecureJwksLookup,
 		OAuthAuthenticatorParams: jimm.OAuthAuthenticatorParams{
 			IssuerURL:         issuerURL,
-			DeviceClientID:    os.Getenv("JIMM_UUID"),
+			DeviceClientID:    deviceClientID,
 			DeviceScopes:      deviceScopesParsed,
 			AccessTokenExpiry: accessTokenExpiryDuration,
 		},
