@@ -203,6 +203,13 @@ func (c *Client) ListServiceAccountCredentials(req *params.ListServiceAccountCre
 	return &response, err
 }
 
+// UpdateServiceAccountCredentials updates credentials associated with a service account.
+func (c *Client) UpdateServiceAccountCredentials(req *params.UpdateServiceAccountCredentialsRequest) (*jujuparams.UpdateCredentialResults, error) {
+	var response jujuparams.UpdateCredentialResults
+	err := c.caller.APICall("JIMM", 4, "", "UpdateServiceAccountCredentials", req, &response)
+	return &response, err
+}
+
 // GrantServiceAccountAccess grants admin access to a service account to given groups/identities.
 func (c *Client) GrantServiceAccountAccess(req *params.GrantServiceAccountAccess) error {
 	return c.caller.APICall("JIMM", 4, "", "GrantServiceAccountAccess", req, nil)

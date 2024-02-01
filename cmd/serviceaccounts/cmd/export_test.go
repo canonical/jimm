@@ -1,4 +1,4 @@
-// Copyright 2021 Canonical Ltd.
+// Copyright 2024 Canonical Ltd.
 
 package cmd
 
@@ -24,6 +24,18 @@ func NewAddServiceAccountCommandForTesting(store jujuclient.ClientStore, bClient
 
 func NewListServiceAccountCredentialsCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
 	cmd := &listServiceAccountCredentialsCommand{
+		store: store,
+		dialOpts: &jujuapi.DialOpts{
+			InsecureSkipVerify: true,
+			BakeryClient:       bClient,
+		},
+	}
+
+	return modelcmd.WrapBase(cmd)
+}
+
+func NewUpdateCredentialsCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
+	cmd := &updateCredentialsCommand{
 		store: store,
 		dialOpts: &jujuapi.DialOpts{
 			InsecureSkipVerify: true,
