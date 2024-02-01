@@ -76,9 +76,8 @@ func start(ctx context.Context, s *service.Service) error {
 		if err != nil {
 			zapctx.Error(ctx, "failed to parse access token expiry duration", zap.Error(err))
 			return err
-		} else {
-			accessTokenExpiryDuration = expiry
 		}
+		accessTokenExpiryDuration = expiry
 	}
 
 	issuerURL := os.Getenv("JIMM_OAUTH_ISSUER_URL")
