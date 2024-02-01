@@ -1,0 +1,26 @@
+name: Spell checker
+on:
+  pull_request:
+    branches:
+    - '*'
+  push:
+    branches:
+    - main
+permissions:
+  contents: read
+  pull-requests: write 
+
+jobs:
+  misspell:
+    name: Check
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v4
+    - name: Check for spelling errors
+      uses: reviewdog/action-misspell@v1
+      with:
+        exclude: ./vendor/*
+        fail_on_error: true
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        reporter: github-check
