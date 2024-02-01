@@ -70,14 +70,25 @@ func (s *grantSuite) TestGrant(c *gc.C) {
 	c.Assert(ok, gc.Equals, true)
 }
 
-func (s *grantSuite) TestMissingClientIDArg(c *gc.C) {
-	bClient := s.UserBakeryClient("alice")
-	_, err := cmdtesting.RunCommand(c, cmd.NewGrantCommandForTesting(s.ClientStore(), bClient))
-	c.Assert(err, gc.ErrorMatches, "client ID not specified")
-}
-
 func (s *grantSuite) TestMissingArgs(c *gc.C) {
+	tests := []struct {
+		name          string
+		args          []string
+		expectedError string
+	}{{
+		name:          "missing client ID",
+		args:          []string{},
+		expectedError: "client ID not specified",
+	}, {
+		name:          "missing identity (user/group)",
+		args:          []string{"some-client-id"},
+		expectedError: "user/group not specified",
+	}}
+
 	bClient := s.UserBakeryClient("alice")
-	_, err := cmdtesting.RunCommand(c, cmd.NewGrantCommandForTesting(s.ClientStore(), bClient), "some-client-id")
-	c.Assert(err, gc.ErrorMatches, "user/group not specified")
+	clientStore := s.ClientStore()
+	for _, t := range tests {
+		_, err := cmdtesting.RunCommand(c, cmd.NewGrantCommandForTesting(clientStore, bClient), t.args...)
+		c.Assert(err, gc.ErrorMatches, t.expectedError, gc.Commentf("test case failed: %q", t.name))
+	}
 }
