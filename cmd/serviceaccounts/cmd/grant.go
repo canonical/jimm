@@ -3,6 +3,8 @@
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/juju/cmd/v3"
 	jujuapi "github.com/juju/juju/api"
 	jujucmd "github.com/juju/juju/cmd"
@@ -90,10 +92,6 @@ func (c *grantCommand) Run(ctxt *cmd.Context) error {
 	if err != nil {
 		return errors.E(err)
 	}
-
-	err = c.out.Write(ctxt, "access granted")
-	if err != nil {
-		return errors.E(err)
-	}
+	fmt.Fprintln(ctxt.Stdout, "access granted")
 	return nil
 }
