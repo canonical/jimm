@@ -45,3 +45,15 @@ func NewUpdateCredentialsCommandForTesting(store jujuclient.ClientStore, bClient
 
 	return modelcmd.WrapBase(cmd)
 }
+
+func NewGrantCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
+	cmd := &grantCommand{
+		store: store,
+		dialOpts: &jujuapi.DialOpts{
+			InsecureSkipVerify: true,
+			BakeryClient:       bClient,
+		},
+	}
+
+	return modelcmd.WrapBase(cmd)
+}
