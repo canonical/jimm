@@ -1,4 +1,4 @@
-name: juju-jaas
+name: jaas
 summary: JAAS plugin
 description: Juju plugin for providing JAAS functionality to the Juju CLI.
 version: git
