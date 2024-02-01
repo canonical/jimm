@@ -202,3 +202,8 @@ func (c *Client) ListServiceAccountCredentials(req *params.ListServiceAccountCre
 	err := c.caller.APICall("JIMM", 4, "", "ListServiceAccountCredentials", req, &response)
 	return &response, err
 }
+
+// GrantServiceAccountAccess grants admin access to a service account to given groups/identities.
+func (c *Client) GrantServiceAccountAccess(req *params.GrantServiceAccountAccess) error {
+	return c.caller.APICall("JIMM", 4, "", "GrantServiceAccountAccess", req, nil)
+}
