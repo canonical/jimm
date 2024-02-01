@@ -12,6 +12,7 @@ import (
 	"time"
 
 	cofga "github.com/canonical/ofga"
+	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery/agent"
@@ -82,7 +83,14 @@ func (s *jimmSuite) SetUpTest(c *gc.C) {
 		},
 		JWTExpiryDuration:     time.Minute,
 		InsecureSecretStorage: true,
+		OAuthAuthenticatorParams: service.OAuthAuthenticatorParams{
+			IssuerURL:         "http://localhost:8082/realms/jimm",
+			DeviceClientID:    "jimm-device",
+			DeviceScopes:      []string{oidc.ScopeOpenID, "profile", "email"},
+			AccessTokenExpiry: time.Duration(time.Hour),
+		},
 	}
+
 	srv, err := service.NewService(ctx, s.Params)
 	c.Assert(err, gc.Equals, nil)
 	s.Service = srv
