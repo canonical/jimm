@@ -3,7 +3,8 @@ summary: JAAS plugin
 description: Juju plugin for providing JAAS functionality to the Juju CLI.
 version: git
 grade: stable
-base: core20
+base: bare
+build-base: core20
 confinement: strict
 
 slots:
