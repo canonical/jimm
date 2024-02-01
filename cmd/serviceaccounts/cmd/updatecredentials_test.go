@@ -184,36 +184,33 @@ func (s *updateCredentialsSuite) TestCredentialNotInLocalStore(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, "credential \"non-existing-credential-name\" not found on local client.*")
 }
 
-func (s *updateCredentialsSuite) TestMissingClientIDArg(c *gc.C) {
-	bClient := s.UserBakeryClient("alice")
-	_, err := cmdtesting.RunCommand(c, cmd.NewUpdateCredentialsCommandForTesting(s.ClientStore(), bClient))
-	c.Assert(err, gc.ErrorMatches, "client ID not specified")
-}
+func (s *updateCredentialsSuite) TestMissingArgs(c *gc.C) {
+	tests := []struct {
+		name          string
+		args          []string
+		expectedError string
+	}{{
+		name:          "missing client ID",
+		args:          []string{},
+		expectedError: "client ID not specified",
+	}, {
+		name:          "missing cloud",
+		args:          []string{"some-client-id"},
+		expectedError: "cloud not specified",
+	}, {
+		name:          "missing credential name",
+		args:          []string{"some-client-id", "some-cloud"},
+		expectedError: "credential name not specified",
+	}, {
+		name:          "too many args",
+		args:          []string{"some-client-id", "some-cloud", "some-credential-name", "extra-arg"},
+		expectedError: "too many args",
+	}}
 
-func (s *updateCredentialsSuite) TestMissingCloudArg(c *gc.C) {
 	bClient := s.UserBakeryClient("alice")
-	_, err := cmdtesting.RunCommand(c, cmd.NewUpdateCredentialsCommandForTesting(s.ClientStore(), bClient),
-		"some-client-id",
-	)
-	c.Assert(err, gc.ErrorMatches, "cloud not specified")
-}
-
-func (s *updateCredentialsSuite) TestMissingCredentialNameArg(c *gc.C) {
-	bClient := s.UserBakeryClient("alice")
-	_, err := cmdtesting.RunCommand(c, cmd.NewUpdateCredentialsCommandForTesting(s.ClientStore(), bClient),
-		"some-client-id",
-		"some-cloud",
-	)
-	c.Assert(err, gc.ErrorMatches, "credential name not specified")
-}
-
-func (s *updateCredentialsSuite) TestTooManyArgs(c *gc.C) {
-	bClient := s.UserBakeryClient("alice")
-	_, err := cmdtesting.RunCommand(c, cmd.NewUpdateCredentialsCommandForTesting(s.ClientStore(), bClient),
-		"some-client-id",
-		"some-cloud",
-		"some-credential-name",
-		"extra-arg",
-	)
-	c.Assert(err, gc.ErrorMatches, "too many args")
+	clientStore := s.ClientStore()
+	for _, t := range tests {
+		_, err := cmdtesting.RunCommand(c, cmd.NewUpdateCredentialsCommandForTesting(clientStore, bClient), t.args...)
+		c.Assert(err, gc.ErrorMatches, t.expectedError, gc.Commentf("test case failed: %q", t.name))
+	}
 }
