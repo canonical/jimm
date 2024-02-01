@@ -4,7 +4,6 @@ package cmd
 
 import (
 	"github.com/juju/cmd/v3"
-	"github.com/juju/gnuflag"
 	jujuapi "github.com/juju/juju/api"
 	jujucmd "github.com/juju/juju/cmd"
 	"github.com/juju/juju/cmd/modelcmd"
@@ -53,15 +52,6 @@ func (c *grantCommand) Info() *cmd.Info {
 		Purpose:  "Grants administrator access over a service account to the given groups/identities",
 		Examples: grantCommandExamples,
 		Doc:      grantCommandDoc,
-	})
-}
-
-// SetFlags implements Command.SetFlags.
-func (c *grantCommand) SetFlags(f *gnuflag.FlagSet) {
-	c.CommandBase.SetFlags(f)
-	c.out.AddFlags(f, "yaml", map[string]cmd.Formatter{
-		"yaml": cmd.FormatYaml,
-		"json": cmd.FormatJson,
 	})
 }
 
