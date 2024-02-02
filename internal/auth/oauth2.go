@@ -84,6 +84,7 @@ func (as *AuthenticationService) Device(ctx context.Context) (*oauth2.DeviceAuth
 
 	resp, err := as.deviceConfig.DeviceAuth(ctx)
 	if err != nil {
+		zapctx.Error(ctx, "device auth call failed", zap.Error(err))
 		return nil, errors.E(op, err, "device auth call failed")
 	}
 
