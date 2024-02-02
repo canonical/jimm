@@ -1,0 +1,33 @@
+name: juju-jaas
+summary: JAAS plugin
+description: Juju plugin for providing JAAS functionality to the Juju CLI.
+version: git
+grade: stable
+base: bare
+build-base: core20
+confinement: strict
+
+slots:
+  jaas-plugin:
+    interface: content
+    content: jaas-plugin
+    read: 
+      - $SNAP/bin
+
+# The app has no plugs as it is intended to be invoked by the Juju CLI Snap.
+apps:
+  jaas:
+    command: bin/juju-jaas
+
+parts:
+  jaas:
+    plugin: go
+    source: ./
+    source-type: git
+    prime:
+    - bin/juju-jaas
+    override-build: |
+      set -e
+      CGO_ENABLED=0 go build -o juju-jaas github.com/canonical/jimm/cmd/jaas
+      mkdir -p $GOBIN
+      cp ./juju-jaas $GOBIN/juju-jaas
