@@ -12,6 +12,7 @@ import (
 	"github.com/juju/names/v4"
 	"github.com/juju/version"
 	"github.com/rogpeppe/fastuuid"
+	"golang.org/x/oauth2"
 
 	"github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/internal/db"
@@ -30,6 +31,7 @@ type JIMM interface {
 	AddHostedCloud(ctx context.Context, user *openfga.User, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error
 	AddModel(ctx context.Context, u *openfga.User, args *jimm.ModelCreateArgs) (_ *jujuparams.ModelInfo, err error)
 	Authenticate(ctx context.Context, req *jujuparams.LoginRequest) (*openfga.User, error)
+	OAuthAuthenticationService() jimm.OAuthAuthenticator
 	AuthorizationClient() *openfga.OFGAClient
 	ChangeModelCredential(ctx context.Context, user *openfga.User, modelTag names.ModelTag, cloudCredentialTag names.CloudCredentialTag) error
 	DB() *db.Database
@@ -108,6 +110,11 @@ type controllerRoot struct {
 	user                  *openfga.User
 	controllerUUIDMasking bool
 	generator             *fastuuid.Generator
+
+	// deviceOAuthResponse holds a device code flow response for this request,
+	// such that JIMM can retrieve the access and ID tokens via polling the Authentication
+	// Service's issuer via the /token endpoint.
+	deviceOAuthResponse *oauth2.DeviceAuthResponse
 }
 
 func newControllerRoot(j JIMM, p Params) *controllerRoot {
@@ -125,6 +132,7 @@ func newControllerRoot(j JIMM, p Params) *controllerRoot {
 	r.AddMethod("Admin", 1, "Login", rpc.Method(unsupportedLogin))
 	r.AddMethod("Admin", 2, "Login", rpc.Method(unsupportedLogin))
 	r.AddMethod("Admin", 3, "Login", rpc.Method(r.Login))
+	r.AddMethod("Admin", 3, "LoginDevice", rpc.Method(r.LoginDevice))
 	r.AddMethod("Pinger", 1, "Ping", rpc.Method(r.Ping))
 	return r
 }
