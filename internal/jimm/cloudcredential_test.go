@@ -783,7 +783,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 			}
 			err = jimmDb.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
-			river := jimmtest.NewRiver(c, nil, client, &jimmDb)
+
 			j := &jimm.JIMM{
 				UUID:     uuid.NewString(),
 				Database: jimmDb,
@@ -791,8 +791,8 @@ func TestUpdateCloudCredential(t *testing.T) {
 					API: api,
 				},
 				OpenFGAClient: client,
-				River:         river,
 			}
+			j.River = jimmtest.NewRiver(c, nil, client, &jimmDb, j)
 
 			u, arg, expectedCredential, expectedError := test.createEnv(c, j, client)
 			user := openfga.NewUser(u, client)
@@ -1246,8 +1246,7 @@ func TestRevokeCloudCredential(t *testing.T) {
 			}
 			err = jimmDb.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
-			river := jimmtest.NewRiver(c, nil, client, &jimmDb)
-			c.Assert(err, qt.IsNil)
+
 			j := &jimm.JIMM{
 				UUID:     uuid.NewString(),
 				Database: jimmDb,
@@ -1255,9 +1254,9 @@ func TestRevokeCloudCredential(t *testing.T) {
 					API: api,
 				},
 				OpenFGAClient: client,
-				River:         river,
 			}
-
+			j.River = jimmtest.NewRiver(c, nil, client, &jimmDb, j)
+			c.Assert(err, qt.IsNil)
 			user, tag, expectedError := test.createEnv(c, j, client)
 
 			err = j.RevokeCloudCredential(ctx, user, tag, false)

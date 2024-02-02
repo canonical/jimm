@@ -908,8 +908,6 @@ func TestAddModel(t *testing.T) {
 			err = jimmDb.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 
-			river := jimmtest.NewRiver(c, nil, client, &jimmDb)
-
 			j := &jimm.JIMM{
 				UUID:     uuid.NewString(),
 				Database: jimmDb,
@@ -917,8 +915,8 @@ func TestAddModel(t *testing.T) {
 					API: api,
 				},
 				OpenFGAClient: client,
-				River:         river,
 			}
+			j.River = jimmtest.NewRiver(c, nil, client, &jimmDb, j)
 
 			env := jimmtest.ParseEnvironment(c, test.env)
 			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
@@ -3552,7 +3550,6 @@ users:
 	ctx := context.Background()
 	err = jimmDb.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
-	river := jimmtest.NewRiver(c, nil, client, &jimmDb)
 
 	j := &jimm.JIMM{
 		UUID:     uuid.NewString(),
@@ -3561,8 +3558,8 @@ users:
 			API: api,
 		},
 		OpenFGAClient: client,
-		River:         river,
 	}
+	j.River = jimmtest.NewRiver(c, nil, client, &jimmDb, j)
 
 	envDefinition := `
 clouds:

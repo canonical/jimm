@@ -17,10 +17,10 @@ type Cloud struct {
 	UpdatedAt time.Time
 
 	// Name is the name of the cloud.
-	Name string `gorm:"not null;uniqueIndex"`
+	Name string `gorm:"not null;uniqueIndex" json:"name"`
 
 	// Type is the provider type of cloud.
-	Type string `gorm:"not null"`
+	Type string `gorm:"not null" json:"type"`
 
 	// HostCloudRegion is the "cloud/region" that hosts this cloud, if the
 	// cloud is hosted.
@@ -158,8 +158,8 @@ type CloudRegion struct {
 	gorm.Model
 
 	// Cloud is the cloud this region belongs to.
-	CloudName string `gorm:"uniqueIndex:idx_cloud_region_cloud_name_name"`
-	Cloud     Cloud  `gorm:"foreignKey:CloudName;references:Name;constraint:OnDelete:CASCADE"`
+	CloudName string `gorm:"uniqueIndex:idx_cloud_region_cloud_name_name" json:"cloud_name"`
+	Cloud     Cloud  `gorm:"foreignKey:CloudName;references:Name;constraint:OnDelete:CASCADE" json:"cloud"`
 
 	// Name is the name of the region.
 	Name string `gorm:"not null;uniqueIndex:idx_cloud_region_cloud_name_name"`

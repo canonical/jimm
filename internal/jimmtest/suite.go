@@ -79,7 +79,7 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 	err = jimmDb.Migrate(ctx, false)
 	c.Assert(err, gc.Equals, nil)
 
-	river := NewRiver(gcChecker, nil, s.OFGAClient, &jimmDb)
+	river := NewRiver(gcChecker, nil, s.OFGAClient, &jimmDb, s.JIMM)
 	c.Assert(err, gc.IsNil)
 
 	// Setup OpenFGA.

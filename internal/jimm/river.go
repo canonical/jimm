@@ -9,7 +9,6 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/juju/names/v4"
 	"github.com/juju/zaputil"
 	"github.com/juju/zaputil/zapctx"
 	"github.com/riverqueue/river"
@@ -19,70 +18,13 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/canonical/jimm/internal/db"
-	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/openfga"
-	ofganames "github.com/canonical/jimm/internal/openfga/names"
 )
 
 // WaitConfig is used to set the waiting duration for river jobs.
 type WaitConfig struct {
 	Duration time.Duration
-}
-
-// RiverOpenFGAArgs holds the river job arguments for writing tuples to OpenFGA.
-type RiverOpenFGAArgs struct {
-	ControllerUUID string `json:"controller_uuid"`
-	ModelId        uint   `json:"model_id"`
-	ModelInfoUUID  string `json:"model_info_uuid"`
-	OwnerName      string `json:"owner_name"`
-}
-
-// Kind is a string that uniquely identifies the type of job to be picked up by the appropriate river workers.
-// This is required by river and must be provided on the job arguments struct to implement the JobArgs interface.
-func (RiverOpenFGAArgs) Kind() string { return "OpenFGA" }
-
-// OpenFGAWorker is the river worker that would run the job.
-type RiverOpenFGAWorker struct {
-	river.WorkerDefaults[RiverOpenFGAArgs]
-	OfgaClient *openfga.OFGAClient
-	Database   db.Database
-}
-
-// Work is the function executed by the worker when it picks up the job.
-func (w *RiverOpenFGAWorker) Work(ctx context.Context, job *river.Job[RiverOpenFGAArgs]) error {
-	controllerTag := names.NewControllerTag(job.Args.ControllerUUID)
-	modelTag := names.NewModelTag(job.Args.ModelInfoUUID)
-
-	owner := &dbmodel.User{Username: job.Args.OwnerName}
-	err := w.Database.GetUser(ctx, owner)
-	if err != nil {
-		return errors.E(err)
-	}
-	if err := w.OfgaClient.AddControllerModel(
-		ctx,
-		controllerTag,
-		modelTag,
-	); err != nil {
-		zapctx.Error(
-			ctx,
-			"failed to add controller-model relation",
-			zap.String("controller", controllerTag.Id()),
-			zap.String("model", modelTag.Id()),
-		)
-		return errors.E(err, "failed to add the controller-model relation from the river job.")
-	}
-	err = openfga.NewUser(owner, w.OfgaClient).SetModelAccess(ctx, names.NewModelTag(job.Args.ModelInfoUUID), ofganames.AdministratorRelation)
-	if err != nil {
-		zapctx.Error(
-			ctx,
-			"failed to add administrator relation",
-			zap.String("user", owner.Tag().String()),
-			zap.String("model", modelTag.Id()),
-		)
-		return errors.E(err, "failed to add the administrator relation from the river job.")
-	}
-	return nil
 }
 
 // River is the struct that holds that Client connection to river.
@@ -98,9 +40,9 @@ type River struct {
 }
 
 // registerJimmWorkers would register known workers safely and return a pointer to a river.workers struct that should be used in river creation.
-func registerJimmWorkers(ctx context.Context, ofgaConn *openfga.OFGAClient, db *db.Database) (*river.Workers, error) {
+func registerJimmWorkers(ctx context.Context, ofgaConn *openfga.OFGAClient, db *db.Database, jimm *JIMM) (*river.Workers, error) {
 	workers := river.NewWorkers()
-	if err := river.AddWorkerSafely(workers, &RiverOpenFGAWorker{OfgaClient: ofgaConn, Database: *db}); err != nil {
+	if err := river.AddWorkerSafely(workers, &RiverAddModelWorker{OfgaClient: ofgaConn, Database: db, JIMM: jimm}); err != nil {
 		return nil, err
 	}
 	return workers, nil
@@ -150,9 +92,9 @@ type RiverConfig struct {
 
 // NewRiver returns a new river instance after applying the needed migrations to the database.
 // It will open a postgres connections pool that would be closed in the Cleanup routine.
-func NewRiver(ctx context.Context, riverConfig RiverConfig, ofgaClient *openfga.OFGAClient, db *db.Database) (_ *River, err error) {
+func NewRiver(ctx context.Context, riverConfig RiverConfig, ofgaClient *openfga.OFGAClient, db *db.Database, jimm *JIMM) (_ *River, err error) {
 	maxAttempts := max(1, riverConfig.MaxAttempts)
-	workers, err := registerJimmWorkers(ctx, ofgaClient, db)
+	workers, err := registerJimmWorkers(ctx, ofgaClient, db, jimm)
 	if err != nil {
 		return nil, err
 	}
@@ -226,8 +168,12 @@ func InsertJob(ctx context.Context, waitConfig *WaitConfig, r *River, insertFunc
 					return nil
 				}
 			case item := <-failedChan:
-				if item.Job.ID == row.ID && item.Job.Attempt == item.Job.MaxAttempts && item.Job.FinalizedAt != nil {
-					return errors.E(fmt.Sprintf("river job %d failed after %d attempts at %s. failure reason %v", item.Job.ID, item.Job.Attempt, item.Job.FinalizedAt, item.Job.Errors))
+				if item.Job.ID == row.ID {
+					if item.Job.Attempt == item.Job.MaxAttempts && item.Job.FinalizedAt != nil {
+						return errors.E(fmt.Sprintf("river job %d failed after %d attempts at %s. failure reason %v", item.Job.ID, item.Job.Attempt, item.Job.FinalizedAt, item.Job.Errors))
+					} else {
+						zapctx.Warn(ctx, fmt.Sprintf("job %d failed in attempt %d with error %v, river will continue retrying!", item.Job.ID, item.Job.Attempt, item.Job.Errors[item.Job.Attempt-1]))
+					}
 				}
 			case item := <-otherChan:
 				if item.Job.ID == row.ID && item.Job.State == river.JobStateCancelled {

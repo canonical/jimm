@@ -11,7 +11,7 @@ import (
 )
 
 // NewRiver returns a River instance for tests.
-func NewRiver(t Tester, riverConfig *jimm.RiverConfig, ofgaConn *openfga.OFGAClient, db *db.Database) *jimm.River {
+func NewRiver(t Tester, riverConfig *jimm.RiverConfig, ofgaConn *openfga.OFGAClient, db *db.Database, j *jimm.JIMM) *jimm.River {
 	dsn := getTestDBName(t)
 	if riverConfig == nil {
 		riverConfig = &jimm.RiverConfig{
@@ -19,7 +19,7 @@ func NewRiver(t Tester, riverConfig *jimm.RiverConfig, ofgaConn *openfga.OFGACli
 			DSN:    dsn,
 		}
 	}
-	riverClient, err := jimm.NewRiver(context.Background(), *riverConfig, ofgaConn, db)
+	riverClient, err := jimm.NewRiver(context.Background(), *riverConfig, ofgaConn, db, j)
 	if err != nil {
 		t.Fatalf("failed to create river client")
 	}

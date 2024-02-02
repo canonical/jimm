@@ -328,7 +328,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		DSN:         p.DSN,
 		MaxAttempts: p.RiverMaxAttempts,
 	}
-	s.jimm.River, err = jimm.NewRiver(ctx, riverConfig, s.jimm.OpenFGAClient, &s.jimm.Database)
+	s.jimm.River, err = jimm.NewRiver(ctx, riverConfig, s.jimm.OpenFGAClient, &s.jimm.Database, &s.jimm)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}

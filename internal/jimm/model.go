@@ -20,6 +20,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/canonical/jimm/internal/constants"
+	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/openfga"
@@ -41,12 +42,12 @@ func shuffleRegionControllers(controllers []dbmodel.CloudRegionControllerPriorit
 
 // ModelCreateArgs contains parameters used to add a new model.
 type ModelCreateArgs struct {
-	Name            string
-	Owner           names.UserTag
-	Config          map[string]interface{}
-	Cloud           names.CloudTag
-	CloudRegion     string
-	CloudCredential names.CloudCredentialTag
+	Name            string                   `json:"name"`
+	Owner           names.UserTag            `json:"owner"`
+	Config          map[string]interface{}   `json:"config"`
+	Cloud           names.CloudTag           `json:"cloud"`
+	CloudRegion     string                   `json:"cloud_region"`
+	CloudCredential names.CloudCredentialTag `json:"cloud_credential"`
 }
 
 // FromJujuModelCreateArgs converts jujuparams.ModelCreateArgs into AddModelArgs.
@@ -94,6 +95,29 @@ func newModelBuilder(ctx context.Context, j *JIMM) *modelBuilder {
 		ctx:  ctx,
 		jimm: j,
 	}
+}
+
+func newModelBuilderFromModel(ctx context.Context, j *JIMM, owner *dbmodel.User, modelName string) (*modelBuilder, error) {
+	const op = errors.Op("jimm.newModelBuilderFromModel")
+	b := &modelBuilder{
+		ctx:   ctx,
+		jimm:  j,
+		owner: owner,
+		name:  modelName,
+	}
+	b.model = &dbmodel.Model{
+		OwnerUsername: owner.Username,
+		Name:          modelName,
+	}
+	if err := j.Database.GetModel(ctx, b.model); err != nil {
+		return nil, errors.E(err, "Model was not created")
+	}
+	b.controller = &b.model.Controller
+	b.cloudRegionID = b.model.CloudRegionID
+	b.cloud = &b.model.CloudCredential.Cloud
+	b = b.WithCloudRegion("")
+	b.credential = &b.model.CloudCredential
+	return b, b.err
 }
 
 type modelBuilder struct {
@@ -212,6 +236,7 @@ func (b *modelBuilder) WithCloudRegion(region string) *modelBuilder {
 				continue
 			}
 			region = r.Name
+			break
 		}
 	}
 	// loop through all cloud regions
@@ -441,11 +466,11 @@ func (b *modelBuilder) CreateControllerModel() *modelBuilder {
 			relation: string(jujupermission.AddModelAccess),
 		},
 	)
+	defer api.Close()
 	if err != nil {
 		b.err = errors.E(err)
 		return b
 	}
-	defer api.Close()
 
 	if b.credential != nil {
 		if err := b.updateCredential(b.ctx, api, b.credential); err != nil {
@@ -506,10 +531,81 @@ func (b *modelBuilder) JujuModelInfo() *jujuparams.ModelInfo {
 	return b.modelInfo
 }
 
+// RiverAddModelArgs holds the river job arguments for building models.
+type RiverAddModelArgs struct {
+	ModelCreateArgs    `json:"model_create_args"`
+	OpenFgaUserName    string `json:"user"`
+	OpenFgaIsJimmAdmin bool   `json:"jimm_admin"`
+}
+
+// Kind is a string that uniquely identifies the type of job to be picked up by the appropriate river workers.
+// This is required by river and must be provided on the job arguments struct to implement the JobArgs interface.
+func (RiverAddModelArgs) Kind() string { return "BuildModel" }
+
+// RiverAddModelWorker is the river worker that would run the job.
+type RiverAddModelWorker struct {
+	river.WorkerDefaults[RiverAddModelArgs]
+	Database   *db.Database
+	JIMM       *JIMM
+	OfgaClient *openfga.OFGAClient
+}
+
+// Work is the function executed by the worker when it picks up the job.
+func (w *RiverAddModelWorker) Work(ctx context.Context, job *river.Job[RiverAddModelArgs]) error {
+	const op = errors.Op("jimm.AddModel")
+	args := job.Args.ModelCreateArgs
+	j := w.JIMM
+	owner := &dbmodel.User{
+		Username: args.Owner.Id(),
+	}
+	err := j.Database.GetUser(ctx, owner)
+	if err != nil {
+		return errors.E(op, err)
+	}
+	builder, err := newModelBuilderFromModel(ctx, w.JIMM, owner, args.Name)
+	if err != nil {
+		return river.JobCancel(fmt.Errorf("failed to construct a model builder from the db model"))
+	}
+	builder = builder.CreateControllerModel()
+	if err := builder.Error(); err != nil {
+		return errors.E(op, err)
+	}
+	// update builder to construct the builder state from the model id.
+	builder = builder.UpdateDatabaseModel()
+	if err := builder.Error(); err != nil {
+		return errors.E(op, err)
+	}
+
+	mi := builder.JujuModelInfo()
+	if err := w.OfgaClient.AddControllerModel(
+		ctx,
+		builder.controller.ResourceTag(),
+		builder.model.ResourceTag(),
+	); err != nil {
+		zapctx.Error(
+			ctx,
+			"failed to add controller-model relation",
+			zap.String("controller", builder.controller.UUID),
+			zap.String("model", builder.model.UUID.String),
+		)
+		return errors.E(err, "failed to add the controller-model relation from the river job.")
+	}
+	err = openfga.NewUser(owner, w.OfgaClient).SetModelAccess(ctx, names.NewModelTag(mi.UUID), ofganames.AdministratorRelation)
+	if err != nil {
+		zapctx.Error(
+			ctx,
+			"failed to add administrator relation",
+			zap.String("user", owner.Tag().String()),
+			zap.String("model", builder.model.UUID.String),
+		)
+		return errors.E(err, "failed to add the administrator relation from the river job.")
+	}
+	return nil
+}
+
 // AddModel adds the specified model to JIMM.
 func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCreateArgs) (_ *jujuparams.ModelInfo, err error) {
 	const op = errors.Op("jimm.AddModel")
-
 	owner := &dbmodel.User{
 		Username: args.Owner.Id(),
 	}
@@ -522,7 +618,7 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 	if owner.Username != user.Username && !user.JimmAdmin {
 		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
-
+	// from here, start a new job
 	builder := newModelBuilder(ctx, j)
 	builder = builder.WithOwner(owner)
 	builder = builder.WithName(args.Name)
@@ -531,7 +627,7 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 	}
 
 	// fetch user model defaults
-	userConfig, err := j.UserModelDefaults(ctx, user.User)
+	userConfig, err := j.UserModelDefaults(ctx, owner)
 	if err != nil && errors.ErrorCode(err) != errors.CodeNotFound {
 		return nil, errors.E(op, "failed to fetch cloud defaults")
 	}
@@ -540,7 +636,7 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 	// fetch cloud defaults
 	if args.Cloud != (names.CloudTag{}) {
 		cloudDefaults := dbmodel.CloudDefaults{
-			Username: user.Username,
+			Username: owner.Username,
 			Cloud: dbmodel.Cloud{
 				Name: args.Cloud.Id(),
 			},
@@ -550,14 +646,12 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 			return nil, errors.E(op, "failed to fetch cloud defaults")
 		}
 		builder = builder.WithConfig(cloudDefaults.Defaults)
-	}
-
-	if args.Cloud != (names.CloudTag{}) {
 		builder = builder.WithCloud(args.Cloud)
 		if err := builder.Error(); err != nil {
 			return nil, errors.E(op, err)
 		}
 	}
+
 	builder = builder.WithCloudRegion(args.CloudRegion)
 	if err := builder.Error(); err != nil {
 		return nil, errors.E(op, err)
@@ -576,7 +670,7 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 	// fetch cloud region defaults
 	if args.Cloud != (names.CloudTag{}) && builder.cloudRegion != "" {
 		cloudRegionDefaults := dbmodel.CloudDefaults{
-			Username: user.Username,
+			Username: owner.Username,
 			Cloud: dbmodel.Cloud{
 				Name: args.Cloud.Id(),
 			},
@@ -599,38 +693,34 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 			return nil, errors.E(op, err)
 		}
 	}
+
 	builder = builder.CreateDatabaseModel()
 	if err := builder.Error(); err != nil {
 		return nil, errors.E(op, err)
 	}
 	defer builder.Cleanup()
 
-	builder = builder.CreateControllerModel()
-	if err := builder.Error(); err != nil {
-		return nil, errors.E(op, err)
+	riverAddModelArgs := RiverAddModelArgs{
+		ModelCreateArgs:    *args,
+		OpenFgaUserName:    user.Username,
+		OpenFgaIsJimmAdmin: user.JimmAdmin,
 	}
-
-	builder = builder.UpdateDatabaseModel()
-	if err := builder.Error(); err != nil {
-		return nil, errors.E(op, err)
-	}
-
-	mi := builder.JujuModelInfo()
-	openfgaRiverJobArgs := RiverOpenFGAArgs{
-		ControllerUUID: builder.controller.UUID,
-		ModelId:        builder.model.ID,
-		OwnerName:      builder.owner.Username,
-		ModelInfoUUID:  mi.UUID,
-	}
-	err = InsertJob(ctx, &WaitConfig{Duration: 1 * time.Minute}, j.River, func() (*rivertype.JobRow, error) {
-		return j.River.Client.Insert(ctx, openfgaRiverJobArgs, &river.InsertOpts{MaxAttempts: j.River.MaxAttempts})
+	// perform all checks from the builder before submitting the job (until after createDatabaseModel)
+	err = InsertJob(ctx, &WaitConfig{Duration: 10 * time.Minute}, j.River, func() (*rivertype.JobRow, error) {
+		return j.River.Client.Insert(ctx, riverAddModelArgs, &river.InsertOpts{MaxAttempts: j.River.MaxAttempts})
 	})
 	if err != nil {
 		return nil, errors.E(err, "failed to insert and wait for the river job")
 	}
-	return mi, nil
+	model := dbmodel.Model{
+		OwnerUsername: user.Username,
+		Name:          args.Name,
+	}
+	if err = j.Database.GetModel(ctx, &model); err != nil {
+		return nil, errors.E(err, "Model was not created")
+	}
+	return j.ModelInfo(ctx, user, names.NewModelTag(model.UUID.String))
 }
-
 
 // ModelInfo returns the model info for the model with the given ModelTag.
 // The returned ModelInfo will be appropriate for the given user's
