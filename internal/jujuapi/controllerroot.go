@@ -132,7 +132,8 @@ func newControllerRoot(j JIMM, p Params) *controllerRoot {
 	r.AddMethod("Admin", 1, "Login", rpc.Method(unsupportedLogin))
 	r.AddMethod("Admin", 2, "Login", rpc.Method(unsupportedLogin))
 	r.AddMethod("Admin", 3, "Login", rpc.Method(r.Login))
-	r.AddMethod("Admin", 3, "LoginDevice", rpc.Method(r.LoginDevice))
+	r.AddMethod("Admin", 4, "Login", rpc.Method(r.Login))
+	r.AddMethod("Admin", 4, "LoginDevice", rpc.Method(r.LoginDevice))
 	r.AddMethod("Pinger", 1, "Ping", rpc.Method(r.Ping))
 	return r
 }

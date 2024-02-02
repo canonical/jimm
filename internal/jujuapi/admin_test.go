@@ -81,7 +81,7 @@ func (s *adminSuite) TestDeviceLogin(c *gc.C) {
 	// A complete URI looks like: http://localhost:8082/realms/jimm/device?user_code=HOKO-OTRV
 	// where the user code is set as a part of the query string.
 	var resp params.LoginDeviceResponse
-	err = conn.APICall("Admin", 3, "", "LoginDevice", nil, &resp)
+	err = conn.APICall("Admin", 4, "", "LoginDevice", nil, &resp)
 	c.Assert(err, gc.IsNil)
 	c.Assert(resp.UserCode, gc.Not(gc.IsNil))
 	c.Assert(resp.VerificationURI, gc.Equals, "http://localhost:8082/realms/jimm/device")
@@ -91,7 +91,7 @@ func (s *adminSuite) TestDeviceLogin(c *gc.C) {
 	userResp, err := client.Get(resp.VerificationURI + "?user_code=" + resp.UserCode)
 	c.Assert(err, gc.IsNil)
 	body := userResp.Body
-	// defer body.Close()
+	defer body.Close()
 	b, err := io.ReadAll(body)
 	c.Assert(err, gc.IsNil)
 	loginForm := string(b)
@@ -118,7 +118,7 @@ func handleLoginForm(c *gc.C, loginForm string, client *http.Client) {
 	c.Assert(err, gc.IsNil)
 
 	loginRespBody := loginResp.Body
-	// defer loginRespBody.Close()
+	defer loginRespBody.Close()
 
 	// Step 2.3, the user will now be redirected to a consent screen
 	// and is expected to click "yes". We simulate this by posting the form programatically.
@@ -135,7 +135,7 @@ func handleLoginForm(c *gc.C, loginForm string, client *http.Client) {
 	v.Add("accept", "Yes")
 	consentResp, err := client.PostForm("http://localhost:8082"+consentFormUri, v)
 	c.Assert(err, gc.IsNil)
-	// defer consentResp.Body.Close()
+	defer consentResp.Body.Close()
 
 	// Read the response to ensure it is OK and has been accepted.
 	b, err := io.ReadAll(consentResp.Body)
