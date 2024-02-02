@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/coreos/go-oidc/v3/oidc"
 	qt "github.com/frankban/quicktest"
 	"github.com/google/uuid"
 	"github.com/lestrrat-go/jwx/v2/jwk"
@@ -106,6 +107,12 @@ func setupService(ctx context.Context, c *qt.C) (*jimm.Service, *httptest.Server
 			Store:     cofgaParams.StoreID,
 			Token:     cofgaParams.Token,
 			AuthModel: cofgaParams.AuthModelID,
+		},
+		OAuthAuthenticatorParams: jimm.OAuthAuthenticatorParams{
+			IssuerURL:         "http://localhost:8082/realms/jimm",
+			DeviceClientID:    "jimm-device",
+			DeviceScopes:      []string{oidc.ScopeOpenID, "profile", "email"},
+			AccessTokenExpiry: time.Duration(time.Hour),
 		},
 	})
 	c.Assert(err, qt.IsNil)

@@ -4,8 +4,14 @@ package auth
 
 import (
 	"context"
+	"net/mail"
+	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
+	"github.com/juju/zaputil/zapctx"
+	"github.com/lestrrat-go/jwx/v2/jwa"
+	"github.com/lestrrat-go/jwx/v2/jwt"
+	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 
 	"github.com/canonical/jimm/internal/errors"
@@ -17,6 +23,8 @@ type AuthenticationService struct {
 	// provider holds a OIDC provider wrapper for the OAuth2.0 /x/oauth package,
 	// enabling UserInfo calls, wellknown retrieval and jwks verification.
 	provider *oidc.Provider
+	// accessTokenExpiry holds the expiry time for JIMM minted access tokens (JWTs).
+	accessTokenExpiry time.Duration
 }
 
 // AuthenticationServiceParams holds the parameters to initialise
@@ -31,6 +39,8 @@ type AuthenticationServiceParams struct {
 	DeviceClientID string
 	// DeviceScopes holds the scopes that you wish to retrieve.
 	DeviceScopes []string
+	// AccessTokenExpiry holds the expiry time of minted JIMM access tokens (JWTs).
+	AccessTokenExpiry time.Duration
 }
 
 // NewAuthenticationService returns a new authentication service for handling
@@ -40,7 +50,8 @@ func NewAuthenticationService(ctx context.Context, params AuthenticationServiceP
 
 	provider, err := oidc.NewProvider(ctx, params.IssuerURL)
 	if err != nil {
-		return nil, errors.E(op, err, "failed to create oidc provider")
+		zapctx.Error(ctx, "failed to create oidc provider", zap.Error(err))
+		return nil, errors.E(op, errors.CodeServerConfiguration, err, "failed to create oidc provider")
 	}
 
 	return &AuthenticationService{
@@ -50,6 +61,7 @@ func NewAuthenticationService(ctx context.Context, params AuthenticationServiceP
 			Endpoint: provider.Endpoint(),
 			Scopes:   params.DeviceScopes,
 		},
+		accessTokenExpiry: params.AccessTokenExpiry,
 	}, nil
 }
 
@@ -72,6 +84,7 @@ func (as *AuthenticationService) Device(ctx context.Context) (*oauth2.DeviceAuth
 
 	resp, err := as.deviceConfig.DeviceAuth(ctx)
 	if err != nil {
+		zapctx.Error(ctx, "device auth call failed", zap.Error(err))
 		return nil, errors.E(op, err, "device auth call failed")
 	}
 
@@ -81,7 +94,7 @@ func (as *AuthenticationService) Device(ctx context.Context) (*oauth2.DeviceAuth
 // DeviceAccessToken continues and collect an access token during the device login flow
 // and is step TWO.
 //
-// See Device(...) godoc for more info pertaining to the fko.
+// See Device(...) godoc for more info pertaining to the flow.
 func (as *AuthenticationService) DeviceAccessToken(ctx context.Context, res *oauth2.DeviceAuthResponse) (*oauth2.Token, error) {
 	const op = errors.Op("auth.AuthenticationService.DeviceAccessToken")
 
@@ -133,5 +146,44 @@ func (as *AuthenticationService) Email(idToken *oidc.IDToken) (string, error) {
 	}
 
 	return claims.Email, nil
+}
 
+// MintAccessToken mints a session access token to be used when logging into JIMM
+// via an access token. The token only contains the user's email for authentication.
+func (as *AuthenticationService) MintAccessToken(email string, secretKey string) ([]byte, error) {
+	const op = errors.Op("auth.AuthenticationService.MintAccessToken")
+
+	token, err := jwt.NewBuilder().
+		Subject(email).
+		Expiration(time.Now().Add(as.accessTokenExpiry)).
+		Build()
+	if err != nil {
+		return nil, errors.E(op, err, "failed to build access token")
+	}
+
+	freshToken, err := jwt.Sign(token, jwt.WithKey(jwa.HS256, []byte(secretKey)))
+	if err != nil {
+		return nil, errors.E(op, err, "failed to sign access token")
+	}
+	return freshToken, nil
+}
+
+// VerifyAccessToken symmetrically verifies the validty of the signature on the
+// access token JWT, returning the parsed token.
+//
+// The subject of the token contains the user's email and can be used
+// for user object creation.
+func (as *AuthenticationService) VerifyAccessToken(token []byte, secretKey string) (jwt.Token, error) {
+	const op = errors.Op("auth.AuthenticationService.VerifyAccessToken")
+
+	parsedToken, err := jwt.Parse(token, jwt.WithKey(jwa.HS256, []byte(secretKey)))
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	if _, err = mail.ParseAddress(parsedToken.Subject()); err != nil {
+		return nil, errors.E(op, "failed to parse email")
+	}
+
+	return parsedToken, nil
 }

@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"regexp"
 	"testing"
+	"time"
 
 	"github.com/canonical/jimm/internal/auth"
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -108,4 +109,97 @@ func TestDevice(t *testing.T) {
 	email, err := authSvc.Email(idToken)
 	c.Assert(err, qt.IsNil)
 	c.Assert(email, qt.Equals, "jimm-test@canonical.com")
+}
+
+// TestAccessTokens tests both the minting and validation of JIMM
+// access tokens.
+func TestAccessTokens(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := context.Background()
+
+	authSvc, err := auth.NewAuthenticationService(ctx, auth.AuthenticationServiceParams{
+		IssuerURL:         "http://localhost:8082/realms/jimm",
+		DeviceClientID:    "jimm-device",
+		DeviceScopes:      []string{oidc.ScopeOpenID, "profile", "email"},
+		AccessTokenExpiry: time.Hour,
+	})
+	c.Assert(err, qt.IsNil)
+
+	secretKey := "secret-key"
+	token, err := authSvc.MintAccessToken("jimm-test@canonical.com", secretKey)
+	c.Assert(err, qt.IsNil)
+	c.Assert(len(token) > 0, qt.IsTrue)
+
+	jwtToken, err := authSvc.VerifyAccessToken(token, secretKey)
+	c.Assert(err, qt.IsNil)
+	c.Assert(jwtToken.Subject(), qt.Equals, "jimm-test@canonical.com")
+}
+
+func TestAccessTokenRejectsWrongSecretKey(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := context.Background()
+
+	authSvc, err := auth.NewAuthenticationService(ctx, auth.AuthenticationServiceParams{
+		IssuerURL:         "http://localhost:8082/realms/jimm",
+		DeviceClientID:    "jimm-device",
+		DeviceScopes:      []string{oidc.ScopeOpenID, "profile", "email"},
+		AccessTokenExpiry: time.Hour,
+	})
+	c.Assert(err, qt.IsNil)
+
+	secretKey := "secret-key"
+	token, err := authSvc.MintAccessToken("jimm-test@canonical.com", secretKey)
+	c.Assert(err, qt.IsNil)
+	c.Assert(len(token) > 0, qt.IsTrue)
+
+	_, err = authSvc.VerifyAccessToken(token, "wrong key")
+	c.Assert(err, qt.ErrorMatches, "could not verify message using any of the signatures or keys")
+}
+
+func TestAccessTokenRejectsExpiredToken(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := context.Background()
+
+	noDuration := time.Duration(0)
+
+	authSvc, err := auth.NewAuthenticationService(ctx, auth.AuthenticationServiceParams{
+		IssuerURL:         "http://localhost:8082/realms/jimm",
+		DeviceClientID:    "jimm-device",
+		DeviceScopes:      []string{oidc.ScopeOpenID, "profile", "email"},
+		AccessTokenExpiry: noDuration,
+	})
+	c.Assert(err, qt.IsNil)
+
+	secretKey := "secret-key"
+	token, err := authSvc.MintAccessToken("jimm-test@canonical.com", secretKey)
+	c.Assert(err, qt.IsNil)
+	c.Assert(len(token) > 0, qt.IsTrue)
+
+	_, err = authSvc.VerifyAccessToken(token, secretKey)
+	c.Assert(err, qt.ErrorMatches, `"exp" not satisfied`)
+}
+
+func TestAccessTokenValidatesEmail(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := context.Background()
+
+	authSvc, err := auth.NewAuthenticationService(ctx, auth.AuthenticationServiceParams{
+		IssuerURL:         "http://localhost:8082/realms/jimm",
+		DeviceClientID:    "jimm-device",
+		DeviceScopes:      []string{oidc.ScopeOpenID, "profile", "email"},
+		AccessTokenExpiry: time.Hour,
+	})
+	c.Assert(err, qt.IsNil)
+
+	secretKey := "secret-key"
+	token, err := authSvc.MintAccessToken("", secretKey)
+	c.Assert(err, qt.IsNil)
+	c.Assert(len(token) > 0, qt.IsTrue)
+
+	_, err = authSvc.VerifyAccessToken(token, secretKey)
+	c.Assert(err, qt.ErrorMatches, "failed to parse email")
 }

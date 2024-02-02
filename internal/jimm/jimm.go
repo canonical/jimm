@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/juju/juju/api/base"
 	"github.com/juju/juju/core/crossmodel"
@@ -17,6 +18,7 @@ import (
 	"github.com/juju/names/v4"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
+	"golang.org/x/oauth2"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/canonical/jimm/internal/db"
@@ -76,9 +78,21 @@ type JIMM struct {
 	// with the OpenFGA ReBAC system.
 	OpenFGAClient *openfga.OFGAClient
 
+	// JWKService holds a service responsible for generating and delivering a JWKS
+	// for consumption within Juju controllers.
 	JWKService *jimmjwx.JWKSService
 
+	// JWTService is responsible for minting JWTs to access controllers.
 	JWTService *jimmjwx.JWTService
+
+	// OAuthAuthenticator is responsible for handling authentication
+	// via OAuth2.0 AND JWT access tokens to JIMM.
+	OAuthAuthenticator OAuthAuthenticator
+}
+
+// OAuthAuthenticationService returns the JIMM's authentication service.
+func (j *JIMM) OAuthAuthenticationService() OAuthAuthenticator {
+	return j.OAuthAuthenticator
 }
 
 // ResourceTag returns JIMM's controller tag stating its UUID.
@@ -106,6 +120,39 @@ type Authenticator interface {
 	// Authenticate processes the given LoginRequest and returns the user
 	// that has authenticated.
 	Authenticate(ctx context.Context, req *jujuparams.LoginRequest) (*openfga.User, error)
+}
+
+// OAuthAuthenticator is responsible for handling authentication
+// via OAuth2.0 AND JWT access tokens to JIMM.
+type OAuthAuthenticator interface {
+	// Device initiates a device flow login and is step ONE of TWO.
+	//
+	// This is done via retrieving a:
+	// - Device code
+	// - User code
+	// - VerificationURI
+	// - Interval
+	// - Expiry
+	// From the device /auth endpoint.
+	//
+	// The verification uri and user code is sent to the user, as they must enter the code
+	// into the uri.
+	//
+	// The interval, expiry and device code and used to poll the token endpoint for completion.
+	Device(ctx context.Context) (*oauth2.DeviceAuthResponse, error)
+
+	// DeviceAccessToken continues and collect an access token during the device login flow
+	// and is step TWO.
+	//
+	// See Device(...) godoc for more info pertaining to the flow.
+	DeviceAccessToken(ctx context.Context, res *oauth2.DeviceAuthResponse) (*oauth2.Token, error)
+
+	// ExtractAndVerifyIDToken extracts the id token from the extras claims of an oauth2 token
+	// and performs signature verification of the token.
+	ExtractAndVerifyIDToken(ctx context.Context, oauth2Token *oauth2.Token) (*oidc.IDToken, error)
+
+	// Email retrieves the users email from an id token via the email claim
+	Email(idToken *oidc.IDToken) (string, error)
 }
 
 type permission struct {

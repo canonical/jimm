@@ -75,6 +75,9 @@ services:
       OPENFGA_STORE: "01GP1254CHWJC1MNGVB0WDG1T0"
       OPENFGA_AUTH_MODEL: "01GP1EC038KHGB6JJ2XXXXCXKB"
       OPENFGA_TOKEN: "jimm"
+      JIMM_OAUTH_ISSUER_URL: "http://keycloak:8082/realms/jimm" # Scheme required
+      JIMM_OAUTH_DEVICE_CLIENT_ID: "jimm-device" # Must be a public client, no client secret
+      JIMM_OAUTH_DEVICE_SCOPES: "openid, profile, email" # Comma separated list of scopes
     volumes:
       - ./:/jimm/
       - ./local/vault/approle.json:/vault/approle.json:rw
@@ -227,6 +230,7 @@ services:
 
   keycloak:
     image: docker.io/bitnami/keycloak:23
+    container_name: keycloak
     environment:
       KEYCLOAK_HTTP_PORT: 8082
       KEYCLOAK_ENABLE_HEALTH_ENDPOINTS: true
@@ -240,7 +244,7 @@ services:
     ports:
       - "8082:8082"
     healthcheck:
-      test: [ "CMD", "curl", "http://0.0.0.0:8082/health/started" ]
+      test: [ "CMD", "curl", "http://localhost:8082/realms/jimm/.well-known/openid-configuration" ]
       interval: 5s
       timeout: 5s
       retries: 30
