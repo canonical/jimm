@@ -97,7 +97,7 @@ func newModelBuilder(ctx context.Context, j *JIMM) *modelBuilder {
 	}
 }
 
-func newModelBuilderFromModel(ctx context.Context, j *JIMM, owner *dbmodel.User, modelName string) (*modelBuilder, error) {
+func newModelBuilderFromModel(ctx context.Context, j *JIMM, owner *dbmodel.User, modelName string, config map[string]interface{}) (*modelBuilder, error) {
 	const op = errors.Op("jimm.newModelBuilderFromModel")
 	b := &modelBuilder{
 		ctx:   ctx,
@@ -105,6 +105,7 @@ func newModelBuilderFromModel(ctx context.Context, j *JIMM, owner *dbmodel.User,
 		owner: owner,
 		name:  modelName,
 	}
+	b = b.WithConfig(config)
 	b.model = &dbmodel.Model{
 		OwnerUsername: owner.Username,
 		Name:          modelName,
@@ -114,7 +115,7 @@ func newModelBuilderFromModel(ctx context.Context, j *JIMM, owner *dbmodel.User,
 	}
 	b.controller = &b.model.Controller
 	b.cloudRegionID = b.model.CloudRegionID
-	b.cloud = &b.model.CloudCredential.Cloud
+	b.cloud = &b.model.CloudRegion.Cloud // bug here
 	b = b.WithCloudRegion("")
 	b.credential = &b.model.CloudCredential
 	return b, b.err
@@ -466,11 +467,11 @@ func (b *modelBuilder) CreateControllerModel() *modelBuilder {
 			relation: string(jujupermission.AddModelAccess),
 		},
 	)
-	defer api.Close()
 	if err != nil {
 		b.err = errors.E(err)
 		return b
 	}
+	defer api.Close()
 
 	if b.credential != nil {
 		if err := b.updateCredential(b.ctx, api, b.credential); err != nil {
@@ -533,9 +534,9 @@ func (b *modelBuilder) JujuModelInfo() *jujuparams.ModelInfo {
 
 // RiverAddModelArgs holds the river job arguments for building models.
 type RiverAddModelArgs struct {
-	ModelCreateArgs    `json:"model_create_args"`
-	OpenFgaUserName    string `json:"user"`
-	OpenFgaIsJimmAdmin bool   `json:"jimm_admin"`
+	ModelName string                 `json:"name"`
+	OwnerName string                 `json:"owner_name"`
+	Config    map[string]interface{} `json:"config"`
 }
 
 // Kind is a string that uniquely identifies the type of job to be picked up by the appropriate river workers.
@@ -553,16 +554,16 @@ type RiverAddModelWorker struct {
 // Work is the function executed by the worker when it picks up the job.
 func (w *RiverAddModelWorker) Work(ctx context.Context, job *river.Job[RiverAddModelArgs]) error {
 	const op = errors.Op("jimm.AddModel")
-	args := job.Args.ModelCreateArgs
+	args := job.Args
 	j := w.JIMM
 	owner := &dbmodel.User{
-		Username: args.Owner.Id(),
+		Username: names.NewUserTag(args.OwnerName).Id(),
 	}
 	err := j.Database.GetUser(ctx, owner)
 	if err != nil {
 		return errors.E(op, err)
 	}
-	builder, err := newModelBuilderFromModel(ctx, w.JIMM, owner, args.Name)
+	builder, err := newModelBuilderFromModel(ctx, w.JIMM, owner, args.ModelName, args.Config)
 	if err != nil {
 		return river.JobCancel(fmt.Errorf("failed to construct a model builder from the db model"))
 	}
@@ -701,9 +702,9 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 	defer builder.Cleanup()
 
 	riverAddModelArgs := RiverAddModelArgs{
-		ModelCreateArgs:    *args,
-		OpenFgaUserName:    user.Username,
-		OpenFgaIsJimmAdmin: user.JimmAdmin,
+		ModelName: builder.name,
+		OwnerName: args.Owner.Id(),
+		Config:    builder.config,
 	}
 	// perform all checks from the builder before submitting the job (until after createDatabaseModel)
 	err = InsertJob(ctx, &WaitConfig{Duration: 10 * time.Minute}, j.River, func() (*rivertype.JobRow, error) {
