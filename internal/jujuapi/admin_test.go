@@ -47,7 +47,7 @@ func (s *adminSuite) TestLoginToControllerWithInvalidMacaroon(c *gc.C) {
 // TestDeviceLogin takes a test user through the flow of logging into jimm
 // via the correct facades. All are done in a single test to see the flow end-2-end.
 //
-// With in the test are clear comments explaining what is happening when and why.
+// Within the test are clear comments explaining what is happening when and why.
 // Please refer to these comments for further details.
 func (s *adminSuite) TestDeviceLogin(c *gc.C) {
 	conn := s.open(c, &api.Info{

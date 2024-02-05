@@ -69,7 +69,7 @@ func start(ctx context.Context, s *service.Service) error {
 		}
 	}
 
-	accessTokenExpiryDuration := time.Duration(0)
+	sessionTokenExpiryDuration := time.Duration(0)
 	durationString = os.Getenv("JIMM_ACCESS_TOKEN_EXPIRY_DURATION")
 	if durationString != "" {
 		expiry, err := time.ParseDuration(durationString)
@@ -77,7 +77,7 @@ func start(ctx context.Context, s *service.Service) error {
 			zapctx.Error(ctx, "failed to parse access token expiry duration", zap.Error(err))
 			return err
 		}
-		accessTokenExpiryDuration = expiry
+		sessionTokenExpiryDuration = expiry
 	}
 
 	issuerURL := os.Getenv("JIMM_OAUTH_ISSUER_URL")
@@ -145,10 +145,10 @@ func start(ctx context.Context, s *service.Service) error {
 		InsecureSecretStorage:         insecureSecretStorage,
 		InsecureJwksLookup:            insecureJwksLookup,
 		OAuthAuthenticatorParams: jimm.OAuthAuthenticatorParams{
-			IssuerURL:         issuerURL,
-			DeviceClientID:    deviceClientID,
-			DeviceScopes:      deviceScopesParsed,
-			AccessTokenExpiry: accessTokenExpiryDuration,
+			IssuerURL:          issuerURL,
+			DeviceClientID:     deviceClientID,
+			DeviceScopes:       deviceScopesParsed,
+			SessionTokenExpiry: sessionTokenExpiryDuration,
 		},
 	})
 	if err != nil {

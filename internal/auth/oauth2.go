@@ -23,8 +23,8 @@ type AuthenticationService struct {
 	// provider holds a OIDC provider wrapper for the OAuth2.0 /x/oauth package,
 	// enabling UserInfo calls, wellknown retrieval and jwks verification.
 	provider *oidc.Provider
-	// accessTokenExpiry holds the expiry time for JIMM minted access tokens (JWTs).
-	accessTokenExpiry time.Duration
+	// sessionTokenExpiry holds the expiry time for JIMM minted access tokens (JWTs).
+	sessionTokenExpiry time.Duration
 }
 
 // AuthenticationServiceParams holds the parameters to initialise
@@ -39,8 +39,8 @@ type AuthenticationServiceParams struct {
 	DeviceClientID string
 	// DeviceScopes holds the scopes that you wish to retrieve.
 	DeviceScopes []string
-	// AccessTokenExpiry holds the expiry time of minted JIMM access tokens (JWTs).
-	AccessTokenExpiry time.Duration
+	// SessionTokenExpiry holds the expiry time of minted JIMM access tokens (JWTs).
+	SessionTokenExpiry time.Duration
 }
 
 // NewAuthenticationService returns a new authentication service for handling
@@ -61,7 +61,7 @@ func NewAuthenticationService(ctx context.Context, params AuthenticationServiceP
 			Endpoint: provider.Endpoint(),
 			Scopes:   params.DeviceScopes,
 		},
-		accessTokenExpiry: params.AccessTokenExpiry,
+		sessionTokenExpiry: params.SessionTokenExpiry,
 	}, nil
 }
 
@@ -148,14 +148,14 @@ func (as *AuthenticationService) Email(idToken *oidc.IDToken) (string, error) {
 	return claims.Email, nil
 }
 
-// MintAccessToken mints a session access token to be used when logging into JIMM
+// MintSessionToken mints a session token to be used when logging into JIMM
 // via an access token. The token only contains the user's email for authentication.
-func (as *AuthenticationService) MintAccessToken(email string, secretKey string) ([]byte, error) {
+func (as *AuthenticationService) MintSessionToken(email string, secretKey string) ([]byte, error) {
 	const op = errors.Op("auth.AuthenticationService.MintAccessToken")
 
 	token, err := jwt.NewBuilder().
 		Subject(email).
-		Expiration(time.Now().Add(as.accessTokenExpiry)).
+		Expiration(time.Now().Add(as.sessionTokenExpiry)).
 		Build()
 	if err != nil {
 		return nil, errors.E(op, err, "failed to build access token")
