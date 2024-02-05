@@ -145,6 +145,7 @@ var addModelTests = []struct {
 	updateCredential    func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error)
 	grantJIMMModelAdmin func(context.Context, names.ModelTag) error
 	createModel         func(ctx context.Context, args *jujuparams.ModelCreateArgs, mi *jujuparams.ModelInfo) error
+	modelInfo           func(_ context.Context, mi *jujuparams.ModelInfo) error
 	username            string
 	jimmAdmin           bool
 	args                jujuparams.ModelCreateArgs
@@ -203,6 +204,11 @@ controllers:
 		return nil, nil
 	},
 	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
+		return nil
+	},
+	modelInfo: func(_ context.Context, mi *jujuparams.ModelInfo) error {
+		mi.UUID = "00000001-0000-0000-0000-0000-000000000001"
+		mi.Name = "test-model"
 		return nil
 	},
 	createModel: assertConfig(map[string]interface{}{
@@ -318,6 +324,11 @@ controllers:
 	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
 		return nil
 	},
+	modelInfo: func(_ context.Context, mi *jujuparams.ModelInfo) error {
+		mi.UUID = "00000001-0000-0000-0000-0000-000000000001"
+		mi.Name = "test-model"
+		return nil
+	},
 	createModel: assertConfig(map[string]interface{}{
 		"key1": "value1",
 		"key2": "value2",
@@ -415,6 +426,11 @@ controllers:
 		return nil, nil
 	},
 	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
+		return nil
+	},
+	modelInfo: func(_ context.Context, mi *jujuparams.ModelInfo) error {
+		mi.UUID = "00000001-0000-0000-0000-0000-000000000001"
+		mi.Name = "test-model"
 		return nil
 	},
 	createModel: createModel(`
@@ -517,6 +533,11 @@ users:
 	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
 		return nil
 	},
+	modelInfo: func(_ context.Context, mi *jujuparams.ModelInfo) error {
+		mi.UUID = "00000001-0000-0000-0000-0000-000000000001"
+		mi.Name = "test-model"
+		return nil
+	},
 	createModel: createModel(`
 uuid: 00000001-0000-0000-0000-0000-000000000001
 status:
@@ -615,6 +636,11 @@ users:
 	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
 		return nil
 	},
+	modelInfo: func(_ context.Context, mi *jujuparams.ModelInfo) error {
+		mi.UUID = "00000001-0000-0000-0000-0000-000000000001"
+		mi.Name = "test-model"
+		return nil
+	},
 	createModel: createModel(`
 uuid: 00000001-0000-0000-0000-0000-000000000001
 status:
@@ -676,6 +702,11 @@ controllers:
 	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
 		return nil
 	},
+	modelInfo: func(_ context.Context, mi *jujuparams.ModelInfo) error {
+		mi.UUID = "00000001-0000-0000-0000-0000-000000000001"
+		mi.Name = "test-model"
+		return nil
+	},
 	createModel: func(ctx context.Context, args *jujuparams.ModelCreateArgs, mi *jujuparams.ModelInfo) error {
 		return errors.E("a test error")
 	},
@@ -688,7 +719,7 @@ controllers:
 		CloudRegion:        "test-region-1",
 		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1").String(),
 	},
-	expectError: "a test error",
+	expectError: ".* a test error .*",
 }, {
 	name: "ModelExists",
 	env: `
@@ -743,6 +774,11 @@ models:
 		return nil, nil
 	},
 	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
+		return nil
+	},
+	modelInfo: func(_ context.Context, mi *jujuparams.ModelInfo) error {
+		mi.UUID = "00000001-0000-0000-0000-0000-000000000001"
+		mi.Name = "test-model"
 		return nil
 	},
 	createModel: createModel(`
@@ -807,6 +843,11 @@ controllers:
 	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
 		return nil
 	},
+	modelInfo: func(_ context.Context, mi *jujuparams.ModelInfo) error {
+		mi.UUID = "00000001-0000-0000-0000-0000-000000000001"
+		mi.Name = "test-model"
+		return nil
+	},
 	createModel: createModel(`
 uuid: 00000001-0000-0000-0000-0000-000000000001
 status:
@@ -828,7 +869,7 @@ users:
 		CloudRegion:        "test-region-1",
 		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1").String(),
 	},
-	expectError: "failed to update cloud credential: a silly error",
+	expectError: ".*failed to update cloud credential: a silly error.*",
 }, {
 	name: "UserWithoutAddModelPermission",
 	env: `
@@ -866,6 +907,11 @@ controllers:
 	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
 		return nil
 	},
+	modelInfo: func(_ context.Context, mi *jujuparams.ModelInfo) error {
+		mi.UUID = "00000001-0000-0000-0000-0000-000000000001"
+		mi.Name = "test-model"
+		return nil
+	},
 	createModel: createModel(`
 uuid: 00000001-0000-0000-0000-0000-000000000001
 status:
@@ -897,8 +943,8 @@ func TestAddModel(t *testing.T) {
 				UpdateCredential_:    test.updateCredential,
 				GrantJIMMModelAdmin_: test.grantJIMMModelAdmin,
 				CreateModel_:         test.createModel,
+				ModelInfo_:           test.modelInfo,
 			}
-
 			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.name)
 			c.Assert(err, qt.IsNil)
 			ctx := context.Background()
@@ -3528,6 +3574,7 @@ func TestAddModelDeletedController(t *testing.T) {
 		GrantJIMMModelAdmin_: func(context.Context, names.ModelTag) error {
 			return nil
 		},
+		ModelInfo_: func(ctx context.Context, mi *jujuparams.ModelInfo) error { return nil },
 		CreateModel_: createModel(`
 uuid: 00000001-0000-0000-0000-0000-000000000004
 status:

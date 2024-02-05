@@ -111,13 +111,31 @@ func newModelBuilderFromModel(ctx context.Context, j *JIMM, owner *dbmodel.User,
 		Name:          modelName,
 	}
 	if err := j.Database.GetModel(ctx, b.model); err != nil {
-		return nil, errors.E(err, "Model was not created")
+		return nil, errors.E(err, fmt.Sprintf("Model was not created, err: %s", err))
 	}
 	b.controller = &b.model.Controller
-	b.cloudRegionID = b.model.CloudRegionID
+	// b.cloudRegionID = b.model.CloudRegionID
 	b.cloud = &b.model.CloudRegion.Cloud // bug here
-	b = b.WithCloudRegion("")
+	if err := j.Database.GetCloud(ctx, b.cloud); err != nil {
+		return nil, errors.E(err, "cloud not found")
+	}
+	b = b.WithCloudRegion(b.model.CloudRegion.Name)
 	b.credential = &b.model.CloudCredential
+	// fetch cloud region defaults
+	if b.cloud != nil && names.NewCloudTag(b.cloud.Name) != (names.CloudTag{}) && b.cloudRegion != "" {
+		cloudRegionDefaults := dbmodel.CloudDefaults{
+			Username: owner.Username,
+			Cloud: dbmodel.Cloud{
+				Name: names.NewCloudTag(b.cloud.Name).Id(),
+			},
+			Region: b.cloudRegion,
+		}
+		err := j.Database.CloudDefaults(ctx, &cloudRegionDefaults)
+		if err != nil && errors.ErrorCode(err) != errors.CodeNotFound {
+			return nil, errors.E(op, "failed to fetch cloud defaults")
+		}
+		b = b.WithConfig(cloudRegionDefaults.Defaults)
+	}
 	return b, b.err
 }
 
@@ -535,6 +553,7 @@ func (b *modelBuilder) JujuModelInfo() *jujuparams.ModelInfo {
 // RiverAddModelArgs holds the river job arguments for building models.
 type RiverAddModelArgs struct {
 	ModelName string                 `json:"name"`
+	UserName  string                 `json:"user_name"`
 	OwnerName string                 `json:"owner_name"`
 	Config    map[string]interface{} `json:"config"`
 }
@@ -556,16 +575,17 @@ func (w *RiverAddModelWorker) Work(ctx context.Context, job *river.Job[RiverAddM
 	const op = errors.Op("jimm.AddModel")
 	args := job.Args
 	j := w.JIMM
-	owner := &dbmodel.User{
-		Username: names.NewUserTag(args.OwnerName).Id(),
+	user := &dbmodel.User{Username: args.UserName}
+	owner := &dbmodel.User{Username: args.OwnerName}
+	if err := j.Database.GetUser(ctx, user); err != nil {
+		return errors.E(op, err)
 	}
-	err := j.Database.GetUser(ctx, owner)
-	if err != nil {
+	if err := j.Database.GetUser(ctx, owner); err != nil {
 		return errors.E(op, err)
 	}
 	builder, err := newModelBuilderFromModel(ctx, w.JIMM, owner, args.ModelName, args.Config)
 	if err != nil {
-		return river.JobCancel(fmt.Errorf("failed to construct a model builder from the db model"))
+		return errors.E(op, err)
 	}
 	builder = builder.CreateControllerModel()
 	if err := builder.Error(); err != nil {
@@ -628,7 +648,7 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 	}
 
 	// fetch user model defaults
-	userConfig, err := j.UserModelDefaults(ctx, owner)
+	userConfig, err := j.UserModelDefaults(ctx, user.User)
 	if err != nil && errors.ErrorCode(err) != errors.CodeNotFound {
 		return nil, errors.E(op, "failed to fetch cloud defaults")
 	}
@@ -637,7 +657,7 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 	// fetch cloud defaults
 	if args.Cloud != (names.CloudTag{}) {
 		cloudDefaults := dbmodel.CloudDefaults{
-			Username: owner.Username,
+			Username: user.Username,
 			Cloud: dbmodel.Cloud{
 				Name: args.Cloud.Id(),
 			},
@@ -660,7 +680,8 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 
 	// at this point we know which cloud will host the model and
 	// we must check the user has add-model permission on the cloud
-	canAddModel, err := openfga.NewUser(owner, j.OpenFGAClient).IsAllowedAddModel(ctx, builder.cloud.ResourceTag())
+	ownerOfgaUser := openfga.NewUser(owner, j.OpenFGAClient)
+	canAddModel, err := ownerOfgaUser.IsAllowedAddModel(ctx, builder.cloud.ResourceTag())
 	if err != nil {
 		return nil, errors.E(op, "permission check failed")
 	}
@@ -671,7 +692,7 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 	// fetch cloud region defaults
 	if args.Cloud != (names.CloudTag{}) && builder.cloudRegion != "" {
 		cloudRegionDefaults := dbmodel.CloudDefaults{
-			Username: owner.Username,
+			Username: user.Username,
 			Cloud: dbmodel.Cloud{
 				Name: args.Cloud.Id(),
 			},
@@ -702,25 +723,33 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 	defer builder.Cleanup()
 
 	riverAddModelArgs := RiverAddModelArgs{
-		ModelName: builder.name,
-		OwnerName: args.Owner.Id(),
 		Config:    builder.config,
+		ModelName: builder.name,
+		OwnerName: owner.Username,
+		UserName:  user.Username,
 	}
 	// perform all checks from the builder before submitting the job (until after createDatabaseModel)
 	err = InsertJob(ctx, &WaitConfig{Duration: 10 * time.Minute}, j.River, func() (*rivertype.JobRow, error) {
 		return j.River.Client.Insert(ctx, riverAddModelArgs, &river.InsertOpts{MaxAttempts: j.River.MaxAttempts})
 	})
 	if err != nil {
-		return nil, errors.E(err, "failed to insert and wait for the river job")
+		return nil, errors.E(err, fmt.Sprintf("failed to insert and wait for the river job, err: %s", err))
 	}
-	model := dbmodel.Model{
-		OwnerUsername: user.Username,
-		Name:          args.Name,
+	model := &dbmodel.Model{
+		// Name:         builder.name,
+		ControllerID: builder.controller.ID,
+		Owner:        *owner,
+		// CloudCredentialID: builder.credential.ID,
+		// CloudRegionID:     builder.cloudRegionID,
 	}
-	if err = j.Database.GetModel(ctx, &model); err != nil {
-		return nil, errors.E(err, "Model was not created")
+	if err = j.Database.GetModel(ctx, model); err != nil {
+		return nil, errors.E(err, fmt.Sprintf("Model was not created, err: %s", err))
 	}
-	return j.ModelInfo(ctx, user, names.NewModelTag(model.UUID.String))
+	modelInfo, err := j.ModelInfo(ctx, ownerOfgaUser, names.NewModelTag(model.UUID.String))
+	if err != nil {
+		return nil, errors.E(err, fmt.Sprintf("failed to read model info, err: %s", err))
+	}
+	return modelInfo, nil
 }
 
 // ModelInfo returns the model info for the model with the given ModelTag.

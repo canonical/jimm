@@ -774,6 +774,11 @@ func TestUpdateCloudCredential(t *testing.T) {
 					}}
 					return nil
 				},
+				ModelInfo_: func(_ context.Context, mi *jujuparams.ModelInfo) error {
+					mi.UUID = "00000001-0000-0000-0000-0000-000000000001"
+					mi.Name = "test-model"
+					return nil
+				},
 			}
 
 			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
