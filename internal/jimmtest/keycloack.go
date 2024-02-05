@@ -65,6 +65,8 @@ func CreateRandomKeycloakUser() (*KeycloakUser, error) {
 	}, nil
 }
 
+// getAdminCLIAccessToken authenticates with the `admin-cli` client and returns
+// the access token to be used to communicate with Keycloak admin API.
 func getAdminCLIAccessToken() (string, error) {
 	httpClient := http.Client{}
 	u := url.URL{
@@ -110,6 +112,7 @@ func getAdminCLIAccessToken() (string, error) {
 	}
 }
 
+// getKeycloakUsersMap returns a map of Keycloak users, associating usernames to IDs.
 func getKeycloakUsersMap(adminCLIToken string) (map[string]string, error) {
 	httpClient := http.Client{}
 	u := url.URL{
@@ -153,6 +156,7 @@ func getKeycloakUsersMap(adminCLIToken string) (map[string]string, error) {
 	return result, nil
 }
 
+// getKeycloakUserId returns the Keycloak user ID of a given username.
 func getKeycloakUserId(adminCLIToken, username string) (string, error) {
 	m, err := getKeycloakUsersMap(adminCLIToken)
 	if err != nil {
@@ -166,6 +170,7 @@ func getKeycloakUserId(adminCLIToken, username string) (string, error) {
 	}
 }
 
+// addKeycloakUser adds a user (username/email pair) to Keycloak.
 func addKeycloakUser(adminCLIToken, email, username string) error {
 	httpClient := http.Client{}
 	u := url.URL{
@@ -210,6 +215,7 @@ func addKeycloakUser(adminCLIToken, email, username string) error {
 	return nil
 }
 
+// setKeycloakUserPassword sets the password for given Keycloak user (identified by its ID).
 func setKeycloakUserPassword(adminCLIToken, id, password string) error {
 	httpClient := http.Client{}
 	u := url.URL{
