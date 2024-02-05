@@ -181,6 +181,7 @@ services:
 
   insert-hardcoded-store:
     image: governmentpaas/psql
+    profiles: ["dev"]
     container_name: insert-hardcoded-store
     command: psql -Atx postgresql://jimm:jimm@db/jimm?sslmode=disable -c "INSERT INTO store (id,name,created_at,updated_at) VALUES ('01GP1254CHWJC1MNGVB0WDG1T0','jimm',NOW(),NOW());"
     depends_on:
@@ -217,13 +218,18 @@ services:
   # Adds the auth model and updates its authorisation model id to be the expected hard-coded id such that our local JIMM can utilise it for queries.
   # The auth model json is retrieved from file via volume mount.
   insert-hardcoded-auth-model:
+    profiles: ["dev"]
     image: governmentpaas/psql
     container_name: insert-hardcoded-auth-model
     volumes:
       - ./local/openfga/authorisation_model.json:/authorisation_model.json
-    command: >
-      sh -c "wget -q -O - --header 'Content-Type: application/json' --header 'Authorization: Bearer jimm' --post-file authorisation_model.json openfga:8080/stores/01GP1254CHWJC1MNGVB0WDG1T0/authorization-models && \
-      psql -Atx postgresql://jimm:jimm@db/jimm?sslmode=disable -c \"UPDATE authorization_model SET authorization_model_id = '01GP1EC038KHGB6JJ2XXXXCXKB' WHERE store = '01GP1254CHWJC1MNGVB0WDG1T0';\""
+    command: 
+        - /bin/sh
+        - -c
+        - |
+          wget -q -O - --header 'Content-Type: application/json' --header 'Authorization: Bearer jimm' --post-file authorisation_model.json openfga:8080/stores/01GP1254CHWJC1MNGVB0WDG1T0/authorization-models
+          psql -Atx postgresql://jimm:jimm@db/jimm?sslmode=disable -c "UPDATE authorization_model SET authorization_model_id = '01GP1EC038KHGB6JJ2XXXXCXKB' WHERE store = '01GP1254CHWJC1MNGVB0WDG1T0';"
+          echo "Finished"
     depends_on:
       openfga:
         condition: service_healthy
