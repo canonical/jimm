@@ -75,9 +75,9 @@ type OAuthAuthenticatorParams struct {
 	DeviceClientID string
 	// DeviceScopes holds the scopes that you wish to retrieve.
 	DeviceScopes []string
-	// AccessTokenExpiry holds the expiry duration for issued JWTs
+	// SessionTokenExpiry holds the expiry duration for issued JWTs
 	// for user (CLI) to JIMM authentication.
-	AccessTokenExpiry time.Duration
+	SessionTokenExpiry time.Duration
 }
 
 // A Params structure contains the parameters required to initialise a new

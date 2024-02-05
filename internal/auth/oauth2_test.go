@@ -119,15 +119,15 @@ func TestAccessTokens(t *testing.T) {
 	ctx := context.Background()
 
 	authSvc, err := auth.NewAuthenticationService(ctx, auth.AuthenticationServiceParams{
-		IssuerURL:         "http://localhost:8082/realms/jimm",
-		DeviceClientID:    "jimm-device",
-		DeviceScopes:      []string{oidc.ScopeOpenID, "profile", "email"},
-		AccessTokenExpiry: time.Hour,
+		IssuerURL:          "http://localhost:8082/realms/jimm",
+		DeviceClientID:     "jimm-device",
+		DeviceScopes:       []string{oidc.ScopeOpenID, "profile", "email"},
+		SessionTokenExpiry: time.Hour,
 	})
 	c.Assert(err, qt.IsNil)
 
 	secretKey := "secret-key"
-	token, err := authSvc.MintAccessToken("jimm-test@canonical.com", secretKey)
+	token, err := authSvc.MintSessionToken("jimm-test@canonical.com", secretKey)
 	c.Assert(err, qt.IsNil)
 	c.Assert(len(token) > 0, qt.IsTrue)
 
@@ -142,15 +142,15 @@ func TestAccessTokenRejectsWrongSecretKey(t *testing.T) {
 	ctx := context.Background()
 
 	authSvc, err := auth.NewAuthenticationService(ctx, auth.AuthenticationServiceParams{
-		IssuerURL:         "http://localhost:8082/realms/jimm",
-		DeviceClientID:    "jimm-device",
-		DeviceScopes:      []string{oidc.ScopeOpenID, "profile", "email"},
-		AccessTokenExpiry: time.Hour,
+		IssuerURL:          "http://localhost:8082/realms/jimm",
+		DeviceClientID:     "jimm-device",
+		DeviceScopes:       []string{oidc.ScopeOpenID, "profile", "email"},
+		SessionTokenExpiry: time.Hour,
 	})
 	c.Assert(err, qt.IsNil)
 
 	secretKey := "secret-key"
-	token, err := authSvc.MintAccessToken("jimm-test@canonical.com", secretKey)
+	token, err := authSvc.MintSessionToken("jimm-test@canonical.com", secretKey)
 	c.Assert(err, qt.IsNil)
 	c.Assert(len(token) > 0, qt.IsTrue)
 
@@ -166,15 +166,15 @@ func TestAccessTokenRejectsExpiredToken(t *testing.T) {
 	noDuration := time.Duration(0)
 
 	authSvc, err := auth.NewAuthenticationService(ctx, auth.AuthenticationServiceParams{
-		IssuerURL:         "http://localhost:8082/realms/jimm",
-		DeviceClientID:    "jimm-device",
-		DeviceScopes:      []string{oidc.ScopeOpenID, "profile", "email"},
-		AccessTokenExpiry: noDuration,
+		IssuerURL:          "http://localhost:8082/realms/jimm",
+		DeviceClientID:     "jimm-device",
+		DeviceScopes:       []string{oidc.ScopeOpenID, "profile", "email"},
+		SessionTokenExpiry: noDuration,
 	})
 	c.Assert(err, qt.IsNil)
 
 	secretKey := "secret-key"
-	token, err := authSvc.MintAccessToken("jimm-test@canonical.com", secretKey)
+	token, err := authSvc.MintSessionToken("jimm-test@canonical.com", secretKey)
 	c.Assert(err, qt.IsNil)
 	c.Assert(len(token) > 0, qt.IsTrue)
 
@@ -188,15 +188,15 @@ func TestAccessTokenValidatesEmail(t *testing.T) {
 	ctx := context.Background()
 
 	authSvc, err := auth.NewAuthenticationService(ctx, auth.AuthenticationServiceParams{
-		IssuerURL:         "http://localhost:8082/realms/jimm",
-		DeviceClientID:    "jimm-device",
-		DeviceScopes:      []string{oidc.ScopeOpenID, "profile", "email"},
-		AccessTokenExpiry: time.Hour,
+		IssuerURL:          "http://localhost:8082/realms/jimm",
+		DeviceClientID:     "jimm-device",
+		DeviceScopes:       []string{oidc.ScopeOpenID, "profile", "email"},
+		SessionTokenExpiry: time.Hour,
 	})
 	c.Assert(err, qt.IsNil)
 
 	secretKey := "secret-key"
-	token, err := authSvc.MintAccessToken("", secretKey)
+	token, err := authSvc.MintSessionToken("", secretKey)
 	c.Assert(err, qt.IsNil)
 	c.Assert(len(token) > 0, qt.IsTrue)
 
