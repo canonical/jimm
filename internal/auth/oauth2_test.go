@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/canonical/jimm/internal/auth"
+	"github.com/canonical/jimm/internal/jimmtest"
 	"github.com/coreos/go-oidc/v3/oidc"
 	qt "github.com/frankban/quicktest"
 )
@@ -28,6 +29,9 @@ import (
 // can manually POST the forms throughout the flow.
 func TestDevice(t *testing.T) {
 	c := qt.New(t)
+
+	u, err := jimmtest.CreateRandomKeycloakUser()
+	c.Assert(err, qt.IsNil)
 
 	ctx := context.Background()
 
@@ -64,10 +68,8 @@ func TestDevice(t *testing.T) {
 	loginFormUrl := match[1]
 
 	v := url.Values{}
-	// The username and password are hardcoded witih jimm-realm.json in our local
-	// keycloak configuration for the jimm realm.
-	v.Add("username", "jimm-test")
-	v.Add("password", "password")
+	v.Add("username", u.Username)
+	v.Add("password", u.Password)
 	loginResp, err := client.PostForm(loginFormUrl, v)
 	c.Assert(err, qt.IsNil)
 	defer loginResp.Body.Close()
@@ -103,12 +105,12 @@ func TestDevice(t *testing.T) {
 	c.Assert(idToken, qt.IsNotNil)
 
 	// Test subject set
-	c.Assert(idToken.Subject, qt.Equals, "8281cec3-5b48-46eb-a41d-72c15ec3f9e0")
+	c.Assert(idToken.Subject, qt.Equals, u.Id)
 
 	// Retrieve the email
 	email, err := authSvc.Email(idToken)
 	c.Assert(err, qt.IsNil)
-	c.Assert(email, qt.Equals, "jimm-test@canonical.com")
+	c.Assert(email, qt.Equals, u.Email)
 }
 
 // TestAccessTokens tests both the minting and validation of JIMM

@@ -593,13 +593,17 @@
       ]
     },
     {
-      "id": "5c17b099-c66d-4e74-991e-0fd22cb3050e",
       "clientId": "admin-cli",
       "name": "${client_admin-cli}",
+      "description": "",
+      "rootUrl": "",
+      "adminUrl": "",
+      "baseUrl": "",
       "surrogateAuthRequired": false,
       "enabled": true,
       "alwaysDisplayInConsole": false,
       "clientAuthenticatorType": "client-secret",
+      "secret": "DOLcuE5Cd7IxuR7JE4hpAUxaLF7RlAWh",
       "redirectUris": [],
       "webOrigins": [],
       "notBefore": 0,
@@ -609,11 +613,17 @@
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": true,
       "serviceAccountsEnabled": false,
-      "publicClient": true,
+      "publicClient": false,
       "frontchannelLogout": false,
       "protocol": "openid-connect",
       "attributes": {
-        "post.logout.redirect.uris": "+"
+        "oidc.ciba.grant.enabled": "false",
+        "client.secret.creation.time": "1706880117",
+        "backchannel.logout.session.required": "true",
+        "post.logout.redirect.uris": "+",
+        "oauth2.device.authorization.grant.enabled": "false",
+        "display.on.consent.screen": "false",
+        "backchannel.logout.revoke.offline.tokens": "false"
       },
       "authenticationFlowBindingOverrides": {},
       "fullScopeAllowed": false,
@@ -630,7 +640,12 @@
         "phone",
         "offline_access",
         "microprofile-jwt"
-      ]
+      ],
+      "access": {
+        "view": true,
+        "configure": true,
+        "manage": true
+      }
     },
     {
       "id": "a335192a-14e7-4f47-ae24-d9b45a89fb77",
