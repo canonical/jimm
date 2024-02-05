@@ -84,7 +84,7 @@ func (r *controllerRoot) Login(ctx context.Context, req jujuparams.LoginRequest)
 //
 // Upon successful login, the user is then expected to retrieve an access token using
 // GetDeviceAccessToken.
-func (r *controllerRoot) LoginDevice(ctx context.Context, req params.LoginDeviceRequest) (params.LoginDeviceResponse, error) {
+func (r *controllerRoot) LoginDevice(ctx context.Context) (params.LoginDeviceResponse, error) {
 	const op = errors.Op("jujuapi.LoginDevice")
 	response := params.LoginDeviceResponse{}
 	authSvc := r.jimm.OAuthAuthenticationService()

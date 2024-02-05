@@ -394,9 +394,6 @@ type MigrateModelRequest struct {
 	Specs []MigrateModelInfo `json:"specs"`
 }
 
-// LoginDeviceRequest initiates an OAuth2.0 device grant login flow with JIMM.
-type LoginDeviceRequest struct{}
-
 // LoginDeviceResponse holds the details to complete a LoginDevice flow.
 type LoginDeviceResponse struct {
 	// VerificationURI holds the URI that the user must navigate to
