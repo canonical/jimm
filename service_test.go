@@ -51,10 +51,10 @@ func TestDefaultService(t *testing.T) {
 		OpenFGAParams:         cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
 		InsecureSecretStorage: true,
 		OAuthAuthenticatorParams: jimm.OAuthAuthenticatorParams{
-			IssuerURL:         "http://localhost:8082/realms/jimm",
-			DeviceClientID:    "jimm-device",
-			DeviceScopes:      []string{oidc.ScopeOpenID, "profile", "email"},
-			AccessTokenExpiry: time.Duration(time.Hour),
+			IssuerURL:          "http://localhost:8082/realms/jimm",
+			DeviceClientID:     "jimm-device",
+			DeviceScopes:       []string{oidc.ScopeOpenID, "profile", "email"},
+			SessionTokenExpiry: time.Duration(time.Hour),
 		},
 	})
 	c.Assert(err, qt.IsNil)
@@ -75,10 +75,10 @@ func TestServiceStartsWithoutSecretStore(t *testing.T) {
 		DSN:           jimmtest.CreateEmptyDatabase(c),
 		OpenFGAParams: cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
 		OAuthAuthenticatorParams: jimm.OAuthAuthenticatorParams{
-			IssuerURL:         "http://localhost:8082/realms/jimm",
-			DeviceClientID:    "jimm-device",
-			DeviceScopes:      []string{oidc.ScopeOpenID, "profile", "email"},
-			AccessTokenExpiry: time.Duration(time.Hour),
+			IssuerURL:          "http://localhost:8082/realms/jimm",
+			DeviceClientID:     "jimm-device",
+			DeviceScopes:       []string{oidc.ScopeOpenID, "profile", "email"},
+			SessionTokenExpiry: time.Duration(time.Hour),
 		},
 	})
 	c.Assert(err, qt.IsNil)
@@ -97,10 +97,10 @@ func TestAuthenticator(t *testing.T) {
 		OpenFGAParams:         cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
 		InsecureSecretStorage: true,
 		OAuthAuthenticatorParams: jimm.OAuthAuthenticatorParams{
-			IssuerURL:         "http://localhost:8082/realms/jimm",
-			DeviceClientID:    "jimm-device",
-			DeviceScopes:      []string{oidc.ScopeOpenID, "profile", "email"},
-			AccessTokenExpiry: time.Duration(time.Hour),
+			IssuerURL:          "http://localhost:8082/realms/jimm",
+			DeviceClientID:     "jimm-device",
+			DeviceScopes:       []string{oidc.ScopeOpenID, "profile", "email"},
+			SessionTokenExpiry: time.Duration(time.Hour),
 		},
 	}
 	candid := startCandid(c, &p)
@@ -166,10 +166,10 @@ func TestVault(t *testing.T) {
 		VaultSecretFile: "./local/vault/approle.json",
 		OpenFGAParams:   cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
 		OAuthAuthenticatorParams: jimm.OAuthAuthenticatorParams{
-			IssuerURL:         "http://localhost:8082/realms/jimm",
-			DeviceClientID:    "jimm-device",
-			DeviceScopes:      []string{oidc.ScopeOpenID, "profile", "email"},
-			AccessTokenExpiry: time.Duration(time.Hour),
+			IssuerURL:          "http://localhost:8082/realms/jimm",
+			DeviceClientID:     "jimm-device",
+			DeviceScopes:       []string{oidc.ScopeOpenID, "profile", "email"},
+			SessionTokenExpiry: time.Duration(time.Hour),
 		},
 	}
 	candid := startCandid(c, &p)
@@ -235,10 +235,10 @@ func TestPostgresSecretStore(t *testing.T) {
 		OpenFGAParams:         cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
 		InsecureSecretStorage: true,
 		OAuthAuthenticatorParams: jimm.OAuthAuthenticatorParams{
-			IssuerURL:         "http://localhost:8082/realms/jimm",
-			DeviceClientID:    "jimm-device",
-			DeviceScopes:      []string{oidc.ScopeOpenID, "profile", "email"},
-			AccessTokenExpiry: time.Duration(time.Hour),
+			IssuerURL:          "http://localhost:8082/realms/jimm",
+			DeviceClientID:     "jimm-device",
+			DeviceScopes:       []string{oidc.ScopeOpenID, "profile", "email"},
+			SessionTokenExpiry: time.Duration(time.Hour),
 		},
 	}
 	_, err = jimm.NewService(context.Background(), p)
@@ -257,10 +257,10 @@ func TestOpenFGA(t *testing.T) {
 		OpenFGAParams:    cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
 		ControllerAdmins: []string{"alice", "eve"},
 		OAuthAuthenticatorParams: jimm.OAuthAuthenticatorParams{
-			IssuerURL:         "http://localhost:8082/realms/jimm",
-			DeviceClientID:    "jimm-device",
-			DeviceScopes:      []string{oidc.ScopeOpenID, "profile", "email"},
-			AccessTokenExpiry: time.Duration(time.Hour),
+			IssuerURL:          "http://localhost:8082/realms/jimm",
+			DeviceClientID:     "jimm-device",
+			DeviceScopes:       []string{oidc.ScopeOpenID, "profile", "email"},
+			SessionTokenExpiry: time.Duration(time.Hour),
 		},
 	}
 	candid := startCandid(c, &p)
@@ -313,10 +313,10 @@ func TestPublicKey(t *testing.T) {
 		PrivateKey:       "c1VkV05+iWzCxMwMVcWbr0YJWQSEO62v+z3EQ2BhFMw=",
 		PublicKey:        "pC8MEk9MS9S8fhyRnOJ4qARTcTAwoM9L1nH/Yq0MwWU=",
 		OAuthAuthenticatorParams: jimm.OAuthAuthenticatorParams{
-			IssuerURL:         "http://localhost:8082/realms/jimm",
-			DeviceClientID:    "jimm-device",
-			DeviceScopes:      []string{oidc.ScopeOpenID, "profile", "email"},
-			AccessTokenExpiry: time.Duration(time.Hour),
+			IssuerURL:          "http://localhost:8082/realms/jimm",
+			DeviceClientID:     "jimm-device",
+			DeviceScopes:       []string{oidc.ScopeOpenID, "profile", "email"},
+			SessionTokenExpiry: time.Duration(time.Hour),
 		},
 	}
 	_ = startCandid(c, &p)
@@ -401,10 +401,10 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 				PrivateKey:       "c1VkV05+iWzCxMwMVcWbr0YJWQSEO62v+z3EQ2BhFMw=",
 				PublicKey:        "pC8MEk9MS9S8fhyRnOJ4qARTcTAwoM9L1nH/Yq0MwWU=",
 				OAuthAuthenticatorParams: jimm.OAuthAuthenticatorParams{
-					IssuerURL:         "http://localhost:8082/realms/jimm",
-					DeviceClientID:    "jimm-device",
-					DeviceScopes:      []string{oidc.ScopeOpenID, "profile", "email"},
-					AccessTokenExpiry: time.Duration(time.Hour),
+					IssuerURL:          "http://localhost:8082/realms/jimm",
+					DeviceClientID:     "jimm-device",
+					DeviceScopes:       []string{oidc.ScopeOpenID, "profile", "email"},
+					SessionTokenExpiry: time.Duration(time.Hour),
 				},
 			}
 			_ = startCandid(c, &p)

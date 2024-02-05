@@ -84,10 +84,10 @@ func (s *jimmSuite) SetUpTest(c *gc.C) {
 		JWTExpiryDuration:     time.Minute,
 		InsecureSecretStorage: true,
 		OAuthAuthenticatorParams: service.OAuthAuthenticatorParams{
-			IssuerURL:         "http://localhost:8082/realms/jimm",
-			DeviceClientID:    "jimm-device",
-			DeviceScopes:      []string{oidc.ScopeOpenID, "profile", "email"},
-			AccessTokenExpiry: time.Duration(time.Hour),
+			IssuerURL:          "http://localhost:8082/realms/jimm",
+			DeviceClientID:     "jimm-device",
+			DeviceScopes:       []string{oidc.ScopeOpenID, "profile", "email"},
+			SessionTokenExpiry: time.Duration(time.Hour),
 		},
 	}
 

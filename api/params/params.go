@@ -393,3 +393,22 @@ type MigrateModelInfo struct {
 type MigrateModelRequest struct {
 	Specs []MigrateModelInfo `json:"specs"`
 }
+
+// LoginDeviceResponse holds the details to complete a LoginDevice flow.
+type LoginDeviceResponse struct {
+	// VerificationURI holds the URI that the user must navigate to
+	// when entering their "user-code" to consent to this authorisation
+	// request.
+	VerificationURI string `json:"verification-uri"`
+	// UserCode holds the one-time use user consent code.
+	UserCode string `json:"user-code"`
+	// DeviceLoginID contains the login id to be sent to GetDeviceAccessToken in
+	// order to begin a CLI based short-lived session.
+	DeviceLoginID string `json:"device-login-id"`
+}
+
+// LoginDeviceAccessTokenRequest holds no parameters to initiate a device login.
+type LoginDeviceAccessTokenRequest struct{}
+
+// LoginDeviceAccessTokenResponse TODO
+type LoginDeviceAccessTokenResponse struct{}

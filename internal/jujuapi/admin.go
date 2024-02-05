@@ -11,6 +11,7 @@ import (
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 
+	"github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/internal/auth"
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/servermon"
@@ -76,4 +77,27 @@ func (r *controllerRoot) Login(ctx context.Context, req jujuparams.LoginRequest)
 		Facades:       facades,
 		ServerVersion: srvVersion.String(),
 	}, nil
+}
+
+// LoginDevice starts a device login flow (typically a CLI). It will return a verification URI
+// and user code that the user is expected to enter into the verification URI link.
+//
+// Upon successful login, the user is then expected to retrieve an access token using
+// GetDeviceAccessToken.
+func (r *controllerRoot) LoginDevice(ctx context.Context) (params.LoginDeviceResponse, error) {
+	const op = errors.Op("jujuapi.LoginDevice")
+	response := params.LoginDeviceResponse{}
+	authSvc := r.jimm.OAuthAuthenticationService()
+
+	deviceResponse, err := authSvc.Device(ctx)
+	if err != nil {
+		return response, errors.E(op, err)
+	}
+
+	r.deviceOAuthResponse = deviceResponse
+
+	response.VerificationURI = deviceResponse.VerificationURI
+	response.UserCode = deviceResponse.UserCode
+
+	return response, nil
 }

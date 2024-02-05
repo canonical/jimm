@@ -3,6 +3,14 @@
 package jujuapi_test
 
 import (
+	"fmt"
+	"io"
+	"net/http"
+	"net/http/cookiejar"
+	"net/url"
+	"regexp"
+
+	"github.com/canonical/jimm/api/params"
 	"github.com/juju/juju/api"
 	jujuparams "github.com/juju/juju/rpc/params"
 	gc "gopkg.in/check.v1"
@@ -34,4 +42,105 @@ func (s *adminSuite) TestLoginToControllerWithInvalidMacaroon(c *gc.C) {
 		Macaroons: []macaroon.Slice{{invalidMacaroon}},
 	}, "test")
 	conn.Close()
+}
+
+// TestDeviceLogin takes a test user through the flow of logging into jimm
+// via the correct facades. All are done in a single test to see the flow end-2-end.
+//
+// Within the test are clear comments explaining what is happening when and why.
+// Please refer to these comments for further details.
+func (s *adminSuite) TestDeviceLogin(c *gc.C) {
+	conn := s.open(c, &api.Info{
+		SkipLogin: true,
+	}, "test")
+	defer conn.Close()
+
+	// We create a http client to keep the same cookies across all requests
+	// using a simple jar.
+	jar, err := cookiejar.New(nil)
+	c.Assert(err, gc.IsNil)
+
+	client := &http.Client{
+		Jar: jar,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			fmt.Println("redirected to", req.URL)
+			return nil
+		},
+	}
+
+	// Step 1, initiate a device login and get the verification URI and usercode.
+	// Next, the user will send this code to the verification URI.
+	//
+	// To simplify the test, we're not going the browser route and instead
+	// are going to use the VerificationURIComplete which is equivalent to scanning
+	// a QR code. Both are ultimately the same.
+	//
+	// A normal verification URI looks like: http://localhost:8082/realms/jimm/device
+	// in which the user code is posted.
+	//
+	// A complete URI looks like: http://localhost:8082/realms/jimm/device?user_code=HOKO-OTRV
+	// where the user code is set as a part of the query string.
+	var resp params.LoginDeviceResponse
+	err = conn.APICall("Admin", 4, "", "LoginDevice", nil, &resp)
+	c.Assert(err, gc.IsNil)
+	c.Assert(resp.UserCode, gc.Not(gc.IsNil))
+	c.Assert(resp.VerificationURI, gc.Equals, "http://localhost:8082/realms/jimm/device")
+
+	// Step 2, complete the user side of the authentication by sending the
+	// user code to the verification URI using the "complete" method.
+	userResp, err := client.Get(resp.VerificationURI + "?user_code=" + resp.UserCode)
+	c.Assert(err, gc.IsNil)
+	body := userResp.Body
+	defer body.Close()
+	b, err := io.ReadAll(body)
+	c.Assert(err, gc.IsNil)
+	loginForm := string(b)
+
+	// Step 2.1, handle the login form (see this func for more details)
+	handleLoginForm(c, loginForm, client)
+}
+
+// handleLoginForm runs through the login process emulating the user typing in
+// their username and password and then clicking consent, to complete
+// the device login flow.
+func handleLoginForm(c *gc.C, loginForm string, client *http.Client) {
+	// Step 2.2, now we'll be redirected to a sign-in page and must sign in.
+	re := regexp.MustCompile(`action="(.*?)" method=`)
+	match := re.FindStringSubmatch(loginForm)
+	loginFormUrl := match[1]
+
+	// The username and password are hardcoded witih jimm-realm.json in our local
+	// keycloak configuration for the jimm realm.
+	v := url.Values{}
+	v.Add("username", "jimm-test")
+	v.Add("password", "password")
+	loginResp, err := client.PostForm(loginFormUrl, v)
+	c.Assert(err, gc.IsNil)
+
+	loginRespBody := loginResp.Body
+	defer loginRespBody.Close()
+
+	// Step 2.3, the user will now be redirected to a consent screen
+	// and is expected to click "yes". We simulate this by posting the form programatically.
+	loginRespB, err := io.ReadAll(loginRespBody)
+	c.Assert(err, gc.IsNil)
+	loginRespS := string(loginRespB)
+
+	re = regexp.MustCompile(`action="(.*?)" method=`)
+	match = re.FindStringSubmatch(loginRespS)
+	consentFormUri := match[1]
+
+	// We post the "yes" value to accept it.
+	v = url.Values{}
+	v.Add("accept", "Yes")
+	consentResp, err := client.PostForm("http://localhost:8082"+consentFormUri, v)
+	c.Assert(err, gc.IsNil)
+	defer consentResp.Body.Close()
+
+	// Read the response to ensure it is OK and has been accepted.
+	b, err := io.ReadAll(consentResp.Body)
+	c.Assert(err, gc.IsNil)
+
+	re = regexp.MustCompile(`Device Login Successful`)
+	c.Assert(re.MatchString(string(b)), gc.Equals, true)
 }
