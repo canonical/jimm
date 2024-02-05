@@ -222,7 +222,7 @@ services:
     container_name: insert-hardcoded-auth-model
     volumes:
       - ./local/openfga/authorisation_model.json:/authorisation_model.json
-    command: 
+    command:
         - /bin/sh
         - -c
         - |

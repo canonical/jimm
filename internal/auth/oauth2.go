@@ -23,7 +23,7 @@ type AuthenticationService struct {
 	// provider holds a OIDC provider wrapper for the OAuth2.0 /x/oauth package,
 	// enabling UserInfo calls, wellknown retrieval and jwks verification.
 	provider *oidc.Provider
-	// sessionTokenExpiry holds the expiry time for JIMM minted access tokens (JWTs).
+	// sessionTokenExpiry holds the expiry time for JIMM minted session tokens (JWTs).
 	sessionTokenExpiry time.Duration
 }
 
@@ -39,7 +39,7 @@ type AuthenticationServiceParams struct {
 	DeviceClientID string
 	// DeviceScopes holds the scopes that you wish to retrieve.
 	DeviceScopes []string
-	// SessionTokenExpiry holds the expiry time of minted JIMM access tokens (JWTs).
+	// SessionTokenExpiry holds the expiry time of minted JIMM session tokens (JWTs).
 	SessionTokenExpiry time.Duration
 }
 
