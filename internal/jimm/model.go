@@ -736,11 +736,7 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 		return nil, errors.E(err, fmt.Sprintf("failed to insert and wait for the river job, err: %s", err))
 	}
 	model := &dbmodel.Model{
-		// Name:         builder.name,
-		ControllerID: builder.controller.ID,
-		Owner:        *owner,
-		// CloudCredentialID: builder.credential.ID,
-		// CloudRegionID:     builder.cloudRegionID,
+		ID: builder.model.ID,
 	}
 	if err = j.Database.GetModel(ctx, model); err != nil {
 		return nil, errors.E(err, fmt.Sprintf("Model was not created, err: %s", err))
