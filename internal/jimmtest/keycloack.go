@@ -25,6 +25,46 @@ const (
 	keycloakAdminCLISecret   = "DOLcuE5Cd7IxuR7JE4hpAUxaLF7RlAWh"
 )
 
+// KeycloakUser represents a basic user created in Keycloak.
+type KeycloakUser struct {
+	Id       string
+	Email    string
+	Username string
+	Password string
+}
+
+// CreateRandomKeycloakUser creates a Keycloak user with random username and
+// returns the created user details.
+func CreateRandomKeycloakUser() (*KeycloakUser, error) {
+	username := "random_user_" + uuid.New().String()[0:8]
+	email := username + "@canonical.com"
+	password := "jimm"
+
+	adminCLIToken, err := getAdminCLIAccessToken()
+	if err != nil {
+		return nil, errors.E(err, "failed to authenticate admin CLI user")
+	}
+
+	if err := addKeycloakUser(adminCLIToken, email, username); err != nil {
+		return nil, errors.E(err, fmt.Sprintf("failed to add keycloak user (%q, %q)", email, username))
+	}
+
+	id, err := getKeycloakUserId(adminCLIToken, username)
+	if err != nil {
+		return nil, errors.E(err, fmt.Sprintf("failed to retrieve ID for newly added keycloak user (%q, %q)", email, username))
+	}
+
+	if err := setKeycloakUserPassword(adminCLIToken, id, password); err != nil {
+		return nil, errors.E(err, fmt.Sprintf("failed to set password for newly added keycloak user (%q, %q, %q)", email, username, password))
+	}
+	return &KeycloakUser{
+		Id:       id,
+		Email:    email,
+		Username: username,
+		Password: password,
+	}, nil
+}
+
 func getAdminCLIAccessToken() (string, error) {
 	httpClient := http.Client{}
 	u := url.URL{
@@ -210,44 +250,4 @@ func setKeycloakUserPassword(adminCLIToken, id, password string) error {
 		return errors.E(fmt.Sprintf("failed to set keycloak user password (status-code: %d): %q", resp.StatusCode, string(body)))
 	}
 	return nil
-}
-
-// KeycloakUser represents a basic user created in Keycloak.
-type KeycloakUser struct {
-	Id       string
-	Email    string
-	Username string
-	Password string
-}
-
-// CreateRandomKeycloakUser creates a Keycloak user with random username and
-// returns the created user details.
-func CreateRandomKeycloakUser() (*KeycloakUser, error) {
-	username := "random_user_" + uuid.New().String()[0:8]
-	email := username + "@canonical.com"
-	password := "jimm"
-
-	adminCLIToken, err := getAdminCLIAccessToken()
-	if err != nil {
-		return nil, errors.E(err, "failed to authenticate admin CLI user")
-	}
-
-	if err := addKeycloakUser(adminCLIToken, email, username); err != nil {
-		return nil, errors.E(err, fmt.Sprintf("failed to add keycloak user (%q, %q)", email, username))
-	}
-
-	id, err := getKeycloakUserId(adminCLIToken, username)
-	if err != nil {
-		return nil, errors.E(err, fmt.Sprintf("failed to retrieve ID for newly added keycloak user (%q, %q)", email, username))
-	}
-
-	if err := setKeycloakUserPassword(adminCLIToken, id, password); err != nil {
-		return nil, errors.E(err, fmt.Sprintf("failed to set password for newly added keycloak user (%q, %q, %q)", email, username, password))
-	}
-	return &KeycloakUser{
-		Id:       id,
-		Email:    email,
-		Username: username,
-		Password: password,
-	}, nil
 }
