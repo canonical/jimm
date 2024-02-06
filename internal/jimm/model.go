@@ -518,8 +518,8 @@ func (b *modelBuilder) CreateControllerModel() *modelBuilder {
 			// the operation to delete a model isn't synchronous even
 			// for empty models. We could also have a worker that deletes
 			// empty models that don't appear in the database.
-			if mi_err := api.ModelInfo(b.ctx, b.modelInfo); mi_err != nil {
-				b.err = errors.E(err, fmt.Sprintf("model already existed, but failed to read its model info: %s", mi_err))
+			if miErr := api.ModelInfo(b.ctx, b.modelInfo); miErr != nil {
+				b.err = errors.E(err, fmt.Sprintf("model already exists, but failed to read its model info: %s", miErr))
 			} else {
 				b.err = errors.E(err, errors.CodeAlreadyExists, "model name in use")
 			}

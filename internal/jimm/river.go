@@ -36,9 +36,9 @@ type River struct {
 }
 
 // registerJimmWorkers would register known workers safely and return a pointer to a river.workers struct that should be used in river creation.
-func registerJimmWorkers(ctx context.Context, ofgaConn *openfga.OFGAClient, db *db.Database, jimm *JIMM) (*river.Workers, error) {
+func registerJimmWorkers(ctx context.Context, ofgaClient *openfga.OFGAClient, db *db.Database, jimm *JIMM) (*river.Workers, error) {
 	workers := river.NewWorkers()
-	if err := river.AddWorkerSafely(workers, &RiverAddModelWorker{OfgaClient: ofgaConn, Database: db, JIMM: jimm}); err != nil {
+	if err := river.AddWorkerSafely(workers, &RiverAddModelWorker{OfgaClient: ofgaClient, Database: db, JIMM: jimm}); err != nil {
 		return nil, err
 	}
 	return workers, nil

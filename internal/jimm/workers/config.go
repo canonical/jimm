@@ -28,12 +28,6 @@ type LinearRetryPolicy struct {
 	DelayStep int
 }
 
-// NewLinearRetryPolicy returns the a new ClientRetryPolicy that uses a linear schedule
-// First retry waits 1 * DelayStep, then 2 * DelayStep, and so on.
-func NewLinearRetryPolicy(DelayStep int) *LinearRetryPolicy {
-	return &LinearRetryPolicy{DelayStep: DelayStep}
-}
-
 // NextAt returns the next retry time based on the non-generic JobRow
 // which includes an up-to-date Errors list.
 func (policy *LinearRetryPolicy) NextAt(job *rivertype.JobRow) time.Time {
