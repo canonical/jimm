@@ -19,13 +19,9 @@ import (
 
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/jimm/workers"
 	"github.com/canonical/jimm/internal/openfga"
 )
-
-// WaitConfig is used to set the waiting duration for river jobs.
-type WaitConfig struct {
-	Duration time.Duration
-}
 
 // River is the struct that holds that Client connection to river.
 type River struct {
@@ -138,7 +134,7 @@ func NewRiver(ctx context.Context, riverConfig RiverConfig, ofgaClient *openfga.
 
 // InsertJob performs the insertion function provided to add a job to River's job queue.
 // If waitConfig is not nil, the function blocks until the job is finished, failed, canceled, times out, or the context is done.
-func InsertJob(ctx context.Context, waitConfig *WaitConfig, r *River, insertFunc func() (*rivertype.JobRow, error)) error {
+func InsertJob(ctx context.Context, waitConfig *workers.WaitConfig, r *River, insertFunc func() (*rivertype.JobRow, error)) error {
 	var completedChan <-chan *river.Event
 	var completedSubscribeCancel func()
 	var failedChan <-chan *river.Event

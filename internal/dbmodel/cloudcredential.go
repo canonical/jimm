@@ -15,11 +15,11 @@ type CloudCredential struct {
 	gorm.Model
 
 	// Name is the name of the credential.
-	Name string `json:"name"`
+	Name string
 
 	// Cloud is the cloud this credential is for.
-	CloudName string `json:"cloud_name"`
-	Cloud     Cloud  `gorm:"foreignKey:CloudName;references:Name;constraint:OnDelete:CASCADE" json:"cloud"`
+	CloudName string
+	Cloud     Cloud `gorm:"foreignKey:CloudName;references:Name;constraint:OnDelete:CASCADE"`
 
 	// Owner is the user that owns this credential.
 	OwnerUsername string

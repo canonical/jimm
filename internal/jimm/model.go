@@ -23,6 +23,7 @@ import (
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/jimm/workers"
 	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 )
@@ -570,6 +571,14 @@ type RiverAddModelWorker struct {
 	OfgaClient *openfga.OFGAClient
 }
 
+func (w *RiverAddModelWorker) Timeout(job *river.Job[RiverAddModelArgs]) time.Duration {
+	return workers.AddModelTimeout
+}
+
+func (w *RiverAddModelWorker) NextRetry(job *river.Job[RiverAddModelArgs]) time.Time {
+	return time.Now().Add(20 * time.Second)
+}
+
 // Work is the function executed by the worker when it picks up the job.
 func (w *RiverAddModelWorker) Work(ctx context.Context, job *river.Job[RiverAddModelArgs]) error {
 	const op = errors.Op("jimm.AddModel")
@@ -639,7 +648,7 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 	if owner.Username != user.Username && !user.JimmAdmin {
 		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
-	// from here, start a new job
+
 	builder := newModelBuilder(ctx, j)
 	builder = builder.WithOwner(owner)
 	builder = builder.WithName(args.Name)
@@ -728,8 +737,8 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 		OwnerName: owner.Username,
 		UserName:  user.Username,
 	}
-	// perform all checks from the builder before submitting the job (until after createDatabaseModel)
-	err = InsertJob(ctx, &WaitConfig{Duration: 10 * time.Minute}, j.River, func() (*rivertype.JobRow, error) {
+
+	err = InsertJob(ctx, &workers.WaitConfig{Duration: workers.AddModelTimeout}, j.River, func() (*rivertype.JobRow, error) {
 		return j.River.Client.Insert(ctx, riverAddModelArgs, &river.InsertOpts{MaxAttempts: j.River.MaxAttempts})
 	})
 	if err != nil {

@@ -17,10 +17,10 @@ type Cloud struct {
 	UpdatedAt time.Time
 
 	// Name is the name of the cloud.
-	Name string `gorm:"not null;uniqueIndex" json:"name"`
+	Name string `gorm:"not null;uniqueIndex"`
 
 	// Type is the provider type of cloud.
-	Type string `gorm:"not null" json:"type"`
+	Type string `gorm:"not null"`
 
 	// HostCloudRegion is the "cloud/region" that hosts this cloud, if the
 	// cloud is hosted.
