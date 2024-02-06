@@ -43,12 +43,12 @@ func shuffleRegionControllers(controllers []dbmodel.CloudRegionControllerPriorit
 
 // ModelCreateArgs contains parameters used to add a new model.
 type ModelCreateArgs struct {
-	Name            string                   `json:"name"`
-	Owner           names.UserTag            `json:"owner"`
-	Config          map[string]interface{}   `json:"config"`
-	Cloud           names.CloudTag           `json:"cloud"`
-	CloudRegion     string                   `json:"cloud_region"`
-	CloudCredential names.CloudCredentialTag `json:"cloud_credential"`
+	Name            string
+	Owner           names.UserTag
+	Config          map[string]interface{}
+	Cloud           names.CloudTag
+	CloudRegion     string
+	CloudCredential names.CloudCredentialTag
 }
 
 // FromJujuModelCreateArgs converts jujuparams.ModelCreateArgs into AddModelArgs.
@@ -112,16 +112,16 @@ func newModelBuilderFromModel(ctx context.Context, j *JIMM, owner *dbmodel.User,
 		Name:          modelName,
 	}
 	if err := j.Database.GetModel(ctx, b.model); err != nil {
-		return nil, errors.E(err, fmt.Sprintf("Model was not created, err: %s", err))
+		return nil, errors.E(err, fmt.Sprintf("failed to fetch model information, err: %s", err))
 	}
 	b.controller = &b.model.Controller
-	// b.cloudRegionID = b.model.CloudRegionID
-	b.cloud = &b.model.CloudRegion.Cloud // bug here
+	b.cloud = &b.model.CloudRegion.Cloud
 	if err := j.Database.GetCloud(ctx, b.cloud); err != nil {
 		return nil, errors.E(err, "cloud not found")
 	}
 	b = b.WithCloudRegion(b.model.CloudRegion.Name)
 	b.credential = &b.model.CloudCredential
+
 	// fetch cloud region defaults
 	if b.cloud != nil && names.NewCloudTag(b.cloud.Name) != (names.CloudTag{}) && b.cloudRegion != "" {
 		cloudRegionDefaults := dbmodel.CloudDefaults{
@@ -518,7 +518,11 @@ func (b *modelBuilder) CreateControllerModel() *modelBuilder {
 			// the operation to delete a model isn't synchronous even
 			// for empty models. We could also have a worker that deletes
 			// empty models that don't appear in the database.
-			b.err = errors.E(err, errors.CodeAlreadyExists, "model name in use")
+			if mi_err := api.ModelInfo(b.ctx, b.modelInfo); mi_err != nil {
+				b.err = errors.E(err, fmt.Sprintf("model already existed, but failed to read its model info: %s", mi_err))
+			} else {
+				b.err = errors.E(err, errors.CodeAlreadyExists, "model name in use")
+			}
 		case jujuparams.CodeUpgradeInProgress:
 			b.err = errors.E(err, "upgrade in progress")
 		default:
@@ -561,7 +565,7 @@ type RiverAddModelArgs struct {
 
 // Kind is a string that uniquely identifies the type of job to be picked up by the appropriate river workers.
 // This is required by river and must be provided on the job arguments struct to implement the JobArgs interface.
-func (RiverAddModelArgs) Kind() string { return "BuildModel" }
+func (RiverAddModelArgs) Kind() string { return "AddModel" }
 
 // RiverAddModelWorker is the river worker that would run the job.
 type RiverAddModelWorker struct {
@@ -571,10 +575,13 @@ type RiverAddModelWorker struct {
 	OfgaClient *openfga.OFGAClient
 }
 
+// Timeout returns the timeout duration for the RiverAddModelWorker.
+// This is needed to avoid using the default timeout on the client.
 func (w *RiverAddModelWorker) Timeout(job *river.Job[RiverAddModelArgs]) time.Duration {
 	return workers.AddModelTimeout
 }
 
+// NextRerty returns the time that is used to schedule the next retry in case of a failure.
 func (w *RiverAddModelWorker) NextRetry(job *river.Job[RiverAddModelArgs]) time.Time {
 	return time.Now().Add(20 * time.Second)
 }
@@ -597,7 +604,7 @@ func (w *RiverAddModelWorker) Work(ctx context.Context, job *river.Job[RiverAddM
 		return errors.E(op, err)
 	}
 	builder = builder.CreateControllerModel()
-	if err := builder.Error(); err != nil {
+	if err := builder.Error(); err != nil && errors.ErrorCode(err) != errors.CodeAlreadyExists {
 		return errors.E(op, err)
 	}
 	// update builder to construct the builder state from the model id.
@@ -748,7 +755,7 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 		ID: builder.model.ID,
 	}
 	if err = j.Database.GetModel(ctx, model); err != nil {
-		return nil, errors.E(err, fmt.Sprintf("Model was not created, err: %s", err))
+		return nil, errors.E(err, fmt.Sprintf("failed to fetch model information, err: %s", err))
 	}
 	modelInfo, err := j.ModelInfo(ctx, ownerOfgaUser, names.NewModelTag(model.UUID.String))
 	if err != nil {

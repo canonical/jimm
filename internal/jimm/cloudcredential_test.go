@@ -1262,7 +1262,6 @@ func TestRevokeCloudCredential(t *testing.T) {
 				OpenFGAClient: client,
 			}
 			j.River = jimmtest.NewRiver(c, nil, client, &jimmDb, j)
-			c.Assert(err, qt.IsNil)
 			user, tag, expectedError := test.createEnv(c, j, client)
 
 			err = j.RevokeCloudCredential(ctx, user, tag, false)

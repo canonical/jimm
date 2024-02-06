@@ -158,8 +158,8 @@ type CloudRegion struct {
 	gorm.Model
 
 	// Cloud is the cloud this region belongs to.
-	CloudName string `gorm:"uniqueIndex:idx_cloud_region_cloud_name_name" json:"cloud_name"`
-	Cloud     Cloud  `gorm:"foreignKey:CloudName;references:Name;constraint:OnDelete:CASCADE" json:"cloud"`
+	CloudName string `gorm:"uniqueIndex:idx_cloud_region_cloud_name_name"`
+	Cloud     Cloud  `gorm:"foreignKey:CloudName;references:Name;constraint:OnDelete:CASCADE"`
 
 	// Name is the name of the region.
 	Name string `gorm:"not null;uniqueIndex:idx_cloud_region_cloud_name_name"`

@@ -1,3 +1,6 @@
+// Copyright 2024 Canonical Ltd.
+
+// Package workers contains the configurations for timeouts and retry policies for our river workers.
 package workers
 
 import (
@@ -7,7 +10,9 @@ import (
 )
 
 const (
-	AddModelTimeout   = 5 * time.Minute
+	// AddModelTimeout is the timeout configuration for the RiverAddModel worker.
+	AddModelTimeout = 5 * time.Minute
+	// AddModelDelayStep is used to configure the LinearRetryPolicy for the RiverAddModel worker.
 	AddModelDelayStep = 5
 )
 

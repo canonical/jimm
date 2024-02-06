@@ -88,7 +88,6 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 		OpenFGAClient:   s.OFGAClient,
 	}
 	s.JIMM.River = NewRiver(gcChecker, nil, s.OFGAClient, &jimmDb, s.JIMM)
-	c.Assert(err, gc.IsNil)
 
 	s.cancel = cancel
 
