@@ -17,6 +17,7 @@ import (
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 	"github.com/juju/zaputil/zapctx"
+	"github.com/lestrrat-go/jwx/v2/jwt"
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 	"golang.org/x/sync/errgroup"
@@ -153,6 +154,17 @@ type OAuthAuthenticator interface {
 
 	// Email retrieves the users email from an id token via the email claim
 	Email(idToken *oidc.IDToken) (string, error)
+
+	// MintSessionToken mints a session token to be used when logging into JIMM
+	// via an access token. The token only contains the user's email for authentication.
+	MintSessionToken(email string, secretKey string) ([]byte, error)
+
+	// VerifyAccessToken symmetrically verifies the validty of the signature on the
+	// access token JWT, returning the parsed token.
+	//
+	// The subject of the token contains the user's email and can be used
+	// for user object creation.
+	VerifyAccessToken(token []byte, secretKey string) (jwt.Token, error)
 }
 
 type permission struct {

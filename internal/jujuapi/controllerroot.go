@@ -114,6 +114,10 @@ type controllerRoot struct {
 	// deviceOAuthResponse holds a device code flow response for this request,
 	// such that JIMM can retrieve the access and ID tokens via polling the Authentication
 	// Service's issuer via the /token endpoint.
+	//
+	// NOTE: As this is on the controller root struct, and a new controller root
+	// is created per WS, it is EXPECTED that the subsequent call to GetDeviceSessionToken
+	// happens on the SAME websocket.
 	deviceOAuthResponse *oauth2.DeviceAuthResponse
 }
 
@@ -134,6 +138,8 @@ func newControllerRoot(j JIMM, p Params) *controllerRoot {
 	r.AddMethod("Admin", 3, "Login", rpc.Method(r.Login))
 	r.AddMethod("Admin", 4, "Login", rpc.Method(r.Login))
 	r.AddMethod("Admin", 4, "LoginDevice", rpc.Method(r.LoginDevice))
+	r.AddMethod("Admin", 4, "GetDeviceSessionToken", rpc.Method(r.GetDeviceSessionToken))
+	r.AddMethod("Admin", 4, "LoginSessionToken", rpc.Method(r.LoginSessionToken))
 	r.AddMethod("Pinger", 1, "Ping", rpc.Method(r.Ping))
 	return r
 }

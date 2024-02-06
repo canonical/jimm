@@ -4,17 +4,22 @@ package auth
 
 import (
 	"context"
+	"encoding/base64"
+	"fmt"
 	"net/mail"
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
+	"github.com/juju/names/v4"
 	"github.com/juju/zaputil/zapctx"
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 
+	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/openfga"
 )
 
 // AuthenticationService handles authentication within JIMM.
@@ -25,6 +30,8 @@ type AuthenticationService struct {
 	provider *oidc.Provider
 	// sessionTokenExpiry holds the expiry time for JIMM minted session tokens (JWTs).
 	sessionTokenExpiry time.Duration
+	// OpenFGAClient is the authorisation client for JIMM.
+	OpenFGAClient *openfga.OFGAClient
 }
 
 // AuthenticationServiceParams holds the parameters to initialise
@@ -165,7 +172,12 @@ func (as *AuthenticationService) MintSessionToken(email string, secretKey string
 	if err != nil {
 		return nil, errors.E(op, err, "failed to sign access token")
 	}
-	return freshToken, nil
+
+	encToken := make([]byte, base64.StdEncoding.EncodedLen(len(freshToken)))
+
+	base64.StdEncoding.Encode(encToken, freshToken)
+
+	return encToken, nil
 }
 
 // VerifyAccessToken symmetrically verifies the validty of the signature on the
@@ -186,4 +198,23 @@ func (as *AuthenticationService) VerifyAccessToken(token []byte, secretKey strin
 	}
 
 	return parsedToken, nil
+}
+
+// GetUser retrieves a user from the database by email.
+func (as *AuthenticationService) GetUser(email string) (*dbmodel.User, error) {
+	const op = errors.Op("auth.AuthenticationService.CreateUser")
+
+	if !names.IsValidUser(email) {
+		return nil, errors.E(op, fmt.Sprintf("authenticated identity %q cannot be used as juju username", email))
+	}
+
+	ut := names.NewUserTag(email)
+	if ut.IsLocal() {
+		ut = ut.WithDomain("external")
+	}
+
+	return &dbmodel.User{
+		Username:    ut.Id(),
+		DisplayName: ut.Name(),
+	}, nil
 }
