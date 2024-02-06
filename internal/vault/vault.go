@@ -385,6 +385,60 @@ func (s *VaultStore) getJWKSExpiryPath() string {
 	return path.Join(s.getWellKnownPath(), "jwks-expiry")
 }
 
+// GetOAuthKey returns the current HS256 (symmetric) key used to sign OAuth session tokens.
+func (s *VaultStore) GetOAuthKey(ctx context.Context) ([]byte, error) {
+	const op = errors.Op("vault.GetOAuthKey")
+
+	client, err := s.client(ctx)
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	secret, err := client.Logical().Read(s.GetOAuthKeyPath())
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	if secret == nil {
+		msg := "no OAuth key exists yet"
+		zapctx.Debug(ctx, msg)
+		return nil, errors.E(op, errors.CodeNotFound, msg)
+	}
+
+	keyPemB64 := secret.Data["key"].(string)
+
+	keyPem, err := base64.StdEncoding.DecodeString(keyPemB64)
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	return keyPem, nil
+}
+
+// PutOAuthKey puts a HS256 key into the credentials store for signing OAuth session tokens.
+func (s *VaultStore) PutOAuthKey(ctx context.Context, raw []byte) error {
+	const op = errors.Op("vault.PutOAuthKey")
+
+	client, err := s.client(ctx)
+	if err != nil {
+		return errors.E(op, err)
+	}
+
+	if _, err := client.Logical().Write(
+		s.GetOAuthKeyPath(),
+		map[string]interface{}{"key": raw},
+	); err != nil {
+		return errors.E(op, err)
+	}
+	return nil
+}
+
+// GetOAuthKeyPath returns a hardcoded suffixed vault path (dependent on
+// the initial KVPath) to the OAuth JWK location.
+func (s *VaultStore) GetOAuthKeyPath() string {
+	return path.Join(s.KVPath, "creds", "oauth", "key")
+}
+
 // deleteControllerCredentials removes the credentials associated with the controller in
 // the vault service.
 func (s *VaultStore) deleteControllerCredentials(ctx context.Context, controllerName string) error {

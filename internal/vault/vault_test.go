@@ -184,3 +184,18 @@ func TestGetAndPutJWKSPrivateKey(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(string(keyPem), qt.Contains, "-----BEGIN RSA PRIVATE KEY-----")
 }
+
+func TestGetAndPutOAuthKey(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+	store := newStore(c)
+
+	// We didn't use a pre-defined/constant key here because in that case we had
+	// to make sure there's nothing left from last test runs in Vault.
+	key := []byte(uuid.NewString()) // A random UUID as key
+	err := store.PutOAuthKey(ctx, key)
+	c.Assert(err, qt.IsNil)
+	retrievedKey, err := store.GetOAuthKey(ctx)
+	c.Assert(err, qt.IsNil)
+	c.Assert(retrievedKey, qt.DeepEquals, key)
+}
