@@ -26,6 +26,8 @@ const (
 	jwksPublicKeyTag  = "jwksPublicKey"
 	jwksPrivateKeyTag = "jwksPrivateKey"
 	jwksExpiryTag     = "jwksExpiry"
+	oauthKind         = "oauth"
+	oauthKeyTag       = "oauthKey"
 )
 
 // UpsertSecret stores secret information.
@@ -278,5 +280,35 @@ func (d *Database) PutJWKSExpiry(ctx context.Context, expiry time.Time) error {
 		return errors.E(op, err, "failed to marshal jwks data")
 	}
 	secret := dbmodel.NewSecret(jwksKind, jwksExpiryTag, expiryJson)
+	return d.UpsertSecret(ctx, &secret)
+}
+
+// GetOAuthKey returns the current HS256 (symmetric) key used to sign OAuth session tokens.
+func (d *Database) GetOAuthKey(ctx context.Context) ([]byte, error) {
+	const op = errors.Op("database.GetOAuthKey")
+	secret := dbmodel.NewSecret(oauthKind, oauthKeyTag, nil)
+	err := d.GetSecret(ctx, &secret)
+	if err != nil {
+		zapctx.Error(ctx, "failed to get oauth key", zap.Error(err))
+		return nil, errors.E(op, err)
+	}
+	var pem []byte
+	err = json.Unmarshal(secret.Data, &pem)
+	if err != nil {
+		zapctx.Error(ctx, "failed to unmarshal pem data", zap.Error(err))
+		return nil, errors.E(op, err)
+	}
+	return pem, nil
+}
+
+// PutOAuthKey puts a HS256 key into the credentials store for signing OAuth session tokens.
+func (d *Database) PutOAuthKey(ctx context.Context, raw []byte) error {
+	const op = errors.Op("database.PutOAuthKey")
+	oauthKey, err := json.Marshal(raw)
+	if err != nil {
+		zapctx.Error(ctx, "failed to marshal pem data", zap.Error(err))
+		return errors.E(op, err, "failed to marshal oauth key")
+	}
+	secret := dbmodel.NewSecret(oauthKind, oauthKeyTag, oauthKey)
 	return d.UpsertSecret(ctx, &secret)
 }
