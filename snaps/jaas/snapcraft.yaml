@@ -17,17 +17,21 @@ slots:
 # The app has no plugs as it is intended to be invoked by the Juju CLI Snap.
 apps:
   jaas:
-    command: bin/juju-jaas
+    command: bin/jaas
 
 parts:
   jaas:
     plugin: go
     source: ./
     source-type: git
+    stage-packages: [busybox-static]
     prime:
-    - bin/juju-jaas
+      - bin/jaas
+      - bin/busybox
+      - bin/static-sh
     override-build: |
       set -e
-      CGO_ENABLED=0 go build -o juju-jaas github.com/canonical/jimm/cmd/jaas
-      mkdir -p $GOBIN
-      cp ./juju-jaas $GOBIN/juju-jaas
+      CGO_ENABLED=0 go install github.com/canonical/jimm/cmd/jaas
+    override-prime: |
+      snapcraftctl prime
+      ln -sf ./jaas bin/juju-add-service-account
