@@ -83,7 +83,7 @@ func (c *riverViewerCommand) Run(ctx *cmd.Context) error {
 	if DSN == "" {
 		return errors.E("failed to read JIMM_DSN from the environment")
 	}
-	r, err := jimm.NewRiver(ctx, jimm.RiverConfig{DSN: DSN, MaxAttempts: 3}, nil, nil)
+	r, err := jimm.NewRiver(ctx, jimm.RiverConfig{DSN: DSN, MaxAttempts: 3}, nil, nil, nil)
 	if err != nil {
 		return err
 	}

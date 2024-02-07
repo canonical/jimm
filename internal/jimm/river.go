@@ -33,6 +33,8 @@ type River struct {
 	MaxAttempts int
 	// RetryPolicy determines when the next attempt for a failed job will be run.
 	RetryPolicy river.ClientRetryPolicy
+	// DSN is the DSN for the DB river is connected to.
+	DSN string
 }
 
 // registerJimmWorkers would register known workers safely and return a pointer to a river.workers struct that should be used in river creation.
@@ -122,7 +124,7 @@ func NewRiver(ctx context.Context, riverConfig RiverConfig, ofgaClient *openfga.
 		dbPool.Close()
 		return nil, err
 	}
-	r := River{Client: riverClient, dbPool: dbPool, MaxAttempts: maxAttempts}
+	r := River{Client: riverClient, dbPool: dbPool, MaxAttempts: maxAttempts, DSN: riverConfig.DSN}
 	err = r.doMigration(ctx)
 	if err != nil {
 		dbPool.Close()
