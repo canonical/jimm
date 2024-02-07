@@ -107,8 +107,7 @@ func newModelBuilderFromModel(ctx context.Context, j *JIMM, owner *dbmodel.User,
 	}
 	b = b.WithConfig(config)
 	b.model = &dbmodel.Model{
-		OwnerUsername: owner.Username,
-		ID:            modelId,
+		ID: modelId,
 	}
 	if err := j.Database.GetModel(ctx, b.model); err != nil {
 		return nil, errors.E(err, fmt.Sprintf("failed to fetch model information, err: %s", err))
@@ -720,13 +719,13 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 			return nil, errors.E(op, err)
 		}
 	}
-	//check here id db model has it id
+
 	builder = builder.CreateDatabaseModel()
 	if err := builder.Error(); err != nil {
 		return nil, errors.E(op, err)
 	}
 	defer builder.Cleanup()
-	// check here if dbmodel has its id
+
 	riverAddModelArgs := RiverAddModelArgs{
 		Config:    builder.config,
 		ModelId:   builder.model.ID,
