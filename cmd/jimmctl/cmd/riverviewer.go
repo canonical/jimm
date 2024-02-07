@@ -42,13 +42,21 @@ type riverViewerCommand struct {
 	args   RiverViewerArgs
 }
 
+const riverViewerDoc = `
+	river-viewer allows you to view failed/canceled/completed jobs from the DB.
+
+	Examples:
+		jimmctl river-viewer 
+		jimmctl river-viewer --limit 100 --reverse
+		jimmctl river-viewer --getCompleted --format json
+`
+
 // Info implements Command.Info. It returns the command information.
 func (c *riverViewerCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
 		Name:    "river-viewer",
-		Args:    "<ISO8601 date>",
-		Purpose: "purges audit logs from the database before the given date",
-		Doc:     purgeLogsDoc,
+		Purpose: "Interact with river to see jobs and their arguments.",
+		Doc:     riverViewerDoc,
 	})
 }
 
