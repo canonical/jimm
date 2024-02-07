@@ -29,6 +29,14 @@ type InMemoryCredentialStore struct {
 	cloudCredentialAttributes map[string]map[string]string
 }
 
+// NewInMemoryCredentialStore returns a new instance of `InMemoryCredentialStore`
+// with some secrets/keys being populated.
+func NewInMemoryCredentialStore() *InMemoryCredentialStore {
+	return &InMemoryCredentialStore{
+		oauthKey: []byte("secret-oauth-key"),
+	}
+}
+
 // Get retrieves the stored attributes of a cloud credential.
 func (s *InMemoryCredentialStore) Get(ctx context.Context, credTag names.CloudCredentialTag) (map[string]string, error) {
 	s.mu.Lock()

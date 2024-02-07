@@ -74,7 +74,7 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 		Database: db.Database{
 			DB: PostgresDB(GocheckTester{c}, nil),
 		},
-		CredentialStore: &InMemoryCredentialStore{},
+		CredentialStore: NewInMemoryCredentialStore(),
 		Pubsub:          &pubsub.Hub{MaxConcurrency: 10},
 		UUID:            ControllerUUID,
 		OpenFGAClient:   s.OFGAClient,
