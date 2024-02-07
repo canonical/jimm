@@ -3,9 +3,7 @@
 package cmd_test
 
 import (
-	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"os"
 
 	"github.com/juju/cmd/v3/cmdtesting"
@@ -39,18 +37,19 @@ func (s *riverViewerSuite) TestRiverViewer2success(c *gc.C) {
 		c.Errorf("failed to deserialize command output, err %s", err)
 	}
 	c.Assert(len(data[rivertype.JobStateCompleted]), gc.Equals, 1)
-	jobRow := data[rivertype.JobStateAvailable][0]
+	jobRow := data[rivertype.JobStateCompleted][0]
 	c.Assert(jobRow.Kind, gc.Equals, "AddModel")
-	decodedArgs, err := base64.StdEncoding.DecodeString(string(jobRow.EncodedArgs[:]))
-	if err != nil {
-		c.Errorf("Error decoding EncodedArgs, err %s", err)
-	}
 	var args jimm.RiverAddModelArgs
-	err = json.Unmarshal(decodedArgs, &args)
+	err = json.Unmarshal(jobRow.EncodedArgs, &args)
 	if err != nil {
 		c.Errorf("Error unmarshalling decoded EncodedArgs, err %s", err)
 	}
-	fmt.Println(args)
+	config := make(map[string]interface{})
+	c.Assert(args, gc.DeepEquals, jimm.RiverAddModelArgs{
+		ModelId:   1,
+		OwnerName: "charlie@external",
+		Config:    config,
+	})
 	c.Assert(len(data[rivertype.JobStateCancelled]), gc.Equals, 0)
 	c.Assert(len(data[rivertype.JobStateDiscarded]), gc.Equals, 0)
 }
