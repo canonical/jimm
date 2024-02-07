@@ -24,6 +24,7 @@ type InMemoryCredentialStore struct {
 	jwks                      jwk.Set
 	privateKey                []byte
 	expiry                    time.Time
+	oauthKey                  []byte
 	controllerCredentials     map[string]controllerCredentials
 	cloudCredentialAttributes map[string]map[string]string
 }
@@ -174,6 +175,32 @@ func (s *InMemoryCredentialStore) PutJWKSExpiry(ctx context.Context, expiry time
 	defer s.mu.Unlock()
 
 	s.expiry = expiry
+
+	return nil
+}
+
+// GetOAuthKey returns the current HS256 (symmetric) key used to sign OAuth session tokens.
+func (s *InMemoryCredentialStore) GetOAuthKey(ctx context.Context) ([]byte, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if s.oauthKey == nil || len(s.oauthKey) == 0 {
+		return nil, errors.E(errors.CodeNotFound)
+	}
+
+	key := make([]byte, len(s.oauthKey))
+	copy(key, s.oauthKey)
+
+	return key, nil
+}
+
+// PutOAuthKey puts a HS256 key into the credentials store for signing OAuth session tokens.
+func (s *InMemoryCredentialStore) PutOAuthKey(ctx context.Context, raw []byte) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.oauthKey = make([]byte, len(raw))
+	copy(s.oauthKey, raw)
 
 	return nil
 }
