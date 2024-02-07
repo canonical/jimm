@@ -98,22 +98,22 @@ func newModelBuilder(ctx context.Context, j *JIMM) *modelBuilder {
 	}
 }
 
-func newModelBuilderFromModel(ctx context.Context, j *JIMM, owner *dbmodel.User, modelName string, config map[string]interface{}) (*modelBuilder, error) {
+func newModelBuilderFromModel(ctx context.Context, j *JIMM, owner *dbmodel.User, modelId uint, config map[string]interface{}) (*modelBuilder, error) {
 	const op = errors.Op("jimm.newModelBuilderFromModel")
 	b := &modelBuilder{
 		ctx:   ctx,
 		jimm:  j,
 		owner: owner,
-		name:  modelName,
 	}
 	b = b.WithConfig(config)
 	b.model = &dbmodel.Model{
 		OwnerUsername: owner.Username,
-		Name:          modelName,
+		ID:            modelId,
 	}
 	if err := j.Database.GetModel(ctx, b.model); err != nil {
 		return nil, errors.E(err, fmt.Sprintf("failed to fetch model information, err: %s", err))
 	}
+	b.name = b.model.Name
 	b.controller = &b.model.Controller
 	b.cloud = &b.model.CloudRegion.Cloud
 	if err := j.Database.GetCloud(ctx, b.cloud); err != nil {
@@ -504,9 +504,8 @@ func (b *modelBuilder) CreateControllerModel() *modelBuilder {
 		b.err = errors.E(err)
 		return b
 	}
-
-	var info jujuparams.ModelInfo
-	if err := api.CreateModel(b.ctx, args, &info); err != nil {
+	b.modelInfo = &jujuparams.ModelInfo{}
+	if err := api.CreateModel(b.ctx, args, b.modelInfo); err != nil {
 		switch jujuparams.ErrCode(err) {
 		case jujuparams.CodeAlreadyExists:
 			// The model already exists in the controller but it didn't
@@ -520,8 +519,6 @@ func (b *modelBuilder) CreateControllerModel() *modelBuilder {
 			// empty models that don't appear in the database.
 			if miErr := api.ModelInfo(b.ctx, b.modelInfo); miErr != nil {
 				b.err = errors.E(err, fmt.Sprintf("model already exists, but failed to read its model info: %s", miErr))
-			} else {
-				b.err = errors.E(err, errors.CodeAlreadyExists, "model name in use")
 			}
 		case jujuparams.CodeUpgradeInProgress:
 			b.err = errors.E(err, "upgrade in progress")
@@ -531,10 +528,7 @@ func (b *modelBuilder) CreateControllerModel() *modelBuilder {
 			// controller.
 			b.err = errors.E(err, errors.CodeBadRequest)
 		}
-		return b
 	}
-
-	b.modelInfo = &info
 	return b
 }
 
@@ -557,8 +551,7 @@ func (b *modelBuilder) JujuModelInfo() *jujuparams.ModelInfo {
 
 // RiverAddModelArgs holds the river job arguments for building models.
 type RiverAddModelArgs struct {
-	ModelName string                 `json:"name"`
-	UserName  string                 `json:"user_name"`
+	ModelId   uint                   `json:"model_id"`
 	OwnerName string                 `json:"owner_name"`
 	Config    map[string]interface{} `json:"config"`
 }
@@ -581,7 +574,7 @@ func (w *RiverAddModelWorker) Timeout(job *river.Job[RiverAddModelArgs]) time.Du
 	return workers.AddModelTimeout
 }
 
-// NextRerty returns the time that is used to schedule the next retry in case of a failure.
+// NextRetry returns the time that is used to schedule the next retry in case of a failure.
 func (w *RiverAddModelWorker) NextRetry(job *river.Job[RiverAddModelArgs]) time.Time {
 	return time.Now().Add(20 * time.Second)
 }
@@ -591,20 +584,16 @@ func (w *RiverAddModelWorker) Work(ctx context.Context, job *river.Job[RiverAddM
 	const op = errors.Op("jimm.AddModel")
 	args := job.Args
 	j := w.JIMM
-	user := &dbmodel.User{Username: args.UserName}
 	owner := &dbmodel.User{Username: args.OwnerName}
-	if err := j.Database.GetUser(ctx, user); err != nil {
-		return errors.E(op, err)
-	}
 	if err := j.Database.GetUser(ctx, owner); err != nil {
 		return errors.E(op, err)
 	}
-	builder, err := newModelBuilderFromModel(ctx, w.JIMM, owner, args.ModelName, args.Config)
+	builder, err := newModelBuilderFromModel(ctx, w.JIMM, owner, args.ModelId, args.Config)
 	if err != nil {
 		return errors.E(op, err)
 	}
 	builder = builder.CreateControllerModel()
-	if err := builder.Error(); err != nil && errors.ErrorCode(err) != errors.CodeAlreadyExists {
+	if err := builder.Error(); err != nil {
 		return errors.E(op, err)
 	}
 	// update builder to construct the builder state from the model id.
@@ -731,24 +720,25 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 			return nil, errors.E(op, err)
 		}
 	}
-
+	//check here id db model has it id
 	builder = builder.CreateDatabaseModel()
 	if err := builder.Error(); err != nil {
 		return nil, errors.E(op, err)
 	}
 	defer builder.Cleanup()
-
+	// check here if dbmodel has its id
 	riverAddModelArgs := RiverAddModelArgs{
 		Config:    builder.config,
-		ModelName: builder.name,
+		ModelId:   builder.model.ID,
 		OwnerName: owner.Username,
-		UserName:  user.Username,
 	}
 
-	err = InsertJob(ctx, &workers.WaitConfig{Duration: workers.AddModelTimeout}, j.River, func() (*rivertype.JobRow, error) {
+	waitConfig := &workers.WaitConfig{Duration: time.Duration(j.River.MaxAttempts) * workers.AddModelTimeout}
+	err = InsertJob(ctx, waitConfig, j.River, func() (*rivertype.JobRow, error) {
 		return j.River.Client.Insert(ctx, riverAddModelArgs, &river.InsertOpts{MaxAttempts: j.River.MaxAttempts})
 	})
 	if err != nil {
+		builder.err = err
 		return nil, errors.E(err, fmt.Sprintf("failed to insert and wait for the river job, err: %s", err))
 	}
 	model := &dbmodel.Model{
