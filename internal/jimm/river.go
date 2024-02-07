@@ -46,7 +46,7 @@ func (RiverOpenFGAArgs) Kind() string { return "OpenFGA" }
 type RiverOpenFGAWorker struct {
 	river.WorkerDefaults[RiverOpenFGAArgs]
 	OfgaClient *openfga.OFGAClient
-	Database   db.Database
+	Database   *db.Database
 }
 
 // Work is the function executed by the worker when it picks up the job.
@@ -100,7 +100,7 @@ type River struct {
 // registerJimmWorkers would register known workers safely and return a pointer to a river.workers struct that should be used in river creation.
 func registerJimmWorkers(ctx context.Context, ofgaConn *openfga.OFGAClient, db *db.Database) (*river.Workers, error) {
 	workers := river.NewWorkers()
-	if err := river.AddWorkerSafely(workers, &RiverOpenFGAWorker{OfgaClient: ofgaConn, Database: *db}); err != nil {
+	if err := river.AddWorkerSafely(workers, &RiverOpenFGAWorker{OfgaClient: ofgaConn, Database: db}); err != nil {
 		return nil, err
 	}
 	return workers, nil
