@@ -18,6 +18,15 @@ import (
 	"github.com/riverqueue/river/rivertype"
 )
 
+const riverViewerDoc = `
+	river-viewer allows you to view failed/canceled/completed jobs from the DB.
+
+	Examples:
+		jimmctl river-viewer 
+		jimmctl river-viewer --limit 100 --reverse
+		jimmctl river-viewer --getCompleted --format json
+`
+
 func NewRiverViewerCommand() cmd.Command {
 	cmd := &riverViewerCommand{}
 	return modelcmd.WrapBase(cmd)
@@ -41,15 +50,6 @@ type riverViewerCommand struct {
 	client *river.Client[pgx.Tx]
 	args   RiverViewerArgs
 }
-
-const riverViewerDoc = `
-	river-viewer allows you to view failed/canceled/completed jobs from the DB.
-
-	Examples:
-		jimmctl river-viewer 
-		jimmctl river-viewer --limit 100 --reverse
-		jimmctl river-viewer --getCompleted --format json
-`
 
 // Info implements Command.Info. It returns the command information.
 func (c *riverViewerCommand) Info() *cmd.Info {
@@ -112,11 +112,9 @@ func (c *riverViewerCommand) Run(ctx *cmd.Context) error {
 			return err
 		}
 	}
-
 	if err := c.out.Write(ctx, jobsMap); err != nil {
 		return errors.E(fmt.Sprintf("failed to write output. err: %s", err))
 	}
-
 	if err := c.client.Stop(ctx); err != nil {
 		return errors.E(fmt.Sprintf("failed to stop river client, err: %s", err))
 	}
@@ -131,18 +129,15 @@ func (c *riverViewerCommand) SetFlags(f *gnuflag.FlagSet) {
 		"json":    cmd.FormatJson,
 		"tabular": formatTabular,
 	})
-
 	// UNUSED FOR NOW
 	f.StringVar(&c.args.After, "after", "", "display events that happened after specified time")
 	f.StringVar(&c.args.Before, "before", "", "display events that happened before specified time")
 	f.StringVar(&c.args.Workers, "workers", "", "display events for specific workers. use comma-separated workers")
 	f.IntVar(&c.args.Offset, "offset", 0, "pagination offset")
-
 	// USED
 	f.IntVar(&c.args.Limit, "limit", 100, "limit the maximum number of returned jobs per state.")
 	f.BoolVar(&c.args.Reverse, "reverse", false, "reverse the order of jobs, showing the most recent first")
 	f.BoolVar(&c.args.GetFailed, "getFailed", true, "return jobs that were discarded")
 	f.BoolVar(&c.args.GetCanceled, "getCanceled", true, "return jobs that were cancelled")
 	f.BoolVar(&c.args.GetCompleted, "getCompleted", false, "return jobs that completed successfully")
-
 }
