@@ -173,6 +173,11 @@ type OAuthAuthenticator interface {
 	VerifyClientCredentials(ctx context.Context, clientID string, clientSecret string) error
 }
 
+// GetCredentialStore return the OpenFGA client used by JIMM.
+func (j *JIMM) GetCredentialStore() credentials.CredentialStore {
+	return j.CredentialStore
+}
+
 type permission struct {
 	resource string
 	relation string
