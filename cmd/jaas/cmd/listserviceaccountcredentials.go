@@ -25,13 +25,13 @@ import (
 
 var (
 	listServiceCredentialsCommandDoc = `
-list-credentials command list the cloud credentials belonging to a service account.
+list-credentials lists the cloud credentials belonging to a service account.
 
 This command only shows credentials uploaded to the controller that belong to the service account.
+Client-side credentials should be managed via the juju credentials command.
 
-Client credentials should be managed via juju credentials.
-
-Example:
+`
+	listServiceAccountCredentialsExamples = `
 	juju list-service-account-credentials <clientID> 
 	juju list-service-account-credentials <clientID> --show-secrets
 	juju list-service-account-credentials <clientID> --format yaml
@@ -60,9 +60,11 @@ type listServiceAccountCredentialsCommand struct {
 
 func (c *listServiceAccountCredentialsCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:    "list-service-account-credentials",
-		Purpose: "List service account cloud credentials",
-		Doc:     listServiceCredentialsCommandDoc,
+		Name:     "list-service-account-credentials",
+		Purpose:  "List service account cloud credentials",
+		Args:     "<clientID>",
+		Doc:      listServiceCredentialsCommandDoc,
+		Examples: listServiceAccountCredentialsExamples,
 	})
 }
 
