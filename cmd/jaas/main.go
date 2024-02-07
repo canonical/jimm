@@ -5,6 +5,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/canonical/jimm/cmd/jaas/cmd"
 	jujucmd "github.com/juju/cmd/v3"
@@ -38,7 +39,19 @@ func main() {
 		os.Exit(2)
 	}
 	superCmd := NewSuperCommand()
-	args := os.Args
-
-	os.Exit(jujucmd.Main(superCmd, ctx, args[1:]))
+	fmt.Printf("Args: %v\n", os.Args)
+	var args []string
+	// The following if condition handles cases where the juju binary calls our binary
+	// as a plugin. Symlinks of the form juju-<command> are created to make all jaas commands
+	// appear as top level commands to the Juju CLI and then we strip the juju- prefix to mimic
+	// a normal call.
+	if len(os.Args) > 0 && strings.HasPrefix(os.Args[0], "juju-") && os.Args[0] != "juju-jaas" {
+		args = make([]string, len(os.Args))
+		copy(args[1:], os.Args[1:])
+		args[0] = strings.TrimPrefix(os.Args[0], "juju-")
+	} else {
+		args = os.Args[1:]
+	}
+	fmt.Printf("New Args: %v\n", args)
+	os.Exit(jujucmd.Main(superCmd, ctx, args))
 }

@@ -24,14 +24,16 @@ parts:
     plugin: go
     source: ./
     source-type: git
-    stage-packages: [busybox-static]
     prime:
       - bin/jaas
-      - bin/busybox
-      - bin/static-sh
     override-build: |
       set -e
       CGO_ENABLED=0 go install github.com/canonical/jimm/cmd/jaas
     override-prime: |
       snapcraftctl prime
-      ln -sf ./jaas bin/juju-add-service-account
+      # Add all CLI commands below to make them appear top-level to Juju.
+      ln -sf jaas bin/juju-jaas
+      ln -sf jaas bin/juju-add-service-account
+      ln -sf jaas bin/juju-list-service-account-credentials
+      ln -sf jaas bin/juju-update-service-account-credentials
+      ln -sf jaas bin/juju-grant-service-account-access

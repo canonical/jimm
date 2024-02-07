@@ -20,7 +20,7 @@ var (
 add command binds a service account to your user, giving you administrator access over the service account.
 
 Example:
-	juju service-account add <client-id> 
+	juju add-service-account <client-id> 
 `
 )
 
@@ -46,7 +46,7 @@ type addServiceAccountCommand struct {
 // Info implements Command.Info.
 func (c *addServiceAccountCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:    "add",
+		Name:    "add-service-account",
 		Purpose: "Add service account",
 		Doc:     addServiceCommandDoc,
 	})
