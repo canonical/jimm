@@ -9,6 +9,8 @@ import (
 
 	"github.com/canonical/jimm/internal/jimmjwx"
 	qt "github.com/frankban/quicktest"
+	"github.com/lestrrat-go/iter/arrayiter"
+	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 )
 
@@ -29,14 +31,10 @@ func TestRegisterJWKSCacheRegistersTheCacheSuccessfully(t *testing.T) {
 	jwtService := jimmjwx.NewJWTService(jimmjwx.JWTServiceParams{
 		Host:   u.Host,
 		Store:  store,
-		Secure: true,
 		Expiry: time.Minute,
 	})
 
-	// Test RegisterJWKSCache does register the public key just setup
-	jwtService.RegisterJWKSCache(ctx, srv.Client())
-
-	set, err := jwtService.Cache.Get(ctx, "https://"+u.Host+"/.well-known/jwks.json")
+	set, err := jwtService.JWKS.Get(ctx)
 	c.Assert(err, qt.IsNil)
 	c.Assert(set.Len(), qt.Equals, 1)
 }
@@ -65,11 +63,8 @@ func TestNewJWTIsParsableByExponent(t *testing.T) {
 	jwtService := jimmjwx.NewJWTService(jimmjwx.JWTServiceParams{
 		Host:   u.Host,
 		Store:  store,
-		Secure: true,
 		Expiry: time.Minute,
 	})
-	// Setup JWKS Cache
-	jwtService.RegisterJWKSCache(ctx, srv.Client())
 
 	// Mint a new JWT
 	tok, err := jwtService.NewJWT(ctx, jimmjwx.JWTParams{
@@ -83,7 +78,7 @@ func TestNewJWTIsParsableByExponent(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	// Retrieve pubkey from cache
-	set, err := jwtService.Cache.Get(ctx, "https://"+u.Host+"/.well-known/jwks.json")
+	set, err := jwtService.JWKS.Get(ctx)
 	c.Assert(err, qt.IsNil)
 
 	// Test the token parses
@@ -129,11 +124,8 @@ func TestNewJWTExpires(t *testing.T) {
 	jwtService := jimmjwx.NewJWTService(jimmjwx.JWTServiceParams{
 		Host:   u.Host,
 		Store:  store,
-		Secure: true,
 		Expiry: time.Nanosecond,
 	})
-	// Setup JWKS Cache
-	jwtService.RegisterJWKSCache(ctx, srv.Client())
 
 	// Mint a new JWT
 	tok, err := jwtService.NewJWT(ctx, jimmjwx.JWTParams{
@@ -147,7 +139,7 @@ func TestNewJWTExpires(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	// Retrieve pubkey from cache
-	set, err := jwtService.Cache.Get(ctx, "https://"+u.Host+"/.well-known/jwks.json")
+	set, err := jwtService.JWKS.Get(ctx)
 	c.Assert(err, qt.IsNil)
 
 	time.Sleep(time.Nanosecond * 10)
@@ -158,4 +150,29 @@ func TestNewJWTExpires(t *testing.T) {
 		jwt.WithKeySet(set),
 	)
 	c.Assert(err, qt.ErrorMatches, `"exp" not satisfied`)
+}
+
+func TestCredentialCache(t *testing.T) {
+	c := qt.New(t)
+	store := newStore(c)
+	ctx := context.Background()
+	set, _, err := jimmjwx.GenerateJWK(ctx)
+	c.Assert(err, qt.IsNil)
+	store.PutJWKS(ctx, set)
+	vaultCache := jimmjwx.NewCredentialCache(store)
+	gotSet, err := vaultCache.Get(ctx)
+	c.Assert(err, qt.IsNil)
+	c.Assert(gotSet.Len(), qt.Not(qt.Equals), 0)
+	expectedKeyPairs := getKeyPairs(ctx, set)
+	wantKeyPairs := getKeyPairs(ctx, gotSet)
+	c.Assert(expectedKeyPairs, qt.DeepEquals, wantKeyPairs)
+}
+
+func getKeyPairs(ctx context.Context, set jwk.Set) []*arrayiter.Pair {
+	res := make([]*arrayiter.Pair, 0)
+	iterator := set.Keys(ctx)
+	for val := iterator.Pair(); iterator.Next(ctx); val = iterator.Pair() {
+		res = append(res, val)
+	}
+	return res
 }

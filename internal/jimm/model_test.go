@@ -3565,11 +3565,8 @@ clouds:
   regions:
   - name: test-region-1
   - name: test-region-2
-  users:
-  - user: alice@external
-    access: add-model
-user-defaults:
-- user: alice@external
+users:
+- username: alice@external
   controller-access: superuser
 cloud-credentials:
 - name: test-credential-1
