@@ -51,4 +51,10 @@ type CredentialStore interface {
 
 	// PutJWKSExpiry sets the expiry time for the current JWKS within the store.
 	PutJWKSExpiry(ctx context.Context, expiry time.Time) error
+
+	// GetOAuthKey returns the current HS256 (symmetric) key used to sign OAuth session tokens.
+	GetOAuthKey(ctx context.Context) ([]byte, error)
+
+	// PutOAuthKey puts a HS256 (symmetric) key into the credentials store for signing OAuth session tokens.
+	PutOAuthKey(ctx context.Context, raw []byte) error
 }
