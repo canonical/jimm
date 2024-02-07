@@ -21,7 +21,7 @@ add-service-account binds a service account to your user, giving you administrat
 Can only be run once per service account.
 `
 	addServiceCommandExamples = `
-	juju add-service-account <client-id> 
+    juju add-service-account <client-id> 
 `
 )
 

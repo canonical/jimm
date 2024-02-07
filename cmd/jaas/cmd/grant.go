@@ -21,7 +21,7 @@ var (
 grant-service-account-access grants administrator access over a service account to the given groups/identities.
 `
 	grantCommandExamples = `
-	juju grant-service-account-access 00000000-0000-0000-0000-000000000000 user-foo group-bar
+    juju grant-service-account-access 00000000-0000-0000-0000-000000000000 user-foo group-bar
 `
 )
 

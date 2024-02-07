@@ -32,9 +32,9 @@ Client-side credentials should be managed via the juju credentials command.
 
 `
 	listServiceAccountCredentialsExamples = `
-	juju list-service-account-credentials <clientID> 
-	juju list-service-account-credentials <clientID> --show-secrets
-	juju list-service-account-credentials <clientID> --format yaml
+    juju list-service-account-credentials <clientID> 
+    juju list-service-account-credentials <clientID> --show-secrets
+    juju list-service-account-credentials <clientID> --format yaml
 `
 )
 
