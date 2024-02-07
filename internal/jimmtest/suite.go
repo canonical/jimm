@@ -79,9 +79,6 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 	err = jimmDb.Migrate(ctx, false)
 	c.Assert(err, gc.Equals, nil)
 
-	river := NewRiver(gcChecker, nil, s.OFGAClient, &jimmDb)
-	c.Assert(err, gc.IsNil)
-
 	// Setup OpenFGA.
 	s.JIMM = &jimm.JIMM{
 		Database:        jimmDb,
@@ -89,8 +86,8 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 		Pubsub:          &pubsub.Hub{MaxConcurrency: 10},
 		UUID:            ControllerUUID,
 		OpenFGAClient:   s.OFGAClient,
-		River:           river,
 	}
+	s.JIMM.River = NewRiver(gcChecker, nil, s.OFGAClient, &jimmDb, s.JIMM)
 
 	s.cancel = cancel
 

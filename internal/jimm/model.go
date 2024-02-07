@@ -20,8 +20,10 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/canonical/jimm/internal/constants"
+	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/jimm/workers"
 	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 )
@@ -94,6 +96,47 @@ func newModelBuilder(ctx context.Context, j *JIMM) *modelBuilder {
 		ctx:  ctx,
 		jimm: j,
 	}
+}
+
+func newModelBuilderFromModel(ctx context.Context, j *JIMM, owner *dbmodel.User, modelId uint, config map[string]interface{}) (*modelBuilder, error) {
+	const op = errors.Op("jimm.newModelBuilderFromModel")
+	b := &modelBuilder{
+		ctx:   ctx,
+		jimm:  j,
+		owner: owner,
+	}
+	b = b.WithConfig(config)
+	b.model = &dbmodel.Model{
+		ID: modelId,
+	}
+	if err := j.Database.GetModel(ctx, b.model); err != nil {
+		return nil, errors.E(err, fmt.Sprintf("failed to fetch model information, err: %s", err))
+	}
+	b.name = b.model.Name
+	b.controller = &b.model.Controller
+	b.cloud = &b.model.CloudRegion.Cloud
+	if err := j.Database.GetCloud(ctx, b.cloud); err != nil {
+		return nil, errors.E(err, "cloud not found")
+	}
+	b = b.WithCloudRegion(b.model.CloudRegion.Name)
+	b.credential = &b.model.CloudCredential
+
+	// fetch cloud region defaults
+	if b.cloud != nil && names.NewCloudTag(b.cloud.Name) != (names.CloudTag{}) && b.cloudRegion != "" {
+		cloudRegionDefaults := dbmodel.CloudDefaults{
+			Username: owner.Username,
+			Cloud: dbmodel.Cloud{
+				Name: names.NewCloudTag(b.cloud.Name).Id(),
+			},
+			Region: b.cloudRegion,
+		}
+		err := j.Database.CloudDefaults(ctx, &cloudRegionDefaults)
+		if err != nil && errors.ErrorCode(err) != errors.CodeNotFound {
+			return nil, errors.E(op, "failed to fetch cloud defaults")
+		}
+		b = b.WithConfig(cloudRegionDefaults.Defaults)
+	}
+	return b, b.err
 }
 
 type modelBuilder struct {
@@ -212,6 +255,7 @@ func (b *modelBuilder) WithCloudRegion(region string) *modelBuilder {
 				continue
 			}
 			region = r.Name
+			break
 		}
 	}
 	// loop through all cloud regions
@@ -459,9 +503,8 @@ func (b *modelBuilder) CreateControllerModel() *modelBuilder {
 		b.err = errors.E(err)
 		return b
 	}
-
-	var info jujuparams.ModelInfo
-	if err := api.CreateModel(b.ctx, args, &info); err != nil {
+	b.modelInfo = &jujuparams.ModelInfo{}
+	if err := api.CreateModel(b.ctx, args, b.modelInfo); err != nil {
 		switch jujuparams.ErrCode(err) {
 		case jujuparams.CodeAlreadyExists:
 			// The model already exists in the controller but it didn't
@@ -473,7 +516,9 @@ func (b *modelBuilder) CreateControllerModel() *modelBuilder {
 			// the operation to delete a model isn't synchronous even
 			// for empty models. We could also have a worker that deletes
 			// empty models that don't appear in the database.
-			b.err = errors.E(err, errors.CodeAlreadyExists, "model name in use")
+			if miErr := api.ModelInfo(b.ctx, b.modelInfo); miErr != nil {
+				b.err = errors.E(err, fmt.Sprintf("model already exists, but failed to read its model info: %s", miErr))
+			}
 		case jujuparams.CodeUpgradeInProgress:
 			b.err = errors.E(err, "upgrade in progress")
 		default:
@@ -482,10 +527,7 @@ func (b *modelBuilder) CreateControllerModel() *modelBuilder {
 			// controller.
 			b.err = errors.E(err, errors.CodeBadRequest)
 		}
-		return b
 	}
-
-	b.modelInfo = &info
 	return b
 }
 
@@ -506,10 +548,89 @@ func (b *modelBuilder) JujuModelInfo() *jujuparams.ModelInfo {
 	return b.modelInfo
 }
 
+// RiverAddModelArgs holds the river job arguments for building models.
+type RiverAddModelArgs struct {
+	ModelId   uint                   `json:"model_id"`
+	OwnerName string                 `json:"owner_name"`
+	Config    map[string]interface{} `json:"config"`
+}
+
+// Kind is a string that uniquely identifies the type of job to be picked up by the appropriate river workers.
+// This is required by river and must be provided on the job arguments struct to implement the JobArgs interface.
+func (RiverAddModelArgs) Kind() string { return "AddModel" }
+
+// RiverAddModelWorker is the river worker that would run the job.
+type RiverAddModelWorker struct {
+	river.WorkerDefaults[RiverAddModelArgs]
+	Database   *db.Database
+	JIMM       *JIMM
+	OfgaClient *openfga.OFGAClient
+}
+
+// Timeout returns the timeout duration for the RiverAddModelWorker.
+// This is needed to avoid using the default timeout on the client.
+func (w *RiverAddModelWorker) Timeout(job *river.Job[RiverAddModelArgs]) time.Duration {
+	return workers.AddModelTimeout
+}
+
+// NextRetry returns the time that is used to schedule the next retry in case of a failure.
+func (w *RiverAddModelWorker) NextRetry(job *river.Job[RiverAddModelArgs]) time.Time {
+	return time.Now().Add(20 * time.Second)
+}
+
+// Work is the function executed by the worker when it picks up the job.
+func (w *RiverAddModelWorker) Work(ctx context.Context, job *river.Job[RiverAddModelArgs]) error {
+	const op = errors.Op("jimm.AddModel")
+	args := job.Args
+	j := w.JIMM
+	owner := &dbmodel.User{Username: args.OwnerName}
+	if err := j.Database.GetUser(ctx, owner); err != nil {
+		return errors.E(op, err)
+	}
+	builder, err := newModelBuilderFromModel(ctx, w.JIMM, owner, args.ModelId, args.Config)
+	if err != nil {
+		return errors.E(op, err)
+	}
+	builder = builder.CreateControllerModel()
+	if err := builder.Error(); err != nil {
+		return errors.E(op, err)
+	}
+	// update builder to construct the builder state from the model id.
+	builder = builder.UpdateDatabaseModel()
+	if err := builder.Error(); err != nil {
+		return errors.E(op, err)
+	}
+
+	mi := builder.JujuModelInfo()
+	if err := w.OfgaClient.AddControllerModel(
+		ctx,
+		builder.controller.ResourceTag(),
+		builder.model.ResourceTag(),
+	); err != nil {
+		zapctx.Error(
+			ctx,
+			"failed to add controller-model relation",
+			zap.String("controller", builder.controller.UUID),
+			zap.String("model", builder.model.UUID.String),
+		)
+		return errors.E(err, "failed to add the controller-model relation from the river job.")
+	}
+	err = openfga.NewUser(owner, w.OfgaClient).SetModelAccess(ctx, names.NewModelTag(mi.UUID), ofganames.AdministratorRelation)
+	if err != nil {
+		zapctx.Error(
+			ctx,
+			"failed to add administrator relation",
+			zap.String("user", owner.Tag().String()),
+			zap.String("model", builder.model.UUID.String),
+		)
+		return errors.E(err, "failed to add the administrator relation from the river job.")
+	}
+	return nil
+}
+
 // AddModel adds the specified model to JIMM.
 func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCreateArgs) (_ *jujuparams.ModelInfo, err error) {
 	const op = errors.Op("jimm.AddModel")
-
 	owner := &dbmodel.User{
 		Username: args.Owner.Id(),
 	}
@@ -550,14 +671,12 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 			return nil, errors.E(op, "failed to fetch cloud defaults")
 		}
 		builder = builder.WithConfig(cloudDefaults.Defaults)
-	}
-
-	if args.Cloud != (names.CloudTag{}) {
 		builder = builder.WithCloud(args.Cloud)
 		if err := builder.Error(); err != nil {
 			return nil, errors.E(op, err)
 		}
 	}
+
 	builder = builder.WithCloudRegion(args.CloudRegion)
 	if err := builder.Error(); err != nil {
 		return nil, errors.E(op, err)
@@ -565,7 +684,8 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 
 	// at this point we know which cloud will host the model and
 	// we must check the user has add-model permission on the cloud
-	canAddModel, err := openfga.NewUser(owner, j.OpenFGAClient).IsAllowedAddModel(ctx, builder.cloud.ResourceTag())
+	ownerOfgaUser := openfga.NewUser(owner, j.OpenFGAClient)
+	canAddModel, err := ownerOfgaUser.IsAllowedAddModel(ctx, builder.cloud.ResourceTag())
 	if err != nil {
 		return nil, errors.E(op, "permission check failed")
 	}
@@ -599,38 +719,39 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 			return nil, errors.E(op, err)
 		}
 	}
+
 	builder = builder.CreateDatabaseModel()
 	if err := builder.Error(); err != nil {
 		return nil, errors.E(op, err)
 	}
 	defer builder.Cleanup()
 
-	builder = builder.CreateControllerModel()
-	if err := builder.Error(); err != nil {
-		return nil, errors.E(op, err)
+	riverAddModelArgs := RiverAddModelArgs{
+		Config:    builder.config,
+		ModelId:   builder.model.ID,
+		OwnerName: owner.Username,
 	}
 
-	builder = builder.UpdateDatabaseModel()
-	if err := builder.Error(); err != nil {
-		return nil, errors.E(op, err)
-	}
-
-	mi := builder.JujuModelInfo()
-	openfgaRiverJobArgs := RiverOpenFGAArgs{
-		ControllerUUID: builder.controller.UUID,
-		ModelId:        builder.model.ID,
-		OwnerName:      builder.owner.Username,
-		ModelInfoUUID:  mi.UUID,
-	}
-	err = InsertJob(ctx, &WaitConfig{Duration: 1 * time.Minute}, j.River, func() (*rivertype.JobRow, error) {
-		return j.River.Client.Insert(ctx, openfgaRiverJobArgs, &river.InsertOpts{MaxAttempts: j.River.MaxAttempts})
+	waitConfig := &workers.WaitConfig{Duration: time.Duration(j.River.MaxAttempts) * workers.AddModelTimeout}
+	err = InsertJob(ctx, waitConfig, j.River, func() (*rivertype.JobRow, error) {
+		return j.River.Client.Insert(ctx, riverAddModelArgs, &river.InsertOpts{MaxAttempts: j.River.MaxAttempts})
 	})
 	if err != nil {
-		return nil, errors.E(err, "failed to insert and wait for the river job")
+		builder.err = err
+		return nil, errors.E(err, fmt.Sprintf("failed to insert and wait for the river job, err: %s", err))
 	}
-	return mi, nil
+	model := &dbmodel.Model{
+		ID: builder.model.ID,
+	}
+	if err = j.Database.GetModel(ctx, model); err != nil {
+		return nil, errors.E(err, fmt.Sprintf("failed to fetch model information, err: %s", err))
+	}
+	modelInfo, err := j.ModelInfo(ctx, ownerOfgaUser, names.NewModelTag(model.UUID.String))
+	if err != nil {
+		return nil, errors.E(err, fmt.Sprintf("failed to read model info, err: %s", err))
+	}
+	return modelInfo, nil
 }
-
 
 // ModelInfo returns the model info for the model with the given ModelTag.
 // The returned ModelInfo will be appropriate for the given user's

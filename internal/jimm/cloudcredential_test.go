@@ -774,6 +774,11 @@ func TestUpdateCloudCredential(t *testing.T) {
 					}}
 					return nil
 				},
+				ModelInfo_: func(_ context.Context, mi *jujuparams.ModelInfo) error {
+					mi.UUID = "00000001-0000-0000-0000-0000-000000000001"
+					mi.Name = "test-model"
+					return nil
+				},
 			}
 
 			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
@@ -783,7 +788,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 			}
 			err = jimmDb.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
-			river := jimmtest.NewRiver(c, nil, client, &jimmDb)
+
 			j := &jimm.JIMM{
 				UUID:     uuid.NewString(),
 				Database: jimmDb,
@@ -791,8 +796,8 @@ func TestUpdateCloudCredential(t *testing.T) {
 					API: api,
 				},
 				OpenFGAClient: client,
-				River:         river,
 			}
+			j.River = jimmtest.NewRiver(c, nil, client, &jimmDb, j)
 
 			u, arg, expectedCredential, expectedError := test.createEnv(c, j, client)
 			user := openfga.NewUser(u, client)
@@ -1201,6 +1206,7 @@ func TestRevokeCloudCredential(t *testing.T) {
 				GrantJIMMModelAdmin_: func(_ context.Context, _ names.ModelTag) error {
 					return nil
 				},
+				ModelInfo_: func(ctx context.Context, mi *jujuparams.ModelInfo) error { return nil },
 				CreateModel_: func(ctx context.Context, args *jujuparams.ModelCreateArgs, mi *jujuparams.ModelInfo) error {
 					mi.Name = args.Name
 					mi.UUID = "00000001-0000-0000-0000-0000-000000000001"
@@ -1246,8 +1252,7 @@ func TestRevokeCloudCredential(t *testing.T) {
 			}
 			err = jimmDb.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
-			river := jimmtest.NewRiver(c, nil, client, &jimmDb)
-			c.Assert(err, qt.IsNil)
+
 			j := &jimm.JIMM{
 				UUID:     uuid.NewString(),
 				Database: jimmDb,
@@ -1255,9 +1260,8 @@ func TestRevokeCloudCredential(t *testing.T) {
 					API: api,
 				},
 				OpenFGAClient: client,
-				River:         river,
 			}
-
+			j.River = jimmtest.NewRiver(c, nil, client, &jimmDb, j)
 			user, tag, expectedError := test.createEnv(c, j, client)
 
 			err = j.RevokeCloudCredential(ctx, user, tag, false)
