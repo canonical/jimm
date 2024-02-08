@@ -14,6 +14,7 @@ import (
 	"github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/internal/auth"
 	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/openfga"
 	"github.com/canonical/jimm/internal/servermon"
 )
 
@@ -145,11 +146,10 @@ func (r *controllerRoot) GetDeviceSessionToken(ctx context.Context) (params.GetD
 // LoginSessionToken
 func (r *controllerRoot) LoginSessionToken(ctx context.Context, req params.LoginSessionTokenRequest) (jujuparams.LoginResult, error) {
 	const op = errors.Op("jujuapi.LoginSessionToken")
-	authSvc := r.jimm.OAuthAuthenticationService()
+	authenticationSvc := r.jimm.OAuthAuthenticationService()
 
-	// TODO(ale8k): Add vault logic to get secret key and generate one
-	// on start up.
-	_, err := authSvc.VerifyAccessToken([]byte(req.SessionToken), "secret-key")
+	// Verify the session token
+	jwtToken, err := authenticationSvc.VerifySessionToken(req.SessionToken, "secret-key")
 	if err != nil {
 		var aerr *auth.AuthenticationError
 		if stderrors.As(err, &aerr) {
@@ -158,8 +158,71 @@ func (r *controllerRoot) LoginSessionToken(ctx context.Context, req params.Login
 		return jujuparams.LoginResult{}, errors.E(op, err)
 	}
 
-	//email := jwtToken.Subject()
-	authClient := r.jimm.AuthorizationClient()
+	// Get an OpenFGA user to place on the controllerRoot for this WS
+	// such that:
+	//
+	//	- Subsequent calls are aware of the user
+	//	- Authorisation checks are done against the openfga.User
+	email := jwtToken.Subject()
+	user, err := r.jimm.GetOpenFGAUserAndAuthorise(ctx, email)
+	if err != nil {
+		return jujuparams.LoginResult{}, errors.E(op, err)
+	}
 
-	return jujuparams.LoginResult{}, nil
+	// TODO(ale8k): This isn't needed I don't think as controller roots are unique
+	// per WS, but if anyone knows different please let me know.
+	r.mu.Lock()
+	r.user = user
+	r.mu.Unlock()
+
+	// Get server version for LoginResult
+	srvVersion, err := r.jimm.EarliestControllerVersion(ctx)
+	if err != nil {
+		return jujuparams.LoginResult{}, errors.E(op, err)
+	}
+
+	return jujuparams.LoginResult{
+		PublicDNSName: r.params.PublicDNSName,
+		UserInfo:      setupAuthUserInfo(ctx, r, user),
+		ControllerTag: setupControllerTag(r),
+		Facades:       setupFacades(r),
+		ServerVersion: srvVersion.String(),
+	}, nil
+}
+
+// setupControllerTag returns the String() of a controller tag based on the
+// JIMM controller UUID.
+func setupControllerTag(root *controllerRoot) string {
+	return names.NewControllerTag(root.params.ControllerUUID).String()
+}
+
+// setupAuthUserInfo creates a user info object to embed into the LoginResult.
+func setupAuthUserInfo(ctx context.Context, root *controllerRoot, user *openfga.User) *jujuparams.AuthUserInfo {
+	aui := jujuparams.AuthUserInfo{
+		DisplayName: user.DisplayName,
+		Identity:    user.Tag().String(),
+		// TODO(Kian) CSS-6040 improve combining Postgres and OpenFGA info
+		ControllerAccess: user.GetControllerAccess(ctx, root.jimm.ResourceTag()).String(),
+	}
+	if user.LastLogin.Valid {
+		aui.LastConnection = &user.LastLogin.Time
+	}
+	return &aui
+}
+
+// setupFacades ranges over all facades JIMM is aware of and sorts them into
+// a versioned slice to give back to the LoginResult.
+func setupFacades(root *controllerRoot) []jujuparams.FacadeVersions {
+	var facades []jujuparams.FacadeVersions
+	for name, f := range facadeInit {
+		facades = append(facades, jujuparams.FacadeVersions{
+			Name:     name,
+			Versions: f(root),
+		})
+	}
+	sort.Slice(facades, func(i, j int) bool {
+		return facades[i].Name < facades[j].Name
+	})
+	return facades
+
 }

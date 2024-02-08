@@ -59,3 +59,63 @@ func (j *JIMM) Authenticate(ctx context.Context, req *jujuparams.LoginRequest) (
 	u.JimmAdmin = isJimmAdmin
 	return u, nil
 }
+
+// GetOpenFGAUserAndAuthorise returns a valid OpenFGA user, this means:
+//
+//   - It contains a valid dbmodel user, including their email and juju username
+//   - Their last user model has been updated for this connection
+//   - The user model is wrapped in an OpenFGA user type
+//   - Their admin status is checked and placed on the OpenFGA user type the user's
+//     details are wrapped in
+func (j *JIMM) GetOpenFGAUserAndAuthorise(ctx context.Context, email string) (*openfga.User, error) {
+	const op = errors.Op("jimm.GetOpenFGAUser")
+
+	// Validate the user and get the model
+	ut, err := j.OAuthAuthenticationService().GetUserModel(email)
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	// Setup user model using the tag to populate query fields
+	user := &dbmodel.User{
+		Username:    ut.Id(),
+		DisplayName: ut.Name(),
+	}
+
+	// Load the users details
+	if err = j.Database.Transaction(func(tx *db.Database) error {
+		if err := tx.GetUser(ctx, user); err != nil {
+			return err
+		}
+		// got uuid?
+		// no?
+		// update
+
+		// TODO(ale8k):
+		// This logic of updating the users last login should be done else where
+		// and not in the retrieval of the user, ideally a new db method
+		// to update login times and tokens. For now, it's ok, but it should be
+		// moved.
+		user.LastLogin.Time = j.Database.DB.Config.NowFunc()
+		user.LastLogin.Valid = true
+		// TODO(ale8k): Update access token & refresh tokens for this user
+		return tx.UpdateUser(ctx, user)
+	}); err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	// Wrap the user in OpenFGA user for administrator check & ready to place
+	// on controllerRoot.user
+	ofgaUser := openfga.NewUser(user, j.AuthorizationClient())
+
+	// Check if user is admin
+	isJimmAdmin, err := openfga.IsAdministrator(ctx, ofgaUser, j.ResourceTag())
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	// Set the users admin status for the lifecycle of this WS
+	ofgaUser.JimmAdmin = isJimmAdmin
+
+	return ofgaUser, nil
+}

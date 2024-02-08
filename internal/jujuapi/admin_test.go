@@ -10,6 +10,7 @@ import (
 	"net/http/cookiejar"
 	"net/url"
 	"regexp"
+	"strings"
 
 	"github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/internal/jimmtest"
@@ -112,8 +113,25 @@ func (s *adminSuite) TestDeviceLogin(c *gc.C) {
 	err = conn.APICall("Admin", 4, "", "GetDeviceSessionToken", nil, &sessionTokenResp)
 	c.Assert(err, gc.IsNil)
 	// Ensure it is base64 and decodable
-	_, err = base64.StdEncoding.DecodeString(sessionTokenResp.SessionToken)
+	decodedToken, err := base64.StdEncoding.DecodeString(sessionTokenResp.SessionToken)
 	c.Assert(err, gc.IsNil)
+
+	// Step 4, use this session token to "login".
+
+	// Test no token present
+	var loginResult jujuparams.LoginResult
+	err = conn.APICall("Admin", 4, "", "LoginSessionToken", nil, &loginResult)
+	c.Assert(err, gc.ErrorMatches, "authentication failed, no token presented")
+
+	// Test token not base64 encoded
+	err = conn.APICall("Admin", 4, "", "LoginSessionToken", params.LoginSessionTokenRequest{SessionToken: string(decodedToken)}, &loginResult)
+	c.Assert(err, gc.ErrorMatches, "authentication failed, failed to decode token")
+
+	// Test token base64 encoded passes authentication
+	err = conn.APICall("Admin", 4, "", "LoginSessionToken", params.LoginSessionTokenRequest{SessionToken: sessionTokenResp.SessionToken}, &loginResult)
+	c.Assert(err, gc.IsNil)
+	c.Assert(loginResult.UserInfo.Identity, gc.Equals, "user-"+user.Email)
+	c.Assert(loginResult.UserInfo.DisplayName, gc.Equals, strings.Split(user.Email, "@")[0])
 }
 
 // handleLoginForm runs through the login process emulating the user typing in

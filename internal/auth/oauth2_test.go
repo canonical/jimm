@@ -113,9 +113,9 @@ func TestDevice(t *testing.T) {
 	c.Assert(email, qt.Equals, u.Email)
 }
 
-// TestAccessTokens tests both the minting and validation of JIMM
-// access tokens.
-func TestAccessTokens(t *testing.T) {
+// TestSessionTokens tests both the minting and validation of JIMM
+// session tokens.
+func TestSessionTokens(t *testing.T) {
 	c := qt.New(t)
 
 	ctx := context.Background()
@@ -133,12 +133,12 @@ func TestAccessTokens(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(len(token) > 0, qt.IsTrue)
 
-	jwtToken, err := authSvc.VerifyAccessToken(token, secretKey)
+	jwtToken, err := authSvc.VerifySessionToken(token, secretKey)
 	c.Assert(err, qt.IsNil)
 	c.Assert(jwtToken.Subject(), qt.Equals, "jimm-test@canonical.com")
 }
 
-func TestAccessTokenRejectsWrongSecretKey(t *testing.T) {
+func TestSessionTokenRejectsWrongSecretKey(t *testing.T) {
 	c := qt.New(t)
 
 	ctx := context.Background()
@@ -156,11 +156,11 @@ func TestAccessTokenRejectsWrongSecretKey(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(len(token) > 0, qt.IsTrue)
 
-	_, err = authSvc.VerifyAccessToken(token, "wrong key")
+	_, err = authSvc.VerifySessionToken(token, "wrong key")
 	c.Assert(err, qt.ErrorMatches, "could not verify message using any of the signatures or keys")
 }
 
-func TestAccessTokenRejectsExpiredToken(t *testing.T) {
+func TestSessionTokenRejectsExpiredToken(t *testing.T) {
 	c := qt.New(t)
 
 	ctx := context.Background()
@@ -180,11 +180,11 @@ func TestAccessTokenRejectsExpiredToken(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(len(token) > 0, qt.IsTrue)
 
-	_, err = authSvc.VerifyAccessToken(token, secretKey)
-	c.Assert(err, qt.ErrorMatches, `"exp" not satisfied`)
+	_, err = authSvc.VerifySessionToken(token, secretKey)
+	c.Assert(err, qt.ErrorMatches, `JIMM session token expired`)
 }
 
-func TestAccessTokenValidatesEmail(t *testing.T) {
+func TestSessionTokenValidatesEmail(t *testing.T) {
 	c := qt.New(t)
 
 	ctx := context.Background()
@@ -202,6 +202,57 @@ func TestAccessTokenValidatesEmail(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(len(token) > 0, qt.IsTrue)
 
-	_, err = authSvc.VerifyAccessToken(token, secretKey)
+	_, err = authSvc.VerifySessionToken(token, secretKey)
 	c.Assert(err, qt.ErrorMatches, "failed to parse email")
+}
+
+func TestGetUserModel(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := context.Background()
+
+	authSvc, err := auth.NewAuthenticationService(ctx, auth.AuthenticationServiceParams{
+		IssuerURL:          "http://localhost:8082/realms/jimm",
+		DeviceClientID:     "jimm-device",
+		DeviceScopes:       []string{oidc.ScopeOpenID, "profile", "email"},
+		SessionTokenExpiry: time.Hour,
+	})
+	c.Assert(err, qt.IsNil)
+
+	_, err = authSvc.GetUserModel("safe@email.com")
+	c.Assert(err, qt.IsNil)
+}
+
+func TestGetUserModelBadEmail(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := context.Background()
+
+	authSvc, err := auth.NewAuthenticationService(ctx, auth.AuthenticationServiceParams{
+		IssuerURL:          "http://localhost:8082/realms/jimm",
+		DeviceClientID:     "jimm-device",
+		DeviceScopes:       []string{oidc.ScopeOpenID, "profile", "email"},
+		SessionTokenExpiry: time.Hour,
+	})
+	c.Assert(err, qt.IsNil)
+
+	_, err = authSvc.GetUserModel("bademail")
+	c.Assert(err, qt.ErrorMatches, `authenticated identity "bademail" cannot be used as juju username, invalid email`)
+}
+
+func TestGetUserModelBadJujuUsername(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := context.Background()
+
+	authSvc, err := auth.NewAuthenticationService(ctx, auth.AuthenticationServiceParams{
+		IssuerURL:          "http://localhost:8082/realms/jimm",
+		DeviceClientID:     "jimm-device",
+		DeviceScopes:       []string{oidc.ScopeOpenID, "profile", "email"},
+		SessionTokenExpiry: time.Hour,
+	})
+	c.Assert(err, qt.IsNil)
+
+	_, err = authSvc.GetUserModel("myemail_@domain.com")
+	c.Assert(err, qt.ErrorMatches, `authenticated identity "!!!" cannot be used as juju username`)
 }

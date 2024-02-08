@@ -157,14 +157,22 @@ type OAuthAuthenticator interface {
 
 	// MintSessionToken mints a session token to be used when logging into JIMM
 	// via an access token. The token only contains the user's email for authentication.
-	MintSessionToken(email string, secretKey string) ([]byte, error)
+	MintSessionToken(email string, secretKey string) (string, error)
 
-	// VerifyAccessToken symmetrically verifies the validty of the signature on the
+	// VerifySessionToken symmetrically verifies the validty of the signature on the
 	// access token JWT, returning the parsed token.
 	//
 	// The subject of the token contains the user's email and can be used
 	// for user object creation.
-	VerifyAccessToken(token []byte, secretKey string) (jwt.Token, error)
+	VerifySessionToken(token string, secretKey string) (jwt.Token, error)
+
+	// GetUserModel does three things:
+	//
+	//   - Checks if the email is a valid user id and if it isn't rejects the users authentication.
+	//   - Validates the email (as this method could be used by numerous authentication methods that
+	//     don't necessarily go through a flow such as the session token flow).
+	//   - Returns a names.UserTag, that is now a) a valid juju user and b) has a valid email
+	GetUserModel(email string) (*names.UserTag, error)
 }
 
 type permission struct {

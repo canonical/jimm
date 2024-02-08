@@ -17,7 +17,6 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 
-	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/openfga"
 )
@@ -89,6 +88,7 @@ func NewAuthenticationService(ctx context.Context, params AuthenticationServiceP
 func (as *AuthenticationService) Device(ctx context.Context) (*oauth2.DeviceAuthResponse, error) {
 	const op = errors.Op("auth.AuthenticationService.Device")
 
+	// oauth2.SetAuthURLParam("client_secret", as.deviceConfig.ClientSecret)
 	resp, err := as.deviceConfig.DeviceAuth(ctx)
 	if err != nil {
 		zapctx.Error(ctx, "device auth call failed", zap.Error(err))
@@ -157,7 +157,7 @@ func (as *AuthenticationService) Email(idToken *oidc.IDToken) (string, error) {
 
 // MintSessionToken mints a session token to be used when logging into JIMM
 // via an access token. The token only contains the user's email for authentication.
-func (as *AuthenticationService) MintSessionToken(email string, secretKey string) ([]byte, error) {
+func (as *AuthenticationService) MintSessionToken(email string, secretKey string) (string, error) {
 	const op = errors.Op("auth.AuthenticationService.MintAccessToken")
 
 	token, err := jwt.NewBuilder().
@@ -165,31 +165,39 @@ func (as *AuthenticationService) MintSessionToken(email string, secretKey string
 		Expiration(time.Now().Add(as.sessionTokenExpiry)).
 		Build()
 	if err != nil {
-		return nil, errors.E(op, err, "failed to build access token")
+		return "", errors.E(op, err, "failed to build access token")
 	}
 
 	freshToken, err := jwt.Sign(token, jwt.WithKey(jwa.HS256, []byte(secretKey)))
 	if err != nil {
-		return nil, errors.E(op, err, "failed to sign access token")
+		return "", errors.E(op, err, "failed to sign access token")
 	}
 
-	encToken := make([]byte, base64.StdEncoding.EncodedLen(len(freshToken)))
-
-	base64.StdEncoding.Encode(encToken, freshToken)
-
-	return encToken, nil
+	return base64.StdEncoding.EncodeToString(freshToken), nil
 }
 
-// VerifyAccessToken symmetrically verifies the validty of the signature on the
+// VerifySessionToken symmetrically verifies the validty of the signature on the
 // access token JWT, returning the parsed token.
 //
 // The subject of the token contains the user's email and can be used
 // for user object creation.
-func (as *AuthenticationService) VerifyAccessToken(token []byte, secretKey string) (jwt.Token, error) {
-	const op = errors.Op("auth.AuthenticationService.VerifyAccessToken")
+func (as *AuthenticationService) VerifySessionToken(token string, secretKey string) (jwt.Token, error) {
+	const op = errors.Op("auth.AuthenticationService.VerifySessionToken")
 
-	parsedToken, err := jwt.Parse(token, jwt.WithKey(jwa.HS256, []byte(secretKey)))
+	if len(token) == 0 {
+		return nil, errors.E(op, "authentication failed, no token presented")
+	}
+
+	decodedToken, err := base64.StdEncoding.DecodeString(token)
 	if err != nil {
+		return nil, errors.E(op, "authentication failed, failed to decode token")
+	}
+
+	parsedToken, err := jwt.Parse(decodedToken, jwt.WithKey(jwa.HS256, []byte(secretKey)))
+	if err != nil {
+		if err.Error() == "\"exp\" not satisfied" {
+			return nil, errors.E(op, "JIMM session token expired")
+		}
 		return nil, errors.E(op, err)
 	}
 
@@ -200,21 +208,24 @@ func (as *AuthenticationService) VerifyAccessToken(token []byte, secretKey strin
 	return parsedToken, nil
 }
 
-// GetUser retrieves a user from the database by email.
-func (as *AuthenticationService) GetUser(email string) (*dbmodel.User, error) {
+// GetUserModel does three things:
+//
+//   - Checks if the email is a valid user id and if it isn't rejects the users authentication.
+//   - Validates the email (as this method could be used by numerous authentication methods that
+//     don't necessarily go through a flow such as the session token flow).
+//   - Returns a names.UserTag, that is now a) a valid juju user and b) has a valid email
+func (as *AuthenticationService) GetUserModel(email string) (*names.UserTag, error) {
 	const op = errors.Op("auth.AuthenticationService.CreateUser")
 
+	// TODO(ale8k): Doesn't allow underscores right now, check with Ian.
 	if !names.IsValidUser(email) {
 		return nil, errors.E(op, fmt.Sprintf("authenticated identity %q cannot be used as juju username", email))
 	}
 
-	ut := names.NewUserTag(email)
-	if ut.IsLocal() {
-		ut = ut.WithDomain("external")
+	if _, err := mail.ParseAddress(email); err != nil {
+		return nil, errors.E(op, fmt.Sprintf("authenticated identity %q cannot be used as juju username, invalid email", email))
 	}
 
-	return &dbmodel.User{
-		Username:    ut.Id(),
-		DisplayName: ut.Name(),
-	}, nil
+	ut := names.NewUserTag(email)
+	return &ut, nil
 }
