@@ -6,6 +6,7 @@ import (
 	"time"
 
 	jujuparams "github.com/juju/juju/rpc/params"
+	"github.com/riverqueue/river/rivertype"
 )
 
 // An AddCloudToControllerRequest is the request sent when adding a new cloud
@@ -136,6 +137,13 @@ type AuditEvents struct {
 	Events []AuditEvent `json:"events"`
 }
 
+// RiverJobs contains the failed, completed, and cancelled jobs.
+type RiverJobs struct {
+	FailedJobs    []rivertype.JobRow `json:"failedJobs"`
+	CompletedJobs []rivertype.JobRow `json:"completedJobs"`
+	CancelledJobs []rivertype.JobRow `json:"cancelledJobs"`
+}
+
 // A ControllerInfo describes a controller on a JIMM system.
 type ControllerInfo struct {
 	// Name is the name of the controller.
@@ -211,6 +219,38 @@ type FindAuditEventsRequest struct {
 	// SortTime will sort by most recent (time descending) when true.
 	// When false no explicit ordering will be applied.
 	SortTime bool `json:"sortTime,omitempty"`
+}
+
+type ViewJobsRequest struct {
+	// After is used to filter the jobs that had a change in their state after a certain time
+	//If this is specified it must contain an RFC3339 encoded time value.
+	After string `json:"after,omitempty"`
+
+	// Before is used to filter the jobs that had a change in their state before a certain time
+	//If this is specified it must contain an RFC3339 encoded time value.
+	Before string `json:"before,omitempty"`
+
+	// GetCancelled returns jobs that are in 'JobStateCancelled`
+	GetCancelled bool `json:"getCanceled,omitempty"`
+
+	// GetCompleted returns jobs that are in 'JobStateCompleted'
+	GetCompleted bool `json:"getCompleted,omitempty"`
+
+	// GetFailed returns jobs that are in 'JobStateDiscarded'
+	GetFailed bool `json:"getFailed,omitempty"`
+
+	// Limit is the maximum number of jobs to return/
+	Limit int `json:"limit,omitempty"`
+
+	// Offset is the page index you want to read from.
+	// Reading records starts from the job at indeex = Offset * Limit
+	Offset int `json:"offset,omitempty"`
+
+	// SortAsc returns the jobs sorted in ascending order if set to true.
+	SortAsc bool `json:"sortAscending,omitempty"`
+
+	// JobKind is used to return jobs of specific kind.
+	JobKind []string `json:"jobKinds,omitempty"`
 }
 
 // A ListControllersResponse is the response that is sent in a

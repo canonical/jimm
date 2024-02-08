@@ -97,6 +97,7 @@ type JIMM struct {
 	UpdateMigratedModel_               func(ctx context.Context, user *openfga.User, modelTag names.ModelTag, targetControllerName string) error
 	UserModelDefaults_                 func(ctx context.Context, user *dbmodel.User) (map[string]interface{}, error)
 	ValidateModelUpgrade_              func(ctx context.Context, u *openfga.User, mt names.ModelTag, force bool) error
+	ViewJobs_                          func(ctx context.Context, req params.ViewJobsRequest) (params.RiverJobs, error)
 	WatchAllModelSummaries_            func(ctx context.Context, controller *dbmodel.Controller) (_ func() error, err error)
 }
 
@@ -507,6 +508,12 @@ func (j *JIMM) ValidateModelUpgrade(ctx context.Context, u *openfga.User, mt nam
 		return errors.E(errors.CodeNotImplemented)
 	}
 	return j.ValidateModelUpgrade_(ctx, u, mt, force)
+}
+func (j *JIMM) ViewJobs(ctx context.Context, req params.ViewJobsRequest) (params.RiverJobs, error) {
+	if j.ViewJobs_ == nil {
+		return params.RiverJobs{}, errors.E(errors.CodeNotImplemented)
+	}
+	return j.ViewJobs_(ctx, req)
 }
 func (j *JIMM) WatchAllModelSummaries(ctx context.Context, controller *dbmodel.Controller) (_ func() error, err error) {
 	if j.WatchAllModelSummaries_ == nil {

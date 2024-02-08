@@ -79,6 +79,18 @@ func NewListAuditEventsCommandForTesting(store jujuclient.ClientStore, bClient *
 	return modelcmd.WrapBase(cmd)
 }
 
+func NewJobViewerCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
+	cmd := &jobViewerCommand{
+		store: store,
+		dialOpts: &jujuapi.DialOpts{
+			InsecureSkipVerify: true,
+			BakeryClient:       bClient,
+		},
+	}
+
+	return modelcmd.WrapBase(cmd)
+}
+
 func NewAddCloudToControllerCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client, cloudByNameFunc func(string) (*cloud.Cloud, error)) cmd.Command {
 	cmd := &addCloudToControllerCommand{
 		store:           store,

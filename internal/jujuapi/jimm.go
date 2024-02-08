@@ -49,6 +49,7 @@ func init() {
 		crossModelQueryMethod := rpc.Method(r.CrossModelQuery)
 		purgeLogsMethod := rpc.Method(r.PurgeLogs)
 		migrateModel := rpc.Method(r.MigrateModel)
+		viewJobsMethod := rpc.Method(r.ViewJobs)
 
 		// JIMM Generic RPC
 		r.AddMethod("JIMM", 4, "AddController", addControllerMethod)
@@ -66,6 +67,8 @@ func init() {
 		r.AddMethod("JIMM", 4, "RemoveCloudFromController", removeCloudFromControllerMethod)
 		r.AddMethod("JIMM", 4, "PurgeLogs", purgeLogsMethod)
 		r.AddMethod("JIMM", 4, "MigrateModel", migrateModel)
+		r.AddMethod("JIMM", 4, "ViewJobs", viewJobsMethod)
+
 		// JIMM ReBAC RPC
 		r.AddMethod("JIMM", 4, "AddGroup", addGroupMethod)
 		r.AddMethod("JIMM", 4, "RenameGroup", renameGroupMethod)
@@ -494,4 +497,13 @@ func (r *controllerRoot) MigrateModel(ctx context.Context, args apiparams.Migrat
 	return jujuparams.InitiateMigrationResults{
 		Results: results,
 	}, nil
+}
+
+func (r *controllerRoot) ViewJobs(ctx context.Context, req apiparams.ViewJobsRequest) (apiparams.RiverJobs, error) {
+	const op = errors.Op("jujuapi.ViewJobs")
+	riverJobs, err := r.jimm.ViewJobs(ctx, req)
+	if err != nil {
+		return apiparams.RiverJobs{}, errors.E(op, err)
+	}
+	return riverJobs, nil
 }

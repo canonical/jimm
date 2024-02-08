@@ -4,7 +4,6 @@ package cmd_test
 
 import (
 	"encoding/json"
-	"os"
 
 	"github.com/juju/cmd/v3/cmdtesting"
 	jujuparams "github.com/juju/juju/rpc/params"
@@ -17,20 +16,22 @@ import (
 	"github.com/canonical/jimm/internal/jimmtest"
 )
 
-type riverViewerSuite struct {
+type jobViewerSuite struct {
 	jimmSuite
 }
 
-var _ = gc.Suite(&riverViewerSuite{})
+var _ = gc.Suite(&jobViewerSuite{})
 
-func (s *riverViewerSuite) TestRiverViewer2success(c *gc.C) {
+func (s *jobViewerSuite) TestJobViewer2success(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
-	os.Setenv("JIMM_DSN", s.JIMM.River.DSN)
 	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@external/cred")
 	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{AuthType: "empty"})
 	s.AddModel(c, names.NewUserTag("charlie@external"), "model-2", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, cct)
-	context, err := cmdtesting.RunCommand(c, cmd.NewRiverViewerCommand(), "--getCompleted", "--format", "json")
+
+	bClient := s.userBakeryClient("alice")
+	context, err := cmdtesting.RunCommand(c, cmd.NewJobViewerCommandForTesting(s.ClientStore(), bClient), "--getCompleted", "--format", "json")
 	c.Assert(err, gc.IsNil)
+
 	cmdOut := cmdtesting.Stdout(context)
 	var data map[rivertype.JobState][]rivertype.JobRow
 	if err := json.Unmarshal([]byte(cmdOut), &data); err != nil {

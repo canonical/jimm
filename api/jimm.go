@@ -53,6 +53,14 @@ func (c *Client) FindAuditEvents(req *params.FindAuditEventsRequest) (params.Aud
 	return resp, nil
 }
 
+func (c *Client) ViewJobs(req *params.ViewJobsRequest) (params.RiverJobs, error) {
+	var resp params.RiverJobs
+	if err := c.caller.APICall("JIMM", 4, "", "ViewJobs", req, &resp); err != nil {
+		return params.RiverJobs{}, err
+	}
+	return resp, nil
+}
+
 // GrantAuditLogAccess grants the given access to the audit log to the
 // given user.
 func (c *Client) GrantAuditLogAccess(req *params.AuditLogAccessRequest) error {

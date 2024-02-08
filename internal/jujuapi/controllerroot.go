@@ -99,6 +99,7 @@ type JIMM interface {
 	UpdateMigratedModel(ctx context.Context, user *openfga.User, modelTag names.ModelTag, targetControllerName string) error
 	UserModelDefaults(ctx context.Context, user *dbmodel.User) (map[string]interface{}, error)
 	ValidateModelUpgrade(ctx context.Context, u *openfga.User, mt names.ModelTag, force bool) error
+	ViewJobs(ctx context.Context, req params.ViewJobsRequest) (params.RiverJobs, error)
 	WatchAllModelSummaries(ctx context.Context, controller *dbmodel.Controller) (_ func() error, err error)
 }
 
