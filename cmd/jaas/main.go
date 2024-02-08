@@ -32,6 +32,11 @@ func NewSuperCommand() *jujucmd.SuperCommand {
 	return serviceAccountCmd
 }
 
+const (
+	jujuPrefix  = "juju-"
+	jaasCommand = "juju-jaas"
+)
+
 func main() {
 	ctx, err := jujucmd.DefaultContext()
 	if err != nil {
@@ -43,7 +48,7 @@ func main() {
 	// The following if condition handles cases where the juju binary calls jaas as a plugin.
 	// Symlinks of the form juju-<command> are created to make all jaas commands appear as top
 	// level commands to the Juju CLI and then we strip the juju- prefix to obtain the desired function.
-	if len(os.Args) > 0 && strings.HasPrefix(os.Args[0], "juju-") && os.Args[0] != "juju-jaas" {
+	if strings.HasPrefix(os.Args[0], jujuPrefix) && os.Args[0] != jaasCommand {
 		args = make([]string, len(os.Args))
 		copy(args[1:], os.Args[1:])
 		args[0] = strings.TrimPrefix(os.Args[0], "juju-")
