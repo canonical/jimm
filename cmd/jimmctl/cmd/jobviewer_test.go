@@ -43,9 +43,8 @@ func (s *jobViewerSuite) TestJobViewer2success(c *gc.C) {
 	c.Assert(jobRow.Kind, gc.Equals, "AddModel")
 	var args jimm.RiverAddModelArgs
 	err = json.Unmarshal(jobRow.EncodedArgs, &args)
-	if err != nil {
-		c.Errorf("Error unmarshalling decoded EncodedArgs, err %s", err)
-	}
+	c.Assert(err, gc.IsNil)
+
 	config := make(map[string]interface{})
 	c.Assert(args, gc.DeepEquals, jimm.RiverAddModelArgs{
 		ModelId:   1,

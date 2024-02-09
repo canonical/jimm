@@ -3,14 +3,18 @@
 package cmd
 
 import (
+	"fmt"
+	"io"
 	"strings"
 
+	"github.com/gosuri/uitable"
 	"github.com/juju/cmd/v3"
 	"github.com/juju/gnuflag"
 	jujuapi "github.com/juju/juju/api"
 	jujucmd "github.com/juju/juju/cmd"
 	"github.com/juju/juju/cmd/modelcmd"
 	"github.com/juju/juju/jujuclient"
+	"github.com/riverqueue/river/rivertype"
 
 	"github.com/canonical/jimm/api"
 	apiparams "github.com/canonical/jimm/api/params"
@@ -82,13 +86,47 @@ func (c *jobViewerCommand) Run(ctx *cmd.Context) error {
 	return nil
 }
 
+func formatJobsTabular(writer io.Writer, value interface{}) error {
+	jobs, ok := value.(apiparams.RiverJobs)
+	if !ok {
+		return errors.E(fmt.Sprintf("expected value of type %T, got %T", jobs, value))
+	}
+
+	table := uitable.New()
+	table.MaxColWidth = 50
+	table.Wrap = true
+
+	printJobs := func(jobsList []rivertype.JobRow, state rivertype.JobState) {
+		table.AddRow(state, "ID", "Attempt", "Attempted At", "Created At", "Kind", "Finalized At", "Args", "Errors")
+		for _, job := range jobsList {
+			table.AddRow(
+				"",
+				job.ID,
+				job.Attempt,
+				job.AttemptedAt,
+				job.CreatedAt,
+				job.Kind,
+				job.FinalizedAt,
+				string(job.EncodedArgs[:]),
+				job.Errors)
+		}
+		table.AddRow()
+	}
+	printJobs(jobs.CompletedJobs, rivertype.JobStateCompleted)
+	printJobs(jobs.CancelledJobs, rivertype.JobStateCancelled)
+	printJobs(jobs.FailedJobs, rivertype.JobStateDiscarded)
+
+	fmt.Fprint(writer, table)
+	return nil
+}
+
 // SetFlags implements Command.SetFlags.
 func (c *jobViewerCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.CommandBase.SetFlags(f)
 	c.out.AddFlags(f, "yaml", map[string]cmd.Formatter{
 		"yaml":    cmd.FormatYaml,
 		"json":    cmd.FormatJson,
-		"tabular": formatTabular,
+		"tabular": formatJobsTabular,
 	})
 	var JobKinds string
 	// UNUSED FOR NOW

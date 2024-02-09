@@ -139,8 +139,11 @@ type AuditEvents struct {
 
 // RiverJobs contains the failed, completed, and cancelled jobs.
 type RiverJobs struct {
-	FailedJobs    []rivertype.JobRow `json:"failedJobs"`
+	// FailedJobs has all the Job Rows info about failed jobs
+	FailedJobs []rivertype.JobRow `json:"failedJobs"`
+	// CompletedJobs has all the Job Rows info about completed jobs
 	CompletedJobs []rivertype.JobRow `json:"completedJobs"`
+	// CancelledJobs has all the Job Rows info about cancelled jobs
 	CancelledJobs []rivertype.JobRow `json:"cancelledJobs"`
 }
 
