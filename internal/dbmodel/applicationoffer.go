@@ -104,7 +104,7 @@ func (o *ApplicationOffer) FromJujuApplicationOfferAdminDetails(offerDetails juj
 		o.Connections[i] = ApplicationOfferConnection{
 			SourceModelTag: connection.SourceModelTag,
 			RelationID:     connection.RelationId,
-			Username:       connection.Username,
+			IdentityName:   connection.Username,
 			Endpoint:       connection.Endpoint,
 			IngressSubnets: connection.IngressSubnets,
 		}
@@ -137,7 +137,7 @@ func (o *ApplicationOffer) ToJujuApplicationOfferDetails() jujuparams.Applicatio
 		connections[i] = jujuparams.OfferConnection{
 			SourceModelTag: connection.SourceModelTag,
 			RelationId:     connection.RelationID,
-			Username:       connection.Username,
+			Username:       connection.IdentityName,
 			Endpoint:       connection.Endpoint,
 			IngressSubnets: connection.IngressSubnets,
 		}
@@ -199,7 +199,7 @@ type ApplicationOfferConnection struct {
 
 	SourceModelTag string
 	RelationID     int
-	Username       string
+	IdentityName   string
 	Endpoint       string
 	IngressSubnets Strings
 }

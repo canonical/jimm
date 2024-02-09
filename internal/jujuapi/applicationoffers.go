@@ -110,7 +110,7 @@ func (r *controllerRoot) getConsumeDetails(ctx context.Context, user *openfga.Us
 	// Ensure the path is normalised.
 	if ourl.User == "" {
 		// If the model owner is not specified use the specified user.
-		ourl.User = user.Username
+		ourl.User = user.Name
 	}
 
 	details := jujuparams.ConsumeOfferDetails{

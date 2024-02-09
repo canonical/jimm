@@ -45,7 +45,7 @@ func (r DbAuditLogger) newAuditLogEntry(header *rpc.Header) dbmodel.AuditLogEntr
 	ale := dbmodel.AuditLogEntry{
 		Time:           time.Now().UTC().Round(time.Millisecond),
 		MessageId:      header.RequestId,
-		UserTag:        r.getUser().String(),
+		IdentityTag:    r.getUser().String(),
 		ConversationId: r.conversationId,
 	}
 	return ale

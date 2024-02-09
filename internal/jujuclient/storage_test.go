@@ -35,12 +35,12 @@ func (s *storageSuite) TestListFilesystems(c *gc.C) {
 
 	info := s.APIInfo(c)
 	ctl := dbmodel.Controller{
-		UUID:          s.ControllerConfig.ControllerUUID(),
-		Name:          s.ControllerConfig.ControllerName(),
-		CACertificate: info.CACert,
-		AdminUser:     info.Tag.Id(),
-		AdminPassword: info.Password,
-		PublicAddress: info.Addrs[0],
+		UUID:              s.ControllerConfig.ControllerUUID(),
+		Name:              s.ControllerConfig.ControllerName(),
+		CACertificate:     info.CACert,
+		AdminIdentityName: info.Tag.Id(),
+		AdminPassword:     info.Password,
+		PublicAddress:     info.Addrs[0],
 	}
 
 	models, err := s.API.UpdateCredential(ctx, cred)
@@ -81,12 +81,12 @@ func (s *storageSuite) TestListVolumes(c *gc.C) {
 
 	info := s.APIInfo(c)
 	ctl := dbmodel.Controller{
-		UUID:          s.ControllerConfig.ControllerUUID(),
-		Name:          s.ControllerConfig.ControllerName(),
-		CACertificate: info.CACert,
-		AdminUser:     info.Tag.Id(),
-		AdminPassword: info.Password,
-		PublicAddress: info.Addrs[0],
+		UUID:              s.ControllerConfig.ControllerUUID(),
+		Name:              s.ControllerConfig.ControllerName(),
+		CACertificate:     info.CACert,
+		AdminIdentityName: info.Tag.Id(),
+		AdminPassword:     info.Password,
+		PublicAddress:     info.Addrs[0],
 	}
 
 	models, err := s.API.UpdateCredential(ctx, cred)
@@ -127,12 +127,12 @@ func (s *storageSuite) TestListStorageDetails(c *gc.C) {
 
 	info := s.APIInfo(c)
 	ctl := dbmodel.Controller{
-		UUID:          s.ControllerConfig.ControllerUUID(),
-		Name:          s.ControllerConfig.ControllerName(),
-		CACertificate: info.CACert,
-		AdminUser:     info.Tag.Id(),
-		AdminPassword: info.Password,
-		PublicAddress: info.Addrs[0],
+		UUID:              s.ControllerConfig.ControllerUUID(),
+		Name:              s.ControllerConfig.ControllerName(),
+		CACertificate:     info.CACert,
+		AdminIdentityName: info.Tag.Id(),
+		AdminPassword:     info.Password,
+		PublicAddress:     info.Addrs[0],
 	}
 
 	models, err := s.API.UpdateCredential(ctx, cred)

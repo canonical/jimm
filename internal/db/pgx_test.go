@@ -23,6 +23,10 @@ import (
 	"github.com/canonical/jimm/internal/jimmtest"
 )
 
+const (
+	defaultDSN = "postgresql://jimm:jimm@127.0.0.1:5432/jimm"
+)
+
 func TestPostgres(t *testing.T) {
 	c := qt.New(t)
 
@@ -34,8 +38,10 @@ type postgresSuite struct {
 }
 
 func (s *postgresSuite) Init(c *qt.C) {
-	dsn, exists := os.LookupEnv("JIMM_TEST_PGXDSN")
-	c.Assert(exists, qt.IsTrue, qt.Commentf("env var JIMM_TEST_PGXDSN is not assigned"))
+	dsn := defaultDSN
+	if envTestDSN, exists := os.LookupEnv("JIMM_TEST_PGXDSN"); exists {
+		dsn = envTestDSN
+	}
 
 	connCfg, err := pgx.ParseConfig(dsn)
 	c.Assert(err, qt.IsNil)

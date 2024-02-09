@@ -122,8 +122,8 @@ func (s *dbSuite) TestGetControllerWithModels(c *qt.C) {
 		CloudName:   "test-cloud",
 		CloudRegion: "test-region",
 	}
-	u := dbmodel.User{
-		Username: "bob@external",
+	u := dbmodel.Identity{
+		Name: "bob@external",
 	}
 	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
 

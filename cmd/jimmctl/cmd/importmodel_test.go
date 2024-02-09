@@ -13,12 +13,13 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/cmd/jimmctl/cmd"
+	"github.com/canonical/jimm/internal/cmdtest"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/jimmtest"
 )
 
 type importModelSuite struct {
-	jimmSuite
+	cmdtest.JimmCmdSuite
 }
 
 var _ = gc.Suite(&importModelSuite{})
@@ -42,7 +43,7 @@ func (s *importModelSuite) TestImportModelSuperuser(c *gc.C) {
 	defer m.Close()
 
 	// alice is superuser
-	bClient := s.userBakeryClient("alice")
+	bClient := s.UserBakeryClient("alice")
 	_, err = cmdtesting.RunCommand(c, cmd.NewImportModelCommandForTesting(s.ClientStore(), bClient), "controller-1", m.ModelUUID())
 	c.Assert(err, gc.IsNil)
 
@@ -50,7 +51,7 @@ func (s *importModelSuite) TestImportModelSuperuser(c *gc.C) {
 	model2.SetTag(names.NewModelTag(m.ModelUUID()))
 	err = s.JIMM.Database.GetModel(context.Background(), &model2)
 	c.Assert(err, gc.Equals, nil)
-	c.Check(model2.OwnerUsername, gc.Equals, "charlie@external")
+	c.Check(model2.OwnerIdentityName, gc.Equals, "charlie@external")
 }
 
 func (s *importModelSuite) TestImportModelFromLocalUser(c *gc.C) {
@@ -69,7 +70,7 @@ func (s *importModelSuite) TestImportModelFromLocalUser(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	// alice is superuser
-	bClient := s.userBakeryClient("alice")
+	bClient := s.UserBakeryClient("alice")
 	_, err = cmdtesting.RunCommand(c, cmd.NewImportModelCommandForTesting(s.ClientStore(), bClient), "controller-1", mt.Id(), "--owner", "alice@external")
 	c.Assert(err, gc.IsNil)
 
@@ -78,7 +79,7 @@ func (s *importModelSuite) TestImportModelFromLocalUser(c *gc.C) {
 	err = s.JIMM.Database.GetModel(context.Background(), &model2)
 	c.Assert(err, gc.Equals, nil)
 	c.Check(model2.CreatedAt.After(model.CreatedAt), gc.Equals, true)
-	c.Check(model2.OwnerUsername, gc.Equals, "alice@external")
+	c.Check(model2.OwnerIdentityName, gc.Equals, "alice@external")
 }
 
 func (s *importModelSuite) TestImportModelUnauthorized(c *gc.C) {
@@ -100,31 +101,31 @@ func (s *importModelSuite) TestImportModelUnauthorized(c *gc.C) {
 	defer m.Close()
 
 	// bob is not superuser
-	bClient := s.userBakeryClient("bob")
+	bClient := s.UserBakeryClient("bob")
 	_, err = cmdtesting.RunCommand(c, cmd.NewImportModelCommandForTesting(s.ClientStore(), bClient), "controller-1", m.ModelUUID())
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
 
 func (s *importModelSuite) TestImportModelNoController(c *gc.C) {
-	bClient := s.userBakeryClient("bob")
+	bClient := s.UserBakeryClient("bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewImportModelCommandForTesting(s.ClientStore(), bClient))
 	c.Assert(err, gc.ErrorMatches, `controller not specified`)
 }
 
 func (s *importModelSuite) TestImportModelNoModelUUID(c *gc.C) {
-	bClient := s.userBakeryClient("bob")
+	bClient := s.UserBakeryClient("bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewImportModelCommandForTesting(s.ClientStore(), bClient), "controller-id")
 	c.Assert(err, gc.ErrorMatches, `model uuid not specified`)
 }
 
 func (s *importModelSuite) TestImportModelInvalidModelUUID(c *gc.C) {
-	bClient := s.userBakeryClient("bob")
+	bClient := s.UserBakeryClient("bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewImportModelCommandForTesting(s.ClientStore(), bClient), "controller-id", "not-a-uuid")
 	c.Assert(err, gc.ErrorMatches, `invalid model uuid`)
 }
 
 func (s *importModelSuite) TestImportModelTooManyArgs(c *gc.C) {
-	bClient := s.userBakeryClient("bob")
+	bClient := s.UserBakeryClient("bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewImportModelCommandForTesting(s.ClientStore(), bClient), "controller-id", "not-a-uuid", "spare-argument")
 	c.Assert(err, gc.ErrorMatches, `too many args`)
 }

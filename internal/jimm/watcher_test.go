@@ -386,7 +386,7 @@ var watcherTests = []struct {
 		c.Assert(err, qt.IsNil)
 		// zero any uninteresting associations
 		// TODO(mhilton) don't fetch these in the first place.
-		model.Owner = dbmodel.User{}
+		model.Owner = dbmodel.Identity{}
 		model.CloudCredential = dbmodel.CloudCredential{}
 		model.CloudRegion = dbmodel.CloudRegion{}
 		model.Controller = dbmodel.Controller{}
@@ -482,7 +482,7 @@ var watcherTests = []struct {
 		c.Assert(err, qt.IsNil)
 		// zero any uninteresting associations
 		// TODO(mhilton) don't fetch these in the first place.
-		model.Owner = dbmodel.User{}
+		model.Owner = dbmodel.Identity{}
 		model.CloudCredential = dbmodel.CloudCredential{}
 		model.CloudRegion = dbmodel.CloudRegion{}
 		model.Controller = dbmodel.Controller{}

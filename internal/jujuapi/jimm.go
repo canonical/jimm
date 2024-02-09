@@ -49,6 +49,10 @@ func init() {
 		crossModelQueryMethod := rpc.Method(r.CrossModelQuery)
 		purgeLogsMethod := rpc.Method(r.PurgeLogs)
 		migrateModel := rpc.Method(r.MigrateModel)
+		addServiceAccountMethod := rpc.Method(r.AddServiceAccount)
+		updateServiceAccountCredentials := rpc.Method(r.UpdateServiceAccountCredentials)
+		listServiceAccountCredentials := rpc.Method(r.ListServiceAccountCredentials)
+		grantServiceAccountAccess := rpc.Method(r.GrantServiceAccountAccess)
 
 		// JIMM Generic RPC
 		r.AddMethod("JIMM", 4, "AddController", addControllerMethod)
@@ -77,6 +81,11 @@ func init() {
 		r.AddMethod("JIMM", 4, "ListRelationshipTuples", listRelationshipTuplesMethod)
 		// JIMM Cross-model queries
 		r.AddMethod("JIMM", 4, "CrossModelQuery", crossModelQueryMethod)
+		// JIMM Service Accounts
+		r.AddMethod("JIMM", 4, "AddServiceAccount", addServiceAccountMethod)
+		r.AddMethod("JIMM", 4, "UpdateServiceAccountCredentials", updateServiceAccountCredentials)
+		r.AddMethod("JIMM", 4, "ListServiceAccountCredentials", listServiceAccountCredentials)
+		r.AddMethod("JIMM", 4, "GrantServiceAccountAccess", grantServiceAccountAccess)
 
 		return []int{4}
 	}
@@ -165,12 +174,12 @@ func (r *controllerRoot) AddController(ctx context.Context, req apiparams.AddCon
 	}
 
 	ctl := dbmodel.Controller{
-		UUID:          req.UUID,
-		Name:          req.Name,
-		PublicAddress: req.PublicAddress,
-		CACertificate: req.CACertificate,
-		AdminUser:     req.Username,
-		AdminPassword: req.Password,
+		UUID:              req.UUID,
+		Name:              req.Name,
+		PublicAddress:     req.PublicAddress,
+		CACertificate:     req.CACertificate,
+		AdminIdentityName: req.Username,
+		AdminPassword:     req.Password,
 	}
 	nphps, err := network.ParseProviderHostPorts(req.APIAddresses...)
 	if err != nil {
@@ -290,7 +299,7 @@ func auditParamsToFilter(req apiparams.FindAuditEventsRequest) (db.AuditLogFilte
 		if err != nil {
 			return filter, errors.E(err, errors.CodeBadRequest, `invalid "user-tag" filter`)
 		}
-		filter.UserTag = tag.String()
+		filter.IdentityTag = tag.String()
 	}
 
 	limit := int(req.Limit)

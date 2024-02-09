@@ -32,10 +32,10 @@ func (j *JIMM) Authenticate(ctx context.Context, req *jujuparams.LoginRequest) (
 	}
 
 	err = j.Database.Transaction(func(tx *db.Database) error {
-		pu := dbmodel.User{
-			Username: u.Username,
+		pu := dbmodel.Identity{
+			Name: u.Name,
 		}
-		if err := tx.GetUser(ctx, &pu); err != nil {
+		if err := tx.GetIdentity(ctx, &pu); err != nil {
 			return err
 		}
 		u.Model = pu.Model
@@ -47,7 +47,7 @@ func (j *JIMM) Authenticate(ctx context.Context, req *jujuparams.LoginRequest) (
 		}
 		pu.LastLogin.Time = j.Database.DB.Config.NowFunc()
 		pu.LastLogin.Valid = true
-		return tx.UpdateUser(ctx, &pu)
+		return tx.UpdateIdentity(ctx, &pu)
 	})
 	if err != nil {
 		return nil, errors.E(op, err)

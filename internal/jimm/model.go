@@ -102,7 +102,7 @@ type modelBuilder struct {
 
 	name          string
 	config        map[string]interface{}
-	owner         *dbmodel.User
+	owner         *dbmodel.Identity
 	credential    *dbmodel.CloudCredential
 	controller    *dbmodel.Controller
 	cloud         *dbmodel.Cloud
@@ -146,7 +146,7 @@ func (b *modelBuilder) jujuModelCreateArgs() (*jujuparams.ModelCreateArgs, error
 }
 
 // WithOwner returns a builder with the specified owner.
-func (b *modelBuilder) WithOwner(owner *dbmodel.User) *modelBuilder {
+func (b *modelBuilder) WithOwner(owner *dbmodel.Identity) *modelBuilder {
 	if b.err != nil {
 		return b
 	}
@@ -247,9 +247,9 @@ func (b *modelBuilder) WithCloudCredential(credentialTag names.CloudCredentialTa
 		return b
 	}
 	credential := dbmodel.CloudCredential{
-		Name:          credentialTag.Name(),
-		CloudName:     credentialTag.Cloud().Id(),
-		OwnerUsername: credentialTag.Owner().Id(),
+		Name:              credentialTag.Name(),
+		CloudName:         credentialTag.Cloud().Id(),
+		OwnerIdentityName: credentialTag.Owner().Id(),
 	}
 	err := b.jimm.Database.GetCloudCredential(b.ctx, &credential)
 	if err != nil {
@@ -315,7 +315,7 @@ func (b *modelBuilder) CreateDatabaseModel() *modelBuilder {
 	err := b.jimm.Database.AddModel(b.ctx, b.model)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.CodeAlreadyExists {
-			b.err = errors.E(err, fmt.Sprintf("model %s/%s already exists", b.owner.Username, b.name))
+			b.err = errors.E(err, fmt.Sprintf("model %s/%s already exists", b.owner.Name, b.name))
 			return b
 		} else {
 			zapctx.Error(b.ctx, "failed to store model information", zaputil.Error(err))
@@ -339,7 +339,7 @@ func (b *modelBuilder) Cleanup() {
 	// context expiration
 	ctx := context.Background()
 	if derr := b.jimm.Database.DeleteModel(ctx, b.model); derr != nil {
-		zapctx.Error(ctx, "failed to delete model", zap.String("model", b.model.Name), zap.String("owner", b.model.Owner.Username), zaputil.Error(derr))
+		zapctx.Error(ctx, "failed to delete model", zap.String("model", b.model.Name), zap.String("owner", b.model.Owner.Name), zaputil.Error(derr))
 	}
 }
 
@@ -403,7 +403,7 @@ func (b *modelBuilder) selectCloudCredentials() error {
 	if b.cloud == nil {
 		return errors.E("cloud not specified")
 	}
-	credentials, err := b.jimm.Database.GetUserCloudCredentials(b.ctx, b.owner, b.cloud.Name)
+	credentials, err := b.jimm.Database.GetIdentityCloudCredentials(b.ctx, b.owner, b.cloud.Name)
 	if err != nil {
 		return errors.E(err, "failed to fetch user cloud credentials")
 	}
@@ -519,16 +519,16 @@ func (b *modelBuilder) JujuModelInfo() *jujuparams.ModelInfo {
 func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCreateArgs) (_ *jujuparams.ModelInfo, err error) {
 	const op = errors.Op("jimm.AddModel")
 
-	owner := &dbmodel.User{
-		Username: args.Owner.Id(),
+	owner := &dbmodel.Identity{
+		Name: args.Owner.Id(),
 	}
-	err = j.Database.GetUser(ctx, owner)
+	err = j.Database.GetIdentity(ctx, owner)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
 
 	// Only JIMM admins are able to add models on behalf of other users.
-	if owner.Username != user.Username && !user.JimmAdmin {
+	if owner.Name != user.Name && !user.JimmAdmin {
 		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
@@ -540,7 +540,7 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 	}
 
 	// fetch user model defaults
-	userConfig, err := j.UserModelDefaults(ctx, user.User)
+	userConfig, err := j.IdentityModelDefaults(ctx, user.Identity)
 	if err != nil && errors.ErrorCode(err) != errors.CodeNotFound {
 		return nil, errors.E(op, "failed to fetch cloud defaults")
 	}
@@ -549,7 +549,7 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 	// fetch cloud defaults
 	if args.Cloud != (names.CloudTag{}) {
 		cloudDefaults := dbmodel.CloudDefaults{
-			Username: user.Username,
+			IdentityName: user.Name,
 			Cloud: dbmodel.Cloud{
 				Name: args.Cloud.Id(),
 			},
@@ -585,7 +585,7 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 	// fetch cloud region defaults
 	if args.Cloud != (names.CloudTag{}) && builder.cloudRegion != "" {
 		cloudRegionDefaults := dbmodel.CloudDefaults{
-			Username: user.Username,
+			IdentityName: user.Name,
 			Cloud: dbmodel.Cloud{
 				Name: args.Cloud.Id(),
 			},
@@ -706,8 +706,8 @@ func (j *JIMM) ModelInfo(ctx context.Context, user *openfga.User, mt names.Model
 			// Since we are checking user relations in decreasing level of
 			// access privilege, we want to make sure the user has not
 			// already been recorded with a higher access level.
-			if _, ok := userAccess[u.Username]; !ok {
-				userAccess[u.Username] = ToModelAccessString(relation)
+			if _, ok := userAccess[u.Name]; !ok {
+				userAccess[u.Name] = ToModelAccessString(relation)
 			}
 		}
 	}
@@ -721,7 +721,7 @@ func (j *JIMM) ModelInfo(ctx context.Context, user *openfga.User, mt names.Model
 		if !strings.Contains(username, "@") {
 			continue
 		}
-		if modelAccess == "admin" || username == user.Username || username == ofganames.EveryoneUser {
+		if modelAccess == "admin" || username == user.Name || username == ofganames.EveryoneUser {
 			users = append(users, jujuparams.ModelUserInfo{
 				UserName: username,
 				Access:   jujuparams.UserAccessPermission(access),
@@ -850,9 +850,9 @@ func (j *JIMM) GrantModelAccess(ctx context.Context, user *openfga.User, mt name
 	}
 
 	err = j.doModelAdmin(ctx, user, mt, func(_ *dbmodel.Model, _ API) error {
-		targetUser := &dbmodel.User{}
+		targetUser := &dbmodel.Identity{}
 		targetUser.SetTag(ut)
-		if err := j.Database.GetUser(ctx, targetUser); err != nil {
+		if err := j.Database.GetIdentity(ctx, targetUser); err != nil {
 			return err
 		}
 		targetOfgaUser := openfga.NewUser(targetUser, j.OpenFGAClient)
@@ -928,9 +928,9 @@ func (j *JIMM) RevokeModelAccess(ctx context.Context, user *openfga.User, mt nam
 	}
 
 	err = j.doModel(ctx, user, mt, requiredAccess, func(_ *dbmodel.Model, _ API) error {
-		targetUser := &dbmodel.User{}
+		targetUser := &dbmodel.Identity{}
 		targetUser.SetTag(ut)
-		if err := j.Database.GetUser(ctx, targetUser); err != nil {
+		if err := j.Database.GetIdentity(ctx, targetUser); err != nil {
 			return err
 		}
 		targetOfgaUser := openfga.NewUser(targetUser, j.OpenFGAClient)

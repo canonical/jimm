@@ -29,9 +29,9 @@ type Model struct {
 	// UUID is the UUID of the model.
 	UUID sql.NullString
 
-	// Owner is user that owns the model.
-	OwnerUsername string
-	Owner         User `gorm:"foreignkey:OwnerUsername;references:Username"`
+	// Owner is identity that owns the model.
+	OwnerIdentityName string
+	Owner             Identity `gorm:"foreignkey:OwnerIdentityName;references:Name"`
 
 	// Controller is the controller that is hosting the model.
 	ControllerID uint
@@ -103,8 +103,8 @@ func (m *Model) SetTag(t names.ModelTag) {
 }
 
 // FromModelUpdate updates the model from the given ModelUpdate.
-func (m *Model) SwitchOwner(u *User) {
-	m.OwnerUsername = u.Username
+func (m *Model) SwitchOwner(u *Identity) {
+	m.OwnerIdentityName = u.Name
 	m.Owner = *u
 }
 
@@ -120,7 +120,7 @@ func (m *Model) FromJujuModelInfo(info jujuparams.ModelInfo) error {
 		if err != nil {
 			return errors.E(err)
 		}
-		m.OwnerUsername = ut.Id()
+		m.OwnerIdentityName = ut.Id()
 	}
 	m.Life = string(info.Life)
 	m.Status.FromJujuEntityStatus(info.Status)
@@ -140,7 +140,7 @@ func (m *Model) FromJujuModelInfo(info jujuparams.ModelInfo) error {
 		}
 		m.CloudCredential.Name = cct.Name()
 		m.CloudCredential.CloudName = cct.Cloud().Id()
-		m.CloudCredential.Owner.Username = cct.Owner().Id()
+		m.CloudCredential.Owner.Name = cct.Owner().Id()
 	}
 
 	if info.SLA != nil {
@@ -167,7 +167,7 @@ func (m Model) ToJujuModel() jujuparams.Model {
 	jm.Name = m.Name
 	jm.UUID = m.UUID.String
 	jm.Type = m.Type
-	jm.OwnerTag = names.NewUserTag(m.OwnerUsername).String()
+	jm.OwnerTag = names.NewUserTag(m.OwnerIdentityName).String()
 	return jm
 }
 

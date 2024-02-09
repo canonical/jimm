@@ -1,0 +1,14 @@
+name: Release jimmctl snap
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v3*'
+
+jobs:
+  build-and-release:
+    uses: ./.github/workflows/snap-release.yaml
+    with:
+      folder: jaas
+      release-channel: 3/edge

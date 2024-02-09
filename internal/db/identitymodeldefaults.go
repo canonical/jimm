@@ -11,18 +11,18 @@ import (
 	"github.com/canonical/jimm/internal/errors"
 )
 
-// SetUserModelDefaults sets default model setting values for the controller.
-func (d *Database) SetUserModelDefaults(ctx context.Context, defaults *dbmodel.UserModelDefaults) error {
-	const op = errors.Op("db.SetUserModelDefaults")
+// SetIdentityModelDefaults sets default model setting values for the controller.
+func (d *Database) SetIdentityModelDefaults(ctx context.Context, defaults *dbmodel.IdentityModelDefaults) error {
+	const op = errors.Op("db.SetIdentityModelDefaults")
 
 	err := d.Transaction(func(d *Database) error {
 		db := d.DB.WithContext(ctx)
 
-		dbDefaults := dbmodel.UserModelDefaults{
-			Username: defaults.Username,
+		dbDefaults := dbmodel.IdentityModelDefaults{
+			IdentityName: defaults.IdentityName,
 		}
 		// try to fetch cloud defaults from the db
-		err := d.UserModelDefaults(ctx, &dbDefaults)
+		err := d.IdentityModelDefaults(ctx, &dbDefaults)
 		if err != nil {
 			if errors.ErrorCode(err) == errors.CodeNotFound {
 				// if defaults do not exist, we create them
@@ -40,7 +40,7 @@ func (d *Database) SetUserModelDefaults(ctx context.Context, defaults *dbmodel.U
 		}
 		if err := db.Clauses(clause.OnConflict{
 			Columns: []clause.Column{
-				{Name: "username"},
+				{Name: "identity_name"},
 			},
 			DoUpdates: clause.AssignmentColumns([]string{"defaults"}),
 		}).Create(&dbDefaults).Error; err != nil {
@@ -54,22 +54,22 @@ func (d *Database) SetUserModelDefaults(ctx context.Context, defaults *dbmodel.U
 	return nil
 }
 
-// UserModelDefaults fetches user defaults.
-func (d *Database) UserModelDefaults(ctx context.Context, defaults *dbmodel.UserModelDefaults) error {
-	const op = errors.Op("db.UserModelDefaults")
+// IdentityModelDefaults fetches identities defaults.
+func (d *Database) IdentityModelDefaults(ctx context.Context, defaults *dbmodel.IdentityModelDefaults) error {
+	const op = errors.Op("db.IdentityModelDefaults")
 
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
 	}
 	db := d.DB.WithContext(ctx)
 
-	db = db.Where("username = ?", defaults.Username)
+	db = db.Where("identity_name = ?", defaults.IdentityName)
 
-	result := db.Preload("User").First(&defaults)
+	result := db.Preload("Identity").First(&defaults)
 	if result.Error != nil {
 		err := dbError(result.Error)
 		if errors.ErrorCode(err) == errors.CodeNotFound {
-			return errors.E(op, errors.CodeNotFound, "usermodeldefaults not found", err)
+			return errors.E(op, errors.CodeNotFound, "identitymodeldefaults not found", err)
 		}
 		return errors.E(op, err)
 	}

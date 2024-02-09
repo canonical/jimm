@@ -32,7 +32,7 @@ func ControllerTagCompare(a, b dbmodel.Controller) bool {
 // determines if two database user objects are equal based on comparing
 // the Tag values. This is often sufficient where the objects are embedded
 // in another database object.
-func UserTagCompare(a, b dbmodel.User) bool {
+func UserTagCompare(a, b dbmodel.Identity) bool {
 	return a.Tag() == b.Tag()
 }
 
@@ -42,11 +42,11 @@ var DBObjectEquals = qt.CmpEquals(
 	cmpopts.EquateEmpty(),
 	cmpopts.IgnoreTypes(gorm.Model{}),
 	cmpopts.IgnoreFields(dbmodel.Cloud{}, "ID", "CreatedAt", "UpdatedAt"),
-	cmpopts.IgnoreFields(dbmodel.CloudCredential{}, "CloudName", "OwnerUsername"),
+	cmpopts.IgnoreFields(dbmodel.CloudCredential{}, "CloudName", "OwnerIdentityName"),
 	cmpopts.IgnoreFields(dbmodel.CloudRegion{}, "CloudName"),
 	cmpopts.IgnoreFields(dbmodel.CloudRegionControllerPriority{}, "CloudRegionID", "ControllerID"),
 	cmpopts.IgnoreFields(dbmodel.Controller{}, "ID"),
-	cmpopts.IgnoreFields(dbmodel.Model{}, "ID", "CreatedAt", "UpdatedAt", "OwnerUsername", "ControllerID", "CloudRegionID", "CloudCredentialID"),
+	cmpopts.IgnoreFields(dbmodel.Model{}, "ID", "CreatedAt", "UpdatedAt", "OwnerIdentityName", "ControllerID", "CloudRegionID", "CloudCredentialID"),
 )
 
 // CmpEquals uses cmp.Diff (see http://godoc.org/github.com/google/go-cmp/cmp#Diff)

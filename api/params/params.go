@@ -412,3 +412,37 @@ type LoginDeviceAccessTokenRequest struct{}
 
 // LoginDeviceAccessTokenResponse TODO
 type LoginDeviceAccessTokenResponse struct{}
+
+// Service Account related request parameters
+
+// AddServiceAccountRequest holds a request to add a service account.
+type AddServiceAccountRequest struct {
+	// ClientID holds the client id of the service account.
+	ClientID string `json:"client-id"`
+}
+
+// UpdateServiceAccountCredentialsRequest holds a request to update
+// a service accounts cloud credentials.
+type UpdateServiceAccountCredentialsRequest struct {
+	jujuparams.UpdateCredentialArgs
+	// ClientID holds the client id of the service account.
+	ClientID string `json:"client-id"`
+}
+
+// ListServiceAccountCredentialsRequest holds a request to list
+// a service accounts cloud credentials.
+type ListServiceAccountCredentialsRequest struct {
+	jujuparams.CloudCredentialArgs
+	// ClientID holds the client id of the service account.
+	ClientID string `json:"client-id"`
+}
+
+// ListServiceAccountCredentialsRequest holds a request to list
+// a service accounts cloud credentials.
+type GrantServiceAccountAccess struct {
+	// Entities holds a slice of entities (identities and groups)
+	// that should have administration access to the desired clientID.
+	Entities []string `json:"entities"`
+	// ClientID holds the client id of the service account.
+	ClientID string `json:"client-id"`
+}

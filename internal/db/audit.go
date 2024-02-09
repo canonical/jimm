@@ -36,9 +36,9 @@ type AuditLogFilter struct {
 	// found.
 	End time.Time
 
-	// UserTag defines the user-tag on the audit log entry to match, if
-	// this is empty all user-tags are matched.
-	UserTag string
+	// IdentityTag defines the identity-tag on the audit log entry to match, if
+	// this is empty all identity-tags are matched.
+	IdentityTag string
 
 	// Model is used to filter the event log to only contain events that
 	// were performed against a specific model.
@@ -77,8 +77,8 @@ func (d *Database) ForEachAuditLogEntry(ctx context.Context, filter AuditLogFilt
 	if !filter.End.IsZero() {
 		db = db.Where("time <= ?", filter.End)
 	}
-	if filter.UserTag != "" {
-		db = db.Where("user_tag = ?", filter.UserTag)
+	if filter.IdentityTag != "" {
+		db = db.Where("identity_tag = ?", filter.IdentityTag)
 	}
 	if filter.Model != "" {
 		db = db.Where("model = ?", filter.Model)
