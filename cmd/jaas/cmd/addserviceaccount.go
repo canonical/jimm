@@ -49,7 +49,7 @@ func (c *addServiceAccountCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
 		Name:     "add-service-account",
 		Purpose:  "Add permission to manage a service account",
-		Args:     "<client-id> ",
+		Args:     "<client-id>",
 		Examples: addServiceCommandExamples,
 		Doc:      addServiceCommandDoc,
 	})

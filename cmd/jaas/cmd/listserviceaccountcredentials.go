@@ -32,9 +32,9 @@ Client-side credentials should be managed via the juju credentials command.
 
 `
 	listServiceAccountCredentialsExamples = `
-    juju list-service-account-credentials <clientID> 
-    juju list-service-account-credentials <clientID> --show-secrets
-    juju list-service-account-credentials <clientID> --format yaml
+    juju list-service-account-credentials <client-id> 
+    juju list-service-account-credentials <client-id> --show-secrets
+    juju list-service-account-credentials <client-id> --format yaml
 `
 )
 
@@ -62,7 +62,7 @@ func (c *listServiceAccountCredentialsCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
 		Name:     "list-service-account-credentials",
 		Purpose:  "List service account cloud credentials",
-		Args:     "<clientID>",
+		Args:     "<client-id>",
 		Doc:      listServiceCredentialsCommandDoc,
 		Examples: listServiceAccountCredentialsExamples,
 	})
