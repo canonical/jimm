@@ -1,4 +1,4 @@
-# Juju Intelligent Model Manager
+# Juju Intelligent Model Manager - test
 
 This service provides the ability to manage multiple juju models. It is
 considered a work in progress.
