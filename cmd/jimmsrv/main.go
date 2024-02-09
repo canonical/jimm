@@ -98,6 +98,12 @@ func start(ctx context.Context, s *service.Service) error {
 		return errors.E("no oauth device client id")
 	}
 
+	clientSecret := os.Getenv("JIMM_OAUTH_CLIENT_SECRET")
+	if clientSecret == "" {
+		zapctx.Error(ctx, "no oauth client secret")
+		return errors.E("no oauth client secret")
+	}
+
 	deviceScopes := os.Getenv("JIMM_OAUTH_DEVICE_SCOPES")
 	deviceScopesParsed := strings.Split(deviceScopes, ",")
 	for i, scope := range deviceScopesParsed {
@@ -147,6 +153,7 @@ func start(ctx context.Context, s *service.Service) error {
 		OAuthAuthenticatorParams: jimm.OAuthAuthenticatorParams{
 			IssuerURL:          issuerURL,
 			DeviceClientID:     deviceClientID,
+			ClientSecret:       clientSecret,
 			DeviceScopes:       deviceScopesParsed,
 			SessionTokenExpiry: sessionTokenExpiryDuration,
 		},

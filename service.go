@@ -73,6 +73,9 @@ type OAuthAuthenticatorParams struct {
 	// to handle device OAuth2.0 flows. The client is NOT expected to be confidential
 	// and as such does not need a client secret (given it is configured correctly).
 	DeviceClientID string
+	// ClientSecret holds the OAuth2.0 "client-secret" to authenticate when performing
+	// /auth and /token requests.
+	ClientSecret string
 	// DeviceScopes holds the scopes that you wish to retrieve.
 	DeviceScopes []string
 	// SessionTokenExpiry holds the expiry duration for issued JWTs
@@ -324,6 +327,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		auth.AuthenticationServiceParams{
 			IssuerURL:      p.OAuthAuthenticatorParams.IssuerURL,
 			DeviceClientID: p.OAuthAuthenticatorParams.DeviceClientID,
+			ClientSecret:   p.OAuthAuthenticatorParams.ClientSecret,
 			DeviceScopes:   p.OAuthAuthenticatorParams.DeviceScopes,
 		},
 	)

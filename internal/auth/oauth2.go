@@ -43,6 +43,9 @@ type AuthenticationServiceParams struct {
 	// to handle device OAuth2.0 flows. The client is NOT expected to be confidential
 	// and as such does not need a client secret (given it is configured correctly).
 	DeviceClientID string
+	// ClientSecret holds the OAuth2.0 "client-secret" to authenticate when performing
+	// /auth and /token requests.
+	ClientSecret string
 	// DeviceScopes holds the scopes that you wish to retrieve.
 	DeviceScopes []string
 	// SessionTokenExpiry holds the expiry time of minted JIMM session tokens (JWTs).
@@ -63,9 +66,10 @@ func NewAuthenticationService(ctx context.Context, params AuthenticationServiceP
 	return &AuthenticationService{
 		provider: provider,
 		deviceConfig: oauth2.Config{
-			ClientID: params.DeviceClientID,
-			Endpoint: provider.Endpoint(),
-			Scopes:   params.DeviceScopes,
+			ClientID:     params.DeviceClientID,
+			ClientSecret: params.ClientSecret,
+			Endpoint:     provider.Endpoint(),
+			Scopes:       params.DeviceScopes,
 		},
 		sessionTokenExpiry: params.SessionTokenExpiry,
 	}, nil
@@ -88,8 +92,10 @@ func NewAuthenticationService(ctx context.Context, params AuthenticationServiceP
 func (as *AuthenticationService) Device(ctx context.Context) (*oauth2.DeviceAuthResponse, error) {
 	const op = errors.Op("auth.AuthenticationService.Device")
 
-	// oauth2.SetAuthURLParam("client_secret", as.deviceConfig.ClientSecret)
-	resp, err := as.deviceConfig.DeviceAuth(ctx)
+	resp, err := as.deviceConfig.DeviceAuth(
+		ctx,
+		oauth2.SetAuthURLParam("client_secret", as.deviceConfig.ClientSecret),
+	)
 	if err != nil {
 		zapctx.Error(ctx, "device auth call failed", zap.Error(err))
 		return nil, errors.E(op, err, "device auth call failed")
@@ -105,7 +111,11 @@ func (as *AuthenticationService) Device(ctx context.Context) (*oauth2.DeviceAuth
 func (as *AuthenticationService) DeviceAccessToken(ctx context.Context, res *oauth2.DeviceAuthResponse) (*oauth2.Token, error) {
 	const op = errors.Op("auth.AuthenticationService.DeviceAccessToken")
 
-	t, err := as.deviceConfig.DeviceAccessToken(ctx, res)
+	t, err := as.deviceConfig.DeviceAccessToken(
+		ctx,
+		res,
+		oauth2.SetAuthURLParam("client_secret", as.deviceConfig.ClientSecret),
+	)
 	if err != nil {
 		return nil, errors.E(op, err, "device access token call failed")
 	}

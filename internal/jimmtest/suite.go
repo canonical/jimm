@@ -91,6 +91,7 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 	authSvc, err := auth.NewAuthenticationService(ctx, auth.AuthenticationServiceParams{
 		IssuerURL:          "http://localhost:8082/realms/jimm",
 		DeviceClientID:     "jimm-device",
+		ClientSecret:       "SwjDofnbDzJDm9iyfUhEp67FfUFMY8L4",
 		DeviceScopes:       []string{oidc.ScopeOpenID, "profile", "email"},
 		SessionTokenExpiry: time.Hour,
 	})

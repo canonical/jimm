@@ -19,6 +19,23 @@ import (
 	qt "github.com/frankban/quicktest"
 )
 
+func setupTestAuthSvc(ctx context.Context, c *qt.C, expiry time.Duration) *auth.AuthenticationService {
+	authSvc, err := auth.NewAuthenticationService(ctx, auth.AuthenticationServiceParams{
+		IssuerURL:          "http://localhost:8082/realms/jimm",
+		DeviceClientID:     "jimm-device",
+		ClientSecret:       "SwjDofnbDzJDm9iyfUhEp67FfUFMY8L4",
+		DeviceScopes:       []string{oidc.ScopeOpenID, "profile", "email"},
+		SessionTokenExpiry: expiry,
+	})
+	c.Assert(err, qt.IsNil)
+
+	return authSvc
+}
+
+// flow for users:
+// user -> jimm -> keycloak client -> access token to user (jimm just stores the creds)
+// svcacc -> jimm -> keycloak client -> access token to user (jimm just sends the creds)
+
 // TestDevice is a unique test in that it runs through the entire device oauth2.0
 // flow and additionally ensures the id token is verified and correct.
 //
@@ -35,12 +52,7 @@ func TestDevice(t *testing.T) {
 
 	ctx := context.Background()
 
-	authSvc, err := auth.NewAuthenticationService(ctx, auth.AuthenticationServiceParams{
-		IssuerURL:      "http://localhost:8082/realms/jimm",
-		DeviceClientID: "jimm-device",
-		DeviceScopes:   []string{oidc.ScopeOpenID, "profile", "email"},
-	})
-	c.Assert(err, qt.IsNil)
+	authSvc := setupTestAuthSvc(ctx, c, time.Hour)
 
 	res, err := authSvc.Device(ctx)
 	c.Assert(err, qt.IsNil)
@@ -120,13 +132,7 @@ func TestSessionTokens(t *testing.T) {
 
 	ctx := context.Background()
 
-	authSvc, err := auth.NewAuthenticationService(ctx, auth.AuthenticationServiceParams{
-		IssuerURL:          "http://localhost:8082/realms/jimm",
-		DeviceClientID:     "jimm-device",
-		DeviceScopes:       []string{oidc.ScopeOpenID, "profile", "email"},
-		SessionTokenExpiry: time.Hour,
-	})
-	c.Assert(err, qt.IsNil)
+	authSvc := setupTestAuthSvc(ctx, c, time.Hour)
 
 	secretKey := "secret-key"
 	token, err := authSvc.MintSessionToken("jimm-test@canonical.com", secretKey)
@@ -143,13 +149,7 @@ func TestSessionTokenRejectsWrongSecretKey(t *testing.T) {
 
 	ctx := context.Background()
 
-	authSvc, err := auth.NewAuthenticationService(ctx, auth.AuthenticationServiceParams{
-		IssuerURL:          "http://localhost:8082/realms/jimm",
-		DeviceClientID:     "jimm-device",
-		DeviceScopes:       []string{oidc.ScopeOpenID, "profile", "email"},
-		SessionTokenExpiry: time.Hour,
-	})
-	c.Assert(err, qt.IsNil)
+	authSvc := setupTestAuthSvc(ctx, c, time.Hour)
 
 	secretKey := "secret-key"
 	token, err := authSvc.MintSessionToken("jimm-test@canonical.com", secretKey)
@@ -166,14 +166,7 @@ func TestSessionTokenRejectsExpiredToken(t *testing.T) {
 	ctx := context.Background()
 
 	noDuration := time.Duration(0)
-
-	authSvc, err := auth.NewAuthenticationService(ctx, auth.AuthenticationServiceParams{
-		IssuerURL:          "http://localhost:8082/realms/jimm",
-		DeviceClientID:     "jimm-device",
-		DeviceScopes:       []string{oidc.ScopeOpenID, "profile", "email"},
-		SessionTokenExpiry: noDuration,
-	})
-	c.Assert(err, qt.IsNil)
+	authSvc := setupTestAuthSvc(ctx, c, noDuration)
 
 	secretKey := "secret-key"
 	token, err := authSvc.MintSessionToken("jimm-test@canonical.com", secretKey)
@@ -189,13 +182,7 @@ func TestSessionTokenValidatesEmail(t *testing.T) {
 
 	ctx := context.Background()
 
-	authSvc, err := auth.NewAuthenticationService(ctx, auth.AuthenticationServiceParams{
-		IssuerURL:          "http://localhost:8082/realms/jimm",
-		DeviceClientID:     "jimm-device",
-		DeviceScopes:       []string{oidc.ScopeOpenID, "profile", "email"},
-		SessionTokenExpiry: time.Hour,
-	})
-	c.Assert(err, qt.IsNil)
+	authSvc := setupTestAuthSvc(ctx, c, time.Hour)
 
 	secretKey := "secret-key"
 	token, err := authSvc.MintSessionToken("", secretKey)
@@ -211,15 +198,9 @@ func TestGetUserModel(t *testing.T) {
 
 	ctx := context.Background()
 
-	authSvc, err := auth.NewAuthenticationService(ctx, auth.AuthenticationServiceParams{
-		IssuerURL:          "http://localhost:8082/realms/jimm",
-		DeviceClientID:     "jimm-device",
-		DeviceScopes:       []string{oidc.ScopeOpenID, "profile", "email"},
-		SessionTokenExpiry: time.Hour,
-	})
-	c.Assert(err, qt.IsNil)
+	authSvc := setupTestAuthSvc(ctx, c, time.Hour)
 
-	_, err = authSvc.GetUserModel("safe@email.com")
+	_, err := authSvc.GetUserModel("safe@email.com")
 	c.Assert(err, qt.IsNil)
 }
 
@@ -228,15 +209,9 @@ func TestGetUserModelBadEmail(t *testing.T) {
 
 	ctx := context.Background()
 
-	authSvc, err := auth.NewAuthenticationService(ctx, auth.AuthenticationServiceParams{
-		IssuerURL:          "http://localhost:8082/realms/jimm",
-		DeviceClientID:     "jimm-device",
-		DeviceScopes:       []string{oidc.ScopeOpenID, "profile", "email"},
-		SessionTokenExpiry: time.Hour,
-	})
-	c.Assert(err, qt.IsNil)
+	authSvc := setupTestAuthSvc(ctx, c, time.Hour)
 
-	_, err = authSvc.GetUserModel("bademail")
+	_, err := authSvc.GetUserModel("bademail")
 	c.Assert(err, qt.ErrorMatches, `authenticated identity "bademail" cannot be used as juju username, invalid email`)
 }
 
@@ -245,14 +220,8 @@ func TestGetUserModelBadJujuUsername(t *testing.T) {
 
 	ctx := context.Background()
 
-	authSvc, err := auth.NewAuthenticationService(ctx, auth.AuthenticationServiceParams{
-		IssuerURL:          "http://localhost:8082/realms/jimm",
-		DeviceClientID:     "jimm-device",
-		DeviceScopes:       []string{oidc.ScopeOpenID, "profile", "email"},
-		SessionTokenExpiry: time.Hour,
-	})
-	c.Assert(err, qt.IsNil)
+	authSvc := setupTestAuthSvc(ctx, c, time.Hour)
 
-	_, err = authSvc.GetUserModel("myemail_@domain.com")
+	_, err := authSvc.GetUserModel("myemail_@domain.com")
 	c.Assert(err, qt.ErrorMatches, `authenticated identity "!!!" cannot be used as juju username`)
 }
