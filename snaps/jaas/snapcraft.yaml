@@ -17,7 +17,7 @@ slots:
 # The app has no plugs as it is intended to be invoked by the Juju CLI Snap.
 apps:
   jaas:
-    command: bin/juju-jaas
+    command: bin/jaas
 
 parts:
   jaas:
@@ -25,9 +25,15 @@ parts:
     source: ./
     source-type: git
     prime:
-    - bin/juju-jaas
+      - bin/jaas
     override-build: |
       set -e
-      CGO_ENABLED=0 go build -o juju-jaas github.com/canonical/jimm/cmd/jaas
-      mkdir -p $GOBIN
-      cp ./juju-jaas $GOBIN/juju-jaas
+      CGO_ENABLED=0 go install github.com/canonical/jimm/cmd/jaas
+    override-prime: |
+      snapcraftctl prime
+      # Add all CLI commands below to make them appear top-level to Juju.
+      ln -sf jaas bin/juju-jaas
+      ln -sf jaas bin/juju-add-service-account
+      ln -sf jaas bin/juju-list-service-account-credentials
+      ln -sf jaas bin/juju-update-service-account-credentials
+      ln -sf jaas bin/juju-grant-service-account-access

@@ -17,10 +17,11 @@ import (
 
 var (
 	addServiceCommandDoc = `
-add command binds a service account to your user, giving you administrator access over the service account.
-
-Example:
-	juju service-account add <client-id> 
+add-service-account binds a service account to your user, giving you administrator access over the service account.
+Can only be run once per service account.
+`
+	addServiceCommandExamples = `
+    juju add-service-account <client-id> 
 `
 )
 
@@ -46,9 +47,11 @@ type addServiceAccountCommand struct {
 // Info implements Command.Info.
 func (c *addServiceAccountCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:    "add",
-		Purpose: "Add service account",
-		Doc:     addServiceCommandDoc,
+		Name:     "add-service-account",
+		Purpose:  "Add permission to manage a service account",
+		Args:     "<client-id>",
+		Examples: addServiceCommandExamples,
+		Doc:      addServiceCommandDoc,
 	})
 }
 

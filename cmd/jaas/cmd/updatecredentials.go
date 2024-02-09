@@ -27,7 +27,7 @@ This will add the credentials to JAAS if they were not found.
 `
 
 	updateCredentialsCommandExamples = `
-    juju service-account update-credentials 00000000-0000-0000-0000-000000000000 aws credential-name
+    juju update-service-account-credentials update-credentials 00000000-0000-0000-0000-000000000000 aws credential-name
 `
 )
 
@@ -56,7 +56,7 @@ type updateCredentialsCommand struct {
 // Info implements Command.Info.
 func (c *updateCredentialsCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:     "update-credentials",
+		Name:     "update-service-account-credentials",
 		Purpose:  "Update service account cloud credentials",
 		Args:     "<client-id> <cloud> <credential-name>",
 		Doc:      updateCredentialsCommandDoc,
