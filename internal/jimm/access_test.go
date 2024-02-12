@@ -479,7 +479,7 @@ func TestParseTag(t *testing.T) {
 
 	user, _, controller, model, _, _, _ := createTestControllerEnvironment(ctx, c, j.Database)
 
-	jimmTag := "model-" + controller.Name + ":" + user.Username + "/" + model.Name + "#administrator"
+	jimmTag := "model-" + controller.Name + ":" + user.Name + "/" + model.Name + "#administrator"
 
 	// JIMM tag syntax for models
 	tag, err := j.ParseTag(ctx, jimmTag)
@@ -545,7 +545,7 @@ func TestResolveTupleObjectMapsApplicationOffersUUIDs(t *testing.T) {
 
 	user, _, controller, model, offer, _, _ := createTestControllerEnvironment(ctx, c, j.Database)
 
-	jimmTag := "applicationoffer-" + controller.Name + ":" + user.Username + "/" + model.Name + "." + offer.Name + "#administrator"
+	jimmTag := "applicationoffer-" + controller.Name + ":" + user.Name + "/" + model.Name + "." + offer.Name + "#administrator"
 
 	jujuTag, err := jimm.ResolveTag(j.UUID, &j.Database, jimmTag)
 	c.Assert(err, qt.IsNil)
@@ -573,7 +573,7 @@ func TestResolveTupleObjectMapsModelUUIDs(t *testing.T) {
 
 	user, _, controller, model, _, _, _ := createTestControllerEnvironment(ctx, c, j.Database)
 
-	jimmTag := "model-" + controller.Name + ":" + user.Username + "/" + model.Name + "#administrator"
+	jimmTag := "model-" + controller.Name + ":" + user.Name + "/" + model.Name + "#administrator"
 
 	tag, err := jimm.ResolveTag(j.UUID, &j.Database, jimmTag)
 	c.Assert(err, qt.IsNil)
@@ -709,7 +709,7 @@ func TestResolveTupleObjectHandlesErrors(t *testing.T) {
 		// Resolves bad groups where they do not exist
 		{
 			input: "group-myspecialpokemon-his-name-is-youguessedit-diglett",
-			want:  "group not found",
+			want:  "group myspecialpokemon-his-name-is-youguessedit-diglett not found",
 		},
 		// Resolves bad controllers where they do not exist
 		{
@@ -756,7 +756,7 @@ func TestResolveTupleObjectHandlesErrors(t *testing.T) {
 // TODO(ale8k): Make this an implicit thing on the JIMM suite per test & refactor the current state.
 // and make the suite argument an interface of the required calls we use here.
 func createTestControllerEnvironment(ctx context.Context, c *qt.C, db db.Database) (
-	dbmodel.User,
+	dbmodel.Identity,
 	dbmodel.GroupEntry,
 	dbmodel.Controller,
 	dbmodel.Model,
@@ -770,8 +770,8 @@ func createTestControllerEnvironment(ctx context.Context, c *qt.C, db db.Databas
 	err = db.GetGroup(ctx, &group)
 	c.Assert(err, qt.IsNil)
 
-	u := dbmodel.User{
-		Username: petname.Generate(2, "-") + "@external",
+	u := dbmodel.Identity{
+		Name: petname.Generate(2, "-") + "@external",
 	}
 	c.Assert(db.DB.Create(&u).Error, qt.IsNil)
 
@@ -798,10 +798,10 @@ func createTestControllerEnvironment(ctx context.Context, c *qt.C, db db.Databas
 	c.Assert(err, qt.IsNil)
 
 	cred := dbmodel.CloudCredential{
-		Name:          petname.Generate(2, "-"),
-		CloudName:     cloud.Name,
-		OwnerUsername: u.Username,
-		AuthType:      "empty",
+		Name:              petname.Generate(2, "-"),
+		CloudName:         cloud.Name,
+		OwnerIdentityName: u.Name,
+		AuthType:          "empty",
 	}
 	err = db.SetCloudCredential(ctx, &cred)
 	c.Assert(err, qt.IsNil)
@@ -812,7 +812,7 @@ func createTestControllerEnvironment(ctx context.Context, c *qt.C, db db.Databas
 			String: id.String(),
 			Valid:  true,
 		},
-		OwnerUsername:     u.Username,
+		OwnerIdentityName: u.Name,
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
 		CloudCredentialID: cred.ID,
@@ -830,7 +830,7 @@ func createTestControllerEnvironment(ctx context.Context, c *qt.C, db db.Databas
 	c.Assert(err, qt.IsNil)
 
 	offerName := petname.Generate(2, "-")
-	offerURL, err := crossmodel.ParseOfferURL(controller.Name + ":" + u.Username + "/" + model.Name + "." + offerName)
+	offerURL, err := crossmodel.ParseOfferURL(controller.Name + ":" + u.Name + "/" + model.Name + "." + offerName)
 	c.Assert(err, qt.IsNil)
 
 	offer := dbmodel.ApplicationOffer{

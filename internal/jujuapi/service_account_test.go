@@ -333,7 +333,7 @@ func TestGrantServiceAccountAccess(t *testing.T) {
 
 	tests := []struct {
 		about                     string
-		grantServiceAccountAccess func(ctx context.Context, user *openfga.User, svcAccTag jimmnames.ServiceAccountTag, tags []*ofganames.Tag) error
+		grantServiceAccountAccess func(ctx context.Context, user *openfga.User, svcAccTag jimmnames.ServiceAccountTag, entities []string) error
 		params                    params.GrantServiceAccountAccess
 		tags                      []string
 		username                  string
@@ -341,7 +341,7 @@ func TestGrantServiceAccountAccess(t *testing.T) {
 		expectedError             string
 	}{{
 		about: "Valid request",
-		grantServiceAccountAccess: func(ctx context.Context, user *openfga.User, svcAccTag jimmnames.ServiceAccountTag, tags []*ofganames.Tag) error {
+		grantServiceAccountAccess: func(ctx context.Context, user *openfga.User, svcAccTag jimmnames.ServiceAccountTag, entities []string) error {
 			return nil
 		},
 		params: params.GrantServiceAccountAccess{
@@ -357,47 +357,6 @@ func TestGrantServiceAccountAccess(t *testing.T) {
 			Relation: ofganames.AdministratorRelation,
 			Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag("fca1f605-736e-4d1f-bcd2-aecc726923be")),
 		}},
-	}, {
-		about: "Group that doesn't exist",
-		grantServiceAccountAccess: func(ctx context.Context, user *openfga.User, svcAccTag jimmnames.ServiceAccountTag, tags []*ofganames.Tag) error {
-			return nil
-		},
-		params: params.GrantServiceAccountAccess{
-			Entities: []string{
-				"user-alice",
-				"user-bob",
-				// This group doesn't exist.
-				"group-bar",
-			},
-			ClientID: "fca1f605-736e-4d1f-bcd2-aecc726923be",
-		},
-		username: "alice",
-		addTuples: []openfga.Tuple{{
-			Object:   ofganames.ConvertTag(names.NewUserTag("alice")),
-			Relation: ofganames.AdministratorRelation,
-			Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag("fca1f605-736e-4d1f-bcd2-aecc726923be")),
-		}},
-		expectedError: "group bar not found",
-	}, {
-		about: "Invalid tags",
-		grantServiceAccountAccess: func(ctx context.Context, user *openfga.User, svcAccTag jimmnames.ServiceAccountTag, tags []*ofganames.Tag) error {
-			return nil
-		},
-		params: params.GrantServiceAccountAccess{
-			Entities: []string{
-				"user-alice",
-				"user-bob",
-				"controller-jimm",
-			},
-			ClientID: "fca1f605-736e-4d1f-bcd2-aecc726923be",
-		},
-		username: "alice",
-		addTuples: []openfga.Tuple{{
-			Object:   ofganames.ConvertTag(names.NewUserTag("alice")),
-			Relation: ofganames.AdministratorRelation,
-			Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag("fca1f605-736e-4d1f-bcd2-aecc726923be")),
-		}},
-		expectedError: "invalid entity - not user or group",
 	}}
 
 	for _, test := range tests {

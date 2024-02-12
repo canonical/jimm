@@ -58,14 +58,30 @@ func (j *JIMM) AddServiceAccount(ctx context.Context, u *openfga.User, clientId 
 // GrantServiceAccountAccess creates an administrator relation between the tags provided
 // and the service account. The provided tags must be users or groups (with the member relation)
 // otherwise OpenFGA will report an error.
-func (j *JIMM) GrantServiceAccountAccess(ctx context.Context, u *openfga.User, svcAccTag jimmnames.ServiceAccountTag, tags []*ofganames.Tag) error {
+func (j *JIMM) GrantServiceAccountAccess(ctx context.Context, u *openfga.User, svcAccTag jimmnames.ServiceAccountTag, entities []string) error {
 	op := errors.Op("jimm.GrantServiceAccountAccess")
+	tags := make([]*ofganames.Tag, 0, len(entities))
+	// Validate tags
+	for _, val := range entities {
+		tag, err := j.ParseTag(ctx, val)
+		if err != nil {
+			return errors.E(op, err)
+		}
+		if tag.Kind != openfga.UserType && tag.Kind != openfga.GroupType {
+			return errors.E(op, "invalid entity - not user or group")
+		}
+		if tag.Kind == openfga.GroupType {
+			tag.Relation = ofganames.MemberRelation
+		}
+		tags = append(tags, tag)
+	}
 	tuples := make([]openfga.Tuple, 0, len(tags))
+	svcAccEntity := ofganames.ConvertTag(svcAccTag)
 	for _, tag := range tags {
 		tuple := openfga.Tuple{
 			Object:   tag,
 			Relation: ofganames.AdministratorRelation,
-			Target:   ofganames.ConvertTag(svcAccTag),
+			Target:   svcAccEntity,
 		}
 		tuples = append(tuples, tuple)
 	}

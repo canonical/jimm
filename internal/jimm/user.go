@@ -65,10 +65,10 @@ func (j *JIMM) Authenticate(ctx context.Context, req *jujuparams.LoginRequest) (
 func (j *JIMM) GetUser(ctx context.Context, username string) (*openfga.User, error) {
 	const op = errors.Op("jimm.GetUser")
 
-	user := dbmodel.User{
-		Username: username,
+	user := dbmodel.Identity{
+		Name: username,
 	}
-	if err := j.Database.GetUser(ctx, &user); err != nil {
+	if err := j.Database.GetIdentity(ctx, &user); err != nil {
 		return nil, err
 	}
 	u := openfga.NewUser(&user, j.OpenFGAClient)
