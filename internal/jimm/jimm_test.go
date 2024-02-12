@@ -80,6 +80,10 @@ func TestFindAuditEvents(t *testing.T) {
 		events[i] = e
 	}
 
+	found, err := j.FindAuditEvents(context.Background(), admin, db.AuditLogFilter{})
+	c.Assert(err, qt.IsNil)
+	c.Assert(found, qt.HasLen, len(events))
+
 	tests := []struct {
 		about          string
 		users          []*openfga.User

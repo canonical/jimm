@@ -31,6 +31,7 @@ type JIMM interface {
 	AddCloudToController(ctx context.Context, user *openfga.User, controllerName string, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error
 	AddController(ctx context.Context, u *openfga.User, ctl *dbmodel.Controller) error
 	AddHostedCloud(ctx context.Context, user *openfga.User, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error
+	AddGroup(ctx context.Context, user *openfga.User, name string) error
 	AddModel(ctx context.Context, u *openfga.User, args *jimm.ModelCreateArgs) (_ *jujuparams.ModelInfo, err error)
 	AddServiceAccount(ctx context.Context, u *openfga.User, clientId string) error
 	Authenticate(ctx context.Context, req *jujuparams.LoginRequest) (*openfga.User, error)
@@ -58,6 +59,7 @@ type JIMM interface {
 	GetCloudCredentialAttributes(ctx context.Context, u *openfga.User, cred *dbmodel.CloudCredential, hidden bool) (attrs map[string]string, redacted []string, err error)
 	GetControllerConfig(ctx context.Context, u *dbmodel.Identity) (*dbmodel.ControllerConfig, error)
 	GetJimmControllerAccess(ctx context.Context, user *openfga.User, tag names.UserTag) (string, error)
+	GetUser(ctx context.Context, username string) (*openfga.User, error)
 	GetUserCloudAccess(ctx context.Context, user *openfga.User, cloud names.CloudTag) (string, error)
 	GetUserControllerAccess(ctx context.Context, user *openfga.User, controller names.ControllerTag) (string, error)
 	GetUserModelAccess(ctx context.Context, user *openfga.User, model names.ModelTag) (string, error)
@@ -71,16 +73,20 @@ type JIMM interface {
 	InitiateInternalMigration(ctx context.Context, user *openfga.User, modelTag names.ModelTag, targetController string) (jujuparams.InitiateMigrationResult, error)
 	InitiateMigration(ctx context.Context, user *openfga.User, spec jujuparams.MigrationSpec, targetControllerID uint) (jujuparams.InitiateMigrationResult, error)
 	ListApplicationOffers(ctx context.Context, user *openfga.User, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetails, error)
+	ListGroups(ctx context.Context, user *openfga.User) ([]dbmodel.GroupEntry, error)
 	ModelDefaultsForCloud(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag) (jujuparams.ModelDefaultsResult, error)
 	ModelInfo(ctx context.Context, u *openfga.User, mt names.ModelTag) (*jujuparams.ModelInfo, error)
 	ModelStatus(ctx context.Context, u *openfga.User, mt names.ModelTag) (*jujuparams.ModelStatus, error)
 	Offer(ctx context.Context, user *openfga.User, offer jimm.AddApplicationOfferParams) error
+	ParseTag(ctx context.Context, key string) (*ofganames.Tag, error)
 	PubSubHub() *pubsub.Hub
 	PurgeLogs(ctx context.Context, user *openfga.User, before time.Time) (int64, error)
 	QueryModelsJq(ctx context.Context, models []dbmodel.Model, jqQuery string) (params.CrossModelQueryResponse, error)
+	RenameGroup(ctx context.Context, user *openfga.User, oldName, newName string) error
 	RemoveCloud(ctx context.Context, u *openfga.User, ct names.CloudTag) error
 	RemoveCloudFromController(ctx context.Context, u *openfga.User, controllerName string, ct names.CloudTag) error
 	RemoveController(ctx context.Context, user *openfga.User, controllerName string, force bool) error
+	RemoveGroup(ctx context.Context, user *openfga.User, name string) error
 	ResourceTag() names.ControllerTag
 	RevokeAuditLogAccess(ctx context.Context, user *openfga.User, targetUserTag names.UserTag) error
 	RevokeCloudAccess(ctx context.Context, user *openfga.User, ct names.CloudTag, ut names.UserTag, access string) error
@@ -89,8 +95,9 @@ type JIMM interface {
 	RevokeOfferAccess(ctx context.Context, user *openfga.User, offerURL string, ut names.UserTag, access jujuparams.OfferAccessPermission) (err error)
 	SetControllerConfig(ctx context.Context, u *openfga.User, args jujuparams.ControllerConfigSet) error
 	SetControllerDeprecated(ctx context.Context, user *openfga.User, controllerName string, deprecated bool) error
-	SetIdentityModelDefaults(ctx context.Context, user *dbmodel.Identity, configs map[string]interface{}) error
 	SetModelDefaults(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag, region string, configs map[string]interface{}) error
+	SetUserModelDefaults(ctx context.Context, user *dbmodel.Identity, configs map[string]interface{}) error
+	ToJAASTag(ctx context.Context, tag *ofganames.Tag) (string, error)
 	UnsetModelDefaults(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag, region string, keys []string) error
 	UpdateApplicationOffer(ctx context.Context, controller *dbmodel.Controller, offerUUID string, removed bool) error
 	UpdateCloud(ctx context.Context, u *openfga.User, ct names.CloudTag, cloud jujuparams.Cloud) error
@@ -159,13 +166,11 @@ func (r *controllerRoot) masquerade(ctx context.Context, userTag string) (*openf
 	if !r.user.JimmAdmin {
 		return nil, errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
-	user := dbmodel.Identity{
-		Name: ut.Id(),
-	}
-	if err := r.jimm.DB().GetIdentity(ctx, &user); err != nil {
+	user, err := r.jimm.GetUser(ctx, ut.Id())
+	if err != nil {
 		return nil, err
 	}
-	return openfga.NewUser(&user, r.jimm.AuthorizationClient()), nil
+	return user, nil
 }
 
 // parseUserTag parses a names.UserTag and validates it is for an

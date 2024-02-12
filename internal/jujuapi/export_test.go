@@ -14,8 +14,6 @@ import (
 
 var (
 	NewModelAccessWatcher = newModelAccessWatcher
-	ParseTag              = parseTag
-	ResolveTag            = resolveTag
 	ModelInfoFromPath     = modelInfoFromPath
 	AuditParamsToFilter   = auditParamsToFilter
 	AuditLogDefaultLimit  = limitDefault
@@ -41,12 +39,10 @@ func RunModelAccessWatcher(w *modelAccessWatcher) {
 }
 
 func ToJAASTag(db db.Database, tag *ofganames.Tag) (string, error) {
-	c := controllerRoot{
-		jimm: &jimm.JIMM{
-			Database: db,
-		},
+	jimm := &jimm.JIMM{
+		Database: db,
 	}
-	return c.toJAASTag(context.Background(), tag)
+	return jimm.ToJAASTag(context.Background(), tag)
 }
 
 func NewControllerRoot(j JIMM, p Params) *controllerRoot {

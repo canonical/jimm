@@ -104,8 +104,6 @@ func (s *JimmCmdSuite) SetUpTest(c *gc.C) {
 
 	s.HTTP.StartTLS()
 
-	s.Service.RegisterJwksCache(ctx)
-
 	// NOW we can set up the  juju conn suites
 	s.ControllerConfigAttrs = map[string]interface{}{
 		"login-token-refresh-url": u.String() + "/.well-known/jwks.json",

@@ -19,6 +19,7 @@ var (
 	NewControllerClient            = &newControllerClient
 	FillMigrationTarget            = fillMigrationTarget
 	InitiateMigration              = &initiateMigration
+	ResolveTag                     = resolveTag
 )
 
 func WatchController(w *Watcher, ctx context.Context, ctl *dbmodel.Controller) error {

@@ -11,7 +11,6 @@ import (
 	petname "github.com/dustinkirkland/golang-petname"
 	"github.com/google/uuid"
 	"github.com/juju/juju/core/crossmodel"
-	"github.com/juju/names/v4"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 
@@ -23,7 +22,6 @@ import (
 	"github.com/canonical/jimm/internal/jujuapi"
 	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
-	jimmnames "github.com/canonical/jimm/pkg/names"
 )
 
 type accessControlSuite struct {
@@ -1313,158 +1311,6 @@ func (s *accessControlSuite) TestCheckRelationControllerAdministratorFlow(c *gc.
 /*
  None-facade related tests
 */
-
-func (s *accessControlSuite) TestResolveTupleObjectHandlesErrors(c *gc.C) {
-	ctx := context.Background()
-
-	_, _, controller, model, offer, _, _, _, closeClient := createTestControllerEnvironment(ctx, c, s)
-	closeClient()
-
-	type test struct {
-		input string
-		want  string
-	}
-
-	tests := []test{
-		// Resolves bad tuple objects in general
-		{
-			input: "unknowntag-blabla",
-			want:  "failed to map tag unknowntag",
-		},
-		// Resolves bad groups where they do not exist
-		{
-			input: "group-myspecialpokemon-his-name-is-youguessedit-diglett",
-			want:  "group myspecialpokemon-his-name-is-youguessedit-diglett not found",
-		},
-		// Resolves bad controllers where they do not exist
-		{
-			input: "controller-mycontroller-that-does-not-exist",
-			want:  "controller not found",
-		},
-		// Resolves bad models where the user cannot be obtained from the JIMM tag
-		{
-			input: "model-mycontroller-that-does-not-exist/mymodel",
-			want:  "model not found",
-		},
-		// Resolves bad models where it cannot be found on the specified controller
-		{
-			input: "model-" + controller.Name + ":alex/",
-			want:  "model not found",
-		},
-		// Resolves bad applicationoffers where it cannot be found on the specified controller/model combo
-		{
-			input: "applicationoffer-" + controller.Name + ":alex/" + model.Name + "." + offer.Name + "fluff",
-			want:  "application offer not found",
-		},
-	}
-	for _, tc := range tests {
-		_, err := jujuapi.ResolveTag(s.JIMM.UUID, s.JIMM.DB(), tc.input)
-		c.Assert(err, gc.ErrorMatches, tc.want)
-	}
-}
-
-func (s *accessControlSuite) TestResolveTagObjectMapsUsers(c *gc.C) {
-	tag, err := jujuapi.ResolveTag(s.JIMM.UUID, s.JIMM.DB(), "user-alex@externally-werly#member")
-	c.Assert(err, gc.IsNil)
-	c.Assert(tag, gc.DeepEquals, ofganames.ConvertTagWithRelation(names.NewUserTag("alex@externally-werly"), ofganames.MemberRelation))
-}
-
-func (s *accessControlSuite) TestResolveTupleObjectMapsGroups(c *gc.C) {
-	ctx := context.Background()
-	err := s.JIMM.Database.AddGroup(context.Background(), "myhandsomegroupofdigletts")
-	c.Assert(err, gc.IsNil)
-	group := &dbmodel.GroupEntry{
-		Name: "myhandsomegroupofdigletts",
-	}
-	err = s.JIMM.Database.GetGroup(ctx, group)
-	c.Assert(err, gc.IsNil)
-	tag, err := jujuapi.ResolveTag(s.JIMM.UUID, s.JIMM.DB(), "group-"+group.Name+"#member")
-	c.Assert(err, gc.IsNil)
-	c.Assert(tag, gc.DeepEquals, ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag("1"), ofganames.MemberRelation))
-}
-
-func (s *accessControlSuite) TestResolveTupleObjectMapsControllerUUIDs(c *gc.C) {
-	ctx := context.Background()
-
-	cloud := dbmodel.Cloud{
-		Name: "test-cloud",
-	}
-	err := s.JIMM.Database.AddCloud(context.Background(), &cloud)
-	c.Assert(err, gc.IsNil)
-
-	uuid, _ := uuid.NewRandom()
-	controller := dbmodel.Controller{
-		Name:      "mycontroller",
-		UUID:      uuid.String(),
-		CloudName: "test-cloud",
-	}
-	err = s.JIMM.Database.AddController(ctx, &controller)
-	c.Assert(err, gc.IsNil)
-
-	tag, err := jujuapi.ResolveTag(s.JIMM.UUID, s.JIMM.DB(), "controller-mycontroller#administrator")
-	c.Assert(err, gc.IsNil)
-	c.Assert(tag, gc.DeepEquals, ofganames.ConvertTagWithRelation(names.NewControllerTag(uuid.String()), ofganames.AdministratorRelation))
-}
-
-func (s *accessControlSuite) TestResolveTupleObjectMapsModelUUIDs(c *gc.C) {
-	ctx := context.Background()
-
-	user, _, controller, model, _, _, _, _, closeClient := createTestControllerEnvironment(ctx, c, s)
-	defer closeClient()
-
-	jimmTag := "model-" + controller.Name + ":" + user.Name + "/" + model.Name + "#administrator"
-
-	tag, err := jujuapi.ResolveTag(s.JIMM.UUID, s.JIMM.DB(), jimmTag)
-	c.Assert(err, gc.IsNil)
-	c.Assert(tag, gc.DeepEquals, ofganames.ConvertTagWithRelation(names.NewModelTag(model.UUID.String), ofganames.AdministratorRelation))
-
-}
-
-func (s *accessControlSuite) TestResolveTupleObjectMapsApplicationOffersUUIDs(c *gc.C) {
-	ctx := context.Background()
-
-	user, _, controller, model, offer, _, _, _, closeClient := createTestControllerEnvironment(ctx, c, s)
-	closeClient()
-
-	jimmTag := "applicationoffer-" + controller.Name + ":" + user.Name + "/" + model.Name + "." + offer.Name + "#administrator"
-
-	jujuTag, err := jujuapi.ResolveTag(s.JIMM.UUID, s.JIMM.DB(), jimmTag)
-	c.Assert(err, gc.IsNil)
-	c.Assert(jujuTag, gc.DeepEquals, ofganames.ConvertTagWithRelation(names.NewApplicationOfferTag(offer.UUID), ofganames.AdministratorRelation))
-}
-
-func (s *accessControlSuite) TestResolveJIMM(c *gc.C) {
-	jimmTag := "controller-jimm"
-
-	jujuTag, err := jujuapi.ResolveTag(s.JIMM.UUID, s.JIMM.DB(), jimmTag)
-	c.Assert(err, gc.IsNil)
-	c.Assert(jujuTag, gc.DeepEquals, ofganames.ConvertTag(names.NewControllerTag(s.JIMM.UUID)))
-}
-
-func (s *accessControlSuite) TestParseTag(c *gc.C) {
-	ctx := context.Background()
-
-	user, _, controller, model, _, _, _, _, closeClient := createTestControllerEnvironment(ctx, c, s)
-	defer closeClient()
-
-	jimmTag := "model-" + controller.Name + ":" + user.Name + "/" + model.Name + "#administrator"
-
-	// JIMM tag syntax for models
-	tag, err := jujuapi.ParseTag(ctx, s.JIMM.UUID, s.JIMM.DB(), jimmTag)
-	c.Assert(err, gc.IsNil)
-	c.Assert(tag.Kind.String(), gc.Equals, names.ModelTagKind)
-	c.Assert(tag.ID, gc.Equals, model.UUID.String)
-	c.Assert(tag.Relation.String(), gc.Equals, "administrator")
-
-	jujuTag := "model-" + model.UUID.String + "#administrator"
-
-	// Juju tag syntax for models
-	tag, err = jujuapi.ParseTag(ctx, s.JIMM.UUID, s.JIMM.DB(), jujuTag)
-	c.Assert(err, gc.IsNil)
-	c.Assert(tag.ID, gc.Equals, model.UUID.String)
-	c.Assert(tag.Kind.String(), gc.Equals, names.ModelTagKind)
-	c.Assert(tag.Relation.String(), gc.Equals, "administrator")
-}
 
 // createTestControllerEnvironment is a utility function creating the necessary components of adding a:
 //   - user
