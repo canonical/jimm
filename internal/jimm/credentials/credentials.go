@@ -16,6 +16,7 @@ import (
 //   - JWK Set
 //   - JWK expiry
 //   - JWK private key
+//   - OAuth session signing secret
 type CredentialStore interface {
 	// Get retrieves the stored attributes of a cloud credential.
 	Get(context.Context, names.CloudCredentialTag) (map[string]string, error)
