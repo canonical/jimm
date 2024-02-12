@@ -52,8 +52,8 @@ func TestDefaultService(t *testing.T) {
 		InsecureSecretStorage: true,
 		OAuthAuthenticatorParams: jimm.OAuthAuthenticatorParams{
 			IssuerURL:          "http://localhost:8082/realms/jimm",
-			DeviceClientID:     "jimm-device",
-			DeviceScopes:       []string{oidc.ScopeOpenID, "profile", "email"},
+			ClientID:           "jimm-device",
+			Scopes:             []string{oidc.ScopeOpenID, "profile", "email"},
 			SessionTokenExpiry: time.Duration(time.Hour),
 		},
 	})
@@ -76,8 +76,8 @@ func TestServiceStartsWithoutSecretStore(t *testing.T) {
 		OpenFGAParams: cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
 		OAuthAuthenticatorParams: jimm.OAuthAuthenticatorParams{
 			IssuerURL:          "http://localhost:8082/realms/jimm",
-			DeviceClientID:     "jimm-device",
-			DeviceScopes:       []string{oidc.ScopeOpenID, "profile", "email"},
+			ClientID:           "jimm-device",
+			Scopes:             []string{oidc.ScopeOpenID, "profile", "email"},
 			SessionTokenExpiry: time.Duration(time.Hour),
 		},
 	})
@@ -98,8 +98,8 @@ func TestAuthenticator(t *testing.T) {
 		InsecureSecretStorage: true,
 		OAuthAuthenticatorParams: jimm.OAuthAuthenticatorParams{
 			IssuerURL:          "http://localhost:8082/realms/jimm",
-			DeviceClientID:     "jimm-device",
-			DeviceScopes:       []string{oidc.ScopeOpenID, "profile", "email"},
+			ClientID:           "jimm-device",
+			Scopes:             []string{oidc.ScopeOpenID, "profile", "email"},
 			SessionTokenExpiry: time.Duration(time.Hour),
 		},
 	}
@@ -167,8 +167,8 @@ func TestVault(t *testing.T) {
 		OpenFGAParams:   cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
 		OAuthAuthenticatorParams: jimm.OAuthAuthenticatorParams{
 			IssuerURL:          "http://localhost:8082/realms/jimm",
-			DeviceClientID:     "jimm-device",
-			DeviceScopes:       []string{oidc.ScopeOpenID, "profile", "email"},
+			ClientID:           "jimm-device",
+			Scopes:             []string{oidc.ScopeOpenID, "profile", "email"},
 			SessionTokenExpiry: time.Duration(time.Hour),
 		},
 	}
@@ -236,8 +236,8 @@ func TestPostgresSecretStore(t *testing.T) {
 		InsecureSecretStorage: true,
 		OAuthAuthenticatorParams: jimm.OAuthAuthenticatorParams{
 			IssuerURL:          "http://localhost:8082/realms/jimm",
-			DeviceClientID:     "jimm-device",
-			DeviceScopes:       []string{oidc.ScopeOpenID, "profile", "email"},
+			ClientID:           "jimm-device",
+			Scopes:             []string{oidc.ScopeOpenID, "profile", "email"},
 			SessionTokenExpiry: time.Duration(time.Hour),
 		},
 	}
@@ -258,8 +258,8 @@ func TestOpenFGA(t *testing.T) {
 		ControllerAdmins: []string{"alice", "eve"},
 		OAuthAuthenticatorParams: jimm.OAuthAuthenticatorParams{
 			IssuerURL:          "http://localhost:8082/realms/jimm",
-			DeviceClientID:     "jimm-device",
-			DeviceScopes:       []string{oidc.ScopeOpenID, "profile", "email"},
+			ClientID:           "jimm-device",
+			Scopes:             []string{oidc.ScopeOpenID, "profile", "email"},
 			SessionTokenExpiry: time.Duration(time.Hour),
 		},
 	}
@@ -314,8 +314,8 @@ func TestPublicKey(t *testing.T) {
 		PublicKey:        "pC8MEk9MS9S8fhyRnOJ4qARTcTAwoM9L1nH/Yq0MwWU=",
 		OAuthAuthenticatorParams: jimm.OAuthAuthenticatorParams{
 			IssuerURL:          "http://localhost:8082/realms/jimm",
-			DeviceClientID:     "jimm-device",
-			DeviceScopes:       []string{oidc.ScopeOpenID, "profile", "email"},
+			ClientID:           "jimm-device",
+			Scopes:             []string{oidc.ScopeOpenID, "profile", "email"},
 			SessionTokenExpiry: time.Duration(time.Hour),
 		},
 	}
@@ -402,8 +402,8 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 				PublicKey:        "pC8MEk9MS9S8fhyRnOJ4qARTcTAwoM9L1nH/Yq0MwWU=",
 				OAuthAuthenticatorParams: jimm.OAuthAuthenticatorParams{
 					IssuerURL:          "http://localhost:8082/realms/jimm",
-					DeviceClientID:     "jimm-device",
-					DeviceScopes:       []string{oidc.ScopeOpenID, "profile", "email"},
+					ClientID:           "jimm-device",
+					Scopes:             []string{oidc.ScopeOpenID, "profile", "email"},
 					SessionTokenExpiry: time.Duration(time.Hour),
 				},
 			}

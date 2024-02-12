@@ -22,19 +22,15 @@ import (
 func setupTestAuthSvc(ctx context.Context, c *qt.C, expiry time.Duration) *auth.AuthenticationService {
 	authSvc, err := auth.NewAuthenticationService(ctx, auth.AuthenticationServiceParams{
 		IssuerURL:          "http://localhost:8082/realms/jimm",
-		DeviceClientID:     "jimm-device",
+		ClientID:           "jimm-device",
 		ClientSecret:       "SwjDofnbDzJDm9iyfUhEp67FfUFMY8L4",
-		DeviceScopes:       []string{oidc.ScopeOpenID, "profile", "email"},
+		Scopes:             []string{oidc.ScopeOpenID, "profile", "email"},
 		SessionTokenExpiry: expiry,
 	})
 	c.Assert(err, qt.IsNil)
 
 	return authSvc
 }
-
-// flow for users:
-// user -> jimm -> keycloak client -> access token to user (jimm just stores the creds)
-// svcacc -> jimm -> keycloak client -> access token to user (jimm just sends the creds)
 
 // TestDevice is a unique test in that it runs through the entire device oauth2.0
 // flow and additionally ensures the id token is verified and correct.
@@ -191,37 +187,4 @@ func TestSessionTokenValidatesEmail(t *testing.T) {
 
 	_, err = authSvc.VerifySessionToken(token, secretKey)
 	c.Assert(err, qt.ErrorMatches, "failed to parse email")
-}
-
-func TestGetUserModel(t *testing.T) {
-	c := qt.New(t)
-
-	ctx := context.Background()
-
-	authSvc := setupTestAuthSvc(ctx, c, time.Hour)
-
-	_, err := authSvc.GetUserModel("safe@email.com")
-	c.Assert(err, qt.IsNil)
-}
-
-func TestGetUserModelBadEmail(t *testing.T) {
-	c := qt.New(t)
-
-	ctx := context.Background()
-
-	authSvc := setupTestAuthSvc(ctx, c, time.Hour)
-
-	_, err := authSvc.GetUserModel("bademail")
-	c.Assert(err, qt.ErrorMatches, `authenticated identity "bademail" cannot be used as juju username, invalid email`)
-}
-
-func TestGetUserModelBadJujuUsername(t *testing.T) {
-	c := qt.New(t)
-
-	ctx := context.Background()
-
-	authSvc := setupTestAuthSvc(ctx, c, time.Hour)
-
-	_, err := authSvc.GetUserModel("myemail_@domain.com")
-	c.Assert(err, qt.ErrorMatches, `authenticated identity "!!!" cannot be used as juju username`)
 }

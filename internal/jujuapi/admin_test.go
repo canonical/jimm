@@ -3,6 +3,7 @@
 package jujuapi_test
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"io"
@@ -13,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/canonical/jimm/api/params"
+	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/jimmtest"
 	"github.com/juju/juju/api"
 	jujuparams "github.com/juju/juju/rpc/params"
@@ -132,6 +134,17 @@ func (s *adminSuite) TestDeviceLogin(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	c.Assert(loginResult.UserInfo.Identity, gc.Equals, "user-"+user.Email)
 	c.Assert(loginResult.UserInfo.DisplayName, gc.Equals, strings.Split(user.Email, "@")[0])
+
+	// Finally, ensure db did indeed update the access token for this user
+	updatedUser := &dbmodel.User{
+		Username: user.Email,
+	}
+	c.Assert(s.JIMM.DB().GetUser(context.Background(), updatedUser), gc.IsNil)
+	// TODO(ale8k): Do we need to validate the token again for the test?
+	// It has just been through a verifier etc and was returned directly
+	// from the device grant?
+	c.Assert(updatedUser.AccessToken, gc.Not(gc.Equals), "")
+
 }
 
 // handleLoginForm runs through the login process emulating the user typing in

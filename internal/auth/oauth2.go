@@ -5,12 +5,10 @@ package auth
 import (
 	"context"
 	"encoding/base64"
-	"fmt"
 	"net/mail"
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
-	"github.com/juju/names/v4"
 	"github.com/juju/zaputil/zapctx"
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwt"
@@ -23,7 +21,7 @@ import (
 
 // AuthenticationService handles authentication within JIMM.
 type AuthenticationService struct {
-	deviceConfig oauth2.Config
+	oauthConfig oauth2.Config
 	// provider holds a OIDC provider wrapper for the OAuth2.0 /x/oauth package,
 	// enabling UserInfo calls, wellknown retrieval and jwks verification.
 	provider *oidc.Provider
@@ -39,15 +37,13 @@ type AuthenticationServiceParams struct {
 	// IssuerURL is the URL of the OAuth2.0 server.
 	// I.e., http://localhost:8082/realms/jimm in the case of keycloak.
 	IssuerURL string
-	// DeviceClientID holds the OAuth2.0 client id registered and configured
-	// to handle device OAuth2.0 flows. The client is NOT expected to be confidential
-	// and as such does not need a client secret (given it is configured correctly).
-	DeviceClientID string
+	// ClientID holds the OAuth2.0 client id. The client IS expected to be confidential.
+	ClientID string
 	// ClientSecret holds the OAuth2.0 "client-secret" to authenticate when performing
 	// /auth and /token requests.
 	ClientSecret string
-	// DeviceScopes holds the scopes that you wish to retrieve.
-	DeviceScopes []string
+	// Scopes holds the scopes that you wish to retrieve.
+	Scopes []string
 	// SessionTokenExpiry holds the expiry time of minted JIMM session tokens (JWTs).
 	SessionTokenExpiry time.Duration
 }
@@ -65,11 +61,11 @@ func NewAuthenticationService(ctx context.Context, params AuthenticationServiceP
 
 	return &AuthenticationService{
 		provider: provider,
-		deviceConfig: oauth2.Config{
-			ClientID:     params.DeviceClientID,
+		oauthConfig: oauth2.Config{
+			ClientID:     params.ClientID,
 			ClientSecret: params.ClientSecret,
 			Endpoint:     provider.Endpoint(),
-			Scopes:       params.DeviceScopes,
+			Scopes:       params.Scopes,
 		},
 		sessionTokenExpiry: params.SessionTokenExpiry,
 	}, nil
@@ -92,9 +88,9 @@ func NewAuthenticationService(ctx context.Context, params AuthenticationServiceP
 func (as *AuthenticationService) Device(ctx context.Context) (*oauth2.DeviceAuthResponse, error) {
 	const op = errors.Op("auth.AuthenticationService.Device")
 
-	resp, err := as.deviceConfig.DeviceAuth(
+	resp, err := as.oauthConfig.DeviceAuth(
 		ctx,
-		oauth2.SetAuthURLParam("client_secret", as.deviceConfig.ClientSecret),
+		oauth2.SetAuthURLParam("client_secret", as.oauthConfig.ClientSecret),
 	)
 	if err != nil {
 		zapctx.Error(ctx, "device auth call failed", zap.Error(err))
@@ -111,10 +107,10 @@ func (as *AuthenticationService) Device(ctx context.Context) (*oauth2.DeviceAuth
 func (as *AuthenticationService) DeviceAccessToken(ctx context.Context, res *oauth2.DeviceAuthResponse) (*oauth2.Token, error) {
 	const op = errors.Op("auth.AuthenticationService.DeviceAccessToken")
 
-	t, err := as.deviceConfig.DeviceAccessToken(
+	t, err := as.oauthConfig.DeviceAccessToken(
 		ctx,
 		res,
-		oauth2.SetAuthURLParam("client_secret", as.deviceConfig.ClientSecret),
+		oauth2.SetAuthURLParam("client_secret", as.oauthConfig.ClientSecret),
 	)
 	if err != nil {
 		return nil, errors.E(op, err, "device access token call failed")
@@ -135,7 +131,7 @@ func (as *AuthenticationService) ExtractAndVerifyIDToken(ctx context.Context, oa
 	}
 
 	verifier := as.provider.Verifier(&oidc.Config{
-		ClientID: as.deviceConfig.ClientID,
+		ClientID: as.oauthConfig.ClientID,
 	})
 
 	token, err := verifier.Verify(ctx, rawIDToken)
@@ -216,26 +212,4 @@ func (as *AuthenticationService) VerifySessionToken(token string, secretKey stri
 	}
 
 	return parsedToken, nil
-}
-
-// GetUserModel does three things:
-//
-//   - Checks if the email is a valid user id and if it isn't rejects the users authentication.
-//   - Validates the email (as this method could be used by numerous authentication methods that
-//     don't necessarily go through a flow such as the session token flow).
-//   - Returns a names.UserTag, that is now a) a valid juju user and b) has a valid email
-func (as *AuthenticationService) GetUserModel(email string) (*names.UserTag, error) {
-	const op = errors.Op("auth.AuthenticationService.CreateUser")
-
-	// TODO(ale8k): Doesn't allow underscores right now, check with Ian.
-	if !names.IsValidUser(email) {
-		return nil, errors.E(op, fmt.Sprintf("authenticated identity %q cannot be used as juju username", email))
-	}
-
-	if _, err := mail.ParseAddress(email); err != nil {
-		return nil, errors.E(op, fmt.Sprintf("authenticated identity %q cannot be used as juju username, invalid email", email))
-	}
-
-	ut := names.NewUserTag(email)
-	return &ut, nil
 }

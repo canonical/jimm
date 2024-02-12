@@ -92,10 +92,10 @@ func start(ctx context.Context, s *service.Service) error {
 		return errors.E("oauth issuer url has no scheme")
 	}
 
-	deviceClientID := os.Getenv("JIMM_OAUTH_DEVICE_CLIENT_ID")
-	if deviceClientID == "" {
-		zapctx.Error(ctx, "no oauth device client id")
-		return errors.E("no oauth device client id")
+	clientID := os.Getenv("JIMM_OAUTH_CLIENT_ID")
+	if clientID == "" {
+		zapctx.Error(ctx, "no oauth client id")
+		return errors.E("no oauth client id")
 	}
 
 	clientSecret := os.Getenv("JIMM_OAUTH_CLIENT_SECRET")
@@ -104,14 +104,14 @@ func start(ctx context.Context, s *service.Service) error {
 		return errors.E("no oauth client secret")
 	}
 
-	deviceScopes := os.Getenv("JIMM_OAUTH_DEVICE_SCOPES")
-	deviceScopesParsed := strings.Split(deviceScopes, ",")
-	for i, scope := range deviceScopesParsed {
-		deviceScopesParsed[i] = strings.TrimSpace(scope)
+	scopes := os.Getenv("JIMM_OAUTH_SCOPES")
+	scopesParsed := strings.Split(scopes, ",")
+	for i, scope := range scopesParsed {
+		scopesParsed[i] = strings.TrimSpace(scope)
 	}
-	if len(deviceScopesParsed) == 0 {
-		zapctx.Error(ctx, "no oauth device client scopes present")
-		return errors.E("no oauth device client scopes present")
+	if len(scopesParsed) == 0 {
+		zapctx.Error(ctx, "no oauth client scopes present")
+		return errors.E("no oauth client scopes present")
 	}
 
 	insecureSecretStorage := false
@@ -152,9 +152,9 @@ func start(ctx context.Context, s *service.Service) error {
 		InsecureJwksLookup:            insecureJwksLookup,
 		OAuthAuthenticatorParams: jimm.OAuthAuthenticatorParams{
 			IssuerURL:          issuerURL,
-			DeviceClientID:     deviceClientID,
+			ClientID:           clientID,
 			ClientSecret:       clientSecret,
-			DeviceScopes:       deviceScopesParsed,
+			Scopes:             scopesParsed,
 			SessionTokenExpiry: sessionTokenExpiryDuration,
 		},
 	})

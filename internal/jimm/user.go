@@ -60,36 +60,24 @@ func (j *JIMM) Authenticate(ctx context.Context, req *jujuparams.LoginRequest) (
 	return u, nil
 }
 
-// GetOpenFGAUserAndAuthorise returns a valid OpenFGA user, this means:
-//
-//   - It contains a valid dbmodel user, including their email and juju username
-//   - Their last user model has been updated for this connection
-//   - The user model is wrapped in an OpenFGA user type
-//   - Their admin status is checked and placed on the OpenFGA user type the user's
-//     details are wrapped in
+// GetOpenFGAUserAndAuthorise returns a valid OpenFGA user, authorising
+// them as an admin of JIMM if a tuple exists for this user.
 func (j *JIMM) GetOpenFGAUserAndAuthorise(ctx context.Context, email string) (*openfga.User, error) {
-	const op = errors.Op("jimm.GetOpenFGAUser")
-
-	// Validate the user and get the model
-	ut, err := j.OAuthAuthenticationService().GetUserModel(email)
-	if err != nil {
-		return nil, errors.E(op, err)
-	}
+	const op = errors.Op("jimm.GetOpenFGAUserAndAuthorise")
 
 	// Setup user model using the tag to populate query fields
 	user := &dbmodel.User{
-		Username:    ut.Id(),
-		DisplayName: ut.Name(),
+		// TODO(ale8k): username is email for NOW until we add email field
+		// and map emails/usernames to a uuid for the user. Then, queries should be
+		// queried upon by uuid, not username.
+		Username: email,
 	}
 
 	// Load the users details
-	if err = j.Database.Transaction(func(tx *db.Database) error {
+	if err := j.Database.Transaction(func(tx *db.Database) error {
 		if err := tx.GetUser(ctx, user); err != nil {
 			return err
 		}
-		// got uuid?
-		// no?
-		// update
 
 		// TODO(ale8k):
 		// This logic of updating the users last login should be done else where

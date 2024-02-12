@@ -34,6 +34,11 @@ type User struct {
 
 	// CloudCredentials are the cloud credentials owned by this user.
 	CloudCredentials []CloudCredential `gorm:"foreignKey:OwnerUsername;references:Username"`
+
+	// AccessToken is an OAuth2.0 access token for this user, it may have come
+	// from the browser or device flow, and as such is updated on every successful
+	// login.
+	AccessToken string
 }
 
 // Tag returns a names.Tag for the user.

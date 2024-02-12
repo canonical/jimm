@@ -111,8 +111,8 @@ func TestGetOpenFGAUser(t *testing.T) {
 	// TODO(ale8k): Mock this
 	authSvc, err := auth.NewAuthenticationService(ctx, auth.AuthenticationServiceParams{
 		IssuerURL:          "http://localhost:8082/realms/jimm",
-		DeviceClientID:     "jimm-device",
-		DeviceScopes:       []string{"openid", "profile", "email"},
+		ClientID:           "jimm-device",
+		Scopes:             []string{"openid", "profile", "email"},
 		SessionTokenExpiry: time.Hour,
 	})
 	c.Assert(err, qt.IsNil)

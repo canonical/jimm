@@ -165,14 +165,6 @@ type OAuthAuthenticator interface {
 	// The subject of the token contains the user's email and can be used
 	// for user object creation.
 	VerifySessionToken(token string, secretKey string) (jwt.Token, error)
-
-	// GetUserModel does three things:
-	//
-	//   - Checks if the email is a valid user id and if it isn't rejects the users authentication.
-	//   - Validates the email (as this method could be used by numerous authentication methods that
-	//     don't necessarily go through a flow such as the session token flow).
-	//   - Returns a names.UserTag, that is now a) a valid juju user and b) has a valid email
-	GetUserModel(email string) (*names.UserTag, error)
 }
 
 type permission struct {
