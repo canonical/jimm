@@ -130,7 +130,7 @@ func (j *JIMM) AddController(ctx context.Context, u *openfga.User, ctl *dbmodel.
 	return j.AddController_(ctx, u, ctl)
 }
 func (j *JIMM) AddGroup(ctx context.Context, u *openfga.User, name string) error {
-	if j.AddGroup == nil {
+	if j.AddGroup_ == nil {
 		return errors.E(errors.CodeNotImplemented)
 	}
 	return j.AddGroup_(ctx, u, name)
