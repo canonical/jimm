@@ -20,8 +20,8 @@ func (d *Database) SetCloudDefaults(ctx context.Context, defaults *dbmodel.Cloud
 		db := d.DB.WithContext(ctx)
 
 		dbDefaults := dbmodel.CloudDefaults{
-			Username: defaults.Username,
-			CloudID:  defaults.CloudID,
+			IdentityName: defaults.IdentityName,
+			CloudID:      defaults.CloudID,
 			Cloud: dbmodel.Cloud{
 				Name: defaults.Cloud.Name,
 			},
@@ -46,7 +46,7 @@ func (d *Database) SetCloudDefaults(ctx context.Context, defaults *dbmodel.Cloud
 		}
 		if err := db.Clauses(clause.OnConflict{
 			Columns: []clause.Column{
-				{Name: "username"},
+				{Name: "identity_name"},
 				{Name: "cloud_id"},
 				{Name: "region"},
 			},
@@ -70,8 +70,8 @@ func (d *Database) UnsetCloudDefaults(ctx context.Context, defaults *dbmodel.Clo
 		db := d.DB.WithContext(ctx)
 
 		dbDefaults := dbmodel.CloudDefaults{
-			Username: defaults.Username,
-			CloudID:  defaults.CloudID,
+			IdentityName: defaults.IdentityName,
+			CloudID:      defaults.CloudID,
 			Cloud: dbmodel.Cloud{
 				Name: defaults.Cloud.Name,
 			},
@@ -89,7 +89,7 @@ func (d *Database) UnsetCloudDefaults(ctx context.Context, defaults *dbmodel.Clo
 		}
 		if err := db.Clauses(clause.OnConflict{
 			Columns: []clause.Column{
-				{Name: "username"},
+				{Name: "identity_name"},
 				{Name: "cloud_id"},
 				{Name: "region"},
 			},
@@ -114,7 +114,7 @@ func (d *Database) CloudDefaults(ctx context.Context, defaults *dbmodel.CloudDef
 	}
 	db := d.DB.WithContext(ctx)
 
-	db = db.Where("username = ?", defaults.Username)
+	db = db.Where("identity_name = ?", defaults.IdentityName)
 	db = db.Joins("JOIN clouds ON clouds.id = cloud_defaults.cloud_id")
 	if defaults.CloudID != 0 {
 		db = db.Where("clouds.id = ?", defaults.CloudID)
@@ -123,7 +123,7 @@ func (d *Database) CloudDefaults(ctx context.Context, defaults *dbmodel.CloudDef
 	}
 	db = db.Where("region = ?", defaults.Region)
 
-	result := db.Preload("User").Preload("Cloud").First(&defaults)
+	result := db.Preload("Identity").Preload("Cloud").First(&defaults)
 	if result.Error != nil {
 		err := dbError(result.Error)
 		if errors.ErrorCode(err) == errors.CodeNotFound {
@@ -135,7 +135,7 @@ func (d *Database) CloudDefaults(ctx context.Context, defaults *dbmodel.CloudDef
 }
 
 // ModelDefaultsForCloud returns the default config values for the specified cloud.
-func (d *Database) ModelDefaultsForCloud(ctx context.Context, user *dbmodel.User, cloud names.CloudTag) ([]dbmodel.CloudDefaults, error) {
+func (d *Database) ModelDefaultsForCloud(ctx context.Context, user *dbmodel.Identity, cloud names.CloudTag) ([]dbmodel.CloudDefaults, error) {
 	const op = errors.Op("db.ModelDefaultsForCloud")
 
 	if err := d.ready(); err != nil {
@@ -143,12 +143,12 @@ func (d *Database) ModelDefaultsForCloud(ctx context.Context, user *dbmodel.User
 	}
 	db := d.DB.WithContext(ctx)
 
-	db = db.Where("username = ?", user.Username)
+	db = db.Where("identity_name = ?", user.Name)
 	db = db.Joins("JOIN clouds ON clouds.id = cloud_defaults.cloud_id")
 	db = db.Where("clouds.name = ?", cloud.Id())
 
 	var defaults []dbmodel.CloudDefaults
-	result := db.Preload("User").Preload("Cloud").Find(&defaults)
+	result := db.Preload("Identity").Preload("Cloud").Find(&defaults)
 	if result.Error != nil {
 		return nil, errors.E(op, dbError(result.Error))
 	}

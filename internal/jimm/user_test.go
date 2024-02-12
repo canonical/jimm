@@ -52,15 +52,15 @@ func TestAuthenticate(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	auth.User = openfga.NewUser(
-		&dbmodel.User{
-			Username:    "bob@external",
+		&dbmodel.Identity{
+			Name:        "bob@external",
 			DisplayName: "Bob",
 		},
 		client,
 	)
 	u, err := j.Authenticate(ctx, nil)
 	c.Assert(err, qt.IsNil)
-	c.Check(u.Username, qt.Equals, "bob@external")
+	c.Check(u.Name, qt.Equals, "bob@external")
 	c.Check(u.JimmAdmin, qt.IsFalse)
 
 	err = auth.User.SetControllerAccess(
@@ -72,18 +72,18 @@ func TestAuthenticate(t *testing.T) {
 
 	u, err = j.Authenticate(ctx, nil)
 	c.Assert(err, qt.IsNil)
-	c.Check(u.Username, qt.Equals, "bob@external")
+	c.Check(u.Name, qt.Equals, "bob@external")
 	c.Check(u.JimmAdmin, qt.IsTrue)
 
-	u2 := dbmodel.User{
-		Username: "bob@external",
+	u2 := dbmodel.Identity{
+		Name: "bob@external",
 	}
-	err = j.Database.GetUser(ctx, &u2)
+	err = j.Database.GetIdentity(ctx, &u2)
 	c.Assert(err, qt.IsNil)
 
-	c.Check(u2, qt.DeepEquals, dbmodel.User{
+	c.Check(u2, qt.DeepEquals, dbmodel.Identity{
 		Model:       u.Model,
-		Username:    "bob@external",
+		Name:        "bob@external",
 		DisplayName: "Bob",
 		LastLogin: sql.NullTime{
 			Time:  now,

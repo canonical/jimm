@@ -147,8 +147,8 @@ func TestAddController(t *testing.T) {
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
-	u := dbmodel.User{
-		Username: "alice@external",
+	u := dbmodel.Identity{
+		Name: "alice@external",
 	}
 
 	alice := openfga.NewUser(&u, client)
@@ -157,10 +157,10 @@ func TestAddController(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	ctl1 := dbmodel.Controller{
-		Name:          "test-controller",
-		AdminUser:     "admin",
-		AdminPassword: "5ecret",
-		PublicAddress: "example.com:443",
+		Name:              "test-controller",
+		AdminIdentityName: "admin",
+		AdminPassword:     "5ecret",
+		PublicAddress:     "example.com:443",
 	}
 	err = j.AddController(context.Background(), alice, &ctl1)
 	c.Assert(err, qt.IsNil)
@@ -173,10 +173,10 @@ func TestAddController(t *testing.T) {
 	c.Check(ctl2, qt.CmpEquals(cmpopts.EquateEmpty(), cmpopts.IgnoreTypes(dbmodel.CloudRegion{})), ctl1)
 
 	ctl3 := dbmodel.Controller{
-		Name:          "test-controller-2",
-		AdminUser:     "admin",
-		AdminPassword: "5ecret",
-		PublicAddress: "example.com:443",
+		Name:              "test-controller-2",
+		AdminIdentityName: "admin",
+		AdminPassword:     "5ecret",
+		PublicAddress:     "example.com:443",
 	}
 	err = j.AddController(context.Background(), alice, &ctl3)
 	c.Assert(err, qt.IsNil)
@@ -315,8 +315,8 @@ func TestAddControllerWithVault(t *testing.T) {
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
-	u := dbmodel.User{
-		Username: "alice@external",
+	u := dbmodel.Identity{
+		Name: "alice@external",
 	}
 	alice := openfga.NewUser(&u, ofgaClient)
 	alice.JimmAdmin = true
@@ -325,14 +325,14 @@ func TestAddControllerWithVault(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	ctl1 := dbmodel.Controller{
-		Name:          "test-controller",
-		AdminUser:     "admin",
-		AdminPassword: "5ecret",
-		PublicAddress: "example.com:443",
+		Name:              "test-controller",
+		AdminIdentityName: "admin",
+		AdminPassword:     "5ecret",
+		PublicAddress:     "example.com:443",
 	}
 	err = j.AddController(context.Background(), alice, &ctl1)
 	c.Assert(err, qt.IsNil)
-	c.Assert(ctl1.AdminUser, qt.Equals, "")
+	c.Assert(ctl1.AdminIdentityName, qt.Equals, "")
 	c.Assert(ctl1.AdminPassword, qt.Equals, "")
 
 	ctl2 := dbmodel.Controller{
@@ -348,14 +348,14 @@ func TestAddControllerWithVault(t *testing.T) {
 	c.Assert(password, qt.Equals, "5ecret")
 
 	ctl3 := dbmodel.Controller{
-		Name:          "test-controller-2",
-		AdminUser:     "admin",
-		AdminPassword: "5ecretToo",
-		PublicAddress: "example.com:443",
+		Name:              "test-controller-2",
+		AdminIdentityName: "admin",
+		AdminPassword:     "5ecretToo",
+		PublicAddress:     "example.com:443",
 	}
 	err = j.AddController(context.Background(), alice, &ctl3)
 	c.Assert(err, qt.IsNil)
-	c.Assert(ctl3.AdminUser, qt.Equals, "")
+	c.Assert(ctl3.AdminIdentityName, qt.Equals, "")
 	c.Assert(ctl3.AdminPassword, qt.Equals, "")
 
 	ctl4 := dbmodel.Controller{
@@ -602,8 +602,8 @@ func TestImportModel(t *testing.T) {
 				String: "00000002-0000-0000-0000-000000000001",
 				Valid:  true,
 			},
-			Owner: dbmodel.User{
-				Username:    "alice@external",
+			Owner: dbmodel.Identity{
+				Name:        "alice@external",
 				DisplayName: "Alice",
 			},
 			Controller: dbmodel.Controller{
@@ -690,8 +690,8 @@ func TestImportModel(t *testing.T) {
 				String: "00000002-0000-0000-0000-000000000001",
 				Valid:  true,
 			},
-			Owner: dbmodel.User{
-				Username:    "alice@external",
+			Owner: dbmodel.Identity{
+				Name:        "alice@external",
 				DisplayName: "Alice",
 			},
 			Controller: dbmodel.Controller{
@@ -1121,7 +1121,7 @@ func TestGetControllerConfig(t *testing.T) {
 			})
 			c.Assert(err, qt.Equals, nil)
 
-			cfg, err := j.GetControllerConfig(ctx, user.User)
+			cfg, err := j.GetControllerConfig(ctx, user.Identity)
 			if test.expectedError == "" {
 				c.Assert(err, qt.IsNil)
 				c.Assert(cfg, jimmtest.DBObjectEquals, &test.expectedConfig)
@@ -1436,8 +1436,8 @@ func TestInitiateMigration(t *testing.T) {
 		about: "model migration initiated successfully",
 		user: func(client *openfga.OFGAClient) *openfga.User {
 			return openfga.NewUser(
-				&dbmodel.User{
-					Username: "alice@external",
+				&dbmodel.Identity{
+					Name: "alice@external",
 				},
 				client,
 			)
@@ -1461,8 +1461,8 @@ func TestInitiateMigration(t *testing.T) {
 		about: "model not found",
 		user: func(client *openfga.OFGAClient) *openfga.User {
 			return openfga.NewUser(
-				&dbmodel.User{
-					Username: "alice@external",
+				&dbmodel.Identity{
+					Name: "alice@external",
 				},
 				client,
 			)
@@ -1481,8 +1481,8 @@ func TestInitiateMigration(t *testing.T) {
 		about: "InitiateMigration call fails",
 		user: func(client *openfga.OFGAClient) *openfga.User {
 			return openfga.NewUser(
-				&dbmodel.User{
-					Username: "alice@external",
+				&dbmodel.Identity{
+					Name: "alice@external",
 				},
 				client,
 			)
@@ -1502,8 +1502,8 @@ func TestInitiateMigration(t *testing.T) {
 		about: "non-admin-user gets unauthorized error",
 		user: func(client *openfga.OFGAClient) *openfga.User {
 			return openfga.NewUser(
-				&dbmodel.User{
-					Username: "bob@external",
+				&dbmodel.Identity{
+					Name: "bob@external",
 				},
 				client,
 			)
@@ -1521,8 +1521,8 @@ func TestInitiateMigration(t *testing.T) {
 		about: "invalid model tag",
 		user: func(client *openfga.OFGAClient) *openfga.User {
 			return openfga.NewUser(
-				&dbmodel.User{
-					Username: "alice@external",
+				&dbmodel.Identity{
+					Name: "alice@external",
 				},
 				client,
 			)
@@ -1540,8 +1540,8 @@ func TestInitiateMigration(t *testing.T) {
 		about: "invalid target controller tag",
 		user: func(client *openfga.OFGAClient) *openfga.User {
 			return openfga.NewUser(
-				&dbmodel.User{
-					Username: "alice@external",
+				&dbmodel.Identity{
+					Name: "alice@external",
 				},
 				client,
 			)
@@ -1559,8 +1559,8 @@ func TestInitiateMigration(t *testing.T) {
 		about: "invalid target user tag",
 		user: func(client *openfga.OFGAClient) *openfga.User {
 			return openfga.NewUser(
-				&dbmodel.User{
-					Username: "alice@external",
+				&dbmodel.Identity{
+					Name: "alice@external",
 				},
 				client,
 			)
@@ -1578,8 +1578,8 @@ func TestInitiateMigration(t *testing.T) {
 		about: "invalid macaroon data",
 		user: func(client *openfga.OFGAClient) *openfga.User {
 			return openfga.NewUser(
-				&dbmodel.User{
-					Username: "alice@external",
+				&dbmodel.Identity{
+					Name: "alice@external",
 				},
 				client,
 			)

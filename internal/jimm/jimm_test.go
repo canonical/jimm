@@ -45,32 +45,32 @@ func TestFindAuditEvents(t *testing.T) {
 	err = j.Database.Migrate(ctx, true)
 	c.Assert(err, qt.Equals, nil)
 
-	admin := openfga.NewUser(&dbmodel.User{Username: "alice@external"}, client)
+	admin := openfga.NewUser(&dbmodel.Identity{Name: "alice@external"}, client)
 	err = admin.SetControllerAccess(ctx, j.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, qt.IsNil)
 
-	privileged := openfga.NewUser(&dbmodel.User{Username: "bob@external"}, client)
+	privileged := openfga.NewUser(&dbmodel.Identity{Name: "bob@external"}, client)
 	err = privileged.SetControllerAccess(ctx, j.ResourceTag(), ofganames.AuditLogViewerRelation)
 	c.Assert(err, qt.IsNil)
 
-	unprivileged := openfga.NewUser(&dbmodel.User{Username: "eve@external"}, client)
+	unprivileged := openfga.NewUser(&dbmodel.Identity{Name: "eve@external"}, client)
 
 	events := []dbmodel.AuditLogEntry{{
 		Time:         now,
-		UserTag:      admin.User.Tag().String(),
+		IdentityTag:  admin.Identity.Tag().String(),
 		FacadeMethod: "Login",
 	}, {
 		Time:         now.Add(time.Hour),
-		UserTag:      admin.User.Tag().String(),
+		IdentityTag:  admin.Identity.Tag().String(),
 		FacadeMethod: "AddModel",
 	}, {
 		Time:         now.Add(2 * time.Hour),
-		UserTag:      privileged.User.Tag().String(),
+		IdentityTag:  privileged.Identity.Tag().String(),
 		Model:        "TestModel",
 		FacadeMethod: "Deploy",
 	}, {
 		Time:         now.Add(3 * time.Hour),
-		UserTag:      privileged.User.Tag().String(),
+		IdentityTag:  privileged.Identity.Tag().String(),
 		Model:        "TestModel",
 		FacadeMethod: "DestroyModel",
 	}}
@@ -102,7 +102,7 @@ func TestFindAuditEvents(t *testing.T) {
 		about: "admin/privileged user is allowed to find audit events by user",
 		users: []*openfga.User{admin, privileged},
 		filter: db.AuditLogFilter{
-			UserTag: admin.Tag().String(),
+			IdentityTag: admin.Tag().String(),
 		},
 		expectedEvents: []dbmodel.AuditLogEntry{events[0], events[1]},
 	}, {
@@ -139,13 +139,13 @@ func TestFindAuditEvents(t *testing.T) {
 		about: "admin/privileged user - no events found",
 		users: []*openfga.User{admin, privileged},
 		filter: db.AuditLogFilter{
-			UserTag: "no-such-user",
+			IdentityTag: "no-such-user",
 		},
 	}, {
 		about: "unprivileged user is not allowed to access audit events",
 		users: []*openfga.User{unprivileged},
 		filter: db.AuditLogFilter{
-			UserTag: admin.Tag().String(),
+			IdentityTag: admin.Tag().String(),
 		},
 		expectedError: "unauthorized",
 	}}
@@ -224,7 +224,7 @@ func TestListControllers(t *testing.T) {
 
 	tests := []struct {
 		about               string
-		user                dbmodel.User
+		user                dbmodel.Identity
 		jimmAdmin           bool
 		expectedControllers []dbmodel.Controller
 		expectedError       string
@@ -312,7 +312,7 @@ func TestSetControllerDeprecated(t *testing.T) {
 
 	tests := []struct {
 		about         string
-		user          dbmodel.User
+		user          dbmodel.Identity
 		jimmAdmin     bool
 		deprecated    bool
 		expectedError string

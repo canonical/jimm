@@ -57,7 +57,7 @@ func TestRecreateDeletedModel(t *testing.T) {
 		CloudRegion:     cl.Regions[0],
 		CloudCredential: cred,
 	}
-	c.Check(db.Create(&m2).Error, qt.ErrorMatches, `.*violates unique constraint "models_controller_id_owner_username_name_key".*`)
+	c.Check(db.Create(&m2).Error, qt.ErrorMatches, `.*violates unique constraint "models_controller_id_owner_identity_name_name_key".*`)
 
 	c.Assert(db.Delete(&m1).Error, qt.IsNil)
 	c.Check(db.First(&m1).Error, qt.Equals, gorm.ErrRecordNotFound)
@@ -214,15 +214,15 @@ func TestToJujuModel(t *testing.T) {
 			String: "00000001-0000-0000-0000-0000-000000000001",
 			Valid:  true,
 		},
-		OwnerUsername:   u.Username,
-		Owner:           u,
-		Controller:      ctl,
-		CloudRegion:     cl.Regions[0],
-		CloudCredential: cred,
-		Type:            "iaas",
-		IsController:    false,
-		DefaultSeries:   "warty",
-		Life:            constants.ALIVE.String(),
+		OwnerIdentityName: u.Name,
+		Owner:             u,
+		Controller:        ctl,
+		CloudRegion:       cl.Regions[0],
+		CloudCredential:   cred,
+		Type:              "iaas",
+		IsController:      false,
+		DefaultSeries:     "warty",
+		Life:              constants.ALIVE.String(),
 		Status: dbmodel.Status{
 			Status: "available",
 			Since: sql.NullTime{
@@ -316,9 +316,9 @@ func TestToJujuModelSummary(t *testing.T) {
 
 // initModelEnv initialises a controller, cloud and cloud-credential so
 // that a model can be created.
-func initModelEnv(c *qt.C, db *gorm.DB) (dbmodel.Cloud, dbmodel.CloudCredential, dbmodel.Controller, dbmodel.User) {
-	u := dbmodel.User{
-		Username: "bob@external",
+func initModelEnv(c *qt.C, db *gorm.DB) (dbmodel.Cloud, dbmodel.CloudCredential, dbmodel.Controller, dbmodel.Identity) {
+	u := dbmodel.Identity{
+		Name: "bob@external",
 	}
 	c.Assert(db.Create(&u).Error, qt.IsNil)
 
@@ -414,15 +414,15 @@ func TestModelFromJujuModelInfo(t *testing.T) {
 		CloudCredential: dbmodel.CloudCredential{
 			Name:      "test-cred",
 			CloudName: "test-cloud",
-			Owner: dbmodel.User{
-				Username: "bob@external",
+			Owner: dbmodel.Identity{
+				Name: "bob@external",
 			},
 		},
-		OwnerUsername: "bob@external",
-		Type:          "iaas",
-		IsController:  false,
-		DefaultSeries: "warty",
-		Life:          constants.ALIVE.String(),
+		OwnerIdentityName: "bob@external",
+		Type:              "iaas",
+		IsController:      false,
+		DefaultSeries:     "warty",
+		Life:              constants.ALIVE.String(),
 		Status: dbmodel.Status{
 			Status: "available",
 			Since: sql.NullTime{

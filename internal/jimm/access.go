@@ -357,9 +357,9 @@ func (j *JIMM) GrantAuditLogAccess(ctx context.Context, user *openfga.User, targ
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
-	targetUser := &dbmodel.User{}
+	targetUser := &dbmodel.Identity{}
 	targetUser.SetTag(targetUserTag)
-	err := j.Database.GetUser(ctx, targetUser)
+	err := j.Database.GetIdentity(ctx, targetUser)
 	if err != nil {
 		return errors.E(op, err)
 	}
@@ -380,9 +380,9 @@ func (j *JIMM) RevokeAuditLogAccess(ctx context.Context, user *openfga.User, tar
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
-	targetUser := &dbmodel.User{}
+	targetUser := &dbmodel.Identity{}
 	targetUser.SetTag(targetUserTag)
-	err := j.Database.GetUser(ctx, targetUser)
+	err := j.Database.GetIdentity(ctx, targetUser)
 	if err != nil {
 		return errors.E(op, err)
 	}
@@ -427,7 +427,7 @@ func (j *JIMM) ToJAASTag(ctx context.Context, tag *ofganames.Tag) (string, error
 		if err != nil {
 			return "", errors.E(err, "failed to fetch model information")
 		}
-		modelString := names.ModelTagKind + "-" + model.Controller.Name + ":" + model.OwnerUsername + "/" + model.Name
+		modelString := names.ModelTagKind + "-" + model.Controller.Name + ":" + model.OwnerIdentityName + "/" + model.Name
 		if tag.Relation.String() != "" {
 			modelString = modelString + "#" + tag.Relation.String()
 		}
@@ -440,7 +440,7 @@ func (j *JIMM) ToJAASTag(ctx context.Context, tag *ofganames.Tag) (string, error
 		if err != nil {
 			return "", errors.E(err, "failed to fetch application offer information")
 		}
-		aoString := names.ApplicationOfferTagKind + "-" + ao.Model.Controller.Name + ":" + ao.Model.OwnerUsername + "/" + ao.Model.Name + "." + ao.Name
+		aoString := names.ApplicationOfferTagKind + "-" + ao.Model.Controller.Name + ":" + ao.Model.OwnerIdentityName + "/" + ao.Model.Name + "." + ao.Name
 		if tag.Relation.String() != "" {
 			aoString = aoString + "#" + tag.Relation.String()
 		}
@@ -534,7 +534,7 @@ func resolveTag(jimmUUID string, db *db.Database, tag string) (*ofganames.Tag, e
 		}
 		err := db.GetGroup(ctx, entry)
 		if err != nil {
-			return nil, errors.E("group not found")
+			return nil, errors.E(fmt.Sprintf("group %s not found", trailer))
 		}
 		return ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag(strconv.FormatUint(uint64(entry.ID), 10)), relation), nil
 
@@ -580,7 +580,7 @@ func resolveTag(jimmUUID string, db *db.Database, tag string) (*ofganames.Tag, e
 				return nil, errors.E("controller not found")
 			}
 			model.ControllerID = controller.ID
-			model.OwnerUsername = userName
+			model.OwnerIdentityName = userName
 			model.Name = modelName
 		}
 

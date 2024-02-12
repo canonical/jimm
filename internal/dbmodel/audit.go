@@ -40,8 +40,8 @@ type AuditLogEntry struct {
 	// ObjectId contains the object id to act on, only used by certain facades.
 	ObjectId string
 
-	// UserTag is the tag of the user the performed the action.
-	UserTag string `gorm:"index"`
+	// IdentityTag is the tag of the identity that performed the action.
+	IdentityTag string `gorm:"index"`
 
 	// IsResponse indicates whether the action was a Response/Request.
 	IsResponse bool
@@ -69,7 +69,7 @@ func (e AuditLogEntry) ToAPIAuditEvent() apiparams.AuditEvent {
 	ale.FacadeName = e.FacadeName
 	ale.FacadeVersion = e.FacadeVersion
 	ale.ObjectId = e.ObjectId
-	ale.UserTag = e.UserTag
+	ale.UserTag = e.IdentityTag
 	ale.Model = e.Model
 	ale.IsResponse = e.IsResponse
 	ale.Errors = nil

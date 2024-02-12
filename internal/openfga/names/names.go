@@ -58,7 +58,8 @@ type ResourceTagger interface {
 		names.ControllerTag |
 		names.ModelTag |
 		names.ApplicationOfferTag |
-		names.CloudTag
+		names.CloudTag |
+		jimmnames.ServiceAccountTag
 
 	Id() string
 	Kind() string
@@ -106,7 +107,8 @@ func BlankKindTag(kind string) (*Tag, error) {
 	switch kind {
 	case names.UserTagKind, jimmnames.GroupTagKind,
 		names.ControllerTagKind, names.ModelTagKind,
-		names.ApplicationOfferTagKind, names.CloudTagKind:
+		names.ApplicationOfferTagKind, names.CloudTagKind,
+		jimmnames.ServiceAccountTagKind:
 		return &Tag{
 			Kind: cofga.Kind(kind),
 		}, nil

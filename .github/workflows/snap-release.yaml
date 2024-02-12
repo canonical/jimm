@@ -1,10 +1,14 @@
-name: Release jimmctl snap
+name: Release snap
 
 on:
-  workflow_dispatch:
-  push:
-    tags:
-      - 'v3*'
+  workflow_call:
+    inputs:
+      folder:
+        required: true
+        type: string
+      release-channel:
+        required: true
+        type: string
 
 # Note this workflow requires a Github secret to provide auth against snapstore.
 # snapcraft export-login --snaps=PACKAGE_NAME --acls package_access,package_push,package_update,package_release exported.txt
@@ -23,7 +27,7 @@ jobs:
     - name: scripts
       run: |
         mkdir -p ./snap
-        cp ./snaps/jimmctl/snapcraft.yaml ./snap/
+        cp ./snaps/${{ inputs.folder }}/snapcraft.yaml ./snap/
     - uses: snapcore/action-build@v1
       id: snapcraft
     - uses: actions/upload-artifact@v2
@@ -44,5 +48,4 @@ jobs:
       with:
         store_login: ${{ secrets.STORE_LOGIN }}
         snap: ${{needs.build.outputs.snap}}
-        release: '3/edge'
-
+        release: '${{ inputs.release-channel }}'

@@ -17,17 +17,17 @@ import (
 	"github.com/canonical/jimm/internal/jimmtest"
 )
 
-func TestSetUserModelDefaults(t *testing.T) {
+func TestSetIdentityModelDefaults(t *testing.T) {
 	c := qt.New(t)
 
 	ctx := context.Background()
 	now := time.Now()
 
 	type testConfig struct {
-		user             *dbmodel.User
+		identity         *dbmodel.Identity
 		defaults         map[string]interface{}
 		expectedError    string
-		expectedDefaults *dbmodel.UserModelDefaults
+		expectedDefaults *dbmodel.IdentityModelDefaults
 	}
 
 	tests := []struct {
@@ -37,24 +37,24 @@ func TestSetUserModelDefaults(t *testing.T) {
 	}{{
 		about: "defaults do not exist yet - defaults created",
 		setup: func(c *qt.C, j *jimm.JIMM) testConfig {
-			user := dbmodel.User{
-				Username: "bob@external",
+			identity := dbmodel.Identity{
+				Name: "bob@external",
 			}
-			c.Assert(j.Database.DB.Create(&user).Error, qt.IsNil)
+			c.Assert(j.Database.DB.Create(&identity).Error, qt.IsNil)
 
 			defaults := map[string]interface{}{
 				"key1": float64(42),
 				"key2": "a test string",
 			}
 
-			expectedDefaults := dbmodel.UserModelDefaults{
-				Username: user.Username,
-				User:     user,
-				Defaults: defaults,
+			expectedDefaults := dbmodel.IdentityModelDefaults{
+				IdentityName: identity.Name,
+				Identity:     identity,
+				Defaults:     defaults,
 			}
 
 			return testConfig{
-				user:             &user,
+				identity:         &identity,
 				defaults:         defaults,
 				expectedDefaults: &expectedDefaults,
 			}
@@ -62,14 +62,14 @@ func TestSetUserModelDefaults(t *testing.T) {
 	}, {
 		about: "defaults already exist - defaults updated",
 		setup: func(c *qt.C, j *jimm.JIMM) testConfig {
-			user := dbmodel.User{
-				Username: "bob@external",
+			identity := dbmodel.Identity{
+				Name: "bob@external",
 			}
-			c.Assert(j.Database.DB.Create(&user).Error, qt.IsNil)
+			c.Assert(j.Database.DB.Create(&identity).Error, qt.IsNil)
 
-			j.Database.SetUserModelDefaults(ctx, &dbmodel.UserModelDefaults{
-				Username: user.Username,
-				User:     user,
+			j.Database.SetIdentityModelDefaults(ctx, &dbmodel.IdentityModelDefaults{
+				IdentityName: identity.Name,
+				Identity:     identity,
 				Defaults: map[string]interface{}{
 					"key1": float64(17),
 					"key2": "a test string",
@@ -82,23 +82,23 @@ func TestSetUserModelDefaults(t *testing.T) {
 				"key3": "a new value",
 			}
 
-			expectedDefaults := dbmodel.UserModelDefaults{
-				Username: user.Username,
-				User:     user,
-				Defaults: defaults,
+			expectedDefaults := dbmodel.IdentityModelDefaults{
+				IdentityName: identity.Name,
+				Identity:     identity,
+				Defaults:     defaults,
 			}
 
 			return testConfig{
-				user:             &user,
+				identity:         &identity,
 				defaults:         defaults,
 				expectedDefaults: &expectedDefaults,
 			}
 		},
 	}, {
-		about: "user does not exist",
+		about: "identity does not exist",
 		setup: func(c *qt.C, j *jimm.JIMM) testConfig {
-			user := dbmodel.User{
-				Username: "bob@external",
+			identity := dbmodel.Identity{
+				Name: "bob@external",
 			}
 
 			defaults := map[string]interface{}{
@@ -108,7 +108,7 @@ func TestSetUserModelDefaults(t *testing.T) {
 			}
 
 			return testConfig{
-				user:          &user,
+				identity:      &identity,
 				defaults:      defaults,
 				expectedError: `.*violates foreign key constraint.*`,
 			}
@@ -116,10 +116,10 @@ func TestSetUserModelDefaults(t *testing.T) {
 	}, {
 		about: "cannot set agent-version",
 		setup: func(c *qt.C, j *jimm.JIMM) testConfig {
-			user := dbmodel.User{
-				Username: "bob@external",
+			identity := dbmodel.Identity{
+				Name: "bob@external",
 			}
-			c.Assert(j.Database.DB.Create(&user).Error, qt.IsNil)
+			c.Assert(j.Database.DB.Create(&identity).Error, qt.IsNil)
 
 			defaults := map[string]interface{}{
 				"agent-version": "2.0",
@@ -128,7 +128,7 @@ func TestSetUserModelDefaults(t *testing.T) {
 			}
 
 			return testConfig{
-				user:          &user,
+				identity:      &identity,
 				defaults:      defaults,
 				expectedError: `agent-version cannot have a default value`,
 			}
@@ -147,13 +147,13 @@ func TestSetUserModelDefaults(t *testing.T) {
 
 			testConfig := test.setup(c, j)
 
-			err = j.SetUserModelDefaults(ctx, testConfig.user, testConfig.defaults)
+			err = j.SetIdentityModelDefaults(ctx, testConfig.identity, testConfig.defaults)
 			if testConfig.expectedError == "" {
 				c.Assert(err, qt.Equals, nil)
-				dbDefaults := dbmodel.UserModelDefaults{
-					Username: testConfig.expectedDefaults.Username,
+				dbDefaults := dbmodel.IdentityModelDefaults{
+					IdentityName: testConfig.expectedDefaults.IdentityName,
 				}
-				err = j.Database.UserModelDefaults(ctx, &dbDefaults)
+				err = j.Database.IdentityModelDefaults(ctx, &dbDefaults)
 				c.Assert(err, qt.Equals, nil)
 				c.Assert(&dbDefaults, qt.CmpEquals(cmpopts.IgnoreTypes(gorm.Model{})), testConfig.expectedDefaults)
 			} else {

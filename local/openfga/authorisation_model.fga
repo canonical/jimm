@@ -1,0 +1,38 @@
+model
+  schema 1.1
+
+type applicationoffer
+  relations
+    define administrator: [user, user:*, group#member] or administrator from model
+    define consumer: [user, user:*, group#member] or administrator
+    define model: [model]
+    define reader: [user, user:*, group#member] or consumer
+
+type cloud
+  relations
+    define administrator: [user, user:*, group#member] or administrator from controller
+    define can_addmodel: [user, user:*, group#member] or administrator
+    define controller: [controller]
+
+type controller
+  relations
+    define administrator: [user, user:*, group#member] or administrator from controller
+    define audit_log_viewer: [user, user:*, group#member] or administrator
+    define controller: [controller]
+
+type group
+  relations
+    define member: [user, user:*, group#member]
+
+type model
+  relations
+    define administrator: [user, user:*, group#member] or administrator from controller
+    define controller: [controller]
+    define reader: [user, user:*, group#member] or writer
+    define writer: [user, user:*, group#member] or administrator
+
+type user
+
+type serviceaccount
+  relations
+    define administator: [user, user:*, group#member]

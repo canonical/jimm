@@ -571,7 +571,7 @@ func ensureControllerAdministrators(ctx context.Context, client *openfga.OFGACli
 	tuples := []openfga.Tuple{}
 	for _, username := range admins {
 		userTag := names.NewUserTag(username)
-		user := openfga.NewUser(&dbmodel.User{Username: userTag.Id()}, client)
+		user := openfga.NewUser(&dbmodel.Identity{Name: userTag.Id()}, client)
 		isAdmin, err := openfga.IsAdministrator(ctx, user, controller)
 		if err != nil {
 			return errors.E(err)

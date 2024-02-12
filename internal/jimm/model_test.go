@@ -237,8 +237,8 @@ users:
 			String: "00000001-0000-0000-0000-0000-000000000001",
 			Valid:  true,
 		},
-		Owner: dbmodel.User{
-			Username: "alice@external",
+		Owner: dbmodel.Identity{
+			Name: "alice@external",
 		},
 		Controller: dbmodel.Controller{
 			Name:        "controller-2",
@@ -351,8 +351,8 @@ users:
 			String: "00000001-0000-0000-0000-0000-000000000001",
 			Valid:  true,
 		},
-		Owner: dbmodel.User{
-			Username: "alice@external",
+		Owner: dbmodel.Identity{
+			Name: "alice@external",
 		},
 		Controller: dbmodel.Controller{
 			Name:        "controller-2",
@@ -444,8 +444,8 @@ users:
 			String: "00000001-0000-0000-0000-0000-000000000001",
 			Valid:  true,
 		},
-		Owner: dbmodel.User{
-			Username: "alice@external",
+		Owner: dbmodel.Identity{
+			Name: "alice@external",
 		},
 		Controller: dbmodel.Controller{
 			Name:        "controller-2",
@@ -544,8 +544,8 @@ users:
 			String: "00000001-0000-0000-0000-0000-000000000001",
 			Valid:  true,
 		},
-		Owner: dbmodel.User{
-			Username: "bob@external",
+		Owner: dbmodel.Identity{
+			Name: "bob@external",
 		},
 		Controller: dbmodel.Controller{
 			Name:        "controller-2",
@@ -945,8 +945,8 @@ func TestAddModel(t *testing.T) {
 				isModelAdmin, err := openfga.IsAdministrator(
 					context.Background(),
 					openfga.NewUser(
-						&dbmodel.User{
-							Username: ownerId,
+						&dbmodel.Identity{
+							Name: ownerId,
 						},
 						client,
 					),
@@ -1296,8 +1296,8 @@ func TestModelInfo(t *testing.T) {
 			env := jimmtest.ParseEnvironment(c, test.env)
 			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
 
-			dbUser := &dbmodel.User{
-				Username: test.username,
+			dbUser := &dbmodel.Identity{
+				Name: test.username,
 			}
 			user := openfga.NewUser(dbUser, client)
 
@@ -3353,8 +3353,8 @@ var updateModelCredentialTests = []struct {
 			String: "00000002-0000-0000-0000-000000000001",
 			Valid:  true,
 		},
-		Owner: dbmodel.User{
-			Username: "alice@external",
+		Owner: dbmodel.Identity{
+			Name: "alice@external",
 		},
 		Controller: dbmodel.Controller{
 			Name:        "controller-1",

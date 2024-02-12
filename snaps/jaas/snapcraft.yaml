@@ -1,0 +1,39 @@
+name: jaas
+summary: JAAS plugin
+description: Juju plugin for providing JAAS functionality to the Juju CLI.
+version: git
+grade: stable
+base: bare
+build-base: core20
+confinement: strict
+
+slots:
+  jaas-plugin:
+    interface: content
+    content: jaas-plugin
+    read: 
+      - $SNAP/bin
+
+# The app has no plugs as it is intended to be invoked by the Juju CLI Snap.
+apps:
+  jaas:
+    command: bin/jaas
+
+parts:
+  jaas:
+    plugin: go
+    source: ./
+    source-type: git
+    prime:
+      - bin/jaas
+    override-build: |
+      set -e
+      CGO_ENABLED=0 go install github.com/canonical/jimm/cmd/jaas
+    override-prime: |
+      snapcraftctl prime
+      # Add all CLI commands below to make them appear top-level to Juju.
+      ln -sf jaas bin/juju-jaas
+      ln -sf jaas bin/juju-add-service-account
+      ln -sf jaas bin/juju-list-service-account-credentials
+      ln -sf jaas bin/juju-update-service-account-credentials
+      ln -sf jaas bin/juju-grant-service-account-access
