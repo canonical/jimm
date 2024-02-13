@@ -39,7 +39,7 @@ type KeycloakUser struct {
 // CreateRandomKeycloakUser creates a Keycloak user with random username and
 // returns the created user details.
 func CreateRandomKeycloakUser() (*KeycloakUser, error) {
-	username := "random_user_" + uuid.New().String()[0:8]
+	username := "random-user-" + uuid.New().String()[0:8]
 	email := username + "@canonical.com"
 	password := "jimm"
 

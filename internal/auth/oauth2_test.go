@@ -19,6 +19,19 @@ import (
 	qt "github.com/frankban/quicktest"
 )
 
+func setupTestAuthSvc(ctx context.Context, c *qt.C, expiry time.Duration) *auth.AuthenticationService {
+	authSvc, err := auth.NewAuthenticationService(ctx, auth.AuthenticationServiceParams{
+		IssuerURL:          "http://localhost:8082/realms/jimm",
+		ClientID:           "jimm-device",
+		ClientSecret:       "SwjDofnbDzJDm9iyfUhEp67FfUFMY8L4",
+		Scopes:             []string{oidc.ScopeOpenID, "profile", "email"},
+		SessionTokenExpiry: expiry,
+	})
+	c.Assert(err, qt.IsNil)
+
+	return authSvc
+}
+
 // TestDevice is a unique test in that it runs through the entire device oauth2.0
 // flow and additionally ensures the id token is verified and correct.
 //
@@ -35,12 +48,7 @@ func TestDevice(t *testing.T) {
 
 	ctx := context.Background()
 
-	authSvc, err := auth.NewAuthenticationService(ctx, auth.AuthenticationServiceParams{
-		IssuerURL:      "http://localhost:8082/realms/jimm",
-		DeviceClientID: "jimm-device",
-		DeviceScopes:   []string{oidc.ScopeOpenID, "profile", "email"},
-	})
-	c.Assert(err, qt.IsNil)
+	authSvc := setupTestAuthSvc(ctx, c, time.Hour)
 
 	res, err := authSvc.Device(ctx)
 	c.Assert(err, qt.IsNil)
@@ -113,95 +121,70 @@ func TestDevice(t *testing.T) {
 	c.Assert(email, qt.Equals, u.Email)
 }
 
-// TestAccessTokens tests both the minting and validation of JIMM
-// access tokens.
-func TestAccessTokens(t *testing.T) {
+// TestSessionTokens tests both the minting and validation of JIMM
+// session tokens.
+func TestSessionTokens(t *testing.T) {
 	c := qt.New(t)
 
 	ctx := context.Background()
 
-	authSvc, err := auth.NewAuthenticationService(ctx, auth.AuthenticationServiceParams{
-		IssuerURL:          "http://localhost:8082/realms/jimm",
-		DeviceClientID:     "jimm-device",
-		DeviceScopes:       []string{oidc.ScopeOpenID, "profile", "email"},
-		SessionTokenExpiry: time.Hour,
-	})
-	c.Assert(err, qt.IsNil)
+	authSvc := setupTestAuthSvc(ctx, c, time.Hour)
 
 	secretKey := "secret-key"
 	token, err := authSvc.MintSessionToken("jimm-test@canonical.com", secretKey)
 	c.Assert(err, qt.IsNil)
 	c.Assert(len(token) > 0, qt.IsTrue)
 
-	jwtToken, err := authSvc.VerifyAccessToken(token, secretKey)
+	jwtToken, err := authSvc.VerifySessionToken(token, secretKey)
 	c.Assert(err, qt.IsNil)
 	c.Assert(jwtToken.Subject(), qt.Equals, "jimm-test@canonical.com")
 }
 
-func TestAccessTokenRejectsWrongSecretKey(t *testing.T) {
+func TestSessionTokenRejectsWrongSecretKey(t *testing.T) {
 	c := qt.New(t)
 
 	ctx := context.Background()
 
-	authSvc, err := auth.NewAuthenticationService(ctx, auth.AuthenticationServiceParams{
-		IssuerURL:          "http://localhost:8082/realms/jimm",
-		DeviceClientID:     "jimm-device",
-		DeviceScopes:       []string{oidc.ScopeOpenID, "profile", "email"},
-		SessionTokenExpiry: time.Hour,
-	})
-	c.Assert(err, qt.IsNil)
+	authSvc := setupTestAuthSvc(ctx, c, time.Hour)
 
 	secretKey := "secret-key"
 	token, err := authSvc.MintSessionToken("jimm-test@canonical.com", secretKey)
 	c.Assert(err, qt.IsNil)
 	c.Assert(len(token) > 0, qt.IsTrue)
 
-	_, err = authSvc.VerifyAccessToken(token, "wrong key")
+	_, err = authSvc.VerifySessionToken(token, "wrong key")
 	c.Assert(err, qt.ErrorMatches, "could not verify message using any of the signatures or keys")
 }
 
-func TestAccessTokenRejectsExpiredToken(t *testing.T) {
+func TestSessionTokenRejectsExpiredToken(t *testing.T) {
 	c := qt.New(t)
 
 	ctx := context.Background()
 
 	noDuration := time.Duration(0)
-
-	authSvc, err := auth.NewAuthenticationService(ctx, auth.AuthenticationServiceParams{
-		IssuerURL:          "http://localhost:8082/realms/jimm",
-		DeviceClientID:     "jimm-device",
-		DeviceScopes:       []string{oidc.ScopeOpenID, "profile", "email"},
-		SessionTokenExpiry: noDuration,
-	})
-	c.Assert(err, qt.IsNil)
+	authSvc := setupTestAuthSvc(ctx, c, noDuration)
 
 	secretKey := "secret-key"
 	token, err := authSvc.MintSessionToken("jimm-test@canonical.com", secretKey)
 	c.Assert(err, qt.IsNil)
 	c.Assert(len(token) > 0, qt.IsTrue)
 
-	_, err = authSvc.VerifyAccessToken(token, secretKey)
-	c.Assert(err, qt.ErrorMatches, `"exp" not satisfied`)
+	_, err = authSvc.VerifySessionToken(token, secretKey)
+	c.Assert(err, qt.ErrorMatches, `JIMM session token expired`)
 }
 
-func TestAccessTokenValidatesEmail(t *testing.T) {
+func TestSessionTokenValidatesEmail(t *testing.T) {
 	c := qt.New(t)
 
 	ctx := context.Background()
 
-	authSvc, err := auth.NewAuthenticationService(ctx, auth.AuthenticationServiceParams{
-		IssuerURL:          "http://localhost:8082/realms/jimm",
-		DeviceClientID:     "jimm-device",
-		DeviceScopes:       []string{oidc.ScopeOpenID, "profile", "email"},
-		SessionTokenExpiry: time.Hour,
-	})
-	c.Assert(err, qt.IsNil)
+	authSvc := setupTestAuthSvc(ctx, c, time.Hour)
 
 	secretKey := "secret-key"
 	token, err := authSvc.MintSessionToken("", secretKey)
 	c.Assert(err, qt.IsNil)
 	c.Assert(len(token) > 0, qt.IsTrue)
 
-	_, err = authSvc.VerifyAccessToken(token, secretKey)
+	_, err = authSvc.VerifySessionToken(token, secretKey)
 	c.Assert(err, qt.ErrorMatches, "failed to parse email")
 }

@@ -61,6 +61,7 @@ type JIMM struct {
 	GetControllerConfig_               func(ctx context.Context, u *dbmodel.Identity) (*dbmodel.ControllerConfig, error)
 	GetJimmControllerAccess_           func(ctx context.Context, user *openfga.User, tag names.UserTag) (string, error)
 	GetUser_                           func(ctx context.Context, username string) (*openfga.User, error)
+	GetOpenFGAUserAndAuthorise_        func(ctx context.Context, email string) (*openfga.User, error)
 	GetUserCloudAccess_                func(ctx context.Context, user *openfga.User, cloud names.CloudTag) (string, error)
 	GetUserControllerAccess_           func(ctx context.Context, user *openfga.User, controller names.ControllerTag) (string, error)
 	GetUserModelAccess_                func(ctx context.Context, user *openfga.User, model names.ModelTag) (string, error)
@@ -310,6 +311,12 @@ func (j *JIMM) GetUser(ctx context.Context, username string) (*openfga.User, err
 		return nil, errors.E(errors.CodeNotImplemented)
 	}
 	return j.GetUser(ctx, username)
+}
+func (j *JIMM) GetOpenFGAUserAndAuthorise(ctx context.Context, email string) (*openfga.User, error) {
+	if j.GetOpenFGAUserAndAuthorise_ == nil {
+		return nil, errors.E(errors.CodeNotImplemented)
+	}
+	return j.GetUser(ctx, email)
 }
 func (j *JIMM) GetUserCloudAccess(ctx context.Context, user *openfga.User, cloud names.CloudTag) (string, error) {
 	if j.GetUserCloudAccess_ == nil {

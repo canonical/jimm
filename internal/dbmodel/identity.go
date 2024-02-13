@@ -34,6 +34,11 @@ type Identity struct {
 
 	// CloudCredentials are the cloud credentials owned by this identity.
 	CloudCredentials []CloudCredential `gorm:"foreignKey:OwnerIdentityName;references:Name"`
+
+	// AccessToken is an OAuth2.0 access token for this identity, it may have come
+	// from the browser or device flow, and as such is updated on every successful
+	// login.
+	AccessToken string
 }
 
 // Tag returns a names.Tag for the identity.

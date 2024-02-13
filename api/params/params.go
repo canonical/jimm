@@ -402,16 +402,31 @@ type LoginDeviceResponse struct {
 	VerificationURI string `json:"verification-uri"`
 	// UserCode holds the one-time use user consent code.
 	UserCode string `json:"user-code"`
-	// DeviceLoginID contains the login id to be sent to GetDeviceAccessToken in
-	// order to begin a CLI based short-lived session.
-	DeviceLoginID string `json:"device-login-id"`
 }
 
-// LoginDeviceAccessTokenRequest holds no parameters to initiate a device login.
-type LoginDeviceAccessTokenRequest struct{}
+// GetDeviceSessionTokenResponse returns a session token to be used against
+// LoginWithSessionToken for authentication. The session token will be base64
+// encoded.
+type GetDeviceSessionTokenResponse struct {
+	// SessionToken is a base64 encoded JWT capable of authenticating
+	// a user. The JWT contains the users email address in the subject,
+	// and this is used to identify this user.
+	SessionToken string `json:"session-token"`
+}
 
-// LoginDeviceAccessTokenResponse TODO
-type LoginDeviceAccessTokenResponse struct{}
+// LoginWithSessionTokenRequest accepts a session token minted by JIMM and logs
+// the user in.
+//
+// The login response for this login request type is that of jujuparams.LoginResult,
+// such that the behaviour of previous macroon based authentication is unchanged.
+// However, on unauthenticated requests, the error is different and is not a macaroon
+// discharge request.
+type LoginWithSessionTokenRequest struct {
+	// SessionToken is a base64 encoded JWT capable of authenticating
+	// a user. The JWT contains the users email address in the subject,
+	// and this is used to identify this user.
+	SessionToken string `json:"session-token"`
+}
 
 // Service Account related request parameters
 

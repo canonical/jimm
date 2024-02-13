@@ -87,8 +87,8 @@ func (s *JimmCmdSuite) SetUpTest(c *gc.C) {
 		InsecureSecretStorage: true,
 		OAuthAuthenticatorParams: service.OAuthAuthenticatorParams{
 			IssuerURL:          "http://localhost:8082/realms/jimm",
-			DeviceClientID:     "jimm-device",
-			DeviceScopes:       []string{oidc.ScopeOpenID, "profile", "email"},
+			ClientID:           "jimm-device",
+			Scopes:             []string{oidc.ScopeOpenID, "profile", "email"},
 			SessionTokenExpiry: time.Duration(time.Hour),
 		},
 	}

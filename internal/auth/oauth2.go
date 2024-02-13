@@ -4,6 +4,8 @@ package auth
 
 import (
 	"context"
+	"encoding/base64"
+	stderrors "errors"
 	"net/mail"
 	"time"
 
@@ -19,7 +21,7 @@ import (
 
 // AuthenticationService handles authentication within JIMM.
 type AuthenticationService struct {
-	deviceConfig oauth2.Config
+	oauthConfig oauth2.Config
 	// provider holds a OIDC provider wrapper for the OAuth2.0 /x/oauth package,
 	// enabling UserInfo calls, wellknown retrieval and jwks verification.
 	provider *oidc.Provider
@@ -33,12 +35,13 @@ type AuthenticationServiceParams struct {
 	// IssuerURL is the URL of the OAuth2.0 server.
 	// I.e., http://localhost:8082/realms/jimm in the case of keycloak.
 	IssuerURL string
-	// DeviceClientID holds the OAuth2.0 client id registered and configured
-	// to handle device OAuth2.0 flows. The client is NOT expected to be confidential
-	// and as such does not need a client secret (given it is configured correctly).
-	DeviceClientID string
-	// DeviceScopes holds the scopes that you wish to retrieve.
-	DeviceScopes []string
+	// ClientID holds the OAuth2.0 client id. The client IS expected to be confidential.
+	ClientID string
+	// ClientSecret holds the OAuth2.0 "client-secret" to authenticate when performing
+	// /auth and /token requests.
+	ClientSecret string
+	// Scopes holds the scopes that you wish to retrieve.
+	Scopes []string
 	// SessionTokenExpiry holds the expiry time of minted JIMM session tokens (JWTs).
 	SessionTokenExpiry time.Duration
 }
@@ -56,10 +59,11 @@ func NewAuthenticationService(ctx context.Context, params AuthenticationServiceP
 
 	return &AuthenticationService{
 		provider: provider,
-		deviceConfig: oauth2.Config{
-			ClientID: params.DeviceClientID,
-			Endpoint: provider.Endpoint(),
-			Scopes:   params.DeviceScopes,
+		oauthConfig: oauth2.Config{
+			ClientID:     params.ClientID,
+			ClientSecret: params.ClientSecret,
+			Endpoint:     provider.Endpoint(),
+			Scopes:       params.Scopes,
 		},
 		sessionTokenExpiry: params.SessionTokenExpiry,
 	}, nil
@@ -82,7 +86,10 @@ func NewAuthenticationService(ctx context.Context, params AuthenticationServiceP
 func (as *AuthenticationService) Device(ctx context.Context) (*oauth2.DeviceAuthResponse, error) {
 	const op = errors.Op("auth.AuthenticationService.Device")
 
-	resp, err := as.deviceConfig.DeviceAuth(ctx)
+	resp, err := as.oauthConfig.DeviceAuth(
+		ctx,
+		oauth2.SetAuthURLParam("client_secret", as.oauthConfig.ClientSecret),
+	)
 	if err != nil {
 		zapctx.Error(ctx, "device auth call failed", zap.Error(err))
 		return nil, errors.E(op, err, "device auth call failed")
@@ -98,7 +105,11 @@ func (as *AuthenticationService) Device(ctx context.Context) (*oauth2.DeviceAuth
 func (as *AuthenticationService) DeviceAccessToken(ctx context.Context, res *oauth2.DeviceAuthResponse) (*oauth2.Token, error) {
 	const op = errors.Op("auth.AuthenticationService.DeviceAccessToken")
 
-	t, err := as.deviceConfig.DeviceAccessToken(ctx, res)
+	t, err := as.oauthConfig.DeviceAccessToken(
+		ctx,
+		res,
+		oauth2.SetAuthURLParam("client_secret", as.oauthConfig.ClientSecret),
+	)
 	if err != nil {
 		return nil, errors.E(op, err, "device access token call failed")
 	}
@@ -118,7 +129,7 @@ func (as *AuthenticationService) ExtractAndVerifyIDToken(ctx context.Context, oa
 	}
 
 	verifier := as.provider.Verifier(&oidc.Config{
-		ClientID: as.deviceConfig.ClientID,
+		ClientID: as.oauthConfig.ClientID,
 	})
 
 	token, err := verifier.Verify(ctx, rawIDToken)
@@ -150,7 +161,7 @@ func (as *AuthenticationService) Email(idToken *oidc.IDToken) (string, error) {
 
 // MintSessionToken mints a session token to be used when logging into JIMM
 // via an access token. The token only contains the user's email for authentication.
-func (as *AuthenticationService) MintSessionToken(email string, secretKey string) ([]byte, error) {
+func (as *AuthenticationService) MintSessionToken(email string, secretKey string) (string, error) {
 	const op = errors.Op("auth.AuthenticationService.MintAccessToken")
 
 	token, err := jwt.NewBuilder().
@@ -158,26 +169,39 @@ func (as *AuthenticationService) MintSessionToken(email string, secretKey string
 		Expiration(time.Now().Add(as.sessionTokenExpiry)).
 		Build()
 	if err != nil {
-		return nil, errors.E(op, err, "failed to build access token")
+		return "", errors.E(op, err, "failed to build access token")
 	}
 
 	freshToken, err := jwt.Sign(token, jwt.WithKey(jwa.HS256, []byte(secretKey)))
 	if err != nil {
-		return nil, errors.E(op, err, "failed to sign access token")
+		return "", errors.E(op, err, "failed to sign access token")
 	}
-	return freshToken, nil
+
+	return base64.StdEncoding.EncodeToString(freshToken), nil
 }
 
-// VerifyAccessToken symmetrically verifies the validty of the signature on the
+// VerifySessionToken symmetrically verifies the validty of the signature on the
 // access token JWT, returning the parsed token.
 //
 // The subject of the token contains the user's email and can be used
 // for user object creation.
-func (as *AuthenticationService) VerifyAccessToken(token []byte, secretKey string) (jwt.Token, error) {
-	const op = errors.Op("auth.AuthenticationService.VerifyAccessToken")
+func (as *AuthenticationService) VerifySessionToken(token string, secretKey string) (jwt.Token, error) {
+	const op = errors.Op("auth.AuthenticationService.VerifySessionToken")
 
-	parsedToken, err := jwt.Parse(token, jwt.WithKey(jwa.HS256, []byte(secretKey)))
+	if len(token) == 0 {
+		return nil, errors.E(op, "authentication failed, no token presented")
+	}
+
+	decodedToken, err := base64.StdEncoding.DecodeString(token)
 	if err != nil {
+		return nil, errors.E(op, "authentication failed, failed to decode token")
+	}
+
+	parsedToken, err := jwt.Parse(decodedToken, jwt.WithKey(jwa.HS256, []byte(secretKey)))
+	if err != nil {
+		if stderrors.Is(err, jwt.ErrTokenExpired()) {
+			return nil, errors.E(op, "JIMM session token expired")
+		}
 		return nil, errors.E(op, err)
 	}
 

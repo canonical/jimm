@@ -68,12 +68,13 @@ type OAuthAuthenticatorParams struct {
 	// IssuerURL is the URL of the OAuth2.0 server.
 	// I.e., http://localhost:8082/realms/jimm in the case of keycloak.
 	IssuerURL string
-	// DeviceClientID holds the OAuth2.0 client id registered and configured
-	// to handle device OAuth2.0 flows. The client is NOT expected to be confidential
-	// and as such does not need a client secret (given it is configured correctly).
-	DeviceClientID string
-	// DeviceScopes holds the scopes that you wish to retrieve.
-	DeviceScopes []string
+	// ClientID holds the OAuth2.0. The client IS expected to be confidential.
+	ClientID string
+	// ClientSecret holds the OAuth2.0 "client-secret" to authenticate when performing
+	// /auth and /token requests.
+	ClientSecret string
+	// Scopes holds the scopes that you wish to retrieve.
+	Scopes []string
 	// SessionTokenExpiry holds the expiry duration for issued JWTs
 	// for user (CLI) to JIMM authentication.
 	SessionTokenExpiry time.Duration
@@ -299,9 +300,10 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	s.jimm.OAuthAuthenticator, err = auth.NewAuthenticationService(
 		ctx,
 		auth.AuthenticationServiceParams{
-			IssuerURL:      p.OAuthAuthenticatorParams.IssuerURL,
-			DeviceClientID: p.OAuthAuthenticatorParams.DeviceClientID,
-			DeviceScopes:   p.OAuthAuthenticatorParams.DeviceScopes,
+			IssuerURL:    p.OAuthAuthenticatorParams.IssuerURL,
+			ClientID:     p.OAuthAuthenticatorParams.ClientID,
+			ClientSecret: p.OAuthAuthenticatorParams.ClientSecret,
+			Scopes:       p.OAuthAuthenticatorParams.Scopes,
 		},
 	)
 	if err != nil {

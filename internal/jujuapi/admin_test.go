@@ -3,14 +3,19 @@
 package jujuapi_test
 
 import (
+	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
 	"regexp"
+	"strings"
 
 	"github.com/canonical/jimm/api/params"
+	"github.com/canonical/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/jimmtest"
 	"github.com/juju/juju/api"
 	jujuparams "github.com/juju/juju/rpc/params"
 	gc "gopkg.in/check.v1"
@@ -55,6 +60,10 @@ func (s *adminSuite) TestDeviceLogin(c *gc.C) {
 	}, "test")
 	defer conn.Close()
 
+	// Create a user in keycloak
+	user, err := jimmtest.CreateRandomKeycloakUser()
+	c.Assert(err, gc.IsNil)
+
 	// We create a http client to keep the same cookies across all requests
 	// using a simple jar.
 	jar, err := cookiejar.New(nil)
@@ -80,15 +89,15 @@ func (s *adminSuite) TestDeviceLogin(c *gc.C) {
 	//
 	// A complete URI looks like: http://localhost:8082/realms/jimm/device?user_code=HOKO-OTRV
 	// where the user code is set as a part of the query string.
-	var resp params.LoginDeviceResponse
-	err = conn.APICall("Admin", 4, "", "LoginDevice", nil, &resp)
+	var loginDeviceResp params.LoginDeviceResponse
+	err = conn.APICall("Admin", 4, "", "LoginDevice", nil, &loginDeviceResp)
 	c.Assert(err, gc.IsNil)
-	c.Assert(resp.UserCode, gc.Not(gc.IsNil))
-	c.Assert(resp.VerificationURI, gc.Equals, "http://localhost:8082/realms/jimm/device")
+	c.Assert(loginDeviceResp.UserCode, gc.Not(gc.IsNil))
+	c.Assert(loginDeviceResp.VerificationURI, gc.Equals, "http://localhost:8082/realms/jimm/device")
 
 	// Step 2, complete the user side of the authentication by sending the
 	// user code to the verification URI using the "complete" method.
-	userResp, err := client.Get(resp.VerificationURI + "?user_code=" + resp.UserCode)
+	userResp, err := client.Get(loginDeviceResp.VerificationURI + "?user_code=" + loginDeviceResp.UserCode)
 	c.Assert(err, gc.IsNil)
 	body := userResp.Body
 	defer body.Close()
@@ -97,13 +106,51 @@ func (s *adminSuite) TestDeviceLogin(c *gc.C) {
 	loginForm := string(b)
 
 	// Step 2.1, handle the login form (see this func for more details)
-	handleLoginForm(c, loginForm, client)
+	handleLoginForm(c, loginForm, client, user.Username, user.Password)
+
+	// Step 3, after the user has entered the user code, the polling for an access
+	// token will complete. The polling can begin before OR after the user has entered the
+	// user code, for the simplicity of testing, we are retrieving it AFTER.
+	var sessionTokenResp params.GetDeviceSessionTokenResponse
+	err = conn.APICall("Admin", 4, "", "GetDeviceSessionToken", nil, &sessionTokenResp)
+	c.Assert(err, gc.IsNil)
+	// Ensure it is base64 and decodable
+	decodedToken, err := base64.StdEncoding.DecodeString(sessionTokenResp.SessionToken)
+	c.Assert(err, gc.IsNil)
+
+	// Step 4, use this session token to "login".
+
+	// Test no token present
+	var loginResult jujuparams.LoginResult
+	err = conn.APICall("Admin", 4, "", "LoginWithSessionToken", nil, &loginResult)
+	c.Assert(err, gc.ErrorMatches, "authentication failed, no token presented")
+
+	// Test token not base64 encoded
+	err = conn.APICall("Admin", 4, "", "LoginWithSessionToken", params.LoginWithSessionTokenRequest{SessionToken: string(decodedToken)}, &loginResult)
+	c.Assert(err, gc.ErrorMatches, "authentication failed, failed to decode token")
+
+	// Test token base64 encoded passes authentication
+	err = conn.APICall("Admin", 4, "", "LoginWithSessionToken", params.LoginWithSessionTokenRequest{SessionToken: sessionTokenResp.SessionToken}, &loginResult)
+	c.Assert(err, gc.IsNil)
+	c.Assert(loginResult.UserInfo.Identity, gc.Equals, "user-"+user.Email)
+	c.Assert(loginResult.UserInfo.DisplayName, gc.Equals, strings.Split(user.Email, "@")[0])
+
+	// Finally, ensure db did indeed update the access token for this user
+	updatedUser := &dbmodel.Identity{
+		Name: user.Email,
+	}
+	c.Assert(s.JIMM.DB().GetIdentity(context.Background(), updatedUser), gc.IsNil)
+	// TODO(ale8k): Do we need to validate the token again for the test?
+	// It has just been through a verifier etc and was returned directly
+	// from the device grant?
+	c.Assert(updatedUser.AccessToken, gc.Not(gc.Equals), "")
+
 }
 
 // handleLoginForm runs through the login process emulating the user typing in
 // their username and password and then clicking consent, to complete
 // the device login flow.
-func handleLoginForm(c *gc.C, loginForm string, client *http.Client) {
+func handleLoginForm(c *gc.C, loginForm string, client *http.Client, username, password string) {
 	// Step 2.2, now we'll be redirected to a sign-in page and must sign in.
 	re := regexp.MustCompile(`action="(.*?)" method=`)
 	match := re.FindStringSubmatch(loginForm)
@@ -112,8 +159,8 @@ func handleLoginForm(c *gc.C, loginForm string, client *http.Client) {
 	// The username and password are hardcoded witih jimm-realm.json in our local
 	// keycloak configuration for the jimm realm.
 	v := url.Values{}
-	v.Add("username", "jimm-test")
-	v.Add("password", "password")
+	v.Add("username", username)
+	v.Add("password", password)
 	loginResp, err := client.PostForm(loginFormUrl, v)
 	c.Assert(err, gc.IsNil)
 

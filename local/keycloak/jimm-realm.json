@@ -688,7 +688,6 @@
       ]
     },
     {
-      "id": "9b8ea7fd-1ea8-43e6-9e2e-71b8f7d878e3",
       "clientId": "jimm-device",
       "name": "jimm-testing",
       "description": "A client to enable testing JIMM",
@@ -699,6 +698,7 @@
       "enabled": true,
       "alwaysDisplayInConsole": true,
       "clientAuthenticatorType": "client-secret",
+      "secret": "SwjDofnbDzJDm9iyfUhEp67FfUFMY8L4",
       "redirectUris": [
         "http://localhost/cb"
       ],
@@ -712,12 +712,12 @@
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": true,
       "serviceAccountsEnabled": false,
-      "publicClient": true,
+      "publicClient": false,
       "frontchannelLogout": true,
       "protocol": "openid-connect",
       "attributes": {
         "oidc.ciba.grant.enabled": "false",
-        "client.secret.creation.time": "1705363608",
+        "client.secret.creation.time": "1707471625",
         "backchannel.logout.session.required": "true",
         "consent.screen.text": "JIMM consent screen",
         "login_theme": "base",
@@ -731,7 +731,6 @@
       "nodeReRegistrationTimeout": -1,
       "protocolMappers": [
         {
-          "id": "28687e0a-ff13-4a16-b8a8-80bd6bbccea9",
           "name": "Client Host",
           "protocol": "openid-connect",
           "protocolMapper": "oidc-usersessionmodel-note-mapper",
@@ -747,7 +746,6 @@
           }
         },
         {
-          "id": "1f6015f3-2812-41a9-896d-155d7d685ca6",
           "name": "Client IP Address",
           "protocol": "openid-connect",
           "protocolMapper": "oidc-usersessionmodel-note-mapper",
@@ -763,7 +761,6 @@
           }
         },
         {
-          "id": "5f8f6d15-2f4d-4ce0-908b-9c5fd482e1b5",
           "name": "Client ID",
           "protocol": "openid-connect",
           "protocolMapper": "oidc-usersessionmodel-note-mapper",
@@ -791,7 +788,12 @@
         "phone",
         "offline_access",
         "microprofile-jwt"
-      ]
+      ],
+      "access": {
+        "view": true,
+        "configure": true,
+        "manage": true
+      }
     },
     {
       "id": "7ec82fa5-d1f5-4e74-b438-e9be4fa32f17",

@@ -89,9 +89,11 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 
 	// Connects to a pre-configured keycloak realm
 	authSvc, err := auth.NewAuthenticationService(ctx, auth.AuthenticationServiceParams{
-		IssuerURL:      "http://localhost:8082/realms/jimm",
-		DeviceClientID: "jimm-device",
-		DeviceScopes:   []string{oidc.ScopeOpenID, "profile", "email"},
+		IssuerURL:          "http://localhost:8082/realms/jimm",
+		ClientID:           "jimm-device",
+		ClientSecret:       "SwjDofnbDzJDm9iyfUhEp67FfUFMY8L4",
+		Scopes:             []string{oidc.ScopeOpenID, "profile", "email"},
+		SessionTokenExpiry: time.Hour,
 	})
 	c.Assert(err, gc.Equals, nil)
 	s.JIMM.OAuthAuthenticator = authSvc
