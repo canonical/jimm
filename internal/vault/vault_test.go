@@ -199,3 +199,13 @@ func TestGetAndPutOAuthKey(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(retrievedKey, qt.DeepEquals, key)
 }
+
+func TestGetOAuthKeyFailsIfNotFound(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+	store := newStore(c)
+
+	retrieved, err := store.GetOAuthKey(ctx)
+	c.Assert(err, qt.ErrorMatches, "no OAuth key exists")
+	c.Assert(retrieved, qt.IsNil)
+}

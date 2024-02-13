@@ -400,7 +400,7 @@ func (s *VaultStore) GetOAuthKey(ctx context.Context) ([]byte, error) {
 	}
 
 	if secret == nil {
-		msg := "no OAuth key exists yet"
+		msg := "no OAuth key exists"
 		zapctx.Debug(ctx, msg)
 		return nil, errors.E(op, errors.CodeNotFound, msg)
 	}
