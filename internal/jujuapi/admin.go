@@ -110,7 +110,7 @@ func (r *controllerRoot) LoginDevice(ctx context.Context) (params.LoginDeviceRes
 
 // GetDeviceSessionToken retrieves an access token from the OIDC provider
 // and wraps it into a JWT, using the id token's email claim for the subject
-// of the JWT. This in turn will be used for authentication against LoginSessionToken,
+// of the JWT. This in turn will be used for authentication against LoginWithSessionToken,
 // where the subject of the JWT contains the user's email - enabling identification
 // of the said user's session.
 func (r *controllerRoot) GetDeviceSessionToken(ctx context.Context) (params.GetDeviceSessionTokenResponse, error) {
@@ -173,9 +173,13 @@ func (r *controllerRoot) GetDeviceSessionToken(ctx context.Context) (params.GetD
 	return response, nil
 }
 
-// LoginSessionToken
-func (r *controllerRoot) LoginSessionToken(ctx context.Context, req params.LoginSessionTokenRequest) (jujuparams.LoginResult, error) {
-	const op = errors.Op("jujuapi.LoginSessionToken")
+// LoginWithSessionToken handles logging into the JIMM via a session token that JIMM has
+// minted itself, this session token is simply a JWT containing the users email
+// at which point the email is used to perform a lookup for the user, authorise
+// whether or not they're an admin and place the user on the controller root
+// such that subsequent facade method calls can access the authenticated user.
+func (r *controllerRoot) LoginWithSessionToken(ctx context.Context, req params.LoginWithSessionTokenRequest) (jujuparams.LoginResult, error) {
+	const op = errors.Op("jujuapi.LoginWithSessionToken")
 	authenticationSvc := r.jimm.OAuthAuthenticationService()
 
 	// Verify the session token

@@ -405,7 +405,7 @@ type LoginDeviceResponse struct {
 }
 
 // GetDeviceSessionTokenResponse returns a session token to be used against
-// LoginSessionToken for authentication. The session token will be base64
+// LoginWithSessionToken for authentication. The session token will be base64
 // encoded.
 type GetDeviceSessionTokenResponse struct {
 	// SessionToken is a base64 encoded JWT capable of authenticating
@@ -414,14 +414,14 @@ type GetDeviceSessionTokenResponse struct {
 	SessionToken string `json:"session-token"`
 }
 
-// LoginSessionTokenRequest accepts a session token minted by JIMM and logs
+// LoginWithSessionTokenRequest accepts a session token minted by JIMM and logs
 // the user in.
 //
 // The login response for this login request type is that of jujuparams.LoginResult,
 // such that the behaviour of previous macroon based authentication is unchanged.
 // However, on unauthenticated requests, the error is different and is not a macaroon
 // discharge request.
-type LoginSessionTokenRequest struct {
+type LoginWithSessionTokenRequest struct {
 	// SessionToken is a base64 encoded JWT capable of authenticating
 	// a user. The JWT contains the users email address in the subject,
 	// and this is used to identify this user.

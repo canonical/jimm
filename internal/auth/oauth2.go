@@ -5,6 +5,7 @@ package auth
 import (
 	"context"
 	"encoding/base64"
+	stderrors "errors"
 	"net/mail"
 	"time"
 
@@ -16,7 +17,6 @@ import (
 	"golang.org/x/oauth2"
 
 	"github.com/canonical/jimm/internal/errors"
-	"github.com/canonical/jimm/internal/openfga"
 )
 
 // AuthenticationService handles authentication within JIMM.
@@ -27,8 +27,6 @@ type AuthenticationService struct {
 	provider *oidc.Provider
 	// sessionTokenExpiry holds the expiry time for JIMM minted session tokens (JWTs).
 	sessionTokenExpiry time.Duration
-	// OpenFGAClient is the authorisation client for JIMM.
-	OpenFGAClient *openfga.OFGAClient
 }
 
 // AuthenticationServiceParams holds the parameters to initialise
@@ -201,7 +199,7 @@ func (as *AuthenticationService) VerifySessionToken(token string, secretKey stri
 
 	parsedToken, err := jwt.Parse(decodedToken, jwt.WithKey(jwa.HS256, []byte(secretKey)))
 	if err != nil {
-		if err.Error() == "\"exp\" not satisfied" {
+		if stderrors.Is(err, jwt.ErrTokenExpired()) {
 			return nil, errors.E(op, "JIMM session token expired")
 		}
 		return nil, errors.E(op, err)
