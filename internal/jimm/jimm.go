@@ -576,7 +576,7 @@ func fillMigrationTarget(db db.Database, credStore credentials.CredentialStore, 
 	if err != nil {
 		return jujuparams.MigrationTargetInfo{}, 0, err
 	}
-	adminUser := dbController.AdminUser
+	adminUser := dbController.AdminIdentityName
 	adminPass := dbController.AdminPassword
 	if adminPass == "" {
 		u, p, err := credStore.GetControllerCredentials(ctx, controllerName)

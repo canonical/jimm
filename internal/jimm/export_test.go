@@ -19,6 +19,7 @@ var (
 	NewControllerClient            = &newControllerClient
 	FillMigrationTarget            = fillMigrationTarget
 	InitiateMigration              = &initiateMigration
+	ResolveTag                     = resolveTag
 )
 
 func WatchController(w *Watcher, ctx context.Context, ctl *dbmodel.Controller) error {
@@ -43,6 +44,6 @@ func NewWatcherWithDeltaProcessedChannel(db db.Database, dialer Dialer, pubsub P
 	}
 }
 
-func (j *JIMM) ListApplicationOfferUsers(ctx context.Context, offer names.ApplicationOfferTag, user *dbmodel.User, accessLevel string) ([]jujuparams.OfferUserDetails, error) {
+func (j *JIMM) ListApplicationOfferUsers(ctx context.Context, offer names.ApplicationOfferTag, user *dbmodel.Identity, accessLevel string) ([]jujuparams.OfferUserDetails, error) {
 	return j.listApplicationOfferUsers(ctx, offer, user, accessLevel)
 }

@@ -4,6 +4,7 @@ package jimmtest
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,6 +14,8 @@ import (
 
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/google/uuid"
+	"github.com/juju/zaputil/zapctx"
+	"go.uber.org/zap"
 )
 
 // These constants are based on the `docker-compose.yaml` and `local/keycloak/jimm-realm.json` content.
@@ -42,6 +45,7 @@ func CreateRandomKeycloakUser() (*KeycloakUser, error) {
 
 	adminCLIToken, err := getAdminCLIAccessToken()
 	if err != nil {
+		zapctx.Error(context.Background(), "failed to authenticate admin CLI user", zap.Error(err))
 		return nil, errors.E(err, "failed to authenticate admin CLI user")
 	}
 

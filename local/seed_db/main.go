@@ -47,8 +47,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	u := dbmodel.User{
-		Username: petname.Generate(2, "-") + "@external",
+	u := dbmodel.Identity{
+		Name: petname.Generate(2, "-") + "@external",
 	}
 	if err = db.DB.Create(&u).Error; err != nil {
 		fmt.Println("failed to add user to db ", err)
@@ -84,10 +84,10 @@ func main() {
 	}
 
 	cred := dbmodel.CloudCredential{
-		Name:          petname.Generate(2, "-"),
-		CloudName:     cloud.Name,
-		OwnerUsername: u.Username,
-		AuthType:      "empty",
+		Name:              petname.Generate(2, "-"),
+		CloudName:         cloud.Name,
+		OwnerIdentityName: u.Name,
+		AuthType:          "empty",
 	}
 	if err = db.SetCloudCredential(ctx, &cred); err != nil {
 		fmt.Println("failed to add cloud credential to db ", err)
@@ -100,7 +100,7 @@ func main() {
 			String: id.String(),
 			Valid:  true,
 		},
-		OwnerUsername:     u.Username,
+		OwnerIdentityName: u.Name,
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
 		CloudCredentialID: cred.ID,
@@ -119,7 +119,7 @@ func main() {
 	}
 
 	offerName := petname.Generate(2, "-")
-	offerURL, _ := crossmodel.ParseOfferURL(controller.Name + ":" + u.Username + "/" + model.Name + "." + offerName)
+	offerURL, _ := crossmodel.ParseOfferURL(controller.Name + ":" + u.Name + "/" + model.Name + "." + offerName)
 	offer := dbmodel.ApplicationOffer{
 		UUID:            id.String(),
 		Name:            offerName,

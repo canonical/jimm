@@ -4,7 +4,6 @@ package jimm
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"net/http"
 	"os"
@@ -178,10 +177,6 @@ type Params struct {
 	// instead of dedicated secure storage. SHOULD NOT BE USED IN PRODUCTION.
 	InsecureSecretStorage bool
 
-	// InsecureJwksLookup instructs JIMM to lookup its JWKS value via
-	// http instead of https. Useful when running JIMM in a docker compose.
-	InsecureJwksLookup bool
-
 	// OAuthAuthenticatorParams holds parameters needed to configure an OAuthAuthenticator
 	// implementation.
 	OAuthAuthenticatorParams OAuthAuthenticatorParams
@@ -234,24 +229,6 @@ func (s *Service) StartJWKSRotator(ctx context.Context, checkRotateRequired <-ch
 		return nil
 	}
 	return s.jimm.JWKService.StartJWKSRotator(ctx, checkRotateRequired, initialRotateRequiredTime)
-}
-
-// RegisterJwksCache registers the JWKS Cache with JIMM's JWT service.
-func (s *Service) RegisterJwksCache(ctx context.Context) {
-	if s.jimm.JWTService == nil {
-		zapctx.Warn(ctx, "skipping JWKS cache registration - service not available")
-		return
-	}
-	tlsConfig := &tls.Config{
-		InsecureSkipVerify: true,
-	}
-	client := &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: tlsConfig,
-		},
-		Timeout: 15 * time.Second,
-	}
-	s.jimm.JWTService.RegisterJWKSCache(ctx, client)
 }
 
 // NewService creates a new Service using the given params.
@@ -345,7 +322,6 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	s.jimm.JWKService = jimmjwx.NewJWKSService(s.jimm.CredentialStore)
 	s.jimm.JWTService = jimmjwx.NewJWTService(jimmjwx.JWTServiceParams{
 		Host:   p.PublicDNSName,
-		Secure: !p.InsecureJwksLookup,
 		Store:  s.jimm.CredentialStore,
 		Expiry: p.JWTExpiryDuration,
 	})
@@ -597,7 +573,7 @@ func ensureControllerAdministrators(ctx context.Context, client *openfga.OFGACli
 	tuples := []openfga.Tuple{}
 	for _, username := range admins {
 		userTag := names.NewUserTag(username)
-		user := openfga.NewUser(&dbmodel.User{Username: userTag.Id()}, client)
+		user := openfga.NewUser(&dbmodel.Identity{Name: userTag.Id()}, client)
 		isAdmin, err := openfga.IsAdministrator(ctx, user, controller)
 		if err != nil {
 			return errors.E(err)

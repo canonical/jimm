@@ -19,15 +19,15 @@ func (d *Database) SetCloudCredential(ctx context.Context, cred *dbmodel.CloudCr
 		return errors.E(op, err)
 	}
 
-	if cred.CloudName == "" || cred.OwnerUsername == "" || cred.Name == "" {
-		return errors.E(op, errors.CodeBadRequest, fmt.Sprintf("invalid cloudcredential tag %q", cred.CloudName+"/"+cred.OwnerUsername+"/"+cred.Name))
+	if cred.CloudName == "" || cred.OwnerIdentityName == "" || cred.Name == "" {
+		return errors.E(op, errors.CodeBadRequest, fmt.Sprintf("invalid cloudcredential tag %q", cred.CloudName+"/"+cred.OwnerIdentityName+"/"+cred.Name))
 	}
 
 	db := d.DB.WithContext(ctx)
 	if err := db.Clauses(clause.OnConflict{
 		Columns: []clause.Column{
 			{Name: "cloud_name"},
-			{Name: "owner_username"},
+			{Name: "owner_identity_name"},
 			{Name: "name"},
 		},
 		DoUpdates: clause.AssignmentColumns([]string{"auth_type", "label", "attributes_in_vault", "attributes", "valid"}),
@@ -44,16 +44,16 @@ func (d *Database) GetCloudCredential(ctx context.Context, cred *dbmodel.CloudCr
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
 	}
-	if cred.CloudName == "" || cred.OwnerUsername == "" || cred.Name == "" {
-		return errors.E(op, errors.CodeNotFound, fmt.Sprintf("cloudcredential %q not found", cred.CloudName+"/"+cred.OwnerUsername+"/"+cred.Name))
+	if cred.CloudName == "" || cred.OwnerIdentityName == "" || cred.Name == "" {
+		return errors.E(op, errors.CodeNotFound, fmt.Sprintf("cloudcredential %q not found", cred.CloudName+"/"+cred.OwnerIdentityName+"/"+cred.Name))
 	}
 	db := d.DB.WithContext(ctx)
 	db = db.Preload("Cloud")
 	db = db.Preload("Models")
-	if err := db.Where("cloud_name = ? AND owner_username = ? AND name = ?", cred.CloudName, cred.OwnerUsername, cred.Name).First(&cred).Error; err != nil {
+	if err := db.Where("cloud_name = ? AND owner_identity_name = ? AND name = ?", cred.CloudName, cred.OwnerIdentityName, cred.Name).First(&cred).Error; err != nil {
 		err := dbError(err)
 		if errors.ErrorCode(err) == errors.CodeNotFound {
-			return errors.E(op, errors.CodeNotFound, fmt.Sprintf("cloudcredential %q not found", cred.CloudName+"/"+cred.OwnerUsername+"/"+cred.Name), err)
+			return errors.E(op, errors.CodeNotFound, fmt.Sprintf("cloudcredential %q not found", cred.CloudName+"/"+cred.OwnerIdentityName+"/"+cred.Name), err)
 		}
 		return errors.E(op, err)
 	}
@@ -61,10 +61,10 @@ func (d *Database) GetCloudCredential(ctx context.Context, cred *dbmodel.CloudCr
 }
 
 // ForEachCloudCredential iterates through all cloud credentials owned by
-// the given user calling the given function with each one. If cloud is
+// the given identity calling the given function with each one. If cloud is
 // specified then the cloud-credentials are filtered to only return
 // credentials for that cloud.
-func (d *Database) ForEachCloudCredential(ctx context.Context, username, cloud string, f func(*dbmodel.CloudCredential) error) error {
+func (d *Database) ForEachCloudCredential(ctx context.Context, identityName, cloud string, f func(*dbmodel.CloudCredential) error) error {
 	const op = errors.Op("db.ForEachCloudCredential")
 
 	if err := d.ready(); err != nil {
@@ -74,9 +74,9 @@ func (d *Database) ForEachCloudCredential(ctx context.Context, username, cloud s
 	db := d.DB.WithContext(ctx)
 	mdb := db.Model(dbmodel.CloudCredential{})
 	if cloud == "" {
-		mdb = mdb.Where("owner_username = ?", username)
+		mdb = mdb.Where("owner_identity_name = ?", identityName)
 	} else {
-		mdb = mdb.Where("cloud_name = ? AND owner_username = ?", cloud, username)
+		mdb = mdb.Where("cloud_name = ? AND owner_identity_name = ?", cloud, identityName)
 	}
 	rows, err := mdb.Rows()
 	if err != nil {

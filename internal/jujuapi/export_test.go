@@ -7,14 +7,13 @@ import (
 
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/jimm"
+	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 	jujuparams "github.com/juju/juju/rpc/params"
 )
 
 var (
 	NewModelAccessWatcher = newModelAccessWatcher
-	ParseTag              = parseTag
-	ResolveTag            = resolveTag
 	ModelInfoFromPath     = modelInfoFromPath
 	AuditParamsToFilter   = auditParamsToFilter
 	AuditLogDefaultLimit  = limitDefault
@@ -40,14 +39,22 @@ func RunModelAccessWatcher(w *modelAccessWatcher) {
 }
 
 func ToJAASTag(db db.Database, tag *ofganames.Tag) (string, error) {
-	c := controllerRoot{
-		jimm: &jimm.JIMM{
-			Database: db,
-		},
+	jimm := &jimm.JIMM{
+		Database: db,
 	}
-	return c.toJAASTag(context.Background(), tag)
+	return jimm.ToJAASTag(context.Background(), tag)
 }
 
 func NewControllerRoot(j JIMM, p Params) *controllerRoot {
 	return newControllerRoot(j, p)
+}
+
+func (r *controllerRoot) GetServiceAccount(ctx context.Context, clientID string) (*openfga.User, error) {
+	return r.getServiceAccount(ctx, clientID)
+}
+
+var SetUser = func(r *controllerRoot, u *openfga.User) {
+	r.mu.Lock()
+	r.user = u
+	r.mu.Unlock()
 }

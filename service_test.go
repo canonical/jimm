@@ -290,7 +290,7 @@ func TestOpenFGA(t *testing.T) {
 	// assert controller admins have been created in openfga
 	for _, username := range []string{"alice", "eve"} {
 		user := openfga.NewUser(
-			&dbmodel.User{Username: username},
+			&dbmodel.Identity{Name: username},
 			client,
 		)
 		allowed, err := openfga.IsAdministrator(context.Background(), user, names.NewControllerTag(p.ControllerUUID))
@@ -340,15 +340,15 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 		UUID: "7e4e7ffb-5116-4544-a400-f584d08c410e",
 		Name: "test-application-offer",
 	}
-	user := dbmodel.User{
-		Username: "alice@external",
+	user := dbmodel.Identity{
+		Name: "alice@external",
 	}
 
 	ctx := context.Background()
 
 	tests := []struct {
 		about          string
-		setup          func(c *qt.C, ofgaClient *openfga.OFGAClient, user *dbmodel.User)
+		setup          func(c *qt.C, ofgaClient *openfga.OFGAClient, user *dbmodel.Identity)
 		caveats        []string
 		expectDeclared map[string]string
 		expectedError  string
@@ -358,7 +358,7 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 		expectedError: ".*third party refused discharge: cannot discharge: caveat not recognized",
 	}, {
 		about: "user is an offer reader",
-		setup: func(c *qt.C, ofgaClient *openfga.OFGAClient, user *dbmodel.User) {
+		setup: func(c *qt.C, ofgaClient *openfga.OFGAClient, user *dbmodel.Identity) {
 			u := openfga.NewUser(user, ofgaClient)
 			err := u.SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.ReaderRelation)
 			c.Assert(err, qt.IsNil)
@@ -371,7 +371,7 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 		expectedError: ".*cannot discharge: permission denied",
 	}, {
 		about: "user is an offer consumer",
-		setup: func(c *qt.C, ofgaClient *openfga.OFGAClient, user *dbmodel.User) {
+		setup: func(c *qt.C, ofgaClient *openfga.OFGAClient, user *dbmodel.Identity) {
 			u := openfga.NewUser(user, ofgaClient)
 			err := u.SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.ConsumerRelation)
 			c.Assert(err, qt.IsNil)
@@ -380,7 +380,7 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 		expectDeclared: map[string]string{"offer-uuid": offer.UUID},
 	}, {
 		about: "user is an offer administrator",
-		setup: func(c *qt.C, ofgaClient *openfga.OFGAClient, user *dbmodel.User) {
+		setup: func(c *qt.C, ofgaClient *openfga.OFGAClient, user *dbmodel.Identity) {
 			u := openfga.NewUser(user, ofgaClient)
 			err := u.SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)

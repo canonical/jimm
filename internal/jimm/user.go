@@ -32,10 +32,10 @@ func (j *JIMM) Authenticate(ctx context.Context, req *jujuparams.LoginRequest) (
 	}
 
 	err = j.Database.Transaction(func(tx *db.Database) error {
-		pu := dbmodel.User{
-			Username: u.Username,
+		pu := dbmodel.Identity{
+			Name: u.Name,
 		}
-		if err := tx.GetUser(ctx, &pu); err != nil {
+		if err := tx.GetIdentity(ctx, &pu); err != nil {
 			return err
 		}
 		u.Model = pu.Model
@@ -47,7 +47,7 @@ func (j *JIMM) Authenticate(ctx context.Context, req *jujuparams.LoginRequest) (
 		}
 		pu.LastLogin.Time = j.Database.DB.Config.NowFunc()
 		pu.LastLogin.Valid = true
-		return tx.UpdateUser(ctx, &pu)
+		return tx.UpdateIdentity(ctx, &pu)
 	})
 	if err != nil {
 		return nil, errors.E(op, err)
@@ -65,17 +65,17 @@ func (j *JIMM) Authenticate(ctx context.Context, req *jujuparams.LoginRequest) (
 func (j *JIMM) GetOpenFGAUserAndAuthorise(ctx context.Context, email string) (*openfga.User, error) {
 	const op = errors.Op("jimm.GetOpenFGAUserAndAuthorise")
 
-	// Setup user model using the tag to populate query fields
-	user := &dbmodel.User{
-		// TODO(ale8k): username is email for NOW until we add email field
+	// Setup identity model using the tag to populate query fields
+	user := &dbmodel.Identity{
+		// TODO(ale8k): Name is email for NOW until we add email field
 		// and map emails/usernames to a uuid for the user. Then, queries should be
 		// queried upon by uuid, not username.
-		Username: email,
+		Name: email,
 	}
 
 	// Load the users details
 	if err := j.Database.Transaction(func(tx *db.Database) error {
-		if err := tx.GetUser(ctx, user); err != nil {
+		if err := tx.GetIdentity(ctx, user); err != nil {
 			return err
 		}
 
@@ -86,8 +86,8 @@ func (j *JIMM) GetOpenFGAUserAndAuthorise(ctx context.Context, email string) (*o
 		// moved.
 		user.LastLogin.Time = j.Database.DB.Config.NowFunc()
 		user.LastLogin.Valid = true
-		// TODO(ale8k): Update access token & refresh tokens for this user
-		return tx.UpdateUser(ctx, user)
+
+		return tx.UpdateIdentity(ctx, user)
 	}); err != nil {
 		return nil, errors.E(op, err)
 	}
@@ -106,4 +106,26 @@ func (j *JIMM) GetOpenFGAUserAndAuthorise(ctx context.Context, email string) (*o
 	ofgaUser.JimmAdmin = isJimmAdmin
 
 	return ofgaUser, nil
+}
+
+// GetUser fetches the user specified by the username and returns
+// an openfga User that can be used to verify user's permissions.
+func (j *JIMM) GetUser(ctx context.Context, username string) (*openfga.User, error) {
+	const op = errors.Op("jimm.GetUser")
+
+	user := dbmodel.Identity{
+		Name: username,
+	}
+	if err := j.Database.GetIdentity(ctx, &user); err != nil {
+		return nil, err
+	}
+	u := openfga.NewUser(&user, j.OpenFGAClient)
+
+	isJimmAdmin, err := openfga.IsAdministrator(ctx, u, j.ResourceTag())
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+	u.JimmAdmin = isJimmAdmin
+
+	return u, nil
 }

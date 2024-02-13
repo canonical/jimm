@@ -92,7 +92,7 @@ func (j *JIMM) AddController(ctx context.Context, user *openfga.User, ctl *dbmod
 
 	credentialsStored := false
 	if j.CredentialStore != nil {
-		err := j.CredentialStore.PutControllerCredentials(ctx, ctl.Name, ctl.AdminUser, ctl.AdminPassword)
+		err := j.CredentialStore.PutControllerCredentials(ctx, ctl.Name, ctl.AdminIdentityName, ctl.AdminPassword)
 		if err != nil {
 			return errors.E(op, err, "failed to store controller credentials")
 		}
@@ -145,7 +145,7 @@ func (j *JIMM) AddController(ctx context.Context, user *openfga.User, ctl *dbmod
 		// if we already stored controller credentials in CredentialStore
 		// we should not store them plain text in JIMM's DB.
 		if credentialsStored {
-			ctl.AdminUser = ""
+			ctl.AdminIdentityName = ""
 			ctl.AdminPassword = ""
 		}
 		if err := tx.AddController(ctx, ctl); err != nil {
@@ -169,8 +169,8 @@ func (j *JIMM) AddController(ctx context.Context, user *openfga.User, ctl *dbmod
 		if cloud.ResourceTag().String() == ms.CloudTag {
 			everyoneTag := names.NewUserTag(ofganames.EveryoneUser)
 			everyone := openfga.NewUser(
-				&dbmodel.User{
-					Username: everyoneTag.Id(),
+				&dbmodel.Identity{
+					Name: everyoneTag.Id(),
 				},
 				j.OpenFGAClient,
 			)
@@ -287,7 +287,7 @@ func (j *JIMM) GetJimmControllerAccess(ctx context.Context, user *openfga.User, 
 	// for him/her-self then we return that - either the user
 	// is a JIMM admin (aka "superuser"), or they have a "login"
 	// access level.
-	if user.Username == tag.Id() {
+	if user.Name == tag.Id() {
 		if user.JimmAdmin {
 			return "superuser", nil
 		}
@@ -300,7 +300,7 @@ func (j *JIMM) GetJimmControllerAccess(ctx context.Context, user *openfga.User, 
 		return "", errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
-	var targetUser dbmodel.User
+	var targetUser dbmodel.Identity
 	targetUser.SetTag(tag)
 	targetUserTag := openfga.NewUser(&targetUser, j.OpenFGAClient)
 
@@ -378,9 +378,9 @@ func (j *JIMM) ImportModel(ctx context.Context, user *openfga.User, controllerNa
 	if ownerTag.IsLocal() {
 		return errors.E(op, "cannot import model from local user, try --owner to switch the model owner")
 	}
-	ownerUser := dbmodel.User{}
+	ownerUser := dbmodel.Identity{}
 	ownerUser.SetTag(ownerTag)
-	err = j.Database.GetUser(ctx, &ownerUser)
+	err = j.Database.GetIdentity(ctx, &ownerUser)
 	if err != nil {
 		return errors.E(op, err)
 	}
@@ -393,7 +393,7 @@ func (j *JIMM) ImportModel(ctx context.Context, user *openfga.User, controllerNa
 		zapctx.Error(
 			ctx,
 			"failed to set model admin",
-			zap.String("owner", ownerUser.Username),
+			zap.String("owner", ownerUser.Name),
 			zap.String("model", modelTag.String()),
 			zap.Error(err),
 		)
@@ -412,12 +412,12 @@ func (j *JIMM) ImportModel(ctx context.Context, user *openfga.User, controllerNa
 	// credential against the cloud the model is deployed against. Even using the correct cloud for the
 	// credential is not strictly necessary, but will help prevent the user thinking they can create new
 	// models on the incoming cloud.
-	allCredentials, err := j.Database.GetUserCloudCredentials(ctx, &ownerUser, cloudTag.Id())
+	allCredentials, err := j.Database.GetIdentityCloudCredentials(ctx, &ownerUser, cloudTag.Id())
 	if err != nil {
 		return errors.E(op, err)
 	}
 	if len(allCredentials) == 0 {
-		return errors.E(op, errors.CodeNotFound, fmt.Sprintf("Failed to find cloud credential for user %s on cloud %s", ownerUser.Username, cloudTag.Id()))
+		return errors.E(op, errors.CodeNotFound, fmt.Sprintf("Failed to find cloud credential for user %s on cloud %s", ownerUser.Name, cloudTag.Id()))
 	}
 	cloudCredential := allCredentials[0]
 
@@ -527,7 +527,7 @@ func (j *JIMM) SetControllerConfig(ctx context.Context, user *openfga.User, args
 }
 
 // GetControllerConfig returns jimm's controller config.
-func (j *JIMM) GetControllerConfig(ctx context.Context, u *dbmodel.User) (*dbmodel.ControllerConfig, error) {
+func (j *JIMM) GetControllerConfig(ctx context.Context, u *dbmodel.Identity) (*dbmodel.ControllerConfig, error) {
 	const op = errors.Op("jimm.GetControllerConfig")
 	config := dbmodel.ControllerConfig{
 		Name:   "jimm",

@@ -26,8 +26,8 @@ func (j *JIMM) GetUserCloudAccess(ctx context.Context, user *openfga.User, cloud
 	if accessLevel == ofganames.NoRelation {
 		everyoneTag := names.NewUserTag(ofganames.EveryoneUser)
 		everyone := openfga.NewUser(
-			&dbmodel.User{
-				Username: everyoneTag.Id(),
+			&dbmodel.Identity{
+				Name: everyoneTag.Id(),
 			},
 			j.OpenFGAClient,
 		)
@@ -99,8 +99,8 @@ func (j *JIMM) ForEachUserCloud(ctx context.Context, user *openfga.User, f func(
 	}
 
 	// Also include "public" clouds
-	everyoneDB := dbmodel.User{
-		Username: ofganames.EveryoneUser,
+	everyoneDB := dbmodel.Identity{
+		Name: ofganames.EveryoneUser,
 	}
 	everyone := openfga.NewUser(&everyoneDB, j.OpenFGAClient)
 
@@ -396,7 +396,7 @@ func (j *JIMM) AddHostedCloud(ctx context.Context, user *openfga.User, tag names
 		zapctx.Error(
 			ctx,
 			"failed to add user as cloud admin",
-			zap.String("user", user.Username),
+			zap.String("user", user.Name),
 			zap.String("cloud", dbCloud.ResourceTag().Id()),
 			zap.Error(err),
 		)
@@ -528,9 +528,9 @@ func (j *JIMM) GrantCloudAccess(ctx context.Context, user *openfga.User, ct name
 	}
 
 	err = j.doCloudAdmin(ctx, user, ct, func(_ *dbmodel.Cloud, _ API) error {
-		targetUser := &dbmodel.User{}
+		targetUser := &dbmodel.Identity{}
 		targetUser.SetTag(ut)
-		if err := j.Database.GetUser(ctx, targetUser); err != nil {
+		if err := j.Database.GetIdentity(ctx, targetUser); err != nil {
 			return err
 		}
 		targetOfgaUser := openfga.NewUser(targetUser, j.OpenFGAClient)
@@ -593,9 +593,9 @@ func (j *JIMM) RevokeCloudAccess(ctx context.Context, user *openfga.User, ct nam
 	}
 
 	err = j.doCloudAdmin(ctx, user, ct, func(_ *dbmodel.Cloud, _ API) error {
-		targetUser := &dbmodel.User{}
+		targetUser := &dbmodel.Identity{}
 		targetUser.SetTag(ut)
-		if err := j.Database.GetUser(ctx, targetUser); err != nil {
+		if err := j.Database.GetIdentity(ctx, targetUser); err != nil {
 			return err
 		}
 		targetOfgaUser := openfga.NewUser(targetUser, j.OpenFGAClient)

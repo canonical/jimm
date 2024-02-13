@@ -416,6 +416,33 @@
         },
         {
             "type": "user"
+        },
+        {
+            "metadata": {
+                "relations": {
+                    "administrator": {
+                        "directly_related_user_types": [
+                            {
+                                "type": "user"
+                            },
+                            {
+                                "type": "user",
+                                "wildcard": {}
+                            },
+                            {
+                                "relation": "member",
+                                "type": "group"
+                            }
+                        ]
+                    }
+                }
+            },
+            "relations": {
+                "administrator": {
+                    "this": {}
+                }
+            },
+            "type": "serviceaccount"
         }
     ]
 }

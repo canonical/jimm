@@ -27,7 +27,7 @@ func TestAddApplicationOfferUnconfiguredDatabase(t *testing.T) {
 }
 
 type testEnvironment struct {
-	u          dbmodel.User
+	u          dbmodel.Identity
 	cloud      dbmodel.Cloud
 	cred       dbmodel.CloudCredential
 	controller dbmodel.Controller
@@ -40,8 +40,8 @@ func initTestEnvironment(c *qt.C, db *db.Database) testEnvironment {
 
 	env := testEnvironment{}
 
-	env.u = dbmodel.User{
-		Username: "bob@external",
+	env.u = dbmodel.Identity{
+		Name: "bob@external",
 	}
 	c.Assert(db.DB.Create(&env.u).Error, qt.IsNil)
 
@@ -241,8 +241,8 @@ func (s *dbSuite) TestFindApplicationOffers(c *qt.C) {
 	err := s.Database.AddApplicationOffer(context.Background(), &offer1)
 	c.Assert(err, qt.Equals, nil)
 
-	u := dbmodel.User{
-		Username: "alice@external",
+	u := dbmodel.Identity{
+		Name: "alice@external",
 	}
 	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
 

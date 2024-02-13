@@ -415,14 +415,14 @@ func TestAuditLogAPIParamsConversion(t *testing.T) {
 				SortTime: false,
 			},
 			result: db.AuditLogFilter{
-				Start:    time.Date(2023, 8, 14, 0, 0, 0, 0, time.UTC),
-				End:      time.Date(2023, 8, 14, 0, 0, 0, 0, time.UTC),
-				UserTag:  "user-alice",
-				Model:    "123",
-				Method:   "Deploy",
-				Offset:   10,
-				Limit:    10,
-				SortTime: false,
+				Start:       time.Date(2023, 8, 14, 0, 0, 0, 0, time.UTC),
+				End:         time.Date(2023, 8, 14, 0, 0, 0, 0, time.UTC),
+				IdentityTag: "user-alice",
+				Model:       "123",
+				Method:      "Deploy",
+				Offset:      10,
+				Limit:       10,
+				SortTime:    false,
 			},
 		}, {
 			about: "Test limit lower bound",
@@ -567,10 +567,10 @@ func (s *jimmSuite) TestImportModel(c *gc.C) {
 
 func (s *jimmSuite) TestAddCloudToController(c *gc.C) {
 	ctx := context.Background()
-	u := dbmodel.User{
-		Username: "alice@external",
+	u := dbmodel.Identity{
+		Name: "alice@external",
 	}
-	err := s.JIMM.Database.GetUser(ctx, &u)
+	err := s.JIMM.Database.GetIdentity(ctx, &u)
 	c.Assert(err, gc.IsNil)
 
 	conn := s.open(c, nil, "alice@external")
@@ -604,10 +604,10 @@ func (s *jimmSuite) TestAddCloudToController(c *gc.C) {
 
 func (s *jimmSuite) TestAddExistingCloudToController(c *gc.C) {
 	ctx := context.Background()
-	u := dbmodel.User{
-		Username: "alice@external",
+	u := dbmodel.Identity{
+		Name: "alice@external",
 	}
-	err := s.JIMM.Database.GetUser(ctx, &u)
+	err := s.JIMM.Database.GetIdentity(ctx, &u)
 	c.Assert(err, gc.IsNil)
 
 	conn := s.open(c, nil, "alice@external")
@@ -652,10 +652,10 @@ func (s *jimmSuite) TestAddExistingCloudToController(c *gc.C) {
 
 func (s *jimmSuite) TestRemoveCloudFromController(c *gc.C) {
 	ctx := context.Background()
-	u := dbmodel.User{
-		Username: "alice@external",
+	u := dbmodel.Identity{
+		Name: "alice@external",
 	}
-	err := s.JIMM.Database.GetUser(ctx, &u)
+	err := s.JIMM.Database.GetIdentity(ctx, &u)
 	c.Assert(err, gc.IsNil)
 
 	conn := s.open(c, nil, "alice@external")

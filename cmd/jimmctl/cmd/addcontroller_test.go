@@ -14,11 +14,12 @@ import (
 
 	apiparams "github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/cmd/jimmctl/cmd"
+	"github.com/canonical/jimm/internal/cmdtest"
 	"github.com/canonical/jimm/internal/jimmtest"
 )
 
 type addControllerSuite struct {
-	jimmSuite
+	cmdtest.JimmCmdSuite
 }
 
 var _ = gc.Suite(&addControllerSuite{})
@@ -37,7 +38,7 @@ func (s *addControllerSuite) TestAddControllerSuperuser(c *gc.C) {
 	defer os.RemoveAll(tmpdir)
 
 	// alice is superuser
-	bClient := s.userBakeryClient("alice")
+	bClient := s.UserBakeryClient("alice")
 	ctx, err := cmdtesting.RunCommand(c, cmd.NewAddControllerCommandForTesting(s.ClientStore(), bClient), tmpfile)
 	c.Assert(err, gc.IsNil)
 	c.Assert(cmdtesting.Stdout(ctx), gc.Matches, `name: controller-1
@@ -100,7 +101,7 @@ func (s *addControllerSuite) TestAddController(c *gc.C) {
 	defer os.RemoveAll(tmpdir)
 
 	// bob is not superuser
-	bClient := s.userBakeryClient("bob")
+	bClient := s.UserBakeryClient("bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewAddControllerCommandForTesting(s.ClientStore(), bClient), tmpfile)
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }

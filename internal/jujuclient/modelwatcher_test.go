@@ -42,12 +42,12 @@ func (s *modelWatcherSuite) SetUpTest(c *gc.C) {
 		}})
 	}
 	ctl := dbmodel.Controller{
-		UUID:          s.ControllerConfig.ControllerUUID(),
-		Name:          s.ControllerConfig.ControllerName(),
-		CACertificate: info.CACert,
-		AdminUser:     info.Tag.Id(),
-		AdminPassword: info.Password,
-		Addresses:     hpss,
+		UUID:              s.ControllerConfig.ControllerUUID(),
+		Name:              s.ControllerConfig.ControllerName(),
+		CACertificate:     info.CACert,
+		AdminIdentityName: info.Tag.Id(),
+		AdminPassword:     info.Password,
+		Addresses:         hpss,
 	}
 
 	s.API, err = s.Dialer.Dial(context.Background(), &ctl, s.Model.ModelTag(), nil)
