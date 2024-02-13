@@ -136,10 +136,10 @@ func (s *adminSuite) TestDeviceLogin(c *gc.C) {
 	c.Assert(loginResult.UserInfo.DisplayName, gc.Equals, strings.Split(user.Email, "@")[0])
 
 	// Finally, ensure db did indeed update the access token for this user
-	updatedUser := &dbmodel.User{
-		Username: user.Email,
+	updatedUser := &dbmodel.Identity{
+		Name: user.Email,
 	}
-	c.Assert(s.JIMM.DB().GetUser(context.Background(), updatedUser), gc.IsNil)
+	c.Assert(s.JIMM.DB().GetIdentity(context.Background(), updatedUser), gc.IsNil)
 	// TODO(ale8k): Do we need to validate the token again for the test?
 	// It has just been through a verifier etc and was returned directly
 	// from the device grant?
