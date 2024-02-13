@@ -297,3 +297,13 @@ func (s *dbSuite) TestPutAndGetOAuthKey(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(retrievedKey, qt.DeepEquals, key)
 }
+
+func (s *dbSuite) TestGetOAuthKeyFailsIfNotFound(c *qt.C) {
+	err := s.Database.Migrate(context.Background(), true)
+	c.Assert(err, qt.Equals, nil)
+	ctx := context.Background()
+
+	retrieved, err := s.Database.GetOAuthKey(ctx)
+	c.Assert(err, qt.ErrorMatches, "secret not found")
+	c.Assert(retrieved, qt.IsNil)
+}
