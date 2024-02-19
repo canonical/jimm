@@ -7,7 +7,6 @@ package jimm
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"strings"
 	"time"
 
@@ -17,12 +16,9 @@ import (
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 	"github.com/juju/zaputil/zapctx"
-	"github.com/riverqueue/river"
-	"github.com/riverqueue/river/rivertype"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
@@ -385,49 +381,6 @@ func (j *JIMM) FindAuditEvents(ctx context.Context, user *openfga.User, filter d
 	}
 
 	return entries, nil
-}
-
-func (j *JIMM) ViewJobs(ctx context.Context, req params.ViewJobsRequest) (riverJobs params.RiverJobs, err error) {
-	const op = errors.Op("jimm.ViewJobs")
-	client := j.River.Client
-
-	getJobs := func(state rivertype.JobState) (jobs []rivertype.JobRow, err error) {
-		sortOrder := river.SortOrderDesc
-		if req.SortAsc {
-			sortOrder = river.SortOrderAsc
-		}
-		jobsList, err := client.JobList(
-			ctx,
-			river.NewJobListParams().
-				State(state).
-				OrderBy(river.JobListOrderByTime, sortOrder).
-				First(req.Limit),
-		)
-		jobs = make([]rivertype.JobRow, len(jobsList))
-		for i, job := range jobsList {
-			jobs[i] = *job
-		}
-		if err != nil {
-			return make([]rivertype.JobRow, 0), errors.E(op, fmt.Sprintf("failed to read %s jobs from river db, err: %s", state, err))
-		}
-		return jobs, nil
-	}
-	if req.IncludeFailed {
-		if riverJobs.FailedJobs, err = getJobs(rivertype.JobStateDiscarded); err != nil {
-			return params.RiverJobs{}, err
-		}
-	}
-	if req.IncludeCancelled {
-		if riverJobs.CancelledJobs, err = getJobs(rivertype.JobStateCancelled); err != nil {
-			return params.RiverJobs{}, err
-		}
-	}
-	if req.IncludeCompleted {
-		if riverJobs.CompletedJobs, err = getJobs(rivertype.JobStateCompleted); err != nil {
-			return params.RiverJobs{}, err
-		}
-	}
-	return riverJobs, nil
 }
 
 // ListControllers returns a list of controllers the user has access to.

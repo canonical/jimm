@@ -501,6 +501,9 @@ func (r *controllerRoot) MigrateModel(ctx context.Context, args apiparams.Migrat
 
 func (r *controllerRoot) ViewJobs(ctx context.Context, req apiparams.ViewJobsRequest) (apiparams.RiverJobs, error) {
 	const op = errors.Op("jujuapi.ViewJobs")
+	if !r.user.JimmAdmin {
+		return apiparams.RiverJobs{}, errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
 	riverJobs, err := r.jimm.ViewJobs(ctx, req)
 	if err != nil {
 		return apiparams.RiverJobs{}, errors.E(op, err)
