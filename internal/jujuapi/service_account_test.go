@@ -214,6 +214,40 @@ func TestUpdateServiceAccountCredentials(t *testing.T) {
 			Relation: ofganames.AdministratorRelation,
 			Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag("fca1f605-736e-4d1f-bcd2-aecc726923be")),
 		}},
+	}, {
+		about: "Invalid Service account ID",
+		updateCloudCredential: func(ctx context.Context, u *openfga.User, args jimm.UpdateCloudCredentialArgs) ([]jujuparams.UpdateCredentialModelResult, error) {
+			return nil, nil
+		},
+		args: params.UpdateServiceAccountCredentialsRequest{
+			ClientID: "_123_",
+			UpdateCredentialArgs: jujuparams.UpdateCredentialArgs{
+				Credentials: []jujuparams.TaggedCredential{
+					{
+						Tag:        "cloudcred-aws/1cbe5066-ea80-4979-8633-048d32f46cf8/cred-name",
+						Credential: jujuparams.CloudCredential{Attributes: map[string]string{"foo": "bar"}},
+					},
+				}},
+		},
+		username:      "alice",
+		expectedError: "invalid client ID",
+	}, {
+		about: "Missing service account administrator permission",
+		updateCloudCredential: func(ctx context.Context, u *openfga.User, args jimm.UpdateCloudCredentialArgs) ([]jujuparams.UpdateCredentialModelResult, error) {
+			return nil, nil
+		},
+		args: params.UpdateServiceAccountCredentialsRequest{
+			ClientID: "fca1f605-736e-4d1f-bcd2-aecc726923be",
+			UpdateCredentialArgs: jujuparams.UpdateCredentialArgs{
+				Credentials: []jujuparams.TaggedCredential{
+					{
+						Tag:        "cloudcred-aws/1cbe5066-ea80-4979-8633-048d32f46cf8/cred-name",
+						Credential: jujuparams.CloudCredential{Attributes: map[string]string{"foo": "bar"}},
+					},
+				}},
+		},
+		username:      "alice",
+		expectedError: "unauthorized",
 	}}
 
 	for _, test := range tests {
@@ -288,6 +322,40 @@ func TestListServiceAccountCredentials(t *testing.T) {
 			Relation: ofganames.AdministratorRelation,
 			Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag("fca1f605-736e-4d1f-bcd2-aecc726923be")),
 		}},
+	}, {
+		about: "Invalid Service account ID",
+		ForEachUserCloudCredential: func(ctx context.Context, u *dbmodel.Identity, ct names.CloudTag, f func(cred *dbmodel.CloudCredential) error) error {
+			return nil
+		},
+		args: params.ListServiceAccountCredentialsRequest{
+			ClientID: "_123_",
+		},
+		getCloudCredential: func(ctx context.Context, user *openfga.User, tag names.CloudCredentialTag) (*dbmodel.CloudCredential, error) {
+			cred := &dbmodel.CloudCredential{}
+			return cred, nil
+		},
+		getCloudCredentialAttributes: func(ctx context.Context, u *openfga.User, cred *dbmodel.CloudCredential, hidden bool) (attrs map[string]string, redacted []string, err error) {
+			return nil, nil, nil
+		},
+		username:      "alice",
+		expectedError: "invalid client ID",
+	}, {
+		about: "Missing service account administrator permission",
+		ForEachUserCloudCredential: func(ctx context.Context, u *dbmodel.Identity, ct names.CloudTag, f func(cred *dbmodel.CloudCredential) error) error {
+			return nil
+		},
+		args: params.ListServiceAccountCredentialsRequest{
+			ClientID: "fca1f605-736e-4d1f-bcd2-aecc726923be",
+		},
+		getCloudCredential: func(ctx context.Context, user *openfga.User, tag names.CloudCredentialTag) (*dbmodel.CloudCredential, error) {
+			cred := &dbmodel.CloudCredential{}
+			return cred, nil
+		},
+		getCloudCredentialAttributes: func(ctx context.Context, u *openfga.User, cred *dbmodel.CloudCredential, hidden bool) (attrs map[string]string, redacted []string, err error) {
+			return nil, nil, nil
+		},
+		username:      "alice",
+		expectedError: "unauthorized",
 	}}
 
 	for _, test := range tests {
@@ -357,6 +425,34 @@ func TestGrantServiceAccountAccess(t *testing.T) {
 			Relation: ofganames.AdministratorRelation,
 			Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag("fca1f605-736e-4d1f-bcd2-aecc726923be")),
 		}},
+	}, {
+		about: "Invalid Service account ID",
+		grantServiceAccountAccess: func(ctx context.Context, user *openfga.User, svcAccTag jimmnames.ServiceAccountTag, entities []string) error {
+			return nil
+		},
+		params: params.GrantServiceAccountAccess{
+			Entities: []string{
+				"user-alice",
+				"user-bob",
+			},
+			ClientID: "_123_",
+		},
+		username:      "alice",
+		expectedError: "invalid client ID",
+	}, {
+		about: "Missing service account administrator permission",
+		grantServiceAccountAccess: func(ctx context.Context, user *openfga.User, svcAccTag jimmnames.ServiceAccountTag, entities []string) error {
+			return nil
+		},
+		params: params.GrantServiceAccountAccess{
+			Entities: []string{
+				"user-alice",
+				"user-bob",
+			},
+			ClientID: "fca1f605-736e-4d1f-bcd2-aecc726923be",
+		},
+		username:      "alice",
+		expectedError: "unauthorized",
 	}}
 
 	for _, test := range tests {
