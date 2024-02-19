@@ -10,7 +10,6 @@ import (
 
 	"github.com/canonical/candid/candidtest"
 	cofga "github.com/canonical/ofga"
-	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/identchecker"
@@ -87,16 +86,7 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
 
-	// Connects to a pre-configured keycloak realm
-	authSvc, err := auth.NewAuthenticationService(ctx, auth.AuthenticationServiceParams{
-		IssuerURL:          "http://localhost:8082/realms/jimm",
-		ClientID:           "jimm-device",
-		ClientSecret:       "SwjDofnbDzJDm9iyfUhEp67FfUFMY8L4",
-		Scopes:             []string{oidc.ScopeOpenID, "profile", "email"},
-		SessionTokenExpiry: time.Hour,
-	})
-	c.Assert(err, gc.Equals, nil)
-	s.JIMM.OAuthAuthenticator = authSvc
+	s.JIMM.OAuthAuthenticator = MockOAuthAuthenticator{}
 
 	err = s.JIMM.Database.Migrate(ctx, false)
 	c.Assert(err, gc.Equals, nil)
