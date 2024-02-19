@@ -186,6 +186,10 @@ func (as *AuthenticationService) MintSessionToken(email string, secretKey string
 // The subject of the token contains the user's email and can be used
 // for user object creation.
 func (as *AuthenticationService) VerifySessionToken(token string, secretKey string) (jwt.Token, error) {
+	return VerifySessionToken(token, secretKey)
+}
+
+func VerifySessionToken(token string, secretKey string) (jwt.Token, error) {
 	const op = errors.Op("auth.AuthenticationService.VerifySessionToken")
 
 	if len(token) == 0 {

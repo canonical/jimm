@@ -86,7 +86,8 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
 
-	s.JIMM.OAuthAuthenticator = MockOAuthAuthenticator{}
+	// Note that the secret key here must match what is used in tests.
+	s.JIMM.OAuthAuthenticator = NewMockOAuthAuthenticator("test-key")
 
 	err = s.JIMM.Database.Migrate(ctx, false)
 	c.Assert(err, gc.Equals, nil)
