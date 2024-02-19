@@ -79,8 +79,8 @@ func NewListAuditEventsCommandForTesting(store jujuclient.ClientStore, bClient *
 	return modelcmd.WrapBase(cmd)
 }
 
-func NewJobViewerCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
-	cmd := &jobViewerCommand{
+func NewViewJobsCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
+	cmd := &viewJobsCommand{
 		store: store,
 		dialOpts: &jujuapi.DialOpts{
 			InsecureSkipVerify: true,

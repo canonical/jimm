@@ -462,7 +462,7 @@ func (s *jimmSuite) TestViewJobs(c *gc.C) {
 	conn := s.open(c, nil, "bob")
 	defer conn.Close()
 	client := api.NewClient(conn)
-	jobs, err := client.ViewJobs(&apiparams.ViewJobsRequest{GetCompleted: true, GetFailed: true, GetCancelled: true, Limit: 10, SortAsc: true})
+	jobs, err := client.ViewJobs(&apiparams.ViewJobsRequest{IncludeCompleted: true, IncludeFailed: true, IncludeCancelled: true, Limit: 10, SortAsc: true})
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(len(jobs.CancelledJobs), gc.Equals, 0)
 	c.Assert(len(jobs.FailedJobs), gc.Equals, 0)

@@ -412,17 +412,17 @@ func (j *JIMM) ViewJobs(ctx context.Context, req params.ViewJobsRequest) (riverJ
 		}
 		return jobs, nil
 	}
-	if req.GetFailed {
+	if req.IncludeFailed {
 		if riverJobs.FailedJobs, err = getJobs(rivertype.JobStateDiscarded); err != nil {
 			return params.RiverJobs{}, err
 		}
 	}
-	if req.GetCancelled {
+	if req.IncludeCancelled {
 		if riverJobs.CancelledJobs, err = getJobs(rivertype.JobStateCancelled); err != nil {
 			return params.RiverJobs{}, err
 		}
 	}
-	if req.GetCompleted {
+	if req.IncludeCompleted {
 		if riverJobs.CompletedJobs, err = getJobs(rivertype.JobStateCompleted); err != nil {
 			return params.RiverJobs{}, err
 		}

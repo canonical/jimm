@@ -225,35 +225,20 @@ type FindAuditEventsRequest struct {
 }
 
 type ViewJobsRequest struct {
-	// After is used to filter the jobs that had a change in their state after a certain time
-	//If this is specified it must contain an RFC3339 encoded time value.
-	After string `json:"after,omitempty"`
+	// IncludeCancelled returns jobs that are in 'JobStateCancelled`
+	IncludeCancelled bool `json:"includeCancelled,omitempty"`
 
-	// Before is used to filter the jobs that had a change in their state before a certain time
-	//If this is specified it must contain an RFC3339 encoded time value.
-	Before string `json:"before,omitempty"`
+	// IncludeCompleted returns jobs that are in 'JobStateCompleted'
+	IncludeCompleted bool `json:"includeCompleted,omitempty"`
 
-	// GetCancelled returns jobs that are in 'JobStateCancelled`
-	GetCancelled bool `json:"getCanceled,omitempty"`
-
-	// GetCompleted returns jobs that are in 'JobStateCompleted'
-	GetCompleted bool `json:"getCompleted,omitempty"`
-
-	// GetFailed returns jobs that are in 'JobStateDiscarded'
-	GetFailed bool `json:"getFailed,omitempty"`
+	// IncludeFailed returns jobs that are in 'JobStateDiscarded'
+	IncludeFailed bool `json:"includeFailed,omitempty"`
 
 	// Limit is the maximum number of jobs to return/
 	Limit int `json:"limit,omitempty"`
 
-	// Offset is the page index you want to read from.
-	// Reading records starts from the job at indeex = Offset * Limit
-	Offset int `json:"offset,omitempty"`
-
 	// SortAsc returns the jobs sorted in ascending order if set to true.
 	SortAsc bool `json:"sortAscending,omitempty"`
-
-	// JobKind is used to return jobs of specific kind.
-	JobKind []string `json:"jobKinds,omitempty"`
 }
 
 // A ListControllersResponse is the response that is sent in a

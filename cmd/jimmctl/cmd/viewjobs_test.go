@@ -29,7 +29,7 @@ func (s *jobViewerSuite) TestJobViewer2success(c *gc.C) {
 	s.AddModel(c, names.NewUserTag("charlie@external"), "model-2", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, cct)
 
 	bClient := s.userBakeryClient("alice")
-	context, err := cmdtesting.RunCommand(c, cmd.NewJobViewerCommandForTesting(s.ClientStore(), bClient), "--getCompleted", "--format", "json")
+	context, err := cmdtesting.RunCommand(c, cmd.NewViewJobsCommandForTesting(s.ClientStore(), bClient), "--getCompleted", "--format", "json")
 	c.Assert(err, gc.IsNil)
 
 	cmdOut := cmdtesting.Stdout(context)
