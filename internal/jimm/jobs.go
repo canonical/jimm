@@ -13,45 +13,43 @@ import (
 	"github.com/canonical/jimm/internal/errors"
 )
 
-func (j *JIMM) ViewJobs(ctx context.Context, req params.ViewJobsRequest) (riverJobs params.RiverJobs, err error) {
-	const op = errors.Op("jimm.ViewJobs")
-	client := j.River.Client
-	req.Limit = min(req.Limit, 10000) // count greater than 10_000 makes river panics, which kills jimm.
-
-	getJobs := func(state rivertype.JobState) (jobs []rivertype.JobRow, err error) {
-		sortOrder := river.SortOrderDesc
-		if req.SortAsc {
-			sortOrder = river.SortOrderAsc
-		}
-		jobsList, err := client.JobList(
-			ctx,
-			river.NewJobListParams().
-				State(state).
-				OrderBy(river.JobListOrderByTime, sortOrder).
-				First(req.Limit),
-		)
-		if err != nil {
-			return make([]rivertype.JobRow, 0), errors.E(op, fmt.Sprintf("failed to read %s jobs from river db, err: %s", state, err))
-		}
-		jobs = make([]rivertype.JobRow, len(jobsList))
-		for i, job := range jobsList {
-			jobs[i] = *job
-		}
-		return jobs, nil
+// GetJobListParams constructs the river.JobListParams based on params.ViewJobsRequest and state
+func GetJobListParams(req params.ViewJobsRequest, state rivertype.JobState) *river.JobListParams {
+	sortOrder := river.SortOrderDesc
+	if req.SortAsc {
+		sortOrder = river.SortOrderAsc
 	}
+	return river.NewJobListParams().First(max(1, min(req.Limit, 10000))).OrderBy(river.JobListOrderByTime, sortOrder).State(state)
+}
 
+// GetJobs returns a job based on a specific state and filters
+func (j *JIMM) GetJobs(ctx context.Context, req params.ViewJobsRequest, state rivertype.JobState) (jobs []rivertype.JobRow, err error) {
+	const op = errors.Op("jimm.GetJobs")
+	jobsList, err := j.River.Client.JobList(ctx, GetJobListParams(req, state))
+	if err != nil {
+		return make([]rivertype.JobRow, 0), errors.E(op, fmt.Sprintf("failed to read %s jobs from river db, err: %s", state, err))
+	}
+	jobs = make([]rivertype.JobRow, len(jobsList))
+	for i, job := range jobsList {
+		jobs[i] = *job
+	}
+	return jobs, nil
+}
+
+// ViewJobs returns a params.RiverJobs with Failed, Cancelled, and Completed jobs filtered based on the ViewJobsRequest
+func (j *JIMM) ViewJobs(ctx context.Context, req params.ViewJobsRequest) (riverJobs params.RiverJobs, err error) {
 	if req.IncludeFailed {
-		if riverJobs.FailedJobs, err = getJobs(rivertype.JobStateDiscarded); err != nil {
+		if riverJobs.FailedJobs, err = j.GetJobs(ctx, req, rivertype.JobStateDiscarded); err != nil {
 			return params.RiverJobs{}, err
 		}
 	}
 	if req.IncludeCancelled {
-		if riverJobs.CancelledJobs, err = getJobs(rivertype.JobStateCancelled); err != nil {
+		if riverJobs.CancelledJobs, err = j.GetJobs(ctx, req, rivertype.JobStateCancelled); err != nil {
 			return params.RiverJobs{}, err
 		}
 	}
 	if req.IncludeCompleted {
-		if riverJobs.CompletedJobs, err = getJobs(rivertype.JobStateCompleted); err != nil {
+		if riverJobs.CompletedJobs, err = j.GetJobs(ctx, req, rivertype.JobStateCompleted); err != nil {
 			return params.RiverJobs{}, err
 		}
 	}
