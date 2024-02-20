@@ -50,15 +50,18 @@ func CreateRandomKeycloakUser() (*KeycloakUser, error) {
 	}
 
 	if err := addKeycloakUser(adminCLIToken, email, username); err != nil {
+		zapctx.Error(context.Background(), "failed to add keycloak user", zap.Error(err))
 		return nil, errors.E(err, fmt.Sprintf("failed to add keycloak user (%q, %q)", email, username))
 	}
 
 	id, err := getKeycloakUserId(adminCLIToken, username)
 	if err != nil {
+		zapctx.Error(context.Background(), "failed to get keycloak user ID", zap.Error(err))
 		return nil, errors.E(err, fmt.Sprintf("failed to retrieve ID for newly added keycloak user (%q, %q)", email, username))
 	}
 
 	if err := setKeycloakUserPassword(adminCLIToken, id, password); err != nil {
+		zapctx.Error(context.Background(), "failed to set keycloak user password", zap.Error(err))
 		return nil, errors.E(err, fmt.Sprintf("failed to set password for newly added keycloak user (%q, %q, %q)", email, username, password))
 	}
 	return &KeycloakUser{

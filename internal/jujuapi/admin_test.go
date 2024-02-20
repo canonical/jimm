@@ -12,10 +12,13 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/canonical/jimm/api/params"
+	"github.com/canonical/jimm/internal/auth"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/jimmtest"
+	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/juju/juju/api"
 	jujuparams "github.com/juju/juju/rpc/params"
 	gc "gopkg.in/check.v1"
@@ -24,6 +27,22 @@ import (
 
 type adminSuite struct {
 	websocketSuite
+}
+
+func (s *adminSuite) SetUpTest(c *gc.C) {
+	s.websocketSuite.SetUpTest(c)
+	ctx := context.Background()
+	// Replace JIMM's mock authenticator with a real one here
+	// for testing the login flows.
+	authSvc, err := auth.NewAuthenticationService(ctx, auth.AuthenticationServiceParams{
+		IssuerURL:          "http://localhost:8082/realms/jimm",
+		ClientID:           "jimm-device",
+		ClientSecret:       "SwjDofnbDzJDm9iyfUhEp67FfUFMY8L4",
+		Scopes:             []string{oidc.ScopeOpenID, "profile", "email"},
+		SessionTokenExpiry: time.Hour,
+	})
+	c.Assert(err, gc.Equals, nil)
+	s.JIMM.OAuthAuthenticator = authSvc
 }
 
 var _ = gc.Suite(&adminSuite{})
