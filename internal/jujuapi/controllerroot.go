@@ -42,6 +42,7 @@ type JIMM interface {
 	EarliestControllerVersion(ctx context.Context) (version.Number, error)
 	FindApplicationOffers(ctx context.Context, user *openfga.User, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetails, error)
 	FindAuditEvents(ctx context.Context, user *openfga.User, filter db.AuditLogFilter) ([]dbmodel.AuditLogEntry, error)
+	FindJobs(ctx context.Context, req params.FindJobsRequest) (params.Jobs, error)
 	ForEachCloud(ctx context.Context, user *openfga.User, f func(*dbmodel.Cloud) error) error
 	ForEachModel(ctx context.Context, u *openfga.User, f func(*dbmodel.Model, jujuparams.UserAccessPermission) error) error
 	ForEachUserCloud(ctx context.Context, user *openfga.User, f func(*dbmodel.Cloud) error) error
@@ -99,7 +100,6 @@ type JIMM interface {
 	UpdateMigratedModel(ctx context.Context, user *openfga.User, modelTag names.ModelTag, targetControllerName string) error
 	UserModelDefaults(ctx context.Context, user *dbmodel.User) (map[string]interface{}, error)
 	ValidateModelUpgrade(ctx context.Context, u *openfga.User, mt names.ModelTag, force bool) error
-	ViewJobs(ctx context.Context, req params.ViewJobsRequest) (params.RiverJobs, error)
 	WatchAllModelSummaries(ctx context.Context, controller *dbmodel.Controller) (_ func() error, err error)
 }
 

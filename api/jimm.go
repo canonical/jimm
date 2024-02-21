@@ -53,11 +53,11 @@ func (c *Client) FindAuditEvents(req *params.FindAuditEventsRequest) (params.Aud
 	return resp, nil
 }
 
-// ViewJobs returns a list jobs that match the requested filters.
-func (c *Client) ViewJobs(req *params.ViewJobsRequest) (params.RiverJobs, error) {
-	var resp params.RiverJobs
-	if err := c.caller.APICall("JIMM", 4, "", "ViewJobs", req, &resp); err != nil {
-		return params.RiverJobs{}, err
+// FindJobs returns a list jobs that match the requested filters.
+func (c *Client) FindJobs(req *params.FindJobsRequest) (params.Jobs, error) {
+	var resp params.Jobs
+	if err := c.caller.APICall("JIMM", 4, "", "FindJobs", req, &resp); err != nil {
+		return params.Jobs{}, err
 	}
 	return resp, nil
 }

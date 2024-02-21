@@ -456,13 +456,13 @@ func TestAuditLogAPIParamsConversion(t *testing.T) {
 	}
 }
 
-func (s *jimmSuite) TestViewJobs(c *gc.C) {
+func (s *jimmSuite) TestFindJobs(c *gc.C) {
 	s.AddController(c, "controller-2", s.APIInfo(c))
 	s.AddModel(c, names.NewUserTag("charlie@external"), "model-1", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, s.Model2.CloudCredential.ResourceTag())
 	conn := s.open(c, nil, "alice")
 	defer conn.Close()
 	client := api.NewClient(conn)
-	jobs, err := client.ViewJobs(&apiparams.ViewJobsRequest{IncludeCompleted: true, IncludeFailed: true, IncludeCancelled: true, Limit: 10, SortAsc: true})
+	jobs, err := client.FindJobs(&apiparams.FindJobsRequest{IncludeCompleted: true, IncludeFailed: true, IncludeCancelled: true, Limit: 10, SortAsc: true})
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(len(jobs.CancelledJobs), gc.Equals, 0)
 	c.Assert(len(jobs.FailedJobs), gc.Equals, 0)
@@ -483,11 +483,11 @@ func (s *jimmSuite) TestViewJobs(c *gc.C) {
 	}
 }
 
-func (s *jimmSuite) TestViewJobUnauthorized(c *gc.C) {
+func (s *jimmSuite) TestFindJobUnauthorized(c *gc.C) {
 	conn := s.open(c, nil, "bob")
 	defer conn.Close()
 	client := api.NewClient(conn)
-	_, err := client.ViewJobs(&apiparams.ViewJobsRequest{IncludeCompleted: true})
+	_, err := client.FindJobs(&apiparams.FindJobsRequest{IncludeCompleted: true})
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
 

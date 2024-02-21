@@ -29,12 +29,12 @@ func TestJobListParams(t *testing.T) {
 	c := qt.New(t)
 	tests := []struct {
 		about             string
-		request           apiparams.ViewJobsRequest
+		request           apiparams.FindJobsRequest
 		state             rivertype.JobState
 		expectedJobParams river.JobListParams
 	}{{
 		about: "get failed jobs, negative limit so it will replace it with 1, and sort ascending",
-		request: apiparams.ViewJobsRequest{
+		request: apiparams.FindJobsRequest{
 			Limit:   -1,
 			SortAsc: true,
 		},
@@ -42,7 +42,7 @@ func TestJobListParams(t *testing.T) {
 		expectedJobParams: *river.NewJobListParams().First(1).OrderBy(river.JobListOrderByTime, river.SortOrderAsc).State(river.JobStateDiscarded),
 	}, {
 		about: "get cancelled jobs, > 10000 limit so it will be capped at 10000, and sort descending",
-		request: apiparams.ViewJobsRequest{
+		request: apiparams.FindJobsRequest{
 			Limit:   15000,
 			SortAsc: false,
 		},
@@ -50,7 +50,7 @@ func TestJobListParams(t *testing.T) {
 		expectedJobParams: *river.NewJobListParams().First(10000).OrderBy(river.JobListOrderByTime, river.SortOrderDesc).State(river.JobStateCancelled),
 	}, {
 		about: "get completed jobs, 2000 limit, and sort ascending",
-		request: apiparams.ViewJobsRequest{
+		request: apiparams.FindJobsRequest{
 			Limit:   2000,
 			SortAsc: false,
 		},
@@ -66,7 +66,7 @@ func TestJobListParams(t *testing.T) {
 	}
 }
 
-func TestViewJobs(t *testing.T) {
+func TestFindJobs(t *testing.T) {
 	c := qt.New(t)
 
 	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
@@ -190,14 +190,14 @@ func TestViewJobs(t *testing.T) {
 	})
 	c.Assert(err, qt.IsNil)
 
-	jobs, err := j.ViewJobs(context.Background(), apiparams.ViewJobsRequest{IncludeCancelled: true, IncludeCompleted: true, IncludeFailed: true, SortAsc: true})
-	expectedJobs := apiparams.RiverJobs{
-		FailedJobs:    []rivertype.JobRow{{Kind: "AddModel", ID: 1, Attempt: 1, MaxAttempts: 1, State: rivertype.JobStateDiscarded}},
-		CompletedJobs: []rivertype.JobRow{{Kind: "AddModel", ID: 2, Attempt: 1, MaxAttempts: 1, State: rivertype.JobStateCompleted}},
-		CancelledJobs: []rivertype.JobRow{},
+	jobs, err := j.FindJobs(context.Background(), apiparams.FindJobsRequest{IncludeCancelled: true, IncludeCompleted: true, IncludeFailed: true, SortAsc: true})
+	expectedJobs := apiparams.Jobs{
+		FailedJobs:    []apiparams.Job{{Kind: "AddModel", ID: 1, Attempt: 1, MaxAttempts: 1, State: string(rivertype.JobStateDiscarded)}},
+		CompletedJobs: []apiparams.Job{{Kind: "AddModel", ID: 2, Attempt: 1, MaxAttempts: 1, State: string(rivertype.JobStateCompleted)}},
+		CancelledJobs: []apiparams.Job{},
 	}
 	c.Assert(err, qt.Equals, nil)
-	jobComparator := qt.CmpEquals(cmpopts.IgnoreFields(rivertype.JobRow{}, "Metadata", "FinalizedAt", "Priority", "Queue", "ScheduledAt", "Tags", "Errors", "EncodedArgs", "CreatedAt", "AttemptedAt", "AttemptedBy"), cmpopts.EquateEmpty())
+	jobComparator := qt.CmpEquals(cmpopts.IgnoreFields(apiparams.Job{}, "FinalizedAt", "Errors", "EncodedArgs", "CreatedAt", "AttemptedAt"), cmpopts.EquateEmpty())
 	c.Assert(jobs.FailedJobs, jobComparator, expectedJobs.FailedJobs)
 	c.Assert(len(jobs.CompletedJobs), qt.DeepEquals, len(expectedJobs.CompletedJobs))
 }

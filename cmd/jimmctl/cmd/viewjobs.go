@@ -20,48 +20,48 @@ import (
 	"github.com/canonical/jimm/internal/errors"
 )
 
-const viewJobsDoc = `
-	view-jobs allows you to view failed/canceled/completed jobs from the DB.
+const findJobsDoc = `
+	find-jobs allows you to view failed/canceled/completed jobs from the DB.
 
 	Examples:
-		jimmctl view-jobs 
-		jimmctl view-jobs --limit 100 --sort-ascending
-		jimmctl view-jobs --view-completed --format json
+		jimmctl find-jobs 
+		jimmctl find-jobs --limit 100 --sort-ascending
+		jimmctl find-jobs --view-completed --format json
 `
 
-func NewViewJobsCommand() cmd.Command {
-	cmd := &viewJobsCommand{
+func NewFindJobsCommand() cmd.Command {
+	cmd := &findJobsCommand{
 		store: jujuclient.NewFileClientStore(),
 	}
 	return modelcmd.WrapBase(cmd)
 }
 
-type viewJobsCommand struct {
+type findJobsCommand struct {
 	modelcmd.ControllerCommandBase
 	out cmd.Output
 
 	store    jujuclient.ClientStore
 	dialOpts *jujuapi.DialOpts
-	args     apiparams.ViewJobsRequest
+	args     apiparams.FindJobsRequest
 }
 
 // Info implements Command.Info. It returns the command information.
-func (c *viewJobsCommand) Info() *cmd.Info {
+func (c *findJobsCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
 		Name:    "view-jobs",
 		Purpose: "Interact with jimm's job engine to see jobs, their statistics, and arguments",
-		Doc:     viewJobsDoc,
+		Doc:     findJobsDoc,
 	})
 }
 
 // Init implements Command.Init. It checks the number of arguments and validates
 // the date.
-func (c *viewJobsCommand) Init(args []string) error {
+func (c *findJobsCommand) Init(args []string) error {
 	return nil
 }
 
 // Run implements Command.Run.
-func (c *viewJobsCommand) Run(ctx *cmd.Context) error {
+func (c *findJobsCommand) Run(ctx *cmd.Context) error {
 	currentController, err := c.store.CurrentController()
 	if err != nil {
 		return errors.E(err, "could not determine controller")
@@ -73,7 +73,7 @@ func (c *viewJobsCommand) Run(ctx *cmd.Context) error {
 	}
 
 	client := api.NewClient(apiCaller)
-	jobs, err := client.ViewJobs(&c.args)
+	jobs, err := client.FindJobs(&c.args)
 	if err != nil {
 		return errors.E(err)
 	}
@@ -86,7 +86,7 @@ func (c *viewJobsCommand) Run(ctx *cmd.Context) error {
 }
 
 func formatJobsTabular(writer io.Writer, value interface{}) error {
-	jobs, ok := value.(apiparams.RiverJobs)
+	jobs, ok := value.(apiparams.Jobs)
 	if !ok {
 		return errors.E(fmt.Sprintf("expected value of type %T, got %T", jobs, value))
 	}
@@ -95,7 +95,7 @@ func formatJobsTabular(writer io.Writer, value interface{}) error {
 	table.MaxColWidth = 50
 	table.Wrap = true
 
-	printJobs := func(jobsList []rivertype.JobRow, state rivertype.JobState) {
+	printJobs := func(jobsList []apiparams.Job, state rivertype.JobState) {
 		table.AddRow(state, "ID", "Attempt", "Attempted At", "Created At", "Kind", "Finalized At", "Args", "Errors")
 		for _, job := range jobsList {
 			table.AddRow(
@@ -120,7 +120,7 @@ func formatJobsTabular(writer io.Writer, value interface{}) error {
 }
 
 // SetFlags implements Command.SetFlags.
-func (c *viewJobsCommand) SetFlags(f *gnuflag.FlagSet) {
+func (c *findJobsCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.CommandBase.SetFlags(f)
 	c.out.AddFlags(f, "yaml", map[string]cmd.Formatter{
 		"yaml":    cmd.FormatYaml,

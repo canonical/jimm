@@ -137,14 +137,68 @@ type AuditEvents struct {
 	Events []AuditEvent `json:"events"`
 }
 
-// RiverJobs contains the failed, completed, and cancelled jobs.
-type RiverJobs struct {
+// JobAttemptError represents an error that occurred during a job attempt.
+type JobAttemptError struct {
+	// Error contains the stringified error of an error returned from a job or a
+	// panic value in case of a panic.
+	Error string `json:"error" yaml:"error"`
+
+	// Trace contains a stack trace from a job that panicked. The trace is
+	// produced by invoking `debug.Trace()`.
+	Trace string `json:"trace" yaml:"trace"`
+}
+
+// Job represents a job to be processed by a worker.
+type Job struct {
+	// ID of the job.
+	ID int64 `json:"id" yaml:"id"`
+
+	// Attempt is the attempt number of the job. Jobs are inserted at 0, the
+	// number is incremented to 1 the first time work its worked, and may
+	// increment further if it's either snoozed or errors.
+	Attempt int `json:"attempt" yaml:"attempt"`
+
+	// AttemptedAt is the time that the job was last worked. Starts out as `nil`
+	// on a new insert.
+	AttemptedAt *time.Time `json:"attempted_at" yaml:"attempted_at"`
+
+	// CreatedAt is when the job record was created.
+	CreatedAt time.Time `json:"created_at" yaml:"created_at"`
+
+	// EncodedArgs is the job's JobArgs encoded as JSON.
+	EncodedArgs []byte `json:"encoded_args" yaml:"encoded_args"`
+
+	// Errors is a set of errors that occurred when the job was worked, one for
+	// each attempt. Ordered from earliest error to the latest error.
+	Errors []JobAttemptError `json:"errors" yaml:"errors"`
+
+	// FinalizedAt is the time at which the job was "finalized", meaning it was
+	// either completed successfully or errored for the last time such that
+	// it'll no longer be retried.
+	FinalizedAt *time.Time `json:"finalized_at,omitempty" yaml:"finalized_at,omitempty"`
+
+	// Kind uniquely identifies the type of job and instructs which worker
+	// should work it. It is set at insertion time via `Kind()` on the
+	// `JobArgs`.
+	Kind string `json:"kind" yaml:"kind"`
+
+	// MaxAttempts is the maximum number of attempts that the job will be tried
+	// before it errors for the last time and will no longer be worked.
+	MaxAttempts int `json:"max_attempts" yaml:"max_attempts"`
+
+	// State is the state of job like `available` or `completed`. Jobs are
+	// `available` when they're first inserted.
+	State string `json:"state" yaml:"state"`
+}
+
+// Jobs contains the failed, completed, and cancelled jobs.
+type Jobs struct {
 	// FailedJobs has all the Job Rows info about failed jobs
-	FailedJobs []rivertype.JobRow `json:"failedJobs"`
+	FailedJobs []Job `json:"failedJobs"`
 	// CompletedJobs has all the Job Rows info about completed jobs
-	CompletedJobs []rivertype.JobRow `json:"completedJobs"`
+	CompletedJobs []Job `json:"completedJobs"`
 	// CancelledJobs has all the Job Rows info about cancelled jobs
-	CancelledJobs []rivertype.JobRow `json:"cancelledJobs"`
+	CancelledJobs []Job `json:"cancelledJobs"`
 }
 
 // A ControllerInfo describes a controller on a JIMM system.
@@ -224,7 +278,7 @@ type FindAuditEventsRequest struct {
 	SortTime bool `json:"sortTime,omitempty"`
 }
 
-type ViewJobsRequest struct {
+type FindJobsRequest struct {
 	// IncludeCancelled returns jobs that are in 'JobStateCancelled`
 	IncludeCancelled bool `json:"includeCancelled,omitempty"`
 
@@ -420,4 +474,30 @@ type MigrateModelInfo struct {
 // MigrateModelRequest allows for multiple migration requests to be made.
 type MigrateModelRequest struct {
 	Specs []MigrateModelInfo `json:"specs"`
+}
+
+func convertAttemptErrors(attemptErrors []rivertype.AttemptError) []JobAttemptError {
+	jobAttemptErrors := make([]JobAttemptError, len(attemptErrors))
+	for i, err := range attemptErrors {
+		jobAttemptErrors[i] = JobAttemptError{
+			Error: err.Error,
+			Trace: err.Trace,
+		}
+	}
+	return jobAttemptErrors
+}
+
+func ConvertJobRowToJob(jobRow *rivertype.JobRow) Job {
+	return Job{
+		ID:          jobRow.ID,
+		Attempt:     jobRow.Attempt,
+		AttemptedAt: jobRow.AttemptedAt,
+		CreatedAt:   jobRow.CreatedAt,
+		EncodedArgs: jobRow.EncodedArgs,
+		Errors:      convertAttemptErrors(jobRow.Errors),
+		FinalizedAt: jobRow.FinalizedAt,
+		Kind:        jobRow.Kind,
+		MaxAttempts: jobRow.MaxAttempts,
+		State:       string(jobRow.State),
+	}
 }

@@ -29,11 +29,11 @@ func (s *jobViewerSuite) TestJobViewer(c *gc.C) {
 	s.AddModel(c, names.NewUserTag("charlie@external"), "model-2", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, cct)
 
 	bClient := s.userBakeryClient("alice")
-	context, err := cmdtesting.RunCommand(c, cmd.NewViewJobsCommandForTesting(s.ClientStore(), bClient), "--view-completed", "--format", "json")
+	context, err := cmdtesting.RunCommand(c, cmd.NewFindJobsCommandForTesting(s.ClientStore(), bClient), "--view-completed", "--format", "json")
 	c.Assert(err, gc.IsNil)
 
 	cmdOut := cmdtesting.Stdout(context)
-	var data apiparams.RiverJobs
+	var data apiparams.Jobs
 	if err := json.Unmarshal([]byte(cmdOut), &data); err != nil {
 		c.Errorf("failed to deserialize command output, err %s", err)
 	}
