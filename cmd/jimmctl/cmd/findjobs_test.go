@@ -16,13 +16,13 @@ import (
 	"github.com/canonical/jimm/internal/jimmtest"
 )
 
-type jobViewerSuite struct {
+type jobFinderSuite struct {
 	jimmSuite
 }
 
-var _ = gc.Suite(&jobViewerSuite{})
+var _ = gc.Suite(&jobFinderSuite{})
 
-func (s *jobViewerSuite) TestJobViewer(c *gc.C) {
+func (s *jobFinderSuite) TestJobFinder(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
 	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@external/cred")
 	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{AuthType: "empty"})

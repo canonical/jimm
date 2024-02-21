@@ -48,7 +48,7 @@ type findJobsCommand struct {
 // Info implements Command.Info. It returns the command information.
 func (c *findJobsCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:    "view-jobs",
+		Name:    "find-jobs",
 		Purpose: "Interact with jimm's job engine to see jobs, their statistics, and arguments",
 		Doc:     findJobsDoc,
 	})
