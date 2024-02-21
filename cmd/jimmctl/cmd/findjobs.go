@@ -29,6 +29,7 @@ const findJobsDoc = `
 		jimmctl find-jobs --view-completed --format json
 `
 
+// NewFindJobsCommand provides search functionality for JIMM's retryable jobs.
 func NewFindJobsCommand() cmd.Command {
 	cmd := &findJobsCommand{
 		store: jujuclient.NewFileClientStore(),
