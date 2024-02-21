@@ -19,7 +19,8 @@ func GetJobListParams(req params.ViewJobsRequest, state rivertype.JobState) *riv
 	if req.SortAsc {
 		sortOrder = river.SortOrderAsc
 	}
-	return river.NewJobListParams().First(max(1, min(req.Limit, 10000))).OrderBy(river.JobListOrderByTime, sortOrder).State(state)
+	first := max(1, min(req.Limit, 10000))
+	return river.NewJobListParams().First(first).OrderBy(river.JobListOrderByTime, sortOrder).State(state)
 }
 
 // GetJobs returns a job based on a specific state and filters
@@ -27,7 +28,7 @@ func (j *JIMM) GetJobs(ctx context.Context, req params.ViewJobsRequest, state ri
 	const op = errors.Op("jimm.GetJobs")
 	jobsList, err := j.River.Client.JobList(ctx, GetJobListParams(req, state))
 	if err != nil {
-		return make([]rivertype.JobRow, 0), errors.E(op, fmt.Sprintf("failed to read %s jobs from river db, err: %s", state, err))
+		return nil, errors.E(op, fmt.Sprintf("failed to read %s jobs from river db, err: %s", state, err))
 	}
 	jobs = make([]rivertype.JobRow, len(jobsList))
 	for i, job := range jobsList {

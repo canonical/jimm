@@ -25,8 +25,8 @@ const viewJobsDoc = `
 
 	Examples:
 		jimmctl view-jobs 
-		jimmctl view-jobs --limit 100 --reverse
-		jimmctl view-jobs --getCompleted --format json
+		jimmctl view-jobs --limit 100 --sort-ascending
+		jimmctl view-jobs --view-completed --format json
 `
 
 func NewViewJobsCommand() cmd.Command {
@@ -129,7 +129,7 @@ func (c *viewJobsCommand) SetFlags(f *gnuflag.FlagSet) {
 	})
 	f.IntVar(&c.args.Limit, "limit", 100, "limit the maximum number of returned jobs per state.")
 	f.BoolVar(&c.args.SortAsc, "sort-ascending", false, "return the jobs from the oldest to the newest")
-	f.BoolVar(&c.args.IncludeFailed, "inc-failed", true, "return jobs that were discarded")
-	f.BoolVar(&c.args.IncludeCancelled, "inc-cancelled", true, "return jobs that were cancelled")
-	f.BoolVar(&c.args.IncludeCompleted, "inc-completed", false, "return jobs that completed successfully")
+	f.BoolVar(&c.args.IncludeFailed, "view-failed", true, "return jobs that were discarded")
+	f.BoolVar(&c.args.IncludeCancelled, "view-cancelled", true, "return jobs that were cancelled")
+	f.BoolVar(&c.args.IncludeCompleted, "view-completed", false, "return jobs that completed successfully")
 }

@@ -5,7 +5,6 @@ package jimm_test
 import (
 	"context"
 	"testing"
-	"time"
 
 	qt "github.com/frankban/quicktest"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -70,14 +69,12 @@ func TestJobListParams(t *testing.T) {
 func TestViewJobs(t *testing.T) {
 	c := qt.New(t)
 
-	now := time.Now().UTC().Truncate(time.Microsecond)
-
 	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
 	ctx := context.Background()
 	jimmDb := db.Database{
-		DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
+		DB: jimmtest.PostgresDB(c, nil),
 	}
 	j := &jimm.JIMM{
 		UUID:          uuid.NewString(),
@@ -129,14 +126,14 @@ func TestViewJobs(t *testing.T) {
 	err = j.Database.SetCloudCredential(context.Background(), &cred)
 	c.Assert(err, qt.Equals, nil)
 
-	_, _ = j.AddModel(context.Background(), admin, &jimm.ModelCreateArgs{
+	_, err = j.AddModel(context.Background(), admin, &jimm.ModelCreateArgs{
 		Name:            "test-model",
 		Owner:           names.NewUserTag(u.Username),
 		Cloud:           names.NewCloudTag(cloud.Name),
 		CloudRegion:     "test-region-1",
 		CloudCredential: names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1"),
 	})
-
+	c.Assert(err, qt.IsNotNil)
 	// the above fails because no dialer is configured on JIMM
 	api := &jimmtest.API{
 		UpdateCredential_: func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
@@ -200,6 +197,7 @@ func TestViewJobs(t *testing.T) {
 		CancelledJobs: []rivertype.JobRow{},
 	}
 	c.Assert(err, qt.Equals, nil)
-	c.Assert(jobs.FailedJobs, qt.CmpEquals(cmpopts.IgnoreFields(rivertype.JobRow{}, "Metadata", "FinalizedAt", "Priority", "Queue", "ScheduledAt", "Tags", "Errors", "EncodedArgs", "CreatedAt", "AttemptedAt", "AttemptedBy"), cmpopts.EquateEmpty()), expectedJobs.FailedJobs)
+	jobComparator := qt.CmpEquals(cmpopts.IgnoreFields(rivertype.JobRow{}, "Metadata", "FinalizedAt", "Priority", "Queue", "ScheduledAt", "Tags", "Errors", "EncodedArgs", "CreatedAt", "AttemptedAt", "AttemptedBy"), cmpopts.EquateEmpty())
+	c.Assert(jobs.FailedJobs, jobComparator, expectedJobs.FailedJobs)
 	c.Assert(len(jobs.CompletedJobs), qt.DeepEquals, len(expectedJobs.CompletedJobs))
 }

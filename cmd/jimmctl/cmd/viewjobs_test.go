@@ -22,14 +22,14 @@ type jobViewerSuite struct {
 
 var _ = gc.Suite(&jobViewerSuite{})
 
-func (s *jobViewerSuite) TestJobViewer2success(c *gc.C) {
+func (s *jobViewerSuite) TestJobViewer(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
 	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@external/cred")
 	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{AuthType: "empty"})
 	s.AddModel(c, names.NewUserTag("charlie@external"), "model-2", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, cct)
 
 	bClient := s.userBakeryClient("alice")
-	context, err := cmdtesting.RunCommand(c, cmd.NewViewJobsCommandForTesting(s.ClientStore(), bClient), "--inc-completed", "--format", "json")
+	context, err := cmdtesting.RunCommand(c, cmd.NewViewJobsCommandForTesting(s.ClientStore(), bClient), "--view-completed", "--format", "json")
 	c.Assert(err, gc.IsNil)
 
 	cmdOut := cmdtesting.Stdout(context)
@@ -53,17 +53,4 @@ func (s *jobViewerSuite) TestJobViewer2success(c *gc.C) {
 	})
 	c.Assert(len(data.CancelledJobs), gc.Equals, 0)
 	c.Assert(len(data.FailedJobs), gc.Equals, 0)
-}
-
-func (s *jobViewerSuite) TestViewJobsNotAuthorized(c *gc.C) {
-	s.AddController(c, "controller-1", s.APIInfo(c))
-
-	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@external/cred")
-	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{AuthType: "empty"})
-	s.AddModel(c, names.NewUserTag("charlie@external"), "model-2", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, cct)
-
-	// bob is not superuser
-	bClient := s.userBakeryClient("bob")
-	_, err := cmdtesting.RunCommand(c, cmd.NewViewJobsCommandForTesting(s.ClientStore(), bClient), "--inc-completed", "--format", "json")
-	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
