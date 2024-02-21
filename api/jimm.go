@@ -53,6 +53,15 @@ func (c *Client) FindAuditEvents(req *params.FindAuditEventsRequest) (params.Aud
 	return resp, nil
 }
 
+// FindJobs returns a list jobs that match the requested filters.
+func (c *Client) FindJobs(req *params.FindJobsRequest) (params.Jobs, error) {
+	var resp params.Jobs
+	if err := c.caller.APICall("JIMM", 4, "", "FindJobs", req, &resp); err != nil {
+		return params.Jobs{}, err
+	}
+	return resp, nil
+}
+
 // GrantAuditLogAccess grants the given access to the audit log to the
 // given user.
 func (c *Client) GrantAuditLogAccess(req *params.AuditLogAccessRequest) error {

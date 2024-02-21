@@ -136,6 +136,70 @@ type AuditEvents struct {
 	Events []AuditEvent `json:"events"`
 }
 
+// JobAttemptError represents an error that occurred during a job attempt.
+type JobAttemptError struct {
+	// Error contains the stringified error of an error returned from a job or a
+	// panic value in case of a panic.
+	Error string `json:"error" yaml:"error"`
+
+	// Trace contains a stack trace from a job that panicked. The trace is
+	// produced by invoking `debug.Trace()`.
+	Trace string `json:"trace" yaml:"trace"`
+}
+
+// Job represents a job to be processed by a worker.
+type Job struct {
+	// ID of the job.
+	ID int64 `json:"id" yaml:"id"`
+
+	// Attempt is the attempt number of the job. Jobs are inserted at 0, the
+	// number is incremented to 1 the first time work its worked, and may
+	// increment further if it's either snoozed or errors.
+	Attempt int `json:"attempt" yaml:"attempt"`
+
+	// AttemptedAt is the time that the job was last worked. Starts out as `nil`
+	// on a new insert.
+	AttemptedAt *time.Time `json:"attempted_at" yaml:"attempted_at"`
+
+	// CreatedAt is when the job record was created.
+	CreatedAt time.Time `json:"created_at" yaml:"created_at"`
+
+	// EncodedArgs is the job's JobArgs encoded as JSON.
+	EncodedArgs []byte `json:"encoded_args" yaml:"encoded_args"`
+
+	// Errors is a set of errors that occurred when the job was worked, one for
+	// each attempt. Ordered from earliest error to the latest error.
+	Errors []JobAttemptError `json:"errors" yaml:"errors"`
+
+	// FinalizedAt is the time at which the job was "finalized", meaning it was
+	// either completed successfully or errored for the last time such that
+	// it'll no longer be retried.
+	FinalizedAt *time.Time `json:"finalized_at,omitempty" yaml:"finalized_at,omitempty"`
+
+	// Kind uniquely identifies the type of job and instructs which worker
+	// should work it. It is set at insertion time via `Kind()` on the
+	// `JobArgs`.
+	Kind string `json:"kind" yaml:"kind"`
+
+	// MaxAttempts is the maximum number of attempts that the job will be tried
+	// before it errors for the last time and will no longer be worked.
+	MaxAttempts int `json:"max_attempts" yaml:"max_attempts"`
+
+	// State is the state of job like `available` or `completed`. Jobs are
+	// `available` when they're first inserted.
+	State string `json:"state" yaml:"state"`
+}
+
+// Jobs contains the failed, completed, and cancelled jobs.
+type Jobs struct {
+	// FailedJobs has all the Job Rows info about failed jobs
+	FailedJobs []Job `json:"failedJobs"`
+	// CompletedJobs has all the Job Rows info about completed jobs
+	CompletedJobs []Job `json:"completedJobs"`
+	// CancelledJobs has all the Job Rows info about cancelled jobs
+	CancelledJobs []Job `json:"cancelledJobs"`
+}
+
 // A ControllerInfo describes a controller on a JIMM system.
 type ControllerInfo struct {
 	// Name is the name of the controller.
@@ -211,6 +275,23 @@ type FindAuditEventsRequest struct {
 	// SortTime will sort by most recent (time descending) when true.
 	// When false no explicit ordering will be applied.
 	SortTime bool `json:"sortTime,omitempty"`
+}
+
+type FindJobsRequest struct {
+	// IncludeCancelled returns jobs that are in 'JobStateCancelled`
+	IncludeCancelled bool `json:"includeCancelled,omitempty"`
+
+	// IncludeCompleted returns jobs that are in 'JobStateCompleted'
+	IncludeCompleted bool `json:"includeCompleted,omitempty"`
+
+	// IncludeFailed returns jobs that are in 'JobStateDiscarded'
+	IncludeFailed bool `json:"includeFailed,omitempty"`
+
+	// Limit is the maximum number of jobs to return/
+	Limit int `json:"limit,omitempty"`
+
+	// SortAsc returns the jobs sorted in ascending order if set to true.
+	SortAsc bool `json:"sortAscending,omitempty"`
 }
 
 // A ListControllersResponse is the response that is sent in a

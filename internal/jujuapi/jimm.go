@@ -49,6 +49,7 @@ func init() {
 		crossModelQueryMethod := rpc.Method(r.CrossModelQuery)
 		purgeLogsMethod := rpc.Method(r.PurgeLogs)
 		migrateModel := rpc.Method(r.MigrateModel)
+		findJobsMethod := rpc.Method(r.FindJobs)
 
 		// JIMM Generic RPC
 		r.AddMethod("JIMM", 4, "AddController", addControllerMethod)
@@ -66,6 +67,8 @@ func init() {
 		r.AddMethod("JIMM", 4, "RemoveCloudFromController", removeCloudFromControllerMethod)
 		r.AddMethod("JIMM", 4, "PurgeLogs", purgeLogsMethod)
 		r.AddMethod("JIMM", 4, "MigrateModel", migrateModel)
+		r.AddMethod("JIMM", 4, "FindJobs", findJobsMethod)
+
 		// JIMM ReBAC RPC
 		r.AddMethod("JIMM", 4, "AddGroup", addGroupMethod)
 		r.AddMethod("JIMM", 4, "RenameGroup", renameGroupMethod)
@@ -494,4 +497,18 @@ func (r *controllerRoot) MigrateModel(ctx context.Context, args apiparams.Migrat
 	return jujuparams.InitiateMigrationResults{
 		Results: results,
 	}, nil
+}
+
+// FindJobs returns a list of jobs in different states after applying the filters in the FindJobsRequest
+// This is only accessible by JIMM admins
+func (r *controllerRoot) FindJobs(ctx context.Context, req apiparams.FindJobsRequest) (apiparams.Jobs, error) {
+	const op = errors.Op("jujuapi.FindJobs")
+	if !r.user.JimmAdmin {
+		return apiparams.Jobs{}, errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
+	Jobs, err := r.jimm.FindJobs(ctx, req)
+	if err != nil {
+		return apiparams.Jobs{}, errors.E(op, err)
+	}
+	return Jobs, nil
 }

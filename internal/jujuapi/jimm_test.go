@@ -4,6 +4,7 @@ package jujuapi_test
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -22,6 +23,7 @@ import (
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/jimm"
 	"github.com/canonical/jimm/internal/jimmtest"
 	"github.com/canonical/jimm/internal/jujuapi"
 	"github.com/canonical/jimm/internal/openfga"
@@ -452,6 +454,41 @@ func TestAuditLogAPIParamsConversion(t *testing.T) {
 			c.Assert(err, qt.ErrorMatches, test.err)
 		}
 	}
+}
+
+func (s *jimmSuite) TestFindJobs(c *gc.C) {
+	s.AddController(c, "controller-2", s.APIInfo(c))
+	s.AddModel(c, names.NewUserTag("charlie@external"), "model-1", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, s.Model2.CloudCredential.ResourceTag())
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+	client := api.NewClient(conn)
+	jobs, err := client.FindJobs(&apiparams.FindJobsRequest{IncludeCompleted: true, IncludeFailed: true, IncludeCancelled: true, Limit: 10, SortAsc: true})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(len(jobs.CancelledJobs), gc.Equals, 0)
+	c.Assert(len(jobs.FailedJobs), gc.Equals, 0)
+	c.Assert(len(jobs.CompletedJobs), gc.Equals, 4)
+
+	for i, job := range jobs.CompletedJobs {
+		c.Assert(job.Kind, gc.Equals, "AddModel")
+		c.Assert(len(job.Errors), gc.Equals, 0)
+		var args jimm.RiverAddModelArgs
+		err = json.Unmarshal(job.EncodedArgs, &args)
+		c.Assert(err, gc.IsNil)
+		user := "charlie@external"
+		if i == 0 {
+			user = "bob@external"
+		}
+		c.Assert(args.OwnerName, gc.Equals, user)
+		c.Assert(args.ModelId, gc.Equals, uint(i+1))
+	}
+}
+
+func (s *jimmSuite) TestFindJobUnauthorized(c *gc.C) {
+	conn := s.open(c, nil, "bob")
+	defer conn.Close()
+	client := api.NewClient(conn)
+	_, err := client.FindJobs(&apiparams.FindJobsRequest{IncludeCompleted: true})
+	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
 
 func (s *jimmSuite) TestFullModelStatus(c *gc.C) {

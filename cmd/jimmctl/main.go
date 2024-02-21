@@ -38,6 +38,7 @@ func NewSuperCommand() *jujucmd.SuperCommand {
 	jimmcmd.Register(cmd.NewCrossModelQueryCommand())
 	jimmcmd.Register(cmd.NewPurgeLogsCommand())
 	jimmcmd.Register(cmd.NewMigrateModelCommand())
+	jimmcmd.Register(cmd.NewFindJobsCommand())
 	return jimmcmd
 }
 
