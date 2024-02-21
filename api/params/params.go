@@ -6,7 +6,6 @@ import (
 	"time"
 
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/riverqueue/river/rivertype"
 )
 
 // An AddCloudToControllerRequest is the request sent when adding a new cloud
@@ -474,30 +473,4 @@ type MigrateModelInfo struct {
 // MigrateModelRequest allows for multiple migration requests to be made.
 type MigrateModelRequest struct {
 	Specs []MigrateModelInfo `json:"specs"`
-}
-
-func convertAttemptErrors(attemptErrors []rivertype.AttemptError) []JobAttemptError {
-	jobAttemptErrors := make([]JobAttemptError, len(attemptErrors))
-	for i, err := range attemptErrors {
-		jobAttemptErrors[i] = JobAttemptError{
-			Error: err.Error,
-			Trace: err.Trace,
-		}
-	}
-	return jobAttemptErrors
-}
-
-func ConvertJobRowToJob(jobRow *rivertype.JobRow) Job {
-	return Job{
-		ID:          jobRow.ID,
-		Attempt:     jobRow.Attempt,
-		AttemptedAt: jobRow.AttemptedAt,
-		CreatedAt:   jobRow.CreatedAt,
-		EncodedArgs: jobRow.EncodedArgs,
-		Errors:      convertAttemptErrors(jobRow.Errors),
-		FinalizedAt: jobRow.FinalizedAt,
-		Kind:        jobRow.Kind,
-		MaxAttempts: jobRow.MaxAttempts,
-		State:       string(jobRow.State),
-	}
 }
