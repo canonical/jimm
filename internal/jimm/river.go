@@ -82,7 +82,7 @@ func (r *River) Monitor() {
 
 	for {
 		item := <-failedChan
-		if item.Job.Attempt == item.Job.MaxAttempts && item.Job.FinalizedAt != nil {
+		if item != nil && item.Job.Attempt == item.Job.MaxAttempts && item.Job.FinalizedAt != nil {
 			servermon.FailedJobsCount.WithLabelValues(item.Job.Kind).Inc()
 		}
 	}
