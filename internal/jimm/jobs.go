@@ -32,7 +32,7 @@ func (j *JIMM) GetJobs(ctx context.Context, req params.FindJobsRequest, state ri
 	}
 	jobs = make([]params.Job, len(jobsList))
 	for i, job := range jobsList {
-		jobs[i] = params.ConvertJobRowToJob(job)
+		jobs[i] = ConvertJobRowToJob(job)
 	}
 	return jobs, nil
 }
@@ -55,4 +55,32 @@ func (j *JIMM) FindJobs(ctx context.Context, req params.FindJobsRequest) (Jobs p
 		}
 	}
 	return Jobs, nil
+}
+
+// convertAttemptErrors converts rivertype.AttemptError to apiparams.JobAttemptError
+func convertAttemptErrors(attemptErrors []rivertype.AttemptError) []params.JobAttemptError {
+	jobAttemptErrors := make([]params.JobAttemptError, len(attemptErrors))
+	for i, err := range attemptErrors {
+		jobAttemptErrors[i] = params.JobAttemptError{
+			Error: err.Error,
+			Trace: err.Trace,
+		}
+	}
+	return jobAttemptErrors
+}
+
+// ConvertJobRowToJob converts rivertype.JobRow to apiparams Job
+func ConvertJobRowToJob(jobRow *rivertype.JobRow) params.Job {
+	return params.Job{
+		ID:          jobRow.ID,
+		Attempt:     jobRow.Attempt,
+		AttemptedAt: jobRow.AttemptedAt,
+		CreatedAt:   jobRow.CreatedAt,
+		EncodedArgs: jobRow.EncodedArgs,
+		Errors:      convertAttemptErrors(jobRow.Errors),
+		FinalizedAt: jobRow.FinalizedAt,
+		Kind:        jobRow.Kind,
+		MaxAttempts: jobRow.MaxAttempts,
+		State:       string(jobRow.State),
+	}
 }

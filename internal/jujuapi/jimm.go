@@ -499,6 +499,8 @@ func (r *controllerRoot) MigrateModel(ctx context.Context, args apiparams.Migrat
 	}, nil
 }
 
+// FindJobs returns a list of jobs in different states after applying the filters in the FindJobsRequest
+// This is only accessible by JIMM admins
 func (r *controllerRoot) FindJobs(ctx context.Context, req apiparams.FindJobsRequest) (apiparams.Jobs, error) {
 	const op = errors.Op("jujuapi.FindJobs")
 	if !r.user.JimmAdmin {
