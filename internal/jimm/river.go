@@ -73,6 +73,21 @@ func (r *River) doMigration(ctx context.Context) error {
 	return nil
 }
 
+// Monitor listens on the failure channel and increments the prometheus counters for every failed job kind
+func (r *River) Monitor() {
+	var failedChan <-chan *river.Event
+	var failedSubscribeCancel func()
+	failedChan, failedSubscribeCancel = r.Client.Subscribe(river.EventKindJobFailed)
+	defer failedSubscribeCancel()
+
+	for {
+		item := <-failedChan
+		if item.Job.Attempt == item.Job.MaxAttempts && item.Job.FinalizedAt != nil {
+			servermon.FailedJobsCount.WithLabelValues(item.Job.Kind).Inc()
+		}
+	}
+}
+
 // RiverConfig is a struct that represents the arguments to create the River instance.
 type RiverConfig struct {
 	// Config is an optional river config object that includes the retry policy,
@@ -167,7 +182,6 @@ func InsertJob(ctx context.Context, waitConfig *workers.WaitConfig, r *River, in
 			case item := <-failedChan:
 				if item.Job.ID == row.ID {
 					if item.Job.Attempt == item.Job.MaxAttempts && item.Job.FinalizedAt != nil {
-						servermon.FailedJobsCount.WithLabelValues(item.Job.Kind).Inc()
 						return errors.E(fmt.Sprintf("river job %d failed after %d attempts at %s. failure reason %v", item.Job.ID, item.Job.Attempt, item.Job.FinalizedAt, item.Job.Errors))
 					} else {
 						zapctx.Warn(ctx, fmt.Sprintf("job %d failed in attempt %d with error %v, river will continue retrying!", item.Job.ID, item.Job.Attempt, item.Job.Errors[item.Job.Attempt-1]))
