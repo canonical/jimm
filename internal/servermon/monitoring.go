@@ -124,7 +124,7 @@ var (
 		Namespace: "jem",
 		Subsystem: "jobs",
 		Name:      "failed_jobs",
-		Help:      "The number of failed jobs after retrying for the MaxAttempts",
+		Help:      "The number of failed jobs after retrying for the MaxAttempts.",
 	}, []string{"job_kind"})
 	MonitorDeltasReceivedCount = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "jem",
