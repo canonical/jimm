@@ -19,6 +19,7 @@ import hashlib
 import json
 import logging
 import socket
+from urllib.parse import urljoin
 
 import hvac
 import requests
@@ -27,6 +28,7 @@ from charms.data_platform_libs.v0.database_requires import (
     DatabaseRequires,
 )
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
+from charms.hydra.v0.oauth import ClientConfig, OAuthInfoChangedEvent, OAuthRequirer
 from charms.loki_k8s.v0.loki_push_api import LogProxyConsumer
 from charms.nginx_ingress_integrator.v0.nginx_route import require_nginx_route
 from charms.openfga_k8s.v0.openfga import OpenFGARequires, OpenFGAStoreCreateEvent
@@ -72,6 +74,10 @@ OPENFGA_STORE_NAME = "jimm"
 LOG_FILE = "/var/log/jimm"
 # This likely will just be JIMM's port.
 PROMETHEUS_PORT = 8080
+OAUTH = "oauth"
+OAUTH_SCOPES = "openid email offline_access"
+# TODO: Add "device_code" below once the charm interface supports it.
+OAUTH_GRANT_TYPES = ["authorization_code", "refresh_token"]
 
 
 class DeferError(Exception):
@@ -89,7 +95,10 @@ class JimmOperatorCharm(CharmBase):
 
         self._state = State(self.app, lambda: self.model.get_relation("peer"))
         self._unit_state = State(self.unit, lambda: self.model.get_relation("peer"))
+        self.oauth = OAuthRequirer(self, self._oauth_client_config, relation_name=OAUTH)
 
+        self.framework.observe(self.oauth.on.oauth_info_changed, self._on_oauth_info_changed)
+        self.framework.observe(self.oauth.on.oauth_info_removed, self._on_oauth_info_changed)
         self.framework.observe(self.on.peer_relation_changed, self._on_peer_relation_changed)
         self.framework.observe(self.on.jimm_pebble_ready, self._on_jimm_pebble_ready)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
@@ -199,6 +208,9 @@ class JimmOperatorCharm(CharmBase):
     def _on_config_changed(self, event):
         self._update_workload(event)
 
+    def _on_oauth_info_changed(self, event: OAuthInfoChangedEvent):
+        self._update_workload(event)
+
     @requires_state_setter
     def _on_leader_elected(self, event):
         if not self._state.private_key:
@@ -235,6 +247,7 @@ class JimmOperatorCharm(CharmBase):
             event.defer()
             return
 
+        self.oauth.update_client_config(client_config=self._oauth_client_config)
         self._ensure_bakery_agent_file(event)
         self._ensure_vault_file(event)
         if self.model.get_relation("vault") and not container.exists(self._vault_secret_filename):
@@ -242,10 +255,17 @@ class JimmOperatorCharm(CharmBase):
             self.unit.status = BlockedStatus("Vault relation present but vault setup is not ready yet")
             return
 
+        if not self.oauth.is_client_created():
+            logger.warning("OAuth relation is not ready yet")
+            self.unit.status = BlockedStatus("Waiting for OAuth relation")
+            return
+
         dns_name = self._get_dns_name(event)
         if not dns_name:
             logger.warning("dns name not set")
             return
+
+        oauth_provider_info = self.oauth.get_provider_info()
 
         config_values = {
             "CANDID_PUBLIC_KEY": self.config.get("candid-public-key", ""),
@@ -265,8 +285,13 @@ class JimmOperatorCharm(CharmBase):
             "OPENFGA_PORT": self._state.openfga_port,
             "PRIVATE_KEY": self.config.get("private-key", ""),
             "PUBLIC_KEY": self.config.get("public-key", ""),
-            "JIMM_JWT_EXPIRY": self.config.get("jwt-expiry", "5m"),
+            "JIMM_JWT_EXPIRY": self.config.get("jwt-expiry"),
             "JIMM_MACAROON_EXPIRY_DURATION": self.config.get("macaroon-expiry-duration", "24h"),
+            "JIMM_ACCESS_TOKEN_EXPIRY_DURATION": self.config.get("session-expiry-duration"),
+            "JIMM_OAUTH_ISSUER_URL": oauth_provider_info.issuer_url,
+            "JIMM_OAUTH_CLIENT_ID": oauth_provider_info.client_id,
+            "JIMM_OAUTH_CLIENT_SECRET": oauth_provider_info.client_secret,
+            "JIMM_OAUTH_SCOPES": oauth_provider_info.scope,
         }
         if self._state.dsn:
             config_values["JIMM_DSN"] = self._state.dsn
@@ -734,6 +759,17 @@ class JimmOperatorCharm(CharmBase):
             return
         self._state.openfga_auth_model_id = authorization_model_id
         self._update_workload(event)
+
+    @property
+    def _oauth_client_config(self) -> ClientConfig:
+        dns = self.config.get("dns-name")
+        if dns is None or dns == "":
+            dns = "http://localhost"
+        return ClientConfig(
+            urljoin(dns, "/oauth/callback"),
+            OAUTH_SCOPES,
+            OAUTH_GRANT_TYPES,
+        )
 
 
 def _json_data(event, key):

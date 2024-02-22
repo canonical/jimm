@@ -77,7 +77,7 @@ services:
       JIMM_OAUTH_ISSUER_URL: "http://keycloak:8082/realms/jimm" # Scheme required
       JIMM_OAUTH_CLIENT_ID: "jimm-device"
       JIMM_OAUTH_CLIENT_SECRET: "SwjDofnbDzJDm9iyfUhEp67FfUFMY8L4"
-      JIMM_OAUTH_SCOPES: "openid, profile, email" # Comma separated list of scopes
+      JIMM_OAUTH_SCOPES: "openid profile email" # Space separated list of scopes
     volumes:
       - ./:/jimm/
       - ./local/vault/approle.json:/vault/approle.json:rw
