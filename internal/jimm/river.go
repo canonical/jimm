@@ -21,6 +21,7 @@ import (
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/jimm/workers"
 	"github.com/canonical/jimm/internal/openfga"
+	"github.com/canonical/jimm/internal/servermon"
 )
 
 // River is the struct that holds that Client connection to river.
@@ -166,6 +167,7 @@ func InsertJob(ctx context.Context, waitConfig *workers.WaitConfig, r *River, in
 			case item := <-failedChan:
 				if item.Job.ID == row.ID {
 					if item.Job.Attempt == item.Job.MaxAttempts && item.Job.FinalizedAt != nil {
+						servermon.FailedJobsCount.WithLabelValues(item.Job.Kind).Inc()
 						return errors.E(fmt.Sprintf("river job %d failed after %d attempts at %s. failure reason %v", item.Job.ID, item.Job.Attempt, item.Job.FinalizedAt, item.Job.Errors))
 					} else {
 						zapctx.Warn(ctx, fmt.Sprintf("job %d failed in attempt %d with error %v, river will continue retrying!", item.Job.ID, item.Job.Attempt, item.Job.Errors[item.Job.Attempt-1]))
