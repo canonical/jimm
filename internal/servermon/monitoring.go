@@ -10,18 +10,6 @@ import (
 )
 
 var (
-	AddModelFailCount = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: "jem",
-		Subsystem: "jobs",
-		Name: "add_model_fail",
-		Help: "The number of failed add model jobs with after the MaxAttempts",
-	})
-	AddModelSuccessCount = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: "jem",
-		Subsystem: "jobs",
-		Name: "add_model_Success",
-		Help: "The number of successful add model jobs with before the MaxAttempts",
-	})
 	QueryTimeAuditLogCleanUpHistogram = prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: "jem",
 		Name:      "db_query_audit_clean_up_duration_seconds",
@@ -132,6 +120,12 @@ var (
 		Name:      "models_destroyed_count",
 		Help:      "The number of models destroyed.",
 	})
+	FailedJobsCount = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "jem",
+		Subsystem: "jobs",
+		Name:      "failed_jobs",
+		Help:      "The number of failed jobs after retrying for the MaxAttempts",
+	}, []string{"job_kind"})
 	MonitorDeltasReceivedCount = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "jem",
 		Subsystem: "monitor",
@@ -189,8 +183,6 @@ var (
 )
 
 func init() {
-	prometheus.MustRegister(AddModelFailCount)	
-	prometheus.MustRegister(AddModelSuccessCount)
 	prometheus.MustRegister(AuthenticationFailCount)
 	prometheus.MustRegister(AuthenticationSuccessCount)
 	prometheus.MustRegister(AuthenticatorPoolGet)
@@ -199,14 +191,15 @@ func init() {
 	prometheus.MustRegister(ConcurrentWebsocketConnections)
 	prometheus.MustRegister(DatabaseFailCount)
 	prometheus.MustRegister(DeployedUnitCount)
+	prometheus.MustRegister(FailedJobsCount)
 	prometheus.MustRegister(LoginFailCount)
 	prometheus.MustRegister(LoginRedirectCount)
 	prometheus.MustRegister(LoginSuccessCount)
 	prometheus.MustRegister(ModelLifetime)
 	prometheus.MustRegister(ModelsCreatedCount)
 	prometheus.MustRegister(ModelsCreatedFailCount)
-	prometheus.MustRegister(MonitorDeltasReceivedCount)
 	prometheus.MustRegister(MonitorDeltaBatchesReceivedCount)
+	prometheus.MustRegister(MonitorDeltasReceivedCount)
 	prometheus.MustRegister(MonitorErrorsCount)
 	prometheus.MustRegister(MonitorLeaseGauge)
 	prometheus.MustRegister(requestDuration)

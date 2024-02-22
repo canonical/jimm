@@ -738,22 +738,18 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 	})
 	if err != nil {
 		builder.err = err
-		servermon.AddModelFailCount.Inc()
 		return nil, errors.E(err, fmt.Sprintf("failed to insert and wait for the river job, err: %s", err))
 	}
 	model := &dbmodel.Model{
 		ID: builder.model.ID,
 	}
 	if err = j.Database.GetModel(ctx, model); err != nil {
-		servermon.AddModelFailCount.Inc()
 		return nil, errors.E(err, fmt.Sprintf("failed to fetch model information, err: %s", err))
 	}
 	modelInfo, err := j.ModelInfo(ctx, ownerOfgaUser, names.NewModelTag(model.UUID.String))
 	if err != nil {
-		servermon.AddModelFailCount.Inc()
 		return nil, errors.E(err, fmt.Sprintf("failed to read model info, err: %s", err))
 	}
-	servermon.AddModelSuccessCount.Inc()
 	return modelInfo, nil
 }
 
