@@ -10,6 +10,18 @@ import (
 )
 
 var (
+	AddModelFailCount = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: "jem",
+		Subsystem: "jobs",
+		Name: "add_model_fail",
+		Help: "The number of failed add model jobs with after the MaxAttempts",
+	})
+	AddModelSuccessCount = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: "jem",
+		Subsystem: "jobs",
+		Name: "add_model_Success",
+		Help: "The number of successful add model jobs with before the MaxAttempts",
+	})
 	QueryTimeAuditLogCleanUpHistogram = prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: "jem",
 		Name:      "db_query_audit_clean_up_duration_seconds",
@@ -177,6 +189,8 @@ var (
 )
 
 func init() {
+	prometheus.MustRegister(AddModelFailCount)	
+	prometheus.MustRegister(AddModelSuccessCount)
 	prometheus.MustRegister(AuthenticationFailCount)
 	prometheus.MustRegister(AuthenticationSuccessCount)
 	prometheus.MustRegister(AuthenticatorPoolGet)
