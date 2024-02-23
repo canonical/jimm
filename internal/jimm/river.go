@@ -21,6 +21,7 @@ import (
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/jimm/workers"
 	"github.com/canonical/jimm/internal/openfga"
+	"github.com/canonical/jimm/internal/servermon"
 )
 
 // River is the struct that holds that Client connection to river.
@@ -70,6 +71,22 @@ func (r *River) doMigration(ctx context.Context) error {
 		return err
 	}
 	return nil
+}
+
+// Monitor listens on the failure channel and increments the prometheus counters for every failed job kind
+func (r *River) Monitor(ctx context.Context) {
+	failedChan, failedSubscribeCancel := r.Client.Subscribe(river.EventKindJobFailed)
+	defer failedSubscribeCancel()
+	for {
+		select {
+		case <-ctx.Done():
+			return // Exit if the context is cancelled
+		case item := <-failedChan:
+			if item != nil && item.Job.Attempt == item.Job.MaxAttempts {
+				servermon.FailedJobsCount.WithLabelValues(item.Job.Kind).Inc()
+			}
+		}
+	}
 }
 
 // RiverConfig is a struct that represents the arguments to create the River instance.

@@ -120,6 +120,12 @@ var (
 		Name:      "models_destroyed_count",
 		Help:      "The number of models destroyed.",
 	})
+	FailedJobsCount = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "jem",
+		Subsystem: "jobs",
+		Name:      "failed_jobs",
+		Help:      "The number of failed jobs after retrying for the MaxAttempts.",
+	}, []string{"job_kind"})
 	MonitorDeltasReceivedCount = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "jem",
 		Subsystem: "monitor",
@@ -185,14 +191,15 @@ func init() {
 	prometheus.MustRegister(ConcurrentWebsocketConnections)
 	prometheus.MustRegister(DatabaseFailCount)
 	prometheus.MustRegister(DeployedUnitCount)
+	prometheus.MustRegister(FailedJobsCount)
 	prometheus.MustRegister(LoginFailCount)
 	prometheus.MustRegister(LoginRedirectCount)
 	prometheus.MustRegister(LoginSuccessCount)
 	prometheus.MustRegister(ModelLifetime)
 	prometheus.MustRegister(ModelsCreatedCount)
 	prometheus.MustRegister(ModelsCreatedFailCount)
-	prometheus.MustRegister(MonitorDeltasReceivedCount)
 	prometheus.MustRegister(MonitorDeltaBatchesReceivedCount)
+	prometheus.MustRegister(MonitorDeltasReceivedCount)
 	prometheus.MustRegister(MonitorErrorsCount)
 	prometheus.MustRegister(MonitorLeaseGauge)
 	prometheus.MustRegister(requestDuration)
