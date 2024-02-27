@@ -162,6 +162,12 @@ class TestCharm(unittest.TestCase):
         expected_env.update({"INSECURE_SECRET_STORAGE": "enabled"})
         self.assertEqual(plan.to_dict(), get_expected_plan(expected_env))
 
+    def test_app_dns_address(self):
+        self.harness.update_config(MINIMAL_CONFIG)
+        self.harness.update_config({"dns-name": "jimm.com"})
+        oauth_client = self.harness.charm._oauth_client_config
+        self.assertEqual(oauth_client.redirect_uri, "https://jimm.com/oauth/callback")
+
     def test_app_enters_block_states_if_oauth_relation_removed(self):
         self.harness.update_config(MINIMAL_CONFIG)
         self.harness.remove_relation(self.oauth_rel_id)

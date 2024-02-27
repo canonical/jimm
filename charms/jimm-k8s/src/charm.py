@@ -765,11 +765,19 @@ class JimmOperatorCharm(CharmBase):
         dns = self.config.get("dns-name")
         if dns is None or dns == "":
             dns = "http://localhost"
+        dns = ensureFQDN(dns)
         return ClientConfig(
             urljoin(dns, "/oauth/callback"),
             OAUTH_SCOPES,
             OAUTH_GRANT_TYPES,
         )
+
+
+def ensureFQDN(dns: str):  # noqa: N802
+    """Ensures a domain name has an https:// prefix."""
+    if not dns.startswith("http"):
+        dns = "https://" + dns
+    return dns
 
 
 def _json_data(event, key):
