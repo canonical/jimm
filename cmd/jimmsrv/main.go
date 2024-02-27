@@ -105,7 +105,7 @@ func start(ctx context.Context, s *service.Service) error {
 	}
 
 	scopes := os.Getenv("JIMM_OAUTH_SCOPES")
-	scopesParsed := strings.Split(scopes, ",")
+	scopesParsed := strings.Split(scopes, " ")
 	for i, scope := range scopesParsed {
 		scopesParsed[i] = strings.TrimSpace(scope)
 	}

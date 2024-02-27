@@ -15,6 +15,18 @@ from ops.testing import Harness
 
 from src.charm import JimmOperatorCharm
 
+OAUTH_CLIENT_ID = "jimm_client_id"
+OAUTH_CLIENT_SECRET = "test-secret"
+OAUTH_PROVIDER_INFO = {
+    "authorization_endpoint": "https://example.oidc.com/oauth2/auth",
+    "introspection_endpoint": "https://example.oidc.com/admin/oauth2/introspect",
+    "issuer_url": "https://example.oidc.com",
+    "jwks_endpoint": "https://example.oidc.com/.well-known/jwks.json",
+    "scope": "openid profile email phone",
+    "token_endpoint": "https://example.oidc.com/oauth2/token",
+    "userinfo_endpoint": "https://example.oidc.com/userinfo",
+}
+
 MINIMAL_CONFIG = {
     "uuid": "1234567890",
     "candid-url": "test-candid-url",
@@ -28,7 +40,6 @@ EXPECTED_ENV = {
     "JIMM_DASHBOARD_LOCATION": "https://jaas.ai/models",
     "JIMM_DNS_NAME": "juju-jimm-k8s-0.juju-jimm-k8s-endpoints.None.svc.cluster.local",
     "JIMM_ENABLE_JWKS_ROTATOR": "1",
-    "JIMM_JWT_EXPIRY": "5m",
     "JIMM_LISTEN_ADDR": ":8080",
     "JIMM_LOG_LEVEL": "info",
     "JIMM_UUID": "1234567890",
@@ -37,7 +48,34 @@ EXPECTED_ENV = {
     "PUBLIC_KEY": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
     "JIMM_AUDIT_LOG_RETENTION_PERIOD_IN_DAYS": "0",
     "JIMM_MACAROON_EXPIRY_DURATION": "24h",
+    "JIMM_JWT_EXPIRY": "5m",
+    "JIMM_ACCESS_TOKEN_EXPIRY_DURATION": "6h",
+    "JIMM_OAUTH_ISSUER_URL": OAUTH_PROVIDER_INFO["issuer_url"],
+    "JIMM_OAUTH_CLIENT_ID": OAUTH_CLIENT_ID,
+    "JIMM_OAUTH_CLIENT_SECRET": OAUTH_CLIENT_SECRET,
+    "JIMM_OAUTH_SCOPES": OAUTH_PROVIDER_INFO["scope"],
 }
+
+
+def get_expected_plan(env):
+    return {
+        "services": {
+            "jimm": {
+                "summary": "JAAS Intelligent Model Manager",
+                "startup": "disabled",
+                "override": "replace",
+                "command": "/root/jimmsrv",
+                "environment": env,
+            }
+        },
+        "checks": {
+            "jimm-check": {
+                "override": "replace",
+                "period": "1m",
+                "http": {"url": "http://localhost:8080/debug/status"},
+            }
+        },
+    }
 
 
 class MockExec:
@@ -64,8 +102,22 @@ class TestCharm(unittest.TestCase):
         self.harness.add_relation_unit(jimm_id, "juju-jimm-k8s/1")
         self.harness.container_pebble_ready("jimm")
 
-        rel_id = self.harness.add_relation("ingress", "nginx-ingress")
-        self.harness.add_relation_unit(rel_id, "nginx-ingress/0")
+        self.ingress_rel_id = self.harness.add_relation("ingress", "nginx-ingress")
+        self.harness.add_relation_unit(self.ingress_rel_id, "nginx-ingress/0")
+
+        self.oauth_rel_id = self.harness.add_relation("oauth", "hydra")
+        self.harness.add_relation_unit(self.oauth_rel_id, "hydra/0")
+        secret_id = self.harness.add_model_secret("hydra", {"secret": OAUTH_CLIENT_SECRET})
+        self.harness.grant_secret(secret_id, "juju-jimm-k8s")
+        self.harness.update_relation_data(
+            self.oauth_rel_id,
+            "hydra",
+            {
+                "client_id": OAUTH_CLIENT_ID,
+                "client_secret_id": secret_id,
+                **OAUTH_PROVIDER_INFO,
+            },
+        )
 
     # import ipdb; ipdb.set_trace()
     def test_on_pebble_ready(self):
@@ -77,20 +129,7 @@ class TestCharm(unittest.TestCase):
 
         # Check the that the plan was updated
         plan = self.harness.get_container_pebble_plan("jimm")
-        self.assertEqual(
-            plan.to_dict(),
-            {
-                "services": {
-                    "jimm": {
-                        "summary": "JAAS Intelligent Model Manager",
-                        "startup": "disabled",
-                        "override": "replace",
-                        "command": "/root/jimmsrv",
-                        "environment": EXPECTED_ENV,
-                    }
-                }
-            },
-        )
+        self.assertEqual(plan.to_dict(), get_expected_plan(EXPECTED_ENV))
 
     def test_on_config_changed(self):
         container = self.harness.model.unit.get_container("jimm")
@@ -104,20 +143,7 @@ class TestCharm(unittest.TestCase):
 
         # Check the that the plan was updated
         plan = self.harness.get_container_pebble_plan("jimm")
-        self.assertEqual(
-            plan.to_dict(),
-            {
-                "services": {
-                    "jimm": {
-                        "summary": "JAAS Intelligent Model Manager",
-                        "startup": "disabled",
-                        "override": "replace",
-                        "command": "/root/jimmsrv",
-                        "environment": EXPECTED_ENV,
-                    }
-                }
-            },
-        )
+        self.assertEqual(plan.to_dict(), get_expected_plan(EXPECTED_ENV))
 
     def test_postgres_secret_storage_config(self):
         container = self.harness.model.unit.get_container("jimm")
@@ -134,20 +160,50 @@ class TestCharm(unittest.TestCase):
         plan = self.harness.get_container_pebble_plan("jimm")
         expected_env = EXPECTED_ENV.copy()
         expected_env.update({"INSECURE_SECRET_STORAGE": "enabled"})
-        self.assertEqual(
-            plan.to_dict(),
-            {
-                "services": {
-                    "jimm": {
-                        "summary": "JAAS Intelligent Model Manager",
-                        "startup": "disabled",
-                        "override": "replace",
-                        "command": "/root/jimmsrv",
-                        "environment": expected_env,
-                    }
-                }
-            },
+        self.assertEqual(plan.to_dict(), get_expected_plan(expected_env))
+
+    def test_app_dns_address(self):
+        self.harness.update_config(MINIMAL_CONFIG)
+        self.harness.update_config({"dns-name": "jimm.com"})
+        oauth_client = self.harness.charm._oauth_client_config
+        self.assertEqual(oauth_client.redirect_uri, "https://jimm.com/oauth/callback")
+
+    def test_app_enters_block_states_if_oauth_relation_removed(self):
+        self.harness.update_config(MINIMAL_CONFIG)
+        self.harness.remove_relation(self.oauth_rel_id)
+        container = self.harness.model.unit.get_container("jimm")
+        # Emit the pebble-ready event for jimm
+        self.harness.charm.on.jimm_pebble_ready.emit(container)
+
+        # Check the that the plan is empty
+        plan = self.harness.get_container_pebble_plan("jimm")
+        self.assertEqual(plan.to_dict(), {})
+        self.assertEqual(self.harness.charm.unit.status.name, BlockedStatus.name)
+        self.assertEqual(self.harness.charm.unit.status.message, "Waiting for OAuth relation")
+
+    def test_app_enters_block_state_if_oauth_relation_not_ready(self):
+        self.harness.update_config(MINIMAL_CONFIG)
+        self.harness.remove_relation(self.oauth_rel_id)
+        oauth_relation = self.harness.add_relation("oauth", "hydra")
+        self.harness.add_relation_unit(oauth_relation, "hydra/0")
+        secret_id = self.harness.add_model_secret("hydra", {"secret": OAUTH_CLIENT_SECRET})
+        self.harness.grant_secret(secret_id, "juju-jimm-k8s")
+        # If the client-id is empty we should detect that the oauth relation is not ready.
+        # The readiness check is handled by the OAuth library.
+        self.harness.update_relation_data(
+            oauth_relation,
+            "hydra",
+            {"client_id": ""},
         )
+        container = self.harness.model.unit.get_container("jimm")
+        # Emit the pebble-ready event for jimm
+        self.harness.charm.on.jimm_pebble_ready.emit(container)
+
+        # Check the that the plan is empty
+        plan = self.harness.get_container_pebble_plan("jimm")
+        self.assertEqual(plan.to_dict(), {})
+        self.assertEqual(self.harness.charm.unit.status.name, BlockedStatus.name)
+        self.assertEqual(self.harness.charm.unit.status.message, "Waiting for OAuth relation")
 
     def test_bakery_configuration(self):
         container = self.harness.model.unit.get_container("jimm")
@@ -171,20 +227,7 @@ class TestCharm(unittest.TestCase):
         expected_env.update({"BAKERY_AGENT_FILE": "/root/config/agent.json"})
         # Check the that the plan was updated
         plan = self.harness.get_container_pebble_plan("jimm")
-        self.assertEqual(
-            plan.to_dict(),
-            {
-                "services": {
-                    "jimm": {
-                        "summary": "JAAS Intelligent Model Manager",
-                        "startup": "disabled",
-                        "override": "replace",
-                        "command": "/root/jimmsrv",
-                        "environment": expected_env,
-                    }
-                }
-            },
-        )
+        self.assertEqual(plan.to_dict(), get_expected_plan(expected_env))
         agent_data = container.pull("/root/config/agent.json")
         agent_json = json.loads(agent_data.read())
         self.assertEqual(
@@ -211,20 +254,7 @@ class TestCharm(unittest.TestCase):
         expected_env.update({"JIMM_AUDIT_LOG_RETENTION_PERIOD_IN_DAYS": "10"})
         # Check the that the plan was updated
         plan = self.harness.get_container_pebble_plan("jimm")
-        self.assertEqual(
-            plan.to_dict(),
-            {
-                "services": {
-                    "jimm": {
-                        "summary": "JAAS Intelligent Model Manager",
-                        "startup": "disabled",
-                        "override": "replace",
-                        "command": "/root/jimmsrv",
-                        "environment": expected_env,
-                    }
-                }
-            },
-        )
+        self.assertEqual(plan.to_dict(), get_expected_plan(expected_env))
 
     def test_dashboard_relation_joined(self):
         harness = Harness(JimmOperatorCharm)

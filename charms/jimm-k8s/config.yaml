@@ -85,7 +85,17 @@ options:
     type: string
     description: |
       Duration for the JWT expiry (defaults to 5 minutes).
+      This is the JWT JIMM sends to a Juju controller to authenticate
+      model related commands. Increase this if long running websocket
+      connections are failing due to authentication errors.
     default: 5m
+  session-expiry-duration:
+    type: string
+    default: 6h
+    description: |
+      Expiry duration for JIMM session tokens. These tokens are used
+      by clients and their expiry determines how frequently a user
+      must login.
   macaroon-expiry-duration:
     type: string
     default: 24h
