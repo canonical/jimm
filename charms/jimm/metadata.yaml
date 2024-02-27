@@ -34,6 +34,10 @@ provides:
   cos-agent:
     interface: cos_agent
     limit: 1
+  oauth:
+    interface: oauth
+    limit: 1
+  
 
 requires:
   database:
