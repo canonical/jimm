@@ -185,7 +185,6 @@ class JimmCharm(SystemdCharm):
 
     def _on_database_event(self, event: DatabaseRequiresEvent):
         """Handle database event"""
-
         if not event.endpoints:
             logger.info("received empty database host address")
             event.defer()
@@ -223,8 +222,14 @@ class JimmCharm(SystemdCharm):
             logger.warning("OAuth relation is not ready yet")
             return
         oauth_provider_info = self.oauth.get_provider_info()
+        oauth_info = {
+            "issuer_url": oauth_provider_info.issuer_url,
+            "client_id": oauth_provider_info.client_id,
+            "client_secret": oauth_provider_info.client_secret,
+            "scope": oauth_provider_info.scope,
+        }
         with open(self._env_filename(OAUTH_PART), "wt") as f:
-            f.write(self._render_template("jimm-oauth.env", **oauth_provider_info))
+            f.write(self._render_template("jimm-oauth.env", **oauth_info))
         if self._ready():
             self.restart()
         self._on_update_status(event)
@@ -307,7 +312,7 @@ class JimmCharm(SystemdCharm):
             "vault_auth_path": "/auth/approle/login",
             "vault_path": "charm-jimm-creds",
         }
-        with open(self._env_filename(LEADER_PART), "wt") as f:
+        with open(self._env_filename(VAULT_PART), "wt") as f:
             f.write(self._render_template("jimm-vault.env", **args))
 
     def _install_snap(self):
