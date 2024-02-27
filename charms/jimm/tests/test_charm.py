@@ -21,6 +21,26 @@ from ops.testing import Harness
 
 from src.charm import JimmCharm
 
+OAUTH_CLIENT_ID = "jimm_client_id"
+OAUTH_CLIENT_SECRET = "test-secret"
+OAUTH_PROVIDER_INFO = {
+    "authorization_endpoint": "https://example.oidc.com/oauth2/auth",
+    "introspection_endpoint": "https://example.oidc.com/admin/oauth2/introspect",
+    "issuer_url": "https://example.oidc.com",
+    "jwks_endpoint": "https://example.oidc.com/.well-known/jwks.json",
+    "scope": "openid profile email phone",
+    "token_endpoint": "https://example.oidc.com/oauth2/token",
+    "userinfo_endpoint": "https://example.oidc.com/userinfo",
+}
+
+OPENFGA_PROVIDER_INFO = {
+    "address": "openfga.localhost",
+    "port": "8080",
+    "scheme": "http",
+    "store_id": "fake-store-id",
+    "token": "fake-token",
+}
+
 
 class TestCharm(unittest.TestCase):
     def setUp(self):
@@ -44,6 +64,34 @@ class TestCharm(unittest.TestCase):
             os.path.join(self.tempdir.name, "files"),
         )
         self.harness.charm.framework.charm_dir = pathlib.Path(self.tempdir.name)
+        self.add_oauth_relation()
+        self.add_openfga_relation()
+
+    def add_oauth_relation(self):
+        self.oauth_rel_id = self.harness.add_relation("oauth", "hydra")
+        self.harness.add_relation_unit(self.oauth_rel_id, "hydra/0")
+        secret_id = self.harness.add_model_secret("hydra", {"secret": OAUTH_CLIENT_SECRET})
+        self.harness.grant_secret(secret_id, "juju-jimm-k8s")
+        self.harness.update_relation_data(
+            self.oauth_rel_id,
+            "hydra",
+            {
+                "client_id": OAUTH_CLIENT_ID,
+                "client_secret_id": secret_id,
+                **OAUTH_PROVIDER_INFO,
+            },
+        )
+
+    def add_openfga_relation(self):
+        self.openfga_rel_id = self.harness.add_relation("openfga", "openfga")
+        self.harness.add_relation_unit(self.openfga_rel_id, "openfga/0")
+        self.harness.update_relation_data(
+            self.openfga_rel_id,
+            "openfga",
+            {
+                **OPENFGA_PROVIDER_INFO,
+            },
+        )
 
     def test_install(self):
         service_file = os.path.join(self.harness.charm.charm_dir, "juju-jimm.service")
@@ -126,7 +174,7 @@ class TestCharm(unittest.TestCase):
         with open(config_file) as f:
             lines = f.readlines()
         os.unlink(config_file)
-        self.assertEqual(len(lines), 21)
+        self.assertEqual(len(lines), 22)
         self.assertEqual(lines[0].strip(), "BAKERY_AGENT_FILE=")
         self.assertEqual(lines[1].strip(), "CANDID_URL=https://candid.example.com")
         self.assertEqual(lines[2].strip(), "JIMM_ADMINS=user1 user2 group1")
@@ -175,7 +223,7 @@ class TestCharm(unittest.TestCase):
         with open(config_file) as f:
             lines = f.readlines()
         os.unlink(config_file)
-        self.assertEqual(len(lines), 21)
+        self.assertEqual(len(lines), 22)
         self.assertEqual(lines[0].strip(), "BAKERY_AGENT_FILE=")
         self.assertEqual(lines[1].strip(), "CANDID_URL=https://candid.example.com")
         self.assertEqual(lines[2].strip(), "JIMM_ADMINS=user1 user2 group1")
@@ -223,7 +271,7 @@ class TestCharm(unittest.TestCase):
         with open(config_file) as f:
             lines = f.readlines()
         os.unlink(config_file)
-        self.assertEqual(len(lines), 19)
+        self.assertEqual(len(lines), 20)
         self.assertEqual(lines[0].strip(), "BAKERY_AGENT_FILE=")
         self.assertEqual(lines[1].strip(), "CANDID_URL=https://candid.example.com")
         self.assertEqual(lines[2].strip(), "JIMM_ADMINS=user1 user2 group1")
@@ -276,7 +324,7 @@ class TestCharm(unittest.TestCase):
 
         with open(config_file) as f:
             lines = f.readlines()
-        self.assertEqual(len(lines), 19)
+        self.assertEqual(len(lines), 20)
         self.assertEqual(
             lines[0].strip(),
             "BAKERY_AGENT_FILE=" + self.harness.charm._agent_filename,
@@ -303,7 +351,7 @@ class TestCharm(unittest.TestCase):
         )
         with open(config_file) as f:
             lines = f.readlines()
-        self.assertEqual(len(lines), 19)
+        self.assertEqual(len(lines), 20)
         self.assertEqual(lines[0].strip(), "BAKERY_AGENT_FILE=")
         self.assertEqual(lines[1].strip(), "CANDID_URL=https://candid.example.com")
         self.assertEqual(lines[2].strip(), "JIMM_ADMINS=user1 user2 group1")
@@ -591,14 +639,14 @@ class TestCharm(unittest.TestCase):
         with open(config_file) as f:
             lines = f.readlines()
         os.unlink(config_file)
-        self.assertEqual(len(lines), 21)
+        self.assertEqual(len(lines), 22)
         self.assertEqual(len([match for match in lines if "INSECURE_SECRET_STORAGE" in match]), 0)
         self.harness.update_config({"postgres-secret-storage": True})
         self.assertTrue(os.path.exists(config_file))
         with open(config_file) as f:
             lines = f.readlines()
         os.unlink(config_file)
-        self.assertEqual(len(lines), 23)
+        self.assertEqual(len(lines), 24)
         self.assertEqual(len([match for match in lines if "INSECURE_SECRET_STORAGE" in match]), 1)
 
 

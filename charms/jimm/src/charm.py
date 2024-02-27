@@ -11,6 +11,7 @@ import shutil
 import socket
 import subprocess
 import urllib
+from urllib.parse import urljoin
 
 import hvac
 from charmhelpers.contrib.charmsupport.nrpe import NRPE
@@ -19,6 +20,7 @@ from charms.data_platform_libs.v0.data_interfaces import (
     DatabaseRequiresEvent,
 )
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
+from charms.hydra.v0.oauth import ClientConfig, OAuthInfoChangedEvent, OAuthRequirer
 from charms.openfga_k8s.v0.openfga import OpenFGARequires, OpenFGAStoreCreateEvent
 from jinja2 import Environment, FileSystemLoader
 from ops.main import main
@@ -28,10 +30,7 @@ from ops.model import (
     MaintenanceStatus,
     ModelError,
     Relation,
-    WaitingStatus,
 )
-from urllib.parse import urljoin
-from charms.hydra.v0.oauth import ClientConfig, OAuthInfoChangedEvent, OAuthRequirer
 
 from systemd import SystemdCharm
 
@@ -72,10 +71,6 @@ class JimmCharm(SystemdCharm):
             self.on.dashboard_relation_joined,
             self._on_dashboard_relation_joined,
         )
-        self.framework.observe(self.oauth.on.oauth_info_changed, self._on_oauth_info_changed)
-        self.framework.observe(self.oauth.on.oauth_info_removed, self._on_oauth_info_removed)
-
-        self.oauth = OAuthRequirer(self, self._oauth_client_config, relation_name=OAUTH)
         self._agent_filename = "/var/snap/jimm/common/agent.json"
         self._vault_secret_filename = "/var/snap/jimm/common/vault_secret.json"
         self._workload_filename = "/snap/bin/jimm"
@@ -99,6 +94,10 @@ class JimmCharm(SystemdCharm):
             self.openfga.on.openfga_store_created,
             self._on_openfga_store_created,
         )
+
+        self.oauth = OAuthRequirer(self, self._oauth_client_config, relation_name=OAUTH)
+        self.framework.observe(self.oauth.on.oauth_info_changed, self._on_oauth_info_changed)
+        self.framework.observe(self.oauth.on.oauth_info_removed, self._on_oauth_info_removed)
 
         # Grafana agent relation
         self._grafana_agent = COSAgentProvider(
@@ -244,14 +243,7 @@ class JimmCharm(SystemdCharm):
     def _on_update_status(self, _):
         """Update the status of the charm."""
 
-        if not os.path.exists(self._workload_filename):
-            self.unit.status = BlockedStatus("waiting for jimm-snap resource")
-            return
-        if not self.model.get_relation("database"):
-            self.unit.status = BlockedStatus("waiting for database")
-            return
-        if not os.path.exists(self._env_filename(DB_PART)):
-            self.unit.status = WaitingStatus("waiting for database")
+        if not self._ready():
             return
         try:
             url = "http://localhost:8080/debug/info"
@@ -381,16 +373,20 @@ class JimmCharm(SystemdCharm):
 
     def _ready(self):
         if not os.path.exists(self._env_filename()):
+            logger.warning("Missing base environment file")
             self.unit.status = BlockedStatus("Waiting for environment")
             return False
         if not os.path.exists(self._env_filename(DB_PART)):
+            logger.warning("Missing database environment file")
             self.unit.status = BlockedStatus("Waiting for database relation")
             return False
-        if not os.path.exists(self._env_filename(OPENFGA_PART)):
-            self.unit.status = BlockedStatus("Waiting for openfga relation")
-            return False
         if not os.path.exists(self._env_filename(OAUTH_PART)):
+            logger.warning("Missing oauth environment file")
             self.unit.status = BlockedStatus("Waiting for oauth relation")
+            return False
+        if not os.path.exists(self._env_filename(OPENFGA_PART)):
+            logger.warning("Missing openfga environment file")
+            self.unit.status = BlockedStatus("Waiting for openfga relation")
             return False
         return True
 
@@ -442,17 +438,29 @@ class JimmCharm(SystemdCharm):
 
         with open(self._env_filename(OPENFGA_PART), "wt") as f:
             f.write(self._render_template("jimm-openfga.env", **args))
+        if self._ready():
+            self.restart()
+        self._on_update_status(None)
 
     @property
     def _oauth_client_config(self) -> ClientConfig:
         dns = self.config.get("dns-name")
         if dns is None or dns == "":
             dns = "http://localhost"
+        dns = ensureFQDN(dns)
         return ClientConfig(
             urljoin(dns, "/oauth/callback"),
             OAUTH_SCOPES,
             OAUTH_GRANT_TYPES,
         )
+
+
+def ensureFQDN(dns: str):  # noqa: N802
+    """Ensures a domain name has an https:// prefix."""
+    if not dns.startswith("http"):
+        dns = "https://" + dns
+    return dns
+
 
 def _json_data(event, key):
     logger.debug("getting relation data {}".format(key))
