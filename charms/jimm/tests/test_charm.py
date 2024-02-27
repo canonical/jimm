@@ -206,6 +206,7 @@ class TestCharm(unittest.TestCase):
             "JIMM_JWT_EXPIRY=10m",
         )
         self.assertEqual(lines[20].strip(), "JIMM_MACAROON_EXPIRY_DURATION=48h")
+        self.assertEqual(lines[21].strip(), "JIMM_ACCESS_TOKEN_EXPIRY_DURATION=6h")
 
     def test_config_changed_redirect_to_dashboard(self):
         config_file = os.path.join(self.harness.charm.charm_dir, "juju-jimm.env")

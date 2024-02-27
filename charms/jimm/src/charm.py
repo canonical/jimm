@@ -152,6 +152,7 @@ class JimmCharm(SystemdCharm):
             "audit_retention_period": self.config.get("audit-log-retention-period-in-days", ""),
             "jwt_expiry": self.config.get("jwt-expiry", "5m"),
             "macaroon_expiry_duration": self.config.get("macaroon-expiry-duration"),
+            "session_expiry_duration": self.config.get("session-expiry-duration"),
         }
 
         self.oauth.update_client_config(client_config=self._oauth_client_config)
