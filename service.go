@@ -349,6 +349,10 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		"/.well-known",
 		wellknownapi.NewWellKnownHandler(s.jimm.CredentialStore),
 	)
+	mountHandler(
+		"/auth",
+		jimmhttp.NewOAuthHandler(s.jimm.OAuthAuthenticator),
+	)
 
 	params := jujuapi.Params{
 		ControllerUUID:   p.ControllerUUID,

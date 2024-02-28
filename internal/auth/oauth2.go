@@ -44,6 +44,10 @@ type AuthenticationServiceParams struct {
 	Scopes []string
 	// SessionTokenExpiry holds the expiry time of minted JIMM session tokens (JWTs).
 	SessionTokenExpiry time.Duration
+	// RedirectURL is the URL for handling the exchange of authorisation
+	// codes into access tokens (and id tokens), for JIMM, this is expected
+	// to be the servers own callback endpoint registered under /auth/callback.
+	RedirectURL string
 }
 
 // NewAuthenticationService returns a new authentication service for handling
@@ -64,9 +68,18 @@ func NewAuthenticationService(ctx context.Context, params AuthenticationServiceP
 			ClientSecret: params.ClientSecret,
 			Endpoint:     provider.Endpoint(),
 			Scopes:       params.Scopes,
+			RedirectURL:  params.RedirectURL,
 		},
 		sessionTokenExpiry: params.SessionTokenExpiry,
 	}, nil
+}
+
+// AuthCodeURL returns an auth code URL for the browser to be redirected to from
+// the handler within JIMM.
+func (as *AuthenticationService) AuthCodeURL() string {
+	// TODO(ale8k): Generate a UUID V4 state and store in-memory for token exchanges
+	// later.
+	return as.oauthConfig.AuthCodeURL("")
 }
 
 // Device initiates a device flow login and is step ONE of TWO.
