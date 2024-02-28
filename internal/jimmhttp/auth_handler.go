@@ -16,8 +16,7 @@ type OAuthHandler struct {
 // BrowserOAuthAuthenticator handles authorisation code authentication within JIMM
 // via OIDC.
 type BrowserOAuthAuthenticator interface {
-	// AuthCodeURL returns an auth code URL for the browser to be redirected to from
-	// the handler within JIMM.
+	// AuthCodeURL returns a URL that will be used to redirect a browser to the identity provider.
 	AuthCodeURL() string
 }
 

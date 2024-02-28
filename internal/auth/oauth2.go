@@ -74,11 +74,15 @@ func NewAuthenticationService(ctx context.Context, params AuthenticationServiceP
 	}, nil
 }
 
-// AuthCodeURL returns an auth code URL for the browser to be redirected to from
-// the handler within JIMM.
+// AuthCodeURL returns a URL that will be used to redirect a browser to the identity provider.
 func (as *AuthenticationService) AuthCodeURL() string {
-	// TODO(ale8k): Generate a UUID V4 state and store in-memory for token exchanges
-	// later.
+	// As we're not the browser creating the auth code url and then communicating back
+	// to the server, it is OK not to set a state as there's no communication
+	// between say many "tabs" and a JIMM deployment, but rather
+	// just JIMM creating the auth code URL itself, and then handling the exchanging
+	// itself. Of course, middleman attacks between the IdP and JIMM are possible,
+	// but we'd have much larger problems than an auth code interception at that
+	// point. As such, we're opting out of using auth code URL state.
 	return as.oauthConfig.AuthCodeURL("")
 }
 
