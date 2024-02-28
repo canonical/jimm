@@ -8,7 +8,7 @@ import (
 
 	"github.com/canonical/jimm/internal/errors"
 	cofga "github.com/canonical/ofga"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 	jimmnames "github.com/canonical/jimm/pkg/names"

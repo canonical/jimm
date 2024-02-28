@@ -7,7 +7,7 @@ import (
 
 	"github.com/juju/charm/v11"
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	"gorm.io/gorm"
 )
 

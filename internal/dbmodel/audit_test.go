@@ -8,7 +8,7 @@ import (
 	"time"
 
 	qt "github.com/frankban/quicktest"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 
 	apiparams "github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/internal/dbmodel"

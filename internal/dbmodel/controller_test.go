@@ -10,7 +10,7 @@ import (
 	"github.com/canonical/jimm/internal/dbmodel"
 	qt "github.com/frankban/quicktest"
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 )
 
 func TestControllerTag(t *testing.T) {

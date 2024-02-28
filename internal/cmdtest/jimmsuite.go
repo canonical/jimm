@@ -23,7 +23,7 @@ import (
 	corejujutesting "github.com/juju/juju/juju/testing"
 	jjclient "github.com/juju/juju/jujuclient"
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	gc "gopkg.in/check.v1"
 
 	service "github.com/canonical/jimm"

@@ -21,7 +21,7 @@ import (
 	"github.com/juju/juju/state"
 	"github.com/juju/juju/testing/factory"
 	jujuversion "github.com/juju/juju/version"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/utils/v2"
 	gc "gopkg.in/check.v1"

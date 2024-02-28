@@ -16,7 +16,7 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/gorilla/websocket"
 	"github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"

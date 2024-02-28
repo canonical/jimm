@@ -16,7 +16,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/juju/juju/core/life"
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	"github.com/juju/version/v2"
 	"sigs.k8s.io/yaml"
 

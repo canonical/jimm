@@ -15,7 +15,7 @@ import (
 	"github.com/juju/juju/core/life"
 	"github.com/juju/juju/core/migration"
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 
 	"github.com/canonical/jimm/internal/constants"
 	"github.com/canonical/jimm/internal/db"

@@ -15,7 +15,7 @@ import (
 	petname "github.com/dustinkirkland/golang-petname"
 	"github.com/google/uuid"
 	"github.com/juju/cmd/v3/cmdtesting"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	gc "gopkg.in/check.v1"
 	yamlv2 "gopkg.in/yaml.v2"
 	"gopkg.in/yaml.v3"

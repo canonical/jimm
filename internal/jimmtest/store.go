@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 
 	"github.com/canonical/jimm/internal/errors"

@@ -12,7 +12,7 @@ import (
 	cofga "github.com/canonical/ofga"
 
 	"github.com/juju/juju/core/permission"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 )
 
 // Relation Types

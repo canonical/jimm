@@ -6,7 +6,7 @@ import (
 	"context"
 
 	"github.com/juju/cmd/v3/cmdtesting"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/cmd/jaas/cmd"

@@ -26,7 +26,7 @@ import (
 	"github.com/juju/juju/api/client/cloud"
 	jujucloud "github.com/juju/juju/cloud"
 	"github.com/juju/juju/core/macaroon"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 
 	"github.com/canonical/jimm"
 	"github.com/canonical/jimm/internal/dbmodel"

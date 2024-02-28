@@ -21,7 +21,7 @@ import (
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery/agent"
 	"github.com/google/uuid"
 	vaultapi "github.com/hashicorp/vault/api"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
