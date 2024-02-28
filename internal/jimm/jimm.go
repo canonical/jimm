@@ -165,10 +165,6 @@ type OAuthAuthenticator interface {
 	// The subject of the token contains the user's email and can be used
 	// for user object creation.
 	VerifySessionToken(token string, secretKey string) (jwt.Token, error)
-
-	// AuthCodeURL returns an auth code URL for the browser to be redirected to from
-	// the handler within JIMM.
-	AuthCodeURL() string
 }
 
 type permission struct {
