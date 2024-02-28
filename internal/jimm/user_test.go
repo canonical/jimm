@@ -44,7 +44,6 @@ func TestAuthenticate(t *testing.T) {
 		Database: db.Database{
 			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 		},
-		Authenticator: &auth,
 		OpenFGAClient: client,
 	}
 	ctx := context.Background()

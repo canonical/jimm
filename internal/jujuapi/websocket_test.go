@@ -11,9 +11,6 @@ import (
 	"net/http/httptest"
 	"net/url"
 
-	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
-	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
-	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery/agent"
 	"github.com/juju/juju/api"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
@@ -28,7 +25,6 @@ import (
 )
 
 type websocketSuite struct {
-	jimmtest.CandidSuite
 	jimmtest.BootstrapSuite
 
 	Params     jujuapi.Params
@@ -46,15 +42,9 @@ func (s *websocketSuite) SetUpTest(c *gc.C) {
 	ctx, cancelFnc := context.WithCancel(context.Background())
 	s.cancelFnc = cancelFnc
 
-	s.ControllerAdmins = []string{"controller-admin"}
-
-	s.CandidSuite.SetUpTest(c)
 	s.BootstrapSuite.SetUpTest(c)
 
-	s.JIMM.Authenticator = s.Authenticator
-
 	s.Params.ControllerUUID = "914487b5-60e7-42bb-bd63-1adc3fd3a388"
-	s.Params.IdentityLocation = s.Candid.URL.String()
 
 	mux := http.NewServeMux()
 	mux.Handle("/api", jujuapi.APIHandler(ctx, s.JIMM, s.Params))
@@ -64,8 +54,6 @@ func (s *websocketSuite) SetUpTest(c *gc.C) {
 
 	s.APIHandler = mux
 	s.HTTP = httptest.NewTLSServer(s.APIHandler)
-
-	s.Candid.AddUser("alice")
 
 	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@external/cred")
 	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{AuthType: "empty"})
@@ -104,7 +92,6 @@ func (s *websocketSuite) TearDownTest(c *gc.C) {
 		s.HTTP.Close()
 	}
 	s.BootstrapSuite.TearDownTest(c)
-	s.CandidSuite.TearDownTest(c)
 }
 
 // openNoAssert creates a new websocket connection to the test server, using the
@@ -128,24 +115,11 @@ func (s *websocketSuite) openNoAssert(c *gc.C, info *api.Info, username string) 
 	c.Assert(err, gc.Equals, nil)
 	inf.CACert = w.String()
 
-	s.Candid.AddUser(username)
-	key := s.Candid.UserPublicKey(username)
-	bClient := httpbakery.NewClient()
-	bClient.Key = &bakery.KeyPair{
-		Public:  bakery.PublicKey{Key: bakery.Key(key.Public.Key)},
-		Private: bakery.PrivateKey{Key: bakery.Key(key.Private.Key)},
-	}
-	agent.SetUpAuth(bClient, &agent.AuthInfo{
-		Key: bClient.Key,
-		Agents: []agent.Agent{{
-			URL:      s.Candid.URL.String(),
-			Username: username,
-		}},
-	})
+	lp := jimmtest.NewUserSessionLogin(username)
 
 	return api.Open(&inf, api.DialOpts{
 		InsecureSkipVerify: true,
-		BakeryClient:       bClient,
+		LoginProvider:      lp,
 	})
 }
 

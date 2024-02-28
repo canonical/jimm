@@ -4,13 +4,21 @@ package jimmtest
 
 import (
 	"context"
+	"encoding/base64"
+	"time"
 
+	"github.com/juju/juju/api"
 	jujuparams "github.com/juju/juju/rpc/params"
+	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 
 	"github.com/canonical/jimm/internal/auth"
 	"github.com/canonical/jimm/internal/jimm"
 	"github.com/canonical/jimm/internal/openfga"
+)
+
+var (
+	jwtTestSecret = "test-secret"
 )
 
 // An Authenticator is an implementation of jimm.Authenticator that returns
@@ -38,4 +46,23 @@ func NewMockOAuthAuthenticator(secretKey string) MockOAuthAuthenticator {
 // Allowing JIMM tests to create their own session tokens that will always be accepted.
 func (m MockOAuthAuthenticator) VerifySessionToken(token string, secretKey string) (jwt.Token, error) {
 	return auth.VerifySessionToken(token, m.secretKey)
+}
+
+func NewUserSessionLogin(username string) api.LoginProvider {
+	token, err := jwt.NewBuilder().
+		Subject(username).
+		Expiration(time.Now().Add(1 * time.Hour)).
+		Build()
+	if err != nil {
+		panic("failed to generate test session token")
+	}
+
+	freshToken, err := jwt.Sign(token, jwt.WithKey(jwa.HS256, []byte(jwtTestSecret)))
+	if err != nil {
+		panic("failed to sign test session token")
+	}
+
+	b64Token := base64.StdEncoding.EncodeToString(freshToken)
+	lp := api.NewSessionTokenLoginProvider(b64Token, nil, nil)
+	return lp
 }

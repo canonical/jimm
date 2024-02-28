@@ -133,8 +133,6 @@ func (s *modelManagerSuite) TestListModelSummariesWithoutControllerUUIDMasking(c
 	err := conn1.APICall("JIMM", 4, "", "DisableControllerUUIDMasking", nil, nil)
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 
-	s.Candid.AddUser("adam", "controller-admin")
-
 	// we need to make bob jimm admin to disable controller UUID masking
 	err = s.OFGAClient.AddRelation(context.Background(),
 		openfga.Tuple{
@@ -517,8 +515,6 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 		},
 	})
 	f.MakeMachine(c, nil)
-
-	s.Candid.AddUser("bob", "controller-admin")
 
 	// we make bob a jimm administrator
 	bob := openfga.NewUser(&dbmodel.Identity{Name: "bob@external"}, s.OFGAClient)

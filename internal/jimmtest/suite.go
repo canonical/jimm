@@ -8,12 +8,8 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/canonical/candid/candidtest"
 	cofga "github.com/canonical/ofga"
 	"github.com/go-chi/chi/v5"
-	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
-	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/identchecker"
-	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	"github.com/juju/juju/api"
 	"github.com/juju/juju/core/network"
 	corejujutesting "github.com/juju/juju/juju/testing"
@@ -21,7 +17,6 @@ import (
 	"github.com/juju/names/v5"
 	gc "gopkg.in/check.v1"
 
-	"github.com/canonical/jimm/internal/auth"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/jimm"
@@ -87,7 +82,7 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 	s.cancel = cancel
 
 	// Note that the secret key here must match what is used in tests.
-	s.JIMM.OAuthAuthenticator = NewMockOAuthAuthenticator("test-key")
+	s.JIMM.OAuthAuthenticator = NewMockOAuthAuthenticator(jwtTestSecret)
 
 	err = s.JIMM.Database.Migrate(ctx, false)
 	c.Assert(err, gc.Equals, nil)
@@ -211,50 +206,6 @@ func (s *JIMMSuite) AddModel(c *gc.C, owner names.UserTag, name string, cloud na
 	c.Assert(err, gc.Equals, nil)
 
 	return names.NewModelTag(mi.UUID)
-}
-
-// A CandidSuite is a suite that initialises a candid test system to use a
-// jimm Authenticator.
-type CandidSuite struct {
-	// ControllerAdmins is the list of users and groups that are
-	// controller adminstrators.
-	ControllerAdmins []string
-
-	// The following are created in SetUpTest
-	Candid          *candidtest.Server
-	CandidPublicKey string
-	Authenticator   jimm.Authenticator
-}
-
-func (s *CandidSuite) SetUpTest(c *gc.C) {
-	s.Candid = candidtest.NewServer()
-	s.Candid.AddUser("agent-user", candidtest.GroupListGroup)
-	ofgaClient, _, _, err := SetupTestOFGAClient(c.TestName())
-	c.Assert(err, gc.IsNil)
-	s.Authenticator = auth.JujuAuthenticator{
-		Client: ofgaClient,
-		Bakery: identchecker.NewBakery(identchecker.BakeryParams{
-			Locator:        s.Candid,
-			Key:            bakery.MustGenerateKey(),
-			IdentityClient: s.Candid.CandidClient("agent-user"),
-			Location:       "jimmtest",
-		}),
-		ControllerAdmins: s.ControllerAdmins,
-	}
-	tpi, err := httpbakery.ThirdPartyInfoForLocation(context.Background(), nil, s.Candid.URL.String())
-	c.Assert(err, gc.Equals, nil)
-	pk, err := tpi.PublicKey.MarshalText()
-	c.Assert(err, gc.Equals, nil)
-	s.CandidPublicKey = string(pk)
-
-}
-
-func (s *CandidSuite) TearDownTest(c *gc.C) {
-	s.Authenticator = nil
-	if s.Candid != nil {
-		s.Candid.Close()
-		s.Candid = nil
-	}
 }
 
 // A JujuSuite is a suite that intialises a JIMM and adds the testing juju

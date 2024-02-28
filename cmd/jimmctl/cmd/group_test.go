@@ -13,6 +13,7 @@ import (
 	"github.com/canonical/jimm/cmd/jimmctl/cmd"
 	"github.com/canonical/jimm/internal/cmdtest"
 	"github.com/canonical/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/jimmtest"
 )
 
 type groupSuite struct {
@@ -23,7 +24,7 @@ var _ = gc.Suite(&groupSuite{})
 
 func (s *groupSuite) TestAddGroupSuperuser(c *gc.C) {
 	// alice is superuser
-	bClient := s.UserBakeryClient("alice")
+	bClient := jimmtest.NewUserSessionLogin("alice")
 	_, err := cmdtesting.RunCommand(c, cmd.NewAddGroupCommandForTesting(s.ClientStore(), bClient), "test-group")
 	c.Assert(err, gc.IsNil)
 
@@ -36,14 +37,14 @@ func (s *groupSuite) TestAddGroupSuperuser(c *gc.C) {
 
 func (s *groupSuite) TestAddGroup(c *gc.C) {
 	// bob is not superuser
-	bClient := s.UserBakeryClient("bob")
+	bClient := jimmtest.NewUserSessionLogin("bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewAddGroupCommandForTesting(s.ClientStore(), bClient), "test-group")
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
 
 func (s *groupSuite) TestRenameGroupSuperuser(c *gc.C) {
 	// alice is superuser
-	bClient := s.UserBakeryClient("alice")
+	bClient := jimmtest.NewUserSessionLogin("alice")
 
 	err := s.JimmCmdSuite.JIMM.Database.AddGroup(context.TODO(), "test-group")
 	c.Assert(err, gc.IsNil)
@@ -60,14 +61,14 @@ func (s *groupSuite) TestRenameGroupSuperuser(c *gc.C) {
 
 func (s *groupSuite) TestRenameGroup(c *gc.C) {
 	// bob is not superuser
-	bClient := s.UserBakeryClient("bob")
+	bClient := jimmtest.NewUserSessionLogin("bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewRenameGroupCommandForTesting(s.ClientStore(), bClient), "test-group", "renamed-group")
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
 
 func (s *groupSuite) TestRemoveGroupSuperuser(c *gc.C) {
 	// alice is superuser
-	bClient := s.UserBakeryClient("alice")
+	bClient := jimmtest.NewUserSessionLogin("alice")
 
 	err := s.JimmCmdSuite.JIMM.Database.AddGroup(context.TODO(), "test-group")
 	c.Assert(err, gc.IsNil)
@@ -82,7 +83,7 @@ func (s *groupSuite) TestRemoveGroupSuperuser(c *gc.C) {
 
 func (s *groupSuite) TestRemoveGroupWithoutFlag(c *gc.C) {
 	// alice is superuser
-	bClient := s.UserBakeryClient("alice")
+	bClient := jimmtest.NewUserSessionLogin("alice")
 
 	_, err := cmdtesting.RunCommand(c, cmd.NewRemoveGroupCommandForTesting(s.ClientStore(), bClient), "test-group")
 	c.Assert(err.Error(), gc.Matches, "Failed to read from input.")
@@ -90,14 +91,14 @@ func (s *groupSuite) TestRemoveGroupWithoutFlag(c *gc.C) {
 
 func (s *groupSuite) TestRemoveGroup(c *gc.C) {
 	// bob is not superuser
-	bClient := s.UserBakeryClient("bob")
+	bClient := jimmtest.NewUserSessionLogin("bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewRemoveGroupCommandForTesting(s.ClientStore(), bClient), "test-group", "-y")
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
 
 func (s *groupSuite) TestListGroupsSuperuser(c *gc.C) {
 	// alice is superuser
-	bClient := s.UserBakeryClient("alice")
+	bClient := jimmtest.NewUserSessionLogin("alice")
 
 	for i := 0; i < 3; i++ {
 		err := s.JimmCmdSuite.JIMM.Database.AddGroup(context.TODO(), fmt.Sprint("test-group", i))
@@ -114,7 +115,7 @@ func (s *groupSuite) TestListGroupsSuperuser(c *gc.C) {
 
 func (s *groupSuite) TestListGroups(c *gc.C) {
 	// bob is not superuser
-	bClient := s.UserBakeryClient("bob")
+	bClient := jimmtest.NewUserSessionLogin("bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewListGroupsCommandForTesting(s.ClientStore(), bClient), "test-group")
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }

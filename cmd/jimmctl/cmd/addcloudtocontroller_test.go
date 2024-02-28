@@ -18,6 +18,7 @@ import (
 	"github.com/canonical/jimm/internal/cmdtest"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/jimmtest"
 	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 )
@@ -167,7 +168,7 @@ clouds:
 		c.Log(test.about)
 		tmpfile, cleanupFunc := writeTempFile(c, test.cloudInfo)
 
-		bClient := s.UserBakeryClient("bob@external")
+		bClient := jimmtest.NewUserSessionLogin("bob@external")
 		// Running the command succeeds
 		newCmd := cmd.NewAddCloudToControllerCommandForTesting(s.ClientStore(), bClient, test.cloudByNameFunc)
 		var err error

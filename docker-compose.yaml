@@ -44,9 +44,6 @@ services:
       JIMM_LOG_LEVEL: "debug"
       JIMM_UUID: "3217dbc9-8ea9-4381-9e97-01eab0b3f6bb"
       JIMM_DSN: "postgresql://jimm:jimm@db/jimm"
-      CANDID_URL: "http://0.0.0.0:8081" # For external client redirects (in the case of compose and running outside)
-      # Hardcoded pre-generated key, see ./local/candid/config.yaml
-      CANDID_PUBLIC_KEY: "CIdWcEUN+0OZnKW9KwruRQnQDY/qqzVdD30CijwiWCk="
       # Not needed for local test (yet).
       # BAKERY_AGENT_FILE: ""
       JIMM_ADMINS: "jimm@candid.localhost"
@@ -149,27 +146,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-
-  candid:
-    image: candid:latest
-    container_name: candid
-    entrypoint: "/candid.sh"
-    profiles: ["dev"]
-    expose:
-      - 8081
-    ports:
-      - 8081:8081
-    volumes:
-      - ./local/candid/config.yaml:/etc/candid/config.yaml
-      - ./local/candid/entry.sh:/candid.sh
-    depends_on:
-      db:
-        condition: service_healthy
-    healthcheck:
-      test: [ "CMD", "curl", "http://localhost:8081/debug/status" ]
-      interval: 5s
-      timeout: 5s
-      retries: 5
 
   migrateopenfga:
     image: openfga/openfga:v1.2.0

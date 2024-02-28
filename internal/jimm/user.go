@@ -22,42 +22,7 @@ import (
 // of the websocket connection.
 func (j *JIMM) Authenticate(ctx context.Context, req *jujuparams.LoginRequest) (*openfga.User, error) {
 	const op = errors.Op("jimm.Authenticate")
-	if j == nil || j.Authenticator == nil {
-		return nil, errors.E(op, errors.CodeServerConfiguration, "authenticator not configured")
-	}
-
-	u, err := j.Authenticator.Authenticate(ctx, req)
-	if err != nil {
-		return nil, errors.E(op, err)
-	}
-
-	err = j.Database.Transaction(func(tx *db.Database) error {
-		pu := dbmodel.Identity{
-			Name: u.Name,
-		}
-		if err := tx.GetIdentity(ctx, &pu); err != nil {
-			return err
-		}
-		u.Model = pu.Model
-		u.LastLogin = pu.LastLogin
-
-		// TODO(mhilton) support disabled users.
-		if u.DisplayName != "" {
-			pu.DisplayName = u.DisplayName
-		}
-		pu.LastLogin.Time = j.Database.DB.Config.NowFunc()
-		pu.LastLogin.Valid = true
-		return tx.UpdateIdentity(ctx, &pu)
-	})
-	if err != nil {
-		return nil, errors.E(op, err)
-	}
-	isJimmAdmin, err := openfga.IsAdministrator(ctx, u, j.ResourceTag())
-	if err != nil {
-		return nil, errors.E(op, err)
-	}
-	u.JimmAdmin = isJimmAdmin
-	return u, nil
+	return nil, errors.E(op, "Invalid login, ensure you are using Juju 3.5+")
 }
 
 // GetOpenFGAUserAndAuthorise returns a valid OpenFGA user, authorising

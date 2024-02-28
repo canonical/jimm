@@ -7,6 +7,7 @@ package cmdtest
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/pem"
 	"net/http"
 	"net/http/httptest"
@@ -15,15 +16,14 @@ import (
 
 	cofga "github.com/canonical/ofga"
 	"github.com/coreos/go-oidc/v3/oidc"
-	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
-	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
-	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery/agent"
 	"github.com/juju/juju/api"
 	"github.com/juju/juju/core/network"
 	corejujutesting "github.com/juju/juju/juju/testing"
 	jjclient "github.com/juju/juju/jujuclient"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
+	"github.com/lestrrat-go/jwx/v2/jwa"
+	"github.com/lestrrat-go/jwx/v2/jwt"
 	gc "gopkg.in/check.v1"
 
 	service "github.com/canonical/jimm"
@@ -35,8 +35,26 @@ import (
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 )
 
+func NewUserSessionLogin(username string) api.LoginProvider {
+	token, err := jwt.NewBuilder().
+		Subject(username).
+		Expiration(time.Now().Add(1 * time.Hour)).
+		Build()
+	if err != nil {
+		panic("failed to generate test session token")
+	}
+
+	freshToken, err := jwt.Sign(token, jwt.WithKey(jwa.HS256, []byte("test-shared-secret")))
+	if err != nil {
+		panic("failed to sign test session token")
+	}
+
+	b64Token := base64.StdEncoding.EncodeToString(freshToken)
+	lp := api.NewSessionTokenLoginProvider(b64Token, nil, nil)
+	return lp
+}
+
 type JimmCmdSuite struct {
-	jimmtest.CandidSuite
 	corejujutesting.JujuConnSuite
 
 	Params      service.Params
@@ -56,8 +74,6 @@ func (s *JimmCmdSuite) SetUpTest(c *gc.C) {
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
 
-	s.CandidSuite.SetUpTest(c)
-
 	s.HTTP = httptest.NewUnstartedServer(nil)
 	u, err := url.Parse("https://" + s.HTTP.Listener.Addr().String())
 	c.Assert(err, gc.Equals, nil)
@@ -71,8 +87,6 @@ func (s *JimmCmdSuite) SetUpTest(c *gc.C) {
 	s.Params = service.Params{
 		PublicDNSName:    u.Host,
 		ControllerUUID:   "914487b5-60e7-42bb-bd63-1adc3fd3a388",
-		CandidURL:        s.Candid.URL.String(),
-		CandidPublicKey:  s.CandidPublicKey,
 		ControllerAdmins: []string{"admin"},
 		DSN:              jimmtest.CreateEmptyDatabase(&jimmtest.GocheckTester{c}),
 		OpenFGAParams: service.OpenFGAParams{
@@ -108,7 +122,6 @@ func (s *JimmCmdSuite) SetUpTest(c *gc.C) {
 	s.ControllerConfigAttrs = map[string]interface{}{
 		"login-token-refresh-url": u.String() + "/.well-known/jwks.json",
 	}
-	s.ControllerAdmins = []string{"controller-admin"}
 	s.JujuConnSuite.SetUpTest(c)
 
 	s.AdminUser = &dbmodel.Identity{
@@ -121,8 +134,6 @@ func (s *JimmCmdSuite) SetUpTest(c *gc.C) {
 	alice := openfga.NewUser(s.AdminUser, ofgaClient)
 	err = alice.SetControllerAccess(context.Background(), s.JIMM.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, gc.Equals, nil)
-
-	s.Candid.AddUser("alice")
 
 	w := new(bytes.Buffer)
 	err = pem.Encode(w, &pem.Block{
@@ -167,27 +178,26 @@ func (s *JimmCmdSuite) TearDownTest(c *gc.C) {
 	if err := s.JIMM.Database.Close(); err != nil {
 		c.Logf("failed to close database connections at tear down: %s", err)
 	}
-	s.CandidSuite.TearDownTest(c)
 	s.JujuConnSuite.TearDownTest(c)
 }
 
-func (s *JimmCmdSuite) UserBakeryClient(username string) *httpbakery.Client {
-	s.Candid.AddUser(username)
-	key := s.Candid.UserPublicKey(username)
-	bClient := httpbakery.NewClient()
-	bClient.Key = &bakery.KeyPair{
-		Public:  bakery.PublicKey{Key: bakery.Key(key.Public.Key)},
-		Private: bakery.PrivateKey{Key: bakery.Key(key.Private.Key)},
-	}
-	agent.SetUpAuth(bClient, &agent.AuthInfo{
-		Key: bClient.Key,
-		Agents: []agent.Agent{{
-			URL:      s.Candid.URL.String(),
-			Username: username,
-		}},
-	})
-	return bClient
-}
+// func (s *JimmCmdSuite) UserBakeryClient(username string) *httpbakery.Client {
+// 	s.Candid.AddUser(username)
+// 	key := s.Candid.UserPublicKey(username)
+// 	bClient := httpbakery.NewClient()
+// 	bClient.Key = &bakery.KeyPair{
+// 		Public:  bakery.PublicKey{Key: bakery.Key(key.Public.Key)},
+// 		Private: bakery.PrivateKey{Key: bakery.Key(key.Private.Key)},
+// 	}
+// 	agent.SetUpAuth(bClient, &agent.AuthInfo{
+// 		Key: bClient.Key,
+// 		Agents: []agent.Agent{{
+// 			URL:      s.Candid.URL.String(),
+// 			Username: username,
+// 		}},
+// 	})
+// 	return bClient
+// }
 
 func (s *JimmCmdSuite) AddController(c *gc.C, name string, info *api.Info) {
 	ctl := &dbmodel.Controller{

@@ -16,6 +16,7 @@ import (
 	"github.com/canonical/jimm/internal/cmdtest"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/jimm"
+	"github.com/canonical/jimm/internal/jimmtest"
 	"github.com/canonical/jimm/internal/openfga"
 )
 
@@ -98,7 +99,7 @@ aws    foo
 	}
 	for _, test := range testCases {
 		c.Log(test.about)
-		bClient := s.UserBakeryClient("alice")
+		bClient := jimmtest.NewUserSessionLogin("alice")
 		var result *jujucmd.Context
 		if test.showSecrets {
 			result, err = cmdtesting.RunCommand(c, cmd.NewListServiceAccountCredentialsCommandForTesting(s.ClientStore(), bClient), clientID, "--format", test.format, "--show-secrets")

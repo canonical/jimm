@@ -49,11 +49,6 @@ type JIMM struct {
 	// the data.
 	Database db.Database
 
-	// Authenticator is the authenticator JIMM uses to determine the user
-	// authenticating with the API. If this is not specified then all
-	// authentication requests are considered to have failed.
-	Authenticator Authenticator
-
 	// Dialer is the API dialer JIMM uses to contact juju controllers. if
 	// this is not configured all connection attempts will fail.
 	Dialer Dialer

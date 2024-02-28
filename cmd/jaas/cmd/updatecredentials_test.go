@@ -12,6 +12,7 @@ import (
 	"github.com/canonical/jimm/cmd/jaas/cmd"
 	"github.com/canonical/jimm/internal/cmdtest"
 	"github.com/canonical/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/jimmtest"
 	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 	jimmnames "github.com/canonical/jimm/pkg/names"
@@ -30,7 +31,7 @@ func (s *updateCredentialsSuite) TestUpdateCredentialsWithNewCredentials(c *gc.C
 	clientID := "abda51b2-d735-4794-a8bd-49c506baa4af"
 
 	// alice is superuser
-	bClient := s.UserBakeryClient("alice")
+	bClient := jimmtest.NewUserSessionLogin("alice")
 
 	sa := dbmodel.Identity{
 		Name: clientID,
@@ -91,7 +92,7 @@ func (s *updateCredentialsSuite) TestUpdateCredentialsWithExistingCredentials(c 
 	clientID := "abda51b2-d735-4794-a8bd-49c506baa4af"
 
 	// alice is superuser
-	bClient := s.UserBakeryClient("alice")
+	bClient := jimmtest.NewUserSessionLogin("alice")
 
 	sa := dbmodel.Identity{
 		Name: clientID,
@@ -156,7 +157,7 @@ func (s *updateCredentialsSuite) TestUpdateCredentialsWithExistingCredentials(c 
 }
 
 func (s *updateCredentialsSuite) TestCloudNotInLocalStore(c *gc.C) {
-	bClient := s.UserBakeryClient("alice")
+	bClient := jimmtest.NewUserSessionLogin("alice")
 	_, err := cmdtesting.RunCommand(c, cmd.NewUpdateCredentialsCommandForTesting(s.ClientStore(), bClient),
 		"00000000-0000-0000-0000-000000000000",
 		"non-existing-cloud",
@@ -166,7 +167,7 @@ func (s *updateCredentialsSuite) TestCloudNotInLocalStore(c *gc.C) {
 }
 
 func (s *updateCredentialsSuite) TestCredentialNotInLocalStore(c *gc.C) {
-	bClient := s.UserBakeryClient("alice")
+	bClient := jimmtest.NewUserSessionLogin("alice")
 
 	clientStore := s.ClientStore()
 	err := clientStore.UpdateCredential("some-cloud", jujucloud.CloudCredential{
@@ -207,7 +208,7 @@ func (s *updateCredentialsSuite) TestMissingArgs(c *gc.C) {
 		expectedError: "too many args",
 	}}
 
-	bClient := s.UserBakeryClient("alice")
+	bClient := jimmtest.NewUserSessionLogin("alice")
 	clientStore := s.ClientStore()
 	for _, t := range tests {
 		_, err := cmdtesting.RunCommand(c, cmd.NewUpdateCredentialsCommandForTesting(clientStore, bClient), t.args...)

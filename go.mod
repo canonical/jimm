@@ -21,7 +21,7 @@ require (
 	github.com/juju/juju v0.0.0-20240214102724-e1b7dcd73903
 	github.com/juju/loggo v1.0.0
 	github.com/juju/mgomonitor v0.0.0-20181029151116-52206bb0cd31
-	github.com/juju/names/v4 v4.0.0
+	github.com/juju/names/v4 v4.0.0 // indirect
 	github.com/juju/rpcreflect v1.2.0
 	github.com/juju/testing v1.1.0
 	github.com/juju/utils/v2 v2.0.0-20210305225158-eedbe7b6b3e2
@@ -51,7 +51,8 @@ require (
 	github.com/go-chi/render v1.0.2
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/itchyny/gojq v0.12.12
-	github.com/juju/charm/v11 v11.0.2
+	github.com/juju/charm/v12 v12.0.0
+	github.com/juju/names/v5 v5.0.0
 	github.com/lestrrat-go/iter v1.0.2
 	github.com/lestrrat-go/jwx/v2 v2.0.19
 	github.com/oklog/ulid/v2 v2.1.0
@@ -166,7 +167,6 @@ require (
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/juju/ansiterm v1.0.0 // indirect
 	github.com/juju/blobstore/v3 v3.0.2 // indirect
-	github.com/juju/charm/v12 v12.0.0 // indirect
 	github.com/juju/clock v1.0.3 // indirect
 	github.com/juju/collections v1.0.4 // indirect
 	github.com/juju/description/v5 v5.0.0 // indirect
@@ -184,7 +184,6 @@ require (
 	github.com/juju/mgo/v2 v2.0.2 // indirect
 	github.com/juju/mgo/v3 v3.0.4 // indirect
 	github.com/juju/mutex/v2 v2.0.0 // indirect
-	github.com/juju/names/v5 v5.0.0 // indirect
 	github.com/juju/naturalsort v1.0.0 // indirect
 	github.com/juju/os/v2 v2.2.3 // indirect
 	github.com/juju/packaging/v2 v2.0.1 // indirect

@@ -199,6 +199,10 @@ func (c *Connection) IsBroken() bool {
 	return c.client.IsBroken()
 }
 
+func (c *Connection) RootHTTPClient() (*httprequest.Client, error) {
+	return c.HTTPClient()
+}
+
 // hasFacadeVersion returns whether the connection supports the given
 // facade at the given version.
 func (c *Connection) hasFacadeVersion(facade string, version int) bool {
