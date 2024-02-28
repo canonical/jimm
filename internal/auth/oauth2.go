@@ -44,6 +44,10 @@ type AuthenticationServiceParams struct {
 	Scopes []string
 	// SessionTokenExpiry holds the expiry time of minted JIMM session tokens (JWTs).
 	SessionTokenExpiry time.Duration
+	// RedirectURL is the URL for handling the exchange of authorisation
+	// codes into access tokens (and id tokens), for JIMM, this is expected
+	// to be the servers own callback endpoint registered under /auth/callback.
+	RedirectURL string
 }
 
 // NewAuthenticationService returns a new authentication service for handling
@@ -64,9 +68,22 @@ func NewAuthenticationService(ctx context.Context, params AuthenticationServiceP
 			ClientSecret: params.ClientSecret,
 			Endpoint:     provider.Endpoint(),
 			Scopes:       params.Scopes,
+			RedirectURL:  params.RedirectURL,
 		},
 		sessionTokenExpiry: params.SessionTokenExpiry,
 	}, nil
+}
+
+// AuthCodeURL returns a URL that will be used to redirect a browser to the identity provider.
+func (as *AuthenticationService) AuthCodeURL() string {
+	// As we're not the browser creating the auth code url and then communicating back
+	// to the server, it is OK not to set a state as there's no communication
+	// between say many "tabs" and a JIMM deployment, but rather
+	// just JIMM creating the auth code URL itself, and then handling the exchanging
+	// itself. Of course, middleman attacks between the IdP and JIMM are possible,
+	// but we'd have much larger problems than an auth code interception at that
+	// point. As such, we're opting out of using auth code URL state.
+	return as.oauthConfig.AuthCodeURL("")
 }
 
 // Device initiates a device flow login and is step ONE of TWO.

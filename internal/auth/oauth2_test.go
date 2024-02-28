@@ -26,10 +26,29 @@ func setupTestAuthSvc(ctx context.Context, c *qt.C, expiry time.Duration) *auth.
 		ClientSecret:       "SwjDofnbDzJDm9iyfUhEp67FfUFMY8L4",
 		Scopes:             []string{oidc.ScopeOpenID, "profile", "email"},
 		SessionTokenExpiry: expiry,
+		RedirectURL:        "http://localhost:8080/auth/callback",
 	})
 	c.Assert(err, qt.IsNil)
 
 	return authSvc
+}
+
+// This test requires the local docker compose to be running and keycloak
+// to be available.
+//
+// TODO(ale8k): Use a mock for this and also device below, but future work???
+func TestAuthCodeURL(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	authSvc := setupTestAuthSvc(ctx, c, time.Hour)
+
+	url := authSvc.AuthCodeURL()
+	c.Assert(
+		url,
+		qt.Equals,
+		`http://localhost:8082/realms/jimm/protocol/openid-connect/auth?client_id=jimm-device&redirect_uri=http%3A%2F%2Flocalhost%3A8080%2Fauth%2Fcallback&response_type=code&scope=openid+profile+email`,
+	)
 }
 
 // TestDevice is a unique test in that it runs through the entire device oauth2.0
