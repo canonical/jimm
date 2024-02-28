@@ -365,7 +365,7 @@ class JimmCharm(SystemdCharm):
             "conf_file": self._env_filename(),
             "db_file": self._env_filename(DB_PART),
             "leader_file": self._env_filename(LEADER_PART),
-            "vault_file": self._env_filename(LEADER_PART),
+            "vault_file": self._env_filename(VAULT_PART),
             "openfga_file": self._env_filename(OPENFGA_PART),
         }
         with open(self.service_file, "wt") as f:
