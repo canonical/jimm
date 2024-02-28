@@ -215,6 +215,10 @@ class JimmCharm(SystemdCharm):
     def _on_database_relation_broken(self, event) -> None:
         """Database relation broken handler."""
         logger.info("database relation removed")
+        try:
+            os.remove(self._env_filename(DB_PART))
+        except OSError:
+            pass
         self.stop()
         self._on_update_status(None)
 
@@ -237,6 +241,10 @@ class JimmCharm(SystemdCharm):
 
     def _on_oauth_info_removed(self, event: OAuthInfoChangedEvent):
         logger.info("oauth relation removed")
+        try:
+            os.remove(self._env_filename(OAUTH_PART))
+        except OSError:
+            pass
         self.stop()
         self._on_update_status(event)
 
