@@ -19,6 +19,7 @@ import (
 
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/discharger"
 	"github.com/canonical/jimm/internal/jimm"
 	"github.com/canonical/jimm/internal/jimmhttp"
 	"github.com/canonical/jimm/internal/jimmjwx"
@@ -110,6 +111,9 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 		"/.well-known",
 		wellknownapi.NewWellKnownHandler(s.JIMM.CredentialStore),
 	)
+	macaroonDischarger := s.setupMacaroonDischarger(c)
+	localDischargePath := "/macaroons"
+	mux.Handle(localDischargePath+"/*", discharger.GetDischargerMux(macaroonDischarger, localDischargePath))
 
 	s.Server = httptest.NewServer(mux)
 
@@ -139,6 +143,16 @@ func (s *JIMMSuite) TearDownTest(c *gc.C) {
 	if err := s.JIMM.Database.Close(); err != nil {
 		c.Logf("failed to close database connections at tear down: %s", err)
 	}
+}
+
+func (s *JIMMSuite) setupMacaroonDischarger(c *gc.C) *discharger.MacaroonDischarger {
+	cfg := discharger.MacaroonDischargerConfig{
+		MacaroonExpiryDuration: 1 * time.Hour,
+		ControllerUUID:         s.JIMM.UUID,
+	}
+	macaroonDischarger, err := discharger.NewMacaroonDischarger(cfg, &s.JIMM.Database, s.JIMM.OpenFGAClient)
+	c.Assert(err, gc.IsNil)
+	return macaroonDischarger
 }
 
 func (s *JIMMSuite) NewUser(u *dbmodel.Identity) *openfga.User {

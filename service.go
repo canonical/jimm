@@ -12,7 +12,6 @@ import (
 
 	cofga "github.com/canonical/ofga"
 	"github.com/go-chi/chi/v5"
-	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	"github.com/google/uuid"
 	vaultapi "github.com/hashicorp/vault/api"
 	"github.com/juju/names/v5"
@@ -25,6 +24,7 @@ import (
 	"github.com/canonical/jimm/internal/dashboard"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/debugapi"
+	"github.com/canonical/jimm/internal/discharger"
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/jimm"
 	jimmcreds "github.com/canonical/jimm/internal/jimm/credentials"
@@ -214,6 +214,8 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	s := new(Service)
 	s.mux = chi.NewRouter()
 
+	// Setup all dependency services
+
 	if p.ControllerUUID == "" {
 		controllerUUID, err := uuid.NewRandom()
 		if err != nil {
@@ -259,12 +261,6 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		return nil, errors.E(op, err, "failed to ensure controller admins")
 	}
 
-	dischargeMux, err := s.setupDischarger(p, openFGAclient)
-	if err != nil {
-		return nil, errors.E(op, err, "failed to set up discharger")
-	}
-	s.mux.Handle(localDischargePath+"/*", dischargeMux)
-
 	s.jimm.OAuthAuthenticator, err = auth.NewAuthenticationService(
 		ctx,
 		auth.AuthenticationServiceParams{
@@ -301,6 +297,8 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		s.jimm.Dialer = jimm.CacheDialer(s.jimm.Dialer)
 	}
 
+	// Setup all HTTP handlers.
+
 	mountHandler := func(path string, h jimmhttp.JIMMHttpHandler) {
 		s.mux.Mount(path, h.Routes())
 	}
@@ -317,6 +315,11 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		"/.well-known",
 		wellknownapi.NewWellKnownHandler(s.jimm.CredentialStore),
 	)
+	macaroonDischarger, err := s.setupDischarger(p)
+	if err != nil {
+		return nil, errors.E(op, err, "failed to set up discharger")
+	}
+	s.mux.Handle(localDischargePath+"/*", discharger.GetDischargerMux(macaroonDischarger, localDischargePath))
 
 	params := jujuapi.Params{
 		ControllerUUID: p.ControllerUUID,
@@ -337,22 +340,18 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 // setupDischarger set JIMM up as a discharger of 3rd party caveats addressed to it. This is intended
 // to enable Juju controllers to check for permissions using a macaroon-based workflow (atm only
 // for cross model relations).
-func (s *Service) setupDischarger(p Params, openFGAclient *openfga.OFGAClient) (*http.ServeMux, error) {
-	macaroonDischarger, err := newMacaroonDischarger(p, &s.jimm.Database, openFGAclient)
+func (s *Service) setupDischarger(p Params) (*discharger.MacaroonDischarger, error) {
+	cfg := discharger.MacaroonDischargerConfig{
+		PublicKey:              p.PublicKey,
+		PrivateKey:             p.PrivateKey,
+		MacaroonExpiryDuration: p.MacaroonExpiryDuration,
+		ControllerUUID:         p.ControllerUUID,
+	}
+	MacaroonDischarger, err := discharger.NewMacaroonDischarger(cfg, &s.jimm.Database, s.jimm.OpenFGAClient)
 	if err != nil {
 		return nil, errors.E(err)
 	}
-
-	discharger := httpbakery.NewDischarger(
-		httpbakery.DischargerParams{
-			Key:     &macaroonDischarger.kp,
-			Checker: httpbakery.ThirdPartyCaveatCheckerFunc(macaroonDischarger.checkThirdPartyCaveat),
-		},
-	)
-	dischargeMux := http.NewServeMux()
-	discharger.AddMuxHandlers(dischargeMux, localDischargePath)
-
-	return dischargeMux, nil
+	return MacaroonDischarger, nil
 }
 
 func openDB(ctx context.Context, dsn string) (*gorm.DB, error) {

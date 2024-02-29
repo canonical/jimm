@@ -5,6 +5,7 @@ package jimmtest
 import (
 	"context"
 	"encoding/base64"
+	"strings"
 	"time"
 
 	"github.com/juju/juju/api"
@@ -49,8 +50,9 @@ func (m MockOAuthAuthenticator) VerifySessionToken(token string, secretKey strin
 }
 
 func NewUserSessionLogin(username string) api.LoginProvider {
+	email := convertUsernameToEmail(username)
 	token, err := jwt.NewBuilder().
-		Subject(username).
+		Subject(email).
 		Expiration(time.Now().Add(1 * time.Hour)).
 		Build()
 	if err != nil {
@@ -65,4 +67,11 @@ func NewUserSessionLogin(username string) api.LoginProvider {
 	b64Token := base64.StdEncoding.EncodeToString(freshToken)
 	lp := api.NewSessionTokenLoginProvider(b64Token, nil, nil)
 	return lp
+}
+
+func convertUsernameToEmail(username string) string {
+	if !strings.Contains(username, "@") {
+		return username + "@canonical.com"
+	}
+	return username
 }
