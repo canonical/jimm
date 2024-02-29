@@ -151,6 +151,7 @@ func (as *AuthenticationService) ExtractAndVerifyIDToken(ctx context.Context, oa
 
 	token, err := verifier.Verify(ctx, rawIDToken)
 	if err != nil {
+		zapctx.Error(ctx, "failed to verify id token", zap.Error(err))
 		return nil, errors.E(op, err, "failed to verify id token")
 	}
 
