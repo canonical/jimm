@@ -88,7 +88,7 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 	err = s.JIMM.Database.Migrate(ctx, false)
 	c.Assert(err, gc.Equals, nil)
 	s.AdminUser = &dbmodel.Identity{
-		Name:      "alice@external",
+		Name:      "alice@canonical.com",
 		LastLogin: db.Now(),
 	}
 	err = s.JIMM.Database.GetIdentity(ctx, s.AdminUser)
@@ -278,7 +278,7 @@ type BootstrapSuite struct {
 func (s *BootstrapSuite) SetUpTest(c *gc.C) {
 	s.JujuSuite.SetUpTest(c)
 
-	cct := names.NewCloudCredentialTag(TestCloudName + "/bob@external/cred")
+	cct := names.NewCloudCredentialTag(TestCloudName + "/bob@canonical.com/cred")
 	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{
 		AuthType: "empty",
 	})
@@ -288,7 +288,7 @@ func (s *BootstrapSuite) SetUpTest(c *gc.C) {
 	err := s.JIMM.Database.GetCloudCredential(ctx, s.CloudCredential)
 	c.Assert(err, gc.Equals, nil)
 
-	mt := s.AddModel(c, names.NewUserTag("bob@external"), "model-1", names.NewCloudTag(TestCloudName), TestCloudRegionName, cct)
+	mt := s.AddModel(c, names.NewUserTag("bob@canonical.com"), "model-1", names.NewCloudTag(TestCloudName), TestCloudRegionName, cct)
 	s.Model = new(dbmodel.Model)
 	s.Model.SetTag(mt)
 	err = s.JIMM.Database.GetModel(ctx, s.Model)

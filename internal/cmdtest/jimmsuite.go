@@ -125,7 +125,7 @@ func (s *JimmCmdSuite) SetUpTest(c *gc.C) {
 	s.JujuConnSuite.SetUpTest(c)
 
 	s.AdminUser = &dbmodel.Identity{
-		Name:      "alice@external",
+		Name:      "alice@canonical.com",
 		LastLogin: db.Now(),
 	}
 	err = s.JIMM.Database.GetIdentity(ctx, s.AdminUser)
@@ -135,7 +135,7 @@ func (s *JimmCmdSuite) SetUpTest(c *gc.C) {
 	err = alice.SetControllerAccess(context.Background(), s.JIMM.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, gc.Equals, nil)
 
-	s.AddAdminUser("alice@canonical.com")
+	s.AddAdminUser(c, "alice@canonical.com")
 
 	w := new(bytes.Buffer)
 	err = pem.Encode(w, &pem.Block{

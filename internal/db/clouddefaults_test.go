@@ -23,7 +23,7 @@ func (s *dbSuite) TestModelDefaults(c *qt.C) {
 	c.Assert(err, qt.Equals, nil)
 
 	u := dbmodel.Identity{
-		Name: "bob@external",
+		Name: "bob@canonical.com",
 	}
 	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
 

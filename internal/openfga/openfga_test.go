@@ -279,8 +279,8 @@ func (s *openFGATestSuite) TestRemoveApplicationOffer(c *gc.C) {
 func (s *openFGATestSuite) TestRemoveGroup(c *gc.C) {
 	group1 := jimmnames.NewGroupTag("1")
 	group2 := jimmnames.NewGroupTag("2")
-	alice := names.NewUserTag("alice@external")
-	adam := names.NewUserTag("adam@external")
+	alice := names.NewUserTag("alice@canonical.com")
+	adam := names.NewUserTag("adam@canonical.com")
 
 	tuples := []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(alice),
@@ -333,8 +333,8 @@ func (s *openFGATestSuite) TestRemoveGroup(c *gc.C) {
 func (s *openFGATestSuite) TestRemoveCloud(c *gc.C) {
 	cloud1 := names.NewCloudTag("cloud-1")
 
-	alice := names.NewUserTag("alice@external")
-	adam := names.NewUserTag("adam@external")
+	alice := names.NewUserTag("alice@canonical.com")
+	adam := names.NewUserTag("adam@canonical.com")
 
 	tuples := []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(alice),

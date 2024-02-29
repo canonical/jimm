@@ -27,7 +27,7 @@ func (s *removeCloudFromControllerSuite) SetUpTest(c *gc.C) {
 }
 
 func (s *removeCloudFromControllerSuite) TestRemoveCloudFromController(c *gc.C) {
-	bClient := jimmtest.NewUserSessionLogin("alice@external")
+	bClient := jimmtest.NewUserSessionLogin("alice@canonical.com")
 
 	command := cmd.NewRemoveCloudFromControllerCommandForTesting(
 		s.ClientStore(),
@@ -49,7 +49,7 @@ func (s *removeCloudFromControllerSuite) TestRemoveCloudFromController(c *gc.C) 
 }
 
 func (s *removeCloudFromControllerSuite) TestRemoveCloudFromControllerWrongArguments(c *gc.C) {
-	bClient := jimmtest.NewUserSessionLogin("alice@external")
+	bClient := jimmtest.NewUserSessionLogin("alice@canonical.com")
 
 	command := cmd.NewRemoveCloudFromControllerCommandForTesting(
 		s.ClientStore(),
@@ -64,7 +64,7 @@ func (s *removeCloudFromControllerSuite) TestRemoveCloudFromControllerWrongArgum
 }
 
 func (s *removeCloudFromControllerSuite) TestRemoveCloudFromControllerCloudNotFound(c *gc.C) {
-	bClient := jimmtest.NewUserSessionLogin("alice@external")
+	bClient := jimmtest.NewUserSessionLogin("alice@canonical.com")
 
 	command := cmd.NewRemoveCloudFromControllerCommandForTesting(
 		s.ClientStore(),

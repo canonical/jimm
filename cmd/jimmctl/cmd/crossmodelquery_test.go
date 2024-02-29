@@ -27,9 +27,9 @@ func (s *crossModelQuerySuite) TestCrossModelQueryCommand(c *gc.C) {
 	bClient := jimmtest.NewUserSessionLogin("alice")
 
 	s.AddController(c, "controller-2", s.APIInfo(c))
-	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/alice@external/cred")
+	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/alice@canonical.com/cred")
 	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{AuthType: "empty"})
-	mt := s.AddModel(c, names.NewUserTag("alice@external"), "stg-o11y", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, cct)
+	mt := s.AddModel(c, names.NewUserTag("alice@canonical.com"), "stg-o11y", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, cct)
 	state, _ := s.StatePool.Get(mt.Id())
 	f := factory.NewFactory(state.State, s.StatePool)
 	app := f.MakeApplication(c, &factory.ApplicationParams{

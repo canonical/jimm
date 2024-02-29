@@ -49,10 +49,10 @@ func TestGetOpenFGAUser(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	// Get the OpenFGA variant of the user
-	ofgaUser, err := j.GetOpenFGAUserAndAuthorise(ctx, "bob@external.com")
+	ofgaUser, err := j.GetOpenFGAUserAndAuthorise(ctx, "bob@canonical.com.com")
 	c.Assert(err, qt.IsNil)
 	// Username -> email
-	c.Assert(ofgaUser.Name, qt.Equals, "bob@external.com")
+	c.Assert(ofgaUser.Name, qt.Equals, "bob@canonical.com.com")
 	// As no display name was set for this user as they're being created this time over
 	c.Assert(ofgaUser.DisplayName, qt.Equals, "")
 	// The last login should be updated, so we check if it's been updated
@@ -73,10 +73,10 @@ func TestGetOpenFGAUser(t *testing.T) {
 		qt.IsNil,
 	)
 
-	ofgaUser, err = j.GetOpenFGAUserAndAuthorise(ctx, "bob@external.com")
+	ofgaUser, err = j.GetOpenFGAUserAndAuthorise(ctx, "bob@canonical.com.com")
 	c.Assert(err, qt.IsNil)
 
-	c.Assert(ofgaUser.Name, qt.Equals, "bob@external.com")
+	c.Assert(ofgaUser.Name, qt.Equals, "bob@canonical.com.com")
 	c.Assert(ofgaUser.DisplayName, qt.Equals, "")
 	c.Assert((time.Since(ofgaUser.LastLogin.Time) > time.Second), qt.IsFalse)
 	c.Assert(ofgaUser.LastLogin.Valid, qt.IsTrue)

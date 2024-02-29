@@ -38,7 +38,7 @@ func TestSetIdentityModelDefaults(t *testing.T) {
 		about: "defaults do not exist yet - defaults created",
 		setup: func(c *qt.C, j *jimm.JIMM) testConfig {
 			identity := dbmodel.Identity{
-				Name: "bob@external",
+				Name: "bob@canonical.com",
 			}
 			c.Assert(j.Database.DB.Create(&identity).Error, qt.IsNil)
 
@@ -63,7 +63,7 @@ func TestSetIdentityModelDefaults(t *testing.T) {
 		about: "defaults already exist - defaults updated",
 		setup: func(c *qt.C, j *jimm.JIMM) testConfig {
 			identity := dbmodel.Identity{
-				Name: "bob@external",
+				Name: "bob@canonical.com",
 			}
 			c.Assert(j.Database.DB.Create(&identity).Error, qt.IsNil)
 
@@ -98,7 +98,7 @@ func TestSetIdentityModelDefaults(t *testing.T) {
 		about: "identity does not exist",
 		setup: func(c *qt.C, j *jimm.JIMM) testConfig {
 			identity := dbmodel.Identity{
-				Name: "bob@external",
+				Name: "bob@canonical.com",
 			}
 
 			defaults := map[string]interface{}{
@@ -117,7 +117,7 @@ func TestSetIdentityModelDefaults(t *testing.T) {
 		about: "cannot set agent-version",
 		setup: func(c *qt.C, j *jimm.JIMM) testConfig {
 			identity := dbmodel.Identity{
-				Name: "bob@external",
+				Name: "bob@canonical.com",
 			}
 			c.Assert(j.Database.DB.Create(&identity).Error, qt.IsNil)
 

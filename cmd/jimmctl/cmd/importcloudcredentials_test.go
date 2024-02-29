@@ -31,7 +31,7 @@ const creds = `{
 	}
 }
 {
-	"_id": "aws/bob@external/test1",
+	"_id": "aws/bob@canonical.com/test1",
 	"type": "access-key",
 	"attributes": {
 		"access-key": "key-id2",
@@ -70,7 +70,7 @@ func (s *importCloudCredentialsSuite) TestImportCloudCredentials(c *gc.C) {
 
 	cred1 := dbmodel.CloudCredential{
 		CloudName:         "aws",
-		OwnerIdentityName: "alice@external",
+		OwnerIdentityName: "alice@canonical.com",
 		Name:              "test1",
 	}
 	err = s.JIMM.Database.GetCloudCredential(context.Background(), &cred1)
@@ -79,7 +79,7 @@ func (s *importCloudCredentialsSuite) TestImportCloudCredentials(c *gc.C) {
 
 	cred2 := dbmodel.CloudCredential{
 		CloudName:         "aws",
-		OwnerIdentityName: "bob@external",
+		OwnerIdentityName: "bob@canonical.com",
 		Name:              "test1",
 	}
 	err = s.JIMM.Database.GetCloudCredential(context.Background(), &cred2)
@@ -88,7 +88,7 @@ func (s *importCloudCredentialsSuite) TestImportCloudCredentials(c *gc.C) {
 
 	cred3 := dbmodel.CloudCredential{
 		CloudName:         "gce",
-		OwnerIdentityName: "charlie@external",
+		OwnerIdentityName: "charlie@canonical.com",
 		Name:              "test1",
 	}
 	err = s.JIMM.Database.GetCloudCredential(context.Background(), &cred3)

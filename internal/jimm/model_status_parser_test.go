@@ -27,11 +27,11 @@ clouds:
   regions:
   - name: test-cloud-region
 cloud-credentials:
-- owner: alice@external
+- owner: alice@canonical.com
   name: cred-1
   cloud: test-cloud
 users:
-- username: alice@external
+- username: alice@canonical.com
   controller-access: superuser
 controllers:
 - name: controller-1
@@ -47,14 +47,14 @@ models:
   cloud: test-cloud
   region: test-cloud-region
   cloud-credential: cred-1
-  owner: alice@external
+  owner: alice@canonical.com
   life: alive
   status:
     status: available
     info: "OK!"
     since: 2020-02-20T20:02:20Z
   users:
-  - user: alice@external
+  - user: alice@canonical.com
     access: admin
 - name: model-2
   type: iaas
@@ -64,14 +64,14 @@ models:
   cloud: test-cloud
   region: test-cloud-region
   cloud-credential: cred-1
-  owner: alice@external
+  owner: alice@canonical.com
   life: alive
   status:
     status: available
     info: "OK!"
     since: 2020-02-20T20:02:20Z
   users:
-  - user: alice@external
+  - user: alice@canonical.com
     access: admin
 - name: model-3
   type: iaas
@@ -81,14 +81,14 @@ models:
   cloud: test-cloud
   region: test-cloud-region
   cloud-credential: cred-1
-  owner: alice@external
+  owner: alice@canonical.com
   life: alive
   status:
     status: available
     info: "OK!"
     since: 2020-02-20T20:02:20Z
   users:
-  - user: alice@external
+  - user: alice@canonical.com
     access: admin
 - name: model-5
   type: iaas
@@ -98,14 +98,14 @@ models:
   cloud: test-cloud
   region: test-cloud-region
   cloud-credential: cred-1
-  owner: alice@external
+  owner: alice@canonical.com
   life: alive
   status:
     status: available
     info: "OK!"
     since: 2020-02-20T20:02:20Z
   users:
-  - user: alice@external
+  - user: alice@canonical.com
     access: admin
   sla:
     level: unsupported

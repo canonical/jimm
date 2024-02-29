@@ -135,7 +135,7 @@ func TestVault(t *testing.T) {
 
 	cloudClient := cloud.NewClient(conn)
 
-	tag := names.NewCloudCredentialTag("test/bob@external/test-1").String()
+	tag := names.NewCloudCredentialTag("test/bob@canonical.com/test-1").String()
 	_, err = cloudClient.UpdateCloudsCredentials(map[string]jujucloud.Credential{
 		tag: jujucloud.NewCredential(jujucloud.UserPassAuthType, map[string]string{
 			"username": "test-user",
@@ -150,7 +150,7 @@ func TestVault(t *testing.T) {
 		AuthPath:   p.VaultAuthPath,
 		KVPath:     p.VaultPath,
 	}
-	attr, err := store.Get(context.Background(), names.NewCloudCredentialTag("test/bob@external/test-1"))
+	attr, err := store.Get(context.Background(), names.NewCloudCredentialTag("test/bob@canonical.com/test-1"))
 	c.Assert(err, qt.IsNil)
 	c.Check(attr, qt.DeepEquals, map[string]string{
 		"username": "test-user",
@@ -274,7 +274,7 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 		Name: "test-application-offer",
 	}
 	user := dbmodel.Identity{
-		Name: "alice@external",
+		Name: "alice@canonical.com",
 	}
 
 	ctx := context.Background()

@@ -31,7 +31,7 @@ const testWatcherEnv = `clouds:
   regions:
   - name: test-cloud-region
 cloud-credentials:
-- owner: alice@external
+- owner: alice@canonical.com
   name: cred-1
   cloud: test-cloud
 controllers:
@@ -48,18 +48,18 @@ models:
   cloud: test-cloud
   region: test-cloud-region
   cloud-credential: cred-1
-  owner: alice@external
+  owner: alice@canonical.com
   life: alive
   status:
     status: available
     info: "OK!"
     since: 2020-02-20T20:02:20Z
   users:
-  - user: alice@external
+  - user: alice@canonical.com
     access: admin
-  - user: bob@external
+  - user: bob@canonical.com
     access: write
-  - user: charlie@external
+  - user: charlie@canonical.com
     access: read
   sla:
     level: unsupported
@@ -72,7 +72,7 @@ models:
   cloud: test-cloud
   region: test-cloud-region
   cloud-credential: cred-1
-  owner: alice@external
+  owner: alice@canonical.com
   life: dying
 - name: model-3
   type: iaas
@@ -82,7 +82,7 @@ models:
   cloud: test-cloud
   region: test-cloud-region
   cloud-credential: cred-1
-  owner: alice@external
+  owner: alice@canonical.com
   life: dead
 `
 
@@ -331,7 +331,7 @@ var watcherTests = []struct {
 			Entity: &jujuparams.ModelUpdate{
 				ModelUUID: "00000002-0000-0000-0000-000000000004",
 				Name:      "new-model",
-				Owner:     "charlie@external",
+				Owner:     "charlie@canonical.com",
 				Life:      "starting",
 			},
 		}},
@@ -357,7 +357,7 @@ var watcherTests = []struct {
 			Entity: &jujuparams.ModelUpdate{
 				ModelUUID:      "00000002-0000-0000-0000-000000000001",
 				Name:           "model-1",
-				Owner:          "alice@external",
+				Owner:          "alice@canonical.com",
 				Life:           life.Value(constants.ALIVE.String()),
 				ControllerUUID: "00000001-0000-0000-0000-000000000001",
 				Status: jujuparams.StatusInfo{
@@ -638,7 +638,7 @@ var modelSummaryWatcherTests = []struct {
 				Units:        4,
 				Relations:    12,
 			},
-			Admins: []string{"alice@external", "bob"},
+			Admins: []string{"alice@canonical.com", "bob"},
 		}, {
 			// this is a summary for an model unknown to jimm
 			// meaning its summary will not be published
@@ -652,7 +652,7 @@ var modelSummaryWatcherTests = []struct {
 				Units:        2,
 				Relations:    1,
 			},
-			Admins: []string{"bob@external"},
+			Admins: []string{"bob@canonical.com"},
 		}},
 		nil,
 	},
@@ -668,7 +668,7 @@ var modelSummaryWatcherTests = []struct {
 					Units:        4,
 					Relations:    12,
 				},
-				Admins: []string{"alice@external"},
+				Admins: []string{"alice@canonical.com"},
 			},
 		})
 	},
@@ -876,7 +876,7 @@ const testMigratingModelsWatcherEnv = `clouds:
   regions:
   - name: test-cloud-region
 cloud-credentials:
-- owner: alice@external
+- owner: alice@canonical.com
   name: cred-1
   cloud: test-cloud
 controllers:
@@ -898,7 +898,7 @@ models:
   cloud: test-cloud
   region: test-cloud-region
   cloud-credential: cred-1
-  owner: alice@external
+  owner: alice@canonical.com
   life: migrating-internal
 - name: model-2
   type: iaas
@@ -908,7 +908,7 @@ models:
   cloud: test-cloud
   region: test-cloud-region
   cloud-credential: cred-1
-  owner: alice@external
+  owner: alice@canonical.com
   life: migrating-away
 `
 
@@ -986,7 +986,7 @@ const testFailedMigratingModelsWatcherEnv = `clouds:
   regions:
   - name: test-cloud-region
 cloud-credentials:
-- owner: alice@external
+- owner: alice@canonical.com
   name: cred-1
   cloud: test-cloud
 controllers:
@@ -1008,7 +1008,7 @@ models:
   cloud: test-cloud
   region: test-cloud-region
   cloud-credential: cred-1
-  owner: alice@external
+  owner: alice@canonical.com
   life: migrating-internal
 `
 
@@ -1079,7 +1079,7 @@ const testWatcherIgnoreDeltasForModelsFromIncorrectControllerEnv = `clouds:
   regions:
   - name: test-cloud-region
 cloud-credentials:
-- owner: alice@external
+- owner: alice@canonical.com
   name: cred-1
   cloud: test-cloud
 controllers:
@@ -1100,7 +1100,7 @@ models:
   cloud: test-cloud
   region: test-cloud-region
   cloud-credential: cred-1
-  owner: alice@external
+  owner: alice@canonical.com
   life: alive
 `
 
@@ -1177,7 +1177,7 @@ func TestWatcherIgnoreDeltasForModelsFromIncorrectController(t *testing.T) {
 		Entity: &jujuparams.ModelUpdate{
 			ModelUUID: "00000002-0000-0000-0000-000000000001",
 			Name:      "model-1",
-			Owner:     "alice@external",
+			Owner:     "alice@canonical.com",
 			Life:      life.Value(constants.ALIVE.String()),
 			Status: jujuparams.StatusInfo{
 				Current: "busy",

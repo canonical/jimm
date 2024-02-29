@@ -35,7 +35,7 @@ func (s *addCloudToControllerSuite) SetUpTest(c *gc.C) {
 	// We add user bob, who is a JIMM administrator.
 	err := s.JIMM.Database.UpdateIdentity(context.Background(), &dbmodel.Identity{
 		DisplayName: "Bob",
-		Name:        "bob@external",
+		Name:        "bob@canonical.com",
 	})
 	c.Assert(err, gc.IsNil)
 
@@ -54,7 +54,7 @@ func (s *addCloudToControllerSuite) SetUpTest(c *gc.C) {
 	// test-cloud.
 	bob := openfga.NewUser(
 		&dbmodel.Identity{
-			Name: "bob@external",
+			Name: "bob@canonical.com",
 		},
 		s.JIMM.OpenFGAClient,
 	)
@@ -168,7 +168,7 @@ clouds:
 		c.Log(test.about)
 		tmpfile, cleanupFunc := writeTempFile(c, test.cloudInfo)
 
-		bClient := jimmtest.NewUserSessionLogin("bob@external")
+		bClient := jimmtest.NewUserSessionLogin("bob@canonical.com")
 		// Running the command succeeds
 		newCmd := cmd.NewAddCloudToControllerCommandForTesting(s.ClientStore(), bClient, test.cloudByNameFunc)
 		var err error

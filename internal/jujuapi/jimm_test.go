@@ -308,7 +308,7 @@ func (s *jimmSuite) TestAuditLog(c *gc.C) {
 
 	c.Assert(len(evs.Events), gc.Equals, 13)
 
-	bobTag := names.NewUserTag("bob@external").String()
+	bobTag := names.NewUserTag("bob@canonical.com").String()
 
 	expectedEvents := apiparams.AuditEvents{
 		Events: []apiparams.AuditEvent{{
@@ -368,7 +368,7 @@ func (s *jimmSuite) TestAuditLog(c *gc.C) {
 
 	// alice can grant bob access to audit log entries
 	err = client2.GrantAuditLogAccess(&apiparams.AuditLogAccessRequest{
-		UserTag: names.NewUserTag("bob@external").String(),
+		UserTag: names.NewUserTag("bob@canonical.com").String(),
 	})
 	c.Assert(err, gc.Equals, nil)
 
@@ -456,7 +456,7 @@ func TestAuditLogAPIParamsConversion(t *testing.T) {
 
 func (s *jimmSuite) TestFullModelStatus(c *gc.C) {
 	s.AddController(c, "controller-2", s.APIInfo(c))
-	mt := s.AddModel(c, names.NewUserTag("charlie@external"), "model-1", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, s.Model2.CloudCredential.ResourceTag())
+	mt := s.AddModel(c, names.NewUserTag("charlie@canonical.com"), "model-1", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, s.Model2.CloudCredential.ResourceTag())
 
 	conn := s.open(c, nil, "bob")
 	defer conn.Close()
@@ -472,7 +472,7 @@ func (s *jimmSuite) TestFullModelStatus(c *gc.C) {
 	})
 	c.Assert(err, gc.ErrorMatches, "unauthorized.*")
 
-	conn = s.open(c, nil, "alice@external")
+	conn = s.open(c, nil, "alice@canonical.com")
 	defer conn.Close()
 	client = api.NewClient(conn)
 
@@ -568,12 +568,12 @@ func (s *jimmSuite) TestImportModel(c *gc.C) {
 func (s *jimmSuite) TestAddCloudToController(c *gc.C) {
 	ctx := context.Background()
 	u := dbmodel.Identity{
-		Name: "alice@external",
+		Name: "alice@canonical.com",
 	}
 	err := s.JIMM.Database.GetIdentity(ctx, &u)
 	c.Assert(err, gc.IsNil)
 
-	conn := s.open(c, nil, "alice@external")
+	conn := s.open(c, nil, "alice@canonical.com")
 	defer conn.Close()
 
 	req := apiparams.AddCloudToControllerRequest{
@@ -605,12 +605,12 @@ func (s *jimmSuite) TestAddCloudToController(c *gc.C) {
 func (s *jimmSuite) TestAddExistingCloudToController(c *gc.C) {
 	ctx := context.Background()
 	u := dbmodel.Identity{
-		Name: "alice@external",
+		Name: "alice@canonical.com",
 	}
 	err := s.JIMM.Database.GetIdentity(ctx, &u)
 	c.Assert(err, gc.IsNil)
 
-	conn := s.open(c, nil, "alice@external")
+	conn := s.open(c, nil, "alice@canonical.com")
 	defer conn.Close()
 
 	force := true
@@ -653,12 +653,12 @@ func (s *jimmSuite) TestAddExistingCloudToController(c *gc.C) {
 func (s *jimmSuite) TestRemoveCloudFromController(c *gc.C) {
 	ctx := context.Background()
 	u := dbmodel.Identity{
-		Name: "alice@external",
+		Name: "alice@canonical.com",
 	}
 	err := s.JIMM.Database.GetIdentity(ctx, &u)
 	c.Assert(err, gc.IsNil)
 
-	conn := s.open(c, nil, "alice@external")
+	conn := s.open(c, nil, "alice@canonical.com")
 	defer conn.Close()
 
 	req := apiparams.AddCloudToControllerRequest{
@@ -699,7 +699,7 @@ func (s *jimmSuite) TestCrossModelQuery(c *gc.C) {
 	s.AddController(c, "controller-2", s.APIInfo(c))
 	s.AddModel(
 		c,
-		names.NewUserTag("charlie@external"),
+		names.NewUserTag("charlie@canonical.com"),
 		"model-20",
 		names.NewCloudTag(jimmtest.TestCloudName),
 		jimmtest.TestCloudRegionName,
@@ -707,7 +707,7 @@ func (s *jimmSuite) TestCrossModelQuery(c *gc.C) {
 	)
 	s.AddModel(
 		c,
-		names.NewUserTag("charlie@external"),
+		names.NewUserTag("charlie@canonical.com"),
 		"model-21",
 		names.NewCloudTag(jimmtest.TestCloudName),
 		jimmtest.TestCloudRegionName,
@@ -715,7 +715,7 @@ func (s *jimmSuite) TestCrossModelQuery(c *gc.C) {
 	)
 	s.AddModel(
 		c,
-		names.NewUserTag("charlie@external"),
+		names.NewUserTag("charlie@canonical.com"),
 		"model-22",
 		names.NewCloudTag(jimmtest.TestCloudName),
 		jimmtest.TestCloudRegionName,
@@ -774,7 +774,7 @@ func (s *jimmSuite) TestCrossModelQuery(c *gc.C) {
 func (s *jimmSuite) TestJimmModelMigrationSuperuser(c *gc.C) {
 	mt := s.AddModel(
 		c,
-		names.NewUserTag("charlie@external"),
+		names.NewUserTag("charlie@canonical.com"),
 		"model-20",
 		names.NewCloudTag(jimmtest.TestCloudName),
 		jimmtest.TestCloudRegionName,
@@ -801,7 +801,7 @@ func (s *jimmSuite) TestJimmModelMigrationSuperuser(c *gc.C) {
 func (s *jimmSuite) TestJimmModelMigrationNonSuperuser(c *gc.C) {
 	mt := s.AddModel(
 		c,
-		names.NewUserTag("charlie@external"),
+		names.NewUserTag("charlie@canonical.com"),
 		"model-20",
 		names.NewCloudTag(jimmtest.TestCloudName),
 		jimmtest.TestCloudRegionName,

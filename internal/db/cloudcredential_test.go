@@ -31,7 +31,7 @@ func (s *dbSuite) TestSetCloudCredentialInvalidTag(c *qt.C) {
 	c.Assert(err, qt.Equals, nil)
 
 	u := dbmodel.Identity{
-		Name: "bob@external",
+		Name: "bob@canonical.com",
 	}
 	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
 
@@ -59,7 +59,7 @@ func (s *dbSuite) TestSetCloudCredential(c *qt.C) {
 	c.Assert(err, qt.Equals, nil)
 
 	u := dbmodel.Identity{
-		Name: "bob@external",
+		Name: "bob@canonical.com",
 	}
 	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
 
@@ -96,7 +96,7 @@ func (s *dbSuite) TestSetCloudCredentialUpdate(c *qt.C) {
 	c.Assert(err, qt.Equals, nil)
 
 	u := dbmodel.Identity{
-		Name: "bob@external",
+		Name: "bob@canonical.com",
 	}
 	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
 
@@ -166,7 +166,7 @@ func (s *dbSuite) TestGetCloudCredential(c *qt.C) {
 	c.Assert(err, qt.Equals, nil)
 
 	u := dbmodel.Identity{
-		Name: "bob@external",
+		Name: "bob@canonical.com",
 	}
 	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
 
@@ -221,25 +221,25 @@ const forEachCloudCredentialEnv = `clouds:
 cloud-credentials:
 - name: cred-1
   cloud: cloud-1
-  owner: alice@external
+  owner: alice@canonical.com
   attributes:
     k1: v1
     k2: v2
 - name: cred-2
   cloud: cloud-1
-  owner: bob@external
+  owner: bob@canonical.com
   attributes:
     k1: v1
     k2: v2
 - name: cred-3
   cloud: cloud-2
-  owner: alice@external
+  owner: alice@canonical.com
 - name: cred-4
   cloud: cloud-2
-  owner: bob@external
+  owner: bob@canonical.com
 - name: cred-5
   cloud: cloud-1
-  owner: alice@external
+  owner: alice@canonical.com
 `
 
 var forEachCloudCredentialTests = []struct {
@@ -252,22 +252,22 @@ var forEachCloudCredentialTests = []struct {
 	expectErrorCode   errors.Code
 }{{
 	name:     "UserCredentialsWithCloud",
-	username: "alice@external",
+	username: "alice@canonical.com",
 	cloud:    "cloud-1",
 	expectCredentials: []string{
-		names.NewCloudCredentialTag("cloud-1/alice@external/cred-1").String(),
-		names.NewCloudCredentialTag("cloud-1/alice@external/cred-5").String(),
+		names.NewCloudCredentialTag("cloud-1/alice@canonical.com/cred-1").String(),
+		names.NewCloudCredentialTag("cloud-1/alice@canonical.com/cred-5").String(),
 	},
 }, {
 	name:     "UserCredentialsWithoutCloud",
-	username: "bob@external",
+	username: "bob@canonical.com",
 	expectCredentials: []string{
-		names.NewCloudCredentialTag("cloud-1/bob@external/cred-2").String(),
-		names.NewCloudCredentialTag("cloud-2/bob@external/cred-4").String(),
+		names.NewCloudCredentialTag("cloud-1/bob@canonical.com/cred-2").String(),
+		names.NewCloudCredentialTag("cloud-2/bob@canonical.com/cred-4").String(),
 	},
 }, {
 	name:     "IterationError",
-	username: "alice@external",
+	username: "alice@canonical.com",
 	f: func(*dbmodel.CloudCredential) error {
 		return errors.E("test error", errors.Code("test code"))
 	},

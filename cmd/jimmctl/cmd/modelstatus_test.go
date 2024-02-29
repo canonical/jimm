@@ -56,9 +56,9 @@ var _ = gc.Suite(&modelStatusSuite{})
 func (s *modelStatusSuite) TestModelStatusSuperuser(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
 
-	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@external/cred")
+	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@canonical.com/cred")
 	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{AuthType: "empty", Attributes: map[string]string{"key": "value"}})
-	mt := s.AddModel(c, names.NewUserTag("charlie@external"), "model-2", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, cct)
+	mt := s.AddModel(c, names.NewUserTag("charlie@canonical.com"), "model-2", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, cct)
 
 	// alice is superuser
 	bClient := jimmtest.NewUserSessionLogin("alice")
@@ -70,9 +70,9 @@ func (s *modelStatusSuite) TestModelStatusSuperuser(c *gc.C) {
 func (s *modelStatusSuite) TestModelStatus(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
 
-	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@external/cred")
+	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@canonical.com/cred")
 	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{AuthType: "empty", Attributes: map[string]string{"key": "value"}})
-	mt := s.AddModel(c, names.NewUserTag("charlie@external"), "model-2", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, cct)
+	mt := s.AddModel(c, names.NewUserTag("charlie@canonical.com"), "model-2", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, cct)
 
 	// bob is not superuser
 	bClient := jimmtest.NewUserSessionLogin("bob")

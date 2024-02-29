@@ -22,9 +22,9 @@ var _ = gc.Suite(&listAuditEventsSuite{})
 func (s *listAuditEventsSuite) TestListAuditEventsSuperuser(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
 
-	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@external/cred")
+	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@canonical.com/cred")
 	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{AuthType: "empty"})
-	s.AddModel(c, names.NewUserTag("charlie@external"), "model-2", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, cct)
+	s.AddModel(c, names.NewUserTag("charlie@canonical.com"), "model-2", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, cct)
 
 	// alice is superuser
 	bClient := jimmtest.NewUserSessionLogin("alice")
@@ -61,9 +61,9 @@ func (s *listAuditEventsSuite) TestListAuditEventsSuperuser(c *gc.C) {
 func (s *listAuditEventsSuite) TestListAuditEventsStatus(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
 
-	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@external/cred")
+	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@canonical.com/cred")
 	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{AuthType: "empty"})
-	s.AddModel(c, names.NewUserTag("charlie@external"), "model-2", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, cct)
+	s.AddModel(c, names.NewUserTag("charlie@canonical.com"), "model-2", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, cct)
 
 	// bob is not superuser
 	bClient := jimmtest.NewUserSessionLogin("bob")

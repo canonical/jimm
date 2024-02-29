@@ -243,7 +243,7 @@ func (s *relationSuite) TestRemoveRelationViaFileSuperuser(c *gc.C) {
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewControllerTag(s.Params.ControllerUUID)),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewControllerTag(s.Params.ControllerUUID)),
 	}})
@@ -269,7 +269,7 @@ func initializeEnvironment(c *gc.C, ctx context.Context, db *db.Database, u dbmo
 	env := environment{}
 
 	u1 := dbmodel.Identity{
-		Name: "eve@external",
+		Name: "eve@canonical.com",
 	}
 	c.Assert(db.DB.Create(&u1).Error, gc.IsNil)
 
@@ -390,7 +390,7 @@ func (s *relationSuite) TestListRelations(c *gc.C) {
 			Relation:     "administrator",
 			TargetObject: "controller-jimm",
 		}, {
-			Object:       "user-alice@external",
+			Object:       "user-alice@canonical.com",
 			Relation:     "administrator",
 			TargetObject: "controller-jimm",
 		}},
@@ -403,7 +403,7 @@ func (s *relationSuite) TestListRelations(c *gc.C) {
 			Relation:     "administrator",
 			TargetObject: "controller-jimm",
 		}, {
-			Object:       "user-alice@external",
+			Object:       "user-alice@canonical.com",
 			Relation:     "administrator",
 			TargetObject: "controller-jimm",
 		}},
@@ -426,13 +426,13 @@ func (s *relationSuite) TestListRelations(c *gc.C) {
 		gc.Equals,
 		`Object              	Relation     	Target Object                                                            
 user-admin          	administrator	controller-jimm                                                          
-user-alice@external 	administrator	controller-jimm                                                          
-user-alice@external 	member       	group-group-1                                                            
-user-eve@external   	member       	group-group-2                                                            
+user-alice@canonical.com 	administrator	controller-jimm                                                          
+user-alice@canonical.com 	member       	group-group-1                                                            
+user-eve@canonical.com   	member       	group-group-2                                                            
 group-group-2#member	member       	group-group-3                                                            
 group-group-3#member	administrator	controller-test-controller-1                                             
-group-group-1#member	administrator	model-test-controller-1:alice@external/test-model-1                      
-user-eve@external   	administrator	applicationoffer-test-controller-1:alice@external/test-model-1.testoffer1`,
+group-group-1#member	administrator	model-test-controller-1:alice@canonical.com/test-model-1                      
+user-eve@canonical.com   	administrator	applicationoffer-test-controller-1:alice@canonical.com/test-model-1.testoffer1`,
 	)
 }
 
@@ -451,7 +451,7 @@ func (s *relationSuite) TestCheckRelationViaSuperuser(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	u := dbmodel.Identity{
-		Name: petname.Generate(2, "-") + "@external",
+		Name: petname.Generate(2, "-") + "@canonical.com",
 	}
 	c.Assert(db.DB.Create(&u).Error, gc.IsNil)
 

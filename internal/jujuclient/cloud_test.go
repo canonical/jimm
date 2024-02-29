@@ -43,7 +43,7 @@ func (s *cloudSuite) TestCheckCredentialModels(c *gc.C) {
 func (s *cloudSuite) TestCheckCredentialModelsWithModels(c *gc.C) {
 	ctx := context.Background()
 
-	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/bob@external/pw1").String()
+	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/bob@canonical.com/pw1").String()
 	cred := jujuparams.TaggedCredential{
 		Tag: cct,
 		Credential: jujuparams.CloudCredential{
@@ -62,7 +62,7 @@ func (s *cloudSuite) TestCheckCredentialModelsWithModels(c *gc.C) {
 	var info jujuparams.ModelInfo
 	err = s.API.CreateModel(ctx, &jujuparams.ModelCreateArgs{
 		Name:               "model-1",
-		OwnerTag:           names.NewUserTag("bob@external").String(),
+		OwnerTag:           names.NewUserTag("bob@canonical.com").String(),
 		CloudCredentialTag: cct,
 	}, &info)
 	c.Assert(err, gc.Equals, nil)
@@ -70,7 +70,7 @@ func (s *cloudSuite) TestCheckCredentialModelsWithModels(c *gc.C) {
 
 	err = s.API.CreateModel(ctx, &jujuparams.ModelCreateArgs{
 		Name:               "model-2",
-		OwnerTag:           names.NewUserTag("bob@external").String(),
+		OwnerTag:           names.NewUserTag("bob@canonical.com").String(),
 		CloudCredentialTag: cct,
 	}, &info)
 	c.Assert(err, gc.Equals, nil)
@@ -151,7 +151,7 @@ func (s *cloudSuite) TestRevokeCredential(c *gc.C) {
 func (s *cloudSuite) TestUpdateCredentialWithModels(c *gc.C) {
 	ctx := context.Background()
 
-	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/bob@external/pw1").String()
+	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/bob@canonical.com/pw1").String()
 	cred := jujuparams.TaggedCredential{
 		Tag: cct,
 		Credential: jujuparams.CloudCredential{
@@ -170,7 +170,7 @@ func (s *cloudSuite) TestUpdateCredentialWithModels(c *gc.C) {
 	var info jujuparams.ModelInfo
 	err = s.API.CreateModel(ctx, &jujuparams.ModelCreateArgs{
 		Name:               "model-1",
-		OwnerTag:           names.NewUserTag("bob@external").String(),
+		OwnerTag:           names.NewUserTag("bob@canonical.com").String(),
 		CloudCredentialTag: cct,
 	}, &info)
 	c.Assert(err, gc.Equals, nil)
@@ -178,7 +178,7 @@ func (s *cloudSuite) TestUpdateCredentialWithModels(c *gc.C) {
 
 	err = s.API.CreateModel(ctx, &jujuparams.ModelCreateArgs{
 		Name:               "model-2",
-		OwnerTag:           names.NewUserTag("bob@external").String(),
+		OwnerTag:           names.NewUserTag("bob@canonical.com").String(),
 		CloudCredentialTag: cct,
 	}, &info)
 	c.Assert(err, gc.Equals, nil)
@@ -396,22 +396,22 @@ func (s *cloudSuite) TestRemoveCloud(c *gc.C) {
 }
 
 func (s *cloudSuite) TestGrantCloudAccess(c *gc.C) {
-	err := s.API.GrantCloudAccess(context.Background(), names.NewCloudTag("no-such-cloud"), names.NewUserTag("user@external"), "add-model")
+	err := s.API.GrantCloudAccess(context.Background(), names.NewCloudTag("no-such-cloud"), names.NewUserTag("user@canonical.com"), "add-model")
 	c.Check(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeNotFound)
-	err = s.API.GrantCloudAccess(context.Background(), names.NewCloudTag(jimmtest.TestCloudName), names.NewUserTag("user@external"), "add-model")
+	err = s.API.GrantCloudAccess(context.Background(), names.NewCloudTag(jimmtest.TestCloudName), names.NewUserTag("user@canonical.com"), "add-model")
 	c.Check(err, gc.Equals, nil)
 }
 
 func (s *cloudSuite) TestRevokeCloudAccess(c *gc.C) {
-	err := s.API.RevokeCloudAccess(context.Background(), names.NewCloudTag("no-such-cloud"), names.NewUserTag("user@external"), "add-model")
+	err := s.API.RevokeCloudAccess(context.Background(), names.NewCloudTag("no-such-cloud"), names.NewUserTag("user@canonical.com"), "add-model")
 	c.Check(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeNotFound)
-	err = s.API.GrantCloudAccess(context.Background(), names.NewCloudTag(jimmtest.TestCloudName), names.NewUserTag("user@external"), "admin")
+	err = s.API.GrantCloudAccess(context.Background(), names.NewCloudTag(jimmtest.TestCloudName), names.NewUserTag("user@canonical.com"), "admin")
 	c.Assert(err, gc.Equals, nil)
-	err = s.API.RevokeCloudAccess(context.Background(), names.NewCloudTag(jimmtest.TestCloudName), names.NewUserTag("user@external"), "admin")
+	err = s.API.RevokeCloudAccess(context.Background(), names.NewCloudTag(jimmtest.TestCloudName), names.NewUserTag("user@canonical.com"), "admin")
 	c.Check(err, gc.Equals, nil)
-	err = s.API.RevokeCloudAccess(context.Background(), names.NewCloudTag(jimmtest.TestCloudName), names.NewUserTag("user@external"), "add-model")
+	err = s.API.RevokeCloudAccess(context.Background(), names.NewCloudTag(jimmtest.TestCloudName), names.NewUserTag("user@canonical.com"), "add-model")
 	c.Check(err, gc.Equals, nil)
-	err = s.API.RevokeCloudAccess(context.Background(), names.NewCloudTag(jimmtest.TestCloudName), names.NewUserTag("user@external"), "add-model")
+	err = s.API.RevokeCloudAccess(context.Background(), names.NewCloudTag(jimmtest.TestCloudName), names.NewUserTag("user@canonical.com"), "add-model")
 	c.Check(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeNotFound)
 }
 

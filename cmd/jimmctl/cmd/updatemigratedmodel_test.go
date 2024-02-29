@@ -25,9 +25,9 @@ var _ = gc.Suite(&updateMigratedModelSuite{})
 func (s *updateMigratedModelSuite) TestUpdateMigratedModelSuperuser(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
 
-	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@external/cred")
+	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@canonical.com/cred")
 	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{AuthType: "empty"})
-	mt := s.AddModel(c, names.NewUserTag("charlie@external"), "model-2", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, cct)
+	mt := s.AddModel(c, names.NewUserTag("charlie@canonical.com"), "model-2", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, cct)
 	var model dbmodel.Model
 	model.SetTag(mt)
 	err := s.JIMM.Database.GetModel(context.Background(), &model)
@@ -50,9 +50,9 @@ func (s *updateMigratedModelSuite) TestUpdateMigratedModelSuperuser(c *gc.C) {
 func (s *updateMigratedModelSuite) TestUpdateMigratedModelUnauthorized(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
 
-	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@external/cred")
+	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@canonical.com/cred")
 	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{AuthType: "empty"})
-	mt := s.AddModel(c, names.NewUserTag("charlie@external"), "model-2", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, cct)
+	mt := s.AddModel(c, names.NewUserTag("charlie@canonical.com"), "model-2", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, cct)
 
 	// bob is not superuser
 	bClient := jimmtest.NewUserSessionLogin("bob")

@@ -24,7 +24,7 @@ var _ = gc.Suite(&clientSuite{})
 func (s *clientSuite) TestStatus(c *gc.C) {
 	ctx := context.Background()
 
-	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/bob@external/pw1").String()
+	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/bob@canonical.com/pw1").String()
 	cred := jujuparams.TaggedCredential{
 		Tag: cct,
 		Credential: jujuparams.CloudCredential{
@@ -53,7 +53,7 @@ func (s *clientSuite) TestStatus(c *gc.C) {
 	var modelInfo jujuparams.ModelInfo
 	err = s.API.CreateModel(ctx, &jujuparams.ModelCreateArgs{
 		Name:               "model-1",
-		OwnerTag:           names.NewUserTag("bob@external").String(),
+		OwnerTag:           names.NewUserTag("bob@canonical.com").String(),
 		CloudCredentialTag: cct,
 	}, &modelInfo)
 	c.Assert(err, gc.Equals, nil)

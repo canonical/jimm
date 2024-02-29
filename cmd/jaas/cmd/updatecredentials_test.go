@@ -41,7 +41,7 @@ func (s *updateCredentialsSuite) TestUpdateCredentialsWithNewCredentials(c *gc.C
 
 	// Make alice admin of the service account
 	tuple := openfga.Tuple{
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag(clientID)),
 	}
@@ -102,7 +102,7 @@ func (s *updateCredentialsSuite) TestUpdateCredentialsWithExistingCredentials(c 
 
 	// Make alice admin of the service account
 	tuple := openfga.Tuple{
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag(clientID)),
 	}

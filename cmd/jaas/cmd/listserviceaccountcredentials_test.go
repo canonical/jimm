@@ -37,7 +37,7 @@ func (s *listServiceAccountCredentialsSuite) TestListServiceAccountCredentials(c
 	clientID := "abda51b2-d735-4794-a8bd-49c506baa4af"
 	// alice is superuser
 	ctx := context.Background()
-	user := dbmodel.Identity{Name: "alice@external"}
+	user := dbmodel.Identity{Name: "alice@canonical.com"}
 	u := openfga.NewUser(&user, s.OFGAClient)
 	err = s.JIMM.AddServiceAccount(ctx, u, clientID)
 	c.Assert(err, gc.IsNil)

@@ -24,7 +24,7 @@ const importModelCommandDoc = `
 
 	The --owner command is necessary when importing a model created by a 
 	local user and it will switch the model owner to the desired external user.
-	E.g. --owner my-user@external
+	E.g. --owner my-user@canonical.com
 
 	Example:
 		jimmctl import-model <controller name> <model-uuid>

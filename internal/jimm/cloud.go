@@ -280,7 +280,7 @@ func (j *JIMM) AddCloudToController(ctx context.Context, user *openfga.User, con
 		)
 	}
 
-	// TODO(Kian) CSS-6081 Give user access to the cloud here and potentially everyone@external.
+	// TODO(Kian) CSS-6081 Give user access to the cloud here and potentially everyone@canonical.com.
 
 	return nil
 }

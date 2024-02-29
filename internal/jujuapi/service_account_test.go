@@ -504,7 +504,7 @@ func (s *serviceAccountSuite) TestUpdateServiceAccountCredentialsIntegration(c *
 	serviceAccount := jimmnames.NewServiceAccountTag("fca1f605-736e-4d1f-bcd2-aecc726923be")
 
 	tuple := openfga.Tuple{
-		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(serviceAccount),
 	}

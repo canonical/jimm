@@ -42,20 +42,20 @@ func TestModelCreateArgs(t *testing.T) {
 		about: "all ok",
 		args: jujuparams.ModelCreateArgs{
 			Name:               "test-model",
-			OwnerTag:           names.NewUserTag("alice@external").String(),
+			OwnerTag:           names.NewUserTag("alice@canonical.com").String(),
 			CloudTag:           names.NewCloudTag("test-cloud").String(),
-			CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1").String(),
+			CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1").String(),
 		},
 		expectedArgs: jimm.ModelCreateArgs{
 			Name:            "test-model",
-			Owner:           names.NewUserTag("alice@external"),
+			Owner:           names.NewUserTag("alice@canonical.com"),
 			Cloud:           names.NewCloudTag("test-cloud"),
-			CloudCredential: names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1"),
+			CloudCredential: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
 		},
 	}, {
 		about: "name not specified",
 		args: jujuparams.ModelCreateArgs{
-			OwnerTag:           names.NewUserTag("alice@external").String(),
+			OwnerTag:           names.NewUserTag("alice@canonical.com").String(),
 			CloudTag:           names.NewCloudTag("test-cloud").String(),
 			CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice/test-credential-1").String(),
 		},
@@ -64,16 +64,16 @@ func TestModelCreateArgs(t *testing.T) {
 		about: "invalid owner tag",
 		args: jujuparams.ModelCreateArgs{
 			Name:               "test-model",
-			OwnerTag:           "alice@external",
+			OwnerTag:           "alice@canonical.com",
 			CloudTag:           names.NewCloudTag("test-cloud").String(),
 			CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice/test-credential-1").String(),
 		},
-		expectedError: `"alice@external" is not a valid tag`,
+		expectedError: `"alice@canonical.com" is not a valid tag`,
 	}, {
 		about: "invalid cloud tag",
 		args: jujuparams.ModelCreateArgs{
 			Name:               "test-model",
-			OwnerTag:           names.NewUserTag("alice@external").String(),
+			OwnerTag:           names.NewUserTag("alice@canonical.com").String(),
 			CloudTag:           "test-cloud",
 			CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice/test-credential-1").String(),
 		},
@@ -82,7 +82,7 @@ func TestModelCreateArgs(t *testing.T) {
 		about: "invalid cloud credential tag",
 		args: jujuparams.ModelCreateArgs{
 			Name:               "test-model",
-			OwnerTag:           names.NewUserTag("alice@external").String(),
+			OwnerTag:           names.NewUserTag("alice@canonical.com").String(),
 			CloudTag:           names.NewCloudTag("test-cloud").String(),
 			CloudCredentialTag: "test-credential-1",
 		},
@@ -91,7 +91,7 @@ func TestModelCreateArgs(t *testing.T) {
 		about: "cloud does not match cloud credential cloud",
 		args: jujuparams.ModelCreateArgs{
 			Name:               "test-model",
-			OwnerTag:           names.NewUserTag("alice@external").String(),
+			OwnerTag:           names.NewUserTag("alice@canonical.com").String(),
 			CloudTag:           names.NewCloudTag("test-cloud").String(),
 			CloudCredentialTag: names.NewCloudCredentialTag("another-cloud/alice/test-credential-1").String(),
 		},
@@ -108,7 +108,7 @@ func TestModelCreateArgs(t *testing.T) {
 		about: "cloud tag not specified",
 		args: jujuparams.ModelCreateArgs{
 			Name:               "test-model",
-			OwnerTag:           names.NewUserTag("alice@external").String(),
+			OwnerTag:           names.NewUserTag("alice@canonical.com").String(),
 			CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice/test-credential-1").String(),
 		},
 		expectedError: "no cloud specified for model; please specify one",
@@ -159,26 +159,26 @@ clouds:
   regions:
   - name: test-region-1
   users:
-  - user: alice@external
+  - user: alice@canonical.com
     access: add-model
 user-defaults:
-- user: alice@external
+- user: alice@canonical.com
   defaults:
     key4: value4
 cloud-defaults:
-- user: alice@external
+- user: alice@canonical.com
   cloud: test-cloud
   region: test-region-1
   defaults:
     key1: value1
     key2: value2
-- user: alice@external
+- user: alice@canonical.com
   cloud: test-cloud
   defaults:
     key3: value3
 cloud-credentials:
 - name: test-credential-1
-  owner: alice@external
+  owner: alice@canonical.com
   cloud: test-cloud
   auth-type: empty
 controllers:
@@ -217,19 +217,19 @@ status:
   info: running a test
 life: alive
 users:
-- user: alice@external
+- user: alice@canonical.com
   access: admin
 - user: bob
   access: read
 `[1:])),
-	username:  "alice@external",
+	username:  "alice@canonical.com",
 	jimmAdmin: true,
 	args: jujuparams.ModelCreateArgs{
 		Name:               "test-model",
-		OwnerTag:           names.NewUserTag("alice@external").String(),
+		OwnerTag:           names.NewUserTag("alice@canonical.com").String(),
 		CloudTag:           names.NewCloudTag("test-cloud").String(),
 		CloudRegion:        "test-region-1",
-		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1").String(),
+		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1").String(),
 	},
 	expectModel: dbmodel.Model{
 		Name: "test-model",
@@ -238,7 +238,7 @@ users:
 			Valid:  true,
 		},
 		Owner: dbmodel.Identity{
-			Name: "alice@external",
+			Name: "alice@canonical.com",
 		},
 		Controller: dbmodel.Controller{
 			Name:        "controller-2",
@@ -272,26 +272,26 @@ clouds:
   regions:
   - name: test-region-1
   users:
-  - user: alice@external
+  - user: alice@canonical.com
     access: add-model
 user-defaults:
-- user: alice@external
+- user: alice@canonical.com
   defaults:
     key4: value4
 cloud-defaults:
-- user: alice@external
+- user: alice@canonical.com
   cloud: test-cloud
   region: test-region-1
   defaults:
     key1: value1
     key2: value2
-- user: alice@external
+- user: alice@canonical.com
   cloud: test-cloud
   defaults:
     key3: value3
 cloud-credentials:
 - name: test-credential-1
-  owner: alice@external
+  owner: alice@canonical.com
   cloud: test-cloud
   auth-type: empty
 controllers:
@@ -330,20 +330,20 @@ status:
   info: running a test
 life: alive
 users:
-- user: alice@external
+- user: alice@canonical.com
   access: admin
 - user: bob
   access: read
 `[1:])),
-	username:  "alice@external",
+	username:  "alice@canonical.com",
 	jimmAdmin: true,
 	args: jujuparams.ModelCreateArgs{
 		Name:     "test-model",
-		OwnerTag: names.NewUserTag("alice@external").String(),
+		OwnerTag: names.NewUserTag("alice@canonical.com").String(),
 		CloudTag: names.NewCloudTag("test-cloud").String(),
 		// Creating a model without specifying the cloud region
 		CloudRegion:        "",
-		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1").String(),
+		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1").String(),
 	},
 	expectModel: dbmodel.Model{
 		Name: "test-model",
@@ -352,7 +352,7 @@ users:
 			Valid:  true,
 		},
 		Owner: dbmodel.Identity{
-			Name: "alice@external",
+			Name: "alice@canonical.com",
 		},
 		Controller: dbmodel.Controller{
 			Name:        "controller-2",
@@ -386,11 +386,11 @@ clouds:
   regions:
   - name: test-region-1
   users:
-  - user: alice@external
+  - user: alice@canonical.com
     access: add-model
 cloud-credentials:
 - name: test-credential-1
-  owner: alice@external
+  owner: alice@canonical.com
   cloud: test-cloud
   auth-type: empty
 controllers:
@@ -424,19 +424,19 @@ status:
   info: running a test
 life: alive
 users:
-- user: alice@external
+- user: alice@canonical.com
   access: admin
 - user: bob
   access: read
 `[1:]),
-	username:  "alice@external",
+	username:  "alice@canonical.com",
 	jimmAdmin: true,
 	args: jujuparams.ModelCreateArgs{
 		Name:               "test-model",
-		OwnerTag:           names.NewUserTag("alice@external").String(),
+		OwnerTag:           names.NewUserTag("alice@canonical.com").String(),
 		CloudTag:           names.NewCloudTag("test-cloud").String(),
 		CloudRegion:        "test-region-1",
-		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1").String(),
+		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1").String(),
 	},
 	expectModel: dbmodel.Model{
 		Name: "test-model",
@@ -445,7 +445,7 @@ users:
 			Valid:  true,
 		},
 		Owner: dbmodel.Identity{
-			Name: "alice@external",
+			Name: "alice@canonical.com",
 		},
 		Controller: dbmodel.Controller{
 			Name:        "controller-2",
@@ -479,13 +479,13 @@ clouds:
   regions:
   - name: test-region-1
   users:
-  - user: alice@external
+  - user: alice@canonical.com
     access: admin
-  - user: bob@external
+  - user: bob@canonical.com
     access: add-model
 cloud-credentials:
 - name: test-credential-1
-  owner: alice@external
+  owner: alice@canonical.com
   cloud: test-cloud
   auth-type: empty
 controllers:
@@ -506,9 +506,9 @@ controllers:
     region: test-region-1
     priority: 2
 users:
-- username: alice@external
+- username: alice@canonical.com
   controller-access: superuser
-- username: bob@external
+- username: bob@canonical.com
   controller-access: login
 `[1:],
 	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
@@ -524,19 +524,19 @@ status:
   info: running a test
 life: alive
 users:
-- user: alice@external
+- user: alice@canonical.com
   access: admin
 - user: bob
   access: read
 `[1:]),
-	username:  "alice@external",
+	username:  "alice@canonical.com",
 	jimmAdmin: true,
 	args: jujuparams.ModelCreateArgs{
 		Name:               "test-model",
-		OwnerTag:           names.NewUserTag("bob@external").String(),
+		OwnerTag:           names.NewUserTag("bob@canonical.com").String(),
 		CloudTag:           names.NewCloudTag("test-cloud").String(),
 		CloudRegion:        "test-region-1",
-		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1").String(),
+		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1").String(),
 	},
 	expectModel: dbmodel.Model{
 		Name: "test-model",
@@ -545,7 +545,7 @@ users:
 			Valid:  true,
 		},
 		Owner: dbmodel.Identity{
-			Name: "bob@external",
+			Name: "bob@canonical.com",
 		},
 		Controller: dbmodel.Controller{
 			Name:        "controller-2",
@@ -579,11 +579,11 @@ clouds:
   regions:
   - name: test-region-1
   users:
-  - user: alice@external
+  - user: alice@canonical.com
     access: add-model
 cloud-credentials:
 - name: test-credential-1
-  owner: alice@external
+  owner: alice@canonical.com
   cloud: test-cloud
   auth-type: empty
 controllers:
@@ -604,9 +604,9 @@ controllers:
     region: test-region-1
     priority: 2
 users:
-- username: alice@external
+- username: alice@canonical.com
   controller-access: login
-- username: bob@external
+- username: bob@canonical.com
   controller-access: login
 `[1:],
 	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
@@ -622,18 +622,18 @@ status:
   info: running a test
 life: alive
 users:
-- user: alice@external
+- user: alice@canonical.com
   access: admin
 - user: bob
   access: read
 `[1:]),
-	username: "alice@external",
+	username: "alice@canonical.com",
 	args: jujuparams.ModelCreateArgs{
 		Name:               "test-model",
-		OwnerTag:           names.NewUserTag("bob@external").String(),
+		OwnerTag:           names.NewUserTag("bob@canonical.com").String(),
 		CloudTag:           names.NewCloudTag("test-cloud").String(),
 		CloudRegion:        "test-region-1",
-		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1").String(),
+		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1").String(),
 	},
 	expectError: "unauthorized",
 }, {
@@ -645,11 +645,11 @@ clouds:
   regions:
   - name: test-region-1
   users:
-  - user: alice@external
+  - user: alice@canonical.com
     access: add-model
 cloud-credentials:
 - name: test-credential-1
-  owner: alice@external
+  owner: alice@canonical.com
   cloud: test-cloud
   auth-type: empty
 controllers:
@@ -679,14 +679,14 @@ controllers:
 	createModel: func(ctx context.Context, args *jujuparams.ModelCreateArgs, mi *jujuparams.ModelInfo) error {
 		return errors.E("a test error")
 	},
-	username:  "alice@external",
+	username:  "alice@canonical.com",
 	jimmAdmin: true,
 	args: jujuparams.ModelCreateArgs{
 		Name:               "test-model",
-		OwnerTag:           names.NewUserTag("alice@external").String(),
+		OwnerTag:           names.NewUserTag("alice@canonical.com").String(),
 		CloudTag:           names.NewCloudTag("test-cloud").String(),
 		CloudRegion:        "test-region-1",
-		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1").String(),
+		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1").String(),
 	},
 	expectError: "a test error",
 }, {
@@ -698,7 +698,7 @@ clouds:
   regions:
   - name: test-region-1
   users:
-  - user: alice@external
+  - user: alice@canonical.com
     access: add-model
 - name: test-cloud-2
   type: test-provider
@@ -706,11 +706,11 @@ clouds:
   - name: test-region-2
 cloud-credentials:
 - name: test-credential-1
-  owner: alice@external
+  owner: alice@canonical.com
   cloud: test-cloud
   auth-type: empty
 - name: test-credential-2
-  owner: alice@external
+  owner: alice@canonical.com
   cloud: test-cloud-2
   auth-type: empty
 controllers:
@@ -732,7 +732,7 @@ controllers:
     priority: 1
 models:
 - name: test-model
-  owner: alice@external
+  owner: alice@canonical.com
   uuid: 00000001-0000-0000-0000-0000-000000000003
   cloud: test-cloud
   region: test-region-1
@@ -752,21 +752,21 @@ status:
   info: running a test
 life: alive
 users:
-- user: alice@external
+- user: alice@canonical.com
   access: admin
 - user: bob
   access: read
 `[1:]),
-	username:  "alice@external",
+	username:  "alice@canonical.com",
 	jimmAdmin: true,
 	args: jujuparams.ModelCreateArgs{
 		Name:               "test-model",
-		OwnerTag:           names.NewUserTag("alice@external").String(),
+		OwnerTag:           names.NewUserTag("alice@canonical.com").String(),
 		CloudTag:           names.NewCloudTag("test-cloud").String(),
 		CloudRegion:        "test-region-1",
-		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1").String(),
+		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1").String(),
 	},
-	expectError: "model alice@external/test-model already exists",
+	expectError: "model alice@canonical.com/test-model already exists",
 }, {
 	name: "UpdateCredentialError",
 	env: `
@@ -776,11 +776,11 @@ clouds:
   regions:
   - name: test-region-1
   users:
-  - user: alice@external
+  - user: alice@canonical.com
     access: add-model
 cloud-credentials:
 - name: test-credential-1
-  owner: alice@external
+  owner: alice@canonical.com
   cloud: test-cloud
   auth-type: empty
 controllers:
@@ -814,19 +814,19 @@ status:
   info: running a test
 life: alive
 users:
-- user: alice@external
+- user: alice@canonical.com
   access: admin
 - user: bob
   access: read
 `[1:]),
-	username:  "alice@external",
+	username:  "alice@canonical.com",
 	jimmAdmin: true,
 	args: jujuparams.ModelCreateArgs{
 		Name:               "test-model",
-		OwnerTag:           names.NewUserTag("alice@external").String(),
+		OwnerTag:           names.NewUserTag("alice@canonical.com").String(),
 		CloudTag:           names.NewCloudTag("test-cloud").String(),
 		CloudRegion:        "test-region-1",
-		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1").String(),
+		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1").String(),
 	},
 	expectError: "failed to update cloud credential: a silly error",
 }, {
@@ -839,7 +839,7 @@ clouds:
   - name: test-region-1
 cloud-credentials:
 - name: test-credential-1
-  owner: alice@external
+  owner: alice@canonical.com
   cloud: test-cloud
   auth-type: empty
 controllers:
@@ -873,17 +873,17 @@ status:
   info: running a test
 life: alive
 users:
-- user: alice@external
+- user: alice@canonical.com
   access: admin
 `[1:]),
-	username:  "alice@external",
+	username:  "alice@canonical.com",
 	jimmAdmin: true,
 	args: jujuparams.ModelCreateArgs{
 		Name:               "test-model",
-		OwnerTag:           names.NewUserTag("alice@external").String(),
+		OwnerTag:           names.NewUserTag("alice@canonical.com").String(),
 		CloudTag:           names.NewCloudTag("test-cloud").String(),
 		CloudRegion:        "test-region-1",
-		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1").String(),
+		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1").String(),
 	},
 	expectError: "unauthorized",
 }}
@@ -994,14 +994,14 @@ func assertConfig(config map[string]interface{}, fnc func(context.Context, *juju
 
 }
 
-// Note that this env does not give the everyone@external user access to the model.
+// Note that this env does not give the everyone@canonical.com user access to the model.
 const modelInfoTestEnv = `clouds:
 - name: test-cloud
   type: test-provider
   regions:
   - name: test-cloud-region
 cloud-credentials:
-- owner: alice@external
+- owner: alice@canonical.com
   name: cred-1
   cloud: test-cloud
 controllers:
@@ -1018,7 +1018,7 @@ models:
   cloud: test-cloud
   region: test-cloud-region
   cloud-credential: cred-1
-  owner: alice@external
+  owner: alice@canonical.com
   life: alive
   status:
     status: available
@@ -1028,17 +1028,17 @@ models:
     level: unsupported
   agent-version: 1.2.3
   users:
-  - user: alice@external
+  - user: alice@canonical.com
     access: admin
-  - user: bob@external
+  - user: bob@canonical.com
     access: write
-  - user: charlie@external
+  - user: charlie@canonical.com
     access: read
 `
 
-// This env extends the one above to provide the everyone@external user with access to the model.
+// This env extends the one above to provide the everyone@canonical.com user with access to the model.
 const modelInfoTestEnvWithEveryoneAccess = modelInfoTestEnv + `
-  - user: everyone@external
+  - user: everyone@canonical.com
     access: read
 `
 
@@ -1052,7 +1052,7 @@ var modelInfoTests = []struct {
 }{{
 	name:     "AdminUser",
 	env:      modelInfoTestEnv,
-	username: "alice@external",
+	username: "alice@canonical.com",
 	uuid:     "00000002-0000-0000-0000-000000000001",
 	expectModelInfo: &jujuparams.ModelInfo{
 		Name:               "model-1",
@@ -1063,8 +1063,8 @@ var modelInfoTests = []struct {
 		DefaultSeries:      "warty",
 		CloudTag:           names.NewCloudTag("test-cloud").String(),
 		CloudRegion:        "test-cloud-region",
-		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/cred-1").String(),
-		OwnerTag:           names.NewUserTag("alice@external").String(),
+		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/cred-1").String(),
+		OwnerTag:           names.NewUserTag("alice@canonical.com").String(),
 		Life:               life.Value(constants.ALIVE.String()),
 		Status: jujuparams.EntityStatus{
 			Status: "available",
@@ -1072,13 +1072,13 @@ var modelInfoTests = []struct {
 			Since:  newDate(2020, 2, 20, 20, 2, 20, 0, time.UTC),
 		},
 		Users: []jujuparams.ModelUserInfo{{
-			UserName: "alice@external",
+			UserName: "alice@canonical.com",
 			Access:   "admin",
 		}, {
-			UserName: "bob@external",
+			UserName: "bob@canonical.com",
 			Access:   "write",
 		}, {
-			UserName: "charlie@external",
+			UserName: "charlie@canonical.com",
 			Access:   "read",
 		}},
 		Machines: []jujuparams.ModelMachineInfo{{
@@ -1106,7 +1106,7 @@ var modelInfoTests = []struct {
 }, {
 	name:     "WriteUser",
 	env:      modelInfoTestEnv,
-	username: "bob@external",
+	username: "bob@canonical.com",
 	uuid:     "00000002-0000-0000-0000-000000000001",
 	expectModelInfo: &jujuparams.ModelInfo{
 		Name:               "model-1",
@@ -1117,8 +1117,8 @@ var modelInfoTests = []struct {
 		DefaultSeries:      "warty",
 		CloudTag:           names.NewCloudTag("test-cloud").String(),
 		CloudRegion:        "test-cloud-region",
-		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/cred-1").String(),
-		OwnerTag:           names.NewUserTag("alice@external").String(),
+		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/cred-1").String(),
+		OwnerTag:           names.NewUserTag("alice@canonical.com").String(),
 		Life:               life.Value(constants.ALIVE.String()),
 		Status: jujuparams.EntityStatus{
 			Status: "available",
@@ -1126,7 +1126,7 @@ var modelInfoTests = []struct {
 			Since:  newDate(2020, 2, 20, 20, 2, 20, 0, time.UTC),
 		},
 		Users: []jujuparams.ModelUserInfo{{
-			UserName: "bob@external",
+			UserName: "bob@canonical.com",
 			Access:   "write",
 		}},
 		Machines: []jujuparams.ModelMachineInfo{{
@@ -1154,7 +1154,7 @@ var modelInfoTests = []struct {
 }, {
 	name:     "ReadUser",
 	env:      modelInfoTestEnv,
-	username: "charlie@external",
+	username: "charlie@canonical.com",
 	uuid:     "00000002-0000-0000-0000-000000000001",
 	expectModelInfo: &jujuparams.ModelInfo{
 		Name:               "model-1",
@@ -1165,8 +1165,8 @@ var modelInfoTests = []struct {
 		DefaultSeries:      "warty",
 		CloudTag:           names.NewCloudTag("test-cloud").String(),
 		CloudRegion:        "test-cloud-region",
-		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/cred-1").String(),
-		OwnerTag:           names.NewUserTag("alice@external").String(),
+		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/cred-1").String(),
+		OwnerTag:           names.NewUserTag("alice@canonical.com").String(),
 		Life:               life.Value(constants.ALIVE.String()),
 		Status: jujuparams.EntityStatus{
 			Status: "available",
@@ -1174,7 +1174,7 @@ var modelInfoTests = []struct {
 			Since:  newDate(2020, 2, 20, 20, 2, 20, 0, time.UTC),
 		},
 		Users: []jujuparams.ModelUserInfo{{
-			UserName: "charlie@external",
+			UserName: "charlie@canonical.com",
 			Access:   "read",
 		}},
 		SLA: &jujuparams.ModelSLAInfo{
@@ -1185,19 +1185,19 @@ var modelInfoTests = []struct {
 }, {
 	name:        "NoAccess",
 	env:         modelInfoTestEnv,
-	username:    "diane@external",
+	username:    "diane@canonical.com",
 	uuid:        "00000002-0000-0000-0000-000000000001",
 	expectError: "unauthorized",
 }, {
 	name:        "NotFound",
 	env:         modelInfoTestEnv,
-	username:    "alice@external",
+	username:    "alice@canonical.com",
 	uuid:        "00000002-0000-0000-0000-000000000002",
 	expectError: "model not found",
 }, {
 	name:     "Access through everyone user",
 	env:      modelInfoTestEnvWithEveryoneAccess,
-	username: "diane@external",
+	username: "diane@canonical.com",
 	uuid:     "00000002-0000-0000-0000-000000000001",
 	expectModelInfo: &jujuparams.ModelInfo{
 		Name:               "model-1",
@@ -1208,8 +1208,8 @@ var modelInfoTests = []struct {
 		DefaultSeries:      "warty",
 		CloudTag:           names.NewCloudTag("test-cloud").String(),
 		CloudRegion:        "test-cloud-region",
-		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/cred-1").String(),
-		OwnerTag:           names.NewUserTag("alice@external").String(),
+		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/cred-1").String(),
+		OwnerTag:           names.NewUserTag("alice@canonical.com").String(),
 		Life:               life.Value(constants.ALIVE.String()),
 		Status: jujuparams.EntityStatus{
 			Status: "available",
@@ -1217,7 +1217,7 @@ var modelInfoTests = []struct {
 			Since:  newDate(2020, 2, 20, 20, 2, 20, 0, time.UTC),
 		},
 		Users: []jujuparams.ModelUserInfo{{
-			UserName: "everyone@external",
+			UserName: "everyone@canonical.com",
 			Access:   "read",
 		}},
 		SLA: &jujuparams.ModelSLAInfo{
@@ -1254,8 +1254,8 @@ func TestModelInfo(t *testing.T) {
 							mi.DefaultSeries = "warty"
 							mi.CloudTag = names.NewCloudTag("test-cloud").String()
 							mi.CloudRegion = "test-cloud-region"
-							mi.CloudCredentialTag = names.NewCloudCredentialTag("test-cloud/alice@external/cred-1").String()
-							mi.OwnerTag = names.NewUserTag("alice@external").String()
+							mi.CloudCredentialTag = names.NewCloudCredentialTag("test-cloud/alice@canonical.com/cred-1").String()
+							mi.OwnerTag = names.NewUserTag("alice@canonical.com").String()
 							mi.Life = life.Value(constants.ALIVE.String())
 							mi.Status = jujuparams.EntityStatus{
 								Status: "available",
@@ -1321,7 +1321,7 @@ const modelStatusTestEnv = `clouds:
   regions:
   - name: test-cloud-region
 cloud-credentials:
-- owner: alice@external
+- owner: alice@canonical.com
   name: cred-1
   cloud: test-cloud
 controllers:
@@ -1338,16 +1338,16 @@ models:
   cloud: test-cloud
   region: test-cloud-region
   cloud-credential: cred-1
-  owner: alice@external
+  owner: alice@canonical.com
   users:
-  - user: alice@external
+  - user: alice@canonical.com
     access: admin
-  - user: bob@external
+  - user: bob@canonical.com
     access: write
-  - user: charlie@external
+  - user: charlie@canonical.com
     access: read
 users:
-- username: diane@external
+- username: diane@canonical.com
   controller-access: superuser
 `
 
@@ -1361,13 +1361,13 @@ var modelStatusTests = []struct {
 	expectError       string
 }{{
 	name:        "ModelNotFound",
-	username:    "alice@external",
+	username:    "alice@canonical.com",
 	uuid:        "00000001-0000-0000-0000-000000000001",
 	expectError: `model not found`,
 }, {
 	name:        "UnauthorizedUser",
 	env:         modelStatusTestEnv,
-	username:    "bob@external",
+	username:    "bob@canonical.com",
 	uuid:        "00000002-0000-0000-0000-000000000001",
 	expectError: "unauthorized",
 }, {
@@ -1382,10 +1382,10 @@ var modelStatusTests = []struct {
 		ms.HostedMachineCount = 10
 		ms.ApplicationCount = 3
 		ms.UnitCount = 20
-		ms.OwnerTag = names.NewUserTag("alice@external").String()
+		ms.OwnerTag = names.NewUserTag("alice@canonical.com").String()
 		return nil
 	},
-	username: "alice@external",
+	username: "alice@canonical.com",
 	uuid:     "00000002-0000-0000-0000-000000000001",
 	expectModelStatus: &jujuparams.ModelStatus{
 		ModelTag:           names.NewModelTag("00000002-0000-0000-0000-000000000001").String(),
@@ -1394,7 +1394,7 @@ var modelStatusTests = []struct {
 		HostedMachineCount: 10,
 		ApplicationCount:   3,
 		UnitCount:          20,
-		OwnerTag:           names.NewUserTag("alice@external").String(),
+		OwnerTag:           names.NewUserTag("alice@canonical.com").String(),
 	},
 }, {
 	name: "APIError",
@@ -1402,7 +1402,7 @@ var modelStatusTests = []struct {
 	modelStatus: func(_ context.Context, ms *jujuparams.ModelStatus) error {
 		return errors.E("test error")
 	},
-	username:    "alice@external",
+	username:    "alice@canonical.com",
 	uuid:        "00000002-0000-0000-0000-000000000001",
 	expectError: "test error",
 }}
@@ -1459,7 +1459,7 @@ const forEachModelTestEnv = `clouds:
   regions:
   - name: test-cloud-region
 cloud-credentials:
-- owner: alice@external
+- owner: alice@canonical.com
   name: cred-1
   cloud: test-cloud
 controllers:
@@ -1476,16 +1476,16 @@ models:
   cloud: test-cloud
   region: test-cloud-region
   cloud-credential: cred-1
-  owner: alice@external
+  owner: alice@canonical.com
   life: alive
   status:
     status: available
     info: "OK!"
     since: 2020-02-20T20:02:20Z
   users:
-  - user: alice@external
+  - user: alice@canonical.com
     access: admin
-  - user: bob@external
+  - user: bob@canonical.com
     access: admin
   sla:
     level: unsupported
@@ -1501,16 +1501,16 @@ models:
   cloud: test-cloud
   region: test-cloud-region
   cloud-credential: cred-1
-  owner: alice@external
+  owner: alice@canonical.com
   life: alive
   status:
     status: available
     info: "OK!"
     since: 2020-02-20T20:02:20Z
   users:
-  - user: alice@external
+  - user: alice@canonical.com
     access: admin
-  - user: bob@external
+  - user: bob@canonical.com
     access: write
   sla:
     level: unsupported
@@ -1525,14 +1525,14 @@ models:
   cloud: test-cloud
   region: test-cloud-region
   cloud-credential: cred-1
-  owner: alice@external
+  owner: alice@canonical.com
   life: alive
   status:
     status: available
     info: "OK!"
     since: 2020-02-20T20:02:20Z
   users:
-  - user: alice@external
+  - user: alice@canonical.com
     access: admin
   sla:
     level: unsupported
@@ -1547,22 +1547,22 @@ models:
   cloud: test-cloud
   region: test-cloud-region
   cloud-credential: cred-1
-  owner: alice@external
+  owner: alice@canonical.com
   life: alive
   status:
     status: available
     info: "OK!"
     since: 2020-02-20T20:02:20Z
   users:
-  - user: alice@external
+  - user: alice@canonical.com
     access: admin
-  - user: bob@external
+  - user: bob@canonical.com
     access: read
   sla:
     level: unsupported
   agent-version: 1.2.3
 users:
-- username: alice@external
+- username: alice@canonical.com
   controller-access: superuser
 `
 
@@ -1590,7 +1590,7 @@ func TestForEachUserModel(t *testing.T) {
 	env := jimmtest.ParseEnvironment(c, forEachModelTestEnv)
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
 
-	dbUser := env.User("bob@external").DBObject(c, j.Database)
+	dbUser := env.User("bob@canonical.com").DBObject(c, j.Database)
 	user := openfga.NewUser(&dbUser, client)
 
 	var res []jujuparams.ModelSummaryResult
@@ -1611,8 +1611,8 @@ func TestForEachUserModel(t *testing.T) {
 			DefaultSeries:      "warty",
 			CloudTag:           names.NewCloudTag("test-cloud").String(),
 			CloudRegion:        "test-cloud-region",
-			CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/cred-1").String(),
-			OwnerTag:           names.NewUserTag("alice@external").String(),
+			CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/cred-1").String(),
+			OwnerTag:           names.NewUserTag("alice@canonical.com").String(),
 			Life:               life.Value(constants.ALIVE.String()),
 			Status: jujuparams.EntityStatus{
 				Status: "available",
@@ -1645,8 +1645,8 @@ func TestForEachUserModel(t *testing.T) {
 			DefaultSeries:      "warty",
 			CloudTag:           names.NewCloudTag("test-cloud").String(),
 			CloudRegion:        "test-cloud-region",
-			CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/cred-1").String(),
-			OwnerTag:           names.NewUserTag("alice@external").String(),
+			CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/cred-1").String(),
+			OwnerTag:           names.NewUserTag("alice@canonical.com").String(),
 			Life:               life.Value(constants.ALIVE.String()),
 			Status: jujuparams.EntityStatus{
 				Status: "available",
@@ -1679,8 +1679,8 @@ func TestForEachUserModel(t *testing.T) {
 			DefaultSeries:      "warty",
 			CloudTag:           names.NewCloudTag("test-cloud").String(),
 			CloudRegion:        "test-cloud-region",
-			CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/cred-1").String(),
-			OwnerTag:           names.NewUserTag("alice@external").String(),
+			CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/cred-1").String(),
+			OwnerTag:           names.NewUserTag("alice@canonical.com").String(),
 			Life:               life.Value(constants.ALIVE.String()),
 			Status: jujuparams.EntityStatus{
 				Status: "available",
@@ -1729,7 +1729,7 @@ func TestForEachModel(t *testing.T) {
 	env := jimmtest.ParseEnvironment(c, forEachModelTestEnv)
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
 
-	dbUser := env.User("bob@external").DBObject(c, j.Database)
+	dbUser := env.User("bob@canonical.com").DBObject(c, j.Database)
 	bob := openfga.NewUser(&dbUser, client)
 
 	err = j.ForEachModel(ctx, bob, func(_ *dbmodel.Model, _ jujuparams.UserAccessPermission) error {
@@ -1738,7 +1738,7 @@ func TestForEachModel(t *testing.T) {
 	c.Check(err, qt.ErrorMatches, `unauthorized`)
 	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeUnauthorized)
 
-	dbUser = env.User("alice@external").DBObject(c, j.Database)
+	dbUser = env.User("alice@canonical.com").DBObject(c, j.Database)
 	alice := openfga.NewUser(&dbUser, client)
 	alice.JimmAdmin = true
 
@@ -1763,7 +1763,7 @@ const grantModelAccessTestEnv = `clouds:
   regions:
   - name: test-cloud-region
 cloud-credentials:
-- owner: alice@external
+- owner: alice@canonical.com
   name: cred-1
   cloud: test-cloud
 controllers:
@@ -1778,11 +1778,11 @@ models:
   cloud: test-cloud
   region: test-cloud-region
   cloud-credential: cred-1
-  owner: alice@external
+  owner: alice@canonical.com
   users:
-  - user: alice@external
+  - user: alice@canonical.com
     access: admin
-  - user: charlie@external
+  - user: charlie@canonical.com
     access: write
 `
 
@@ -1799,158 +1799,158 @@ var grantModelAccessTests = []struct {
 	expectErrorCode errors.Code
 }{{
 	name:            "ModelNotFound",
-	username:        "alice@external",
+	username:        "alice@canonical.com",
 	uuid:            "00000002-0000-0000-0000-000000000001",
-	targetUsername:  "bob@external",
+	targetUsername:  "bob@canonical.com",
 	access:          "write",
 	expectError:     `model not found`,
 	expectErrorCode: errors.CodeNotFound,
 }, {
 	name:           "Admin grants 'admin' access to a user with no access",
 	env:            grantModelAccessTestEnv,
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	uuid:           "00000002-0000-0000-0000-000000000001",
-	targetUsername: "bob@external",
+	targetUsername: "bob@canonical.com",
 	access:         "admin",
 	expectRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
 		Relation: ofganames.WriterRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
 	name:           "Admin grants 'write' access to a user with no access",
 	env:            grantModelAccessTestEnv,
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	uuid:           "00000002-0000-0000-0000-000000000001",
-	targetUsername: "bob@external",
+	targetUsername: "bob@canonical.com",
 	access:         "write",
 	expectRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
 		Relation: ofganames.WriterRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
 		Relation: ofganames.WriterRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
 	name:           "Admin grants 'read' access to a user with no access",
 	env:            grantModelAccessTestEnv,
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	uuid:           "00000002-0000-0000-0000-000000000001",
-	targetUsername: "bob@external",
+	targetUsername: "bob@canonical.com",
 	access:         "read",
 	expectRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
 		Relation: ofganames.ReaderRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
 		Relation: ofganames.WriterRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
 	name:           "Admin grants 'write' access to a user who already has 'write' access",
 	env:            grantModelAccessTestEnv,
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	uuid:           "00000002-0000-0000-0000-000000000001",
-	targetUsername: "charlie@external",
+	targetUsername: "charlie@canonical.com",
 	access:         "write",
 	expectRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
 		Relation: ofganames.WriterRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
 	name:           "Admin grants 'read' access to a user who already has 'write' access",
 	env:            grantModelAccessTestEnv,
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	uuid:           "00000002-0000-0000-0000-000000000001",
-	targetUsername: "charlie@external",
+	targetUsername: "charlie@canonical.com",
 	access:         "read",
 	expectRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
 		Relation: ofganames.WriterRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
 	name:           "Admin grants 'admin' access to themselves",
 	env:            grantModelAccessTestEnv,
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	uuid:           "00000002-0000-0000-0000-000000000001",
-	targetUsername: "alice@external",
+	targetUsername: "alice@canonical.com",
 	access:         "admin",
 	expectRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
 		Relation: ofganames.WriterRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
 	name:           "Admin grants 'write' access to themselves",
 	env:            grantModelAccessTestEnv,
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	uuid:           "00000002-0000-0000-0000-000000000001",
-	targetUsername: "alice@external",
+	targetUsername: "alice@canonical.com",
 	access:         "write",
 	expectRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
 		Relation: ofganames.WriterRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
 	name:           "Admin grants 'read' access to themselves",
 	env:            grantModelAccessTestEnv,
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	uuid:           "00000002-0000-0000-0000-000000000001",
-	targetUsername: "alice@external",
+	targetUsername: "alice@canonical.com",
 	access:         "read",
 	expectRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
 		Relation: ofganames.WriterRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
 	name:            "UserNotAuthorized",
 	env:             grantModelAccessTestEnv,
-	username:        "charlie@external",
+	username:        "charlie@canonical.com",
 	uuid:            "00000002-0000-0000-0000-000000000001",
-	targetUsername:  "bob@external",
+	targetUsername:  "bob@canonical.com",
 	access:          "write",
 	expectError:     `unauthorized`,
 	expectErrorCode: errors.CodeUnauthorized,
@@ -1958,17 +1958,17 @@ var grantModelAccessTests = []struct {
 	name:           "DialError",
 	env:            grantModelAccessTestEnv,
 	dialError:      errors.E("test dial error"),
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	uuid:           "00000002-0000-0000-0000-000000000001",
-	targetUsername: "bob@external",
+	targetUsername: "bob@canonical.com",
 	access:         "write",
 	expectError:    `test dial error`,
 }, {
 	name:           "unknown access",
 	env:            grantModelAccessTestEnv,
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	uuid:           "00000002-0000-0000-0000-000000000001",
-	targetUsername: "bob@external",
+	targetUsername: "bob@canonical.com",
 	access:         "some-unknown-access",
 	expectError:    `failed to recognize given access: "some-unknown-access"`,
 }}
@@ -2028,7 +2028,7 @@ const revokeModelAccessTestEnv = `clouds:
   regions:
   - name: test-cloud-region
 cloud-credentials:
-- owner: alice@external
+- owner: alice@canonical.com
   name: cred-1
   cloud: test-cloud
 controllers:
@@ -2043,15 +2043,15 @@ models:
   cloud: test-cloud
   region: test-cloud-region
   cloud-credential: cred-1
-  owner: alice@external
+  owner: alice@canonical.com
   users:
-  - user: alice@external
+  - user: alice@canonical.com
     access: admin
-  - user: bob@external
+  - user: bob@canonical.com
     access: admin
-  - user: charlie@external
+  - user: charlie@canonical.com
     access: write
-  - user: daphne@external
+  - user: daphne@canonical.com
     access: read
 - name: model-2
   uuid: 00000002-0000-0000-0000-000000000002
@@ -2059,11 +2059,11 @@ models:
   cloud: test-cloud
   region: test-cloud-region
   cloud-credential: cred-1
-  owner: alice@external
+  owner: alice@canonical.com
   users:
-  - user: alice@external
+  - user: alice@canonical.com
     access: admin
-  - user: earl@external
+  - user: earl@canonical.com
     access: admin
 `
 
@@ -2082,594 +2082,594 @@ var revokeModelAccessTests = []struct {
 	expectErrorCode        errors.Code
 }{{
 	name:            "ModelNotFound",
-	username:        "alice@external",
+	username:        "alice@canonical.com",
 	uuid:            "00000002-0000-0000-0000-000000000001",
-	targetUsername:  "bob@external",
+	targetUsername:  "bob@canonical.com",
 	access:          "write",
 	expectError:     `model not found`,
 	expectErrorCode: errors.CodeNotFound,
 }, {
 	name:           "Admin revokes 'admin' access from another admin",
 	env:            revokeModelAccessTestEnv,
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	uuid:           "00000002-0000-0000-0000-000000000001",
-	targetUsername: "bob@external",
+	targetUsername: "bob@canonical.com",
 	access:         "admin",
 	expectRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
 		Relation: ofganames.WriterRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@canonical.com")),
 		Relation: ofganames.ReaderRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 	expectRemovedRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
 	name:           "Admin revokes 'write' access from another admin",
 	env:            revokeModelAccessTestEnv,
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	uuid:           "00000002-0000-0000-0000-000000000001",
-	targetUsername: "bob@external",
+	targetUsername: "bob@canonical.com",
 	access:         "write",
 	expectRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
 		Relation: ofganames.WriterRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@canonical.com")),
 		Relation: ofganames.ReaderRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 	expectRemovedRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
 	name:           "Admin revokes 'read' access from another admin",
 	env:            revokeModelAccessTestEnv,
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	uuid:           "00000002-0000-0000-0000-000000000001",
-	targetUsername: "bob@external",
+	targetUsername: "bob@canonical.com",
 	access:         "read",
 	expectRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
 		Relation: ofganames.WriterRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@canonical.com")),
 		Relation: ofganames.ReaderRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 	expectRemovedRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
 	name:           "Admin revokes 'admin' access from a user who has 'write' access",
 	env:            revokeModelAccessTestEnv,
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	uuid:           "00000002-0000-0000-0000-000000000001",
-	targetUsername: "charlie@external",
+	targetUsername: "charlie@canonical.com",
 	access:         "admin",
 	expectRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
 		Relation: ofganames.WriterRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@canonical.com")),
 		Relation: ofganames.ReaderRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
 	name:           "Admin revokes 'write' access from a user who has 'write' access",
 	env:            revokeModelAccessTestEnv,
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	uuid:           "00000002-0000-0000-0000-000000000001",
-	targetUsername: "charlie@external",
+	targetUsername: "charlie@canonical.com",
 	access:         "write",
 	expectRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@canonical.com")),
 		Relation: ofganames.ReaderRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 	expectRemovedRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
 		Relation: ofganames.WriterRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
 	name:           "Admin revokes 'read' access from a user who has 'write' access",
 	env:            revokeModelAccessTestEnv,
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	uuid:           "00000002-0000-0000-0000-000000000001",
-	targetUsername: "charlie@external",
+	targetUsername: "charlie@canonical.com",
 	access:         "read",
 	expectRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@canonical.com")),
 		Relation: ofganames.ReaderRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 	expectRemovedRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
 		Relation: ofganames.WriterRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
 	name:           "Admin revokes 'admin' access from a user who has 'read' access",
 	env:            revokeModelAccessTestEnv,
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	uuid:           "00000002-0000-0000-0000-000000000001",
-	targetUsername: "daphne@external",
+	targetUsername: "daphne@canonical.com",
 	access:         "admin",
 	expectRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
 		Relation: ofganames.WriterRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@canonical.com")),
 		Relation: ofganames.ReaderRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
 	name:           "Admin revokes 'write' access from a user who has 'read' access",
 	env:            revokeModelAccessTestEnv,
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	uuid:           "00000002-0000-0000-0000-000000000001",
-	targetUsername: "daphne@external",
+	targetUsername: "daphne@canonical.com",
 	access:         "write",
 	expectRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
 		Relation: ofganames.WriterRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@canonical.com")),
 		Relation: ofganames.ReaderRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
 	name:           "Admin revokes 'read' access from a user who has 'read' access",
 	env:            revokeModelAccessTestEnv,
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	uuid:           "00000002-0000-0000-0000-000000000001",
-	targetUsername: "daphne@external",
+	targetUsername: "daphne@canonical.com",
 	access:         "read",
 	expectRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
 		Relation: ofganames.WriterRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 	expectRemovedRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@canonical.com")),
 		Relation: ofganames.ReaderRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
 	name:           "Admin revokes 'admin' access from themselves",
 	env:            revokeModelAccessTestEnv,
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	uuid:           "00000002-0000-0000-0000-000000000001",
-	targetUsername: "alice@external",
+	targetUsername: "alice@canonical.com",
 	access:         "admin",
 	expectRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
 		Relation: ofganames.WriterRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@canonical.com")),
 		Relation: ofganames.ReaderRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 	expectRemovedRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
 	name:           "Admin revokes 'write' access from themselves",
 	env:            revokeModelAccessTestEnv,
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	uuid:           "00000002-0000-0000-0000-000000000001",
-	targetUsername: "alice@external",
+	targetUsername: "alice@canonical.com",
 	access:         "write",
 	expectRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
 		Relation: ofganames.WriterRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@canonical.com")),
 		Relation: ofganames.ReaderRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 	expectRemovedRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
 	name:           "Admin revokes 'read' access from themselves",
 	env:            revokeModelAccessTestEnv,
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	uuid:           "00000002-0000-0000-0000-000000000001",
-	targetUsername: "alice@external",
+	targetUsername: "alice@canonical.com",
 	access:         "read",
 	expectRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
 		Relation: ofganames.WriterRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@canonical.com")),
 		Relation: ofganames.ReaderRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 	expectRemovedRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
 	name:           "Writer revokes 'admin' access from themselves",
 	env:            revokeModelAccessTestEnv,
-	username:       "charlie@external",
+	username:       "charlie@canonical.com",
 	uuid:           "00000002-0000-0000-0000-000000000001",
-	targetUsername: "charlie@external",
+	targetUsername: "charlie@canonical.com",
 	access:         "admin",
 	expectRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
 		Relation: ofganames.WriterRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@canonical.com")),
 		Relation: ofganames.ReaderRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
 	name:           "Writer revokes 'write' access from themselves",
 	env:            revokeModelAccessTestEnv,
-	username:       "charlie@external",
+	username:       "charlie@canonical.com",
 	uuid:           "00000002-0000-0000-0000-000000000001",
-	targetUsername: "charlie@external",
+	targetUsername: "charlie@canonical.com",
 	access:         "write",
 	expectRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@canonical.com")),
 		Relation: ofganames.ReaderRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 	expectRemovedRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
 		Relation: ofganames.WriterRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
 	name:           "Writer revokes 'read' access from themselves",
 	env:            revokeModelAccessTestEnv,
-	username:       "charlie@external",
+	username:       "charlie@canonical.com",
 	uuid:           "00000002-0000-0000-0000-000000000001",
-	targetUsername: "charlie@external",
+	targetUsername: "charlie@canonical.com",
 	access:         "read",
 	expectRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@canonical.com")),
 		Relation: ofganames.ReaderRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 	expectRemovedRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
 		Relation: ofganames.WriterRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
 	name:           "Reader revokes 'admin' access from themselves",
 	env:            revokeModelAccessTestEnv,
-	username:       "daphne@external",
+	username:       "daphne@canonical.com",
 	uuid:           "00000002-0000-0000-0000-000000000001",
-	targetUsername: "daphne@external",
+	targetUsername: "daphne@canonical.com",
 	access:         "admin",
 	expectRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
 		Relation: ofganames.WriterRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@canonical.com")),
 		Relation: ofganames.ReaderRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
 	name:           "Reader revokes 'write' access from themselves",
 	env:            revokeModelAccessTestEnv,
-	username:       "daphne@external",
+	username:       "daphne@canonical.com",
 	uuid:           "00000002-0000-0000-0000-000000000001",
-	targetUsername: "daphne@external",
+	targetUsername: "daphne@canonical.com",
 	access:         "write",
 	expectRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
 		Relation: ofganames.WriterRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@canonical.com")),
 		Relation: ofganames.ReaderRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
 	name:           "Reader revokes 'read' access from themselves",
 	env:            revokeModelAccessTestEnv,
-	username:       "daphne@external",
+	username:       "daphne@canonical.com",
 	uuid:           "00000002-0000-0000-0000-000000000001",
-	targetUsername: "daphne@external",
+	targetUsername: "daphne@canonical.com",
 	access:         "read",
 	expectRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
 		Relation: ofganames.WriterRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 	expectRemovedRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@canonical.com")),
 		Relation: ofganames.ReaderRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
 	name:           "Admin revokes 'admin' access from a user who has separate tuples for all accesses (read/write/admin)",
 	env:            revokeModelAccessTestEnv,
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	uuid:           "00000002-0000-0000-0000-000000000001",
-	targetUsername: "daphne@external",
+	targetUsername: "daphne@canonical.com",
 	access:         "admin",
 	extraInitialTuples: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@canonical.com")),
 		Relation: ofganames.WriterRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	},
 	// No need to add the 'read' relation, because it's already there due to the environment setup.
 	},
 	expectRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
 		Relation: ofganames.WriterRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@canonical.com")),
 		Relation: ofganames.WriterRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@canonical.com")),
 		Relation: ofganames.ReaderRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 	expectRemovedRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
 	name:           "Admin revokes 'write' access from a user who has separate tuples for all accesses (read/write/admin)",
 	env:            revokeModelAccessTestEnv,
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	uuid:           "00000002-0000-0000-0000-000000000001",
-	targetUsername: "daphne@external",
+	targetUsername: "daphne@canonical.com",
 	access:         "write",
 	extraInitialTuples: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@canonical.com")),
 		Relation: ofganames.WriterRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	},
 	// No need to add the 'read' relation, because it's already there due to the environment setup.
 	},
 	expectRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
 		Relation: ofganames.WriterRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@canonical.com")),
 		Relation: ofganames.ReaderRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 	expectRemovedRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@canonical.com")),
 		Relation: ofganames.WriterRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
 	name:           "Admin revokes 'read' access from a user who has separate tuples for all accesses (read/write/admin)",
 	env:            revokeModelAccessTestEnv,
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	uuid:           "00000002-0000-0000-0000-000000000001",
-	targetUsername: "daphne@external",
+	targetUsername: "daphne@canonical.com",
 	access:         "read",
 	extraInitialTuples: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@canonical.com")),
 		Relation: ofganames.WriterRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	},
 	// No need to add the 'read' relation, because it's already there due to the environment setup.
 	},
 	expectRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
 		Relation: ofganames.WriterRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 	expectRemovedRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@canonical.com")),
 		Relation: ofganames.WriterRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@canonical.com")),
 		Relation: ofganames.ReaderRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
 	name:            "UserNotAuthorized",
 	env:             revokeModelAccessTestEnv,
-	username:        "charlie@external",
+	username:        "charlie@canonical.com",
 	uuid:            "00000002-0000-0000-0000-000000000001",
-	targetUsername:  "bob@external",
+	targetUsername:  "bob@canonical.com",
 	access:          "write",
 	expectError:     `unauthorized`,
 	expectErrorCode: errors.CodeUnauthorized,
@@ -2677,17 +2677,17 @@ var revokeModelAccessTests = []struct {
 	name:           "DialError",
 	env:            revokeModelAccessTestEnv,
 	dialError:      errors.E("test dial error"),
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	uuid:           "00000002-0000-0000-0000-000000000001",
-	targetUsername: "bob@external",
+	targetUsername: "bob@canonical.com",
 	access:         "write",
 	expectError:    `test dial error`,
 }, {
 	name:           "unknown access",
 	env:            revokeModelAccessTestEnv,
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	uuid:           "00000002-0000-0000-0000-000000000001",
-	targetUsername: "bob@external",
+	targetUsername: "bob@canonical.com",
 	access:         "some-unknown-access",
 	expectError:    `failed to recognize given access: "some-unknown-access"`,
 }}
@@ -2769,7 +2769,7 @@ const destroyModelTestEnv = `clouds:
   regions:
   - name: test-cloud-region
 cloud-credentials:
-- owner: alice@external
+- owner: alice@canonical.com
   name: cred-1
   cloud: test-cloud
 controllers:
@@ -2784,15 +2784,15 @@ models:
   cloud: test-cloud
   region: test-cloud-region
   cloud-credential: cred-1
-  owner: alice@external
+  owner: alice@canonical.com
   life: alive
   users:
-  - user: alice@external
+  - user: alice@canonical.com
     access: admin
-  - user: bob@external
+  - user: bob@canonical.com
     access: write
 users:
-- username: charlie@external
+- username: charlie@canonical.com
   controller-access: superuser
 `
 
@@ -2812,14 +2812,14 @@ var destroyModelTests = []struct {
 }{{
 	name:            "NotFound",
 	env:             destroyModelTestEnv,
-	username:        "alice@external",
+	username:        "alice@canonical.com",
 	uuid:            "00000002-0000-0000-0000-000000000002",
 	expectError:     `model not found`,
 	expectErrorCode: errors.CodeNotFound,
 }, {
 	name:            "Unauthorized",
 	env:             destroyModelTestEnv,
-	username:        "bob@external",
+	username:        "bob@canonical.com",
 	uuid:            "00000002-0000-0000-0000-000000000001",
 	expectError:     `unauthorized`,
 	expectErrorCode: errors.CodeUnauthorized,
@@ -2844,7 +2844,7 @@ var destroyModelTests = []struct {
 		}
 		return nil
 	},
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	destroyStorage: newBool(true),
 	force:          newBool(false),
@@ -2856,13 +2856,13 @@ var destroyModelTests = []struct {
 	destroyModel: func(_ context.Context, _ names.ModelTag, _, _ *bool, _, _ *time.Duration) error {
 		return nil
 	},
-	username: "charlie@external",
+	username: "charlie@canonical.com",
 	uuid:     "00000002-0000-0000-0000-000000000001",
 }, {
 	name:        "DialError",
 	env:         destroyModelTestEnv,
 	dialError:   errors.E("dial error"),
-	username:    "alice@external",
+	username:    "alice@canonical.com",
 	uuid:        "00000002-0000-0000-0000-000000000001",
 	expectError: `dial error`,
 }, {
@@ -2871,7 +2871,7 @@ var destroyModelTests = []struct {
 	destroyModel: func(_ context.Context, _ names.ModelTag, _, _ *bool, _, _ *time.Duration) error {
 		return errors.E("api error")
 	},
-	username:    "charlie@external",
+	username:    "charlie@canonical.com",
 	uuid:        "00000002-0000-0000-0000-000000000001",
 	expectError: `api error`,
 }}
@@ -2948,14 +2948,14 @@ var dumpModelTests = []struct {
 	name: "NotFound",
 	// reuse the destroyModelTestEnv for these tests.
 	env:             destroyModelTestEnv,
-	username:        "alice@external",
+	username:        "alice@canonical.com",
 	uuid:            "00000002-0000-0000-0000-000000000002",
 	expectError:     `model not found`,
 	expectErrorCode: errors.CodeNotFound,
 }, {
 	name:            "Unauthorized",
 	env:             destroyModelTestEnv,
-	username:        "bob@external",
+	username:        "bob@canonical.com",
 	uuid:            "00000002-0000-0000-0000-000000000001",
 	expectError:     `unauthorized`,
 	expectErrorCode: errors.CodeUnauthorized,
@@ -2971,7 +2971,7 @@ var dumpModelTests = []struct {
 		}
 		return "model dump", nil
 	},
-	username:     "alice@external",
+	username:     "alice@canonical.com",
 	uuid:         "00000002-0000-0000-0000-000000000001",
 	simplified:   true,
 	expectString: "model dump",
@@ -2981,14 +2981,14 @@ var dumpModelTests = []struct {
 	dumpModel: func(_ context.Context, _ names.ModelTag, _ bool) (string, error) {
 		return "model dump2", nil
 	},
-	username:     "charlie@external",
+	username:     "charlie@canonical.com",
 	uuid:         "00000002-0000-0000-0000-000000000001",
 	expectString: "model dump2",
 }, {
 	name:        "DialError",
 	env:         destroyModelTestEnv,
 	dialError:   errors.E("dial error"),
-	username:    "alice@external",
+	username:    "alice@canonical.com",
 	uuid:        "00000002-0000-0000-0000-000000000001",
 	expectError: `dial error`,
 }, {
@@ -2997,7 +2997,7 @@ var dumpModelTests = []struct {
 	dumpModel: func(_ context.Context, _ names.ModelTag, _ bool) (string, error) {
 		return "", errors.E("api error")
 	},
-	username:    "charlie@external",
+	username:    "charlie@canonical.com",
 	uuid:        "00000002-0000-0000-0000-000000000001",
 	expectError: `api error`,
 }}
@@ -3065,14 +3065,14 @@ var dumpModelDBTests = []struct {
 	name: "NotFound",
 	// reuse the destroyModelTestEnv for these tests.
 	env:             destroyModelTestEnv,
-	username:        "alice@external",
+	username:        "alice@canonical.com",
 	uuid:            "00000002-0000-0000-0000-000000000002",
 	expectError:     `model not found`,
 	expectErrorCode: errors.CodeNotFound,
 }, {
 	name:            "Unauthorized",
 	env:             destroyModelTestEnv,
-	username:        "bob@external",
+	username:        "bob@canonical.com",
 	uuid:            "00000002-0000-0000-0000-000000000001",
 	expectError:     `unauthorized`,
 	expectErrorCode: errors.CodeUnauthorized,
@@ -3085,7 +3085,7 @@ var dumpModelDBTests = []struct {
 		}
 		return map[string]interface{}{"model": "dump"}, nil
 	},
-	username:   "alice@external",
+	username:   "alice@canonical.com",
 	uuid:       "00000002-0000-0000-0000-000000000001",
 	expectDump: map[string]interface{}{"model": "dump"},
 }, {
@@ -3094,14 +3094,14 @@ var dumpModelDBTests = []struct {
 	dumpModelDB: func(_ context.Context, _ names.ModelTag) (map[string]interface{}, error) {
 		return map[string]interface{}{"model": "dump 2"}, nil
 	},
-	username:   "charlie@external",
+	username:   "charlie@canonical.com",
 	uuid:       "00000002-0000-0000-0000-000000000001",
 	expectDump: map[string]interface{}{"model": "dump 2"},
 }, {
 	name:        "DialError",
 	env:         destroyModelTestEnv,
 	dialError:   errors.E("dial error"),
-	username:    "alice@external",
+	username:    "alice@canonical.com",
 	uuid:        "00000002-0000-0000-0000-000000000001",
 	expectError: `dial error`,
 }, {
@@ -3110,7 +3110,7 @@ var dumpModelDBTests = []struct {
 	dumpModelDB: func(_ context.Context, _ names.ModelTag) (map[string]interface{}, error) {
 		return nil, errors.E("api error")
 	},
-	username:    "charlie@external",
+	username:    "charlie@canonical.com",
 	uuid:        "00000002-0000-0000-0000-000000000001",
 	expectError: `api error`,
 }}
@@ -3178,14 +3178,14 @@ var validateModelUpgradeTests = []struct {
 	name: "NotFound",
 	// reuse the destroyModelTestEnv for these tests.
 	env:             destroyModelTestEnv,
-	username:        "alice@external",
+	username:        "alice@canonical.com",
 	uuid:            "00000002-0000-0000-0000-000000000002",
 	expectError:     `model not found`,
 	expectErrorCode: errors.CodeNotFound,
 }, {
 	name:            "Unauthorized",
 	env:             destroyModelTestEnv,
-	username:        "bob@external",
+	username:        "bob@canonical.com",
 	uuid:            "00000002-0000-0000-0000-000000000001",
 	expectError:     `unauthorized`,
 	expectErrorCode: errors.CodeUnauthorized,
@@ -3201,7 +3201,7 @@ var validateModelUpgradeTests = []struct {
 		}
 		return nil
 	},
-	username: "alice@external",
+	username: "alice@canonical.com",
 	uuid:     "00000002-0000-0000-0000-000000000001",
 	force:    true,
 }, {
@@ -3213,13 +3213,13 @@ var validateModelUpgradeTests = []struct {
 		}
 		return nil
 	},
-	username: "charlie@external",
+	username: "charlie@canonical.com",
 	uuid:     "00000002-0000-0000-0000-000000000001",
 }, {
 	name:        "DialError",
 	env:         destroyModelTestEnv,
 	dialError:   errors.E("dial error"),
-	username:    "alice@external",
+	username:    "alice@canonical.com",
 	uuid:        "00000002-0000-0000-0000-000000000001",
 	expectError: `dial error`,
 }, {
@@ -3228,7 +3228,7 @@ var validateModelUpgradeTests = []struct {
 	validateModelUpgrade: func(_ context.Context, _ names.ModelTag, _ bool) error {
 		return errors.E("api error")
 	},
-	username:    "charlie@external",
+	username:    "charlie@canonical.com",
 	uuid:        "00000002-0000-0000-0000-000000000001",
 	expectError: `api error`,
 }}
@@ -3288,10 +3288,10 @@ const updateModelCredentialTestEnv = `clouds:
   regions:
   - name: test-cloud-region
 cloud-credentials:
-- owner: alice@external
+- owner: alice@canonical.com
   name: cred-2
   cloud: test-cloud
-- owner: alice@external
+- owner: alice@canonical.com
   name: cred-1
   cloud: test-cloud
 controllers:
@@ -3306,11 +3306,11 @@ models:
   cloud: test-cloud
   region: test-cloud-region
   cloud-credential: cred-1
-  owner: alice@external
+  owner: alice@canonical.com
   users:
-  - user: alice@external
+  - user: alice@canonical.com
     access: admin
-  - user: charlie@external
+  - user: charlie@canonical.com
     access: write
 `
 
@@ -3330,7 +3330,7 @@ var updateModelCredentialTests = []struct {
 	name: "success",
 	env:  updateModelCredentialTestEnv,
 	updateCredential: func(_ context.Context, taggedCredential jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
-		if taggedCredential.Tag != "cloudcred-test-cloud_alice@external_cred-2" {
+		if taggedCredential.Tag != "cloudcred-test-cloud_alice@canonical.com_cred-2" {
 			return nil, errors.E("bad cloud credential tag")
 		}
 		return nil, nil
@@ -3339,13 +3339,13 @@ var updateModelCredentialTests = []struct {
 		if modelTag.Id() != "00000002-0000-0000-0000-000000000001" {
 			return errors.E("bad model tag")
 		}
-		if credentialTag.Id() != "test-cloud/alice@external/cred-2" {
+		if credentialTag.Id() != "test-cloud/alice@canonical.com/cred-2" {
 			return errors.E("bad cloud credential tag")
 		}
 		return nil
 	},
-	username:   "alice@external",
-	credential: "test-cloud/alice@external/cred-2",
+	username:   "alice@canonical.com",
+	credential: "test-cloud/alice@canonical.com/cred-2",
 	uuid:       "00000002-0000-0000-0000-000000000001",
 	expectModel: dbmodel.Model{
 		Name: "model-1",
@@ -3354,7 +3354,7 @@ var updateModelCredentialTests = []struct {
 			Valid:  true,
 		},
 		Owner: dbmodel.Identity{
-			Name: "alice@external",
+			Name: "alice@canonical.com",
 		},
 		Controller: dbmodel.Controller{
 			Name:        "controller-1",
@@ -3377,7 +3377,7 @@ var updateModelCredentialTests = []struct {
 	name: "user not admin",
 	env:  updateModelCredentialTestEnv,
 	updateCredential: func(_ context.Context, taggedCredential jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
-		if taggedCredential.Tag != "cloudcred-test-cloud_alice@external_cred-2" {
+		if taggedCredential.Tag != "cloudcred-test-cloud_alice@canonical.com_cred-2" {
 			return nil, errors.E("bad cloud credential tag")
 		}
 		return nil, nil
@@ -3386,21 +3386,21 @@ var updateModelCredentialTests = []struct {
 		if modelTag.Id() != "00000002-0000-0000-0000-000000000001" {
 			return errors.E("bad model tag")
 		}
-		if credentialTag.Id() != "test-cloud/alice@external/cred-2" {
+		if credentialTag.Id() != "test-cloud/alice@canonical.com/cred-2" {
 			return errors.E("bad cloud credential tag")
 		}
 		return nil
 	},
-	username:        "charlie@external",
-	credential:      "test-cloud/alice@external/cred-2",
+	username:        "charlie@canonical.com",
+	credential:      "test-cloud/alice@canonical.com/cred-2",
 	uuid:            "00000002-0000-0000-0000-000000000001",
 	expectError:     "unauthorized",
 	expectErrorCode: errors.CodeUnauthorized,
 }, {
 	name:            "model not found",
 	env:             updateModelCredentialTestEnv,
-	username:        "charlie@external",
-	credential:      "test-cloud/alice@external/cred-2",
+	username:        "charlie@canonical.com",
+	credential:      "test-cloud/alice@canonical.com/cred-2",
 	uuid:            "00000002-0000-0000-0000-000000000002",
 	expectError:     "unauthorized",
 	expectErrorCode: errors.CodeUnauthorized,
@@ -3408,7 +3408,7 @@ var updateModelCredentialTests = []struct {
 	name: "credential not found",
 	env:  updateModelCredentialTestEnv,
 	updateCredential: func(_ context.Context, taggedCredential jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
-		if taggedCredential.Tag != "cloudcred-test-cloud_alice@external_cred-2" {
+		if taggedCredential.Tag != "cloudcred-test-cloud_alice@canonical.com_cred-2" {
 			return nil, errors.E("bad cloud credential tag")
 		}
 		return nil, nil
@@ -3417,15 +3417,15 @@ var updateModelCredentialTests = []struct {
 		if modelTag.Id() != "00000002-0000-0000-0000-000000000001" {
 			return errors.E("bad model tag")
 		}
-		if credentialTag.Id() != "test-cloud/alice@external/cred-2" {
+		if credentialTag.Id() != "test-cloud/alice@canonical.com/cred-2" {
 			return errors.E("bad cloud credential tag")
 		}
 		return nil
 	},
-	username:        "alice@external",
-	credential:      "test-cloud/alice@external/cred-3",
+	username:        "alice@canonical.com",
+	credential:      "test-cloud/alice@canonical.com/cred-3",
 	uuid:            "00000002-0000-0000-0000-000000000001",
-	expectError:     `cloudcredential "test-cloud/alice@external/cred-3" not found`,
+	expectError:     `cloudcredential "test-cloud/alice@canonical.com/cred-3" not found`,
 	expectErrorCode: errors.CodeNotFound,
 }, {
 	name: "update credential returns an error",
@@ -3433,15 +3433,15 @@ var updateModelCredentialTests = []struct {
 	updateCredential: func(_ context.Context, taggedCredential jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 		return nil, errors.E("an error")
 	},
-	username:    "alice@external",
-	credential:  "test-cloud/alice@external/cred-2",
+	username:    "alice@canonical.com",
+	credential:  "test-cloud/alice@canonical.com/cred-2",
 	uuid:        "00000002-0000-0000-0000-000000000001",
 	expectError: "an error",
 }, {
 	name: "change model credential returns an error",
 	env:  updateModelCredentialTestEnv,
 	updateCredential: func(_ context.Context, taggedCredential jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
-		if taggedCredential.Tag != "cloudcred-test-cloud_alice@external_cred-2" {
+		if taggedCredential.Tag != "cloudcred-test-cloud_alice@canonical.com_cred-2" {
 			return nil, errors.E("bad cloud credential tag")
 		}
 		return nil, nil
@@ -3449,8 +3449,8 @@ var updateModelCredentialTests = []struct {
 	changeModelCredential: func(_ context.Context, modelTag names.ModelTag, credentialTag names.CloudCredentialTag) error {
 		return errors.E("an error")
 	},
-	username:    "alice@external",
-	credential:  "test-cloud/alice@external/cred-2",
+	username:    "alice@canonical.com",
+	credential:  "test-cloud/alice@canonical.com/cred-2",
 	uuid:        "00000002-0000-0000-0000-000000000001",
 	expectError: "an error",
 }}
@@ -3534,7 +3534,7 @@ status:
   info: running a test
 life: alive
 users:
-- user: alice@external
+- user: alice@canonical.com
   access: admin
 - user: bob
   access: read
@@ -3566,11 +3566,11 @@ clouds:
   - name: test-region-1
   - name: test-region-2
 users:
-- username: alice@external
+- username: alice@canonical.com
   controller-access: superuser
 cloud-credentials:
 - name: test-credential-1
-  owner: alice@external
+  owner: alice@canonical.com
   cloud: test-cloud
   auth-type: empty
 controllers:
@@ -3602,7 +3602,7 @@ controllers:
 	env := jimmtest.ParseEnvironment(c, envDefinition)
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
 
-	dbUser := env.User("alice@external").DBObject(c, j.Database)
+	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
 	user := openfga.NewUser(&dbUser, client)
 
 	controller := dbmodel.Controller{
@@ -3617,10 +3617,10 @@ controllers:
 	args := jimm.ModelCreateArgs{}
 	err = args.FromJujuModelCreateArgs(&jujuparams.ModelCreateArgs{
 		Name:               "test-model",
-		OwnerTag:           names.NewUserTag("alice@external").String(),
+		OwnerTag:           names.NewUserTag("alice@canonical.com").String(),
 		CloudTag:           names.NewCloudTag("test-cloud").String(),
 		CloudRegion:        "test-region-1",
-		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1").String(),
+		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1").String(),
 	})
 	c.Assert(err, qt.IsNil)
 

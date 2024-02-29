@@ -60,7 +60,7 @@ func TestAuthenticateLogin(t *testing.T) {
 	c.Check(u.LastLogin.Valid, qt.Equals, false)
 	u.LastLogin = sql.NullTime{}
 	c.Check(u.Identity, qt.DeepEquals, &dbmodel.Identity{
-		Name:        "alice@external",
+		Name:        "alice@canonical.com",
 		DisplayName: "alice",
 	})
 }
@@ -147,7 +147,7 @@ func TestAuthenticateLoginSuperuser(t *testing.T) {
 	c.Check(u.LastLogin.Valid, qt.Equals, false)
 	u.LastLogin = sql.NullTime{}
 	c.Check(u.Identity, qt.DeepEquals, &dbmodel.Identity{
-		Name:        "bob@external",
+		Name:        "bob@canonical.com",
 		DisplayName: "bob",
 	})
 }

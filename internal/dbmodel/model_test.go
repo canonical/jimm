@@ -241,7 +241,7 @@ func TestToJujuModel(t *testing.T) {
 		Name:     "test-model",
 		UUID:     "00000001-0000-0000-0000-0000-000000000001",
 		Type:     "iaas",
-		OwnerTag: "user-bob@external",
+		OwnerTag: "user-bob@canonical.com",
 	})
 }
 
@@ -291,8 +291,8 @@ func TestToJujuModelSummary(t *testing.T) {
 		DefaultSeries:      "warty",
 		CloudTag:           "cloud-test-cloud",
 		CloudRegion:        "test-region",
-		CloudCredentialTag: "cloudcred-test-cloud_bob@external_test-cred",
-		OwnerTag:           "user-bob@external",
+		CloudCredentialTag: "cloudcred-test-cloud_bob@canonical.com_test-cred",
+		OwnerTag:           "user-bob@canonical.com",
 		Life:               life.Value(constants.ALIVE.String()),
 		Status: jujuparams.EntityStatus{
 			Status: "available",
@@ -318,7 +318,7 @@ func TestToJujuModelSummary(t *testing.T) {
 // that a model can be created.
 func initModelEnv(c *qt.C, db *gorm.DB) (dbmodel.Cloud, dbmodel.CloudCredential, dbmodel.Controller, dbmodel.Identity) {
 	u := dbmodel.Identity{
-		Name: "bob@external",
+		Name: "bob@canonical.com",
 	}
 	c.Assert(db.Create(&u).Error, qt.IsNil)
 
@@ -366,16 +366,16 @@ func TestModelFromJujuModelInfo(t *testing.T) {
 		DefaultSeries:           "warty",
 		CloudTag:                "cloud-test-cloud",
 		CloudRegion:             "test-region",
-		CloudCredentialTag:      "cloudcred-test-cloud_bob@external_test-cred",
+		CloudCredentialTag:      "cloudcred-test-cloud_bob@canonical.com_test-cred",
 		CloudCredentialValidity: nil,
-		OwnerTag:                "user-bob@external",
+		OwnerTag:                "user-bob@canonical.com",
 		Life:                    life.Value(constants.ALIVE.String()),
 		Status: jujuparams.EntityStatus{
 			Status: "available",
 			Since:  &now,
 		},
 		Users: []jujuparams.ModelUserInfo{{
-			UserName:    "bob@external",
+			UserName:    "bob@canonical.com",
 			DisplayName: "Bobby The Tester",
 			Access:      "admin",
 		}},
@@ -415,10 +415,10 @@ func TestModelFromJujuModelInfo(t *testing.T) {
 			Name:      "test-cred",
 			CloudName: "test-cloud",
 			Owner: dbmodel.Identity{
-				Name: "bob@external",
+				Name: "bob@canonical.com",
 			},
 		},
-		OwnerIdentityName: "bob@external",
+		OwnerIdentityName: "bob@canonical.com",
 		Type:              "iaas",
 		IsController:      false,
 		DefaultSeries:     "warty",

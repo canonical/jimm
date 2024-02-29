@@ -40,7 +40,7 @@ func (s *grantSuite) TestGrant(c *gc.C) {
 
 	// Make alice admin of the service account
 	tuple := openfga.Tuple{
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag(clientID)),
 	}

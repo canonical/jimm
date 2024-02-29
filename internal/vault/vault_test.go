@@ -64,7 +64,7 @@ func TestVaultCloudCredentialAttributeStoreRoundTrip(t *testing.T) {
 
 	st := newStore(c)
 	ctx := context.Background()
-	tag := names.NewCloudCredentialTag("aws/alice@external/" + c.Name())
+	tag := names.NewCloudCredentialTag("aws/alice@canonical.com/" + c.Name())
 	err := st.Put(ctx, tag, map[string]string{"a": "A", "b": "1234"})
 	c.Assert(err, qt.IsNil)
 
@@ -84,7 +84,7 @@ func TestVaultCloudCredentialAtrributeStoreEmpty(t *testing.T) {
 
 	st := newStore(c)
 	ctx := context.Background()
-	tag := names.NewCloudCredentialTag("aws/alice@external/" + c.Name())
+	tag := names.NewCloudCredentialTag("aws/alice@canonical.com/" + c.Name())
 
 	attr, err := st.Get(ctx, tag)
 	c.Assert(err, qt.IsNil)

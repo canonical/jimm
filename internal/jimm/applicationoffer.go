@@ -276,7 +276,7 @@ func (j *JIMM) listApplicationOfferUsers(ctx context.Context, offer names.Applic
 	userDetails := []jujuparams.OfferUserDetails{}
 	for username, level := range users {
 		// non-admin users should only see their own access level
-		// and access level of "everyone@external" - meaning the access
+		// and access level of "everyone@canonical.com" - meaning the access
 		// level everybody has.
 		if accessLevel != string(jujuparams.OfferAdminAccess) && username != ofganames.EveryoneUser && username != user.Name {
 			continue

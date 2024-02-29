@@ -79,7 +79,7 @@ func NewOpenFGAClient(cofgaClient *cofga.Client) *OFGAClient {
 
 // publicAccessAdaptor handles cases where a tuple need to be transformed before being
 // returned to the application layer. The wildcard tuple * for users is replaced
-// with the everyone@external user.
+// with the everyone@canonical.com user.
 func publicAccessAdaptor(tt cofga.TimestampedTuple) cofga.TimestampedTuple {
 	if tt.Tuple.Object.Kind == UserType && tt.Tuple.Object.IsPublicAccess() {
 		tt.Tuple.Object.ID = ofganames.EveryoneUser

@@ -20,11 +20,11 @@ func TestIdentity(t *testing.T) {
 	db := gormDB(c)
 
 	var u0 dbmodel.Identity
-	result := db.Where("name = ?", "bob@external").First(&u0)
+	result := db.Where("name = ?", "bob@canonical.com").First(&u0)
 	c.Check(result.Error, qt.Equals, gorm.ErrRecordNotFound)
 
 	u1 := dbmodel.Identity{
-		Name:        "bob@external",
+		Name:        "bob@canonical.com",
 		DisplayName: "bob",
 	}
 	result = db.Create(&u1)
@@ -32,7 +32,7 @@ func TestIdentity(t *testing.T) {
 	c.Check(result.RowsAffected, qt.Equals, int64(1))
 
 	var u2 dbmodel.Identity
-	result = db.Where("name = ?", "bob@external").First(&u2)
+	result = db.Where("name = ?", "bob@canonical.com").First(&u2)
 	c.Assert(result.Error, qt.IsNil)
 	c.Check(u2, qt.DeepEquals, u1)
 
@@ -41,12 +41,12 @@ func TestIdentity(t *testing.T) {
 	result = db.Save(&u2)
 	c.Assert(result.Error, qt.IsNil)
 	var u3 dbmodel.Identity
-	result = db.Where("name = ?", "bob@external").First(&u3)
+	result = db.Where("name = ?", "bob@canonical.com").First(&u3)
 	c.Assert(result.Error, qt.IsNil)
 	c.Check(u3, qt.DeepEquals, u2)
 
 	u4 := dbmodel.Identity{
-		Name:        "bob@external",
+		Name:        "bob@canonical.com",
 		DisplayName: "bob",
 	}
 	result = db.Create(&u4)
@@ -57,10 +57,10 @@ func TestUserTag(t *testing.T) {
 	c := qt.New(t)
 
 	u := dbmodel.Identity{
-		Name: "bob@external",
+		Name: "bob@canonical.com",
 	}
 	tag := u.Tag()
-	c.Check(tag.String(), qt.Equals, "user-bob@external")
+	c.Check(tag.String(), qt.Equals, "user-bob@canonical.com")
 	var u2 dbmodel.Identity
 	u2.SetTag(tag.(names.UserTag))
 	c.Check(u2, qt.DeepEquals, u)
@@ -77,7 +77,7 @@ func TestIdentityCloudCredentials(t *testing.T) {
 	c.Assert(result.Error, qt.IsNil)
 
 	u := dbmodel.Identity{
-		Name: "bob@external",
+		Name: "bob@canonical.com",
 	}
 	result = db.Create(&u)
 	c.Assert(result.Error, qt.IsNil)
@@ -125,12 +125,12 @@ func TestIdentityToJujuUserInfo(t *testing.T) {
 		Model: gorm.Model{
 			CreatedAt: time.Now(),
 		},
-		Name:        "alice@external",
+		Name:        "alice@canonical.com",
 		DisplayName: "Alice",
 	}
 	ui := u.ToJujuUserInfo()
 	c.Check(ui, qt.DeepEquals, jujuparams.UserInfo{
-		Username:    "alice@external",
+		Username:    "alice@canonical.com",
 		DisplayName: "Alice",
 		Access:      "",
 		DateCreated: u.CreatedAt,
@@ -142,7 +142,7 @@ func TestIdentityToJujuUserInfo(t *testing.T) {
 	}
 	ui = u.ToJujuUserInfo()
 	c.Check(ui, qt.DeepEquals, jujuparams.UserInfo{
-		Username:       "alice@external",
+		Username:       "alice@canonical.com",
 		DisplayName:    "Alice",
 		Access:         "",
 		DateCreated:    u.CreatedAt,
