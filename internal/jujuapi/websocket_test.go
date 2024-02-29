@@ -55,6 +55,8 @@ func (s *websocketSuite) SetUpTest(c *gc.C) {
 	s.APIHandler = mux
 	s.HTTP = httptest.NewTLSServer(s.APIHandler)
 
+	s.AddAdminUser(c, "alice@canonical.com")
+
 	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@external/cred")
 	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{AuthType: "empty"})
 	s.Credential2 = new(dbmodel.CloudCredential)

@@ -135,6 +135,8 @@ func (s *JimmCmdSuite) SetUpTest(c *gc.C) {
 	err = alice.SetControllerAccess(context.Background(), s.JIMM.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, gc.Equals, nil)
 
+	s.AddAdminUser("alice@canonical.com")
+
 	w := new(bytes.Buffer)
 	err = pem.Encode(w, &pem.Block{
 		Type:  "CERTIFICATE",
@@ -153,6 +155,17 @@ func (s *JimmCmdSuite) SetUpTest(c *gc.C) {
 		}
 		return store
 	}
+}
+
+func (s *JimmCmdSuite) AddAdminUser(c *gc.C, email string) {
+	identity := dbmodel.Identity{
+		Name: email,
+	}
+	err := s.JIMM.Database.GetIdentity(context.Background(), &identity)
+	c.Assert(err, gc.IsNil)
+	ofgaUser := openfga.NewUser(&identity, s.OFGAClient)
+	err = ofgaUser.SetControllerAccess(context.Background(), s.JIMM.ResourceTag(), ofganames.AdministratorRelation)
+	c.Assert(err, gc.IsNil)
 }
 
 // RefreshControllerAddress is a useful helper function when writing table tests for JIMM CLI

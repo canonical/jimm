@@ -5,25 +5,11 @@ package jimm
 import (
 	"context"
 
-	jujuparams "github.com/juju/juju/rpc/params"
-
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/openfga"
 )
-
-// Authenticate processes the given LoginRequest using the configured
-// authenticator, it then retrieves the user information from the database.
-// If the authenticated user does not yet exist in the database it will be
-// created using the values returned from the authenticator as the user's
-// details. Finally we check if the user is a administrator of JIMM and set
-// the JimmAdmin field if this is true which will persist for the duration
-// of the websocket connection.
-func (j *JIMM) Authenticate(ctx context.Context, req *jujuparams.LoginRequest) (*openfga.User, error) {
-	const op = errors.Op("jimm.Authenticate")
-	return nil, errors.E(op, "Invalid login, ensure you are using Juju 3.5+")
-}
 
 // GetOpenFGAUserAndAuthorise returns a valid OpenFGA user, authorising
 // them as an admin of JIMM if a tuple exists for this user.

@@ -155,6 +155,17 @@ func (s *JIMMSuite) setupMacaroonDischarger(c *gc.C) *discharger.MacaroonDischar
 	return macaroonDischarger
 }
 
+func (s *JIMMSuite) AddAdminUser(c *gc.C, email string) {
+	identity := dbmodel.Identity{
+		Name: email,
+	}
+	err := s.JIMM.Database.GetIdentity(context.Background(), &identity)
+	c.Assert(err, gc.IsNil)
+	ofgaUser := openfga.NewUser(&identity, s.OFGAClient)
+	err = ofgaUser.SetControllerAccess(context.Background(), s.JIMM.ResourceTag(), ofganames.AdministratorRelation)
+	c.Assert(err, gc.IsNil)
+}
+
 func (s *JIMMSuite) NewUser(u *dbmodel.Identity) *openfga.User {
 	return openfga.NewUser(u, s.OFGAClient)
 }
