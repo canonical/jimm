@@ -261,7 +261,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		return nil, errors.E(op, err, "failed to ensure controller admins")
 	}
 
-	s.jimm.OAuthAuthenticator, err = auth.NewAuthenticationService(
+	authSvc, err := auth.NewAuthenticationService(
 		ctx,
 		auth.AuthenticationServiceParams{
 			IssuerURL:    p.OAuthAuthenticatorParams.IssuerURL,
@@ -270,6 +270,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 			Scopes:       p.OAuthAuthenticatorParams.Scopes,
 		},
 	)
+	s.jimm.OAuthAuthenticator = authSvc
 	if err != nil {
 		zapctx.Error(ctx, "failed to setup authentication service", zap.Error(err))
 		return nil, errors.E(op, err, "failed to setup authentication service")
@@ -314,6 +315,10 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	mountHandler(
 		"/.well-known",
 		wellknownapi.NewWellKnownHandler(s.jimm.CredentialStore),
+	)
+	mountHandler(
+		"/auth",
+		jimmhttp.NewOAuthHandler(authSvc),
 	)
 	macaroonDischarger, err := s.setupDischarger(p)
 	if err != nil {

@@ -691,16 +691,16 @@
       "clientId": "jimm-device",
       "name": "jimm-testing",
       "description": "A client to enable testing JIMM",
-      "rootUrl": "http://localhost",
-      "adminUrl": "http://localhost",
-      "baseUrl": "http://localhost",
+      "rootUrl": "http://127.0.0.1",
+      "adminUrl": "http://127.0.0.1",
+      "baseUrl": "http://127.0.0.1",
       "surrogateAuthRequired": false,
       "enabled": true,
       "alwaysDisplayInConsole": true,
       "clientAuthenticatorType": "client-secret",
       "secret": "SwjDofnbDzJDm9iyfUhEp67FfUFMY8L4",
       "redirectUris": [
-        "http://localhost/cb"
+        "http://127.0.0.1/*"
       ],
       "webOrigins": [
         "*"
