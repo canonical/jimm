@@ -306,7 +306,7 @@ func (s *jimmSuite) TestAuditLog(c *gc.C) {
 	evs, err := client2.FindAuditEvents(&apiparams.FindAuditEventsRequest{})
 	c.Assert(err, gc.Equals, nil)
 
-	c.Assert(len(evs.Events), gc.Equals, 13)
+	c.Assert(len(evs.Events), gc.Equals, 9)
 
 	bobTag := names.NewUserTag("bob@canonical.com").String()
 
@@ -316,7 +316,7 @@ func (s *jimmSuite) TestAuditLog(c *gc.C) {
 			ConversationId: evs.Events[0].ConversationId,
 			MessageId:      1,
 			FacadeName:     "Admin",
-			FacadeMethod:   "Login",
+			FacadeMethod:   "LoginWithSessionToken",
 			FacadeVersion:  evs.Events[0].FacadeVersion,
 			ObjectId:       "",
 			UserTag:        "user-",
@@ -328,10 +328,10 @@ func (s *jimmSuite) TestAuditLog(c *gc.C) {
 			ConversationId: evs.Events[1].ConversationId,
 			MessageId:      1,
 			FacadeName:     "Admin",
-			FacadeMethod:   "Login",
+			FacadeMethod:   "LoginWithSessionToken",
 			FacadeVersion:  evs.Events[1].FacadeVersion,
 			ObjectId:       "",
-			UserTag:        "user-",
+			UserTag:        bobTag,
 			IsResponse:     true,
 			Params:         nil,
 			Errors:         evs.Events[1].Errors,
@@ -339,11 +339,11 @@ func (s *jimmSuite) TestAuditLog(c *gc.C) {
 			Time:           evs.Events[2].Time,
 			ConversationId: evs.Events[2].ConversationId,
 			MessageId:      2,
-			FacadeName:     "Admin",
-			FacadeMethod:   "Login",
+			FacadeName:     "JIMM",
+			FacadeMethod:   "FindAuditEvents",
 			FacadeVersion:  evs.Events[2].FacadeVersion,
 			ObjectId:       "",
-			UserTag:        "user-",
+			UserTag:        bobTag,
 			IsResponse:     false,
 			Params:         evs.Events[2].Params,
 			Errors:         nil,
@@ -351,8 +351,8 @@ func (s *jimmSuite) TestAuditLog(c *gc.C) {
 			Time:           evs.Events[3].Time,
 			ConversationId: evs.Events[3].ConversationId,
 			MessageId:      2,
-			FacadeName:     "Admin",
-			FacadeMethod:   "Login",
+			FacadeName:     "JIMM",
+			FacadeMethod:   "FindAuditEvents",
 			FacadeVersion:  evs.Events[3].FacadeVersion,
 			ObjectId:       "",
 			UserTag:        bobTag,

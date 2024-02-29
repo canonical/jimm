@@ -188,8 +188,10 @@ func (s *JimmCmdSuite) TearDownTest(c *gc.C) {
 	if s.HTTP != nil {
 		s.HTTP.Close()
 	}
-	if err := s.JIMM.Database.Close(); err != nil {
-		c.Logf("failed to close database connections at tear down: %s", err)
+	if s.JIMM != nil && s.JIMM.Database.DB != nil {
+		if err := s.JIMM.Database.Close(); err != nil {
+			c.Logf("failed to close database connections at tear down: %s", err)
+		}
 	}
 	s.JujuConnSuite.TearDownTest(c)
 }
