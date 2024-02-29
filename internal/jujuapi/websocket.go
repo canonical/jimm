@@ -130,7 +130,7 @@ func modelInfoFromPath(path string) (uuid string, finalPath string, err error) {
 
 // ServeWS implements jimmhttp.WSServer.
 func (s modelProxyServer) ServeWS(ctx context.Context, clientConn *websocket.Conn) {
-	//TODO(KIAN)!!! FIX MODEL PROXY TO USE NEW AUTHENTICATOR
+	// TODO(CSS-7331) Refactor model proxy for new login methods
 	jwtGenerator := jimm.NewJWTGenerator(nil, &s.jimm.Database, s.jimm, s.jimm.JWTService)
 	connectionFunc := controllerConnectionFunc(s, &jwtGenerator)
 	zapctx.Debug(ctx, "Starting proxier")

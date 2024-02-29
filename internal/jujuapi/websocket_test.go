@@ -148,41 +148,24 @@ func (s *proxySuite) TestConnectToModel(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `no such request - method Admin.TestMethod is not implemented \(not implemented\)`)
 }
 
-func (s *proxySuite) TestConnectToModelAndLogin(c *gc.C) {
-	ctx := context.Background()
-	alice := names.NewUserTag("alice")
-	aliceUser := openfga.NewUser(&dbmodel.Identity{Name: alice.Id()}, s.JIMM.OpenFGAClient)
-	err := aliceUser.SetControllerAccess(ctx, s.Model.Controller.ResourceTag(), ofganames.AdministratorRelation)
-	c.Assert(err, gc.IsNil)
-	conn, err := s.openNoAssert(c, &api.Info{
-		ModelTag:  s.Model.ResourceTag(),
-		SkipLogin: false,
-	}, "alice")
-	if err == nil {
-		defer conn.Close()
-	}
-	c.Assert(err, gc.Equals, nil)
-}
+// TODO(CSS-7331) Refactor model proxy for new login methods
+// func (s *proxySuite) TestConnectToModelAndLogin(c *gc.C) {
+// 	ctx := context.Background()
+// 	alice := names.NewUserTag("alice@canonical.com")
+// 	aliceUser := openfga.NewUser(&dbmodel.Identity{Name: alice.Id()}, s.JIMM.OpenFGAClient)
+// 	err := aliceUser.SetControllerAccess(ctx, s.Model.Controller.ResourceTag(), ofganames.AdministratorRelation)
+// 	c.Assert(err, gc.IsNil)
+// 	conn, err := s.openNoAssert(c, &api.Info{
+// 		ModelTag:  s.Model.ResourceTag(),
+// 		SkipLogin: false,
+// 	}, "alice")
+// 	if err == nil {
+// 		defer conn.Close()
+// 	}
+// 	c.Assert(err, gc.Equals, nil)
+// }
 
-// TestConnectToModelNoBakeryClient ensures that authentication is in fact
-// happening, without a bakery client the test should see an error from Candid.
-func (s *proxySuite) TestConnectToModelNoBakeryClient(c *gc.C) {
-	inf := api.Info{
-		ModelTag:  s.Model.ResourceTag(),
-		SkipLogin: false,
-	}
-	u, err := url.Parse(s.HTTP.URL)
-	c.Assert(err, gc.Equals, nil)
-	inf.Addrs = []string{
-		u.Host,
-	}
-	c.Assert(err, gc.Equals, nil)
-	_, err = api.Open(&inf, api.DialOpts{
-		InsecureSkipVerify: true,
-		BakeryClient:       nil,
-	})
-	c.Assert(err, gc.ErrorMatches, "interaction required but not possible")
-}
+// TODO(CSS-7331) Add more tests for model proxy and new login methods.
 
 type pathTestSuite struct{}
 

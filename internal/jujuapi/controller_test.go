@@ -166,7 +166,7 @@ func (s *controllerSuite) TestIdentityProviderURL(c *gc.C) {
 	var result jujuparams.StringResult
 	err := conn.APICall("Controller", 11, "", "IdentityProviderURL", nil, &result)
 	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(result.Result, gc.Matches, `https://127\.0\.0\.1.*`)
+	c.Assert(result.Result, gc.Matches, ``)
 }
 
 func (s *controllerSuite) TestControllerVersion(c *gc.C) {

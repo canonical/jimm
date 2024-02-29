@@ -6,6 +6,7 @@ import (
 	"context"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"time"
 
 	cofga "github.com/canonical/ofga"
@@ -161,6 +162,12 @@ func (s *JIMMSuite) AddAdminUser(c *gc.C, email string) {
 	}
 	err := s.JIMM.Database.GetIdentity(context.Background(), &identity)
 	c.Assert(err, gc.IsNil)
+	// Set the display name of the identity.
+	displayName, _, _ := strings.Cut(email, "@")
+	identity.DisplayName = displayName
+	err = s.JIMM.Database.UpdateIdentity(context.Background(), &identity)
+	c.Assert(err, gc.IsNil)
+	// Give the identity admin permission.
 	ofgaUser := openfga.NewUser(&identity, s.OFGAClient)
 	err = ofgaUser.SetControllerAccess(context.Background(), s.JIMM.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, gc.IsNil)

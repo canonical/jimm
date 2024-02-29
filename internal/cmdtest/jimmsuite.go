@@ -7,7 +7,6 @@ package cmdtest
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/pem"
 	"net/http"
 	"net/http/httptest"
@@ -22,8 +21,6 @@ import (
 	jjclient "github.com/juju/juju/jujuclient"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
-	"github.com/lestrrat-go/jwx/v2/jwa"
-	"github.com/lestrrat-go/jwx/v2/jwt"
 	gc "gopkg.in/check.v1"
 
 	service "github.com/canonical/jimm"
@@ -34,25 +31,6 @@ import (
 	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 )
-
-func NewUserSessionLogin(username string) api.LoginProvider {
-	token, err := jwt.NewBuilder().
-		Subject(username).
-		Expiration(time.Now().Add(1 * time.Hour)).
-		Build()
-	if err != nil {
-		panic("failed to generate test session token")
-	}
-
-	freshToken, err := jwt.Sign(token, jwt.WithKey(jwa.HS256, []byte("test-shared-secret")))
-	if err != nil {
-		panic("failed to sign test session token")
-	}
-
-	b64Token := base64.StdEncoding.EncodeToString(freshToken)
-	lp := api.NewSessionTokenLoginProvider(b64Token, nil, nil)
-	return lp
-}
 
 type JimmCmdSuite struct {
 	corejujutesting.JujuConnSuite
@@ -195,24 +173,6 @@ func (s *JimmCmdSuite) TearDownTest(c *gc.C) {
 	}
 	s.JujuConnSuite.TearDownTest(c)
 }
-
-// func (s *JimmCmdSuite) UserBakeryClient(username string) *httpbakery.Client {
-// 	s.Candid.AddUser(username)
-// 	key := s.Candid.UserPublicKey(username)
-// 	bClient := httpbakery.NewClient()
-// 	bClient.Key = &bakery.KeyPair{
-// 		Public:  bakery.PublicKey{Key: bakery.Key(key.Public.Key)},
-// 		Private: bakery.PrivateKey{Key: bakery.Key(key.Private.Key)},
-// 	}
-// 	agent.SetUpAuth(bClient, &agent.AuthInfo{
-// 		Key: bClient.Key,
-// 		Agents: []agent.Agent{{
-// 			URL:      s.Candid.URL.String(),
-// 			Username: username,
-// 		}},
-// 	})
-// 	return bClient
-// }
 
 func (s *JimmCmdSuite) AddController(c *gc.C, name string, info *api.Info) {
 	ctl := &dbmodel.Controller{

@@ -56,7 +56,7 @@ var (
 	// (1)[group](2)[-](3)[alices-wonderland](10)[#member]
 	// So if a group, user, UUID, controller name comes in, it will always be index 3 for them
 	// and if a relation specifier is present, it will always be index 10
-	jujuURIMatcher = regexp.MustCompile(`([a-zA-Z0-9]*)(\-|\z)([a-zA-Z0-9-@.]*)(\:|)([a-zA-Z0-9-@]*)(\/|)([a-zA-Z0-9-]*)(\.|)([a-zA-Z0-9-]*)([a-zA-Z#]*|\z)\z`)
+	jujuURIMatcher = regexp.MustCompile(`([a-zA-Z0-9]*)(\-|\z)([a-zA-Z0-9-@.]*)(\:|)([a-zA-Z0-9-@.]*)(\/|)([a-zA-Z0-9-]*)(\.|)([a-zA-Z0-9-]*)([a-zA-Z#]*|\z)\z`)
 )
 
 // ToOfferAccessString maps relation to an application offer access string.

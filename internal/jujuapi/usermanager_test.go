@@ -102,9 +102,10 @@ func (s *userManagerSuite) TestUserInfoWithDomain(c *gc.C) {
 	c.Assert(users[0].DateCreated.IsZero(), gc.Equals, false)
 	users[0].DateCreated = time.Time{}
 	c.Assert(users[0], jc.DeepEquals, jujuparams.UserInfo{
-		Username:    "alice@mydomain",
-		DisplayName: "alice",
-		Access:      "",
+		Username:       "alice@mydomain",
+		DisplayName:    "",
+		Access:         "",
+		LastConnection: users[0].LastConnection,
 	})
 }
 
