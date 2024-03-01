@@ -36,7 +36,7 @@ func (s *listAuditEventsSuite) TestListAuditEventsSuperuser(c *gc.C) {
   conversation-id: .*
   message-id: 1
   facade-name: Admin
-  facade-method: Login
+  facade-method: LoginWithSessionToken
   facade-version: \d
   user-tag: user-
   is-response: false
@@ -46,9 +46,9 @@ func (s *listAuditEventsSuite) TestListAuditEventsSuperuser(c *gc.C) {
   conversation-id: .*
   message-id: 1
   facade-name: Admin
-  facade-method: Login
+  facade-method: LoginWithSessionToken
   facade-version: \d
-  user-tag: user-
+  user-tag: user-alice@canonical.com
   is-response: true
   errors:
     results:

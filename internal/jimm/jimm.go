@@ -399,7 +399,13 @@ func (j *JIMM) AddAuditLogEntry(ale *dbmodel.AuditLogEntry) {
 	}
 }
 
-var sensitiveMethods = map[string]struct{}{"login": {}, "addcredentials": {}, "updatecredentials": {}}
+var sensitiveMethods = map[string]struct{}{
+	"login":                 {},
+	"logindevice":           {},
+	"getdevicesessiontoken": {},
+	"loginwithsessiontoken": {},
+	"addcredentials":        {},
+	"updatecredentials":     {}}
 var redactJSON = dbmodel.JSON(`{"params":"redacted"}`)
 
 func redactSensitiveParams(ale *dbmodel.AuditLogEntry) {

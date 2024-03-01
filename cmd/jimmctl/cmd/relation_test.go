@@ -424,15 +424,15 @@ func (s *relationSuite) TestListRelations(c *gc.C) {
 	c.Assert(
 		cmdtesting.Stdout(context),
 		gc.Equals,
-		`Object              	Relation     	Target Object                                                            
-user-admin          	administrator	controller-jimm                                                          
-user-alice@canonical.com 	administrator	controller-jimm                                                          
-user-alice@canonical.com 	member       	group-group-1                                                            
-user-eve@canonical.com   	member       	group-group-2                                                            
-group-group-2#member	member       	group-group-3                                                            
-group-group-3#member	administrator	controller-test-controller-1                                             
-group-group-1#member	administrator	model-test-controller-1:alice@canonical.com/test-model-1                      
-user-eve@canonical.com   	administrator	applicationoffer-test-controller-1:alice@canonical.com/test-model-1.testoffer1`,
+		`Object                  	Relation     	Target Object                                                                 
+user-admin              	administrator	controller-jimm                                                               
+user-alice@canonical.com	administrator	controller-jimm                                                               
+user-alice@canonical.com	member       	group-group-1                                                                 
+user-eve@canonical.com  	member       	group-group-2                                                                 
+group-group-2#member    	member       	group-group-3                                                                 
+group-group-3#member    	administrator	controller-test-controller-1                                                  
+group-group-1#member    	administrator	model-test-controller-1:alice@canonical.com/test-model-1                      
+user-eve@canonical.com  	administrator	applicationoffer-test-controller-1:alice@canonical.com/test-model-1.testoffer1`,
 	)
 }
 

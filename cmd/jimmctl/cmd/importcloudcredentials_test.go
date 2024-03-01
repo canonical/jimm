@@ -23,7 +23,7 @@ type importCloudCredentialsSuite struct {
 var _ = gc.Suite(&importCloudCredentialsSuite{})
 
 const creds = `{
-	"_id": "aws/alice/test1",
+	"_id": "aws/alice@canonical.com/test1",
 	"type": "access-key",
 	"attributes": {
 		"access-key": "key-id",
@@ -39,7 +39,7 @@ const creds = `{
 	}
 }
 {
-	"_id": "gce/charlie/test1",
+	"_id": "gce/charlie@canonical.com/test1",
 	"type": "empty",
 	"attributes": {}
 }`
