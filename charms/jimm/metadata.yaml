@@ -34,6 +34,7 @@ provides:
   cos-agent:
     interface: cos_agent
     limit: 1
+  
 
 requires:
   database:
@@ -43,6 +44,9 @@ requires:
     optional: true
   openfga:
     interface: openfga
+  oauth:
+    interface: oauth
+    limit: 1
 
 resources:
   jimm-snap:
