@@ -329,7 +329,7 @@ const addHostedCloudTestEnv = `clouds:
   regions:
   - name: test-region
   users:
-  - user: everyone
+  - user: everyone@external
     access: add-model
 - name: private-cloud
   type: test-provider2

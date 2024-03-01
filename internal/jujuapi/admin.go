@@ -116,7 +116,7 @@ func (r *controllerRoot) GetDeviceSessionToken(ctx context.Context) (params.GetD
 
 	// TODO(ale8k): Add vault logic to get secret key and generate one
 	// on start up.
-	encToken, err := authSvc.MintSessionToken(email, "secret-key")
+	encToken, err := authSvc.MintSessionToken(email, "test-secret")
 	if err != nil {
 		return response, errors.E(op, err)
 	}

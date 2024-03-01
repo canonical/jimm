@@ -228,7 +228,8 @@ func (auth *JWTGenerator) MakeLoginToken(ctx context.Context, req *jujuparams.Lo
 	// Recreate the accessMapCache to prevent leaking permissions across multiple login requests.
 	auth.accessMapCache = make(map[string]string)
 	var authErr error
-	auth.user, authErr = auth.authenticator.Authenticate(ctx, req)
+	// TODO(CSS-7331) Refactor model proxy for new login methods
+	auth.user, authErr = nil, nil
 	if authErr != nil {
 		zapctx.Error(ctx, "authentication failed", zap.Error(authErr))
 		return nil, authErr
