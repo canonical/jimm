@@ -132,11 +132,11 @@ func (s *adminSuite) TestDeviceLogin(c *gc.C) {
 	// Test no token present
 	var loginResult jujuparams.LoginResult
 	err = conn.APICall("Admin", 4, "", "LoginWithSessionToken", nil, &loginResult)
-	c.Assert(err, gc.ErrorMatches, "authentication failed, no token presented")
+	c.Assert(err, gc.ErrorMatches, "authentication failed, no token presented.*")
 
 	// Test token not base64 encoded
 	err = conn.APICall("Admin", 4, "", "LoginWithSessionToken", params.LoginWithSessionTokenRequest{SessionToken: string(decodedToken)}, &loginResult)
-	c.Assert(err, gc.ErrorMatches, "authentication failed, failed to decode token")
+	c.Assert(err, gc.ErrorMatches, "authentication failed, failed to decode token.*")
 
 	// Test token base64 encoded passes authentication
 	err = conn.APICall("Admin", 4, "", "LoginWithSessionToken", params.LoginWithSessionTokenRequest{SessionToken: sessionTokenResp.SessionToken}, &loginResult)

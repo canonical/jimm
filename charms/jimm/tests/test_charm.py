@@ -16,10 +16,30 @@ from threading import Thread
 from unittest.mock import MagicMock, Mock, call, patch
 
 import hvac
-from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
+from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus
 from ops.testing import Harness
 
 from src.charm import JimmCharm
+
+OAUTH_CLIENT_ID = "jimm_client_id"
+OAUTH_CLIENT_SECRET = "test-secret"
+OAUTH_PROVIDER_INFO = {
+    "authorization_endpoint": "https://example.oidc.com/oauth2/auth",
+    "introspection_endpoint": "https://example.oidc.com/admin/oauth2/introspect",
+    "issuer_url": "https://example.oidc.com",
+    "jwks_endpoint": "https://example.oidc.com/.well-known/jwks.json",
+    "scope": "openid profile email phone",
+    "token_endpoint": "https://example.oidc.com/oauth2/token",
+    "userinfo_endpoint": "https://example.oidc.com/userinfo",
+}
+
+OPENFGA_PROVIDER_INFO = {
+    "address": "openfga.localhost",
+    "port": "8080",
+    "scheme": "http",
+    "store_id": "fake-store-id",
+    "token": "fake-token",
+}
 
 
 class TestCharm(unittest.TestCase):
@@ -45,6 +65,32 @@ class TestCharm(unittest.TestCase):
         )
         self.harness.charm.framework.charm_dir = pathlib.Path(self.tempdir.name)
 
+    def add_oauth_relation(self):
+        self.oauth_rel_id = self.harness.add_relation("oauth", "hydra")
+        self.harness.add_relation_unit(self.oauth_rel_id, "hydra/0")
+        secret_id = self.harness.add_model_secret("hydra", {"secret": OAUTH_CLIENT_SECRET})
+        self.harness.grant_secret(secret_id, "juju-jimm")
+        self.harness.update_relation_data(
+            self.oauth_rel_id,
+            "hydra",
+            {
+                "client_id": OAUTH_CLIENT_ID,
+                "client_secret_id": secret_id,
+                **OAUTH_PROVIDER_INFO,
+            },
+        )
+
+    def add_openfga_relation(self):
+        self.openfga_rel_id = self.harness.add_relation("openfga", "openfga")
+        self.harness.add_relation_unit(self.openfga_rel_id, "openfga/0")
+        self.harness.update_relation_data(
+            self.openfga_rel_id,
+            "openfga",
+            {
+                **OPENFGA_PROVIDER_INFO,
+            },
+        )
+
     def test_install(self):
         service_file = os.path.join(self.harness.charm.charm_dir, "juju-jimm.service")
         self.harness.add_resource("jimm-snap", "Test data")
@@ -66,6 +112,9 @@ class TestCharm(unittest.TestCase):
             f.write("test")
         with open(self.harness.charm._env_filename("db"), "wt") as f:
             f.write("test")
+        self.harness.set_leader(True)
+        self.add_oauth_relation()
+        self.add_openfga_relation()
         self.harness.charm.on.start.emit()
         self.harness.charm._systemctl.assert_has_calls(
             (
@@ -94,6 +143,9 @@ class TestCharm(unittest.TestCase):
             f.write("test")
         with open(self.harness.charm._env_filename("db"), "wt") as f:
             f.write("test")
+        self.harness.set_leader(True)
+        self.add_oauth_relation()
+        self.add_openfga_relation()
         self.harness.charm.on.upgrade_charm.emit()
         self.assertTrue(os.path.exists(service_file))
         self.assertEqual(self.harness.charm._snap.call_args.args[0], "install")
@@ -126,7 +178,7 @@ class TestCharm(unittest.TestCase):
         with open(config_file) as f:
             lines = f.readlines()
         os.unlink(config_file)
-        self.assertEqual(len(lines), 21)
+        self.assertEqual(len(lines), 22)
         self.assertEqual(lines[0].strip(), "BAKERY_AGENT_FILE=")
         self.assertEqual(lines[1].strip(), "CANDID_URL=https://candid.example.com")
         self.assertEqual(lines[2].strip(), "JIMM_ADMINS=user1 user2 group1")
@@ -154,6 +206,7 @@ class TestCharm(unittest.TestCase):
             "JIMM_JWT_EXPIRY=10m",
         )
         self.assertEqual(lines[20].strip(), "JIMM_MACAROON_EXPIRY_DURATION=48h")
+        self.assertEqual(lines[21].strip(), "JIMM_ACCESS_TOKEN_EXPIRY_DURATION=6h")
 
     def test_config_changed_redirect_to_dashboard(self):
         config_file = os.path.join(self.harness.charm.charm_dir, "juju-jimm.env")
@@ -175,7 +228,7 @@ class TestCharm(unittest.TestCase):
         with open(config_file) as f:
             lines = f.readlines()
         os.unlink(config_file)
-        self.assertEqual(len(lines), 21)
+        self.assertEqual(len(lines), 22)
         self.assertEqual(lines[0].strip(), "BAKERY_AGENT_FILE=")
         self.assertEqual(lines[1].strip(), "CANDID_URL=https://candid.example.com")
         self.assertEqual(lines[2].strip(), "JIMM_ADMINS=user1 user2 group1")
@@ -223,7 +276,7 @@ class TestCharm(unittest.TestCase):
         with open(config_file) as f:
             lines = f.readlines()
         os.unlink(config_file)
-        self.assertEqual(len(lines), 19)
+        self.assertEqual(len(lines), 20)
         self.assertEqual(lines[0].strip(), "BAKERY_AGENT_FILE=")
         self.assertEqual(lines[1].strip(), "CANDID_URL=https://candid.example.com")
         self.assertEqual(lines[2].strip(), "JIMM_ADMINS=user1 user2 group1")
@@ -276,7 +329,7 @@ class TestCharm(unittest.TestCase):
 
         with open(config_file) as f:
             lines = f.readlines()
-        self.assertEqual(len(lines), 19)
+        self.assertEqual(len(lines), 20)
         self.assertEqual(
             lines[0].strip(),
             "BAKERY_AGENT_FILE=" + self.harness.charm._agent_filename,
@@ -303,7 +356,7 @@ class TestCharm(unittest.TestCase):
         )
         with open(config_file) as f:
             lines = f.readlines()
-        self.assertEqual(len(lines), 19)
+        self.assertEqual(len(lines), 20)
         self.assertEqual(lines[0].strip(), "BAKERY_AGENT_FILE=")
         self.assertEqual(lines[1].strip(), "CANDID_URL=https://candid.example.com")
         self.assertEqual(lines[2].strip(), "JIMM_ADMINS=user1 user2 group1")
@@ -336,6 +389,8 @@ class TestCharm(unittest.TestCase):
             lines = f.readlines()
         self.assertEqual(lines[0].strip(), "JIMM_WATCH_CONTROLLERS=")
         self.harness.set_leader(True)
+        self.add_oauth_relation()
+        self.add_openfga_relation()
         with open(leader_file) as f:
             lines = f.readlines()
         self.assertEqual(lines[0].strip(), "JIMM_WATCH_CONTROLLERS=1")
@@ -373,6 +428,9 @@ class TestCharm(unittest.TestCase):
         db_file = os.path.join(self.harness.charm.charm_dir, "juju-jimm-db.env")
         with open(self.harness.charm._env_filename(), "wt") as f:
             f.write("test")
+        self.harness.set_leader(True)
+        self.add_oauth_relation()
+        self.add_openfga_relation()
         id = self.harness.add_relation("database", "postgresql")
         self.harness.add_relation_unit(id, "postgresql/0")
         self.harness.update_relation_data(
@@ -476,22 +534,17 @@ class TestCharm(unittest.TestCase):
         self.harness.charm.on.update_status.emit()
         self.assertEqual(
             self.harness.charm.unit.status,
-            BlockedStatus("waiting for jimm-snap resource"),
+            BlockedStatus("Waiting for environment"),
         )
-        with open(self.harness.charm._workload_filename, "wt") as f:
-            f.write("jimm.bin")
+        with open(self.harness.charm._env_filename(), "wt") as f:
+            f.write("test")
         self.harness.charm.on.update_status.emit()
         self.assertEqual(
             self.harness.charm.unit.status,
-            BlockedStatus("waiting for database"),
+            BlockedStatus("Waiting for database relation"),
         )
         id = self.harness.add_relation("database", "postgresql")
         self.harness.add_relation_unit(id, "postgresql/0")
-        self.harness.charm.on.update_status.emit()
-        self.assertEqual(
-            self.harness.charm.unit.status,
-            WaitingStatus("waiting for database"),
-        )
         self.harness.update_relation_data(
             id,
             "postgresql",
@@ -501,7 +554,17 @@ class TestCharm(unittest.TestCase):
                 "endpoints": "some.database.host,some.other.database.host",
             },
         )
-        self.harness.charm.on.update_status.emit()
+        self.assertEqual(
+            self.harness.charm.unit.status,
+            BlockedStatus("Waiting for oauth relation"),
+        )
+        self.harness.set_leader(True)
+        self.add_oauth_relation()
+        self.assertEqual(
+            self.harness.charm.unit.status,
+            BlockedStatus("Waiting for openfga relation"),
+        )
+        self.add_openfga_relation()
         self.assertEqual(self.harness.charm.unit.status, MaintenanceStatus("starting"))
         s = HTTPServer(("", 8080), VersionHTTPRequestHandler)
         t = Thread(target=s.serve_forever)
@@ -591,14 +654,14 @@ class TestCharm(unittest.TestCase):
         with open(config_file) as f:
             lines = f.readlines()
         os.unlink(config_file)
-        self.assertEqual(len(lines), 21)
+        self.assertEqual(len(lines), 22)
         self.assertEqual(len([match for match in lines if "INSECURE_SECRET_STORAGE" in match]), 0)
         self.harness.update_config({"postgres-secret-storage": True})
         self.assertTrue(os.path.exists(config_file))
         with open(config_file) as f:
             lines = f.readlines()
         os.unlink(config_file)
-        self.assertEqual(len(lines), 23)
+        self.assertEqual(len(lines), 24)
         self.assertEqual(len([match for match in lines if "INSECURE_SECRET_STORAGE" in match]), 1)
 
 
