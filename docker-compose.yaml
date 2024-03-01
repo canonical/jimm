@@ -241,7 +241,7 @@ services:
       KEYCLOAK_CREATE_ADMIN_USER: true
       KEYCLOAK_ADMIN_USER: jimm
       KEYCLOAK_ADMIN_PASSWORD: jimm
-      KEYCLOAK_DATABASE_VENDOR: dev-mem
+      KEYCLOAK_DATABASE_VENDOR: dev-file
       KEYCLOAK_EXTRA_ARGS: "-Dkeycloak.migration.action=import -Dkeycloak.migration.provider=singleFile -Dkeycloak.migration.file=/bitnami/keycloak/data/import/realm.json -Dkeycloak.migration.replace-placeholders=true -Dkeycloak.profile.feature.upload_scripts=enabled"
     volumes:
       - ./local/keycloak/jimm-realm.json:/bitnami/keycloak/data/import/realm.json:ro
