@@ -768,7 +768,7 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 					UserName: "eve@canonical.com",
 					Access:   "read",
 				}, {
-					UserName: "everyone@canonical.com",
+					UserName: "everyone@external",
 					Access:   "read",
 				}},
 				Spaces: []jujuparams.RemoteSpace{{
@@ -817,7 +817,7 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 					UserName: "bob@canonical.com",
 					Access:   "consume",
 				}, {
-					UserName: "everyone@canonical.com",
+					UserName: "everyone@external",
 					Access:   "read",
 				}},
 				Spaces: []jujuparams.RemoteSpace{{

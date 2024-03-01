@@ -16,7 +16,6 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/internal/jimmtest"
-	ofganames "github.com/canonical/jimm/internal/openfga/names"
 )
 
 type applicationoffersSuite struct {
@@ -410,7 +409,7 @@ func (s *applicationoffersSuite) TestGetApplicationOffer(c *gc.C) {
 				DisplayName: "admin",
 				Access:      string(jujuparams.OfferAdminAccess),
 			}, {
-				UserName: ofganames.EveryoneUser,
+				UserName: "everyone@external",
 				Access:   string(jujuparams.OfferReadAccess),
 			}},
 		},
@@ -495,7 +494,7 @@ func (s *applicationoffersSuite) TestGrantApplicationOfferAccess(c *gc.C) {
 				DisplayName: "admin",
 				Access:      string(jujuparams.OfferAdminAccess),
 			}, {
-				UserName: ofganames.EveryoneUser,
+				UserName: "everyone@external",
 				Access:   string(jujuparams.OfferReadAccess),
 			}, {
 				UserName: "test-user-2@canonical.com",
@@ -583,7 +582,7 @@ func (s *applicationoffersSuite) TestRevokeApplicationOfferAccess(c *gc.C) {
 				DisplayName: "admin",
 				Access:      string(jujuparams.OfferAdminAccess),
 			}, {
-				UserName: ofganames.EveryoneUser,
+				UserName: "everyone@external",
 				Access:   string(jujuparams.OfferReadAccess),
 			}, {
 				UserName: "test-user-2@canonical.com",
@@ -622,7 +621,7 @@ func (s *applicationoffersSuite) TestRevokeApplicationOfferAccess(c *gc.C) {
 				DisplayName: "admin",
 				Access:      string(jujuparams.OfferAdminAccess),
 			}, {
-				UserName: ofganames.EveryoneUser,
+				UserName: "everyone@external",
 				Access:   string(jujuparams.OfferReadAccess),
 			}, {
 				UserName: "test-user-2@canonical.com",
@@ -765,7 +764,7 @@ func (s *applicationoffersSuite) TestGetApplicationOfferConsumeDetails(c *gc.C) 
 				DisplayName: "admin",
 				Access:      "admin",
 			}, {
-				UserName:    ofganames.EveryoneUser,
+				UserName:    "everyone@external",
 				DisplayName: "",
 				Access:      "read",
 			}},

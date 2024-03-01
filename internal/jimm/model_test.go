@@ -994,7 +994,7 @@ func assertConfig(config map[string]interface{}, fnc func(context.Context, *juju
 
 }
 
-// Note that this env does not give the everyone@canonical.com user access to the model.
+// Note that this env does not give the everyone user access to the model.
 const modelInfoTestEnv = `clouds:
 - name: test-cloud
   type: test-provider
@@ -1036,9 +1036,9 @@ models:
     access: read
 `
 
-// This env extends the one above to provide the everyone@canonical.com user with access to the model.
+// This env extends the one above to provide the everyone user with access to the model.
 const modelInfoTestEnvWithEveryoneAccess = modelInfoTestEnv + `
-  - user: everyone@canonical.com
+  - user: everyone@external
     access: read
 `
 
@@ -1217,7 +1217,7 @@ var modelInfoTests = []struct {
 			Since:  newDate(2020, 2, 20, 20, 2, 20, 0, time.UTC),
 		},
 		Users: []jujuparams.ModelUserInfo{{
-			UserName: "everyone@canonical.com",
+			UserName: "everyone@external",
 			Access:   "read",
 		}},
 		SLA: &jujuparams.ModelSLAInfo{

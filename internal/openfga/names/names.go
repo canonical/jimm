@@ -44,7 +44,7 @@ var (
 var allRelations = []cofga.Relation{MemberRelation, AdministratorRelation, ControllerRelation, ModelRelation, ConsumerRelation, ReaderRelation, WriterRelation, CanAddModelRelation, AuditLogViewerRelation, NoRelation}
 
 // EveryoneUser is the username representing all users and is treated uniquely when used in OpenFGA tuples.
-const EveryoneUser = "everyone@canonical.com"
+const EveryoneUser = "everyone@external"
 
 // Tag represents an entity tag as used by JIMM in OpenFGA.
 type Tag = cofga.Entity
@@ -80,7 +80,7 @@ func ConvertTag[RT ResourceTagger](t RT) *Tag {
 	if t.Kind() == names.UserTagKind && id == EveryoneUser {
 		// A user with ID "*" represents "everyone" in OpenFGA and allows checks like
 		// `user:bob reader type:my-resource` to return true without a separate query
-		// for the user:everyone@canonical.com user.
+		// for the user:everyone user.
 		id = "*"
 	}
 	tag := &Tag{
