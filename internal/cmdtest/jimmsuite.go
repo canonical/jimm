@@ -7,10 +7,14 @@ package cmdtest
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/pem"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	cofga "github.com/canonical/ofga"
@@ -53,6 +57,7 @@ func (s *JimmCmdSuite) SetUpTest(c *gc.C) {
 	s.cancel = cancel
 
 	s.HTTP = httptest.NewUnstartedServer(nil)
+	s.HTTP.TLS = setupTLS(c)
 	u, err := url.Parse("https://" + s.HTTP.Listener.Addr().String())
 	c.Assert(err, gc.Equals, nil)
 
@@ -135,6 +140,56 @@ func (s *JimmCmdSuite) SetUpTest(c *gc.C) {
 	}
 }
 
+func (s *JimmCmdSuite) TearDownTest(c *gc.C) {
+	if s.cancel != nil {
+		s.cancel()
+	}
+	if s.HTTP != nil {
+		s.HTTP.Close()
+	}
+	if s.JIMM != nil && s.JIMM.Database.DB != nil {
+		if err := s.JIMM.Database.Close(); err != nil {
+			c.Logf("failed to close database connections at tear down: %s", err)
+		}
+	}
+	s.JujuConnSuite.TearDownTest(c)
+}
+
+func getRootJimmPath(c *gc.C) string {
+	path, err := os.Getwd()
+	c.Assert(err, gc.IsNil)
+	dirs := strings.Split(path, "/")
+	c.Assert(len(dirs), gc.Not(gc.Equals), 1)
+	dirs = dirs[1:]
+	jimmIndex := -1
+	for i, part := range dirs {
+		if part == "jimm" {
+			jimmIndex = i + 1
+			break
+		}
+	}
+	c.Assert(jimmIndex, gc.Not(gc.Equals), -1)
+	return "/" + filepath.Join(dirs[:jimmIndex]...)
+}
+
+func setupTLS(c *gc.C) *tls.Config {
+	jimmPath := getRootJimmPath(c)
+	pathToCert := filepath.Join(jimmPath, "local/traefik/certs/server.crt")
+	localhostCert, err := os.ReadFile(pathToCert)
+	c.Assert(err, gc.IsNil, gc.Commentf("Unable to find cert at %s. Run make cert in root directory.", pathToCert))
+
+	pathToKey := filepath.Join(jimmPath, "local/traefik/certs/server.key")
+	localhostKey, err := os.ReadFile(pathToKey)
+	c.Assert(err, gc.IsNil, gc.Commentf("Unable to find key at %s. Run make cert in root directory.", pathToKey))
+
+	cert, err := tls.X509KeyPair(localhostCert, localhostKey)
+	c.Assert(err, gc.IsNil, gc.Commentf("Failed to generate certificate key pair."))
+
+	tlsConfig := new(tls.Config)
+	tlsConfig.Certificates = []tls.Certificate{cert}
+	return tlsConfig
+}
+
 func (s *JimmCmdSuite) AddAdminUser(c *gc.C, email string) {
 	identity := dbmodel.Identity{
 		Name: email,
@@ -157,21 +212,6 @@ func (s *JimmCmdSuite) RefreshControllerAddress(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	jimm.APIEndpoints = []string{u.Host}
 	s.ClientStore().Controllers["JIMM"] = jimm
-}
-
-func (s *JimmCmdSuite) TearDownTest(c *gc.C) {
-	if s.cancel != nil {
-		s.cancel()
-	}
-	if s.HTTP != nil {
-		s.HTTP.Close()
-	}
-	if s.JIMM != nil && s.JIMM.Database.DB != nil {
-		if err := s.JIMM.Database.Close(); err != nil {
-			c.Logf("failed to close database connections at tear down: %s", err)
-		}
-	}
-	s.JujuConnSuite.TearDownTest(c)
 }
 
 func (s *JimmCmdSuite) AddController(c *gc.C, name string, info *api.Info) {

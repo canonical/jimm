@@ -330,4 +330,4 @@ replace (
 
 replace github.com/mattn/go-sqlite3 => github.com/mattn/go-sqlite3 v1.14.5
 
-replace github.com/juju/juju v0.0.0-20240214102724-e1b7dcd73903 => github.com/kian99/juju v0.0.0-20240228092809-8c306d31400c
+replace github.com/juju/juju v0.0.0-20240214102724-e1b7dcd73903 => github.com/kian99/juju v0.0.0-20240301094235-2688d7cd925e

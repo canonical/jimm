@@ -29,15 +29,17 @@ clean:
 	-$(RM) -r jimm-release/
 	-$(RM) jimm-*.tar.xz
 
-test-env: sysdeps
+certs:
+	@cd local/traefik/certs; ./certs.sh; cd -
+
+test-env: sysdeps certs
 	@touch ./local/vault/approle.json && touch ./local/vault/roleid.txt
-	@docker compose up --force-recreate
+	@docker compose up --force-recreate -d --wait
 
 test-env-cleanup:
 	@docker compose down -v --remove-orphans
 
-dev-env-setup: sysdeps
-	@cd local/traefik/certs; ./certs.sh; cd -
+dev-env-setup: sysdeps certs
 	@touch ./local/vault/approle.json && touch ./local/vault/roleid.txt
 	@make version/commit.txt && make version/version.txt
 	@go mod vendor

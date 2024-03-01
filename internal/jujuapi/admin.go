@@ -137,7 +137,9 @@ func (r *controllerRoot) LoginWithSessionToken(ctx context.Context, req params.L
 	authenticationSvc := r.jimm.OAuthAuthenticationService()
 
 	// Verify the session token
-	jwtToken, err := authenticationSvc.VerifySessionToken(req.SessionToken, "secret-key")
+	// TODO(CSS-7081): Ensure for tests that the secret key can be configured.
+	// Or configure cmd tests to use the configured secret.
+	jwtToken, err := authenticationSvc.VerifySessionToken(req.SessionToken, "test-secret")
 	if err != nil {
 		var aerr *auth.AuthenticationError
 		if stderrors.As(err, &aerr) {

@@ -716,8 +716,8 @@ github.com/julienschmidt/httprouter v1.3.0 h1:U0609e9tgbseu3rBINet9P48AI/D3oJs4d
 github.com/julienschmidt/httprouter v1.3.0/go.mod h1:JR6WtHb+2LUe8TCKY3cZOxFyyO8IZAc4RVcycCCAKdM=
 github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 h1:Z9n2FFNUXsshfwJMBgNA0RU6/i7WVaAegv3PtuIHPMs=
 github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51/go.mod h1:CzGEWj7cYgsdH8dAjBGEr58BoE7ScuLd+fwFZ44+/x8=
-github.com/kian99/juju v0.0.0-20240228092809-8c306d31400c h1:GJmyRUMIoyP61Js0D5L4I8/wG03hbGhyAFXHfyvHoAg=
-github.com/kian99/juju v0.0.0-20240228092809-8c306d31400c/go.mod h1:V5eSJgiG7Evs4ejKhI7na7olYzHR1rxZXwx1/27Sa18=
+github.com/kian99/juju v0.0.0-20240301094235-2688d7cd925e h1:MnSWbm0Th+V7YI61C4ledtaxg564bzwBdh665fj/MeM=
+github.com/kian99/juju v0.0.0-20240301094235-2688d7cd925e/go.mod h1:V5eSJgiG7Evs4ejKhI7na7olYzHR1rxZXwx1/27Sa18=
 github.com/kisielk/errcheck v1.5.0/go.mod h1:pFxgyoBC7bSaBwPgfKdkLd5X25qrDl4LWUI2bnpBCr8=
 github.com/kisielk/gotool v1.0.0/go.mod h1:XhKaO+MFFWcvkIS/tQcRk01m1F5IRFswLeQ+oQHNcck=
 github.com/konsorten/go-windows-terminal-sequences v1.0.1/go.mod h1:T0+1ngSBFLxvqU3pZ+m/2kptfBszLMUkC4ZK/EgS/cQ=
