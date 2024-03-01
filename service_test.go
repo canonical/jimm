@@ -259,7 +259,7 @@ func TestPublicKey(t *testing.T) {
 	srv := httptest.NewTLSServer(svc)
 	c.Cleanup(srv.Close)
 
-	response, err := http.Get(srv.URL + "/macaroons/publickey")
+	response, err := srv.Client().Get(srv.URL + "/macaroons/publickey")
 	c.Assert(err, qt.IsNil)
 	data, err := io.ReadAll(response.Body)
 	c.Assert(err, qt.IsNil)
@@ -380,6 +380,9 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 			}
 
 			bakeryClient := httpbakery.NewClient()
+			// Give the bakery client the transport config from the test server client
+			// so that the bakery client has the necessary certs for the test server.
+			bakeryClient.Client.Transport = srv.Client().Transport
 			ms, err := bakeryClient.DischargeAll(context.TODO(), m)
 			if test.expectedError != "" {
 				c.Assert(err, qt.ErrorMatches, test.expectedError)
