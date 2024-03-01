@@ -36,7 +36,7 @@ test-env: sysdeps
 test-env-cleanup:
 	@docker compose down -v --remove-orphans
 
-dev-env-setup: sysdeps pull/candid
+dev-env-setup: sysdeps
 	@cd local/traefik/certs; ./certs.sh; cd -
 	@touch ./local/vault/approle.json && touch ./local/vault/roleid.txt
 	@make version/commit.txt && make version/version.txt
@@ -97,11 +97,6 @@ push-microk8s: jimm-image
 	docker tag jimm:latest localhost:32000/jimm:latest
 	docker push localhost:32000/jimm:latest
 
-pull/candid:
-	-git clone https://github.com/canonical/candid.git ./tmp/candid
-	(cd ./tmp/candid && make image)
-	docker image ls candid
-
 get-local-auth:
 	@go run ./local/authy
 
@@ -138,7 +133,6 @@ help:
 	@echo 'make sysdeps - Install the development environment system packages.'
 	@echo 'make format - Format the source files.'
 	@echo 'make simplify - Format and simplify the source files.'
-	@echo 'make pull/candid - Pull candid for local development environment.'
 	@echo 'make get-local-auth - Get local auth to the API WSS endpoint locally.'
 
 .PHONY: build check install release clean format server simplify sysdeps help FORCE

@@ -85,9 +85,10 @@ type Params struct {
 	// will be used.
 	DSN string
 
-	// ControllerAdmins contains a list of candid users (or groups)
+	// ControllerAdmins contains a list of users (or groups)
 	// that will be given the access-level "superuser" when they
 	// authenticate to the controller.
+	// TODO(CSS-7507) - Wire this up for OAuth bootstrapping.
 	ControllerAdmins []string
 
 	// DisableConnectionCache disables caching connections to
