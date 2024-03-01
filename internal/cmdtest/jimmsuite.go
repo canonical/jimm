@@ -162,8 +162,10 @@ func getRootJimmPath(c *gc.C) string {
 	c.Assert(len(dirs), gc.Not(gc.Equals), 1)
 	dirs = dirs[1:]
 	jimmIndex := -1
-	for i, part := range dirs {
-		if part == "jimm" {
+	// Range over dirs from the end to ensure no top-level jimm
+	// folders interfere with our search.
+	for i := len(dirs) - 1; i >= 0; i-- {
+		if dirs[i] == "jimm" {
 			jimmIndex = i + 1
 			break
 		}

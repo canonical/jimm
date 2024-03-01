@@ -73,7 +73,6 @@ func NewMacaroonDischarger(cfg MacaroonDischargerConfig, db *db.Database, ofgaCl
 	}, nil
 }
 
-type MyTest struct{}
 type MacaroonDischarger struct {
 	ofgaClient *openfga.OFGAClient
 	bakery     *bakery.Bakery
