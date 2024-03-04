@@ -28,7 +28,7 @@ func setupTestAuthSvc(ctx context.Context, c *qt.C, expiry time.Duration) *auth.
 		Scopes:             []string{oidc.ScopeOpenID, "profile", "email"},
 		SessionTokenExpiry: expiry,
 		RedirectURL:        "http://localhost:8080/auth/callback",
-		Db: &db.Database{
+		Store: &db.Database{
 			DB: jimmtest.PostgresDB(c, func() time.Time { return time.Now() }),
 		},
 	})

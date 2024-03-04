@@ -94,7 +94,6 @@ func (r *controllerRoot) LoginDevice(ctx context.Context) (params.LoginDeviceRes
 	if err != nil {
 		return response, errors.E(op, err)
 	}
-
 	// NOTE: As this is on the controller root struct, and a new controller root
 	// is created per WS, it is EXPECTED that the subsequent call to GetDeviceSessionToken
 	// happens on the SAME websocket.
@@ -163,7 +162,7 @@ func (r *controllerRoot) LoginWithSessionToken(ctx context.Context, req params.L
 		if stderrors.As(err, &aerr) {
 			return aerr.LoginResult, nil
 		}
-		return jujuparams.LoginResult{}, errors.E(op, err)
+		return jujuparams.LoginResult{}, errors.E(op, err, errors.CodeUnauthorized)
 	}
 
 	// Get an OpenFGA user to place on the controllerRoot for this WS

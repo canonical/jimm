@@ -15,13 +15,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/coreos/go-oidc/v3/oidc"
+	qt "github.com/frankban/quicktest"
+
 	"github.com/canonical/jimm/internal/auth"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/jimmhttp"
 	"github.com/canonical/jimm/internal/jimmtest"
-
-	"github.com/coreos/go-oidc/v3/oidc"
-	qt "github.com/frankban/quicktest"
 )
 
 func setupTestServer(c *qt.C, dashboardURL string) *httptest.Server {
@@ -51,7 +51,7 @@ func setupTestServer(c *qt.C, dashboardURL string) *httptest.Server {
 		SessionTokenExpiry: time.Hour,
 		// Now we know the port the test server is running on
 		RedirectURL: redirectURL,
-		Db:          db,
+		Store:       db,
 	})
 	c.Assert(err, qt.IsNil)
 

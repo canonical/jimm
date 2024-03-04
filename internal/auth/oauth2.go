@@ -58,7 +58,10 @@ type AuthenticationServiceParams struct {
 	// to be the servers own callback endpoint registered under /auth/callback.
 	RedirectURL string
 
-	Db IdentityStore
+	// Store holds the identity store used by the authentication service
+	// to fetch and update identities. I.e., their access tokens, refresh tokens,
+	// display name, etc.
+	Store IdentityStore
 }
 
 // NewAuthenticationService returns a new authentication service for handling
@@ -82,7 +85,7 @@ func NewAuthenticationService(ctx context.Context, params AuthenticationServiceP
 			RedirectURL:  params.RedirectURL,
 		},
 		sessionTokenExpiry: params.SessionTokenExpiry,
-		db:                 params.Db,
+		db:                 params.Store,
 	}, nil
 }
 
@@ -184,6 +187,7 @@ func (as *AuthenticationService) ExtractAndVerifyIDToken(ctx context.Context, oa
 
 	token, err := verifier.Verify(ctx, rawIDToken)
 	if err != nil {
+		zapctx.Error(ctx, "failed to verify id token", zap.Error(err))
 		return nil, errors.E(op, err, "failed to verify id token")
 	}
 

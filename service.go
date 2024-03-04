@@ -304,11 +304,12 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	authSvc, err := auth.NewAuthenticationService(
 		ctx,
 		auth.AuthenticationServiceParams{
-			IssuerURL:    p.OAuthAuthenticatorParams.IssuerURL,
-			ClientID:     p.OAuthAuthenticatorParams.ClientID,
-			ClientSecret: p.OAuthAuthenticatorParams.ClientSecret,
-			Scopes:       p.OAuthAuthenticatorParams.Scopes,
-			Db:           &s.jimm.Database,
+			IssuerURL:          p.OAuthAuthenticatorParams.IssuerURL,
+			ClientID:           p.OAuthAuthenticatorParams.ClientID,
+			ClientSecret:       p.OAuthAuthenticatorParams.ClientSecret,
+			Scopes:             p.OAuthAuthenticatorParams.Scopes,
+			SessionTokenExpiry: p.OAuthAuthenticatorParams.SessionTokenExpiry,
+			Store:              &s.jimm.Database,
 		},
 	)
 	s.jimm.OAuthAuthenticator = authSvc

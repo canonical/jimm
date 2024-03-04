@@ -2,7 +2,6 @@ package jimmhttp
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -73,7 +72,6 @@ func write500(ctx context.Context, err error, w http.ResponseWriter, logMsg stri
 
 // Callback handles /auth/callback.
 func (oah *OAuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("YOLO")
 	ctx := context.Background()
 
 	code := r.URL.Query().Get("code")
