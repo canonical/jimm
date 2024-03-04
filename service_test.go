@@ -56,6 +56,7 @@ func TestDefaultService(t *testing.T) {
 			Scopes:             []string{oidc.ScopeOpenID, "profile", "email"},
 			SessionTokenExpiry: time.Duration(time.Hour),
 		},
+		DashboardFinalRedirectURL: "",
 	})
 	c.Assert(err, qt.IsNil)
 	rr := httptest.NewRecorder()
@@ -80,6 +81,7 @@ func TestServiceStartsWithoutSecretStore(t *testing.T) {
 			Scopes:             []string{oidc.ScopeOpenID, "profile", "email"},
 			SessionTokenExpiry: time.Duration(time.Hour),
 		},
+		DashboardFinalRedirectURL: "",
 	})
 	c.Assert(err, qt.IsNil)
 }
@@ -102,6 +104,7 @@ func TestAuthenticator(t *testing.T) {
 			Scopes:             []string{oidc.ScopeOpenID, "profile", "email"},
 			SessionTokenExpiry: time.Duration(time.Hour),
 		},
+		DashboardFinalRedirectURL: "",
 	}
 	candid := startCandid(c, &p)
 	svc, err := jimm.NewService(context.Background(), p)
@@ -171,6 +174,7 @@ func TestVault(t *testing.T) {
 			Scopes:             []string{oidc.ScopeOpenID, "profile", "email"},
 			SessionTokenExpiry: time.Duration(time.Hour),
 		},
+		DashboardFinalRedirectURL: "",
 	}
 	candid := startCandid(c, &p)
 	vaultClient, _, creds, _ := jimmtest.VaultClient(c, ".")
@@ -240,6 +244,7 @@ func TestPostgresSecretStore(t *testing.T) {
 			Scopes:             []string{oidc.ScopeOpenID, "profile", "email"},
 			SessionTokenExpiry: time.Duration(time.Hour),
 		},
+		DashboardFinalRedirectURL: "",
 	}
 	_, err = jimm.NewService(context.Background(), p)
 	c.Assert(err, qt.IsNil)
@@ -262,6 +267,7 @@ func TestOpenFGA(t *testing.T) {
 			Scopes:             []string{oidc.ScopeOpenID, "profile", "email"},
 			SessionTokenExpiry: time.Duration(time.Hour),
 		},
+		DashboardFinalRedirectURL: "",
 	}
 	candid := startCandid(c, &p)
 	svc, err := jimm.NewService(context.Background(), p)
@@ -318,6 +324,7 @@ func TestPublicKey(t *testing.T) {
 			Scopes:             []string{oidc.ScopeOpenID, "profile", "email"},
 			SessionTokenExpiry: time.Duration(time.Hour),
 		},
+		DashboardFinalRedirectURL: "",
 	}
 	_ = startCandid(c, &p)
 	svc, err := jimm.NewService(context.Background(), p)
@@ -406,6 +413,7 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 					Scopes:             []string{oidc.ScopeOpenID, "profile", "email"},
 					SessionTokenExpiry: time.Duration(time.Hour),
 				},
+				DashboardFinalRedirectURL: "",
 			}
 			_ = startCandid(c, &p)
 			svc, err := jimm.NewService(context.Background(), p)

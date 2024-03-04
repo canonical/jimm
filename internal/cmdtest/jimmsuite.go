@@ -91,6 +91,7 @@ func (s *JimmCmdSuite) SetUpTest(c *gc.C) {
 			Scopes:             []string{oidc.ScopeOpenID, "profile", "email"},
 			SessionTokenExpiry: time.Duration(time.Hour),
 		},
+		DashboardFinalRedirectURL: "",
 	}
 
 	srv, err := service.NewService(ctx, s.Params)

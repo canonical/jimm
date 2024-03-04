@@ -114,6 +114,7 @@ func setupService(ctx context.Context, c *qt.C) (*jimm.Service, *httptest.Server
 			Scopes:             []string{oidc.ScopeOpenID, "profile", "email"},
 			SessionTokenExpiry: time.Duration(time.Hour),
 		},
+		DashboardFinalRedirectURL: "",
 	})
 	c.Assert(err, qt.IsNil)
 
