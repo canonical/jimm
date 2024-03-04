@@ -152,6 +152,7 @@ func start(ctx context.Context, s *service.Service) error {
 			Scopes:             scopesParsed,
 			SessionTokenExpiry: sessionTokenExpiryDuration,
 		},
+		DashboardFinalRedirectURL: os.Getenv("JIMM_DASHBOARD_FINAL_REDIRECT_URL"),
 	})
 	if err != nil {
 		return err

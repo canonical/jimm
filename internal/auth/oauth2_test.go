@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/canonical/jimm/internal/auth"
+	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/jimmtest"
 	"github.com/coreos/go-oidc/v3/oidc"
 	qt "github.com/frankban/quicktest"
@@ -27,6 +28,9 @@ func setupTestAuthSvc(ctx context.Context, c *qt.C, expiry time.Duration) *auth.
 		Scopes:             []string{oidc.ScopeOpenID, "profile", "email"},
 		SessionTokenExpiry: expiry,
 		RedirectURL:        "http://localhost:8080/auth/callback",
+		Db: &db.Database{
+			DB: jimmtest.PostgresDB(c, func() time.Time { return time.Now() }),
+		},
 	})
 	c.Assert(err, qt.IsNil)
 

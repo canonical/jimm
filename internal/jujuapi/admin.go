@@ -6,7 +6,6 @@ import (
 	"context"
 	stderrors "errors"
 	"sort"
-	"strings"
 
 	"github.com/juju/juju/rpc"
 	jujuparams "github.com/juju/juju/rpc/params"
@@ -14,7 +13,6 @@ import (
 
 	"github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/internal/auth"
-	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/openfga"
 	"github.com/canonical/jimm/internal/servermon"
@@ -133,33 +131,9 @@ func (r *controllerRoot) GetDeviceSessionToken(ctx context.Context) (params.GetD
 		return response, errors.E(op, err)
 	}
 
-	// TODO(ale8k): Move this into a service, don't do db logic
-	// at the handler level
-	// Now we know who the user is, i.e., their email
-	// we'll update their access token.
-	// <Start of todo>
-	// Build username + display name
-	db := r.jimm.DB()
-	u := &dbmodel.Identity{
-		Name: email,
-	}
-	// TODO(babakks): If user does not exist, we will create one with an empty
-	// display name (which we shouldn't). So it would be better to fetch
-	// and then create. At the moment, GetUser is used for both create and fetch,
-	// this should be changed and split apart so it is intentional what entities
-	// we are creating or fetching.
-	if err := db.GetIdentity(ctx, u); err != nil {
+	if err := authSvc.UpdateIdentity(ctx, email, token); err != nil {
 		return response, errors.E(op, err)
 	}
-	// Check if user has a display name, if not, set one
-	if u.DisplayName == "" {
-		u.DisplayName = strings.Split(email, "@")[0]
-	}
-	u.AccessToken = token.AccessToken
-	if err := r.jimm.DB().UpdateIdentity(ctx, u); err != nil {
-		return response, errors.E(op, err)
-	}
-	// <End of todo>
 
 	// TODO(ale8k): Add vault logic to get secret key and generate one
 	// on start up.

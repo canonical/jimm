@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	stderrors "errors"
 	"net/mail"
+	"strings"
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -16,6 +17,7 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 
+	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
 )
 
@@ -27,6 +29,13 @@ type AuthenticationService struct {
 	provider *oidc.Provider
 	// sessionTokenExpiry holds the expiry time for JIMM minted session tokens (JWTs).
 	sessionTokenExpiry time.Duration
+
+	db IdentityStore
+}
+
+type IdentityStore interface {
+	GetIdentity(ctx context.Context, u *dbmodel.Identity) error
+	UpdateIdentity(ctx context.Context, u *dbmodel.Identity) error
 }
 
 // AuthenticationServiceParams holds the parameters to initialise
@@ -48,6 +57,8 @@ type AuthenticationServiceParams struct {
 	// codes into access tokens (and id tokens), for JIMM, this is expected
 	// to be the servers own callback endpoint registered under /auth/callback.
 	RedirectURL string
+
+	Db IdentityStore
 }
 
 // NewAuthenticationService returns a new authentication service for handling
@@ -71,6 +82,7 @@ func NewAuthenticationService(ctx context.Context, params AuthenticationServiceP
 			RedirectURL:  params.RedirectURL,
 		},
 		sessionTokenExpiry: params.SessionTokenExpiry,
+		db:                 params.Db,
 	}, nil
 }
 
@@ -84,6 +96,27 @@ func (as *AuthenticationService) AuthCodeURL() string {
 	// but we'd have much larger problems than an auth code interception at that
 	// point. As such, we're opting out of using auth code URL state.
 	return as.oauthConfig.AuthCodeURL("")
+}
+
+// Exchange exchanges an authorisation code for an access token.
+//
+// TODO(ale8k): How to test this? A callback has to be made and it needs to be valid,
+// this may need some thought as to whether its actually worth testing or are we
+// just testing the library. The handler test essentially covers this so perhaps
+// its ok to leave it as is?
+func (as *AuthenticationService) Exchange(ctx context.Context, code string) (*oauth2.Token, error) {
+	const op = errors.Op("auth.AuthenticationService.Exchange")
+
+	t, err := as.oauthConfig.Exchange(
+		ctx,
+		code,
+		oauth2.SetAuthURLParam("client_secret", as.oauthConfig.ClientSecret),
+	)
+	if err != nil {
+		return nil, errors.E(op, err, "device access token call failed")
+	}
+
+	return t, nil
 }
 
 // Device initiates a device flow login and is step ONE of TWO.
@@ -200,6 +233,32 @@ func (as *AuthenticationService) MintSessionToken(email string, secretKey string
 // VerifySessionToken calls the exported VerifySessionToken function.
 func (as *AuthenticationService) VerifySessionToken(token string, secretKey string) (jwt.Token, error) {
 	return VerifySessionToken(token, secretKey)
+}
+
+// UpdateIdentity updates the database with the display name and access token set for the user.
+// And, if present, a refresh token.
+func (as *AuthenticationService) UpdateIdentity(ctx context.Context, email string, token *oauth2.Token) error {
+	db := as.db
+	u := &dbmodel.Identity{
+		Name: email,
+	}
+	// TODO(babakks): If user does not exist, we will create one with an empty
+	// display name (which we shouldn't). So it would be better to fetch
+	// and then create. At the moment, GetUser is used for both create and fetch,
+	// this should be changed and split apart so it is intentional what entities
+	// we are creating or fetching.
+	if err := db.GetIdentity(ctx, u); err != nil {
+		return err
+	}
+	// Check if user has a display name, if not, set one
+	if u.DisplayName == "" {
+		u.DisplayName = strings.Split(email, "@")[0]
+	}
+	u.AccessToken = token.AccessToken
+	if err := db.UpdateIdentity(ctx, u); err != nil {
+		return err
+	}
+	return nil
 }
 
 // VerifySessionToken symmetrically verifies the validty of the signature on the

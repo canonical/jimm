@@ -114,6 +114,9 @@ func TestGetOpenFGAUser(t *testing.T) {
 		ClientID:           "jimm-device",
 		Scopes:             []string{"openid", "profile", "email"},
 		SessionTokenExpiry: time.Hour,
+		Db: &db.Database{
+			DB: jimmtest.PostgresDB(c, func() time.Time { return time.Now() }),
+		},
 	})
 	c.Assert(err, qt.IsNil)
 

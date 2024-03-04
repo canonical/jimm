@@ -165,6 +165,10 @@ type OAuthAuthenticator interface {
 	// The subject of the token contains the user's email and can be used
 	// for user object creation.
 	VerifySessionToken(token string, secretKey string) (jwt.Token, error)
+
+	// UpdateIdentity updates the database with the display name and access token set for the user.
+	// And, if present, a refresh token.
+	UpdateIdentity(ctx context.Context, email string, token *oauth2.Token) error
 }
 
 type permission struct {
