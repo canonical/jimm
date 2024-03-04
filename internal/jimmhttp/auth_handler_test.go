@@ -128,3 +128,37 @@ func TestBrowserAuth(t *testing.T) {
 
 	defer loginResp.Body.Close()
 }
+
+func TestCallbackFailsNoCodePresent(t *testing.T) {
+	c := qt.New(t)
+
+	s := setupTestServer(c, "<no dashboard needed for this test>")
+	defer s.Close()
+
+	// Test with no code present at all
+	res, err := http.Get(s.URL + "/callback")
+	c.Assert(err, qt.IsNil)
+
+	defer res.Body.Close()
+
+	b, err := io.ReadAll(res.Body)
+	c.Assert(err, qt.IsNil)
+	c.Assert(string(b), qt.Equals, http.StatusText(http.StatusBadRequest))
+}
+
+func TestCallbackFailsExchange(t *testing.T) {
+	c := qt.New(t)
+
+	s := setupTestServer(c, "<no dashboard needed for this test>")
+	defer s.Close()
+
+	// Test with no code present at all
+	res, err := http.Get(s.URL + "/callback?code=idonotexist")
+	c.Assert(err, qt.IsNil)
+
+	defer res.Body.Close()
+
+	b, err := io.ReadAll(res.Body)
+	c.Assert(err, qt.IsNil)
+	c.Assert(string(b), qt.Equals, http.StatusText(http.StatusBadRequest))
+}

@@ -118,7 +118,7 @@ func (as *AuthenticationService) Exchange(ctx context.Context, code string) (*oa
 		oauth2.SetAuthURLParam("client_secret", as.oauthConfig.ClientSecret),
 	)
 	if err != nil {
-		return nil, errors.E(op, err, "device access token call failed")
+		return nil, errors.E(op, err, "authorisation code exchange failed")
 	}
 
 	return t, nil

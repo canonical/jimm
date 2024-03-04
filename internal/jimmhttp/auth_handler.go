@@ -72,6 +72,11 @@ func (oah *OAuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 
 	authSvc := oah.Authenticator
 
+	if code == "" {
+		writeError(ctx, w, http.StatusBadRequest, nil, "no authorisation code present")
+		return
+	}
+
 	token, err := authSvc.Exchange(ctx, code)
 	if err != nil {
 		writeError(ctx, w, http.StatusBadRequest, err, "failed to exchange authcode")
