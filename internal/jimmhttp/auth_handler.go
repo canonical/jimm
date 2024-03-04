@@ -10,6 +10,8 @@ import (
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
+
+	"github.com/canonical/jimm/internal/errors"
 )
 
 // OAuthHandler handles the oauth2.0 browser flow for JIMM.
@@ -31,12 +33,18 @@ type BrowserOAuthAuthenticator interface {
 }
 
 // NewOAuthHandler returns a new OAuth handler.
-func NewOAuthHandler(authenticator BrowserOAuthAuthenticator, dashboardFinalRedirectURL string) *OAuthHandler {
+func NewOAuthHandler(authenticator BrowserOAuthAuthenticator, dashboardFinalRedirectURL string) (*OAuthHandler, error) {
+	if authenticator == nil {
+		return nil, errors.E("nil authenticator")
+	}
+	if dashboardFinalRedirectURL == "" {
+		return nil, errors.E("final redirect url not specified")
+	}
 	return &OAuthHandler{
 		Router:                    chi.NewRouter(),
 		Authenticator:             authenticator,
 		DashboardFinalRedirectURL: dashboardFinalRedirectURL,
-	}
+	}, nil
 }
 
 // Routes returns the grouped routers routes with group specific middlewares.

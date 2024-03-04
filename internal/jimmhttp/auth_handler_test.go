@@ -55,8 +55,10 @@ func setupTestServer(c *qt.C, dashboardURL string) *httptest.Server {
 	})
 	c.Assert(err, qt.IsNil)
 
-	r := jimmhttp.NewOAuthHandler(authSvc, dashboardURL).Routes()
-	s.Config.Handler = r
+	h, err := jimmhttp.NewOAuthHandler(authSvc, dashboardURL)
+	c.Assert(err, qt.IsNil)
+
+	s.Config.Handler = h.Routes()
 
 	s.Start()
 

@@ -355,9 +355,13 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		"/.well-known",
 		wellknownapi.NewWellKnownHandler(s.jimm.CredentialStore),
 	)
+	oauthHandler, err := jimmhttp.NewOAuthHandler(authSvc, p.DashboardFinalRedirectURL)
+	if err != nil {
+		return nil, errors.E(op, err, "failed to setup authentication handler")
+	}
 	mountHandler(
 		"/auth",
-		jimmhttp.NewOAuthHandler(authSvc, p.DashboardFinalRedirectURL),
+		oauthHandler,
 	)
 
 	params := jujuapi.Params{
