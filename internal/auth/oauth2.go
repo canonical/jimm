@@ -33,6 +33,8 @@ type AuthenticationService struct {
 	db IdentityStore
 }
 
+// Identity store holds the necessary methods to get and update an identity
+// within JIMM's store.
 type IdentityStore interface {
 	GetIdentity(ctx context.Context, u *dbmodel.Identity) error
 	UpdateIdentity(ctx context.Context, u *dbmodel.Identity) error

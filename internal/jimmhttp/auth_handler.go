@@ -64,12 +64,6 @@ func (oah *OAuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
 }
 
-func write500(ctx context.Context, err error, w http.ResponseWriter, logMsg string) {
-	zapctx.Error(ctx, logMsg, zap.Error(err))
-	w.WriteHeader(http.StatusInternalServerError)
-	w.Write([]byte("Internal Server Error."))
-}
-
 // Callback handles /auth/callback.
 func (oah *OAuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
@@ -80,26 +74,34 @@ func (oah *OAuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 
 	token, err := authSvc.Exchange(ctx, code)
 	if err != nil {
-		write500(ctx, err, w, "failed to exchange authcode")
+		writeError(ctx, w, http.StatusBadRequest, err, "failed to exchange authcode")
 		return
 	}
 
 	idToken, err := authSvc.ExtractAndVerifyIDToken(ctx, token)
 	if err != nil {
-		write500(ctx, err, w, "failed to extract and verify id token")
+		writeError(ctx, w, http.StatusBadRequest, err, "failed to extract and verify id token")
 		return
 	}
 
 	email, err := authSvc.Email(idToken)
 	if err != nil {
-		write500(ctx, err, w, "failed to extract email from id token")
+		writeError(ctx, w, http.StatusBadRequest, err, "failed to extract email from id token")
 		return
 	}
 
 	if err := authSvc.UpdateIdentity(ctx, email, token); err != nil {
-		write500(ctx, err, w, "failed to update identity")
+		writeError(ctx, w, http.StatusBadRequest, err, "failed to update identity")
 		return
 	}
 
 	http.Redirect(w, r, oah.DashboardFinalRedirectURL, http.StatusPermanentRedirect)
+}
+
+// writeError writes an error and logs the message. It is expected that the status code
+// is an erroneous status code.
+func writeError(ctx context.Context, w http.ResponseWriter, status int, err error, logMessage string) {
+	zapctx.Error(ctx, logMessage, zap.Error(err))
+	w.WriteHeader(status)
+	w.Write([]byte(http.StatusText(status)))
 }
