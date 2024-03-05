@@ -1,6 +1,7 @@
 -- 1_6.sql is a migration that adds access tokens to the user table
 -- and is a migration that renames `user` to `identity`.
 ALTER TABLE users ADD COLUMN access_token TEXT;
+ALTER TABLE users ADD COLUMN refresh_token TEXT;
 
 -- Note that we don't need to rename underlying indexes/constraints. As Postgres
 -- docs states:
