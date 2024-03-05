@@ -69,13 +69,12 @@ func (oah *OAuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 
 	code := r.URL.Query().Get("code")
-
-	authSvc := oah.Authenticator
-
 	if code == "" {
 		writeError(ctx, w, http.StatusBadRequest, nil, "no authorisation code present")
 		return
 	}
+
+	authSvc := oah.Authenticator
 
 	token, err := authSvc.Exchange(ctx, code)
 	if err != nil {

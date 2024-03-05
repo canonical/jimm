@@ -260,6 +260,7 @@ func (as *AuthenticationService) UpdateIdentity(ctx context.Context, email strin
 	if u.DisplayName == "" {
 		u.DisplayName = strings.Split(email, "@")[0]
 	}
+
 	u.AccessToken = token.AccessToken
 	u.RefreshToken = token.RefreshToken
 	if err := db.UpdateIdentity(ctx, u); err != nil {
