@@ -26,11 +26,22 @@ type OAuthHandler struct {
 }
 
 type OAuthHandlerParams struct {
-	Authenticator             BrowserOAuthAuthenticator
+	// Authenticator is the authenticator to handle browser authentication.
+	Authenticator BrowserOAuthAuthenticator
+
+	// DashboardFinalRedirectURL is the final redirection URL to send users to
+	// upon completing the authorisation code flow.
 	DashboardFinalRedirectURL string
-	SessionStore              *pgstore.PGStore
-	SecureCookies             bool
-	CookieExpiry              int
+
+	// SessionStore is the cookie session store.
+	SessionStore *pgstore.PGStore
+
+	// SessionCookies determines if HTTPS must be enabled in order for JIMM
+	// to set cookies when creating browser based sessions.
+	SecureCookies bool
+
+	// CookieExpiry is how long the cookie will be valid before expiring in seconds.
+	CookieExpiry int
 }
 
 // BrowserOAuthAuthenticator handles authorisation code authentication within JIMM
