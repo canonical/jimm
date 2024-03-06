@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/antonlindstrom/pgstore"
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/go-chi/chi/v5"
 	"github.com/juju/zaputil/zapctx"
@@ -17,8 +18,19 @@ import (
 // Implements jimmhttp.JIMMHttpHandler.
 type OAuthHandler struct {
 	Router                    *chi.Mux
+	authenticator             BrowserOAuthAuthenticator
+	dashboardFinalRedirectURL string
+	sessionStore              *pgstore.PGStore
+	secureCookies             bool
+	cookieExpiry              int
+}
+
+type OAuthHandlerParams struct {
 	Authenticator             BrowserOAuthAuthenticator
 	DashboardFinalRedirectURL string
+	SessionStore              *pgstore.PGStore
+	SecureCookies             bool
+	CookieExpiry              int
 }
 
 // BrowserOAuthAuthenticator handles authorisation code authentication within JIMM
@@ -32,17 +44,23 @@ type BrowserOAuthAuthenticator interface {
 }
 
 // NewOAuthHandler returns a new OAuth handler.
-func NewOAuthHandler(authenticator BrowserOAuthAuthenticator, dashboardFinalRedirectURL string) (*OAuthHandler, error) {
-	if authenticator == nil {
+func NewOAuthHandler(p OAuthHandlerParams) (*OAuthHandler, error) {
+	if p.Authenticator == nil {
 		return nil, errors.E("nil authenticator")
 	}
-	if dashboardFinalRedirectURL == "" {
+	if p.DashboardFinalRedirectURL == "" {
 		return nil, errors.E("final redirect url not specified")
+	}
+	if p.SessionStore == nil {
+		return nil, errors.E("nil session store")
 	}
 	return &OAuthHandler{
 		Router:                    chi.NewRouter(),
-		Authenticator:             authenticator,
-		DashboardFinalRedirectURL: dashboardFinalRedirectURL,
+		authenticator:             p.Authenticator,
+		dashboardFinalRedirectURL: p.DashboardFinalRedirectURL,
+		sessionStore:              p.SessionStore,
+		secureCookies:             p.SecureCookies,
+		cookieExpiry:              p.CookieExpiry,
 	}, nil
 }
 
@@ -60,7 +78,7 @@ func (oah *OAuthHandler) SetupMiddleware() {
 
 // Login handles /auth/login.
 func (oah *OAuthHandler) Login(w http.ResponseWriter, r *http.Request) {
-	redirectURL := oah.Authenticator.AuthCodeURL()
+	redirectURL := oah.authenticator.AuthCodeURL()
 	http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
 }
 
@@ -74,7 +92,7 @@ func (oah *OAuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	authSvc := oah.Authenticator
+	authSvc := oah.authenticator
 
 	token, err := authSvc.Exchange(ctx, code)
 	if err != nil {
@@ -99,7 +117,23 @@ func (oah *OAuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.Redirect(w, r, oah.DashboardFinalRedirectURL, http.StatusPermanentRedirect)
+	// If the session is empty, it'll just be an empty session, we only check
+	// errors for bad decoding etc.
+	session, err := oah.sessionStore.Get(r, "jimm-browser-session")
+	if err != nil {
+		writeError(ctx, w, http.StatusBadRequest, err, "failed to get session")
+	}
+
+	session.IsNew = true             // Sets cookie to a fresh new cookie
+	session.Options.MaxAge = 86400   // 24 Hours expiry
+	session.Options.Secure = false   // Ensures only sent with HTTPS
+	session.Options.HttpOnly = false // Allow Javascript to read it
+
+	session.Values["jimm-session"] = email
+	if err = session.Save(r, w); err != nil {
+		writeError(ctx, w, http.StatusBadRequest, err, "failed to save session")
+	}
+	http.Redirect(w, r, oah.dashboardFinalRedirectURL, http.StatusPermanentRedirect)
 }
 
 // writeError writes an error and logs the message. It is expected that the status code

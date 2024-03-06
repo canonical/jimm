@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/antonlindstrom/pgstore"
 	"github.com/coreos/go-oidc/v3/oidc"
 	qt "github.com/frankban/quicktest"
 
@@ -24,7 +25,23 @@ import (
 	"github.com/canonical/jimm/internal/jimmtest"
 )
 
-func setupTestServer(c *qt.C, dashboardURL string) *httptest.Server {
+func setupDbAndSessionStore(c *qt.C) (*db.Database, *pgstore.PGStore) {
+	// Setup db ahead of time so we have access to session store
+	db := &db.Database{
+		DB: jimmtest.PostgresDB(c, func() time.Time { return time.Now() }),
+	}
+	c.Assert(db.Migrate(context.Background(), false), qt.IsNil)
+
+	sqlDb, err := db.DB.DB()
+	c.Assert(err, qt.IsNil)
+
+	store, err := pgstore.NewPGStoreFromPool(sqlDb, []byte("secretsecretdigletts"))
+	c.Assert(err, qt.IsNil)
+
+	return db, store
+}
+
+func setupTestServer(c *qt.C, dashboardURL string, db *db.Database, sessionStore *pgstore.PGStore) *httptest.Server {
 	// Create unstarted server to enable auth service
 	s := httptest.NewUnstartedServer(nil)
 	// Setup random port listener
@@ -39,10 +56,7 @@ func setupTestServer(c *qt.C, dashboardURL string) *httptest.Server {
 
 	// Remember redirect url to check it matches after test server starts
 	redirectURL := "http://127.0.0.1:" + port + "/callback"
-	db := &db.Database{
-		DB: jimmtest.PostgresDB(c, func() time.Time { return time.Now() }),
-	}
-	c.Assert(db.Migrate(context.Background(), false), qt.IsNil)
+
 	authSvc, err := auth.NewAuthenticationService(context.Background(), auth.AuthenticationServiceParams{
 		IssuerURL:          "http://localhost:8082/realms/jimm",
 		ClientID:           "jimm-device",
@@ -55,7 +69,13 @@ func setupTestServer(c *qt.C, dashboardURL string) *httptest.Server {
 	})
 	c.Assert(err, qt.IsNil)
 
-	h, err := jimmhttp.NewOAuthHandler(authSvc, dashboardURL)
+	h, err := jimmhttp.NewOAuthHandler(jimmhttp.OAuthHandlerParams{
+		Authenticator:             authSvc,
+		DashboardFinalRedirectURL: dashboardURL,
+		SessionStore:              sessionStore,
+		SecureCookies:             false,
+		CookieExpiry:              86400,
+	})
 	c.Assert(err, qt.IsNil)
 
 	s.Config.Handler = h.Routes()
@@ -76,6 +96,8 @@ func setupTestServer(c *qt.C, dashboardURL string) *httptest.Server {
 func TestBrowserAuth(t *testing.T) {
 	c := qt.New(t)
 
+	db, sessionStore := setupDbAndSessionStore(c)
+
 	// Setup final test redirect url server, to emulate
 	// the dashboard receiving the final piece of the flow
 	dashboardResponse := "dashboard received final callback"
@@ -83,12 +105,19 @@ func TestBrowserAuth(t *testing.T) {
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
 				fmt.Fprint(w, dashboardResponse)
+				sessionCookie, _ := r.Cookie("jimm-browser-session")
+				c.Assert(sessionCookie.Name, qt.Equals, "jimm-browser-session")
+				c.Assert(sessionCookie.Value, qt.Not(qt.Equals), "")
+				// Check the session exist in db
+				session, err := sessionStore.Get(r, "jimm-browser-session")
+				c.Assert(err, qt.IsNil)
+				c.Assert(session.Values["jimm-session"], qt.Equals, "jimm-test@canonical.com")
 			},
 		),
 	)
 	defer dashboard.Close()
 
-	s := setupTestServer(c, dashboard.URL)
+	s := setupTestServer(c, dashboard.URL, db, sessionStore)
 	defer s.Close()
 
 	jar, err := cookiejar.New(nil)
@@ -132,7 +161,8 @@ func TestBrowserAuth(t *testing.T) {
 func TestCallbackFailsNoCodePresent(t *testing.T) {
 	c := qt.New(t)
 
-	s := setupTestServer(c, "<no dashboard needed for this test>")
+	db, sessionStore := setupDbAndSessionStore(c)
+	s := setupTestServer(c, "<no dashboard needed for this test>", db, sessionStore)
 	defer s.Close()
 
 	// Test with no code present at all
@@ -149,7 +179,8 @@ func TestCallbackFailsNoCodePresent(t *testing.T) {
 func TestCallbackFailsExchange(t *testing.T) {
 	c := qt.New(t)
 
-	s := setupTestServer(c, "<no dashboard needed for this test>")
+	db, sessionStore := setupDbAndSessionStore(c)
+	s := setupTestServer(c, "<no dashboard needed for this test>", db, sessionStore)
 	defer s.Close()
 
 	// Test with no code present at all

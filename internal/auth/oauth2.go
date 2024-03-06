@@ -244,6 +244,8 @@ func (as *AuthenticationService) VerifySessionToken(token string, secretKey stri
 // UpdateIdentity updates the database with the display name and access token set for the user.
 // And, if present, a refresh token.
 func (as *AuthenticationService) UpdateIdentity(ctx context.Context, email string, token *oauth2.Token) error {
+	const op = errors.Op("auth.UpdateIdentity")
+
 	db := as.db
 	u := &dbmodel.Identity{
 		Name: email,
@@ -254,17 +256,22 @@ func (as *AuthenticationService) UpdateIdentity(ctx context.Context, email strin
 	// this should be changed and split apart so it is intentional what entities
 	// we are creating or fetching.
 	if err := db.GetIdentity(ctx, u); err != nil {
-		return err
+		return errors.E(op, err)
 	}
 	// Check if user has a display name, if not, set one
 	if u.DisplayName == "" {
-		u.DisplayName = strings.Split(email, "@")[0]
+		splitEmail := strings.Split(email, "@")
+		if len(splitEmail) > 0 {
+			u.DisplayName = strings.Split(email, "@")[0]
+		} else {
+			return errors.E(op, "failed to split email")
+		}
 	}
 
 	u.AccessToken = token.AccessToken
 	u.RefreshToken = token.RefreshToken
 	if err := db.UpdateIdentity(ctx, u); err != nil {
-		return err
+		return errors.E(op, err)
 	}
 
 	return nil

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -118,6 +119,21 @@ func start(ctx context.Context, s *service.Service) error {
 	if _, ok := os.LookupEnv("INSECURE_SECRET_STORAGE"); ok {
 		insecureSecretStorage = true
 	}
+
+	secureSessionCookies := false
+	if _, ok := os.LookupEnv("JIMM_SECURE_SESSION_COOKIES"); ok {
+		secureSessionCookies = true
+	}
+
+	sessionCookieExpiry := os.Getenv("JIMM_SESSION_COOKIE_EXPIRY")
+	sessionCookieExpiryInt, err := strconv.Atoi(sessionCookieExpiry)
+	if err != nil {
+		return errors.E("unable to parse jimm session cookie expiry")
+	}
+	if sessionCookieExpiryInt < 0 {
+		return errors.E("jimm session cookie expiry cannot be less than 0")
+	}
+
 	jimmsvc, err := jimm.NewService(ctx, jimm.Params{
 		ControllerUUID:    os.Getenv("JIMM_UUID"),
 		DSN:               os.Getenv("JIMM_DSN"),
@@ -153,6 +169,8 @@ func start(ctx context.Context, s *service.Service) error {
 			SessionTokenExpiry: sessionTokenExpiryDuration,
 		},
 		DashboardFinalRedirectURL: os.Getenv("JIMM_DASHBOARD_FINAL_REDIRECT_URL"),
+		SecureSessionCookies:      secureSessionCookies,
+		SessionCookieExpiry:       sessionCookieExpiryInt,
 	})
 	if err != nil {
 		return err
