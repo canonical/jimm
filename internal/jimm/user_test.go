@@ -108,21 +108,22 @@ func TestGetOpenFGAUser(t *testing.T) {
 	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
+	db := &db.Database{
+		DB: jimmtest.PostgresDB(c, func() time.Time { return time.Now() }),
+	}
 	// TODO(ale8k): Mock this
 	authSvc, err := auth.NewAuthenticationService(ctx, auth.AuthenticationServiceParams{
 		IssuerURL:          "http://localhost:8082/realms/jimm",
 		ClientID:           "jimm-device",
 		Scopes:             []string{"openid", "profile", "email"},
 		SessionTokenExpiry: time.Hour,
+		Store:              db,
 	})
 	c.Assert(err, qt.IsNil)
 
-	now := time.Now().UTC().Round(time.Millisecond)
 	j := &jimm.JIMM{
-		UUID: "test",
-		Database: db.Database{
-			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
-		},
+		UUID:               "test",
+		Database:           *db,
 		OAuthAuthenticator: authSvc,
 		OpenFGAClient:      client,
 	}

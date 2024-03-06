@@ -14,12 +14,19 @@ import (
 	"time"
 
 	"github.com/canonical/jimm/internal/auth"
+	"github.com/canonical/jimm/internal/db"
+	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/jimmtest"
 	"github.com/coreos/go-oidc/v3/oidc"
 	qt "github.com/frankban/quicktest"
 )
 
-func setupTestAuthSvc(ctx context.Context, c *qt.C, expiry time.Duration) *auth.AuthenticationService {
+func setupTestAuthSvc(ctx context.Context, c *qt.C, expiry time.Duration) (*auth.AuthenticationService, *db.Database) {
+	db := &db.Database{
+		DB: jimmtest.PostgresDB(c, func() time.Time { return time.Now() }),
+	}
+	c.Assert(db.Migrate(ctx, false), qt.IsNil)
+
 	authSvc, err := auth.NewAuthenticationService(ctx, auth.AuthenticationServiceParams{
 		IssuerURL:          "http://localhost:8082/realms/jimm",
 		ClientID:           "jimm-device",
@@ -27,10 +34,11 @@ func setupTestAuthSvc(ctx context.Context, c *qt.C, expiry time.Duration) *auth.
 		Scopes:             []string{oidc.ScopeOpenID, "profile", "email"},
 		SessionTokenExpiry: expiry,
 		RedirectURL:        "http://localhost:8080/auth/callback",
+		Store:              db,
 	})
 	c.Assert(err, qt.IsNil)
 
-	return authSvc
+	return authSvc, db
 }
 
 // This test requires the local docker compose to be running and keycloak
@@ -41,7 +49,7 @@ func TestAuthCodeURL(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
-	authSvc := setupTestAuthSvc(ctx, c, time.Hour)
+	authSvc, _ := setupTestAuthSvc(ctx, c, time.Hour)
 
 	url := authSvc.AuthCodeURL()
 	c.Assert(
@@ -67,7 +75,7 @@ func TestDevice(t *testing.T) {
 
 	ctx := context.Background()
 
-	authSvc := setupTestAuthSvc(ctx, c, time.Hour)
+	authSvc, db := setupTestAuthSvc(ctx, c, time.Hour)
 
 	res, err := authSvc.Device(ctx)
 	c.Assert(err, qt.IsNil)
@@ -138,6 +146,17 @@ func TestDevice(t *testing.T) {
 	email, err := authSvc.Email(idToken)
 	c.Assert(err, qt.IsNil)
 	c.Assert(email, qt.Equals, u.Email)
+
+	// Update the identity
+	err = authSvc.UpdateIdentity(ctx, email, token)
+	c.Assert(err, qt.IsNil)
+
+	updatedUser := &dbmodel.Identity{
+		Name: u.Email,
+	}
+	c.Assert(db.GetIdentity(ctx, updatedUser), qt.IsNil)
+	c.Assert(updatedUser.AccessToken, qt.Not(qt.Equals), "")
+	c.Assert(updatedUser.RefreshToken, qt.Not(qt.Equals), "")
 }
 
 // TestSessionTokens tests both the minting and validation of JIMM
@@ -147,7 +166,7 @@ func TestSessionTokens(t *testing.T) {
 
 	ctx := context.Background()
 
-	authSvc := setupTestAuthSvc(ctx, c, time.Hour)
+	authSvc, _ := setupTestAuthSvc(ctx, c, time.Hour)
 
 	secretKey := "secret-key"
 	token, err := authSvc.MintSessionToken("jimm-test@canonical.com", secretKey)
@@ -164,7 +183,7 @@ func TestSessionTokenRejectsWrongSecretKey(t *testing.T) {
 
 	ctx := context.Background()
 
-	authSvc := setupTestAuthSvc(ctx, c, time.Hour)
+	authSvc, _ := setupTestAuthSvc(ctx, c, time.Hour)
 
 	secretKey := "secret-key"
 	token, err := authSvc.MintSessionToken("jimm-test@canonical.com", secretKey)
@@ -181,7 +200,7 @@ func TestSessionTokenRejectsExpiredToken(t *testing.T) {
 	ctx := context.Background()
 
 	noDuration := time.Duration(0)
-	authSvc := setupTestAuthSvc(ctx, c, noDuration)
+	authSvc, _ := setupTestAuthSvc(ctx, c, noDuration)
 
 	secretKey := "secret-key"
 	token, err := authSvc.MintSessionToken("jimm-test@canonical.com", secretKey)
@@ -197,7 +216,7 @@ func TestSessionTokenValidatesEmail(t *testing.T) {
 
 	ctx := context.Background()
 
-	authSvc := setupTestAuthSvc(ctx, c, time.Hour)
+	authSvc, _ := setupTestAuthSvc(ctx, c, time.Hour)
 
 	secretKey := "secret-key"
 	token, err := authSvc.MintSessionToken("", secretKey)

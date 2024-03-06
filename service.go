@@ -180,6 +180,10 @@ type Params struct {
 	// OAuthAuthenticatorParams holds parameters needed to configure an OAuthAuthenticator
 	// implementation.
 	OAuthAuthenticatorParams OAuthAuthenticatorParams
+
+	// DashboardFinalRedirectURL is the URL to FINALLY redirect to after completing
+	// the /callback in an authorisation code OAuth2.0 flow to finish the flow.
+	DashboardFinalRedirectURL string
 }
 
 // A Service is the implementation of a JIMM server.
@@ -305,6 +309,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 			ClientSecret:       p.OAuthAuthenticatorParams.ClientSecret,
 			Scopes:             p.OAuthAuthenticatorParams.Scopes,
 			SessionTokenExpiry: p.OAuthAuthenticatorParams.SessionTokenExpiry,
+			Store:              &s.jimm.Database,
 		},
 	)
 	s.jimm.OAuthAuthenticator = authSvc
@@ -351,9 +356,13 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		"/.well-known",
 		wellknownapi.NewWellKnownHandler(s.jimm.CredentialStore),
 	)
+	oauthHandler, err := jimmhttp.NewOAuthHandler(authSvc, p.DashboardFinalRedirectURL)
+	if err != nil {
+		return nil, errors.E(op, err, "failed to setup authentication handler")
+	}
 	mountHandler(
 		"/auth",
-		jimmhttp.NewOAuthHandler(authSvc),
+		oauthHandler,
 	)
 
 	params := jujuapi.Params{

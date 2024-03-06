@@ -18,6 +18,7 @@ import (
 	"github.com/canonical/jimm/internal/auth"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/jimmtest"
+
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/juju/juju/api"
 	jujuparams "github.com/juju/juju/rpc/params"
@@ -32,6 +33,7 @@ type adminSuite struct {
 func (s *adminSuite) SetUpTest(c *gc.C) {
 	s.websocketSuite.SetUpTest(c)
 	ctx := context.Background()
+
 	// Replace JIMM's mock authenticator with a real one here
 	// for testing the login flows.
 	authSvc, err := auth.NewAuthenticationService(ctx, auth.AuthenticationServiceParams{
@@ -40,6 +42,7 @@ func (s *adminSuite) SetUpTest(c *gc.C) {
 		ClientSecret:       "SwjDofnbDzJDm9iyfUhEp67FfUFMY8L4",
 		Scopes:             []string{oidc.ScopeOpenID, "profile", "email"},
 		SessionTokenExpiry: time.Hour,
+		Store:              &s.JIMM.Database,
 	})
 	c.Assert(err, gc.Equals, nil)
 	s.JIMM.OAuthAuthenticator = authSvc
@@ -78,6 +81,9 @@ func (s *adminSuite) TestDeviceLogin(c *gc.C) {
 		SkipLogin: true,
 	}, "test")
 	defer conn.Close()
+
+	err := s.JIMM.Database.Migrate(context.Background(), false)
+	c.Assert(err, gc.IsNil)
 
 	// Create a user in keycloak
 	user, err := jimmtest.CreateRandomKeycloakUser()
