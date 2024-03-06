@@ -135,10 +135,10 @@ func (oah *OAuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		writeError(ctx, w, http.StatusBadRequest, err, "failed to get session")
 	}
 
-	session.IsNew = true             // Sets cookie to a fresh new cookie
-	session.Options.MaxAge = 86400   // 24 Hours expiry
-	session.Options.Secure = false   // Ensures only sent with HTTPS
-	session.Options.HttpOnly = false // Allow Javascript to read it
+	session.IsNew = true                       // Sets cookie to a fresh new cookie
+	session.Options.MaxAge = oah.cookieExpiry  // 24 Hours expiry
+	session.Options.Secure = oah.secureCookies // Ensures only sent with HTTPS
+	session.Options.HttpOnly = false           // Allow Javascript to read it
 
 	session.Values["jimm-session"] = email
 	if err = session.Save(r, w); err != nil {

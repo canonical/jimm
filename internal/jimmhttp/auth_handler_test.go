@@ -56,7 +56,6 @@ func setupTestServer(c *qt.C, dashboardURL string, db *db.Database, sessionStore
 
 	// Remember redirect url to check it matches after test server starts
 	redirectURL := "http://127.0.0.1:" + port + "/callback"
-
 	authSvc, err := auth.NewAuthenticationService(context.Background(), auth.AuthenticationServiceParams{
 		IssuerURL:          "http://localhost:8082/realms/jimm",
 		ClientID:           "jimm-device",
