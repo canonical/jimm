@@ -25,6 +25,7 @@ type OAuthHandler struct {
 	cookieExpiry              int
 }
 
+// OAuthHandlerParams holds the parameters to configure the OAuthHandler.
 type OAuthHandlerParams struct {
 	// Authenticator is the authenticator to handle browser authentication.
 	Authenticator BrowserOAuthAuthenticator
