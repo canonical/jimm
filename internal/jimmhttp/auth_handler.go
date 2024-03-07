@@ -137,7 +137,7 @@ func (oah *OAuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	session.IsNew = true                       // Sets cookie to a fresh new cookie
-	session.Options.MaxAge = oah.cookieExpiry  // 24 Hours expiry
+	session.Options.MaxAge = oah.cookieExpiry  // Expiry in seconds
 	session.Options.Secure = oah.secureCookies // Ensures only sent with HTTPS
 	session.Options.HttpOnly = false           // Allow Javascript to read it
 

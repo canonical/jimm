@@ -219,7 +219,7 @@ func (as *AuthenticationService) Email(idToken *oidc.IDToken) (string, error) {
 // via an access token. The token only contains the user's email for authentication.
 func (as *AuthenticationService) MintSessionToken(email string, secretKey string) (string, error) {
 	const op = errors.Op("auth.AuthenticationService.MintAccessToken")
-
+	
 	token, err := jwt.NewBuilder().
 		Subject(email).
 		Expiration(time.Now().Add(as.sessionTokenExpiry)).
