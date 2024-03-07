@@ -4,13 +4,16 @@ package jimm
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/antonlindstrom/pgstore"
 	"github.com/canonical/candid/candidclient"
 	cofga "github.com/canonical/ofga"
 	"github.com/go-chi/chi/v5"
@@ -184,6 +187,13 @@ type Params struct {
 	// DashboardFinalRedirectURL is the URL to FINALLY redirect to after completing
 	// the /callback in an authorisation code OAuth2.0 flow to finish the flow.
 	DashboardFinalRedirectURL string
+
+	// SecureSessionCookies determines if HTTPS must be enabled in order for JIMM
+	// to set cookies when creating browser based sessions.
+	SecureSessionCookies bool
+
+	// SessionCookieExpiry is how long the cookie will be valid before expiring in seconds.
+	SessionCookieExpiry int
 }
 
 // A Service is the implementation of a JIMM server.
@@ -264,6 +274,20 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	if err := s.jimm.Database.Migrate(ctx, false); err != nil {
 		return nil, errors.E(op, err)
 	}
+	sqlDb, err := s.jimm.Database.DB.DB()
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	// Setup browser session store
+	sessionStore, err := setupSessionStore(sqlDb, "secret-key-todo")
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	// Cleanup expired session every 30 minutes
+	defer sessionStore.StopCleanup(sessionStore.Cleanup(time.Minute * 30))
+	s.jimm.CookieSessionStore = sessionStore
 
 	if p.AuditLogRetentionPeriodInDays != "" {
 		period, err := strconv.Atoi(p.AuditLogRetentionPeriodInDays)
@@ -340,6 +364,10 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		s.jimm.Dialer = jimm.CacheDialer(s.jimm.Dialer)
 	}
 
+	if _, err := url.Parse(p.DashboardFinalRedirectURL); err != nil {
+		return nil, errors.E(op, err, "failed to parse final redirect url for the dashboard")
+	}
+
 	mountHandler := func(path string, h jimmhttp.JIMMHttpHandler) {
 		s.mux.Mount(path, h.Routes())
 	}
@@ -356,7 +384,13 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		"/.well-known",
 		wellknownapi.NewWellKnownHandler(s.jimm.CredentialStore),
 	)
-	oauthHandler, err := jimmhttp.NewOAuthHandler(authSvc, p.DashboardFinalRedirectURL)
+	oauthHandler, err := jimmhttp.NewOAuthHandler(jimmhttp.OAuthHandlerParams{
+		Authenticator:             authSvc,
+		DashboardFinalRedirectURL: p.DashboardFinalRedirectURL,
+		SessionStore:              sessionStore,
+		SecureCookies:             p.SecureSessionCookies,
+		CookieExpiry:              p.SessionCookieExpiry,
+	})
 	if err != nil {
 		return nil, errors.E(op, err, "failed to setup authentication handler")
 	}
@@ -401,6 +435,11 @@ func (s *Service) setupDischarger(p Params, openFGAclient *openfga.OFGAClient) (
 	discharger.AddMuxHandlers(dischargeMux, localDischargePath)
 
 	return &macaroonDischarger.kp, dischargeMux, nil
+}
+
+func setupSessionStore(db *sql.DB, secretKey string) (*pgstore.PGStore, error) {
+	store, err := pgstore.NewPGStoreFromPool(db, []byte(secretKey))
+	return store, err
 }
 
 func openDB(ctx context.Context, dsn string) (*gorm.DB, error) {

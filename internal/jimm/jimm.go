@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/antonlindstrom/pgstore"
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/juju/juju/api/base"
@@ -89,6 +90,9 @@ type JIMM struct {
 	// OAuthAuthenticator is responsible for handling authentication
 	// via OAuth2.0 AND JWT access tokens to JIMM.
 	OAuthAuthenticator OAuthAuthenticator
+
+	// CookieSessionStore is respnsible for handling cookie based sessions.
+	CookieSessionStore *pgstore.PGStore
 }
 
 // OAuthAuthenticationService returns the JIMM's authentication service.
