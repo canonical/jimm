@@ -16,6 +16,7 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwt"
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/clientcredentials"
 
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
@@ -219,7 +220,7 @@ func (as *AuthenticationService) Email(idToken *oidc.IDToken) (string, error) {
 // via an access token. The token only contains the user's email for authentication.
 func (as *AuthenticationService) MintSessionToken(email string, secretKey string) (string, error) {
 	const op = errors.Op("auth.AuthenticationService.MintAccessToken")
-	
+
 	token, err := jwt.NewBuilder().
 		Subject(email).
 		Expiration(time.Now().Add(as.sessionTokenExpiry)).
@@ -309,4 +310,22 @@ func VerifySessionToken(token string, secretKey string) (jwt.Token, error) {
 	}
 
 	return parsedToken, nil
+}
+
+// VerifyClientCredentials verifies the provided client ID and client secret.
+func (as *AuthenticationService) VerifyClientCredentials(ctx context.Context, clientID string, clientSecret string) error {
+	cfg := clientcredentials.Config{
+		ClientID:     clientID,
+		ClientSecret: clientSecret,
+		TokenURL:     as.oauthConfig.Endpoint.TokenURL,
+		Scopes:       as.oauthConfig.Scopes,
+		AuthStyle:    oauth2.AuthStyle(as.oauthConfig.Endpoint.AuthStyle),
+	}
+
+	_, err := cfg.Token(ctx)
+	if err != nil {
+		zapctx.Error(ctx, "client credential verification failed", zap.Error(err))
+		return errors.E(errors.CodeUnauthorized, "invalid client credentials")
+	}
+	return nil
 }

@@ -200,6 +200,44 @@ func (r *controllerRoot) LoginWithSessionToken(ctx context.Context, req params.L
 	}, nil
 }
 
+// LoginWithClientCredentials handles logging into the JIMM with the client ID
+// and secret created by the IdP.
+func (r *controllerRoot) LoginWithClientCredentials(ctx context.Context, req params.LoginWithClientCredentialsRequest) (jujuparams.LoginResult, error) {
+	const op = errors.Op("jujuapi.LoginWithClientCredentials")
+
+	authenticationSvc := r.jimm.OAuthAuthenticationService()
+	if authenticationSvc == nil {
+		return jujuparams.LoginResult{}, errors.E("authentication service not specified")
+	}
+	err := authenticationSvc.VerifyClientCredentials(ctx, req.ClientID, req.ClientSecret)
+	if err != nil {
+		return jujuparams.LoginResult{}, errors.E(err, errors.CodeUnauthorized)
+	}
+
+	user, err := r.jimm.GetOpenFGAUserAndAuthorise(ctx, req.ClientID)
+	if err != nil {
+		return jujuparams.LoginResult{}, errors.E(op, err)
+	}
+
+	r.mu.Lock()
+	r.user = user
+	r.mu.Unlock()
+
+	// Get server version for LoginResult
+	srvVersion, err := r.jimm.EarliestControllerVersion(ctx)
+	if err != nil {
+		return jujuparams.LoginResult{}, errors.E(op, err)
+	}
+
+	return jujuparams.LoginResult{
+		PublicDNSName: r.params.PublicDNSName,
+		UserInfo:      setupAuthUserInfo(ctx, r, user),
+		ControllerTag: setupControllerTag(r),
+		Facades:       setupFacades(r),
+		ServerVersion: srvVersion.String(),
+	}, nil
+}
+
 // setupControllerTag returns the String() of a controller tag based on the
 // JIMM controller UUID.
 func setupControllerTag(root *controllerRoot) string {

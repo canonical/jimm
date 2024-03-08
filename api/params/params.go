@@ -430,6 +430,13 @@ type LoginWithSessionTokenRequest struct {
 
 // Service Account related request parameters
 
+// LoginWithClientCredentialsRequest holds the client id and secret used
+// to authenticate with JIMM.
+type LoginWithClientCredentialsRequest struct {
+	ClientID     string `json:"client-id"`
+	ClientSecret string `json:"client-secret"`
+}
+
 // AddServiceAccountRequest holds a request to add a service account.
 type AddServiceAccountRequest struct {
 	// ClientID holds the client id of the service account.

@@ -151,6 +151,7 @@ func newControllerRoot(j JIMM, p Params) *controllerRoot {
 	r.AddMethod("Admin", 4, "LoginDevice", rpc.Method(r.LoginDevice))
 	r.AddMethod("Admin", 4, "GetDeviceSessionToken", rpc.Method(r.GetDeviceSessionToken))
 	r.AddMethod("Admin", 4, "LoginWithSessionToken", rpc.Method(r.LoginWithSessionToken))
+	r.AddMethod("Admin", 4, "LoginWithClientCredentials", rpc.Method(r.LoginWithClientCredentials))
 	r.AddMethod("Pinger", 1, "Ping", rpc.Method(r.Ping))
 	return r
 }

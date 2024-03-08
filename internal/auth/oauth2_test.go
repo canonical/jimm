@@ -226,3 +226,22 @@ func TestSessionTokenValidatesEmail(t *testing.T) {
 	_, err = authSvc.VerifySessionToken(token, secretKey)
 	c.Assert(err, qt.ErrorMatches, "failed to parse email")
 }
+
+func TestVerifyClientCredentials(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	const (
+		// these are valid client credentials hardcoded into the jimm realm
+		validClientID     = "test-client-id"
+		validClientSecret = "2M2blFbO4GX4zfggQpivQSxwWX1XGgNf"
+	)
+
+	authSvc, _ := setupTestAuthSvc(ctx, c, time.Hour)
+
+	err := authSvc.VerifyClientCredentials(ctx, validClientID, validClientSecret)
+	c.Assert(err, qt.IsNil)
+
+	err = authSvc.VerifyClientCredentials(ctx, "invalid-client-id", validClientSecret)
+	c.Assert(err, qt.ErrorMatches, "invalid client credentials")
+}

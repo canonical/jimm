@@ -22,6 +22,7 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/juju/juju/api"
 	jujuparams "github.com/juju/juju/rpc/params"
+	"github.com/juju/names/v4"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon.v2"
 )
@@ -215,4 +216,32 @@ func handleLoginForm(c *gc.C, loginForm string, client *http.Client, username, p
 
 	re = regexp.MustCompile(`Device Login Successful`)
 	c.Assert(re.MatchString(string(b)), gc.Equals, true)
+}
+
+func (s *adminSuite) TestLoginWithClientCredentials(c *gc.C) {
+	conn := s.open(c, &api.Info{
+		SkipLogin: true,
+	}, "test")
+	defer conn.Close()
+
+	const (
+		// these are valid client credentials hardcoded into the jimm realm
+		validClientID     = "test-client-id"
+		validClientSecret = "2M2blFbO4GX4zfggQpivQSxwWX1XGgNf"
+	)
+
+	var loginResult jujuparams.LoginResult
+	err := conn.APICall("Admin", 4, "", "LoginWithClientCredentials", params.LoginWithClientCredentialsRequest{
+		ClientID:     validClientID,
+		ClientSecret: validClientSecret,
+	}, &loginResult)
+	c.Assert(err, gc.IsNil)
+	c.Assert(loginResult.ControllerTag, gc.Equals, names.NewControllerTag(s.Params.ControllerUUID).String())
+	c.Assert(loginResult.UserInfo.Identity, gc.Equals, names.NewUserTag("test-client-id").String())
+
+	err = conn.APICall("Admin", 4, "", "LoginWithClientCredentials", params.LoginWithClientCredentialsRequest{
+		ClientID:     "invalid-client-id",
+		ClientSecret: "invalid-secret",
+	}, &loginResult)
+	c.Assert(err, gc.ErrorMatches, `invalid client credentials \(unauthorized access\)`)
 }
