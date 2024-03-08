@@ -173,6 +173,9 @@ type OAuthAuthenticator interface {
 	// UpdateIdentity updates the database with the display name and access token set for the user.
 	// And, if present, a refresh token.
 	UpdateIdentity(ctx context.Context, email string, token *oauth2.Token) error
+
+	// VerifyClientCredentials verifies the provided client ID and client secret.
+	VerifyClientCredentials(ctx context.Context, clientID string, clientSecret string) error
 }
 
 type permission struct {
