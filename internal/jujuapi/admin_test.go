@@ -18,9 +18,11 @@ import (
 	"github.com/canonical/jimm/internal/auth"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/jimmtest"
+
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/juju/juju/api"
 	jujuparams "github.com/juju/juju/rpc/params"
+	"github.com/juju/names/v4"
 	gc "gopkg.in/check.v1"
 )
 
@@ -31,6 +33,7 @@ type adminSuite struct {
 func (s *adminSuite) SetUpTest(c *gc.C) {
 	s.websocketSuite.SetUpTest(c)
 	ctx := context.Background()
+
 	// Replace JIMM's mock authenticator with a real one here
 	// for testing the login flows.
 	authSvc, err := auth.NewAuthenticationService(ctx, auth.AuthenticationServiceParams{
@@ -39,6 +42,7 @@ func (s *adminSuite) SetUpTest(c *gc.C) {
 		ClientSecret:       "SwjDofnbDzJDm9iyfUhEp67FfUFMY8L4",
 		Scopes:             []string{oidc.ScopeOpenID, "profile", "email"},
 		SessionTokenExpiry: time.Hour,
+		Store:              &s.JIMM.Database,
 	})
 	c.Assert(err, gc.Equals, nil)
 	s.JIMM.OAuthAuthenticator = authSvc
@@ -68,6 +72,9 @@ func (s *adminSuite) TestDeviceLogin(c *gc.C) {
 		SkipLogin: true,
 	}, "test")
 	defer conn.Close()
+
+	err := s.JIMM.Database.Migrate(context.Background(), false)
+	c.Assert(err, gc.IsNil)
 
 	// Create a user in keycloak
 	user, err := jimmtest.CreateRandomKeycloakUser()
@@ -199,4 +206,32 @@ func handleLoginForm(c *gc.C, loginForm string, client *http.Client, username, p
 
 	re = regexp.MustCompile(`Device Login Successful`)
 	c.Assert(re.MatchString(string(b)), gc.Equals, true)
+}
+
+func (s *adminSuite) TestLoginWithClientCredentials(c *gc.C) {
+	conn := s.open(c, &api.Info{
+		SkipLogin: true,
+	}, "test")
+	defer conn.Close()
+
+	const (
+		// these are valid client credentials hardcoded into the jimm realm
+		validClientID     = "test-client-id"
+		validClientSecret = "2M2blFbO4GX4zfggQpivQSxwWX1XGgNf"
+	)
+
+	var loginResult jujuparams.LoginResult
+	err := conn.APICall("Admin", 4, "", "LoginWithClientCredentials", params.LoginWithClientCredentialsRequest{
+		ClientID:     validClientID,
+		ClientSecret: validClientSecret,
+	}, &loginResult)
+	c.Assert(err, gc.IsNil)
+	c.Assert(loginResult.ControllerTag, gc.Equals, names.NewControllerTag(s.Params.ControllerUUID).String())
+	c.Assert(loginResult.UserInfo.Identity, gc.Equals, names.NewUserTag("test-client-id").String())
+
+	err = conn.APICall("Admin", 4, "", "LoginWithClientCredentials", params.LoginWithClientCredentialsRequest{
+		ClientID:     "invalid-client-id",
+		ClientSecret: "invalid-secret",
+	}, &loginResult)
+	c.Assert(err, gc.ErrorMatches, `invalid client credentials \(unauthorized access\)`)
 }

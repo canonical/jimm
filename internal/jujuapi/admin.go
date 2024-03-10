@@ -6,7 +6,6 @@ import (
 	"context"
 	stderrors "errors"
 	"sort"
-	"strings"
 
 	"github.com/juju/juju/rpc"
 	jujuparams "github.com/juju/juju/rpc/params"
@@ -14,7 +13,6 @@ import (
 
 	"github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/internal/auth"
-	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/openfga"
 )
@@ -86,33 +84,9 @@ func (r *controllerRoot) GetDeviceSessionToken(ctx context.Context) (params.GetD
 		return response, errors.E(op, err)
 	}
 
-	// TODO(ale8k): Move this into a service, don't do db logic
-	// at the handler level
-	// Now we know who the user is, i.e., their email
-	// we'll update their access token.
-	// <Start of todo>
-	// Build username + display name
-	db := r.jimm.DB()
-	u := &dbmodel.Identity{
-		Name: email,
-	}
-	// TODO(babakks): If user does not exist, we will create one with an empty
-	// display name (which we shouldn't). So it would be better to fetch
-	// and then create. At the moment, GetUser is used for both create and fetch,
-	// this should be changed and split apart so it is intentional what entities
-	// we are creating or fetching.
-	if err := db.GetIdentity(ctx, u); err != nil {
+	if err := authSvc.UpdateIdentity(ctx, email, token); err != nil {
 		return response, errors.E(op, err)
 	}
-	// Check if user has a display name, if not, set one
-	if u.DisplayName == "" {
-		u.DisplayName = strings.Split(email, "@")[0]
-	}
-	u.AccessToken = token.AccessToken
-	if err := r.jimm.DB().UpdateIdentity(ctx, u); err != nil {
-		return response, errors.E(op, err)
-	}
-	// <End of todo>
 
 	// TODO(ale8k): Add vault logic to get secret key and generate one
 	// on start up.
@@ -163,6 +137,44 @@ func (r *controllerRoot) LoginWithSessionToken(ctx context.Context, req params.L
 
 	// TODO(ale8k): This isn't needed I don't think as controller roots are unique
 	// per WS, but if anyone knows different please let me know.
+	r.mu.Lock()
+	r.user = user
+	r.mu.Unlock()
+
+	// Get server version for LoginResult
+	srvVersion, err := r.jimm.EarliestControllerVersion(ctx)
+	if err != nil {
+		return jujuparams.LoginResult{}, errors.E(op, err)
+	}
+
+	return jujuparams.LoginResult{
+		PublicDNSName: r.params.PublicDNSName,
+		UserInfo:      setupAuthUserInfo(ctx, r, user),
+		ControllerTag: setupControllerTag(r),
+		Facades:       setupFacades(r),
+		ServerVersion: srvVersion.String(),
+	}, nil
+}
+
+// LoginWithClientCredentials handles logging into the JIMM with the client ID
+// and secret created by the IdP.
+func (r *controllerRoot) LoginWithClientCredentials(ctx context.Context, req params.LoginWithClientCredentialsRequest) (jujuparams.LoginResult, error) {
+	const op = errors.Op("jujuapi.LoginWithClientCredentials")
+
+	authenticationSvc := r.jimm.OAuthAuthenticationService()
+	if authenticationSvc == nil {
+		return jujuparams.LoginResult{}, errors.E("authentication service not specified")
+	}
+	err := authenticationSvc.VerifyClientCredentials(ctx, req.ClientID, req.ClientSecret)
+	if err != nil {
+		return jujuparams.LoginResult{}, errors.E(err, errors.CodeUnauthorized)
+	}
+
+	user, err := r.jimm.GetOpenFGAUserAndAuthorise(ctx, req.ClientID)
+	if err != nil {
+		return jujuparams.LoginResult{}, errors.E(op, err)
+	}
+
 	r.mu.Lock()
 	r.user = user
 	r.mu.Unlock()

@@ -39,6 +39,11 @@ type Identity struct {
 	// from the browser or device flow, and as such is updated on every successful
 	// login.
 	AccessToken string
+
+	// RefreshToken is an OAuth2.0 refresh token for this identity, it may have come
+	// from the browser or device flow, and as such is updated on every successful
+	// login.
+	RefreshToken string
 }
 
 // Tag returns a names.Tag for the identity.

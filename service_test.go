@@ -52,6 +52,7 @@ func TestDefaultService(t *testing.T) {
 			Scopes:             []string{oidc.ScopeOpenID, "profile", "email"},
 			SessionTokenExpiry: time.Duration(time.Hour),
 		},
+		DashboardFinalRedirectURL: "<no dashboard needed for this test>",
 	})
 	c.Assert(err, qt.IsNil)
 	rr := httptest.NewRecorder()
@@ -76,8 +77,69 @@ func TestServiceStartsWithoutSecretStore(t *testing.T) {
 			Scopes:             []string{oidc.ScopeOpenID, "profile", "email"},
 			SessionTokenExpiry: time.Duration(time.Hour),
 		},
+		DashboardFinalRedirectURL: "<no dashboard needed for this test>",
 	})
 	c.Assert(err, qt.IsNil)
+}
+
+func TestAuthenticator(t *testing.T) {
+	c := qt.New(t)
+
+	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
+	c.Assert(err, qt.IsNil)
+
+	p := jimm.Params{
+		ControllerUUID:        "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
+		DSN:                   jimmtest.CreateEmptyDatabase(c),
+		ControllerAdmins:      []string{"admin"},
+		OpenFGAParams:         cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
+		InsecureSecretStorage: true,
+		OAuthAuthenticatorParams: jimm.OAuthAuthenticatorParams{
+			IssuerURL:          "http://localhost:8082/realms/jimm",
+			ClientID:           "jimm-device",
+			Scopes:             []string{oidc.ScopeOpenID, "profile", "email"},
+			SessionTokenExpiry: time.Duration(time.Hour),
+		},
+		DashboardFinalRedirectURL: "<no dashboard needed for this test>",
+	}
+	svc, err := jimm.NewService(context.Background(), p)
+	c.Assert(err, qt.IsNil)
+
+	srv := httptest.NewTLSServer(svc)
+	c.Cleanup(srv.Close)
+	info := api.Info{
+		Addrs: []string{srv.Listener.Addr().String()},
+	}
+
+	conn, err := api.Open(&info, api.DialOpts{
+		LoginProvider:      jimmtest.NewUserSessionLogin("alice"),
+		InsecureSkipVerify: true,
+	})
+	c.Assert(err, qt.IsNil)
+	c.Cleanup(func() {
+		if err := conn.Close(); err != nil {
+			c.Logf("closing connection: %s", err)
+		}
+	})
+
+	c.Check(conn.ControllerTag(), qt.Equals, names.NewControllerTag("6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11"))
+	c.Check(conn.AuthTag(), qt.Equals, names.NewUserTag("alice@canonical.com"))
+	c.Check(conn.ControllerAccess(), qt.Equals, "")
+
+	conn, err = api.Open(&info, api.DialOpts{
+		LoginProvider:      jimmtest.NewUserSessionLogin("bob"),
+		InsecureSkipVerify: true,
+	})
+	c.Assert(err, qt.IsNil)
+	c.Cleanup(func() {
+		if err := conn.Close(); err != nil {
+			c.Logf("closing connection: %s", err)
+		}
+	})
+
+	c.Check(conn.ControllerTag(), qt.Equals, names.NewControllerTag("6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11"))
+	c.Check(conn.AuthTag(), qt.Equals, names.NewUserTag("bob@canonical.com"))
+	c.Check(conn.ControllerAccess(), qt.Equals, "")
 }
 
 const testVaultEnv = `clouds:
@@ -107,6 +169,7 @@ func TestVault(t *testing.T) {
 			Scopes:             []string{oidc.ScopeOpenID, "profile", "email"},
 			SessionTokenExpiry: time.Duration(time.Hour),
 		},
+		DashboardFinalRedirectURL: "<no dashboard needed for this test>",
 	}
 	vaultClient, _, creds, _ := jimmtest.VaultClient(c, ".")
 
@@ -175,6 +238,7 @@ func TestPostgresSecretStore(t *testing.T) {
 			Scopes:             []string{oidc.ScopeOpenID, "profile", "email"},
 			SessionTokenExpiry: time.Duration(time.Hour),
 		},
+		DashboardFinalRedirectURL: "<no dashboard needed for this test>",
 	}
 	_, err = jimm.NewService(context.Background(), p)
 	c.Assert(err, qt.IsNil)
@@ -197,6 +261,7 @@ func TestOpenFGA(t *testing.T) {
 			Scopes:             []string{oidc.ScopeOpenID, "profile", "email"},
 			SessionTokenExpiry: time.Duration(time.Hour),
 		},
+		DashboardFinalRedirectURL: "<no dashboard needed for this test>",
 	}
 	svc, err := jimm.NewService(context.Background(), p)
 	c.Assert(err, qt.IsNil)
@@ -252,6 +317,7 @@ func TestPublicKey(t *testing.T) {
 			Scopes:             []string{oidc.ScopeOpenID, "profile", "email"},
 			SessionTokenExpiry: time.Duration(time.Hour),
 		},
+		DashboardFinalRedirectURL: "<no dashboard needed for this test>",
 	}
 	svc, err := jimm.NewService(context.Background(), p)
 	c.Assert(err, qt.IsNil)
@@ -339,6 +405,7 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 					Scopes:             []string{oidc.ScopeOpenID, "profile", "email"},
 					SessionTokenExpiry: time.Duration(time.Hour),
 				},
+				DashboardFinalRedirectURL: "<no dashboard needed for this test>",
 			}
 			svc, err := jimm.NewService(context.Background(), p)
 			c.Assert(err, qt.IsNil)

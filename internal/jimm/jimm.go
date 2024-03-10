@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/antonlindstrom/pgstore"
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/juju/juju/api/base"
@@ -84,6 +85,9 @@ type JIMM struct {
 	// OAuthAuthenticator is responsible for handling authentication
 	// via OAuth2.0 AND JWT access tokens to JIMM.
 	OAuthAuthenticator OAuthAuthenticator
+
+	// CookieSessionStore is respnsible for handling cookie based sessions.
+	CookieSessionStore *pgstore.PGStore
 }
 
 // OAuthAuthenticationService returns the JIMM's authentication service.
@@ -160,6 +164,13 @@ type OAuthAuthenticator interface {
 	// The subject of the token contains the user's email and can be used
 	// for user object creation.
 	VerifySessionToken(token string, secretKey string) (jwt.Token, error)
+
+	// UpdateIdentity updates the database with the display name and access token set for the user.
+	// And, if present, a refresh token.
+	UpdateIdentity(ctx context.Context, email string, token *oauth2.Token) error
+
+	// VerifyClientCredentials verifies the provided client ID and client secret.
+	VerifyClientCredentials(ctx context.Context, clientID string, clientSecret string) error
 }
 
 type permission struct {
