@@ -26,7 +26,7 @@ var _ = gc.Suite(&addServiceAccountSuite{})
 func (s *addServiceAccountSuite) TestAddServiceAccount(c *gc.C) {
 	clientID := "abda51b2-d735-4794-a8bd-49c506baa4af"
 	// alice is superuser
-	bClient := jimmtest.NewUserSessionLogin("alice")
+	bClient := jimmtest.NewUserSessionLogin(c, "alice")
 	_, err := cmdtesting.RunCommand(c, cmd.NewAddServiceAccountCommandForTesting(s.ClientStore(), bClient), clientID)
 	c.Assert(err, gc.IsNil)
 	tuple := openfga.Tuple{
@@ -42,7 +42,7 @@ func (s *addServiceAccountSuite) TestAddServiceAccount(c *gc.C) {
 	_, err = cmdtesting.RunCommand(c, cmd.NewAddServiceAccountCommandForTesting(s.ClientStore(), bClient), clientID)
 	c.Assert(err, gc.IsNil)
 	// Check that re-running the command for a different user returns an error.
-	bClientBob := jimmtest.NewUserSessionLogin("bob")
+	bClientBob := jimmtest.NewUserSessionLogin(c, "bob")
 	_, err = cmdtesting.RunCommand(c, cmd.NewAddServiceAccountCommandForTesting(s.ClientStore(), bClientBob), clientID)
 	c.Assert(err, gc.ErrorMatches, "service account already owned")
 }
