@@ -11,12 +11,11 @@ import (
 	"github.com/juju/juju/core/crossmodel"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/testing/factory"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/internal/jimmtest"
-	ofganames "github.com/canonical/jimm/internal/openfga/names"
 )
 
 type applicationoffersSuite struct {
@@ -33,7 +32,7 @@ func (s *applicationoffersSuite) SetUpTest(c *gc.C) {
 	ctx := context.Background()
 	err := s.API.CreateModel(ctx, &jujuparams.ModelCreateArgs{
 		Name:     "test-model",
-		OwnerTag: names.NewUserTag("test-user@external").String(),
+		OwnerTag: names.NewUserTag("test-user@canonical.com").String(),
 	}, &s.modelInfo)
 	c.Assert(err, gc.Equals, nil)
 }
@@ -56,7 +55,7 @@ func (s *applicationoffersSuite) TestOffer(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	offerURL := crossmodel.OfferURL{
-		User:            "test-user@external",
+		User:            "test-user@canonical.com",
 		ModelName:       s.modelInfo.Name,
 		ApplicationName: "test-offer",
 	}
@@ -92,7 +91,7 @@ func (s *applicationoffersSuite) TestOffer(c *gc.C) {
 
 func (s *applicationoffersSuite) TestOfferError(c *gc.C) {
 	offerURL := crossmodel.OfferURL{
-		User:            "test-user@external",
+		User:            "test-user@canonical.com",
 		ModelName:       s.modelInfo.Name,
 		ApplicationName: "test-offer",
 	}
@@ -147,7 +146,7 @@ func (s *applicationoffersSuite) TestListApplicationOffersMatching(c *gc.C) {
 
 	ctx := context.Background()
 	offerURL := crossmodel.OfferURL{
-		User:            "test-user@external",
+		User:            "test-user@canonical.com",
 		ModelName:       s.modelInfo.Name,
 		ApplicationName: "test-offer",
 	}
@@ -199,7 +198,7 @@ func (s *applicationoffersSuite) TestListApplicationOffersNoMatch(c *gc.C) {
 
 	ctx := context.Background()
 	offerURL := crossmodel.OfferURL{
-		User:            "test-user@external",
+		User:            "test-user@canonical.com",
 		ModelName:       s.modelInfo.Name,
 		ApplicationName: "test-offer",
 	}
@@ -263,7 +262,7 @@ func (s *applicationoffersSuite) TestFindApplicationOffersMatching(c *gc.C) {
 
 	ctx := context.Background()
 	offerURL := crossmodel.OfferURL{
-		User:            "test-user@external",
+		User:            "test-user@canonical.com",
 		ModelName:       s.modelInfo.Name,
 		ApplicationName: "test-offer",
 	}
@@ -315,7 +314,7 @@ func (s *applicationoffersSuite) TestFindApplicationOffersNoMatch(c *gc.C) {
 
 	ctx := context.Background()
 	offerURL := crossmodel.OfferURL{
-		User:            "test-user@external",
+		User:            "test-user@canonical.com",
 		ModelName:       s.modelInfo.Name,
 		ApplicationName: "test-offer",
 	}
@@ -363,7 +362,7 @@ func (s *applicationoffersSuite) TestGetApplicationOffer(c *gc.C) {
 
 	ctx := context.Background()
 	offerURL := crossmodel.OfferURL{
-		User:            "test-user@external",
+		User:            "test-user@canonical.com",
 		ModelName:       s.modelInfo.Name,
 		ApplicationName: "test-offer",
 	}
@@ -410,7 +409,7 @@ func (s *applicationoffersSuite) TestGetApplicationOffer(c *gc.C) {
 				DisplayName: "admin",
 				Access:      string(jujuparams.OfferAdminAccess),
 			}, {
-				UserName: ofganames.EveryoneUser,
+				UserName: "everyone@external",
 				Access:   string(jujuparams.OfferReadAccess),
 			}},
 		},
@@ -422,9 +421,9 @@ func (s *applicationoffersSuite) TestGetApplicationOfferNotFound(c *gc.C) {
 	ctx := context.Background()
 
 	var info jujuparams.ApplicationOfferAdminDetails
-	info.OfferURL = "test-user@external/test-model.test-offer"
+	info.OfferURL = "test-user@canonical.com/test-model.test-offer"
 	err := s.API.GetApplicationOffer(ctx, &info)
-	c.Assert(err, gc.ErrorMatches, `application offer "test-user@external/test-model.test-offer" not found`)
+	c.Assert(err, gc.ErrorMatches, `application offer "test-user@canonical.com/test-model.test-offer" not found`)
 }
 
 func (s *applicationoffersSuite) TestGrantApplicationOfferAccess(c *gc.C) {
@@ -446,7 +445,7 @@ func (s *applicationoffersSuite) TestGrantApplicationOfferAccess(c *gc.C) {
 
 	ctx := context.Background()
 	offerURL := crossmodel.OfferURL{
-		User:            "test-user@external",
+		User:            "test-user@canonical.com",
 		ModelName:       s.modelInfo.Name,
 		ApplicationName: "test-offer",
 	}
@@ -464,7 +463,7 @@ func (s *applicationoffersSuite) TestGrantApplicationOfferAccess(c *gc.C) {
 	)
 	c.Assert(err, gc.Equals, nil)
 
-	err = s.API.GrantApplicationOfferAccess(ctx, offerURL.String(), names.NewUserTag("test-user-2@external"), jujuparams.OfferConsumeAccess)
+	err = s.API.GrantApplicationOfferAccess(ctx, offerURL.String(), names.NewUserTag("test-user-2@canonical.com"), jujuparams.OfferConsumeAccess)
 	c.Assert(err, gc.Equals, nil)
 
 	var info jujuparams.ApplicationOfferAdminDetails
@@ -495,10 +494,10 @@ func (s *applicationoffersSuite) TestGrantApplicationOfferAccess(c *gc.C) {
 				DisplayName: "admin",
 				Access:      string(jujuparams.OfferAdminAccess),
 			}, {
-				UserName: ofganames.EveryoneUser,
+				UserName: "everyone@external",
 				Access:   string(jujuparams.OfferReadAccess),
 			}, {
-				UserName: "test-user-2@external",
+				UserName: "test-user-2@canonical.com",
 				Access:   string(jujuparams.OfferConsumeAccess),
 			}},
 		},
@@ -508,9 +507,9 @@ func (s *applicationoffersSuite) TestGrantApplicationOfferAccess(c *gc.C) {
 
 func (s *applicationoffersSuite) TestGrantApplicationOfferAccessNotFound(c *gc.C) {
 	ctx := context.Background()
-	offerURL := "test-user@external/test-model.test-offer"
+	offerURL := "test-user@canonical.com/test-model.test-offer"
 
-	err := s.API.GrantApplicationOfferAccess(ctx, offerURL, names.NewUserTag("test-user-2@external"), jujuparams.OfferConsumeAccess)
+	err := s.API.GrantApplicationOfferAccess(ctx, offerURL, names.NewUserTag("test-user-2@canonical.com"), jujuparams.OfferConsumeAccess)
 	c.Check(err, gc.ErrorMatches, `offer "test-offer" not found`)
 }
 
@@ -533,7 +532,7 @@ func (s *applicationoffersSuite) TestRevokeApplicationOfferAccess(c *gc.C) {
 
 	ctx := context.Background()
 	offerURL := crossmodel.OfferURL{
-		User:            "test-user@external",
+		User:            "test-user@canonical.com",
 		ModelName:       s.modelInfo.Name,
 		ApplicationName: "test-offer",
 	}
@@ -551,7 +550,7 @@ func (s *applicationoffersSuite) TestRevokeApplicationOfferAccess(c *gc.C) {
 	)
 	c.Assert(err, gc.Equals, nil)
 
-	err = s.API.GrantApplicationOfferAccess(ctx, offerURL.String(), names.NewUserTag("test-user-2@external"), jujuparams.OfferConsumeAccess)
+	err = s.API.GrantApplicationOfferAccess(ctx, offerURL.String(), names.NewUserTag("test-user-2@canonical.com"), jujuparams.OfferConsumeAccess)
 	c.Assert(err, gc.Equals, nil)
 
 	var info jujuparams.ApplicationOfferAdminDetails
@@ -569,7 +568,7 @@ func (s *applicationoffersSuite) TestRevokeApplicationOfferAccess(c *gc.C) {
 	c.Check(info, jc.DeepEquals, jujuparams.ApplicationOfferAdminDetails{
 		ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
 			SourceModelTag:         names.NewModelTag(s.modelInfo.UUID).String(),
-			OfferURL:               "test-user@external/test-model.test-offer",
+			OfferURL:               "test-user@canonical.com/test-model.test-offer",
 			OfferName:              "test-offer",
 			ApplicationDescription: "A pretty popular blog engine",
 			Endpoints: []jujuparams.RemoteEndpoint{{
@@ -583,17 +582,17 @@ func (s *applicationoffersSuite) TestRevokeApplicationOfferAccess(c *gc.C) {
 				DisplayName: "admin",
 				Access:      string(jujuparams.OfferAdminAccess),
 			}, {
-				UserName: ofganames.EveryoneUser,
+				UserName: "everyone@external",
 				Access:   string(jujuparams.OfferReadAccess),
 			}, {
-				UserName: "test-user-2@external",
+				UserName: "test-user-2@canonical.com",
 				Access:   string(jujuparams.OfferConsumeAccess),
 			}},
 		},
 		ApplicationName: "test-app",
 	})
 
-	err = s.API.RevokeApplicationOfferAccess(ctx, offerURL.String(), names.NewUserTag("test-user-2@external"), jujuparams.OfferConsumeAccess)
+	err = s.API.RevokeApplicationOfferAccess(ctx, offerURL.String(), names.NewUserTag("test-user-2@canonical.com"), jujuparams.OfferConsumeAccess)
 	c.Assert(err, gc.Equals, nil)
 
 	err = s.API.GetApplicationOffer(ctx, &info)
@@ -622,10 +621,10 @@ func (s *applicationoffersSuite) TestRevokeApplicationOfferAccess(c *gc.C) {
 				DisplayName: "admin",
 				Access:      string(jujuparams.OfferAdminAccess),
 			}, {
-				UserName: ofganames.EveryoneUser,
+				UserName: "everyone@external",
 				Access:   string(jujuparams.OfferReadAccess),
 			}, {
-				UserName: "test-user-2@external",
+				UserName: "test-user-2@canonical.com",
 				Access:   string(jujuparams.OfferReadAccess),
 			}},
 		},
@@ -635,9 +634,9 @@ func (s *applicationoffersSuite) TestRevokeApplicationOfferAccess(c *gc.C) {
 
 func (s *applicationoffersSuite) TestRevokeApplicationOfferAccessNotFound(c *gc.C) {
 	ctx := context.Background()
-	offerURL := "test-user@external/test-model.test-offer"
+	offerURL := "test-user@canonical.com/test-model.test-offer"
 
-	err := s.API.RevokeApplicationOfferAccess(ctx, offerURL, names.NewUserTag("test-user-2@external"), jujuparams.OfferConsumeAccess)
+	err := s.API.RevokeApplicationOfferAccess(ctx, offerURL, names.NewUserTag("test-user-2@canonical.com"), jujuparams.OfferConsumeAccess)
 	c.Check(err, gc.ErrorMatches, `offer "test-offer" not found`)
 }
 
@@ -660,7 +659,7 @@ func (s *applicationoffersSuite) TestDestroyApplicationOffer(c *gc.C) {
 
 	ctx := context.Background()
 	offerURL := crossmodel.OfferURL{
-		User:            "test-user@external",
+		User:            "test-user@canonical.com",
 		ModelName:       s.modelInfo.Name,
 		ApplicationName: "test-offer",
 	}
@@ -717,7 +716,7 @@ func (s *applicationoffersSuite) TestGetApplicationOfferConsumeDetails(c *gc.C) 
 
 	ctx := context.Background()
 	offerURL := crossmodel.OfferURL{
-		User:            "test-user@external",
+		User:            "test-user@canonical.com",
 		ModelName:       s.modelInfo.Name,
 		ApplicationName: "test-offer",
 	}
@@ -751,7 +750,7 @@ func (s *applicationoffersSuite) TestGetApplicationOfferConsumeDetails(c *gc.C) 
 	c.Check(info, jimmtest.CmpEquals(cmpopts.SortSlices(lessF)), jujuparams.ConsumeOfferDetails{
 		Offer: &jujuparams.ApplicationOfferDetails{
 			SourceModelTag:         names.NewModelTag(s.modelInfo.UUID).String(),
-			OfferURL:               "test-user@external/test-model.test-offer",
+			OfferURL:               "test-user@canonical.com/test-model.test-offer",
 			OfferName:              "test-offer",
 			ApplicationDescription: "A pretty popular blog engine",
 			Endpoints: []jujuparams.RemoteEndpoint{{
@@ -765,7 +764,7 @@ func (s *applicationoffersSuite) TestGetApplicationOfferConsumeDetails(c *gc.C) 
 				DisplayName: "admin",
 				Access:      "admin",
 			}, {
-				UserName:    ofganames.EveryoneUser,
+				UserName:    "everyone@external",
 				DisplayName: "",
 				Access:      "read",
 			}},
@@ -781,8 +780,8 @@ func (s *applicationoffersSuite) TestGetApplicationOfferConsumeDetails(c *gc.C) 
 func (s *applicationoffersSuite) TestGetApplicationOfferConsumeDetailsNotFound(c *gc.C) {
 	var info jujuparams.ConsumeOfferDetails
 	info.Offer = &jujuparams.ApplicationOfferDetails{
-		OfferURL: "test-user@external/test-model.test-offer",
+		OfferURL: "test-user@canonical.com/test-model.test-offer",
 	}
-	err := s.API.GetApplicationOfferConsumeDetails(context.Background(), names.NewUserTag("test-user@external"), &info, bakery.Version2)
-	c.Check(err, gc.ErrorMatches, `application offer "test-user@external/test-model.test-offer" not found`)
+	err := s.API.GetApplicationOfferConsumeDetails(context.Background(), names.NewUserTag("test-user@canonical.com"), &info, bakery.Version2)
+	c.Check(err, gc.ErrorMatches, `application offer "test-user@canonical.com/test-model.test-offer" not found`)
 }

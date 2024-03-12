@@ -10,7 +10,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/google/uuid"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/internal/jimmtest"
@@ -279,8 +279,8 @@ func (s *openFGATestSuite) TestRemoveApplicationOffer(c *gc.C) {
 func (s *openFGATestSuite) TestRemoveGroup(c *gc.C) {
 	group1 := jimmnames.NewGroupTag("1")
 	group2 := jimmnames.NewGroupTag("2")
-	alice := names.NewUserTag("alice@external")
-	adam := names.NewUserTag("adam@external")
+	alice := names.NewUserTag("alice@canonical.com")
+	adam := names.NewUserTag("adam@canonical.com")
 
 	tuples := []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(alice),
@@ -333,8 +333,8 @@ func (s *openFGATestSuite) TestRemoveGroup(c *gc.C) {
 func (s *openFGATestSuite) TestRemoveCloud(c *gc.C) {
 	cloud1 := names.NewCloudTag("cloud-1")
 
-	alice := names.NewUserTag("alice@external")
-	adam := names.NewUserTag("adam@external")
+	alice := names.NewUserTag("alice@canonical.com")
+	adam := names.NewUserTag("adam@canonical.com")
 
 	tuples := []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(alice),

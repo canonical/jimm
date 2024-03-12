@@ -1,6 +1,6 @@
 // Copyright 2023 Canonical Ltd.
 
-package jimm
+package discharger
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/dbrootkeystore"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	jjmacaroon "github.com/juju/juju/core/macaroon"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
@@ -27,19 +27,26 @@ import (
 
 var defaultDischargeExpiry = 15 * time.Minute
 
-func newMacaroonDischarger(p Params, db *db.Database, ofgaClient *openfga.OFGAClient) (*macaroonDischarger, error) {
+type MacaroonDischargerConfig struct {
+	PublicKey              string
+	PrivateKey             string
+	MacaroonExpiryDuration time.Duration
+	ControllerUUID         string
+}
+
+func NewMacaroonDischarger(cfg MacaroonDischargerConfig, db *db.Database, ofgaClient *openfga.OFGAClient) (*MacaroonDischarger, error) {
 	var kp bakery.KeyPair
-	if p.PublicKey == "" || p.PrivateKey == "" {
+	if cfg.PublicKey == "" || cfg.PrivateKey == "" {
 		generatedKP, err := bakery.GenerateKey()
 		if err != nil {
 			return nil, errors.E(err, "failed to generate a bakery keypair")
 		}
 		kp = *generatedKP
 	} else {
-		if err := kp.Private.UnmarshalText([]byte(p.PrivateKey)); err != nil {
+		if err := kp.Private.UnmarshalText([]byte(cfg.PrivateKey)); err != nil {
 			return nil, errors.E(err, "cannot unmarshal private key")
 		}
-		if err := kp.Public.UnmarshalText([]byte(p.PublicKey)); err != nil {
+		if err := kp.Public.UnmarshalText([]byte(cfg.PublicKey)); err != nil {
 			return nil, errors.E(err, "cannot unmarshal public key")
 		}
 	}
@@ -51,25 +58,39 @@ func newMacaroonDischarger(p Params, db *db.Database, ofgaClient *openfga.OFGACl
 			RootKeyStore: dbrootkeystore.NewRootKeys(100, nil).NewStore(
 				db,
 				dbrootkeystore.Policy{
-					ExpiryDuration: p.MacaroonExpiryDuration,
+					ExpiryDuration: cfg.MacaroonExpiryDuration,
 				},
 			),
 			Key:      &kp,
-			Location: "jimm " + p.ControllerUUID,
+			Location: "jimm " + cfg.ControllerUUID,
 		},
 	)
 
-	return &macaroonDischarger{
+	return &MacaroonDischarger{
 		ofgaClient: ofgaClient,
 		bakery:     b,
 		kp:         kp,
 	}, nil
 }
 
-type macaroonDischarger struct {
+type MacaroonDischarger struct {
 	ofgaClient *openfga.OFGAClient
 	bakery     *bakery.Bakery
 	kp         bakery.KeyPair
+}
+
+// GetDischargerMux returns a mux that can handle macaroon bakery requests for the provided discharger.
+func GetDischargerMux(MacaroonDischarger *MacaroonDischarger, rootPath string) *http.ServeMux {
+	discharger := httpbakery.NewDischarger(
+		httpbakery.DischargerParams{
+			Key:     &MacaroonDischarger.kp,
+			Checker: httpbakery.ThirdPartyCaveatCheckerFunc(MacaroonDischarger.CheckThirdPartyCaveat),
+		},
+	)
+	dischargeMux := http.NewServeMux()
+	discharger.AddMuxHandlers(dischargeMux, rootPath)
+
+	return dischargeMux
 }
 
 // thirdPartyCaveatCheckerFunction returns a function that
@@ -82,7 +103,7 @@ type macaroonDischarger struct {
 // a declared caveat declaring offer uuid:
 //
 //	declared offer-uuid <offer uuid>
-func (md *macaroonDischarger) checkThirdPartyCaveat(ctx context.Context, req *http.Request, cavInfo *bakery.ThirdPartyCaveatInfo, _ *httpbakery.DischargeToken) ([]checkers.Caveat, error) {
+func (md *MacaroonDischarger) CheckThirdPartyCaveat(ctx context.Context, req *http.Request, cavInfo *bakery.ThirdPartyCaveatInfo, _ *httpbakery.DischargeToken) ([]checkers.Caveat, error) {
 	caveatTokens := strings.Split(string(cavInfo.Condition), " ")
 	if len(caveatTokens) != 3 {
 		zapctx.Error(ctx, "caveat token length incorrect", zap.Int("length", len(caveatTokens)))

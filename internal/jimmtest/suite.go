@@ -6,24 +6,21 @@ import (
 	"context"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"time"
 
-	"github.com/canonical/candid/candidtest"
 	cofga "github.com/canonical/ofga"
 	"github.com/go-chi/chi/v5"
-	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
-	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/identchecker"
-	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	"github.com/juju/juju/api"
 	"github.com/juju/juju/core/network"
 	corejujutesting "github.com/juju/juju/juju/testing"
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	gc "gopkg.in/check.v1"
 
-	"github.com/canonical/jimm/internal/auth"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/discharger"
 	"github.com/canonical/jimm/internal/jimm"
 	"github.com/canonical/jimm/internal/jimmhttp"
 	"github.com/canonical/jimm/internal/jimmjwx"
@@ -87,12 +84,12 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 	s.cancel = cancel
 
 	// Note that the secret key here must match what is used in tests.
-	s.JIMM.OAuthAuthenticator = NewMockOAuthAuthenticator("test-key")
+	s.JIMM.OAuthAuthenticator = NewMockOAuthAuthenticator(jwtTestSecret)
 
 	err = s.JIMM.Database.Migrate(ctx, false)
 	c.Assert(err, gc.Equals, nil)
 	s.AdminUser = &dbmodel.Identity{
-		Name:      "alice@external",
+		Name:      "alice@canonical.com",
 		LastLogin: db.Now(),
 	}
 	err = s.JIMM.Database.GetIdentity(ctx, s.AdminUser)
@@ -115,6 +112,9 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 		"/.well-known",
 		wellknownapi.NewWellKnownHandler(s.JIMM.CredentialStore),
 	)
+	macaroonDischarger := s.setupMacaroonDischarger(c)
+	localDischargePath := "/macaroons"
+	mux.Handle(localDischargePath+"/*", discharger.GetDischargerMux(macaroonDischarger, localDischargePath))
 
 	s.Server = httptest.NewServer(mux)
 
@@ -144,6 +144,33 @@ func (s *JIMMSuite) TearDownTest(c *gc.C) {
 	if err := s.JIMM.Database.Close(); err != nil {
 		c.Logf("failed to close database connections at tear down: %s", err)
 	}
+}
+
+func (s *JIMMSuite) setupMacaroonDischarger(c *gc.C) *discharger.MacaroonDischarger {
+	cfg := discharger.MacaroonDischargerConfig{
+		MacaroonExpiryDuration: 1 * time.Hour,
+		ControllerUUID:         s.JIMM.UUID,
+	}
+	macaroonDischarger, err := discharger.NewMacaroonDischarger(cfg, &s.JIMM.Database, s.JIMM.OpenFGAClient)
+	c.Assert(err, gc.IsNil)
+	return macaroonDischarger
+}
+
+func (s *JIMMSuite) AddAdminUser(c *gc.C, email string) {
+	identity := dbmodel.Identity{
+		Name: email,
+	}
+	err := s.JIMM.Database.GetIdentity(context.Background(), &identity)
+	c.Assert(err, gc.IsNil)
+	// Set the display name of the identity.
+	displayName, _, _ := strings.Cut(email, "@")
+	identity.DisplayName = displayName
+	err = s.JIMM.Database.UpdateIdentity(context.Background(), &identity)
+	c.Assert(err, gc.IsNil)
+	// Give the identity admin permission.
+	ofgaUser := openfga.NewUser(&identity, s.OFGAClient)
+	err = ofgaUser.SetControllerAccess(context.Background(), s.JIMM.ResourceTag(), ofganames.AdministratorRelation)
+	c.Assert(err, gc.IsNil)
 }
 
 func (s *JIMMSuite) NewUser(u *dbmodel.Identity) *openfga.User {
@@ -213,50 +240,6 @@ func (s *JIMMSuite) AddModel(c *gc.C, owner names.UserTag, name string, cloud na
 	return names.NewModelTag(mi.UUID)
 }
 
-// A CandidSuite is a suite that initialises a candid test system to use a
-// jimm Authenticator.
-type CandidSuite struct {
-	// ControllerAdmins is the list of users and groups that are
-	// controller adminstrators.
-	ControllerAdmins []string
-
-	// The following are created in SetUpTest
-	Candid          *candidtest.Server
-	CandidPublicKey string
-	Authenticator   jimm.Authenticator
-}
-
-func (s *CandidSuite) SetUpTest(c *gc.C) {
-	s.Candid = candidtest.NewServer()
-	s.Candid.AddUser("agent-user", candidtest.GroupListGroup)
-	ofgaClient, _, _, err := SetupTestOFGAClient(c.TestName())
-	c.Assert(err, gc.IsNil)
-	s.Authenticator = auth.JujuAuthenticator{
-		Client: ofgaClient,
-		Bakery: identchecker.NewBakery(identchecker.BakeryParams{
-			Locator:        s.Candid,
-			Key:            bakery.MustGenerateKey(),
-			IdentityClient: s.Candid.CandidClient("agent-user"),
-			Location:       "jimmtest",
-		}),
-		ControllerAdmins: s.ControllerAdmins,
-	}
-	tpi, err := httpbakery.ThirdPartyInfoForLocation(context.Background(), nil, s.Candid.URL.String())
-	c.Assert(err, gc.Equals, nil)
-	pk, err := tpi.PublicKey.MarshalText()
-	c.Assert(err, gc.Equals, nil)
-	s.CandidPublicKey = string(pk)
-
-}
-
-func (s *CandidSuite) TearDownTest(c *gc.C) {
-	s.Authenticator = nil
-	if s.Candid != nil {
-		s.Candid.Close()
-		s.Candid = nil
-	}
-}
-
 // A JujuSuite is a suite that intialises a JIMM and adds the testing juju
 // controller.
 type JujuSuite struct {
@@ -302,7 +285,7 @@ type BootstrapSuite struct {
 func (s *BootstrapSuite) SetUpTest(c *gc.C) {
 	s.JujuSuite.SetUpTest(c)
 
-	cct := names.NewCloudCredentialTag(TestCloudName + "/bob@external/cred")
+	cct := names.NewCloudCredentialTag(TestCloudName + "/bob@canonical.com/cred")
 	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{
 		AuthType: "empty",
 	})
@@ -312,7 +295,7 @@ func (s *BootstrapSuite) SetUpTest(c *gc.C) {
 	err := s.JIMM.Database.GetCloudCredential(ctx, s.CloudCredential)
 	c.Assert(err, gc.Equals, nil)
 
-	mt := s.AddModel(c, names.NewUserTag("bob@external"), "model-1", names.NewCloudTag(TestCloudName), TestCloudRegionName, cct)
+	mt := s.AddModel(c, names.NewUserTag("bob@canonical.com"), "model-1", names.NewCloudTag(TestCloudName), TestCloudRegionName, cct)
 	s.Model = new(dbmodel.Model)
 	s.Model.SetTag(mt)
 	err = s.JIMM.Database.GetModel(ctx, s.Model)

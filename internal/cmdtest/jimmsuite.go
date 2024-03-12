@@ -7,23 +7,24 @@ package cmdtest
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/pem"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	cofga "github.com/canonical/ofga"
 	"github.com/coreos/go-oidc/v3/oidc"
-	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
-	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
-	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery/agent"
 	"github.com/juju/juju/api"
 	"github.com/juju/juju/core/network"
 	corejujutesting "github.com/juju/juju/juju/testing"
 	jjclient "github.com/juju/juju/jujuclient"
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	gc "gopkg.in/check.v1"
 
 	service "github.com/canonical/jimm"
@@ -36,7 +37,6 @@ import (
 )
 
 type JimmCmdSuite struct {
-	jimmtest.CandidSuite
 	corejujutesting.JujuConnSuite
 
 	Params      service.Params
@@ -56,9 +56,8 @@ func (s *JimmCmdSuite) SetUpTest(c *gc.C) {
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
 
-	s.CandidSuite.SetUpTest(c)
-
 	s.HTTP = httptest.NewUnstartedServer(nil)
+	s.HTTP.TLS = setupTLS(c)
 	u, err := url.Parse("https://" + s.HTTP.Listener.Addr().String())
 	c.Assert(err, gc.Equals, nil)
 
@@ -71,8 +70,6 @@ func (s *JimmCmdSuite) SetUpTest(c *gc.C) {
 	s.Params = service.Params{
 		PublicDNSName:    u.Host,
 		ControllerUUID:   "914487b5-60e7-42bb-bd63-1adc3fd3a388",
-		CandidURL:        s.Candid.URL.String(),
-		CandidPublicKey:  s.CandidPublicKey,
 		ControllerAdmins: []string{"admin"},
 		DSN:              jimmtest.CreateEmptyDatabase(&jimmtest.GocheckTester{c}),
 		OpenFGAParams: service.OpenFGAParams{
@@ -109,11 +106,10 @@ func (s *JimmCmdSuite) SetUpTest(c *gc.C) {
 	s.ControllerConfigAttrs = map[string]interface{}{
 		"login-token-refresh-url": u.String() + "/.well-known/jwks.json",
 	}
-	s.ControllerAdmins = []string{"controller-admin"}
 	s.JujuConnSuite.SetUpTest(c)
 
 	s.AdminUser = &dbmodel.Identity{
-		Name:      "alice@external",
+		Name:      "alice@canonical.com",
 		LastLogin: db.Now(),
 	}
 	err = s.JIMM.Database.GetIdentity(ctx, s.AdminUser)
@@ -123,7 +119,7 @@ func (s *JimmCmdSuite) SetUpTest(c *gc.C) {
 	err = alice.SetControllerAccess(context.Background(), s.JIMM.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, gc.Equals, nil)
 
-	s.Candid.AddUser("alice")
+	s.AddAdminUser(c, "alice@canonical.com")
 
 	w := new(bytes.Buffer)
 	err = pem.Encode(w, &pem.Block{
@@ -145,6 +141,69 @@ func (s *JimmCmdSuite) SetUpTest(c *gc.C) {
 	}
 }
 
+func (s *JimmCmdSuite) TearDownTest(c *gc.C) {
+	if s.cancel != nil {
+		s.cancel()
+	}
+	if s.HTTP != nil {
+		s.HTTP.Close()
+	}
+	if s.JIMM != nil && s.JIMM.Database.DB != nil {
+		if err := s.JIMM.Database.Close(); err != nil {
+			c.Logf("failed to close database connections at tear down: %s", err)
+		}
+	}
+	s.JujuConnSuite.TearDownTest(c)
+}
+
+func getRootJimmPath(c *gc.C) string {
+	path, err := os.Getwd()
+	c.Assert(err, gc.IsNil)
+	dirs := strings.Split(path, "/")
+	c.Assert(len(dirs), gc.Not(gc.Equals), 1)
+	dirs = dirs[1:]
+	jimmIndex := -1
+	// Range over dirs from the end to ensure no top-level jimm
+	// folders interfere with our search.
+	for i := len(dirs) - 1; i >= 0; i-- {
+		if dirs[i] == "jimm" {
+			jimmIndex = i + 1
+			break
+		}
+	}
+	c.Assert(jimmIndex, gc.Not(gc.Equals), -1)
+	return "/" + filepath.Join(dirs[:jimmIndex]...)
+}
+
+func setupTLS(c *gc.C) *tls.Config {
+	jimmPath := getRootJimmPath(c)
+	pathToCert := filepath.Join(jimmPath, "local/traefik/certs/server.crt")
+	localhostCert, err := os.ReadFile(pathToCert)
+	c.Assert(err, gc.IsNil, gc.Commentf("Unable to find cert at %s. Run make cert in root directory.", pathToCert))
+
+	pathToKey := filepath.Join(jimmPath, "local/traefik/certs/server.key")
+	localhostKey, err := os.ReadFile(pathToKey)
+	c.Assert(err, gc.IsNil, gc.Commentf("Unable to find key at %s. Run make cert in root directory.", pathToKey))
+
+	cert, err := tls.X509KeyPair(localhostCert, localhostKey)
+	c.Assert(err, gc.IsNil, gc.Commentf("Failed to generate certificate key pair."))
+
+	tlsConfig := new(tls.Config)
+	tlsConfig.Certificates = []tls.Certificate{cert}
+	return tlsConfig
+}
+
+func (s *JimmCmdSuite) AddAdminUser(c *gc.C, email string) {
+	identity := dbmodel.Identity{
+		Name: email,
+	}
+	err := s.JIMM.Database.GetIdentity(context.Background(), &identity)
+	c.Assert(err, gc.IsNil)
+	ofgaUser := openfga.NewUser(&identity, s.OFGAClient)
+	err = ofgaUser.SetControllerAccess(context.Background(), s.JIMM.ResourceTag(), ofganames.AdministratorRelation)
+	c.Assert(err, gc.IsNil)
+}
+
 // RefreshControllerAddress is a useful helper function when writing table tests for JIMM CLI
 // commands that use NewAPIRootWithDialOpts. Each invocation of the NewAPIRootWithDialOpts function
 // updates the ClientStore and removes local IPs thus removing JIMM's IP.
@@ -156,38 +215,6 @@ func (s *JimmCmdSuite) RefreshControllerAddress(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	jimm.APIEndpoints = []string{u.Host}
 	s.ClientStore().Controllers["JIMM"] = jimm
-}
-
-func (s *JimmCmdSuite) TearDownTest(c *gc.C) {
-	if s.cancel != nil {
-		s.cancel()
-	}
-	if s.HTTP != nil {
-		s.HTTP.Close()
-	}
-	if err := s.JIMM.Database.Close(); err != nil {
-		c.Logf("failed to close database connections at tear down: %s", err)
-	}
-	s.CandidSuite.TearDownTest(c)
-	s.JujuConnSuite.TearDownTest(c)
-}
-
-func (s *JimmCmdSuite) UserBakeryClient(username string) *httpbakery.Client {
-	s.Candid.AddUser(username)
-	key := s.Candid.UserPublicKey(username)
-	bClient := httpbakery.NewClient()
-	bClient.Key = &bakery.KeyPair{
-		Public:  bakery.PublicKey{Key: bakery.Key(key.Public.Key)},
-		Private: bakery.PrivateKey{Key: bakery.Key(key.Private.Key)},
-	}
-	agent.SetUpAuth(bClient, &agent.AuthInfo{
-		Key: bClient.Key,
-		Agents: []agent.Agent{{
-			URL:      s.Candid.URL.String(),
-			Username: username,
-		}},
-	})
-	return bClient
 }
 
 func (s *JimmCmdSuite) AddController(c *gc.C, name string, info *api.Info) {

@@ -14,7 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/juju/juju/core/crossmodel"
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	"github.com/juju/zaputil"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
@@ -50,13 +50,13 @@ var (
 	// [9] - Application offer name
 	// [10] - Relation specifier (i.e., #member)
 	// A complete matcher example would look like so with square-brackets denoting groups and paranthsis denoting index:
-	// (1)[controller](2)[-](3)[controller-1](4)[:](5)[alice@external-place](6)[/](7)[model-1](8)[.](9)[offer-1](10)[#relation-specifier]"
+	// (1)[controller](2)[-](3)[controller-1](4)[:](5)[alice@canonical.com-place](6)[/](7)[model-1](8)[.](9)[offer-1](10)[#relation-specifier]"
 	// In the case of something like: user-alice@wonderland or group-alices-wonderland#member, it would look like so:
 	// (1)[user](2)[-](3)[alices@wonderland]
 	// (1)[group](2)[-](3)[alices-wonderland](10)[#member]
 	// So if a group, user, UUID, controller name comes in, it will always be index 3 for them
 	// and if a relation specifier is present, it will always be index 10
-	jujuURIMatcher = regexp.MustCompile(`([a-zA-Z0-9]*)(\-|\z)([a-zA-Z0-9-@.]*)(\:|)([a-zA-Z0-9-@]*)(\/|)([a-zA-Z0-9-]*)(\.|)([a-zA-Z0-9-]*)([a-zA-Z#]*|\z)\z`)
+	jujuURIMatcher = regexp.MustCompile(`([a-zA-Z0-9]*)(\-|\z)([a-zA-Z0-9-@.]*)(\:|)([a-zA-Z0-9-@.]*)(\/|)([a-zA-Z0-9-]*)(\.|)([a-zA-Z0-9-]*)([a-zA-Z#]*|\z)\z`)
 )
 
 // ToOfferAccessString maps relation to an application offer access string.
@@ -228,6 +228,7 @@ func (auth *JWTGenerator) MakeLoginToken(ctx context.Context, req *jujuparams.Lo
 	// Recreate the accessMapCache to prevent leaking permissions across multiple login requests.
 	auth.accessMapCache = make(map[string]string)
 	var authErr error
+	// TODO(CSS-7331) Refactor model proxy for new login methods
 	auth.user, authErr = auth.authenticator.Authenticate(ctx, req)
 	if authErr != nil {
 		zapctx.Error(ctx, "authentication failed", zap.Error(authErr))
@@ -482,7 +483,7 @@ func (j *JIMM) ToJAASTag(ctx context.Context, tag *ofganames.Tag) (string, error
 	}
 }
 
-// resolveTag resolves JIMM tag [of any kind available] (i.e., controller-mycontroller:alex@external/mymodel.myoffer)
+// resolveTag resolves JIMM tag [of any kind available] (i.e., controller-mycontroller:alex@canonical.com/mymodel.myoffer)
 // into a juju string tag (i.e., controller-<controller uuid>).
 //
 // If the JIMM tag is aleady of juju string tag form, the transformation is left alone.

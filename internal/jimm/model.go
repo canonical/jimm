@@ -12,7 +12,7 @@ import (
 
 	jujupermission "github.com/juju/juju/core/permission"
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	"github.com/juju/zaputil"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
@@ -716,8 +716,7 @@ func (j *JIMM) ModelInfo(ctx context.Context, user *openfga.User, mt names.Model
 	for username, access := range userAccess {
 		// If the user does not contain an "@" sign (no domain), it means
 		// this is a local user of this controller and JIMM does not
-		// care or know about local users - only Candid users are
-		// relevant.
+		// care or know about local users.
 		if !strings.Contains(username, "@") {
 			continue
 		}

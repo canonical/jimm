@@ -10,7 +10,7 @@ import (
 	"github.com/canonical/jimm/internal/dbmodel"
 	qt "github.com/frankban/quicktest"
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 )
 
 func TestControllerTag(t *testing.T) {
@@ -92,7 +92,7 @@ func TestControllerModels(t *testing.T) {
 	c.Assert(db.Create(&m1).Error, qt.IsNil)
 
 	u2 := dbmodel.Identity{
-		Name: "charlie@external",
+		Name: "charlie@canonical.com",
 	}
 	c.Assert(db.Create(&u2).Error, qt.IsNil)
 

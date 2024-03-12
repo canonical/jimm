@@ -14,7 +14,7 @@ import (
 	"github.com/juju/juju/cmd/juju/status"
 	"github.com/juju/juju/cmd/juju/storage"
 	rpcparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
 )
 

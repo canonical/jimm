@@ -21,7 +21,7 @@ import (
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	"github.com/juju/juju/api/base"
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 	"gopkg.in/httprequest.v1"
@@ -197,6 +197,10 @@ func (c *Connection) IsBroken() bool {
 		return true
 	}
 	return c.client.IsBroken()
+}
+
+func (c *Connection) RootHTTPClient() (*httprequest.Client, error) {
+	return c.HTTPClient()
 }
 
 // hasFacadeVersion returns whether the connection supports the given

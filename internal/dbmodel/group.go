@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	"gorm.io/gorm"
 
 	apiparams "github.com/canonical/jimm/api/params"

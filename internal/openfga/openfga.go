@@ -8,7 +8,7 @@ import (
 
 	"github.com/canonical/jimm/internal/errors"
 	cofga "github.com/canonical/ofga"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 	jimmnames "github.com/canonical/jimm/pkg/names"
@@ -79,7 +79,7 @@ func NewOpenFGAClient(cofgaClient *cofga.Client) *OFGAClient {
 
 // publicAccessAdaptor handles cases where a tuple need to be transformed before being
 // returned to the application layer. The wildcard tuple * for users is replaced
-// with the everyone@external user.
+// with the everyone user.
 func publicAccessAdaptor(tt cofga.TimestampedTuple) cofga.TimestampedTuple {
 	if tt.Tuple.Object.Kind == UserType && tt.Tuple.Object.IsPublicAccess() {
 		tt.Tuple.Object.ID = ofganames.EveryoneUser

@@ -42,6 +42,8 @@ jobs:
         run: |
           touch ./local/vault/approle.json
           touch ./local/vault/roleid.txt
+      - name: Create test certs
+        run: make certs
       - name: Start test environment
         run: docker compose up -d --wait
       - name: Build and Test
@@ -65,12 +67,6 @@ jobs:
       - uses: actions/setup-go@v4
         with:
           go-version-file: 'go.mod'
-      - name: Pull candid repo for test environment
-        run: |
-          git clone https://github.com/canonical/candid.git ./tmp/candid
-          cd ./tmp/candid
-          make image
-          docker image ls candid
       - name: Add volume files
         run: |
           touch ./local/vault/approle.json

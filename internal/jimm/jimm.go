@@ -16,7 +16,7 @@ import (
 	"github.com/juju/juju/api/base"
 	"github.com/juju/juju/core/crossmodel"
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 	"go.uber.org/zap"
@@ -49,11 +49,6 @@ type JIMM struct {
 	// responsible for ensuring that the authenticated user has access to
 	// the data.
 	Database db.Database
-
-	// Authenticator is the authenticator JIMM uses to determine the user
-	// authenticating with the API. If this is not specified then all
-	// authentication requests are considered to have failed.
-	Authenticator Authenticator
 
 	// Dialer is the API dialer JIMM uses to contact juju controllers. if
 	// this is not configured all connection attempts will fail.
@@ -415,7 +410,13 @@ func (j *JIMM) AddAuditLogEntry(ale *dbmodel.AuditLogEntry) {
 	}
 }
 
-var sensitiveMethods = map[string]struct{}{"login": {}, "addcredentials": {}, "updatecredentials": {}}
+var sensitiveMethods = map[string]struct{}{
+	"login":                 {},
+	"logindevice":           {},
+	"getdevicesessiontoken": {},
+	"loginwithsessiontoken": {},
+	"addcredentials":        {},
+	"updatecredentials":     {}}
 var redactJSON = dbmodel.JSON(`{"params":"redacted"}`)
 
 func redactSensitiveParams(ale *dbmodel.AuditLogEntry) {

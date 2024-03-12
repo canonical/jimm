@@ -38,7 +38,7 @@ func (s *addControllerSuite) TestAddControllerSuperuser(c *gc.C) {
 	defer os.RemoveAll(tmpdir)
 
 	// alice is superuser
-	bClient := s.UserBakeryClient("alice")
+	bClient := jimmtest.NewUserSessionLogin("alice")
 	ctx, err := cmdtesting.RunCommand(c, cmd.NewAddControllerCommandForTesting(s.ClientStore(), bClient), tmpfile)
 	c.Assert(err, gc.IsNil)
 	c.Assert(cmdtesting.Stdout(ctx), gc.Matches, `name: controller-1
@@ -101,7 +101,7 @@ func (s *addControllerSuite) TestAddController(c *gc.C) {
 	defer os.RemoveAll(tmpdir)
 
 	// bob is not superuser
-	bClient := s.UserBakeryClient("bob")
+	bClient := jimmtest.NewUserSessionLogin("bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewAddControllerCommandForTesting(s.ClientStore(), bClient), tmpfile)
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }

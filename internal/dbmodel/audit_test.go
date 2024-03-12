@@ -8,7 +8,7 @@ import (
 	"time"
 
 	qt "github.com/frankban/quicktest"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 
 	apiparams "github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/internal/dbmodel"
@@ -30,7 +30,7 @@ func TestAuditLogEntry(t *testing.T) {
 		FacadeMethod:   "AddController",
 		FacadeVersion:  1,
 		ObjectId:       "1",
-		IdentityTag:    names.NewUserTag("bob@external").String(),
+		IdentityTag:    names.NewUserTag("bob@canonical.com").String(),
 		IsResponse:     false,
 		Params:         paramsJSON,
 		Errors:         nil,
@@ -57,7 +57,7 @@ func TestToAPIAuditEvent(t *testing.T) {
 		FacadeMethod:   "AddController",
 		FacadeVersion:  1,
 		ObjectId:       "1",
-		IdentityTag:    names.NewUserTag("bob@external").String(),
+		IdentityTag:    names.NewUserTag("bob@canonical.com").String(),
 		IsResponse:     false,
 		Params:         paramsJSON,
 		Errors:         nil,
@@ -71,7 +71,7 @@ func TestToAPIAuditEvent(t *testing.T) {
 		FacadeMethod:   "AddController",
 		FacadeVersion:  1,
 		ObjectId:       "1",
-		UserTag:        names.NewUserTag("bob@external").String(),
+		UserTag:        names.NewUserTag("bob@canonical.com").String(),
 		IsResponse:     false,
 		Params:         map[string]any{"a": "b", "c": "d"},
 		Errors:         nil,

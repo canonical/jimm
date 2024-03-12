@@ -6,7 +6,7 @@ import (
 	"database/sql"
 
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	"gorm.io/gorm"
 )
 
@@ -15,7 +15,7 @@ type Identity struct {
 	gorm.Model
 
 	// Name is the name of the identity. This is the user name when
-	// representing a Juju user (i.e. with an @external suffix), or the client
+	// representing a Juju user (i.e. with an @canonical.com suffix), or the client
 	// ID for a service account. The Name will have originated at an
 	// external identity provider in JAAS deployments.
 	Name string `gorm:"not null;uniqueIndex"`

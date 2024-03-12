@@ -16,7 +16,7 @@ import (
 	"github.com/juju/juju/cmd/modelcmd"
 	"github.com/juju/juju/jujuclient"
 	"github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 
 	"github.com/canonical/jimm/api"
 	apiparams "github.com/canonical/jimm/api/params"

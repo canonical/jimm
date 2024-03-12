@@ -5,7 +5,7 @@ import (
 	"context"
 
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/internal/dbmodel"
@@ -21,7 +21,7 @@ var _ = gc.Suite(&storageSuite{})
 func (s *storageSuite) TestListFilesystems(c *gc.C) {
 	ctx := context.Background()
 
-	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/bob@external/pw1")
+	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/bob@canonical.com/pw1")
 	cred := jujuparams.TaggedCredential{
 		Tag: cct.String(),
 		Credential: jujuparams.CloudCredential{
@@ -50,7 +50,7 @@ func (s *storageSuite) TestListFilesystems(c *gc.C) {
 	var modelInfo jujuparams.ModelInfo
 	err = s.API.CreateModel(ctx, &jujuparams.ModelCreateArgs{
 		Name:               "model-1",
-		OwnerTag:           names.NewUserTag("bob@external").String(),
+		OwnerTag:           names.NewUserTag("bob@canonical.com").String(),
 		CloudCredentialTag: cct.String(),
 	}, &modelInfo)
 	c.Assert(err, gc.Equals, nil)
@@ -67,7 +67,7 @@ func (s *storageSuite) TestListFilesystems(c *gc.C) {
 func (s *storageSuite) TestListVolumes(c *gc.C) {
 	ctx := context.Background()
 
-	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/bob@external/pw1").String()
+	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/bob@canonical.com/pw1").String()
 	cred := jujuparams.TaggedCredential{
 		Tag: cct,
 		Credential: jujuparams.CloudCredential{
@@ -96,7 +96,7 @@ func (s *storageSuite) TestListVolumes(c *gc.C) {
 	var modelInfo jujuparams.ModelInfo
 	err = s.API.CreateModel(ctx, &jujuparams.ModelCreateArgs{
 		Name:               "model-1",
-		OwnerTag:           names.NewUserTag("bob@external").String(),
+		OwnerTag:           names.NewUserTag("bob@canonical.com").String(),
 		CloudCredentialTag: cct,
 	}, &modelInfo)
 	c.Assert(err, gc.Equals, nil)
@@ -113,7 +113,7 @@ func (s *storageSuite) TestListVolumes(c *gc.C) {
 func (s *storageSuite) TestListStorageDetails(c *gc.C) {
 	ctx := context.Background()
 
-	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/bob@external/pw1").String()
+	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/bob@canonical.com/pw1").String()
 	cred := jujuparams.TaggedCredential{
 		Tag: cct,
 		Credential: jujuparams.CloudCredential{
@@ -142,7 +142,7 @@ func (s *storageSuite) TestListStorageDetails(c *gc.C) {
 	var modelInfo jujuparams.ModelInfo
 	err = s.API.CreateModel(ctx, &jujuparams.ModelCreateArgs{
 		Name:               "model-1",
-		OwnerTag:           names.NewUserTag("bob@external").String(),
+		OwnerTag:           names.NewUserTag("bob@canonical.com").String(),
 		CloudCredentialTag: cct,
 	}, &modelInfo)
 	c.Assert(err, gc.Equals, nil)

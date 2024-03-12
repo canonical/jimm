@@ -4,29 +4,25 @@ package jimm_test
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/canonical/candid/candidtest"
 	cofga "github.com/canonical/ofga"
 	"github.com/coreos/go-oidc/v3/oidc"
 	qt "github.com/frankban/quicktest"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/checkers"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
-	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery/agent"
 	"github.com/juju/juju/api"
 	"github.com/juju/juju/api/client/cloud"
 	jujucloud "github.com/juju/juju/cloud"
 	"github.com/juju/juju/core/macaroon"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 
 	"github.com/canonical/jimm"
 	"github.com/canonical/jimm/internal/dbmodel"
@@ -106,7 +102,6 @@ func TestAuthenticator(t *testing.T) {
 		},
 		DashboardFinalRedirectURL: "<no dashboard needed for this test>",
 	}
-	candid := startCandid(c, &p)
 	svc, err := jimm.NewService(context.Background(), p)
 	c.Assert(err, qt.IsNil)
 
@@ -117,7 +112,7 @@ func TestAuthenticator(t *testing.T) {
 	}
 
 	conn, err := api.Open(&info, api.DialOpts{
-		BakeryClient:       userClient(candid, "alice", "admin"),
+		LoginProvider:      jimmtest.NewUserSessionLogin("alice"),
 		InsecureSkipVerify: true,
 	})
 	c.Assert(err, qt.IsNil)
@@ -128,11 +123,11 @@ func TestAuthenticator(t *testing.T) {
 	})
 
 	c.Check(conn.ControllerTag(), qt.Equals, names.NewControllerTag("6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11"))
-	c.Check(conn.AuthTag(), qt.Equals, names.NewUserTag("alice@external"))
+	c.Check(conn.AuthTag(), qt.Equals, names.NewUserTag("alice@canonical.com"))
 	c.Check(conn.ControllerAccess(), qt.Equals, "")
 
 	conn, err = api.Open(&info, api.DialOpts{
-		BakeryClient:       userClient(candid, "bob"),
+		LoginProvider:      jimmtest.NewUserSessionLogin("bob"),
 		InsecureSkipVerify: true,
 	})
 	c.Assert(err, qt.IsNil)
@@ -143,7 +138,7 @@ func TestAuthenticator(t *testing.T) {
 	})
 
 	c.Check(conn.ControllerTag(), qt.Equals, names.NewControllerTag("6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11"))
-	c.Check(conn.AuthTag(), qt.Equals, names.NewUserTag("bob@external"))
+	c.Check(conn.AuthTag(), qt.Equals, names.NewUserTag("bob@canonical.com"))
 	c.Check(conn.ControllerAccess(), qt.Equals, "")
 }
 
@@ -176,7 +171,6 @@ func TestVault(t *testing.T) {
 		},
 		DashboardFinalRedirectURL: "<no dashboard needed for this test>",
 	}
-	candid := startCandid(c, &p)
 	vaultClient, _, creds, _ := jimmtest.VaultClient(c, ".")
 
 	svc, err := jimm.NewService(context.Background(), p)
@@ -192,7 +186,7 @@ func TestVault(t *testing.T) {
 	}
 
 	conn, err := api.Open(&info, api.DialOpts{
-		BakeryClient:       userClient(candid, "bob"),
+		LoginProvider:      jimmtest.NewUserSessionLogin("bob"),
 		InsecureSkipVerify: true,
 	})
 	c.Assert(err, qt.IsNil)
@@ -204,7 +198,7 @@ func TestVault(t *testing.T) {
 
 	cloudClient := cloud.NewClient(conn)
 
-	tag := names.NewCloudCredentialTag("test/bob@external/test-1").String()
+	tag := names.NewCloudCredentialTag("test/bob@canonical.com/test-1").String()
 	_, err = cloudClient.UpdateCloudsCredentials(map[string]jujucloud.Credential{
 		tag: jujucloud.NewCredential(jujucloud.UserPassAuthType, map[string]string{
 			"username": "test-user",
@@ -219,7 +213,7 @@ func TestVault(t *testing.T) {
 		AuthPath:   p.VaultAuthPath,
 		KVPath:     p.VaultPath,
 	}
-	attr, err := store.Get(context.Background(), names.NewCloudCredentialTag("test/bob@external/test-1"))
+	attr, err := store.Get(context.Background(), names.NewCloudCredentialTag("test/bob@canonical.com/test-1"))
 	c.Assert(err, qt.IsNil)
 	c.Check(attr, qt.DeepEquals, map[string]string{
 		"username": "test-user",
@@ -269,7 +263,6 @@ func TestOpenFGA(t *testing.T) {
 		},
 		DashboardFinalRedirectURL: "<no dashboard needed for this test>",
 	}
-	candid := startCandid(c, &p)
 	svc, err := jimm.NewService(context.Background(), p)
 	c.Assert(err, qt.IsNil)
 
@@ -280,7 +273,7 @@ func TestOpenFGA(t *testing.T) {
 	}
 
 	conn, err := api.Open(&info, api.DialOpts{
-		BakeryClient:       userClient(candid, "bob"),
+		LoginProvider:      jimmtest.NewUserSessionLogin("bob"),
 		InsecureSkipVerify: true,
 	})
 	c.Assert(err, qt.IsNil)
@@ -326,14 +319,13 @@ func TestPublicKey(t *testing.T) {
 		},
 		DashboardFinalRedirectURL: "<no dashboard needed for this test>",
 	}
-	_ = startCandid(c, &p)
 	svc, err := jimm.NewService(context.Background(), p)
 	c.Assert(err, qt.IsNil)
 
 	srv := httptest.NewTLSServer(svc)
 	c.Cleanup(srv.Close)
 
-	response, err := http.Get(srv.URL + "/macaroons/publickey")
+	response, err := srv.Client().Get(srv.URL + "/macaroons/publickey")
 	c.Assert(err, qt.IsNil)
 	data, err := io.ReadAll(response.Body)
 	c.Assert(err, qt.IsNil)
@@ -348,7 +340,7 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 		Name: "test-application-offer",
 	}
 	user := dbmodel.Identity{
-		Name: "alice@external",
+		Name: "alice@canonical.com",
 	}
 
 	ctx := context.Background()
@@ -415,7 +407,6 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 				},
 				DashboardFinalRedirectURL: "<no dashboard needed for this test>",
 			}
-			_ = startCandid(c, &p)
 			svc, err := jimm.NewService(context.Background(), p)
 			c.Assert(err, qt.IsNil)
 
@@ -456,6 +447,9 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 			}
 
 			bakeryClient := httpbakery.NewClient()
+			// Give the bakery client the transport config from the test server client
+			// so that the bakery client has the necessary certs for the test server.
+			bakeryClient.Client.Transport = srv.Client().Transport
 			ms, err := bakeryClient.DischargeAll(context.TODO(), m)
 			if test.expectedError != "" {
 				c.Assert(err, qt.ErrorMatches, test.expectedError)
@@ -468,53 +462,6 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 				c.Assert(declaredCaveats, qt.DeepEquals, test.expectDeclared)
 			}
 		})
-	}
-}
-
-func startCandid(c *qt.C, p *jimm.Params) *candidtest.Server {
-	candid := candidtest.NewServer()
-	c.Cleanup(candid.Close)
-	p.CandidURL = candid.URL.String()
-
-	tpi, err := httpbakery.ThirdPartyInfoForLocation(context.Background(), nil, candid.URL.String())
-	c.Assert(err, qt.IsNil)
-	pk, err := tpi.PublicKey.MarshalText()
-	c.Assert(err, qt.IsNil)
-	p.CandidPublicKey = string(pk)
-
-	candid.AddUser("jimm-agent", candidtest.GroupListGroup)
-	buf, err := json.Marshal(agent.AuthInfo{
-		Key: key(candid, "jimm-agent"),
-		Agents: []agent.Agent{{
-			URL:      candid.URL.String(),
-			Username: "jimm-agent",
-		}},
-	})
-	c.Assert(err, qt.IsNil)
-	p.BakeryAgentFile = filepath.Join(c.TempDir(), "agent.json")
-	err = os.WriteFile(p.BakeryAgentFile, buf, 0400)
-	c.Assert(err, qt.IsNil)
-	return candid
-}
-
-func userClient(candid *candidtest.Server, user string, groups ...string) *httpbakery.Client {
-	candid.AddUser(user, groups...)
-	client := httpbakery.NewClient()
-	agent.SetUpAuth(client, &agent.AuthInfo{
-		Key: key(candid, user),
-		Agents: []agent.Agent{{
-			URL:      candid.URL.String(),
-			Username: user,
-		}},
-	})
-	return client
-}
-
-func key(candid *candidtest.Server, user string) *bakery.KeyPair {
-	key := candid.UserPublicKey(user)
-	return &bakery.KeyPair{
-		Public:  bakery.PublicKey{Key: bakery.Key(key.Public.Key)},
-		Private: bakery.PrivateKey{Key: bakery.Key(key.Private.Key)},
 	}
 }
 

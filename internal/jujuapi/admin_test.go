@@ -24,7 +24,6 @@ import (
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/macaroon.v2"
 )
 
 type adminSuite struct {
@@ -57,19 +56,10 @@ func (s *adminSuite) TestLoginToController(c *gc.C) {
 	}, "test")
 	defer conn.Close()
 	err := conn.Login(nil, "", "", nil)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, gc.ErrorMatches, "Invalid login, ensure you are using Juju 3\\.5\\+")
 	var resp jujuparams.RedirectInfoResult
 	err = conn.APICall("Admin", 3, "", "RedirectInfo", nil, &resp)
 	c.Assert(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeNotImplemented)
-}
-
-func (s *adminSuite) TestLoginToControllerWithInvalidMacaroon(c *gc.C) {
-	invalidMacaroon, err := macaroon.New(nil, []byte("invalid"), "", macaroon.V1)
-	c.Assert(err, gc.Equals, nil)
-	conn := s.open(c, &api.Info{
-		Macaroons: []macaroon.Slice{{invalidMacaroon}},
-	}, "test")
-	conn.Close()
 }
 
 // TestDeviceLogin takes a test user through the flow of logging into jimm

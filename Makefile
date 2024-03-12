@@ -29,15 +29,17 @@ clean:
 	-$(RM) -r jimm-release/
 	-$(RM) jimm-*.tar.xz
 
-test-env: sysdeps
+certs:
+	@cd local/traefik/certs; ./certs.sh; cd -
+
+test-env: sysdeps certs
 	@touch ./local/vault/approle.json && touch ./local/vault/roleid.txt
-	@docker compose up --force-recreate
+	@docker compose up --force-recreate -d --wait
 
 test-env-cleanup:
 	@docker compose down -v --remove-orphans
 
-dev-env-setup: sysdeps pull/candid
-	@cd local/traefik/certs; ./certs.sh; cd -
+dev-env-setup: sysdeps certs
 	@touch ./local/vault/approle.json && touch ./local/vault/roleid.txt
 	@make version/commit.txt && make version/version.txt
 	@go mod vendor
@@ -97,11 +99,6 @@ push-microk8s: jimm-image
 	docker tag jimm:latest localhost:32000/jimm:latest
 	docker push localhost:32000/jimm:latest
 
-pull/candid:
-	-git clone https://github.com/canonical/candid.git ./tmp/candid
-	(cd ./tmp/candid && make image)
-	docker image ls candid
-
 get-local-auth:
 	@go run ./local/authy
 
@@ -138,7 +135,6 @@ help:
 	@echo 'make sysdeps - Install the development environment system packages.'
 	@echo 'make format - Format the source files.'
 	@echo 'make simplify - Format and simplify the source files.'
-	@echo 'make pull/candid - Pull candid for local development environment.'
 	@echo 'make get-local-auth - Get local auth to the API WSS endpoint locally.'
 
 .PHONY: build check install release clean format server simplify sysdeps help FORCE

@@ -314,9 +314,9 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 		},
 		//Test username with dots and @ -> group
 		{
-			input: tuple{"user-" + "kelvin.lina.test@external", "member", "group-" + group.Name},
+			input: tuple{"user-" + "kelvin.lina.test@canonical.com", "member", "group-" + group.Name},
 			want: createTuple(
-				"user:"+"kelvin.lina.test@external",
+				"user:"+"kelvin.lina.test@canonical.com",
 				"member",
 				"group:"+stringGroupID(group.ID),
 			),
@@ -880,8 +880,8 @@ func (s *accessControlSuite) TestCheckRelationAsNonAdmin(c *gc.C) {
 	defer conn.Close()
 	client := api.NewClient(conn)
 
-	userAliceKey := "user-alice@external"
-	userBobKey := "user-bob@external"
+	userAliceKey := "user-alice@canonical.com"
+	userBobKey := "user-bob@canonical.com"
 
 	// Verify Bob checking for Alice's permission fails
 	input := apiparams.RelationshipTuple{
@@ -1348,7 +1348,7 @@ func createTestControllerEnvironment(ctx context.Context, c *gc.C, s *accessCont
 	c.Assert(err, gc.IsNil)
 
 	u := dbmodel.Identity{
-		Name: petname.Generate(2, "-") + "@external",
+		Name: petname.Generate(2, "-") + "@canonical.com",
 	}
 	c.Assert(db.DB.Create(&u).Error, gc.IsNil)
 

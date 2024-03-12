@@ -13,10 +13,10 @@ import (
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/google/uuid"
-	"github.com/juju/charm/v11"
+	"github.com/juju/charm/v12"
 	"github.com/juju/juju/core/crossmodel"
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	"gopkg.in/macaroon.v2"
 	"gorm.io/gorm"
 
@@ -44,39 +44,39 @@ var initializeEnvironment = func(c *qt.C, ctx context.Context, db *db.Database, 
 
 	// Alice is a model admin, but not a superuser or offer admin.
 	u := dbmodel.Identity{
-		Name: "alice@external",
+		Name: "alice@canonical.com",
 	}
 	c.Assert(db.DB.Create(&u).Error, qt.IsNil)
 
 	u1 := dbmodel.Identity{
-		Name: "eve@external",
+		Name: "eve@canonical.com",
 	}
 	c.Assert(db.DB.Create(&u1).Error, qt.IsNil)
 
 	u2 := dbmodel.Identity{
-		Name: "bob@external",
+		Name: "bob@canonical.com",
 	}
 	c.Assert(db.DB.Create(&u2).Error, qt.IsNil)
 
 	u3 := dbmodel.Identity{
-		Name: "fred@external",
+		Name: "fred@canonical.com",
 	}
 	c.Assert(db.DB.Create(&u3).Error, qt.IsNil)
 
 	u4 := dbmodel.Identity{
-		Name: "grant@external",
+		Name: "grant@canonical.com",
 	}
 	c.Assert(db.DB.Create(&u4).Error, qt.IsNil)
 
 	// Jane is an offer admin, but not a superuser or model admin.
 	u5 := dbmodel.Identity{
-		Name: "jane@external",
+		Name: "jane@canonical.com",
 	}
 	c.Assert(db.DB.Create(&u5).Error, qt.IsNil)
 
 	// Joe is a superuser, but not a model or offer admin.
 	u6 := dbmodel.Identity{
-		Name: "joe@external",
+		Name: "joe@canonical.com",
 	}
 	c.Assert(db.DB.Create(&u6).Error, qt.IsNil)
 
@@ -569,17 +569,17 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	u := dbmodel.Identity{
-		Name: "alice@external",
+		Name: "alice@canonical.com",
 	}
 	c.Assert(db.DB.Create(&u).Error, qt.IsNil)
 
 	u1 := dbmodel.Identity{
-		Name: "eve@external",
+		Name: "eve@canonical.com",
 	}
 	c.Assert(db.DB.Create(&u1).Error, qt.IsNil)
 
 	u2 := dbmodel.Identity{
-		Name: "bob@external",
+		Name: "bob@canonical.com",
 	}
 	c.Assert(db.DB.Create(&u2).Error, qt.IsNil)
 
@@ -692,13 +692,13 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 							"key2": "value2",
 						},
 						Users: []jujuparams.OfferUserDetails{{
-							UserName: "alice@external",
+							UserName: "alice@canonical.com",
 							Access:   "admin",
 						}, {
-							UserName: "eve@external",
+							UserName: "eve@canonical.com",
 							Access:   "read",
 						}, {
-							UserName: "bob@external",
+							UserName: "bob@canonical.com",
 							Access:   "consume",
 						}},
 						Spaces: []jujuparams.RemoteSpace{{
@@ -759,13 +759,13 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 					"key2": "value2",
 				},
 				Users: []jujuparams.OfferUserDetails{{
-					UserName: "alice@external",
+					UserName: "alice@canonical.com",
 					Access:   "admin",
 				}, {
-					UserName: "bob@external",
+					UserName: "bob@canonical.com",
 					Access:   "consume",
 				}, {
-					UserName: "eve@external",
+					UserName: "eve@canonical.com",
 					Access:   "read",
 				}, {
 					UserName: "everyone@external",
@@ -814,7 +814,7 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 					"key2": "value2",
 				},
 				Users: []jujuparams.OfferUserDetails{{
-					UserName: "bob@external",
+					UserName: "bob@canonical.com",
 					Access:   "consume",
 				}, {
 					UserName: "everyone@external",
@@ -923,10 +923,10 @@ func TestGetApplicationOffer(t *testing.T) {
 							"key2": "value5",
 						},
 						Users: []jujuparams.OfferUserDetails{{
-							UserName: "alice@external",
+							UserName: "alice@canonical.com",
 							Access:   string(jujuparams.OfferAdminAccess),
 						}, {
-							UserName: "eve@external",
+							UserName: "eve@canonical.com",
 							Access:   "read",
 						}, {
 							UserName: "admin",
@@ -943,17 +943,17 @@ func TestGetApplicationOffer(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	u := dbmodel.Identity{
-		Name: "alice@external",
+		Name: "alice@canonical.com",
 	}
 	c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
 
 	u1 := dbmodel.Identity{
-		Name: "eve@external",
+		Name: "eve@canonical.com",
 	}
 	c.Assert(j.Database.DB.Create(&u1).Error, qt.IsNil)
 
 	u2 := dbmodel.Identity{
-		Name: "bob@external",
+		Name: "bob@canonical.com",
 	}
 	c.Assert(j.Database.DB.Create(&u2).Error, qt.IsNil)
 
@@ -1078,10 +1078,10 @@ func TestGetApplicationOffer(t *testing.T) {
 					"key2": "value5",
 				},
 				Users: []jujuparams.OfferUserDetails{{
-					UserName: "alice@external",
+					UserName: "alice@canonical.com",
 					Access:   "admin",
 				}, {
-					UserName: "eve@external",
+					UserName: "eve@canonical.com",
 					Access:   "read",
 				}},
 				Spaces: []jujuparams.RemoteSpace{{
@@ -1129,7 +1129,7 @@ func TestGetApplicationOffer(t *testing.T) {
 					"key2": "value5",
 				},
 				Users: []jujuparams.OfferUserDetails{{
-					UserName: "eve@external",
+					UserName: "eve@canonical.com",
 					Access:   "read",
 				}},
 				Spaces: []jujuparams.RemoteSpace{{
@@ -1245,7 +1245,7 @@ func TestOffer(t *testing.T) {
 			ctx := context.Background()
 
 			u := dbmodel.Identity{
-				Name: "alice@external",
+				Name: "alice@canonical.com",
 			}
 			c.Assert(db.DB.Create(&u).Error, qt.IsNil)
 
@@ -1367,7 +1367,7 @@ func TestOffer(t *testing.T) {
 			ctx := context.Background()
 
 			u := dbmodel.Identity{
-				Name: "alice@external",
+				Name: "alice@canonical.com",
 			}
 			c.Assert(db.DB.Create(&u).Error, qt.IsNil)
 
@@ -1453,7 +1453,7 @@ func TestOffer(t *testing.T) {
 		},
 		createEnv: func(c *qt.C, db db.Database, client *openfga.OFGAClient) (dbmodel.Identity, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
 			u := dbmodel.Identity{
-				Name: "alice@external",
+				Name: "alice@canonical.com",
 			}
 
 			c.Assert(db.DB.Create(&u).Error, qt.IsNil)
@@ -1488,7 +1488,7 @@ func TestOffer(t *testing.T) {
 			ctx := context.Background()
 
 			u := dbmodel.Identity{
-				Name: "alice@external",
+				Name: "alice@canonical.com",
 			}
 			c.Assert(db.DB.Create(&u).Error, qt.IsNil)
 
@@ -1577,12 +1577,12 @@ func TestOffer(t *testing.T) {
 			ctx := context.Background()
 
 			u := dbmodel.Identity{
-				Name: "alice@external",
+				Name: "alice@canonical.com",
 			}
 			c.Assert(db.DB.Create(&u).Error, qt.IsNil)
 
 			u1 := dbmodel.Identity{
-				Name: "eve@external",
+				Name: "eve@canonical.com",
 			}
 			c.Assert(db.DB.Create(&u1).Error, qt.IsNil)
 
@@ -1670,7 +1670,7 @@ func TestOffer(t *testing.T) {
 			ctx := context.Background()
 
 			u := dbmodel.Identity{
-				Name: "alice@external",
+				Name: "alice@canonical.com",
 			}
 			c.Assert(db.DB.Create(&u).Error, qt.IsNil)
 
@@ -1758,7 +1758,7 @@ func TestOffer(t *testing.T) {
 			ctx := context.Background()
 
 			u := dbmodel.Identity{
-				Name: "alice@external",
+				Name: "alice@canonical.com",
 			}
 			c.Assert(db.DB.Create(&u).Error, qt.IsNil)
 
@@ -1888,7 +1888,7 @@ func TestOfferAssertOpenFGARelationsExist(t *testing.T) {
 		ctx := context.Background()
 
 		u := dbmodel.Identity{
-			Name: "alice@external",
+			Name: "alice@canonical.com",
 		}
 		c.Assert(db.DB.Create(&u).Error, qt.IsNil)
 
@@ -2573,23 +2573,23 @@ func TestFindApplicationOffers(t *testing.T) {
 						}}
 					} else {
 						details.Users = []jujuparams.OfferUserDetails{{
-							UserName: "alice@external",
+							UserName: "alice@canonical.com",
 							Access:   "admin",
 						}, {
-							UserName: "bob@external",
+							UserName: "bob@canonical.com",
 							Access:   "consume",
 						}, {
-							UserName: "eve@external",
+							UserName: "eve@canonical.com",
 							Access:   "admin",
 						}, {
-							UserName: "fred@external",
+							UserName: "fred@canonical.com",
 							Access:   "read",
 						}, {
-							UserName: "jane@external",
+							UserName: "jane@canonical.com",
 							Access:   "admin",
 						}, {
 							// joe is jimm admin
-							UserName: "joe@external",
+							UserName: "joe@canonical.com",
 							Access:   "admin",
 						}}
 					}
@@ -2627,7 +2627,7 @@ const listApplicationsTestEnv = `clouds:
   regions:
   - name: test-cloud-region
 cloud-credentials:
-- owner: alice@external
+- owner: alice@canonical.com
   name: cred-1
   cloud: test-cloud
 controllers:
@@ -2644,18 +2644,18 @@ models:
   cloud: test-cloud
   region: test-cloud-region
   cloud-credential: cred-1
-  owner: bob@external
+  owner: bob@canonical.com
   life: alive
   status:
     status: available
     info: "OK!"
     since: 2020-02-20T20:02:20Z
   users:
-  - user: alice@external
+  - user: alice@canonical.com
     access: admin
-  - user: bob@external
+  - user: bob@canonical.com
     access: admin
-  - user: charlie@external
+  - user: charlie@canonical.com
     access: read
   sla:
     level: unsupported
@@ -2668,18 +2668,18 @@ models:
   cloud: test-cloud
   region: test-cloud-region
   cloud-credential: cred-1
-  owner: alice@external
+  owner: alice@canonical.com
   life: alive
   status:
     status: available
     info: "OK!"
     since: 2020-02-20T20:02:20Z
   users:
-  - user: alice@external
+  - user: alice@canonical.com
     access: admin
-  - user: bob@external
+  - user: bob@canonical.com
     access: write
-  - user: charlie@external
+  - user: charlie@canonical.com
     access: read
   sla:
     level: unsupported
@@ -2729,13 +2729,13 @@ func TestListApplicationOffers(t *testing.T) {
 									"key2": "value2",
 								},
 								Users: []jujuparams.OfferUserDetails{{
-									UserName: "alice@external",
+									UserName: "alice@canonical.com",
 									Access:   "admin",
 								}, {
-									UserName: "eve@external",
+									UserName: "eve@canonical.com",
 									Access:   "read",
 								}, {
-									UserName: "bob@external",
+									UserName: "bob@canonical.com",
 									Access:   "consume",
 								}},
 								Spaces: []jujuparams.RemoteSpace{{
@@ -2753,7 +2753,7 @@ func TestListApplicationOffers(t *testing.T) {
 							Connections: []jujuparams.OfferConnection{{
 								SourceModelTag: "00000011-0000-0000-0000-000000000001",
 								RelationId:     1,
-								Username:       "charlie@external",
+								Username:       "charlie@canonical.com",
 								Endpoint:       "an-endpoint",
 							}},
 						}, {
@@ -2774,13 +2774,13 @@ func TestListApplicationOffers(t *testing.T) {
 									"key2": "value2",
 								},
 								Users: []jujuparams.OfferUserDetails{{
-									UserName: "alice@external",
+									UserName: "alice@canonical.com",
 									Access:   "admin",
 								}, {
-									UserName: "eve@external",
+									UserName: "eve@canonical.com",
 									Access:   "read",
 								}, {
-									UserName: "bob@external",
+									UserName: "bob@canonical.com",
 									Access:   "consume",
 								}},
 								Spaces: []jujuparams.RemoteSpace{{
@@ -2798,7 +2798,7 @@ func TestListApplicationOffers(t *testing.T) {
 							Connections: []jujuparams.OfferConnection{{
 								SourceModelTag: "00000011-0000-0000-0000-000000000002",
 								RelationId:     2,
-								Username:       "charlie@external",
+								Username:       "charlie@canonical.com",
 								Endpoint:       "an-endpoint",
 							}},
 						}}, nil
@@ -2821,13 +2821,13 @@ func TestListApplicationOffers(t *testing.T) {
 									"key2": "value2",
 								},
 								Users: []jujuparams.OfferUserDetails{{
-									UserName: "alice@external",
+									UserName: "alice@canonical.com",
 									Access:   "admin",
 								}, {
-									UserName: "eve@external",
+									UserName: "eve@canonical.com",
 									Access:   "read",
 								}, {
-									UserName: "bob@external",
+									UserName: "bob@canonical.com",
 									Access:   "consume",
 								}},
 								Spaces: []jujuparams.RemoteSpace{{
@@ -2845,7 +2845,7 @@ func TestListApplicationOffers(t *testing.T) {
 							Connections: []jujuparams.OfferConnection{{
 								SourceModelTag: "00000011-0000-0000-0000-000000000003",
 								RelationId:     3,
-								Username:       "charlie@external",
+								Username:       "charlie@canonical.com",
 								Endpoint:       "an-endpoint",
 							}},
 						}}, nil
@@ -2857,46 +2857,46 @@ func TestListApplicationOffers(t *testing.T) {
 	}
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), db, client)
 	tuples := []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewApplicationOfferTag("00000012-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("eve@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("eve@canonical.com")),
 		Relation: ofganames.ReaderRelation,
 		Target:   ofganames.ConvertTag(names.NewApplicationOfferTag("00000012-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
 		Relation: ofganames.ConsumerRelation,
 		Target:   ofganames.ConvertTag(names.NewApplicationOfferTag("00000012-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewApplicationOfferTag("00000012-0000-0000-0000-000000000002")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("eve@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("eve@canonical.com")),
 		Relation: ofganames.ReaderRelation,
 		Target:   ofganames.ConvertTag(names.NewApplicationOfferTag("00000012-0000-0000-0000-000000000002")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
 		Relation: ofganames.ConsumerRelation,
 		Target:   ofganames.ConvertTag(names.NewApplicationOfferTag("00000012-0000-0000-0000-000000000002")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewApplicationOfferTag("00000012-0000-0000-0000-000000000003")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("eve@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("eve@canonical.com")),
 		Relation: ofganames.ReaderRelation,
 		Target:   ofganames.ConvertTag(names.NewApplicationOfferTag("00000012-0000-0000-0000-000000000003")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
 		Relation: ofganames.ConsumerRelation,
 		Target:   ofganames.ConvertTag(names.NewApplicationOfferTag("00000012-0000-0000-0000-000000000003")),
 	}}
 	err = client.AddRelation(context.Background(), tuples...)
 	c.Assert(err, qt.IsNil)
 
-	u := env.User("alice@external").DBObject(c, db)
+	u := env.User("alice@canonical.com").DBObject(c, db)
 	_, err = j.ListApplicationOffers(ctx, openfga.NewUser(&u, client))
 	c.Assert(err, qt.ErrorMatches, `at least one filter must be specified`)
 
@@ -2904,7 +2904,7 @@ func TestListApplicationOffers(t *testing.T) {
 	c.Assert(err, qt.ErrorMatches, `application offer filter must specify a model name`)
 
 	filters := []jujuparams.OfferFilter{{
-		OwnerName: "bob@external",
+		OwnerName: "bob@canonical.com",
 		ModelName: "model-1",
 	}, {
 		ModelName: "model-2",
@@ -2936,13 +2936,13 @@ func TestListApplicationOffers(t *testing.T) {
 				"key2": "value2",
 			},
 			Users: []jujuparams.OfferUserDetails{{
-				UserName: "alice@external",
+				UserName: "alice@canonical.com",
 				Access:   "admin",
 			}, {
-				UserName: "bob@external",
+				UserName: "bob@canonical.com",
 				Access:   "consume",
 			}, {
-				UserName: "eve@external",
+				UserName: "eve@canonical.com",
 				Access:   "read",
 			}},
 			Spaces: []jujuparams.RemoteSpace{{
@@ -2960,7 +2960,7 @@ func TestListApplicationOffers(t *testing.T) {
 		Connections: []jujuparams.OfferConnection{{
 			SourceModelTag: "00000011-0000-0000-0000-000000000003",
 			RelationId:     3,
-			Username:       "charlie@external",
+			Username:       "charlie@canonical.com",
 			Endpoint:       "an-endpoint",
 		}},
 	}, {
@@ -2981,13 +2981,13 @@ func TestListApplicationOffers(t *testing.T) {
 				"key2": "value2",
 			},
 			Users: []jujuparams.OfferUserDetails{{
-				UserName: "alice@external",
+				UserName: "alice@canonical.com",
 				Access:   "admin",
 			}, {
-				UserName: "bob@external",
+				UserName: "bob@canonical.com",
 				Access:   "consume",
 			}, {
-				UserName: "eve@external",
+				UserName: "eve@canonical.com",
 				Access:   "read",
 			}},
 			Spaces: []jujuparams.RemoteSpace{{
@@ -3005,7 +3005,7 @@ func TestListApplicationOffers(t *testing.T) {
 		Connections: []jujuparams.OfferConnection{{
 			SourceModelTag: "00000011-0000-0000-0000-000000000001",
 			RelationId:     1,
-			Username:       "charlie@external",
+			Username:       "charlie@canonical.com",
 			Endpoint:       "an-endpoint",
 		}},
 	}, {
@@ -3026,13 +3026,13 @@ func TestListApplicationOffers(t *testing.T) {
 				"key2": "value2",
 			},
 			Users: []jujuparams.OfferUserDetails{{
-				UserName: "alice@external",
+				UserName: "alice@canonical.com",
 				Access:   "admin",
 			}, {
-				UserName: "bob@external",
+				UserName: "bob@canonical.com",
 				Access:   "consume",
 			}, {
-				UserName: "eve@external",
+				UserName: "eve@canonical.com",
 				Access:   "read",
 			}},
 			Spaces: []jujuparams.RemoteSpace{{
@@ -3050,7 +3050,7 @@ func TestListApplicationOffers(t *testing.T) {
 		Connections: []jujuparams.OfferConnection{{
 			SourceModelTag: "00000011-0000-0000-0000-000000000002",
 			RelationId:     2,
-			Username:       "charlie@external",
+			Username:       "charlie@canonical.com",
 			Endpoint:       "an-endpoint",
 		}},
 	}})

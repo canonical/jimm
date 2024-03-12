@@ -14,7 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/juju/juju/core/crossmodel"
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 
 	"github.com/canonical/jimm/internal/constants"
 	"github.com/canonical/jimm/internal/db"
@@ -204,7 +204,7 @@ func TestJWTGeneratorMakeLoginToken(t *testing.T) {
 	}{{
 		about: "initial login, all is well",
 		authenticator: &testAuthenticator{
-			username: "eve@external",
+			username: "eve@canonical.com",
 		},
 		database: &testDatabase{
 			ctl: dbmodel.Controller{
@@ -231,7 +231,7 @@ func TestJWTGeneratorMakeLoginToken(t *testing.T) {
 		jwtService: &testJWTService{},
 		expectedJWTParams: jimmjwx.JWTParams{
 			Controller: ct.Id(),
-			User:       names.NewUserTag("eve@external").String(),
+			User:       names.NewUserTag("eve@canonical.com").String(),
 			Access: map[string]string{
 				ct.String():                              "superuser",
 				mt.String():                              "admin",
@@ -241,14 +241,14 @@ func TestJWTGeneratorMakeLoginToken(t *testing.T) {
 	}, {
 		about: "authorization fails",
 		authenticator: &testAuthenticator{
-			username: "eve@external",
+			username: "eve@canonical.com",
 			err:      errors.E("a test error"),
 		},
 		expectedError: "a test error",
 	}, {
 		about: "model access check fails",
 		authenticator: &testAuthenticator{
-			username: "eve@external",
+			username: "eve@canonical.com",
 		},
 		accessChecker: &testAccessChecker{
 			modelAccessCheckErr: errors.E("a test error"),
@@ -258,7 +258,7 @@ func TestJWTGeneratorMakeLoginToken(t *testing.T) {
 	}, {
 		about: "controller access check fails",
 		authenticator: &testAuthenticator{
-			username: "eve@external",
+			username: "eve@canonical.com",
 		},
 		accessChecker: &testAccessChecker{
 			modelAccess: map[string]string{
@@ -270,7 +270,7 @@ func TestJWTGeneratorMakeLoginToken(t *testing.T) {
 	}, {
 		about: "get controller from db fails",
 		authenticator: &testAuthenticator{
-			username: "eve@external",
+			username: "eve@canonical.com",
 		},
 		database: &testDatabase{
 			err: errors.E("a test error"),
@@ -287,7 +287,7 @@ func TestJWTGeneratorMakeLoginToken(t *testing.T) {
 	}, {
 		about: "cloud access check fails",
 		authenticator: &testAuthenticator{
-			username: "eve@external",
+			username: "eve@canonical.com",
 		},
 		database: &testDatabase{
 			ctl: dbmodel.Controller{
@@ -313,7 +313,7 @@ func TestJWTGeneratorMakeLoginToken(t *testing.T) {
 	}, {
 		about: "jwt service errors out",
 		authenticator: &testAuthenticator{
-			username: "eve@external",
+			username: "eve@canonical.com",
 		},
 		database: &testDatabase{
 			ctl: dbmodel.Controller{
@@ -376,7 +376,7 @@ func TestJWTGeneratorMakeToken(t *testing.T) {
 		jwtService: &testJWTService{},
 		expectedJWTParams: jimmjwx.JWTParams{
 			Controller: ct.Id(),
-			User:       names.NewUserTag("eve@external").String(),
+			User:       names.NewUserTag("eve@canonical.com").String(),
 			Access: map[string]string{
 				ct.String():                              "superuser",
 				mt.String():                              "admin",
@@ -402,7 +402,7 @@ func TestJWTGeneratorMakeToken(t *testing.T) {
 		},
 		expectedJWTParams: jimmjwx.JWTParams{
 			Controller: ct.Id(),
-			User:       names.NewUserTag("eve@external").String(),
+			User:       names.NewUserTag("eve@canonical.com").String(),
 			Access: map[string]string{
 				ct.String():                              "superuser",
 				mt.String():                              "admin",
@@ -415,7 +415,7 @@ func TestJWTGeneratorMakeToken(t *testing.T) {
 	for _, test := range tests {
 		generator := jimm.NewJWTGenerator(
 			&testAuthenticator{
-				username: "eve@external",
+				username: "eve@canonical.com",
 			},
 			&testDatabase{
 				ctl: dbmodel.Controller{
@@ -669,9 +669,9 @@ func TestResolveTagObjectMapsUsers(t *testing.T) {
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
-	tag, err := jimm.ResolveTag(j.UUID, &j.Database, "user-alex@externally-werly#member")
+	tag, err := jimm.ResolveTag(j.UUID, &j.Database, "user-alex@canonical.comly-werly#member")
 	c.Assert(err, qt.IsNil)
-	c.Assert(tag, qt.DeepEquals, ofganames.ConvertTagWithRelation(names.NewUserTag("alex@externally-werly"), ofganames.MemberRelation))
+	c.Assert(tag, qt.DeepEquals, ofganames.ConvertTagWithRelation(names.NewUserTag("alex@canonical.comly-werly"), ofganames.MemberRelation))
 }
 
 func TestResolveTupleObjectHandlesErrors(t *testing.T) {
@@ -771,7 +771,7 @@ func createTestControllerEnvironment(ctx context.Context, c *qt.C, db db.Databas
 	c.Assert(err, qt.IsNil)
 
 	u := dbmodel.Identity{
-		Name: petname.Generate(2, "-") + "@external",
+		Name: petname.Generate(2, "-") + "@canonical.com",
 	}
 	c.Assert(db.DB.Create(&u).Error, qt.IsNil)
 

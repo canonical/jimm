@@ -68,14 +68,14 @@ func (s *userManagerSuite) TestUserInfoSpecifiedUser(c *gc.C) {
 	defer conn.Close()
 
 	client := usermanager.NewClient(conn)
-	users, err := client.UserInfo([]string{"alice@external"}, usermanager.AllUsers)
+	users, err := client.UserInfo([]string{"alice@canonical.com"}, usermanager.AllUsers)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(len(users), gc.Equals, 1)
 	c.Assert(users[0].DateCreated.IsZero(), gc.Equals, false)
 	users[0].DateCreated = time.Time{}
 	users[0].LastConnection = nil
 	c.Assert(users[0], jc.DeepEquals, jujuparams.UserInfo{
-		Username:    "alice@external",
+		Username:    "alice@canonical.com",
 		DisplayName: "alice",
 		Access:      "",
 	})
@@ -86,8 +86,8 @@ func (s *userManagerSuite) TestUserInfoSpecifiedUsers(c *gc.C) {
 	defer conn.Close()
 
 	client := usermanager.NewClient(conn)
-	users, err := client.UserInfo([]string{"alice@external", "bob@external"}, usermanager.AllUsers)
-	c.Assert(err, gc.ErrorMatches, "bob@external: unauthorized access")
+	users, err := client.UserInfo([]string{"alice@canonical.com", "bob@canonical.com"}, usermanager.AllUsers)
+	c.Assert(err, gc.ErrorMatches, "bob@canonical.com: unauthorized access")
 	c.Assert(users, gc.HasLen, 0)
 }
 
@@ -102,9 +102,10 @@ func (s *userManagerSuite) TestUserInfoWithDomain(c *gc.C) {
 	c.Assert(users[0].DateCreated.IsZero(), gc.Equals, false)
 	users[0].DateCreated = time.Time{}
 	c.Assert(users[0], jc.DeepEquals, jujuparams.UserInfo{
-		Username:    "alice@mydomain",
-		DisplayName: "alice",
-		Access:      "",
+		Username:       "alice@mydomain",
+		DisplayName:    "",
+		Access:         "",
+		LastConnection: users[0].LastConnection,
 	})
 }
 
@@ -113,8 +114,8 @@ func (s *userManagerSuite) TestUserInfoInvalidUsername(c *gc.C) {
 	defer conn.Close()
 
 	client := usermanager.NewClient(conn)
-	users, err := client.UserInfo([]string{"alice-@external"}, usermanager.AllUsers)
-	c.Assert(err, gc.ErrorMatches, `"alice-@external" is not a valid username`)
+	users, err := client.UserInfo([]string{"alice-@canonical.com"}, usermanager.AllUsers)
+	c.Assert(err, gc.ErrorMatches, `"alice-@canonical.com" is not a valid username`)
 	c.Assert(users, gc.HasLen, 0)
 }
 

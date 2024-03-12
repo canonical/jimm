@@ -15,7 +15,7 @@ import (
 	petname "github.com/dustinkirkland/golang-petname"
 	"github.com/google/uuid"
 	"github.com/juju/cmd/v3/cmdtesting"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	gc "gopkg.in/check.v1"
 	yamlv2 "gopkg.in/yaml.v2"
 	"gopkg.in/yaml.v3"
@@ -25,6 +25,7 @@ import (
 	"github.com/canonical/jimm/internal/cmdtest"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/jimmtest"
 	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 	jimmnames "github.com/canonical/jimm/pkg/names"
@@ -38,7 +39,7 @@ var _ = gc.Suite(&relationSuite{})
 
 func (s *relationSuite) TestAddRelationSuperuser(c *gc.C) {
 	// alice is superuser
-	bClient := s.UserBakeryClient("alice")
+	bClient := jimmtest.NewUserSessionLogin("alice")
 	group1 := "testGroup1"
 	group2 := "testGroup2"
 	type tuple struct {
@@ -109,7 +110,7 @@ func (s *relationSuite) TestAddRelationSuperuser(c *gc.C) {
 
 func (s *relationSuite) TestMissingParamsAddRelationSuperuser(c *gc.C) {
 	// alice is superuser
-	bClient := s.UserBakeryClient("alice")
+	bClient := jimmtest.NewUserSessionLogin("alice")
 
 	_, err := cmdtesting.RunCommand(c, cmd.NewAddRelationCommandForTesting(s.ClientStore(), bClient), "foo", "bar")
 	c.Assert(err, gc.ErrorMatches, "target object not specified")
@@ -122,7 +123,7 @@ func (s *relationSuite) TestMissingParamsAddRelationSuperuser(c *gc.C) {
 
 func (s *relationSuite) TestAddRelationViaFileSuperuser(c *gc.C) {
 	// alice is superuser
-	bClient := s.UserBakeryClient("alice")
+	bClient := jimmtest.NewUserSessionLogin("alice")
 	group1 := "testGroup1"
 	group2 := "testGroup2"
 	group3 := "testGroup3"
@@ -151,14 +152,14 @@ func (s *relationSuite) TestAddRelationViaFileSuperuser(c *gc.C) {
 }
 
 func (s *relationSuite) TestAddRelationRejectsUnauthorisedUsers(c *gc.C) {
-	bClient := s.UserBakeryClient("bob")
+	bClient := jimmtest.NewUserSessionLogin("bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewAddRelationCommandForTesting(s.ClientStore(), bClient), "test-group1", "member", "test-group2")
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
 
 func (s *relationSuite) TestRemoveRelationSuperuser(c *gc.C) {
 	// alice is superuser
-	bClient := s.UserBakeryClient("alice")
+	bClient := jimmtest.NewUserSessionLogin("alice")
 	group1 := "testGroup1"
 	group2 := "testGroup2"
 	type tuple struct {
@@ -204,7 +205,7 @@ func (s *relationSuite) TestRemoveRelationSuperuser(c *gc.C) {
 }
 
 func (s *relationSuite) TestRemoveRelationViaFileSuperuser(c *gc.C) {
-	bClient := s.UserBakeryClient("alice")
+	bClient := jimmtest.NewUserSessionLogin("alice")
 	group1 := "testGroup1"
 	group2 := "testGroup2"
 	group3 := "testGroup3"
@@ -242,7 +243,7 @@ func (s *relationSuite) TestRemoveRelationViaFileSuperuser(c *gc.C) {
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewControllerTag(s.Params.ControllerUUID)),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewControllerTag(s.Params.ControllerUUID)),
 	}})
@@ -250,7 +251,7 @@ func (s *relationSuite) TestRemoveRelationViaFileSuperuser(c *gc.C) {
 
 func (s *relationSuite) TestRemoveRelation(c *gc.C) {
 	// bob is not superuser
-	bClient := s.UserBakeryClient("bob")
+	bClient := jimmtest.NewUserSessionLogin("bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewRemoveRelationCommandForTesting(s.ClientStore(), bClient), "test-group1#member", "member", "test-group2")
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
@@ -268,7 +269,7 @@ func initializeEnvironment(c *gc.C, ctx context.Context, db *db.Database, u dbmo
 	env := environment{}
 
 	u1 := dbmodel.Identity{
-		Name: "eve@external",
+		Name: "eve@canonical.com",
 	}
 	c.Assert(db.DB.Create(&u1).Error, gc.IsNil)
 
@@ -345,7 +346,7 @@ func initializeEnvironment(c *gc.C, ctx context.Context, db *db.Database, u dbmo
 func (s *relationSuite) TestListRelations(c *gc.C) {
 	env := initializeEnvironment(c, context.Background(), &s.JIMM.Database, *s.AdminUser)
 	// alice is superuser
-	bClient := s.UserBakeryClient("alice")
+	bClient := jimmtest.NewUserSessionLogin("alice")
 
 	groups := []string{"group-1", "group-2", "group-3"}
 	for _, group := range groups {
@@ -389,7 +390,7 @@ func (s *relationSuite) TestListRelations(c *gc.C) {
 			Relation:     "administrator",
 			TargetObject: "controller-jimm",
 		}, {
-			Object:       "user-alice@external",
+			Object:       "user-alice@canonical.com",
 			Relation:     "administrator",
 			TargetObject: "controller-jimm",
 		}},
@@ -402,7 +403,7 @@ func (s *relationSuite) TestListRelations(c *gc.C) {
 			Relation:     "administrator",
 			TargetObject: "controller-jimm",
 		}, {
-			Object:       "user-alice@external",
+			Object:       "user-alice@canonical.com",
 			Relation:     "administrator",
 			TargetObject: "controller-jimm",
 		}},
@@ -423,22 +424,22 @@ func (s *relationSuite) TestListRelations(c *gc.C) {
 	c.Assert(
 		cmdtesting.Stdout(context),
 		gc.Equals,
-		`Object              	Relation     	Target Object                                                            
-user-admin          	administrator	controller-jimm                                                          
-user-alice@external 	administrator	controller-jimm                                                          
-user-alice@external 	member       	group-group-1                                                            
-user-eve@external   	member       	group-group-2                                                            
-group-group-2#member	member       	group-group-3                                                            
-group-group-3#member	administrator	controller-test-controller-1                                             
-group-group-1#member	administrator	model-test-controller-1:alice@external/test-model-1                      
-user-eve@external   	administrator	applicationoffer-test-controller-1:alice@external/test-model-1.testoffer1`,
+		`Object                  	Relation     	Target Object                                                                 
+user-admin              	administrator	controller-jimm                                                               
+user-alice@canonical.com	administrator	controller-jimm                                                               
+user-alice@canonical.com	member       	group-group-1                                                                 
+user-eve@canonical.com  	member       	group-group-2                                                                 
+group-group-2#member    	member       	group-group-3                                                                 
+group-group-3#member    	administrator	controller-test-controller-1                                                  
+group-group-1#member    	administrator	model-test-controller-1:alice@canonical.com/test-model-1                      
+user-eve@canonical.com  	administrator	applicationoffer-test-controller-1:alice@canonical.com/test-model-1.testoffer1`,
 	)
 }
 
 // TODO: remove boilerplate of env setup and use initialiseEnvironment
 func (s *relationSuite) TestCheckRelationViaSuperuser(c *gc.C) {
 	ctx := context.TODO()
-	bClient := s.UserBakeryClient("alice")
+	bClient := jimmtest.NewUserSessionLogin("alice")
 	ofgaClient := s.JIMM.OpenFGAClient
 
 	// Add some resources to check against
@@ -450,7 +451,7 @@ func (s *relationSuite) TestCheckRelationViaSuperuser(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	u := dbmodel.Identity{
-		Name: petname.Generate(2, "-") + "@external",
+		Name: petname.Generate(2, "-") + "@canonical.com",
 	}
 	c.Assert(db.DB.Create(&u).Error, gc.IsNil)
 
@@ -613,7 +614,7 @@ func (s *relationSuite) TestCheckRelationViaSuperuser(c *gc.C) {
 
 func (s *relationSuite) TestCheckRelation(c *gc.C) {
 	// bob is not superuser
-	bClient := s.UserBakeryClient("bob")
+	bClient := jimmtest.NewUserSessionLogin("bob")
 	_, err := cmdtesting.RunCommand(
 		c,
 		cmd.NewCheckRelationCommandForTesting(s.ClientStore(), bClient),

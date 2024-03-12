@@ -9,13 +9,14 @@ import (
 	jujucmd "github.com/juju/cmd/v3"
 	"github.com/juju/cmd/v3/cmdtesting"
 	"github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/cmd/jaas/cmd"
 	"github.com/canonical/jimm/internal/cmdtest"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/jimm"
+	"github.com/canonical/jimm/internal/jimmtest"
 	"github.com/canonical/jimm/internal/openfga"
 )
 
@@ -36,7 +37,7 @@ func (s *listServiceAccountCredentialsSuite) TestListServiceAccountCredentials(c
 	clientID := "abda51b2-d735-4794-a8bd-49c506baa4af"
 	// alice is superuser
 	ctx := context.Background()
-	user := dbmodel.Identity{Name: "alice@external"}
+	user := dbmodel.Identity{Name: "alice@canonical.com"}
 	u := openfga.NewUser(&user, s.OFGAClient)
 	err = s.JIMM.AddServiceAccount(ctx, u, clientID)
 	c.Assert(err, gc.IsNil)
@@ -98,7 +99,7 @@ aws    foo
 	}
 	for _, test := range testCases {
 		c.Log(test.about)
-		bClient := s.UserBakeryClient("alice")
+		bClient := jimmtest.NewUserSessionLogin("alice")
 		var result *jujucmd.Context
 		if test.showSecrets {
 			result, err = cmdtesting.RunCommand(c, cmd.NewListServiceAccountCredentialsCommandForTesting(s.ClientStore(), bClient), clientID, "--format", test.format, "--show-secrets")
