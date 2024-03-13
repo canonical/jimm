@@ -307,8 +307,13 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		return nil, errors.E(op, err, "failed to setup authentication service")
 	}
 
-	if err := s.setupCredentialStore(ctx, p); err != nil {
+	if store, err := s.newCredentialStore(ctx, p); err != nil {
 		return nil, errors.E(op, err)
+	} else if store == nil {
+		s.jimm.CredentialStore = nil
+	} else {
+		cachedStore := jimmcreds.NewCachedCredentialStore(store, jimmcreds.CachedCredentialStoreParams{})
+		s.jimm.CredentialStore = &cachedStore
 	}
 
 	if p.JWTExpiryDuration == 0 {
@@ -429,27 +434,27 @@ func openDB(ctx context.Context, dsn string) (*gorm.DB, error) {
 	})
 }
 
-func (s *Service) setupCredentialStore(ctx context.Context, p Params) error {
+func (s *Service) newCredentialStore(ctx context.Context, p Params) (jimmcreds.CredentialStore, error) {
 	const op = errors.Op("newSecretStore")
 	vs, err := newVaultStore(ctx, p)
 	if err != nil {
 		zapctx.Error(ctx, "Vault Store error", zap.Error(err))
-		return errors.E(op, err)
+		return nil, errors.E(op, err)
 	}
 	if vs != nil {
 		s.jimm.CredentialStore = vs
-		return nil
+		return vs, nil
 	}
 
 	// Only enable Postgres storage for secrets if explicitly enabled.
 	if p.InsecureSecretStorage {
 		zapctx.Warn(ctx, "using plaintext postgres for secret storage")
 		s.jimm.CredentialStore = &s.jimm.Database
-		return nil
+		return s.jimm.CredentialStore, nil
 	}
 	// Currently jimm will start without a credential store but
 	// functionality will be limited.
-	return nil
+	return nil, nil
 }
 
 func newVaultStore(ctx context.Context, p Params) (jimmcreds.CredentialStore, error) {
