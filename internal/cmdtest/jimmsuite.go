@@ -100,7 +100,7 @@ func (s *JimmCmdSuite) SetUpTest(c *gc.C) {
 	err = s.Service.StartJWKSRotator(ctx, time.NewTicker(time.Hour).C, time.Now().UTC().AddDate(0, 3, 0))
 	c.Assert(err, gc.Equals, nil)
 
-	err = s.Service.CheckOrGenerateOAuthKey(ctx)
+	err = s.JIMM.GetCredentialStore().PutOAuthKey(ctx, []byte(jimmtest.JWTTestSecret))
 	c.Assert(err, gc.Equals, nil)
 
 	s.HTTP.StartTLS()

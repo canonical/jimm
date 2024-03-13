@@ -18,8 +18,8 @@ import (
 	"github.com/canonical/jimm/internal/openfga"
 )
 
-var (
-	jwtTestSecret = "test-secret"
+const (
+	JWTTestSecret = "test-secret"
 )
 
 // An Authenticator is an implementation of jimm.Authenticator that returns
@@ -59,7 +59,7 @@ func NewUserSessionLogin(username string) api.LoginProvider {
 		panic("failed to generate test session token")
 	}
 
-	freshToken, err := jwt.Sign(token, jwt.WithKey(jwa.HS256, []byte(jwtTestSecret)))
+	freshToken, err := jwt.Sign(token, jwt.WithKey(jwa.HS256, []byte(JWTTestSecret)))
 	if err != nil {
 		panic("failed to sign test session token")
 	}
