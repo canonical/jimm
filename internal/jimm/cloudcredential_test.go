@@ -1770,3 +1770,11 @@ func (s testCloudCredentialAttributeStore) PutJWKSExpiry(ctx context.Context, ex
 func (s testCloudCredentialAttributeStore) CleanupJWKS(ctx context.Context) error {
 	return errors.E(errors.CodeNotImplemented)
 }
+
+func (s testCloudCredentialAttributeStore) GetOAuthKey(ctx context.Context) ([]byte, error) {
+	return nil, errors.E(errors.CodeNotImplemented)
+}
+
+func (s testCloudCredentialAttributeStore) PutOAuthKey(ctx context.Context, raw []byte) error {
+	return errors.E(errors.CodeNotImplemented)
+}
