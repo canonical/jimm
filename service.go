@@ -442,15 +442,13 @@ func (s *Service) newCredentialStore(ctx context.Context, p Params) (jimmcreds.C
 		return nil, errors.E(op, err)
 	}
 	if vs != nil {
-		s.jimm.CredentialStore = vs
 		return vs, nil
 	}
 
 	// Only enable Postgres storage for secrets if explicitly enabled.
 	if p.InsecureSecretStorage {
 		zapctx.Warn(ctx, "using plaintext postgres for secret storage")
-		s.jimm.CredentialStore = &s.jimm.Database
-		return s.jimm.CredentialStore, nil
+		return &s.jimm.Database, nil
 	}
 	// Currently jimm will start without a credential store but
 	// functionality will be limited.
