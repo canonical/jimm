@@ -156,6 +156,15 @@ func (s *InMemoryCredentialStore) GetJWKSExpiry(ctx context.Context) (time.Time,
 	return s.expiry, nil
 }
 
+// CleanupJWKS removes all secrets associated with OAuth.
+func (s *InMemoryCredentialStore) CleanupOAuth(ctx context.Context) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.oauthKey = nil
+	return nil
+}
+
 // PutJWKS puts a generated RS256[4096 bit] JWKS without x5c or x5t into the credential store.
 func (s *InMemoryCredentialStore) PutJWKS(ctx context.Context, jwks jwk.Set) error {
 	s.mu.Lock()
