@@ -4,7 +4,6 @@ package credentials
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	"github.com/hashicorp/golang-lru/v2/expirable"
@@ -20,9 +19,7 @@ type CachedCredentialStore struct {
 	CredentialStore
 
 	jwksCache     *expirable.LRU[string, jwk.Set]
-	jwksMutex     sync.Mutex
 	oauthKeyCache *expirable.LRU[string, []byte]
-	oauthKeyMutex sync.Mutex
 }
 
 // defaultJWKSExpiry default for CachedCredentialStoreParams.JWKExpiry field value.
@@ -72,9 +69,6 @@ const oauthKeyCacheKey = "oauthKey"
 
 // CleanupJWKS cleans up the JWKS cache and delegates to the wrapped store.
 func (c *CachedCredentialStore) CleanupJWKS(ctx context.Context) error {
-	c.jwksMutex.Lock()
-	defer c.jwksMutex.Unlock()
-
 	c.jwksCache.Purge()
 	return c.CredentialStore.CleanupJWKS(ctx)
 }
@@ -83,9 +77,6 @@ func (c *CachedCredentialStore) CleanupJWKS(ctx context.Context) error {
 // corresponding method. If there is no cached value it delegates the call to the
 // wrapped store and then caches the returned value.
 func (c *CachedCredentialStore) GetJWKS(ctx context.Context) (jwk.Set, error) {
-	c.jwksMutex.Lock()
-	defer c.jwksMutex.Unlock()
-
 	if val, ok := c.jwksCache.Get(jwksCacheKey); ok {
 		return val, nil
 	}
@@ -99,9 +90,6 @@ func (c *CachedCredentialStore) GetJWKS(ctx context.Context) (jwk.Set, error) {
 
 // PutJWKS cleans up the JWKS cache and delegates to the wrapped store.
 func (c *CachedCredentialStore) PutJWKS(ctx context.Context, jwks jwk.Set) error {
-	c.jwksMutex.Lock()
-	defer c.jwksMutex.Unlock()
-
 	// TODO(babakks): Note that we're cleaning up the entire cache which is fine
 	// for now, because at the moment there's only one entry (i.e., a JWK set) in
 	// the cache. In future, if we had more JWKSs in the cache, we need to just
@@ -115,9 +103,6 @@ func (c *CachedCredentialStore) PutJWKS(ctx context.Context, jwks jwk.Set) error
 // corresponding method. If there is no cached value it delegates the call to the
 // wrapped store and then caches the returned value.
 func (c *CachedCredentialStore) GetOAuthKey(ctx context.Context) ([]byte, error) {
-	c.oauthKeyMutex.Lock()
-	defer c.oauthKeyMutex.Unlock()
-
 	if val, ok := c.oauthKeyCache.Get(oauthKeyCacheKey); ok {
 		return val, nil
 	}
@@ -131,9 +116,6 @@ func (c *CachedCredentialStore) GetOAuthKey(ctx context.Context) ([]byte, error)
 
 // PutOAuthKey cleans up the OAuth key cache and delegates to the wrapped store.
 func (c *CachedCredentialStore) PutOAuthKey(ctx context.Context, raw []byte) error {
-	c.oauthKeyMutex.Lock()
-	defer c.oauthKeyMutex.Unlock()
-
 	c.oauthKeyCache.Purge()
 	return c.CredentialStore.PutOAuthKey(ctx, raw)
 }
