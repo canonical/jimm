@@ -33,7 +33,7 @@ type InMemoryCredentialStore struct {
 // with some secrets/keys being populated.
 func NewInMemoryCredentialStore() *InMemoryCredentialStore {
 	return &InMemoryCredentialStore{
-		oauthKey: []byte("secret-oauth-key"),
+		oauthKey: []byte(JWTTestSecret),
 	}
 }
 
