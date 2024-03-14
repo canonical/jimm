@@ -1771,6 +1771,10 @@ func (s testCloudCredentialAttributeStore) CleanupJWKS(ctx context.Context) erro
 	return errors.E(errors.CodeNotImplemented)
 }
 
+func (s testCloudCredentialAttributeStore) CleanupOAuth(ctx context.Context) error {
+	return errors.E(errors.CodeNotImplemented)
+}
+
 func (s testCloudCredentialAttributeStore) GetOAuthKey(ctx context.Context) ([]byte, error) {
 	return nil, errors.E(errors.CodeNotImplemented)
 }
