@@ -200,10 +200,26 @@ func TestGetAndPutOAuthKey(t *testing.T) {
 	c.Assert(retrievedKey, qt.DeepEquals, key)
 }
 
+func TestGetOAuthKeyFailsIfDataIsNil(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+	store := newStore(c)
+
+	err := store.PutOAuthKey(ctx, nil)
+	c.Assert(err, qt.IsNil)
+
+	retrieved, err := store.GetOAuthKey(ctx)
+	c.Assert(err, qt.ErrorMatches, "nil OAuth key data")
+	c.Assert(retrieved, qt.IsNil)
+}
+
 func TestGetOAuthKeyFailsIfNotFound(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 	store := newStore(c)
+
+	err := store.CleanupOAuth(ctx)
+	c.Assert(err, qt.IsNil)
 
 	retrieved, err := store.GetOAuthKey(ctx)
 	c.Assert(err, qt.ErrorMatches, "no OAuth key exists")

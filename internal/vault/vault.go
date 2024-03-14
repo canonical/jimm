@@ -385,6 +385,23 @@ func (s *VaultStore) getJWKSExpiryPath() string {
 	return path.Join(s.getWellKnownPath(), "jwks-expiry")
 }
 
+// CleanupOAuth removes all secrets associated with OAuth.
+func (s *VaultStore) CleanupOAuth(ctx context.Context) error {
+	const op = errors.Op("vault.CleanupOAuth")
+
+	client, err := s.client(ctx)
+	if err != nil {
+		return errors.E(op, err)
+	}
+
+	// Vault does not return errors on deletion requests where
+	// the secret does not exist.
+	if _, err := client.Logical().Delete(s.GetOAuthKeyPath()); err != nil {
+		return errors.E(op, err)
+	}
+	return nil
+}
+
 // GetOAuthKey returns the current HS256 (symmetric) key used to sign OAuth session tokens.
 func (s *VaultStore) GetOAuthKey(ctx context.Context) ([]byte, error) {
 	const op = errors.Op("vault.GetOAuthKey")
@@ -405,7 +422,14 @@ func (s *VaultStore) GetOAuthKey(ctx context.Context) ([]byte, error) {
 		return nil, errors.E(op, errors.CodeNotFound, msg)
 	}
 
-	keyPemB64 := secret.Data["key"].(string)
+	raw := secret.Data["key"]
+	if secret.Data["key"] == nil {
+		msg := "nil OAuth key data"
+		zapctx.Debug(ctx, msg)
+		return nil, errors.E(op, errors.CodeNotFound, msg)
+	}
+
+	keyPemB64 := raw.(string)
 
 	keyPem, err := base64.StdEncoding.DecodeString(keyPemB64)
 	if err != nil {
