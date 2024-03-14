@@ -283,6 +283,18 @@ func (d *Database) PutJWKSExpiry(ctx context.Context, expiry time.Time) error {
 	return d.UpsertSecret(ctx, &secret)
 }
 
+// CleanupJWKS removes all secrets associated with OAuth.
+func (d *Database) CleanupOAuth(ctx context.Context) error {
+	const op = errors.Op("database.CleanupOAuth")
+	secret := dbmodel.NewSecret(oauthKind, oauthKeyTag, nil)
+	err := d.DeleteSecret(ctx, &secret)
+	if err != nil {
+		zapctx.Error(ctx, "failed to cleanup OAUth key", zap.Error(err))
+		return errors.E(op, err, "failed to cleanup OAUth key")
+	}
+	return nil
+}
+
 // GetOAuthKey returns the current HS256 (symmetric) key used to sign OAuth session tokens.
 func (d *Database) GetOAuthKey(ctx context.Context) ([]byte, error) {
 	const op = errors.Op("database.GetOAuthKey")
