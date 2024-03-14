@@ -59,7 +59,7 @@ func (s *VaultStore) Get(ctx context.Context, tag names.CloudCredentialTag) (map
 		return nil, errors.E(op, err)
 	}
 
-	secret, err := client.Logical().Read(s.path(tag))
+	secret, err := client.Logical().ReadWithContext(ctx, s.path(tag))
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
@@ -96,7 +96,7 @@ func (s *VaultStore) Put(ctx context.Context, tag names.CloudCredentialTag, attr
 	for k, v := range attr {
 		data[k] = v
 	}
-	_, err = client.Logical().Write(s.path(tag), data)
+	_, err = client.Logical().WriteWithContext(ctx, s.path(tag), data)
 	if err != nil {
 		return errors.E(op, err)
 	}
@@ -112,7 +112,7 @@ func (s *VaultStore) delete(ctx context.Context, tag names.CloudCredentialTag) e
 	if err != nil {
 		return errors.E(op, err)
 	}
-	_, err = client.Logical().Delete(s.path(tag))
+	_, err = client.Logical().DeleteWithContext(ctx, s.path(tag))
 	if rerr, ok := err.(*api.ResponseError); ok && rerr.StatusCode == http.StatusNotFound {
 		// Ignore the error if attempting to delete something that isn't there.
 		err = nil
@@ -133,7 +133,7 @@ func (s *VaultStore) GetControllerCredentials(ctx context.Context, controllerNam
 		return "", "", errors.E(op, err)
 	}
 
-	secret, err := client.Logical().Read(s.controllerCredentialsPath(controllerName))
+	secret, err := client.Logical().ReadWithContext(ctx, s.controllerCredentialsPath(controllerName))
 	if err != nil {
 		return "", "", errors.E(op, err)
 	}
@@ -169,7 +169,7 @@ func (s *VaultStore) PutControllerCredentials(ctx context.Context, controllerNam
 		usernameKey: username,
 		passwordKey: password,
 	}
-	_, err = client.Logical().Write(s.controllerCredentialsPath(controllerName), data)
+	_, err = client.Logical().WriteWithContext(ctx, s.controllerCredentialsPath(controllerName), data)
 	if err != nil {
 		return errors.E(op, err)
 	}
@@ -186,9 +186,9 @@ func (s *VaultStore) CleanupJWKS(ctx context.Context) error {
 	}
 	// Vault does not return errors on deletion requests where
 	// the secret does not exist. As such we just return the last known error.
-	client.Logical().Delete(s.getJWKSExpiryPath())
-	client.Logical().Delete(s.getJWKSPath())
-	if _, err = client.Logical().Delete(s.getJWKSPrivateKeyPath()); err != nil {
+	client.Logical().DeleteWithContext(ctx, s.getJWKSExpiryPath())
+	client.Logical().DeleteWithContext(ctx, s.getJWKSPath())
+	if _, err = client.Logical().DeleteWithContext(ctx, s.getJWKSPrivateKeyPath()); err != nil {
 		return errors.E(op, err)
 	}
 	return nil
@@ -203,7 +203,7 @@ func (s *VaultStore) GetJWKS(ctx context.Context) (jwk.Set, error) {
 		return nil, errors.E(op, err)
 	}
 
-	secret, err := client.Logical().Read(s.getJWKSPath())
+	secret, err := client.Logical().ReadWithContext(ctx, s.getJWKSPath())
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
@@ -239,7 +239,7 @@ func (s *VaultStore) GetJWKSPrivateKey(ctx context.Context) ([]byte, error) {
 		return nil, errors.E(op, err)
 	}
 
-	secret, err := client.Logical().Read(s.getJWKSPrivateKeyPath())
+	secret, err := client.Logical().ReadWithContext(ctx, s.getJWKSPrivateKeyPath())
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
@@ -269,7 +269,7 @@ func (s *VaultStore) GetJWKSExpiry(ctx context.Context) (time.Time, error) {
 		return now, errors.E(op, err)
 	}
 
-	secret, err := client.Logical().Read(s.getJWKSExpiryPath())
+	secret, err := client.Logical().ReadWithContext(ctx, s.getJWKSExpiryPath())
 	if err != nil {
 		return now, errors.E(op, err)
 	}
@@ -310,7 +310,8 @@ func (s *VaultStore) PutJWKS(ctx context.Context, jwks jwk.Set) error {
 		return errors.E(op, err)
 	}
 
-	_, err = client.Logical().WriteBytes(
+	_, err = client.Logical().WriteBytesWithContext(
+		ctx,
 		// We persist in a similar folder to the controller credentials, but sub-route
 		// to .well-known for further extensions and mental clarity within our vault.
 		s.getJWKSPath(),
@@ -332,7 +333,8 @@ func (s *VaultStore) PutJWKSPrivateKey(ctx context.Context, pem []byte) error {
 		return errors.E(op, err)
 	}
 
-	if _, err := client.Logical().Write(
+	if _, err := client.Logical().WriteWithContext(
+		ctx,
 		// We persist in a similar folder to the controller credentials, but sub-route
 		// to .well-known for further extensions and mental clarity within our vault.
 		s.getJWKSPrivateKeyPath(),
@@ -352,7 +354,8 @@ func (s *VaultStore) PutJWKSExpiry(ctx context.Context, expiry time.Time) error 
 		return errors.E(op, err)
 	}
 
-	if _, err := client.Logical().Write(
+	if _, err := client.Logical().WriteWithContext(
+		ctx,
 		s.getJWKSExpiryPath(),
 		map[string]interface{}{
 			"jwks-expiry": expiry,
@@ -396,7 +399,7 @@ func (s *VaultStore) CleanupOAuth(ctx context.Context) error {
 
 	// Vault does not return errors on deletion requests where
 	// the secret does not exist.
-	if _, err := client.Logical().Delete(s.GetOAuthKeyPath()); err != nil {
+	if _, err := client.Logical().DeleteWithContext(ctx, s.GetOAuthKeyPath()); err != nil {
 		return errors.E(op, err)
 	}
 	return nil
@@ -411,7 +414,7 @@ func (s *VaultStore) GetOAuthKey(ctx context.Context) ([]byte, error) {
 		return nil, errors.E(op, err)
 	}
 
-	secret, err := client.Logical().Read(s.GetOAuthKeyPath())
+	secret, err := client.Logical().ReadWithContext(ctx, s.GetOAuthKeyPath())
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
@@ -448,7 +451,8 @@ func (s *VaultStore) PutOAuthKey(ctx context.Context, raw []byte) error {
 		return errors.E(op, err)
 	}
 
-	if _, err := client.Logical().Write(
+	if _, err := client.Logical().WriteWithContext(
+		ctx,
 		s.GetOAuthKeyPath(),
 		map[string]interface{}{"key": raw},
 	); err != nil {
@@ -472,7 +476,7 @@ func (s *VaultStore) deleteControllerCredentials(ctx context.Context, controller
 	if err != nil {
 		return errors.E(op, err)
 	}
-	_, err = client.Logical().Delete(s.controllerCredentialsPath(controllerName))
+	_, err = client.Logical().DeleteWithContext(ctx, s.controllerCredentialsPath(controllerName))
 	if rerr, ok := err.(*api.ResponseError); ok && rerr.StatusCode == http.StatusNotFound {
 		// Ignore the error if attempting to delete something that isn't there.
 		err = nil
@@ -495,7 +499,7 @@ func (s *VaultStore) client(ctx context.Context) (*api.Client, error) {
 		return s.client_, nil
 	}
 
-	secret, err := s.Client.Logical().Write(s.AuthPath, s.AuthSecret)
+	secret, err := s.Client.Logical().WriteWithContext(ctx, s.AuthPath, s.AuthSecret)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
