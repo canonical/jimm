@@ -115,13 +115,6 @@ func (j *JIMM) AuthorizationClient() *openfga.OFGAClient {
 	return j.OpenFGAClient
 }
 
-// An Authenticator authenticates login requests.
-type Authenticator interface {
-	// Authenticate processes the given LoginRequest and returns the user
-	// that has authenticated.
-	Authenticate(ctx context.Context, req *jujuparams.LoginRequest) (*openfga.User, error)
-}
-
 // OAuthAuthenticator is responsible for handling authentication
 // via OAuth2.0 AND JWT access tokens to JIMM.
 type OAuthAuthenticator interface {
