@@ -283,9 +283,9 @@ func (d *Database) PutJWKSExpiry(ctx context.Context, expiry time.Time) error {
 	return d.UpsertSecret(ctx, &secret)
 }
 
-// CleanupJWKS removes all secrets associated with OAuth.
-func (d *Database) CleanupOAuth(ctx context.Context) error {
-	const op = errors.Op("database.CleanupOAuth")
+// CleanupOAuthSecrets removes all secrets associated with OAuth.
+func (d *Database) CleanupOAuthSecrets(ctx context.Context) error {
+	const op = errors.Op("database.CleanupOAuthSecrets")
 	secret := dbmodel.NewSecret(oauthKind, oauthKeyTag, nil)
 	err := d.DeleteSecret(ctx, &secret)
 	if err != nil {

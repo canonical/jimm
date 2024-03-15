@@ -52,11 +52,11 @@ type CredentialStore interface {
 	// PutJWKSPrivateKey persists the private key associated with the current JWKS within the store.
 	PutJWKSPrivateKey(ctx context.Context, pem []byte) error
 
-	// CleanupJWKS removes all secrets associated with OAuth.
-	CleanupOAuth(ctx context.Context) error
-
 	// PutJWKSExpiry sets the expiry time for the current JWKS within the store.
 	PutJWKSExpiry(ctx context.Context, expiry time.Time) error
+
+	// CleanupOAuthSecrets removes all secrets associated with OAuth.
+	CleanupOAuthSecrets(ctx context.Context) error
 
 	// GetOAuthKey returns the current HS256 (symmetric) key used to sign OAuth session tokens.
 	GetOAuthKey(ctx context.Context) ([]byte, error)

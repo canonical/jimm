@@ -388,9 +388,9 @@ func (s *VaultStore) getJWKSExpiryPath() string {
 	return path.Join(s.getWellKnownPath(), "jwks-expiry")
 }
 
-// CleanupOAuth removes all secrets associated with OAuth.
-func (s *VaultStore) CleanupOAuth(ctx context.Context) error {
-	const op = errors.Op("vault.CleanupOAuth")
+// CleanupOAuthSecrets removes all secrets associated with OAuth.
+func (s *VaultStore) CleanupOAuthSecrets(ctx context.Context) error {
+	const op = errors.Op("vault.CleanupOAuthSecrets")
 
 	client, err := s.client(ctx)
 	if err != nil {

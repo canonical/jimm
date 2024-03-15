@@ -156,8 +156,8 @@ func (s *InMemoryCredentialStore) GetJWKSExpiry(ctx context.Context) (time.Time,
 	return s.expiry, nil
 }
 
-// CleanupJWKS removes all secrets associated with OAuth.
-func (s *InMemoryCredentialStore) CleanupOAuth(ctx context.Context) error {
+// CleanupOAuthSecrets removes all secrets associated with OAuth.
+func (s *InMemoryCredentialStore) CleanupOAuthSecrets(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

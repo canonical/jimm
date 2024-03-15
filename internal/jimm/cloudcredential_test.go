@@ -1771,7 +1771,7 @@ func (s testCloudCredentialAttributeStore) CleanupJWKS(ctx context.Context) erro
 	return errors.E(errors.CodeNotImplemented)
 }
 
-func (s testCloudCredentialAttributeStore) CleanupOAuth(ctx context.Context) error {
+func (s testCloudCredentialAttributeStore) CleanupOAuthSecrets(ctx context.Context) error {
 	return errors.E(errors.CodeNotImplemented)
 }
 

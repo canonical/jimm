@@ -218,7 +218,7 @@ func TestGetOAuthKeyFailsIfNotFound(t *testing.T) {
 	ctx := context.Background()
 	store := newStore(c)
 
-	err := store.CleanupOAuth(ctx)
+	err := store.CleanupOAuthSecrets(ctx)
 	c.Assert(err, qt.IsNil)
 
 	retrieved, err := store.GetOAuthKey(ctx)
