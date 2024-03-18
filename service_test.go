@@ -112,7 +112,7 @@ func TestAuthenticator(t *testing.T) {
 	}
 
 	conn, err := api.Open(&info, api.DialOpts{
-		LoginProvider:      jimmtest.NewUserSessionLogin("alice"),
+		LoginProvider:      jimmtest.NewUserSessionLogin(c, "alice"),
 		InsecureSkipVerify: true,
 	})
 	c.Assert(err, qt.IsNil)
@@ -127,7 +127,7 @@ func TestAuthenticator(t *testing.T) {
 	c.Check(conn.ControllerAccess(), qt.Equals, "")
 
 	conn, err = api.Open(&info, api.DialOpts{
-		LoginProvider:      jimmtest.NewUserSessionLogin("bob"),
+		LoginProvider:      jimmtest.NewUserSessionLogin(c, "bob"),
 		InsecureSkipVerify: true,
 	})
 	c.Assert(err, qt.IsNil)
@@ -186,7 +186,7 @@ func TestVault(t *testing.T) {
 	}
 
 	conn, err := api.Open(&info, api.DialOpts{
-		LoginProvider:      jimmtest.NewUserSessionLogin("bob"),
+		LoginProvider:      jimmtest.NewUserSessionLogin(c, "bob"),
 		InsecureSkipVerify: true,
 	})
 	c.Assert(err, qt.IsNil)
@@ -273,7 +273,7 @@ func TestOpenFGA(t *testing.T) {
 	}
 
 	conn, err := api.Open(&info, api.DialOpts{
-		LoginProvider:      jimmtest.NewUserSessionLogin("bob"),
+		LoginProvider:      jimmtest.NewUserSessionLogin(c, "bob"),
 		InsecureSkipVerify: true,
 	})
 	c.Assert(err, qt.IsNil)

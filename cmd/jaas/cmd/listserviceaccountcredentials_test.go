@@ -99,7 +99,7 @@ aws    foo
 	}
 	for _, test := range testCases {
 		c.Log(test.about)
-		bClient := jimmtest.NewUserSessionLogin("alice")
+		bClient := jimmtest.NewUserSessionLogin(c, "alice")
 		var result *jujucmd.Context
 		if test.showSecrets {
 			result, err = cmdtesting.RunCommand(c, cmd.NewListServiceAccountCredentialsCommandForTesting(s.ClientStore(), bClient), clientID, "--format", test.format, "--show-secrets")
