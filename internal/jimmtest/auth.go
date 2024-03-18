@@ -22,6 +22,14 @@ const (
 	JWTTestSecret = "test-secret"
 )
 
+// A SimpleTester is a simple version of the test interface
+// that both the GoChecker and QuickTest checker satisfy.
+// Useful for enabling test setup functions to fail without a panic.
+type SimpleTester interface {
+	Fatalf(format string, args ...interface{})
+	Logf(format string, args ...interface{})
+}
+
 // An Authenticator is an implementation of jimm.Authenticator that returns
 // the stored user and error.
 type Authenticator struct {
@@ -49,19 +57,22 @@ func (m MockOAuthAuthenticator) VerifySessionToken(token string, secretKey strin
 	return auth.VerifySessionToken(token, m.secretKey)
 }
 
-func NewUserSessionLogin(username string) api.LoginProvider {
+// NewUserSessionLogin returns a login provider than be used with Juju Dial Opts
+// to define how login will take place. In this case we login using a session token
+// that the JIMM server should verify with the same test secret.
+func NewUserSessionLogin(c SimpleTester, username string) api.LoginProvider {
 	email := convertUsernameToEmail(username)
 	token, err := jwt.NewBuilder().
 		Subject(email).
 		Expiration(time.Now().Add(1 * time.Hour)).
 		Build()
 	if err != nil {
-		panic("failed to generate test session token")
+		c.Fatalf("failed to generate test session token")
 	}
 
 	freshToken, err := jwt.Sign(token, jwt.WithKey(jwa.HS256, []byte(JWTTestSecret)))
 	if err != nil {
-		panic("failed to sign test session token")
+		c.Fatalf("failed to sign test session token")
 	}
 
 	b64Token := base64.StdEncoding.EncodeToString(freshToken)
