@@ -124,7 +124,7 @@ func (s *websocketSuite) openNoAssert(
 	c.Assert(err, gc.Equals, nil)
 	inf.CACert = w.String()
 
-	lp := jimmtest.NewUserSessionLogin(username)
+	lp := jimmtest.NewUserSessionLogin(c, username)
 
 	dialOpts := api.DialOpts{
 		InsecureSkipVerify: true,

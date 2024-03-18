@@ -23,7 +23,7 @@ var _ = gc.Suite(&purgeLogsSuite{})
 
 func (s *purgeLogsSuite) TestPurgeLogsSuperuser(c *gc.C) {
 	// alice is superuser
-	bClient := jimmtest.NewUserSessionLogin("alice")
+	bClient := jimmtest.NewUserSessionLogin(c, "alice")
 	datastring := "2021-01-01T00:00:00Z"
 	cmdCtx, err := cmdtesting.RunCommand(c, cmd.NewPurgeLogsCommandForTesting(s.ClientStore(), bClient), datastring)
 	c.Assert(err, gc.IsNil)
@@ -34,7 +34,7 @@ func (s *purgeLogsSuite) TestPurgeLogsSuperuser(c *gc.C) {
 
 func (s *purgeLogsSuite) TestInvalidISO8601Date(c *gc.C) {
 	// alice is superuser
-	bClient := jimmtest.NewUserSessionLogin("alice")
+	bClient := jimmtest.NewUserSessionLogin(c, "alice")
 	datastring := "13/01/2021"
 	_, err := cmdtesting.RunCommand(c, cmd.NewPurgeLogsCommandForTesting(s.ClientStore(), bClient), datastring)
 	c.Assert(err, gc.ErrorMatches, `invalid date. Expected ISO8601 date`)
@@ -43,7 +43,7 @@ func (s *purgeLogsSuite) TestInvalidISO8601Date(c *gc.C) {
 
 func (s *purgeLogsSuite) TestPurgeLogs(c *gc.C) {
 	// bob is not superuser
-	bClient := jimmtest.NewUserSessionLogin("bob")
+	bClient := jimmtest.NewUserSessionLogin(c, "bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewPurgeLogsCommandForTesting(s.ClientStore(), bClient), "2021-01-01T00:00:00Z")
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
@@ -85,7 +85,7 @@ func (s *purgeLogsSuite) TestPurgeLogsFromDb(c *gc.C) {
 
 		tomorrow := relativeNow.AddDate(0, 0, 1).Format(layout)
 		//alice is superuser
-		bClient := jimmtest.NewUserSessionLogin("alice")
+		bClient := jimmtest.NewUserSessionLogin(c, "alice")
 		cmdCtx, err := cmdtesting.RunCommand(c, cmd.NewPurgeLogsCommandForTesting(s.ClientStore(), bClient), tomorrow)
 		c.Assert(err, gc.IsNil)
 		// check that logs have been deleted

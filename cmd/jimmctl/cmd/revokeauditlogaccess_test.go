@@ -20,14 +20,14 @@ type revokeAuditLogAccessSuite struct {
 
 func (s *revokeAuditLogAccessSuite) TestRevokeAuditLogAccessSuperuser(c *gc.C) {
 	// alice is superuser
-	bClient := jimmtest.NewUserSessionLogin("alice")
+	bClient := jimmtest.NewUserSessionLogin(c, "alice")
 	_, err := cmdtesting.RunCommand(c, cmd.NewRevokeAuditLogAccessCommandForTesting(s.ClientStore(), bClient), "bob@canonical.com")
 	c.Assert(err, gc.IsNil)
 }
 
 func (s *revokeAuditLogAccessSuite) TestRevokeAuditLogAccess(c *gc.C) {
 	// bob is not superuser
-	bClient := jimmtest.NewUserSessionLogin("bob")
+	bClient := jimmtest.NewUserSessionLogin(c, "bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewRevokeAuditLogAccessCommandForTesting(s.ClientStore(), bClient), "bob@canonical.com")
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
