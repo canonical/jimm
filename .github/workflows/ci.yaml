@@ -35,8 +35,6 @@ jobs:
           go-version-file: 'go.mod'
       - name: Install dependencies
         run: sudo apt-get update -y && sudo apt-get install -y gcc git-core gnupg build-essential
-      - name: Remove installed mongodb
-        run: sudo apt purge mongodb-org && sudo apt autoremove
       - run: sudo snap install juju-db --channel 4.4/stable
       - name: Add volume files
         run: |
