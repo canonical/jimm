@@ -107,7 +107,7 @@ func (r *controllerRoot) LoginWithSessionCookie(ctx context.Context) (jujuparams
 	// If no identity ID has come through, then no cookie was present
 	// and as such authentication has failed.
 	if r.identityId == "" {
-		return jujuparams.LoginResult{}, errors.E(op, (&auth.AuthenticationError{}).Error())
+		return jujuparams.LoginResult{}, errors.E(op, &auth.AuthenticationError{})
 	}
 
 	user, err := r.jimm.GetOpenFGAUserAndAuthorise(ctx, r.identityId)

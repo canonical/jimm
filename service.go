@@ -263,6 +263,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
+
 	// Cleanup expired session every 30 minutes
 	defer sessionStore.StopCleanup(sessionStore.Cleanup(time.Minute * 30))
 
@@ -353,7 +354,6 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		Authenticator:             authSvc,
 		DashboardFinalRedirectURL: p.DashboardFinalRedirectURL,
 		SecureCookies:             p.SecureSessionCookies,
-		CookieExpiry:              p.SessionCookieExpiry,
 	})
 	if err != nil {
 		return nil, errors.E(op, err, "failed to setup authentication handler")

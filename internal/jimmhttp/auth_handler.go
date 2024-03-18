@@ -20,7 +20,6 @@ type OAuthHandler struct {
 	authenticator             BrowserOAuthAuthenticator
 	dashboardFinalRedirectURL string
 	secureCookies             bool
-	cookieExpiry              int
 }
 
 // OAuthHandlerParams holds the parameters to configure the OAuthHandler.
@@ -35,9 +34,6 @@ type OAuthHandlerParams struct {
 	// SessionCookies determines if HTTPS must be enabled in order for JIMM
 	// to set cookies when creating browser based sessions.
 	SecureCookies bool
-
-	// CookieExpiry is how long the cookie will be valid before expiring in seconds.
-	CookieExpiry int
 }
 
 // BrowserOAuthAuthenticator handles authorisation code authentication within JIMM
@@ -70,7 +66,6 @@ func NewOAuthHandler(p OAuthHandlerParams) (*OAuthHandler, error) {
 		authenticator:             p.Authenticator,
 		dashboardFinalRedirectURL: p.DashboardFinalRedirectURL,
 		secureCookies:             p.SecureCookies,
-		cookieExpiry:              p.CookieExpiry,
 	}, nil
 }
 

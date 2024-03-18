@@ -40,30 +40,16 @@ func TestBrowserAuth(t *testing.T) {
 	c := qt.New(t)
 
 	db, sessionStore := setupDbAndSessionStore(c)
-	cookie, err := jimmtest.RunBrowserLogin(db, sessionStore, 60)
+	cookie, err := jimmtest.RunBrowserLogin(db, sessionStore)
 	c.Assert(err, qt.IsNil)
 	c.Assert(cookie, qt.Not(qt.Equals), "")
-
-	// // Get the decrypted session by falseifying (cant spell) the request
-	// r, _ := http.NewRequest("", "", nil)
-	// r.Header.Set("Cookie", cookie)
-	// session, err := sessionStore.Get(r, auth.SessionName)
-	// c.Assert(err, qt.IsNil)
-	// fmt.Println(session)
-
-	// // Get the raw cookies by falseifying a save and retrieving set-cookie header
-	// w := httptest.NewRecorder()
-	// session.Options.MaxAge = 30
-	// session.Save(r, w)
-	// decryptedCookie := w.Header().Get("Set-Cookie")
-	// c.Assert(decryptedCookie, qt.Equals, "digsdig")
 }
 
 func TestCallbackFailsNoCodePresent(t *testing.T) {
 	c := qt.New(t)
 
 	db, sessionStore := setupDbAndSessionStore(c)
-	s, err := jimmtest.SetupTestDashboardCallbackHandler("<no dashboard needed for this test>", db, sessionStore, 60)
+	s, err := jimmtest.SetupTestDashboardCallbackHandler("<no dashboard needed for this test>", db, sessionStore)
 	c.Assert(err, qt.IsNil)
 	defer s.Close()
 
@@ -82,7 +68,7 @@ func TestCallbackFailsExchange(t *testing.T) {
 	c := qt.New(t)
 
 	db, sessionStore := setupDbAndSessionStore(c)
-	s, err := jimmtest.SetupTestDashboardCallbackHandler("<no dashboard needed for this test>", db, sessionStore, 60)
+	s, err := jimmtest.SetupTestDashboardCallbackHandler("<no dashboard needed for this test>", db, sessionStore)
 	c.Assert(err, qt.IsNil)
 	defer s.Close()
 

@@ -91,7 +91,7 @@ func convertUsernameToEmail(username string) string {
 	return username
 }
 
-func SetupTestDashboardCallbackHandler(browserURL string, db *db.Database, sessionStore sessions.Store, cookieExpiry int) (*httptest.Server, error) {
+func SetupTestDashboardCallbackHandler(browserURL string, db *db.Database, sessionStore sessions.Store) (*httptest.Server, error) {
 	// Create unstarted server to enable auth service
 	s := httptest.NewUnstartedServer(nil)
 	// Setup random port listener
@@ -129,7 +129,6 @@ func SetupTestDashboardCallbackHandler(browserURL string, db *db.Database, sessi
 		Authenticator:             authSvc,
 		DashboardFinalRedirectURL: browserURL,
 		SecureCookies:             false,
-		CookieExpiry:              cookieExpiry,
 	})
 	if err != nil {
 		return nil, err
@@ -147,7 +146,7 @@ func SetupTestDashboardCallbackHandler(browserURL string, db *db.Database, sessi
 	return s, nil
 }
 
-func RunBrowserLogin(db *db.Database, sessionStore sessions.Store, cookieExpiry int) (string, error) {
+func RunBrowserLogin(db *db.Database, sessionStore sessions.Store) (string, error) {
 	var cookieString string
 
 	// Setup final test redirect url server, to emulate
@@ -163,7 +162,7 @@ func RunBrowserLogin(db *db.Database, sessionStore sessions.Store, cookieExpiry 
 	)
 	defer browser.Close()
 
-	s, err := SetupTestDashboardCallbackHandler(browser.URL, db, sessionStore, cookieExpiry)
+	s, err := SetupTestDashboardCallbackHandler(browser.URL, db, sessionStore)
 	if err != nil {
 		return cookieString, err
 	}

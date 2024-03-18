@@ -119,6 +119,14 @@ func NewAuthenticationService(ctx context.Context, params AuthenticationServiceP
 		return nil, errors.E(op, errors.CodeServerConfiguration, err, "failed to create oidc provider")
 	}
 
+	if params.SessionCookieMaxAge == 0 {
+		return nil, errors.E(op, errors.CodeServerConfiguration, err, "session cookie max age not set")
+	}
+
+	if params.SessionTokenExpiry == 0 {
+		return nil, errors.E(op, errors.CodeServerConfiguration, err, "session token expiry not set")
+	}
+
 	return &AuthenticationService{
 		provider: provider,
 		oauthConfig: oauth2.Config{
@@ -384,7 +392,7 @@ func (as *AuthenticationService) CreateBrowserSession(
 	secureCookies bool,
 	email string,
 ) error {
-	const op = errors.Op("")
+	const op = errors.Op("auth.AuthenticationService.CreateBrowserSession")
 
 	session, err := as.sessionStore.Get(r, SessionName)
 	if err != nil {
@@ -407,12 +415,12 @@ func (as *AuthenticationService) CreateBrowserSession(
 // retrieving new access tokens upon expiry. If this cannot be done, the cookie
 // is deleted and an error is returned.
 func (as *AuthenticationService) AuthenticateBrowserSession(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error) {
-	const op = errors.Op("")
+	const op = errors.Op("auth.AuthenticationService.AuthenticateBrowserSession")
 
 	// Get the session for this cookie
 	session, err := as.sessionStore.Get(req, SessionName)
 	if err != nil {
-		return ctx, errors.E(op, err)
+		return ctx, errors.E(op, err, "failed to retrieve session")
 	}
 
 	// Get the identity id (email)
@@ -424,7 +432,7 @@ func (as *AuthenticationService) AuthenticateBrowserSession(ctx context.Context,
 	// If it's not ok, kill their session
 	if err != nil {
 		session.Options.MaxAge = -1
-		if err = session.Save(req, w); err != nil {
+		if err := session.Save(req, w); err != nil {
 			return ctx, errors.E(op, err)
 		}
 		return ctx, errors.E(op, err)
@@ -444,7 +452,7 @@ func (as *AuthenticationService) AuthenticateBrowserSession(ctx context.Context,
 
 // validateAndUpdateAccessToken
 func (as *AuthenticationService) validateAndUpdateAccessToken(ctx context.Context, email any) error {
-	const op = errors.Op("")
+	const op = errors.Op("auth.AuthenticationService.validateAndUpdateAccessToken")
 
 	// Cast the email, it is any because we pass it through the context when authenticating
 	// with cookies and it makes sense to handle the casting here
@@ -489,7 +497,7 @@ func (as *AuthenticationService) validateAndUpdateAccessToken(ctx context.Contex
 //
 // This is to be called only when a token is expired.
 func (as *AuthenticationService) refreshIdentitiesToken(ctx context.Context, email string, t *oauth2.Token) error {
-	const op = errors.Op("")
+	const op = errors.Op("auth.AuthenticationService.refreshIdentitiesToken")
 
 	tSrc := as.oauthConfig.TokenSource(ctx, t)
 

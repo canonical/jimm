@@ -82,6 +82,11 @@ func (s *adminSuite) TestLoginToController(c *gc.C) {
 //
 // Within the test are clear comments explaining what is happening when and why.
 // Please refer to these comments for further details.
+//
+// We only test happy path here due to having tested edge cases and failure cases
+// within the auth service itself such as invalid cookies, expired access tokens and
+// missing/expired/revoked refresh tokens.
+
 func (s *adminSuite) TestBrowserLogin(c *gc.C) {
 	// The setup runs a browser login with callback, ultimately retrieving
 	// a logged in user by cookie.
@@ -91,7 +96,7 @@ func (s *adminSuite) TestBrowserLogin(c *gc.C) {
 	sessionStore, err := pgstore.NewPGStoreFromPool(sqldb, []byte("secretsecretdigletts"))
 	c.Assert(err, gc.IsNil)
 
-	cookie, err := jimmtest.RunBrowserLogin(s.JIMM.DB(), sessionStore, 60)
+	cookie, err := jimmtest.RunBrowserLogin(s.JIMM.DB(), sessionStore)
 	c.Assert(err, gc.IsNil)
 	c.Assert(cookie, gc.Not(gc.Equals), "")
 
@@ -158,13 +163,31 @@ func (s *adminSuite) TestBrowserLogin(c *gc.C) {
 	defer conn.Close()
 
 	lr := &jujuparams.LoginResult{}
-	c.Assert(
-		conn.APICall("Admin", 4, "", "LoginWithSessionCookie", nil, lr),
-		gc.IsNil,
-	)
+	err = conn.APICall("Admin", 4, "", "LoginWithSessionCookie", nil, lr)
+	c.Assert(err, gc.IsNil)
 
 	c.Assert(lr.UserInfo.Identity, gc.Equals, "user-jimm-test@canonical.com")
 	c.Assert(lr.UserInfo.DisplayName, gc.Equals, "jimm-test")
+}
+
+// TestBrowserLoginNoCookie attempts to login without a cookie.
+func (s *adminSuite) TestBrowserLoginNoCookie(c *gc.C) {
+	conn := s.open(
+		c,
+		&api.Info{
+			SkipLogin: true,
+		},
+		"test",
+	)
+	defer conn.Close()
+
+	lr := &jujuparams.LoginResult{}
+	err := conn.APICall("Admin", 4, "", "LoginWithSessionCookie", nil, lr)
+	c.Assert(
+		err,
+		gc.ErrorMatches,
+		"authentication failed",
+	)
 }
 
 // TestDeviceLogin takes a test user through the flow of logging into jimm
