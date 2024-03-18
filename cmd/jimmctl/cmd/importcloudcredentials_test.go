@@ -64,7 +64,7 @@ func (s *importCloudCredentialsSuite) TestImportCloudCredentials(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	// alice is superuser
-	bClient := jimmtest.NewUserSessionLogin("alice")
+	bClient := jimmtest.NewUserSessionLogin(c, "alice")
 	_, err = cmdtesting.RunCommand(c, cmd.NewImportCloudCredentialsCommandForTesting(s.ClientStore(), bClient), tmpfile)
 	c.Assert(err, gc.IsNil)
 

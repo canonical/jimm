@@ -168,7 +168,7 @@ clouds:
 		c.Log(test.about)
 		tmpfile, cleanupFunc := writeTempFile(c, test.cloudInfo)
 
-		bClient := jimmtest.NewUserSessionLogin("bob@canonical.com")
+		bClient := jimmtest.NewUserSessionLogin(c, "bob@canonical.com")
 		// Running the command succeeds
 		newCmd := cmd.NewAddCloudToControllerCommandForTesting(s.ClientStore(), bClient, test.cloudByNameFunc)
 		var err error

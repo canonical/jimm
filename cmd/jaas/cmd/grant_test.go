@@ -30,7 +30,7 @@ func (s *grantSuite) TestGrant(c *gc.C) {
 	clientID := "abda51b2-d735-4794-a8bd-49c506baa4af"
 
 	// alice is superuser
-	bClient := jimmtest.NewUserSessionLogin("alice")
+	bClient := jimmtest.NewUserSessionLogin(c, "alice")
 
 	sa := dbmodel.Identity{
 		Name: clientID,
@@ -86,7 +86,7 @@ func (s *grantSuite) TestMissingArgs(c *gc.C) {
 		expectedError: "user/group not specified",
 	}}
 
-	bClient := jimmtest.NewUserSessionLogin("alice")
+	bClient := jimmtest.NewUserSessionLogin(c, "alice")
 	clientStore := s.ClientStore()
 	for _, t := range tests {
 		_, err := cmdtesting.RunCommand(c, cmd.NewGrantCommandForTesting(clientStore, bClient), t.args...)

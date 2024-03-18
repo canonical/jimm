@@ -669,9 +669,9 @@ func TestResolveTagObjectMapsUsers(t *testing.T) {
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
-	tag, err := jimm.ResolveTag(j.UUID, &j.Database, "user-alex@canonical.comly-werly#member")
+	tag, err := jimm.ResolveTag(j.UUID, &j.Database, "user-alex@canonical.com-werly#member")
 	c.Assert(err, qt.IsNil)
-	c.Assert(tag, qt.DeepEquals, ofganames.ConvertTagWithRelation(names.NewUserTag("alex@canonical.comly-werly"), ofganames.MemberRelation))
+	c.Assert(tag, qt.DeepEquals, ofganames.ConvertTagWithRelation(names.NewUserTag("alex@canonical.com-werly"), ofganames.MemberRelation))
 }
 
 func TestResolveTupleObjectHandlesErrors(t *testing.T) {
