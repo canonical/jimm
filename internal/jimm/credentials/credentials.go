@@ -58,9 +58,9 @@ type CredentialStore interface {
 	// CleanupOAuthSecrets removes all secrets associated with OAuth.
 	CleanupOAuthSecrets(ctx context.Context) error
 
-	// GetOAuthKey returns the current HS256 (symmetric) key used to sign OAuth session tokens.
-	GetOAuthKey(ctx context.Context) ([]byte, error)
+	// GetOAuthSecret returns the current HS256 (symmetric encryption) secret used to sign OAuth session tokens.
+	GetOAuthSecret(ctx context.Context) ([]byte, error)
 
-	// PutOAuthKey puts a HS256 (symmetric) key into the credentials store for signing OAuth session tokens.
-	PutOAuthKey(ctx context.Context, raw []byte) error
+	// PutOAuthSecret puts a HS256 (symmetric encryption) secret into the credentials store for signing OAuth session tokens.
+	PutOAuthSecret(ctx context.Context, raw []byte) error
 }

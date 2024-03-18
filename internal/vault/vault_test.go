@@ -185,7 +185,7 @@ func TestGetAndPutJWKSPrivateKey(t *testing.T) {
 	c.Assert(string(keyPem), qt.Contains, "-----BEGIN RSA PRIVATE KEY-----")
 }
 
-func TestGetAndPutOAuthKey(t *testing.T) {
+func TestGetAndPutOAuthSecret(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 	store := newStore(c)
@@ -193,27 +193,27 @@ func TestGetAndPutOAuthKey(t *testing.T) {
 	// We didn't use a pre-defined/constant key here because in that case we had
 	// to make sure there's nothing left from last test runs in Vault.
 	key := []byte(uuid.NewString()) // A random UUID as key
-	err := store.PutOAuthKey(ctx, key)
+	err := store.PutOAuthSecret(ctx, key)
 	c.Assert(err, qt.IsNil)
-	retrievedKey, err := store.GetOAuthKey(ctx)
+	retrievedKey, err := store.GetOAuthSecret(ctx)
 	c.Assert(err, qt.IsNil)
 	c.Assert(retrievedKey, qt.DeepEquals, key)
 }
 
-func TestGetOAuthKeyFailsIfDataIsNil(t *testing.T) {
+func TestGetOAuthSecretFailsIfDataIsNil(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 	store := newStore(c)
 
-	err := store.PutOAuthKey(ctx, nil)
+	err := store.PutOAuthSecret(ctx, nil)
 	c.Assert(err, qt.IsNil)
 
-	retrieved, err := store.GetOAuthKey(ctx)
+	retrieved, err := store.GetOAuthSecret(ctx)
 	c.Assert(err, qt.ErrorMatches, "nil OAuth key data")
 	c.Assert(retrieved, qt.IsNil)
 }
 
-func TestGetOAuthKeyFailsIfNotFound(t *testing.T) {
+func TestGetOAuthSecretFailsIfNotFound(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 	store := newStore(c)
@@ -221,7 +221,7 @@ func TestGetOAuthKeyFailsIfNotFound(t *testing.T) {
 	err := store.CleanupOAuthSecrets(ctx)
 	c.Assert(err, qt.IsNil)
 
-	retrieved, err := store.GetOAuthKey(ctx)
+	retrieved, err := store.GetOAuthSecret(ctx)
 	c.Assert(err, qt.ErrorMatches, "no OAuth key exists")
 	c.Assert(retrieved, qt.IsNil)
 }

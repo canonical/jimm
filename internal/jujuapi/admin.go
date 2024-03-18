@@ -88,7 +88,7 @@ func (r *controllerRoot) GetDeviceSessionToken(ctx context.Context) (params.GetD
 		return response, errors.E(op, err)
 	}
 
-	secretKey, err := r.jimm.GetCredentialStore().GetOAuthKey(ctx)
+	secretKey, err := r.jimm.GetCredentialStore().GetOAuthSecret(ctx)
 	if err != nil {
 		return response, errors.E(op, err, "failed to retrieve oauth secret key")
 	}
@@ -113,7 +113,7 @@ func (r *controllerRoot) LoginWithSessionToken(ctx context.Context, req params.L
 	authenticationSvc := r.jimm.OAuthAuthenticationService()
 
 	// Verify the session token
-	secretKey, err := r.jimm.GetCredentialStore().GetOAuthKey(ctx)
+	secretKey, err := r.jimm.GetCredentialStore().GetOAuthSecret(ctx)
 	if err != nil {
 		return jujuparams.LoginResult{}, errors.E(op, err, "failed to retrieve oauth secret key")
 	}

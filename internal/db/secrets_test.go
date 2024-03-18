@@ -280,12 +280,12 @@ func (s *dbSuite) TestCleanupJWKS(c *qt.C) {
 	c.Assert(count, qt.Equals, int64(0))
 }
 
-func (s *dbSuite) TestPutAndGetOAuthKey(c *qt.C) {
+func (s *dbSuite) TestPutAndGetOAuthSecret(c *qt.C) {
 	err := s.Database.Migrate(context.Background(), true)
 	c.Assert(err, qt.Equals, nil)
 	ctx := context.Background()
 	key := []byte(uuid.NewString())
-	c.Assert(s.Database.PutOAuthKey(ctx, key), qt.IsNil)
+	c.Assert(s.Database.PutOAuthSecret(ctx, key), qt.IsNil)
 
 	secret := dbmodel.Secret{}
 	tx := s.Database.DB.First(&secret)
@@ -293,17 +293,17 @@ func (s *dbSuite) TestPutAndGetOAuthKey(c *qt.C) {
 	c.Assert(secret.Type, qt.Equals, db.OAuthKind)
 	c.Assert(secret.Tag, qt.Equals, db.OAuthKeyTag)
 
-	retrievedKey, err := s.Database.GetOAuthKey(ctx)
+	retrievedKey, err := s.Database.GetOAuthSecret(ctx)
 	c.Assert(err, qt.IsNil)
 	c.Assert(retrievedKey, qt.DeepEquals, key)
 }
 
-func (s *dbSuite) TestGetOAuthKeyFailsIfNotFound(c *qt.C) {
+func (s *dbSuite) TestGetOAuthSecretFailsIfNotFound(c *qt.C) {
 	err := s.Database.Migrate(context.Background(), true)
 	c.Assert(err, qt.Equals, nil)
 	ctx := context.Background()
 
-	retrieved, err := s.Database.GetOAuthKey(ctx)
+	retrieved, err := s.Database.GetOAuthSecret(ctx)
 	c.Assert(err, qt.ErrorMatches, "secret not found")
 	c.Assert(retrieved, qt.IsNil)
 }

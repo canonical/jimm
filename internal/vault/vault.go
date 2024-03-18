@@ -399,22 +399,22 @@ func (s *VaultStore) CleanupOAuthSecrets(ctx context.Context) error {
 
 	// Vault does not return errors on deletion requests where
 	// the secret does not exist.
-	if _, err := client.Logical().DeleteWithContext(ctx, s.GetOAuthKeyPath()); err != nil {
+	if _, err := client.Logical().DeleteWithContext(ctx, s.GetOAuthSecretPath()); err != nil {
 		return errors.E(op, err)
 	}
 	return nil
 }
 
-// GetOAuthKey returns the current HS256 (symmetric) key used to sign OAuth session tokens.
-func (s *VaultStore) GetOAuthKey(ctx context.Context) ([]byte, error) {
-	const op = errors.Op("vault.GetOAuthKey")
+// GetOAuthSecret returns the current HS256 (symmetric encryption) secret used to sign OAuth session tokens.
+func (s *VaultStore) GetOAuthSecret(ctx context.Context) ([]byte, error) {
+	const op = errors.Op("vault.GetOAuthSecret")
 
 	client, err := s.client(ctx)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
 
-	secret, err := client.Logical().ReadWithContext(ctx, s.GetOAuthKeyPath())
+	secret, err := client.Logical().ReadWithContext(ctx, s.GetOAuthSecretPath())
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
@@ -442,9 +442,9 @@ func (s *VaultStore) GetOAuthKey(ctx context.Context) ([]byte, error) {
 	return keyPem, nil
 }
 
-// PutOAuthKey puts a HS256 key into the credentials store for signing OAuth session tokens.
-func (s *VaultStore) PutOAuthKey(ctx context.Context, raw []byte) error {
-	const op = errors.Op("vault.PutOAuthKey")
+// PutOAuthSecret puts a HS256 (symmetric encryption) secret into the credentials store for signing OAuth session tokens.
+func (s *VaultStore) PutOAuthSecret(ctx context.Context, raw []byte) error {
+	const op = errors.Op("vault.PutOAuthSecret")
 
 	client, err := s.client(ctx)
 	if err != nil {
@@ -453,7 +453,7 @@ func (s *VaultStore) PutOAuthKey(ctx context.Context, raw []byte) error {
 
 	if _, err := client.Logical().WriteWithContext(
 		ctx,
-		s.GetOAuthKeyPath(),
+		s.GetOAuthSecretPath(),
 		map[string]interface{}{"key": raw},
 	); err != nil {
 		return errors.E(op, err)
@@ -461,9 +461,9 @@ func (s *VaultStore) PutOAuthKey(ctx context.Context, raw []byte) error {
 	return nil
 }
 
-// GetOAuthKeyPath returns a hardcoded suffixed vault path (dependent on
+// GetOAuthSecretPath returns a hardcoded suffixed vault path (dependent on
 // the initial KVPath) to the OAuth JWK location.
-func (s *VaultStore) GetOAuthKeyPath() string {
+func (s *VaultStore) GetOAuthSecretPath() string {
 	return path.Join(s.KVPath, "creds", "oauth", "key")
 }
 

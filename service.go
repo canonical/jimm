@@ -504,7 +504,7 @@ func (s *Service) CheckOrGenerateOAuthKey(ctx context.Context) error {
 		return nil
 	}
 
-	if secret, err := store.GetOAuthKey(ctx); err == nil && secret != nil && len(secret) > 0 {
+	if secret, err := store.GetOAuthSecret(ctx); err == nil && secret != nil && len(secret) > 0 {
 		zapctx.Info(ctx, "detected existing OAuth secret key")
 		return nil
 	}
@@ -515,7 +515,7 @@ func (s *Service) CheckOrGenerateOAuthKey(ctx context.Context) error {
 		return errors.E(op, err, "failed to generate OAuth secret key")
 	}
 
-	if err := store.PutOAuthKey(ctx, secret); err != nil {
+	if err := store.PutOAuthSecret(ctx, secret); err != nil {
 		zapctx.Error(ctx, "failed to store generated OAuth secret key", zap.Error(err))
 		return errors.E(op, err, "failed to store generated OAuth secret key")
 	}

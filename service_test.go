@@ -106,7 +106,7 @@ func TestAuthenticator(t *testing.T) {
 	svc, err := jimm.NewService(ctx, p)
 	c.Assert(err, qt.IsNil)
 
-	err = svc.JIMM().GetCredentialStore().PutOAuthKey(ctx, []byte(jimmtest.JWTTestSecret))
+	err = svc.JIMM().GetCredentialStore().PutOAuthSecret(ctx, []byte(jimmtest.JWTTestSecret))
 	c.Assert(err, qt.IsNil)
 
 	srv := httptest.NewTLSServer(svc)
@@ -181,7 +181,7 @@ func TestVault(t *testing.T) {
 	svc, err := jimm.NewService(ctx, p)
 	c.Assert(err, qt.IsNil)
 
-	err = svc.JIMM().GetCredentialStore().PutOAuthKey(ctx, []byte(jimmtest.JWTTestSecret))
+	err = svc.JIMM().GetCredentialStore().PutOAuthSecret(ctx, []byte(jimmtest.JWTTestSecret))
 	c.Assert(err, qt.IsNil)
 
 	env := jimmtest.ParseEnvironment(c, testVaultEnv)
@@ -277,7 +277,7 @@ func TestOpenFGA(t *testing.T) {
 	svc, err := jimm.NewService(ctx, p)
 	c.Assert(err, qt.IsNil)
 
-	err = svc.JIMM().GetCredentialStore().PutOAuthKey(ctx, []byte(jimmtest.JWTTestSecret))
+	err = svc.JIMM().GetCredentialStore().PutOAuthSecret(ctx, []byte(jimmtest.JWTTestSecret))
 	c.Assert(err, qt.IsNil)
 
 	srv := httptest.NewTLSServer(svc)

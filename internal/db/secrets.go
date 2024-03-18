@@ -295,9 +295,9 @@ func (d *Database) CleanupOAuthSecrets(ctx context.Context) error {
 	return nil
 }
 
-// GetOAuthKey returns the current HS256 (symmetric) key used to sign OAuth session tokens.
-func (d *Database) GetOAuthKey(ctx context.Context) ([]byte, error) {
-	const op = errors.Op("database.GetOAuthKey")
+// GetOAuthSecret returns the current HS256 (symmetric encryption) secret used to sign OAuth session tokens.
+func (d *Database) GetOAuthSecret(ctx context.Context) ([]byte, error) {
+	const op = errors.Op("database.GetOAuthSecret")
 	secret := dbmodel.NewSecret(oauthKind, oauthKeyTag, nil)
 	err := d.GetSecret(ctx, &secret)
 	if err != nil {
@@ -313,9 +313,9 @@ func (d *Database) GetOAuthKey(ctx context.Context) ([]byte, error) {
 	return pem, nil
 }
 
-// PutOAuthKey puts a HS256 key into the credentials store for signing OAuth session tokens.
-func (d *Database) PutOAuthKey(ctx context.Context, raw []byte) error {
-	const op = errors.Op("database.PutOAuthKey")
+// PutOAuthSecret puts a HS256 (symmetric encryption) secret into the credentials store for signing OAuth session tokens.
+func (d *Database) PutOAuthSecret(ctx context.Context, raw []byte) error {
+	const op = errors.Op("database.PutOAuthSecret")
 	oauthKey, err := json.Marshal(raw)
 	if err != nil {
 		zapctx.Error(ctx, "failed to marshal pem data", zap.Error(err))

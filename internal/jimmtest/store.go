@@ -156,15 +156,6 @@ func (s *InMemoryCredentialStore) GetJWKSExpiry(ctx context.Context) (time.Time,
 	return s.expiry, nil
 }
 
-// CleanupOAuthSecrets removes all secrets associated with OAuth.
-func (s *InMemoryCredentialStore) CleanupOAuthSecrets(ctx context.Context) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	s.oauthKey = nil
-	return nil
-}
-
 // PutJWKS puts a generated RS256[4096 bit] JWKS without x5c or x5t into the credential store.
 func (s *InMemoryCredentialStore) PutJWKS(ctx context.Context, jwks jwk.Set) error {
 	s.mu.Lock()
@@ -196,8 +187,17 @@ func (s *InMemoryCredentialStore) PutJWKSExpiry(ctx context.Context, expiry time
 	return nil
 }
 
-// GetOAuthKey returns the current HS256 (symmetric) key used to sign OAuth session tokens.
-func (s *InMemoryCredentialStore) GetOAuthKey(ctx context.Context) ([]byte, error) {
+// CleanupOAuthSecrets removes all secrets associated with OAuth.
+func (s *InMemoryCredentialStore) CleanupOAuthSecrets(ctx context.Context) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.oauthKey = nil
+	return nil
+}
+
+// GetOAuthSecret returns the current HS256 (symmetric encryption) secret used to sign OAuth session tokens.
+func (s *InMemoryCredentialStore) GetOAuthSecret(ctx context.Context) ([]byte, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -211,8 +211,8 @@ func (s *InMemoryCredentialStore) GetOAuthKey(ctx context.Context) ([]byte, erro
 	return key, nil
 }
 
-// PutOAuthKey puts a HS256 key into the credentials store for signing OAuth session tokens.
-func (s *InMemoryCredentialStore) PutOAuthKey(ctx context.Context, raw []byte) error {
+// PutOAuthSecret puts a HS256 (symmetric encryption) secret into the credentials store for signing OAuth session tokens.
+func (s *InMemoryCredentialStore) PutOAuthSecret(ctx context.Context, raw []byte) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

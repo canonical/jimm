@@ -1775,10 +1775,10 @@ func (s testCloudCredentialAttributeStore) CleanupOAuthSecrets(ctx context.Conte
 	return errors.E(errors.CodeNotImplemented)
 }
 
-func (s testCloudCredentialAttributeStore) GetOAuthKey(ctx context.Context) ([]byte, error) {
+func (s testCloudCredentialAttributeStore) GetOAuthSecret(ctx context.Context) ([]byte, error) {
 	return nil, errors.E(errors.CodeNotImplemented)
 }
 
-func (s testCloudCredentialAttributeStore) PutOAuthKey(ctx context.Context, raw []byte) error {
+func (s testCloudCredentialAttributeStore) PutOAuthSecret(ctx context.Context, raw []byte) error {
 	return errors.E(errors.CodeNotImplemented)
 }
