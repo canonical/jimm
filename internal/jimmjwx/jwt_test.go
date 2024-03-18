@@ -69,7 +69,7 @@ func TestNewJWTIsParsableByExponent(t *testing.T) {
 	// Mint a new JWT
 	tok, err := jwtService.NewJWT(ctx, jimmjwx.JWTParams{
 		Controller: "controller-my-diglett-controller",
-		User:       "diglett@external",
+		User:       "diglett@canonical.com",
 		Access: map[string]string{
 			"controller": "superuser",
 			"model":      "administrator",
@@ -90,7 +90,7 @@ func TestNewJWTIsParsableByExponent(t *testing.T) {
 
 	// Test token has what we want
 	c.Assert(token.Audience()[0], qt.Equals, "controller-my-diglett-controller")
-	c.Assert(token.Subject(), qt.Equals, "diglett@external")
+	c.Assert(token.Subject(), qt.Equals, "diglett@canonical.com")
 	accessClaim, ok := token.Get("access")
 	c.Assert(ok, qt.IsTrue)
 	c.Assert(accessClaim, qt.DeepEquals, map[string]any{
@@ -130,7 +130,7 @@ func TestNewJWTExpires(t *testing.T) {
 	// Mint a new JWT
 	tok, err := jwtService.NewJWT(ctx, jimmjwx.JWTParams{
 		Controller: "controller-my-diglett-controller",
-		User:       "diglett@external",
+		User:       "diglett@canonical.com",
 		Access: map[string]string{
 			"controller": "superuser",
 			"model":      "administrator",

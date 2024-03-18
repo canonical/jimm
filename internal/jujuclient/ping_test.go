@@ -6,7 +6,7 @@ import (
 	"context"
 
 	"github.com/canonical/jimm/internal/dbmodel"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	gc "gopkg.in/check.v1"
 )
 

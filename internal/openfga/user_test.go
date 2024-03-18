@@ -8,7 +8,7 @@ import (
 
 	cofga "github.com/canonical/ofga"
 	"github.com/google/uuid"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/internal/dbmodel"

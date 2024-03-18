@@ -3,7 +3,6 @@
 package cmd
 
 import (
-	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	"github.com/juju/cmd/v3"
 	jujuapi "github.com/juju/juju/api"
 	"github.com/juju/juju/cloud"
@@ -19,73 +18,73 @@ var (
 
 type AccessResult = accessResult
 
-func NewListControllersCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
+func NewListControllersCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &listControllersCommand{
 		store: store,
 		dialOpts: &jujuapi.DialOpts{
 			InsecureSkipVerify: true,
-			BakeryClient:       bClient,
+			LoginProvider:      lp,
 		},
 	}
 
 	return modelcmd.WrapBase(cmd)
 }
 
-func NewModelStatusCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
+func NewModelStatusCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &modelStatusCommand{
 		store: store,
 		dialOpts: &jujuapi.DialOpts{
 			InsecureSkipVerify: true,
-			BakeryClient:       bClient,
+			LoginProvider:      lp,
 		},
 	}
 
 	return modelcmd.WrapBase(cmd)
 }
 
-func NewGrantAuditLogAccessCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
+func NewGrantAuditLogAccessCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &grantAuditLogAccessCommand{
 		store: store,
 		dialOpts: &jujuapi.DialOpts{
 			InsecureSkipVerify: true,
-			BakeryClient:       bClient,
+			LoginProvider:      lp,
 		},
 	}
 
 	return modelcmd.WrapBase(cmd)
 }
 
-func NewRevokeAuditLogAccessCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
+func NewRevokeAuditLogAccessCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &revokeAuditLogAccessCommand{
 		store: store,
 		dialOpts: &jujuapi.DialOpts{
 			InsecureSkipVerify: true,
-			BakeryClient:       bClient,
+			LoginProvider:      lp,
 		},
 	}
 
 	return modelcmd.WrapBase(cmd)
 }
 
-func NewListAuditEventsCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
+func NewListAuditEventsCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &listAuditEventsCommand{
 		store: store,
 		dialOpts: &jujuapi.DialOpts{
 			InsecureSkipVerify: true,
-			BakeryClient:       bClient,
+			LoginProvider:      lp,
 		},
 	}
 
 	return modelcmd.WrapBase(cmd)
 }
 
-func NewAddCloudToControllerCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client, cloudByNameFunc func(string) (*cloud.Cloud, error)) cmd.Command {
+func NewAddCloudToControllerCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider, cloudByNameFunc func(string) (*cloud.Cloud, error)) cmd.Command {
 	cmd := &addCloudToControllerCommand{
 		store:           store,
 		cloudByNameFunc: cloudByNameFunc,
 		dialOpts: &jujuapi.DialOpts{
 			InsecureSkipVerify: true,
-			BakeryClient:       bClient,
+			LoginProvider:      lp,
 		},
 	}
 
@@ -94,12 +93,12 @@ func NewAddCloudToControllerCommandForTesting(store jujuclient.ClientStore, bCli
 
 type RemoveCloudFromControllerAPI = removeCloudFromControllerAPI
 
-func NewRemoveCloudFromControllerCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client, removeCloudFromControllerAPIFunc func() (RemoveCloudFromControllerAPI, error)) cmd.Command {
+func NewRemoveCloudFromControllerCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider, removeCloudFromControllerAPIFunc func() (RemoveCloudFromControllerAPI, error)) cmd.Command {
 	cmd := &removeCloudFromControllerCommand{
 		store: store,
 		dialOpts: &jujuapi.DialOpts{
 			InsecureSkipVerify: true,
-			BakeryClient:       bClient,
+			LoginProvider:      lp,
 		},
 		removeCloudFromControllerAPIFunc: removeCloudFromControllerAPIFunc,
 	}
@@ -110,24 +109,24 @@ func NewRemoveCloudFromControllerCommandForTesting(store jujuclient.ClientStore,
 	return modelcmd.WrapBase(cmd)
 }
 
-func NewAddControllerCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
+func NewAddControllerCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &addControllerCommand{
 		store: store,
 		dialOpts: &jujuapi.DialOpts{
 			InsecureSkipVerify: true,
-			BakeryClient:       bClient,
+			LoginProvider:      lp,
 		},
 	}
 
 	return modelcmd.WrapBase(cmd)
 }
 
-func NewRemoveControllerCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
+func NewRemoveControllerCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &removeControllerCommand{
 		store: store,
 		dialOpts: &jujuapi.DialOpts{
 			InsecureSkipVerify: true,
-			BakeryClient:       bClient,
+			LoginProvider:      lp,
 		},
 	}
 
@@ -142,180 +141,180 @@ func NewControllerInfoCommandForTesting(store jujuclient.ClientStore) cmd.Comman
 	return modelcmd.WrapBase(cmd)
 }
 
-func NewSetControllerDeprecatedCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
+func NewSetControllerDeprecatedCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &setControllerDeprecatedCommand{
 		store: store,
 		dialOpts: &jujuapi.DialOpts{
 			InsecureSkipVerify: true,
-			BakeryClient:       bClient,
+			LoginProvider:      lp,
 		},
 	}
 
 	return modelcmd.WrapBase(cmd)
 }
 
-func NewImportModelCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
+func NewImportModelCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &importModelCommand{
 		store: store,
 		dialOpts: &jujuapi.DialOpts{
 			InsecureSkipVerify: true,
-			BakeryClient:       bClient,
+			LoginProvider:      lp,
 		},
 	}
 
 	return modelcmd.WrapBase(cmd)
 }
 
-func NewUpdateMigratedModelCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
+func NewUpdateMigratedModelCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &updateMigratedModelCommand{
 		store: store,
 		dialOpts: &jujuapi.DialOpts{
 			InsecureSkipVerify: true,
-			BakeryClient:       bClient,
+			LoginProvider:      lp,
 		},
 	}
 
 	return modelcmd.WrapBase(cmd)
 }
 
-func NewImportCloudCredentialsCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
+func NewImportCloudCredentialsCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &importCloudCredentialsCommand{
 		store: store,
 		dialOpts: &jujuapi.DialOpts{
 			InsecureSkipVerify: true,
-			BakeryClient:       bClient,
+			LoginProvider:      lp,
 		},
 	}
 
 	return modelcmd.WrapBase(cmd)
 }
 
-func NewAddGroupCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
+func NewAddGroupCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &addGroupCommand{
 		store: store,
 		dialOpts: &jujuapi.DialOpts{
 			InsecureSkipVerify: true,
-			BakeryClient:       bClient,
+			LoginProvider:      lp,
 		},
 	}
 
 	return modelcmd.WrapBase(cmd)
 }
 
-func NewRenameGroupCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
+func NewRenameGroupCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &renameGroupCommand{
 		store: store,
 		dialOpts: &jujuapi.DialOpts{
 			InsecureSkipVerify: true,
-			BakeryClient:       bClient,
+			LoginProvider:      lp,
 		},
 	}
 
 	return modelcmd.WrapBase(cmd)
 }
 
-func NewRemoveGroupCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
+func NewRemoveGroupCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &removeGroupCommand{
 		store: store,
 		dialOpts: &jujuapi.DialOpts{
 			InsecureSkipVerify: true,
-			BakeryClient:       bClient,
+			LoginProvider:      lp,
 		},
 	}
 
 	return modelcmd.WrapBase(cmd)
 }
 
-func NewListGroupsCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
+func NewListGroupsCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &listGroupsCommand{
 		store: store,
 		dialOpts: &jujuapi.DialOpts{
 			InsecureSkipVerify: true,
-			BakeryClient:       bClient,
+			LoginProvider:      lp,
 		},
 	}
 
 	return modelcmd.WrapBase(cmd)
 }
 
-func NewAddRelationCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
+func NewAddRelationCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &addRelationCommand{
 		store: store,
 		dialOpts: &jujuapi.DialOpts{
 			InsecureSkipVerify: true,
-			BakeryClient:       bClient,
+			LoginProvider:      lp,
 		},
 	}
 
 	return modelcmd.WrapBase(cmd)
 }
 
-func NewRemoveRelationCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
+func NewRemoveRelationCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &removeRelationCommand{
 		store: store,
 		dialOpts: &jujuapi.DialOpts{
 			InsecureSkipVerify: true,
-			BakeryClient:       bClient,
+			LoginProvider:      lp,
 		},
 	}
 
 	return modelcmd.WrapBase(cmd)
 }
 
-func NewListRelationsCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
+func NewListRelationsCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &listRelationsCommand{
 		store: store,
 		dialOpts: &jujuapi.DialOpts{
 			InsecureSkipVerify: true,
-			BakeryClient:       bClient,
+			LoginProvider:      lp,
 		},
 	}
 
 	return modelcmd.WrapBase(cmd)
 }
 
-func NewCheckRelationCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
+func NewCheckRelationCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &checkRelationCommand{
 		store: store,
 		dialOpts: &jujuapi.DialOpts{
 			InsecureSkipVerify: true,
-			BakeryClient:       bClient,
+			LoginProvider:      lp,
 		},
 	}
 
 	return modelcmd.WrapBase(cmd)
 }
 
-func NewCrossModelQueryCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
+func NewCrossModelQueryCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &crossModelQueryCommand{
 		store: store,
 		dialOpts: &jujuapi.DialOpts{
 			InsecureSkipVerify: true,
-			BakeryClient:       bClient,
+			LoginProvider:      lp,
 		},
 	}
 
 	return modelcmd.WrapBase(cmd)
 }
 
-func NewPurgeLogsCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
+func NewPurgeLogsCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &purgeLogsCommand{
 		store: store,
 		dialOpts: &jujuapi.DialOpts{
 			InsecureSkipVerify: true,
-			BakeryClient:       bClient,
+			LoginProvider:      lp,
 		},
 	}
 
 	return modelcmd.WrapBase(cmd)
 }
 
-func NewMigrateModelCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
+func NewMigrateModelCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &migrateModelCommand{
 		store: store,
 		dialOpts: &jujuapi.DialOpts{
 			InsecureSkipVerify: true,
-			BakeryClient:       bClient,
+			LoginProvider:      lp,
 		},
 	}
 

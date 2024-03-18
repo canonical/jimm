@@ -3,55 +3,54 @@
 package cmd
 
 import (
-	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	"github.com/juju/cmd/v3"
 	jujuapi "github.com/juju/juju/api"
 	"github.com/juju/juju/cmd/modelcmd"
 	"github.com/juju/juju/jujuclient"
 )
 
-func NewAddServiceAccountCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
+func NewAddServiceAccountCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &addServiceAccountCommand{
 		store: store,
 		dialOpts: &jujuapi.DialOpts{
 			InsecureSkipVerify: true,
-			BakeryClient:       bClient,
+			LoginProvider:      lp,
 		},
 	}
 
 	return modelcmd.WrapBase(cmd)
 }
 
-func NewListServiceAccountCredentialsCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
+func NewListServiceAccountCredentialsCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &listServiceAccountCredentialsCommand{
 		store: store,
 		dialOpts: &jujuapi.DialOpts{
 			InsecureSkipVerify: true,
-			BakeryClient:       bClient,
+			LoginProvider:      lp,
 		},
 	}
 
 	return modelcmd.WrapBase(cmd)
 }
 
-func NewUpdateCredentialsCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
+func NewUpdateCredentialsCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &updateCredentialsCommand{
 		store: store,
 		dialOpts: &jujuapi.DialOpts{
 			InsecureSkipVerify: true,
-			BakeryClient:       bClient,
+			LoginProvider:      lp,
 		},
 	}
 
 	return modelcmd.WrapBase(cmd)
 }
 
-func NewGrantCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
+func NewGrantCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &grantCommand{
 		store: store,
 		dialOpts: &jujuapi.DialOpts{
 			InsecureSkipVerify: true,
-			BakeryClient:       bClient,
+			LoginProvider:      lp,
 		},
 	}
 

@@ -9,7 +9,7 @@ import (
 
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	"github.com/juju/version"
 	"github.com/rogpeppe/fastuuid"
 	"golang.org/x/oauth2"
@@ -34,7 +34,6 @@ type JIMM interface {
 	AddGroup(ctx context.Context, user *openfga.User, name string) error
 	AddModel(ctx context.Context, u *openfga.User, args *jimm.ModelCreateArgs) (_ *jujuparams.ModelInfo, err error)
 	AddServiceAccount(ctx context.Context, u *openfga.User, clientId string) error
-	Authenticate(ctx context.Context, req *jujuparams.LoginRequest) (*openfga.User, error)
 	OAuthAuthenticationService() jimm.OAuthAuthenticator
 	AuthorizationClient() *openfga.OFGAClient
 	ChangeModelCredential(ctx context.Context, user *openfga.User, modelTag names.ModelTag, cloudCredentialTag names.CloudCredentialTag) error

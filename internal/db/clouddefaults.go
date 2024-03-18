@@ -5,7 +5,7 @@ package db
 import (
 	"context"
 
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	"gorm.io/gorm/clause"
 
 	"github.com/canonical/jimm/internal/dbmodel"

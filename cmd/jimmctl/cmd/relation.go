@@ -118,7 +118,7 @@ jimmctl auth relation remove group-MyTeam#member loginer controller-MyController
 Verifies the access between resources.
 
 Example:
-jimmctl auth relation check user-alice@external administrator controller-aws-controller-1
+jimmctl auth relation check user-alice@canonical.com administrator controller-aws-controller-1
 
 Example:
 	jimmctl auth relation check <object> <relation> <target_object>

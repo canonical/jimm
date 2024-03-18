@@ -5,7 +5,6 @@ package jimm
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"net/http"
 	"net/url"
 	"os"
@@ -14,17 +13,11 @@ import (
 	"time"
 
 	"github.com/antonlindstrom/pgstore"
-	"github.com/canonical/candid/candidclient"
 	cofga "github.com/canonical/ofga"
 	"github.com/go-chi/chi/v5"
-	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
-	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/dbrootkeystore"
-	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/identchecker"
-	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
-	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery/agent"
 	"github.com/google/uuid"
 	vaultapi "github.com/hashicorp/vault/api"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
@@ -32,9 +25,9 @@ import (
 
 	"github.com/canonical/jimm/internal/auth"
 	"github.com/canonical/jimm/internal/dashboard"
-	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/debugapi"
+	"github.com/canonical/jimm/internal/discharger"
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/jimm"
 	jimmcreds "github.com/canonical/jimm/internal/jimm/credentials"
@@ -95,26 +88,10 @@ type Params struct {
 	// will be used.
 	DSN string
 
-	// CandidURL contains the URL of the candid server that the JIMM
-	// service will use for authentication. If this is empty then no
-	// authentication will be possible.
-	CandidURL string
-
-	// CandidPublicKey contains the base64 encoded public key of the
-	// candid server specified in CandidURL. In most cases there is no
-	// need to set this parameter, The public key will be retrieved
-	// from the candid server itself.
-	CandidPublicKey string
-
-	// BakeryAgentFile contains the path of a file containing agent
-	// authentication information for JIMM. If this is empty then
-	// authentication will only use information contained in the
-	// discharged macaroons.
-	BakeryAgentFile string
-
-	// ControllerAdmins contains a list of candid users (or groups)
+	// ControllerAdmins contains a list of users (or groups)
 	// that will be given the access-level "superuser" when they
 	// authenticate to the controller.
+	// TODO(CSS-7507) - Wire this up for OAuth bootstrapping.
 	ControllerAdmins []string
 
 	// DisableConnectionCache disables caching connections to
@@ -252,6 +229,8 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	s := new(Service)
 	s.mux = chi.NewRouter()
 
+	// Setup all dependency services
+
 	if p.ControllerUUID == "" {
 		controllerUUID, err := uuid.NewRandom()
 		if err != nil {
@@ -311,20 +290,6 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		return nil, errors.E(op, err, "failed to ensure controller admins")
 	}
 
-	kp, dischargeMux, err := s.setupDischarger(p, openFGAclient)
-	if err != nil {
-		return nil, errors.E(op, err, "failed to set up discharger")
-	}
-	s.mux.Handle(localDischargePath+"/*", dischargeMux)
-
-	// Ale8k: This authenticator is old and used for macaroon auth
-	// it is still present for backwards compatibility but SHOULD
-	// be removed in the future.
-	s.jimm.Authenticator, err = newAuthenticator(ctx, &s.jimm.Database, openFGAclient, kp, p)
-	if err != nil {
-		return nil, errors.E(op, err)
-	}
-
 	authSvc, err := auth.NewAuthenticationService(
 		ctx,
 		auth.AuthenticationServiceParams{
@@ -368,6 +333,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		return nil, errors.E(op, err, "failed to parse final redirect url for the dashboard")
 	}
 
+	// Setup all HTTP handlers.
 	mountHandler := func(path string, h jimmhttp.JIMMHttpHandler) {
 		s.mux.Mount(path, h.Routes())
 	}
@@ -398,11 +364,15 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		"/auth",
 		oauthHandler,
 	)
+	macaroonDischarger, err := s.setupDischarger(p)
+	if err != nil {
+		return nil, errors.E(op, err, "failed to set up discharger")
+	}
+	s.mux.Handle(localDischargePath+"/*", discharger.GetDischargerMux(macaroonDischarger, localDischargePath))
 
 	params := jujuapi.Params{
-		ControllerUUID:   p.ControllerUUID,
-		IdentityLocation: p.CandidURL,
-		PublicDNSName:    p.PublicDNSName,
+		ControllerUUID: p.ControllerUUID,
+		PublicDNSName:  p.PublicDNSName,
 	}
 
 	s.mux.Handle("/api", jujuapi.APIHandler(ctx, &s.jimm, params))
@@ -419,22 +389,18 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 // setupDischarger set JIMM up as a discharger of 3rd party caveats addressed to it. This is intended
 // to enable Juju controllers to check for permissions using a macaroon-based workflow (atm only
 // for cross model relations).
-func (s *Service) setupDischarger(p Params, openFGAclient *openfga.OFGAClient) (*bakery.KeyPair, *http.ServeMux, error) {
-	macaroonDischarger, err := newMacaroonDischarger(p, &s.jimm.Database, openFGAclient)
-	if err != nil {
-		return nil, nil, errors.E(err)
+func (s *Service) setupDischarger(p Params) (*discharger.MacaroonDischarger, error) {
+	cfg := discharger.MacaroonDischargerConfig{
+		PublicKey:              p.PublicKey,
+		PrivateKey:             p.PrivateKey,
+		MacaroonExpiryDuration: p.MacaroonExpiryDuration,
+		ControllerUUID:         p.ControllerUUID,
 	}
-
-	discharger := httpbakery.NewDischarger(
-		httpbakery.DischargerParams{
-			Key:     &macaroonDischarger.kp,
-			Checker: httpbakery.ThirdPartyCaveatCheckerFunc(macaroonDischarger.checkThirdPartyCaveat),
-		},
-	)
-	dischargeMux := http.NewServeMux()
-	discharger.AddMuxHandlers(dischargeMux, localDischargePath)
-
-	return &macaroonDischarger.kp, dischargeMux, nil
+	MacaroonDischarger, err := discharger.NewMacaroonDischarger(cfg, &s.jimm.Database, s.jimm.OpenFGAClient)
+	if err != nil {
+		return nil, errors.E(err)
+	}
+	return MacaroonDischarger, nil
 }
 
 func setupSessionStore(db *sql.DB, secretKey string) (*pgstore.PGStore, error) {
@@ -461,81 +427,6 @@ func openDB(ctx context.Context, dsn string) (*gorm.DB, error) {
 			return time.Now().Truncate(time.Microsecond)
 		},
 	})
-}
-
-func newAuthenticator(ctx context.Context, db *db.Database, client *openfga.OFGAClient, key *bakery.KeyPair, p Params) (jimm.Authenticator, error) {
-	if p.CandidURL == "" {
-		// No authenticator configured
-		return nil, nil
-	}
-	zapctx.Info(ctx, "configuring authenticator",
-		zap.String("CandidURL", p.CandidURL),
-		zap.String("CandidPublicKey", p.CandidPublicKey),
-		zap.String("BakeryAgentFile", p.BakeryAgentFile),
-	)
-	tps := bakery.NewThirdPartyStore()
-	if p.CandidPublicKey != "" {
-		var pk bakery.PublicKey
-		if err := pk.Key.UnmarshalText([]byte(p.CandidPublicKey)); err != nil {
-			return nil, err
-		}
-		tps.AddInfo(p.CandidURL, bakery.ThirdPartyInfo{
-			PublicKey: pk,
-			Version:   bakery.Version2,
-		})
-	}
-
-	bClient := httpbakery.NewClient()
-	var agentUsername string
-	if p.BakeryAgentFile != "" {
-		data, err := os.ReadFile(p.BakeryAgentFile)
-		if err != nil {
-			return nil, err
-		}
-		var info agent.AuthInfo
-		if err := json.Unmarshal(data, &info); err != nil {
-			return nil, err
-		}
-		if err := agent.SetUpAuth(bClient, &info); err != nil {
-			return nil, err
-		}
-		for _, a := range info.Agents {
-			if a.URL == p.CandidURL {
-				agentUsername = a.Username
-			}
-		}
-	}
-	candidClient, err := candidclient.New(candidclient.NewParams{
-		BaseURL:       p.CandidURL,
-		Client:        bClient,
-		AgentUsername: agentUsername,
-		CacheTime:     10 * time.Minute,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	if p.MacaroonExpiryDuration == 0 {
-		p.MacaroonExpiryDuration = 24 * time.Hour
-	}
-
-	return auth.JujuAuthenticator{
-		Bakery: identchecker.NewBakery(identchecker.BakeryParams{
-			RootKeyStore: dbrootkeystore.NewRootKeys(100, nil).NewStore(
-				db,
-				dbrootkeystore.Policy{
-					ExpiryDuration: p.MacaroonExpiryDuration,
-				},
-			),
-			Locator:        httpbakery.NewThirdPartyLocator(nil, tps),
-			Key:            key,
-			IdentityClient: candidClient,
-			Location:       "jimm",
-			Logger:         logger.BakeryLogger{},
-		}),
-		ControllerAdmins: p.ControllerAdmins,
-		Client:           client,
-	}, nil
 }
 
 func (s *Service) setupCredentialStore(ctx context.Context, p Params) error {

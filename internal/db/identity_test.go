@@ -36,7 +36,7 @@ func (s *dbSuite) TestGetIdentity(c *qt.C) {
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
 	u := dbmodel.Identity{
-		Name: "bob@external",
+		Name: "bob@canonical.com",
 	}
 	err = s.Database.GetIdentity(ctx, &u)
 	c.Assert(err, qt.IsNil)
@@ -72,7 +72,7 @@ func (s *dbSuite) TestUpdateIdentity(c *qt.C) {
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
 	u := dbmodel.Identity{
-		Name: "bob@external",
+		Name: "bob@canonical.com",
 	}
 	err = s.Database.GetIdentity(ctx, &u)
 	c.Assert(err, qt.IsNil)
@@ -113,7 +113,7 @@ func (s *dbSuite) TestGetIdentityCloudCredentials(c *qt.C) {
 	c.Check(err, qt.IsNil)
 
 	u := dbmodel.Identity{
-		Name: "bob@external",
+		Name: "bob@canonical.com",
 	}
 	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
 

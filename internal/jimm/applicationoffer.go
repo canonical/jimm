@@ -11,7 +11,7 @@ import (
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/juju/juju/core/crossmodel"
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	"github.com/juju/zaputil"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
@@ -276,7 +276,7 @@ func (j *JIMM) listApplicationOfferUsers(ctx context.Context, offer names.Applic
 	userDetails := []jujuparams.OfferUserDetails{}
 	for username, level := range users {
 		// non-admin users should only see their own access level
-		// and access level of "everyone@external" - meaning the access
+		// and the access level of "everyone" - meaning the access
 		// level everybody has.
 		if accessLevel != string(jujuparams.OfferAdminAccess) && username != ofganames.EveryoneUser && username != user.Name {
 			continue

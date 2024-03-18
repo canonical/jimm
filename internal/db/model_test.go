@@ -32,7 +32,7 @@ func (s *dbSuite) TestAddModel(c *qt.C) {
 	c.Assert(err, qt.Equals, nil)
 
 	u := dbmodel.Identity{
-		Name: "bob@external",
+		Name: "bob@canonical.com",
 	}
 	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
 
@@ -105,7 +105,7 @@ func (s *dbSuite) TestGetModel(c *qt.C) {
 	c.Assert(err, qt.Equals, nil)
 
 	u := dbmodel.Identity{
-		Name: "bob@external",
+		Name: "bob@canonical.com",
 	}
 	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
 
@@ -205,7 +205,7 @@ func (s *dbSuite) TestUpdateModel(c *qt.C) {
 	c.Assert(err, qt.Equals, nil)
 
 	u := dbmodel.Identity{
-		Name: "bob@external",
+		Name: "bob@canonical.com",
 	}
 	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
 
@@ -283,7 +283,7 @@ func (s *dbSuite) TestDeleteModel(c *qt.C) {
 	c.Assert(err, qt.Equals, nil)
 
 	u := dbmodel.Identity{
-		Name: "bob@external",
+		Name: "bob@canonical.com",
 	}
 	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
 
@@ -357,7 +357,7 @@ func (s *dbSuite) TestGetModelsUsingCredential(c *qt.C) {
 	c.Assert(err, qt.Equals, nil)
 
 	u := dbmodel.Identity{
-		Name: "bob@external",
+		Name: "bob@canonical.com",
 	}
 	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
 
@@ -490,7 +490,7 @@ const testForEachModelEnv = `clouds:
 cloud-credentials:
 - name: test-cred
   cloud: test
-  owner: alice@external
+  owner: alice@canonical.com
   type: empty
 controllers:
 - name: test
@@ -500,35 +500,35 @@ controllers:
 models:
 - name: test-1
   uuid: 00000002-0000-0000-0000-000000000001
-  owner: alice@external
+  owner: alice@canonical.com
   cloud: test
   region: test-region
   cloud-credential: test-cred
   controller: test
   users:
-  - user: alice@external
+  - user: alice@canonical.com
     access: admin
-  - user: bob@external
+  - user: bob@canonical.com
     access: write
 - name: test-2
   uuid: 00000002-0000-0000-0000-000000000002
-  owner: bob@external
+  owner: bob@canonical.com
   cloud: test
   region: test-region
   cloud-credential: test-cred
   controller: test
   users:
-  - user: bob@external
+  - user: bob@canonical.com
     access: admin
 - name: test-3
   uuid: 00000002-0000-0000-0000-000000000003
-  owner: bob@external
+  owner: bob@canonical.com
   cloud: test
   region: test-region
   cloud-credential: test-cred
   controller: test
   users:
-  - user: bob@external
+  - user: bob@canonical.com
     access: admin
 `
 
@@ -567,7 +567,7 @@ const testGetModelsByUUIDEnv = `clouds:
 cloud-credentials:
 - name: test-cred
   cloud: test
-  owner: alice@external
+  owner: alice@canonical.com
   type: empty
 controllers:
 - name: test
@@ -577,35 +577,35 @@ controllers:
 models:
 - name: test-1
   uuid: 00000002-0000-0000-0000-000000000001
-  owner: alice@external
+  owner: alice@canonical.com
   cloud: test
   region: test-region
   cloud-credential: test-cred
   controller: test
   users:
-  - user: alice@external
+  - user: alice@canonical.com
     access: admin
-  - user: bob@external
+  - user: bob@canonical.com
     access: write
 - name: test-2
   uuid: 00000002-0000-0000-0000-000000000002
-  owner: bob@external
+  owner: bob@canonical.com
   cloud: test
   region: test-region
   cloud-credential: test-cred
   controller: test
   users:
-  - user: bob@external
+  - user: bob@canonical.com
     access: admin
 - name: test-3
   uuid: 00000002-0000-0000-0000-000000000003
-  owner: bob@external
+  owner: bob@canonical.com
   cloud: test
   region: test-region
   cloud-credential: test-cred
   controller: test
   users:
-  - user: bob@external
+  - user: bob@canonical.com
     access: admin
 `
 

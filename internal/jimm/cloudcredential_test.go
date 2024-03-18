@@ -14,7 +14,7 @@ import (
 	"github.com/juju/juju/core/life"
 	"github.com/juju/juju/core/status"
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 
 	"github.com/canonical/jimm/internal/db"
@@ -45,7 +45,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 		jimmAdmin: true,
 		createEnv: func(c *qt.C, j *jimm.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, jimm.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
 			u := dbmodel.Identity{
-				Name: "alice@external",
+				Name: "alice@canonical.com",
 			}
 			c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
 
@@ -112,12 +112,12 @@ func TestUpdateCloudCredential(t *testing.T) {
 				Owner:           names.NewUserTag(u.Name),
 				Cloud:           names.NewCloudTag(cloud.Name),
 				CloudRegion:     "test-region-1",
-				CloudCredential: names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1"),
+				CloudCredential: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
 			})
 			c.Assert(err, qt.Equals, nil)
 
 			arg := jimm.UpdateCloudCredentialArgs{
-				CredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1"),
+				CredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
 				Credential: jujuparams.CloudCredential{
 					Attributes: map[string]string{
 						"key1": "value1",
@@ -159,7 +159,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 		updateCredentialErrors: []error{nil, errors.E("test error")},
 		createEnv: func(c *qt.C, j *jimm.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, jimm.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
 			u := dbmodel.Identity{
-				Name: "alice@external",
+				Name: "alice@canonical.com",
 			}
 			c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
 
@@ -227,12 +227,12 @@ func TestUpdateCloudCredential(t *testing.T) {
 				Owner:           names.NewUserTag(u.Name),
 				Cloud:           names.NewCloudTag(cloud.Name),
 				CloudRegion:     "test-region-1",
-				CloudCredential: names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1"),
+				CloudCredential: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
 			})
 			c.Assert(err, qt.Equals, nil)
 
 			arg := jimm.UpdateCloudCredentialArgs{
-				CredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1"),
+				CredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
 				Credential: jujuparams.CloudCredential{
 					Attributes: map[string]string{
 						"key1": "value1",
@@ -250,7 +250,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 		updateCredentialErrors: []error{nil},
 		createEnv: func(c *qt.C, j *jimm.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, jimm.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
 			u := dbmodel.Identity{
-				Name: "alice@external",
+				Name: "alice@canonical.com",
 			}
 			c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
 
@@ -313,12 +313,12 @@ func TestUpdateCloudCredential(t *testing.T) {
 				Owner:           names.NewUserTag(u.Name),
 				Cloud:           names.NewCloudTag(cloud.Name),
 				CloudRegion:     "test-region-1",
-				CloudCredential: names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1"),
+				CloudCredential: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
 			})
 			c.Assert(err, qt.Equals, nil)
 
 			arg := jimm.UpdateCloudCredentialArgs{
-				CredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1"),
+				CredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
 				Credential: jujuparams.CloudCredential{
 					Attributes: map[string]string{
 						"key1": "value1",
@@ -334,7 +334,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 		jimmAdmin: true,
 		createEnv: func(c *qt.C, j *jimm.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, jimm.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
 			u := dbmodel.Identity{
-				Name: "alice@external",
+				Name: "alice@canonical.com",
 			}
 			c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
 
@@ -345,7 +345,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 
 			eve := dbmodel.Identity{
-				Name: "eve@external",
+				Name: "eve@canonical.com",
 			}
 			c.Assert(j.Database.DB.Create(&eve).Error, qt.IsNil)
 
@@ -404,15 +404,15 @@ func TestUpdateCloudCredential(t *testing.T) {
 
 			mi, err := j.AddModel(context.Background(), alice, &jimm.ModelCreateArgs{
 				Name:            "test-model",
-				Owner:           names.NewUserTag("eve@external"),
+				Owner:           names.NewUserTag("eve@canonical.com"),
 				Cloud:           names.NewCloudTag(cloud.Name),
 				CloudRegion:     "test-region-1",
-				CloudCredential: names.NewCloudCredentialTag("test-cloud/eve@external/test-credential-1"),
+				CloudCredential: names.NewCloudCredentialTag("test-cloud/eve@canonical.com/test-credential-1"),
 			})
 			c.Assert(err, qt.Equals, nil)
 
 			arg := jimm.UpdateCloudCredentialArgs{
-				CredentialTag: names.NewCloudCredentialTag("test-cloud/eve@external/test-credential-1"),
+				CredentialTag: names.NewCloudCredentialTag("test-cloud/eve@canonical.com/test-credential-1"),
 				Credential: jujuparams.CloudCredential{
 					Attributes: map[string]string{
 						"key1": "value1",
@@ -458,7 +458,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 		jimmAdmin:             true,
 		createEnv: func(c *qt.C, j *jimm.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, jimm.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
 			u := dbmodel.Identity{
-				Name: "alice@external",
+				Name: "alice@canonical.com",
 			}
 			c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
 
@@ -526,12 +526,12 @@ func TestUpdateCloudCredential(t *testing.T) {
 				Owner:           names.NewUserTag(u.Name),
 				Cloud:           names.NewCloudTag(cloud.Name),
 				CloudRegion:     "test-region-1",
-				CloudCredential: names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1"),
+				CloudCredential: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
 			})
 			c.Assert(err, qt.Equals, nil)
 
 			arg := jimm.UpdateCloudCredentialArgs{
-				CredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1"),
+				CredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
 				Credential: jujuparams.CloudCredential{
 					Attributes: map[string]string{
 						"key1": "value1",
@@ -571,7 +571,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 		jimmAdmin: true,
 		createEnv: func(c *qt.C, j *jimm.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, jimm.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
 			u := dbmodel.Identity{
-				Name: "alice@external",
+				Name: "alice@canonical.com",
 			}
 			c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
 
@@ -638,12 +638,12 @@ func TestUpdateCloudCredential(t *testing.T) {
 				Owner:           names.NewUserTag(u.Name),
 				Cloud:           names.NewCloudTag(cloud.Name),
 				CloudRegion:     "test-region-1",
-				CloudCredential: names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1"),
+				CloudCredential: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
 			})
 			c.Assert(err, qt.Equals, nil)
 
 			arg := jimm.UpdateCloudCredentialArgs{
-				CredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1"),
+				CredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
 				Credential: jujuparams.CloudCredential{
 					Attributes: map[string]string{
 						"key1": "value1",
@@ -751,7 +751,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 					}
 					mi.Life = life.Alive
 					mi.Users = []jujuparams.ModelUserInfo{{
-						UserName: "alice@external",
+						UserName: "alice@canonical.com",
 						Access:   jujuparams.ModelAdminAccess,
 					}, {
 						// "bob" is a local user
@@ -832,7 +832,7 @@ func TestUpdateCloudCredentialForUnknownUser(t *testing.T) {
   regions:
   - name: default
 users:
-- username: alice@external
+- username: alice@canonical.com
   controller-access: superuser
 `)
 	j := &jimm.JIMM{
@@ -849,11 +849,11 @@ users:
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
-	u := env.User("alice@external").DBObject(c, j.Database)
+	u := env.User("alice@canonical.com").DBObject(c, j.Database)
 	user := openfga.NewUser(&u, client)
 	user.JimmAdmin = true
 	_, err = j.UpdateCloudCredential(ctx, user, jimm.UpdateCloudCredentialArgs{
-		CredentialTag: names.NewCloudCredentialTag("test-cloud/bob@external/test"),
+		CredentialTag: names.NewCloudCredentialTag("test-cloud/bob@canonical.com/test"),
 		Credential: jujuparams.CloudCredential{
 			AuthType: "empty",
 		},
@@ -877,7 +877,7 @@ func TestRevokeCloudCredential(t *testing.T) {
 		about: "credential revoked",
 		createEnv: func(c *qt.C, j *jimm.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, names.CloudCredentialTag, string) {
 			u := dbmodel.Identity{
-				Name: "alice@external",
+				Name: "alice@canonical.com",
 			}
 			c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
 
@@ -940,7 +940,7 @@ func TestRevokeCloudCredential(t *testing.T) {
 				Type: "test-provider",
 			}
 
-			tag := names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1")
+			tag := names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1")
 			return &u, tag, ""
 		},
 	}, {
@@ -951,7 +951,7 @@ func TestRevokeCloudCredential(t *testing.T) {
 		}},
 		createEnv: func(c *qt.C, j *jimm.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, names.CloudCredentialTag, string) {
 			u := dbmodel.Identity{
-				Name: "alice@external",
+				Name: "alice@canonical.com",
 			}
 			c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
 
@@ -1014,14 +1014,14 @@ func TestRevokeCloudCredential(t *testing.T) {
 				Type: "test-provider",
 			}
 
-			tag := names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1")
+			tag := names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1")
 			return &u, tag, ""
 		},
 	}, {
 		about: "credential still used by a model",
 		createEnv: func(c *qt.C, j *jimm.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, names.CloudCredentialTag, string) {
 			u := dbmodel.Identity{
-				Name: "alice@external",
+				Name: "alice@canonical.com",
 			}
 			c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
 
@@ -1084,11 +1084,11 @@ func TestRevokeCloudCredential(t *testing.T) {
 				Owner:           names.NewUserTag(u.Name),
 				Cloud:           names.NewCloudTag(cloud.Name),
 				CloudRegion:     "test-region-1",
-				CloudCredential: names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1"),
+				CloudCredential: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
 			})
 			c.Assert(err, qt.Equals, nil)
 
-			tag := names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1")
+			tag := names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1")
 
 			return &u, tag, `cloud credential still used by 1 model\(s\)`
 		},
@@ -1096,7 +1096,7 @@ func TestRevokeCloudCredential(t *testing.T) {
 		about: "user not owner of credentials - unauthorizer error",
 		createEnv: func(c *qt.C, j *jimm.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, names.CloudCredentialTag, string) {
 			u := dbmodel.Identity{
-				Name: "alice@external",
+				Name: "alice@canonical.com",
 			}
 			c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
 
@@ -1105,7 +1105,7 @@ func TestRevokeCloudCredential(t *testing.T) {
 			err := alice.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 
-			tag := names.NewCloudCredentialTag("test-cloud/eve@external/test-credential-1")
+			tag := names.NewCloudCredentialTag("test-cloud/eve@canonical.com/test-credential-1")
 
 			return &u, tag, "unauthorized"
 		},
@@ -1114,7 +1114,7 @@ func TestRevokeCloudCredential(t *testing.T) {
 		revokeCredentialErrors: []error{errors.E("test error")},
 		createEnv: func(c *qt.C, j *jimm.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, names.CloudCredentialTag, string) {
 			u := dbmodel.Identity{
-				Name: "alice@external",
+				Name: "alice@canonical.com",
 			}
 			c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
 
@@ -1172,7 +1172,7 @@ func TestRevokeCloudCredential(t *testing.T) {
 			err = j.Database.SetCloudCredential(context.Background(), &cred)
 			c.Assert(err, qt.Equals, nil)
 
-			tag := names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1")
+			tag := names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1")
 
 			return &u, tag, "test error"
 		},
@@ -1214,7 +1214,7 @@ func TestRevokeCloudCredential(t *testing.T) {
 					}
 					mi.Life = life.Alive
 					mi.Users = []jujuparams.ModelUserInfo{{
-						UserName: "alice@external",
+						UserName: "alice@canonical.com",
 						Access:   jujuparams.ModelAdminAccess,
 					}, {
 						// "bob" is a local user
@@ -1286,7 +1286,7 @@ func TestGetCloudCredential(t *testing.T) {
 		about: "all ok",
 		createEnv: func(c *qt.C, j *jimm.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, names.CloudCredentialTag, dbmodel.CloudCredential, string) {
 			u := dbmodel.Identity{
-				Name: "alice@external",
+				Name: "alice@canonical.com",
 			}
 			c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
 
@@ -1348,7 +1348,7 @@ func TestGetCloudCredential(t *testing.T) {
 			err = j.Database.SetCloudCredential(context.Background(), &cred)
 			c.Assert(err, qt.Equals, nil)
 
-			tag := names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1")
+			tag := names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1")
 
 			return &u, tag, cred, ""
 		},
@@ -1356,7 +1356,7 @@ func TestGetCloudCredential(t *testing.T) {
 		about: "credential not found",
 		createEnv: func(c *qt.C, j *jimm.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, names.CloudCredentialTag, dbmodel.CloudCredential, string) {
 			u := dbmodel.Identity{
-				Name: "alice@external",
+				Name: "alice@canonical.com",
 			}
 			c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
 
@@ -1365,9 +1365,9 @@ func TestGetCloudCredential(t *testing.T) {
 			err := alice.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 
-			tag := names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1")
+			tag := names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1")
 
-			return &u, tag, dbmodel.CloudCredential{}, `cloudcredential "test-cloud/alice@external/test-credential-1" not found`
+			return &u, tag, dbmodel.CloudCredential{}, `cloudcredential "test-cloud/alice@canonical.com/test-credential-1" not found`
 		},
 	}}
 	for _, test := range tests {
@@ -1410,29 +1410,29 @@ const forEachUserCloudCredentialEnv = `clouds:
 cloud-credentials:
 - name: cred-1
   cloud: cloud-1
-  owner: alice@external
+  owner: alice@canonical.com
   attributes:
     k1: v1
     k2: v2
 - name: cred-2
   cloud: cloud-1
-  owner: bob@external
+  owner: bob@canonical.com
   attributes:
     k1: v1
     k2: v2
 - name: cred-3
   cloud: cloud-2
-  owner: alice@external
+  owner: alice@canonical.com
 - name: cred-4
   cloud: cloud-2
-  owner: bob@external
+  owner: bob@canonical.com
 - name: cred-5
   cloud: cloud-1
-  owner: alice@external
+  owner: alice@canonical.com
 users:
-- username: alice@external
+- username: alice@canonical.com
   controller-access: superuser
-- username: bob@external
+- username: bob@canonical.com
 `
 
 var forEachUserCloudCredentialTests = []struct {
@@ -1447,24 +1447,24 @@ var forEachUserCloudCredentialTests = []struct {
 }{{
 	name:     "UserCredentialsWithCloud",
 	env:      forEachUserCloudCredentialEnv,
-	username: "alice@external",
+	username: "alice@canonical.com",
 	cloudTag: names.NewCloudTag("cloud-1"),
 	expectCredentials: []string{
-		names.NewCloudCredentialTag("cloud-1/alice@external/cred-1").String(),
-		names.NewCloudCredentialTag("cloud-1/alice@external/cred-5").String(),
+		names.NewCloudCredentialTag("cloud-1/alice@canonical.com/cred-1").String(),
+		names.NewCloudCredentialTag("cloud-1/alice@canonical.com/cred-5").String(),
 	},
 }, {
 	name:     "UserCredentialsWithoutCloud",
 	env:      forEachUserCloudCredentialEnv,
-	username: "bob@external",
+	username: "bob@canonical.com",
 	expectCredentials: []string{
-		names.NewCloudCredentialTag("cloud-1/bob@external/cred-2").String(),
-		names.NewCloudCredentialTag("cloud-2/bob@external/cred-4").String(),
+		names.NewCloudCredentialTag("cloud-1/bob@canonical.com/cred-2").String(),
+		names.NewCloudCredentialTag("cloud-2/bob@canonical.com/cred-4").String(),
 	},
 }, {
 	name:     "IterationError",
 	env:      forEachUserCloudCredentialEnv,
-	username: "alice@external",
+	username: "alice@canonical.com",
 	f: func(*dbmodel.CloudCredential) error {
 		return errors.E("test error", errors.Code("test code"))
 	},
@@ -1530,7 +1530,7 @@ const getCloudCredentialAttributesEnv = `clouds:
 cloud-credentials:
 - name: cred-1
   cloud: test-cloud
-  owner: bob@external
+  owner: bob@canonical.com
   auth-type: oauth2
   attributes:
     client-email: bob@example.com
@@ -1538,9 +1538,9 @@ cloud-credentials:
     private-key: super-secret
     project-id: 5678
 users:
-- username: alice@external
+- username: alice@canonical.com
   controller-access: superuser
-- username: bob@external
+- username: bob@canonical.com
 `
 
 var getCloudCredentialAttributesTests = []struct {
@@ -1554,7 +1554,7 @@ var getCloudCredentialAttributesTests = []struct {
 	expectErrorCode  errors.Code
 }{{
 	name:      "OwnerNoHidden",
-	username:  "bob@external",
+	username:  "bob@canonical.com",
 	jimmAdmin: true,
 	expectAttributes: map[string]string{
 		"client-email": "bob@example.com",
@@ -1564,7 +1564,7 @@ var getCloudCredentialAttributesTests = []struct {
 	expectRedacted: []string{"private-key"},
 }, {
 	name:     "OwnerWithHidden",
-	username: "bob@external",
+	username: "bob@canonical.com",
 	hidden:   true,
 	expectAttributes: map[string]string{
 		"client-email": "bob@example.com",
@@ -1574,7 +1574,7 @@ var getCloudCredentialAttributesTests = []struct {
 	},
 }, {
 	name:      "SuperUserNoHidden",
-	username:  "alice@external",
+	username:  "alice@canonical.com",
 	jimmAdmin: true,
 	expectAttributes: map[string]string{
 		"client-email": "bob@example.com",
@@ -1584,14 +1584,14 @@ var getCloudCredentialAttributesTests = []struct {
 	expectRedacted: []string{"private-key"},
 }, {
 	name:            "SuperUserWithHiddenUnauthorized",
-	username:        "alice@external",
+	username:        "alice@canonical.com",
 	hidden:          true,
 	jimmAdmin:       true,
 	expectError:     `unauthorized`,
 	expectErrorCode: errors.CodeUnauthorized,
 }, {
 	name:            "OtherUserUnauthorized",
-	username:        "charlie@external",
+	username:        "charlie@canonical.com",
 	expectError:     `unauthorized`,
 	expectErrorCode: errors.CodeUnauthorized,
 }}
@@ -1620,9 +1620,9 @@ func TestGetCloudCredentialAttributes(t *testing.T) {
 			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
-			u := env.User("bob@external").DBObject(c, j.Database)
+			u := env.User("bob@canonical.com").DBObject(c, j.Database)
 			userBob := openfga.NewUser(&u, client)
-			cred, err := j.GetCloudCredential(ctx, userBob, names.NewCloudCredentialTag("test-cloud/bob@external/cred-1"))
+			cred, err := j.GetCloudCredential(ctx, userBob, names.NewCloudCredentialTag("test-cloud/bob@canonical.com/cred-1"))
 			c.Assert(err, qt.IsNil)
 
 			u = env.User(test.username).DBObject(c, j.Database)
@@ -1674,10 +1674,10 @@ func TestCloudCredentialAttributeStore(t *testing.T) {
 `)
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
 
-	u := env.User("alice@external").DBObject(c, j.Database)
+	u := env.User("alice@canonical.com").DBObject(c, j.Database)
 	user := openfga.NewUser(&u, client)
 	args := jimm.UpdateCloudCredentialArgs{
-		CredentialTag: names.NewCloudCredentialTag("test/alice@external/cred-1"),
+		CredentialTag: names.NewCloudCredentialTag("test/alice@canonical.com/cred-1"),
 		Credential: jujuparams.CloudCredential{
 			AuthType: "userpass",
 			Attributes: map[string]string{
@@ -1690,14 +1690,14 @@ func TestCloudCredentialAttributeStore(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	cred := dbmodel.CloudCredential{
-		OwnerIdentityName: "alice@external",
+		OwnerIdentityName: "alice@canonical.com",
 		Name:              "cred-1",
 		CloudName:         "test",
 	}
 	err = j.Database.GetCloudCredential(ctx, &cred)
 	c.Assert(err, qt.IsNil)
 	c.Check(cred, jimmtest.DBObjectEquals, dbmodel.CloudCredential{
-		OwnerIdentityName: "alice@external",
+		OwnerIdentityName: "alice@canonical.com",
 		Name:              "cred-1",
 		CloudName:         "test",
 		AuthType:          "userpass",

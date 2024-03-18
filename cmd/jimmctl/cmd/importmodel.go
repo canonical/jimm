@@ -9,7 +9,7 @@ import (
 	jujucmd "github.com/juju/juju/cmd"
 	"github.com/juju/juju/cmd/modelcmd"
 	"github.com/juju/juju/jujuclient"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 
 	"github.com/canonical/jimm/api"
 	apiparams "github.com/canonical/jimm/api/params"
@@ -24,7 +24,7 @@ const importModelCommandDoc = `
 
 	The --owner command is necessary when importing a model created by a 
 	local user and it will switch the model owner to the desired external user.
-	E.g. --owner my-user@external
+	E.g. --owner my-user@canonical.com
 
 	Example:
 		jimmctl import-model <controller name> <model-uuid>

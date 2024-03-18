@@ -3,7 +3,7 @@ package names
 import (
 	"regexp"
 
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 )
 
 // JIMM handles applicationoffers via UUID, as such

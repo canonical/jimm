@@ -123,7 +123,7 @@ func (s *dbSuite) TestGetControllerWithModels(c *qt.C) {
 		CloudRegion: "test-region",
 	}
 	u := dbmodel.Identity{
-		Name: "bob@external",
+		Name: "bob@canonical.com",
 	}
 	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
 
@@ -219,7 +219,7 @@ const testForEachControllerEnv = `clouds:
 cloud-credentials:
 - name: test-cred
   cloud: test
-  owner: alice@external
+  owner: alice@canonical.com
   type: empty
 controllers:
 - name: test1
@@ -379,7 +379,7 @@ const testForEachControllerModelEnv = `clouds:
 cloud-credentials:
 - name: test-cred
   cloud: test
-  owner: alice@external
+  owner: alice@canonical.com
   type: empty
 controllers:
 - name: test
@@ -392,28 +392,28 @@ controllers:
   region: test-region
 models:
 - name: test-1
-  owner: alice@external
+  owner: alice@canonical.com
   uuid: 00000002-0000-0000-0000-000000000001
   controller: test
   cloud: test
   region: test-region
   cloud-credential: test-cred
 - name: test-2
-  owner: alice@external
+  owner: alice@canonical.com
   uuid: 00000002-0000-0000-0000-000000000002
   controller: test
   cloud: test
   region: test-region
   cloud-credential: test-cred
 - name: test-3
-  owner: alice@external
+  owner: alice@canonical.com
   uuid: 00000002-0000-0000-0000-000000000003
   controller: test-2
   cloud: test
   region: test-region
   cloud-credential: test-cred
 - name: test-4
-  owner: alice@external
+  owner: alice@canonical.com
   uuid: 00000002-0000-0000-0000-000000000004
   controller: test
   cloud: test

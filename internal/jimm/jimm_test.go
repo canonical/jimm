@@ -13,7 +13,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/google/uuid"
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 
 	"github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/internal/db"
@@ -45,15 +45,15 @@ func TestFindAuditEvents(t *testing.T) {
 	err = j.Database.Migrate(ctx, true)
 	c.Assert(err, qt.Equals, nil)
 
-	admin := openfga.NewUser(&dbmodel.Identity{Name: "alice@external"}, client)
+	admin := openfga.NewUser(&dbmodel.Identity{Name: "alice@canonical.com"}, client)
 	err = admin.SetControllerAccess(ctx, j.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, qt.IsNil)
 
-	privileged := openfga.NewUser(&dbmodel.Identity{Name: "bob@external"}, client)
+	privileged := openfga.NewUser(&dbmodel.Identity{Name: "bob@canonical.com"}, client)
 	err = privileged.SetControllerAccess(ctx, j.ResourceTag(), ofganames.AuditLogViewerRelation)
 	c.Assert(err, qt.IsNil)
 
-	unprivileged := openfga.NewUser(&dbmodel.Identity{Name: "eve@external"}, client)
+	unprivileged := openfga.NewUser(&dbmodel.Identity{Name: "eve@canonical.com"}, client)
 
 	events := []dbmodel.AuditLogEntry{{
 		Time:         now,
@@ -172,7 +172,7 @@ const testListCoControllersEnv = `clouds:
 cloud-credentials:
 - name: test-cred
   cloud: test
-  owner: alice@external
+  owner: alice@canonical.com
   type: empty
 controllers:
 - name: test1
@@ -191,11 +191,11 @@ controllers:
   region: test-region-3
   agent-version: 2.1.0
 users:
-- username: alice@external
+- username: alice@canonical.com
   controller-access: superuser
-- username: bob@external
+- username: bob@canonical.com
   controller-access: login
-- username: eve@external
+- username: eve@canonical.com
   controller-access: "no-access"
 `
 
@@ -230,7 +230,7 @@ func TestListControllers(t *testing.T) {
 		expectedError       string
 	}{{
 		about:     "superuser can list controllers",
-		user:      env.User("alice@external").DBObject(c, j.Database),
+		user:      env.User("alice@canonical.com").DBObject(c, j.Database),
 		jimmAdmin: true,
 		expectedControllers: []dbmodel.Controller{
 			env.Controller("test1").DBObject(c, j.Database),
@@ -239,11 +239,11 @@ func TestListControllers(t *testing.T) {
 		},
 	}, {
 		about:         "add-model user can not list controllers",
-		user:          env.User("bob@external").DBObject(c, j.Database),
+		user:          env.User("bob@canonical.com").DBObject(c, j.Database),
 		expectedError: "unauthorized",
 	}, {
 		about:         "user withouth access rights cannot list controllers",
-		user:          env.User("eve@external").DBObject(c, j.Database),
+		user:          env.User("eve@canonical.com").DBObject(c, j.Database),
 		expectedError: "unauthorized",
 	}}
 
@@ -270,7 +270,7 @@ const testSetControllerDeprecatedEnv = `clouds:
 cloud-credentials:
 - name: test-cred
   cloud: test
-  owner: alice@external
+  owner: alice@canonical.com
   type: empty
 controllers:
 - name: test1
@@ -279,11 +279,11 @@ controllers:
   region: test-region-1
   agent-version: 3.2.1
 users:
-- username: alice@external
+- username: alice@canonical.com
   controller-access: superuser
-- username: bob@external
+- username: bob@canonical.com
   controller-access: login
-- username: eve@external
+- username: eve@canonical.com
   controller-access: "no-access"
 `
 
@@ -318,17 +318,17 @@ func TestSetControllerDeprecated(t *testing.T) {
 		expectedError string
 	}{{
 		about:      "superuser can deprecate a controller",
-		user:       env.User("alice@external").DBObject(c, j.Database),
+		user:       env.User("alice@canonical.com").DBObject(c, j.Database),
 		jimmAdmin:  true,
 		deprecated: true,
 	}, {
 		about:      "superuser can deprecate a controller",
-		user:       env.User("alice@external").DBObject(c, j.Database),
+		user:       env.User("alice@canonical.com").DBObject(c, j.Database),
 		jimmAdmin:  true,
 		deprecated: false,
 	}, {
 		about:         "user withouth access rights cannot deprecate a controller",
-		user:          env.User("eve@external").DBObject(c, j.Database),
+		user:          env.User("eve@canonical.com").DBObject(c, j.Database),
 		expectedError: "unauthorized",
 		deprecated:    true,
 	}}
@@ -359,15 +359,15 @@ const removeControllerTestEnv = `clouds:
   regions:
   - name: test-cloud-region
 cloud-credentials:
-- owner: alice@external
+- owner: alice@canonical.com
   name: cred-1
   cloud: test-cloud
 users:
-- username: alice@external
+- username: alice@canonical.com
   controller-access: superuser
-- username: bob@external
+- username: bob@canonical.com
   controller-access: login
-- username: eve@external
+- username: eve@canonical.com
   controller-access: "no-access"
 controllers:
 - name: controller-1
@@ -383,18 +383,18 @@ models:
   cloud: test-cloud
   region: test-cloud-region
   cloud-credential: cred-1
-  owner: alice@external
+  owner: alice@canonical.com
   life: alive
   status:
     status: available
     info: "OK!"
     since: 2020-02-20T20:02:20Z
   users:
-  - user: alice@external
+  - user: alice@canonical.com
     access: admin
-  - user: bob@external
+  - user: bob@canonical.com
     access: write
-  - user: charlie@external
+  - user: charlie@canonical.com
     access: read
   sla:
     level: unsupported
@@ -416,30 +416,30 @@ func TestRemoveController(t *testing.T) {
 		expectedError    string
 	}{{
 		about:            "superuser can remove an unavailable controller",
-		user:             "alice@external",
+		user:             "alice@canonical.com",
 		unavailableSince: &now,
 		force:            true,
 		jimmAdmin:        true,
 	}, {
 		about:     "superuser can remove a live controller with force",
-		user:      "alice@external",
+		user:      "alice@canonical.com",
 		force:     true,
 		jimmAdmin: true,
 	}, {
 		about:         "superuser cannot remove a live controller",
-		user:          "alice@external",
+		user:          "alice@canonical.com",
 		force:         false,
 		jimmAdmin:     true,
 		expectedError: "controller is still alive",
 	}, {
 		about:         "add-model user cannot remove a controller",
-		user:          "bob@external",
+		user:          "bob@canonical.com",
 		expectedError: "unauthorized",
 		jimmAdmin:     false,
 		force:         false,
 	}, {
 		about:         "user withouth access rights cannot remove a controller",
-		user:          "eve@external",
+		user:          "eve@canonical.com",
 		expectedError: "unauthorized",
 		jimmAdmin:     false,
 		force:         false,
@@ -498,15 +498,15 @@ const fullModelStatusTestEnv = `clouds:
   regions:
   - name: test-cloud-region
 cloud-credentials:
-- owner: alice@external
+- owner: alice@canonical.com
   name: cred-1
   cloud: test-cloud
 users:
-- username: alice@external
+- username: alice@canonical.com
   controller-access: superuser
-- username: bob@external
+- username: bob@canonical.com
   controller-access: login
-- username: eve@external
+- username: eve@canonical.com
   controller-access: "no-access"
 controllers:
 - name: controller-1
@@ -522,7 +522,7 @@ models:
   cloud: test-cloud
   region: test-cloud-region
   cloud-credential: cred-1
-  owner: alice@external
+  owner: alice@canonical.com
   life: alive
 `
 
@@ -565,7 +565,7 @@ func TestFullModelStatus(t *testing.T) {
 		expectedError  string
 	}{{
 		about:     "superuser allowed to see full model status",
-		user:      "alice@external",
+		user:      "alice@canonical.com",
 		modelUUID: "00000002-0000-0000-0000-000000000001",
 		jimmAdmin: true,
 		statusFunc: func(_ context.Context, _ []string) (*jujuparams.FullStatus, error) {
@@ -574,7 +574,7 @@ func TestFullModelStatus(t *testing.T) {
 		expectedStatus: fullStatus,
 	}, {
 		about:     "model not found",
-		user:      "alice@external",
+		user:      "alice@canonical.com",
 		modelUUID: "00000002-0000-0000-0000-000000000002",
 		jimmAdmin: true,
 		statusFunc: func(_ context.Context, _ []string) (*jujuparams.FullStatus, error) {
@@ -583,7 +583,7 @@ func TestFullModelStatus(t *testing.T) {
 		expectedError: "model not found",
 	}, {
 		about:     "controller returns an error",
-		user:      "alice@external",
+		user:      "alice@canonical.com",
 		modelUUID: "00000002-0000-0000-0000-000000000001",
 		jimmAdmin: true,
 		statusFunc: func(_ context.Context, _ []string) (*jujuparams.FullStatus, error) {
@@ -592,7 +592,7 @@ func TestFullModelStatus(t *testing.T) {
 		expectedError: "an error",
 	}, {
 		about:     "add-model user not allowed to see full model status",
-		user:      "bob@external",
+		user:      "bob@canonical.com",
 		modelUUID: "00000002-0000-0000-0000-000000000001",
 		jimmAdmin: false,
 		statusFunc: func(_ context.Context, _ []string) (*jujuparams.FullStatus, error) {
@@ -601,7 +601,7 @@ func TestFullModelStatus(t *testing.T) {
 		expectedError: "unauthorized",
 	}, {
 		about:     "no-access user not allowed to see full model status",
-		user:      "eve@external",
+		user:      "eve@canonical.com",
 		modelUUID: "00000002-0000-0000-0000-000000000001",
 		jimmAdmin: false,
 		statusFunc: func(_ context.Context, _ []string) (*jujuparams.FullStatus, error) {
@@ -673,7 +673,7 @@ func TestFillMigrationTarget(t *testing.T) {
 		expectedError  string
 	}{{
 		about:          "controller exists",
-		userTag:        "alice@external",
+		userTag:        "alice@canonical.com",
 		controllerName: "controller-1",
 		expectedInfo: jujuparams.MigrationTargetInfo{
 			ControllerTag: "controller-00000001-0000-0000-0000-000000000001",
@@ -683,7 +683,7 @@ func TestFillMigrationTarget(t *testing.T) {
 		},
 	}, {
 		about:          "controller doesn't exist",
-		userTag:        "alice@external",
+		userTag:        "alice@canonical.com",
 		controllerName: "controller-2",
 		expectedError:  "controller not found",
 	},
@@ -723,7 +723,7 @@ const InitiateMigrationTestEnv = `clouds:
   regions:
   - name: test-cloud-region
 cloud-credentials:
-  - owner: alice@external
+  - owner: alice@canonical.com
     name: cred-1
     cloud: test-cloud
 controllers:
@@ -740,10 +740,10 @@ models:
     cloud: test-cloud
     region: test-cloud-region
     cloud-credential: cred-1
-    owner: alice@external
+    owner: alice@canonical.com
     life: alive
 users:
-  - username: alice@external
+  - username: alice@canonical.com
     controller-access: superuser
 `
 
@@ -760,11 +760,11 @@ func TestInitiateInternalMigration(t *testing.T) {
 		expectedError string
 	}{{
 		about:       "success",
-		user:        "alice@external",
+		user:        "alice@canonical.com",
 		migrateInfo: params.MigrateModelInfo{ModelTag: "model-00000002-0000-0000-0000-000000000001", TargetController: "myController"},
 	}, {
 		about:         "model doesn't exist",
-		user:          "alice@external",
+		user:          "alice@canonical.com",
 		migrateInfo:   params.MigrateModelInfo{ModelTag: "model-00000002-0000-0000-0000-000000000002", TargetController: "myController"},
 		expectedError: "model not found",
 	},

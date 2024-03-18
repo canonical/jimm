@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
@@ -74,9 +74,7 @@ func (r *controllerRoot) MongoVersion(ctx context.Context) (jujuparams.StringRes
 // provider for this controller or an empty string if no external identity
 // provider has been configured when the controller was bootstrapped.
 func (r *controllerRoot) IdentityProviderURL(ctx context.Context) (jujuparams.StringResult, error) {
-	return jujuparams.StringResult{
-		Result: r.params.IdentityLocation,
-	}, nil
+	return jujuparams.StringResult{Result: ""}, nil
 }
 
 // ControllerVersion returns the version information associated with this

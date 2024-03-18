@@ -10,7 +10,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/juju/juju/core/life"
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/utils/v2"
 	gc "gopkg.in/check.v1"
@@ -31,7 +31,7 @@ func (s *modelmanagerSuite) TestCreateModel(c *gc.C) {
 	var info jujuparams.ModelInfo
 	err := s.API.CreateModel(ctx, &jujuparams.ModelCreateArgs{
 		Name:     "test-model",
-		OwnerTag: names.NewUserTag("test-user@external").String(),
+		OwnerTag: names.NewUserTag("test-user@canonical.com").String(),
 	}, &info)
 	c.Assert(err, gc.Equals, nil)
 
@@ -53,7 +53,7 @@ func (s *modelmanagerSuite) TestCreateModelError(c *gc.C) {
 	var info jujuparams.ModelInfo
 	err := s.API.CreateModel(ctx, &jujuparams.ModelCreateArgs{
 		Name:     "test-model",
-		OwnerTag: names.NewUserTag("test-user@external").String(),
+		OwnerTag: names.NewUserTag("test-user@canonical.com").String(),
 		CloudTag: names.NewCloudTag("nosuchcloud").String(),
 	}, &info)
 	c.Check(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeNotFound)
@@ -66,7 +66,7 @@ func (s *modelmanagerSuite) TestGrantJIMMModelAdmin(c *gc.C) {
 	var info jujuparams.ModelInfo
 	err := s.API.CreateModel(ctx, &jujuparams.ModelCreateArgs{
 		Name:     "test-model",
-		OwnerTag: names.NewUserTag("test-user@external").String(),
+		OwnerTag: names.NewUserTag("test-user@canonical.com").String(),
 	}, &info)
 	c.Assert(err, gc.Equals, nil)
 
@@ -99,7 +99,7 @@ func (s *modelmanagerSuite) TestModelInfo(c *gc.C) {
 	var info jujuparams.ModelInfo
 	err := s.API.CreateModel(ctx, &jujuparams.ModelCreateArgs{
 		Name:     "test-model",
-		OwnerTag: names.NewUserTag("test-user@external").String(),
+		OwnerTag: names.NewUserTag("test-user@canonical.com").String(),
 	}, &info)
 	c.Assert(err, gc.Equals, nil)
 
@@ -129,11 +129,11 @@ func (s *modelmanagerSuite) TestGrantRevokeModel(c *gc.C) {
 	var info jujuparams.ModelInfo
 	err := s.API.CreateModel(ctx, &jujuparams.ModelCreateArgs{
 		Name:     "test-model",
-		OwnerTag: names.NewUserTag("test-user@external").String(),
+		OwnerTag: names.NewUserTag("test-user@canonical.com").String(),
 	}, &info)
 	c.Assert(err, gc.Equals, nil)
 
-	err = s.API.GrantModelAccess(ctx, names.NewModelTag(info.UUID), names.NewUserTag("test-user-2@external"), jujuparams.ModelReadAccess)
+	err = s.API.GrantModelAccess(ctx, names.NewModelTag(info.UUID), names.NewUserTag("test-user-2@canonical.com"), jujuparams.ModelReadAccess)
 	c.Assert(err, gc.Equals, nil)
 
 	err = s.API.ModelInfo(ctx, &info)
@@ -143,22 +143,22 @@ func (s *modelmanagerSuite) TestGrantRevokeModel(c *gc.C) {
 		return a.UserName < b.UserName
 	}
 	c.Check(info.Users, jimmtest.CmpEquals(cmpopts.SortSlices(lessf)), []jujuparams.ModelUserInfo{{
-		UserName:    "test-user@external",
+		UserName:    "test-user@canonical.com",
 		DisplayName: "test-user",
 		Access:      "admin",
 	}, {
-		UserName: "test-user-2@external",
+		UserName: "test-user-2@canonical.com",
 		Access:   "read",
 	}})
 
-	err = s.API.RevokeModelAccess(ctx, names.NewModelTag(info.UUID), names.NewUserTag("test-user-2@external"), jujuparams.ModelReadAccess)
+	err = s.API.RevokeModelAccess(ctx, names.NewModelTag(info.UUID), names.NewUserTag("test-user-2@canonical.com"), jujuparams.ModelReadAccess)
 	c.Assert(err, gc.Equals, nil)
 
 	err = s.API.ModelInfo(ctx, &info)
 	c.Assert(err, gc.Equals, nil)
 
 	c.Check(info.Users, jimmtest.CmpEquals(cmpopts.SortSlices(lessf)), []jujuparams.ModelUserInfo{{
-		UserName:    "test-user@external",
+		UserName:    "test-user@canonical.com",
 		DisplayName: "test-user",
 		Access:      "admin",
 	}})
@@ -188,7 +188,7 @@ func (s *modelmanagerSuite) TestValidateModelUpgrade(c *gc.C) {
 
 	args := jujuparams.ModelCreateArgs{
 		Name:     "test-model",
-		OwnerTag: names.NewUserTag("test-user@external").String(),
+		OwnerTag: names.NewUserTag("test-user@canonical.com").String(),
 	}
 	var info jujuparams.ModelInfo
 
@@ -209,7 +209,7 @@ func (s *modelmanagerSuite) TestDestroyModel(c *gc.C) {
 	var info jujuparams.ModelInfo
 	err := s.API.CreateModel(ctx, &jujuparams.ModelCreateArgs{
 		Name:     "test-model",
-		OwnerTag: names.NewUserTag("test-user@external").String(),
+		OwnerTag: names.NewUserTag("test-user@canonical.com").String(),
 	}, &info)
 	c.Assert(err, gc.Equals, nil)
 
@@ -228,7 +228,7 @@ func (s *modelmanagerSuite) TestModelStatus(c *gc.C) {
 	var info jujuparams.ModelInfo
 	err := s.API.CreateModel(ctx, &jujuparams.ModelCreateArgs{
 		Name:     "test-model",
-		OwnerTag: names.NewUserTag("test-user@external").String(),
+		OwnerTag: names.NewUserTag("test-user@canonical.com").String(),
 	}, &info)
 	c.Assert(err, gc.Equals, nil)
 
@@ -263,7 +263,7 @@ func (s *modelmanagerSuite) TestChangeModelCredential(c *gc.C) {
 	var info jujuparams.ModelInfo
 	err := s.API.CreateModel(ctx, &jujuparams.ModelCreateArgs{
 		Name:     "test-model",
-		OwnerTag: names.NewUserTag("test-user@external").String(),
+		OwnerTag: names.NewUserTag("test-user@canonical.com").String(),
 	}, &info)
 	c.Assert(err, gc.Equals, nil)
 

@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 
 	"github.com/canonical/jimm/internal/dbmodel"
 )
@@ -37,7 +37,7 @@ func TestCloudCredential(t *testing.T) {
 			Name: "test-cloud",
 		},
 		Owner: dbmodel.Identity{
-			Name: "bob@external",
+			Name: "bob@canonical.com",
 		},
 		AuthType: "empty",
 		Label:    "test label",
@@ -70,14 +70,14 @@ func TestCloudCredentialsCascadeOnDelete(t *testing.T) {
 		Name:  "test-credential",
 		Cloud: cloud,
 		Owner: dbmodel.Identity{
-			Name: "bob@external",
+			Name: "bob@canonical.com",
 		},
 	}
 	result = db.Create(&cred)
 	c.Assert(result.Error, qt.IsNil)
 	c.Check(result.RowsAffected, qt.Equals, int64(1))
 	c.Check(cred.CloudName, qt.Equals, "test-cloud")
-	c.Check(cred.OwnerIdentityName, qt.Equals, "bob@external")
+	c.Check(cred.OwnerIdentityName, qt.Equals, "bob@canonical.com")
 
 	result = db.Delete(&cloud)
 	c.Assert(result.Error, qt.IsNil)

@@ -10,7 +10,7 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/google/uuid"
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
@@ -42,22 +42,22 @@ func TestGetCloud(t *testing.T) {
 
 	alice := openfga.NewUser(
 		&dbmodel.Identity{
-			Name: "alice@external",
+			Name: "alice@canonical.com",
 		},
 		client,
 	)
 	bob := openfga.NewUser(
 		&dbmodel.Identity{
-			Name: "bob@external",
+			Name: "bob@canonical.com",
 		},
 		client,
 	)
-	charlie := openfga.NewUser(&dbmodel.Identity{Name: "charlie@external"}, client)
+	charlie := openfga.NewUser(&dbmodel.Identity{Name: "charlie@canonical.com"}, client)
 
 	// daphne is a jimm administrator
 	daphne := openfga.NewUser(
 		&dbmodel.Identity{
-			Name: "daphne@external",
+			Name: "daphne@canonical.com",
 		},
 		client,
 	)
@@ -169,19 +169,19 @@ func TestForEachCloud(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	alice := openfga.NewUser(
-		&dbmodel.Identity{Name: "alice@external"},
+		&dbmodel.Identity{Name: "alice@canonical.com"},
 		client,
 	)
 	bob := openfga.NewUser(
-		&dbmodel.Identity{Name: "bob@external"},
+		&dbmodel.Identity{Name: "bob@canonical.com"},
 		client,
 	)
 	charlie := openfga.NewUser(
-		&dbmodel.Identity{Name: "charlie@external"},
+		&dbmodel.Identity{Name: "charlie@canonical.com"},
 		client,
 	)
 	daphne := openfga.NewUser(
-		&dbmodel.Identity{Name: "daphne@external"},
+		&dbmodel.Identity{Name: "daphne@canonical.com"},
 		client,
 	)
 	daphne.JimmAdmin = true
@@ -336,14 +336,14 @@ const addHostedCloudTestEnv = `clouds:
   regions:
   - name: test-region
   users:
-  - user: alice@external
+  - user: alice@canonical.com
     access: admin
 - name: private-cloud2
   type: test-provider3
   regions:
   - name: test-region-2
   users:
-  - user: bob@external
+  - user: bob@canonical.com
     access: admin
 - name: existing-cloud
   type: kubernetes
@@ -351,7 +351,7 @@ const addHostedCloudTestEnv = `clouds:
   regions:
   - name: default
   users:
-  - user: alice@external
+  - user: alice@canonical.com
     access: admin
 controllers:
 - name: test-controller
@@ -366,9 +366,9 @@ controllers:
     region: default
     priority: 1
 users:
-- username: alice@external
+- username: alice@canonical.com
   controller-access: superuser
-- username: bob@external
+- username: bob@canonical.com
   controller-access: login
 `
 
@@ -409,7 +409,7 @@ var addHostedCloudTests = []struct {
 		}
 		return nil
 	},
-	username:  "bob@external",
+	username:  "bob@canonical.com",
 	cloudName: "new-cloud",
 	cloud: jujuparams.Cloud{
 		Type:             "kubernetes",
@@ -445,7 +445,7 @@ var addHostedCloudTests = []struct {
 	},
 }, {
 	name:      "CloudWithReservedName",
-	username:  "bob@external",
+	username:  "bob@canonical.com",
 	cloudName: "aws",
 	cloud: jujuparams.Cloud{
 		Type:             "kubernetes",
@@ -459,7 +459,7 @@ var addHostedCloudTests = []struct {
 	expectErrorCode: errors.CodeAlreadyExists,
 }, {
 	name:      "ExistingCloud",
-	username:  "bob@external",
+	username:  "bob@canonical.com",
 	cloudName: "existing-cloud",
 	cloud: jujuparams.Cloud{
 		Type:             "kubernetes",
@@ -473,7 +473,7 @@ var addHostedCloudTests = []struct {
 	expectErrorCode: errors.CodeAlreadyExists,
 }, {
 	name:      "InvalidCloudType",
-	username:  "bob@external",
+	username:  "bob@canonical.com",
 	cloudName: "new-cloud",
 	cloud: jujuparams.Cloud{
 		Type:             "ec2",
@@ -487,7 +487,7 @@ var addHostedCloudTests = []struct {
 	expectErrorCode: errors.CodeIncompatibleClouds,
 }, {
 	name:      "HostCloudRegionNotFound",
-	username:  "bob@external",
+	username:  "bob@canonical.com",
 	cloudName: "new-cloud",
 	cloud: jujuparams.Cloud{
 		Type:             "kubernetes",
@@ -501,7 +501,7 @@ var addHostedCloudTests = []struct {
 	expectErrorCode: errors.CodeNotFound,
 }, {
 	name:      "InvalidHostCloudRegion",
-	username:  "bob@external",
+	username:  "bob@canonical.com",
 	cloudName: "new-cloud",
 	cloud: jujuparams.Cloud{
 		Type:             "kubernetes",
@@ -515,7 +515,7 @@ var addHostedCloudTests = []struct {
 	expectErrorCode: errors.CodeBadRequest,
 }, {
 	name:      "UserHasNoCloudAccess",
-	username:  "bob@external",
+	username:  "bob@canonical.com",
 	cloudName: "new-cloud",
 	cloud: jujuparams.Cloud{
 		Type:             "kubernetes",
@@ -529,7 +529,7 @@ var addHostedCloudTests = []struct {
 	expectErrorCode: errors.CodeUnauthorized,
 }, {
 	name:      "HostCloudIsHosted",
-	username:  "alice@external",
+	username:  "alice@canonical.com",
 	cloudName: "new-cloud",
 	cloud: jujuparams.Cloud{
 		Type:             "kubernetes",
@@ -544,7 +544,7 @@ var addHostedCloudTests = []struct {
 }, {
 	name:      "DialError",
 	dialError: errors.E("dial error"),
-	username:  "alice@external",
+	username:  "alice@canonical.com",
 	cloudName: "new-cloud",
 	cloud: jujuparams.Cloud{
 		Type:             "kubernetes",
@@ -560,7 +560,7 @@ var addHostedCloudTests = []struct {
 	addCloud: func(context.Context, names.CloudTag, jujuparams.Cloud, bool) error {
 		return errors.E("addcloud error")
 	},
-	username:  "alice@external",
+	username:  "alice@canonical.com",
 	cloudName: "new-cloud",
 	cloud: jujuparams.Cloud{
 		Type:             "kubernetes",
@@ -672,7 +672,7 @@ var addHostedCloudToControllerTests = []struct {
 		}
 		return nil
 	},
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	controllerName: "test-controller",
 	cloudName:      "new-cloud",
 	cloud: jujuparams.Cloud{
@@ -731,7 +731,7 @@ var addHostedCloudToControllerTests = []struct {
 		}
 		return nil
 	},
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	controllerName: "no-such-controller",
 	cloudName:      "new-cloud",
 	cloud: jujuparams.Cloud{
@@ -746,7 +746,7 @@ var addHostedCloudToControllerTests = []struct {
 	expectErrorCode: errors.CodeNotFound,
 }, {
 	name:           "CloudWithReservedName",
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	controllerName: "test-controller",
 	cloudName:      "aws",
 	cloud: jujuparams.Cloud{
@@ -761,7 +761,7 @@ var addHostedCloudToControllerTests = []struct {
 	expectErrorCode: errors.CodeAlreadyExists,
 }, {
 	name:           "HostCloudRegionNotFound",
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	controllerName: "test-controller",
 	cloudName:      "new-cloud",
 	cloud: jujuparams.Cloud{
@@ -776,7 +776,7 @@ var addHostedCloudToControllerTests = []struct {
 	expectErrorCode: errors.CodeIncompatibleClouds,
 }, {
 	name:           "InvalidHostCloudRegion",
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	controllerName: "test-controller",
 	cloudName:      "new-cloud",
 	cloud: jujuparams.Cloud{
@@ -791,7 +791,7 @@ var addHostedCloudToControllerTests = []struct {
 	expectErrorCode: errors.CodeIncompatibleClouds,
 }, {
 	name:           "UserHasNoCloudAccess",
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	controllerName: "test-controller",
 	cloudName:      "new-cloud",
 	cloud: jujuparams.Cloud{
@@ -806,7 +806,7 @@ var addHostedCloudToControllerTests = []struct {
 	expectErrorCode: errors.CodeIncompatibleClouds,
 }, {
 	name:           "HostCloudIsHosted",
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	controllerName: "test-controller",
 	cloudName:      "new-cloud",
 	cloud: jujuparams.Cloud{
@@ -822,7 +822,7 @@ var addHostedCloudToControllerTests = []struct {
 }, {
 	name:           "DialError",
 	dialError:      errors.E("dial error"),
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	controllerName: "test-controller",
 	cloudName:      "new-cloud",
 	cloud: jujuparams.Cloud{
@@ -839,7 +839,7 @@ var addHostedCloudToControllerTests = []struct {
 	addCloud: func(context.Context, names.CloudTag, jujuparams.Cloud, bool) error {
 		return errors.E("addcloud error")
 	},
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	controllerName: "test-controller",
 	cloudName:      "new-cloud",
 	cloud: jujuparams.Cloud{
@@ -928,7 +928,7 @@ const grantCloudAccessTestEnv = `clouds:
   - name: default
   - name: region2
   users:
-  - user: alice@external
+  - user: alice@canonical.com
     access: admin
 controllers:
 - name: controller-1
@@ -960,50 +960,50 @@ var grantCloudAccessTests = []struct {
 	expectErrorCode errors.Code
 }{{
 	name:            "CloudNotFound",
-	username:        "alice@external",
+	username:        "alice@canonical.com",
 	cloud:           "test2",
-	targetUsername:  "bob@external",
+	targetUsername:  "bob@canonical.com",
 	access:          "add-model",
 	expectError:     `cloud "test2" not found`,
 	expectErrorCode: errors.CodeNotFound,
 }, {
 	name:           "Admin grants admin access",
 	env:            grantCloudAccessTestEnv,
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	cloud:          "test",
-	targetUsername: "bob@external",
+	targetUsername: "bob@canonical.com",
 	access:         "admin",
 	expectRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
 	}},
 }, {
 	name:           "Admin grants add-model access",
 	env:            grantCloudAccessTestEnv,
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	cloud:          "test",
-	targetUsername: "bob@external",
+	targetUsername: "bob@canonical.com",
 	access:         "add-model",
 	expectRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
 		Relation: ofganames.CanAddModelRelation,
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
 	}},
 }, {
 	name:            "UserNotAuthorized",
 	env:             grantCloudAccessTestEnv,
-	username:        "charlie@external",
+	username:        "charlie@canonical.com",
 	cloud:           "test",
-	targetUsername:  "bob@external",
+	targetUsername:  "bob@canonical.com",
 	access:          "add-model",
 	expectError:     `unauthorized`,
 	expectErrorCode: errors.CodeUnauthorized,
@@ -1011,17 +1011,17 @@ var grantCloudAccessTests = []struct {
 	name:           "DialError",
 	env:            grantCloudAccessTestEnv,
 	dialError:      errors.E("test dial error"),
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	cloud:          "test",
-	targetUsername: "bob@external",
+	targetUsername: "bob@canonical.com",
 	access:         "add-model",
 	expectError:    `test dial error`,
 }, {
 	name:           "unknown access",
 	env:            grantCloudAccessTestEnv,
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	cloud:          "test",
-	targetUsername: "bob@external",
+	targetUsername: "bob@canonical.com",
 	access:         "some-unknown-access",
 	expectError:    `failed to recognize given access: "some-unknown-access"`,
 }}
@@ -1081,7 +1081,7 @@ const revokeCloudAccessTestEnv = `clouds:
   regions:
   - name: test-cloud-region
   users:
-  - user: daphne@external
+  - user: daphne@canonical.com
     access: admin
 - name: test
   type: kubernetes
@@ -1089,11 +1089,11 @@ const revokeCloudAccessTestEnv = `clouds:
   regions:
   - name: default
   users:
-  - user: alice@external
+  - user: alice@canonical.com
     access: admin
-  - user: bob@external
+  - user: bob@canonical.com
     access: admin
-  - user: charlie@external
+  - user: charlie@canonical.com
     access: add-model
 controllers:
 - name: controller-1
@@ -1124,185 +1124,185 @@ var revokeCloudAccessTests = []struct {
 	expectErrorCode        errors.Code
 }{{
 	name:            "CloudNotFound",
-	username:        "alice@external",
+	username:        "alice@canonical.com",
 	cloud:           "test2",
-	targetUsername:  "bob@external",
+	targetUsername:  "bob@canonical.com",
 	access:          "admin",
 	expectError:     `cloud "test2" not found`,
 	expectErrorCode: errors.CodeNotFound,
 }, {
 	name:           "Admin revokes 'admin' from another admin",
 	env:            revokeCloudAccessTestEnv,
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	cloud:          "test",
-	targetUsername: "bob@external",
+	targetUsername: "bob@canonical.com",
 	access:         "admin",
 	expectRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
 		Relation: ofganames.CanAddModelRelation,
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
 	}},
 	expectRemovedRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
 	}},
 }, {
 	name:           "Admin revokes 'add-model' from another admin",
 	env:            revokeCloudAccessTestEnv,
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	cloud:          "test",
-	targetUsername: "bob@external",
+	targetUsername: "bob@canonical.com",
 	access:         "add-model",
 	expectRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
 		Relation: ofganames.CanAddModelRelation,
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
 	}},
 	expectRemovedRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
 	}},
 }, {
 	name:           "Admin revokes 'add-model' from a user with 'add-model' access",
 	env:            revokeCloudAccessTestEnv,
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	cloud:          "test",
-	targetUsername: "charlie@external",
+	targetUsername: "charlie@canonical.com",
 	access:         "add-model",
 	expectRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
 	}},
 	expectRemovedRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
 		Relation: ofganames.CanAddModelRelation,
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
 	}},
 }, {
 	name:           "Admin revokes 'add-model' from a user with no access",
 	env:            revokeCloudAccessTestEnv,
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	cloud:          "test",
-	targetUsername: "daphne@external",
+	targetUsername: "daphne@canonical.com",
 	access:         "add-model",
 	expectRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
 		Relation: ofganames.CanAddModelRelation,
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
 	}},
 }, {
 	name:           "Admin revokes 'admin' from a user with no access",
 	env:            revokeCloudAccessTestEnv,
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	cloud:          "test",
-	targetUsername: "daphne@external",
+	targetUsername: "daphne@canonical.com",
 	access:         "admin",
 	expectRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
 		Relation: ofganames.CanAddModelRelation,
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
 	}},
 }, {
 	name:           "Admin revokes 'add-model' access from a user who has separate tuples for all accesses (add-model/admin)",
 	env:            revokeCloudAccessTestEnv,
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	cloud:          "test",
-	targetUsername: "charlie@external",
+	targetUsername: "charlie@canonical.com",
 	access:         "add-model",
 	extraInitialTuples: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
 	},
 	// No need to add the 'add-model' relation, because it's already there due to the environment setup.
 	},
 	expectRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
 	}},
 	expectRemovedRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
 		Relation: ofganames.CanAddModelRelation,
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
 	}},
 }, {
 	name:           "Admin revokes 'admin' access from a user who has separate tuples for all accesses (add-model/admin)",
 	env:            revokeCloudAccessTestEnv,
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	cloud:          "test",
-	targetUsername: "charlie@external",
+	targetUsername: "charlie@canonical.com",
 	access:         "admin",
 	extraInitialTuples: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
 	},
 	// No need to add the 'add-model' relation, because it's already there due to the environment setup.
 	},
 	expectRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
 		Relation: ofganames.CanAddModelRelation,
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
 	}},
 	expectRemovedRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewCloudTag("test")),
 	}},
 }, {
 	name:            "UserNotAuthorized",
 	env:             revokeCloudAccessTestEnv,
-	username:        "charlie@external",
+	username:        "charlie@canonical.com",
 	cloud:           "test",
-	targetUsername:  "bob@external",
+	targetUsername:  "bob@canonical.com",
 	access:          "add-model",
 	expectError:     `unauthorized`,
 	expectErrorCode: errors.CodeUnauthorized,
@@ -1310,17 +1310,17 @@ var revokeCloudAccessTests = []struct {
 	name:           "DialError",
 	env:            revokeCloudAccessTestEnv,
 	dialError:      errors.E("test dial error"),
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	cloud:          "test",
-	targetUsername: "bob@external",
+	targetUsername: "bob@canonical.com",
 	access:         "add-model",
 	expectError:    `test dial error`,
 }, {
 	name:           "unknown access",
 	env:            revokeCloudAccessTestEnv,
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	cloud:          "test",
-	targetUsername: "bob@external",
+	targetUsername: "bob@canonical.com",
 	access:         "some-unknown-access",
 	expectError:    `failed to recognize given access: "some-unknown-access"`,
 }}
@@ -1408,9 +1408,9 @@ const removeCloudTestEnv = `clouds:
   regions:
   - name: default
   users:
-  - user: alice@external
+  - user: alice@canonical.com
     access: admin
-  - user: bob@external
+  - user: bob@canonical.com
     access: add-model
 controllers:
 - name: controller-1
@@ -1437,7 +1437,7 @@ var removeCloudTests = []struct {
 	expectErrorCode errors.Code
 }{{
 	name:            "CloudNotFound",
-	username:        "alice@external",
+	username:        "alice@canonical.com",
 	cloud:           "test2",
 	expectError:     `cloud "test2" not found`,
 	expectErrorCode: errors.CodeNotFound,
@@ -1450,12 +1450,12 @@ var removeCloudTests = []struct {
 		}
 		return nil
 	},
-	username: "alice@external",
+	username: "alice@canonical.com",
 	cloud:    "test",
 }, {
 	name:            "UserNotAuthorized",
 	env:             removeCloudTestEnv,
-	username:        "bob@external",
+	username:        "bob@canonical.com",
 	cloud:           "test",
 	expectError:     `unauthorized`,
 	expectErrorCode: errors.CodeUnauthorized,
@@ -1463,7 +1463,7 @@ var removeCloudTests = []struct {
 	name:        "DialError",
 	env:         removeCloudTestEnv,
 	dialError:   errors.E("test dial error"),
-	username:    "alice@external",
+	username:    "alice@canonical.com",
 	cloud:       "test",
 	expectError: `test dial error`,
 }, {
@@ -1472,7 +1472,7 @@ var removeCloudTests = []struct {
 	removeCloud: func(_ context.Context, mt names.CloudTag) error {
 		return errors.E("test error")
 	},
-	username:    "alice@external",
+	username:    "alice@canonical.com",
 	cloud:       "test",
 	expectError: `test error`,
 }}
@@ -1539,9 +1539,9 @@ const updateCloudTestEnv = `clouds:
   regions:
   - name: default
   users:
-  - user: alice@external
+  - user: alice@canonical.com
     access: admin
-  - user: bob@external
+  - user: bob@canonical.com
     access: admin
 controllers:
 - name: controller-1
@@ -1556,7 +1556,7 @@ controllers:
     region: default
     priority: 1
 users:
-- username: alice@external
+- username: alice@canonical.com
   controller-access: superuser
 `
 
@@ -1573,12 +1573,12 @@ var updateCloudTests = []struct {
 	expectCloud     dbmodel.Cloud
 }{{
 	name:            "CloudNotFound",
-	username:        "alice@external",
+	username:        "alice@canonical.com",
 	cloud:           "test2",
 	expectError:     `cloud "test2" not found`,
 	expectErrorCode: errors.CodeNotFound,
 }, /* NOTE (alesstimec) Need to figure out what makes test-cloud
-	                        a public cloud giving alice@external the right
+	                        a public cloud giving alice@canonical.com the right
 							to update it.
 			{
 					name: "SuccessPublicCloud",
@@ -1589,7 +1589,7 @@ var updateCloudTests = []struct {
 						}
 						return nil
 					},
-					username: "alice@external",
+					username: "alice@canonical.com",
 					cloud:    "test-cloud",
 					update: jujuparams.Cloud{
 						Type:             "test-provider",
@@ -1656,7 +1656,7 @@ var updateCloudTests = []struct {
 			}
 			return nil
 		},
-		username: "bob@external",
+		username: "bob@canonical.com",
 		cloud:    "test",
 		update: jujuparams.Cloud{
 			Type:             "kubernetes",
@@ -1693,7 +1693,7 @@ var updateCloudTests = []struct {
 	}, {
 		name:            "UserNotAuthorized",
 		env:             updateCloudTestEnv,
-		username:        "bob@external",
+		username:        "bob@canonical.com",
 		cloud:           "test-cloud",
 		expectError:     `unauthorized`,
 		expectErrorCode: errors.CodeUnauthorized,
@@ -1701,7 +1701,7 @@ var updateCloudTests = []struct {
 		name:        "DialError",
 		env:         updateCloudTestEnv,
 		dialError:   errors.E("test dial error"),
-		username:    "alice@external",
+		username:    "alice@canonical.com",
 		cloud:       "test",
 		expectError: `test dial error`,
 	}, {
@@ -1710,7 +1710,7 @@ var updateCloudTests = []struct {
 		updateCloud: func(context.Context, names.CloudTag, jujuparams.Cloud) error {
 			return errors.E("test error")
 		},
-		username:    "alice@external",
+		username:    "alice@canonical.com",
 		cloud:       "test",
 		expectError: `test error`,
 	}}
@@ -1780,9 +1780,9 @@ const removeCloudFromControllerTestEnv = `clouds:
   regions:
   - name: default
   users:
-  - user: alice@external
+  - user: alice@canonical.com
     access: admin
-  - user: bob@external
+  - user: bob@canonical.com
     access: add-model
 - name: test
   type: kubernetes
@@ -1790,9 +1790,9 @@ const removeCloudFromControllerTestEnv = `clouds:
   regions:
   - name: default
   users:
-  - user: alice@external
+  - user: alice@canonical.com
     access: admin
-  - user: bob@external
+  - user: bob@canonical.com
     access: add-model
 controllers:
 - name: controller-1
@@ -1835,7 +1835,7 @@ var removeCloudFromControllerTests = []struct {
 	assertSuccess   func(c *qt.C, j *jimm.JIMM)
 }{{
 	name:            "CloudNotFound",
-	username:        "alice@external",
+	username:        "alice@canonical.com",
 	cloud:           "test2",
 	controllerName:  "controller-2",
 	expectError:     `cloud "test2" not found`,
@@ -1849,7 +1849,7 @@ var removeCloudFromControllerTests = []struct {
 		}
 		return nil
 	},
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	cloud:          "test",
 	controllerName: "controller-2",
 	assertSuccess: func(c *qt.C, j *jimm.JIMM) {
@@ -1873,7 +1873,7 @@ var removeCloudFromControllerTests = []struct {
 		}
 		return nil
 	},
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	cloud:          "test-cloud-2",
 	controllerName: "controller-2",
 	assertSuccess: func(c *qt.C, j *jimm.JIMM) {
@@ -1886,7 +1886,7 @@ var removeCloudFromControllerTests = []struct {
 }, {
 	name:            "UserNotAutfhorized",
 	env:             removeCloudFromControllerTestEnv,
-	username:        "bob@external",
+	username:        "bob@canonical.com",
 	cloud:           "test",
 	controllerName:  "controller-2",
 	expectError:     `unauthorized`,
@@ -1895,7 +1895,7 @@ var removeCloudFromControllerTests = []struct {
 	name:           "DialError",
 	env:            removeCloudFromControllerTestEnv,
 	dialError:      errors.E("test dial error"),
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	cloud:          "test",
 	controllerName: "controller-2",
 	expectError:    `test dial error`,
@@ -1905,7 +1905,7 @@ var removeCloudFromControllerTests = []struct {
 	removeCloud: func(_ context.Context, mt names.CloudTag) error {
 		return errors.E("test error")
 	},
-	username:       "alice@external",
+	username:       "alice@canonical.com",
 	cloud:          "test",
 	controllerName: "controller-2",
 	expectError:    `test error`,

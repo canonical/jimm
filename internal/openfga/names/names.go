@@ -12,7 +12,7 @@ import (
 	cofga "github.com/canonical/ofga"
 
 	"github.com/juju/juju/core/permission"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 )
 
 // Relation Types
@@ -80,7 +80,7 @@ func ConvertTag[RT ResourceTagger](t RT) *Tag {
 	if t.Kind() == names.UserTagKind && id == EveryoneUser {
 		// A user with ID "*" represents "everyone" in OpenFGA and allows checks like
 		// `user:bob reader type:my-resource` to return true without a separate query
-		// for the user:everyone@external user.
+		// for the user:everyone user.
 		id = "*"
 	}
 	tag := &Tag{

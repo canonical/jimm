@@ -5,7 +5,7 @@ package names_test
 import (
 	"testing"
 
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	gc "gopkg.in/check.v1"
 
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
