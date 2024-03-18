@@ -5,6 +5,7 @@ package jujuapi_test
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/pem"
 	"fmt"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	"net/url"
 
 	"github.com/juju/juju/api"
+	"github.com/juju/juju/rpc/jsoncodec"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	gc "gopkg.in/check.v1"
@@ -99,7 +101,12 @@ func (s *websocketSuite) TearDownTest(c *gc.C) {
 // openNoAssert creates a new websocket connection to the test server, using the
 // connection info specified in info, authenticating as the given user.
 // If info is nil then default values will be used.
-func (s *websocketSuite) openNoAssert(c *gc.C, info *api.Info, username string) (api.Connection, error) {
+func (s *websocketSuite) openNoAssert(
+	c *gc.C,
+	info *api.Info,
+	username string,
+	dialWebsocket func(ctx context.Context, urlStr string, tlsConfig *tls.Config, ipAddr string) (jsoncodec.JSONConn, error),
+) (api.Connection, error) {
 	var inf api.Info
 	if info != nil {
 		inf = *info
@@ -119,14 +126,31 @@ func (s *websocketSuite) openNoAssert(c *gc.C, info *api.Info, username string) 
 
 	lp := jimmtest.NewUserSessionLogin(username)
 
-	return api.Open(&inf, api.DialOpts{
+	dialOpts := api.DialOpts{
 		InsecureSkipVerify: true,
 		LoginProvider:      lp,
-	})
+	}
+
+	if dialWebsocket != nil {
+		dialOpts.DialWebsocket = dialWebsocket
+	}
+
+	return api.Open(&inf, dialOpts)
 }
 
 func (s *websocketSuite) open(c *gc.C, info *api.Info, username string) api.Connection {
-	conn, err := s.openNoAssert(c, info, username)
+	conn, err := s.openNoAssert(c, info, username, nil)
+	c.Assert(err, gc.Equals, nil)
+	return conn
+}
+
+func (s *websocketSuite) openWithDialWebsocket(
+	c *gc.C,
+	info *api.Info,
+	username string,
+	dialWebsocket func(ctx context.Context, urlStr string, tlsConfig *tls.Config, ipAddr string) (jsoncodec.JSONConn, error),
+) api.Connection {
+	conn, err := s.openNoAssert(c, info, username, dialWebsocket)
 	c.Assert(err, gc.Equals, nil)
 	return conn
 }

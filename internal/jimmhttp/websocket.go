@@ -12,6 +12,8 @@ import (
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
+	"github.com/canonical/jimm/internal/auth"
+	"github.com/canonical/jimm/internal/jimm"
 	"github.com/canonical/jimm/internal/servermon"
 )
 
@@ -33,6 +35,34 @@ type WSHandler struct {
 // been started.
 func (h *WSHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	ctx := req.Context()
+
+	// We perform cookie authentication at the HTTP layer instead of WS
+	// due to limitations of setting and retrieving cookies in the WS layer.
+	//
+	// If no cookie is present, we expect 1 of 3 scenarios:
+	// 1. It's a device session token login.
+	// 2. It's a client credential login.
+	// 3. It's an "expired" cookie login, and as such no cookie
+	//	  has been sent with the request. The handling of this is within
+	//    LoginWithSessionCookie, in which, due to no identityId being present
+	//    we know the cookie expired or a request with no cookie was made.
+	_, err := req.Cookie(auth.SessionName)
+
+	// Now we know a cookie is present, so let's try perform a cookie login / logic
+	// as presumably a cookie of this name should only ever be present in the case
+	// the browser performs a connection.
+	if err == nil {
+		ctx, err = h.Server.GetAuthenticationService().AuthenticateBrowserSession(
+			ctx, w, req,
+		)
+		if err != nil {
+			// Something went wrong when trying to perform the authentication
+			// of the cookie.
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+	}
+
 	ctx = context.WithValue(ctx, contextPathKey("path"), req.URL.EscapedPath())
 	conn, err := h.Upgrader.Upgrade(w, req, nil)
 	if err != nil {
@@ -70,4 +100,7 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 // the websocket connection, but not send any control messages.
 type WSServer interface {
 	ServeWS(context.Context, *websocket.Conn)
+
+	// GetAuthenticationService returns JIMM's authentication services.
+	GetAuthenticationService() jimm.OAuthAuthenticator
 }

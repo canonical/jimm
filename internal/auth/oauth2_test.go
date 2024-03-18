@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/antonlindstrom/pgstore"
 	"github.com/canonical/jimm/internal/auth"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
@@ -27,6 +28,12 @@ func setupTestAuthSvc(ctx context.Context, c *qt.C, expiry time.Duration) (*auth
 	}
 	c.Assert(db.Migrate(ctx, false), qt.IsNil)
 
+	sqldb, err := db.DB.DB()
+	c.Assert(err, qt.IsNil)
+
+	sessionStore, err := pgstore.NewPGStoreFromPool(sqldb, []byte("secretsecretdigletts"))
+	c.Assert(err, qt.IsNil)
+
 	authSvc, err := auth.NewAuthenticationService(ctx, auth.AuthenticationServiceParams{
 		IssuerURL:          "http://localhost:8082/realms/jimm",
 		ClientID:           "jimm-device",
@@ -35,6 +42,7 @@ func setupTestAuthSvc(ctx context.Context, c *qt.C, expiry time.Duration) (*auth
 		SessionTokenExpiry: expiry,
 		RedirectURL:        "http://localhost:8080/auth/callback",
 		Store:              db,
+		SessionStore:       sessionStore,
 	})
 	c.Assert(err, qt.IsNil)
 

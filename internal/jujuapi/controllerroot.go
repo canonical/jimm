@@ -129,9 +129,12 @@ type controllerRoot struct {
 	// is created per WS, it is EXPECTED that the subsequent call to GetDeviceSessionToken
 	// happens on the SAME websocket.
 	deviceOAuthResponse *oauth2.DeviceAuthResponse
+
+	// identityId is the id of the identity attempting to login via a session cookie.
+	identityId string
 }
 
-func newControllerRoot(j JIMM, p Params) *controllerRoot {
+func newControllerRoot(j JIMM, p Params, identityId string) *controllerRoot {
 	watcherRegistry := &watcherRegistry{
 		watchers: make(map[string]*modelSummaryWatcher),
 	}
@@ -141,6 +144,8 @@ func newControllerRoot(j JIMM, p Params) *controllerRoot {
 		watchers:              watcherRegistry,
 		pingF:                 func() {},
 		controllerUUIDMasking: true,
+		user:                  nil, // TODO
+		identityId:            identityId,
 	}
 
 	r.AddMethod("Admin", 1, "Login", rpc.Method(unsupportedLogin))
@@ -150,6 +155,7 @@ func newControllerRoot(j JIMM, p Params) *controllerRoot {
 	r.AddMethod("Admin", 4, "LoginDevice", rpc.Method(r.LoginDevice))
 	r.AddMethod("Admin", 4, "GetDeviceSessionToken", rpc.Method(r.GetDeviceSessionToken))
 	r.AddMethod("Admin", 4, "LoginWithSessionToken", rpc.Method(r.LoginWithSessionToken))
+	r.AddMethod("Admin", 4, "LoginWithSessionCookie", rpc.Method(r.LoginWithSessionCookie))
 	r.AddMethod("Admin", 4, "LoginWithClientCredentials", rpc.Method(r.LoginWithClientCredentials))
 	r.AddMethod("Pinger", 1, "Ping", rpc.Method(r.Ping))
 	return r

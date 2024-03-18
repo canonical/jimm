@@ -263,10 +263,8 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
-
 	// Cleanup expired session every 30 minutes
 	defer sessionStore.StopCleanup(sessionStore.Cleanup(time.Minute * 30))
-	s.jimm.CookieSessionStore = sessionStore
 
 	if p.AuditLogRetentionPeriodInDays != "" {
 		period, err := strconv.Atoi(p.AuditLogRetentionPeriodInDays)
@@ -299,6 +297,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 			Scopes:             p.OAuthAuthenticatorParams.Scopes,
 			SessionTokenExpiry: p.OAuthAuthenticatorParams.SessionTokenExpiry,
 			Store:              &s.jimm.Database,
+			SessionStore:       sessionStore,
 		},
 	)
 	s.jimm.OAuthAuthenticator = authSvc
@@ -353,7 +352,6 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	oauthHandler, err := jimmhttp.NewOAuthHandler(jimmhttp.OAuthHandlerParams{
 		Authenticator:             authSvc,
 		DashboardFinalRedirectURL: p.DashboardFinalRedirectURL,
-		SessionStore:              sessionStore,
 		SecureCookies:             p.SecureSessionCookies,
 		CookieExpiry:              p.SessionCookieExpiry,
 	})

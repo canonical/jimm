@@ -12,6 +12,7 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/gorilla/websocket"
 
+	"github.com/canonical/jimm/internal/jimm"
 	"github.com/canonical/jimm/internal/jimmhttp"
 )
 
@@ -57,6 +58,11 @@ func (s echoServer) ServeWS(ctx context.Context, conn *websocket.Conn) {
 	}
 }
 
+// GetAuthenticationService returns JIMM's oauth authentication service.
+func (s echoServer) GetAuthenticationService() jimm.OAuthAuthenticator {
+	return nil
+}
+
 func TestWSHandlerPanic(t *testing.T) {
 	c := qt.New(t)
 
@@ -76,6 +82,11 @@ func TestWSHandlerPanic(t *testing.T) {
 }
 
 type panicServer struct{}
+
+// GetAuthenticationService returns JIMM's oauth authentication service.
+func (s panicServer) GetAuthenticationService() jimm.OAuthAuthenticator {
+	return nil
+}
 
 func (s panicServer) ServeWS(ctx context.Context, conn *websocket.Conn) {
 	panic("test")

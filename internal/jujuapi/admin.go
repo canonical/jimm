@@ -100,6 +100,40 @@ func (r *controllerRoot) GetDeviceSessionToken(ctx context.Context) (params.GetD
 	return response, nil
 }
 
+// LoginWithSessionCookie
+func (r *controllerRoot) LoginWithSessionCookie(ctx context.Context) (jujuparams.LoginResult, error) {
+	const op = errors.Op("jujuapi.LoginWithSessionCookie")
+
+	// If no identity ID has come through, then no cookie was present
+	// and as such authentication has failed.
+	if r.identityId == "" {
+		return jujuparams.LoginResult{}, errors.E(op, (&auth.AuthenticationError{}).Error())
+	}
+
+	user, err := r.jimm.GetOpenFGAUserAndAuthorise(ctx, r.identityId)
+	if err != nil {
+		return jujuparams.LoginResult{}, errors.E(op, err)
+	}
+
+	r.mu.Lock()
+	r.user = user
+	r.mu.Unlock()
+
+	// Get server version for LoginResult
+	srvVersion, err := r.jimm.EarliestControllerVersion(ctx)
+	if err != nil {
+		return jujuparams.LoginResult{}, errors.E(op, err)
+	}
+
+	return jujuparams.LoginResult{
+		PublicDNSName: r.params.PublicDNSName,
+		UserInfo:      setupAuthUserInfo(ctx, r, user),
+		ControllerTag: setupControllerTag(r),
+		Facades:       setupFacades(r),
+		ServerVersion: srvVersion.String(),
+	}, nil
+}
+
 // LoginWithSessionToken handles logging into the JIMM via a session token that JIMM has
 // minted itself, this session token is simply a JWT containing the users email
 // at which point the email is used to perform a lookup for the user, authorise

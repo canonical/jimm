@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/antonlindstrom/pgstore"
 	qt "github.com/frankban/quicktest"
 	"github.com/juju/names/v5"
 
@@ -29,6 +30,11 @@ func TestGetOpenFGAUser(t *testing.T) {
 	db := &db.Database{
 		DB: jimmtest.PostgresDB(c, func() time.Time { return time.Now() }),
 	}
+	sqldb, err := db.DB.DB()
+	c.Assert(err, qt.IsNil)
+
+	sessionStore, err := pgstore.NewPGStoreFromPool(sqldb, []byte("secretsecretdigletts"))
+	c.Assert(err, qt.IsNil)
 	// TODO(ale8k): Mock this
 	authSvc, err := auth.NewAuthenticationService(ctx, auth.AuthenticationServiceParams{
 		IssuerURL:          "http://localhost:8082/realms/jimm",
@@ -36,6 +42,7 @@ func TestGetOpenFGAUser(t *testing.T) {
 		Scopes:             []string{"openid", "profile", "email"},
 		SessionTokenExpiry: time.Hour,
 		Store:              db,
+		SessionStore:       sessionStore,
 	})
 	c.Assert(err, qt.IsNil)
 

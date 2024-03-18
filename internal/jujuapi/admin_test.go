@@ -4,9 +4,11 @@ package jujuapi_test
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/base64"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -14,14 +16,19 @@ import (
 	"strings"
 	"time"
 
+	"github.com/antonlindstrom/pgstore"
 	"github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/internal/auth"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/jimmtest"
+	"github.com/gorilla/websocket"
 
 	"github.com/coreos/go-oidc/v3/oidc"
+	"github.com/juju/errors"
 	"github.com/juju/juju/api"
+	"github.com/juju/juju/rpc/jsoncodec"
 	jujuparams "github.com/juju/juju/rpc/params"
+	"github.com/juju/juju/utils/proxy"
 	"github.com/juju/names/v4"
 	gc "gopkg.in/check.v1"
 )
@@ -34,15 +41,23 @@ func (s *adminSuite) SetUpTest(c *gc.C) {
 	s.websocketSuite.SetUpTest(c)
 	ctx := context.Background()
 
+	sqldb, err := s.JIMM.Database.DB.DB()
+	c.Assert(err, gc.IsNil)
+
+	sessionStore, err := pgstore.NewPGStoreFromPool(sqldb, []byte("secretsecretdigletts"))
+	c.Assert(err, gc.IsNil)
+
 	// Replace JIMM's mock authenticator with a real one here
 	// for testing the login flows.
 	authSvc, err := auth.NewAuthenticationService(ctx, auth.AuthenticationServiceParams{
-		IssuerURL:          "http://localhost:8082/realms/jimm",
-		ClientID:           "jimm-device",
-		ClientSecret:       "SwjDofnbDzJDm9iyfUhEp67FfUFMY8L4",
-		Scopes:             []string{oidc.ScopeOpenID, "profile", "email"},
-		SessionTokenExpiry: time.Hour,
-		Store:              &s.JIMM.Database,
+		IssuerURL:           "http://localhost:8082/realms/jimm",
+		ClientID:            "jimm-device",
+		ClientSecret:        "SwjDofnbDzJDm9iyfUhEp67FfUFMY8L4",
+		Scopes:              []string{oidc.ScopeOpenID, "profile", "email"},
+		SessionTokenExpiry:  time.Hour,
+		Store:               &s.JIMM.Database,
+		SessionStore:        sessionStore,
+		SessionCookieMaxAge: 60,
 	})
 	c.Assert(err, gc.Equals, nil)
 	s.JIMM.OAuthAuthenticator = authSvc
@@ -60,6 +75,96 @@ func (s *adminSuite) TestLoginToController(c *gc.C) {
 	var resp jujuparams.RedirectInfoResult
 	err = conn.APICall("Admin", 3, "", "RedirectInfo", nil, &resp)
 	c.Assert(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeNotImplemented)
+}
+
+// TestBrowserLogin takes a test user through the flow of logging into jimm
+// via the correct facades. All are done in a single test to see the flow end-2-end.
+//
+// Within the test are clear comments explaining what is happening when and why.
+// Please refer to these comments for further details.
+func (s *adminSuite) TestBrowserLogin(c *gc.C) {
+	// The setup runs a browser login with callback, ultimately retrieving
+	// a logged in user by cookie.
+	sqldb, err := s.JIMM.DB().DB.DB()
+	c.Assert(err, gc.IsNil)
+
+	sessionStore, err := pgstore.NewPGStoreFromPool(sqldb, []byte("secretsecretdigletts"))
+	c.Assert(err, gc.IsNil)
+
+	cookie, err := jimmtest.RunBrowserLogin(s.JIMM.DB(), sessionStore, 60)
+	c.Assert(err, gc.IsNil)
+	c.Assert(cookie, gc.Not(gc.Equals), "")
+
+	cookies := jimmtest.ParseCookies(cookie)
+	c.Assert(cookies, gc.HasLen, 1)
+
+	jar, err := cookiejar.New(nil)
+	c.Assert(err, gc.IsNil)
+
+	// Now we move this cookie to the JIMM server on the admin suite and
+	// set the cookie on the jimm test server url so that the cookie can be
+	// sent on WS calls.
+	jimmURL, err := url.Parse(s.Server.URL)
+	c.Assert(err, gc.IsNil)
+	jar.SetCookies(jimmURL, cookies)
+
+	// Copied from github.com/juju/juju@v0.0.0-20240304110523-55fb5d03683b/api/apiclient.go
+	dialWebsocket := func(ctx context.Context, urlStr string, tlsConfig *tls.Config, ipAddr string) (jsoncodec.JSONConn, error) {
+		url, err := url.Parse(urlStr)
+		if err != nil {
+			return nil, errors.Trace(err)
+		}
+
+		netDialer := net.Dialer{}
+		dialer := &websocket.Dialer{
+			NetDial: func(netw, addr string) (net.Conn, error) {
+				if addr == url.Host {
+					addr = ipAddr
+				}
+				return netDialer.DialContext(ctx, netw, addr)
+			},
+			Proxy:            proxy.DefaultConfig.GetProxy,
+			HandshakeTimeout: 45 * time.Second,
+			TLSClientConfig:  tlsConfig,
+			Jar:              jar,
+		}
+
+		c, resp, err := dialer.Dial(urlStr, nil)
+		if err != nil {
+			if err == websocket.ErrBadHandshake {
+				defer resp.Body.Close()
+				body, readErr := io.ReadAll(resp.Body)
+				if readErr == nil {
+					err = errors.Errorf(
+						"%s (%s)",
+						strings.TrimSpace(string(body)),
+						http.StatusText(resp.StatusCode),
+					)
+				}
+			}
+			return nil, errors.Trace(err)
+		}
+		return jsoncodec.NewWebsocketConn(c), nil
+	}
+
+	conn := s.openWithDialWebsocket(
+		c,
+		&api.Info{
+			SkipLogin: true,
+		},
+		"test",
+		dialWebsocket,
+	)
+	defer conn.Close()
+
+	lr := &jujuparams.LoginResult{}
+	c.Assert(
+		conn.APICall("Admin", 4, "", "LoginWithSessionCookie", nil, lr),
+		gc.IsNil,
+	)
+
+	c.Assert(lr.UserInfo.Identity, gc.Equals, "user-jimm-test@canonical.com")
+	c.Assert(lr.UserInfo.DisplayName, gc.Equals, "jimm-test")
 }
 
 // TestDeviceLogin takes a test user through the flow of logging into jimm
