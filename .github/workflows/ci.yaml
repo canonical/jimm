@@ -24,7 +24,7 @@ jobs:
 
   build_test:
     name: Build and Test
-    runs-on: ubuntu-20.04
+    runs-on: [self-hosted, linux, X64, jammy, large]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -59,7 +59,7 @@ jobs:
 
   smoke_test:
     name: Smoke Test
-    runs-on: ubuntu-22.04
+    runs-on: [self-hosted, linux, X64, jammy, large]
     # The docker compose has a healthcheck on the JIMM container.
     # So if the compose returns with exit code 0 then the JIMM server successfully started.
     steps:
