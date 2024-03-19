@@ -74,6 +74,8 @@ type OAuthAuthenticatorParams struct {
 	// SessionTokenExpiry holds the expiry duration for issued JWTs
 	// for user (CLI) to JIMM authentication.
 	SessionTokenExpiry time.Duration
+	// SessionCookieMaxAge holds the max age for session cookies.
+	SessionCookieMaxAge int
 }
 
 // A Params structure contains the parameters required to initialise a new
@@ -167,9 +169,6 @@ type Params struct {
 	// SecureSessionCookies determines if HTTPS must be enabled in order for JIMM
 	// to set cookies when creating browser based sessions.
 	SecureSessionCookies bool
-
-	// SessionCookieExpiry is how long the cookie will be valid before expiring in seconds.
-	SessionCookieExpiry int
 }
 
 // A Service is the implementation of a JIMM server.
@@ -291,13 +290,14 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	authSvc, err := auth.NewAuthenticationService(
 		ctx,
 		auth.AuthenticationServiceParams{
-			IssuerURL:          p.OAuthAuthenticatorParams.IssuerURL,
-			ClientID:           p.OAuthAuthenticatorParams.ClientID,
-			ClientSecret:       p.OAuthAuthenticatorParams.ClientSecret,
-			Scopes:             p.OAuthAuthenticatorParams.Scopes,
-			SessionTokenExpiry: p.OAuthAuthenticatorParams.SessionTokenExpiry,
-			Store:              &s.jimm.Database,
-			SessionStore:       sessionStore,
+			IssuerURL:           p.OAuthAuthenticatorParams.IssuerURL,
+			ClientID:            p.OAuthAuthenticatorParams.ClientID,
+			ClientSecret:        p.OAuthAuthenticatorParams.ClientSecret,
+			Scopes:              p.OAuthAuthenticatorParams.Scopes,
+			SessionTokenExpiry:  p.OAuthAuthenticatorParams.SessionTokenExpiry,
+			SessionCookieMaxAge: p.OAuthAuthenticatorParams.SessionCookieMaxAge,
+			Store:               &s.jimm.Database,
+			SessionStore:        sessionStore,
 		},
 	)
 	s.jimm.OAuthAuthenticator = authSvc

@@ -92,7 +92,7 @@ type AuthenticationServiceParams struct {
 	Scopes []string
 	// SessionTokenExpiry holds the expiry time of minted JIMM session tokens (JWTs).
 	SessionTokenExpiry time.Duration
-	// sessionCookieMaxAge holds the max age for session cookies.
+	// SessionCookieMaxAge holds the max age for session cookies.
 	SessionCookieMaxAge int
 	// RedirectURL is the URL for handling the exchange of authorisation
 	// codes into access tokens (and id tokens), for JIMM, this is expected

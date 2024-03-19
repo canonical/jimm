@@ -109,10 +109,11 @@ func setupService(ctx context.Context, c *qt.C) (*jimm.Service, *httptest.Server
 			AuthModel: cofgaParams.AuthModelID,
 		},
 		OAuthAuthenticatorParams: jimm.OAuthAuthenticatorParams{
-			IssuerURL:          "http://localhost:8082/realms/jimm",
-			ClientID:           "jimm-device",
-			Scopes:             []string{oidc.ScopeOpenID, "profile", "email"},
-			SessionTokenExpiry: time.Duration(time.Hour),
+			IssuerURL:           "http://localhost:8082/realms/jimm",
+			ClientID:            "jimm-device",
+			Scopes:              []string{oidc.ScopeOpenID, "profile", "email"},
+			SessionTokenExpiry:  time.Duration(time.Hour),
+			SessionCookieMaxAge: 60,
 		},
 		DashboardFinalRedirectURL: "<no dashboard needed for this test>",
 	})

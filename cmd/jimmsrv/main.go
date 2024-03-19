@@ -159,15 +159,15 @@ func start(ctx context.Context, s *service.Service) error {
 		JWTExpiryDuration:             jwtExpiryDuration,
 		InsecureSecretStorage:         insecureSecretStorage,
 		OAuthAuthenticatorParams: jimm.OAuthAuthenticatorParams{
-			IssuerURL:          issuerURL,
-			ClientID:           clientID,
-			ClientSecret:       clientSecret,
-			Scopes:             scopesParsed,
-			SessionTokenExpiry: sessionTokenExpiryDuration,
+			IssuerURL:           issuerURL,
+			ClientID:            clientID,
+			ClientSecret:        clientSecret,
+			Scopes:              scopesParsed,
+			SessionTokenExpiry:  sessionTokenExpiryDuration,
+			SessionCookieMaxAge: 60,
 		},
 		DashboardFinalRedirectURL: os.Getenv("JIMM_DASHBOARD_FINAL_REDIRECT_URL"),
 		SecureSessionCookies:      secureSessionCookies,
-		SessionCookieExpiry:       sessionCookieExpiryInt,
 	})
 	if err != nil {
 		return err
