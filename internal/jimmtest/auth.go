@@ -8,14 +8,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math/rand"
 	"net"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
 	"net/url"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
@@ -103,20 +101,16 @@ func convertUsernameToEmail(username string) string {
 }
 
 func SetupTestDashboardCallbackHandler(browserURL string, db *db.Database, sessionStore sessions.Store) (*httptest.Server, error) {
-	// Create unstarted server to enable auth service
-	s := httptest.NewUnstartedServer(nil)
-	// Setup random port listener
-	minPort := 30000
-	maxPort := 50000
-
-	port := strconv.Itoa(rand.Intn(maxPort-minPort+1) + minPort)
-	l, err := net.Listen("tcp", "localhost:"+port)
+	// Find a random free TCP port.
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		return nil, err
 	}
+	port := fmt.Sprintf("%d", listener.Addr().(*net.TCPAddr).Port)
 
-	// Set the listener with a random port
-	s.Listener = l
+	// Create unstarted server to enable auth service
+	s := httptest.NewUnstartedServer(nil)
+	s.Listener = listener
 
 	// Remember redirect url to check it matches after test server starts
 	redirectURL := "http://127.0.0.1:" + port + "/callback"
