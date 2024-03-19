@@ -145,7 +145,7 @@ func TestCacheSequence_JWKSExpires(t *testing.T) {
 	store.AssertExpectations(c)
 }
 
-func TestCacheSequence_GetOAuthKeyHitsCache(t *testing.T) {
+func TestCacheSequence_GetOAuthSecretHitsCache(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 	store := &MockCredentialStore{}
