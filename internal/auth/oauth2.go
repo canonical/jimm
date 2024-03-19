@@ -119,10 +119,6 @@ func NewAuthenticationService(ctx context.Context, params AuthenticationServiceP
 		return nil, errors.E(op, errors.CodeServerConfiguration, err, "failed to create oidc provider")
 	}
 
-	if params.SessionCookieMaxAge == 0 {
-		return nil, errors.E(op, errors.CodeServerConfiguration, err, "session cookie max age not set")
-	}
-
 	if params.SessionTokenExpiry == 0 {
 		return nil, errors.E(op, errors.CodeServerConfiguration, err, "session token expiry not set")
 	}
@@ -417,51 +413,44 @@ func (as *AuthenticationService) CreateBrowserSession(
 func (as *AuthenticationService) AuthenticateBrowserSession(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error) {
 	const op = errors.Op("auth.AuthenticationService.AuthenticateBrowserSession")
 
-	// Get the session for this cookie
 	session, err := as.sessionStore.Get(req, SessionName)
 	if err != nil {
 		return ctx, errors.E(op, err, "failed to retrieve session")
 	}
 
-	// Get the identity id (email)
-	identityId := session.Values[SessionIdentityKey]
+	identityId, ok := session.Values[SessionIdentityKey]
+	if !ok {
+		return ctx, errors.E(op, "session is missing identity key")
+	}
 
-	// Check the access token is ok
 	err = as.validateAndUpdateAccessToken(ctx, identityId)
 
-	// If it's not ok, kill their session
 	if err != nil {
-		session.Options.MaxAge = -1
-		if err := session.Save(req, w); err != nil {
+		if err := as.deleteSession(session, w, req); err != nil {
 			return ctx, errors.E(op, err)
 		}
 		return ctx, errors.E(op, err)
 	}
-	// Otherwise update the context with the identity id
+
 	ctx = ContextWithSessionIdentity(ctx, identityId)
 
-	// Extend the session
-	session.Options.MaxAge = as.sessionCookieMaxAge
-	if err = session.Save(req, w); err != nil {
+	if err := as.extendSession(session, w, req); err != nil {
 		return ctx, errors.E(op, err)
 	}
 
-	// And give the context back with the identity id present
 	return ctx, nil
 }
 
-// validateAndUpdateAccessToken
+// validateAndUpdateAccessToken validates the access tokens expiry, and if it cannot, then
+// it attempts to refresh the access token.
 func (as *AuthenticationService) validateAndUpdateAccessToken(ctx context.Context, email any) error {
 	const op = errors.Op("auth.AuthenticationService.validateAndUpdateAccessToken")
 
-	// Cast the email, it is any because we pass it through the context when authenticating
-	// with cookies and it makes sense to handle the casting here
 	emailStr, ok := email.(string)
 	if !ok {
 		return errors.E(op, "failed to cast email")
 	}
 
-	// Get identity
 	db := as.db
 	u := &dbmodel.Identity{
 		Name: emailStr,
@@ -470,7 +459,6 @@ func (as *AuthenticationService) validateAndUpdateAccessToken(ctx context.Contex
 		return errors.E(op, err)
 	}
 
-	// Construct token
 	t := &oauth2.Token{
 		AccessToken:  u.AccessToken,
 		RefreshToken: u.RefreshToken,
@@ -478,17 +466,14 @@ func (as *AuthenticationService) validateAndUpdateAccessToken(ctx context.Contex
 		TokenType:    u.AccessTokenType,
 	}
 
-	// Check its valid
 	if t.Valid() {
 		return nil
 	}
 
-	// Attempt to update the identity with a new token
 	if err := as.refreshIdentitiesToken(ctx, emailStr, t); err != nil {
 		return errors.E(op, err)
 	}
 
-	// All good!
 	return nil
 }
 
@@ -501,7 +486,7 @@ func (as *AuthenticationService) refreshIdentitiesToken(ctx context.Context, ema
 
 	tSrc := as.oauthConfig.TokenSource(ctx, t)
 
-	// Get a new access and refresh token
+	// Get a new access and refresh token (token source only has Token())
 	newToken, err := tSrc.Token()
 	if err != nil {
 		return errors.E(op, err, "failed to refresh token")
@@ -509,6 +494,30 @@ func (as *AuthenticationService) refreshIdentitiesToken(ctx context.Context, ema
 
 	if err := as.UpdateIdentity(ctx, email, newToken); err != nil {
 		return errors.E(op, err, "failed to update identity")
+	}
+
+	return nil
+}
+
+func (as *AuthenticationService) deleteSession(session *sessions.Session, w http.ResponseWriter, req *http.Request) error {
+	const op = errors.Op("auth.AuthenticationService.deleteSession")
+
+	session.Options.MaxAge = 0
+
+	if err := session.Save(req, w); err != nil {
+		return errors.E(op, err)
+	}
+
+	return nil
+}
+
+func (as *AuthenticationService) extendSession(session *sessions.Session, w http.ResponseWriter, req *http.Request) error {
+	const op = errors.Op("auth.AuthenticationService.extendSession")
+
+	session.Options.MaxAge = as.sessionCookieMaxAge
+
+	if err := session.Save(req, w); err != nil {
+		return errors.E(op, err)
 	}
 
 	return nil

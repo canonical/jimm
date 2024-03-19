@@ -113,52 +113,13 @@ func (s *adminSuite) TestBrowserLogin(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	jar.SetCookies(jimmURL, cookies)
 
-	// Copied from github.com/juju/juju@v0.0.0-20240304110523-55fb5d03683b/api/apiclient.go
-	dialWebsocket := func(ctx context.Context, urlStr string, tlsConfig *tls.Config, ipAddr string) (jsoncodec.JSONConn, error) {
-		url, err := url.Parse(urlStr)
-		if err != nil {
-			return nil, errors.Trace(err)
-		}
-
-		netDialer := net.Dialer{}
-		dialer := &websocket.Dialer{
-			NetDial: func(netw, addr string) (net.Conn, error) {
-				if addr == url.Host {
-					addr = ipAddr
-				}
-				return netDialer.DialContext(ctx, netw, addr)
-			},
-			Proxy:            proxy.DefaultConfig.GetProxy,
-			HandshakeTimeout: 45 * time.Second,
-			TLSClientConfig:  tlsConfig,
-			Jar:              jar,
-		}
-
-		c, resp, err := dialer.Dial(urlStr, nil)
-		if err != nil {
-			if err == websocket.ErrBadHandshake {
-				defer resp.Body.Close()
-				body, readErr := io.ReadAll(resp.Body)
-				if readErr == nil {
-					err = errors.Errorf(
-						"%s (%s)",
-						strings.TrimSpace(string(body)),
-						http.StatusText(resp.StatusCode),
-					)
-				}
-			}
-			return nil, errors.Trace(err)
-		}
-		return jsoncodec.NewWebsocketConn(c), nil
-	}
-
 	conn := s.openWithDialWebsocket(
 		c,
 		&api.Info{
 			SkipLogin: true,
 		},
 		"test",
-		dialWebsocket,
+		getDialWebsocketWithCustomCookieJar(jar),
 	)
 	defer conn.Close()
 
@@ -362,4 +323,52 @@ func (s *adminSuite) TestLoginWithClientCredentials(c *gc.C) {
 		ClientSecret: "invalid-secret",
 	}, &loginResult)
 	c.Assert(err, gc.ErrorMatches, `invalid client credentials \(unauthorized access\)`)
+}
+
+// getDialWebsocketWithCustomCookieJar is mostly the default dialer configuration exception
+// we need a dial websocket for juju containing a custom cookie jar to send cookies to
+// a new server url when testing LoginWithSessionCookie. As such this closure simply
+// passes the jar through.
+func getDialWebsocketWithCustomCookieJar(jar *cookiejar.Jar) func(ctx context.Context, urlStr string, tlsConfig *tls.Config, ipAddr string) (jsoncodec.JSONConn, error) {
+	// Copied from github.com/juju/juju@v0.0.0-20240304110523-55fb5d03683b/api/apiclient.go
+	dialWebsocket := func(ctx context.Context, urlStr string, tlsConfig *tls.Config, ipAddr string) (jsoncodec.JSONConn, error) {
+		url, err := url.Parse(urlStr)
+		if err != nil {
+			return nil, errors.Trace(err)
+		}
+
+		netDialer := net.Dialer{}
+		dialer := &websocket.Dialer{
+			NetDial: func(netw, addr string) (net.Conn, error) {
+				if addr == url.Host {
+					addr = ipAddr
+				}
+				return netDialer.DialContext(ctx, netw, addr)
+			},
+			Proxy:            proxy.DefaultConfig.GetProxy,
+			HandshakeTimeout: 45 * time.Second,
+			TLSClientConfig:  tlsConfig,
+			// We update the jar so that the cookies retrieved from RunBrowserLogin
+			// can be sent in the LoginWithSessionCookie call.
+			Jar: jar,
+		}
+
+		c, resp, err := dialer.Dial(urlStr, nil)
+		if err != nil {
+			if err == websocket.ErrBadHandshake {
+				defer resp.Body.Close()
+				body, readErr := io.ReadAll(resp.Body)
+				if readErr == nil {
+					err = errors.Errorf(
+						"%s (%s)",
+						strings.TrimSpace(string(body)),
+						http.StatusText(resp.StatusCode),
+					)
+				}
+			}
+			return nil, errors.Trace(err)
+		}
+		return jsoncodec.NewWebsocketConn(c), nil
+	}
+	return dialWebsocket
 }

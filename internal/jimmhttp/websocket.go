@@ -36,31 +36,14 @@ type WSHandler struct {
 func (h *WSHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	ctx := req.Context()
 
-	// We perform cookie authentication at the HTTP layer instead of WS
-	// due to limitations of setting and retrieving cookies in the WS layer.
-	//
-	// If no cookie is present, we expect 1 of 3 scenarios:
-	// 1. It's a device session token login.
-	// 2. It's a client credential login.
-	// 3. It's an "expired" cookie login, and as such no cookie
-	//	  has been sent with the request. The handling of this is within
-	//    LoginWithSessionCookie, in which, due to no identityId being present
-	//    we know the cookie expired or a request with no cookie was made.
-	_, err := req.Cookie(auth.SessionName)
-
-	// Now we know a cookie is present, so let's try perform a cookie login / logic
-	// as presumably a cookie of this name should only ever be present in the case
-	// the browser performs a connection.
-	if err == nil {
-		ctx, err = h.Server.GetAuthenticationService().AuthenticateBrowserSession(
-			ctx, w, req,
-		)
-		if err != nil {
-			// Something went wrong when trying to perform the authentication
-			// of the cookie.
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
+	ctx, err := handleBrowserAuthentication(
+		ctx,
+		h.Server.GetAuthenticationService(),
+		w,
+		req,
+	)
+	if err != nil {
+		return
 	}
 
 	ctx = context.WithValue(ctx, contextPathKey("path"), req.URL.EscapedPath())
@@ -91,6 +74,46 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	h.Server.ServeWS(ctx, conn)
+}
+
+// handleBrowserAuthentication handles browser authentication when a session cookie
+// is present, ultimately placing the identity resolved from the cookie within the
+// passed context.
+//
+// It updates the response header on authentication errors with a InternalServerError,
+// and as such is safe to return from your handler upon error without updating
+// the response statuses.
+func handleBrowserAuthentication(ctx context.Context, authSvc jimm.OAuthAuthenticator, w http.ResponseWriter, req *http.Request) (context.Context, error) {
+	// We perform cookie authentication at the HTTP layer instead of WS
+	// due to limitations of setting and retrieving cookies in the WS layer.
+	//
+	// If no cookie is present, we expect 1 of 3 scenarios:
+	// 1. It's a device session token login.
+	// 2. It's a client credential login.
+	// 3. It's an "expired" cookie login, and as such no cookie
+	//	  has been sent with the request. The handling of this is within
+	//    LoginWithSessionCookie, in which, due to no identityId being present
+	//    we know the cookie expired or a request with no cookie was made.
+	_, err := req.Cookie(auth.SessionName)
+
+	// Now we know a cookie is present, so let's try perform a cookie login / logic
+	// as presumably a cookie of this name should only ever be present in the case
+	// the browser performs a connection.
+	if err == nil {
+		ctx, err = authSvc.AuthenticateBrowserSession(
+			ctx, w, req,
+		)
+		if err != nil {
+			// Something went wrong when trying to perform the authentication
+			// of the cookie.
+			w.WriteHeader(http.StatusInternalServerError)
+			return ctx, err
+		}
+	}
+
+	// If there's an error due to failure to find the cookie, just return the context
+	// and move on presuming it's a device or client credentials login.
+	return ctx, nil
 }
 
 // A WSServer is a websocket server.

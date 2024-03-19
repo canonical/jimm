@@ -144,7 +144,6 @@ func newControllerRoot(j JIMM, p Params, identityId string) *controllerRoot {
 		watchers:              watcherRegistry,
 		pingF:                 func() {},
 		controllerUUIDMasking: true,
-		user:                  nil, // TODO
 		identityId:            identityId,
 	}
 

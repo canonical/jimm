@@ -405,7 +405,6 @@ func TestAuthenticateBrowserSessionHandlesExpiredAccessTokens(t *testing.T) {
 	// Check identity added
 	identityId := auth.SessionIdentityFromContext(ctx)
 	c.Assert(identityId, qt.Equals, "jimm-test@canonical.com")
-	// Check recorder has Set-Cookie
 
 	// Get identity again with new access token expiry and access token
 	err = db.GetIdentity(ctx, &u)
