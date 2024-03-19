@@ -502,7 +502,7 @@ func (as *AuthenticationService) refreshIdentitiesToken(ctx context.Context, ema
 func (as *AuthenticationService) deleteSession(session *sessions.Session, w http.ResponseWriter, req *http.Request) error {
 	const op = errors.Op("auth.AuthenticationService.deleteSession")
 
-	session.Options.MaxAge = 0
+	session.Options.MaxAge = -1
 
 	if err := session.Save(req, w); err != nil {
 		return errors.E(op, err)
