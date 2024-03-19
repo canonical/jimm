@@ -35,14 +35,14 @@ func TestGetOpenFGAUser(t *testing.T) {
 
 	sessionStore, err := pgstore.NewPGStoreFromPool(sqldb, []byte("secretsecretdigletts"))
 	c.Assert(err, qt.IsNil)
-	// TODO(ale8k): Mock this
 	authSvc, err := auth.NewAuthenticationService(ctx, auth.AuthenticationServiceParams{
-		IssuerURL:          "http://localhost:8082/realms/jimm",
-		ClientID:           "jimm-device",
-		Scopes:             []string{"openid", "profile", "email"},
-		SessionTokenExpiry: time.Hour,
-		Store:              db,
-		SessionStore:       sessionStore,
+		IssuerURL:           "http://localhost:8082/realms/jimm",
+		ClientID:            "jimm-device",
+		Scopes:              []string{"openid", "profile", "email"},
+		SessionTokenExpiry:  time.Hour,
+		Store:               db,
+		SessionStore:        sessionStore,
+		SessionCookieMaxAge: 60,
 	})
 	c.Assert(err, qt.IsNil)
 
