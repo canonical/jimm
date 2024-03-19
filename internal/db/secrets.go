@@ -304,13 +304,13 @@ func (d *Database) GetOAuthSecret(ctx context.Context) ([]byte, error) {
 		zapctx.Error(ctx, "failed to get oauth key", zap.Error(err))
 		return nil, errors.E(op, err)
 	}
-	var pem []byte
-	err = json.Unmarshal(secret.Data, &pem)
+	var oauthKey []byte
+	err = json.Unmarshal(secret.Data, &oauthKey)
 	if err != nil {
 		zapctx.Error(ctx, "failed to unmarshal pem data", zap.Error(err))
 		return nil, errors.E(op, err)
 	}
-	return pem, nil
+	return oauthKey, nil
 }
 
 // PutOAuthSecret puts a HS256 (symmetric encryption) secret into the credentials store for signing OAuth session tokens.
