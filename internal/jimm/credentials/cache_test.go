@@ -151,28 +151,28 @@ func TestCacheSequence_GetOAuthKeyHitsCache(t *testing.T) {
 	store := &MockCredentialStore{}
 
 	store.
-		On("PutOAuthKey", mock.Anything, mock.Anything).Return(nil).
-		On("GetOAuthKey", mock.Anything).Return([]byte{0}, nil).Times(1) // This bails on the second call.
+		On("PutOAuthSecret", mock.Anything, mock.Anything).Return(nil).
+		On("GetOAuthSecret", mock.Anything).Return([]byte{0}, nil).Times(1) // This bails on the second call.
 
 	cache := NewCachedCredentialStore(store, CachedCredentialStoreParams{})
 
-	err := cache.PutOAuthKey(ctx, nil) // The argument itself is not important, so nil is passed.
+	err := cache.PutOAuthSecret(ctx, nil) // The argument itself is not important, so nil is passed.
 	c.Assert(err, qt.IsNil)
 
-	// First GetOAuthKey should hit the wrapped credential store.
-	retrieved1, err := cache.GetOAuthKey(ctx)
+	// First GetOAuthSecret should hit the wrapped credential store.
+	retrieved1, err := cache.GetOAuthSecret(ctx)
 	c.Assert(err, qt.IsNil)
 	c.Assert(retrieved1, qt.DeepEquals, []byte{0})
 
-	// Second GetOAuthKey should be returned from the cached value.
-	retrieved2, err := cache.GetOAuthKey(ctx)
+	// Second GetOAuthSecret should be returned from the cached value.
+	retrieved2, err := cache.GetOAuthSecret(ctx)
 	c.Assert(err, qt.IsNil)
 	c.Assert(retrieved2, qt.DeepEquals, retrieved1)
 
 	store.AssertExpectations(c)
 }
 
-func TestCacheSequence_PutOAuthKeyPurgesCache(t *testing.T) {
+func TestCacheSequence_PutOAuthSecretPurgesCache(t *testing.T) {
 	// This test is to ensure that cached values are purged whenever a put
 	// operation takes place. First, we do a put-get sequence to fetch the value
 	// into the cache and then repeat the put-get sequence which should yield the
@@ -181,62 +181,62 @@ func TestCacheSequence_PutOAuthKeyPurgesCache(t *testing.T) {
 	ctx := context.Background()
 	store := &MockCredentialStore{}
 
-	latestOAuthKey := []byte{255} // Keeping a reference to it for later use in assertion.
+	latestOAuthSecret := []byte{255} // Keeping a reference to it for later use in assertion.
 	store.
-		On("PutOAuthKey", mock.Anything, mock.Anything).Return(nil).Times(1).
-		On("GetOAuthKey", mock.Anything).Return([]byte{0}, nil).Times(1).
-		On("PutOAuthKey", mock.Anything, mock.Anything).Return(nil).Times(1).
-		On("GetOAuthKey", mock.Anything).Return(latestOAuthKey, nil).Times(1)
+		On("PutOAuthSecret", mock.Anything, mock.Anything).Return(nil).Times(1).
+		On("GetOAuthSecret", mock.Anything).Return([]byte{0}, nil).Times(1).
+		On("PutOAuthSecret", mock.Anything, mock.Anything).Return(nil).Times(1).
+		On("GetOAuthSecret", mock.Anything).Return(latestOAuthSecret, nil).Times(1)
 
 	cache := NewCachedCredentialStore(store, CachedCredentialStoreParams{})
 
-	err := cache.PutOAuthKey(ctx, nil) // The argument itself is not important, so nil is passed.
+	err := cache.PutOAuthSecret(ctx, nil) // The argument itself is not important, so nil is passed.
 	c.Assert(err, qt.IsNil)
 
-	retrieved1, err := cache.GetOAuthKey(ctx)
+	retrieved1, err := cache.GetOAuthSecret(ctx)
 	c.Assert(err, qt.IsNil)
 	c.Assert(retrieved1, qt.DeepEquals, []byte{0})
 
-	err = cache.PutOAuthKey(ctx, nil) // The argument itself is not important, so nil is passed.
+	err = cache.PutOAuthSecret(ctx, nil) // The argument itself is not important, so nil is passed.
 	c.Assert(err, qt.IsNil)
 
-	retrieved2, err := cache.GetOAuthKey(ctx)
+	retrieved2, err := cache.GetOAuthSecret(ctx)
 	c.Assert(err, qt.IsNil)
 	c.Assert(retrieved2, qt.IsNotNil)
-	c.Assert(retrieved2, qt.DeepEquals, latestOAuthKey)
+	c.Assert(retrieved2, qt.DeepEquals, latestOAuthSecret)
 
 	store.AssertExpectations(c)
 }
 
-func TestCacheSequence_OAuthKeyExpires(t *testing.T) {
+func TestCacheSequence_OAuthSecretExpires(t *testing.T) {
 	// We simulate the cache expiry by calling the internal cache object's purge method.
 	c := qt.New(t)
 	ctx := context.Background()
 	store := &MockCredentialStore{}
 
 	store.
-		On("PutOAuthKey", mock.Anything, mock.Anything).Return(nil).
-		On("GetOAuthKey", mock.Anything).Return([]byte{0}, nil).Times(1).
-		On("GetOAuthKey", mock.Anything).Return([]byte{255}, nil).Times(1)
+		On("PutOAuthSecret", mock.Anything, mock.Anything).Return(nil).
+		On("GetOAuthSecret", mock.Anything).Return([]byte{0}, nil).Times(1).
+		On("GetOAuthSecret", mock.Anything).Return([]byte{255}, nil).Times(1)
 
 	cache := NewCachedCredentialStore(store, CachedCredentialStoreParams{})
 
-	err := cache.PutOAuthKey(ctx, nil) // The argument itself is not important, so nil is passed.
+	err := cache.PutOAuthSecret(ctx, nil) // The argument itself is not important, so nil is passed.
 	c.Assert(err, qt.IsNil)
 
-	retrieved1, err := cache.GetOAuthKey(ctx)
+	retrieved1, err := cache.GetOAuthSecret(ctx)
 	c.Assert(err, qt.IsNil)
 	c.Assert(retrieved1, qt.DeepEquals, []byte{0})
 
 	// This should be returned from the cached value.
-	retrieved2, err := cache.GetOAuthKey(ctx)
+	retrieved2, err := cache.GetOAuthSecret(ctx)
 	c.Assert(err, qt.IsNil)
 	c.Assert(retrieved2, qt.DeepEquals, retrieved1)
 
-	cache.oauthKeyCache.Purge()
+	cache.oauthSecretCache.Purge()
 
 	// Second retrieved value must be different due to expiry.
-	retrieved3, err := cache.GetOAuthKey(ctx)
+	retrieved3, err := cache.GetOAuthSecret(ctx)
 	c.Assert(err, qt.IsNil)
 	c.Assert(retrieved3, qt.DeepEquals, []byte{255})
 

@@ -82,7 +82,7 @@ func (m *MockCredentialStore) CleanupOAuthSecrets(ctx context.Context) error {
 	return args.Error(0)
 }
 
-func (m *MockCredentialStore) GetOAuthKey(ctx context.Context) ([]byte, error) {
+func (m *MockCredentialStore) GetOAuthSecret(ctx context.Context) ([]byte, error) {
 	args := m.Called(ctx)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -90,7 +90,7 @@ func (m *MockCredentialStore) GetOAuthKey(ctx context.Context) ([]byte, error) {
 	return args.Get(0).([]byte), args.Error(1)
 }
 
-func (m *MockCredentialStore) PutOAuthKey(ctx context.Context, raw []byte) error {
+func (m *MockCredentialStore) PutOAuthSecret(ctx context.Context, raw []byte) error {
 	args := m.Called(ctx, raw)
 	return args.Error(0)
 }

@@ -18,8 +18,8 @@ import (
 type CachedCredentialStore struct {
 	CredentialStore
 
-	jwksCache     *expirable.LRU[string, jwk.Set]
-	oauthKeyCache *expirable.LRU[string, []byte]
+	jwksCache        *expirable.LRU[string, jwk.Set]
+	oauthSecretCache *expirable.LRU[string, []byte]
 }
 
 // defaultJWKSExpiry default for CachedCredentialStoreParams.JWKExpiry field value.
@@ -58,9 +58,9 @@ func NewCachedCredentialStore(store CredentialStore, params CachedCredentialStor
 	}
 
 	return CachedCredentialStore{
-		CredentialStore: store,
-		jwksCache:       expirable.NewLRU[string, jwk.Set](1, nil, jwksExpiry),
-		oauthKeyCache:   expirable.NewLRU[string, []byte](1, nil, oauthKeyExpiry),
+		CredentialStore:  store,
+		jwksCache:        expirable.NewLRU[string, jwk.Set](1, nil, jwksExpiry),
+		oauthSecretCache: expirable.NewLRU[string, []byte](1, nil, oauthKeyExpiry),
 	}
 }
 
@@ -99,23 +99,30 @@ func (c *CachedCredentialStore) PutJWKS(ctx context.Context, jwks jwk.Set) error
 	return c.CredentialStore.PutJWKS(ctx, jwks)
 }
 
-// GetOAuthKey returns the cached return value of the last call to the wrapped store's
+// CleanupOAuthSecrets cleans up the secrets associated with OAuth cache and
+// delegates to the wrapped store.
+func (c *CachedCredentialStore) CleanupOAuthSecrets(ctx context.Context) error {
+	c.jwksCache.Purge()
+	return c.CredentialStore.CleanupOAuthSecrets(ctx)
+}
+
+// GetOAuthSecret returns the cached return value of the last call to the wrapped store's
 // corresponding method. If there is no cached value it delegates the call to the
 // wrapped store and then caches the returned value.
-func (c *CachedCredentialStore) GetOAuthKey(ctx context.Context) ([]byte, error) {
-	if val, ok := c.oauthKeyCache.Get(oauthKeyCacheKey); ok {
+func (c *CachedCredentialStore) GetOAuthSecret(ctx context.Context) ([]byte, error) {
+	if val, ok := c.oauthSecretCache.Get(oauthKeyCacheKey); ok {
 		return val, nil
 	}
-	key, err := c.CredentialStore.GetOAuthKey(ctx)
+	key, err := c.CredentialStore.GetOAuthSecret(ctx)
 	if err != nil {
 		return nil, err
 	}
-	c.oauthKeyCache.Add(oauthKeyCacheKey, key)
+	c.oauthSecretCache.Add(oauthKeyCacheKey, key)
 	return key, nil
 }
 
-// PutOAuthKey cleans up the OAuth key cache and delegates to the wrapped store.
-func (c *CachedCredentialStore) PutOAuthKey(ctx context.Context, raw []byte) error {
-	c.oauthKeyCache.Purge()
-	return c.CredentialStore.PutOAuthKey(ctx, raw)
+// PutOAuthSecret cleans up the OAuth key cache and delegates to the wrapped store.
+func (c *CachedCredentialStore) PutOAuthSecret(ctx context.Context, raw []byte) error {
+	c.oauthSecretCache.Purge()
+	return c.CredentialStore.PutOAuthSecret(ctx, raw)
 }
