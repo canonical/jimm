@@ -18,8 +18,8 @@ import (
 	"github.com/canonical/jimm/internal/openfga"
 )
 
-var (
-	jwtTestSecret = "test-secret"
+const (
+	JWTTestSecret = "test-secret"
 )
 
 // A SimpleTester is a simple version of the test interface
@@ -70,7 +70,7 @@ func NewUserSessionLogin(c SimpleTester, username string) api.LoginProvider {
 		c.Fatalf("failed to generate test session token")
 	}
 
-	freshToken, err := jwt.Sign(token, jwt.WithKey(jwa.HS256, []byte(jwtTestSecret)))
+	freshToken, err := jwt.Sign(token, jwt.WithKey(jwa.HS256, []byte(JWTTestSecret)))
 	if err != nil {
 		c.Fatalf("failed to sign test session token")
 	}

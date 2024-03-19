@@ -696,7 +696,7 @@ func TestFillMigrationTarget(t *testing.T) {
 			err := db.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 
-			store := &jimmtest.InMemoryCredentialStore{}
+			store := jimmtest.NewInMemoryCredentialStore()
 			err = store.PutControllerCredentials(context.Background(), test.controllerName, "admin", "test-secret")
 			c.Assert(err, qt.IsNil)
 
@@ -775,7 +775,7 @@ func TestInitiateInternalMigration(t *testing.T) {
 			c.Patch(jimm.InitiateMigration, func(ctx context.Context, j *jimm.JIMM, user *openfga.User, spec jujuparams.MigrationSpec, targetID uint) (jujuparams.InitiateMigrationResult, error) {
 				return jujuparams.InitiateMigrationResult{}, nil
 			})
-			store := &jimmtest.InMemoryCredentialStore{}
+			store := jimmtest.NewInMemoryCredentialStore()
 			err := store.PutControllerCredentials(context.Background(), test.migrateInfo.TargetController, "admin", "test-secret")
 			c.Assert(err, qt.IsNil)
 

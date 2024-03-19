@@ -4,14 +4,12 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"math/rand"
 	"net"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
 	"net/url"
 	"regexp"
-	"strconv"
 	"testing"
 	"time"
 
@@ -42,17 +40,14 @@ func setupDbAndSessionStore(c *qt.C) (*db.Database, *pgstore.PGStore) {
 }
 
 func setupTestServer(c *qt.C, dashboardURL string, db *db.Database, sessionStore *pgstore.PGStore) *httptest.Server {
+	// Find a random free TCP port.
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	c.Assert(err, qt.IsNil)
+	port := fmt.Sprintf("%d", listener.Addr().(*net.TCPAddr).Port)
+
 	// Create unstarted server to enable auth service
 	s := httptest.NewUnstartedServer(nil)
-	// Setup random port listener
-	minPort := 30000
-	maxPort := 50000
-
-	port := strconv.Itoa(rand.Intn(maxPort-minPort+1) + minPort)
-	l, err := net.Listen("tcp", "localhost:"+port)
-	c.Assert(err, qt.IsNil)
-	// Set the listener with a random port
-	s.Listener = l
+	s.Listener = listener
 
 	// Remember redirect url to check it matches after test server starts
 	redirectURL := "http://127.0.0.1:" + port + "/callback"

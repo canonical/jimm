@@ -179,13 +179,17 @@ func start(ctx context.Context, s *service.Service) error {
 	s.Go(func() error { return jimmsvc.WatchModelSummaries(ctx) })
 
 	if os.Getenv("JIMM_ENABLE_JWKS_ROTATOR") != "" {
-		zapctx.Info(ctx, "attempting to start JWKS rotator")
+		zapctx.Info(ctx, "attempting to start JWKS rotator and generate OAuth secret key")
 		s.Go(func() error {
-			err := jimmsvc.StartJWKSRotator(ctx, time.NewTicker(time.Hour).C, time.Now().UTC().AddDate(0, 3, 0))
-			if err != nil {
+			if err := jimmsvc.StartJWKSRotator(ctx, time.NewTicker(time.Hour).C, time.Now().UTC().AddDate(0, 3, 0)); err != nil {
 				zapctx.Error(ctx, "failed to start JWKS rotator", zap.Error(err))
+				return err
 			}
-			return err
+			if err := jimmsvc.CheckOrGenerateOAuthKey(ctx); err != nil {
+				zapctx.Error(ctx, "failed to check/generate OAuth secret key", zap.Error(err))
+				return err
+			}
+			return nil
 		})
 	}
 
