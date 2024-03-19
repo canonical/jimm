@@ -88,9 +88,12 @@ func (r *controllerRoot) GetDeviceSessionToken(ctx context.Context) (params.GetD
 		return response, errors.E(op, err)
 	}
 
-	// TODO(ale8k): Add vault logic to get secret key and generate one
-	// on start up.
-	encToken, err := authSvc.MintSessionToken(email, "test-secret")
+	secretKey, err := r.jimm.GetCredentialStore().GetOAuthSecret(ctx)
+	if err != nil {
+		return response, errors.E(op, err, "failed to retrieve oauth secret key")
+	}
+
+	encToken, err := authSvc.MintSessionToken(email, string(secretKey))
 	if err != nil {
 		return response, errors.E(op, err)
 	}
@@ -144,9 +147,12 @@ func (r *controllerRoot) LoginWithSessionToken(ctx context.Context, req params.L
 	authenticationSvc := r.jimm.OAuthAuthenticationService()
 
 	// Verify the session token
-	// TODO(CSS-7081): Ensure for tests that the secret key can be configured.
-	// Or configure cmd tests to use the configured secret.
-	jwtToken, err := authenticationSvc.VerifySessionToken(req.SessionToken, "test-secret")
+	secretKey, err := r.jimm.GetCredentialStore().GetOAuthSecret(ctx)
+	if err != nil {
+		return jujuparams.LoginResult{}, errors.E(op, err, "failed to retrieve oauth secret key")
+	}
+
+	jwtToken, err := authenticationSvc.VerifySessionToken(req.SessionToken, string(secretKey))
 	if err != nil {
 		var aerr *auth.AuthenticationError
 		if stderrors.As(err, &aerr) {

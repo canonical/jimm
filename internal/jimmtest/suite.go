@@ -76,7 +76,7 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 		Database: db.Database{
 			DB: pgdb,
 		},
-		CredentialStore: &InMemoryCredentialStore{},
+		CredentialStore: NewInMemoryCredentialStore(),
 		Pubsub:          &pubsub.Hub{MaxConcurrency: 10},
 		UUID:            ControllerUUID,
 		OpenFGAClient:   s.OFGAClient,
@@ -86,7 +86,7 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 	s.cancel = cancel
 
 	// Note that the secret key here must match what is used in tests.
-	s.JIMM.OAuthAuthenticator = NewMockOAuthAuthenticator(jwtTestSecret)
+	s.JIMM.OAuthAuthenticator = NewMockOAuthAuthenticator(JWTTestSecret)
 
 	err = s.JIMM.Database.Migrate(ctx, false)
 	c.Assert(err, gc.Equals, nil)

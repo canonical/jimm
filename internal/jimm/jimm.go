@@ -175,6 +175,11 @@ type OAuthAuthenticator interface {
 	AuthenticateBrowserSession(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error)
 }
 
+// GetCredentialStore returns the credential store used by JIMM.
+func (j *JIMM) GetCredentialStore() credentials.CredentialStore {
+	return j.CredentialStore
+}
+
 type permission struct {
 	resource string
 	relation string

@@ -4,6 +4,7 @@ package jimm
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
 	"net/http"
 	"net/url"
@@ -488,6 +489,34 @@ func newVaultStore(ctx context.Context, p Params) (jimmcreds.CredentialStore, er
 		AuthPath:   p.VaultAuthPath,
 		KVPath:     p.VaultPath,
 	}, nil
+}
+
+// CheckOrGenerateOAuthKey checks if the OAuth secret key already exists on the
+// credential store, and if not, generates a random 4096-bit secret key and
+func (s *Service) CheckOrGenerateOAuthKey(ctx context.Context) error {
+	const op = errors.Op("CheckOrGenerateOAuthKey")
+	store := s.jimm.CredentialStore
+	if store == nil {
+		zapctx.Info(ctx, "skipped generating initial OAuth secret key due to nil credential store")
+		return nil
+	}
+
+	if secret, err := store.GetOAuthSecret(ctx); err == nil && secret != nil && len(secret) > 0 {
+		zapctx.Info(ctx, "detected existing OAuth secret key")
+		return nil
+	}
+
+	secret := make([]byte, 4096)
+	if _, err := rand.Read(secret); err != nil {
+		zapctx.Error(ctx, "failed to generate OAuth secret key", zap.Error(err))
+		return errors.E(op, err, "failed to generate OAuth secret key")
+	}
+
+	if err := store.PutOAuthSecret(ctx, secret); err != nil {
+		zapctx.Error(ctx, "failed to store generated OAuth secret key", zap.Error(err))
+		return errors.E(op, err, "failed to store generated OAuth secret key")
+	}
+	return nil
 }
 
 func newOpenFGAClient(ctx context.Context, p OpenFGAParams) (*openfga.OFGAClient, error) {

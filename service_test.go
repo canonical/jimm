@@ -86,6 +86,7 @@ func TestServiceStartsWithoutSecretStore(t *testing.T) {
 
 func TestAuthenticator(t *testing.T) {
 	c := qt.New(t)
+	ctx := context.Background()
 
 	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
@@ -105,7 +106,10 @@ func TestAuthenticator(t *testing.T) {
 		},
 		DashboardFinalRedirectURL: "<no dashboard needed for this test>",
 	}
-	svc, err := jimm.NewService(context.Background(), p)
+	svc, err := jimm.NewService(ctx, p)
+	c.Assert(err, qt.IsNil)
+
+	err = svc.JIMM().GetCredentialStore().PutOAuthSecret(ctx, []byte(jimmtest.JWTTestSecret))
 	c.Assert(err, qt.IsNil)
 
 	srv := httptest.NewTLSServer(svc)
@@ -154,6 +158,7 @@ const testVaultEnv = `clouds:
 
 func TestVault(t *testing.T) {
 	c := qt.New(t)
+	ctx := context.Background()
 
 	ofgaClient, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
@@ -177,7 +182,10 @@ func TestVault(t *testing.T) {
 	}
 	vaultClient, _, creds, _ := jimmtest.VaultClient(c, ".")
 
-	svc, err := jimm.NewService(context.Background(), p)
+	svc, err := jimm.NewService(ctx, p)
+	c.Assert(err, qt.IsNil)
+
+	err = svc.JIMM().GetCredentialStore().PutOAuthSecret(ctx, []byte(jimmtest.JWTTestSecret))
 	c.Assert(err, qt.IsNil)
 
 	env := jimmtest.ParseEnvironment(c, testVaultEnv)
@@ -251,15 +259,17 @@ func TestPostgresSecretStore(t *testing.T) {
 
 func TestOpenFGA(t *testing.T) {
 	c := qt.New(t)
+	ctx := context.Background()
 
 	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
 	p := jimm.Params{
-		ControllerUUID:   "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
-		DSN:              jimmtest.CreateEmptyDatabase(c),
-		OpenFGAParams:    cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
-		ControllerAdmins: []string{"alice", "eve"},
+		ControllerUUID:        "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
+		DSN:                   jimmtest.CreateEmptyDatabase(c),
+		OpenFGAParams:         cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
+		ControllerAdmins:      []string{"alice", "eve"},
+		InsecureSecretStorage: true,
 		OAuthAuthenticatorParams: jimm.OAuthAuthenticatorParams{
 			IssuerURL:           "http://localhost:8082/realms/jimm",
 			ClientID:            "jimm-device",
@@ -269,7 +279,11 @@ func TestOpenFGA(t *testing.T) {
 		},
 		DashboardFinalRedirectURL: "<no dashboard needed for this test>",
 	}
-	svc, err := jimm.NewService(context.Background(), p)
+
+	svc, err := jimm.NewService(ctx, p)
+	c.Assert(err, qt.IsNil)
+
+	err = svc.JIMM().GetCredentialStore().PutOAuthSecret(ctx, []byte(jimmtest.JWTTestSecret))
 	c.Assert(err, qt.IsNil)
 
 	srv := httptest.NewTLSServer(svc)

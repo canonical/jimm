@@ -17,6 +17,7 @@ import (
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/jimm"
+	jimmcreds "github.com/canonical/jimm/internal/jimm/credentials"
 	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 	"github.com/canonical/jimm/internal/pubsub"
@@ -59,6 +60,7 @@ type JIMM struct {
 	GetCloudCredential_                func(ctx context.Context, user *openfga.User, tag names.CloudCredentialTag) (*dbmodel.CloudCredential, error)
 	GetCloudCredentialAttributes_      func(ctx context.Context, u *openfga.User, cred *dbmodel.CloudCredential, hidden bool) (attrs map[string]string, redacted []string, err error)
 	GetControllerConfig_               func(ctx context.Context, u *dbmodel.Identity) (*dbmodel.ControllerConfig, error)
+	GetCredentialStore_                func() jimmcreds.CredentialStore
 	GetJimmControllerAccess_           func(ctx context.Context, user *openfga.User, tag names.UserTag) (string, error)
 	GetUser_                           func(ctx context.Context, username string) (*openfga.User, error)
 	GetOpenFGAUserAndAuthorise_        func(ctx context.Context, email string) (*openfga.User, error)
@@ -299,6 +301,12 @@ func (j *JIMM) GetControllerConfig(ctx context.Context, u *dbmodel.Identity) (*d
 		return nil, errors.E(errors.CodeNotImplemented)
 	}
 	return j.GetControllerConfig_(ctx, u)
+}
+func (j *JIMM) GetCredentialStore() jimmcreds.CredentialStore {
+	if j.GetCredentialStore_ == nil {
+		return nil
+	}
+	return j.GetCredentialStore_()
 }
 func (j *JIMM) GetJimmControllerAccess(ctx context.Context, user *openfga.User, tag names.UserTag) (string, error) {
 	if j.GetJimmControllerAccess_ == nil {
