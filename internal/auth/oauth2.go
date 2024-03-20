@@ -441,6 +441,45 @@ func (as *AuthenticationService) AuthenticateBrowserSession(ctx context.Context,
 	return ctx, nil
 }
 
+// Logout does two things:
+//
+//   - It deletes the session (Max-Age = -1), and within the database the cleanup routine will remove
+//     the expired session upon next run.
+//   - It resets the access tokens for this user
+func (as *AuthenticationService) Logout(ctx context.Context, w http.ResponseWriter, req *http.Request) error {
+	const op = errors.Op("auth.AuthenticationService.Logout")
+
+	session, err := as.sessionStore.Get(req, SessionName)
+	if err != nil {
+		return errors.E(op, err, "failed to retrieve session")
+	}
+
+	identityId, ok := session.Values[SessionIdentityKey]
+	if !ok {
+		return errors.E(op, "session is missing identity key")
+	}
+
+	identityIdStr, ok := identityId.(string)
+	if !ok {
+		return errors.E(op, "session identity key could not be parsed to string")
+	}
+
+	if err := as.deleteSession(session, w, req); err != nil {
+		return errors.E(op, err)
+	}
+
+	if err := as.UpdateIdentity(ctx, identityIdStr, &oauth2.Token{
+		AccessToken:  "",
+		RefreshToken: "",
+		Expiry:       time.Now(),
+		TokenType:    "",
+	}); err != nil {
+		return errors.E(op, err)
+	}
+
+	return nil
+}
+
 // validateAndUpdateAccessToken validates the access tokens expiry, and if it cannot, then
 // it attempts to refresh the access token.
 func (as *AuthenticationService) validateAndUpdateAccessToken(ctx context.Context, email any) error {
