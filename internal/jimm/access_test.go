@@ -195,17 +195,15 @@ func TestJWTGeneratorMakeLoginToken(t *testing.T) {
 
 	tests := []struct {
 		about             string
-		authenticator     *testAuthenticator
+		username          string
 		database          *testDatabase
 		accessChecker     *testAccessChecker
 		jwtService        *testJWTService
 		expectedError     string
 		expectedJWTParams jimmjwx.JWTParams
 	}{{
-		about: "initial login, all is well",
-		authenticator: &testAuthenticator{
-			username: "eve@canonical.com",
-		},
+		about:    "initial login, all is well",
+		username: "eve@canonical.com",
 		database: &testDatabase{
 			ctl: dbmodel.Controller{
 				CloudRegions: []dbmodel.CloudRegionControllerPriority{{
@@ -239,27 +237,16 @@ func TestJWTGeneratorMakeLoginToken(t *testing.T) {
 			},
 		},
 	}, {
-		about: "authorization fails",
-		authenticator: &testAuthenticator{
-			username: "eve@canonical.com",
-			err:      errors.E("a test error"),
-		},
-		expectedError: "a test error",
-	}, {
-		about: "model access check fails",
-		authenticator: &testAuthenticator{
-			username: "eve@canonical.com",
-		},
+		about:    "model access check fails",
+		username: "eve@canonical.com",
 		accessChecker: &testAccessChecker{
 			modelAccessCheckErr: errors.E("a test error"),
 		},
 		jwtService:    &testJWTService{},
 		expectedError: "a test error",
 	}, {
-		about: "controller access check fails",
-		authenticator: &testAuthenticator{
-			username: "eve@canonical.com",
-		},
+		about:    "controller access check fails",
+		username: "eve@canonical.com",
 		accessChecker: &testAccessChecker{
 			modelAccess: map[string]string{
 				mt.String(): "admin",
@@ -268,10 +255,8 @@ func TestJWTGeneratorMakeLoginToken(t *testing.T) {
 		},
 		expectedError: "a test error",
 	}, {
-		about: "get controller from db fails",
-		authenticator: &testAuthenticator{
-			username: "eve@canonical.com",
-		},
+		about:    "get controller from db fails",
+		username: "eve@canonical.com",
 		database: &testDatabase{
 			err: errors.E("a test error"),
 		},
@@ -285,10 +270,8 @@ func TestJWTGeneratorMakeLoginToken(t *testing.T) {
 		},
 		expectedError: "failed to fetch controller",
 	}, {
-		about: "cloud access check fails",
-		authenticator: &testAuthenticator{
-			username: "eve@canonical.com",
-		},
+		about:    "cloud access check fails",
+		username: "eve@canonical.com",
 		database: &testDatabase{
 			ctl: dbmodel.Controller{
 				CloudRegions: []dbmodel.CloudRegionControllerPriority{{
@@ -311,10 +294,8 @@ func TestJWTGeneratorMakeLoginToken(t *testing.T) {
 		},
 		expectedError: "failed to check user's cloud access",
 	}, {
-		about: "jwt service errors out",
-		authenticator: &testAuthenticator{
-			username: "eve@canonical.com",
-		},
+		about:    "jwt service errors out",
+		username: "eve@canonical.com",
 		database: &testDatabase{
 			ctl: dbmodel.Controller{
 				CloudRegions: []dbmodel.CloudRegionControllerPriority{{
@@ -344,10 +325,14 @@ func TestJWTGeneratorMakeLoginToken(t *testing.T) {
 	}}
 
 	for _, test := range tests {
-		generator := jimm.NewJWTGenerator(test.authenticator, test.database, test.accessChecker, test.jwtService)
+		generator := jimm.NewJWTGenerator(test.database, test.accessChecker, test.jwtService)
 		generator.SetTags(mt, ct)
 
-		_, err := generator.MakeLoginToken(context.Background(), &jujuparams.LoginRequest{})
+		_, err := generator.MakeLoginToken(context.Background(), &openfga.User{
+			Identity: &dbmodel.Identity{
+				Name: test.username,
+			},
+		})
 		if test.expectedError != "" {
 			c.Assert(err, qt.ErrorMatches, test.expectedError)
 		} else {
@@ -414,9 +399,6 @@ func TestJWTGeneratorMakeToken(t *testing.T) {
 
 	for _, test := range tests {
 		generator := jimm.NewJWTGenerator(
-			&testAuthenticator{
-				username: "eve@canonical.com",
-			},
 			&testDatabase{
 				ctl: dbmodel.Controller{
 					CloudRegions: []dbmodel.CloudRegionControllerPriority{{
@@ -445,7 +427,11 @@ func TestJWTGeneratorMakeToken(t *testing.T) {
 		)
 		generator.SetTags(mt, ct)
 
-		_, err := generator.MakeLoginToken(context.Background(), &jujuparams.LoginRequest{})
+		_, err := generator.MakeLoginToken(context.Background(), &openfga.User{
+			Identity: &dbmodel.Identity{
+				Name: "eve@canonical.com",
+			},
+		})
 		c.Assert(err, qt.IsNil)
 
 		_, err = generator.MakeToken(context.Background(), test.permissions)

@@ -110,6 +110,7 @@ func PostgresDB(t Tester, nowFunc func() time.Time) *gorm.DB {
 	}
 
 	suggestedName := "jimm_test_" + t.Name()
+	t.Logf("suggested db name: %s", suggestedName)
 	_, dsn, err := createDatabaseFromTemplate(suggestedName, templateDatabaseName)
 	if err != nil {
 		t.Fatalf("error creating database (%s): %s", suggestedName, err)
