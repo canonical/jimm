@@ -120,7 +120,7 @@ func NewAuthenticationService(ctx context.Context, params AuthenticationServiceP
 	}
 
 	if params.SessionTokenExpiry == 0 {
-		return nil, errors.E(op, errors.CodeServerConfiguration, err, "session token expiry not set")
+		return nil, errors.E(op, errors.CodeServerConfiguration, "session token expiry not set")
 	}
 
 	return &AuthenticationService{
