@@ -35,15 +35,15 @@ type WSHandler struct {
 // been started.
 func (h *WSHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	ctx := req.Context()
+	var authErr error
 
-	ctx, err := handleBrowserAuthentication(
-		ctx,
-		h.Server.GetAuthenticationService(),
-		w,
-		req,
-	)
-	if err != nil {
-		return
+	if h.Server != nil {
+		ctx, authErr = handleBrowserAuthentication(
+			ctx,
+			h.Server.GetAuthenticationService(),
+			w,
+			req,
+		)
 	}
 
 	ctx = context.WithValue(ctx, contextPathKey("path"), req.URL.EscapedPath())
@@ -54,26 +54,43 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		zapctx.Error(ctx, "cannot upgrade websocket", zap.Error(err))
 		return
 	}
+
 	servermon.ConcurrentWebsocketConnections.Inc()
 	defer conn.Close()
 	defer servermon.ConcurrentWebsocketConnections.Dec()
 	defer func() {
 		if err := recover(); err != nil {
 			zapctx.Error(ctx, "websocket panic", zap.Any("err", err), zap.Stack("stack"))
-			data := websocket.FormatCloseMessage(websocket.CloseInternalServerErr, fmt.Sprintf("%v", err))
-			if err := conn.WriteControl(websocket.CloseMessage, data, time.Time{}); err != nil {
-				zapctx.Error(ctx, "cannot write close message", zap.Error(err))
-			}
+			writeInternalServerErrorClosure(ctx, conn, err)
 		}
 	}()
-	if h.Server == nil {
-		data := websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")
-		if err := conn.WriteControl(websocket.CloseMessage, data, time.Time{}); err != nil {
-			zapctx.Error(ctx, "cannot write close message", zap.Error(err))
-		}
+
+	if authErr != nil {
+		zapctx.Error(ctx, "browser authentication error", zap.Any("err", authErr), zap.Stack("stack"))
+		writeInternalServerErrorClosure(ctx, conn, authErr)
 		return
 	}
+
+	if h.Server == nil {
+		writeNormalClosure(ctx, conn)
+		return
+	}
+
 	h.Server.ServeWS(ctx, conn)
+}
+
+func writeNormalClosure(ctx context.Context, conn *websocket.Conn) {
+	data := websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")
+	if err := conn.WriteControl(websocket.CloseMessage, data, time.Time{}); err != nil {
+		zapctx.Error(ctx, "cannot write close message", zap.Error(err))
+	}
+}
+
+func writeInternalServerErrorClosure(ctx context.Context, conn *websocket.Conn, err any) {
+	data := websocket.FormatCloseMessage(websocket.CloseInternalServerErr, fmt.Sprintf("%v", err))
+	if err := conn.WriteControl(websocket.CloseMessage, data, time.Time{}); err != nil {
+		zapctx.Error(ctx, "cannot write close message", zap.Error(err))
+	}
 }
 
 // handleBrowserAuthentication handles browser authentication when a session cookie
@@ -106,7 +123,6 @@ func handleBrowserAuthentication(ctx context.Context, authSvc jimm.OAuthAuthenti
 		if err != nil {
 			// Something went wrong when trying to perform the authentication
 			// of the cookie.
-			w.WriteHeader(http.StatusInternalServerError)
 			return ctx, err
 		}
 	}

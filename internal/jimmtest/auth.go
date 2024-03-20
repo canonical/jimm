@@ -70,6 +70,10 @@ func (m MockOAuthAuthenticator) VerifySessionToken(token string, secretKey strin
 	return auth.VerifySessionToken(token, m.secretKey)
 }
 
+func (m MockOAuthAuthenticator) AuthenticateBrowserSession(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error) {
+	return ctx, errors.New("authentication failed")
+}
+
 // NewUserSessionLogin returns a login provider than be used with Juju Dial Opts
 // to define how login will take place. In this case we login using a session token
 // that the JIMM server should verify with the same test secret.
