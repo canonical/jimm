@@ -119,10 +119,6 @@ func NewAuthenticationService(ctx context.Context, params AuthenticationServiceP
 		return nil, errors.E(op, errors.CodeServerConfiguration, err, "failed to create oidc provider")
 	}
 
-	if params.SessionTokenExpiry == 0 {
-		return nil, errors.E(op, errors.CodeServerConfiguration, "session token expiry not set")
-	}
-
 	return &AuthenticationService{
 		provider: provider,
 		oauthConfig: oauth2.Config{
