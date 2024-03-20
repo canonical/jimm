@@ -14,6 +14,7 @@ import (
 	"github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/internal/auth"
 	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/jimm"
 	"github.com/canonical/jimm/internal/openfga"
 )
 
@@ -28,12 +29,6 @@ func unsupportedLogin() error {
 
 var facadeInit = make(map[string]func(r *controllerRoot) []int)
 
-// Login implements the Login method on the Admin facade.
-func (r *controllerRoot) Login(ctx context.Context, req jujuparams.LoginRequest) (jujuparams.LoginResult, error) {
-	const op = errors.Op("jujuapi.Login")
-	return jujuparams.LoginResult{}, errors.E(op, "Invalid login, ensure you are using Juju 3.5+")
-}
-
 // LoginDevice starts a device login flow (typically a CLI). It will return a verification URI
 // and user code that the user is expected to enter into the verification URI link.
 //
@@ -42,9 +37,8 @@ func (r *controllerRoot) Login(ctx context.Context, req jujuparams.LoginRequest)
 func (r *controllerRoot) LoginDevice(ctx context.Context) (params.LoginDeviceResponse, error) {
 	const op = errors.Op("jujuapi.LoginDevice")
 	response := params.LoginDeviceResponse{}
-	authSvc := r.jimm.OAuthAuthenticationService()
 
-	deviceResponse, err := authSvc.Device(ctx)
+	deviceResponse, err := jimm.LoginDevice(ctx, r.jimm.OAuthAuthenticationService())
 	if err != nil {
 		return response, errors.E(op, err)
 	}
@@ -53,8 +47,8 @@ func (r *controllerRoot) LoginDevice(ctx context.Context) (params.LoginDeviceRes
 	// happens on the SAME websocket.
 	r.deviceOAuthResponse = deviceResponse
 
-	response.VerificationURI = deviceResponse.VerificationURI
 	response.UserCode = deviceResponse.UserCode
+	response.VerificationURI = deviceResponse.VerificationURI
 
 	return response, nil
 }
@@ -67,39 +61,13 @@ func (r *controllerRoot) LoginDevice(ctx context.Context) (params.LoginDeviceRes
 func (r *controllerRoot) GetDeviceSessionToken(ctx context.Context) (params.GetDeviceSessionTokenResponse, error) {
 	const op = errors.Op("jujuapi.GetDeviceSessionToken")
 	response := params.GetDeviceSessionTokenResponse{}
-	authSvc := r.jimm.OAuthAuthenticationService()
 
-	token, err := authSvc.DeviceAccessToken(ctx, r.deviceOAuthResponse)
+	token, err := jimm.GetDeviceSessionToken(ctx, r.jimm.OAuthAuthenticationService(), r.jimm.GetCredentialStore(), r.deviceOAuthResponse)
 	if err != nil {
 		return response, errors.E(op, err)
 	}
 
-	idToken, err := authSvc.ExtractAndVerifyIDToken(ctx, token)
-	if err != nil {
-		return response, errors.E(op, err)
-	}
-
-	email, err := authSvc.Email(idToken)
-	if err != nil {
-		return response, errors.E(op, err)
-	}
-
-	if err := authSvc.UpdateIdentity(ctx, email, token); err != nil {
-		return response, errors.E(op, err)
-	}
-
-	secretKey, err := r.jimm.GetCredentialStore().GetOAuthSecret(ctx)
-	if err != nil {
-		return response, errors.E(op, err, "failed to retrieve oauth secret key")
-	}
-
-	encToken, err := authSvc.MintSessionToken(email, string(secretKey))
-	if err != nil {
-		return response, errors.E(op, err)
-	}
-
-	response.SessionToken = string(encToken)
-
+	response.SessionToken = token
 	return response, nil
 }
 

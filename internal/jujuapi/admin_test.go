@@ -71,7 +71,7 @@ func (s *adminSuite) TestLoginToController(c *gc.C) {
 	}, "test")
 	defer conn.Close()
 	err := conn.Login(nil, "", "", nil)
-	c.Assert(err, gc.ErrorMatches, "Invalid login, ensure you are using Juju 3\\.5\\+")
+	c.Assert(err, gc.ErrorMatches, `JIMM does not support login from old clients \(not supported\)`)
 	var resp jujuparams.RedirectInfoResult
 	err = conn.APICall("Admin", 3, "", "RedirectInfo", nil, &resp)
 	c.Assert(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeNotImplemented)
