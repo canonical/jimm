@@ -4,19 +4,21 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	stderrors "errors"
 	"sync"
 	"time"
 
-	"github.com/gorilla/websocket"
 	"github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
+	"golang.org/x/oauth2"
 
-	"github.com/canonical/jimm/internal/auth"
+	apiparams "github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/jimm"
+	"github.com/canonical/jimm/internal/jimm/credentials"
+	"github.com/canonical/jimm/internal/openfga"
 	"github.com/canonical/jimm/internal/utils"
 )
 
@@ -26,10 +28,10 @@ const (
 
 // TokenGenerator authenticates a user and generates a JWT token.
 type TokenGenerator interface {
-	// MakeLoginToken authorizes the user based on the provided login requests and returns
-	// a JWT containing claims about user's access to the controller, model (if applicable)
-	// and all clouds that the controller knows about.
-	MakeLoginToken(ctx context.Context, req *params.LoginRequest) ([]byte, error)
+	// MakeLoginToken returns a JWT containing claims about user's access
+	// to the controller, model (if applicable) and all clouds that the
+	// controller knows about.
+	MakeLoginToken(ctx context.Context, user *openfga.User) ([]byte, error)
 	// MakeToken assumes MakeLoginToken has already been called and checks the permissions
 	// specified in the permissionMap. If the logged in user has all those permissions
 	// a JWT will be returned with assertions confirming all those permissions.
@@ -40,10 +42,91 @@ type TokenGenerator interface {
 	GetUser() names.UserTag
 }
 
+// WebsocketConnection represents the websocket connection interface used by the proxy.
+type WebsocketConnection interface {
+	ReadJSON(v interface{}) error
+	WriteJSON(v interface{}) error
+	Close() error
+}
+
+// JIMM represents the JIMM interface used by the proxy.
+type JIMM interface {
+	GetOpenFGAUserAndAuthorise(ctx context.Context, email string) (*openfga.User, error)
+	OAuthAuthenticationService() jimm.OAuthAuthenticator
+	GetCredentialStore() credentials.CredentialStore
+}
+
+// ProxyHelpers contains all the necessary helpers for proxying a Juju client
+// connection to a model.
+type ProxyHelpers struct {
+	ConnClient        WebsocketConnection
+	TokenGen          TokenGenerator
+	ConnectController func(context.Context) (WebsocketConnection, string, error)
+	AuditLog          func(*dbmodel.AuditLogEntry)
+	JIMM              JIMM
+}
+
+// ProxySockets will proxy requests from a client connection through to a controller
+// tokenGen is used to authenticate the user and generate JWT token.
+// connectController provides the function to return a connection to the desired controller endpoint.
+func ProxySockets(ctx context.Context, helpers ProxyHelpers) error {
+	const op = errors.Op("rpc.ProxySockets")
+	if helpers.ConnectController == nil {
+		zapctx.Error(ctx, "Missing controller connect function")
+		return errors.E(op, "Missing controller connect function")
+	}
+	if helpers.AuditLog == nil {
+		zapctx.Error(ctx, "Missing audit log function")
+		return errors.E(op, "Missing audit log function")
+	}
+	errChan := make(chan error, 2)
+	msgInFlight := inflightMsgs{messages: make(map[uint64]*message)}
+	client := writeLockConn{conn: helpers.ConnClient}
+	// Note that the clProxy start method will create the connection to the desired controller only
+	// after the first message has been received so that any errors can be properly sent back to the client.
+	clProxy := clientProxy{
+		modelProxy: modelProxy{
+			src:            &client,
+			msgs:           &msgInFlight,
+			tokenGen:       helpers.TokenGen,
+			auditLog:       helpers.AuditLog,
+			conversationId: utils.NewConversationID(),
+			jimm:           helpers.JIMM,
+		},
+		errChan:              errChan,
+		createControllerConn: helpers.ConnectController,
+	}
+	clProxy.wg.Add(1)
+	go func() {
+		defer clProxy.wg.Done()
+		errChan <- clProxy.start(ctx)
+	}()
+	var err error
+	select {
+	// No cleanup is needed on error, when the client closes the connection
+	// all go routines will proceed to error and exit.
+	case err = <-errChan:
+		zapctx.Debug(ctx, "Proxy error", zap.Error(err))
+	case <-ctx.Done():
+		err = errors.E(op, "Context cancelled")
+		zapctx.Debug(ctx, "Context cancelled")
+		helpers.ConnClient.Close()
+		clProxy.mu.Lock()
+		clProxy.closed = true
+		// TODO(Kian): Test removing close on dst below. The client connection should do it.
+		if clProxy.dst != nil {
+			clProxy.dst.conn.Close()
+		}
+		clProxy.mu.Unlock()
+	}
+	clProxy.wg.Wait()
+	return err
+}
+
 // writeLockConn provides a websocket connection that is safe for concurrent writes.
 type writeLockConn struct {
 	mu   sync.Mutex
-	conn *websocket.Conn
+	conn WebsocketConnection
 }
 
 // readJson allows for non-concurrent reads on the websocket.
@@ -58,10 +141,18 @@ func (c *writeLockConn) writeJson(v interface{}) error {
 	return c.conn.WriteJSON(v)
 }
 
-func (c *writeLockConn) sendMessage(responseData json.RawMessage, request *message) {
+func (c *writeLockConn) sendMessage(responseObject any, request *message) {
 	msg := new(message)
 	msg.RequestID = request.RequestID
-	msg.Response = responseData
+	msg.Response = request.Response
+	if responseObject != nil {
+		responseData, err := json.Marshal(responseObject)
+		if err != nil {
+			errorMsg := createErrResponse(err, request)
+			c.writeJson(errorMsg)
+		}
+		msg.Response = responseData
+	}
 	c.writeJson(msg)
 }
 
@@ -73,7 +164,10 @@ type inflightMsgs struct {
 func (msgs *inflightMsgs) addMessage(msg *message) {
 	msgs.mu.Lock()
 	defer msgs.mu.Unlock()
+
 	// Putting the login request on ID 0 to persist it.
+	// Note (alesstimec) It's a bit confusing that we automagically add "login" message
+	// as the first message. We should revisit this.
 	if msg.Type == "Admin" && msg.Request == "Login" {
 		msgs.messages[0] = msg
 	} else {
@@ -103,8 +197,11 @@ type modelProxy struct {
 	msgs           *inflightMsgs
 	auditLog       func(*dbmodel.AuditLogEntry)
 	tokenGen       TokenGenerator
+	jimm           JIMM
 	modelName      string
 	conversationId string
+
+	deviceOAuthResponse *oauth2.DeviceAuthResponse
 }
 
 func (p *modelProxy) sendError(socket *writeLockConn, req *message, err error) {
@@ -169,7 +266,7 @@ type clientProxy struct {
 	modelProxy
 	wg                   sync.WaitGroup
 	errChan              chan error
-	createControllerConn func(context.Context) (*websocket.Conn, string, error)
+	createControllerConn func(context.Context) (WebsocketConnection, string, error)
 	// mu synchronises changes to closed and modelproxy.dst, dst is is only created
 	// at some unspecified point in the future after a client request.
 	mu     sync.Mutex
@@ -179,7 +276,6 @@ type clientProxy struct {
 // start begins the client->controller proxier.
 func (p *clientProxy) start(ctx context.Context) error {
 	const op = errors.Op("rpc.clientProxy.start")
-	const initialLogin = true
 	defer func() {
 		if p.dst != nil {
 			p.dst.conn.Close()
@@ -202,22 +298,17 @@ func (p *clientProxy) start(ctx context.Context) error {
 		p.auditLogMessage(msg, false)
 		// All requests should be proxied as transparently as possible through to the controller
 		// except for auth related requests like Login because JIMM is auth gateway.
-		if msg.Type == "Admin" && msg.Request == "Login" {
-			zapctx.Debug(ctx, "Login request found, adding JWT")
-			if err := addJWT(ctx, initialLogin, msg, nil, p.tokenGen); err != nil {
-				zapctx.Error(ctx, "Failed to add JWT", zap.Error(err))
-				var aerr *auth.AuthenticationError
-				if stderrors.As(err, &aerr) {
-					res, err := json.Marshal(aerr.LoginResult)
-					if err != nil {
-						p.sendError(p.src, msg, err)
-						return err
-					}
-					p.src.sendMessage(res, msg)
-					continue
-				}
+		if msg.Type == "Admin" {
+			zapctx.Debug(ctx, "Found an Admin facade call")
+			toClient, toController, err := p.handleAdminFacade(ctx, msg)
+			if err != nil {
 				p.sendError(p.src, msg, err)
 				continue
+			}
+			if toClient != nil {
+				p.src.sendMessage(nil, toClient)
+			} else if toController != nil {
+				msg = toController
 			}
 		}
 		if msg.RequestID == 0 {
@@ -381,7 +472,6 @@ func checkPermissionsRequired(ctx context.Context, msg *message) (map[string]any
 
 func (p *controllerProxy) redoLogin(ctx context.Context, permissions map[string]any) error {
 	const op = errors.Op("rpc.redoLogin")
-	const initialLogin = false
 	var loginMsg *message
 	if msg, ok := p.msgs.messages[0]; ok {
 		loginMsg = msg
@@ -389,7 +479,7 @@ func (p *controllerProxy) redoLogin(ctx context.Context, permissions map[string]
 	if loginMsg == nil {
 		return errors.E(op, errors.CodeUnauthorized, "Haven't received login yet")
 	}
-	err := addJWT(ctx, initialLogin, loginMsg, permissions, p.tokenGen)
+	err := addJWT(ctx, loginMsg, permissions, p.tokenGen)
 	if err != nil {
 		return err
 	}
@@ -401,8 +491,7 @@ func (p *controllerProxy) redoLogin(ctx context.Context, permissions map[string]
 }
 
 // addJWT adds a JWT token to the the provided message.
-// If initialLogin is set the user will be authenticated.
-func addJWT(ctx context.Context, initialLogin bool, msg *message, permissions map[string]interface{}, tokenGen TokenGenerator) error {
+func addJWT(ctx context.Context, msg *message, permissions map[string]interface{}, tokenGen TokenGenerator) error {
 	const op = errors.Op("rpc.addJWT")
 	// First we unmarshal the existing LoginRequest.
 	if msg == nil {
@@ -412,21 +501,13 @@ func addJWT(ctx context.Context, initialLogin bool, msg *message, permissions ma
 	if err := json.Unmarshal(msg.Params, &lr); err != nil {
 		return errors.E(op, err)
 	}
-	var jwt []byte
-	var err error
-	if initialLogin {
-		jwt, err = tokenGen.MakeLoginToken(ctx, &lr)
-		if err != nil {
-			zapctx.Error(ctx, "failed to make token", zap.Error(err))
-			return errors.E(op, err)
-		}
-	} else {
-		jwt, err = tokenGen.MakeToken(ctx, permissions)
-		if err != nil {
-			zapctx.Error(ctx, "failed to make token", zap.Error(err))
-			return errors.E(op, err)
-		}
+
+	jwt, err := tokenGen.MakeToken(ctx, permissions)
+	if err != nil {
+		zapctx.Error(ctx, "failed to make token", zap.Error(err))
+		return errors.E(op, err)
 	}
+
 	jwtString := base64.StdEncoding.EncodeToString(jwt)
 	// Add the JWT as base64 encoded string.
 	lr.Token = jwtString
@@ -448,71 +529,6 @@ func createErrResponse(err error, req *message) *message {
 	return errMsg
 }
 
-// ProxyHelpers contains all the necessary helpers for proxying a Juju client
-// connection to a model.
-type ProxyHelpers struct {
-	ConnClient        *websocket.Conn
-	TokenGen          TokenGenerator
-	ConnectController func(context.Context) (*websocket.Conn, string, error)
-	AuditLog          func(*dbmodel.AuditLogEntry)
-}
-
-// ProxySockets will proxy requests from a client connection through to a controller
-// tokenGen is used to authenticate the user and generate JWT token.
-// connectController provides the function to return a connection to the desired controller endpoint.
-func ProxySockets(ctx context.Context, helpers ProxyHelpers) error {
-	const op = errors.Op("rpc.ProxySockets")
-	if helpers.ConnectController == nil {
-		zapctx.Error(ctx, "Missing controller connect function")
-		return errors.E(op, "Missing controller connect function")
-	}
-	if helpers.AuditLog == nil {
-		zapctx.Error(ctx, "Missing audit log function")
-		return errors.E(op, "Missing audit log function")
-	}
-	errChan := make(chan error, 2)
-	msgInFlight := inflightMsgs{messages: make(map[uint64]*message)}
-	client := writeLockConn{conn: helpers.ConnClient}
-	// Note that the clProxy start method will create the connection to the desired controller only
-	// after the first message has been received so that any errors can be properly sent back to the client.
-	clProxy := clientProxy{
-		modelProxy: modelProxy{
-			src:            &client,
-			msgs:           &msgInFlight,
-			tokenGen:       helpers.TokenGen,
-			auditLog:       helpers.AuditLog,
-			conversationId: utils.NewConversationID(),
-		},
-		errChan:              errChan,
-		createControllerConn: helpers.ConnectController,
-	}
-	clProxy.wg.Add(1)
-	go func() {
-		defer clProxy.wg.Done()
-		errChan <- clProxy.start(ctx)
-	}()
-	var err error
-	select {
-	// No cleanup is needed on error, when the client closes the connection
-	// all go routines will proceed to error and exit.
-	case err = <-errChan:
-		zapctx.Debug(ctx, "Proxy error", zap.Error(err))
-	case <-ctx.Done():
-		err = errors.E(op, "Context cancelled")
-		zapctx.Debug(ctx, "Context cancelled")
-		helpers.ConnClient.Close()
-		clProxy.mu.Lock()
-		clProxy.closed = true
-		// TODO(Kian): Test removing close on dst below. The client connection should do it.
-		if clProxy.dst != nil {
-			clProxy.dst.conn.Close()
-		}
-		clProxy.mu.Unlock()
-	}
-	clProxy.wg.Wait()
-	return err
-}
-
 func modifyControllerResponse(msg *message) error {
 	var response map[string]interface{}
 	err := json.Unmarshal(msg.Response, &response)
@@ -527,4 +543,122 @@ func modifyControllerResponse(msg *message) error {
 	}
 	msg.Response = newResp
 	return nil
+}
+
+// handleAdminFacade processes the admin facade call and returns:
+// a message to be returned to the source
+// a message to be sent to the destination
+// an error
+func (p *clientProxy) handleAdminFacade(ctx context.Context, msg *message) (clientResponse *message, controllerMessage *message, err error) {
+	errorFnc := func(err error) (*message, *message, error) {
+		return nil, nil, err
+	}
+	switch msg.Request {
+	case "LoginDevice":
+		deviceResponse, err := jimm.LoginDevice(ctx, p.jimm.OAuthAuthenticationService())
+		if err != nil {
+			return errorFnc(err)
+		}
+		p.deviceOAuthResponse = deviceResponse
+
+		data, err := json.Marshal(apiparams.LoginDeviceResponse{
+			VerificationURI: deviceResponse.VerificationURI,
+			UserCode:        deviceResponse.UserCode,
+		})
+		if err != nil {
+			return errorFnc(err)
+		}
+		msg.Response = data
+		return msg, nil, nil
+	case "GetDeviceSessionToken":
+		sessionToken, err := jimm.GetDeviceSessionToken(ctx, p.jimm.OAuthAuthenticationService(), p.jimm.GetCredentialStore(), p.deviceOAuthResponse)
+		if err != nil {
+			return errorFnc(err)
+		}
+		data, err := json.Marshal(apiparams.GetDeviceSessionTokenResponse{
+			SessionToken: sessionToken,
+		})
+		if err != nil {
+			return errorFnc(err)
+		}
+		msg.Response = data
+		return msg, nil, nil
+	case "LoginWithSessionToken":
+		var request apiparams.LoginWithSessionTokenRequest
+		err := json.Unmarshal(msg.Params, &request)
+		if err != nil {
+			return errorFnc(err)
+		}
+
+		// Verify the session token
+		// TODO(CSS-7081): Ensure for tests that the secret key can be configured.
+		// Or configure cmd tests to use the configured secret.
+		token, err := p.jimm.OAuthAuthenticationService().VerifySessionToken(request.SessionToken, "test-secret")
+		if err != nil {
+			return errorFnc(err)
+		}
+		email := token.Subject()
+
+		user, err := p.jimm.GetOpenFGAUserAndAuthorise(ctx, email)
+		if err != nil {
+			return errorFnc(err)
+		}
+
+		jwt, err := p.tokenGen.MakeLoginToken(ctx, user)
+		if err != nil {
+			return errorFnc(err)
+		}
+		data, err := json.Marshal(params.LoginRequest{
+			AuthTag: names.NewUserTag(email).String(),
+			Token:   base64.StdEncoding.EncodeToString(jwt),
+		})
+		if err != nil {
+			return errorFnc(err)
+		}
+		m := *msg
+		m.Type = "Admin"
+		m.Request = "Login"
+		m.Version = 3
+		m.Params = data
+		return nil, &m, nil
+	case "LoginWithClientCredentials":
+		var request apiparams.LoginWithClientCredentialsRequest
+		err := json.Unmarshal(msg.Params, &request)
+		if err != nil {
+			return errorFnc(err)
+		}
+		err = p.jimm.OAuthAuthenticationService().VerifyClientCredentials(ctx, request.ClientID, request.ClientSecret)
+		if err != nil {
+			return errorFnc(err)
+		}
+
+		user, err := p.jimm.GetOpenFGAUserAndAuthorise(ctx, request.ClientID)
+		if err != nil {
+			return errorFnc(err)
+		}
+
+		jwt, err := p.tokenGen.MakeLoginToken(ctx, user)
+		if err != nil {
+			return errorFnc(err)
+		}
+		data, err := json.Marshal(params.LoginRequest{
+			AuthTag: names.NewUserTag(request.ClientID).String(),
+			Token:   base64.StdEncoding.EncodeToString(jwt),
+		})
+		if err != nil {
+			return errorFnc(err)
+		}
+		m := *msg
+		m.Type = "Admin"
+		m.Request = "Login"
+		m.Version = 3
+		m.Params = data
+		return nil, &m, nil
+	case "LoginWithCookie":
+		return errorFnc(errors.E(errors.CodeNotImplemented))
+	case "Login":
+		return errorFnc(errors.E("JIMM does not support login from old clients", errors.CodeNotSupported))
+	default:
+		return nil, nil, nil
+	}
 }

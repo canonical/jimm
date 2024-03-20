@@ -176,7 +176,6 @@ type JWTService interface {
 
 // JWTGenerator provides the necessary state and methods to authorize a user and generate JWT tokens.
 type JWTGenerator struct {
-	authenticator Authenticator
 	database      JWTGeneratorDatabase
 	accessChecker JWTGeneratorAccessChecker
 	jwtService    JWTService
@@ -190,9 +189,8 @@ type JWTGenerator struct {
 }
 
 // NewJWTGenerator returns a new JwtAuthorizer struct
-func NewJWTGenerator(authenticator Authenticator, database JWTGeneratorDatabase, accessChecker JWTGeneratorAccessChecker, jwtService JWTService) JWTGenerator {
+func NewJWTGenerator(database JWTGeneratorDatabase, accessChecker JWTGeneratorAccessChecker, jwtService JWTService) JWTGenerator {
 	return JWTGenerator{
-		authenticator: authenticator,
 		database:      database,
 		accessChecker: accessChecker,
 		jwtService:    jwtService,
@@ -216,24 +214,21 @@ func (auth *JWTGenerator) GetUser() names.UserTag {
 // MakeLoginToken authorizes the user based on the provided login requests and returns
 // a JWT containing claims about user's access to the controller, model (if applicable)
 // and all clouds that the controller knows about.
-func (auth *JWTGenerator) MakeLoginToken(ctx context.Context, req *jujuparams.LoginRequest) ([]byte, error) {
+func (auth *JWTGenerator) MakeLoginToken(ctx context.Context, user *openfga.User) ([]byte, error) {
 	const op = errors.Op("jimm.MakeLoginToken")
 
 	auth.mu.Lock()
 	defer auth.mu.Unlock()
 
-	if req == nil {
-		return nil, errors.E(op, "missing login request.")
+	if user == nil {
+		return nil, errors.E(op, "user not specified")
 	}
+	auth.user = user
+
 	// Recreate the accessMapCache to prevent leaking permissions across multiple login requests.
 	auth.accessMapCache = make(map[string]string)
 	var authErr error
-	// TODO(CSS-7331) Refactor model proxy for new login methods
-	auth.user, authErr = auth.authenticator.Authenticate(ctx, req)
-	if authErr != nil {
-		zapctx.Error(ctx, "authentication failed", zap.Error(authErr))
-		return nil, authErr
-	}
+
 	var modelAccess string
 	if auth.mt.Id() == "" {
 		return nil, errors.E(op, "model not set")

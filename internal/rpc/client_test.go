@@ -15,11 +15,11 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"github.com/gorilla/websocket"
-	"github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/openfga"
 	"github.com/canonical/jimm/internal/rpc"
 )
 
@@ -225,7 +225,7 @@ func TestClientReceiveInvalidMessage(t *testing.T) {
 
 type testTokenGenerator struct{}
 
-func (p *testTokenGenerator) MakeLoginToken(ctx context.Context, req *params.LoginRequest) ([]byte, error) {
+func (p *testTokenGenerator) MakeLoginToken(ctx context.Context, user *openfga.User) ([]byte, error) {
 	return nil, nil
 }
 
@@ -250,7 +250,7 @@ func TestProxySockets(t *testing.T) {
 	errChan := make(chan error)
 	srvJIMM := newServer(func(connClient *websocket.Conn) error {
 		testTokenGen := testTokenGenerator{}
-		f := func(context.Context) (*websocket.Conn, string, error) {
+		f := func(context.Context) (rpc.WebsocketConnection, string, error) {
 			connController, err := srvController.dialer.DialWebsocket(ctx, srvController.URL)
 			c.Assert(err, qt.IsNil)
 			return connController, "TestName", nil
@@ -297,7 +297,7 @@ func TestCancelProxySockets(t *testing.T) {
 	errChan := make(chan error)
 	srvJIMM := newServer(func(connClient *websocket.Conn) error {
 		testTokenGen := testTokenGenerator{}
-		f := func(context.Context) (*websocket.Conn, string, error) {
+		f := func(context.Context) (rpc.WebsocketConnection, string, error) {
 			connController, err := srvController.dialer.DialWebsocket(ctx, srvController.URL)
 			c.Assert(err, qt.IsNil)
 			return connController, "TestName", nil
@@ -337,7 +337,7 @@ func TestProxySocketsAuditLogs(t *testing.T) {
 	errChan := make(chan error)
 	srvJIMM := newServer(func(connClient *websocket.Conn) error {
 		testTokenGen := testTokenGenerator{}
-		f := func(context.Context) (*websocket.Conn, string, error) {
+		f := func(context.Context) (rpc.WebsocketConnection, string, error) {
 			connController, err := srvController.dialer.DialWebsocket(ctx, srvController.URL)
 			c.Assert(err, qt.IsNil)
 			return connController, "TestModelName", nil
