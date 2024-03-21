@@ -503,9 +503,7 @@ func (as *AuthenticationService) refreshIdentitiesToken(ctx context.Context, ema
 func (as *AuthenticationService) deleteSession(session *sessions.Session, w http.ResponseWriter, req *http.Request) error {
 	const op = errors.Op("auth.AuthenticationService.deleteSession")
 
-	session.Options.MaxAge = -1
-
-	if err := session.Save(req, w); err != nil {
+	if err := as.modifySession(session, w, req, -1); err != nil {
 		return errors.E(op, err)
 	}
 
@@ -515,7 +513,17 @@ func (as *AuthenticationService) deleteSession(session *sessions.Session, w http
 func (as *AuthenticationService) extendSession(session *sessions.Session, w http.ResponseWriter, req *http.Request) error {
 	const op = errors.Op("auth.AuthenticationService.extendSession")
 
-	session.Options.MaxAge = as.sessionCookieMaxAge
+	if err := as.modifySession(session, w, req, as.sessionCookieMaxAge); err != nil {
+		return errors.E(op, err)
+	}
+
+	return nil
+}
+
+func (as *AuthenticationService) modifySession(session *sessions.Session, w http.ResponseWriter, req *http.Request, maxAge int) error {
+	const op = errors.Op("auth.AuthenticationService.modifySession")
+
+	session.Options.MaxAge = maxAge
 
 	if err := session.Save(req, w); err != nil {
 		return errors.E(op, err)
