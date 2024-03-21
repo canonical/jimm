@@ -11,6 +11,7 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/gorilla/sessions"
 
+	"github.com/canonical/jimm/internal/auth"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/jimmtest"
 )
@@ -43,12 +44,42 @@ func TestBrowserLoginAndLogout(t *testing.T) {
 
 	// Login
 	db, sessionStore := setupDbAndSessionStore(c)
-	cookie, err := jimmtest.RunBrowserLogin(db, sessionStore)
+
+	pgSession := sessionStore.(*pgstore.PGStore)
+	pgSession.Cleanup(time.Nanosecond)
+
+	cookie, jimmHTTPServer, err := jimmtest.RunBrowserLoginAndKeepServerRunning(db, sessionStore)
 	c.Assert(err, qt.IsNil)
+	defer jimmHTTPServer.Close()
 	c.Assert(cookie, qt.Not(qt.Equals), "")
 
-	//Logout
-	http.NewRequest("GET", s.ur)
+	// Logout
+	req, err := http.NewRequest("GET", jimmHTTPServer.URL+"/logout", nil)
+	c.Assert(err, qt.IsNil)
+	parsedCookies := jimmtest.ParseCookies(cookie)
+	c.Assert(parsedCookies, qt.HasLen, 1)
+	req.AddCookie(parsedCookies[0])
+
+	res, err := http.DefaultClient.Do(req)
+	c.Assert(err, qt.IsNil)
+	c.Assert(res.StatusCode, qt.Equals, http.StatusOK)
+
+	// Ensure session is going to be cleaned up
+
+	// This session is cached so we check the database manually
+	session, err := sessionStore.Get(req, auth.SessionName)
+	c.Assert(err, qt.IsNil)
+
+	// Using the PGSession variant
+	pgSessionInstance := pgstore.PGSession{}
+	tx := db.DB.
+		Raw(
+			"SELECT id, key, data, created_on, modified_on, expires_on FROM http_sessions WHERE key = ?",
+			session.ID,
+		).
+		Scan(&pgSessionInstance)
+	c.Assert(tx.Error, qt.IsNil)
+	c.Assert(pgSessionInstance.ID, qt.Equals, 0) // Incrementing ids, so 0 == deleted / not found.
 }
 
 func TestLogoutNoIdentity(t *testing.T) {}

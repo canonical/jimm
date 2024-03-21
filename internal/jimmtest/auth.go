@@ -155,7 +155,25 @@ func SetupTestDashboardCallbackHandler(browserURL string, db *db.Database, sessi
 	return s, nil
 }
 
+func RunBrowserLoginAndKeepServerRunning(db *db.Database, sessionStore sessions.Store) (string, *httptest.Server, error) {
+	cookieString, jimmHTTPServer, err := runBrowserLogin(db, sessionStore)
+	return cookieString, jimmHTTPServer, err
+}
+
 func RunBrowserLogin(db *db.Database, sessionStore sessions.Store) (string, error) {
+	cookieString, jimmHTTPServer, err := runBrowserLogin(db, sessionStore)
+	defer jimmHTTPServer.Close()
+	return cookieString, err
+}
+
+func ParseCookies(cookies string) []*http.Cookie {
+	header := http.Header{}
+	header.Add("Cookie", cookies)
+	request := http.Request{Header: header}
+	return request.Cookies()
+}
+
+func runBrowserLogin(db *db.Database, sessionStore sessions.Store) (string, *httptest.Server, error) {
 	var cookieString string
 
 	// Setup final test redirect url server, to emulate
@@ -173,13 +191,12 @@ func RunBrowserLogin(db *db.Database, sessionStore sessions.Store) (string, erro
 
 	s, err := SetupTestDashboardCallbackHandler(browser.URL, db, sessionStore)
 	if err != nil {
-		return cookieString, err
+		return cookieString, s, err
 	}
-	defer s.Close()
 
 	jar, err := cookiejar.New(nil)
 	if err != nil {
-		return cookieString, err
+		return cookieString, s, err
 	}
 
 	client := &http.Client{
@@ -192,17 +209,17 @@ func RunBrowserLogin(db *db.Database, sessionStore sessions.Store) (string, erro
 
 	res, err := client.Get(s.URL + "/login")
 	if err != nil {
-		return cookieString, err
+		return cookieString, s, err
 	}
 
 	if res.StatusCode != http.StatusOK {
-		return cookieString, errors.New("status code not ok")
+		return cookieString, s, errors.New("status code not ok")
 	}
 
 	defer res.Body.Close()
 	b, err := io.ReadAll(res.Body)
 	if err != nil {
-		return cookieString, err
+		return cookieString, s, err
 	}
 
 	re := regexp.MustCompile(`action="(.*?)" method=`)
@@ -214,28 +231,21 @@ func RunBrowserLogin(db *db.Database, sessionStore sessions.Store) (string, erro
 	v.Add("password", "password")
 	loginResp, err := client.PostForm(loginFormUrl, v)
 	if err != nil {
-		return cookieString, err
+		return cookieString, s, err
 	}
 
 	b, err = io.ReadAll(loginResp.Body)
 	if err != nil {
-		return cookieString, err
+		return cookieString, s, err
 	}
 
 	if string(b) != dashboardResponse {
-		return cookieString, errors.New("dashboard response not equal")
+		return cookieString, s, errors.New("dashboard response not equal")
 	}
 	if loginResp.StatusCode != http.StatusOK {
-		return cookieString, errors.New("status code not ok")
+		return cookieString, s, errors.New("status code not ok")
 	}
 
 	loginResp.Body.Close()
-	return cookieString, nil
-}
-
-func ParseCookies(cookies string) []*http.Cookie {
-	header := http.Header{}
-	header.Add("Cookie", cookies)
-	request := http.Request{Header: header}
-	return request.Cookies()
+	return cookieString, s, nil
 }
