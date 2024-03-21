@@ -78,7 +78,7 @@ services:
       JIMM_DASHBOARD_FINAL_REDIRECT_URL: "https://my-dashboard.com/final-callback" # Example URL
       JIMM_ACCESS_TOKEN_EXPIRY_DURATION: 1h
       JIMM_SECURE_SESSION_COOKIES: false
-      JIMM_SESSION_COOKIE_EXPIRY: 86400
+      JIMM_SESSION_COOKIE_MAX_AGE: 86400
     volumes:
       - ./:/jimm/
       - ./local/vault/approle.json:/vault/approle.json:rw

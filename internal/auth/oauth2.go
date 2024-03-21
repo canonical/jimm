@@ -12,6 +12,7 @@ import (
 	"context"
 	"encoding/base64"
 	stderrors "errors"
+	"fmt"
 	"net/http"
 	"net/mail"
 	"strings"
@@ -42,9 +43,11 @@ const (
 
 type sessionIdentityContextKey struct{}
 
-func ContextWithSessionIdentity(ctx context.Context, sessionIdentityId any) context.Context {
+func contextWithSessionIdentity(ctx context.Context, sessionIdentityId any) context.Context {
 	return context.WithValue(ctx, sessionIdentityContextKey{}, sessionIdentityId)
 }
+
+// SessionIdentityFromContext returns the session identity key from the context.
 func SessionIdentityFromContext(ctx context.Context) string {
 	v := ctx.Value(sessionIdentityContextKey{})
 	if v == nil {
@@ -428,7 +431,7 @@ func (as *AuthenticationService) AuthenticateBrowserSession(ctx context.Context,
 		return ctx, errors.E(op, err)
 	}
 
-	ctx = ContextWithSessionIdentity(ctx, identityId)
+	ctx = contextWithSessionIdentity(ctx, identityId)
 
 	if err := as.extendSession(session, w, req); err != nil {
 		return ctx, errors.E(op, err)
@@ -444,7 +447,7 @@ func (as *AuthenticationService) validateAndUpdateAccessToken(ctx context.Contex
 
 	emailStr, ok := email.(string)
 	if !ok {
-		return errors.E(op, "failed to cast email")
+		return errors.E(op, fmt.Sprintf("failed to cast email: got %T, expected %T", email, emailStr))
 	}
 
 	db := as.db
@@ -462,6 +465,8 @@ func (as *AuthenticationService) validateAndUpdateAccessToken(ctx context.Contex
 		TokenType:    u.AccessTokenType,
 	}
 
+	// Valid simply checks the expiry, if the token isn't valid,
+	// we attempt to refresh the identities tokens and update them.
 	if t.Valid() {
 		return nil
 	}
