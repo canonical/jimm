@@ -11,7 +11,6 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/gorilla/sessions"
 
-	"github.com/canonical/jimm/internal/auth"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/jimmtest"
 )
@@ -42,6 +41,8 @@ func setupDbAndSessionStore(c *qt.C) (*db.Database, sessions.Store) {
 func TestBrowserLoginAndLogout(t *testing.T) {
 	c := qt.New(t)
 
+	// TODO in WHOAMI PR, run a WHOAMI without cookie
+
 	// Login
 	db, sessionStore := setupDbAndSessionStore(c)
 
@@ -52,6 +53,8 @@ func TestBrowserLoginAndLogout(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	defer jimmHTTPServer.Close()
 	c.Assert(cookie, qt.Not(qt.Equals), "")
+
+	// TODO in WHOAMI PR, run a WHOAMI with cookie
 
 	// Logout
 	req, err := http.NewRequest("GET", jimmHTTPServer.URL+"/logout", nil)
@@ -64,25 +67,17 @@ func TestBrowserLoginAndLogout(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(res.StatusCode, qt.Equals, http.StatusOK)
 
-	// Ensure session is going to be cleaned up
+	// TODO in WHOAMI PR, run a WHOAMI without cookie
+	// This is following Kians suggestion of embedding whoami into this test
+	// which makes 100% sense.
 
-	// This session is cached so we check the database manually
-	session, err := sessionStore.Get(req, auth.SessionName)
+	// Logout with no identity
+	req, err = http.NewRequest("GET", jimmHTTPServer.URL+"/logout", nil)
 	c.Assert(err, qt.IsNil)
-
-	// Using the PGSession variant
-	pgSessionInstance := pgstore.PGSession{}
-	tx := db.DB.
-		Raw(
-			"SELECT id, key, data, created_on, modified_on, expires_on FROM http_sessions WHERE key = ?",
-			session.ID,
-		).
-		Scan(&pgSessionInstance)
-	c.Assert(tx.Error, qt.IsNil)
-	c.Assert(pgSessionInstance.ID, qt.Equals, 0) // Incrementing ids, so 0 == deleted / not found.
+	res, err = http.DefaultClient.Do(req)
+	c.Assert(err, qt.IsNil)
+	c.Assert(res.StatusCode, qt.Equals, http.StatusForbidden)
 }
-
-func TestLogoutNoIdentity(t *testing.T) {}
 
 func TestCallbackFailsNoCodePresent(t *testing.T) {
 	c := qt.New(t)

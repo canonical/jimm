@@ -10,6 +10,7 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 
+	"github.com/canonical/jimm/internal/auth"
 	"github.com/canonical/jimm/internal/errors"
 )
 
@@ -143,8 +144,12 @@ func (oah *OAuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 
 	authSvc := oah.authenticator
 
-	err := authSvc.Logout(ctx, w, r)
-	if err != nil {
+	if _, err := r.Cookie(auth.SessionName); err != nil {
+		writeError(ctx, w, http.StatusForbidden, err, "no session cookie to logout")
+		return
+	}
+
+	if err := authSvc.Logout(ctx, w, r); err != nil {
 		writeError(ctx, w, http.StatusInternalServerError, err, "failed to logout")
 		return
 	}
