@@ -423,7 +423,6 @@ func (as *AuthenticationService) AuthenticateBrowserSession(ctx context.Context,
 	}
 
 	err = as.validateAndUpdateAccessToken(ctx, identityId)
-
 	if err != nil {
 		if err := as.deleteSession(session, w, req); err != nil {
 			return ctx, errors.E(op, err)
