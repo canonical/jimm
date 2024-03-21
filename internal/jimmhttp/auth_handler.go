@@ -2,6 +2,7 @@ package jimmhttp
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -53,6 +54,8 @@ type BrowserOAuthAuthenticator interface {
 		email string,
 	) error
 	Logout(ctx context.Context, w http.ResponseWriter, req *http.Request) error
+	AuthenticateBrowserSession(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error)
+	Whoami(ctx context.Context) (*auth.WhoamiResponse, error)
 }
 
 // NewOAuthHandler returns a new OAuth handler.
@@ -77,6 +80,7 @@ func (oah *OAuthHandler) Routes() chi.Router {
 	oah.Router.Get("/login", oah.Login)
 	oah.Router.Get("/callback", oah.Callback)
 	oah.Router.Get("/logout", oah.Logout)
+	oah.Router.Get("/whoami", oah.Whoami)
 	return oah.Router
 }
 
@@ -92,7 +96,7 @@ func (oah *OAuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 // Callback handles /auth/callback.
 func (oah *OAuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
-	ctx := context.Background()
+	ctx := r.Context()
 
 	code := r.URL.Query().Get("code")
 	if code == "" {
@@ -140,7 +144,7 @@ func (oah *OAuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 
 // Logout handles /auth/logout.
 func (oah *OAuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
-	ctx := context.Background()
+	ctx := r.Context()
 
 	authSvc := oah.authenticator
 
@@ -154,6 +158,42 @@ func (oah *OAuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusOK)
+}
+
+// Whoami handles /auth/whoami.
+func (oah *OAuthHandler) Whoami(w http.ResponseWriter, r *http.Request) {
+	ctx := context.Background()
+
+	authSvc := oah.authenticator
+
+	if _, err := r.Cookie(auth.SessionName); err != nil {
+		writeError(ctx, w, http.StatusForbidden, err, "no session cookie to identity user")
+		return
+	}
+
+	ctx, err := authSvc.AuthenticateBrowserSession(ctx, w, r)
+	if err != nil {
+		writeError(ctx, w, http.StatusInternalServerError, err, "failed to authenticate users session")
+		return
+	}
+
+	whoamiResp, err := authSvc.Whoami(ctx)
+	if err != nil {
+		writeError(ctx, w, http.StatusInternalServerError, err, "failed to find whoami from identity id")
+		return
+	}
+
+	b, err := json.Marshal(whoamiResp)
+	if err != nil {
+		writeError(ctx, w, http.StatusInternalServerError, err, "failed to marshal whoami resp")
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	if _, err := w.Write(b); err != nil {
+		writeError(ctx, w, http.StatusInternalServerError, err, "failed to write response to whoami")
+		return
+	}
 }
 
 // writeError writes an error and logs the message. It is expected that the status code

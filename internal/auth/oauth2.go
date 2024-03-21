@@ -480,6 +480,38 @@ func (as *AuthenticationService) Logout(ctx context.Context, w http.ResponseWrit
 	return nil
 }
 
+// WhoamiResponse holds the response for a /auth/whoami call.
+type WhoamiResponse struct {
+	DisplayName string `json:"display-name"`
+	Email       string `json:"email"`
+}
+
+// Whoami returns "whoami" response, based on the identity id populating the fields
+// according to the current database schema for identities. This is likely subject
+// to change in the future.
+func (as *AuthenticationService) Whoami(ctx context.Context) (*WhoamiResponse, error) {
+	const op = errors.Op("auth.AuthenticationService.Whoami")
+
+	identityId := SessionIdentityFromContext(ctx)
+	if identityId == "" {
+		return nil, errors.E(op, "no identity in context")
+	}
+
+	u := &dbmodel.Identity{
+		Name: identityId,
+	}
+
+	if err := as.db.GetIdentity(ctx, u); err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	return &WhoamiResponse{
+		DisplayName: u.DisplayName,
+		Email:       u.Name,
+	}, nil
+
+}
+
 // validateAndUpdateAccessToken validates the access tokens expiry, and if it cannot, then
 // it attempts to refresh the access token.
 func (as *AuthenticationService) validateAndUpdateAccessToken(ctx context.Context, email any) error {

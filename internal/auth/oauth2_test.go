@@ -321,9 +321,11 @@ func TestAuthenticateBrowserSessionAndLogout(t *testing.T) {
 	ctx, err = authSvc.AuthenticateBrowserSession(ctx, rec, req)
 	c.Assert(err, qt.IsNil)
 
-	// Check identity added
-	identityId := auth.SessionIdentityFromContext(ctx)
-	c.Assert(identityId, qt.Equals, "jimm-test@canonical.com")
+	// Test whoami
+	whoamiResp, err := authSvc.Whoami(ctx)
+	c.Assert(err, qt.IsNil)
+	c.Assert(whoamiResp.DisplayName, qt.Equals, "jimm-test")
+	c.Assert(whoamiResp.Email, qt.Equals, "jimm-test@canonical.com")
 
 	// Assert Set-Cookie present
 	setCookieCookies := rec.Header().Get("Set-Cookie")
@@ -333,6 +335,11 @@ func TestAuthenticateBrowserSessionAndLogout(t *testing.T) {
 	// Test logout does indeed remove the cookie for us
 	err = authSvc.Logout(ctx, rec, req)
 	c.Assert(err, qt.IsNil)
+
+	// Test whoami with empty context (simulating a logged out user)
+	_, err = authSvc.Whoami(context.Background())
+	c.Assert(err, qt.ErrorMatches, "no identity in context")
+
 }
 
 func TestAuthenticateBrowserSessionRejectsNoneDecryptableOrDecodableCookies(t *testing.T) {
