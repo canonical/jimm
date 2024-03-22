@@ -11,7 +11,7 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/gorilla/sessions"
 
-	"github.com/canonical/jimm/internal/auth"
+	"github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/jimmtest"
 )
@@ -66,7 +66,7 @@ func TestBrowserLoginAndLogout(t *testing.T) {
 	c.Assert(res.StatusCode, qt.Equals, http.StatusOK)
 	b, err := io.ReadAll(res.Body)
 	c.Assert(err, qt.IsNil)
-	c.Assert(string(b), qt.JSONEquals, &auth.WhoamiResponse{
+	c.Assert(string(b), qt.JSONEquals, &params.WhoamiResponse{
 		DisplayName: "jimm-test",
 		Email:       "jimm-test@canonical.com",
 	})

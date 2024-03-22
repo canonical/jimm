@@ -11,6 +11,7 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 
+	"github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/internal/auth"
 	"github.com/canonical/jimm/internal/errors"
 )
@@ -55,7 +56,7 @@ type BrowserOAuthAuthenticator interface {
 	) error
 	Logout(ctx context.Context, w http.ResponseWriter, req *http.Request) error
 	AuthenticateBrowserSession(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error)
-	Whoami(ctx context.Context) (*auth.WhoamiResponse, error)
+	Whoami(ctx context.Context) (*params.WhoamiResponse, error)
 }
 
 // NewOAuthHandler returns a new OAuth handler.
@@ -189,11 +190,12 @@ func (oah *OAuthHandler) Whoami(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
 	if _, err := w.Write(b); err != nil {
 		writeError(ctx, w, http.StatusInternalServerError, err, "failed to write response to whoami")
 		return
 	}
+
+	w.WriteHeader(http.StatusOK)
 }
 
 // writeError writes an error and logs the message. It is expected that the status code

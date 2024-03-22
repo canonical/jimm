@@ -27,6 +27,7 @@ import (
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/clientcredentials"
 
+	"github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
 )
@@ -485,16 +486,10 @@ func (as *AuthenticationService) Logout(ctx context.Context, w http.ResponseWrit
 	return nil
 }
 
-// WhoamiResponse holds the response for a /auth/whoami call.
-type WhoamiResponse struct {
-	DisplayName string `json:"display-name"`
-	Email       string `json:"email"`
-}
-
 // Whoami returns "whoami" response, based on the identity id populating the fields
 // according to the current database schema for identities. This is likely subject
 // to change in the future.
-func (as *AuthenticationService) Whoami(ctx context.Context) (*WhoamiResponse, error) {
+func (as *AuthenticationService) Whoami(ctx context.Context) (*params.WhoamiResponse, error) {
 	const op = errors.Op("auth.AuthenticationService.Whoami")
 
 	identityId := SessionIdentityFromContext(ctx)
@@ -510,7 +505,7 @@ func (as *AuthenticationService) Whoami(ctx context.Context) (*WhoamiResponse, e
 		return nil, errors.E(op, err)
 	}
 
-	return &WhoamiResponse{
+	return &params.WhoamiResponse{
 		DisplayName: u.DisplayName,
 		Email:       u.Name,
 	}, nil
