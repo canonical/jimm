@@ -71,7 +71,12 @@ func (r *controllerRoot) GetDeviceSessionToken(ctx context.Context) (params.GetD
 	return response, nil
 }
 
-// LoginWithSessionCookie
+// LoginWithSessionCookie is a facade call which has the cookie intercepted at the http layer,
+// in which it is then placed on the controller root under "identityId", this identityId is used
+// to perform a user lookup and authorise the login call.
+//
+// It may be misleading in that it does not interact with cookies at all, but this will only ever
+// be successful upon the http layer login being successful.
 func (r *controllerRoot) LoginWithSessionCookie(ctx context.Context) (jujuparams.LoginResult, error) {
 	const op = errors.Op("jujuapi.LoginWithSessionCookie")
 

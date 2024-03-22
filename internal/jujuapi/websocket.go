@@ -147,11 +147,12 @@ func (s modelProxyServer) ServeWS(ctx context.Context, clientConn *websocket.Con
 	zapctx.Debug(ctx, "Starting proxier")
 	auditLogger := s.jimm.AddAuditLogEntry
 	proxyHelpers := jimmRPC.ProxyHelpers{
-		ConnClient:        clientConn,
-		TokenGen:          &jwtGenerator,
-		ConnectController: connectionFunc,
-		AuditLog:          auditLogger,
-		JIMM:              s.jimm,
+		ConnClient:              clientConn,
+		TokenGen:                &jwtGenerator,
+		ConnectController:       connectionFunc,
+		AuditLog:                auditLogger,
+		JIMM:                    s.jimm,
+		AuthenticatedIdentityID: auth.SessionIdentityFromContext(ctx),
 	}
 	jimmRPC.ProxySockets(ctx, proxyHelpers)
 }

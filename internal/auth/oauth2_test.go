@@ -376,7 +376,6 @@ func TestAuthenticateBrowserSessionRejectsNoneDecryptableOrDecodableCookies(t *t
 
 	rec = httptest.NewRecorder()
 
-	// The underlying error is a a value not valid err
 	_, err = authSvc.AuthenticateBrowserSession(ctx, rec, req)
 	c.Assert(err, qt.ErrorMatches, "failed to retrieve session")
 }
