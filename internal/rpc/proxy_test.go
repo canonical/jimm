@@ -68,6 +68,7 @@ func TestProxySocketsAdminFacade(t *testing.T) {
 	tests := []struct {
 		about                     string
 		messageToSend             message
+		authenticateEntityID      string
 		expectedClientResponse    *message
 		expectedControllerMessage *message
 		oauthAuthenticatorError   error
@@ -199,6 +200,38 @@ func TestProxySocketsAdminFacade(t *testing.T) {
 			Request:   "AnyMethod",
 			Params:    []byte(`{"key":"value"}`),
 		},
+	}, {
+		about: "login with session cookie - a login message is sent to the controller",
+		messageToSend: message{
+			RequestID: 1,
+			Type:      "Admin",
+			Version:   4,
+			Request:   "LoginWithSessionCookie",
+			Params:    ccData,
+		},
+		authenticateEntityID: "alice@wonderland.io",
+		expectedControllerMessage: &message{
+			RequestID: 1,
+			Type:      "Admin",
+			Version:   3,
+			Request:   "Login",
+			Params:    loginData,
+		},
+	}, {
+		about: "login with session cookie - but there was no identity id in the cookie",
+		messageToSend: message{
+			RequestID: 1,
+			Type:      "Admin",
+			Version:   4,
+			Request:   "LoginWithSessionCookie",
+			Params:    ccData,
+		},
+		expectedClientResponse: &message{
+			RequestID: 1,
+			Error:     "unauthorized access",
+			ErrorCode: "unauthorized access",
+		},
+		oauthAuthenticatorError: errors.E(errors.CodeUnauthorized),
 	}}
 
 	for _, test := range tests {
@@ -223,6 +256,7 @@ func TestProxySocketsAdminFacade(t *testing.T) {
 				JIMM: &mockJIMM{
 					authenticator: authenticator,
 				},
+				AuthenticatedIdentityID: test.authenticateEntityID,
 			}
 			go rpc.ProxySockets(ctx, helpers)
 
