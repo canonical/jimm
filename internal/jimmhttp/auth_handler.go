@@ -10,6 +10,7 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 
+	"github.com/canonical/jimm/internal/auth"
 	"github.com/canonical/jimm/internal/errors"
 )
 
@@ -51,6 +52,7 @@ type BrowserOAuthAuthenticator interface {
 		secureCookies bool,
 		email string,
 	) error
+	Logout(ctx context.Context, w http.ResponseWriter, req *http.Request) error
 }
 
 // NewOAuthHandler returns a new OAuth handler.
@@ -74,6 +76,7 @@ func (oah *OAuthHandler) Routes() chi.Router {
 	oah.SetupMiddleware()
 	oah.Router.Get("/login", oah.Login)
 	oah.Router.Get("/callback", oah.Callback)
+	oah.Router.Get("/logout", oah.Logout)
 	return oah.Router
 }
 
@@ -133,6 +136,24 @@ func (oah *OAuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Redirect(w, r, oah.dashboardFinalRedirectURL, http.StatusPermanentRedirect)
+}
+
+// Logout handles /auth/logout.
+func (oah *OAuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
+	ctx := context.Background()
+
+	authSvc := oah.authenticator
+
+	if _, err := r.Cookie(auth.SessionName); err != nil {
+		writeError(ctx, w, http.StatusForbidden, err, "no session cookie to logout")
+		return
+	}
+
+	if err := authSvc.Logout(ctx, w, r); err != nil {
+		writeError(ctx, w, http.StatusInternalServerError, err, "failed to logout")
+		return
+	}
+	w.WriteHeader(http.StatusOK)
 }
 
 // writeError writes an error and logs the message. It is expected that the status code

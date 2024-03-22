@@ -301,7 +301,7 @@ func TestCreateBrowserSession(t *testing.T) {
 	c.Assert(session.Values[auth.SessionIdentityKey], qt.Equals, "jimm-test@canonical.com")
 }
 
-func TestAuthenticateBrowserSession(t *testing.T) {
+func TestAuthenticateBrowserSessionAndLogout(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
@@ -329,6 +329,10 @@ func TestAuthenticateBrowserSession(t *testing.T) {
 	setCookieCookies := rec.Header().Get("Set-Cookie")
 	parsedCookies := jimmtest.ParseCookies(setCookieCookies)
 	assertSetCookiesIsCorrect(c, rec, parsedCookies)
+
+	// Test logout does indeed remove the cookie for us
+	err = authSvc.Logout(ctx, rec, req)
+	c.Assert(err, qt.IsNil)
 }
 
 func TestAuthenticateBrowserSessionRejectsNoneDecryptableOrDecodableCookies(t *testing.T) {

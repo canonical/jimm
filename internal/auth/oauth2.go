@@ -439,6 +439,52 @@ func (as *AuthenticationService) AuthenticateBrowserSession(ctx context.Context,
 	return ctx, nil
 }
 
+// Logout does two things:
+//
+//   - It deletes the session (Max-Age = -1), and within the database the cleanup routine will remove
+//     the expired session upon next run.
+//   - It resets the access tokens for this user
+func (as *AuthenticationService) Logout(ctx context.Context, w http.ResponseWriter, req *http.Request) error {
+	const op = errors.Op("auth.AuthenticationService.Logout")
+
+	session, err := as.sessionStore.Get(req, SessionName)
+	if err != nil {
+		zapctx.Error(ctx, "failed to retrieve session", zap.Error(err))
+		return errors.E(op, err, "failed to retrieve session")
+	}
+
+	identityId, ok := session.Values[SessionIdentityKey]
+	if !ok {
+		err := errors.E(op, "session is missing identity key")
+		zapctx.Error(ctx, "session is missing identity key", zap.Error(err))
+		return err
+	}
+
+	identityIdStr, ok := identityId.(string)
+	if !ok {
+		err := errors.E(op, fmt.Sprintf("session identity key could not be parsed: expected %T, got %T", identityIdStr, identityId))
+		zapctx.Error(ctx, "failed to parse session identity key", zap.Error(err))
+		return err
+	}
+
+	if err := as.deleteSession(session, w, req); err != nil {
+		zapctx.Error(ctx, "failed to delete session", zap.Error(err))
+		return errors.E(op, err)
+	}
+
+	if err := as.UpdateIdentity(ctx, identityIdStr, &oauth2.Token{
+		AccessToken:  "",
+		RefreshToken: "",
+		Expiry:       time.Now(),
+		TokenType:    "",
+	}); err != nil {
+		zapctx.Error(ctx, "failed to update identity", zap.Error(err))
+		return errors.E(op, err)
+	}
+
+	return nil
+}
+
 // validateAndUpdateAccessToken validates the access tokens expiry, and if it cannot, then
 // it attempts to refresh the access token.
 func (as *AuthenticationService) validateAndUpdateAccessToken(ctx context.Context, email any) error {
