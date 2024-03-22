@@ -50,7 +50,8 @@ func SessionIdentityFromContext(ctx context.Context) string {
 	if v == nil {
 		return ""
 	}
-	return v.(string)
+	s, _ := v.(string)
+	return s
 }
 
 // AuthenticationService handles authentication within JIMM.
@@ -61,8 +62,7 @@ type AuthenticationService struct {
 	provider *oidc.Provider
 	// sessionTokenExpiry holds the expiry time for JIMM minted session tokens (JWTs).
 	sessionTokenExpiry time.Duration
-
-	// sessionCookieMaxAge holds the max age for session cookies.
+	// sessionCookieMaxAge holds the max age for session cookies in seconds.
 	sessionCookieMaxAge int
 
 	db IdentityStore
@@ -92,7 +92,7 @@ type AuthenticationServiceParams struct {
 	Scopes []string
 	// SessionTokenExpiry holds the expiry time of minted JIMM session tokens (JWTs).
 	SessionTokenExpiry time.Duration
-	// SessionCookieMaxAge holds the max age for session cookies.
+	// SessionCookieMaxAge holds the max age for session cookies in seconds.
 	SessionCookieMaxAge int
 	// RedirectURL is the URL for handling the exchange of authorisation
 	// codes into access tokens (and id tokens), for JIMM, this is expected
@@ -427,7 +427,7 @@ func (as *AuthenticationService) AuthenticateBrowserSession(ctx context.Context,
 
 	if err != nil {
 		if err := as.deleteSession(session, w, req); err != nil {
-			return ctx, errors.E(op, err)
+			return ctx, errors.E(op, err, "failed to delete session after getting an invalid token")
 		}
 		return ctx, errors.E(op, err)
 	}

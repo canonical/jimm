@@ -264,9 +264,10 @@ func assertSetCookiesIsCorrect(c *qt.C, rec *httptest.ResponseRecorder, parsedCo
 		for _, v := range cookies {
 			if v.Name == name {
 				found = true
+				break
 			}
 		}
-		c.Assert(found, qt.IsTrue)
+		c.Assert(found, qt.IsTrue, qt.Commentf("cookie data assertion failed"))
 	}
 	assertHasCookie(auth.SessionName, parsedCookies)
 	assertHasCookie("Path", parsedCookies)
