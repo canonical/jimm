@@ -12,6 +12,7 @@ import (
 	"context"
 	"encoding/base64"
 	stderrors "errors"
+	"fmt"
 	"net/http"
 	"net/mail"
 	"strings"
@@ -42,9 +43,11 @@ const (
 
 type sessionIdentityContextKey struct{}
 
-func ContextWithSessionIdentity(ctx context.Context, sessionIdentityId any) context.Context {
+func contextWithSessionIdentity(ctx context.Context, sessionIdentityId any) context.Context {
 	return context.WithValue(ctx, sessionIdentityContextKey{}, sessionIdentityId)
 }
+
+// SessionIdentityFromContext returns the session identity key from the context.
 func SessionIdentityFromContext(ctx context.Context) string {
 	v := ctx.Value(sessionIdentityContextKey{})
 	if v == nil {
@@ -117,10 +120,6 @@ func NewAuthenticationService(ctx context.Context, params AuthenticationServiceP
 	if err != nil {
 		zapctx.Error(ctx, "failed to create oidc provider", zap.Error(err))
 		return nil, errors.E(op, errors.CodeServerConfiguration, err, "failed to create oidc provider")
-	}
-
-	if params.SessionTokenExpiry == 0 {
-		return nil, errors.E(op, errors.CodeServerConfiguration, "session token expiry not set")
 	}
 
 	return &AuthenticationService{
@@ -424,7 +423,6 @@ func (as *AuthenticationService) AuthenticateBrowserSession(ctx context.Context,
 	}
 
 	err = as.validateAndUpdateAccessToken(ctx, identityId)
-
 	if err != nil {
 		if err := as.deleteSession(session, w, req); err != nil {
 			return ctx, errors.E(op, err)
@@ -432,7 +430,7 @@ func (as *AuthenticationService) AuthenticateBrowserSession(ctx context.Context,
 		return ctx, errors.E(op, err)
 	}
 
-	ctx = ContextWithSessionIdentity(ctx, identityId)
+	ctx = contextWithSessionIdentity(ctx, identityId)
 
 	if err := as.extendSession(session, w, req); err != nil {
 		return ctx, errors.E(op, err)
@@ -487,7 +485,7 @@ func (as *AuthenticationService) validateAndUpdateAccessToken(ctx context.Contex
 
 	emailStr, ok := email.(string)
 	if !ok {
-		return errors.E(op, "failed to cast email")
+		return errors.E(op, fmt.Sprintf("failed to cast email: got %T, expected %T", email, emailStr))
 	}
 
 	db := as.db
@@ -505,6 +503,8 @@ func (as *AuthenticationService) validateAndUpdateAccessToken(ctx context.Contex
 		TokenType:    u.AccessTokenType,
 	}
 
+	// Valid simply checks the expiry, if the token isn't valid,
+	// we attempt to refresh the identities tokens and update them.
 	if t.Valid() {
 		return nil
 	}
@@ -541,9 +541,7 @@ func (as *AuthenticationService) refreshIdentitiesToken(ctx context.Context, ema
 func (as *AuthenticationService) deleteSession(session *sessions.Session, w http.ResponseWriter, req *http.Request) error {
 	const op = errors.Op("auth.AuthenticationService.deleteSession")
 
-	session.Options.MaxAge = -1
-
-	if err := session.Save(req, w); err != nil {
+	if err := as.modifySession(session, w, req, -1); err != nil {
 		return errors.E(op, err)
 	}
 
@@ -553,7 +551,17 @@ func (as *AuthenticationService) deleteSession(session *sessions.Session, w http
 func (as *AuthenticationService) extendSession(session *sessions.Session, w http.ResponseWriter, req *http.Request) error {
 	const op = errors.Op("auth.AuthenticationService.extendSession")
 
-	session.Options.MaxAge = as.sessionCookieMaxAge
+	if err := as.modifySession(session, w, req, as.sessionCookieMaxAge); err != nil {
+		return errors.E(op, err)
+	}
+
+	return nil
+}
+
+func (as *AuthenticationService) modifySession(session *sessions.Session, w http.ResponseWriter, req *http.Request, maxAge int) error {
+	const op = errors.Op("auth.AuthenticationService.modifySession")
+
+	session.Options.MaxAge = maxAge
 
 	if err := session.Save(req, w); err != nil {
 		return errors.E(op, err)

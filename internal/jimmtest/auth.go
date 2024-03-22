@@ -14,6 +14,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -110,7 +111,7 @@ func SetupTestDashboardCallbackHandler(browserURL string, db *db.Database, sessi
 	if err != nil {
 		return nil, err
 	}
-	port := fmt.Sprintf("%d", listener.Addr().(*net.TCPAddr).Port)
+	port := strconv.Itoa(listener.Addr().(*net.TCPAddr).Port)
 
 	// Create unstarted server to enable auth service
 	s := httptest.NewUnstartedServer(nil)

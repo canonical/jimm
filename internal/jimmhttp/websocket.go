@@ -37,7 +37,7 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	ctx := req.Context()
 	var authErr error
 
-	if h.Server != nil {
+	if h.Server != nil && h.Server.GetAuthenticationService() != nil {
 		ctx, authErr = handleBrowserAuthentication(
 			ctx,
 			h.Server.GetAuthenticationService(),
@@ -121,6 +121,7 @@ func handleBrowserAuthentication(ctx context.Context, authSvc jimm.OAuthAuthenti
 			ctx, w, req,
 		)
 		if err != nil {
+			zapctx.Error(ctx, "authenticate browser session failed", zap.Error(err))
 			// Something went wrong when trying to perform the authentication
 			// of the cookie.
 			return ctx, err
