@@ -449,20 +449,26 @@ func (as *AuthenticationService) Logout(ctx context.Context, w http.ResponseWrit
 
 	session, err := as.sessionStore.Get(req, SessionName)
 	if err != nil {
+		zapctx.Error(ctx, "failed to retrieve session", zap.Error(err))
 		return errors.E(op, err, "failed to retrieve session")
 	}
 
 	identityId, ok := session.Values[SessionIdentityKey]
 	if !ok {
-		return errors.E(op, "session is missing identity key")
+		err := errors.E(op, "session is missing identity key")
+		zapctx.Error(ctx, "session is missing identity key", zap.Error(err))
+		return err
 	}
 
 	identityIdStr, ok := identityId.(string)
 	if !ok {
-		return errors.E(op, "session identity key could not be parsed to string")
+		err := errors.E(op, fmt.Sprintf("session identity key could not be parsed: expected %T, got %T", identityIdStr, identityId))
+		zapctx.Error(ctx, "failed to parse session identity key", zap.Error(err))
+		return err
 	}
 
 	if err := as.deleteSession(session, w, req); err != nil {
+		zapctx.Error(ctx, "failed to delete session", zap.Error(err))
 		return errors.E(op, err)
 	}
 
@@ -472,6 +478,7 @@ func (as *AuthenticationService) Logout(ctx context.Context, w http.ResponseWrit
 		Expiry:       time.Now(),
 		TokenType:    "",
 	}); err != nil {
+		zapctx.Error(ctx, "failed to update identity", zap.Error(err))
 		return errors.E(op, err)
 	}
 
