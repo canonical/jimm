@@ -59,11 +59,12 @@ type JIMM interface {
 // ProxyHelpers contains all the necessary helpers for proxying a Juju client
 // connection to a model.
 type ProxyHelpers struct {
-	ConnClient        WebsocketConnection
-	TokenGen          TokenGenerator
-	ConnectController func(context.Context) (WebsocketConnection, string, error)
-	AuditLog          func(*dbmodel.AuditLogEntry)
-	JIMM              JIMM
+	ConnClient              WebsocketConnection
+	TokenGen                TokenGenerator
+	ConnectController       func(context.Context) (WebsocketConnection, string, error)
+	AuditLog                func(*dbmodel.AuditLogEntry)
+	JIMM                    JIMM
+	AuthenticatedIdentityID string
 }
 
 // ProxySockets will proxy requests from a client connection through to a controller
@@ -86,12 +87,13 @@ func ProxySockets(ctx context.Context, helpers ProxyHelpers) error {
 	// after the first message has been received so that any errors can be properly sent back to the client.
 	clProxy := clientProxy{
 		modelProxy: modelProxy{
-			src:            &client,
-			msgs:           &msgInFlight,
-			tokenGen:       helpers.TokenGen,
-			auditLog:       helpers.AuditLog,
-			conversationId: utils.NewConversationID(),
-			jimm:           helpers.JIMM,
+			src:                     &client,
+			msgs:                    &msgInFlight,
+			tokenGen:                helpers.TokenGen,
+			auditLog:                helpers.AuditLog,
+			conversationId:          utils.NewConversationID(),
+			jimm:                    helpers.JIMM,
+			authenticatedIdentityID: helpers.AuthenticatedIdentityID,
 		},
 		errChan:              errChan,
 		createControllerConn: helpers.ConnectController,
@@ -192,14 +194,15 @@ func (msgs *inflightMsgs) getMessage(key uint64) *message {
 }
 
 type modelProxy struct {
-	src            *writeLockConn
-	dst            *writeLockConn
-	msgs           *inflightMsgs
-	auditLog       func(*dbmodel.AuditLogEntry)
-	tokenGen       TokenGenerator
-	jimm           JIMM
-	modelName      string
-	conversationId string
+	src                     *writeLockConn
+	dst                     *writeLockConn
+	msgs                    *inflightMsgs
+	auditLog                func(*dbmodel.AuditLogEntry)
+	tokenGen                TokenGenerator
+	jimm                    JIMM
+	modelName               string
+	conversationId          string
+	authenticatedIdentityID string
 
 	deviceOAuthResponse *oauth2.DeviceAuthResponse
 }
@@ -553,6 +556,14 @@ func (p *clientProxy) handleAdminFacade(ctx context.Context, msg *message) (clie
 	errorFnc := func(err error) (*message, *message, error) {
 		return nil, nil, err
 	}
+	controllerLoginMessageFnc := func(data []byte) (*message, *message, error) {
+		m := *msg
+		m.Type = "Admin"
+		m.Request = "Login"
+		m.Version = 3
+		m.Params = data
+		return nil, &m, nil
+	}
 	switch msg.Request {
 	case "LoginDevice":
 		deviceResponse, err := jimm.LoginDevice(ctx, p.jimm.OAuthAuthenticationService())
@@ -615,12 +626,7 @@ func (p *clientProxy) handleAdminFacade(ctx context.Context, msg *message) (clie
 		if err != nil {
 			return errorFnc(err)
 		}
-		m := *msg
-		m.Type = "Admin"
-		m.Request = "Login"
-		m.Version = 3
-		m.Params = data
-		return nil, &m, nil
+		return controllerLoginMessageFnc(data)
 	case "LoginWithClientCredentials":
 		var request apiparams.LoginWithClientCredentialsRequest
 		err := json.Unmarshal(msg.Params, &request)
@@ -648,14 +654,28 @@ func (p *clientProxy) handleAdminFacade(ctx context.Context, msg *message) (clie
 		if err != nil {
 			return errorFnc(err)
 		}
-		m := *msg
-		m.Type = "Admin"
-		m.Request = "Login"
-		m.Version = 3
-		m.Params = data
-		return nil, &m, nil
-	case "LoginWithCookie":
-		return errorFnc(errors.E(errors.CodeNotImplemented))
+		return controllerLoginMessageFnc(data)
+	case "LoginWithSessionCookie":
+		if p.modelProxy.authenticatedIdentityID == "" {
+			return errorFnc(errors.E(errors.CodeUnauthorized))
+		}
+		user, err := p.jimm.GetOpenFGAUserAndAuthorise(ctx, p.modelProxy.authenticatedIdentityID)
+		if err != nil {
+			return errorFnc(err)
+		}
+
+		jwt, err := p.tokenGen.MakeLoginToken(ctx, user)
+		if err != nil {
+			return errorFnc(err)
+		}
+		data, err := json.Marshal(params.LoginRequest{
+			AuthTag: user.ResourceTag().String(),
+			Token:   base64.StdEncoding.EncodeToString(jwt),
+		})
+		if err != nil {
+			return errorFnc(err)
+		}
+		return controllerLoginMessageFnc(data)
 	case "Login":
 		return errorFnc(errors.E("JIMM does not support login from old clients", errors.CodeNotSupported))
 	default:

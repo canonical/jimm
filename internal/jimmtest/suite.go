@@ -69,10 +69,12 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 	s.OFGAClient, s.COFGAClient, s.COFGAParams, err = SetupTestOFGAClient(c.TestName())
 	c.Assert(err, gc.IsNil)
 
+	pgdb := PostgresDB(GocheckTester{c}, nil)
+
 	// Setup OpenFGA.
 	s.JIMM = &jimm.JIMM{
 		Database: db.Database{
-			DB: PostgresDB(GocheckTester{c}, nil),
+			DB: pgdb,
 		},
 		CredentialStore: NewInMemoryCredentialStore(),
 		Pubsub:          &pubsub.Hub{MaxConcurrency: 10},

@@ -12,11 +12,14 @@ import (
 	"context"
 	"encoding/base64"
 	stderrors "errors"
+	"fmt"
+	"net/http"
 	"net/mail"
 	"strings"
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
+	"github.com/gorilla/sessions"
 	"github.com/juju/zaputil/zapctx"
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwt"
@@ -28,6 +31,31 @@ import (
 	"github.com/canonical/jimm/internal/errors"
 )
 
+const (
+	// SessionName is the name of the gorilla session and is used to retrieve
+	// the session object from the database.
+	SessionName = "jimm-browser-session"
+
+	// SessionIdentityKey is the key for the identity value stored within the
+	// session.
+	SessionIdentityKey = "identity-id"
+)
+
+type sessionIdentityContextKey struct{}
+
+func contextWithSessionIdentity(ctx context.Context, sessionIdentityId any) context.Context {
+	return context.WithValue(ctx, sessionIdentityContextKey{}, sessionIdentityId)
+}
+
+// SessionIdentityFromContext returns the session identity key from the context.
+func SessionIdentityFromContext(ctx context.Context) string {
+	v := ctx.Value(sessionIdentityContextKey{})
+	if v == nil {
+		return ""
+	}
+	return v.(string)
+}
+
 // AuthenticationService handles authentication within JIMM.
 type AuthenticationService struct {
 	oauthConfig oauth2.Config
@@ -37,7 +65,12 @@ type AuthenticationService struct {
 	// sessionTokenExpiry holds the expiry time for JIMM minted session tokens (JWTs).
 	sessionTokenExpiry time.Duration
 
+	// sessionCookieMaxAge holds the max age for session cookies.
+	sessionCookieMaxAge int
+
 	db IdentityStore
+
+	sessionStore sessions.Store
 }
 
 // Identity store holds the necessary methods to get and update an identity
@@ -62,6 +95,8 @@ type AuthenticationServiceParams struct {
 	Scopes []string
 	// SessionTokenExpiry holds the expiry time of minted JIMM session tokens (JWTs).
 	SessionTokenExpiry time.Duration
+	// SessionCookieMaxAge holds the max age for session cookies.
+	SessionCookieMaxAge int
 	// RedirectURL is the URL for handling the exchange of authorisation
 	// codes into access tokens (and id tokens), for JIMM, this is expected
 	// to be the servers own callback endpoint registered under /auth/callback.
@@ -71,6 +106,9 @@ type AuthenticationServiceParams struct {
 	// to fetch and update identities. I.e., their access tokens, refresh tokens,
 	// display name, etc.
 	Store IdentityStore
+
+	// SessionStore holds the store for creating, getting and saving gorrila sessions.
+	SessionStore sessions.Store
 }
 
 // NewAuthenticationService returns a new authentication service for handling
@@ -93,8 +131,10 @@ func NewAuthenticationService(ctx context.Context, params AuthenticationServiceP
 			Scopes:       params.Scopes,
 			RedirectURL:  params.RedirectURL,
 		},
-		sessionTokenExpiry: params.SessionTokenExpiry,
-		db:                 params.Store,
+		sessionTokenExpiry:  params.SessionTokenExpiry,
+		db:                  params.Store,
+		sessionStore:        params.SessionStore,
+		sessionCookieMaxAge: params.SessionCookieMaxAge,
 	}, nil
 }
 
@@ -277,6 +317,8 @@ func (as *AuthenticationService) UpdateIdentity(ctx context.Context, email strin
 
 	u.AccessToken = token.AccessToken
 	u.RefreshToken = token.RefreshToken
+	u.AccessTokenExpiry = token.Expiry
+	u.AccessTokenType = token.TokenType
 	if err := db.UpdateIdentity(ctx, u); err != nil {
 		return errors.E(op, err)
 	}
@@ -333,5 +375,204 @@ func (as *AuthenticationService) VerifyClientCredentials(ctx context.Context, cl
 		zapctx.Error(ctx, "client credential verification failed", zap.Error(err))
 		return errors.E(errors.CodeUnauthorized, "invalid client credentials")
 	}
+	return nil
+}
+
+// CreateBrowserSession creates a session and updates the cookie for a browser
+// login callback.
+func (as *AuthenticationService) CreateBrowserSession(
+	ctx context.Context,
+	w http.ResponseWriter,
+	r *http.Request,
+	secureCookies bool,
+	email string,
+) error {
+	const op = errors.Op("auth.AuthenticationService.CreateBrowserSession")
+
+	session, err := as.sessionStore.Get(r, SessionName)
+	if err != nil {
+		return errors.E(op, err)
+	}
+
+	session.IsNew = true                            // Sets cookie to a fresh new cookie
+	session.Options.MaxAge = as.sessionCookieMaxAge // Expiry in seconds
+	session.Options.Secure = secureCookies          // Ensures only sent with HTTPS
+	session.Options.HttpOnly = false                // Allow Javascript to read it
+
+	session.Values[SessionIdentityKey] = email
+	if err = session.Save(r, w); err != nil {
+		return errors.E(op, err)
+	}
+	return nil
+}
+
+// AuthenticateBrowserSession updates the session for a browser, additionally
+// retrieving new access tokens upon expiry. If this cannot be done, the cookie
+// is deleted and an error is returned.
+func (as *AuthenticationService) AuthenticateBrowserSession(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error) {
+	const op = errors.Op("auth.AuthenticationService.AuthenticateBrowserSession")
+
+	session, err := as.sessionStore.Get(req, SessionName)
+	if err != nil {
+		return ctx, errors.E(op, err, "failed to retrieve session")
+	}
+
+	identityId, ok := session.Values[SessionIdentityKey]
+	if !ok {
+		return ctx, errors.E(op, "session is missing identity key")
+	}
+
+	err = as.validateAndUpdateAccessToken(ctx, identityId)
+	if err != nil {
+		if err := as.deleteSession(session, w, req); err != nil {
+			return ctx, errors.E(op, err)
+		}
+		return ctx, errors.E(op, err)
+	}
+
+	ctx = contextWithSessionIdentity(ctx, identityId)
+
+	if err := as.extendSession(session, w, req); err != nil {
+		return ctx, errors.E(op, err)
+	}
+
+	return ctx, nil
+}
+
+// Logout does two things:
+//
+//   - It deletes the session (Max-Age = -1), and within the database the cleanup routine will remove
+//     the expired session upon next run.
+//   - It resets the access tokens for this user
+func (as *AuthenticationService) Logout(ctx context.Context, w http.ResponseWriter, req *http.Request) error {
+	const op = errors.Op("auth.AuthenticationService.Logout")
+
+	session, err := as.sessionStore.Get(req, SessionName)
+	if err != nil {
+		zapctx.Error(ctx, "failed to retrieve session", zap.Error(err))
+		return errors.E(op, err, "failed to retrieve session")
+	}
+
+	identityId, ok := session.Values[SessionIdentityKey]
+	if !ok {
+		err := errors.E(op, "session is missing identity key")
+		zapctx.Error(ctx, "session is missing identity key", zap.Error(err))
+		return err
+	}
+
+	identityIdStr, ok := identityId.(string)
+	if !ok {
+		err := errors.E(op, fmt.Sprintf("session identity key could not be parsed: expected %T, got %T", identityIdStr, identityId))
+		zapctx.Error(ctx, "failed to parse session identity key", zap.Error(err))
+		return err
+	}
+
+	if err := as.deleteSession(session, w, req); err != nil {
+		zapctx.Error(ctx, "failed to delete session", zap.Error(err))
+		return errors.E(op, err)
+	}
+
+	if err := as.UpdateIdentity(ctx, identityIdStr, &oauth2.Token{
+		AccessToken:  "",
+		RefreshToken: "",
+		Expiry:       time.Now(),
+		TokenType:    "",
+	}); err != nil {
+		zapctx.Error(ctx, "failed to update identity", zap.Error(err))
+		return errors.E(op, err)
+	}
+
+	return nil
+}
+
+// validateAndUpdateAccessToken validates the access tokens expiry, and if it cannot, then
+// it attempts to refresh the access token.
+func (as *AuthenticationService) validateAndUpdateAccessToken(ctx context.Context, email any) error {
+	const op = errors.Op("auth.AuthenticationService.validateAndUpdateAccessToken")
+
+	emailStr, ok := email.(string)
+	if !ok {
+		return errors.E(op, fmt.Sprintf("failed to cast email: got %T, expected %T", email, emailStr))
+	}
+
+	db := as.db
+	u := &dbmodel.Identity{
+		Name: emailStr,
+	}
+	if err := db.GetIdentity(ctx, u); err != nil {
+		return errors.E(op, err)
+	}
+
+	t := &oauth2.Token{
+		AccessToken:  u.AccessToken,
+		RefreshToken: u.RefreshToken,
+		Expiry:       u.AccessTokenExpiry,
+		TokenType:    u.AccessTokenType,
+	}
+
+	// Valid simply checks the expiry, if the token isn't valid,
+	// we attempt to refresh the identities tokens and update them.
+	if t.Valid() {
+		return nil
+	}
+
+	if err := as.refreshIdentitiesToken(ctx, emailStr, t); err != nil {
+		return errors.E(op, err)
+	}
+
+	return nil
+}
+
+// refreshIdentitiesToken creates a token source based on the expired token and performs
+// a manual token refresh, updating the identity afterwards.
+//
+// This is to be called only when a token is expired.
+func (as *AuthenticationService) refreshIdentitiesToken(ctx context.Context, email string, t *oauth2.Token) error {
+	const op = errors.Op("auth.AuthenticationService.refreshIdentitiesToken")
+
+	tSrc := as.oauthConfig.TokenSource(ctx, t)
+
+	// Get a new access and refresh token (token source only has Token())
+	newToken, err := tSrc.Token()
+	if err != nil {
+		return errors.E(op, err, "failed to refresh token")
+	}
+
+	if err := as.UpdateIdentity(ctx, email, newToken); err != nil {
+		return errors.E(op, err, "failed to update identity")
+	}
+
+	return nil
+}
+
+func (as *AuthenticationService) deleteSession(session *sessions.Session, w http.ResponseWriter, req *http.Request) error {
+	const op = errors.Op("auth.AuthenticationService.deleteSession")
+
+	if err := as.modifySession(session, w, req, -1); err != nil {
+		return errors.E(op, err)
+	}
+
+	return nil
+}
+
+func (as *AuthenticationService) extendSession(session *sessions.Session, w http.ResponseWriter, req *http.Request) error {
+	const op = errors.Op("auth.AuthenticationService.extendSession")
+
+	if err := as.modifySession(session, w, req, as.sessionCookieMaxAge); err != nil {
+		return errors.E(op, err)
+	}
+
+	return nil
+}
+
+func (as *AuthenticationService) modifySession(session *sessions.Session, w http.ResponseWriter, req *http.Request, maxAge int) error {
+	const op = errors.Op("auth.AuthenticationService.modifySession")
+
+	session.Options.MaxAge = maxAge
+
+	if err := session.Save(req, w); err != nil {
+		return errors.E(op, err)
+	}
+
 	return nil
 }

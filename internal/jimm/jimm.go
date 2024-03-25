@@ -7,10 +7,10 @@ package jimm
 import (
 	"context"
 	"database/sql"
+	"net/http"
 	"strings"
 	"time"
 
-	"github.com/antonlindstrom/pgstore"
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/juju/juju/api/base"
@@ -85,9 +85,6 @@ type JIMM struct {
 	// OAuthAuthenticator is responsible for handling authentication
 	// via OAuth2.0 AND JWT access tokens to JIMM.
 	OAuthAuthenticator OAuthAuthenticator
-
-	// CookieSessionStore is respnsible for handling cookie based sessions.
-	CookieSessionStore *pgstore.PGStore
 }
 
 // OAuthAuthenticationService returns the JIMM's authentication service.
@@ -164,6 +161,11 @@ type OAuthAuthenticator interface {
 
 	// VerifyClientCredentials verifies the provided client ID and client secret.
 	VerifyClientCredentials(ctx context.Context, clientID string, clientSecret string) error
+
+	// AuthenticateBrowserSession updates the session for a browser, additionally
+	// retrieving new access tokens upon expiry. If this cannot be done, the cookie
+	// is deleted and an error is returned.
+	AuthenticateBrowserSession(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error)
 }
 
 // GetCredentialStore returns the credential store used by JIMM.

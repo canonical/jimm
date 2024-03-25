@@ -125,13 +125,13 @@ func start(ctx context.Context, s *service.Service) error {
 		secureSessionCookies = true
 	}
 
-	sessionCookieExpiry := os.Getenv("JIMM_SESSION_COOKIE_EXPIRY")
-	sessionCookieExpiryInt, err := strconv.Atoi(sessionCookieExpiry)
+	sessionCookieMaxAge := os.Getenv("JIMM_SESSION_COOKIE_MAX_AGE")
+	sessionCookieMaxAgeInt, err := strconv.Atoi(sessionCookieMaxAge)
 	if err != nil {
-		return errors.E("unable to parse jimm session cookie expiry")
+		return errors.E("unable to parse jimm session cookie max age")
 	}
-	if sessionCookieExpiryInt < 0 {
-		return errors.E("jimm session cookie expiry cannot be less than 0")
+	if sessionCookieMaxAgeInt < 0 {
+		return errors.E("jimm session cookie max age cannot be less than 0")
 	}
 
 	jimmsvc, err := jimm.NewService(ctx, jimm.Params{
@@ -159,15 +159,15 @@ func start(ctx context.Context, s *service.Service) error {
 		JWTExpiryDuration:             jwtExpiryDuration,
 		InsecureSecretStorage:         insecureSecretStorage,
 		OAuthAuthenticatorParams: jimm.OAuthAuthenticatorParams{
-			IssuerURL:          issuerURL,
-			ClientID:           clientID,
-			ClientSecret:       clientSecret,
-			Scopes:             scopesParsed,
-			SessionTokenExpiry: sessionTokenExpiryDuration,
+			IssuerURL:           issuerURL,
+			ClientID:            clientID,
+			ClientSecret:        clientSecret,
+			Scopes:              scopesParsed,
+			SessionTokenExpiry:  sessionTokenExpiryDuration,
+			SessionCookieMaxAge: sessionCookieMaxAgeInt,
 		},
 		DashboardFinalRedirectURL: os.Getenv("JIMM_DASHBOARD_FINAL_REDIRECT_URL"),
 		SecureSessionCookies:      secureSessionCookies,
-		SessionCookieExpiry:       sessionCookieExpiryInt,
 	})
 	if err != nil {
 		return err

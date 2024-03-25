@@ -46,7 +46,7 @@ func ToJAASTag(db db.Database, tag *ofganames.Tag) (string, error) {
 }
 
 func NewControllerRoot(j JIMM, p Params) *controllerRoot {
-	return newControllerRoot(j, p)
+	return newControllerRoot(j, p, "")
 }
 
 func (r *controllerRoot) GetServiceAccount(ctx context.Context, clientID string) (*openfga.User, error) {

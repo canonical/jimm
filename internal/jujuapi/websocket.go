@@ -17,6 +17,7 @@ import (
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
+	"github.com/canonical/jimm/internal/auth"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/jimm"
@@ -43,9 +44,15 @@ type apiServer struct {
 	params  Params
 }
 
+// GetAuthenticationService returns JIMM's oauth authentication service.
+func (s *apiServer) GetAuthenticationService() jimm.OAuthAuthenticator {
+	return s.jimm.OAuthAuthenticator
+}
+
 // ServeWS implements jimmhttp.WSServer.
-func (s *apiServer) ServeWS(_ context.Context, conn *websocket.Conn) {
-	controllerRoot := newControllerRoot(s.jimm, s.params)
+func (s *apiServer) ServeWS(ctx context.Context, conn *websocket.Conn) {
+	identityId := auth.SessionIdentityFromContext(ctx)
+	controllerRoot := newControllerRoot(s.jimm, s.params, identityId)
 	s.cleanup = controllerRoot.cleanup
 	Dblogger := controllerRoot.newAuditLogger()
 	serveRoot(context.Background(), controllerRoot, Dblogger, conn)
@@ -128,6 +135,11 @@ func modelInfoFromPath(path string) (uuid string, finalPath string, err error) {
 	return matches[modelIndex], matches[finalPathIndex], nil
 }
 
+// GetAuthenticationService returns JIMM's oauth authentication service.
+func (s modelProxyServer) GetAuthenticationService() jimm.OAuthAuthenticator {
+	return s.jimm.OAuthAuthenticator
+}
+
 // ServeWS implements jimmhttp.WSServer.
 func (s modelProxyServer) ServeWS(ctx context.Context, clientConn *websocket.Conn) {
 	jwtGenerator := jimm.NewJWTGenerator(&s.jimm.Database, s.jimm, s.jimm.JWTService)
@@ -135,11 +147,12 @@ func (s modelProxyServer) ServeWS(ctx context.Context, clientConn *websocket.Con
 	zapctx.Debug(ctx, "Starting proxier")
 	auditLogger := s.jimm.AddAuditLogEntry
 	proxyHelpers := jimmRPC.ProxyHelpers{
-		ConnClient:        clientConn,
-		TokenGen:          &jwtGenerator,
-		ConnectController: connectionFunc,
-		AuditLog:          auditLogger,
-		JIMM:              s.jimm,
+		ConnClient:              clientConn,
+		TokenGen:                &jwtGenerator,
+		ConnectController:       connectionFunc,
+		AuditLog:                auditLogger,
+		JIMM:                    s.jimm,
+		AuthenticatedIdentityID: auth.SessionIdentityFromContext(ctx),
 	}
 	jimmRPC.ProxySockets(ctx, proxyHelpers)
 }

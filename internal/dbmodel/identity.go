@@ -4,6 +4,7 @@ package dbmodel
 
 import (
 	"database/sql"
+	"time"
 
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
@@ -44,6 +45,12 @@ type Identity struct {
 	// from the browser or device flow, and as such is updated on every successful
 	// login.
 	RefreshToken string
+
+	// AccessTokenExpiry is the expiration date for this access token.
+	AccessTokenExpiry time.Time
+
+	// AccessTokenType is the type for the token, typically bearer.
+	AccessTokenType string
 }
 
 // Tag returns a names.Tag for the identity.
