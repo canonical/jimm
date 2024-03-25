@@ -11,6 +11,7 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/gorilla/sessions"
 
+	"github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/jimmtest"
 )
@@ -41,8 +42,6 @@ func setupDbAndSessionStore(c *qt.C) (*db.Database, sessions.Store) {
 func TestBrowserLoginAndLogout(t *testing.T) {
 	c := qt.New(t)
 
-	// TODO in WHOAMI PR, run a WHOAMI without cookie
-
 	// Login
 	db, sessionStore := setupDbAndSessionStore(c)
 
@@ -54,10 +53,8 @@ func TestBrowserLoginAndLogout(t *testing.T) {
 	defer jimmHTTPServer.Close()
 	c.Assert(cookie, qt.Not(qt.Equals), "")
 
-	// TODO in WHOAMI PR, run a WHOAMI with cookie
-
-	// Logout
-	req, err := http.NewRequest("GET", jimmHTTPServer.URL+"/logout", nil)
+	// Run a whoami logged in
+	req, err := http.NewRequest("GET", jimmHTTPServer.URL+"/whoami", nil)
 	c.Assert(err, qt.IsNil)
 	parsedCookies := jimmtest.ParseCookies(cookie)
 	c.Assert(parsedCookies, qt.HasLen, 1)
@@ -65,17 +62,48 @@ func TestBrowserLoginAndLogout(t *testing.T) {
 
 	res, err := http.DefaultClient.Do(req)
 	c.Assert(err, qt.IsNil)
+	defer res.Body.Close()
+	c.Assert(res.StatusCode, qt.Equals, http.StatusOK)
+	b, err := io.ReadAll(res.Body)
+	c.Assert(err, qt.IsNil)
+	c.Assert(string(b), qt.JSONEquals, &params.WhoamiResponse{
+		DisplayName: "jimm-test",
+		Email:       "jimm-test@canonical.com",
+	})
+
+	// Logout
+	req, err = http.NewRequest("GET", jimmHTTPServer.URL+"/logout", nil)
+	c.Assert(err, qt.IsNil)
+	req.AddCookie(parsedCookies[0])
+
+	res, err = http.DefaultClient.Do(req)
+	c.Assert(err, qt.IsNil)
+	defer res.Body.Close()
 	c.Assert(res.StatusCode, qt.Equals, http.StatusOK)
 
-	// TODO in WHOAMI PR, run a WHOAMI without cookie
-	// This is following Kians suggestion of embedding whoami into this test
-	// which makes 100% sense.
+	// Run a whoami logged out
+	req, err = http.NewRequest("GET", jimmHTTPServer.URL+"/whoami", nil)
+	c.Assert(err, qt.IsNil)
+	parsedCookies = jimmtest.ParseCookies(cookie)
+	c.Assert(parsedCookies, qt.HasLen, 1)
+	req.AddCookie(parsedCookies[0])
 
-	// Logout with no identity
+	res, err = http.DefaultClient.Do(req)
+	c.Assert(err, qt.IsNil)
+	defer res.Body.Close()
+	c.Assert(res.StatusCode, qt.Equals, http.StatusInternalServerError)
+	b, err = io.ReadAll(res.Body)
+	c.Assert(err, qt.IsNil)
+	// TODO(ale8k): Really it isn't an internal server error here, the session is just
+	// missing in our store, we should probably bring this error up and return a forbidden.
+	c.Assert(string(b), qt.Equals, "Internal Server Error")
+
+	// Run a logout with no identity
 	req, err = http.NewRequest("GET", jimmHTTPServer.URL+"/logout", nil)
 	c.Assert(err, qt.IsNil)
 	res, err = http.DefaultClient.Do(req)
 	c.Assert(err, qt.IsNil)
+	defer res.Body.Close()
 	c.Assert(res.StatusCode, qt.Equals, http.StatusForbidden)
 }
 

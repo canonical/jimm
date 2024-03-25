@@ -75,7 +75,7 @@ type OAuthAuthenticatorParams struct {
 	// SessionTokenExpiry holds the expiry duration for issued JWTs
 	// for user (CLI) to JIMM authentication.
 	SessionTokenExpiry time.Duration
-	// SessionCookieMaxAge holds the max age for session cookies.
+	// SessionCookieMaxAge holds the max age for session cookies in seconds.
 	SessionCookieMaxAge int
 }
 
