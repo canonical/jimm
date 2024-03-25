@@ -54,7 +54,11 @@ func SessionIdentityFromContext(ctx context.Context) string {
 	if v == nil {
 		return ""
 	}
-	s, _ := v.(string)
+	s, ok := v.(string)
+	if !ok {
+		zapctx.Error(ctx, "failed to retrieve identity string from context", zap.Any("identity", v))
+		return ""
+	}
 	return s
 }
 

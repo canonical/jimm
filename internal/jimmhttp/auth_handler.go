@@ -163,7 +163,7 @@ func (oah *OAuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 
 // Whoami handles /auth/whoami.
 func (oah *OAuthHandler) Whoami(w http.ResponseWriter, r *http.Request) {
-	ctx := context.Background()
+	ctx := r.Context()
 
 	authSvc := oah.authenticator
 
@@ -194,7 +194,7 @@ func (oah *OAuthHandler) Whoami(w http.ResponseWriter, r *http.Request) {
 		writeError(ctx, w, http.StatusInternalServerError, err, "failed to write response to whoami")
 		return
 	}
-
+	w.Header().Add("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 }
 
