@@ -159,22 +159,30 @@ func (c *writeLockConn) sendMessage(responseObject any, request *message) {
 }
 
 type inflightMsgs struct {
-	mu       sync.Mutex
-	messages map[uint64]*message
+	mu           sync.Mutex
+	loginMessage *message
+	messages     map[uint64]*message
+}
+
+func (msgs *inflightMsgs) addLoginMessage(msg *message) {
+	msgs.mu.Lock()
+	defer msgs.mu.Unlock()
+
+	msgs.loginMessage = msg
+}
+
+func (msgs *inflightMsgs) getLoginMessage() *message {
+	msgs.mu.Lock()
+	defer msgs.mu.Unlock()
+
+	return msgs.loginMessage
 }
 
 func (msgs *inflightMsgs) addMessage(msg *message) {
 	msgs.mu.Lock()
 	defer msgs.mu.Unlock()
 
-	// Putting the login request on ID 0 to persist it.
-	// Note (alesstimec) It's a bit confusing that we automagically add "login" message
-	// as the first message. We should revisit this.
-	if msg.Type == "Admin" && msg.Request == "Login" {
-		msgs.messages[0] = msg
-	} else {
-		msgs.messages[msg.RequestID] = msg
-	}
+	msgs.messages[msg.RequestID] = msg
 }
 
 func (msgs *inflightMsgs) removeMessage(msg *message) {
@@ -302,7 +310,7 @@ func (p *clientProxy) start(ctx context.Context) error {
 		// All requests should be proxied as transparently as possible through to the controller
 		// except for auth related requests like Login because JIMM is auth gateway.
 		if msg.Type == "Admin" {
-			zapctx.Debug(ctx, "Found an Admin facade call")
+			zapctx.Debug(ctx, "handling an Admin facade call")
 			toClient, toController, err := p.handleAdminFacade(ctx, msg)
 			if err != nil {
 				p.sendError(p.src, msg, err)
@@ -312,6 +320,7 @@ func (p *clientProxy) start(ctx context.Context) error {
 				p.src.sendMessage(nil, toClient)
 			} else if toController != nil {
 				msg = toController
+				p.msgs.addLoginMessage(toController)
 			}
 		}
 		if msg.RequestID == 0 {
@@ -475,10 +484,8 @@ func checkPermissionsRequired(ctx context.Context, msg *message) (map[string]any
 
 func (p *controllerProxy) redoLogin(ctx context.Context, permissions map[string]any) error {
 	const op = errors.Op("rpc.redoLogin")
-	var loginMsg *message
-	if msg, ok := p.msgs.messages[0]; ok {
-		loginMsg = msg
-	}
+
+	loginMsg := p.msgs.getLoginMessage()
 	if loginMsg == nil {
 		return errors.E(op, errors.CodeUnauthorized, "Haven't received login yet")
 	}
