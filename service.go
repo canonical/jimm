@@ -65,16 +65,21 @@ type OAuthAuthenticatorParams struct {
 	// IssuerURL is the URL of the OAuth2.0 server.
 	// I.e., http://localhost:8082/realms/jimm in the case of keycloak.
 	IssuerURL string
+
 	// ClientID holds the OAuth2.0. The client IS expected to be confidential.
 	ClientID string
+
 	// ClientSecret holds the OAuth2.0 "client-secret" to authenticate when performing
 	// /auth and /token requests.
 	ClientSecret string
+
 	// Scopes holds the scopes that you wish to retrieve.
 	Scopes []string
+
 	// SessionTokenExpiry holds the expiry duration for issued JWTs
 	// for user (CLI) to JIMM authentication.
 	SessionTokenExpiry time.Duration
+
 	// SessionCookieMaxAge holds the max age for session cookies in seconds.
 	SessionCookieMaxAge int
 }
@@ -288,6 +293,10 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		return nil, errors.E(op, err, "failed to ensure controller admins")
 	}
 
+	authResourceBasePath := "/auth"
+	redirectUrl, _ := url.Parse(p.PublicDNSName + authResourceBasePath + jimmhttp.CallbackEndpoint)
+	redirectUrl.Scheme = "https"
+
 	authSvc, err := auth.NewAuthenticationService(
 		ctx,
 		auth.AuthenticationServiceParams{
@@ -299,6 +308,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 			SessionCookieMaxAge: p.OAuthAuthenticatorParams.SessionCookieMaxAge,
 			Store:               &s.jimm.Database,
 			SessionStore:        sessionStore,
+			RedirectURL:         redirectUrl.String(),
 		},
 	)
 	s.jimm.OAuthAuthenticator = authSvc
@@ -359,7 +369,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		return nil, errors.E(op, err, "failed to setup authentication handler")
 	}
 	mountHandler(
-		"/auth",
+		authResourceBasePath,
 		oauthHandler,
 	)
 	macaroonDischarger, err := s.setupDischarger(p)
