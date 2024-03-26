@@ -13,6 +13,10 @@ import (
 	"strings"
 	"time"
 
+	"go.uber.org/zap"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+
 	"github.com/antonlindstrom/pgstore"
 	cofga "github.com/canonical/ofga"
 	"github.com/go-chi/chi/v5"
@@ -20,9 +24,6 @@ import (
 	vaultapi "github.com/hashicorp/vault/api"
 	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
-	"go.uber.org/zap"
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
 
 	"github.com/canonical/jimm/internal/auth"
 	"github.com/canonical/jimm/internal/dashboard"
@@ -294,8 +295,10 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	}
 
 	authResourceBasePath := "/auth"
-	redirectUrl, _ := url.Parse(p.PublicDNSName + authResourceBasePath + jimmhttp.CallbackEndpoint)
-	redirectUrl.Scheme = "https"
+	redirectUrl := p.PublicDNSName + authResourceBasePath + jimmhttp.CallbackEndpoint
+	if !strings.HasPrefix(redirectUrl, "https://") || !strings.HasPrefix(redirectUrl, "http://") {
+		redirectUrl = "https://" + redirectUrl
+	}
 
 	authSvc, err := auth.NewAuthenticationService(
 		ctx,
@@ -308,7 +311,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 			SessionCookieMaxAge: p.OAuthAuthenticatorParams.SessionCookieMaxAge,
 			Store:               &s.jimm.Database,
 			SessionStore:        sessionStore,
-			RedirectURL:         redirectUrl.String(),
+			RedirectURL:         redirectUrl,
 		},
 	)
 	s.jimm.OAuthAuthenticator = authSvc
