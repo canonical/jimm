@@ -91,17 +91,23 @@ type AuthenticationServiceParams struct {
 	// IssuerURL is the URL of the OAuth2.0 server.
 	// I.e., http://localhost:8082/realms/jimm in the case of keycloak.
 	IssuerURL string
+
 	// ClientID holds the OAuth2.0 client id. The client IS expected to be confidential.
 	ClientID string
+
 	// ClientSecret holds the OAuth2.0 "client-secret" to authenticate when performing
 	// /auth and /token requests.
 	ClientSecret string
+
 	// Scopes holds the scopes that you wish to retrieve.
 	Scopes []string
+
 	// SessionTokenExpiry holds the expiry time of minted JIMM session tokens (JWTs).
 	SessionTokenExpiry time.Duration
+
 	// SessionCookieMaxAge holds the max age for session cookies in seconds.
 	SessionCookieMaxAge int
+
 	// RedirectURL is the URL for handling the exchange of authorisation
 	// codes into access tokens (and id tokens), for JIMM, this is expected
 	// to be the servers own callback endpoint registered under /auth/callback.
