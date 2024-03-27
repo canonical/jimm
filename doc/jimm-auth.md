@@ -6,20 +6,20 @@ To perform a login against JIMM using the authorisation code flow from a browser
 
 ## Performing a login (HTTP)
 ### HTTP /auth/login GET
-This will perform a a temporary redirect (307) to a preconfigured /auth endpoint of the configured OAuth capable IdP's server. The user will then be expected to login using any of the configured methods on the OAuth server, such as social sign in or self service.
+This will perform a a temporary redirect (307) to the /auth endpoint of JAAS' OAuth capable IdP server. The user will then be expected to login using any of the configured methods on the OAuth server, such as social sign in (e.g. Sign in with Google/Github/etc) or self service.
 
 ### HTTP /auth/callback REDIRECT
-Upon a successful login, the correctly configured IdP's OAuth server will redirect back to JIMM's callback endpoint.
+Upon a successful login, the OAuth server will redirect back to JIMM's callback endpoint.
 
 This endpoint will do the following:
-1. Extract the authorisation code
-2. Exchange the authorisation code for an OAuth token
-3. Attempt to extract an id_token (if the openid scope is not provided, this will fail and the login will be rejected)
-4. Attempt to verify the id_token 
+1. Authenticate the user with the OAuth server
+2. Create a session for the user within JIMM's database
+3. Create and return an encrypted cookie containing the session information
+4. Redirect the user back to a configurable final redirect URL (likely the Juju dashboard)
 5. Attempt to extract the email claim from the id_token
 6. Create a session within JIMM's internal database and then attach an encrypted cookie containing the session identity ID to the response for the final redirect called "jimm-browser-session", finally, jimm redirect back the the configured final redirect URL (which is likely to be the Juju dashboard)
 
-> Note: The cookie returned will have HTTP Only set to false, enabling SPA's to read the cookie.
+> Note: The cookie returned will have HTTP Only set to false, enabling SPA's (Single Page Application) to read the cookie.
 
 After receiving the redirect from JIMM, the browser will now store the cookie and it can be used for the next steps. 
 
@@ -58,5 +58,16 @@ In the event of an internal server error, a status Internal Server Error 500 wil
 
 Otherwise, a status OK 200 will be returned, which will reset the cookies max-age to -1, informing the browser to remove the session cookie immediately.
 
-## How do I configure the session length?
+# Sessions
+## The kind of sessions
+### IdP Sessions
+The IdP will hold a session for the authenticated user, meaning, that should another OAuth
+flow be processed, if the user has already entered their credentials, they will not be
+expected to enter them again until the IdP session expires.
+### OAuth Sessions
+OAuth sessions are often referred to as offline sessions, which directly relates to the use
+of the offline_access scope.
+### Application Sessions
+
+## JIMM Sessions (Application Sessions): How do I configure JIMM the session length?
 The session length is dependent on the refresh tokens maximum age, which is handled at the IdP level called [offline_access](https://openid.net/specs/openid-connect-core-1_0.html#OfflineAccess). This maximum idle length will be handled at the IdP layer, meaning, if the idle is reached, the refresh session is removed. For an example of how keycloak handles this, see [here](https://wjw465150.gitbooks.io/keycloak-documentation/content/server_admin/topics/sessions/offline.html). 
