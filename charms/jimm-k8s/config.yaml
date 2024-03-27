@@ -116,4 +116,4 @@ options:
     default: "https://jimm.dashboard.com/auth/login/redirect"
     description: |
       The final redirect URL for JIMM to redirect to when completing a browser based
-      login. This should be your dashboard. 
+      login. This should be your dashboard.
