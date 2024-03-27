@@ -13,10 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"go.uber.org/zap"
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
-
 	"github.com/antonlindstrom/pgstore"
 	cofga "github.com/canonical/ofga"
 	"github.com/go-chi/chi/v5"
@@ -24,6 +20,9 @@ import (
 	vaultapi "github.com/hashicorp/vault/api"
 	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
+	"go.uber.org/zap"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 
 	"github.com/canonical/jimm/internal/auth"
 	"github.com/canonical/jimm/internal/dashboard"
