@@ -2,6 +2,8 @@
 
 
 ## Introduction
+JIMM has introduced OAuth for federated authenticated, i.e., the ability to sign in via an external identity provider. The flow used is [authorisation code](https://auth0.com/docs/get-started/authentication-and-authorization-flow/authorization-code-flow). On top of this, JIMM now uses (OpenID Connect)[https://www.microsoft.com/en-us/security/business/security-101/what-is-openid-connect-oidc#:~:text=and%20use%20cases-,OpenID%20Connect%20(OIDC)%20defined,in%20to%20access%20digital%20services.].
+
 To perform a login against JIMM using the authorisation code flow from a browser, there are 4 HTTP endpoints available and 1 websocket facade call. 
 
 ## Performing a login (HTTP)
@@ -60,14 +62,19 @@ Otherwise, a status OK 200 will be returned, which will reset the cookies max-ag
 
 # Sessions
 ## The kind of sessions
+
 ### IdP Sessions
 The IdP will hold a session for the authenticated user, meaning, that should another OAuth
-flow be processed, if the user has already entered their credentials, they will not be
-expected to enter them again until the IdP session expires.
+flow be processed, if the user has already entered their credentials, and a session is active, they will not be expected to enter them again until the IdP session expires.
+
+This means, should the user be redirected to the IdP's login page, they'll only have to perform a consent and not enter their credentials (if consent is enabled), and then they will be immediately redirected to the configured redirect URI callback.
+
 ### OAuth Sessions
 OAuth sessions are often referred to as offline sessions, which directly relates to the use
-of the offline_access scope.
-### Application Sessions
+of the [offline_access](https://openid.net/specs/openid-connect-core-1_0.html#OfflineAccess) scope. The access token expiry is used to determine if an OAuth session is currently active, and to be refreshed is handled by the IdP's offline_access idle timeout and/or expiry. If the refresh tokens idle timeout is reached, the token is revoked and any existing access tokens are also revoked.
 
-## JIMM Sessions (Application Sessions): How do I configure JIMM the session length?
-The session length is dependent on the refresh tokens maximum age, which is handled at the IdP level called [offline_access](https://openid.net/specs/openid-connect-core-1_0.html#OfflineAccess). This maximum idle length will be handled at the IdP layer, meaning, if the idle is reached, the refresh session is removed. For an example of how keycloak handles this, see [here](https://wjw465150.gitbooks.io/keycloak-documentation/content/server_admin/topics/sessions/offline.html). 
+For an example of how keycloak handles this, see [here](https://wjw465150.gitbooks.io/keycloak-documentation/content/server_admin/topics/sessions/offline.html). 
+
+### Application Sessions
+Application sessions are sessions between the client and the application, they may use means such as a JWT, cookie or some other means to authenticate the user for some period of time. The refreshing of these sessions is dependent on the OAuth session, and whether it is still valid.
+
