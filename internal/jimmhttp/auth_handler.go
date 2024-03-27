@@ -16,6 +16,12 @@ import (
 	"github.com/canonical/jimm/internal/errors"
 )
 
+// CallbackEndpoint holds the endpoint path for OAuth2.0 authorisation
+// flow callbacks.
+const (
+	CallbackEndpoint = "/callback"
+)
+
 // OAuthHandler handles the oauth2.0 browser flow for JIMM.
 // Implements jimmhttp.JIMMHttpHandler.
 type OAuthHandler struct {
@@ -79,7 +85,7 @@ func NewOAuthHandler(p OAuthHandlerParams) (*OAuthHandler, error) {
 func (oah *OAuthHandler) Routes() chi.Router {
 	oah.SetupMiddleware()
 	oah.Router.Get("/login", oah.Login)
-	oah.Router.Get("/callback", oah.Callback)
+	oah.Router.Get(CallbackEndpoint, oah.Callback)
 	oah.Router.Get("/logout", oah.Logout)
 	oah.Router.Get("/whoami", oah.Whoami)
 	return oah.Router
