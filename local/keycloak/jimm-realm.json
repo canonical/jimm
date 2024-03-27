@@ -806,7 +806,9 @@
       "clientAuthenticatorType": "client-secret",
       "secret": "SwjDofnbDzJDm9iyfUhEp67FfUFMY8L4",
       "redirectUris": [
-        "http://127.0.0.1/*"
+        "http://127.0.0.1/*",
+        "https://jimm.localhost/*",
+        "https://localhost/*"
       ],
       "webOrigins": [
         "*"
