@@ -174,7 +174,7 @@ class TestCharm(unittest.TestCase):
                 "macaroon-expiry-duration": "48h",
                 "secure-session-cookies": True,
                 "session-cookie-max-age": 86400,
-                "final-redirect-url": ""
+                "final-redirect-url": "",
             }
         )
         self.assertTrue(os.path.exists(config_file))
@@ -227,7 +227,7 @@ class TestCharm(unittest.TestCase):
                 "macaroon-expiry-duration": "48h",
                 "secure-session-cookies": True,
                 "session-cookie-max-age": 86400,
-                "final-redirect-url": ""
+                "final-redirect-url": "",
             }
         )
         self.assertTrue(os.path.exists(config_file))
@@ -278,7 +278,7 @@ class TestCharm(unittest.TestCase):
                 "macaroon-expiry-duration": "48h",
                 "secure-session-cookies": True,
                 "session-cookie-max-age": 86400,
-                "final-redirect-url": ""
+                "final-redirect-url": "",
             }
         )
         self.assertTrue(os.path.exists(config_file))
