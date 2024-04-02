@@ -133,7 +133,6 @@ class TestCharm(unittest.TestCase):
 
         # Check the that the plan was updated
         plan = self.harness.get_container_pebble_plan("jimm")
-        print(plan.to_dict())
         self.assertEqual(plan.to_dict(), get_expected_plan(EXPECTED_ENV))
 
     def test_on_config_changed(self):
