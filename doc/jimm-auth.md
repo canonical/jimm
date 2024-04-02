@@ -2,7 +2,7 @@
 
 
 ## Introduction
-JIMM has introduced OAuth for federated authentication, i.e., the ability to sign in via an external identity provider. The flow used is [authorisation code](https://auth0.com/docs/get-started/authentication-and-authorization-flow/authorization-code-flow). On top of this, JIMM now uses (OpenID Connect)[https://www.microsoft.com/en-us/security/business/security-101/what-is-openid-connect-oidc#:~:text=and%20use%20cases-,OpenID%20Connect%20(OIDC)%20defined,in%20to%20access%20digital%20services.].
+JIMM has introduced OAuth for federated authentication, i.e., the ability to sign in via an external identity provider. The flow used is [authorisation code](https://auth0.com/docs/get-started/authentication-and-authorization-flow/authorization-code-flow). On top of this, JIMM now uses [OpenID Connect](https://www.microsoft.com/en-us/security/business/security-101/what-is-openid-connect-oidc#:~:text=and%20use%20cases-,OpenID%20Connect%20(OIDC)%20defined,in%20to%20access%20digital%20services.).
 
 To perform a login against JIMM using the authorisation code flow from a browser, there are 4 HTTP endpoints available and 1 websocket facade call. 
 
