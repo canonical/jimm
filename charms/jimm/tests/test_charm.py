@@ -172,13 +172,16 @@ class TestCharm(unittest.TestCase):
                 "audit-log-retention-period-in-days": "10",
                 "jwt-expiry": "10m",
                 "macaroon-expiry-duration": "48h",
+                "secure-session-cookies": True,
+                "session-cookie-max-age": 86400,
+                "final-redirect-url": "",
             }
         )
         self.assertTrue(os.path.exists(config_file))
         with open(config_file) as f:
             lines = f.readlines()
         os.unlink(config_file)
-        self.assertEqual(len(lines), 22)
+        self.assertEqual(len(lines), 25)
         self.assertEqual(lines[0].strip(), "BAKERY_AGENT_FILE=")
         self.assertEqual(lines[1].strip(), "CANDID_URL=https://candid.example.com")
         self.assertEqual(lines[2].strip(), "JIMM_ADMINS=user1 user2 group1")
@@ -222,13 +225,16 @@ class TestCharm(unittest.TestCase):
                 "private-key": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
                 "audit-log-retention-period-in-days": "10",
                 "macaroon-expiry-duration": "48h",
+                "secure-session-cookies": True,
+                "session-cookie-max-age": 86400,
+                "final-redirect-url": "",
             }
         )
         self.assertTrue(os.path.exists(config_file))
         with open(config_file) as f:
             lines = f.readlines()
         os.unlink(config_file)
-        self.assertEqual(len(lines), 22)
+        self.assertEqual(len(lines), 25)
         self.assertEqual(lines[0].strip(), "BAKERY_AGENT_FILE=")
         self.assertEqual(lines[1].strip(), "CANDID_URL=https://candid.example.com")
         self.assertEqual(lines[2].strip(), "JIMM_ADMINS=user1 user2 group1")
@@ -270,13 +276,16 @@ class TestCharm(unittest.TestCase):
                 "private-key": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
                 "audit-log-retention-period-in-days": "10",
                 "macaroon-expiry-duration": "48h",
+                "secure-session-cookies": True,
+                "session-cookie-max-age": 86400,
+                "final-redirect-url": "",
             }
         )
         self.assertTrue(os.path.exists(config_file))
         with open(config_file) as f:
             lines = f.readlines()
         os.unlink(config_file)
-        self.assertEqual(len(lines), 20)
+        self.assertEqual(len(lines), 23)
         self.assertEqual(lines[0].strip(), "BAKERY_AGENT_FILE=")
         self.assertEqual(lines[1].strip(), "CANDID_URL=https://candid.example.com")
         self.assertEqual(lines[2].strip(), "JIMM_ADMINS=user1 user2 group1")
@@ -329,7 +338,7 @@ class TestCharm(unittest.TestCase):
 
         with open(config_file) as f:
             lines = f.readlines()
-        self.assertEqual(len(lines), 20)
+        self.assertEqual(len(lines), 23)
         self.assertEqual(
             lines[0].strip(),
             "BAKERY_AGENT_FILE=" + self.harness.charm._agent_filename,
@@ -356,7 +365,7 @@ class TestCharm(unittest.TestCase):
         )
         with open(config_file) as f:
             lines = f.readlines()
-        self.assertEqual(len(lines), 20)
+        self.assertEqual(len(lines), 23)
         self.assertEqual(lines[0].strip(), "BAKERY_AGENT_FILE=")
         self.assertEqual(lines[1].strip(), "CANDID_URL=https://candid.example.com")
         self.assertEqual(lines[2].strip(), "JIMM_ADMINS=user1 user2 group1")
@@ -654,14 +663,14 @@ class TestCharm(unittest.TestCase):
         with open(config_file) as f:
             lines = f.readlines()
         os.unlink(config_file)
-        self.assertEqual(len(lines), 22)
+        self.assertEqual(len(lines), 25)
         self.assertEqual(len([match for match in lines if "INSECURE_SECRET_STORAGE" in match]), 0)
         self.harness.update_config({"postgres-secret-storage": True})
         self.assertTrue(os.path.exists(config_file))
         with open(config_file) as f:
             lines = f.readlines()
         os.unlink(config_file)
-        self.assertEqual(len(lines), 24)
+        self.assertEqual(len(lines), 27)
         self.assertEqual(len([match for match in lines if "INSECURE_SECRET_STORAGE" in match]), 1)
 
 
