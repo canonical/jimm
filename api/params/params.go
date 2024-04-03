@@ -468,3 +468,9 @@ type GrantServiceAccountAccess struct {
 	// ClientID holds the client id of the service account.
 	ClientID string `json:"client-id"`
 }
+
+// WhoamiResponse holds the response for a /auth/whoami call.
+type WhoamiResponse struct {
+	DisplayName string `json:"display-name"`
+	Email       string `json:"email"`
+}

@@ -2,6 +2,7 @@ package jimmhttp
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -10,8 +11,15 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 
+	"github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/internal/auth"
 	"github.com/canonical/jimm/internal/errors"
+)
+
+// CallbackEndpoint holds the endpoint path for OAuth2.0 authorisation
+// flow callbacks.
+const (
+	CallbackEndpoint = "/callback"
 )
 
 // OAuthHandler handles the oauth2.0 browser flow for JIMM.
@@ -53,6 +61,8 @@ type BrowserOAuthAuthenticator interface {
 		email string,
 	) error
 	Logout(ctx context.Context, w http.ResponseWriter, req *http.Request) error
+	AuthenticateBrowserSession(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error)
+	Whoami(ctx context.Context) (*params.WhoamiResponse, error)
 }
 
 // NewOAuthHandler returns a new OAuth handler.
@@ -75,8 +85,9 @@ func NewOAuthHandler(p OAuthHandlerParams) (*OAuthHandler, error) {
 func (oah *OAuthHandler) Routes() chi.Router {
 	oah.SetupMiddleware()
 	oah.Router.Get("/login", oah.Login)
-	oah.Router.Get("/callback", oah.Callback)
+	oah.Router.Get(CallbackEndpoint, oah.Callback)
 	oah.Router.Get("/logout", oah.Logout)
+	oah.Router.Get("/whoami", oah.Whoami)
 	return oah.Router
 }
 
@@ -92,7 +103,7 @@ func (oah *OAuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 // Callback handles /auth/callback.
 func (oah *OAuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
-	ctx := context.Background()
+	ctx := r.Context()
 
 	code := r.URL.Query().Get("code")
 	if code == "" {
@@ -140,7 +151,7 @@ func (oah *OAuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 
 // Logout handles /auth/logout.
 func (oah *OAuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
-	ctx := context.Background()
+	ctx := r.Context()
 
 	authSvc := oah.authenticator
 
@@ -153,6 +164,43 @@ func (oah *OAuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 		writeError(ctx, w, http.StatusInternalServerError, err, "failed to logout")
 		return
 	}
+	w.WriteHeader(http.StatusOK)
+}
+
+// Whoami handles /auth/whoami.
+func (oah *OAuthHandler) Whoami(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	authSvc := oah.authenticator
+
+	if _, err := r.Cookie(auth.SessionName); err != nil {
+		writeError(ctx, w, http.StatusForbidden, err, "no session cookie to identity user")
+		return
+	}
+
+	ctx, err := authSvc.AuthenticateBrowserSession(ctx, w, r)
+	if err != nil {
+		writeError(ctx, w, http.StatusInternalServerError, err, "failed to authenticate users session")
+		return
+	}
+
+	whoamiResp, err := authSvc.Whoami(ctx)
+	if err != nil {
+		writeError(ctx, w, http.StatusInternalServerError, err, "failed to find whoami from identity id")
+		return
+	}
+
+	b, err := json.Marshal(whoamiResp)
+	if err != nil {
+		writeError(ctx, w, http.StatusInternalServerError, err, "failed to marshal whoami resp")
+		return
+	}
+
+	if _, err := w.Write(b); err != nil {
+		writeError(ctx, w, http.StatusInternalServerError, err, "failed to write response to whoami")
+		return
+	}
+	w.Header().Add("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 }
 

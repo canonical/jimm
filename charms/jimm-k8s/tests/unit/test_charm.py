@@ -33,6 +33,7 @@ MINIMAL_CONFIG = {
     "public-key": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
     "private-key": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
     "vault-access-address": "10.0.1.123",
+    "final-redirect-url": "some-url",
 }
 
 EXPECTED_ENV = {
@@ -54,6 +55,9 @@ EXPECTED_ENV = {
     "JIMM_OAUTH_CLIENT_ID": OAUTH_CLIENT_ID,
     "JIMM_OAUTH_CLIENT_SECRET": OAUTH_CLIENT_SECRET,
     "JIMM_OAUTH_SCOPES": OAUTH_PROVIDER_INFO["scope"],
+    "JIMM_DASHBOARD_FINAL_REDIRECT_URL:": "some-url",
+    "JIMM_SECURE_SESSION_COOKIES:": True,
+    "JIMM_SESSION_COOKIE_MAX_AGE:": 86400,
 }
 
 
@@ -218,6 +222,7 @@ class TestCharm(unittest.TestCase):
                 "candid-agent-private-key": "test-private-key",
                 "public-key": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
                 "private-key": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
+                "final-redirect-url": "some-url",
             }
         )
 

@@ -27,6 +27,7 @@ import (
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/clientcredentials"
 
+	"github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
 )
@@ -53,7 +54,12 @@ func SessionIdentityFromContext(ctx context.Context) string {
 	if v == nil {
 		return ""
 	}
-	return v.(string)
+	s, ok := v.(string)
+	if !ok {
+		zapctx.Error(ctx, "failed to retrieve identity string from context", zap.Any("identity", v))
+		return ""
+	}
+	return s
 }
 
 // AuthenticationService handles authentication within JIMM.
@@ -64,8 +70,7 @@ type AuthenticationService struct {
 	provider *oidc.Provider
 	// sessionTokenExpiry holds the expiry time for JIMM minted session tokens (JWTs).
 	sessionTokenExpiry time.Duration
-
-	// sessionCookieMaxAge holds the max age for session cookies.
+	// sessionCookieMaxAge holds the max age for session cookies in seconds.
 	sessionCookieMaxAge int
 
 	db IdentityStore
@@ -86,17 +91,23 @@ type AuthenticationServiceParams struct {
 	// IssuerURL is the URL of the OAuth2.0 server.
 	// I.e., http://localhost:8082/realms/jimm in the case of keycloak.
 	IssuerURL string
+
 	// ClientID holds the OAuth2.0 client id. The client IS expected to be confidential.
 	ClientID string
+
 	// ClientSecret holds the OAuth2.0 "client-secret" to authenticate when performing
 	// /auth and /token requests.
 	ClientSecret string
+
 	// Scopes holds the scopes that you wish to retrieve.
 	Scopes []string
+
 	// SessionTokenExpiry holds the expiry time of minted JIMM session tokens (JWTs).
 	SessionTokenExpiry time.Duration
-	// SessionCookieMaxAge holds the max age for session cookies.
+
+	// SessionCookieMaxAge holds the max age for session cookies in seconds.
 	SessionCookieMaxAge int
+
 	// RedirectURL is the URL for handling the exchange of authorisation
 	// codes into access tokens (and id tokens), for JIMM, this is expected
 	// to be the servers own callback endpoint registered under /auth/callback.
@@ -425,7 +436,7 @@ func (as *AuthenticationService) AuthenticateBrowserSession(ctx context.Context,
 	err = as.validateAndUpdateAccessToken(ctx, identityId)
 	if err != nil {
 		if err := as.deleteSession(session, w, req); err != nil {
-			return ctx, errors.E(op, err)
+			return ctx, errors.E(op, err, "failed to delete session after getting an invalid token")
 		}
 		return ctx, errors.E(op, err)
 	}
@@ -483,6 +494,32 @@ func (as *AuthenticationService) Logout(ctx context.Context, w http.ResponseWrit
 	}
 
 	return nil
+}
+
+// Whoami returns "whoami" response, based on the identity id populating the fields
+// according to the current database schema for identities. This is likely subject
+// to change in the future.
+func (as *AuthenticationService) Whoami(ctx context.Context) (*params.WhoamiResponse, error) {
+	const op = errors.Op("auth.AuthenticationService.Whoami")
+
+	identityId := SessionIdentityFromContext(ctx)
+	if identityId == "" {
+		return nil, errors.E(op, "no identity in context")
+	}
+
+	u := &dbmodel.Identity{
+		Name: identityId,
+	}
+
+	if err := as.db.GetIdentity(ctx, u); err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	return &params.WhoamiResponse{
+		DisplayName: u.DisplayName,
+		Email:       u.Name,
+	}, nil
+
 }
 
 // validateAndUpdateAccessToken validates the access tokens expiry, and if it cannot, then
