@@ -14,16 +14,20 @@ func TestParseServiceAccountID(t *testing.T) {
 		err        string
 	}{{
 		about:      "Valid svc account tag",
-		tag:        "serviceaccount-1e654457-a195-4a41-8360-929c7f455d43",
-		expectedID: "1e654457-a195-4a41-8360-929c7f455d43",
+		tag:        "serviceaccount-1e654457-a195-4a41-8360-929c7f455d43@canonical.com",
+		expectedID: "1e654457-a195-4a41-8360-929c7f455d43@canonical.com",
 		err:        "",
 	}, {
+		about: "Invalid svc account tag (no domain)",
+		tag:   "serviceaccount-1e654457-a195-4a41-8360-929c7f455d43",
+		err:   "is not a valid serviceaccount tag",
+	}, {
 		about: "Invalid svc account tag (serviceaccounts)",
-		tag:   "serviceaccounts-1e654457-a195-4a41-8360-929c7f455d43",
+		tag:   "serviceaccounts-1e654457-a195-4a41-8360-929c7f455d43@canonical.com",
 		err:   "is not a valid tag",
 	}, {
 		about: "Invalid svc account tag (no prefix)",
-		tag:   "1e654457-a195-4a41-8360-929c7f455d43",
+		tag:   "1e654457-a195-4a41-8360-929c7f455d43@canonical.com",
 		err:   "is not a valid tag",
 	}, {
 		about: "Invalid svc account tag (missing ID)",
@@ -47,10 +51,12 @@ func TestParseServiceAccountID(t *testing.T) {
 }
 
 func TestIsValidServiceAccountId(t *testing.T) {
-	assert.True(t, IsValidServiceAccountId("1e654457-a195-4a41-8360-929c7f455d43"))
-	assert.True(t, IsValidServiceAccountId("12345"))
-	assert.True(t, IsValidServiceAccountId("abc123"))
-	assert.True(t, IsValidServiceAccountId("ABC123"))
+	assert.True(t, IsValidServiceAccountId("1e654457-a195-4a41-8360-929c7f455d43@canonical.com"))
+	assert.True(t, IsValidServiceAccountId("12345@canonical.com"))
+	assert.True(t, IsValidServiceAccountId("abc123@canonical.com"))
+	assert.True(t, IsValidServiceAccountId("ABC123@canonical.com"))
+	assert.True(t, IsValidServiceAccountId("ABC123@canonical.com"))
+	assert.False(t, IsValidServiceAccountId("ABC123"))
 	assert.False(t, IsValidServiceAccountId("abc 123"))
 	assert.False(t, IsValidServiceAccountId(""))
 	assert.False(t, IsValidServiceAccountId("  "))

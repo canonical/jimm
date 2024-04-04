@@ -23,4 +23,4 @@ CLOUDINIT_TEMPLATE=$'cloudinit-userdata: |
 printf "$CLOUDINIT_TEMPLATE" "$(lxc network get lxdbr0 ipv4.address | cut -f1 -d/)" "$(cat local/traefik/certs/ca.crt | sed -e 's/^/        /')" > "${CLOUDINIT_FILE}"
 
 echo "Bootstrapping controller"
-juju bootstrap localhost "${CONTROLLER_NAME}" --config allow-model-access=true --config "${CLOUDINIT_FILE}" --config login-token-refresh-url=https://jimm.localhost/.well-known/jwks.json
+juju bootstrap lxd "${CONTROLLER_NAME}" --config "${CLOUDINIT_FILE}" --config login-token-refresh-url=https://jimm.localhost/.well-known/jwks.json --debug 

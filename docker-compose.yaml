@@ -21,7 +21,12 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
-    
+    labels:
+      traefik.enable: true
+      traefik.http.routers.traefik.rule: Host(`127.0.0.1`)
+      traefik.http.routers.traefik.entrypoints: websecure
+      traefik.http.routers.traefik.tls: true
+
   jimm:
     image: cosmtrek/air:latest
     profiles: ["dev"]
@@ -46,7 +51,7 @@ services:
       JIMM_DSN: "postgresql://jimm:jimm@db/jimm"
       # Not needed for local test (yet).
       # BAKERY_AGENT_FILE: ""
-      JIMM_ADMINS: "jimm@candid.localhost"
+      JIMM_ADMINS: "jimm-test@canonical.com"
       # Note: You can comment out the Vault ENV vars below and instead use INSECURE_SECRET_STORAGE to place secrets in Postgres.
       VAULT_ADDR: "http://vault:8200"
       VAULT_PATH: "/jimm-kv/"

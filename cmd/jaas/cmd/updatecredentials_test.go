@@ -28,7 +28,7 @@ var _ = gc.Suite(&updateCredentialsSuite{})
 func (s *updateCredentialsSuite) TestUpdateCredentialsWithNewCredentials(c *gc.C) {
 	ctx := context.Background()
 
-	clientID := "abda51b2-d735-4794-a8bd-49c506baa4af"
+	clientID := "abda51b2-d735-4794-a8bd-49c506baa4af@canonical.com"
 
 	// alice is superuser
 	bClient := jimmtest.NewUserSessionLogin(c, "alice")
@@ -69,7 +69,7 @@ func (s *updateCredentialsSuite) TestUpdateCredentialsWithNewCredentials(c *gc.C
 	cmdContext, err := cmdtesting.RunCommand(c, cmd.NewUpdateCredentialsCommandForTesting(clientStore, bClient), clientID, "test-cloud", "test-credentials")
 	c.Assert(err, gc.IsNil)
 	c.Assert(cmdtesting.Stdout(cmdContext), gc.Equals, `results:
-- credentialtag: cloudcred-test-cloud_abda51b2-d735-4794-a8bd-49c506baa4af_test-credentials
+- credentialtag: cloudcred-test-cloud_abda51b2-d735-4794-a8bd-49c506baa4af@canonical.com_test-credentials
   error: null
   models: []
 `)
@@ -89,7 +89,7 @@ func (s *updateCredentialsSuite) TestUpdateCredentialsWithNewCredentials(c *gc.C
 func (s *updateCredentialsSuite) TestUpdateCredentialsWithExistingCredentials(c *gc.C) {
 	ctx := context.Background()
 
-	clientID := "abda51b2-d735-4794-a8bd-49c506baa4af"
+	clientID := "abda51b2-d735-4794-a8bd-49c506baa4af@canonical.com"
 
 	// alice is superuser
 	bClient := jimmtest.NewUserSessionLogin(c, "alice")
@@ -139,7 +139,7 @@ func (s *updateCredentialsSuite) TestUpdateCredentialsWithExistingCredentials(c 
 	cmdContext, err := cmdtesting.RunCommand(c, cmd.NewUpdateCredentialsCommandForTesting(clientStore, bClient), clientID, "test-cloud", "test-credentials")
 	c.Assert(err, gc.IsNil)
 	c.Assert(cmdtesting.Stdout(cmdContext), gc.Equals, `results:
-- credentialtag: cloudcred-test-cloud_abda51b2-d735-4794-a8bd-49c506baa4af_test-credentials
+- credentialtag: cloudcred-test-cloud_abda51b2-d735-4794-a8bd-49c506baa4af@canonical.com_test-credentials
   error: null
   models: []
 `)
@@ -159,7 +159,7 @@ func (s *updateCredentialsSuite) TestUpdateCredentialsWithExistingCredentials(c 
 func (s *updateCredentialsSuite) TestCloudNotInLocalStore(c *gc.C) {
 	bClient := jimmtest.NewUserSessionLogin(c, "alice")
 	_, err := cmdtesting.RunCommand(c, cmd.NewUpdateCredentialsCommandForTesting(s.ClientStore(), bClient),
-		"00000000-0000-0000-0000-000000000000",
+		"00000000-0000-0000-0000-000000000000@canonical.com",
 		"non-existing-cloud",
 		"foo",
 	)
@@ -178,7 +178,7 @@ func (s *updateCredentialsSuite) TestCredentialNotInLocalStore(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	_, err = cmdtesting.RunCommand(c, cmd.NewUpdateCredentialsCommandForTesting(clientStore, bClient),
-		"00000000-0000-0000-0000-000000000000",
+		"00000000-0000-0000-0000-000000000000@canonical.com",
 		"some-cloud",
 		"non-existing-credential-name",
 	)
@@ -196,15 +196,15 @@ func (s *updateCredentialsSuite) TestMissingArgs(c *gc.C) {
 		expectedError: "client ID not specified",
 	}, {
 		name:          "missing cloud",
-		args:          []string{"some-client-id"},
+		args:          []string{"some-client-id@canonical.com"},
 		expectedError: "cloud not specified",
 	}, {
 		name:          "missing credential name",
-		args:          []string{"some-client-id", "some-cloud"},
+		args:          []string{"some-client-id@canonical.com", "some-cloud"},
 		expectedError: "credential name not specified",
 	}, {
 		name:          "too many args",
-		args:          []string{"some-client-id", "some-cloud", "some-credential-name", "extra-arg"},
+		args:          []string{"some-client-id@canonical.com", "some-cloud", "some-credential-name", "extra-arg"},
 		expectedError: "too many args",
 	}}
 

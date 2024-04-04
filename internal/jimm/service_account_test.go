@@ -35,7 +35,7 @@ func TestAddServiceAccount(t *testing.T) {
 		},
 		client,
 	)
-	clientID := "39caae91-b914-41ae-83f8-c7b86ca5ad5a"
+	clientID := "39caae91-b914-41ae-83f8-c7b86ca5ad5a@canonical.com"
 	err = j.AddServiceAccount(ctx, user, clientID)
 	c.Assert(err, qt.IsNil)
 	err = j.AddServiceAccount(ctx, user, clientID)
@@ -73,7 +73,7 @@ func TestGrantServiceAccountAccess(t *testing.T) {
 			"user-bob",
 			"group-1#member",
 		},
-		clientID: "fca1f605-736e-4d1f-bcd2-aecc726923be",
+		clientID: "fca1f605-736e-4d1f-bcd2-aecc726923be@canonical.com",
 		username: "alice",
 	}, {
 		about: "Group that doesn't exist",
@@ -86,7 +86,7 @@ func TestGrantServiceAccountAccess(t *testing.T) {
 			// This group doesn't exist.
 			"group-bar",
 		},
-		clientID:      "fca1f605-736e-4d1f-bcd2-aecc726923be",
+		clientID:      "fca1f605-736e-4d1f-bcd2-aecc726923be@canonical.com",
 		username:      "alice",
 		expectedError: "group bar not found",
 	}, {
@@ -99,7 +99,7 @@ func TestGrantServiceAccountAccess(t *testing.T) {
 			"user-bob",
 			"controller-jimm",
 		},
-		clientID:      "fca1f605-736e-4d1f-bcd2-aecc726923be",
+		clientID:      "fca1f605-736e-4d1f-bcd2-aecc726923be@canonical.com",
 		username:      "alice",
 		expectedError: "invalid entity - not user or group",
 	}}
