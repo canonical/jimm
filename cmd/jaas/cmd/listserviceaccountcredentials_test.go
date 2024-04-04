@@ -34,7 +34,7 @@ func (s *listServiceAccountCredentialsSuite) TestListServiceAccountCredentials(c
 	})
 	c.Assert(err, gc.IsNil)
 	// Create Alice Identity and Service Account Identity.
-	clientID := "abda51b2-d735-4794-a8bd-49c506baa4af"
+	clientID := "abda51b2-d735-4794-a8bd-49c506baa4af@canonical.com"
 	// alice is superuser
 	ctx := context.Background()
 	user := dbmodel.Identity{Name: "alice@canonical.com"}

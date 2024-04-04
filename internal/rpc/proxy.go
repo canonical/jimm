@@ -609,9 +609,12 @@ func (p *clientProxy) handleAdminFacade(ctx context.Context, msg *message) (clie
 		}
 
 		// Verify the session token
-		// TODO(CSS-7081): Ensure for tests that the secret key can be configured.
-		// Or configure cmd tests to use the configured secret.
-		token, err := p.jimm.OAuthAuthenticationService().VerifySessionToken(request.SessionToken, "test-secret")
+		secretKey, err := p.jimm.GetCredentialStore().GetOAuthSecret(ctx)
+		if err != nil {
+			return errorFnc(err)
+		}
+
+		token, err := p.jimm.OAuthAuthenticationService().VerifySessionToken(request.SessionToken, string(secretKey))
 		if err != nil {
 			return errorFnc(err)
 		}

@@ -6,18 +6,14 @@ package names
 
 import (
 	"fmt"
-	"regexp"
+
+	"github.com/juju/names/v5"
 )
 
 const (
 	// ServiceAccountTagKind represents the resource "kind" that service accounts
 	// are represented as.
 	ServiceAccountTagKind = "serviceaccount"
-)
-
-var (
-	validClientIdSnippet = `^[0-9a-zA-Z-]+$`
-	validClientId        = regexp.MustCompile(validClientIdSnippet)
 )
 
 // ServiceAccount represents a service account where id is the client ID.
@@ -38,13 +34,11 @@ func (t ServiceAccountTag) String() string { return ServiceAccountTagKind + "-" 
 // NewServiceAccountTag creates a valid ServiceAccountTag if it is possible to parse
 // the provided tag.
 func NewServiceAccountTag(clientId string) ServiceAccountTag {
-	id := validClientId.FindString(clientId)
-
 	if !IsValidServiceAccountId(clientId) {
 		panic(fmt.Sprintf("invalid client tag %q", clientId))
 	}
 
-	return ServiceAccountTag{id: id}
+	return ServiceAccountTag{id: clientId}
 }
 
 // ParseServiceAccountTag parses a service account tag string.
@@ -62,5 +56,9 @@ func ParseServiceAccountTag(tag string) (ServiceAccountTag, error) {
 
 // IsValidServiceAccountId verifies the client id for a service account is valid according to a regex internally.
 func IsValidServiceAccountId(id string) bool {
-	return validClientId.MatchString(id)
+	if !names.IsValidUser(id) {
+		return false
+	}
+	t := names.NewUserTag(id)
+	return t.Domain() != ""
 }

@@ -24,7 +24,7 @@ type addServiceAccountSuite struct {
 var _ = gc.Suite(&addServiceAccountSuite{})
 
 func (s *addServiceAccountSuite) TestAddServiceAccount(c *gc.C) {
-	clientID := "abda51b2-d735-4794-a8bd-49c506baa4af"
+	clientID := "abda51b2-d735-4794-a8bd-49c506baa4af@canonical.com"
 	// alice is superuser
 	bClient := jimmtest.NewUserSessionLogin(c, "alice")
 	_, err := cmdtesting.RunCommand(c, cmd.NewAddServiceAccountCommandForTesting(s.ClientStore(), bClient), clientID)
