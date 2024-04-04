@@ -153,6 +153,9 @@ class JimmCharm(SystemdCharm):
             "jwt_expiry": self.config.get("jwt-expiry", "5m"),
             "macaroon_expiry_duration": self.config.get("macaroon-expiry-duration"),
             "session_expiry_duration": self.config.get("session-expiry-duration"),
+            "secure_session_cookies": self.config.get("secure-session-cookies"),
+            "session_cookie_max_age": self.config.get("session-cookie-max-age"),
+            "final_redirect_url": self.config.get("final-redirect-url"),
         }
 
         self.oauth.update_client_config(client_config=self._oauth_client_config)
