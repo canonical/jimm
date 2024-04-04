@@ -29,7 +29,6 @@ OAUTH_PROVIDER_INFO = {
 
 MINIMAL_CONFIG = {
     "uuid": "1234567890",
-    "candid-url": "test-candid-url",
     "public-key": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
     "private-key": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
     "vault-access-address": "10.0.1.123",
@@ -37,7 +36,7 @@ MINIMAL_CONFIG = {
 }
 
 EXPECTED_ENV = {
-    "CANDID_URL": "test-candid-url",
+    "JIMM_ADMINS": "",
     "JIMM_DASHBOARD_LOCATION": "https://jaas.ai/models",
     "JIMM_DNS_NAME": "juju-jimm-k8s-0.juju-jimm-k8s-endpoints.None.svc.cluster.local",
     "JIMM_ENABLE_JWKS_ROTATOR": "1",
@@ -45,8 +44,8 @@ EXPECTED_ENV = {
     "JIMM_LOG_LEVEL": "info",
     "JIMM_UUID": "1234567890",
     "JIMM_WATCH_CONTROLLERS": "1",
-    "PRIVATE_KEY": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
-    "PUBLIC_KEY": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
+    "BAKERY_PRIVATE_KEY": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
+    "BAKERY_PUBLIC_KEY": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
     "JIMM_AUDIT_LOG_RETENTION_PERIOD_IN_DAYS": "0",
     "JIMM_MACAROON_EXPIRY_DURATION": "24h",
     "JIMM_JWT_EXPIRY": "5m",
@@ -209,43 +208,6 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(self.harness.charm.unit.status.name, BlockedStatus.name)
         self.assertEqual(self.harness.charm.unit.status.message, "Waiting for OAuth relation")
 
-    def test_bakery_configuration(self):
-        container = self.harness.model.unit.get_container("jimm")
-        self.harness.charm.on.jimm_pebble_ready.emit(container)
-
-        self.harness.update_config(
-            {
-                "uuid": "1234567890",
-                "candid-url": "test-candid-url",
-                "candid-agent-username": "test-username",
-                "candid-agent-public-key": "test-public-key",
-                "candid-agent-private-key": "test-private-key",
-                "public-key": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
-                "private-key": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
-                "final-redirect-url": "some-url",
-            }
-        )
-
-        # Emit the pebble-ready event for jimm
-        self.harness.charm.on.jimm_pebble_ready.emit(container)
-        expected_env = EXPECTED_ENV.copy()
-        expected_env.update({"BAKERY_AGENT_FILE": "/root/config/agent.json"})
-        # Check the that the plan was updated
-        plan = self.harness.get_container_pebble_plan("jimm")
-        self.assertEqual(plan.to_dict(), get_expected_plan(expected_env))
-        agent_data = container.pull("/root/config/agent.json")
-        agent_json = json.loads(agent_data.read())
-        self.assertEqual(
-            agent_json,
-            {
-                "key": {
-                    "public": "test-public-key",
-                    "private": "test-private-key",
-                },
-                "agents": [{"url": "test-candid-url", "username": "test-username"}],
-            },
-        )
-
     def test_audit_log_retention_config(self):
         container = self.harness.model.unit.get_container("jimm")
         self.harness.charm.on.jimm_pebble_ready.emit(container)
@@ -271,10 +233,6 @@ class TestCharm(unittest.TestCase):
         harness.set_leader(True)
         harness.update_config(
             {
-                "candid-agent-username": "username@candid",
-                "candid-agent-private-key": "agent-private-key",
-                "candid-agent-public-key": "agent-public-key",
-                "candid-url": "https://candid.example.com",
                 "controller-admins": "user1 user2 group1",
                 "uuid": "caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa",
             }
@@ -289,7 +247,6 @@ class TestCharm(unittest.TestCase):
             data["controller_url"],
             "wss://juju-jimm-k8s-0.juju-jimm-k8s-endpoints.None.svc.cluster.local",
         )
-        self.assertEqual(data["identity_provider_url"], "https://candid.example.com")
         self.assertEqual(data["is_juju"], "False")
 
     @patch("socket.gethostname")
@@ -312,10 +269,6 @@ class TestCharm(unittest.TestCase):
 
         harness.update_config(
             {
-                "candid-agent-username": "username@candid",
-                "candid-agent-private-key": "agent-private-key",
-                "candid-agent-public-key": "agent-public-key",
-                "candid-url": "https://candid.example.com",
                 "controller-admins": "user1 user2 group1",
                 "uuid": "caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa",
                 "vault-access-address": "10.0.1.123",

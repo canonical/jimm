@@ -59,13 +59,14 @@ WORKLOAD_CONTAINER = "jimm"
 REQUIRED_SETTINGS = {
     "JIMM_UUID": "missing uuid configuration",
     "JIMM_DSN": "missing postgresql relation",
-    "CANDID_URL": "missing candid-url configuration",
     "OPENFGA_STORE": "missing openfga relation",
     "OPENFGA_AUTH_MODEL": "run create-authorization-model action",
     "OPENFGA_HOST": "missing openfga relation",
     "OPENFGA_SCHEME": "missing openfga relation",
     "OPENFGA_TOKEN": "missing openfga relation",
     "OPENFGA_PORT": "missing openfga relation",
+    "BAKERY_PRIVATE_KEY": "missing private key configuration",
+    "BAKERY_PUBLIC_KEY": "missing public key configuration",
 }
 
 JIMM_SERVICE_NAME = "jimm"
@@ -193,9 +194,7 @@ class JimmOperatorCharm(CharmBase):
             self._on_create_authorization_model_action,
         )
 
-        self._local_agent_filename = "agent.json"
         self._local_vault_secret_filename = "vault_secret.js"
-        self._agent_filename = "/root/config/agent.json"
         self._vault_secret_filename = "/root/config/vault_secret.json"
         self._vault_path = "charm-jimm-k8s-creds"
 
@@ -219,23 +218,6 @@ class JimmOperatorCharm(CharmBase):
 
         self._update_workload(event)
 
-    def _ensure_bakery_agent_file(self, event):
-        # we create the file containing agent keys if needed.
-        if not self._path_exists_in_workload(self._agent_filename):
-            url = self.config.get("candid-url", "")
-            username = self.config.get("candid-agent-username", "")
-            private_key = self.config.get("candid-agent-private-key", "")
-            public_key = self.config.get("candid-agent-public-key", "")
-            if not url or not username or not private_key or not public_key:
-                return ""
-            data = {
-                "key": {"public": public_key, "private": private_key},
-                "agents": [{"url": url, "username": username}],
-            }
-            agent_data = json.dumps(data)
-
-            self._push_to_workload(self._agent_filename, agent_data, event)
-
     @requires_state
     def _update_workload(self, event):
         """' Update workload with all available configuration
@@ -248,7 +230,6 @@ class JimmOperatorCharm(CharmBase):
             return
 
         self.oauth.update_client_config(client_config=self._oauth_client_config)
-        self._ensure_bakery_agent_file(event)
         self._ensure_vault_file(event)
         if self.model.get_relation("vault") and not container.exists(self._vault_secret_filename):
             logger.warning("Vault relation present but vault setup is not ready yet")
@@ -268,8 +249,6 @@ class JimmOperatorCharm(CharmBase):
         oauth_provider_info = self.oauth.get_provider_info()
 
         config_values = {
-            "CANDID_PUBLIC_KEY": self.config.get("candid-public-key", ""),
-            "CANDID_URL": self.config.get("candid-url", ""),
             "JIMM_AUDIT_LOG_RETENTION_PERIOD_IN_DAYS": self.config.get("audit-log-retention-period-in-days", ""),
             "JIMM_ADMINS": self.config.get("controller-admins", ""),
             "JIMM_DNS_NAME": dns_name,
@@ -283,8 +262,8 @@ class JimmOperatorCharm(CharmBase):
             "OPENFGA_SCHEME": self._state.openfga_scheme,
             "OPENFGA_TOKEN": self._state.openfga_token,
             "OPENFGA_PORT": self._state.openfga_port,
-            "PRIVATE_KEY": self.config.get("private-key", ""),
-            "PUBLIC_KEY": self.config.get("public-key", ""),
+            "BAKERY_PRIVATE_KEY": self.config.get("private-key", ""),
+            "BAKERY_PUBLIC_KEY": self.config.get("public-key", ""),
             "JIMM_JWT_EXPIRY": self.config.get("jwt-expiry"),
             "JIMM_MACAROON_EXPIRY_DURATION": self.config.get("macaroon-expiry-duration", "24h"),
             "JIMM_ACCESS_TOKEN_EXPIRY_DURATION": self.config.get("session-expiry-duration"),
@@ -298,9 +277,6 @@ class JimmOperatorCharm(CharmBase):
         }
         if self._state.dsn:
             config_values["JIMM_DSN"] = self._state.dsn
-
-        if container.exists(self._agent_filename):
-            config_values["BAKERY_AGENT_FILE"] = self._agent_filename
 
         if container.exists(self._vault_secret_filename):
             config_values["VAULT_ADDR"] = self._state.vault_address
@@ -316,7 +292,7 @@ class JimmOperatorCharm(CharmBase):
             config_values["INSECURE_SECRET_STORAGE"] = "enabled"  # Value doesn't matter, checks env var exists.
 
         # remove empty configuration values
-        config_values = {key: value for key, value in config_values.items() if value}
+        config_values = {key: value for key, value in config_values.items() if value is not None}
 
         pebble_layer = {
             "summary": "jimm layer",
@@ -363,7 +339,6 @@ class JimmOperatorCharm(CharmBase):
             dashboard_relation.data[self.app].update(
                 {
                     "controller_url": "wss://{}".format(dns_name),
-                    "identity_provider_url": self.config.get("candid-url"),
                     "is_juju": str(False),
                 }
             )
@@ -407,7 +382,6 @@ class JimmOperatorCharm(CharmBase):
         event.relation.data[self.app].update(
             {
                 "controller_url": "wss://{}".format(dns_name),
-                "identity_provider_url": self.config["candid-url"],
                 "is_juju": str(False),
             }
         )
