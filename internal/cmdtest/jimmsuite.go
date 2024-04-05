@@ -18,7 +18,6 @@ import (
 	"time"
 
 	cofga "github.com/canonical/ofga"
-	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/juju/juju/api"
 	"github.com/juju/juju/core/network"
 	corejujutesting "github.com/juju/juju/juju/testing"
@@ -67,30 +66,19 @@ func (s *JimmCmdSuite) SetUpTest(c *gc.C) {
 	s.COFGAClient = cofgaClient
 	s.COFGAParams = cofgaParams
 
-	s.Params = service.Params{
-		PublicDNSName:    u.Host,
-		ControllerUUID:   "914487b5-60e7-42bb-bd63-1adc3fd3a388",
-		ControllerAdmins: []string{"admin"},
-		DSN:              jimmtest.CreateEmptyDatabase(&jimmtest.GocheckTester{c}),
-		OpenFGAParams: service.OpenFGAParams{
-			Scheme:    cofgaParams.Scheme,
-			Host:      cofgaParams.Host,
-			Port:      cofgaParams.Port,
-			Store:     cofgaParams.StoreID,
-			Token:     cofgaParams.Token,
-			AuthModel: cofgaParams.AuthModelID,
-		},
-		JWTExpiryDuration:     time.Minute,
-		InsecureSecretStorage: true,
-		OAuthAuthenticatorParams: service.OAuthAuthenticatorParams{
-			IssuerURL:           "http://localhost:8082/realms/jimm",
-			ClientID:            "jimm-device",
-			Scopes:              []string{oidc.ScopeOpenID, "profile", "email"},
-			SessionTokenExpiry:  time.Duration(time.Hour),
-			SessionCookieMaxAge: 60,
-		},
-		DashboardFinalRedirectURL: "<no dashboard needed for this test>",
+	s.Params = jimmtest.NewTestJimmParams(&jimmtest.GocheckTester{C: c})
+	s.Params.PublicDNSName = u.Host
+	s.Params.ControllerAdmins = []string{"admin"}
+	s.Params.OpenFGAParams = service.OpenFGAParams{
+		Scheme:    cofgaParams.Scheme,
+		Host:      cofgaParams.Host,
+		Port:      cofgaParams.Port,
+		Store:     cofgaParams.StoreID,
+		Token:     cofgaParams.Token,
+		AuthModel: cofgaParams.AuthModelID,
 	}
+	s.Params.JWTExpiryDuration = time.Minute
+	s.Params.InsecureSecretStorage = true
 
 	srv, err := service.NewService(ctx, s.Params)
 	c.Assert(err, gc.Equals, nil)

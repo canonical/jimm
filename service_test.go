@@ -10,10 +10,8 @@ import (
 	"net/http/httptest"
 	"os"
 	"testing"
-	"time"
 
 	cofga "github.com/canonical/ofga"
-	"github.com/coreos/go-oidc/v3/oidc"
 	qt "github.com/frankban/quicktest"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/checkers"
@@ -42,19 +40,9 @@ func TestDefaultService(t *testing.T) {
 
 	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
-	svc, err := jimm.NewService(context.Background(), jimm.Params{
-		DSN:                   jimmtest.CreateEmptyDatabase(c),
-		OpenFGAParams:         cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
-		InsecureSecretStorage: true,
-		OAuthAuthenticatorParams: jimm.OAuthAuthenticatorParams{
-			IssuerURL:           "http://localhost:8082/realms/jimm",
-			ClientID:            "jimm-device",
-			Scopes:              []string{oidc.ScopeOpenID, "profile", "email"},
-			SessionTokenExpiry:  time.Duration(time.Hour),
-			SessionCookieMaxAge: 60,
-		},
-		DashboardFinalRedirectURL: "<no dashboard needed for this test>",
-	})
+	p := jimmtest.NewTestJimmParams(c)
+	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
+	svc, err := jimm.NewService(context.Background(), p)
 	c.Assert(err, qt.IsNil)
 	rr := httptest.NewRecorder()
 	req, err := http.NewRequest("GET", "/debug/info", nil)
@@ -69,18 +57,9 @@ func TestServiceStartsWithoutSecretStore(t *testing.T) {
 
 	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
-	_, err = jimm.NewService(context.Background(), jimm.Params{
-		DSN:           jimmtest.CreateEmptyDatabase(c),
-		OpenFGAParams: cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
-		OAuthAuthenticatorParams: jimm.OAuthAuthenticatorParams{
-			IssuerURL:           "http://localhost:8082/realms/jimm",
-			ClientID:            "jimm-device",
-			Scopes:              []string{oidc.ScopeOpenID, "profile", "email"},
-			SessionTokenExpiry:  time.Duration(time.Hour),
-			SessionCookieMaxAge: 60,
-		},
-		DashboardFinalRedirectURL: "<no dashboard needed for this test>",
-	})
+	p := jimmtest.NewTestJimmParams(c)
+	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
+	_, err = jimm.NewService(context.Background(), p)
 	c.Assert(err, qt.IsNil)
 }
 
@@ -91,22 +70,10 @@ func TestAuthenticator(t *testing.T) {
 	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
-	p := jimm.Params{
-		ControllerUUID:        "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
-		DSN:                   jimmtest.CreateEmptyDatabase(c),
-		ControllerAdmins:      []string{"admin"},
-		OpenFGAParams:         cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
-		InsecureSecretStorage: true,
-		OAuthAuthenticatorParams: jimm.OAuthAuthenticatorParams{
-			IssuerURL:           "http://localhost:8082/realms/jimm",
-			ClientID:            "jimm-device",
-			Scopes:              []string{oidc.ScopeOpenID, "profile", "email"},
-			SessionTokenExpiry:  time.Duration(time.Hour),
-			SessionCookieMaxAge: 60,
-		},
-		DashboardFinalRedirectURL: "<no dashboard needed for this test>",
-	}
-	svc, err := jimm.NewService(ctx, p)
+	p := jimmtest.NewTestJimmParams(c)
+	p.InsecureSecretStorage = true
+	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
+	svc, err := jimm.NewService(context.Background(), p)
 	c.Assert(err, qt.IsNil)
 
 	err = svc.JIMM().GetCredentialStore().PutOAuthSecret(ctx, []byte(jimmtest.JWTTestSecret))
@@ -163,25 +130,13 @@ func TestVault(t *testing.T) {
 	ofgaClient, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
-	p := jimm.Params{
-		ControllerUUID:  "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
-		DSN:             jimmtest.CreateEmptyDatabase(c),
-		VaultAddress:    "http://localhost:8200",
-		VaultAuthPath:   "/auth/approle/login",
-		VaultPath:       "/jimm-kv/",
-		VaultSecretFile: "./local/vault/approle.json",
-		OpenFGAParams:   cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
-		OAuthAuthenticatorParams: jimm.OAuthAuthenticatorParams{
-			IssuerURL:           "http://localhost:8082/realms/jimm",
-			ClientID:            "jimm-device",
-			Scopes:              []string{oidc.ScopeOpenID, "profile", "email"},
-			SessionTokenExpiry:  time.Duration(time.Hour),
-			SessionCookieMaxAge: 60,
-		},
-		DashboardFinalRedirectURL: "<no dashboard needed for this test>",
-	}
 	vaultClient, _, creds, _ := jimmtest.VaultClient(c, ".")
-
+	p := jimmtest.NewTestJimmParams(c)
+	p.VaultAddress = "http://localhost:8200"
+	p.VaultAuthPath = "/auth/approle/login"
+	p.VaultPath = "/jimm-kv/"
+	p.VaultSecretFile = "./local/vault/approle.json"
+	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
 	svc, err := jimm.NewService(ctx, p)
 	c.Assert(err, qt.IsNil)
 
@@ -239,20 +194,9 @@ func TestPostgresSecretStore(t *testing.T) {
 	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
-	p := jimm.Params{
-		ControllerUUID:        "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
-		DSN:                   jimmtest.CreateEmptyDatabase(c),
-		OpenFGAParams:         cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
-		InsecureSecretStorage: true,
-		OAuthAuthenticatorParams: jimm.OAuthAuthenticatorParams{
-			IssuerURL:           "http://localhost:8082/realms/jimm",
-			ClientID:            "jimm-device",
-			Scopes:              []string{oidc.ScopeOpenID, "profile", "email"},
-			SessionTokenExpiry:  time.Duration(time.Hour),
-			SessionCookieMaxAge: 60,
-		},
-		DashboardFinalRedirectURL: "<no dashboard needed for this test>",
-	}
+	p := jimmtest.NewTestJimmParams(c)
+	p.InsecureSecretStorage = true
+	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
 	_, err = jimm.NewService(context.Background(), p)
 	c.Assert(err, qt.IsNil)
 }
@@ -264,22 +208,10 @@ func TestOpenFGA(t *testing.T) {
 	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
-	p := jimm.Params{
-		ControllerUUID:        "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
-		DSN:                   jimmtest.CreateEmptyDatabase(c),
-		OpenFGAParams:         cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
-		ControllerAdmins:      []string{"alice", "eve"},
-		InsecureSecretStorage: true,
-		OAuthAuthenticatorParams: jimm.OAuthAuthenticatorParams{
-			IssuerURL:           "http://localhost:8082/realms/jimm",
-			ClientID:            "jimm-device",
-			Scopes:              []string{oidc.ScopeOpenID, "profile", "email"},
-			SessionTokenExpiry:  time.Duration(time.Hour),
-			SessionCookieMaxAge: 60,
-		},
-		DashboardFinalRedirectURL: "<no dashboard needed for this test>",
-	}
-
+	p := jimmtest.NewTestJimmParams(c)
+	p.InsecureSecretStorage = true
+	p.ControllerAdmins = []string{"alice", "eve"}
+	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
 	svc, err := jimm.NewService(ctx, p)
 	c.Assert(err, qt.IsNil)
 
@@ -324,22 +256,8 @@ func TestPublicKey(t *testing.T) {
 	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
-	p := jimm.Params{
-		ControllerUUID:   "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
-		DSN:              jimmtest.CreateEmptyDatabase(c),
-		OpenFGAParams:    cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
-		ControllerAdmins: []string{"alice", "eve"},
-		PrivateKey:       "c1VkV05+iWzCxMwMVcWbr0YJWQSEO62v+z3EQ2BhFMw=",
-		PublicKey:        "pC8MEk9MS9S8fhyRnOJ4qARTcTAwoM9L1nH/Yq0MwWU=",
-		OAuthAuthenticatorParams: jimm.OAuthAuthenticatorParams{
-			IssuerURL:           "http://localhost:8082/realms/jimm",
-			ClientID:            "jimm-device",
-			Scopes:              []string{oidc.ScopeOpenID, "profile", "email"},
-			SessionTokenExpiry:  time.Duration(time.Hour),
-			SessionCookieMaxAge: 60,
-		},
-		DashboardFinalRedirectURL: "<no dashboard needed for this test>",
-	}
+	p := jimmtest.NewTestJimmParams(c)
+	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
 	svc, err := jimm.NewService(context.Background(), p)
 	c.Assert(err, qt.IsNil)
 
@@ -350,7 +268,7 @@ func TestPublicKey(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	data, err := io.ReadAll(response.Body)
 	c.Assert(err, qt.IsNil)
-	c.Assert(string(data), qt.Equals, `{"PublicKey":"pC8MEk9MS9S8fhyRnOJ4qARTcTAwoM9L1nH/Yq0MwWU="}`)
+	c.Assert(string(data), qt.Equals, `{"PublicKey":"izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk="}`)
 }
 
 func TestThirdPartyCaveatDischarge(t *testing.T) {
@@ -413,22 +331,8 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 			ofgaClient, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 			c.Assert(err, qt.IsNil)
 
-			p := jimm.Params{
-				ControllerUUID:   "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
-				DSN:              jimmtest.CreateEmptyDatabase(c),
-				OpenFGAParams:    cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
-				ControllerAdmins: []string{"alice", "eve"},
-				PrivateKey:       "c1VkV05+iWzCxMwMVcWbr0YJWQSEO62v+z3EQ2BhFMw=",
-				PublicKey:        "pC8MEk9MS9S8fhyRnOJ4qARTcTAwoM9L1nH/Yq0MwWU=",
-				OAuthAuthenticatorParams: jimm.OAuthAuthenticatorParams{
-					IssuerURL:           "http://localhost:8082/realms/jimm",
-					ClientID:            "jimm-device",
-					Scopes:              []string{oidc.ScopeOpenID, "profile", "email"},
-					SessionTokenExpiry:  time.Duration(time.Hour),
-					SessionCookieMaxAge: 60,
-				},
-				DashboardFinalRedirectURL: "<no dashboard needed for this test>",
-			}
+			p := jimmtest.NewTestJimmParams(c)
+			p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
 			svc, err := jimm.NewService(context.Background(), p)
 			c.Assert(err, qt.IsNil)
 

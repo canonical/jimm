@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/coreos/go-oidc/v3/oidc"
 	qt "github.com/frankban/quicktest"
 	"github.com/google/uuid"
 	"github.com/lestrrat-go/jwx/v2/jwk"
@@ -93,30 +92,21 @@ func setupService(ctx context.Context, c *qt.C) (*jimm.Service, *httptest.Server
 	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
-	svc, err := jimm.NewService(context.Background(), jimm.Params{
-		ControllerUUID:  "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
-		DSN:             jimmtest.CreateEmptyDatabase(c),
-		VaultAddress:    "http://localhost:8200",
-		VaultAuthPath:   "/auth/approle/login",
-		VaultPath:       "/jimm-kv/",
-		VaultSecretFile: "../../local/vault/approle.json",
-		OpenFGAParams: jimm.OpenFGAParams{
-			Scheme:    cofgaParams.Scheme,
-			Host:      cofgaParams.Host,
-			Port:      cofgaParams.Port,
-			Store:     cofgaParams.StoreID,
-			Token:     cofgaParams.Token,
-			AuthModel: cofgaParams.AuthModelID,
-		},
-		OAuthAuthenticatorParams: jimm.OAuthAuthenticatorParams{
-			IssuerURL:           "http://localhost:8082/realms/jimm",
-			ClientID:            "jimm-device",
-			Scopes:              []string{oidc.ScopeOpenID, "profile", "email"},
-			SessionTokenExpiry:  time.Duration(time.Hour),
-			SessionCookieMaxAge: 60,
-		},
-		DashboardFinalRedirectURL: "<no dashboard needed for this test>",
-	})
+	p := jimmtest.NewTestJimmParams(c)
+	p.VaultAddress = "http://localhost:8200"
+	p.VaultAuthPath = "/auth/approle/login"
+	p.VaultPath = "/jimm-kv/"
+	p.VaultSecretFile = "../../local/vault/approle.json"
+	p.OpenFGAParams = jimm.OpenFGAParams{
+		Scheme:    cofgaParams.Scheme,
+		Host:      cofgaParams.Host,
+		Port:      cofgaParams.Port,
+		Store:     cofgaParams.StoreID,
+		Token:     cofgaParams.Token,
+		AuthModel: cofgaParams.AuthModelID,
+	}
+	svc, err := jimm.NewService(context.Background(), p)
+
 	c.Assert(err, qt.IsNil)
 
 	srv := httptest.NewTLSServer(svc)
