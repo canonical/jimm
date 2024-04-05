@@ -180,7 +180,7 @@ class TestCharm(unittest.TestCase):
         with open(config_file) as f:
             lines = f.readlines()
         os.unlink(config_file)
-        self.assertEqual(len(lines), 23)
+        self.assertEqual(len(lines), 19)
         self.assertEqual(lines[0].strip(), "JIMM_ADMINS=user1 user2 group1")
         self.assertEqual(
             lines[2].strip(),
@@ -190,23 +190,23 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(lines[7].strip(), "JIMM_LOG_LEVEL=debug")
         self.assertEqual(lines[8].strip(), "JIMM_UUID=caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa")
         self.assertEqual(
+            lines[9].strip(),
+            "BAKERY_PRIVATE_KEY=ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
+        )
+        self.assertEqual(
             lines[10].strip(),
-            "PRIVATE_KEY=ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
+            "BAKERY_PUBLIC_KEY=izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
         )
         self.assertEqual(
-            lines[13].strip(),
-            "PUBLIC_KEY=izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
-        )
-        self.assertEqual(
-            lines[15].strip(),
+            lines[11].strip(),
             "JIMM_AUDIT_LOG_RETENTION_PERIOD_IN_DAYS=10",
         )
         self.assertEqual(
-            lines[16].strip(),
+            lines[12].strip(),
             "JIMM_JWT_EXPIRY=10m",
         )
-        self.assertEqual(lines[18].strip(), "JIMM_MACAROON_EXPIRY_DURATION=48h")
-        self.assertEqual(lines[19].strip(), "JIMM_ACCESS_TOKEN_EXPIRY_DURATION=6h")
+        self.assertEqual(lines[14].strip(), "JIMM_MACAROON_EXPIRY_DURATION=48h")
+        self.assertEqual(lines[15].strip(), "JIMM_ACCESS_TOKEN_EXPIRY_DURATION=6h")
 
     def test_config_changed_redirect_to_dashboard(self):
         config_file = os.path.join(self.harness.charm.charm_dir, "juju-jimm.env")
@@ -230,7 +230,7 @@ class TestCharm(unittest.TestCase):
         with open(config_file) as f:
             lines = f.readlines()
         os.unlink(config_file)
-        self.assertEqual(len(lines), 23)
+        self.assertEqual(len(lines), 19)
         self.assertEqual(lines[0].strip(), "JIMM_ADMINS=user1 user2 group1")
         self.assertEqual(
             lines[2].strip(),
@@ -240,22 +240,22 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(lines[7].strip(), "JIMM_LOG_LEVEL=debug")
         self.assertEqual(lines[8].strip(), "JIMM_UUID=caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa")
         self.assertEqual(
+            lines[9].strip(),
+            "BAKERY_PRIVATE_KEY=ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
+        )
+        self.assertEqual(
             lines[10].strip(),
-            "PRIVATE_KEY=ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
+            "BAKERY_PUBLIC_KEY=izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
         )
         self.assertEqual(
-            lines[13].strip(),
-            "PUBLIC_KEY=izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
-        )
-        self.assertEqual(
-            lines[15].strip(),
+            lines[11].strip(),
             "JIMM_AUDIT_LOG_RETENTION_PERIOD_IN_DAYS=10",
         )
         self.assertEqual(
-            lines[16].strip(),
+            lines[12].strip(),
             "JIMM_JWT_EXPIRY=5m",
         )
-        self.assertEqual(lines[18].strip(), "JIMM_MACAROON_EXPIRY_DURATION=48h")
+        self.assertEqual(lines[14].strip(), "JIMM_MACAROON_EXPIRY_DURATION=48h")
 
     def test_config_changed_ready(self):
         config_file = os.path.join(self.harness.charm.charm_dir, "juju-jimm.env")
@@ -278,7 +278,7 @@ class TestCharm(unittest.TestCase):
         with open(config_file) as f:
             lines = f.readlines()
         os.unlink(config_file)
-        self.assertEqual(len(lines), 21)
+        self.assertEqual(len(lines), 17)
         self.assertEqual(lines[0].strip(), "JIMM_ADMINS=user1 user2 group1")
         self.assertEqual(
             lines[2].strip(),
@@ -287,22 +287,22 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(lines[5].strip(), "JIMM_LOG_LEVEL=info")
         self.assertEqual(lines[6].strip(), "JIMM_UUID=caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa")
         self.assertEqual(
+            lines[7].strip(),
+            "BAKERY_PRIVATE_KEY=ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
+        )
+        self.assertEqual(
             lines[8].strip(),
-            "PRIVATE_KEY=ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
+            "BAKERY_PUBLIC_KEY=izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
         )
         self.assertEqual(
-            lines[11].strip(),
-            "PUBLIC_KEY=izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
-        )
-        self.assertEqual(
-            lines[13].strip(),
+            lines[9].strip(),
             "JIMM_AUDIT_LOG_RETENTION_PERIOD_IN_DAYS=10",
         )
         self.assertEqual(
-            lines[14].strip(),
+            lines[10].strip(),
             "JIMM_JWT_EXPIRY=5m",
         )
-        self.assertEqual(lines[16].strip(), "JIMM_MACAROON_EXPIRY_DURATION=48h")
+        self.assertEqual(lines[12].strip(), "JIMM_MACAROON_EXPIRY_DURATION=48h")
 
     def test_leader_elected(self):
         leader_file = os.path.join(self.harness.charm.charm_dir, "juju-jimm-leader.env")
@@ -585,14 +585,14 @@ class TestCharm(unittest.TestCase):
         with open(config_file) as f:
             lines = f.readlines()
         os.unlink(config_file)
-        self.assertEqual(len(lines), 23)
+        self.assertEqual(len(lines), 19)
         self.assertEqual(len([match for match in lines if "INSECURE_SECRET_STORAGE" in match]), 0)
         self.harness.update_config({"postgres-secret-storage": True})
         self.assertTrue(os.path.exists(config_file))
         with open(config_file) as f:
             lines = f.readlines()
         os.unlink(config_file)
-        self.assertEqual(len(lines), 25)
+        self.assertEqual(len(lines), 21)
         self.assertEqual(len([match for match in lines if "INSECURE_SECRET_STORAGE" in match]), 1)
 
     def test_oauth_relation_changed(self):
