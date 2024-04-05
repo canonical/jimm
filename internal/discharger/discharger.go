@@ -37,11 +37,7 @@ type MacaroonDischargerConfig struct {
 func NewMacaroonDischarger(cfg MacaroonDischargerConfig, db *db.Database, ofgaClient *openfga.OFGAClient) (*MacaroonDischarger, error) {
 	var kp bakery.KeyPair
 	if cfg.PublicKey == "" || cfg.PrivateKey == "" {
-		generatedKP, err := bakery.GenerateKey()
-		if err != nil {
-			return nil, errors.E(err, "failed to generate a bakery keypair")
-		}
-		kp = *generatedKP
+		return nil, errors.E("missing bakery private/public key")
 	} else {
 		if err := kp.Private.UnmarshalText([]byte(cfg.PrivateKey)); err != nil {
 			return nil, errors.E(err, "cannot unmarshal private key")

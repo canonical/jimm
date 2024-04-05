@@ -51,7 +51,7 @@ var (
 `
 
 	expectedOutput = `- name: jaas
-  uuid: 914487b5-60e7-42bb-bd63-1adc3fd3a388
+  uuid: 6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11
   publicaddress: ""
   apiaddresses: \[\]
   cacertificate: ""
