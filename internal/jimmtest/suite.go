@@ -152,6 +152,8 @@ func (s *JIMMSuite) setupMacaroonDischarger(c *gc.C) *discharger.MacaroonDischar
 	cfg := discharger.MacaroonDischargerConfig{
 		MacaroonExpiryDuration: 1 * time.Hour,
 		ControllerUUID:         s.JIMM.UUID,
+		PrivateKey:             "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
+		PublicKey:              "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
 	}
 	macaroonDischarger, err := discharger.NewMacaroonDischarger(cfg, &s.JIMM.Database, s.JIMM.OpenFGAClient)
 	c.Assert(err, gc.IsNil)

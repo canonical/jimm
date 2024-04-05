@@ -10,24 +10,6 @@ options:
       Logs are purged at 9AM UTC. Defaults to 0, which means by 
       default logs are never purged.
     default: "0"
-  candid-agent-private-key:
-    type: string
-    description: |
-      Private key of the agent user for accessing the candid API.
-  candid-agent-public-key:
-    type: string
-    description: |
-      Public key of the agent user for accessing the candid API.
-  candid-agent-username:
-    type: string
-    description: |
-      Name of the agent user for accessing the candid API.
-  candid-url:
-    type: string
-    description: URL of candid server.
-  candid-public-key:
-    type: string
-    description: Candid public key.
   controller-admins:
     type: string
     description: |
