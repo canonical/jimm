@@ -10,7 +10,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from ops.model import BlockedStatus
+from ops.model import ActiveStatus, BlockedStatus
 from ops.testing import Harness
 
 from src.charm import JimmOperatorCharm
@@ -27,6 +27,14 @@ OAUTH_PROVIDER_INFO = {
     "userinfo_endpoint": "https://example.oidc.com/userinfo",
 }
 
+OPENFGA_PROVIDER_INFO = {
+    "address": "openfga.localhost",
+    "port": "8080",
+    "scheme": "http",
+    "store_id": "fake-store-id",
+    "token": "fake-token",
+}
+
 MINIMAL_CONFIG = {
     "uuid": "1234567890",
     "public-key": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
@@ -36,7 +44,6 @@ MINIMAL_CONFIG = {
 }
 
 EXPECTED_ENV = {
-    "JIMM_ADMINS": "",
     "JIMM_DASHBOARD_LOCATION": "https://jaas.ai/models",
     "JIMM_DNS_NAME": "juju-jimm-k8s-0.juju-jimm-k8s-endpoints.None.svc.cluster.local",
     "JIMM_ENABLE_JWKS_ROTATOR": "1",
@@ -119,6 +126,17 @@ class TestCharm(unittest.TestCase):
                 "client_id": OAUTH_CLIENT_ID,
                 "client_secret_id": secret_id,
                 **OAUTH_PROVIDER_INFO,
+            },
+        )
+
+    def add_openfga_relation(self):
+        self.openfga_rel_id = self.harness.add_relation("openfga", "openfga")
+        self.harness.add_relation_unit(self.openfga_rel_id, "openfga/0")
+        self.harness.update_relation_data(
+            self.openfga_rel_id,
+            "openfga",
+            {
+                **OPENFGA_PROVIDER_INFO,
             },
         )
 
@@ -337,3 +355,24 @@ class TestCharm(unittest.TestCase):
         with self.assertRaises(ValueError) as e:
             self.harness.add_relation_unit(id, "vault/0")
             self.assertEqual(e, "Missing config vault-access-address for vault relation")
+
+    def test_app_blocked_without_private_key(self):
+        self.harness.enable_hooks()
+        # Fake the Postgres relation.
+        self.harness.charm._state.dsn = "postgres-dsn"
+        # Setup the OpenFGA relation.
+        self.add_openfga_relation()
+        self.harness.charm._state.openfga_auth_model_id = 1
+        # Set the config with the private-key value missing.
+        min_config_no_private_key = MINIMAL_CONFIG.copy()
+        del min_config_no_private_key["private-key"]
+        self.harness.update_config(min_config_no_private_key)
+        self.assertEqual(self.harness.charm.unit.status.name, BlockedStatus.name)
+        self.assertEqual(
+            self.harness.charm.unit.status.message,
+            "BAKERY_PRIVATE_KEY configuration value not set: missing private key configuration",
+        )
+        # Now check that we can get the app into an active state.
+        self.harness.update_config(MINIMAL_CONFIG)
+        self.assertEqual(self.harness.charm.unit.status.name, ActiveStatus.name)
+        self.assertEqual(self.harness.charm.unit.status.message, "running")

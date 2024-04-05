@@ -292,7 +292,7 @@ class JimmOperatorCharm(CharmBase):
             config_values["INSECURE_SECRET_STORAGE"] = "enabled"  # Value doesn't matter, checks env var exists.
 
         # remove empty configuration values
-        config_values = {key: value for key, value in config_values.items() if value is not None}
+        config_values = {key: value for key, value in config_values.items() if value}
 
         pebble_layer = {
             "summary": "jimm layer",
