@@ -71,7 +71,6 @@ class JimmCharm(SystemdCharm):
             self.on.dashboard_relation_joined,
             self._on_dashboard_relation_joined,
         )
-        self._agent_filename = "/var/snap/jimm/common/agent.json"
         self._vault_secret_filename = "/var/snap/jimm/common/vault_secret.json"
         self._workload_filename = "/snap/bin/jimm"
         self._rsyslog_conf_path = "/etc/rsyslog.d/10-jimm.conf"
@@ -141,14 +140,12 @@ class JimmCharm(SystemdCharm):
 
         args = {
             "admins": self.config.get("controller-admins", ""),
-            "bakery_agent_file": self._bakery_agent_file(),
-            "candid_url": self.config.get("candid-url"),
             "dns_name": self.config.get("dns-name"),
             "log_level": self.config.get("log-level"),
             "uuid": self.config.get("uuid"),
             "dashboard_location": self.config.get("juju-dashboard-location"),
-            "public_key": self.config.get("public-key"),
-            "private_key": self.config.get("private-key"),
+            "bakery_public_key": self.config.get("public-key", ""),
+            "bakery_private_key": self.config.get("private-key", ""),
             "audit_retention_period": self.config.get("audit-log-retention-period-in-days", ""),
             "jwt_expiry": self.config.get("jwt-expiry", "5m"),
             "macaroon_expiry_duration": self.config.get("macaroon-expiry-duration"),
@@ -353,24 +350,6 @@ class JimmCharm(SystemdCharm):
         )
         self._systemctl("restart", "rsyslog")
 
-    def _bakery_agent_file(self):
-        url = self.config.get("candid-url", "")
-        username = self.config.get("candid-agent-username", "")
-        private_key = self.config.get("candid-agent-private-key", "")
-        public_key = self.config.get("candid-agent-public-key", "")
-        if not url or not username or not private_key or not public_key:
-            return ""
-        data = {
-            "key": {"public": public_key, "private": private_key},
-            "agents": [{"url": url, "username": username}],
-        }
-        try:
-            with open(self._agent_filename, "wt") as f:
-                json.dump(data, f)
-        except FileNotFoundError:
-            return ""
-        return self._agent_filename
-
     def _write_service_file(self):
         args = {
             "conf_file": self._env_filename(),
@@ -378,6 +357,7 @@ class JimmCharm(SystemdCharm):
             "leader_file": self._env_filename(LEADER_PART),
             "vault_file": self._env_filename(VAULT_PART),
             "openfga_file": self._env_filename(OPENFGA_PART),
+            "oauth_file": self._env_filename(OAUTH_PART),
         }
         with open(self.service_file, "wt") as f:
             f.write(self._render_template("jimm.service", **args))
@@ -429,7 +409,6 @@ class JimmCharm(SystemdCharm):
             relation.data[self.app].update(
                 {
                     "controller_url": "wss://{}".format(self.config["dns-name"]),
-                    "identity_provider_url": self.config["candid-url"],
                     "is_juju": str(False),
                 }
             )
