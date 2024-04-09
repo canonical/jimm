@@ -14,6 +14,10 @@ const (
 	// ServiceAccountTagKind represents the resource "kind" that service accounts
 	// are represented as.
 	ServiceAccountTagKind = "serviceaccount"
+
+	// ServiceAccountDomain is the @domain suffix that service account IDs should
+	// have.
+	ServiceAccountDomain = "serviceaccount"
 )
 
 // ServiceAccount represents a service account where id is the client ID.
@@ -54,11 +58,13 @@ func ParseServiceAccountTag(tag string) (ServiceAccountTag, error) {
 	return gt, nil
 }
 
-// IsValidServiceAccountId verifies the client id for a service account is valid according to a regex internally.
+// IsValidServiceAccountId verifies the client id for a service account is valid
+// according to a regex internally. A valid service account ID must have a
+// `@serviceaccount` domain.
 func IsValidServiceAccountId(id string) bool {
 	if !names.IsValidUser(id) {
 		return false
 	}
 	t := names.NewUserTag(id)
-	return t.Domain() != ""
+	return t.Domain() == ServiceAccountDomain
 }
