@@ -73,7 +73,7 @@ func TestGrantServiceAccountAccess(t *testing.T) {
 			"user-bob",
 			"group-1#member",
 		},
-		clientID: "fca1f605-736e-4d1f-bcd2-aecc726923be@canonical.com",
+		clientID: "fca1f605-736e-4d1f-bcd2-aecc726923be@serviceaccount",
 		username: "alice",
 	}, {
 		about: "Group that doesn't exist",
@@ -86,7 +86,7 @@ func TestGrantServiceAccountAccess(t *testing.T) {
 			// This group doesn't exist.
 			"group-bar",
 		},
-		clientID:      "fca1f605-736e-4d1f-bcd2-aecc726923be@canonical.com",
+		clientID:      "fca1f605-736e-4d1f-bcd2-aecc726923be@serviceaccount",
 		username:      "alice",
 		expectedError: "group bar not found",
 	}, {
@@ -99,7 +99,7 @@ func TestGrantServiceAccountAccess(t *testing.T) {
 			"user-bob",
 			"controller-jimm",
 		},
-		clientID:      "fca1f605-736e-4d1f-bcd2-aecc726923be@canonical.com",
+		clientID:      "fca1f605-736e-4d1f-bcd2-aecc726923be@serviceaccount",
 		username:      "alice",
 		expectedError: "invalid entity - not user or group",
 	}}
