@@ -17,27 +17,33 @@ import (
 	jimmnames "github.com/canonical/jimm/pkg/names"
 )
 
-// service_acount contains the primary RPC commands for handling service accounts within JIMM via the JIMM facade itself.
+// service_account contains the primary RPC commands for handling service accounts within JIMM via the JIMM facade itself.
 
 // AddGroup creates a group within JIMMs DB for reference by OpenFGA.
 func (r *controllerRoot) AddServiceAccount(ctx context.Context, req apiparams.AddServiceAccountRequest) error {
 	const op = errors.Op("jujuapi.AddServiceAccount")
 
-	if !jimmnames.IsValidServiceAccountId(req.ClientID) {
-		return errors.E(op, errors.CodeBadRequest, "invalid client ID")
+	clientIdWithDomain, err := ensureValidClientIdWithDomain(req.ClientID)
+	if err != nil {
+		return errors.E(op, errors.CodeBadRequest, err)
 	}
 
-	return r.jimm.AddServiceAccount(ctx, r.user, req.ClientID)
+	return r.jimm.AddServiceAccount(ctx, r.user, clientIdWithDomain)
 }
 
 // getServiceAccount validates the incoming identity has administrator permission
 // on the service account and returns the service account identity.
 func (r *controllerRoot) getServiceAccount(ctx context.Context, clientID string) (*openfga.User, error) {
-	if !jimmnames.IsValidServiceAccountId(clientID) {
+	clientIdWithDomain, err := ensureValidClientIdWithDomain(clientID)
+	if err != nil {
+		return nil, errors.E(errors.CodeBadRequest, err)
+	}
+
+	if !jimmnames.IsValidServiceAccountId(clientIdWithDomain) {
 		return nil, errors.E(errors.CodeBadRequest, "invalid client ID")
 	}
 
-	ok, err := r.user.IsServiceAccountAdmin(ctx, jimmnames.NewServiceAccountTag(clientID))
+	ok, err := r.user.IsServiceAccountAdmin(ctx, jimmnames.NewServiceAccountTag(clientIdWithDomain))
 	if err != nil {
 		return nil, errors.E(err)
 	}
@@ -46,7 +52,7 @@ func (r *controllerRoot) getServiceAccount(ctx context.Context, clientID string)
 	}
 
 	var targetIdentityModel dbmodel.Identity
-	targetIdentityModel.SetTag(names.NewUserTag(clientID))
+	targetIdentityModel.SetTag(names.NewUserTag(clientIdWithDomain))
 	if err := r.jimm.DB().GetIdentity(ctx, &targetIdentityModel); err != nil {
 		return nil, errors.E(err)
 	}
@@ -111,11 +117,16 @@ func (r *controllerRoot) ListServiceAccountCredentials(ctx context.Context, req 
 func (r *controllerRoot) GrantServiceAccountAccess(ctx context.Context, req apiparams.GrantServiceAccountAccess) error {
 	const op = errors.Op("jujuapi.GrantServiceAccountAccess")
 
-	_, err := r.getServiceAccount(ctx, req.ClientID)
+	clientIdWithDomain, err := ensureValidClientIdWithDomain(req.ClientID)
+	if err != nil {
+		return errors.E(op, errors.CodeBadRequest, err)
+	}
+
+	_, err = r.getServiceAccount(ctx, clientIdWithDomain)
 	if err != nil {
 		return errors.E(op, err)
 	}
-	svcAccTag := jimmnames.NewServiceAccountTag(req.ClientID)
+	svcAccTag := jimmnames.NewServiceAccountTag(clientIdWithDomain)
 
 	return r.jimm.GrantServiceAccountAccess(ctx, r.user, svcAccTag, req.Entities)
 }
