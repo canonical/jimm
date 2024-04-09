@@ -4,6 +4,7 @@ package jujuapi
 
 import (
 	"context"
+	"strings"
 
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
@@ -117,4 +118,18 @@ func (r *controllerRoot) GrantServiceAccountAccess(ctx context.Context, req apip
 	svcAccTag := jimmnames.NewServiceAccountTag(req.ClientID)
 
 	return r.jimm.GrantServiceAccountAccess(ctx, r.user, svcAccTag, req.Entities)
+}
+
+// ensureValidClientIdWithDomain returns the given client ID with the
+// `@serviceaccount` appended to it, if not already there. If the client ID is
+// not a valid service account ID this function returns an error.
+func ensureValidClientIdWithDomain(clientId string) (string, error) {
+	if !strings.HasSuffix(clientId, "@"+jimmnames.ServiceAccountDomain) {
+		clientId += "@" + jimmnames.ServiceAccountDomain
+	}
+
+	if !jimmnames.IsValidServiceAccountId(clientId) {
+		return "", errors.E(errors.CodeBadRequest, "invalid client ID")
+	}
+	return clientId, nil
 }
