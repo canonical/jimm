@@ -28,25 +28,38 @@ func TestAddServiceAccount(t *testing.T) {
 	c := qt.New(t)
 
 	tests := []struct {
-		about             string
-		addServiceAccount func(ctx context.Context, user *openfga.User, clientID string) error
-		args              params.AddServiceAccountRequest
-		expectedError     string
+		about         string
+		args          params.AddServiceAccountRequest
+		addedClientId string
+		expectedError string
 	}{{
-		about: "Valid client ID",
-		addServiceAccount: func(ctx context.Context, user *openfga.User, clientID string) error {
-			return nil
-		},
+		about: "Valid client ID without domain",
 		args: params.AddServiceAccountRequest{
-			ClientID: "fca1f605-736e-4d1f-bcd2-aecc726923be@canonical.com",
+			ClientID: "fca1f605-736e-4d1f-bcd2-aecc726923be",
 		},
+		addedClientId: "fca1f605-736e-4d1f-bcd2-aecc726923be@serviceaccount",
 	}, {
-		about: "Invalid Client ID",
-		addServiceAccount: func(ctx context.Context, user *openfga.User, clientID string) error {
-			return nil
+		about: "Valid client ID with correct domain",
+		args: params.AddServiceAccountRequest{
+			ClientID: "fca1f605-736e-4d1f-bcd2-aecc726923be@serviceaccount",
 		},
+		addedClientId: "fca1f605-736e-4d1f-bcd2-aecc726923be@serviceaccount",
+	}, {
+		about: "Valid client ID with wrong domain",
+		args: params.AddServiceAccountRequest{
+			ClientID: "fca1f605-736e-4d1f-bcd2-aecc726923be@not-serviceaccount",
+		},
+		expectedError: "invalid client ID",
+	}, {
+		about: "Invalid Client ID without domain",
 		args: params.AddServiceAccountRequest{
 			ClientID: "_123_",
+		},
+		expectedError: "invalid client ID",
+	}, {
+		about: "Invalid Client ID with wrong domain",
+		args: params.AddServiceAccountRequest{
+			ClientID: "_123_@not-serviceaccount",
 		},
 		expectedError: "invalid client ID",
 	}}
@@ -55,7 +68,10 @@ func TestAddServiceAccount(t *testing.T) {
 		test := test
 		c.Run(test.about, func(c *qt.C) {
 			jimm := &jimmtest.JIMM{
-				AddServiceAccount_: test.addServiceAccount,
+				AddServiceAccount_: func(_ context.Context, _ *openfga.User, clientID string) error {
+					c.Assert(clientID, qt.Equals, test.addedClientId)
+					return nil
+				},
 			}
 			cr := jujuapi.NewControllerRoot(jimm, jujuapi.Params{})
 
@@ -73,24 +89,41 @@ func TestGetServiceAccount(t *testing.T) {
 	c := qt.New(t)
 
 	tests := []struct {
-		about         string
-		clientID      string
-		addTuples     []openfga.Tuple
-		username      string
-		expectedError string
+		about            string
+		clientID         string
+		addTuples        []openfga.Tuple
+		username         string
+		expectedClientID string
+		expectedError    string
 	}{{
-		about:    "Valid request",
-		clientID: "fca1f605-736e-4d1f-bcd2-aecc726923be@canonical.com",
+		about:    "Valid request without domain",
+		clientID: "fca1f605-736e-4d1f-bcd2-aecc726923be",
 		username: "alice",
 		addTuples: []openfga.Tuple{{
 			Object:   ofganames.ConvertTag(names.NewUserTag("alice")),
 			Relation: ofganames.AdministratorRelation,
-			Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag("fca1f605-736e-4d1f-bcd2-aecc726923be@canonical.com")),
+			Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag("fca1f605-736e-4d1f-bcd2-aecc726923be@serviceaccount")),
 		}},
+		expectedClientID: "fca1f605-736e-4d1f-bcd2-aecc726923be@serviceaccount",
+	}, {
+		about:    "Valid request with domain",
+		clientID: "fca1f605-736e-4d1f-bcd2-aecc726923be@serviceaccount",
+		username: "alice",
+		addTuples: []openfga.Tuple{{
+			Object:   ofganames.ConvertTag(names.NewUserTag("alice")),
+			Relation: ofganames.AdministratorRelation,
+			Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag("fca1f605-736e-4d1f-bcd2-aecc726923be@serviceaccount")),
+		}},
+		expectedClientID: "fca1f605-736e-4d1f-bcd2-aecc726923be@serviceaccount",
+	}, {
+		about:         "Invalid request: wrong domain",
+		clientID:      "fca1f605-736e-4d1f-bcd2-aecc726923be@not-serviceaccount",
+		username:      "alice",
+		expectedError: "invalid client ID",
 	}, {
 		about:         "Missing service account administrator permission",
 		username:      "alice",
-		clientID:      "fca1f605-736e-4d1f-bcd2-aecc726923be@canonical.com",
+		clientID:      "fca1f605-736e-4d1f-bcd2-aecc726923be@serviceaccount",
 		expectedError: "unauthorized",
 	}, {
 		about:         "Invalid Client ID",
@@ -126,7 +159,7 @@ func TestGetServiceAccount(t *testing.T) {
 			res, err := cr.GetServiceAccount(context.Background(), test.clientID)
 			if test.expectedError == "" {
 				c.Assert(err, qt.IsNil)
-				c.Assert(res.Identity.Name, qt.Equals, test.clientID)
+				c.Assert(res.Identity.Name, qt.Equals, test.expectedClientID)
 			} else {
 				c.Assert(err, qt.ErrorMatches, test.expectedError)
 			}
@@ -146,7 +179,7 @@ func TestUpdateServiceAccountCredentials(t *testing.T) {
 		expectedResult        jujuparams.UpdateCredentialResults
 		expectedError         string
 	}{{
-		about: "Valid request",
+		about: "Valid request without domain",
 		updateCloudCredential: func(ctx context.Context, u *openfga.User, args jimm.UpdateCloudCredentialArgs) ([]jujuparams.UpdateCredentialModelResult, error) {
 			return nil, nil
 		},
@@ -164,7 +197,7 @@ func TestUpdateServiceAccountCredentials(t *testing.T) {
 				},
 			}},
 		args: params.UpdateServiceAccountCredentialsRequest{
-			ClientID: "fca1f605-736e-4d1f-bcd2-aecc726923be@canonical.com",
+			ClientID: "fca1f605-736e-4d1f-bcd2-aecc726923be",
 			UpdateCredentialArgs: jujuparams.UpdateCredentialArgs{
 				Credentials: []jujuparams.TaggedCredential{
 					{
@@ -181,7 +214,45 @@ func TestUpdateServiceAccountCredentials(t *testing.T) {
 		addTuples: []openfga.Tuple{{
 			Object:   ofganames.ConvertTag(names.NewUserTag("alice")),
 			Relation: ofganames.AdministratorRelation,
-			Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag("fca1f605-736e-4d1f-bcd2-aecc726923be@canonical.com")),
+			Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag("fca1f605-736e-4d1f-bcd2-aecc726923be@serviceaccount")),
+		}},
+	}, {
+		about: "Valid request with domain",
+		updateCloudCredential: func(ctx context.Context, u *openfga.User, args jimm.UpdateCloudCredentialArgs) ([]jujuparams.UpdateCredentialModelResult, error) {
+			return nil, nil
+		},
+		expectedResult: jujuparams.UpdateCredentialResults{
+			Results: []jujuparams.UpdateCredentialResult{
+				{
+					CredentialTag: "cloudcred-aws/1cbe5066-ea80-4979-8633-048d32f46cf8/cred-name",
+					Error:         nil,
+					Models:        nil,
+				},
+				{
+					CredentialTag: "cloudcred-azure/1cbe5066-ea80-4979-8633-048d32f46cf8/cred-name2",
+					Error:         nil,
+					Models:        nil,
+				},
+			}},
+		args: params.UpdateServiceAccountCredentialsRequest{
+			ClientID: "fca1f605-736e-4d1f-bcd2-aecc726923be@serviceaccount",
+			UpdateCredentialArgs: jujuparams.UpdateCredentialArgs{
+				Credentials: []jujuparams.TaggedCredential{
+					{
+						Tag:        "cloudcred-aws/1cbe5066-ea80-4979-8633-048d32f46cf8/cred-name",
+						Credential: jujuparams.CloudCredential{Attributes: map[string]string{"foo": "bar"}},
+					},
+					{
+						Tag:        "cloudcred-azure/1cbe5066-ea80-4979-8633-048d32f46cf8/cred-name2",
+						Credential: jujuparams.CloudCredential{Attributes: map[string]string{"wolf": "low"}},
+					},
+				}},
+		},
+		username: "alice",
+		addTuples: []openfga.Tuple{{
+			Object:   ofganames.ConvertTag(names.NewUserTag("alice")),
+			Relation: ofganames.AdministratorRelation,
+			Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag("fca1f605-736e-4d1f-bcd2-aecc726923be@serviceaccount")),
 		}},
 	}, {
 		about: "Invalid Credential Tag",
@@ -199,7 +270,7 @@ func TestUpdateServiceAccountCredentials(t *testing.T) {
 				},
 			}},
 		args: params.UpdateServiceAccountCredentialsRequest{
-			ClientID: "fca1f605-736e-4d1f-bcd2-aecc726923be@canonical.com",
+			ClientID: "fca1f605-736e-4d1f-bcd2-aecc726923be",
 			UpdateCredentialArgs: jujuparams.UpdateCredentialArgs{
 				Credentials: []jujuparams.TaggedCredential{
 					{
@@ -212,7 +283,7 @@ func TestUpdateServiceAccountCredentials(t *testing.T) {
 		addTuples: []openfga.Tuple{{
 			Object:   ofganames.ConvertTag(names.NewUserTag("alice")),
 			Relation: ofganames.AdministratorRelation,
-			Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag("fca1f605-736e-4d1f-bcd2-aecc726923be@canonical.com")),
+			Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag("fca1f605-736e-4d1f-bcd2-aecc726923be@serviceaccount")),
 		}},
 	}, {
 		about: "Invalid Service account ID",
@@ -237,7 +308,7 @@ func TestUpdateServiceAccountCredentials(t *testing.T) {
 			return nil, nil
 		},
 		args: params.UpdateServiceAccountCredentialsRequest{
-			ClientID: "fca1f605-736e-4d1f-bcd2-aecc726923be@canonical.com",
+			ClientID: "fca1f605-736e-4d1f-bcd2-aecc726923be",
 			UpdateCredentialArgs: jujuparams.UpdateCredentialArgs{
 				Credentials: []jujuparams.TaggedCredential{
 					{
@@ -300,14 +371,14 @@ func TestListServiceAccountCredentials(t *testing.T) {
 		expectedResult               jujuparams.CredentialContentResults
 		expectedError                string
 	}{{
-		about: "Valid request",
+		about: "Valid request without domain",
 		ForEachUserCloudCredential: func(ctx context.Context, u *dbmodel.Identity, ct names.CloudTag, f func(cred *dbmodel.CloudCredential) error) error {
 			return nil
 		},
 		expectedResult: jujuparams.CredentialContentResults{
 			Results: []jujuparams.CredentialContentResult{}},
 		args: params.ListServiceAccountCredentialsRequest{
-			ClientID: "fca1f605-736e-4d1f-bcd2-aecc726923be@canonical.com",
+			ClientID: "fca1f605-736e-4d1f-bcd2-aecc726923be",
 		},
 		getCloudCredential: func(ctx context.Context, user *openfga.User, tag names.CloudCredentialTag) (*dbmodel.CloudCredential, error) {
 			cred := &dbmodel.CloudCredential{}
@@ -320,7 +391,30 @@ func TestListServiceAccountCredentials(t *testing.T) {
 		addTuples: []openfga.Tuple{{
 			Object:   ofganames.ConvertTag(names.NewUserTag("alice")),
 			Relation: ofganames.AdministratorRelation,
-			Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag("fca1f605-736e-4d1f-bcd2-aecc726923be@canonical.com")),
+			Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag("fca1f605-736e-4d1f-bcd2-aecc726923be@serviceaccount")),
+		}},
+	}, {
+		about: "Valid request with domain",
+		ForEachUserCloudCredential: func(ctx context.Context, u *dbmodel.Identity, ct names.CloudTag, f func(cred *dbmodel.CloudCredential) error) error {
+			return nil
+		},
+		expectedResult: jujuparams.CredentialContentResults{
+			Results: []jujuparams.CredentialContentResult{}},
+		args: params.ListServiceAccountCredentialsRequest{
+			ClientID: "fca1f605-736e-4d1f-bcd2-aecc726923be@serviceaccount",
+		},
+		getCloudCredential: func(ctx context.Context, user *openfga.User, tag names.CloudCredentialTag) (*dbmodel.CloudCredential, error) {
+			cred := &dbmodel.CloudCredential{}
+			return cred, nil
+		},
+		getCloudCredentialAttributes: func(ctx context.Context, u *openfga.User, cred *dbmodel.CloudCredential, hidden bool) (attrs map[string]string, redacted []string, err error) {
+			return nil, nil, nil
+		},
+		username: "alice",
+		addTuples: []openfga.Tuple{{
+			Object:   ofganames.ConvertTag(names.NewUserTag("alice")),
+			Relation: ofganames.AdministratorRelation,
+			Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag("fca1f605-736e-4d1f-bcd2-aecc726923be@serviceaccount")),
 		}},
 	}, {
 		about: "Invalid Service account ID",
@@ -345,7 +439,7 @@ func TestListServiceAccountCredentials(t *testing.T) {
 			return nil
 		},
 		args: params.ListServiceAccountCredentialsRequest{
-			ClientID: "fca1f605-736e-4d1f-bcd2-aecc726923be@canonical.com",
+			ClientID: "fca1f605-736e-4d1f-bcd2-aecc726923be",
 		},
 		getCloudCredential: func(ctx context.Context, user *openfga.User, tag names.CloudCredentialTag) (*dbmodel.CloudCredential, error) {
 			cred := &dbmodel.CloudCredential{}
@@ -408,7 +502,7 @@ func TestGrantServiceAccountAccess(t *testing.T) {
 		addTuples                 []openfga.Tuple
 		expectedError             string
 	}{{
-		about: "Valid request",
+		about: "Valid request without domain",
 		grantServiceAccountAccess: func(ctx context.Context, user *openfga.User, svcAccTag jimmnames.ServiceAccountTag, entities []string) error {
 			return nil
 		},
@@ -417,13 +511,31 @@ func TestGrantServiceAccountAccess(t *testing.T) {
 				"user-alice",
 				"user-bob",
 			},
-			ClientID: "fca1f605-736e-4d1f-bcd2-aecc726923be@canonical.com",
+			ClientID: "fca1f605-736e-4d1f-bcd2-aecc726923be",
 		},
 		username: "alice",
 		addTuples: []openfga.Tuple{{
 			Object:   ofganames.ConvertTag(names.NewUserTag("alice")),
 			Relation: ofganames.AdministratorRelation,
-			Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag("fca1f605-736e-4d1f-bcd2-aecc726923be@canonical.com")),
+			Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag("fca1f605-736e-4d1f-bcd2-aecc726923be@serviceaccount")),
+		}},
+	}, {
+		about: "Valid request with domain",
+		grantServiceAccountAccess: func(ctx context.Context, user *openfga.User, svcAccTag jimmnames.ServiceAccountTag, entities []string) error {
+			return nil
+		},
+		params: params.GrantServiceAccountAccess{
+			Entities: []string{
+				"user-alice",
+				"user-bob",
+			},
+			ClientID: "fca1f605-736e-4d1f-bcd2-aecc726923be@serviceaccount",
+		},
+		username: "alice",
+		addTuples: []openfga.Tuple{{
+			Object:   ofganames.ConvertTag(names.NewUserTag("alice")),
+			Relation: ofganames.AdministratorRelation,
+			Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag("fca1f605-736e-4d1f-bcd2-aecc726923be@serviceaccount")),
 		}},
 	}, {
 		about: "Invalid Service account ID",
@@ -449,7 +561,7 @@ func TestGrantServiceAccountAccess(t *testing.T) {
 				"user-alice",
 				"user-bob",
 			},
-			ClientID: "fca1f605-736e-4d1f-bcd2-aecc726923be@canonical.com",
+			ClientID: "fca1f605-736e-4d1f-bcd2-aecc726923be@serviceaccount",
 		},
 		username:      "alice",
 		expectedError: "unauthorized",
@@ -501,7 +613,7 @@ func (s *serviceAccountSuite) TestUpdateServiceAccountCredentialsIntegration(c *
 	conn := s.open(c, nil, "bob")
 	defer conn.Close()
 
-	serviceAccount := jimmnames.NewServiceAccountTag("fca1f605-736e-4d1f-bcd2-aecc726923be@canonical.com")
+	serviceAccount := jimmnames.NewServiceAccountTag("fca1f605-736e-4d1f-bcd2-aecc726923be@serviceaccount")
 
 	tuple := openfga.Tuple{
 		Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
@@ -517,15 +629,15 @@ func (s *serviceAccountSuite) TestUpdateServiceAccountCredentialsIntegration(c *
 
 	var credResults jujuparams.UpdateCredentialResults
 	err := conn.APICall("JIMM", 4, "", "UpdateServiceAccountCredentials", params.UpdateServiceAccountCredentialsRequest{
-		ClientID: "fca1f605-736e-4d1f-bcd2-aecc726923be@canonical.com",
+		ClientID: "fca1f605-736e-4d1f-bcd2-aecc726923be@serviceaccount",
 		UpdateCredentialArgs: jujuparams.UpdateCredentialArgs{
 			Credentials: []jujuparams.TaggedCredential{
 				{
-					Tag:        "cloudcred-aws/fca1f605-736e-4d1f-bcd2-aecc726923be@canonical.com/cred-name",
+					Tag:        "cloudcred-aws/fca1f605-736e-4d1f-bcd2-aecc726923be@serviceaccount/cred-name",
 					Credential: jujuparams.CloudCredential{Attributes: map[string]string{"foo": "bar"}},
 				},
 				{
-					Tag:        "cloudcred-aws/fca1f605-736e-4d1f-bcd2-aecc726923be@canonical.com/cred-name2",
+					Tag:        "cloudcred-aws/fca1f605-736e-4d1f-bcd2-aecc726923be@serviceaccount/cred-name2",
 					Credential: jujuparams.CloudCredential{Attributes: map[string]string{"wolf": "low"}},
 				},
 			}},
@@ -534,12 +646,12 @@ func (s *serviceAccountSuite) TestUpdateServiceAccountCredentialsIntegration(c *
 	expectedResult := jujuparams.UpdateCredentialResults{
 		Results: []jujuparams.UpdateCredentialResult{
 			{
-				CredentialTag: "cloudcred-aws/fca1f605-736e-4d1f-bcd2-aecc726923be@canonical.com/cred-name",
+				CredentialTag: "cloudcred-aws/fca1f605-736e-4d1f-bcd2-aecc726923be@serviceaccount/cred-name",
 				Error:         nil,
 				Models:        nil,
 			},
 			{
-				CredentialTag: "cloudcred-aws/fca1f605-736e-4d1f-bcd2-aecc726923be@canonical.com/cred-name2",
+				CredentialTag: "cloudcred-aws/fca1f605-736e-4d1f-bcd2-aecc726923be@serviceaccount/cred-name2",
 				Error:         nil,
 				Models:        nil,
 			},
