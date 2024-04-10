@@ -21,11 +21,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
-    labels:
-      traefik.enable: true
-      traefik.http.routers.traefik.rule: Host(`127.0.0.1`)
-      traefik.http.routers.traefik.entrypoints: websecure
-      traefik.http.routers.traefik.tls: true
 
   jimm:
     image: cosmtrek/air:latest
