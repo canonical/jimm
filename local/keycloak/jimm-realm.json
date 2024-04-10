@@ -693,7 +693,7 @@
       ]
     },
     {
-      "clientId": "test-client-id@canonical.com",
+      "clientId": "test-client-id",
       "name": "",
       "description": "",
       "rootUrl": "",
