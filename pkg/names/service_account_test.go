@@ -3,6 +3,7 @@ package names
 import (
 	"testing"
 
+	qt "github.com/frankban/quicktest"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -64,4 +65,54 @@ func TestIsValidServiceAccountId(t *testing.T) {
 	assert.False(t, IsValidServiceAccountId("@serviceaccount"))
 	assert.False(t, IsValidServiceAccountId("abc123@some-other-domain"))
 	assert.False(t, IsValidServiceAccountId("abc123@"))
+}
+
+func TestEnsureValidClientIdWithDomain(t *testing.T) {
+	c := qt.New(t)
+
+	tests := []struct {
+		name          string
+		id            string
+		expectedError bool
+		expectedId    string
+	}{{
+		name:       "uuid, no domain",
+		id:         "00000000-0000-0000-0000-000000000000",
+		expectedId: "00000000-0000-0000-0000-000000000000@serviceaccount",
+	}, {
+		name:       "uuid, with domain",
+		id:         "00000000-0000-0000-0000-000000000000@serviceaccount",
+		expectedId: "00000000-0000-0000-0000-000000000000@serviceaccount",
+	}, {
+		name:          "empty",
+		id:            "",
+		expectedError: true,
+	}, {
+		name:          "empty id, with correct domain",
+		id:            "@serviceaccount",
+		expectedError: true,
+	}, {
+		name:          "uuid, with wrong domain",
+		id:            "00000000-0000-0000-0000-000000000000@some-domain",
+		expectedError: true,
+	}, {
+		name:          "invalid format",
+		id:            "_123_",
+		expectedError: true,
+	},
+	}
+
+	for _, t := range tests {
+		tt := t
+		c.Run(tt.name, func(c *qt.C) {
+			result, err := EnsureValidClientIdWithDomain(tt.id)
+			if tt.expectedError {
+				c.Assert(err, qt.ErrorMatches, "invalid client ID")
+				c.Assert(result, qt.Equals, "")
+			} else {
+				c.Assert(err, qt.IsNil)
+				c.Assert(result, qt.Equals, tt.expectedId)
+			}
+		})
+	}
 }
