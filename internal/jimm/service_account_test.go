@@ -35,7 +35,7 @@ func TestAddServiceAccount(t *testing.T) {
 		},
 		client,
 	)
-	clientID := "39caae91-b914-41ae-83f8-c7b86ca5ad5a@canonical.com"
+	clientID := "39caae91-b914-41ae-83f8-c7b86ca5ad5a@serviceaccount"
 	err = j.AddServiceAccount(ctx, user, clientID)
 	c.Assert(err, qt.IsNil)
 	err = j.AddServiceAccount(ctx, user, clientID)
