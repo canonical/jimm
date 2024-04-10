@@ -359,7 +359,7 @@ func VerifySessionToken(token string, secretKey string) (jwt.Token, error) {
 	parsedToken, err := jwt.Parse(decodedToken, jwt.WithKey(jwa.HS256, []byte(secretKey)))
 	if err != nil {
 		if stderrors.Is(err, jwt.ErrTokenExpired()) {
-			return nil, errors.E(op, "JIMM session token expired")
+			return nil, errors.E(op, errors.CodeUnauthorized, "JIMM session token expired")
 		}
 		return nil, errors.E(op, err)
 	}
