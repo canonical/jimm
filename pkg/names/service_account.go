@@ -6,7 +6,9 @@ package names
 
 import (
 	"fmt"
+	"strings"
 
+	"github.com/canonical/jimm/internal/errors"
 	"github.com/juju/names/v5"
 )
 
@@ -67,4 +69,18 @@ func IsValidServiceAccountId(id string) bool {
 	}
 	t := names.NewUserTag(id)
 	return t.Domain() == ServiceAccountDomain
+}
+
+// EnsureValidClientIdWithDomain returns the given service account ID with the
+// `@serviceaccount` appended to it, if not already there. If the ID is not a
+// valid service account ID this function returns an error.
+func EnsureValidClientIdWithDomain(id string) (string, error) {
+	if !strings.HasSuffix(id, "@"+ServiceAccountDomain) {
+		id += "@" + ServiceAccountDomain
+	}
+
+	if !IsValidServiceAccountId(id) {
+		return "", errors.E(errors.CodeBadRequest, "invalid client ID")
+	}
+	return id, nil
 }
