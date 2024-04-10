@@ -16,6 +16,7 @@ import (
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/jimm"
 	"github.com/canonical/jimm/internal/openfga"
+	jimmnames "github.com/canonical/jimm/pkg/names"
 )
 
 // unsupportedLogin returns an appropriate error for login attempts using
@@ -183,7 +184,8 @@ func (r *controllerRoot) LoginWithClientCredentials(ctx context.Context, req par
 		return jujuparams.LoginResult{}, errors.E(err, errors.CodeUnauthorized)
 	}
 
-	user, err := r.jimm.GetOpenFGAUserAndAuthorise(ctx, req.ClientID)
+	clientIdWithDomain := req.ClientID + "@" + jimmnames.ServiceAccountDomain
+	user, err := r.jimm.GetOpenFGAUserAndAuthorise(ctx, clientIdWithDomain)
 	if err != nil {
 		return jujuparams.LoginResult{}, errors.E(op, err)
 	}
