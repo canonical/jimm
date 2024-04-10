@@ -14,8 +14,8 @@ func TestParseServiceAccountID(t *testing.T) {
 		err        string
 	}{{
 		about:      "Valid svc account tag",
-		tag:        "serviceaccount-1e654457-a195-4a41-8360-929c7f455d43@canonical.com",
-		expectedID: "1e654457-a195-4a41-8360-929c7f455d43@canonical.com",
+		tag:        "serviceaccount-1e654457-a195-4a41-8360-929c7f455d43@serviceaccount",
+		expectedID: "1e654457-a195-4a41-8360-929c7f455d43@serviceaccount",
 		err:        "",
 	}, {
 		about: "Invalid svc account tag (no domain)",
@@ -23,11 +23,11 @@ func TestParseServiceAccountID(t *testing.T) {
 		err:   "is not a valid serviceaccount tag",
 	}, {
 		about: "Invalid svc account tag (serviceaccounts)",
-		tag:   "serviceaccounts-1e654457-a195-4a41-8360-929c7f455d43@canonical.com",
+		tag:   "serviceaccounts-1e654457-a195-4a41-8360-929c7f455d43@serviceaccount",
 		err:   "is not a valid tag",
 	}, {
 		about: "Invalid svc account tag (no prefix)",
-		tag:   "1e654457-a195-4a41-8360-929c7f455d43@canonical.com",
+		tag:   "1e654457-a195-4a41-8360-929c7f455d43@serviceaccount",
 		err:   "is not a valid tag",
 	}, {
 		about: "Invalid svc account tag (missing ID)",
@@ -51,13 +51,17 @@ func TestParseServiceAccountID(t *testing.T) {
 }
 
 func TestIsValidServiceAccountId(t *testing.T) {
-	assert.True(t, IsValidServiceAccountId("1e654457-a195-4a41-8360-929c7f455d43@canonical.com"))
-	assert.True(t, IsValidServiceAccountId("12345@canonical.com"))
-	assert.True(t, IsValidServiceAccountId("abc123@canonical.com"))
-	assert.True(t, IsValidServiceAccountId("ABC123@canonical.com"))
-	assert.True(t, IsValidServiceAccountId("ABC123@canonical.com"))
+	assert.True(t, IsValidServiceAccountId("1e654457-a195-4a41-8360-929c7f455d43@serviceaccount"))
+	assert.True(t, IsValidServiceAccountId("12345@serviceaccount"))
+	assert.True(t, IsValidServiceAccountId("abc123@serviceaccount"))
+	assert.True(t, IsValidServiceAccountId("ABC123@serviceaccount"))
+	assert.True(t, IsValidServiceAccountId("ABC123@serviceaccount"))
 	assert.False(t, IsValidServiceAccountId("ABC123"))
 	assert.False(t, IsValidServiceAccountId("abc 123"))
 	assert.False(t, IsValidServiceAccountId(""))
 	assert.False(t, IsValidServiceAccountId("  "))
+	assert.False(t, IsValidServiceAccountId("@"))
+	assert.False(t, IsValidServiceAccountId("@serviceaccount"))
+	assert.False(t, IsValidServiceAccountId("abc123@some-other-domain"))
+	assert.False(t, IsValidServiceAccountId("abc123@"))
 }
