@@ -4,6 +4,7 @@ package jujuapi
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -194,7 +195,7 @@ func parseUserTag(tag string) (names.UserTag, error) {
 		return names.UserTag{}, errors.E(errors.CodeBadRequest, err)
 	}
 	if ut.IsLocal() {
-		return names.UserTag{}, errors.E(errors.CodeBadRequest, "unsupported local user")
+		return names.UserTag{}, errors.E(errors.CodeBadRequest, fmt.Sprintf("unsupported local user; if this is a service account add @%s domain", jimmnames.ServiceAccountDomain))
 	}
 	return ut, nil
 }
