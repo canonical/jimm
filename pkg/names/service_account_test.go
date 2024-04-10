@@ -105,7 +105,7 @@ func TestEnsureValidClientIdWithDomain(t *testing.T) {
 	for _, t := range tests {
 		tt := t
 		c.Run(tt.name, func(c *qt.C) {
-			result, err := EnsureValidClientIdWithDomain(tt.id)
+			result, err := EnsureValidServiceAccountId(tt.id)
 			if tt.expectedError {
 				c.Assert(err, qt.ErrorMatches, "invalid client ID")
 				c.Assert(result, qt.Equals, "")

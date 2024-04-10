@@ -71,10 +71,10 @@ func IsValidServiceAccountId(id string) bool {
 	return t.Domain() == ServiceAccountDomain
 }
 
-// EnsureValidClientIdWithDomain returns the given service account ID with the
+// EnsureValidServiceAccountId returns the given service account ID with the
 // `@serviceaccount` appended to it, if not already there. If the ID is not a
 // valid service account ID this function returns an error.
-func EnsureValidClientIdWithDomain(id string) (string, error) {
+func EnsureValidServiceAccountId(id string) (string, error) {
 	if !strings.HasSuffix(id, "@"+ServiceAccountDomain) {
 		id += "@" + ServiceAccountDomain
 	}
