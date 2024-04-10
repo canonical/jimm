@@ -27,13 +27,14 @@ var _ = gc.Suite(&grantSuite{})
 func (s *grantSuite) TestGrant(c *gc.C) {
 	ctx := context.Background()
 
-	clientID := "abda51b2-d735-4794-a8bd-49c506baa4af@canonical.com"
+	clientID := "abda51b2-d735-4794-a8bd-49c506baa4af"
+	clientIdWithDomain := clientID + "@serviceaccount"
 
 	// alice is superuser
 	bClient := jimmtest.NewUserSessionLogin(c, "alice")
 
 	sa := dbmodel.Identity{
-		Name: clientID,
+		Name: clientIdWithDomain,
 	}
 	err := s.JIMM.Database.GetIdentity(ctx, &sa)
 	c.Assert(err, gc.IsNil)
@@ -42,7 +43,7 @@ func (s *grantSuite) TestGrant(c *gc.C) {
 	tuple := openfga.Tuple{
 		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
-		Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag(clientID)),
+		Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag(clientIdWithDomain)),
 	}
 	err = s.JIMM.OpenFGAClient.AddRelation(ctx, tuple)
 	c.Assert(err, gc.IsNil)
@@ -57,7 +58,7 @@ func (s *grantSuite) TestGrant(c *gc.C) {
 	ok, err := s.JIMM.OpenFGAClient.CheckRelation(ctx, openfga.Tuple{
 		Object:   ofganames.ConvertTag(names.NewUserTag("bob")),
 		Relation: ofganames.AdministratorRelation,
-		Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag(clientID)),
+		Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag(clientIdWithDomain)),
 	}, false)
 	c.Assert(err, gc.IsNil)
 	c.Assert(ok, gc.Equals, true)
@@ -65,7 +66,7 @@ func (s *grantSuite) TestGrant(c *gc.C) {
 	ok, err = s.JIMM.OpenFGAClient.CheckRelation(ctx, openfga.Tuple{
 		Object:   ofganames.ConvertTag(jimmnames.NewGroupTag("1#member")),
 		Relation: ofganames.AdministratorRelation,
-		Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag(clientID)),
+		Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag(clientIdWithDomain)),
 	}, false)
 	c.Assert(err, gc.IsNil)
 	c.Assert(ok, gc.Equals, true)
