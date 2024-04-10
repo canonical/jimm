@@ -305,7 +305,7 @@ func (s *adminSuite) TestLoginWithClientCredentials(c *gc.C) {
 
 	const (
 		// these are valid client credentials hardcoded into the jimm realm
-		validClientID     = "test-client-id@canonical.com"
+		validClientID     = "test-client-id"
 		validClientSecret = "2M2blFbO4GX4zfggQpivQSxwWX1XGgNf"
 	)
 
@@ -316,7 +316,7 @@ func (s *adminSuite) TestLoginWithClientCredentials(c *gc.C) {
 	}, &loginResult)
 	c.Assert(err, gc.IsNil)
 	c.Assert(loginResult.ControllerTag, gc.Equals, names.NewControllerTag(s.Params.ControllerUUID).String())
-	c.Assert(loginResult.UserInfo.Identity, gc.Equals, names.NewUserTag("test-client-id@canonical.com").String())
+	c.Assert(loginResult.UserInfo.Identity, gc.Equals, names.NewUserTag("test-client-id@serviceaccount").String())
 
 	err = conn.APICall("Admin", 4, "", "LoginWithClientCredentials", params.LoginWithClientCredentialsRequest{
 		ClientID:     "invalid-client-id",
