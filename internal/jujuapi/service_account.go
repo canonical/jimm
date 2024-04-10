@@ -4,7 +4,6 @@ package jujuapi
 
 import (
 	"context"
-	"strings"
 
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
@@ -23,7 +22,7 @@ import (
 func (r *controllerRoot) AddServiceAccount(ctx context.Context, req apiparams.AddServiceAccountRequest) error {
 	const op = errors.Op("jujuapi.AddServiceAccount")
 
-	clientIdWithDomain, err := ensureValidClientIdWithDomain(req.ClientID)
+	clientIdWithDomain, err := jimmnames.EnsureValidServiceAccountId(req.ClientID)
 	if err != nil {
 		return errors.E(op, errors.CodeBadRequest, err)
 	}
@@ -34,7 +33,7 @@ func (r *controllerRoot) AddServiceAccount(ctx context.Context, req apiparams.Ad
 // getServiceAccount validates the incoming identity has administrator permission
 // on the service account and returns the service account identity.
 func (r *controllerRoot) getServiceAccount(ctx context.Context, clientID string) (*openfga.User, error) {
-	clientIdWithDomain, err := ensureValidClientIdWithDomain(clientID)
+	clientIdWithDomain, err := jimmnames.EnsureValidServiceAccountId(clientID)
 	if err != nil {
 		return nil, errors.E(errors.CodeBadRequest, err)
 	}
@@ -117,7 +116,7 @@ func (r *controllerRoot) ListServiceAccountCredentials(ctx context.Context, req 
 func (r *controllerRoot) GrantServiceAccountAccess(ctx context.Context, req apiparams.GrantServiceAccountAccess) error {
 	const op = errors.Op("jujuapi.GrantServiceAccountAccess")
 
-	clientIdWithDomain, err := ensureValidClientIdWithDomain(req.ClientID)
+	clientIdWithDomain, err := jimmnames.EnsureValidServiceAccountId(req.ClientID)
 	if err != nil {
 		return errors.E(op, errors.CodeBadRequest, err)
 	}
@@ -129,18 +128,4 @@ func (r *controllerRoot) GrantServiceAccountAccess(ctx context.Context, req apip
 	svcAccTag := jimmnames.NewServiceAccountTag(clientIdWithDomain)
 
 	return r.jimm.GrantServiceAccountAccess(ctx, r.user, svcAccTag, req.Entities)
-}
-
-// ensureValidClientIdWithDomain returns the given client ID with the
-// `@serviceaccount` appended to it, if not already there. If the client ID is
-// not a valid service account ID this function returns an error.
-func ensureValidClientIdWithDomain(clientId string) (string, error) {
-	if !strings.HasSuffix(clientId, "@"+jimmnames.ServiceAccountDomain) {
-		clientId += "@" + jimmnames.ServiceAccountDomain
-	}
-
-	if !jimmnames.IsValidServiceAccountId(clientId) {
-		return "", errors.E(errors.CodeBadRequest, "invalid client ID")
-	}
-	return clientId, nil
 }
