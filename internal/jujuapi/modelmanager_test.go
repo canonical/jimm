@@ -1000,7 +1000,7 @@ func (s *modelManagerSuite) TestModifyModelAccessErrors(c *gc.C) {
 			Access:   jujuparams.ModelReadAccess,
 			ModelTag: s.Model.Tag().String(),
 		},
-		expectError: `unsupported local user`,
+		expectError: `unsupported local user; if this is a service account add @serviceaccount domain`,
 	}, {
 		about: "no such model",
 		modifyModelAccess: jujuparams.ModifyModelAccess{
