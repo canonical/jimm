@@ -125,7 +125,7 @@ func (s *userManagerSuite) TestUserInfoLocalUsername(c *gc.C) {
 
 	client := usermanager.NewClient(conn)
 	users, err := client.UserInfo([]string{"alice"}, usermanager.AllUsers)
-	c.Assert(err, gc.ErrorMatches, `alice: unsupported local user`)
+	c.Assert(err, gc.ErrorMatches, `alice: unsupported local user; if this is a service account add @serviceaccount domain`)
 	c.Assert(users, gc.HasLen, 0)
 }
 

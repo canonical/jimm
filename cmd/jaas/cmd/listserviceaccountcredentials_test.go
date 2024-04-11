@@ -34,20 +34,21 @@ func (s *listServiceAccountCredentialsSuite) TestListServiceAccountCredentials(c
 	})
 	c.Assert(err, gc.IsNil)
 	// Create Alice Identity and Service Account Identity.
-	clientID := "abda51b2-d735-4794-a8bd-49c506baa4af@canonical.com"
+	clientID := "abda51b2-d735-4794-a8bd-49c506baa4af"
+	clientIDWithDomain := clientID + "@serviceaccount"
 	// alice is superuser
 	ctx := context.Background()
 	user := dbmodel.Identity{Name: "alice@canonical.com"}
 	u := openfga.NewUser(&user, s.OFGAClient)
-	err = s.JIMM.AddServiceAccount(ctx, u, clientID)
+	err = s.JIMM.AddServiceAccount(ctx, u, clientIDWithDomain)
 	c.Assert(err, gc.IsNil)
-	svcAcc := dbmodel.Identity{Name: clientID}
+	svcAcc := dbmodel.Identity{Name: clientIDWithDomain}
 	err = s.JIMM.Database.GetIdentity(ctx, &svcAcc)
 	c.Assert(err, gc.IsNil)
 	svcAccIdentity := openfga.NewUser(&svcAcc, s.OFGAClient)
 	// Create cloud-credential for service account.
 	updateArgs := jimm.UpdateCloudCredentialArgs{
-		CredentialTag: names.NewCloudCredentialTag(fmt.Sprintf("aws/%s/foo", clientID)),
+		CredentialTag: names.NewCloudCredentialTag(fmt.Sprintf("aws/%s/foo", clientIDWithDomain)),
 		Credential:    params.CloudCredential{Attributes: map[string]string{"foo": "bar"}},
 	}
 	_, err = s.JIMM.UpdateCloudCredential(ctx, svcAccIdentity, updateArgs)

@@ -18,6 +18,7 @@ import (
 	"github.com/canonical/jimm/api"
 	apiparams "github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/internal/errors"
+	jimmnames "github.com/canonical/jimm/pkg/names"
 )
 
 var (
@@ -110,8 +111,18 @@ func (c *updateCredentialsCommand) Run(ctxt *cmd.Context) error {
 		return errors.E(err)
 	}
 
+	// Note that ensuring a client ID comes with the correct domain (which is
+	// `@serviceaccount`) is not the responsibility of the CLI commands and is
+	// actually taken care of in the `jujuapi` package. But, here, since we need
+	// to create cloud credential tags, which are meant to be used by JIMM
+	// internals, we have to make sure they're in the correct format.
+	clientIdWithDomain, err := jimmnames.EnsureValidServiceAccountId(c.clientID)
+	if err != nil {
+		return errors.E("invalid client ID")
+	}
+
 	taggedCredential := jujuparams.TaggedCredential{
-		Tag:        names.NewCloudCredentialTag(fmt.Sprintf("%s/%s/%s", c.cloud, c.clientID, c.credentialName)).String(),
+		Tag:        names.NewCloudCredentialTag(fmt.Sprintf("%s/%s/%s", c.cloud, clientIdWithDomain, c.credentialName)).String(),
 		Credential: *credential,
 	}
 

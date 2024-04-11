@@ -245,7 +245,7 @@ func TestVerifyClientCredentials(t *testing.T) {
 
 	const (
 		// these are valid client credentials hardcoded into the jimm realm
-		validClientID     = "test-client-id@canonical.com"
+		validClientID     = "test-client-id"
 		validClientSecret = "2M2blFbO4GX4zfggQpivQSxwWX1XGgNf"
 	)
 

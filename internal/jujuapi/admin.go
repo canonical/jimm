@@ -16,6 +16,7 @@ import (
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/jimm"
 	"github.com/canonical/jimm/internal/openfga"
+	jimmnames "github.com/canonical/jimm/pkg/names"
 )
 
 // unsupportedLogin returns an appropriate error for login attempts using
@@ -174,16 +175,21 @@ func (r *controllerRoot) LoginWithSessionToken(ctx context.Context, req params.L
 func (r *controllerRoot) LoginWithClientCredentials(ctx context.Context, req params.LoginWithClientCredentialsRequest) (jujuparams.LoginResult, error) {
 	const op = errors.Op("jujuapi.LoginWithClientCredentials")
 
+	clientIdWithDomain, err := jimmnames.EnsureValidServiceAccountId(req.ClientID)
+	if err != nil {
+		return jujuparams.LoginResult{}, errors.E("invalid client ID")
+	}
+
 	authenticationSvc := r.jimm.OAuthAuthenticationService()
 	if authenticationSvc == nil {
 		return jujuparams.LoginResult{}, errors.E("authentication service not specified")
 	}
-	err := authenticationSvc.VerifyClientCredentials(ctx, req.ClientID, req.ClientSecret)
+	err = authenticationSvc.VerifyClientCredentials(ctx, req.ClientID, req.ClientSecret)
 	if err != nil {
 		return jujuparams.LoginResult{}, errors.E(err, errors.CodeUnauthorized)
 	}
 
-	user, err := r.jimm.GetOpenFGAUserAndAuthorise(ctx, req.ClientID)
+	user, err := r.jimm.GetOpenFGAUserAndAuthorise(ctx, clientIdWithDomain)
 	if err != nil {
 		return jujuparams.LoginResult{}, errors.E(op, err)
 	}

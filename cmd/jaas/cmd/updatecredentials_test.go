@@ -28,13 +28,14 @@ var _ = gc.Suite(&updateCredentialsSuite{})
 func (s *updateCredentialsSuite) TestUpdateCredentialsWithNewCredentials(c *gc.C) {
 	ctx := context.Background()
 
-	clientID := "abda51b2-d735-4794-a8bd-49c506baa4af@canonical.com"
+	clientID := "abda51b2-d735-4794-a8bd-49c506baa4af"
+	clientIDWithDomain := clientID + "@serviceaccount"
 
 	// alice is superuser
 	bClient := jimmtest.NewUserSessionLogin(c, "alice")
 
 	sa := dbmodel.Identity{
-		Name: clientID,
+		Name: clientIDWithDomain,
 	}
 	err := s.JIMM.Database.GetIdentity(ctx, &sa)
 	c.Assert(err, gc.IsNil)
@@ -43,7 +44,7 @@ func (s *updateCredentialsSuite) TestUpdateCredentialsWithNewCredentials(c *gc.C
 	tuple := openfga.Tuple{
 		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
-		Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag(clientID)),
+		Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag(clientIDWithDomain)),
 	}
 	err = s.JIMM.OpenFGAClient.AddRelation(ctx, tuple)
 	c.Assert(err, gc.IsNil)
@@ -69,13 +70,13 @@ func (s *updateCredentialsSuite) TestUpdateCredentialsWithNewCredentials(c *gc.C
 	cmdContext, err := cmdtesting.RunCommand(c, cmd.NewUpdateCredentialsCommandForTesting(clientStore, bClient), clientID, "test-cloud", "test-credentials")
 	c.Assert(err, gc.IsNil)
 	c.Assert(cmdtesting.Stdout(cmdContext), gc.Equals, `results:
-- credentialtag: cloudcred-test-cloud_abda51b2-d735-4794-a8bd-49c506baa4af@canonical.com_test-credentials
+- credentialtag: cloudcred-test-cloud_abda51b2-d735-4794-a8bd-49c506baa4af@serviceaccount_test-credentials
   error: null
   models: []
 `)
 
 	ofgaUser := openfga.NewUser(&sa, s.JIMM.AuthorizationClient())
-	cloudCredentialTag := names.NewCloudCredentialTag("test-cloud/" + clientID + "/test-credentials")
+	cloudCredentialTag := names.NewCloudCredentialTag("test-cloud/" + clientIDWithDomain + "/test-credentials")
 	cloudCredential2, err := s.JIMM.GetCloudCredential(ctx, ofgaUser, cloudCredentialTag)
 	c.Assert(err, gc.IsNil)
 	attrs, _, err := s.JIMM.GetCloudCredentialAttributes(ctx, ofgaUser, cloudCredential2, true)
@@ -89,13 +90,14 @@ func (s *updateCredentialsSuite) TestUpdateCredentialsWithNewCredentials(c *gc.C
 func (s *updateCredentialsSuite) TestUpdateCredentialsWithExistingCredentials(c *gc.C) {
 	ctx := context.Background()
 
-	clientID := "abda51b2-d735-4794-a8bd-49c506baa4af@canonical.com"
+	clientID := "abda51b2-d735-4794-a8bd-49c506baa4af"
+	clientIDWithDomain := clientID + "@serviceaccount"
 
 	// alice is superuser
 	bClient := jimmtest.NewUserSessionLogin(c, "alice")
 
 	sa := dbmodel.Identity{
-		Name: clientID,
+		Name: clientIDWithDomain,
 	}
 	err := s.JIMM.Database.GetIdentity(ctx, &sa)
 	c.Assert(err, gc.IsNil)
@@ -104,7 +106,7 @@ func (s *updateCredentialsSuite) TestUpdateCredentialsWithExistingCredentials(c 
 	tuple := openfga.Tuple{
 		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
-		Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag(clientID)),
+		Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag(clientIDWithDomain)),
 	}
 	err = s.JIMM.OpenFGAClient.AddRelation(ctx, tuple)
 	c.Assert(err, gc.IsNil)
@@ -119,7 +121,7 @@ func (s *updateCredentialsSuite) TestUpdateCredentialsWithExistingCredentials(c 
 	cloudCredential := dbmodel.CloudCredential{
 		Name:              "test-credentials",
 		CloudName:         "test-cloud",
-		OwnerIdentityName: clientID,
+		OwnerIdentityName: clientIDWithDomain,
 		AuthType:          "empty",
 	}
 	err = s.JIMM.Database.SetCloudCredential(ctx, &cloudCredential)
@@ -139,13 +141,13 @@ func (s *updateCredentialsSuite) TestUpdateCredentialsWithExistingCredentials(c 
 	cmdContext, err := cmdtesting.RunCommand(c, cmd.NewUpdateCredentialsCommandForTesting(clientStore, bClient), clientID, "test-cloud", "test-credentials")
 	c.Assert(err, gc.IsNil)
 	c.Assert(cmdtesting.Stdout(cmdContext), gc.Equals, `results:
-- credentialtag: cloudcred-test-cloud_abda51b2-d735-4794-a8bd-49c506baa4af@canonical.com_test-credentials
+- credentialtag: cloudcred-test-cloud_abda51b2-d735-4794-a8bd-49c506baa4af@serviceaccount_test-credentials
   error: null
   models: []
 `)
 
 	ofgaUser := openfga.NewUser(&sa, s.JIMM.AuthorizationClient())
-	cloudCredentialTag := names.NewCloudCredentialTag("test-cloud/" + clientID + "/test-credentials")
+	cloudCredentialTag := names.NewCloudCredentialTag("test-cloud/" + clientIDWithDomain + "/test-credentials")
 	cloudCredential2, err := s.JIMM.GetCloudCredential(ctx, ofgaUser, cloudCredentialTag)
 	c.Assert(err, gc.IsNil)
 	attrs, _, err := s.JIMM.GetCloudCredentialAttributes(ctx, ofgaUser, cloudCredential2, true)
@@ -159,7 +161,7 @@ func (s *updateCredentialsSuite) TestUpdateCredentialsWithExistingCredentials(c 
 func (s *updateCredentialsSuite) TestCloudNotInLocalStore(c *gc.C) {
 	bClient := jimmtest.NewUserSessionLogin(c, "alice")
 	_, err := cmdtesting.RunCommand(c, cmd.NewUpdateCredentialsCommandForTesting(s.ClientStore(), bClient),
-		"00000000-0000-0000-0000-000000000000@canonical.com",
+		"00000000-0000-0000-0000-000000000000",
 		"non-existing-cloud",
 		"foo",
 	)
@@ -178,7 +180,7 @@ func (s *updateCredentialsSuite) TestCredentialNotInLocalStore(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	_, err = cmdtesting.RunCommand(c, cmd.NewUpdateCredentialsCommandForTesting(clientStore, bClient),
-		"00000000-0000-0000-0000-000000000000@canonical.com",
+		"00000000-0000-0000-0000-000000000000",
 		"some-cloud",
 		"non-existing-credential-name",
 	)
@@ -196,15 +198,15 @@ func (s *updateCredentialsSuite) TestMissingArgs(c *gc.C) {
 		expectedError: "client ID not specified",
 	}, {
 		name:          "missing cloud",
-		args:          []string{"some-client-id@canonical.com"},
+		args:          []string{"some-client-id"},
 		expectedError: "cloud not specified",
 	}, {
 		name:          "missing credential name",
-		args:          []string{"some-client-id@canonical.com", "some-cloud"},
+		args:          []string{"some-client-id", "some-cloud"},
 		expectedError: "credential name not specified",
 	}, {
 		name:          "too many args",
-		args:          []string{"some-client-id@canonical.com", "some-cloud", "some-credential-name", "extra-arg"},
+		args:          []string{"some-client-id", "some-cloud", "some-credential-name", "extra-arg"},
 		expectedError: "too many args",
 	}}
 
