@@ -123,6 +123,10 @@ func (i *Identity) SantiseIdentityId() {
 // SetDisplayName ensures that DisplayNames are set to the first part of
 // an email (example@domain.com -> example) or client id (uuid@serviceaccount -> uuid)
 // for use within the dashboard.
+//
+// Note: It will only set the display name if the display name is NOT set.
 func (i *Identity) SetDisplayName() {
-	i.DisplayName = strings.Split(i.Name, "@")[0]
+	if i.DisplayName == "" {
+		i.DisplayName = strings.Split(i.Name, "@")[0]
+	}
 }
