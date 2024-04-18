@@ -3,7 +3,10 @@
 package dbmodel
 
 import (
+	"crypto/sha256"
 	"database/sql"
+	"fmt"
+	"strings"
 	"time"
 
 	jujuparams "github.com/juju/juju/rpc/params"
@@ -82,4 +85,44 @@ func (i Identity) ToJujuUserInfo() jujuparams.UserInfo {
 		ui.LastConnection = &i.LastLogin.Time
 	}
 	return ui
+}
+
+// SanitiseIdentityId ensures that the identity id persisted is safe
+// for use in Juju tags, this is done by replacing all of the unsafe
+// email characters AND underscores (despite being safe in emails) with
+// hyphens. See the corresponding test for examples of sanitisations.
+func (i *Identity) SantiseIdentityId() {
+	userTagReplacer := strings.NewReplacer(
+		"~", "-",
+		"!", "-",
+		"$", "-",
+		"%", "-",
+		"^", "-",
+		"&", "-",
+		"*", "-",
+		"_", "-",
+		"=", "-",
+		"{", "-",
+		"}", "-",
+		"'", "-",
+		"?", "-",
+	)
+
+	replaced := userTagReplacer.Replace(i.Name)
+
+	if replaced == i.Name {
+		return
+	}
+
+	hash := sha256.Sum256([]byte(i.Name))
+	shortHash := fmt.Sprintf("%x", hash[:3])
+	replacedWithSHA := strings.Replace(replaced, "@", shortHash+"@", 1)
+	i.Name = replacedWithSHA
+}
+
+// SetDisplayName ensures that DisplayNames are set to the first part of
+// an email (example@domain.com -> example) or client id (uuid@serviceaccount -> uuid)
+// for use within the dashboard.
+func (i *Identity) SetDisplayName() {
+	i.DisplayName = strings.Split(i.Name, "@")[0]
 }

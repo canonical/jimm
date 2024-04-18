@@ -47,6 +47,23 @@ func (s *dbSuite) TestGetIdentity(c *qt.C) {
 	err = s.Database.GetIdentity(ctx, &u2)
 	c.Assert(err, qt.IsNil)
 	c.Check(u2, qt.DeepEquals, u)
+
+	// Test email / client id is sanitised on GetIdentity
+	u3 := dbmodel.Identity{
+		Name: "jimm_test@canonical.com",
+	}
+	err = s.Database.GetIdentity(ctx, &u3)
+	c.Assert(err, qt.IsNil)
+	c.Check(u3.Name, qt.DeepEquals, "jimm-test43cc8c@canonical.com")
+
+	// Test get on the sanitised email returns ONLY the sanitised user
+	// and doesn't create a new user
+	u4 := dbmodel.Identity{
+		Name: "jimm-test43cc8c@canonical.com",
+	}
+	err = s.Database.GetIdentity(ctx, &u4)
+	c.Assert(err, qt.IsNil)
+	c.Check(u4, qt.DeepEquals, u3)
 }
 
 func TestUpdateIdentityUnconfiguredDatabase(t *testing.T) {
@@ -86,6 +103,27 @@ func (s *dbSuite) TestUpdateIdentity(c *qt.C) {
 	err = s.Database.GetIdentity(ctx, &u2)
 	c.Assert(err, qt.IsNil)
 	c.Check(u2, qt.DeepEquals, u)
+
+	// Test email / client id is sanitised on GetIdentity
+	u3 := dbmodel.Identity{
+		Name: "jimm_test@canonical.com",
+	}
+	err = s.Database.GetIdentity(ctx, &u3)
+	c.Assert(err, qt.IsNil)
+	c.Check(u3.Name, qt.DeepEquals, "jimm-test43cc8c@canonical.com")
+
+	u3.AccessToken = "REMOVED-ACCESS-TOKEN-EXAMPLE"
+	err = s.Database.UpdateIdentity(ctx, &u3)
+	c.Assert(err, qt.IsNil)
+
+	// Do a final get just to be super clear the updates have taken effect on the
+	// sanitised user
+	u4 := dbmodel.Identity{
+		Name: u3.Name,
+	}
+	err = s.Database.GetIdentity(ctx, &u4)
+	c.Assert(err, qt.IsNil)
+	c.Assert(u4, qt.DeepEquals, u3)
 }
 
 func TestGetIdentityCloudCredentialsUnconfiguredDatabase(t *testing.T) {

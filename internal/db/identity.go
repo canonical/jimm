@@ -4,6 +4,7 @@ package db
 
 import (
 	"context"
+	"strings"
 
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
@@ -29,6 +30,9 @@ func (d *Database) GetIdentity(ctx context.Context, u *dbmodel.Identity) error {
 		return errors.E(op, errors.CodeNotFound, `invalid identity name ""`)
 	}
 
+	u.SantiseIdentityId()
+	u.SetDisplayName()
+
 	db := d.DB.WithContext(ctx)
 	if err := db.Where("name = ?", u.Name).FirstOrCreate(&u).Error; err != nil {
 		return errors.E(op, err)
@@ -48,6 +52,14 @@ func (d *Database) FetchIdentity(ctx context.Context, u *dbmodel.Identity) error
 
 	if u.Name == "" {
 		return errors.E(op, errors.CodeNotFound, `invalid identity name ""`)
+	}
+
+	u.SantiseIdentityId()
+	u.SetDisplayName()
+
+	// Check if user has a display name, if not, set one
+	if u.DisplayName == "" {
+		u.DisplayName = strings.Split(u.Name, "@")[0]
 	}
 
 	db := d.DB.WithContext(ctx)
@@ -73,6 +85,14 @@ func (d *Database) UpdateIdentity(ctx context.Context, u *dbmodel.Identity) erro
 		return errors.E(op, errors.CodeNotFound, `invalid identity name ""`)
 	}
 
+	u.SantiseIdentityId()
+	u.SetDisplayName()
+
+	// Check if user has a display name, if not, set one
+	if u.DisplayName == "" {
+		u.DisplayName = strings.Split(u.Name, "@")[0]
+	}
+
 	db := d.DB.WithContext(ctx)
 	db = db.Omit("ApplicationOffers").Omit("Clouds").Omit("CloudCredentials").Omit("Models")
 	if err := db.Save(u).Error; err != nil {
@@ -91,6 +111,9 @@ func (d *Database) GetIdentityCloudCredentials(ctx context.Context, u *dbmodel.I
 	if u.Name == "" || cloud == "" {
 		return nil, errors.E(op, errors.CodeNotFound, `cloudcredential not found`)
 	}
+
+	u.SantiseIdentityId()
+	u.SetDisplayName()
 
 	var credentials []dbmodel.CloudCredential
 	db := d.DB.WithContext(ctx)

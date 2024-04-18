@@ -149,3 +149,68 @@ func TestIdentityToJujuUserInfo(t *testing.T) {
 		LastConnection: &u.LastLogin.Time,
 	})
 }
+
+func TestSanitiseIdentityId(t *testing.T) {
+	c := qt.New(t)
+
+	tests := []struct {
+		about    string
+		input    string
+		expected string
+	}{
+		{
+			about:    "catch all test",
+			input:    "hi~!$%^&*_=}{'?@~!$%^&*_=}{'?bye.com",
+			expected: "hi-------------861fcb@-------------bye.com",
+		},
+		{
+			about:    "test bad email",
+			input:    "alice_wonderland@bad_domain.com",
+			expected: "alice-wonderland39cfd5@bad-domain.com",
+		},
+		{
+			about:    "test good email",
+			input:    "alice-wonderland@good-domain.com",
+			expected: "alice-wonderland@good-domain.com",
+		},
+		{
+			about:    "test good service account",
+			input:    "fca1f605-736e-4d1f-bcd2-aecc726923be@serviceaccount",
+			expected: "fca1f605-736e-4d1f-bcd2-aecc726923be@serviceaccount",
+		},
+		{
+			about:    "test bad service account",
+			input:    "fca1f605_736e_4d1f_bcd2_aecc726923be@serviceaccount",
+			expected: "fca1f605-736e-4d1f-bcd2-aecc726923be28d4eb@serviceaccount",
+		},
+	}
+	for _, tc := range tests {
+		c.Run(tc.about, func(c *qt.C) {
+			u := dbmodel.Identity{
+				Model: gorm.Model{
+					CreatedAt: time.Now(),
+				},
+				Name: tc.input,
+			}
+
+			u.SantiseIdentityId()
+
+			c.Assert(u.Name, qt.Equals, tc.expected)
+		})
+	}
+}
+
+func TestSetDisplayName(t *testing.T) {
+	c := qt.New(t)
+
+	u := dbmodel.Identity{
+		Model: gorm.Model{
+			CreatedAt: time.Now(),
+		},
+		Name: "jimm-test@canonical.com",
+	}
+
+	u.SetDisplayName()
+
+	c.Assert(u.DisplayName, qt.Equals, "jimm-test")
+}

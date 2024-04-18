@@ -308,7 +308,12 @@ func TestAuthenticateBrowserSessionAndLogout(t *testing.T) {
 
 	authSvc, db, sessionStore := setupTestAuthSvc(ctx, c, time.Hour)
 
-	cookie, err := jimmtest.RunBrowserLogin(db, sessionStore)
+	cookie, err := jimmtest.RunBrowserLogin(
+		db,
+		sessionStore,
+		jimmtest.HardcodedSafeUsername,
+		jimmtest.HardcodedSafePassword,
+	)
 	c.Assert(err, qt.IsNil)
 
 	rec := httptest.NewRecorder()
@@ -349,7 +354,12 @@ func TestAuthenticateBrowserSessionRejectsNoneDecryptableOrDecodableCookies(t *t
 
 	authSvc, db, sessionStore := setupTestAuthSvc(ctx, c, time.Hour)
 
-	_, err := jimmtest.RunBrowserLogin(db, sessionStore)
+	_, err := jimmtest.RunBrowserLogin(
+		db,
+		sessionStore,
+		jimmtest.HardcodedSafeUsername,
+		jimmtest.HardcodedSafePassword,
+	)
 	c.Assert(err, qt.IsNil)
 
 	// Failure case 1: Bad base64 decoding
@@ -386,7 +396,12 @@ func TestAuthenticateBrowserSessionHandlesExpiredAccessTokens(t *testing.T) {
 
 	authSvc, db, sessionStore := setupTestAuthSvc(ctx, c, time.Hour)
 
-	cookie, err := jimmtest.RunBrowserLogin(db, sessionStore)
+	cookie, err := jimmtest.RunBrowserLogin(
+		db,
+		sessionStore,
+		jimmtest.HardcodedSafeUsername,
+		jimmtest.HardcodedSafePassword,
+	)
 	c.Assert(err, qt.IsNil)
 
 	rec := httptest.NewRecorder()
@@ -437,7 +452,12 @@ func TestAuthenticateBrowserSessionHandlesMissingOrExpiredRefreshTokens(t *testi
 
 	authSvc, db, sessionStore := setupTestAuthSvc(ctx, c, time.Hour)
 
-	cookie, err := jimmtest.RunBrowserLogin(db, sessionStore)
+	cookie, err := jimmtest.RunBrowserLogin(
+		db,
+		sessionStore,
+		jimmtest.HardcodedSafeUsername,
+		jimmtest.HardcodedSafePassword,
+	)
 	c.Assert(err, qt.IsNil)
 
 	rec := httptest.NewRecorder()

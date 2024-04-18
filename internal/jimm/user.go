@@ -13,7 +13,7 @@ import (
 
 // GetOpenFGAUserAndAuthorise returns a valid OpenFGA user, authorising
 // them as an admin of JIMM if a tuple exists for this user.
-func (j *JIMM) GetOpenFGAUserAndAuthorise(ctx context.Context, email string) (*openfga.User, error) {
+func (j *JIMM) GetOpenFGAUserAndAuthorise(ctx context.Context, emailOrSvcAccId string) (*openfga.User, error) {
 	const op = errors.Op("jimm.GetOpenFGAUserAndAuthorise")
 
 	// Setup identity model using the tag to populate query fields
@@ -21,7 +21,7 @@ func (j *JIMM) GetOpenFGAUserAndAuthorise(ctx context.Context, email string) (*o
 		// TODO(ale8k): Name is email for NOW until we add email field
 		// and map emails/usernames to a uuid for the user. Then, queries should be
 		// queried upon by uuid, not username.
-		Name: email,
+		Name: emailOrSvcAccId,
 	}
 
 	// Load the users details
