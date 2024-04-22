@@ -502,6 +502,7 @@ func (as *AuthenticationService) Whoami(ctx context.Context) (*params.WhoamiResp
 	}
 
 	// TODO(ale8k): Add test case for this
+	// https://warthogs.atlassian.net/jira/software/c/projects/CSS/boards/725?selectedIssue=CSS-8227
 	u, err := dbmodel.NewIdentity(identityId)
 	if err != nil {
 		return nil, errors.E(op, err)
@@ -531,6 +532,7 @@ func (as *AuthenticationService) validateAndUpdateAccessToken(ctx context.Contex
 	db := as.db
 
 	// TODO(ale8k): Add test case for this
+	// https://warthogs.atlassian.net/jira/software/c/projects/CSS/boards/725?selectedIssue=CSS-8228
 	u, err := dbmodel.NewIdentity(emailStr)
 	if err != nil {
 		return errors.E(op, err)

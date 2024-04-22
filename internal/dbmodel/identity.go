@@ -16,6 +16,8 @@ import (
 )
 
 var (
+	// IdentityCreationError holds the error to be returned on failures to create
+	// an identity model.
 	IdentityCreationError = errors.New("identity name cannot be empty")
 )
 

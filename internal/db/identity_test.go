@@ -46,7 +46,6 @@ func (s *dbSuite) TestGetIdentity(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 	c.Check(u2, qt.DeepEquals, u)
 
-	// Test email / client id is sanitised on GetIdentity
 	u3, err := dbmodel.NewIdentity("jimm_test@canonical.com")
 	c.Assert(err, qt.IsNil)
 	err = s.Database.GetIdentity(ctx, u3)
@@ -100,7 +99,6 @@ func (s *dbSuite) TestUpdateIdentity(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 	c.Check(u2, qt.DeepEquals, u)
 
-	// Test email / client id is sanitised on GetIdentity
 	u3, err := dbmodel.NewIdentity("jimm_test@canonical.com")
 	c.Assert(err, qt.IsNil)
 	err = s.Database.GetIdentity(ctx, u3)
