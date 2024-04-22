@@ -90,10 +90,12 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 
 	err = s.JIMM.Database.Migrate(ctx, false)
 	c.Assert(err, gc.Equals, nil)
-	s.AdminUser = &dbmodel.Identity{
-		Name:      "alice@canonical.com",
-		LastLogin: db.Now(),
-	}
+
+	alice, err := dbmodel.NewIdentity("alice@canonical.com")
+	c.Assert(err, gc.IsNil)
+	alice.LastLogin = db.Now()
+	s.AdminUser = alice
+
 	err = s.JIMM.Database.GetIdentity(ctx, s.AdminUser)
 	c.Assert(err, gc.Equals, nil)
 
@@ -161,18 +163,18 @@ func (s *JIMMSuite) setupMacaroonDischarger(c *gc.C) *discharger.MacaroonDischar
 }
 
 func (s *JIMMSuite) AddAdminUser(c *gc.C, email string) {
-	identity := dbmodel.Identity{
-		Name: email,
-	}
-	err := s.JIMM.Database.GetIdentity(context.Background(), &identity)
+	identity, err := dbmodel.NewIdentity(email)
+	c.Assert(err, gc.IsNil)
+
+	err = s.JIMM.Database.GetIdentity(context.Background(), identity)
 	c.Assert(err, gc.IsNil)
 	// Set the display name of the identity.
 	displayName, _, _ := strings.Cut(email, "@")
 	identity.DisplayName = displayName
-	err = s.JIMM.Database.UpdateIdentity(context.Background(), &identity)
+	err = s.JIMM.Database.UpdateIdentity(context.Background(), identity)
 	c.Assert(err, gc.IsNil)
 	// Give the identity admin permission.
-	ofgaUser := openfga.NewUser(&identity, s.OFGAClient)
+	ofgaUser := openfga.NewUser(identity, s.OFGAClient)
 	err = ofgaUser.SetControllerAccess(context.Background(), s.JIMM.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, gc.IsNil)
 }
@@ -207,11 +209,11 @@ func (s *JIMMSuite) AddController(c *gc.C, name string, info *api.Info) {
 
 func (s *JIMMSuite) UpdateCloudCredential(c *gc.C, tag names.CloudCredentialTag, cred jujuparams.CloudCredential) {
 	ctx := context.Background()
-	u := dbmodel.Identity{
-		Name: tag.Owner().Id(),
-	}
-	user := openfga.NewUser(&u, s.JIMM.OpenFGAClient)
-	err := s.JIMM.Database.GetIdentity(ctx, &u)
+	u, err := dbmodel.NewIdentity(tag.Owner().Id())
+	c.Assert(err, gc.IsNil)
+
+	user := openfga.NewUser(u, s.JIMM.OpenFGAClient)
+	err = s.JIMM.Database.GetIdentity(ctx, u)
 	c.Assert(err, gc.Equals, nil)
 	_, err = s.JIMM.UpdateCloudCredential(ctx, user, jimm.UpdateCloudCredentialArgs{
 		CredentialTag: tag,
@@ -223,12 +225,13 @@ func (s *JIMMSuite) UpdateCloudCredential(c *gc.C, tag names.CloudCredentialTag,
 
 func (s *JIMMSuite) AddModel(c *gc.C, owner names.UserTag, name string, cloud names.CloudTag, region string, cred names.CloudCredentialTag) names.ModelTag {
 	ctx := context.Background()
-	u := dbmodel.Identity{
-		Name: owner.Id(),
-	}
-	err := s.JIMM.Database.GetIdentity(ctx, &u)
+
+	u, err := dbmodel.NewIdentity(owner.Id())
+	c.Assert(err, gc.IsNil)
+
+	err = s.JIMM.Database.GetIdentity(ctx, u)
 	c.Assert(err, gc.Equals, nil)
-	mi, err := s.JIMM.AddModel(ctx, s.NewUser(&u), &jimm.ModelCreateArgs{
+	mi, err := s.JIMM.AddModel(ctx, s.NewUser(u), &jimm.ModelCreateArgs{
 		Name:            name,
 		Owner:           owner,
 		Cloud:           cloud,
@@ -237,7 +240,7 @@ func (s *JIMMSuite) AddModel(c *gc.C, owner names.UserTag, name string, cloud na
 	})
 	c.Assert(err, gc.Equals, nil)
 
-	user := s.NewUser(&u)
+	user := s.NewUser(u)
 	err = user.SetModelAccess(context.Background(), names.NewModelTag(mi.UUID), ofganames.AdministratorRelation)
 	c.Assert(err, gc.Equals, nil)
 

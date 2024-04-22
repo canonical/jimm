@@ -20,6 +20,15 @@ import (
 
 // These constants are based on the `docker-compose.yaml` and `local/keycloak/jimm-realm.json` content.
 const (
+	// HardcodedSafeUsername is a hardcoded test keycloak user that pre-exists
+	// but is safe for use in a Juju UserTag when the email is retrieved.
+	HardcodedSafeUsername = "jimm-test"
+	HardcodedSafePassword = "password"
+	// HardcodedUnsafeUsername is a hardcoded test keycloak user that pre-exists
+	// but is unsafe for use in a Juju UserTag when the email is retrieved.
+	HardcodedUnsafeUsername = "jimm_test"
+	HardcodedUnsafePassword = "password"
+
 	keycloakHost             = "localhost:8082"
 	keycloakJIMMRealmPath    = "/admin/realms/jimm"
 	keycloakAdminUsername    = "jimm"

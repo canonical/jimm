@@ -48,7 +48,12 @@ func TestBrowserLoginAndLogout(t *testing.T) {
 	pgSession := sessionStore.(*pgstore.PGStore)
 	pgSession.Cleanup(time.Nanosecond)
 
-	cookie, jimmHTTPServer, err := jimmtest.RunBrowserLoginAndKeepServerRunning(db, sessionStore)
+	cookie, jimmHTTPServer, err := jimmtest.RunBrowserLoginAndKeepServerRunning(
+		db,
+		sessionStore,
+		jimmtest.HardcodedSafeUsername,
+		jimmtest.HardcodedSafePassword,
+	)
 	c.Assert(err, qt.IsNil)
 	defer jimmHTTPServer.Close()
 	c.Assert(cookie, qt.Not(qt.Equals), "")

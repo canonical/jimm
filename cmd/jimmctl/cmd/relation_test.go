@@ -268,12 +268,11 @@ type environment struct {
 func initializeEnvironment(c *gc.C, ctx context.Context, db *db.Database, u dbmodel.Identity) *environment {
 	env := environment{}
 
-	u1 := dbmodel.Identity{
-		Name: "eve@canonical.com",
-	}
-	c.Assert(db.DB.Create(&u1).Error, gc.IsNil)
+	u1, err := dbmodel.NewIdentity("eve@canonical.com")
+	c.Assert(err, gc.IsNil)
+	c.Assert(db.DB.Create(u1).Error, gc.IsNil)
 
-	env.users = []dbmodel.Identity{u, u1}
+	env.users = []dbmodel.Identity{u, *u1}
 
 	cloud := dbmodel.Cloud{
 		Name: "test-cloud",
@@ -297,7 +296,7 @@ func initializeEnvironment(c *gc.C, ctx context.Context, db *db.Database, u dbmo
 			CloudRegionID: cloud.Regions[0].ID,
 		}},
 	}
-	err := db.AddController(ctx, &controller)
+	err = db.AddController(ctx, &controller)
 	c.Assert(err, gc.Equals, nil)
 	env.controllers = []dbmodel.Controller{controller}
 
@@ -450,10 +449,9 @@ func (s *relationSuite) TestCheckRelationViaSuperuser(c *gc.C) {
 	err = db.GetGroup(ctx, &group)
 	c.Assert(err, gc.IsNil)
 
-	u := dbmodel.Identity{
-		Name: petname.Generate(2, "-") + "@canonical.com",
-	}
-	c.Assert(db.DB.Create(&u).Error, gc.IsNil)
+	u, err := dbmodel.NewIdentity(petname.Generate(2, "-") + "@canonical.com")
+	c.Assert(err, gc.IsNil)
+	c.Assert(db.DB.Create(u).Error, gc.IsNil)
 
 	cloud := dbmodel.Cloud{
 		Name: petname.Generate(2, "-"),

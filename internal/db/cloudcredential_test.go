@@ -30,9 +30,8 @@ func (s *dbSuite) TestSetCloudCredentialInvalidTag(c *qt.C) {
 	err := s.Database.Migrate(context.Background(), true)
 	c.Assert(err, qt.Equals, nil)
 
-	u := dbmodel.Identity{
-		Name: "bob@canonical.com",
-	}
+	u, err := dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, qt.IsNil)
 	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
 
 	cloud := dbmodel.Cloud{
@@ -58,9 +57,8 @@ func (s *dbSuite) TestSetCloudCredential(c *qt.C) {
 	err := s.Database.Migrate(context.Background(), true)
 	c.Assert(err, qt.Equals, nil)
 
-	u := dbmodel.Identity{
-		Name: "bob@canonical.com",
-	}
+	u, err := dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, qt.IsNil)
 	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
 
 	cloud := dbmodel.Cloud{
@@ -95,9 +93,8 @@ func (s *dbSuite) TestSetCloudCredentialUpdate(c *qt.C) {
 	err := s.Database.Migrate(context.Background(), true)
 	c.Assert(err, qt.Equals, nil)
 
-	u := dbmodel.Identity{
-		Name: "bob@canonical.com",
-	}
+	u, err := dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, qt.IsNil)
 	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
 
 	cloud := dbmodel.Cloud{
@@ -165,9 +162,8 @@ func (s *dbSuite) TestGetCloudCredential(c *qt.C) {
 	err := s.Database.Migrate(context.Background(), true)
 	c.Assert(err, qt.Equals, nil)
 
-	u := dbmodel.Identity{
-		Name: "bob@canonical.com",
-	}
+	u, err := dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, qt.IsNil)
 	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
 
 	cloud := dbmodel.Cloud{

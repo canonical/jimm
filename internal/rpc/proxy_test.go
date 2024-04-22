@@ -381,10 +381,12 @@ func (j *mockJIMM) OAuthAuthenticationService() jimm.OAuthAuthenticator {
 }
 
 func (j *mockJIMM) GetOpenFGAUserAndAuthorise(ctx context.Context, email string) (*openfga.User, error) {
+	identity, err := dbmodel.NewIdentity(email)
+	if err != nil {
+		return nil, err
+	}
 	return openfga.NewUser(
-		&dbmodel.Identity{
-			Name: email,
-		},
+		identity,
 		nil,
 	), nil
 }

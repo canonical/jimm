@@ -31,9 +31,8 @@ func (s *dbSuite) TestAddModel(c *qt.C) {
 	err := s.Database.Migrate(context.Background(), true)
 	c.Assert(err, qt.Equals, nil)
 
-	u := dbmodel.Identity{
-		Name: "bob@canonical.com",
-	}
+	u, err := dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, qt.IsNil)
 	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
 
 	cloud := dbmodel.Cloud{
@@ -48,7 +47,7 @@ func (s *dbSuite) TestAddModel(c *qt.C) {
 	cred := dbmodel.CloudCredential{
 		Name:     "test-cred",
 		Cloud:    cloud,
-		Owner:    u,
+		Owner:    *u,
 		AuthType: "empty",
 	}
 	c.Assert(s.Database.DB.Create(&cred).Error, qt.IsNil)
@@ -104,10 +103,9 @@ func (s *dbSuite) TestGetModel(c *qt.C) {
 	err := s.Database.Migrate(context.Background(), true)
 	c.Assert(err, qt.Equals, nil)
 
-	u := dbmodel.Identity{
-		Name: "bob@canonical.com",
-	}
-	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
+	u, err := dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, qt.IsNil)
+	c.Assert(s.Database.DB.Create(u).Error, qt.IsNil)
 
 	cloud := dbmodel.Cloud{
 		Name: "test-cloud",
@@ -121,7 +119,7 @@ func (s *dbSuite) TestGetModel(c *qt.C) {
 	cred := dbmodel.CloudCredential{
 		Name:     "test-cred",
 		Cloud:    cloud,
-		Owner:    u,
+		Owner:    *u,
 		AuthType: "empty",
 	}
 	c.Assert(s.Database.DB.Create(&cred).Error, qt.IsNil)
@@ -143,7 +141,7 @@ func (s *dbSuite) TestGetModel(c *qt.C) {
 			Valid:  true,
 		},
 		OwnerIdentityName: u.Name,
-		Owner:             u,
+		Owner:             *u,
 		ControllerID:      controller.ID,
 		Controller:        controller,
 		CloudRegionID:     cloud.Regions[0].ID,
@@ -162,6 +160,9 @@ func (s *dbSuite) TestGetModel(c *qt.C) {
 		},
 	}
 	model.CloudCredential.Cloud = dbmodel.Cloud{}
+	// We don't care about the cloud credential owner when
+	// loading a model, as we just use the credential to deploy
+	// applications. Hence, we don't use NewIdentity() here
 	model.CloudCredential.Owner = dbmodel.Identity{}
 	err = s.Database.AddModel(context.Background(), &model)
 	c.Assert(err, qt.Equals, nil)
@@ -204,10 +205,9 @@ func (s *dbSuite) TestUpdateModel(c *qt.C) {
 	err := s.Database.Migrate(context.Background(), true)
 	c.Assert(err, qt.Equals, nil)
 
-	u := dbmodel.Identity{
-		Name: "bob@canonical.com",
-	}
-	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
+	i, err := dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, qt.IsNil)
+	c.Assert(s.Database.DB.Create(i).Error, qt.IsNil)
 
 	cloud := dbmodel.Cloud{
 		Name: "test-cloud",
@@ -221,7 +221,7 @@ func (s *dbSuite) TestUpdateModel(c *qt.C) {
 	cred := dbmodel.CloudCredential{
 		Name:     "test-cred",
 		Cloud:    cloud,
-		Owner:    u,
+		Owner:    *i,
 		AuthType: "empty",
 	}
 	c.Assert(s.Database.DB.Create(&cred).Error, qt.IsNil)
@@ -238,7 +238,7 @@ func (s *dbSuite) TestUpdateModel(c *qt.C) {
 
 	model := dbmodel.Model{
 		Name:              "test-model-1",
-		OwnerIdentityName: u.Name,
+		OwnerIdentityName: i.Name,
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
 		CloudCredentialID: cred.ID,
@@ -282,10 +282,9 @@ func (s *dbSuite) TestDeleteModel(c *qt.C) {
 	err := s.Database.Migrate(context.Background(), true)
 	c.Assert(err, qt.Equals, nil)
 
-	u := dbmodel.Identity{
-		Name: "bob@canonical.com",
-	}
-	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
+	i, err := dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, qt.IsNil)
+	c.Assert(s.Database.DB.Create(i).Error, qt.IsNil)
 
 	cloud := dbmodel.Cloud{
 		Name: "test-cloud",
@@ -299,7 +298,7 @@ func (s *dbSuite) TestDeleteModel(c *qt.C) {
 	cred := dbmodel.CloudCredential{
 		Name:     "test-cred",
 		Cloud:    cloud,
-		Owner:    u,
+		Owner:    *i,
 		AuthType: "empty",
 	}
 	c.Assert(s.Database.DB.Create(&cred).Error, qt.IsNil)
@@ -316,7 +315,7 @@ func (s *dbSuite) TestDeleteModel(c *qt.C) {
 
 	model := dbmodel.Model{
 		Name:              "test-model-1",
-		OwnerIdentityName: u.Name,
+		OwnerIdentityName: i.Name,
 		ControllerID:      controller.ID,
 		Controller:        controller,
 		CloudRegionID:     cloud.Regions[0].ID,
@@ -356,10 +355,9 @@ func (s *dbSuite) TestGetModelsUsingCredential(c *qt.C) {
 	err := s.Database.Migrate(context.Background(), true)
 	c.Assert(err, qt.Equals, nil)
 
-	u := dbmodel.Identity{
-		Name: "bob@canonical.com",
-	}
-	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
+	i, err := dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, qt.IsNil)
+	c.Assert(s.Database.DB.Create(i).Error, qt.IsNil)
 
 	cloud := dbmodel.Cloud{
 		Name: "test-cloud",
@@ -373,7 +371,7 @@ func (s *dbSuite) TestGetModelsUsingCredential(c *qt.C) {
 	cred1 := dbmodel.CloudCredential{
 		Name:     "test-cred-1",
 		Cloud:    cloud,
-		Owner:    u,
+		Owner:    *i,
 		AuthType: "empty",
 	}
 	c.Assert(s.Database.DB.Create(&cred1).Error, qt.IsNil)
@@ -381,7 +379,7 @@ func (s *dbSuite) TestGetModelsUsingCredential(c *qt.C) {
 	cred2 := dbmodel.CloudCredential{
 		Name:     "test-cred-2",
 		Cloud:    cloud,
-		Owner:    u,
+		Owner:    *i,
 		AuthType: "empty",
 	}
 	c.Assert(s.Database.DB.Create(&cred2).Error, qt.IsNil)
@@ -401,7 +399,7 @@ func (s *dbSuite) TestGetModelsUsingCredential(c *qt.C) {
 			String: "00000001-0000-0000-0000-0000-000000000001",
 			Valid:  true,
 		},
-		OwnerIdentityName: u.Name,
+		OwnerIdentityName: i.Name,
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
 		CloudCredentialID: cred1.ID,
@@ -425,7 +423,7 @@ func (s *dbSuite) TestGetModelsUsingCredential(c *qt.C) {
 			String: "00000001-0000-0000-0000-0000-000000000002",
 			Valid:  true,
 		},
-		OwnerIdentityName: u.Name,
+		OwnerIdentityName: i.Name,
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
 		CloudCredentialID: cred2.ID,
@@ -454,7 +452,7 @@ func (s *dbSuite) TestGetModelsUsingCredential(c *qt.C) {
 			String: "00000001-0000-0000-0000-0000-000000000001",
 			Valid:  true,
 		},
-		OwnerIdentityName: u.Name,
+		OwnerIdentityName: i.Name,
 		ControllerID:      controller.ID,
 		Controller:        controller,
 		CloudRegionID:     cloud.Regions[0].ID,

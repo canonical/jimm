@@ -86,8 +86,29 @@ func (s *adminSuite) TestLoginToController(c *gc.C) {
 // We only test happy path here due to having tested edge cases and failure cases
 // within the auth service itself such as invalid cookies, expired access tokens and
 // missing/expired/revoked refresh tokens.
+func (s *adminSuite) TestBrowserLoginWithSafeEmail(c *gc.C) {
+	testBrowserLogin(
+		c,
+		s,
+		jimmtest.HardcodedSafeUsername,
+		jimmtest.HardcodedSafePassword,
+		"user-jimm-test@canonical.com",
+		"jimm-test",
+	)
+}
 
-func (s *adminSuite) TestBrowserLogin(c *gc.C) {
+func (s *adminSuite) TestBrowserLoginWithUnsafeEmail(c *gc.C) {
+	testBrowserLogin(
+		c,
+		s,
+		jimmtest.HardcodedUnsafeUsername,
+		jimmtest.HardcodedUnsafePassword,
+		"user-jimm-test43cc8c@canonical.com",
+		"jimm-test43cc8c",
+	)
+}
+
+func testBrowserLogin(c *gc.C, s *adminSuite, username, password, expectedEmail, expectedDisplayName string) {
 	// The setup runs a browser login with callback, ultimately retrieving
 	// a logged in user by cookie.
 	sqldb, err := s.JIMM.DB().DB.DB()
@@ -96,7 +117,12 @@ func (s *adminSuite) TestBrowserLogin(c *gc.C) {
 	sessionStore, err := pgstore.NewPGStoreFromPool(sqldb, []byte("secretsecretdigletts"))
 	c.Assert(err, gc.IsNil)
 
-	cookie, err := jimmtest.RunBrowserLogin(s.JIMM.DB(), sessionStore)
+	cookie, err := jimmtest.RunBrowserLogin(
+		s.JIMM.DB(),
+		sessionStore,
+		username,
+		password,
+	)
 	c.Assert(err, gc.IsNil)
 	c.Assert(cookie, gc.Not(gc.Equals), "")
 
@@ -127,8 +153,8 @@ func (s *adminSuite) TestBrowserLogin(c *gc.C) {
 	err = conn.APICall("Admin", 4, "", "LoginWithSessionCookie", nil, lr)
 	c.Assert(err, gc.IsNil)
 
-	c.Assert(lr.UserInfo.Identity, gc.Equals, "user-jimm-test@canonical.com")
-	c.Assert(lr.UserInfo.DisplayName, gc.Equals, "jimm-test")
+	c.Assert(lr.UserInfo.Identity, gc.Equals, expectedEmail)
+	c.Assert(lr.UserInfo.DisplayName, gc.Equals, expectedDisplayName)
 }
 
 // TestBrowserLoginNoCookie attempts to login without a cookie.
@@ -241,9 +267,9 @@ func (s *adminSuite) TestDeviceLogin(c *gc.C) {
 	c.Assert(loginResult.UserInfo.DisplayName, gc.Equals, strings.Split(user.Email, "@")[0])
 
 	// Finally, ensure db did indeed update the access token for this user
-	updatedUser := &dbmodel.Identity{
-		Name: user.Email,
-	}
+	updatedUser, err := dbmodel.NewIdentity(user.Email)
+	c.Assert(err, gc.IsNil)
+
 	c.Assert(s.JIMM.DB().GetIdentity(context.Background(), updatedUser), gc.IsNil)
 	// TODO(ale8k): Do we need to validate the token again for the test?
 	// It has just been through a verifier etc and was returned directly

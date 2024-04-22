@@ -15,7 +15,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/mail"
-	"strings"
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -305,9 +304,13 @@ func (as *AuthenticationService) UpdateIdentity(ctx context.Context, email strin
 	const op = errors.Op("auth.UpdateIdentity")
 
 	db := as.db
-	u := &dbmodel.Identity{
-		Name: email,
+
+	// TODO(ale8k): Add test case for this
+	u, err := dbmodel.NewIdentity(email)
+	if err != nil {
+		return errors.E(op, err)
 	}
+
 	// TODO(babakks): If user does not exist, we will create one with an empty
 	// display name (which we shouldn't). So it would be better to fetch
 	// and then create. At the moment, GetUser is used for both create and fetch,
@@ -315,15 +318,6 @@ func (as *AuthenticationService) UpdateIdentity(ctx context.Context, email strin
 	// we are creating or fetching.
 	if err := db.GetIdentity(ctx, u); err != nil {
 		return errors.E(op, err)
-	}
-	// Check if user has a display name, if not, set one
-	if u.DisplayName == "" {
-		splitEmail := strings.Split(email, "@")
-		if len(splitEmail) > 0 {
-			u.DisplayName = strings.Split(email, "@")[0]
-		} else {
-			return errors.E(op, "failed to split email")
-		}
 	}
 
 	u.AccessToken = token.AccessToken
@@ -507,8 +501,10 @@ func (as *AuthenticationService) Whoami(ctx context.Context) (*params.WhoamiResp
 		return nil, errors.E(op, "no identity in context")
 	}
 
-	u := &dbmodel.Identity{
-		Name: identityId,
+	// TODO(ale8k) CSS-8227: Add test case for this
+	u, err := dbmodel.NewIdentity(identityId)
+	if err != nil {
+		return nil, errors.E(op, err)
 	}
 
 	if err := as.db.GetIdentity(ctx, u); err != nil {
@@ -533,9 +529,13 @@ func (as *AuthenticationService) validateAndUpdateAccessToken(ctx context.Contex
 	}
 
 	db := as.db
-	u := &dbmodel.Identity{
-		Name: emailStr,
+
+	// TODO(ale8k) CSS-8228: Add test case for this
+	u, err := dbmodel.NewIdentity(emailStr)
+	if err != nil {
+		return errors.E(op, err)
 	}
+
 	if err := db.GetIdentity(ctx, u); err != nil {
 		return errors.E(op, err)
 	}

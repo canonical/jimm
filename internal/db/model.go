@@ -173,6 +173,9 @@ func preloadModel(prefix string, db *gorm.DB) *gorm.DB {
 	db = db.Preload(prefix + "Owner")
 	db = db.Preload(prefix + "Controller")
 	db = db.Preload(prefix + "CloudRegion").Preload(prefix + "CloudRegion.Cloud")
+	// We don't care about the cloud credential owner when
+	// loading a model, as we just use the credential to deploy
+	// applications.
 	db = db.Preload(prefix + "CloudCredential")
 	db = db.Preload(prefix + "Offers").Preload(prefix + "Offers.Connections").Preload(prefix + "Offers.Endpoints").Preload(prefix + "Offers.Spaces")
 

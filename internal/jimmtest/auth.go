@@ -156,13 +156,13 @@ func SetupTestDashboardCallbackHandler(browserURL string, db *db.Database, sessi
 	return s, nil
 }
 
-func RunBrowserLoginAndKeepServerRunning(db *db.Database, sessionStore sessions.Store) (string, *httptest.Server, error) {
-	cookieString, jimmHTTPServer, err := runBrowserLogin(db, sessionStore)
+func RunBrowserLoginAndKeepServerRunning(db *db.Database, sessionStore sessions.Store, username, password string) (string, *httptest.Server, error) {
+	cookieString, jimmHTTPServer, err := runBrowserLogin(db, sessionStore, username, password)
 	return cookieString, jimmHTTPServer, err
 }
 
-func RunBrowserLogin(db *db.Database, sessionStore sessions.Store) (string, error) {
-	cookieString, jimmHTTPServer, err := runBrowserLogin(db, sessionStore)
+func RunBrowserLogin(db *db.Database, sessionStore sessions.Store, username, password string) (string, error) {
+	cookieString, jimmHTTPServer, err := runBrowserLogin(db, sessionStore, username, password)
 	defer jimmHTTPServer.Close()
 	return cookieString, err
 }
@@ -174,7 +174,7 @@ func ParseCookies(cookies string) []*http.Cookie {
 	return request.Cookies()
 }
 
-func runBrowserLogin(db *db.Database, sessionStore sessions.Store) (string, *httptest.Server, error) {
+func runBrowserLogin(db *db.Database, sessionStore sessions.Store, username, password string) (string, *httptest.Server, error) {
 	var cookieString string
 
 	// Setup final test redirect url server, to emulate
@@ -228,8 +228,8 @@ func runBrowserLogin(db *db.Database, sessionStore sessions.Store) (string, *htt
 	loginFormUrl := match[1]
 
 	v := url.Values{}
-	v.Add("username", "jimm-test")
-	v.Add("password", "password")
+	v.Add("username", username)
+	v.Add("password", password)
 	loginResp, err := client.PostForm(loginFormUrl, v)
 	if err != nil {
 		return cookieString, s, err

@@ -240,8 +240,10 @@ func TestOpenFGA(t *testing.T) {
 
 	// assert controller admins have been created in openfga
 	for _, username := range []string{"alice", "eve"} {
+		i, err := dbmodel.NewIdentity(username)
+		c.Assert(err, qt.IsNil)
 		user := openfga.NewUser(
-			&dbmodel.Identity{Name: username},
+			i,
 			client,
 		)
 		allowed, err := openfga.IsAdministrator(context.Background(), user, names.NewControllerTag(p.ControllerUUID))
@@ -278,9 +280,8 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 		UUID: "7e4e7ffb-5116-4544-a400-f584d08c410e",
 		Name: "test-application-offer",
 	}
-	user := dbmodel.Identity{
-		Name: "alice@canonical.com",
-	}
+	user, err := dbmodel.NewIdentity("alice@canonical.com")
+	c.Assert(err, qt.IsNil)
 
 	ctx := context.Background()
 
@@ -350,7 +351,7 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 			})
 
 			if test.setup != nil {
-				test.setup(c, ofgaClient, &user)
+				test.setup(c, ofgaClient, user)
 			}
 
 			m, err := bakery.NewMacaroon(

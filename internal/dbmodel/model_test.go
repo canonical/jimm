@@ -317,9 +317,9 @@ func TestToJujuModelSummary(t *testing.T) {
 // initModelEnv initialises a controller, cloud and cloud-credential so
 // that a model can be created.
 func initModelEnv(c *qt.C, db *gorm.DB) (dbmodel.Cloud, dbmodel.CloudCredential, dbmodel.Controller, dbmodel.Identity) {
-	u := dbmodel.Identity{
-		Name: "bob@canonical.com",
-	}
+	u, err := dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, qt.IsNil)
+
 	c.Assert(db.Create(&u).Error, qt.IsNil)
 
 	cl := dbmodel.Cloud{
@@ -334,7 +334,7 @@ func initModelEnv(c *qt.C, db *gorm.DB) (dbmodel.Cloud, dbmodel.CloudCredential,
 	cred := dbmodel.CloudCredential{
 		Name:     "test-cred",
 		Cloud:    cl,
-		Owner:    u,
+		Owner:    *u,
 		AuthType: "empty",
 	}
 	c.Assert(db.Create(&cred).Error, qt.IsNil)
@@ -347,7 +347,7 @@ func initModelEnv(c *qt.C, db *gorm.DB) (dbmodel.Cloud, dbmodel.CloudCredential,
 	}
 	c.Assert(db.Create(&ctl).Error, qt.IsNil)
 
-	return cl, cred, ctl, u
+	return cl, cred, ctl, *u
 }
 
 func TestModelFromJujuModelInfo(t *testing.T) {
@@ -376,7 +376,7 @@ func TestModelFromJujuModelInfo(t *testing.T) {
 		},
 		Users: []jujuparams.ModelUserInfo{{
 			UserName:    "bob@canonical.com",
-			DisplayName: "Bobby The Tester",
+			DisplayName: "bob",
 			Access:      "admin",
 		}},
 		Machines: []jujuparams.ModelMachineInfo{{
@@ -399,6 +399,14 @@ func TestModelFromJujuModelInfo(t *testing.T) {
 	err := model.FromJujuModelInfo(modelInfo)
 	c.Assert(err, qt.IsNil)
 
+	i, err := dbmodel.NewIdentity("bob@canonical.com")
+	// We set display name to nothing, as when running from model info
+	// you will never get a display name. The way we use FromJujuModelInfo is that
+	// we get as much as we can from the model info, and fill in the bits of
+	// the dbmodel.Model (like the identity) where we can. As such, this doesn't
+	// need to be tested and doesn't make any sense.
+	i.DisplayName = ""
+	c.Assert(err, qt.IsNil)
 	c.Assert(model, qt.DeepEquals, dbmodel.Model{
 		Name: "test-model",
 		UUID: sql.NullString{
@@ -414,9 +422,7 @@ func TestModelFromJujuModelInfo(t *testing.T) {
 		CloudCredential: dbmodel.CloudCredential{
 			Name:      "test-cred",
 			CloudName: "test-cloud",
-			Owner: dbmodel.Identity{
-				Name: "bob@canonical.com",
-			},
+			Owner:     *i,
 		},
 		OwnerIdentityName: "bob@canonical.com",
 		Type:              "iaas",

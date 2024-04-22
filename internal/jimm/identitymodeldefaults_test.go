@@ -37,10 +37,10 @@ func TestSetIdentityModelDefaults(t *testing.T) {
 	}{{
 		about: "defaults do not exist yet - defaults created",
 		setup: func(c *qt.C, j *jimm.JIMM) testConfig {
-			identity := dbmodel.Identity{
-				Name: "bob@canonical.com",
-			}
-			c.Assert(j.Database.DB.Create(&identity).Error, qt.IsNil)
+			identity, err := dbmodel.NewIdentity("bob@canonical.com")
+			c.Assert(err, qt.IsNil)
+
+			c.Assert(j.Database.DB.Create(identity).Error, qt.IsNil)
 
 			defaults := map[string]interface{}{
 				"key1": float64(42),
@@ -49,12 +49,12 @@ func TestSetIdentityModelDefaults(t *testing.T) {
 
 			expectedDefaults := dbmodel.IdentityModelDefaults{
 				IdentityName: identity.Name,
-				Identity:     identity,
+				Identity:     *identity,
 				Defaults:     defaults,
 			}
 
 			return testConfig{
-				identity:         &identity,
+				identity:         identity,
 				defaults:         defaults,
 				expectedDefaults: &expectedDefaults,
 			}
@@ -62,14 +62,14 @@ func TestSetIdentityModelDefaults(t *testing.T) {
 	}, {
 		about: "defaults already exist - defaults updated",
 		setup: func(c *qt.C, j *jimm.JIMM) testConfig {
-			identity := dbmodel.Identity{
-				Name: "bob@canonical.com",
-			}
-			c.Assert(j.Database.DB.Create(&identity).Error, qt.IsNil)
+			identity, err := dbmodel.NewIdentity("bob@canonical.com")
+			c.Assert(err, qt.IsNil)
+
+			c.Assert(j.Database.DB.Create(identity).Error, qt.IsNil)
 
 			j.Database.SetIdentityModelDefaults(ctx, &dbmodel.IdentityModelDefaults{
 				IdentityName: identity.Name,
-				Identity:     identity,
+				Identity:     *identity,
 				Defaults: map[string]interface{}{
 					"key1": float64(17),
 					"key2": "a test string",
@@ -84,12 +84,12 @@ func TestSetIdentityModelDefaults(t *testing.T) {
 
 			expectedDefaults := dbmodel.IdentityModelDefaults{
 				IdentityName: identity.Name,
-				Identity:     identity,
+				Identity:     *identity,
 				Defaults:     defaults,
 			}
 
 			return testConfig{
-				identity:         &identity,
+				identity:         identity,
 				defaults:         defaults,
 				expectedDefaults: &expectedDefaults,
 			}
@@ -97,10 +97,10 @@ func TestSetIdentityModelDefaults(t *testing.T) {
 	}, {
 		about: "cannot set agent-version",
 		setup: func(c *qt.C, j *jimm.JIMM) testConfig {
-			identity := dbmodel.Identity{
-				Name: "bob@canonical.com",
-			}
-			c.Assert(j.Database.DB.Create(&identity).Error, qt.IsNil)
+			identity, err := dbmodel.NewIdentity("bob@canonical.com")
+			c.Assert(err, qt.IsNil)
+
+			c.Assert(j.Database.DB.Create(identity).Error, qt.IsNil)
 
 			defaults := map[string]interface{}{
 				"agent-version": "2.0",
@@ -109,7 +109,7 @@ func TestSetIdentityModelDefaults(t *testing.T) {
 			}
 
 			return testConfig{
-				identity:      &identity,
+				identity:      identity,
 				defaults:      defaults,
 				expectedError: `agent-version cannot have a default value`,
 			}
@@ -163,27 +163,27 @@ func TestIdentityModelDefaults(t *testing.T) {
 	}{{
 		about: "defaults do not exist",
 		setup: func(c *qt.C, j *jimm.JIMM) testConfig {
-			identity := dbmodel.Identity{
-				Name: "bob@canonical.com",
-			}
-			c.Assert(j.Database.DB.Create(&identity).Error, qt.IsNil)
+			identity, err := dbmodel.NewIdentity("bob@canonical.com")
+			c.Assert(err, qt.IsNil)
+
+			c.Assert(j.Database.DB.Create(identity).Error, qt.IsNil)
 
 			return testConfig{
-				identity:      &identity,
+				identity:      identity,
 				expectedError: "identitymodeldefaults not found",
 			}
 		},
 	}, {
 		about: "defaults exist",
 		setup: func(c *qt.C, j *jimm.JIMM) testConfig {
-			identity := dbmodel.Identity{
-				Name: "bob@canonical.com",
-			}
-			c.Assert(j.Database.DB.Create(&identity).Error, qt.IsNil)
+			identity, err := dbmodel.NewIdentity("bob@canonical.com")
+			c.Assert(err, qt.IsNil)
+
+			c.Assert(j.Database.DB.Create(identity).Error, qt.IsNil)
 
 			j.Database.SetIdentityModelDefaults(ctx, &dbmodel.IdentityModelDefaults{
 				IdentityName: identity.Name,
-				Identity:     identity,
+				Identity:     *identity,
 				Defaults: map[string]interface{}{
 					"key1": float64(42),
 					"key2": "a changed string",
@@ -192,7 +192,7 @@ func TestIdentityModelDefaults(t *testing.T) {
 			})
 
 			return testConfig{
-				identity: &identity,
+				identity: identity,
 				expectedDefaults: map[string]interface{}{
 					"key1": float64(42),
 					"key2": "a changed string",

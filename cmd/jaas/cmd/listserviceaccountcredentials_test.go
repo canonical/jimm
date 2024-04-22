@@ -38,14 +38,16 @@ func (s *listServiceAccountCredentialsSuite) TestListServiceAccountCredentials(c
 	clientIDWithDomain := clientID + "@serviceaccount"
 	// alice is superuser
 	ctx := context.Background()
-	user := dbmodel.Identity{Name: "alice@canonical.com"}
-	u := openfga.NewUser(&user, s.OFGAClient)
+	user, err := dbmodel.NewIdentity("alice@canonical.com")
+	c.Assert(err, gc.IsNil)
+	u := openfga.NewUser(user, s.OFGAClient)
 	err = s.JIMM.AddServiceAccount(ctx, u, clientIDWithDomain)
 	c.Assert(err, gc.IsNil)
-	svcAcc := dbmodel.Identity{Name: clientIDWithDomain}
-	err = s.JIMM.Database.GetIdentity(ctx, &svcAcc)
+	svcAcc, err := dbmodel.NewIdentity(clientIDWithDomain)
 	c.Assert(err, gc.IsNil)
-	svcAccIdentity := openfga.NewUser(&svcAcc, s.OFGAClient)
+	err = s.JIMM.Database.GetIdentity(ctx, svcAcc)
+	c.Assert(err, gc.IsNil)
+	svcAccIdentity := openfga.NewUser(svcAcc, s.OFGAClient)
 	// Create cloud-credential for service account.
 	updateArgs := jimm.UpdateCloudCredentialArgs{
 		CredentialTag: names.NewCloudCredentialTag(fmt.Sprintf("aws/%s/foo", clientIDWithDomain)),

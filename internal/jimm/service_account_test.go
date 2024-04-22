@@ -28,11 +28,11 @@ func TestAddServiceAccount(t *testing.T) {
 		OpenFGAClient: client,
 	}
 	c.Assert(err, qt.IsNil)
+
+	bob, err := dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, qt.IsNil)
 	user := openfga.NewUser(
-		&dbmodel.Identity{
-			Name:        "bob@canonical.com",
-			DisplayName: "Bob",
-		},
+		bob,
 		client,
 	)
 	clientID := "39caae91-b914-41ae-83f8-c7b86ca5ad5a@serviceaccount"
@@ -40,11 +40,11 @@ func TestAddServiceAccount(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	err = j.AddServiceAccount(ctx, user, clientID)
 	c.Assert(err, qt.IsNil)
+
+	alive, err := dbmodel.NewIdentity("alive@canonical.com")
+	c.Assert(err, qt.IsNil)
 	userAlice := openfga.NewUser(
-		&dbmodel.Identity{
-			Name:        "alive@canonical.com",
-			DisplayName: "Alice",
-		},
+		alive,
 		client,
 	)
 	err = j.AddServiceAccount(ctx, userAlice, clientID)

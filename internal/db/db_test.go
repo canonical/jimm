@@ -59,10 +59,11 @@ func (s *dbSuite) TestTransaction(c *qt.C) {
 
 	err = s.Database.Migrate(context.Background(), false)
 	c.Assert(err, qt.IsNil)
-
+	i, err := dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, qt.IsNil)
 	err = s.Database.Transaction(func(d *db.Database) error {
 		c.Check(d, qt.Not(qt.Equals), s.Database)
-		return d.GetIdentity(context.Background(), &dbmodel.Identity{Name: "bob@canonical.com"})
+		return d.GetIdentity(context.Background(), i)
 	})
 	c.Assert(err, qt.IsNil)
 

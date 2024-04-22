@@ -33,10 +33,10 @@ func (s *grantSuite) TestGrant(c *gc.C) {
 	// alice is superuser
 	bClient := jimmtest.NewUserSessionLogin(c, "alice")
 
-	sa := dbmodel.Identity{
-		Name: clientIdWithDomain,
-	}
-	err := s.JIMM.Database.GetIdentity(ctx, &sa)
+	sa, err := dbmodel.NewIdentity(clientIdWithDomain)
+	c.Assert(err, gc.IsNil)
+
+	err = s.JIMM.Database.GetIdentity(ctx, sa)
 	c.Assert(err, gc.IsNil)
 
 	// Make alice admin of the service account
