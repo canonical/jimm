@@ -70,7 +70,7 @@ type Identity struct {
 	RefreshToken string
 
 	// AccessTokenExpiry is the expiration date for this access token.
-	AccessTokenExpiry time.Time
+	AccessTokenExpiry time.Time `gorm:"type:timestamp with time zone"`
 
 	// AccessTokenType is the type for the token, typically bearer.
 	AccessTokenType string

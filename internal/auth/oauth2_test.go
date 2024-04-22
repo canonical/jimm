@@ -421,7 +421,8 @@ func TestAuthenticateBrowserSessionHandlesExpiredAccessTokens(t *testing.T) {
 	previousToken := u.AccessToken
 
 	u.AccessTokenExpiry = time.Now()
-	db.UpdateIdentity(ctx, u)
+	err = db.UpdateIdentity(ctx, u)
+	c.Assert(err, qt.IsNil)
 
 	ctx, err = authSvc.AuthenticateBrowserSession(ctx, rec, req)
 	c.Assert(err, qt.IsNil)
