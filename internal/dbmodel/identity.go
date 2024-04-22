@@ -70,6 +70,11 @@ type Identity struct {
 	RefreshToken string
 
 	// AccessTokenExpiry is the expiration date for this access token.
+	// We're using gorm type to dictate the timezone, such that the
+	// database doesn't drop the time zone part for the access token,
+	// and then on retrievals we can perform a safe check for the validity
+	// based on the timezone that was initially sent with the token
+	// from the authentication server.
 	AccessTokenExpiry time.Time `gorm:"type:timestamp with time zone"`
 
 	// AccessTokenType is the type for the token, typically bearer.
