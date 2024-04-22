@@ -122,15 +122,14 @@ func (s *dbSuite) TestGetControllerWithModels(c *qt.C) {
 		CloudName:   "test-cloud",
 		CloudRegion: "test-region",
 	}
-	u := dbmodel.Identity{
-		Name: "bob@canonical.com",
-	}
+	u, err := dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, qt.IsNil)
 	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
 
 	cred := dbmodel.CloudCredential{
 		Name:     "test-cred",
 		Cloud:    cloud,
-		Owner:    u,
+		Owner:    *u,
 		AuthType: "empty",
 	}
 	c.Assert(s.Database.DB.Create(&cred).Error, qt.IsNil)
@@ -144,7 +143,7 @@ func (s *dbSuite) TestGetControllerWithModels(c *qt.C) {
 			String: "00000001-0000-0000-0000-0000-000000000001",
 			Valid:  true,
 		},
-		Owner:           u,
+		Owner:           *u,
 		Controller:      controller,
 		CloudRegion:     cloud.Regions[0],
 		CloudCredential: cred,
@@ -168,7 +167,7 @@ func (s *dbSuite) TestGetControllerWithModels(c *qt.C) {
 			String: "00000001-0000-0000-0000-0000-000000000002",
 			Valid:  true,
 		},
-		Owner:           u,
+		Owner:           *u,
 		Controller:      controller,
 		CloudRegion:     cloud.Regions[0],
 		CloudCredential: cred,

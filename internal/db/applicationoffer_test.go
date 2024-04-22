@@ -39,10 +39,10 @@ func initTestEnvironment(c *qt.C, db *db.Database) testEnvironment {
 	c.Assert(err, qt.Equals, nil)
 
 	env := testEnvironment{}
+	i, err := dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, qt.IsNil)
+	env.u = *i
 
-	env.u = dbmodel.Identity{
-		Name: "bob@canonical.com",
-	}
 	c.Assert(db.DB.Create(&env.u).Error, qt.IsNil)
 
 	env.cloud = dbmodel.Cloud{
@@ -241,9 +241,8 @@ func (s *dbSuite) TestFindApplicationOffers(c *qt.C) {
 	err := s.Database.AddApplicationOffer(context.Background(), &offer1)
 	c.Assert(err, qt.Equals, nil)
 
-	u := dbmodel.Identity{
-		Name: "alice@canonical.com",
-	}
+	u, err := dbmodel.NewIdentity("alice@canonical.com")
+	c.Assert(err, qt.IsNil)
 	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
 
 	offer2 := dbmodel.ApplicationOffer{

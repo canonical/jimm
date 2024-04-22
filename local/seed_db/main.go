@@ -47,10 +47,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	u := dbmodel.Identity{
-		Name: petname.Generate(2, "-") + "@canonical.com",
-	}
-	if err = db.DB.Create(&u).Error; err != nil {
+	u, _ := dbmodel.NewIdentity(petname.Generate(2, "-") + "@canonical.com")
+	if err = db.DB.Create(u).Error; err != nil {
 		fmt.Println("failed to add user to db ", err)
 		os.Exit(1)
 	}

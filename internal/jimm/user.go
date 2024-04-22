@@ -16,12 +16,13 @@ import (
 func (j *JIMM) GetOpenFGAUserAndAuthorise(ctx context.Context, emailOrSvcAccId string) (*openfga.User, error) {
 	const op = errors.Op("jimm.GetOpenFGAUserAndAuthorise")
 
+	// TODO(ale8k): Name is email for NOW until we add email field
+	// and map emails/usernames to a uuid for the user. Then, queries should be
+	// queried upon by uuid, not username.
 	// Setup identity model using the tag to populate query fields
-	user := &dbmodel.Identity{
-		// TODO(ale8k): Name is email for NOW until we add email field
-		// and map emails/usernames to a uuid for the user. Then, queries should be
-		// queried upon by uuid, not username.
-		Name: emailOrSvcAccId,
+	user, err := dbmodel.NewIdentity(emailOrSvcAccId)
+	if err != nil {
+		return nil, errors.E(op, err)
 	}
 
 	// Load the users details
@@ -64,13 +65,15 @@ func (j *JIMM) GetOpenFGAUserAndAuthorise(ctx context.Context, emailOrSvcAccId s
 func (j *JIMM) GetUser(ctx context.Context, username string) (*openfga.User, error) {
 	const op = errors.Op("jimm.GetUser")
 
-	user := dbmodel.Identity{
-		Name: username,
+	user, err := dbmodel.NewIdentity(username)
+	if err != nil {
+		return nil, errors.E(op, err)
 	}
-	if err := j.Database.GetIdentity(ctx, &user); err != nil {
+
+	if err := j.Database.GetIdentity(ctx, user); err != nil {
 		return nil, err
 	}
-	u := openfga.NewUser(&user, j.OpenFGAClient)
+	u := openfga.NewUser(user, j.OpenFGAClient)
 
 	isJimmAdmin, err := openfga.IsAdministrator(ctx, u, j.ResourceTag())
 	if err != nil {

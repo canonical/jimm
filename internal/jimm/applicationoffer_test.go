@@ -43,47 +43,40 @@ var initializeEnvironment = func(c *qt.C, ctx context.Context, db *db.Database, 
 	env := environment{}
 
 	// Alice is a model admin, but not a superuser or offer admin.
-	u := dbmodel.Identity{
-		Name: "alice@canonical.com",
-	}
-	c.Assert(db.DB.Create(&u).Error, qt.IsNil)
+	u, err := dbmodel.NewIdentity("alice@canonical.com")
+	c.Assert(err, qt.IsNil)
+	c.Assert(db.DB.Create(u).Error, qt.IsNil)
 
-	u1 := dbmodel.Identity{
-		Name: "eve@canonical.com",
-	}
-	c.Assert(db.DB.Create(&u1).Error, qt.IsNil)
+	u1, err := dbmodel.NewIdentity("eve@canonical.com")
+	c.Assert(err, qt.IsNil)
+	c.Assert(db.DB.Create(u1).Error, qt.IsNil)
 
-	u2 := dbmodel.Identity{
-		Name: "bob@canonical.com",
-	}
-	c.Assert(db.DB.Create(&u2).Error, qt.IsNil)
+	u2, err := dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, qt.IsNil)
+	c.Assert(db.DB.Create(u2).Error, qt.IsNil)
 
-	u3 := dbmodel.Identity{
-		Name: "fred@canonical.com",
-	}
-	c.Assert(db.DB.Create(&u3).Error, qt.IsNil)
+	u3, err := dbmodel.NewIdentity("fred@canonical.com")
+	c.Assert(err, qt.IsNil)
+	c.Assert(db.DB.Create(u3).Error, qt.IsNil)
 
-	u4 := dbmodel.Identity{
-		Name: "grant@canonical.com",
-	}
-	c.Assert(db.DB.Create(&u4).Error, qt.IsNil)
+	u4, err := dbmodel.NewIdentity("grant@canonical.com")
+	c.Assert(err, qt.IsNil)
+	c.Assert(db.DB.Create(u4).Error, qt.IsNil)
 
 	// Jane is an offer admin, but not a superuser or model admin.
-	u5 := dbmodel.Identity{
-		Name: "jane@canonical.com",
-	}
-	c.Assert(db.DB.Create(&u5).Error, qt.IsNil)
+	u5, err := dbmodel.NewIdentity("jane@canonical.com")
+	c.Assert(err, qt.IsNil)
+	c.Assert(db.DB.Create(u5).Error, qt.IsNil)
 
 	// Joe is a superuser, but not a model or offer admin.
-	u6 := dbmodel.Identity{
-		Name: "joe@canonical.com",
-	}
-	c.Assert(db.DB.Create(&u6).Error, qt.IsNil)
+	u6, err := dbmodel.NewIdentity("joe@canonical.com")
+	c.Assert(err, qt.IsNil)
+	c.Assert(db.DB.Create(u6).Error, qt.IsNil)
 
-	err := openfga.NewUser(&u6, client).SetControllerAccess(ctx, names.NewControllerTag(jimmUUID), ofganames.AdministratorRelation)
+	err = openfga.NewUser(u6, client).SetControllerAccess(ctx, names.NewControllerTag(jimmUUID), ofganames.AdministratorRelation)
 	c.Assert(err, qt.IsNil)
 
-	env.users = []dbmodel.Identity{u, u1, u2, u3, u4, u5, u6}
+	env.users = []dbmodel.Identity{*u, *u1, *u2, *u3, *u4, *u5, *u6}
 
 	cloud := dbmodel.Cloud{
 		Name: "test-cloud",
@@ -96,7 +89,7 @@ var initializeEnvironment = func(c *qt.C, ctx context.Context, db *db.Database, 
 	env.clouds = []dbmodel.Cloud{cloud}
 
 	// user u is administrator of the test-cloud
-	err = openfga.NewUser(&u, client).SetCloudAccess(ctx, cloud.ResourceTag(), ofganames.AdministratorRelation)
+	err = openfga.NewUser(u, client).SetCloudAccess(ctx, cloud.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, qt.IsNil)
 
 	controller := dbmodel.Controller{
@@ -147,7 +140,7 @@ var initializeEnvironment = func(c *qt.C, ctx context.Context, db *db.Database, 
 	env.models = []dbmodel.Model{model}
 
 	// user u is administrator of the test-model
-	err = openfga.NewUser(&u, client).SetModelAccess(ctx, model.ResourceTag(), ofganames.AdministratorRelation)
+	err = openfga.NewUser(u, client).SetModelAccess(ctx, model.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, qt.IsNil)
 
 	err = client.AddControllerModel(context.Background(), controller.ResourceTag(), model.ResourceTag())
@@ -171,19 +164,19 @@ var initializeEnvironment = func(c *qt.C, ctx context.Context, db *db.Database, 
 	c.Assert(err, qt.IsNil)
 
 	// user u1 is administrator of the test-offer
-	err = openfga.NewUser(&u1, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.AdministratorRelation)
+	err = openfga.NewUser(u1, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, qt.IsNil)
 
 	// user u2 is consumer of the test-offer
-	err = openfga.NewUser(&u2, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.ConsumerRelation)
+	err = openfga.NewUser(u2, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.ConsumerRelation)
 	c.Assert(err, qt.IsNil)
 
 	// user u3 is reader of the test-offer
-	err = openfga.NewUser(&u3, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.ReaderRelation)
+	err = openfga.NewUser(u3, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.ReaderRelation)
 	c.Assert(err, qt.IsNil)
 
 	// user u5 is administrator of the test-offer
-	err = openfga.NewUser(&u5, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.AdministratorRelation)
+	err = openfga.NewUser(u5, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, qt.IsNil)
 
 	return &env
@@ -568,20 +561,17 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 	err = db.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
-	u := dbmodel.Identity{
-		Name: "alice@canonical.com",
-	}
-	c.Assert(db.DB.Create(&u).Error, qt.IsNil)
+	u, err := dbmodel.NewIdentity("alice@canonical.com")
+	c.Assert(err, qt.IsNil)
+	c.Assert(db.DB.Create(u).Error, qt.IsNil)
 
-	u1 := dbmodel.Identity{
-		Name: "eve@canonical.com",
-	}
-	c.Assert(db.DB.Create(&u1).Error, qt.IsNil)
+	u1, err := dbmodel.NewIdentity("eve@canonical.com")
+	c.Assert(err, qt.IsNil)
+	c.Assert(db.DB.Create(u1).Error, qt.IsNil)
 
-	u2 := dbmodel.Identity{
-		Name: "bob@canonical.com",
-	}
-	c.Assert(db.DB.Create(&u2).Error, qt.IsNil)
+	u2, err := dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, qt.IsNil)
+	c.Assert(db.DB.Create(u2).Error, qt.IsNil)
 
 	cloud := dbmodel.Cloud{
 		Name: "test-cloud",
@@ -593,7 +583,7 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 	c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
 
 	// user u is administrator of the test-model
-	err = openfga.NewUser(&u, client).SetCloudAccess(ctx, cloud.ResourceTag(), ofganames.AdministratorRelation)
+	err = openfga.NewUser(u, client).SetCloudAccess(ctx, cloud.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, qt.IsNil)
 
 	controller := dbmodel.Controller{
@@ -647,24 +637,23 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	// user u is administrator of the test offer
-	err = openfga.NewUser(&u, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.AdministratorRelation)
+	err = openfga.NewUser(u, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, qt.IsNil)
 
 	// user u1 is reader of the test offer
-	err = openfga.NewUser(&u1, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.ReaderRelation)
+	err = openfga.NewUser(u1, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.ReaderRelation)
 	c.Assert(err, qt.IsNil)
 
 	// user u2 is consumer of the test offer
-	err = openfga.NewUser(&u2, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.ConsumerRelation)
+	err = openfga.NewUser(u2, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.ConsumerRelation)
 	c.Assert(err, qt.IsNil)
 
 	everyoneTag := names.NewUserTag(ofganames.EveryoneUser)
-	uAll := dbmodel.Identity{
-		Name: everyoneTag.Id(),
-	}
-	c.Assert(db.DB.Create(&uAll).Error, qt.IsNil)
+	uAll, err := dbmodel.NewIdentity(everyoneTag.Id())
+	c.Assert(err, qt.IsNil)
+	c.Assert(db.DB.Create(uAll).Error, qt.IsNil)
 	// user uAll is reader of the test offer
-	err = openfga.NewUser(&uAll, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.ReaderRelation)
+	err = openfga.NewUser(uAll, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.ReaderRelation)
 	c.Assert(err, qt.IsNil)
 
 	j := &jimm.JIMM{
@@ -729,7 +718,7 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 		expectedError        string
 	}{{
 		about: "admin can get the application offer consume details ",
-		user:  &u,
+		user:  u,
 		details: jujuparams.ConsumeOfferDetails{
 			Offer: &jujuparams.ApplicationOfferDetails{
 				OfferURL: "test-offer-url",
@@ -784,7 +773,7 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 		},
 	}, {
 		about: "users with consume access can get the application offer consume details with filtered users",
-		user:  &u2,
+		user:  u2,
 		details: jujuparams.ConsumeOfferDetails{
 			Offer: &jujuparams.ApplicationOfferDetails{
 				OfferURL: "test-offer-url",
@@ -833,7 +822,7 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 		},
 	}, {
 		about: "user with read access cannot get application offer consume details",
-		user:  &u1,
+		user:  u1,
 		details: jujuparams.ConsumeOfferDetails{
 			Offer: &jujuparams.ApplicationOfferDetails{
 				OfferURL: "test-offer-url",
@@ -842,7 +831,7 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 		expectedError: "unauthorized",
 	}, {
 		about: "no such offer",
-		user:  &u,
+		user:  u,
 		details: jujuparams.ConsumeOfferDetails{
 			Offer: &jujuparams.ApplicationOfferDetails{
 				OfferURL: "no-such-offer",
@@ -942,19 +931,16 @@ func TestGetApplicationOffer(t *testing.T) {
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
-	u := dbmodel.Identity{
-		Name: "alice@canonical.com",
-	}
+	u, err := dbmodel.NewIdentity("alice@canonical.com")
+	c.Assert(err, qt.IsNil)
 	c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
 
-	u1 := dbmodel.Identity{
-		Name: "eve@canonical.com",
-	}
+	u1, err := dbmodel.NewIdentity("eve@canonical.com")
+	c.Assert(err, qt.IsNil)
 	c.Assert(j.Database.DB.Create(&u1).Error, qt.IsNil)
 
-	u2 := dbmodel.Identity{
-		Name: "bob@canonical.com",
-	}
+	u2, err := dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, qt.IsNil)
 	c.Assert(j.Database.DB.Create(&u2).Error, qt.IsNil)
 
 	cloud := dbmodel.Cloud{
@@ -1044,11 +1030,11 @@ func TestGetApplicationOffer(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	// user u is administrator of the test offer
-	err = openfga.NewUser(&u, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.AdministratorRelation)
+	err = openfga.NewUser(u, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, qt.IsNil)
 
 	// user u1 is reader of the test offer
-	err = openfga.NewUser(&u1, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.ReaderRelation)
+	err = openfga.NewUser(u1, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.ReaderRelation)
 	c.Assert(err, qt.IsNil)
 
 	tests := []struct {
@@ -1059,7 +1045,7 @@ func TestGetApplicationOffer(t *testing.T) {
 		expectedError        string
 	}{{
 		about:    "admin can get the application offer",
-		user:     &u,
+		user:     u,
 		offerURL: "test-offer-url",
 		expectedOfferDetails: jujuparams.ApplicationOfferAdminDetails{
 			ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
@@ -1110,7 +1096,7 @@ func TestGetApplicationOffer(t *testing.T) {
 		},
 	}, {
 		about:    "user with read access can get the application offer, but users and connections are filtered",
-		user:     &u1,
+		user:     u1,
 		offerURL: "test-offer-url",
 		expectedOfferDetails: jujuparams.ApplicationOfferAdminDetails{
 			ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
@@ -1152,12 +1138,12 @@ func TestGetApplicationOffer(t *testing.T) {
 		},
 	}, {
 		about:         "user without access cannot get the application offer",
-		user:          &u2,
+		user:          u2,
 		offerURL:      "test-offer-url",
 		expectedError: "application offer not found",
 	}, {
 		about:         "not found",
-		user:          &u1,
+		user:          u1,
 		offerURL:      "offer-not-found",
 		expectedError: "application offer not found",
 	}}
@@ -1244,10 +1230,9 @@ func TestOffer(t *testing.T) {
 		createEnv: func(c *qt.C, db db.Database, client *openfga.OFGAClient) (dbmodel.Identity, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
 			ctx := context.Background()
 
-			u := dbmodel.Identity{
-				Name: "alice@canonical.com",
-			}
-			c.Assert(db.DB.Create(&u).Error, qt.IsNil)
+			u, err := dbmodel.NewIdentity("alice@canonical.com")
+			c.Assert(err, qt.IsNil)
+			c.Assert(db.DB.Create(u).Error, qt.IsNil)
 
 			cloud := dbmodel.Cloud{
 				Name: "test-cloud",
@@ -1259,7 +1244,7 @@ func TestOffer(t *testing.T) {
 			c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
 
 			// user u is administrator of the test-cloud
-			err := openfga.NewUser(&u, client).SetCloudAccess(ctx, cloud.ResourceTag(), ofganames.AdministratorRelation)
+			err = openfga.NewUser(u, client).SetCloudAccess(ctx, cloud.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 
 			controller := dbmodel.Controller{
@@ -1299,7 +1284,7 @@ func TestOffer(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 
 			// user u is administrator of the test-model
-			err = openfga.NewUser(&u, client).SetModelAccess(ctx, model.ResourceTag(), ofganames.AdministratorRelation)
+			err = openfga.NewUser(u, client).SetModelAccess(ctx, model.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 
 			offerParams := jimm.AddApplicationOfferParams{
@@ -1350,7 +1335,7 @@ func TestOffer(t *testing.T) {
 				}},
 			}
 
-			return u, offerParams, offer, nil
+			return *u, offerParams, offer, nil
 		},
 	}, {
 		about: "controller returns an error when creating an offer",
@@ -1366,10 +1351,9 @@ func TestOffer(t *testing.T) {
 		createEnv: func(c *qt.C, db db.Database, client *openfga.OFGAClient) (dbmodel.Identity, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
 			ctx := context.Background()
 
-			u := dbmodel.Identity{
-				Name: "alice@canonical.com",
-			}
-			c.Assert(db.DB.Create(&u).Error, qt.IsNil)
+			u, err := dbmodel.NewIdentity("alice@canonical.com")
+			c.Assert(err, qt.IsNil)
+			c.Assert(db.DB.Create(u).Error, qt.IsNil)
 
 			cloud := dbmodel.Cloud{
 				Name: "test-cloud",
@@ -1381,7 +1365,7 @@ func TestOffer(t *testing.T) {
 			c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
 
 			// user u is administrator of the test-cloud
-			err := openfga.NewUser(&u, client).SetCloudAccess(ctx, cloud.ResourceTag(), ofganames.AdministratorRelation)
+			err = openfga.NewUser(u, client).SetCloudAccess(ctx, cloud.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 
 			controller := dbmodel.Controller{
@@ -1421,7 +1405,7 @@ func TestOffer(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 
 			// user u is administrator of the test-model
-			err = openfga.NewUser(&u, client).SetModelAccess(ctx, model.ResourceTag(), ofganames.AdministratorRelation)
+			err = openfga.NewUser(u, client).SetModelAccess(ctx, model.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 
 			offerParams := jimm.AddApplicationOfferParams{
@@ -1436,7 +1420,7 @@ func TestOffer(t *testing.T) {
 
 			offer := dbmodel.ApplicationOffer{}
 
-			return u, offerParams, offer, func(c *qt.C, err error) {
+			return *u, offerParams, offer, func(c *qt.C, err error) {
 				c.Assert(err, qt.ErrorMatches, "a silly error")
 			}
 		},
@@ -1452,11 +1436,10 @@ func TestOffer(t *testing.T) {
 			return nil
 		},
 		createEnv: func(c *qt.C, db db.Database, client *openfga.OFGAClient) (dbmodel.Identity, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
-			u := dbmodel.Identity{
-				Name: "alice@canonical.com",
-			}
+			u, err := dbmodel.NewIdentity("alice@canonical.com")
+			c.Assert(err, qt.IsNil)
 
-			c.Assert(db.DB.Create(&u).Error, qt.IsNil)
+			c.Assert(db.DB.Create(u).Error, qt.IsNil)
 			offerParams := jimm.AddApplicationOfferParams{
 				ModelTag:               names.NewModelTag("model-not-found"),
 				OfferName:              "test-app-offer",
@@ -1469,7 +1452,7 @@ func TestOffer(t *testing.T) {
 
 			offer := dbmodel.ApplicationOffer{}
 
-			return u, offerParams, offer, func(c *qt.C, err error) {
+			return *u, offerParams, offer, func(c *qt.C, err error) {
 				c.Assert(err, qt.ErrorMatches, "model not found")
 			}
 		},
@@ -1487,10 +1470,10 @@ func TestOffer(t *testing.T) {
 		createEnv: func(c *qt.C, db db.Database, client *openfga.OFGAClient) (dbmodel.Identity, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
 			ctx := context.Background()
 
-			u := dbmodel.Identity{
-				Name: "alice@canonical.com",
-			}
-			c.Assert(db.DB.Create(&u).Error, qt.IsNil)
+			u, err := dbmodel.NewIdentity("alice@canonical.com")
+			c.Assert(err, qt.IsNil)
+
+			c.Assert(db.DB.Create(u).Error, qt.IsNil)
 
 			cloud := dbmodel.Cloud{
 				Name: "test-cloud",
@@ -1502,7 +1485,7 @@ func TestOffer(t *testing.T) {
 			c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
 
 			// user u is administrator of the test-cloud
-			err := openfga.NewUser(&u, client).SetCloudAccess(ctx, cloud.ResourceTag(), ofganames.AdministratorRelation)
+			err = openfga.NewUser(u, client).SetCloudAccess(ctx, cloud.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 
 			controller := dbmodel.Controller{
@@ -1542,7 +1525,7 @@ func TestOffer(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 
 			// user u is administrator of the test-model
-			err = openfga.NewUser(&u, client).SetModelAccess(ctx, model.ResourceTag(), ofganames.AdministratorRelation)
+			err = openfga.NewUser(u, client).SetModelAccess(ctx, model.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 
 			offerParams := jimm.AddApplicationOfferParams{
@@ -1557,7 +1540,7 @@ func TestOffer(t *testing.T) {
 
 			offer := dbmodel.ApplicationOffer{}
 
-			return u, offerParams, offer, func(c *qt.C, err error) {
+			return *u, offerParams, offer, func(c *qt.C, err error) {
 				c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 				c.Assert(err, qt.ErrorMatches, "application test-app")
 			}
@@ -1576,15 +1559,13 @@ func TestOffer(t *testing.T) {
 		createEnv: func(c *qt.C, db db.Database, client *openfga.OFGAClient) (dbmodel.Identity, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
 			ctx := context.Background()
 
-			u := dbmodel.Identity{
-				Name: "alice@canonical.com",
-			}
-			c.Assert(db.DB.Create(&u).Error, qt.IsNil)
+			u, err := dbmodel.NewIdentity("alice@canonical.com")
+			c.Assert(err, qt.IsNil)
+			c.Assert(db.DB.Create(u).Error, qt.IsNil)
 
-			u1 := dbmodel.Identity{
-				Name: "eve@canonical.com",
-			}
-			c.Assert(db.DB.Create(&u1).Error, qt.IsNil)
+			u1, err := dbmodel.NewIdentity("eve@canonical.com")
+			c.Assert(err, qt.IsNil)
+			c.Assert(db.DB.Create(u1).Error, qt.IsNil)
 
 			cloud := dbmodel.Cloud{
 				Name: "test-cloud",
@@ -1596,7 +1577,7 @@ func TestOffer(t *testing.T) {
 			c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
 
 			// user u is administrator of the test-cloud
-			err := openfga.NewUser(&u, client).SetCloudAccess(ctx, cloud.ResourceTag(), ofganames.AdministratorRelation)
+			err = openfga.NewUser(u, client).SetCloudAccess(ctx, cloud.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 
 			controller := dbmodel.Controller{
@@ -1636,7 +1617,7 @@ func TestOffer(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 
 			// user u is administrator of the test-model
-			err = openfga.NewUser(&u, client).SetModelAccess(ctx, model.ResourceTag(), ofganames.AdministratorRelation)
+			err = openfga.NewUser(u, client).SetModelAccess(ctx, model.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 
 			offerParams := jimm.AddApplicationOfferParams{
@@ -1651,7 +1632,7 @@ func TestOffer(t *testing.T) {
 
 			offer := dbmodel.ApplicationOffer{}
 
-			return u1, offerParams, offer, func(c *qt.C, err error) {
+			return *u1, offerParams, offer, func(c *qt.C, err error) {
 				c.Assert(err, qt.ErrorMatches, "unauthorized")
 			}
 		},
@@ -1669,10 +1650,9 @@ func TestOffer(t *testing.T) {
 		createEnv: func(c *qt.C, db db.Database, client *openfga.OFGAClient) (dbmodel.Identity, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
 			ctx := context.Background()
 
-			u := dbmodel.Identity{
-				Name: "alice@canonical.com",
-			}
-			c.Assert(db.DB.Create(&u).Error, qt.IsNil)
+			u, err := dbmodel.NewIdentity("alice@canonical.com")
+			c.Assert(err, qt.IsNil)
+			c.Assert(db.DB.Create(u).Error, qt.IsNil)
 
 			cloud := dbmodel.Cloud{
 				Name: "test-cloud",
@@ -1684,7 +1664,7 @@ func TestOffer(t *testing.T) {
 			c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
 
 			// user u is administrator of the test-cloud
-			err := openfga.NewUser(&u, client).SetCloudAccess(ctx, cloud.ResourceTag(), ofganames.AdministratorRelation)
+			err = openfga.NewUser(u, client).SetCloudAccess(ctx, cloud.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 
 			controller := dbmodel.Controller{
@@ -1724,7 +1704,7 @@ func TestOffer(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 
 			// user u is administrator of the test-model
-			err = openfga.NewUser(&u, client).SetModelAccess(ctx, model.ResourceTag(), ofganames.AdministratorRelation)
+			err = openfga.NewUser(u, client).SetModelAccess(ctx, model.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 
 			offerParams := jimm.AddApplicationOfferParams{
@@ -1739,7 +1719,7 @@ func TestOffer(t *testing.T) {
 
 			offer := dbmodel.ApplicationOffer{}
 
-			return u, offerParams, offer, func(c *qt.C, err error) {
+			return *u, offerParams, offer, func(c *qt.C, err error) {
 				c.Assert(err, qt.ErrorMatches, "a silly error")
 			}
 		},
@@ -1757,10 +1737,9 @@ func TestOffer(t *testing.T) {
 		createEnv: func(c *qt.C, db db.Database, client *openfga.OFGAClient) (dbmodel.Identity, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
 			ctx := context.Background()
 
-			u := dbmodel.Identity{
-				Name: "alice@canonical.com",
-			}
-			c.Assert(db.DB.Create(&u).Error, qt.IsNil)
+			u, err := dbmodel.NewIdentity("alice@canonical.com")
+			c.Assert(err, qt.IsNil)
+			c.Assert(db.DB.Create(u).Error, qt.IsNil)
 
 			cloud := dbmodel.Cloud{
 				Name: "test-cloud",
@@ -1772,7 +1751,7 @@ func TestOffer(t *testing.T) {
 			c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
 
 			// user u is administrator of the test-cloud
-			err := openfga.NewUser(&u, client).SetCloudAccess(ctx, cloud.ResourceTag(), ofganames.AdministratorRelation)
+			err = openfga.NewUser(u, client).SetCloudAccess(ctx, cloud.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 
 			controller := dbmodel.Controller{
@@ -1812,7 +1791,7 @@ func TestOffer(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 
 			// user u is administrator of the test-model
-			err = openfga.NewUser(&u, client).SetModelAccess(ctx, model.ResourceTag(), ofganames.AdministratorRelation)
+			err = openfga.NewUser(u, client).SetModelAccess(ctx, model.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 
 			offerParams := jimm.AddApplicationOfferParams{
@@ -1827,7 +1806,7 @@ func TestOffer(t *testing.T) {
 
 			offer := dbmodel.ApplicationOffer{}
 
-			return u, offerParams, offer, func(c *qt.C, err error) {
+			return *u, offerParams, offer, func(c *qt.C, err error) {
 				c.Assert(err, qt.ErrorMatches, "application offer already exists")
 				c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeAlreadyExists)
 			}
@@ -1887,9 +1866,8 @@ func TestOfferAssertOpenFGARelationsExist(t *testing.T) {
 	createEnv := func(c *qt.C, db db.Database, client *openfga.OFGAClient) (dbmodel.Identity, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
 		ctx := context.Background()
 
-		u := dbmodel.Identity{
-			Name: "alice@canonical.com",
-		}
+		u, err := dbmodel.NewIdentity("alice@canonical.com")
+		c.Assert(err, qt.IsNil)
 		c.Assert(db.DB.Create(&u).Error, qt.IsNil)
 
 		cloud := dbmodel.Cloud{
@@ -1902,7 +1880,7 @@ func TestOfferAssertOpenFGARelationsExist(t *testing.T) {
 		c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
 
 		// user u is administrator of the test-cloud
-		err := openfga.NewUser(&u, client).SetCloudAccess(ctx, cloud.ResourceTag(), ofganames.AdministratorRelation)
+		err = openfga.NewUser(u, client).SetCloudAccess(ctx, cloud.ResourceTag(), ofganames.AdministratorRelation)
 		c.Assert(err, qt.IsNil)
 
 		controller := dbmodel.Controller{
@@ -1942,7 +1920,7 @@ func TestOfferAssertOpenFGARelationsExist(t *testing.T) {
 		c.Assert(err, qt.IsNil)
 
 		// user u is administrator of the test-model
-		err = openfga.NewUser(&u, client).SetModelAccess(ctx, model.ResourceTag(), ofganames.AdministratorRelation)
+		err = openfga.NewUser(u, client).SetModelAccess(ctx, model.ResourceTag(), ofganames.AdministratorRelation)
 		c.Assert(err, qt.IsNil)
 
 		offerParams := jimm.AddApplicationOfferParams{
@@ -1993,7 +1971,7 @@ func TestOfferAssertOpenFGARelationsExist(t *testing.T) {
 			}},
 		}
 
-		return u, offerParams, offer, nil
+		return *u, offerParams, offer, nil
 	}
 
 	api := &jimmtest.API{

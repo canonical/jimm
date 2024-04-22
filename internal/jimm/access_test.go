@@ -41,10 +41,12 @@ func (ta *testAuthenticator) Authenticate(ctx context.Context, req *jujuparams.L
 	if ta.err != nil {
 		return nil, ta.err
 	}
+	i, err := dbmodel.NewIdentity(ta.username)
+	if err != nil {
+		return nil, err
+	}
 	return &openfga.User{
-		Identity: &dbmodel.Identity{
-			Name: ta.username,
-		},
+		Identity: i,
 	}, nil
 }
 
@@ -149,12 +151,15 @@ func TestAuditLogAccess(t *testing.T) {
 
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
-
-	adminUser := openfga.NewUser(&dbmodel.Identity{Name: "alice"}, j.OpenFGAClient)
+	i, err := dbmodel.NewIdentity("alice")
+	c.Assert(err, qt.IsNil)
+	adminUser := openfga.NewUser(i, j.OpenFGAClient)
 	err = adminUser.SetControllerAccess(ctx, j.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, qt.IsNil)
 
-	user := openfga.NewUser(&dbmodel.Identity{Name: "bob"}, j.OpenFGAClient)
+	i2, err := dbmodel.NewIdentity("bob")
+	c.Assert(err, qt.IsNil)
+	user := openfga.NewUser(i2, j.OpenFGAClient)
 
 	// admin user can grant other users audit log access.
 	err = j.GrantAuditLogAccess(ctx, adminUser, user.ResourceTag())
@@ -328,10 +333,10 @@ func TestJWTGeneratorMakeLoginToken(t *testing.T) {
 		generator := jimm.NewJWTGenerator(test.database, test.accessChecker, test.jwtService)
 		generator.SetTags(mt, ct)
 
-		_, err := generator.MakeLoginToken(context.Background(), &openfga.User{
-			Identity: &dbmodel.Identity{
-				Name: test.username,
-			},
+		i, err := dbmodel.NewIdentity(test.username)
+		c.Assert(err, qt.IsNil)
+		_, err = generator.MakeLoginToken(context.Background(), &openfga.User{
+			Identity: i,
 		})
 		if test.expectedError != "" {
 			c.Assert(err, qt.ErrorMatches, test.expectedError)
@@ -427,10 +432,10 @@ func TestJWTGeneratorMakeToken(t *testing.T) {
 		)
 		generator.SetTags(mt, ct)
 
-		_, err := generator.MakeLoginToken(context.Background(), &openfga.User{
-			Identity: &dbmodel.Identity{
-				Name: "eve@canonical.com",
-			},
+		i, err := dbmodel.NewIdentity("eve@canonical.com")
+		c.Assert(err, qt.IsNil)
+		_, err = generator.MakeLoginToken(context.Background(), &openfga.User{
+			Identity: i,
 		})
 		c.Assert(err, qt.IsNil)
 
@@ -756,10 +761,10 @@ func createTestControllerEnvironment(ctx context.Context, c *qt.C, db db.Databas
 	err = db.GetGroup(ctx, &group)
 	c.Assert(err, qt.IsNil)
 
-	u := dbmodel.Identity{
-		Name: petname.Generate(2, "-") + "@canonical.com",
-	}
-	c.Assert(db.DB.Create(&u).Error, qt.IsNil)
+	u, err := dbmodel.NewIdentity(petname.Generate(2, "-"+"canonical.com"))
+	c.Assert(err, qt.IsNil)
+
+	c.Assert(db.DB.Create(u).Error, qt.IsNil)
 
 	cloud := dbmodel.Cloud{
 		Name: petname.Generate(2, "-"),
@@ -830,7 +835,7 @@ func createTestControllerEnvironment(ctx context.Context, c *qt.C, db db.Databas
 	c.Assert(err, qt.IsNil)
 	c.Assert(len(offer.UUID), qt.Equals, 36)
 
-	return u, group, controller, model, offer, cloud, cred
+	return *u, group, controller, model, offer, cloud, cred
 }
 
 func TestAddGroup(t *testing.T) {

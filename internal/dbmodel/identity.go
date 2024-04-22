@@ -5,6 +5,7 @@ package dbmodel
 import (
 	"crypto/sha256"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -13,6 +14,23 @@ import (
 	"github.com/juju/names/v5"
 	"gorm.io/gorm"
 )
+
+var (
+	IdentityCreationError = errors.New("identity name cannot be empty")
+)
+
+// NewIdentity returns an Identity with the Name and DisplayName fields set.
+func NewIdentity(name string) (*Identity, error) {
+	if name == "" {
+		return nil, IdentityCreationError
+	}
+	i := &Identity{
+		Name: name,
+	}
+	i.santiseIdentityId()
+	i.setDisplayName()
+	return i, nil
+}
 
 // Identity represents a JIMM identity, which can be a user or a service account.
 type Identity struct {
@@ -91,7 +109,7 @@ func (i Identity) ToJujuUserInfo() jujuparams.UserInfo {
 // for use in Juju tags, this is done by replacing all of the unsafe
 // email characters AND underscores (despite being safe in emails) with
 // hyphens. See the corresponding test for examples of sanitisations.
-func (i *Identity) SantiseIdentityId() {
+func (i *Identity) santiseIdentityId() {
 	userTagReplacer := strings.NewReplacer(
 		"~", "-",
 		"!", "-",
@@ -125,7 +143,7 @@ func (i *Identity) SantiseIdentityId() {
 // for use within the dashboard.
 //
 // Note: It will only set the display name if the display name is NOT set.
-func (i *Identity) SetDisplayName() {
+func (i *Identity) setDisplayName() {
 	if i.DisplayName == "" {
 		i.DisplayName = strings.Split(i.Name, "@")[0]
 	}

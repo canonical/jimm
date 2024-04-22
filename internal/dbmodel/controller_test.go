@@ -90,10 +90,9 @@ func TestControllerModels(t *testing.T) {
 		CloudCredential: cred,
 	}
 	c.Assert(db.Create(&m1).Error, qt.IsNil)
+	u2, err := dbmodel.NewIdentity("charlie@canonical.com")
+	c.Assert(err, qt.IsNil)
 
-	u2 := dbmodel.Identity{
-		Name: "charlie@canonical.com",
-	}
 	c.Assert(db.Create(&u2).Error, qt.IsNil)
 
 	m2 := dbmodel.Model{
@@ -102,7 +101,7 @@ func TestControllerModels(t *testing.T) {
 			String: "00000001-0000-0000-0000-0000-000000000002",
 			Valid:  true,
 		},
-		Owner:           u2,
+		Owner:           *u2,
 		Controller:      ctl,
 		CloudRegion:     cl.Regions[0],
 		CloudCredential: cred,
@@ -110,7 +109,7 @@ func TestControllerModels(t *testing.T) {
 	c.Assert(db.Create(&m2).Error, qt.IsNil)
 
 	var models []dbmodel.Model
-	err := db.Model(&ctl).Association("Models").Find(&models)
+	err = db.Model(&ctl).Association("Models").Find(&models)
 	c.Assert(err, qt.IsNil)
 
 	c.Check(models, qt.DeepEquals, []dbmodel.Model{{

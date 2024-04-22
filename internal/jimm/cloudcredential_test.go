@@ -44,13 +44,12 @@ func TestUpdateCloudCredential(t *testing.T) {
 		about:     "all ok",
 		jimmAdmin: true,
 		createEnv: func(c *qt.C, j *jimm.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, jimm.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
-			u := dbmodel.Identity{
-				Name: "alice@canonical.com",
-			}
+			u, err := dbmodel.NewIdentity("alice@canonical.com")
+			c.Assert(err, qt.IsNil)
 			c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
 
-			user := openfga.NewUser(&u, client)
-			err := user.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
+			user := openfga.NewUser(u, client)
+			err = user.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 
 			cloud := dbmodel.Cloud{
@@ -151,21 +150,21 @@ func TestUpdateCloudCredential(t *testing.T) {
 
 			expectedCredential.Models = []dbmodel.Model{m}
 
-			return &u, arg, expectedCredential, ""
+			return u, arg, expectedCredential, ""
 		},
 	}, {
 		about:                  "update credential error returned by controller",
 		jimmAdmin:              true,
 		updateCredentialErrors: []error{nil, errors.E("test error")},
 		createEnv: func(c *qt.C, j *jimm.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, jimm.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
-			u := dbmodel.Identity{
-				Name: "alice@canonical.com",
-			}
+			u, err := dbmodel.NewIdentity("alice@canonical.com")
+			c.Assert(err, qt.IsNil)
+
 			c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
 
-			user := openfga.NewUser(&u, client)
+			user := openfga.NewUser(u, client)
 
-			err := user.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
+			err = user.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 
 			cloud := dbmodel.Cloud{
@@ -241,7 +240,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 					AuthType: "test-auth-type",
 				},
 			}
-			return &u, arg, dbmodel.CloudCredential{}, "test error"
+			return u, arg, dbmodel.CloudCredential{}, "test error"
 		},
 	}, {
 		about:                  "check credential error returned by controller",
@@ -249,14 +248,14 @@ func TestUpdateCloudCredential(t *testing.T) {
 		checkCredentialErrors:  []error{errors.E("test error")},
 		updateCredentialErrors: []error{nil},
 		createEnv: func(c *qt.C, j *jimm.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, jimm.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
-			u := dbmodel.Identity{
-				Name: "alice@canonical.com",
-			}
+			u, err := dbmodel.NewIdentity("alice@canonical.com")
+			c.Assert(err, qt.IsNil)
+
 			c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
 
-			user := openfga.NewUser(&u, client)
+			user := openfga.NewUser(u, client)
 
-			err := user.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
+			err = user.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 
 			cloud := dbmodel.Cloud{
@@ -327,26 +326,26 @@ func TestUpdateCloudCredential(t *testing.T) {
 					AuthType: "test-auth-type",
 				},
 			}
-			return &u, arg, dbmodel.CloudCredential{}, "test error"
+			return u, arg, dbmodel.CloudCredential{}, "test error"
 		},
 	}, {
 		about:     "user is controller superuser",
 		jimmAdmin: true,
 		createEnv: func(c *qt.C, j *jimm.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, jimm.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
-			u := dbmodel.Identity{
-				Name: "alice@canonical.com",
-			}
-			c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
-
-			alice := openfga.NewUser(&u, client)
-			alice.JimmAdmin = true
-
-			err := alice.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
+			u, err := dbmodel.NewIdentity("alice@canonical.com")
 			c.Assert(err, qt.IsNil)
 
-			eve := dbmodel.Identity{
-				Name: "eve@canonical.com",
-			}
+			c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
+
+			alice := openfga.NewUser(u, client)
+			alice.JimmAdmin = true
+
+			err = alice.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
+			c.Assert(err, qt.IsNil)
+
+			eve, err := dbmodel.NewIdentity("eve@canonical.com")
+			c.Assert(err, qt.IsNil)
+
 			c.Assert(j.Database.DB.Create(&eve).Error, qt.IsNil)
 
 			cloud := dbmodel.Cloud{
@@ -361,7 +360,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 			err = alice.SetCloudAccess(context.Background(), cloud.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 
-			e := openfga.NewUser(&eve, client)
+			e := openfga.NewUser(eve, client)
 			err = e.SetCloudAccess(context.Background(), cloud.ResourceTag(), ofganames.CanAddModelRelation)
 			c.Assert(err, qt.IsNil)
 
@@ -436,7 +435,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 			m.CloudCredential = dbmodel.CloudCredential{}
 			m.CloudRegion = dbmodel.CloudRegion{}
 
-			return &u, arg, dbmodel.CloudCredential{
+			return u, arg, dbmodel.CloudCredential{
 				Name:      "test-credential-1",
 				CloudName: cloud.Name,
 				Cloud: dbmodel.Cloud{
@@ -457,14 +456,14 @@ func TestUpdateCloudCredential(t *testing.T) {
 		checkCredentialErrors: []error{errors.E("test error")},
 		jimmAdmin:             true,
 		createEnv: func(c *qt.C, j *jimm.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, jimm.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
-			u := dbmodel.Identity{
-				Name: "alice@canonical.com",
-			}
+			u, err := dbmodel.NewIdentity("alice@canonical.com")
+			c.Assert(err, qt.IsNil)
+
 			c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
 
-			user := openfga.NewUser(&u, client)
+			user := openfga.NewUser(u, client)
 
-			err := user.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
+			err = user.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 
 			cloud := dbmodel.Cloud{
@@ -564,20 +563,20 @@ func TestUpdateCloudCredential(t *testing.T) {
 			m.CloudRegion = dbmodel.CloudRegion{}
 			expectedCredential.Models = []dbmodel.Model{m}
 
-			return &u, arg, expectedCredential, ""
+			return u, arg, expectedCredential, ""
 		},
 	}, {
 		about:     "skip update",
 		jimmAdmin: true,
 		createEnv: func(c *qt.C, j *jimm.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, jimm.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
-			u := dbmodel.Identity{
-				Name: "alice@canonical.com",
-			}
+			u, err := dbmodel.NewIdentity("alice@canonical.com")
+			c.Assert(err, qt.IsNil)
+
 			c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
 
-			user := openfga.NewUser(&u, client)
+			user := openfga.NewUser(u, client)
 
-			err := user.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
+			err = user.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 
 			cloud := dbmodel.Cloud{
@@ -670,7 +669,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 			m.CloudRegion = dbmodel.CloudRegion{}
 			cred.Models = []dbmodel.Model{m}
 
-			return &u, arg, cred, ""
+			return u, arg, cred, ""
 		},
 	}}
 	for _, test := range tests {
@@ -876,14 +875,14 @@ func TestRevokeCloudCredential(t *testing.T) {
 	}{{
 		about: "credential revoked",
 		createEnv: func(c *qt.C, j *jimm.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, names.CloudCredentialTag, string) {
-			u := dbmodel.Identity{
-				Name: "alice@canonical.com",
-			}
+			u, err := dbmodel.NewIdentity("alice@canonical.com")
+			c.Assert(err, qt.IsNil)
+
 			c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
 
-			alice := openfga.NewUser(&u, client)
+			alice := openfga.NewUser(u, client)
 
-			err := alice.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
+			err = alice.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 
 			cloud := dbmodel.Cloud{
@@ -941,7 +940,7 @@ func TestRevokeCloudCredential(t *testing.T) {
 			}
 
 			tag := names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1")
-			return &u, tag, ""
+			return u, tag, ""
 		},
 	}, {
 		about: "credential revoked - controller returns a not found error",
@@ -950,14 +949,14 @@ func TestRevokeCloudCredential(t *testing.T) {
 			Code:    jujuparams.CodeNotFound,
 		}},
 		createEnv: func(c *qt.C, j *jimm.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, names.CloudCredentialTag, string) {
-			u := dbmodel.Identity{
-				Name: "alice@canonical.com",
-			}
+			u, err := dbmodel.NewIdentity("alice@canonical.com")
+			c.Assert(err, qt.IsNil)
+
 			c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
 
-			alice := openfga.NewUser(&u, client)
+			alice := openfga.NewUser(u, client)
 
-			err := alice.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
+			err = alice.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 
 			cloud := dbmodel.Cloud{
@@ -1015,19 +1014,19 @@ func TestRevokeCloudCredential(t *testing.T) {
 			}
 
 			tag := names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1")
-			return &u, tag, ""
+			return u, tag, ""
 		},
 	}, {
 		about: "credential still used by a model",
 		createEnv: func(c *qt.C, j *jimm.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, names.CloudCredentialTag, string) {
-			u := dbmodel.Identity{
-				Name: "alice@canonical.com",
-			}
+			u, err := dbmodel.NewIdentity("alice@canonical.com")
+			c.Assert(err, qt.IsNil)
+
 			c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
 
-			alice := openfga.NewUser(&u, client)
+			alice := openfga.NewUser(u, client)
 
-			err := alice.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
+			err = alice.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 
 			cloud := dbmodel.Cloud{
@@ -1090,37 +1089,37 @@ func TestRevokeCloudCredential(t *testing.T) {
 
 			tag := names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1")
 
-			return &u, tag, `cloud credential still used by 1 model\(s\)`
+			return u, tag, `cloud credential still used by 1 model\(s\)`
 		},
 	}, {
 		about: "user not owner of credentials - unauthorizer error",
 		createEnv: func(c *qt.C, j *jimm.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, names.CloudCredentialTag, string) {
-			u := dbmodel.Identity{
-				Name: "alice@canonical.com",
-			}
+			u, err := dbmodel.NewIdentity("alice@canonical.com")
+			c.Assert(err, qt.IsNil)
+
 			c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
 
-			alice := openfga.NewUser(&u, client)
+			alice := openfga.NewUser(u, client)
 
-			err := alice.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
+			err = alice.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 
 			tag := names.NewCloudCredentialTag("test-cloud/eve@canonical.com/test-credential-1")
 
-			return &u, tag, "unauthorized"
+			return u, tag, "unauthorized"
 		},
 	}, {
 		about:                  "error revoking credential on controller",
 		revokeCredentialErrors: []error{errors.E("test error")},
 		createEnv: func(c *qt.C, j *jimm.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, names.CloudCredentialTag, string) {
-			u := dbmodel.Identity{
-				Name: "alice@canonical.com",
-			}
+			u, err := dbmodel.NewIdentity("alice@canonical.com")
+			c.Assert(err, qt.IsNil)
+
 			c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
 
-			alice := openfga.NewUser(&u, client)
+			alice := openfga.NewUser(u, client)
 
-			err := alice.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
+			err = alice.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 
 			cloud := dbmodel.Cloud{
@@ -1174,7 +1173,7 @@ func TestRevokeCloudCredential(t *testing.T) {
 
 			tag := names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1")
 
-			return &u, tag, "test error"
+			return u, tag, "test error"
 		},
 	}}
 	for _, test := range tests {
@@ -1285,14 +1284,14 @@ func TestGetCloudCredential(t *testing.T) {
 	}{{
 		about: "all ok",
 		createEnv: func(c *qt.C, j *jimm.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, names.CloudCredentialTag, dbmodel.CloudCredential, string) {
-			u := dbmodel.Identity{
-				Name: "alice@canonical.com",
-			}
+			u, err := dbmodel.NewIdentity("alice@canonical.com")
+			c.Assert(err, qt.IsNil)
+
 			c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
 
-			alice := openfga.NewUser(&u, client)
+			alice := openfga.NewUser(u, client)
 
-			err := alice.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
+			err = alice.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 
 			cloud := dbmodel.Cloud{
@@ -1350,24 +1349,24 @@ func TestGetCloudCredential(t *testing.T) {
 
 			tag := names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1")
 
-			return &u, tag, cred, ""
+			return u, tag, cred, ""
 		},
 	}, {
 		about: "credential not found",
 		createEnv: func(c *qt.C, j *jimm.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, names.CloudCredentialTag, dbmodel.CloudCredential, string) {
-			u := dbmodel.Identity{
-				Name: "alice@canonical.com",
-			}
+			u, err := dbmodel.NewIdentity("alice@canonical.com")
+			c.Assert(err, qt.IsNil)
+
 			c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
 
-			alice := openfga.NewUser(&u, client)
+			alice := openfga.NewUser(u, client)
 
-			err := alice.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
+			err = alice.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 
 			tag := names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1")
 
-			return &u, tag, dbmodel.CloudCredential{}, `cloudcredential "test-cloud/alice@canonical.com/test-credential-1" not found`
+			return u, tag, dbmodel.CloudCredential{}, `cloudcredential "test-cloud/alice@canonical.com/test-credential-1" not found`
 		},
 	}}
 	for _, test := range tests {

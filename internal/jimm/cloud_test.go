@@ -40,25 +40,32 @@ func TestGetCloud(t *testing.T) {
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
+	aliceIdentity, err := dbmodel.NewIdentity("alice@canonical.com")
+	c.Assert(err, qt.IsNil)
 	alice := openfga.NewUser(
-		&dbmodel.Identity{
-			Name: "alice@canonical.com",
-		},
+		aliceIdentity,
 		client,
 	)
+
+	bobIdentity, err := dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, qt.IsNil)
 	bob := openfga.NewUser(
-		&dbmodel.Identity{
-			Name: "bob@canonical.com",
-		},
+		bobIdentity,
 		client,
 	)
-	charlie := openfga.NewUser(&dbmodel.Identity{Name: "charlie@canonical.com"}, client)
+
+	charlieIdentity, err := dbmodel.NewIdentity("charlie@canonical.com")
+	c.Assert(err, qt.IsNil)
+	charlie := openfga.NewUser(
+		charlieIdentity,
+		client,
+	)
 
 	// daphne is a jimm administrator
+	daphneIdentity, err := dbmodel.NewIdentity("daphne@canonical.com")
+	c.Assert(err, qt.IsNil)
 	daphne := openfga.NewUser(
-		&dbmodel.Identity{
-			Name: "daphne@canonical.com",
-		},
+		daphneIdentity,
 		client,
 	)
 	err = daphne.SetControllerAccess(
@@ -68,10 +75,10 @@ func TestGetCloud(t *testing.T) {
 	)
 	c.Assert(err, qt.IsNil)
 
+	everyoneIdentity, err := dbmodel.NewIdentity(ofganames.EveryoneUser)
+	c.Assert(err, qt.IsNil)
 	everyone := openfga.NewUser(
-		&dbmodel.Identity{
-			Name: ofganames.EveryoneUser,
-		},
+		everyoneIdentity,
 		client,
 	)
 
@@ -168,28 +175,39 @@ func TestForEachCloud(t *testing.T) {
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
+	aliceIdentity, err := dbmodel.NewIdentity("alice@canonical.com")
+	c.Assert(err, qt.IsNil)
 	alice := openfga.NewUser(
-		&dbmodel.Identity{Name: "alice@canonical.com"},
+		aliceIdentity,
 		client,
 	)
+
+	bobIdentity, err := dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, qt.IsNil)
 	bob := openfga.NewUser(
-		&dbmodel.Identity{Name: "bob@canonical.com"},
+		bobIdentity,
 		client,
 	)
+
+	charlieIdentity, err := dbmodel.NewIdentity("charlie@canonical.com")
+	c.Assert(err, qt.IsNil)
 	charlie := openfga.NewUser(
-		&dbmodel.Identity{Name: "charlie@canonical.com"},
+		charlieIdentity,
 		client,
 	)
+
+	daphneIdentity, err := dbmodel.NewIdentity("daphne@canonical.com")
+	c.Assert(err, qt.IsNil)
 	daphne := openfga.NewUser(
-		&dbmodel.Identity{Name: "daphne@canonical.com"},
+		daphneIdentity,
 		client,
 	)
 	daphne.JimmAdmin = true
 
+	everyoneIdentity, err := dbmodel.NewIdentity(ofganames.EveryoneUser)
+	c.Assert(err, qt.IsNil)
 	everyone := openfga.NewUser(
-		&dbmodel.Identity{
-			Name: ofganames.EveryoneUser,
-		},
+		everyoneIdentity,
 		client,
 	)
 

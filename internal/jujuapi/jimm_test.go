@@ -567,10 +567,11 @@ func (s *jimmSuite) TestImportModel(c *gc.C) {
 
 func (s *jimmSuite) TestAddCloudToController(c *gc.C) {
 	ctx := context.Background()
-	u := dbmodel.Identity{
-		Name: "alice@canonical.com",
-	}
-	err := s.JIMM.Database.GetIdentity(ctx, &u)
+
+	u, err := dbmodel.NewIdentity("alice@canonical.com")
+	c.Assert(err, gc.IsNil)
+
+	err = s.JIMM.Database.GetIdentity(ctx, u)
 	c.Assert(err, gc.IsNil)
 
 	conn := s.open(c, nil, "alice@canonical.com")
@@ -594,7 +595,7 @@ func (s *jimmSuite) TestAddCloudToController(c *gc.C) {
 	err = conn.APICall("JIMM", 4, "", "AddCloudToController", &req, nil)
 	c.Assert(err, gc.Equals, nil)
 
-	user := openfga.NewUser(&u, s.OFGAClient)
+	user := openfga.NewUser(u, s.OFGAClient)
 
 	cloud, err := s.JIMM.GetCloud(context.Background(), user, names.NewCloudTag("test-cloud"))
 	c.Assert(err, gc.IsNil)
@@ -604,10 +605,11 @@ func (s *jimmSuite) TestAddCloudToController(c *gc.C) {
 
 func (s *jimmSuite) TestAddExistingCloudToController(c *gc.C) {
 	ctx := context.Background()
-	u := dbmodel.Identity{
-		Name: "alice@canonical.com",
-	}
-	err := s.JIMM.Database.GetIdentity(ctx, &u)
+
+	u, err := dbmodel.NewIdentity("alice@canonical.com")
+	c.Assert(err, gc.IsNil)
+
+	err = s.JIMM.Database.GetIdentity(ctx, u)
 	c.Assert(err, gc.IsNil)
 
 	conn := s.open(c, nil, "alice@canonical.com")
@@ -631,7 +633,7 @@ func (s *jimmSuite) TestAddExistingCloudToController(c *gc.C) {
 	}
 	err = conn.APICall("JIMM", 4, "", "AddCloudToController", &req, nil)
 	c.Assert(err, gc.Equals, nil)
-	user := openfga.NewUser(&u, s.OFGAClient)
+	user := openfga.NewUser(u, s.OFGAClient)
 	cloud, err := s.JIMM.GetCloud(context.Background(), user, names.NewCloudTag("test-cloud"))
 	c.Assert(err, gc.IsNil)
 	c.Assert(cloud.Name, gc.DeepEquals, "test-cloud")
@@ -652,10 +654,11 @@ func (s *jimmSuite) TestAddExistingCloudToController(c *gc.C) {
 
 func (s *jimmSuite) TestRemoveCloudFromController(c *gc.C) {
 	ctx := context.Background()
-	u := dbmodel.Identity{
-		Name: "alice@canonical.com",
-	}
-	err := s.JIMM.Database.GetIdentity(ctx, &u)
+
+	u, err := dbmodel.NewIdentity("alice@canonical.com")
+	c.Assert(err, gc.IsNil)
+
+	err = s.JIMM.Database.GetIdentity(ctx, u)
 	c.Assert(err, gc.IsNil)
 
 	conn := s.open(c, nil, "alice@canonical.com")
@@ -679,7 +682,7 @@ func (s *jimmSuite) TestRemoveCloudFromController(c *gc.C) {
 	err = conn.APICall("JIMM", 4, "", "AddCloudToController", &req, nil)
 	c.Assert(err, gc.Equals, nil)
 
-	user := openfga.NewUser(&u, s.OFGAClient)
+	user := openfga.NewUser(u, s.OFGAClient)
 
 	_, err = s.JIMM.GetCloud(context.Background(), user, names.NewCloudTag("test-cloud"))
 	c.Assert(err, gc.Equals, nil)

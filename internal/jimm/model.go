@@ -519,9 +519,11 @@ func (b *modelBuilder) JujuModelInfo() *jujuparams.ModelInfo {
 func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCreateArgs) (_ *jujuparams.ModelInfo, err error) {
 	const op = errors.Op("jimm.AddModel")
 
-	owner := &dbmodel.Identity{
-		Name: args.Owner.Id(),
+	owner, err := dbmodel.NewIdentity(args.Owner.Id())
+	if err != nil {
+		return nil, errors.E(op, err)
 	}
+
 	err = j.Database.GetIdentity(ctx, owner)
 	if err != nil {
 		return nil, errors.E(op, err)

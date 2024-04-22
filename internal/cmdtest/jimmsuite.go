@@ -100,10 +100,11 @@ func (s *JimmCmdSuite) SetUpTest(c *gc.C) {
 	}
 	s.JujuConnSuite.SetUpTest(c)
 
-	s.AdminUser = &dbmodel.Identity{
-		Name:      "alice@canonical.com",
-		LastLogin: db.Now(),
-	}
+	i, err := dbmodel.NewIdentity("alice@canonical.com")
+	c.Assert(err, gc.IsNil)
+	s.AdminUser = i
+	s.AdminUser.LastLogin = db.Now()
+
 	err = s.JIMM.Database.GetIdentity(ctx, s.AdminUser)
 	c.Assert(err, gc.Equals, nil)
 
@@ -186,12 +187,11 @@ func setupTLS(c *gc.C) *tls.Config {
 }
 
 func (s *JimmCmdSuite) AddAdminUser(c *gc.C, email string) {
-	identity := dbmodel.Identity{
-		Name: email,
-	}
-	err := s.JIMM.Database.GetIdentity(context.Background(), &identity)
+	identity, err := dbmodel.NewIdentity(email)
 	c.Assert(err, gc.IsNil)
-	ofgaUser := openfga.NewUser(&identity, s.OFGAClient)
+	err = s.JIMM.Database.GetIdentity(context.Background(), identity)
+	c.Assert(err, gc.IsNil)
+	ofgaUser := openfga.NewUser(identity, s.OFGAClient)
 	err = ofgaUser.SetControllerAccess(context.Background(), s.JIMM.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, gc.IsNil)
 }
@@ -235,11 +235,10 @@ func (s *JimmCmdSuite) AddController(c *gc.C, name string, info *api.Info) {
 
 func (s *JimmCmdSuite) UpdateCloudCredential(c *gc.C, tag names.CloudCredentialTag, cred jujuparams.CloudCredential) {
 	ctx := context.Background()
-	u := dbmodel.Identity{
-		Name: tag.Owner().Id(),
-	}
-	user := openfga.NewUser(&u, s.JIMM.OpenFGAClient)
-	err := s.JIMM.Database.GetIdentity(ctx, &u)
+	u, err := dbmodel.NewIdentity(tag.Owner().Id())
+	c.Assert(err, gc.IsNil)
+	user := openfga.NewUser(u, s.JIMM.OpenFGAClient)
+	err = s.JIMM.Database.GetIdentity(ctx, u)
 	c.Assert(err, gc.Equals, nil)
 	_, err = s.JIMM.UpdateCloudCredential(ctx, user, jimm.UpdateCloudCredentialArgs{
 		CredentialTag: tag,
@@ -251,13 +250,13 @@ func (s *JimmCmdSuite) UpdateCloudCredential(c *gc.C, tag names.CloudCredentialT
 
 func (s *JimmCmdSuite) AddModel(c *gc.C, owner names.UserTag, name string, cloud names.CloudTag, region string, cred names.CloudCredentialTag) names.ModelTag {
 	ctx := context.Background()
+	i, err := dbmodel.NewIdentity(owner.Id())
+	c.Assert(err, gc.IsNil)
 	u := openfga.NewUser(
-		&dbmodel.Identity{
-			Name: owner.Id(),
-		},
+		i,
 		s.OFGAClient,
 	)
-	err := s.JIMM.Database.GetIdentity(ctx, u.Identity)
+	err = s.JIMM.Database.GetIdentity(ctx, u.Identity)
 	c.Assert(err, gc.Equals, nil)
 	mi, err := s.JIMM.AddModel(ctx, u, &jimm.ModelCreateArgs{
 		Name:            name,

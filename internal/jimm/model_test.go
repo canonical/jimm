@@ -942,12 +942,13 @@ func TestAddModel(t *testing.T) {
 				if ownerId == "" {
 					ownerId = user.Tag().Id()
 				}
+
+				ownerIdentity, err := dbmodel.NewIdentity(ownerId)
+				c.Assert(err, qt.IsNil)
 				isModelAdmin, err := openfga.IsAdministrator(
 					context.Background(),
 					openfga.NewUser(
-						&dbmodel.Identity{
-							Name: ownerId,
-						},
+						ownerIdentity,
 						client,
 					),
 					m1.ResourceTag(),
@@ -1296,9 +1297,9 @@ func TestModelInfo(t *testing.T) {
 			env := jimmtest.ParseEnvironment(c, test.env)
 			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
 
-			dbUser := &dbmodel.Identity{
-				Name: test.username,
-			}
+			dbUser, err := dbmodel.NewIdentity(test.username)
+			c.Assert(err, qt.IsNil)
+
 			user := openfga.NewUser(dbUser, client)
 
 			mi, err := j.ModelInfo(context.Background(), user, names.NewModelTag(test.uuid))

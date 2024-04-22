@@ -450,7 +450,11 @@ func ListUsersWithAccess[T ofganames.ResourceTagger](ctx context.Context, client
 		if entity.ID == "*" {
 			entity.ID = ofganames.EveryoneUser
 		}
-		users[i] = NewUser(&dbmodel.Identity{Name: entity.ID}, client)
+		identity, err := dbmodel.NewIdentity(entity.ID)
+		if err != nil {
+			zapctx.Error(ctx, "failed to return user with access", zap.Error(err), zap.String("id", entity.ID))
+		}
+		users[i] = NewUser(identity, client)
 	}
 	return users, nil
 }

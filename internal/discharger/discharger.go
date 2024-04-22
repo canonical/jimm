@@ -122,10 +122,12 @@ func (md *MacaroonDischarger) CheckThirdPartyCaveat(ctx context.Context, req *ht
 
 	offerTag := jimmnames.NewApplicationOfferTag(offerUUID)
 
+	i, err := dbmodel.NewIdentity(userTag.Id())
+	if err != nil {
+		return nil, err
+	}
 	user := openfga.NewUser(
-		&dbmodel.Identity{
-			Name: userTag.Id(),
-		},
+		i,
 		md.ofgaClient,
 	)
 

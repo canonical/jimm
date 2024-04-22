@@ -30,15 +30,14 @@ func TestCloudCredentialTag(t *testing.T) {
 func TestCloudCredential(t *testing.T) {
 	c := qt.New(t)
 	db := gormDB(c)
-
+	i, err := dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, qt.IsNil)
 	cred := dbmodel.CloudCredential{
 		Name: "test-credential",
 		Cloud: dbmodel.Cloud{
 			Name: "test-cloud",
 		},
-		Owner: dbmodel.Identity{
-			Name: "bob@canonical.com",
-		},
+		Owner:    *i,
 		AuthType: "empty",
 		Label:    "test label",
 		Attributes: dbmodel.StringMap{
@@ -65,13 +64,12 @@ func TestCloudCredentialsCascadeOnDelete(t *testing.T) {
 	result := db.Create(&cloud)
 	c.Assert(result.Error, qt.IsNil)
 	c.Check(result.RowsAffected, qt.Equals, int64(1))
-
+	i, err := dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, qt.IsNil)
 	cred := dbmodel.CloudCredential{
 		Name:  "test-credential",
 		Cloud: cloud,
-		Owner: dbmodel.Identity{
-			Name: "bob@canonical.com",
-		},
+		Owner: *i,
 	}
 	result = db.Create(&cred)
 	c.Assert(result.Error, qt.IsNil)
