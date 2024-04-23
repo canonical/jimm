@@ -224,53 +224,23 @@ func (as *AuthenticationService) DeviceAccessToken(ctx context.Context, res *oau
 		oauth2.SetAuthURLParam("client_secret", as.oauthConfig.ClientSecret),
 	)
 	if err != nil {
+		zapctx.Error(ctx, "device access token call failed", zap.Error(err))
 		return nil, errors.E(op, err, "device access token call failed")
 	}
 
 	return t, nil
 }
 
-// ExtractAndVerifyIDToken extracts the id token from the extras claims of an oauth2 token
-// and performs signature verification of the token.
-func (as *AuthenticationService) ExtractAndVerifyIDToken(ctx context.Context, oauth2Token *oauth2.Token) (*oidc.IDToken, error) {
+// UserInfo call the user info endpoint using the provided token and returns user's email.
+func (as *AuthenticationService) UserInfo(ctx context.Context, oauth2Token *oauth2.Token) (string, error) {
 	const op = errors.Op("auth.AuthenticationService.ExtractAndVerifyIDToken")
 
-	// Extract the ID Token from oauth2 token.
-	rawIDToken, ok := oauth2Token.Extra("id_token").(string)
-	if !ok {
-		return nil, errors.E(op, "failed to extract id token")
-	}
-
-	verifier := as.provider.Verifier(&oidc.Config{
-		ClientID: as.oauthConfig.ClientID,
-	})
-
-	token, err := verifier.Verify(ctx, rawIDToken)
+	userInfo, err := as.provider.UserInfo(ctx, oauth2.StaticTokenSource(oauth2Token))
 	if err != nil {
-		zapctx.Error(ctx, "failed to verify id token", zap.Error(err))
-		return nil, errors.E(op, err, "failed to verify id token")
+		return "", errors.E(op, err, "failed to retrieve user info")
 	}
 
-	return token, nil
-}
-
-// Email retrieves the users email from an id token via the email claim
-func (as *AuthenticationService) Email(idToken *oidc.IDToken) (string, error) {
-	const op = errors.Op("auth.AuthenticationService.Email")
-
-	var claims struct {
-		Email         string `json:"email"`
-		EmailVerified bool   `json:"email_verified"` // TODO(ale8k): Add verification logic
-	}
-	if idToken == nil {
-		return "", errors.E(op, "id token is nil")
-	}
-
-	if err := idToken.Claims(&claims); err != nil {
-		return "", errors.E(op, err, "failed to extract claims")
-	}
-
-	return claims.Email, nil
+	return userInfo.Email, nil
 }
 
 // MintSessionToken mints a session token to be used when logging into JIMM

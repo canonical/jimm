@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/coreos/go-oidc/v3/oidc"
 	qt "github.com/frankban/quicktest"
 	"github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
@@ -321,14 +320,7 @@ func (m *mockOAuthAuthenticator) DeviceAccessToken(ctx context.Context, res *oau
 	return &oauth2.Token{}, nil
 }
 
-func (m *mockOAuthAuthenticator) ExtractAndVerifyIDToken(ctx context.Context, oauth2Token *oauth2.Token) (*oidc.IDToken, error) {
-	if m.err != nil {
-		return nil, m.err
-	}
-	return &oidc.IDToken{}, nil
-}
-
-func (m *mockOAuthAuthenticator) Email(idToken *oidc.IDToken) (string, error) {
+func (m *mockOAuthAuthenticator) UserInfo(ctx context.Context, oauth2Token *oauth2.Token) (string, error) {
 	if m.err != nil {
 		return "", m.err
 	}
