@@ -2,7 +2,7 @@
 -- and is a migration that renames `user` to `identity`.
 ALTER TABLE users ADD COLUMN access_token TEXT;
 ALTER TABLE users ADD COLUMN refresh_token TEXT;
-ALTER TABLE users ADD COLUMN access_token_expiry TIMESTAMP;
+ALTER TABLE users ADD COLUMN access_token_expiry TIMESTAMP WITH TIME ZONE;
 ALTER TABLE users ADD COLUMN access_token_type TEXT;
 
 -- Note that we don't need to rename underlying indexes/constraints. As Postgres
