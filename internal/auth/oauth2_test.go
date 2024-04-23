@@ -155,9 +155,8 @@ func TestDevice(t *testing.T) {
 	err = authSvc.UpdateIdentity(ctx, email, token)
 	c.Assert(err, qt.IsNil)
 
-	updatedUser := &dbmodel.Identity{
-		Name: u.Email,
-	}
+	updatedUser, err := dbmodel.NewIdentity(u.Email)
+	c.Assert(err, qt.IsNil)
 	c.Assert(db.GetIdentity(ctx, updatedUser), qt.IsNil)
 	c.Assert(updatedUser.AccessToken, qt.Not(qt.Equals), "")
 	c.Assert(updatedUser.RefreshToken, qt.Not(qt.Equals), "")
@@ -300,7 +299,12 @@ func TestAuthenticateBrowserSessionAndLogout(t *testing.T) {
 
 	authSvc, db, sessionStore := setupTestAuthSvc(ctx, c, time.Hour)
 
-	cookie, err := jimmtest.RunBrowserLogin(db, sessionStore)
+	cookie, err := jimmtest.RunBrowserLogin(
+		db,
+		sessionStore,
+		jimmtest.HardcodedSafeUsername,
+		jimmtest.HardcodedSafePassword,
+	)
 	c.Assert(err, qt.IsNil)
 
 	rec := httptest.NewRecorder()
@@ -341,7 +345,12 @@ func TestAuthenticateBrowserSessionRejectsNoneDecryptableOrDecodableCookies(t *t
 
 	authSvc, db, sessionStore := setupTestAuthSvc(ctx, c, time.Hour)
 
-	_, err := jimmtest.RunBrowserLogin(db, sessionStore)
+	_, err := jimmtest.RunBrowserLogin(
+		db,
+		sessionStore,
+		jimmtest.HardcodedSafeUsername,
+		jimmtest.HardcodedSafePassword,
+	)
 	c.Assert(err, qt.IsNil)
 
 	// Failure case 1: Bad base64 decoding
@@ -378,7 +387,12 @@ func TestAuthenticateBrowserSessionHandlesExpiredAccessTokens(t *testing.T) {
 
 	authSvc, db, sessionStore := setupTestAuthSvc(ctx, c, time.Hour)
 
-	cookie, err := jimmtest.RunBrowserLogin(db, sessionStore)
+	cookie, err := jimmtest.RunBrowserLogin(
+		db,
+		sessionStore,
+		jimmtest.HardcodedSafeUsername,
+		jimmtest.HardcodedSafePassword,
+	)
 	c.Assert(err, qt.IsNil)
 
 	rec := httptest.NewRecorder()
@@ -391,16 +405,16 @@ func TestAuthenticateBrowserSessionHandlesExpiredAccessTokens(t *testing.T) {
 
 	// User exists from run browser login, but we're gonna
 	// artificially expire their access token
-	u := dbmodel.Identity{
-		Name: "jimm-test@canonical.com",
-	}
-	err = db.GetIdentity(ctx, &u)
+	u, err := dbmodel.NewIdentity("jimm-test@canonical.com")
+	c.Assert(err, qt.IsNil)
+	err = db.GetIdentity(ctx, u)
 	c.Assert(err, qt.IsNil)
 
 	previousToken := u.AccessToken
 
 	u.AccessTokenExpiry = time.Now()
-	db.UpdateIdentity(ctx, &u)
+	err = db.UpdateIdentity(ctx, u)
+	c.Assert(err, qt.IsNil)
 
 	ctx, err = authSvc.AuthenticateBrowserSession(ctx, rec, req)
 	c.Assert(err, qt.IsNil)
@@ -410,7 +424,7 @@ func TestAuthenticateBrowserSessionHandlesExpiredAccessTokens(t *testing.T) {
 	c.Assert(identityId, qt.Equals, "jimm-test@canonical.com")
 
 	// Get identity again with new access token expiry and access token
-	err = db.GetIdentity(ctx, &u)
+	err = db.GetIdentity(ctx, u)
 	c.Assert(err, qt.IsNil)
 
 	// Assert new access token is valid for at least 4 minutes(our setup is 5 minutes)
@@ -429,7 +443,12 @@ func TestAuthenticateBrowserSessionHandlesMissingOrExpiredRefreshTokens(t *testi
 
 	authSvc, db, sessionStore := setupTestAuthSvc(ctx, c, time.Hour)
 
-	cookie, err := jimmtest.RunBrowserLogin(db, sessionStore)
+	cookie, err := jimmtest.RunBrowserLogin(
+		db,
+		sessionStore,
+		jimmtest.HardcodedSafeUsername,
+		jimmtest.HardcodedSafePassword,
+	)
 	c.Assert(err, qt.IsNil)
 
 	rec := httptest.NewRecorder()
@@ -442,10 +461,9 @@ func TestAuthenticateBrowserSessionHandlesMissingOrExpiredRefreshTokens(t *testi
 
 	// User exists from run browser login, but we're gonna
 	// artificially expire their access token
-	u := dbmodel.Identity{
-		Name: "jimm-test@canonical.com",
-	}
-	err = db.GetIdentity(ctx, &u)
+	u, err := dbmodel.NewIdentity("jimm-test@canonical.com")
+	c.Assert(err, qt.IsNil)
+	err = db.GetIdentity(ctx, u)
 	c.Assert(err, qt.IsNil)
 
 	// As our access token has "expired"
@@ -453,7 +471,7 @@ func TestAuthenticateBrowserSessionHandlesMissingOrExpiredRefreshTokens(t *testi
 	// And we're missing a refresh token (the same case would apply for an expired refresh token
 	// or any scenario where the token source cannot refresh the access token)
 	u.RefreshToken = ""
-	db.UpdateIdentity(ctx, &u)
+	db.UpdateIdentity(ctx, u)
 
 	// AuthenticateBrowserSession should fail to refresh the users session and delete
 	// the current session, giving us the same cookie back with a max-age of -1.

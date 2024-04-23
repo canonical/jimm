@@ -37,9 +37,9 @@ func TestSetIdentityModelDefaults(t *testing.T) {
 	}{{
 		about: "defaults do not exist yet - defaults created",
 		setup: func(c *qt.C, j *jimm.JIMM) testConfig {
-			identity := dbmodel.Identity{
-				Name: "bob@canonical.com",
-			}
+			i, err := dbmodel.NewIdentity("bob@canonical.com")
+			c.Assert(err, qt.IsNil)
+			identity := i
 			c.Assert(j.Database.DB.Create(&identity).Error, qt.IsNil)
 
 			defaults := map[string]interface{}{
@@ -49,12 +49,12 @@ func TestSetIdentityModelDefaults(t *testing.T) {
 
 			expectedDefaults := dbmodel.IdentityModelDefaults{
 				IdentityName: identity.Name,
-				Identity:     identity,
+				Identity:     *i,
 				Defaults:     defaults,
 			}
 
 			return testConfig{
-				identity:         &identity,
+				identity:         i,
 				defaults:         defaults,
 				expectedDefaults: &expectedDefaults,
 			}
@@ -62,14 +62,13 @@ func TestSetIdentityModelDefaults(t *testing.T) {
 	}, {
 		about: "defaults already exist - defaults updated",
 		setup: func(c *qt.C, j *jimm.JIMM) testConfig {
-			identity := dbmodel.Identity{
-				Name: "bob@canonical.com",
-			}
-			c.Assert(j.Database.DB.Create(&identity).Error, qt.IsNil)
+			i, err := dbmodel.NewIdentity("bob@canonical.com")
+			c.Assert(err, qt.IsNil)
+			c.Assert(j.Database.DB.Create(i).Error, qt.IsNil)
 
 			j.Database.SetIdentityModelDefaults(ctx, &dbmodel.IdentityModelDefaults{
-				IdentityName: identity.Name,
-				Identity:     identity,
+				IdentityName: i.Name,
+				Identity:     *i,
 				Defaults: map[string]interface{}{
 					"key1": float64(17),
 					"key2": "a test string",
@@ -83,13 +82,13 @@ func TestSetIdentityModelDefaults(t *testing.T) {
 			}
 
 			expectedDefaults := dbmodel.IdentityModelDefaults{
-				IdentityName: identity.Name,
-				Identity:     identity,
+				IdentityName: i.Name,
+				Identity:     *i,
 				Defaults:     defaults,
 			}
 
 			return testConfig{
-				identity:         &identity,
+				identity:         i,
 				defaults:         defaults,
 				expectedDefaults: &expectedDefaults,
 			}
@@ -97,9 +96,8 @@ func TestSetIdentityModelDefaults(t *testing.T) {
 	}, {
 		about: "identity does not exist",
 		setup: func(c *qt.C, j *jimm.JIMM) testConfig {
-			identity := dbmodel.Identity{
-				Name: "bob@canonical.com",
-			}
+			i, err := dbmodel.NewIdentity("bob@canonical.com")
+			c.Assert(err, qt.IsNil)
 
 			defaults := map[string]interface{}{
 				"key1": float64(42),
@@ -108,7 +106,7 @@ func TestSetIdentityModelDefaults(t *testing.T) {
 			}
 
 			return testConfig{
-				identity:      &identity,
+				identity:      i,
 				defaults:      defaults,
 				expectedError: `.*violates foreign key constraint.*`,
 			}
@@ -116,10 +114,9 @@ func TestSetIdentityModelDefaults(t *testing.T) {
 	}, {
 		about: "cannot set agent-version",
 		setup: func(c *qt.C, j *jimm.JIMM) testConfig {
-			identity := dbmodel.Identity{
-				Name: "bob@canonical.com",
-			}
-			c.Assert(j.Database.DB.Create(&identity).Error, qt.IsNil)
+			i, err := dbmodel.NewIdentity("bob@canonical.com")
+			c.Assert(err, qt.IsNil)
+			c.Assert(j.Database.DB.Create(i).Error, qt.IsNil)
 
 			defaults := map[string]interface{}{
 				"agent-version": "2.0",
@@ -128,7 +125,7 @@ func TestSetIdentityModelDefaults(t *testing.T) {
 			}
 
 			return testConfig{
-				identity:      &identity,
+				identity:      i,
 				defaults:      defaults,
 				expectedError: `agent-version cannot have a default value`,
 			}

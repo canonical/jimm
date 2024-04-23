@@ -45,15 +45,23 @@ func TestFindAuditEvents(t *testing.T) {
 	err = j.Database.Migrate(ctx, true)
 	c.Assert(err, qt.Equals, nil)
 
-	admin := openfga.NewUser(&dbmodel.Identity{Name: "alice@canonical.com"}, client)
+	alice, err := dbmodel.NewIdentity("alice@canonical.com")
+	c.Assert(err, qt.IsNil)
+
+	admin := openfga.NewUser(alice, client)
 	err = admin.SetControllerAccess(ctx, j.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, qt.IsNil)
 
-	privileged := openfga.NewUser(&dbmodel.Identity{Name: "bob@canonical.com"}, client)
+	bob, err := dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, qt.IsNil)
+
+	privileged := openfga.NewUser(bob, client)
 	err = privileged.SetControllerAccess(ctx, j.ResourceTag(), ofganames.AuditLogViewerRelation)
 	c.Assert(err, qt.IsNil)
 
-	unprivileged := openfga.NewUser(&dbmodel.Identity{Name: "eve@canonical.com"}, client)
+	eve, err := dbmodel.NewIdentity("eve@canonical.com")
+	c.Assert(err, qt.IsNil)
+	unprivileged := openfga.NewUser(eve, client)
 
 	events := []dbmodel.AuditLogEntry{{
 		Time:         now,

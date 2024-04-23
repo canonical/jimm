@@ -33,10 +33,9 @@ func (s *addCloudToControllerSuite) SetUpTest(c *gc.C) {
 	s.JimmCmdSuite.SetUpTest(c)
 
 	// We add user bob, who is a JIMM administrator.
-	err := s.JIMM.Database.UpdateIdentity(context.Background(), &dbmodel.Identity{
-		DisplayName: "Bob",
-		Name:        "bob@canonical.com",
-	})
+	i, err := dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, gc.IsNil)
+	err = s.JIMM.Database.UpdateIdentity(context.Background(), i)
 	c.Assert(err, gc.IsNil)
 
 	// We add a test-cloud cloud.
@@ -52,10 +51,10 @@ func (s *addCloudToControllerSuite) SetUpTest(c *gc.C) {
 
 	// We grant user bob administrator access to JIMM and the added
 	// test-cloud.
+	i, err = dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, gc.IsNil)
 	bob := openfga.NewUser(
-		&dbmodel.Identity{
-			Name: "bob@canonical.com",
-		},
+		i,
 		s.JIMM.OpenFGAClient,
 	)
 	err = bob.SetControllerAccess(context.Background(), s.JIMM.ResourceTag(), ofganames.AdministratorRelation)

@@ -78,10 +78,11 @@ func (s *websocketSuite) SetUpTest(c *gc.C) {
 	err = s.JIMM.Database.GetModel(ctx, s.Model3)
 	c.Assert(err, gc.Equals, nil)
 
+	bobIdentity, err := dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, gc.IsNil)
+
 	bob := openfga.NewUser(
-		&dbmodel.Identity{
-			Name: "bob@canonical.com",
-		},
+		bobIdentity,
 		s.OFGAClient,
 	)
 	err = bob.SetModelAccess(ctx, s.Model3.ResourceTag(), ofganames.ReaderRelation)

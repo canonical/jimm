@@ -34,10 +34,9 @@ func (s *updateCredentialsSuite) TestUpdateCredentialsWithNewCredentials(c *gc.C
 	// alice is superuser
 	bClient := jimmtest.NewUserSessionLogin(c, "alice")
 
-	sa := dbmodel.Identity{
-		Name: clientIDWithDomain,
-	}
-	err := s.JIMM.Database.GetIdentity(ctx, &sa)
+	sa, err := dbmodel.NewIdentity(clientIDWithDomain)
+	c.Assert(err, gc.IsNil)
+	err = s.JIMM.Database.GetIdentity(ctx, sa)
 	c.Assert(err, gc.IsNil)
 
 	// Make alice admin of the service account
@@ -75,7 +74,7 @@ func (s *updateCredentialsSuite) TestUpdateCredentialsWithNewCredentials(c *gc.C
   models: []
 `)
 
-	ofgaUser := openfga.NewUser(&sa, s.JIMM.AuthorizationClient())
+	ofgaUser := openfga.NewUser(sa, s.JIMM.AuthorizationClient())
 	cloudCredentialTag := names.NewCloudCredentialTag("test-cloud/" + clientIDWithDomain + "/test-credentials")
 	cloudCredential2, err := s.JIMM.GetCloudCredential(ctx, ofgaUser, cloudCredentialTag)
 	c.Assert(err, gc.IsNil)
@@ -96,10 +95,9 @@ func (s *updateCredentialsSuite) TestUpdateCredentialsWithExistingCredentials(c 
 	// alice is superuser
 	bClient := jimmtest.NewUserSessionLogin(c, "alice")
 
-	sa := dbmodel.Identity{
-		Name: clientIDWithDomain,
-	}
-	err := s.JIMM.Database.GetIdentity(ctx, &sa)
+	sa, err := dbmodel.NewIdentity(clientIDWithDomain)
+	c.Assert(err, gc.IsNil)
+	err = s.JIMM.Database.GetIdentity(ctx, sa)
 	c.Assert(err, gc.IsNil)
 
 	// Make alice admin of the service account
@@ -146,7 +144,7 @@ func (s *updateCredentialsSuite) TestUpdateCredentialsWithExistingCredentials(c 
   models: []
 `)
 
-	ofgaUser := openfga.NewUser(&sa, s.JIMM.AuthorizationClient())
+	ofgaUser := openfga.NewUser(sa, s.JIMM.AuthorizationClient())
 	cloudCredentialTag := names.NewCloudCredentialTag("test-cloud/" + clientIDWithDomain + "/test-credentials")
 	cloudCredential2, err := s.JIMM.GetCloudCredential(ctx, ofgaUser, cloudCredentialTag)
 	c.Assert(err, gc.IsNil)

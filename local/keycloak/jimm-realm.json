@@ -476,6 +476,28 @@
           "manage-account"
         ]
       }
+    },
+    {
+      "id": "8281cec3-5b48-46eb-a41d-72c15ec3f9e1",
+      "username": "jimm_test",
+      "email": "jimm_test@canonical.com",
+      "emailVerified": true,
+      "enabled": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password"
+        }
+      ],
+      "realmRoles": [
+        "user"
+      ],
+      "clientRoles": {
+        "account": [
+          "view-profile",
+          "manage-account"
+        ]
+      }
     }
   ],
   "scopeMappings": [

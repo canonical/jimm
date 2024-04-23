@@ -1347,10 +1347,10 @@ func createTestControllerEnvironment(ctx context.Context, c *gc.C, s *accessCont
 	err = db.GetGroup(ctx, &group)
 	c.Assert(err, gc.IsNil)
 
-	u := dbmodel.Identity{
-		Name: petname.Generate(2, "-") + "@canonical.com",
-	}
-	c.Assert(db.DB.Create(&u).Error, gc.IsNil)
+	u, err := dbmodel.NewIdentity(petname.Generate(2, "-") + "@canonical.com")
+	c.Assert(err, gc.IsNil)
+
+	c.Assert(db.DB.Create(u).Error, gc.IsNil)
 
 	cloud := dbmodel.Cloud{
 		Name: petname.Generate(2, "-"),
@@ -1424,7 +1424,7 @@ func createTestControllerEnvironment(ctx context.Context, c *gc.C, s *accessCont
 	conn := s.open(c, nil, "alice")
 	client := api.NewClient(conn)
 
-	return u, group, controller, model, offer, cloud, cred, client, func() {
+	return *u, group, controller, model, offer, cloud, cred, client, func() {
 		conn.Close()
 	}
 }

@@ -140,10 +140,14 @@ func (j *JIMM) Offer(ctx context.Context, user *openfga.User, offer AddApplicati
 	if ownerId == "" {
 		ownerId = user.Tag().Id()
 	}
+
+	identity, err := dbmodel.NewIdentity(ownerId)
+	if err != nil {
+		return errors.E(op, err)
+	}
+
 	owner := openfga.NewUser(
-		&dbmodel.Identity{
-			Name: ownerId,
-		},
+		identity,
 		j.OpenFGAClient,
 	)
 	if err := owner.SetApplicationOfferAccess(ctx, doc.ResourceTag(), ofganames.AdministratorRelation); err != nil {
@@ -154,10 +158,13 @@ func (j *JIMM) Offer(ctx context.Context, user *openfga.User, offer AddApplicati
 			zap.String("application-offer", doc.UUID))
 	}
 
+	everyoneIdentity, err := dbmodel.NewIdentity(ofganames.EveryoneUser)
+	if err != nil {
+		return errors.E(op, err)
+	}
+
 	everyone := openfga.NewUser(
-		&dbmodel.Identity{
-			Name: ofganames.EveryoneUser,
-		},
+		everyoneIdentity,
 		j.OpenFGAClient,
 	)
 	if err := everyone.SetApplicationOfferAccess(ctx, doc.ResourceTag(), ofganames.ReaderRelation); err != nil {
@@ -357,8 +364,13 @@ func (j *JIMM) GetApplicationOffer(ctx context.Context, user *openfga.User, offe
 func (j *JIMM) GrantOfferAccess(ctx context.Context, user *openfga.User, offerURL string, ut names.UserTag, access jujuparams.OfferAccessPermission) error {
 	const op = errors.Op("jimm.GrantOfferAccess")
 
-	err := j.doApplicationOfferAdmin(ctx, user, offerURL, func(offer *dbmodel.ApplicationOffer, api API) error {
-		tUser := openfga.NewUser(&dbmodel.Identity{Name: ut.Id()}, j.OpenFGAClient)
+	identity, err := dbmodel.NewIdentity(ut.Id())
+	if err != nil {
+		return errors.E(op, err)
+	}
+
+	err = j.doApplicationOfferAdmin(ctx, user, offerURL, func(offer *dbmodel.ApplicationOffer, api API) error {
+		tUser := openfga.NewUser(identity, j.OpenFGAClient)
 		currentRelation := tUser.GetApplicationOfferAccess(ctx, offer.ResourceTag())
 		currentAccessLevel := ToOfferAccessString(currentRelation)
 		targetAccessLevel := determineAccessLevelAfterGrant(currentAccessLevel, string(access))
@@ -414,8 +426,13 @@ func determineAccessLevelAfterGrant(currentAccessLevel, grantAccessLevel string)
 func (j *JIMM) RevokeOfferAccess(ctx context.Context, user *openfga.User, offerURL string, ut names.UserTag, access jujuparams.OfferAccessPermission) (err error) {
 	const op = errors.Op("jimm.RevokeOfferAccess")
 
+	identity, err := dbmodel.NewIdentity(ut.Id())
+	if err != nil {
+		return errors.E(op, err)
+	}
+
 	err = j.doApplicationOfferAdmin(ctx, user, offerURL, func(offer *dbmodel.ApplicationOffer, api API) error {
-		tUser := openfga.NewUser(&dbmodel.Identity{Name: ut.Id()}, j.OpenFGAClient)
+		tUser := openfga.NewUser(identity, j.OpenFGAClient)
 		targetRelation, err := ToOfferRelation(string(access))
 		if err != nil {
 			return errors.E(op, err)
@@ -664,10 +681,12 @@ func (j *JIMM) applicationOfferFilters(ctx context.Context, jujuFilters ...jujup
 		}
 		if len(f.AllowedConsumerTags) > 0 {
 			for _, u := range f.AllowedConsumerTags {
-				dbUser := dbmodel.Identity{
-					Name: u,
+				identity, err := dbmodel.NewIdentity(u)
+				if err != nil {
+					return nil, errors.E(err)
 				}
-				ofgaUser := openfga.NewUser(&dbUser, j.OpenFGAClient)
+
+				ofgaUser := openfga.NewUser(identity, j.OpenFGAClient)
 				offerUUIDs, err := ofgaUser.ListApplicationOffers(ctx, ofganames.ConsumerRelation)
 				if err != nil {
 					return nil, errors.E(err)

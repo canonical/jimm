@@ -264,8 +264,11 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 	//client := modelmanager.NewClient(conn)
 	//err := client.GrantModel("bob@canonical.com", "write", mt4.Id())
 	//c.Assert(err, gc.Equals, nil)
-	bob := openfga.NewUser(&dbmodel.Identity{Name: "bob@canonical.com"}, s.OFGAClient)
-	err := bob.SetModelAccess(context.Background(), mt4, ofganames.WriterRelation)
+
+	bobIdentity, err := dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, gc.IsNil)
+	bob := openfga.NewUser(bobIdentity, s.OFGAClient)
+	err = bob.SetModelAccess(context.Background(), mt4, ofganames.WriterRelation)
 	c.Assert(err, gc.Equals, nil)
 
 	mt5 := s.AddModel(c, names.NewUserTag("charlie@canonical.com"), "model-5", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, s.Model2.CloudCredential.ResourceTag())
@@ -521,7 +524,9 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 	s.AddAdminUser(c, "bob@canonical.com")
 
 	// we make bob a jimm administrator
-	bob := openfga.NewUser(&dbmodel.Identity{Name: "bob@canonical.com"}, s.OFGAClient)
+	bobIdentity, err := dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, gc.IsNil)
+	bob := openfga.NewUser(bobIdentity, s.OFGAClient)
 	err = bob.SetControllerAccess(context.Background(), s.JIMM.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, gc.Equals, nil)
 

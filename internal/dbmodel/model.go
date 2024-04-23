@@ -47,7 +47,7 @@ type Model struct {
 
 	// CloudCredential is the credential used with the model.
 	CloudCredentialID uint
-	CloudCredential   CloudCredential
+	CloudCredential   CloudCredential `gorm:"foreignkey:CloudCredentialID;references:ID"`
 
 	// Type is the type of model.
 	Type string
@@ -108,7 +108,10 @@ func (m *Model) SwitchOwner(u *Identity) {
 	m.Owner = *u
 }
 
-// FromJujuModelInfo converts jujuparams.ModelInfo into Model.
+// FromJujuModelInfo converts on a best-effort basis jujuparams.ModelInfo into Model.
+//
+// Some fields specific to JIMM which aren't present in a jujuparams.ModelInfo type
+// will need to be filled in manually by the caller of this function.
 func (m *Model) FromJujuModelInfo(info jujuparams.ModelInfo) error {
 	m.Name = info.Name
 	m.Type = info.Type
