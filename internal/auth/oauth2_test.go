@@ -146,8 +146,16 @@ func TestDevice(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(token, qt.IsNotNil)
 
-	// Get user info
-	email, err := authSvc.UserInfo(ctx, token)
+	// Extract and verify id token
+	idToken, err := authSvc.ExtractAndVerifyIDToken(ctx, token)
+	c.Assert(err, qt.IsNil)
+	c.Assert(idToken, qt.IsNotNil)
+
+	// Test subject set
+	c.Assert(idToken.Subject, qt.Equals, u.Id)
+
+	// Retrieve the email
+	email, err := authSvc.Email(idToken)
 	c.Assert(err, qt.IsNil)
 	c.Assert(email, qt.Equals, u.Email)
 
