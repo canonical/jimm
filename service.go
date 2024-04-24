@@ -8,7 +8,6 @@ import (
 	"database/sql"
 	"net/http"
 	"net/url"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -107,11 +106,11 @@ type Params struct {
 	// call. This is mostly useful for testing.
 	DisableConnectionCache bool
 
-	// VaultSecretFile is the path of the file containing the secret to
-	// use with the vault server. If this is empty then no attempt will
-	// be made to use a vault server and JIMM will store everything in
-	// it's local database.
-	VaultSecretFile string
+	// VaultRoleID is the AppRole role ID.
+	VaultRoleID string
+
+	// VaultRoleSecretID is the AppRole secret ID.
+	VaultRoleSecretID string
 
 	// VaultAddress is the URL of a vault server that will be used to
 	// store secrets for JIMM. If this is empty then the default
@@ -441,6 +440,14 @@ func openDB(ctx context.Context, dsn string) (*gorm.DB, error) {
 
 func (s *Service) setupCredentialStore(ctx context.Context, p Params) error {
 	const op = errors.Op("newSecretStore")
+
+	// Only enable Postgres storage for secrets if explicitly enabled.
+	if p.InsecureSecretStorage {
+		zapctx.Warn(ctx, "using plaintext postgres for secret storage")
+		s.jimm.CredentialStore = &s.jimm.Database
+		return nil
+	}
+
 	vs, err := newVaultStore(ctx, p)
 	if err != nil {
 		zapctx.Error(ctx, "Vault Store error", zap.Error(err))
@@ -451,39 +458,21 @@ func (s *Service) setupCredentialStore(ctx context.Context, p Params) error {
 		return nil
 	}
 
-	// Only enable Postgres storage for secrets if explicitly enabled.
-	if p.InsecureSecretStorage {
-		zapctx.Warn(ctx, "using plaintext postgres for secret storage")
-		s.jimm.CredentialStore = &s.jimm.Database
-		return nil
-	}
 	// Currently jimm will start without a credential store but
 	// functionality will be limited.
 	return nil
 }
 
 func newVaultStore(ctx context.Context, p Params) (jimmcreds.CredentialStore, error) {
-	if p.VaultSecretFile == "" {
+	if p.VaultRoleID == "" || p.VaultRoleSecretID == "" {
 		return nil, nil
 	}
 	zapctx.Info(ctx, "configuring vault client",
 		zap.String("VaultAddress", p.VaultAddress),
 		zap.String("VaultPath", p.VaultPath),
-		zap.String("VaultSecretFile", p.VaultSecretFile),
-		zap.String("VaultAuthPath", p.VaultAuthPath),
+		zap.String("VaultRoleID", p.VaultRoleID),
 	)
 	servermon.VaultConfigured.Inc()
-
-	f, err := os.Open(p.VaultSecretFile)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	s, err := vaultapi.ParseSecret(f)
-	if err != nil || s == nil {
-		zapctx.Error(ctx, "failed to parse vault secret from file")
-		return nil, err
-	}
 
 	cfg := vaultapi.DefaultConfig()
 	if p.VaultAddress != "" {
@@ -496,10 +485,10 @@ func newVaultStore(ctx context.Context, p Params) (jimmcreds.CredentialStore, er
 	}
 
 	return &vault.VaultStore{
-		Client:     client,
-		AuthSecret: s.Data,
-		AuthPath:   p.VaultAuthPath,
-		KVPath:     p.VaultPath,
+		Client:       client,
+		RoleID:       p.VaultRoleID,
+		RoleSecretID: p.VaultRoleSecretID,
+		KVPath:       p.VaultPath,
 	}, nil
 }
 

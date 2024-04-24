@@ -8,7 +8,6 @@ import json
 import pathlib
 import tempfile
 import unittest
-from unittest.mock import patch
 
 from ops.model import ActiveStatus, BlockedStatus
 from ops.testing import Harness
@@ -39,7 +38,6 @@ MINIMAL_CONFIG = {
     "uuid": "1234567890",
     "public-key": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
     "private-key": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
-    "vault-access-address": "10.0.1.123",
     "final-redirect-url": "some-url",
 }
 
@@ -267,94 +265,51 @@ class TestCharm(unittest.TestCase):
         )
         self.assertEqual(data["is_juju"], "False")
 
-    @patch("socket.gethostname")
-    @patch("hvac.Client.sys")
-    def test_vault_relation_joined(self, hvac_client_sys, gethostname):
-        gethostname.return_value = "test-hostname"
-        hvac_client_sys.unwrap.return_value = {
-            "key1": "value1",
-            "data": {"key2": "value2"},
-        }
+    def test_vault_relation_joined(self):
 
-        harness = Harness(JimmOperatorCharm)
-        self.addCleanup(harness.cleanup)
+        self.harness.enable_hooks()
+        self.harness.charm.on.install.emit()
 
-        jimm_id = harness.add_relation("peer", "juju-jimm-k8s")
-        harness.add_relation_unit(jimm_id, "juju-jimm-k8s/1")
+        id = self.harness.add_relation("vault", "vault-k8s")
+        self.harness.add_relation_unit(id, "vault-k8s/0")
 
-        dashboard_id = harness.add_relation("dashboard", "juju-dashboard")
-        harness.add_relation_unit(dashboard_id, "juju-dashboard/0")
+        self.harness.update_config(MINIMAL_CONFIG)
 
-        harness.update_config(
+        data = self.harness.get_relation_data(id, "juju-jimm-k8s/0")
+        self.assertTrue(data)
+        self.assertTrue("egress_subnet" in data)
+        self.assertTrue("nonce" in data)
+
+        secret_id = self.harness.add_model_secret(
+            "vault-k8s/0",
+            {"role-id": "111", "role-secret-id": "222"},
+        )
+        self.harness.grant_secret(secret_id, "juju-jimm-k8s")
+
+        credentials = {data["nonce"]: secret_id}
+        self.harness.update_relation_data(
+            id,
+            "vault-k8s",
             {
-                "controller-admins": "user1 user2 group1",
-                "uuid": "caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa",
-                "vault-access-address": "10.0.1.123",
+                "vault_url": "127.0.0.1:8081",
+                "ca_certificate": "abcd",
+                "mount": "charm-juju-jimm-k8s-jimm",
+                "credentials": json.dumps(credentials, sort_keys=True),
+            },
+        )
+
+        plan = self.harness.get_container_pebble_plan("jimm")
+        expected_env = EXPECTED_ENV.copy()
+        expected_env.update(
+            {
+                "VAULT_ADDR": "127.0.0.1:8081",
+                "VAULT_CACERT_BYTES": "abcd",
+                "VAULT_PATH": "charm-juju-jimm-k8s-jimm",
+                "VAULT_ROLE_ID": "111",
+                "VAULT_ROLE_SECRET_ID": "222",
             }
         )
-        harness.set_leader(True)
-        harness.begin_with_initial_hooks()
-
-        container = harness.model.unit.get_container("jimm")
-        # Emit the pebble-ready event for jimm
-        harness.charm.on.jimm_pebble_ready.emit(container)
-
-        id = harness.add_relation("vault", "vault-k8s")
-        harness.add_relation_unit(id, "vault-k8s/0")
-        data = harness.get_relation_data(id, "juju-jimm-k8s/0")
-
-        self.assertTrue(data)
-        self.assertEqual(
-            data["secret_backend"],
-            '"charm-jimm-k8s-creds"',
-        )
-        self.assertEqual(data["hostname"], '"test-hostname"')
-        self.assertEqual(data["access_address"], "10.0.1.123")
-
-        harness.update_relation_data(
-            id,
-            "vault-k8s/0",
-            {
-                "vault_url": '"127.0.0.1:8081"',
-                "juju-jimm-k8s/0_role_id": '"juju-jimm-k8s-0-test-role-id"',
-                "juju-jimm-k8s/0_token": '"juju-jimm-k8s-0-test-token"',
-            },
-        )
-
-        vault_data = container.pull("/root/config/vault_secret.json")
-        vault_json = json.loads(vault_data.read())
-        self.assertEqual(
-            vault_json,
-            {
-                "key1": "value1",
-                "data": {
-                    "key2": "value2",
-                    "role_id": "juju-jimm-k8s-0-test-role-id",
-                },
-            },
-        )
-
-    def test_app_enters_blocked_state_if_vault_related_but_not_ready(self):
-        self.harness.update_config(MINIMAL_CONFIG)
-        container = self.harness.model.unit.get_container("jimm")
-        # Emit the pebble-ready event for jimm
-        self.harness.add_relation("vault", "remote-app-name")
-        self.harness.charm.on.jimm_pebble_ready.emit(container)
-
-        self.assertEqual(self.harness.charm.unit.status.name, BlockedStatus.name)
-        self.assertEqual(
-            self.harness.charm.unit.status.message, "Vault relation present but vault setup is not ready yet"
-        )
-
-    def test_app_raises_error_without_vault_config(self):
-        self.harness.enable_hooks()
-        minim_config_no_vault_config = MINIMAL_CONFIG.copy()
-        del minim_config_no_vault_config["vault-access-address"]
-        self.harness.update_config(minim_config_no_vault_config)
-        id = self.harness.add_relation("vault", "vault")
-        with self.assertRaises(ValueError) as e:
-            self.harness.add_relation_unit(id, "vault/0")
-            self.assertEqual(e, "Missing config vault-access-address for vault relation")
+        self.assertEqual(plan.to_dict(), get_expected_plan(expected_env))
 
     def test_app_blocked_without_private_key(self):
         self.harness.enable_hooks()
