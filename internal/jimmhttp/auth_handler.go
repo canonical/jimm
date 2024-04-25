@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/go-chi/chi/v5"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
@@ -50,8 +49,7 @@ type OAuthHandlerParams struct {
 type BrowserOAuthAuthenticator interface {
 	AuthCodeURL() string
 	Exchange(ctx context.Context, code string) (*oauth2.Token, error)
-	ExtractAndVerifyIDToken(ctx context.Context, oauth2Token *oauth2.Token) (*oidc.IDToken, error)
-	Email(idToken *oidc.IDToken) (string, error)
+	UserInfo(ctx context.Context, oauth2Token *oauth2.Token) (string, error)
 	UpdateIdentity(ctx context.Context, email string, token *oauth2.Token) error
 	CreateBrowserSession(
 		ctx context.Context,
@@ -119,15 +117,9 @@ func (oah *OAuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	idToken, err := authSvc.ExtractAndVerifyIDToken(ctx, token)
+	email, err := authSvc.UserInfo(ctx, token)
 	if err != nil {
-		writeError(ctx, w, http.StatusBadRequest, err, "failed to extract and verify id token")
-		return
-	}
-
-	email, err := authSvc.Email(idToken)
-	if err != nil {
-		writeError(ctx, w, http.StatusBadRequest, err, "failed to extract email from id token")
+		writeError(ctx, w, http.StatusBadRequest, err, "failed to retrieve user info")
 		return
 	}
 
