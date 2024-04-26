@@ -12,7 +12,7 @@ parts:
       - importlib-resources
       - urllib3
       - zipp
-      - maturin
+      - pydantic-core
 bases:
   # This run-on is not as strict as the machine charm
   # as the jimm-server runs in a container.
