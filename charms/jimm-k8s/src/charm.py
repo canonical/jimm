@@ -315,7 +315,12 @@ class JimmOperatorCharm(CharmBase):
             config_values["JIMM_DSN"] = self._state.dsn
 
         vault_config = self._vault_config()
-        if vault_config:
+        insecure_secret_store = self.config.get("postgres-secret-storage", False)
+        if not vault_config and not insecure_secret_store:
+            logger.warning("Vault relation is not ready yet")
+            self.unit.status = BlockedStatus("Waiting for Vault relation")
+            return
+        elif vault_config and not insecure_secret_store:
             config_values.update(vault_config)
 
         if self.model.unit.is_leader():
