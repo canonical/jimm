@@ -14,7 +14,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import hashlib
 import json
 import logging
 import secrets
@@ -516,30 +515,6 @@ class JimmOperatorCharm(CharmBase):
         if container.can_connect():
             return container.exists(path)
         return False
-
-    def _push_to_workload(self, filename, content, event):
-        """Create file on the workload container with
-        the specified content."""
-
-        container = self.unit.get_container(WORKLOAD_CONTAINER)
-        if container.can_connect():
-            logger.info("pushing file {} to the workload containe".format(filename))
-            container.push(filename, content, make_dirs=True)
-        else:
-            logger.info("workload container not ready - defering")
-            event.defer()
-
-    def _hash(self, filename):
-        buffer_size = 65536
-        md5 = hashlib.md5()
-
-        with open(filename, "rb") as f:
-            while True:
-                data = f.read(buffer_size)
-                if not data:
-                    break
-                md5.update(data)
-            return md5.hexdigest()
 
     @requires_state_setter
     def _on_openfga_store_created(self, event: OpenFGAStoreCreateEvent):
