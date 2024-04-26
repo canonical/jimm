@@ -191,15 +191,15 @@ func TestAddController(t *testing.T) {
 func TestAddControllerWithVault(t *testing.T) {
 	c := qt.New(t)
 
-	client, path, creds, ok := jimmtest.VaultClient(c, "../../")
+	client, path, roleID, roleSecretID, ok := jimmtest.VaultClient(c, "../../")
 	if !ok {
 		c.Skip("vault not available")
 	}
 	store := &vault.VaultStore{
-		Client:     client,
-		AuthSecret: creds,
-		AuthPath:   "/auth/approle/login",
-		KVPath:     path,
+		Client:       client,
+		RoleID:       roleID,
+		RoleSecretID: roleSecretID,
+		KVPath:       path,
 	}
 
 	now := time.Now().UTC().Round(time.Millisecond)

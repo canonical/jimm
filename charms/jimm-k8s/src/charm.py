@@ -14,14 +14,11 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-
-import hashlib
 import json
 import logging
-import socket
+import secrets
 from urllib.parse import urljoin
 
-import hvac
 import requests
 from charms.data_platform_libs.v0.database_requires import (
     DatabaseEvent,
@@ -46,9 +43,16 @@ from charms.traefik_k8s.v1.ingress import (
     IngressPerAppRequirer,
     IngressPerAppRevokedEvent,
 )
-from ops.charm import ActionEvent, CharmBase, RelationJoinedEvent
+from charms.vault_k8s.v0 import vault_kv
+from ops.charm import ActionEvent, CharmBase, InstallEvent, RelationJoinedEvent
 from ops.main import main
-from ops.model import ActiveStatus, BlockedStatus, ErrorStatus, WaitingStatus
+from ops.model import (
+    ActiveStatus,
+    BlockedStatus,
+    ErrorStatus,
+    TooManyRelatedAppsError,
+    WaitingStatus,
+)
 
 from state import State, requires_state, requires_state_setter
 
@@ -79,6 +83,7 @@ OAUTH = "oauth"
 OAUTH_SCOPES = "openid email offline_access"
 # TODO: Add "device_code" below once the charm interface supports it.
 OAUTH_GRANT_TYPES = ["authorization_code", "refresh_token"]
+VAULT_NONCE_SECRET_LABEL = "nonce"
 
 
 class DeferError(Exception):
@@ -95,7 +100,6 @@ class JimmOperatorCharm(CharmBase):
         super().__init__(*args)
 
         self._state = State(self.app, lambda: self.model.get_relation("peer"))
-        self._unit_state = State(self.unit, lambda: self.model.get_relation("peer"))
         self.oauth = OAuthRequirer(self, self._oauth_client_config, relation_name=OAUTH)
 
         self.framework.observe(self.oauth.on.oauth_info_changed, self._on_oauth_info_changed)
@@ -170,9 +174,15 @@ class JimmOperatorCharm(CharmBase):
         )
 
         # Vault relation
-        self.framework.observe(self.on.vault_relation_joined, self._on_vault_relation_joined)
-        self.framework.observe(self.on.vault_relation_changed, self._on_vault_relation_changed)
-        self.framework.observe(self.on.vault_relation_departed, self._on_vault_relation_departed)
+        self.vault = vault_kv.VaultKvRequires(
+            self,
+            "vault",
+            "jimm",
+        )
+        self.framework.observe(self.on.install, self._on_install)
+        self.framework.observe(self.vault.on.connected, self._on_vault_connected)
+        self.framework.observe(self.vault.on.ready, self._on_vault_ready)
+        self.framework.observe(self.vault.on.gone_away, self._on_vault_gone_away)
 
         # Grafana relation
         self._grafana_dashboards = GrafanaDashboardProvider(self, relation_name="grafana-dashboard")
@@ -194,10 +204,6 @@ class JimmOperatorCharm(CharmBase):
             self._on_create_authorization_model_action,
         )
 
-        self._local_vault_secret_filename = "vault_secret.js"
-        self._vault_secret_filename = "/root/config/vault_secret.json"
-        self._vault_path = "charm-jimm-k8s-creds"
-
     def _on_peer_relation_changed(self, event):
         self._update_workload(event)
 
@@ -210,6 +216,13 @@ class JimmOperatorCharm(CharmBase):
     def _on_oauth_info_changed(self, event: OAuthInfoChangedEvent):
         self._update_workload(event)
 
+    def _on_install(self, event: InstallEvent):
+        self.unit.add_secret(
+            {"nonce": secrets.token_hex(16)},
+            label=VAULT_NONCE_SECRET_LABEL,
+            description="Nonce for vault-kv relation",
+        )
+
     @requires_state_setter
     def _on_leader_elected(self, event):
         if not self._state.private_key:
@@ -218,9 +231,37 @@ class JimmOperatorCharm(CharmBase):
 
         self._update_workload(event)
 
+    def _vault_config(self):
+        try:
+            relation = self.model.get_relation("vault")
+        except TooManyRelatedAppsError:
+            raise RuntimeError("More than one relations are defined. Please provide a relation_id")
+        if relation is None:
+            return None
+        vault_url = self.vault.get_vault_url(relation)
+        ca_certificate = self.vault.get_ca_certificate(relation)
+        mount = self.vault.get_mount(relation)
+        unit_credentials = self.vault.get_unit_credentials(relation)
+        if not unit_credentials:
+            return None
+
+        # unit_credentials is a juju secret id
+        secret = self.model.get_secret(id=unit_credentials)
+        secret_content = secret.get_content()
+        role_id = secret_content["role-id"]
+        role_secret_id = secret_content["role-secret-id"]
+
+        return {
+            "VAULT_ADDR": vault_url,
+            "VAULT_CACERT_BYTES": ca_certificate,
+            "VAULT_ROLE_ID": role_id,
+            "VAULT_ROLE_SECRET_ID": role_secret_id,
+            "VAULT_PATH": mount,
+        }
+
     @requires_state
     def _update_workload(self, event):
-        """' Update workload with all available configuration
+        """Update workload with all available configuration
         data."""
 
         container = self.unit.get_container(WORKLOAD_CONTAINER)
@@ -230,12 +271,6 @@ class JimmOperatorCharm(CharmBase):
             return
 
         self.oauth.update_client_config(client_config=self._oauth_client_config)
-        self._ensure_vault_file(event)
-        if self.model.get_relation("vault") and not container.exists(self._vault_secret_filename):
-            logger.warning("Vault relation present but vault setup is not ready yet")
-            self.unit.status = BlockedStatus("Vault relation present but vault setup is not ready yet")
-            return
-
         if not self.oauth.is_client_created():
             logger.warning("OAuth relation is not ready yet")
             self.unit.status = BlockedStatus("Waiting for OAuth relation")
@@ -278,11 +313,14 @@ class JimmOperatorCharm(CharmBase):
         if self._state.dsn:
             config_values["JIMM_DSN"] = self._state.dsn
 
-        if container.exists(self._vault_secret_filename):
-            config_values["VAULT_ADDR"] = self._state.vault_address
-            config_values["VAULT_PATH"] = self._vault_path
-            config_values["VAULT_SECRET_FILE"] = self._vault_secret_filename
-            config_values["VAULT_AUTH_PATH"] = "/auth/approle/login"
+        vault_config = self._vault_config()
+        insecure_secret_store = self.config.get("postgres-secret-storage", False)
+        if not vault_config and not insecure_secret_store:
+            logger.warning("Vault relation is not ready yet")
+            self.unit.status = BlockedStatus("Waiting for Vault relation")
+            return
+        elif vault_config and not insecure_secret_store:
+            config_values.update(vault_config)
 
         if self.model.unit.is_leader():
             config_values["JIMM_WATCH_CONTROLLERS"] = "1"
@@ -361,17 +399,24 @@ class JimmOperatorCharm(CharmBase):
             logger.info("workload not ready")
             return
 
-    def _on_update_status(self, _):
+    def _on_update_status(self, event):
         """Update the status of the charm."""
         if self.unit.status.name == ErrorStatus.name:
             # Skip ready check if unit in error to allow for error resolution.
             logger.info("unit in error status, skipping ready check")
             return
+
         try:
             self._ready()
         except DeferError:
             logger.info("workload not ready")
             return
+
+        # update vault relation if exists
+        binding = self.model.get_binding("vault-kv")
+        if binding is not None:
+            egress_subnet = str(binding.network.interfaces[0].subnet)
+            self.interface.request_credentials(event.relation, egress_subnet, self.get_vault_nonce())
 
     @requires_state_setter
     def _on_dashboard_relation_joined(self, event: RelationJoinedEvent):
@@ -452,96 +497,15 @@ class JimmOperatorCharm(CharmBase):
     def _get_network_address(self, event):
         return str(self.model.get_binding(event.relation).network.egress_subnets[0].network_address)
 
-    def _on_vault_relation_joined(self, event):
-        if self.config.get("vault-access-address") is None:
-            logger.error("Missing config vault-access-address for vault relation")
-            raise ValueError("Missing config vault-access-address for vault relation")
+    def _on_vault_connected(self, event: vault_kv.VaultKvConnectedEvent):
+        relation = self.model.get_relation(event.relation_name, event.relation_id)
+        egress_subnet = str(self.model.get_binding(relation).network.interfaces[0].subnet)
+        self.vault.request_credentials(relation, egress_subnet, self.get_vault_nonce())
 
-        event.relation.data[self.unit]["secret_backend"] = json.dumps(self._vault_path)
-        event.relation.data[self.unit]["hostname"] = json.dumps(socket.gethostname())
-        event.relation.data[self.unit]["access_address"] = self.config["vault-access-address"]
-        event.relation.data[self.unit]["isolated"] = json.dumps(False)
+    def _on_vault_ready(self, event: vault_kv.VaultKvReadyEvent):
+        self._update_workload(event)
 
-    def _ensure_vault_file(self, event):
-        container = self.unit.get_container(WORKLOAD_CONTAINER)
-
-        if not self._unit_state.is_ready():
-            logger.info("unit state not ready")
-            event.defer()
-            return
-
-        # if we can't connect to the container we should defer
-        # this event.
-        if not container.can_connect():
-            event.defer()
-            return
-
-        if container.exists(self._vault_secret_filename):
-            container.remove_path(self._vault_secret_filename)
-
-        secret_data = self._unit_state.vault_secret_data
-        if secret_data:
-            self._push_to_workload(self._vault_secret_filename, secret_data, event)
-
-    def _on_vault_relation_departed(self, event):
-        if self._unit_state.vault_secret_data is not None:
-            logger.info("secret data found will remove")
-            self._unit_state.vault_secret_data = None
-
-        container = self.unit.get_container(WORKLOAD_CONTAINER)
-        if not container.can_connect():
-            logger.info("cannot connect to the workload container - deferring the event")
-            event.defer()
-            return
-
-        if container.exists(self._vault_secret_filename):
-            logger.info("Removing vault secret from workload container")
-            container.remove_path(self._vault_secret_filename)
-
-    def _on_vault_relation_changed(self, event):
-        if not self._unit_state.is_ready() or not self._state.is_ready():
-            logger.info("state not ready")
-            event.defer()
-            return
-
-        if self._unit_state.vault_secret_data is not None:
-            return
-
-        addr = None
-        role_id = None
-        token = None
-        try:
-            for key, value in event.relation.data[event.unit].items():
-                value = value.strip('"')
-                if "vault_url" in key:
-                    addr = value
-                if "_role_id" in key:
-                    role_id = value
-                if "_token" in key:
-                    token = value
-        except Exception:
-            logger.warning("Vault relation not ready")
-            return
-        if not addr:
-            logger.warning("Vault address not received")
-            return
-        if not role_id:
-            logger.warning("Vault roleid not received")
-            return
-        if not token:
-            logger.warning("Vault token not received")
-            return
-        client = hvac.Client(url=addr, token=token)
-        secret = client.sys.unwrap()
-        secret["data"]["role_id"] = role_id
-
-        secret_data = json.dumps(secret)
-
-        logger.info("setting unit state data {}".format(secret_data))
-        self._unit_state.vault_secret_data = secret_data
-        if self.unit.is_leader():
-            self._state.vault_address = addr
-
+    def _on_vault_gone_away(self, event: vault_kv.VaultKvGoneAwayEvent):
         self._update_workload(event)
 
     def _path_exists_in_workload(self, path: str):
@@ -551,30 +515,6 @@ class JimmOperatorCharm(CharmBase):
         if container.can_connect():
             return container.exists(path)
         return False
-
-    def _push_to_workload(self, filename, content, event):
-        """Create file on the workload container with
-        the specified content."""
-
-        container = self.unit.get_container(WORKLOAD_CONTAINER)
-        if container.can_connect():
-            logger.info("pushing file {} to the workload containe".format(filename))
-            container.push(filename, content, make_dirs=True)
-        else:
-            logger.info("workload container not ready - defering")
-            event.defer()
-
-    def _hash(self, filename):
-        buffer_size = 65536
-        md5 = hashlib.md5()
-
-        with open(filename, "rb") as f:
-            while True:
-                data = f.read(buffer_size)
-                if not data:
-                    break
-                md5.update(data)
-            return md5.hexdigest()
 
     @requires_state_setter
     def _on_openfga_store_created(self, event: OpenFGAStoreCreateEvent):
@@ -748,6 +688,11 @@ class JimmOperatorCharm(CharmBase):
             OAUTH_SCOPES,
             OAUTH_GRANT_TYPES,
         )
+
+    def get_vault_nonce(self):
+        secret = self.model.get_secret(label=VAULT_NONCE_SECRET_LABEL)
+        nonce = secret.get_content()["nonce"]
+        return nonce
 
 
 def ensureFQDN(dns: str):  # noqa: N802

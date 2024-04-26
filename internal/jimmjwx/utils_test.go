@@ -18,16 +18,15 @@ import (
 )
 
 func newStore(t testing.TB) *vault.VaultStore {
-	client, path, creds, ok := jimmtest.VaultClient(t, "../../")
-
+	client, path, roleID, roleSecretID, ok := jimmtest.VaultClient(t, "../../")
 	if !ok {
 		t.Skip("vault not available")
 	}
 	return &vault.VaultStore{
-		Client:     client,
-		AuthSecret: creds,
-		AuthPath:   "/auth/approle/login",
-		KVPath:     path,
+		Client:       client,
+		RoleID:       roleID,
+		RoleSecretID: roleSecretID,
+		KVPath:       path,
 	}
 }
 
@@ -92,11 +91,15 @@ func setupService(ctx context.Context, c *qt.C) (*jimm.Service, *httptest.Server
 	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
+	_, path, roleID, roleSecretID, ok := jimmtest.VaultClient(c, "../../")
+	c.Assert(ok, qt.IsTrue)
+
 	p := jimmtest.NewTestJimmParams(c)
 	p.VaultAddress = "http://localhost:8200"
 	p.VaultAuthPath = "/auth/approle/login"
-	p.VaultPath = "/jimm-kv/"
-	p.VaultSecretFile = "../../local/vault/approle.json"
+	p.VaultPath = path
+	p.VaultRoleID = roleID
+	p.VaultRoleSecretID = roleSecretID
 	p.OpenFGAParams = jimm.OpenFGAParams{
 		Scheme:    cofgaParams.Scheme,
 		Host:      cofgaParams.Host,

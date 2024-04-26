@@ -12,7 +12,7 @@ require (
 	github.com/google/uuid v1.5.0
 	github.com/gorilla/websocket v1.5.1
 	github.com/gosuri/uitable v0.0.4
-	github.com/hashicorp/vault/api v1.10.0
+	github.com/hashicorp/vault/api v1.13.0
 	github.com/jackc/pgconn v1.13.0
 	github.com/jackc/pgx/v4 v4.17.2
 	github.com/juju/cmd/v3 v3.0.14
@@ -33,7 +33,7 @@ require (
 	github.com/prometheus/client_golang v1.18.0
 	github.com/rogpeppe/fastuuid v1.2.0
 	go.uber.org/zap v1.24.0
-	golang.org/x/net v0.21.0 // indirect
+	golang.org/x/net v0.24.0 // indirect
 	golang.org/x/sync v0.5.0
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
 	gopkg.in/macaroon-bakery.v2 v2.3.0
@@ -52,6 +52,7 @@ require (
 	github.com/go-chi/render v1.0.2
 	github.com/gorilla/sessions v1.2.1
 	github.com/hashicorp/golang-lru/v2 v2.0.7
+	github.com/hashicorp/vault/api/auth/approle v0.6.0
 	github.com/itchyny/gojq v0.12.12
 	github.com/juju/charm/v12 v12.0.0
 	github.com/juju/names/v5 v5.0.0
@@ -104,7 +105,7 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bmizerany/pat v0.0.0-20210406213842-e4b6760bdd6f // indirect
 	github.com/canonical/lxd v0.0.0-20231214113525-e676fc63c50a // indirect
-	github.com/cenkalti/backoff/v3 v3.0.0 // indirect
+	github.com/cenkalti/backoff/v3 v3.2.2 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/cjlapao/common-go v0.0.39 // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
@@ -115,7 +116,7 @@ require (
 	github.com/docker/distribution v2.8.3+incompatible // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
-	github.com/fatih/color v1.14.1 // indirect
+	github.com/fatih/color v1.16.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/flosch/pongo2 v0.0.0-20200913210552-0d938eb266f3 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
@@ -123,6 +124,7 @@ require (
 	github.com/gdamore/tcell/v2 v2.5.1 // indirect
 	github.com/go-goose/goose/v5 v5.0.0-20230421180421-abaee9096e3a // indirect
 	github.com/go-jose/go-jose/v3 v3.0.3 // indirect
+	github.com/go-jose/go-jose/v4 v4.0.1 // indirect
 	github.com/go-logr/logr v1.4.1 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-macaroon-bakery/macaroonpb v1.0.0 // indirect
@@ -147,11 +149,11 @@ require (
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
-	github.com/hashicorp/go-retryablehttp v0.6.6 // indirect
+	github.com/hashicorp/go-retryablehttp v0.7.5 // indirect
 	github.com/hashicorp/go-rootcerts v1.0.2 // indirect
-	github.com/hashicorp/go-secure-stdlib/parseutil v0.1.6 // indirect
+	github.com/hashicorp/go-secure-stdlib/parseutil v0.1.8 // indirect
 	github.com/hashicorp/go-secure-stdlib/strutil v0.1.2 // indirect
-	github.com/hashicorp/go-sockaddr v1.0.2 // indirect
+	github.com/hashicorp/go-sockaddr v1.0.6 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/im7mortal/kmutex v1.0.1 // indirect
 	github.com/imdario/mergo v0.3.12 // indirect
@@ -295,10 +297,10 @@ require (
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/mock v0.4.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/crypto v0.21.0 // indirect
+	golang.org/x/crypto v0.22.0 // indirect
 	golang.org/x/exp v0.0.0-20231127185646-65229373498e // indirect
-	golang.org/x/sys v0.18.0 // indirect
-	golang.org/x/term v0.18.0 // indirect
+	golang.org/x/sys v0.19.0 // indirect
+	golang.org/x/term v0.19.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	google.golang.org/api v0.154.0 // indirect
