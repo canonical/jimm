@@ -414,8 +414,11 @@ class JimmOperatorCharm(CharmBase):
         # update vault relation if exists
         binding = self.model.get_binding("vault-kv")
         if binding is not None:
-            egress_subnet = str(binding.network.interfaces[0].subnet)
-            self.interface.request_credentials(event.relation, egress_subnet, self.get_vault_nonce())
+            try:
+                egress_subnet = str(binding.network.interfaces[0].subnet)
+                self.interface.request_credentials(event.relation, egress_subnet, self.get_vault_nonce())
+            except Exception as e:
+                logging.warning(f"failed to update vault relation - {repr(e)}")
 
     @requires_state_setter
     def _on_dashboard_relation_joined(self, event: RelationJoinedEvent):
@@ -496,14 +499,6 @@ class JimmOperatorCharm(CharmBase):
     def _on_vault_gone_away(self, event: vault_kv.VaultKvGoneAwayEvent):
         self._update_workload(event)
 
-    def _path_exists_in_workload(self, path: str):
-        """Returns true if the specified path exists in the
-        workload container."""
-        container = self.unit.get_container(WORKLOAD_CONTAINER)
-        if container.can_connect():
-            return container.exists(path)
-        return False
-
     @requires_state_setter
     def _on_openfga_store_created(self, event: OpenFGAStoreCreateEvent):
         if not event.store_id:
@@ -547,7 +542,7 @@ class JimmOperatorCharm(CharmBase):
             subject=dns_name,
         )
 
-        self._state.csr = csr.decode()
+        self._state.csr = csr.decode().removesuffix("\n")
 
         self.certificates.request_certificate_creation(certificate_signing_request=csr)
 

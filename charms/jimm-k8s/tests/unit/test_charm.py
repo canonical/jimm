@@ -184,7 +184,7 @@ class TestCharm(TestCase):
 
     def add_postgres_relation(self):
         self.postgres_rel_id = self.harness.add_relation("database", "postgresql")
-        self.harness.add_relation_unit(self.oauth_rel_id, "postgresql/0")
+        self.harness.add_relation_unit(self.postgres_rel_id, "postgresql/0")
         self.harness.update_relation_data(
             self.postgres_rel_id,
             "postgresql",
@@ -194,6 +194,41 @@ class TestCharm(TestCase):
                 "endpoints": "local-1.localhost,local-2.localhost",
             },
         )
+
+    def start_minimal_jimm(self):
+        self.harness.enable_hooks()
+        self.harness.charm._state.dsn = "postgres-dsn"
+        self.add_openfga_relation()
+        self.add_vault_relation()
+        self.harness.charm._state.openfga_auth_model_id = 1
+        self.harness.update_config(MINIMAL_CONFIG)
+        self.assertEqual(self.harness.charm.unit.status.name, ActiveStatus.name)
+        self.assertEqual(self.harness.charm.unit.status.message, "running")
+
+    def test_add_certificates_relation(self):
+        self.start_minimal_jimm()
+        self.harness.set_leader(True)
+        self.certificates_rel_id = self.harness.add_relation("certificates", "certificates")
+        self.harness.add_relation_unit(self.certificates_rel_id, "certificates/0")
+        self.harness.update_relation_data(
+            self.certificates_rel_id,
+            "certificates",
+            {
+                "certificates": json.dumps(
+                    [
+                        {
+                            "certificate": "cert",
+                            "ca": "ca",
+                            "chain": ["chain"],
+                            "certificate_signing_request": self.harness.charm._state.csr,
+                        }
+                    ]
+                )
+            },
+        )
+        self.assertEqual(self.harness.charm._state.ca, "ca")
+        self.assertEqual(self.harness.charm._state.certificate, "cert")
+        self.assertEqual(self.harness.charm._state.chain, ["chain"])
 
     def test_on_pebble_ready(self):
         self.harness.enable_hooks()
@@ -207,6 +242,12 @@ class TestCharm(TestCase):
         # Check the that the plan was updated
         plan = self.harness.get_container_pebble_plan("jimm")
         self.assertEqual(plan.to_dict(), get_expected_plan(EXPECTED_VAULT_ENV))
+
+    def test_ready_without_plan(self):
+        self.harness.enable_hooks()
+        self.harness.charm._ready()
+        self.assertEqual(self.harness.charm.unit.status.name, BlockedStatus.name)
+        self.assertEqual(self.harness.charm.unit.status.message, "Waiting for OAuth relation")
 
     def test_on_config_changed(self):
         self.harness.enable_hooks()
@@ -225,17 +266,16 @@ class TestCharm(TestCase):
         self.assertEqual(plan.to_dict(), get_expected_plan(EXPECTED_VAULT_ENV))
 
     def test_stop(self):
-        self.harness.enable_hooks()
-        self.harness.charm._state.dsn = "postgres-dsn"
-        self.add_openfga_relation()
-        self.add_vault_relation()
-        self.harness.charm._state.openfga_auth_model_id = 1
-        self.harness.update_config(MINIMAL_CONFIG)
-        self.assertEqual(self.harness.charm.unit.status.name, ActiveStatus.name)
-        self.assertEqual(self.harness.charm.unit.status.message, "running")
+        self.start_minimal_jimm()
         self.harness.charm.on.stop.emit()
         self.assertEqual(self.harness.charm.unit.status.name, WaitingStatus.name)
         self.assertEqual(self.harness.charm.unit.status.message, "stopped")
+
+    def test_update_status(self):
+        self.start_minimal_jimm()
+        self.harness.charm.on.update_status.emit()
+        self.assertEqual(self.harness.charm.unit.status.name, ActiveStatus.name)
+        self.assertEqual(self.harness.charm.unit.status.message, "running")
 
     def test_postgres_relation_joined(self):
         self.harness.enable_hooks()
