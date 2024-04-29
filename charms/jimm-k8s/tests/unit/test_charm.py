@@ -7,10 +7,10 @@
 import json
 import pathlib
 import tempfile
-import unittest
+from unittest import TestCase, mock
 
-from ops.model import ActiveStatus, BlockedStatus
-from ops.testing import Harness
+from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
+from ops.testing import ActionFailed, Harness
 
 from src.charm import JimmOperatorCharm
 
@@ -103,7 +103,7 @@ class MockExec:
         return True
 
 
-class TestCharm(unittest.TestCase):
+class TestCharm(TestCase):
     def setUp(self):
         self.maxDiff = None
         self.harness = Harness(JimmOperatorCharm)
@@ -182,7 +182,19 @@ class TestCharm(unittest.TestCase):
             },
         )
 
-    # import ipdb; ipdb.set_trace()
+    def add_postgres_relation(self):
+        self.postgres_rel_id = self.harness.add_relation("database", "postgresql")
+        self.harness.add_relation_unit(self.oauth_rel_id, "postgresql/0")
+        self.harness.update_relation_data(
+            self.postgres_rel_id,
+            "postgresql",
+            {
+                "username": "postgres-user",
+                "password": "postgres-pass",
+                "endpoints": "local-1.localhost,local-2.localhost",
+            },
+        )
+
     def test_on_pebble_ready(self):
         self.harness.enable_hooks()
         self.add_vault_relation()
@@ -211,6 +223,26 @@ class TestCharm(unittest.TestCase):
         # Check the that the plan was updated
         plan = self.harness.get_container_pebble_plan("jimm")
         self.assertEqual(plan.to_dict(), get_expected_plan(EXPECTED_VAULT_ENV))
+
+    def test_stop(self):
+        self.harness.enable_hooks()
+        self.harness.charm._state.dsn = "postgres-dsn"
+        self.add_openfga_relation()
+        self.add_vault_relation()
+        self.harness.charm._state.openfga_auth_model_id = 1
+        self.harness.update_config(MINIMAL_CONFIG)
+        self.assertEqual(self.harness.charm.unit.status.name, ActiveStatus.name)
+        self.assertEqual(self.harness.charm.unit.status.message, "running")
+        self.harness.charm.on.stop.emit()
+        self.assertEqual(self.harness.charm.unit.status.name, WaitingStatus.name)
+        self.assertEqual(self.harness.charm.unit.status.message, "stopped")
+
+    def test_postgres_relation_joined(self):
+        self.harness.enable_hooks()
+        self.add_postgres_relation()
+        self.assertEqual(
+            self.harness.charm._state.dsn, "postgresql://postgres-user:postgres-pass@local-1.localhost/jimm"
+        )
 
     def test_postgres_secret_storage_config(self):
         self.harness.update_config(MINIMAL_CONFIG)
@@ -338,3 +370,28 @@ class TestCharm(unittest.TestCase):
         self.harness.update_config(MINIMAL_CONFIG)
         self.assertEqual(self.harness.charm.unit.status.name, ActiveStatus.name)
         self.assertEqual(self.harness.charm.unit.status.message, "running")
+
+    def mocked_requests_post(*args, **kwargs):
+        class MockResponse:
+            def __init__(self, json_data, status_code):
+                self.json_data = json_data
+                self.status_code = status_code
+                self.ok = True
+
+            def json(self):
+                return self.json_data
+
+        return MockResponse({"authorization_model_id": 123}, 200)
+
+    @mock.patch("src.charm.requests.post")
+    def test_create_auth_model_action(self, mock_post):
+        mock_post.side_effect = self.mocked_requests_post
+        self.harness.enable_hooks()
+        self.add_openfga_relation()
+        self.harness.run_action("create-authorization-model", {"model": "null"})
+        self.assertEqual(self.harness.charm._state.openfga_auth_model_id, 123)
+
+    def test_create_auth_model_action_without_openfga_relation(self):
+        with self.assertRaises(ActionFailed) as e:
+            self.harness.run_action("create-authorization-model", {"model": "null"})
+        self.assertEqual(str(e.exception.message), "missing openfga relation")
