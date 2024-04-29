@@ -17,7 +17,7 @@
 import json
 import logging
 import secrets
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 import requests
 from charms.data_platform_libs.v0.database_requires import (
@@ -28,7 +28,7 @@ from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.hydra.v0.oauth import ClientConfig, OAuthInfoChangedEvent, OAuthRequirer
 from charms.loki_k8s.v0.loki_push_api import LogProxyConsumer
 from charms.nginx_ingress_integrator.v0.nginx_route import require_nginx_route
-from charms.openfga_k8s.v0.openfga import OpenFGARequires, OpenFGAStoreCreateEvent
+from charms.openfga_k8s.v1.openfga import OpenFGARequires, OpenFGAStoreCreateEvent
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from charms.tls_certificates_interface.v1.tls_certificates import (
     CertificateAvailableEvent,
@@ -521,17 +521,17 @@ class JimmOperatorCharm(CharmBase):
         if not event.store_id:
             return
 
-        token = event.token
-        if event.token_secret_id:
-            secret = self.model.get_secret(id=event.token_secret_id)
-            secret_content = secret.get_content()
-            token = secret_content["token"]
+        info = self.openfga.get_store_info()
+        if not info:
+            logger.warning("openfga info not ready yet")
+            return
 
-        self._state.openfga_store_id = event.store_id
-        self._state.openfga_token = token
-        self._state.openfga_address = event.address
-        self._state.openfga_port = event.port
-        self._state.openfga_scheme = event.scheme
+        self._state.openfga_store_id = info.store_id
+        self._state.openfga_token = info.token
+        o = urlparse(info.http_api_url)
+        self._state.openfga_address = o.hostname
+        self._state.openfga_port = o.port
+        self._state.openfga_scheme = o.scheme
 
         self._update_workload(event)
 
