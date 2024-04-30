@@ -12,6 +12,18 @@ import utils
 import yaml
 from juju.action import Action
 from pytest_operator.plugin import OpsTest
+from oauth_tools.dex import ExternalIdpManager
+from oauth_tools.oauth_test_helper import (
+    deploy_identity_bundle,
+    get_reverse_proxy_app_url,
+    complete_external_idp_login,
+    access_application_login_page,
+    click_on_sign_in_button_by_text,
+    verify_page_loads,
+    get_cookie_from_browser_by_name,
+)
+from oauth_tools.conftest import *  # noqa
+from oauth_tools.constants import EXTERNAL_USER_EMAIL, APPS
 
 logger = logging.getLogger(__name__)
 
@@ -33,77 +45,72 @@ async def test_build_and_deploy_with_ngingx(ops_test: OpsTest, local_charm):
         charm = await ops_test.build_charm(".")
     resources = {"jimm-image": "localhost:32000/jimm:latest"}
 
+    # Instantiating the ExternalIdpManager object deploys the external identity provider.
+    external_idp_manager = ExternalIdpManager(ops_test=ops_test)
+
     # Deploy the charm and wait for active/idle status
     logger.debug("deploying charms")
-    await ops_test.model.deploy(
-        charm,
-        resources=resources,
-        application_name=APP_NAME,
-        series="focal",
-        config={
-            "uuid": "f4dec11e-e2b6-40bb-871a-cc38e958af49",
-            "dns-name": "test.jimm.local",
-            "candid-url": "https://api.jujucharms.com/identity",
-            "public-key": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
-            "private-key": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
-        },
-    )
-    await ops_test.model.deploy(
-        "nginx-ingress-integrator",
-        application_name="nginx",
-    )
-    await asyncio.gather(
-        ops_test.model.deploy(
-            "postgresql-k8s",
-            application_name="postgresql",
-            channel="edge",
-        ),
-        ops_test.model.deploy(
-            "openfga-k8s",
-            application_name="openfga",
-            channel="edge",
-        ),
-    )
+    async with ops_test.fast_forward():
+        await asyncio.gather(
+            ops_test.model.deploy(
+                charm,
+                resources=resources,
+                application_name=APP_NAME,
+                series="focal",
+                config={
+                    "uuid": "f4dec11e-e2b6-40bb-871a-cc38e958af49",
+                    "dns-name": "test.jimm.local",
+                    "public-key": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
+                    "private-key": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
+                },
+            ),
+            ops_test.model.deploy(
+                "nginx-ingress-integrator",
+                application_name="jimm-ingress",
+                channel="latest/stable"
+            ),
+            ops_test.model.deploy(
+                "postgresql-k8s",
+                application_name="jimm-db",
+                channel="14/stable",
+            ),
+            ops_test.model.deploy(
+                "openfga-k8s",
+                application_name="openfga",
+                channel="latest/stable",
+            ),
+            deploy_identity_bundle(
+                ops_test=ops_test,
+                external_idp_manager=external_idp_manager
+            ),
+        )
 
     logger.info("waiting for postgresql")
     await ops_test.model.wait_for_idle(
-        apps=["postgresql", "nginx"],
+        apps=["jimm-db"],
         status="active",
         raise_on_blocked=True,
         timeout=40000,
     )
 
     logger.info("adding ingress relation")
-    await ops_test.model.relate("{}:nginx-route".format(APP_NAME), "nginx")
+    await ops_test.model.relate("{}:nginx-route".format(APP_NAME), "jimm-ingress")
 
     logger.info("adding openfga postgresql relation")
-    await ops_test.model.relate("openfga:database", "postgresql:database")
-
-    logger.info("waiting for openfga")
-    await ops_test.model.wait_for_idle(
-        apps=["openfga"],
-        status="blocked",
-        timeout=40000,
-    )
-
-    openfga_unit = await utils.get_unit_by_name("openfga", "0", ops_test.model.units)
-    for i in range(10):
-        action: Action = await openfga_unit.run_action("schema-upgrade")
-        result = await action.wait()
-        logger.info("attempt {} -> action result {} {}".format(i, result.status, result.results))
-        if result.results == {"result": "done", "return-code": 0}:
-            break
-        time.sleep(2)
+    await ops_test.model.relate("openfga:database", "jimm-db:database")
 
     logger.info("adding openfga relation")
     await ops_test.model.relate(APP_NAME, "openfga")
 
     logger.info("adding postgresql relation")
-    await ops_test.model.relate(APP_NAME, "postgresql:database")
+    await ops_test.model.relate(APP_NAME, "jimm-db:database")
+
+    logger.info("adding ouath relation")
+    await ops_test.model.integrate(f"{APP_NAME}:oauth", APPS.HYDRA)
 
     logger.info("waiting for jimm")
     await ops_test.model.wait_for_idle(
-        apps=[APP_NAME],
+        apps=[APP_NAME, APPS.HYDRA],
         status="active",
         # raise_on_blocked=True,
         timeout=40000,
