@@ -11,7 +11,7 @@ import shutil
 import socket
 import subprocess
 import urllib
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 import hvac
 from charmhelpers.contrib.charmsupport.nrpe import NRPE
@@ -21,7 +21,7 @@ from charms.data_platform_libs.v0.data_interfaces import (
 )
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from charms.hydra.v0.oauth import ClientConfig, OAuthInfoChangedEvent, OAuthRequirer
-from charms.openfga_k8s.v0.openfga import OpenFGARequires, OpenFGAStoreCreateEvent
+from charms.openfga_k8s.v1.openfga import OpenFGARequires, OpenFGAStoreCreateEvent
 from jinja2 import Environment, FileSystemLoader
 from ops.main import main
 from ops.model import (
@@ -417,19 +417,18 @@ class JimmCharm(SystemdCharm):
         if not event.store_id:
             return
 
-        token = event.token
-        if event.token_secret_id:
-            logger.error("token secret {}".format(event.token_secret_id))
-            secret = self.model.get_secret(id=event.token_secret_id)
-            secret_content = secret.get_content()
-            token = secret_content["token"]
+        info = self.openfga.get_store_info()
+        if not info:
+            logger.warning("openfga info not ready yet")
+            return
 
+        o = urlparse(info.http_api_url)
         args = {
-            "openfga_host": event.address,
-            "openfga_port": event.port,
-            "openfga_scheme": event.scheme,
-            "openfga_store": event.store_id,
-            "openfga_token": token,
+            "openfga_host": o.hostname,
+            "openfga_port": o.port,
+            "openfga_scheme": o.scheme,
+            "openfga_store": info.store_id,
+            "openfga_token": info.token,
         }
 
         with open(self._env_filename(OPENFGA_PART), "wt") as f:

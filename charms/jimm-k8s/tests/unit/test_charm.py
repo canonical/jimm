@@ -27,9 +27,8 @@ OAUTH_PROVIDER_INFO = {
 }
 
 OPENFGA_PROVIDER_INFO = {
-    "address": "openfga.localhost",
-    "port": "8080",
-    "scheme": "http",
+    "http_api_url": "http://openfga.localhost:8080",
+    "grpc_api_url": "grpc://openfga.localhost:8090",
     "store_id": "fake-store-id",
     "token": "fake-token",
 }
