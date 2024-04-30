@@ -48,6 +48,17 @@ async def test_build_and_deploy_with_ngingx(ops_test: OpsTest, local_charm):
     # Instantiating the ExternalIdpManager object deploys the external identity provider.
     external_idp_manager = ExternalIdpManager(ops_test=ops_test)
 
+    # Deploy the identity bundle first because it checks everything is ready and if we deploy JIMM apps 
+    # at the same time, then that check will fail.
+    logger.debug("deploying identity bundle")
+    async with ops_test.fast_forward():
+        await asyncio.gather(
+            deploy_identity_bundle(
+                ops_test=ops_test,
+                external_idp_manager=external_idp_manager
+            ),
+        )
+
     # Deploy the charm and wait for active/idle status
     logger.debug("deploying charms")
     async with ops_test.fast_forward():
@@ -62,6 +73,7 @@ async def test_build_and_deploy_with_ngingx(ops_test: OpsTest, local_charm):
                     "dns-name": "test.jimm.local",
                     "public-key": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
                     "private-key": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
+                    "postgres-secret-storage": True,
                 },
             ),
             ops_test.model.deploy(
@@ -79,10 +91,6 @@ async def test_build_and_deploy_with_ngingx(ops_test: OpsTest, local_charm):
                 application_name="openfga",
                 channel="latest/stable",
             ),
-            deploy_identity_bundle(
-                ops_test=ops_test,
-                external_idp_manager=external_idp_manager
-            ),
         )
 
     logger.info("waiting for postgresql")
@@ -90,7 +98,7 @@ async def test_build_and_deploy_with_ngingx(ops_test: OpsTest, local_charm):
         apps=["jimm-db"],
         status="active",
         raise_on_blocked=True,
-        timeout=40000,
+        timeout=2000,
     )
 
     logger.info("adding ingress relation")
@@ -108,12 +116,11 @@ async def test_build_and_deploy_with_ngingx(ops_test: OpsTest, local_charm):
     logger.info("adding ouath relation")
     await ops_test.model.integrate(f"{APP_NAME}:oauth", APPS.HYDRA)
 
-    logger.info("waiting for jimm")
+    logger.info("waiting for jimm to be blocked pending auth model creation")
     await ops_test.model.wait_for_idle(
-        apps=[APP_NAME, APPS.HYDRA],
-        status="active",
-        # raise_on_blocked=True,
-        timeout=40000,
+        apps=[APP_NAME],
+        status="blocked",
+        timeout=2000,
     )
 
     logger.info("running the create authorization model action")
