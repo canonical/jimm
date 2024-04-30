@@ -410,21 +410,21 @@ class TestCharm(TestCase):
         self.assertEqual(self.harness.charm.unit.status.name, ActiveStatus.name)
         self.assertEqual(self.harness.charm.unit.status.message, "running")
 
-    def mocked_requests_post(*args, **kwargs):
-        class MockResponse:
-            def __init__(self, json_data, status_code):
-                self.json_data = json_data
-                self.status_code = status_code
-                self.ok = True
-
-            def json(self):
-                return self.json_data
-
-        return MockResponse({"authorization_model_id": 123}, 200)
-
     @mock.patch("src.charm.requests.post")
     def test_create_auth_model_action(self, mock_post):
-        mock_post.side_effect = self.mocked_requests_post
+        def mocked_requests_post(*args, **kwargs):
+            class MockResponse:
+                def __init__(self, json_data, status_code):
+                    self.json_data = json_data
+                    self.status_code = status_code
+                    self.ok = True
+
+                def json(self):
+                    return self.json_data
+
+            return MockResponse({"authorization_model_id": 123}, 200)
+
+        mock_post.side_effect = mocked_requests_post
         self.harness.enable_hooks()
         self.add_openfga_relation()
         self.harness.run_action("create-authorization-model", {"model": "null"})
