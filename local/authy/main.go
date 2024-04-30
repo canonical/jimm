@@ -175,5 +175,5 @@ func main() {
 	fmt.Println()
 	fmt.Println(string(maccaroonieswoonies))
 	fmt.Println()
-	fmt.Println("Copy the macaroons, head to the JIMMY postman collection and update your local collection variable for API_AUTH.")
+	fmt.Println("Copy the macaroons, head to the JIMM postman collection and update your local collection variable for API_AUTH.")
 }
