@@ -20,6 +20,7 @@ import (
 	"github.com/canonical/jimm/internal/jimm/credentials"
 	"github.com/canonical/jimm/internal/openfga"
 	"github.com/canonical/jimm/internal/utils"
+	jimmnames "github.com/canonical/jimm/pkg/names"
 )
 
 const (
@@ -643,12 +644,16 @@ func (p *clientProxy) handleAdminFacade(ctx context.Context, msg *message) (clie
 		if err != nil {
 			return errorFnc(err)
 		}
+		clientIdWithDomain, err := jimmnames.EnsureValidServiceAccountId(request.ClientID)
+		if err != nil {
+			return errorFnc(err)
+		}
 		err = p.jimm.OAuthAuthenticationService().VerifyClientCredentials(ctx, request.ClientID, request.ClientSecret)
 		if err != nil {
 			return errorFnc(err)
 		}
 
-		user, err := p.jimm.GetOpenFGAUserAndAuthorise(ctx, request.ClientID)
+		user, err := p.jimm.GetOpenFGAUserAndAuthorise(ctx, clientIdWithDomain)
 		if err != nil {
 			return errorFnc(err)
 		}
@@ -658,7 +663,7 @@ func (p *clientProxy) handleAdminFacade(ctx context.Context, msg *message) (clie
 			return errorFnc(err)
 		}
 		data, err := json.Marshal(params.LoginRequest{
-			AuthTag: names.NewUserTag(request.ClientID).String(),
+			AuthTag: names.NewUserTag(clientIdWithDomain).String(),
 			Token:   base64.StdEncoding.EncodeToString(jwt),
 		})
 		if err != nil {
