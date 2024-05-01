@@ -367,6 +367,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		SecureCookies:             p.SecureSessionCookies,
 	})
 	if err != nil {
+		zapctx.Error(ctx, "failed to setup authentication handler", zap.Error(err))
 		return nil, errors.E(op, err, "failed to setup authentication handler")
 	}
 	mountHandler(

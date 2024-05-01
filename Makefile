@@ -47,7 +47,7 @@ dev-env:
 	@docker compose --profile dev up --force-recreate
 
 dev-env-cleanup:
-	@docker compose down -v --remove-orphans
+	@docker compose --profile dev down -v --remove-orphans
 
 # Reformat all source files.
 format:

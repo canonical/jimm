@@ -157,7 +157,9 @@ func (as *AuthenticationService) AuthCodeURL() string {
 	// itself. Of course, middleman attacks between the IdP and JIMM are possible,
 	// but we'd have much larger problems than an auth code interception at that
 	// point. As such, we're opting out of using auth code URL state.
-	return as.oauthConfig.AuthCodeURL("")
+
+	// Note: that Hydra requires a state parameter of at least 8 characters.
+	return as.oauthConfig.AuthCodeURL("12345678")
 }
 
 // Exchange exchanges an authorisation code for an access token.

@@ -20,6 +20,10 @@ import secrets
 from urllib.parse import urljoin, urlparse
 
 import requests
+from charms.certificate_transfer_interface.v0.certificate_transfer import (
+    CertificateRemovedEvent,
+    CertificateTransferRequires,
+)
 from charms.data_platform_libs.v0.data_interfaces import (
     DatabaseRequires,
     DatabaseRequiresEvent,
@@ -52,7 +56,9 @@ from ops.model import (
     ErrorStatus,
     TooManyRelatedAppsError,
     WaitingStatus,
+    Container
 )
+import string
 
 from state import State, requires_state, requires_state_setter
 
@@ -80,10 +86,14 @@ LOG_FILE = "/var/log/jimm"
 # This likely will just be JIMM's port.
 PROMETHEUS_PORT = 8080
 OAUTH = "oauth"
-OAUTH_SCOPES = "openid email offline_access"
+OAUTH_SCOPES = "openid profile email offline_access"
 # TODO: Add "device_code" below once the charm interface supports it.
 OAUTH_GRANT_TYPES = ["authorization_code", "refresh_token"]
 VAULT_NONCE_SECRET_LABEL = "nonce"
+# Template for storing trusted certificate in a file.
+TRUSTED_CA_TEMPLATE = string.Template(
+    "/usr/local/share/ca-certificates/trusted-ca-cert-$rel_id-ca.crt"
+)
 
 
 class DeferError(Exception):
@@ -203,6 +213,16 @@ class JimmOperatorCharm(CharmBase):
             self._on_create_authorization_model_action,
         )
 
+        self.trusted_cert_transfer = CertificateTransferRequires(self, "receive-ca-cert")
+        self.framework.observe(
+            self.trusted_cert_transfer.on.certificate_available,
+            self._on_trusted_certificate_available,  # pyright: ignore
+        )
+        self.framework.observe(
+            self.trusted_cert_transfer.on.certificate_removed,
+            self._on_trusted_certificate_removed,  # pyright: ignore
+        )
+
     def _on_peer_relation_changed(self, event):
         self._update_workload(event)
 
@@ -304,7 +324,7 @@ class JimmOperatorCharm(CharmBase):
             "JIMM_OAUTH_ISSUER_URL": oauth_provider_info.issuer_url,
             "JIMM_OAUTH_CLIENT_ID": oauth_provider_info.client_id,
             "JIMM_OAUTH_CLIENT_SECRET": oauth_provider_info.client_secret,
-            "JIMM_OAUTH_SCOPES": oauth_provider_info.scope,
+            "JIMM_OAUTH_SCOPES": OAUTH_SCOPES,
             "JIMM_DASHBOARD_FINAL_REDIRECT_URL": self.config.get("final-redirect-url"),
             "JIMM_SECURE_SESSION_COOKIES": self.config.get("secure-session-cookies"),
             "JIMM_SESSION_COOKIE_MAX_AGE": self.config.get("session-cookie-max-age"),
@@ -351,12 +371,17 @@ class JimmOperatorCharm(CharmBase):
                 }
             },
         }
+        force_restart = self._update_trusted_ca_certs(container)
         container.add_layer("jimm", pebble_layer, combine=True)
         try:
             if self._ready():
                 if container.get_service(JIMM_SERVICE_NAME).is_running():
-                    logger.info("replanning service")
-                    container.replan()
+                    if force_restart:
+                        logger.info("performing service restart")
+                        container.restart(JIMM_SERVICE_NAME)
+                    else:
+                        logger.info("replanning service")
+                        container.replan()
                 else:
                     logger.info("starting service")
                     container.start(JIMM_SERVICE_NAME)
@@ -667,7 +692,7 @@ class JimmOperatorCharm(CharmBase):
             dns = "http://localhost"
         dns = ensureFQDN(dns)
         return ClientConfig(
-            urljoin(dns, "/oauth/callback"),
+            urljoin(dns, "/auth/callback"),
             OAUTH_SCOPES,
             OAUTH_GRANT_TYPES,
         )
@@ -676,6 +701,55 @@ class JimmOperatorCharm(CharmBase):
         secret = self.model.get_secret(label=VAULT_NONCE_SECRET_LABEL)
         nonce = secret.get_content()["nonce"]
         return nonce
+
+    def _update_trusted_ca_certs(self, container: Container) -> bool:
+        """This function receives the trusted certificates from the certificate_transfer integration.
+
+        JIMM needs to restart to use newly received certificates. Certificates attached to the
+        relation need to be pulled before JIMM is started.
+        This function is needed because relation events are not emitted on upgrade, and because we
+        do not have (nor do we want) persistent storage for certs.
+
+        Args:
+            container (Container): The workload container, the caller must ensure that we can connect.
+
+        Returns:
+            bool: A boolean to indicate whether the workload service should be restarted.
+        """
+        if not self.model.get_relation(relation_name=self.trusted_cert_transfer.relationship_name):
+            return False
+
+        logger.info(
+            "Pulling trusted ca certificates from %s relation.",
+            self.trusted_cert_transfer.relationship_name,
+        )
+        for relation in self.model.relations.get(self.trusted_cert_transfer.relationship_name, []):
+            # For some reason, relation.units includes our unit and app. Need to exclude them.
+            for unit in set(relation.units).difference([self.app, self.unit]):
+                # Note: this nested loop handles the case of multi-unit CA, each unit providing
+                # a different ca cert, but that is not currently supported by the lib itself.
+                cert_path = TRUSTED_CA_TEMPLATE.substitute(rel_id=relation.id)
+                if cert := relation.data[unit].get("ca"):
+                    container.push(cert_path, cert, make_dirs=True)
+
+        stdout, stderr = container.exec(["update-ca-certificates", "--fresh"]).wait_output()
+        logger.info("stdout update-ca-certificates: %s", stdout)
+        logger.info("stderr update-ca-certificates: %s", stderr)
+
+        return True
+
+    def _on_trusted_certificate_available(self, event):
+        self._update_workload(event)
+
+    def _on_trusted_certificate_removed(self, event: CertificateRemovedEvent):
+        # All certificates received from the relation are in separate files marked by the relation id.
+        container = self.unit.get_container(WORKLOAD_CONTAINER)
+        if not container.can_connect():
+            event.defer()
+            return
+        cert_path = TRUSTED_CA_TEMPLATE.substitute(rel_id=event.relation_id)
+        container.remove_path(cert_path, recursive=True)
+        self._update_workload(event)
 
 
 def ensureFQDN(dns: str):  # noqa: N802

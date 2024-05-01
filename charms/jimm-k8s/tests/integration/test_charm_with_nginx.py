@@ -70,7 +70,8 @@ async def test_build_and_deploy_with_ngingx(ops_test: OpsTest, local_charm):
                 series="focal",
                 config={
                     "uuid": "f4dec11e-e2b6-40bb-871a-cc38e958af49",
-                    "dns-name": "test.jimm.local",
+                    "dns-name": "test.jimm.localhost",
+                    "final-redirect-url": "https://canonical.com",
                     "public-key": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
                     "private-key": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
                     "postgres-secret-storage": True,
