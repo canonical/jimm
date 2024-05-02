@@ -20,9 +20,9 @@ import secrets
 from urllib.parse import urljoin, urlparse
 
 import requests
-from charms.data_platform_libs.v0.database_requires import (
-    DatabaseEvent,
+from charms.data_platform_libs.v0.data_interfaces import (
     DatabaseRequires,
+    DatabaseRequiresEvent,
 )
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.hydra.v0.oauth import ClientConfig, OAuthInfoChangedEvent, OAuthRequirer
@@ -164,7 +164,6 @@ class JimmOperatorCharm(CharmBase):
             self.database.on.endpoints_changed,
             self._on_database_event,
         )
-        self.framework.observe(self.on.database_relation_broken, self._on_database_relation_broken)
 
         # OpenFGA relation
         self.openfga = OpenFGARequires(self, OPENFGA_STORE_NAME)
@@ -415,8 +414,11 @@ class JimmOperatorCharm(CharmBase):
         # update vault relation if exists
         binding = self.model.get_binding("vault-kv")
         if binding is not None:
-            egress_subnet = str(binding.network.interfaces[0].subnet)
-            self.interface.request_credentials(event.relation, egress_subnet, self.get_vault_nonce())
+            try:
+                egress_subnet = str(binding.network.interfaces[0].subnet)
+                self.interface.request_credentials(event.relation, egress_subnet, self.get_vault_nonce())
+            except Exception as e:
+                logging.warning(f"failed to update vault relation - {repr(e)}")
 
     @requires_state_setter
     def _on_dashboard_relation_joined(self, event: RelationJoinedEvent):
@@ -432,7 +434,7 @@ class JimmOperatorCharm(CharmBase):
         )
 
     @requires_state_setter
-    def _on_database_event(self, event: DatabaseEvent) -> None:
+    def _on_database_event(self, event: DatabaseRequiresEvent) -> None:
         """Database event handler."""
 
         if event.username is None or event.password is None:
@@ -452,17 +454,6 @@ class JimmOperatorCharm(CharmBase):
 
         # record the connection string
         self._state.dsn = uri
-
-        self._update_workload(event)
-
-    @requires_state_setter
-    def _on_database_relation_broken(self, event: DatabaseEvent) -> None:
-        """Database relation broken handler."""
-
-        # when the database relation is broken, we unset the
-        # connection string and schema-created from the application
-        # bucket of the peer relation
-        del self._state.dsn
 
         self._update_workload(event)
 
@@ -508,14 +499,6 @@ class JimmOperatorCharm(CharmBase):
     def _on_vault_gone_away(self, event: vault_kv.VaultKvGoneAwayEvent):
         self._update_workload(event)
 
-    def _path_exists_in_workload(self, path: str):
-        """Returns true if the specified path exists in the
-        workload container."""
-        container = self.unit.get_container(WORKLOAD_CONTAINER)
-        if container.can_connect():
-            return container.exists(path)
-        return False
-
     @requires_state_setter
     def _on_openfga_store_created(self, event: OpenFGAStoreCreateEvent):
         if not event.store_id:
@@ -559,7 +542,7 @@ class JimmOperatorCharm(CharmBase):
             subject=dns_name,
         )
 
-        self._state.csr = csr.decode()
+        self._state.csr = csr.decode().removesuffix("\n")
 
         self.certificates.request_certificate_creation(certificate_signing_request=csr)
 
@@ -700,14 +683,6 @@ def ensureFQDN(dns: str):  # noqa: N802
     if not dns.startswith("http"):
         dns = "https://" + dns
     return dns
-
-
-def _json_data(event, key):
-    logger.debug("getting relation data {}".format(key))
-    try:
-        return json.loads(event.relation.data[event.unit][key])
-    except KeyError:
-        return None
 
 
 if __name__ == "__main__":
