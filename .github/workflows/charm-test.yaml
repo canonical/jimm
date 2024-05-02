@@ -72,7 +72,7 @@ jobs:
           microk8s-group: snap_microk8s
           microk8s-addons: "ingress hostpath-storage dns rbac registry metallb:${{ steps.ip_range.outputs.ip_range }}"
       # Download the charm from the build to speed up integration tests.
-      - uses: actions/download-artifact@master
+      - uses: actions/download-artifact@v4
         with:
           name: jimm-k8s-charm
           path: ./charms/${{ env.charm-type }}
