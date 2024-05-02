@@ -81,7 +81,7 @@ async def deploy_jimm(ops_test: OpsTest, local_charm: bool) -> JimmEnv:
                 config={
                     "uuid": "f4dec11e-e2b6-40bb-871a-cc38e958af49",
                     "dns-name": jimm_address.netloc,
-                    "final-redirect-url": os.path.join(jimm_address.netloc, "debug/info"),
+                    "final-redirect-url": os.path.join(jimm_address.geturl(), "debug/info"),
                     "public-key": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
                     "private-key": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
                     "postgres-secret-storage": True,
@@ -144,7 +144,7 @@ async def deploy_jimm(ops_test: OpsTest, local_charm: bool) -> JimmEnv:
             )
             result = await action.wait()
             logger.info("attempt {} -> action result {} {}".format(i, result.status, result.results))
-            if result.results == {"return-code": 0}:
+            if result.results.get("return-code") == 0:
                 break
             time.sleep(2)
     assert ops_test.model.applications[APP_NAME].status == "active"
