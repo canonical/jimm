@@ -156,7 +156,7 @@ func (as *AuthenticationService) AuthCodeURL() string {
 	// Because Hydra only accepts return addresses that have been pre-registered
 	// the risk of csrf attacks is largely eliminated, but this may not be the case with other IdPs.
 
-	// Note: that Hydra requires a state parameter of at least 8 characters.
+	// Note that Hydra requires a state parameter of at least 8 characters.
 	return as.oauthConfig.AuthCodeURL("12345678")
 }
 

@@ -62,11 +62,11 @@ jobs:
       - name: Setup operator environment
         uses: charmed-kubernetes/actions-operator@main
         with:
-          channel: 1.29-strict/stable
+          channel: 1.28-strict/stable
           juju-channel: 3.4/stable
           provider: microk8s
           microk8s-group: snap_microk8s
-          microk8s-addons: "ingress hostpath-storage dns rbac registry metallb:10.64.140.43/30"
+          microk8s-addons: "ingress hostpath-storage dns registry metallb:10.64.140.43/30"
       # Download the charm from the build to speed up integration tests.
       - uses: actions/download-artifact@v4
         with:
@@ -77,7 +77,7 @@ jobs:
       - name: Install tox
         run: python -m pip install tox
       - name: Integration tests
-        run: tox -vve integration -- --localCharm
+        run: tox -e integration -- --localCharm
         working-directory: ./charms/${{ env.charm-type }}
       - name: Dump logs
         if: failure()
