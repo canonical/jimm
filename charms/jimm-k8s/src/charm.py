@@ -17,6 +17,7 @@
 import json
 import logging
 import secrets
+import string
 from urllib.parse import urljoin, urlparse
 
 import requests
@@ -53,12 +54,11 @@ from ops.main import main
 from ops.model import (
     ActiveStatus,
     BlockedStatus,
+    Container,
     ErrorStatus,
     TooManyRelatedAppsError,
     WaitingStatus,
-    Container
 )
-import string
 
 from state import State, requires_state, requires_state_setter
 
@@ -91,9 +91,7 @@ OAUTH_SCOPES = "openid profile email offline_access"
 OAUTH_GRANT_TYPES = ["authorization_code", "refresh_token"]
 VAULT_NONCE_SECRET_LABEL = "nonce"
 # Template for storing trusted certificate in a file.
-TRUSTED_CA_TEMPLATE = string.Template(
-    "/usr/local/share/ca-certificates/trusted-ca-cert-$rel_id-ca.crt"
-)
+TRUSTED_CA_TEMPLATE = string.Template("/usr/local/share/ca-certificates/trusted-ca-cert-$rel_id-ca.crt")
 
 
 class DeferError(Exception):
