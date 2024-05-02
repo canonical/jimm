@@ -57,12 +57,8 @@ jobs:
     env:
       charm-type: "jimm-k8s"
     steps:
-      - name: Get IP range
-        id: ip_range
-        run: |
-          echo "ip_range=$(ip -4 -j route get 2.2.2.2 | jq -r '.[] | .prefsrc')/32" >> $GITHUB_OUTPUT
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Setup operator environment
         uses: charmed-kubernetes/actions-operator@main
         with:
@@ -70,7 +66,7 @@ jobs:
           juju-channel: 3.4/stable
           provider: microk8s
           microk8s-group: snap_microk8s
-          microk8s-addons: "ingress hostpath-storage dns rbac registry metallb:${{ steps.ip_range.outputs.ip_range }}"
+          microk8s-addons: "ingress hostpath-storage dns rbac registry metallb:10.64.140.43/30"
       # Download the charm from the build to speed up integration tests.
       - uses: actions/download-artifact@v4
         with:

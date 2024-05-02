@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy_with_ngingx(ops_test: OpsTest, local_charm, page: Page, context: BrowserContext):
+async def test_jimm_oauth_browser_login(ops_test: OpsTest, local_charm, page: Page, context: BrowserContext):
     """Build the charm-under-test and deploy it together with related charms.
 
     Run a playwright test to perform the browser login flow and confirm the session cookie is valid.

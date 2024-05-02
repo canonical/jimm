@@ -63,14 +63,14 @@ async def deploy_jimm(ops_test: OpsTest, local_charm: bool) -> JimmEnv:
 
     # Deploy the identity bundle first because it checks everything is in an active state and if we deploy JIMM apps
     # at the same time, then that check will fail.
-    logger.debug("deploying identity bundle")
+    logger.info("deploying identity bundle")
     async with ops_test.fast_forward():
         await asyncio.gather(
             deploy_identity_bundle(ops_test=ops_test, external_idp_manager=external_idp_manager),
         )
 
     # Deploy the charm and wait for active/idle status
-    logger.debug("deploying charms")
+    logger.info("deploying charms")
     async with ops_test.fast_forward():
         await asyncio.gather(
             ops_test.model.deploy(
