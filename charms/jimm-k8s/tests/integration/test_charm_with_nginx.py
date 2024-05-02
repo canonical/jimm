@@ -7,6 +7,10 @@ import logging
 import time
 from pathlib import Path
 
+import os
+import requests
+from urllib.parse import ParseResult
+from playwright.async_api._generated import Page, BrowserContext
 import pytest
 import utils
 import yaml
@@ -15,10 +19,8 @@ from pytest_operator.plugin import OpsTest
 from oauth_tools.dex import ExternalIdpManager
 from oauth_tools.oauth_test_helper import (
     deploy_identity_bundle,
-    get_reverse_proxy_app_url,
     complete_external_idp_login,
     access_application_login_page,
-    click_on_sign_in_button_by_text,
     verify_page_loads,
     get_cookie_from_browser_by_name,
 )
@@ -32,7 +34,7 @@ APP_NAME = "juju-jimm-k8s"
 
 
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy_with_ngingx(ops_test: OpsTest, local_charm):
+async def test_build_and_deploy_with_ngingx(ops_test: OpsTest, local_charm, page: Page, context: BrowserContext):
     """Build the charm-under-test and deploy it together with related charms.
 
     Assert on the unit status before any relations/configurations take place.
@@ -45,6 +47,7 @@ async def test_build_and_deploy_with_ngingx(ops_test: OpsTest, local_charm):
         charm = await ops_test.build_charm(".")
     resources = {"jimm-image": "localhost:32000/jimm:latest"}
 
+    jimm_address = ParseResult(scheme="http", netloc="test.jimm.localhost", path="", params="", query="", fragment="")
     # Instantiating the ExternalIdpManager object deploys the external identity provider.
     external_idp_manager = ExternalIdpManager(ops_test=ops_test)
 
@@ -59,7 +62,7 @@ async def test_build_and_deploy_with_ngingx(ops_test: OpsTest, local_charm):
             ),
         )
 
-    # Deploy the charm and wait for active/idle status
+    # # Deploy the charm and wait for active/idle status
     logger.debug("deploying charms")
     async with ops_test.fast_forward():
         await asyncio.gather(
@@ -70,8 +73,8 @@ async def test_build_and_deploy_with_ngingx(ops_test: OpsTest, local_charm):
                 series="focal",
                 config={
                     "uuid": "f4dec11e-e2b6-40bb-871a-cc38e958af49",
-                    "dns-name": "test.jimm.localhost",
-                    "final-redirect-url": "https://canonical.com",
+                    "dns-name": jimm_address.netloc,
+                    "final-redirect-url": os.path.join(jimm_address.netloc, "debug/info"),
                     "public-key": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
                     "private-key": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
                     "postgres-secret-storage": True,
@@ -101,6 +104,9 @@ async def test_build_and_deploy_with_ngingx(ops_test: OpsTest, local_charm):
         raise_on_blocked=True,
         timeout=2000,
     )
+
+    logger.info("adding custom ca cert relation")
+    await ops_test.model.relate("{}:receive-ca-cert".format(APP_NAME), APPS.SELF_SIGNED_CERTIFICATES)
 
     logger.info("adding ingress relation")
     await ops_test.model.relate("{}:nginx-route".format(APP_NAME), "jimm-ingress")
@@ -140,3 +146,30 @@ async def test_build_and_deploy_with_ngingx(ops_test: OpsTest, local_charm):
             time.sleep(2)
 
     assert ops_test.model.applications[APP_NAME].status == "active"
+    logger.info("jimm is active and ready")
+    logger.info("running browser flow login test")
+    logger.info(f"jimm's address is {jimm_address.geturl()}")
+    jimm_login_page = os.path.join(jimm_address.geturl(), "auth/login")
+
+    await access_application_login_page(page=page, url=jimm_login_page)
+    logger.info("completing external idp login")
+    await complete_external_idp_login(
+        page=page, ops_test=ops_test, external_idp_manager=external_idp_manager
+    )
+    redirect_url = os.path.join(jimm_address.geturl(), "debug/info")
+    logger.info(f"verifying return to JIMM - expecting a final redirect to {redirect_url}")
+    await verify_page_loads(page=page, url=redirect_url)
+
+    logger.info("verifying session cookie")
+    # Verifying that the login flow was successful is application specific.
+    # The test uses JIMM's /auth/whoami endpoint to verify the session cookie is valid
+    jimm_session_cookie = await get_cookie_from_browser_by_name(
+        browser_context=context, name="jimm-browser-session"
+    )
+    request = requests.get(
+        os.path.join(jimm_address.geturl(), "auth/whoami"),
+        headers={"Cookie": f"jimm-browser-session={jimm_session_cookie}"},
+        verify=False,
+    )
+    assert request.status_code == 200
+    assert request.json()["email"] == EXTERNAL_USER_EMAIL

@@ -150,13 +150,11 @@ func NewAuthenticationService(ctx context.Context, params AuthenticationServiceP
 
 // AuthCodeURL returns a URL that will be used to redirect a browser to the identity provider.
 func (as *AuthenticationService) AuthCodeURL() string {
-	// As we're not the browser creating the auth code url and then communicating back
-	// to the server, it is OK not to set a state as there's no communication
-	// between say many "tabs" and a JIMM deployment, but rather
-	// just JIMM creating the auth code URL itself, and then handling the exchanging
-	// itself. Of course, middleman attacks between the IdP and JIMM are possible,
-	// but we'd have much larger problems than an auth code interception at that
-	// point. As such, we're opting out of using auth code URL state.
+	// Hydra requires the state parameter to be at least 8 characters.
+	// Note that state is primarily a guard against csrf attacks.
+	// A good reference is https://spring.io/blog/2011/11/30/cross-site-request-forgery-and-oauth2
+	// Because Hydra only accepts return addresses that have been pre-registered
+	// the risk of csrf attacks is largely eliminated, but this may not be the case with other IdPs.
 
 	// Note: that Hydra requires a state parameter of at least 8 characters.
 	return as.oauthConfig.AuthCodeURL("12345678")
