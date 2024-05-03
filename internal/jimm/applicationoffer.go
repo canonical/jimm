@@ -95,8 +95,8 @@ func (j *JIMM) Offer(ctx context.Context, user *openfga.User, offer AddApplicati
 		return errors.E(op, err)
 	}
 
-	offerDetails := jujuparams.ApplicationOfferAdminDetails{
-		ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
+	offerDetails := jujuparams.ApplicationOfferAdminDetailsV5{
+		ApplicationOfferDetailsV5: jujuparams.ApplicationOfferDetailsV5{
 			OfferURL: offerURL.String(),
 		},
 	}
@@ -107,7 +107,7 @@ func (j *JIMM) Offer(ctx context.Context, user *openfga.User, offer AddApplicati
 	}
 
 	var doc dbmodel.ApplicationOffer
-	doc.FromJujuApplicationOfferAdminDetails(offerDetails)
+	doc.FromJujuApplicationOfferAdminDetailsV5(offerDetails)
 	if err != nil {
 		zapctx.Error(ctx, "failed to convert application offer details", zaputil.Error(err))
 		return errors.E(op, err)
@@ -299,7 +299,7 @@ func (j *JIMM) listApplicationOfferUsers(ctx context.Context, offer names.Applic
 }
 
 // GetApplicationOffer returns details of the offer with the specified URL.
-func (j *JIMM) GetApplicationOffer(ctx context.Context, user *openfga.User, offerURL string) (*jujuparams.ApplicationOfferAdminDetails, error) {
+func (j *JIMM) GetApplicationOffer(ctx context.Context, user *openfga.User, offerURL string) (*jujuparams.ApplicationOfferAdminDetailsV5, error) {
 	const op = errors.Op("jimm.GetApplicationOffer")
 
 	offer := dbmodel.ApplicationOffer{
@@ -342,7 +342,7 @@ func (j *JIMM) GetApplicationOffer(ctx context.Context, user *openfga.User, offe
 	}
 	defer api.Close()
 
-	var offerDetails jujuparams.ApplicationOfferAdminDetails
+	var offerDetails jujuparams.ApplicationOfferAdminDetailsV5
 	offerDetails.OfferURL = offerURL
 	if err := api.GetApplicationOffer(ctx, &offerDetails); err != nil {
 		return nil, errors.E(op, err)
@@ -546,8 +546,8 @@ func (j *JIMM) UpdateApplicationOffer(ctx context.Context, controller *dbmodel.C
 	}
 	defer api.Close()
 
-	offerDetails := jujuparams.ApplicationOfferAdminDetails{
-		ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
+	offerDetails := jujuparams.ApplicationOfferAdminDetailsV5{
+		ApplicationOfferDetailsV5: jujuparams.ApplicationOfferDetailsV5{
 			OfferURL: offer.URL,
 		},
 	}
@@ -556,7 +556,7 @@ func (j *JIMM) UpdateApplicationOffer(ctx context.Context, controller *dbmodel.C
 		return errors.E(op, err)
 	}
 
-	offer.FromJujuApplicationOfferAdminDetails(offerDetails)
+	offer.FromJujuApplicationOfferAdminDetailsV5(offerDetails)
 	err = j.Database.UpdateApplicationOffer(ctx, &offer)
 	if err != nil {
 		return errors.E(op, err)
@@ -595,7 +595,7 @@ func (j *JIMM) getUserOfferAccess(ctx context.Context, user *openfga.User, offer
 }
 
 // FindApplicationOffers returns details of offers matching the specified filter.
-func (j *JIMM) FindApplicationOffers(ctx context.Context, user *openfga.User, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetails, error) {
+func (j *JIMM) FindApplicationOffers(ctx context.Context, user *openfga.User, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error) {
 	const op = errors.Op("jimm.FindApplicationOffers")
 
 	if len(filters) == 0 {
@@ -615,7 +615,7 @@ func (j *JIMM) FindApplicationOffers(ctx context.Context, user *openfga.User, fi
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
-	offerDetails := make([]jujuparams.ApplicationOfferAdminDetails, len(offers))
+	offerDetails := make([]jujuparams.ApplicationOfferAdminDetailsV5, len(offers))
 	for i, offer := range offers {
 		// TODO (alesstimec) Optimize this: currently check all possible
 		// permission levels for an offer, this is suboptimal.
@@ -624,7 +624,7 @@ func (j *JIMM) FindApplicationOffers(ctx context.Context, user *openfga.User, fi
 			return nil, errors.E(op, err)
 		}
 
-		offerDetails[i] = offer.ToJujuApplicationOfferDetails()
+		offerDetails[i] = offer.ToJujuApplicationOfferDetailsV5()
 
 		// non-admin users should not see connections of an application
 		// offer.
@@ -703,7 +703,7 @@ func (j *JIMM) applicationOfferFilters(ctx context.Context, jujuFilters ...jujup
 }
 
 // ListApplicationOffers returns details of offers matching the specified filter.
-func (j *JIMM) ListApplicationOffers(ctx context.Context, user *openfga.User, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetails, error) {
+func (j *JIMM) ListApplicationOffers(ctx context.Context, user *openfga.User, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error) {
 	const op = errors.Op("jimm.ListApplicationOffers")
 
 	type modelKey struct {
@@ -730,7 +730,7 @@ func (j *JIMM) ListApplicationOffers(ctx context.Context, user *openfga.User, fi
 		modelFilters[m] = append(modelFilters[m], f)
 	}
 
-	var offers []jujuparams.ApplicationOfferAdminDetails
+	var offers []jujuparams.ApplicationOfferAdminDetailsV5
 
 	var keys []modelKey
 	for k := range modelFilters {
@@ -764,7 +764,7 @@ func (j *JIMM) ListApplicationOffers(ctx context.Context, user *openfga.User, fi
 	return offers, nil
 }
 
-func (j *JIMM) listApplicationOffersForModel(ctx context.Context, user *openfga.User, m *dbmodel.Model, filters []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetails, error) {
+func (j *JIMM) listApplicationOffersForModel(ctx context.Context, user *openfga.User, m *dbmodel.Model, filters []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error) {
 	const op = errors.Op("jimm.listApplicationOffersForModel")
 
 	if err := j.Database.GetModel(ctx, m); err != nil {

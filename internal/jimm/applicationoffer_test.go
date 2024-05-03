@@ -20,7 +20,6 @@ import (
 	"gopkg.in/macaroon.v2"
 	"gorm.io/gorm"
 
-	"github.com/canonical/jimm/internal/constants"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
@@ -664,7 +663,7 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 			UUID: "00000000-0000-0000-0000-0000-0000000000001",
 			API: &jimmtest.API{
 				GetApplicationOfferConsumeDetails_: func(ctx context.Context, user names.UserTag, details *jujuparams.ConsumeOfferDetails, v bakery.Version) error {
-					details.Offer = &jujuparams.ApplicationOfferDetails{
+					details.Offer = &jujuparams.ApplicationOfferDetailsV5{
 						SourceModelTag:         names.NewModelTag(model.UUID.String).String(),
 						OfferUUID:              offer.UUID,
 						OfferURL:               offer.URL,
@@ -676,10 +675,6 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 							Interface: "unknown",
 							Limit:     1,
 						}},
-						Bindings: map[string]string{
-							"key1": "value1",
-							"key2": "value2",
-						},
 						Users: []jujuparams.OfferUserDetails{{
 							UserName: "alice@canonical.com",
 							Access:   "admin",
@@ -689,15 +684,6 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 						}, {
 							UserName: "bob@canonical.com",
 							Access:   "consume",
-						}},
-						Spaces: []jujuparams.RemoteSpace{{
-							CloudType:  "test-cloud-type",
-							Name:       "test-remote-space",
-							ProviderId: "test-provider-id",
-							ProviderAttributes: map[string]interface{}{
-								"attr1": "value1",
-								"attr2": "value2",
-							},
 						}},
 					}
 					details.Macaroon = &macaroon.Macaroon{}
@@ -720,7 +706,7 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 		about: "admin can get the application offer consume details ",
 		user:  u,
 		details: jujuparams.ConsumeOfferDetails{
-			Offer: &jujuparams.ApplicationOfferDetails{
+			Offer: &jujuparams.ApplicationOfferDetailsV5{
 				OfferURL: "test-offer-url",
 			},
 		},
@@ -731,7 +717,7 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 				Addrs:         []string{"test-public-address"},
 			},
 			Macaroon: &macaroon.Macaroon{},
-			Offer: &jujuparams.ApplicationOfferDetails{
+			Offer: &jujuparams.ApplicationOfferDetailsV5{
 				SourceModelTag:         names.NewModelTag(model.UUID.String).String(),
 				OfferUUID:              offer.UUID,
 				OfferURL:               offer.URL,
@@ -743,10 +729,6 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 					Interface: "unknown",
 					Limit:     1,
 				}},
-				Bindings: map[string]string{
-					"key1": "value1",
-					"key2": "value2",
-				},
 				Users: []jujuparams.OfferUserDetails{{
 					UserName: "alice@canonical.com",
 					Access:   "admin",
@@ -760,22 +742,13 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 					UserName: "everyone@external",
 					Access:   "read",
 				}},
-				Spaces: []jujuparams.RemoteSpace{{
-					CloudType:  "test-cloud-type",
-					Name:       "test-remote-space",
-					ProviderId: "test-provider-id",
-					ProviderAttributes: map[string]interface{}{
-						"attr1": "value1",
-						"attr2": "value2",
-					},
-				}},
 			},
 		},
 	}, {
 		about: "users with consume access can get the application offer consume details with filtered users",
 		user:  u2,
 		details: jujuparams.ConsumeOfferDetails{
-			Offer: &jujuparams.ApplicationOfferDetails{
+			Offer: &jujuparams.ApplicationOfferDetailsV5{
 				OfferURL: "test-offer-url",
 			},
 		},
@@ -786,7 +759,7 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 				Addrs:         []string{"test-public-address"},
 			},
 			Macaroon: &macaroon.Macaroon{},
-			Offer: &jujuparams.ApplicationOfferDetails{
+			Offer: &jujuparams.ApplicationOfferDetailsV5{
 				SourceModelTag:         names.NewModelTag(model.UUID.String).String(),
 				OfferUUID:              offer.UUID,
 				OfferURL:               offer.URL,
@@ -798,10 +771,6 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 					Interface: "unknown",
 					Limit:     1,
 				}},
-				Bindings: map[string]string{
-					"key1": "value1",
-					"key2": "value2",
-				},
 				Users: []jujuparams.OfferUserDetails{{
 					UserName: "bob@canonical.com",
 					Access:   "consume",
@@ -809,22 +778,13 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 					UserName: "everyone@external",
 					Access:   "read",
 				}},
-				Spaces: []jujuparams.RemoteSpace{{
-					CloudType:  "test-cloud-type",
-					Name:       "test-remote-space",
-					ProviderId: "test-provider-id",
-					ProviderAttributes: map[string]interface{}{
-						"attr1": "value1",
-						"attr2": "value2",
-					},
-				}},
 			},
 		},
 	}, {
 		about: "user with read access cannot get application offer consume details",
 		user:  u1,
 		details: jujuparams.ConsumeOfferDetails{
-			Offer: &jujuparams.ApplicationOfferDetails{
+			Offer: &jujuparams.ApplicationOfferDetailsV5{
 				OfferURL: "test-offer-url",
 			},
 		},
@@ -833,7 +793,7 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 		about: "no such offer",
 		user:  u,
 		details: jujuparams.ConsumeOfferDetails{
-			Offer: &jujuparams.ApplicationOfferDetails{
+			Offer: &jujuparams.ApplicationOfferDetailsV5{
 				OfferURL: "no-such-offer",
 			},
 		},
@@ -873,7 +833,7 @@ func TestGetApplicationOffer(t *testing.T) {
 		},
 		Dialer: &jimmtest.Dialer{
 			API: &jimmtest.API{
-				GetApplicationOffer_: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetails) error {
+				GetApplicationOffer_: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetailsV5) error {
 					details.ApplicationName = "test-app"
 					details.CharmURL = "cs:test-app:17"
 					details.Connections = []jujuparams.OfferConnection{{
@@ -882,7 +842,7 @@ func TestGetApplicationOffer(t *testing.T) {
 						Username:       "unknown",
 						Endpoint:       "test-endpoint",
 					}}
-					details.ApplicationOfferDetails = jujuparams.ApplicationOfferDetails{
+					details.ApplicationOfferDetailsV5 = jujuparams.ApplicationOfferDetailsV5{
 						SourceModelTag:         names.NewModelTag("00000000-0000-0000-0000-0000-0000000000003").String(),
 						OfferUUID:              "00000000-0000-0000-0000-0000-0000000000011",
 						OfferURL:               "test-offer-url",
@@ -893,24 +853,6 @@ func TestGetApplicationOffer(t *testing.T) {
 							Interface: "unknown",
 							Limit:     1,
 						}},
-						Spaces: []jujuparams.RemoteSpace{{
-							CloudType:  "test-cloud-type",
-							Name:       "test-remote-space",
-							ProviderId: "test-provider-id",
-							ProviderAttributes: map[string]interface{}{
-								"attr1": "value1",
-								"attr2": "value2",
-							},
-							Subnets: []jujuparams.Subnet{{
-								SpaceTag: "test-remote-space",
-								VLANTag:  1024,
-								Status:   constants.DEAD.String(),
-							}},
-						}},
-						Bindings: map[string]string{
-							"key1": "value4",
-							"key2": "value5",
-						},
 						Users: []jujuparams.OfferUserDetails{{
 							UserName: "alice@canonical.com",
 							Access:   string(jujuparams.OfferAdminAccess),
@@ -1004,20 +946,6 @@ func TestGetApplicationOffer(t *testing.T) {
 			Interface:          "unknown",
 			Limit:              1,
 		}},
-		Spaces: []dbmodel.ApplicationOfferRemoteSpace{{
-			ApplicationOfferID: 1,
-			CloudType:          "test-cloud-type",
-			Name:               "test-remote-space",
-			ProviderID:         "test-provider-id",
-			ProviderAttributes: dbmodel.Map{
-				"attr1": "value1",
-				"attr2": "value2",
-			},
-		}},
-		Bindings: dbmodel.StringMap{
-			"key1": "value1",
-			"key2": "value2",
-		},
 		Connections: []dbmodel.ApplicationOfferConnection{{
 			ApplicationOfferID: 1,
 			SourceModelTag:     "test-model-src",
@@ -1041,14 +969,14 @@ func TestGetApplicationOffer(t *testing.T) {
 		about                string
 		user                 *dbmodel.Identity
 		offerURL             string
-		expectedOfferDetails jujuparams.ApplicationOfferAdminDetails
+		expectedOfferDetails jujuparams.ApplicationOfferAdminDetailsV5
 		expectedError        string
 	}{{
 		about:    "admin can get the application offer",
 		user:     u,
 		offerURL: "test-offer-url",
-		expectedOfferDetails: jujuparams.ApplicationOfferAdminDetails{
-			ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
+		expectedOfferDetails: jujuparams.ApplicationOfferAdminDetailsV5{
+			ApplicationOfferDetailsV5: jujuparams.ApplicationOfferDetailsV5{
 				SourceModelTag:         names.NewModelTag(model.UUID.String).String(),
 				OfferUUID:              "00000000-0000-0000-0000-0000-0000000000011",
 				OfferURL:               "test-offer-url",
@@ -1059,30 +987,12 @@ func TestGetApplicationOffer(t *testing.T) {
 					Interface: "unknown",
 					Limit:     1,
 				}},
-				Bindings: map[string]string{
-					"key1": "value4",
-					"key2": "value5",
-				},
 				Users: []jujuparams.OfferUserDetails{{
 					UserName: "alice@canonical.com",
 					Access:   "admin",
 				}, {
 					UserName: "eve@canonical.com",
 					Access:   "read",
-				}},
-				Spaces: []jujuparams.RemoteSpace{{
-					CloudType:  "test-cloud-type",
-					Name:       "test-remote-space",
-					ProviderId: "test-provider-id",
-					ProviderAttributes: map[string]interface{}{
-						"attr1": "value1",
-						"attr2": "value2",
-					},
-					Subnets: []jujuparams.Subnet{{
-						SpaceTag: "test-remote-space",
-						VLANTag:  1024,
-						Status:   constants.DEAD.String(),
-					}},
 				}},
 			},
 			ApplicationName: "test-app",
@@ -1098,8 +1008,8 @@ func TestGetApplicationOffer(t *testing.T) {
 		about:    "user with read access can get the application offer, but users and connections are filtered",
 		user:     u1,
 		offerURL: "test-offer-url",
-		expectedOfferDetails: jujuparams.ApplicationOfferAdminDetails{
-			ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
+		expectedOfferDetails: jujuparams.ApplicationOfferAdminDetailsV5{
+			ApplicationOfferDetailsV5: jujuparams.ApplicationOfferDetailsV5{
 				SourceModelTag:         names.NewModelTag(model.UUID.String).String(),
 				OfferUUID:              "00000000-0000-0000-0000-0000-0000000000011",
 				OfferURL:               "test-offer-url",
@@ -1110,27 +1020,9 @@ func TestGetApplicationOffer(t *testing.T) {
 					Interface: "unknown",
 					Limit:     1,
 				}},
-				Bindings: map[string]string{
-					"key1": "value4",
-					"key2": "value5",
-				},
 				Users: []jujuparams.OfferUserDetails{{
 					UserName: "eve@canonical.com",
 					Access:   "read",
-				}},
-				Spaces: []jujuparams.RemoteSpace{{
-					CloudType:  "test-cloud-type",
-					Name:       "test-remote-space",
-					ProviderId: "test-provider-id",
-					ProviderAttributes: map[string]interface{}{
-						"attr1": "value1",
-						"attr2": "value2",
-					},
-					Subnets: []jujuparams.Subnet{{
-						SpaceTag: "test-remote-space",
-						VLANTag:  1024,
-						Status:   constants.DEAD.String(),
-					}},
 				}},
 			},
 			ApplicationName: "test-app",
@@ -1170,13 +1062,13 @@ func TestOffer(t *testing.T) {
 	now := time.Now().UTC().Round(time.Millisecond)
 	tests := []struct {
 		about                       string
-		getApplicationOffer         func(context.Context, *jujuparams.ApplicationOfferAdminDetails) error
+		getApplicationOffer         func(context.Context, *jujuparams.ApplicationOfferAdminDetailsV5) error
 		grantApplicationOfferAccess func(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error
 		offer                       func(context.Context, crossmodel.OfferURL, jujuparams.AddApplicationOffer) error
 		createEnv                   func(*qt.C, db.Database, *openfga.OFGAClient) (dbmodel.Identity, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error))
 	}{{
 		about: "all ok",
-		getApplicationOffer: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetails) error {
+		getApplicationOffer: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetailsV5) error {
 			details.ApplicationName = "test-app"
 			details.CharmURL = "cs:test-app:17"
 			details.Connections = []jujuparams.OfferConnection{{
@@ -1185,7 +1077,7 @@ func TestOffer(t *testing.T) {
 				Username:       "unknown",
 				Endpoint:       "test-endpoint",
 			}}
-			details.ApplicationOfferDetails = jujuparams.ApplicationOfferDetails{
+			details.ApplicationOfferDetailsV5 = jujuparams.ApplicationOfferDetailsV5{
 				OfferUUID:              "00000000-0000-0000-0000-0000-0000000000004",
 				OfferURL:               "test-offer-url",
 				ApplicationDescription: "a test app offering",
@@ -1195,24 +1087,6 @@ func TestOffer(t *testing.T) {
 					Interface: "unknown",
 					Limit:     1,
 				}},
-				Spaces: []jujuparams.RemoteSpace{{
-					CloudType:  "test-cloud-type",
-					Name:       "test-remote-space",
-					ProviderId: "test-provider-id",
-					ProviderAttributes: map[string]interface{}{
-						"attr1": "value1",
-						"attr2": "value2",
-					},
-					Subnets: []jujuparams.Subnet{{
-						SpaceTag: "test-remote-space",
-						VLANTag:  1024,
-						Status:   constants.ALIVE.String(),
-					}},
-				}},
-				Bindings: map[string]string{
-					"key1": "value1",
-					"key2": "value2",
-				},
 				Users: []jujuparams.OfferUserDetails{{
 					UserName:    "alice",
 					DisplayName: "alice, sister of eve",
@@ -1312,20 +1186,6 @@ func TestOffer(t *testing.T) {
 					Interface:          "unknown",
 					Limit:              1,
 				}},
-				Spaces: []dbmodel.ApplicationOfferRemoteSpace{{
-					ApplicationOfferID: 1,
-					CloudType:          "test-cloud-type",
-					Name:               "test-remote-space",
-					ProviderID:         "test-provider-id",
-					ProviderAttributes: dbmodel.Map{
-						"attr1": "value1",
-						"attr2": "value2",
-					},
-				}},
-				Bindings: dbmodel.StringMap{
-					"key1": "value1",
-					"key2": "value2",
-				},
 				Connections: []dbmodel.ApplicationOfferConnection{{
 					ApplicationOfferID: 1,
 					SourceModelTag:     "test-model-src",
@@ -1339,7 +1199,7 @@ func TestOffer(t *testing.T) {
 		},
 	}, {
 		about: "controller returns an error when creating an offer",
-		getApplicationOffer: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetails) error {
+		getApplicationOffer: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetailsV5) error {
 			return nil
 		},
 		grantApplicationOfferAccess: func(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error {
@@ -1426,7 +1286,7 @@ func TestOffer(t *testing.T) {
 		},
 	}, {
 		about: "model not found",
-		getApplicationOffer: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetails) error {
+		getApplicationOffer: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetailsV5) error {
 			return nil
 		},
 		grantApplicationOfferAccess: func(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error {
@@ -1458,7 +1318,7 @@ func TestOffer(t *testing.T) {
 		},
 	}, {
 		about: "application not found",
-		getApplicationOffer: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetails) error {
+		getApplicationOffer: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetailsV5) error {
 			return nil
 		},
 		grantApplicationOfferAccess: func(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error {
@@ -1547,7 +1407,7 @@ func TestOffer(t *testing.T) {
 		},
 	}, {
 		about: "user not model admin",
-		getApplicationOffer: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetails) error {
+		getApplicationOffer: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetailsV5) error {
 			return nil
 		},
 		grantApplicationOfferAccess: func(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error {
@@ -1638,7 +1498,7 @@ func TestOffer(t *testing.T) {
 		},
 	}, {
 		about: "fail to fetch application offer details",
-		getApplicationOffer: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetails) error {
+		getApplicationOffer: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetailsV5) error {
 			return errors.E("a silly error")
 		},
 		grantApplicationOfferAccess: func(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error {
@@ -1725,7 +1585,7 @@ func TestOffer(t *testing.T) {
 		},
 	}, {
 		about: "controller returns `application offer already exists`",
-		getApplicationOffer: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetails) error {
+		getApplicationOffer: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetailsV5) error {
 			return nil
 		},
 		grantApplicationOfferAccess: func(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error {
@@ -1948,20 +1808,6 @@ func TestOfferAssertOpenFGARelationsExist(t *testing.T) {
 				Interface:          "unknown",
 				Limit:              1,
 			}},
-			Spaces: []dbmodel.ApplicationOfferRemoteSpace{{
-				ApplicationOfferID: 1,
-				CloudType:          "test-cloud-type",
-				Name:               "test-remote-space",
-				ProviderID:         "test-provider-id",
-				ProviderAttributes: dbmodel.Map{
-					"attr1": "value1",
-					"attr2": "value2",
-				},
-			}},
-			Bindings: dbmodel.StringMap{
-				"key1": "value1",
-				"key2": "value2",
-			},
 			Connections: []dbmodel.ApplicationOfferConnection{{
 				ApplicationOfferID: 1,
 				SourceModelTag:     "test-model-src",
@@ -1975,7 +1821,7 @@ func TestOfferAssertOpenFGARelationsExist(t *testing.T) {
 	}
 
 	api := &jimmtest.API{
-		GetApplicationOffer_: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetails) error {
+		GetApplicationOffer_: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetailsV5) error {
 			details.ApplicationName = "test-app"
 			details.CharmURL = "cs:test-app:17"
 			details.Connections = []jujuparams.OfferConnection{{
@@ -1984,7 +1830,7 @@ func TestOfferAssertOpenFGARelationsExist(t *testing.T) {
 				Username:       "unknown",
 				Endpoint:       "test-endpoint",
 			}}
-			details.ApplicationOfferDetails = jujuparams.ApplicationOfferDetails{
+			details.ApplicationOfferDetailsV5 = jujuparams.ApplicationOfferDetailsV5{
 				OfferUUID:              "00000000-0000-0000-0000-0000-0000000000004",
 				OfferURL:               "test-offer-url",
 				ApplicationDescription: "a test app offering",
@@ -1994,24 +1840,6 @@ func TestOfferAssertOpenFGARelationsExist(t *testing.T) {
 					Interface: "unknown",
 					Limit:     1,
 				}},
-				Spaces: []jujuparams.RemoteSpace{{
-					CloudType:  "test-cloud-type",
-					Name:       "test-remote-space",
-					ProviderId: "test-provider-id",
-					ProviderAttributes: map[string]interface{}{
-						"attr1": "value1",
-						"attr2": "value2",
-					},
-					Subnets: []jujuparams.Subnet{{
-						SpaceTag: "test-remote-space",
-						VLANTag:  1024,
-						Status:   constants.ALIVE.String(),
-					}},
-				}},
-				Bindings: map[string]string{
-					"key1": "value1",
-					"key2": "value2",
-				},
 				Users: []jujuparams.OfferUserDetails{{
 					UserName:    "alice",
 					DisplayName: "alice, sister of eve",
@@ -2295,19 +2123,6 @@ func TestUpdateOffer(t *testing.T) {
 			ApplicationName:        "test-app",
 			CharmURL:               "cs:test-app:17",
 			ApplicationDescription: "changed offer description",
-			Spaces: []dbmodel.ApplicationOfferRemoteSpace{{
-				ApplicationOfferID: 1,
-				CloudType:          "test-cloud-type",
-				Name:               "test-remote-space",
-				ProviderID:         "test-provider-id",
-				ProviderAttributes: dbmodel.Map{
-					"attr1": "value3",
-					"attr2": "value4"},
-			}},
-			Bindings: dbmodel.StringMap{
-				"key1": "value4",
-				"key2": "value5",
-			},
 			Connections: []dbmodel.ApplicationOfferConnection{{
 				ApplicationOfferID: 1,
 				SourceModelTag:     "test-model-src",
@@ -2359,7 +2174,7 @@ func TestUpdateOffer(t *testing.T) {
 				Database:      db,
 				Dialer: &jimmtest.Dialer{
 					API: &jimmtest.API{
-						GetApplicationOffer_: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetails) error {
+						GetApplicationOffer_: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetailsV5) error {
 							details.ApplicationName = "test-app"
 							details.CharmURL = "cs:test-app:17"
 							details.Connections = []jujuparams.OfferConnection{{
@@ -2368,7 +2183,7 @@ func TestUpdateOffer(t *testing.T) {
 								Username:       "unknown",
 								Endpoint:       "test-endpoint",
 							}}
-							details.ApplicationOfferDetails = jujuparams.ApplicationOfferDetails{
+							details.ApplicationOfferDetailsV5 = jujuparams.ApplicationOfferDetailsV5{
 								OfferUUID:              "00000000-0000-0000-0000-0000-0000000000011",
 								OfferURL:               "test-offer-url",
 								ApplicationDescription: "changed offer description",
@@ -2378,24 +2193,6 @@ func TestUpdateOffer(t *testing.T) {
 									Interface: "unknown",
 									Limit:     1,
 								}},
-								Spaces: []jujuparams.RemoteSpace{{
-									CloudType:  "test-cloud-type",
-									Name:       "test-remote-space",
-									ProviderId: "test-provider-id",
-									ProviderAttributes: map[string]interface{}{
-										"attr1": "value3",
-										"attr2": "value4",
-									},
-									Subnets: []jujuparams.Subnet{{
-										SpaceTag: "test-remote-space",
-										VLANTag:  1024,
-										Status:   constants.DEAD.String(),
-									}},
-								}},
-								Bindings: map[string]string{
-									"key1": "value4",
-									"key2": "value5",
-								},
 								Users: []jujuparams.OfferUserDetails{{
 									UserName:    "alice",
 									DisplayName: "alice, sister of eve",
@@ -2543,7 +2340,7 @@ func TestFindApplicationOffers(t *testing.T) {
 			if test.expectedError == "" {
 				c.Assert(err, qt.IsNil)
 				if test.expectedOffer != nil {
-					details := test.expectedOffer.ToJujuApplicationOfferDetails()
+					details := test.expectedOffer.ToJujuApplicationOfferDetailsV5()
 					if accessLevel != string(jujuparams.OfferAdminAccess) {
 						details.Users = []jujuparams.OfferUserDetails{{
 							UserName: user.Name,
@@ -2587,7 +2384,7 @@ func TestFindApplicationOffers(t *testing.T) {
 							cmpopts.IgnoreTypes(gorm.Model{}),
 							cmpopts.IgnoreTypes(dbmodel.Model{}),
 						),
-						[]jujuparams.ApplicationOfferAdminDetails{details},
+						[]jujuparams.ApplicationOfferAdminDetailsV5{details},
 					)
 				} else {
 					c.Assert(offers, qt.HasLen, 0)
@@ -2686,11 +2483,11 @@ func TestListApplicationOffers(t *testing.T) {
 		Database:      db,
 		Dialer: &jimmtest.Dialer{
 			API: &jimmtest.API{
-				ListApplicationOffers_: func(_ context.Context, filters []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetails, error) {
+				ListApplicationOffers_: func(_ context.Context, filters []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error) {
 					switch filters[0].ModelName {
 					case "model-1":
-						return []jujuparams.ApplicationOfferAdminDetails{{
-							ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
+						return []jujuparams.ApplicationOfferAdminDetailsV5{{
+							ApplicationOfferDetailsV5: jujuparams.ApplicationOfferDetailsV5{
 								SourceModelTag:         "00000011-0000-0000-0000-000000000001",
 								OfferUUID:              "00000012-0000-0000-0000-000000000001",
 								OfferURL:               "test-offer-url",
@@ -2702,10 +2499,6 @@ func TestListApplicationOffers(t *testing.T) {
 									Interface: "unknown",
 									Limit:     1,
 								}},
-								Bindings: map[string]string{
-									"key1": "value1",
-									"key2": "value2",
-								},
 								Users: []jujuparams.OfferUserDetails{{
 									UserName: "alice@canonical.com",
 									Access:   "admin",
@@ -2715,15 +2508,6 @@ func TestListApplicationOffers(t *testing.T) {
 								}, {
 									UserName: "bob@canonical.com",
 									Access:   "consume",
-								}},
-								Spaces: []jujuparams.RemoteSpace{{
-									CloudType:  "test-cloud-type",
-									Name:       "test-remote-space",
-									ProviderId: "test-provider-id",
-									ProviderAttributes: map[string]interface{}{
-										"attr1": "value1",
-										"attr2": "value2",
-									},
 								}},
 							},
 							ApplicationName: "application-1",
@@ -2735,7 +2519,7 @@ func TestListApplicationOffers(t *testing.T) {
 								Endpoint:       "an-endpoint",
 							}},
 						}, {
-							ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
+							ApplicationOfferDetailsV5: jujuparams.ApplicationOfferDetailsV5{
 								SourceModelTag:         "00000011-0000-0000-0000-000000000002",
 								OfferUUID:              "00000012-0000-0000-0000-000000000002",
 								OfferURL:               "test-offer-url",
@@ -2747,10 +2531,6 @@ func TestListApplicationOffers(t *testing.T) {
 									Interface: "unknown",
 									Limit:     1,
 								}},
-								Bindings: map[string]string{
-									"key1": "value1",
-									"key2": "value2",
-								},
 								Users: []jujuparams.OfferUserDetails{{
 									UserName: "alice@canonical.com",
 									Access:   "admin",
@@ -2760,15 +2540,6 @@ func TestListApplicationOffers(t *testing.T) {
 								}, {
 									UserName: "bob@canonical.com",
 									Access:   "consume",
-								}},
-								Spaces: []jujuparams.RemoteSpace{{
-									CloudType:  "test-cloud-type",
-									Name:       "test-remote-space",
-									ProviderId: "test-provider-id",
-									ProviderAttributes: map[string]interface{}{
-										"attr1": "value1",
-										"attr2": "value2",
-									},
 								}},
 							},
 							ApplicationName: "application-2",
@@ -2781,8 +2552,8 @@ func TestListApplicationOffers(t *testing.T) {
 							}},
 						}}, nil
 					case "model-2":
-						return []jujuparams.ApplicationOfferAdminDetails{{
-							ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
+						return []jujuparams.ApplicationOfferAdminDetailsV5{{
+							ApplicationOfferDetailsV5: jujuparams.ApplicationOfferDetailsV5{
 								SourceModelTag:         "00000011-0000-0000-0000-000000000003",
 								OfferUUID:              "00000012-0000-0000-0000-000000000003",
 								OfferURL:               "test-offer-url",
@@ -2794,10 +2565,6 @@ func TestListApplicationOffers(t *testing.T) {
 									Interface: "unknown",
 									Limit:     1,
 								}},
-								Bindings: map[string]string{
-									"key1": "value1",
-									"key2": "value2",
-								},
 								Users: []jujuparams.OfferUserDetails{{
 									UserName: "alice@canonical.com",
 									Access:   "admin",
@@ -2807,15 +2574,6 @@ func TestListApplicationOffers(t *testing.T) {
 								}, {
 									UserName: "bob@canonical.com",
 									Access:   "consume",
-								}},
-								Spaces: []jujuparams.RemoteSpace{{
-									CloudType:  "test-cloud-type",
-									Name:       "test-remote-space",
-									ProviderId: "test-provider-id",
-									ProviderAttributes: map[string]interface{}{
-										"attr1": "value1",
-										"attr2": "value2",
-									},
 								}},
 							},
 							ApplicationName: "application-3",
@@ -2896,8 +2654,8 @@ func TestListApplicationOffers(t *testing.T) {
 			return offers[i].Users[j].UserName < offers[i].Users[k].UserName
 		})
 	}
-	c.Check(offers, qt.DeepEquals, []jujuparams.ApplicationOfferAdminDetails{{
-		ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
+	c.Check(offers, qt.DeepEquals, []jujuparams.ApplicationOfferAdminDetailsV5{{
+		ApplicationOfferDetailsV5: jujuparams.ApplicationOfferDetailsV5{
 			SourceModelTag:         "00000011-0000-0000-0000-000000000003",
 			OfferUUID:              "00000012-0000-0000-0000-000000000003",
 			OfferURL:               "test-offer-url",
@@ -2909,10 +2667,6 @@ func TestListApplicationOffers(t *testing.T) {
 				Interface: "unknown",
 				Limit:     1,
 			}},
-			Bindings: map[string]string{
-				"key1": "value1",
-				"key2": "value2",
-			},
 			Users: []jujuparams.OfferUserDetails{{
 				UserName: "alice@canonical.com",
 				Access:   "admin",
@@ -2922,15 +2676,6 @@ func TestListApplicationOffers(t *testing.T) {
 			}, {
 				UserName: "eve@canonical.com",
 				Access:   "read",
-			}},
-			Spaces: []jujuparams.RemoteSpace{{
-				CloudType:  "test-cloud-type",
-				Name:       "test-remote-space",
-				ProviderId: "test-provider-id",
-				ProviderAttributes: map[string]interface{}{
-					"attr1": "value1",
-					"attr2": "value2",
-				},
 			}},
 		},
 		ApplicationName: "application-3",
@@ -2942,7 +2687,7 @@ func TestListApplicationOffers(t *testing.T) {
 			Endpoint:       "an-endpoint",
 		}},
 	}, {
-		ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
+		ApplicationOfferDetailsV5: jujuparams.ApplicationOfferDetailsV5{
 			SourceModelTag:         "00000011-0000-0000-0000-000000000001",
 			OfferUUID:              "00000012-0000-0000-0000-000000000001",
 			OfferURL:               "test-offer-url",
@@ -2954,10 +2699,6 @@ func TestListApplicationOffers(t *testing.T) {
 				Interface: "unknown",
 				Limit:     1,
 			}},
-			Bindings: map[string]string{
-				"key1": "value1",
-				"key2": "value2",
-			},
 			Users: []jujuparams.OfferUserDetails{{
 				UserName: "alice@canonical.com",
 				Access:   "admin",
@@ -2967,15 +2708,6 @@ func TestListApplicationOffers(t *testing.T) {
 			}, {
 				UserName: "eve@canonical.com",
 				Access:   "read",
-			}},
-			Spaces: []jujuparams.RemoteSpace{{
-				CloudType:  "test-cloud-type",
-				Name:       "test-remote-space",
-				ProviderId: "test-provider-id",
-				ProviderAttributes: map[string]interface{}{
-					"attr1": "value1",
-					"attr2": "value2",
-				},
 			}},
 		},
 		ApplicationName: "application-1",
@@ -2987,7 +2719,7 @@ func TestListApplicationOffers(t *testing.T) {
 			Endpoint:       "an-endpoint",
 		}},
 	}, {
-		ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
+		ApplicationOfferDetailsV5: jujuparams.ApplicationOfferDetailsV5{
 			SourceModelTag:         "00000011-0000-0000-0000-000000000002",
 			OfferUUID:              "00000012-0000-0000-0000-000000000002",
 			OfferURL:               "test-offer-url",
@@ -2999,10 +2731,6 @@ func TestListApplicationOffers(t *testing.T) {
 				Interface: "unknown",
 				Limit:     1,
 			}},
-			Bindings: map[string]string{
-				"key1": "value1",
-				"key2": "value2",
-			},
 			Users: []jujuparams.OfferUserDetails{{
 				UserName: "alice@canonical.com",
 				Access:   "admin",
@@ -3012,15 +2740,6 @@ func TestListApplicationOffers(t *testing.T) {
 			}, {
 				UserName: "eve@canonical.com",
 				Access:   "read",
-			}},
-			Spaces: []jujuparams.RemoteSpace{{
-				CloudType:  "test-cloud-type",
-				Name:       "test-remote-space",
-				ProviderId: "test-provider-id",
-				ProviderAttributes: map[string]interface{}{
-					"attr1": "value1",
-					"attr2": "value2",
-				},
 			}},
 		},
 		ApplicationName: "application-2",

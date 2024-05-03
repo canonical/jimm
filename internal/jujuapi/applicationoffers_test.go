@@ -112,7 +112,7 @@ func (s *applicationOffersSuite) TestGetConsumeDetails(c *gc.C) {
 		return details.Offer.Users[i].UserName < details.Offer.Users[j].UserName
 	})
 	c.Check(details, gc.DeepEquals, jujuparams.ConsumeOfferDetails{
-		Offer: &jujuparams.ApplicationOfferDetails{
+		Offer: &jujuparams.ApplicationOfferDetailsV5{
 			SourceModelTag:         s.Model.Tag().String(),
 			OfferURL:               ourl.Path(),
 			OfferName:              "test-offer",
@@ -156,7 +156,7 @@ func (s *applicationOffersSuite) TestGetConsumeDetails(c *gc.C) {
 		return details.Offer.Users[j].UserName < details.Offer.Users[k].UserName
 	})
 	c.Check(details, gc.DeepEquals, jujuparams.ConsumeOfferDetails{
-		Offer: &jujuparams.ApplicationOfferDetails{
+		Offer: &jujuparams.ApplicationOfferDetailsV5{
 			SourceModelTag:         s.Model.Tag().String(),
 			OfferURL:               ourl.Path(),
 			OfferName:              "test-offer",

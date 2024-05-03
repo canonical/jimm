@@ -133,15 +133,15 @@ type API struct {
 	DestroyModel_                      func(context.Context, names.ModelTag, *bool, *bool, *time.Duration, *time.Duration) error
 	DumpModel_                         func(context.Context, names.ModelTag, bool) (string, error)
 	DumpModelDB_                       func(context.Context, names.ModelTag) (map[string]interface{}, error)
-	FindApplicationOffers_             func(context.Context, []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetails, error)
-	GetApplicationOffer_               func(context.Context, *jujuparams.ApplicationOfferAdminDetails) error
+	FindApplicationOffers_             func(context.Context, []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error)
+	GetApplicationOffer_               func(context.Context, *jujuparams.ApplicationOfferAdminDetailsV5) error
 	GetApplicationOfferConsumeDetails_ func(context.Context, names.UserTag, *jujuparams.ConsumeOfferDetails, bakery.Version) error
 	GrantApplicationOfferAccess_       func(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error
 	GrantCloudAccess_                  func(context.Context, names.CloudTag, names.UserTag, string) error
 	GrantJIMMModelAdmin_               func(context.Context, names.ModelTag) error
 	GrantModelAccess_                  func(context.Context, names.ModelTag, names.UserTag, jujuparams.UserAccessPermission) error
 	IsBroken_                          bool
-	ListApplicationOffers_             func(context.Context, []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetails, error)
+	ListApplicationOffers_             func(context.Context, []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error)
 	ModelInfo_                         func(context.Context, *jujuparams.ModelInfo) error
 	ModelStatus_                       func(context.Context, *jujuparams.ModelStatus) error
 	ModelSummaryWatcherNext_           func(context.Context, string) ([]jujuparams.ModelAbstract, error)
@@ -267,14 +267,14 @@ func (a *API) DumpModelDB(ctx context.Context, mt names.ModelTag) (map[string]in
 	return a.DumpModelDB_(ctx, mt)
 }
 
-func (a *API) FindApplicationOffers(ctx context.Context, f []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetails, error) {
+func (a *API) FindApplicationOffers(ctx context.Context, f []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error) {
 	if a.FindApplicationOffers_ == nil {
 		return nil, errors.E(errors.CodeNotImplemented)
 	}
 	return a.FindApplicationOffers_(ctx, f)
 }
 
-func (a *API) GetApplicationOffer(ctx context.Context, offer *jujuparams.ApplicationOfferAdminDetails) error {
+func (a *API) GetApplicationOffer(ctx context.Context, offer *jujuparams.ApplicationOfferAdminDetailsV5) error {
 	if a.GetApplicationOffer_ == nil {
 		return errors.E(errors.CodeNotImplemented)
 	}
@@ -320,7 +320,7 @@ func (a *API) IsBroken() bool {
 	return a.IsBroken_
 }
 
-func (a *API) ListApplicationOffers(ctx context.Context, f []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetails, error) {
+func (a *API) ListApplicationOffers(ctx context.Context, f []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error) {
 	if a.ListApplicationOffers_ == nil {
 		return nil, errors.E(errors.CodeNotImplemented)
 	}
