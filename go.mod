@@ -18,7 +18,7 @@ require (
 	github.com/juju/cmd/v3 v3.0.14
 	github.com/juju/errors v1.0.0
 	github.com/juju/gnuflag v1.0.0
-	github.com/juju/juju v0.0.0-20240326123458-2e9c0e4a3bf1
+	github.com/juju/juju v0.0.0-20240304110523-55fb5d03683b
 	github.com/juju/loggo v1.0.0
 	github.com/juju/mgomonitor v0.0.0-20181029151116-52206bb0cd31
 	github.com/juju/names/v4 v4.0.0
@@ -173,7 +173,7 @@ require (
 	github.com/juju/blobstore/v3 v3.0.2 // indirect
 	github.com/juju/clock v1.0.3 // indirect
 	github.com/juju/collections v1.0.4 // indirect
-	github.com/juju/description/v5 v5.0.0 // indirect
+	github.com/juju/description/v5 v5.0.4 // indirect
 	github.com/juju/featureflag v1.0.0 // indirect
 	github.com/juju/go4 v0.0.0-20160222163258-40d72ab9641a // indirect
 	github.com/juju/gojsonpointer v0.0.0-20150204194629-afe8b77aa08f // indirect
@@ -202,7 +202,7 @@ require (
 	github.com/juju/schema v1.2.0 // indirect
 	github.com/juju/txn/v3 v3.0.2 // indirect
 	github.com/juju/usso v1.0.1 // indirect
-	github.com/juju/utils/v3 v3.1.0 // indirect
+	github.com/juju/utils/v3 v3.1.1 // indirect
 	github.com/juju/viddy v0.0.0-beta5 // indirect
 	github.com/juju/webbrowser v1.0.0 // indirect
 	github.com/juju/worker/v3 v3.5.0 // indirect
@@ -307,7 +307,7 @@ require (
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20231127180814-3a041ad873d4 // indirect
 	google.golang.org/grpc v1.59.0 // indirect
-	google.golang.org/protobuf v1.31.0 // indirect
+	google.golang.org/protobuf v1.33.0 // indirect
 	gopkg.in/gobwas/glob.v0 v0.2.3 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect

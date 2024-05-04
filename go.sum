@@ -588,8 +588,8 @@ github.com/juju/collections v0.0.0-20220203020748-febd7cad8a7a/go.mod h1:JWeZdyt
 github.com/juju/collections v1.0.0/go.mod h1:JWeZdyttIEbkR51z2S13+J+aCuHVe0F6meRy+P0YGDo=
 github.com/juju/collections v1.0.4 h1:GjL+aN512m2rVDqhPII7P6qB0e+iYFubz8sqBhZaZtk=
 github.com/juju/collections v1.0.4/go.mod h1:hVrdB0Zwq9wIU1Fl6ItD2+UETeNeOEs+nGvJufVe+0c=
-github.com/juju/description/v5 v5.0.0 h1:koySpaGHVTvoHlr+siRLxVKS/Jzilud5iGzjE7tldks=
-github.com/juju/description/v5 v5.0.0/go.mod h1:TQsp2Z56EVab7onQY2/O6tLHznovAcckyLz/DgDfVPY=
+github.com/juju/description/v5 v5.0.4 h1:qA35hRglZ47j1mmo9zUM9R+2WSDCH5dvL5ik7gA2aVE=
+github.com/juju/description/v5 v5.0.4/go.mod h1:TQsp2Z56EVab7onQY2/O6tLHznovAcckyLz/DgDfVPY=
 github.com/juju/errors v0.0.0-20150916125642-1b5e39b83d18/go.mod h1:W54LbzXuIE0boCoNJfwqpmkKJ1O4TCTZMetAt6jGk7Q=
 github.com/juju/errors v0.0.0-20200330140219-3fe23663418f/go.mod h1:W54LbzXuIE0boCoNJfwqpmkKJ1O4TCTZMetAt6jGk7Q=
 github.com/juju/errors v0.0.0-20210818161939-5560c4c073ff/go.mod h1:i1eL7XREII6aHpQ2gApI/v6FkVUDEBremNkcBCKYAcY=
@@ -618,8 +618,8 @@ github.com/juju/idmclient/v2 v2.0.0 h1:PsGa092JGy6iFNHZCcao+bigVsTyz1C+tHNRdYmKv
 github.com/juju/idmclient/v2 v2.0.0/go.mod h1:EOiFbPmnkqKvCUS/DHpDRWhL7eKF0AJaTvMjIYlIUak=
 github.com/juju/jsonschema v1.0.0 h1:2ScR9hhVdHxft+Te3fnclVx61MmlikHNEOirTGi+hV4=
 github.com/juju/jsonschema v1.0.0/go.mod h1:SlFW+jFtpWX0P4Tb+zTTPR4ufttLrnJIdQPePxVEfkM=
-github.com/juju/juju v0.0.0-20240326123458-2e9c0e4a3bf1 h1:D3UhnVdb/hKeYYuJxAurNRdeMYFZ8NpwASdNhO6veXo=
-github.com/juju/juju v0.0.0-20240326123458-2e9c0e4a3bf1/go.mod h1:3khqJ0oYy4XCK28MfnCjR4msT+F0Gn3sV94s/i7x+EI=
+github.com/juju/juju v0.0.0-20240304110523-55fb5d03683b h1:rowVYnJXJQup9dFBNLx3PCa9NWZ63jgewlwHB2HDBEk=
+github.com/juju/juju v0.0.0-20240304110523-55fb5d03683b/go.mod h1:lG1192+QZsfFbVI+3Vg9KDv+F2tGc+8marXD9E1Vnuc=
 github.com/juju/loggo v0.0.0-20170605014607-8232ab8918d9/go.mod h1:vgyd7OREkbtVEN/8IXZe5Ooef3LQePvuBm9UWj6ZL8U=
 github.com/juju/loggo v0.0.0-20190212223446-d976af380377/go.mod h1:vgyd7OREkbtVEN/8IXZe5Ooef3LQePvuBm9UWj6ZL8U=
 github.com/juju/loggo v0.0.0-20200526014432-9ce3a2e09b5e/go.mod h1:vgyd7OREkbtVEN/8IXZe5Ooef3LQePvuBm9UWj6ZL8U=
@@ -705,8 +705,8 @@ github.com/juju/utils/v3 v3.0.0-20220130232349-cd7ecef0e94a/go.mod h1:LzwbbEN7bu
 github.com/juju/utils/v3 v3.0.0-20220202114721-338bb0530e89/go.mod h1:wf5w+8jyTh2IYnSX0sHnMJo4ZPwwuiBWn+xN3DkQg4k=
 github.com/juju/utils/v3 v3.0.0-20220203023959-c3fbc78a33b0/go.mod h1:8csUcj1VRkfjNIRzBFWzLFCMLwLqsRWvkmhfVAUwbC4=
 github.com/juju/utils/v3 v3.0.0/go.mod h1:8csUcj1VRkfjNIRzBFWzLFCMLwLqsRWvkmhfVAUwbC4=
-github.com/juju/utils/v3 v3.1.0 h1:NrNo73oVtfr7kLP17/BDpubXwa7YEW16+Ult6z9kpHI=
-github.com/juju/utils/v3 v3.1.0/go.mod h1:nAj3sHtdYfAkvnkqttTy3Xzm2HzkD9Hfgnc+upOW2Z8=
+github.com/juju/utils/v3 v3.1.1 h1:shEMr/4Wkw0YCOPz5IFOYkLv1ec50pzRi59TRl0qQ/0=
+github.com/juju/utils/v3 v3.1.1/go.mod h1:nAj3sHtdYfAkvnkqttTy3Xzm2HzkD9Hfgnc+upOW2Z8=
 github.com/juju/version v0.0.0-20161031051906-1f41e27e54f2/go.mod h1:kE8gK5X0CImdr7qpSKl3xB2PmpySSmfj7zVbkZFs81U=
 github.com/juju/version v0.0.0-20180108022336-b64dbd566305/go.mod h1:kE8gK5X0CImdr7qpSKl3xB2PmpySSmfj7zVbkZFs81U=
 github.com/juju/version v0.0.0-20191219164919-81c1be00b9a6/go.mod h1:kE8gK5X0CImdr7qpSKl3xB2PmpySSmfj7zVbkZFs81U=
@@ -1552,8 +1552,8 @@ google.golang.org/protobuf v1.24.0/go.mod h1:r/3tXBNzIEhYS9I1OUVjXDlt8tc493IdKGj
 google.golang.org/protobuf v1.25.0/go.mod h1:9JNX74DMeImyA3h4bdi1ymwjUzf21/xIlbajtzgsN7c=
 google.golang.org/protobuf v1.26.0-rc.1/go.mod h1:jlhhOSvTdKEhbULTjvd4ARK9grFBp09yW+WbY/TyQbw=
 google.golang.org/protobuf v1.26.0/go.mod h1:9q0QmTI4eRPtz6boOQmLYwt+qCgq0jsYwAQnmE0givc=
-google.golang.org/protobuf v1.31.0 h1:g0LDEJHgrBl9N9r17Ru3sqWhkIx2NB67okBHPwC7hs8=
-google.golang.org/protobuf v1.31.0/go.mod h1:HV8QOd/L58Z+nl8r43ehVNZIU/HEI6OcFqwMG9pJV4I=
+google.golang.org/protobuf v1.33.0 h1:uNO2rsAINq/JlFpSdYEKIZ0uKD/R9cpdv0T+yoGwGmI=
+google.golang.org/protobuf v1.33.0/go.mod h1:c6P6GXX6sHbq/GpV6MGZEdwhWPcYBgnhAHhKbcUYpos=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
 gopkg.in/check.v1 v1.0.0-20160105164936-4f90aeace3a2/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
 gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
