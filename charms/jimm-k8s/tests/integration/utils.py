@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Dict
 from urllib.parse import ParseResult
 
+import requests
 import utils
 import yaml
 from juju.action import Action
@@ -144,6 +145,9 @@ async def deploy_jimm(ops_test: OpsTest, local_charm: bool) -> JimmEnv:
             if result.results.get("return-code") == 0:
                 break
             time.sleep(2)
-    assert ops_test.model.applications[APP_NAME].status == "active"
-    logger.info("jimm is active and ready")
+
+    await ops_test.model.wait_for_idle(timeout=2000)
+    jimm_debug_info = requests.get(os.path.join(jimm_address.geturl(), "debug/info"))
+    assert jimm_debug_info.status_code == 200
+    logger.info("jimm info = %s", jimm_debug_info.json())
     return JimmEnv(jimm_address, external_idp_manager)
