@@ -10,6 +10,7 @@ package auth
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/base64"
 	stderrors "errors"
 	"fmt"
@@ -39,6 +40,9 @@ const (
 	// SessionIdentityKey is the key for the identity value stored within the
 	// session.
 	SessionIdentityKey = "identity-id"
+
+	// StateKey is the key for the OAuth callback state stored within a user's cookie.
+	StateKey = "jimm-oauth-state"
 )
 
 type sessionIdentityContextKey struct{}
@@ -149,15 +153,21 @@ func NewAuthenticationService(ctx context.Context, params AuthenticationServiceP
 }
 
 // AuthCodeURL returns a URL that will be used to redirect a browser to the identity provider.
-func (as *AuthenticationService) AuthCodeURL() string {
+// It also generates a random state string that was used as part of the auth code URL. The state string
+// is returned alongside the auth code URL and any errors that occured during state generation.
+func (as *AuthenticationService) AuthCodeURL() (string, string, error) {
 	// Hydra requires the state parameter to be at least 8 characters.
 	// Note that state is primarily a guard against csrf attacks.
 	// A good reference is https://spring.io/blog/2011/11/30/cross-site-request-forgery-and-oauth2
 	// Because Hydra only accepts return addresses that have been pre-registered
 	// the risk of csrf attacks is largely eliminated, but this may not be the case with other IdPs.
-
-	// Note that Hydra requires a state parameter of at least 8 characters.
-	return as.oauthConfig.AuthCodeURL("12345678")
+	b := make([]byte, 8)
+	_, err := rand.Read(b)
+	if err != nil {
+		return "", "", err
+	}
+	state := base64.URLEncoding.EncodeToString(b)
+	return as.oauthConfig.AuthCodeURL(state), state, nil
 }
 
 // Exchange exchanges an authorisation code for an access token.
@@ -394,7 +404,7 @@ func (as *AuthenticationService) AuthenticateBrowserSession(ctx context.Context,
 
 	identityId, ok := session.Values[SessionIdentityKey]
 	if !ok {
-		return ctx, errors.E(op, "session is missing identity key")
+		return ctx, errors.E(op, errors.CodeForbidden, "session is missing identity key")
 	}
 
 	err = as.validateAndUpdateAccessToken(ctx, identityId)

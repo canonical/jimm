@@ -292,8 +292,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		return nil, errors.E(op, err, "failed to ensure controller admins")
 	}
 
-	authResourceBasePath := "/auth"
-	redirectUrl := p.PublicDNSName + authResourceBasePath + jimmhttp.CallbackEndpoint
+	redirectUrl := p.PublicDNSName + jimmhttp.AuthResourceBasePath + jimmhttp.CallbackEndpoint
 	if !strings.HasPrefix(redirectUrl, "https://") || !strings.HasPrefix(redirectUrl, "http://") {
 		redirectUrl = "https://" + redirectUrl
 	}
@@ -371,7 +370,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		return nil, errors.E(op, err, "failed to setup authentication handler")
 	}
 	mountHandler(
-		authResourceBasePath,
+		jimmhttp.AuthResourceBasePath,
 		oauthHandler,
 	)
 	macaroonDischarger, err := s.setupDischarger(p)
