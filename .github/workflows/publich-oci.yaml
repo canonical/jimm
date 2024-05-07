@@ -1,0 +1,33 @@
+# Publish the OCI image to ghcr
+name: Publish image
+
+on:
+  # Note that when running via workflow_dispatch, the github.ref_name
+  # variable will match the selected branch name used.
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  publish:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build local images
+        run: make jimm-image
+
+      - name: Push to github package
+        run: |
+          new_tag=ghcr.io/canonical/jimm:${{ github.ref_name }}
+          docker tag jimm:latest $new_tag
+          docker push $new_tag
