@@ -110,6 +110,7 @@ func start(ctx context.Context, s *service.Service) error {
 	for i, scope := range scopesParsed {
 		scopesParsed[i] = strings.TrimSpace(scope)
 	}
+	zapctx.Info(ctx, "oauth scopes", zap.Any("scopes", scopesParsed))
 	if len(scopesParsed) == 0 {
 		zapctx.Error(ctx, "no oauth client scopes present")
 		return errors.E("no oauth client scopes present")

@@ -21,7 +21,7 @@ OAUTH_PROVIDER_INFO = {
     "introspection_endpoint": "https://example.oidc.com/admin/oauth2/introspect",
     "issuer_url": "https://example.oidc.com",
     "jwks_endpoint": "https://example.oidc.com/.well-known/jwks.json",
-    "scope": "openid profile email phone",
+    "scope": "openid profile email offline_access",
     "token_endpoint": "https://example.oidc.com/oauth2/token",
     "userinfo_endpoint": "https://example.oidc.com/userinfo",
 }
@@ -58,9 +58,9 @@ BASE_ENV = {
     "JIMM_OAUTH_CLIENT_ID": OAUTH_CLIENT_ID,
     "JIMM_OAUTH_CLIENT_SECRET": OAUTH_CLIENT_SECRET,
     "JIMM_OAUTH_SCOPES": OAUTH_PROVIDER_INFO["scope"],
-    "JIMM_DASHBOARD_FINAL_REDIRECT_URL:": "some-url",
-    "JIMM_SECURE_SESSION_COOKIES:": True,
-    "JIMM_SESSION_COOKIE_MAX_AGE:": 86400,
+    "JIMM_DASHBOARD_FINAL_REDIRECT_URL": "some-url",
+    "JIMM_SECURE_SESSION_COOKIES": True,
+    "JIMM_SESSION_COOKIE_MAX_AGE": 86400,
 }
 
 # The environment may optionally include Vault.
@@ -298,7 +298,7 @@ class TestCharm(TestCase):
         self.harness.update_config(MINIMAL_CONFIG)
         self.harness.update_config({"dns-name": "jimm.com"})
         oauth_client = self.harness.charm._oauth_client_config
-        self.assertEqual(oauth_client.redirect_uri, "https://jimm.com/oauth/callback")
+        self.assertEqual(oauth_client.redirect_uri, "https://jimm.com/auth/callback")
 
     def test_app_enters_block_states_if_oauth_relation_removed(self):
         self.harness.update_config(MINIMAL_CONFIG)
