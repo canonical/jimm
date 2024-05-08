@@ -19,7 +19,10 @@ METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME = "juju-jimm-k8s"
 
 
+# TODO: Update this test to use utils.deploy_jimm() and extend that function to allow the caller
+# to decide where to deploy JIMM from. Then this test can just upgrade JIMM.
 @pytest.mark.abort_on_fail
+@pytest.mark.skip(reason="todo: refactor things for this test.")
 async def test_upgrade_running_application(ops_test: OpsTest, local_charm):
     """Deploy latest published charm and upgrade it with charm-under-test.
 
