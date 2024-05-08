@@ -161,12 +161,13 @@ func (as *AuthenticationService) AuthCodeURL() (string, string, error) {
 	// A good reference is https://spring.io/blog/2011/11/30/cross-site-request-forgery-and-oauth2
 	// Because Hydra only accepts return addresses that have been pre-registered
 	// the risk of csrf attacks is largely eliminated, but this may not be the case with other IdPs.
+	const op = errors.Op("AuthenticationService.AuthCodeURL")
 	b := make([]byte, 8)
 	_, err := rand.Read(b)
 	if err != nil {
-		return "", "", err
+		return "", "", errors.E(op, fmt.Sprintf("failed to generate state secret: %s", err.Error()))
 	}
-	state := base64.URLEncoding.EncodeToString(b)
+	state := base64.RawURLEncoding.EncodeToString(b)
 	return as.oauthConfig.AuthCodeURL(state), state, nil
 }
 

@@ -103,7 +103,8 @@ func (oah *OAuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	redirectURL, state, err := oah.authenticator.AuthCodeURL()
 	if err != nil {
-		writeError(ctx, w, http.StatusInternalServerError, err, "failed to generate random state")
+		writeError(ctx, w, http.StatusInternalServerError, err, "failed to generate auth redirect URL")
+		return
 	}
 	http.SetCookie(w, &http.Cookie{
 		Name:     auth.StateKey,
