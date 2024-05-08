@@ -10,6 +10,7 @@ package auth
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/base64"
 	stderrors "errors"
 	"fmt"
@@ -39,6 +40,9 @@ const (
 	// SessionIdentityKey is the key for the identity value stored within the
 	// session.
 	SessionIdentityKey = "identity-id"
+
+	// StateKey is the key for the OAuth callback state stored within a user's cookie.
+	StateKey = "jimm-oauth-state"
 )
 
 type sessionIdentityContextKey struct{}
@@ -149,15 +153,22 @@ func NewAuthenticationService(ctx context.Context, params AuthenticationServiceP
 }
 
 // AuthCodeURL returns a URL that will be used to redirect a browser to the identity provider.
-func (as *AuthenticationService) AuthCodeURL() string {
-	// As we're not the browser creating the auth code url and then communicating back
-	// to the server, it is OK not to set a state as there's no communication
-	// between say many "tabs" and a JIMM deployment, but rather
-	// just JIMM creating the auth code URL itself, and then handling the exchanging
-	// itself. Of course, middleman attacks between the IdP and JIMM are possible,
-	// but we'd have much larger problems than an auth code interception at that
-	// point. As such, we're opting out of using auth code URL state.
-	return as.oauthConfig.AuthCodeURL("")
+// It also generates a random state string that was used as part of the auth code URL. The state string
+// is returned alongside the auth code URL and any errors that occured during state generation.
+func (as *AuthenticationService) AuthCodeURL() (string, string, error) {
+	// Hydra requires the state parameter to be at least 8 characters.
+	// Note that state is primarily a guard against csrf attacks.
+	// A good reference is https://spring.io/blog/2011/11/30/cross-site-request-forgery-and-oauth2
+	// Because Hydra only accepts return addresses that have been pre-registered
+	// the risk of csrf attacks is largely eliminated, but this may not be the case with other IdPs.
+	const op = errors.Op("AuthenticationService.AuthCodeURL")
+	b := make([]byte, 8)
+	_, err := rand.Read(b)
+	if err != nil {
+		return "", "", errors.E(op, fmt.Sprintf("failed to generate state secret: %s", err.Error()))
+	}
+	state := base64.RawURLEncoding.EncodeToString(b)
+	return as.oauthConfig.AuthCodeURL(state), state, nil
 }
 
 // Exchange exchanges an authorisation code for an access token.
@@ -424,7 +435,7 @@ func (as *AuthenticationService) AuthenticateBrowserSession(ctx context.Context,
 
 	identityId, ok := session.Values[SessionIdentityKey]
 	if !ok {
-		return ctx, errors.E(op, "session is missing identity key")
+		return ctx, errors.E(op, errors.CodeForbidden, "session is missing identity key")
 	}
 
 	err = as.validateAndUpdateAccessToken(ctx, identityId)

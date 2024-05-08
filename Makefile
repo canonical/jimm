@@ -33,22 +33,21 @@ certs:
 	@cd local/traefik/certs; ./certs.sh; cd -
 
 test-env: sysdeps certs
-	@touch ./local/vault/approle.json && touch ./local/vault/roleid.txt
+	@touch ./local/vault/approle.json && touch ./local/vault/roleid.txt && touch ./local/vault/vault.env
 	@docker compose up --force-recreate -d --wait
 
 test-env-cleanup:
 	@docker compose down -v --remove-orphans
 
 dev-env-setup: sysdeps certs
-	@touch ./local/vault/approle.json && touch ./local/vault/roleid.txt
+	@touch ./local/vault/approle.json && touch ./local/vault/roleid.txt && touch ./local/vault/vault.env
 	@make version/commit.txt && make version/version.txt
-	@go mod vendor
 
 dev-env:
 	@docker compose --profile dev up --force-recreate
 
 dev-env-cleanup:
-	@docker compose down -v --remove-orphans
+	@docker compose --profile dev down -v --remove-orphans
 
 # Reformat all source files.
 format:

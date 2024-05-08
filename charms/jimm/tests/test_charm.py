@@ -34,9 +34,8 @@ OAUTH_PROVIDER_INFO = {
 }
 
 OPENFGA_PROVIDER_INFO = {
-    "address": "openfga.localhost",
-    "port": "8080",
-    "scheme": "http",
+    "http_api_url": "http://openfga.localhost:8080",
+    "grpc_api_url": "grpc://openfga.localhost:8090",
     "store_id": "fake-store-id",
     "token": "fake-token",
 }
@@ -538,35 +537,16 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(data["is_juju"], "False")
 
     def test_openfga_relation_changed(self):
-        id = self.harness.add_relation("openfga", "openfga")
-        self.harness.add_relation_unit(id, "openfga/0")
-
-        ofga = self.harness.model.get_app("openfga")
-        secret = ofga.add_secret({"token": "test-secret-token"})
-
-        self.harness.update_relation_data(
-            id,
-            "openfga",
-            {
-                "store_id": "test-store",
-                "token_secret_id": secret.id,
-                "address": "test-address",
-                "port": "8080",
-                "scheme": "http",
-            },
-        )
-
-        relation = self.harness.model.get_relation("openfga", id)
-        self.harness.charm.openfga.on.openfga_store_created.emit(relation)
+        self.add_openfga_relation()
 
         with open(self.harness.charm._env_filename("openfga")) as f:
             lines = f.readlines()
 
-            self.assertEqual(lines[0].strip(), "OPENFGA_HOST=test-address")
+            self.assertEqual(lines[0].strip(), "OPENFGA_HOST=openfga.localhost")
             self.assertEqual(lines[1].strip(), "OPENFGA_PORT=8080")
             self.assertEqual(lines[2].strip(), "OPENFGA_SCHEME=http")
-            self.assertEqual(lines[3].strip(), "OPENFGA_STORE=test-store")
-            self.assertEqual(lines[4].strip(), "OPENFGA_TOKEN=test-secret-token")
+            self.assertEqual(lines[3].strip(), "OPENFGA_STORE=fake-store-id")
+            self.assertEqual(lines[4].strip(), "OPENFGA_TOKEN=fake-token")
 
     def test_insecure_secret_storage(self):
         """Test that the flag for insecure secret storage is only generated when explicitly requested."""

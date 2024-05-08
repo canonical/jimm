@@ -130,12 +130,12 @@ func TestVault(t *testing.T) {
 	ofgaClient, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
-	vaultClient, _, creds, _ := jimmtest.VaultClient(c, ".")
+	vaultClient, _, roleID, roleSecretID, _ := jimmtest.VaultClient(c, ".")
 	p := jimmtest.NewTestJimmParams(c)
 	p.VaultAddress = "http://localhost:8200"
-	p.VaultAuthPath = "/auth/approle/login"
 	p.VaultPath = "/jimm-kv/"
-	p.VaultSecretFile = "./local/vault/approle.json"
+	p.VaultRoleID = roleID
+	p.VaultRoleSecretID = roleSecretID
 	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
 	svc, err := jimm.NewService(ctx, p)
 	c.Assert(err, qt.IsNil)
@@ -175,10 +175,10 @@ func TestVault(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	store := vault.VaultStore{
-		Client:     vaultClient,
-		AuthSecret: creds,
-		AuthPath:   p.VaultAuthPath,
-		KVPath:     p.VaultPath,
+		Client:       vaultClient,
+		RoleID:       roleID,
+		RoleSecretID: roleSecretID,
+		KVPath:       p.VaultPath,
 	}
 	attr, err := store.Get(context.Background(), names.NewCloudCredentialTag("test/bob@canonical.com/test-1"))
 	c.Assert(err, qt.IsNil)

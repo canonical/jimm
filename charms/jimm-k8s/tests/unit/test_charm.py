@@ -7,11 +7,10 @@
 import json
 import pathlib
 import tempfile
-import unittest
-from unittest.mock import patch
+from unittest import TestCase, mock
 
-from ops.model import ActiveStatus, BlockedStatus
-from ops.testing import Harness
+from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
+from ops.testing import ActionFailed, Harness
 
 from src.charm import JimmOperatorCharm
 
@@ -22,15 +21,14 @@ OAUTH_PROVIDER_INFO = {
     "introspection_endpoint": "https://example.oidc.com/admin/oauth2/introspect",
     "issuer_url": "https://example.oidc.com",
     "jwks_endpoint": "https://example.oidc.com/.well-known/jwks.json",
-    "scope": "openid profile email phone",
+    "scope": "openid profile email offline_access",
     "token_endpoint": "https://example.oidc.com/oauth2/token",
     "userinfo_endpoint": "https://example.oidc.com/userinfo",
 }
 
 OPENFGA_PROVIDER_INFO = {
-    "address": "openfga.localhost",
-    "port": "8080",
-    "scheme": "http",
+    "http_api_url": "http://openfga.localhost:8080",
+    "grpc_api_url": "grpc://openfga.localhost:8090",
     "store_id": "fake-store-id",
     "token": "fake-token",
 }
@@ -39,13 +37,12 @@ MINIMAL_CONFIG = {
     "uuid": "1234567890",
     "public-key": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
     "private-key": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
-    "vault-access-address": "10.0.1.123",
     "final-redirect-url": "some-url",
 }
 
-EXPECTED_ENV = {
+BASE_ENV = {
     "JIMM_DASHBOARD_LOCATION": "https://jaas.ai/models",
-    "JIMM_DNS_NAME": "juju-jimm-k8s-0.juju-jimm-k8s-endpoints.None.svc.cluster.local",
+    "JIMM_DNS_NAME": "juju-jimm-k8s-0.juju-jimm-k8s-endpoints.jimm-model.svc.cluster.local",
     "JIMM_ENABLE_JWKS_ROTATOR": "1",
     "JIMM_LISTEN_ADDR": ":8080",
     "JIMM_LOG_LEVEL": "info",
@@ -61,10 +58,22 @@ EXPECTED_ENV = {
     "JIMM_OAUTH_CLIENT_ID": OAUTH_CLIENT_ID,
     "JIMM_OAUTH_CLIENT_SECRET": OAUTH_CLIENT_SECRET,
     "JIMM_OAUTH_SCOPES": OAUTH_PROVIDER_INFO["scope"],
-    "JIMM_DASHBOARD_FINAL_REDIRECT_URL:": "some-url",
-    "JIMM_SECURE_SESSION_COOKIES:": True,
-    "JIMM_SESSION_COOKIE_MAX_AGE:": 86400,
+    "JIMM_DASHBOARD_FINAL_REDIRECT_URL": "some-url",
+    "JIMM_SECURE_SESSION_COOKIES": True,
+    "JIMM_SESSION_COOKIE_MAX_AGE": 86400,
 }
+
+# The environment may optionally include Vault.
+EXPECTED_VAULT_ENV = BASE_ENV.copy()
+EXPECTED_VAULT_ENV.update(
+    {
+        "VAULT_ADDR": "127.0.0.1:8081",
+        "VAULT_CACERT_BYTES": "abcd",
+        "VAULT_PATH": "charm-juju-jimm-k8s-jimm",
+        "VAULT_ROLE_ID": "111",
+        "VAULT_ROLE_SECRET_ID": "222",
+    }
+)
 
 
 def get_expected_plan(env):
@@ -93,12 +102,13 @@ class MockExec:
         return True
 
 
-class TestCharm(unittest.TestCase):
+class TestCharm(TestCase):
     def setUp(self):
         self.maxDiff = None
         self.harness = Harness(JimmOperatorCharm)
         self.addCleanup(self.harness.cleanup)
         self.harness.disable_hooks()
+        self.harness.set_model_name("jimm-model")
         self.harness.add_oci_resource("jimm-image")
         self.harness.set_can_connect("jimm", True)
         self.harness.set_leader(True)
@@ -115,6 +125,48 @@ class TestCharm(unittest.TestCase):
         self.ingress_rel_id = self.harness.add_relation("ingress", "nginx-ingress")
         self.harness.add_relation_unit(self.ingress_rel_id, "nginx-ingress/0")
 
+        self.add_oauth_relation()
+
+    def add_openfga_relation(self):
+        self.openfga_rel_id = self.harness.add_relation("openfga", "openfga")
+        self.harness.add_relation_unit(self.openfga_rel_id, "openfga/0")
+        self.harness.update_relation_data(
+            self.openfga_rel_id,
+            "openfga",
+            {
+                **OPENFGA_PROVIDER_INFO,
+            },
+        )
+
+    def add_vault_relation(self):
+        self.harness.charm.on.install.emit()
+        id = self.harness.add_relation("vault", "vault-k8s")
+        self.harness.add_relation_unit(id, "vault-k8s/0")
+
+        data = self.harness.get_relation_data(id, "juju-jimm-k8s/0")
+        self.assertTrue(data)
+        self.assertTrue("egress_subnet" in data)
+        self.assertTrue("nonce" in data)
+
+        secret_id = self.harness.add_model_secret(
+            "vault-k8s/0",
+            {"role-id": "111", "role-secret-id": "222"},
+        )
+        self.harness.grant_secret(secret_id, "juju-jimm-k8s")
+
+        credentials = {data["nonce"]: secret_id}
+        self.harness.update_relation_data(
+            id,
+            "vault-k8s",
+            {
+                "vault_url": "127.0.0.1:8081",
+                "ca_certificate": "abcd",
+                "mount": "charm-juju-jimm-k8s-jimm",
+                "credentials": json.dumps(credentials, sort_keys=True),
+            },
+        )
+
+    def add_oauth_relation(self):
         self.oauth_rel_id = self.harness.add_relation("oauth", "hydra")
         self.harness.add_relation_unit(self.oauth_rel_id, "hydra/0")
         secret_id = self.harness.add_model_secret("hydra", {"secret": OAUTH_CLIENT_SECRET})
@@ -129,19 +181,57 @@ class TestCharm(unittest.TestCase):
             },
         )
 
-    def add_openfga_relation(self):
-        self.openfga_rel_id = self.harness.add_relation("openfga", "openfga")
-        self.harness.add_relation_unit(self.openfga_rel_id, "openfga/0")
+    def add_postgres_relation(self):
+        self.postgres_rel_id = self.harness.add_relation("database", "postgresql")
+        self.harness.add_relation_unit(self.postgres_rel_id, "postgresql/0")
         self.harness.update_relation_data(
-            self.openfga_rel_id,
-            "openfga",
+            self.postgres_rel_id,
+            "postgresql",
             {
-                **OPENFGA_PROVIDER_INFO,
+                "username": "postgres-user",
+                "password": "postgres-pass",
+                "endpoints": "local-1.localhost,local-2.localhost",
             },
         )
 
-    # import ipdb; ipdb.set_trace()
+    def start_minimal_jimm(self):
+        self.harness.enable_hooks()
+        self.harness.charm._state.dsn = "postgres-dsn"
+        self.add_openfga_relation()
+        self.add_vault_relation()
+        self.harness.charm._state.openfga_auth_model_id = 1
+        self.harness.update_config(MINIMAL_CONFIG)
+        self.assertEqual(self.harness.charm.unit.status.name, ActiveStatus.name)
+        self.assertEqual(self.harness.charm.unit.status.message, "running")
+
+    def test_add_certificates_relation(self):
+        self.start_minimal_jimm()
+        self.harness.set_leader(True)
+        self.certificates_rel_id = self.harness.add_relation("certificates", "certificates")
+        self.harness.add_relation_unit(self.certificates_rel_id, "certificates/0")
+        self.harness.update_relation_data(
+            self.certificates_rel_id,
+            "certificates",
+            {
+                "certificates": json.dumps(
+                    [
+                        {
+                            "certificate": "cert",
+                            "ca": "ca",
+                            "chain": ["chain"],
+                            "certificate_signing_request": self.harness.charm._state.csr,
+                        }
+                    ]
+                )
+            },
+        )
+        self.assertEqual(self.harness.charm._state.ca, "ca")
+        self.assertEqual(self.harness.charm._state.certificate, "cert")
+        self.assertEqual(self.harness.charm._state.chain, ["chain"])
+
     def test_on_pebble_ready(self):
+        self.harness.enable_hooks()
+        self.add_vault_relation()
         self.harness.update_config(MINIMAL_CONFIG)
 
         container = self.harness.model.unit.get_container("jimm")
@@ -150,9 +240,17 @@ class TestCharm(unittest.TestCase):
 
         # Check the that the plan was updated
         plan = self.harness.get_container_pebble_plan("jimm")
-        self.assertEqual(plan.to_dict(), get_expected_plan(EXPECTED_ENV))
+        self.assertEqual(plan.to_dict(), get_expected_plan(EXPECTED_VAULT_ENV))
+
+    def test_ready_without_plan(self):
+        self.harness.enable_hooks()
+        self.harness.charm._ready()
+        self.assertEqual(self.harness.charm.unit.status.name, BlockedStatus.name)
+        self.assertEqual(self.harness.charm.unit.status.message, "Waiting for OAuth relation")
 
     def test_on_config_changed(self):
+        self.harness.enable_hooks()
+        self.add_vault_relation()
         container = self.harness.model.unit.get_container("jimm")
         self.harness.charm.on.jimm_pebble_ready.emit(container)
 
@@ -164,22 +262,35 @@ class TestCharm(unittest.TestCase):
 
         # Check the that the plan was updated
         plan = self.harness.get_container_pebble_plan("jimm")
-        self.assertEqual(plan.to_dict(), get_expected_plan(EXPECTED_ENV))
+        self.assertEqual(plan.to_dict(), get_expected_plan(EXPECTED_VAULT_ENV))
+
+    def test_stop(self):
+        self.start_minimal_jimm()
+        self.harness.charm.on.stop.emit()
+        self.assertEqual(self.harness.charm.unit.status.name, WaitingStatus.name)
+        self.assertEqual(self.harness.charm.unit.status.message, "stopped")
+
+    def test_update_status(self):
+        self.start_minimal_jimm()
+        self.harness.charm.on.update_status.emit()
+        self.assertEqual(self.harness.charm.unit.status.name, ActiveStatus.name)
+        self.assertEqual(self.harness.charm.unit.status.message, "running")
+
+    def test_postgres_relation_joined(self):
+        self.harness.enable_hooks()
+        self.add_postgres_relation()
+        self.assertEqual(
+            self.harness.charm._state.dsn, "postgresql://postgres-user:postgres-pass@local-1.localhost/jimm"
+        )
 
     def test_postgres_secret_storage_config(self):
+        self.harness.update_config(MINIMAL_CONFIG)
+        self.harness.update_config({"postgres-secret-storage": True})
         container = self.harness.model.unit.get_container("jimm")
         self.harness.charm.on.jimm_pebble_ready.emit(container)
 
-        self.harness.update_config(MINIMAL_CONFIG)
-        self.harness.update_config({"postgres-secret-storage": True})
-        self.harness.set_leader(True)
-
-        # Emit the pebble-ready event for jimm
-        self.harness.charm.on.jimm_pebble_ready.emit(container)
-
-        # Check the that the plan was updated
         plan = self.harness.get_container_pebble_plan("jimm")
-        expected_env = EXPECTED_ENV.copy()
+        expected_env = BASE_ENV.copy()
         expected_env.update({"INSECURE_SECRET_STORAGE": "enabled"})
         self.assertEqual(plan.to_dict(), get_expected_plan(expected_env))
 
@@ -187,7 +298,7 @@ class TestCharm(unittest.TestCase):
         self.harness.update_config(MINIMAL_CONFIG)
         self.harness.update_config({"dns-name": "jimm.com"})
         oauth_client = self.harness.charm._oauth_client_config
-        self.assertEqual(oauth_client.redirect_uri, "https://jimm.com/oauth/callback")
+        self.assertEqual(oauth_client.redirect_uri, "https://jimm.com/auth/callback")
 
     def test_app_enters_block_states_if_oauth_relation_removed(self):
         self.harness.update_config(MINIMAL_CONFIG)
@@ -227,6 +338,8 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(self.harness.charm.unit.status.message, "Waiting for OAuth relation")
 
     def test_audit_log_retention_config(self):
+        self.harness.enable_hooks()
+        self.add_vault_relation()
         container = self.harness.model.unit.get_container("jimm")
         self.harness.charm.on.jimm_pebble_ready.emit(container)
 
@@ -235,7 +348,7 @@ class TestCharm(unittest.TestCase):
 
         # Emit the pebble-ready event for jimm
         self.harness.charm.on.jimm_pebble_ready.emit(container)
-        expected_env = EXPECTED_ENV.copy()
+        expected_env = EXPECTED_VAULT_ENV.copy()
         expected_env.update({"JIMM_AUDIT_LOG_RETENTION_PERIOD_IN_DAYS": "10"})
         # Check the that the plan was updated
         plan = self.harness.get_container_pebble_plan("jimm")
@@ -267,94 +380,13 @@ class TestCharm(unittest.TestCase):
         )
         self.assertEqual(data["is_juju"], "False")
 
-    @patch("socket.gethostname")
-    @patch("hvac.Client.sys")
-    def test_vault_relation_joined(self, hvac_client_sys, gethostname):
-        gethostname.return_value = "test-hostname"
-        hvac_client_sys.unwrap.return_value = {
-            "key1": "value1",
-            "data": {"key2": "value2"},
-        }
-
-        harness = Harness(JimmOperatorCharm)
-        self.addCleanup(harness.cleanup)
-
-        jimm_id = harness.add_relation("peer", "juju-jimm-k8s")
-        harness.add_relation_unit(jimm_id, "juju-jimm-k8s/1")
-
-        dashboard_id = harness.add_relation("dashboard", "juju-dashboard")
-        harness.add_relation_unit(dashboard_id, "juju-dashboard/0")
-
-        harness.update_config(
-            {
-                "controller-admins": "user1 user2 group1",
-                "uuid": "caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa",
-                "vault-access-address": "10.0.1.123",
-            }
-        )
-        harness.set_leader(True)
-        harness.begin_with_initial_hooks()
-
-        container = harness.model.unit.get_container("jimm")
-        # Emit the pebble-ready event for jimm
-        harness.charm.on.jimm_pebble_ready.emit(container)
-
-        id = harness.add_relation("vault", "vault-k8s")
-        harness.add_relation_unit(id, "vault-k8s/0")
-        data = harness.get_relation_data(id, "juju-jimm-k8s/0")
-
-        self.assertTrue(data)
-        self.assertEqual(
-            data["secret_backend"],
-            '"charm-jimm-k8s-creds"',
-        )
-        self.assertEqual(data["hostname"], '"test-hostname"')
-        self.assertEqual(data["access_address"], "10.0.1.123")
-
-        harness.update_relation_data(
-            id,
-            "vault-k8s/0",
-            {
-                "vault_url": '"127.0.0.1:8081"',
-                "juju-jimm-k8s/0_role_id": '"juju-jimm-k8s-0-test-role-id"',
-                "juju-jimm-k8s/0_token": '"juju-jimm-k8s-0-test-token"',
-            },
-        )
-
-        vault_data = container.pull("/root/config/vault_secret.json")
-        vault_json = json.loads(vault_data.read())
-        self.assertEqual(
-            vault_json,
-            {
-                "key1": "value1",
-                "data": {
-                    "key2": "value2",
-                    "role_id": "juju-jimm-k8s-0-test-role-id",
-                },
-            },
-        )
-
-    def test_app_enters_blocked_state_if_vault_related_but_not_ready(self):
-        self.harness.update_config(MINIMAL_CONFIG)
-        container = self.harness.model.unit.get_container("jimm")
-        # Emit the pebble-ready event for jimm
-        self.harness.add_relation("vault", "remote-app-name")
-        self.harness.charm.on.jimm_pebble_ready.emit(container)
-
-        self.assertEqual(self.harness.charm.unit.status.name, BlockedStatus.name)
-        self.assertEqual(
-            self.harness.charm.unit.status.message, "Vault relation present but vault setup is not ready yet"
-        )
-
-    def test_app_raises_error_without_vault_config(self):
+    def test_vault_relation_joined(self):
         self.harness.enable_hooks()
-        minim_config_no_vault_config = MINIMAL_CONFIG.copy()
-        del minim_config_no_vault_config["vault-access-address"]
-        self.harness.update_config(minim_config_no_vault_config)
-        id = self.harness.add_relation("vault", "vault")
-        with self.assertRaises(ValueError) as e:
-            self.harness.add_relation_unit(id, "vault/0")
-            self.assertEqual(e, "Missing config vault-access-address for vault relation")
+        self.add_vault_relation()
+
+        self.harness.update_config(MINIMAL_CONFIG)
+        plan = self.harness.get_container_pebble_plan("jimm")
+        self.assertEqual(plan.to_dict(), get_expected_plan(EXPECTED_VAULT_ENV))
 
     def test_app_blocked_without_private_key(self):
         self.harness.enable_hooks()
@@ -362,6 +394,7 @@ class TestCharm(unittest.TestCase):
         self.harness.charm._state.dsn = "postgres-dsn"
         # Setup the OpenFGA relation.
         self.add_openfga_relation()
+        self.add_vault_relation()
         self.harness.charm._state.openfga_auth_model_id = 1
         # Set the config with the private-key value missing.
         min_config_no_private_key = MINIMAL_CONFIG.copy()
@@ -376,3 +409,28 @@ class TestCharm(unittest.TestCase):
         self.harness.update_config(MINIMAL_CONFIG)
         self.assertEqual(self.harness.charm.unit.status.name, ActiveStatus.name)
         self.assertEqual(self.harness.charm.unit.status.message, "running")
+
+    @mock.patch("src.charm.requests.post")
+    def test_create_auth_model_action(self, mock_post):
+        def mocked_requests_post(*args, **kwargs):
+            class MockResponse:
+                def __init__(self, json_data, status_code):
+                    self.json_data = json_data
+                    self.status_code = status_code
+                    self.ok = True
+
+                def json(self):
+                    return self.json_data
+
+            return MockResponse({"authorization_model_id": 123}, 200)
+
+        mock_post.side_effect = mocked_requests_post
+        self.harness.enable_hooks()
+        self.add_openfga_relation()
+        self.harness.run_action("create-authorization-model", {"model": "null"})
+        self.assertEqual(self.harness.charm._state.openfga_auth_model_id, 123)
+
+    def test_create_auth_model_action_without_openfga_relation(self):
+        with self.assertRaises(ActionFailed) as e:
+            self.harness.run_action("create-authorization-model", {"model": "null"})
+        self.assertEqual(str(e.exception.message), "missing openfga relation")

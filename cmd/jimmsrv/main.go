@@ -110,6 +110,7 @@ func start(ctx context.Context, s *service.Service) error {
 	for i, scope := range scopesParsed {
 		scopesParsed[i] = strings.TrimSpace(scope)
 	}
+	zapctx.Info(ctx, "oauth scopes", zap.Any("scopes", scopesParsed))
 	if len(scopesParsed) == 0 {
 		zapctx.Error(ctx, "no oauth client scopes present")
 		return errors.E("no oauth client scopes present")
@@ -138,9 +139,9 @@ func start(ctx context.Context, s *service.Service) error {
 		ControllerUUID:    os.Getenv("JIMM_UUID"),
 		DSN:               os.Getenv("JIMM_DSN"),
 		ControllerAdmins:  strings.Fields(os.Getenv("JIMM_ADMINS")),
-		VaultSecretFile:   os.Getenv("VAULT_SECRET_FILE"),
+		VaultRoleID:       os.Getenv("VAULT_ROLE_ID"),
+		VaultRoleSecretID: os.Getenv("VAULT_ROLE_SECRET_ID"),
 		VaultAddress:      os.Getenv("VAULT_ADDR"),
-		VaultAuthPath:     os.Getenv("VAULT_AUTH_PATH"),
 		VaultPath:         os.Getenv("VAULT_PATH"),
 		DashboardLocation: os.Getenv("JIMM_DASHBOARD_LOCATION"),
 		PublicDNSName:     os.Getenv("JIMM_DNS_NAME"),

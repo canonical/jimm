@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
+	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/sessions"
 	"github.com/juju/juju/api"
 	jujuparams "github.com/juju/juju/rpc/params"
@@ -118,7 +119,7 @@ func SetupTestDashboardCallbackHandler(browserURL string, db *db.Database, sessi
 	s.Listener = listener
 
 	// Remember redirect url to check it matches after test server starts
-	redirectURL := "http://127.0.0.1:" + port + "/callback"
+	redirectURL := "http://127.0.0.1:" + port + jimmhttp.AuthResourceBasePath + jimmhttp.CallbackEndpoint
 	authSvc, err := auth.NewAuthenticationService(context.Background(), auth.AuthenticationServiceParams{
 		IssuerURL:          "http://localhost:8082/realms/jimm",
 		ClientID:           "jimm-device",
@@ -144,12 +145,15 @@ func SetupTestDashboardCallbackHandler(browserURL string, db *db.Database, sessi
 		return nil, err
 	}
 
-	s.Config.Handler = h.Routes()
+	mux := chi.NewMux()
+	mux.Mount(jimmhttp.AuthResourceBasePath, h.Routes())
+	s.Config.Handler = mux
 
 	s.Start()
 
 	// Ensure redirectURL is matching port on listener
-	if s.URL+"/callback" != redirectURL {
+	callbackURL := s.URL + jimmhttp.AuthResourceBasePath + jimmhttp.CallbackEndpoint
+	if callbackURL != redirectURL {
 		return s, errors.New("server callback does not match redirectURL")
 	}
 
@@ -208,7 +212,8 @@ func runBrowserLogin(db *db.Database, sessionStore sessions.Store, username, pas
 		},
 	}
 
-	res, err := client.Get(s.URL + "/login")
+	loginURL := s.URL + jimmhttp.AuthResourceBasePath + jimmhttp.LoginEndpoint
+	res, err := client.Get(loginURL)
 	if err != nil {
 		return cookieString, s, err
 	}

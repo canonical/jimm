@@ -63,12 +63,14 @@ func TestAuthCodeURL(t *testing.T) {
 
 	authSvc, _, _ := setupTestAuthSvc(ctx, c, time.Hour)
 
-	url := authSvc.AuthCodeURL()
+	url, state, err := authSvc.AuthCodeURL()
+	c.Assert(err, qt.IsNil)
 	c.Assert(
 		url,
-		qt.Equals,
-		`http://localhost:8082/realms/jimm/protocol/openid-connect/auth?client_id=jimm-device&redirect_uri=http%3A%2F%2Flocalhost%3A8080%2Fauth%2Fcallback&response_type=code&scope=openid+profile+email`,
+		qt.Matches,
+		regexp.MustCompile(`http:\/\/localhost:8082\/realms\/jimm\/protocol\/openid-connect\/auth\?client_id=jimm-device&redirect_uri=http%3A%2F%2Flocalhost%3A8080%2Fauth%2Fcallback&response_type=code&scope=openid\+profile\+email&state=.*`),
 	)
+	c.Assert(len(state), qt.Not(qt.Equals), 0)
 }
 
 // TestDevice is a unique test in that it runs through the entire device oauth2.0

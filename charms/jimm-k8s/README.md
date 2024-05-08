@@ -1,59 +1,33 @@
-# JAAS Intelligent Model Manager
+# JIMM (K8s Charm)
+
+[![CharmHub Badge](https://charmhub.io/juju-jimm-k8s/badge.svg)](https://charmhub.io/juju-jimm-k8s)
+[![Release](https://github.com/canonical/jimm/actions/workflows/charm-release.yaml/badge.svg)](https://github.com/canonical/jimm/actions/workflows/charm-release.yaml)
+[![Tests](https://github.com/canonical/jimm/actions/workflows/charm-test.yaml/badge.svg?branch=v3)](https://github.com/canonical/jimm/actions/workflows/charm-test.yaml?query=branch%3Av3)
 
 ## Description
 
-JIMM provides centralized model management for JAAS systems.
+JIMM is a extension of Juju, an open source orchestration engine, providing additional capabilities to your Juju environments. 
+The JIMM K8s charm is the easiest and the recommended way to deploy JIMM. This charm installs and configures the JIMM server.
+
+JIMM provides a number of useful features on top of Juju including,
+- A single location to manage your Juju infrastructure.
+- The ability to query across multiple Juju controllers simultaneously.
+- Expanded authentication and authorisation functionality utilising OAuth2.0 and Relationship-based Access Control (ReBAC).
+
+For users who want to deploy JIMM in its entirety (including its dependencies), it is recommended to visit [our documentation](https://canonical-jaas-documentation.readthedocs-hosted.com/en/latest/) for more details.
 
 ## Usage
 
-The JIMM payload is provided by a JIMM snap that must be attached to
-the application:
+JIMM can be deployed with the following command which will alias the deployed application name as simply `jimm`.
 
 ```
-juju deploy ./jimm-k8s.charm --resource jimm-image=jimm:latest
+juju deploy juju-jimm-k8s jimm
 ```
 
-To upgrade the workload attach a new version of the jimm container:
+## Documentation
 
-```
-juju attach jimm-k8s jimm-image=jimm:latest
-```
+For more detailed instructions on deploying and using JIMM, please visit our [documentation page](https://canonical-jaas-documentation.readthedocs-hosted.com/en/latest/).
 
-JIMM requires a postgresql database for data storage:
+## Contributing
 
-```
-juju jimm-k8s dsn='postgres://...'
-```
-
-## Developing
-
-Create and activate a virtualenv with the development requirements:
-
-    virtualenv -p python3 venv
-    source venv/bin/activate
-    pip install -r requirements-dev.txt
-
-## Testing
-
-The Python operator framework includes a very nice harness for testing
-operator behaviour without full deployment. The test suite can be run 
-using `tox`. You can either `pip install tox` system-wide or create a
-virtual env and install tox there as follows
-```
-python3 -m venv venv
-source ./venv/bin/activate
-pip install tox
-```
-At this point you can run tests/linters/formatters.
-```
-tox -e fmt
-tox -e lint
-tox -e unit
-tox -e integration
-```
-Note that integration tests will build the charm and deploy it to a local
-microk8s controller (which must be setup prior to running the integration test).
-To switch the integration test to use a locally built charm use 
-```
-tox -e integration -- --localCharm
-```
+Please see the [Juju SDK documentation](https://juju.is/docs/sdk) for more information about developing and improving charms. For developer guidance please check our contribution [guideline](CONTRIBUTING.md).

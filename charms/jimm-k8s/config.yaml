@@ -57,12 +57,6 @@ options:
   dns-name:
     type: string
     description: DNS hostname that JIMM is being served from.
-  vault-access-address:
-    type: string
-    description: |
-      The source address for the connection to Vault. 
-      This should be a single IP with no CIDR.
-      E.g. 10.1.2.123
   jwt-expiry:
     type: string
     description: |
@@ -92,7 +86,7 @@ options:
     default: 86400
     description: |
       The max age for the session cookies in seconds, on subsequent logins, the session instance
-      extended by this amount. 
+      extended by this amount.
   final-redirect-url:
     type: string
     default: ""

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/vault/api"
+	auth "github.com/hashicorp/vault/api/auth/approle"
 	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
 	"github.com/lestrrat-go/jwx/v2/jwk"
@@ -31,13 +32,11 @@ type VaultStore struct {
 	// service. This client is not modified by the store.
 	Client *api.Client
 
-	// AuthSecret contains the secret used to authenticate with the
-	// vault service.
-	AuthSecret map[string]interface{}
+	// RoleID is the AppRole role ID.
+	RoleID string
 
-	// AuthPath is the path of the endpoint used to authenticate with
-	// the vault service.
-	AuthPath string
+	// RoleSecretID is the AppRole secret ID.
+	RoleSecretID string
 
 	// KVPath is the root path in the vault for JIMM's key-value
 	// storage.
@@ -499,15 +498,30 @@ func (s *VaultStore) client(ctx context.Context) (*api.Client, error) {
 		return s.client_, nil
 	}
 
-	secret, err := s.Client.Logical().WriteWithContext(ctx, s.AuthPath, s.AuthSecret)
+	roleSecretID := &auth.SecretID{
+		FromString: s.RoleSecretID,
+	}
+	appRoleAuth, err := auth.NewAppRoleAuth(
+		s.RoleID,
+		roleSecretID,
+	)
+	if err != nil {
+		return nil, errors.E(op, err, "unable to initialize approle auth method")
+	}
+
+	authInfo, err := s.Client.Auth().Login(ctx, appRoleAuth)
+	if err != nil {
+		return nil, errors.E(op, err, "unable to login to approle auth method")
+	}
+	if authInfo == nil {
+		return nil, errors.E(op, "no auth info was returned after login")
+	}
+
+	ttl, err := authInfo.TokenTTL()
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
-	ttl, err := secret.TokenTTL()
-	if err != nil {
-		return nil, errors.E(op, err)
-	}
-	tok, err := secret.TokenID()
+	tok, err := authInfo.TokenID()
 	if err != nil {
 		return nil, errors.E(op, err)
 	}

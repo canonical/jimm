@@ -4,6 +4,9 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"net/http/cookiejar"
+	"net/http/httptest"
+	"net/url"
 	"testing"
 	"time"
 
@@ -12,7 +15,9 @@ import (
 	"github.com/gorilla/sessions"
 
 	"github.com/canonical/jimm/api/params"
+	"github.com/canonical/jimm/internal/auth"
 	"github.com/canonical/jimm/internal/db"
+	"github.com/canonical/jimm/internal/jimmhttp"
 	"github.com/canonical/jimm/internal/jimmtest"
 )
 
@@ -30,6 +35,16 @@ func setupDbAndSessionStore(c *qt.C) (*db.Database, sessions.Store) {
 	c.Assert(err, qt.IsNil)
 
 	return db, store
+}
+
+func createClientWithStateCookie(c *qt.C, s *httptest.Server) *http.Client {
+	jar, err := cookiejar.New(nil)
+	c.Assert(err, qt.IsNil)
+	jimmURL, err := url.Parse(s.URL)
+	c.Assert(err, qt.IsNil)
+	stateCookie := http.Cookie{Name: auth.StateKey, Value: "123"}
+	jar.SetCookies(jimmURL, []*http.Cookie{&stateCookie})
+	return &http.Client{Jar: jar}
 }
 
 // TestBrowserLoginAndLogout goes through the flow of a browser logging in, simulating
@@ -59,7 +74,7 @@ func TestBrowserLoginAndLogout(t *testing.T) {
 	c.Assert(cookie, qt.Not(qt.Equals), "")
 
 	// Run a whoami logged in
-	req, err := http.NewRequest("GET", jimmHTTPServer.URL+"/whoami", nil)
+	req, err := http.NewRequest("GET", jimmHTTPServer.URL+jimmhttp.AuthResourceBasePath+jimmhttp.WhoAmIEndpoint, nil)
 	c.Assert(err, qt.IsNil)
 	parsedCookies := jimmtest.ParseCookies(cookie)
 	c.Assert(parsedCookies, qt.HasLen, 1)
@@ -77,7 +92,7 @@ func TestBrowserLoginAndLogout(t *testing.T) {
 	})
 
 	// Logout
-	req, err = http.NewRequest("GET", jimmHTTPServer.URL+"/logout", nil)
+	req, err = http.NewRequest("GET", jimmHTTPServer.URL+jimmhttp.AuthResourceBasePath+jimmhttp.LogOutEndpoint, nil)
 	c.Assert(err, qt.IsNil)
 	req.AddCookie(parsedCookies[0])
 
@@ -87,7 +102,7 @@ func TestBrowserLoginAndLogout(t *testing.T) {
 	c.Assert(res.StatusCode, qt.Equals, http.StatusOK)
 
 	// Run a whoami logged out
-	req, err = http.NewRequest("GET", jimmHTTPServer.URL+"/whoami", nil)
+	req, err = http.NewRequest("GET", jimmHTTPServer.URL+jimmhttp.AuthResourceBasePath+jimmhttp.WhoAmIEndpoint, nil)
 	c.Assert(err, qt.IsNil)
 	parsedCookies = jimmtest.ParseCookies(cookie)
 	c.Assert(parsedCookies, qt.HasLen, 1)
@@ -96,20 +111,53 @@ func TestBrowserLoginAndLogout(t *testing.T) {
 	res, err = http.DefaultClient.Do(req)
 	c.Assert(err, qt.IsNil)
 	defer res.Body.Close()
-	c.Assert(res.StatusCode, qt.Equals, http.StatusInternalServerError)
-	b, err = io.ReadAll(res.Body)
-	c.Assert(err, qt.IsNil)
-	// TODO(ale8k): Really it isn't an internal server error here, the session is just
-	// missing in our store, we should probably bring this error up and return a forbidden.
-	c.Assert(string(b), qt.Equals, "Internal Server Error")
+	c.Assert(res.StatusCode, qt.Equals, http.StatusForbidden)
 
 	// Run a logout with no identity
-	req, err = http.NewRequest("GET", jimmHTTPServer.URL+"/logout", nil)
+	req, err = http.NewRequest("GET", jimmHTTPServer.URL+jimmhttp.AuthResourceBasePath+jimmhttp.LogOutEndpoint, nil)
 	c.Assert(err, qt.IsNil)
 	res, err = http.DefaultClient.Do(req)
 	c.Assert(err, qt.IsNil)
 	defer res.Body.Close()
 	c.Assert(res.StatusCode, qt.Equals, http.StatusForbidden)
+}
+
+func TestCallbackFailsNoState(t *testing.T) {
+	c := qt.New(t)
+
+	db, sessionStore := setupDbAndSessionStore(c)
+	s, err := jimmtest.SetupTestDashboardCallbackHandler("<no dashboard needed for this test>", db, sessionStore)
+	c.Assert(err, qt.IsNil)
+	defer s.Close()
+
+	callbackURL := s.URL + jimmhttp.AuthResourceBasePath + jimmhttp.CallbackEndpoint
+	res, err := http.Get(callbackURL)
+	c.Assert(err, qt.IsNil)
+
+	defer res.Body.Close()
+
+	b, err := io.ReadAll(res.Body)
+	c.Assert(err, qt.IsNil)
+	c.Assert(string(b), qt.Equals, http.StatusText(http.StatusForbidden)+" - no state cookie present")
+}
+
+func TestCallbackFailsStateNoMatch(t *testing.T) {
+	c := qt.New(t)
+
+	db, sessionStore := setupDbAndSessionStore(c)
+	s, err := jimmtest.SetupTestDashboardCallbackHandler("<no dashboard needed for this test>", db, sessionStore)
+	c.Assert(err, qt.IsNil)
+	defer s.Close()
+
+	client := createClientWithStateCookie(c, s)
+	callbackURL := s.URL + jimmhttp.AuthResourceBasePath + jimmhttp.CallbackEndpoint
+	res, err := client.Get(callbackURL + "?state=567")
+	c.Assert(err, qt.IsNil)
+
+	defer res.Body.Close()
+	b, err := io.ReadAll(res.Body)
+	c.Assert(err, qt.IsNil)
+	c.Assert(string(b), qt.Equals, http.StatusText(http.StatusForbidden)+" - state does not match")
 }
 
 func TestCallbackFailsNoCodePresent(t *testing.T) {
@@ -120,15 +168,17 @@ func TestCallbackFailsNoCodePresent(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	defer s.Close()
 
-	// Test with no code present at all
-	res, err := http.Get(s.URL + "/callback")
+	client := createClientWithStateCookie(c, s)
+
+	callbackURL := s.URL + jimmhttp.AuthResourceBasePath + jimmhttp.CallbackEndpoint
+	res, err := client.Get(callbackURL + "?state=123")
 	c.Assert(err, qt.IsNil)
 
 	defer res.Body.Close()
 
 	b, err := io.ReadAll(res.Body)
 	c.Assert(err, qt.IsNil)
-	c.Assert(string(b), qt.Equals, http.StatusText(http.StatusBadRequest))
+	c.Assert(string(b), qt.Equals, http.StatusText(http.StatusForbidden)+" - missing auth code")
 }
 
 func TestCallbackFailsExchange(t *testing.T) {
@@ -139,13 +189,15 @@ func TestCallbackFailsExchange(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	defer s.Close()
 
-	// Test with no code present at all
-	res, err := http.Get(s.URL + "/callback?code=idonotexist")
+	client := createClientWithStateCookie(c, s)
+	callbackURL := s.URL + jimmhttp.AuthResourceBasePath + jimmhttp.CallbackEndpoint
+	c.Assert(err, qt.IsNil)
+	res, err := client.Get(callbackURL + "?code=idonotexist&state=123")
 	c.Assert(err, qt.IsNil)
 
 	defer res.Body.Close()
 
 	b, err := io.ReadAll(res.Body)
 	c.Assert(err, qt.IsNil)
-	c.Assert(string(b), qt.Equals, http.StatusText(http.StatusBadRequest))
+	c.Assert(string(b), qt.Equals, http.StatusText(http.StatusForbidden)+" - authorisation code exchange failed")
 }

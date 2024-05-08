@@ -56,7 +56,7 @@ Note that you can export an environment variable `CONTROLLER_NAME` and re-run st
 controllers that will be controlled by JIMM.
 
 1. `juju unregister jimm-dev`                     - Unregister any other local JIMM you have.
-2. `juju login jimm.localhost -c jimm-dev`        - Login to local JIMM with `jimm:jimm`. (If you name the controller jimm-dev, the script will pick it up!)
+2. `juju login jimm.localhost -c jimm-dev`        - Login to local JIMM with `Username: jimm-test, Password: password`. (If you name the controller jimm-dev, the script will pick it up!)
 3. `./local/jimm/setup-controller.sh`             - Performs controller setup.
 4. `./local/jimm/add-controller.sh`               - A local script to do many of the manual steps for us. See script for more details.
 5. `juju add-model test`                          - Adds a model to qa-controller via JIMM.
