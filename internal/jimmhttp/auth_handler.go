@@ -123,20 +123,20 @@ func (oah *OAuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 	stateByCookie, err := r.Cookie(auth.StateKey)
 	if err != nil {
 		usrErr := errors.E("no state cookie present")
-		writeError(ctx, w, http.StatusBadRequest, usrErr, "no state cookie present")
+		writeError(ctx, w, http.StatusForbidden, usrErr, "no state cookie present")
 		return
 	}
 	stateByURL := r.URL.Query().Get("state")
 	if stateByCookie.Value != stateByURL {
 		err := errors.E("state does not match")
-		writeError(ctx, w, http.StatusBadRequest, err, "state does not match")
+		writeError(ctx, w, http.StatusForbidden, err, "state does not match")
 		return
 	}
 
 	code := r.URL.Query().Get("code")
 	if code == "" {
 		err := errors.E("missing auth code")
-		writeError(ctx, w, http.StatusBadRequest, err, "no authorisation code present")
+		writeError(ctx, w, http.StatusForbidden, err, "no authorisation code present")
 		return
 	}
 
@@ -144,18 +144,18 @@ func (oah *OAuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 
 	token, err := authSvc.Exchange(ctx, code)
 	if err != nil {
-		writeError(ctx, w, http.StatusBadRequest, err, "failed to exchange authcode")
+		writeError(ctx, w, http.StatusForbidden, err, "failed to exchange authcode")
 		return
 	}
 
 	email, err := authSvc.UserInfo(ctx, token)
 	if err != nil {
-		writeError(ctx, w, http.StatusBadRequest, err, "failed to retrieve user info")
+		writeError(ctx, w, http.StatusInternalServerError, err, "failed to retrieve user info")
 		return
 	}
 
 	if err := authSvc.UpdateIdentity(ctx, email, token); err != nil {
-		writeError(ctx, w, http.StatusBadRequest, err, "failed to update identity")
+		writeError(ctx, w, http.StatusInternalServerError, err, "failed to update identity")
 		return
 	}
 
@@ -166,7 +166,7 @@ func (oah *OAuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		oah.secureCookies,
 		email,
 	); err != nil {
-		writeError(ctx, w, http.StatusBadRequest, err, "failed to setup session")
+		writeError(ctx, w, http.StatusInternalServerError, err, "failed to setup session")
 	}
 
 	http.Redirect(w, r, oah.dashboardFinalRedirectURL, http.StatusPermanentRedirect)

@@ -138,7 +138,26 @@ func TestCallbackFailsNoState(t *testing.T) {
 
 	b, err := io.ReadAll(res.Body)
 	c.Assert(err, qt.IsNil)
-	c.Assert(string(b), qt.Equals, http.StatusText(http.StatusBadRequest)+" - no state cookie present")
+	c.Assert(string(b), qt.Equals, http.StatusText(http.StatusForbidden)+" - no state cookie present")
+}
+
+func TestCallbackFailsStateNoMatch(t *testing.T) {
+	c := qt.New(t)
+
+	db, sessionStore := setupDbAndSessionStore(c)
+	s, err := jimmtest.SetupTestDashboardCallbackHandler("<no dashboard needed for this test>", db, sessionStore)
+	c.Assert(err, qt.IsNil)
+	defer s.Close()
+
+	client := createClientWithStateCookie(c, s)
+	callbackURL := s.URL + jimmhttp.AuthResourceBasePath + jimmhttp.CallbackEndpoint
+	res, err := client.Get(callbackURL + "?state=567")
+	c.Assert(err, qt.IsNil)
+
+	defer res.Body.Close()
+	b, err := io.ReadAll(res.Body)
+	c.Assert(err, qt.IsNil)
+	c.Assert(string(b), qt.Equals, http.StatusText(http.StatusForbidden)+" - state does not match")
 }
 
 func TestCallbackFailsNoCodePresent(t *testing.T) {
@@ -159,7 +178,7 @@ func TestCallbackFailsNoCodePresent(t *testing.T) {
 
 	b, err := io.ReadAll(res.Body)
 	c.Assert(err, qt.IsNil)
-	c.Assert(string(b), qt.Equals, http.StatusText(http.StatusBadRequest)+" - missing auth code")
+	c.Assert(string(b), qt.Equals, http.StatusText(http.StatusForbidden)+" - missing auth code")
 }
 
 func TestCallbackFailsExchange(t *testing.T) {
@@ -180,5 +199,5 @@ func TestCallbackFailsExchange(t *testing.T) {
 
 	b, err := io.ReadAll(res.Body)
 	c.Assert(err, qt.IsNil)
-	c.Assert(string(b), qt.Equals, http.StatusText(http.StatusBadRequest)+" - authorisation code exchange failed")
+	c.Assert(string(b), qt.Equals, http.StatusText(http.StatusForbidden)+" - authorisation code exchange failed")
 }
