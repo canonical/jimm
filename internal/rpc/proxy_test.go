@@ -53,7 +53,7 @@ func TestProxySocketsAdminFacade(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	serviceAccountLoginData, err := json.Marshal(params.LoginRequest{
-		AuthTag: names.NewUserTag("test-client-id").String(),
+		AuthTag: names.NewUserTag("test-client-id@serviceaccount").String(),
 		Token:   "dGVzdCB0b2tlbg==",
 	})
 	c.Assert(err, qt.IsNil)
