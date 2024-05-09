@@ -39,7 +39,12 @@ func GetDeviceSessionToken(ctx context.Context, authenticator OAuthAuthenticator
 		return "", errors.E(op, err)
 	}
 
-	email, err := authenticator.UserInfo(ctx, token)
+	idToken, err := authenticator.ExtractAndVerifyIDToken(ctx, token)
+	if err != nil {
+		return "", errors.E(op, err)
+	}
+
+	email, err := authenticator.Email(idToken)
 	if err != nil {
 		return "", errors.E(op, err)
 	}
