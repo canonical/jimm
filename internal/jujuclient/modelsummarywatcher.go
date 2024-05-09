@@ -37,7 +37,7 @@ func (c Connection) WatchAllModelSummaries(ctx context.Context) (string, error) 
 func (c Connection) ModelSummaryWatcherNext(ctx context.Context, id string) ([]jujuparams.ModelAbstract, error) {
 	const op = errors.Op("jujuclient.ModelSummaryWatcherNext")
 	var resp jujuparams.SummaryWatcherNextResults
-	if err := c.client.Call(ctx, "ModelSummaryWatcher", 1, id, "Next", nil, &resp); err != nil {
+	if err := c.Call(ctx, "ModelSummaryWatcher", 1, id, "Next", nil, &resp); err != nil {
 		return nil, errors.E(op, jujuerrors.Cause(err))
 	}
 	return resp.Models, nil
@@ -49,7 +49,7 @@ func (c Connection) ModelSummaryWatcherNext(ctx context.Context, id string) ([]j
 // ModelSummaryWatcher facade version 1.
 func (c Connection) ModelSummaryWatcherStop(ctx context.Context, id string) error {
 	const op = errors.Op("jujuclient.ModelSummaryWatcherStop")
-	if err := c.client.Call(ctx, "ModelSummaryWatcher", 1, id, "Stop", nil, nil); err != nil {
+	if err := c.Call(ctx, "ModelSummaryWatcher", 1, id, "Stop", nil, nil); err != nil {
 		return errors.E(op, jujuerrors.Cause(err))
 	}
 	return nil

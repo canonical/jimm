@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/juju/juju/api"
 	"github.com/juju/juju/core/network"
 	jujuparams "github.com/juju/juju/rpc/params"
 	jujuversion "github.com/juju/juju/version"
@@ -26,12 +27,7 @@ type jujuclientSuite struct {
 	API    jimm.API
 }
 
-func (s *jujuclientSuite) SetUpTest(c *gc.C) {
-	s.JujuSuite.SetUpTest(c)
-
-	s.Dialer = s.JIMM.Dialer
-	var err error
-	info := s.APIInfo(c)
+func parseInfoAddressToHostPorts(info *api.Info) dbmodel.HostPorts {
 	hpss := make(dbmodel.HostPorts, 0, len(info.Addrs))
 	for _, addr := range info.Addrs {
 		hp, err := network.ParseMachineHostPort(addr)
@@ -43,6 +39,17 @@ func (s *jujuclientSuite) SetUpTest(c *gc.C) {
 			Port:    hp.Port(),
 		}})
 	}
+	return hpss
+}
+
+func (s *jujuclientSuite) SetUpTest(c *gc.C) {
+	s.JujuSuite.SetUpTest(c)
+
+	s.Dialer = s.JIMM.Dialer
+	var err error
+	info := s.APIInfo(c)
+	hpss := parseInfoAddressToHostPorts(info)
+
 	ctl := dbmodel.Controller{
 		UUID:          s.ControllerConfig.ControllerUUID(),
 		Name:          s.ControllerConfig.ControllerName(),
@@ -70,6 +77,7 @@ var _ = gc.Suite(&dialSuite{})
 
 func (s *dialSuite) TestDial(c *gc.C) {
 	info := s.APIInfo(c)
+
 	ctl := dbmodel.Controller{
 		UUID:              s.ControllerConfig.ControllerUUID(),
 		Name:              s.ControllerConfig.ControllerName(),
@@ -77,7 +85,13 @@ func (s *dialSuite) TestDial(c *gc.C) {
 		AdminIdentityName: info.Tag.Id(),
 		AdminPassword:     info.Password,
 		PublicAddress:     info.Addrs[0],
+		// TODO(ale8k):
+		// In the new simple connector, ADDRESS MUST BE PRESENT
+		// but we often dial without addresses present, and only public address
+		// figure out what's best.
+		Addresses: parseInfoAddressToHostPorts(info),
 	}
+
 	api, err := s.Dialer.Dial(context.Background(), &ctl, names.ModelTag{}, nil)
 	c.Assert(err, gc.Equals, nil)
 	defer api.Close()
@@ -90,23 +104,17 @@ func (s *dialSuite) TestDial(c *gc.C) {
 	c.Check(addrs, jc.DeepEquals, info.Addrs)
 }
 
-type cExtended struct {
-	*gc.C
-}
-
-func (t *cExtended) Name() string {
-	return t.TestName()
-}
-
 func (s *dialSuite) TestDialWithJWT(c *gc.C) {
 	ctx := context.Background()
 
 	info := s.APIInfo(c)
+
 	ctl := dbmodel.Controller{
 		UUID:          info.ControllerUUID,
 		Name:          s.ControllerConfig.ControllerName(),
 		CACertificate: info.CACert,
 		PublicAddress: info.Addrs[0],
+		Addresses:     parseInfoAddressToHostPorts(info),
 	}
 
 	dialer := &jujuclient.Dialer{
