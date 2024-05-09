@@ -114,7 +114,7 @@ func (oah *OAuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		MaxAge:   900,                                     // 15 min.
 		Path:     AuthResourceBasePath + CallbackEndpoint, // Only send the cookie back on /auth paths.
 		HttpOnly: true,                                    // Restrict access from JS.
-		SameSite: http.SameSiteStrictMode,                 // Cannot be sent cross-origin.
+		SameSite: http.SameSiteLaxMode,                    // Allow the cookie to be sent on a redirect from the IdP to JIMM.
 	})
 	http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
 }
@@ -232,12 +232,10 @@ func (oah *OAuthHandler) Whoami(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, err := w.Write(b); err != nil {
-		writeError(ctx, w, http.StatusInternalServerError, err, "failed to write response to whoami")
-		return
-	}
 	w.Header().Add("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
+	if _, err := w.Write(b); err != nil {
+		zapctx.Error(ctx, "failed to write whoami body", zap.Error(err))
+	}
 }
 
 // writeError writes an error and logs the message. It is expected that the status code
