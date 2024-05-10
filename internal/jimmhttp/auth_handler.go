@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/go-chi/chi/v5"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
@@ -54,7 +55,8 @@ type OAuthHandlerParams struct {
 type BrowserOAuthAuthenticator interface {
 	AuthCodeURL() (string, string, error)
 	Exchange(ctx context.Context, code string) (*oauth2.Token, error)
-	UserInfo(ctx context.Context, oauth2Token *oauth2.Token) (string, error)
+	ExtractAndVerifyIDToken(ctx context.Context, oauth2Token *oauth2.Token) (*oidc.IDToken, error)
+	Email(idToken *oidc.IDToken) (string, error)
 	UpdateIdentity(ctx context.Context, email string, token *oauth2.Token) error
 	CreateBrowserSession(
 		ctx context.Context,
@@ -112,7 +114,7 @@ func (oah *OAuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		MaxAge:   900,                                     // 15 min.
 		Path:     AuthResourceBasePath + CallbackEndpoint, // Only send the cookie back on /auth paths.
 		HttpOnly: true,                                    // Restrict access from JS.
-		SameSite: http.SameSiteStrictMode,                 // Cannot be sent cross-origin.
+		SameSite: http.SameSiteLaxMode,                    // Allow the cookie to be sent on a redirect from the IdP to JIMM.
 	})
 	http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
 }
@@ -149,9 +151,15 @@ func (oah *OAuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	email, err := authSvc.UserInfo(ctx, token)
+	idToken, err := authSvc.ExtractAndVerifyIDToken(ctx, token)
 	if err != nil {
-		writeError(ctx, w, http.StatusInternalServerError, err, "failed to retrieve user info")
+		writeError(ctx, w, http.StatusInternalServerError, err, "failed to extract and verify id token")
+		return
+	}
+
+	email, err := authSvc.Email(idToken)
+	if err != nil {
+		writeError(ctx, w, http.StatusInternalServerError, err, "failed to extract email from id token")
 		return
 	}
 
@@ -224,12 +232,10 @@ func (oah *OAuthHandler) Whoami(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, err := w.Write(b); err != nil {
-		writeError(ctx, w, http.StatusInternalServerError, err, "failed to write response to whoami")
-		return
-	}
 	w.Header().Add("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
+	if _, err := w.Write(b); err != nil {
+		zapctx.Error(ctx, "failed to write whoami body", zap.Error(err))
+	}
 }
 
 // writeError writes an error and logs the message. It is expected that the status code

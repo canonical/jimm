@@ -71,7 +71,7 @@ services:
       JIMM_OAUTH_CLIENT_ID: "jimm-device"
       JIMM_OAUTH_CLIENT_SECRET: "SwjDofnbDzJDm9iyfUhEp67FfUFMY8L4"
       JIMM_OAUTH_SCOPES: "openid profile email" # Space separated list of scopes
-      JIMM_DASHBOARD_FINAL_REDIRECT_URL: "https://my-dashboard.com/final-callback" # Example URL
+      JIMM_DASHBOARD_FINAL_REDIRECT_URL: "https://jaas.ai" # Example URL
       JIMM_ACCESS_TOKEN_EXPIRY_DURATION: 1h
       JIMM_SECURE_SESSION_COOKIES: false
       JIMM_SESSION_COOKIE_MAX_AGE: 86400
