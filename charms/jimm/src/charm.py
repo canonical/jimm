@@ -41,7 +41,7 @@ OPENFGA_STORE_NAME = "jimm"
 OAUTH = "oauth"
 OAUTH_SCOPES = "openid email offline_access"
 # TODO: Add "device_code" below once the charm interface supports it.
-OAUTH_GRANT_TYPES = ["authorization_code", "refresh_token"]
+OAUTH_GRANT_TYPES = ["authorization_code", "refresh_token", "urn:ietf:params:oauth:grant-type:device_code"]
 
 # Env file parts
 DB_PART = "db"
