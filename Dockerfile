@@ -21,7 +21,6 @@ LABEL org.opencontainers.image.source=https://github.com/canonical/jimm
 LABEL org.opencontainers.image.description="JIMM server container image"
 RUN apt-get -qq update && apt-get -qq install -y ca-certificates postgresql-client
 WORKDIR /root/
-RUN mkdir ./openfga
 COPY --from=build-env /usr/src/jimm/openfga/authorisation_model.json ./openfga/
 COPY --from=build-env /usr/src/jimm/jimmsrv .
 COPY --from=build-env /usr/src/jimm/internal/dbmodel/sql ./sql/
