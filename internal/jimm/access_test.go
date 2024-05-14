@@ -638,7 +638,7 @@ func TestResolveTupleObjectMapsGroups(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	tag, err := jimm.ResolveTag(j.UUID, &j.Database, "group-"+group.Name+"#member")
 	c.Assert(err, qt.IsNil)
-	c.Assert(tag, qt.DeepEquals, ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag("1"), ofganames.MemberRelation))
+	c.Assert(tag, qt.DeepEquals, ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag(group.UUID), ofganames.MemberRelation))
 }
 
 func TestResolveTagObjectMapsUsers(t *testing.T) {

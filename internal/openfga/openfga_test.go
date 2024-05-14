@@ -36,14 +36,14 @@ func (s *openFGATestSuite) SetUpTest(c *gc.C) {
 func (s *openFGATestSuite) TestWritingTuplesToOFGASucceeds(c *gc.C) {
 	ctx := context.Background()
 
-	groupid := "1"
+	groupUUID := uuid.NewString()
 
 	uuid1, _ := uuid.NewRandom()
 	user1 := names.NewUserTag(uuid1.String())
 	tuple1 := openfga.Tuple{
 		Object:   ofganames.ConvertTag(user1),
 		Relation: "member",
-		Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(groupid)),
+		Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(groupUUID)),
 	}
 
 	uuid2, _ := uuid.NewRandom()
@@ -51,7 +51,7 @@ func (s *openFGATestSuite) TestWritingTuplesToOFGASucceeds(c *gc.C) {
 	tuple2 := openfga.Tuple{
 		Object:   ofganames.ConvertTag(user2),
 		Relation: "member",
-		Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(groupid)),
+		Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(groupUUID)),
 	}
 
 	err := s.ofgaClient.AddRelation(ctx, tuple1, tuple2)
@@ -69,21 +69,21 @@ func (s *openFGATestSuite) TestWritingTuplesToOFGASucceeds(c *gc.C) {
 func (suite *openFGATestSuite) TestRemovingTuplesFromOFGASucceeds(c *gc.C) {
 	ctx := context.Background()
 
-	groupid := "2"
+	groupUUID := uuid.NewString()
 
 	//Create tuples before writing to db
 	user1 := ofganames.ConvertTag(names.NewUserTag("bob"))
 	tuple1 := openfga.Tuple{
 		Object:   user1,
 		Relation: "member",
-		Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(groupid)),
+		Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(groupUUID)),
 	}
 
 	user2 := ofganames.ConvertTag(names.NewUserTag("alice"))
 	tuple2 := openfga.Tuple{
 		Object:   user2,
 		Relation: "member",
-		Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(groupid)),
+		Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(groupUUID)),
 	}
 
 	//Delete before insert should fail
@@ -113,7 +113,7 @@ func (suite *openFGATestSuite) TestRemovingTuplesFromOFGASucceeds(c *gc.C) {
 func (s *openFGATestSuite) TestCheckRelationSucceeds(c *gc.C) {
 	ctx := context.Background()
 
-	groupid := "3"
+	groupUUID := uuid.NewString()
 	controllerUUID, _ := uuid.NewRandom()
 	controller := names.NewControllerTag(controllerUUID.String())
 
@@ -121,10 +121,10 @@ func (s *openFGATestSuite) TestCheckRelationSucceeds(c *gc.C) {
 	userToGroup := openfga.Tuple{
 		Object:   user,
 		Relation: "member",
-		Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(groupid)),
+		Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(groupUUID)),
 	}
 	groupToController := openfga.Tuple{
-		Object:   ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag(groupid), ofganames.MemberRelation),
+		Object:   ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag(groupUUID), ofganames.MemberRelation),
 		Relation: "administrator",
 		Target:   ofganames.ConvertTag(controller),
 	}
@@ -143,7 +143,7 @@ func (s *openFGATestSuite) TestCheckRelationSucceeds(c *gc.C) {
 }
 
 func (s *openFGATestSuite) TestRemoveTuplesSucceeds(c *gc.C) {
-	groupid := "4"
+	groupUUID := uuid.NewString()
 
 	// Note (babakks): OpenFGA only supports a limited number of write operation
 	// per request (default is 100). That's why we're testing with a large number
@@ -155,14 +155,14 @@ func (s *openFGATestSuite) TestRemoveTuplesSucceeds(c *gc.C) {
 		tuple := openfga.Tuple{
 			Object:   ofganames.ConvertTag(names.NewUserTag("test" + strconv.Itoa(i))),
 			Relation: "member",
-			Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(groupid)),
+			Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(groupUUID)),
 		}
 		err := s.ofgaClient.AddRelation(context.Background(), tuple)
 		c.Assert(err, gc.IsNil)
 	}
 
 	checkTuple := openfga.Tuple{
-		Target: ofganames.ConvertTag(jimmnames.NewGroupTag(groupid)),
+		Target: ofganames.ConvertTag(jimmnames.NewGroupTag(groupUUID)),
 	}
 	c.Logf("checking for tuple %v\n", checkTuple)
 	err := s.ofgaClient.RemoveTuples(context.Background(), checkTuple)
@@ -277,8 +277,8 @@ func (s *openFGATestSuite) TestRemoveApplicationOffer(c *gc.C) {
 }
 
 func (s *openFGATestSuite) TestRemoveGroup(c *gc.C) {
-	group1 := jimmnames.NewGroupTag("1")
-	group2 := jimmnames.NewGroupTag("2")
+	group1 := jimmnames.NewGroupTag(uuid.NewString())
+	group2 := jimmnames.NewGroupTag(uuid.NewString())
 	alice := names.NewUserTag("alice@canonical.com")
 	adam := names.NewUserTag("adam@canonical.com")
 
@@ -448,6 +448,8 @@ func (s *openFGATestSuite) TestListObjectsWithContextualTuples(c *gc.C) {
 		}
 	}
 
+	groupUUID := uuid.NewString()
+
 	ids, err := s.ofgaClient.ListObjects(ctx, ofganames.ConvertTag(names.NewUserTag("alice")), "reader", "model", []openfga.Tuple{
 		{
 			Object:   ofganames.ConvertTag(names.NewUserTag("alice")),
@@ -458,10 +460,10 @@ func (s *openFGATestSuite) TestListObjectsWithContextualTuples(c *gc.C) {
 		{
 			Object:   ofganames.ConvertTag(names.NewUserTag("alice")),
 			Relation: ofganames.MemberRelation,
-			Target:   ofganames.ConvertTag(jimmnames.NewGroupTag("1")),
+			Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(groupUUID)),
 		},
 		{
-			Object:   ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag("1"), ofganames.MemberRelation),
+			Object:   ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag(groupUUID), ofganames.MemberRelation),
 			Relation: ofganames.ReaderRelation,
 			Target:   ofganames.ConvertTag(names.NewModelTag(modelUUIDs[1])),
 		},
@@ -505,6 +507,8 @@ func (s *openFGATestSuite) TestListObjectsWithPeristedTuples(c *gc.C) {
 		}
 	}
 
+	groupUUID := uuid.NewString()
+
 	c.Assert(s.ofgaClient.AddRelation(ctx,
 		[]openfga.Tuple{
 			{
@@ -516,10 +520,10 @@ func (s *openFGATestSuite) TestListObjectsWithPeristedTuples(c *gc.C) {
 			{
 				Object:   ofganames.ConvertTag(names.NewUserTag("alice")),
 				Relation: ofganames.MemberRelation,
-				Target:   ofganames.ConvertTag(jimmnames.NewGroupTag("1")),
+				Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(groupUUID)),
 			},
 			{
-				Object:   ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag("1"), ofganames.MemberRelation),
+				Object:   ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag(groupUUID), ofganames.MemberRelation),
 				Relation: ofganames.ReaderRelation,
 				Target:   ofganames.ConvertTag(names.NewModelTag(modelUUIDs[1])),
 			},

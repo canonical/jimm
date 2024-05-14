@@ -5,9 +5,15 @@ package db
 import (
 	"context"
 
+	"github.com/google/uuid"
+
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
 )
+
+var newUUID = func() string {
+	return uuid.NewString()
+}
 
 // AddGroup adds a new group.
 func (d *Database) AddGroup(ctx context.Context, name string) error {
@@ -17,6 +23,7 @@ func (d *Database) AddGroup(ctx context.Context, name string) error {
 	}
 	ge := dbmodel.GroupEntry{
 		Name: name,
+		UUID: newUUID(),
 	}
 
 	if err := d.DB.WithContext(ctx).Create(&ge).Error; err != nil {
@@ -35,6 +42,9 @@ func (d *Database) GetGroup(ctx context.Context, group *dbmodel.GroupEntry) erro
 	db := d.DB.WithContext(ctx)
 	if group.ID != 0 {
 		db = db.Where("id = ?", group.ID)
+	}
+	if group.UUID != "" {
+		db = db.Where("uuid = ?", group.UUID)
 	}
 	if group.Name != "" {
 		db = db.Where("name = ?", group.Name)
@@ -83,6 +93,9 @@ func (d *Database) UpdateGroup(ctx context.Context, group *dbmodel.GroupEntry) e
 	if group.ID == 0 {
 		return errors.E(errors.CodeNotFound)
 	}
+	if group.UUID == "" {
+		return errors.E("group uuid not specified", errors.CodeNotFound)
+	}
 	if err := d.DB.WithContext(ctx).Save(group).Error; err != nil {
 		return errors.E(op, dbError(err))
 	}
@@ -96,6 +109,9 @@ func (d *Database) RemoveGroup(ctx context.Context, group *dbmodel.GroupEntry) e
 		return errors.E(op, err)
 	}
 	if group.ID == 0 {
+		return errors.E(errors.CodeNotFound)
+	}
+	if group.UUID == "" {
 		return errors.E(errors.CodeNotFound)
 	}
 	if err := d.DB.WithContext(ctx).Delete(group).Error; err != nil {

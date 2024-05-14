@@ -7,7 +7,6 @@ import (
 	"database/sql"
 	"fmt"
 	"regexp"
-	"strconv"
 	"strings"
 	"sync"
 
@@ -18,7 +17,6 @@ import (
 	"github.com/juju/zaputil"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
-	"gorm.io/gorm"
 
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
@@ -442,16 +440,10 @@ func (j *JIMM) ToJAASTag(ctx context.Context, tag *ofganames.Tag) (string, error
 		}
 		return aoString, nil
 	case jimmnames.GroupTagKind:
-		id, err := strconv.ParseUint(tag.ID, 10, 32)
-		if err != nil {
-			return "", errors.E(err, fmt.Sprintf("failed to parse group id: %v", tag.ID))
-		}
 		group := dbmodel.GroupEntry{
-			Model: gorm.Model{
-				ID: uint(id),
-			},
+			UUID: tag.ID,
 		}
-		err = j.Database.GetGroup(ctx, &group)
+		err := j.Database.GetGroup(ctx, &group)
 		if err != nil {
 			return "", errors.E(err, "failed to fetch group information")
 		}
@@ -532,7 +524,7 @@ func resolveTag(jimmUUID string, db *db.Database, tag string) (*ofganames.Tag, e
 		if err != nil {
 			return nil, errors.E(fmt.Sprintf("group %s not found", trailer))
 		}
-		return ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag(strconv.FormatUint(uint64(entry.ID), 10)), relation), nil
+		return ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag(entry.UUID), relation), nil
 
 	case names.ControllerTagKind:
 		zapctx.Debug(

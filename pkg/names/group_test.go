@@ -1,28 +1,32 @@
 package names
 
 import (
+	"fmt"
 	"regexp"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestParseGroupTagAcceptsGroups(t *testing.T) {
-	gt, err := ParseGroupTag("group-1")
+	uuid := uuid.NewString()
+	gt, err := ParseGroupTag(fmt.Sprintf("group-%s", uuid))
 	assert.NoError(t, err)
-	assert.Equal(t, "1", gt.id)
-	assert.Equal(t, "1", gt.Id())
+	assert.Equal(t, uuid, gt.id)
+	assert.Equal(t, uuid, gt.Id())
 	assert.Equal(t, "group", gt.Kind())
-	assert.Equal(t, "group-1", gt.String())
+	assert.Equal(t, fmt.Sprintf("group-%s", uuid), gt.String())
 }
 
 func TestParseGroupTagAcceptsGroupsWithRelationSpecifier(t *testing.T) {
-	gt, err := ParseGroupTag("group-1#member")
+	uuid := uuid.NewString()
+	gt, err := ParseGroupTag(fmt.Sprintf("group-%s#member", uuid))
 	assert.NoError(t, err)
-	assert.Equal(t, "1#member", gt.id)
-	assert.Equal(t, "1#member", gt.Id())
+	assert.Equal(t, fmt.Sprintf("%s#member", uuid), gt.id)
+	assert.Equal(t, fmt.Sprintf("%s#member", uuid), gt.Id())
 	assert.Equal(t, "group", gt.Kind())
-	assert.Equal(t, "group-1#member", gt.String())
+	assert.Equal(t, fmt.Sprintf("group-%s#member", uuid), gt.String())
 }
 
 func TestParseGroupTagDeniesBadKinds(t *testing.T) {
@@ -96,6 +100,9 @@ func TestIsValidGroupName(t *testing.T) {
 		expectedValidity: true,
 	}, {
 		name:             "short_",
+		expectedValidity: false,
+	}, {
+		name:             "group.A#member",
 		expectedValidity: false,
 	}}
 
