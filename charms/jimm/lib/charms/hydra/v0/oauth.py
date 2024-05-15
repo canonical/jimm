@@ -48,21 +48,14 @@ class SomeCharm(CharmBase):
 ```
 """
 
-import inspect
 import json
 import logging
 import re
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, fields
 from typing import Dict, List, Mapping, Optional
 
 import jsonschema
-from ops.charm import (
-    CharmBase,
-    RelationBrokenEvent,
-    RelationChangedEvent,
-    RelationCreatedEvent,
-    RelationDepartedEvent,
-)
+from ops.charm import CharmBase, RelationBrokenEvent, RelationChangedEvent, RelationCreatedEvent
 from ops.framework import EventBase, EventSource, Handle, Object, ObjectEvents
 from ops.model import Relation, Secret, TooManyRelatedAppsError
 
@@ -74,12 +67,20 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 5
+LIBPATCH = 8
+
+PYDEPS = ["jsonschema"]
+
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_RELATION_NAME = "oauth"
-ALLOWED_GRANT_TYPES = ["authorization_code", "refresh_token", "client_credentials"]
+ALLOWED_GRANT_TYPES = [
+    "authorization_code",
+    "refresh_token",
+    "client_credentials",
+    "urn:ietf:params:oauth:grant-type:device_code",
+]
 ALLOWED_CLIENT_AUTHN_METHODS = ["client_secret_basic", "client_secret_post"]
 CLIENT_SECRET_FIELD = "secret"
 
@@ -153,13 +154,13 @@ OAUTH_REQUIRER_JSON_SCHEMA = {
             "type": "array",
             "default": None,
             "items": {
-                "enum": ["authorization_code", "client_credentials", "refresh_token"],
+                "enum": ALLOWED_GRANT_TYPES,
                 "type": "string",
             },
         },
         "token_endpoint_auth_method": {
             "type": "string",
-            "enum": ["client_secret_basic", "client_secret_post"],
+            "enum": ALLOWED_CLIENT_AUTHN_METHODS,
             "default": "client_secret_basic",
         },
     },
@@ -295,7 +296,7 @@ class OauthProviderConfig:
     @classmethod
     def from_dict(cls, dic: Dict) -> "OauthProviderConfig":
         """Generate OauthProviderConfig instance from dict."""
-        return cls(**{k: v for k, v in dic.items() if k in inspect.signature(cls).parameters})
+        return cls(**{k: v for k, v in dic.items() if k in [f.name for f in fields(cls)]})
 
 
 class OAuthInfoChangedEvent(EventBase):
@@ -315,6 +316,7 @@ class OAuthInfoChangedEvent(EventBase):
 
     def restore(self, snapshot: Dict) -> None:
         """Restore event."""
+        super().restore(snapshot)
         self.client_id = snapshot["client_id"]
         self.client_secret_id = snapshot["client_secret_id"]
 
@@ -395,9 +397,6 @@ class OAuthRequirer(OAuthRelation):
         self.on.oauth_info_removed.emit()
 
     def _on_relation_changed_event(self, event: RelationChangedEvent) -> None:
-        if not self.model.unit.is_leader():
-            return
-
         data = event.relation.data[event.app]
         if not data:
             logger.info("No relation data available.")
@@ -457,7 +456,9 @@ class OAuthRequirer(OAuthRelation):
             and "client_secret_id" in relation.data[relation.app]
         )
 
-    def get_provider_info(self, relation_id: Optional[int] = None) -> OauthProviderConfig:
+    def get_provider_info(
+        self, relation_id: Optional[int] = None
+    ) -> Optional[OauthProviderConfig]:
         """Get the provider information from the databag."""
         if len(self.model.relations) == 0:
             return None
@@ -650,8 +651,8 @@ class OAuthProvider(OAuthRelation):
             self._get_client_config_from_relation_data,
         )
         self.framework.observe(
-            events.relation_departed,
-            self._on_relation_departed,
+            events.relation_broken,
+            self._on_relation_broken,
         )
 
     def _get_client_config_from_relation_data(self, event: RelationChangedEvent) -> None:
@@ -699,7 +700,7 @@ class OAuthProvider(OAuthRelation):
     def _get_secret_label(self, relation: Relation) -> str:
         return f"client_secret_{relation.id}"
 
-    def _on_relation_departed(self, event: RelationDepartedEvent) -> None:
+    def _on_relation_broken(self, event: RelationBrokenEvent) -> None:
         # Workaround for https://github.com/canonical/operator/issues/888
         self._pop_relation_data(event.relation.id)
 

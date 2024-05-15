@@ -7,6 +7,7 @@ if [ "$1" != "--force" ]; then
     if [ -f "server.crt" ] && [ -f "server.key" ]; then
         echo "Server certs already exist. Skipping cert generation."
         echo "Run with --force to regenerate."
+        exit 0
     fi
 fi
 

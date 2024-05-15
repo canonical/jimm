@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/go-chi/chi/v5"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
@@ -15,10 +16,15 @@ import (
 	"github.com/canonical/jimm/internal/errors"
 )
 
-// CallbackEndpoint holds the endpoint path for OAuth2.0 authorisation
-// flow callbacks.
+// These consts holds the endpoint paths for OAuth2.0 related auth.
+// AuthResourceBasePath forms the base path and the remainder are
+// appended onto the base in practice.
 const (
-	CallbackEndpoint = "/callback"
+	AuthResourceBasePath = "/auth"
+	CallbackEndpoint     = "/callback"
+	WhoAmIEndpoint       = "/whoami"
+	LogOutEndpoint       = "/logout"
+	LoginEndpoint        = "/login"
 )
 
 // OAuthHandler handles the oauth2.0 browser flow for JIMM.
@@ -47,9 +53,10 @@ type OAuthHandlerParams struct {
 // BrowserOAuthAuthenticator handles authorisation code authentication within JIMM
 // via OIDC.
 type BrowserOAuthAuthenticator interface {
-	AuthCodeURL() string
+	AuthCodeURL() (string, string, error)
 	Exchange(ctx context.Context, code string) (*oauth2.Token, error)
-	UserInfo(ctx context.Context, oauth2Token *oauth2.Token) (string, error)
+	ExtractAndVerifyIDToken(ctx context.Context, oauth2Token *oauth2.Token) (*oidc.IDToken, error)
+	Email(idToken *oidc.IDToken) (string, error)
 	UpdateIdentity(ctx context.Context, email string, token *oauth2.Token) error
 	CreateBrowserSession(
 		ctx context.Context,
@@ -82,10 +89,10 @@ func NewOAuthHandler(p OAuthHandlerParams) (*OAuthHandler, error) {
 // Routes returns the grouped routers routes with group specific middlewares.
 func (oah *OAuthHandler) Routes() chi.Router {
 	oah.SetupMiddleware()
-	oah.Router.Get("/login", oah.Login)
+	oah.Router.Get(LoginEndpoint, oah.Login)
 	oah.Router.Get(CallbackEndpoint, oah.Callback)
-	oah.Router.Get("/logout", oah.Logout)
-	oah.Router.Get("/whoami", oah.Whoami)
+	oah.Router.Get(LogOutEndpoint, oah.Logout)
+	oah.Router.Get(WhoAmIEndpoint, oah.Whoami)
 	return oah.Router
 }
 
@@ -95,7 +102,20 @@ func (oah *OAuthHandler) SetupMiddleware() {
 
 // Login handles /auth/login.
 func (oah *OAuthHandler) Login(w http.ResponseWriter, r *http.Request) {
-	redirectURL := oah.authenticator.AuthCodeURL()
+	ctx := r.Context()
+	redirectURL, state, err := oah.authenticator.AuthCodeURL()
+	if err != nil {
+		writeError(ctx, w, http.StatusInternalServerError, err, "failed to generate auth redirect URL")
+		return
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     auth.StateKey,
+		Value:    state,
+		MaxAge:   900,                                     // 15 min.
+		Path:     AuthResourceBasePath + CallbackEndpoint, // Only send the cookie back on /auth paths.
+		HttpOnly: true,                                    // Restrict access from JS.
+		SameSite: http.SameSiteLaxMode,                    // Allow the cookie to be sent on a redirect from the IdP to JIMM.
+	})
 	http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
 }
 
@@ -103,9 +123,23 @@ func (oah *OAuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 func (oah *OAuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
+	stateByCookie, err := r.Cookie(auth.StateKey)
+	if err != nil {
+		usrErr := errors.E("no state cookie present")
+		writeError(ctx, w, http.StatusForbidden, usrErr, "no state cookie present")
+		return
+	}
+	stateByURL := r.URL.Query().Get("state")
+	if stateByCookie.Value != stateByURL {
+		err := errors.E("state does not match")
+		writeError(ctx, w, http.StatusForbidden, err, "state does not match")
+		return
+	}
+
 	code := r.URL.Query().Get("code")
 	if code == "" {
-		writeError(ctx, w, http.StatusBadRequest, nil, "no authorisation code present")
+		err := errors.E("missing auth code")
+		writeError(ctx, w, http.StatusForbidden, err, "no authorisation code present")
 		return
 	}
 
@@ -113,18 +147,24 @@ func (oah *OAuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 
 	token, err := authSvc.Exchange(ctx, code)
 	if err != nil {
-		writeError(ctx, w, http.StatusBadRequest, err, "failed to exchange authcode")
+		writeError(ctx, w, http.StatusForbidden, err, "failed to exchange authcode")
 		return
 	}
 
-	email, err := authSvc.UserInfo(ctx, token)
+	idToken, err := authSvc.ExtractAndVerifyIDToken(ctx, token)
 	if err != nil {
-		writeError(ctx, w, http.StatusBadRequest, err, "failed to retrieve user info")
+		writeError(ctx, w, http.StatusInternalServerError, err, "failed to extract and verify id token")
+		return
+	}
+
+	email, err := authSvc.Email(idToken)
+	if err != nil {
+		writeError(ctx, w, http.StatusInternalServerError, err, "failed to extract email from id token")
 		return
 	}
 
 	if err := authSvc.UpdateIdentity(ctx, email, token); err != nil {
-		writeError(ctx, w, http.StatusBadRequest, err, "failed to update identity")
+		writeError(ctx, w, http.StatusInternalServerError, err, "failed to update identity")
 		return
 	}
 
@@ -135,7 +175,7 @@ func (oah *OAuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		oah.secureCookies,
 		email,
 	); err != nil {
-		writeError(ctx, w, http.StatusBadRequest, err, "failed to setup session")
+		writeError(ctx, w, http.StatusInternalServerError, err, "failed to setup session")
 	}
 
 	http.Redirect(w, r, oah.dashboardFinalRedirectURL, http.StatusPermanentRedirect)
@@ -172,6 +212,10 @@ func (oah *OAuthHandler) Whoami(w http.ResponseWriter, r *http.Request) {
 
 	ctx, err := authSvc.AuthenticateBrowserSession(ctx, w, r)
 	if err != nil {
+		if errors.ErrorCode(err) == errors.CodeForbidden {
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
 		writeError(ctx, w, http.StatusInternalServerError, err, "failed to authenticate users session")
 		return
 	}
@@ -188,12 +232,10 @@ func (oah *OAuthHandler) Whoami(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, err := w.Write(b); err != nil {
-		writeError(ctx, w, http.StatusInternalServerError, err, "failed to write response to whoami")
-		return
-	}
 	w.Header().Add("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
+	if _, err := w.Write(b); err != nil {
+		zapctx.Error(ctx, "failed to write whoami body", zap.Error(err))
+	}
 }
 
 // writeError writes an error and logs the message. It is expected that the status code
@@ -201,5 +243,9 @@ func (oah *OAuthHandler) Whoami(w http.ResponseWriter, r *http.Request) {
 func writeError(ctx context.Context, w http.ResponseWriter, status int, err error, logMessage string) {
 	zapctx.Error(ctx, logMessage, zap.Error(err))
 	w.WriteHeader(status)
-	w.Write([]byte(http.StatusText(status)))
+	errMsg := ""
+	if err != nil {
+		errMsg = " - " + err.Error()
+	}
+	w.Write([]byte(http.StatusText(status) + errMsg))
 }

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/juju/juju/api/base"
 	"github.com/juju/juju/core/crossmodel"
@@ -136,9 +137,12 @@ type OAuthAuthenticator interface {
 	// See Device(...) godoc for more info pertaining to the flow.
 	DeviceAccessToken(ctx context.Context, res *oauth2.DeviceAuthResponse) (*oauth2.Token, error)
 
-	// UserInfo calls the user info endpoint using the provided token and returns
-	// user's email.
-	UserInfo(ctx context.Context, oauth2Token *oauth2.Token) (string, error)
+	// ExtractAndVerifyIDToken extracts the id token from the extras claims of an oauth2 token
+	// and performs signature verification of the token.
+	ExtractAndVerifyIDToken(ctx context.Context, oauth2Token *oauth2.Token) (*oidc.IDToken, error)
+
+	// Email retrieves the users email from an id token via the email claim
+	Email(idToken *oidc.IDToken) (string, error)
 
 	// MintSessionToken mints a session token to be used when logging into JIMM
 	// via an access token. The token only contains the user's email for authentication.
