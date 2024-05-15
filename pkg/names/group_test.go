@@ -1,61 +1,89 @@
-package names
+// Copyright 2024 Canonical Ltd.
+
+package names_test
 
 import (
 	"fmt"
-	"regexp"
 	"testing"
 
+	qt "github.com/frankban/quicktest"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/canonical/jimm/pkg/names"
 )
 
-func TestParseGroupTagAcceptsGroups(t *testing.T) {
+func TestParseGroupTag(t *testing.T) {
+	c := qt.New(t)
 	uuid := uuid.NewString()
-	gt, err := ParseGroupTag(fmt.Sprintf("group-%s", uuid))
-	assert.NoError(t, err)
-	assert.Equal(t, uuid, gt.id)
-	assert.Equal(t, uuid, gt.Id())
-	assert.Equal(t, "group", gt.Kind())
-	assert.Equal(t, fmt.Sprintf("group-%s", uuid), gt.String())
-}
 
-func TestParseGroupTagAcceptsGroupsWithRelationSpecifier(t *testing.T) {
-	uuid := uuid.NewString()
-	gt, err := ParseGroupTag(fmt.Sprintf("group-%s#member", uuid))
-	assert.NoError(t, err)
-	assert.Equal(t, fmt.Sprintf("%s#member", uuid), gt.id)
-	assert.Equal(t, fmt.Sprintf("%s#member", uuid), gt.Id())
-	assert.Equal(t, "group", gt.Kind())
-	assert.Equal(t, fmt.Sprintf("group-%s#member", uuid), gt.String())
+	tests := []struct {
+		tag           string
+		expectedError string
+		expectedTag   string
+		expectedId    string
+	}{{
+		tag:         fmt.Sprintf("group-%s", uuid),
+		expectedId:  uuid,
+		expectedTag: fmt.Sprintf("group-%s", uuid),
+	}, {
+		tag:         fmt.Sprintf("group-%s#member", uuid),
+		expectedId:  fmt.Sprintf("%s#member", uuid),
+		expectedTag: fmt.Sprintf("group-%s#member", uuid),
+	}, {
+		tag:           "pokemon-diglett",
+		expectedError: "\"pokemon-diglett\" is not a valid tag",
+	}}
+
+	for i, test := range tests {
+		test := test
+		c.Run(fmt.Sprintf("test case %d", i), func(c *qt.C) {
+			gt, err := names.ParseGroupTag(test.tag)
+			if test.expectedError == "" {
+				c.Assert(err, qt.IsNil)
+				c.Assert(gt.Id(), qt.Equals, test.expectedId)
+				c.Assert(gt.Kind(), qt.Equals, "group")
+				c.Assert(gt.String(), qt.Equals, test.expectedTag)
+			} else {
+				c.Assert(err, qt.ErrorMatches, test.expectedError)
+			}
+		})
+	}
 }
 
 func TestParseGroupTagDeniesBadKinds(t *testing.T) {
-	_, err := ParseGroupTag("pokemon-diglett")
+	_, err := names.ParseGroupTag("pokemon-diglett")
 	assert.Error(t, err)
 	assert.ErrorContains(t, err, "\"pokemon-diglett\" is not a valid tag")
 }
 
 func TestIsValidGroupId(t *testing.T) {
-	r := regexp.MustCompile(`^[1-9][0-9]*(#|\z)[a-z]*$`)
-	assert.False(t, r.MatchString("0#hi"))
-	assert.False(t, r.MatchString("0"))
-	assert.False(t, r.MatchString("a#hi"))
-	assert.False(t, r.MatchString("01"))
-	assert.True(t, r.MatchString("1"))
-	assert.True(t, r.MatchString("1#"))
-	assert.True(t, r.MatchString("1#hi"))
-
-	s := r.FindString("1010")
-	assert.Equal(t, "1010", s)
-
-	s = r.FindString("01010")
-	assert.Equal(t, "", s)
-
-	s = r.FindString("01010#")
-	assert.Equal(t, "", s)
-
-	s = r.FindString("1010#member")
-	assert.Equal(t, "1010#member", s)
+	uuid := uuid.NewString()
+	tests := []struct {
+		id            string
+		expectedValid bool
+	}{{
+		id:            uuid,
+		expectedValid: true,
+	}, {
+		id:            fmt.Sprintf("%s#member", uuid),
+		expectedValid: true,
+	}, {
+		id:            fmt.Sprintf("%s#member#member", uuid),
+		expectedValid: false,
+	}, {
+		id:            fmt.Sprintf("%s#", uuid),
+		expectedValid: false,
+	}, {
+		id:            "0#member",
+		expectedValid: false,
+	}, {
+		id:            "0",
+		expectedValid: false,
+	}}
+	for _, test := range tests {
+		assert.Equal(t, names.IsValidGroupId(test.id), test.expectedValid)
+	}
 }
 
 func TestIsValidGroupName(t *testing.T) {
@@ -109,7 +137,7 @@ func TestIsValidGroupName(t *testing.T) {
 	for _, test := range tests {
 		t.Logf("testing group name %q, expected validity %v", test.name, test.expectedValidity)
 
-		valid := IsValidGroupName(test.name)
+		valid := names.IsValidGroupName(test.name)
 		assert.Equal(t, valid, test.expectedValidity)
 	}
 }
