@@ -25,6 +25,13 @@ const (
 	passwordKey = "password"
 )
 
+const (
+	jwksKey        = "jwks"
+	jwksExpiryKey  = "jwks-expiry"
+	jwksPrivateKey = "jwks-private"
+	oAuthSecretKey = "oauth-secret"
+)
+
 // A VaultStore stores cloud credential attributes and
 // controller credentials in vault.
 type VaultStore struct {
@@ -58,7 +65,7 @@ func (s *VaultStore) Get(ctx context.Context, tag names.CloudCredentialTag) (map
 		return nil, errors.E(op, err)
 	}
 
-	secret, err := client.Logical().ReadWithContext(ctx, s.path(tag))
+	secret, err := client.KVv2(s.KVPath).Get(ctx, s.path(tag))
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
@@ -95,7 +102,7 @@ func (s *VaultStore) Put(ctx context.Context, tag names.CloudCredentialTag, attr
 	for k, v := range attr {
 		data[k] = v
 	}
-	_, err = client.Logical().WriteWithContext(ctx, s.path(tag), data)
+	_, err = client.KVv2(s.KVPath).Put(ctx, s.path(tag), data)
 	if err != nil {
 		return errors.E(op, err)
 	}
@@ -111,7 +118,7 @@ func (s *VaultStore) delete(ctx context.Context, tag names.CloudCredentialTag) e
 	if err != nil {
 		return errors.E(op, err)
 	}
-	_, err = client.Logical().DeleteWithContext(ctx, s.path(tag))
+	err = client.KVv2(s.KVPath).Delete(ctx, s.path(tag))
 	if rerr, ok := err.(*api.ResponseError); ok && rerr.StatusCode == http.StatusNotFound {
 		// Ignore the error if attempting to delete something that isn't there.
 		err = nil
@@ -132,7 +139,7 @@ func (s *VaultStore) GetControllerCredentials(ctx context.Context, controllerNam
 		return "", "", errors.E(op, err)
 	}
 
-	secret, err := client.Logical().ReadWithContext(ctx, s.controllerCredentialsPath(controllerName))
+	secret, err := client.KVv2(s.KVPath).Get(ctx, s.controllerCredentialsPath(controllerName))
 	if err != nil {
 		return "", "", errors.E(op, err)
 	}
@@ -168,7 +175,7 @@ func (s *VaultStore) PutControllerCredentials(ctx context.Context, controllerNam
 		usernameKey: username,
 		passwordKey: password,
 	}
-	_, err = client.Logical().WriteWithContext(ctx, s.controllerCredentialsPath(controllerName), data)
+	_, err = client.KVv2(s.KVPath).Put(ctx, s.controllerCredentialsPath(controllerName), data)
 	if err != nil {
 		return errors.E(op, err)
 	}
@@ -185,9 +192,9 @@ func (s *VaultStore) CleanupJWKS(ctx context.Context) error {
 	}
 	// Vault does not return errors on deletion requests where
 	// the secret does not exist. As such we just return the last known error.
-	client.Logical().DeleteWithContext(ctx, s.getJWKSExpiryPath())
-	client.Logical().DeleteWithContext(ctx, s.getJWKSPath())
-	if _, err = client.Logical().DeleteWithContext(ctx, s.getJWKSPrivateKeyPath()); err != nil {
+	client.KVv2(s.KVPath).Delete(ctx, s.getJWKSExpiryPath())
+	client.KVv2(s.KVPath).Delete(ctx, s.getJWKSPath())
+	if err = client.KVv2(s.KVPath).Delete(ctx, s.getJWKSPrivateKeyPath()); err != nil {
 		return errors.E(op, err)
 	}
 	return nil
@@ -202,7 +209,7 @@ func (s *VaultStore) GetJWKS(ctx context.Context) (jwk.Set, error) {
 		return nil, errors.E(op, err)
 	}
 
-	secret, err := client.Logical().ReadWithContext(ctx, s.getJWKSPath())
+	secret, err := client.KVv2(s.KVPath).Get(ctx, s.getJWKSPath())
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
@@ -216,7 +223,7 @@ func (s *VaultStore) GetJWKS(ctx context.Context) (jwk.Set, error) {
 		return nil, errors.E(op, errors.CodeNotFound, msg)
 	}
 
-	b, err := json.Marshal(secret.Data)
+	b, err := json.Marshal(secret.Data[jwksKey])
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
@@ -238,7 +245,7 @@ func (s *VaultStore) GetJWKSPrivateKey(ctx context.Context) ([]byte, error) {
 		return nil, errors.E(op, err)
 	}
 
-	secret, err := client.Logical().ReadWithContext(ctx, s.getJWKSPrivateKeyPath())
+	secret, err := client.KVv2(s.KVPath).Get(ctx, s.getJWKSPrivateKeyPath())
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
@@ -249,7 +256,7 @@ func (s *VaultStore) GetJWKSPrivateKey(ctx context.Context) ([]byte, error) {
 		return nil, errors.E(op, errors.CodeNotFound, msg)
 	}
 
-	keyPemB64 := secret.Data["key"].(string)
+	keyPemB64 := secret.Data[jwksPrivateKey].(string)
 
 	keyPem, err := base64.StdEncoding.DecodeString(keyPemB64)
 	if err != nil {
@@ -268,7 +275,7 @@ func (s *VaultStore) GetJWKSExpiry(ctx context.Context) (time.Time, error) {
 		return now, errors.E(op, err)
 	}
 
-	secret, err := client.Logical().ReadWithContext(ctx, s.getJWKSExpiryPath())
+	secret, err := client.KVv2(s.KVPath).Get(ctx, s.getJWKSExpiryPath())
 	if err != nil {
 		return now, errors.E(op, err)
 	}
@@ -279,7 +286,7 @@ func (s *VaultStore) GetJWKSExpiry(ctx context.Context) (time.Time, error) {
 		return now, errors.E(op, errors.CodeNotFound, msg)
 	}
 
-	expiry, ok := secret.Data["jwks-expiry"].(string)
+	expiry, ok := secret.Data[jwksExpiryKey].(string)
 	if !ok {
 		return now, errors.E(op, "failed to retrieve expiry")
 	}
@@ -309,14 +316,8 @@ func (s *VaultStore) PutJWKS(ctx context.Context, jwks jwk.Set) error {
 		return errors.E(op, err)
 	}
 
-	_, err = client.Logical().WriteBytesWithContext(
-		ctx,
-		// We persist in a similar folder to the controller credentials, but sub-route
-		// to .well-known for further extensions and mental clarity within our vault.
-		s.getJWKSPath(),
-		jwksJson,
-	)
-	if err != nil {
+	jwksData := map[string]any{jwksKey: jwksJson}
+	if _, err = client.KVv2(s.KVPath).Put(ctx, s.getJWKSPath(), jwksData); err != nil {
 		return errors.E(op, err)
 	}
 
@@ -332,13 +333,8 @@ func (s *VaultStore) PutJWKSPrivateKey(ctx context.Context, pem []byte) error {
 		return errors.E(op, err)
 	}
 
-	if _, err := client.Logical().WriteWithContext(
-		ctx,
-		// We persist in a similar folder to the controller credentials, but sub-route
-		// to .well-known for further extensions and mental clarity within our vault.
-		s.getJWKSPrivateKeyPath(),
-		map[string]interface{}{"key": pem},
-	); err != nil {
+	privateKeyData := map[string]interface{}{jwksPrivateKey: pem}
+	if _, err := client.KVv2(s.KVPath).Put(ctx, s.getJWKSPrivateKeyPath(), privateKeyData); err != nil {
 		return errors.E(op, err)
 	}
 	return nil
@@ -352,14 +348,8 @@ func (s *VaultStore) PutJWKSExpiry(ctx context.Context, expiry time.Time) error 
 	if err != nil {
 		return errors.E(op, err)
 	}
-
-	if _, err := client.Logical().WriteWithContext(
-		ctx,
-		s.getJWKSExpiryPath(),
-		map[string]interface{}{
-			"jwks-expiry": expiry,
-		},
-	); err != nil {
+	expiryData := map[string]interface{}{jwksExpiryKey: expiry}
+	if _, err := client.KVv2(s.KVPath).Put(ctx, s.getJWKSExpiryPath(), expiryData); err != nil {
 		return errors.E(op, err)
 	}
 	return nil
@@ -367,7 +357,7 @@ func (s *VaultStore) PutJWKSExpiry(ctx context.Context, expiry time.Time) error 
 
 // getWellKnownPath returns a hard coded path to the .well-known credentials.
 func (s *VaultStore) getWellKnownPath() string {
-	return path.Join(s.KVPath, "creds", ".well-known")
+	return path.Join("creds", ".well-known")
 }
 
 // getJWKSPath returns a hardcoded suffixed vault path (dependent on
@@ -398,7 +388,7 @@ func (s *VaultStore) CleanupOAuthSecrets(ctx context.Context) error {
 
 	// Vault does not return errors on deletion requests where
 	// the secret does not exist.
-	if _, err := client.Logical().DeleteWithContext(ctx, s.GetOAuthSecretPath()); err != nil {
+	if err := client.KVv2(s.KVPath).Delete(ctx, s.GetOAuthSecretPath()); err != nil {
 		return errors.E(op, err)
 	}
 	return nil
@@ -413,7 +403,7 @@ func (s *VaultStore) GetOAuthSecret(ctx context.Context) ([]byte, error) {
 		return nil, errors.E(op, err)
 	}
 
-	secret, err := client.Logical().ReadWithContext(ctx, s.GetOAuthSecretPath())
+	secret, err := client.KVv2(s.KVPath).Get(ctx, s.GetOAuthSecretPath())
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
@@ -424,7 +414,7 @@ func (s *VaultStore) GetOAuthSecret(ctx context.Context) ([]byte, error) {
 		return nil, errors.E(op, errors.CodeNotFound, msg)
 	}
 
-	raw := secret.Data["key"]
+	raw := secret.Data[oAuthSecretKey]
 	if secret.Data["key"] == nil {
 		msg := "nil OAuth key data"
 		zapctx.Debug(ctx, msg)
@@ -450,11 +440,8 @@ func (s *VaultStore) PutOAuthSecret(ctx context.Context, raw []byte) error {
 		return errors.E(op, err)
 	}
 
-	if _, err := client.Logical().WriteWithContext(
-		ctx,
-		s.GetOAuthSecretPath(),
-		map[string]interface{}{"key": raw},
-	); err != nil {
+	oAuthSecretData := map[string]interface{}{oAuthSecretKey: raw}
+	if _, err := client.KVv2(s.KVPath).Put(ctx, s.KVPath, oAuthSecretData); err != nil {
 		return errors.E(op, err)
 	}
 	return nil
@@ -475,7 +462,7 @@ func (s *VaultStore) deleteControllerCredentials(ctx context.Context, controller
 	if err != nil {
 		return errors.E(op, err)
 	}
-	_, err = client.Logical().DeleteWithContext(ctx, s.controllerCredentialsPath(controllerName))
+	err = client.KVv2(s.KVPath).Delete(ctx, s.controllerCredentialsPath(controllerName))
 	if rerr, ok := err.(*api.ResponseError); ok && rerr.StatusCode == http.StatusNotFound {
 		// Ignore the error if attempting to delete something that isn't there.
 		err = nil
