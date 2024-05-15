@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	goerr "errors"
 	"net/http"
 	"path"
 	"sync"
@@ -66,7 +67,7 @@ func (s *VaultStore) Get(ctx context.Context, tag names.CloudCredentialTag) (map
 	}
 
 	secret, err := client.KVv2(s.KVPath).Get(ctx, s.path(tag))
-	if err != nil {
+	if err != nil && goerr.Unwrap(err) != api.ErrSecretNotFound {
 		return nil, errors.E(op, err)
 	}
 	if secret == nil {
@@ -140,7 +141,7 @@ func (s *VaultStore) GetControllerCredentials(ctx context.Context, controllerNam
 	}
 
 	secret, err := client.KVv2(s.KVPath).Get(ctx, s.controllerCredentialsPath(controllerName))
-	if err != nil {
+	if err != nil && goerr.Unwrap(err) != api.ErrSecretNotFound {
 		return "", "", errors.E(op, err)
 	}
 	if secret == nil {
@@ -210,7 +211,7 @@ func (s *VaultStore) GetJWKS(ctx context.Context) (jwk.Set, error) {
 	}
 
 	secret, err := client.KVv2(s.KVPath).Get(ctx, s.getJWKSPath())
-	if err != nil {
+	if err != nil && goerr.Unwrap(err) != api.ErrSecretNotFound {
 		return nil, errors.E(op, err)
 	}
 
@@ -246,7 +247,7 @@ func (s *VaultStore) GetJWKSPrivateKey(ctx context.Context) ([]byte, error) {
 	}
 
 	secret, err := client.KVv2(s.KVPath).Get(ctx, s.getJWKSPrivateKeyPath())
-	if err != nil {
+	if err != nil && goerr.Unwrap(err) != api.ErrSecretNotFound {
 		return nil, errors.E(op, err)
 	}
 
@@ -276,7 +277,7 @@ func (s *VaultStore) GetJWKSExpiry(ctx context.Context) (time.Time, error) {
 	}
 
 	secret, err := client.KVv2(s.KVPath).Get(ctx, s.getJWKSExpiryPath())
-	if err != nil {
+	if err != nil && goerr.Unwrap(err) != api.ErrSecretNotFound {
 		return now, errors.E(op, err)
 	}
 
@@ -357,24 +358,24 @@ func (s *VaultStore) PutJWKSExpiry(ctx context.Context, expiry time.Time) error 
 
 // getWellKnownPath returns a hard coded path to the .well-known credentials.
 func (s *VaultStore) getWellKnownPath() string {
-	return path.Join("creds", ".well-known")
+	return path.Join("creds", ".well-known")[1:]
 }
 
 // getJWKSPath returns a hardcoded suffixed vault path (dependent on
 // the initial KVPath) to the .well-known JWKS location.
 func (s *VaultStore) getJWKSPath() string {
-	return path.Join(s.getWellKnownPath(), "jwks.json")
+	return path.Join(s.getWellKnownPath(), "jwks.json")[1:]
 }
 
 // getJWKSPath returns a hardcoded suffixed vault path (dependent on
 // the initial KVPath) to the .well-known JWKS location.
 func (s *VaultStore) getJWKSPrivateKeyPath() string {
-	return path.Join(s.getWellKnownPath(), "jwks-key.pem")
+	return path.Join(s.getWellKnownPath(), "jwks-key.pem")[1:]
 }
 
 // getJWKSPath returns the path to the jwks expiry secret.
 func (s *VaultStore) getJWKSExpiryPath() string {
-	return path.Join(s.getWellKnownPath(), "jwks-expiry")
+	return path.Join(s.getWellKnownPath(), "jwks-expiry")[1:]
 }
 
 // CleanupOAuthSecrets removes all secrets associated with OAuth.
@@ -404,7 +405,7 @@ func (s *VaultStore) GetOAuthSecret(ctx context.Context) ([]byte, error) {
 	}
 
 	secret, err := client.KVv2(s.KVPath).Get(ctx, s.GetOAuthSecretPath())
-	if err != nil {
+	if err != nil && goerr.Unwrap(err) != api.ErrSecretNotFound {
 		return nil, errors.E(op, err)
 	}
 
@@ -441,7 +442,7 @@ func (s *VaultStore) PutOAuthSecret(ctx context.Context, raw []byte) error {
 	}
 
 	oAuthSecretData := map[string]interface{}{oAuthSecretKey: raw}
-	if _, err := client.KVv2(s.KVPath).Put(ctx, s.KVPath, oAuthSecretData); err != nil {
+	if _, err := client.KVv2(s.KVPath).Put(ctx, s.GetOAuthSecretPath(), oAuthSecretData); err != nil {
 		return errors.E(op, err)
 	}
 	return nil
@@ -450,7 +451,7 @@ func (s *VaultStore) PutOAuthSecret(ctx context.Context, raw []byte) error {
 // GetOAuthSecretPath returns a hardcoded suffixed vault path (dependent on
 // the initial KVPath) to the OAuth JWK location.
 func (s *VaultStore) GetOAuthSecretPath() string {
-	return path.Join(s.KVPath, "creds", "oauth", "key")
+	return path.Join("creds", "oauth", "key")[1:]
 }
 
 // deleteControllerCredentials removes the credentials associated with the controller in
@@ -522,9 +523,9 @@ func (s *VaultStore) client(ctx context.Context) (*api.Client, error) {
 }
 
 func (s *VaultStore) path(tag names.CloudCredentialTag) string {
-	return path.Join(s.KVPath, "creds", tag.Cloud().Id(), tag.Owner().Id(), tag.Name())
+	return path.Join("creds", tag.Cloud().Id(), tag.Owner().Id(), tag.Name())[1:]
 }
 
 func (s *VaultStore) controllerCredentialsPath(controllerName string) string {
-	return path.Join(s.KVPath, "creds", controllerName)
+	return path.Join("creds", controllerName)[1:]
 }
