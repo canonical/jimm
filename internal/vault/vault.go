@@ -70,7 +70,7 @@ func (s *VaultStore) Get(ctx context.Context, tag names.CloudCredentialTag) (map
 	if err != nil && goerr.Unwrap(err) != api.ErrSecretNotFound {
 		return nil, errors.E(op, err)
 	}
-	if secret == nil {
+	if secret == nil || secret.Data == nil {
 		return nil, nil
 	}
 	attr := make(map[string]string, len(secret.Data))
@@ -144,7 +144,7 @@ func (s *VaultStore) GetControllerCredentials(ctx context.Context, controllerNam
 	if err != nil && goerr.Unwrap(err) != api.ErrSecretNotFound {
 		return "", "", errors.E(op, err)
 	}
-	if secret == nil {
+	if secret == nil || secret.Data == nil {
 		return "", "", nil
 	}
 	var username, password string
@@ -218,18 +218,18 @@ func (s *VaultStore) GetJWKS(ctx context.Context) (jwk.Set, error) {
 	// This is how the current version of vaults API Read works,
 	// if the secret is not present on the path, it will instead return
 	// nil for the secret and a nil error. So we must check for this.
-	if secret == nil {
+	if secret == nil || secret.Data == nil {
 		msg := "no JWKS exists yet."
 		zapctx.Debug(ctx, msg)
 		return nil, errors.E(op, errors.CodeNotFound, msg)
 	}
 
-	b, err := json.Marshal(secret.Data[jwksKey])
-	if err != nil {
-		return nil, errors.E(op, err)
+	jsonString, ok := secret.Data[jwksKey].(string)
+	if !ok {
+		return nil, errors.E(op, "invalid type for jwks")
 	}
 
-	ks, err := jwk.ParseString(string(b))
+	ks, err := jwk.ParseString(jsonString)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
@@ -251,7 +251,7 @@ func (s *VaultStore) GetJWKSPrivateKey(ctx context.Context) ([]byte, error) {
 		return nil, errors.E(op, err)
 	}
 
-	if secret == nil {
+	if secret == nil || secret.Data == nil {
 		msg := "no JWKS private key exists yet."
 		zapctx.Debug(ctx, msg)
 		return nil, errors.E(op, errors.CodeNotFound, msg)
@@ -281,7 +281,7 @@ func (s *VaultStore) GetJWKSExpiry(ctx context.Context) (time.Time, error) {
 		return now, errors.E(op, err)
 	}
 
-	if secret == nil {
+	if secret == nil || secret.Data == nil {
 		msg := "no JWKS expiry exists yet."
 		zapctx.Debug(ctx, msg)
 		return now, errors.E(op, errors.CodeNotFound, msg)
@@ -317,7 +317,7 @@ func (s *VaultStore) PutJWKS(ctx context.Context, jwks jwk.Set) error {
 		return errors.E(op, err)
 	}
 
-	jwksData := map[string]any{jwksKey: jwksJson}
+	jwksData := map[string]any{jwksKey: string(jwksJson)}
 	if _, err = client.KVv2(s.KVPath).Put(ctx, s.getJWKSPath(), jwksData); err != nil {
 		return errors.E(op, err)
 	}
@@ -358,24 +358,24 @@ func (s *VaultStore) PutJWKSExpiry(ctx context.Context, expiry time.Time) error 
 
 // getWellKnownPath returns a hard coded path to the .well-known credentials.
 func (s *VaultStore) getWellKnownPath() string {
-	return path.Join("creds", ".well-known")[1:]
+	return path.Join("creds", ".well-known")
 }
 
 // getJWKSPath returns a hardcoded suffixed vault path (dependent on
 // the initial KVPath) to the .well-known JWKS location.
 func (s *VaultStore) getJWKSPath() string {
-	return path.Join(s.getWellKnownPath(), "jwks.json")[1:]
+	return path.Join(s.getWellKnownPath(), "jwks.json")
 }
 
 // getJWKSPath returns a hardcoded suffixed vault path (dependent on
 // the initial KVPath) to the .well-known JWKS location.
 func (s *VaultStore) getJWKSPrivateKeyPath() string {
-	return path.Join(s.getWellKnownPath(), "jwks-key.pem")[1:]
+	return path.Join(s.getWellKnownPath(), "jwks-key.pem")
 }
 
 // getJWKSPath returns the path to the jwks expiry secret.
 func (s *VaultStore) getJWKSExpiryPath() string {
-	return path.Join(s.getWellKnownPath(), "jwks-expiry")[1:]
+	return path.Join(s.getWellKnownPath(), "jwks-expiry")
 }
 
 // CleanupOAuthSecrets removes all secrets associated with OAuth.
@@ -409,20 +409,24 @@ func (s *VaultStore) GetOAuthSecret(ctx context.Context) ([]byte, error) {
 		return nil, errors.E(op, err)
 	}
 
-	if secret == nil {
+	if secret == nil || secret.Data == nil {
 		msg := "no OAuth key exists"
 		zapctx.Debug(ctx, msg)
 		return nil, errors.E(op, errors.CodeNotFound, msg)
 	}
 
-	raw := secret.Data[oAuthSecretKey]
-	if secret.Data["key"] == nil {
+	raw, ok := secret.Data[oAuthSecretKey]
+	if !ok {
 		msg := "nil OAuth key data"
 		zapctx.Debug(ctx, msg)
 		return nil, errors.E(op, errors.CodeNotFound, msg)
 	}
 
-	keyPemB64 := raw.(string)
+	keyPemB64, ok := raw.(string)
+	if !ok {
+		zapctx.Debug(ctx, "oauth secret is not a string")
+		return nil, errors.E(op, errors.CodeNotFound, "oauth secret not found")
+	}
 
 	keyPem, err := base64.StdEncoding.DecodeString(keyPemB64)
 	if err != nil {
@@ -451,7 +455,7 @@ func (s *VaultStore) PutOAuthSecret(ctx context.Context, raw []byte) error {
 // GetOAuthSecretPath returns a hardcoded suffixed vault path (dependent on
 // the initial KVPath) to the OAuth JWK location.
 func (s *VaultStore) GetOAuthSecretPath() string {
-	return path.Join("creds", "oauth", "key")[1:]
+	return path.Join("creds", "oauth", "key")
 }
 
 // deleteControllerCredentials removes the credentials associated with the controller in
@@ -523,9 +527,9 @@ func (s *VaultStore) client(ctx context.Context) (*api.Client, error) {
 }
 
 func (s *VaultStore) path(tag names.CloudCredentialTag) string {
-	return path.Join("creds", tag.Cloud().Id(), tag.Owner().Id(), tag.Name())[1:]
+	return path.Join("creds", tag.Cloud().Id(), tag.Owner().Id(), tag.Name())
 }
 
 func (s *VaultStore) controllerCredentialsPath(controllerName string) string {
-	return path.Join("creds", controllerName)[1:]
+	return path.Join("creds", controllerName)
 }
