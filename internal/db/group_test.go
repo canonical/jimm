@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
+	"github.com/google/uuid"
 
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
@@ -24,6 +25,11 @@ func TestAddGroupUnconfiguredDatabase(t *testing.T) {
 
 func (s *dbSuite) TestAddGroup(c *qt.C) {
 	ctx := context.Background()
+
+	uuid := uuid.NewString()
+	c.Patch(db.NewUUID, func() string {
+		return uuid
+	})
 
 	err := s.Database.AddGroup(ctx, "test-group")
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
@@ -44,9 +50,15 @@ func (s *dbSuite) TestAddGroup(c *qt.C) {
 	c.Assert(tx.Error, qt.IsNil)
 	c.Assert(ge.ID, qt.Equals, uint(1))
 	c.Assert(ge.Name, qt.Equals, "test-group")
+	c.Assert(ge.UUID, qt.Equals, uuid)
 }
 
 func (s *dbSuite) TestGetGroup(c *qt.C) {
+	uuid1 := uuid.NewString()
+	c.Patch(db.NewUUID, func() string {
+		return uuid1
+	})
+
 	err := s.Database.GetGroup(context.Background(), &dbmodel.GroupEntry{
 		Name: "test-group",
 	})
@@ -68,6 +80,12 @@ func (s *dbSuite) TestGetGroup(c *qt.C) {
 	c.Check(err, qt.IsNil)
 	c.Assert(group.ID, qt.Equals, uint(1))
 	c.Assert(group.Name, qt.Equals, "test-group")
+	c.Assert(group.UUID, qt.Equals, uuid1)
+
+	uuid2 := uuid.NewString()
+	c.Patch(db.NewUUID, func() string {
+		return uuid2
+	})
 
 	err = s.Database.AddGroup(context.Background(), "test-group1")
 	c.Assert(err, qt.IsNil)
@@ -80,6 +98,7 @@ func (s *dbSuite) TestGetGroup(c *qt.C) {
 	c.Check(err, qt.IsNil)
 	c.Assert(group.ID, qt.Equals, uint(2))
 	c.Assert(group.Name, qt.Equals, "test-group1")
+	c.Assert(group.UUID, qt.Equals, uuid2)
 }
 
 func (s *dbSuite) TestUpdateGroup(c *qt.C) {

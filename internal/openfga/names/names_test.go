@@ -42,8 +42,8 @@ func (s *namesSuite) TestFromResourceTag(c *gc.C) {
 	result = ofganames.ConvertTag(names.NewCloudTag("test"))
 	c.Assert(result, gc.DeepEquals, ofganames.NewTag("test", names.CloudTagKind, ""))
 
-	result = ofganames.ConvertTag(jimmnames.NewGroupTag("1"))
-	c.Assert(result, gc.DeepEquals, ofganames.NewTag("1", jimmnames.GroupTagKind, ""))
+	result = ofganames.ConvertTag(jimmnames.NewGroupTag(id.String()))
+	c.Assert(result, gc.DeepEquals, ofganames.NewTag(id.String(), jimmnames.GroupTagKind, ""))
 }
 
 func (s *namesSuite) TestFromGenericResourceTag(c *gc.C) {
