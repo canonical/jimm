@@ -209,7 +209,7 @@ func TestGetOAuthSecretFailsIfDataIsNil(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	retrieved, err := store.GetOAuthSecret(ctx)
-	c.Assert(err, qt.ErrorMatches, "nil OAuth key data")
+	c.Assert(err, qt.ErrorMatches, "oauth secret not found")
 	c.Assert(retrieved, qt.IsNil)
 }
 
