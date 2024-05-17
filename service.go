@@ -488,7 +488,7 @@ func newVaultStore(ctx context.Context, p Params) (jimmcreds.CredentialStore, er
 		Client:       client,
 		RoleID:       p.VaultRoleID,
 		RoleSecretID: p.VaultRoleSecretID,
-		KVPath:       p.VaultPath,
+		KVPath:       strings.ReplaceAll(p.VaultPath, "/", ""),
 	}, nil
 }
 

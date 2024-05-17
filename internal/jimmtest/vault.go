@@ -49,5 +49,5 @@ func VaultClient(tb fatalF, prefix string) (*api.Client, string, string, string,
 	if !ok {
 		panic("failed to convert role secret ID to string")
 	}
-	return vaultClient, "/jimm-kv/", roleIDString, roleSecretIDString, true
+	return vaultClient, "jimm-kv", roleIDString, roleSecretIDString, true
 }

@@ -43,7 +43,7 @@ dev-env-setup: sysdeps certs
 	@touch ./local/vault/approle.json && touch ./local/vault/roleid.txt && touch ./local/vault/vault.env
 	@make version/commit.txt && make version/version.txt
 
-dev-env:
+dev-env: dev-env-setup
 	@docker compose --profile dev up --force-recreate
 
 dev-env-cleanup:
