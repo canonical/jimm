@@ -9,4 +9,5 @@ var (
 	JwksExpiryTag     = jwksExpiryTag
 	OAuthKind         = oauthKind
 	OAuthKeyTag       = oauthKeyTag
+	NewUUID           = &newUUID
 )

@@ -33,6 +33,7 @@ func (s *groupSuite) TestAddGroupSuperuser(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	c.Assert(group.ID, gc.Equals, uint(1))
 	c.Assert(group.Name, gc.Equals, "test-group")
+	c.Assert(group.UUID, gc.Not(gc.Equals), "")
 }
 
 func (s *groupSuite) TestAddGroup(c *gc.C) {
