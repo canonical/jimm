@@ -24,6 +24,7 @@ jobs:
       with:
         fetch-depth: 0
         fetch-tags: true
+    - run: git fetch --tags --force origin # https://github.com/actions/checkout/issues/882 & https://github.com/actions/checkout/issues/290 
     - name: Setup snap to build
       run: |
         mkdir -p ./snap
