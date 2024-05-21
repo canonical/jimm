@@ -46,7 +46,7 @@ type JIMM struct {
 	DumpModel_                         func(ctx context.Context, u *openfga.User, mt names.ModelTag, simplified bool) (string, error)
 	DumpModelDB_                       func(ctx context.Context, u *openfga.User, mt names.ModelTag) (map[string]interface{}, error)
 	EarliestControllerVersion_         func(ctx context.Context) (version.Number, error)
-	FindApplicationOffers_             func(ctx context.Context, user *openfga.User, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetails, error)
+	FindApplicationOffers_             func(ctx context.Context, user *openfga.User, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error)
 	FindAuditEvents_                   func(ctx context.Context, user *openfga.User, filter db.AuditLogFilter) ([]dbmodel.AuditLogEntry, error)
 	ForEachCloud_                      func(ctx context.Context, user *openfga.User, f func(*dbmodel.Cloud) error) error
 	ForEachModel_                      func(ctx context.Context, u *openfga.User, f func(*dbmodel.Model, jujuparams.UserAccessPermission) error) error
@@ -54,7 +54,7 @@ type JIMM struct {
 	ForEachUserCloudCredential_        func(ctx context.Context, u *dbmodel.Identity, ct names.CloudTag, f func(cred *dbmodel.CloudCredential) error) error
 	ForEachUserModel_                  func(ctx context.Context, u *openfga.User, f func(*dbmodel.Model, jujuparams.UserAccessPermission) error) error
 	FullModelStatus_                   func(ctx context.Context, user *openfga.User, modelTag names.ModelTag, patterns []string) (*jujuparams.FullStatus, error)
-	GetApplicationOffer_               func(ctx context.Context, user *openfga.User, offerURL string) (*jujuparams.ApplicationOfferAdminDetails, error)
+	GetApplicationOffer_               func(ctx context.Context, user *openfga.User, offerURL string) (*jujuparams.ApplicationOfferAdminDetailsV5, error)
 	GetApplicationOfferConsumeDetails_ func(ctx context.Context, user *openfga.User, details *jujuparams.ConsumeOfferDetails, v bakery.Version) error
 	GetCloud_                          func(ctx context.Context, u *openfga.User, tag names.CloudTag) (dbmodel.Cloud, error)
 	GetCloudCredential_                func(ctx context.Context, user *openfga.User, tag names.CloudCredentialTag) (*dbmodel.CloudCredential, error)
@@ -76,7 +76,7 @@ type JIMM struct {
 	IdentityModelDefaults_             func(ctx context.Context, user *dbmodel.Identity) (map[string]interface{}, error)
 	InitiateMigration_                 func(ctx context.Context, user *openfga.User, spec jujuparams.MigrationSpec, targetControllerID uint) (jujuparams.InitiateMigrationResult, error)
 	InitiateInternalMigration_         func(ctx context.Context, user *openfga.User, modelTag names.ModelTag, targetController string) (jujuparams.InitiateMigrationResult, error)
-	ListApplicationOffers_             func(ctx context.Context, user *openfga.User, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetails, error)
+	ListApplicationOffers_             func(ctx context.Context, user *openfga.User, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error)
 	ListControllers_                   func(ctx context.Context, user *openfga.User) ([]dbmodel.Controller, error)
 	ListGroups_                        func(ctx context.Context, user *openfga.User) ([]dbmodel.GroupEntry, error)
 	ModelDefaultsForCloud_             func(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag) (jujuparams.ModelDefaultsResult, error)
@@ -218,7 +218,7 @@ func (j *JIMM) EarliestControllerVersion(ctx context.Context) (version.Number, e
 	}
 	return j.EarliestControllerVersion_(ctx)
 }
-func (j *JIMM) FindApplicationOffers(ctx context.Context, user *openfga.User, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetails, error) {
+func (j *JIMM) FindApplicationOffers(ctx context.Context, user *openfga.User, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error) {
 	if j.FindApplicationOffers_ == nil {
 		return nil, errors.E(errors.CodeNotImplemented)
 	}
@@ -266,7 +266,7 @@ func (j *JIMM) FullModelStatus(ctx context.Context, user *openfga.User, modelTag
 	}
 	return j.FullModelStatus_(ctx, user, modelTag, patterns)
 }
-func (j *JIMM) GetApplicationOffer(ctx context.Context, user *openfga.User, offerURL string) (*jujuparams.ApplicationOfferAdminDetails, error) {
+func (j *JIMM) GetApplicationOffer(ctx context.Context, user *openfga.User, offerURL string) (*jujuparams.ApplicationOfferAdminDetailsV5, error) {
 	if j.GetApplicationOffer_ == nil {
 		return nil, errors.E(errors.CodeNotImplemented)
 	}
@@ -394,7 +394,7 @@ func (j *JIMM) InitiateInternalMigration(ctx context.Context, user *openfga.User
 	}
 	return j.InitiateInternalMigration_(ctx, user, modelTag, targetController)
 }
-func (j *JIMM) ListApplicationOffers(ctx context.Context, user *openfga.User, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetails, error) {
+func (j *JIMM) ListApplicationOffers(ctx context.Context, user *openfga.User, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error) {
 	if j.ListApplicationOffers_ == nil {
 		return nil, errors.E(errors.CodeNotImplemented)
 	}

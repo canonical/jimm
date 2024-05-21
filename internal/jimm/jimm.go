@@ -264,11 +264,11 @@ type API interface {
 
 	// FindApplicationOffers finds application offers that match the
 	// filter.
-	FindApplicationOffers(context.Context, []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetails, error)
+	FindApplicationOffers(context.Context, []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error)
 
 	// GetApplicationOffer completes the given ApplicationOfferAdminDetails
 	// structure.
-	GetApplicationOffer(context.Context, *jujuparams.ApplicationOfferAdminDetails) error
+	GetApplicationOffer(context.Context, *jujuparams.ApplicationOfferAdminDetailsV5) error
 
 	// GetApplicationOfferConsumeDetails gets the details required to
 	// consume an application offer
@@ -292,7 +292,7 @@ type API interface {
 
 	// ListApplicationOffers lists application offers that match the
 	// filter.
-	ListApplicationOffers(context.Context, []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetails, error)
+	ListApplicationOffers(context.Context, []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error)
 
 	// ModelInfo fetches a model's ModelInfo.
 	ModelInfo(context.Context, *jujuparams.ModelInfo) error

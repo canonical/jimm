@@ -164,7 +164,7 @@ func (s *applicationoffersSuite) TestListApplicationOffersMatching(c *gc.C) {
 	)
 	c.Assert(err, gc.Equals, nil)
 
-	var info jujuparams.ApplicationOfferAdminDetails
+	var info jujuparams.ApplicationOfferAdminDetailsV5
 	info.OfferURL = offerURL.String()
 	err = s.API.GetApplicationOffer(ctx, &info)
 	c.Assert(err, gc.Equals, nil)
@@ -176,7 +176,7 @@ func (s *applicationoffersSuite) TestListApplicationOffersMatching(c *gc.C) {
 		ModelName: s.modelInfo.Name,
 	}})
 	c.Assert(err, gc.Equals, nil)
-	c.Check(offers, gc.DeepEquals, []jujuparams.ApplicationOfferAdminDetails{info})
+	c.Check(offers, gc.DeepEquals, []jujuparams.ApplicationOfferAdminDetailsV5{info})
 }
 
 func (s *applicationoffersSuite) TestListApplicationOffersNoMatch(c *gc.C) {
@@ -280,7 +280,7 @@ func (s *applicationoffersSuite) TestFindApplicationOffersMatching(c *gc.C) {
 	)
 	c.Assert(err, gc.Equals, nil)
 
-	var info jujuparams.ApplicationOfferAdminDetails
+	var info jujuparams.ApplicationOfferAdminDetailsV5
 	info.OfferURL = offerURL.String()
 	err = s.API.GetApplicationOffer(ctx, &info)
 	c.Assert(err, gc.Equals, nil)
@@ -292,7 +292,7 @@ func (s *applicationoffersSuite) TestFindApplicationOffersMatching(c *gc.C) {
 		ModelName: s.modelInfo.Name,
 	}})
 	c.Assert(err, gc.Equals, nil)
-	c.Check(offers, gc.DeepEquals, []jujuparams.ApplicationOfferAdminDetails{info})
+	c.Check(offers, gc.DeepEquals, []jujuparams.ApplicationOfferAdminDetailsV5{info})
 }
 
 func (s *applicationoffersSuite) TestFindApplicationOffersNoMatch(c *gc.C) {
@@ -380,7 +380,7 @@ func (s *applicationoffersSuite) TestGetApplicationOffer(c *gc.C) {
 	)
 	c.Assert(err, gc.Equals, nil)
 
-	var info jujuparams.ApplicationOfferAdminDetails
+	var info jujuparams.ApplicationOfferAdminDetailsV5
 	info.OfferURL = offerURL.String()
 	err = s.API.GetApplicationOffer(ctx, &info)
 	c.Assert(err, gc.Equals, nil)
@@ -392,8 +392,8 @@ func (s *applicationoffersSuite) TestGetApplicationOffer(c *gc.C) {
 	})
 	c.Check(info.CharmURL, gc.Matches, `ch:amd64/quantal/wordpress-[0-9]*`)
 	info.CharmURL = ""
-	c.Check(info, jc.DeepEquals, jujuparams.ApplicationOfferAdminDetails{
-		ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
+	c.Check(info, jc.DeepEquals, jujuparams.ApplicationOfferAdminDetailsV5{
+		ApplicationOfferDetailsV5: jujuparams.ApplicationOfferDetailsV5{
 			SourceModelTag:         names.NewModelTag(s.modelInfo.UUID).String(),
 			OfferURL:               offerURL.String(),
 			OfferName:              "test-offer",
@@ -420,7 +420,7 @@ func (s *applicationoffersSuite) TestGetApplicationOffer(c *gc.C) {
 func (s *applicationoffersSuite) TestGetApplicationOfferNotFound(c *gc.C) {
 	ctx := context.Background()
 
-	var info jujuparams.ApplicationOfferAdminDetails
+	var info jujuparams.ApplicationOfferAdminDetailsV5
 	info.OfferURL = "test-user@canonical.com/test-model.test-offer"
 	err := s.API.GetApplicationOffer(ctx, &info)
 	c.Assert(err, gc.ErrorMatches, `application offer "test-user@canonical.com/test-model.test-offer" not found`)
@@ -466,7 +466,7 @@ func (s *applicationoffersSuite) TestGrantApplicationOfferAccess(c *gc.C) {
 	err = s.API.GrantApplicationOfferAccess(ctx, offerURL.String(), names.NewUserTag("test-user-2@canonical.com"), jujuparams.OfferConsumeAccess)
 	c.Assert(err, gc.Equals, nil)
 
-	var info jujuparams.ApplicationOfferAdminDetails
+	var info jujuparams.ApplicationOfferAdminDetailsV5
 	info.OfferURL = offerURL.String()
 	err = s.API.GetApplicationOffer(ctx, &info)
 	c.Assert(err, gc.Equals, nil)
@@ -477,8 +477,8 @@ func (s *applicationoffersSuite) TestGrantApplicationOfferAccess(c *gc.C) {
 	})
 	c.Check(info.CharmURL, gc.Matches, `ch:amd64/quantal/wordpress-[0-9]*`)
 	info.CharmURL = ""
-	c.Check(info, jc.DeepEquals, jujuparams.ApplicationOfferAdminDetails{
-		ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
+	c.Check(info, jc.DeepEquals, jujuparams.ApplicationOfferAdminDetailsV5{
+		ApplicationOfferDetailsV5: jujuparams.ApplicationOfferDetailsV5{
 			SourceModelTag:         names.NewModelTag(s.modelInfo.UUID).String(),
 			OfferURL:               offerURL.String(),
 			OfferName:              "test-offer",
@@ -553,7 +553,7 @@ func (s *applicationoffersSuite) TestRevokeApplicationOfferAccess(c *gc.C) {
 	err = s.API.GrantApplicationOfferAccess(ctx, offerURL.String(), names.NewUserTag("test-user-2@canonical.com"), jujuparams.OfferConsumeAccess)
 	c.Assert(err, gc.Equals, nil)
 
-	var info jujuparams.ApplicationOfferAdminDetails
+	var info jujuparams.ApplicationOfferAdminDetailsV5
 	info.OfferURL = offerURL.String()
 	err = s.API.GetApplicationOffer(ctx, &info)
 	c.Assert(err, gc.Equals, nil)
@@ -565,8 +565,8 @@ func (s *applicationoffersSuite) TestRevokeApplicationOfferAccess(c *gc.C) {
 	})
 	c.Check(info.CharmURL, gc.Matches, `ch:amd64/quantal/wordpress-[0-9]*`)
 	info.CharmURL = ""
-	c.Check(info, jc.DeepEquals, jujuparams.ApplicationOfferAdminDetails{
-		ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
+	c.Check(info, jc.DeepEquals, jujuparams.ApplicationOfferAdminDetailsV5{
+		ApplicationOfferDetailsV5: jujuparams.ApplicationOfferDetailsV5{
 			SourceModelTag:         names.NewModelTag(s.modelInfo.UUID).String(),
 			OfferURL:               "test-user@canonical.com/test-model.test-offer",
 			OfferName:              "test-offer",
@@ -604,8 +604,8 @@ func (s *applicationoffersSuite) TestRevokeApplicationOfferAccess(c *gc.C) {
 	})
 	c.Check(info.CharmURL, gc.Matches, `ch:amd64/quantal/wordpress-[0-9]*`)
 	info.CharmURL = ""
-	c.Check(info, jc.DeepEquals, jujuparams.ApplicationOfferAdminDetails{
-		ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
+	c.Check(info, jc.DeepEquals, jujuparams.ApplicationOfferAdminDetailsV5{
+		ApplicationOfferDetailsV5: jujuparams.ApplicationOfferDetailsV5{
 			SourceModelTag:         names.NewModelTag(s.modelInfo.UUID).String(),
 			OfferURL:               offerURL.String(),
 			OfferName:              "test-offer",
@@ -735,7 +735,7 @@ func (s *applicationoffersSuite) TestGetApplicationOfferConsumeDetails(c *gc.C) 
 	c.Assert(err, gc.Equals, nil)
 
 	var info jujuparams.ConsumeOfferDetails
-	info.Offer = &jujuparams.ApplicationOfferDetails{
+	info.Offer = &jujuparams.ApplicationOfferDetailsV5{
 		OfferURL: offerURL.String(),
 	}
 	err = s.API.GetApplicationOfferConsumeDetails(ctx, names.NewUserTag("admin"), &info, bakery.Version2)
@@ -748,7 +748,7 @@ func (s *applicationoffersSuite) TestGetApplicationOfferConsumeDetails(c *gc.C) 
 		return a.UserName < b.UserName
 	}
 	c.Check(info, jimmtest.CmpEquals(cmpopts.SortSlices(lessF)), jujuparams.ConsumeOfferDetails{
-		Offer: &jujuparams.ApplicationOfferDetails{
+		Offer: &jujuparams.ApplicationOfferDetailsV5{
 			SourceModelTag:         names.NewModelTag(s.modelInfo.UUID).String(),
 			OfferURL:               "test-user@canonical.com/test-model.test-offer",
 			OfferName:              "test-offer",
@@ -779,7 +779,7 @@ func (s *applicationoffersSuite) TestGetApplicationOfferConsumeDetails(c *gc.C) 
 
 func (s *applicationoffersSuite) TestGetApplicationOfferConsumeDetailsNotFound(c *gc.C) {
 	var info jujuparams.ConsumeOfferDetails
-	info.Offer = &jujuparams.ApplicationOfferDetails{
+	info.Offer = &jujuparams.ApplicationOfferDetailsV5{
 		OfferURL: "test-user@canonical.com/test-model.test-offer",
 	}
 	err := s.API.GetApplicationOfferConsumeDetails(context.Background(), names.NewUserTag("test-user@canonical.com"), &info, bakery.Version2)

@@ -177,7 +177,7 @@ func preloadModel(prefix string, db *gorm.DB) *gorm.DB {
 	// loading a model, as we just use the credential to deploy
 	// applications.
 	db = db.Preload(prefix + "CloudCredential")
-	db = db.Preload(prefix + "Offers").Preload(prefix + "Offers.Connections").Preload(prefix + "Offers.Endpoints").Preload(prefix + "Offers.Spaces")
+	db = db.Preload(prefix + "Offers").Preload(prefix + "Offers.Connections").Preload(prefix + "Offers.Endpoints")
 
 	return db
 }

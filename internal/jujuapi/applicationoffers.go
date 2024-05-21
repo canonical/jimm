@@ -114,7 +114,7 @@ func (r *controllerRoot) getConsumeDetails(ctx context.Context, user *openfga.Us
 	}
 
 	details := jujuparams.ConsumeOfferDetails{
-		Offer: &jujuparams.ApplicationOfferDetails{
+		Offer: &jujuparams.ApplicationOfferDetailsV5{
 			OfferURL: ourl.AsLocal().Path(),
 		},
 	}
@@ -125,9 +125,9 @@ func (r *controllerRoot) getConsumeDetails(ctx context.Context, user *openfga.Us
 }
 
 // ListApplicationOffers returns all offers matching the specified filters.
-func (r *controllerRoot) ListApplicationOffers(ctx context.Context, args jujuparams.OfferFilters) (jujuparams.QueryApplicationOffersResults, error) {
+func (r *controllerRoot) ListApplicationOffers(ctx context.Context, args jujuparams.OfferFilters) (jujuparams.QueryApplicationOffersResultsV5, error) {
 	const op = errors.Op("jujuapi.ListApplicationOffers")
-	results := jujuparams.QueryApplicationOffersResults{}
+	results := jujuparams.QueryApplicationOffersResultsV5{}
 
 	offers, err := r.jimm.ListApplicationOffers(ctx, r.user, args.Filters...)
 	if err != nil {
@@ -141,9 +141,9 @@ func (r *controllerRoot) ListApplicationOffers(ctx context.Context, args jujupar
 // FindApplicationOffers returns all offers matching the specified filters
 // as long as the user has read access to each offer. It also omits details
 // on users and connections.
-func (r *controllerRoot) FindApplicationOffers(ctx context.Context, args jujuparams.OfferFilters) (jujuparams.QueryApplicationOffersResults, error) {
+func (r *controllerRoot) FindApplicationOffers(ctx context.Context, args jujuparams.OfferFilters) (jujuparams.QueryApplicationOffersResultsV5, error) {
 	const op = errors.Op("jujuapi.FindApplicationOffers")
-	results := jujuparams.QueryApplicationOffersResults{}
+	results := jujuparams.QueryApplicationOffersResultsV5{}
 
 	offers, err := r.jimm.FindApplicationOffers(ctx, r.user, args.Filters...)
 	if err != nil {
