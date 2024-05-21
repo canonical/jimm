@@ -1,5 +1,5 @@
 # Publish the OCI image to ghcr
-name: Publish image
+name: Publish server image
 
 on:
   # Note that when running via workflow_dispatch, the github.ref_name
