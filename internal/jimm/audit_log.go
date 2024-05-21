@@ -9,7 +9,7 @@ import (
 
 	"github.com/juju/juju/rpc"
 	"github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
@@ -45,7 +45,7 @@ func (r DbAuditLogger) newAuditLogEntry(header *rpc.Header) dbmodel.AuditLogEntr
 	ale := dbmodel.AuditLogEntry{
 		Time:           time.Now().UTC().Round(time.Millisecond),
 		MessageId:      header.RequestId,
-		UserTag:        r.getUser().String(),
+		IdentityTag:    r.getUser().String(),
 		ConversationId: r.conversationId,
 	}
 	return ale

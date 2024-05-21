@@ -1,12 +1,14 @@
 // Copyright 2023 canonical.
 
+// Package credentials provides abstractions/definitions for credential storage
+// backends and caching mechanisms.
 package credentials
 
 import (
 	"context"
 	"time"
 
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 )
 
@@ -16,6 +18,7 @@ import (
 //   - JWK Set
 //   - JWK expiry
 //   - JWK private key
+//   - OAuth session signing secret
 type CredentialStore interface {
 	// Get retrieves the stored attributes of a cloud credential.
 	Get(context.Context, names.CloudCredentialTag) (map[string]string, error)
@@ -51,4 +54,13 @@ type CredentialStore interface {
 
 	// PutJWKSExpiry sets the expiry time for the current JWKS within the store.
 	PutJWKSExpiry(ctx context.Context, expiry time.Time) error
+
+	// CleanupOAuthSecrets removes all secrets associated with OAuth.
+	CleanupOAuthSecrets(ctx context.Context) error
+
+	// GetOAuthSecret returns the current HS256 (symmetric encryption) secret used to sign OAuth session tokens.
+	GetOAuthSecret(ctx context.Context) ([]byte, error)
+
+	// PutOAuthSecret puts a HS256 (symmetric encryption) secret into the credentials store for signing OAuth session tokens.
+	PutOAuthSecret(ctx context.Context, raw []byte) error
 }

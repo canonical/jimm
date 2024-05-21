@@ -11,7 +11,7 @@ import (
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/juju/juju/core/crossmodel"
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	"github.com/juju/zaputil"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
@@ -61,7 +61,7 @@ func (j *JIMM) Offer(ctx context.Context, user *openfga.User, offer AddApplicati
 	}
 
 	offerURL := crossmodel.OfferURL{
-		User:      model.OwnerUsername,
+		User:      model.OwnerIdentityName,
 		ModelName: model.Name,
 		// Confusingly the application name in the offer URL is
 		// actually the offer name.
@@ -95,8 +95,8 @@ func (j *JIMM) Offer(ctx context.Context, user *openfga.User, offer AddApplicati
 		return errors.E(op, err)
 	}
 
-	offerDetails := jujuparams.ApplicationOfferAdminDetails{
-		ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
+	offerDetails := jujuparams.ApplicationOfferAdminDetailsV5{
+		ApplicationOfferDetailsV5: jujuparams.ApplicationOfferDetailsV5{
 			OfferURL: offerURL.String(),
 		},
 	}
@@ -107,7 +107,7 @@ func (j *JIMM) Offer(ctx context.Context, user *openfga.User, offer AddApplicati
 	}
 
 	var doc dbmodel.ApplicationOffer
-	doc.FromJujuApplicationOfferAdminDetails(offerDetails)
+	doc.FromJujuApplicationOfferAdminDetailsV5(offerDetails)
 	if err != nil {
 		zapctx.Error(ctx, "failed to convert application offer details", zaputil.Error(err))
 		return errors.E(op, err)
@@ -140,10 +140,14 @@ func (j *JIMM) Offer(ctx context.Context, user *openfga.User, offer AddApplicati
 	if ownerId == "" {
 		ownerId = user.Tag().Id()
 	}
+
+	identity, err := dbmodel.NewIdentity(ownerId)
+	if err != nil {
+		return errors.E(op, err)
+	}
+
 	owner := openfga.NewUser(
-		&dbmodel.User{
-			Username: ownerId,
-		},
+		identity,
 		j.OpenFGAClient,
 	)
 	if err := owner.SetApplicationOfferAccess(ctx, doc.ResourceTag(), ofganames.AdministratorRelation); err != nil {
@@ -154,10 +158,13 @@ func (j *JIMM) Offer(ctx context.Context, user *openfga.User, offer AddApplicati
 			zap.String("application-offer", doc.UUID))
 	}
 
+	everyoneIdentity, err := dbmodel.NewIdentity(ofganames.EveryoneUser)
+	if err != nil {
+		return errors.E(op, err)
+	}
+
 	everyone := openfga.NewUser(
-		&dbmodel.User{
-			Username: ofganames.EveryoneUser,
-		},
+		everyoneIdentity,
 		j.OpenFGAClient,
 	)
 	if err := everyone.SetApplicationOfferAccess(ctx, doc.ResourceTag(), ofganames.ReaderRelation); err != nil {
@@ -223,7 +230,7 @@ func (j *JIMM) GetApplicationOfferConsumeDetails(ctx context.Context, user *open
 
 	// Fix the consume details from the controller to be correct for JAAS.
 	// Filter out any juju local users.
-	users, err := j.listApplicationOfferUsers(ctx, offer.ResourceTag(), user.User, accessLevel)
+	users, err := j.listApplicationOfferUsers(ctx, offer.ResourceTag(), user.Identity, accessLevel)
 	if err != nil {
 		return errors.E(op, err)
 	}
@@ -251,7 +258,7 @@ func (j *JIMM) GetApplicationOfferConsumeDetails(ctx context.Context, user *open
 // only see themselves.
 // TODO(Kian) CSS-6040 Consider changing wherever this function is used to
 // better encapsulate transforming Postgres/OpenFGA objects into Juju objects.
-func (j *JIMM) listApplicationOfferUsers(ctx context.Context, offer names.ApplicationOfferTag, user *dbmodel.User, accessLevel string) ([]jujuparams.OfferUserDetails, error) {
+func (j *JIMM) listApplicationOfferUsers(ctx context.Context, offer names.ApplicationOfferTag, user *dbmodel.Identity, accessLevel string) ([]jujuparams.OfferUserDetails, error) {
 	users := make(map[string]string)
 	// we loop through relations in a decreasing order of access
 	for _, relation := range []openfga.Relation{
@@ -266,19 +273,19 @@ func (j *JIMM) listApplicationOfferUsers(ctx context.Context, offer names.Applic
 		for _, user := range usersWithRelation {
 			// if the user is in the users map, it must already have a higher
 			// access level - we skip this user
-			if users[user.Username] != "" {
+			if users[user.Name] != "" {
 				continue
 			}
-			users[user.Username] = ToOfferAccessString(relation)
+			users[user.Name] = ToOfferAccessString(relation)
 		}
 	}
 
 	userDetails := []jujuparams.OfferUserDetails{}
 	for username, level := range users {
 		// non-admin users should only see their own access level
-		// and access level of "everyone@external" - meaning the access
+		// and the access level of "everyone" - meaning the access
 		// level everybody has.
-		if accessLevel != string(jujuparams.OfferAdminAccess) && username != ofganames.EveryoneUser && username != user.Username {
+		if accessLevel != string(jujuparams.OfferAdminAccess) && username != ofganames.EveryoneUser && username != user.Name {
 			continue
 		}
 		userDetails = append(userDetails, jujuparams.OfferUserDetails{
@@ -292,7 +299,7 @@ func (j *JIMM) listApplicationOfferUsers(ctx context.Context, offer names.Applic
 }
 
 // GetApplicationOffer returns details of the offer with the specified URL.
-func (j *JIMM) GetApplicationOffer(ctx context.Context, user *openfga.User, offerURL string) (*jujuparams.ApplicationOfferAdminDetails, error) {
+func (j *JIMM) GetApplicationOffer(ctx context.Context, user *openfga.User, offerURL string) (*jujuparams.ApplicationOfferAdminDetailsV5, error) {
 	const op = errors.Op("jimm.GetApplicationOffer")
 
 	offer := dbmodel.ApplicationOffer{
@@ -335,7 +342,7 @@ func (j *JIMM) GetApplicationOffer(ctx context.Context, user *openfga.User, offe
 	}
 	defer api.Close()
 
-	var offerDetails jujuparams.ApplicationOfferAdminDetails
+	var offerDetails jujuparams.ApplicationOfferAdminDetailsV5
 	offerDetails.OfferURL = offerURL
 	if err := api.GetApplicationOffer(ctx, &offerDetails); err != nil {
 		return nil, errors.E(op, err)
@@ -344,7 +351,7 @@ func (j *JIMM) GetApplicationOffer(ctx context.Context, user *openfga.User, offe
 	if accessLevel != string(jujuparams.OfferAdminAccess) {
 		offerDetails.Connections = nil
 	}
-	users, err := j.listApplicationOfferUsers(ctx, offer.ResourceTag(), user.User, accessLevel)
+	users, err := j.listApplicationOfferUsers(ctx, offer.ResourceTag(), user.Identity, accessLevel)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
@@ -357,8 +364,13 @@ func (j *JIMM) GetApplicationOffer(ctx context.Context, user *openfga.User, offe
 func (j *JIMM) GrantOfferAccess(ctx context.Context, user *openfga.User, offerURL string, ut names.UserTag, access jujuparams.OfferAccessPermission) error {
 	const op = errors.Op("jimm.GrantOfferAccess")
 
-	err := j.doApplicationOfferAdmin(ctx, user, offerURL, func(offer *dbmodel.ApplicationOffer, api API) error {
-		tUser := openfga.NewUser(&dbmodel.User{Username: ut.Id()}, j.OpenFGAClient)
+	identity, err := dbmodel.NewIdentity(ut.Id())
+	if err != nil {
+		return errors.E(op, err)
+	}
+
+	err = j.doApplicationOfferAdmin(ctx, user, offerURL, func(offer *dbmodel.ApplicationOffer, api API) error {
+		tUser := openfga.NewUser(identity, j.OpenFGAClient)
 		currentRelation := tUser.GetApplicationOfferAccess(ctx, offer.ResourceTag())
 		currentAccessLevel := ToOfferAccessString(currentRelation)
 		targetAccessLevel := determineAccessLevelAfterGrant(currentAccessLevel, string(access))
@@ -414,8 +426,13 @@ func determineAccessLevelAfterGrant(currentAccessLevel, grantAccessLevel string)
 func (j *JIMM) RevokeOfferAccess(ctx context.Context, user *openfga.User, offerURL string, ut names.UserTag, access jujuparams.OfferAccessPermission) (err error) {
 	const op = errors.Op("jimm.RevokeOfferAccess")
 
+	identity, err := dbmodel.NewIdentity(ut.Id())
+	if err != nil {
+		return errors.E(op, err)
+	}
+
 	err = j.doApplicationOfferAdmin(ctx, user, offerURL, func(offer *dbmodel.ApplicationOffer, api API) error {
-		tUser := openfga.NewUser(&dbmodel.User{Username: ut.Id()}, j.OpenFGAClient)
+		tUser := openfga.NewUser(identity, j.OpenFGAClient)
 		targetRelation, err := ToOfferRelation(string(access))
 		if err != nil {
 			return errors.E(op, err)
@@ -529,8 +546,8 @@ func (j *JIMM) UpdateApplicationOffer(ctx context.Context, controller *dbmodel.C
 	}
 	defer api.Close()
 
-	offerDetails := jujuparams.ApplicationOfferAdminDetails{
-		ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
+	offerDetails := jujuparams.ApplicationOfferAdminDetailsV5{
+		ApplicationOfferDetailsV5: jujuparams.ApplicationOfferDetailsV5{
 			OfferURL: offer.URL,
 		},
 	}
@@ -539,7 +556,7 @@ func (j *JIMM) UpdateApplicationOffer(ctx context.Context, controller *dbmodel.C
 		return errors.E(op, err)
 	}
 
-	offer.FromJujuApplicationOfferAdminDetails(offerDetails)
+	offer.FromJujuApplicationOfferAdminDetailsV5(offerDetails)
 	err = j.Database.UpdateApplicationOffer(ctx, &offer)
 	if err != nil {
 		return errors.E(op, err)
@@ -578,7 +595,7 @@ func (j *JIMM) getUserOfferAccess(ctx context.Context, user *openfga.User, offer
 }
 
 // FindApplicationOffers returns details of offers matching the specified filter.
-func (j *JIMM) FindApplicationOffers(ctx context.Context, user *openfga.User, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetails, error) {
+func (j *JIMM) FindApplicationOffers(ctx context.Context, user *openfga.User, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error) {
 	const op = errors.Op("jimm.FindApplicationOffers")
 
 	if len(filters) == 0 {
@@ -598,7 +615,7 @@ func (j *JIMM) FindApplicationOffers(ctx context.Context, user *openfga.User, fi
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
-	offerDetails := make([]jujuparams.ApplicationOfferAdminDetails, len(offers))
+	offerDetails := make([]jujuparams.ApplicationOfferAdminDetailsV5, len(offers))
 	for i, offer := range offers {
 		// TODO (alesstimec) Optimize this: currently check all possible
 		// permission levels for an offer, this is suboptimal.
@@ -607,14 +624,14 @@ func (j *JIMM) FindApplicationOffers(ctx context.Context, user *openfga.User, fi
 			return nil, errors.E(op, err)
 		}
 
-		offerDetails[i] = offer.ToJujuApplicationOfferDetails()
+		offerDetails[i] = offer.ToJujuApplicationOfferDetailsV5()
 
 		// non-admin users should not see connections of an application
 		// offer.
 		if accessLevel != "admin" {
 			offerDetails[i].Connections = nil
 		}
-		users, err := j.listApplicationOfferUsers(ctx, offer.ResourceTag(), user.User, accessLevel)
+		users, err := j.listApplicationOfferUsers(ctx, offer.ResourceTag(), user.Identity, accessLevel)
 		if err != nil {
 			return nil, errors.E(op, err)
 		}
@@ -664,10 +681,12 @@ func (j *JIMM) applicationOfferFilters(ctx context.Context, jujuFilters ...jujup
 		}
 		if len(f.AllowedConsumerTags) > 0 {
 			for _, u := range f.AllowedConsumerTags {
-				dbUser := dbmodel.User{
-					Username: u,
+				identity, err := dbmodel.NewIdentity(u)
+				if err != nil {
+					return nil, errors.E(err)
 				}
-				ofgaUser := openfga.NewUser(&dbUser, j.OpenFGAClient)
+
+				ofgaUser := openfga.NewUser(identity, j.OpenFGAClient)
 				offerUUIDs, err := ofgaUser.ListApplicationOffers(ctx, ofganames.ConsumerRelation)
 				if err != nil {
 					return nil, errors.E(err)
@@ -684,7 +703,7 @@ func (j *JIMM) applicationOfferFilters(ctx context.Context, jujuFilters ...jujup
 }
 
 // ListApplicationOffers returns details of offers matching the specified filter.
-func (j *JIMM) ListApplicationOffers(ctx context.Context, user *openfga.User, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetails, error) {
+func (j *JIMM) ListApplicationOffers(ctx context.Context, user *openfga.User, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error) {
 	const op = errors.Op("jimm.ListApplicationOffers")
 
 	type modelKey struct {
@@ -702,7 +721,7 @@ func (j *JIMM) ListApplicationOffers(ctx context.Context, user *openfga.User, fi
 			return nil, errors.E(op, "application offer filter must specify a model name")
 		}
 		if f.OwnerName == "" {
-			f.OwnerName = user.Username
+			f.OwnerName = user.Name
 		}
 		m := modelKey{
 			name:          f.ModelName,
@@ -711,7 +730,7 @@ func (j *JIMM) ListApplicationOffers(ctx context.Context, user *openfga.User, fi
 		modelFilters[m] = append(modelFilters[m], f)
 	}
 
-	var offers []jujuparams.ApplicationOfferAdminDetails
+	var offers []jujuparams.ApplicationOfferAdminDetailsV5
 
 	var keys []modelKey
 	for k := range modelFilters {
@@ -726,15 +745,15 @@ func (j *JIMM) ListApplicationOffers(ctx context.Context, user *openfga.User, fi
 
 	for _, k := range keys {
 		m := dbmodel.Model{
-			Name:          k.name,
-			OwnerUsername: k.ownerUsername,
+			Name:              k.name,
+			OwnerIdentityName: k.ownerUsername,
 		}
 		offerDetails, err := j.listApplicationOffersForModel(ctx, user, &m, modelFilters[k])
 		if err != nil {
 			return nil, errors.E(op, err)
 		}
 		for _, offer := range offerDetails {
-			users, err := j.listApplicationOfferUsers(ctx, names.NewApplicationOfferTag(offer.OfferUUID), user.User, "admin")
+			users, err := j.listApplicationOfferUsers(ctx, names.NewApplicationOfferTag(offer.OfferUUID), user.Identity, "admin")
 			if err != nil {
 				return nil, errors.E(op, err)
 			}
@@ -745,7 +764,7 @@ func (j *JIMM) ListApplicationOffers(ctx context.Context, user *openfga.User, fi
 	return offers, nil
 }
 
-func (j *JIMM) listApplicationOffersForModel(ctx context.Context, user *openfga.User, m *dbmodel.Model, filters []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetails, error) {
+func (j *JIMM) listApplicationOffersForModel(ctx context.Context, user *openfga.User, m *dbmodel.Model, filters []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error) {
 	const op = errors.Op("jimm.listApplicationOffersForModel")
 
 	if err := j.Database.GetModel(ctx, m); err != nil {

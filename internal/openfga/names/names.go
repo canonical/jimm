@@ -12,7 +12,7 @@ import (
 	cofga "github.com/canonical/ofga"
 
 	"github.com/juju/juju/core/permission"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 )
 
 // Relation Types
@@ -58,7 +58,8 @@ type ResourceTagger interface {
 		names.ControllerTag |
 		names.ModelTag |
 		names.ApplicationOfferTag |
-		names.CloudTag
+		names.CloudTag |
+		jimmnames.ServiceAccountTag
 
 	Id() string
 	Kind() string
@@ -79,7 +80,7 @@ func ConvertTag[RT ResourceTagger](t RT) *Tag {
 	if t.Kind() == names.UserTagKind && id == EveryoneUser {
 		// A user with ID "*" represents "everyone" in OpenFGA and allows checks like
 		// `user:bob reader type:my-resource` to return true without a separate query
-		// for the user:everyone@external user.
+		// for the user:everyone user.
 		id = "*"
 	}
 	tag := &Tag{
@@ -106,7 +107,8 @@ func BlankKindTag(kind string) (*Tag, error) {
 	switch kind {
 	case names.UserTagKind, jimmnames.GroupTagKind,
 		names.ControllerTagKind, names.ModelTagKind,
-		names.ApplicationOfferTagKind, names.CloudTagKind:
+		names.ApplicationOfferTagKind, names.CloudTagKind,
+		jimmnames.ServiceAccountTagKind:
 		return &Tag{
 			Kind: cofga.Kind(kind),
 		}, nil

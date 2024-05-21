@@ -42,8 +42,8 @@ func (d *Database) GetModel(ctx context.Context, model *dbmodel.Model) error {
 		}
 	} else if model.ID != 0 {
 		db = db.Where("id = ?", model.ID)
-	} else if model.OwnerUsername != "" && model.Name != "" {
-		db = db.Where("owner_username = ? AND name = ?", model.OwnerUsername, model.Name)
+	} else if model.OwnerIdentityName != "" && model.Name != "" {
+		db = db.Where("owner_identity_name = ? AND name = ?", model.OwnerIdentityName, model.Name)
 	} else if model.ControllerID != 0 {
 		// TODO(ales): fix ordering of where fields and handle error to represent what is *actually* required.
 		db = db.Where("controller_id = ?", model.ControllerID)
@@ -173,8 +173,11 @@ func preloadModel(prefix string, db *gorm.DB) *gorm.DB {
 	db = db.Preload(prefix + "Owner")
 	db = db.Preload(prefix + "Controller")
 	db = db.Preload(prefix + "CloudRegion").Preload(prefix + "CloudRegion.Cloud")
+	// We don't care about the cloud credential owner when
+	// loading a model, as we just use the credential to deploy
+	// applications.
 	db = db.Preload(prefix + "CloudCredential")
-	db = db.Preload(prefix + "Offers").Preload(prefix + "Offers.Connections").Preload(prefix + "Offers.Endpoints").Preload(prefix + "Offers.Spaces")
+	db = db.Preload(prefix + "Offers").Preload(prefix + "Offers.Connections").Preload(prefix + "Offers.Endpoints")
 
 	return db
 }

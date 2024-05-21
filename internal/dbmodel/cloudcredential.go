@@ -6,7 +6,7 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	"gorm.io/gorm"
 )
 
@@ -21,9 +21,9 @@ type CloudCredential struct {
 	CloudName string
 	Cloud     Cloud `gorm:"foreignKey:CloudName;references:Name;constraint:OnDelete:CASCADE"`
 
-	// Owner is the user that owns this credential.
-	OwnerUsername string
-	Owner         User `gorm:"foreignKey:OwnerUsername;references:Username"`
+	// Owner is the identity that owns this credential.
+	OwnerIdentityName string
+	Owner             Identity `gorm:"foreignKey:OwnerIdentityName;references:Name"`
 
 	// AuthType is the type of the credential.
 	AuthType string
@@ -55,17 +55,17 @@ func (c CloudCredential) Tag() names.Tag {
 // a concrete type names.CloudCredentialTag instead of the
 // names.Tag interface.
 func (c CloudCredential) ResourceTag() names.CloudCredentialTag {
-	return names.NewCloudCredentialTag(fmt.Sprintf("%s/%s/%s", c.CloudName, c.OwnerUsername, c.Name))
+	return names.NewCloudCredentialTag(fmt.Sprintf("%s/%s/%s", c.CloudName, c.OwnerIdentityName, c.Name))
 }
 
 // SetTag sets the Name, CloudName and Username fields from the given tag.
 func (c *CloudCredential) SetTag(t names.CloudCredentialTag) {
 	c.CloudName = t.Cloud().Id()
 	c.Name = t.Name()
-	c.OwnerUsername = t.Owner().Id()
+	c.OwnerIdentityName = t.Owner().Id()
 }
 
 // Path returns a juju style cloud credential path.
 func (c CloudCredential) Path() string {
-	return fmt.Sprintf("%s/%s/%s", c.CloudName, c.OwnerUsername, c.Name)
+	return fmt.Sprintf("%s/%s/%s", c.CloudName, c.OwnerIdentityName, c.Name)
 }

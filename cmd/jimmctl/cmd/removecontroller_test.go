@@ -7,11 +7,12 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/cmd/jimmctl/cmd"
+	"github.com/canonical/jimm/internal/cmdtest"
 	"github.com/canonical/jimm/internal/jimmtest"
 )
 
 type removeControllerSuite struct {
-	jimmSuite
+	cmdtest.JimmCmdSuite
 }
 
 var _ = gc.Suite(&removeControllerSuite{})
@@ -20,7 +21,7 @@ func (s *removeControllerSuite) TestRemoveControllerSuperuser(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
 
 	// alice is superuser
-	bClient := s.userBakeryClient("alice")
+	bClient := jimmtest.NewUserSessionLogin(c, "alice")
 	context, err := cmdtesting.RunCommand(c, cmd.NewRemoveControllerCommandForTesting(s.ClientStore(), bClient), "controller-1", "--force")
 	c.Assert(err, gc.IsNil)
 	c.Assert(cmdtesting.Stdout(context), gc.Matches, `name: controller-1
@@ -69,7 +70,7 @@ func (s *removeControllerSuite) TestRemoveController(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
 
 	// bob is not superuser
-	bClient := s.userBakeryClient("bob")
+	bClient := jimmtest.NewUserSessionLogin(c, "bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewRemoveControllerCommandForTesting(s.ClientStore(), bClient), "controller-1", "--force")
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }

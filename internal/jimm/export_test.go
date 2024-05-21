@@ -6,7 +6,7 @@ import (
 	"context"
 
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
@@ -44,6 +44,6 @@ func NewWatcherWithDeltaProcessedChannel(db db.Database, dialer Dialer, pubsub P
 	}
 }
 
-func (j *JIMM) ListApplicationOfferUsers(ctx context.Context, offer names.ApplicationOfferTag, user *dbmodel.User, accessLevel string) ([]jujuparams.OfferUserDetails, error) {
+func (j *JIMM) ListApplicationOfferUsers(ctx context.Context, offer names.ApplicationOfferTag, user *dbmodel.Identity, accessLevel string) ([]jujuparams.OfferUserDetails, error) {
 	return j.listApplicationOfferUsers(ctx, offer, user, accessLevel)
 }

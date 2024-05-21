@@ -13,14 +13,13 @@ import (
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/google/uuid"
-	"github.com/juju/charm/v11"
+	"github.com/juju/charm/v12"
 	"github.com/juju/juju/core/crossmodel"
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	"gopkg.in/macaroon.v2"
 	"gorm.io/gorm"
 
-	"github.com/canonical/jimm/internal/constants"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
@@ -31,7 +30,7 @@ import (
 )
 
 type environment struct {
-	users             []dbmodel.User
+	users             []dbmodel.Identity
 	clouds            []dbmodel.Cloud
 	credentials       []dbmodel.CloudCredential
 	controllers       []dbmodel.Controller
@@ -43,47 +42,40 @@ var initializeEnvironment = func(c *qt.C, ctx context.Context, db *db.Database, 
 	env := environment{}
 
 	// Alice is a model admin, but not a superuser or offer admin.
-	u := dbmodel.User{
-		Username: "alice@external",
-	}
-	c.Assert(db.DB.Create(&u).Error, qt.IsNil)
+	u, err := dbmodel.NewIdentity("alice@canonical.com")
+	c.Assert(err, qt.IsNil)
+	c.Assert(db.DB.Create(u).Error, qt.IsNil)
 
-	u1 := dbmodel.User{
-		Username: "eve@external",
-	}
-	c.Assert(db.DB.Create(&u1).Error, qt.IsNil)
+	u1, err := dbmodel.NewIdentity("eve@canonical.com")
+	c.Assert(err, qt.IsNil)
+	c.Assert(db.DB.Create(u1).Error, qt.IsNil)
 
-	u2 := dbmodel.User{
-		Username: "bob@external",
-	}
-	c.Assert(db.DB.Create(&u2).Error, qt.IsNil)
+	u2, err := dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, qt.IsNil)
+	c.Assert(db.DB.Create(u2).Error, qt.IsNil)
 
-	u3 := dbmodel.User{
-		Username: "fred@external",
-	}
-	c.Assert(db.DB.Create(&u3).Error, qt.IsNil)
+	u3, err := dbmodel.NewIdentity("fred@canonical.com")
+	c.Assert(err, qt.IsNil)
+	c.Assert(db.DB.Create(u3).Error, qt.IsNil)
 
-	u4 := dbmodel.User{
-		Username: "grant@external",
-	}
-	c.Assert(db.DB.Create(&u4).Error, qt.IsNil)
+	u4, err := dbmodel.NewIdentity("grant@canonical.com")
+	c.Assert(err, qt.IsNil)
+	c.Assert(db.DB.Create(u4).Error, qt.IsNil)
 
 	// Jane is an offer admin, but not a superuser or model admin.
-	u5 := dbmodel.User{
-		Username: "jane@external",
-	}
-	c.Assert(db.DB.Create(&u5).Error, qt.IsNil)
+	u5, err := dbmodel.NewIdentity("jane@canonical.com")
+	c.Assert(err, qt.IsNil)
+	c.Assert(db.DB.Create(u5).Error, qt.IsNil)
 
 	// Joe is a superuser, but not a model or offer admin.
-	u6 := dbmodel.User{
-		Username: "joe@external",
-	}
-	c.Assert(db.DB.Create(&u6).Error, qt.IsNil)
+	u6, err := dbmodel.NewIdentity("joe@canonical.com")
+	c.Assert(err, qt.IsNil)
+	c.Assert(db.DB.Create(u6).Error, qt.IsNil)
 
-	err := openfga.NewUser(&u6, client).SetControllerAccess(ctx, names.NewControllerTag(jimmUUID), ofganames.AdministratorRelation)
+	err = openfga.NewUser(u6, client).SetControllerAccess(ctx, names.NewControllerTag(jimmUUID), ofganames.AdministratorRelation)
 	c.Assert(err, qt.IsNil)
 
-	env.users = []dbmodel.User{u, u1, u2, u3, u4, u5, u6}
+	env.users = []dbmodel.Identity{*u, *u1, *u2, *u3, *u4, *u5, *u6}
 
 	cloud := dbmodel.Cloud{
 		Name: "test-cloud",
@@ -96,7 +88,7 @@ var initializeEnvironment = func(c *qt.C, ctx context.Context, db *db.Database, 
 	env.clouds = []dbmodel.Cloud{cloud}
 
 	// user u is administrator of the test-cloud
-	err = openfga.NewUser(&u, client).SetCloudAccess(ctx, cloud.ResourceTag(), ofganames.AdministratorRelation)
+	err = openfga.NewUser(u, client).SetCloudAccess(ctx, cloud.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, qt.IsNil)
 
 	controller := dbmodel.Controller{
@@ -122,10 +114,10 @@ var initializeEnvironment = func(c *qt.C, ctx context.Context, db *db.Database, 
 	c.Assert(err, qt.IsNil)
 
 	cred := dbmodel.CloudCredential{
-		Name:          "test-credential-1",
-		CloudName:     cloud.Name,
-		OwnerUsername: u.Username,
-		AuthType:      "empty",
+		Name:              "test-credential-1",
+		CloudName:         cloud.Name,
+		OwnerIdentityName: u.Name,
+		AuthType:          "empty",
 	}
 	err = db.SetCloudCredential(ctx, &cred)
 	c.Assert(err, qt.IsNil)
@@ -137,7 +129,7 @@ var initializeEnvironment = func(c *qt.C, ctx context.Context, db *db.Database, 
 			String: "00000000-0000-0000-0000-0000-0000000000003",
 			Valid:  true,
 		},
-		OwnerUsername:     u.Username,
+		OwnerIdentityName: u.Name,
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
 		CloudCredentialID: cred.ID,
@@ -147,7 +139,7 @@ var initializeEnvironment = func(c *qt.C, ctx context.Context, db *db.Database, 
 	env.models = []dbmodel.Model{model}
 
 	// user u is administrator of the test-model
-	err = openfga.NewUser(&u, client).SetModelAccess(ctx, model.ResourceTag(), ofganames.AdministratorRelation)
+	err = openfga.NewUser(u, client).SetModelAccess(ctx, model.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, qt.IsNil)
 
 	err = client.AddControllerModel(context.Background(), controller.ResourceTag(), model.ResourceTag())
@@ -171,19 +163,19 @@ var initializeEnvironment = func(c *qt.C, ctx context.Context, db *db.Database, 
 	c.Assert(err, qt.IsNil)
 
 	// user u1 is administrator of the test-offer
-	err = openfga.NewUser(&u1, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.AdministratorRelation)
+	err = openfga.NewUser(u1, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, qt.IsNil)
 
 	// user u2 is consumer of the test-offer
-	err = openfga.NewUser(&u2, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.ConsumerRelation)
+	err = openfga.NewUser(u2, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.ConsumerRelation)
 	c.Assert(err, qt.IsNil)
 
 	// user u3 is reader of the test-offer
-	err = openfga.NewUser(&u3, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.ReaderRelation)
+	err = openfga.NewUser(u3, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.ReaderRelation)
 	c.Assert(err, qt.IsNil)
 
 	// user u5 is administrator of the test-offer
-	err = openfga.NewUser(&u5, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.AdministratorRelation)
+	err = openfga.NewUser(u5, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, qt.IsNil)
 
 	return &env
@@ -197,117 +189,117 @@ func TestRevokeOfferAccess(t *testing.T) {
 
 	tests := []struct {
 		about                      string
-		parameterFunc              func(*environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission)
+		parameterFunc              func(*environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission)
 		setup                      func(*environment, *openfga.OFGAClient)
 		expectedError              string
 		expectedAccessLevel        string
 		expectedAccessLevelOnError string // This expectation is meant to ensure there'll be no unpredicted behavior (like changing existing relations) after an error has occurred
 	}{{
 		about: "admin revokes a model's admin user's admin access - an error returns (relation is indirect)",
-		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
+		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
 			return env.users[1], env.users[0], "test-offer-url", jujuparams.OfferAdminAccess
 		},
 		expectedError:              "failed to unset given access",
 		expectedAccessLevelOnError: "admin",
 	}, {
 		about: "model admin revokes an admin user admin access - user has no access",
-		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
+		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
 			return env.users[0], env.users[1], "test-offer-url", jujuparams.OfferAdminAccess
 		},
 		expectedAccessLevel: "",
 	}, {
 		about: "admin revokes an admin user admin access - user has no access",
-		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
+		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
 			return env.users[5], env.users[1], "test-offer-url", jujuparams.OfferAdminAccess
 		},
 		expectedAccessLevel: "",
 	}, {
 		about: "superuser revokes an admin user admin access - user has no access",
-		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
+		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
 			return env.users[6], env.users[1], "test-offer-url", jujuparams.OfferAdminAccess
 		},
 		expectedAccessLevel: "",
 	}, {
 		about: "admin revokes an admin user consume access - an error returns (no direct relation to remove)",
-		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
+		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
 			return env.users[0], env.users[1], "test-offer-url", jujuparams.OfferConsumeAccess
 		},
 		expectedError:              "failed to unset given access",
 		expectedAccessLevelOnError: "admin",
 	}, {
 		about: "admin revokes an admin user read access - an error returns (no direct relation to remove)",
-		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
+		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
 			return env.users[0], env.users[1], "test-offer-url", jujuparams.OfferReadAccess
 		},
 		expectedError:              "failed to unset given access",
 		expectedAccessLevelOnError: "admin",
 	}, {
 		about: "admin revokes a consume user admin access - an error returns (no direct relation to remove)",
-		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
+		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
 			return env.users[0], env.users[2], "test-offer-url", jujuparams.OfferAdminAccess
 		},
 		expectedError:              "failed to unset given access",
 		expectedAccessLevelOnError: "consume",
 	}, {
 		about: "admin revokes a consume user consume access - user has no access",
-		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
+		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
 			return env.users[0], env.users[2], "test-offer-url", jujuparams.OfferConsumeAccess
 		},
 		expectedAccessLevel: "",
 	}, {
 		about: "admin revokes a consume user read access - an error returns (no direct relation to remove)",
-		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
+		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
 			return env.users[0], env.users[2], "test-offer-url", jujuparams.OfferReadAccess
 		},
 		expectedError:              "failed to unset given access",
 		expectedAccessLevelOnError: "consume",
 	}, {
 		about: "admin revokes a read user admin access - an error returns (no direct relation to remove)",
-		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
+		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
 			return env.users[0], env.users[3], "test-offer-url", jujuparams.OfferAdminAccess
 		},
 		expectedError:              "failed to unset given access",
 		expectedAccessLevelOnError: "read",
 	}, {
 		about: "admin revokes a read user consume access - an error returns (no direct relation to remove)",
-		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
+		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
 			return env.users[0], env.users[3], "test-offer-url", jujuparams.OfferConsumeAccess
 		},
 		expectedError:              "failed to unset given access",
 		expectedAccessLevelOnError: "read",
 	}, {
 		about: "admin revokes a read user read access - user has no access",
-		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
+		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
 			return env.users[0], env.users[3], "test-offer-url", jujuparams.OfferReadAccess
 		},
 		expectedAccessLevel: "",
 	}, {
 		about: "admin tries to revoke access to user that does not have access - an error returns",
-		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
+		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
 			return env.users[0], env.users[4], "test-offer-url", jujuparams.OfferReadAccess
 		},
 		expectedError: "failed to unset given access",
 	}, {
 		about: "user with consume access cannot revoke access",
-		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
+		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
 			return env.users[2], env.users[3], "test-offer-url", jujuparams.OfferReadAccess
 		},
 		expectedError: "unauthorized",
 	}, {
 		about: "user with read access cannot revoke access",
-		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
+		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
 			return env.users[3], env.users[3], "test-offer-url", jujuparams.OfferReadAccess
 		},
 		expectedError: "unauthorized",
 	}, {
 		about: "no such offer",
-		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
+		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
 			return env.users[3], env.users[3], "no-such-offer", jujuparams.OfferReadAccess
 		},
 		expectedError: "application offer not found",
 	}, {
 		about: "admin revokes another user (who is direct admin+consumer) their consume access - an error returns (saying user still has access; hinting to use 'jimmctl' for advanced cases)",
-		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
+		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
 			return env.users[1], env.users[4], env.applicationOffers[0].URL, jujuparams.OfferConsumeAccess
 		},
 		setup: func(env *environment, client *openfga.OFGAClient) {
@@ -318,7 +310,7 @@ func TestRevokeOfferAccess(t *testing.T) {
 		expectedAccessLevelOnError: "admin",
 	}, {
 		about: "admin revokes another user (who is direct admin+reader) their read access - an error returns (saying user still has access; hinting to use 'jimmctl' for advanced cases)",
-		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
+		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
 			return env.users[1], env.users[4], env.applicationOffers[0].URL, jujuparams.OfferReadAccess
 		},
 		setup: func(env *environment, client *openfga.OFGAClient) {
@@ -329,7 +321,7 @@ func TestRevokeOfferAccess(t *testing.T) {
 		expectedAccessLevelOnError: "admin",
 	}, {
 		about: "admin revokes another user (who is direct consumer+reader) their read access - an error returns (saying user still has access; hinting to use 'jimmctl' for advanced cases)",
-		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
+		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
 			return env.users[1], env.users[4], env.applicationOffers[0].URL, jujuparams.OfferReadAccess
 		},
 		setup: func(env *environment, client *openfga.OFGAClient) {
@@ -402,108 +394,108 @@ func TestGrantOfferAccess(t *testing.T) {
 
 	tests := []struct {
 		about               string
-		parameterFunc       func(*environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission)
+		parameterFunc       func(*environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission)
 		expectedError       string
 		expectedAccessLevel string
 	}{{
 		about: "model admin grants an admin user admin access - admin user keeps admin",
-		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
+		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
 			return env.users[0], env.users[1], "test-offer-url", jujuparams.OfferAdminAccess
 		},
 		expectedAccessLevel: "admin",
 	}, {
 		about: "model admin grants an admin user consume access - admin user keeps admin",
-		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
+		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
 			return env.users[0], env.users[1], "test-offer-url", jujuparams.OfferConsumeAccess
 		},
 		expectedAccessLevel: "admin",
 	}, {
 		about: "model admin grants an admin user read access - admin user keeps admin",
-		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
+		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
 			return env.users[0], env.users[1], "test-offer-url", jujuparams.OfferReadAccess
 		},
 		expectedAccessLevel: "admin",
 	}, {
 		about: "model admin grants a consume user admin access - user gets admin access",
-		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
+		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
 			return env.users[0], env.users[2], "test-offer-url", jujuparams.OfferAdminAccess
 		},
 		expectedAccessLevel: "admin",
 	}, {
 		about: "admin grants a consume user admin access - user gets admin access",
-		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
+		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
 			return env.users[5], env.users[2], "test-offer-url", jujuparams.OfferAdminAccess
 		},
 		expectedAccessLevel: "admin",
 	}, {
 		about: "superuser grants a consume user admin access - user gets admin access",
-		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
+		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
 			return env.users[6], env.users[2], "test-offer-url", jujuparams.OfferAdminAccess
 		},
 		expectedAccessLevel: "admin",
 	}, {
 		about: "admin grants a consume user consume access - user keeps consume access",
-		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
+		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
 			return env.users[0], env.users[2], "test-offer-url", jujuparams.OfferConsumeAccess
 		},
 		expectedAccessLevel: "consume",
 	}, {
 		about: "admin grants a consume user read access - use keeps consume access",
-		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
+		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
 			return env.users[0], env.users[2], "test-offer-url", jujuparams.OfferReadAccess
 		},
 		expectedAccessLevel: "consume",
 	}, {
 		about: "admin grants a read user admin access - user gets admin access",
-		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
+		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
 			return env.users[0], env.users[3], "test-offer-url", jujuparams.OfferAdminAccess
 		},
 		expectedAccessLevel: "admin",
 	}, {
 		about: "admin grants a read user consume access - user gets consume access",
-		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
+		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
 			return env.users[0], env.users[3], "test-offer-url", jujuparams.OfferConsumeAccess
 		},
 		expectedAccessLevel: "consume",
 	}, {
 		about: "admin grants a read user read access - user keeps read access",
-		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
+		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
 			return env.users[0], env.users[3], "test-offer-url", jujuparams.OfferReadAccess
 		},
 		expectedAccessLevel: "read",
 	}, {
 		about: "no such offer",
-		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
+		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
 			return env.users[0], env.users[3], "no-such-offer", jujuparams.OfferReadAccess
 		},
 		expectedError: "application offer not found",
 	}, {
 		about: "user with consume rights cannot grant any rights",
-		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
+		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
 			return env.users[2], env.users[4], "test-offer-url", jujuparams.OfferConsumeAccess
 		},
 		expectedError: "unauthorized",
 	}, {
 		about: "user with read rights cannot grant any rights",
-		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
+		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
 			return env.users[3], env.users[4], "test-offer-url", jujuparams.OfferConsumeAccess
 		},
 		expectedError: "unauthorized",
 	}, {
 		about: "admin grants new user admin access - new user has admin access",
-		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
+		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
 			return env.users[0], env.users[4], "test-offer-url", jujuparams.OfferAdminAccess
 		},
 		expectedAccessLevel: "admin",
 	}, {
 		about: "admin grants new user consume access - new user has consume access",
-		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
+		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
 			return env.users[0], env.users[4], "test-offer-url", jujuparams.OfferConsumeAccess
 		},
 		expectedAccessLevel: "consume",
 	}, {
 		about: "admin grants new user read access - new user has read access",
-		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
+		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
 			return env.users[0], env.users[4], "test-offer-url", jujuparams.OfferReadAccess
 		},
 		expectedAccessLevel: "read",
@@ -568,20 +560,17 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 	err = db.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
-	u := dbmodel.User{
-		Username: "alice@external",
-	}
-	c.Assert(db.DB.Create(&u).Error, qt.IsNil)
+	u, err := dbmodel.NewIdentity("alice@canonical.com")
+	c.Assert(err, qt.IsNil)
+	c.Assert(db.DB.Create(u).Error, qt.IsNil)
 
-	u1 := dbmodel.User{
-		Username: "eve@external",
-	}
-	c.Assert(db.DB.Create(&u1).Error, qt.IsNil)
+	u1, err := dbmodel.NewIdentity("eve@canonical.com")
+	c.Assert(err, qt.IsNil)
+	c.Assert(db.DB.Create(u1).Error, qt.IsNil)
 
-	u2 := dbmodel.User{
-		Username: "bob@external",
-	}
-	c.Assert(db.DB.Create(&u2).Error, qt.IsNil)
+	u2, err := dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, qt.IsNil)
+	c.Assert(db.DB.Create(u2).Error, qt.IsNil)
 
 	cloud := dbmodel.Cloud{
 		Name: "test-cloud",
@@ -593,7 +582,7 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 	c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
 
 	// user u is administrator of the test-model
-	err = openfga.NewUser(&u, client).SetCloudAccess(ctx, cloud.ResourceTag(), ofganames.AdministratorRelation)
+	err = openfga.NewUser(u, client).SetCloudAccess(ctx, cloud.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, qt.IsNil)
 
 	controller := dbmodel.Controller{
@@ -612,10 +601,10 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	cred := dbmodel.CloudCredential{
-		Name:          "test-credential-1",
-		CloudName:     cloud.Name,
-		OwnerUsername: u.Username,
-		AuthType:      "empty",
+		Name:              "test-credential-1",
+		CloudName:         cloud.Name,
+		OwnerIdentityName: u.Name,
+		AuthType:          "empty",
 	}
 	err = db.SetCloudCredential(ctx, &cred)
 	c.Assert(err, qt.IsNil)
@@ -626,7 +615,7 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 			String: "00000000-0000-0000-0000-0000-0000000000003",
 			Valid:  true,
 		},
-		OwnerUsername:     u.Username,
+		OwnerIdentityName: u.Name,
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
 		CloudCredentialID: cred.ID,
@@ -647,24 +636,23 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	// user u is administrator of the test offer
-	err = openfga.NewUser(&u, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.AdministratorRelation)
+	err = openfga.NewUser(u, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, qt.IsNil)
 
 	// user u1 is reader of the test offer
-	err = openfga.NewUser(&u1, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.ReaderRelation)
+	err = openfga.NewUser(u1, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.ReaderRelation)
 	c.Assert(err, qt.IsNil)
 
 	// user u2 is consumer of the test offer
-	err = openfga.NewUser(&u2, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.ConsumerRelation)
+	err = openfga.NewUser(u2, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.ConsumerRelation)
 	c.Assert(err, qt.IsNil)
 
 	everyoneTag := names.NewUserTag(ofganames.EveryoneUser)
-	uAll := dbmodel.User{
-		Username: everyoneTag.Id(),
-	}
-	c.Assert(db.DB.Create(&uAll).Error, qt.IsNil)
+	uAll, err := dbmodel.NewIdentity(everyoneTag.Id())
+	c.Assert(err, qt.IsNil)
+	c.Assert(db.DB.Create(uAll).Error, qt.IsNil)
 	// user uAll is reader of the test offer
-	err = openfga.NewUser(&uAll, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.ReaderRelation)
+	err = openfga.NewUser(uAll, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.ReaderRelation)
 	c.Assert(err, qt.IsNil)
 
 	j := &jimm.JIMM{
@@ -675,7 +663,7 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 			UUID: "00000000-0000-0000-0000-0000-0000000000001",
 			API: &jimmtest.API{
 				GetApplicationOfferConsumeDetails_: func(ctx context.Context, user names.UserTag, details *jujuparams.ConsumeOfferDetails, v bakery.Version) error {
-					details.Offer = &jujuparams.ApplicationOfferDetails{
+					details.Offer = &jujuparams.ApplicationOfferDetailsV5{
 						SourceModelTag:         names.NewModelTag(model.UUID.String).String(),
 						OfferUUID:              offer.UUID,
 						OfferURL:               offer.URL,
@@ -687,28 +675,15 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 							Interface: "unknown",
 							Limit:     1,
 						}},
-						Bindings: map[string]string{
-							"key1": "value1",
-							"key2": "value2",
-						},
 						Users: []jujuparams.OfferUserDetails{{
-							UserName: "alice@external",
+							UserName: "alice@canonical.com",
 							Access:   "admin",
 						}, {
-							UserName: "eve@external",
+							UserName: "eve@canonical.com",
 							Access:   "read",
 						}, {
-							UserName: "bob@external",
+							UserName: "bob@canonical.com",
 							Access:   "consume",
-						}},
-						Spaces: []jujuparams.RemoteSpace{{
-							CloudType:  "test-cloud-type",
-							Name:       "test-remote-space",
-							ProviderId: "test-provider-id",
-							ProviderAttributes: map[string]interface{}{
-								"attr1": "value1",
-								"attr2": "value2",
-							},
 						}},
 					}
 					details.Macaroon = &macaroon.Macaroon{}
@@ -723,15 +698,15 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 
 	tests := []struct {
 		about                string
-		user                 *dbmodel.User
+		user                 *dbmodel.Identity
 		details              jujuparams.ConsumeOfferDetails
 		expectedOfferDetails jujuparams.ConsumeOfferDetails
 		expectedError        string
 	}{{
 		about: "admin can get the application offer consume details ",
-		user:  &u,
+		user:  u,
 		details: jujuparams.ConsumeOfferDetails{
-			Offer: &jujuparams.ApplicationOfferDetails{
+			Offer: &jujuparams.ApplicationOfferDetailsV5{
 				OfferURL: "test-offer-url",
 			},
 		},
@@ -742,7 +717,7 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 				Addrs:         []string{"test-public-address"},
 			},
 			Macaroon: &macaroon.Macaroon{},
-			Offer: &jujuparams.ApplicationOfferDetails{
+			Offer: &jujuparams.ApplicationOfferDetailsV5{
 				SourceModelTag:         names.NewModelTag(model.UUID.String).String(),
 				OfferUUID:              offer.UUID,
 				OfferURL:               offer.URL,
@@ -754,39 +729,26 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 					Interface: "unknown",
 					Limit:     1,
 				}},
-				Bindings: map[string]string{
-					"key1": "value1",
-					"key2": "value2",
-				},
 				Users: []jujuparams.OfferUserDetails{{
-					UserName: "alice@external",
+					UserName: "alice@canonical.com",
 					Access:   "admin",
 				}, {
-					UserName: "bob@external",
+					UserName: "bob@canonical.com",
 					Access:   "consume",
 				}, {
-					UserName: "eve@external",
+					UserName: "eve@canonical.com",
 					Access:   "read",
 				}, {
 					UserName: "everyone@external",
 					Access:   "read",
-				}},
-				Spaces: []jujuparams.RemoteSpace{{
-					CloudType:  "test-cloud-type",
-					Name:       "test-remote-space",
-					ProviderId: "test-provider-id",
-					ProviderAttributes: map[string]interface{}{
-						"attr1": "value1",
-						"attr2": "value2",
-					},
 				}},
 			},
 		},
 	}, {
 		about: "users with consume access can get the application offer consume details with filtered users",
-		user:  &u2,
+		user:  u2,
 		details: jujuparams.ConsumeOfferDetails{
-			Offer: &jujuparams.ApplicationOfferDetails{
+			Offer: &jujuparams.ApplicationOfferDetailsV5{
 				OfferURL: "test-offer-url",
 			},
 		},
@@ -797,7 +759,7 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 				Addrs:         []string{"test-public-address"},
 			},
 			Macaroon: &macaroon.Macaroon{},
-			Offer: &jujuparams.ApplicationOfferDetails{
+			Offer: &jujuparams.ApplicationOfferDetailsV5{
 				SourceModelTag:         names.NewModelTag(model.UUID.String).String(),
 				OfferUUID:              offer.UUID,
 				OfferURL:               offer.URL,
@@ -809,42 +771,29 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 					Interface: "unknown",
 					Limit:     1,
 				}},
-				Bindings: map[string]string{
-					"key1": "value1",
-					"key2": "value2",
-				},
 				Users: []jujuparams.OfferUserDetails{{
-					UserName: "bob@external",
+					UserName: "bob@canonical.com",
 					Access:   "consume",
 				}, {
 					UserName: "everyone@external",
 					Access:   "read",
 				}},
-				Spaces: []jujuparams.RemoteSpace{{
-					CloudType:  "test-cloud-type",
-					Name:       "test-remote-space",
-					ProviderId: "test-provider-id",
-					ProviderAttributes: map[string]interface{}{
-						"attr1": "value1",
-						"attr2": "value2",
-					},
-				}},
 			},
 		},
 	}, {
 		about: "user with read access cannot get application offer consume details",
-		user:  &u1,
+		user:  u1,
 		details: jujuparams.ConsumeOfferDetails{
-			Offer: &jujuparams.ApplicationOfferDetails{
+			Offer: &jujuparams.ApplicationOfferDetailsV5{
 				OfferURL: "test-offer-url",
 			},
 		},
 		expectedError: "unauthorized",
 	}, {
 		about: "no such offer",
-		user:  &u,
+		user:  u,
 		details: jujuparams.ConsumeOfferDetails{
-			Offer: &jujuparams.ApplicationOfferDetails{
+			Offer: &jujuparams.ApplicationOfferDetailsV5{
 				OfferURL: "no-such-offer",
 			},
 		},
@@ -884,7 +833,7 @@ func TestGetApplicationOffer(t *testing.T) {
 		},
 		Dialer: &jimmtest.Dialer{
 			API: &jimmtest.API{
-				GetApplicationOffer_: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetails) error {
+				GetApplicationOffer_: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetailsV5) error {
 					details.ApplicationName = "test-app"
 					details.CharmURL = "cs:test-app:17"
 					details.Connections = []jujuparams.OfferConnection{{
@@ -893,7 +842,7 @@ func TestGetApplicationOffer(t *testing.T) {
 						Username:       "unknown",
 						Endpoint:       "test-endpoint",
 					}}
-					details.ApplicationOfferDetails = jujuparams.ApplicationOfferDetails{
+					details.ApplicationOfferDetailsV5 = jujuparams.ApplicationOfferDetailsV5{
 						SourceModelTag:         names.NewModelTag("00000000-0000-0000-0000-0000-0000000000003").String(),
 						OfferUUID:              "00000000-0000-0000-0000-0000-0000000000011",
 						OfferURL:               "test-offer-url",
@@ -904,29 +853,11 @@ func TestGetApplicationOffer(t *testing.T) {
 							Interface: "unknown",
 							Limit:     1,
 						}},
-						Spaces: []jujuparams.RemoteSpace{{
-							CloudType:  "test-cloud-type",
-							Name:       "test-remote-space",
-							ProviderId: "test-provider-id",
-							ProviderAttributes: map[string]interface{}{
-								"attr1": "value1",
-								"attr2": "value2",
-							},
-							Subnets: []jujuparams.Subnet{{
-								SpaceTag: "test-remote-space",
-								VLANTag:  1024,
-								Status:   constants.DEAD.String(),
-							}},
-						}},
-						Bindings: map[string]string{
-							"key1": "value4",
-							"key2": "value5",
-						},
 						Users: []jujuparams.OfferUserDetails{{
-							UserName: "alice@external",
+							UserName: "alice@canonical.com",
 							Access:   string(jujuparams.OfferAdminAccess),
 						}, {
-							UserName: "eve@external",
+							UserName: "eve@canonical.com",
 							Access:   "read",
 						}, {
 							UserName: "admin",
@@ -942,19 +873,16 @@ func TestGetApplicationOffer(t *testing.T) {
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
-	u := dbmodel.User{
-		Username: "alice@external",
-	}
+	u, err := dbmodel.NewIdentity("alice@canonical.com")
+	c.Assert(err, qt.IsNil)
 	c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
 
-	u1 := dbmodel.User{
-		Username: "eve@external",
-	}
+	u1, err := dbmodel.NewIdentity("eve@canonical.com")
+	c.Assert(err, qt.IsNil)
 	c.Assert(j.Database.DB.Create(&u1).Error, qt.IsNil)
 
-	u2 := dbmodel.User{
-		Username: "bob@external",
-	}
+	u2, err := dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, qt.IsNil)
 	c.Assert(j.Database.DB.Create(&u2).Error, qt.IsNil)
 
 	cloud := dbmodel.Cloud{
@@ -980,10 +908,10 @@ func TestGetApplicationOffer(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	cred := dbmodel.CloudCredential{
-		Name:          "test-credential-1",
-		CloudName:     cloud.Name,
-		OwnerUsername: u.Username,
-		AuthType:      "empty",
+		Name:              "test-credential-1",
+		CloudName:         cloud.Name,
+		OwnerIdentityName: u.Name,
+		AuthType:          "empty",
 	}
 	err = j.Database.SetCloudCredential(ctx, &cred)
 	c.Assert(err, qt.IsNil)
@@ -994,7 +922,7 @@ func TestGetApplicationOffer(t *testing.T) {
 			String: "00000000-0000-0000-0000-0000-0000000000003",
 			Valid:  true,
 		},
-		OwnerUsername:     u.Username,
+		OwnerIdentityName: u.Name,
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
 		CloudCredentialID: cred.ID,
@@ -1018,25 +946,11 @@ func TestGetApplicationOffer(t *testing.T) {
 			Interface:          "unknown",
 			Limit:              1,
 		}},
-		Spaces: []dbmodel.ApplicationOfferRemoteSpace{{
-			ApplicationOfferID: 1,
-			CloudType:          "test-cloud-type",
-			Name:               "test-remote-space",
-			ProviderID:         "test-provider-id",
-			ProviderAttributes: dbmodel.Map{
-				"attr1": "value1",
-				"attr2": "value2",
-			},
-		}},
-		Bindings: dbmodel.StringMap{
-			"key1": "value1",
-			"key2": "value2",
-		},
 		Connections: []dbmodel.ApplicationOfferConnection{{
 			ApplicationOfferID: 1,
 			SourceModelTag:     "test-model-src",
 			RelationID:         1,
-			Username:           "unknown",
+			IdentityName:       "unknown",
 			Endpoint:           "test-endpoint",
 		}},
 	}
@@ -1044,25 +958,25 @@ func TestGetApplicationOffer(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	// user u is administrator of the test offer
-	err = openfga.NewUser(&u, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.AdministratorRelation)
+	err = openfga.NewUser(u, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, qt.IsNil)
 
 	// user u1 is reader of the test offer
-	err = openfga.NewUser(&u1, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.ReaderRelation)
+	err = openfga.NewUser(u1, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.ReaderRelation)
 	c.Assert(err, qt.IsNil)
 
 	tests := []struct {
 		about                string
-		user                 *dbmodel.User
+		user                 *dbmodel.Identity
 		offerURL             string
-		expectedOfferDetails jujuparams.ApplicationOfferAdminDetails
+		expectedOfferDetails jujuparams.ApplicationOfferAdminDetailsV5
 		expectedError        string
 	}{{
 		about:    "admin can get the application offer",
-		user:     &u,
+		user:     u,
 		offerURL: "test-offer-url",
-		expectedOfferDetails: jujuparams.ApplicationOfferAdminDetails{
-			ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
+		expectedOfferDetails: jujuparams.ApplicationOfferAdminDetailsV5{
+			ApplicationOfferDetailsV5: jujuparams.ApplicationOfferDetailsV5{
 				SourceModelTag:         names.NewModelTag(model.UUID.String).String(),
 				OfferUUID:              "00000000-0000-0000-0000-0000-0000000000011",
 				OfferURL:               "test-offer-url",
@@ -1073,30 +987,12 @@ func TestGetApplicationOffer(t *testing.T) {
 					Interface: "unknown",
 					Limit:     1,
 				}},
-				Bindings: map[string]string{
-					"key1": "value4",
-					"key2": "value5",
-				},
 				Users: []jujuparams.OfferUserDetails{{
-					UserName: "alice@external",
+					UserName: "alice@canonical.com",
 					Access:   "admin",
 				}, {
-					UserName: "eve@external",
+					UserName: "eve@canonical.com",
 					Access:   "read",
-				}},
-				Spaces: []jujuparams.RemoteSpace{{
-					CloudType:  "test-cloud-type",
-					Name:       "test-remote-space",
-					ProviderId: "test-provider-id",
-					ProviderAttributes: map[string]interface{}{
-						"attr1": "value1",
-						"attr2": "value2",
-					},
-					Subnets: []jujuparams.Subnet{{
-						SpaceTag: "test-remote-space",
-						VLANTag:  1024,
-						Status:   constants.DEAD.String(),
-					}},
 				}},
 			},
 			ApplicationName: "test-app",
@@ -1110,10 +1006,10 @@ func TestGetApplicationOffer(t *testing.T) {
 		},
 	}, {
 		about:    "user with read access can get the application offer, but users and connections are filtered",
-		user:     &u1,
+		user:     u1,
 		offerURL: "test-offer-url",
-		expectedOfferDetails: jujuparams.ApplicationOfferAdminDetails{
-			ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
+		expectedOfferDetails: jujuparams.ApplicationOfferAdminDetailsV5{
+			ApplicationOfferDetailsV5: jujuparams.ApplicationOfferDetailsV5{
 				SourceModelTag:         names.NewModelTag(model.UUID.String).String(),
 				OfferUUID:              "00000000-0000-0000-0000-0000-0000000000011",
 				OfferURL:               "test-offer-url",
@@ -1124,27 +1020,9 @@ func TestGetApplicationOffer(t *testing.T) {
 					Interface: "unknown",
 					Limit:     1,
 				}},
-				Bindings: map[string]string{
-					"key1": "value4",
-					"key2": "value5",
-				},
 				Users: []jujuparams.OfferUserDetails{{
-					UserName: "eve@external",
+					UserName: "eve@canonical.com",
 					Access:   "read",
-				}},
-				Spaces: []jujuparams.RemoteSpace{{
-					CloudType:  "test-cloud-type",
-					Name:       "test-remote-space",
-					ProviderId: "test-provider-id",
-					ProviderAttributes: map[string]interface{}{
-						"attr1": "value1",
-						"attr2": "value2",
-					},
-					Subnets: []jujuparams.Subnet{{
-						SpaceTag: "test-remote-space",
-						VLANTag:  1024,
-						Status:   constants.DEAD.String(),
-					}},
 				}},
 			},
 			ApplicationName: "test-app",
@@ -1152,12 +1030,12 @@ func TestGetApplicationOffer(t *testing.T) {
 		},
 	}, {
 		about:         "user without access cannot get the application offer",
-		user:          &u2,
+		user:          u2,
 		offerURL:      "test-offer-url",
 		expectedError: "application offer not found",
 	}, {
 		about:         "not found",
-		user:          &u1,
+		user:          u1,
 		offerURL:      "offer-not-found",
 		expectedError: "application offer not found",
 	}}
@@ -1184,13 +1062,13 @@ func TestOffer(t *testing.T) {
 	now := time.Now().UTC().Round(time.Millisecond)
 	tests := []struct {
 		about                       string
-		getApplicationOffer         func(context.Context, *jujuparams.ApplicationOfferAdminDetails) error
+		getApplicationOffer         func(context.Context, *jujuparams.ApplicationOfferAdminDetailsV5) error
 		grantApplicationOfferAccess func(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error
 		offer                       func(context.Context, crossmodel.OfferURL, jujuparams.AddApplicationOffer) error
-		createEnv                   func(*qt.C, db.Database, *openfga.OFGAClient) (dbmodel.User, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error))
+		createEnv                   func(*qt.C, db.Database, *openfga.OFGAClient) (dbmodel.Identity, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error))
 	}{{
 		about: "all ok",
-		getApplicationOffer: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetails) error {
+		getApplicationOffer: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetailsV5) error {
 			details.ApplicationName = "test-app"
 			details.CharmURL = "cs:test-app:17"
 			details.Connections = []jujuparams.OfferConnection{{
@@ -1199,7 +1077,7 @@ func TestOffer(t *testing.T) {
 				Username:       "unknown",
 				Endpoint:       "test-endpoint",
 			}}
-			details.ApplicationOfferDetails = jujuparams.ApplicationOfferDetails{
+			details.ApplicationOfferDetailsV5 = jujuparams.ApplicationOfferDetailsV5{
 				OfferUUID:              "00000000-0000-0000-0000-0000-0000000000004",
 				OfferURL:               "test-offer-url",
 				ApplicationDescription: "a test app offering",
@@ -1209,24 +1087,6 @@ func TestOffer(t *testing.T) {
 					Interface: "unknown",
 					Limit:     1,
 				}},
-				Spaces: []jujuparams.RemoteSpace{{
-					CloudType:  "test-cloud-type",
-					Name:       "test-remote-space",
-					ProviderId: "test-provider-id",
-					ProviderAttributes: map[string]interface{}{
-						"attr1": "value1",
-						"attr2": "value2",
-					},
-					Subnets: []jujuparams.Subnet{{
-						SpaceTag: "test-remote-space",
-						VLANTag:  1024,
-						Status:   constants.ALIVE.String(),
-					}},
-				}},
-				Bindings: map[string]string{
-					"key1": "value1",
-					"key2": "value2",
-				},
 				Users: []jujuparams.OfferUserDetails{{
 					UserName:    "alice",
 					DisplayName: "alice, sister of eve",
@@ -1241,13 +1101,12 @@ func TestOffer(t *testing.T) {
 		offer: func(context.Context, crossmodel.OfferURL, jujuparams.AddApplicationOffer) error {
 			return nil
 		},
-		createEnv: func(c *qt.C, db db.Database, client *openfga.OFGAClient) (dbmodel.User, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
+		createEnv: func(c *qt.C, db db.Database, client *openfga.OFGAClient) (dbmodel.Identity, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
 			ctx := context.Background()
 
-			u := dbmodel.User{
-				Username: "alice@external",
-			}
-			c.Assert(db.DB.Create(&u).Error, qt.IsNil)
+			u, err := dbmodel.NewIdentity("alice@canonical.com")
+			c.Assert(err, qt.IsNil)
+			c.Assert(db.DB.Create(u).Error, qt.IsNil)
 
 			cloud := dbmodel.Cloud{
 				Name: "test-cloud",
@@ -1259,7 +1118,7 @@ func TestOffer(t *testing.T) {
 			c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
 
 			// user u is administrator of the test-cloud
-			err := openfga.NewUser(&u, client).SetCloudAccess(ctx, cloud.ResourceTag(), ofganames.AdministratorRelation)
+			err = openfga.NewUser(u, client).SetCloudAccess(ctx, cloud.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 
 			controller := dbmodel.Controller{
@@ -1276,10 +1135,10 @@ func TestOffer(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 
 			cred := dbmodel.CloudCredential{
-				Name:          "test-credential-1",
-				CloudName:     cloud.Name,
-				OwnerUsername: u.Username,
-				AuthType:      "empty",
+				Name:              "test-credential-1",
+				CloudName:         cloud.Name,
+				OwnerIdentityName: u.Name,
+				AuthType:          "empty",
 			}
 			err = db.SetCloudCredential(ctx, &cred)
 			c.Assert(err, qt.IsNil)
@@ -1290,7 +1149,7 @@ func TestOffer(t *testing.T) {
 					String: "00000000-0000-0000-0000-0000-0000000000003",
 					Valid:  true,
 				},
-				OwnerUsername:     u.Username,
+				OwnerIdentityName: u.Name,
 				ControllerID:      controller.ID,
 				CloudRegionID:     cloud.Regions[0].ID,
 				CloudCredentialID: cred.ID,
@@ -1299,7 +1158,7 @@ func TestOffer(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 
 			// user u is administrator of the test-model
-			err = openfga.NewUser(&u, client).SetModelAccess(ctx, model.ResourceTag(), ofganames.AdministratorRelation)
+			err = openfga.NewUser(u, client).SetModelAccess(ctx, model.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 
 			offerParams := jimm.AddApplicationOfferParams{
@@ -1327,34 +1186,20 @@ func TestOffer(t *testing.T) {
 					Interface:          "unknown",
 					Limit:              1,
 				}},
-				Spaces: []dbmodel.ApplicationOfferRemoteSpace{{
-					ApplicationOfferID: 1,
-					CloudType:          "test-cloud-type",
-					Name:               "test-remote-space",
-					ProviderID:         "test-provider-id",
-					ProviderAttributes: dbmodel.Map{
-						"attr1": "value1",
-						"attr2": "value2",
-					},
-				}},
-				Bindings: dbmodel.StringMap{
-					"key1": "value1",
-					"key2": "value2",
-				},
 				Connections: []dbmodel.ApplicationOfferConnection{{
 					ApplicationOfferID: 1,
 					SourceModelTag:     "test-model-src",
 					RelationID:         1,
-					Username:           "unknown",
+					IdentityName:       "unknown",
 					Endpoint:           "test-endpoint",
 				}},
 			}
 
-			return u, offerParams, offer, nil
+			return *u, offerParams, offer, nil
 		},
 	}, {
 		about: "controller returns an error when creating an offer",
-		getApplicationOffer: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetails) error {
+		getApplicationOffer: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetailsV5) error {
 			return nil
 		},
 		grantApplicationOfferAccess: func(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error {
@@ -1363,13 +1208,12 @@ func TestOffer(t *testing.T) {
 		offer: func(context.Context, crossmodel.OfferURL, jujuparams.AddApplicationOffer) error {
 			return errors.E("a silly error")
 		},
-		createEnv: func(c *qt.C, db db.Database, client *openfga.OFGAClient) (dbmodel.User, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
+		createEnv: func(c *qt.C, db db.Database, client *openfga.OFGAClient) (dbmodel.Identity, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
 			ctx := context.Background()
 
-			u := dbmodel.User{
-				Username: "alice@external",
-			}
-			c.Assert(db.DB.Create(&u).Error, qt.IsNil)
+			u, err := dbmodel.NewIdentity("alice@canonical.com")
+			c.Assert(err, qt.IsNil)
+			c.Assert(db.DB.Create(u).Error, qt.IsNil)
 
 			cloud := dbmodel.Cloud{
 				Name: "test-cloud",
@@ -1381,7 +1225,7 @@ func TestOffer(t *testing.T) {
 			c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
 
 			// user u is administrator of the test-cloud
-			err := openfga.NewUser(&u, client).SetCloudAccess(ctx, cloud.ResourceTag(), ofganames.AdministratorRelation)
+			err = openfga.NewUser(u, client).SetCloudAccess(ctx, cloud.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 
 			controller := dbmodel.Controller{
@@ -1398,10 +1242,10 @@ func TestOffer(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 
 			cred := dbmodel.CloudCredential{
-				Name:          "test-credential-1",
-				CloudName:     cloud.Name,
-				OwnerUsername: u.Username,
-				AuthType:      "empty",
+				Name:              "test-credential-1",
+				CloudName:         cloud.Name,
+				OwnerIdentityName: u.Name,
+				AuthType:          "empty",
 			}
 			err = db.SetCloudCredential(ctx, &cred)
 			c.Assert(err, qt.IsNil)
@@ -1412,7 +1256,7 @@ func TestOffer(t *testing.T) {
 					String: "00000000-0000-0000-0000-0000-0000000000003",
 					Valid:  true,
 				},
-				OwnerUsername:     u.Username,
+				OwnerIdentityName: u.Name,
 				ControllerID:      controller.ID,
 				CloudRegionID:     cloud.Regions[0].ID,
 				CloudCredentialID: cred.ID,
@@ -1421,7 +1265,7 @@ func TestOffer(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 
 			// user u is administrator of the test-model
-			err = openfga.NewUser(&u, client).SetModelAccess(ctx, model.ResourceTag(), ofganames.AdministratorRelation)
+			err = openfga.NewUser(u, client).SetModelAccess(ctx, model.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 
 			offerParams := jimm.AddApplicationOfferParams{
@@ -1436,13 +1280,13 @@ func TestOffer(t *testing.T) {
 
 			offer := dbmodel.ApplicationOffer{}
 
-			return u, offerParams, offer, func(c *qt.C, err error) {
+			return *u, offerParams, offer, func(c *qt.C, err error) {
 				c.Assert(err, qt.ErrorMatches, "a silly error")
 			}
 		},
 	}, {
 		about: "model not found",
-		getApplicationOffer: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetails) error {
+		getApplicationOffer: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetailsV5) error {
 			return nil
 		},
 		grantApplicationOfferAccess: func(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error {
@@ -1451,12 +1295,11 @@ func TestOffer(t *testing.T) {
 		offer: func(context.Context, crossmodel.OfferURL, jujuparams.AddApplicationOffer) error {
 			return nil
 		},
-		createEnv: func(c *qt.C, db db.Database, client *openfga.OFGAClient) (dbmodel.User, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
-			u := dbmodel.User{
-				Username: "alice@external",
-			}
+		createEnv: func(c *qt.C, db db.Database, client *openfga.OFGAClient) (dbmodel.Identity, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
+			u, err := dbmodel.NewIdentity("alice@canonical.com")
+			c.Assert(err, qt.IsNil)
 
-			c.Assert(db.DB.Create(&u).Error, qt.IsNil)
+			c.Assert(db.DB.Create(u).Error, qt.IsNil)
 			offerParams := jimm.AddApplicationOfferParams{
 				ModelTag:               names.NewModelTag("model-not-found"),
 				OfferName:              "test-app-offer",
@@ -1469,13 +1312,13 @@ func TestOffer(t *testing.T) {
 
 			offer := dbmodel.ApplicationOffer{}
 
-			return u, offerParams, offer, func(c *qt.C, err error) {
+			return *u, offerParams, offer, func(c *qt.C, err error) {
 				c.Assert(err, qt.ErrorMatches, "model not found")
 			}
 		},
 	}, {
 		about: "application not found",
-		getApplicationOffer: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetails) error {
+		getApplicationOffer: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetailsV5) error {
 			return nil
 		},
 		grantApplicationOfferAccess: func(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error {
@@ -1484,13 +1327,13 @@ func TestOffer(t *testing.T) {
 		offer: func(context.Context, crossmodel.OfferURL, jujuparams.AddApplicationOffer) error {
 			return errors.E(errors.CodeNotFound, "application test-app")
 		},
-		createEnv: func(c *qt.C, db db.Database, client *openfga.OFGAClient) (dbmodel.User, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
+		createEnv: func(c *qt.C, db db.Database, client *openfga.OFGAClient) (dbmodel.Identity, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
 			ctx := context.Background()
 
-			u := dbmodel.User{
-				Username: "alice@external",
-			}
-			c.Assert(db.DB.Create(&u).Error, qt.IsNil)
+			u, err := dbmodel.NewIdentity("alice@canonical.com")
+			c.Assert(err, qt.IsNil)
+
+			c.Assert(db.DB.Create(u).Error, qt.IsNil)
 
 			cloud := dbmodel.Cloud{
 				Name: "test-cloud",
@@ -1502,7 +1345,7 @@ func TestOffer(t *testing.T) {
 			c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
 
 			// user u is administrator of the test-cloud
-			err := openfga.NewUser(&u, client).SetCloudAccess(ctx, cloud.ResourceTag(), ofganames.AdministratorRelation)
+			err = openfga.NewUser(u, client).SetCloudAccess(ctx, cloud.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 
 			controller := dbmodel.Controller{
@@ -1519,10 +1362,10 @@ func TestOffer(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 
 			cred := dbmodel.CloudCredential{
-				Name:          "test-credential-1",
-				CloudName:     cloud.Name,
-				OwnerUsername: u.Username,
-				AuthType:      "empty",
+				Name:              "test-credential-1",
+				CloudName:         cloud.Name,
+				OwnerIdentityName: u.Name,
+				AuthType:          "empty",
 			}
 			err = db.SetCloudCredential(ctx, &cred)
 			c.Assert(err, qt.IsNil)
@@ -1533,7 +1376,7 @@ func TestOffer(t *testing.T) {
 					String: "00000000-0000-0000-0000-0000-0000000000003",
 					Valid:  true,
 				},
-				OwnerUsername:     u.Username,
+				OwnerIdentityName: u.Name,
 				ControllerID:      controller.ID,
 				CloudRegionID:     cloud.Regions[0].ID,
 				CloudCredentialID: cred.ID,
@@ -1542,7 +1385,7 @@ func TestOffer(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 
 			// user u is administrator of the test-model
-			err = openfga.NewUser(&u, client).SetModelAccess(ctx, model.ResourceTag(), ofganames.AdministratorRelation)
+			err = openfga.NewUser(u, client).SetModelAccess(ctx, model.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 
 			offerParams := jimm.AddApplicationOfferParams{
@@ -1557,14 +1400,14 @@ func TestOffer(t *testing.T) {
 
 			offer := dbmodel.ApplicationOffer{}
 
-			return u, offerParams, offer, func(c *qt.C, err error) {
+			return *u, offerParams, offer, func(c *qt.C, err error) {
 				c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 				c.Assert(err, qt.ErrorMatches, "application test-app")
 			}
 		},
 	}, {
 		about: "user not model admin",
-		getApplicationOffer: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetails) error {
+		getApplicationOffer: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetailsV5) error {
 			return nil
 		},
 		grantApplicationOfferAccess: func(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error {
@@ -1573,18 +1416,16 @@ func TestOffer(t *testing.T) {
 		offer: func(context.Context, crossmodel.OfferURL, jujuparams.AddApplicationOffer) error {
 			return nil
 		},
-		createEnv: func(c *qt.C, db db.Database, client *openfga.OFGAClient) (dbmodel.User, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
+		createEnv: func(c *qt.C, db db.Database, client *openfga.OFGAClient) (dbmodel.Identity, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
 			ctx := context.Background()
 
-			u := dbmodel.User{
-				Username: "alice@external",
-			}
-			c.Assert(db.DB.Create(&u).Error, qt.IsNil)
+			u, err := dbmodel.NewIdentity("alice@canonical.com")
+			c.Assert(err, qt.IsNil)
+			c.Assert(db.DB.Create(u).Error, qt.IsNil)
 
-			u1 := dbmodel.User{
-				Username: "eve@external",
-			}
-			c.Assert(db.DB.Create(&u1).Error, qt.IsNil)
+			u1, err := dbmodel.NewIdentity("eve@canonical.com")
+			c.Assert(err, qt.IsNil)
+			c.Assert(db.DB.Create(u1).Error, qt.IsNil)
 
 			cloud := dbmodel.Cloud{
 				Name: "test-cloud",
@@ -1596,7 +1437,7 @@ func TestOffer(t *testing.T) {
 			c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
 
 			// user u is administrator of the test-cloud
-			err := openfga.NewUser(&u, client).SetCloudAccess(ctx, cloud.ResourceTag(), ofganames.AdministratorRelation)
+			err = openfga.NewUser(u, client).SetCloudAccess(ctx, cloud.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 
 			controller := dbmodel.Controller{
@@ -1613,10 +1454,10 @@ func TestOffer(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 
 			cred := dbmodel.CloudCredential{
-				Name:          "test-credential-1",
-				CloudName:     cloud.Name,
-				OwnerUsername: u.Username,
-				AuthType:      "empty",
+				Name:              "test-credential-1",
+				CloudName:         cloud.Name,
+				OwnerIdentityName: u.Name,
+				AuthType:          "empty",
 			}
 			err = db.SetCloudCredential(ctx, &cred)
 			c.Assert(err, qt.IsNil)
@@ -1627,7 +1468,7 @@ func TestOffer(t *testing.T) {
 					String: "00000000-0000-0000-0000-0000-0000000000003",
 					Valid:  true,
 				},
-				OwnerUsername:     u.Username,
+				OwnerIdentityName: u.Name,
 				ControllerID:      controller.ID,
 				CloudRegionID:     cloud.Regions[0].ID,
 				CloudCredentialID: cred.ID,
@@ -1636,7 +1477,7 @@ func TestOffer(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 
 			// user u is administrator of the test-model
-			err = openfga.NewUser(&u, client).SetModelAccess(ctx, model.ResourceTag(), ofganames.AdministratorRelation)
+			err = openfga.NewUser(u, client).SetModelAccess(ctx, model.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 
 			offerParams := jimm.AddApplicationOfferParams{
@@ -1651,13 +1492,13 @@ func TestOffer(t *testing.T) {
 
 			offer := dbmodel.ApplicationOffer{}
 
-			return u1, offerParams, offer, func(c *qt.C, err error) {
+			return *u1, offerParams, offer, func(c *qt.C, err error) {
 				c.Assert(err, qt.ErrorMatches, "unauthorized")
 			}
 		},
 	}, {
 		about: "fail to fetch application offer details",
-		getApplicationOffer: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetails) error {
+		getApplicationOffer: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetailsV5) error {
 			return errors.E("a silly error")
 		},
 		grantApplicationOfferAccess: func(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error {
@@ -1666,13 +1507,12 @@ func TestOffer(t *testing.T) {
 		offer: func(context.Context, crossmodel.OfferURL, jujuparams.AddApplicationOffer) error {
 			return nil
 		},
-		createEnv: func(c *qt.C, db db.Database, client *openfga.OFGAClient) (dbmodel.User, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
+		createEnv: func(c *qt.C, db db.Database, client *openfga.OFGAClient) (dbmodel.Identity, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
 			ctx := context.Background()
 
-			u := dbmodel.User{
-				Username: "alice@external",
-			}
-			c.Assert(db.DB.Create(&u).Error, qt.IsNil)
+			u, err := dbmodel.NewIdentity("alice@canonical.com")
+			c.Assert(err, qt.IsNil)
+			c.Assert(db.DB.Create(u).Error, qt.IsNil)
 
 			cloud := dbmodel.Cloud{
 				Name: "test-cloud",
@@ -1684,7 +1524,7 @@ func TestOffer(t *testing.T) {
 			c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
 
 			// user u is administrator of the test-cloud
-			err := openfga.NewUser(&u, client).SetCloudAccess(ctx, cloud.ResourceTag(), ofganames.AdministratorRelation)
+			err = openfga.NewUser(u, client).SetCloudAccess(ctx, cloud.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 
 			controller := dbmodel.Controller{
@@ -1701,10 +1541,10 @@ func TestOffer(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 
 			cred := dbmodel.CloudCredential{
-				Name:          "test-credential-1",
-				CloudName:     cloud.Name,
-				OwnerUsername: u.Username,
-				AuthType:      "empty",
+				Name:              "test-credential-1",
+				CloudName:         cloud.Name,
+				OwnerIdentityName: u.Name,
+				AuthType:          "empty",
 			}
 			err = db.SetCloudCredential(ctx, &cred)
 			c.Assert(err, qt.IsNil)
@@ -1715,7 +1555,7 @@ func TestOffer(t *testing.T) {
 					String: "00000000-0000-0000-0000-0000-0000000000003",
 					Valid:  true,
 				},
-				OwnerUsername:     u.Username,
+				OwnerIdentityName: u.Name,
 				ControllerID:      controller.ID,
 				CloudRegionID:     cloud.Regions[0].ID,
 				CloudCredentialID: cred.ID,
@@ -1724,7 +1564,7 @@ func TestOffer(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 
 			// user u is administrator of the test-model
-			err = openfga.NewUser(&u, client).SetModelAccess(ctx, model.ResourceTag(), ofganames.AdministratorRelation)
+			err = openfga.NewUser(u, client).SetModelAccess(ctx, model.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 
 			offerParams := jimm.AddApplicationOfferParams{
@@ -1739,13 +1579,13 @@ func TestOffer(t *testing.T) {
 
 			offer := dbmodel.ApplicationOffer{}
 
-			return u, offerParams, offer, func(c *qt.C, err error) {
+			return *u, offerParams, offer, func(c *qt.C, err error) {
 				c.Assert(err, qt.ErrorMatches, "a silly error")
 			}
 		},
 	}, {
 		about: "controller returns `application offer already exists`",
-		getApplicationOffer: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetails) error {
+		getApplicationOffer: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetailsV5) error {
 			return nil
 		},
 		grantApplicationOfferAccess: func(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error {
@@ -1754,13 +1594,12 @@ func TestOffer(t *testing.T) {
 		offer: func(context.Context, crossmodel.OfferURL, jujuparams.AddApplicationOffer) error {
 			return errors.E("application offer already exists")
 		},
-		createEnv: func(c *qt.C, db db.Database, client *openfga.OFGAClient) (dbmodel.User, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
+		createEnv: func(c *qt.C, db db.Database, client *openfga.OFGAClient) (dbmodel.Identity, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
 			ctx := context.Background()
 
-			u := dbmodel.User{
-				Username: "alice@external",
-			}
-			c.Assert(db.DB.Create(&u).Error, qt.IsNil)
+			u, err := dbmodel.NewIdentity("alice@canonical.com")
+			c.Assert(err, qt.IsNil)
+			c.Assert(db.DB.Create(u).Error, qt.IsNil)
 
 			cloud := dbmodel.Cloud{
 				Name: "test-cloud",
@@ -1772,7 +1611,7 @@ func TestOffer(t *testing.T) {
 			c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
 
 			// user u is administrator of the test-cloud
-			err := openfga.NewUser(&u, client).SetCloudAccess(ctx, cloud.ResourceTag(), ofganames.AdministratorRelation)
+			err = openfga.NewUser(u, client).SetCloudAccess(ctx, cloud.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 
 			controller := dbmodel.Controller{
@@ -1789,10 +1628,10 @@ func TestOffer(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 
 			cred := dbmodel.CloudCredential{
-				Name:          "test-credential-1",
-				CloudName:     cloud.Name,
-				OwnerUsername: u.Username,
-				AuthType:      "empty",
+				Name:              "test-credential-1",
+				CloudName:         cloud.Name,
+				OwnerIdentityName: u.Name,
+				AuthType:          "empty",
 			}
 			err = db.SetCloudCredential(ctx, &cred)
 			c.Assert(err, qt.IsNil)
@@ -1803,7 +1642,7 @@ func TestOffer(t *testing.T) {
 					String: "00000000-0000-0000-0000-0000-0000000000003",
 					Valid:  true,
 				},
-				OwnerUsername:     u.Username,
+				OwnerIdentityName: u.Name,
 				ControllerID:      controller.ID,
 				CloudRegionID:     cloud.Regions[0].ID,
 				CloudCredentialID: cred.ID,
@@ -1812,7 +1651,7 @@ func TestOffer(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 
 			// user u is administrator of the test-model
-			err = openfga.NewUser(&u, client).SetModelAccess(ctx, model.ResourceTag(), ofganames.AdministratorRelation)
+			err = openfga.NewUser(u, client).SetModelAccess(ctx, model.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 
 			offerParams := jimm.AddApplicationOfferParams{
@@ -1827,7 +1666,7 @@ func TestOffer(t *testing.T) {
 
 			offer := dbmodel.ApplicationOffer{}
 
-			return u, offerParams, offer, func(c *qt.C, err error) {
+			return *u, offerParams, offer, func(c *qt.C, err error) {
 				c.Assert(err, qt.ErrorMatches, "application offer already exists")
 				c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeAlreadyExists)
 			}
@@ -1884,12 +1723,11 @@ func TestOfferAssertOpenFGARelationsExist(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now().UTC().Round(time.Millisecond)
 
-	createEnv := func(c *qt.C, db db.Database, client *openfga.OFGAClient) (dbmodel.User, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
+	createEnv := func(c *qt.C, db db.Database, client *openfga.OFGAClient) (dbmodel.Identity, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
 		ctx := context.Background()
 
-		u := dbmodel.User{
-			Username: "alice@external",
-		}
+		u, err := dbmodel.NewIdentity("alice@canonical.com")
+		c.Assert(err, qt.IsNil)
 		c.Assert(db.DB.Create(&u).Error, qt.IsNil)
 
 		cloud := dbmodel.Cloud{
@@ -1902,7 +1740,7 @@ func TestOfferAssertOpenFGARelationsExist(t *testing.T) {
 		c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
 
 		// user u is administrator of the test-cloud
-		err := openfga.NewUser(&u, client).SetCloudAccess(ctx, cloud.ResourceTag(), ofganames.AdministratorRelation)
+		err = openfga.NewUser(u, client).SetCloudAccess(ctx, cloud.ResourceTag(), ofganames.AdministratorRelation)
 		c.Assert(err, qt.IsNil)
 
 		controller := dbmodel.Controller{
@@ -1919,10 +1757,10 @@ func TestOfferAssertOpenFGARelationsExist(t *testing.T) {
 		c.Assert(err, qt.IsNil)
 
 		cred := dbmodel.CloudCredential{
-			Name:          "test-credential-1",
-			CloudName:     cloud.Name,
-			OwnerUsername: u.Username,
-			AuthType:      "empty",
+			Name:              "test-credential-1",
+			CloudName:         cloud.Name,
+			OwnerIdentityName: u.Name,
+			AuthType:          "empty",
 		}
 		err = db.SetCloudCredential(ctx, &cred)
 		c.Assert(err, qt.IsNil)
@@ -1933,7 +1771,7 @@ func TestOfferAssertOpenFGARelationsExist(t *testing.T) {
 				String: "00000000-0000-0000-0000-0000-0000000000003",
 				Valid:  true,
 			},
-			OwnerUsername:     u.Username,
+			OwnerIdentityName: u.Name,
 			ControllerID:      controller.ID,
 			CloudRegionID:     cloud.Regions[0].ID,
 			CloudCredentialID: cred.ID,
@@ -1942,7 +1780,7 @@ func TestOfferAssertOpenFGARelationsExist(t *testing.T) {
 		c.Assert(err, qt.IsNil)
 
 		// user u is administrator of the test-model
-		err = openfga.NewUser(&u, client).SetModelAccess(ctx, model.ResourceTag(), ofganames.AdministratorRelation)
+		err = openfga.NewUser(u, client).SetModelAccess(ctx, model.ResourceTag(), ofganames.AdministratorRelation)
 		c.Assert(err, qt.IsNil)
 
 		offerParams := jimm.AddApplicationOfferParams{
@@ -1970,34 +1808,20 @@ func TestOfferAssertOpenFGARelationsExist(t *testing.T) {
 				Interface:          "unknown",
 				Limit:              1,
 			}},
-			Spaces: []dbmodel.ApplicationOfferRemoteSpace{{
-				ApplicationOfferID: 1,
-				CloudType:          "test-cloud-type",
-				Name:               "test-remote-space",
-				ProviderID:         "test-provider-id",
-				ProviderAttributes: dbmodel.Map{
-					"attr1": "value1",
-					"attr2": "value2",
-				},
-			}},
-			Bindings: dbmodel.StringMap{
-				"key1": "value1",
-				"key2": "value2",
-			},
 			Connections: []dbmodel.ApplicationOfferConnection{{
 				ApplicationOfferID: 1,
 				SourceModelTag:     "test-model-src",
 				RelationID:         1,
-				Username:           "unknown",
+				IdentityName:       "unknown",
 				Endpoint:           "test-endpoint",
 			}},
 		}
 
-		return u, offerParams, offer, nil
+		return *u, offerParams, offer, nil
 	}
 
 	api := &jimmtest.API{
-		GetApplicationOffer_: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetails) error {
+		GetApplicationOffer_: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetailsV5) error {
 			details.ApplicationName = "test-app"
 			details.CharmURL = "cs:test-app:17"
 			details.Connections = []jujuparams.OfferConnection{{
@@ -2006,7 +1830,7 @@ func TestOfferAssertOpenFGARelationsExist(t *testing.T) {
 				Username:       "unknown",
 				Endpoint:       "test-endpoint",
 			}}
-			details.ApplicationOfferDetails = jujuparams.ApplicationOfferDetails{
+			details.ApplicationOfferDetailsV5 = jujuparams.ApplicationOfferDetailsV5{
 				OfferUUID:              "00000000-0000-0000-0000-0000-0000000000004",
 				OfferURL:               "test-offer-url",
 				ApplicationDescription: "a test app offering",
@@ -2016,24 +1840,6 @@ func TestOfferAssertOpenFGARelationsExist(t *testing.T) {
 					Interface: "unknown",
 					Limit:     1,
 				}},
-				Spaces: []jujuparams.RemoteSpace{{
-					CloudType:  "test-cloud-type",
-					Name:       "test-remote-space",
-					ProviderId: "test-provider-id",
-					ProviderAttributes: map[string]interface{}{
-						"attr1": "value1",
-						"attr2": "value2",
-					},
-					Subnets: []jujuparams.Subnet{{
-						SpaceTag: "test-remote-space",
-						VLANTag:  1024,
-						Status:   constants.ALIVE.String(),
-					}},
-				}},
-				Bindings: map[string]string{
-					"key1": "value1",
-					"key2": "value2",
-				},
 				Users: []jujuparams.OfferUserDetails{{
 					UserName:    "alice",
 					DisplayName: "alice, sister of eve",
@@ -2195,42 +2001,42 @@ func TestDestroyOffer(t *testing.T) {
 
 	tests := []struct {
 		about         string
-		parameterFunc func(*environment) (dbmodel.User, string)
+		parameterFunc func(*environment) (dbmodel.Identity, string)
 		destroyError  string
 		expectedError string
 	}{{
 		about: "admin allowed to destroy an offer",
-		parameterFunc: func(env *environment) (dbmodel.User, string) {
+		parameterFunc: func(env *environment) (dbmodel.Identity, string) {
 			return env.users[0], "test-offer-url"
 		},
 	}, {
 		about: "user with consume access not allowed to destroy an offer",
-		parameterFunc: func(env *environment) (dbmodel.User, string) {
+		parameterFunc: func(env *environment) (dbmodel.Identity, string) {
 			return env.users[2], "test-offer-url"
 		},
 		expectedError: "unauthorized",
 	}, {
 		about: "user with read access not allowed to destroy an offer",
-		parameterFunc: func(env *environment) (dbmodel.User, string) {
+		parameterFunc: func(env *environment) (dbmodel.Identity, string) {
 			return env.users[3], "test-offer-url"
 		},
 		expectedError: "unauthorized",
 	}, {
 		about: "user without access not allowed to destroy an offer",
-		parameterFunc: func(env *environment) (dbmodel.User, string) {
+		parameterFunc: func(env *environment) (dbmodel.Identity, string) {
 			return env.users[4], "test-offer-url"
 		},
 		expectedError: "unauthorized",
 	}, {
 		about: "offer not found",
-		parameterFunc: func(env *environment) (dbmodel.User, string) {
+		parameterFunc: func(env *environment) (dbmodel.Identity, string) {
 			return env.users[0], "no-such-offer"
 		},
 		expectedError: "application offer not found",
 	}, {
 		about:        "controller returns an error",
 		destroyError: "a silly error",
-		parameterFunc: func(env *environment) (dbmodel.User, string) {
+		parameterFunc: func(env *environment) (dbmodel.Identity, string) {
 			return env.users[0], "test-offer-url"
 		},
 		expectedError: "a silly error",
@@ -2317,24 +2123,11 @@ func TestUpdateOffer(t *testing.T) {
 			ApplicationName:        "test-app",
 			CharmURL:               "cs:test-app:17",
 			ApplicationDescription: "changed offer description",
-			Spaces: []dbmodel.ApplicationOfferRemoteSpace{{
-				ApplicationOfferID: 1,
-				CloudType:          "test-cloud-type",
-				Name:               "test-remote-space",
-				ProviderID:         "test-provider-id",
-				ProviderAttributes: dbmodel.Map{
-					"attr1": "value3",
-					"attr2": "value4"},
-			}},
-			Bindings: dbmodel.StringMap{
-				"key1": "value4",
-				"key2": "value5",
-			},
 			Connections: []dbmodel.ApplicationOfferConnection{{
 				ApplicationOfferID: 1,
 				SourceModelTag:     "test-model-src",
 				RelationID:         1,
-				Username:           "unknown",
+				IdentityName:       "unknown",
 				Endpoint:           "test-endpoint",
 			}},
 			Endpoints: []dbmodel.ApplicationOfferRemoteEndpoint{{
@@ -2381,7 +2174,7 @@ func TestUpdateOffer(t *testing.T) {
 				Database:      db,
 				Dialer: &jimmtest.Dialer{
 					API: &jimmtest.API{
-						GetApplicationOffer_: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetails) error {
+						GetApplicationOffer_: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetailsV5) error {
 							details.ApplicationName = "test-app"
 							details.CharmURL = "cs:test-app:17"
 							details.Connections = []jujuparams.OfferConnection{{
@@ -2390,7 +2183,7 @@ func TestUpdateOffer(t *testing.T) {
 								Username:       "unknown",
 								Endpoint:       "test-endpoint",
 							}}
-							details.ApplicationOfferDetails = jujuparams.ApplicationOfferDetails{
+							details.ApplicationOfferDetailsV5 = jujuparams.ApplicationOfferDetailsV5{
 								OfferUUID:              "00000000-0000-0000-0000-0000-0000000000011",
 								OfferURL:               "test-offer-url",
 								ApplicationDescription: "changed offer description",
@@ -2400,24 +2193,6 @@ func TestUpdateOffer(t *testing.T) {
 									Interface: "unknown",
 									Limit:     1,
 								}},
-								Spaces: []jujuparams.RemoteSpace{{
-									CloudType:  "test-cloud-type",
-									Name:       "test-remote-space",
-									ProviderId: "test-provider-id",
-									ProviderAttributes: map[string]interface{}{
-										"attr1": "value3",
-										"attr2": "value4",
-									},
-									Subnets: []jujuparams.Subnet{{
-										SpaceTag: "test-remote-space",
-										VLANTag:  1024,
-										Status:   constants.DEAD.String(),
-									}},
-								}},
-								Bindings: map[string]string{
-									"key1": "value4",
-									"key2": "value5",
-								},
 								Users: []jujuparams.OfferUserDetails{{
 									UserName:    "alice",
 									DisplayName: "alice, sister of eve",
@@ -2484,12 +2259,12 @@ func TestFindApplicationOffers(t *testing.T) {
 
 	tests := []struct {
 		about         string
-		parameterFunc func(*environment) (dbmodel.User, string, []jujuparams.OfferFilter)
+		parameterFunc func(*environment) (dbmodel.Identity, string, []jujuparams.OfferFilter)
 		expectedError string
 		expectedOffer *dbmodel.ApplicationOffer
 	}{{
 		about: "find an offer as an offer consumer",
-		parameterFunc: func(env *environment) (dbmodel.User, string, []jujuparams.OfferFilter) {
+		parameterFunc: func(env *environment) (dbmodel.Identity, string, []jujuparams.OfferFilter) {
 			return env.users[2], "consume", []jujuparams.OfferFilter{{
 				OfferName: "test-offer",
 			}}
@@ -2497,7 +2272,7 @@ func TestFindApplicationOffers(t *testing.T) {
 		expectedOffer: &expectedOffer,
 	}, {
 		about: "find an offer as model admin",
-		parameterFunc: func(env *environment) (dbmodel.User, string, []jujuparams.OfferFilter) {
+		parameterFunc: func(env *environment) (dbmodel.Identity, string, []jujuparams.OfferFilter) {
 			return env.users[0], "admin", []jujuparams.OfferFilter{{
 				OfferName: "test-offer",
 			}}
@@ -2505,7 +2280,7 @@ func TestFindApplicationOffers(t *testing.T) {
 		expectedOffer: &expectedOffer,
 	}, {
 		about: "find an offer as offer admin",
-		parameterFunc: func(env *environment) (dbmodel.User, string, []jujuparams.OfferFilter) {
+		parameterFunc: func(env *environment) (dbmodel.Identity, string, []jujuparams.OfferFilter) {
 			return env.users[5], "admin", []jujuparams.OfferFilter{{
 				OfferName: "test-offer",
 			}}
@@ -2513,7 +2288,7 @@ func TestFindApplicationOffers(t *testing.T) {
 		expectedOffer: &expectedOffer,
 	}, {
 		about: "find an offer as superuser",
-		parameterFunc: func(env *environment) (dbmodel.User, string, []jujuparams.OfferFilter) {
+		parameterFunc: func(env *environment) (dbmodel.Identity, string, []jujuparams.OfferFilter) {
 			return env.users[6], "admin", []jujuparams.OfferFilter{{
 				OfferName: "test-offer",
 			}}
@@ -2521,14 +2296,14 @@ func TestFindApplicationOffers(t *testing.T) {
 		expectedOffer: &expectedOffer,
 	}, {
 		about: "offer not found",
-		parameterFunc: func(env *environment) (dbmodel.User, string, []jujuparams.OfferFilter) {
+		parameterFunc: func(env *environment) (dbmodel.Identity, string, []jujuparams.OfferFilter) {
 			return env.users[0], "admin", []jujuparams.OfferFilter{{
 				OfferName: "no-such-offer",
 			}}
 		},
 	}, {
 		about: "user without access cannot find offers",
-		parameterFunc: func(env *environment) (dbmodel.User, string, []jujuparams.OfferFilter) {
+		parameterFunc: func(env *environment) (dbmodel.Identity, string, []jujuparams.OfferFilter) {
 			return env.users[4], "", []jujuparams.OfferFilter{{
 				OfferName: "test-offer",
 			}}
@@ -2565,31 +2340,31 @@ func TestFindApplicationOffers(t *testing.T) {
 			if test.expectedError == "" {
 				c.Assert(err, qt.IsNil)
 				if test.expectedOffer != nil {
-					details := test.expectedOffer.ToJujuApplicationOfferDetails()
+					details := test.expectedOffer.ToJujuApplicationOfferDetailsV5()
 					if accessLevel != string(jujuparams.OfferAdminAccess) {
 						details.Users = []jujuparams.OfferUserDetails{{
-							UserName: user.Username,
+							UserName: user.Name,
 							Access:   accessLevel,
 						}}
 					} else {
 						details.Users = []jujuparams.OfferUserDetails{{
-							UserName: "alice@external",
+							UserName: "alice@canonical.com",
 							Access:   "admin",
 						}, {
-							UserName: "bob@external",
+							UserName: "bob@canonical.com",
 							Access:   "consume",
 						}, {
-							UserName: "eve@external",
+							UserName: "eve@canonical.com",
 							Access:   "admin",
 						}, {
-							UserName: "fred@external",
+							UserName: "fred@canonical.com",
 							Access:   "read",
 						}, {
-							UserName: "jane@external",
+							UserName: "jane@canonical.com",
 							Access:   "admin",
 						}, {
 							// joe is jimm admin
-							UserName: "joe@external",
+							UserName: "joe@canonical.com",
 							Access:   "admin",
 						}}
 					}
@@ -2609,7 +2384,7 @@ func TestFindApplicationOffers(t *testing.T) {
 							cmpopts.IgnoreTypes(gorm.Model{}),
 							cmpopts.IgnoreTypes(dbmodel.Model{}),
 						),
-						[]jujuparams.ApplicationOfferAdminDetails{details},
+						[]jujuparams.ApplicationOfferAdminDetailsV5{details},
 					)
 				} else {
 					c.Assert(offers, qt.HasLen, 0)
@@ -2627,7 +2402,7 @@ const listApplicationsTestEnv = `clouds:
   regions:
   - name: test-cloud-region
 cloud-credentials:
-- owner: alice@external
+- owner: alice@canonical.com
   name: cred-1
   cloud: test-cloud
 controllers:
@@ -2644,18 +2419,18 @@ models:
   cloud: test-cloud
   region: test-cloud-region
   cloud-credential: cred-1
-  owner: bob@external
+  owner: bob@canonical.com
   life: alive
   status:
     status: available
     info: "OK!"
     since: 2020-02-20T20:02:20Z
   users:
-  - user: alice@external
+  - user: alice@canonical.com
     access: admin
-  - user: bob@external
+  - user: bob@canonical.com
     access: admin
-  - user: charlie@external
+  - user: charlie@canonical.com
     access: read
   sla:
     level: unsupported
@@ -2668,18 +2443,18 @@ models:
   cloud: test-cloud
   region: test-cloud-region
   cloud-credential: cred-1
-  owner: alice@external
+  owner: alice@canonical.com
   life: alive
   status:
     status: available
     info: "OK!"
     since: 2020-02-20T20:02:20Z
   users:
-  - user: alice@external
+  - user: alice@canonical.com
     access: admin
-  - user: bob@external
+  - user: bob@canonical.com
     access: write
-  - user: charlie@external
+  - user: charlie@canonical.com
     access: read
   sla:
     level: unsupported
@@ -2708,11 +2483,11 @@ func TestListApplicationOffers(t *testing.T) {
 		Database:      db,
 		Dialer: &jimmtest.Dialer{
 			API: &jimmtest.API{
-				ListApplicationOffers_: func(_ context.Context, filters []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetails, error) {
+				ListApplicationOffers_: func(_ context.Context, filters []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error) {
 					switch filters[0].ModelName {
 					case "model-1":
-						return []jujuparams.ApplicationOfferAdminDetails{{
-							ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
+						return []jujuparams.ApplicationOfferAdminDetailsV5{{
+							ApplicationOfferDetailsV5: jujuparams.ApplicationOfferDetailsV5{
 								SourceModelTag:         "00000011-0000-0000-0000-000000000001",
 								OfferUUID:              "00000012-0000-0000-0000-000000000001",
 								OfferURL:               "test-offer-url",
@@ -2724,28 +2499,15 @@ func TestListApplicationOffers(t *testing.T) {
 									Interface: "unknown",
 									Limit:     1,
 								}},
-								Bindings: map[string]string{
-									"key1": "value1",
-									"key2": "value2",
-								},
 								Users: []jujuparams.OfferUserDetails{{
-									UserName: "alice@external",
+									UserName: "alice@canonical.com",
 									Access:   "admin",
 								}, {
-									UserName: "eve@external",
+									UserName: "eve@canonical.com",
 									Access:   "read",
 								}, {
-									UserName: "bob@external",
+									UserName: "bob@canonical.com",
 									Access:   "consume",
-								}},
-								Spaces: []jujuparams.RemoteSpace{{
-									CloudType:  "test-cloud-type",
-									Name:       "test-remote-space",
-									ProviderId: "test-provider-id",
-									ProviderAttributes: map[string]interface{}{
-										"attr1": "value1",
-										"attr2": "value2",
-									},
 								}},
 							},
 							ApplicationName: "application-1",
@@ -2753,11 +2515,11 @@ func TestListApplicationOffers(t *testing.T) {
 							Connections: []jujuparams.OfferConnection{{
 								SourceModelTag: "00000011-0000-0000-0000-000000000001",
 								RelationId:     1,
-								Username:       "charlie@external",
+								Username:       "charlie@canonical.com",
 								Endpoint:       "an-endpoint",
 							}},
 						}, {
-							ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
+							ApplicationOfferDetailsV5: jujuparams.ApplicationOfferDetailsV5{
 								SourceModelTag:         "00000011-0000-0000-0000-000000000002",
 								OfferUUID:              "00000012-0000-0000-0000-000000000002",
 								OfferURL:               "test-offer-url",
@@ -2769,28 +2531,15 @@ func TestListApplicationOffers(t *testing.T) {
 									Interface: "unknown",
 									Limit:     1,
 								}},
-								Bindings: map[string]string{
-									"key1": "value1",
-									"key2": "value2",
-								},
 								Users: []jujuparams.OfferUserDetails{{
-									UserName: "alice@external",
+									UserName: "alice@canonical.com",
 									Access:   "admin",
 								}, {
-									UserName: "eve@external",
+									UserName: "eve@canonical.com",
 									Access:   "read",
 								}, {
-									UserName: "bob@external",
+									UserName: "bob@canonical.com",
 									Access:   "consume",
-								}},
-								Spaces: []jujuparams.RemoteSpace{{
-									CloudType:  "test-cloud-type",
-									Name:       "test-remote-space",
-									ProviderId: "test-provider-id",
-									ProviderAttributes: map[string]interface{}{
-										"attr1": "value1",
-										"attr2": "value2",
-									},
 								}},
 							},
 							ApplicationName: "application-2",
@@ -2798,13 +2547,13 @@ func TestListApplicationOffers(t *testing.T) {
 							Connections: []jujuparams.OfferConnection{{
 								SourceModelTag: "00000011-0000-0000-0000-000000000002",
 								RelationId:     2,
-								Username:       "charlie@external",
+								Username:       "charlie@canonical.com",
 								Endpoint:       "an-endpoint",
 							}},
 						}}, nil
 					case "model-2":
-						return []jujuparams.ApplicationOfferAdminDetails{{
-							ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
+						return []jujuparams.ApplicationOfferAdminDetailsV5{{
+							ApplicationOfferDetailsV5: jujuparams.ApplicationOfferDetailsV5{
 								SourceModelTag:         "00000011-0000-0000-0000-000000000003",
 								OfferUUID:              "00000012-0000-0000-0000-000000000003",
 								OfferURL:               "test-offer-url",
@@ -2816,28 +2565,15 @@ func TestListApplicationOffers(t *testing.T) {
 									Interface: "unknown",
 									Limit:     1,
 								}},
-								Bindings: map[string]string{
-									"key1": "value1",
-									"key2": "value2",
-								},
 								Users: []jujuparams.OfferUserDetails{{
-									UserName: "alice@external",
+									UserName: "alice@canonical.com",
 									Access:   "admin",
 								}, {
-									UserName: "eve@external",
+									UserName: "eve@canonical.com",
 									Access:   "read",
 								}, {
-									UserName: "bob@external",
+									UserName: "bob@canonical.com",
 									Access:   "consume",
-								}},
-								Spaces: []jujuparams.RemoteSpace{{
-									CloudType:  "test-cloud-type",
-									Name:       "test-remote-space",
-									ProviderId: "test-provider-id",
-									ProviderAttributes: map[string]interface{}{
-										"attr1": "value1",
-										"attr2": "value2",
-									},
 								}},
 							},
 							ApplicationName: "application-3",
@@ -2845,7 +2581,7 @@ func TestListApplicationOffers(t *testing.T) {
 							Connections: []jujuparams.OfferConnection{{
 								SourceModelTag: "00000011-0000-0000-0000-000000000003",
 								RelationId:     3,
-								Username:       "charlie@external",
+								Username:       "charlie@canonical.com",
 								Endpoint:       "an-endpoint",
 							}},
 						}}, nil
@@ -2857,46 +2593,46 @@ func TestListApplicationOffers(t *testing.T) {
 	}
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), db, client)
 	tuples := []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewApplicationOfferTag("00000012-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("eve@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("eve@canonical.com")),
 		Relation: ofganames.ReaderRelation,
 		Target:   ofganames.ConvertTag(names.NewApplicationOfferTag("00000012-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
 		Relation: ofganames.ConsumerRelation,
 		Target:   ofganames.ConvertTag(names.NewApplicationOfferTag("00000012-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewApplicationOfferTag("00000012-0000-0000-0000-000000000002")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("eve@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("eve@canonical.com")),
 		Relation: ofganames.ReaderRelation,
 		Target:   ofganames.ConvertTag(names.NewApplicationOfferTag("00000012-0000-0000-0000-000000000002")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
 		Relation: ofganames.ConsumerRelation,
 		Target:   ofganames.ConvertTag(names.NewApplicationOfferTag("00000012-0000-0000-0000-000000000002")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewApplicationOfferTag("00000012-0000-0000-0000-000000000003")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("eve@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("eve@canonical.com")),
 		Relation: ofganames.ReaderRelation,
 		Target:   ofganames.ConvertTag(names.NewApplicationOfferTag("00000012-0000-0000-0000-000000000003")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
 		Relation: ofganames.ConsumerRelation,
 		Target:   ofganames.ConvertTag(names.NewApplicationOfferTag("00000012-0000-0000-0000-000000000003")),
 	}}
 	err = client.AddRelation(context.Background(), tuples...)
 	c.Assert(err, qt.IsNil)
 
-	u := env.User("alice@external").DBObject(c, db)
+	u := env.User("alice@canonical.com").DBObject(c, db)
 	_, err = j.ListApplicationOffers(ctx, openfga.NewUser(&u, client))
 	c.Assert(err, qt.ErrorMatches, `at least one filter must be specified`)
 
@@ -2904,7 +2640,7 @@ func TestListApplicationOffers(t *testing.T) {
 	c.Assert(err, qt.ErrorMatches, `application offer filter must specify a model name`)
 
 	filters := []jujuparams.OfferFilter{{
-		OwnerName: "bob@external",
+		OwnerName: "bob@canonical.com",
 		ModelName: "model-1",
 	}, {
 		ModelName: "model-2",
@@ -2918,8 +2654,8 @@ func TestListApplicationOffers(t *testing.T) {
 			return offers[i].Users[j].UserName < offers[i].Users[k].UserName
 		})
 	}
-	c.Check(offers, qt.DeepEquals, []jujuparams.ApplicationOfferAdminDetails{{
-		ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
+	c.Check(offers, qt.DeepEquals, []jujuparams.ApplicationOfferAdminDetailsV5{{
+		ApplicationOfferDetailsV5: jujuparams.ApplicationOfferDetailsV5{
 			SourceModelTag:         "00000011-0000-0000-0000-000000000003",
 			OfferUUID:              "00000012-0000-0000-0000-000000000003",
 			OfferURL:               "test-offer-url",
@@ -2931,28 +2667,15 @@ func TestListApplicationOffers(t *testing.T) {
 				Interface: "unknown",
 				Limit:     1,
 			}},
-			Bindings: map[string]string{
-				"key1": "value1",
-				"key2": "value2",
-			},
 			Users: []jujuparams.OfferUserDetails{{
-				UserName: "alice@external",
+				UserName: "alice@canonical.com",
 				Access:   "admin",
 			}, {
-				UserName: "bob@external",
+				UserName: "bob@canonical.com",
 				Access:   "consume",
 			}, {
-				UserName: "eve@external",
+				UserName: "eve@canonical.com",
 				Access:   "read",
-			}},
-			Spaces: []jujuparams.RemoteSpace{{
-				CloudType:  "test-cloud-type",
-				Name:       "test-remote-space",
-				ProviderId: "test-provider-id",
-				ProviderAttributes: map[string]interface{}{
-					"attr1": "value1",
-					"attr2": "value2",
-				},
 			}},
 		},
 		ApplicationName: "application-3",
@@ -2960,11 +2683,11 @@ func TestListApplicationOffers(t *testing.T) {
 		Connections: []jujuparams.OfferConnection{{
 			SourceModelTag: "00000011-0000-0000-0000-000000000003",
 			RelationId:     3,
-			Username:       "charlie@external",
+			Username:       "charlie@canonical.com",
 			Endpoint:       "an-endpoint",
 		}},
 	}, {
-		ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
+		ApplicationOfferDetailsV5: jujuparams.ApplicationOfferDetailsV5{
 			SourceModelTag:         "00000011-0000-0000-0000-000000000001",
 			OfferUUID:              "00000012-0000-0000-0000-000000000001",
 			OfferURL:               "test-offer-url",
@@ -2976,28 +2699,15 @@ func TestListApplicationOffers(t *testing.T) {
 				Interface: "unknown",
 				Limit:     1,
 			}},
-			Bindings: map[string]string{
-				"key1": "value1",
-				"key2": "value2",
-			},
 			Users: []jujuparams.OfferUserDetails{{
-				UserName: "alice@external",
+				UserName: "alice@canonical.com",
 				Access:   "admin",
 			}, {
-				UserName: "bob@external",
+				UserName: "bob@canonical.com",
 				Access:   "consume",
 			}, {
-				UserName: "eve@external",
+				UserName: "eve@canonical.com",
 				Access:   "read",
-			}},
-			Spaces: []jujuparams.RemoteSpace{{
-				CloudType:  "test-cloud-type",
-				Name:       "test-remote-space",
-				ProviderId: "test-provider-id",
-				ProviderAttributes: map[string]interface{}{
-					"attr1": "value1",
-					"attr2": "value2",
-				},
 			}},
 		},
 		ApplicationName: "application-1",
@@ -3005,11 +2715,11 @@ func TestListApplicationOffers(t *testing.T) {
 		Connections: []jujuparams.OfferConnection{{
 			SourceModelTag: "00000011-0000-0000-0000-000000000001",
 			RelationId:     1,
-			Username:       "charlie@external",
+			Username:       "charlie@canonical.com",
 			Endpoint:       "an-endpoint",
 		}},
 	}, {
-		ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
+		ApplicationOfferDetailsV5: jujuparams.ApplicationOfferDetailsV5{
 			SourceModelTag:         "00000011-0000-0000-0000-000000000002",
 			OfferUUID:              "00000012-0000-0000-0000-000000000002",
 			OfferURL:               "test-offer-url",
@@ -3021,28 +2731,15 @@ func TestListApplicationOffers(t *testing.T) {
 				Interface: "unknown",
 				Limit:     1,
 			}},
-			Bindings: map[string]string{
-				"key1": "value1",
-				"key2": "value2",
-			},
 			Users: []jujuparams.OfferUserDetails{{
-				UserName: "alice@external",
+				UserName: "alice@canonical.com",
 				Access:   "admin",
 			}, {
-				UserName: "bob@external",
+				UserName: "bob@canonical.com",
 				Access:   "consume",
 			}, {
-				UserName: "eve@external",
+				UserName: "eve@canonical.com",
 				Access:   "read",
-			}},
-			Spaces: []jujuparams.RemoteSpace{{
-				CloudType:  "test-cloud-type",
-				Name:       "test-remote-space",
-				ProviderId: "test-provider-id",
-				ProviderAttributes: map[string]interface{}{
-					"attr1": "value1",
-					"attr2": "value2",
-				},
 			}},
 		},
 		ApplicationName: "application-2",
@@ -3050,7 +2747,7 @@ func TestListApplicationOffers(t *testing.T) {
 		Connections: []jujuparams.OfferConnection{{
 			SourceModelTag: "00000011-0000-0000-0000-000000000002",
 			RelationId:     2,
-			Username:       "charlie@external",
+			Username:       "charlie@canonical.com",
 			Endpoint:       "an-endpoint",
 		}},
 	}})

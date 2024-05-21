@@ -8,6 +8,7 @@ import (
 	"crypto/sha1"
 	"encoding/base64"
 	"fmt"
+	"math/rand"
 	"net/url"
 	"os"
 	"regexp"
@@ -109,6 +110,7 @@ func PostgresDB(t Tester, nowFunc func() time.Time) *gorm.DB {
 	}
 
 	suggestedName := "jimm_test_" + t.Name()
+	t.Logf("suggested db name: %s", suggestedName)
 	_, dsn, err := createDatabaseFromTemplate(suggestedName, templateDatabaseName)
 	if err != nil {
 		t.Fatalf("error creating database (%s): %s", suggestedName, err)
@@ -148,7 +150,9 @@ func computeSafeDatabaseName(suggestedName string) string {
 	safeName := re.ReplaceAllString(suggestedName, "_")
 
 	hasher := sha1.New()
-	hasher.Write([]byte(suggestedName))
+	// Provide some random chars for the hash. Useful where tests
+	// have the same suite name and same test name.
+	hasher.Write([]byte(suggestedName + randSeq(5)))
 	sha := base64.URLEncoding.EncodeToString(hasher.Sum(nil))
 
 	// Note that when using `base64.URLEncoding` the result may include a hyphen (-)
@@ -163,6 +167,16 @@ func computeSafeDatabaseName(suggestedName string) string {
 		return safeNameWithHash
 	}
 	return strings.ToLower(safeName[:maxDatabaseNameLength-len(shaSuffix)] + shaSuffix)
+}
+
+var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+
+func randSeq(n int) string {
+	b := make([]rune, n)
+	for i := range b {
+		b[i] = letters[rand.Intn(len(letters))]
+	}
+	return string(b)
 }
 
 // createDatabaseMutex to avoid issues at the time of creating databases, it's

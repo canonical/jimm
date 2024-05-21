@@ -5,7 +5,7 @@ package names_test
 import (
 	"testing"
 
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	gc "gopkg.in/check.v1"
 
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
@@ -42,8 +42,8 @@ func (s *namesSuite) TestFromResourceTag(c *gc.C) {
 	result = ofganames.ConvertTag(names.NewCloudTag("test"))
 	c.Assert(result, gc.DeepEquals, ofganames.NewTag("test", names.CloudTagKind, ""))
 
-	result = ofganames.ConvertTag(jimmnames.NewGroupTag("1"))
-	c.Assert(result, gc.DeepEquals, ofganames.NewTag("1", jimmnames.GroupTagKind, ""))
+	result = ofganames.ConvertTag(jimmnames.NewGroupTag(id.String()))
+	c.Assert(result, gc.DeepEquals, ofganames.NewTag(id.String(), jimmnames.GroupTagKind, ""))
 }
 
 func (s *namesSuite) TestFromGenericResourceTag(c *gc.C) {

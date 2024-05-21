@@ -11,30 +11,31 @@ import (
 
 	"github.com/juju/cmd/v3/cmdtesting"
 	"github.com/juju/juju/cloud"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/cmd/jimmctl/cmd"
+	"github.com/canonical/jimm/internal/cmdtest"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/jimmtest"
 	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 )
 
 type addCloudToControllerSuite struct {
-	jimmSuite
+	cmdtest.JimmCmdSuite
 }
 
 var _ = gc.Suite(&addCloudToControllerSuite{})
 
 func (s *addCloudToControllerSuite) SetUpTest(c *gc.C) {
-	s.jimmSuite.SetUpTest(c)
+	s.JimmCmdSuite.SetUpTest(c)
 
 	// We add user bob, who is a JIMM administrator.
-	err := s.JIMM.Database.UpdateUser(context.Background(), &dbmodel.User{
-		DisplayName: "Bob",
-		Username:    "bob@external",
-	})
+	i, err := dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, gc.IsNil)
+	err = s.JIMM.Database.UpdateIdentity(context.Background(), i)
 	c.Assert(err, gc.IsNil)
 
 	// We add a test-cloud cloud.
@@ -50,10 +51,10 @@ func (s *addCloudToControllerSuite) SetUpTest(c *gc.C) {
 
 	// We grant user bob administrator access to JIMM and the added
 	// test-cloud.
+	i, err = dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, gc.IsNil)
 	bob := openfga.NewUser(
-		&dbmodel.User{
-			Username: "bob@external",
-		},
+		i,
 		s.JIMM.OpenFGAClient,
 	)
 	err = bob.SetControllerAccess(context.Background(), s.JIMM.ResourceTag(), ofganames.AdministratorRelation)
@@ -166,7 +167,7 @@ clouds:
 		c.Log(test.about)
 		tmpfile, cleanupFunc := writeTempFile(c, test.cloudInfo)
 
-		bClient := s.userBakeryClient("bob@external")
+		bClient := jimmtest.NewUserSessionLogin(c, "bob@canonical.com")
 		// Running the command succeeds
 		newCmd := cmd.NewAddCloudToControllerCommandForTesting(s.ClientStore(), bClient, test.cloudByNameFunc)
 		var err error

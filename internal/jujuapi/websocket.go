@@ -17,6 +17,7 @@ import (
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
+	"github.com/canonical/jimm/internal/auth"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/jimm"
@@ -43,9 +44,15 @@ type apiServer struct {
 	params  Params
 }
 
+// GetAuthenticationService returns JIMM's oauth authentication service.
+func (s *apiServer) GetAuthenticationService() jimm.OAuthAuthenticator {
+	return s.jimm.OAuthAuthenticator
+}
+
 // ServeWS implements jimmhttp.WSServer.
-func (s *apiServer) ServeWS(_ context.Context, conn *websocket.Conn) {
-	controllerRoot := newControllerRoot(s.jimm, s.params)
+func (s *apiServer) ServeWS(ctx context.Context, conn *websocket.Conn) {
+	identityId := auth.SessionIdentityFromContext(ctx)
+	controllerRoot := newControllerRoot(s.jimm, s.params, identityId)
 	s.cleanup = controllerRoot.cleanup
 	Dblogger := controllerRoot.newAuditLogger()
 	serveRoot(context.Background(), controllerRoot, Dblogger, conn)
@@ -128,25 +135,32 @@ func modelInfoFromPath(path string) (uuid string, finalPath string, err error) {
 	return matches[modelIndex], matches[finalPathIndex], nil
 }
 
+// GetAuthenticationService returns JIMM's oauth authentication service.
+func (s modelProxyServer) GetAuthenticationService() jimm.OAuthAuthenticator {
+	return s.jimm.OAuthAuthenticator
+}
+
 // ServeWS implements jimmhttp.WSServer.
 func (s modelProxyServer) ServeWS(ctx context.Context, clientConn *websocket.Conn) {
-	jwtGenerator := jimm.NewJWTGenerator(s.jimm.Authenticator, &s.jimm.Database, s.jimm, s.jimm.JWTService)
+	jwtGenerator := jimm.NewJWTGenerator(&s.jimm.Database, s.jimm, s.jimm.JWTService)
 	connectionFunc := controllerConnectionFunc(s, &jwtGenerator)
 	zapctx.Debug(ctx, "Starting proxier")
 	auditLogger := s.jimm.AddAuditLogEntry
 	proxyHelpers := jimmRPC.ProxyHelpers{
-		ConnClient:        clientConn,
-		TokenGen:          &jwtGenerator,
-		ConnectController: connectionFunc,
-		AuditLog:          auditLogger,
+		ConnClient:              clientConn,
+		TokenGen:                &jwtGenerator,
+		ConnectController:       connectionFunc,
+		AuditLog:                auditLogger,
+		JIMM:                    s.jimm,
+		AuthenticatedIdentityID: auth.SessionIdentityFromContext(ctx),
 	}
 	jimmRPC.ProxySockets(ctx, proxyHelpers)
 }
 
 // controllerConnectionFunc returns a function that will be used to
 // connect to a controller when a client makes a request.
-func controllerConnectionFunc(s modelProxyServer, jwtGenerator *jimm.JWTGenerator) func(context.Context) (*websocket.Conn, string, error) {
-	connectToControllerFunc := func(ctx context.Context) (*websocket.Conn, string, error) {
+func controllerConnectionFunc(s modelProxyServer, jwtGenerator *jimm.JWTGenerator) func(context.Context) (jimmRPC.WebsocketConnection, string, error) {
+	return func(ctx context.Context) (jimmRPC.WebsocketConnection, string, error) {
 		const op = errors.Op("proxy.controllerConnectionFunc")
 		path := jimmhttp.PathElementFromContext(ctx, "path")
 		zapctx.Debug(ctx, "grabbing model info from path", zap.String("path", path))
@@ -176,7 +190,6 @@ func controllerConnectionFunc(s modelProxyServer, jwtGenerator *jimm.JWTGenerato
 		fullModelName := m.Controller.Name + "/" + m.Name
 		return controllerConn, fullModelName, nil
 	}
-	return connectToControllerFunc
 }
 
 // Use a 64k frame size for the websockets while we need to deal

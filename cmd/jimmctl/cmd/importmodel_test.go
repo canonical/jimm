@@ -9,16 +9,17 @@ import (
 	jjcloud "github.com/juju/juju/cloud"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/testing/factory"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/cmd/jimmctl/cmd"
+	"github.com/canonical/jimm/internal/cmdtest"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/jimmtest"
 )
 
 type importModelSuite struct {
-	jimmSuite
+	cmdtest.JimmCmdSuite
 }
 
 var _ = gc.Suite(&importModelSuite{})
@@ -26,7 +27,7 @@ var _ = gc.Suite(&importModelSuite{})
 func (s *importModelSuite) TestImportModelSuperuser(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
 
-	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@external/cred")
+	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@canonical.com/cred")
 	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{AuthType: "empty", Attributes: map[string]string{"key": "value"}})
 
 	err := s.BackingState.UpdateCloudCredential(cct, jjcloud.NewCredential(jjcloud.EmptyAuthType, map[string]string{"key": "value"}))
@@ -34,7 +35,7 @@ func (s *importModelSuite) TestImportModelSuperuser(c *gc.C) {
 
 	m := s.Factory.MakeModel(c, &factory.ModelParams{
 		Name:            "model-2",
-		Owner:           names.NewUserTag("charlie@external"),
+		Owner:           names.NewUserTag("charlie@canonical.com"),
 		CloudName:       jimmtest.TestCloudName,
 		CloudRegion:     jimmtest.TestCloudRegionName,
 		CloudCredential: cct,
@@ -42,7 +43,7 @@ func (s *importModelSuite) TestImportModelSuperuser(c *gc.C) {
 	defer m.Close()
 
 	// alice is superuser
-	bClient := s.userBakeryClient("alice")
+	bClient := jimmtest.NewUserSessionLogin(c, "alice")
 	_, err = cmdtesting.RunCommand(c, cmd.NewImportModelCommandForTesting(s.ClientStore(), bClient), "controller-1", m.ModelUUID())
 	c.Assert(err, gc.IsNil)
 
@@ -50,17 +51,17 @@ func (s *importModelSuite) TestImportModelSuperuser(c *gc.C) {
 	model2.SetTag(names.NewModelTag(m.ModelUUID()))
 	err = s.JIMM.Database.GetModel(context.Background(), &model2)
 	c.Assert(err, gc.Equals, nil)
-	c.Check(model2.OwnerUsername, gc.Equals, "charlie@external")
+	c.Check(model2.OwnerIdentityName, gc.Equals, "charlie@canonical.com")
 }
 
 func (s *importModelSuite) TestImportModelFromLocalUser(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
-	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@external/cred")
+	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@canonical.com/cred")
 	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{AuthType: "empty"})
 	// Add credentials for Alice on the test cloud, they are needed for the Alice user to become the new model owner
-	cctAlice := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/alice@external/cred")
+	cctAlice := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/alice@canonical.com/cred")
 	s.UpdateCloudCredential(c, cctAlice, jujuparams.CloudCredential{AuthType: "empty"})
-	mt := s.AddModel(c, names.NewUserTag("charlie@external"), "model-2", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, cct)
+	mt := s.AddModel(c, names.NewUserTag("charlie@canonical.com"), "model-2", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, cct)
 	var model dbmodel.Model
 	model.SetTag(mt)
 	err := s.JIMM.Database.GetModel(context.Background(), &model)
@@ -69,8 +70,8 @@ func (s *importModelSuite) TestImportModelFromLocalUser(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	// alice is superuser
-	bClient := s.userBakeryClient("alice")
-	_, err = cmdtesting.RunCommand(c, cmd.NewImportModelCommandForTesting(s.ClientStore(), bClient), "controller-1", mt.Id(), "--owner", "alice@external")
+	bClient := jimmtest.NewUserSessionLogin(c, "alice")
+	_, err = cmdtesting.RunCommand(c, cmd.NewImportModelCommandForTesting(s.ClientStore(), bClient), "controller-1", mt.Id(), "--owner", "alice@canonical.com")
 	c.Assert(err, gc.IsNil)
 
 	var model2 dbmodel.Model
@@ -78,13 +79,13 @@ func (s *importModelSuite) TestImportModelFromLocalUser(c *gc.C) {
 	err = s.JIMM.Database.GetModel(context.Background(), &model2)
 	c.Assert(err, gc.Equals, nil)
 	c.Check(model2.CreatedAt.After(model.CreatedAt), gc.Equals, true)
-	c.Check(model2.OwnerUsername, gc.Equals, "alice@external")
+	c.Check(model2.OwnerIdentityName, gc.Equals, "alice@canonical.com")
 }
 
 func (s *importModelSuite) TestImportModelUnauthorized(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
 
-	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@external/cred")
+	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@canonical.com/cred")
 	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{AuthType: "empty"})
 
 	err := s.BackingState.UpdateCloudCredential(cct, jjcloud.NewCredential(jjcloud.EmptyAuthType, map[string]string{"key": "value"}))
@@ -92,7 +93,7 @@ func (s *importModelSuite) TestImportModelUnauthorized(c *gc.C) {
 
 	m := s.Factory.MakeModel(c, &factory.ModelParams{
 		Name:            "model-2",
-		Owner:           names.NewUserTag("charlie@external"),
+		Owner:           names.NewUserTag("charlie@canonical.com"),
 		CloudName:       jimmtest.TestCloudName,
 		CloudRegion:     jimmtest.TestCloudRegionName,
 		CloudCredential: cct,
@@ -100,31 +101,31 @@ func (s *importModelSuite) TestImportModelUnauthorized(c *gc.C) {
 	defer m.Close()
 
 	// bob is not superuser
-	bClient := s.userBakeryClient("bob")
+	bClient := jimmtest.NewUserSessionLogin(c, "bob")
 	_, err = cmdtesting.RunCommand(c, cmd.NewImportModelCommandForTesting(s.ClientStore(), bClient), "controller-1", m.ModelUUID())
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
 
 func (s *importModelSuite) TestImportModelNoController(c *gc.C) {
-	bClient := s.userBakeryClient("bob")
+	bClient := jimmtest.NewUserSessionLogin(c, "bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewImportModelCommandForTesting(s.ClientStore(), bClient))
 	c.Assert(err, gc.ErrorMatches, `controller not specified`)
 }
 
 func (s *importModelSuite) TestImportModelNoModelUUID(c *gc.C) {
-	bClient := s.userBakeryClient("bob")
+	bClient := jimmtest.NewUserSessionLogin(c, "bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewImportModelCommandForTesting(s.ClientStore(), bClient), "controller-id")
 	c.Assert(err, gc.ErrorMatches, `model uuid not specified`)
 }
 
 func (s *importModelSuite) TestImportModelInvalidModelUUID(c *gc.C) {
-	bClient := s.userBakeryClient("bob")
+	bClient := jimmtest.NewUserSessionLogin(c, "bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewImportModelCommandForTesting(s.ClientStore(), bClient), "controller-id", "not-a-uuid")
 	c.Assert(err, gc.ErrorMatches, `invalid model uuid`)
 }
 
 func (s *importModelSuite) TestImportModelTooManyArgs(c *gc.C) {
-	bClient := s.userBakeryClient("bob")
+	bClient := jimmtest.NewUserSessionLogin(c, "bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewImportModelCommandForTesting(s.ClientStore(), bClient), "controller-id", "not-a-uuid", "spare-argument")
 	c.Assert(err, gc.ErrorMatches, `too many args`)
 }

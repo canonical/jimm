@@ -17,8 +17,11 @@ RUN go build -tags version -o jimmsrv -v ./cmd/jimmsrv
 
 # Define a smaller single process image for deployment
 FROM ${DOCKER_REGISTRY}ubuntu:20.04 AS deploy-env
+LABEL org.opencontainers.image.source=https://github.com/canonical/jimm
+LABEL org.opencontainers.image.description="JIMM server container image"
 RUN apt-get -qq update && apt-get -qq install -y ca-certificates postgresql-client
 WORKDIR /root/
+COPY --from=build-env /usr/src/jimm/openfga/authorisation_model.json ./openfga/
 COPY --from=build-env /usr/src/jimm/jimmsrv .
 COPY --from=build-env /usr/src/jimm/internal/dbmodel/sql ./sql/
 ENTRYPOINT [ "./jimmsrv" ]

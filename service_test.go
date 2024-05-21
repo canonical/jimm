@@ -4,27 +4,23 @@ package jimm_test
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"path/filepath"
 	"testing"
 
-	"github.com/canonical/candid/candidtest"
 	cofga "github.com/canonical/ofga"
 	qt "github.com/frankban/quicktest"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/checkers"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
-	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery/agent"
 	"github.com/juju/juju/api"
 	"github.com/juju/juju/api/client/cloud"
 	jujucloud "github.com/juju/juju/cloud"
 	"github.com/juju/juju/core/macaroon"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 
 	"github.com/canonical/jimm"
 	"github.com/canonical/jimm/internal/dbmodel"
@@ -44,11 +40,9 @@ func TestDefaultService(t *testing.T) {
 
 	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
-	svc, err := jimm.NewService(context.Background(), jimm.Params{
-		DSN:                   jimmtest.CreateEmptyDatabase(c),
-		OpenFGAParams:         cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
-		InsecureSecretStorage: true,
-	})
+	p := jimmtest.NewTestJimmParams(c)
+	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
+	svc, err := jimm.NewService(context.Background(), p)
 	c.Assert(err, qt.IsNil)
 	rr := httptest.NewRecorder()
 	req, err := http.NewRequest("GET", "/debug/info", nil)
@@ -63,28 +57,26 @@ func TestServiceStartsWithoutSecretStore(t *testing.T) {
 
 	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
-	_, err = jimm.NewService(context.Background(), jimm.Params{
-		DSN:           jimmtest.CreateEmptyDatabase(c),
-		OpenFGAParams: cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
-	})
+	p := jimmtest.NewTestJimmParams(c)
+	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
+	_, err = jimm.NewService(context.Background(), p)
 	c.Assert(err, qt.IsNil)
 }
 
 func TestAuthenticator(t *testing.T) {
 	c := qt.New(t)
+	ctx := context.Background()
 
 	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
-	p := jimm.Params{
-		ControllerUUID:        "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
-		DSN:                   jimmtest.CreateEmptyDatabase(c),
-		ControllerAdmins:      []string{"admin"},
-		OpenFGAParams:         cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
-		InsecureSecretStorage: true,
-	}
-	candid := startCandid(c, &p)
+	p := jimmtest.NewTestJimmParams(c)
+	p.InsecureSecretStorage = true
+	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
 	svc, err := jimm.NewService(context.Background(), p)
+	c.Assert(err, qt.IsNil)
+
+	err = svc.JIMM().GetCredentialStore().PutOAuthSecret(ctx, []byte(jimmtest.JWTTestSecret))
 	c.Assert(err, qt.IsNil)
 
 	srv := httptest.NewTLSServer(svc)
@@ -94,7 +86,7 @@ func TestAuthenticator(t *testing.T) {
 	}
 
 	conn, err := api.Open(&info, api.DialOpts{
-		BakeryClient:       userClient(candid, "alice", "admin"),
+		LoginProvider:      jimmtest.NewUserSessionLogin(c, "alice"),
 		InsecureSkipVerify: true,
 	})
 	c.Assert(err, qt.IsNil)
@@ -105,11 +97,11 @@ func TestAuthenticator(t *testing.T) {
 	})
 
 	c.Check(conn.ControllerTag(), qt.Equals, names.NewControllerTag("6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11"))
-	c.Check(conn.AuthTag(), qt.Equals, names.NewUserTag("alice@external"))
+	c.Check(conn.AuthTag(), qt.Equals, names.NewUserTag("alice@canonical.com"))
 	c.Check(conn.ControllerAccess(), qt.Equals, "")
 
 	conn, err = api.Open(&info, api.DialOpts{
-		BakeryClient:       userClient(candid, "bob"),
+		LoginProvider:      jimmtest.NewUserSessionLogin(c, "bob"),
 		InsecureSkipVerify: true,
 	})
 	c.Assert(err, qt.IsNil)
@@ -120,7 +112,7 @@ func TestAuthenticator(t *testing.T) {
 	})
 
 	c.Check(conn.ControllerTag(), qt.Equals, names.NewControllerTag("6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11"))
-	c.Check(conn.AuthTag(), qt.Equals, names.NewUserTag("bob@external"))
+	c.Check(conn.AuthTag(), qt.Equals, names.NewUserTag("bob@canonical.com"))
 	c.Check(conn.ControllerAccess(), qt.Equals, "")
 }
 
@@ -133,23 +125,22 @@ const testVaultEnv = `clouds:
 
 func TestVault(t *testing.T) {
 	c := qt.New(t)
+	ctx := context.Background()
 
 	ofgaClient, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
-	p := jimm.Params{
-		ControllerUUID:  "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
-		DSN:             jimmtest.CreateEmptyDatabase(c),
-		VaultAddress:    "http://localhost:8200",
-		VaultAuthPath:   "/auth/approle/login",
-		VaultPath:       "/jimm-kv/",
-		VaultSecretFile: "./local/vault/approle.json",
-		OpenFGAParams:   cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
-	}
-	candid := startCandid(c, &p)
-	vaultClient, _, creds, _ := jimmtest.VaultClient(c, ".")
+	vaultClient, _, roleID, roleSecretID, _ := jimmtest.VaultClient(c, ".")
+	p := jimmtest.NewTestJimmParams(c)
+	p.VaultAddress = "http://localhost:8200"
+	p.VaultPath = "/jimm-kv/"
+	p.VaultRoleID = roleID
+	p.VaultRoleSecretID = roleSecretID
+	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
+	svc, err := jimm.NewService(ctx, p)
+	c.Assert(err, qt.IsNil)
 
-	svc, err := jimm.NewService(context.Background(), p)
+	err = svc.JIMM().GetCredentialStore().PutOAuthSecret(ctx, []byte(jimmtest.JWTTestSecret))
 	c.Assert(err, qt.IsNil)
 
 	env := jimmtest.ParseEnvironment(c, testVaultEnv)
@@ -162,7 +153,7 @@ func TestVault(t *testing.T) {
 	}
 
 	conn, err := api.Open(&info, api.DialOpts{
-		BakeryClient:       userClient(candid, "bob"),
+		LoginProvider:      jimmtest.NewUserSessionLogin(c, "bob"),
 		InsecureSkipVerify: true,
 	})
 	c.Assert(err, qt.IsNil)
@@ -174,7 +165,7 @@ func TestVault(t *testing.T) {
 
 	cloudClient := cloud.NewClient(conn)
 
-	tag := names.NewCloudCredentialTag("test/bob@external/test-1").String()
+	tag := names.NewCloudCredentialTag("test/bob@canonical.com/test-1").String()
 	_, err = cloudClient.UpdateCloudsCredentials(map[string]jujucloud.Credential{
 		tag: jujucloud.NewCredential(jujucloud.UserPassAuthType, map[string]string{
 			"username": "test-user",
@@ -184,12 +175,12 @@ func TestVault(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	store := vault.VaultStore{
-		Client:     vaultClient,
-		AuthSecret: creds,
-		AuthPath:   p.VaultAuthPath,
-		KVPath:     p.VaultPath,
+		Client:       vaultClient,
+		RoleID:       roleID,
+		RoleSecretID: roleSecretID,
+		KVPath:       p.VaultPath,
 	}
-	attr, err := store.Get(context.Background(), names.NewCloudCredentialTag("test/bob@external/test-1"))
+	attr, err := store.Get(context.Background(), names.NewCloudCredentialTag("test/bob@canonical.com/test-1"))
 	c.Assert(err, qt.IsNil)
 	c.Check(attr, qt.DeepEquals, map[string]string{
 		"username": "test-user",
@@ -203,30 +194,28 @@ func TestPostgresSecretStore(t *testing.T) {
 	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
-	p := jimm.Params{
-		ControllerUUID:        "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
-		DSN:                   jimmtest.CreateEmptyDatabase(c),
-		OpenFGAParams:         cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
-		InsecureSecretStorage: true,
-	}
+	p := jimmtest.NewTestJimmParams(c)
+	p.InsecureSecretStorage = true
+	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
 	_, err = jimm.NewService(context.Background(), p)
 	c.Assert(err, qt.IsNil)
 }
 
 func TestOpenFGA(t *testing.T) {
 	c := qt.New(t)
+	ctx := context.Background()
 
 	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
-	p := jimm.Params{
-		ControllerUUID:   "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
-		DSN:              jimmtest.CreateEmptyDatabase(c),
-		OpenFGAParams:    cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
-		ControllerAdmins: []string{"alice", "eve"},
-	}
-	candid := startCandid(c, &p)
-	svc, err := jimm.NewService(context.Background(), p)
+	p := jimmtest.NewTestJimmParams(c)
+	p.InsecureSecretStorage = true
+	p.ControllerAdmins = []string{"alice", "eve"}
+	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
+	svc, err := jimm.NewService(ctx, p)
+	c.Assert(err, qt.IsNil)
+
+	err = svc.JIMM().GetCredentialStore().PutOAuthSecret(ctx, []byte(jimmtest.JWTTestSecret))
 	c.Assert(err, qt.IsNil)
 
 	srv := httptest.NewTLSServer(svc)
@@ -236,7 +225,7 @@ func TestOpenFGA(t *testing.T) {
 	}
 
 	conn, err := api.Open(&info, api.DialOpts{
-		BakeryClient:       userClient(candid, "bob"),
+		LoginProvider:      jimmtest.NewUserSessionLogin(c, "bob"),
 		InsecureSkipVerify: true,
 	})
 	c.Assert(err, qt.IsNil)
@@ -251,8 +240,10 @@ func TestOpenFGA(t *testing.T) {
 
 	// assert controller admins have been created in openfga
 	for _, username := range []string{"alice", "eve"} {
+		i, err := dbmodel.NewIdentity(username)
+		c.Assert(err, qt.IsNil)
 		user := openfga.NewUser(
-			&dbmodel.User{Username: username},
+			i,
 			client,
 		)
 		allowed, err := openfga.IsAdministrator(context.Background(), user, names.NewControllerTag(p.ControllerUUID))
@@ -267,26 +258,19 @@ func TestPublicKey(t *testing.T) {
 	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
-	p := jimm.Params{
-		ControllerUUID:   "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
-		DSN:              jimmtest.CreateEmptyDatabase(c),
-		OpenFGAParams:    cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
-		ControllerAdmins: []string{"alice", "eve"},
-		PrivateKey:       "c1VkV05+iWzCxMwMVcWbr0YJWQSEO62v+z3EQ2BhFMw=",
-		PublicKey:        "pC8MEk9MS9S8fhyRnOJ4qARTcTAwoM9L1nH/Yq0MwWU=",
-	}
-	_ = startCandid(c, &p)
+	p := jimmtest.NewTestJimmParams(c)
+	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
 	svc, err := jimm.NewService(context.Background(), p)
 	c.Assert(err, qt.IsNil)
 
 	srv := httptest.NewTLSServer(svc)
 	c.Cleanup(srv.Close)
 
-	response, err := http.Get(srv.URL + "/macaroons/publickey")
+	response, err := srv.Client().Get(srv.URL + "/macaroons/publickey")
 	c.Assert(err, qt.IsNil)
 	data, err := io.ReadAll(response.Body)
 	c.Assert(err, qt.IsNil)
-	c.Assert(string(data), qt.Equals, `{"PublicKey":"pC8MEk9MS9S8fhyRnOJ4qARTcTAwoM9L1nH/Yq0MwWU="}`)
+	c.Assert(string(data), qt.Equals, `{"PublicKey":"izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk="}`)
 }
 
 func TestThirdPartyCaveatDischarge(t *testing.T) {
@@ -296,15 +280,14 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 		UUID: "7e4e7ffb-5116-4544-a400-f584d08c410e",
 		Name: "test-application-offer",
 	}
-	user := dbmodel.User{
-		Username: "alice@external",
-	}
+	user, err := dbmodel.NewIdentity("alice@canonical.com")
+	c.Assert(err, qt.IsNil)
 
 	ctx := context.Background()
 
 	tests := []struct {
 		about          string
-		setup          func(c *qt.C, ofgaClient *openfga.OFGAClient, user *dbmodel.User)
+		setup          func(c *qt.C, ofgaClient *openfga.OFGAClient, user *dbmodel.Identity)
 		caveats        []string
 		expectDeclared map[string]string
 		expectedError  string
@@ -314,7 +297,7 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 		expectedError: ".*third party refused discharge: cannot discharge: caveat not recognized",
 	}, {
 		about: "user is an offer reader",
-		setup: func(c *qt.C, ofgaClient *openfga.OFGAClient, user *dbmodel.User) {
+		setup: func(c *qt.C, ofgaClient *openfga.OFGAClient, user *dbmodel.Identity) {
 			u := openfga.NewUser(user, ofgaClient)
 			err := u.SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.ReaderRelation)
 			c.Assert(err, qt.IsNil)
@@ -327,7 +310,7 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 		expectedError: ".*cannot discharge: permission denied",
 	}, {
 		about: "user is an offer consumer",
-		setup: func(c *qt.C, ofgaClient *openfga.OFGAClient, user *dbmodel.User) {
+		setup: func(c *qt.C, ofgaClient *openfga.OFGAClient, user *dbmodel.Identity) {
 			u := openfga.NewUser(user, ofgaClient)
 			err := u.SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.ConsumerRelation)
 			c.Assert(err, qt.IsNil)
@@ -336,7 +319,7 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 		expectDeclared: map[string]string{"offer-uuid": offer.UUID},
 	}, {
 		about: "user is an offer administrator",
-		setup: func(c *qt.C, ofgaClient *openfga.OFGAClient, user *dbmodel.User) {
+		setup: func(c *qt.C, ofgaClient *openfga.OFGAClient, user *dbmodel.Identity) {
 			u := openfga.NewUser(user, ofgaClient)
 			err := u.SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
@@ -349,15 +332,8 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 			ofgaClient, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 			c.Assert(err, qt.IsNil)
 
-			p := jimm.Params{
-				ControllerUUID:   "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
-				DSN:              jimmtest.CreateEmptyDatabase(c),
-				OpenFGAParams:    cofgaParamsToJIMMOpenFGAParams(*cofgaParams),
-				ControllerAdmins: []string{"alice", "eve"},
-				PrivateKey:       "c1VkV05+iWzCxMwMVcWbr0YJWQSEO62v+z3EQ2BhFMw=",
-				PublicKey:        "pC8MEk9MS9S8fhyRnOJ4qARTcTAwoM9L1nH/Yq0MwWU=",
-			}
-			_ = startCandid(c, &p)
+			p := jimmtest.NewTestJimmParams(c)
+			p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
 			svc, err := jimm.NewService(context.Background(), p)
 			c.Assert(err, qt.IsNil)
 
@@ -375,7 +351,7 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 			})
 
 			if test.setup != nil {
-				test.setup(c, ofgaClient, &user)
+				test.setup(c, ofgaClient, user)
 			}
 
 			m, err := bakery.NewMacaroon(
@@ -398,6 +374,9 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 			}
 
 			bakeryClient := httpbakery.NewClient()
+			// Give the bakery client the transport config from the test server client
+			// so that the bakery client has the necessary certs for the test server.
+			bakeryClient.Client.Transport = srv.Client().Transport
 			ms, err := bakeryClient.DischargeAll(context.TODO(), m)
 			if test.expectedError != "" {
 				c.Assert(err, qt.ErrorMatches, test.expectedError)
@@ -410,53 +389,6 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 				c.Assert(declaredCaveats, qt.DeepEquals, test.expectDeclared)
 			}
 		})
-	}
-}
-
-func startCandid(c *qt.C, p *jimm.Params) *candidtest.Server {
-	candid := candidtest.NewServer()
-	c.Cleanup(candid.Close)
-	p.CandidURL = candid.URL.String()
-
-	tpi, err := httpbakery.ThirdPartyInfoForLocation(context.Background(), nil, candid.URL.String())
-	c.Assert(err, qt.IsNil)
-	pk, err := tpi.PublicKey.MarshalText()
-	c.Assert(err, qt.IsNil)
-	p.CandidPublicKey = string(pk)
-
-	candid.AddUser("jimm-agent", candidtest.GroupListGroup)
-	buf, err := json.Marshal(agent.AuthInfo{
-		Key: key(candid, "jimm-agent"),
-		Agents: []agent.Agent{{
-			URL:      candid.URL.String(),
-			Username: "jimm-agent",
-		}},
-	})
-	c.Assert(err, qt.IsNil)
-	p.BakeryAgentFile = filepath.Join(c.TempDir(), "agent.json")
-	err = os.WriteFile(p.BakeryAgentFile, buf, 0400)
-	c.Assert(err, qt.IsNil)
-	return candid
-}
-
-func userClient(candid *candidtest.Server, user string, groups ...string) *httpbakery.Client {
-	candid.AddUser(user, groups...)
-	client := httpbakery.NewClient()
-	agent.SetUpAuth(client, &agent.AuthInfo{
-		Key: key(candid, user),
-		Agents: []agent.Agent{{
-			URL:      candid.URL.String(),
-			Username: user,
-		}},
-	})
-	return client
-}
-
-func key(candid *candidtest.Server, user string) *bakery.KeyPair {
-	key := candid.UserPublicKey(user)
-	return &bakery.KeyPair{
-		Public:  bakery.PublicKey{Key: bakery.Key(key.Public.Key)},
-		Private: bakery.PrivateKey{Key: bakery.Key(key.Private.Key)},
 	}
 }
 

@@ -5,9 +5,9 @@ package dbmodel
 import (
 	"time"
 
-	"github.com/juju/charm/v11"
+	"github.com/juju/charm/v12"
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	"gorm.io/gorm"
 )
 
@@ -69,96 +69,39 @@ func (o *ApplicationOffer) SetTag(t names.ApplicationOfferTag) {
 	o.UUID = t.Id()
 }
 
-// FromJujuApplicationOfferAdminDetails fills in the information from jujuparams ApplicationOfferAdminDetails.
-func (o *ApplicationOffer) FromJujuApplicationOfferAdminDetails(offerDetails jujuparams.ApplicationOfferAdminDetails) {
+// FromJujuApplicationOfferAdminDetails maps the Juju ApplicationOfferDetails struct type to a JIMM type
+// such that it can be persisted.
+func (o *ApplicationOffer) FromJujuApplicationOfferAdminDetailsV5(offerDetails jujuparams.ApplicationOfferAdminDetailsV5) {
 	o.ApplicationName = offerDetails.ApplicationName
 	o.ApplicationDescription = offerDetails.ApplicationDescription
 	o.Name = offerDetails.OfferName
 	o.UUID = offerDetails.OfferUUID
 	o.URL = offerDetails.OfferURL
-	o.Bindings = offerDetails.Bindings
 	o.CharmURL = offerDetails.CharmURL
-
-	o.Endpoints = make([]ApplicationOfferRemoteEndpoint, len(offerDetails.Endpoints))
-	for i, endpoint := range offerDetails.Endpoints {
-		o.Endpoints[i] = ApplicationOfferRemoteEndpoint{
-			Name:      endpoint.Name,
-			Role:      string(endpoint.Role),
-			Interface: endpoint.Interface,
-			Limit:     endpoint.Limit,
-		}
-	}
-
-	o.Spaces = make([]ApplicationOfferRemoteSpace, len(offerDetails.Spaces))
-	for i, space := range offerDetails.Spaces {
-		o.Spaces[i] = ApplicationOfferRemoteSpace{
-			CloudType:          space.CloudType,
-			Name:               space.Name,
-			ProviderID:         space.ProviderId,
-			ProviderAttributes: space.ProviderAttributes,
-		}
-	}
-
-	o.Connections = make([]ApplicationOfferConnection, len(offerDetails.Connections))
-	for i, connection := range offerDetails.Connections {
-		o.Connections[i] = ApplicationOfferConnection{
-			SourceModelTag: connection.SourceModelTag,
-			RelationID:     connection.RelationId,
-			Username:       connection.Username,
-			Endpoint:       connection.Endpoint,
-			IngressSubnets: connection.IngressSubnets,
-		}
-	}
+	o.Endpoints = mapJujuRemoteEndpointsToJIMMRemoteEndpoints(offerDetails.Endpoints)
+	o.Connections = mapJujuConnectionsToJIMMConnections(offerDetails.Connections)
 }
 
-// ToJujuApplicationOfferDetails returns a jujuparams ApplicationOfferAdminDetails based on the application offer.
-func (o *ApplicationOffer) ToJujuApplicationOfferDetails() jujuparams.ApplicationOfferAdminDetails {
-	endpoints := make([]jujuparams.RemoteEndpoint, len(o.Endpoints))
-	for i, endpoint := range o.Endpoints {
-		endpoints[i] = jujuparams.RemoteEndpoint{
-			Name:      endpoint.Name,
-			Role:      charm.RelationRole(endpoint.Role),
-			Interface: endpoint.Interface,
-			Limit:     endpoint.Limit,
-		}
-	}
-	spaces := make([]jujuparams.RemoteSpace, len(o.Spaces))
-	for i, space := range o.Spaces {
-		spaces[i] = jujuparams.RemoteSpace{
-			CloudType:          space.CloudType,
-			Name:               space.Name,
-			ProviderId:         space.ProviderID,
-			ProviderAttributes: space.ProviderAttributes,
-		}
+// ToJujuApplicationOfferDetails maps the JIMM ApplicationOfferDetails struct type to a jujuparams type
+// such that it can be sent over the wire.
+func (o *ApplicationOffer) ToJujuApplicationOfferDetailsV5() jujuparams.ApplicationOfferAdminDetailsV5 {
+	v5Details := jujuparams.ApplicationOfferDetailsV5{
+		SourceModelTag:         o.Model.Tag().String(),
+		OfferUUID:              o.UUID,
+		OfferURL:               o.URL,
+		OfferName:              o.Name,
+		ApplicationDescription: o.ApplicationDescription,
+		Endpoints:              mapJIMMRemoteEndpointsToJujuRemoteEndpoints(o.Endpoints),
 	}
 
-	connections := make([]jujuparams.OfferConnection, len(o.Connections))
-	for i, connection := range o.Connections {
-		connections[i] = jujuparams.OfferConnection{
-			SourceModelTag: connection.SourceModelTag,
-			RelationId:     connection.RelationID,
-			Username:       connection.Username,
-			Endpoint:       connection.Endpoint,
-			IngressSubnets: connection.IngressSubnets,
-		}
+	v5AdminDetails := jujuparams.ApplicationOfferAdminDetailsV5{
+		ApplicationOfferDetailsV5: v5Details,
+		ApplicationName:           o.ApplicationName,
+		CharmURL:                  o.CharmURL,
+		Connections:               mapJIMMConnectionsToJujuConnections(o.Connections),
 	}
-	return jujuparams.ApplicationOfferAdminDetails{
-		ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
-			SourceModelTag:         o.Model.Tag().String(),
-			OfferUUID:              o.UUID,
-			OfferURL:               o.URL,
-			OfferName:              o.Name,
-			ApplicationDescription: o.ApplicationDescription,
-			Endpoints:              endpoints,
-			Spaces:                 spaces,
-			Bindings:               o.Bindings,
-			//TODO(Kian) CSS-6040 Refactor the below to use a better abstraction for Postgres/OpenFGA to Juju types
-			Users: nil,
-		},
-		ApplicationName: o.ApplicationName,
-		CharmURL:        o.CharmURL,
-		Connections:     connections,
-	}
+
+	return v5AdminDetails
 }
 
 // ApplicationOfferRemoteEndpoint represents a remote application endpoint.
@@ -199,7 +142,72 @@ type ApplicationOfferConnection struct {
 
 	SourceModelTag string
 	RelationID     int
-	Username       string
+	IdentityName   string
 	Endpoint       string
 	IngressSubnets Strings
+}
+
+// mapJIMMRemoteEndpointsToJujuRemoteEndpoints maps the types between JIMM's
+// remote endpoints type (with gorm embedded for persistence) to a jujuparams
+// remote endpoint, such that it can be sent over the wire and contains the correct
+// json tags.
+func mapJIMMRemoteEndpointsToJujuRemoteEndpoints(endpoints []ApplicationOfferRemoteEndpoint) []jujuparams.RemoteEndpoint {
+	mappedEndpoints := make([]jujuparams.RemoteEndpoint, len(endpoints))
+	for i, endpoint := range endpoints {
+		mappedEndpoints[i] = jujuparams.RemoteEndpoint{
+			Name:      endpoint.Name,
+			Role:      charm.RelationRole(endpoint.Role),
+			Interface: endpoint.Interface,
+			Limit:     endpoint.Limit,
+		}
+	}
+	return mappedEndpoints
+}
+
+// mapJujuRemoteEndpointsToJIMMRemoteEndpoints - See above for details, this does the opposite.
+func mapJujuRemoteEndpointsToJIMMRemoteEndpoints(endpoints []jujuparams.RemoteEndpoint) []ApplicationOfferRemoteEndpoint {
+	mappedEndpoints := make([]ApplicationOfferRemoteEndpoint, len(endpoints))
+	for i, endpoint := range endpoints {
+		mappedEndpoints[i] = ApplicationOfferRemoteEndpoint{
+			Name:      endpoint.Name,
+			Role:      string(endpoint.Role),
+			Interface: endpoint.Interface,
+			Limit:     endpoint.Limit,
+		}
+	}
+	return mappedEndpoints
+}
+
+// mapJIMMConnectionsToJujuConnections maps the types between JIMM's
+// offer connection type (with gorm embedded for persistence) to a jujuparams
+// offer connection, such that it can be sent over the wire and contains the correct
+// json tags.
+func mapJIMMConnectionsToJujuConnections(connections []ApplicationOfferConnection) []jujuparams.OfferConnection {
+	mappedConnections := make([]jujuparams.OfferConnection, len(connections))
+	for i, connection := range connections {
+		mappedConnections[i] = jujuparams.OfferConnection{
+			SourceModelTag: connection.SourceModelTag,
+			RelationId:     connection.RelationID,
+			Username:       connection.IdentityName,
+			Endpoint:       connection.Endpoint,
+			IngressSubnets: connection.IngressSubnets,
+			// TODO(ale8k): Status is missing, do we need it??
+		}
+	}
+	return mappedConnections
+}
+
+// mapJujuConnectionsToJIMMConnections - See above for details, this does the opposite.
+func mapJujuConnectionsToJIMMConnections(connections []jujuparams.OfferConnection) []ApplicationOfferConnection {
+	mappedConnections := make([]ApplicationOfferConnection, len(connections))
+	for i, connection := range connections {
+		mappedConnections[i] = ApplicationOfferConnection{
+			SourceModelTag: connection.SourceModelTag,
+			RelationID:     connection.RelationId,
+			IdentityName:   connection.Username,
+			Endpoint:       connection.Endpoint,
+			IngressSubnets: connection.IngressSubnets,
+		}
+	}
+	return mappedConnections
 }

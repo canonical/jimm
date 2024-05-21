@@ -122,15 +122,14 @@ func (s *dbSuite) TestGetControllerWithModels(c *qt.C) {
 		CloudName:   "test-cloud",
 		CloudRegion: "test-region",
 	}
-	u := dbmodel.User{
-		Username: "bob@external",
-	}
+	u, err := dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, qt.IsNil)
 	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
 
 	cred := dbmodel.CloudCredential{
 		Name:     "test-cred",
 		Cloud:    cloud,
-		Owner:    u,
+		Owner:    *u,
 		AuthType: "empty",
 	}
 	c.Assert(s.Database.DB.Create(&cred).Error, qt.IsNil)
@@ -144,7 +143,7 @@ func (s *dbSuite) TestGetControllerWithModels(c *qt.C) {
 			String: "00000001-0000-0000-0000-0000-000000000001",
 			Valid:  true,
 		},
-		Owner:           u,
+		Owner:           *u,
 		Controller:      controller,
 		CloudRegion:     cloud.Regions[0],
 		CloudCredential: cred,
@@ -168,7 +167,7 @@ func (s *dbSuite) TestGetControllerWithModels(c *qt.C) {
 			String: "00000001-0000-0000-0000-0000-000000000002",
 			Valid:  true,
 		},
-		Owner:           u,
+		Owner:           *u,
 		Controller:      controller,
 		CloudRegion:     cloud.Regions[0],
 		CloudCredential: cred,
@@ -219,7 +218,7 @@ const testForEachControllerEnv = `clouds:
 cloud-credentials:
 - name: test-cred
   cloud: test
-  owner: alice@external
+  owner: alice@canonical.com
   type: empty
 controllers:
 - name: test1
@@ -379,7 +378,7 @@ const testForEachControllerModelEnv = `clouds:
 cloud-credentials:
 - name: test-cred
   cloud: test
-  owner: alice@external
+  owner: alice@canonical.com
   type: empty
 controllers:
 - name: test
@@ -392,28 +391,28 @@ controllers:
   region: test-region
 models:
 - name: test-1
-  owner: alice@external
+  owner: alice@canonical.com
   uuid: 00000002-0000-0000-0000-000000000001
   controller: test
   cloud: test
   region: test-region
   cloud-credential: test-cred
 - name: test-2
-  owner: alice@external
+  owner: alice@canonical.com
   uuid: 00000002-0000-0000-0000-000000000002
   controller: test
   cloud: test
   region: test-region
   cloud-credential: test-cred
 - name: test-3
-  owner: alice@external
+  owner: alice@canonical.com
   uuid: 00000002-0000-0000-0000-000000000003
   controller: test-2
   cloud: test
   region: test-region
   cloud-credential: test-cred
 - name: test-4
-  owner: alice@external
+  owner: alice@canonical.com
   uuid: 00000002-0000-0000-0000-000000000004
   controller: test
   cloud: test

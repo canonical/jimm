@@ -7,10 +7,12 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/cmd/jimmctl/cmd"
+	"github.com/canonical/jimm/internal/cmdtest"
+	"github.com/canonical/jimm/internal/jimmtest"
 )
 
 type grantAuditLogAccessSuite struct {
-	jimmSuite
+	cmdtest.JimmCmdSuite
 }
 
 // TODO (alesstimec) uncomment once granting/revoking is reimplemented
@@ -18,14 +20,14 @@ type grantAuditLogAccessSuite struct {
 
 func (s *grantAuditLogAccessSuite) TestGrantAuditLogAccessSuperuser(c *gc.C) {
 	// alice is superuser
-	bClient := s.userBakeryClient("alice")
-	_, err := cmdtesting.RunCommand(c, cmd.NewGrantAuditLogAccessCommandForTesting(s.ClientStore(), bClient), "bob@external")
+	bClient := jimmtest.NewUserSessionLogin(c, "alice")
+	_, err := cmdtesting.RunCommand(c, cmd.NewGrantAuditLogAccessCommandForTesting(s.ClientStore(), bClient), "bob@canonical.com")
 	c.Assert(err, gc.IsNil)
 }
 
 func (s *grantAuditLogAccessSuite) TestGrantAuditLogAccess(c *gc.C) {
 	// bob is not superuser
-	bClient := s.userBakeryClient("bob")
-	_, err := cmdtesting.RunCommand(c, cmd.NewGrantAuditLogAccessCommandForTesting(s.ClientStore(), bClient), "bob@external")
+	bClient := jimmtest.NewUserSessionLogin(c, "bob")
+	_, err := cmdtesting.RunCommand(c, cmd.NewGrantAuditLogAccessCommandForTesting(s.ClientStore(), bClient), "bob@canonical.com")
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }

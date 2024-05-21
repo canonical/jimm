@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
@@ -30,9 +30,8 @@ func (s *dbSuite) TestSetCloudCredentialInvalidTag(c *qt.C) {
 	err := s.Database.Migrate(context.Background(), true)
 	c.Assert(err, qt.Equals, nil)
 
-	u := dbmodel.User{
-		Username: "bob@external",
-	}
+	u, err := dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, qt.IsNil)
 	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
 
 	cloud := dbmodel.Cloud{
@@ -45,12 +44,12 @@ func (s *dbSuite) TestSetCloudCredentialInvalidTag(c *qt.C) {
 	c.Assert(s.Database.DB.Create(&cloud).Error, qt.IsNil)
 
 	cred := dbmodel.CloudCredential{
-		Name:          "test-cred",
-		OwnerUsername: u.Username,
-		AuthType:      "empty",
+		Name:              "test-cred",
+		OwnerIdentityName: u.Name,
+		AuthType:          "empty",
 	}
 	err = s.Database.SetCloudCredential(context.Background(), &cred)
-	c.Check(err, qt.ErrorMatches, fmt.Sprintf("invalid cloudcredential tag %q", cred.CloudName+"/"+cred.OwnerUsername+"/"+cred.Name))
+	c.Check(err, qt.ErrorMatches, fmt.Sprintf("invalid cloudcredential tag %q", cred.CloudName+"/"+cred.OwnerIdentityName+"/"+cred.Name))
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeBadRequest)
 }
 
@@ -58,9 +57,8 @@ func (s *dbSuite) TestSetCloudCredential(c *qt.C) {
 	err := s.Database.Migrate(context.Background(), true)
 	c.Assert(err, qt.Equals, nil)
 
-	u := dbmodel.User{
-		Username: "bob@external",
-	}
+	u, err := dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, qt.IsNil)
 	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
 
 	cloud := dbmodel.Cloud{
@@ -73,17 +71,17 @@ func (s *dbSuite) TestSetCloudCredential(c *qt.C) {
 	c.Assert(s.Database.DB.Create(&cloud).Error, qt.IsNil)
 
 	cred := dbmodel.CloudCredential{
-		Name:          "test-cred",
-		CloudName:     cloud.Name,
-		OwnerUsername: u.Username,
-		AuthType:      "empty",
+		Name:              "test-cred",
+		CloudName:         cloud.Name,
+		OwnerIdentityName: u.Name,
+		AuthType:          "empty",
 	}
 	c1 := cred
 	err = s.Database.SetCloudCredential(context.Background(), &cred)
 	c.Assert(err, qt.Equals, nil)
 
 	var dbCred dbmodel.CloudCredential
-	result := s.Database.DB.Where("cloud_name = ? AND owner_username = ? AND name = ?", cloud.Name, u.Username, cred.Name).First(&dbCred)
+	result := s.Database.DB.Where("cloud_name = ? AND owner_identity_name = ? AND name = ?", cloud.Name, u.Name, cred.Name).First(&dbCred)
 	c.Assert(result.Error, qt.Equals, nil)
 	c.Assert(dbCred, qt.DeepEquals, cred)
 
@@ -95,9 +93,8 @@ func (s *dbSuite) TestSetCloudCredentialUpdate(c *qt.C) {
 	err := s.Database.Migrate(context.Background(), true)
 	c.Assert(err, qt.Equals, nil)
 
-	u := dbmodel.User{
-		Username: "bob@external",
-	}
+	u, err := dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, qt.IsNil)
 	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
 
 	cloud := dbmodel.Cloud{
@@ -110,10 +107,10 @@ func (s *dbSuite) TestSetCloudCredentialUpdate(c *qt.C) {
 	c.Assert(s.Database.DB.Create(&cloud).Error, qt.IsNil)
 
 	cred := dbmodel.CloudCredential{
-		Name:          "test-cred",
-		CloudName:     cloud.Name,
-		OwnerUsername: u.Username,
-		AuthType:      "empty",
+		Name:              "test-cred",
+		CloudName:         cloud.Name,
+		OwnerIdentityName: u.Name,
+		AuthType:          "empty",
 	}
 	err = s.Database.SetCloudCredential(context.Background(), &cred)
 	c.Assert(err, qt.Equals, nil)
@@ -135,9 +132,9 @@ func (s *dbSuite) TestSetCloudCredentialUpdate(c *qt.C) {
 	c.Assert(err, qt.Equals, nil)
 
 	dbCred := dbmodel.CloudCredential{
-		CloudName:     cloud.Name,
-		OwnerUsername: u.Username,
-		Name:          cred.Name,
+		CloudName:         cloud.Name,
+		OwnerIdentityName: u.Name,
+		Name:              cred.Name,
 	}
 	err = s.Database.GetCloudCredential(context.Background(), &dbCred)
 	c.Assert(err, qt.Equals, nil)
@@ -165,9 +162,8 @@ func (s *dbSuite) TestGetCloudCredential(c *qt.C) {
 	err := s.Database.Migrate(context.Background(), true)
 	c.Assert(err, qt.Equals, nil)
 
-	u := dbmodel.User{
-		Username: "bob@external",
-	}
+	u, err := dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, qt.IsNil)
 	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
 
 	cloud := dbmodel.Cloud{
@@ -180,10 +176,10 @@ func (s *dbSuite) TestGetCloudCredential(c *qt.C) {
 	c.Assert(s.Database.DB.Create(&cloud).Error, qt.IsNil)
 
 	cred := dbmodel.CloudCredential{
-		Name:          "test-cred",
-		CloudName:     cloud.Name,
-		OwnerUsername: u.Username,
-		AuthType:      "empty",
+		Name:              "test-cred",
+		CloudName:         cloud.Name,
+		OwnerIdentityName: u.Name,
+		AuthType:          "empty",
 	}
 	cred.Cloud.Regions = nil
 	err = s.Database.SetCloudCredential(context.Background(), &cred)
@@ -193,9 +189,9 @@ func (s *dbSuite) TestGetCloudCredential(c *qt.C) {
 	cred.Cloud.Regions = nil
 
 	dbCred := dbmodel.CloudCredential{
-		CloudName:     cloud.Name,
-		OwnerUsername: u.Username,
-		Name:          cred.Name,
+		CloudName:         cloud.Name,
+		OwnerIdentityName: u.Name,
+		Name:              cred.Name,
 	}
 	err = s.Database.GetCloudCredential(context.Background(), &dbCred)
 	c.Assert(err, qt.Equals, nil)
@@ -221,25 +217,25 @@ const forEachCloudCredentialEnv = `clouds:
 cloud-credentials:
 - name: cred-1
   cloud: cloud-1
-  owner: alice@external
+  owner: alice@canonical.com
   attributes:
     k1: v1
     k2: v2
 - name: cred-2
   cloud: cloud-1
-  owner: bob@external
+  owner: bob@canonical.com
   attributes:
     k1: v1
     k2: v2
 - name: cred-3
   cloud: cloud-2
-  owner: alice@external
+  owner: alice@canonical.com
 - name: cred-4
   cloud: cloud-2
-  owner: bob@external
+  owner: bob@canonical.com
 - name: cred-5
   cloud: cloud-1
-  owner: alice@external
+  owner: alice@canonical.com
 `
 
 var forEachCloudCredentialTests = []struct {
@@ -252,22 +248,22 @@ var forEachCloudCredentialTests = []struct {
 	expectErrorCode   errors.Code
 }{{
 	name:     "UserCredentialsWithCloud",
-	username: "alice@external",
+	username: "alice@canonical.com",
 	cloud:    "cloud-1",
 	expectCredentials: []string{
-		names.NewCloudCredentialTag("cloud-1/alice@external/cred-1").String(),
-		names.NewCloudCredentialTag("cloud-1/alice@external/cred-5").String(),
+		names.NewCloudCredentialTag("cloud-1/alice@canonical.com/cred-1").String(),
+		names.NewCloudCredentialTag("cloud-1/alice@canonical.com/cred-5").String(),
 	},
 }, {
 	name:     "UserCredentialsWithoutCloud",
-	username: "bob@external",
+	username: "bob@canonical.com",
 	expectCredentials: []string{
-		names.NewCloudCredentialTag("cloud-1/bob@external/cred-2").String(),
-		names.NewCloudCredentialTag("cloud-2/bob@external/cred-4").String(),
+		names.NewCloudCredentialTag("cloud-1/bob@canonical.com/cred-2").String(),
+		names.NewCloudCredentialTag("cloud-2/bob@canonical.com/cred-4").String(),
 	},
 }, {
 	name:     "IterationError",
-	username: "alice@external",
+	username: "alice@canonical.com",
 	f: func(*dbmodel.CloudCredential) error {
 		return errors.E("test error", errors.Code("test code"))
 	},

@@ -6,16 +6,17 @@ import (
 	"encoding/json"
 
 	"github.com/canonical/jimm/cmd/jimmctl/cmd"
+	"github.com/canonical/jimm/internal/cmdtest"
 	"github.com/canonical/jimm/internal/jimmtest"
 	"github.com/juju/cmd/v3/cmdtesting"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/testing/factory"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	gc "gopkg.in/check.v1"
 )
 
 type crossModelQuerySuite struct {
-	jimmSuite
+	cmdtest.JimmCmdSuite
 }
 
 var _ = gc.Suite(&crossModelQuerySuite{})
@@ -23,12 +24,12 @@ var _ = gc.Suite(&crossModelQuerySuite{})
 func (s *crossModelQuerySuite) TestCrossModelQueryCommand(c *gc.C) {
 	// Test setup.
 	store := s.ClientStore()
-	bClient := s.userBakeryClient("alice")
+	bClient := jimmtest.NewUserSessionLogin(c, "alice")
 
 	s.AddController(c, "controller-2", s.APIInfo(c))
-	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/alice@external/cred")
+	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/alice@canonical.com/cred")
 	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{AuthType: "empty"})
-	mt := s.AddModel(c, names.NewUserTag("alice@external"), "stg-o11y", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, cct)
+	mt := s.AddModel(c, names.NewUserTag("alice@canonical.com"), "stg-o11y", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, cct)
 	state, _ := s.StatePool.Get(mt.Id())
 	f := factory.NewFactory(state.State, s.StatePool)
 	app := f.MakeApplication(c, &factory.ApplicationParams{

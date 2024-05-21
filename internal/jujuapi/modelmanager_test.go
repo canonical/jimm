@@ -21,7 +21,7 @@ import (
 	"github.com/juju/juju/state"
 	"github.com/juju/juju/testing/factory"
 	jujuversion "github.com/juju/juju/version"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/utils/v2"
 	gc "gopkg.in/check.v1"
@@ -34,7 +34,7 @@ import (
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 )
 
-const jujuVersion = "3.3.1"
+const jujuVersion = "3.5-rc1"
 
 type modelManagerSuite struct {
 	websocketSuite
@@ -55,7 +55,7 @@ func (s *modelManagerSuite) TestListModelSummaries(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	client := modelmanager.NewClient(conn)
-	models, err := client.ListModelSummaries("bob@external", false)
+	models, err := client.ListModelSummaries("bob@canonical.com", false)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(models, jimmtest.CmpEquals(
 		cmpopts.IgnoreTypes(&time.Time{}),
@@ -70,8 +70,8 @@ func (s *modelManagerSuite) TestListModelSummaries(c *gc.C) {
 		DefaultSeries:   "jammy",
 		Cloud:           jimmtest.TestCloudName,
 		CloudRegion:     jimmtest.TestCloudRegionName,
-		CloudCredential: jimmtest.TestCloudName + "/bob@external/cred",
-		Owner:           "bob@external",
+		CloudCredential: jimmtest.TestCloudName + "/bob@canonical.com/cred",
+		Owner:           "bob@canonical.com",
 		Life:            life.Value(constants.ALIVE.String()),
 		Status: base.Status{
 			Status: status.Available,
@@ -101,8 +101,8 @@ func (s *modelManagerSuite) TestListModelSummaries(c *gc.C) {
 		DefaultSeries:   "jammy",
 		Cloud:           jimmtest.TestCloudName,
 		CloudRegion:     jimmtest.TestCloudRegionName,
-		CloudCredential: jimmtest.TestCloudName + "/charlie@external/cred",
-		Owner:           "charlie@external",
+		CloudCredential: jimmtest.TestCloudName + "/charlie@canonical.com/cred",
+		Owner:           "charlie@canonical.com",
 		Life:            life.Value(constants.ALIVE.String()),
 		Status: base.Status{
 			Status: status.Available,
@@ -133,12 +133,12 @@ func (s *modelManagerSuite) TestListModelSummariesWithoutControllerUUIDMasking(c
 	err := conn1.APICall("JIMM", 4, "", "DisableControllerUUIDMasking", nil, nil)
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 
-	s.Candid.AddUser("adam", "controller-admin")
+	s.AddAdminUser(c, "adam@canonical.com")
 
 	// we need to make bob jimm admin to disable controller UUID masking
 	err = s.OFGAClient.AddRelation(context.Background(),
 		openfga.Tuple{
-			Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+			Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
 			Relation: ofganames.AdministratorRelation,
 			Target:   ofganames.ConvertTag(s.JIMM.ResourceTag()),
 		},
@@ -155,7 +155,7 @@ func (s *modelManagerSuite) TestListModelSummariesWithoutControllerUUIDMasking(c
 	// connection, we can make bob a regular user again.
 	err = s.OFGAClient.RemoveRelation(context.Background(),
 		openfga.Tuple{
-			Object:   ofganames.ConvertTag(names.NewUserTag("bob@external")),
+			Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
 			Relation: ofganames.AdministratorRelation,
 			Target:   ofganames.ConvertTag(s.JIMM.ResourceTag()),
 		},
@@ -178,8 +178,8 @@ func (s *modelManagerSuite) TestListModelSummariesWithoutControllerUUIDMasking(c
 		DefaultSeries:   "jammy",
 		Cloud:           jimmtest.TestCloudName,
 		CloudRegion:     jimmtest.TestCloudRegionName,
-		CloudCredential: jimmtest.TestCloudName + "/bob@external/cred",
-		Owner:           "bob@external",
+		CloudCredential: jimmtest.TestCloudName + "/bob@canonical.com/cred",
+		Owner:           "bob@canonical.com",
 		Life:            life.Value(constants.ALIVE.String()),
 		Status: base.Status{
 			Status: status.Available,
@@ -209,8 +209,8 @@ func (s *modelManagerSuite) TestListModelSummariesWithoutControllerUUIDMasking(c
 		DefaultSeries:   "jammy",
 		Cloud:           jimmtest.TestCloudName,
 		CloudRegion:     jimmtest.TestCloudRegionName,
-		CloudCredential: jimmtest.TestCloudName + "/charlie@external/cred",
-		Owner:           "charlie@external",
+		CloudCredential: jimmtest.TestCloudName + "/charlie@canonical.com/cred",
+		Owner:           "charlie@canonical.com",
 		Life:            life.Value(constants.ALIVE.String()),
 		Status: base.Status{
 			Status: status.Available,
@@ -245,32 +245,35 @@ func (s *modelManagerSuite) TestListModels(c *gc.C) {
 	c.Assert(models, jc.SameContents, []base.UserModel{{
 		Name:  "model-1",
 		UUID:  s.Model.UUID.String,
-		Owner: "bob@external",
+		Owner: "bob@canonical.com",
 		Type:  "iaas",
 	}, {
 		Name:  "model-3",
 		UUID:  s.Model3.UUID.String,
-		Owner: "charlie@external",
+		Owner: "charlie@canonical.com",
 		Type:  "iaas",
 	}})
 }
 
 func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
-	mt4 := s.AddModel(c, names.NewUserTag("charlie@external"), "model-4", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, s.Model2.CloudCredential.ResourceTag())
+	mt4 := s.AddModel(c, names.NewUserTag("charlie@canonical.com"), "model-4", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, s.Model2.CloudCredential.ResourceTag())
 
 	// TODO (alesstimec) change once granting has been re-implemented
 	//conn := s.open(c, nil, "charlie")
 	//defer conn.Close()
 	//client := modelmanager.NewClient(conn)
-	//err := client.GrantModel("bob@external", "write", mt4.Id())
+	//err := client.GrantModel("bob@canonical.com", "write", mt4.Id())
 	//c.Assert(err, gc.Equals, nil)
-	bob := openfga.NewUser(&dbmodel.User{Username: "bob@external"}, s.OFGAClient)
-	err := bob.SetModelAccess(context.Background(), mt4, ofganames.WriterRelation)
+
+	bobIdentity, err := dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, gc.IsNil)
+	bob := openfga.NewUser(bobIdentity, s.OFGAClient)
+	err = bob.SetModelAccess(context.Background(), mt4, ofganames.WriterRelation)
 	c.Assert(err, gc.Equals, nil)
 
-	mt5 := s.AddModel(c, names.NewUserTag("charlie@external"), "model-5", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, s.Model2.CloudCredential.ResourceTag())
+	mt5 := s.AddModel(c, names.NewUserTag("charlie@canonical.com"), "model-5", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, s.Model2.CloudCredential.ResourceTag())
 	// TODO (alesstimec) change once granting has been re-implemented
-	//err = client.GrantModel("bob@external", "admin", mt5.Id())
+	//err = client.GrantModel("bob@canonical.com", "admin", mt5.Id())
 	//c.Assert(err, gc.Equals, nil)
 	err = bob.SetModelAccess(context.Background(), mt5, ofganames.AdministratorRelation)
 	c.Assert(err, gc.Equals, nil)
@@ -333,7 +336,7 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 			CloudTag:           names.NewCloudTag(jimmtest.TestCloudName).String(),
 			CloudRegion:        jimmtest.TestCloudRegionName,
 			CloudCredentialTag: s.Model.CloudCredential.Tag().String(),
-			OwnerTag:           names.NewUserTag("bob@external").String(),
+			OwnerTag:           names.NewUserTag("bob@canonical.com").String(),
 			Life:               life.Alive,
 			Status: jujuparams.EntityStatus{
 				Status: status.Available,
@@ -342,10 +345,10 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 				Level: "unsupported",
 			},
 			Users: []jujuparams.ModelUserInfo{{
-				UserName: "alice@external",
+				UserName: "alice@canonical.com",
 				Access:   jujuparams.ModelAdminAccess,
 			}, {
-				UserName: "bob@external",
+				UserName: "bob@canonical.com",
 				Access:   jujuparams.ModelAdminAccess,
 			}},
 			AgentVersion:            &jujuversion.Current,
@@ -372,7 +375,7 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 			CloudTag:           names.NewCloudTag(jimmtest.TestCloudName).String(),
 			CloudRegion:        jimmtest.TestCloudRegionName,
 			CloudCredentialTag: s.Model3.CloudCredential.Tag().String(),
-			OwnerTag:           names.NewUserTag("charlie@external").String(),
+			OwnerTag:           names.NewUserTag("charlie@canonical.com").String(),
 			Life:               life.Alive,
 			Status: jujuparams.EntityStatus{
 				Status: status.Available,
@@ -381,7 +384,7 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 				Level: "unsupported",
 			},
 			Users: []jujuparams.ModelUserInfo{{
-				UserName: "bob@external",
+				UserName: "bob@canonical.com",
 				Access:   jujuparams.ModelReadAccess,
 			}},
 			AgentVersion:            &jujuversion.Current,
@@ -403,7 +406,7 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 			CloudTag:           names.NewCloudTag(jimmtest.TestCloudName).String(),
 			CloudRegion:        jimmtest.TestCloudRegionName,
 			CloudCredentialTag: s.Model2.CloudCredential.Tag().String(),
-			OwnerTag:           names.NewUserTag("charlie@external").String(),
+			OwnerTag:           names.NewUserTag("charlie@canonical.com").String(),
 			Life:               life.Alive,
 			Status: jujuparams.EntityStatus{
 				Status: status.Available,
@@ -412,7 +415,7 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 				Level: "unsupported",
 			},
 			Users: []jujuparams.ModelUserInfo{{
-				UserName: "bob@external",
+				UserName: "bob@canonical.com",
 				Access:   jujuparams.ModelWriteAccess,
 			}},
 			Machines: []jujuparams.ModelMachineInfo{{
@@ -455,7 +458,7 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 			CloudTag:           names.NewCloudTag(jimmtest.TestCloudName).String(),
 			CloudRegion:        jimmtest.TestCloudRegionName,
 			CloudCredentialTag: s.Model2.CloudCredential.Tag().String(),
-			OwnerTag:           names.NewUserTag("charlie@external").String(),
+			OwnerTag:           names.NewUserTag("charlie@canonical.com").String(),
 			Life:               life.Alive,
 			Status: jujuparams.EntityStatus{
 				Status: status.Available,
@@ -464,13 +467,13 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 				Level: "unsupported",
 			},
 			Users: []jujuparams.ModelUserInfo{{
-				UserName: "alice@external",
+				UserName: "alice@canonical.com",
 				Access:   jujuparams.ModelAdminAccess,
 			}, {
-				UserName: "bob@external",
+				UserName: "bob@canonical.com",
 				Access:   jujuparams.ModelAdminAccess,
 			}, {
-				UserName: "charlie@external",
+				UserName: "charlie@canonical.com",
 				Access:   jujuparams.ModelAdminAccess,
 			}},
 			AgentVersion:            &jujuversion.Current,
@@ -491,9 +494,9 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 }
 
 func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
-	mt4 := s.AddModel(c, names.NewUserTag("charlie@external"), "model-4", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, s.Model2.CloudCredential.ResourceTag())
+	mt4 := s.AddModel(c, names.NewUserTag("charlie@canonical.com"), "model-4", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, s.Model2.CloudCredential.ResourceTag())
 
-	mt5 := s.AddModel(c, names.NewUserTag("charlie@external"), "model-5", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, s.Model2.CloudCredential.ResourceTag())
+	mt5 := s.AddModel(c, names.NewUserTag("charlie@canonical.com"), "model-5", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, s.Model2.CloudCredential.ResourceTag())
 
 	// Add some machines to one of the models
 	state, err := s.StatePool.Get(s.Model3.Tag().Id())
@@ -518,10 +521,12 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 	})
 	f.MakeMachine(c, nil)
 
-	s.Candid.AddUser("bob", "controller-admin")
+	s.AddAdminUser(c, "bob@canonical.com")
 
 	// we make bob a jimm administrator
-	bob := openfga.NewUser(&dbmodel.User{Username: "bob@external"}, s.OFGAClient)
+	bobIdentity, err := dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, gc.IsNil)
+	bob := openfga.NewUser(bobIdentity, s.OFGAClient)
 	err = bob.SetControllerAccess(context.Background(), s.JIMM.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, gc.Equals, nil)
 
@@ -572,10 +577,10 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 				Level: "unsupported",
 			},
 			Users: []jujuparams.ModelUserInfo{{
-				UserName: "alice@external",
+				UserName: "alice@canonical.com",
 				Access:   jujuparams.ModelAdminAccess,
 			}, {
-				UserName: "bob@external",
+				UserName: "bob@canonical.com",
 				Access:   jujuparams.ModelAdminAccess,
 			}},
 			AgentVersion:            &jujuversion.Current,
@@ -606,13 +611,13 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 				Level: "unsupported",
 			},
 			Users: []jujuparams.ModelUserInfo{{
-				UserName: "alice@external",
+				UserName: "alice@canonical.com",
 				Access:   jujuparams.ModelAdminAccess,
 			}, {
-				UserName: "bob@external",
+				UserName: "bob@canonical.com",
 				Access:   jujuparams.ModelAdminAccess,
 			}, {
-				UserName: "charlie@external",
+				UserName: "charlie@canonical.com",
 				Access:   jujuparams.ModelAdminAccess,
 			}},
 			AgentVersion:            &jujuversion.Current,
@@ -643,13 +648,13 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 				Level: "unsupported",
 			},
 			Users: []jujuparams.ModelUserInfo{{
-				UserName: "alice@external",
+				UserName: "alice@canonical.com",
 				Access:   jujuparams.ModelAdminAccess,
 			}, {
-				UserName: "bob@external",
+				UserName: "bob@canonical.com",
 				Access:   jujuparams.ModelAdminAccess,
 			}, {
-				UserName: "charlie@external",
+				UserName: "charlie@canonical.com",
 				Access:   jujuparams.ModelAdminAccess,
 			}},
 			Machines: []jujuparams.ModelMachineInfo{{
@@ -692,7 +697,7 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 			CloudTag:           names.NewCloudTag(jimmtest.TestCloudName).String(),
 			CloudRegion:        jimmtest.TestCloudRegionName,
 			CloudCredentialTag: s.Model2.CloudCredential.Tag().String(),
-			OwnerTag:           names.NewUserTag("charlie@external").String(),
+			OwnerTag:           names.NewUserTag("charlie@canonical.com").String(),
 			Life:               life.Alive,
 			Status: jujuparams.EntityStatus{
 				Status: status.Available,
@@ -701,13 +706,13 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 				Level: "unsupported",
 			},
 			Users: []jujuparams.ModelUserInfo{{
-				UserName: "alice@external",
+				UserName: "alice@canonical.com",
 				Access:   jujuparams.ModelAdminAccess,
 			}, {
-				UserName: "bob@external",
+				UserName: "bob@canonical.com",
 				Access:   jujuparams.ModelAdminAccess,
 			}, {
-				UserName: "charlie@external",
+				UserName: "charlie@canonical.com",
 				Access:   jujuparams.ModelAdminAccess,
 			}},
 			Machines: []jujuparams.ModelMachineInfo{{
@@ -750,7 +755,7 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 			CloudTag:           names.NewCloudTag(jimmtest.TestCloudName).String(),
 			CloudRegion:        jimmtest.TestCloudRegionName,
 			CloudCredentialTag: s.Model2.CloudCredential.Tag().String(),
-			OwnerTag:           names.NewUserTag("charlie@external").String(),
+			OwnerTag:           names.NewUserTag("charlie@canonical.com").String(),
 			Life:               life.Alive,
 			Status: jujuparams.EntityStatus{
 				Status: status.Available,
@@ -759,13 +764,13 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 				Level: "unsupported",
 			},
 			Users: []jujuparams.ModelUserInfo{{
-				UserName: "alice@external",
+				UserName: "alice@canonical.com",
 				Access:   jujuparams.ModelAdminAccess,
 			}, {
-				UserName: "bob@external",
+				UserName: "bob@canonical.com",
 				Access:   jujuparams.ModelAdminAccess,
 			}, {
-				UserName: "charlie@external",
+				UserName: "charlie@canonical.com",
 				Access:   jujuparams.ModelAdminAccess,
 			}},
 			AgentVersion:            &jujuversion.Current,
@@ -797,27 +802,27 @@ var createModelTests = []struct {
 }{{
 	about:         "success",
 	name:          "model",
-	ownerTag:      names.NewUserTag("bob@external").String(),
+	ownerTag:      names.NewUserTag("bob@canonical.com").String(),
 	cloudTag:      names.NewCloudTag(jimmtest.TestCloudName).String(),
-	credentialTag: "cloudcred-" + jimmtest.TestCloudName + "_bob@external_cred",
+	credentialTag: "cloudcred-" + jimmtest.TestCloudName + "_bob@canonical.com_cred",
 }, {
 	about:         "unauthorized user",
 	name:          "model-2",
-	ownerTag:      names.NewUserTag("charlie@external").String(),
+	ownerTag:      names.NewUserTag("charlie@canonical.com").String(),
 	cloudTag:      names.NewCloudTag(jimmtest.TestCloudName).String(),
-	credentialTag: "cloudcred-" + jimmtest.TestCloudName + "_bob@external_cred",
+	credentialTag: "cloudcred-" + jimmtest.TestCloudName + "_bob@canonical.com_cred",
 	expectError:   `unauthorized \(unauthorized access\)`,
 }, {
 	about:         "existing model name",
 	name:          "model-1",
-	ownerTag:      names.NewUserTag("bob@external").String(),
+	ownerTag:      names.NewUserTag("bob@canonical.com").String(),
 	cloudTag:      names.NewCloudTag(jimmtest.TestCloudName).String(),
-	credentialTag: "cloudcred-" + jimmtest.TestCloudName + "_bob@external_cred",
-	expectError:   "model bob@external/model-1 already exists \\(already exists\\)",
+	credentialTag: "cloudcred-" + jimmtest.TestCloudName + "_bob@canonical.com_cred",
+	expectError:   "model bob@canonical.com/model-1 already exists \\(already exists\\)",
 }, {
 	about:         "no controller",
 	name:          "model-3",
-	ownerTag:      names.NewUserTag("bob@external").String(),
+	ownerTag:      names.NewUserTag("bob@canonical.com").String(),
 	region:        "no-such-region",
 	cloudTag:      names.NewCloudTag(jimmtest.TestCloudName).String(),
 	credentialTag: "",
@@ -827,46 +832,46 @@ var createModelTests = []struct {
 	name:          "model-4",
 	ownerTag:      names.NewUserTag("bob").String(),
 	cloudTag:      names.NewCloudTag(jimmtest.TestCloudName).String(),
-	credentialTag: "cloudcred-" + jimmtest.TestCloudName + "_bob@external_cred",
+	credentialTag: "cloudcred-" + jimmtest.TestCloudName + "_bob@canonical.com_cred",
 	expectError:   `unauthorized \(unauthorized access\)`,
 }, {
 	about:         "invalid user",
 	name:          "model-5",
-	ownerTag:      "user-bob/test@external",
+	ownerTag:      "user-bob/test@canonical.com",
 	cloudTag:      names.NewCloudTag(jimmtest.TestCloudName).String(),
-	credentialTag: "cloudcred-" + jimmtest.TestCloudName + "_bob@external_cred",
-	expectError:   `"user-bob/test@external" is not a valid user tag \(bad request\)`,
+	credentialTag: "cloudcred-" + jimmtest.TestCloudName + "_bob@canonical.com_cred",
+	expectError:   `"user-bob/test@canonical.com" is not a valid user tag \(bad request\)`,
 }, {
 	about:         "specific cloud",
 	name:          "model-6",
-	ownerTag:      names.NewUserTag("bob@external").String(),
+	ownerTag:      names.NewUserTag("bob@canonical.com").String(),
 	cloudTag:      names.NewCloudTag(jimmtest.TestCloudName).String(),
-	credentialTag: "cloudcred-" + jimmtest.TestCloudName + "_bob@external_cred",
+	credentialTag: "cloudcred-" + jimmtest.TestCloudName + "_bob@canonical.com_cred",
 }, {
 	about:         "specific cloud and region",
 	name:          "model-7",
-	ownerTag:      names.NewUserTag("bob@external").String(),
+	ownerTag:      names.NewUserTag("bob@canonical.com").String(),
 	cloudTag:      names.NewCloudTag(jimmtest.TestCloudName).String(),
 	region:        jimmtest.TestCloudRegionName,
-	credentialTag: "cloudcred-" + jimmtest.TestCloudName + "_bob@external_cred",
+	credentialTag: "cloudcred-" + jimmtest.TestCloudName + "_bob@canonical.com_cred",
 }, {
 	about:         "bad cloud tag",
 	name:          "model-8",
-	ownerTag:      names.NewUserTag("bob@external").String(),
+	ownerTag:      names.NewUserTag("bob@canonical.com").String(),
 	cloudTag:      "not-a-cloud-tag",
-	credentialTag: "cloudcred-" + jimmtest.TestCloudName + "_bob@external_cred1",
+	credentialTag: "cloudcred-" + jimmtest.TestCloudName + "_bob@canonical.com_cred1",
 	expectError:   `"not-a-cloud-tag" is not a valid tag \(bad request\)`,
 }, {
 	about:         "no cloud tag",
 	name:          "model-8",
-	ownerTag:      names.NewUserTag("bob@external").String(),
+	ownerTag:      names.NewUserTag("bob@canonical.com").String(),
 	cloudTag:      "",
-	credentialTag: "cloudcred-" + jimmtest.TestCloudName + "_bob@external_cred1",
+	credentialTag: "cloudcred-" + jimmtest.TestCloudName + "_bob@canonical.com_cred1",
 	expectError:   `no cloud specified for model; please specify one`,
 }, {
 	about:    "no credential tag selects unambigous creds",
 	name:     "model-8",
-	ownerTag: names.NewUserTag("bob@external").String(),
+	ownerTag: names.NewUserTag("bob@canonical.com").String(),
 	cloudTag: names.NewCloudTag(jimmtest.TestCloudName).String(),
 	region:   jimmtest.TestCloudRegionName,
 }}
@@ -927,7 +932,7 @@ func (s *modelManagerSuite) TestGrantAndRevokeModel(c *gc.C) {
 	c.Assert(res, gc.HasLen, 1)
 	c.Assert(res[0].Error, gc.ErrorMatches, "unauthorized")
 
-	err = client.GrantModel("charlie@external", "write", s.Model.UUID.String)
+	err = client.GrantModel("charlie@canonical.com", "write", s.Model.UUID.String)
 	c.Assert(err, gc.Equals, nil)
 
 	res, err = client2.ModelInfo([]names.ModelTag{s.Model.ResourceTag()})
@@ -936,7 +941,7 @@ func (s *modelManagerSuite) TestGrantAndRevokeModel(c *gc.C) {
 	c.Assert(res[0].Error, gc.IsNil)
 	c.Assert(res[0].Result.UUID, gc.Equals, s.Model.UUID.String)
 
-	err = client.RevokeModel("charlie@external", "read", s.Model.UUID.String)
+	err = client.RevokeModel("charlie@canonical.com", "read", s.Model.UUID.String)
 	c.Assert(err, gc.Equals, nil)
 
 	res, err = client2.ModelInfo([]names.ModelTag{s.Model.ResourceTag()})
@@ -956,7 +961,7 @@ func (s *modelManagerSuite) TestUserRevokeOwnAccess(c *gc.C) {
 	defer conn2.Close()
 	client2 := modelmanager.NewClient(conn2)
 
-	err := client.GrantModel("charlie@external", "read", s.Model.UUID.String)
+	err := client.GrantModel("charlie@canonical.com", "read", s.Model.UUID.String)
 	c.Assert(err, gc.Equals, nil)
 
 	res, err := client2.ModelInfo([]names.ModelTag{names.NewModelTag(s.Model.UUID.String)})
@@ -965,7 +970,7 @@ func (s *modelManagerSuite) TestUserRevokeOwnAccess(c *gc.C) {
 	c.Assert(res[0].Error, gc.IsNil)
 	c.Assert(res[0].Result.UUID, gc.Equals, s.Model.UUID.String)
 
-	err = client2.RevokeModel("charlie@external", "read", s.Model.UUID.String)
+	err = client2.RevokeModel("charlie@canonical.com", "read", s.Model.UUID.String)
 	c.Assert(err, gc.Equals, nil)
 
 	res, err = client2.ModelInfo([]names.ModelTag{names.NewModelTag(s.Model.UUID.String)})
@@ -986,7 +991,7 @@ func (s *modelManagerSuite) TestModifyModelAccessErrors(c *gc.C) {
 	}{{
 		about: "unauthorized",
 		modifyModelAccess: jujuparams.ModifyModelAccess{
-			UserTag:  names.NewUserTag("eve@external").String(),
+			UserTag:  names.NewUserTag("eve@canonical.com").String(),
 			Action:   jujuparams.GrantModelAccess,
 			Access:   jujuparams.ModelReadAccess,
 			ModelTag: s.Model2.Tag().String(),
@@ -1000,11 +1005,11 @@ func (s *modelManagerSuite) TestModifyModelAccessErrors(c *gc.C) {
 			Access:   jujuparams.ModelReadAccess,
 			ModelTag: s.Model.Tag().String(),
 		},
-		expectError: `unsupported local user`,
+		expectError: `unsupported local user; if this is a service account add @serviceaccount domain`,
 	}, {
 		about: "no such model",
 		modifyModelAccess: jujuparams.ModifyModelAccess{
-			UserTag:  names.NewUserTag("eve@external").String(),
+			UserTag:  names.NewUserTag("eve@canonical.com").String(),
 			Action:   jujuparams.GrantModelAccess,
 			Access:   jujuparams.ModelReadAccess,
 			ModelTag: names.NewModelTag("00000000-0000-0000-0000-000000000000").String(),
@@ -1013,7 +1018,7 @@ func (s *modelManagerSuite) TestModifyModelAccessErrors(c *gc.C) {
 	}, {
 		about: "invalid model tag",
 		modifyModelAccess: jujuparams.ModifyModelAccess{
-			UserTag:  names.NewUserTag("eve@external").String(),
+			UserTag:  names.NewUserTag("eve@canonical.com").String(),
 			Action:   jujuparams.GrantModelAccess,
 			Access:   jujuparams.ModelReadAccess,
 			ModelTag: "not-a-model-tag",
@@ -1031,7 +1036,7 @@ func (s *modelManagerSuite) TestModifyModelAccessErrors(c *gc.C) {
 	}, {
 		about: "unknown action",
 		modifyModelAccess: jujuparams.ModifyModelAccess{
-			UserTag:  names.NewUserTag("eve@external").String(),
+			UserTag:  names.NewUserTag("eve@canonical.com").String(),
 			Action:   "not-an-action",
 			Access:   jujuparams.ModelReadAccess,
 			ModelTag: s.Model.Tag().String(),
@@ -1040,7 +1045,7 @@ func (s *modelManagerSuite) TestModifyModelAccessErrors(c *gc.C) {
 	}, {
 		about: "invalid access",
 		modifyModelAccess: jujuparams.ModifyModelAccess{
-			UserTag:  names.NewUserTag("eve@external").String(),
+			UserTag:  names.NewUserTag("eve@canonical.com").String(),
 			Action:   jujuparams.GrantModelAccess,
 			Access:   "not-an-access",
 			ModelTag: s.Model.Tag().String(),
@@ -1141,7 +1146,7 @@ func (s *modelManagerSuite) TestChangeModelCredential(c *gc.C) {
 	defer conn.Close()
 
 	modelTag := s.Model.ResourceTag()
-	credTag := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/bob@external/cred2")
+	credTag := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/bob@canonical.com/cred2")
 	s.UpdateCloudCredential(c, credTag, jujuparams.CloudCredential{AuthType: "empty"})
 
 	client := modelmanager.NewClient(conn)
@@ -1159,7 +1164,7 @@ func (s *modelManagerSuite) TestChangeModelCredentialUnauthorizedModel(c *gc.C) 
 	defer conn.Close()
 
 	modelTag := s.Model.ResourceTag()
-	credTag := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/bob@external/cred2")
+	credTag := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/bob@canonical.com/cred2")
 	client := modelmanager.NewClient(conn)
 	err := client.ChangeModelCredential(modelTag, credTag)
 	c.Assert(err, gc.ErrorMatches, `unauthorized`)
@@ -1170,7 +1175,7 @@ func (s *modelManagerSuite) TestChangeModelCredentialUnauthorizedCredential(c *g
 	defer conn.Close()
 
 	modelTag := s.Model.ResourceTag()
-	credTag := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/alice@external/cred2")
+	credTag := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/alice@canonical.com/cred2")
 	client := modelmanager.NewClient(conn)
 	err := client.ChangeModelCredential(modelTag, credTag)
 	c.Assert(err, gc.ErrorMatches, `unauthorized`)
@@ -1192,10 +1197,10 @@ func (s *modelManagerSuite) TestChangeModelCredentialNotFoundCredential(c *gc.C)
 	defer conn.Close()
 
 	modelTag := s.Model.ResourceTag()
-	credTag := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/bob@external/cred2")
+	credTag := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/bob@canonical.com/cred2")
 	client := modelmanager.NewClient(conn)
 	err := client.ChangeModelCredential(modelTag, credTag)
-	c.Assert(err, gc.ErrorMatches, `cloudcredential "`+jimmtest.TestCloudName+`/bob@external/cred2" not found`)
+	c.Assert(err, gc.ErrorMatches, `cloudcredential "`+jimmtest.TestCloudName+`/bob@canonical.com/cred2" not found`)
 }
 
 func (s *modelManagerSuite) TestChangeModelCredentialLocalUserCredential(c *gc.C) {
@@ -1211,7 +1216,7 @@ func (s *modelManagerSuite) TestChangeModelCredentialLocalUserCredential(c *gc.C
 
 func (s *modelManagerSuite) TestValidateModelUpgrades(c *gc.C) {
 	c.Skip("3.2 no longer implements ValidateModelUpgrade")
-	conn := s.open(c, nil, "alice@external")
+	conn := s.open(c, nil, "alice@canonical.com")
 	defer conn.Close()
 
 	modelTag := s.Model.ResourceTag()
@@ -1339,7 +1344,7 @@ func (s *caasModelManagerSuite) SetUpTest(c *gc.C) {
 	}, false)
 	c.Assert(err, gc.Equals, nil)
 
-	s.cred = names.NewCloudCredentialTag("bob-cloud/bob@external/k8s")
+	s.cred = names.NewCloudCredentialTag("bob-cloud/bob@canonical.com/k8s")
 	cred := cloud.NewCredential(cloud.UserPassAuthType, map[string]string{
 		"username": kubetest.Username,
 		"password": kubetest.Password,
@@ -1361,7 +1366,7 @@ func (s *caasModelManagerSuite) TestCreateModelKubernetes(c *gc.C) {
 	defer conn.Close()
 
 	client := modelmanager.NewClient(conn)
-	mi, err := client.CreateModel("k8s-model-1", "bob@external", "bob-cloud", "", s.cred, nil)
+	mi, err := client.CreateModel("k8s-model-1", "bob@canonical.com", "bob-cloud", "", s.cred, nil)
 	c.Assert(err, gc.Equals, nil)
 
 	c.Assert(mi.Name, gc.Equals, "k8s-model-1")
@@ -1369,7 +1374,7 @@ func (s *caasModelManagerSuite) TestCreateModelKubernetes(c *gc.C) {
 	c.Assert(mi.ProviderType, gc.Equals, "kubernetes")
 	c.Assert(mi.Cloud, gc.Equals, "bob-cloud")
 	c.Assert(mi.CloudRegion, gc.Equals, "default")
-	c.Assert(mi.Owner, gc.Equals, "bob@external")
+	c.Assert(mi.Owner, gc.Equals, "bob@canonical.com")
 }
 
 func (s *caasModelManagerSuite) TestListCAASModelSummaries(c *gc.C) {
@@ -1380,7 +1385,7 @@ func (s *caasModelManagerSuite) TestListCAASModelSummaries(c *gc.C) {
 	defer conn.Close()
 
 	client := modelmanager.NewClient(conn)
-	mi, err := client.CreateModel("k8s-model-1", "bob@external", "bob-cloud", "", s.cred, nil)
+	mi, err := client.CreateModel("k8s-model-1", "bob@canonical.com", "bob-cloud", "", s.cred, nil)
 	c.Assert(err, gc.Equals, nil)
 
 	models, err := client.ListModelSummaries("bob", false)
@@ -1399,7 +1404,7 @@ func (s *caasModelManagerSuite) TestListCAASModelSummaries(c *gc.C) {
 		Cloud:           "bob-cloud",
 		CloudRegion:     "default",
 		CloudCredential: s.cred.Id(),
-		Owner:           "bob@external",
+		Owner:           "bob@canonical.com",
 		Life:            life.Value(constants.ALIVE.String()),
 		Status: base.Status{
 			Status: status.Available,
@@ -1430,8 +1435,8 @@ func (s *caasModelManagerSuite) TestListCAASModelSummaries(c *gc.C) {
 		DefaultSeries:   "jammy",
 		Cloud:           jimmtest.TestCloudName,
 		CloudRegion:     jimmtest.TestCloudRegionName,
-		CloudCredential: jimmtest.TestCloudName + "/bob@external/cred",
-		Owner:           "bob@external",
+		CloudCredential: jimmtest.TestCloudName + "/bob@canonical.com/cred",
+		Owner:           "bob@canonical.com",
 		Life:            life.Value(constants.ALIVE.String()),
 		Status: base.Status{
 			Status: status.Available,
@@ -1452,8 +1457,8 @@ func (s *caasModelManagerSuite) TestListCAASModelSummaries(c *gc.C) {
 		DefaultSeries:   "jammy",
 		Cloud:           jimmtest.TestCloudName,
 		CloudRegion:     jimmtest.TestCloudRegionName,
-		CloudCredential: jimmtest.TestCloudName + "/charlie@external/cred",
-		Owner:           "charlie@external",
+		CloudCredential: jimmtest.TestCloudName + "/charlie@canonical.com/cred",
+		Owner:           "charlie@canonical.com",
 		Life:            life.Value(constants.ALIVE.String()),
 		Status: base.Status{
 			Status: status.Available,
@@ -1476,7 +1481,7 @@ func (s *caasModelManagerSuite) TestListCAASModels(c *gc.C) {
 	defer conn.Close()
 
 	client := modelmanager.NewClient(conn)
-	mi, err := client.CreateModel("k8s-model-1", "bob@external", "bob-cloud", "", s.cred, nil)
+	mi, err := client.CreateModel("k8s-model-1", "bob@canonical.com", "bob-cloud", "", s.cred, nil)
 	c.Assert(err, gc.Equals, nil)
 
 	models, err := client.ListModels("bob")
@@ -1484,17 +1489,17 @@ func (s *caasModelManagerSuite) TestListCAASModels(c *gc.C) {
 	c.Assert(models, jc.SameContents, []base.UserModel{{
 		Name:  "k8s-model-1",
 		UUID:  mi.UUID,
-		Owner: "bob@external",
+		Owner: "bob@canonical.com",
 		Type:  "caas",
 	}, {
 		Name:  "model-1",
 		UUID:  s.Model.UUID.String,
-		Owner: "bob@external",
+		Owner: "bob@canonical.com",
 		Type:  "iaas",
 	}, {
 		Name:  "model-3",
 		UUID:  s.Model3.UUID.String,
-		Owner: "charlie@external",
+		Owner: "charlie@canonical.com",
 		Type:  "iaas",
 	}})
 }

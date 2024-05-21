@@ -7,4 +7,7 @@ var (
 	JwksPublicKeyTag  = jwksPublicKeyTag
 	JwksPrivateKeyTag = jwksPrivateKeyTag
 	JwksExpiryTag     = jwksExpiryTag
+	OAuthKind         = oauthKind
+	OAuthKeyTag       = oauthKeyTag
+	NewUUID           = &newUUID
 )

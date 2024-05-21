@@ -24,7 +24,7 @@ jobs:
 
   build_test:
     name: Build and Test
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
         with:
@@ -35,15 +35,16 @@ jobs:
           go-version-file: 'go.mod'
       - name: Install dependencies
         run: sudo apt-get update -y && sudo apt-get install -y gcc git-core gnupg build-essential
-      - name: Remove installed mongodb
-        run: sudo apt purge mongodb-org && sudo apt autoremove
       - run: sudo snap install juju-db --channel 4.4/stable
       - name: Add volume files
         run: |
           touch ./local/vault/approle.json
           touch ./local/vault/roleid.txt
+          touch ./local/vault/vault.env
+      - name: Create test certs
+        run: make certs
       - name: Start test environment
-        run: docker compose up -d
+        run: docker compose up -d --wait
       - name: Build and Test
         run: go test -mod readonly ./... -timeout 1h -cover
         env:
@@ -65,16 +66,11 @@ jobs:
       - uses: actions/setup-go@v4
         with:
           go-version-file: 'go.mod'
-      - name: Pull candid repo for test environment
-        run: |
-          git clone https://github.com/canonical/candid.git ./tmp/candid
-          cd ./tmp/candid
-          make image
-          docker image ls candid
       - name: Add volume files
         run: |
           touch ./local/vault/approle.json
           touch ./local/vault/roleid.txt
+          touch ./local/vault/vault.env
       - run: go version
       - run: go mod vendor
       - run: docker compose --profile dev up -d --wait --timestamps

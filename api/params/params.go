@@ -294,6 +294,7 @@ type RemoveGroupRequest struct {
 
 // Group holds the details of a group currently residing in JIMM.
 type Group struct {
+	UUID      string `json:"uuid"`
 	Name      string `json:"name"`
 	CreatedAt string `json:"created_at"`
 	UpdatedAt string `json:"updated_at"`
@@ -392,4 +393,85 @@ type MigrateModelInfo struct {
 // MigrateModelRequest allows for multiple migration requests to be made.
 type MigrateModelRequest struct {
 	Specs []MigrateModelInfo `json:"specs"`
+}
+
+// LoginDeviceResponse holds the details to complete a LoginDevice flow.
+type LoginDeviceResponse struct {
+	// VerificationURI holds the URI that the user must navigate to
+	// when entering their "user-code" to consent to this authorisation
+	// request.
+	VerificationURI string `json:"verification-uri"`
+	// UserCode holds the one-time use user consent code.
+	UserCode string `json:"user-code"`
+}
+
+// GetDeviceSessionTokenResponse returns a session token to be used against
+// LoginWithSessionToken for authentication. The session token will be base64
+// encoded.
+type GetDeviceSessionTokenResponse struct {
+	// SessionToken is a base64 encoded JWT capable of authenticating
+	// a user. The JWT contains the users email address in the subject,
+	// and this is used to identify this user.
+	SessionToken string `json:"session-token"`
+}
+
+// LoginWithSessionTokenRequest accepts a session token minted by JIMM and logs
+// the user in.
+//
+// The login response for this login request type is that of jujuparams.LoginResult,
+// such that the behaviour of previous macroon based authentication is unchanged.
+// However, on unauthenticated requests, the error is different and is not a macaroon
+// discharge request.
+type LoginWithSessionTokenRequest struct {
+	// SessionToken is a base64 encoded JWT capable of authenticating
+	// a user. The JWT contains the users email address in the subject,
+	// and this is used to identify this user.
+	SessionToken string `json:"session-token"`
+}
+
+// Service Account related request parameters
+
+// LoginWithClientCredentialsRequest holds the client id and secret used
+// to authenticate with JIMM.
+type LoginWithClientCredentialsRequest struct {
+	ClientID     string `json:"client-id"`
+	ClientSecret string `json:"client-secret"`
+}
+
+// AddServiceAccountRequest holds a request to add a service account.
+type AddServiceAccountRequest struct {
+	// ClientID holds the client id of the service account.
+	ClientID string `json:"client-id"`
+}
+
+// UpdateServiceAccountCredentialsRequest holds a request to update
+// a service accounts cloud credentials.
+type UpdateServiceAccountCredentialsRequest struct {
+	jujuparams.UpdateCredentialArgs
+	// ClientID holds the client id of the service account.
+	ClientID string `json:"client-id"`
+}
+
+// ListServiceAccountCredentialsRequest holds a request to list
+// a service accounts cloud credentials.
+type ListServiceAccountCredentialsRequest struct {
+	jujuparams.CloudCredentialArgs
+	// ClientID holds the client id of the service account.
+	ClientID string `json:"client-id"`
+}
+
+// ListServiceAccountCredentialsRequest holds a request to list
+// a service accounts cloud credentials.
+type GrantServiceAccountAccess struct {
+	// Entities holds a slice of entities (identities and groups)
+	// that should have administration access to the desired clientID.
+	Entities []string `json:"entities"`
+	// ClientID holds the client id of the service account.
+	ClientID string `json:"client-id"`
+}
+
+// WhoamiResponse holds the response for a /auth/whoami call.
+type WhoamiResponse struct {
+	DisplayName string `json:"display-name"`
+	Email       string `json:"email"`
 }

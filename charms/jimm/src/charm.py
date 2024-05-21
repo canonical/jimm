@@ -11,6 +11,7 @@ import shutil
 import socket
 import subprocess
 import urllib
+from urllib.parse import urljoin, urlparse
 
 import hvac
 from charmhelpers.contrib.charmsupport.nrpe import NRPE
@@ -19,7 +20,8 @@ from charms.data_platform_libs.v0.data_interfaces import (
     DatabaseRequiresEvent,
 )
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
-from charms.openfga_k8s.v0.openfga import OpenFGARequires, OpenFGAStoreCreateEvent
+from charms.hydra.v0.oauth import ClientConfig, OAuthInfoChangedEvent, OAuthRequirer
+from charms.openfga_k8s.v1.openfga import OpenFGARequires, OpenFGAStoreCreateEvent
 from jinja2 import Environment, FileSystemLoader
 from ops.main import main
 from ops.model import (
@@ -28,7 +30,6 @@ from ops.model import (
     MaintenanceStatus,
     ModelError,
     Relation,
-    WaitingStatus,
 )
 
 from systemd import SystemdCharm
@@ -37,6 +38,17 @@ logger = logging.getLogger(__name__)
 
 DATABASE_NAME = "jimm"
 OPENFGA_STORE_NAME = "jimm"
+OAUTH = "oauth"
+OAUTH_SCOPES = "openid email offline_access"
+# TODO: Add "device_code" below once the charm interface supports it.
+OAUTH_GRANT_TYPES = ["authorization_code", "refresh_token", "urn:ietf:params:oauth:grant-type:device_code"]
+
+# Env file parts
+DB_PART = "db"
+VAULT_PART = "vault"
+OAUTH_PART = "oauth"
+LEADER_PART = "leader"
+OPENFGA_PART = "openfga"
 
 
 class JimmCharm(SystemdCharm):
@@ -59,7 +71,6 @@ class JimmCharm(SystemdCharm):
             self.on.dashboard_relation_joined,
             self._on_dashboard_relation_joined,
         )
-        self._agent_filename = "/var/snap/jimm/common/agent.json"
         self._vault_secret_filename = "/var/snap/jimm/common/vault_secret.json"
         self._workload_filename = "/snap/bin/jimm"
         self._rsyslog_conf_path = "/etc/rsyslog.d/10-jimm.conf"
@@ -82,6 +93,10 @@ class JimmCharm(SystemdCharm):
             self.openfga.on.openfga_store_created,
             self._on_openfga_store_created,
         )
+
+        self.oauth = OAuthRequirer(self, self._oauth_client_config, relation_name=OAUTH)
+        self.framework.observe(self.oauth.on.oauth_info_changed, self._on_oauth_info_changed)
+        self.framework.observe(self.oauth.on.oauth_info_removed, self._on_oauth_info_removed)
 
         # Grafana agent relation
         self._grafana_agent = COSAgentProvider(
@@ -125,18 +140,22 @@ class JimmCharm(SystemdCharm):
 
         args = {
             "admins": self.config.get("controller-admins", ""),
-            "bakery_agent_file": self._bakery_agent_file(),
-            "candid_url": self.config.get("candid-url"),
             "dns_name": self.config.get("dns-name"),
             "log_level": self.config.get("log-level"),
             "uuid": self.config.get("uuid"),
             "dashboard_location": self.config.get("juju-dashboard-location"),
-            "public_key": self.config.get("public-key"),
-            "private_key": self.config.get("private-key"),
+            "bakery_public_key": self.config.get("public-key", ""),
+            "bakery_private_key": self.config.get("private-key", ""),
             "audit_retention_period": self.config.get("audit-log-retention-period-in-days", ""),
             "jwt_expiry": self.config.get("jwt-expiry", "5m"),
             "macaroon_expiry_duration": self.config.get("macaroon-expiry-duration"),
+            "session_expiry_duration": self.config.get("session-expiry-duration"),
+            "secure_session_cookies": self.config.get("secure-session-cookies"),
+            "session_cookie_max_age": self.config.get("session-cookie-max-age"),
+            "final_redirect_url": self.config.get("final-redirect-url"),
         }
+
+        self.oauth.update_client_config(client_config=self._oauth_client_config)
 
         if self.config.get("postgres-secret-storage", False):
             args["insecure_secret_storage"] = "enabled"  # Value doesn't matter, only checks env var exists.
@@ -159,7 +178,7 @@ class JimmCharm(SystemdCharm):
         if self.model.unit.is_leader():
             args["jimm_watch_controllers"] = "1"
             args["jimm_enable_jwks_rotator"] = "1"
-        with open(self._env_filename("leader"), "wt") as f:
+        with open(self._env_filename(LEADER_PART), "wt") as f:
             f.write(self._render_template("jimm-leader.env", **args))
         if self._ready():
             self.restart()
@@ -167,7 +186,6 @@ class JimmCharm(SystemdCharm):
 
     def _on_database_event(self, event: DatabaseRequiresEvent):
         """Handle database event"""
-
         if not event.endpoints:
             logger.info("received empty database host address")
             event.defer()
@@ -188,7 +206,7 @@ class JimmCharm(SystemdCharm):
         logger.info("received database uri: {}".format(uri))
 
         args = {"dsn": uri}
-        with open(self._env_filename("db"), "wt") as f:
+        with open(self._env_filename(DB_PART), "wt") as f:
             f.write(self._render_template("jimm-db.env", **args))
         if self._ready():
             self.restart()
@@ -196,12 +214,39 @@ class JimmCharm(SystemdCharm):
 
     def _on_database_relation_broken(self, event) -> None:
         """Database relation broken handler."""
-        if not self._ready():
-            event.defer()
-            logger.warning("Unit is not ready")
-            return
         logger.info("database relation removed")
+        try:
+            os.remove(self._env_filename(DB_PART))
+        except OSError:
+            pass
+        self.stop()
         self._on_update_status(None)
+
+    def _on_oauth_info_changed(self, event: OAuthInfoChangedEvent):
+        if not self.oauth.is_client_created():
+            logger.warning("OAuth relation is not ready yet")
+            return
+        oauth_provider_info = self.oauth.get_provider_info()
+        oauth_info = {
+            "issuer_url": oauth_provider_info.issuer_url,
+            "client_id": oauth_provider_info.client_id,
+            "client_secret": oauth_provider_info.client_secret,
+            "scope": oauth_provider_info.scope,
+        }
+        with open(self._env_filename(OAUTH_PART), "wt") as f:
+            f.write(self._render_template("jimm-oauth.env", **oauth_info))
+        if self._ready():
+            self.restart()
+        self._on_update_status(event)
+
+    def _on_oauth_info_removed(self, event: OAuthInfoChangedEvent):
+        logger.info("oauth relation removed")
+        try:
+            os.remove(self._env_filename(OAUTH_PART))
+        except OSError:
+            pass
+        self.stop()
+        self._on_update_status(event)
 
     def _on_stop(self, _):
         """Stop the JIMM service."""
@@ -212,14 +257,7 @@ class JimmCharm(SystemdCharm):
     def _on_update_status(self, _):
         """Update the status of the charm."""
 
-        if not os.path.exists(self._workload_filename):
-            self.unit.status = BlockedStatus("waiting for jimm-snap resource")
-            return
-        if not self.model.get_relation("database"):
-            self.unit.status = BlockedStatus("waiting for database")
-            return
-        if not os.path.exists(self._env_filename("db")):
-            self.unit.status = WaitingStatus("waiting for database")
+        if not self._ready():
             return
         try:
             url = "http://localhost:8080/debug/info"
@@ -283,7 +321,7 @@ class JimmCharm(SystemdCharm):
             "vault_auth_path": "/auth/approle/login",
             "vault_path": "charm-jimm-creds",
         }
-        with open(self._env_filename("vault"), "wt") as f:
+        with open(self._env_filename(VAULT_PART), "wt") as f:
             f.write(self._render_template("jimm-vault.env", **args))
 
     def _install_snap(self):
@@ -312,31 +350,14 @@ class JimmCharm(SystemdCharm):
         )
         self._systemctl("restart", "rsyslog")
 
-    def _bakery_agent_file(self):
-        url = self.config.get("candid-url", "")
-        username = self.config.get("candid-agent-username", "")
-        private_key = self.config.get("candid-agent-private-key", "")
-        public_key = self.config.get("candid-agent-public-key", "")
-        if not url or not username or not private_key or not public_key:
-            return ""
-        data = {
-            "key": {"public": public_key, "private": private_key},
-            "agents": [{"url": url, "username": username}],
-        }
-        try:
-            with open(self._agent_filename, "wt") as f:
-                json.dump(data, f)
-        except FileNotFoundError:
-            return ""
-        return self._agent_filename
-
     def _write_service_file(self):
         args = {
             "conf_file": self._env_filename(),
-            "db_file": self._env_filename("db"),
-            "leader_file": self._env_filename("leader"),
-            "vault_file": self._env_filename("vault"),
-            "openfga_file": self._env_filename("openfga"),
+            "db_file": self._env_filename(DB_PART),
+            "leader_file": self._env_filename(LEADER_PART),
+            "vault_file": self._env_filename(VAULT_PART),
+            "openfga_file": self._env_filename(OPENFGA_PART),
+            "oauth_file": self._env_filename(OAUTH_PART),
         }
         with open(self.service_file, "wt") as f:
             f.write(self._render_template("jimm.service", **args))
@@ -349,8 +370,20 @@ class JimmCharm(SystemdCharm):
 
     def _ready(self):
         if not os.path.exists(self._env_filename()):
+            logger.warning("Missing base environment file")
+            self.unit.status = BlockedStatus("Waiting for environment")
             return False
-        if not os.path.exists(self._env_filename("db")):
+        if not os.path.exists(self._env_filename(DB_PART)):
+            logger.warning("Missing database environment file")
+            self.unit.status = BlockedStatus("Waiting for database relation")
+            return False
+        if not os.path.exists(self._env_filename(OAUTH_PART)):
+            logger.warning("Missing oauth environment file")
+            self.unit.status = BlockedStatus("Waiting for oauth relation")
+            return False
+        if not os.path.exists(self._env_filename(OPENFGA_PART)):
+            logger.warning("Missing openfga environment file")
+            self.unit.status = BlockedStatus("Waiting for openfga relation")
             return False
         return True
 
@@ -376,7 +409,6 @@ class JimmCharm(SystemdCharm):
             relation.data[self.app].update(
                 {
                     "controller_url": "wss://{}".format(self.config["dns-name"]),
-                    "identity_provider_url": self.config["candid-url"],
                     "is_juju": str(False),
                 }
             )
@@ -385,23 +417,44 @@ class JimmCharm(SystemdCharm):
         if not event.store_id:
             return
 
-        token = event.token
-        if event.token_secret_id:
-            logger.error("token secret {}".format(event.token_secret_id))
-            secret = self.model.get_secret(id=event.token_secret_id)
-            secret_content = secret.get_content()
-            token = secret_content["token"]
+        info = self.openfga.get_store_info()
+        if not info:
+            logger.warning("openfga info not ready yet")
+            return
 
+        o = urlparse(info.http_api_url)
         args = {
-            "openfga_host": event.address,
-            "openfga_port": event.port,
-            "openfga_scheme": event.scheme,
-            "openfga_store": event.store_id,
-            "openfga_token": token,
+            "openfga_host": o.hostname,
+            "openfga_port": o.port,
+            "openfga_scheme": o.scheme,
+            "openfga_store": info.store_id,
+            "openfga_token": info.token,
         }
 
-        with open(self._env_filename("openfga"), "wt") as f:
+        with open(self._env_filename(OPENFGA_PART), "wt") as f:
             f.write(self._render_template("jimm-openfga.env", **args))
+        if self._ready():
+            self.restart()
+        self._on_update_status(None)
+
+    @property
+    def _oauth_client_config(self) -> ClientConfig:
+        dns = self.config.get("dns-name")
+        if dns is None or dns == "":
+            dns = "http://localhost"
+        dns = ensureFQDN(dns)
+        return ClientConfig(
+            urljoin(dns, "/oauth/callback"),
+            OAUTH_SCOPES,
+            OAUTH_GRANT_TYPES,
+        )
+
+
+def ensureFQDN(dns: str):  # noqa: N802
+    """Ensures a domain name has an https:// prefix."""
+    if not dns.startswith("http"):
+        dns = "https://" + dns
+    return dns
 
 
 def _json_data(event, key):

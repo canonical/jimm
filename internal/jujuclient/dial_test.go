@@ -9,7 +9,7 @@ import (
 	"github.com/juju/juju/core/network"
 	jujuparams "github.com/juju/juju/rpc/params"
 	jujuversion "github.com/juju/juju/version"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 
@@ -71,12 +71,12 @@ var _ = gc.Suite(&dialSuite{})
 func (s *dialSuite) TestDial(c *gc.C) {
 	info := s.APIInfo(c)
 	ctl := dbmodel.Controller{
-		UUID:          s.ControllerConfig.ControllerUUID(),
-		Name:          s.ControllerConfig.ControllerName(),
-		CACertificate: info.CACert,
-		AdminUser:     info.Tag.Id(),
-		AdminPassword: info.Password,
-		PublicAddress: info.Addrs[0],
+		UUID:              s.ControllerConfig.ControllerUUID(),
+		Name:              s.ControllerConfig.ControllerName(),
+		CACertificate:     info.CACert,
+		AdminIdentityName: info.Tag.Id(),
+		AdminPassword:     info.Password,
+		PublicAddress:     info.Addrs[0],
 	}
 	api, err := s.Dialer.Dial(context.Background(), &ctl, names.ModelTag{}, nil)
 	c.Assert(err, gc.Equals, nil)

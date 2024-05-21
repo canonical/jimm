@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 
 	"github.com/canonical/jimm/internal/errors"
@@ -24,8 +24,17 @@ type InMemoryCredentialStore struct {
 	jwks                      jwk.Set
 	privateKey                []byte
 	expiry                    time.Time
+	oauthKey                  []byte
 	controllerCredentials     map[string]controllerCredentials
 	cloudCredentialAttributes map[string]map[string]string
+}
+
+// NewInMemoryCredentialStore returns a new instance of `InMemoryCredentialStore`
+// with some secrets/keys being populated.
+func NewInMemoryCredentialStore() *InMemoryCredentialStore {
+	return &InMemoryCredentialStore{
+		oauthKey: []byte(JWTTestSecret),
+	}
 }
 
 // Get retrieves the stored attributes of a cloud credential.
@@ -174,6 +183,41 @@ func (s *InMemoryCredentialStore) PutJWKSExpiry(ctx context.Context, expiry time
 	defer s.mu.Unlock()
 
 	s.expiry = expiry
+
+	return nil
+}
+
+// CleanupOAuthSecrets removes all secrets associated with OAuth.
+func (s *InMemoryCredentialStore) CleanupOAuthSecrets(ctx context.Context) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.oauthKey = nil
+	return nil
+}
+
+// GetOAuthSecret returns the current HS256 (symmetric encryption) secret used to sign OAuth session tokens.
+func (s *InMemoryCredentialStore) GetOAuthSecret(ctx context.Context) ([]byte, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if s.oauthKey == nil || len(s.oauthKey) == 0 {
+		return nil, errors.E(errors.CodeNotFound)
+	}
+
+	key := make([]byte, len(s.oauthKey))
+	copy(key, s.oauthKey)
+
+	return key, nil
+}
+
+// PutOAuthSecret puts a HS256 (symmetric encryption) secret into the credentials store for signing OAuth session tokens.
+func (s *InMemoryCredentialStore) PutOAuthSecret(ctx context.Context, raw []byte) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.oauthKey = make([]byte, len(raw))
+	copy(s.oauthKey, raw)
 
 	return nil
 }

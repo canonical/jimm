@@ -45,6 +45,12 @@ See [here](./local/README.md) on how to get started.
 
 ## Testing
 
+## TLDR
+Run:
+```
+$ make test-env
+$ go test ./...
+```
 ### Pre-requisite
 To check if your system has all the prequisites installed simply run `make sysdeps`.
 This will check for all test prequisites and inform you how to install them if not installed. 
@@ -55,6 +61,11 @@ As the juju controller internal suites start their our mongod instances, it is r
 This can be installed via: `sudo snap install juju-db`.
 The latest JIMM has an upgraded dependency on Juju which requires in turn requires juju-db from channel `4.4/stable`,
  this can be installed with `sudo snap install juju-db --channel=4.4/stable`
+
+Tests inside of `cmd/` create a JIMM server and test the jimmctl and jaas CLI packages. The Juju CLI requires that it connects to
+an HTTPS server, but these tests also start a Juju controller which expects to be able to fetch a JWKS and macaroon publickey
+from JIMM (which is running as an HTTPS server). This would normally result in a TLS certificate error, however JIMM will
+attempt to use a custom self-signed cert from the certificate generated in `local/traefik/certs`. The make command `make certs` will generate these certs and place the CA in your system's cert pool which will be picked up by the Go HTTP client.
 
 The rest of the suite relies on PostgreSQL, OpenFGA and Hashicorp Vault which are dockerised
 and as such you may simple run `make test-env` to be integration test ready.

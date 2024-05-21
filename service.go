@@ -4,24 +4,20 @@ package jimm
 
 import (
 	"context"
-	"encoding/json"
+	"crypto/rand"
+	"database/sql"
 	"net/http"
-	"os"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/canonical/candid/candidclient"
+	"github.com/antonlindstrom/pgstore"
 	cofga "github.com/canonical/ofga"
 	"github.com/go-chi/chi/v5"
-	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
-	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/dbrootkeystore"
-	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/identchecker"
-	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
-	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery/agent"
 	"github.com/google/uuid"
 	vaultapi "github.com/hashicorp/vault/api"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
@@ -29,9 +25,9 @@ import (
 
 	"github.com/canonical/jimm/internal/auth"
 	"github.com/canonical/jimm/internal/dashboard"
-	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/debugapi"
+	"github.com/canonical/jimm/internal/discharger"
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/jimm"
 	jimmcreds "github.com/canonical/jimm/internal/jimm/credentials"
@@ -62,6 +58,31 @@ type OpenFGAParams struct {
 	Port      string
 }
 
+// OAuthAuthenticatorParams holds parameters needed to configure an OAuthAuthenticator
+// implementation.
+type OAuthAuthenticatorParams struct {
+	// IssuerURL is the URL of the OAuth2.0 server.
+	// I.e., http://localhost:8082/realms/jimm in the case of keycloak.
+	IssuerURL string
+
+	// ClientID holds the OAuth2.0. The client IS expected to be confidential.
+	ClientID string
+
+	// ClientSecret holds the OAuth2.0 "client-secret" to authenticate when performing
+	// /auth and /token requests.
+	ClientSecret string
+
+	// Scopes holds the scopes that you wish to retrieve.
+	Scopes []string
+
+	// SessionTokenExpiry holds the expiry duration for issued JWTs
+	// for user (CLI) to JIMM authentication.
+	SessionTokenExpiry time.Duration
+
+	// SessionCookieMaxAge holds the max age for session cookies in seconds.
+	SessionCookieMaxAge int
+}
+
 // A Params structure contains the parameters required to initialise a new
 // Service.
 type Params struct {
@@ -74,24 +95,7 @@ type Params struct {
 	// will be used.
 	DSN string
 
-	// CandidURL contains the URL of the candid server that the JIMM
-	// service will use for authentication. If this is empty then no
-	// authentication will be possible.
-	CandidURL string
-
-	// CandidPublicKey contains the base64 encoded public key of the
-	// candid server specified in CandidURL. In most cases there is no
-	// need to set this parameter, The public key will be retrieved
-	// from the candid server itself.
-	CandidPublicKey string
-
-	// BakeryAgentFile contains the path of a file containing agent
-	// authentication information for JIMM. If this is empty then
-	// authentication will only use information contained in the
-	// discharged macaroons.
-	BakeryAgentFile string
-
-	// ControllerAdmins contains a list of candid users (or groups)
+	// ControllerAdmins contains a list of users (or groups)
 	// that will be given the access-level "superuser" when they
 	// authenticate to the controller.
 	ControllerAdmins []string
@@ -102,11 +106,11 @@ type Params struct {
 	// call. This is mostly useful for testing.
 	DisableConnectionCache bool
 
-	// VaultSecretFile is the path of the file containing the secret to
-	// use with the vault server. If this is empty then no attempt will
-	// be made to use a vault server and JIMM will store everything in
-	// it's local database.
-	VaultSecretFile string
+	// VaultRoleID is the AppRole role ID.
+	VaultRoleID string
+
+	// VaultRoleSecretID is the AppRole secret ID.
+	VaultRoleSecretID string
 
 	// VaultAddress is the URL of a vault server that will be used to
 	// store secrets for JIMM. If this is empty then the default
@@ -151,12 +155,25 @@ type Params struct {
 	// MacaroonExpiryDuration holds the expiry duration of authentication macaroons.
 	MacaroonExpiryDuration time.Duration
 
-	// JWTExpiryDuration holds the expiry duration for issued JWTs.
+	// JWTExpiryDuration holds the expiry duration for issued JWTs
+	// for controller to JIMM communication ONLY.
 	JWTExpiryDuration time.Duration
 
 	// InsecureSecretStorage instructs JIMM to store secrets in its database
 	// instead of dedicated secure storage. SHOULD NOT BE USED IN PRODUCTION.
 	InsecureSecretStorage bool
+
+	// OAuthAuthenticatorParams holds parameters needed to configure an OAuthAuthenticator
+	// implementation.
+	OAuthAuthenticatorParams OAuthAuthenticatorParams
+
+	// DashboardFinalRedirectURL is the URL to FINALLY redirect to after completing
+	// the /callback in an authorisation code OAuth2.0 flow to finish the flow.
+	DashboardFinalRedirectURL string
+
+	// SecureSessionCookies determines if HTTPS must be enabled in order for JIMM
+	// to set cookies when creating browser based sessions.
+	SecureSessionCookies bool
 }
 
 // A Service is the implementation of a JIMM server.
@@ -215,6 +232,8 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	s := new(Service)
 	s.mux = chi.NewRouter()
 
+	// Setup all dependency services
+
 	if p.ControllerUUID == "" {
 		controllerUUID, err := uuid.NewRandom()
 		if err != nil {
@@ -237,6 +256,19 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	if err := s.jimm.Database.Migrate(ctx, false); err != nil {
 		return nil, errors.E(op, err)
 	}
+	sqlDb, err := s.jimm.Database.DB.DB()
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	// Setup browser session store
+	sessionStore, err := setupSessionStore(sqlDb, "secret-key-todo")
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	// Cleanup expired session every 30 minutes
+	defer sessionStore.StopCleanup(sessionStore.Cleanup(time.Minute * 30))
 
 	if p.AuditLogRetentionPeriodInDays != "" {
 		period, err := strconv.Atoi(p.AuditLogRetentionPeriodInDays)
@@ -260,15 +292,29 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		return nil, errors.E(op, err, "failed to ensure controller admins")
 	}
 
-	kp, dischargeMux, err := s.setupDischarger(p, openFGAclient)
-	if err != nil {
-		return nil, errors.E(op, err, "failed to set up discharger")
+	redirectUrl := p.PublicDNSName + jimmhttp.AuthResourceBasePath + jimmhttp.CallbackEndpoint
+	if !strings.HasPrefix(redirectUrl, "https://") || !strings.HasPrefix(redirectUrl, "http://") {
+		redirectUrl = "https://" + redirectUrl
 	}
-	s.mux.Handle(localDischargePath+"/*", dischargeMux)
 
-	s.jimm.Authenticator, err = newAuthenticator(ctx, &s.jimm.Database, openFGAclient, kp, p)
+	authSvc, err := auth.NewAuthenticationService(
+		ctx,
+		auth.AuthenticationServiceParams{
+			IssuerURL:           p.OAuthAuthenticatorParams.IssuerURL,
+			ClientID:            p.OAuthAuthenticatorParams.ClientID,
+			ClientSecret:        p.OAuthAuthenticatorParams.ClientSecret,
+			Scopes:              p.OAuthAuthenticatorParams.Scopes,
+			SessionTokenExpiry:  p.OAuthAuthenticatorParams.SessionTokenExpiry,
+			SessionCookieMaxAge: p.OAuthAuthenticatorParams.SessionCookieMaxAge,
+			Store:               &s.jimm.Database,
+			SessionStore:        sessionStore,
+			RedirectURL:         redirectUrl,
+		},
+	)
+	s.jimm.OAuthAuthenticator = authSvc
 	if err != nil {
-		return nil, errors.E(op, err)
+		zapctx.Error(ctx, "failed to setup authentication service", zap.Error(err))
+		return nil, errors.E(op, err, "failed to setup authentication service")
 	}
 
 	if err := s.setupCredentialStore(ctx, p); err != nil {
@@ -293,6 +339,11 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		s.jimm.Dialer = jimm.CacheDialer(s.jimm.Dialer)
 	}
 
+	if _, err := url.Parse(p.DashboardFinalRedirectURL); err != nil {
+		return nil, errors.E(op, err, "failed to parse final redirect url for the dashboard")
+	}
+
+	// Setup all HTTP handlers.
 	mountHandler := func(path string, h jimmhttp.JIMMHttpHandler) {
 		s.mux.Mount(path, h.Routes())
 	}
@@ -309,11 +360,28 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		"/.well-known",
 		wellknownapi.NewWellKnownHandler(s.jimm.CredentialStore),
 	)
+	oauthHandler, err := jimmhttp.NewOAuthHandler(jimmhttp.OAuthHandlerParams{
+		Authenticator:             authSvc,
+		DashboardFinalRedirectURL: p.DashboardFinalRedirectURL,
+		SecureCookies:             p.SecureSessionCookies,
+	})
+	if err != nil {
+		zapctx.Error(ctx, "failed to setup authentication handler", zap.Error(err))
+		return nil, errors.E(op, err, "failed to setup authentication handler")
+	}
+	mountHandler(
+		jimmhttp.AuthResourceBasePath,
+		oauthHandler,
+	)
+	macaroonDischarger, err := s.setupDischarger(p)
+	if err != nil {
+		return nil, errors.E(op, err, "failed to set up discharger")
+	}
+	s.mux.Handle(localDischargePath+"/*", discharger.GetDischargerMux(macaroonDischarger, localDischargePath))
 
 	params := jujuapi.Params{
-		ControllerUUID:   p.ControllerUUID,
-		IdentityLocation: p.CandidURL,
-		PublicDNSName:    p.PublicDNSName,
+		ControllerUUID: p.ControllerUUID,
+		PublicDNSName:  p.PublicDNSName,
 	}
 
 	s.mux.Handle("/api", jujuapi.APIHandler(ctx, &s.jimm, params))
@@ -330,22 +398,23 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 // setupDischarger set JIMM up as a discharger of 3rd party caveats addressed to it. This is intended
 // to enable Juju controllers to check for permissions using a macaroon-based workflow (atm only
 // for cross model relations).
-func (s *Service) setupDischarger(p Params, openFGAclient *openfga.OFGAClient) (*bakery.KeyPair, *http.ServeMux, error) {
-	macaroonDischarger, err := newMacaroonDischarger(p, &s.jimm.Database, openFGAclient)
-	if err != nil {
-		return nil, nil, errors.E(err)
+func (s *Service) setupDischarger(p Params) (*discharger.MacaroonDischarger, error) {
+	cfg := discharger.MacaroonDischargerConfig{
+		PublicKey:              p.PublicKey,
+		PrivateKey:             p.PrivateKey,
+		MacaroonExpiryDuration: p.MacaroonExpiryDuration,
+		ControllerUUID:         p.ControllerUUID,
 	}
+	MacaroonDischarger, err := discharger.NewMacaroonDischarger(cfg, &s.jimm.Database, s.jimm.OpenFGAClient)
+	if err != nil {
+		return nil, errors.E(err)
+	}
+	return MacaroonDischarger, nil
+}
 
-	discharger := httpbakery.NewDischarger(
-		httpbakery.DischargerParams{
-			Key:     &macaroonDischarger.kp,
-			Checker: httpbakery.ThirdPartyCaveatCheckerFunc(macaroonDischarger.checkThirdPartyCaveat),
-		},
-	)
-	dischargeMux := http.NewServeMux()
-	discharger.AddMuxHandlers(dischargeMux, localDischargePath)
-
-	return &macaroonDischarger.kp, dischargeMux, nil
+func setupSessionStore(db *sql.DB, secretKey string) (*pgstore.PGStore, error) {
+	store, err := pgstore.NewPGStoreFromPool(db, []byte(secretKey))
+	return store, err
 }
 
 func openDB(ctx context.Context, dsn string) (*gorm.DB, error) {
@@ -369,83 +438,16 @@ func openDB(ctx context.Context, dsn string) (*gorm.DB, error) {
 	})
 }
 
-func newAuthenticator(ctx context.Context, db *db.Database, client *openfga.OFGAClient, key *bakery.KeyPair, p Params) (jimm.Authenticator, error) {
-	if p.CandidURL == "" {
-		// No authenticator configured
-		return nil, nil
-	}
-	zapctx.Info(ctx, "configuring authenticator",
-		zap.String("CandidURL", p.CandidURL),
-		zap.String("CandidPublicKey", p.CandidPublicKey),
-		zap.String("BakeryAgentFile", p.BakeryAgentFile),
-	)
-	tps := bakery.NewThirdPartyStore()
-	if p.CandidPublicKey != "" {
-		var pk bakery.PublicKey
-		if err := pk.Key.UnmarshalText([]byte(p.CandidPublicKey)); err != nil {
-			return nil, err
-		}
-		tps.AddInfo(p.CandidURL, bakery.ThirdPartyInfo{
-			PublicKey: pk,
-			Version:   bakery.Version2,
-		})
-	}
-
-	bClient := httpbakery.NewClient()
-	var agentUsername string
-	if p.BakeryAgentFile != "" {
-		data, err := os.ReadFile(p.BakeryAgentFile)
-		if err != nil {
-			return nil, err
-		}
-		var info agent.AuthInfo
-		if err := json.Unmarshal(data, &info); err != nil {
-			return nil, err
-		}
-		if err := agent.SetUpAuth(bClient, &info); err != nil {
-			return nil, err
-		}
-		for _, a := range info.Agents {
-			if a.URL == p.CandidURL {
-				agentUsername = a.Username
-			}
-		}
-	}
-	candidClient, err := candidclient.New(candidclient.NewParams{
-		BaseURL:       p.CandidURL,
-		Client:        bClient,
-		AgentUsername: agentUsername,
-		CacheTime:     10 * time.Minute,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	if p.MacaroonExpiryDuration == 0 {
-		p.MacaroonExpiryDuration = 24 * time.Hour
-	}
-
-	return auth.JujuAuthenticator{
-		Bakery: identchecker.NewBakery(identchecker.BakeryParams{
-			RootKeyStore: dbrootkeystore.NewRootKeys(100, nil).NewStore(
-				db,
-				dbrootkeystore.Policy{
-					ExpiryDuration: p.MacaroonExpiryDuration,
-				},
-			),
-			Locator:        httpbakery.NewThirdPartyLocator(nil, tps),
-			Key:            key,
-			IdentityClient: candidClient,
-			Location:       "jimm",
-			Logger:         logger.BakeryLogger{},
-		}),
-		ControllerAdmins: p.ControllerAdmins,
-		Client:           client,
-	}, nil
-}
-
 func (s *Service) setupCredentialStore(ctx context.Context, p Params) error {
 	const op = errors.Op("newSecretStore")
+
+	// Only enable Postgres storage for secrets if explicitly enabled.
+	if p.InsecureSecretStorage {
+		zapctx.Warn(ctx, "using plaintext postgres for secret storage")
+		s.jimm.CredentialStore = &s.jimm.Database
+		return nil
+	}
+
 	vs, err := newVaultStore(ctx, p)
 	if err != nil {
 		zapctx.Error(ctx, "Vault Store error", zap.Error(err))
@@ -456,39 +458,21 @@ func (s *Service) setupCredentialStore(ctx context.Context, p Params) error {
 		return nil
 	}
 
-	// Only enable Postgres storage for secrets if explicitly enabled.
-	if p.InsecureSecretStorage {
-		zapctx.Warn(ctx, "using plaintext postgres for secret storage")
-		s.jimm.CredentialStore = &s.jimm.Database
-		return nil
-	}
 	// Currently jimm will start without a credential store but
 	// functionality will be limited.
 	return nil
 }
 
 func newVaultStore(ctx context.Context, p Params) (jimmcreds.CredentialStore, error) {
-	if p.VaultSecretFile == "" {
+	if p.VaultRoleID == "" || p.VaultRoleSecretID == "" {
 		return nil, nil
 	}
 	zapctx.Info(ctx, "configuring vault client",
 		zap.String("VaultAddress", p.VaultAddress),
 		zap.String("VaultPath", p.VaultPath),
-		zap.String("VaultSecretFile", p.VaultSecretFile),
-		zap.String("VaultAuthPath", p.VaultAuthPath),
+		zap.String("VaultRoleID", p.VaultRoleID),
 	)
 	servermon.VaultConfigured.Inc()
-
-	f, err := os.Open(p.VaultSecretFile)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	s, err := vaultapi.ParseSecret(f)
-	if err != nil || s == nil {
-		zapctx.Error(ctx, "failed to parse vault secret from file")
-		return nil, err
-	}
 
 	cfg := vaultapi.DefaultConfig()
 	if p.VaultAddress != "" {
@@ -501,11 +485,39 @@ func newVaultStore(ctx context.Context, p Params) (jimmcreds.CredentialStore, er
 	}
 
 	return &vault.VaultStore{
-		Client:     client,
-		AuthSecret: s.Data,
-		AuthPath:   p.VaultAuthPath,
-		KVPath:     p.VaultPath,
+		Client:       client,
+		RoleID:       p.VaultRoleID,
+		RoleSecretID: p.VaultRoleSecretID,
+		KVPath:       strings.ReplaceAll(p.VaultPath, "/", ""),
 	}, nil
+}
+
+// CheckOrGenerateOAuthKey checks if the OAuth secret key already exists on the
+// credential store, and if not, generates a random 4096-bit secret key and
+func (s *Service) CheckOrGenerateOAuthKey(ctx context.Context) error {
+	const op = errors.Op("CheckOrGenerateOAuthKey")
+	store := s.jimm.CredentialStore
+	if store == nil {
+		zapctx.Info(ctx, "skipped generating initial OAuth secret key due to nil credential store")
+		return nil
+	}
+
+	if secret, err := store.GetOAuthSecret(ctx); err == nil && secret != nil && len(secret) > 0 {
+		zapctx.Info(ctx, "detected existing OAuth secret key")
+		return nil
+	}
+
+	secret := make([]byte, 4096)
+	if _, err := rand.Read(secret); err != nil {
+		zapctx.Error(ctx, "failed to generate OAuth secret key", zap.Error(err))
+		return errors.E(op, err, "failed to generate OAuth secret key")
+	}
+
+	if err := store.PutOAuthSecret(ctx, secret); err != nil {
+		zapctx.Error(ctx, "failed to store generated OAuth secret key", zap.Error(err))
+		return errors.E(op, err, "failed to store generated OAuth secret key")
+	}
+	return nil
 }
 
 func newOpenFGAClient(ctx context.Context, p OpenFGAParams) (*openfga.OFGAClient, error) {
@@ -533,7 +545,11 @@ func ensureControllerAdministrators(ctx context.Context, client *openfga.OFGACli
 	tuples := []openfga.Tuple{}
 	for _, username := range admins {
 		userTag := names.NewUserTag(username)
-		user := openfga.NewUser(&dbmodel.User{Username: userTag.Id()}, client)
+		i, err := dbmodel.NewIdentity(userTag.Id())
+		if err != nil {
+			return errors.E(err)
+		}
+		user := openfga.NewUser(i, client)
 		isAdmin, err := openfga.IsAdministrator(ctx, user, controller)
 		if err != nil {
 			return errors.E(err)

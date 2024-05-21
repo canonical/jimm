@@ -10,7 +10,7 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/juju/juju/core/life"
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	"gorm.io/gorm"
 
 	"github.com/canonical/jimm/internal/constants"
@@ -57,7 +57,7 @@ func TestRecreateDeletedModel(t *testing.T) {
 		CloudRegion:     cl.Regions[0],
 		CloudCredential: cred,
 	}
-	c.Check(db.Create(&m2).Error, qt.ErrorMatches, `.*violates unique constraint "models_controller_id_owner_username_name_key".*`)
+	c.Check(db.Create(&m2).Error, qt.ErrorMatches, `.*violates unique constraint "models_controller_id_owner_identity_name_name_key".*`)
 
 	c.Assert(db.Delete(&m1).Error, qt.IsNil)
 	c.Check(db.First(&m1).Error, qt.Equals, gorm.ErrRecordNotFound)
@@ -214,15 +214,15 @@ func TestToJujuModel(t *testing.T) {
 			String: "00000001-0000-0000-0000-0000-000000000001",
 			Valid:  true,
 		},
-		OwnerUsername:   u.Username,
-		Owner:           u,
-		Controller:      ctl,
-		CloudRegion:     cl.Regions[0],
-		CloudCredential: cred,
-		Type:            "iaas",
-		IsController:    false,
-		DefaultSeries:   "warty",
-		Life:            constants.ALIVE.String(),
+		OwnerIdentityName: u.Name,
+		Owner:             u,
+		Controller:        ctl,
+		CloudRegion:       cl.Regions[0],
+		CloudCredential:   cred,
+		Type:              "iaas",
+		IsController:      false,
+		DefaultSeries:     "warty",
+		Life:              constants.ALIVE.String(),
 		Status: dbmodel.Status{
 			Status: "available",
 			Since: sql.NullTime{
@@ -241,7 +241,7 @@ func TestToJujuModel(t *testing.T) {
 		Name:     "test-model",
 		UUID:     "00000001-0000-0000-0000-0000-000000000001",
 		Type:     "iaas",
-		OwnerTag: "user-bob@external",
+		OwnerTag: "user-bob@canonical.com",
 	})
 }
 
@@ -291,8 +291,8 @@ func TestToJujuModelSummary(t *testing.T) {
 		DefaultSeries:      "warty",
 		CloudTag:           "cloud-test-cloud",
 		CloudRegion:        "test-region",
-		CloudCredentialTag: "cloudcred-test-cloud_bob@external_test-cred",
-		OwnerTag:           "user-bob@external",
+		CloudCredentialTag: "cloudcred-test-cloud_bob@canonical.com_test-cred",
+		OwnerTag:           "user-bob@canonical.com",
 		Life:               life.Value(constants.ALIVE.String()),
 		Status: jujuparams.EntityStatus{
 			Status: "available",
@@ -316,10 +316,10 @@ func TestToJujuModelSummary(t *testing.T) {
 
 // initModelEnv initialises a controller, cloud and cloud-credential so
 // that a model can be created.
-func initModelEnv(c *qt.C, db *gorm.DB) (dbmodel.Cloud, dbmodel.CloudCredential, dbmodel.Controller, dbmodel.User) {
-	u := dbmodel.User{
-		Username: "bob@external",
-	}
+func initModelEnv(c *qt.C, db *gorm.DB) (dbmodel.Cloud, dbmodel.CloudCredential, dbmodel.Controller, dbmodel.Identity) {
+	u, err := dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, qt.IsNil)
+
 	c.Assert(db.Create(&u).Error, qt.IsNil)
 
 	cl := dbmodel.Cloud{
@@ -334,7 +334,7 @@ func initModelEnv(c *qt.C, db *gorm.DB) (dbmodel.Cloud, dbmodel.CloudCredential,
 	cred := dbmodel.CloudCredential{
 		Name:     "test-cred",
 		Cloud:    cl,
-		Owner:    u,
+		Owner:    *u,
 		AuthType: "empty",
 	}
 	c.Assert(db.Create(&cred).Error, qt.IsNil)
@@ -347,7 +347,7 @@ func initModelEnv(c *qt.C, db *gorm.DB) (dbmodel.Cloud, dbmodel.CloudCredential,
 	}
 	c.Assert(db.Create(&ctl).Error, qt.IsNil)
 
-	return cl, cred, ctl, u
+	return cl, cred, ctl, *u
 }
 
 func TestModelFromJujuModelInfo(t *testing.T) {
@@ -366,17 +366,17 @@ func TestModelFromJujuModelInfo(t *testing.T) {
 		DefaultSeries:           "warty",
 		CloudTag:                "cloud-test-cloud",
 		CloudRegion:             "test-region",
-		CloudCredentialTag:      "cloudcred-test-cloud_bob@external_test-cred",
+		CloudCredentialTag:      "cloudcred-test-cloud_bob@canonical.com_test-cred",
 		CloudCredentialValidity: nil,
-		OwnerTag:                "user-bob@external",
+		OwnerTag:                "user-bob@canonical.com",
 		Life:                    life.Value(constants.ALIVE.String()),
 		Status: jujuparams.EntityStatus{
 			Status: "available",
 			Since:  &now,
 		},
 		Users: []jujuparams.ModelUserInfo{{
-			UserName:    "bob@external",
-			DisplayName: "Bobby The Tester",
+			UserName:    "bob@canonical.com",
+			DisplayName: "bob",
 			Access:      "admin",
 		}},
 		Machines: []jujuparams.ModelMachineInfo{{
@@ -399,6 +399,14 @@ func TestModelFromJujuModelInfo(t *testing.T) {
 	err := model.FromJujuModelInfo(modelInfo)
 	c.Assert(err, qt.IsNil)
 
+	i, err := dbmodel.NewIdentity("bob@canonical.com")
+	// We set display name to nothing, as when running from model info
+	// you will never get a display name. The way we use FromJujuModelInfo is that
+	// we get as much as we can from the model info, and fill in the bits of
+	// the dbmodel.Model (like the identity) where we can. As such, this doesn't
+	// need to be tested and doesn't make any sense.
+	i.DisplayName = ""
+	c.Assert(err, qt.IsNil)
 	c.Assert(model, qt.DeepEquals, dbmodel.Model{
 		Name: "test-model",
 		UUID: sql.NullString{
@@ -414,15 +422,13 @@ func TestModelFromJujuModelInfo(t *testing.T) {
 		CloudCredential: dbmodel.CloudCredential{
 			Name:      "test-cred",
 			CloudName: "test-cloud",
-			Owner: dbmodel.User{
-				Username: "bob@external",
-			},
+			Owner:     *i,
 		},
-		OwnerUsername: "bob@external",
-		Type:          "iaas",
-		IsController:  false,
-		DefaultSeries: "warty",
-		Life:          constants.ALIVE.String(),
+		OwnerIdentityName: "bob@canonical.com",
+		Type:              "iaas",
+		IsController:      false,
+		DefaultSeries:     "warty",
+		Life:              constants.ALIVE.String(),
 		Status: dbmodel.Status{
 			Status: "available",
 			Since: sql.NullTime{

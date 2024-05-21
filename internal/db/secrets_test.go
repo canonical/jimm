@@ -8,7 +8,7 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"github.com/google/uuid"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 
@@ -278,4 +278,32 @@ func (s *dbSuite) TestCleanupJWKS(c *qt.C) {
 	c.Assert(s.Database.CleanupJWKS(ctx), qt.IsNil)
 	c.Assert(s.Database.DB.Model(&dbmodel.Secret{}).Count(&count).Error, qt.IsNil)
 	c.Assert(count, qt.Equals, int64(0))
+}
+
+func (s *dbSuite) TestPutAndGetOAuthSecret(c *qt.C) {
+	err := s.Database.Migrate(context.Background(), true)
+	c.Assert(err, qt.Equals, nil)
+	ctx := context.Background()
+	key := []byte(uuid.NewString())
+	c.Assert(s.Database.PutOAuthSecret(ctx, key), qt.IsNil)
+
+	secret := dbmodel.Secret{}
+	tx := s.Database.DB.First(&secret)
+	c.Assert(tx.Error, qt.IsNil)
+	c.Assert(secret.Type, qt.Equals, db.OAuthKind)
+	c.Assert(secret.Tag, qt.Equals, db.OAuthKeyTag)
+
+	retrievedKey, err := s.Database.GetOAuthSecret(ctx)
+	c.Assert(err, qt.IsNil)
+	c.Assert(retrievedKey, qt.DeepEquals, key)
+}
+
+func (s *dbSuite) TestGetOAuthSecretFailsIfNotFound(c *qt.C) {
+	err := s.Database.Migrate(context.Background(), true)
+	c.Assert(err, qt.Equals, nil)
+	ctx := context.Background()
+
+	retrieved, err := s.Database.GetOAuthSecret(ctx)
+	c.Assert(err, qt.ErrorMatches, "secret not found")
+	c.Assert(retrieved, qt.IsNil)
 }

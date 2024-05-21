@@ -6,29 +6,30 @@ import (
 	"context"
 	"strings"
 
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
+	jimmnames "github.com/canonical/jimm/pkg/names"
 	"github.com/canonical/ofga"
 )
 
 // NewUser returns a new user structure that can be used to check
 // user's access rights to various resources.
-func NewUser(u *dbmodel.User, client *OFGAClient) *User {
+func NewUser(u *dbmodel.Identity, client *OFGAClient) *User {
 	return &User{
-		User:   u,
-		client: client,
+		Identity: u,
+		client:   client,
 	}
 }
 
 // User wraps dbmodel.User and implements methods that enable us
 // to check user's access rights to various resources.
 type User struct {
-	*dbmodel.User
+	*dbmodel.Identity
 	client    *OFGAClient
 	JimmAdmin bool
 }
@@ -77,6 +78,15 @@ func (u *User) IsModelWriter(ctx context.Context, resource names.ModelTag) (bool
 		return false, errors.E(err)
 	}
 	return isWriter, nil
+}
+
+// IsServiceAccountAdmin returns true if the user has administrator relation to the service account.
+func (u *User) IsServiceAccountAdmin(ctx context.Context, clientID jimmnames.ServiceAccountTag) (bool, error) {
+	isAdmin, err := checkRelation(ctx, u, clientID, ofganames.AdministratorRelation)
+	if err != nil {
+		return false, errors.E(err)
+	}
+	return isAdmin, nil
 }
 
 // GetCloudAccess returns the relation the user has to the specified cloud.
@@ -318,7 +328,7 @@ func IsAdministrator[T administratorT](ctx context.Context, u *User, resource T)
 			ctx,
 			"openfga administrator check failed",
 			zap.Error(err),
-			zap.String("user", u.Username),
+			zap.String("user", u.Name),
 			zap.String("resource", resource.String()),
 		)
 		return false, errors.E(err)
@@ -440,7 +450,11 @@ func ListUsersWithAccess[T ofganames.ResourceTagger](ctx context.Context, client
 		if entity.ID == "*" {
 			entity.ID = ofganames.EveryoneUser
 		}
-		users[i] = NewUser(&dbmodel.User{Username: entity.ID}, client)
+		identity, err := dbmodel.NewIdentity(entity.ID)
+		if err != nil {
+			zapctx.Error(ctx, "failed to return user with access", zap.Error(err), zap.String("id", entity.ID))
+		}
+		users[i] = NewUser(identity, client)
 	}
 	return users, nil
 }

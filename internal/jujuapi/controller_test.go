@@ -17,7 +17,7 @@ import (
 	"github.com/juju/juju/core/life"
 	jujuparams "github.com/juju/juju/rpc/params"
 	jujuversion "github.com/juju/juju/version"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 
@@ -101,13 +101,13 @@ func (s *controllerSuite) TestAllModels(c *gc.C) {
 	c.Assert(models, jc.SameContents, []base.UserModel{{
 		Name:           "model-1",
 		UUID:           s.Model.UUID.String,
-		Owner:          "bob@external",
+		Owner:          "bob@canonical.com",
 		LastConnection: nil,
 		Type:           "iaas",
 	}, {
 		Name:           "model-3",
 		UUID:           s.Model3.UUID.String,
-		Owner:          "charlie@external",
+		Owner:          "charlie@canonical.com",
 		LastConnection: nil,
 		Type:           "iaas",
 	}})
@@ -124,7 +124,7 @@ func (s *controllerSuite) TestModelStatus(c *gc.C) {
 		c.Check(models[0], jc.DeepEquals, base.ModelStatus{
 			UUID:               s.Model.UUID.String,
 			Life:               life.Value(constants.ALIVE.String()),
-			Owner:              "bob@external",
+			Owner:              "bob@canonical.com",
 			TotalMachineCount:  0,
 			CoreCount:          0,
 			HostedMachineCount: 0,
@@ -166,7 +166,7 @@ func (s *controllerSuite) TestIdentityProviderURL(c *gc.C) {
 	var result jujuparams.StringResult
 	err := conn.APICall("Controller", 11, "", "IdentityProviderURL", nil, &result)
 	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(result.Result, gc.Matches, `https://127\.0\.0\.1.*`)
+	c.Assert(result.Result, gc.Matches, ``)
 }
 
 func (s *controllerSuite) TestControllerVersion(c *gc.C) {
@@ -187,11 +187,11 @@ func (s *controllerSuite) TestControllerAccess(c *gc.C) {
 	defer conn.Close()
 
 	client := controllerapi.NewClient(conn)
-	access, err := client.GetControllerAccess("alice@external")
+	access, err := client.GetControllerAccess("alice@canonical.com")
 	c.Assert(err, gc.Equals, nil)
 	c.Check(string(access), gc.Equals, "superuser")
 
-	access, err = client.GetControllerAccess("bob@external")
+	access, err = client.GetControllerAccess("bob@canonical.com")
 	c.Assert(err, gc.Equals, nil)
 	c.Check(string(access), gc.Equals, "login")
 
@@ -199,11 +199,11 @@ func (s *controllerSuite) TestControllerAccess(c *gc.C) {
 	defer conn.Close()
 
 	client = controllerapi.NewClient(conn)
-	access, err = client.GetControllerAccess("bob@external")
+	access, err = client.GetControllerAccess("bob@canonical.com")
 	c.Assert(err, gc.Equals, nil)
 	c.Check(string(access), gc.Equals, "login")
 
-	_, err = client.GetControllerAccess("alice@external")
+	_, err = client.GetControllerAccess("alice@canonical.com")
 	c.Assert(err, gc.ErrorMatches, `unauthorized`)
 }
 

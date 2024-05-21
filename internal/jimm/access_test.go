@@ -14,7 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/juju/juju/core/crossmodel"
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 
 	"github.com/canonical/jimm/internal/constants"
 	"github.com/canonical/jimm/internal/db"
@@ -41,10 +41,12 @@ func (ta *testAuthenticator) Authenticate(ctx context.Context, req *jujuparams.L
 	if ta.err != nil {
 		return nil, ta.err
 	}
+	i, err := dbmodel.NewIdentity(ta.username)
+	if err != nil {
+		return nil, err
+	}
 	return &openfga.User{
-		User: &dbmodel.User{
-			Username: ta.username,
-		},
+		Identity: i,
 	}, nil
 }
 
@@ -149,12 +151,15 @@ func TestAuditLogAccess(t *testing.T) {
 
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
-
-	adminUser := openfga.NewUser(&dbmodel.User{Username: "alice"}, j.OpenFGAClient)
+	i, err := dbmodel.NewIdentity("alice")
+	c.Assert(err, qt.IsNil)
+	adminUser := openfga.NewUser(i, j.OpenFGAClient)
 	err = adminUser.SetControllerAccess(ctx, j.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, qt.IsNil)
 
-	user := openfga.NewUser(&dbmodel.User{Username: "bob"}, j.OpenFGAClient)
+	i2, err := dbmodel.NewIdentity("bob")
+	c.Assert(err, qt.IsNil)
+	user := openfga.NewUser(i2, j.OpenFGAClient)
 
 	// admin user can grant other users audit log access.
 	err = j.GrantAuditLogAccess(ctx, adminUser, user.ResourceTag())
@@ -195,17 +200,15 @@ func TestJWTGeneratorMakeLoginToken(t *testing.T) {
 
 	tests := []struct {
 		about             string
-		authenticator     *testAuthenticator
+		username          string
 		database          *testDatabase
 		accessChecker     *testAccessChecker
 		jwtService        *testJWTService
 		expectedError     string
 		expectedJWTParams jimmjwx.JWTParams
 	}{{
-		about: "initial login, all is well",
-		authenticator: &testAuthenticator{
-			username: "eve@external",
-		},
+		about:    "initial login, all is well",
+		username: "eve@canonical.com",
 		database: &testDatabase{
 			ctl: dbmodel.Controller{
 				CloudRegions: []dbmodel.CloudRegionControllerPriority{{
@@ -231,7 +234,7 @@ func TestJWTGeneratorMakeLoginToken(t *testing.T) {
 		jwtService: &testJWTService{},
 		expectedJWTParams: jimmjwx.JWTParams{
 			Controller: ct.Id(),
-			User:       names.NewUserTag("eve@external").String(),
+			User:       names.NewUserTag("eve@canonical.com").String(),
 			Access: map[string]string{
 				ct.String():                              "superuser",
 				mt.String():                              "admin",
@@ -239,27 +242,16 @@ func TestJWTGeneratorMakeLoginToken(t *testing.T) {
 			},
 		},
 	}, {
-		about: "authorization fails",
-		authenticator: &testAuthenticator{
-			username: "eve@external",
-			err:      errors.E("a test error"),
-		},
-		expectedError: "a test error",
-	}, {
-		about: "model access check fails",
-		authenticator: &testAuthenticator{
-			username: "eve@external",
-		},
+		about:    "model access check fails",
+		username: "eve@canonical.com",
 		accessChecker: &testAccessChecker{
 			modelAccessCheckErr: errors.E("a test error"),
 		},
 		jwtService:    &testJWTService{},
 		expectedError: "a test error",
 	}, {
-		about: "controller access check fails",
-		authenticator: &testAuthenticator{
-			username: "eve@external",
-		},
+		about:    "controller access check fails",
+		username: "eve@canonical.com",
 		accessChecker: &testAccessChecker{
 			modelAccess: map[string]string{
 				mt.String(): "admin",
@@ -268,10 +260,8 @@ func TestJWTGeneratorMakeLoginToken(t *testing.T) {
 		},
 		expectedError: "a test error",
 	}, {
-		about: "get controller from db fails",
-		authenticator: &testAuthenticator{
-			username: "eve@external",
-		},
+		about:    "get controller from db fails",
+		username: "eve@canonical.com",
 		database: &testDatabase{
 			err: errors.E("a test error"),
 		},
@@ -285,10 +275,8 @@ func TestJWTGeneratorMakeLoginToken(t *testing.T) {
 		},
 		expectedError: "failed to fetch controller",
 	}, {
-		about: "cloud access check fails",
-		authenticator: &testAuthenticator{
-			username: "eve@external",
-		},
+		about:    "cloud access check fails",
+		username: "eve@canonical.com",
 		database: &testDatabase{
 			ctl: dbmodel.Controller{
 				CloudRegions: []dbmodel.CloudRegionControllerPriority{{
@@ -311,10 +299,8 @@ func TestJWTGeneratorMakeLoginToken(t *testing.T) {
 		},
 		expectedError: "failed to check user's cloud access",
 	}, {
-		about: "jwt service errors out",
-		authenticator: &testAuthenticator{
-			username: "eve@external",
-		},
+		about:    "jwt service errors out",
+		username: "eve@canonical.com",
 		database: &testDatabase{
 			ctl: dbmodel.Controller{
 				CloudRegions: []dbmodel.CloudRegionControllerPriority{{
@@ -344,10 +330,14 @@ func TestJWTGeneratorMakeLoginToken(t *testing.T) {
 	}}
 
 	for _, test := range tests {
-		generator := jimm.NewJWTGenerator(test.authenticator, test.database, test.accessChecker, test.jwtService)
+		generator := jimm.NewJWTGenerator(test.database, test.accessChecker, test.jwtService)
 		generator.SetTags(mt, ct)
 
-		_, err := generator.MakeLoginToken(context.Background(), &jujuparams.LoginRequest{})
+		i, err := dbmodel.NewIdentity(test.username)
+		c.Assert(err, qt.IsNil)
+		_, err = generator.MakeLoginToken(context.Background(), &openfga.User{
+			Identity: i,
+		})
 		if test.expectedError != "" {
 			c.Assert(err, qt.ErrorMatches, test.expectedError)
 		} else {
@@ -376,7 +366,7 @@ func TestJWTGeneratorMakeToken(t *testing.T) {
 		jwtService: &testJWTService{},
 		expectedJWTParams: jimmjwx.JWTParams{
 			Controller: ct.Id(),
-			User:       names.NewUserTag("eve@external").String(),
+			User:       names.NewUserTag("eve@canonical.com").String(),
 			Access: map[string]string{
 				ct.String():                              "superuser",
 				mt.String():                              "admin",
@@ -402,7 +392,7 @@ func TestJWTGeneratorMakeToken(t *testing.T) {
 		},
 		expectedJWTParams: jimmjwx.JWTParams{
 			Controller: ct.Id(),
-			User:       names.NewUserTag("eve@external").String(),
+			User:       names.NewUserTag("eve@canonical.com").String(),
 			Access: map[string]string{
 				ct.String():                              "superuser",
 				mt.String():                              "admin",
@@ -414,9 +404,6 @@ func TestJWTGeneratorMakeToken(t *testing.T) {
 
 	for _, test := range tests {
 		generator := jimm.NewJWTGenerator(
-			&testAuthenticator{
-				username: "eve@external",
-			},
 			&testDatabase{
 				ctl: dbmodel.Controller{
 					CloudRegions: []dbmodel.CloudRegionControllerPriority{{
@@ -445,7 +432,11 @@ func TestJWTGeneratorMakeToken(t *testing.T) {
 		)
 		generator.SetTags(mt, ct)
 
-		_, err := generator.MakeLoginToken(context.Background(), &jujuparams.LoginRequest{})
+		i, err := dbmodel.NewIdentity("eve@canonical.com")
+		c.Assert(err, qt.IsNil)
+		_, err = generator.MakeLoginToken(context.Background(), &openfga.User{
+			Identity: i,
+		})
 		c.Assert(err, qt.IsNil)
 
 		_, err = generator.MakeToken(context.Background(), test.permissions)
@@ -479,7 +470,7 @@ func TestParseTag(t *testing.T) {
 
 	user, _, controller, model, _, _, _ := createTestControllerEnvironment(ctx, c, j.Database)
 
-	jimmTag := "model-" + controller.Name + ":" + user.Username + "/" + model.Name + "#administrator"
+	jimmTag := "model-" + controller.Name + ":" + user.Name + "/" + model.Name + "#administrator"
 
 	// JIMM tag syntax for models
 	tag, err := j.ParseTag(ctx, jimmTag)
@@ -545,7 +536,7 @@ func TestResolveTupleObjectMapsApplicationOffersUUIDs(t *testing.T) {
 
 	user, _, controller, model, offer, _, _ := createTestControllerEnvironment(ctx, c, j.Database)
 
-	jimmTag := "applicationoffer-" + controller.Name + ":" + user.Username + "/" + model.Name + "." + offer.Name + "#administrator"
+	jimmTag := "applicationoffer-" + controller.Name + ":" + user.Name + "/" + model.Name + "." + offer.Name + "#administrator"
 
 	jujuTag, err := jimm.ResolveTag(j.UUID, &j.Database, jimmTag)
 	c.Assert(err, qt.IsNil)
@@ -573,7 +564,7 @@ func TestResolveTupleObjectMapsModelUUIDs(t *testing.T) {
 
 	user, _, controller, model, _, _, _ := createTestControllerEnvironment(ctx, c, j.Database)
 
-	jimmTag := "model-" + controller.Name + ":" + user.Username + "/" + model.Name + "#administrator"
+	jimmTag := "model-" + controller.Name + ":" + user.Name + "/" + model.Name + "#administrator"
 
 	tag, err := jimm.ResolveTag(j.UUID, &j.Database, jimmTag)
 	c.Assert(err, qt.IsNil)
@@ -647,7 +638,7 @@ func TestResolveTupleObjectMapsGroups(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	tag, err := jimm.ResolveTag(j.UUID, &j.Database, "group-"+group.Name+"#member")
 	c.Assert(err, qt.IsNil)
-	c.Assert(tag, qt.DeepEquals, ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag("1"), ofganames.MemberRelation))
+	c.Assert(tag, qt.DeepEquals, ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag(group.UUID), ofganames.MemberRelation))
 }
 
 func TestResolveTagObjectMapsUsers(t *testing.T) {
@@ -669,9 +660,9 @@ func TestResolveTagObjectMapsUsers(t *testing.T) {
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
-	tag, err := jimm.ResolveTag(j.UUID, &j.Database, "user-alex@externally-werly#member")
+	tag, err := jimm.ResolveTag(j.UUID, &j.Database, "user-alex@canonical.com-werly#member")
 	c.Assert(err, qt.IsNil)
-	c.Assert(tag, qt.DeepEquals, ofganames.ConvertTagWithRelation(names.NewUserTag("alex@externally-werly"), ofganames.MemberRelation))
+	c.Assert(tag, qt.DeepEquals, ofganames.ConvertTagWithRelation(names.NewUserTag("alex@canonical.com-werly"), ofganames.MemberRelation))
 }
 
 func TestResolveTupleObjectHandlesErrors(t *testing.T) {
@@ -709,7 +700,7 @@ func TestResolveTupleObjectHandlesErrors(t *testing.T) {
 		// Resolves bad groups where they do not exist
 		{
 			input: "group-myspecialpokemon-his-name-is-youguessedit-diglett",
-			want:  "group not found",
+			want:  "group myspecialpokemon-his-name-is-youguessedit-diglett not found",
 		},
 		// Resolves bad controllers where they do not exist
 		{
@@ -756,7 +747,7 @@ func TestResolveTupleObjectHandlesErrors(t *testing.T) {
 // TODO(ale8k): Make this an implicit thing on the JIMM suite per test & refactor the current state.
 // and make the suite argument an interface of the required calls we use here.
 func createTestControllerEnvironment(ctx context.Context, c *qt.C, db db.Database) (
-	dbmodel.User,
+	dbmodel.Identity,
 	dbmodel.GroupEntry,
 	dbmodel.Controller,
 	dbmodel.Model,
@@ -770,10 +761,10 @@ func createTestControllerEnvironment(ctx context.Context, c *qt.C, db db.Databas
 	err = db.GetGroup(ctx, &group)
 	c.Assert(err, qt.IsNil)
 
-	u := dbmodel.User{
-		Username: petname.Generate(2, "-") + "@external",
-	}
-	c.Assert(db.DB.Create(&u).Error, qt.IsNil)
+	u, err := dbmodel.NewIdentity(petname.Generate(2, "-"+"canonical.com"))
+	c.Assert(err, qt.IsNil)
+
+	c.Assert(db.DB.Create(u).Error, qt.IsNil)
 
 	cloud := dbmodel.Cloud{
 		Name: petname.Generate(2, "-"),
@@ -798,10 +789,10 @@ func createTestControllerEnvironment(ctx context.Context, c *qt.C, db db.Databas
 	c.Assert(err, qt.IsNil)
 
 	cred := dbmodel.CloudCredential{
-		Name:          petname.Generate(2, "-"),
-		CloudName:     cloud.Name,
-		OwnerUsername: u.Username,
-		AuthType:      "empty",
+		Name:              petname.Generate(2, "-"),
+		CloudName:         cloud.Name,
+		OwnerIdentityName: u.Name,
+		AuthType:          "empty",
 	}
 	err = db.SetCloudCredential(ctx, &cred)
 	c.Assert(err, qt.IsNil)
@@ -812,7 +803,7 @@ func createTestControllerEnvironment(ctx context.Context, c *qt.C, db db.Databas
 			String: id.String(),
 			Valid:  true,
 		},
-		OwnerUsername:     u.Username,
+		OwnerIdentityName: u.Name,
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
 		CloudCredentialID: cred.ID,
@@ -830,7 +821,7 @@ func createTestControllerEnvironment(ctx context.Context, c *qt.C, db db.Databas
 	c.Assert(err, qt.IsNil)
 
 	offerName := petname.Generate(2, "-")
-	offerURL, err := crossmodel.ParseOfferURL(controller.Name + ":" + u.Username + "/" + model.Name + "." + offerName)
+	offerURL, err := crossmodel.ParseOfferURL(controller.Name + ":" + u.Name + "/" + model.Name + "." + offerName)
 	c.Assert(err, qt.IsNil)
 
 	offer := dbmodel.ApplicationOffer{
@@ -844,7 +835,7 @@ func createTestControllerEnvironment(ctx context.Context, c *qt.C, db db.Databas
 	c.Assert(err, qt.IsNil)
 	c.Assert(len(offer.UUID), qt.Equals, 36)
 
-	return u, group, controller, model, offer, cloud, cred
+	return *u, group, controller, model, offer, cloud, cred
 }
 
 func TestAddGroup(t *testing.T) {

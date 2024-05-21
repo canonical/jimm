@@ -6,24 +6,21 @@ import (
 	"context"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"time"
 
-	"github.com/canonical/candid/candidtest"
 	cofga "github.com/canonical/ofga"
 	"github.com/go-chi/chi/v5"
-	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
-	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/identchecker"
-	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	"github.com/juju/juju/api"
 	"github.com/juju/juju/core/network"
 	corejujutesting "github.com/juju/juju/juju/testing"
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	gc "gopkg.in/check.v1"
 
-	"github.com/canonical/jimm/internal/auth"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/discharger"
 	"github.com/canonical/jimm/internal/jimm"
 	"github.com/canonical/jimm/internal/jimmhttp"
 	"github.com/canonical/jimm/internal/jimmjwx"
@@ -58,7 +55,7 @@ type JIMMSuite struct {
 	// Authenticator configured.
 	JIMM *jimm.JIMM
 
-	AdminUser   *dbmodel.User
+	AdminUser   *dbmodel.Identity
 	OFGAClient  *openfga.OFGAClient
 	COFGAClient *cofga.Client
 	COFGAParams *cofga.OpenFGAParams
@@ -72,12 +69,14 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 	s.OFGAClient, s.COFGAClient, s.COFGAParams, err = SetupTestOFGAClient(c.TestName())
 	c.Assert(err, gc.IsNil)
 
+	pgdb := PostgresDB(GocheckTester{c}, nil)
+
 	// Setup OpenFGA.
 	s.JIMM = &jimm.JIMM{
 		Database: db.Database{
-			DB: PostgresDB(GocheckTester{c}, nil),
+			DB: pgdb,
 		},
-		CredentialStore: &InMemoryCredentialStore{},
+		CredentialStore: NewInMemoryCredentialStore(),
 		Pubsub:          &pubsub.Hub{MaxConcurrency: 10},
 		UUID:            ControllerUUID,
 		OpenFGAClient:   s.OFGAClient,
@@ -86,13 +85,18 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
 
+	// Note that the secret key here must match what is used in tests.
+	s.JIMM.OAuthAuthenticator = NewMockOAuthAuthenticator(JWTTestSecret)
+
 	err = s.JIMM.Database.Migrate(ctx, false)
 	c.Assert(err, gc.Equals, nil)
-	s.AdminUser = &dbmodel.User{
-		Username:  "alice@external",
-		LastLogin: db.Now(),
-	}
-	err = s.JIMM.Database.GetUser(ctx, s.AdminUser)
+
+	alice, err := dbmodel.NewIdentity("alice@canonical.com")
+	c.Assert(err, gc.IsNil)
+	alice.LastLogin = db.Now()
+	s.AdminUser = alice
+
+	err = s.JIMM.Database.GetIdentity(ctx, s.AdminUser)
 	c.Assert(err, gc.Equals, nil)
 
 	adminUser := openfga.NewUser(s.AdminUser, s.OFGAClient)
@@ -112,6 +116,9 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 		"/.well-known",
 		wellknownapi.NewWellKnownHandler(s.JIMM.CredentialStore),
 	)
+	macaroonDischarger := s.setupMacaroonDischarger(c)
+	localDischargePath := "/macaroons"
+	mux.Handle(localDischargePath+"/*", discharger.GetDischargerMux(macaroonDischarger, localDischargePath))
 
 	s.Server = httptest.NewServer(mux)
 
@@ -143,18 +150,47 @@ func (s *JIMMSuite) TearDownTest(c *gc.C) {
 	}
 }
 
-func (s *JIMMSuite) NewUser(u *dbmodel.User) *openfga.User {
+func (s *JIMMSuite) setupMacaroonDischarger(c *gc.C) *discharger.MacaroonDischarger {
+	cfg := discharger.MacaroonDischargerConfig{
+		MacaroonExpiryDuration: 1 * time.Hour,
+		ControllerUUID:         s.JIMM.UUID,
+		PrivateKey:             "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
+		PublicKey:              "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
+	}
+	macaroonDischarger, err := discharger.NewMacaroonDischarger(cfg, &s.JIMM.Database, s.JIMM.OpenFGAClient)
+	c.Assert(err, gc.IsNil)
+	return macaroonDischarger
+}
+
+func (s *JIMMSuite) AddAdminUser(c *gc.C, email string) {
+	identity, err := dbmodel.NewIdentity(email)
+	c.Assert(err, gc.IsNil)
+
+	err = s.JIMM.Database.GetIdentity(context.Background(), identity)
+	c.Assert(err, gc.IsNil)
+	// Set the display name of the identity.
+	displayName, _, _ := strings.Cut(email, "@")
+	identity.DisplayName = displayName
+	err = s.JIMM.Database.UpdateIdentity(context.Background(), identity)
+	c.Assert(err, gc.IsNil)
+	// Give the identity admin permission.
+	ofgaUser := openfga.NewUser(identity, s.OFGAClient)
+	err = ofgaUser.SetControllerAccess(context.Background(), s.JIMM.ResourceTag(), ofganames.AdministratorRelation)
+	c.Assert(err, gc.IsNil)
+}
+
+func (s *JIMMSuite) NewUser(u *dbmodel.Identity) *openfga.User {
 	return openfga.NewUser(u, s.OFGAClient)
 }
 
 func (s *JIMMSuite) AddController(c *gc.C, name string, info *api.Info) {
 	ctl := &dbmodel.Controller{
-		UUID:          info.ControllerUUID,
-		Name:          name,
-		AdminUser:     info.Tag.Id(),
-		AdminPassword: info.Password,
-		CACertificate: info.CACert,
-		Addresses:     nil,
+		UUID:              info.ControllerUUID,
+		Name:              name,
+		AdminIdentityName: info.Tag.Id(),
+		AdminPassword:     info.Password,
+		CACertificate:     info.CACert,
+		Addresses:         nil,
 	}
 	ctl.Addresses = make(dbmodel.HostPorts, 0, len(info.Addrs))
 	for _, addr := range info.Addrs {
@@ -173,11 +209,11 @@ func (s *JIMMSuite) AddController(c *gc.C, name string, info *api.Info) {
 
 func (s *JIMMSuite) UpdateCloudCredential(c *gc.C, tag names.CloudCredentialTag, cred jujuparams.CloudCredential) {
 	ctx := context.Background()
-	u := dbmodel.User{
-		Username: tag.Owner().Id(),
-	}
-	user := openfga.NewUser(&u, s.JIMM.OpenFGAClient)
-	err := s.JIMM.Database.GetUser(ctx, &u)
+	u, err := dbmodel.NewIdentity(tag.Owner().Id())
+	c.Assert(err, gc.IsNil)
+
+	user := openfga.NewUser(u, s.JIMM.OpenFGAClient)
+	err = s.JIMM.Database.GetIdentity(ctx, u)
 	c.Assert(err, gc.Equals, nil)
 	_, err = s.JIMM.UpdateCloudCredential(ctx, user, jimm.UpdateCloudCredentialArgs{
 		CredentialTag: tag,
@@ -189,12 +225,13 @@ func (s *JIMMSuite) UpdateCloudCredential(c *gc.C, tag names.CloudCredentialTag,
 
 func (s *JIMMSuite) AddModel(c *gc.C, owner names.UserTag, name string, cloud names.CloudTag, region string, cred names.CloudCredentialTag) names.ModelTag {
 	ctx := context.Background()
-	u := dbmodel.User{
-		Username: owner.Id(),
-	}
-	err := s.JIMM.Database.GetUser(ctx, &u)
+
+	u, err := dbmodel.NewIdentity(owner.Id())
+	c.Assert(err, gc.IsNil)
+
+	err = s.JIMM.Database.GetIdentity(ctx, u)
 	c.Assert(err, gc.Equals, nil)
-	mi, err := s.JIMM.AddModel(ctx, s.NewUser(&u), &jimm.ModelCreateArgs{
+	mi, err := s.JIMM.AddModel(ctx, s.NewUser(u), &jimm.ModelCreateArgs{
 		Name:            name,
 		Owner:           owner,
 		Cloud:           cloud,
@@ -203,55 +240,11 @@ func (s *JIMMSuite) AddModel(c *gc.C, owner names.UserTag, name string, cloud na
 	})
 	c.Assert(err, gc.Equals, nil)
 
-	user := s.NewUser(&u)
+	user := s.NewUser(u)
 	err = user.SetModelAccess(context.Background(), names.NewModelTag(mi.UUID), ofganames.AdministratorRelation)
 	c.Assert(err, gc.Equals, nil)
 
 	return names.NewModelTag(mi.UUID)
-}
-
-// A CandidSuite is a suite that initialises a candid test system to use a
-// jimm Authenticator.
-type CandidSuite struct {
-	// ControllerAdmins is the list of users and groups that are
-	// controller adminstrators.
-	ControllerAdmins []string
-
-	// The following are created in SetUpTest
-	Candid          *candidtest.Server
-	CandidPublicKey string
-	Authenticator   jimm.Authenticator
-}
-
-func (s *CandidSuite) SetUpTest(c *gc.C) {
-	s.Candid = candidtest.NewServer()
-	s.Candid.AddUser("agent-user", candidtest.GroupListGroup)
-	ofgaClient, _, _, err := SetupTestOFGAClient(c.TestName())
-	c.Assert(err, gc.IsNil)
-	s.Authenticator = auth.JujuAuthenticator{
-		Client: ofgaClient,
-		Bakery: identchecker.NewBakery(identchecker.BakeryParams{
-			Locator:        s.Candid,
-			Key:            bakery.MustGenerateKey(),
-			IdentityClient: s.Candid.CandidClient("agent-user"),
-			Location:       "jimmtest",
-		}),
-		ControllerAdmins: s.ControllerAdmins,
-	}
-	tpi, err := httpbakery.ThirdPartyInfoForLocation(context.Background(), nil, s.Candid.URL.String())
-	c.Assert(err, gc.Equals, nil)
-	pk, err := tpi.PublicKey.MarshalText()
-	c.Assert(err, gc.Equals, nil)
-	s.CandidPublicKey = string(pk)
-
-}
-
-func (s *CandidSuite) TearDownTest(c *gc.C) {
-	s.Authenticator = nil
-	if s.Candid != nil {
-		s.Candid.Close()
-		s.Candid = nil
-	}
 }
 
 // A JujuSuite is a suite that intialises a JIMM and adds the testing juju
@@ -299,7 +292,7 @@ type BootstrapSuite struct {
 func (s *BootstrapSuite) SetUpTest(c *gc.C) {
 	s.JujuSuite.SetUpTest(c)
 
-	cct := names.NewCloudCredentialTag(TestCloudName + "/bob@external/cred")
+	cct := names.NewCloudCredentialTag(TestCloudName + "/bob@canonical.com/cred")
 	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{
 		AuthType: "empty",
 	})
@@ -309,7 +302,7 @@ func (s *BootstrapSuite) SetUpTest(c *gc.C) {
 	err := s.JIMM.Database.GetCloudCredential(ctx, s.CloudCredential)
 	c.Assert(err, gc.Equals, nil)
 
-	mt := s.AddModel(c, names.NewUserTag("bob@external"), "model-1", names.NewCloudTag(TestCloudName), TestCloudRegionName, cct)
+	mt := s.AddModel(c, names.NewUserTag("bob@canonical.com"), "model-1", names.NewCloudTag(TestCloudName), TestCloudRegionName, cct)
 	s.Model = new(dbmodel.Model)
 	s.Model.SetTag(mt)
 	err = s.JIMM.Database.GetModel(ctx, s.Model)

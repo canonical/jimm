@@ -10,7 +10,7 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	"sigs.k8s.io/yaml"
 
 	"github.com/canonical/jimm/internal/db"
@@ -167,7 +167,7 @@ func (m Model) addModelRelations(c *qt.C, jimmTag names.ControllerTag, db db.Dat
 		case "read":
 			relation = ofganames.ReaderRelation
 		default:
-			c.Fatalf("unknown model access: %s %s", dbUser.Username, u.Access)
+			c.Fatalf("unknown model access: %s %s", dbUser.Name, u.Access)
 		}
 		user := openfga.NewUser(&dbUser, client)
 		err := user.SetModelAccess(context.Background(), m.dbo.ResourceTag(), relation)
@@ -180,11 +180,15 @@ func (m Model) addModelRelations(c *qt.C, jimmTag names.ControllerTag, db db.Dat
 
 // addControllerRelations adds permissions the model should have and adds permissions for users to the controller.
 func (ctl Controller) addControllerRelations(c *qt.C, jimmTag names.ControllerTag, db db.Database, client *openfga.OFGAClient) {
-	if ctl.dbo.AdminUser != "" {
-		user := openfga.NewUser(&dbmodel.User{
-			Username: ctl.dbo.AdminUser,
-		}, client)
-		err := user.SetControllerAccess(context.Background(), ctl.dbo.ResourceTag(), ofganames.AdministratorRelation)
+	if ctl.dbo.AdminIdentityName != "" {
+		userIdentity, err := dbmodel.NewIdentity(ctl.dbo.AdminIdentityName)
+		c.Assert(err, qt.IsNil)
+
+		user := openfga.NewUser(
+			userIdentity,
+			client,
+		)
+		err = user.SetControllerAccess(context.Background(), ctl.dbo.ResourceTag(), ofganames.AdministratorRelation)
 		c.Assert(err, qt.IsNil)
 	}
 	err := client.AddCloudController(context.Background(), names.NewCloudTag(ctl.Cloud), ctl.dbo.ResourceTag())
@@ -253,18 +257,18 @@ type UserDefaults struct {
 	Defaults map[string]interface{} `json:"defaults"`
 
 	env *Environment
-	dbo dbmodel.UserModelDefaults
+	dbo dbmodel.IdentityModelDefaults
 }
 
-func (cd *UserDefaults) DBObject(c *qt.C, db db.Database) dbmodel.UserModelDefaults {
+func (cd *UserDefaults) DBObject(c *qt.C, db db.Database) dbmodel.IdentityModelDefaults {
 	if cd.dbo.ID != 0 {
 		return cd.dbo
 	}
 
-	cd.dbo.User = cd.env.User(cd.User).DBObject(c, db)
+	cd.dbo.Identity = cd.env.User(cd.User).DBObject(c, db)
 	cd.dbo.Defaults = cd.Defaults
 
-	err := db.SetUserModelDefaults(context.Background(), &cd.dbo)
+	err := db.SetIdentityModelDefaults(context.Background(), &cd.dbo)
 	c.Assert(err, qt.IsNil)
 	return cd.dbo
 }
@@ -285,7 +289,7 @@ func (cd *CloudDefaults) DBObject(c *qt.C, db db.Database) dbmodel.CloudDefaults
 		return cd.dbo
 	}
 
-	cd.dbo.User = cd.env.User(cd.User).DBObject(c, db)
+	cd.dbo.Identity = cd.env.User(cd.User).DBObject(c, db)
 	cd.dbo.Cloud = cd.env.Cloud(cd.Cloud).DBObject(c, db)
 	cd.dbo.Region = cd.Region
 	cd.dbo.Defaults = cd.Defaults
@@ -355,7 +359,7 @@ func (cc *CloudCredential) DBObject(c *qt.C, db db.Database) dbmodel.CloudCreden
 	cc.dbo.Cloud = cc.env.Cloud(cc.Cloud).DBObject(c, db)
 	cc.dbo.CloudName = cc.dbo.Cloud.Name
 	cc.dbo.Owner = cc.env.User(cc.Owner).DBObject(c, db)
-	cc.dbo.OwnerUsername = cc.dbo.Owner.Username
+	cc.dbo.OwnerIdentityName = cc.dbo.Owner.Name
 	cc.dbo.AuthType = cc.AuthType
 	cc.dbo.Attributes = cc.Attributes
 
@@ -387,7 +391,7 @@ func (ctl *Controller) DBObject(c *qt.C, db db.Database) dbmodel.Controller {
 	ctl.dbo.Name = ctl.Name
 	ctl.dbo.UUID = ctl.UUID
 	ctl.dbo.AgentVersion = ctl.AgentVersion
-	ctl.dbo.AdminUser = ctl.AdminUser
+	ctl.dbo.AdminIdentityName = ctl.AdminUser
 	ctl.dbo.AdminPassword = ctl.AdminPassword
 	ctl.dbo.CloudName = ctl.Cloud
 	ctl.dbo.CloudRegion = ctl.CloudRegion
@@ -484,17 +488,17 @@ type User struct {
 	ControllerAccess string `json:"controller-access"`
 
 	env *Environment
-	dbo dbmodel.User
+	dbo dbmodel.Identity
 }
 
-func (u *User) DBObject(c *qt.C, db db.Database) dbmodel.User {
+func (u *User) DBObject(c *qt.C, db db.Database) dbmodel.Identity {
 	if u.dbo.ID != 0 {
 		return u.dbo
 	}
-	u.dbo.Username = u.Username
+	u.dbo.Name = u.Username
 	u.dbo.DisplayName = u.DisplayName
 
-	err := db.UpdateUser(context.Background(), &u.dbo)
+	err := db.UpdateIdentity(context.Background(), &u.dbo)
 	c.Assert(err, qt.IsNil)
 	return u.dbo
 }

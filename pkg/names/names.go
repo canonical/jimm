@@ -1,10 +1,12 @@
+// Copyright 2024 Canonical Ltd.
+
 package names
 
 import (
 	"fmt"
 	"strings"
 
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 )
 
 // TagKind returns one of the *TagKind constants for the given tag, or
@@ -45,6 +47,11 @@ func ParseTag(tag string) (names.Tag, error) {
 			return nil, invalidTagError(tag, kind)
 		}
 		return NewApplicationOfferTag(id), nil
+	case ServiceAccountTagKind:
+		if !IsValidServiceAccountId(id) {
+			return nil, invalidTagError(tag, kind)
+		}
+		return NewServiceAccountTag(id), nil
 	default:
 		return names.ParseTag(tag)
 	}

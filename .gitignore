@@ -14,11 +14,13 @@
 /local/vault/approle.json
 local/vault/approle.json
 local/vault/roleid.txt
+local/vault/vault.env
 
 *.crt
 *.key
 *.csr
 /jimmctl
+/jimmsrv
 qa-controller
 
 /cloudinit.temp.yaml

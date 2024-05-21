@@ -13,7 +13,7 @@ import (
 	"github.com/juju/juju/cloud"
 	jujuparams "github.com/juju/juju/rpc/params"
 	jujuversion "github.com/juju/juju/version"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 
@@ -306,9 +306,9 @@ func (s *jimmSuite) TestAuditLog(c *gc.C) {
 	evs, err := client2.FindAuditEvents(&apiparams.FindAuditEventsRequest{})
 	c.Assert(err, gc.Equals, nil)
 
-	c.Assert(len(evs.Events), gc.Equals, 13)
+	c.Assert(len(evs.Events), gc.Equals, 9)
 
-	bobTag := names.NewUserTag("bob@external").String()
+	bobTag := names.NewUserTag("bob@canonical.com").String()
 
 	expectedEvents := apiparams.AuditEvents{
 		Events: []apiparams.AuditEvent{{
@@ -316,7 +316,7 @@ func (s *jimmSuite) TestAuditLog(c *gc.C) {
 			ConversationId: evs.Events[0].ConversationId,
 			MessageId:      1,
 			FacadeName:     "Admin",
-			FacadeMethod:   "Login",
+			FacadeMethod:   "LoginWithSessionToken",
 			FacadeVersion:  evs.Events[0].FacadeVersion,
 			ObjectId:       "",
 			UserTag:        "user-",
@@ -328,10 +328,10 @@ func (s *jimmSuite) TestAuditLog(c *gc.C) {
 			ConversationId: evs.Events[1].ConversationId,
 			MessageId:      1,
 			FacadeName:     "Admin",
-			FacadeMethod:   "Login",
+			FacadeMethod:   "LoginWithSessionToken",
 			FacadeVersion:  evs.Events[1].FacadeVersion,
 			ObjectId:       "",
-			UserTag:        "user-",
+			UserTag:        bobTag,
 			IsResponse:     true,
 			Params:         nil,
 			Errors:         evs.Events[1].Errors,
@@ -339,11 +339,11 @@ func (s *jimmSuite) TestAuditLog(c *gc.C) {
 			Time:           evs.Events[2].Time,
 			ConversationId: evs.Events[2].ConversationId,
 			MessageId:      2,
-			FacadeName:     "Admin",
-			FacadeMethod:   "Login",
+			FacadeName:     "JIMM",
+			FacadeMethod:   "FindAuditEvents",
 			FacadeVersion:  evs.Events[2].FacadeVersion,
 			ObjectId:       "",
-			UserTag:        "user-",
+			UserTag:        bobTag,
 			IsResponse:     false,
 			Params:         evs.Events[2].Params,
 			Errors:         nil,
@@ -351,8 +351,8 @@ func (s *jimmSuite) TestAuditLog(c *gc.C) {
 			Time:           evs.Events[3].Time,
 			ConversationId: evs.Events[3].ConversationId,
 			MessageId:      2,
-			FacadeName:     "Admin",
-			FacadeMethod:   "Login",
+			FacadeName:     "JIMM",
+			FacadeMethod:   "FindAuditEvents",
 			FacadeVersion:  evs.Events[3].FacadeVersion,
 			ObjectId:       "",
 			UserTag:        bobTag,
@@ -368,7 +368,7 @@ func (s *jimmSuite) TestAuditLog(c *gc.C) {
 
 	// alice can grant bob access to audit log entries
 	err = client2.GrantAuditLogAccess(&apiparams.AuditLogAccessRequest{
-		UserTag: names.NewUserTag("bob@external").String(),
+		UserTag: names.NewUserTag("bob@canonical.com").String(),
 	})
 	c.Assert(err, gc.Equals, nil)
 
@@ -415,14 +415,14 @@ func TestAuditLogAPIParamsConversion(t *testing.T) {
 				SortTime: false,
 			},
 			result: db.AuditLogFilter{
-				Start:    time.Date(2023, 8, 14, 0, 0, 0, 0, time.UTC),
-				End:      time.Date(2023, 8, 14, 0, 0, 0, 0, time.UTC),
-				UserTag:  "user-alice",
-				Model:    "123",
-				Method:   "Deploy",
-				Offset:   10,
-				Limit:    10,
-				SortTime: false,
+				Start:       time.Date(2023, 8, 14, 0, 0, 0, 0, time.UTC),
+				End:         time.Date(2023, 8, 14, 0, 0, 0, 0, time.UTC),
+				IdentityTag: "user-alice",
+				Model:       "123",
+				Method:      "Deploy",
+				Offset:      10,
+				Limit:       10,
+				SortTime:    false,
 			},
 		}, {
 			about: "Test limit lower bound",
@@ -456,7 +456,7 @@ func TestAuditLogAPIParamsConversion(t *testing.T) {
 
 func (s *jimmSuite) TestFullModelStatus(c *gc.C) {
 	s.AddController(c, "controller-2", s.APIInfo(c))
-	mt := s.AddModel(c, names.NewUserTag("charlie@external"), "model-1", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, s.Model2.CloudCredential.ResourceTag())
+	mt := s.AddModel(c, names.NewUserTag("charlie@canonical.com"), "model-1", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, s.Model2.CloudCredential.ResourceTag())
 
 	conn := s.open(c, nil, "bob")
 	defer conn.Close()
@@ -472,7 +472,7 @@ func (s *jimmSuite) TestFullModelStatus(c *gc.C) {
 	})
 	c.Assert(err, gc.ErrorMatches, "unauthorized.*")
 
-	conn = s.open(c, nil, "alice@external")
+	conn = s.open(c, nil, "alice@canonical.com")
 	defer conn.Close()
 	client = api.NewClient(conn)
 
@@ -567,13 +567,14 @@ func (s *jimmSuite) TestImportModel(c *gc.C) {
 
 func (s *jimmSuite) TestAddCloudToController(c *gc.C) {
 	ctx := context.Background()
-	u := dbmodel.User{
-		Username: "alice@external",
-	}
-	err := s.JIMM.Database.GetUser(ctx, &u)
+
+	u, err := dbmodel.NewIdentity("alice@canonical.com")
 	c.Assert(err, gc.IsNil)
 
-	conn := s.open(c, nil, "alice@external")
+	err = s.JIMM.Database.GetIdentity(ctx, u)
+	c.Assert(err, gc.IsNil)
+
+	conn := s.open(c, nil, "alice@canonical.com")
 	defer conn.Close()
 
 	req := apiparams.AddCloudToControllerRequest{
@@ -594,7 +595,7 @@ func (s *jimmSuite) TestAddCloudToController(c *gc.C) {
 	err = conn.APICall("JIMM", 4, "", "AddCloudToController", &req, nil)
 	c.Assert(err, gc.Equals, nil)
 
-	user := openfga.NewUser(&u, s.OFGAClient)
+	user := openfga.NewUser(u, s.OFGAClient)
 
 	cloud, err := s.JIMM.GetCloud(context.Background(), user, names.NewCloudTag("test-cloud"))
 	c.Assert(err, gc.IsNil)
@@ -604,13 +605,14 @@ func (s *jimmSuite) TestAddCloudToController(c *gc.C) {
 
 func (s *jimmSuite) TestAddExistingCloudToController(c *gc.C) {
 	ctx := context.Background()
-	u := dbmodel.User{
-		Username: "alice@external",
-	}
-	err := s.JIMM.Database.GetUser(ctx, &u)
+
+	u, err := dbmodel.NewIdentity("alice@canonical.com")
 	c.Assert(err, gc.IsNil)
 
-	conn := s.open(c, nil, "alice@external")
+	err = s.JIMM.Database.GetIdentity(ctx, u)
+	c.Assert(err, gc.IsNil)
+
+	conn := s.open(c, nil, "alice@canonical.com")
 	defer conn.Close()
 
 	force := true
@@ -631,7 +633,7 @@ func (s *jimmSuite) TestAddExistingCloudToController(c *gc.C) {
 	}
 	err = conn.APICall("JIMM", 4, "", "AddCloudToController", &req, nil)
 	c.Assert(err, gc.Equals, nil)
-	user := openfga.NewUser(&u, s.OFGAClient)
+	user := openfga.NewUser(u, s.OFGAClient)
 	cloud, err := s.JIMM.GetCloud(context.Background(), user, names.NewCloudTag("test-cloud"))
 	c.Assert(err, gc.IsNil)
 	c.Assert(cloud.Name, gc.DeepEquals, "test-cloud")
@@ -652,13 +654,14 @@ func (s *jimmSuite) TestAddExistingCloudToController(c *gc.C) {
 
 func (s *jimmSuite) TestRemoveCloudFromController(c *gc.C) {
 	ctx := context.Background()
-	u := dbmodel.User{
-		Username: "alice@external",
-	}
-	err := s.JIMM.Database.GetUser(ctx, &u)
+
+	u, err := dbmodel.NewIdentity("alice@canonical.com")
 	c.Assert(err, gc.IsNil)
 
-	conn := s.open(c, nil, "alice@external")
+	err = s.JIMM.Database.GetIdentity(ctx, u)
+	c.Assert(err, gc.IsNil)
+
+	conn := s.open(c, nil, "alice@canonical.com")
 	defer conn.Close()
 
 	req := apiparams.AddCloudToControllerRequest{
@@ -679,7 +682,7 @@ func (s *jimmSuite) TestRemoveCloudFromController(c *gc.C) {
 	err = conn.APICall("JIMM", 4, "", "AddCloudToController", &req, nil)
 	c.Assert(err, gc.Equals, nil)
 
-	user := openfga.NewUser(&u, s.OFGAClient)
+	user := openfga.NewUser(u, s.OFGAClient)
 
 	_, err = s.JIMM.GetCloud(context.Background(), user, names.NewCloudTag("test-cloud"))
 	c.Assert(err, gc.Equals, nil)
@@ -699,7 +702,7 @@ func (s *jimmSuite) TestCrossModelQuery(c *gc.C) {
 	s.AddController(c, "controller-2", s.APIInfo(c))
 	s.AddModel(
 		c,
-		names.NewUserTag("charlie@external"),
+		names.NewUserTag("charlie@canonical.com"),
 		"model-20",
 		names.NewCloudTag(jimmtest.TestCloudName),
 		jimmtest.TestCloudRegionName,
@@ -707,7 +710,7 @@ func (s *jimmSuite) TestCrossModelQuery(c *gc.C) {
 	)
 	s.AddModel(
 		c,
-		names.NewUserTag("charlie@external"),
+		names.NewUserTag("charlie@canonical.com"),
 		"model-21",
 		names.NewCloudTag(jimmtest.TestCloudName),
 		jimmtest.TestCloudRegionName,
@@ -715,7 +718,7 @@ func (s *jimmSuite) TestCrossModelQuery(c *gc.C) {
 	)
 	s.AddModel(
 		c,
-		names.NewUserTag("charlie@external"),
+		names.NewUserTag("charlie@canonical.com"),
 		"model-22",
 		names.NewCloudTag(jimmtest.TestCloudName),
 		jimmtest.TestCloudRegionName,
@@ -774,7 +777,7 @@ func (s *jimmSuite) TestCrossModelQuery(c *gc.C) {
 func (s *jimmSuite) TestJimmModelMigrationSuperuser(c *gc.C) {
 	mt := s.AddModel(
 		c,
-		names.NewUserTag("charlie@external"),
+		names.NewUserTag("charlie@canonical.com"),
 		"model-20",
 		names.NewCloudTag(jimmtest.TestCloudName),
 		jimmtest.TestCloudRegionName,
@@ -801,7 +804,7 @@ func (s *jimmSuite) TestJimmModelMigrationSuperuser(c *gc.C) {
 func (s *jimmSuite) TestJimmModelMigrationNonSuperuser(c *gc.C) {
 	mt := s.AddModel(
 		c,
-		names.NewUserTag("charlie@external"),
+		names.NewUserTag("charlie@canonical.com"),
 		"model-20",
 		names.NewCloudTag(jimmtest.TestCloudName),
 		jimmtest.TestCloudRegionName,

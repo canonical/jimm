@@ -14,7 +14,7 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"github.com/google/uuid"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 
@@ -28,15 +28,15 @@ func TestMain(m *testing.M) {
 }
 
 func newStore(t testing.TB) *vault.VaultStore {
-	client, path, creds, ok := jimmtest.VaultClient(t, "../../")
+	client, path, roleID, secretID, ok := jimmtest.VaultClient(t, "../../")
 	if !ok {
 		t.Skip("vault not available")
 	}
 	return &vault.VaultStore{
-		Client:     client,
-		AuthSecret: creds,
-		AuthPath:   "/auth/approle/login",
-		KVPath:     path,
+		Client:       client,
+		RoleID:       roleID,
+		RoleSecretID: secretID,
+		KVPath:       path,
 	}
 }
 
@@ -64,7 +64,7 @@ func TestVaultCloudCredentialAttributeStoreRoundTrip(t *testing.T) {
 
 	st := newStore(c)
 	ctx := context.Background()
-	tag := names.NewCloudCredentialTag("aws/alice@external/" + c.Name())
+	tag := names.NewCloudCredentialTag("aws/alice@canonical.com/" + c.Name())
 	err := st.Put(ctx, tag, map[string]string{"a": "A", "b": "1234"})
 	c.Assert(err, qt.IsNil)
 
@@ -84,7 +84,7 @@ func TestVaultCloudCredentialAtrributeStoreEmpty(t *testing.T) {
 
 	st := newStore(c)
 	ctx := context.Background()
-	tag := names.NewCloudCredentialTag("aws/alice@external/" + c.Name())
+	tag := names.NewCloudCredentialTag("aws/alice@canonical.com/" + c.Name())
 
 	attr, err := st.Get(ctx, tag)
 	c.Assert(err, qt.IsNil)
@@ -183,4 +183,45 @@ func TestGetAndPutJWKSPrivateKey(t *testing.T) {
 	keyPem, err := store.GetJWKSPrivateKey(ctx)
 	c.Assert(err, qt.IsNil)
 	c.Assert(string(keyPem), qt.Contains, "-----BEGIN RSA PRIVATE KEY-----")
+}
+
+func TestGetAndPutOAuthSecret(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+	store := newStore(c)
+
+	// We didn't use a pre-defined/constant key here because in that case we had
+	// to make sure there's nothing left from last test runs in Vault.
+	key := []byte(uuid.NewString()) // A random UUID as key
+	err := store.PutOAuthSecret(ctx, key)
+	c.Assert(err, qt.IsNil)
+	retrievedKey, err := store.GetOAuthSecret(ctx)
+	c.Assert(err, qt.IsNil)
+	c.Assert(retrievedKey, qt.DeepEquals, key)
+}
+
+func TestGetOAuthSecretFailsIfDataIsNil(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+	store := newStore(c)
+
+	err := store.PutOAuthSecret(ctx, nil)
+	c.Assert(err, qt.IsNil)
+
+	retrieved, err := store.GetOAuthSecret(ctx)
+	c.Assert(err, qt.ErrorMatches, "oauth secret not found")
+	c.Assert(retrieved, qt.IsNil)
+}
+
+func TestGetOAuthSecretFailsIfNotFound(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+	store := newStore(c)
+
+	err := store.CleanupOAuthSecrets(ctx)
+	c.Assert(err, qt.IsNil)
+
+	retrieved, err := store.GetOAuthSecret(ctx)
+	c.Assert(err, qt.ErrorMatches, "no OAuth key exists")
+	c.Assert(retrieved, qt.IsNil)
 }

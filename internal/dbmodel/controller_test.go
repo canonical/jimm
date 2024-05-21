@@ -10,7 +10,7 @@ import (
 	"github.com/canonical/jimm/internal/dbmodel"
 	qt "github.com/frankban/quicktest"
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 )
 
 func TestControllerTag(t *testing.T) {
@@ -39,13 +39,13 @@ func TestController(t *testing.T) {
 	c.Assert(result.Error, qt.IsNil)
 
 	ctl := dbmodel.Controller{
-		Name:          "test-controller",
-		UUID:          "00000000-0000-0000-0000-000000000001",
-		AdminUser:     "admin",
-		AdminPassword: "pw",
-		CACertificate: "ca-cert",
-		PublicAddress: "controller.example.com:443",
-		CloudName:     "test-cloud",
+		Name:              "test-controller",
+		UUID:              "00000000-0000-0000-0000-000000000001",
+		AdminIdentityName: "admin",
+		AdminPassword:     "pw",
+		CACertificate:     "ca-cert",
+		PublicAddress:     "controller.example.com:443",
+		CloudName:         "test-cloud",
 		Addresses: dbmodel.HostPorts([][]jujuparams.HostPort{{{
 			Address: jujuparams.Address{
 				Value: "1.1.1.1",
@@ -90,10 +90,9 @@ func TestControllerModels(t *testing.T) {
 		CloudCredential: cred,
 	}
 	c.Assert(db.Create(&m1).Error, qt.IsNil)
+	u2, err := dbmodel.NewIdentity("charlie@canonical.com")
+	c.Assert(err, qt.IsNil)
 
-	u2 := dbmodel.User{
-		Username: "charlie@external",
-	}
 	c.Assert(db.Create(&u2).Error, qt.IsNil)
 
 	m2 := dbmodel.Model{
@@ -102,7 +101,7 @@ func TestControllerModels(t *testing.T) {
 			String: "00000001-0000-0000-0000-0000-000000000002",
 			Valid:  true,
 		},
-		Owner:           u2,
+		Owner:           *u2,
 		Controller:      ctl,
 		CloudRegion:     cl.Regions[0],
 		CloudCredential: cred,
@@ -110,7 +109,7 @@ func TestControllerModels(t *testing.T) {
 	c.Assert(db.Create(&m2).Error, qt.IsNil)
 
 	var models []dbmodel.Model
-	err := db.Model(&ctl).Association("Models").Find(&models)
+	err = db.Model(&ctl).Association("Models").Find(&models)
 	c.Assert(err, qt.IsNil)
 
 	c.Check(models, qt.DeepEquals, []dbmodel.Model{{
@@ -119,7 +118,7 @@ func TestControllerModels(t *testing.T) {
 		UpdatedAt:         m1.UpdatedAt,
 		Name:              m1.Name,
 		UUID:              m1.UUID,
-		OwnerUsername:     m1.OwnerUsername,
+		OwnerIdentityName: m1.OwnerIdentityName,
 		ControllerID:      m1.ControllerID,
 		CloudRegionID:     m1.CloudRegionID,
 		CloudCredentialID: m1.CloudCredentialID,
@@ -129,7 +128,7 @@ func TestControllerModels(t *testing.T) {
 		UpdatedAt:         m2.UpdatedAt,
 		Name:              m2.Name,
 		UUID:              m2.UUID,
-		OwnerUsername:     m2.OwnerUsername,
+		OwnerIdentityName: m2.OwnerIdentityName,
 		ControllerID:      m2.ControllerID,
 		CloudRegionID:     m2.CloudRegionID,
 		CloudCredentialID: m2.CloudCredentialID,
@@ -166,7 +165,7 @@ func TestToAPIControllerInfo(t *testing.T) {
 		CloudRegion: cl.Regions[0],
 		Priority:    dbmodel.CloudRegionControllerPriorityDeployed,
 	}}
-	ctl.AdminUser = "admin"
+	ctl.AdminIdentityName = "admin"
 	ctl.AgentVersion = "1.2.3"
 
 	ci := ctl.ToAPIControllerInfo()

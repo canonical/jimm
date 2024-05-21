@@ -7,18 +7,16 @@ import (
 	"database/sql"
 	"fmt"
 	"regexp"
-	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/google/uuid"
 	"github.com/juju/juju/core/crossmodel"
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	"github.com/juju/zaputil"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
-	"gorm.io/gorm"
 
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
@@ -50,13 +48,13 @@ var (
 	// [9] - Application offer name
 	// [10] - Relation specifier (i.e., #member)
 	// A complete matcher example would look like so with square-brackets denoting groups and paranthsis denoting index:
-	// (1)[controller](2)[-](3)[controller-1](4)[:](5)[alice@external-place](6)[/](7)[model-1](8)[.](9)[offer-1](10)[#relation-specifier]"
+	// (1)[controller](2)[-](3)[controller-1](4)[:](5)[alice@canonical.com-place](6)[/](7)[model-1](8)[.](9)[offer-1](10)[#relation-specifier]"
 	// In the case of something like: user-alice@wonderland or group-alices-wonderland#member, it would look like so:
 	// (1)[user](2)[-](3)[alices@wonderland]
 	// (1)[group](2)[-](3)[alices-wonderland](10)[#member]
 	// So if a group, user, UUID, controller name comes in, it will always be index 3 for them
 	// and if a relation specifier is present, it will always be index 10
-	jujuURIMatcher = regexp.MustCompile(`([a-zA-Z0-9]*)(\-|\z)([a-zA-Z0-9-@.]*)(\:|)([a-zA-Z0-9-@]*)(\/|)([a-zA-Z0-9-]*)(\.|)([a-zA-Z0-9-]*)([a-zA-Z#]*|\z)\z`)
+	jujuURIMatcher = regexp.MustCompile(`([a-zA-Z0-9]*)(\-|\z)([a-zA-Z0-9-@.]*)(\:|)([a-zA-Z0-9-@.]*)(\/|)([a-zA-Z0-9-]*)(\.|)([a-zA-Z0-9-]*)([a-zA-Z#]*|\z)\z`)
 )
 
 // ToOfferAccessString maps relation to an application offer access string.
@@ -176,7 +174,6 @@ type JWTService interface {
 
 // JWTGenerator provides the necessary state and methods to authorize a user and generate JWT tokens.
 type JWTGenerator struct {
-	authenticator Authenticator
 	database      JWTGeneratorDatabase
 	accessChecker JWTGeneratorAccessChecker
 	jwtService    JWTService
@@ -190,9 +187,8 @@ type JWTGenerator struct {
 }
 
 // NewJWTGenerator returns a new JwtAuthorizer struct
-func NewJWTGenerator(authenticator Authenticator, database JWTGeneratorDatabase, accessChecker JWTGeneratorAccessChecker, jwtService JWTService) JWTGenerator {
+func NewJWTGenerator(database JWTGeneratorDatabase, accessChecker JWTGeneratorAccessChecker, jwtService JWTService) JWTGenerator {
 	return JWTGenerator{
-		authenticator: authenticator,
 		database:      database,
 		accessChecker: accessChecker,
 		jwtService:    jwtService,
@@ -216,23 +212,21 @@ func (auth *JWTGenerator) GetUser() names.UserTag {
 // MakeLoginToken authorizes the user based on the provided login requests and returns
 // a JWT containing claims about user's access to the controller, model (if applicable)
 // and all clouds that the controller knows about.
-func (auth *JWTGenerator) MakeLoginToken(ctx context.Context, req *jujuparams.LoginRequest) ([]byte, error) {
+func (auth *JWTGenerator) MakeLoginToken(ctx context.Context, user *openfga.User) ([]byte, error) {
 	const op = errors.Op("jimm.MakeLoginToken")
 
 	auth.mu.Lock()
 	defer auth.mu.Unlock()
 
-	if req == nil {
-		return nil, errors.E(op, "missing login request.")
+	if user == nil {
+		return nil, errors.E(op, "user not specified")
 	}
+	auth.user = user
+
 	// Recreate the accessMapCache to prevent leaking permissions across multiple login requests.
 	auth.accessMapCache = make(map[string]string)
 	var authErr error
-	auth.user, authErr = auth.authenticator.Authenticate(ctx, req)
-	if authErr != nil {
-		zapctx.Error(ctx, "authentication failed", zap.Error(authErr))
-		return nil, authErr
-	}
+
 	var modelAccess string
 	if auth.mt.Id() == "" {
 		return nil, errors.E(op, "model not set")
@@ -357,9 +351,9 @@ func (j *JIMM) GrantAuditLogAccess(ctx context.Context, user *openfga.User, targ
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
-	targetUser := &dbmodel.User{}
+	targetUser := &dbmodel.Identity{}
 	targetUser.SetTag(targetUserTag)
-	err := j.Database.GetUser(ctx, targetUser)
+	err := j.Database.GetIdentity(ctx, targetUser)
 	if err != nil {
 		return errors.E(op, err)
 	}
@@ -380,9 +374,9 @@ func (j *JIMM) RevokeAuditLogAccess(ctx context.Context, user *openfga.User, tar
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
-	targetUser := &dbmodel.User{}
+	targetUser := &dbmodel.Identity{}
 	targetUser.SetTag(targetUserTag)
-	err := j.Database.GetUser(ctx, targetUser)
+	err := j.Database.GetIdentity(ctx, targetUser)
 	if err != nil {
 		return errors.E(op, err)
 	}
@@ -427,7 +421,7 @@ func (j *JIMM) ToJAASTag(ctx context.Context, tag *ofganames.Tag) (string, error
 		if err != nil {
 			return "", errors.E(err, "failed to fetch model information")
 		}
-		modelString := names.ModelTagKind + "-" + model.Controller.Name + ":" + model.OwnerUsername + "/" + model.Name
+		modelString := names.ModelTagKind + "-" + model.Controller.Name + ":" + model.OwnerIdentityName + "/" + model.Name
 		if tag.Relation.String() != "" {
 			modelString = modelString + "#" + tag.Relation.String()
 		}
@@ -440,22 +434,16 @@ func (j *JIMM) ToJAASTag(ctx context.Context, tag *ofganames.Tag) (string, error
 		if err != nil {
 			return "", errors.E(err, "failed to fetch application offer information")
 		}
-		aoString := names.ApplicationOfferTagKind + "-" + ao.Model.Controller.Name + ":" + ao.Model.OwnerUsername + "/" + ao.Model.Name + "." + ao.Name
+		aoString := names.ApplicationOfferTagKind + "-" + ao.Model.Controller.Name + ":" + ao.Model.OwnerIdentityName + "/" + ao.Model.Name + "." + ao.Name
 		if tag.Relation.String() != "" {
 			aoString = aoString + "#" + tag.Relation.String()
 		}
 		return aoString, nil
 	case jimmnames.GroupTagKind:
-		id, err := strconv.ParseUint(tag.ID, 10, 32)
-		if err != nil {
-			return "", errors.E(err, fmt.Sprintf("failed to parse group id: %v", tag.ID))
-		}
 		group := dbmodel.GroupEntry{
-			Model: gorm.Model{
-				ID: uint(id),
-			},
+			UUID: tag.ID,
 		}
-		err = j.Database.GetGroup(ctx, &group)
+		err := j.Database.GetGroup(ctx, &group)
 		if err != nil {
 			return "", errors.E(err, "failed to fetch group information")
 		}
@@ -482,7 +470,7 @@ func (j *JIMM) ToJAASTag(ctx context.Context, tag *ofganames.Tag) (string, error
 	}
 }
 
-// resolveTag resolves JIMM tag [of any kind available] (i.e., controller-mycontroller:alex@external/mymodel.myoffer)
+// resolveTag resolves JIMM tag [of any kind available] (i.e., controller-mycontroller:alex@canonical.com/mymodel.myoffer)
 // into a juju string tag (i.e., controller-<controller uuid>).
 //
 // If the JIMM tag is aleady of juju string tag form, the transformation is left alone.
@@ -534,9 +522,9 @@ func resolveTag(jimmUUID string, db *db.Database, tag string) (*ofganames.Tag, e
 		}
 		err := db.GetGroup(ctx, entry)
 		if err != nil {
-			return nil, errors.E("group not found")
+			return nil, errors.E(fmt.Sprintf("group %s not found", trailer))
 		}
-		return ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag(strconv.FormatUint(uint64(entry.ID), 10)), relation), nil
+		return ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag(entry.UUID), relation), nil
 
 	case names.ControllerTagKind:
 		zapctx.Debug(
@@ -580,7 +568,7 @@ func resolveTag(jimmUUID string, db *db.Database, tag string) (*ofganames.Tag, e
 				return nil, errors.E("controller not found")
 			}
 			model.ControllerID = controller.ID
-			model.OwnerUsername = userName
+			model.OwnerIdentityName = userName
 			model.Name = modelName
 		}
 

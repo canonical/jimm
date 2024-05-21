@@ -29,24 +29,25 @@ clean:
 	-$(RM) -r jimm-release/
 	-$(RM) jimm-*.tar.xz
 
-test-env: sysdeps
-	@touch ./local/vault/approle.json && touch ./local/vault/roleid.txt
-	@docker compose up --force-recreate
+certs:
+	@cd local/traefik/certs; ./certs.sh; cd -
+
+test-env: sysdeps certs
+	@touch ./local/vault/approle.json && touch ./local/vault/roleid.txt && touch ./local/vault/vault.env
+	@docker compose up --force-recreate -d --wait
 
 test-env-cleanup:
 	@docker compose down -v --remove-orphans
 
-dev-env-setup: sysdeps pull/candid
-	@cd local/traefik/certs; ./certs.sh; cd -
-	@touch ./local/vault/approle.json && touch ./local/vault/roleid.txt
+dev-env-setup: sysdeps certs
+	@touch ./local/vault/approle.json && touch ./local/vault/roleid.txt && touch ./local/vault/vault.env
 	@make version/commit.txt && make version/version.txt
-	@go mod vendor
 
-dev-env:
+dev-env: dev-env-setup
 	@docker compose --profile dev up --force-recreate
 
 dev-env-cleanup:
-	@docker compose down -v --remove-orphans
+	@docker compose --profile dev down -v --remove-orphans
 
 # Reformat all source files.
 format:
@@ -88,14 +89,14 @@ jimmctl-snap:
 	cp -R ./snaps/jimmctl/* ./snap/
 	snapcraft
 
+jaas-snap:
+	mkdir -p ./snap
+	cp -R ./snaps/jaas/* ./snap/
+	snapcraft
+
 push-microk8s: jimm-image
 	docker tag jimm:latest localhost:32000/jimm:latest
 	docker push localhost:32000/jimm:latest
-
-pull/candid:
-	-git clone https://github.com/canonical/candid.git ./tmp/candid
-	(cd ./tmp/candid && make image)
-	docker image ls candid
 
 get-local-auth:
 	@go run ./local/authy
@@ -133,7 +134,6 @@ help:
 	@echo 'make sysdeps - Install the development environment system packages.'
 	@echo 'make format - Format the source files.'
 	@echo 'make simplify - Format and simplify the source files.'
-	@echo 'make pull/candid - Pull candid for local development environment.'
 	@echo 'make get-local-auth - Get local auth to the API WSS endpoint locally.'
 
 .PHONY: build check install release clean format server simplify sysdeps help FORCE

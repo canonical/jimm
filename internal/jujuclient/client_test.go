@@ -8,7 +8,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	jujuparams "github.com/juju/juju/rpc/params"
 	jujuversion "github.com/juju/juju/version"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/internal/dbmodel"
@@ -24,7 +24,7 @@ var _ = gc.Suite(&clientSuite{})
 func (s *clientSuite) TestStatus(c *gc.C) {
 	ctx := context.Background()
 
-	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/bob@external/pw1").String()
+	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/bob@canonical.com/pw1").String()
 	cred := jujuparams.TaggedCredential{
 		Tag: cct,
 		Credential: jujuparams.CloudCredential{
@@ -38,12 +38,12 @@ func (s *clientSuite) TestStatus(c *gc.C) {
 
 	info := s.APIInfo(c)
 	ctl := dbmodel.Controller{
-		UUID:          info.ControllerUUID,
-		Name:          s.ControllerConfig.ControllerName(),
-		CACertificate: info.CACert,
-		AdminUser:     info.Tag.Id(),
-		AdminPassword: info.Password,
-		PublicAddress: info.Addrs[0],
+		UUID:              info.ControllerUUID,
+		Name:              s.ControllerConfig.ControllerName(),
+		CACertificate:     info.CACert,
+		AdminIdentityName: info.Tag.Id(),
+		AdminPassword:     info.Password,
+		PublicAddress:     info.Addrs[0],
 	}
 
 	models, err := s.API.UpdateCredential(ctx, cred)
@@ -53,7 +53,7 @@ func (s *clientSuite) TestStatus(c *gc.C) {
 	var modelInfo jujuparams.ModelInfo
 	err = s.API.CreateModel(ctx, &jujuparams.ModelCreateArgs{
 		Name:               "model-1",
-		OwnerTag:           names.NewUserTag("bob@external").String(),
+		OwnerTag:           names.NewUserTag("bob@canonical.com").String(),
 		CloudCredentialTag: cct,
 	}, &modelInfo)
 	c.Assert(err, gc.Equals, nil)

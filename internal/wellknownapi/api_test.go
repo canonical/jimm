@@ -20,15 +20,15 @@ import (
 )
 
 func newStore(t testing.TB) *vault.VaultStore {
-	client, path, creds, ok := jimmtest.VaultClient(t, "../../")
+	client, path, roleID, roleSecretID, ok := jimmtest.VaultClient(t, "../../")
 	if !ok {
 		t.Skip("vault not available")
 	}
 	return &vault.VaultStore{
-		Client:     client,
-		AuthSecret: creds,
-		AuthPath:   "/auth/approle/login",
-		KVPath:     path,
+		Client:       client,
+		RoleID:       roleID,
+		RoleSecretID: roleSecretID,
+		KVPath:       path,
 	}
 }
 
@@ -60,7 +60,7 @@ func setupHandlerAndRecorder(c *qt.C, path string, store *vault.VaultStore) *htt
 	return rr
 }
 
-// 404: In the event the JWKS cannot be found expliciticly from
+// 404: In the event the JWKS cannot be found explicitly from
 // the credential store.
 func TestWellknownAPIJWKSJSONHandles404(t *testing.T) {
 	c := qt.New(t)

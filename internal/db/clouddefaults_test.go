@@ -8,7 +8,7 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	"gorm.io/gorm"
 
 	"github.com/canonical/jimm/internal/db"
@@ -22,9 +22,8 @@ func (s *dbSuite) TestModelDefaults(c *qt.C) {
 	err := s.Database.Migrate(ctx, true)
 	c.Assert(err, qt.Equals, nil)
 
-	u := dbmodel.User{
-		Username: "bob@external",
-	}
+	u, err := dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, qt.IsNil)
 	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
 
 	cloud1 := dbmodel.Cloud{
@@ -48,11 +47,11 @@ func (s *dbSuite) TestModelDefaults(c *qt.C) {
 	cloud := cloud1
 	cloud.Regions = nil
 	defaults := dbmodel.CloudDefaults{
-		Username: u.Username,
-		User:     u,
-		CloudID:  cloud.ID,
-		Cloud:    cloud,
-		Region:   cloud1.Regions[0].Name,
+		IdentityName: u.Name,
+		Identity:     *u,
+		CloudID:      cloud.ID,
+		Cloud:        cloud,
+		Region:       cloud1.Regions[0].Name,
 		Defaults: map[string]interface{}{
 			"key1": float64(17),
 			"key2": "some other data",
@@ -61,7 +60,7 @@ func (s *dbSuite) TestModelDefaults(c *qt.C) {
 	err = s.Database.SetCloudDefaults(ctx, &defaults)
 	c.Check(err, qt.Equals, nil)
 
-	d, err := s.Database.ModelDefaultsForCloud(ctx, &u, names.NewCloudTag("test-cloud-1"))
+	d, err := s.Database.ModelDefaultsForCloud(ctx, u, names.NewCloudTag("test-cloud-1"))
 	c.Assert(err, qt.Equals, nil)
 	c.Assert(d, qt.HasLen, 1)
 	c.Assert(d[0], qt.DeepEquals, defaults)
@@ -71,7 +70,7 @@ func (s *dbSuite) TestModelDefaults(c *qt.C) {
 	err = s.Database.SetCloudDefaults(ctx, &defaults)
 	c.Check(err, qt.Equals, nil)
 
-	d, err = s.Database.ModelDefaultsForCloud(ctx, &u, names.NewCloudTag("test-cloud-1"))
+	d, err = s.Database.ModelDefaultsForCloud(ctx, u, names.NewCloudTag("test-cloud-1"))
 	c.Assert(err, qt.Equals, nil)
 	c.Assert(d, qt.HasLen, 1)
 	c.Assert(d[0].Defaults, qt.DeepEquals, dbmodel.Map{
@@ -81,20 +80,20 @@ func (s *dbSuite) TestModelDefaults(c *qt.C) {
 	})
 
 	dbDefaults := dbmodel.CloudDefaults{
-		Username: u.Username,
-		CloudID:  cloud2.ID,
-		Cloud:    cloud2,
-		Region:   cloud2.Regions[0].Name,
+		IdentityName: u.Name,
+		CloudID:      cloud2.ID,
+		Cloud:        cloud2,
+		Region:       cloud2.Regions[0].Name,
 	}
 	err = s.Database.CloudDefaults(ctx, &dbDefaults)
 	c.Assert(err, qt.ErrorMatches, "cloudregiondefaults not found")
 	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
 	dbDefaults = dbmodel.CloudDefaults{
-		Username: u.Username,
-		CloudID:  cloud1.ID,
-		Cloud:    cloud1,
-		Region:   cloud1.Regions[0].Name,
+		IdentityName: u.Name,
+		CloudID:      cloud1.ID,
+		Cloud:        cloud1,
+		Region:       cloud1.Regions[0].Name,
 	}
 	err = s.Database.CloudDefaults(ctx, &dbDefaults)
 	c.Assert(err, qt.Equals, nil)
@@ -106,20 +105,20 @@ func (s *dbSuite) TestModelDefaults(c *qt.C) {
 	err = s.Database.CloudDefaults(ctx, &dbDefaults)
 	c.Assert(err, qt.Equals, nil)
 	c.Assert(dbDefaults, qt.CmpEquals(cmpopts.IgnoreTypes([]dbmodel.CloudRegion{}, gorm.Model{})), dbmodel.CloudDefaults{
-		Username: u.Username,
-		User:     u,
-		CloudID:  cloud1.ID,
-		Cloud:    cloud1,
-		Region:   cloud1.Regions[0].Name,
+		IdentityName: u.Name,
+		Identity:     *u,
+		CloudID:      cloud1.ID,
+		Cloud:        cloud1,
+		Region:       cloud1.Regions[0].Name,
 		Defaults: map[string]interface{}{
 			"key3": "more data",
 		},
 	})
 
 	err = s.Database.UnsetCloudDefaults(ctx, &dbmodel.CloudDefaults{
-		Username: u.Username,
-		CloudID:  cloud2.ID,
-		Region:   "no-such-region",
+		IdentityName: u.Name,
+		CloudID:      cloud2.ID,
+		Region:       "no-such-region",
 	}, []string{"key1", "key2", "unknown-key"})
 	c.Assert(err, qt.ErrorMatches, "cloudregiondefaults not found")
 }
@@ -155,7 +154,9 @@ func TestModelDefaultsForCloudUnconfiguredDatabase(t *testing.T) {
 	c := qt.New(t)
 
 	var d db.Database
-	_, err := d.ModelDefaultsForCloud(context.Background(), &dbmodel.User{}, names.NewCloudTag("test-cloud"))
+	i, err := dbmodel.NewIdentity("bob")
+	c.Assert(err, qt.IsNil)
+	_, err = d.ModelDefaultsForCloud(context.Background(), i, names.NewCloudTag("test-cloud"))
 	c.Check(err, qt.ErrorMatches, `database not configured`)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeServerConfiguration)
 }

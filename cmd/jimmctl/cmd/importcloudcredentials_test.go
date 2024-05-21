@@ -11,17 +11,19 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/cmd/jimmctl/cmd"
+	"github.com/canonical/jimm/internal/cmdtest"
 	"github.com/canonical/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/jimmtest"
 )
 
 type importCloudCredentialsSuite struct {
-	jimmSuite
+	cmdtest.JimmCmdSuite
 }
 
 var _ = gc.Suite(&importCloudCredentialsSuite{})
 
 const creds = `{
-	"_id": "aws/alice/test1",
+	"_id": "aws/alice@canonical.com/test1",
 	"type": "access-key",
 	"attributes": {
 		"access-key": "key-id",
@@ -29,7 +31,7 @@ const creds = `{
 	}
 }
 {
-	"_id": "aws/bob@external/test1",
+	"_id": "aws/bob@canonical.com/test1",
 	"type": "access-key",
 	"attributes": {
 		"access-key": "key-id2",
@@ -37,7 +39,7 @@ const creds = `{
 	}
 }
 {
-	"_id": "gce/charlie/test1",
+	"_id": "gce/charlie@canonical.com/test1",
 	"type": "empty",
 	"attributes": {}
 }`
@@ -62,32 +64,32 @@ func (s *importCloudCredentialsSuite) TestImportCloudCredentials(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	// alice is superuser
-	bClient := s.userBakeryClient("alice")
+	bClient := jimmtest.NewUserSessionLogin(c, "alice")
 	_, err = cmdtesting.RunCommand(c, cmd.NewImportCloudCredentialsCommandForTesting(s.ClientStore(), bClient), tmpfile)
 	c.Assert(err, gc.IsNil)
 
 	cred1 := dbmodel.CloudCredential{
-		CloudName:     "aws",
-		OwnerUsername: "alice@external",
-		Name:          "test1",
+		CloudName:         "aws",
+		OwnerIdentityName: "alice@canonical.com",
+		Name:              "test1",
 	}
 	err = s.JIMM.Database.GetCloudCredential(context.Background(), &cred1)
 	c.Assert(err, gc.IsNil)
 	c.Check(cred1.AuthType, gc.Equals, "access-key")
 
 	cred2 := dbmodel.CloudCredential{
-		CloudName:     "aws",
-		OwnerUsername: "bob@external",
-		Name:          "test1",
+		CloudName:         "aws",
+		OwnerIdentityName: "bob@canonical.com",
+		Name:              "test1",
 	}
 	err = s.JIMM.Database.GetCloudCredential(context.Background(), &cred2)
 	c.Assert(err, gc.IsNil)
 	c.Check(cred2.AuthType, gc.Equals, "access-key")
 
 	cred3 := dbmodel.CloudCredential{
-		CloudName:     "gce",
-		OwnerUsername: "charlie@external",
-		Name:          "test1",
+		CloudName:         "gce",
+		OwnerIdentityName: "charlie@canonical.com",
+		Name:              "test1",
 	}
 	err = s.JIMM.Database.GetCloudCredential(context.Background(), &cred3)
 	c.Assert(err, gc.IsNil)

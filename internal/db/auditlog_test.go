@@ -8,7 +8,7 @@ import (
 	"time"
 
 	qt "github.com/frankban/quicktest"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
@@ -28,8 +28,8 @@ func (s *dbSuite) TestAddAuditLogEntry(c *qt.C) {
 	ctx := context.Background()
 
 	ale := dbmodel.AuditLogEntry{
-		Time:    time.Now().UTC().Round(time.Millisecond),
-		UserTag: names.NewUserTag("alice@external").String(),
+		Time:        time.Now().UTC().Round(time.Millisecond),
+		IdentityTag: names.NewUserTag("alice@canonical.com").String(),
 	}
 
 	err := s.Database.AddAuditLogEntry(ctx, &ale)
@@ -63,17 +63,17 @@ func TestForEachAuditLogEntryUnconfiguredDatabase(t *testing.T) {
 }
 
 var testAuditLogEntries = []dbmodel.AuditLogEntry{{
-	Time:    time.Date(2020, time.February, 20, 20, 2, 20, 0, time.UTC),
-	UserTag: names.NewUserTag("alice@external").String(),
+	Time:        time.Date(2020, time.February, 20, 20, 2, 20, 0, time.UTC),
+	IdentityTag: names.NewUserTag("alice@canonical.com").String(),
 }, {
-	Time:    time.Date(2020, time.February, 20, 20, 2, 21, 0, time.UTC),
-	UserTag: names.NewUserTag("alice@external").String(),
+	Time:        time.Date(2020, time.February, 20, 20, 2, 21, 0, time.UTC),
+	IdentityTag: names.NewUserTag("alice@canonical.com").String(),
 }, {
-	Time:    time.Date(2020, time.February, 20, 20, 2, 21, 0, time.UTC),
-	UserTag: names.NewUserTag("bob@external").String(),
+	Time:        time.Date(2020, time.February, 20, 20, 2, 21, 0, time.UTC),
+	IdentityTag: names.NewUserTag("bob@canonical.com").String(),
 }, {
-	Time:    time.Date(2020, time.February, 20, 20, 2, 23, 0, time.UTC),
-	UserTag: names.NewUserTag("alice@external").String(),
+	Time:        time.Date(2020, time.February, 20, 20, 2, 23, 0, time.UTC),
+	IdentityTag: names.NewUserTag("alice@canonical.com").String(),
 }}
 
 var forEachAuditLogEntryTests = []struct {
@@ -106,7 +106,7 @@ var forEachAuditLogEntryTests = []struct {
 }, {
 	name: "UserTagFilter",
 	filter: db.AuditLogFilter{
-		UserTag: names.NewUserTag("alice@external").String(),
+		IdentityTag: names.NewUserTag("alice@canonical.com").String(),
 	},
 	expectEntries: []int{0, 1, 3},
 }}
@@ -209,16 +209,16 @@ func (s *dbSuite) TestPurgeLogsFromDb(c *qt.C) {
 	ctx := context.Background()
 	relativeNow := time.Now().AddDate(-1, 0, 0)
 	ale := dbmodel.AuditLogEntry{
-		Time:    relativeNow.UTC().Round(time.Millisecond),
-		UserTag: names.NewUserTag("alice@external").String(),
+		Time:        relativeNow.UTC().Round(time.Millisecond),
+		IdentityTag: names.NewUserTag("alice@canonical.com").String(),
 	}
 	ale_past := dbmodel.AuditLogEntry{
-		Time:    relativeNow.AddDate(0, 0, -1).UTC().Round(time.Millisecond),
-		UserTag: names.NewUserTag("alice@external").String(),
+		Time:        relativeNow.AddDate(0, 0, -1).UTC().Round(time.Millisecond),
+		IdentityTag: names.NewUserTag("alice@canonical.com").String(),
 	}
 	ale_future := dbmodel.AuditLogEntry{
-		Time:    relativeNow.AddDate(0, 0, 5).UTC().Round(time.Millisecond),
-		UserTag: names.NewUserTag("alice@external").String(),
+		Time:        relativeNow.AddDate(0, 0, 5).UTC().Round(time.Millisecond),
+		IdentityTag: names.NewUserTag("alice@canonical.com").String(),
 	}
 
 	err := s.Database.Migrate(context.Background(), false)

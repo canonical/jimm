@@ -5,7 +5,9 @@ package main
 import (
 	"context"
 	"net/http"
+	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -15,6 +17,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/canonical/jimm"
+	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/version"
 )
 
@@ -57,29 +60,88 @@ func start(ctx context.Context, s *service.Service) error {
 		macaroonExpiryDuration = expiry
 	}
 	jwtExpiryDuration := 24 * time.Hour
-	durationString = os.Getenv("JIMM_MACAROON_EXPIRY_DURATION")
+	durationString = os.Getenv("JIMM_JWT_EXPIRY")
 	if durationString != "" {
 		expiry, err := time.ParseDuration(durationString)
 		if err != nil {
-			zapctx.Error(ctx, "failed to parse macaroon expiry duration", zap.Error(err))
+			zapctx.Error(ctx, "failed to parse jwt expiry duration", zap.Error(err))
 		} else {
 			jwtExpiryDuration = expiry
 		}
 	}
+
+	sessionTokenExpiryDuration := time.Duration(0)
+	durationString = os.Getenv("JIMM_ACCESS_TOKEN_EXPIRY_DURATION")
+	if durationString != "" {
+		expiry, err := time.ParseDuration(durationString)
+		if err != nil {
+			zapctx.Error(ctx, "failed to parse access token expiry duration", zap.Error(err))
+			return err
+		}
+		sessionTokenExpiryDuration = expiry
+	}
+
+	issuerURL := os.Getenv("JIMM_OAUTH_ISSUER_URL")
+	parsedIssuerURL, err := url.Parse(issuerURL)
+	if err != nil {
+		zapctx.Error(ctx, "failed to parse oauth issuer url", zap.Error(err))
+		return err
+	}
+
+	if parsedIssuerURL.Scheme == "" {
+		zapctx.Error(ctx, "oauth issuer url has no scheme")
+		return errors.E("oauth issuer url has no scheme")
+	}
+
+	clientID := os.Getenv("JIMM_OAUTH_CLIENT_ID")
+	if clientID == "" {
+		zapctx.Error(ctx, "no oauth client id")
+		return errors.E("no oauth client id")
+	}
+
+	clientSecret := os.Getenv("JIMM_OAUTH_CLIENT_SECRET")
+	if clientSecret == "" {
+		zapctx.Error(ctx, "no oauth client secret")
+		return errors.E("no oauth client secret")
+	}
+
+	scopes := os.Getenv("JIMM_OAUTH_SCOPES")
+	scopesParsed := strings.Split(scopes, " ")
+	for i, scope := range scopesParsed {
+		scopesParsed[i] = strings.TrimSpace(scope)
+	}
+	zapctx.Info(ctx, "oauth scopes", zap.Any("scopes", scopesParsed))
+	if len(scopesParsed) == 0 {
+		zapctx.Error(ctx, "no oauth client scopes present")
+		return errors.E("no oauth client scopes present")
+	}
+
 	insecureSecretStorage := false
 	if _, ok := os.LookupEnv("INSECURE_SECRET_STORAGE"); ok {
 		insecureSecretStorage = true
 	}
+
+	secureSessionCookies := false
+	if _, ok := os.LookupEnv("JIMM_SECURE_SESSION_COOKIES"); ok {
+		secureSessionCookies = true
+	}
+
+	sessionCookieMaxAge := os.Getenv("JIMM_SESSION_COOKIE_MAX_AGE")
+	sessionCookieMaxAgeInt, err := strconv.Atoi(sessionCookieMaxAge)
+	if err != nil {
+		return errors.E("unable to parse jimm session cookie max age")
+	}
+	if sessionCookieMaxAgeInt < 0 {
+		return errors.E("jimm session cookie max age cannot be less than 0")
+	}
+
 	jimmsvc, err := jimm.NewService(ctx, jimm.Params{
 		ControllerUUID:    os.Getenv("JIMM_UUID"),
 		DSN:               os.Getenv("JIMM_DSN"),
-		CandidURL:         os.Getenv("CANDID_URL"),
-		CandidPublicKey:   os.Getenv("CANDID_PUBLIC_KEY"),
-		BakeryAgentFile:   os.Getenv("BAKERY_AGENT_FILE"),
 		ControllerAdmins:  strings.Fields(os.Getenv("JIMM_ADMINS")),
-		VaultSecretFile:   os.Getenv("VAULT_SECRET_FILE"),
+		VaultRoleID:       os.Getenv("VAULT_ROLE_ID"),
+		VaultRoleSecretID: os.Getenv("VAULT_ROLE_SECRET_ID"),
 		VaultAddress:      os.Getenv("VAULT_ADDR"),
-		VaultAuthPath:     os.Getenv("VAULT_AUTH_PATH"),
 		VaultPath:         os.Getenv("VAULT_PATH"),
 		DashboardLocation: os.Getenv("JIMM_DASHBOARD_LOCATION"),
 		PublicDNSName:     os.Getenv("JIMM_DNS_NAME"),
@@ -97,6 +159,16 @@ func start(ctx context.Context, s *service.Service) error {
 		MacaroonExpiryDuration:        macaroonExpiryDuration,
 		JWTExpiryDuration:             jwtExpiryDuration,
 		InsecureSecretStorage:         insecureSecretStorage,
+		OAuthAuthenticatorParams: jimm.OAuthAuthenticatorParams{
+			IssuerURL:           issuerURL,
+			ClientID:            clientID,
+			ClientSecret:        clientSecret,
+			Scopes:              scopesParsed,
+			SessionTokenExpiry:  sessionTokenExpiryDuration,
+			SessionCookieMaxAge: sessionCookieMaxAgeInt,
+		},
+		DashboardFinalRedirectURL: os.Getenv("JIMM_DASHBOARD_FINAL_REDIRECT_URL"),
+		SecureSessionCookies:      secureSessionCookies,
 	})
 	if err != nil {
 		return err
@@ -108,13 +180,17 @@ func start(ctx context.Context, s *service.Service) error {
 	s.Go(func() error { return jimmsvc.WatchModelSummaries(ctx) })
 
 	if os.Getenv("JIMM_ENABLE_JWKS_ROTATOR") != "" {
-		zapctx.Info(ctx, "attempting to start JWKS rotator")
+		zapctx.Info(ctx, "attempting to start JWKS rotator and generate OAuth secret key")
 		s.Go(func() error {
-			err := jimmsvc.StartJWKSRotator(ctx, time.NewTicker(time.Hour).C, time.Now().UTC().AddDate(0, 3, 0))
-			if err != nil {
+			if err := jimmsvc.StartJWKSRotator(ctx, time.NewTicker(time.Hour).C, time.Now().UTC().AddDate(0, 3, 0)); err != nil {
 				zapctx.Error(ctx, "failed to start JWKS rotator", zap.Error(err))
+				return err
 			}
-			return err
+			if err := jimmsvc.CheckOrGenerateOAuthKey(ctx); err != nil {
+				zapctx.Error(ctx, "failed to check/generate OAuth secret key", zap.Error(err))
+				return err
+			}
+			return nil
 		})
 	}
 

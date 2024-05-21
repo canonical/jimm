@@ -9,7 +9,7 @@ import (
 	"github.com/juju/juju/core/life"
 	"github.com/juju/juju/core/status"
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	"github.com/juju/version/v2"
 
 	"github.com/canonical/jimm/internal/errors"
@@ -29,9 +29,9 @@ type Model struct {
 	// UUID is the UUID of the model.
 	UUID sql.NullString
 
-	// Owner is user that owns the model.
-	OwnerUsername string
-	Owner         User `gorm:"foreignkey:OwnerUsername;references:Username"`
+	// Owner is identity that owns the model.
+	OwnerIdentityName string
+	Owner             Identity `gorm:"foreignkey:OwnerIdentityName;references:Name"`
 
 	// Controller is the controller that is hosting the model.
 	ControllerID uint
@@ -47,7 +47,7 @@ type Model struct {
 
 	// CloudCredential is the credential used with the model.
 	CloudCredentialID uint
-	CloudCredential   CloudCredential
+	CloudCredential   CloudCredential `gorm:"foreignkey:CloudCredentialID;references:ID"`
 
 	// Type is the type of model.
 	Type string
@@ -103,12 +103,15 @@ func (m *Model) SetTag(t names.ModelTag) {
 }
 
 // FromModelUpdate updates the model from the given ModelUpdate.
-func (m *Model) SwitchOwner(u *User) {
-	m.OwnerUsername = u.Username
+func (m *Model) SwitchOwner(u *Identity) {
+	m.OwnerIdentityName = u.Name
 	m.Owner = *u
 }
 
-// FromJujuModelInfo converts jujuparams.ModelInfo into Model.
+// FromJujuModelInfo converts on a best-effort basis jujuparams.ModelInfo into Model.
+//
+// Some fields specific to JIMM which aren't present in a jujuparams.ModelInfo type
+// will need to be filled in manually by the caller of this function.
 func (m *Model) FromJujuModelInfo(info jujuparams.ModelInfo) error {
 	m.Name = info.Name
 	m.Type = info.Type
@@ -120,7 +123,7 @@ func (m *Model) FromJujuModelInfo(info jujuparams.ModelInfo) error {
 		if err != nil {
 			return errors.E(err)
 		}
-		m.OwnerUsername = ut.Id()
+		m.OwnerIdentityName = ut.Id()
 	}
 	m.Life = string(info.Life)
 	m.Status.FromJujuEntityStatus(info.Status)
@@ -140,7 +143,7 @@ func (m *Model) FromJujuModelInfo(info jujuparams.ModelInfo) error {
 		}
 		m.CloudCredential.Name = cct.Name()
 		m.CloudCredential.CloudName = cct.Cloud().Id()
-		m.CloudCredential.Owner.Username = cct.Owner().Id()
+		m.CloudCredential.Owner.Name = cct.Owner().Id()
 	}
 
 	if info.SLA != nil {
@@ -167,7 +170,7 @@ func (m Model) ToJujuModel() jujuparams.Model {
 	jm.Name = m.Name
 	jm.UUID = m.UUID.String
 	jm.Type = m.Type
-	jm.OwnerTag = names.NewUserTag(m.OwnerUsername).String()
+	jm.OwnerTag = names.NewUserTag(m.OwnerIdentityName).String()
 	return jm
 }
 

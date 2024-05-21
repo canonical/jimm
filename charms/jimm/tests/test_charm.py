@@ -16,10 +16,29 @@ from threading import Thread
 from unittest.mock import MagicMock, Mock, call, patch
 
 import hvac
-from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
+from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus
 from ops.testing import Harness
 
 from src.charm import JimmCharm
+
+OAUTH_CLIENT_ID = "jimm_client_id"
+OAUTH_CLIENT_SECRET = "test-secret"
+OAUTH_PROVIDER_INFO = {
+    "authorization_endpoint": "https://example.oidc.com/oauth2/auth",
+    "introspection_endpoint": "https://example.oidc.com/admin/oauth2/introspect",
+    "issuer_url": "https://example.oidc.com",
+    "jwks_endpoint": "https://example.oidc.com/.well-known/jwks.json",
+    "scope": "openid profile email phone",
+    "token_endpoint": "https://example.oidc.com/oauth2/token",
+    "userinfo_endpoint": "https://example.oidc.com/userinfo",
+}
+
+OPENFGA_PROVIDER_INFO = {
+    "http_api_url": "http://openfga.localhost:8080",
+    "grpc_api_url": "grpc://openfga.localhost:8090",
+    "store_id": "fake-store-id",
+    "token": "fake-token",
+}
 
 
 class TestCharm(unittest.TestCase):
@@ -45,6 +64,32 @@ class TestCharm(unittest.TestCase):
         )
         self.harness.charm.framework.charm_dir = pathlib.Path(self.tempdir.name)
 
+    def add_oauth_relation(self):
+        self.oauth_rel_id = self.harness.add_relation("oauth", "hydra")
+        self.harness.add_relation_unit(self.oauth_rel_id, "hydra/0")
+        self.oauth_secret_id = self.harness.add_model_secret("hydra", {"secret": OAUTH_CLIENT_SECRET})
+        self.harness.grant_secret(self.oauth_secret_id, "juju-jimm")
+        self.harness.update_relation_data(
+            self.oauth_rel_id,
+            "hydra",
+            {
+                "client_id": OAUTH_CLIENT_ID,
+                "client_secret_id": self.oauth_secret_id,
+                **OAUTH_PROVIDER_INFO,
+            },
+        )
+
+    def add_openfga_relation(self):
+        self.openfga_rel_id = self.harness.add_relation("openfga", "openfga")
+        self.harness.add_relation_unit(self.openfga_rel_id, "openfga/0")
+        self.harness.update_relation_data(
+            self.openfga_rel_id,
+            "openfga",
+            {
+                **OPENFGA_PROVIDER_INFO,
+            },
+        )
+
     def test_install(self):
         service_file = os.path.join(self.harness.charm.charm_dir, "juju-jimm.service")
         self.harness.add_resource("jimm-snap", "Test data")
@@ -66,6 +111,9 @@ class TestCharm(unittest.TestCase):
             f.write("test")
         with open(self.harness.charm._env_filename("db"), "wt") as f:
             f.write("test")
+        self.harness.set_leader(True)
+        self.add_oauth_relation()
+        self.add_openfga_relation()
         self.harness.charm.on.start.emit()
         self.harness.charm._systemctl.assert_has_calls(
             (
@@ -94,6 +142,9 @@ class TestCharm(unittest.TestCase):
             f.write("test")
         with open(self.harness.charm._env_filename("db"), "wt") as f:
             f.write("test")
+        self.harness.set_leader(True)
+        self.add_oauth_relation()
+        self.add_openfga_relation()
         self.harness.charm.on.upgrade_charm.emit()
         self.assertTrue(os.path.exists(service_file))
         self.assertEqual(self.harness.charm._snap.call_args.args[0], "install")
@@ -110,7 +161,6 @@ class TestCharm(unittest.TestCase):
         config_file = os.path.join(self.harness.charm.charm_dir, "juju-jimm.env")
         self.harness.update_config(
             {
-                "candid-url": "https://candid.example.com",
                 "controller-admins": "user1 user2 group1",
                 "dns-name": "jimm.example.com",
                 "log-level": "debug",
@@ -120,46 +170,47 @@ class TestCharm(unittest.TestCase):
                 "audit-log-retention-period-in-days": "10",
                 "jwt-expiry": "10m",
                 "macaroon-expiry-duration": "48h",
+                "secure-session-cookies": True,
+                "session-cookie-max-age": 86400,
+                "final-redirect-url": "",
             }
         )
         self.assertTrue(os.path.exists(config_file))
         with open(config_file) as f:
             lines = f.readlines()
         os.unlink(config_file)
-        self.assertEqual(len(lines), 21)
-        self.assertEqual(lines[0].strip(), "BAKERY_AGENT_FILE=")
-        self.assertEqual(lines[1].strip(), "CANDID_URL=https://candid.example.com")
-        self.assertEqual(lines[2].strip(), "JIMM_ADMINS=user1 user2 group1")
+        self.assertEqual(len(lines), 19)
+        self.assertEqual(lines[0].strip(), "JIMM_ADMINS=user1 user2 group1")
         self.assertEqual(
-            lines[4].strip(),
+            lines[2].strip(),
             "JIMM_DASHBOARD_LOCATION=https://jaas.ai/models",
         )
-        self.assertEqual(lines[7].strip(), "JIMM_DNS_NAME=" + "jimm.example.com")
-        self.assertEqual(lines[9].strip(), "JIMM_LOG_LEVEL=debug")
-        self.assertEqual(lines[10].strip(), "JIMM_UUID=caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa")
+        self.assertEqual(lines[5].strip(), "JIMM_DNS_NAME=" + "jimm.example.com")
+        self.assertEqual(lines[7].strip(), "JIMM_LOG_LEVEL=debug")
+        self.assertEqual(lines[8].strip(), "JIMM_UUID=caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa")
         self.assertEqual(
-            lines[12].strip(),
-            "PRIVATE_KEY=ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
+            lines[9].strip(),
+            "BAKERY_PRIVATE_KEY=ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
         )
         self.assertEqual(
-            lines[15].strip(),
-            "PUBLIC_KEY=izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
+            lines[10].strip(),
+            "BAKERY_PUBLIC_KEY=izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
         )
         self.assertEqual(
-            lines[17].strip(),
+            lines[11].strip(),
             "JIMM_AUDIT_LOG_RETENTION_PERIOD_IN_DAYS=10",
         )
         self.assertEqual(
-            lines[18].strip(),
+            lines[12].strip(),
             "JIMM_JWT_EXPIRY=10m",
         )
-        self.assertEqual(lines[20].strip(), "JIMM_MACAROON_EXPIRY_DURATION=48h")
+        self.assertEqual(lines[14].strip(), "JIMM_MACAROON_EXPIRY_DURATION=48h")
+        self.assertEqual(lines[15].strip(), "JIMM_ACCESS_TOKEN_EXPIRY_DURATION=6h")
 
     def test_config_changed_redirect_to_dashboard(self):
         config_file = os.path.join(self.harness.charm.charm_dir, "juju-jimm.env")
         self.harness.update_config(
             {
-                "candid-url": "https://candid.example.com",
                 "controller-admins": "user1 user2 group1",
                 "dns-name": "jimm.example.com",
                 "log-level": "debug",
@@ -169,40 +220,41 @@ class TestCharm(unittest.TestCase):
                 "private-key": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
                 "audit-log-retention-period-in-days": "10",
                 "macaroon-expiry-duration": "48h",
+                "secure-session-cookies": True,
+                "session-cookie-max-age": 86400,
+                "final-redirect-url": "",
             }
         )
         self.assertTrue(os.path.exists(config_file))
         with open(config_file) as f:
             lines = f.readlines()
         os.unlink(config_file)
-        self.assertEqual(len(lines), 21)
-        self.assertEqual(lines[0].strip(), "BAKERY_AGENT_FILE=")
-        self.assertEqual(lines[1].strip(), "CANDID_URL=https://candid.example.com")
-        self.assertEqual(lines[2].strip(), "JIMM_ADMINS=user1 user2 group1")
+        self.assertEqual(len(lines), 19)
+        self.assertEqual(lines[0].strip(), "JIMM_ADMINS=user1 user2 group1")
         self.assertEqual(
-            lines[4].strip(),
+            lines[2].strip(),
             "JIMM_DASHBOARD_LOCATION=https://test.jaas.ai/models",
         )
-        self.assertEqual(lines[7].strip(), "JIMM_DNS_NAME=" + "jimm.example.com")
-        self.assertEqual(lines[9].strip(), "JIMM_LOG_LEVEL=debug")
-        self.assertEqual(lines[10].strip(), "JIMM_UUID=caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa")
+        self.assertEqual(lines[5].strip(), "JIMM_DNS_NAME=" + "jimm.example.com")
+        self.assertEqual(lines[7].strip(), "JIMM_LOG_LEVEL=debug")
+        self.assertEqual(lines[8].strip(), "JIMM_UUID=caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa")
         self.assertEqual(
-            lines[12].strip(),
-            "PRIVATE_KEY=ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
+            lines[9].strip(),
+            "BAKERY_PRIVATE_KEY=ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
         )
         self.assertEqual(
-            lines[15].strip(),
-            "PUBLIC_KEY=izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
+            lines[10].strip(),
+            "BAKERY_PUBLIC_KEY=izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
         )
         self.assertEqual(
-            lines[17].strip(),
+            lines[11].strip(),
             "JIMM_AUDIT_LOG_RETENTION_PERIOD_IN_DAYS=10",
         )
         self.assertEqual(
-            lines[18].strip(),
+            lines[12].strip(),
             "JIMM_JWT_EXPIRY=5m",
         )
-        self.assertEqual(lines[20].strip(), "JIMM_MACAROON_EXPIRY_DURATION=48h")
+        self.assertEqual(lines[14].strip(), "JIMM_MACAROON_EXPIRY_DURATION=48h")
 
     def test_config_changed_ready(self):
         config_file = os.path.join(self.harness.charm.charm_dir, "juju-jimm.env")
@@ -210,107 +262,46 @@ class TestCharm(unittest.TestCase):
             f.write("test")
         self.harness.update_config(
             {
-                "candid-url": "https://candid.example.com",
                 "controller-admins": "user1 user2 group1",
                 "uuid": "caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa",
                 "public-key": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
                 "private-key": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
                 "audit-log-retention-period-in-days": "10",
                 "macaroon-expiry-duration": "48h",
+                "secure-session-cookies": True,
+                "session-cookie-max-age": 86400,
+                "final-redirect-url": "",
             }
         )
         self.assertTrue(os.path.exists(config_file))
         with open(config_file) as f:
             lines = f.readlines()
         os.unlink(config_file)
-        self.assertEqual(len(lines), 19)
-        self.assertEqual(lines[0].strip(), "BAKERY_AGENT_FILE=")
-        self.assertEqual(lines[1].strip(), "CANDID_URL=https://candid.example.com")
-        self.assertEqual(lines[2].strip(), "JIMM_ADMINS=user1 user2 group1")
+        self.assertEqual(len(lines), 17)
+        self.assertEqual(lines[0].strip(), "JIMM_ADMINS=user1 user2 group1")
         self.assertEqual(
-            lines[4].strip(),
+            lines[2].strip(),
             "JIMM_DASHBOARD_LOCATION=https://jaas.ai/models",
         )
-        self.assertEqual(lines[7].strip(), "JIMM_LOG_LEVEL=info")
-        self.assertEqual(lines[8].strip(), "JIMM_UUID=caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa")
+        self.assertEqual(lines[5].strip(), "JIMM_LOG_LEVEL=info")
+        self.assertEqual(lines[6].strip(), "JIMM_UUID=caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa")
         self.assertEqual(
-            lines[10].strip(),
-            "PRIVATE_KEY=ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
+            lines[7].strip(),
+            "BAKERY_PRIVATE_KEY=ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
         )
         self.assertEqual(
-            lines[13].strip(),
-            "PUBLIC_KEY=izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
+            lines[8].strip(),
+            "BAKERY_PUBLIC_KEY=izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
         )
         self.assertEqual(
-            lines[15].strip(),
+            lines[9].strip(),
             "JIMM_AUDIT_LOG_RETENTION_PERIOD_IN_DAYS=10",
         )
         self.assertEqual(
-            lines[16].strip(),
+            lines[10].strip(),
             "JIMM_JWT_EXPIRY=5m",
         )
-        self.assertEqual(lines[18].strip(), "JIMM_MACAROON_EXPIRY_DURATION=48h")
-
-    def test_config_changed_with_agent(self):
-        config_file = os.path.join(self.harness.charm.charm_dir, "juju-jimm.env")
-        self.harness.charm._agent_filename = os.path.join(self.tempdir.name, "agent.json")
-        self.harness.update_config(
-            {
-                "candid-agent-username": "username@candid",
-                "candid-agent-private-key": "agent-private-key",
-                "candid-agent-public-key": "agent-public-key",
-                "candid-url": "https://candid.example.com",
-                "controller-admins": "user1 user2 group1",
-                "uuid": "caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa",
-                "public-key": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
-                "private-key": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
-            }
-        )
-        self.assertTrue(os.path.exists(self.harness.charm._agent_filename))
-        with open(self.harness.charm._agent_filename) as f:
-            data = json.load(f)
-        self.assertEqual(data["key"]["public"], "agent-public-key")
-        self.assertEqual(data["key"]["private"], "agent-private-key")
-
-        self.assertTrue(os.path.exists(config_file))
-
-        with open(config_file) as f:
-            lines = f.readlines()
-        self.assertEqual(len(lines), 19)
-        self.assertEqual(
-            lines[0].strip(),
-            "BAKERY_AGENT_FILE=" + self.harness.charm._agent_filename,
-        )
-        self.assertEqual(lines[1].strip(), "CANDID_URL=https://candid.example.com")
-        self.assertEqual(lines[2].strip(), "JIMM_ADMINS=user1 user2 group1")
-        self.assertEqual(lines[4].strip(), "JIMM_DASHBOARD_LOCATION=https://jaas.ai/models")
-        self.assertEqual(lines[7].strip(), "JIMM_LOG_LEVEL=info")
-        self.assertEqual(lines[8].strip(), "JIMM_UUID=caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa")
-        self.assertEqual(lines[18].strip(), "JIMM_MACAROON_EXPIRY_DURATION=24h")
-
-        self.harness.charm._agent_filename = os.path.join(self.tempdir.name, "no-such-dir", "agent.json")
-        self.harness.update_config(
-            {
-                "candid-agent-username": "username@candid",
-                "candid-agent-private-key": "agent-private-key2",
-                "candid-agent-public-key": "agent-public-key2",
-                "candid-url": "https://candid.example.com",
-                "controller-admins": "user1 user2 group1",
-                "uuid": "caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa",
-                "public-key": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
-                "private-key": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
-            }
-        )
-        with open(config_file) as f:
-            lines = f.readlines()
-        self.assertEqual(len(lines), 19)
-        self.assertEqual(lines[0].strip(), "BAKERY_AGENT_FILE=")
-        self.assertEqual(lines[1].strip(), "CANDID_URL=https://candid.example.com")
-        self.assertEqual(lines[2].strip(), "JIMM_ADMINS=user1 user2 group1")
-        self.assertEqual(lines[4].strip(), "JIMM_DASHBOARD_LOCATION=https://jaas.ai/models")
-        self.assertEqual(lines[7].strip(), "JIMM_LOG_LEVEL=info")
-        self.assertEqual(lines[8].strip(), "JIMM_UUID=caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa")
-        self.assertEqual(lines[18].strip(), "JIMM_MACAROON_EXPIRY_DURATION=24h")
+        self.assertEqual(lines[12].strip(), "JIMM_MACAROON_EXPIRY_DURATION=48h")
 
     def test_leader_elected(self):
         leader_file = os.path.join(self.harness.charm.charm_dir, "juju-jimm-leader.env")
@@ -336,6 +327,8 @@ class TestCharm(unittest.TestCase):
             lines = f.readlines()
         self.assertEqual(lines[0].strip(), "JIMM_WATCH_CONTROLLERS=")
         self.harness.set_leader(True)
+        self.add_oauth_relation()
+        self.add_openfga_relation()
         with open(leader_file) as f:
             lines = f.readlines()
         self.assertEqual(lines[0].strip(), "JIMM_WATCH_CONTROLLERS=1")
@@ -373,6 +366,9 @@ class TestCharm(unittest.TestCase):
         db_file = os.path.join(self.harness.charm.charm_dir, "juju-jimm-db.env")
         with open(self.harness.charm._env_filename(), "wt") as f:
             f.write("test")
+        self.harness.set_leader(True)
+        self.add_oauth_relation()
+        self.add_openfga_relation()
         id = self.harness.add_relation("database", "postgresql")
         self.harness.add_relation_unit(id, "postgresql/0")
         self.harness.update_relation_data(
@@ -476,22 +472,17 @@ class TestCharm(unittest.TestCase):
         self.harness.charm.on.update_status.emit()
         self.assertEqual(
             self.harness.charm.unit.status,
-            BlockedStatus("waiting for jimm-snap resource"),
+            BlockedStatus("Waiting for environment"),
         )
-        with open(self.harness.charm._workload_filename, "wt") as f:
-            f.write("jimm.bin")
+        with open(self.harness.charm._env_filename(), "wt") as f:
+            f.write("test")
         self.harness.charm.on.update_status.emit()
         self.assertEqual(
             self.harness.charm.unit.status,
-            BlockedStatus("waiting for database"),
+            BlockedStatus("Waiting for database relation"),
         )
         id = self.harness.add_relation("database", "postgresql")
         self.harness.add_relation_unit(id, "postgresql/0")
-        self.harness.charm.on.update_status.emit()
-        self.assertEqual(
-            self.harness.charm.unit.status,
-            WaitingStatus("waiting for database"),
-        )
         self.harness.update_relation_data(
             id,
             "postgresql",
@@ -501,7 +492,17 @@ class TestCharm(unittest.TestCase):
                 "endpoints": "some.database.host,some.other.database.host",
             },
         )
-        self.harness.charm.on.update_status.emit()
+        self.assertEqual(
+            self.harness.charm.unit.status,
+            BlockedStatus("Waiting for oauth relation"),
+        )
+        self.harness.set_leader(True)
+        self.add_oauth_relation()
+        self.assertEqual(
+            self.harness.charm.unit.status,
+            BlockedStatus("Waiting for openfga relation"),
+        )
+        self.add_openfga_relation()
         self.assertEqual(self.harness.charm.unit.status, MaintenanceStatus("starting"))
         s = HTTPServer(("", 8080), VersionHTTPRequestHandler)
         t = Thread(target=s.serve_forever)
@@ -518,67 +519,40 @@ class TestCharm(unittest.TestCase):
         harness.begin()
         harness.set_leader(True)
 
-        with tempfile.NamedTemporaryFile() as tmp:
-            harness.charm._agent_filename = tmp.name
-            harness.update_config(
-                {
-                    "dns-name": "jimm.example.com",
-                    "candid-agent-username": "username@candid",
-                    "candid-agent-private-key": "agent-private-key",
-                    "candid-agent-public-key": "agent-public-key",
-                    "candid-url": "https://candid.example.com",
-                    "controller-admins": "user1 user2 group1",
-                    "uuid": "caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa",
-                    "public-key": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
-                    "private-key": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
-                }
-            )
+        harness.update_config(
+            {
+                "dns-name": "jimm.example.com",
+                "controller-admins": "user1 user2 group1",
+                "uuid": "caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa",
+                "public-key": "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
+                "private-key": "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
+            }
+        )
 
         id = harness.add_relation("dashboard", "juju-dashboard")
         harness.add_relation_unit(id, "juju-dashboard/0")
         data = harness.get_relation_data(id, "juju-jimm")
         self.assertTrue(data)
         self.assertEqual(data["controller_url"], "wss://jimm.example.com")
-        self.assertEqual(data["identity_provider_url"], "https://candid.example.com")
         self.assertEqual(data["is_juju"], "False")
 
     def test_openfga_relation_changed(self):
-        id = self.harness.add_relation("openfga", "openfga")
-        self.harness.add_relation_unit(id, "openfga/0")
-
-        ofga = self.harness.model.get_app("openfga")
-        secret = ofga.add_secret({"token": "test-secret-token"})
-
-        self.harness.update_relation_data(
-            id,
-            "openfga",
-            {
-                "store_id": "test-store",
-                "token_secret_id": secret.id,
-                "address": "test-address",
-                "port": "8080",
-                "scheme": "http",
-            },
-        )
-
-        relation = self.harness.model.get_relation("openfga", id)
-        self.harness.charm.openfga.on.openfga_store_created.emit(relation)
+        self.add_openfga_relation()
 
         with open(self.harness.charm._env_filename("openfga")) as f:
             lines = f.readlines()
 
-            self.assertEqual(lines[0].strip(), "OPENFGA_HOST=test-address")
+            self.assertEqual(lines[0].strip(), "OPENFGA_HOST=openfga.localhost")
             self.assertEqual(lines[1].strip(), "OPENFGA_PORT=8080")
             self.assertEqual(lines[2].strip(), "OPENFGA_SCHEME=http")
-            self.assertEqual(lines[3].strip(), "OPENFGA_STORE=test-store")
-            self.assertEqual(lines[4].strip(), "OPENFGA_TOKEN=test-secret-token")
+            self.assertEqual(lines[3].strip(), "OPENFGA_STORE=fake-store-id")
+            self.assertEqual(lines[4].strip(), "OPENFGA_TOKEN=fake-token")
 
     def test_insecure_secret_storage(self):
         """Test that the flag for insecure secret storage is only generated when explicitly requested."""
         config_file = os.path.join(self.harness.charm.charm_dir, "juju-jimm.env")
         self.harness.update_config(
             {
-                "candid-url": "https://candid.example.com",
                 "controller-admins": "user1 user2 group1",
                 "dns-name": "jimm.example.com",
                 "log-level": "debug",
@@ -591,15 +565,26 @@ class TestCharm(unittest.TestCase):
         with open(config_file) as f:
             lines = f.readlines()
         os.unlink(config_file)
-        self.assertEqual(len(lines), 21)
+        self.assertEqual(len(lines), 19)
         self.assertEqual(len([match for match in lines if "INSECURE_SECRET_STORAGE" in match]), 0)
         self.harness.update_config({"postgres-secret-storage": True})
         self.assertTrue(os.path.exists(config_file))
         with open(config_file) as f:
             lines = f.readlines()
         os.unlink(config_file)
-        self.assertEqual(len(lines), 23)
+        self.assertEqual(len(lines), 21)
         self.assertEqual(len([match for match in lines if "INSECURE_SECRET_STORAGE" in match]), 1)
+
+    def test_oauth_relation_changed(self):
+        self.harness.set_leader(True)
+        self.add_oauth_relation()
+
+        with open(self.harness.charm._env_filename("oauth")) as f:
+            lines = f.readlines()
+            self.assertEqual(lines[0].strip(), "JIMM_OAUTH_ISSUER_URL=https://example.oidc.com")
+            self.assertEqual(lines[1].strip(), "JIMM_OAUTH_CLIENT_ID=jimm_client_id")
+            self.assertEqual(lines[2].strip(), "JIMM_OAUTH_CLIENT_SECRET=test-secret")
+            self.assertEqual(lines[3].strip(), "JIMM_OAUTH_SCOPES=openid profile email phone")
 
 
 class VersionHTTPRequestHandler(BaseHTTPRequestHandler):

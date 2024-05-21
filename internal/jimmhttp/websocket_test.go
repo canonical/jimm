@@ -4,6 +4,7 @@ package jimmhttp_test
 
 import (
 	"context"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -12,7 +13,10 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/gorilla/websocket"
 
+	"github.com/canonical/jimm/internal/auth"
+	"github.com/canonical/jimm/internal/jimm"
 	"github.com/canonical/jimm/internal/jimmhttp"
+	"github.com/canonical/jimm/internal/jimmtest"
 )
 
 func TestWSHandler(t *testing.T) {
@@ -57,6 +61,11 @@ func (s echoServer) ServeWS(ctx context.Context, conn *websocket.Conn) {
 	}
 }
 
+// GetAuthenticationService returns JIMM's oauth authentication service.
+func (s echoServer) GetAuthenticationService() jimm.OAuthAuthenticator {
+	return nil
+}
+
 func TestWSHandlerPanic(t *testing.T) {
 	c := qt.New(t)
 
@@ -77,6 +86,11 @@ func TestWSHandlerPanic(t *testing.T) {
 
 type panicServer struct{}
 
+// GetAuthenticationService returns JIMM's oauth authentication service.
+func (s panicServer) GetAuthenticationService() jimm.OAuthAuthenticator {
+	return nil
+}
+
 func (s panicServer) ServeWS(ctx context.Context, conn *websocket.Conn) {
 	panic("test")
 }
@@ -95,4 +109,33 @@ func TestWSHandlerNilServer(t *testing.T) {
 
 	_, _, err = conn.ReadMessage()
 	c.Assert(err, qt.ErrorMatches, `websocket: close 1000 \(normal\)`)
+}
+
+type authFailServer struct{}
+
+// GetAuthenticationService returns JIMM's oauth authentication service.
+func (s authFailServer) GetAuthenticationService() jimm.OAuthAuthenticator {
+	return jimmtest.NewMockOAuthAuthenticator("")
+}
+
+func (s authFailServer) ServeWS(ctx context.Context, conn *websocket.Conn) {}
+
+func TestWSHandlerAuthFailsServer(t *testing.T) {
+	c := qt.New(t)
+
+	hnd := &jimmhttp.WSHandler{
+		Server: authFailServer{},
+	}
+
+	srv := httptest.NewServer(hnd)
+	c.Cleanup(srv.Close)
+
+	var d websocket.Dialer
+	conn, _, err := d.Dial("ws"+strings.TrimPrefix(srv.URL, "http"), http.Header{
+		"Cookie": []string{auth.SessionName + "=naughty_cookie"},
+	})
+	c.Assert(err, qt.IsNil)
+
+	_, _, err = conn.ReadMessage()
+	c.Assert(err, qt.ErrorMatches, `websocket: close 1011 \(internal server error\): authentication failed`)
 }

@@ -18,7 +18,7 @@ import (
 	"github.com/juju/juju/core/life"
 	"github.com/juju/juju/core/status"
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	semversion "github.com/juju/version"
 	"gopkg.in/macaroon.v2"
 
@@ -98,11 +98,11 @@ func TestAddController(t *testing.T) {
 			// TODO(Kian) We can remove these returned users, we ignore them when importing a
 			// controller into JIMM.
 			ci.Users = []jujuparams.CloudUserInfo{{
-				UserName:    "alice@external",
+				UserName:    "alice@canonical.com",
 				DisplayName: "Alice",
 				Access:      "admin",
 			}, {
-				UserName:    "bob@external",
+				UserName:    "bob@canonical.com",
 				DisplayName: "Bob",
 				Access:      "add-model",
 			}}
@@ -147,20 +147,19 @@ func TestAddController(t *testing.T) {
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
-	u := dbmodel.User{
-		Username: "alice@external",
-	}
+	u, err := dbmodel.NewIdentity("alice@canonical.com")
+	c.Assert(err, qt.IsNil)
 
-	alice := openfga.NewUser(&u, client)
+	alice := openfga.NewUser(u, client)
 	alice.JimmAdmin = true
 	err = alice.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, qt.IsNil)
 
 	ctl1 := dbmodel.Controller{
-		Name:          "test-controller",
-		AdminUser:     "admin",
-		AdminPassword: "5ecret",
-		PublicAddress: "example.com:443",
+		Name:              "test-controller",
+		AdminIdentityName: "admin",
+		AdminPassword:     "5ecret",
+		PublicAddress:     "example.com:443",
 	}
 	err = j.AddController(context.Background(), alice, &ctl1)
 	c.Assert(err, qt.IsNil)
@@ -173,10 +172,10 @@ func TestAddController(t *testing.T) {
 	c.Check(ctl2, qt.CmpEquals(cmpopts.EquateEmpty(), cmpopts.IgnoreTypes(dbmodel.CloudRegion{})), ctl1)
 
 	ctl3 := dbmodel.Controller{
-		Name:          "test-controller-2",
-		AdminUser:     "admin",
-		AdminPassword: "5ecret",
-		PublicAddress: "example.com:443",
+		Name:              "test-controller-2",
+		AdminIdentityName: "admin",
+		AdminPassword:     "5ecret",
+		PublicAddress:     "example.com:443",
 	}
 	err = j.AddController(context.Background(), alice, &ctl3)
 	c.Assert(err, qt.IsNil)
@@ -192,15 +191,15 @@ func TestAddController(t *testing.T) {
 func TestAddControllerWithVault(t *testing.T) {
 	c := qt.New(t)
 
-	client, path, creds, ok := jimmtest.VaultClient(c, "../../")
+	client, path, roleID, roleSecretID, ok := jimmtest.VaultClient(c, "../../")
 	if !ok {
 		c.Skip("vault not available")
 	}
 	store := &vault.VaultStore{
-		Client:     client,
-		AuthSecret: creds,
-		AuthPath:   "/auth/approle/login",
-		KVPath:     path,
+		Client:       client,
+		RoleID:       roleID,
+		RoleSecretID: roleSecretID,
+		KVPath:       path,
 	}
 
 	now := time.Now().UTC().Round(time.Millisecond)
@@ -265,11 +264,11 @@ func TestAddControllerWithVault(t *testing.T) {
 			// TODO(Kian) We can remove these returned users, we ignore them when importing a
 			// controller into JIMM.
 			ci.Users = []jujuparams.CloudUserInfo{{
-				UserName:    "alice@external",
+				UserName:    "alice@canonical.com",
 				DisplayName: "Alice",
 				Access:      "admin",
 			}, {
-				UserName:    "bob@external",
+				UserName:    "bob@canonical.com",
 				DisplayName: "Bob",
 				Access:      "add-model",
 			}}
@@ -315,24 +314,24 @@ func TestAddControllerWithVault(t *testing.T) {
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
-	u := dbmodel.User{
-		Username: "alice@external",
-	}
-	alice := openfga.NewUser(&u, ofgaClient)
+	u, err := dbmodel.NewIdentity("alice@canonical.com")
+	c.Assert(err, qt.IsNil)
+
+	alice := openfga.NewUser(u, ofgaClient)
 	alice.JimmAdmin = true
 
 	err = alice.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, qt.IsNil)
 
 	ctl1 := dbmodel.Controller{
-		Name:          "test-controller",
-		AdminUser:     "admin",
-		AdminPassword: "5ecret",
-		PublicAddress: "example.com:443",
+		Name:              "test-controller",
+		AdminIdentityName: "admin",
+		AdminPassword:     "5ecret",
+		PublicAddress:     "example.com:443",
 	}
 	err = j.AddController(context.Background(), alice, &ctl1)
 	c.Assert(err, qt.IsNil)
-	c.Assert(ctl1.AdminUser, qt.Equals, "")
+	c.Assert(ctl1.AdminIdentityName, qt.Equals, "")
 	c.Assert(ctl1.AdminPassword, qt.Equals, "")
 
 	ctl2 := dbmodel.Controller{
@@ -348,14 +347,14 @@ func TestAddControllerWithVault(t *testing.T) {
 	c.Assert(password, qt.Equals, "5ecret")
 
 	ctl3 := dbmodel.Controller{
-		Name:          "test-controller-2",
-		AdminUser:     "admin",
-		AdminPassword: "5ecretToo",
-		PublicAddress: "example.com:443",
+		Name:              "test-controller-2",
+		AdminIdentityName: "admin",
+		AdminPassword:     "5ecretToo",
+		PublicAddress:     "example.com:443",
 	}
 	err = j.AddController(context.Background(), alice, &ctl3)
 	c.Assert(err, qt.IsNil)
-	c.Assert(ctl3.AdminUser, qt.Equals, "")
+	c.Assert(ctl3.AdminIdentityName, qt.Equals, "")
 	c.Assert(ctl3.AdminPassword, qt.Equals, "")
 
 	ctl4 := dbmodel.Controller{
@@ -379,7 +378,7 @@ const testEarliestControllerVersionEnv = `clouds:
 cloud-credentials:
 - name: test-cred
   cloud: test
-  owner: alice@external
+  owner: alice@canonical.com
   type: empty
 controllers:
 - name: test1
@@ -429,10 +428,10 @@ func TestEarliestControllerVersion(t *testing.T) {
 
 const testImportModelEnv = `
 users:
-- username: alice@external
+- username: alice@canonical.com
   display-name: Alice
   controller-access: superuser
-- username: bob@external
+- username: bob@canonical.com
   display-name: Bob
   controller-access: login
 clouds:
@@ -443,7 +442,7 @@ clouds:
 cloud-credentials:
 - name: test-credential
   cloud: test-cloud
-  owner: alice@external
+  owner: alice@canonical.com
   type: empty
 controllers:
 - name: test-controller
@@ -460,18 +459,18 @@ models:
   cloud: test-cloud
   region: test-region
   cloud-credential: test-credential
-  owner: alice@external
+  owner: alice@canonical.com
   life: alive
   status:
     status: available
     info: "OK!"
     since: 2020-02-20T20:02:20Z
   users:
-  - user: alice@external
+  - user: alice@canonical.com
     access: admin
-  - user: bob@external
+  - user: bob@canonical.com
     access: write
-  - user: charlie@external
+  - user: charlie@canonical.com
     access: read
   sla:
     level: unsupported
@@ -497,7 +496,7 @@ func TestImportModel(t *testing.T) {
 		deltas         []jujuparams.Delta
 	}{{
 		about:          "model imported",
-		user:           "alice@external",
+		user:           "alice@canonical.com",
 		controllerName: "test-controller",
 		newOwner:       "",
 		modelUUID:      "00000002-0000-0000-0000-000000000001",
@@ -510,9 +509,9 @@ func TestImportModel(t *testing.T) {
 			info.DefaultSeries = "test-series"
 			info.CloudTag = names.NewCloudTag("test-cloud").String()
 			info.CloudRegion = "test-region"
-			info.CloudCredentialTag = names.NewCloudCredentialTag("test-cloud/alice@external/test-credential").String()
+			info.CloudCredentialTag = names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential").String()
 			info.CloudCredentialValidity = &trueValue
-			info.OwnerTag = names.NewUserTag("alice@external").String()
+			info.OwnerTag = names.NewUserTag("alice@canonical.com").String()
 			info.Life = life.Alive
 			info.Status = jujuparams.EntityStatus{
 				Status: status.Status("ok"),
@@ -520,10 +519,10 @@ func TestImportModel(t *testing.T) {
 				Since:  &now,
 			}
 			info.Users = []jujuparams.ModelUserInfo{{
-				UserName: "alice@external",
+				UserName: "alice@canonical.com",
 				Access:   jujuparams.ModelAdminAccess,
 			}, {
-				UserName: "bob@external",
+				UserName: "bob@canonical.com",
 				Access:   jujuparams.ModelReadAccess,
 			}}
 			info.Machines = []jujuparams.ModelMachineInfo{{
@@ -534,7 +533,7 @@ func TestImportModel(t *testing.T) {
 			}}
 			info.SLA = &jujuparams.ModelSLAInfo{
 				Level: "essential",
-				Owner: "alice@external",
+				Owner: "alice@canonical.com",
 			}
 			info.AgentVersion = newVersion("2.1.0")
 			return nil
@@ -543,7 +542,7 @@ func TestImportModel(t *testing.T) {
 			Entity: &jujuparams.ModelUpdate{
 				ModelUUID:      "00000002-0000-0000-0000-000000000001",
 				Name:           "test-model",
-				Owner:          "alice@external",
+				Owner:          "alice@canonical.com",
 				Life:           life.Value(constants.ALIVE.String()),
 				ControllerUUID: "00000001-0000-0000-0000-000000000001",
 				Status: jujuparams.StatusInfo{
@@ -602,8 +601,8 @@ func TestImportModel(t *testing.T) {
 				String: "00000002-0000-0000-0000-000000000001",
 				Valid:  true,
 			},
-			Owner: dbmodel.User{
-				Username:    "alice@external",
+			Owner: dbmodel.Identity{
+				Name:        "alice@canonical.com",
 				DisplayName: "Alice",
 			},
 			Controller: dbmodel.Controller{
@@ -642,9 +641,9 @@ func TestImportModel(t *testing.T) {
 		},
 	}, {
 		about:          "model from local user imported",
-		user:           "alice@external",
+		user:           "alice@canonical.com",
 		controllerName: "test-controller",
-		newOwner:       "alice@external",
+		newOwner:       "alice@canonical.com",
 		modelUUID:      "00000002-0000-0000-0000-000000000001",
 		jimmAdmin:      true,
 		modelInfo: func(_ context.Context, info *jujuparams.ModelInfo) error {
@@ -690,8 +689,8 @@ func TestImportModel(t *testing.T) {
 				String: "00000002-0000-0000-0000-000000000001",
 				Valid:  true,
 			},
-			Owner: dbmodel.User{
-				Username:    "alice@external",
+			Owner: dbmodel.Identity{
+				Name:        "alice@canonical.com",
 				DisplayName: "Alice",
 			},
 			Controller: dbmodel.Controller{
@@ -730,7 +729,7 @@ func TestImportModel(t *testing.T) {
 		},
 	}, {
 		about:          "new model owner is local user",
-		user:           "alice@external",
+		user:           "alice@canonical.com",
 		controllerName: "test-controller",
 		newOwner:       "bob",
 		modelUUID:      "00000002-0000-0000-0000-000000000001",
@@ -775,7 +774,7 @@ func TestImportModel(t *testing.T) {
 		},
 	}, {
 		about:          "model not found",
-		user:           "alice@external",
+		user:           "alice@canonical.com",
 		controllerName: "test-controller",
 		newOwner:       "",
 		modelUUID:      "00000002-0000-0000-0000-000000000001",
@@ -786,7 +785,7 @@ func TestImportModel(t *testing.T) {
 		expectedError: "model not found",
 	}, {
 		about:          "fail import from local user without newOwner flag",
-		user:           "alice@external",
+		user:           "alice@canonical.com",
 		controllerName: "test-controller",
 		newOwner:       "",
 		modelUUID:      "00000002-0000-0000-0000-000000000001",
@@ -799,7 +798,7 @@ func TestImportModel(t *testing.T) {
 			info.DefaultSeries = "test-series"
 			info.CloudTag = names.NewCloudTag("test-cloud").String()
 			info.CloudRegion = "test-region"
-			info.CloudCredentialTag = names.NewCloudCredentialTag("test-cloud/alice@external/unknown-credential").String()
+			info.CloudCredentialTag = names.NewCloudCredentialTag("test-cloud/alice@canonical.com/unknown-credential").String()
 			info.CloudCredentialValidity = &trueValue
 			info.OwnerTag = names.NewUserTag("local-user").String()
 			return nil
@@ -807,7 +806,7 @@ func TestImportModel(t *testing.T) {
 		expectedError: `cannot import model from local user, try --owner to switch the model owner`,
 	}, {
 		about:          "cloud credentials not found",
-		user:           "alice@external",
+		user:           "alice@canonical.com",
 		controllerName: "test-controller",
 		newOwner:       "",
 		modelUUID:      "00000002-0000-0000-0000-000000000001",
@@ -820,15 +819,15 @@ func TestImportModel(t *testing.T) {
 			info.DefaultSeries = "test-series"
 			info.CloudTag = names.NewCloudTag("invalid-cloud").String()
 			info.CloudRegion = "test-region"
-			info.CloudCredentialTag = names.NewCloudCredentialTag("invalid-cloud/alice@external/unknown-credential").String()
+			info.CloudCredentialTag = names.NewCloudCredentialTag("invalid-cloud/alice@canonical.com/unknown-credential").String()
 			info.CloudCredentialValidity = &trueValue
-			info.OwnerTag = names.NewUserTag("alice@external").String()
+			info.OwnerTag = names.NewUserTag("alice@canonical.com").String()
 			return nil
 		},
-		expectedError: `Failed to find cloud credential for user alice@external on cloud invalid-cloud`,
+		expectedError: `Failed to find cloud credential for user alice@canonical.com on cloud invalid-cloud`,
 	}, {
 		about:          "cloud region not found",
-		user:           "alice@external",
+		user:           "alice@canonical.com",
 		controllerName: "test-controller",
 		newOwner:       "",
 		modelUUID:      "00000002-0000-0000-0000-000000000001",
@@ -841,15 +840,15 @@ func TestImportModel(t *testing.T) {
 			info.DefaultSeries = "test-series"
 			info.CloudTag = names.NewCloudTag("test-cloud").String()
 			info.CloudRegion = "unknown-region"
-			info.CloudCredentialTag = names.NewCloudCredentialTag("test-cloud/alice@external/test-credential").String()
+			info.CloudCredentialTag = names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential").String()
 			info.CloudCredentialValidity = &trueValue
-			info.OwnerTag = names.NewUserTag("alice@external").String()
+			info.OwnerTag = names.NewUserTag("alice@canonical.com").String()
 			return nil
 		},
 		expectedError: `cloud region not found`,
 	}, {
 		about:          "not allowed if not superuser",
-		user:           "bob@external",
+		user:           "bob@canonical.com",
 		controllerName: "test-controller",
 		newOwner:       "",
 		modelUUID:      "00000002-0000-0000-0000-000000000001",
@@ -862,15 +861,15 @@ func TestImportModel(t *testing.T) {
 			info.DefaultSeries = "test-series"
 			info.CloudTag = names.NewCloudTag("test-cloud").String()
 			info.CloudRegion = "test-region"
-			info.CloudCredentialTag = names.NewCloudCredentialTag("test-cloud/alice@external/test-credential").String()
+			info.CloudCredentialTag = names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential").String()
 			info.CloudCredentialValidity = &trueValue
-			info.OwnerTag = names.NewUserTag("alice@external").String()
+			info.OwnerTag = names.NewUserTag("alice@canonical.com").String()
 			return nil
 		},
 		expectedError: `unauthorized`,
 	}, {
 		about:          "model already exists",
-		user:           "alice@external",
+		user:           "alice@canonical.com",
 		controllerName: "test-controller",
 		newOwner:       "",
 		modelUUID:      "00000002-0000-0000-0000-000000000002",
@@ -883,9 +882,9 @@ func TestImportModel(t *testing.T) {
 			info.DefaultSeries = "test-series"
 			info.CloudTag = names.NewCloudTag("test-cloud").String()
 			info.CloudRegion = "test-region"
-			info.CloudCredentialTag = names.NewCloudCredentialTag("test-cloud/alice@external/test-credential").String()
+			info.CloudCredentialTag = names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential").String()
 			info.CloudCredentialValidity = &trueValue
-			info.OwnerTag = names.NewUserTag("alice@external").String()
+			info.OwnerTag = names.NewUserTag("alice@canonical.com").String()
 			return nil
 		},
 		expectedError: `model already exists`,
@@ -956,9 +955,9 @@ func TestImportModel(t *testing.T) {
 
 const testControllerConfigEnv = `
 users:
-- username: alice@external
-- username: eve@external
-- username: fred@external
+- username: alice@canonical.com
+- username: eve@canonical.com
+- username: fred@canonical.com
 `
 
 func TestSetControllerConfig(t *testing.T) {
@@ -973,7 +972,7 @@ func TestSetControllerConfig(t *testing.T) {
 		expectedConfig dbmodel.ControllerConfig
 	}{{
 		about: "admin allowed to set config",
-		user:  "alice@external",
+		user:  "alice@canonical.com",
 		args: jujuparams.ControllerConfigSet{
 			Config: map[string]interface{}{
 				"key1": "value1",
@@ -992,7 +991,7 @@ func TestSetControllerConfig(t *testing.T) {
 		},
 	}, {
 		about: "add-model user - unauthorized",
-		user:  "eve@external",
+		user:  "eve@canonical.com",
 		args: jujuparams.ControllerConfigSet{
 			Config: map[string]interface{}{
 				"key1": "value1",
@@ -1003,7 +1002,7 @@ func TestSetControllerConfig(t *testing.T) {
 		expectedError: "unauthorized",
 	}, {
 		about: "login user - unauthorized",
-		user:  "fred@external",
+		user:  "fred@canonical.com",
 		args: jujuparams.ControllerConfigSet{
 			Config: map[string]interface{}{
 				"key1": "value1",
@@ -1061,7 +1060,7 @@ func TestGetControllerConfig(t *testing.T) {
 		expectedConfig dbmodel.ControllerConfig
 	}{{
 		about:     "admin allowed to set config",
-		user:      "alice@external",
+		user:      "alice@canonical.com",
 		jimmAdmin: true,
 		expectedConfig: dbmodel.ControllerConfig{
 			Name: "jimm",
@@ -1071,7 +1070,7 @@ func TestGetControllerConfig(t *testing.T) {
 		},
 	}, {
 		about:     "add-model user - unauthorized",
-		user:      "eve@external",
+		user:      "eve@canonical.com",
 		jimmAdmin: false,
 		expectedConfig: dbmodel.ControllerConfig{
 			Name: "jimm",
@@ -1081,7 +1080,7 @@ func TestGetControllerConfig(t *testing.T) {
 		},
 	}, {
 		about:     "login user - unauthorized",
-		user:      "fred@external",
+		user:      "fred@canonical.com",
 		jimmAdmin: false,
 		expectedConfig: dbmodel.ControllerConfig{
 			Name: "jimm",
@@ -1106,7 +1105,7 @@ func TestGetControllerConfig(t *testing.T) {
 			env := jimmtest.ParseEnvironment(c, testImportModelEnv)
 			env.PopulateDB(c, j.Database)
 
-			dbSuperuser := env.User("alice@external").DBObject(c, j.Database)
+			dbSuperuser := env.User("alice@canonical.com").DBObject(c, j.Database)
 			superuser := openfga.NewUser(&dbSuperuser, nil)
 			superuser.JimmAdmin = true
 
@@ -1121,7 +1120,7 @@ func TestGetControllerConfig(t *testing.T) {
 			})
 			c.Assert(err, qt.Equals, nil)
 
-			cfg, err := j.GetControllerConfig(ctx, user.User)
+			cfg, err := j.GetControllerConfig(ctx, user.Identity)
 			if test.expectedError == "" {
 				c.Assert(err, qt.IsNil)
 				c.Assert(cfg, jimmtest.DBObjectEquals, &test.expectedConfig)
@@ -1134,10 +1133,10 @@ func TestGetControllerConfig(t *testing.T) {
 
 const testUpdateMigratedModelEnv = `
 users:
-- username: alice@external
+- username: alice@canonical.com
   display-name: Alice
   controller-access: superuser
-- username: bob@external
+- username: bob@canonical.com
   display-name: Bob
   controller-access: login
 clouds:
@@ -1148,7 +1147,7 @@ clouds:
 cloud-credentials:
 - name: test-credential
   cloud: test-cloud
-  owner: alice@external
+  owner: alice@canonical.com
   type: empty
 controllers:
 - name: controller-1
@@ -1161,7 +1160,7 @@ controllers:
   cloud: test-cloud
   region: test-region-1
   agent-version: 3.2.1
-  admin-user: alice@external
+  admin-user: alice@canonical.com
   admin-password: c0ntr0113rs3cre7
 models:
 - name: model-1
@@ -1172,18 +1171,18 @@ models:
   cloud: test-cloud
   region: test-region
   cloud-credential: test-credential
-  owner: alice@external
+  owner: alice@canonical.com
   life: alive
   status:
     status: available
     info: "OK!"
     since: 2020-02-20T20:02:20Z
   users:
-  - user: alice@external
+  - user: alice@canonical.com
     access: admin
-  - user: bob@external
+  - user: bob@canonical.com
     access: write
-  - user: charlie@external
+  - user: charlie@canonical.com
     access: read
   sla:
     level: unsupported
@@ -1203,24 +1202,24 @@ func TestUpdateMigratedModel(t *testing.T) {
 		expectedError    string
 	}{{
 		about:         "add-model user not allowed to update migrated model",
-		user:          "bob@external",
+		user:          "bob@canonical.com",
 		expectedError: "unauthorized",
 	}, {
 		about:         "model not found",
-		user:          "alice@external",
+		user:          "alice@canonical.com",
 		model:         names.NewModelTag("unknown-model"),
 		expectedError: "model not found",
 		jimmAdmin:     true,
 	}, {
 		about:            "controller not found",
-		user:             "alice@external",
+		user:             "alice@canonical.com",
 		model:            names.NewModelTag("00000002-0000-0000-0000-000000000002"),
 		targetController: "no-such-controller",
 		expectedError:    "controller not found",
 		jimmAdmin:        true,
 	}, {
 		about:            "api returns an error",
-		user:             "alice@external",
+		user:             "alice@canonical.com",
 		model:            names.NewModelTag("00000002-0000-0000-0000-000000000002"),
 		targetController: "controller-2",
 		modelInfo: func(context.Context, *jujuparams.ModelInfo) error {
@@ -1230,7 +1229,7 @@ func TestUpdateMigratedModel(t *testing.T) {
 		jimmAdmin:     true,
 	}, {
 		about:            "all ok",
-		user:             "alice@external",
+		user:             "alice@canonical.com",
 		model:            names.NewModelTag("00000002-0000-0000-0000-000000000002"),
 		targetController: "controller-2",
 		modelInfo: func(context.Context, *jujuparams.ModelInfo) error {
@@ -1285,10 +1284,10 @@ func TestUpdateMigratedModel(t *testing.T) {
 
 const testGetControllerAccessEnv = `
 users:
-- username: alice@external
+- username: alice@canonical.com
   display-name: Alice
   controller-access: superuser
-- username: bob@external
+- username: bob@canonical.com
   display-name: Bob
   controller-access: login
 `
@@ -1313,29 +1312,29 @@ func TestGetControllerAccess(t *testing.T) {
 	env := jimmtest.ParseEnvironment(c, testGetControllerAccessEnv)
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
 
-	dbUser := env.User("alice@external").DBObject(c, j.Database)
+	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
 	alice := openfga.NewUser(&dbUser, client)
 	alice.JimmAdmin = true
 
-	access, err := j.GetJimmControllerAccess(ctx, alice, names.NewUserTag("alice@external"))
+	access, err := j.GetJimmControllerAccess(ctx, alice, names.NewUserTag("alice@canonical.com"))
 	c.Assert(err, qt.IsNil)
 	c.Check(access, qt.Equals, "superuser")
 
-	access, err = j.GetJimmControllerAccess(ctx, alice, names.NewUserTag("bob@external"))
+	access, err = j.GetJimmControllerAccess(ctx, alice, names.NewUserTag("bob@canonical.com"))
 	c.Assert(err, qt.IsNil)
 	c.Check(access, qt.Equals, "login")
 
-	access, err = j.GetJimmControllerAccess(ctx, alice, names.NewUserTag("charlie@external"))
+	access, err = j.GetJimmControllerAccess(ctx, alice, names.NewUserTag("charlie@canonical.com"))
 	c.Assert(err, qt.IsNil)
 	c.Check(access, qt.Equals, "login")
 
-	dbUser = env.User("bob@external").DBObject(c, j.Database)
+	dbUser = env.User("bob@canonical.com").DBObject(c, j.Database)
 	alice = openfga.NewUser(&dbUser, client)
-	access, err = j.GetJimmControllerAccess(ctx, alice, names.NewUserTag("bob@external"))
+	access, err = j.GetJimmControllerAccess(ctx, alice, names.NewUserTag("bob@canonical.com"))
 	c.Assert(err, qt.IsNil)
 	c.Check(access, qt.Equals, "login")
 
-	_, err = j.GetJimmControllerAccess(ctx, alice, names.NewUserTag("alice@external"))
+	_, err = j.GetJimmControllerAccess(ctx, alice, names.NewUserTag("alice@canonical.com"))
 	c.Assert(err, qt.ErrorMatches, "unauthorized")
 }
 
@@ -1347,7 +1346,7 @@ const testInitiateMigrationEnv = `clouds:
 cloud-credentials:
 - name: test-cred
   cloud: test-cloud
-  owner: alice@external
+  owner: alice@canonical.com
   type: empty
 controllers:
 - name: controller-1
@@ -1369,18 +1368,18 @@ models:
   cloud: test-cloud
   region: test-region-1
   cloud-credential: test-cred
-  owner: alice@external
+  owner: alice@canonical.com
   life: alive
   status:
     status: available
     info: "OK!"
     since: 2020-02-20T20:02:20Z
   users:
-  - user: alice@external
+  - user: alice@canonical.com
     access: admin
-  - user: bob@external
+  - user: bob@canonical.com
     access: write
-  - user: charlie@external
+  - user: charlie@canonical.com
     access: read
   sla:
     level: unsupported
@@ -1393,18 +1392,18 @@ models:
   cloud: test-cloud
   region: test-region-1
   cloud-credential: test-cred
-  owner: alice@external
+  owner: alice@canonical.com
   life: alive
   status:
     status: available
     info: "OK!"
     since: 2020-02-20T20:02:20Z
   users:
-  - user: alice@external
+  - user: alice@canonical.com
     access: admin
-  - user: bob@external
+  - user: bob@canonical.com
     access: write
-  - user: charlie@external
+  - user: charlie@canonical.com
     access: read
   sla:
     level: unsupported
@@ -1435,10 +1434,10 @@ func TestInitiateMigration(t *testing.T) {
 	}{{
 		about: "model migration initiated successfully",
 		user: func(client *openfga.OFGAClient) *openfga.User {
+			u, err := dbmodel.NewIdentity("alice@canonical.com")
+			c.Assert(err, qt.IsNil)
 			return openfga.NewUser(
-				&dbmodel.User{
-					Username: "alice@external",
-				},
+				u,
 				client,
 			)
 		},
@@ -1446,7 +1445,7 @@ func TestInitiateMigration(t *testing.T) {
 			ModelTag: mt1.String(),
 			TargetInfo: jujuparams.MigrationTargetInfo{
 				ControllerTag: names.NewControllerTag(uuid.NewString()).String(),
-				AuthTag:       names.NewUserTag("target-user@external").String(),
+				AuthTag:       names.NewUserTag("target-user@canonical.com").String(),
 				Macaroons:     string(macaroonData),
 			},
 		},
@@ -1460,10 +1459,10 @@ func TestInitiateMigration(t *testing.T) {
 	}, {
 		about: "model not found",
 		user: func(client *openfga.OFGAClient) *openfga.User {
+			u, err := dbmodel.NewIdentity("alice@canonical.com")
+			c.Assert(err, qt.IsNil)
 			return openfga.NewUser(
-				&dbmodel.User{
-					Username: "alice@external",
-				},
+				u,
 				client,
 			)
 		},
@@ -1471,7 +1470,7 @@ func TestInitiateMigration(t *testing.T) {
 			ModelTag: names.NewModelTag(uuid.NewString()).String(),
 			TargetInfo: jujuparams.MigrationTargetInfo{
 				ControllerTag: names.NewControllerTag(uuid.NewString()).String(),
-				AuthTag:       names.NewUserTag("target-user@external").String(),
+				AuthTag:       names.NewUserTag("target-user@canonical.com").String(),
 				Macaroons:     string(macaroonData),
 			},
 		},
@@ -1480,10 +1479,10 @@ func TestInitiateMigration(t *testing.T) {
 	}, {
 		about: "InitiateMigration call fails",
 		user: func(client *openfga.OFGAClient) *openfga.User {
+			u, err := dbmodel.NewIdentity("alice@canonical.com")
+			c.Assert(err, qt.IsNil)
 			return openfga.NewUser(
-				&dbmodel.User{
-					Username: "alice@external",
-				},
+				u,
 				client,
 			)
 		},
@@ -1491,7 +1490,7 @@ func TestInitiateMigration(t *testing.T) {
 			ModelTag: mt1.String(),
 			TargetInfo: jujuparams.MigrationTargetInfo{
 				ControllerTag: names.NewControllerTag(uuid.NewString()).String(),
-				AuthTag:       names.NewUserTag("target-user@external").String(),
+				AuthTag:       names.NewUserTag("target-user@canonical.com").String(),
 			},
 		},
 		initiateMigrationResults: []result{{
@@ -1501,10 +1500,10 @@ func TestInitiateMigration(t *testing.T) {
 	}, {
 		about: "non-admin-user gets unauthorized error",
 		user: func(client *openfga.OFGAClient) *openfga.User {
+			u, err := dbmodel.NewIdentity("bob@canonical.com")
+			c.Assert(err, qt.IsNil)
 			return openfga.NewUser(
-				&dbmodel.User{
-					Username: "bob@external",
-				},
+				u,
 				client,
 			)
 		},
@@ -1512,7 +1511,7 @@ func TestInitiateMigration(t *testing.T) {
 			ModelTag: mt1.String(),
 			TargetInfo: jujuparams.MigrationTargetInfo{
 				ControllerTag: names.NewControllerTag(uuid.NewString()).String(),
-				AuthTag:       names.NewUserTag("target-user@external").String(),
+				AuthTag:       names.NewUserTag("target-user@canonical.com").String(),
 			},
 		},
 		initiateMigrationResults: []result{{}},
@@ -1520,10 +1519,10 @@ func TestInitiateMigration(t *testing.T) {
 	}, {
 		about: "invalid model tag",
 		user: func(client *openfga.OFGAClient) *openfga.User {
+			u, err := dbmodel.NewIdentity("alice@canonical.com")
+			c.Assert(err, qt.IsNil)
 			return openfga.NewUser(
-				&dbmodel.User{
-					Username: "alice@external",
-				},
+				u,
 				client,
 			)
 		},
@@ -1531,7 +1530,7 @@ func TestInitiateMigration(t *testing.T) {
 			ModelTag: "invalid-model-tag",
 			TargetInfo: jujuparams.MigrationTargetInfo{
 				ControllerTag: names.NewControllerTag(uuid.NewString()).String(),
-				AuthTag:       names.NewUserTag("target-user@external").String(),
+				AuthTag:       names.NewUserTag("target-user@canonical.com").String(),
 			},
 		},
 		initiateMigrationResults: []result{{}},
@@ -1539,10 +1538,10 @@ func TestInitiateMigration(t *testing.T) {
 	}, {
 		about: "invalid target controller tag",
 		user: func(client *openfga.OFGAClient) *openfga.User {
+			u, err := dbmodel.NewIdentity("alice@canonical.com")
+			c.Assert(err, qt.IsNil)
 			return openfga.NewUser(
-				&dbmodel.User{
-					Username: "alice@external",
-				},
+				u,
 				client,
 			)
 		},
@@ -1550,7 +1549,7 @@ func TestInitiateMigration(t *testing.T) {
 			ModelTag: mt1.String(),
 			TargetInfo: jujuparams.MigrationTargetInfo{
 				ControllerTag: "invalid-controller-tag",
-				AuthTag:       names.NewUserTag("target-user@external").String(),
+				AuthTag:       names.NewUserTag("target-user@canonical.com").String(),
 			},
 		},
 		initiateMigrationResults: []result{{}},
@@ -1558,10 +1557,10 @@ func TestInitiateMigration(t *testing.T) {
 	}, {
 		about: "invalid target user tag",
 		user: func(client *openfga.OFGAClient) *openfga.User {
+			u, err := dbmodel.NewIdentity("alice@canonical.com")
+			c.Assert(err, qt.IsNil)
 			return openfga.NewUser(
-				&dbmodel.User{
-					Username: "alice@external",
-				},
+				u,
 				client,
 			)
 		},
@@ -1577,10 +1576,10 @@ func TestInitiateMigration(t *testing.T) {
 	}, {
 		about: "invalid macaroon data",
 		user: func(client *openfga.OFGAClient) *openfga.User {
+			u, err := dbmodel.NewIdentity("alice@canonical.com")
+			c.Assert(err, qt.IsNil)
 			return openfga.NewUser(
-				&dbmodel.User{
-					Username: "alice@external",
-				},
+				u,
 				client,
 			)
 		},
@@ -1588,7 +1587,7 @@ func TestInitiateMigration(t *testing.T) {
 			ModelTag: mt1.String(),
 			TargetInfo: jujuparams.MigrationTargetInfo{
 				ControllerTag: names.NewControllerTag(uuid.NewString()).String(),
-				AuthTag:       names.NewUserTag("target-user@external").String(),
+				AuthTag:       names.NewUserTag("target-user@canonical.com").String(),
 				Macaroons:     "invalid-macaroon-data",
 			},
 		},

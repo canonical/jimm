@@ -10,21 +10,6 @@ options:
       Logs are purged at 9AM UTC. Defaults to 0, which means by 
       default logs are never purged.
     default: "0"
-  candid-agent-private-key:
-    type: string
-    description: |
-      Private key of the agent user for accessing the candid API.
-  candid-agent-public-key:
-    type: string
-    description: |
-      Public key of the agent user for accessing the candid API.
-  candid-agent-username:
-    type: string
-    description: |
-      Name of the agent user for accessing the candid API.
-  candid-url:
-    type: string
-    description: URL of candid server
   controller-admins:
     type: string
     description: |
@@ -81,3 +66,27 @@ options:
     type: string
     default: 24h
     description: Expiry duration for authentication macaroons.
+  session-expiry-duration:
+    type: string
+    default: 6h
+    description: |
+      Expiry duration for JIMM session tokens. These tokens are used
+      by clients and their expiry determines how frequently a user
+      must login.
+  secure-session-cookies:
+    type: boolean
+    default: true
+    description: |
+      Whether HTTPS must be enabled to set session cookies.
+  session-cookie-max-age:
+    type: int
+    default: 86400
+    description: |
+      The max age for the session cookies in seconds, on subsequent logins, the session instance
+      extended by this amount. 
+  final-redirect-url:
+    type: string
+    default: ""
+    description: |
+      The final redirect URL for JIMM to redirect to when completing a browser based
+      login. This should be your dashboard. 

@@ -5,18 +5,17 @@ package jujuapi_test
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/pem"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 
-	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
-	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
-	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery/agent"
 	"github.com/juju/juju/api"
+	"github.com/juju/juju/rpc/jsoncodec"
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/internal/dbmodel"
@@ -28,7 +27,6 @@ import (
 )
 
 type websocketSuite struct {
-	jimmtest.CandidSuite
 	jimmtest.BootstrapSuite
 
 	Params     jujuapi.Params
@@ -46,15 +44,9 @@ func (s *websocketSuite) SetUpTest(c *gc.C) {
 	ctx, cancelFnc := context.WithCancel(context.Background())
 	s.cancelFnc = cancelFnc
 
-	s.ControllerAdmins = []string{"controller-admin"}
-
-	s.CandidSuite.SetUpTest(c)
 	s.BootstrapSuite.SetUpTest(c)
 
-	s.JIMM.Authenticator = s.Authenticator
-
 	s.Params.ControllerUUID = "914487b5-60e7-42bb-bd63-1adc3fd3a388"
-	s.Params.IdentityLocation = s.Candid.URL.String()
 
 	mux := http.NewServeMux()
 	mux.Handle("/api", jujuapi.APIHandler(ctx, s.JIMM, s.Params))
@@ -65,31 +57,32 @@ func (s *websocketSuite) SetUpTest(c *gc.C) {
 	s.APIHandler = mux
 	s.HTTP = httptest.NewTLSServer(s.APIHandler)
 
-	s.Candid.AddUser("alice")
+	s.AddAdminUser(c, "alice@canonical.com")
 
-	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@external/cred")
+	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@canonical.com/cred")
 	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{AuthType: "empty"})
 	s.Credential2 = new(dbmodel.CloudCredential)
 	s.Credential2.SetTag(cct)
 	err := s.JIMM.Database.GetCloudCredential(ctx, s.Credential2)
 	c.Assert(err, gc.Equals, nil)
 
-	mt := s.AddModel(c, names.NewUserTag("charlie@external"), "model-2", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, cct)
+	mt := s.AddModel(c, names.NewUserTag("charlie@canonical.com"), "model-2", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, cct)
 	s.Model2 = new(dbmodel.Model)
 	s.Model2.SetTag(mt)
 	err = s.JIMM.Database.GetModel(ctx, s.Model2)
 	c.Assert(err, gc.Equals, nil)
 
-	mt = s.AddModel(c, names.NewUserTag("charlie@external"), "model-3", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, cct)
+	mt = s.AddModel(c, names.NewUserTag("charlie@canonical.com"), "model-3", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, cct)
 	s.Model3 = new(dbmodel.Model)
 	s.Model3.SetTag(mt)
 	err = s.JIMM.Database.GetModel(ctx, s.Model3)
 	c.Assert(err, gc.Equals, nil)
 
+	bobIdentity, err := dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, gc.IsNil)
+
 	bob := openfga.NewUser(
-		&dbmodel.User{
-			Username: "bob@external",
-		},
+		bobIdentity,
 		s.OFGAClient,
 	)
 	err = bob.SetModelAccess(ctx, s.Model3.ResourceTag(), ofganames.ReaderRelation)
@@ -104,13 +97,17 @@ func (s *websocketSuite) TearDownTest(c *gc.C) {
 		s.HTTP.Close()
 	}
 	s.BootstrapSuite.TearDownTest(c)
-	s.CandidSuite.TearDownTest(c)
 }
 
 // openNoAssert creates a new websocket connection to the test server, using the
 // connection info specified in info, authenticating as the given user.
 // If info is nil then default values will be used.
-func (s *websocketSuite) openNoAssert(c *gc.C, info *api.Info, username string) (api.Connection, error) {
+func (s *websocketSuite) openNoAssert(
+	c *gc.C,
+	info *api.Info,
+	username string,
+	dialWebsocket func(ctx context.Context, urlStr string, tlsConfig *tls.Config, ipAddr string) (jsoncodec.JSONConn, error),
+) (api.Connection, error) {
 	var inf api.Info
 	if info != nil {
 		inf = *info
@@ -128,29 +125,33 @@ func (s *websocketSuite) openNoAssert(c *gc.C, info *api.Info, username string) 
 	c.Assert(err, gc.Equals, nil)
 	inf.CACert = w.String()
 
-	s.Candid.AddUser(username)
-	key := s.Candid.UserPublicKey(username)
-	bClient := httpbakery.NewClient()
-	bClient.Key = &bakery.KeyPair{
-		Public:  bakery.PublicKey{Key: bakery.Key(key.Public.Key)},
-		Private: bakery.PrivateKey{Key: bakery.Key(key.Private.Key)},
-	}
-	agent.SetUpAuth(bClient, &agent.AuthInfo{
-		Key: bClient.Key,
-		Agents: []agent.Agent{{
-			URL:      s.Candid.URL.String(),
-			Username: username,
-		}},
-	})
+	lp := jimmtest.NewUserSessionLogin(c, username)
 
-	return api.Open(&inf, api.DialOpts{
+	dialOpts := api.DialOpts{
 		InsecureSkipVerify: true,
-		BakeryClient:       bClient,
-	})
+		LoginProvider:      lp,
+	}
+
+	if dialWebsocket != nil {
+		dialOpts.DialWebsocket = dialWebsocket
+	}
+
+	return api.Open(&inf, dialOpts)
 }
 
 func (s *websocketSuite) open(c *gc.C, info *api.Info, username string) api.Connection {
-	conn, err := s.openNoAssert(c, info, username)
+	conn, err := s.openNoAssert(c, info, username, nil)
+	c.Assert(err, gc.Equals, nil)
+	return conn
+}
+
+func (s *websocketSuite) openWithDialWebsocket(
+	c *gc.C,
+	info *api.Info,
+	username string,
+	dialWebsocket func(ctx context.Context, urlStr string, tlsConfig *tls.Config, ipAddr string) (jsoncodec.JSONConn, error),
+) api.Connection {
+	conn, err := s.openNoAssert(c, info, username, dialWebsocket)
 	c.Assert(err, gc.Equals, nil)
 	return conn
 }
@@ -172,41 +173,24 @@ func (s *proxySuite) TestConnectToModel(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `no such request - method Admin.TestMethod is not implemented \(not implemented\)`)
 }
 
-func (s *proxySuite) TestConnectToModelAndLogin(c *gc.C) {
-	ctx := context.Background()
-	alice := names.NewUserTag("alice")
-	aliceUser := openfga.NewUser(&dbmodel.User{Username: alice.Id()}, s.JIMM.OpenFGAClient)
-	err := aliceUser.SetControllerAccess(ctx, s.Model.Controller.ResourceTag(), ofganames.AdministratorRelation)
-	c.Assert(err, gc.IsNil)
-	conn, err := s.openNoAssert(c, &api.Info{
-		ModelTag:  s.Model.ResourceTag(),
-		SkipLogin: false,
-	}, "alice")
-	if err == nil {
-		defer conn.Close()
-	}
-	c.Assert(err, gc.Equals, nil)
-}
+// TODO(CSS-7331) Refactor model proxy for new login methods
+// func (s *proxySuite) TestConnectToModelAndLogin(c *gc.C) {
+// 	ctx := context.Background()
+// 	alice := names.NewUserTag("alice@canonical.com")
+// 	aliceUser := openfga.NewUser(&dbmodel.Identity{Name: alice.Id()}, s.JIMM.OpenFGAClient)
+// 	err := aliceUser.SetControllerAccess(ctx, s.Model.Controller.ResourceTag(), ofganames.AdministratorRelation)
+// 	c.Assert(err, gc.IsNil)
+// 	conn, err := s.openNoAssert(c, &api.Info{
+// 		ModelTag:  s.Model.ResourceTag(),
+// 		SkipLogin: false,
+// 	}, "alice")
+// 	if err == nil {
+// 		defer conn.Close()
+// 	}
+// 	c.Assert(err, gc.Equals, nil)
+// }
 
-// TestConnectToModelNoBakeryClient ensures that authentication is in fact
-// happening, without a bakery client the test should see an error from Candid.
-func (s *proxySuite) TestConnectToModelNoBakeryClient(c *gc.C) {
-	inf := api.Info{
-		ModelTag:  s.Model.ResourceTag(),
-		SkipLogin: false,
-	}
-	u, err := url.Parse(s.HTTP.URL)
-	c.Assert(err, gc.Equals, nil)
-	inf.Addrs = []string{
-		u.Host,
-	}
-	c.Assert(err, gc.Equals, nil)
-	_, err = api.Open(&inf, api.DialOpts{
-		InsecureSkipVerify: true,
-		BakeryClient:       nil,
-	})
-	c.Assert(err, gc.ErrorMatches, "interaction required but not possible")
-}
+// TODO(CSS-7331) Add more tests for model proxy and new login methods.
 
 type pathTestSuite struct{}
 

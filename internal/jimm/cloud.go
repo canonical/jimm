@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	"github.com/juju/zaputil"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
@@ -25,10 +25,12 @@ func (j *JIMM) GetUserCloudAccess(ctx context.Context, user *openfga.User, cloud
 	accessLevel := user.GetCloudAccess(ctx, cloud)
 	if accessLevel == ofganames.NoRelation {
 		everyoneTag := names.NewUserTag(ofganames.EveryoneUser)
+		everyoneIdentity, err := dbmodel.NewIdentity(everyoneTag.Id())
+		if err != nil {
+			return "", err
+		}
 		everyone := openfga.NewUser(
-			&dbmodel.User{
-				Username: everyoneTag.Id(),
-			},
+			everyoneIdentity,
 			j.OpenFGAClient,
 		)
 		accessLevel = everyone.GetCloudAccess(ctx, cloud)
@@ -99,10 +101,12 @@ func (j *JIMM) ForEachUserCloud(ctx context.Context, user *openfga.User, f func(
 	}
 
 	// Also include "public" clouds
-	everyoneDB := dbmodel.User{
-		Username: ofganames.EveryoneUser,
+	everyoneDB, err := dbmodel.NewIdentity(ofganames.EveryoneUser)
+	if err != nil {
+		return errors.E(op, err)
 	}
-	everyone := openfga.NewUser(&everyoneDB, j.OpenFGAClient)
+
+	everyone := openfga.NewUser(everyoneDB, j.OpenFGAClient)
 
 	for _, cloud := range clouds {
 		if seen[cloud.Name] {
@@ -280,7 +284,7 @@ func (j *JIMM) AddCloudToController(ctx context.Context, user *openfga.User, con
 		)
 	}
 
-	// TODO(Kian) CSS-6081 Give user access to the cloud here and potentially everyone@external.
+	// TODO(Kian) CSS-6081 Give user access to the cloud here and potentially everyone.
 
 	return nil
 }
@@ -396,7 +400,7 @@ func (j *JIMM) AddHostedCloud(ctx context.Context, user *openfga.User, tag names
 		zapctx.Error(
 			ctx,
 			"failed to add user as cloud admin",
-			zap.String("user", user.Username),
+			zap.String("user", user.Name),
 			zap.String("cloud", dbCloud.ResourceTag().Id()),
 			zap.Error(err),
 		)
@@ -528,9 +532,9 @@ func (j *JIMM) GrantCloudAccess(ctx context.Context, user *openfga.User, ct name
 	}
 
 	err = j.doCloudAdmin(ctx, user, ct, func(_ *dbmodel.Cloud, _ API) error {
-		targetUser := &dbmodel.User{}
+		targetUser := &dbmodel.Identity{}
 		targetUser.SetTag(ut)
-		if err := j.Database.GetUser(ctx, targetUser); err != nil {
+		if err := j.Database.GetIdentity(ctx, targetUser); err != nil {
 			return err
 		}
 		targetOfgaUser := openfga.NewUser(targetUser, j.OpenFGAClient)
@@ -593,9 +597,9 @@ func (j *JIMM) RevokeCloudAccess(ctx context.Context, user *openfga.User, ct nam
 	}
 
 	err = j.doCloudAdmin(ctx, user, ct, func(_ *dbmodel.Cloud, _ API) error {
-		targetUser := &dbmodel.User{}
+		targetUser := &dbmodel.Identity{}
 		targetUser.SetTag(ut)
-		if err := j.Database.GetUser(ctx, targetUser); err != nil {
+		if err := j.Database.GetIdentity(ctx, targetUser); err != nil {
 			return err
 		}
 		targetOfgaUser := openfga.NewUser(targetUser, j.OpenFGAClient)

@@ -8,7 +8,7 @@ import (
 	"net"
 
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	"gorm.io/gorm"
 
 	apiparams "github.com/canonical/jimm/api/params"
@@ -28,9 +28,9 @@ type Controller struct {
 	// purposes.
 	UUID string `gorm:"not null"`
 
-	// AdminUser is the username that JIMM uses to connect to the
+	// AdminIdentityName is the identity name that JIMM uses to connect to the
 	// controller.
-	AdminUser string
+	AdminIdentityName string
 
 	// AdminPassword is the password that JIMM uses to connect to the
 	// controller.
@@ -104,7 +104,7 @@ func (c Controller) ToAPIControllerInfo() apiparams.ControllerInfo {
 	var ci apiparams.ControllerInfo
 	ci.Name = c.Name
 	ci.UUID = c.UUID
-	ci.Username = c.AdminUser
+	ci.Username = c.AdminIdentityName
 	ci.PublicAddress = c.PublicAddress
 	for _, hps := range c.Addresses {
 		for _, hp := range hps {
@@ -114,7 +114,7 @@ func (c Controller) ToAPIControllerInfo() apiparams.ControllerInfo {
 	ci.CACertificate = c.CACertificate
 	ci.CloudTag = names.NewCloudTag(c.CloudName).String()
 	ci.CloudRegion = c.CloudRegion
-	ci.Username = c.AdminUser
+	ci.Username = c.AdminIdentityName
 	ci.AgentVersion = c.AgentVersion
 	if c.UnavailableSince.Valid {
 		ci.Status = jujuparams.EntityStatus{

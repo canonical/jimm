@@ -38,7 +38,7 @@ var (
 	// [9] - Application offer name
 	// [10] - Relation specifier (i.e., #member)
 	// A complete matcher example would look like so with square-brackets denoting groups and paranthsis denoting index:
-	// (1)[controller](2)[-](3)[controller-1](4)[:](5)[alice@external-place](6)[/](7)[model-1](8)[.](9)[offer-1](10)[#relation-specifier]"
+	// (1)[controller](2)[-](3)[controller-1](4)[:](5)[alice@canonical.com-place](6)[/](7)[model-1](8)[.](9)[offer-1](10)[#relation-specifier]"
 	// In the case of something like: user-alice@wonderland or group-alices-wonderland#member, it would look like so:
 	// (1)[user](2)[-](3)[alices@wonderland]
 	// (1)[group](2)[-](3)[alices-wonderland](10)[#member]
@@ -164,7 +164,7 @@ func (r *controllerRoot) CheckRelation(ctx context.Context, req apiparams.CheckR
 		return checkResp, errors.E(op, errors.CodeFailedToParseTupleKey, err)
 	}
 
-	userCheckingSelf := parsedTuple.Object.Kind == openfga.UserType && parsedTuple.Object.ID == r.user.Username
+	userCheckingSelf := parsedTuple.Object.Kind == openfga.UserType && parsedTuple.Object.ID == r.user.Name
 	// Admins can check any relation, non-admins can only check their own.
 	if !(r.user.JimmAdmin || userCheckingSelf) {
 		return checkResp, errors.E(op, errors.CodeUnauthorized, "unauthorized")

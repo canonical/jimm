@@ -7,16 +7,20 @@ package jimm
 import (
 	"context"
 	"database/sql"
+	"net/http"
 	"strings"
 	"time"
 
+	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/juju/juju/api/base"
 	"github.com/juju/juju/core/crossmodel"
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
+	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
+	"github.com/lestrrat-go/jwx/v2/jwt"
 	"go.uber.org/zap"
+	"golang.org/x/oauth2"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/canonical/jimm/internal/db"
@@ -46,11 +50,6 @@ type JIMM struct {
 	// the data.
 	Database db.Database
 
-	// Authenticator is the authenticator JIMM uses to determine the user
-	// authenticating with the API. If this is not specified then all
-	// authentication requests are considered to have failed.
-	Authenticator Authenticator
-
 	// Dialer is the API dialer JIMM uses to contact juju controllers. if
 	// this is not configured all connection attempts will fail.
 	Dialer Dialer
@@ -76,9 +75,21 @@ type JIMM struct {
 	// with the OpenFGA ReBAC system.
 	OpenFGAClient *openfga.OFGAClient
 
+	// JWKService holds a service responsible for generating and delivering a JWKS
+	// for consumption within Juju controllers.
 	JWKService *jimmjwx.JWKSService
 
+	// JWTService is responsible for minting JWTs to access controllers.
 	JWTService *jimmjwx.JWTService
+
+	// OAuthAuthenticator is responsible for handling authentication
+	// via OAuth2.0 AND JWT access tokens to JIMM.
+	OAuthAuthenticator OAuthAuthenticator
+}
+
+// OAuthAuthenticationService returns the JIMM's authentication service.
+func (j *JIMM) OAuthAuthenticationService() OAuthAuthenticator {
+	return j.OAuthAuthenticator
 }
 
 // ResourceTag returns JIMM's controller tag stating its UUID.
@@ -101,11 +112,65 @@ func (j *JIMM) AuthorizationClient() *openfga.OFGAClient {
 	return j.OpenFGAClient
 }
 
-// An Authenticator authenticates login requests.
-type Authenticator interface {
-	// Authenticate processes the given LoginRequest and returns the user
-	// that has authenticated.
-	Authenticate(ctx context.Context, req *jujuparams.LoginRequest) (*openfga.User, error)
+// OAuthAuthenticator is responsible for handling authentication
+// via OAuth2.0 AND JWT access tokens to JIMM.
+type OAuthAuthenticator interface {
+	// Device initiates a device flow login and is step ONE of TWO.
+	//
+	// This is done via retrieving a:
+	// - Device code
+	// - User code
+	// - VerificationURI
+	// - Interval
+	// - Expiry
+	// From the device /auth endpoint.
+	//
+	// The verification uri and user code is sent to the user, as they must enter the code
+	// into the uri.
+	//
+	// The interval, expiry and device code and used to poll the token endpoint for completion.
+	Device(ctx context.Context) (*oauth2.DeviceAuthResponse, error)
+
+	// DeviceAccessToken continues and collect an access token during the device login flow
+	// and is step TWO.
+	//
+	// See Device(...) godoc for more info pertaining to the flow.
+	DeviceAccessToken(ctx context.Context, res *oauth2.DeviceAuthResponse) (*oauth2.Token, error)
+
+	// ExtractAndVerifyIDToken extracts the id token from the extras claims of an oauth2 token
+	// and performs signature verification of the token.
+	ExtractAndVerifyIDToken(ctx context.Context, oauth2Token *oauth2.Token) (*oidc.IDToken, error)
+
+	// Email retrieves the users email from an id token via the email claim
+	Email(idToken *oidc.IDToken) (string, error)
+
+	// MintSessionToken mints a session token to be used when logging into JIMM
+	// via an access token. The token only contains the user's email for authentication.
+	MintSessionToken(email string, secretKey string) (string, error)
+
+	// VerifySessionToken symmetrically verifies the validty of the signature on the
+	// access token JWT, returning the parsed token.
+	//
+	// The subject of the token contains the user's email and can be used
+	// for user object creation.
+	VerifySessionToken(token string, secretKey string) (jwt.Token, error)
+
+	// UpdateIdentity updates the database with the display name and access token set for the user.
+	// And, if present, a refresh token.
+	UpdateIdentity(ctx context.Context, email string, token *oauth2.Token) error
+
+	// VerifyClientCredentials verifies the provided client ID and client secret.
+	VerifyClientCredentials(ctx context.Context, clientID string, clientSecret string) error
+
+	// AuthenticateBrowserSession updates the session for a browser, additionally
+	// retrieving new access tokens upon expiry. If this cannot be done, the cookie
+	// is deleted and an error is returned.
+	AuthenticateBrowserSession(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error)
+}
+
+// GetCredentialStore returns the credential store used by JIMM.
+func (j *JIMM) GetCredentialStore() credentials.CredentialStore {
+	return j.CredentialStore
 }
 
 type permission struct {
@@ -199,11 +264,11 @@ type API interface {
 
 	// FindApplicationOffers finds application offers that match the
 	// filter.
-	FindApplicationOffers(context.Context, []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetails, error)
+	FindApplicationOffers(context.Context, []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error)
 
 	// GetApplicationOffer completes the given ApplicationOfferAdminDetails
 	// structure.
-	GetApplicationOffer(context.Context, *jujuparams.ApplicationOfferAdminDetails) error
+	GetApplicationOffer(context.Context, *jujuparams.ApplicationOfferAdminDetailsV5) error
 
 	// GetApplicationOfferConsumeDetails gets the details required to
 	// consume an application offer
@@ -227,7 +292,7 @@ type API interface {
 
 	// ListApplicationOffers lists application offers that match the
 	// filter.
-	ListApplicationOffers(context.Context, []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetails, error)
+	ListApplicationOffers(context.Context, []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error)
 
 	// ModelInfo fetches a model's ModelInfo.
 	ModelInfo(context.Context, *jujuparams.ModelInfo) error
@@ -345,7 +410,13 @@ func (j *JIMM) AddAuditLogEntry(ale *dbmodel.AuditLogEntry) {
 	}
 }
 
-var sensitiveMethods = map[string]struct{}{"login": {}, "addcredentials": {}, "updatecredentials": {}}
+var sensitiveMethods = map[string]struct{}{
+	"login":                 {},
+	"logindevice":           {},
+	"getdevicesessiontoken": {},
+	"loginwithsessiontoken": {},
+	"addcredentials":        {},
+	"updatecredentials":     {}}
 var redactJSON = dbmodel.JSON(`{"params":"redacted"}`)
 
 func redactSensitiveParams(ale *dbmodel.AuditLogEntry) {
@@ -517,7 +588,7 @@ func fillMigrationTarget(db db.Database, credStore credentials.CredentialStore, 
 	if err != nil {
 		return jujuparams.MigrationTargetInfo{}, 0, err
 	}
-	adminUser := dbController.AdminUser
+	adminUser := dbController.AdminIdentityName
 	adminPass := dbController.AdminPassword
 	if adminPass == "" {
 		u, p, err := credStore.GetControllerCredentials(ctx, controllerName)

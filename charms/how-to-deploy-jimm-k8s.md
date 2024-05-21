@@ -26,17 +26,9 @@ juju switch jimm
 make push-microk8s
 //Switch to jimm-k8s charm directory
 charmcraft pack
-juju deploy ./juju-jimm-k8s_ubuntu-20.04-amd64.charm --resource jimm-image="localhost:32000/jimm:latest" --config uuid=ff77dbd0-ab87-444e-b9c7-768c675bf59d --config dns-name=juju-jimm-k8s-0.juju-jimm-k8s-endpoints.jimm.svc.cluster.local --config candid-url="https://api.staging.jujucharms.com/identity" --config vault-access-address="<IP>"
-// The following commands can be skipped but will prevent
-// JIMM from communicating with Candid.
-juju config juju-jimm-k8s private-key=<removed> 
-juju config juju-jimm-k8s public-key=<removed>
-juju config juju-jimm-k8s candid-public-key=<removed>
-juju config juju-jimm-k8s candid-agent-username=<removed>
-juju config juju-jimm-k8s candid-agent-public-key=<removed>
-juju config juju-jimm-k8s candid-agent-private-key=<removed>
+juju deploy ./juju-jimm-k8s_ubuntu-20.04-amd64.charm --resource jimm-image="localhost:32000/jimm:latest" --config uuid=ff77dbd0-ab87-444e-b9c7-768c675bf59d --config dns-name=juju-jimm-k8s-0.juju-jimm-k8s-endpoints.jimm.svc.cluster.local --config vault-access-address="<IP>"
 ```
-Deploy OPNEFGA, make relations and run setup actions
+Deploy OPENFGA, make relations and run setup actions
 ```
 juju deploy openfga-k8s --series=jammy --channel=latest/edge --revision=5
 juju relate juju-jimm-k8s openfga-k8s
