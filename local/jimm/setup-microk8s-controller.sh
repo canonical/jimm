@@ -9,5 +9,3 @@
 # 4. sudo snap restart microk8s
 juju bootstrap microk8s "qa-microk8s" --config login-token-refresh-url=http://10.0.1.1:17070/.well-known/jwks.json 
 
-
-
