@@ -10,10 +10,8 @@
 #
 # Requirements to run this script:
 # - yq (snap)
-set -eux
-
 JIMM_CONTROLLER_NAME="${JIMM_CONTROLLER_NAME:-jimm-dev}"
-CONTROLLER_NAME="${CONTROLLER_NAME:-qa-controller}"
+CONTROLLER_NAME="${CONTROLLER_NAME:-qa-lxd}"
 CONTROLLER_YAML_PATH="${CONTROLLER_NAME}".yaml
 CLIENT_CREDENTIAL_NAME="${CLIENT_CREDENTIAL_NAME:-localhost}"
 

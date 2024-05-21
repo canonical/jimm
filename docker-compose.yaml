@@ -23,8 +23,6 @@ services:
   jimm:
     image: cosmtrek/air:latest
     profiles: ["dev"]
-    # extra_hosts:
-    # - "host.docker.internal:host-gateway"
     # working_dir value has to be the same of mapped volume
     hostname: jimm.localhost
     working_dir: /jimm

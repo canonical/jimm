@@ -21,6 +21,8 @@ local/vault/vault.env
 *.csr
 /jimmctl
 /jimmsrv
-qa-controller
+qa-lxd
 
 /cloudinit.temp.yaml
+
+local/traefik/certs/ca.srl
