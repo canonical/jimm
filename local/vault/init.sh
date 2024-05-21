@@ -46,7 +46,7 @@ echo "SecretID applied & wrapped in cubbyhole for 10h, token is: $JIMM_SECRET_WR
 # Enable the KV at the defined policy path
 echo "Enabling KV at policy path /jimm-kv"
 echo "/jimm-kv accessible by policy jimm-app"
-vault secrets enable -path /jimm-kv kv
+vault secrets enable -version=2 -path /jimm-kv kv
 echo "Creating approle auth file."
 VAULT_TOKEN=$JIMM_SECRET_WRAPPED vault unwrap > /vault/approle_tmp.yaml
 echo "$JIMM_ROLE_ID" > /vault/roleid.txt

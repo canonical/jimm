@@ -1,7 +1,5 @@
-// Copyright 2024 canonical.
+// Copyright 2024 Canonical Ltd.
 
-// Service accounts are an OIDC/OAuth concept which allows for machine<->machine communication.
-// Service accounts are identified by their client ID.
 package names
 
 import (
@@ -21,6 +19,9 @@ const (
 	// have.
 	ServiceAccountDomain = "serviceaccount"
 )
+
+// Service accounts are an OIDC/OAuth concept which allows for machine<->machine communication.
+// Service accounts are identified by their client ID.
 
 // ServiceAccount represents a service account where id is the client ID.
 // Implements juju names.Tag.

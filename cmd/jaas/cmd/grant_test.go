@@ -4,6 +4,7 @@ package cmd_test
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/juju/cmd/v3/cmdtesting"
 	"github.com/juju/names/v5"
@@ -51,6 +52,12 @@ func (s *grantSuite) TestGrant(c *gc.C) {
 	err = s.JIMM.Database.AddGroup(ctx, "1")
 	c.Assert(err, gc.IsNil)
 
+	group := dbmodel.GroupEntry{
+		Name: "1",
+	}
+	err = s.JIMM.Database.GetGroup(ctx, &group)
+	c.Assert(err, gc.IsNil)
+
 	cmdContext, err := cmdtesting.RunCommand(c, cmd.NewGrantCommandForTesting(s.ClientStore(), bClient), clientID, "user-bob", "group-1")
 	c.Assert(err, gc.IsNil)
 	c.Assert(cmdtesting.Stdout(cmdContext), gc.Equals, "access granted\n")
@@ -64,7 +71,7 @@ func (s *grantSuite) TestGrant(c *gc.C) {
 	c.Assert(ok, gc.Equals, true)
 
 	ok, err = s.JIMM.OpenFGAClient.CheckRelation(ctx, openfga.Tuple{
-		Object:   ofganames.ConvertTag(jimmnames.NewGroupTag("1#member")),
+		Object:   ofganames.ConvertTag(jimmnames.NewGroupTag(fmt.Sprintf("%s#member", group.UUID))),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag(clientIdWithDomain)),
 	}, false)

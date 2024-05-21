@@ -60,7 +60,7 @@ func setupHandlerAndRecorder(c *qt.C, path string, store *vault.VaultStore) *htt
 	return rr
 }
 
-// 404: In the event the JWKS cannot be found expliciticly from
+// 404: In the event the JWKS cannot be found explicitly from
 // the credential store.
 func TestWellknownAPIJWKSJSONHandles404(t *testing.T) {
 	c := qt.New(t)

@@ -307,7 +307,7 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 			want: createTuple(
 				"user:"+user.Name,
 				"member",
-				"group:"+stringGroupID(group.ID),
+				"group:"+group.UUID,
 			),
 			err:         false,
 			changesType: "group",
@@ -318,7 +318,7 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 			want: createTuple(
 				"user:"+"kelvin.lina.test@canonical.com",
 				"member",
-				"group:"+stringGroupID(group.ID),
+				"group:"+group.UUID,
 			),
 			err:         false,
 			changesType: "group",
@@ -327,7 +327,7 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 		{
 			input: tuple{"group-" + "test-group#member", "administrator", "controller-" + controller.UUID},
 			want: createTuple(
-				"group:"+stringGroupID(group.ID)+"#member",
+				"group:"+group.UUID+"#member",
 				"administrator",
 				"controller:"+controller.UUID,
 			),
@@ -382,7 +382,7 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 		{
 			input: tuple{"group-" + group.Name + "#member", "administrator", "controller-" + controller.Name},
 			want: createTuple(
-				"group:"+stringGroupID(group.ID)+"#member",
+				"group:"+group.UUID+"#member",
 				"administrator",
 				"controller:"+controller.UUID,
 			),
@@ -393,7 +393,7 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 		{
 			input: tuple{"group-" + group.Name + "#member", "administrator", "controller-" + controller.UUID},
 			want: createTuple(
-				"group:"+stringGroupID(group.ID)+"#member",
+				"group:"+group.UUID+"#member",
 				"administrator",
 				"controller:"+controller.UUID,
 			),
@@ -404,7 +404,7 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 		{
 			input: tuple{"group-" + group.Name + "#member", "writer", "model-" + controller.Name + ":" + user.Name + "/" + model.Name},
 			want: createTuple(
-				"group:"+stringGroupID(group.ID)+"#member",
+				"group:"+group.UUID+"#member",
 				"writer",
 				"model:"+model.UUID.String,
 			),
@@ -415,7 +415,7 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 		{
 			input: tuple{"group-" + group.Name + "#member", "writer", "model-" + model.UUID.String},
 			want: createTuple(
-				"group:"+stringGroupID(group.ID)+"#member",
+				"group:"+group.UUID+"#member",
 				"writer",
 				"model:"+model.UUID.String,
 			),
@@ -426,7 +426,7 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 		{
 			input: tuple{"group-" + group.Name + "#member", "consumer", "applicationoffer-" + controller.Name + ":" + user.Name + "/" + model.Name + "." + offer.Name},
 			want: createTuple(
-				"group:"+stringGroupID(group.ID)+"#member",
+				"group:"+group.UUID+"#member",
 				"consumer",
 				"applicationoffer:"+offer.UUID,
 			),
@@ -437,7 +437,7 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 		{
 			input: tuple{"group-" + group.Name + "#member", "consumer", "applicationoffer-" + offer.UUID},
 			want: createTuple(
-				"group:"+stringGroupID(group.ID)+"#member",
+				"group:"+group.UUID+"#member",
 				"consumer",
 				"applicationoffer:"+offer.UUID,
 			),
@@ -448,9 +448,9 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 		{
 			input: tuple{"group-" + group.Name + "#member", "member", "group-" + group2.Name},
 			want: createTuple(
-				"group:"+stringGroupID(group.ID)+"#member",
+				"group:"+group.UUID+"#member",
 				"member",
-				"group:"+stringGroupID(group2.ID),
+				"group:"+group2.UUID,
 			),
 			err:         false,
 			changesType: "group",
@@ -566,7 +566,7 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 			want: createTuple(
 				"user:"+user.Name,
 				"member",
-				"group:"+stringGroupID(group.ID),
+				"group:"+group.UUID,
 			),
 			err:         false,
 			changesType: "group",
@@ -580,7 +580,7 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 			},
 			toRemove: tuple{"group-" + group.Name + "#member", "administrator", "controller-" + controller.UUID},
 			want: createTuple(
-				"group:"+stringGroupID(group.ID)+"#member",
+				"group:"+group.UUID+"#member",
 				"administrator",
 				"controller:"+controller.UUID,
 			),
@@ -660,7 +660,7 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 			},
 			toRemove: tuple{"group-" + group.Name + "#member", "administrator", "controller-" + controller.Name},
 			want: createTuple(
-				"group:"+stringGroupID(group.ID)+"#member",
+				"group:"+group.UUID+"#member",
 				"administrator",
 				"controller:"+controller.UUID,
 			),
@@ -676,7 +676,7 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 			},
 			toRemove: tuple{"group-" + group.Name + "#member", "administrator", "controller-" + controller.UUID},
 			want: createTuple(
-				"group:"+stringGroupID(group.ID)+"#member",
+				"group:"+group.UUID+"#member",
 				"administrator",
 				"controller:"+controller.UUID,
 			),
@@ -692,7 +692,7 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 			},
 			toRemove: tuple{"group-" + group.Name + "#member", "writer", "model-" + controller.Name + ":" + user.Name + "/" + model.Name},
 			want: createTuple(
-				"group:"+stringGroupID(group.ID)+"#member",
+				"group:"+group.UUID+"#member",
 				"writer",
 				"model:"+model.UUID.String,
 			),
@@ -708,7 +708,7 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 			},
 			toRemove: tuple{"group-" + group.Name + "#member", "writer", "model-" + model.UUID.String},
 			want: createTuple(
-				"group:"+stringGroupID(group.ID)+"#member",
+				"group:"+group.UUID+"#member",
 				"writer",
 				"model:"+model.UUID.String,
 			),
@@ -724,7 +724,7 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 			},
 			toRemove: tuple{"group-" + group.Name + "#member", "consumer", "applicationoffer-" + controller.Name + ":" + user.Name + "/" + model.Name + "." + offer.Name},
 			want: createTuple(
-				"group:"+stringGroupID(group.ID)+"#member",
+				"group:"+group.UUID+"#member",
 				"consumer",
 				"applicationoffer:"+offer.UUID,
 			),
@@ -740,7 +740,7 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 			},
 			toRemove: tuple{"group-" + group.Name + "#member", "consumer", "applicationoffer-" + offer.UUID},
 			want: createTuple(
-				"group:"+stringGroupID(group.ID)+"#member",
+				"group:"+group.UUID+"#member",
 				"consumer",
 				"applicationoffer:"+offer.UUID,
 			),

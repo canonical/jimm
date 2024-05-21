@@ -3,7 +3,6 @@
 package dbmodel
 
 import (
-	"strconv"
 	"time"
 
 	"github.com/juju/names/v5"
@@ -19,12 +18,16 @@ type GroupEntry struct {
 
 	// Name holds the name of the group.
 	Name string `gorm:"index;column:name"`
+
+	// UUID holds the uuid of the group.
+	UUID string `gotm:"index;column:uuid"`
 }
 
 // ToAPIGroup converts a group entry to a JIMM API
 // Group.
 func (g GroupEntry) ToAPIGroupEntry() apiparams.Group {
 	var group apiparams.Group
+	group.UUID = g.UUID
 	group.Name = g.Name
 	group.CreatedAt = g.CreatedAt.Format(time.RFC3339)
 	group.UpdatedAt = g.UpdatedAt.Format(time.RFC3339)
@@ -47,5 +50,5 @@ func (g *GroupEntry) Tag() names.Tag {
 // a concrete type names.GroupTag instead of the
 // names.Tag interface.
 func (g *GroupEntry) ResourceTag() jimmnames.GroupTag {
-	return jimmnames.NewGroupTag(strconv.Itoa(int(g.ID)))
+	return jimmnames.NewGroupTag(g.UUID)
 }
