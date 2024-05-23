@@ -392,6 +392,48 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 	}
 }
 
+func TestDisableOAuthEndpointsWhenDashboardRedirectURLNotSet(t *testing.T) {
+	c := qt.New(t)
+
+	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
+	c.Assert(err, qt.IsNil)
+
+	p := jimmtest.NewTestJimmParams(c)
+	p.DashboardFinalRedirectURL = ""
+	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
+
+	svc, err := jimm.NewService(context.Background(), p)
+	c.Assert(err, qt.IsNil)
+
+	srv := httptest.NewTLSServer(svc)
+	c.Cleanup(srv.Close)
+
+	response, err := srv.Client().Get(srv.URL + "/auth/whoami")
+	c.Assert(err, qt.IsNil)
+	c.Assert(response.StatusCode, qt.Equals, http.StatusNotFound)
+}
+
+func TestEnableOAuthEndpointsWhenDashboardRedirectURLSet(t *testing.T) {
+	c := qt.New(t)
+
+	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
+	c.Assert(err, qt.IsNil)
+
+	p := jimmtest.NewTestJimmParams(c)
+	p.DashboardFinalRedirectURL = "some-redirect-url"
+	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
+
+	svc, err := jimm.NewService(context.Background(), p)
+	c.Assert(err, qt.IsNil)
+
+	srv := httptest.NewTLSServer(svc)
+	c.Cleanup(srv.Close)
+
+	response, err := srv.Client().Get(srv.URL + "/auth/whoami")
+	c.Assert(err, qt.IsNil)
+	c.Assert(response.StatusCode, qt.Not(qt.Equals), http.StatusNotFound)
+}
+
 // cofgaParamsToJIMMOpenFGAParams To avoid circular references, the test setup function (jimmtest.SetupTestOFGAClient)
 // does not provide us with an instance of `jimm.OpenFGAParams`, so it just returns a `cofga.OpenFGAParams` instance.
 // This method reshapes the later into the former.
