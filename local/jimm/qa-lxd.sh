@@ -5,6 +5,8 @@
 # to QA against.
 #
 # It handles the removal of all older resources to ensure a fresh QA env.
+#
+# Please make sure you've run make "make dev-env-setup" for this script to work.
 
 
 cleanup() {
@@ -21,7 +23,7 @@ cleanup() {
     fi
 
     echo "Tearing down compose..."
-    compose_teardown_output=$(docker compose --profile dev down -v 2>&1) || true
+    compose_teardown_output=$(docker compose --project-directory ../../ --file ../../docker-compose.yaml --profile dev down -v 2>&1) || true
     if [ $? -ne 0 ]; then
         echo "$compose_teardown_output"
     fi
@@ -31,7 +33,7 @@ cleanup
 
 echo "*** Starting QA environment setup ***"
 
-docker compose --profile dev up -d
+docker compose --project-directory ../../ --file ../../docker-compose.yaml --profile dev up -d
 
 juju login jimm.localhost -c jimm-dev
 

@@ -50,7 +50,17 @@ The `request name` represents the literal WS endpoint, i.e., `API = /api`.
 2. Install Juju: `sudo snap install juju --channel=3.3/stable` (minimum Juju version is `3.3`).
 3. Install JQ: `sudo snap install jq`.
 
-## Controller set up
+## All-In-One scripts
+We have two all-in-one scripts, namely:
+- qa-lxd.sh
+- qa-microk8s.sh
+These scripts respectively spin up jimm in compose, setup controllers in the targeted environment
+and handle connectivity. Finally, adding a test model to Q/A against.
+
+Please ensure you've run "make dev-env-setup" first though!
+
+## Manual
+### Controller set up
 
 Note that you can export an environment variable `CONTROLLER_NAME` and re-run steps 3. and 4. below to create multiple Juju
 controllers that will be controlled by JIMM.
