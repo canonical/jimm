@@ -9,6 +9,10 @@ on:
       release-channel:
         required: true
         type: string
+    secrets:
+      STORE_LOGIN:
+        required: true
+
 
 # Note this workflow requires a Github secret to provide auth against snapstore.
 # snapcraft export-login --snaps=PACKAGE_NAME --acls package_access,package_push,package_update,package_release exported.txt
@@ -47,6 +51,5 @@ jobs:
       env:
         SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.STORE_LOGIN }}
       with:
-        store_login: ${{ secrets.STORE_LOGIN }}
         snap: ${{needs.build.outputs.snap}}
         release: '${{ inputs.release-channel }}'

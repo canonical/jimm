@@ -12,3 +12,4 @@ jobs:
     with:
       folder: jaas
       release-channel: 3/edge
+    secrets: inherit
