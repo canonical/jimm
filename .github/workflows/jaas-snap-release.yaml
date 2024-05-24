@@ -1,4 +1,4 @@
-name: Release jimmctl snap
+name: Release jaas snap
 
 on:
   workflow_dispatch:
