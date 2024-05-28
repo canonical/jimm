@@ -383,6 +383,7 @@ user-eve@canonical.com  	administrator	applicationoffer-test-controller-1:alice@
 		_, err := cmdtesting.RunCommand(c, cmd.NewAddGroupCommandForTesting(s.ClientStore(), bClient), groupName)
 		c.Assert(err, gc.IsNil)
 
+		// -72 is used to fill the rest of the line with whitespace as the output is padded to the length of the longest row
 		tabularOutput += fmt.Sprintf("\nuser-eve@canonical.com  	member       	group-%-72s", groupName)
 		relations = append(relations, apiparams.RelationshipTuple{
 			Object:       "user-" + env.users[1].Name,
