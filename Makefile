@@ -111,13 +111,12 @@ endef
 
 # Install packages required to develop JIMM and run tests.
 APT_BASED := $(shell command -v apt-get >/dev/null; echo $$?)
-sysdeps:
+sys-deps:
 ifeq ($(APT_BASED),0)
 	@$(call check_dep,go,Missing Go - install from https://go.dev/doc/install or 'sudo snap install go')
 	@$(call check_dep,git,Missing Git - install with 'sudo apt install git')
 	@$(call check_dep,gcc,Missing gcc - install with 'sudo apt install build-essentials')
 	@$(call check_dep,docker,Missing Docker - install from https://docs.docker.com/engine/install/')
-	@$(call check_dep,docker-compose,Missing Docker Compose - install from https://docs.docker.com/engine/install/')
 	@$(call check_dep,juju-db.mongo,Missing juju-db - install with 'sudo snap install juju-db --channel=4.4/stable')
 else
 	@echo sysdeps runs only on systems with apt-get
