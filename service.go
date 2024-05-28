@@ -362,7 +362,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	)
 
 	if p.DashboardFinalRedirectURL == "" {
-		zapctx.Warn(ctx, "disabling OAuth browser flow due to unset dashboard redirect URL")
+		zapctx.Warn(ctx, "OAuth handler not enabled, due to unset dashboard redirect URL")
 	} else {
 		oauthHandler, err := jimmhttp.NewOAuthHandler(jimmhttp.OAuthHandlerParams{
 			Authenticator:             authSvc,
