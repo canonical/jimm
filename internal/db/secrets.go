@@ -329,3 +329,33 @@ func (d *Database) PutOAuthSecret(ctx context.Context, raw []byte) error {
 	secret := dbmodel.NewSecret(oauthKind, oauthKeyTag, oauthKey)
 	return d.UpsertSecret(ctx, &secret)
 }
+
+// GetOAuthSessionStoreSecret returns the current secret used to store session tokens.
+func (d *Database) GetOAuthSessionStoreSecret(ctx context.Context) ([]byte, error) {
+	const op = errors.Op("database.GetOAuthSessionStoreSecret")
+	secret := dbmodel.NewSecret(oauthKind, oauthSessionStoreSecretTag, nil)
+	err := d.GetSecret(ctx, &secret)
+	if err != nil {
+		zapctx.Error(ctx, "failed to get oauth session store secret", zap.Error(err))
+		return nil, errors.E(op, err)
+	}
+	var pem []byte
+	err = json.Unmarshal(secret.Data, &pem)
+	if err != nil {
+		zapctx.Error(ctx, "failed to unmarshal pem data", zap.Error(err))
+		return nil, errors.E(op, err)
+	}
+	return pem, nil
+}
+
+// PutOAuthSessionStoreSecret puts a secret into the credentials store for secure storage of session tokens.
+func (d *Database) PutOAuthSessionStoreSecret(ctx context.Context, raw []byte) error {
+	const op = errors.Op("database.PutOAuthSessionStoreSecret")
+	oauthSessionStoreSecret, err := json.Marshal(raw)
+	if err != nil {
+		zapctx.Error(ctx, "failed to marshal pem data", zap.Error(err))
+		return errors.E(op, err, "failed to marshal oauth session store secret")
+	}
+	secret := dbmodel.NewSecret(oauthKind, oauthSessionStoreSecretTag, oauthSessionStoreSecret)
+	return d.UpsertSecret(ctx, &secret)
+}
