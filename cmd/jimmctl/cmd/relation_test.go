@@ -347,20 +347,10 @@ func (s *relationSuite) TestListRelations(c *gc.C) {
 	// alice is superuser
 	bClient := jimmtest.NewUserSessionLogin(c, "alice")
 
-	groups := []string{"group-1", "group-2", "group-3"}
-	for _, group := range groups {
-		_, err := cmdtesting.RunCommand(c, cmd.NewAddGroupCommandForTesting(s.ClientStore(), bClient), group)
-		c.Assert(err, gc.IsNil)
-	}
-
 	relations := []apiparams.RelationshipTuple{{
 		Object:       "user-" + env.users[0].Name,
 		Relation:     "member",
 		TargetObject: "group-group-1",
-	}, {
-		Object:       "user-" + env.users[1].Name,
-		Relation:     "member",
-		TargetObject: "group-group-2",
 	}, {
 		Object:       "group-group-2#member",
 		Relation:     "member",
@@ -378,10 +368,37 @@ func (s *relationSuite) TestListRelations(c *gc.C) {
 		Relation:     "administrator",
 		TargetObject: "applicationoffer-" + env.controllers[0].Name + ":" + env.applicationOffers[0].Model.OwnerIdentityName + "/" + env.applicationOffers[0].Model.Name + "." + env.applicationOffers[0].Name,
 	}}
+
+	tabularOutput := `Object                  	Relation     	Target Object                                                                 
+user-admin              	administrator	controller-jimm                                                               
+user-alice@canonical.com	administrator	controller-jimm                                                               
+user-alice@canonical.com	member       	group-group-1                                                                 
+group-group-2#member    	member       	group-group-3                                                                 
+group-group-3#member    	administrator	controller-test-controller-1                                                  
+group-group-1#member    	administrator	model-test-controller-1:alice@canonical.com/test-model-1                      
+user-eve@canonical.com  	administrator	applicationoffer-test-controller-1:alice@canonical.com/test-model-1.testoffer1`
+
+	for i := 0; i < cmd.DefaultPageSize+1; i++ {
+		groupName := fmt.Sprintf("group-%d", i)
+		_, err := cmdtesting.RunCommand(c, cmd.NewAddGroupCommandForTesting(s.ClientStore(), bClient), groupName)
+		c.Assert(err, gc.IsNil)
+
+		tabularOutput += fmt.Sprintf("\nuser-eve@canonical.com  	member       	group-%-72s", groupName)
+		relations = append(relations, apiparams.RelationshipTuple{
+			Object:       "user-" + env.users[1].Name,
+			Relation:     "member",
+			TargetObject: "group-" + groupName,
+		})
+	}
+
 	for _, relation := range relations {
 		_, err := cmdtesting.RunCommand(c, cmd.NewAddRelationCommandForTesting(s.ClientStore(), bClient), relation.Object, relation.Relation, relation.TargetObject)
 		c.Assert(err, gc.IsNil)
 	}
+
+	context, err := cmdtesting.RunCommand(c, cmd.NewListRelationsCommandForTesting(s.ClientStore(), bClient), "--format", "tabular")
+	c.Assert(err, gc.IsNil)
+	c.Assert(cmdtesting.Stdout(context), gc.Equals, tabularOutput)
 
 	expectedJSONData, err := json.Marshal(append(
 		[]apiparams.RelationshipTuple{{
@@ -396,6 +413,10 @@ func (s *relationSuite) TestListRelations(c *gc.C) {
 		relations...,
 	))
 	c.Assert(err, gc.IsNil)
+	context, err = cmdtesting.RunCommand(c, cmd.NewListRelationsCommandForTesting(s.ClientStore(), bClient), "--format", "json")
+	c.Assert(err, gc.IsNil)
+	c.Assert(strings.TrimRight(cmdtesting.Stdout(context), "\n"), gc.Equals, string(expectedJSONData))
+
 	expectedYAMLData, err := yaml.Marshal(append(
 		[]apiparams.RelationshipTuple{{
 			Object:       "user-admin",
@@ -409,30 +430,9 @@ func (s *relationSuite) TestListRelations(c *gc.C) {
 		relations...,
 	))
 	c.Assert(err, gc.IsNil)
-
-	context, err := cmdtesting.RunCommand(c, cmd.NewListRelationsCommandForTesting(s.ClientStore(), bClient), "--format", "json")
-	c.Assert(err, gc.IsNil)
-	c.Assert(strings.TrimRight(cmdtesting.Stdout(context), "\n"), gc.Equals, string(expectedJSONData))
-
 	context, err = cmdtesting.RunCommand(c, cmd.NewListRelationsCommandForTesting(s.ClientStore(), bClient))
 	c.Assert(err, gc.IsNil)
 	c.Assert(cmdtesting.Stdout(context), gc.Equals, string(expectedYAMLData))
-
-	context, err = cmdtesting.RunCommand(c, cmd.NewListRelationsCommandForTesting(s.ClientStore(), bClient), "--format", "tabular")
-	c.Assert(err, gc.IsNil)
-	c.Assert(
-		cmdtesting.Stdout(context),
-		gc.Equals,
-		`Object                  	Relation     	Target Object                                                                 
-user-admin              	administrator	controller-jimm                                                               
-user-alice@canonical.com	administrator	controller-jimm                                                               
-user-alice@canonical.com	member       	group-group-1                                                                 
-user-eve@canonical.com  	member       	group-group-2                                                                 
-group-group-2#member    	member       	group-group-3                                                                 
-group-group-3#member    	administrator	controller-test-controller-1                                                  
-group-group-1#member    	administrator	model-test-controller-1:alice@canonical.com/test-model-1                      
-user-eve@canonical.com  	administrator	applicationoffer-test-controller-1:alice@canonical.com/test-model-1.testoffer1`,
-	)
 }
 
 // TODO: remove boilerplate of env setup and use initialiseEnvironment

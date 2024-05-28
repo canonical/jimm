@@ -137,7 +137,7 @@ Examples:
 	returns the list of relations, where target object
 	matches the specified one
 
-	jimmctl auth relation list --target <target_object>  --relation <relation
+	jimmctl auth relation list --target <target_object>  --relation <relation>
 	returns the list of relations, where target object
 	and relation match the specified ones
 `
@@ -544,7 +544,7 @@ func (c *listRelationsCommand) Run(ctxt *cmd.Context) error {
 		Tuple:    c.tuple,
 		PageSize: defaultPageSize,
 	}
-	result, err := fetchRelations(client, params, "")
+	result, err := fetchRelations(client, params)
 	if err != nil {
 		return errors.E(err)
 	}
@@ -557,13 +557,14 @@ func (c *listRelationsCommand) Run(ctxt *cmd.Context) error {
 	return nil
 }
 
-func fetchRelations(client *api.Client, params apiparams.ListRelationshipTuplesRequest, continuationToken string) (*apiparams.ListRelationshipTuplesResponse, error) {
+func fetchRelations(client *api.Client, params apiparams.ListRelationshipTuplesRequest) (*apiparams.ListRelationshipTuplesResponse, error) {
 	response, err := client.ListRelationshipTuples(&params)
 	if err != nil {
 		return nil, errors.E(err)
 	}
 	if response.ContinuationToken != "" {
-		response1, err := fetchRelations(client, params, response.ContinuationToken)
+		params.ContinuationToken = response.ContinuationToken
+		response1, err := fetchRelations(client, params)
 		if err != nil {
 			return nil, errors.E(err)
 		}

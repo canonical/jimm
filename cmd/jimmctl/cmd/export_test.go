@@ -14,6 +14,7 @@ var (
 	AccessMessage       = accessMessageFormat
 	AccessResultAllowed = accessResultAllowed
 	AccessResultDenied  = accessResultDenied
+	DefaultPageSize     = defaultPageSize
 )
 
 type AccessResult = accessResult
