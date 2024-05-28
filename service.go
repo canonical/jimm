@@ -360,19 +360,25 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		"/.well-known",
 		wellknownapi.NewWellKnownHandler(s.jimm.CredentialStore),
 	)
-	oauthHandler, err := jimmhttp.NewOAuthHandler(jimmhttp.OAuthHandlerParams{
-		Authenticator:             authSvc,
-		DashboardFinalRedirectURL: p.DashboardFinalRedirectURL,
-		SecureCookies:             p.SecureSessionCookies,
-	})
-	if err != nil {
-		zapctx.Error(ctx, "failed to setup authentication handler", zap.Error(err))
-		return nil, errors.E(op, err, "failed to setup authentication handler")
+
+	if p.DashboardFinalRedirectURL == "" {
+		zapctx.Warn(ctx, "OAuth handler not enabled, due to unset dashboard redirect URL")
+	} else {
+		oauthHandler, err := jimmhttp.NewOAuthHandler(jimmhttp.OAuthHandlerParams{
+			Authenticator:             authSvc,
+			DashboardFinalRedirectURL: p.DashboardFinalRedirectURL,
+			SecureCookies:             p.SecureSessionCookies,
+		})
+		if err != nil {
+			zapctx.Error(ctx, "failed to setup authentication handler", zap.Error(err))
+			return nil, errors.E(op, err, "failed to setup authentication handler")
+		}
+		mountHandler(
+			jimmhttp.AuthResourceBasePath,
+			oauthHandler,
+		)
 	}
-	mountHandler(
-		jimmhttp.AuthResourceBasePath,
-		oauthHandler,
-	)
+
 	macaroonDischarger, err := s.setupDischarger(p)
 	if err != nil {
 		return nil, errors.E(op, err, "failed to set up discharger")
