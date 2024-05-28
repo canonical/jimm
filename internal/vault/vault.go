@@ -389,10 +389,16 @@ func (s *VaultStore) CleanupOAuthSecrets(ctx context.Context) error {
 
 	// Vault does not return errors on deletion requests where
 	// the secret does not exist.
-	if err := client.KVv2(s.KVPath).Delete(ctx, s.GetOAuthSecretPath()); err != nil {
+	if err := client.KVv2(s.KVPath).Delete(ctx, s.GetOAuthSecretsBasePath()); err != nil {
 		return errors.E(op, err)
 	}
 	return nil
+}
+
+// GetOAuthSecretsBasePath returns a hardcoded suffixed vault path (dependent on
+// the initial KVPath) representing the base path for OAuth related secrets.
+func (s *VaultStore) GetOAuthSecretsBasePath() string {
+	return path.Join("creds", "oauth")
 }
 
 // GetOAuthSecret returns the current HS256 (symmetric encryption) secret used to sign OAuth session tokens.
@@ -455,7 +461,7 @@ func (s *VaultStore) PutOAuthSecret(ctx context.Context, raw []byte) error {
 // GetOAuthSecretPath returns a hardcoded suffixed vault path (dependent on
 // the initial KVPath) to the OAuth JWK location.
 func (s *VaultStore) GetOAuthSecretPath() string {
-	return path.Join("creds", "oauth", "key")
+	return path.Join(s.GetOAuthSecretsBasePath(), "key")
 }
 
 // deleteControllerCredentials removes the credentials associated with the controller in
