@@ -12,4 +12,5 @@ jobs:
     with:
       folder: jimmctl
       release-channel: 3/edge
+    secrets: inherit
 
