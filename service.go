@@ -261,15 +261,6 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		return nil, errors.E(op, err)
 	}
 
-	// Setup browser session store
-	sessionStore, err := setupSessionStore(sqlDb, "secret-key-todo")
-	if err != nil {
-		return nil, errors.E(op, err)
-	}
-
-	// Cleanup expired session every 30 minutes
-	defer sessionStore.StopCleanup(sessionStore.Cleanup(time.Minute * 30))
-
 	if p.AuditLogRetentionPeriodInDays != "" {
 		period, err := strconv.Atoi(p.AuditLogRetentionPeriodInDays)
 		if err != nil {
@@ -291,6 +282,19 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	if err := ensureControllerAdministrators(ctx, openFGAclient, p.ControllerUUID, p.ControllerAdmins); err != nil {
 		return nil, errors.E(op, err, "failed to ensure controller admins")
 	}
+
+	if err := s.setupCredentialStore(ctx, p); err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	// Setup browser session store
+	sessionStore, err := setupSessionStore(ctx, sqlDb, s.jimm.CredentialStore)
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	// Cleanup expired session every 30 minutes
+	defer sessionStore.StopCleanup(sessionStore.Cleanup(time.Minute * 30))
 
 	redirectUrl := p.PublicDNSName + jimmhttp.AuthResourceBasePath + jimmhttp.CallbackEndpoint
 	if !strings.HasPrefix(redirectUrl, "https://") || !strings.HasPrefix(redirectUrl, "http://") {
@@ -315,10 +319,6 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	if err != nil {
 		zapctx.Error(ctx, "failed to setup authentication service", zap.Error(err))
 		return nil, errors.E(op, err, "failed to setup authentication service")
-	}
-
-	if err := s.setupCredentialStore(ctx, p); err != nil {
-		return nil, errors.E(op, err)
 	}
 
 	if p.JWTExpiryDuration == 0 {
@@ -418,8 +418,13 @@ func (s *Service) setupDischarger(p Params) (*discharger.MacaroonDischarger, err
 	return MacaroonDischarger, nil
 }
 
-func setupSessionStore(db *sql.DB, secretKey string) (*pgstore.PGStore, error) {
-	store, err := pgstore.NewPGStoreFromPool(db, []byte(secretKey))
+func setupSessionStore(ctx context.Context, db *sql.DB, credStore jimmcreds.CredentialStore) (*pgstore.PGStore, error) {
+	oauthSessionStoreSecret, err := credStore.GetOAuthSessionStoreSecret(ctx)
+	if err != nil {
+		return nil, errors.E(err, "session store secret not found")
+	}
+
+	store, err := pgstore.NewPGStoreFromPool(db, oauthSessionStoreSecret)
 	return store, err
 }
 
