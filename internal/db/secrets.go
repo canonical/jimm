@@ -22,12 +22,13 @@ const (
 	passwordKey = "password"
 
 	// These constants are used to create the appropriate identifiers for JWKS related data.
-	jwksKind          = "jwks"
-	jwksPublicKeyTag  = "jwksPublicKey"
-	jwksPrivateKeyTag = "jwksPrivateKey"
-	jwksExpiryTag     = "jwksExpiry"
-	oauthKind         = "oauth"
-	oauthKeyTag       = "oauthKey"
+	jwksKind                   = "jwks"
+	jwksPublicKeyTag           = "jwksPublicKey"
+	jwksPrivateKeyTag          = "jwksPrivateKey"
+	jwksExpiryTag              = "jwksExpiry"
+	oauthKind                  = "oauth"
+	oauthKeyTag                = "oauthKey"
+	oauthSessionStoreSecretTag = "oauthSessionStoreSecret"
 )
 
 // UpsertSecret stores secret information.
@@ -287,10 +288,14 @@ func (d *Database) PutJWKSExpiry(ctx context.Context, expiry time.Time) error {
 func (d *Database) CleanupOAuthSecrets(ctx context.Context) error {
 	const op = errors.Op("database.CleanupOAuthSecrets")
 	secret := dbmodel.NewSecret(oauthKind, oauthKeyTag, nil)
-	err := d.DeleteSecret(ctx, &secret)
-	if err != nil {
-		zapctx.Error(ctx, "failed to cleanup OAUth key", zap.Error(err))
-		return errors.E(op, err, "failed to cleanup OAUth key")
+	if err := d.DeleteSecret(ctx, &secret); err != nil {
+		zapctx.Error(ctx, "failed to cleanup OAuth key", zap.Error(err))
+		return errors.E(op, err, "failed to cleanup OAuth key")
+	}
+	secret = dbmodel.NewSecret(oauthKind, oauthSessionStoreSecretTag, nil)
+	if err := d.DeleteSecret(ctx, &secret); err != nil {
+		zapctx.Error(ctx, "failed to cleanup OAuth session store secret", zap.Error(err))
+		return errors.E(op, err, "failed to cleanup OAuth session store secret")
 	}
 	return nil
 }
