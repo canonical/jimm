@@ -386,7 +386,7 @@ func unsetMultipleResourceAccesses[T ofganames.ResourceTagger](ctx context.Conte
 			existingRelations[timestampedTuple.Tuple.Relation] = nil
 		}
 
-		if continuationToken == lastContinuationToken {
+		if continuationToken == "" {
 			break
 		}
 		lastContinuationToken = continuationToken
