@@ -491,9 +491,7 @@ func (s *Service) setupCredentialStore(ctx context.Context, p Params) error {
 		return nil
 	}
 
-	// Currently jimm will start without a credential store but
-	// functionality will be limited.
-	return nil
+	return errors.E(op, "jimm cannot start without a credential store")
 }
 
 func newVaultStore(ctx context.Context, p Params) (jimmcreds.CredentialStore, error) {
