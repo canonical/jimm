@@ -52,7 +52,7 @@ func TestDefaultService(t *testing.T) {
 	c.Check(resp.StatusCode, qt.Equals, http.StatusOK)
 }
 
-func TestServiceStartsWithoutSecretStore(t *testing.T) {
+func TestServiceDoesNotStartWithoutCredentialStore(t *testing.T) {
 	c := qt.New(t)
 
 	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
@@ -60,7 +60,7 @@ func TestServiceStartsWithoutSecretStore(t *testing.T) {
 	p := jimmtest.NewTestJimmParams(c)
 	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
 	_, err = jimm.NewService(context.Background(), p)
-	c.Assert(err, qt.IsNil)
+	c.Assert(err, qt.ErrorMatches, "jimm cannot start without a credential store")
 }
 
 func TestAuthenticator(t *testing.T) {
