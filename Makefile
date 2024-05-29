@@ -130,7 +130,7 @@ help:
 	@echo 'make install - Install the package.'
 	@echo 'make server - Start the JIMM server.'
 	@echo 'make clean - Remove object files from package source directories.'
-	@echo 'make sysdeps - Install the development environment system packages.'
+	@echo 'make sys-deps - Install the development environment system packages.'
 	@echo 'make format - Format the source files.'
 	@echo 'make simplify - Format and simplify the source files.'
 	@echo 'make get-local-auth - Get local auth to the API WSS endpoint locally.'
