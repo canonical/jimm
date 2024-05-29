@@ -576,3 +576,50 @@ func (s *userTestSuite) TestListApplicationOffers(c *gc.C) {
 	sort.Strings(offerUUIDs)
 	c.Assert(offerUUIDs, gc.DeepEquals, wantUUIDs)
 }
+
+func (s *userTestSuite) TestUnsetMultipleResourceAccesses(c *gc.C) {
+	ctx := context.Background()
+
+	modelUUID, err := uuid.NewRandom()
+	c.Assert(err, gc.IsNil)
+	model := names.NewModelTag(modelUUID.String())
+
+	adam := names.NewUserTag("adam")
+
+	adamIdentity, err := dbmodel.NewIdentity("adam")
+	c.Assert(err, gc.IsNil)
+
+	adamUser := openfga.NewUser(adamIdentity, s.ofgaClient)
+
+	tuples := []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(adam),
+		Relation: ofganames.ReaderRelation,
+		Target:   ofganames.ConvertTag(model),
+	}, {
+		Object:   ofganames.ConvertTag(adam),
+		Relation: ofganames.WriterRelation,
+		Target:   ofganames.ConvertTag(model),
+	}, {
+		Object:   ofganames.ConvertTag(adam),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(model),
+	}}
+
+	err = s.ofgaClient.AddRelation(ctx, tuples...)
+	c.Assert(err, gc.IsNil)
+
+	err = openfga.UnsetMultipleResourceAccesses(
+		ctx, adamUser, model,
+		[]openfga.Relation{
+			ofganames.ReaderRelation,
+			ofganames.WriterRelation,
+			ofganames.AdministratorRelation,
+		},
+		1, // The smallest value to make paginated requests.
+	)
+	c.Assert(err, gc.IsNil)
+
+	retrieved, _, err := s.cofgaClient.FindMatchingTuples(ctx, openfga.Tuple{Target: ofganames.ConvertTag(model)}, 0, "")
+	c.Assert(err, gc.IsNil)
+	c.Assert(retrieved, gc.HasLen, 0)
+}
