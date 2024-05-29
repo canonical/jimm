@@ -390,7 +390,10 @@ func (s *VaultStore) CleanupOAuthSecrets(ctx context.Context) error {
 
 	// Vault does not return errors on deletion requests where
 	// the secret does not exist.
-	if err := client.KVv2(s.KVPath).Delete(ctx, s.GetOAuthSecretsBasePath()); err != nil {
+	if err := client.KVv2(s.KVPath).Delete(ctx, s.GetOAuthSecretPath()); err != nil {
+		return errors.E(op, err)
+	}
+	if err := client.KVv2(s.KVPath).Delete(ctx, s.GetOAuthSessionStoreSecretPath()); err != nil {
 		return errors.E(op, err)
 	}
 	return nil
