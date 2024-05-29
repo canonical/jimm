@@ -342,10 +342,29 @@ func initializeEnvironment(c *gc.C, ctx context.Context, db *db.Database, u dbmo
 	return &env
 }
 
+func relationsToTabularStr(relations []apiparams.RelationshipTuple) string {
+	objHeader, relHeader, targObjHeader := "Object", "Relation", "Target Object"
+	objColSize, relColSize, targObjColSize := len(objHeader), len(relHeader), len(targObjHeader)
+	for _, r := range relations {
+		objColSize = max(objColSize, len(r.Object))
+		relColSize = max(relColSize, len(r.Relation))
+		targObjColSize = max(targObjColSize, len(r.TargetObject))
+	}
+
+	formatRow := func(object, relation, targetObject string) string {
+		return fmt.Sprintf("%-*s\t%-*s\t%-*s", objColSize, object, relColSize, relation, targObjColSize, targetObject)
+	}
+	tabularStr := formatRow(objHeader, relHeader, targObjHeader)
+	for _, r := range relations {
+		tabularStr += "\n" + formatRow(r.Object, r.Relation, r.TargetObject)
+	}
+
+	return tabularStr
+}
+
 func (s *relationSuite) TestListRelations(c *gc.C) {
 	env := initializeEnvironment(c, context.Background(), &s.JIMM.Database, *s.AdminUser)
-	// alice is superuser
-	bClient := jimmtest.NewUserSessionLogin(c, "alice")
+	bClient := jimmtest.NewUserSessionLogin(c, "alice") // alice is superuser
 
 	relations := []apiparams.RelationshipTuple{{
 		Object:       "user-" + env.users[0].Name,
@@ -367,24 +386,17 @@ func (s *relationSuite) TestListRelations(c *gc.C) {
 		Object:       "user-" + env.users[1].Name,
 		Relation:     "administrator",
 		TargetObject: "applicationoffer-" + env.controllers[0].Name + ":" + env.applicationOffers[0].Model.OwnerIdentityName + "/" + env.applicationOffers[0].Model.Name + "." + env.applicationOffers[0].Name,
+	}, {
+		Object:       "user-" + env.users[0].Name,
+		Relation:     "administrator",
+		TargetObject: "serviceaccount-test@serviceaccount",
 	}}
-
-	tabularOutput := `Object                  	Relation     	Target Object                                                                 
-user-admin              	administrator	controller-jimm                                                               
-user-alice@canonical.com	administrator	controller-jimm                                                               
-user-alice@canonical.com	member       	group-group-1                                                                 
-group-group-2#member    	member       	group-group-3                                                                 
-group-group-3#member    	administrator	controller-test-controller-1                                                  
-group-group-1#member    	administrator	model-test-controller-1:alice@canonical.com/test-model-1                      
-user-eve@canonical.com  	administrator	applicationoffer-test-controller-1:alice@canonical.com/test-model-1.testoffer1`
 
 	for i := 0; i < cmd.DefaultPageSize+1; i++ {
 		groupName := fmt.Sprintf("group-%d", i)
 		_, err := cmdtesting.RunCommand(c, cmd.NewAddGroupCommandForTesting(s.ClientStore(), bClient), groupName)
 		c.Assert(err, gc.IsNil)
 
-		// -72 is used to fill the rest of the line with whitespace as the output is padded to the length of the longest row
-		tabularOutput += fmt.Sprintf("\nuser-eve@canonical.com  	member       	group-%-72s", groupName)
 		relations = append(relations, apiparams.RelationshipTuple{
 			Object:       "user-" + env.users[1].Name,
 			Relation:     "member",
@@ -397,11 +409,7 @@ user-eve@canonical.com  	administrator	applicationoffer-test-controller-1:alice@
 		c.Assert(err, gc.IsNil)
 	}
 
-	context, err := cmdtesting.RunCommand(c, cmd.NewListRelationsCommandForTesting(s.ClientStore(), bClient), "--format", "tabular")
-	c.Assert(err, gc.IsNil)
-	c.Assert(cmdtesting.Stdout(context), gc.Equals, tabularOutput)
-
-	expectedJSONData, err := json.Marshal(append(
+	expectedRelations := append(
 		[]apiparams.RelationshipTuple{{
 			Object:       "user-admin",
 			Relation:     "administrator",
@@ -412,24 +420,19 @@ user-eve@canonical.com  	administrator	applicationoffer-test-controller-1:alice@
 			TargetObject: "controller-jimm",
 		}},
 		relations...,
-	))
+	)
+
+	context, err := cmdtesting.RunCommand(c, cmd.NewListRelationsCommandForTesting(s.ClientStore(), bClient), "--format", "tabular")
+	c.Assert(err, gc.IsNil)
+	c.Assert(cmdtesting.Stdout(context), gc.Equals, relationsToTabularStr(expectedRelations))
+
+	expectedJSONData, err := json.Marshal(expectedRelations)
 	c.Assert(err, gc.IsNil)
 	context, err = cmdtesting.RunCommand(c, cmd.NewListRelationsCommandForTesting(s.ClientStore(), bClient), "--format", "json")
 	c.Assert(err, gc.IsNil)
 	c.Assert(strings.TrimRight(cmdtesting.Stdout(context), "\n"), gc.Equals, string(expectedJSONData))
 
-	expectedYAMLData, err := yaml.Marshal(append(
-		[]apiparams.RelationshipTuple{{
-			Object:       "user-admin",
-			Relation:     "administrator",
-			TargetObject: "controller-jimm",
-		}, {
-			Object:       "user-alice@canonical.com",
-			Relation:     "administrator",
-			TargetObject: "controller-jimm",
-		}},
-		relations...,
-	))
+	expectedYAMLData, err := yaml.Marshal(expectedRelations)
 	c.Assert(err, gc.IsNil)
 	context, err = cmdtesting.RunCommand(c, cmd.NewListRelationsCommandForTesting(s.ClientStore(), bClient))
 	c.Assert(err, gc.IsNil)
