@@ -294,7 +294,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	}
 
 	// Cleanup expired session every 30 minutes
-	defer sessionStore.StopCleanup(sessionStore.Cleanup(time.Minute * 30))
+	sessionStore.Cleanup(time.Minute * 30)
 
 	redirectUrl := p.PublicDNSName + jimmhttp.AuthResourceBasePath + jimmhttp.CallbackEndpoint
 	if !strings.HasPrefix(redirectUrl, "https://") || !strings.HasPrefix(redirectUrl, "http://") {
