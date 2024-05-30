@@ -180,7 +180,8 @@ type Params struct {
 type Service struct {
 	jimm jimm.JIMM
 
-	mux *chi.Mux
+	mux      *chi.Mux
+	cleanups []func()
 }
 
 func (s *Service) JIMM() *jimm.JIMM {
@@ -223,6 +224,15 @@ func (s *Service) StartJWKSRotator(ctx context.Context, checkRotateRequired <-ch
 		return nil
 	}
 	return s.jimm.JWKService.StartJWKSRotator(ctx, checkRotateRequired, initialRotateRequiredTime)
+}
+
+// Cleanup cleans up resources that need to be released on shutdown.
+func (s *Service) Cleanup() {
+	// Iterating over clean up function in reverse-order to avoid early clean ups.
+	for i := len(s.cleanups) - 1; i >= 0; i-- {
+		f := s.cleanups[i]
+		f()
+	}
 }
 
 // NewService creates a new Service using the given params.
