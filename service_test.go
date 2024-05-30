@@ -42,6 +42,7 @@ func TestDefaultService(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	p := jimmtest.NewTestJimmParams(c)
 	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
+	p.InsecureSecretStorage = true
 	svc, err := jimm.NewService(context.Background(), p)
 	c.Assert(err, qt.IsNil)
 	rr := httptest.NewRecorder()
@@ -52,7 +53,7 @@ func TestDefaultService(t *testing.T) {
 	c.Check(resp.StatusCode, qt.Equals, http.StatusOK)
 }
 
-func TestServiceStartsWithoutSecretStore(t *testing.T) {
+func TestServiceDoesNotStartWithoutCredentialStore(t *testing.T) {
 	c := qt.New(t)
 
 	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
@@ -60,7 +61,7 @@ func TestServiceStartsWithoutSecretStore(t *testing.T) {
 	p := jimmtest.NewTestJimmParams(c)
 	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
 	_, err = jimm.NewService(context.Background(), p)
-	c.Assert(err, qt.IsNil)
+	c.Assert(err, qt.ErrorMatches, "jimm cannot start without a credential store")
 }
 
 func TestAuthenticator(t *testing.T) {
@@ -260,6 +261,7 @@ func TestPublicKey(t *testing.T) {
 
 	p := jimmtest.NewTestJimmParams(c)
 	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
+	p.InsecureSecretStorage = true
 	svc, err := jimm.NewService(context.Background(), p)
 	c.Assert(err, qt.IsNil)
 
@@ -334,6 +336,7 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 
 			p := jimmtest.NewTestJimmParams(c)
 			p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
+			p.InsecureSecretStorage = true
 			svc, err := jimm.NewService(context.Background(), p)
 			c.Assert(err, qt.IsNil)
 
@@ -400,9 +403,10 @@ func TestDisableOAuthEndpointsWhenDashboardRedirectURLNotSet(t *testing.T) {
 
 	p := jimmtest.NewTestJimmParams(c)
 	p.DashboardFinalRedirectURL = ""
+	p.InsecureSecretStorage = true
 	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
-
 	svc, err := jimm.NewService(context.Background(), p)
+
 	c.Assert(err, qt.IsNil)
 
 	srv := httptest.NewTLSServer(svc)
@@ -421,6 +425,7 @@ func TestEnableOAuthEndpointsWhenDashboardRedirectURLSet(t *testing.T) {
 
 	p := jimmtest.NewTestJimmParams(c)
 	p.DashboardFinalRedirectURL = "some-redirect-url"
+	p.InsecureSecretStorage = true
 	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
 
 	svc, err := jimm.NewService(context.Background(), p)

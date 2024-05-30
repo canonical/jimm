@@ -261,15 +261,6 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		return nil, errors.E(op, err)
 	}
 
-	// Setup browser session store
-	sessionStore, err := setupSessionStore(sqlDb, "secret-key-todo")
-	if err != nil {
-		return nil, errors.E(op, err)
-	}
-
-	// Cleanup expired session every 30 minutes
-	defer sessionStore.StopCleanup(sessionStore.Cleanup(time.Minute * 30))
-
 	if p.AuditLogRetentionPeriodInDays != "" {
 		period, err := strconv.Atoi(p.AuditLogRetentionPeriodInDays)
 		if err != nil {
@@ -291,6 +282,19 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	if err := ensureControllerAdministrators(ctx, openFGAclient, p.ControllerUUID, p.ControllerAdmins); err != nil {
 		return nil, errors.E(op, err, "failed to ensure controller admins")
 	}
+
+	if err := s.setupCredentialStore(ctx, p); err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	// Setup browser session store
+	sessionStore, err := setupSessionStore(ctx, sqlDb, s.jimm.CredentialStore)
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	// Cleanup expired session every 30 minutes
+	sessionStore.Cleanup(time.Minute * 30)
 
 	redirectUrl := p.PublicDNSName + jimmhttp.AuthResourceBasePath + jimmhttp.CallbackEndpoint
 	if !strings.HasPrefix(redirectUrl, "https://") || !strings.HasPrefix(redirectUrl, "http://") {
@@ -315,10 +319,6 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	if err != nil {
 		zapctx.Error(ctx, "failed to setup authentication service", zap.Error(err))
 		return nil, errors.E(op, err, "failed to setup authentication service")
-	}
-
-	if err := s.setupCredentialStore(ctx, p); err != nil {
-		return nil, errors.E(op, err)
 	}
 
 	if p.JWTExpiryDuration == 0 {
@@ -418,9 +418,36 @@ func (s *Service) setupDischarger(p Params) (*discharger.MacaroonDischarger, err
 	return MacaroonDischarger, nil
 }
 
-func setupSessionStore(db *sql.DB, secretKey string) (*pgstore.PGStore, error) {
-	store, err := pgstore.NewPGStoreFromPool(db, []byte(secretKey))
+func setupSessionStore(ctx context.Context, db *sql.DB, credStore jimmcreds.CredentialStore) (*pgstore.PGStore, error) {
+	oauthSessionStoreSecret, err := credStore.GetOAuthSessionStoreSecret(ctx)
+	if err == nil {
+		zapctx.Info(ctx, "detected existing OAuth session store secret")
+	} else if errors.ErrorCode(err) == errors.CodeNotFound {
+		oauthSessionStoreSecret, err = generateOAuthSessionStoreSecret(ctx, credStore)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, errors.E(err, "failed to read session store secret")
+	}
+
+	store, err := pgstore.NewPGStoreFromPool(db, oauthSessionStoreSecret)
 	return store, err
+}
+
+func generateOAuthSessionStoreSecret(ctx context.Context, store jimmcreds.CredentialStore) ([]byte, error) {
+	const op = errors.Op("generateOAuthSessionStoreSecret")
+	secret := make([]byte, 64)
+	if _, err := rand.Read(secret); err != nil {
+		zapctx.Error(ctx, "failed to generate OAuth session store secret", zap.Error(err))
+		return nil, errors.E(op, err, "failed to generate OAuth session store secret")
+	}
+
+	if err := store.PutOAuthSessionStoreSecret(ctx, secret); err != nil {
+		zapctx.Error(ctx, "failed to store generated OAuth session store secret", zap.Error(err))
+		return nil, errors.E(op, err, "failed to store generated OAuth session store secret")
+	}
+	return secret, nil
 }
 
 func openDB(ctx context.Context, dsn string) (*gorm.DB, error) {
@@ -464,9 +491,7 @@ func (s *Service) setupCredentialStore(ctx context.Context, p Params) error {
 		return nil
 	}
 
-	// Currently jimm will start without a credential store but
-	// functionality will be limited.
-	return nil
+	return errors.E(op, "jimm cannot start without a credential store")
 }
 
 func newVaultStore(ctx context.Context, p Params) (jimmcreds.CredentialStore, error) {

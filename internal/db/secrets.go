@@ -22,12 +22,13 @@ const (
 	passwordKey = "password"
 
 	// These constants are used to create the appropriate identifiers for JWKS related data.
-	jwksKind          = "jwks"
-	jwksPublicKeyTag  = "jwksPublicKey"
-	jwksPrivateKeyTag = "jwksPrivateKey"
-	jwksExpiryTag     = "jwksExpiry"
-	oauthKind         = "oauth"
-	oauthKeyTag       = "oauthKey"
+	jwksKind                   = "jwks"
+	jwksPublicKeyTag           = "jwksPublicKey"
+	jwksPrivateKeyTag          = "jwksPrivateKey"
+	jwksExpiryTag              = "jwksExpiry"
+	oauthKind                  = "oauth"
+	oauthKeyTag                = "oauthKey"
+	oauthSessionStoreSecretTag = "oauthSessionStoreSecret"
 )
 
 // UpsertSecret stores secret information.
@@ -287,10 +288,14 @@ func (d *Database) PutJWKSExpiry(ctx context.Context, expiry time.Time) error {
 func (d *Database) CleanupOAuthSecrets(ctx context.Context) error {
 	const op = errors.Op("database.CleanupOAuthSecrets")
 	secret := dbmodel.NewSecret(oauthKind, oauthKeyTag, nil)
-	err := d.DeleteSecret(ctx, &secret)
-	if err != nil {
-		zapctx.Error(ctx, "failed to cleanup OAUth key", zap.Error(err))
-		return errors.E(op, err, "failed to cleanup OAUth key")
+	if err := d.DeleteSecret(ctx, &secret); err != nil {
+		zapctx.Error(ctx, "failed to cleanup OAuth key", zap.Error(err))
+		return errors.E(op, err, "failed to cleanup OAuth key")
+	}
+	secret = dbmodel.NewSecret(oauthKind, oauthSessionStoreSecretTag, nil)
+	if err := d.DeleteSecret(ctx, &secret); err != nil {
+		zapctx.Error(ctx, "failed to cleanup OAuth session store secret", zap.Error(err))
+		return errors.E(op, err, "failed to cleanup OAuth session store secret")
 	}
 	return nil
 }
@@ -322,5 +327,35 @@ func (d *Database) PutOAuthSecret(ctx context.Context, raw []byte) error {
 		return errors.E(op, err, "failed to marshal oauth key")
 	}
 	secret := dbmodel.NewSecret(oauthKind, oauthKeyTag, oauthKey)
+	return d.UpsertSecret(ctx, &secret)
+}
+
+// GetOAuthSessionStoreSecret returns the current secret used to store session tokens.
+func (d *Database) GetOAuthSessionStoreSecret(ctx context.Context) ([]byte, error) {
+	const op = errors.Op("database.GetOAuthSessionStoreSecret")
+	secret := dbmodel.NewSecret(oauthKind, oauthSessionStoreSecretTag, nil)
+	err := d.GetSecret(ctx, &secret)
+	if err != nil {
+		zapctx.Error(ctx, "failed to get oauth session store secret", zap.Error(err))
+		return nil, errors.E(op, err)
+	}
+	var pem []byte
+	err = json.Unmarshal(secret.Data, &pem)
+	if err != nil {
+		zapctx.Error(ctx, "failed to unmarshal pem data", zap.Error(err))
+		return nil, errors.E(op, err)
+	}
+	return pem, nil
+}
+
+// PutOAuthSessionStoreSecret puts a secret into the credentials store for secure storage of session tokens.
+func (d *Database) PutOAuthSessionStoreSecret(ctx context.Context, raw []byte) error {
+	const op = errors.Op("database.PutOAuthSessionStoreSecret")
+	oauthSessionStoreSecret, err := json.Marshal(raw)
+	if err != nil {
+		zapctx.Error(ctx, "failed to marshal pem data", zap.Error(err))
+		return errors.E(op, err, "failed to marshal oauth session store secret")
+	}
+	secret := dbmodel.NewSecret(oauthKind, oauthSessionStoreSecretTag, oauthSessionStoreSecret)
 	return d.UpsertSecret(ctx, &secret)
 }
