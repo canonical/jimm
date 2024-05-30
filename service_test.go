@@ -452,3 +452,14 @@ func cofgaParamsToJIMMOpenFGAParams(cofgaParams cofga.OpenFGAParams) jimm.OpenFG
 		AuthModel: cofgaParams.AuthModelID,
 	}
 }
+
+func TestCleanup(t *testing.T) {
+	c := qt.New(t)
+
+	outputs := make(chan string, 2)
+	service := jimm.Service{}
+	service.AddCleanup(func() { outputs <- "first" })
+	service.AddCleanup(func() { outputs <- "second" })
+	service.Cleanup()
+	c.Assert([]string{<-outputs, <-outputs}, qt.DeepEquals, []string{"second", "first"})
+}
