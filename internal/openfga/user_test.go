@@ -576,3 +576,81 @@ func (s *userTestSuite) TestListApplicationOffers(c *gc.C) {
 	sort.Strings(offerUUIDs)
 	c.Assert(offerUUIDs, gc.DeepEquals, wantUUIDs)
 }
+
+func (s *userTestSuite) TestUnsetMultipleResourceAccesses(c *gc.C) {
+	ctx := context.Background()
+
+	tests := []struct {
+		name     string
+		pageSize int32
+	}{{
+		name:     "pageSize: 0 (OpenFGA default)",
+		pageSize: 0,
+	}, {
+		name:     "pageSize: 100 (OpenFGA max)",
+		pageSize: 100,
+	}, {
+		name:     "pageSize: 1",
+		pageSize: 1,
+	}, {
+		name:     "pageSize: 2",
+		pageSize: 2,
+	}, {
+		name:     "pageSize: 3",
+		pageSize: 3,
+	}, {
+		name:     "pageSize: 4",
+		pageSize: 4,
+	}}
+
+	for _, tt := range tests {
+		modelUUID, err := uuid.NewRandom()
+		c.Assert(err, gc.IsNil)
+		model := names.NewModelTag(modelUUID.String())
+
+		adam := names.NewUserTag("adam")
+
+		adamIdentity, err := dbmodel.NewIdentity("adam")
+		c.Assert(err, gc.IsNil)
+
+		adamUser := openfga.NewUser(adamIdentity, s.ofgaClient)
+
+		// Note that the total number of tuples in OpenFGA actually has no
+		// effect here, because the `unsetMultipleResourceAccesses` function
+		// queries for tuples that have a specific object and target. So, the
+		// returned tuples are just a few. That's why we've used user-to-model
+		// tuples in this test because they have the highest number of possible
+		// relations (i.e., reader, writer, and administrator).
+		tuples := []openfga.Tuple{{
+			Object:   ofganames.ConvertTag(adam),
+			Relation: ofganames.ReaderRelation,
+			Target:   ofganames.ConvertTag(model),
+		}, {
+			Object:   ofganames.ConvertTag(adam),
+			Relation: ofganames.WriterRelation,
+			Target:   ofganames.ConvertTag(model),
+		}, {
+			Object:   ofganames.ConvertTag(adam),
+			Relation: ofganames.AdministratorRelation,
+			Target:   ofganames.ConvertTag(model),
+		}}
+
+		err = s.ofgaClient.AddRelation(ctx, tuples...)
+		c.Assert(err, gc.IsNil)
+
+		err = openfga.UnsetMultipleResourceAccesses(
+			ctx, adamUser, model,
+			[]openfga.Relation{
+				ofganames.ReaderRelation,
+				ofganames.WriterRelation,
+				ofganames.AdministratorRelation,
+			},
+			tt.pageSize,
+		)
+		c.Assert(err, gc.IsNil)
+
+		retrieved, _, err := s.cofgaClient.FindMatchingTuples(ctx, openfga.Tuple{Target: ofganames.ConvertTag(model)}, 0, "")
+		c.Assert(err, gc.IsNil)
+		c.Assert(retrieved, gc.HasLen, 0)
+	}
+}
