@@ -234,6 +234,11 @@ func (s *Service) Cleanup() {
 	}
 }
 
+// AddCleanup adds a clean up function to be run at service shutdown.
+func (s *Service) AddCleanup(f func()) {
+	s.cleanups = append(s.cleanups, f)
+}
+
 // NewService creates a new Service using the given params.
 func NewService(ctx context.Context, p Params) (*Service, error) {
 	const op = errors.Op("NewService")
@@ -450,7 +455,7 @@ func (s *Service) setupSessionStore(ctx context.Context) (*pgstore.PGStore, erro
 
 	// Cleanup expired session every 30 minutes
 	cleanupQuit, cleanupDone := store.Cleanup(time.Minute * 30)
-	s.cleanups = append(s.cleanups, func() {
+	s.AddCleanup(func() {
 		store.StopCleanup(cleanupQuit, cleanupDone)
 	})
 	return store, nil
