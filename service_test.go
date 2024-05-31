@@ -471,3 +471,21 @@ func TestCleanup(t *testing.T) {
 	service.Cleanup()
 	c.Assert([]string{<-outputs, <-outputs}, qt.DeepEquals, []string{"second", "first"})
 }
+
+func TestCleanupDoesNotPanic_SessionStoreRelatedCleanups(t *testing.T) {
+	c := qt.New(t)
+
+	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
+	c.Assert(err, qt.IsNil)
+	p := jimmtest.NewTestJimmParams(c)
+	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
+	p.InsecureSecretStorage = true
+
+	svc, err := jimm.NewService(context.Background(), p)
+	c.Assert(err, qt.IsNil)
+
+	// Make sure `cleanups` is not empty.
+	c.Assert(len(svc.GetCleanups()) > 0, qt.IsTrue)
+
+	svc.Cleanup()
+}
