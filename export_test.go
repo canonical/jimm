@@ -2,3 +2,7 @@
 package jimm
 
 var NewOpenFGAClient = newOpenFGAClient
+
+func (s *Service) GetCleanups() []func() {
+	return s.cleanups
+}
