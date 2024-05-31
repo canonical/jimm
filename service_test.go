@@ -45,6 +45,7 @@ func TestDefaultService(t *testing.T) {
 	p.InsecureSecretStorage = true
 	svc, err := jimm.NewService(context.Background(), p)
 	c.Assert(err, qt.IsNil)
+	defer svc.Cleanup()
 	rr := httptest.NewRecorder()
 	req, err := http.NewRequest("GET", "/debug/info", nil)
 	c.Assert(err, qt.IsNil)
@@ -76,6 +77,7 @@ func TestAuthenticator(t *testing.T) {
 	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
 	svc, err := jimm.NewService(context.Background(), p)
 	c.Assert(err, qt.IsNil)
+	defer svc.Cleanup()
 
 	err = svc.JIMM().GetCredentialStore().PutOAuthSecret(ctx, []byte(jimmtest.JWTTestSecret))
 	c.Assert(err, qt.IsNil)
@@ -140,6 +142,7 @@ func TestVault(t *testing.T) {
 	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
 	svc, err := jimm.NewService(ctx, p)
 	c.Assert(err, qt.IsNil)
+	defer svc.Cleanup()
 
 	err = svc.JIMM().GetCredentialStore().PutOAuthSecret(ctx, []byte(jimmtest.JWTTestSecret))
 	c.Assert(err, qt.IsNil)
@@ -198,8 +201,9 @@ func TestPostgresSecretStore(t *testing.T) {
 	p := jimmtest.NewTestJimmParams(c)
 	p.InsecureSecretStorage = true
 	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
-	_, err = jimm.NewService(context.Background(), p)
+	svc, err := jimm.NewService(context.Background(), p)
 	c.Assert(err, qt.IsNil)
+	defer svc.Cleanup()
 }
 
 func TestOpenFGA(t *testing.T) {
@@ -215,6 +219,7 @@ func TestOpenFGA(t *testing.T) {
 	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
 	svc, err := jimm.NewService(ctx, p)
 	c.Assert(err, qt.IsNil)
+	defer svc.Cleanup()
 
 	err = svc.JIMM().GetCredentialStore().PutOAuthSecret(ctx, []byte(jimmtest.JWTTestSecret))
 	c.Assert(err, qt.IsNil)
@@ -264,6 +269,7 @@ func TestPublicKey(t *testing.T) {
 	p.InsecureSecretStorage = true
 	svc, err := jimm.NewService(context.Background(), p)
 	c.Assert(err, qt.IsNil)
+	defer svc.Cleanup()
 
 	srv := httptest.NewTLSServer(svc)
 	c.Cleanup(srv.Close)
@@ -339,6 +345,7 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 			p.InsecureSecretStorage = true
 			svc, err := jimm.NewService(context.Background(), p)
 			c.Assert(err, qt.IsNil)
+			defer svc.Cleanup()
 
 			srv := httptest.NewTLSServer(svc)
 			c.Cleanup(srv.Close)
@@ -406,8 +413,8 @@ func TestDisableOAuthEndpointsWhenDashboardRedirectURLNotSet(t *testing.T) {
 	p.InsecureSecretStorage = true
 	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
 	svc, err := jimm.NewService(context.Background(), p)
-
 	c.Assert(err, qt.IsNil)
+	defer svc.Cleanup()
 
 	srv := httptest.NewTLSServer(svc)
 	c.Cleanup(srv.Close)
@@ -430,6 +437,7 @@ func TestEnableOAuthEndpointsWhenDashboardRedirectURLSet(t *testing.T) {
 
 	svc, err := jimm.NewService(context.Background(), p)
 	c.Assert(err, qt.IsNil)
+	defer svc.Cleanup()
 
 	srv := httptest.NewTLSServer(svc)
 	c.Cleanup(srv.Close)
