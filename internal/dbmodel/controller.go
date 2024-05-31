@@ -46,6 +46,10 @@ type Controller struct {
 	// name and port.
 	PublicAddress string
 
+	// TLSHostname provides a hostname that will be used for TLS verfication.
+	// Useful for local dev to avoid TLS issues.
+	TLSHostname string `gorm:"column:tls_hostname"`
+
 	// CloudName is the name of the cloud which is hosting this
 	// controller.
 	CloudName string

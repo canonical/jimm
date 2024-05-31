@@ -44,6 +44,9 @@ type AddControllerRequest struct {
 	// themselves are migrated.
 	PublicAddress string `json:"public-address,omitempty"`
 
+	// TLSHostname is the hostname used for TLS verification.
+	TLSHostname string `json:"tls-hostname,omitempty"`
+
 	// APIAddresses contains the currently known API addresses for the
 	// controller.
 	APIAddresses []string `json:"api-addresses,omitempty"`
