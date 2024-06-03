@@ -180,6 +180,7 @@ func (r *controllerRoot) AddController(ctx context.Context, req apiparams.AddCon
 		CACertificate:     req.CACertificate,
 		AdminIdentityName: req.Username,
 		AdminPassword:     req.Password,
+		TLSHostname:       req.TLSHostname,
 	}
 	nphps, err := network.ParseProviderHostPorts(req.APIAddresses...)
 	if err != nil {
