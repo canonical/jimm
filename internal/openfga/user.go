@@ -334,7 +334,7 @@ func IsAdministrator[T administratorT](ctx context.Context, u *User, resource T)
 		return false, errors.E(err)
 	}
 	if isAdmin {
-		zapctx.Info(
+		zapctx.Debug(
 			ctx,
 			"user is resource administrator",
 			zap.String("user", u.Tag().String()),
