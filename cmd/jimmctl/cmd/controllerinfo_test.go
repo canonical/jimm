@@ -244,7 +244,7 @@ func (s *controllerInfoSuite) TestControllerInfoCannotProvideAddrAndLocalFlag(c 
 	fname := path.Join(dir, "test.yaml")
 
 	_, err = cmdtesting.RunCommand(c, cmd.NewControllerInfoCommandForTesting(store), "controller-1", fname, "myaddress", "--local")
-	c.Assert(err, gc.ErrorMatches, "please do not set both the address argument and the local flag")
+	c.Assert(err, gc.ErrorMatches, "cannot set both public address and local flag")
 }
 
 func (s *controllerInfoSuite) TestControllerInfoWithTlsFlag(c *gc.C) {

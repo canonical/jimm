@@ -83,7 +83,7 @@ func (c *controllerInfoCommand) Init(args []string) error {
 		return errors.New("too many args")
 	}
 	if c.local && len(c.publicAddress) > 0 {
-		return errors.New("please do not set both the address argument and the local flag")
+		return errors.New("cannot set both public address and local flag")
 	}
 	return nil
 }
