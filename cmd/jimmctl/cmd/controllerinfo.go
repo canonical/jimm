@@ -52,6 +52,7 @@ type controllerInfoCommand struct {
 	publicAddress  string
 	file           cmd.FileVar
 	local          bool
+	tlsHostname    string
 }
 
 func (c *controllerInfoCommand) Info() *cmd.Info {
@@ -66,6 +67,7 @@ func (c *controllerInfoCommand) Info() *cmd.Info {
 func (c *controllerInfoCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.CommandBase.SetFlags(f)
 	f.BoolVar(&c.local, "local", false, "If local flag is specified, then the local API address and CA cert of the controller will be used.")
+	f.StringVar(&c.tlsHostname, "tls-hostname", "", "Specify the hostname for TLS verfiication.")
 }
 
 // Init implements the cmd.Command interface.
@@ -79,6 +81,9 @@ func (c *controllerInfoCommand) Init(args []string) error {
 	}
 	if len(args) > 3 {
 		return errors.New("too many args")
+	}
+	if c.local && len(c.publicAddress) > 0 {
+		return errors.New("cannot set both public address and local flag")
 	}
 	return nil
 }
@@ -103,6 +108,7 @@ func (c *controllerInfoCommand) Run(ctxt *cmd.Context) error {
 		Password:     accountDetails.Password,
 	}
 
+	info.TLSHostname = c.tlsHostname
 	info.PublicAddress = c.publicAddress
 	if c.local {
 		info.PublicAddress = controller.APIEndpoints[0]
@@ -110,9 +116,6 @@ func (c *controllerInfoCommand) Run(ctxt *cmd.Context) error {
 	}
 	if info.PublicAddress == "" {
 		return errors.New("public address must be set")
-	}
-	if c.local && len(c.publicAddress) > 0 {
-		return errors.New("please do not set both the address argument and the local flag")
 	}
 
 	data, err := yaml.Marshal(info)
