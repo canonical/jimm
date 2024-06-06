@@ -466,8 +466,8 @@ func TestCleanup(t *testing.T) {
 
 	outputs := make(chan string, 2)
 	service := jimm.Service{}
-	service.AddCleanup(func() { outputs <- "first" })
-	service.AddCleanup(func() { outputs <- "second" })
+	service.AddCleanup(func() error { outputs <- "first"; return nil })
+	service.AddCleanup(func() error { outputs <- "second"; return nil })
 	service.Cleanup()
 	c.Assert([]string{<-outputs, <-outputs}, qt.DeepEquals, []string{"second", "first"})
 }
