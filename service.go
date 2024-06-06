@@ -180,7 +180,7 @@ type Service struct {
 	jimm jimm.JIMM
 
 	mux      *chi.Mux
-	cleanups []func()
+	cleanups []func() error
 }
 
 func (s *Service) JIMM() *jimm.JIMM {
@@ -230,12 +230,14 @@ func (s *Service) Cleanup() {
 	// Iterating over clean up function in reverse-order to avoid early clean ups.
 	for i := len(s.cleanups) - 1; i >= 0; i-- {
 		f := s.cleanups[i]
-		f()
+		if err := f(); err != nil {
+			zapctx.Error(context.Background(), "cleanup failed", zap.Error(err))
+		}
 	}
 }
 
 // AddCleanup adds a clean up function to be run at service shutdown.
-func (s *Service) AddCleanup(f func()) {
+func (s *Service) AddCleanup(f func() error) {
 	s.cleanups = append(s.cleanups, f)
 }
 
@@ -455,8 +457,9 @@ func (s *Service) setupSessionStore(ctx context.Context) (*pgstore.PGStore, erro
 
 	// Cleanup expired session every 30 minutes
 	cleanupQuit, cleanupDone := store.Cleanup(time.Minute * 30)
-	s.AddCleanup(func() {
+	s.AddCleanup(func() error {
 		store.StopCleanup(cleanupQuit, cleanupDone)
+		return nil
 	})
 	return store, nil
 }
