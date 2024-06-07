@@ -7,13 +7,12 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/juju/juju/core/migration"
 	jujuparams "github.com/juju/juju/rpc/params"
+	"github.com/juju/juju/state"
 	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
-	"github.com/canonical/jimm/internal/constants"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
@@ -228,67 +227,8 @@ func (w *Watcher) watchController(ctx context.Context, ctl *dbmodel.Controller) 
 	}
 	defer api.AllModelWatcherStop(ctx, id)
 
-	checkMigratingModel := func(m *dbmodel.Model) error {
-		// models that were in the migrating state may no longer be on
-		// the controller, here we will update them once migration has completed.
-		modelMigrating := m.Life == constants.MIGRATING_AWAY.String() || m.Life == constants.MIGRATING_INTERNAL.String()
-		if !modelMigrating {
-			return nil
-		}
-		mi := jujuparams.ModelInfo{
-			UUID: m.UUID.String,
-		}
-		if err := api.ModelInfo(ctx, &mi); err == nil {
-			if mi.Migration == nil {
-				return nil
-			}
-			migrationPhase, ok := migration.ParsePhase(mi.Migration.Status)
-			if !ok {
-				zapctx.Error(ctx, "invalid phase received", zap.String("phase", mi.Migration.Status))
-				return nil
-			}
-			zapctx.Info(ctx, "model migration in progress", zap.String("model", m.Name), zap.String("phase", migrationPhase.String()))
-			// Without a clean way to check for migration failure, we opt to check for these two states
-			// which are currently the final states for any failed migrations.
-			if migrationPhase == migration.ABORTDONE || migrationPhase == migration.REAPFAILED {
-				// Clean up migration info
-				m.MigrationControllerID = sql.NullInt32{Int32: 0, Valid: false}
-				m.Life = constants.ALIVE.String()
-				if err := w.Database.UpdateModel(ctx, m); err != nil {
-					zapctx.Error(ctx, "failed to update migrating model info", zap.Error(err))
-					return errors.E(op, err)
-				}
-				return nil
-			}
-		} else {
-			// If we get an error then we have reached migration completion.
-			misingOrRedirectError := errors.ErrorCode(err) == errors.CodeNotFound || errors.ErrorCode(err) == errors.CodeRedirect
-			if !misingOrRedirectError {
-				return nil
-			}
-			// Model undergoing internal migration needs an update to its parent controller.
-			if m.Life == constants.MIGRATING_INTERNAL.String() {
-				m.ControllerID = uint(m.MigrationControllerID.Int32)
-				m.MigrationControllerID = sql.NullInt32{Int32: 0, Valid: false}
-				m.Life = constants.ALIVE.String()
-				if err := w.Database.UpdateModel(ctx, m); err != nil {
-					zapctx.Error(ctx, "failed to update migrating model info", zap.Error(err))
-					return errors.E(op, err)
-				}
-				return nil
-			} else {
-				// Model migrating to controller not managed by JIMM should now be deleted.
-				if err := w.Database.DeleteModel(ctx, m); err != nil {
-					return errors.E(op, err)
-				}
-				return nil
-			}
-		}
-		return nil
-	}
-
 	checkDyingModel := func(m *dbmodel.Model) error {
-		if m.Life == constants.DYING.String() || m.Life == constants.DEAD.String() {
+		if m.Life == state.Dying.String() || m.Life == state.Dead.String() {
 			// models that were in the dying state may no
 			// longer be on the controller, check if it should
 			// be immediately deleted.
@@ -314,7 +254,7 @@ func (w *Watcher) watchController(ctx context.Context, ctl *dbmodel.Controller) 
 	// modelStates contains the set of models running on the
 	// controller that JIMM is interested in. The function also
 	// check for any dying models and deletes them where necessary.
-	modelStates, err := w.checkControllerModels(ctx, ctl, checkDyingModel, checkMigratingModel)
+	modelStates, err := w.checkControllerModels(ctx, ctl, checkDyingModel)
 	if err != nil {
 		return errors.E(op, err)
 	}
@@ -558,7 +498,7 @@ func (w *Watcher) deleteModel(ctx context.Context, model *dbmodel.Model) error {
 				return err
 			}
 		}
-		if !(model.Life == constants.DYING.String() || model.Life == constants.DEAD.String()) {
+		if !(model.Life == state.Dying.String() || model.Life == state.Dead.String()) {
 			// If the model hasn't been marked as dying, don't remove it.
 			return nil
 		}

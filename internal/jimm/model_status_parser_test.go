@@ -10,8 +10,8 @@ import (
 	"github.com/juju/juju/core/life"
 	"github.com/juju/juju/core/status"
 	jujuparams "github.com/juju/juju/rpc/params"
+	"github.com/juju/juju/state"
 
-	"github.com/canonical/jimm/internal/constants"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/jimm"
@@ -363,7 +363,7 @@ func TestQueryModelsJq(t *testing.T) {
 													MountPoint: "/home/ubuntu/myapp/.data",
 													ReadOnly:   false,
 												},
-												Life: life.Value(constants.ALIVE.String()),
+												Life: life.Value(state.Alive.String()),
 											},
 										},
 									},

@@ -11,8 +11,8 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	jujuparams "github.com/juju/juju/rpc/params"
+	"github.com/juju/juju/state"
 
-	"github.com/canonical/jimm/internal/constants"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
@@ -150,7 +150,7 @@ func (s *dbSuite) TestGetControllerWithModels(c *qt.C) {
 		Type:            "iaas",
 		IsController:    true,
 		DefaultSeries:   "warty",
-		Life:            constants.ALIVE.String(),
+		Life:            state.Alive.String(),
 		Status: dbmodel.Status{
 			Status: "available",
 			Since: sql.NullTime{
@@ -174,7 +174,7 @@ func (s *dbSuite) TestGetControllerWithModels(c *qt.C) {
 		Type:            "iaas",
 		IsController:    false,
 		DefaultSeries:   "warty",
-		Life:            constants.ALIVE.String(),
+		Life:            state.Alive.String(),
 		Status: dbmodel.Status{
 			Status: "available",
 			Since: sql.NullTime{

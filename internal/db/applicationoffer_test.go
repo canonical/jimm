@@ -10,8 +10,8 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/juju/juju/state"
 
-	"github.com/canonical/jimm/internal/constants"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
@@ -83,7 +83,7 @@ func initTestEnvironment(c *qt.C, db *db.Database) testEnvironment {
 		Type:            "iaas",
 		IsController:    false,
 		DefaultSeries:   "warty",
-		Life:            constants.ALIVE.String(),
+		Life:            state.Alive.String(),
 		Status: dbmodel.Status{
 			Status: "available",
 			Since: sql.NullTime{

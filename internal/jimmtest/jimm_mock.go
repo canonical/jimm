@@ -74,7 +74,7 @@ type JIMM struct {
 	GrantServiceAccountAccess_         func(ctx context.Context, u *openfga.User, svcAccTag jimmnames.ServiceAccountTag, entities []string) error
 	ImportModel_                       func(ctx context.Context, user *openfga.User, controllerName string, modelTag names.ModelTag, newOwner string) error
 	IdentityModelDefaults_             func(ctx context.Context, user *dbmodel.Identity) (map[string]interface{}, error)
-	InitiateMigration_                 func(ctx context.Context, user *openfga.User, spec jujuparams.MigrationSpec, targetControllerID uint) (jujuparams.InitiateMigrationResult, error)
+	InitiateMigration_                 func(ctx context.Context, user *openfga.User, spec jujuparams.MigrationSpec) (jujuparams.InitiateMigrationResult, error)
 	InitiateInternalMigration_         func(ctx context.Context, user *openfga.User, modelTag names.ModelTag, targetController string) (jujuparams.InitiateMigrationResult, error)
 	ListApplicationOffers_             func(ctx context.Context, user *openfga.User, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error)
 	ListControllers_                   func(ctx context.Context, user *openfga.User) ([]dbmodel.Controller, error)
@@ -382,11 +382,11 @@ func (j *JIMM) ImportModel(ctx context.Context, user *openfga.User, controllerNa
 	}
 	return j.ImportModel_(ctx, user, controllerName, modelTag, newOwner)
 }
-func (j *JIMM) InitiateMigration(ctx context.Context, user *openfga.User, spec jujuparams.MigrationSpec, targetControllerID uint) (jujuparams.InitiateMigrationResult, error) {
+func (j *JIMM) InitiateMigration(ctx context.Context, user *openfga.User, spec jujuparams.MigrationSpec) (jujuparams.InitiateMigrationResult, error) {
 	if j.InitiateMigration_ == nil {
 		return jujuparams.InitiateMigrationResult{}, errors.E(errors.CodeNotImplemented)
 	}
-	return j.InitiateMigration_(ctx, user, spec, targetControllerID)
+	return j.InitiateMigration_(ctx, user, spec)
 }
 func (j *JIMM) InitiateInternalMigration(ctx context.Context, user *openfga.User, modelTag names.ModelTag, targetController string) (jujuparams.InitiateMigrationResult, error) {
 	if j.InitiateInternalMigration_ == nil {
