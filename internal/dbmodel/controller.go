@@ -4,8 +4,8 @@ package dbmodel
 
 import (
 	"database/sql"
-	"fmt"
 	"net"
+	"strconv"
 
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
@@ -112,7 +112,7 @@ func (c Controller) ToAPIControllerInfo() apiparams.ControllerInfo {
 	ci.PublicAddress = c.PublicAddress
 	for _, hps := range c.Addresses {
 		for _, hp := range hps {
-			ci.APIAddresses = append(ci.APIAddresses, fmt.Sprintf("%s:%d", hp.Value, hp.Port))
+			ci.APIAddresses = append(ci.APIAddresses, net.JoinHostPort(hp.Value, strconv.Itoa(hp.Port)))
 		}
 	}
 	ci.CACertificate = c.CACertificate
