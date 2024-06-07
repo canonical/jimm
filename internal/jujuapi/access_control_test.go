@@ -864,6 +864,7 @@ func (s *accessControlSuite) TestListRelationshipTuples(c *gc.C) {
 	c.Assert(err, jc.ErrorIsNil)
 	// first three tuples created during setup test
 	c.Assert(response.Tuples[12:], jc.DeepEquals, tuples)
+	c.Assert(len(response.Errors), gc.Equals, 0)
 
 	response, err = client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{
 		Tuple: apiparams.RelationshipTuple{
@@ -872,7 +873,85 @@ func (s *accessControlSuite) TestListRelationshipTuples(c *gc.C) {
 	})
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(response.Tuples, jc.DeepEquals, []apiparams.RelationshipTuple{tuples[3]})
+	c.Assert(len(response.Errors), gc.Equals, 0)
+}
 
+func (s *accessControlSuite) TestListRelationshipTuplesAfterDeletingGroup(c *gc.C) {
+	ctx := context.Background()
+	user, _, controller, model, applicationOffer, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
+	defer closeClient()
+
+	err := client.AddGroup(&apiparams.AddGroupRequest{Name: "yellow"})
+	c.Assert(err, jc.ErrorIsNil)
+	err = client.AddGroup(&apiparams.AddGroupRequest{Name: "orange"})
+	c.Assert(err, jc.ErrorIsNil)
+
+	tuples := []apiparams.RelationshipTuple{{
+		Object:       "group-orange#member",
+		Relation:     "member",
+		TargetObject: "group-yellow",
+	}, {
+		Object:       "user-" + user.Name,
+		Relation:     "member",
+		TargetObject: "group-orange",
+	}, {
+		Object:       "group-yellow#member",
+		Relation:     "administrator",
+		TargetObject: "controller-" + controller.Name,
+	}, {
+		Object:       "group-orange#member",
+		Relation:     "administrator",
+		TargetObject: "applicationoffer-" + controller.Name + ":" + user.Name + "/" + model.Name + "." + applicationOffer.Name,
+	}}
+
+	err = client.AddRelation(&apiparams.AddRelationRequest{Tuples: tuples})
+	c.Assert(err, jc.ErrorIsNil)
+
+	err = client.RemoveGroup(&apiparams.RemoveGroupRequest{Name: "yellow"})
+	c.Assert(err, jc.ErrorIsNil)
+
+	response, err := client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{})
+	c.Assert(err, jc.ErrorIsNil)
+	// Create a new slice of tuples excluding the ones we expect to be deleted.
+	newTuples := []apiparams.RelationshipTuple{tuples[1], tuples[3]}
+	// first three tuples created during setup test
+	c.Assert(response.Tuples[12:], jc.DeepEquals, newTuples)
+	c.Assert(len(response.Errors), gc.Equals, 0)
+}
+
+func (s *accessControlSuite) TestListRelationshipTuplesWithMissingGroups(c *gc.C) {
+	ctx := context.Background()
+	_, _, _, _, _, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
+	defer closeClient()
+
+	err := client.AddGroup(&apiparams.AddGroupRequest{Name: "yellow"})
+	c.Assert(err, jc.ErrorIsNil)
+	err = client.AddGroup(&apiparams.AddGroupRequest{Name: "orange"})
+	c.Assert(err, jc.ErrorIsNil)
+
+	tuples := []apiparams.RelationshipTuple{{
+		Object:       "group-orange#member",
+		Relation:     "member",
+		TargetObject: "group-yellow",
+	}}
+
+	err = client.AddRelation(&apiparams.AddRelationRequest{Tuples: tuples})
+	c.Assert(err, jc.ErrorIsNil)
+
+	// Delete a group without going through the API.
+	group := &dbmodel.GroupEntry{Name: "yellow"}
+	err = s.JIMM.DB().GetGroup(ctx, group)
+	c.Assert(err, jc.ErrorIsNil)
+	err = s.JIMM.DB().RemoveGroup(ctx, group)
+	c.Assert(err, jc.ErrorIsNil)
+
+	response, err := client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{})
+	c.Assert(err, jc.ErrorIsNil)
+	tupleWithoutDBEntry := tuples[0]
+	tupleWithoutDBEntry.TargetObject = "group:" + group.UUID
+	// first three tuples created during setup test
+	c.Assert(response.Tuples[12], gc.Equals, tupleWithoutDBEntry)
+	c.Assert(response.Errors, gc.DeepEquals, []string{"failed to parse target: failed to fetch group information: " + group.UUID})
 }
 
 func (s *accessControlSuite) TestCheckRelationAsNonAdmin(c *gc.C) {

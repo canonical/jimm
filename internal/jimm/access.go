@@ -419,7 +419,7 @@ func (j *JIMM) ToJAASTag(ctx context.Context, tag *ofganames.Tag) (string, error
 		}
 		err := j.Database.GetModel(ctx, &model)
 		if err != nil {
-			return "", errors.E(err, "failed to fetch model information")
+			return "", errors.E(err, fmt.Sprintf("failed to fetch model information: %s", model.UUID.String))
 		}
 		modelString := names.ModelTagKind + "-" + model.Controller.Name + ":" + model.OwnerIdentityName + "/" + model.Name
 		if tag.Relation.String() != "" {
@@ -432,7 +432,7 @@ func (j *JIMM) ToJAASTag(ctx context.Context, tag *ofganames.Tag) (string, error
 		}
 		err := j.Database.GetApplicationOffer(ctx, &ao)
 		if err != nil {
-			return "", errors.E(err, "failed to fetch application offer information")
+			return "", errors.E(err, fmt.Sprintf("failed to fetch application offer information: %s", ao.UUID))
 		}
 		aoString := names.ApplicationOfferTagKind + "-" + ao.Model.Controller.Name + ":" + ao.Model.OwnerIdentityName + "/" + ao.Model.Name + "." + ao.Name
 		if tag.Relation.String() != "" {
@@ -445,7 +445,7 @@ func (j *JIMM) ToJAASTag(ctx context.Context, tag *ofganames.Tag) (string, error
 		}
 		err := j.Database.GetGroup(ctx, &group)
 		if err != nil {
-			return "", errors.E(err, "failed to fetch group information")
+			return "", errors.E(err, fmt.Sprintf("failed to fetch group information: %s", group.UUID))
 		}
 		groupString := jimmnames.GroupTagKind + "-" + group.Name
 		if tag.Relation.String() != "" {
@@ -458,7 +458,7 @@ func (j *JIMM) ToJAASTag(ctx context.Context, tag *ofganames.Tag) (string, error
 		}
 		err := j.Database.GetCloud(ctx, &cloud)
 		if err != nil {
-			return "", errors.E(err, "failed to fetch group information")
+			return "", errors.E(err, fmt.Sprintf("failed to fetch cloud information: %s", cloud.Name))
 		}
 		cloudString := names.CloudTagKind + "-" + cloud.Name
 		if tag.Relation.String() != "" {

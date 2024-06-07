@@ -549,7 +549,9 @@ func (c *listRelationsCommand) Run(ctxt *cmd.Context) error {
 		return errors.E(err)
 	}
 
-	err = c.out.Write(ctxt, result.Tuples)
+	// Ensure continutation token is empty so that we don't print it.
+	result.ContinuationToken = ""
+	err = c.out.Write(ctxt, result)
 	if err != nil {
 		return errors.E(err)
 	}
@@ -573,9 +575,9 @@ func fetchRelations(client *api.Client, params apiparams.ListRelationshipTuplesR
 }
 
 func formatRelationsTabular(writer io.Writer, value interface{}) error {
-	tuples, ok := value.([]apiparams.RelationshipTuple)
+	resp, ok := value.(*apiparams.ListRelationshipTuplesResponse)
 	if !ok {
-		return errors.E(fmt.Sprintf("expected value of type %T, got %T", tuples, value))
+		return errors.E(fmt.Sprintf("expected value of type %T, got %T", resp, value))
 	}
 
 	table := uitable.New()
@@ -583,9 +585,17 @@ func formatRelationsTabular(writer io.Writer, value interface{}) error {
 	table.Wrap = true
 
 	table.AddRow("Object", "Relation", "Target Object")
-	for _, tuple := range tuples {
+	for _, tuple := range resp.Tuples {
 		table.AddRow(tuple.Object, tuple.Relation, tuple.TargetObject)
 	}
 	fmt.Fprint(writer, table)
+
+	if len(resp.Errors) != 0 {
+		fmt.Fprintf(writer, "\n\n")
+		fmt.Fprintln(writer, "Errors")
+		for _, msg := range resp.Errors {
+			fmt.Fprintln(writer, msg)
+		}
+	}
 	return nil
 }
