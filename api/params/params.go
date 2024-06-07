@@ -350,8 +350,9 @@ type ListRelationshipTuplesRequest struct {
 
 // ListRelationshipTuplesResponse holds the response of the ListRelationshipTuples method.
 type ListRelationshipTuplesResponse struct {
-	Tuples            []RelationshipTuple `json:"tuples,omitempty"`
-	ContinuationToken string              `json:"continuation_token,omitempty"`
+	Tuples            []RelationshipTuple `json:"tuples,omitempty" yaml:"tuples,omitempty"`
+	Errors            []string            `json:"errors,omitempty" yaml:"errors,omitempty"`
+	ContinuationToken string              `json:"continuation_token,omitempty" yaml:"continuation_token,omitempty"`
 }
 
 // CrossModelQueryRequest holds the parameters to perform a cross model query against
