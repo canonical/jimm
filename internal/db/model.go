@@ -184,7 +184,7 @@ func preloadModel(prefix string, db *gorm.DB) *gorm.DB {
 
 // GetModelsByControllerID retrieves a list of models hosted on the specified controller.
 func (d *Database) GetModelsByControllerID(ctx context.Context, controllerID uint) ([]dbmodel.Model, error) {
-	const op = errors.Op("db.GetModelsByUUID")
+	const op = errors.Op("db.GetModelsByControllerID")
 
 	if err := d.ready(); err != nil {
 		return nil, errors.E(op, err)
