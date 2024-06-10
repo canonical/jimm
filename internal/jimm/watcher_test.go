@@ -13,11 +13,10 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/juju/juju/core/instance"
 	"github.com/juju/juju/core/life"
-	"github.com/juju/juju/core/migration"
 	jujuparams "github.com/juju/juju/rpc/params"
+	"github.com/juju/juju/state"
 	"github.com/juju/names/v5"
 
-	"github.com/canonical/jimm/internal/constants"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
@@ -218,7 +217,7 @@ var watcherTests = []struct {
 				Name:            "app-1",
 				Exposed:         true,
 				CharmURL:        "cs:app-1",
-				Life:            life.Value(constants.ALIVE.String()),
+				Life:            life.Value(state.Alive.String()),
 				MinUnits:        1,
 				WorkloadVersion: "2",
 			},
@@ -358,7 +357,7 @@ var watcherTests = []struct {
 				ModelUUID:      "00000002-0000-0000-0000-000000000001",
 				Name:           "model-1",
 				Owner:          "alice@canonical.com",
-				Life:           life.Value(constants.ALIVE.String()),
+				Life:           life.Value(state.Alive.String()),
 				ControllerUUID: "00000001-0000-0000-0000-000000000001",
 				Status: jujuparams.StatusInfo{
 					Current: "available",
@@ -398,7 +397,7 @@ var watcherTests = []struct {
 			Name:          "model-1",
 			Type:          "iaas",
 			DefaultSeries: "warty",
-			Life:          constants.ALIVE.String(),
+			Life:          state.Alive.String(),
 			Status: dbmodel.Status{
 				Status:  "available",
 				Info:    "updated status message",
@@ -494,7 +493,7 @@ var watcherTests = []struct {
 			Name:          "model-1",
 			Type:          "iaas",
 			DefaultSeries: "warty",
-			Life:          constants.ALIVE.String(),
+			Life:          state.Alive.String(),
 			Status: dbmodel.Status{
 				Status: "available",
 				Info:   "OK!",
@@ -870,209 +869,6 @@ func TestWatcherRemoveDyingModelsOnStartup(t *testing.T) {
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 }
 
-const testMigratingModelsWatcherEnv = `clouds:
-- name: test-cloud
-  type: test-provider
-  regions:
-  - name: test-cloud-region
-cloud-credentials:
-- owner: alice@canonical.com
-  name: cred-1
-  cloud: test-cloud
-controllers:
-- name: controller-1
-  uuid: 00000001-0000-0000-0000-000000000001
-  cloud: test-cloud
-  region: test-cloud-region
-- name: controller-2
-  uuid: 00000001-0000-0000-0000-000000000002
-  cloud: test-cloud
-  region: test-cloud-region
-models:
-- name: model-1
-  type: iaas
-  uuid: 00000002-0000-0000-0000-000000000001
-  controller: controller-1
-  migration-controller: controller-2
-  default-series: warty
-  cloud: test-cloud
-  region: test-cloud-region
-  cloud-credential: cred-1
-  owner: alice@canonical.com
-  life: migrating-internal
-- name: model-2
-  type: iaas
-  uuid: 00000002-0000-0000-0000-000000000002
-  controller: controller-1
-  default-series: warty
-  cloud: test-cloud
-  region: test-cloud-region
-  cloud-credential: cred-1
-  owner: alice@canonical.com
-  life: migrating-away
-`
-
-func TestWatcherRemoveMigratingModels(t *testing.T) {
-	c := qt.New(t)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	w := &jimm.Watcher{
-		Pubsub: &testPublisher{},
-		Database: db.Database{
-			DB: jimmtest.PostgresDB(c, nil),
-		},
-		Dialer: &jimmtest.Dialer{
-			API: &jimmtest.API{
-				AllModelWatcherNext_: func(_ context.Context, _ string) ([]jujuparams.Delta, error) {
-					cancel()
-					<-ctx.Done()
-					return nil, ctx.Err()
-				},
-				ModelInfo_: func(_ context.Context, info *jujuparams.ModelInfo) error {
-					switch info.UUID {
-					default:
-						c.Errorf("unexpected model uuid: %s", info.UUID)
-					case "00000002-0000-0000-0000-000000000001":
-					case "00000002-0000-0000-0000-000000000002":
-					}
-					return errors.E(errors.CodeNotFound)
-				},
-				WatchAllModels_: func(ctx context.Context) (string, error) {
-					return "1234", nil
-				},
-			},
-		},
-	}
-	env := jimmtest.ParseEnvironment(c, testMigratingModelsWatcherEnv)
-	err := w.Database.Migrate(ctx, false)
-	c.Assert(err, qt.IsNil)
-	env.PopulateDB(c, w.Database)
-	ctl := env.Controllers[0].DBObject(c, w.Database)
-
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		err := jimm.WatchController(w, ctx, &ctl)
-		checkIfContextCanceled(c, ctx, err)
-	}()
-	wg.Wait()
-
-	modelInternalMigrated := dbmodel.Model{
-		UUID: sql.NullString{
-			String: "00000002-0000-0000-0000-000000000001",
-			Valid:  true,
-		},
-	}
-	err = w.Database.GetModel(context.Background(), &modelInternalMigrated)
-	c.Assert(err, qt.IsNil)
-	c.Assert(modelInternalMigrated.Controller.Name, qt.Equals, "controller-2")
-
-	modelExternalMigrated := dbmodel.Model{
-		UUID: sql.NullString{
-			String: "00000002-0000-0000-0000-000000000002",
-			Valid:  true,
-		},
-	}
-	err = w.Database.GetModel(context.Background(), &modelExternalMigrated)
-	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
-}
-
-const testFailedMigratingModelsWatcherEnv = `clouds:
-- name: test-cloud
-  type: test-provider
-  regions:
-  - name: test-cloud-region
-cloud-credentials:
-- owner: alice@canonical.com
-  name: cred-1
-  cloud: test-cloud
-controllers:
-- name: controller-1
-  uuid: 00000001-0000-0000-0000-000000000001
-  cloud: test-cloud
-  region: test-cloud-region
-- name: controller-2
-  uuid: 00000001-0000-0000-0000-000000000002
-  cloud: test-cloud
-  region: test-cloud-region
-models:
-- name: model-1
-  type: iaas
-  uuid: 00000002-0000-0000-0000-000000000001
-  controller: controller-1
-  migration-controller: controller-2
-  default-series: warty
-  cloud: test-cloud
-  region: test-cloud-region
-  cloud-credential: cred-1
-  owner: alice@canonical.com
-  life: migrating-internal
-`
-
-func TestWatcherCleansFailedMigrations(t *testing.T) {
-	c := qt.New(t)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	w := &jimm.Watcher{
-		Pubsub: &testPublisher{},
-		Database: db.Database{
-			DB: jimmtest.PostgresDB(c, nil),
-		},
-		Dialer: &jimmtest.Dialer{
-			API: &jimmtest.API{
-				AllModelWatcherNext_: func(_ context.Context, _ string) ([]jujuparams.Delta, error) {
-					cancel()
-					<-ctx.Done()
-					return nil, ctx.Err()
-				},
-				ModelInfo_: func(_ context.Context, info *jujuparams.ModelInfo) error {
-					switch info.UUID {
-					default:
-						c.Errorf("unexpected model uuid: %s", info.UUID)
-					case "00000002-0000-0000-0000-000000000001":
-					}
-					info.Migration = &jujuparams.ModelMigrationStatus{Status: migration.ABORTDONE.String()}
-					return nil
-				},
-				WatchAllModels_: func(ctx context.Context) (string, error) {
-					return "1234", nil
-				},
-			},
-		},
-	}
-	env := jimmtest.ParseEnvironment(c, testFailedMigratingModelsWatcherEnv)
-	err := w.Database.Migrate(ctx, false)
-	c.Assert(err, qt.IsNil)
-	env.PopulateDB(c, w.Database)
-	ctl := env.Controllers[0].DBObject(c, w.Database)
-
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		err := jimm.WatchController(w, ctx, &ctl)
-		checkIfContextCanceled(c, ctx, err)
-	}()
-	wg.Wait()
-
-	modelInternalMigrated := dbmodel.Model{
-		UUID: sql.NullString{
-			String: "00000002-0000-0000-0000-000000000001",
-			Valid:  true,
-		},
-	}
-	err = w.Database.GetModel(context.Background(), &modelInternalMigrated)
-	c.Assert(err, qt.IsNil)
-	c.Assert(modelInternalMigrated.Controller.Name, qt.Equals, "controller-1")
-	c.Assert(modelInternalMigrated.Life, qt.Equals, constants.ALIVE.String())
-	c.Assert(modelInternalMigrated.MigrationControllerID, qt.Equals, sql.NullInt32{})
-}
-
 const testWatcherIgnoreDeltasForModelsFromIncorrectControllerEnv = `clouds:
 - name: test-cloud
   type: test-provider
@@ -1178,7 +974,7 @@ func TestWatcherIgnoreDeltasForModelsFromIncorrectController(t *testing.T) {
 			ModelUUID: "00000002-0000-0000-0000-000000000001",
 			Name:      "model-1",
 			Owner:     "alice@canonical.com",
-			Life:      life.Value(constants.ALIVE.String()),
+			Life:      life.Value(state.Alive.String()),
 			Status: jujuparams.StatusInfo{
 				Current: "busy",
 			},

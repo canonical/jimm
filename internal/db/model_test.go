@@ -9,9 +9,9 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
+	"github.com/juju/juju/state"
 	"gorm.io/gorm"
 
-	"github.com/canonical/jimm/internal/constants"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
@@ -74,7 +74,7 @@ func (s *dbSuite) TestAddModel(c *qt.C) {
 		CloudCredentialID: cred.ID,
 		Type:              "iaas",
 		DefaultSeries:     "warty",
-		Life:              constants.ALIVE.String(),
+		Life:              state.Alive.String(),
 		Status: dbmodel.Status{
 			Status: "available",
 			Since:  db.Now(),
@@ -150,7 +150,7 @@ func (s *dbSuite) TestGetModel(c *qt.C) {
 		CloudCredential:   cred,
 		Type:              "iaas",
 		DefaultSeries:     "warty",
-		Life:              constants.ALIVE.String(),
+		Life:              state.Alive.String(),
 		Status: dbmodel.Status{
 			Status: "available",
 			Since:  db.Now(),
@@ -244,7 +244,7 @@ func (s *dbSuite) TestUpdateModel(c *qt.C) {
 		CloudCredentialID: cred.ID,
 		Type:              "iaas",
 		DefaultSeries:     "warty",
-		Life:              constants.ALIVE.String(),
+		Life:              state.Alive.String(),
 		Status: dbmodel.Status{
 			Status: "available",
 			Since:  db.Now(),
@@ -322,7 +322,7 @@ func (s *dbSuite) TestDeleteModel(c *qt.C) {
 		CloudCredentialID: cred.ID,
 		Type:              "iaas",
 		DefaultSeries:     "warty",
-		Life:              constants.ALIVE.String(),
+		Life:              state.Alive.String(),
 		Status: dbmodel.Status{
 			Status: "available",
 			Since:  db.Now(),
@@ -405,7 +405,7 @@ func (s *dbSuite) TestGetModelsUsingCredential(c *qt.C) {
 		CloudCredentialID: cred1.ID,
 		Type:              "iaas",
 		DefaultSeries:     "warty",
-		Life:              constants.ALIVE.String(),
+		Life:              state.Alive.String(),
 		Status: dbmodel.Status{
 			Status: "available",
 			Since:  db.Now(),
@@ -429,7 +429,7 @@ func (s *dbSuite) TestGetModelsUsingCredential(c *qt.C) {
 		CloudCredentialID: cred2.ID,
 		Type:              "iaas",
 		DefaultSeries:     "warty",
-		Life:              constants.ALIVE.String(),
+		Life:              state.Alive.String(),
 		Status: dbmodel.Status{
 			Status: "available",
 			Since:  db.Now(),
@@ -459,7 +459,7 @@ func (s *dbSuite) TestGetModelsUsingCredential(c *qt.C) {
 		CloudCredentialID: cred1.ID,
 		Type:              "iaas",
 		DefaultSeries:     "warty",
-		Life:              constants.ALIVE.String(),
+		Life:              state.Alive.String(),
 		Status:            model1.Status,
 		SLA: dbmodel.SLA{
 			Level: "unsupported",

@@ -295,7 +295,7 @@ func (r *controllerRoot) InitiateMigration(ctx context.Context, args jujuparams.
 
 	results := make([]jujuparams.InitiateMigrationResult, len(args.Specs))
 	for i, spec := range args.Specs {
-		result, err := r.jimm.InitiateMigration(ctx, r.user, spec, 0)
+		result, err := r.jimm.InitiateMigration(ctx, r.user, spec)
 		if err != nil {
 			result.Error = mapError(errors.E(op, err))
 		}

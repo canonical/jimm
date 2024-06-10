@@ -11,12 +11,12 @@ import (
 	petname "github.com/dustinkirkland/golang-petname"
 	"github.com/google/uuid"
 	"github.com/juju/juju/core/crossmodel"
+	"github.com/juju/juju/state"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/api"
 	apiparams "github.com/canonical/jimm/api/params"
-	"github.com/canonical/jimm/internal/constants"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/jimmtest"
 	"github.com/canonical/jimm/internal/jujuapi"
@@ -1472,7 +1472,7 @@ func createTestControllerEnvironment(ctx context.Context, c *gc.C, s *accessCont
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
 		CloudCredentialID: cred.ID,
-		Life:              constants.ALIVE.String(),
+		Life:              state.Alive.String(),
 		Status: dbmodel.Status{
 			Status: "available",
 			Since: sql.NullTime{
