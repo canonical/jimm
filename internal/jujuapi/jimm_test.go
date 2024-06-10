@@ -186,6 +186,32 @@ func (s *jimmSuite) TestAddController(c *gc.C) {
 	c.Assert(jujuparams.IsBadRequest(err), gc.Equals, true)
 }
 
+func (s *jimmSuite) TestRemoveAndAddController(c *gc.C) {
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+	client := api.NewClient(conn)
+
+	info := s.APIInfo(c)
+
+	acr := apiparams.AddControllerRequest{
+		UUID:          info.ControllerUUID,
+		Name:          "controller-2",
+		APIAddresses:  info.Addrs,
+		CACertificate: info.CACert,
+		Username:      info.Tag.Id(),
+		Password:      info.Password,
+	}
+
+	ci, err := client.AddController(&acr)
+	c.Assert(err, gc.Equals, nil)
+	_, err = client.RemoveController(&apiparams.RemoveControllerRequest{Name: acr.Name, Force: true})
+	c.Assert(err, gc.Equals, nil)
+	ciNew, err := client.AddController(&acr)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(ci, gc.DeepEquals, ciNew)
+
+}
+
 func (s *jimmSuite) TestAddControllerCustomTLSHostname(c *gc.C) {
 	conn := s.open(c, nil, "alice")
 	defer conn.Close()

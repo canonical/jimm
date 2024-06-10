@@ -181,3 +181,23 @@ func preloadModel(prefix string, db *gorm.DB) *gorm.DB {
 
 	return db
 }
+
+// GetModelsByControllerID retrieves a list of models hosted on the specified controller.
+func (d *Database) GetModelsByControllerID(ctx context.Context, controllerID uint) ([]dbmodel.Model, error) {
+	const op = errors.Op("db.GetModelsByUUID")
+
+	if err := d.ready(); err != nil {
+		return nil, errors.E(op, err)
+	}
+	var models []dbmodel.Model
+	db := d.DB.WithContext(ctx)
+	err := db.Where("controller_id = ?", controllerID).Find(&models).Error
+	if err != nil {
+		err = dbError(err)
+		if errors.ErrorCode(err) == errors.CodeNotFound {
+			return nil, errors.E(op, err, "model not found")
+		}
+		return nil, errors.E(op, dbError(err))
+	}
+	return models, nil
+}
