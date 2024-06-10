@@ -82,6 +82,9 @@ type Controller struct {
 	// controller.
 	CloudRegions []CloudRegionControllerPriority
 
+	// Models contains all the models that are running on this controller.
+	Models []Model
+
 	// TODO(mhilton) Save controller statistics?
 }
 

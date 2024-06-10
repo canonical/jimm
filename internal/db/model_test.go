@@ -639,7 +639,7 @@ func (s *dbSuite) TestGetModelsByUUID(c *qt.C) {
 	c.Check(models[2].Controller.Name, qt.Not(qt.Equals), "")
 }
 
-func (s *dbSuite) TestGetModelsByControllerID(c *qt.C) {
+func (s *dbSuite) TestGetModelsByController(c *qt.C) {
 	err := s.Database.Migrate(context.Background(), true)
 	c.Assert(err, qt.Equals, nil)
 
@@ -725,7 +725,7 @@ func (s *dbSuite) TestGetModelsByControllerID(c *qt.C) {
 	for _, m := range models {
 		c.Assert(s.Database.DB.Create(&m).Error, qt.IsNil)
 	}
-	foundModels, err := s.Database.GetModelsByControllerID(context.Background(), controller.ID)
+	foundModels, err := s.Database.GetModelsByController(context.Background(), controller)
 	foundModelNames := []string{}
 	for _, m := range foundModels {
 		foundModelNames = append(foundModelNames, m.Name)
