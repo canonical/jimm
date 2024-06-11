@@ -153,15 +153,16 @@ func (r *controllerRoot) CreateModel(ctx context.Context, args jujuparams.ModelC
 		return jujuparams.ModelInfo{}, errors.E(op, err)
 	}
 	info, err := r.jimm.AddModel(ctx, r.user, &mca)
-	if err == nil {
-		servermon.ModelsCreatedCount.Inc()
-		if r.controllerUUIDMasking {
-			info.ControllerUUID = r.params.ControllerUUID
-		}
-		return *info, nil
+	if err != nil {
+		servermon.ModelsCreatedFailCount.Inc()
+		return jujuparams.ModelInfo{}, errors.E(op, err)
 	}
-	servermon.ModelsCreatedFailCount.Inc()
-	return jujuparams.ModelInfo{}, errors.E(op, err)
+
+	servermon.ModelsCreatedCount.Inc()
+	if r.controllerUUIDMasking {
+		info.ControllerUUID = r.params.ControllerUUID
+	}
+	return *info, nil
 }
 
 // DestroyModels implements the ModelManager facade's DestroyModels

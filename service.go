@@ -18,6 +18,7 @@ import (
 	vaultapi "github.com/hashicorp/vault/api"
 	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -38,7 +39,6 @@ import (
 	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 	"github.com/canonical/jimm/internal/pubsub"
-	"github.com/canonical/jimm/internal/servermon"
 	"github.com/canonical/jimm/internal/vault"
 	"github.com/canonical/jimm/internal/wellknownapi"
 )
@@ -356,6 +356,8 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		s.mux.Mount(path, h.Routes())
 	}
 
+	s.mux.Mount("/metrics", promhttp.Handler())
+
 	mountHandler(
 		"/debug",
 		debugapi.NewDebugHandler(
@@ -532,7 +534,6 @@ func newVaultStore(ctx context.Context, p Params) (jimmcreds.CredentialStore, er
 		zap.String("VaultPath", p.VaultPath),
 		zap.String("VaultRoleID", p.VaultRoleID),
 	)
-	servermon.VaultConfigured.Inc()
 
 	cfg := vaultapi.DefaultConfig()
 	if p.VaultAddress != "" {

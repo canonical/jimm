@@ -16,6 +16,7 @@ import (
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/servermon"
 )
 
 // Publisher defines the interface used by the Watcher
@@ -293,6 +294,7 @@ func (w *Watcher) watchController(ctx context.Context, ctl *dbmodel.Controller) 
 		if err != nil {
 			return errors.E(op, err)
 		}
+		servermon.MonitorDeltasReceivedCount.WithLabelValues(ctl.UUID).Add(float64(len(deltas)))
 		for _, d := range deltas {
 			eid := d.Entity.EntityId()
 			ctx := zapctx.WithFields(ctx, zap.String("model-uuid", eid.ModelUUID), zap.String("kind", eid.Kind), zap.String("id", eid.Id))
