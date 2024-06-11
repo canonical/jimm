@@ -353,13 +353,17 @@ func TestCloudRegionControllers(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Check(crcps, qt.HasLen, 2)
 	c.Check(crcps[0].Controller, qt.DeepEquals, dbmodel.Controller{
-		Model:       ctl2.Model,
+		ID:          ctl2.ID,
+		CreatedAt:   ctl2.CreatedAt,
+		UpdatedAt:   ctl2.UpdatedAt,
 		Name:        ctl2.Name,
 		CloudName:   ctl2.CloudName,
 		CloudRegion: ctl2.CloudRegion,
 	})
 	c.Check(crcps[1].Controller, qt.DeepEquals, dbmodel.Controller{
-		Model:       ctl1.Model,
+		ID:          ctl1.ID,
+		CreatedAt:   ctl1.CreatedAt,
+		UpdatedAt:   ctl1.UpdatedAt,
 		Name:        ctl1.Name,
 		CloudName:   ctl1.CloudName,
 		CloudRegion: ctl1.CloudRegion,
@@ -370,13 +374,17 @@ func TestCloudRegionControllers(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Check(crcps, qt.HasLen, 2)
 	c.Check(crcps[0].Controller, qt.DeepEquals, dbmodel.Controller{
-		Model:       ctl1.Model,
+		ID:          ctl1.ID,
+		CreatedAt:   ctl1.CreatedAt,
+		UpdatedAt:   ctl1.UpdatedAt,
 		Name:        ctl1.Name,
 		CloudName:   ctl1.CloudName,
 		CloudRegion: ctl1.CloudRegion,
 	})
 	c.Check(crcps[1].Controller, qt.DeepEquals, dbmodel.Controller{
-		Model:       ctl2.Model,
+		ID:          ctl2.ID,
+		CreatedAt:   ctl2.CreatedAt,
+		UpdatedAt:   ctl2.UpdatedAt,
 		Name:        ctl2.Name,
 		CloudName:   ctl2.CloudName,
 		CloudRegion: ctl2.CloudRegion,

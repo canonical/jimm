@@ -468,7 +468,6 @@ func TestRemoveController(t *testing.T) {
 
 			env := jimmtest.ParseEnvironment(c, removeControllerTestEnv)
 			env.PopulateDB(c, j.Database)
-			// env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
 
 			dbUser := env.User(test.user).DBObject(c, j.Database)
 			user := openfga.NewUser(&dbUser, nil)
@@ -498,6 +497,92 @@ func TestRemoveController(t *testing.T) {
 			}
 		})
 	}
+}
+
+const removeAndAddControllerTestEnv = `clouds:
+- name: test-cloud
+  type: test-provider
+  regions:
+  - name: test-cloud-region
+cloud-credentials:
+- owner: alice@canonical.com
+  name: cred-1
+  cloud: test-cloud
+users:
+- username: alice@canonical.com
+  controller-access: superuser
+- username: bob@canonical.com
+  controller-access: login
+- username: eve@canonical.com
+  controller-access: "no-access"
+controllers:
+- name: controller-1
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test-cloud
+  region: test-cloud-region
+models:
+- name: model-1
+  type: iaas
+  uuid: 00000002-0000-0000-0000-000000000001
+  controller: controller-1
+  default-series: warty
+  cloud: test-cloud
+  region: test-cloud-region
+  cloud-credential: cred-1
+  owner: alice@canonical.com
+  life: alive
+  status:
+    status: available
+    info: "OK!"
+    since: 2020-02-20T20:02:20Z
+  users:
+  - user: alice@canonical.com
+    access: admin
+  - user: bob@canonical.com
+    access: write
+  - user: charlie@canonical.com
+    access: read
+  sla:
+    level: unsupported
+  agent-version: 1.2.3
+`
+
+func TestRemoveAndAddController(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+	now := time.Now().UTC().Round(time.Millisecond)
+
+	j := &jimm.JIMM{
+		UUID: uuid.NewString(),
+		Database: db.Database{
+			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
+		},
+	}
+
+	err := j.Database.Migrate(ctx, false)
+	c.Assert(err, qt.IsNil)
+
+	env := jimmtest.ParseEnvironment(c, removeAndAddControllerTestEnv)
+	env.PopulateDB(c, j.Database)
+	controller := env.Controllers[0]
+
+	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
+	user := openfga.NewUser(&dbUser, nil)
+	user.JimmAdmin = true
+
+	err = j.RemoveController(ctx, user, "controller-1", true)
+	c.Assert(err, qt.Equals, nil)
+	ctls, err := j.ListControllers(ctx, user)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(len(ctls), qt.Equals, 0)
+	// Recreate the controller.
+	ctlDbObject := controller.DBObject(c, j.Database)
+	ctlDbObject.ID = 0
+	err = j.Database.AddController(ctx, &ctlDbObject)
+	c.Assert(err, qt.Equals, nil)
+	ctls, err = j.ListControllers(ctx, user)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(len(ctls), qt.Equals, 1)
 }
 
 const fullModelStatusTestEnv = `clouds:

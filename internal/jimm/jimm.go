@@ -527,8 +527,12 @@ func (j *JIMM) RemoveController(ctx context.Context, user *openfga.User, control
 			return errors.E(errors.CodeStillAlive, "controller is still alive")
 		}
 
+		models, err := db.GetModelsByController(ctx, c)
+		if err != nil {
+			return err
+		}
 		// Delete its models first.
-		for _, model := range c.Models {
+		for _, model := range models {
 			err := db.DeleteModel(ctx, &model)
 			if err != nil {
 				return err

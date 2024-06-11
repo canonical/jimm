@@ -309,6 +309,7 @@ func (w *Watcher) watchController(ctx context.Context, ctl *dbmodel.Controller) 
 				continue
 			}
 			if v.changed {
+				v.changed = false
 				// Update changed model.
 				err := w.Database.Transaction(func(tx *db.Database) error {
 					m := dbmodel.Model{
