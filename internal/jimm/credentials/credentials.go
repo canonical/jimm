@@ -54,13 +54,4 @@ type CredentialStore interface {
 
 	// PutJWKSExpiry sets the expiry time for the current JWKS within the store.
 	PutJWKSExpiry(ctx context.Context, expiry time.Time) error
-
-	// CleanupOAuthSecrets removes all secrets associated with OAuth.
-	CleanupOAuthSecrets(ctx context.Context) error
-
-	// GetOAuthSecret returns the current HS256 (symmetric encryption) secret used to sign OAuth session tokens.
-	GetOAuthSecret(ctx context.Context) ([]byte, error)
-
-	// PutOAuthSecret puts a HS256 (symmetric encryption) secret into the credentials store for signing OAuth session tokens.
-	PutOAuthSecret(ctx context.Context, raw []byte) error
 }

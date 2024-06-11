@@ -146,14 +146,14 @@ type OAuthAuthenticator interface {
 
 	// MintSessionToken mints a session token to be used when logging into JIMM
 	// via an access token. The token only contains the user's email for authentication.
-	MintSessionToken(email string, secretKey string) (string, error)
+	MintSessionToken(email string) (string, error)
 
 	// VerifySessionToken symmetrically verifies the validty of the signature on the
 	// access token JWT, returning the parsed token.
 	//
 	// The subject of the token contains the user's email and can be used
 	// for user object creation.
-	VerifySessionToken(token string, secretKey string) (jwt.Token, error)
+	VerifySessionToken(token string) (jwt.Token, error)
 
 	// UpdateIdentity updates the database with the display name and access token set for the user.
 	// And, if present, a refresh token.

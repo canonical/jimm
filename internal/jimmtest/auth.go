@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
+	"net/mail"
 	"net/url"
 	"regexp"
 	"strconv"
@@ -62,17 +63,30 @@ func (a Authenticator) Authenticate(_ context.Context, _ *jujuparams.LoginReques
 
 type MockOAuthAuthenticator struct {
 	jimm.OAuthAuthenticator
-	secretKey string
 }
 
 func NewMockOAuthAuthenticator(secretKey string) MockOAuthAuthenticator {
-	return MockOAuthAuthenticator{secretKey: secretKey}
+	return MockOAuthAuthenticator{}
 }
 
 // VerifySessionToken provides the mock implementation for verifying session tokens.
 // Allowing JIMM tests to create their own session tokens that will always be accepted.
-func (m MockOAuthAuthenticator) VerifySessionToken(token string, secretKey string) (jwt.Token, error) {
-	return auth.VerifySessionToken(token, m.secretKey)
+// Notice that no key is passed to jwt.Parse to skip JWT signature verification.
+func (m MockOAuthAuthenticator) VerifySessionToken(token string) (jwt.Token, error) {
+	decodedToken, err := base64.StdEncoding.DecodeString(token)
+	if err != nil {
+		return nil, errors.New("authentication failed, failed to decode token")
+	}
+
+	parsedToken, err := jwt.Parse(decodedToken)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err = mail.ParseAddress(parsedToken.Subject()); err != nil {
+		return nil, errors.New("failed to parse email")
+	}
+	return parsedToken, nil
 }
 
 func (m MockOAuthAuthenticator) AuthenticateBrowserSession(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error) {
@@ -98,8 +112,7 @@ func NewUserSessionLogin(c SimpleTester, username string) api.LoginProvider {
 	}
 
 	b64Token := base64.StdEncoding.EncodeToString(freshToken)
-	lp := api.NewSessionTokenLoginProvider(b64Token, nil, nil)
-	return lp
+	return api.NewSessionTokenLoginProvider(b64Token, nil, nil)
 }
 
 func convertUsernameToEmail(username string) string {

@@ -356,14 +356,14 @@ func (m *mockOAuthAuthenticator) VerifyClientCredentials(ctx context.Context, cl
 	return errors.E(errors.CodeUnauthorized)
 }
 
-func (m *mockOAuthAuthenticator) MintSessionToken(email string, secretKey string) (string, error) {
+func (m *mockOAuthAuthenticator) MintSessionToken(email string) (string, error) {
 	if m.err != nil {
 		return "", m.err
 	}
 	return "test session token", nil
 }
 
-func (m *mockOAuthAuthenticator) VerifySessionToken(token string, secretKey string) (jwt.Token, error) {
+func (m *mockOAuthAuthenticator) VerifySessionToken(token string) (jwt.Token, error) {
 	if m.err != nil {
 		return nil, m.err
 	}

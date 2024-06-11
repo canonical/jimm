@@ -4,8 +4,6 @@ package main
 
 import (
 	"context"
-	"encoding/base64"
-	"fmt"
 	"net/http"
 	"net/url"
 	"os"
@@ -137,13 +135,9 @@ func start(ctx context.Context, s *service.Service) error {
 		return errors.E("jimm session cookie max age cannot be less than 0")
 	}
 
-	sessionStoreSecretB64 := os.Getenv("JIMM_SESSION_SECRET_KEY")
-	if sessionStoreSecretB64 == "" {
-		return errors.E("jimm session secret key value is missing")
-	}
-	sessionStoreSecret, err := base64.StdEncoding.DecodeString(sessionStoreSecretB64)
-	if err != nil {
-		return errors.E(fmt.Sprintf("failed to decode session secret key: %s", err.Error()))
+	sessionStoreSecret := os.Getenv("JIMM_SESSION_SECRET_KEY")
+	if sessionStoreSecret == "" || len(sessionStoreSecret) < 64 {
+		return errors.E("jimm session store secret must be at least 64 characters")
 	}
 
 	jimmsvc, err := jimm.NewService(ctx, jimm.Params{
@@ -177,10 +171,11 @@ func start(ctx context.Context, s *service.Service) error {
 			Scopes:              scopesParsed,
 			SessionTokenExpiry:  sessionTokenExpiryDuration,
 			SessionCookieMaxAge: sessionCookieMaxAgeInt,
+			SessionSecretKey:    sessionStoreSecret,
 		},
 		DashboardFinalRedirectURL: os.Getenv("JIMM_DASHBOARD_FINAL_REDIRECT_URL"),
 		SecureSessionCookies:      secureSessionCookies,
-		SessionStoreSecret:        sessionStoreSecret,
+		SessionStoreSecret:        []byte(sessionStoreSecret),
 	})
 	if err != nil {
 		return err
@@ -198,10 +193,6 @@ func start(ctx context.Context, s *service.Service) error {
 		s.Go(func() error {
 			if err := jimmsvc.StartJWKSRotator(ctx, time.NewTicker(time.Hour).C, time.Now().UTC().AddDate(0, 3, 0)); err != nil {
 				zapctx.Error(ctx, "failed to start JWKS rotator", zap.Error(err))
-				return err
-			}
-			if err := jimmsvc.CheckOrGenerateOAuthKey(ctx); err != nil {
-				zapctx.Error(ctx, "failed to check/generate OAuth secret key", zap.Error(err))
 				return err
 			}
 			return nil

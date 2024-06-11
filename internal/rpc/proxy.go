@@ -610,12 +610,7 @@ func (p *clientProxy) handleAdminFacade(ctx context.Context, msg *message) (clie
 		}
 
 		// Verify the session token
-		secretKey, err := p.jimm.GetCredentialStore().GetOAuthSecret(ctx)
-		if err != nil {
-			return errorFnc(err)
-		}
-
-		token, err := p.jimm.OAuthAuthenticationService().VerifySessionToken(request.SessionToken, string(secretKey))
+		token, err := p.jimm.OAuthAuthenticationService().VerifySessionToken(request.SessionToken)
 		if err != nil {
 			return errorFnc(err)
 		}
