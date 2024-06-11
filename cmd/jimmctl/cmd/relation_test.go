@@ -342,26 +342,6 @@ func initializeEnvironment(c *gc.C, ctx context.Context, db *db.Database, u dbmo
 	return &env
 }
 
-func relationsToTabularStr(relations []apiparams.RelationshipTuple) string {
-	objHeader, relHeader, targObjHeader := "Object", "Relation", "Target Object"
-	objColSize, relColSize, targObjColSize := len(objHeader), len(relHeader), len(targObjHeader)
-	for _, r := range relations {
-		objColSize = max(objColSize, len(r.Object))
-		relColSize = max(relColSize, len(r.Relation))
-		targObjColSize = max(targObjColSize, len(r.TargetObject))
-	}
-
-	formatRow := func(object, relation, targetObject string) string {
-		return fmt.Sprintf("%-*s\t%-*s\t%-*s", objColSize, object, relColSize, relation, targObjColSize, targetObject)
-	}
-	tabularStr := formatRow(objHeader, relHeader, targObjHeader)
-	for _, r := range relations {
-		tabularStr += "\n" + formatRow(r.Object, r.Relation, r.TargetObject)
-	}
-
-	return tabularStr
-}
-
 func (s *relationSuite) TestListRelations(c *gc.C) {
 	env := initializeEnvironment(c, context.Background(), &s.JIMM.Database, *s.AdminUser)
 	bClient := jimmtest.NewUserSessionLogin(c, "alice") // alice is superuser
@@ -424,7 +404,10 @@ func (s *relationSuite) TestListRelations(c *gc.C) {
 
 	context, err := cmdtesting.RunCommand(c, cmd.NewListRelationsCommandForTesting(s.ClientStore(), bClient), "--format", "tabular")
 	c.Assert(err, gc.IsNil)
-	c.Assert(cmdtesting.Stdout(context), gc.Equals, relationsToTabularStr(expectedRelations))
+	var builder strings.Builder
+	err = cmd.FormatRelationsTabularForTesting(&builder, expectedRelations)
+	c.Assert(err, gc.IsNil)
+	c.Assert(cmdtesting.Stdout(context), gc.Equals, builder.String())
 
 	expectedJSONData, err := json.Marshal(expectedRelations)
 	c.Assert(err, gc.IsNil)

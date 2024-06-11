@@ -3,6 +3,8 @@
 package cmd
 
 import (
+	"io"
+
 	"github.com/juju/cmd/v3"
 	jujuapi "github.com/juju/juju/api"
 	"github.com/juju/juju/cloud"
@@ -320,4 +322,8 @@ func NewMigrateModelCommandForTesting(store jujuclient.ClientStore, lp jujuapi.L
 	}
 
 	return modelcmd.WrapBase(cmd)
+}
+
+func FormatRelationsTabularForTesting(writer io.Writer, value interface{}) error {
+	return formatRelationsTabular(writer, value)
 }
