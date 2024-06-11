@@ -18,11 +18,11 @@ import (
 	"github.com/juju/juju/core/life"
 	"github.com/juju/juju/core/status"
 	jujuparams "github.com/juju/juju/rpc/params"
+	"github.com/juju/juju/state"
 	"github.com/juju/names/v5"
 	semversion "github.com/juju/version"
 	"gopkg.in/macaroon.v2"
 
-	"github.com/canonical/jimm/internal/constants"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
@@ -119,7 +119,7 @@ func TestAddController(t *testing.T) {
 			ms.CloudTag = "cloud-aws"
 			ms.CloudRegion = "eu-west-1"
 			ms.OwnerTag = "user-admin"
-			ms.Life = life.Value(constants.ALIVE.String())
+			ms.Life = life.Value(state.Alive.String())
 			ms.Status = jujuparams.EntityStatus{
 				Status: "available",
 			}
@@ -285,7 +285,7 @@ func TestAddControllerWithVault(t *testing.T) {
 			ms.CloudTag = "cloud-aws"
 			ms.CloudRegion = "eu-west-1"
 			ms.OwnerTag = "user-admin"
-			ms.Life = life.Value(constants.ALIVE.String())
+			ms.Life = life.Value(state.Alive.String())
 			ms.Status = jujuparams.EntityStatus{
 				Status: "available",
 			}
@@ -543,7 +543,7 @@ func TestImportModel(t *testing.T) {
 				ModelUUID:      "00000002-0000-0000-0000-000000000001",
 				Name:           "test-model",
 				Owner:          "alice@canonical.com",
-				Life:           life.Value(constants.ALIVE.String()),
+				Life:           life.Value(state.Alive.String()),
 				ControllerUUID: "00000001-0000-0000-0000-000000000001",
 				Status: jujuparams.StatusInfo{
 					Current: "available",
@@ -562,7 +562,7 @@ func TestImportModel(t *testing.T) {
 				Name:            "app-1",
 				Exposed:         true,
 				CharmURL:        "cs:app-1",
-				Life:            life.Value(constants.ALIVE.String()),
+				Life:            life.Value(state.Alive.String()),
 				MinUnits:        1,
 				WorkloadVersion: "2",
 			},
@@ -570,7 +570,7 @@ func TestImportModel(t *testing.T) {
 			Entity: &jujuparams.MachineInfo{
 				ModelUUID: "00000002-0000-0000-0000-000000000001",
 				Id:        "machine-1",
-				Life:      life.Value(constants.ALIVE.String()),
+				Life:      life.Value(state.Alive.String()),
 				Hostname:  "test-machine-1",
 			},
 		}, {
@@ -624,7 +624,7 @@ func TestImportModel(t *testing.T) {
 			},
 			Type:          "test-type",
 			DefaultSeries: "test-series",
-			Life:          constants.ALIVE.String(),
+			Life:          state.Alive.String(),
 			Status: dbmodel.Status{
 				Status: "available",
 				Info:   "updated status message",
@@ -712,7 +712,7 @@ func TestImportModel(t *testing.T) {
 			},
 			Type:          "test-type",
 			DefaultSeries: "test-series",
-			Life:          constants.ALIVE.String(),
+			Life:          state.Alive.String(),
 			Status: dbmodel.Status{
 				Status: "available",
 				Info:   "test-info",
@@ -1624,7 +1624,7 @@ func TestInitiateMigration(t *testing.T) {
 
 			user := test.user(client)
 
-			result, err := j.InitiateMigration(context.Background(), user, test.spec, 0)
+			result, err := j.InitiateMigration(context.Background(), user, test.spec)
 			if test.expectedError == "" {
 				c.Assert(err, qt.IsNil)
 				c.Assert(result, qt.DeepEquals, test.expectedResult)

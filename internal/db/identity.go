@@ -7,6 +7,7 @@ import (
 
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/servermon"
 )
 
 // GetIdentity loads the details for the identity identified by name. If
@@ -19,15 +20,20 @@ import (
 // this information.
 //
 // GetIdentity returns an error with CodeNotFound if the identity name is invalid.
-func (d *Database) GetIdentity(ctx context.Context, u *dbmodel.Identity) error {
+func (d *Database) GetIdentity(ctx context.Context, u *dbmodel.Identity) (err error) {
 	const op = errors.Op("db.GetIdentity")
-	if err := d.ready(); err != nil {
-		return errors.E(op, err)
-	}
 
 	if u.Name == "" {
 		return errors.E(op, errors.CodeNotFound, `invalid identity name ""`)
 	}
+
+	if err := d.ready(); err != nil {
+		return errors.E(op, err)
+	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
 
 	db := d.DB.WithContext(ctx)
 	if err := db.Where("name = ?", u.Name).FirstOrCreate(&u).Error; err != nil {
@@ -40,15 +46,20 @@ func (d *Database) GetIdentity(ctx context.Context, u *dbmodel.Identity) error {
 // will not create an identity if the identity cannot be found.
 //
 // FetchIdentity returns an error with CodeNotFound if the identity name is invalid.
-func (d *Database) FetchIdentity(ctx context.Context, u *dbmodel.Identity) error {
+func (d *Database) FetchIdentity(ctx context.Context, u *dbmodel.Identity) (err error) {
 	const op = errors.Op("db.FetchIdentity")
-	if err := d.ready(); err != nil {
-		return errors.E(op, err)
-	}
 
 	if u.Name == "" {
 		return errors.E(op, errors.CodeNotFound, `invalid identity name ""`)
 	}
+
+	if err := d.ready(); err != nil {
+		return errors.E(op, err)
+	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
 
 	db := d.DB.WithContext(ctx)
 	if err := db.Where("name = ?", u.Name).First(&u).Error; err != nil {
@@ -63,11 +74,15 @@ func (d *Database) FetchIdentity(ctx context.Context, u *dbmodel.Identity) error
 //
 // UpdateIdentity returns an error with CodeNotFound if the identity name is
 // invalid.
-func (d *Database) UpdateIdentity(ctx context.Context, u *dbmodel.Identity) error {
+func (d *Database) UpdateIdentity(ctx context.Context, u *dbmodel.Identity) (err error) {
 	const op = errors.Op("db.UpdateIdentity")
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
 	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
 
 	if u.Name == "" {
 		return errors.E(op, errors.CodeNotFound, `invalid identity name ""`)
@@ -82,15 +97,20 @@ func (d *Database) UpdateIdentity(ctx context.Context, u *dbmodel.Identity) erro
 }
 
 // GetIdentityCloudCredentials fetches identity's cloud credentials for the specified cloud.
-func (d *Database) GetIdentityCloudCredentials(ctx context.Context, u *dbmodel.Identity, cloud string) ([]dbmodel.CloudCredential, error) {
+func (d *Database) GetIdentityCloudCredentials(ctx context.Context, u *dbmodel.Identity, cloud string) (_ []dbmodel.CloudCredential, err error) {
 	const op = errors.Op("db.GetIdentityCloudCredentials")
-	if err := d.ready(); err != nil {
-		return nil, errors.E(op, err)
-	}
 
 	if u.Name == "" || cloud == "" {
 		return nil, errors.E(op, errors.CodeNotFound, `cloudcredential not found`)
 	}
+
+	if err := d.ready(); err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
 
 	var credentials []dbmodel.CloudCredential
 	db := d.DB.WithContext(ctx)

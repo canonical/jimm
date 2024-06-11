@@ -11,15 +11,21 @@ import (
 
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/servermon"
 )
 
 // GetKey implements Backing.GetKey.
-func (d *Database) GetKey(id []byte) (dbrootkeystore.RootKey, error) {
+func (d *Database) GetKey(id []byte) (_ dbrootkeystore.RootKey, err error) {
 	const op = errors.Op("db.FindLatestKey")
 
-	if d.DB == nil {
+	if err := d.ready(); err != nil {
 		return dbrootkeystore.RootKey{}, bakery.ErrNotFound
 	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
 	rk := dbmodel.RootKey{
 		ID: id,
 	}
@@ -38,12 +44,17 @@ func (d *Database) GetKey(id []byte) (dbrootkeystore.RootKey, error) {
 }
 
 // FindLatestKey implements Backing.FindLatestKey.
-func (d *Database) FindLatestKey(createdAfter, expiresAfter, expiresBefore time.Time) (dbrootkeystore.RootKey, error) {
+func (d *Database) FindLatestKey(createdAfter, expiresAfter, expiresBefore time.Time) (_ dbrootkeystore.RootKey, err error) {
 	const op = errors.Op("db.FindLatestKey")
 
-	if d.DB == nil {
-		return dbrootkeystore.RootKey{}, nil
+	if err := d.ready(); err != nil {
+		return dbrootkeystore.RootKey{}, bakery.ErrNotFound
 	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
 	db := d.DB.Where("created_at > ?", createdAfter)
 	db = db.Where("expires BETWEEN ? AND ?", expiresAfter, expiresBefore)
 	db = db.Order("created_at DESC")
@@ -63,12 +74,17 @@ func (d *Database) FindLatestKey(createdAfter, expiresAfter, expiresBefore time.
 }
 
 // InsertKey implements Backing.InsertKey.
-func (d *Database) InsertKey(key dbrootkeystore.RootKey) error {
+func (d *Database) InsertKey(key dbrootkeystore.RootKey) (err error) {
 	const op = errors.Op("db.InsertKey")
 
-	if d.DB == nil {
-		return errors.E(op, errors.CodeServerConfiguration, "database not configured")
+	if err := d.ready(); err != nil {
+		return errors.E(op, err)
 	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
 	rk := dbmodel.RootKey{
 		ID:        key.Id,
 		CreatedAt: key.Created,

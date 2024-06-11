@@ -34,7 +34,10 @@ import (
 )
 
 const (
-	JWTTestSecret = "test-secret"
+	// Note that these values are deliberately different to make sure we're not
+	// reusing/misusing them.
+	JWTTestSecret      = "test-secret"
+	SessionStoreSecret = "another-test-secret"
 )
 
 // A SimpleTester is a simple version of the test interface

@@ -18,7 +18,7 @@ import (
 	"github.com/juju/names/v5"
 	gc "gopkg.in/check.v1"
 	yamlv2 "gopkg.in/yaml.v2"
-	"gopkg.in/yaml.v3"
+	"sigs.k8s.io/yaml"
 
 	apiparams "github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/cmd/jimmctl/cmd"

@@ -9,6 +9,7 @@ import (
 
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/servermon"
 	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
 	"github.com/lestrrat-go/jwx/v2/jwk"
@@ -22,21 +23,27 @@ const (
 	passwordKey = "password"
 
 	// These constants are used to create the appropriate identifiers for JWKS related data.
-	jwksKind          = "jwks"
-	jwksPublicKeyTag  = "jwksPublicKey"
-	jwksPrivateKeyTag = "jwksPrivateKey"
-	jwksExpiryTag     = "jwksExpiry"
-	oauthKind         = "oauth"
-	oauthKeyTag       = "oauthKey"
+	jwksKind                   = "jwks"
+	jwksPublicKeyTag           = "jwksPublicKey"
+	jwksPrivateKeyTag          = "jwksPrivateKey"
+	jwksExpiryTag              = "jwksExpiry"
+	oauthKind                  = "oauth"
+	oauthKeyTag                = "oauthKey"
+	oauthSessionStoreSecretTag = "oauthSessionStoreSecret"
 )
 
 // UpsertSecret stores secret information.
 //   - updates the secret's time and data if it already exists
-func (d *Database) UpsertSecret(ctx context.Context, secret *dbmodel.Secret) error {
+func (d *Database) UpsertSecret(ctx context.Context, secret *dbmodel.Secret) (err error) {
 	const op = errors.Op("db.AddSecret")
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
 	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
 	// On conflict perform an upset to make the operation resemble a Put.
 	db := d.DB.WithContext(ctx).Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "type"}, {Name: "tag"}},
@@ -49,14 +56,21 @@ func (d *Database) UpsertSecret(ctx context.Context, secret *dbmodel.Secret) err
 }
 
 // GetSecret gets the secret with the specified type and tag.
-func (d *Database) GetSecret(ctx context.Context, secret *dbmodel.Secret) error {
+func (d *Database) GetSecret(ctx context.Context, secret *dbmodel.Secret) (err error) {
 	const op = errors.Op("db.GetSecret")
-	if err := d.ready(); err != nil {
-		return errors.E(op, err)
-	}
+
 	if secret.Tag == "" || secret.Type == "" {
 		return errors.E(op, "missing secret tag and type", errors.CodeBadRequest)
 	}
+
+	if err := d.ready(); err != nil {
+		return errors.E(op, err)
+	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
 	db := d.DB.WithContext(ctx)
 
 	db = db.Where("tag = ? AND type = ?", secret.Tag, secret.Type)
@@ -72,14 +86,21 @@ func (d *Database) GetSecret(ctx context.Context, secret *dbmodel.Secret) error 
 }
 
 // Delete secret deletes the secret with the specified type and tag.
-func (d *Database) DeleteSecret(ctx context.Context, secret *dbmodel.Secret) error {
+func (d *Database) DeleteSecret(ctx context.Context, secret *dbmodel.Secret) (err error) {
 	const op = errors.Op("db.DeleteSecret")
-	if err := d.ready(); err != nil {
-		return errors.E(op, err)
-	}
+
 	if secret.Tag == "" || secret.Type == "" {
 		return errors.E(op, "missing secret tag and type", errors.CodeBadRequest)
 	}
+
+	if err := d.ready(); err != nil {
+		return errors.E(op, err)
+	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
 	db := d.DB.WithContext(ctx)
 
 	if err := db.Unscoped().Where("tag = ? AND type = ?", secret.Tag, secret.Type).Delete(&dbmodel.Secret{}).Error; err != nil {
@@ -89,10 +110,19 @@ func (d *Database) DeleteSecret(ctx context.Context, secret *dbmodel.Secret) err
 }
 
 // Get retrieves the attributes for the given cloud credential from the DB.
-func (d *Database) Get(ctx context.Context, tag names.CloudCredentialTag) (map[string]string, error) {
+func (d *Database) Get(ctx context.Context, tag names.CloudCredentialTag) (_ map[string]string, err error) {
 	const op = errors.Op("database.Get")
+
+	if err := d.ready(); err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
 	secret := dbmodel.NewSecret(tag.Kind(), tag.String(), nil)
-	err := d.GetSecret(ctx, &secret)
+	err = d.GetSecret(ctx, &secret)
 	if err != nil {
 		zapctx.Error(ctx, "failed to get secret data", zap.Error(err))
 		return nil, errors.E(op, err)
@@ -107,8 +137,17 @@ func (d *Database) Get(ctx context.Context, tag names.CloudCredentialTag) (map[s
 }
 
 // Put stores the attributes associated with a cloud-credential in the DB.
-func (d *Database) Put(ctx context.Context, tag names.CloudCredentialTag, attr map[string]string) error {
+func (d *Database) Put(ctx context.Context, tag names.CloudCredentialTag, attr map[string]string) (err error) {
 	const op = errors.Op("database.Put")
+
+	if err := d.ready(); err != nil {
+		return errors.E(op, err)
+	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
 	dataJson, err := json.Marshal(attr)
 	if err != nil {
 		zapctx.Error(ctx, "failed to marshal secret data", zap.Error(err))
@@ -118,18 +157,21 @@ func (d *Database) Put(ctx context.Context, tag names.CloudCredentialTag, attr m
 	return d.UpsertSecret(ctx, &secret)
 }
 
-// deleteCloudCredential removes the attributes associated with the cloud-credential in the DB.
-func (d *Database) deleteCloudCredential(ctx context.Context, tag names.CloudCredentialTag) error {
-	secret := dbmodel.NewSecret(tag.Kind(), tag.String(), nil)
-	return d.DeleteSecret(ctx, &secret)
-}
-
 // GetControllerCredentials retrieves the credentials for the given controller from the DB.
 // It is expected for this interface that a non-existent controller credential return empty username/password.
-func (d *Database) GetControllerCredentials(ctx context.Context, controllerName string) (string, string, error) {
+func (d *Database) GetControllerCredentials(ctx context.Context, controllerName string) (_ string, _ string, err error) {
 	const op = errors.Op("database.GetControllerCredentials")
+
+	if err := d.ready(); err != nil {
+		return "", "", errors.E(op, err)
+	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
 	secret := dbmodel.NewSecret(names.ControllerTagKind, controllerName, nil)
-	err := d.GetSecret(ctx, &secret)
+	err = d.GetSecret(ctx, &secret)
 	if errors.ErrorCode(err) == errors.CodeNotFound {
 		return "", "", nil
 	}
@@ -155,8 +197,17 @@ func (d *Database) GetControllerCredentials(ctx context.Context, controllerName 
 }
 
 // PutControllerCredentials stores the controller credentials in the DB.
-func (d *Database) PutControllerCredentials(ctx context.Context, controllerName string, username string, password string) error {
+func (d *Database) PutControllerCredentials(ctx context.Context, controllerName string, username string, password string) (err error) {
 	const op = errors.Op("database.PutControllerCredentials")
+
+	if err := d.ready(); err != nil {
+		return errors.E(op, err)
+	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
 	secretData := make(map[string]string)
 	secretData[usernameKey] = username
 	secretData[passwordKey] = password
@@ -170,10 +221,19 @@ func (d *Database) PutControllerCredentials(ctx context.Context, controllerName 
 }
 
 // CleanupJWKS removes all secrets associated with the JWKS process.
-func (d *Database) CleanupJWKS(ctx context.Context) error {
+func (d *Database) CleanupJWKS(ctx context.Context) (err error) {
 	const op = errors.Op("database.CleanupJWKS")
+
+	if err := d.ready(); err != nil {
+		return errors.E(op, err)
+	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
 	secret := dbmodel.NewSecret(jwksKind, jwksPublicKeyTag, nil)
-	err := d.DeleteSecret(ctx, &secret)
+	err = d.DeleteSecret(ctx, &secret)
 	if err != nil {
 		zapctx.Error(ctx, "failed to cleanup jwks public key", zap.Error(err))
 		return errors.E(op, err, "failed to cleanup jwks public key")
@@ -194,10 +254,19 @@ func (d *Database) CleanupJWKS(ctx context.Context) error {
 }
 
 // GetJWKS returns the current key set stored within the DB.
-func (d *Database) GetJWKS(ctx context.Context) (jwk.Set, error) {
+func (d *Database) GetJWKS(ctx context.Context) (_ jwk.Set, err error) {
 	const op = errors.Op("database.GetJWKS")
+
+	if err := d.ready(); err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
 	secret := dbmodel.NewSecret(jwksKind, jwksPublicKeyTag, nil)
-	err := d.GetSecret(ctx, &secret)
+	err = d.GetSecret(ctx, &secret)
 	if err != nil {
 		zapctx.Error(ctx, "failed to get jwks data", zap.Error(err))
 		return nil, errors.E(op, err)
@@ -211,10 +280,19 @@ func (d *Database) GetJWKS(ctx context.Context) (jwk.Set, error) {
 }
 
 // GetJWKSPrivateKey returns the current private key for the active JWKS
-func (d *Database) GetJWKSPrivateKey(ctx context.Context) ([]byte, error) {
+func (d *Database) GetJWKSPrivateKey(ctx context.Context) (_ []byte, err error) {
 	const op = errors.Op("database.GetJWKSPrivateKey")
+
+	if err := d.ready(); err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
 	secret := dbmodel.NewSecret(jwksKind, jwksPrivateKeyTag, nil)
-	err := d.GetSecret(ctx, &secret)
+	err = d.GetSecret(ctx, &secret)
 	if err != nil {
 		zapctx.Error(ctx, "failed to get jwks jwks private key", zap.Error(err))
 		return nil, errors.E(op, err)
@@ -229,10 +307,19 @@ func (d *Database) GetJWKSPrivateKey(ctx context.Context) ([]byte, error) {
 }
 
 // GetJWKSExpiry returns the expiry of the active JWKS.
-func (d *Database) GetJWKSExpiry(ctx context.Context) (time.Time, error) {
+func (d *Database) GetJWKSExpiry(ctx context.Context) (_ time.Time, err error) {
 	const op = errors.Op("database.GetJWKSExpiry")
+
+	if err := d.ready(); err != nil {
+		return time.Time{}, errors.E(op, err)
+	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
 	secret := dbmodel.NewSecret(jwksKind, jwksExpiryTag, nil)
-	err := d.GetSecret(ctx, &secret)
+	err = d.GetSecret(ctx, &secret)
 	if err != nil {
 		zapctx.Error(ctx, "failed to get jwks expiry", zap.Error(err))
 		return time.Time{}, errors.E(op, err)
@@ -247,8 +334,17 @@ func (d *Database) GetJWKSExpiry(ctx context.Context) (time.Time, error) {
 }
 
 // PutJWKS puts a JWKS into the DB.
-func (d *Database) PutJWKS(ctx context.Context, jwks jwk.Set) error {
+func (d *Database) PutJWKS(ctx context.Context, jwks jwk.Set) (err error) {
 	const op = errors.Op("database.PutJWKS")
+
+	if err := d.ready(); err != nil {
+		return errors.E(op, err)
+	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
 	jwksJson, err := json.Marshal(jwks)
 	if err != nil {
 		zapctx.Error(ctx, "failed to marshal jwks", zap.Error(err))
@@ -260,8 +356,17 @@ func (d *Database) PutJWKS(ctx context.Context, jwks jwk.Set) error {
 }
 
 // PutJWKSPrivateKey persists the private key associated with the current JWKS within the DB.
-func (d *Database) PutJWKSPrivateKey(ctx context.Context, pem []byte) error {
+func (d *Database) PutJWKSPrivateKey(ctx context.Context, pem []byte) (err error) {
 	const op = errors.Op("database.PutJWKSPrivateKey")
+
+	if err := d.ready(); err != nil {
+		return errors.E(op, err)
+	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
 	privateKeyJson, err := json.Marshal(pem)
 	if err != nil {
 		zapctx.Error(ctx, "failed to marshal pem data", zap.Error(err))
@@ -272,8 +377,17 @@ func (d *Database) PutJWKSPrivateKey(ctx context.Context, pem []byte) error {
 }
 
 // PutJWKSExpiry sets the expiry time for the current JWKS within the DB.
-func (d *Database) PutJWKSExpiry(ctx context.Context, expiry time.Time) error {
+func (d *Database) PutJWKSExpiry(ctx context.Context, expiry time.Time) (err error) {
 	const op = errors.Op("database.PutJWKSExpiry")
+
+	if err := d.ready(); err != nil {
+		return errors.E(op, err)
+	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
 	expiryJson, err := json.Marshal(expiry)
 	if err != nil {
 		zapctx.Error(ctx, "failed to marshal jwks expiry data", zap.Error(err))
@@ -284,22 +398,44 @@ func (d *Database) PutJWKSExpiry(ctx context.Context, expiry time.Time) error {
 }
 
 // CleanupOAuthSecrets removes all secrets associated with OAuth.
-func (d *Database) CleanupOAuthSecrets(ctx context.Context) error {
+func (d *Database) CleanupOAuthSecrets(ctx context.Context) (err error) {
 	const op = errors.Op("database.CleanupOAuthSecrets")
+
+	if err := d.ready(); err != nil {
+		return errors.E(op, err)
+	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
 	secret := dbmodel.NewSecret(oauthKind, oauthKeyTag, nil)
-	err := d.DeleteSecret(ctx, &secret)
-	if err != nil {
-		zapctx.Error(ctx, "failed to cleanup OAUth key", zap.Error(err))
-		return errors.E(op, err, "failed to cleanup OAUth key")
+	if err := d.DeleteSecret(ctx, &secret); err != nil {
+		zapctx.Error(ctx, "failed to cleanup OAuth key", zap.Error(err))
+		return errors.E(op, err, "failed to cleanup OAuth key")
+	}
+	secret = dbmodel.NewSecret(oauthKind, oauthSessionStoreSecretTag, nil)
+	if err := d.DeleteSecret(ctx, &secret); err != nil {
+		zapctx.Error(ctx, "failed to cleanup OAuth session store secret", zap.Error(err))
+		return errors.E(op, err, "failed to cleanup OAuth session store secret")
 	}
 	return nil
 }
 
 // GetOAuthSecret returns the current HS256 (symmetric encryption) secret used to sign OAuth session tokens.
-func (d *Database) GetOAuthSecret(ctx context.Context) ([]byte, error) {
+func (d *Database) GetOAuthSecret(ctx context.Context) (_ []byte, err error) {
 	const op = errors.Op("database.GetOAuthSecret")
+
+	if err := d.ready(); err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
 	secret := dbmodel.NewSecret(oauthKind, oauthKeyTag, nil)
-	err := d.GetSecret(ctx, &secret)
+	err = d.GetSecret(ctx, &secret)
 	if err != nil {
 		zapctx.Error(ctx, "failed to get oauth key", zap.Error(err))
 		return nil, errors.E(op, err)
@@ -314,13 +450,70 @@ func (d *Database) GetOAuthSecret(ctx context.Context) ([]byte, error) {
 }
 
 // PutOAuthSecret puts a HS256 (symmetric encryption) secret into the credentials store for signing OAuth session tokens.
-func (d *Database) PutOAuthSecret(ctx context.Context, raw []byte) error {
+func (d *Database) PutOAuthSecret(ctx context.Context, raw []byte) (err error) {
 	const op = errors.Op("database.PutOAuthSecret")
+
+	if err := d.ready(); err != nil {
+		return errors.E(op, err)
+	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
 	oauthKey, err := json.Marshal(raw)
 	if err != nil {
 		zapctx.Error(ctx, "failed to marshal pem data", zap.Error(err))
 		return errors.E(op, err, "failed to marshal oauth key")
 	}
 	secret := dbmodel.NewSecret(oauthKind, oauthKeyTag, oauthKey)
+	return d.UpsertSecret(ctx, &secret)
+}
+
+// GetOAuthSessionStoreSecret returns the current secret used to store session tokens.
+func (d *Database) GetOAuthSessionStoreSecret(ctx context.Context) (_ []byte, err error) {
+	const op = errors.Op("database.GetOAuthSessionStoreSecret")
+
+	if err := d.ready(); err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
+	secret := dbmodel.NewSecret(oauthKind, oauthSessionStoreSecretTag, nil)
+	err = d.GetSecret(ctx, &secret)
+	if err != nil {
+		zapctx.Error(ctx, "failed to get oauth session store secret", zap.Error(err))
+		return nil, errors.E(op, err)
+	}
+	var pem []byte
+	err = json.Unmarshal(secret.Data, &pem)
+	if err != nil {
+		zapctx.Error(ctx, "failed to unmarshal pem data", zap.Error(err))
+		return nil, errors.E(op, err)
+	}
+	return pem, nil
+}
+
+// PutOAuthSessionStoreSecret puts a secret into the credentials store for secure storage of session tokens.
+func (d *Database) PutOAuthSessionStoreSecret(ctx context.Context, raw []byte) (err error) {
+	const op = errors.Op("database.PutOAuthSessionStoreSecret")
+
+	if err := d.ready(); err != nil {
+		return errors.E(op, err)
+	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
+	oauthSessionStoreSecret, err := json.Marshal(raw)
+	if err != nil {
+		zapctx.Error(ctx, "failed to marshal pem data", zap.Error(err))
+		return errors.E(op, err, "failed to marshal oauth session store secret")
+	}
+	secret := dbmodel.NewSecret(oauthKind, oauthSessionStoreSecretTag, oauthSessionStoreSecret)
 	return d.UpsertSecret(ctx, &secret)
 }

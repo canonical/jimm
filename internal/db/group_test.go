@@ -102,8 +102,8 @@ func (s *dbSuite) TestGetGroup(c *qt.C) {
 }
 
 func (s *dbSuite) TestUpdateGroup(c *qt.C) {
-	err := s.Database.UpdateGroup(context.Background(), &dbmodel.GroupEntry{})
-	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
+	err := s.Database.UpdateGroup(context.Background(), &dbmodel.GroupEntry{Name: "test-group"})
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
 	err = s.Database.Migrate(context.Background(), false)
 	c.Assert(err, qt.IsNil)
@@ -137,8 +137,8 @@ func (s *dbSuite) TestUpdateGroup(c *qt.C) {
 }
 
 func (s *dbSuite) TestRemoveGroup(c *qt.C) {
-	err := s.Database.RemoveGroup(context.Background(), &dbmodel.GroupEntry{})
-	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
+	err := s.Database.RemoveGroup(context.Background(), &dbmodel.GroupEntry{Name: "test-group"})
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
 	err = s.Database.Migrate(context.Background(), false)
 	c.Assert(err, qt.IsNil)

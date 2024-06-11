@@ -242,10 +242,9 @@ func (r *controllerRoot) parseTuple(ctx context.Context, tuple apiparams.Relatio
 // ListRelationshipTuples returns a list of tuples matching the specified filter.
 func (r *controllerRoot) ListRelationshipTuples(ctx context.Context, req apiparams.ListRelationshipTuplesRequest) (apiparams.ListRelationshipTuplesResponse, error) {
 	const op = errors.Op("jujuapi.ListRelationshipTuples")
-	var returnValue apiparams.ListRelationshipTuplesResponse
 
 	if !r.user.JimmAdmin {
-		return returnValue, errors.E(op, errors.CodeUnauthorized, "unauthorized")
+		return apiparams.ListRelationshipTuplesResponse{}, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
 	key := &openfga.Tuple{}
@@ -253,22 +252,25 @@ func (r *controllerRoot) ListRelationshipTuples(ctx context.Context, req apipara
 	if req.Tuple.TargetObject != "" {
 		key, err = r.parseTuple(ctx, req.Tuple)
 		if err != nil {
-			return returnValue, errors.E(op, err)
+			return apiparams.ListRelationshipTuplesResponse{}, errors.E(op, err)
 		}
 	}
 	responseTuples, ct, err := r.jimm.AuthorizationClient().ReadRelatedObjects(ctx, *key, req.PageSize, req.ContinuationToken)
 	if err != nil {
-		return returnValue, errors.E(op, err)
+		return apiparams.ListRelationshipTuplesResponse{}, errors.E(op, err)
 	}
+	errors := []string{}
 	tuples := make([]apiparams.RelationshipTuple, len(responseTuples))
 	for i, t := range responseTuples {
 		object, err := r.jimm.ToJAASTag(ctx, t.Object)
 		if err != nil {
-			return returnValue, errors.E(op, err)
+			object = t.Object.String()
+			errors = append(errors, "failed to parse object: "+err.Error())
 		}
 		target, err := r.jimm.ToJAASTag(ctx, t.Target)
 		if err != nil {
-			return returnValue, errors.E(op, err)
+			target = t.Target.String()
+			errors = append(errors, "failed to parse target: "+err.Error())
 		}
 		tuples[i] = apiparams.RelationshipTuple{
 			Object:       object,
@@ -279,5 +281,6 @@ func (r *controllerRoot) ListRelationshipTuples(ctx context.Context, req apipara
 	return apiparams.ListRelationshipTuplesResponse{
 		Tuples:            tuples,
 		ContinuationToken: ct,
+		Errors:            errors,
 	}, nil
 }

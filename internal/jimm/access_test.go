@@ -14,9 +14,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/juju/juju/core/crossmodel"
 	jujuparams "github.com/juju/juju/rpc/params"
+	"github.com/juju/juju/state"
 	"github.com/juju/names/v5"
 
-	"github.com/canonical/jimm/internal/constants"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
@@ -807,7 +807,7 @@ func createTestControllerEnvironment(ctx context.Context, c *qt.C, db db.Databas
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
 		CloudCredentialID: cred.ID,
-		Life:              constants.ALIVE.String(),
+		Life:              state.Alive.String(),
 		Status: dbmodel.Status{
 			Status: "available",
 			Since: sql.NullTime{

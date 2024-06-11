@@ -4,8 +4,9 @@ package dbmodel
 
 import (
 	"database/sql"
-	"fmt"
 	"net"
+	"strconv"
+	"time"
 
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
@@ -17,7 +18,10 @@ import (
 // A controller represents a juju controller which is hosting models
 // within the JAAS system.
 type Controller struct {
-	gorm.Model
+	// Note that we do not use gorm.Model to avoid the use of soft-deletes.
+	ID        uint `gorm:"primarykey"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
 
 	// Name is the name given to this controller.
 	Name string `gorm:"not null;uniqueIndex"`
@@ -45,6 +49,10 @@ type Controller struct {
 	// when it was added. This address will normally be a resolvable DNS
 	// name and port.
 	PublicAddress string
+
+	// TLSHostname provides a hostname that will be used for TLS verfication.
+	// Useful for local dev to avoid TLS issues.
+	TLSHostname string `gorm:"column:tls_hostname"`
 
 	// CloudName is the name of the cloud which is hosting this
 	// controller.
@@ -108,7 +116,7 @@ func (c Controller) ToAPIControllerInfo() apiparams.ControllerInfo {
 	ci.PublicAddress = c.PublicAddress
 	for _, hps := range c.Addresses {
 		for _, hp := range hps {
-			ci.APIAddresses = append(ci.APIAddresses, fmt.Sprintf("%s:%d", hp.Value, hp.Port))
+			ci.APIAddresses = append(ci.APIAddresses, net.JoinHostPort(hp.Value, strconv.Itoa(hp.Port)))
 		}
 	}
 	ci.CACertificate = c.CACertificate

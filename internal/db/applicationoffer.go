@@ -9,14 +9,21 @@ import (
 
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/servermon"
 )
 
 // AddApplicationOffer stores the application offer information.
-func (d *Database) AddApplicationOffer(ctx context.Context, offer *dbmodel.ApplicationOffer) error {
+func (d *Database) AddApplicationOffer(ctx context.Context, offer *dbmodel.ApplicationOffer) (err error) {
 	const op = errors.Op("db.AddApplicationOffer")
+
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
 	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
 	db := d.DB.WithContext(ctx)
 
 	result := db.Create(offer)
@@ -27,13 +34,19 @@ func (d *Database) AddApplicationOffer(ctx context.Context, offer *dbmodel.Appli
 }
 
 // UpdateApplicationOffer updates the application offer information.
-func (d *Database) UpdateApplicationOffer(ctx context.Context, offer *dbmodel.ApplicationOffer) error {
+func (d *Database) UpdateApplicationOffer(ctx context.Context, offer *dbmodel.ApplicationOffer) (err error) {
 	const op = errors.Op("db.UpdateApplicationOffer")
+
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
 	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
 	db := d.DB.WithContext(ctx)
-	err := db.Transaction(func(tx *gorm.DB) error {
+	err = db.Transaction(func(tx *gorm.DB) error {
 		tx.Omit("Connections", "Endpoints", "Spaces").Save(offer)
 		tx.Model(offer).Association("Connections").Replace(offer.Connections)
 		tx.Model(offer).Association("Endpoints").Replace(offer.Endpoints)
@@ -53,11 +66,16 @@ func (d *Database) UpdateApplicationOffer(ctx context.Context, offer *dbmodel.Ap
 
 // GetApplicationOffer returns application offer information based on the
 // offer UUID or URL.
-func (d *Database) GetApplicationOffer(ctx context.Context, offer *dbmodel.ApplicationOffer) error {
+func (d *Database) GetApplicationOffer(ctx context.Context, offer *dbmodel.ApplicationOffer) (err error) {
 	const op = errors.Op("db.GetApplicationOffer")
+
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
 	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
 	db := d.DB.WithContext(ctx)
 
 	if offer.UUID != "" {
@@ -82,11 +100,17 @@ func (d *Database) GetApplicationOffer(ctx context.Context, offer *dbmodel.Appli
 }
 
 // DeleteApplicationOffer deletes the application offer.
-func (d *Database) DeleteApplicationOffer(ctx context.Context, offer *dbmodel.ApplicationOffer) error {
+func (d *Database) DeleteApplicationOffer(ctx context.Context, offer *dbmodel.ApplicationOffer) (err error) {
 	const op = errors.Op("db.DeleteApplicationOffer")
+
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
 	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
 	db := d.DB.WithContext(ctx)
 
 	result := db.Delete(offer)
@@ -153,14 +177,20 @@ func ApplicationOfferFilterByEndpoint(endpoint dbmodel.ApplicationOfferRemoteEnd
 }
 
 // FindApplicationOffers returns application offers matching criteria specified by the filters.
-func (d *Database) FindApplicationOffers(ctx context.Context, filters ...ApplicationOfferFilter) ([]dbmodel.ApplicationOffer, error) {
+func (d *Database) FindApplicationOffers(ctx context.Context, filters ...ApplicationOfferFilter) (_ []dbmodel.ApplicationOffer, err error) {
 	const op = errors.Op("db.FindApplicationOffer")
+
 	if len(filters) == 0 {
 		return nil, errors.E(op, errors.CodeBadRequest, "no filters specified")
 	}
 	if err := d.ready(); err != nil {
 		return nil, errors.E(op, err)
 	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
 	db := d.DB.WithContext(ctx)
 	db = db.Table("application_offers AS offers")
 

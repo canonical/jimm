@@ -30,6 +30,7 @@ import (
 	"github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/servermon"
 )
 
 const (
@@ -305,8 +306,20 @@ func (as *AuthenticationService) MintSessionToken(email string, secretKey string
 }
 
 // VerifySessionToken calls the exported VerifySessionToken function.
-func (as *AuthenticationService) VerifySessionToken(token string, secretKey string) (jwt.Token, error) {
-	return VerifySessionToken(token, secretKey)
+func (as *AuthenticationService) VerifySessionToken(token string, secretKey string) (_ jwt.Token, err error) {
+	defer func() {
+		if err != nil {
+			servermon.AuthenticationFailCount.WithLabelValues("VerifySessionToken").Inc()
+		} else {
+			servermon.AuthenticationSuccessCount.WithLabelValues("VerifySessionToken").Inc()
+		}
+	}()
+
+	jwt, err := VerifySessionToken(token, secretKey)
+	if err != nil {
+		return nil, errors.E(err)
+	}
+	return jwt, nil
 }
 
 // UpdateIdentity updates the database with the display name and access token set for the user.
@@ -377,7 +390,15 @@ func VerifySessionToken(token string, secretKey string) (jwt.Token, error) {
 }
 
 // VerifyClientCredentials verifies the provided client ID and client secret.
-func (as *AuthenticationService) VerifyClientCredentials(ctx context.Context, clientID string, clientSecret string) error {
+func (as *AuthenticationService) VerifyClientCredentials(ctx context.Context, clientID string, clientSecret string) (err error) {
+	defer func() {
+		if err != nil {
+			servermon.AuthenticationFailCount.WithLabelValues("VerifyClientCredentials").Inc()
+		} else {
+			servermon.AuthenticationSuccessCount.WithLabelValues("VerifyClientCredentials").Inc()
+		}
+	}()
+
 	cfg := clientcredentials.Config{
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
@@ -386,7 +407,7 @@ func (as *AuthenticationService) VerifyClientCredentials(ctx context.Context, cl
 		AuthStyle:    oauth2.AuthStyle(as.oauthConfig.Endpoint.AuthStyle),
 	}
 
-	_, err := cfg.Token(ctx)
+	_, err = cfg.Token(ctx)
 	if err != nil {
 		zapctx.Error(ctx, "client credential verification failed", zap.Error(err))
 		return errors.E(errors.CodeUnauthorized, "invalid client credentials")
@@ -425,8 +446,15 @@ func (as *AuthenticationService) CreateBrowserSession(
 // AuthenticateBrowserSession updates the session for a browser, additionally
 // retrieving new access tokens upon expiry. If this cannot be done, the cookie
 // is deleted and an error is returned.
-func (as *AuthenticationService) AuthenticateBrowserSession(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error) {
+func (as *AuthenticationService) AuthenticateBrowserSession(ctx context.Context, w http.ResponseWriter, req *http.Request) (_ context.Context, err error) {
 	const op = errors.Op("auth.AuthenticationService.AuthenticateBrowserSession")
+	defer func() {
+		if err != nil {
+			servermon.AuthenticationFailCount.WithLabelValues("AuthenticateBrowserSession").Inc()
+		} else {
+			servermon.AuthenticationSuccessCount.WithLabelValues("AuthenticateBrowserSession").Inc()
+		}
+	}()
 
 	session, err := as.sessionStore.Get(req, SessionName)
 	if err != nil {

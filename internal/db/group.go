@@ -9,6 +9,7 @@ import (
 
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/servermon"
 )
 
 var newUUID = func() string {
@@ -16,11 +17,16 @@ var newUUID = func() string {
 }
 
 // AddGroup adds a new group.
-func (d *Database) AddGroup(ctx context.Context, name string) error {
+func (d *Database) AddGroup(ctx context.Context, name string) (err error) {
 	const op = errors.Op("db.AddGroup")
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
 	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
 	ge := dbmodel.GroupEntry{
 		Name: name,
 		UUID: newUUID(),
@@ -33,11 +39,15 @@ func (d *Database) AddGroup(ctx context.Context, name string) error {
 }
 
 // GetGroup returns a GroupEntry with the specified name.
-func (d *Database) GetGroup(ctx context.Context, group *dbmodel.GroupEntry) error {
+func (d *Database) GetGroup(ctx context.Context, group *dbmodel.GroupEntry) (err error) {
 	const op = errors.Op("db.GetGroup")
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
 	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
 
 	db := d.DB.WithContext(ctx)
 	if group.ID != 0 {
@@ -58,11 +68,16 @@ func (d *Database) GetGroup(ctx context.Context, group *dbmodel.GroupEntry) erro
 // ForEachGroup iterates through every group calling the given function
 // for each one. If the given function returns an error the iteration
 // will stop immediately and the error will be returned unmodified.
-func (d *Database) ForEachGroup(ctx context.Context, f func(*dbmodel.GroupEntry) error) error {
+func (d *Database) ForEachGroup(ctx context.Context, f func(*dbmodel.GroupEntry) error) (err error) {
 	const op = errors.Op("db.ForEachGroup")
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
 	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
 	db := d.DB.WithContext(ctx)
 	rows, err := db.Model(&dbmodel.GroupEntry{}).Order("name asc").Rows()
 	if err != nil {
@@ -85,17 +100,24 @@ func (d *Database) ForEachGroup(ctx context.Context, f func(*dbmodel.GroupEntry)
 }
 
 // UpdateGroup updates the group identified by its ID.
-func (d *Database) UpdateGroup(ctx context.Context, group *dbmodel.GroupEntry) error {
+func (d *Database) UpdateGroup(ctx context.Context, group *dbmodel.GroupEntry) (err error) {
 	const op = errors.Op("db.UpdateGroup")
-	if err := d.ready(); err != nil {
-		return errors.E(op, err)
-	}
+
 	if group.ID == 0 {
 		return errors.E(errors.CodeNotFound)
 	}
 	if group.UUID == "" {
 		return errors.E("group uuid not specified", errors.CodeNotFound)
 	}
+
+	if err := d.ready(); err != nil {
+		return errors.E(op, err)
+	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
 	if err := d.DB.WithContext(ctx).Save(group).Error; err != nil {
 		return errors.E(op, dbError(err))
 	}
@@ -103,17 +125,24 @@ func (d *Database) UpdateGroup(ctx context.Context, group *dbmodel.GroupEntry) e
 }
 
 // RemoveGroup removes the group identified by its ID.
-func (d *Database) RemoveGroup(ctx context.Context, group *dbmodel.GroupEntry) error {
+func (d *Database) RemoveGroup(ctx context.Context, group *dbmodel.GroupEntry) (err error) {
 	const op = errors.Op("db.RemoveGroup")
-	if err := d.ready(); err != nil {
-		return errors.E(op, err)
-	}
+
 	if group.ID == 0 {
 		return errors.E(errors.CodeNotFound)
 	}
 	if group.UUID == "" {
 		return errors.E(errors.CodeNotFound)
 	}
+
+	if err := d.ready(); err != nil {
+		return errors.E(op, err)
+	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
 	if err := d.DB.WithContext(ctx).Delete(group).Error; err != nil {
 		return errors.E(op, dbError(err))
 	}

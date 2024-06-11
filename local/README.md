@@ -6,8 +6,8 @@ used for integration testing within the JIMM test suite.
 
 # Starting the environment
 1. Ensure you have `make` installed `sudo apt install make`
-2. Check for system dependecies with `make sys-deps` this will inform you of any missing dependies and how to install them.
-3. Set up necessary prequisites with `make dev-env-setup`
+2. Check for system dependencies with `make sysdeps` this will inform you of any missing dependencies and how to install them.
+3. Set up necessary prerequisites with `make dev-env-setup`
 4. Start the dev env `make dev-env`, going forward you can skip steps 1-3.
 5. To teardown the dev env `make dev-env-cleanup`
 
@@ -47,19 +47,29 @@ The `request name` represents the literal WS endpoint, i.e., `API = /api`.
 1. The following commands might need to be run to work around an [LXC networking
    issue](https://github.com/docker/for-linux/issues/103#issuecomment-383607773):
    `sudo iptables -F FORWARD && sudo iptables -P FORWARD ACCEPT`.
-2. Install Juju: `sudo snap install juju --channel=3.3/stable` (minimum Juju version is `3.3`).
+2. Install Juju: `sudo snap install juju --channel=3.5/stable` (minimum Juju version is `3.5`).
 3. Install JQ: `sudo snap install jq`.
 
-## Controller set up
+## All-In-One scripts
+We have two all-in-one scripts, namely:
+- qa-lxd.sh
+- qa-microk8s.sh
+These scripts respectively spin up jimm in compose, setup controllers in the targeted environment
+and handle connectivity. Finally, adding a test model to Q/A against.
+
+Please ensure you've run "make dev-env-setup" first though!
+
+## Manual
+### Controller set up
 
 Note that you can export an environment variable `CONTROLLER_NAME` and re-run steps 3. and 4. below to create multiple Juju
 controllers that will be controlled by JIMM.
 
 1. `juju unregister jimm-dev`                     - Unregister any other local JIMM you have.
-2. `juju login jimm.localhost -c jimm-dev`        - Login to local JIMM with `Username: jimm-test, Password: password`. (If you name the controller jimm-dev, the script will pick it up!)
+2. `juju login jimm.localhost -c jimm-dev`        - Login to local JIMM with username "jimm-test" password "password"
 3. `./local/jimm/setup-controller.sh`             - Performs controller setup.
 4. `./local/jimm/add-controller.sh`               - A local script to do many of the manual steps for us. See script for more details.
-5. `juju add-model test`                          - Adds a model to qa-controller via JIMM.
+5. `juju add-model test`                          - Adds a model to qa-lxd via JIMM.
 
 # Helpful tidbits!
 > Note: For any secure step to work, ensure you've run the local traefik certs script!

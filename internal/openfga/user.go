@@ -206,7 +206,7 @@ func (u *User) SetModelAccess(ctx context.Context, resource names.ModelTag, rela
 // UnsetModelAccess removes direct relations between the user and the model.
 // Note that the action is idempotent (i.e., does not return error if the relation does not exist).
 func (u *User) UnsetModelAccess(ctx context.Context, resource names.ModelTag, relations ...Relation) error {
-	return unsetMultipleResourceAccesses(ctx, u, resource, relations)
+	return unsetMultipleResourceAccesses(ctx, u, resource, relations, 0)
 }
 
 // SetControllerAccess adds a direct relation between the user and the controller.
@@ -230,7 +230,7 @@ func (u *User) SetCloudAccess(ctx context.Context, resource names.CloudTag, rela
 // UnsetCloudAccess removes direct relations between the user and the cloud.
 // Note that the action is idempotent (i.e., does not return error if the relation does not exist).
 func (u *User) UnsetCloudAccess(ctx context.Context, resource names.CloudTag, relations ...Relation) error {
-	return unsetMultipleResourceAccesses(ctx, u, resource, relations)
+	return unsetMultipleResourceAccesses(ctx, u, resource, relations, 0)
 }
 
 // SetApplicationOfferAccess adds a direct relation between the user and the application offer.
@@ -334,7 +334,7 @@ func IsAdministrator[T administratorT](ctx context.Context, u *User, resource T)
 		return false, errors.E(err)
 	}
 	if isAdmin {
-		zapctx.Info(
+		zapctx.Debug(
 			ctx,
 			"user is resource administrator",
 			zap.String("user", u.Tag().String()),
@@ -364,9 +364,14 @@ func setResourceAccess[T ofganames.ResourceTagger](ctx context.Context, user *Us
 	return nil
 }
 
-// unsetMultipleResourceAccesses deletes relations that correspond to the requested resource access, atomically.
-// Note that the action is idempotent (i.e., does not return error if any of the relations does not exist).
-func unsetMultipleResourceAccesses[T ofganames.ResourceTagger](ctx context.Context, user *User, resource T, relations []Relation) error {
+// unsetMultipleResourceAccesses deletes relations that correspond to the
+// requested resource access, atomically. The pageSize argument determines the
+// read requests chunk size, and can be set to zero to opt to OpenFGA client
+// defaults.
+//
+// Note that the action is idempotent (i.e., does not return error if any of the
+// relations does not exist).
+func unsetMultipleResourceAccesses[T ofganames.ResourceTagger](ctx context.Context, user *User, resource T, relations []Relation, pageSize int32) error {
 	tupleObject := ofganames.ConvertTag(user.ResourceTag())
 	tupleTarget := ofganames.ConvertTag(resource)
 
@@ -376,7 +381,7 @@ func unsetMultipleResourceAccesses[T ofganames.ResourceTagger](ctx context.Conte
 		timestampedTuples, continuationToken, err := user.client.cofgaClient.FindMatchingTuples(ctx, Tuple{
 			Object: tupleObject,
 			Target: tupleTarget,
-		}, 0, lastContinuationToken)
+		}, pageSize, lastContinuationToken)
 
 		if err != nil {
 			return errors.E(err, "failed to retrieve existing relations")
@@ -386,7 +391,7 @@ func unsetMultipleResourceAccesses[T ofganames.ResourceTagger](ctx context.Conte
 			existingRelations[timestampedTuple.Tuple.Relation] = nil
 		}
 
-		if continuationToken == lastContinuationToken {
+		if continuationToken == "" {
 			break
 		}
 		lastContinuationToken = continuationToken

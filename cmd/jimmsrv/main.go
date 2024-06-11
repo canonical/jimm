@@ -201,8 +201,10 @@ func start(ctx context.Context, s *service.Service) error {
 	s.OnShutdown(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
+
 		zapctx.Warn(ctx, "server shutdown triggered")
 		httpsrv.Shutdown(ctx)
+		jimmsvc.Cleanup()
 	})
 	s.Go(httpsrv.ListenAndServe)
 	zapctx.Info(ctx, "Successfully started JIMM server")
