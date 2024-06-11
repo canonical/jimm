@@ -18,7 +18,6 @@ import (
 	"github.com/juju/names/v5"
 	gc "gopkg.in/check.v1"
 	yamlv2 "gopkg.in/yaml.v2"
-	"sigs.k8s.io/yaml"
 
 	apiparams "github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/cmd/jimmctl/cmd"
@@ -415,11 +414,75 @@ func (s *relationSuite) TestListRelations(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	c.Assert(strings.TrimRight(cmdtesting.Stdout(context), "\n"), gc.Equals, string(expectedJSONData))
 
-	expectedYAMLData, err := yaml.Marshal(expectedRelations)
+	// Necessary to use yamlv2 to match what Juju does.
+	expectedYAMLData, err := yamlv2.Marshal(expectedRelations)
 	c.Assert(err, gc.IsNil)
 	context, err = cmdtesting.RunCommand(c, cmd.NewListRelationsCommandForTesting(s.ClientStore(), bClient))
 	c.Assert(err, gc.IsNil)
 	c.Assert(cmdtesting.Stdout(context), gc.Equals, string(expectedYAMLData))
+}
+
+func (s *relationSuite) TestListRelationsWithError(c *gc.C) {
+	env := initializeEnvironment(c, context.Background(), &s.JIMM.Database, *s.AdminUser)
+	// alice is superuser
+	bClient := jimmtest.NewUserSessionLogin(c, "alice")
+
+	_, err := cmdtesting.RunCommand(c, cmd.NewAddGroupCommandForTesting(s.ClientStore(), bClient), "group-1")
+	c.Assert(err, gc.IsNil)
+
+	relation := apiparams.RelationshipTuple{
+		Object:       "user-" + env.users[0].Name,
+		Relation:     "member",
+		TargetObject: "group-group-1",
+	}
+	_, err = cmdtesting.RunCommand(c, cmd.NewAddRelationCommandForTesting(s.ClientStore(), bClient), relation.Object, relation.Relation, relation.TargetObject)
+	c.Assert(err, gc.IsNil)
+
+	ctx := context.Background()
+	group := &dbmodel.GroupEntry{Name: "group-1"}
+	err = s.JIMM.DB().GetGroup(ctx, group)
+	c.Assert(err, gc.IsNil)
+	err = s.JIMM.DB().RemoveGroup(ctx, group)
+	c.Assert(err, gc.IsNil)
+
+	expectedData := apiparams.ListRelationshipTuplesResponse{
+		Tuples: []apiparams.RelationshipTuple{{
+			Object:       "user-admin",
+			Relation:     "administrator",
+			TargetObject: "controller-jimm",
+		}, {
+			Object:       "user-alice@canonical.com",
+			Relation:     "administrator",
+			TargetObject: "controller-jimm",
+		}, {
+			Object:       "user-" + env.users[0].Name,
+			Relation:     "member",
+			TargetObject: "group:" + group.UUID,
+		}},
+		Errors: []string{
+			"failed to parse target: failed to fetch group information: " + group.UUID,
+		},
+	}
+	expectedJSONData, err := json.Marshal(expectedData)
+	c.Assert(err, gc.IsNil)
+	// Necessary to use yamlv2 to match what Juju does.
+	expectedYAMLData, err := yamlv2.Marshal(expectedData)
+	c.Assert(err, gc.IsNil)
+
+	context, err := cmdtesting.RunCommand(c, cmd.NewListRelationsCommandForTesting(s.ClientStore(), bClient), "--format", "json")
+	c.Assert(err, gc.IsNil)
+	c.Assert(strings.TrimRight(cmdtesting.Stdout(context), "\n"), gc.Equals, string(expectedJSONData))
+
+	context, err = cmdtesting.RunCommand(c, cmd.NewListRelationsCommandForTesting(s.ClientStore(), bClient))
+	c.Assert(err, gc.IsNil)
+	c.Assert(cmdtesting.Stdout(context), gc.Equals, string(expectedYAMLData))
+
+	context, err = cmdtesting.RunCommand(c, cmd.NewListRelationsCommandForTesting(s.ClientStore(), bClient), "--format", "tabular")
+	c.Assert(err, gc.IsNil)
+	var builder strings.Builder
+	err = cmd.FormatRelationsTabularForTesting(&builder, expectedData)
+	c.Assert(err, gc.IsNil)
+	c.Assert(cmdtesting.Stdout(context), gc.Equals, builder.String())
 }
 
 // TODO: remove boilerplate of env setup and use initialiseEnvironment
