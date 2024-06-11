@@ -560,19 +560,21 @@ func (c *listRelationsCommand) Run(ctxt *cmd.Context) error {
 }
 
 func fetchRelations(client *api.Client, params apiparams.ListRelationshipTuplesRequest) (*apiparams.ListRelationshipTuplesResponse, error) {
-	response, err := client.ListRelationshipTuples(&params)
-	if err != nil {
-		return nil, errors.E(err)
-	}
-	if response.ContinuationToken != "" {
-		params.ContinuationToken = response.ContinuationToken
-		response1, err := fetchRelations(client, params)
+	tuples := make([]apiparams.RelationshipTuple, 0)
+	for {
+		response, err := client.ListRelationshipTuples(&params)
 		if err != nil {
 			return nil, errors.E(err)
 		}
-		response.Tuples = append(response.Tuples, response1.Tuples...)
+
+		tuples = append(response.Tuples, tuples...)
+
+		if response.ContinuationToken == "" {
+			response.Tuples = tuples
+			return response, nil
+		}
+		params.ContinuationToken = response.ContinuationToken
 	}
-	return response, nil
 }
 
 func formatRelationsTabular(writer io.Writer, value interface{}) error {
