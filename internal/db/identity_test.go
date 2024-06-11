@@ -124,7 +124,7 @@ func TestGetIdentityCloudCredentialsUnconfiguredDatabase(t *testing.T) {
 	var d db.Database
 	i, err := dbmodel.NewIdentity("bob")
 	c.Assert(err, qt.IsNil)
-	_, err = d.GetIdentityCloudCredentials(context.Background(), i, "")
+	_, err = d.GetIdentityCloudCredentials(context.Background(), i, "test-cloud")
 	c.Check(err, qt.ErrorMatches, `database not configured`)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeServerConfiguration)
 }

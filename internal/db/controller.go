@@ -7,15 +7,21 @@ import (
 
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/servermon"
 	"gorm.io/gorm/clause"
 )
 
 // AddController stores the controller information.
-func (d *Database) AddController(ctx context.Context, controller *dbmodel.Controller) error {
+func (d *Database) AddController(ctx context.Context, controller *dbmodel.Controller) (err error) {
 	const op = errors.Op("db.AddController")
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
 	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
 	db := d.DB.WithContext(ctx)
 
 	if err := db.Create(controller).Error; err != nil {
@@ -26,11 +32,16 @@ func (d *Database) AddController(ctx context.Context, controller *dbmodel.Contro
 
 // GetController returns controller information based on the
 // controller UUID or name.
-func (d *Database) GetController(ctx context.Context, controller *dbmodel.Controller) error {
+func (d *Database) GetController(ctx context.Context, controller *dbmodel.Controller) (err error) {
 	const op = errors.Op("db.GetController")
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
 	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
 	db := d.DB.WithContext(ctx)
 
 	if controller.UUID != "" {
@@ -52,14 +63,20 @@ func (d *Database) GetController(ctx context.Context, controller *dbmodel.Contro
 
 // UpdateController updates the given controller record. UpdateController will not store any
 // changes to a controller's CloudRegions or Models.
-func (d *Database) UpdateController(ctx context.Context, controller *dbmodel.Controller) error {
+func (d *Database) UpdateController(ctx context.Context, controller *dbmodel.Controller) (err error) {
 	const op = errors.Op("db.UpdateController")
-	if err := d.ready(); err != nil {
-		return errors.E(op, err)
-	}
+
 	if controller.ID == 0 {
 		return errors.E(op, errors.CodeNotFound, `controller not found`)
 	}
+
+	if err := d.ready(); err != nil {
+		return errors.E(op, err)
+	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
 
 	db := d.DB.WithContext(ctx)
 	db = db.Omit("CloudRegions").Omit("Models")
@@ -70,15 +87,19 @@ func (d *Database) UpdateController(ctx context.Context, controller *dbmodel.Con
 }
 
 // DeleteController removes the specified controller from the database.
-func (d *Database) DeleteController(ctx context.Context, controller *dbmodel.Controller) error {
+func (d *Database) DeleteController(ctx context.Context, controller *dbmodel.Controller) (err error) {
 	const op = errors.Op("db.DeleteController")
+	if controller.ID == 0 {
+		return errors.E(op, errors.CodeNotFound, `controller not found`)
+	}
+
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
 	}
 
-	if controller.ID == 0 {
-		return errors.E(op, errors.CodeNotFound, `controller not found`)
-	}
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
 
 	db := d.DB.WithContext(ctx)
 	if err := db.Delete(controller).Error; err != nil {
@@ -97,12 +118,16 @@ func (d *Database) DeleteController(ctx context.Context, controller *dbmodel.Con
 // ForEachController iterates through every controller calling the given function
 // for each one. If the given function returns an error the iteration
 // will stop immediately and the error will be returned unmodified.
-func (d *Database) ForEachController(ctx context.Context, f func(*dbmodel.Controller) error) error {
+func (d *Database) ForEachController(ctx context.Context, f func(*dbmodel.Controller) error) (err error) {
 	const op = errors.Op("db.ForEachController")
 
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
 	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
 
 	db := d.DB.WithContext(ctx)
 	db = db.Preload("CloudRegions").Preload("CloudRegions.CloudRegion").Preload("CloudRegions.CloudRegion.Cloud")
@@ -130,12 +155,16 @@ func (d *Database) ForEachController(ctx context.Context, f func(*dbmodel.Contro
 // controller calling the given function for each one. If the given
 // function returns an error the iteration will stop immediately and the
 // error will be returned unmodified.
-func (d *Database) ForEachControllerModel(ctx context.Context, ctl *dbmodel.Controller, f func(m *dbmodel.Model) error) error {
+func (d *Database) ForEachControllerModel(ctx context.Context, ctl *dbmodel.Controller, f func(m *dbmodel.Model) error) (err error) {
 	const op = errors.Op("db.ForEachControllerModel")
 
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
 	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
 
 	var models []dbmodel.Model
 	db := d.DB.WithContext(ctx)
@@ -151,12 +180,16 @@ func (d *Database) ForEachControllerModel(ctx context.Context, ctl *dbmodel.Cont
 }
 
 // UpsertControllerConfig upserts the controller config.
-func (d *Database) UpsertControllerConfig(ctx context.Context, cfg *dbmodel.ControllerConfig) error {
+func (d *Database) UpsertControllerConfig(ctx context.Context, cfg *dbmodel.ControllerConfig) (err error) {
 	const op = errors.Op("db.UpsertControllerConfig")
 
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
 	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
 
 	if cfg.Name == "" {
 		return errors.E(op, errors.CodeBadRequest, `invalid config name ""`)
@@ -169,11 +202,15 @@ func (d *Database) UpsertControllerConfig(ctx context.Context, cfg *dbmodel.Cont
 	return nil
 }
 
-func (d *Database) GetControllerConfig(ctx context.Context, cfg *dbmodel.ControllerConfig) error {
+func (d *Database) GetControllerConfig(ctx context.Context, cfg *dbmodel.ControllerConfig) (err error) {
 	const op = errors.Op("db.GetControllerConfig")
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
 	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
 
 	if cfg.Name == "" {
 		return errors.E(op, errors.CodeNotFound, `invalid config name ""`)

@@ -5,6 +5,8 @@
 package servermon
 
 import (
+	"time"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
@@ -22,13 +24,19 @@ var (
 		Name:      "success_total",
 		Help:      "The number of successful authentications.",
 	}, []string{"method"})
-	QueryTimeAuditLogCleanUpHistogram = promauto.NewHistogram(prometheus.HistogramOpts{
+	DBQueryDurationHistogram = promauto.NewHistogramVec(prometheus.HistogramOpts{
 		Namespace: "jimm",
 		Subsystem: "db",
-		Name:      "query_audit_clean_up_duration_seconds",
-		Help:      "Histogram of query time for audit_log clean up in seconds",
+		Name:      "query_duration_seconds",
+		Help:      "Histogram of database query time in seconds",
 		Buckets:   []float64{.005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10},
-	})
+	}, []string{"method"})
+	DBQueryErrorCount = promauto.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "jimm",
+		Subsystem: "db",
+		Name:      "error_total",
+		Help:      "The number of database errors.",
+	}, []string{"method"})
 	ConcurrentWebsocketConnections = promauto.NewGauge(prometheus.GaugeOpts{
 		Namespace: "jimm",
 		Subsystem: "websocket",
@@ -66,3 +74,22 @@ var (
 		Help:      "The duration of a websocket request in seconds.",
 	}, []string{"type", "action"})
 )
+
+// DurationObserver returns a function that, when run with `defer` will
+// record the duration of the parent function's execution.
+// Durations are observer as microseconds.
+func DurationObserver(m *prometheus.HistogramVec, labelValues ...string) func() {
+	start := time.Now()
+	return func() {
+		m.WithLabelValues(labelValues...).Observe(time.Since(start).Seconds())
+	}
+}
+
+// ErrorCount increases the specified counter if the error is not nil.
+func ErrorCounter(m *prometheus.CounterVec, err *error, labelValues ...string) {
+	if *err == nil {
+		return
+	}
+
+	m.WithLabelValues(labelValues...).Inc()
+}
