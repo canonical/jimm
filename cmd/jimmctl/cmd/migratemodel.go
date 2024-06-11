@@ -20,16 +20,14 @@ import (
 
 var migrateModelCommandDoc = `
 	The migrate command migrates a model(s) to a new controller. Specify
-	a model-tag to migrate and the destination controller name.
-	A model-tag is of the form "model-<UUID>" while a controller name is
-	simply the name of the controller.
+	a model-uuid to migrate and the destination controller name.
 
 	Note that multiple models can be targeted for migration by supplying
-	multiple model tags.
+	multiple model uuids.
 
 	Example:
-		jimmctl migrate <controller-name> <model-tag> 
-		jimmctl migrate <controller-name> <model-tag> <model-tag> <model-tag>
+		jimmctl migrate <controller-name> <model-uuid> 
+		jimmctl migrate <controller-name> <model-uuid> <model-uuid> <model-uuid>
 `
 
 // NewMigrateModelCommand returns a command to migrate models.
@@ -72,18 +70,19 @@ func (c *migrateModelCommand) SetFlags(f *gnuflag.FlagSet) {
 // Init implements the cmd.Command interface.
 func (c *migrateModelCommand) Init(args []string) error {
 	if len(args) < 2 {
-		return errors.E("Missing controller and model tag arguments")
+		return errors.E("Missing controller name and model uuid arguments")
 	}
 	for i, arg := range args {
 		if i == 0 {
 			c.targetController = arg
 			continue
 		}
-		_, err := names.ParseModelTag(arg)
+		mt := names.NewModelTag(arg)
+		_, err := names.ParseModelTag(mt.String())
 		if err != nil {
-			return errors.E(err, fmt.Sprintf("%s is not a valid model tag", arg))
+			return errors.E(err, fmt.Sprintf("%s is not a valid model uuid", arg))
 		}
-		c.modelTags = append(c.modelTags, arg)
+		c.modelTags = append(c.modelTags, mt.String())
 	}
 	return nil
 }

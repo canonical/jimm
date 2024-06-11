@@ -34,8 +34,8 @@ import (
 )
 
 var (
-	initiateMigration = func(ctx context.Context, j *JIMM, user *openfga.User, spec jujuparams.MigrationSpec, targetControllerID uint) (jujuparams.InitiateMigrationResult, error) {
-		return j.InitiateMigration(ctx, user, spec, targetControllerID)
+	initiateMigration = func(ctx context.Context, j *JIMM, user *openfga.User, spec jujuparams.MigrationSpec) (jujuparams.InitiateMigrationResult, error) {
+		return j.InitiateMigration(ctx, user, spec)
 	}
 )
 
@@ -527,8 +527,12 @@ func (j *JIMM) RemoveController(ctx context.Context, user *openfga.User, control
 			return errors.E(errors.CodeStillAlive, "controller is still alive")
 		}
 
+		models, err := db.GetModelsByController(ctx, c)
+		if err != nil {
+			return err
+		}
 		// Delete its models first.
-		for _, model := range c.Models {
+		for _, model := range models {
 			err := db.DeleteModel(ctx, &model)
 			if err != nil {
 				return err
@@ -618,7 +622,7 @@ func fillMigrationTarget(db db.Database, credStore credentials.CredentialStore, 
 func (j *JIMM) InitiateInternalMigration(ctx context.Context, user *openfga.User, modelTag names.ModelTag, targetController string) (jujuparams.InitiateMigrationResult, error) {
 	const op = errors.Op("jimm.InitiateInternalMigration")
 
-	migrationTarget, controllerID, err := fillMigrationTarget(j.Database, j.CredentialStore, targetController)
+	migrationTarget, _, err := fillMigrationTarget(j.Database, j.CredentialStore, targetController)
 	if err != nil {
 		return jujuparams.InitiateMigrationResult{}, errors.E(op, err)
 	}
@@ -634,7 +638,7 @@ func (j *JIMM) InitiateInternalMigration(ctx context.Context, user *openfga.User
 		return jujuparams.InitiateMigrationResult{}, errors.E(op, err)
 	}
 	spec := jujuparams.MigrationSpec{ModelTag: modelTag.String(), TargetInfo: migrationTarget}
-	result, err := initiateMigration(ctx, j, user, spec, controllerID)
+	result, err := initiateMigration(ctx, j, user, spec)
 	if err != nil {
 		return result, errors.E(op, err)
 	}

@@ -10,12 +10,12 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/juju/juju/core/life"
 	jujuparams "github.com/juju/juju/rpc/params"
+	"github.com/juju/juju/state"
 	"github.com/juju/names/v5"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/utils/v2"
 	gc "gopkg.in/check.v1"
 
-	"github.com/canonical/jimm/internal/constants"
 	"github.com/canonical/jimm/internal/jimmtest"
 )
 
@@ -39,7 +39,7 @@ func (s *modelmanagerSuite) TestCreateModel(c *gc.C) {
 	c.Check(info.CloudTag, gc.Equals, names.NewCloudTag(jimmtest.TestCloudName).String())
 	c.Check(info.CloudRegion, gc.Equals, jimmtest.TestCloudRegionName)
 	c.Check(info.DefaultSeries, gc.Equals, "jammy")
-	c.Check(string(info.Life), gc.Equals, constants.ALIVE.String())
+	c.Check(string(info.Life), gc.Equals, state.Alive.String())
 	c.Check(string(info.Status.Status), gc.Equals, "available")
 	c.Check(info.Status.Data, gc.IsNil)
 	c.Check(info.Status.Since.After(time.Now().Add(-10*time.Second)), gc.Equals, true)

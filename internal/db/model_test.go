@@ -7,11 +7,12 @@ import (
 	"database/sql"
 	"sort"
 	"testing"
+	"time"
 
 	qt "github.com/frankban/quicktest"
+	"github.com/juju/juju/state"
 	"gorm.io/gorm"
 
-	"github.com/canonical/jimm/internal/constants"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
@@ -57,7 +58,6 @@ func (s *dbSuite) TestAddModel(c *qt.C) {
 		UUID:        "00000000-0000-0000-0000-0000-0000000000001",
 		CloudName:   "test-cloud",
 		CloudRegion: "test-region",
-		Models:      []dbmodel.Model{},
 	}
 	err = s.Database.AddController(context.Background(), &controller)
 	c.Assert(err, qt.Equals, nil)
@@ -74,7 +74,7 @@ func (s *dbSuite) TestAddModel(c *qt.C) {
 		CloudCredentialID: cred.ID,
 		Type:              "iaas",
 		DefaultSeries:     "warty",
-		Life:              constants.ALIVE.String(),
+		Life:              state.Alive.String(),
 		Status: dbmodel.Status{
 			Status: "available",
 			Since:  db.Now(),
@@ -127,7 +127,6 @@ func (s *dbSuite) TestGetModel(c *qt.C) {
 	controller := dbmodel.Controller{
 		Name:        "test-controller",
 		UUID:        "00000000-0000-0000-0000-0000-0000000000001",
-		Models:      []dbmodel.Model{},
 		CloudName:   "test-cloud",
 		CloudRegion: "test-region",
 	}
@@ -150,7 +149,7 @@ func (s *dbSuite) TestGetModel(c *qt.C) {
 		CloudCredential:   cred,
 		Type:              "iaas",
 		DefaultSeries:     "warty",
-		Life:              constants.ALIVE.String(),
+		Life:              state.Alive.String(),
 		Status: dbmodel.Status{
 			Status: "available",
 			Since:  db.Now(),
@@ -231,7 +230,6 @@ func (s *dbSuite) TestUpdateModel(c *qt.C) {
 		UUID:        "00000000-0000-0000-0000-0000-0000000000001",
 		CloudName:   "test-cloud",
 		CloudRegion: "test-region",
-		Models:      []dbmodel.Model{},
 	}
 	err = s.Database.AddController(context.Background(), &controller)
 	c.Assert(err, qt.Equals, nil)
@@ -244,7 +242,7 @@ func (s *dbSuite) TestUpdateModel(c *qt.C) {
 		CloudCredentialID: cred.ID,
 		Type:              "iaas",
 		DefaultSeries:     "warty",
-		Life:              constants.ALIVE.String(),
+		Life:              state.Alive.String(),
 		Status: dbmodel.Status{
 			Status: "available",
 			Since:  db.Now(),
@@ -308,7 +306,6 @@ func (s *dbSuite) TestDeleteModel(c *qt.C) {
 		UUID:        "00000000-0000-0000-0000-0000-0000000000001",
 		CloudName:   "test-cloud",
 		CloudRegion: "test-region",
-		Models:      []dbmodel.Model{},
 	}
 	err = s.Database.AddController(context.Background(), &controller)
 	c.Assert(err, qt.Equals, nil)
@@ -322,7 +319,7 @@ func (s *dbSuite) TestDeleteModel(c *qt.C) {
 		CloudCredentialID: cred.ID,
 		Type:              "iaas",
 		DefaultSeries:     "warty",
-		Life:              constants.ALIVE.String(),
+		Life:              state.Alive.String(),
 		Status: dbmodel.Status{
 			Status: "available",
 			Since:  db.Now(),
@@ -405,7 +402,7 @@ func (s *dbSuite) TestGetModelsUsingCredential(c *qt.C) {
 		CloudCredentialID: cred1.ID,
 		Type:              "iaas",
 		DefaultSeries:     "warty",
-		Life:              constants.ALIVE.String(),
+		Life:              state.Alive.String(),
 		Status: dbmodel.Status{
 			Status: "available",
 			Since:  db.Now(),
@@ -429,7 +426,7 @@ func (s *dbSuite) TestGetModelsUsingCredential(c *qt.C) {
 		CloudCredentialID: cred2.ID,
 		Type:              "iaas",
 		DefaultSeries:     "warty",
-		Life:              constants.ALIVE.String(),
+		Life:              state.Alive.String(),
 		Status: dbmodel.Status{
 			Status: "available",
 			Since:  db.Now(),
@@ -459,7 +456,7 @@ func (s *dbSuite) TestGetModelsUsingCredential(c *qt.C) {
 		CloudCredentialID: cred1.ID,
 		Type:              "iaas",
 		DefaultSeries:     "warty",
-		Life:              constants.ALIVE.String(),
+		Life:              state.Alive.String(),
 		Status:            model1.Status,
 		SLA: dbmodel.SLA{
 			Level: "unsupported",
@@ -640,4 +637,103 @@ func (s *dbSuite) TestGetModelsByUUID(c *qt.C) {
 	c.Check(models[1].Controller.Name, qt.Not(qt.Equals), "")
 	c.Check(models[2].UUID.String, qt.Equals, "00000002-0000-0000-0000-000000000003")
 	c.Check(models[2].Controller.Name, qt.Not(qt.Equals), "")
+}
+
+func (s *dbSuite) TestGetModelsByController(c *qt.C) {
+	err := s.Database.Migrate(context.Background(), true)
+	c.Assert(err, qt.Equals, nil)
+
+	cloud := dbmodel.Cloud{
+		Name: "test-cloud",
+		Type: "test-provider",
+		Regions: []dbmodel.CloudRegion{{
+			Name: "test-region",
+		}},
+	}
+	c.Assert(s.Database.DB.Create(&cloud).Error, qt.IsNil)
+
+	controller := dbmodel.Controller{
+		Name:        "test-controller",
+		UUID:        "00000000-0000-0000-0000-0000-0000000000001",
+		CloudName:   "test-cloud",
+		CloudRegion: "test-region",
+	}
+	u, err := dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, qt.IsNil)
+	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
+
+	cred := dbmodel.CloudCredential{
+		Name:     "test-cred",
+		Cloud:    cloud,
+		Owner:    *u,
+		AuthType: "empty",
+	}
+	c.Assert(s.Database.DB.Create(&cred).Error, qt.IsNil)
+
+	err = s.Database.AddController(context.Background(), &controller)
+	c.Assert(err, qt.Equals, nil)
+
+	models := []dbmodel.Model{{
+		Name: "test-model-1",
+		UUID: sql.NullString{
+			String: "00000001-0000-0000-0000-0000-000000000001",
+			Valid:  true,
+		},
+		Owner:           *u,
+		Controller:      controller,
+		CloudRegion:     cloud.Regions[0],
+		CloudCredential: cred,
+		Type:            "iaas",
+		IsController:    true,
+		DefaultSeries:   "focal",
+		Life:            state.Alive.String(),
+		Status: dbmodel.Status{
+			Status: "available",
+			Since: sql.NullTime{
+				Time:  time.Now(),
+				Valid: true,
+			},
+		},
+		SLA: dbmodel.SLA{
+			Level: "unsupported",
+		},
+	}, {
+		Name: "test-model-2",
+		UUID: sql.NullString{
+			String: "00000001-0000-0000-0000-0000-000000000002",
+			Valid:  true,
+		},
+		Owner:           *u,
+		Controller:      controller,
+		CloudRegion:     cloud.Regions[0],
+		CloudCredential: cred,
+		Type:            "iaas",
+		IsController:    false,
+		DefaultSeries:   "focal",
+		Life:            state.Alive.String(),
+		Status: dbmodel.Status{
+			Status: "available",
+			Since: sql.NullTime{
+				Time:  time.Now(),
+				Valid: true,
+			},
+		},
+		SLA: dbmodel.SLA{
+			Level: "unsupported",
+		},
+	}}
+	for _, m := range models {
+		c.Assert(s.Database.DB.Create(&m).Error, qt.IsNil)
+	}
+	foundModels, err := s.Database.GetModelsByController(context.Background(), controller)
+	foundModelNames := []string{}
+	for _, m := range foundModels {
+		foundModelNames = append(foundModelNames, m.Name)
+	}
+	modelNames := []string{}
+	for _, m := range models {
+		modelNames = append(modelNames, m.Name)
+	}
+	c.Assert(err, qt.IsNil)
+	c.Assert(foundModelNames, qt.DeepEquals, modelNames)
 }

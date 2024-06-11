@@ -225,3 +225,44 @@ func TestGetOAuthSecretFailsIfNotFound(t *testing.T) {
 	c.Assert(err, qt.ErrorMatches, "no OAuth key exists")
 	c.Assert(retrieved, qt.IsNil)
 }
+
+func TestGetAndPutOAuthSessionStoreSecret(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+	store := newStore(c)
+
+	// We didn't use a pre-defined/constant key here because in that case we had
+	// to make sure there's nothing left from last test runs in Vault.
+	key := []byte(uuid.NewString()) // A random UUID as key
+	err := store.PutOAuthSessionStoreSecret(ctx, key)
+	c.Assert(err, qt.IsNil)
+	retrievedKey, err := store.GetOAuthSessionStoreSecret(ctx)
+	c.Assert(err, qt.IsNil)
+	c.Assert(retrievedKey, qt.DeepEquals, key)
+}
+
+func TestGetOAuthSessionStoreSecretFailsIfDataIsNil(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+	store := newStore(c)
+
+	err := store.PutOAuthSessionStoreSecret(ctx, nil)
+	c.Assert(err, qt.IsNil)
+
+	retrieved, err := store.GetOAuthSessionStoreSecret(ctx)
+	c.Assert(err, qt.ErrorMatches, "oauth session store secret not found")
+	c.Assert(retrieved, qt.IsNil)
+}
+
+func TestGetOAuthSessionStoreSecretFailsIfNotFound(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+	store := newStore(c)
+
+	err := store.CleanupOAuthSecrets(ctx)
+	c.Assert(err, qt.IsNil)
+
+	retrieved, err := store.GetOAuthSessionStoreSecret(ctx)
+	c.Assert(err, qt.ErrorMatches, "no OAuth session store secret exists")
+	c.Assert(retrieved, qt.IsNil)
+}

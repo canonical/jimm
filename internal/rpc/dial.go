@@ -63,7 +63,8 @@ func Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag,
 			zapctx.Warn(ctx, "no CA certificates added")
 		}
 		tlsConfig = &tls.Config{
-			RootCAs: cp,
+			RootCAs:    cp,
+			ServerName: ctl.TLSHostname,
 		}
 	}
 	dialer := Dialer{

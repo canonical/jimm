@@ -5,7 +5,6 @@ package jimm
 import (
 	"context"
 	"crypto/rand"
-	"database/sql"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -180,7 +179,8 @@ type Params struct {
 type Service struct {
 	jimm jimm.JIMM
 
-	mux *chi.Mux
+	mux      *chi.Mux
+	cleanups []func() error
 }
 
 func (s *Service) JIMM() *jimm.JIMM {
@@ -225,6 +225,22 @@ func (s *Service) StartJWKSRotator(ctx context.Context, checkRotateRequired <-ch
 	return s.jimm.JWKService.StartJWKSRotator(ctx, checkRotateRequired, initialRotateRequiredTime)
 }
 
+// Cleanup cleans up resources that need to be released on shutdown.
+func (s *Service) Cleanup() {
+	// Iterating over clean up function in reverse-order to avoid early clean ups.
+	for i := len(s.cleanups) - 1; i >= 0; i-- {
+		f := s.cleanups[i]
+		if err := f(); err != nil {
+			zapctx.Error(context.Background(), "cleanup failed", zap.Error(err))
+		}
+	}
+}
+
+// AddCleanup adds a clean up function to be run at service shutdown.
+func (s *Service) AddCleanup(f func() error) {
+	s.cleanups = append(s.cleanups, f)
+}
+
 // NewService creates a new Service using the given params.
 func NewService(ctx context.Context, p Params) (*Service, error) {
 	const op = errors.Op("NewService")
@@ -256,19 +272,6 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	if err := s.jimm.Database.Migrate(ctx, false); err != nil {
 		return nil, errors.E(op, err)
 	}
-	sqlDb, err := s.jimm.Database.DB.DB()
-	if err != nil {
-		return nil, errors.E(op, err)
-	}
-
-	// Setup browser session store
-	sessionStore, err := setupSessionStore(sqlDb, "secret-key-todo")
-	if err != nil {
-		return nil, errors.E(op, err)
-	}
-
-	// Cleanup expired session every 30 minutes
-	defer sessionStore.StopCleanup(sessionStore.Cleanup(time.Minute * 30))
 
 	if p.AuditLogRetentionPeriodInDays != "" {
 		period, err := strconv.Atoi(p.AuditLogRetentionPeriodInDays)
@@ -290,6 +293,15 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	s.jimm.OpenFGAClient = openFGAclient
 	if err := ensureControllerAdministrators(ctx, openFGAclient, p.ControllerUUID, p.ControllerAdmins); err != nil {
 		return nil, errors.E(op, err, "failed to ensure controller admins")
+	}
+
+	if err := s.setupCredentialStore(ctx, p); err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	sessionStore, err := s.setupSessionStore(ctx)
+	if err != nil {
+		return nil, errors.E(op, err)
 	}
 
 	redirectUrl := p.PublicDNSName + jimmhttp.AuthResourceBasePath + jimmhttp.CallbackEndpoint
@@ -315,10 +327,6 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	if err != nil {
 		zapctx.Error(ctx, "failed to setup authentication service", zap.Error(err))
 		return nil, errors.E(op, err, "failed to setup authentication service")
-	}
-
-	if err := s.setupCredentialStore(ctx, p); err != nil {
-		return nil, errors.E(op, err)
 	}
 
 	if p.JWTExpiryDuration == 0 {
@@ -360,19 +368,25 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		"/.well-known",
 		wellknownapi.NewWellKnownHandler(s.jimm.CredentialStore),
 	)
-	oauthHandler, err := jimmhttp.NewOAuthHandler(jimmhttp.OAuthHandlerParams{
-		Authenticator:             authSvc,
-		DashboardFinalRedirectURL: p.DashboardFinalRedirectURL,
-		SecureCookies:             p.SecureSessionCookies,
-	})
-	if err != nil {
-		zapctx.Error(ctx, "failed to setup authentication handler", zap.Error(err))
-		return nil, errors.E(op, err, "failed to setup authentication handler")
+
+	if p.DashboardFinalRedirectURL == "" {
+		zapctx.Warn(ctx, "OAuth handler not enabled, due to unset dashboard redirect URL")
+	} else {
+		oauthHandler, err := jimmhttp.NewOAuthHandler(jimmhttp.OAuthHandlerParams{
+			Authenticator:             authSvc,
+			DashboardFinalRedirectURL: p.DashboardFinalRedirectURL,
+			SecureCookies:             p.SecureSessionCookies,
+		})
+		if err != nil {
+			zapctx.Error(ctx, "failed to setup authentication handler", zap.Error(err))
+			return nil, errors.E(op, err, "failed to setup authentication handler")
+		}
+		mountHandler(
+			jimmhttp.AuthResourceBasePath,
+			oauthHandler,
+		)
 	}
-	mountHandler(
-		jimmhttp.AuthResourceBasePath,
-		oauthHandler,
-	)
+
 	macaroonDischarger, err := s.setupDischarger(p)
 	if err != nil {
 		return nil, errors.E(op, err, "failed to set up discharger")
@@ -412,9 +426,57 @@ func (s *Service) setupDischarger(p Params) (*discharger.MacaroonDischarger, err
 	return MacaroonDischarger, nil
 }
 
-func setupSessionStore(db *sql.DB, secretKey string) (*pgstore.PGStore, error) {
-	store, err := pgstore.NewPGStoreFromPool(db, []byte(secretKey))
-	return store, err
+func (s *Service) setupSessionStore(ctx context.Context) (*pgstore.PGStore, error) {
+	const op = errors.Op("setupSessionStore")
+
+	if s.jimm.CredentialStore == nil {
+		return nil, errors.E(op, "credential store is not configured")
+	}
+
+	sqlDb, err := s.jimm.Database.DB.DB()
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	oauthSessionStoreSecret, err := s.jimm.CredentialStore.GetOAuthSessionStoreSecret(ctx)
+	if err == nil {
+		zapctx.Info(ctx, "detected existing OAuth session store secret")
+	} else if errors.ErrorCode(err) == errors.CodeNotFound {
+		oauthSessionStoreSecret, err = generateOAuthSessionStoreSecret(ctx, s.jimm.CredentialStore)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, errors.E(op, err, "failed to read session store secret")
+	}
+
+	store, err := pgstore.NewPGStoreFromPool(sqlDb, oauthSessionStoreSecret)
+	if err != nil {
+		return nil, errors.E(op, err, "failed to create session store")
+	}
+
+	// Cleanup expired session every 30 minutes
+	cleanupQuit, cleanupDone := store.Cleanup(time.Minute * 30)
+	s.AddCleanup(func() error {
+		store.StopCleanup(cleanupQuit, cleanupDone)
+		return nil
+	})
+	return store, nil
+}
+
+func generateOAuthSessionStoreSecret(ctx context.Context, store jimmcreds.CredentialStore) ([]byte, error) {
+	const op = errors.Op("generateOAuthSessionStoreSecret")
+	secret := make([]byte, 64)
+	if _, err := rand.Read(secret); err != nil {
+		zapctx.Error(ctx, "failed to generate OAuth session store secret", zap.Error(err))
+		return nil, errors.E(op, err, "failed to generate OAuth session store secret")
+	}
+
+	if err := store.PutOAuthSessionStoreSecret(ctx, secret); err != nil {
+		zapctx.Error(ctx, "failed to store generated OAuth session store secret", zap.Error(err))
+		return nil, errors.E(op, err, "failed to store generated OAuth session store secret")
+	}
+	return secret, nil
 }
 
 func openDB(ctx context.Context, dsn string) (*gorm.DB, error) {
@@ -458,9 +520,7 @@ func (s *Service) setupCredentialStore(ctx context.Context, p Params) error {
 		return nil
 	}
 
-	// Currently jimm will start without a credential store but
-	// functionality will be limited.
-	return nil
+	return errors.E(op, "jimm cannot start without a credential store")
 }
 
 func newVaultStore(ctx context.Context, p Params) (jimmcreds.CredentialStore, error) {

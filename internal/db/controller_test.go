@@ -4,15 +4,12 @@ package db_test
 
 import (
 	"context"
-	"database/sql"
 	"testing"
-	"time"
 
 	qt "github.com/frankban/quicktest"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	jujuparams "github.com/juju/juju/rpc/params"
 
-	"github.com/canonical/jimm/internal/constants"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
@@ -72,7 +69,6 @@ func (s *dbSuite) TestGetController(c *qt.C) {
 	controller := dbmodel.Controller{
 		Name:      "test-controller",
 		UUID:      "00000000-0000-0000-0000-0000-0000000000001",
-		Models:    []dbmodel.Model{},
 		CloudName: "test-cloud",
 	}
 	err = s.Database.AddController(context.Background(), &controller)
@@ -100,105 +96,6 @@ func (s *dbSuite) TestGetController(c *qt.C) {
 	eError, ok := err.(*errors.Error)
 	c.Assert(ok, qt.IsTrue)
 	c.Assert(eError.Code, qt.Equals, errors.CodeNotFound)
-}
-
-func (s *dbSuite) TestGetControllerWithModels(c *qt.C) {
-	err := s.Database.Migrate(context.Background(), true)
-	c.Assert(err, qt.Equals, nil)
-
-	cloud := dbmodel.Cloud{
-		Name: "test-cloud",
-		Type: "test-provider",
-		Regions: []dbmodel.CloudRegion{{
-			Name: "test-region",
-		}},
-	}
-	c.Assert(s.Database.DB.Create(&cloud).Error, qt.IsNil)
-
-	controller := dbmodel.Controller{
-		Name:        "test-controller",
-		UUID:        "00000000-0000-0000-0000-0000-0000000000001",
-		Models:      []dbmodel.Model{},
-		CloudName:   "test-cloud",
-		CloudRegion: "test-region",
-	}
-	u, err := dbmodel.NewIdentity("bob@canonical.com")
-	c.Assert(err, qt.IsNil)
-	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
-
-	cred := dbmodel.CloudCredential{
-		Name:     "test-cred",
-		Cloud:    cloud,
-		Owner:    *u,
-		AuthType: "empty",
-	}
-	c.Assert(s.Database.DB.Create(&cred).Error, qt.IsNil)
-
-	err = s.Database.AddController(context.Background(), &controller)
-	c.Assert(err, qt.Equals, nil)
-
-	models := []dbmodel.Model{{
-		Name: "test-model-1",
-		UUID: sql.NullString{
-			String: "00000001-0000-0000-0000-0000-000000000001",
-			Valid:  true,
-		},
-		Owner:           *u,
-		Controller:      controller,
-		CloudRegion:     cloud.Regions[0],
-		CloudCredential: cred,
-		Type:            "iaas",
-		IsController:    true,
-		DefaultSeries:   "warty",
-		Life:            constants.ALIVE.String(),
-		Status: dbmodel.Status{
-			Status: "available",
-			Since: sql.NullTime{
-				Time:  time.Now(),
-				Valid: true,
-			},
-		},
-		SLA: dbmodel.SLA{
-			Level: "unsupported",
-		},
-	}, {
-		Name: "test-model-2",
-		UUID: sql.NullString{
-			String: "00000001-0000-0000-0000-0000-000000000002",
-			Valid:  true,
-		},
-		Owner:           *u,
-		Controller:      controller,
-		CloudRegion:     cloud.Regions[0],
-		CloudCredential: cred,
-		Type:            "iaas",
-		IsController:    false,
-		DefaultSeries:   "warty",
-		Life:            constants.ALIVE.String(),
-		Status: dbmodel.Status{
-			Status: "available",
-			Since: sql.NullTime{
-				Time:  time.Now(),
-				Valid: true,
-			},
-		},
-		SLA: dbmodel.SLA{
-			Level: "unsupported",
-		},
-	}}
-	for _, m := range models {
-		c.Assert(s.Database.DB.Create(&m).Error, qt.IsNil)
-	}
-
-	dbController := dbmodel.Controller{
-		UUID: controller.UUID,
-	}
-	err = s.Database.GetController(context.Background(), &dbController)
-	c.Assert(err, qt.Equals, nil)
-	controller.Models = []dbmodel.Model{
-		models[0],
-	}
-	c.Assert(dbController, qt.CmpEquals(cmpopts.IgnoreFields(dbmodel.Controller{}, "Models"), cmpopts.EquateEmpty()), controller)
 }
 
 func TestForEachControllerUnconfiguredDatabase(t *testing.T) {
@@ -289,7 +186,6 @@ func (s *dbSuite) TestUpdateController(c *qt.C) {
 		UUID:        "00000000-0000-0000-0000-0000-0000000000001",
 		CloudName:   "test-cloud",
 		CloudRegion: "test-region",
-		Models:      []dbmodel.Model{},
 	}
 	err = s.Database.AddController(context.Background(), &controller)
 	c.Assert(err, qt.Equals, nil)
@@ -336,7 +232,6 @@ func (s *dbSuite) TestDeleteController(c *qt.C) {
 		Name:      "test-controller",
 		UUID:      "00000000-0000-0000-0000-0000-0000000000001",
 		CloudName: "test-cloud",
-		Models:    []dbmodel.Model{},
 	}
 	err = s.Database.AddController(context.Background(), &controller)
 	c.Assert(err, qt.Equals, nil)

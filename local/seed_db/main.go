@@ -7,13 +7,13 @@ import (
 	"os"
 	"time"
 
-	"github.com/canonical/jimm/internal/constants"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/logger"
 	petname "github.com/dustinkirkland/golang-petname"
 	"github.com/google/uuid"
 	"github.com/juju/juju/core/crossmodel"
+	"github.com/juju/juju/state"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -102,7 +102,7 @@ func main() {
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
 		CloudCredentialID: cred.ID,
-		Life:              constants.ALIVE.String(),
+		Life:              state.Alive.String(),
 		Status: dbmodel.Status{
 			Status: "available",
 			Since: sql.NullTime{

@@ -307,3 +307,31 @@ func (s *dbSuite) TestGetOAuthSecretFailsIfNotFound(c *qt.C) {
 	c.Assert(err, qt.ErrorMatches, "secret not found")
 	c.Assert(retrieved, qt.IsNil)
 }
+
+func (s *dbSuite) TestPutAndGetOAuthSessionStoreSecret(c *qt.C) {
+	err := s.Database.Migrate(context.Background(), true)
+	c.Assert(err, qt.Equals, nil)
+	ctx := context.Background()
+	key := []byte(uuid.NewString())
+	c.Assert(s.Database.PutOAuthSessionStoreSecret(ctx, key), qt.IsNil)
+
+	secret := dbmodel.Secret{}
+	tx := s.Database.DB.First(&secret)
+	c.Assert(tx.Error, qt.IsNil)
+	c.Assert(secret.Type, qt.Equals, db.OAuthKind)
+	c.Assert(secret.Tag, qt.Equals, db.OAuthSessionStoreSecretTag)
+
+	retrievedKey, err := s.Database.GetOAuthSessionStoreSecret(ctx)
+	c.Assert(err, qt.IsNil)
+	c.Assert(retrievedKey, qt.DeepEquals, key)
+}
+
+func (s *dbSuite) TestGetOAuthSessionStoreSecretFailsIfNotFound(c *qt.C) {
+	err := s.Database.Migrate(context.Background(), true)
+	c.Assert(err, qt.Equals, nil)
+	ctx := context.Background()
+
+	retrieved, err := s.Database.GetOAuthSessionStoreSecret(ctx)
+	c.Assert(err, qt.ErrorMatches, "secret not found")
+	c.Assert(retrieved, qt.IsNil)
+}
