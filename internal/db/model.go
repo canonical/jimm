@@ -9,16 +9,22 @@ import (
 
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/servermon"
 )
 
 // AddModel stores the model information.
 //   - returns an error with code errors.CodeAlreadyExists if
 //     model with the same name already exists.
-func (d *Database) AddModel(ctx context.Context, model *dbmodel.Model) error {
+func (d *Database) AddModel(ctx context.Context, model *dbmodel.Model) (err error) {
 	const op = errors.Op("db.AddModel")
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
 	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
 	db := d.DB.WithContext(ctx)
 
 	if err := db.Create(model).Error; err != nil {
@@ -29,11 +35,16 @@ func (d *Database) AddModel(ctx context.Context, model *dbmodel.Model) error {
 
 // GetModel returns model information based on the
 // model UUID.
-func (d *Database) GetModel(ctx context.Context, model *dbmodel.Model) error {
+func (d *Database) GetModel(ctx context.Context, model *dbmodel.Model) (err error) {
 	const op = errors.Op("db.GetModel")
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
 	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
 	db := d.DB.WithContext(ctx)
 	if model.UUID.Valid {
 		db = db.Where("uuid = ?", model.UUID.String)
@@ -64,11 +75,16 @@ func (d *Database) GetModel(ctx context.Context, model *dbmodel.Model) error {
 }
 
 // GetModelsUsingCredential returns all models that use the specified credentials.
-func (d *Database) GetModelsUsingCredential(ctx context.Context, credentialID uint) ([]dbmodel.Model, error) {
+func (d *Database) GetModelsUsingCredential(ctx context.Context, credentialID uint) (_ []dbmodel.Model, err error) {
 	const op = errors.Op("db.GetModelsUsingCredential")
 	if err := d.ready(); err != nil {
 		return nil, errors.E(op, err)
 	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
 	db := d.DB.WithContext(ctx)
 	var models []dbmodel.Model
 	result := db.Where("cloud_credential_id = ?", credentialID).Preload("Controller").Find(&models)
@@ -79,11 +95,16 @@ func (d *Database) GetModelsUsingCredential(ctx context.Context, credentialID ui
 }
 
 // UpdateModel updates the model information.
-func (d *Database) UpdateModel(ctx context.Context, model *dbmodel.Model) error {
+func (d *Database) UpdateModel(ctx context.Context, model *dbmodel.Model) (err error) {
 	const op = errors.Op("db.UpdateModel")
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
 	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
 	db := d.DB.WithContext(ctx)
 	if err := db.Save(model).Error; err != nil {
 		return errors.E(op, dbError(err))
@@ -92,11 +113,15 @@ func (d *Database) UpdateModel(ctx context.Context, model *dbmodel.Model) error 
 }
 
 // DeleteModel removes the model information from the database.
-func (d *Database) DeleteModel(ctx context.Context, model *dbmodel.Model) error {
+func (d *Database) DeleteModel(ctx context.Context, model *dbmodel.Model) (err error) {
 	const op = errors.Op("db.DeleteModel")
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
 	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
 
 	db := d.DB.WithContext(ctx)
 	if err := db.Delete(model, model.ID).Error; err != nil {
@@ -108,12 +133,16 @@ func (d *Database) DeleteModel(ctx context.Context, model *dbmodel.Model) error 
 // ForEachModel iterates through every model calling the given function
 // for each one. If the given function returns an error the iteration
 // will stop immediately and the error will be returned unmodified.
-func (d *Database) ForEachModel(ctx context.Context, f func(m *dbmodel.Model) error) error {
+func (d *Database) ForEachModel(ctx context.Context, f func(m *dbmodel.Model) error) (err error) {
 	const op = errors.Op("db.ForEachModel")
 
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
 	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
 
 	db := d.DB.WithContext(ctx)
 	db = preloadModel("", db)
@@ -146,16 +175,21 @@ func (d *Database) ForEachModel(ctx context.Context, f func(m *dbmodel.Model) er
 
 // GetModelsByUUID retrieves a list of models where the model UUIDs are in
 // the provided modelUUIDs slice.
-func (d *Database) GetModelsByUUID(ctx context.Context, modelUUIDs []string) ([]dbmodel.Model, error) {
+func (d *Database) GetModelsByUUID(ctx context.Context, modelUUIDs []string) (_ []dbmodel.Model, err error) {
 	const op = errors.Op("db.GetModelsByUUID")
 
 	if err := d.ready(); err != nil {
 		return nil, errors.E(op, err)
 	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
 	var models []dbmodel.Model
 	db := d.DB.WithContext(ctx)
 	db = preloadModel("", db)
-	err := db.Where("uuid IN ?", modelUUIDs).Find(&models).Error
+	err = db.Where("uuid IN ?", modelUUIDs).Find(&models).Error
 	if err != nil {
 		err = dbError(err)
 		if errors.ErrorCode(err) == errors.CodeNotFound {

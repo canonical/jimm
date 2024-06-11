@@ -10,13 +10,22 @@ import (
 
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/servermon"
 )
 
 // SetCloudDefaults sets default model setting values for the specified cloud/region.
-func (d *Database) SetCloudDefaults(ctx context.Context, defaults *dbmodel.CloudDefaults) error {
+func (d *Database) SetCloudDefaults(ctx context.Context, defaults *dbmodel.CloudDefaults) (err error) {
 	const op = errors.Op("db.SetCloudDefaults")
 
-	err := d.Transaction(func(d *Database) error {
+	if err := d.ready(); err != nil {
+		return errors.E(op, err)
+	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
+	err = d.Transaction(func(d *Database) error {
 		db := d.DB.WithContext(ctx)
 
 		dbDefaults := dbmodel.CloudDefaults{
@@ -63,10 +72,18 @@ func (d *Database) SetCloudDefaults(ctx context.Context, defaults *dbmodel.Cloud
 }
 
 // UnsetCloudDefaults unsets default model setting values for the specified cloud/region.
-func (d *Database) UnsetCloudDefaults(ctx context.Context, defaults *dbmodel.CloudDefaults, keys []string) error {
+func (d *Database) UnsetCloudDefaults(ctx context.Context, defaults *dbmodel.CloudDefaults, keys []string) (err error) {
 	const op = errors.Op("db.UpsertCloudDefaults")
 
-	err := d.Transaction(func(d *Database) error {
+	if err := d.ready(); err != nil {
+		return errors.E(op, err)
+	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
+	err = d.Transaction(func(d *Database) error {
 		db := d.DB.WithContext(ctx)
 
 		dbDefaults := dbmodel.CloudDefaults{
@@ -106,12 +123,17 @@ func (d *Database) UnsetCloudDefaults(ctx context.Context, defaults *dbmodel.Clo
 }
 
 // CloudDefaults fetches cloud defaults based on user, cloud name or id and region name.
-func (d *Database) CloudDefaults(ctx context.Context, defaults *dbmodel.CloudDefaults) error {
+func (d *Database) CloudDefaults(ctx context.Context, defaults *dbmodel.CloudDefaults) (err error) {
 	const op = errors.Op("db.CloudDefaults")
 
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
 	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
 	db := d.DB.WithContext(ctx)
 
 	db = db.Where("identity_name = ?", defaults.IdentityName)
@@ -135,12 +157,17 @@ func (d *Database) CloudDefaults(ctx context.Context, defaults *dbmodel.CloudDef
 }
 
 // ModelDefaultsForCloud returns the default config values for the specified cloud.
-func (d *Database) ModelDefaultsForCloud(ctx context.Context, user *dbmodel.Identity, cloud names.CloudTag) ([]dbmodel.CloudDefaults, error) {
+func (d *Database) ModelDefaultsForCloud(ctx context.Context, user *dbmodel.Identity, cloud names.CloudTag) (_ []dbmodel.CloudDefaults, err error) {
 	const op = errors.Op("db.ModelDefaultsForCloud")
 
 	if err := d.ready(); err != nil {
 		return nil, errors.E(op, err)
 	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
 	db := d.DB.WithContext(ctx)
 
 	db = db.Where("identity_name = ?", user.Name)

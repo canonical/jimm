@@ -12,11 +12,16 @@ import (
 )
 
 // AddAuditLogEntry adds a new entry to the audit log.
-func (d *Database) AddAuditLogEntry(ctx context.Context, ale *dbmodel.AuditLogEntry) error {
+func (d *Database) AddAuditLogEntry(ctx context.Context, ale *dbmodel.AuditLogEntry) (err error) {
 	const op = errors.Op("db.AddAuditLogEntry")
+
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
 	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
 
 	if err := d.DB.WithContext(ctx).Create(ale).Error; err != nil {
 		return errors.E(op, dbError(err))
@@ -64,11 +69,15 @@ type AuditLogFilter struct {
 // ForEachAuditLogEntry iterates through all audit log entries that match
 // the given filter calling f for each entry. If f returns an error
 // iteration stops immediately and the error is retuned unmodified.
-func (d *Database) ForEachAuditLogEntry(ctx context.Context, filter AuditLogFilter, f func(*dbmodel.AuditLogEntry) error) error {
+func (d *Database) ForEachAuditLogEntry(ctx context.Context, filter AuditLogFilter, f func(*dbmodel.AuditLogEntry) error) (err error) {
 	const op = errors.Op("db.ForEachAuditLogEntry")
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
 	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
 
 	db := d.DB.WithContext(ctx).Model(&dbmodel.AuditLogEntry{})
 	if !filter.Start.IsZero() {
@@ -114,15 +123,22 @@ func (d *Database) ForEachAuditLogEntry(ctx context.Context, filter AuditLogFilt
 
 // CleanupAuditLogs cleans up audit logs after the auditLogRetentionPeriodInDays,
 // HARD deleting them from the database.
-func (d *Database) DeleteAuditLogsBefore(ctx context.Context, before time.Time) (int64, error) {
+func (d *Database) DeleteAuditLogsBefore(ctx context.Context, before time.Time) (_ int64, err error) {
 	const op = errors.Op("db.DeleteAuditLogsBefore")
-	now := time.Now()
+
+	if err := d.ready(); err != nil {
+		return 0, errors.E(op, err)
+	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
 	tx := d.DB.
 		WithContext(ctx).
 		Unscoped().
 		Where("time < ?", before).
 		Delete(&dbmodel.AuditLogEntry{})
-	servermon.QueryTimeAuditLogCleanUpHistogram.Observe(time.Since(now).Seconds())
 	if tx.Error != nil {
 		return 0, errors.E(op, dbError(tx.Error))
 	}

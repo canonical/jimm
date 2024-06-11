@@ -9,13 +9,22 @@ import (
 
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/servermon"
 )
 
 // SetIdentityModelDefaults sets default model setting values for the controller.
-func (d *Database) SetIdentityModelDefaults(ctx context.Context, defaults *dbmodel.IdentityModelDefaults) error {
+func (d *Database) SetIdentityModelDefaults(ctx context.Context, defaults *dbmodel.IdentityModelDefaults) (err error) {
 	const op = errors.Op("db.SetIdentityModelDefaults")
 
-	err := d.Transaction(func(d *Database) error {
+	if err := d.ready(); err != nil {
+		return errors.E(op, err)
+	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
+	err = d.Transaction(func(d *Database) error {
 		db := d.DB.WithContext(ctx)
 
 		dbDefaults := dbmodel.IdentityModelDefaults{
@@ -55,12 +64,17 @@ func (d *Database) SetIdentityModelDefaults(ctx context.Context, defaults *dbmod
 }
 
 // IdentityModelDefaults fetches identities defaults.
-func (d *Database) IdentityModelDefaults(ctx context.Context, defaults *dbmodel.IdentityModelDefaults) error {
+func (d *Database) IdentityModelDefaults(ctx context.Context, defaults *dbmodel.IdentityModelDefaults) (err error) {
 	const op = errors.Op("db.IdentityModelDefaults")
 
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
 	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
 	db := d.DB.WithContext(ctx)
 
 	db = db.Where("identity_name = ?", defaults.IdentityName)

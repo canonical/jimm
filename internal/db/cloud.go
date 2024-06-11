@@ -10,16 +10,21 @@ import (
 
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/servermon"
 )
 
 // AddCloud adds the given cloud to the database. AddCloud returns an error
 // with a code of CodeAlreadyExists if there is already a cloud with the
 // same name.
-func (d *Database) AddCloud(ctx context.Context, c *dbmodel.Cloud) error {
+func (d *Database) AddCloud(ctx context.Context, c *dbmodel.Cloud) (err error) {
 	const op = errors.Op("db.AddCloud")
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
 	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
 
 	db := d.DB.WithContext(ctx)
 	if err := db.Create(c).Error; err != nil {
@@ -35,11 +40,15 @@ func (d *Database) AddCloud(ctx context.Context, c *dbmodel.Cloud) error {
 // GetCloud fills in the given cloud document based on the cloud name. If
 // no cloud is found with the matching name then an error with a code of
 // CodeNotFound will be returned.
-func (d *Database) GetCloud(ctx context.Context, c *dbmodel.Cloud) error {
+func (d *Database) GetCloud(ctx context.Context, c *dbmodel.Cloud) (err error) {
 	const op = errors.Op("db.GetCloud")
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
 	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
 
 	db := d.DB.WithContext(ctx)
 	db = db.Where("name = ?", c.Name)
@@ -55,11 +64,15 @@ func (d *Database) GetCloud(ctx context.Context, c *dbmodel.Cloud) error {
 }
 
 // GetClouds retrieves all the clouds from the database.
-func (d *Database) GetClouds(ctx context.Context) ([]dbmodel.Cloud, error) {
+func (d *Database) GetClouds(ctx context.Context) (_ []dbmodel.Cloud, err error) {
 	const op = errors.Op("db.GetClouds")
 	if err := d.ready(); err != nil {
 		return nil, errors.E(op, err)
 	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
 
 	var clouds []dbmodel.Cloud
 	db := d.DB.WithContext(ctx)
@@ -73,13 +86,17 @@ func (d *Database) GetClouds(ctx context.Context) ([]dbmodel.Cloud, error) {
 // UpdateCloud updates the database definition of the cloud to match the
 // given cloud. UpdateCloud does not update any user information, nor does
 // it remove any information - this is an additive method.
-func (d *Database) UpdateCloud(ctx context.Context, c *dbmodel.Cloud) error {
+func (d *Database) UpdateCloud(ctx context.Context, c *dbmodel.Cloud) (err error) {
 	const op = errors.Op("db.UpdateCloud")
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
 	}
 
-	err := d.DB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
+	err = d.DB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Save(c).Error; err != nil {
 			return err
 		}
@@ -114,11 +131,15 @@ func preloadCloud(prefix string, db *gorm.DB) *gorm.DB {
 // AddCloudRegion adds a new cloud-region to a cloud. AddCloudRegion
 // returns an error with a code of CodeAlreadyExists if there is already a
 // region with the same name on the cloud.
-func (d *Database) AddCloudRegion(ctx context.Context, cr *dbmodel.CloudRegion) error {
+func (d *Database) AddCloudRegion(ctx context.Context, cr *dbmodel.CloudRegion) (err error) {
 	const op = errors.Op("db.AddCloudRegion")
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
 	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
 
 	db := d.DB.WithContext(ctx)
 	if err := db.Create(cr).Error; err != nil {
@@ -133,11 +154,15 @@ func (d *Database) AddCloudRegion(ctx context.Context, cr *dbmodel.CloudRegion) 
 
 // FindRegion finds a region with the given name on a cloud with the given
 // provider type.
-func (d *Database) FindRegion(ctx context.Context, providerType, name string) (*dbmodel.CloudRegion, error) {
+func (d *Database) FindRegion(ctx context.Context, providerType, name string) (_ *dbmodel.CloudRegion, err error) {
 	const op = errors.Op("db.FindRegion")
 	if err := d.ready(); err != nil {
 		return nil, errors.E(op, err)
 	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
 
 	db := d.DB.WithContext(ctx)
 	db = db.Preload("Cloud").Preload("Controllers").Preload("Controllers.Controller")
@@ -151,12 +176,16 @@ func (d *Database) FindRegion(ctx context.Context, providerType, name string) (*
 }
 
 // DeleteCloud deletes the given cloud.
-func (d *Database) DeleteCloud(ctx context.Context, c *dbmodel.Cloud) error {
+func (d *Database) DeleteCloud(ctx context.Context, c *dbmodel.Cloud) (err error) {
 	const op = errors.Op("db.DeleteCloud")
 
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
 	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
 
 	db := d.DB.WithContext(ctx)
 	if err := db.Delete(c).Error; err != nil {
@@ -166,12 +195,16 @@ func (d *Database) DeleteCloud(ctx context.Context, c *dbmodel.Cloud) error {
 }
 
 // DeleteCloudRegionControllerPriority deletes the given cloud region controller priority entry.
-func (d *Database) DeleteCloudRegionControllerPriority(ctx context.Context, c *dbmodel.CloudRegionControllerPriority) error {
+func (d *Database) DeleteCloudRegionControllerPriority(ctx context.Context, c *dbmodel.CloudRegionControllerPriority) (err error) {
 	const op = errors.Op("db.DeleteCloudRegionControllerPriority")
 
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
 	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
 
 	db := d.DB.WithContext(ctx)
 	if err := db.Delete(c).Error; err != nil {

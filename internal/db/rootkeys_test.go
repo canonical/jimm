@@ -68,7 +68,7 @@ func TestFindLatestKeyUnconfiguredDatabase(t *testing.T) {
 	var d db.Database
 	now := time.Now().UTC().Round(time.Millisecond)
 	rk, err := d.FindLatestKey(now.Add(-24*time.Hour), now.Add(24*time.Hour), now.Add(48*time.Hour))
-	c.Assert(err, qt.IsNil)
+	c.Assert(err, qt.DeepEquals, bakery.ErrNotFound)
 	c.Check(rk, qt.DeepEquals, dbrootkeystore.RootKey{})
 }
 

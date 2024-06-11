@@ -163,7 +163,7 @@ func TestUpdateControllerUnconfiguredDatabase(t *testing.T) {
 	c := qt.New(t)
 
 	var d db.Database
-	err := d.UpdateController(context.Background(), &dbmodel.Controller{})
+	err := d.UpdateController(context.Background(), &dbmodel.Controller{ID: 1})
 	c.Check(err, qt.ErrorMatches, `database not configured`)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeServerConfiguration)
 }
