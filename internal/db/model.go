@@ -183,6 +183,7 @@ func preloadModel(prefix string, db *gorm.DB) *gorm.DB {
 }
 
 // GetModelsByController retrieves a list of models hosted on the specified controller.
+// Note that because we do not preload here, foreign key references will be empty.
 func (d *Database) GetModelsByController(ctx context.Context, ctl dbmodel.Controller) ([]dbmodel.Model, error) {
 	const op = errors.Op("db.GetModelsByController")
 
@@ -191,7 +192,7 @@ func (d *Database) GetModelsByController(ctx context.Context, ctl dbmodel.Contro
 	}
 	var models []dbmodel.Model
 	db := d.DB.WithContext(ctx)
-	if err := db.Model(ctl).Association("Models").Delete(&models); err != nil {
+	if err := db.Model(ctl).Association("Models").Find(&models); err != nil {
 		return nil, errors.E(op, dbError(err))
 	}
 	return models, nil
