@@ -4,6 +4,8 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
+	"fmt"
 	"net/http"
 	"net/url"
 	"os"
@@ -135,6 +137,15 @@ func start(ctx context.Context, s *service.Service) error {
 		return errors.E("jimm session cookie max age cannot be less than 0")
 	}
 
+	sessionStoreSecretB64 := os.Getenv("JIMM_SESSION_SECRET_KEY")
+	if sessionStoreSecretB64 == "" {
+		return errors.E("jimm session secret key value is missing")
+	}
+	sessionStoreSecret, err := base64.StdEncoding.DecodeString(sessionStoreSecretB64)
+	if err != nil {
+		return errors.E(fmt.Sprintf("failed to decode session secret key: %s", err.Error()))
+	}
+
 	jimmsvc, err := jimm.NewService(ctx, jimm.Params{
 		ControllerUUID:    os.Getenv("JIMM_UUID"),
 		DSN:               os.Getenv("JIMM_DSN"),
@@ -169,17 +180,20 @@ func start(ctx context.Context, s *service.Service) error {
 		},
 		DashboardFinalRedirectURL: os.Getenv("JIMM_DASHBOARD_FINAL_REDIRECT_URL"),
 		SecureSessionCookies:      secureSessionCookies,
+		SessionStoreSecret:        sessionStoreSecret,
 	})
 	if err != nil {
 		return err
 	}
 
-	if os.Getenv("JIMM_WATCH_CONTROLLERS") != "" {
+	isLeader := os.Getenv("JIMM_IS_LEADER") != ""
+	// Remove extra check besides isLeader once the charm is updated.
+	if isLeader || os.Getenv("JIMM_WATCH_CONTROLLERS") != "" {
 		s.Go(func() error { return jimmsvc.WatchControllers(ctx) }) // Deletes dead/dying models, updates model config.
 	}
-	s.Go(func() error { return jimmsvc.WatchModelSummaries(ctx) })
 
-	if os.Getenv("JIMM_ENABLE_JWKS_ROTATOR") != "" {
+	// Remove extra check besides isLeader once the charm is updated.
+	if isLeader || os.Getenv("JIMM_ENABLE_JWKS_ROTATOR") != "" {
 		zapctx.Info(ctx, "attempting to start JWKS rotator and generate OAuth secret key")
 		s.Go(func() error {
 			if err := jimmsvc.StartJWKSRotator(ctx, time.NewTicker(time.Hour).C, time.Now().UTC().AddDate(0, 3, 0)); err != nil {

@@ -63,10 +63,4 @@ type CredentialStore interface {
 
 	// PutOAuthSecret puts a HS256 (symmetric encryption) secret into the credentials store for signing OAuth session tokens.
 	PutOAuthSecret(ctx context.Context, raw []byte) error
-
-	// GetOAuthSessionStoreSecret returns the current secret used to store session tokens.
-	GetOAuthSessionStoreSecret(ctx context.Context) ([]byte, error)
-
-	// PutOAuthSessionStoreSecret puts a secret into the credentials store for secure storage of session tokens.
-	PutOAuthSessionStoreSecret(ctx context.Context, raw []byte) error
 }

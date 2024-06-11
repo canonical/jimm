@@ -224,29 +224,3 @@ func (s *InMemoryCredentialStore) PutOAuthSecret(ctx context.Context, raw []byte
 
 	return nil
 }
-
-// GetOAuthSessionStoreSecret returns the current secret used to store session tokens.
-func (s *InMemoryCredentialStore) GetOAuthSessionStoreSecret(ctx context.Context) ([]byte, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	if s.oauthSessionStoreSecret == nil || len(s.oauthSessionStoreSecret) == 0 {
-		return nil, errors.E(errors.CodeNotFound)
-	}
-
-	key := make([]byte, len(s.oauthSessionStoreSecret))
-	copy(key, s.oauthSessionStoreSecret)
-
-	return key, nil
-}
-
-// PutOAuthSessionStoreSecret puts a secret into the credentials store for secure storage of session tokens.
-func (s *InMemoryCredentialStore) PutOAuthSessionStoreSecret(ctx context.Context, raw []byte) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	s.oauthSessionStoreSecret = make([]byte, len(raw))
-	copy(s.oauthSessionStoreSecret, raw)
-
-	return nil
-}

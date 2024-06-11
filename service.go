@@ -173,6 +173,9 @@ type Params struct {
 	// SecureSessionCookies determines if HTTPS must be enabled in order for JIMM
 	// to set cookies when creating browser based sessions.
 	SecureSessionCookies bool
+
+	// Randomly generated secret passed via config used for securely storing session data.
+	SessionStoreSecret []byte
 }
 
 // A Service is the implementation of a JIMM server.
@@ -203,6 +206,8 @@ func (s *Service) WatchControllers(ctx context.Context) error {
 	return w.Watch(ctx, 10*time.Minute)
 }
 
+// (UNUSED) Previously used to watch all models and pass messages about
+// updates to models.
 // WatchModelSummaries connects to all controllers and starts a
 // ModelSummaryWatcher for all models. WatchModelSummaries finishes when
 // the given context is canceled, or there is a fatal error watching model
@@ -299,7 +304,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		return nil, errors.E(op, err)
 	}
 
-	sessionStore, err := s.setupSessionStore(ctx)
+	sessionStore, err := s.setupSessionStore(ctx, p.SessionStoreSecret)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
@@ -428,7 +433,7 @@ func (s *Service) setupDischarger(p Params) (*discharger.MacaroonDischarger, err
 	return MacaroonDischarger, nil
 }
 
-func (s *Service) setupSessionStore(ctx context.Context) (*pgstore.PGStore, error) {
+func (s *Service) setupSessionStore(ctx context.Context, sessionSecret []byte) (*pgstore.PGStore, error) {
 	const op = errors.Op("setupSessionStore")
 
 	if s.jimm.CredentialStore == nil {
@@ -440,20 +445,9 @@ func (s *Service) setupSessionStore(ctx context.Context) (*pgstore.PGStore, erro
 		return nil, errors.E(op, err)
 	}
 
-	oauthSessionStoreSecret, err := s.jimm.CredentialStore.GetOAuthSessionStoreSecret(ctx)
-	if err == nil {
-		zapctx.Info(ctx, "detected existing OAuth session store secret")
-	} else if errors.ErrorCode(err) == errors.CodeNotFound {
-		oauthSessionStoreSecret, err = generateOAuthSessionStoreSecret(ctx, s.jimm.CredentialStore)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		return nil, errors.E(op, err, "failed to read session store secret")
-	}
-
-	store, err := pgstore.NewPGStoreFromPool(sqlDb, oauthSessionStoreSecret)
+	store, err := pgstore.NewPGStoreFromPool(sqlDb, sessionSecret)
 	if err != nil {
+		zapctx.Error(ctx, "failed to create session store", zap.Error(err))
 		return nil, errors.E(op, err, "failed to create session store")
 	}
 
@@ -464,21 +458,6 @@ func (s *Service) setupSessionStore(ctx context.Context) (*pgstore.PGStore, erro
 		return nil
 	})
 	return store, nil
-}
-
-func generateOAuthSessionStoreSecret(ctx context.Context, store jimmcreds.CredentialStore) ([]byte, error) {
-	const op = errors.Op("generateOAuthSessionStoreSecret")
-	secret := make([]byte, 64)
-	if _, err := rand.Read(secret); err != nil {
-		zapctx.Error(ctx, "failed to generate OAuth session store secret", zap.Error(err))
-		return nil, errors.E(op, err, "failed to generate OAuth session store secret")
-	}
-
-	if err := store.PutOAuthSessionStoreSecret(ctx, secret); err != nil {
-		zapctx.Error(ctx, "failed to store generated OAuth session store secret", zap.Error(err))
-		return nil, errors.E(op, err, "failed to store generated OAuth session store secret")
-	}
-	return secret, nil
 }
 
 func openDB(ctx context.Context, dsn string) (*gorm.DB, error) {

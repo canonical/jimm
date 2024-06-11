@@ -449,9 +449,6 @@ func (s *VaultStore) CleanupOAuthSecrets(ctx context.Context) (err error) {
 	if err := client.KVv2(s.KVPath).Delete(ctx, s.GetOAuthSecretPath()); err != nil {
 		return errors.E(op, err)
 	}
-	if err := client.KVv2(s.KVPath).Delete(ctx, s.GetOAuthSessionStoreSecretPath()); err != nil {
-		return errors.E(op, err)
-	}
 	return nil
 }
 
@@ -530,77 +527,6 @@ func (s *VaultStore) PutOAuthSecret(ctx context.Context, raw []byte) (err error)
 // the initial KVPath) to the OAuth JWK location.
 func (s *VaultStore) GetOAuthSecretPath() string {
 	return path.Join(s.GetOAuthSecretsBasePath(), "key")
-}
-
-// GetOAuthSessionStoreSecret returns the current secret used to store session tokens.
-func (s *VaultStore) GetOAuthSessionStoreSecret(ctx context.Context) (_ []byte, err error) {
-	const op = errors.Op("vault.GetOAuthSessionStoreSecret")
-
-	durationObserver := servermon.DurationObserver(servermon.VaultCallDurationHistogram, string(op))
-	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.VaultCallErrorCount, &err, string(op))
-
-	client, err := s.client(ctx)
-	if err != nil {
-		return nil, errors.E(op, err)
-	}
-
-	secret, err := client.KVv2(s.KVPath).Get(ctx, s.GetOAuthSessionStoreSecretPath())
-	if err != nil && goerr.Unwrap(err) != api.ErrSecretNotFound {
-		return nil, errors.E(op, err)
-	}
-
-	if secret == nil || secret.Data == nil {
-		msg := "no OAuth session store secret exists"
-		zapctx.Debug(ctx, msg)
-		return nil, errors.E(op, errors.CodeNotFound, msg)
-	}
-
-	raw, ok := secret.Data[oAuthSessionStoreSecretKey]
-	if !ok {
-		msg := "nil OAuth session store secret data"
-		zapctx.Debug(ctx, msg)
-		return nil, errors.E(op, errors.CodeNotFound, msg)
-	}
-
-	keyPemB64, ok := raw.(string)
-	if !ok {
-		zapctx.Debug(ctx, "oauth session store secret is not a string")
-		return nil, errors.E(op, errors.CodeNotFound, "oauth session store secret not found")
-	}
-
-	keyPem, err := base64.StdEncoding.DecodeString(keyPemB64)
-	if err != nil {
-		return nil, errors.E(op, err)
-	}
-
-	return keyPem, nil
-}
-
-// PutOAuthSessionStoreSecret puts a secret into the credentials store for secure storage of session tokens.
-func (s *VaultStore) PutOAuthSessionStoreSecret(ctx context.Context, raw []byte) (err error) {
-	const op = errors.Op("vault.PutOAuthSessionStoreSecret")
-
-	durationObserver := servermon.DurationObserver(servermon.VaultCallDurationHistogram, string(op))
-	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.VaultCallErrorCount, &err, string(op))
-
-	client, err := s.client(ctx)
-	if err != nil {
-		return errors.E(op, err)
-	}
-
-	oAuthSecretData := map[string]interface{}{oAuthSessionStoreSecretKey: raw}
-	if _, err := client.KVv2(s.KVPath).Put(ctx, s.GetOAuthSessionStoreSecretPath(), oAuthSecretData); err != nil {
-		return errors.E(op, err)
-	}
-	return nil
-}
-
-// GetOAuthSessionStoreSecretPath returns a hardcoded suffixed vault path
-// (dependent on the initial KVPath) to the OAuth session storage secret.
-func (s *VaultStore) GetOAuthSessionStoreSecretPath() string {
-	return path.Join(s.GetOAuthSecretsBasePath(), "session-store")
 }
 
 // deleteControllerCredentials removes the credentials associated with the controller in
