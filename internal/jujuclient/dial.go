@@ -236,9 +236,9 @@ func (c *Connection) redial(ctx context.Context, requiredPermissions map[string]
 // the server and waits for the response to be returned or the context to
 // be canceled.
 func (c *Connection) Call(ctx context.Context, facade string, version int, id, method string, args, resp interface{}) (err error) {
-	labels := []string{facade, method, "", c.mt.Id()}
+	labels := []string{facade, method, ""}
 	if c.ctl != nil {
-		labels = []string{facade, method, c.ctl.UUID, c.mt.Id()}
+		labels = []string{facade, method, c.ctl.UUID}
 	}
 	durationObserver := servermon.DurationObserver(servermon.JujuCallDurationHistogram, labels...)
 	defer durationObserver()

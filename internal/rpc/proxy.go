@@ -56,7 +56,6 @@ type WebsocketConnection interface {
 type WebsocketConnectionWithMetadata struct {
 	Conn           WebsocketConnection
 	ControllerUUID string
-	ModelUUID      string
 	ModelName      string
 }
 
@@ -170,8 +169,7 @@ func (c *writeLockConn) sendMessage(responseObject any, request *message) {
 }
 
 type inflightMsgs struct {
-	controlerUUID string
-	modelUUID     string
+	controllerUUID string
 
 	mu           sync.Mutex
 	loginMessage *message
@@ -205,8 +203,7 @@ func (msgs *inflightMsgs) removeMessage(msg *message) {
 	servermon.JujuCallDurationHistogram.WithLabelValues(
 		msg.Type,
 		msg.Request,
-		msgs.controlerUUID,
-		msgs.modelUUID,
+		msgs.controllerUUID,
 	).Observe(time.Since(msg.start).Seconds())
 
 	msgs.mu.Lock()
@@ -248,7 +245,7 @@ func (p *modelProxy) sendError(socket *writeLockConn, req *message, err error) {
 		socket.writeJson(msg)
 	}
 	// An error message is a response back to the client.
-	servermon.JujuCallErrorCount.WithLabelValues(req.Type, req.Request, p.msgs.controlerUUID, p.msgs.modelUUID)
+	servermon.JujuCallErrorCount.WithLabelValues(req.Type, req.Request, p.msgs.controllerUUID)
 	p.auditLogMessage(msg, true)
 }
 
@@ -316,7 +313,6 @@ func (p *clientProxy) start(ctx context.Context) error {
 			p.dst.conn.Close()
 		}
 	}()
-
 	for {
 		zapctx.Debug(ctx, "Reading on client connection")
 		msg := new(message)
@@ -324,7 +320,6 @@ func (p *clientProxy) start(ctx context.Context) error {
 			// Error reading on the socket implies it is closed, simply return.
 			return err
 		}
-
 		zapctx.Debug(ctx, "Read message from client", zap.Any("message", msg))
 		err := p.makeControllerConnection(ctx)
 		if err != nil {
@@ -340,7 +335,7 @@ func (p *clientProxy) start(ctx context.Context) error {
 			toClient, toController, err := p.handleAdminFacade(ctx, msg)
 			if err != nil {
 				p.sendError(p.src, msg, err)
-				return nil
+				continue
 			}
 			if toClient != nil {
 				p.src.sendMessage(nil, toClient)
@@ -353,16 +348,15 @@ func (p *clientProxy) start(ctx context.Context) error {
 			zapctx.Error(ctx, "Invalid request ID 0")
 			err := errors.E(op, "Invalid request ID 0")
 			p.sendError(p.src, msg, err)
-			return nil
+			continue
 		}
 		p.msgs.addMessage(msg)
 		zapctx.Debug(ctx, "Writing to controller")
-
 		if err := p.dst.writeJson(msg); err != nil {
 			zapctx.Error(ctx, "clientProxy error writing to dst", zap.Error(err))
 			p.sendError(p.src, msg, err)
 			p.msgs.removeMessage(msg)
-			return nil
+			continue
 		}
 	}
 }
@@ -386,8 +380,7 @@ func (p *clientProxy) makeControllerConnection(ctx context.Context) error {
 		return err
 	}
 
-	p.msgs.controlerUUID = connWithMetadata.ControllerUUID
-	p.msgs.modelUUID = connWithMetadata.ModelUUID
+	p.msgs.controllerUUID = connWithMetadata.ControllerUUID
 
 	p.modelName = connWithMetadata.ModelName
 	p.dst = &writeLockConn{conn: connWithMetadata.Conn}

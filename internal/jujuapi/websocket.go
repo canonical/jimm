@@ -191,7 +191,6 @@ func controllerConnectionFunc(s modelProxyServer, jwtGenerator *jimm.JWTGenerato
 		return jimmRPC.WebsocketConnectionWithMetadata{
 			Conn:           controllerConn,
 			ControllerUUID: m.Controller.UUID,
-			ModelUUID:      m.UUID.String,
 			ModelName:      fullModelName,
 		}, nil
 	}

@@ -254,7 +254,6 @@ func TestProxySocketsAdminFacade(t *testing.T) {
 					return rpc.WebsocketConnectionWithMetadata{
 						Conn:           controllerWebsocket,
 						ModelName:      "test model",
-						ModelUUID:      uuid.NewString(),
 						ControllerUUID: uuid.NewString(),
 					}, nil
 				},
