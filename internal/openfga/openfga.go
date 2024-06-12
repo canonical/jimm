@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/servermon"
 	cofga "github.com/canonical/ofga"
 	"github.com/juju/names/v5"
 
@@ -124,17 +125,35 @@ func (o *OFGAClient) listObjects(ctx context.Context, user *Tag, relation Relati
 }
 
 // AddRelation adds given relations (tuples).
-func (o *OFGAClient) AddRelation(ctx context.Context, tuples ...Tuple) error {
+func (o *OFGAClient) AddRelation(ctx context.Context, tuples ...Tuple) (err error) {
+	op := errors.Op("openfga.AddRelation")
+
+	durationObserver := servermon.DurationObserver(servermon.OpenFGACallDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.OpenFGACallErrorCount, &err, string(op))
+
 	return o.cofgaClient.AddRelation(ctx, tuples...)
 }
 
 // RemoveRelation removes given relations (tuples).
-func (o *OFGAClient) RemoveRelation(ctx context.Context, tuples ...Tuple) error {
+func (o *OFGAClient) RemoveRelation(ctx context.Context, tuples ...Tuple) (err error) {
+	op := errors.Op("openfga.RemoveRelation")
+
+	durationObserver := servermon.DurationObserver(servermon.OpenFGACallDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.OpenFGACallErrorCount, &err, string(op))
+
 	return o.cofgaClient.RemoveRelation(ctx, tuples...)
 }
 
 // ListObjects returns all object IDs of <objType> that a user has the relation <relation> to.
-func (o *OFGAClient) ListObjects(ctx context.Context, user *Tag, relation Relation, objType Kind, contextualTuples []Tuple) ([]Tag, error) {
+func (o *OFGAClient) ListObjects(ctx context.Context, user *Tag, relation Relation, objType Kind, contextualTuples []Tuple) (_ []Tag, err error) {
+	op := errors.Op("openfga.ListObjects")
+
+	durationObserver := servermon.DurationObserver(servermon.OpenFGACallDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.OpenFGACallErrorCount, &err, string(op))
+
 	return o.listObjects(ctx, user, relation, objType, contextualTuples)
 }
 
@@ -143,14 +162,26 @@ func (o *OFGAClient) ListObjects(ctx context.Context, user *Tag, relation Relati
 // See: https://openfga.dev/api/service#/Relationship%20Tuples/Read
 //
 // You may read via pagination utilising the continuation token returned from the request.
-func (o *OFGAClient) ReadRelatedObjects(ctx context.Context, tuple Tuple, pageSize int32, continuationToken string) ([]Tuple, string, error) {
+func (o *OFGAClient) ReadRelatedObjects(ctx context.Context, tuple Tuple, pageSize int32, continuationToken string) (_ []Tuple, _ string, err error) {
+	op := errors.Op("openfga.ReadRelatedObjects")
+
+	durationObserver := servermon.DurationObserver(servermon.OpenFGACallDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.OpenFGACallErrorCount, &err, string(op))
+
 	return o.getRelatedObjects(ctx, tuple, pageSize, continuationToken)
 }
 
 // CheckRelation verifies that a user (or object) is allowed to access the target object by the specified relation.
 //
 // It will return a bool of simply true or false, denoting authorisation, and an error.
-func (o *OFGAClient) CheckRelation(ctx context.Context, tuple Tuple, trace bool) (bool, error) {
+func (o *OFGAClient) CheckRelation(ctx context.Context, tuple Tuple, trace bool) (_ bool, err error) {
+	op := errors.Op("openfga.CheckRelation")
+
+	durationObserver := servermon.DurationObserver(servermon.OpenFGACallDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.OpenFGACallErrorCount, &err, string(op))
+
 	if trace {
 		return o.cofgaClient.CheckRelationWithTracing(ctx, tuple)
 	}
@@ -158,7 +189,13 @@ func (o *OFGAClient) CheckRelation(ctx context.Context, tuple Tuple, trace bool)
 }
 
 // removeTuples iteratively reads through all the tuples with the parameters as supplied by tuple and deletes them.
-func (o *OFGAClient) removeTuples(ctx context.Context, tuple Tuple) error {
+func (o *OFGAClient) removeTuples(ctx context.Context, tuple Tuple) (err error) {
+	op := errors.Op("openfga.removeTuples")
+
+	durationObserver := servermon.DurationObserver(servermon.OpenFGACallDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.OpenFGACallErrorCount, &err, string(op))
+
 	// Note (babakks): an obvious improvement to this function is to make it work
 	// atomically and remove all the tuples in a transaction. At the moment, it's
 	// not simple, because OpenFGA supports limited number of write operation per
