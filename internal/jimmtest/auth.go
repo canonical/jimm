@@ -71,14 +71,14 @@ func NewMockOAuthAuthenticator(secretKey string) MockOAuthAuthenticator {
 
 // VerifySessionToken provides the mock implementation for verifying session tokens.
 // Allowing JIMM tests to create their own session tokens that will always be accepted.
-// Notice that no key is passed to jwt.Parse to skip JWT signature verification.
+// Notice the use of jwt.ParseInsecure to skip JWT signature verification.
 func (m MockOAuthAuthenticator) VerifySessionToken(token string) (jwt.Token, error) {
 	decodedToken, err := base64.StdEncoding.DecodeString(token)
 	if err != nil {
 		return nil, errors.New("authentication failed, failed to decode token")
 	}
 
-	parsedToken, err := jwt.Parse(decodedToken)
+	parsedToken, err := jwt.ParseInsecure(decodedToken)
 	if err != nil {
 		return nil, err
 	}
