@@ -1,0 +1,58 @@
+name: jimm
+base: ubuntu@22.04
+version: '0.1'
+summary: Juju Intelligent Model Manager provides a convient way to manage all of your models!
+description: |
+    JIMM is a juju controller, used in conjunction with the JaaS dashboard to provide a seamless way
+    to manage models, regardless of where their controllers reside or what cloud they may be running on.
+
+license: GPL-3.0
+platforms:
+    amd64:
+
+services:
+    server:
+        summary: JIMM
+        description: |
+            JIMM is a juju controller, used in conjunction with the JaaS dashboard to provide a seamless way
+            to manage models, regardless of where their controllers reside or what cloud they may be running on.
+        startup: enabled
+        override: replace
+        command: jimmsrv
+        on-success: ignore
+        on-failure: restart
+        backoff-delay: 1s
+        backoff-factor: 2
+        backoff-limit: 10s
+        kill-delay: 10s
+
+parts:
+    builder: 
+        plugin: go # https://canonical-craft-parts--694.com.readthedocs.build/en/694/common/craft-parts/reference/plugins/go_plugin.html
+        source: .
+        source-type: local
+        build-snaps:
+        - go/1.22/stable
+        build-packages:
+          - git
+          - make 
+        build-environment:
+            - GOOS: linux
+        override-build: |
+            set -ex
+
+            mkdir -p $CRAFT_PART_INSTALL/usr/local/bin
+
+            make build/server
+            cp ./jimmsrv $CRAFT_PART_INSTALL/usr/local/bin
+
+            # The location of SQL files isn't configurable right now, as such we just 
+            # place it in bin
+            cp -r ./internal/dbmodel/sql $CRAFT_PART_INSTALL/usr/local/bin/sql
+
+            # Copied for the charm to collect and apply, not this container itself
+            mkdir -p $CRAFT_PART_INSTALL/root/openfga/
+            cp ./openfga/authorisation_model.json $CRAFT_PART_INSTALL/root/openfga/authorisation_model.json
+           
+        stage-packages:
+            - ca-certificates

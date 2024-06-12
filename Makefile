@@ -68,9 +68,6 @@ version/version.txt: FORCE
         echo $(GIT_VERSION) > version/version.txt; \
     fi
 
-jimmsrv: version/commit.txt version/version.txt
-	go build -tags release -v $(PROJECT)/cmd/jemd
-
 jimm-image:
 	docker build --target deploy-env \
 	--build-arg="GIT_COMMIT=$(GIT_COMMIT)" \
@@ -98,8 +95,15 @@ push-microk8s: jimm-image
 	docker tag jimm:latest localhost:32000/jimm:latest
 	docker push localhost:32000/jimm:latest
 
-get-local-auth:
-	@go run ./local/authy
+rock:
+	-rm *.rock
+	-ln -s ./rocks/jimm.yaml ./rockcraft.yaml
+	rockcraft pack
+	-rm ./rockcraft.yaml
+
+load-rock: 
+	$(eval jimm_version := $(shell cat ./rocks/jimm.yaml | yq ".version"))
+	@sudo /snap/rockcraft/current/bin/skopeo --insecure-policy copy oci-archive:jimm_${jimm_version}_amd64.rock docker-daemon:jimm:latest
 
 define check_dep
     if ! which $(1) > /dev/null; then\
