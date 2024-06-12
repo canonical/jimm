@@ -135,8 +135,8 @@ func start(ctx context.Context, s *service.Service) error {
 		return errors.E("jimm session cookie max age cannot be less than 0")
 	}
 
-	sessionStoreSecret := os.Getenv("JIMM_SESSION_SECRET_KEY")
-	if sessionStoreSecret == "" || len(sessionStoreSecret) < 64 {
+	sessionSecretKey := os.Getenv("JIMM_SESSION_SECRET_KEY")
+	if len(sessionSecretKey) < 64 {
 		return errors.E("jimm session store secret must be at least 64 characters")
 	}
 
@@ -171,24 +171,23 @@ func start(ctx context.Context, s *service.Service) error {
 			Scopes:              scopesParsed,
 			SessionTokenExpiry:  sessionTokenExpiryDuration,
 			SessionCookieMaxAge: sessionCookieMaxAgeInt,
-			SessionSecretKey:    sessionStoreSecret,
+			JWTSessionKey:       sessionSecretKey,
 		},
 		DashboardFinalRedirectURL: os.Getenv("JIMM_DASHBOARD_FINAL_REDIRECT_URL"),
 		SecureSessionCookies:      secureSessionCookies,
-		SessionStoreSecret:        []byte(sessionStoreSecret),
+		CookieSessionKey:          []byte(sessionSecretKey),
 	})
 	if err != nil {
 		return err
 	}
 
 	isLeader := os.Getenv("JIMM_IS_LEADER") != ""
-	// Remove extra check besides isLeader once the charm is updated.
-	if isLeader || os.Getenv("JIMM_WATCH_CONTROLLERS") != "" {
+	if isLeader {
 		s.Go(func() error { return jimmsvc.WatchControllers(ctx) }) // Deletes dead/dying models, updates model config.
 	}
+	s.Go(func() error { return jimmsvc.WatchModelSummaries(ctx) })
 
-	// Remove extra check besides isLeader once the charm is updated.
-	if isLeader || os.Getenv("JIMM_ENABLE_JWKS_ROTATOR") != "" {
+	if isLeader {
 		zapctx.Info(ctx, "attempting to start JWKS rotator and generate OAuth secret key")
 		s.Go(func() error {
 			if err := jimmsvc.StartJWKSRotator(ctx, time.NewTicker(time.Hour).C, time.Now().UTC().AddDate(0, 3, 0)); err != nil {

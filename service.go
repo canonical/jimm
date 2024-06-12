@@ -80,9 +80,9 @@ type OAuthAuthenticatorParams struct {
 	// SessionCookieMaxAge holds the max age for session cookies in seconds.
 	SessionCookieMaxAge int
 
-	// sessionSecretKey holds the secret key used for signing/verifying JWT tokens.
+	// JWTSessionKey holds the secret key used for signing/verifying JWT tokens.
 	// See internal/auth/oauth2.go AuthenticationService.SessionSecretkey for more details.
-	SessionSecretKey string
+	JWTSessionKey string
 }
 
 // A Params structure contains the parameters required to initialise a new
@@ -177,10 +177,10 @@ type Params struct {
 	// to set cookies when creating browser based sessions.
 	SecureSessionCookies bool
 
-	// Randomly generated secret passed via config used for securely storing cookie session data.
-	// The recommended length is 32/64 characters from the Gorilla securecookie lib.
+	// CookieSessionKey is a randomly generated secret passed via config used for signing
+	// cookie data. The recommended length is 32/64 characters from the Gorilla securecookie lib.
 	// https://github.com/gorilla/securecookie/blob/main/securecookie.go#L124
-	SessionStoreSecret []byte
+	CookieSessionKey []byte
 }
 
 // A Service is the implementation of a JIMM server.
@@ -211,8 +211,6 @@ func (s *Service) WatchControllers(ctx context.Context) error {
 	return w.Watch(ctx, 10*time.Minute)
 }
 
-// (UNUSED) Previously used to watch all models and pass messages about
-// updates to models.
 // WatchModelSummaries connects to all controllers and starts a
 // ModelSummaryWatcher for all models. WatchModelSummaries finishes when
 // the given context is canceled, or there is a fatal error watching model
@@ -309,7 +307,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		return nil, errors.E(op, err)
 	}
 
-	sessionStore, err := s.setupSessionStore(ctx, p.SessionStoreSecret)
+	sessionStore, err := s.setupSessionStore(ctx, p.CookieSessionKey)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
@@ -328,7 +326,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 			Scopes:              p.OAuthAuthenticatorParams.Scopes,
 			SessionTokenExpiry:  p.OAuthAuthenticatorParams.SessionTokenExpiry,
 			SessionCookieMaxAge: p.OAuthAuthenticatorParams.SessionCookieMaxAge,
-			SessionSecretKey:    p.OAuthAuthenticatorParams.SessionSecretKey,
+			JWTSessionKey:       p.OAuthAuthenticatorParams.JWTSessionKey,
 			Store:               &s.jimm.Database,
 			SessionStore:        sessionStore,
 			RedirectURL:         redirectUrl,

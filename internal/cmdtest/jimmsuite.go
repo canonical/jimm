@@ -79,7 +79,7 @@ func (s *JimmCmdSuite) SetUpTest(c *gc.C) {
 	}
 	s.Params.JWTExpiryDuration = time.Minute
 	s.Params.InsecureSecretStorage = true
-	s.Params.SessionStoreSecret = []byte("test-secret")
+	s.Params.CookieSessionKey = []byte("test-secret")
 
 	srv, err := service.NewService(ctx, s.Params)
 	c.Assert(err, gc.Equals, nil)

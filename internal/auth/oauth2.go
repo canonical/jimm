@@ -76,11 +76,11 @@ type AuthenticationService struct {
 	sessionTokenExpiry time.Duration
 	// sessionCookieMaxAge holds the max age for session cookies in seconds.
 	sessionCookieMaxAge int
-	// sessionSecretKey holds the secret key used for signing/verifying JWT tokens.
+	// jwtSessionKey holds the secret key used for signing/verifying JWT tokens.
 	// According to https://datatracker.ietf.org/doc/html/rfc7518 minimum key lengths are
 	// HSXXX e.g. HS256 - 256 bits, RSA - at least 2048 bits.
 	// In JIMM we use HS256, requiring a minimum of 32 bytes for the secret key.
-	sessionSecretKey string
+	jwtSessionKey string
 	// The key algorithm to use for verifying/signing JWTs.
 	signingAlg jwa.KeyAlgorithm
 
@@ -119,9 +119,9 @@ type AuthenticationServiceParams struct {
 	// SessionCookieMaxAge holds the max age for session cookies in seconds.
 	SessionCookieMaxAge int
 
-	// sessionSecretKey holds the secret key used for signing/verifying JWT tokens.
-	// See AuthenticationService.SessionSecretKey for more details.
-	SessionSecretKey string
+	// JWTSessionKey holds the secret key used for signing/verifying JWT tokens.
+	// See AuthenticationService.JWTSessionKey for more details.
+	JWTSessionKey string
 
 	// RedirectURL is the URL for handling the exchange of authorisation
 	// codes into access tokens (and id tokens), for JIMM, this is expected
@@ -158,7 +158,7 @@ func NewAuthenticationService(ctx context.Context, params AuthenticationServiceP
 			RedirectURL:  params.RedirectURL,
 		},
 		sessionTokenExpiry:  params.SessionTokenExpiry,
-		sessionSecretKey:    params.SessionSecretKey,
+		jwtSessionKey:       params.JWTSessionKey,
 		signingAlg:          jwa.HS256,
 		db:                  params.Store,
 		sessionStore:        params.SessionStore,
@@ -310,7 +310,7 @@ func (as *AuthenticationService) MintSessionToken(email string) (string, error) 
 		return "", errors.E(op, err, "failed to build access token")
 	}
 
-	freshToken, err := jwt.Sign(token, jwt.WithKey(as.signingAlg, []byte(as.sessionSecretKey)))
+	freshToken, err := jwt.Sign(token, jwt.WithKey(as.signingAlg, []byte(as.jwtSessionKey)))
 	if err != nil {
 		zapctx.Error(context.Background(), "failed to sign access token", zap.Error(err))
 		return "", errors.E(op, err, "failed to sign access token")
@@ -343,7 +343,7 @@ func (as *AuthenticationService) VerifySessionToken(token string) (_ jwt.Token, 
 		return nil, errors.E(op, fmt.Sprintf("authentication failed, failed to decode token: %s", err))
 	}
 
-	parsedToken, err := jwt.Parse(decodedToken, jwt.WithKey(as.signingAlg, []byte(as.sessionSecretKey)))
+	parsedToken, err := jwt.Parse(decodedToken, jwt.WithKey(as.signingAlg, []byte(as.jwtSessionKey)))
 	if err != nil {
 		if stderrors.Is(err, jwt.ErrTokenExpired()) {
 			return nil, errors.E(op, errors.CodeUnauthorized, "JIMM session token expired")

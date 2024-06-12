@@ -108,7 +108,7 @@ func setupService(ctx context.Context, c *qt.C) (*jimm.Service, *httptest.Server
 		Token:     cofgaParams.Token,
 		AuthModel: cofgaParams.AuthModelID,
 	}
-	p.SessionStoreSecret = []byte("test-secret")
+	p.CookieSessionKey = []byte("test-secret")
 	svc, err := jimm.NewService(context.Background(), p)
 
 	c.Assert(err, qt.IsNil)

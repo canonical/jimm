@@ -47,7 +47,7 @@ func setupTestAuthSvc(ctx context.Context, c *qt.C, expiry time.Duration) (*auth
 		Store:               db,
 		SessionStore:        sessionStore,
 		SessionCookieMaxAge: 60,
-		SessionSecretKey:    "secret-key",
+		JWTSessionKey:       "secret-key",
 	})
 	c.Assert(err, qt.IsNil)
 

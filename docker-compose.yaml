@@ -50,11 +50,9 @@ services:
       # INSECURE_SECRET_STORAGE: "enabled"
       # JIMM_DASHBOARD_LOCATION: ""
       JIMM_DNS_NAME: "jimm.localhost"
-      JIMM_WATCH_CONTROLLERS: ""
       JIMM_LISTEN_ADDR: "0.0.0.0:80"
       JIMM_TEST_PGXDSN: "postgresql://jimm:jimm@db/jimm"
       JIMM_JWT_EXPIRY: 30s
-      JIMM_ENABLE_JWKS_ROTATOR: "1"
       JIMM_AUDIT_LOG_RETENTION_PERIOD_IN_DAYS: "1"
       TEST_LOGGING_CONFIG: ""
       BAKERY_PUBLIC_KEY: "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk="
@@ -65,6 +63,7 @@ services:
       OPENFGA_STORE: "01GP1254CHWJC1MNGVB0WDG1T0"
       OPENFGA_AUTH_MODEL: "01GP1EC038KHGB6JJ2XXXXCXKB"
       OPENFGA_TOKEN: "jimm"
+      JIMM_IS_LEADER: true
       JIMM_OAUTH_ISSUER_URL: "http://keycloak.localhost:8082/realms/jimm" # Scheme required
       JIMM_OAUTH_CLIENT_ID: "jimm-device"
       JIMM_OAUTH_CLIENT_SECRET: "SwjDofnbDzJDm9iyfUhEp67FfUFMY8L4"
