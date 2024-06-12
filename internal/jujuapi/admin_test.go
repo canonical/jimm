@@ -58,6 +58,7 @@ func (s *adminSuite) SetUpTest(c *gc.C) {
 		Store:               &s.JIMM.Database,
 		SessionStore:        sessionStore,
 		SessionCookieMaxAge: 60,
+		SessionSecretKey:    "test-secret",
 	})
 	c.Assert(err, gc.Equals, nil)
 	s.JIMM.OAuthAuthenticator = authSvc

@@ -73,7 +73,7 @@ services:
       JIMM_ACCESS_TOKEN_EXPIRY_DURATION: 1h
       JIMM_SECURE_SESSION_COOKIES: false
       JIMM_SESSION_COOKIE_MAX_AGE: 86400
-      JIMM_SESSION_STORE_SECRET_KEY: WHoyUmtSOWc4N003NXhmb3VtaEVzNU9tR3ppSVg4RDg4Ums1WVc4RlN2a0JQU2dlSzl0NUFTOUl2UERKM05uQgo=
+      JIMM_SESSION_SECRET_KEY: Xz2RkR9g87M75xfoumhEs5OmGziIX8D88Rk5YW8FSvkBPSgeK9t5AS9IvPDJ3NnB
     volumes:
       - ./:/jimm/
       - ./local/vault/approle.json:/vault/approle.json:rw

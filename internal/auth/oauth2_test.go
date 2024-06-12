@@ -43,11 +43,11 @@ func setupTestAuthSvc(ctx context.Context, c *qt.C, expiry time.Duration) (*auth
 		ClientSecret:        "SwjDofnbDzJDm9iyfUhEp67FfUFMY8L4",
 		Scopes:              []string{oidc.ScopeOpenID, "profile", "email"},
 		SessionTokenExpiry:  expiry,
-		SessionSecretKey:    "secret-key",
 		RedirectURL:         "http://localhost:8080/auth/callback",
 		Store:               db,
 		SessionStore:        sessionStore,
 		SessionCookieMaxAge: 60,
+		SessionSecretKey:    "secret-key",
 	})
 	c.Assert(err, qt.IsNil)
 

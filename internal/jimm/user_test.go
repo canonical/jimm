@@ -43,6 +43,7 @@ func TestGetOpenFGAUser(t *testing.T) {
 		Store:               db,
 		SessionStore:        sessionStore,
 		SessionCookieMaxAge: 60,
+		SessionSecretKey:    "test-secret",
 	})
 	c.Assert(err, qt.IsNil)
 

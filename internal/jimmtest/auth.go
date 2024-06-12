@@ -147,6 +147,7 @@ func SetupTestDashboardCallbackHandler(browserURL string, db *db.Database, sessi
 		Store:               db,
 		SessionStore:        sessionStore,
 		SessionCookieMaxAge: 60,
+		SessionSecretKey:    "test-secret",
 	})
 	if err != nil {
 		return nil, err

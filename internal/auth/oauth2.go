@@ -312,6 +312,7 @@ func (as *AuthenticationService) MintSessionToken(email string) (string, error) 
 
 	freshToken, err := jwt.Sign(token, jwt.WithKey(as.signingAlg, []byte(as.sessionSecretKey)))
 	if err != nil {
+		zapctx.Error(context.Background(), "failed to sign access token", zap.Error(err))
 		return "", errors.E(op, err, "failed to sign access token")
 	}
 
