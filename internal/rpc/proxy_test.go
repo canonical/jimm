@@ -11,6 +11,7 @@ import (
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	qt "github.com/frankban/quicktest"
+	"github.com/google/uuid"
 	"github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"github.com/lestrrat-go/jwx/v2/jwt"
@@ -249,8 +250,13 @@ func TestProxySocketsAdminFacade(t *testing.T) {
 			helpers := rpc.ProxyHelpers{
 				ConnClient: clientWebsocket,
 				TokenGen:   &mockTokenGenerator{},
-				ConnectController: func(ctx context.Context) (rpc.WebsocketConnection, string, error) {
-					return controllerWebsocket, "test model", nil
+				ConnectController: func(ctx context.Context) (rpc.WebsocketConnectionWithMetadata, error) {
+					return rpc.WebsocketConnectionWithMetadata{
+						Conn:           controllerWebsocket,
+						ModelName:      "test model",
+						ModelUUID:      uuid.NewString(),
+						ControllerUUID: uuid.NewString(),
+					}, nil
 				},
 				AuditLog: func(*dbmodel.AuditLogEntry) {},
 				JIMM: &mockJIMM{

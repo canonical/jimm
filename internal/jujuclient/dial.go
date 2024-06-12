@@ -31,6 +31,7 @@ import (
 	"github.com/canonical/jimm/internal/jimm"
 	"github.com/canonical/jimm/internal/jimmjwx"
 	"github.com/canonical/jimm/internal/rpc"
+	"github.com/canonical/jimm/internal/servermon"
 )
 
 const (
@@ -234,8 +235,16 @@ func (c *Connection) redial(ctx context.Context, requiredPermissions map[string]
 // Call makes an RPC call to the server. Call sends the request message to
 // the server and waits for the response to be returned or the context to
 // be canceled.
-func (c *Connection) Call(ctx context.Context, facade string, version int, id, method string, args, resp interface{}) error {
-	err := c.client.Call(ctx, facade, version, id, method, args, resp)
+func (c *Connection) Call(ctx context.Context, facade string, version int, id, method string, args, resp interface{}) (err error) {
+	labels := []string{facade, method, "", c.mt.Id()}
+	if c.ctl != nil {
+		labels = []string{facade, method, c.ctl.UUID, c.mt.Id()}
+	}
+	durationObserver := servermon.DurationObserver(servermon.JujuCallDurationHistogram, labels...)
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.JujuCallErrorCount, &err, labels...)
+
+	err = c.client.Call(ctx, facade, version, id, method, args, resp)
 	if err != nil {
 		if rpcErr, ok := err.(*rpc.Error); ok {
 			// if we get a permission check required error, we redial the controller

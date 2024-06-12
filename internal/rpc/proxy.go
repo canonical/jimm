@@ -19,6 +19,7 @@ import (
 	"github.com/canonical/jimm/internal/jimm"
 	"github.com/canonical/jimm/internal/jimm/credentials"
 	"github.com/canonical/jimm/internal/openfga"
+	"github.com/canonical/jimm/internal/servermon"
 	"github.com/canonical/jimm/internal/utils"
 	jimmnames "github.com/canonical/jimm/pkg/names"
 )
@@ -50,6 +51,15 @@ type WebsocketConnection interface {
 	Close() error
 }
 
+// WebsocketConnectionWithMetadata holds the websocket connection and metadata about the
+// established connection.
+type WebsocketConnectionWithMetadata struct {
+	Conn           WebsocketConnection
+	ControllerUUID string
+	ModelUUID      string
+	ModelName      string
+}
+
 // JIMM represents the JIMM interface used by the proxy.
 type JIMM interface {
 	GetOpenFGAUserAndAuthorise(ctx context.Context, email string) (*openfga.User, error)
@@ -62,7 +72,7 @@ type JIMM interface {
 type ProxyHelpers struct {
 	ConnClient              WebsocketConnection
 	TokenGen                TokenGenerator
-	ConnectController       func(context.Context) (WebsocketConnection, string, error)
+	ConnectController       func(context.Context) (WebsocketConnectionWithMetadata, error)
 	AuditLog                func(*dbmodel.AuditLogEntry)
 	JIMM                    JIMM
 	AuthenticatedIdentityID string
@@ -160,6 +170,9 @@ func (c *writeLockConn) sendMessage(responseObject any, request *message) {
 }
 
 type inflightMsgs struct {
+	controlerUUID string
+	modelUUID     string
+
 	mu           sync.Mutex
 	loginMessage *message
 	messages     map[uint64]*message
@@ -183,10 +196,19 @@ func (msgs *inflightMsgs) addMessage(msg *message) {
 	msgs.mu.Lock()
 	defer msgs.mu.Unlock()
 
+	msg.start = time.Now()
 	msgs.messages[msg.RequestID] = msg
 }
 
 func (msgs *inflightMsgs) removeMessage(msg *message) {
+	// monitor how long it took to handle this message
+	servermon.JujuCallDurationHistogram.WithLabelValues(
+		msg.Type,
+		msg.Request,
+		msgs.controlerUUID,
+		msgs.modelUUID,
+	).Observe(time.Since(msg.start).Seconds())
+
 	msgs.mu.Lock()
 	defer msgs.mu.Unlock()
 	delete(msgs.messages, msg.RequestID)
@@ -226,6 +248,7 @@ func (p *modelProxy) sendError(socket *writeLockConn, req *message, err error) {
 		socket.writeJson(msg)
 	}
 	// An error message is a response back to the client.
+	servermon.JujuCallErrorCount.WithLabelValues(req.Type, req.Request, p.msgs.controlerUUID, p.msgs.modelUUID)
 	p.auditLogMessage(msg, true)
 }
 
@@ -278,7 +301,7 @@ type clientProxy struct {
 	modelProxy
 	wg                   sync.WaitGroup
 	errChan              chan error
-	createControllerConn func(context.Context) (WebsocketConnection, string, error)
+	createControllerConn func(context.Context) (WebsocketConnectionWithMetadata, error)
 	// mu synchronises changes to closed and modelproxy.dst, dst is is only created
 	// at some unspecified point in the future after a client request.
 	mu     sync.Mutex
@@ -293,6 +316,7 @@ func (p *clientProxy) start(ctx context.Context) error {
 			p.dst.conn.Close()
 		}
 	}()
+
 	for {
 		zapctx.Debug(ctx, "Reading on client connection")
 		msg := new(message)
@@ -300,6 +324,7 @@ func (p *clientProxy) start(ctx context.Context) error {
 			// Error reading on the socket implies it is closed, simply return.
 			return err
 		}
+
 		zapctx.Debug(ctx, "Read message from client", zap.Any("message", msg))
 		err := p.makeControllerConnection(ctx)
 		if err != nil {
@@ -315,7 +340,7 @@ func (p *clientProxy) start(ctx context.Context) error {
 			toClient, toController, err := p.handleAdminFacade(ctx, msg)
 			if err != nil {
 				p.sendError(p.src, msg, err)
-				continue
+				return nil
 			}
 			if toClient != nil {
 				p.src.sendMessage(nil, toClient)
@@ -328,15 +353,16 @@ func (p *clientProxy) start(ctx context.Context) error {
 			zapctx.Error(ctx, "Invalid request ID 0")
 			err := errors.E(op, "Invalid request ID 0")
 			p.sendError(p.src, msg, err)
-			continue
+			return nil
 		}
 		p.msgs.addMessage(msg)
 		zapctx.Debug(ctx, "Writing to controller")
+
 		if err := p.dst.writeJson(msg); err != nil {
 			zapctx.Error(ctx, "clientProxy error writing to dst", zap.Error(err))
 			p.sendError(p.src, msg, err)
 			p.msgs.removeMessage(msg)
-			continue
+			return nil
 		}
 	}
 }
@@ -355,12 +381,16 @@ func (p *clientProxy) makeControllerConnection(ctx context.Context) error {
 		err := errors.E(op, "Client connection closed while starting controller connection")
 		return err
 	}
-	conn, modelName, err := p.createControllerConn(ctx)
+	connWithMetadata, err := p.createControllerConn(ctx)
 	if err != nil {
 		return err
 	}
-	p.modelName = modelName
-	p.dst = &writeLockConn{conn: conn}
+
+	p.msgs.controlerUUID = connWithMetadata.ControllerUUID
+	p.msgs.modelUUID = connWithMetadata.ModelUUID
+
+	p.modelName = connWithMetadata.ModelName
+	p.dst = &writeLockConn{conn: connWithMetadata.Conn}
 	controllerToClient := controllerProxy{
 		modelProxy: modelProxy{
 			src:            p.dst,

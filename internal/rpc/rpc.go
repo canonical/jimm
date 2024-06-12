@@ -7,12 +7,16 @@
 // flexible than the juju implementation.
 package rpc
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"time"
+)
 
 // A message encodes a single message sent, or received, over an RPC
 // connection. It contains the union of fields in a request or response
 // message.
 type message struct {
+	start     time.Time
 	RequestID uint64                 `json:"request-id,omitempty"`
 	Type      string                 `json:"type,omitempty"`
 	Version   int                    `json:"version,omitempty"`
