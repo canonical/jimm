@@ -121,12 +121,7 @@ func (r *controllerRoot) LoginWithSessionToken(ctx context.Context, req params.L
 	authenticationSvc := r.jimm.OAuthAuthenticationService()
 
 	// Verify the session token
-	secretKey, err := r.jimm.GetCredentialStore().GetOAuthSecret(ctx)
-	if err != nil {
-		return jujuparams.LoginResult{}, errors.E(op, err, "failed to retrieve oauth secret key")
-	}
-
-	jwtToken, err := authenticationSvc.VerifySessionToken(req.SessionToken, string(secretKey))
+	jwtToken, err := authenticationSvc.VerifySessionToken(req.SessionToken)
 	if err != nil {
 		var aerr *auth.AuthenticationError
 		if stderrors.As(err, &aerr) {
