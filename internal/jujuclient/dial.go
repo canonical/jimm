@@ -118,7 +118,7 @@ func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag nam
 
 	monitorC := make(chan struct{})
 	broken := new(uint32)
-	go pinger(client, monitorC, broken)
+	go pinger(client, ct.Id(), monitorC, broken)
 	return &Connection{
 		ctx:                ctx,
 		client:             client,
@@ -137,10 +137,14 @@ const pingTimeout = 15 * time.Second
 const pingInterval = 30 * time.Second
 
 // pinger runs in the background ensuring the client connection is kept alive.
-func pinger(client *rpc.Client, doneC <-chan struct{}, broken *uint32) {
+func pinger(client *rpc.Client, controller string, doneC <-chan struct{}, broken *uint32) {
 	doPing := func() bool {
 		ctx, cancel := context.WithTimeout(context.Background(), pingTimeout)
 		defer cancel()
+
+		durationObserver := servermon.DurationObserver(servermon.JujuPingDurationHistogram, controller)
+		defer durationObserver()
+
 		if err := client.Call(ctx, "Pinger", 1, "", "Ping", nil, nil); err != nil {
 			zapctx.Error(ctx, "connection failed", zap.Error(err))
 			return false
