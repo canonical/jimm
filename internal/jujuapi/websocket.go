@@ -159,15 +159,15 @@ func (s modelProxyServer) ServeWS(ctx context.Context, clientConn *websocket.Con
 
 // controllerConnectionFunc returns a function that will be used to
 // connect to a controller when a client makes a request.
-func controllerConnectionFunc(s modelProxyServer, jwtGenerator *jimm.JWTGenerator) func(context.Context) (jimmRPC.WebsocketConnection, string, error) {
-	return func(ctx context.Context) (jimmRPC.WebsocketConnection, string, error) {
+func controllerConnectionFunc(s modelProxyServer, jwtGenerator *jimm.JWTGenerator) func(context.Context) (jimmRPC.WebsocketConnectionWithMetadata, error) {
+	return func(ctx context.Context) (jimmRPC.WebsocketConnectionWithMetadata, error) {
 		const op = errors.Op("proxy.controllerConnectionFunc")
 		path := jimmhttp.PathElementFromContext(ctx, "path")
 		zapctx.Debug(ctx, "grabbing model info from path", zap.String("path", path))
 		uuid, finalPath, err := modelInfoFromPath(path)
 		if err != nil {
 			zapctx.Error(ctx, "error parsing path", zap.Error(err))
-			return nil, "", errors.E(op, err)
+			return jimmRPC.WebsocketConnectionWithMetadata{}, errors.E(op, err)
 		}
 		m := dbmodel.Model{
 			UUID: sql.NullString{
@@ -177,7 +177,7 @@ func controllerConnectionFunc(s modelProxyServer, jwtGenerator *jimm.JWTGenerato
 		}
 		if err := s.jimm.Database.GetModel(context.Background(), &m); err != nil {
 			zapctx.Error(ctx, "failed to find model", zap.String("uuid", uuid), zap.Error(err))
-			return nil, "", errors.E(err, errors.CodeNotFound)
+			return jimmRPC.WebsocketConnectionWithMetadata{}, errors.E(err, errors.CodeNotFound)
 		}
 		jwtGenerator.SetTags(m.ResourceTag(), m.Controller.ResourceTag())
 		mt := m.ResourceTag()
@@ -185,10 +185,14 @@ func controllerConnectionFunc(s modelProxyServer, jwtGenerator *jimm.JWTGenerato
 		controllerConn, err := jimmRPC.Dial(ctx, &m.Controller, mt, finalPath)
 		if err != nil {
 			zapctx.Error(ctx, "cannot dial controller", zap.String("controller", m.Controller.Name), zap.Error(err))
-			return nil, "", err
+			return jimmRPC.WebsocketConnectionWithMetadata{}, err
 		}
 		fullModelName := m.Controller.Name + "/" + m.Name
-		return controllerConn, fullModelName, nil
+		return jimmRPC.WebsocketConnectionWithMetadata{
+			Conn:           controllerConn,
+			ControllerUUID: m.Controller.UUID,
+			ModelName:      fullModelName,
+		}, nil
 	}
 }
 

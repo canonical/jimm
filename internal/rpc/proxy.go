@@ -19,6 +19,7 @@ import (
 	"github.com/canonical/jimm/internal/jimm"
 	"github.com/canonical/jimm/internal/jimm/credentials"
 	"github.com/canonical/jimm/internal/openfga"
+	"github.com/canonical/jimm/internal/servermon"
 	"github.com/canonical/jimm/internal/utils"
 	jimmnames "github.com/canonical/jimm/pkg/names"
 )
@@ -50,6 +51,14 @@ type WebsocketConnection interface {
 	Close() error
 }
 
+// WebsocketConnectionWithMetadata holds the websocket connection and metadata about the
+// established connection.
+type WebsocketConnectionWithMetadata struct {
+	Conn           WebsocketConnection
+	ControllerUUID string
+	ModelName      string
+}
+
 // JIMM represents the JIMM interface used by the proxy.
 type JIMM interface {
 	GetOpenFGAUserAndAuthorise(ctx context.Context, email string) (*openfga.User, error)
@@ -62,7 +71,7 @@ type JIMM interface {
 type ProxyHelpers struct {
 	ConnClient              WebsocketConnection
 	TokenGen                TokenGenerator
-	ConnectController       func(context.Context) (WebsocketConnection, string, error)
+	ConnectController       func(context.Context) (WebsocketConnectionWithMetadata, error)
 	AuditLog                func(*dbmodel.AuditLogEntry)
 	JIMM                    JIMM
 	AuthenticatedIdentityID string
@@ -160,6 +169,8 @@ func (c *writeLockConn) sendMessage(responseObject any, request *message) {
 }
 
 type inflightMsgs struct {
+	controllerUUID string
+
 	mu           sync.Mutex
 	loginMessage *message
 	messages     map[uint64]*message
@@ -183,10 +194,18 @@ func (msgs *inflightMsgs) addMessage(msg *message) {
 	msgs.mu.Lock()
 	defer msgs.mu.Unlock()
 
+	msg.start = time.Now()
 	msgs.messages[msg.RequestID] = msg
 }
 
 func (msgs *inflightMsgs) removeMessage(msg *message) {
+	// monitor how long it took to handle this message
+	servermon.JujuCallDurationHistogram.WithLabelValues(
+		msg.Type,
+		msg.Request,
+		msgs.controllerUUID,
+	).Observe(time.Since(msg.start).Seconds())
+
 	msgs.mu.Lock()
 	defer msgs.mu.Unlock()
 	delete(msgs.messages, msg.RequestID)
@@ -226,6 +245,7 @@ func (p *modelProxy) sendError(socket *writeLockConn, req *message, err error) {
 		socket.writeJson(msg)
 	}
 	// An error message is a response back to the client.
+	servermon.JujuCallErrorCount.WithLabelValues(req.Type, req.Request, p.msgs.controllerUUID)
 	p.auditLogMessage(msg, true)
 }
 
@@ -278,7 +298,7 @@ type clientProxy struct {
 	modelProxy
 	wg                   sync.WaitGroup
 	errChan              chan error
-	createControllerConn func(context.Context) (WebsocketConnection, string, error)
+	createControllerConn func(context.Context) (WebsocketConnectionWithMetadata, error)
 	// mu synchronises changes to closed and modelproxy.dst, dst is is only created
 	// at some unspecified point in the future after a client request.
 	mu     sync.Mutex
@@ -355,12 +375,15 @@ func (p *clientProxy) makeControllerConnection(ctx context.Context) error {
 		err := errors.E(op, "Client connection closed while starting controller connection")
 		return err
 	}
-	conn, modelName, err := p.createControllerConn(ctx)
+	connWithMetadata, err := p.createControllerConn(ctx)
 	if err != nil {
 		return err
 	}
-	p.modelName = modelName
-	p.dst = &writeLockConn{conn: conn}
+
+	p.msgs.controllerUUID = connWithMetadata.ControllerUUID
+
+	p.modelName = connWithMetadata.ModelName
+	p.dst = &writeLockConn{conn: connWithMetadata.Conn}
 	controllerToClient := controllerProxy{
 		modelProxy: modelProxy{
 			src:            p.dst,
