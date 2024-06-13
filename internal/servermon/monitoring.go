@@ -37,6 +37,32 @@ var (
 		Name:      "error_total",
 		Help:      "The number of database errors.",
 	}, []string{"method"})
+	OpenFGACallDurationHistogram = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Namespace: "jimm",
+		Subsystem: "openfga",
+		Name:      "call_duration_seconds",
+		Help:      "Histogram of openfga call time in seconds",
+		Buckets:   []float64{.005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10},
+	}, []string{"method"})
+	OpenFGACallErrorCount = promauto.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "jimm",
+		Subsystem: "openfga",
+		Name:      "error_total",
+		Help:      "The number of openfga call errors.",
+	}, []string{"method"})
+	VaultCallDurationHistogram = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Namespace: "jimm",
+		Subsystem: "vault",
+		Name:      "call_duration_seconds",
+		Help:      "Histogram of vault call time in seconds",
+		Buckets:   []float64{.005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10},
+	}, []string{"method"})
+	VaultCallErrorCount = promauto.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "jimm",
+		Subsystem: "vault",
+		Name:      "error_total",
+		Help:      "The number of vault call errors.",
+	}, []string{"method"})
 	ConcurrentWebsocketConnections = promauto.NewGauge(prometheus.GaugeOpts{
 		Namespace: "jimm",
 		Subsystem: "websocket",
