@@ -4,7 +4,6 @@ package jimm
 
 import (
 	"context"
-	"crypto/rand"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -80,6 +79,10 @@ type OAuthAuthenticatorParams struct {
 
 	// SessionCookieMaxAge holds the max age for session cookies in seconds.
 	SessionCookieMaxAge int
+
+	// JWTSessionKey holds the secret key used for signing/verifying JWT tokens.
+	// See internal/auth/oauth2.go AuthenticationService.SessionSecretkey for more details.
+	JWTSessionKey string
 }
 
 // A Params structure contains the parameters required to initialise a new
@@ -173,6 +176,11 @@ type Params struct {
 	// SecureSessionCookies determines if HTTPS must be enabled in order for JIMM
 	// to set cookies when creating browser based sessions.
 	SecureSessionCookies bool
+
+	// CookieSessionKey is a randomly generated secret passed via config used for signing
+	// cookie data. The recommended length is 32/64 characters from the Gorilla securecookie lib.
+	// https://github.com/gorilla/securecookie/blob/main/securecookie.go#L124
+	CookieSessionKey []byte
 }
 
 // A Service is the implementation of a JIMM server.
@@ -299,7 +307,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		return nil, errors.E(op, err)
 	}
 
-	sessionStore, err := s.setupSessionStore(ctx)
+	sessionStore, err := s.setupSessionStore(ctx, p.CookieSessionKey)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
@@ -318,6 +326,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 			Scopes:              p.OAuthAuthenticatorParams.Scopes,
 			SessionTokenExpiry:  p.OAuthAuthenticatorParams.SessionTokenExpiry,
 			SessionCookieMaxAge: p.OAuthAuthenticatorParams.SessionCookieMaxAge,
+			JWTSessionKey:       p.OAuthAuthenticatorParams.JWTSessionKey,
 			Store:               &s.jimm.Database,
 			SessionStore:        sessionStore,
 			RedirectURL:         redirectUrl,
@@ -428,7 +437,7 @@ func (s *Service) setupDischarger(p Params) (*discharger.MacaroonDischarger, err
 	return MacaroonDischarger, nil
 }
 
-func (s *Service) setupSessionStore(ctx context.Context) (*pgstore.PGStore, error) {
+func (s *Service) setupSessionStore(ctx context.Context, sessionSecret []byte) (*pgstore.PGStore, error) {
 	const op = errors.Op("setupSessionStore")
 
 	if s.jimm.CredentialStore == nil {
@@ -440,20 +449,9 @@ func (s *Service) setupSessionStore(ctx context.Context) (*pgstore.PGStore, erro
 		return nil, errors.E(op, err)
 	}
 
-	oauthSessionStoreSecret, err := s.jimm.CredentialStore.GetOAuthSessionStoreSecret(ctx)
-	if err == nil {
-		zapctx.Info(ctx, "detected existing OAuth session store secret")
-	} else if errors.ErrorCode(err) == errors.CodeNotFound {
-		oauthSessionStoreSecret, err = generateOAuthSessionStoreSecret(ctx, s.jimm.CredentialStore)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		return nil, errors.E(op, err, "failed to read session store secret")
-	}
-
-	store, err := pgstore.NewPGStoreFromPool(sqlDb, oauthSessionStoreSecret)
+	store, err := pgstore.NewPGStoreFromPool(sqlDb, sessionSecret)
 	if err != nil {
+		zapctx.Error(ctx, "failed to create session store", zap.Error(err))
 		return nil, errors.E(op, err, "failed to create session store")
 	}
 
@@ -464,21 +462,6 @@ func (s *Service) setupSessionStore(ctx context.Context) (*pgstore.PGStore, erro
 		return nil
 	})
 	return store, nil
-}
-
-func generateOAuthSessionStoreSecret(ctx context.Context, store jimmcreds.CredentialStore) ([]byte, error) {
-	const op = errors.Op("generateOAuthSessionStoreSecret")
-	secret := make([]byte, 64)
-	if _, err := rand.Read(secret); err != nil {
-		zapctx.Error(ctx, "failed to generate OAuth session store secret", zap.Error(err))
-		return nil, errors.E(op, err, "failed to generate OAuth session store secret")
-	}
-
-	if err := store.PutOAuthSessionStoreSecret(ctx, secret); err != nil {
-		zapctx.Error(ctx, "failed to store generated OAuth session store secret", zap.Error(err))
-		return nil, errors.E(op, err, "failed to store generated OAuth session store secret")
-	}
-	return secret, nil
 }
 
 func openDB(ctx context.Context, dsn string) (*gorm.DB, error) {
@@ -551,34 +534,6 @@ func newVaultStore(ctx context.Context, p Params) (jimmcreds.CredentialStore, er
 		RoleSecretID: p.VaultRoleSecretID,
 		KVPath:       strings.ReplaceAll(p.VaultPath, "/", ""),
 	}, nil
-}
-
-// CheckOrGenerateOAuthKey checks if the OAuth secret key already exists on the
-// credential store, and if not, generates a random 4096-bit secret key and
-func (s *Service) CheckOrGenerateOAuthKey(ctx context.Context) error {
-	const op = errors.Op("CheckOrGenerateOAuthKey")
-	store := s.jimm.CredentialStore
-	if store == nil {
-		zapctx.Info(ctx, "skipped generating initial OAuth secret key due to nil credential store")
-		return nil
-	}
-
-	if secret, err := store.GetOAuthSecret(ctx); err == nil && secret != nil && len(secret) > 0 {
-		zapctx.Info(ctx, "detected existing OAuth secret key")
-		return nil
-	}
-
-	secret := make([]byte, 4096)
-	if _, err := rand.Read(secret); err != nil {
-		zapctx.Error(ctx, "failed to generate OAuth secret key", zap.Error(err))
-		return errors.E(op, err, "failed to generate OAuth secret key")
-	}
-
-	if err := store.PutOAuthSecret(ctx, secret); err != nil {
-		zapctx.Error(ctx, "failed to store generated OAuth secret key", zap.Error(err))
-		return errors.E(op, err, "failed to store generated OAuth secret key")
-	}
-	return nil
 }
 
 func newOpenFGAClient(ctx context.Context, p OpenFGAParams) (*openfga.OFGAClient, error) {

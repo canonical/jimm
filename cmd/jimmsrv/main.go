@@ -135,6 +135,11 @@ func start(ctx context.Context, s *service.Service) error {
 		return errors.E("jimm session cookie max age cannot be less than 0")
 	}
 
+	sessionSecretKey := os.Getenv("JIMM_SESSION_SECRET_KEY")
+	if len(sessionSecretKey) < 64 {
+		return errors.E("jimm session store secret must be at least 64 characters")
+	}
+
 	jimmsvc, err := jimm.NewService(ctx, jimm.Params{
 		ControllerUUID:    os.Getenv("JIMM_UUID"),
 		DSN:               os.Getenv("JIMM_DSN"),
@@ -166,28 +171,27 @@ func start(ctx context.Context, s *service.Service) error {
 			Scopes:              scopesParsed,
 			SessionTokenExpiry:  sessionTokenExpiryDuration,
 			SessionCookieMaxAge: sessionCookieMaxAgeInt,
+			JWTSessionKey:       sessionSecretKey,
 		},
 		DashboardFinalRedirectURL: os.Getenv("JIMM_DASHBOARD_FINAL_REDIRECT_URL"),
 		SecureSessionCookies:      secureSessionCookies,
+		CookieSessionKey:          []byte(sessionSecretKey),
 	})
 	if err != nil {
 		return err
 	}
 
-	if os.Getenv("JIMM_WATCH_CONTROLLERS") != "" {
+	isLeader := os.Getenv("JIMM_IS_LEADER") != ""
+	if isLeader {
 		s.Go(func() error { return jimmsvc.WatchControllers(ctx) }) // Deletes dead/dying models, updates model config.
 	}
 	s.Go(func() error { return jimmsvc.WatchModelSummaries(ctx) })
 
-	if os.Getenv("JIMM_ENABLE_JWKS_ROTATOR") != "" {
+	if isLeader {
 		zapctx.Info(ctx, "attempting to start JWKS rotator and generate OAuth secret key")
 		s.Go(func() error {
 			if err := jimmsvc.StartJWKSRotator(ctx, time.NewTicker(time.Hour).C, time.Now().UTC().AddDate(0, 3, 0)); err != nil {
 				zapctx.Error(ctx, "failed to start JWKS rotator", zap.Error(err))
-				return err
-			}
-			if err := jimmsvc.CheckOrGenerateOAuthKey(ctx); err != nil {
-				zapctx.Error(ctx, "failed to check/generate OAuth secret key", zap.Error(err))
 				return err
 			}
 			return nil

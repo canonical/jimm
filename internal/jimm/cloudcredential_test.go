@@ -1781,11 +1781,3 @@ func (s testCloudCredentialAttributeStore) GetOAuthSecret(ctx context.Context) (
 func (s testCloudCredentialAttributeStore) PutOAuthSecret(ctx context.Context, raw []byte) error {
 	return errors.E(errors.CodeNotImplemented)
 }
-
-func (s testCloudCredentialAttributeStore) GetOAuthSessionStoreSecret(ctx context.Context) ([]byte, error) {
-	return nil, errors.E(errors.CodeNotImplemented)
-}
-
-func (s testCloudCredentialAttributeStore) PutOAuthSessionStoreSecret(ctx context.Context, raw []byte) error {
-	return errors.E(errors.CodeNotImplemented)
-}

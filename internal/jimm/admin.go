@@ -53,12 +53,7 @@ func GetDeviceSessionToken(ctx context.Context, authenticator OAuthAuthenticator
 		return "", errors.E(op, err)
 	}
 
-	secretKey, err := credentialStore.GetOAuthSecret(ctx)
-	if err != nil {
-		return "", errors.E(op, err, "failed to retrieve oauth secret key")
-	}
-
-	encToken, err := authenticator.MintSessionToken(email, string(secretKey))
+	encToken, err := authenticator.MintSessionToken(email)
 	if err != nil {
 		return "", errors.E(op, err)
 	}

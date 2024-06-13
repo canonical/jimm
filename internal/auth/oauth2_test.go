@@ -47,6 +47,7 @@ func setupTestAuthSvc(ctx context.Context, c *qt.C, expiry time.Duration) (*auth
 		Store:               db,
 		SessionStore:        sessionStore,
 		SessionCookieMaxAge: 60,
+		JWTSessionKey:       "secret-key",
 	})
 	c.Assert(err, qt.IsNil)
 
@@ -181,30 +182,13 @@ func TestSessionTokens(t *testing.T) {
 
 	authSvc, _, _ := setupTestAuthSvc(ctx, c, time.Hour)
 
-	secretKey := "secret-key"
-	token, err := authSvc.MintSessionToken("jimm-test@canonical.com", secretKey)
+	token, err := authSvc.MintSessionToken("jimm-test@canonical.com")
 	c.Assert(err, qt.IsNil)
 	c.Assert(len(token) > 0, qt.IsTrue)
 
-	jwtToken, err := authSvc.VerifySessionToken(token, secretKey)
+	jwtToken, err := authSvc.VerifySessionToken(token)
 	c.Assert(err, qt.IsNil)
 	c.Assert(jwtToken.Subject(), qt.Equals, "jimm-test@canonical.com")
-}
-
-func TestSessionTokenRejectsWrongSecretKey(t *testing.T) {
-	c := qt.New(t)
-
-	ctx := context.Background()
-
-	authSvc, _, _ := setupTestAuthSvc(ctx, c, time.Hour)
-
-	secretKey := "secret-key"
-	token, err := authSvc.MintSessionToken("jimm-test@canonical.com", secretKey)
-	c.Assert(err, qt.IsNil)
-	c.Assert(len(token) > 0, qt.IsTrue)
-
-	_, err = authSvc.VerifySessionToken(token, "wrong key")
-	c.Assert(err, qt.ErrorMatches, "could not verify message using any of the signatures or keys")
 }
 
 func TestSessionTokenRejectsExpiredToken(t *testing.T) {
@@ -215,12 +199,11 @@ func TestSessionTokenRejectsExpiredToken(t *testing.T) {
 	noDuration := time.Duration(0)
 	authSvc, _, _ := setupTestAuthSvc(ctx, c, noDuration)
 
-	secretKey := "secret-key"
-	token, err := authSvc.MintSessionToken("jimm-test@canonical.com", secretKey)
+	token, err := authSvc.MintSessionToken("jimm-test@canonical.com")
 	c.Assert(err, qt.IsNil)
 	c.Assert(len(token) > 0, qt.IsTrue)
 
-	_, err = authSvc.VerifySessionToken(token, secretKey)
+	_, err = authSvc.VerifySessionToken(token)
 	c.Assert(err, qt.ErrorMatches, `JIMM session token expired`)
 }
 
@@ -231,12 +214,11 @@ func TestSessionTokenValidatesEmail(t *testing.T) {
 
 	authSvc, _, _ := setupTestAuthSvc(ctx, c, time.Hour)
 
-	secretKey := "secret-key"
-	token, err := authSvc.MintSessionToken("", secretKey)
+	token, err := authSvc.MintSessionToken("")
 	c.Assert(err, qt.IsNil)
 	c.Assert(len(token) > 0, qt.IsTrue)
 
-	_, err = authSvc.VerifySessionToken(token, secretKey)
+	_, err = authSvc.VerifySessionToken(token)
 	c.Assert(err, qt.ErrorMatches, "failed to parse email")
 }
 
