@@ -388,7 +388,7 @@ func (s *relationSuite) TestListRelations(c *gc.C) {
 		c.Assert(err, gc.IsNil)
 	}
 
-	expectedRelations := append(
+	expectedData := apiparams.ListRelationshipTuplesResponse{Tuples: append(
 		[]apiparams.RelationshipTuple{{
 			Object:       "user-admin",
 			Relation:     "administrator",
@@ -399,23 +399,23 @@ func (s *relationSuite) TestListRelations(c *gc.C) {
 			TargetObject: "controller-jimm",
 		}},
 		relations...,
-	)
+	)}
 
 	context, err := cmdtesting.RunCommand(c, cmd.NewListRelationsCommandForTesting(s.ClientStore(), bClient), "--format", "tabular")
 	c.Assert(err, gc.IsNil)
 	var builder strings.Builder
-	err = cmd.FormatRelationsTabularForTesting(&builder, expectedRelations)
+	err = cmd.FormatRelationsTabularForTesting(&builder, &expectedData)
 	c.Assert(err, gc.IsNil)
 	c.Assert(cmdtesting.Stdout(context), gc.Equals, builder.String())
 
-	expectedJSONData, err := json.Marshal(expectedRelations)
+	expectedJSONData, err := json.Marshal(expectedData)
 	c.Assert(err, gc.IsNil)
 	context, err = cmdtesting.RunCommand(c, cmd.NewListRelationsCommandForTesting(s.ClientStore(), bClient), "--format", "json")
 	c.Assert(err, gc.IsNil)
 	c.Assert(strings.TrimRight(cmdtesting.Stdout(context), "\n"), gc.Equals, string(expectedJSONData))
 
 	// Necessary to use yamlv2 to match what Juju does.
-	expectedYAMLData, err := yamlv2.Marshal(expectedRelations)
+	expectedYAMLData, err := yamlv2.Marshal(expectedData)
 	c.Assert(err, gc.IsNil)
 	context, err = cmdtesting.RunCommand(c, cmd.NewListRelationsCommandForTesting(s.ClientStore(), bClient))
 	c.Assert(err, gc.IsNil)
@@ -480,7 +480,7 @@ func (s *relationSuite) TestListRelationsWithError(c *gc.C) {
 	context, err = cmdtesting.RunCommand(c, cmd.NewListRelationsCommandForTesting(s.ClientStore(), bClient), "--format", "tabular")
 	c.Assert(err, gc.IsNil)
 	var builder strings.Builder
-	err = cmd.FormatRelationsTabularForTesting(&builder, expectedData)
+	err = cmd.FormatRelationsTabularForTesting(&builder, &expectedData)
 	c.Assert(err, gc.IsNil)
 	c.Assert(cmdtesting.Stdout(context), gc.Equals, builder.String())
 }
