@@ -70,6 +70,13 @@ var (
 		Help:      "Histogram of juju call time in seconds",
 		Buckets:   []float64{.005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10},
 	}, []string{"facade", "method", "controller"})
+	JujuPingDurationHistogram = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Namespace: "jimm",
+		Subsystem: "juju",
+		Name:      "ping_duration_seconds",
+		Help:      "Histogram of juju ping time in seconds",
+		Buckets:   []float64{.005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10},
+	}, []string{"controller"})
 	JujuCallErrorCount = promauto.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "jimm",
 		Subsystem: "juju",
