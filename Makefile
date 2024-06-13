@@ -32,14 +32,14 @@ clean:
 certs:
 	@cd local/traefik/certs; ./certs.sh; cd -
 
-test-env: sysdeps certs
+test-env: sys-deps certs
 	@touch ./local/vault/approle.json && touch ./local/vault/roleid.txt && touch ./local/vault/vault.env
 	@docker compose up --force-recreate -d --wait
 
 test-env-cleanup:
 	@docker compose down -v --remove-orphans
 
-dev-env-setup: sysdeps certs
+dev-env-setup: sys-deps certs
 	@touch ./local/vault/approle.json && touch ./local/vault/roleid.txt && touch ./local/vault/vault.env
 	@make version/commit.txt && make version/version.txt
 
@@ -121,7 +121,7 @@ ifeq ($(APT_BASED),0)
 	@$(call check_dep,docker,Missing Docker - install from https://docs.docker.com/engine/install/')
 	@$(call check_dep,juju-db.mongo,Missing juju-db - install with 'sudo snap install juju-db --channel=4.4/stable')
 else
-	@echo sysdeps runs only on systems with apt-get
+	@echo sys-deps runs only on systems with apt-get
 	@echo on OS X with homebrew try: brew install bazaar mongodb
 endif
 
@@ -137,6 +137,6 @@ help:
 	@echo 'make simplify - Format and simplify the source files.'
 	@echo 'make get-local-auth - Get local auth to the API WSS endpoint locally.'
 
-.PHONY: build check install release clean format server simplify sysdeps help FORCE
+.PHONY: build check install release clean format server simplify sys-deps help FORCE
 
 FORCE:
