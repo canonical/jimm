@@ -79,6 +79,7 @@ func (s *JimmCmdSuite) SetUpTest(c *gc.C) {
 	}
 	s.Params.JWTExpiryDuration = time.Minute
 	s.Params.InsecureSecretStorage = true
+	s.Params.CookieSessionKey = []byte("test-secret")
 
 	srv, err := service.NewService(ctx, s.Params)
 	c.Assert(err, gc.Equals, nil)
@@ -87,9 +88,6 @@ func (s *JimmCmdSuite) SetUpTest(c *gc.C) {
 	s.HTTP.Config = &http.Server{Handler: srv}
 
 	err = s.Service.StartJWKSRotator(ctx, time.NewTicker(time.Hour).C, time.Now().UTC().AddDate(0, 3, 0))
-	c.Assert(err, gc.Equals, nil)
-
-	err = s.JIMM.GetCredentialStore().PutOAuthSecret(ctx, []byte(jimmtest.JWTTestSecret))
 	c.Assert(err, gc.Equals, nil)
 
 	s.HTTP.StartTLS()

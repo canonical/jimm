@@ -76,6 +76,13 @@ type AuthenticationService struct {
 	sessionTokenExpiry time.Duration
 	// sessionCookieMaxAge holds the max age for session cookies in seconds.
 	sessionCookieMaxAge int
+	// jwtSessionKey holds the secret key used for signing/verifying JWT tokens.
+	// According to https://datatracker.ietf.org/doc/html/rfc7518 minimum key lengths are
+	// HSXXX e.g. HS256 - 256 bits, RSA - at least 2048 bits.
+	// In JIMM we use HS256, requiring a minimum of 32 bytes for the secret key.
+	jwtSessionKey string
+	// The key algorithm to use for verifying/signing JWTs.
+	signingAlg jwa.KeyAlgorithm
 
 	db IdentityStore
 
@@ -112,6 +119,10 @@ type AuthenticationServiceParams struct {
 	// SessionCookieMaxAge holds the max age for session cookies in seconds.
 	SessionCookieMaxAge int
 
+	// JWTSessionKey holds the secret key used for signing/verifying JWT tokens.
+	// See AuthenticationService.JWTSessionKey for more details.
+	JWTSessionKey string
+
 	// RedirectURL is the URL for handling the exchange of authorisation
 	// codes into access tokens (and id tokens), for JIMM, this is expected
 	// to be the servers own callback endpoint registered under /auth/callback.
@@ -147,6 +158,8 @@ func NewAuthenticationService(ctx context.Context, params AuthenticationServiceP
 			RedirectURL:  params.RedirectURL,
 		},
 		sessionTokenExpiry:  params.SessionTokenExpiry,
+		jwtSessionKey:       params.JWTSessionKey,
+		signingAlg:          jwa.HS256,
 		db:                  params.Store,
 		sessionStore:        params.SessionStore,
 		sessionCookieMaxAge: params.SessionCookieMaxAge,
@@ -286,7 +299,7 @@ func (as *AuthenticationService) Email(idToken *oidc.IDToken) (string, error) {
 
 // MintSessionToken mints a session token to be used when logging into JIMM
 // via an access token. The token only contains the user's email for authentication.
-func (as *AuthenticationService) MintSessionToken(email string, secretKey string) (string, error) {
+func (as *AuthenticationService) MintSessionToken(email string) (string, error) {
 	const op = errors.Op("auth.AuthenticationService.MintAccessToken")
 
 	token, err := jwt.NewBuilder().
@@ -297,16 +310,22 @@ func (as *AuthenticationService) MintSessionToken(email string, secretKey string
 		return "", errors.E(op, err, "failed to build access token")
 	}
 
-	freshToken, err := jwt.Sign(token, jwt.WithKey(jwa.HS256, []byte(secretKey)))
+	freshToken, err := jwt.Sign(token, jwt.WithKey(as.signingAlg, []byte(as.jwtSessionKey)))
 	if err != nil {
+		zapctx.Error(context.Background(), "failed to sign access token", zap.Error(err))
 		return "", errors.E(op, err, "failed to sign access token")
 	}
 
 	return base64.StdEncoding.EncodeToString(freshToken), nil
 }
 
-// VerifySessionToken calls the exported VerifySessionToken function.
-func (as *AuthenticationService) VerifySessionToken(token string, secretKey string) (_ jwt.Token, err error) {
+// VerifySessionToken symmetrically verifies the validty of the signature on the
+// access token JWT, returning the parsed token.
+//
+// The subject of the token contains the user's email and can be used
+// for user object creation
+func (as *AuthenticationService) VerifySessionToken(token string) (_ jwt.Token, err error) {
+	const op = errors.Op("auth.AuthenticationService.VerifySessionToken")
 	defer func() {
 		if err != nil {
 			servermon.AuthenticationFailCount.WithLabelValues("VerifySessionToken").Inc()
@@ -315,11 +334,28 @@ func (as *AuthenticationService) VerifySessionToken(token string, secretKey stri
 		}
 	}()
 
-	jwt, err := VerifySessionToken(token, secretKey)
-	if err != nil {
-		return nil, errors.E(err)
+	if len(token) == 0 {
+		return nil, errors.E(op, "authentication failed, no token presented")
 	}
-	return jwt, nil
+
+	decodedToken, err := base64.StdEncoding.DecodeString(token)
+	if err != nil {
+		return nil, errors.E(op, fmt.Sprintf("authentication failed, failed to decode token: %s", err))
+	}
+
+	parsedToken, err := jwt.Parse(decodedToken, jwt.WithKey(as.signingAlg, []byte(as.jwtSessionKey)))
+	if err != nil {
+		if stderrors.Is(err, jwt.ErrTokenExpired()) {
+			return nil, errors.E(op, errors.CodeUnauthorized, "JIMM session token expired")
+		}
+		return nil, errors.E(op, err)
+	}
+
+	if _, err = mail.ParseAddress(parsedToken.Subject()); err != nil {
+		return nil, errors.E(op, "failed to parse email")
+	}
+
+	return parsedToken, nil
 }
 
 // UpdateIdentity updates the database with the display name and access token set for the user.
@@ -353,40 +389,6 @@ func (as *AuthenticationService) UpdateIdentity(ctx context.Context, email strin
 	}
 
 	return nil
-}
-
-// VerifySessionToken symmetrically verifies the validty of the signature on the
-// access token JWT, returning the parsed token.
-//
-// The subject of the token contains the user's email and can be used
-// for user object creation
-//
-// This method is exported for use by the mock authenticator.
-func VerifySessionToken(token string, secretKey string) (jwt.Token, error) {
-	const op = errors.Op("auth.AuthenticationService.VerifySessionToken")
-
-	if len(token) == 0 {
-		return nil, errors.E(op, "authentication failed, no token presented")
-	}
-
-	decodedToken, err := base64.StdEncoding.DecodeString(token)
-	if err != nil {
-		return nil, errors.E(op, "authentication failed, failed to decode token")
-	}
-
-	parsedToken, err := jwt.Parse(decodedToken, jwt.WithKey(jwa.HS256, []byte(secretKey)))
-	if err != nil {
-		if stderrors.Is(err, jwt.ErrTokenExpired()) {
-			return nil, errors.E(op, errors.CodeUnauthorized, "JIMM session token expired")
-		}
-		return nil, errors.E(op, err)
-	}
-
-	if _, err = mail.ParseAddress(parsedToken.Subject()); err != nil {
-		return nil, errors.E(op, "failed to parse email")
-	}
-
-	return parsedToken, nil
 }
 
 // VerifyClientCredentials verifies the provided client ID and client secret.

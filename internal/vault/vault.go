@@ -19,6 +19,7 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwk"
 
 	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/servermon"
 )
 
 const (
@@ -59,8 +60,12 @@ type VaultStore struct {
 
 // Get retrieves the attributes for the given cloud credential from a vault
 // service.
-func (s *VaultStore) Get(ctx context.Context, tag names.CloudCredentialTag) (map[string]string, error) {
+func (s *VaultStore) Get(ctx context.Context, tag names.CloudCredentialTag) (_ map[string]string, err error) {
 	const op = errors.Op("vault.Get")
+
+	durationObserver := servermon.DurationObserver(servermon.VaultCallDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.VaultCallErrorCount, &err, string(op))
 
 	client, err := s.client(ctx)
 	if err != nil {
@@ -89,12 +94,17 @@ func (s *VaultStore) Get(ctx context.Context, tag names.CloudCredentialTag) (map
 
 // Put stores the attributes associated with a cloud-credential in a vault
 // service.
-func (s *VaultStore) Put(ctx context.Context, tag names.CloudCredentialTag, attr map[string]string) error {
+func (s *VaultStore) Put(ctx context.Context, tag names.CloudCredentialTag, attr map[string]string) (err error) {
 	if len(attr) == 0 {
 		return s.delete(ctx, tag)
 	}
 
 	const op = errors.Op("vault.Put")
+
+	durationObserver := servermon.DurationObserver(servermon.VaultCallDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.VaultCallErrorCount, &err, string(op))
+
 	client, err := s.client(ctx)
 	if err != nil {
 		return errors.E(op, err)
@@ -113,8 +123,12 @@ func (s *VaultStore) Put(ctx context.Context, tag names.CloudCredentialTag, attr
 
 // delete removes the attributes associated with the cloud-credential in
 // the vault service.
-func (s *VaultStore) delete(ctx context.Context, tag names.CloudCredentialTag) error {
+func (s *VaultStore) delete(ctx context.Context, tag names.CloudCredentialTag) (err error) {
 	const op = errors.Op("vault.delete")
+
+	durationObserver := servermon.DurationObserver(servermon.VaultCallDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.VaultCallErrorCount, &err, string(op))
 
 	client, err := s.client(ctx)
 	if err != nil {
@@ -133,8 +147,12 @@ func (s *VaultStore) delete(ctx context.Context, tag names.CloudCredentialTag) e
 
 // GetControllerCredentials retrieves the credentials for the given controller from a vault
 // service.
-func (s *VaultStore) GetControllerCredentials(ctx context.Context, controllerName string) (string, string, error) {
+func (s *VaultStore) GetControllerCredentials(ctx context.Context, controllerName string) (_ string, _ string, err error) {
 	const op = errors.Op("vault.GetControllerCredentials")
+
+	durationObserver := servermon.DurationObserver(servermon.VaultCallDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.VaultCallErrorCount, &err, string(op))
 
 	client, err := s.client(ctx)
 	if err != nil {
@@ -162,12 +180,17 @@ func (s *VaultStore) GetControllerCredentials(ctx context.Context, controllerNam
 
 // PutControllerCredentials stores the controller credentials in a vault
 // service.
-func (s *VaultStore) PutControllerCredentials(ctx context.Context, controllerName string, username string, password string) error {
+func (s *VaultStore) PutControllerCredentials(ctx context.Context, controllerName string, username string, password string) (err error) {
 	if username == "" || password == "" {
 		return s.deleteControllerCredentials(ctx, controllerName)
 	}
 
 	const op = errors.Op("vault.PutControllerCredentials")
+
+	durationObserver := servermon.DurationObserver(servermon.VaultCallDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.VaultCallErrorCount, &err, string(op))
+
 	client, err := s.client(ctx)
 	if err != nil {
 		return errors.E(op, err)
@@ -185,8 +208,12 @@ func (s *VaultStore) PutControllerCredentials(ctx context.Context, controllerNam
 }
 
 // CleanupJWKS removes all secrets associated with the JWKS process.
-func (s *VaultStore) CleanupJWKS(ctx context.Context) error {
+func (s *VaultStore) CleanupJWKS(ctx context.Context) (err error) {
 	const op = errors.Op("vault.CleanupJWKS")
+
+	durationObserver := servermon.DurationObserver(servermon.VaultCallDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.VaultCallErrorCount, &err, string(op))
 
 	client, err := s.client(ctx)
 	if err != nil {
@@ -203,8 +230,12 @@ func (s *VaultStore) CleanupJWKS(ctx context.Context) error {
 }
 
 // GetJWKS returns the current key set stored within the credential store.
-func (s *VaultStore) GetJWKS(ctx context.Context) (jwk.Set, error) {
+func (s *VaultStore) GetJWKS(ctx context.Context) (_ jwk.Set, err error) {
 	const op = errors.Op("vault.GetJWKS")
+
+	durationObserver := servermon.DurationObserver(servermon.VaultCallDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.VaultCallErrorCount, &err, string(op))
 
 	client, err := s.client(ctx)
 	if err != nil {
@@ -239,8 +270,12 @@ func (s *VaultStore) GetJWKS(ctx context.Context) (jwk.Set, error) {
 }
 
 // GetJWKSPrivateKey returns the current private key for the active JWKS
-func (s *VaultStore) GetJWKSPrivateKey(ctx context.Context) ([]byte, error) {
+func (s *VaultStore) GetJWKSPrivateKey(ctx context.Context) (_ []byte, err error) {
 	const op = errors.Op("vault.GetJWKSPrivateKey")
+
+	durationObserver := servermon.DurationObserver(servermon.VaultCallDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.VaultCallErrorCount, &err, string(op))
 
 	client, err := s.client(ctx)
 	if err != nil {
@@ -269,8 +304,13 @@ func (s *VaultStore) GetJWKSPrivateKey(ctx context.Context) ([]byte, error) {
 }
 
 // GetJWKSExpiry returns the expiry of the active JWKS.
-func (s *VaultStore) GetJWKSExpiry(ctx context.Context) (time.Time, error) {
+func (s *VaultStore) GetJWKSExpiry(ctx context.Context) (_ time.Time, err error) {
 	const op = errors.Op("vault.getJWKSExpiry")
+
+	durationObserver := servermon.DurationObserver(servermon.VaultCallDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.VaultCallErrorCount, &err, string(op))
+
 	now := time.Now()
 	client, err := s.client(ctx)
 	if err != nil {
@@ -305,8 +345,12 @@ func (s *VaultStore) GetJWKSExpiry(ctx context.Context) (time.Time, error) {
 //
 // The pathing is similar to the controllers credentials
 // in that we understand RS256 keys as credentials, rather than crytographic keys.
-func (s *VaultStore) PutJWKS(ctx context.Context, jwks jwk.Set) error {
+func (s *VaultStore) PutJWKS(ctx context.Context, jwks jwk.Set) (err error) {
 	const op = errors.Op("vault.PutJWKS")
+
+	durationObserver := servermon.DurationObserver(servermon.VaultCallDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.VaultCallErrorCount, &err, string(op))
 
 	client, err := s.client(ctx)
 	if err != nil {
@@ -327,8 +371,12 @@ func (s *VaultStore) PutJWKS(ctx context.Context, jwks jwk.Set) error {
 }
 
 // PutJWKSPrivateKey persists the private key associated with the current JWKS within the store.
-func (s *VaultStore) PutJWKSPrivateKey(ctx context.Context, pem []byte) error {
+func (s *VaultStore) PutJWKSPrivateKey(ctx context.Context, pem []byte) (err error) {
 	const op = errors.Op("vault.PutJWKSPrivateKey")
+
+	durationObserver := servermon.DurationObserver(servermon.VaultCallDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.VaultCallErrorCount, &err, string(op))
 
 	client, err := s.client(ctx)
 	if err != nil {
@@ -343,8 +391,12 @@ func (s *VaultStore) PutJWKSPrivateKey(ctx context.Context, pem []byte) error {
 }
 
 // PutJWKSExpiry sets the expiry time for the current JWKS within the store.
-func (s *VaultStore) PutJWKSExpiry(ctx context.Context, expiry time.Time) error {
+func (s *VaultStore) PutJWKSExpiry(ctx context.Context, expiry time.Time) (err error) {
 	const op = errors.Op("vault.PutJWKSExpiry")
+
+	durationObserver := servermon.DurationObserver(servermon.VaultCallDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.VaultCallErrorCount, &err, string(op))
 
 	client, err := s.client(ctx)
 	if err != nil {
@@ -379,162 +431,14 @@ func (s *VaultStore) getJWKSExpiryPath() string {
 	return path.Join(s.getWellKnownPath(), "jwks-expiry")
 }
 
-// CleanupOAuthSecrets removes all secrets associated with OAuth.
-func (s *VaultStore) CleanupOAuthSecrets(ctx context.Context) error {
-	const op = errors.Op("vault.CleanupOAuthSecrets")
-
-	client, err := s.client(ctx)
-	if err != nil {
-		return errors.E(op, err)
-	}
-
-	// Vault does not return errors on deletion requests where
-	// the secret does not exist.
-	if err := client.KVv2(s.KVPath).Delete(ctx, s.GetOAuthSecretPath()); err != nil {
-		return errors.E(op, err)
-	}
-	if err := client.KVv2(s.KVPath).Delete(ctx, s.GetOAuthSessionStoreSecretPath()); err != nil {
-		return errors.E(op, err)
-	}
-	return nil
-}
-
-// GetOAuthSecretsBasePath returns a hardcoded suffixed vault path (dependent on
-// the initial KVPath) representing the base path for OAuth related secrets.
-func (s *VaultStore) GetOAuthSecretsBasePath() string {
-	return path.Join("creds", "oauth")
-}
-
-// GetOAuthSecret returns the current HS256 (symmetric encryption) secret used to sign OAuth session tokens.
-func (s *VaultStore) GetOAuthSecret(ctx context.Context) ([]byte, error) {
-	const op = errors.Op("vault.GetOAuthSecret")
-
-	client, err := s.client(ctx)
-	if err != nil {
-		return nil, errors.E(op, err)
-	}
-
-	secret, err := client.KVv2(s.KVPath).Get(ctx, s.GetOAuthSecretPath())
-	if err != nil && goerr.Unwrap(err) != api.ErrSecretNotFound {
-		return nil, errors.E(op, err)
-	}
-
-	if secret == nil || secret.Data == nil {
-		msg := "no OAuth key exists"
-		zapctx.Debug(ctx, msg)
-		return nil, errors.E(op, errors.CodeNotFound, msg)
-	}
-
-	raw, ok := secret.Data[oAuthSecretKey]
-	if !ok {
-		msg := "nil OAuth key data"
-		zapctx.Debug(ctx, msg)
-		return nil, errors.E(op, errors.CodeNotFound, msg)
-	}
-
-	keyPemB64, ok := raw.(string)
-	if !ok {
-		zapctx.Debug(ctx, "oauth secret is not a string")
-		return nil, errors.E(op, errors.CodeNotFound, "oauth secret not found")
-	}
-
-	keyPem, err := base64.StdEncoding.DecodeString(keyPemB64)
-	if err != nil {
-		return nil, errors.E(op, err)
-	}
-
-	return keyPem, nil
-}
-
-// PutOAuthSecret puts a HS256 (symmetric encryption) secret into the credentials store for signing OAuth session tokens.
-func (s *VaultStore) PutOAuthSecret(ctx context.Context, raw []byte) error {
-	const op = errors.Op("vault.PutOAuthSecret")
-
-	client, err := s.client(ctx)
-	if err != nil {
-		return errors.E(op, err)
-	}
-
-	oAuthSecretData := map[string]interface{}{oAuthSecretKey: raw}
-	if _, err := client.KVv2(s.KVPath).Put(ctx, s.GetOAuthSecretPath(), oAuthSecretData); err != nil {
-		return errors.E(op, err)
-	}
-	return nil
-}
-
-// GetOAuthSecretPath returns a hardcoded suffixed vault path (dependent on
-// the initial KVPath) to the OAuth JWK location.
-func (s *VaultStore) GetOAuthSecretPath() string {
-	return path.Join(s.GetOAuthSecretsBasePath(), "key")
-}
-
-// GetOAuthSessionStoreSecret returns the current secret used to store session tokens.
-func (s *VaultStore) GetOAuthSessionStoreSecret(ctx context.Context) ([]byte, error) {
-	const op = errors.Op("vault.GetOAuthSessionStoreSecret")
-
-	client, err := s.client(ctx)
-	if err != nil {
-		return nil, errors.E(op, err)
-	}
-
-	secret, err := client.KVv2(s.KVPath).Get(ctx, s.GetOAuthSessionStoreSecretPath())
-	if err != nil && goerr.Unwrap(err) != api.ErrSecretNotFound {
-		return nil, errors.E(op, err)
-	}
-
-	if secret == nil || secret.Data == nil {
-		msg := "no OAuth session store secret exists"
-		zapctx.Debug(ctx, msg)
-		return nil, errors.E(op, errors.CodeNotFound, msg)
-	}
-
-	raw, ok := secret.Data[oAuthSessionStoreSecretKey]
-	if !ok {
-		msg := "nil OAuth session store secret data"
-		zapctx.Debug(ctx, msg)
-		return nil, errors.E(op, errors.CodeNotFound, msg)
-	}
-
-	keyPemB64, ok := raw.(string)
-	if !ok {
-		zapctx.Debug(ctx, "oauth session store secret is not a string")
-		return nil, errors.E(op, errors.CodeNotFound, "oauth session store secret not found")
-	}
-
-	keyPem, err := base64.StdEncoding.DecodeString(keyPemB64)
-	if err != nil {
-		return nil, errors.E(op, err)
-	}
-
-	return keyPem, nil
-}
-
-// PutOAuthSessionStoreSecret puts a secret into the credentials store for secure storage of session tokens.
-func (s *VaultStore) PutOAuthSessionStoreSecret(ctx context.Context, raw []byte) error {
-	const op = errors.Op("vault.PutOAuthSessionStoreSecret")
-
-	client, err := s.client(ctx)
-	if err != nil {
-		return errors.E(op, err)
-	}
-
-	oAuthSecretData := map[string]interface{}{oAuthSessionStoreSecretKey: raw}
-	if _, err := client.KVv2(s.KVPath).Put(ctx, s.GetOAuthSessionStoreSecretPath(), oAuthSecretData); err != nil {
-		return errors.E(op, err)
-	}
-	return nil
-}
-
-// GetOAuthSessionStoreSecretPath returns a hardcoded suffixed vault path
-// (dependent on the initial KVPath) to the OAuth session storage secret.
-func (s *VaultStore) GetOAuthSessionStoreSecretPath() string {
-	return path.Join(s.GetOAuthSecretsBasePath(), "session-store")
-}
-
 // deleteControllerCredentials removes the credentials associated with the controller in
 // the vault service.
-func (s *VaultStore) deleteControllerCredentials(ctx context.Context, controllerName string) error {
+func (s *VaultStore) deleteControllerCredentials(ctx context.Context, controllerName string) (err error) {
 	const op = errors.Op("vault.deleteControllerCredentials")
+
+	durationObserver := servermon.DurationObserver(servermon.VaultCallDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.VaultCallErrorCount, &err, string(op))
 
 	client, err := s.client(ctx)
 	if err != nil {

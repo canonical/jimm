@@ -67,7 +67,6 @@ func TestServiceDoesNotStartWithoutCredentialStore(t *testing.T) {
 
 func TestAuthenticator(t *testing.T) {
 	c := qt.New(t)
-	ctx := context.Background()
 
 	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
@@ -78,9 +77,6 @@ func TestAuthenticator(t *testing.T) {
 	svc, err := jimm.NewService(context.Background(), p)
 	c.Assert(err, qt.IsNil)
 	defer svc.Cleanup()
-
-	err = svc.JIMM().GetCredentialStore().PutOAuthSecret(ctx, []byte(jimmtest.JWTTestSecret))
-	c.Assert(err, qt.IsNil)
 
 	srv := httptest.NewTLSServer(svc)
 	c.Cleanup(srv.Close)
@@ -143,9 +139,6 @@ func TestVault(t *testing.T) {
 	svc, err := jimm.NewService(ctx, p)
 	c.Assert(err, qt.IsNil)
 	defer svc.Cleanup()
-
-	err = svc.JIMM().GetCredentialStore().PutOAuthSecret(ctx, []byte(jimmtest.JWTTestSecret))
-	c.Assert(err, qt.IsNil)
 
 	env := jimmtest.ParseEnvironment(c, testVaultEnv)
 	env.PopulateDBAndPermissions(c, names.NewControllerTag(p.ControllerUUID), svc.JIMM().Database, ofgaClient)
@@ -220,9 +213,6 @@ func TestOpenFGA(t *testing.T) {
 	svc, err := jimm.NewService(ctx, p)
 	c.Assert(err, qt.IsNil)
 	defer svc.Cleanup()
-
-	err = svc.JIMM().GetCredentialStore().PutOAuthSecret(ctx, []byte(jimmtest.JWTTestSecret))
-	c.Assert(err, qt.IsNil)
 
 	srv := httptest.NewTLSServer(svc)
 	c.Cleanup(srv.Close)

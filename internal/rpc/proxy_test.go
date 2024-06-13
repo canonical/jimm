@@ -11,6 +11,7 @@ import (
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	qt "github.com/frankban/quicktest"
+	"github.com/google/uuid"
 	"github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"github.com/lestrrat-go/jwx/v2/jwt"
@@ -249,8 +250,12 @@ func TestProxySocketsAdminFacade(t *testing.T) {
 			helpers := rpc.ProxyHelpers{
 				ConnClient: clientWebsocket,
 				TokenGen:   &mockTokenGenerator{},
-				ConnectController: func(ctx context.Context) (rpc.WebsocketConnection, string, error) {
-					return controllerWebsocket, "test model", nil
+				ConnectController: func(ctx context.Context) (rpc.WebsocketConnectionWithMetadata, error) {
+					return rpc.WebsocketConnectionWithMetadata{
+						Conn:           controllerWebsocket,
+						ModelName:      "test model",
+						ControllerUUID: uuid.NewString(),
+					}, nil
 				},
 				AuditLog: func(*dbmodel.AuditLogEntry) {},
 				JIMM: &mockJIMM{
@@ -356,14 +361,14 @@ func (m *mockOAuthAuthenticator) VerifyClientCredentials(ctx context.Context, cl
 	return errors.E(errors.CodeUnauthorized)
 }
 
-func (m *mockOAuthAuthenticator) MintSessionToken(email string, secretKey string) (string, error) {
+func (m *mockOAuthAuthenticator) MintSessionToken(email string) (string, error) {
 	if m.err != nil {
 		return "", m.err
 	}
 	return "test session token", nil
 }
 
-func (m *mockOAuthAuthenticator) VerifySessionToken(token string, secretKey string) (jwt.Token, error) {
+func (m *mockOAuthAuthenticator) VerifySessionToken(token string) (jwt.Token, error) {
 	if m.err != nil {
 		return nil, m.err
 	}
