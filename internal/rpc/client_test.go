@@ -250,10 +250,13 @@ func TestProxySockets(t *testing.T) {
 	errChan := make(chan error)
 	srvJIMM := newServer(func(connClient *websocket.Conn) error {
 		testTokenGen := testTokenGenerator{}
-		f := func(context.Context) (rpc.WebsocketConnection, string, error) {
+		f := func(context.Context) (rpc.WebsocketConnectionWithMetadata, error) {
 			connController, err := srvController.dialer.DialWebsocket(ctx, srvController.URL)
 			c.Assert(err, qt.IsNil)
-			return connController, "TestName", nil
+			return rpc.WebsocketConnectionWithMetadata{
+				Conn:      connController,
+				ModelName: "TestName",
+			}, nil
 		}
 		auditLogger := func(ale *dbmodel.AuditLogEntry) {}
 		proxyHelpers := rpc.ProxyHelpers{
@@ -297,10 +300,13 @@ func TestCancelProxySockets(t *testing.T) {
 	errChan := make(chan error)
 	srvJIMM := newServer(func(connClient *websocket.Conn) error {
 		testTokenGen := testTokenGenerator{}
-		f := func(context.Context) (rpc.WebsocketConnection, string, error) {
+		f := func(context.Context) (rpc.WebsocketConnectionWithMetadata, error) {
 			connController, err := srvController.dialer.DialWebsocket(ctx, srvController.URL)
 			c.Assert(err, qt.IsNil)
-			return connController, "TestName", nil
+			return rpc.WebsocketConnectionWithMetadata{
+				Conn:      connController,
+				ModelName: "TestName",
+			}, nil
 		}
 		auditLogger := func(ale *dbmodel.AuditLogEntry) {}
 		proxyHelpers := rpc.ProxyHelpers{
@@ -337,10 +343,13 @@ func TestProxySocketsAuditLogs(t *testing.T) {
 	errChan := make(chan error)
 	srvJIMM := newServer(func(connClient *websocket.Conn) error {
 		testTokenGen := testTokenGenerator{}
-		f := func(context.Context) (rpc.WebsocketConnection, string, error) {
+		f := func(context.Context) (rpc.WebsocketConnectionWithMetadata, error) {
 			connController, err := srvController.dialer.DialWebsocket(ctx, srvController.URL)
 			c.Assert(err, qt.IsNil)
-			return connController, "TestModelName", nil
+			return rpc.WebsocketConnectionWithMetadata{
+				Conn:      connController,
+				ModelName: "TestModelName",
+			}, nil
 		}
 		auditLogger := func(ale *dbmodel.AuditLogEntry) { auditLogs = append(auditLogs, ale) }
 		proxyHelpers := rpc.ProxyHelpers{

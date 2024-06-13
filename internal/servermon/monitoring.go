@@ -63,6 +63,19 @@ var (
 		Name:      "error_total",
 		Help:      "The number of vault call errors.",
 	}, []string{"method"})
+	JujuCallDurationHistogram = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Namespace: "jimm",
+		Subsystem: "juju",
+		Name:      "call_duration_seconds",
+		Help:      "Histogram of juju call time in seconds",
+		Buckets:   []float64{.005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10},
+	}, []string{"facade", "method", "controller"})
+	JujuCallErrorCount = promauto.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "jimm",
+		Subsystem: "juju",
+		Name:      "error_total",
+		Help:      "The number of juju call errors.",
+	}, []string{"facade", "method", "controller"})
 	ConcurrentWebsocketConnections = promauto.NewGauge(prometheus.GaugeOpts{
 		Namespace: "jimm",
 		Subsystem: "websocket",
