@@ -3,7 +3,7 @@ base: ubuntu@22.04
 version: '0.1'
 summary: Juju Intelligent Model Manager provides a convient way to manage all of your models!
 description: |
-    JIMM is a juju controller, used in conjunction with the JaaS dashboard to provide a seamless way
+    JIMM is a Juju controller, used in conjunction with the JaaS dashboard to provide a seamless way
     to manage models, regardless of where their controllers reside or what cloud they may be running on.
 
 license: GPL-3.0
@@ -14,7 +14,7 @@ services:
     server:
         summary: JIMM
         description: |
-            JIMM is a juju controller, used in conjunction with the JaaS dashboard to provide a seamless way
+            JIMM is a Juju controller, used in conjunction with the JaaS dashboard to provide a seamless way
             to manage models, regardless of where their controllers reside or what cloud they may be running on.
         startup: enabled
         override: replace
