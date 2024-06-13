@@ -11,9 +11,11 @@ import (
 )
 
 var (
-	AccessMessage       = accessMessageFormat
-	AccessResultAllowed = accessResultAllowed
-	AccessResultDenied  = accessResultDenied
+	AccessMessage          = accessMessageFormat
+	AccessResultAllowed    = accessResultAllowed
+	AccessResultDenied     = accessResultDenied
+	DefaultPageSize        = defaultPageSize
+	FormatRelationsTabular = formatRelationsTabular
 )
 
 type AccessResult = accessResult

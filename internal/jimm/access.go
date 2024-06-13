@@ -394,6 +394,8 @@ func (j *JIMM) ToJAASTag(ctx context.Context, tag *ofganames.Tag) (string, error
 	switch tag.Kind {
 	case names.UserTagKind:
 		return names.UserTagKind + "-" + tag.ID, nil
+	case jimmnames.ServiceAccountTagKind:
+		return jimmnames.ServiceAccountTagKind + "-" + tag.ID, nil
 	case names.ControllerTagKind:
 		if tag.ID == j.ResourceTag().Id() {
 			return "controller-jimm", nil
@@ -603,6 +605,13 @@ func resolveTag(jimmUUID string, db *db.Database, tag string) (*ofganames.Tag, e
 		}
 
 		return ofganames.ConvertTagWithRelation(names.NewApplicationOfferTag(offer.UUID), relation), nil
+	case jimmnames.ServiceAccountTagKind:
+		zapctx.Debug(
+			ctx,
+			"Resolving JIMM tags to Juju tags for tag kind: serviceaccount",
+			zap.String("serviceaccount-name", trailer),
+		)
+		return ofganames.ConvertTagWithRelation(jimmnames.NewServiceAccountTag(trailer), relation), nil
 	}
 	return nil, errors.E("failed to map tag " + matches[1])
 }

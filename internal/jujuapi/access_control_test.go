@@ -22,6 +22,7 @@ import (
 	"github.com/canonical/jimm/internal/jujuapi"
 	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
+	"github.com/canonical/jimm/pkg/names"
 )
 
 type accessControlSuite struct {
@@ -792,7 +793,8 @@ func (s *accessControlSuite) TestJAASTag(c *gc.C) {
 	ctx := context.Background()
 	db := s.JIMM.Database
 
-	user, _, controller, model, applicationOffer, cloud, _, _, closeClient := createTestControllerEnvironment(ctx, c, s)
+	user, group, controller, model, applicationOffer, cloud, _, _, closeClient := createTestControllerEnvironment(ctx, c, s)
+	serviceAccountId := petname.Generate(2, "-") + "@serviceaccount"
 	closeClient()
 
 	tests := []struct {
@@ -802,6 +804,12 @@ func (s *accessControlSuite) TestJAASTag(c *gc.C) {
 	}{{
 		tag:             ofganames.ConvertTag(user.ResourceTag()),
 		expectedJAASTag: "user-" + user.Name,
+	}, {
+		tag:             ofganames.ConvertTag(names.NewServiceAccountTag(serviceAccountId)),
+		expectedJAASTag: "serviceaccount-" + serviceAccountId,
+	}, {
+		tag:             ofganames.ConvertTag(group.ResourceTag()),
+		expectedJAASTag: "group-" + group.Name,
 	}, {
 		tag:             ofganames.ConvertTag(controller.ResourceTag()),
 		expectedJAASTag: "controller-" + controller.Name,

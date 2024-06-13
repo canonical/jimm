@@ -137,7 +137,7 @@ Examples:
 	returns the list of relations, where target object
 	matches the specified one
 
-	jimmctl auth relation list --target <target_object>  --relation <relation
+	jimmctl auth relation list --target <target_object>  --relation <relation>
 	returns the list of relations, where target object
 	and relation match the specified ones
 `
@@ -544,7 +544,7 @@ func (c *listRelationsCommand) Run(ctxt *cmd.Context) error {
 		Tuple:    c.tuple,
 		PageSize: defaultPageSize,
 	}
-	result, err := fetchRelations(client, params, "")
+	result, err := fetchRelations(client, params)
 	if err != nil {
 		return errors.E(err)
 	}
@@ -559,19 +559,20 @@ func (c *listRelationsCommand) Run(ctxt *cmd.Context) error {
 	return nil
 }
 
-func fetchRelations(client *api.Client, params apiparams.ListRelationshipTuplesRequest, continuationToken string) (*apiparams.ListRelationshipTuplesResponse, error) {
-	response, err := client.ListRelationshipTuples(&params)
-	if err != nil {
-		return nil, errors.E(err)
-	}
-	if response.ContinuationToken != "" {
-		response1, err := fetchRelations(client, params, response.ContinuationToken)
+func fetchRelations(client *api.Client, params apiparams.ListRelationshipTuplesRequest) (*apiparams.ListRelationshipTuplesResponse, error) {
+	tuples := make([]apiparams.RelationshipTuple, 0)
+	for {
+		response, err := client.ListRelationshipTuples(&params)
 		if err != nil {
-			return nil, errors.E(err)
+			return nil, errors.E(fmt.Sprintf("failed to fetch list of relationship tuples: %s", err.Error()))
 		}
-		response.Tuples = append(response.Tuples, response1.Tuples...)
+		tuples = append(tuples, response.Tuples...)
+
+		if response.ContinuationToken == "" {
+			return &apiparams.ListRelationshipTuplesResponse{Tuples: tuples, Errors: response.Errors}, nil
+		}
+		params.ContinuationToken = response.ContinuationToken
 	}
-	return response, nil
 }
 
 func formatRelationsTabular(writer io.Writer, value interface{}) error {
