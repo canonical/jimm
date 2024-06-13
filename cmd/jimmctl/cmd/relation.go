@@ -569,8 +569,7 @@ func fetchRelations(client *api.Client, params apiparams.ListRelationshipTuplesR
 		tuples = append(tuples, response.Tuples...)
 
 		if response.ContinuationToken == "" {
-			response.Tuples = tuples
-			return response, nil
+			return &apiparams.ListRelationshipTuplesResponse{Tuples: tuples, Errors: response.Errors}, nil
 		}
 		params.ContinuationToken = response.ContinuationToken
 	}
