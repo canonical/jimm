@@ -404,7 +404,7 @@ func (s *relationSuite) TestListRelations(c *gc.C) {
 	context, err := cmdtesting.RunCommand(c, cmd.NewListRelationsCommandForTesting(s.ClientStore(), bClient), "--format", "tabular")
 	c.Assert(err, gc.IsNil)
 	var builder strings.Builder
-	err = cmd.FormatRelationsTabularForTesting(&builder, &expectedData)
+	err = cmd.FormatRelationsTabular(&builder, &expectedData)
 	c.Assert(err, gc.IsNil)
 	c.Assert(cmdtesting.Stdout(context), gc.Equals, builder.String())
 
@@ -480,7 +480,7 @@ func (s *relationSuite) TestListRelationsWithError(c *gc.C) {
 	context, err = cmdtesting.RunCommand(c, cmd.NewListRelationsCommandForTesting(s.ClientStore(), bClient), "--format", "tabular")
 	c.Assert(err, gc.IsNil)
 	var builder strings.Builder
-	err = cmd.FormatRelationsTabularForTesting(&builder, &expectedData)
+	err = cmd.FormatRelationsTabular(&builder, &expectedData)
 	c.Assert(err, gc.IsNil)
 	c.Assert(cmdtesting.Stdout(context), gc.Equals, builder.String())
 }
