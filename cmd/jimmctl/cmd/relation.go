@@ -564,7 +564,7 @@ func fetchRelations(client *api.Client, params apiparams.ListRelationshipTuplesR
 	for {
 		response, err := client.ListRelationshipTuples(&params)
 		if err != nil {
-			return nil, errors.E(err)
+			return nil, errors.E(fmt.Sprintf("failed to fetch list of relationship tuples: %s", err.Error()))
 		}
 		tuples = append(tuples, response.Tuples...)
 
