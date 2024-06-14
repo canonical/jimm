@@ -27,8 +27,9 @@ jobs:
           fetch-tags: true
           fetch-depth: 0
 
-      - name: Run govulncheck
-        uses: golang/govulncheck-action@v1
+      # TODO(ale8k): Currently hanging forever, not sure why?
+      # - name: Run govulncheck
+      #   uses: golang/govulncheck-action@v1
 
       - name: Run Trivy vulnerability scanner in repo mode
         uses: aquasecurity/trivy-action@0.20.0
