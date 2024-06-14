@@ -21,7 +21,6 @@ jobs:
       release-channel: 3/edge
     secrets: inherit
 
-
   build-and-release-jimm-server:
     uses: ./.github/workflows/snap-release.yaml
     with:
