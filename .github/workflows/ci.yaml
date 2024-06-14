@@ -21,7 +21,8 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
           fetch-tags: true
           fetch-depth: 0
@@ -51,25 +52,35 @@ jobs:
     timeout-minutes: 45
     needs: [security_scan]
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
           fetch-tags: true
           fetch-depth: 0
-      - uses: actions/setup-go@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
         with:
           go-version-file: 'go.mod'
+
       - name: Install dependencies
         run: sudo apt-get update -y && sudo apt-get install -y gcc git-core gnupg build-essential
-      - run: sudo snap install juju-db --channel 4.4/stable
+      
+      - name: Install juju-db
+        run: sudo snap install juju-db --channel 4.4/stable
+
       - name: Add volume files
         run: |
           touch ./local/vault/approle.json
           touch ./local/vault/roleid.txt
           touch ./local/vault/vault.env
+
       - name: Create test certs
         run: make certs
+
       - name: Start test environment
         run: docker compose up -d --wait
+
       - name: Build and Test
         run: go test -mod readonly ./... -timeout 1h -cover
         env:
@@ -88,15 +99,19 @@ jobs:
     # The docker compose has a healthcheck on the JIMM container.
     # So if the compose returns with exit code 0 then the JIMM server successfully started.
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
         with:
           go-version-file: 'go.mod'
+
       - name: Add volume files
         run: |
           touch ./local/vault/approle.json
           touch ./local/vault/roleid.txt
           touch ./local/vault/vault.env
-      - run: go version
-      - run: go mod vendor
-      - run: docker compose --profile dev up -d --wait --timestamps
+
+      - name: Run Smoke Test
+        run: docker compose --profile dev up -d --wait --timestamps
