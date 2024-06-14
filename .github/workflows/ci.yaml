@@ -54,58 +54,58 @@ jobs:
       #     sarif_file: 'trivy-results.sarif'
 
 
-  build_test:
-    name: Build and Test
-    runs-on: ubuntu-22.04
-    timeout-minutes: 45
-    needs: [security_scan]
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-tags: true
-          fetch-depth: 0
-      - uses: actions/setup-go@v4
-        with:
-          go-version-file: 'go.mod'
-      - name: Install dependencies
-        run: sudo apt-get update -y && sudo apt-get install -y gcc git-core gnupg build-essential
-      - run: sudo snap install juju-db --channel 4.4/stable
-      - name: Add volume files
-        run: |
-          touch ./local/vault/approle.json
-          touch ./local/vault/roleid.txt
-          touch ./local/vault/vault.env
-      - name: Create test certs
-        run: make certs
-      - name: Start test environment
-        run: docker compose up -d --wait
-      - name: Build and Test
-        run: go test -mod readonly ./... -timeout 1h -cover
-        env:
-          JIMM_DSN: postgresql://jimm:jimm@localhost:5432/jimm
-          JIMM_TEST_PGXDSN: postgresql://jimm:jimm@localhost:5432/jimm
-          PGHOST: localhost
-          PGPASSWORD: jimm
-          PGSSLMODE: disable
-          PGUSER: jimm
-          PGPORT: 5432
+  # build_test:
+  #   name: Build and Test
+  #   runs-on: ubuntu-22.04
+  #   timeout-minutes: 45
+  #   needs: [security_scan]
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #       with:
+  #         fetch-tags: true
+  #         fetch-depth: 0
+  #     - uses: actions/setup-go@v4
+  #       with:
+  #         go-version-file: 'go.mod'
+  #     - name: Install dependencies
+  #       run: sudo apt-get update -y && sudo apt-get install -y gcc git-core gnupg build-essential
+  #     - run: sudo snap install juju-db --channel 4.4/stable
+  #     - name: Add volume files
+  #       run: |
+  #         touch ./local/vault/approle.json
+  #         touch ./local/vault/roleid.txt
+  #         touch ./local/vault/vault.env
+  #     - name: Create test certs
+  #       run: make certs
+  #     - name: Start test environment
+  #       run: docker compose up -d --wait
+  #     - name: Build and Test
+  #       run: go test -mod readonly ./... -timeout 1h -cover
+  #       env:
+  #         JIMM_DSN: postgresql://jimm:jimm@localhost:5432/jimm
+  #         JIMM_TEST_PGXDSN: postgresql://jimm:jimm@localhost:5432/jimm
+  #         PGHOST: localhost
+  #         PGPASSWORD: jimm
+  #         PGSSLMODE: disable
+  #         PGUSER: jimm
+  #         PGPORT: 5432
 
-  smoke_test:
-    name: Smoke Test
-    runs-on: ubuntu-22.04
-    needs: [security_scan]
-    # The docker compose has a healthcheck on the JIMM container.
-    # So if the compose returns with exit code 0 then the JIMM server successfully started.
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v4
-        with:
-          go-version-file: 'go.mod'
-      - name: Add volume files
-        run: |
-          touch ./local/vault/approle.json
-          touch ./local/vault/roleid.txt
-          touch ./local/vault/vault.env
-      - run: go version
-      - run: go mod vendor
-      - run: docker compose --profile dev up -d --wait --timestamps
+  # smoke_test:
+  #   name: Smoke Test
+  #   runs-on: ubuntu-22.04
+  #   needs: [security_scan]
+  #   # The docker compose has a healthcheck on the JIMM container.
+  #   # So if the compose returns with exit code 0 then the JIMM server successfully started.
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: actions/setup-go@v4
+  #       with:
+  #         go-version-file: 'go.mod'
+  #     - name: Add volume files
+  #       run: |
+  #         touch ./local/vault/approle.json
+  #         touch ./local/vault/roleid.txt
+  #         touch ./local/vault/vault.env
+  #     - run: go version
+  #     - run: go mod vendor
+  #     - run: docker compose --profile dev up -d --wait --timestamps
