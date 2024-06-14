@@ -1,4 +1,6 @@
-name: Release snap
+# Release Snap is a composite workflow used within other workflows
+# to reuse the logic of building and publishing a snap in one.
+name: Release Snap
 
 on:
   workflow_call:

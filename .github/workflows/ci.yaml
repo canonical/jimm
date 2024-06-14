@@ -4,48 +4,73 @@ on:
   workflow_call:
   workflow_dispatch:
 
-
 jobs:
-  # lint:
-  #   runs-on: ubuntu-20.04
-  #   continue-on-error: true
-  #   steps:
-  #     - uses: actions/checkout@v3
-  #     - uses: actions/setup-go@v4
-  #       with:
-  #         go-version-file: 'go.mod'
-  #     - name: golangci-lint
-  #       uses: golangci/golangci-lint-action@v3
-  #       with:
-  #         # Optional: version of golangci-lint to use in form of v1.2 or v1.2.3 or `latest` to use the latest version
-  #         version: latest
-  #         skip-pkg-cache: true
-  #         skip-build-cache: true
+  security_scan:
+    name: Security Scan
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-tags: true
+          fetch-depth: 0
+
+      # TODO(ale8k): Currently hanging forever, not sure why?
+      # - name: Run govulncheck
+      #   uses: golang/govulncheck-action@v1
+
+      - name: Run Trivy vulnerability scanner in repo mode
+        uses: aquasecurity/trivy-action@0.20.0
+        with:
+          scan-type: 'fs'
+          ignore-unfixed: true
+          format: 'table' 
+          # output: 'trivy-results.sarif' # TODO(ale8k) Turn on when uploading to gh and change above line to sarif
+          severity: 'CRITICAL'
+          exit-code: '1'
+
+      # TODO(ale8k): Setup GH security
+      # - name: Upload Trivy scan results to GitHub Security tab
+      #   uses: github/codeql-action/upload-sarif@v2
+      #   with:
+      #     sarif_file: 'trivy-results.sarif'
 
   build_test:
     name: Build and Test
     runs-on: ubuntu-22.04
     timeout-minutes: 45
+    needs: [security_scan]
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
           fetch-tags: true
           fetch-depth: 0
-      - uses: actions/setup-go@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
         with:
           go-version-file: 'go.mod'
+
       - name: Install dependencies
         run: sudo apt-get update -y && sudo apt-get install -y gcc git-core gnupg build-essential
-      - run: sudo snap install juju-db --channel 4.4/stable
+      
+      - name: Install juju-db
+        run: sudo snap install juju-db --channel 4.4/stable
+
       - name: Add volume files
         run: |
           touch ./local/vault/approle.json
           touch ./local/vault/roleid.txt
           touch ./local/vault/vault.env
+
       - name: Create test certs
         run: make certs
+
       - name: Start test environment
         run: docker compose up -d --wait
+
       - name: Build and Test
         run: go test -mod readonly ./... -timeout 1h -cover
         env:
@@ -60,18 +85,23 @@ jobs:
   smoke_test:
     name: Smoke Test
     runs-on: ubuntu-22.04
+    needs: [security_scan]
     # The docker compose has a healthcheck on the JIMM container.
     # So if the compose returns with exit code 0 then the JIMM server successfully started.
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
         with:
           go-version-file: 'go.mod'
+
       - name: Add volume files
         run: |
           touch ./local/vault/approle.json
           touch ./local/vault/roleid.txt
           touch ./local/vault/vault.env
-      - run: go version
-      - run: go mod vendor
-      - run: docker compose --profile dev up -d --wait --timestamps
+
+      - name: Run Smoke Test
+        run: docker compose --profile dev up -d --wait --timestamps
