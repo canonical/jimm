@@ -42,8 +42,8 @@ jobs:
         with:
           scan-type: 'fs'
           ignore-unfixed: true
-          format: 'table' # Sarif for uploading
-          output: 'trivy-results.sarif'
+          format: 'table' 
+          # output: 'trivy-results.sarif' # TODO(ale8k) Turn on when uploading to gh and change above line to sarif
           severity: 'LOW,MEDIUM,HIGH,CRITICAL'
           exit-code: '1'
 
