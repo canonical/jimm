@@ -1,5 +1,4 @@
-# Publish the OCI image to ghcr
-name: Publish server image
+name: Release Server ROCK
 
 on:
   # Note that when running via workflow_dispatch, the github.ref_name

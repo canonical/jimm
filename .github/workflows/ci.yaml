@@ -36,7 +36,6 @@ jobs:
     name: Security Scan
     runs-on: ubuntu-22.04
     timeout-minutes: 45
-    needs: [check-signed-commits]
     steps:
       - name: Run Trivy vulnerability scanner in repo mode
         uses: aquasecurity/trivy-action@0.20.0
