@@ -48,7 +48,7 @@ jobs:
           ignore-unfixed: true
           format: 'table' 
           # output: 'trivy-results.sarif' # TODO(ale8k) Turn on when uploading to gh and change above line to sarif
-          severity: 'LOW,MEDIUM,HIGH,CRITICAL'
+          severity: 'CRITICAL'
           exit-code: '1'
 
       # TODO(ale8k): Setup GH security
