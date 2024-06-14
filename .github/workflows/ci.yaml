@@ -4,7 +4,6 @@ on:
   workflow_call:
   workflow_dispatch:
 
-
 jobs:
   # lint:
   #   runs-on: ubuntu-20.04
@@ -22,10 +21,36 @@ jobs:
   #         skip-pkg-cache: true
   #         skip-build-cache: true
 
+  check-signed-commits:
+    name: Check signed commits in PR
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Check signed commits in PR
+        uses: 1Password/check-signed-commits-action@v1
+
+  security_scan:
+    name: Security Scan
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    needs: [check-signed-commits]
+    steps:
+      - name: Run Trivy vulnerability scanner in repo mode
+        uses: aquasecurity/trivy-action@0.20.0
+        with:
+          scan-type: 'fs'
+          ignore-unfixed: true
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL'
+
   build_test:
     name: Build and Test
     runs-on: ubuntu-22.04
     timeout-minutes: 45
+    needs: [security_scan]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -60,6 +85,7 @@ jobs:
   smoke_test:
     name: Smoke Test
     runs-on: ubuntu-22.04
+    needs: [security_scan]
     # The docker compose has a healthcheck on the JIMM container.
     # So if the compose returns with exit code 0 then the JIMM server successfully started.
     steps:
