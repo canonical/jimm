@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 	"sync"
 
@@ -16,6 +15,7 @@ import (
 
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/openfga"
+	auth_model "github.com/canonical/jimm/openfga"
 )
 
 var (
@@ -35,13 +35,8 @@ type testSetup struct {
 }
 
 func getAuthModelDefinition() (*sdk.AuthorizationModel, error) {
-	b, err := os.ReadFile("../../openfga/authorisation_model.json")
-	if err != nil {
-		return nil, err
-	}
-
 	authModel := sdk.AuthorizationModel{}
-	err = json.Unmarshal(b, &authModel)
+	err := json.Unmarshal(auth_model.AuthModelFile, &authModel)
 	if err != nil {
 		return nil, err
 	}
