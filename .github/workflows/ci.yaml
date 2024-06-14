@@ -42,9 +42,10 @@ jobs:
         with:
           scan-type: 'fs'
           ignore-unfixed: true
-          format: 'sarif'
+          format: 'table' # Sarif for uploading
           output: 'trivy-results.sarif'
-          severity: 'LOW'
+          severity: 'LOW,MEDIUM,HIGH,CRITICAL'
+          exit-code: '1'
 
       # TODO(ale8k): Setup GH security
       # - name: Upload Trivy scan results to GitHub Security tab
