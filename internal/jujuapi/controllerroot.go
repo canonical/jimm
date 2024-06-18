@@ -107,6 +107,7 @@ type JIMM interface {
 	ValidateModelUpgrade(ctx context.Context, u *openfga.User, mt names.ModelTag, force bool) error
 	WatchAllModelSummaries(ctx context.Context, controller *dbmodel.Controller) (_ func() error, err error)
 	GetOpenFGAUserAndAuthorise(ctx context.Context, email string) (*openfga.User, error)
+	GetAllModelSummariesForUser(ctx context.Context, user *openfga.User) (jujuparams.ModelSummaryResults, error)
 }
 
 // controllerRoot is the root for endpoints served on controller connections.

@@ -41,6 +41,69 @@ type modelManagerSuite struct {
 
 var _ = gc.Suite(&modelManagerSuite{})
 
+func (s *modelManagerSuite) TestListModelSummariesV2(c *gc.C) {
+	conn := s.open(c, nil, "bob")
+	defer conn.Close()
+
+	client := modelmanager.NewClient(conn)
+
+	// List for bob
+	models, err := client.ListModelSummaries("bob@canonical.com", false)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(models, jimmtest.CmpEquals(
+		cmpopts.IgnoreTypes(&time.Time{}),
+		cmpopts.SortSlices(func(a, b base.UserModelSummary) bool {
+			return a.Name < b.Name
+		}),
+	), []base.UserModelSummary{{
+		Name:            "model-1",
+		UUID:            s.Model.UUID.String,
+		ControllerUUID:  "914487b5-60e7-42bb-bd63-1adc3fd3a388",
+		ProviderType:    jimmtest.TestProviderType,
+		DefaultSeries:   "jammy",
+		Cloud:           jimmtest.TestCloudName,
+		CloudRegion:     jimmtest.TestCloudRegionName,
+		CloudCredential: jimmtest.TestCloudName + "/bob@canonical.com/cred",
+		Owner:           "bob@canonical.com",
+		Life:            life.Value(state.Alive.String()),
+		Status: base.Status{
+			Status: status.Available,
+			Data:   map[string]interface{}{},
+		},
+		ModelUserAccess: "admin",
+		Counts:          []base.EntityCount{},
+		AgentVersion:    &jujuversion.Current,
+		Type:            "iaas",
+		SLA: &base.SLASummary{
+			Level: "",
+			Owner: "bob@canonical.com",
+		},
+	}, {
+		Name:            "model-3",
+		UUID:            s.Model3.UUID.String,
+		ControllerUUID:  "914487b5-60e7-42bb-bd63-1adc3fd3a388",
+		ProviderType:    jimmtest.TestProviderType,
+		DefaultSeries:   "jammy",
+		Cloud:           jimmtest.TestCloudName,
+		CloudRegion:     jimmtest.TestCloudRegionName,
+		CloudCredential: jimmtest.TestCloudName + "/charlie@canonical.com/cred",
+		Owner:           "charlie@canonical.com",
+		Life:            life.Value(state.Alive.String()),
+		Status: base.Status{
+			Status: status.Available,
+			Data:   map[string]interface{}{},
+		},
+		ModelUserAccess: "read",
+		Counts:          []base.EntityCount{},
+		AgentVersion:    &jujuversion.Current,
+		Type:            "iaas",
+		SLA: &base.SLASummary{
+			Level: "",
+			Owner: "charlie@canonical.com",
+		},
+	}})
+}
+
 func (s *modelManagerSuite) TestListModelSummaries(c *gc.C) {
 	conn := s.open(c, nil, "bob")
 	defer conn.Close()

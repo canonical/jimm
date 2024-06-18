@@ -758,6 +758,92 @@ func (j *JIMM) ModelStatus(ctx context.Context, user *openfga.User, mt names.Mod
 	return &ms, nil
 }
 
+// dialAllController dials all controllers on JIMM and returns a closer
+// to close all connections. Defer the closer.
+//
+// TODO(ale8k): Should this live here? We don't have like a utils.go in jimm pkg
+func (j *JIMM) dialAllControllers() ([]API, func()) {
+	var controllers []dbmodel.Controller
+	apis := []API{}
+
+	_ = j.DB().DB.Find(&controllers).Error
+	for _, c := range controllers {
+		api, err := j.dial(context.Background(), &c, names.ModelTag{})
+		_ = err
+		apis = append(apis, api)
+	}
+
+	closer := func() {
+		for _, a := range apis {
+			a.Close()
+		}
+	}
+
+	return apis, closer
+}
+
+// GetAllModelSummariesForUser dials all controllers JIMM is aware of and calls ListAllModelSummaries
+// on each. It filters out controller models and ensures the user has access to the summarised
+// models and filters out the results.
+func (j *JIMM) GetAllModelSummariesForUser(ctx context.Context, user *openfga.User) (jujuparams.ModelSummaryResults, error) {
+	const op = errors.Op("jimm.GetAllModelSummariesForUser")
+
+	apis, closer := j.dialAllControllers()
+	defer closer()
+
+	filteredSummaries := jujuparams.ModelSummaryResults{}
+	flattenedSummaries := jujuparams.ModelSummaryResults{}
+	summaries := []jujuparams.ModelSummaryResults{}
+
+	// Get all summaries from all controllers
+	for _, api := range apis {
+		var out jujuparams.ModelSummaryResults
+		in := jujuparams.ModelSummariesRequest{UserTag: names.NewUserTag("admin").String(), All: true}
+		if err := api.ListModelSummaries(context.Background(), &in, &out); err != nil {
+			return filteredSummaries, err
+		}
+
+		summaries = append(summaries, out)
+	}
+
+	// Flatten the summaries into a single results
+	for _, s := range summaries {
+		flattenedSummaries.Results = append(flattenedSummaries.Results, s.Results...)
+	}
+
+	// Now we filter the flattened summaries for two things:
+	// 1. If it's an IsController, remove it
+	// 2. Check the user has access
+	for _, r := range flattenedSummaries.Results {
+		// Skip controller models
+		if r.Result.IsController {
+			continue
+		}
+
+		access, err := j.GetUserModelAccess(context.Background(), user, names.NewModelTag(r.Result.UUID))
+		if err != nil {
+			return filteredSummaries, errors.E(op, err)
+		}
+
+		// Update the access to reflect our OpenFGA and not what the controller reported
+		// for the admin user that JIMM retrieved the model summary as.
+		r.Result.UserAccess = jujuparams.UserAccessPermission(access)
+
+		switch access {
+		case "read":
+			fallthrough
+		case "write":
+			fallthrough
+		case "admin":
+			filteredSummaries.Results = append(filteredSummaries.Results, r)
+		default:
+			continue
+		}
+	}
+
+	return filteredSummaries, nil
+}
+
 // ForEachUserModel calls the given function once for each model that the
 // given user has been granted explicit access to. The UserModelAccess
 // object passed to f will always include the Model_, Access, and
