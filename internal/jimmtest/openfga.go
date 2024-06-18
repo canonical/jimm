@@ -4,11 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/fs"
-	"io/ioutil"
-	"os"
-	"path"
-	"path/filepath"
 	"strings"
 	"sync"
 
@@ -20,6 +15,7 @@ import (
 
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/openfga"
+	auth_model "github.com/canonical/jimm/openfga"
 )
 
 var (
@@ -39,44 +35,8 @@ type testSetup struct {
 }
 
 func getAuthModelDefinition() (*sdk.AuthorizationModel, error) {
-	desiredFolder := "local"
-	authPath := ""
-	var pwd string
-	pwd, err := os.Getwd()
-	if err != nil {
-		return nil, err
-	}
-	for ok := true; ok; {
-		if pwd == "/" {
-			break
-		}
-		var files []fs.FileInfo
-		files, err = ioutil.ReadDir(pwd)
-		if err != nil {
-			return nil, err
-		}
-
-		for _, f := range files {
-			if f.Name() == desiredFolder {
-				ok = true
-				authPath = pwd
-			}
-		}
-		// Move up a directory
-		pwd = filepath.Dir(pwd)
-	}
-	if authPath == "" {
-		err = fmt.Errorf("auth path is empty")
-		return nil, err
-	}
-
-	b, err := os.ReadFile(path.Join(authPath, "/local/openfga/authorisation_model.json"))
-	if err != nil {
-		return nil, err
-	}
-
 	authModel := sdk.AuthorizationModel{}
-	err = json.Unmarshal(b, &authModel)
+	err := json.Unmarshal(auth_model.AuthModelFile, &authModel)
 	if err != nil {
 		return nil, err
 	}
