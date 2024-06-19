@@ -758,42 +758,21 @@ func (j *JIMM) ModelStatus(ctx context.Context, user *openfga.User, mt names.Mod
 	return &ms, nil
 }
 
-// dialAllController dials all controllers on JIMM and returns a closer
-// to close all connections. Defer the closer.
-//
-// TODO(ale8k): Should this live here? We don't have like a utils.go in jimm pkg
-func (j *JIMM) dialAllControllers() ([]API, func()) {
-	var controllers []dbmodel.Controller
-	apis := []API{}
-
-	_ = j.DB().DB.Find(&controllers).Error
-	for _, c := range controllers {
-		api, err := j.dial(context.Background(), &c, names.ModelTag{})
-		_ = err
-		apis = append(apis, api)
-	}
-
-	closer := func() {
-		for _, a := range apis {
-			a.Close()
-		}
-	}
-
-	return apis, closer
-}
-
 // GetAllModelSummariesForUser dials all controllers JIMM is aware of and calls ListAllModelSummaries
 // on each. It filters out controller models and ensures the user has access to the summarised
 // models and filters out the results.
 func (j *JIMM) GetAllModelSummariesForUser(ctx context.Context, user *openfga.User) (jujuparams.ModelSummaryResults, error) {
 	const op = errors.Op("jimm.GetAllModelSummariesForUser")
 
-	apis, closer := j.dialAllControllers()
-	defer closer()
-
 	filteredSummaries := jujuparams.ModelSummaryResults{}
 	flattenedSummaries := jujuparams.ModelSummaryResults{}
 	summaries := []jujuparams.ModelSummaryResults{}
+
+	apis, closer, err := j.dialAllControllers(ctx, user)
+	if err != nil {
+		return filteredSummaries, errors.E(op, err)
+	}
+	defer closer()
 
 	// Get all summaries from all controllers
 	for _, api := range apis {

@@ -178,6 +178,57 @@ type permission struct {
 	relation string
 }
 
+// dialAllControllers dials controllers where the user
+// has some kind of access to any model on that given controller.
+//
+// Returns a closer to close all connections. Defer the closer.
+func (j *JIMM) dialAllControllers(ctx context.Context, user *openfga.User) ([]API, func(), error) {
+	const op = errors.Op("jimm.dialAllControllers")
+	apis := []API{}
+
+	// Get access to all models this user has access to
+	uuids, err := user.ListModels(context.Background(), ofganames.ReaderRelation)
+	if err != nil {
+		return apis, nil, errors.E(op, err)
+	}
+
+	// Retrieve the models from db
+	models, err := j.DB().GetModelsByUUID(ctx, uuids)
+	if err != nil {
+		return apis, nil, errors.E(op, err)
+	}
+
+	controllers := []dbmodel.Controller{}
+
+	// Filter out controllers
+	for _, m := range models {
+		containsController := false
+		for _, c := range controllers {
+			if c.UUID == m.Controller.UUID {
+				containsController = true
+			}
+		}
+		if !containsController {
+			controllers = append(controllers, m.Controller)
+		}
+	}
+
+	// Dial these specific controllers where the user has a model on them
+	for _, c := range controllers {
+		api, err := j.dial(context.Background(), &c, names.ModelTag{})
+		_ = err
+		apis = append(apis, api)
+	}
+
+	closer := func() {
+		for _, a := range apis {
+			a.Close()
+		}
+	}
+
+	return apis, closer, nil
+}
+
 // dial dials the controller and model specified by the given Controller
 // and ModelTag. If no Dialer has been configured then an error with a
 // code of CodeConnectionFailed will be returned.
