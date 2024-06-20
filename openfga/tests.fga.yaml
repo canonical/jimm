@@ -1,0 +1,328 @@
+model_file: ./authorisation_model.fga
+
+# In order to avoid the potential entanglement of separate tests the tuples are artifically split into groups using this naming convention: (type):(2-letter test name)-(id)
+# The GitHub action supports running all tests in a directory, but keeping them in a single file improves the local development experience because the CLI does not.
+tuples:
+    # Group
+    - user: user:gr-1
+      relation: member
+      object: group:gr-1
+    - user: group:gr-1#member
+      relation: member
+      object: group:gr-2
+    - user: user:*
+      relation: member
+      object: group:gr-3
+
+    # Controller
+    - user: user:co-1
+      relation: administrator
+      object: controller:co-1
+    - user: controller:co-1
+      relation: controller
+      object: controller:co-2
+    - user: user:*
+      relation: administrator
+      object: controller:co-2
+    - user: group:co-1#member
+      relation: administrator
+      object: controller:co-2
+    - user: user:co-2
+      relation: audit_log_viewer
+      object: controller:co-1
+
+    # Model
+    - user: user:mo-1
+      relation: administrator
+      object: model:mo-1
+    - user: user:*
+      relation: administrator
+      object: model:mo-2
+    - user: group:mo-1#member
+      relation: administrator
+      object: model:mo-1
+    - user: controller:mo-1
+      relation: controller
+      object: model:mo-1
+    - user: user:mo-3
+      relation: administrator
+      object: controller:mo-1
+    - user: group:mo-2#member
+      relation: writer
+      object: model:mo-1
+    - user: user:mo-4
+      relation: reader
+      object: model:mo-1
+    
+    # Cloud
+    - user: user:cl-1
+      relation: administrator
+      object: cloud:cl-1
+    - user: user:*
+      relation: administrator
+      object: cloud:cl-2
+    - user: group:cl-1#member
+      relation: administrator
+      object: cloud:cl-1
+    - user: user:cl-2
+      relation: administrator
+      object: controller:cl-1
+    - user: controller:cl-1
+      relation: controller
+      object: cloud:cl-1
+    - user: group:cl-2#member
+      relation: can_addmodel
+      object: cloud:cl-1
+    
+    # Application Offer
+    - user: user:ao-1
+      relation: administrator
+      object: applicationoffer:ao-1
+    - user: user:*
+      relation: administrator
+      object: applicationoffer:ao-2
+    - user: group:ao-1#member
+      relation: administrator
+      object: applicationoffer:ao-1
+    - user: user:ao-2
+      relation: administrator
+      object: model:ao-1
+    - user: model:ao-1
+      relation: model
+      object: applicationoffer:ao-1
+    - user: group:ao-2#member
+      relation: consumer
+      object: applicationoffer:ao-1
+    - user: user:ao-3
+      relation: reader
+      object: applicationoffer:ao-1
+    
+    # Service Account
+    - user: user:sa-1
+      relation: administator
+      object: serviceaccount:sa-1
+    - user: user:*
+      relation: administator
+      object: serviceaccount:sa-2
+    - user: group:sa-1#member
+      relation: administator
+      object: serviceaccount:sa-1
+
+# Tests directly correspond to the types available in JIMM's authorisation model
+tests:
+    # Ensures:
+    # - all or individual users can become members of a group
+    # - group membership can have multiple layers
+    - name: Group
+      list_objects:
+        - user: user:gr-1
+          type: group
+          assertions:
+            member:
+                - group:gr-1
+                - group:gr-2
+                - group:gr-3
+            
+    # Checks whether:
+    # - all or invididual users, or group members can become administators and audit_log_viewers of a controller
+    # - controllers can be related to each other with correct inheritance of administrator
+    # - audit_log_viewer is a weaker relation that administrator
+    - name: Controller
+      list_objects:
+         - user: user:co-1
+           type: controller
+           assertions:
+             administrator:
+               - controller:co-1
+               - controller:co-2
+             audit_log_viewer:
+               - controller:co-1
+               - controller:co-2
+         - user: group:co-1#member
+           type: controller
+           assertions:
+             administrator:
+               - controller:co-2
+             audit_log_viewer:
+               - controller:co-2
+      check:
+        - user: user:co-2
+          object: controller:co-1
+          assertions:
+            audit_log_viewer: true
+            administrator: false
+
+    # Ensures:
+    # - all or individual users, as well as group members can take part in appropriate relations
+    # - correct relationship with controllers and inheritance of administators from them
+    # - appropriate hierachy of relations in the following order: administrator > writer > reader
+    - name: Model
+      list_objects:
+        - user: user:mo-1
+          type: model
+          assertions:
+            administrator:
+              - model:mo-1
+              - model:mo-2
+            writer:
+              - model:mo-1
+              - model:mo-2
+            reader:
+              - model:mo-1
+              - model:mo-2
+        - user: group:mo-1#member
+          type: model
+          assertions:
+            administrator:
+              - model:mo-1
+            writer:
+              - model:mo-1
+            reader:
+              - model:mo-1
+        - user: controller:mo-1
+          type: model
+          assertions:
+            controller:
+              - model:mo-1
+        - user: user:mo-3
+          type: model
+          assertions:
+            administrator:
+              - model:mo-1
+              - model:mo-2
+            writer:
+              - model:mo-1
+              - model:mo-2
+            reader:
+              - model:mo-1
+              - model:mo-2
+      check:
+        - user: group:mo-2#member
+          object: model:mo-1
+          assertions:
+            writer: true
+            reader: true
+            administrator: false
+        - user: user:mo-4
+          object: model:mo-1
+          assertions:
+            writer: false
+            reader: true
+            administrator: false
+    
+    # Makes sure that: 
+    # - all or individual users, as well as group members, can enter relations with a cloud
+    # - the controller relation and inheritance of their administrators is correct
+    # - proper hierarchy of relations: administrator > can_addmodel
+    - name: Cloud
+      list_objects:
+        - user: user:cl-1
+          type: cloud
+          assertions:
+            administrator:
+              - cloud:cl-1
+              - cloud:cl-2
+            can_addmodel:
+              - cloud:cl-1
+              - cloud:cl-2
+        - user: group:cl-1#member
+          type: cloud
+          assertions:
+            administrator:
+              - cloud:cl-1
+            can_addmodel:
+              - cloud:cl-1
+        - user: controller:cl-1
+          type: cloud
+          assertions:
+            controller:
+              - cloud:cl-1
+        - user: user:cl-2
+          type: cloud
+          assertions:
+            administrator:
+              - cloud:cl-1
+              - cloud:cl-2
+            can_addmodel:
+              - cloud:cl-1
+              - cloud:cl-2
+      check:
+        - user: group:cl-2#member
+          object: cloud:cl-1
+          assertions:
+            can_addmodel: true
+            administrator: false
+
+    # Similarly as the other tests it enforces that: 
+    # - individual or all users, or group members can enter relations with applicationoffer
+    # - applicationoffer can relate to models and inherit their administrators
+    # - hierarchy of relations has the correct order, that is: administrator > consumer > reader. 
+    - name: Application Offer
+      list_objects:
+        - user: user:ao-1
+          type: applicationoffer
+          assertions:
+            administrator:
+              - applicationoffer:ao-1
+              - applicationoffer:ao-2
+            consumer:
+              - applicationoffer:ao-1
+              - applicationoffer:ao-2
+            reader:
+              - applicationoffer:ao-1
+              - applicationoffer:ao-2
+        - user: group:ao-1#member
+          type: applicationoffer
+          assertions:
+            administrator:
+              - applicationoffer:ao-1
+            consumer:
+              - applicationoffer:ao-1
+            reader:
+              - applicationoffer:ao-1
+        - user: model:ao-1
+          type: applicationoffer
+          assertions:
+            model:
+              - applicationoffer:ao-1
+        - user: user:ao-2
+          type: applicationoffer
+          assertions:
+            administrator:
+              - applicationoffer:ao-1
+              - applicationoffer:ao-2
+            consumer:
+              - applicationoffer:ao-1
+              - applicationoffer:ao-2
+            reader:
+              - applicationoffer:ao-1
+              - applicationoffer:ao-2
+      check:
+        - user: group:ao-2#member
+          object: applicationoffer:ao-1
+          assertions:
+            administrator: false
+            consumer: true
+            reader: true
+        - user: user:ao-3
+          object: applicationoffer:ao-1
+          assertions:
+            administrator: false
+            consumer: false
+            reader: true
+
+    # Guarantees that all or individual users, or group members can become administrators of a service account
+    - name: Service Account
+      list_objects:
+        - user: user:sa-1
+          type: serviceaccount
+          assertions:
+            administator:
+              - serviceaccount:sa-1
+              - serviceaccount:sa-2
+        - user: group:sa-1#member
+          type: serviceaccount
+          assertions:
+            administator:
+              - serviceaccount:sa-1
+    
