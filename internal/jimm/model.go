@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	jujupermission "github.com/juju/juju/core/permission"
@@ -766,23 +767,46 @@ func (j *JIMM) GetAllModelSummariesForUser(ctx context.Context, user *openfga.Us
 
 	filteredSummaries := jujuparams.ModelSummaryResults{}
 	flattenedSummaries := jujuparams.ModelSummaryResults{}
-	summaries := []jujuparams.ModelSummaryResults{}
 
-	apis, closer, err := j.dialAllControllers(ctx, user)
+	apis, closer, err := j.dialControllersByUserModelAccess(ctx, user)
 	if err != nil {
 		return filteredSummaries, errors.E(op, err)
 	}
 	defer closer()
 
+	var wg sync.WaitGroup
+	summariesCh := make(chan jujuparams.ModelSummaryResults, len(apis))
+	errorsCh := make(chan error, len(apis))
 	// Get all summaries from all controllers
 	for _, api := range apis {
-		var out jujuparams.ModelSummaryResults
-		in := jujuparams.ModelSummariesRequest{UserTag: names.NewUserTag("admin").String(), All: true}
-		if err := api.ListModelSummaries(context.Background(), &in, &out); err != nil {
-			return filteredSummaries, err
-		}
+		wg.Add(1)
+		go func(a API) {
+			defer wg.Done()
+			var out jujuparams.ModelSummaryResults
+			in := jujuparams.ModelSummariesRequest{UserTag: names.NewUserTag("admin").String(), All: true}
 
-		summaries = append(summaries, out)
+			if err := a.ListModelSummaries(context.Background(), &in, &out); err != nil {
+				errorsCh <- err
+			}
+			summariesCh <- out
+		}(api)
+	}
+	wg.Wait()
+	close(summariesCh)
+	close(errorsCh)
+
+	summaries := []jujuparams.ModelSummaryResults{}
+	errs := []error{}
+
+	for e := range errorsCh {
+		errs = append(errs, e)
+	}
+	if len(errs) > 0 {
+		// What do we do with call errors? Just take the first?
+		return filteredSummaries, errors.E(op, errs[0])
+	}
+	for s := range summariesCh {
+		summaries = append(summaries, s)
 	}
 
 	// Flatten the summaries into a single results

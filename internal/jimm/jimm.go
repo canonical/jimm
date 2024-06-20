@@ -182,7 +182,7 @@ type permission struct {
 // has some kind of access to any model on that given controller.
 //
 // Returns a closer to close all connections. Defer the closer.
-func (j *JIMM) dialAllControllers(ctx context.Context, user *openfga.User) ([]API, func(), error) {
+func (j *JIMM) dialControllersByUserModelAccess(ctx context.Context, user *openfga.User) ([]API, func(), error) {
 	const op = errors.Op("jimm.dialAllControllers")
 	apis := []API{}
 

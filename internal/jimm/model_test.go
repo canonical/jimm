@@ -1358,10 +1358,12 @@ func TestGetAllModelSummariesForUser(t *testing.T) {
 
 	res, err := j.GetAllModelSummariesForUser(ctx, user)
 	c.Assert(err, qt.IsNil)
-	c.Assert(res, qt.HasLen, 2) // 4 with controller models, but they're filtered
-	for _, r := range res.Results {
-		c.Assert(r.Result.UserAccess, qt.Equals, "admin") // Ensure access level set for both models
-	}
+	c.Assert(res.Results, qt.HasLen, 2) // 4 with controller models, but they're filtered
+
+	r0 := res.Results[0].Result.UserAccess
+	r1 := res.Results[1].Result.UserAccess
+	c.Assert(r0, qt.Equals, jujuparams.UserAccessPermission("admin"))
+	c.Assert(r1, qt.Equals, jujuparams.UserAccessPermission("admin"))
 }
 
 func TestModelInfo(t *testing.T) {
