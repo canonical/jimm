@@ -178,24 +178,21 @@ type permission struct {
 	relation string
 }
 
-// dialAllControllers dials controllers where the user
-// has some kind of access to any model on that given controller.
-//
-// Returns a closer to close all connections. Defer the closer.
-func (j *JIMM) dialControllersByUserModelAccess(ctx context.Context, user *openfga.User) ([]API, func(), error) {
+// getControllersByUserModelAccess returns all the controllers dbmodels where
+// the user has access to a model(s) on said controller.
+func (j *JIMM) getControllersByUserModelAccess(ctx context.Context, user *openfga.User) ([]dbmodel.Controller, error) {
 	const op = errors.Op("jimm.dialAllControllers")
-	apis := []API{}
 
 	// Get access to all models this user has access to
 	uuids, err := user.ListModels(context.Background(), ofganames.ReaderRelation)
 	if err != nil {
-		return apis, nil, errors.E(op, err)
+		return nil, errors.E(op, err)
 	}
 
 	// Retrieve the models from db
 	models, err := j.DB().GetModelsByUUID(ctx, uuids)
 	if err != nil {
-		return apis, nil, errors.E(op, err)
+		return nil, errors.E(op, err)
 	}
 
 	controllers := []dbmodel.Controller{}
@@ -213,22 +210,7 @@ func (j *JIMM) dialControllersByUserModelAccess(ctx context.Context, user *openf
 		}
 	}
 
-	// Dial these specific controllers where the user has a model on them
-	for _, c := range controllers {
-		api, err := j.dial(context.Background(), &c, names.ModelTag{})
-		if err != nil {
-			return apis, nil, errors.E(op, err)
-		}
-		apis = append(apis, api)
-	}
-
-	closer := func() {
-		for _, a := range apis {
-			a.Close()
-		}
-	}
-
-	return apis, closer, nil
+	return controllers, nil
 }
 
 // dial dials the controller and model specified by the given Controller
