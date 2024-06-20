@@ -104,91 +104,6 @@ func (s *modelManagerSuite) TestListModelSummariesV2(c *gc.C) {
 	}})
 }
 
-func (s *modelManagerSuite) TestListModelSummaries(c *gc.C) {
-	conn := s.open(c, nil, "bob")
-	defer conn.Close()
-
-	// Add some machines and units to test the counts.
-	s.Model.Machines = 1
-	s.Model.Cores = 2
-	s.Model.Units = 1
-	ctx := context.Background()
-	err := s.JIMM.Database.UpdateModel(ctx, s.Model)
-	c.Assert(err, gc.Equals, nil)
-
-	client := modelmanager.NewClient(conn)
-	models, err := client.ListModelSummaries("bob@canonical.com", false)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(models, jimmtest.CmpEquals(
-		cmpopts.IgnoreTypes(&time.Time{}),
-		cmpopts.SortSlices(func(a, b base.UserModelSummary) bool {
-			return a.Name < b.Name
-		}),
-	), []base.UserModelSummary{{
-		Name:            "model-1",
-		UUID:            s.Model.UUID.String,
-		ControllerUUID:  "914487b5-60e7-42bb-bd63-1adc3fd3a388",
-		ProviderType:    jimmtest.TestProviderType,
-		DefaultSeries:   "jammy",
-		Cloud:           jimmtest.TestCloudName,
-		CloudRegion:     jimmtest.TestCloudRegionName,
-		CloudCredential: jimmtest.TestCloudName + "/bob@canonical.com/cred",
-		Owner:           "bob@canonical.com",
-		Life:            life.Value(state.Alive.String()),
-		Status: base.Status{
-			Status: status.Available,
-			Data:   map[string]interface{}{},
-		},
-		ModelUserAccess: "admin",
-		Counts: []base.EntityCount{{
-			Entity: "machines",
-			Count:  1,
-		}, {
-			Entity: "cores",
-			Count:  2,
-		}, {
-			Entity: "units",
-			Count:  1,
-		}},
-		AgentVersion: &jujuversion.Current,
-		Type:         "iaas",
-		SLA: &base.SLASummary{
-			Level: "unsupported",
-		},
-	}, {
-		Name:            "model-3",
-		UUID:            s.Model3.UUID.String,
-		ControllerUUID:  "914487b5-60e7-42bb-bd63-1adc3fd3a388",
-		ProviderType:    jimmtest.TestProviderType,
-		DefaultSeries:   "jammy",
-		Cloud:           jimmtest.TestCloudName,
-		CloudRegion:     jimmtest.TestCloudRegionName,
-		CloudCredential: jimmtest.TestCloudName + "/charlie@canonical.com/cred",
-		Owner:           "charlie@canonical.com",
-		Life:            life.Value(state.Alive.String()),
-		Status: base.Status{
-			Status: status.Available,
-			Data:   map[string]interface{}{},
-		},
-		ModelUserAccess: "read",
-		Counts: []base.EntityCount{{
-			Entity: "machines",
-			Count:  0,
-		}, {
-			Entity: "cores",
-			Count:  0,
-		}, {
-			Entity: "units",
-			Count:  0,
-		}},
-		AgentVersion: &jujuversion.Current,
-		Type:         "iaas",
-		SLA: &base.SLASummary{
-			Level: "unsupported",
-		},
-	}})
-}
-
 func (s *modelManagerSuite) TestListModelSummariesWithoutControllerUUIDMasking(c *gc.C) {
 	conn1 := s.open(c, nil, "charlie")
 	defer conn1.Close()
@@ -248,20 +163,12 @@ func (s *modelManagerSuite) TestListModelSummariesWithoutControllerUUIDMasking(c
 			Data:   map[string]interface{}{},
 		},
 		ModelUserAccess: "admin",
-		Counts: []base.EntityCount{{
-			Entity: "machines",
-			Count:  0,
-		}, {
-			Entity: "cores",
-			Count:  0,
-		}, {
-			Entity: "units",
-			Count:  0,
-		}},
-		AgentVersion: &jujuversion.Current,
-		Type:         "iaas",
+		Counts:          []base.EntityCount{},
+		AgentVersion:    &jujuversion.Current,
+		Type:            "iaas",
 		SLA: &base.SLASummary{
-			Level: "unsupported",
+			Level: "",
+			Owner: "bob@canonical.com",
 		},
 	}, {
 		Name:            "model-3",
@@ -279,20 +186,12 @@ func (s *modelManagerSuite) TestListModelSummariesWithoutControllerUUIDMasking(c
 			Data:   map[string]interface{}{},
 		},
 		ModelUserAccess: "read",
-		Counts: []base.EntityCount{{
-			Entity: "machines",
-			Count:  0,
-		}, {
-			Entity: "cores",
-			Count:  0,
-		}, {
-			Entity: "units",
-			Count:  0,
-		}},
-		AgentVersion: &jujuversion.Current,
-		Type:         "iaas",
+		Counts:          []base.EntityCount{},
+		AgentVersion:    &jujuversion.Current,
+		Type:            "iaas",
 		SLA: &base.SLASummary{
-			Level: "unsupported",
+			Level: "",
+			Owner: "charlie@canonical.com",
 		},
 	}})
 }

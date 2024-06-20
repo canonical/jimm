@@ -216,7 +216,9 @@ func (j *JIMM) dialAllControllers(ctx context.Context, user *openfga.User) ([]AP
 	// Dial these specific controllers where the user has a model on them
 	for _, c := range controllers {
 		api, err := j.dial(context.Background(), &c, names.ModelTag{})
-		_ = err
+		if err != nil {
+			return apis, nil, errors.E(op, err)
+		}
 		apis = append(apis, api)
 	}
 

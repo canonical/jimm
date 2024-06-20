@@ -1290,6 +1290,12 @@ models:
     access: admin
 `
 
+// TestGetAllModelSummariesForUser ensures that multiple controller calls are made
+// and the results are merged. Due to some mocking constraints it may appear unclear, but
+// please result the test result for details as to why this is working.
+//
+// This is essentially a best effort test and in future, with a refactor of how we
+// mock the juju client API, we should provide the ability to have multiple controllers.
 func TestGetAllModelSummariesForUser(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
@@ -1306,6 +1312,23 @@ func TestGetAllModelSummariesForUser(t *testing.T) {
 		Dialer: &jimmtest.Dialer{
 			API: &jimmtest.API{
 				ListModelSummaries_: func(ctx context.Context, args *jujuparams.ModelSummariesRequest, out *jujuparams.ModelSummaryResults) error {
+					out.Results = []jujuparams.ModelSummaryResult{
+						// This one should be filtered out
+						{
+							Result: &jujuparams.ModelSummary{
+								Name:         "a controller model summary",
+								IsController: true,
+							},
+						},
+						// As we can't return two calls based on "some" controller id,
+						// we're just returning this model summary for this model
+						{
+							Result: &jujuparams.ModelSummary{
+								Name: "a model summary that exists",
+								UUID: "00000002-0000-0000-0000-000000000001",
+							},
+						},
+					}
 					return nil
 				},
 			},
@@ -1323,7 +1346,22 @@ func TestGetAllModelSummariesForUser(t *testing.T) {
 
 	user := openfga.NewUser(dbUser, client)
 
-	j.GetAllModelSummariesForUser(ctx, user)
+	// The result will be two models of same UUID but it still proves our logic is sound.
+	//
+	// Because 2 controllers where alice has "some model", 2 api calls.
+	// Because we cannot mock response per controller, same model result (controller model and normal model)
+	// Because we filter controller model, result goes from 4 -> 2
+	// And finally, because alice has admin access, it is set on the models
+	//
+	// Essentially this still proves we're calling two controllers, filtering controller models
+	// and merging the result - albeit not so clearly.
+
+	res, err := j.GetAllModelSummariesForUser(ctx, user)
+	c.Assert(err, qt.IsNil)
+	c.Assert(res, qt.HasLen, 2) // 4 with controller models, but they're filtered
+	for _, r := range res.Results {
+		c.Assert(r.Result.UserAccess, qt.Equals, "admin") // Ensure access level set for both models
+	}
 }
 
 func TestModelInfo(t *testing.T) {
