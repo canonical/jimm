@@ -24,12 +24,21 @@ tuples:
     - user: user:*
       relation: administrator
       object: controller:co-2
-    - user: group:co-1#member
-      relation: administrator
-      object: controller:co-2
     - user: user:co-2
       relation: audit_log_viewer
       object: controller:co-1
+    - user: user:co-3
+      relation: member
+      object: group:co-1
+    - user: group:co-1#member
+      relation: administrator
+      object: controller:co-2
+    - user: user:co-4
+      relation: member
+      object: group:co-2
+    - user: group:co-2#member
+      relation: audit_log_viewer
+      object: controller:co-2
 
     # Model
     - user: user:mo-1
@@ -52,6 +61,12 @@ tuples:
       object: model:mo-1
     - user: user:mo-4
       relation: reader
+      object: model:mo-1
+    - user: user:mo-5
+      relation: member
+      object: group:mo-3
+    - user: group:mo-3#member
+      relation: writer
       object: model:mo-1
     
     # Cloud
@@ -145,6 +160,17 @@ tests:
                - controller:co-2
              audit_log_viewer:
                - controller:co-2
+         - user: user:co-3
+           type: controller
+           assertions:
+             administrator:
+               - controller:co-2
+         - user: user:co-4
+           type: controller
+           assertions:
+             audit_log_viewer:
+               - controller:co-2
+
       check:
         - user: user:co-2
           object: controller:co-1
@@ -189,6 +215,17 @@ tests:
           assertions:
             administrator:
               - model:mo-1
+              - model:mo-2
+            writer:
+              - model:mo-1
+              - model:mo-2
+            reader:
+              - model:mo-1
+              - model:mo-2
+        - user: user:mo-5
+          type: model
+          assertions:
+            administrator:
               - model:mo-2
             writer:
               - model:mo-1
