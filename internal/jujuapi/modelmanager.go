@@ -101,7 +101,7 @@ func (r *controllerRoot) ListModelSummaries(ctx context.Context, _ jujuparams.Mo
 // ListModels returns the models that the authenticated user
 // has access to. The user parameter is ignored.
 func (r *controllerRoot) ListModels(ctx context.Context, _ jujuparams.Entity) (jujuparams.UserModelList, error) {
-	return r.allModels(ctx)
+	return r.jimm.AllModels(ctx, r.user)
 }
 
 // ModelInfo implements the ModelManager facade's ModelInfo method.

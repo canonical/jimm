@@ -113,6 +113,14 @@ type JIMM struct {
 	ValidateModelUpgrade_              func(ctx context.Context, u *openfga.User, mt names.ModelTag, force bool) error
 	WatchAllModelSummaries_            func(ctx context.Context, controller *dbmodel.Controller) (_ func() error, err error)
 	GetAllModelSummariesForUser_       func(ctx context.Context, user *openfga.User) (jujuparams.ModelSummaryResults, error)
+	AllModels_                         func(ctx context.Context, user *openfga.User) (jujuparams.UserModelList, error)
+}
+
+func (j *JIMM) AllModels(ctx context.Context, user *openfga.User) (jujuparams.UserModelList, error) {
+	if j.AllModels_ == nil {
+		panic("not implemented")
+	}
+	return j.AllModels(ctx, user)
 }
 
 func (j *JIMM) GetAllModelSummariesForUser(ctx context.Context, user *openfga.User) (jujuparams.ModelSummaryResults, error) {

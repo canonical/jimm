@@ -438,6 +438,10 @@ type API interface {
 
 	// ListModelSummaries returns model summaries for a controller based on a user.
 	ListModelSummaries(ctx context.Context, args *jujuparams.ModelSummariesRequest, out *jujuparams.ModelSummaryResults) error
+
+	// AllModels allows controller administrators to get the list of all the
+	// models in the controller.
+	AllModels(ctx context.Context) (jujuparams.UserModelList, error)
 }
 
 // forEachController runs a given function on multiple controllers

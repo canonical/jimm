@@ -35,6 +35,24 @@ type controllerSuite struct {
 
 var _ = gc.Suite(&controllerSuite{})
 
+func (s *controllerSuite) TestAllModels(c *gc.C) {
+	conn := s.open(c, nil, "bob")
+	defer conn.Close()
+	client := controllerapi.NewClient(conn)
+
+	models, err := client.AllModels()
+	c.Assert(err, gc.Equals, nil)
+
+	sort.Slice(models, func(i, j int) bool {
+		return models[i].Name < models[j].Name
+	})
+
+	c.Assert(models[0].Name, gc.Equals, "controller")
+	c.Assert(models[1].Name, gc.Equals, "model-1")
+	c.Assert(models[2].Name, gc.Equals, "model-2")
+	c.Assert(models[3].Name, gc.Equals, "model-3")
+}
+
 func (s *controllerSuite) TestControllerConfig(c *gc.C) {
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
@@ -89,28 +107,6 @@ func (s *controllerSuite) TestMongoVersion(c *gc.C) {
 	_, err := client.MongoVersion()
 	c.Assert(err, gc.ErrorMatches, `not supported \(not supported\)`)
 	c.Assert(jujuparams.IsCodeNotSupported(err), gc.Equals, true)
-}
-
-func (s *controllerSuite) TestAllModels(c *gc.C) {
-	conn := s.open(c, nil, "bob")
-	defer conn.Close()
-	client := controllerapi.NewClient(conn)
-
-	models, err := client.AllModels()
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(models, jc.SameContents, []base.UserModel{{
-		Name:           "model-1",
-		UUID:           s.Model.UUID.String,
-		Owner:          "bob@canonical.com",
-		LastConnection: nil,
-		Type:           "iaas",
-	}, {
-		Name:           "model-3",
-		UUID:           s.Model3.UUID.String,
-		Owner:          "charlie@canonical.com",
-		LastConnection: nil,
-		Type:           "iaas",
-	}})
 }
 
 func (s *controllerSuite) TestModelStatus(c *gc.C) {

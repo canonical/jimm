@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"sort"
 	"sync"
 	"testing"
 	"time"
@@ -32,6 +33,153 @@ import (
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 	"github.com/canonical/jimm/internal/vault"
 )
+
+const allModelsTestEnv = `clouds:
+- name: test-cloud
+  type: test-provider
+  regions:
+  - name: test-cloud-region
+cloud-credentials:
+- owner: alice@canonical.com
+  name: cred-1
+  cloud: test-cloud
+controllers:
+- name: controller-1
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test-cloud
+  region: test-cloud-region
+- name: controller-2
+  uuid: 00000002-0000-0000-0000-000000000002
+  cloud: test-cloud
+  region: test-cloud-region
+models:
+- name: model-1
+  type: iaas
+  uuid: 00000001-0000-0000-0000-000000000001
+  controller: controller-1
+  default-series: warty
+  cloud: test-cloud
+  region: test-cloud-region
+  cloud-credential: cred-1
+  owner: alice@canonical.com
+  life: alive
+  status:
+    status: available
+    info: "OK!"
+    since: 2020-02-20T20:02:20Z
+  sla:
+    level: unsupported
+  agent-version: 1.2.3
+  users:
+  - user: alice@canonical.com
+    access: admin
+- name: model-2
+  type: iaas
+  uuid: 00000002-0000-0000-0000-000000000002
+  controller: controller-2
+  default-series: warty
+  cloud: test-cloud
+  region: test-cloud-region
+  cloud-credential: cred-1
+  owner: alice@canonical.com
+  life: alive
+  status:
+    status: available
+    info: "OK!"
+    since: 2020-02-20T20:02:20Z
+  sla:
+    level: unsupported
+  agent-version: 1.2.3
+  users:
+  - user: alice@canonical.com
+    access: admin
+`
+
+func TestAllModels(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := context.Background()
+
+	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+	c.Assert(err, qt.IsNil)
+
+	j := &jimm.JIMM{
+		UUID:          uuid.NewString(),
+		OpenFGAClient: client,
+		Database: db.Database{
+			DB: jimmtest.PostgresDB(c, nil),
+		},
+		Dialer: &jimmtest.DialerMap{
+			"controller-1": &jimmtest.Dialer{
+				API: &jimmtest.API{
+					AllModels_: func(ctx context.Context) (jujuparams.UserModelList, error) {
+						return jujuparams.UserModelList{
+							UserModels: []jujuparams.UserModel{
+								{
+									Model: jujuparams.Model{
+										Name: "controller-1",
+									},
+								},
+								{
+									Model: jujuparams.Model{
+										Name: "model-1",
+									},
+								},
+							},
+						}, nil
+					},
+				},
+			},
+			"controller-2": &jimmtest.Dialer{
+				API: &jimmtest.API{
+					AllModels_: func(ctx context.Context) (jujuparams.UserModelList, error) {
+						return jujuparams.UserModelList{
+							UserModels: []jujuparams.UserModel{
+								{
+									Model: jujuparams.Model{
+										Name: "controller-2",
+									},
+								},
+								{
+									Model: jujuparams.Model{
+										Name: "model-2",
+									},
+								},
+							},
+						}, nil
+					},
+				},
+			},
+		},
+	}
+
+	err = j.Database.Migrate(ctx, false)
+	c.Assert(err, qt.IsNil)
+
+	env := jimmtest.ParseEnvironment(c, allModelsTestEnv)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
+
+	dbUser, err := dbmodel.NewIdentity("alice@canonical.com")
+	c.Assert(err, qt.IsNil)
+
+	user := openfga.NewUser(dbUser, client)
+
+	res, err := j.AllModels(ctx, user)
+	c.Assert(err, qt.IsNil)
+
+	um := res.UserModels
+	c.Assert(um, qt.HasLen, 4)
+
+	sort.Slice(um, func(i, j int) bool {
+		return um[i].Name < um[j].Name
+	})
+
+	c.Assert(um[0].Name, qt.Equals, "controller-1")
+	c.Assert(um[1].Name, qt.Equals, "controller-2")
+	c.Assert(um[2].Name, qt.Equals, "model-1")
+	c.Assert(um[3].Name, qt.Equals, "model-2")
+
+}
 
 func TestAddController(t *testing.T) {
 	c := qt.New(t)

@@ -168,6 +168,14 @@ type API struct {
 	ListVolumes_                       func(ctx context.Context, machines []string) ([]jujuparams.VolumeDetailsListResult, error)
 	ListStorageDetails_                func(ctx context.Context) ([]jujuparams.StorageDetails, error)
 	ListModelSummaries_                func(ctx context.Context, args *jujuparams.ModelSummariesRequest, out *jujuparams.ModelSummaryResults) error
+	AllModels_                         func(ctx context.Context) (jujuparams.UserModelList, error)
+}
+
+func (a *API) AllModels(ctx context.Context) (jujuparams.UserModelList, error) {
+	if a.AllModels_ == nil {
+		return jujuparams.UserModelList{}, errors.E(errors.CodeNotImplemented)
+	}
+	return a.AllModels_(ctx)
 }
 
 func (a *API) ListModelSummaries(ctx context.Context, args *jujuparams.ModelSummariesRequest, out *jujuparams.ModelSummaryResults) error {

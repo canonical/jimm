@@ -108,6 +108,7 @@ type JIMM interface {
 	WatchAllModelSummaries(ctx context.Context, controller *dbmodel.Controller) (_ func() error, err error)
 	GetOpenFGAUserAndAuthorise(ctx context.Context, email string) (*openfga.User, error)
 	GetAllModelSummariesForUser(ctx context.Context, user *openfga.User) (jujuparams.ModelSummaryResults, error)
+	AllModels(ctx context.Context, user *openfga.User) (jujuparams.UserModelList, error)
 }
 
 // controllerRoot is the root for endpoints served on controller connections.

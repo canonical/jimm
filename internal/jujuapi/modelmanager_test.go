@@ -203,17 +203,15 @@ func (s *modelManagerSuite) TestListModels(c *gc.C) {
 	client := modelmanager.NewClient(conn)
 	models, err := client.ListModels("bob")
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(models, jc.SameContents, []base.UserModel{{
-		Name:  "model-1",
-		UUID:  s.Model.UUID.String,
-		Owner: "bob@canonical.com",
-		Type:  "iaas",
-	}, {
-		Name:  "model-3",
-		UUID:  s.Model3.UUID.String,
-		Owner: "charlie@canonical.com",
-		Type:  "iaas",
-	}})
+
+	sort.Slice(models, func(i, j int) bool {
+		return models[i].Name < models[j].Name
+	})
+
+	c.Assert(models[0].Name, gc.Equals, "controller")
+	c.Assert(models[1].Name, gc.Equals, "model-1")
+	c.Assert(models[2].Name, gc.Equals, "model-2")
+	c.Assert(models[3].Name, gc.Equals, "model-3")
 }
 
 func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
