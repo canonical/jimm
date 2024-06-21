@@ -54,19 +54,23 @@ func (j *JIMM) AllModels(ctx context.Context, user *openfga.User) (jujuparams.Us
 	}
 
 	for _, perms := range uuidToPerms {
-		func() {
+		err := func() error {
 			api, err := j.dial(context.Background(), &perms.controller, names.ModelTag{}, perms.permissions...)
 			if err != nil {
-
+				return err
 			}
 			defer api.Close()
 
 			uml, err := api.AllModels(ctx)
 			if err != nil {
-
+				return err
 			}
 			userModelList.UserModels = append(userModelList.UserModels, uml.UserModels...)
+			return nil
 		}()
+		if err != nil {
+			return userModelList, err
+		}
 	}
 
 	return userModelList, nil
