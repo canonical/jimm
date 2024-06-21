@@ -178,9 +178,16 @@ type permission struct {
 	relation string
 }
 
-// getControllersByUserModelAccess returns all the controllers dbmodels where
-// the user has access to a model(s) on said controller.
-func (j *JIMM) getControllersByUserModelAccess(ctx context.Context, user *openfga.User) ([]dbmodel.Controller, error) {
+type controllerToModelPermissions struct {
+	controller  dbmodel.Controller
+	permissions []permission
+}
+
+// getControllersWithModelPermissionsForUser returns a map of controller uuids to:
+//
+// - Controller db model
+// - The users access permissions to the models on this controller
+func (j *JIMM) getControllersWithModelPermissionsForUser(ctx context.Context, user *openfga.User) (map[string]controllerToModelPermissions, error) {
 	const op = errors.Op("jimm.dialAllControllers")
 
 	// Get access to all models this user has access to
@@ -195,22 +202,35 @@ func (j *JIMM) getControllersByUserModelAccess(ctx context.Context, user *openfg
 		return nil, errors.E(op, err)
 	}
 
-	controllers := []dbmodel.Controller{}
+	uuidToPerms := make(map[string]controllerToModelPermissions)
 
-	// Filter out controllers
 	for _, m := range models {
-		containsController := false
-		for _, c := range controllers {
-			if c.UUID == m.Controller.UUID {
-				containsController = true
-			}
+		access := user.GetModelAccess(ctx, names.NewModelTag(m.UUID.String))
+
+		if _, ok := uuidToPerms[m.Controller.UUID]; ok {
+			c := uuidToPerms[m.Controller.UUID]
+			c.permissions = append(
+				uuidToPerms[m.Controller.UUID].permissions,
+				permission{
+					resource: m.ResourceTag().String(),
+					relation: access.String(),
+				},
+			)
+			uuidToPerms[m.Controller.UUID] = c
+			continue
 		}
-		if !containsController {
-			controllers = append(controllers, m.Controller)
+		uuidToPerms[m.Controller.UUID] = controllerToModelPermissions{
+			controller: m.Controller,
+			permissions: []permission{
+				{
+					resource: m.ResourceTag().String(),
+					relation: access.String(),
+				},
+			},
 		}
 	}
 
-	return controllers, nil
+	return uuidToPerms, nil
 }
 
 // dial dials the controller and model specified by the given Controller

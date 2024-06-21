@@ -1288,6 +1288,26 @@ models:
   users:
   - user: alice@canonical.com
     access: admin
+- name: model-3
+  type: iaas
+  uuid: 00000004-0000-0000-0000-000000000003
+  controller: controller-2
+  default-series: warty
+  cloud: test-cloud
+  region: test-cloud-region
+  cloud-credential: cred-1
+  owner: alice@canonical.com
+  life: alive
+  status:
+    status: available
+    info: "OK!"
+    since: 2020-02-20T20:02:20Z
+  sla:
+    level: unsupported
+  agent-version: 1.2.3
+  users:
+  - user: alice@canonical.com
+    access: admin
 `
 
 func TestGetAllModelSummariesForUser(t *testing.T) {

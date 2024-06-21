@@ -768,21 +768,21 @@ func (j *JIMM) GetAllModelSummariesForUser(ctx context.Context, user *openfga.Us
 	filteredSummaries := jujuparams.ModelSummaryResults{}
 	flattenedSummaries := jujuparams.ModelSummaryResults{}
 
-	controllers, err := j.getControllersByUserModelAccess(ctx, user)
+	uuidToPerms, err := j.getControllersWithModelPermissionsForUser(ctx, user)
 	if err != nil {
 		return filteredSummaries, errors.E(op, err)
 	}
 
 	var wg sync.WaitGroup
-	summariesCh := make(chan jujuparams.ModelSummaryResults, len(controllers))
-	errorsCh := make(chan error, len(controllers))
+	summariesCh := make(chan jujuparams.ModelSummaryResults, len(uuidToPerms))
+	errorsCh := make(chan error, len(uuidToPerms))
 	// Get all summaries from all controllers
-	for _, controller := range controllers {
+	for _, perms := range uuidToPerms {
 		wg.Add(1)
-		go func(c dbmodel.Controller) {
+		go func(c controllerToModelPermissions) {
 			defer wg.Done()
 
-			api, err := j.dial(context.Background(), &c, names.ModelTag{})
+			api, err := j.dial(context.Background(), &c.controller, names.ModelTag{}, c.permissions...)
 			if err != nil {
 				errorsCh <- err
 				return
@@ -790,14 +790,14 @@ func (j *JIMM) GetAllModelSummariesForUser(ctx context.Context, user *openfga.Us
 			defer api.Close()
 
 			var out jujuparams.ModelSummaryResults
-			in := jujuparams.ModelSummariesRequest{UserTag: names.NewUserTag("admin").String(), All: true}
+			in := jujuparams.ModelSummariesRequest{UserTag: names.NewUserTag(user.Name).String(), All: true}
 
 			if err := api.ListModelSummaries(context.Background(), &in, &out); err != nil {
 				errorsCh <- err
 				return
 			}
 			summariesCh <- out
-		}(controller)
+		}(perms)
 	}
 	wg.Wait()
 	close(summariesCh)
