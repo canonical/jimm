@@ -5,146 +5,146 @@
 
 model_file: ./authorisation_model.fga
 
-# In order to avoid the potential entanglement of separate tests the tuples are artifically split into groups using this naming convention: (type):(2-letter test name)-(id)
+# In order to avoid the potential entanglement of separate tests the tuples are artifically split into groups using this naming convention: (type):(2-letter test name)-(type)-(id)
 # The GitHub action supports running all tests in a directory, but keeping them in a single file improves the local development experience because the CLI does not.
 tuples:
     # Group
-    - user: user:gr-1
+    - user: user:gr-user-1
       relation: member
-      object: group:gr-1
-    - user: group:gr-1#member
+      object: group:gr-group-1
+    - user: group:gr-group-1#member
       relation: member
-      object: group:gr-2
+      object: group:gr-group-2
     - user: user:*
       relation: member
-      object: group:gr-3
+      object: group:gr-group-3
 
     # Controller
-    - user: user:co-1
+    - user: user:co-user-1
       relation: administrator
-      object: controller:co-1
-    - user: controller:co-1
+      object: controller:co-controller-1
+    - user: controller:co-controller-1
       relation: controller
-      object: controller:co-2
+      object: controller:co-controller-2
     - user: user:*
       relation: administrator
-      object: controller:co-2
-    - user: user:co-2
+      object: controller:co-controller-2
+    - user: user:co-user-2
       relation: audit_log_viewer
-      object: controller:co-1
-    - user: user:co-3
+      object: controller:co-controller-1
+    - user: user:co-user-3
       relation: member
-      object: group:co-1
-    - user: group:co-1#member
+      object: group:co-group-1
+    - user: group:co-group-1#member
       relation: administrator
-      object: controller:co-2
-    - user: user:co-4
+      object: controller:co-controller-2
+    - user: user:co-user-4
       relation: member
-      object: group:co-2
-    - user: group:co-2#member
+      object: group:co-group-2
+    - user: group:co-group-2#member
       relation: audit_log_viewer
-      object: controller:co-2
+      object: controller:co-controller-2
 
     # Model
-    - user: user:mo-1
+    - user: user:mo-user-1
       relation: administrator
-      object: model:mo-1
+      object: model:mo-model-1
     - user: user:*
       relation: administrator
-      object: model:mo-2
-    - user: group:mo-1#member
+      object: model:mo-model-2
+    - user: group:mo-group-1#member
       relation: administrator
-      object: model:mo-1
-    - user: controller:mo-1
+      object: model:mo-model-1
+    - user: controller:mo-controller-1
       relation: controller
-      object: model:mo-1
-    - user: user:mo-3
+      object: model:mo-model-1
+    - user: user:mo-user-3
       relation: administrator
-      object: controller:mo-1
-    - user: group:mo-2#member
+      object: controller:mo-controller-1
+    - user: group:mo-group-2#member
       relation: writer
-      object: model:mo-1
-    - user: user:mo-4
+      object: model:mo-model-1
+    - user: user:mo-user-4
       relation: reader
-      object: model:mo-1
-    - user: user:mo-5
+      object: model:mo-model-1
+    - user: user:mo-user-5
       relation: member
-      object: group:mo-3
-    - user: group:mo-3#member
+      object: group:mo-group-3
+    - user: group:mo-group-3#member
       relation: writer
-      object: model:mo-1
+      object: model:mo-model-1
     
     # Cloud
-    - user: user:cl-1
+    - user: user:cl-user-1
       relation: administrator
-      object: cloud:cl-1
+      object: cloud:cl-cloud-1
     - user: user:*
       relation: administrator
-      object: cloud:cl-2
-    - user: group:cl-1#member
+      object: cloud:cl-cloud-2
+    - user: group:cl-group-1#member
       relation: administrator
-      object: cloud:cl-1
-    - user: user:cl-2
+      object: cloud:cl-cloud-1
+    - user: user:cl-user-2
       relation: administrator
-      object: controller:cl-1
-    - user: controller:cl-1
+      object: controller:cl-controller-1
+    - user: controller:cl-controller-1
       relation: controller
-      object: cloud:cl-1
-    - user: group:cl-2#member
+      object: cloud:cl-cloud-1
+    - user: group:cl-group-2#member
       relation: can_addmodel
-      object: cloud:cl-1
-    - user: user:cl-3
+      object: cloud:cl-cloud-1
+    - user: user:cl-user-3
       relation: member
-      object: group:cl-3
-    - user: group:cl-3#member
+      object: group:cl-group-3
+    - user: group:cl-group-3#member
       relation: can_addmodel
-      object: cloud:cl-1
+      object: cloud:cl-cloud-1
     
     # Application Offer
-    - user: user:ao-1
+    - user: user:ao-user-1
       relation: administrator
-      object: applicationoffer:ao-1
+      object: applicationoffer:ao-applicationoffer-1
     - user: user:*
       relation: administrator
-      object: applicationoffer:ao-2
-    - user: group:ao-1#member
+      object: applicationoffer:ao-applicationoffer-2
+    - user: group:ao-group-1#member
       relation: administrator
-      object: applicationoffer:ao-1
-    - user: user:ao-2
+      object: applicationoffer:ao-applicationoffer-1
+    - user: user:ao-user-2
       relation: administrator
-      object: model:ao-1
-    - user: model:ao-1
+      object: model:ao-model-1
+    - user: model:ao-model-1
       relation: model
-      object: applicationoffer:ao-1
-    - user: group:ao-2#member
+      object: applicationoffer:ao-applicationoffer-1
+    - user: group:ao-group-2#member
       relation: consumer
-      object: applicationoffer:ao-1
-    - user: user:ao-3
+      object: applicationoffer:ao-applicationoffer-1
+    - user: user:ao-user-3
       relation: reader
-      object: applicationoffer:ao-1
-    - user: user:ao-4
+      object: applicationoffer:ao-applicationoffer-1
+    - user: user:ao-user-4
       relation: member
-      object: group:ao-3
-    - user: group:ao-3#member
+      object: group:ao-group-3
+    - user: group:ao-group-3#member
       relation: consumer
-      object: applicationoffer:ao-1
-    - user: user:ao-5
+      object: applicationoffer:ao-applicationoffer-1
+    - user: user:ao-user-5
       relation: member
-      object: group:ao-4
-    - user: group:ao-4#member
+      object: group:ao-group-4
+    - user: group:ao-group-4#member
       relation: reader
-      object: applicationoffer:ao-1
+      object: applicationoffer:ao-applicationoffer-1
     
     # Service Account
-    - user: user:sa-1
+    - user: user:sa-user-1
       relation: administrator
-      object: serviceaccount:sa-1
+      object: serviceaccount:sa-serviceaccount-1
     - user: user:*
       relation: administrator
-      object: serviceaccount:sa-2
-    - user: group:sa-1#member
+      object: serviceaccount:sa-serviceaccount-2
+    - user: group:sa-group-1#member
       relation: administrator
-      object: serviceaccount:sa-1
+      object: serviceaccount:sa-serviceaccount-1
 
 # Tests directly correspond to the types available in JIMM's authorisation model
 tests:
@@ -153,13 +153,13 @@ tests:
     # - group membership can have multiple layers
     - name: Group
       list_objects:
-        - user: user:gr-1
+        - user: user:gr-user-1
           type: group
           assertions:
             member:
-                - group:gr-1
-                - group:gr-2
-                - group:gr-3
+                - group:gr-group-1
+                - group:gr-group-2
+                - group:gr-group-3
             
     # Checks whether:
     # - all or invididual users, or group members can become administators and audit_log_viewers of a controller
@@ -167,36 +167,36 @@ tests:
     # - proper hierarchy of relations is upheld: administrator > audit_log_viewer
     - name: Controller
       list_objects:
-         - user: user:co-1
+         - user: user:co-user-1
            type: controller
            assertions:
              administrator:
-               - controller:co-1
-               - controller:co-2
+               - controller:co-controller-1
+               - controller:co-controller-2
              audit_log_viewer:
-               - controller:co-1
-               - controller:co-2
-         - user: group:co-1#member
+               - controller:co-controller-1
+               - controller:co-controller-2
+         - user: group:co-group-1#member
            type: controller
            assertions:
              administrator:
-               - controller:co-2
+               - controller:co-controller-2
              audit_log_viewer:
-               - controller:co-2
-         - user: user:co-3
+               - controller:co-controller-2
+         - user: user:co-user-3
            type: controller
            assertions:
              administrator:
-               - controller:co-2
-         - user: user:co-4
+               - controller:co-controller-2
+         - user: user:co-user-4
            type: controller
            assertions:
              audit_log_viewer:
-               - controller:co-2
+               - controller:co-controller-2
 
       check:
-        - user: user:co-2
-          object: controller:co-1
+        - user: user:co-user-2
+          object: controller:co-controller-1
           assertions:
             audit_log_viewer: true
             administrator: false
@@ -207,64 +207,64 @@ tests:
     # - appropriate hierachy of relations in the following order: administrator > writer > reader
     - name: Model
       list_objects:
-        - user: user:mo-1
+        - user: user:mo-user-1
           type: model
           assertions:
             administrator:
-              - model:mo-1
-              - model:mo-2
+              - model:mo-model-1
+              - model:mo-model-2
             writer:
-              - model:mo-1
-              - model:mo-2
+              - model:mo-model-1
+              - model:mo-model-2
             reader:
-              - model:mo-1
-              - model:mo-2
-        - user: group:mo-1#member
+              - model:mo-model-1
+              - model:mo-model-2
+        - user: group:mo-group-1#member
           type: model
           assertions:
             administrator:
-              - model:mo-1
+              - model:mo-model-1
             writer:
-              - model:mo-1
+              - model:mo-model-1
             reader:
-              - model:mo-1
-        - user: controller:mo-1
+              - model:mo-model-1
+        - user: controller:mo-controller-1
           type: model
           assertions:
             controller:
-              - model:mo-1
-        - user: user:mo-3
+              - model:mo-model-1
+        - user: user:mo-user-3
           type: model
           assertions:
             administrator:
-              - model:mo-1
-              - model:mo-2
+              - model:mo-model-1
+              - model:mo-model-2
             writer:
-              - model:mo-1
-              - model:mo-2
+              - model:mo-model-1
+              - model:mo-model-2
             reader:
-              - model:mo-1
-              - model:mo-2
-        - user: user:mo-5
+              - model:mo-model-1
+              - model:mo-model-2
+        - user: user:mo-user-5
           type: model
           assertions:
             administrator:
-              - model:mo-2
+              - model:mo-model-2
             writer:
-              - model:mo-1
-              - model:mo-2
+              - model:mo-model-1
+              - model:mo-model-2
             reader:
-              - model:mo-1
-              - model:mo-2
+              - model:mo-model-1
+              - model:mo-model-2
       check:
-        - user: group:mo-2#member
-          object: model:mo-1
+        - user: group:mo-group-2#member
+          object: model:mo-model-1
           assertions:
             writer: true
             reader: true
             administrator: false
-        - user: user:mo-4
-          object: model:mo-1
+        - user: user:mo-user-4
+          object: model:mo-model-1
           assertions:
             writer: false
             reader: true
@@ -276,44 +276,44 @@ tests:
     # - proper hierarchy of relations: administrator > can_addmodel
     - name: Cloud
       list_objects:
-        - user: user:cl-1
+        - user: user:cl-user-1
           type: cloud
           assertions:
             administrator:
-              - cloud:cl-1
-              - cloud:cl-2
+              - cloud:cl-cloud-1
+              - cloud:cl-cloud-2
             can_addmodel:
-              - cloud:cl-1
-              - cloud:cl-2
-        - user: group:cl-1#member
+              - cloud:cl-cloud-1
+              - cloud:cl-cloud-2
+        - user: group:cl-group-1#member
           type: cloud
           assertions:
             administrator:
-              - cloud:cl-1
+              - cloud:cl-cloud-1
             can_addmodel:
-              - cloud:cl-1
-        - user: controller:cl-1
+              - cloud:cl-cloud-1
+        - user: controller:cl-controller-1
           type: cloud
           assertions:
             controller:
-              - cloud:cl-1
-        - user: user:cl-2
+              - cloud:cl-cloud-1
+        - user: user:cl-user-2
           type: cloud
           assertions:
             administrator:
-              - cloud:cl-1
-              - cloud:cl-2
+              - cloud:cl-cloud-1
+              - cloud:cl-cloud-2
             can_addmodel:
-              - cloud:cl-1
-              - cloud:cl-2
+              - cloud:cl-cloud-1
+              - cloud:cl-cloud-2
       check:
-        - user: group:cl-2#member
-          object: cloud:cl-1
+        - user: group:cl-group-2#member
+          object: cloud:cl-cloud-1
           assertions:
             can_addmodel: true
             administrator: false
-        - user: user:cl-3
-          object: cloud:cl-1
+        - user: user:cl-user-3
+          object: cloud:cl-cloud-1
           assertions:
             can_addmodel: true
             administrator: false
@@ -324,65 +324,65 @@ tests:
     # - hierarchy of relations has the correct order, that is: administrator > consumer > reader. 
     - name: Application Offer
       list_objects:
-        - user: user:ao-1
+        - user: user:ao-user-1
           type: applicationoffer
           assertions:
             administrator:
-              - applicationoffer:ao-1
-              - applicationoffer:ao-2
+              - applicationoffer:ao-applicationoffer-1
+              - applicationoffer:ao-applicationoffer-2
             consumer:
-              - applicationoffer:ao-1
-              - applicationoffer:ao-2
+              - applicationoffer:ao-applicationoffer-1
+              - applicationoffer:ao-applicationoffer-2
             reader:
-              - applicationoffer:ao-1
-              - applicationoffer:ao-2
-        - user: group:ao-1#member
+              - applicationoffer:ao-applicationoffer-1
+              - applicationoffer:ao-applicationoffer-2
+        - user: group:ao-group-1#member
           type: applicationoffer
           assertions:
             administrator:
-              - applicationoffer:ao-1
+              - applicationoffer:ao-applicationoffer-1
             consumer:
-              - applicationoffer:ao-1
+              - applicationoffer:ao-applicationoffer-1
             reader:
-              - applicationoffer:ao-1
-        - user: model:ao-1
+              - applicationoffer:ao-applicationoffer-1
+        - user: model:ao-model-1
           type: applicationoffer
           assertions:
             model:
-              - applicationoffer:ao-1
-        - user: user:ao-2
+              - applicationoffer:ao-applicationoffer-1
+        - user: user:ao-user-2
           type: applicationoffer
           assertions:
             administrator:
-              - applicationoffer:ao-1
-              - applicationoffer:ao-2
+              - applicationoffer:ao-applicationoffer-1
+              - applicationoffer:ao-applicationoffer-2
             consumer:
-              - applicationoffer:ao-1
-              - applicationoffer:ao-2
+              - applicationoffer:ao-applicationoffer-1
+              - applicationoffer:ao-applicationoffer-2
             reader:
-              - applicationoffer:ao-1
-              - applicationoffer:ao-2
+              - applicationoffer:ao-applicationoffer-1
+              - applicationoffer:ao-applicationoffer-2
       check:
-        - user: group:ao-2#member
-          object: applicationoffer:ao-1
+        - user: group:ao-group-2#member
+          object: applicationoffer:ao-applicationoffer-1
           assertions:
             administrator: false
             consumer: true
             reader: true
-        - user: user:ao-3
-          object: applicationoffer:ao-1
+        - user: user:ao-user-3
+          object: applicationoffer:ao-applicationoffer-1
           assertions:
             administrator: false
             consumer: false
             reader: true
-        - user: user:ao-4
-          object: applicationoffer:ao-1
+        - user: user:ao-user-4
+          object: applicationoffer:ao-applicationoffer-1
           assertions:
             administrator: false
             consumer: true
             reader: true
-        - user: user:ao-5
-          object: applicationoffer:ao-1
+        - user: user:ao-user-5
+          object: applicationoffer:ao-applicationoffer-1
           assertions:
             administrator: false
             consumer: false
@@ -391,15 +391,15 @@ tests:
     # Guarantees that all or individual users, or group members can become administrators of a service account
     - name: Service Account
       list_objects:
-        - user: user:sa-1
+        - user: user:sa-user-1
           type: serviceaccount
           assertions:
             administrator:
-              - serviceaccount:sa-1
-              - serviceaccount:sa-2
-        - user: group:sa-1#member
+              - serviceaccount:sa-serviceaccount-1
+              - serviceaccount:sa-serviceaccount-2
+        - user: group:sa-group-1#member
           type: serviceaccount
           assertions:
             administrator:
-              - serviceaccount:sa-1
+              - serviceaccount:sa-serviceaccount-1
     
