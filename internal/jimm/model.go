@@ -8,7 +8,6 @@ import (
 	"math/rand"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	jujupermission "github.com/juju/juju/core/permission"
@@ -773,15 +772,12 @@ func (j *JIMM) GetAllModelSummariesForUser(ctx context.Context, user *openfga.Us
 		return filteredSummaries, errors.E(op, err)
 	}
 
-	var wg sync.WaitGroup
-	summariesCh := make(chan jujuparams.ModelSummaryResults, len(uuidToPerms))
-	errorsCh := make(chan error, len(uuidToPerms))
+	summariesCh := make(chan jujuparams.ModelSummaryResults)
+	errorsCh := make(chan error)
+
 	// Get all summaries from all controllers
 	for _, perms := range uuidToPerms {
-		wg.Add(1)
-		go func(c controllerToModelPermissions) {
-			defer wg.Done()
-
+		go func(c controllerWithModelPermissions) {
 			api, err := j.dial(context.Background(), &c.controller, names.ModelTag{}, c.permissions...)
 			if err != nil {
 				errorsCh <- err
@@ -799,22 +795,22 @@ func (j *JIMM) GetAllModelSummariesForUser(ctx context.Context, user *openfga.Us
 			summariesCh <- out
 		}(perms)
 	}
-	wg.Wait()
-	close(summariesCh)
-	close(errorsCh)
 
 	summaries := []jujuparams.ModelSummaryResults{}
 	errs := []error{}
 
-	for e := range errorsCh {
-		errs = append(errs, e)
+	for range uuidToPerms {
+		select {
+		case sum := <-summariesCh:
+			summaries = append(summaries, sum)
+		case err := <-errorsCh:
+			errs = append(errs, err)
+		}
 	}
+
 	if len(errs) > 0 {
 		// What do we do with call errors? Just take the first?
 		return filteredSummaries, errors.E(op, errs[0])
-	}
-	for s := range summariesCh {
-		summaries = append(summaries, s)
 	}
 
 	// Flatten the summaries into a single results

@@ -178,7 +178,7 @@ type permission struct {
 	relation string
 }
 
-type controllerToModelPermissions struct {
+type controllerWithModelPermissions struct {
 	controller  dbmodel.Controller
 	permissions []permission
 }
@@ -187,7 +187,7 @@ type controllerToModelPermissions struct {
 //
 // - Controller db model
 // - The users access permissions to the models on this controller
-func (j *JIMM) getControllersWithModelPermissionsForUser(ctx context.Context, user *openfga.User) (map[string]controllerToModelPermissions, error) {
+func (j *JIMM) getControllersWithModelPermissionsForUser(ctx context.Context, user *openfga.User) (map[string]controllerWithModelPermissions, error) {
 	const op = errors.Op("jimm.dialAllControllers")
 
 	// Get access to all models this user has access to
@@ -202,7 +202,7 @@ func (j *JIMM) getControllersWithModelPermissionsForUser(ctx context.Context, us
 		return nil, errors.E(op, err)
 	}
 
-	uuidToPerms := make(map[string]controllerToModelPermissions)
+	uuidToPerms := make(map[string]controllerWithModelPermissions)
 
 	for _, m := range models {
 		access := user.GetModelAccess(ctx, names.NewModelTag(m.UUID.String))
@@ -210,7 +210,7 @@ func (j *JIMM) getControllersWithModelPermissionsForUser(ctx context.Context, us
 		if _, ok := uuidToPerms[m.Controller.UUID]; ok {
 			c := uuidToPerms[m.Controller.UUID]
 			c.permissions = append(
-				uuidToPerms[m.Controller.UUID].permissions,
+				c.permissions,
 				permission{
 					resource: m.ResourceTag().String(),
 					relation: access.String(),
@@ -219,7 +219,7 @@ func (j *JIMM) getControllersWithModelPermissionsForUser(ctx context.Context, us
 			uuidToPerms[m.Controller.UUID] = c
 			continue
 		}
-		uuidToPerms[m.Controller.UUID] = controllerToModelPermissions{
+		uuidToPerms[m.Controller.UUID] = controllerWithModelPermissions{
 			controller: m.Controller,
 			permissions: []permission{
 				{

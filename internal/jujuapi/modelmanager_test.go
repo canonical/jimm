@@ -41,7 +41,7 @@ type modelManagerSuite struct {
 
 var _ = gc.Suite(&modelManagerSuite{})
 
-func (s *modelManagerSuite) TestListModelSummariesV2(c *gc.C) {
+func (s *modelManagerSuite) TestListModelSummaries(c *gc.C) {
 	conn := s.open(c, nil, "bob")
 	defer conn.Close()
 
