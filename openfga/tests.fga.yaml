@@ -1,3 +1,8 @@
+# OpenFGA CLI instructions
+#
+# Installation: https://github.com/openfga/cli?tab=readme-ov-file#installation
+# Command: fga model test --tests tests.fga.yaml
+
 model_file: ./authorisation_model.fga
 
 # In order to avoid the potential entanglement of separate tests the tuples are artifically split into groups using this naming convention: (type):(2-letter test name)-(id)
@@ -114,13 +119,13 @@ tuples:
     
     # Service Account
     - user: user:sa-1
-      relation: administator
+      relation: administrator
       object: serviceaccount:sa-1
     - user: user:*
-      relation: administator
+      relation: administrator
       object: serviceaccount:sa-2
     - user: group:sa-1#member
-      relation: administator
+      relation: administrator
       object: serviceaccount:sa-1
 
 # Tests directly correspond to the types available in JIMM's authorisation model
@@ -354,12 +359,12 @@ tests:
         - user: user:sa-1
           type: serviceaccount
           assertions:
-            administator:
+            administrator:
               - serviceaccount:sa-1
               - serviceaccount:sa-2
         - user: group:sa-1#member
           type: serviceaccount
           assertions:
-            administator:
+            administrator:
               - serviceaccount:sa-1
     
