@@ -93,6 +93,12 @@ tuples:
     - user: group:cl-2#member
       relation: can_addmodel
       object: cloud:cl-1
+    - user: user:cl-3
+      relation: member
+      object: group:cl-3
+    - user: group:cl-3#member
+      relation: can_addmodel
+      object: cloud:cl-1
     
     # Application Offer
     - user: user:ao-1
@@ -114,6 +120,18 @@ tuples:
       relation: consumer
       object: applicationoffer:ao-1
     - user: user:ao-3
+      relation: reader
+      object: applicationoffer:ao-1
+    - user: user:ao-4
+      relation: member
+      object: group:ao-3
+    - user: group:ao-3#member
+      relation: consumer
+      object: applicationoffer:ao-1
+    - user: user:ao-5
+      relation: member
+      object: group:ao-4
+    - user: group:ao-4#member
       relation: reader
       object: applicationoffer:ao-1
     
@@ -294,6 +312,11 @@ tests:
           assertions:
             can_addmodel: true
             administrator: false
+        - user: user:cl-3
+          object: cloud:cl-1
+          assertions:
+            can_addmodel: true
+            administrator: false
 
     # Similarly as the other tests it enforces that: 
     # - individual or all users, or group members can enter relations with applicationoffer
@@ -347,6 +370,18 @@ tests:
             consumer: true
             reader: true
         - user: user:ao-3
+          object: applicationoffer:ao-1
+          assertions:
+            administrator: false
+            consumer: false
+            reader: true
+        - user: user:ao-4
+          object: applicationoffer:ao-1
+          assertions:
+            administrator: false
+            consumer: true
+            reader: true
+        - user: user:ao-5
           object: applicationoffer:ao-1
           assertions:
             administrator: false
