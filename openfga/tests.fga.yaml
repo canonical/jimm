@@ -145,6 +145,12 @@ tuples:
     - user: group:sa-group-1#member
       relation: administrator
       object: serviceaccount:sa-serviceaccount-1
+    - user: user:sa-user-2
+      relation: member
+      object: group:sa-group-2
+    - user: group:sa-group-2#member
+      relation: administrator
+      object: serviceaccount:sa-serviceaccount-1
 
 # Tests directly correspond to the types available in JIMM's authorisation model
 tests:
@@ -402,4 +408,10 @@ tests:
           assertions:
             administrator:
               - serviceaccount:sa-serviceaccount-1
+        - user: user:sa-user-2
+          type: serviceaccount
+          assertions:
+            administrator:
+              - serviceaccount:sa-serviceaccount-1
+              - serviceaccount:sa-serviceaccount-2
     
