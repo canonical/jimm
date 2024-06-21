@@ -8,7 +8,7 @@ model_file: ./authorisation_model.fga
 # In order to avoid the potential entanglement of separate tests the tuples are artifically split into groups using this naming convention: (type):(2-letter test name)-(type)-(id)
 # The GitHub action supports running all tests in a directory, but keeping them in a single file improves the local development experience because the CLI does not.
 tuples:
-    # Group
+    # Group (gr)
     - user: user:gr-user-1
       relation: member
       object: group:gr-group-1
@@ -19,7 +19,7 @@ tuples:
       relation: member
       object: group:gr-group-3
 
-    # Controller
+    # Controller (co)
     - user: user:co-user-1
       relation: administrator
       object: controller:co-controller-1
@@ -45,7 +45,7 @@ tuples:
       relation: audit_log_viewer
       object: controller:co-controller-2
 
-    # Model
+    # Model (mo)
     - user: user:mo-user-1
       relation: administrator
       object: model:mo-model-1
@@ -74,7 +74,7 @@ tuples:
       relation: writer
       object: model:mo-model-1
     
-    # Cloud
+    # Cloud (cl)
     - user: user:cl-user-1
       relation: administrator
       object: cloud:cl-cloud-1
@@ -100,7 +100,7 @@ tuples:
       relation: can_addmodel
       object: cloud:cl-cloud-1
     
-    # Application Offer
+    # Application Offer (ao)
     - user: user:ao-user-1
       relation: administrator
       object: applicationoffer:ao-applicationoffer-1
@@ -135,7 +135,7 @@ tuples:
       relation: reader
       object: applicationoffer:ao-applicationoffer-1
     
-    # Service Account
+    # Service Account (sa)
     - user: user:sa-user-1
       relation: administrator
       object: serviceaccount:sa-serviceaccount-1
