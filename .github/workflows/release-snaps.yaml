@@ -1,0 +1,42 @@
+name: Release Snaps
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v3*'
+
+jobs:
+  build-and-release-jimmctl:
+    uses: ./.github/workflows/snap-release.yaml
+    with:
+      folder: jimmctl
+      release-channel: 3/edge
+    secrets: inherit
+
+  build-and-release-jaas-plugin:
+    uses: ./.github/workflows/snap-release.yaml
+    with:
+      folder: jaas
+      release-channel: 3/edge
+    secrets: inherit
+
+  build-jimm-server:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        fetch-tags: true
+    - run: git fetch --tags --force origin # https://github.com/actions/checkout/issues/882 & https://github.com/actions/checkout/issues/290 
+    - name: Setup snap to build
+      run: |
+        mkdir -p ./snap
+        cp ./snaps/jimm/snapcraft.yaml ./snap/
+    - uses: snapcore/action-build@v1
+      id: snapcraft
+    - uses: actions/upload-artifact@v4
+      with:
+        name: ${{ steps.snapcraft.outputs.snap }} 
+        path: ${{ steps.snapcraft.outputs.snap }}
+
