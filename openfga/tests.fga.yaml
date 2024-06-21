@@ -140,8 +140,8 @@ tests:
             
     # Checks whether:
     # - all or invididual users, or group members can become administators and audit_log_viewers of a controller
-    # - controllers can be related to each other with correct inheritance of administrator
-    # - audit_log_viewer is a weaker relation that administrator
+    # - controllers can be related to each other with correct inheritance of administrators
+    # - proper hierarchy of relations is upheld: administrator > audit_log_viewer
     - name: Controller
       list_objects:
          - user: user:co-1
