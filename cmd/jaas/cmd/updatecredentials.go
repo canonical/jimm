@@ -23,12 +23,12 @@ import (
 
 var (
 	updateCredentialsCommandDoc = `
-update-credentials command updates the credentials associated with a service account.
+update-service-account-credentials command updates the credentials associated with a service account.
 This will add the credentials to JAAS if they were not found.
 `
 
 	updateCredentialsCommandExamples = `
-    juju update-service-account-credentials update-credentials 00000000-0000-0000-0000-000000000000 aws credential-name
+    juju update-service-account-credentials 00000000-0000-0000-0000-000000000000 aws credential-name
 `
 )
 

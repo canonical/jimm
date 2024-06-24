@@ -25,7 +25,7 @@ import (
 
 var (
 	listServiceCredentialsCommandDoc = `
-list-credentials lists the cloud credentials belonging to a service account.
+list-service-account-credentials lists the cloud credentials belonging to a service account.
 
 This command only shows credentials uploaded to the controller that belong to the service account.
 Client-side credentials should be managed via the juju credentials command.

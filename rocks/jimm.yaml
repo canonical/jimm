@@ -10,22 +10,6 @@ license: GPL-3.0
 platforms:
     amd64:
 
-services:
-    server:
-        summary: JIMM
-        description: |
-            JIMM is a Juju controller, used in conjunction with the JaaS dashboard to provide a seamless way
-            to manage models, regardless of where their controllers reside or what cloud they may be running on.
-        startup: enabled
-        override: replace
-        command: jimmsrv
-        on-success: ignore
-        on-failure: restart
-        backoff-delay: 1s
-        backoff-factor: 2
-        backoff-limit: 10s
-        kill-delay: 10s
-
 parts:
     ca-certs:
         plugin: nil
