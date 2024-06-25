@@ -233,6 +233,20 @@ func (s *Service) StartJWKSRotator(ctx context.Context, checkRotateRequired <-ch
 	return s.jimm.JWKService.StartJWKSRotator(ctx, checkRotateRequired, initialRotateRequiredTime)
 }
 
+// MonitorResources periodically updates metrics.
+func (s *Service) MonitorResources(ctx context.Context) {
+	s.jimm.UpdateMetrics(ctx)
+	ticker := time.NewTicker(5 * time.Minute)
+	for {
+		select {
+		case <-ticker.C:
+			s.jimm.UpdateMetrics(ctx)
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
 // Cleanup cleans up resources that need to be released on shutdown.
 func (s *Service) Cleanup() {
 	// Iterating over clean up function in reverse-order to avoid early clean ups.
