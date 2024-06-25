@@ -220,6 +220,7 @@ func (j *JIMM) getControllersWithModelPermissionsForUser(ctx context.Context, us
 		jujuPerm, err := ofganames.ConvertRelationToJujuPermission(access)
 		if err != nil {
 			zapctx.Error(ctx, "failed to parse juju permission", zap.Error(err))
+			continue
 		}
 		// Append perm
 		c.permissions = append(c.permissions,
