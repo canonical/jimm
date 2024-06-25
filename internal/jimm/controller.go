@@ -53,24 +53,32 @@ func (j *JIMM) AllModels(ctx context.Context, user *openfga.User) (jujuparams.Us
 		return userModelList, errors.E(op, err)
 	}
 
-	for _, perms := range uuidToPerms {
-		err := func() error {
-			api, err := j.dial(context.Background(), &perms.controller, names.ModelTag{}, perms.permissions...)
-			if err != nil {
-				return err
-			}
-			defer api.Close()
+	umlCh := make(chan jujuparams.UserModelList)
+	errorsCh := make(chan error)
 
-			uml, err := api.AllModels(ctx)
-			if err != nil {
-				return err
-			}
-			userModelList.UserModels = append(userModelList.UserModels, uml.UserModels...)
-			return nil
-		}()
+	dialAndCallControllers(j.dial, uuidToPerms, errorsCh, func(api API) {
+		uml, err := api.AllModels(ctx)
 		if err != nil {
-			return userModelList, err
+			errorsCh <- err
+			return
 		}
+		umlCh <- uml
+	})
+
+	errs := []error{}
+
+	for range uuidToPerms {
+		select {
+		case uml := <-umlCh:
+			userModelList.UserModels = append(userModelList.UserModels, uml.UserModels...)
+		case err := <-errorsCh:
+			errs = append(errs, err)
+		}
+	}
+
+	if len(errs) > 0 {
+		// What do we do with call errors? Just take the first?
+		return userModelList, errors.E(op, errs[0])
 	}
 
 	return userModelList, nil

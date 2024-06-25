@@ -774,26 +774,16 @@ func (j *JIMM) GetAllModelSummariesForUser(ctx context.Context, user *openfga.Us
 	summariesCh := make(chan jujuparams.ModelSummaryResults)
 	errorsCh := make(chan error)
 
-	// Get all summaries from all controllers
-	for _, perms := range uuidToPerms {
-		go func(c controllerWithModelPermissions) {
-			api, err := j.dial(context.Background(), &c.controller, names.ModelTag{}, c.permissions...)
-			if err != nil {
-				errorsCh <- err
-				return
-			}
-			defer api.Close()
+	dialAndCallControllers(j.dial, uuidToPerms, errorsCh, func(api API) {
+		var out jujuparams.ModelSummaryResults
+		in := jujuparams.ModelSummariesRequest{UserTag: names.NewUserTag(user.Name).String(), All: true}
 
-			var out jujuparams.ModelSummaryResults
-			in := jujuparams.ModelSummariesRequest{UserTag: names.NewUserTag(user.Name).String(), All: true}
-
-			if err := api.ListModelSummaries(context.Background(), &in, &out); err != nil {
-				errorsCh <- err
-				return
-			}
-			summariesCh <- out
-		}(perms)
-	}
+		if err := api.ListModelSummaries(context.Background(), &in, &out); err != nil {
+			errorsCh <- err
+			return
+		}
+		summariesCh <- out
+	})
 
 	errs := []error{}
 
