@@ -811,6 +811,12 @@ func (j *JIMM) GetAllModelSummariesForUser(ctx context.Context, user *openfga.Us
 		return flattenedSummaries, errors.E(op, errs[0])
 	}
 
+	// Flatten permissions into single slice for index searching
+	perms := []permission{}
+	for _, v := range uuidToPerms {
+		perms = append(perms, v.permissions...)
+	}
+
 	// Now we filter the flattened summaries for two things:
 	// 1. If it's an IsController, remove it
 	// 2. Check the user has access
@@ -823,10 +829,6 @@ func (j *JIMM) GetAllModelSummariesForUser(ctx context.Context, user *openfga.Us
 
 		// Update the access to reflect our OpenFGA and not what the controller reported.
 		// We use the permission map previously used to map permissions.
-		perms := []permission{}
-		for _, v := range uuidToPerms {
-			perms = append(perms, v.permissions...)
-		}
 		idx := slices.IndexFunc(perms, func(p permission) bool {
 			return p.resource == names.NewModelTag(r.Result.UUID).String()
 		})
