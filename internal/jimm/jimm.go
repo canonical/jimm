@@ -213,7 +213,7 @@ func (j *JIMM) getControllersWithModelPermissionsForUser(ctx context.Context, us
 				c.permissions,
 				permission{
 					resource: m.ResourceTag().String(),
-					relation: access.String(),
+					relation: string(ofganames.ConvertRelationToJujuPermission(access)),
 				},
 			)
 			uuidToPerms[m.Controller.UUID] = c
@@ -224,7 +224,7 @@ func (j *JIMM) getControllersWithModelPermissionsForUser(ctx context.Context, us
 			permissions: []permission{
 				{
 					resource: m.ResourceTag().String(),
-					relation: access.String(),
+					relation: string(ofganames.ConvertRelationToJujuPermission(access)),
 				},
 			},
 		}

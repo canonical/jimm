@@ -1401,11 +1401,11 @@ func TestGetAllModelSummariesForUser(t *testing.T) {
 	res1 := res.Results[0].Result
 	res2 := res.Results[1].Result
 
-	c.Assert(res1.UserAccess, qt.Equals, jujuparams.UserAccessPermission("admin"))
+	c.Assert(res1.UserAccess, qt.Equals, jujuparams.UserAccessPermission("administrator"))
 	c.Assert(res1.UUID, qt.Equals, "00000002-0000-0000-0000-000000000001")
 	c.Assert(res1.ControllerUUID, qt.Equals, "00000001-0000-0000-0000-000000000001")
 
-	c.Assert(res2.UserAccess, qt.Equals, jujuparams.UserAccessPermission("admin"))
+	c.Assert(res2.UserAccess, qt.Equals, jujuparams.UserAccessPermission("administrator"))
 	c.Assert(res2.UUID, qt.Equals, "00000003-0000-0000-0000-000000000002")
 	c.Assert(res2.ControllerUUID, qt.Equals, "00000002-0000-0000-0000-000000000002")
 }

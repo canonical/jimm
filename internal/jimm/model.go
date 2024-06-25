@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -764,12 +765,11 @@ func (j *JIMM) ModelStatus(ctx context.Context, user *openfga.User, mt names.Mod
 func (j *JIMM) GetAllModelSummariesForUser(ctx context.Context, user *openfga.User) (jujuparams.ModelSummaryResults, error) {
 	const op = errors.Op("jimm.GetAllModelSummariesForUser")
 
-	filteredSummaries := jujuparams.ModelSummaryResults{}
 	flattenedSummaries := jujuparams.ModelSummaryResults{}
 
 	uuidToPerms, err := j.getControllersWithModelPermissionsForUser(ctx, user)
 	if err != nil {
-		return filteredSummaries, errors.E(op, err)
+		return flattenedSummaries, errors.E(op, err)
 	}
 
 	summariesCh := make(chan jujuparams.ModelSummaryResults)
@@ -810,7 +810,7 @@ func (j *JIMM) GetAllModelSummariesForUser(ctx context.Context, user *openfga.Us
 
 	if len(errs) > 0 {
 		// What do we do with call errors? Just take the first?
-		return filteredSummaries, errors.E(op, errs[0])
+		return flattenedSummaries, errors.E(op, errs[0])
 	}
 
 	// Flatten the summaries into a single results
@@ -821,34 +821,30 @@ func (j *JIMM) GetAllModelSummariesForUser(ctx context.Context, user *openfga.Us
 	// Now we filter the flattened summaries for two things:
 	// 1. If it's an IsController, remove it
 	// 2. Check the user has access
+	filteredControllers := jujuparams.ModelSummaryResults{}
 	for _, r := range flattenedSummaries.Results {
-		// Skip controller models
+		// Skip controller models.
 		if r.Result.IsController {
 			continue
 		}
 
-		access, err := j.GetUserModelAccess(context.Background(), user, names.NewModelTag(r.Result.UUID))
-		if err != nil {
-			return filteredSummaries, errors.E(op, err)
+		// Update the access to reflect our OpenFGA and not what the controller reported.
+		// We use the permission map previously used to map permissions.
+		perms := []permission{}
+		for _, v := range uuidToPerms {
+			perms = append(perms, v.permissions...)
 		}
-
-		// Update the access to reflect our OpenFGA and not what the controller reported
-		// for the admin user that JIMM retrieved the model summary as.
-		r.Result.UserAccess = jujuparams.UserAccessPermission(access)
-
-		switch access {
-		case "read":
-			fallthrough
-		case "write":
-			fallthrough
-		case "admin":
-			filteredSummaries.Results = append(filteredSummaries.Results, r)
-		default:
+		idx := slices.IndexFunc(perms, func(p permission) bool {
+			return p.resource == names.NewModelTag(r.Result.UUID).String()
+		})
+		if idx == -1 {
 			continue
 		}
+		r.Result.UserAccess = jujuparams.UserAccessPermission(perms[idx].relation)
+		filteredControllers.Results = append(filteredControllers.Results, r)
 	}
 
-	return filteredSummaries, nil
+	return filteredControllers, nil
 }
 
 // ForEachUserModel calls the given function once for each model that the
