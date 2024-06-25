@@ -82,7 +82,7 @@ func (r *controllerRoot) ListModelSummaries(ctx context.Context, _ jujuparams.Mo
 
 	summaries, err := r.jimm.GetAllModelSummariesForUser(ctx, r.user)
 	if err != nil {
-		return summaries, err
+		return summaries, errors.E(op, err)
 	}
 
 	// If controller masking is set, don't reveal the underlying controllers UUID
