@@ -178,7 +178,6 @@ func TestAllModels(t *testing.T) {
 	c.Assert(um[1].Name, qt.Equals, "controller-2")
 	c.Assert(um[2].Name, qt.Equals, "model-1")
 	c.Assert(um[3].Name, qt.Equals, "model-2")
-
 }
 
 func TestAddController(t *testing.T) {
