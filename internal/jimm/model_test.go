@@ -1229,6 +1229,187 @@ var modelInfoTests = []struct {
 },
 }
 
+const getAllModelSummariesForUserTestEnv = `clouds:
+- name: test-cloud
+  type: test-provider
+  regions:
+  - name: test-cloud-region
+cloud-credentials:
+- owner: alice@canonical.com
+  name: cred-1
+  cloud: test-cloud
+controllers:
+- name: controller-1
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test-cloud
+  region: test-cloud-region
+- name: controller-2
+  uuid: 00000002-0000-0000-0000-000000000002
+  cloud: test-cloud
+  region: test-cloud-region
+models:
+- name: model-1
+  type: iaas
+  uuid: 00000002-0000-0000-0000-000000000001
+  controller: controller-1
+  default-series: warty
+  cloud: test-cloud
+  region: test-cloud-region
+  cloud-credential: cred-1
+  owner: alice@canonical.com
+  life: alive
+  status:
+    status: available
+    info: "OK!"
+    since: 2020-02-20T20:02:20Z
+  sla:
+    level: unsupported
+  agent-version: 1.2.3
+  users:
+  - user: alice@canonical.com
+    access: admin
+- name: model-2
+  type: iaas
+  uuid: 00000003-0000-0000-0000-000000000002
+  controller: controller-2
+  default-series: warty
+  cloud: test-cloud
+  region: test-cloud-region
+  cloud-credential: cred-1
+  owner: alice@canonical.com
+  life: alive
+  status:
+    status: available
+    info: "OK!"
+    since: 2020-02-20T20:02:20Z
+  sla:
+    level: unsupported
+  agent-version: 1.2.3
+  users:
+  - user: alice@canonical.com
+    access: admin
+- name: model-3
+  type: iaas
+  uuid: 00000004-0000-0000-0000-000000000003
+  controller: controller-2
+  default-series: warty
+  cloud: test-cloud
+  region: test-cloud-region
+  cloud-credential: cred-1
+  owner: alice@canonical.com
+  life: alive
+  status:
+    status: available
+    info: "OK!"
+    since: 2020-02-20T20:02:20Z
+  sla:
+    level: unsupported
+  agent-version: 1.2.3
+  users:
+  - user: alice@canonical.com
+    access: admin
+`
+
+func TestGetAllModelSummariesForUser(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+	c.Assert(err, qt.IsNil)
+
+	j := &jimm.JIMM{
+		UUID:          uuid.NewString(),
+		OpenFGAClient: client,
+		Database: db.Database{
+			DB: jimmtest.PostgresDB(c, nil),
+		},
+		Dialer: &jimmtest.DialerMap{
+			"controller-1": &jimmtest.Dialer{
+				API: &jimmtest.API{
+					ListModelSummaries_: func(ctx context.Context, args *jujuparams.ModelSummariesRequest, out *jujuparams.ModelSummaryResults) error {
+						out.Results = []jujuparams.ModelSummaryResult{
+							// This one should be filtered out
+							{
+								Result: &jujuparams.ModelSummary{
+									Name:         "a controller model summary",
+									IsController: true,
+								},
+							},
+							// As we can't return two calls based on "some" controller id,
+							// we're just returning this model summary for this model
+							{
+								Result: &jujuparams.ModelSummary{
+									Name:           "a model summary that exists",
+									UUID:           "00000002-0000-0000-0000-000000000001",
+									ControllerUUID: "00000001-0000-0000-0000-000000000001",
+								},
+							},
+						}
+						return nil
+					},
+				},
+			},
+			"controller-2": &jimmtest.Dialer{
+				API: &jimmtest.API{
+					ListModelSummaries_: func(ctx context.Context, args *jujuparams.ModelSummariesRequest, out *jujuparams.ModelSummaryResults) error {
+						out.Results = []jujuparams.ModelSummaryResult{
+							// This one should be filtered out
+							{
+								Result: &jujuparams.ModelSummary{
+									Name:         "a controller model summary",
+									IsController: true,
+								},
+							},
+							// As we can't return two calls based on "some" controller id,
+							// we're just returning this model summary for this model
+							{
+								Result: &jujuparams.ModelSummary{
+									Name:           "a model summary that exists",
+									UUID:           "00000003-0000-0000-0000-000000000002",
+									ControllerUUID: "00000002-0000-0000-0000-000000000002",
+								},
+							},
+						}
+						return nil
+					},
+				},
+			},
+		},
+	}
+
+	err = j.Database.Migrate(ctx, false)
+	c.Assert(err, qt.IsNil)
+
+	env := jimmtest.ParseEnvironment(c, getAllModelSummariesForUserTestEnv)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
+
+	dbUser, err := dbmodel.NewIdentity("alice@canonical.com")
+	c.Assert(err, qt.IsNil)
+
+	user := openfga.NewUser(dbUser, client)
+
+	// Test that from two controllers, each with a single model, we get a combined
+	// summary
+	res, err := j.GetAllModelSummariesForUser(ctx, user)
+	c.Assert(err, qt.IsNil)
+	c.Assert(res.Results, qt.HasLen, 2) // 4 with controller models, but they're filtered
+
+	sort.Slice(res.Results, func(i, j int) bool {
+		return res.Results[i].Result.ControllerUUID < res.Results[j].Result.ControllerUUID
+	})
+
+	res1 := res.Results[0].Result
+	res2 := res.Results[1].Result
+
+	c.Assert(res1.UserAccess, qt.Equals, jujuparams.UserAccessPermission("admin"))
+	c.Assert(res1.UUID, qt.Equals, "00000002-0000-0000-0000-000000000001")
+	c.Assert(res1.ControllerUUID, qt.Equals, "00000001-0000-0000-0000-000000000001")
+
+	c.Assert(res2.UserAccess, qt.Equals, jujuparams.UserAccessPermission("admin"))
+	c.Assert(res2.UUID, qt.Equals, "00000003-0000-0000-0000-000000000002")
+	c.Assert(res2.ControllerUUID, qt.Equals, "00000002-0000-0000-0000-000000000002")
+}
+
 func TestModelInfo(t *testing.T) {
 	c := qt.New(t)
 

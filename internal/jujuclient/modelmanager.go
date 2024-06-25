@@ -13,6 +13,17 @@ import (
 	"github.com/canonical/jimm/internal/errors"
 )
 
+// ListModelSummaries returns model summaries for a controller based on a user.
+func (c Connection) ListModelSummaries(ctx context.Context, args *jujuparams.ModelSummariesRequest, out *jujuparams.ModelSummaryResults) error {
+	const op = errors.Op("jujuclient.ListModelSummaries")
+
+	if err := c.Call(ctx, "ModelManager", 9, "", "ListModelSummaries", args, out); err != nil {
+		return errors.E(op, jujuerrors.Cause(err))
+	}
+
+	return nil
+}
+
 // CreateModel creates a new model as specified by the given model
 // specification. If the model is created successfully then the model
 // document passed in will be updated with the model information returned

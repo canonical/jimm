@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -756,6 +757,89 @@ func (j *JIMM) ModelStatus(ctx context.Context, user *openfga.User, mt names.Mod
 		return nil, errors.E(op, err)
 	}
 	return &ms, nil
+}
+
+// GetAllModelSummariesForUser dials all controllers JIMM is aware of and calls ListAllModelSummaries
+// on each. It filters out controller models and models user does not have access to.
+func (j *JIMM) GetAllModelSummariesForUser(ctx context.Context, user *openfga.User) (jujuparams.ModelSummaryResults, error) {
+	const op = errors.Op("jimm.GetAllModelSummariesForUser")
+
+	flattenedSummaries := jujuparams.ModelSummaryResults{}
+
+	uuidToPerms, err := j.getControllersWithModelPermissionsForUser(ctx, user)
+	if err != nil {
+		return flattenedSummaries, errors.E(op, err)
+	}
+
+	summariesCh := make(chan jujuparams.ModelSummaryResults)
+	errorsCh := make(chan error)
+
+	// Get all summaries from all controllers
+	for _, perms := range uuidToPerms {
+		go func(c controllerWithModelPermissions) {
+			api, err := j.dial(context.Background(), &c.controller, names.ModelTag{}, c.permissions...)
+			if err != nil {
+				errorsCh <- err
+				return
+			}
+			defer api.Close()
+
+			var out jujuparams.ModelSummaryResults
+			in := jujuparams.ModelSummariesRequest{UserTag: names.NewUserTag(user.Name).String(), All: true}
+
+			if err := api.ListModelSummaries(context.Background(), &in, &out); err != nil {
+				errorsCh <- err
+				return
+			}
+			summariesCh <- out
+		}(perms)
+	}
+
+	errs := []error{}
+
+	for range uuidToPerms {
+		select {
+		case sum := <-summariesCh:
+			flattenedSummaries.Results = append(flattenedSummaries.Results, sum.Results...)
+		case err := <-errorsCh:
+			errs = append(errs, err)
+		}
+	}
+
+	if len(errs) > 0 {
+		// What do we do with call errors? Just take the first?
+		return flattenedSummaries, errors.E(op, errs[0])
+	}
+
+	// Flatten permissions into single slice for index searching
+	perms := []permission{}
+	for _, v := range uuidToPerms {
+		perms = append(perms, v.permissions...)
+	}
+
+	// Now we filter the flattened summaries for two things:
+	// 1. If it's an IsController, remove it
+	// 2. Check the user has access
+	filteredControllers := jujuparams.ModelSummaryResults{}
+	for _, r := range flattenedSummaries.Results {
+		// Skip controller models.
+		if r.Result.IsController {
+			continue
+		}
+
+		// Update the access to reflect our OpenFGA and not what the controller reported.
+		// We use the permission map previously used to map permissions.
+		idx := slices.IndexFunc(perms, func(p permission) bool {
+			return p.resource == names.NewModelTag(r.Result.UUID).String()
+		})
+		if idx == -1 {
+			continue
+		}
+		r.Result.UserAccess = jujuparams.UserAccessPermission(perms[idx].relation)
+		filteredControllers.Results = append(filteredControllers.Results, r)
+	}
+
+	return filteredControllers, nil
 }
 
 // ForEachUserModel calls the given function once for each model that the

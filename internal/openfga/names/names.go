@@ -9,7 +9,9 @@ import (
 
 	"github.com/canonical/jimm/internal/errors"
 	jimmnames "github.com/canonical/jimm/pkg/names"
+	"github.com/canonical/ofga"
 	cofga "github.com/canonical/ofga"
+	jujuparams "github.com/juju/juju/rpc/params"
 
 	"github.com/juju/juju/core/permission"
 	"github.com/juju/names/v5"
@@ -140,6 +142,27 @@ func ConvertJujuRelation(relation string) (cofga.Relation, error) {
 		return NoRelation, errors.E(op, "superuser access unused")
 	default:
 		return NoRelation, errors.E(op, "unknown relation")
+	}
+}
+
+// ConvertRelationToJujuPermission converts an openfga relation name to a juju user access permission.
+// I.e., administrator -> admin
+func ConvertRelationToJujuPermission(r ofga.Relation) (jujuparams.UserAccessPermission, error) {
+	const op = errors.Op("ConvertRelationToJujuPermission")
+
+	switch r {
+	case AdministratorRelation:
+		return jujuparams.UserAccessPermission("admin"), nil
+	case ReaderRelation:
+		return jujuparams.UserAccessPermission("read"), nil
+	case WriterRelation:
+		return jujuparams.UserAccessPermission("write"), nil
+	case ConsumerRelation:
+		return jujuparams.UserAccessPermission("consume"), nil
+	case CanAddModelRelation:
+		return jujuparams.UserAccessPermission("add-model"), nil
+	default:
+		return jujuparams.UserAccessPermission("unknown"), errors.E(op, "unknown relation")
 	}
 }
 

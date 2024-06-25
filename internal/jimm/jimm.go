@@ -178,6 +178,66 @@ type permission struct {
 	relation string
 }
 
+type controllerWithModelPermissions struct {
+	controller  dbmodel.Controller
+	permissions []permission
+}
+
+// getControllersWithModelPermissionsForUser returns a map of controller uuids to:
+//
+// - Controller db model
+// - The users access permissions to the models on this controller
+func (j *JIMM) getControllersWithModelPermissionsForUser(ctx context.Context, user *openfga.User) (map[string]controllerWithModelPermissions, error) {
+	const op = errors.Op("jimm.dialAllControllers")
+
+	// List UUIDs of all models user has access to.
+	uuids, err := user.ListModels(context.Background(), ofganames.ReaderRelation)
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	// Retrieve the models from db
+	models, err := j.DB().GetModelsByUUID(ctx, uuids)
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	uuidToPerms := make(map[string]controllerWithModelPermissions)
+
+	for _, m := range models {
+		access := user.GetModelAccess(ctx, names.NewModelTag(m.UUID.String))
+
+		// Ensure controlelr exists on map
+		if _, ok := uuidToPerms[m.Controller.UUID]; !ok {
+			uuidToPerms[m.Controller.UUID] = controllerWithModelPermissions{
+				controller:  m.Controller,
+				permissions: []permission{},
+			}
+		}
+		// Get the existing controller
+		c := uuidToPerms[m.Controller.UUID]
+		// Parse ofga relation name -> juju rbac
+		jujuPerm, err := ofganames.ConvertRelationToJujuPermission(access)
+
+		// If we can't parse our relation to a juju perm, consider this erreoneous
+		// to the point we won't return this permission set.
+		if err != nil {
+			zapctx.Error(ctx, "failed to parse juju permission", zap.Error(err))
+			continue
+		}
+		// Append perm
+		c.permissions = append(c.permissions,
+			permission{
+				resource: m.ResourceTag().String(),
+				relation: string(jujuPerm),
+			},
+		)
+		uuidToPerms[m.Controller.UUID] = c
+	}
+
+	return uuidToPerms, nil
+}
+
 // dial dials the controller and model specified by the given Controller
 // and ModelTag. If no Dialer has been configured then an error with a
 // code of CodeConnectionFailed will be returned.
@@ -375,6 +435,9 @@ type API interface {
 
 	// ListStorageDetails lists all storage.
 	ListStorageDetails(ctx context.Context) ([]jujuparams.StorageDetails, error)
+
+	// ListModelSummaries returns model summaries for a controller based on a user.
+	ListModelSummaries(ctx context.Context, args *jujuparams.ModelSummariesRequest, out *jujuparams.ModelSummaryResults) error
 }
 
 // forEachController runs a given function on multiple controllers
