@@ -95,7 +95,7 @@ func (r *controllerRoot) ListModelSummaries(ctx context.Context, _ jujuparams.Mo
 	}
 
 	// Return the masked summaries from all underlying controllers.
-	return summaries, err
+	return summaries, nil
 }
 
 // ListModels returns the models that the authenticated user

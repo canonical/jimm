@@ -147,20 +147,22 @@ func ConvertJujuRelation(relation string) (cofga.Relation, error) {
 
 // ConvertRelationToJujuPermission converts an openfga relation name to a juju user access permission.
 // I.e., administrator -> admin
-func ConvertRelationToJujuPermission(r ofga.Relation) jujuparams.UserAccessPermission {
+func ConvertRelationToJujuPermission(r ofga.Relation) (jujuparams.UserAccessPermission, error) {
+	const op = errors.Op("ConvertRelationToJujuPermission")
+
 	switch r {
 	case AdministratorRelation:
-		return jujuparams.UserAccessPermission("admin")
+		return jujuparams.UserAccessPermission("admin"), nil
 	case ReaderRelation:
-		return jujuparams.UserAccessPermission("read")
+		return jujuparams.UserAccessPermission("read"), nil
 	case WriterRelation:
-		return jujuparams.UserAccessPermission("write")
+		return jujuparams.UserAccessPermission("write"), nil
 	case ConsumerRelation:
-		return jujuparams.UserAccessPermission("consume")
+		return jujuparams.UserAccessPermission("consume"), nil
 	case CanAddModelRelation:
-		return jujuparams.UserAccessPermission("add-model")
+		return jujuparams.UserAccessPermission("add-model"), nil
 	default:
-		return jujuparams.UserAccessPermission("unknown")
+		return jujuparams.UserAccessPermission("unknown"), errors.E(op, "unknown relation")
 	}
 }
 

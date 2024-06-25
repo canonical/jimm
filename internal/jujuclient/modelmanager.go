@@ -13,6 +13,7 @@ import (
 	"github.com/canonical/jimm/internal/errors"
 )
 
+// ListModelSummaries returns model summaries for a controller based on a user.
 func (c Connection) ListModelSummaries(ctx context.Context, args *jujuparams.ModelSummariesRequest, out *jujuparams.ModelSummaryResults) error {
 	const op = errors.Op("jujuclient.ListModelSummaries")
 

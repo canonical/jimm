@@ -760,8 +760,7 @@ func (j *JIMM) ModelStatus(ctx context.Context, user *openfga.User, mt names.Mod
 }
 
 // GetAllModelSummariesForUser dials all controllers JIMM is aware of and calls ListAllModelSummaries
-// on each. It filters out controller models and ensures the user has access to the summarised
-// models and filters out the results.
+// on each. It filters out controller models and models user does not have access to.
 func (j *JIMM) GetAllModelSummariesForUser(ctx context.Context, user *openfga.User) (jujuparams.ModelSummaryResults, error) {
 	const op = errors.Op("jimm.GetAllModelSummariesForUser")
 
@@ -796,13 +795,12 @@ func (j *JIMM) GetAllModelSummariesForUser(ctx context.Context, user *openfga.Us
 		}(perms)
 	}
 
-	summaries := []jujuparams.ModelSummaryResults{}
 	errs := []error{}
 
 	for range uuidToPerms {
 		select {
 		case sum := <-summariesCh:
-			summaries = append(summaries, sum)
+			flattenedSummaries.Results = append(flattenedSummaries.Results, sum.Results...)
 		case err := <-errorsCh:
 			errs = append(errs, err)
 		}
@@ -811,11 +809,6 @@ func (j *JIMM) GetAllModelSummariesForUser(ctx context.Context, user *openfga.Us
 	if len(errs) > 0 {
 		// What do we do with call errors? Just take the first?
 		return flattenedSummaries, errors.E(op, errs[0])
-	}
-
-	// Flatten the summaries into a single results
-	for _, s := range summaries {
-		flattenedSummaries.Results = append(flattenedSummaries.Results, s.Results...)
 	}
 
 	// Now we filter the flattened summaries for two things:

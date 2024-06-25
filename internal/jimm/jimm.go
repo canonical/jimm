@@ -190,7 +190,7 @@ type controllerWithModelPermissions struct {
 func (j *JIMM) getControllersWithModelPermissionsForUser(ctx context.Context, user *openfga.User) (map[string]controllerWithModelPermissions, error) {
 	const op = errors.Op("jimm.dialAllControllers")
 
-	// Get access to all models this user has access to
+	// List UUIDs of all models user has access to.
 	uuids, err := user.ListModels(context.Background(), ofganames.ReaderRelation)
 	if err != nil {
 		return nil, errors.E(op, err)
@@ -207,27 +207,27 @@ func (j *JIMM) getControllersWithModelPermissionsForUser(ctx context.Context, us
 	for _, m := range models {
 		access := user.GetModelAccess(ctx, names.NewModelTag(m.UUID.String))
 
-		if _, ok := uuidToPerms[m.Controller.UUID]; ok {
-			c := uuidToPerms[m.Controller.UUID]
-			c.permissions = append(
-				c.permissions,
-				permission{
-					resource: m.ResourceTag().String(),
-					relation: string(ofganames.ConvertRelationToJujuPermission(access)),
-				},
-			)
-			uuidToPerms[m.Controller.UUID] = c
-			continue
+		// Ensure controlelr exists on map
+		if _, ok := uuidToPerms[m.Controller.UUID]; !ok {
+			uuidToPerms[m.Controller.UUID] = controllerWithModelPermissions{
+				controller: m.Controller,
+			}
 		}
-		uuidToPerms[m.Controller.UUID] = controllerWithModelPermissions{
-			controller: m.Controller,
-			permissions: []permission{
-				{
-					resource: m.ResourceTag().String(),
-					relation: string(ofganames.ConvertRelationToJujuPermission(access)),
-				},
+		// Get the existing controller
+		c := uuidToPerms[m.Controller.UUID]
+		// Parse ofga relation name -> juju rbac
+		jujuPerm, err := ofganames.ConvertRelationToJujuPermission(access)
+		if err != nil {
+			zapctx.Error(ctx, "failed to parse juju permission", zap.Error(err))
+		}
+		// Append perm
+		c.permissions = append(c.permissions,
+			permission{
+				resource: m.ResourceTag().String(),
+				relation: string(jujuPerm),
 			},
-		}
+		)
+		uuidToPerms[m.Controller.UUID] = c
 	}
 
 	return uuidToPerms, nil
@@ -431,6 +431,7 @@ type API interface {
 	// ListStorageDetails lists all storage.
 	ListStorageDetails(ctx context.Context) ([]jujuparams.StorageDetails, error)
 
+	// ListModelSummaries returns model summaries for a controller based on a user.
 	ListModelSummaries(ctx context.Context, args *jujuparams.ModelSummariesRequest, out *jujuparams.ModelSummaryResults) error
 }
 
