@@ -210,7 +210,8 @@ func (j *JIMM) getControllersWithModelPermissionsForUser(ctx context.Context, us
 		// Ensure controlelr exists on map
 		if _, ok := uuidToPerms[m.Controller.UUID]; !ok {
 			uuidToPerms[m.Controller.UUID] = controllerWithModelPermissions{
-				controller: m.Controller,
+				controller:  m.Controller,
+				permissions: []permission{},
 			}
 		}
 		// Get the existing controller
