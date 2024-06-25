@@ -218,6 +218,9 @@ func (j *JIMM) getControllersWithModelPermissionsForUser(ctx context.Context, us
 		c := uuidToPerms[m.Controller.UUID]
 		// Parse ofga relation name -> juju rbac
 		jujuPerm, err := ofganames.ConvertRelationToJujuPermission(access)
+
+		// If we can't parse our relation to a juju perm, consider this erreoneous
+		// to the point we won't return this permission set.
 		if err != nil {
 			zapctx.Error(ctx, "failed to parse juju permission", zap.Error(err))
 			continue
