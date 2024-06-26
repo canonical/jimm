@@ -183,11 +183,15 @@ type controllerWithModelPermissions struct {
 	permissions []permission
 }
 
+type controllerPermSet map[string]controllerWithModelPermissions
+
+type dialerFunc func(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, permissons ...permission) (API, error)
+
 // getControllersWithModelPermissionsForUser returns a map of controller uuids to:
 //
 // - Controller db model
 // - The users access permissions to the models on this controller
-func (j *JIMM) getControllersWithModelPermissionsForUser(ctx context.Context, user *openfga.User) (map[string]controllerWithModelPermissions, error) {
+func (j *JIMM) getControllersWithModelPermissionsForUser(ctx context.Context, user *openfga.User) (controllerPermSet, error) {
 	const op = errors.Op("jimm.dialAllControllers")
 
 	// List UUIDs of all models user has access to.
@@ -236,6 +240,31 @@ func (j *JIMM) getControllersWithModelPermissionsForUser(ctx context.Context, us
 	}
 
 	return uuidToPerms, nil
+}
+
+// dialAndCallControllers dials multiple controllers in their own routines
+// from the controller permission set and reports errors on dial to an error channel.
+//
+// It takes a function which will pass the dialed controller to the function.
+// Should you wish to handle concurrency waiting, please read from a channel
+// outside the op or create a wait group within the op.
+func dialAndCallControllers(
+	dialerFunc dialerFunc,
+	p controllerPermSet,
+	errCh chan error,
+	op func(api API),
+) {
+	for _, perms := range p {
+		go func(c controllerWithModelPermissions) {
+			api, err := dialerFunc(context.Background(), &c.controller, names.ModelTag{}, c.permissions...)
+			if err != nil {
+				errCh <- err
+				return
+			}
+			defer api.Close()
+			op(api)
+		}(perms)
+	}
 }
 
 // dial dials the controller and model specified by the given Controller
@@ -438,6 +467,10 @@ type API interface {
 
 	// ListModelSummaries returns model summaries for a controller based on a user.
 	ListModelSummaries(ctx context.Context, args *jujuparams.ModelSummariesRequest, out *jujuparams.ModelSummaryResults) error
+
+	// AllModels allows controller administrators to get the list of all the
+	// models in the controller.
+	AllModels(ctx context.Context) (jujuparams.UserModelList, error)
 }
 
 // forEachController runs a given function on multiple controllers

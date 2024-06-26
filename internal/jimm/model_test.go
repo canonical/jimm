@@ -1369,6 +1369,13 @@ func TestGetAllModelSummariesForUser(t *testing.T) {
 									ControllerUUID: "00000002-0000-0000-0000-000000000002",
 								},
 							},
+							{
+								Result: &jujuparams.ModelSummary{
+									Name:           "another model summary that exists",
+									UUID:           "00000004-0000-0000-0000-000000000003",
+									ControllerUUID: "00000002-0000-0000-0000-000000000002",
+								},
+							},
 						}
 						return nil
 					},
@@ -1392,7 +1399,7 @@ func TestGetAllModelSummariesForUser(t *testing.T) {
 	// summary
 	res, err := j.GetAllModelSummariesForUser(ctx, user)
 	c.Assert(err, qt.IsNil)
-	c.Assert(res.Results, qt.HasLen, 2) // 4 with controller models, but they're filtered
+	c.Assert(res.Results, qt.HasLen, 3)
 
 	sort.Slice(res.Results, func(i, j int) bool {
 		return res.Results[i].Result.ControllerUUID < res.Results[j].Result.ControllerUUID
@@ -1400,6 +1407,7 @@ func TestGetAllModelSummariesForUser(t *testing.T) {
 
 	res1 := res.Results[0].Result
 	res2 := res.Results[1].Result
+	res3 := res.Results[2].Result
 
 	c.Assert(res1.UserAccess, qt.Equals, jujuparams.UserAccessPermission("admin"))
 	c.Assert(res1.UUID, qt.Equals, "00000002-0000-0000-0000-000000000001")
@@ -1408,6 +1416,10 @@ func TestGetAllModelSummariesForUser(t *testing.T) {
 	c.Assert(res2.UserAccess, qt.Equals, jujuparams.UserAccessPermission("admin"))
 	c.Assert(res2.UUID, qt.Equals, "00000003-0000-0000-0000-000000000002")
 	c.Assert(res2.ControllerUUID, qt.Equals, "00000002-0000-0000-0000-000000000002")
+
+	c.Assert(res3.UserAccess, qt.Equals, jujuparams.UserAccessPermission("admin"))
+	c.Assert(res3.UUID, qt.Equals, "00000004-0000-0000-0000-000000000003")
+	c.Assert(res3.ControllerUUID, qt.Equals, "00000002-0000-0000-0000-000000000002")
 }
 
 func TestModelInfo(t *testing.T) {
