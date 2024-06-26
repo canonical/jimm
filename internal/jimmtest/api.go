@@ -169,6 +169,14 @@ type API struct {
 	ListStorageDetails_                func(ctx context.Context) ([]jujuparams.StorageDetails, error)
 	ListModelSummaries_                func(ctx context.Context, args *jujuparams.ModelSummariesRequest, out *jujuparams.ModelSummaryResults) error
 	AllModels_                         func(ctx context.Context) (jujuparams.UserModelList, error)
+	CredentialContents_                func(ctx context.Context, args jujuparams.CloudCredentialArgs) (jujuparams.CredentialContentResults, error)
+}
+
+func (a *API) CredentialContents(ctx context.Context, args jujuparams.CloudCredentialArgs) (jujuparams.CredentialContentResults, error) {
+	if a.AllModels_ == nil {
+		return jujuparams.CredentialContentResults{}, errors.E(errors.CodeNotImplemented)
+	}
+	return a.CredentialContents_(ctx, args)
 }
 
 func (a *API) AllModels(ctx context.Context) (jujuparams.UserModelList, error) {
