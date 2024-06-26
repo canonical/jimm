@@ -242,7 +242,7 @@ func (d *Database) CountModelsByController(ctx context.Context, ctl dbmodel.Cont
 	db := d.DB.WithContext(ctx)
 	asc := db.Model(ctl).Association("Models")
 	count := asc.Count()
-	if err := db.Model(ctl).Association("Models").Error; err != nil {
+	if err := asc.Error; err != nil {
 		return 0, errors.E(op, dbError(err))
 	}
 	return int(count), nil
