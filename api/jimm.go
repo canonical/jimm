@@ -196,6 +196,11 @@ func (c *Client) AddServiceAccount(req *params.AddServiceAccountRequest) error {
 	return c.caller.APICall("JIMM", 4, "", "AddServiceAccount", req, nil)
 }
 
+// AddServiceAccountCredential copies a user cloud-credential to a service account.
+func (c *Client) AddServiceAccountCredential(req *params.AddServiceAccountCredentialRequest) error {
+	return c.caller.APICall("JIMM", 4, "", "AddServiceAccountCredential", req, nil)
+}
+
 // ListServiceAccountCredentials lists the cloud credentials belonging to a service account.
 func (c *Client) ListServiceAccountCredentials(req *params.ListServiceAccountCredentialsRequest) (*jujuparams.CredentialContentResults, error) {
 	var response jujuparams.CredentialContentResults

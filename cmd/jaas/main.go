@@ -29,6 +29,7 @@ func NewSuperCommand() *jujucmd.SuperCommand {
 	serviceAccountCmd.Register(cmd.NewListServiceAccountCredentialsCommand())
 	serviceAccountCmd.Register(cmd.NewUpdateCredentialsCommand())
 	serviceAccountCmd.Register(cmd.NewGrantCommand())
+	serviceAccountCmd.Register(cmd.NewAddServiceAccountCredentialCommand())
 	return serviceAccountCmd
 }
 

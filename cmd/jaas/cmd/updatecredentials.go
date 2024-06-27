@@ -28,7 +28,7 @@ This will add the credentials to JAAS if they were not found.
 `
 
 	updateCredentialsCommandExamples = `
-    juju update-service-account-credentials 00000000-0000-0000-0000-000000000000 aws credential-name
+    juju update-service-account-credentials <client-id> aws credential-name
 `
 )
 
