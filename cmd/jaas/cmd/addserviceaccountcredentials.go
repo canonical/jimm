@@ -23,7 +23,7 @@ This allows for an interactive way to set the cloud-credentials for a service ac
 Note that you should first upload a set of cloud-credentials to the controller with juju add-credential.
 `
 	addServiceAccountCredentialsCommandExamples = `
-    juju add-service-account-credentials <client-id> aws credential-name
+    juju add-service-account-credentials <client-id> <cloud-name> <credential-name>
 `
 )
 

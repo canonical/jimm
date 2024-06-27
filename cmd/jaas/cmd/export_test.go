@@ -21,6 +21,18 @@ func NewAddServiceAccountCommandForTesting(store jujuclient.ClientStore, lp juju
 	return modelcmd.WrapBase(cmd)
 }
 
+func NewAddServiceAccountCredentialCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
+	cmd := &addServiceAccountCredentialCommand{
+		store: store,
+		dialOpts: &jujuapi.DialOpts{
+			InsecureSkipVerify: true,
+			LoginProvider:      lp,
+		},
+	}
+
+	return modelcmd.WrapBase(cmd)
+}
+
 func NewListServiceAccountCredentialsCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &listServiceAccountCredentialsCommand{
 		store: store,
