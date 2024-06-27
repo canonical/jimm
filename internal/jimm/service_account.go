@@ -4,11 +4,14 @@ package jimm
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 	jimmnames "github.com/canonical/jimm/pkg/names"
+	jujuparams "github.com/juju/juju/rpc/params"
+	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 )
@@ -53,6 +56,37 @@ func (j *JIMM) AddServiceAccount(ctx context.Context, u *openfga.User, clientId 
 		return errors.E(op, err)
 	}
 	return nil
+}
+
+// AddServiceAccountCredential attempts to create a copy of a user's cloud-credential
+// for a service account.
+func (j *JIMM) AddServiceAccountCredential(ctx context.Context, u *openfga.User, svcAcc *openfga.User, cred names.CloudCredentialTag) error {
+	op := errors.Op("jimm.AddServiceAccountCredential")
+
+	credential, err := j.GetCloudCredential(ctx, u, cred)
+	if err != nil {
+		return errors.E(op, err)
+	}
+	attr, err := j.getCloudCredentialAttributes(ctx, credential)
+	if err != nil {
+		return errors.E(op, err)
+	}
+	newCredID := fmt.Sprintf("%s/%s/%s", cred.Cloud().Id(), svcAcc.Name, cred.Name())
+	if !names.IsValidCloudCredential(newCredID) {
+		return errors.E(op, fmt.Sprintf("new credential ID %s is not a valid cloud credential tag", newCredID))
+	}
+	newCredential := jujuparams.CloudCredential{
+		AuthType:   credential.AuthType,
+		Attributes: attr,
+	}
+	_, err = j.UpdateCloudCredential(ctx, svcAcc, UpdateCloudCredentialArgs{
+		CredentialTag: names.NewCloudCredentialTag(newCredID),
+		Credential:    newCredential,
+		SkipCheck:     false,
+		SkipUpdate:    false,
+	})
+
+	return err
 }
 
 // GrantServiceAccountAccess creates an administrator relation between the tags provided
