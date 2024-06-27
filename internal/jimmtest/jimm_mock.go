@@ -160,7 +160,7 @@ func (j *JIMM) AddServiceAccount(ctx context.Context, u *openfga.User, clientId 
 }
 
 func (j *JIMM) AddServiceAccountCredential(ctx context.Context, u *openfga.User, svcAcc *openfga.User, cloudCredentialTag names.CloudCredentialTag) error {
-	if j.AddServiceAccount_ == nil {
+	if j.AddServiceAccountCredential_ == nil {
 		return errors.E(errors.CodeNotImplemented)
 	}
 	return j.AddServiceAccountCredential_(ctx, u, svcAcc, cloudCredentialTag)

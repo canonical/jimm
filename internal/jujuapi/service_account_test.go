@@ -85,6 +85,98 @@ func TestAddServiceAccount(t *testing.T) {
 	}
 }
 
+func TestAddServiceAccountCredential(t *testing.T) {
+	c := qt.New(t)
+
+	tests := []struct {
+		about         string
+		args          params.AddServiceAccountCredentialRequest
+		addTuples     []openfga.Tuple
+		username      string
+		expectedError string
+	}{{
+		about: "Valid request",
+		args: params.AddServiceAccountCredentialRequest{
+			ClientID: "fca1f605-736e-4d1f-bcd2-aecc726923be",
+			CloudCredentialArg: jujuparams.CloudCredentialArg{
+				CloudName:      "aws",
+				CredentialName: "my-cred",
+			},
+		},
+		username: "alice",
+		addTuples: []openfga.Tuple{{
+			Object:   ofganames.ConvertTag(names.NewUserTag("alice")),
+			Relation: ofganames.AdministratorRelation,
+			Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag("fca1f605-736e-4d1f-bcd2-aecc726923be@serviceaccount")),
+		}},
+	}, {
+		about: "Invalid cloud credential args",
+		args: params.AddServiceAccountCredentialRequest{
+			ClientID: "fca1f605-736e-4d1f-bcd2-aecc726923be",
+			CloudCredentialArg: jujuparams.CloudCredentialArg{
+				CloudName:      "123aws",
+				CredentialName: "123my-cred",
+			},
+		},
+		username: "alice",
+		addTuples: []openfga.Tuple{{
+			Object:   ofganames.ConvertTag(names.NewUserTag("alice")),
+			Relation: ofganames.AdministratorRelation,
+			Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag("fca1f605-736e-4d1f-bcd2-aecc726923be@serviceaccount")),
+		}},
+		expectedError: ".* is not a valid cloud credential tag",
+	}, {
+		about: "Missing permissions",
+		args: params.AddServiceAccountCredentialRequest{
+			ClientID: "fca1f605-736e-4d1f-bcd2-aecc726923be",
+			CloudCredentialArg: jujuparams.CloudCredentialArg{
+				CloudName:      "aws",
+				CredentialName: "my-cred",
+			},
+		},
+		username:      "alice",
+		expectedError: "unauthorized",
+	}}
+
+	for _, test := range tests {
+		test := test
+		c.Run(test.about, func(c *qt.C) {
+			ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+			c.Assert(err, qt.IsNil)
+			pgDb := db.Database{
+				DB: jimmtest.PostgresDB(c, nil),
+			}
+			err = pgDb.Migrate(context.Background(), false)
+			c.Assert(err, qt.IsNil)
+			jimm := &jimmtest.JIMM{
+				AuthorizationClient_: func() *openfga.OFGAClient { return ofgaClient },
+				DB_:                  func() *db.Database { return &pgDb },
+				AddServiceAccountCredential_: func(ctx context.Context, u, svcAcc *openfga.User, cloudCredentialTag names.CloudCredentialTag) error {
+					c.Assert(cloudCredentialTag.Cloud().Id(), qt.Equals, test.args.CloudCredentialArg.CloudName)
+					c.Assert(cloudCredentialTag.Owner().Id(), qt.Equals, u.Name)
+					c.Assert(cloudCredentialTag.Name(), qt.Equals, test.args.CloudCredentialArg.CredentialName)
+					c.Assert(svcAcc.Name, qt.Equals, test.args.ClientID+"@serviceaccount")
+					return nil
+				},
+			}
+			var u dbmodel.Identity
+			u.SetTag(names.NewUserTag(test.username))
+			user := openfga.NewUser(&u, ofgaClient)
+			cr := jujuapi.NewControllerRoot(jimm, jujuapi.Params{})
+			jujuapi.SetUser(cr, user)
+			if len(test.addTuples) > 0 {
+				ofgaClient.AddRelation(context.Background(), test.addTuples...)
+			}
+			err = cr.AddServiceAccountCredential(context.Background(), test.args)
+			if test.expectedError == "" {
+				c.Assert(err, qt.IsNil)
+			} else {
+				c.Assert(err, qt.ErrorMatches, test.expectedError)
+			}
+		})
+	}
+}
+
 func TestGetServiceAccount(t *testing.T) {
 	c := qt.New(t)
 
