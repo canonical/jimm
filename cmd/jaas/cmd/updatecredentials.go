@@ -22,27 +22,27 @@ import (
 )
 
 var (
-	updateCredentialsCommandDoc = `
-update-service-account-credentials command updates the credentials associated with a service account.
-This will add the credentials to JAAS if they were not found.
+	updateCredentialCommandDoc = `
+update-service-account-credential command updates the credentials associated with a service account.
+This will add the credential to JAAS if they were not found.
 `
 
-	updateCredentialsCommandExamples = `
-    juju update-service-account-credentials <client-id> aws credential-name
+	updateCredentialCommandExamples = `
+    juju update-service-account-credential <client-id> aws credential-name
 `
 )
 
-// NewUpdateCredentialsCommand returns a command to update a service account's cloud credentials.
-func NewUpdateCredentialsCommand() cmd.Command {
-	cmd := &updateCredentialsCommand{
+// NewUpdateCredentialCommand returns a command to update a service account's cloud credentials.
+func NewUpdateCredentialCommand() cmd.Command {
+	cmd := &updateCredentialCommand{
 		store: jujuclient.NewFileClientStore(),
 	}
 
 	return modelcmd.WrapBase(cmd)
 }
 
-// updateCredentialsCommand updates a service account's cloud credentials.
-type updateCredentialsCommand struct {
+// updateCredentialCommand updates a service account's cloud credentials.
+type updateCredentialCommand struct {
 	modelcmd.ControllerCommandBase
 	out cmd.Output
 
@@ -55,18 +55,18 @@ type updateCredentialsCommand struct {
 }
 
 // Info implements Command.Info.
-func (c *updateCredentialsCommand) Info() *cmd.Info {
+func (c *updateCredentialCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:     "update-service-account-credentials",
-		Purpose:  "Update service account cloud credentials",
+		Name:     "update-service-account-credential",
+		Purpose:  "Update service account cloud credential",
 		Args:     "<client-id> <cloud> <credential-name>",
-		Doc:      updateCredentialsCommandDoc,
-		Examples: updateCredentialsCommandExamples,
+		Doc:      updateCredentialCommandDoc,
+		Examples: updateCredentialCommandExamples,
 	})
 }
 
 // SetFlags implements Command.SetFlags.
-func (c *updateCredentialsCommand) SetFlags(f *gnuflag.FlagSet) {
+func (c *updateCredentialCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.CommandBase.SetFlags(f)
 	c.out.AddFlags(f, "yaml", map[string]cmd.Formatter{
 		"yaml": cmd.FormatYaml,
@@ -75,7 +75,7 @@ func (c *updateCredentialsCommand) SetFlags(f *gnuflag.FlagSet) {
 }
 
 // Init implements the cmd.Command interface.
-func (c *updateCredentialsCommand) Init(args []string) error {
+func (c *updateCredentialCommand) Init(args []string) error {
 	if len(args) < 1 {
 		return errors.E("client ID not specified")
 	}
@@ -95,7 +95,7 @@ func (c *updateCredentialsCommand) Init(args []string) error {
 }
 
 // Run implements Command.Run.
-func (c *updateCredentialsCommand) Run(ctxt *cmd.Context) error {
+func (c *updateCredentialCommand) Run(ctxt *cmd.Context) error {
 	currentController, err := c.store.CurrentController()
 	if err != nil {
 		return errors.E(err, "could not determine controller")

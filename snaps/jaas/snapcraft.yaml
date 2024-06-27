@@ -34,6 +34,7 @@ parts:
       # Add all CLI commands below to make them appear top-level to Juju.
       ln -sf jaas bin/juju-jaas
       ln -sf jaas bin/juju-add-service-account
+      ln -sf jaas bin/juju-add-service-account-credential
       ln -sf jaas bin/juju-list-service-account-credentials
-      ln -sf jaas bin/juju-update-service-account-credentials
+      ln -sf jaas bin/juju-update-service-account-credential
       ln -sf jaas bin/juju-grant-service-account-access
