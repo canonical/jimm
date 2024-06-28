@@ -3,11 +3,12 @@ package jimm
 import (
 	"context"
 
-	"github.com/canonical/jimm/internal/dbmodel"
-	"github.com/canonical/jimm/internal/servermon"
 	"github.com/juju/zaputil/zapctx"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
+
+	"github.com/canonical/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/servermon"
 )
 
 // UpdateMetrics updates metrics for the total numbers of controllers
