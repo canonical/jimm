@@ -54,7 +54,7 @@ func TestAddServiceAccount(t *testing.T) {
 	c.Assert(err, qt.ErrorMatches, "service account already owned")
 }
 
-func TestAddServiceAccountCredential(t *testing.T) {
+func TestCopyServiceAccountCredential(t *testing.T) {
 	c := qt.New(t)
 
 	ctx := context.Background()
@@ -130,18 +130,19 @@ func TestAddServiceAccountCredential(t *testing.T) {
 	err = j.Database.SetCloudCredential(context.Background(), &cred)
 	c.Assert(err, qt.Equals, nil)
 
-	err = j.AddServiceAccountCredential(ctx, user, svcAcc, cred.ResourceTag())
+	_, res, err := j.CopyServiceAccountCredential(ctx, user, svcAcc, cred.ResourceTag())
 	c.Assert(err, qt.Equals, nil)
 	newCred := dbmodel.CloudCredential{
 		Name:              "test-credential-1",
 		CloudName:         cloud.Name,
 		OwnerIdentityName: svcAcc.Name,
 	}
+	c.Assert(len(res), qt.Equals, 0)
 	err = j.Database.GetCloudCredential(context.Background(), &newCred)
 	c.Assert(err, qt.Equals, nil)
 }
 
-func TestAddServiceAccountCredentialWithMissingCredential(t *testing.T) {
+func TestCopyServiceAccountCredentialWithMissingCredential(t *testing.T) {
 	c := qt.New(t)
 
 	ctx := context.Background()
@@ -172,7 +173,7 @@ func TestAddServiceAccountCredentialWithMissingCredential(t *testing.T) {
 		OwnerIdentityName: u.Name,
 		AuthType:          "empty",
 	}
-	err = j.AddServiceAccountCredential(ctx, user, svcAcc, cred.ResourceTag())
+	_, _, err = j.CopyServiceAccountCredential(ctx, user, svcAcc, cred.ResourceTag())
 	c.Assert(err, qt.ErrorMatches, "cloudcredential .* not found")
 }
 

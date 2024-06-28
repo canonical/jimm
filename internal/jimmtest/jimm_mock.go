@@ -36,11 +36,11 @@ type JIMM struct {
 	AddHostedCloud_                    func(ctx context.Context, user *openfga.User, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error
 	AddModel_                          func(ctx context.Context, u *openfga.User, args *jimm.ModelCreateArgs) (*jujuparams.ModelInfo, error)
 	AddServiceAccount_                 func(ctx context.Context, u *openfga.User, clientId string) error
-	AddServiceAccountCredential_       func(ctx context.Context, u *openfga.User, svcAcc *openfga.User, cloudCredentialTag names.CloudCredentialTag) error
 	Authenticate_                      func(ctx context.Context, req *jujuparams.LoginRequest) (*openfga.User, error)
 	AuthorizationClient_               func() *openfga.OFGAClient
 	ChangeModelCredential_             func(ctx context.Context, user *openfga.User, modelTag names.ModelTag, cloudCredentialTag names.CloudCredentialTag) error
 	CheckPermission_                   func(ctx context.Context, user *openfga.User, cachedPerms map[string]string, desiredPerms map[string]interface{}) (map[string]string, error)
+	CopyServiceAccountCredential_      func(ctx context.Context, u *openfga.User, svcAcc *openfga.User, cloudCredentialTag names.CloudCredentialTag) (names.CloudCredentialTag, []jujuparams.UpdateCredentialModelResult, error)
 	DB_                                func() *db.Database
 	DestroyModel_                      func(ctx context.Context, u *openfga.User, mt names.ModelTag, destroyStorage *bool, force *bool, maxWait *time.Duration, timeout *time.Duration) error
 	DestroyOffer_                      func(ctx context.Context, user *openfga.User, offerURL string, force bool) error
@@ -159,11 +159,11 @@ func (j *JIMM) AddServiceAccount(ctx context.Context, u *openfga.User, clientId 
 	return j.AddServiceAccount_(ctx, u, clientId)
 }
 
-func (j *JIMM) AddServiceAccountCredential(ctx context.Context, u *openfga.User, svcAcc *openfga.User, cloudCredentialTag names.CloudCredentialTag) error {
-	if j.AddServiceAccountCredential_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+func (j *JIMM) CopyServiceAccountCredential(ctx context.Context, u *openfga.User, svcAcc *openfga.User, cloudCredentialTag names.CloudCredentialTag) (names.CloudCredentialTag, []jujuparams.UpdateCredentialModelResult, error) {
+	if j.CopyServiceAccountCredential_ == nil {
+		return names.CloudCredentialTag{}, nil, errors.E(errors.CodeNotImplemented)
 	}
-	return j.AddServiceAccountCredential_(ctx, u, svcAcc, cloudCredentialTag)
+	return j.CopyServiceAccountCredential_(ctx, u, svcAcc, cloudCredentialTag)
 }
 
 func (j *JIMM) Authenticate(ctx context.Context, req *jujuparams.LoginRequest) (*openfga.User, error) {

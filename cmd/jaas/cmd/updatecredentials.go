@@ -13,6 +13,7 @@ import (
 	"github.com/juju/juju/jujuclient"
 	"github.com/juju/names/v5"
 
+	"github.com/juju/juju/rpc/params"
 	jujuparams "github.com/juju/juju/rpc/params"
 
 	"github.com/canonical/jimm/api"
@@ -52,6 +53,7 @@ type updateCredentialCommand struct {
 	clientID       string
 	cloud          string
 	credentialName string
+	local          bool
 }
 
 // Info implements Command.Info.
@@ -72,6 +74,7 @@ func (c *updateCredentialCommand) SetFlags(f *gnuflag.FlagSet) {
 		"yaml": cmd.FormatYaml,
 		"json": cmd.FormatJson,
 	})
+	f.BoolVar(&c.local, "local", false, "Provide this option to use a credential from your local store instead")
 }
 
 // Init implements the cmd.Command interface.
@@ -105,10 +108,27 @@ func (c *updateCredentialCommand) Run(ctxt *cmd.Context) error {
 	if err != nil {
 		return errors.E(err, "failed to dial the controller")
 	}
-
-	credential, err := findCredentialsInLocalCache(c.store, c.cloud, c.credentialName)
+	var resp any
+	if c.local {
+		resp, err = c.updateFromLocalStore(apiCaller)
+	} else {
+		resp, err = c.updateFromControllerStore(apiCaller)
+	}
 	if err != nil {
 		return errors.E(err)
+	}
+
+	err = c.out.Write(ctxt, resp)
+	if err != nil {
+		return errors.E(err)
+	}
+	return nil
+}
+
+func (c *updateCredentialCommand) updateFromLocalStore(apiCaller jujuapi.Connection) (any, error) {
+	credential, err := findCredentialsInLocalCache(c.store, c.cloud, c.credentialName)
+	if err != nil {
+		return nil, errors.E(err)
 	}
 
 	// Note that ensuring a client ID comes with the correct domain (which is
@@ -118,7 +138,7 @@ func (c *updateCredentialCommand) Run(ctxt *cmd.Context) error {
 	// internals, we have to make sure they're in the correct format.
 	clientIdWithDomain, err := jimmnames.EnsureValidServiceAccountId(c.clientID)
 	if err != nil {
-		return errors.E("invalid client ID")
+		return nil, errors.E("invalid client ID")
 	}
 
 	taggedCredential := jujuparams.TaggedCredential{
@@ -136,14 +156,22 @@ func (c *updateCredentialCommand) Run(ctxt *cmd.Context) error {
 	client := api.NewClient(apiCaller)
 	resp, err := client.UpdateServiceAccountCredentials(&params)
 	if err != nil {
-		return errors.E(err)
+		return nil, errors.E(err)
 	}
+	return resp, nil
+}
 
-	err = c.out.Write(ctxt, resp)
-	if err != nil {
-		return errors.E(err)
+func (c *updateCredentialCommand) updateFromControllerStore(apiCaller jujuapi.Connection) (any, error) {
+	params := apiparams.CopyServiceAccountCredentialRequest{
+		ClientID:           c.clientID,
+		CloudCredentialArg: params.CloudCredentialArg{CloudName: c.cloud, CredentialName: c.credentialName},
 	}
-	return nil
+	client := api.NewClient(apiCaller)
+	res, err := client.CopyServiceAccountCredential(&params)
+	if err != nil {
+		return nil, errors.E(err)
+	}
+	return res, nil
 }
 
 func findCredentialsInLocalCache(store jujuclient.ClientStore, cloud, credentialName string) (*jujuparams.CloudCredential, error) {

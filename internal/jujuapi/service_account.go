@@ -31,19 +31,25 @@ func (r *controllerRoot) AddServiceAccount(ctx context.Context, req apiparams.Ad
 	return r.jimm.AddServiceAccount(ctx, r.user, clientIdWithDomain)
 }
 
-// AddServiceAccountCredential copies a users cloud-credential to a service account.
-func (r *controllerRoot) AddServiceAccountCredential(ctx context.Context, req apiparams.AddServiceAccountCredentialRequest) error {
+// CopyServiceAccountCredential copies a users cloud-credential to a service account.
+func (r *controllerRoot) CopyServiceAccountCredential(ctx context.Context, req apiparams.CopyServiceAccountCredentialRequest) (jujuparams.UpdateCredentialResult, error) {
 	const op = errors.Op("jujuapi.AddServiceAccountCredential")
 
 	svcAccIdentity, err := r.getServiceAccount(ctx, req.ClientID)
 	if err != nil {
-		return errors.E(op, err)
+		return jujuparams.UpdateCredentialResult{}, errors.E(op, err)
 	}
 	credId := fmt.Sprintf("%s/%s/%s", req.CloudName, r.user.Name, req.CredentialName)
 	if !names.IsValidCloudCredential(credId) {
-		return errors.E(op, fmt.Sprintf("%s is not a valid cloud credential tag", credId))
+		return jujuparams.UpdateCredentialResult{}, errors.E(op, fmt.Sprintf("%s is not a valid cloud credential tag", credId))
 	}
-	return r.jimm.AddServiceAccountCredential(ctx, r.user, svcAccIdentity, names.NewCloudCredentialTag(credId))
+	newTag, modelRes, err := r.jimm.CopyServiceAccountCredential(ctx, r.user, svcAccIdentity, names.NewCloudCredentialTag(credId))
+	res := jujuparams.UpdateCredentialResult{
+		CredentialTag: newTag.String(),
+		Error:         mapError(err),
+		Models:        modelRes,
+	}
+	return res, err
 }
 
 // getServiceAccount validates the incoming identity has administrator permission

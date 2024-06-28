@@ -196,9 +196,11 @@ func (c *Client) AddServiceAccount(req *params.AddServiceAccountRequest) error {
 	return c.caller.APICall("JIMM", 4, "", "AddServiceAccount", req, nil)
 }
 
-// AddServiceAccountCredential copies a user cloud-credential to a service account.
-func (c *Client) AddServiceAccountCredential(req *params.AddServiceAccountCredentialRequest) error {
-	return c.caller.APICall("JIMM", 4, "", "AddServiceAccountCredential", req, nil)
+// CopyServiceAccountCredential copies a user cloud-credential to a service account.
+func (c *Client) CopyServiceAccountCredential(req *params.CopyServiceAccountCredentialRequest) (*jujuparams.UpdateCredentialResult, error) {
+	var response jujuparams.UpdateCredentialResult
+	err := c.caller.APICall("JIMM", 4, "", "CopyServiceAccountCredential", req, &response)
+	return &response, err
 }
 
 // ListServiceAccountCredentials lists the cloud credentials belonging to a service account.

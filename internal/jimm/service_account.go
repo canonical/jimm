@@ -58,35 +58,35 @@ func (j *JIMM) AddServiceAccount(ctx context.Context, u *openfga.User, clientId 
 	return nil
 }
 
-// AddServiceAccountCredential attempts to create a copy of a user's cloud-credential
+// CopyServiceAccountCredential attempts to create a copy of a user's cloud-credential
 // for a service account.
-func (j *JIMM) AddServiceAccountCredential(ctx context.Context, u *openfga.User, svcAcc *openfga.User, cred names.CloudCredentialTag) error {
+func (j *JIMM) CopyServiceAccountCredential(ctx context.Context, u *openfga.User, svcAcc *openfga.User, cred names.CloudCredentialTag) (names.CloudCredentialTag, []jujuparams.UpdateCredentialModelResult, error) {
 	op := errors.Op("jimm.AddServiceAccountCredential")
 
 	credential, err := j.GetCloudCredential(ctx, u, cred)
 	if err != nil {
-		return errors.E(op, err)
+		return names.CloudCredentialTag{}, nil, errors.E(op, err)
 	}
 	attr, err := j.getCloudCredentialAttributes(ctx, credential)
 	if err != nil {
-		return errors.E(op, err)
+		return names.CloudCredentialTag{}, nil, errors.E(op, err)
 	}
 	newCredID := fmt.Sprintf("%s/%s/%s", cred.Cloud().Id(), svcAcc.Name, cred.Name())
 	if !names.IsValidCloudCredential(newCredID) {
-		return errors.E(op, fmt.Sprintf("new credential ID %s is not a valid cloud credential tag", newCredID))
+		return names.CloudCredentialTag{}, nil, errors.E(op, fmt.Sprintf("new credential ID %s is not a valid cloud credential tag", newCredID))
 	}
 	newCredential := jujuparams.CloudCredential{
 		AuthType:   credential.AuthType,
 		Attributes: attr,
 	}
-	_, err = j.UpdateCloudCredential(ctx, svcAcc, UpdateCloudCredentialArgs{
+	newTag := names.NewCloudCredentialTag(newCredID)
+	modelRes, err := j.UpdateCloudCredential(ctx, svcAcc, UpdateCloudCredentialArgs{
 		CredentialTag: names.NewCloudCredentialTag(newCredID),
 		Credential:    newCredential,
 		SkipCheck:     false,
 		SkipUpdate:    false,
 	})
-
-	return err
+	return newTag, modelRes, err
 }
 
 // GrantServiceAccountAccess creates an administrator relation between the tags provided

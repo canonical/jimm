@@ -448,8 +448,8 @@ type AddServiceAccountRequest struct {
 	ClientID string `json:"client-id"`
 }
 
-// AddServiceAccountCredentialRequest holds a request to copy a user cloud-credential to a service account.
-type AddServiceAccountCredentialRequest struct {
+// CopyServiceAccountCredentialRequest holds a request to copy a user cloud-credential to a service account.
+type CopyServiceAccountCredentialRequest struct {
 	jujuparams.CloudCredentialArg
 	// ClientID holds the client id of the service account.
 	ClientID string `json:"client-id"`

@@ -4,6 +4,7 @@ package jujuapi_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
@@ -85,18 +86,18 @@ func TestAddServiceAccount(t *testing.T) {
 	}
 }
 
-func TestAddServiceAccountCredential(t *testing.T) {
+func TestCopyServiceAccountCredential(t *testing.T) {
 	c := qt.New(t)
 
 	tests := []struct {
 		about         string
-		args          params.AddServiceAccountCredentialRequest
+		args          params.CopyServiceAccountCredentialRequest
 		addTuples     []openfga.Tuple
 		username      string
 		expectedError string
 	}{{
 		about: "Valid request",
-		args: params.AddServiceAccountCredentialRequest{
+		args: params.CopyServiceAccountCredentialRequest{
 			ClientID: "fca1f605-736e-4d1f-bcd2-aecc726923be",
 			CloudCredentialArg: jujuparams.CloudCredentialArg{
 				CloudName:      "aws",
@@ -111,7 +112,7 @@ func TestAddServiceAccountCredential(t *testing.T) {
 		}},
 	}, {
 		about: "Invalid cloud credential args",
-		args: params.AddServiceAccountCredentialRequest{
+		args: params.CopyServiceAccountCredentialRequest{
 			ClientID: "fca1f605-736e-4d1f-bcd2-aecc726923be",
 			CloudCredentialArg: jujuparams.CloudCredentialArg{
 				CloudName:      "123aws",
@@ -127,7 +128,7 @@ func TestAddServiceAccountCredential(t *testing.T) {
 		expectedError: ".* is not a valid cloud credential tag",
 	}, {
 		about: "Missing permissions",
-		args: params.AddServiceAccountCredentialRequest{
+		args: params.CopyServiceAccountCredentialRequest{
 			ClientID: "fca1f605-736e-4d1f-bcd2-aecc726923be",
 			CloudCredentialArg: jujuparams.CloudCredentialArg{
 				CloudName:      "aws",
@@ -151,12 +152,13 @@ func TestAddServiceAccountCredential(t *testing.T) {
 			jimm := &jimmtest.JIMM{
 				AuthorizationClient_: func() *openfga.OFGAClient { return ofgaClient },
 				DB_:                  func() *db.Database { return &pgDb },
-				AddServiceAccountCredential_: func(ctx context.Context, u, svcAcc *openfga.User, cloudCredentialTag names.CloudCredentialTag) error {
+				CopyServiceAccountCredential_: func(ctx context.Context, u, svcAcc *openfga.User, cloudCredentialTag names.CloudCredentialTag) (names.CloudCredentialTag, []jujuparams.UpdateCredentialModelResult, error) {
 					c.Assert(cloudCredentialTag.Cloud().Id(), qt.Equals, test.args.CloudCredentialArg.CloudName)
 					c.Assert(cloudCredentialTag.Owner().Id(), qt.Equals, u.Name)
 					c.Assert(cloudCredentialTag.Name(), qt.Equals, test.args.CloudCredentialArg.CredentialName)
 					c.Assert(svcAcc.Name, qt.Equals, test.args.ClientID+"@serviceaccount")
-					return nil
+					newCredTag := names.NewCloudCredentialTag(fmt.Sprintf("%s/%s/%s", test.args.CloudName, svcAcc.Name, test.args.CredentialName))
+					return newCredTag, nil, nil
 				},
 			}
 			var u dbmodel.Identity
@@ -167,9 +169,10 @@ func TestAddServiceAccountCredential(t *testing.T) {
 			if len(test.addTuples) > 0 {
 				ofgaClient.AddRelation(context.Background(), test.addTuples...)
 			}
-			err = cr.AddServiceAccountCredential(context.Background(), test.args)
+			res, err := cr.CopyServiceAccountCredential(context.Background(), test.args)
 			if test.expectedError == "" {
 				c.Assert(err, qt.IsNil)
+				c.Assert(res.CredentialTag, qt.Equals, fmt.Sprintf("cloudcred-%s_%s_%s", test.args.CloudName, test.args.ClientID+"@serviceaccount", test.args.CredentialName))
 			} else {
 				c.Assert(err, qt.ErrorMatches, test.expectedError)
 			}
