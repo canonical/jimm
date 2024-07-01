@@ -5,9 +5,9 @@ package jujuapi_test
 import (
 	"context"
 
-	"github.com/canonical/jimm/internal/dbmodel"
-	"github.com/canonical/jimm/internal/openfga"
-	ofganames "github.com/canonical/jimm/internal/openfga/names"
+	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/openfga"
+	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/juju/juju/api"
 	"github.com/juju/juju/api/common"
 	gc "gopkg.in/check.v1"
