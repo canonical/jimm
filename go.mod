@@ -53,14 +53,15 @@ require (
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/hashicorp/vault/api/auth/approle v0.6.0
 	github.com/itchyny/gojq v0.12.12
-	github.com/juju/charm/v12 v12.0.0
+	github.com/juju/charm/v12 v12.0.2
+	github.com/juju/http/v2 v2.0.1
 	github.com/juju/names/v5 v5.0.0
 	github.com/lestrrat-go/iter v1.0.2
 	github.com/lestrrat-go/jwx/v2 v2.0.21
 	github.com/oklog/ulid/v2 v2.1.0
 	github.com/rs/cors v1.11.1
 	github.com/stretchr/testify v1.9.0
-	golang.org/x/oauth2 v0.16.0
+	golang.org/x/oauth2 v0.21.0
 	gopkg.in/errgo.v1 v1.0.1
 	gopkg.in/httprequest.v1 v1.2.1
 	gopkg.in/yaml.v2 v2.4.0
@@ -78,7 +79,7 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork v1.1.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources v1.2.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions v1.3.0 // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/azkeys v1.0.1 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/azkeys v1.1.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/internal v1.0.0 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.2.2 // indirect
@@ -179,17 +180,17 @@ require (
 	github.com/juju/gojsonreference v0.0.0-20150204194633-f0d24ac5ee33 // indirect
 	github.com/juju/gojsonschema v1.0.0 // indirect
 	github.com/juju/gomaasapi/v2 v2.2.0 // indirect
-	github.com/juju/http/v2 v2.0.0 // indirect
 	github.com/juju/idmclient/v2 v2.0.0 // indirect
 	github.com/juju/jsonschema v1.0.0 // indirect
+	github.com/juju/loggo/v2 v2.0.0 // indirect
 	github.com/juju/lru v1.0.0 // indirect
 	github.com/juju/lumberjack/v2 v2.0.2 // indirect
 	github.com/juju/mgo/v2 v2.0.2 // indirect
 	github.com/juju/mgo/v3 v3.0.4 // indirect
 	github.com/juju/mutex/v2 v2.0.0 // indirect
 	github.com/juju/naturalsort v1.0.0 // indirect
-	github.com/juju/os/v2 v2.2.3 // indirect
-	github.com/juju/packaging/v3 v3.0.0 // indirect
+	github.com/juju/os/v2 v2.2.5 // indirect
+	github.com/juju/packaging/v3 v3.1.0 // indirect
 	github.com/juju/persistent-cookiejar v1.0.0 // indirect
 	github.com/juju/proxy v1.0.0 // indirect
 	github.com/juju/pubsub/v2 v2.0.0 // indirect
@@ -302,7 +303,6 @@ require (
 	golang.org/x/text v0.16.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	google.golang.org/api v0.154.0 // indirect
-	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20231127180814-3a041ad873d4 // indirect
 	google.golang.org/grpc v1.59.0 // indirect
 	google.golang.org/protobuf v1.33.0 // indirect

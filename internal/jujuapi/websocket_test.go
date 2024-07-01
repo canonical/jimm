@@ -51,7 +51,7 @@ func (s *websocketSuite) SetUpTest(c *gc.C) {
 
 	mux := http.NewServeMux()
 	mux.Handle("/api", jujuapi.APIHandler(ctx, s.JIMM, s.Params))
-	mux.Handle("/model/", jujuapi.ModelHandler(ctx, s.JIMM, s.Params))
+	mux.Handle("/model/", http.StripPrefix("/model", jujuapi.ModelHandler(ctx, s.JIMM, s.Params)))
 	jwks := wellknownapi.NewWellKnownHandler(s.JIMM.CredentialStore)
 	mux.HandleFunc("/.well-known/jwks.json", jwks.JWKS)
 

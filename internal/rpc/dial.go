@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"net/http"
 	"net/url"
 	"path"
 	"sync"
@@ -29,8 +30,8 @@ type Dialer struct {
 }
 
 // Dial establishes a new client RPC connection to the given URL.
-func (d Dialer) Dial(ctx context.Context, url string) (*Client, error) {
-	conn, err := d.DialWebsocket(ctx, url)
+func (d Dialer) Dial(ctx context.Context, url string, headers http.Header) (*Client, error) {
+	conn, err := d.DialWebsocket(ctx, url, headers)
 	if err != nil {
 		return nil, err
 	}
@@ -38,13 +39,13 @@ func (d Dialer) Dial(ctx context.Context, url string) (*Client, error) {
 }
 
 // DialWebsocket dials a url and returns a websocket.
-func (d Dialer) DialWebsocket(ctx context.Context, url string) (*websocket.Conn, error) {
+func (d Dialer) DialWebsocket(ctx context.Context, url string, headers http.Header) (*websocket.Conn, error) {
 	const op = errors.Op("rpc.BasicDial")
 
 	dialer := websocket.Dialer{
 		TLSClientConfig: d.TLSConfig,
 	}
-	conn, _, err := dialer.DialContext(context.Background(), url, nil)
+	conn, _, err := dialer.DialContext(context.Background(), url, headers)
 	if err != nil {
 		zapctx.Error(ctx, "BasicDial failed", zap.Error(err))
 		return nil, errors.E(op, err)
@@ -55,7 +56,7 @@ func (d Dialer) DialWebsocket(ctx context.Context, url string) (*websocket.Conn,
 // Dial connects to the controller/model and returns a raw websocket
 // that can be used as is.
 // It accepts the endpoints to dial, normally /api or /commands.
-func Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, finalPath string) (*websocket.Conn, error) {
+func Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, finalPath string, headers http.Header) (*websocket.Conn, error) {
 	var tlsConfig *tls.Config
 	if ctl.CACertificate != "" {
 		cp := x509.NewCertPool()
@@ -76,7 +77,7 @@ func Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag,
 	if ctl.PublicAddress != "" {
 		// If there is a public-address configured it is almost
 		// certainly the one we want to use, try it first.
-		conn, err := dialer.DialWebsocket(ctx, websocketURL(ctl.PublicAddress, modelTag, finalPath))
+		conn, err := dialer.DialWebsocket(ctx, websocketURL(ctl.PublicAddress, modelTag, finalPath), headers)
 		if err != nil {
 			zapctx.Error(ctx, "failed to dial public address", zaputil.Error(err))
 		} else {
@@ -92,7 +93,7 @@ func Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag,
 		}
 	}
 	zapctx.Debug(ctx, "Dialling all URLs", zap.Any("urls", urls))
-	conn, err := dialAll(ctx, &dialer, urls)
+	conn, err := dialAll(ctx, &dialer, urls, headers)
 	if err != nil {
 		return nil, err
 	}
@@ -132,11 +133,11 @@ func websocketURL(s string, mt names.ModelTag, finalPath string) string {
 
 // dialAll simultaneously dials all given urls and returns the first
 // connection.
-func dialAll(ctx context.Context, dialer *Dialer, urls []string) (*websocket.Conn, error) {
+func dialAll(ctx context.Context, dialer *Dialer, urls []string, headers http.Header) (*websocket.Conn, error) {
 	if len(urls) == 0 {
 		return nil, errors.E("no urls to dial")
 	}
-	conn, err := dialAllHelper(ctx, dialer, urls)
+	conn, err := dialAllHelper(ctx, dialer, urls, headers)
 	if err != nil {
 		return nil, err
 	}
@@ -144,7 +145,7 @@ func dialAll(ctx context.Context, dialer *Dialer, urls []string) (*websocket.Con
 }
 
 // dialAllHelper simultaneously dials all given urls and returns the first successful websocket connection.
-func dialAllHelper(ctx context.Context, dialer *Dialer, urls []string) (*websocket.Conn, error) {
+func dialAllHelper(ctx context.Context, dialer *Dialer, urls []string, headers http.Header) (*websocket.Conn, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -158,7 +159,7 @@ func dialAllHelper(ctx context.Context, dialer *Dialer, urls []string) (*websock
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			conn, dErr := dialer.DialWebsocket(ctx, url)
+			conn, dErr := dialer.DialWebsocket(ctx, url, headers)
 			if dErr != nil {
 				errOnce.Do(func() {
 					err = dErr
