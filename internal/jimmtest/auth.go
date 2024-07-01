@@ -113,10 +113,6 @@ func (m *mockOAuthAuthenticator) DeviceAccessToken(ctx context.Context, res *oau
 	return &oauth2.Token{AccessToken: m.mockAccessToken}, nil
 }
 
-func (m MockOAuthAuthenticator) Device(ctx context.Context) (*oauth2.DeviceAuthResponse, error) {
-	return nil, errors.New("unexpected device login")
-}
-
 // VerifySessionToken provides the mock implementation for verifying session tokens.
 // Allowing JIMM tests to create their own session tokens that will always be accepted.
 // Notice the use of jwt.ParseInsecure to skip JWT signature verification.

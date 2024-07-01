@@ -13,9 +13,10 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/gorilla/websocket"
 
-	"github.com/canonical/jimm/internal/auth"
-	"github.com/canonical/jimm/internal/errors"
-	"github.com/canonical/jimm/internal/jimmhttp"
+	"github.com/canonical/jimm/v3/internal/auth"
+	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jimmhttp"
+	"github.com/canonical/jimm/v3/internal/jimmtest"
 )
 
 func TestWSHandler(t *testing.T) {
