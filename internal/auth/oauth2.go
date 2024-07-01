@@ -48,7 +48,7 @@ const (
 
 type sessionIdentityContextKey struct{}
 
-func contextWithSessionIdentity(ctx context.Context, sessionIdentityId any) context.Context {
+func ContextWithSessionIdentity(ctx context.Context, sessionIdentityId any) context.Context {
 	return context.WithValue(ctx, sessionIdentityContextKey{}, sessionIdentityId)
 }
 
@@ -479,7 +479,7 @@ func (as *AuthenticationService) AuthenticateBrowserSession(ctx context.Context,
 		return ctx, errors.E(op, err)
 	}
 
-	ctx = contextWithSessionIdentity(ctx, identityId)
+	ctx = ContextWithSessionIdentity(ctx, identityId)
 
 	if err := as.extendSession(session, w, req); err != nil {
 		return ctx, errors.E(op, err)

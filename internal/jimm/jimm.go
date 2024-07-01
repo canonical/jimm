@@ -8,6 +8,7 @@ import (
 	"context"
 	"database/sql"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -255,6 +256,9 @@ type API interface {
 
 	// DestroyModel destroys a model.
 	DestroyModel(context.Context, names.ModelTag, *bool, *bool, *time.Duration, *time.Duration) error
+
+	// ConnectStream creates a new connection to a streaming endpoint.
+	ConnectStream(string, url.Values) (base.Stream, error)
 
 	// DumpModel collects a database-agnostic dump of a model.
 	DumpModel(context.Context, names.ModelTag, bool) (string, error)

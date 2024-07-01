@@ -13,10 +13,9 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/gorilla/websocket"
 
-	"github.com/canonical/jimm/v3/internal/auth"
-	"github.com/canonical/jimm/v3/internal/jimm"
-	"github.com/canonical/jimm/v3/internal/jimmhttp"
-	"github.com/canonical/jimm/v3/internal/jimmtest"
+	"github.com/canonical/jimm/internal/auth"
+	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/jimmhttp"
 )
 
 func TestWSHandler(t *testing.T) {
@@ -48,6 +47,10 @@ type echoServer struct {
 	t testing.TB
 }
 
+func (s echoServer) Authenticate(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error) {
+	return ctx, nil
+}
+
 func (s echoServer) ServeWS(ctx context.Context, conn *websocket.Conn) {
 	for {
 		mt, p, err := conn.ReadMessage()
@@ -59,11 +62,6 @@ func (s echoServer) ServeWS(ctx context.Context, conn *websocket.Conn) {
 			return
 		}
 	}
-}
-
-// GetAuthenticationService returns JIMM's oauth authentication service.
-func (s echoServer) GetAuthenticationService() jimm.OAuthAuthenticator {
-	return nil
 }
 
 func TestWSHandlerPanic(t *testing.T) {
@@ -86,9 +84,8 @@ func TestWSHandlerPanic(t *testing.T) {
 
 type panicServer struct{}
 
-// GetAuthenticationService returns JIMM's oauth authentication service.
-func (s panicServer) GetAuthenticationService() jimm.OAuthAuthenticator {
-	return nil
+func (s panicServer) Authenticate(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error) {
+	return ctx, nil
 }
 
 func (s panicServer) ServeWS(ctx context.Context, conn *websocket.Conn) {
@@ -113,10 +110,8 @@ func TestWSHandlerNilServer(t *testing.T) {
 
 type authFailServer struct{ c jimmtest.SimpleTester }
 
-// GetAuthenticationService returns JIMM's oauth authentication service.
-func (s authFailServer) GetAuthenticationService() jimm.OAuthAuthenticator {
-	authenticator := jimmtest.NewMockOAuthAuthenticator(s.c, nil)
-	return &authenticator
+func (s authFailServer) Authenticate(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error) {
+	return ctx, errors.E("authentication failed")
 }
 
 func (s authFailServer) ServeWS(ctx context.Context, conn *websocket.Conn) {}

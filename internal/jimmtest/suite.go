@@ -136,7 +136,8 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 		Expiry: time.Minute,
 	})
 	s.JIMM.Dialer = &jujuclient.Dialer{
-		JWTService: s.JIMM.JWTService,
+		ControllerCredentialsStore: s.JIMM.CredentialStore,
+		JWTService:                 s.JIMM.JWTService,
 	}
 }
 
