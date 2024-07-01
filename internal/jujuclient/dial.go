@@ -45,9 +45,6 @@ type ControllerCredentialsStore interface {
 	// GetControllerCredentials retrieves the credentials for the given controller from a vault
 	// service.
 	GetControllerCredentials(ctx context.Context, controllerName string) (string, string, error)
-	// PutControllerCredentials stores the controller credentials in a vault
-	// service.
-	PutControllerCredentials(ctx context.Context, controllerName string, username string, password string) error
 }
 
 // A Dialer is an implementation of a jimm.Dialer that adapts a juju API

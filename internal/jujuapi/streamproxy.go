@@ -25,14 +25,16 @@ type streamProxier struct {
 	apiServer
 }
 
+// Authenticate implements WSServer.Authenticate
+// It attempts to perform basic auth and will return an unauthorized error if auth fails.
 func (s streamProxier) Authenticate(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error) {
 	_, password, ok := req.BasicAuth()
 	if !ok {
-		return ctx, nil
+		return ctx, errors.E(errors.CodeUnauthorized, "authentication missing")
 	}
 	jwtToken, err := s.jimm.OAuthAuthenticator.VerifySessionToken(password)
 	if err != nil {
-		return ctx, err
+		return ctx, errors.E(errors.CodeUnauthorized, err)
 	}
 	email := jwtToken.Subject()
 	ctx = auth.ContextWithSessionIdentity(ctx, email)
@@ -41,7 +43,6 @@ func (s streamProxier) Authenticate(ctx context.Context, w http.ResponseWriter, 
 
 // ServeWS implements jimmhttp.WSServer.
 func (s streamProxier) ServeWS(ctx context.Context, clientConn *websocket.Conn) {
-	identity := auth.SessionIdentityFromContext(ctx)
 	writeError := func(msg string, code errors.Code) {
 		var errResult jujuParams.ErrorResult
 		errResult.Error = &jujuParams.Error{
@@ -50,6 +51,7 @@ func (s streamProxier) ServeWS(ctx context.Context, clientConn *websocket.Conn) 
 		}
 		clientConn.WriteJSON(errResult)
 	}
+	identity := auth.SessionIdentityFromContext(ctx)
 	if identity == "" {
 		writeError("identity not found", errors.CodeUnauthorized)
 		return

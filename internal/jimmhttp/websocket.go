@@ -35,6 +35,11 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	ctx := req.Context()
 	var authErr error
 
+	if h.Server == nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
 	ctx, authErr = h.Server.Authenticate(ctx, w, req)
 
 	ctx = context.WithValue(ctx, contextPathKey("path"), req.URL.EscapedPath())
@@ -62,19 +67,7 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if h.Server == nil {
-		writeNormalClosure(ctx, conn)
-		return
-	}
-
 	h.Server.ServeWS(ctx, conn)
-}
-
-func writeNormalClosure(ctx context.Context, conn *websocket.Conn) {
-	data := websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")
-	if err := conn.WriteControl(websocket.CloseMessage, data, time.Time{}); err != nil {
-		zapctx.Error(ctx, "cannot write close message", zap.Error(err))
-	}
 }
 
 func writeInternalServerErrorClosure(ctx context.Context, conn *websocket.Conn, err any) {

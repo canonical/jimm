@@ -139,12 +139,13 @@ func (s *pathTestSuite) Test(c *gc.C) {
 		finalPath string
 		fail      bool
 	}{
-		{path: fmt.Sprintf("/model/%s/api", testUUID), uuid: testUUID, finalPath: "api", fail: false},
-		{path: fmt.Sprintf("model/%s/api", testUUID), uuid: testUUID, finalPath: "api", fail: false},
-		{path: fmt.Sprintf("/model/%s/api/", testUUID), uuid: testUUID, finalPath: "api/", fail: false},
-		{path: fmt.Sprintf("/model/%s/api/foo", testUUID), uuid: testUUID, finalPath: "api/foo", fail: false},
-		{path: fmt.Sprintf("/model/%s/commands", testUUID), uuid: testUUID, finalPath: "commands", fail: false},
-		{path: "/model/123/commands", uuid: "123", finalPath: "commands", fail: true},
+		{path: fmt.Sprintf("/%s/api", testUUID), uuid: testUUID, finalPath: "api", fail: false},
+		{path: fmt.Sprintf("/%s/api/", testUUID), uuid: testUUID, finalPath: "api/", fail: false},
+		{path: fmt.Sprintf("/%s/api/foo", testUUID), uuid: testUUID, finalPath: "api/foo", fail: false},
+		{path: fmt.Sprintf("/%s/commands", testUUID), uuid: testUUID, finalPath: "commands", fail: false},
+		{path: fmt.Sprintf("%s/commands", testUUID), fail: true},
+		{path: fmt.Sprintf("/model/%s/commands", testUUID), fail: true},
+		{path: "/model/123/commands", fail: true},
 		{path: fmt.Sprintf("/controller/%s/commands", testUUID), fail: true},
 		{path: fmt.Sprintf("/controller/%s/", testUUID), fail: true},
 		{path: "/controller", fail: true},
