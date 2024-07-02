@@ -198,6 +198,11 @@ func start(ctx context.Context, s *service.Service) error {
 		})
 	}
 
+	if isLeader {
+		// No need for s.Go() since this routine doesn't return an error.
+		go jimmsvc.MonitorResources(ctx)
+	}
+
 	httpsrv := &http.Server{
 		Addr:    addr,
 		Handler: jimmsvc,

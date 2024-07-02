@@ -737,3 +737,54 @@ func (s *dbSuite) TestGetModelsByController(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(foundModelNames, qt.DeepEquals, modelNames)
 }
+
+const testCountModelsByControllerEnv = `clouds:
+- name: test
+  type: test
+  regions:
+  - name: test-region
+cloud-credentials:
+- name: test-cred
+  cloud: test
+  owner: alice@canonical.com
+  type: empty
+controllers:
+- name: test
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test
+  region: test-region
+models:
+- name: test-1
+  uuid: 00000002-0000-0000-0000-000000000001
+  owner: alice@canonical.com
+  cloud: test
+  region: test-region
+  cloud-credential: test-cred
+  controller: test
+- name: test-2
+  uuid: 00000002-0000-0000-0000-000000000002
+  owner: bob@canonical.com
+  cloud: test
+  region: test-region
+  cloud-credential: test-cred
+  controller: test
+- name: test-3
+  uuid: 00000002-0000-0000-0000-000000000003
+  owner: bob@canonical.com
+  cloud: test
+  region: test-region
+  cloud-credential: test-cred
+  controller: test
+`
+
+func (s *dbSuite) TestCountModelsByController(c *qt.C) {
+	err := s.Database.Migrate(context.Background(), true)
+	c.Assert(err, qt.Equals, nil)
+
+	env := jimmtest.ParseEnvironment(c, testCountModelsByControllerEnv)
+	env.PopulateDB(c, *s.Database)
+	c.Assert(len(env.Controllers), qt.Equals, 1)
+	count, err := s.Database.CountModelsByController(context.Background(), env.Controllers[0].DBObject(c, *s.Database))
+	c.Assert(err, qt.IsNil)
+	c.Assert(count, qt.Equals, 3)
+}
