@@ -106,7 +106,7 @@ func (r *controllerRoot) WatchModelSummaries(ctx context.Context) (jujuparams.Su
 	id := fmt.Sprintf("%v", r.generator.Next())
 
 	getModels := func(ctx context.Context) ([]string, error) {
-		models, err := r.allModels(ctx)
+		models, err := r.jimm.AllModels(ctx, r.user)
 		if err != nil {
 			return nil, errors.E(err)
 		}
@@ -168,27 +168,13 @@ func (r *controllerRoot) WatchAllModelSummaries(ctx context.Context) (jujuparams
 
 // AllModels implments the AllModels command on the Controller facade.
 func (r *controllerRoot) AllModels(ctx context.Context) (jujuparams.UserModelList, error) {
-	return r.allModels(ctx)
-}
-
-// allModels returns all the models the logged in user has access to.
-func (r *controllerRoot) allModels(ctx context.Context) (jujuparams.UserModelList, error) {
 	const op = errors.Op("jujuapi.AllModels")
 
-	var models []jujuparams.UserModel
-	err := r.jimm.ForEachUserModel(ctx, r.user, func(m *dbmodel.Model, _ jujuparams.UserAccessPermission) error {
-		// TODO(Kian) CSS-6040 Refactor the below to use a better abstraction for Postgres/OpenFGA to Juju types.
-		var um jujuparams.UserModel
-		um.Model = m.ToJujuModel()
-		models = append(models, um)
-		return nil
-	})
+	uml, err := r.jimm.AllModels(ctx, r.user)
 	if err != nil {
-		return jujuparams.UserModelList{}, errors.E(op, err)
+		return uml, errors.E(op, err)
 	}
-	return jujuparams.UserModelList{
-		UserModels: models,
-	}, nil
+	return uml, err
 }
 
 // ModelStatus implements the ModelStatus command on the Controller facade.

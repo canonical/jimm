@@ -25,6 +25,25 @@ type modelmanagerSuite struct {
 
 var _ = gc.Suite(&modelmanagerSuite{})
 
+func (s *modelmanagerSuite) TestListModelSummaries(c *gc.C) {
+	ctx := context.Background()
+
+	var info jujuparams.ModelInfo
+	err := s.API.CreateModel(ctx, &jujuparams.ModelCreateArgs{
+		Name:     "test-model",
+		OwnerTag: names.NewUserTag("test-user@canonical.com").String(),
+	}, &info)
+	c.Assert(err, gc.Equals, nil)
+
+	in := jujuparams.ModelSummariesRequest{UserTag: names.NewUserTag("admin").String(), All: true}
+	out := jujuparams.ModelSummaryResults{}
+	err = s.API.ListModelSummaries(ctx, &in, &out)
+	c.Assert(err, gc.Equals, nil)
+	// Check just our two models names, and expect juju to return correctly
+	c.Assert(out.Results[0].Result.Name, gc.Equals, "controller")
+	c.Assert(out.Results[1].Result.Name, gc.Equals, "test-model")
+}
+
 func (s *modelmanagerSuite) TestCreateModel(c *gc.C) {
 	ctx := context.Background()
 

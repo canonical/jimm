@@ -57,7 +57,7 @@ func (r *controllerRoot) DisableUser(jujuparams.Entities) (jujuparams.ErrorResul
 
 // ModelUserInfo returns information on all users in the model.
 func (r *controllerRoot) ModelUserInfo(args jujuparams.Entities) (jujuparams.ModelUserInfoResults, error) {
-	return jujuparams.ModelUserInfoResults{}, errors.E(errors.CodeNotImplemented, "not implements")
+	return jujuparams.ModelUserInfoResults{}, errors.E(errors.CodeNotImplemented, "not implemented")
 }
 
 // UserInfo implements the UserManager facade's UserInfo method.

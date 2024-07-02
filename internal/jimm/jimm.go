@@ -178,6 +178,95 @@ type permission struct {
 	relation string
 }
 
+type controllerWithModelPermissions struct {
+	controller  dbmodel.Controller
+	permissions []permission
+}
+
+type controllerPermSet map[string]controllerWithModelPermissions
+
+type dialerFunc func(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, permissons ...permission) (API, error)
+
+// getControllersWithModelPermissionsForUser returns a map of controller uuids to:
+//
+// - Controller db model
+// - The users access permissions to the models on this controller
+func (j *JIMM) getControllersWithModelPermissionsForUser(ctx context.Context, user *openfga.User) (controllerPermSet, error) {
+	const op = errors.Op("jimm.dialAllControllers")
+
+	// List UUIDs of all models user has access to.
+	uuids, err := user.ListModels(context.Background(), ofganames.ReaderRelation)
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	// Retrieve the models from db
+	models, err := j.DB().GetModelsByUUID(ctx, uuids)
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	uuidToPerms := make(map[string]controllerWithModelPermissions)
+
+	for _, m := range models {
+		access := user.GetModelAccess(ctx, names.NewModelTag(m.UUID.String))
+
+		// Ensure controlelr exists on map
+		if _, ok := uuidToPerms[m.Controller.UUID]; !ok {
+			uuidToPerms[m.Controller.UUID] = controllerWithModelPermissions{
+				controller:  m.Controller,
+				permissions: []permission{},
+			}
+		}
+		// Get the existing controller
+		c := uuidToPerms[m.Controller.UUID]
+		// Parse ofga relation name -> juju rbac
+		jujuPerm, err := ofganames.ConvertRelationToJujuPermission(access)
+
+		// If we can't parse our relation to a juju perm, consider this erreoneous
+		// to the point we won't return this permission set.
+		if err != nil {
+			zapctx.Error(ctx, "failed to parse juju permission", zap.Error(err))
+			continue
+		}
+		// Append perm
+		c.permissions = append(c.permissions,
+			permission{
+				resource: m.ResourceTag().String(),
+				relation: string(jujuPerm),
+			},
+		)
+		uuidToPerms[m.Controller.UUID] = c
+	}
+
+	return uuidToPerms, nil
+}
+
+// dialAndCallControllers dials multiple controllers in their own routines
+// from the controller permission set and reports errors on dial to an error channel.
+//
+// It takes a function which will pass the dialed controller to the function.
+// Should you wish to handle concurrency waiting, please read from a channel
+// outside the op or create a wait group within the op.
+func dialAndCallControllers(
+	dialerFunc dialerFunc,
+	p controllerPermSet,
+	errCh chan error,
+	op func(api API),
+) {
+	for _, perms := range p {
+		go func(c controllerWithModelPermissions) {
+			api, err := dialerFunc(context.Background(), &c.controller, names.ModelTag{}, c.permissions...)
+			if err != nil {
+				errCh <- err
+				return
+			}
+			defer api.Close()
+			op(api)
+		}(perms)
+	}
+}
+
 // dial dials the controller and model specified by the given Controller
 // and ModelTag. If no Dialer has been configured then an error with a
 // code of CodeConnectionFailed will be returned.
@@ -375,6 +464,13 @@ type API interface {
 
 	// ListStorageDetails lists all storage.
 	ListStorageDetails(ctx context.Context) ([]jujuparams.StorageDetails, error)
+
+	// ListModelSummaries returns model summaries for a controller based on a user.
+	ListModelSummaries(ctx context.Context, args *jujuparams.ModelSummariesRequest, out *jujuparams.ModelSummaryResults) error
+
+	// AllModels allows controller administrators to get the list of all the
+	// models in the controller.
+	AllModels(ctx context.Context) (jujuparams.UserModelList, error)
 }
 
 // forEachController runs a given function on multiple controllers

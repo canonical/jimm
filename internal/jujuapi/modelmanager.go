@@ -9,7 +9,6 @@ import (
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 
-	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/jimm"
 	"github.com/canonical/jimm/internal/jujuapi/rpc"
@@ -81,32 +80,28 @@ func (r *controllerRoot) DumpModels(ctx context.Context, args jujuparams.DumpMod
 func (r *controllerRoot) ListModelSummaries(ctx context.Context, _ jujuparams.ModelSummariesRequest) (jujuparams.ModelSummaryResults, error) {
 	const op = errors.Op("jujuapi.ListModelSummaries")
 
-	var results []jujuparams.ModelSummaryResult
-	err := r.jimm.ForEachUserModel(ctx, r.user, func(m *dbmodel.Model, access jujuparams.UserAccessPermission) error {
-		// TODO(Kian) CSS-6040 Refactor the below to use a better abstraction for Postgres/OpenFGA to Juju types.
-		ms := m.ToJujuModelSummary()
-		ms.UserAccess = access
-		if r.controllerUUIDMasking {
+	summaries, err := r.jimm.GetAllModelSummariesForUser(ctx, r.user)
+	if err != nil {
+		return summaries, errors.E(op, err)
+	}
+
+	// If controller masking is set, don't reveal the underlying controllers UUID
+	// when performing a summary and instead set JIMM's controller ID for each.
+	if r.controllerUUIDMasking {
+		for _, results := range summaries.Results {
+			ms := results.Result
 			ms.ControllerUUID = r.params.ControllerUUID
 		}
-		result := jujuparams.ModelSummaryResult{
-			Result: &ms,
-		}
-		results = append(results, result)
-		return nil
-	})
-	if err != nil {
-		return jujuparams.ModelSummaryResults{}, errors.E(op, err)
 	}
-	return jujuparams.ModelSummaryResults{
-		Results: results,
-	}, nil
+
+	// Return the masked summaries from all underlying controllers.
+	return summaries, nil
 }
 
 // ListModels returns the models that the authenticated user
 // has access to. The user parameter is ignored.
 func (r *controllerRoot) ListModels(ctx context.Context, _ jujuparams.Entity) (jujuparams.UserModelList, error) {
-	return r.allModels(ctx)
+	return r.jimm.AllModels(ctx, r.user)
 }
 
 // ModelInfo implements the ModelManager facade's ModelInfo method.
