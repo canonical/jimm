@@ -69,7 +69,7 @@ func (s *updateCredentialsSuite) TestUpdateCredentialsWithLocalCredentials(c *gc
 	})
 	c.Assert(err, gc.IsNil)
 
-	cmdContext, err := cmdtesting.RunCommand(c, cmd.NewUpdateCredentialsCommandForTesting(clientStore, bClient), clientID, "test-cloud", "test-credentials", "--local")
+	cmdContext, err := cmdtesting.RunCommand(c, cmd.NewUpdateCredentialsCommandForTesting(clientStore, bClient), clientID, "test-cloud", "test-credentials", "--client")
 	c.Assert(err, gc.IsNil)
 	c.Assert(cmdtesting.Stdout(cmdContext), gc.Equals, `results:
 - credentialtag: cloudcred-test-cloud_abda51b2-d735-4794-a8bd-49c506baa4af@serviceaccount_test-credentials
@@ -95,7 +95,7 @@ func (s *updateCredentialsSuite) TestCloudNotInLocalStore(c *gc.C) {
 		"00000000-0000-0000-0000-000000000000",
 		"non-existing-cloud",
 		"foo",
-		"--local",
+		"--client",
 	)
 	c.Assert(err, gc.ErrorMatches, "failed to fetch local credentials for cloud \"non-existing-cloud\"")
 }
@@ -115,7 +115,7 @@ func (s *updateCredentialsSuite) TestCredentialNotInLocalStore(c *gc.C) {
 		"00000000-0000-0000-0000-000000000000",
 		"some-cloud",
 		"non-existing-credential-name",
-		"--local",
+		"--client",
 	)
 	c.Assert(err, gc.ErrorMatches, "credential \"non-existing-credential-name\" not found on local client.*")
 }
