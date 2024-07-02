@@ -32,6 +32,7 @@ func (r *controllerRoot) AddServiceAccount(ctx context.Context, req apiparams.Ad
 }
 
 // CopyServiceAccountCredential copies a users cloud-credential to a service account.
+// The user must be an administrator of the service account in order to do this.
 func (r *controllerRoot) CopyServiceAccountCredential(ctx context.Context, req apiparams.CopyServiceAccountCredentialRequest) (jujuparams.UpdateCredentialResult, error) {
 	const op = errors.Op("jujuapi.AddServiceAccountCredential")
 

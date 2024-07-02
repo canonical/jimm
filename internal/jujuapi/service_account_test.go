@@ -111,6 +111,21 @@ func TestCopyServiceAccountCredential(t *testing.T) {
 			Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag("fca1f605-736e-4d1f-bcd2-aecc726923be@serviceaccount")),
 		}},
 	}, {
+		about: "Valid request with @serviceaccount domain",
+		args: params.CopyServiceAccountCredentialRequest{
+			ClientID: "fca1f605-736e-4d1f-bcd2-aecc726923be@serviceaccount",
+			CloudCredentialArg: jujuparams.CloudCredentialArg{
+				CloudName:      "aws",
+				CredentialName: "my-cred",
+			},
+		},
+		username: "alice",
+		addTuples: []openfga.Tuple{{
+			Object:   ofganames.ConvertTag(names.NewUserTag("alice")),
+			Relation: ofganames.AdministratorRelation,
+			Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag("fca1f605-736e-4d1f-bcd2-aecc726923be@serviceaccount")),
+		}},
+	}, {
 		about: "Invalid cloud credential args",
 		args: params.CopyServiceAccountCredentialRequest{
 			ClientID: "fca1f605-736e-4d1f-bcd2-aecc726923be",
@@ -149,6 +164,8 @@ func TestCopyServiceAccountCredential(t *testing.T) {
 			}
 			err = pgDb.Migrate(context.Background(), false)
 			c.Assert(err, qt.IsNil)
+			clientIdWithDomain, err := jimmnames.EnsureValidServiceAccountId(test.args.ClientID)
+			c.Assert(err, qt.IsNil)
 			jimm := &jimmtest.JIMM{
 				AuthorizationClient_: func() *openfga.OFGAClient { return ofgaClient },
 				DB_:                  func() *db.Database { return &pgDb },
@@ -156,7 +173,7 @@ func TestCopyServiceAccountCredential(t *testing.T) {
 					c.Assert(cloudCredentialTag.Cloud().Id(), qt.Equals, test.args.CloudCredentialArg.CloudName)
 					c.Assert(cloudCredentialTag.Owner().Id(), qt.Equals, u.Name)
 					c.Assert(cloudCredentialTag.Name(), qt.Equals, test.args.CloudCredentialArg.CredentialName)
-					c.Assert(svcAcc.Name, qt.Equals, test.args.ClientID+"@serviceaccount")
+					c.Assert(svcAcc.Name, qt.Equals, clientIdWithDomain)
 					newCredTag := names.NewCloudCredentialTag(fmt.Sprintf("%s/%s/%s", test.args.CloudName, svcAcc.Name, test.args.CredentialName))
 					return newCredTag, nil, nil
 				},
@@ -172,7 +189,7 @@ func TestCopyServiceAccountCredential(t *testing.T) {
 			res, err := cr.CopyServiceAccountCredential(context.Background(), test.args)
 			if test.expectedError == "" {
 				c.Assert(err, qt.IsNil)
-				c.Assert(res.CredentialTag, qt.Equals, fmt.Sprintf("cloudcred-%s_%s_%s", test.args.CloudName, test.args.ClientID+"@serviceaccount", test.args.CredentialName))
+				c.Assert(res.CredentialTag, qt.Equals, fmt.Sprintf("cloudcred-%s_%s_%s", test.args.CloudName, clientIdWithDomain, test.args.CredentialName))
 			} else {
 				c.Assert(err, qt.ErrorMatches, test.expectedError)
 			}

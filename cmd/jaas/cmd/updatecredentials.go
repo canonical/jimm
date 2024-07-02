@@ -25,11 +25,17 @@ import (
 var (
 	updateCredentialCommandDoc = `
 update-service-account-credential command updates the credentials associated with a service account.
-This will add the credential to JAAS if they were not found.
+Without any additional flags this command will search for the specified credentials on the controller
+and create a copy that belongs to the service account.
+
+If the --client option is provided, the command will search for the specified credential on your local
+client store and upload a copy of the credential that will be owned by the service account.
 `
 
 	updateCredentialCommandExamples = `
-    juju update-service-account-credential <client-id> aws credential-name
+    juju update-service-account-credential <client-id> aws <credential-name>
+	juju update-service-account-credential --client <client-id> aws <credential-name> 
+
 `
 )
 
@@ -53,7 +59,7 @@ type updateCredentialCommand struct {
 	clientID       string
 	cloud          string
 	credentialName string
-	local          bool
+	client         bool
 }
 
 // Info implements Command.Info.
@@ -74,7 +80,7 @@ func (c *updateCredentialCommand) SetFlags(f *gnuflag.FlagSet) {
 		"yaml": cmd.FormatYaml,
 		"json": cmd.FormatJson,
 	})
-	f.BoolVar(&c.local, "local", false, "Provide this option to use a credential from your local store instead")
+	f.BoolVar(&c.client, "client", false, "Provide this option to use a credential from your local store instead")
 }
 
 // Init implements the cmd.Command interface.
@@ -109,7 +115,7 @@ func (c *updateCredentialCommand) Run(ctxt *cmd.Context) error {
 		return errors.E(err, "failed to dial the controller")
 	}
 	var resp any
-	if c.local {
+	if c.client {
 		resp, err = c.updateFromLocalStore(apiCaller)
 	} else {
 		resp, err = c.updateFromControllerStore(apiCaller)
