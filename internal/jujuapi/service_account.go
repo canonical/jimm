@@ -4,6 +4,7 @@ package jujuapi
 
 import (
 	"context"
+	"fmt"
 
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
@@ -18,7 +19,7 @@ import (
 
 // service_account contains the primary RPC commands for handling service accounts within JIMM via the JIMM facade itself.
 
-// AddGroup creates a group within JIMMs DB for reference by OpenFGA.
+// AddServiceAccount associates a service account with a user for interactive management.
 func (r *controllerRoot) AddServiceAccount(ctx context.Context, req apiparams.AddServiceAccountRequest) error {
 	const op = errors.Op("jujuapi.AddServiceAccount")
 
@@ -28,6 +29,28 @@ func (r *controllerRoot) AddServiceAccount(ctx context.Context, req apiparams.Ad
 	}
 
 	return r.jimm.AddServiceAccount(ctx, r.user, clientIdWithDomain)
+}
+
+// CopyServiceAccountCredential copies a users cloud-credential to a service account.
+// The user must be an administrator of the service account in order to do this.
+func (r *controllerRoot) CopyServiceAccountCredential(ctx context.Context, req apiparams.CopyServiceAccountCredentialRequest) (jujuparams.UpdateCredentialResult, error) {
+	const op = errors.Op("jujuapi.AddServiceAccountCredential")
+
+	svcAccIdentity, err := r.getServiceAccount(ctx, req.ClientID)
+	if err != nil {
+		return jujuparams.UpdateCredentialResult{}, errors.E(op, err)
+	}
+	credId := fmt.Sprintf("%s/%s/%s", req.CloudName, r.user.Name, req.CredentialName)
+	if !names.IsValidCloudCredential(credId) {
+		return jujuparams.UpdateCredentialResult{}, errors.E(op, fmt.Sprintf("%s is not a valid cloud credential tag", credId))
+	}
+	newTag, modelRes, err := r.jimm.CopyServiceAccountCredential(ctx, r.user, svcAccIdentity, names.NewCloudCredentialTag(credId))
+	res := jujuparams.UpdateCredentialResult{
+		CredentialTag: newTag.String(),
+		Error:         mapError(err),
+		Models:        modelRes,
+	}
+	return res, err
 }
 
 // getServiceAccount validates the incoming identity has administrator permission
