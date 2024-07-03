@@ -34,7 +34,7 @@ func NewListServiceAccountCredentialsCommandForTesting(store jujuclient.ClientSt
 }
 
 func NewUpdateCredentialsCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
-	cmd := &updateCredentialsCommand{
+	cmd := &updateCredentialCommand{
 		store: store,
 		dialOpts: &jujuapi.DialOpts{
 			InsecureSkipVerify: true,

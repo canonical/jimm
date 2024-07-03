@@ -40,6 +40,7 @@ type JIMM struct {
 	AuthorizationClient_               func() *openfga.OFGAClient
 	ChangeModelCredential_             func(ctx context.Context, user *openfga.User, modelTag names.ModelTag, cloudCredentialTag names.CloudCredentialTag) error
 	CheckPermission_                   func(ctx context.Context, user *openfga.User, cachedPerms map[string]string, desiredPerms map[string]interface{}) (map[string]string, error)
+	CopyServiceAccountCredential_      func(ctx context.Context, u *openfga.User, svcAcc *openfga.User, cloudCredentialTag names.CloudCredentialTag) (names.CloudCredentialTag, []jujuparams.UpdateCredentialModelResult, error)
 	DB_                                func() *db.Database
 	DestroyModel_                      func(ctx context.Context, u *openfga.User, mt names.ModelTag, destroyStorage *bool, force *bool, maxWait *time.Duration, timeout *time.Duration) error
 	DestroyOffer_                      func(ctx context.Context, user *openfga.User, offerURL string, force bool) error
@@ -156,6 +157,13 @@ func (j *JIMM) AddServiceAccount(ctx context.Context, u *openfga.User, clientId 
 		return errors.E(errors.CodeNotImplemented)
 	}
 	return j.AddServiceAccount_(ctx, u, clientId)
+}
+
+func (j *JIMM) CopyServiceAccountCredential(ctx context.Context, u *openfga.User, svcAcc *openfga.User, cloudCredentialTag names.CloudCredentialTag) (names.CloudCredentialTag, []jujuparams.UpdateCredentialModelResult, error) {
+	if j.CopyServiceAccountCredential_ == nil {
+		return names.CloudCredentialTag{}, nil, errors.E(errors.CodeNotImplemented)
+	}
+	return j.CopyServiceAccountCredential_(ctx, u, svcAcc, cloudCredentialTag)
 }
 
 func (j *JIMM) Authenticate(ctx context.Context, req *jujuparams.LoginRequest) (*openfga.User, error) {

@@ -4,6 +4,7 @@ package cmd_test
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/juju/cmd/v3/cmdtesting"
 	"github.com/juju/names/v5"
@@ -12,11 +13,13 @@ import (
 	"github.com/canonical/jimm/cmd/jaas/cmd"
 	"github.com/canonical/jimm/internal/cmdtest"
 	"github.com/canonical/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/jimm"
 	"github.com/canonical/jimm/internal/jimmtest"
 	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 	jimmnames "github.com/canonical/jimm/pkg/names"
 	jujucloud "github.com/juju/juju/cloud"
+	"github.com/juju/juju/rpc/params"
 )
 
 type updateCredentialsSuite struct {
@@ -25,7 +28,7 @@ type updateCredentialsSuite struct {
 
 var _ = gc.Suite(&updateCredentialsSuite{})
 
-func (s *updateCredentialsSuite) TestUpdateCredentialsWithNewCredentials(c *gc.C) {
+func (s *updateCredentialsSuite) TestUpdateCredentialsWithLocalCredentials(c *gc.C) {
 	ctx := context.Background()
 
 	clientID := "abda51b2-d735-4794-a8bd-49c506baa4af"
@@ -66,77 +69,7 @@ func (s *updateCredentialsSuite) TestUpdateCredentialsWithNewCredentials(c *gc.C
 	})
 	c.Assert(err, gc.IsNil)
 
-	cmdContext, err := cmdtesting.RunCommand(c, cmd.NewUpdateCredentialsCommandForTesting(clientStore, bClient), clientID, "test-cloud", "test-credentials")
-	c.Assert(err, gc.IsNil)
-	c.Assert(cmdtesting.Stdout(cmdContext), gc.Equals, `results:
-- credentialtag: cloudcred-test-cloud_abda51b2-d735-4794-a8bd-49c506baa4af@serviceaccount_test-credentials
-  error: null
-  models: []
-`)
-
-	ofgaUser := openfga.NewUser(sa, s.JIMM.AuthorizationClient())
-	cloudCredentialTag := names.NewCloudCredentialTag("test-cloud/" + clientIDWithDomain + "/test-credentials")
-	cloudCredential2, err := s.JIMM.GetCloudCredential(ctx, ofgaUser, cloudCredentialTag)
-	c.Assert(err, gc.IsNil)
-	attrs, _, err := s.JIMM.GetCloudCredentialAttributes(ctx, ofgaUser, cloudCredential2, true)
-	c.Assert(err, gc.IsNil)
-
-	c.Assert(attrs, gc.DeepEquals, map[string]string{
-		"foo": "bar",
-	})
-}
-
-func (s *updateCredentialsSuite) TestUpdateCredentialsWithExistingCredentials(c *gc.C) {
-	ctx := context.Background()
-
-	clientID := "abda51b2-d735-4794-a8bd-49c506baa4af"
-	clientIDWithDomain := clientID + "@serviceaccount"
-
-	// alice is superuser
-	bClient := jimmtest.NewUserSessionLogin(c, "alice")
-
-	sa, err := dbmodel.NewIdentity(clientIDWithDomain)
-	c.Assert(err, gc.IsNil)
-	err = s.JIMM.Database.GetIdentity(ctx, sa)
-	c.Assert(err, gc.IsNil)
-
-	// Make alice admin of the service account
-	tuple := openfga.Tuple{
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
-		Relation: ofganames.AdministratorRelation,
-		Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag(clientIDWithDomain)),
-	}
-	err = s.JIMM.OpenFGAClient.AddRelation(ctx, tuple)
-	c.Assert(err, gc.IsNil)
-
-	cloud := dbmodel.Cloud{
-		Name: "test-cloud",
-		Type: "kubernetes",
-	}
-	err = s.JIMM.Database.AddCloud(ctx, &cloud)
-	c.Assert(err, gc.IsNil)
-
-	cloudCredential := dbmodel.CloudCredential{
-		Name:              "test-credentials",
-		CloudName:         "test-cloud",
-		OwnerIdentityName: clientIDWithDomain,
-		AuthType:          "empty",
-	}
-	err = s.JIMM.Database.SetCloudCredential(ctx, &cloudCredential)
-	c.Assert(err, gc.IsNil)
-
-	clientStore := s.ClientStore()
-
-	err = clientStore.UpdateCredential("test-cloud", jujucloud.CloudCredential{
-		AuthCredentials: map[string]jujucloud.Credential{
-			"test-credentials": jujucloud.NewCredential(jujucloud.EmptyAuthType, map[string]string{
-				"foo": "bar",
-			}),
-		},
-	})
-	c.Assert(err, gc.IsNil)
-
-	cmdContext, err := cmdtesting.RunCommand(c, cmd.NewUpdateCredentialsCommandForTesting(clientStore, bClient), clientID, "test-cloud", "test-credentials")
+	cmdContext, err := cmdtesting.RunCommand(c, cmd.NewUpdateCredentialsCommandForTesting(clientStore, bClient), clientID, "test-cloud", "test-credentials", "--client")
 	c.Assert(err, gc.IsNil)
 	c.Assert(cmdtesting.Stdout(cmdContext), gc.Equals, `results:
 - credentialtag: cloudcred-test-cloud_abda51b2-d735-4794-a8bd-49c506baa4af@serviceaccount_test-credentials
@@ -162,6 +95,7 @@ func (s *updateCredentialsSuite) TestCloudNotInLocalStore(c *gc.C) {
 		"00000000-0000-0000-0000-000000000000",
 		"non-existing-cloud",
 		"foo",
+		"--client",
 	)
 	c.Assert(err, gc.ErrorMatches, "failed to fetch local credentials for cloud \"non-existing-cloud\"")
 }
@@ -181,8 +115,58 @@ func (s *updateCredentialsSuite) TestCredentialNotInLocalStore(c *gc.C) {
 		"00000000-0000-0000-0000-000000000000",
 		"some-cloud",
 		"non-existing-credential-name",
+		"--client",
 	)
 	c.Assert(err, gc.ErrorMatches, "credential \"non-existing-credential-name\" not found on local client.*")
+}
+
+func (s *updateCredentialsSuite) TestUpdateServiceAccountCredentialFromController(c *gc.C) {
+	clientID := "abda51b2-d735-4794-a8bd-49c506baa4af"
+	clientIDWithDomain := clientID + "@serviceaccount"
+	// Create Alice Identity and Service Account Identity.
+	// alice is superuser
+	ctx := context.Background()
+	user, err := dbmodel.NewIdentity("alice@canonical.com")
+	c.Assert(err, gc.IsNil)
+	u := openfga.NewUser(user, s.OFGAClient)
+	err = s.JIMM.AddServiceAccount(ctx, u, clientIDWithDomain)
+	c.Assert(err, gc.IsNil)
+
+	// Create cloud and cloud-credential for Alice.
+	err = s.JIMM.Database.AddCloud(context.Background(), &dbmodel.Cloud{
+		Name:    "aws",
+		Regions: []dbmodel.CloudRegion{{Name: "default", CloudName: "test-cloud"}},
+	})
+	c.Assert(err, gc.IsNil)
+	updateArgs := jimm.UpdateCloudCredentialArgs{
+		CredentialTag: names.NewCloudCredentialTag(fmt.Sprintf("aws/%s/foo", user.Name)),
+		Credential:    params.CloudCredential{Attributes: map[string]string{"key": "bar"}},
+	}
+	_, err = s.JIMM.UpdateCloudCredential(ctx, u, updateArgs)
+	c.Assert(err, gc.IsNil)
+	bClient := jimmtest.NewUserSessionLogin(c, "alice")
+	cmdContext, err := cmdtesting.RunCommand(c, cmd.NewUpdateCredentialsCommandForTesting(s.ClientStore(), bClient), clientID, "aws", "foo")
+	c.Assert(err, gc.IsNil)
+	c.Assert(cmdtesting.Stdout(cmdContext), gc.Equals, `credentialtag: cloudcred-aws_abda51b2-d735-4794-a8bd-49c506baa4af@serviceaccount_foo
+error: null
+models: []
+`)
+	newCred := dbmodel.CloudCredential{
+		CloudName:         "aws",
+		OwnerIdentityName: clientIDWithDomain,
+		Name:              "foo",
+	}
+	err = s.JIMM.Database.GetCloudCredential(ctx, &newCred)
+	c.Assert(err, gc.IsNil)
+	// Verify the old credential's attribute map matches the new one.
+	svcAcc, err := dbmodel.NewIdentity(clientIDWithDomain)
+	c.Assert(err, gc.IsNil)
+	err = s.JIMM.Database.GetIdentity(ctx, svcAcc)
+	c.Assert(err, gc.IsNil)
+	svcAccIdentity := openfga.NewUser(svcAcc, s.OFGAClient)
+	attr, _, err := s.JIMM.GetCloudCredentialAttributes(ctx, svcAccIdentity, &newCred, true)
+	c.Assert(err, gc.IsNil)
+	c.Assert(attr, gc.DeepEquals, updateArgs.Credential.Attributes)
 }
 
 func (s *updateCredentialsSuite) TestMissingArgs(c *gc.C) {

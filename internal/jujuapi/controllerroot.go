@@ -39,6 +39,7 @@ type JIMM interface {
 	OAuthAuthenticationService() jimm.OAuthAuthenticator
 	AuthorizationClient() *openfga.OFGAClient
 	ChangeModelCredential(ctx context.Context, user *openfga.User, modelTag names.ModelTag, cloudCredentialTag names.CloudCredentialTag) error
+	CopyServiceAccountCredential(ctx context.Context, u *openfga.User, svcAcc *openfga.User, cloudCredentialTag names.CloudCredentialTag) (names.CloudCredentialTag, []jujuparams.UpdateCredentialModelResult, error)
 	DB() *db.Database
 	DestroyModel(ctx context.Context, u *openfga.User, mt names.ModelTag, destroyStorage *bool, force *bool, maxWait *time.Duration, timeout *time.Duration) error
 	DestroyOffer(ctx context.Context, user *openfga.User, offerURL string, force bool) error
