@@ -130,26 +130,37 @@ func (w *Watcher) WatchAllModelSummaries(ctx context.Context, interval time.Dura
 	}
 }
 
-func (w *Watcher) dialController(ctx context.Context, ctl *dbmodel.Controller) (API, error) {
+func (w *Watcher) dialController(ctx context.Context, ctl *dbmodel.Controller) (api API, err error) {
 	const op = errors.Op("jimm.dialController")
 
-	// connect to the controller
-	api, err := w.Dialer.Dial(ctx, ctl, names.ModelTag{}, nil)
-	if err != nil {
-		if !ctl.UnavailableSince.Valid {
-			ctl.UnavailableSince = db.Now()
-			var err error
-			if err = w.Database.UpdateController(ctx, ctl); err != nil {
-				zapctx.Error(ctx, "cannot set controller unavailable", zap.Error(err))
-			}
-			if w.controllerUnavailableChan != nil {
-				select {
-				case w.controllerUnavailableChan <- err:
-				default:
-				}
+	updateController := false
+	defer func() {
+		if !updateController {
+			return
+		}
+		if uerr := w.Database.UpdateController(ctx, ctl); err != nil {
+			zapctx.Error(ctx, "cannot set controller available", zap.Error(uerr))
+		}
+		// Note (alesstimec) This channel is only available in tests.
+		if w.controllerUnavailableChan != nil {
+			select {
+			case w.controllerUnavailableChan <- err:
+			default:
 			}
 		}
+	}()
+
+	// connect to the controller
+	api, err = w.Dialer.Dial(ctx, ctl, names.ModelTag{}, nil)
+	if err != nil {
+		ctl.UnavailableSince = db.Now()
+		updateController = true
+
 		return nil, errors.E(op, err)
+	}
+	if ctl.UnavailableSince.Valid {
+		ctl.UnavailableSince = sql.NullTime{}
+		updateController = true
 	}
 	return api, nil
 }
@@ -350,19 +361,6 @@ func (w *Watcher) watchAllModelSummaries(ctx context.Context, ctl *dbmodel.Contr
 	// connect to the controller
 	api, err := w.dialController(ctx, ctl)
 	if err != nil {
-		if !ctl.UnavailableSince.Valid {
-			ctl.UnavailableSince = db.Now()
-			var err error
-			if err = w.Database.UpdateController(ctx, ctl); err != nil {
-				zapctx.Error(ctx, "cannot set controller unavailable", zap.Error(err))
-			}
-			if w.controllerUnavailableChan != nil {
-				select {
-				case w.controllerUnavailableChan <- err:
-				default:
-				}
-			}
-		}
 		return errors.E(op, err)
 	}
 	defer api.Close()

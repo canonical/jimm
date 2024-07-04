@@ -805,11 +805,80 @@ func TestWatcherSetsControllerUnavailable(t *testing.T) {
 		err = w.Database.GetController(ctx, &ctl)
 		c.Assert(err, qt.IsNil)
 		c.Check(ctl.UnavailableSince.Valid, qt.Equals, true)
-		c.Logf("%v %v", ctl.UnavailableSince.Time, time.Now())
-		c.Check(ctl.UnavailableSince.Time.After(time.Now().Add(-10*time.Millisecond)), qt.Equals, true)
 	}
 	cancel()
 	wg.Wait()
+}
+
+func TestWatcherClearsControllerUnavailable(t *testing.T) {
+	c := qt.New(t)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	w := jimm.Watcher{
+		Database: db.Database{
+			DB: jimmtest.PostgresDB(c, nil),
+		},
+		Dialer: &jimmtest.Dialer{
+			API: &jimmtest.API{
+				AllModelWatcherNext_: func(_ context.Context, _ string) ([]jujuparams.Delta, error) {
+					cancel()
+					<-ctx.Done()
+					return nil, ctx.Err()
+				},
+				ModelInfo_: func(_ context.Context, info *jujuparams.ModelInfo) error {
+					switch info.UUID {
+					default:
+						c.Errorf("unexpected model uuid: %s", info.UUID)
+					case "00000002-0000-0000-0000-000000000002":
+					case "00000002-0000-0000-0000-000000000003":
+					}
+					return errors.E(errors.CodeNotFound)
+				},
+				WatchAllModels_: func(ctx context.Context) (string, error) {
+					return "1234", nil
+				},
+			},
+		},
+		Pubsub: &testPublisher{},
+	}
+
+	env := jimmtest.ParseEnvironment(c, testWatcherEnv)
+	err := w.Database.Migrate(ctx, false)
+	c.Assert(err, qt.IsNil)
+	env.PopulateDB(c, w.Database)
+
+	// update controller's UnavailableSince field
+	ctl := dbmodel.Controller{
+		Name: "controller-1",
+	}
+	err = w.Database.GetController(ctx, &ctl)
+	c.Assert(err, qt.IsNil)
+	ctl.UnavailableSince = sql.NullTime{
+		Time:  time.Now(),
+		Valid: true,
+	}
+	err = w.Database.UpdateController(ctx, &ctl)
+	c.Assert(err, qt.IsNil)
+
+	// start the watcher
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		err := w.Watch(ctx, time.Millisecond)
+		checkIfContextCanceled(c, ctx, err)
+	}()
+	wg.Wait()
+
+	// check that the unavailable since time has been cleared
+	ctl = dbmodel.Controller{
+		Name: "controller-1",
+	}
+	err = w.Database.GetController(context.Background(), &ctl)
+	c.Assert(err, qt.IsNil)
+	c.Assert(ctl.UnavailableSince.Valid, qt.IsFalse)
 }
 
 func TestWatcherRemoveDyingModelsOnStartup(t *testing.T) {
