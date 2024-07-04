@@ -11,6 +11,9 @@ GIT_VERSION := $(shell git describe --abbrev=0 --dirty)
 GO_VERSION := $(shell go list -f {{.GoVersion}} -m)
 ARCH := $(shell dpkg --print-architecture)
 
+GH_USER = $(shell git config user.name)
+GH_PAT = $(shell echo url=https://github.com/git/git.git | git credential fill | head -4 | tail -1 | cut -d '=' -f2)
+
 default: build
 
 build: version/commit.txt version/version.txt
@@ -32,6 +35,10 @@ clean:
 certs:
 	@cd local/traefik/certs; ./certs.sh; cd -
 
+secrets:
+	@echo ${GH_USER} > ./local/ghuser
+	@echo ${GH_PAT} > ./local/ghpat
+
 test-env: sys-deps certs
 	@touch ./local/vault/approle.json && touch ./local/vault/roleid.txt && touch ./local/vault/vault.env
 	@docker compose up --force-recreate -d --wait
@@ -39,7 +46,7 @@ test-env: sys-deps certs
 test-env-cleanup:
 	@docker compose down -v --remove-orphans
 
-dev-env-setup: sys-deps certs
+dev-env-setup: sys-deps certs secrets
 	@touch ./local/vault/approle.json && touch ./local/vault/roleid.txt && touch ./local/vault/vault.env
 	@make version/commit.txt && make version/version.txt
 
@@ -143,6 +150,6 @@ help:
 	@echo 'make rock - Build the JIMM rock.'
 	@echo 'make load-rock - Load the most recently built rock into your local docker daemon.'
 
-.PHONY: build check install release clean format server simplify sys-deps help FORCE
+.PHONY: build check install release clean format server simplify sys-deps help FORCE certs secrets
 
 FORCE:

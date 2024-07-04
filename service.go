@@ -38,8 +38,10 @@ import (
 	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 	"github.com/canonical/jimm/internal/pubsub"
+	"github.com/canonical/jimm/internal/rebac"
 	"github.com/canonical/jimm/internal/vault"
 	"github.com/canonical/jimm/internal/wellknownapi"
+	rebachandlers "github.com/canonical/rebac-admin-ui-handlers/v1"
 )
 
 const (
@@ -374,12 +376,22 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		return nil, errors.E(op, err, "failed to parse final redirect url for the dashboard")
 	}
 
+	rebacBackend, err := rebachandlers.NewReBACAdminBackend(rebachandlers.ReBACAdminBackendParams{
+		Authenticator: &rebac.Authenticator{},
+	})
+	if err != nil {
+		zapctx.Error(ctx, "failed to create rebac admin backend", zap.Error(err))
+		return nil, errors.E(op, err, "failed to create rebac admin backend")
+	}
+
 	// Setup all HTTP handlers.
 	mountHandler := func(path string, h jimmhttp.JIMMHttpHandler) {
 		s.mux.Mount(path, h.Routes())
 	}
 
 	s.mux.Mount("/metrics", promhttp.Handler())
+
+	s.mux.Mount("/rebac", rebacBackend.Handler(""))
 
 	mountHandler(
 		"/debug",
