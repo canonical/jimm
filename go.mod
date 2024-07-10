@@ -1,6 +1,6 @@
 module github.com/canonical/jimm
 
-go 1.22.4
+go 1.22.5
 
 require (
 	github.com/canonical/go-dqlite v1.21.0 // indirect
