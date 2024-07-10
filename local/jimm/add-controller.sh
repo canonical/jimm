@@ -29,7 +29,7 @@ echo "Switching juju controller to $JIMM_CONTROLLER_NAME"
 juju switch "$JIMM_CONTROLLER_NAME"
 echo
 echo "Retrieving controller info for $CONTROLLER_NAME"
-./jimmctl controller-info --local "$CONTROLLER_NAME" "$CONTROLLER_YAML_PATH"
+./jimmctl controller-info --local "$CONTROLLER_NAME" "$CONTROLLER_YAML_PATH" --tls-hostname juju-apiserver
 if [[ -f "$CONTROLLER_YAML_PATH" ]]; then
     echo "Controller info retrieved."
 else
