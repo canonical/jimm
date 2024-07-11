@@ -310,8 +310,8 @@ func (m *mockOAuthAuthenticator) Device(ctx context.Context) (*oauth2.DeviceAuth
 		return nil, m.err
 	}
 	return &oauth2.DeviceAuthResponse{
-		DeviceCode:              "test device code",
-		UserCode:                "test user code",
+		DeviceCode:              "test-device-code",
+		UserCode:                "test-user-code",
 		VerificationURI:         "http://no-such-uri.canonical.com",
 		VerificationURIComplete: "http://no-such-uri.canonical.com",
 		Expiry:                  time.Now().Add(time.Minute),

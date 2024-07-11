@@ -337,18 +337,16 @@ func (p *clientProxy) start(ctx context.Context) error {
 				p.sendError(p.src, msg, err)
 				continue
 			}
+			// If there is a response for the client, send it to the client and continue.
+			// If there is a message for the controller instead, use the normal path.
+			// We can't send the client a response from JIMM and send the client message to the controller.
 			if toClient != nil {
 				p.src.sendMessage(nil, toClient)
+				continue
 			} else if toController != nil {
 				msg = toController
 				p.msgs.addLoginMessage(toController)
 			}
-		}
-		if msg.RequestID == 0 {
-			zapctx.Error(ctx, "Invalid request ID 0")
-			err := errors.E(op, "Invalid request ID 0")
-			p.sendError(p.src, msg, err)
-			continue
 		}
 		p.msgs.addMessage(msg)
 		zapctx.Debug(ctx, "Writing to controller")
@@ -585,7 +583,7 @@ func modifyControllerResponse(msg *message) error {
 // an error
 func (p *clientProxy) handleAdminFacade(ctx context.Context, msg *message) (clientResponse *message, controllerMessage *message, err error) {
 	errorFnc := func(err error) (*message, *message, error) {
-		return nil, nil, err
+		return nil, nil, errors.E(err, errors.CodeUnauthorized)
 	}
 	controllerLoginMessageFnc := func(data []byte) (*message, *message, error) {
 		m := *msg

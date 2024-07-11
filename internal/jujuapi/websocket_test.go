@@ -104,13 +104,11 @@ func (s *websocketSuite) TearDownTest(c *gc.C) {
 // If info is nil then default values will be used.
 func (s *websocketSuite) openNoAssert(
 	c *gc.C,
-	info *api.Info,
-	username string,
-	dialWebsocket func(ctx context.Context, urlStr string, tlsConfig *tls.Config, ipAddr string) (jsoncodec.JSONConn, error),
+	d loginDetails,
 ) (api.Connection, error) {
 	var inf api.Info
-	if info != nil {
-		inf = *info
+	if d.info != nil {
+		inf = *d.info
 	}
 	u, err := url.Parse(s.HTTP.URL)
 	c.Assert(err, gc.Equals, nil)
@@ -125,24 +123,39 @@ func (s *websocketSuite) openNoAssert(
 	c.Assert(err, gc.Equals, nil)
 	inf.CACert = w.String()
 
-	lp := jimmtest.NewUserSessionLogin(c, username)
+	if d.lp == nil {
+		d.lp = jimmtest.NewUserSessionLogin(c, d.username)
+	}
 
 	dialOpts := api.DialOpts{
 		InsecureSkipVerify: true,
-		LoginProvider:      lp,
+		LoginProvider:      d.lp,
 	}
 
-	if dialWebsocket != nil {
-		dialOpts.DialWebsocket = dialWebsocket
+	if d.dialWebsocket != nil {
+		dialOpts.DialWebsocket = d.dialWebsocket
 	}
 
 	return api.Open(&inf, dialOpts)
 }
 
+type loginDetails struct {
+	info          *api.Info
+	username      string
+	lp            api.LoginProvider
+	dialWebsocket func(ctx context.Context, urlStr string, tlsConfig *tls.Config, ipAddr string) (jsoncodec.JSONConn, error)
+}
+
 func (s *websocketSuite) open(c *gc.C, info *api.Info, username string) api.Connection {
-	conn, err := s.openNoAssert(c, info, username, nil)
+	ld := loginDetails{info: info, username: username}
+	conn, err := s.openNoAssert(c, ld)
 	c.Assert(err, gc.Equals, nil)
 	return conn
+}
+
+func (s *websocketSuite) openCustomLP(c *gc.C, info *api.Info, username string, lp api.LoginProvider) (api.Connection, error) {
+	ld := loginDetails{info: info, username: username, lp: lp}
+	return s.openNoAssert(c, ld)
 }
 
 func (s *websocketSuite) openWithDialWebsocket(
@@ -151,7 +164,8 @@ func (s *websocketSuite) openWithDialWebsocket(
 	username string,
 	dialWebsocket func(ctx context.Context, urlStr string, tlsConfig *tls.Config, ipAddr string) (jsoncodec.JSONConn, error),
 ) api.Connection {
-	conn, err := s.openNoAssert(c, info, username, dialWebsocket)
+	ld := loginDetails{info: info, username: username, dialWebsocket: dialWebsocket}
+	conn, err := s.openNoAssert(c, ld)
 	c.Assert(err, gc.Equals, nil)
 	return conn
 }
@@ -173,20 +187,57 @@ func (s *proxySuite) TestConnectToModel(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `no such request - method Admin.TestMethod is not implemented \(not implemented\)`)
 }
 
-// TODO(CSS-7331) Refactor model proxy for new login methods
-// func (s *proxySuite) TestConnectToModelAndLogin(c *gc.C) {
+func (s *proxySuite) TestDeviceFlowLogin(c *gc.C) {
+	ctx := context.Background()
+	alice := names.NewUserTag("alice@canonical.com")
+	aliceUser := openfga.NewUser(&dbmodel.Identity{Name: alice.Id()}, s.JIMM.OpenFGAClient)
+	err := aliceUser.SetControllerAccess(ctx, s.Model.Controller.ResourceTag(), ofganames.AdministratorRelation)
+	c.Assert(err, gc.IsNil)
+	var cliOutput string
+	outputFunc := func(format string, a ...any) error {
+		cliOutput = fmt.Sprintf(format, a...)
+		return nil
+	}
+	s.JIMMSuite.ContinueDeviceFlow(aliceUser.Name)
+	conn, err := s.openCustomLP(c, &api.Info{
+		ModelTag:  s.Model.ResourceTag(),
+		SkipLogin: false,
+	}, "alice", api.NewSessionTokenLoginProvider("", outputFunc, func(s string) error { return nil }))
+	c.Assert(err, gc.IsNil)
+	defer conn.Close()
+	c.Check(err, gc.Equals, nil)
+	c.Check(cliOutput, gc.Matches, "Please visit .* and enter code.*")
+}
+
+// TODO(Kian): This test aims to verify that JIMM gracefully handles clients that end their connection
+// during the login flow after JIMM starts polling the OIDC server.
+// After https://github.com/juju/juju/pull/17606 lands We can refactor
+// the API connection login method to use the loging provider on the state struct.
+// func (s *proxySuite) TestDeviceFlowCancelDuringPolling(c *gc.C) {
 // 	ctx := context.Background()
 // 	alice := names.NewUserTag("alice@canonical.com")
 // 	aliceUser := openfga.NewUser(&dbmodel.Identity{Name: alice.Id()}, s.JIMM.OpenFGAClient)
 // 	err := aliceUser.SetControllerAccess(ctx, s.Model.Controller.ResourceTag(), ofganames.AdministratorRelation)
 // 	c.Assert(err, gc.IsNil)
-// 	conn, err := s.openNoAssert(c, &api.Info{
-// 		ModelTag:  s.Model.ResourceTag(),
-// 		SkipLogin: false,
-// 	}, "alice")
-// 	if err == nil {
-// 		defer conn.Close()
+// 	var cliOutput string
+// 	_ = cliOutput
+// 	outputFunc := func(format string, a ...any) error {
+// 		cliOutput = fmt.Sprintf(format, a)
+// 		return nil
 // 	}
+// 	var wg sync.WaitGroup
+// 	var conn api.Connection
+// 	wg.Add(1)
+// 	go func() {
+// 		defer wg.Done()
+// 		conn, err = s.openCustomLP(c, &api.Info{
+// 			ModelTag:  s.Model.ResourceTag(),
+// 			SkipLogin: true,
+// 		}, "alice", api.NewSessionTokenLoginProvider("", outputFunc, func(s string) error { return nil }))
+// 		c.Assert(err, gc.IsNil)
+// 	}()
+// 	conn.Login()
+//  // Close the connection after the cliOutput is filled.
 // 	c.Assert(err, gc.Equals, nil)
 // }
 
