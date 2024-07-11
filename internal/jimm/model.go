@@ -9,6 +9,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	jujupermission "github.com/juju/juju/core/permission"
@@ -764,6 +765,7 @@ func (j *JIMM) ModelStatus(ctx context.Context, user *openfga.User, mt names.Mod
 func (j *JIMM) GetAllModelSummariesForUser(ctx context.Context, user *openfga.User) (jujuparams.ModelSummaryResults, error) {
 	const op = errors.Op("jimm.GetAllModelSummariesForUser")
 
+	var resultMut sync.Mutex
 	flattenedSummaries := jujuparams.ModelSummaryResults{}
 
 	uuidToPerms, err := j.getControllersWithModelPermissionsForUser(ctx, user)
@@ -771,34 +773,20 @@ func (j *JIMM) GetAllModelSummariesForUser(ctx context.Context, user *openfga.Us
 		return flattenedSummaries, errors.E(op, err)
 	}
 
-	summariesCh := make(chan jujuparams.ModelSummaryResults)
-	errorsCh := make(chan error)
-
-	dialAndCallControllers(j.dial, uuidToPerms, errorsCh, func(api API) {
+	err = j.forEachController(ctx, uuidToPerms.GetControllers(), func(c *dbmodel.Controller, api API) error {
+		resultMut.Lock()
+		defer resultMut.Unlock()
 		var out jujuparams.ModelSummaryResults
 		in := jujuparams.ModelSummariesRequest{UserTag: names.NewUserTag(user.Name).String(), All: true}
 
 		if err := api.ListModelSummaries(context.Background(), &in, &out); err != nil {
-			errorsCh <- err
-			return
+			return err
 		}
-		summariesCh <- out
+		flattenedSummaries.Results = append(flattenedSummaries.Results, out.Results...)
+		return nil
 	})
-
-	errs := []error{}
-
-	for range uuidToPerms {
-		select {
-		case sum := <-summariesCh:
-			flattenedSummaries.Results = append(flattenedSummaries.Results, sum.Results...)
-		case err := <-errorsCh:
-			errs = append(errs, err)
-		}
-	}
-
-	if len(errs) > 0 {
-		// What do we do with call errors? Just take the first?
-		return flattenedSummaries, errors.E(op, errs[0])
+	if err != nil {
+		return flattenedSummaries, errors.E(err, op)
 	}
 
 	// Flatten permissions into single slice for index searching

@@ -185,6 +185,14 @@ type controllerWithModelPermissions struct {
 
 type controllerPermSet map[string]controllerWithModelPermissions
 
+func (c controllerPermSet) GetControllers() []dbmodel.Controller {
+	controllers := []dbmodel.Controller{}
+	for _, v := range c {
+		controllers = append(controllers, v.controller)
+	}
+	return controllers
+}
+
 type dialerFunc func(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, permissons ...permission) (API, error)
 
 // getControllersWithModelPermissionsForUser returns a map of controller uuids to:
@@ -240,31 +248,6 @@ func (j *JIMM) getControllersWithModelPermissionsForUser(ctx context.Context, us
 	}
 
 	return uuidToPerms, nil
-}
-
-// dialAndCallControllers dials multiple controllers in their own routines
-// from the controller permission set and reports errors on dial to an error channel.
-//
-// It takes a function which will pass the dialed controller to the function.
-// Should you wish to handle concurrency waiting, please read from a channel
-// outside the op or create a wait group within the op.
-func dialAndCallControllers(
-	dialerFunc dialerFunc,
-	p controllerPermSet,
-	errCh chan error,
-	op func(api API),
-) {
-	for _, perms := range p {
-		go func(c controllerWithModelPermissions) {
-			api, err := dialerFunc(context.Background(), &c.controller, names.ModelTag{}, c.permissions...)
-			if err != nil {
-				errCh <- err
-				return
-			}
-			defer api.Close()
-			op(api)
-		}(perms)
-	}
 }
 
 // dial dials the controller and model specified by the given Controller

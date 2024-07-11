@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"sync"
 
 	"github.com/juju/juju/api/base"
 	"github.com/juju/juju/api/controller/controller"
@@ -45,43 +46,29 @@ var (
 // access to.
 func (j *JIMM) AllModels(ctx context.Context, user *openfga.User) (jujuparams.UserModelList, error) {
 	const op = errors.Op("jimm.AllModels")
-
-	userModelList := jujuparams.UserModelList{}
+	var resultMut sync.Mutex
+	flattenedUml := jujuparams.UserModelList{}
 
 	uuidToPerms, err := j.getControllersWithModelPermissionsForUser(ctx, user)
 	if err != nil {
-		return userModelList, errors.E(op, err)
+		return flattenedUml, errors.E(op, err)
 	}
 
-	umlCh := make(chan jujuparams.UserModelList)
-	errorsCh := make(chan error)
-
-	dialAndCallControllers(j.dial, uuidToPerms, errorsCh, func(api API) {
+	err = j.forEachController(ctx, uuidToPerms.GetControllers(), func(c *dbmodel.Controller, api API) error {
+		resultMut.Lock()
+		defer resultMut.Unlock()
 		uml, err := api.AllModels(ctx)
 		if err != nil {
-			errorsCh <- err
-			return
+			return err
 		}
-		umlCh <- uml
+		flattenedUml.UserModels = append(flattenedUml.UserModels, uml.UserModels...)
+		return nil
 	})
-
-	errs := []error{}
-
-	for range uuidToPerms {
-		select {
-		case uml := <-umlCh:
-			userModelList.UserModels = append(userModelList.UserModels, uml.UserModels...)
-		case err := <-errorsCh:
-			errs = append(errs, err)
-		}
+	if err != nil {
+		return flattenedUml, errors.E(err, op)
 	}
 
-	if len(errs) > 0 {
-		// What do we do with call errors? Just take the first?
-		return userModelList, errors.E(op, errs[0])
-	}
-
-	return userModelList, nil
+	return flattenedUml, nil
 }
 
 // AddController adds the specified controller to JIMM. Only
