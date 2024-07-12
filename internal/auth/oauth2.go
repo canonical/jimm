@@ -326,6 +326,9 @@ func (as *AuthenticationService) MintSessionToken(email string) (string, error) 
 // for user object creation
 func (as *AuthenticationService) VerifySessionToken(token string) (_ jwt.Token, err error) {
 	const op = errors.Op("auth.AuthenticationService.VerifySessionToken")
+	errorFn := func(message string) error {
+		return errors.E(op, message, errors.CodeInvalidSessionToken)
+	}
 	defer func() {
 		if err != nil {
 			servermon.AuthenticationFailCount.WithLabelValues("VerifySessionToken").Inc()
@@ -335,24 +338,24 @@ func (as *AuthenticationService) VerifySessionToken(token string) (_ jwt.Token, 
 	}()
 
 	if len(token) == 0 {
-		return nil, errors.E(op, "authentication failed, no token presented")
+		return nil, errorFn("authentication failed, no token presented")
 	}
 
 	decodedToken, err := base64.StdEncoding.DecodeString(token)
 	if err != nil {
-		return nil, errors.E(op, fmt.Sprintf("authentication failed, failed to decode token: %s", err))
+		return nil, errorFn(fmt.Sprintf("authentication failed, failed to decode token: %s", err))
 	}
 
 	parsedToken, err := jwt.Parse(decodedToken, jwt.WithKey(as.signingAlg, []byte(as.jwtSessionKey)))
 	if err != nil {
 		if stderrors.Is(err, jwt.ErrTokenExpired()) {
-			return nil, errors.E(op, errors.CodeUnauthorized, "JIMM session token expired")
+			return nil, errorFn("JIMM session token expired")
 		}
-		return nil, errors.E(op, err)
+		return nil, errorFn(err.Error())
 	}
 
 	if _, err = mail.ParseAddress(parsedToken.Subject()); err != nil {
-		return nil, errors.E(op, "failed to parse email")
+		return nil, errorFn("failed to parse email")
 	}
 
 	return parsedToken, nil

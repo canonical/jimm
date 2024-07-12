@@ -585,6 +585,8 @@ func modifyControllerResponse(msg *message) error {
 // an error
 func (p *clientProxy) handleAdminFacade(ctx context.Context, msg *message) (clientResponse *message, controllerMessage *message, err error) {
 	errorFnc := func(err error) (*message, *message, error) {
+		// The error contains specific codes that the client will use to decide
+		// how to proceed if login fails.
 		return nil, nil, err
 	}
 	controllerLoginMessageFnc := func(data []byte) (*message, *message, error) {

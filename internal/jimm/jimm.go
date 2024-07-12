@@ -153,6 +153,8 @@ type OAuthAuthenticator interface {
 	//
 	// The subject of the token contains the user's email and can be used
 	// for user object creation.
+	// If verification fails, return error with code CodeInvalidSessionToken
+	// to indicate to the client to retry login.
 	VerifySessionToken(token string) (jwt.Token, error)
 
 	// UpdateIdentity updates the database with the display name and access token set for the user.
