@@ -1,7 +1,8 @@
 name: Security Check
 
 on:
-  pull_request:
+  schedule:
+    - cron: "0 6 */2 * *"   # Run every 2 days at 6 am
   workflow_dispatch:
 
 jobs:
