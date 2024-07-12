@@ -114,7 +114,6 @@ func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag nam
 			facades[fmt.Sprintf("%s\x1f%d", fv.Name, v)] = true
 		}
 	}
-	zapctx.Error(ctx, "facades", zap.Any("version", bestFacadeVersions))
 
 	monitorC := make(chan struct{})
 	broken := new(uint32)
