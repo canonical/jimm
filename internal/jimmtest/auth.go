@@ -25,6 +25,7 @@ import (
 	"github.com/gorilla/sessions"
 	"github.com/juju/juju/api"
 	jujuparams "github.com/juju/juju/rpc/params"
+	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 	"golang.org/x/oauth2"
 
@@ -36,9 +37,10 @@ import (
 )
 
 const (
-	// Note that these values are deliberately different to make sure we're not
-	// reusing/misusing them.
-	JWTTestSecret      = "test-secret"
+	// Secrets used for auth in tests.
+	//
+	// Note that these values are deliberately different to make sure we're not reusing/misusing them.
+	JWTTestSecret      = "jwt-test-secret"
 	SessionStoreSecret = "another-test-secret"
 )
 
@@ -150,7 +152,7 @@ func (m *MockOAuthAuthenticator) UpdateIdentity(ctx context.Context, email strin
 
 // MintSessionToken creates an unsigned session token with the email provided.
 func (m *MockOAuthAuthenticator) MintSessionToken(email string) (string, error) {
-	return newUnsignedSessionToken(m.c, email), nil
+	return newSessionToken(m.c, email, ""), nil
 }
 
 // AuthenticateBrowserSession always returns an error.
@@ -158,7 +160,10 @@ func (m *MockOAuthAuthenticator) AuthenticateBrowserSession(ctx context.Context,
 	return ctx, errors.New("authentication failed")
 }
 
-func newUnsignedSessionToken(c SimpleTester, username string) string {
+// newSessionToken returns a serialised JWT that can be used in tests.
+// Tests using a mock authenticator can provide an empty signatureSecret
+// while integration tests must provide the same secret used when verifying JWTs.
+func newSessionToken(c SimpleTester, username string, signatureSecret string) string {
 	email := convertUsernameToEmail(username)
 	token, err := jwt.NewBuilder().
 		Subject(email).
@@ -167,9 +172,14 @@ func newUnsignedSessionToken(c SimpleTester, username string) string {
 	if err != nil {
 		c.Fatalf("failed to generate test session token")
 	}
-	serialisedToken, err := jwt.NewSerializer().Serialize(token)
+	var serialisedToken []byte
+	if signatureSecret != "" {
+		serialisedToken, err = jwt.Sign(token, jwt.WithKey(jwa.HS256, []byte(JWTTestSecret)))
+	} else {
+		serialisedToken, err = jwt.NewSerializer().Serialize(token)
+	}
 	if err != nil {
-		c.Fatalf("failed to serialise token")
+		c.Fatalf("failed to sign/serialise token")
 	}
 	return base64.StdEncoding.EncodeToString(serialisedToken)
 }
@@ -178,7 +188,7 @@ func newUnsignedSessionToken(c SimpleTester, username string) string {
 // to define how login will take place. In this case we login using a session token
 // that the JIMM server should verify with the same test secret.
 func NewUserSessionLogin(c SimpleTester, username string) api.LoginProvider {
-	b64Token := newUnsignedSessionToken(c, username)
+	b64Token := newSessionToken(c, username, JWTTestSecret)
 	return api.NewSessionTokenLoginProvider(b64Token, nil, nil)
 }
 

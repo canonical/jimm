@@ -83,7 +83,7 @@ func TestProxySocketsAdminFacade(t *testing.T) {
 		},
 		expectedClientResponse: &message{
 			RequestID: 1,
-			Response:  []byte(`{"verification-uri":"http://no-such-uri.canonical.com","user-code":"test user code"}`),
+			Response:  []byte(`{"verification-uri":"http://no-such-uri.canonical.com","user-code":"test-user-code"}`),
 		},
 	}, {
 		about: "login device call, but the authenticator returns an error",
