@@ -125,8 +125,9 @@ func (m *MockOAuthAuthenticator) VerifySessionToken(token string) (jwt.Token, er
 	return parsedToken, nil
 }
 
-// ExtractAndVerifyIDToken return an ID token where the subject matches the subject obtained during the device flow.
+// ExtractAndVerifyIDToken returns an ID token where the subject is equal to the username obtained during the device flow.
 // The auth token must match the one returned during the device flow.
+// If the polled username is empty it indicates an error that the device flow was not run prior to calling this function.
 func (m *MockOAuthAuthenticator) ExtractAndVerifyIDToken(ctx context.Context, oauth2Token *oauth2.Token) (*oidc.IDToken, error) {
 	if m.polledUsername == "" {
 		return &oidc.IDToken{}, errors.New("unknown user for mock auth login")
@@ -156,8 +157,6 @@ func (m *MockOAuthAuthenticator) MintSessionToken(email string) (string, error) 
 func (m *MockOAuthAuthenticator) AuthenticateBrowserSession(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error) {
 	return ctx, errors.New("authentication failed")
 }
-
-// Below are helper functions used for handling auth in tests.
 
 func newUnsignedSessionToken(c SimpleTester, username string) string {
 	email := convertUsernameToEmail(username)

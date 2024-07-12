@@ -339,7 +339,7 @@ func (p *clientProxy) start(ctx context.Context) error {
 			}
 			// If there is a response for the client, send it to the client and continue.
 			// If there is a message for the controller instead, use the normal path.
-			// We can't send the client a response from JIMM and send the client message to the controller.
+			// We can't send the client a response from JIMM and send a message to the controller.
 			if toClient != nil {
 				p.src.sendMessage(nil, toClient)
 				continue

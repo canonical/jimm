@@ -13,6 +13,7 @@ import (
 	"net/url"
 
 	"github.com/juju/juju/api"
+	"github.com/juju/juju/api/client/client"
 	"github.com/juju/juju/rpc/jsoncodec"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
@@ -99,13 +100,17 @@ func (s *websocketSuite) TearDownTest(c *gc.C) {
 	s.BootstrapSuite.TearDownTest(c)
 }
 
+type loginDetails struct {
+	info          *api.Info
+	username      string
+	lp            api.LoginProvider
+	dialWebsocket func(ctx context.Context, urlStr string, tlsConfig *tls.Config, ipAddr string) (jsoncodec.JSONConn, error)
+}
+
 // openNoAssert creates a new websocket connection to the test server, using the
 // connection info specified in info, authenticating as the given user.
 // If info is nil then default values will be used.
-func (s *websocketSuite) openNoAssert(
-	c *gc.C,
-	d loginDetails,
-) (api.Connection, error) {
+func (s *websocketSuite) openNoAssert(c *gc.C, d loginDetails) (api.Connection, error) {
 	var inf api.Info
 	if d.info != nil {
 		inf = *d.info
@@ -137,13 +142,6 @@ func (s *websocketSuite) openNoAssert(
 	}
 
 	return api.Open(&inf, dialOpts)
-}
-
-type loginDetails struct {
-	info          *api.Info
-	username      string
-	lp            api.LoginProvider
-	dialWebsocket func(ctx context.Context, urlStr string, tlsConfig *tls.Config, ipAddr string) (jsoncodec.JSONConn, error)
 }
 
 func (s *websocketSuite) open(c *gc.C, info *api.Info, username string) api.Connection {
@@ -209,10 +207,46 @@ func (s *proxySuite) TestDeviceFlowLogin(c *gc.C) {
 	c.Check(cliOutput, gc.Matches, "Please visit .* and enter code.*")
 }
 
+type logger struct{}
+
+func (l logger) Errorf(string, ...interface{}) {}
+
+func (s *proxySuite) TestModelStatus(c *gc.C) {
+	conn := s.open(c, &api.Info{
+		ModelTag:  s.Model.ResourceTag(),
+		SkipLogin: false,
+	}, "alice@canonical.com")
+	defer conn.Close()
+	jujuClient := client.NewClient(conn, logger{})
+	status, err := jujuClient.Status(nil)
+	c.Check(err, gc.IsNil)
+	c.Check(status, gc.Not(gc.IsNil))
+	c.Check(status.Model.Name, gc.Equals, s.Model.Name)
+}
+
+func (s *proxySuite) TestModelStatusWithoutPermission(c *gc.C) {
+	fooUser := openfga.NewUser(&dbmodel.Identity{Name: "foo@canonical.com"}, s.JIMM.OpenFGAClient)
+	var cliOutput string
+	outputFunc := func(format string, a ...any) error {
+		cliOutput = fmt.Sprintf(format, a...)
+		return nil
+	}
+	s.JIMMSuite.ContinueDeviceFlow(fooUser.Name)
+	conn, err := s.openCustomLP(c, &api.Info{
+		ModelTag:  s.Model.ResourceTag(),
+		SkipLogin: false,
+	}, "foo", api.NewSessionTokenLoginProvider("", outputFunc, func(s string) error { return nil }))
+	c.Check(err, gc.ErrorMatches, "permission denied .*")
+	if conn != nil {
+		defer conn.Close()
+	}
+	c.Check(cliOutput, gc.Matches, "Please visit .* and enter code.*")
+}
+
 // TODO(Kian): This test aims to verify that JIMM gracefully handles clients that end their connection
 // during the login flow after JIMM starts polling the OIDC server.
-// After https://github.com/juju/juju/pull/17606 lands We can refactor
-// the API connection login method to use the loging provider on the state struct.
+// After https://github.com/juju/juju/pull/17606 lands we can begin work on this.
+// The API connection's login method should be refactored use the login provider stored on the state struct.
 // func (s *proxySuite) TestDeviceFlowCancelDuringPolling(c *gc.C) {
 // 	ctx := context.Background()
 // 	alice := names.NewUserTag("alice@canonical.com")
