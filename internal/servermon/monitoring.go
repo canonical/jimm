@@ -119,6 +119,18 @@ var (
 		Name:      "request_duration_seconds",
 		Help:      "The duration of a websocket request in seconds.",
 	}, []string{"type", "action"})
+	ModelCount = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "jimm",
+		Subsystem: "system",
+		Name:      "model_count",
+		Help:      "The number of models managed per controller attached to JIMM.",
+	}, []string{"controller"})
+	ControllerCount = promauto.NewGauge(prometheus.GaugeOpts{
+		Namespace: "jimm",
+		Subsystem: "system",
+		Name:      "controller_count",
+		Help:      "The number of controllers managed by JIMM.",
+	})
 )
 
 // DurationObserver returns a function that, when run with `defer` will

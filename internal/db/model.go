@@ -231,3 +231,19 @@ func (d *Database) GetModelsByController(ctx context.Context, ctl dbmodel.Contro
 	}
 	return models, nil
 }
+
+// CountModelsByController counts the number of models hosted on a controller.
+func (d *Database) CountModelsByController(ctx context.Context, ctl dbmodel.Controller) (int, error) {
+	const op = errors.Op("db.CountModelsByController")
+
+	if err := d.ready(); err != nil {
+		return 0, errors.E(op, err)
+	}
+	db := d.DB.WithContext(ctx)
+	asc := db.Model(ctl).Association("Models")
+	count := asc.Count()
+	if err := asc.Error; err != nil {
+		return 0, errors.E(op, dbError(err))
+	}
+	return int(count), nil
+}

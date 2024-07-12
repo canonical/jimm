@@ -10,29 +10,18 @@ license: GPL-3.0
 platforms:
     amd64:
 
-services:
-    server:
-        summary: JIMM
-        description: |
-            JIMM is a Juju controller, used in conjunction with the JaaS dashboard to provide a seamless way
-            to manage models, regardless of where their controllers reside or what cloud they may be running on.
-        startup: enabled
-        override: replace
-        command: jimmsrv
-        on-success: ignore
-        on-failure: restart
-        backoff-delay: 1s
-        backoff-factor: 2
-        backoff-limit: 10s
-        kill-delay: 10s
-
 parts:
+    ca-certs:
+        plugin: nil
+        overlay-packages: [ca-certificates]
     builder: 
         plugin: go # https://canonical-craft-parts--694.com.readthedocs.build/en/694/common/craft-parts/reference/plugins/go_plugin.html
+        after:
+          - ca-certs
         source: .
         source-type: local
         build-snaps:
-        - go/1.22/stable
+          - go/1.22/stable
         build-packages:
           - git
           - make 
@@ -53,6 +42,4 @@ parts:
             # Copied for the charm to collect and apply, not this container itself
             mkdir -p $CRAFT_PART_INSTALL/root/openfga/
             cp ./openfga/authorisation_model.json $CRAFT_PART_INSTALL/root/openfga/authorisation_model.json
-           
-        stage-packages:
-            - ca-certificates
+

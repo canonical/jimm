@@ -35,4 +35,4 @@ type user
 
 type serviceaccount
   relations
-    define administator: [user, user:*, group#member]
+    define administrator: [user, user:*, group#member]
