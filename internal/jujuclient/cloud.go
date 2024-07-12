@@ -309,3 +309,27 @@ func (c Connection) UpdateCloud(ctx context.Context, tag names.CloudTag, cloud j
 	}
 	return nil
 }
+
+// CredentialContents returns the specified cloud credentials,
+// including the secrets if requested.
+// If no specific credential name/cloud was passed in, all credentials for this user
+// are returned.
+// Only credential owner can see its contents as well as what models use it.
+// Controller admin has no special superpowers here and is treated the same as all other users.
+func (c Connection) CredentialContents(ctx context.Context, args jujuparams.CloudCredentialArgs) (jujuparams.CredentialContentResults, error) {
+	const op = errors.Op("jujuclient.CredentialContents")
+
+	resp := jujuparams.CredentialContentResults{
+		Results: []jujuparams.CredentialContentResult{},
+	}
+
+	err := c.Call(ctx, "Cloud", 7, "", "CredentialContents", &args, &resp)
+	if err != nil {
+		return resp, errors.E(op, jujuerrors.Cause(err))
+	}
+	if resp.Results[0].Error != nil {
+		return resp, errors.E(op, resp.Results[0].Error)
+	}
+	return resp, nil
+
+}
