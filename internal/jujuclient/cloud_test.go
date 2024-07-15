@@ -464,3 +464,11 @@ func (s *cloudSuite) TestUpdateCloud(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	c.Check(cloud2, jc.DeepEquals, cloud)
 }
+
+func (s *cloudSuite) TestCredentialContents(c *gc.C) {
+	ctx := context.Background()
+	args := jujuparams.CloudCredentialArgs{}
+	res, err := s.API.CredentialContents(ctx, args)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(res.Results, gc.HasLen, 1)
+}
