@@ -31,6 +31,7 @@ import (
 
 	"github.com/canonical/jimm/internal/auth"
 	"github.com/canonical/jimm/internal/db"
+	jimmerrors "github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/jimm"
 	"github.com/canonical/jimm/internal/jimmhttp"
 	"github.com/canonical/jimm/internal/openfga"
@@ -111,18 +112,21 @@ func (m *MockOAuthAuthenticator) DeviceAccessToken(ctx context.Context, res *oau
 // Allowing JIMM tests to create their own session tokens that will always be accepted.
 // Notice the use of jwt.ParseInsecure to skip JWT signature verification.
 func (m *MockOAuthAuthenticator) VerifySessionToken(token string) (jwt.Token, error) {
+	errorFn := func(err error) error {
+		return jimmerrors.E(err, jimmerrors.CodeUnauthorized)
+	}
 	decodedToken, err := base64.StdEncoding.DecodeString(token)
 	if err != nil {
-		return nil, errors.New("authentication failed, failed to decode token")
+		return nil, errorFn(errors.New("authentication failed, failed to decode token"))
 	}
 
 	parsedToken, err := jwt.ParseInsecure(decodedToken)
 	if err != nil {
-		return nil, err
+		return nil, errorFn(err)
 	}
 
 	if _, err = mail.ParseAddress(parsedToken.Subject()); err != nil {
-		return nil, errors.New("failed to parse email")
+		return nil, errorFn(errors.New("failed to parse email"))
 	}
 	return parsedToken, nil
 }

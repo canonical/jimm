@@ -151,7 +151,7 @@ func (s *websocketSuite) open(c *gc.C, info *api.Info, username string) api.Conn
 	return conn
 }
 
-func (s *websocketSuite) openCustomLP(c *gc.C, info *api.Info, username string, lp api.LoginProvider) (api.Connection, error) {
+func (s *websocketSuite) openCustomLoginProvider(c *gc.C, info *api.Info, username string, lp api.LoginProvider) (api.Connection, error) {
 	ld := loginDetails{info: info, username: username, lp: lp}
 	return s.openNoAssert(c, ld)
 }
@@ -185,7 +185,7 @@ func (s *proxySuite) TestConnectToModel(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `no such request - method Admin.TestMethod is not implemented \(not implemented\)`)
 }
 
-func (s *proxySuite) TestDeviceFlowLogin(c *gc.C) {
+func (s *proxySuite) TestSessionTokenLoginProvider(c *gc.C) {
 	ctx := context.Background()
 	alice := names.NewUserTag("alice@canonical.com")
 	aliceUser := openfga.NewUser(&dbmodel.Identity{Name: alice.Id()}, s.JIMM.OpenFGAClient)
@@ -197,7 +197,7 @@ func (s *proxySuite) TestDeviceFlowLogin(c *gc.C) {
 		return nil
 	}
 	s.JIMMSuite.ContinueDeviceFlow(aliceUser.Name)
-	conn, err := s.openCustomLP(c, &api.Info{
+	conn, err := s.openCustomLoginProvider(c, &api.Info{
 		ModelTag:  s.Model.ResourceTag(),
 		SkipLogin: false,
 	}, "alice", api.NewSessionTokenLoginProvider("", outputFunc, func(s string) error { return nil }))
@@ -232,7 +232,7 @@ func (s *proxySuite) TestModelStatusWithoutPermission(c *gc.C) {
 		return nil
 	}
 	s.JIMMSuite.ContinueDeviceFlow(fooUser.Name)
-	conn, err := s.openCustomLP(c, &api.Info{
+	conn, err := s.openCustomLoginProvider(c, &api.Info{
 		ModelTag:  s.Model.ResourceTag(),
 		SkipLogin: false,
 	}, "foo", api.NewSessionTokenLoginProvider("", outputFunc, func(s string) error { return nil }))

@@ -583,7 +583,7 @@ func modifyControllerResponse(msg *message) error {
 // an error
 func (p *clientProxy) handleAdminFacade(ctx context.Context, msg *message) (clientResponse *message, controllerMessage *message, err error) {
 	errorFnc := func(err error) (*message, *message, error) {
-		return nil, nil, errors.E(err, errors.CodeUnauthorized)
+		return nil, nil, err
 	}
 	controllerLoginMessageFnc := func(data []byte) (*message, *message, error) {
 		m := *msg
