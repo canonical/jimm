@@ -47,7 +47,7 @@ func (j *JIMM) GetCloudCredential(ctx context.Context, user *openfga.User, tag n
 }
 
 // RevokeCloudCredential checks that the credential with the given path
-// can be revoked  and revokes the credential.
+// can be revoked and revokes the credential.
 func (j *JIMM) RevokeCloudCredential(ctx context.Context, user *dbmodel.Identity, tag names.CloudCredentialTag, force bool) error {
 	const op = errors.Op("jimm.RevokeCloudCredential")
 
@@ -72,15 +72,6 @@ func (j *JIMM) RevokeCloudCredential(ctx context.Context, user *dbmodel.Identity
 		Valid: true,
 	}
 
-	models, err := j.Database.GetModelsUsingCredential(ctx, credential.ID)
-	if err != nil {
-		return errors.E(op, err)
-	}
-	// if the cloud credential is still used by any model we return an error
-	if len(models) > 0 && !force {
-		return errors.E(op, errors.CodeBadRequest, fmt.Sprintf("cloud credential still used by %d model(s)", len(models)))
-	}
-
 	cloud := dbmodel.Cloud{
 		Name: credential.CloudName,
 	}
@@ -88,16 +79,29 @@ func (j *JIMM) RevokeCloudCredential(ctx context.Context, user *dbmodel.Identity
 		return errors.E(op, err)
 	}
 
-	var controllers []dbmodel.Controller
-	seen := make(map[uint]bool)
-	for _, region := range cloud.Regions {
-		for _, cr := range region.Controllers {
-			if seen[cr.ControllerID] {
-				continue
-			}
-			seen[cr.ControllerID] = true
-			controllers = append(controllers, cr.Controller)
+	ofgaUser := openfga.NewUser(user, j.OpenFGAClient)
+	uuidPermSet, err := j.getControllersWithModelPermissionsForUser(ctx, ofgaUser)
+	if err != nil {
+		return errors.E(op, err)
+	}
+	controllers := uuidPermSet.GetControllers()
+
+	err = j.forEachController(ctx, controllers, func(c *dbmodel.Controller, api API) error {
+		res, err := api.CredentialContents(ctx, jujuparams.CloudCredentialArgs{})
+		if err != nil {
+			return err
 		}
+
+		// if the cloud credential is still used by any model we return an error
+		for _, r := range res.Results {
+			if len(r.Result.Models) > 0 && !force {
+				return errors.E(op, errors.CodeBadRequest, fmt.Sprintf("cloud credential still used by %d model(s)", len(r.Result.Models)))
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return errors.E(op, err)
 	}
 
 	err = j.forEachController(ctx, controllers, func(ctl *dbmodel.Controller, api API) error {
@@ -162,19 +166,11 @@ func (j *JIMM) UpdateCloudCredential(ctx context.Context, user *openfga.User, ar
 		return result, errors.E(op, err)
 	}
 
-	models, err := j.Database.GetModelsUsingCredential(ctx, credential.ID)
+	uuidPermSet, err := j.getControllersWithModelPermissionsForUser(ctx, user)
 	if err != nil {
 		return result, errors.E(op, err)
 	}
-	var controllers []dbmodel.Controller
-	seen := make(map[uint]bool)
-	for _, model := range models {
-		if seen[model.ControllerID] {
-			continue
-		}
-		seen[model.ControllerID] = true
-		controllers = append(controllers, model.Controller)
-	}
+	controllers := uuidPermSet.GetControllers()
 
 	credential.AuthType = args.Credential.AuthType
 	credential.Attributes = args.Credential.Attributes
