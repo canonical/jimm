@@ -454,6 +454,14 @@ type API interface {
 	// AllModels allows controller administrators to get the list of all the
 	// models in the controller.
 	AllModels(ctx context.Context) (jujuparams.UserModelList, error)
+
+	// CredentialContents returns the specified cloud credentials,
+	// including the secrets if requested.
+	// If no specific credential name/cloud was passed in, all credentials for this user
+	// are returned.
+	// Only credential owner can see its contents as well as what models use it.
+	// Controller admin has no special superpowers here and is treated the same as all other users.
+	CredentialContents(ctx context.Context, args jujuparams.CloudCredentialArgs) (jujuparams.CredentialContentResults, error)
 }
 
 // forEachController runs a given function on multiple controllers
