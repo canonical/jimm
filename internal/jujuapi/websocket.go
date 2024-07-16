@@ -55,7 +55,7 @@ func (s *apiServer) ServeWS(ctx context.Context, conn *websocket.Conn) {
 	controllerRoot := newControllerRoot(s.jimm, s.params, identityId)
 	s.cleanup = controllerRoot.cleanup
 	Dblogger := controllerRoot.newAuditLogger()
-	serveRoot(context.Background(), controllerRoot, Dblogger, conn)
+	serveRoot(ctx, controllerRoot, Dblogger, conn)
 }
 
 // Kill implements the rpc.Killer interface.
