@@ -31,9 +31,8 @@ services:
       - bash
       - -c
       - >-
-        echo "machine github.com login $(cat ./local/ghuser) password $(cat ./local/ghpat)" > /root/.netrc && chmod 600 /root/.netrc &&
-        go install github.com/go-delve/delve/cmd/dlv@latest &&
-        air
+        go install github.com/go-delve/delve/cmd/dlv@latest
+        && air
     ports:
       - 17070:80
       - 2345:2345

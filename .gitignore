@@ -26,6 +26,3 @@ qa-lxd
 /cloudinit.temp.yaml
 
 local/traefik/certs/ca.srl
-
-ghpat
-ghuser

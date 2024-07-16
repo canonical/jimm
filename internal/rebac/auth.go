@@ -12,7 +12,8 @@ type Authenticator struct{}
 
 var _ interfaces.Authenticator = &Authenticator{}
 
-// Authenticate for now lets everything through to fulfill the requirement of admin rebac backend to have an authenticator
+// Authenticate extracts the calling user's information from the given HTTP request
 func (a *Authenticator) Authenticate(r *http.Request) (any, error) {
+	// TODO(CSS-9386): replace with real authentication
 	return "joe", nil
 }
