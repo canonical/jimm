@@ -216,7 +216,7 @@ func TestSessionTokenRejectsEmptyToken(t *testing.T) {
 	authSvc, _, _ := setupTestAuthSvc(ctx, c, noDuration)
 
 	_, err := authSvc.VerifySessionToken("")
-	c.Assert(err, qt.ErrorMatches, `authentication failed, no token presented`)
+	c.Assert(err, qt.ErrorMatches, `no token presented`)
 	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeUnauthorized)
 }
 

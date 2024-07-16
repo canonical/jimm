@@ -338,12 +338,12 @@ func (as *AuthenticationService) VerifySessionToken(token string) (_ jwt.Token, 
 	}()
 
 	if len(token) == 0 {
-		return nil, errorFn("authentication failed, no token presented")
+		return nil, errorFn("no token presented")
 	}
 
 	decodedToken, err := base64.StdEncoding.DecodeString(token)
 	if err != nil {
-		return nil, errorFn(fmt.Sprintf("authentication failed, failed to decode token: %s", err))
+		return nil, errorFn(fmt.Sprintf("failed to decode token: %s", err))
 	}
 
 	parsedToken, err := jwt.Parse(decodedToken, jwt.WithKey(as.signingAlg, []byte(as.jwtSessionKey)))

@@ -117,7 +117,7 @@ func (m *MockOAuthAuthenticator) VerifySessionToken(token string) (jwt.Token, er
 	}
 	decodedToken, err := base64.StdEncoding.DecodeString(token)
 	if err != nil {
-		return nil, errorFn(errors.New("authentication failed, failed to decode token"))
+		return nil, errorFn(errors.New("failed to decode token"))
 	}
 
 	parsedToken, err := jwt.ParseInsecure(decodedToken)

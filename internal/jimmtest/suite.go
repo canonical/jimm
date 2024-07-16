@@ -249,10 +249,11 @@ func (s *JIMMSuite) AddModel(c *gc.C, owner names.UserTag, name string, cloud na
 	return names.NewModelTag(mi.UUID)
 }
 
+// EnableDeviceFlow allows a test to use the device flow.
 // Call this non-blocking function before login to ensure the device flow won't block.
 //
 // This is necessary as the mock authenticator simulates polling an external OIDC server.
-func (s *JIMMSuite) ContinueDeviceFlow(username string) {
+func (s *JIMMSuite) EnableDeviceFlow(username string) {
 	s.deviceFlowChan <- username
 }
 

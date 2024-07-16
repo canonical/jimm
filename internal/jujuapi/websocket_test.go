@@ -196,7 +196,7 @@ func (s *proxySuite) TestSessionTokenLoginProvider(c *gc.C) {
 		cliOutput = fmt.Sprintf(format, a...)
 		return nil
 	}
-	s.JIMMSuite.ContinueDeviceFlow(aliceUser.Name)
+	s.JIMMSuite.EnableDeviceFlow(aliceUser.Name)
 	conn, err := s.openCustomLoginProvider(c, &api.Info{
 		ModelTag:  s.Model.ResourceTag(),
 		SkipLogin: false,
@@ -231,7 +231,7 @@ func (s *proxySuite) TestModelStatusWithoutPermission(c *gc.C) {
 		cliOutput = fmt.Sprintf(format, a...)
 		return nil
 	}
-	s.JIMMSuite.ContinueDeviceFlow(fooUser.Name)
+	s.JIMMSuite.EnableDeviceFlow(fooUser.Name)
 	conn, err := s.openCustomLoginProvider(c, &api.Info{
 		ModelTag:  s.Model.ResourceTag(),
 		SkipLogin: false,
