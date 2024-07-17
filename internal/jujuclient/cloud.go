@@ -331,5 +331,4 @@ func (c Connection) CredentialContents(ctx context.Context, args jujuparams.Clou
 		return resp, errors.E(op, resp.Results[0].Error)
 	}
 	return resp, nil
-
 }

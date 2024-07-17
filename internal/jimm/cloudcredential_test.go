@@ -375,7 +375,6 @@ func TestUpdateCloudCredential(t *testing.T) {
 				}},
 			}
 			err = j.AddController(context.Background(), alice, &controller1)
-			// err = j.Database.AddController(context.Background(), &controller1)
 			c.Assert(err, qt.Equals, nil)
 
 			controller2 := dbmodel.Controller{
@@ -391,7 +390,6 @@ func TestUpdateCloudCredential(t *testing.T) {
 				}},
 			}
 			err = j.AddController(context.Background(), alice, &controller2)
-			// err = j.Database.AddController(context.Background(), &controller2)
 			c.Assert(err, qt.Equals, nil)
 
 			cred := dbmodel.CloudCredential{
@@ -889,365 +887,338 @@ func TestRevokeCloudCredential(t *testing.T) {
 	cores := uint64(8)
 
 	tests := []struct {
-		about                    string
-		revokeCredentialErrors   []error
-		returnACredentialContent bool
-		createEnv                func(*qt.C, *jimm.JIMM, *openfga.OFGAClient) (*dbmodel.Identity, names.CloudCredentialTag, string)
-	}{
-		{
-			about: "credential revoked",
-			createEnv: func(c *qt.C, j *jimm.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, names.CloudCredentialTag, string) {
-				u, err := dbmodel.NewIdentity("alice@canonical.com")
-				c.Assert(err, qt.IsNil)
+		about                  string
+		revokeCredentialErrors []error
+		stillUsedByAModel      bool
+		createEnv              func(*qt.C, *jimm.JIMM, *openfga.OFGAClient) (*dbmodel.Identity, names.CloudCredentialTag, string)
+	}{{
+		about: "credential revoked",
+		createEnv: func(c *qt.C, j *jimm.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, names.CloudCredentialTag, string) {
+			u, err := dbmodel.NewIdentity("alice@canonical.com")
+			c.Assert(err, qt.IsNil)
 
-				c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
+			c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
 
-				alice := openfga.NewUser(u, client)
+			alice := openfga.NewUser(u, client)
 
-				err = alice.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
-				c.Assert(err, qt.IsNil)
+			err = alice.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
+			c.Assert(err, qt.IsNil)
 
-				cloud := dbmodel.Cloud{
-					Name: "test-cloud",
-					Type: "test-provider",
-					Regions: []dbmodel.CloudRegion{{
-						Name: "test-region-1",
-					}},
-				}
-				c.Assert(j.Database.DB.Create(&cloud).Error, qt.IsNil)
+			cloud := dbmodel.Cloud{
+				Name: "test-cloud",
+				Type: "test-provider",
+				Regions: []dbmodel.CloudRegion{{
+					Name: "test-region-1",
+				}},
+			}
+			c.Assert(j.Database.DB.Create(&cloud).Error, qt.IsNil)
 
-				err = alice.SetCloudAccess(context.Background(), cloud.ResourceTag(), ofganames.AdministratorRelation)
-				c.Assert(err, qt.IsNil)
+			err = alice.SetCloudAccess(context.Background(), cloud.ResourceTag(), ofganames.AdministratorRelation)
+			c.Assert(err, qt.IsNil)
 
-				controller1 := dbmodel.Controller{
-					Name:        "test-controller-1",
-					UUID:        "00000000-0000-0000-0000-0000-0000000000001",
-					CloudName:   "test-cloud",
-					CloudRegion: "test-region-1",
-					CloudRegions: []dbmodel.CloudRegionControllerPriority{{
-						Priority:      0,
-						CloudRegionID: cloud.Regions[0].ID,
-					}},
-				}
-				err = j.Database.AddController(context.Background(), &controller1)
-				c.Assert(err, qt.Equals, nil)
+			controller1 := dbmodel.Controller{
+				Name:        "test-controller-1",
+				UUID:        "00000000-0000-0000-0000-0000-0000000000001",
+				CloudName:   "test-cloud",
+				CloudRegion: "test-region-1",
+				CloudRegions: []dbmodel.CloudRegionControllerPriority{{
+					Priority:      0,
+					CloudRegionID: cloud.Regions[0].ID,
+				}},
+			}
+			err = j.Database.AddController(context.Background(), &controller1)
+			c.Assert(err, qt.Equals, nil)
 
-				controller2 := dbmodel.Controller{
-					Name:        "test-controller-2",
-					UUID:        "00000000-0000-0000-0000-0000-0000000000002",
-					CloudName:   "test-cloud",
-					CloudRegion: "test-region-1",
-					CloudRegions: []dbmodel.CloudRegionControllerPriority{{
-						// controller2 has a higher priority and the model
-						// should be created on this controller
-						Priority:      2,
-						CloudRegionID: cloud.Regions[0].ID,
-					}},
-				}
-				err = j.Database.AddController(context.Background(), &controller2)
-				c.Assert(err, qt.Equals, nil)
+			controller2 := dbmodel.Controller{
+				Name:        "test-controller-2",
+				UUID:        "00000000-0000-0000-0000-0000-0000000000002",
+				CloudName:   "test-cloud",
+				CloudRegion: "test-region-1",
+				CloudRegions: []dbmodel.CloudRegionControllerPriority{{
+					// controller2 has a higher priority and the model
+					// should be created on this controller
+					Priority:      2,
+					CloudRegionID: cloud.Regions[0].ID,
+				}},
+			}
+			err = j.Database.AddController(context.Background(), &controller2)
+			c.Assert(err, qt.Equals, nil)
 
-				cred := dbmodel.CloudCredential{
-					Name:              "test-credential-1",
-					CloudName:         cloud.Name,
-					OwnerIdentityName: u.Name,
-					AuthType:          "empty",
-				}
-				err = j.Database.SetCloudCredential(context.Background(), &cred)
-				c.Assert(err, qt.Equals, nil)
+			cred := dbmodel.CloudCredential{
+				Name:              "test-credential-1",
+				CloudName:         cloud.Name,
+				OwnerIdentityName: u.Name,
+				AuthType:          "empty",
+			}
+			err = j.Database.SetCloudCredential(context.Background(), &cred)
+			c.Assert(err, qt.Equals, nil)
 
-				cred.Cloud = dbmodel.Cloud{
-					Name: "test-cloud",
-					Type: "test-provider",
-				}
+			cred.Cloud = dbmodel.Cloud{
+				Name: "test-cloud",
+				Type: "test-provider",
+			}
 
-				tag := names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1")
-				return u, tag, ""
-			},
+			tag := names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1")
+			return u, tag, ""
 		},
-		{
-			about: "credential revoked - controller returns a not found error",
-			revokeCredentialErrors: []error{&errors.Error{
-				Message: "credential not found",
-				Code:    jujuparams.CodeNotFound,
-			}},
-			createEnv: func(c *qt.C, j *jimm.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, names.CloudCredentialTag, string) {
-				u, err := dbmodel.NewIdentity("alice@canonical.com")
-				c.Assert(err, qt.IsNil)
+	}, {
+		about: "credential revoked - controller returns a not found error",
+		revokeCredentialErrors: []error{&errors.Error{
+			Message: "credential not found",
+			Code:    jujuparams.CodeNotFound,
+		}},
+		createEnv: func(c *qt.C, j *jimm.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, names.CloudCredentialTag, string) {
+			u, err := dbmodel.NewIdentity("alice@canonical.com")
+			c.Assert(err, qt.IsNil)
 
-				c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
+			c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
 
-				alice := openfga.NewUser(u, client)
+			alice := openfga.NewUser(u, client)
 
-				err = alice.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
-				c.Assert(err, qt.IsNil)
+			err = alice.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
+			c.Assert(err, qt.IsNil)
 
-				cloud := dbmodel.Cloud{
-					Name: "test-cloud",
-					Type: "test-provider",
-					Regions: []dbmodel.CloudRegion{{
-						Name: "test-region-1",
-					}},
-				}
-				c.Assert(j.Database.DB.Create(&cloud).Error, qt.IsNil)
+			cloud := dbmodel.Cloud{
+				Name: "test-cloud",
+				Type: "test-provider",
+				Regions: []dbmodel.CloudRegion{{
+					Name: "test-region-1",
+				}},
+			}
+			c.Assert(j.Database.DB.Create(&cloud).Error, qt.IsNil)
 
-				err = alice.SetCloudAccess(context.Background(), cloud.ResourceTag(), ofganames.AdministratorRelation)
-				c.Assert(err, qt.IsNil)
+			err = alice.SetCloudAccess(context.Background(), cloud.ResourceTag(), ofganames.AdministratorRelation)
+			c.Assert(err, qt.IsNil)
 
-				controller1 := dbmodel.Controller{
-					Name:        "test-controller-1",
-					UUID:        "00000000-0000-0000-0000-0000-0000000000001",
-					CloudName:   "test-cloud",
-					CloudRegion: "test-region-1",
-					CloudRegions: []dbmodel.CloudRegionControllerPriority{{
-						Priority:      0,
-						CloudRegionID: cloud.Regions[0].ID,
-					}},
-				}
-				err = j.Database.AddController(context.Background(), &controller1)
-				c.Assert(err, qt.Equals, nil)
+			controller1 := dbmodel.Controller{
+				Name:        "test-controller-1",
+				UUID:        "00000000-0000-0000-0000-0000-0000000000001",
+				CloudName:   "test-cloud",
+				CloudRegion: "test-region-1",
+				CloudRegions: []dbmodel.CloudRegionControllerPriority{{
+					Priority:      0,
+					CloudRegionID: cloud.Regions[0].ID,
+				}},
+			}
+			err = j.Database.AddController(context.Background(), &controller1)
+			c.Assert(err, qt.Equals, nil)
 
-				controller2 := dbmodel.Controller{
-					Name:        "test-controller-2",
-					UUID:        "00000000-0000-0000-0000-0000-0000000000002",
-					CloudName:   "test-cloud",
-					CloudRegion: "test-region-1",
-					CloudRegions: []dbmodel.CloudRegionControllerPriority{{
-						// controller2 has a higher priority and the model
-						// should be created on this controller
-						Priority:      2,
-						CloudRegionID: cloud.Regions[0].ID,
-					}},
-				}
-				err = j.Database.AddController(context.Background(), &controller2)
-				c.Assert(err, qt.Equals, nil)
+			controller2 := dbmodel.Controller{
+				Name:        "test-controller-2",
+				UUID:        "00000000-0000-0000-0000-0000-0000000000002",
+				CloudName:   "test-cloud",
+				CloudRegion: "test-region-1",
+				CloudRegions: []dbmodel.CloudRegionControllerPriority{{
+					// controller2 has a higher priority and the model
+					// should be created on this controller
+					Priority:      2,
+					CloudRegionID: cloud.Regions[0].ID,
+				}},
+			}
+			err = j.Database.AddController(context.Background(), &controller2)
+			c.Assert(err, qt.Equals, nil)
 
-				cred := dbmodel.CloudCredential{
-					Name:              "test-credential-1",
-					CloudName:         cloud.Name,
-					OwnerIdentityName: u.Name,
-					AuthType:          "empty",
-				}
-				err = j.Database.SetCloudCredential(context.Background(), &cred)
-				c.Assert(err, qt.Equals, nil)
+			cred := dbmodel.CloudCredential{
+				Name:              "test-credential-1",
+				CloudName:         cloud.Name,
+				OwnerIdentityName: u.Name,
+				AuthType:          "empty",
+			}
+			err = j.Database.SetCloudCredential(context.Background(), &cred)
+			c.Assert(err, qt.Equals, nil)
 
-				cred.Cloud = dbmodel.Cloud{
-					Name: "test-cloud",
-					Type: "test-provider",
-				}
+			cred.Cloud = dbmodel.Cloud{
+				Name: "test-cloud",
+				Type: "test-provider",
+			}
 
-				tag := names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1")
-				return u, tag, ""
-			},
+			tag := names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1")
+			return u, tag, ""
 		},
-		{
-			about:                    "credential still used by a model",
-			returnACredentialContent: true,
-			createEnv: func(c *qt.C, j *jimm.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, names.CloudCredentialTag, string) {
-				u, err := dbmodel.NewIdentity("alice@canonical.com")
-				c.Assert(err, qt.IsNil)
+	}, {
+		about:             "credential still used by a model",
+		stillUsedByAModel: true,
+		createEnv: func(c *qt.C, j *jimm.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, names.CloudCredentialTag, string) {
+			u, err := dbmodel.NewIdentity("alice@canonical.com")
+			c.Assert(err, qt.IsNil)
 
-				c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
+			c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
 
-				alice := openfga.NewUser(u, client)
+			alice := openfga.NewUser(u, client)
 
-				err = alice.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
-				c.Assert(err, qt.IsNil)
+			err = alice.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
+			c.Assert(err, qt.IsNil)
 
-				cloud := dbmodel.Cloud{
-					Name: "test-cloud",
-					Type: "test-provider",
-					Regions: []dbmodel.CloudRegion{{
-						Name: "test-region-1",
-					}},
-				}
-				c.Assert(j.Database.DB.Create(&cloud).Error, qt.IsNil)
+			cloud := dbmodel.Cloud{
+				Name: "test-cloud",
+				Type: "test-provider",
+				Regions: []dbmodel.CloudRegion{{
+					Name: "test-region-1",
+				}},
+			}
+			c.Assert(j.Database.DB.Create(&cloud).Error, qt.IsNil)
 
-				err = alice.SetCloudAccess(context.Background(), cloud.ResourceTag(), ofganames.AdministratorRelation)
-				c.Assert(err, qt.IsNil)
+			err = alice.SetCloudAccess(context.Background(), cloud.ResourceTag(), ofganames.AdministratorRelation)
+			c.Assert(err, qt.IsNil)
 
-				controller1 := dbmodel.Controller{
-					Name:        "test-controller-1",
-					UUID:        "00000000-0000-0000-0000-0000-0000000000001",
-					CloudName:   "test-cloud",
-					CloudRegion: "test-region-1",
-					CloudRegions: []dbmodel.CloudRegionControllerPriority{{
-						Priority:      0,
-						CloudRegionID: cloud.Regions[0].ID,
-					}},
-				}
-				err = j.Database.AddController(context.Background(), &controller1)
-				c.Assert(err, qt.Equals, nil)
+			controller1 := dbmodel.Controller{
+				Name:        "test-controller-1",
+				UUID:        "00000000-0000-0000-0000-0000-0000000000001",
+				CloudName:   "test-cloud",
+				CloudRegion: "test-region-1",
+				CloudRegions: []dbmodel.CloudRegionControllerPriority{{
+					Priority:      0,
+					CloudRegionID: cloud.Regions[0].ID,
+				}},
+			}
+			err = j.Database.AddController(context.Background(), &controller1)
+			c.Assert(err, qt.Equals, nil)
 
-				controller2 := dbmodel.Controller{
-					Name:        "test-controller-2",
-					UUID:        "00000000-0000-0000-0000-0000-0000000000002",
-					CloudName:   "test-cloud",
-					CloudRegion: "test-region-1",
-					CloudRegions: []dbmodel.CloudRegionControllerPriority{{
-						// controller2 has a higher priority and the model
-						// should be created on this controller
-						Priority:      2,
-						CloudRegionID: cloud.Regions[0].ID,
-					}},
-				}
-				err = j.Database.AddController(context.Background(), &controller2)
-				c.Assert(err, qt.Equals, nil)
+			controller2 := dbmodel.Controller{
+				Name:        "test-controller-2",
+				UUID:        "00000000-0000-0000-0000-0000-0000000000002",
+				CloudName:   "test-cloud",
+				CloudRegion: "test-region-1",
+				CloudRegions: []dbmodel.CloudRegionControllerPriority{{
+					// controller2 has a higher priority and the model
+					// should be created on this controller
+					Priority:      2,
+					CloudRegionID: cloud.Regions[0].ID,
+				}},
+			}
+			err = j.Database.AddController(context.Background(), &controller2)
+			c.Assert(err, qt.Equals, nil)
 
-				cred := dbmodel.CloudCredential{
-					Name:              "test-credential-1",
-					CloudName:         cloud.Name,
-					OwnerIdentityName: u.Name,
-					AuthType:          "empty",
-				}
-				err = j.Database.SetCloudCredential(context.Background(), &cred)
-				c.Assert(err, qt.Equals, nil)
+			cred := dbmodel.CloudCredential{
+				Name:              "test-credential-1",
+				CloudName:         cloud.Name,
+				OwnerIdentityName: u.Name,
+				AuthType:          "empty",
+			}
+			err = j.Database.SetCloudCredential(context.Background(), &cred)
+			c.Assert(err, qt.Equals, nil)
 
-				_, err = j.AddModel(context.Background(), alice, &jimm.ModelCreateArgs{
-					Name:            "test-model",
-					Owner:           names.NewUserTag(u.Name),
-					Cloud:           names.NewCloudTag(cloud.Name),
-					CloudRegion:     "test-region-1",
-					CloudCredential: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
-				})
-				c.Assert(err, qt.Equals, nil)
+			_, err = j.AddModel(context.Background(), alice, &jimm.ModelCreateArgs{
+				Name:            "test-model",
+				Owner:           names.NewUserTag(u.Name),
+				Cloud:           names.NewCloudTag(cloud.Name),
+				CloudRegion:     "test-region-1",
+				CloudCredential: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
+			})
+			c.Assert(err, qt.Equals, nil)
 
-				tag := names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1")
+			tag := names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1")
 
-				return u, tag, `cloud credential still used by 1 model\(s\)`
-			},
+			return u, tag, `cloud credential still used by 1 model\(s\)`
 		},
-		{
-			about: "user not owner of credentials - unauthorizer error",
-			createEnv: func(c *qt.C, j *jimm.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, names.CloudCredentialTag, string) {
-				u, err := dbmodel.NewIdentity("alice@canonical.com")
-				c.Assert(err, qt.IsNil)
+	}, {
+		about: "user not owner of credentials - unauthorizer error",
+		createEnv: func(c *qt.C, j *jimm.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, names.CloudCredentialTag, string) {
+			u, err := dbmodel.NewIdentity("alice@canonical.com")
+			c.Assert(err, qt.IsNil)
 
-				c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
+			c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
 
-				alice := openfga.NewUser(u, client)
+			alice := openfga.NewUser(u, client)
 
-				err = alice.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
-				c.Assert(err, qt.IsNil)
+			err = alice.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
+			c.Assert(err, qt.IsNil)
 
-				tag := names.NewCloudCredentialTag("test-cloud/eve@canonical.com/test-credential-1")
+			tag := names.NewCloudCredentialTag("test-cloud/eve@canonical.com/test-credential-1")
 
-				return u, tag, "unauthorized"
-			},
+			return u, tag, "unauthorized"
 		},
-		{
-			about:                  "error revoking credential on controller",
-			revokeCredentialErrors: []error{errors.E("test error")},
-			createEnv: func(c *qt.C, j *jimm.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, names.CloudCredentialTag, string) {
-				u, err := dbmodel.NewIdentity("alice@canonical.com")
-				c.Assert(err, qt.IsNil)
+	}, {
+		about:                  "error revoking credential on controller",
+		revokeCredentialErrors: []error{errors.E("test error")},
+		createEnv: func(c *qt.C, j *jimm.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, names.CloudCredentialTag, string) {
+			u, err := dbmodel.NewIdentity("alice@canonical.com")
+			c.Assert(err, qt.IsNil)
 
-				c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
+			c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
 
-				alice := openfga.NewUser(u, client)
+			alice := openfga.NewUser(u, client)
 
-				err = alice.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
-				c.Assert(err, qt.IsNil)
+			err = alice.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
+			c.Assert(err, qt.IsNil)
 
-				cloud := dbmodel.Cloud{
-					Name: "test-cloud",
-					Type: "test-provider",
-					Regions: []dbmodel.CloudRegion{{
-						Name: "test-region-1",
-					}},
-				}
-				c.Assert(j.Database.DB.Create(&cloud).Error, qt.IsNil)
+			cloud := dbmodel.Cloud{
+				Name: "test-cloud",
+				Type: "test-provider",
+				Regions: []dbmodel.CloudRegion{{
+					Name: "test-region-1",
+				}},
+			}
+			c.Assert(j.Database.DB.Create(&cloud).Error, qt.IsNil)
 
-				err = alice.SetCloudAccess(context.Background(), cloud.ResourceTag(), ofganames.AdministratorRelation)
-				c.Assert(err, qt.IsNil)
+			err = alice.SetCloudAccess(context.Background(), cloud.ResourceTag(), ofganames.AdministratorRelation)
+			c.Assert(err, qt.IsNil)
 
-				controller1 := dbmodel.Controller{
-					Name:        "test-controller-1",
-					UUID:        "00000000-0000-0000-0000-0000-0000000000001",
-					CloudName:   "test-cloud",
-					CloudRegion: "test-region-1",
-					CloudRegions: []dbmodel.CloudRegionControllerPriority{{
-						Priority:      0,
-						CloudRegionID: cloud.Regions[0].ID,
-					}},
-				}
-				err = j.Database.AddController(context.Background(), &controller1)
-				c.Assert(err, qt.Equals, nil)
+			controller1 := dbmodel.Controller{
+				Name:        "test-controller-1",
+				UUID:        "00000000-0000-0000-0000-0000-0000000000001",
+				CloudName:   "test-cloud",
+				CloudRegion: "test-region-1",
+				CloudRegions: []dbmodel.CloudRegionControllerPriority{{
+					Priority:      0,
+					CloudRegionID: cloud.Regions[0].ID,
+				}},
+			}
+			err = j.Database.AddController(context.Background(), &controller1)
+			c.Assert(err, qt.Equals, nil)
 
-				controller2 := dbmodel.Controller{
-					Name:        "test-controller-2",
-					UUID:        "00000000-0000-0000-0000-0000-0000000000002",
-					CloudName:   "test-cloud",
-					CloudRegion: "test-region-1",
-					CloudRegions: []dbmodel.CloudRegionControllerPriority{{
-						// controller2 has a higher priority and the model
-						// should be created on this controller
-						Priority:      2,
-						CloudRegionID: cloud.Regions[0].ID,
-					}},
-				}
-				err = j.Database.AddController(context.Background(), &controller2)
-				c.Assert(err, qt.Equals, nil)
+			controller2 := dbmodel.Controller{
+				Name:        "test-controller-2",
+				UUID:        "00000000-0000-0000-0000-0000-0000000000002",
+				CloudName:   "test-cloud",
+				CloudRegion: "test-region-1",
+				CloudRegions: []dbmodel.CloudRegionControllerPriority{{
+					// controller2 has a higher priority and the model
+					// should be created on this controller
+					Priority:      2,
+					CloudRegionID: cloud.Regions[0].ID,
+				}},
+			}
+			err = j.Database.AddController(context.Background(), &controller2)
+			c.Assert(err, qt.Equals, nil)
 
-				cred := dbmodel.CloudCredential{
-					Name:              "test-credential-1",
-					CloudName:         cloud.Name,
-					OwnerIdentityName: u.Name,
-					AuthType:          "empty",
-				}
-				err = j.Database.SetCloudCredential(context.Background(), &cred)
-				c.Assert(err, qt.Equals, nil)
+			cred := dbmodel.CloudCredential{
+				Name:              "test-credential-1",
+				CloudName:         cloud.Name,
+				OwnerIdentityName: u.Name,
+				AuthType:          "empty",
+			}
+			err = j.Database.SetCloudCredential(context.Background(), &cred)
+			c.Assert(err, qt.Equals, nil)
 
-				_, err = j.AddModel(context.Background(), alice, &jimm.ModelCreateArgs{
-					Name:            "test-model",
-					Owner:           names.NewUserTag(u.Name),
-					Cloud:           names.NewCloudTag(cloud.Name),
-					CloudRegion:     "test-region-1",
-					CloudCredential: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
-				})
-				c.Assert(err, qt.Equals, nil)
+			_, err = j.AddModel(context.Background(), alice, &jimm.ModelCreateArgs{
+				Name:            "test-model",
+				Owner:           names.NewUserTag(u.Name),
+				Cloud:           names.NewCloudTag(cloud.Name),
+				CloudRegion:     "test-region-1",
+				CloudCredential: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
+			})
+			c.Assert(err, qt.Equals, nil)
 
-				tag := names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1")
+			tag := names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1")
 
-				return u, tag, "test error"
-			},
+			return u, tag, "test error"
 		},
-	}
+	}}
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
 			var mu sync.Mutex
 			revokeErrors := test.revokeCredentialErrors
 			api := &jimmtest.API{
-				CredentialContents_: func(ctx context.Context, args jujuparams.CloudCredentialArgs) (jujuparams.CredentialContentResults, error) {
-					if test.returnACredentialContent {
-						return jujuparams.CredentialContentResults{
-							Results: []jujuparams.CredentialContentResult{
-								{
-									Result: &jujuparams.ControllerCredentialInfo{
-										Content: jujuparams.CredentialContent{
-											Name: "test-credential-1",
-										},
-										Models: []jujuparams.ModelAccess{
-											{
-												Model:  "test-model",
-												Access: "administrator",
-											},
-										},
-									},
-								},
-							},
-						}, nil
+				SupportsCheckCredentialModels_: true,
+				CheckCredentialModels_: func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
+					if test.stillUsedByAModel {
+						return []jujuparams.UpdateCredentialModelResult{{
+							ModelUUID: "00000001-0000-0000-0000-0000-000000000001",
+							ModelName: "test-model",
+						}}, nil
 					}
-					return jujuparams.CredentialContentResults{
-						Results: []jujuparams.CredentialContentResult{
-							{
-								Result: &jujuparams.ControllerCredentialInfo{
-									Content: jujuparams.CredentialContent{},
-									Models:  []jujuparams.ModelAccess{},
-								},
-							},
-						},
-					}, nil
+					return []jujuparams.UpdateCredentialModelResult{}, nil
 				},
 				RevokeCredential_: func(context.Context, names.CloudCredentialTag) error {
 					mu.Lock()

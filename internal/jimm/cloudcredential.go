@@ -86,22 +86,30 @@ func (j *JIMM) RevokeCloudCredential(ctx context.Context, user *dbmodel.Identity
 	}
 	controllers := uuidPermSet.GetControllers()
 
-	err = j.forEachController(ctx, controllers, func(c *dbmodel.Controller, api API) error {
-		res, err := api.CredentialContents(ctx, jujuparams.CloudCredentialArgs{})
-		if err != nil {
-			return err
-		}
-
-		// if the cloud credential is still used by any model we return an error
-		for _, r := range res.Results {
-			if len(r.Result.Models) > 0 && !force {
-				return errors.E(op, errors.CodeBadRequest, fmt.Sprintf("cloud credential still used by %d model(s)", len(r.Result.Models)))
+	if !force {
+		err = j.forEachController(ctx, controllers, func(c *dbmodel.Controller, api API) error {
+			models, err := api.CheckCredentialModels(ctx, jujuparams.TaggedCredential{
+				Tag: tag.Id(),
+				Credential: jujuparams.CloudCredential{
+					AuthType:   credential.AuthType,
+					Attributes: credential.Attributes,
+				},
+			})
+			if err != nil {
+				return err
 			}
+
+			// if the cloud credential is still used by any model(s) we return an error
+			for range models {
+				if len(models) > 0 {
+					return errors.E(op, errors.CodeBadRequest, fmt.Sprintf("cloud credential still used by %d model(s)", len(models)))
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			return errors.E(op, err)
 		}
-		return nil
-	})
-	if err != nil {
-		return errors.E(op, err)
 	}
 
 	err = j.forEachController(ctx, controllers, func(ctl *dbmodel.Controller, api API) error {
