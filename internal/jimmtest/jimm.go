@@ -22,7 +22,7 @@ func NewTestJimmParams(t Tester) jimm.Params {
 			Scopes:              []string{oidc.ScopeOpenID, "profile", "email"},
 			SessionTokenExpiry:  time.Duration(time.Hour),
 			SessionCookieMaxAge: 60,
-			JWTSessionKey:       "test-secret",
+			JWTSessionKey:       JWTTestSecret,
 		},
 		DashboardFinalRedirectURL: "dashboard-url",
 	}
