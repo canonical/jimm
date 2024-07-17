@@ -19,6 +19,7 @@ import (
 	"github.com/canonical/jimm/internal/auth"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/jimmtest"
 	"github.com/coreos/go-oidc/v3/oidc"
 	qt "github.com/frankban/quicktest"
@@ -56,8 +57,6 @@ func setupTestAuthSvc(ctx context.Context, c *qt.C, expiry time.Duration) (*auth
 
 // This test requires the local docker compose to be running and keycloak
 // to be available.
-//
-// TODO(ale8k): Use a mock for this and also device below, but future work???
 func TestAuthCodeURL(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
@@ -205,6 +204,20 @@ func TestSessionTokenRejectsExpiredToken(t *testing.T) {
 
 	_, err = authSvc.VerifySessionToken(token)
 	c.Assert(err, qt.ErrorMatches, `JIMM session token expired`)
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeUnauthorized)
+}
+
+func TestSessionTokenRejectsEmptyToken(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := context.Background()
+
+	noDuration := time.Duration(0)
+	authSvc, _, _ := setupTestAuthSvc(ctx, c, noDuration)
+
+	_, err := authSvc.VerifySessionToken("")
+	c.Assert(err, qt.ErrorMatches, `no token presented`)
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeUnauthorized)
 }
 
 func TestSessionTokenValidatesEmail(t *testing.T) {
@@ -220,6 +233,7 @@ func TestSessionTokenValidatesEmail(t *testing.T) {
 
 	_, err = authSvc.VerifySessionToken(token)
 	c.Assert(err, qt.ErrorMatches, "failed to parse email")
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeUnauthorized)
 }
 
 func TestVerifyClientCredentials(t *testing.T) {
