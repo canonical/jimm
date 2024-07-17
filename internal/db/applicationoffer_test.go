@@ -231,6 +231,7 @@ func (s *dbSuite) TestFindApplicationOffers(c *qt.C) {
 		Name:                   "offer-1",
 		ModelID:                env.model.ID,
 		ApplicationName:        "app-1",
+		URL:                    "url-1",
 		ApplicationDescription: "this is a test application description",
 		Endpoints: []dbmodel.ApplicationOfferRemoteEndpoint{{
 			Name:      "test-endpoint-1",
@@ -249,6 +250,7 @@ func (s *dbSuite) TestFindApplicationOffers(c *qt.C) {
 		UUID:                   "00000000-0000-0000-0000-000000000002",
 		Name:                   "offer-2",
 		ModelID:                env.model.ID,
+		URL:                    "url-2",
 		ApplicationName:        "app-1",
 		ApplicationDescription: "this is another test offer",
 		Endpoints: []dbmodel.ApplicationOfferRemoteEndpoint{{
@@ -264,6 +266,7 @@ func (s *dbSuite) TestFindApplicationOffers(c *qt.C) {
 		UUID:                   "00000000-0000-0000-0000-000000000003",
 		Name:                   "test-3",
 		ModelID:                env.model.ID,
+		URL:                    "url-3",
 		ApplicationName:        "app-1",
 		ApplicationDescription: "this is yet another application offer",
 		Endpoints: []dbmodel.ApplicationOfferRemoteEndpoint{{
