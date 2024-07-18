@@ -5,6 +5,7 @@ package jimm
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"sort"
 	"strings"
 
@@ -68,6 +69,19 @@ func (j *JIMM) Offer(ctx context.Context, user *openfga.User, offer AddApplicati
 		ApplicationName: offer.OfferName,
 	}
 
+	// Verify offer URL doesn't already exist.
+	var offerCheck dbmodel.ApplicationOffer
+	offerCheck.URL = offerURL.String()
+	err = j.Database.GetApplicationOffer(ctx, &offerCheck)
+	if err == nil {
+		return errors.E(fmt.Sprintf("offer %s already exists, use a different name", offerURL.String()), errors.CodeAlreadyExists)
+	} else {
+		if errors.ErrorCode(err) != errors.CodeNotFound {
+			// Anything besides Not Found is a problem.
+			return errors.E(op, err)
+		}
+	}
+
 	api, err := j.dial(ctx, &model.Controller, names.ModelTag{})
 	if err != nil {
 		return errors.E(op, err)
@@ -108,10 +122,6 @@ func (j *JIMM) Offer(ctx context.Context, user *openfga.User, offer AddApplicati
 
 	var doc dbmodel.ApplicationOffer
 	doc.FromJujuApplicationOfferAdminDetailsV5(offerDetails)
-	if err != nil {
-		zapctx.Error(ctx, "failed to convert application offer details", zaputil.Error(err))
-		return errors.E(op, err)
-	}
 	doc.ModelID = model.ID
 	err = j.Database.Transaction(func(db *db.Database) error {
 		if err := db.AddApplicationOffer(ctx, &doc); err != nil {

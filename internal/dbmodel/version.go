@@ -20,7 +20,7 @@ const (
 	// Minor is the minor version of the model described in the dbmodel
 	// package. It should be incremented for any change made to the
 	// database model from database model in a released JIMM.
-	Minor = 10
+	Minor = 11
 )
 
 type Version struct {

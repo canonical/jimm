@@ -67,7 +67,7 @@ func (s *applicationOffersSuite) TestOffer(c *gc.C) {
 	c.Assert(results, gc.HasLen, 1)
 	c.Assert(results[0].Error, gc.Equals, (*jujuparams.Error)(nil))
 
-	results, err = client.Offer(s.Model.UUID.String, "no-such-app", []string{s.endpoint.Name}, "bob@canonical.com", "test-offer", "test offer description")
+	results, err = client.Offer(s.Model.UUID.String, "no-such-app", []string{s.endpoint.Name}, "bob@canonical.com", "test-offer-foo", "test offer description")
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(results, gc.HasLen, 1)
 	c.Assert(results[0].Error, gc.Not(gc.IsNil))
@@ -81,6 +81,29 @@ func (s *applicationOffersSuite) TestOffer(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(results, gc.HasLen, 1)
 	c.Assert(results[0].Error.Code, gc.Equals, "unauthorized access")
+}
+
+func (s *applicationOffersSuite) TestCreateMultipleOffersForSameApp(c *gc.C) {
+	conn := s.open(c, nil, "bob@canonical.com")
+	defer conn.Close()
+	client := applicationoffers.NewClient(conn)
+
+	results, err := client.Offer(s.Model.UUID.String, "test-app", []string{s.endpoint.Name}, "bob@canonical.com", "test-offer", "test offer description")
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(results, gc.HasLen, 1)
+	c.Assert(results[0].Error, gc.Equals, (*jujuparams.Error)(nil))
+
+	// Creating an offer with the same name as above.
+	results, err = client.Offer(s.Model.UUID.String, "test-app", []string{s.endpoint.Name}, "bob@canonical.com", "test-offer", "test offer description")
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(results, gc.HasLen, 1)
+	c.Assert(results[0].Error, gc.ErrorMatches, `offer bob@canonical.com/model-1.test-offer already exists, use a different name.*`)
+
+	// Creating an offer with a new name.
+	results, err = client.Offer(s.Model.UUID.String, "test-app", []string{s.endpoint.Name}, "bob@canonical.com", "test-offer-foo", "test offer description")
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(results, gc.HasLen, 1)
+	c.Assert(results[0].Error, gc.Equals, (*jujuparams.Error)(nil))
 }
 
 func (s *applicationOffersSuite) TestGetConsumeDetails(c *gc.C) {
