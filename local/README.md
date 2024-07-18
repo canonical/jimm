@@ -6,7 +6,7 @@ used for integration testing within the JIMM test suite.
 
 # Starting the environment
 1. Ensure you have `make` installed `sudo apt install make`
-2. Check for system dependencies with `make sysdeps` this will inform you of any missing dependencies and how to install them.
+2. Check for system dependencies with `make sys-deps` this will inform you of any missing dependencies and how to install them.
 3. Set up necessary prerequisites with `make dev-env-setup`
 4. Start the dev env `make dev-env`, going forward you can skip steps 1-3.
 5. To teardown the dev env `make dev-env-cleanup`
