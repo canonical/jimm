@@ -89,7 +89,7 @@ func (j *JIMM) RevokeCloudCredential(ctx context.Context, user *dbmodel.Identity
 	if !force {
 		err = j.forEachController(ctx, controllers, func(c *dbmodel.Controller, api API) error {
 			models, err := api.CheckCredentialModels(ctx, jujuparams.TaggedCredential{
-				Tag: tag.Id(),
+				Tag: tag.String(), // Tagged Credentials require stringified tag, not tag IDs (WHY??????)
 				Credential: jujuparams.CloudCredential{
 					AuthType:   credential.AuthType,
 					Attributes: credential.Attributes,
