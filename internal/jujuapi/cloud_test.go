@@ -491,9 +491,6 @@ func (s *cloudSuite) TestRevokeCredentialsCheckModels(c *gc.C) {
 	client := cloudapi.NewClient(conn)
 	credTag := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/test@canonical.com/cred")
 
-	a, b := credTag.Id(), credTag.String()
-	_, _ = a, b
-
 	_, err := client.UpdateCredentialsCheckModels(
 		credTag,
 		cloud.NewCredential("empty", nil),
