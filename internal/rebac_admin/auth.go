@@ -1,6 +1,6 @@
 // Copyright 2024 Canonical Ltd.
 
-package rebac
+package rebac_admin
 
 import (
 	"net/http"

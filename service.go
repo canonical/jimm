@@ -38,10 +38,9 @@ import (
 	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 	"github.com/canonical/jimm/internal/pubsub"
-	"github.com/canonical/jimm/internal/rebac"
+	"github.com/canonical/jimm/internal/rebac_admin"
 	"github.com/canonical/jimm/internal/vault"
 	"github.com/canonical/jimm/internal/wellknownapi"
-	rebachandlers "github.com/canonical/rebac-admin-ui-handlers/v1"
 )
 
 const (
@@ -376,7 +375,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		return nil, errors.E(op, err, "failed to parse final redirect url for the dashboard")
 	}
 
-	rebacBackend, err := s.setupRebacBackend(ctx)
+	rebacBackend, err := rebac_admin.SetupBackend(ctx)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
@@ -458,20 +457,6 @@ func (s *Service) setupDischarger(p Params) (*discharger.MacaroonDischarger, err
 		return nil, errors.E(err)
 	}
 	return MacaroonDischarger, nil
-}
-
-func (s *Service) setupRebacBackend(ctx context.Context) (*rebachandlers.ReBACAdminBackend, error) {
-	const op = errors.Op("setupRebacBackend")
-
-	rebacBackend, err := rebachandlers.NewReBACAdminBackend(rebachandlers.ReBACAdminBackendParams{
-		Authenticator: &rebac.Authenticator{},
-	})
-	if err != nil {
-		zapctx.Error(ctx, "failed to create rebac admin backend", zap.Error(err))
-		return nil, errors.E(op, err, "failed to create rebac admin backend")
-	}
-
-	return rebacBackend, nil
 }
 
 func (s *Service) setupSessionStore(ctx context.Context, sessionSecret []byte) (*pgstore.PGStore, error) {
