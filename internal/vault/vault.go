@@ -17,6 +17,7 @@ import (
 	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
 	"github.com/lestrrat-go/jwx/v2/jwk"
+	"go.uber.org/zap"
 
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/servermon"
@@ -475,11 +476,13 @@ func (s *VaultStore) client(ctx context.Context) (*api.Client, error) {
 		roleSecretID,
 	)
 	if err != nil {
+		zapctx.Error(ctx, "unable to initialize approle auth method", zap.Error(err))
 		return nil, errors.E(op, err, "unable to initialize approle auth method")
 	}
 
 	authInfo, err := s.Client.Auth().Login(ctx, appRoleAuth)
 	if err != nil {
+		zapctx.Error(ctx, "unable to login to approle auth method", zap.Error(err))
 		return nil, errors.E(op, err, "unable to login to approle auth method")
 	}
 	if authInfo == nil {
