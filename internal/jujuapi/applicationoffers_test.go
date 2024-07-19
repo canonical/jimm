@@ -97,7 +97,7 @@ func (s *applicationOffersSuite) TestCreateMultipleOffersForSameApp(c *gc.C) {
 	results, err = client.Offer(s.Model.UUID.String, "test-app", []string{s.endpoint.Name}, "bob@canonical.com", "test-offer", "test offer description")
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(results, gc.HasLen, 1)
-	c.Assert(results[0].Error, gc.ErrorMatches, `offer bob@canonical.com/model-1.test-offer already exists, use a different name.*`)
+	c.Assert(results[0].Error, gc.ErrorMatches, `offer bob@canonical.com/model-1.test-offer already exists, please use a different name.*`)
 
 	// Creating an offer with a new name.
 	results, err = client.Offer(s.Model.UUID.String, "test-app", []string{s.endpoint.Name}, "bob@canonical.com", "test-offer-foo", "test offer description")
