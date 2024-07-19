@@ -74,7 +74,7 @@ func (j *JIMM) Offer(ctx context.Context, user *openfga.User, offer AddApplicati
 	offerCheck.URL = offerURL.String()
 	err = j.Database.GetApplicationOffer(ctx, &offerCheck)
 	if err == nil {
-		return errors.E(fmt.Sprintf("offer %s already exists, use a different name", offerURL.String()), errors.CodeAlreadyExists)
+		return errors.E(fmt.Sprintf("offer %s already exists, please use a different name", offerURL.String()), errors.CodeAlreadyExists)
 	} else {
 		if errors.ErrorCode(err) != errors.CodeNotFound {
 			// Anything besides Not Found is a problem.
