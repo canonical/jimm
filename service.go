@@ -38,6 +38,7 @@ import (
 	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 	"github.com/canonical/jimm/internal/pubsub"
+	"github.com/canonical/jimm/internal/rebac_admin"
 	"github.com/canonical/jimm/internal/vault"
 	"github.com/canonical/jimm/internal/wellknownapi"
 )
@@ -374,12 +375,19 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		return nil, errors.E(op, err, "failed to parse final redirect url for the dashboard")
 	}
 
+	rebacBackend, err := rebac_admin.SetupBackend(ctx)
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+
 	// Setup all HTTP handlers.
 	mountHandler := func(path string, h jimmhttp.JIMMHttpHandler) {
 		s.mux.Mount(path, h.Routes())
 	}
 
 	s.mux.Mount("/metrics", promhttp.Handler())
+
+	s.mux.Mount("/rebac", rebacBackend.Handler(""))
 
 	mountHandler(
 		"/debug",

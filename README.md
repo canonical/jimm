@@ -29,7 +29,7 @@ Since a refresh of the project, there was an addition of delegated authorization
 
 A couple of system packages are required in order to set up a development
 environment. To install them, run the following:
-`make sysdeps`
+`make sys-deps`
 
 At this point, from the root of this branch, run the command:
 `make install`
@@ -52,7 +52,7 @@ $ make test-env
 $ go test ./...
 ```
 ### Pre-requisite
-To check if your system has all the prequisites installed simply run `make sysdeps`.
+To check if your system has all the prequisites installed simply run `make sys-deps`.
 This will check for all test prequisites and inform you how to install them if not installed. 
 You will need to install `make` first with `sudo apt install make`
 
