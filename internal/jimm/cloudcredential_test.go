@@ -374,7 +374,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 					CloudRegionID: cloud.Regions[0].ID,
 				}},
 			}
-			err = j.Database.AddController(context.Background(), &controller1)
+			err = j.AddController(context.Background(), alice, &controller1)
 			c.Assert(err, qt.Equals, nil)
 
 			controller2 := dbmodel.Controller{
@@ -389,7 +389,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 					CloudRegionID: cloud.Regions[0].ID,
 				}},
 			}
-			err = j.Database.AddController(context.Background(), &controller2)
+			err = j.AddController(context.Background(), alice, &controller2)
 			c.Assert(err, qt.Equals, nil)
 
 			cred := dbmodel.CloudCredential{
@@ -737,6 +737,24 @@ func TestUpdateCloudCredential(t *testing.T) {
 				GrantJIMMModelAdmin_: func(_ context.Context, _ names.ModelTag) error {
 					return nil
 				},
+				// Used for adding a controller
+				ControllerModelSummary_: func(ctx context.Context, ms *jujuparams.ModelSummary) error {
+					ms.CloudTag = names.NewCloudTag("test-cloud").String()
+					return nil
+				},
+				// Used for adding a controller
+				Clouds_: func(ctx context.Context) (map[names.CloudTag]jujuparams.Cloud, error) {
+					return map[names.CloudTag]jujuparams.Cloud{
+						names.NewCloudTag("test-cloud"): jujuparams.Cloud{
+							Type: "test-provider",
+							Regions: []jujuparams.CloudRegion{
+								{
+									Name: "test-region-1",
+								},
+							},
+						},
+					}, nil
+				},
 				CreateModel_: func(ctx context.Context, args *jujuparams.ModelCreateArgs, mi *jujuparams.ModelInfo) error {
 					mi.Name = args.Name
 					mi.UUID = "00000001-0000-0000-0000-0000-000000000001"
@@ -871,6 +889,7 @@ func TestRevokeCloudCredential(t *testing.T) {
 	tests := []struct {
 		about                  string
 		revokeCredentialErrors []error
+		stillUsedByAModel      bool
 		createEnv              func(*qt.C, *jimm.JIMM, *openfga.OFGAClient) (*dbmodel.Identity, names.CloudCredentialTag, string)
 	}{{
 		about: "credential revoked",
@@ -1017,7 +1036,8 @@ func TestRevokeCloudCredential(t *testing.T) {
 			return u, tag, ""
 		},
 	}, {
-		about: "credential still used by a model",
+		about:             "credential still used by a model",
+		stillUsedByAModel: true,
 		createEnv: func(c *qt.C, j *jimm.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, names.CloudCredentialTag, string) {
 			u, err := dbmodel.NewIdentity("alice@canonical.com")
 			c.Assert(err, qt.IsNil)
@@ -1171,6 +1191,15 @@ func TestRevokeCloudCredential(t *testing.T) {
 			err = j.Database.SetCloudCredential(context.Background(), &cred)
 			c.Assert(err, qt.Equals, nil)
 
+			_, err = j.AddModel(context.Background(), alice, &jimm.ModelCreateArgs{
+				Name:            "test-model",
+				Owner:           names.NewUserTag(u.Name),
+				Cloud:           names.NewCloudTag(cloud.Name),
+				CloudRegion:     "test-region-1",
+				CloudCredential: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
+			})
+			c.Assert(err, qt.Equals, nil)
+
 			tag := names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1")
 
 			return u, tag, "test error"
@@ -1181,6 +1210,16 @@ func TestRevokeCloudCredential(t *testing.T) {
 			var mu sync.Mutex
 			revokeErrors := test.revokeCredentialErrors
 			api := &jimmtest.API{
+				SupportsCheckCredentialModels_: true,
+				CheckCredentialModels_: func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
+					if test.stillUsedByAModel {
+						return []jujuparams.UpdateCredentialModelResult{{
+							ModelUUID: "00000001-0000-0000-0000-0000-000000000001",
+							ModelName: "test-model",
+						}}, nil
+					}
+					return []jujuparams.UpdateCredentialModelResult{}, nil
+				},
 				RevokeCredential_: func(context.Context, names.CloudCredentialTag) error {
 					mu.Lock()
 					defer mu.Unlock()

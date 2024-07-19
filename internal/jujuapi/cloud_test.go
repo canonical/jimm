@@ -490,6 +490,7 @@ func (s *cloudSuite) TestRevokeCredentialsCheckModels(c *gc.C) {
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
 	credTag := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/test@canonical.com/cred")
+
 	_, err := client.UpdateCredentialsCheckModels(
 		credTag,
 		cloud.NewCredential("empty", nil),
@@ -514,6 +515,7 @@ func (s *cloudSuite) TestRevokeCredentialsCheckModels(c *gc.C) {
 	_, err = mmclient.CreateModel("test", "test@canonical.com", jimmtest.TestCloudName, jimmtest.TestCloudRegionName, credTag, nil)
 	c.Assert(err, gc.Equals, nil)
 
+	// Test when its still used by a model
 	var resp jujuparams.ErrorResults
 	err = conn.APICall("Cloud", 7, "", "RevokeCredentialsCheckModels", jujuparams.RevokeCredentialArgs{
 		Credentials: []jujuparams.RevokeCredentialArg{{
@@ -524,6 +526,7 @@ func (s *cloudSuite) TestRevokeCredentialsCheckModels(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(resp.Results[0].Error, gc.ErrorMatches, `cloud credential still used by 1 model\(s\)`)
 
+	// Test forcing the update, despite being still used by a model
 	resp.Results = nil
 	err = conn.APICall("Cloud", 7, "", "RevokeCredentialsCheckModels", jujuparams.RevokeCredentialArgs{
 		Credentials: []jujuparams.RevokeCredentialArg{{
@@ -534,6 +537,7 @@ func (s *cloudSuite) TestRevokeCredentialsCheckModels(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(resp.Results[0].Error, gc.IsNil)
 
+	// After the forced update, make sure it's no longer found on the controller
 	ccr, err = client.Credentials(credTag)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(ccr, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
@@ -543,6 +547,8 @@ func (s *cloudSuite) TestRevokeCredentialsCheckModels(c *gc.C) {
 		},
 	}})
 
+	// After the forced update, make sure there's no association between the user
+	// and the revoked credentials
 	tags, err = client.UserCredentials(credTag.Owner(), credTag.Cloud())
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(tags, jc.DeepEquals, []names.CloudCredentialTag{})
