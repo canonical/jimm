@@ -19,5 +19,5 @@ func (s *EntitlementsService) ListEntitlements(ctx context.Context, params *reso
 
 // RawEntitlements returns the list of entitlements as raw text.
 func (s *EntitlementsService) RawEntitlements(ctx context.Context) (string, error) {
-	return string(openfgastatic.AuthModelFileDSL), nil
+	return string(openfgastatic.AuthModelDSL), nil
 }
