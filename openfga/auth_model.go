@@ -10,3 +10,6 @@ import (
 
 //go:embed authorisation_model.json
 var AuthModelFile []byte
+
+//go:embed authorisation_model.fga
+var AuthModelFileDSL []byte

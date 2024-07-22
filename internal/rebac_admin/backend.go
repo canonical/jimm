@@ -14,6 +14,7 @@ func SetupBackend(ctx context.Context) (*rebachandlers.ReBACAdminBackend, error)
 
 	rebacBackend, err := rebachandlers.NewReBACAdminBackend(rebachandlers.ReBACAdminBackendParams{
 		Authenticator: &Authenticator{},
+		Entitlements:  &EntitlementsService{},
 	})
 	if err != nil {
 		zapctx.Error(ctx, "failed to create rebac admin backend", zap.Error(err))

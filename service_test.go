@@ -293,6 +293,32 @@ func TestRebacAdminApi(t *testing.T) {
 	c.Assert(response.StatusCode, qt.Equals, 200)
 }
 
+func TestRebacEntitlementsApi(t *testing.T) {
+	c := qt.New(t)
+
+	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
+	c.Assert(err, qt.IsNil)
+
+	p := jimmtest.NewTestJimmParams(c)
+	p.InsecureSecretStorage = true
+	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
+
+	svc, err := jimm.NewService(context.Background(), p)
+	c.Assert(err, qt.IsNil)
+	defer svc.Cleanup()
+
+	srv := httptest.NewTLSServer(svc)
+	c.Cleanup(srv.Close)
+
+	response, err := srv.Client().Get(srv.URL + "/rebac/v1/entitlements")
+	c.Assert(err, qt.IsNil)
+	c.Assert(response.StatusCode, qt.Equals, 200)
+
+	responseRaw, err := srv.Client().Get(srv.URL + "/rebac/v1/entitlements/raw")
+	c.Assert(err, qt.IsNil)
+	c.Assert(responseRaw.StatusCode, qt.Equals, 200)
+}
+
 func TestThirdPartyCaveatDischarge(t *testing.T) {
 	c := qt.New(t)
 
