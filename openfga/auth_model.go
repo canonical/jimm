@@ -9,4 +9,7 @@ import (
 )
 
 //go:embed authorisation_model.json
-var AuthModelFile []byte
+var AuthModelJSON []byte
+
+//go:embed authorisation_model.fga
+var AuthModelDSL []byte

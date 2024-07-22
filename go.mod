@@ -45,7 +45,7 @@ require (
 require (
 	github.com/antonlindstrom/pgstore v0.0.0-20220421113606-e3a6e3fed12a
 	github.com/canonical/ofga v0.10.0
-	github.com/canonical/rebac-admin-ui-handlers v0.0.0-20240702080748-d1d377dd37b3
+	github.com/canonical/rebac-admin-ui-handlers v0.0.0-20240717130927-038848181576
 	github.com/coreos/go-oidc/v3 v3.9.0
 	github.com/dustinkirkland/golang-petname v0.0.0-20231002161417-6a283f1aaaf2
 	github.com/go-chi/chi/v5 v5.0.12
