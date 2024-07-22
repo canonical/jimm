@@ -22,12 +22,12 @@ import (
 	"github.com/juju/juju/core/macaroon"
 	"github.com/juju/names/v5"
 
+	jimmsvc "github.com/canonical/jimm/cmd/jimmsrv/service"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/jimmtest"
 	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 	"github.com/canonical/jimm/internal/vault"
-	jimmsvc "github.com/canonical/jimm/pkg/service"
 )
 
 func TestMain(m *testing.M) {

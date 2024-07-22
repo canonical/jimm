@@ -16,8 +16,8 @@ import (
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
+	jimmsvc "github.com/canonical/jimm/cmd/jimmsrv/service"
 	"github.com/canonical/jimm/internal/errors"
-	jimmsvc "github.com/canonical/jimm/pkg/service"
 	"github.com/canonical/jimm/version"
 )
 
