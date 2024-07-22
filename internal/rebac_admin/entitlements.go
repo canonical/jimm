@@ -1,4 +1,4 @@
-// Copyright 2023 canonical.
+// Copyright 2024 canonical.
 
 package rebac_admin
 
@@ -9,6 +9,7 @@ import (
 	"github.com/canonical/rebac-admin-ui-handlers/v1/resources"
 )
 
+// EntitlementsService implements the `EntitlementsService` interface from rebac-admin-ui-handlers library
 type EntitlementsService struct{}
 
 // ListEntitlements returns the list of entitlements in JSON format.

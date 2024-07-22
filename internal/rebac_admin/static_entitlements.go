@@ -1,10 +1,11 @@
-// Copyright 2023 canonical.
+// Copyright 2024 canonical.
 
 package rebac_admin
 
 import "github.com/canonical/rebac-admin-ui-handlers/v1/resources"
 
-// For rebac v1 this list is kept manually
+// For rebac v1 this list is kept manually.
+// The reason behind that is we want to decide what relations to expose to rebac admin ui.
 var EntitlementsList = []resources.EntityEntitlement{
 	// applicationoffer
 	{EntitlementType: "administrator", EntityName: "user", EntityType: "applicationoffer"},
