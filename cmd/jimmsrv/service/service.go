@@ -1,6 +1,6 @@
 // Copyright 2021 Canonical Ltd.
 
-package jimm
+package service
 
 import (
 	"context"
