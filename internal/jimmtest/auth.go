@@ -19,11 +19,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/canonical/jimm/internal/auth"
-	"github.com/canonical/jimm/internal/db"
-	"github.com/canonical/jimm/internal/jimm"
-	"github.com/canonical/jimm/internal/jimmhttp"
-	"github.com/canonical/jimm/internal/openfga"
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/sessions"
@@ -31,6 +26,12 @@ import (
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwt"
+
+	"github.com/canonical/jimm/internal/auth"
+	"github.com/canonical/jimm/internal/db"
+	"github.com/canonical/jimm/internal/jimm"
+	"github.com/canonical/jimm/internal/jimmhttp"
+	"github.com/canonical/jimm/internal/openfga"
 )
 
 const (
