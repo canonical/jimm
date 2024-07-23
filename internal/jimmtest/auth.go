@@ -19,6 +19,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/canonical/jimm/internal/auth"
+	"github.com/canonical/jimm/internal/db"
+	"github.com/canonical/jimm/internal/jimm"
+	"github.com/canonical/jimm/internal/jimmhttp"
+	"github.com/canonical/jimm/internal/openfga"
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/sessions"
@@ -26,12 +31,6 @@ import (
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwt"
-
-	"github.com/canonical/jimm/internal/auth"
-	"github.com/canonical/jimm/internal/db"
-	"github.com/canonical/jimm/internal/jimm"
-	"github.com/canonical/jimm/internal/jimmhttp"
-	"github.com/canonical/jimm/internal/openfga"
 )
 
 const (
@@ -63,6 +62,7 @@ func (a Authenticator) Authenticate(_ context.Context, _ *jujuparams.LoginReques
 
 type MockOAuthAuthenticator struct {
 	jimm.OAuthAuthenticator
+	AuthenticateBrowserSession_ func(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error)
 }
 
 func NewMockOAuthAuthenticator(secretKey string) MockOAuthAuthenticator {
@@ -90,6 +90,9 @@ func (m MockOAuthAuthenticator) VerifySessionToken(token string) (jwt.Token, err
 }
 
 func (m MockOAuthAuthenticator) AuthenticateBrowserSession(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error) {
+	if m.AuthenticateBrowserSession_ != nil {
+		return m.AuthenticateBrowserSession_(ctx, w, req)
+	}
 	return ctx, errors.New("authentication failed")
 }
 

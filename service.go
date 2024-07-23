@@ -375,7 +375,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		return nil, errors.E(op, err, "failed to parse final redirect url for the dashboard")
 	}
 
-	rebacBackend, err := rebac_admin.SetupBackend(ctx)
+	rebacBackend, err := rebac_admin.SetupBackend(ctx, &s.jimm)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}

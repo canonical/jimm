@@ -1,19 +1,22 @@
+// Copyright 2024 Canonical Ltd.
+
 package rebac_admin
 
 import (
 	"context"
 
 	"github.com/canonical/jimm/internal/errors"
-	rebachandlers "github.com/canonical/rebac-admin-ui-handlers/v1"
+	"github.com/canonical/jimm/internal/jimm"
+	rebac_handlers "github.com/canonical/rebac-admin-ui-handlers/v1"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 )
 
-func SetupBackend(ctx context.Context) (*rebachandlers.ReBACAdminBackend, error) {
-	const op = errors.Op("setupRebacBackend")
+func SetupBackend(ctx context.Context, jimm *jimm.JIMM) (*rebac_handlers.ReBACAdminBackend, error) {
+	const op = errors.Op("rebac_admin.SetupBackend")
 
-	rebacBackend, err := rebachandlers.NewReBACAdminBackend(rebachandlers.ReBACAdminBackendParams{
-		Authenticator: &Authenticator{},
+	rebacBackend, err := rebac_handlers.NewReBACAdminBackend(rebac_handlers.ReBACAdminBackendParams{
+		Authenticator: newAuthenticator(jimm),
 		Entitlements:  &EntitlementsService{},
 	})
 	if err != nil {

@@ -13,6 +13,7 @@ import (
 	sdk "github.com/openfga/go-sdk"
 	"gopkg.in/errgo.v1"
 
+	svc "github.com/canonical/jimm"
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/openfga"
 	auth_model "github.com/canonical/jimm/openfga"
@@ -164,4 +165,16 @@ func TruncateOpenFgaTuples(ctx context.Context) error {
 	conn.Exec(ctx, "TRUNCATE TABLE tuple;")
 	conn.Exec(ctx, "TRUNCATE TABLE changelog;")
 	return nil
+}
+
+// Reshapes cofga OpenFGAParams to jimm OpenFGAParams
+func CofgaParamsToJIMMOpenFGAParams(cofgaParams cofga.OpenFGAParams) svc.OpenFGAParams {
+	return svc.OpenFGAParams{
+		Scheme:    cofgaParams.Scheme,
+		Host:      cofgaParams.Host,
+		Port:      cofgaParams.Port,
+		Store:     cofgaParams.StoreID,
+		Token:     cofgaParams.Token,
+		AuthModel: cofgaParams.AuthModelID,
+	}
 }
