@@ -59,7 +59,6 @@ func (r *controllerRoot) AddGroup(ctx context.Context, req apiparams.AddGroupReq
 	if !jimmnames.IsValidGroupName(req.Name) {
 		return errors.E(op, errors.CodeBadRequest, "invalid group name")
 	}
-
 	if err := r.jimm.AddGroup(ctx, r.user, req.Name); err != nil {
 		zapctx.Error(ctx, "failed to add group", zaputil.Error(err))
 		return errors.E(op, err)
@@ -119,18 +118,13 @@ func (r *controllerRoot) ListGroups(ctx context.Context, req apiparams.ListGroup
 // within OpenFGA.
 func (r *controllerRoot) AddRelation(ctx context.Context, req apiparams.AddRelationRequest) error {
 	const op = errors.Op("jujuapi.AddRelation")
-
-	if !r.user.JimmAdmin {
-		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
-	}
 	keys, err := r.parseTuples(ctx, req.Tuples)
 	if err != nil {
 		return errors.E(err)
 	}
-	err = r.jimm.AuthorizationClient().AddRelation(ctx, keys...)
-	if err != nil {
-		zapctx.Error(ctx, "failed to add tuple(s)", zap.NamedError("add-relation-error", err))
-		return errors.E(op, errors.CodeOpenFGARequestFailed, err)
+	if err := r.jimm.AddRelation(ctx, r.user, keys); err != nil {
+		zapctx.Error(ctx, "failed to add relation", zaputil.Error(err))
+		return errors.E(op, err)
 	}
 	return nil
 }
@@ -140,14 +134,11 @@ func (r *controllerRoot) AddRelation(ctx context.Context, req apiparams.AddRelat
 func (r *controllerRoot) RemoveRelation(ctx context.Context, req apiparams.RemoveRelationRequest) error {
 	const op = errors.Op("jujuapi.RemoveRelation")
 
-	if !r.user.JimmAdmin {
-		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
-	}
 	keys, err := r.parseTuples(ctx, req.Tuples)
 	if err != nil {
 		return errors.E(op, err)
 	}
-	err = r.jimm.AuthorizationClient().RemoveRelation(ctx, keys...)
+	err = r.jimm.RemoveRelation(ctx, r.user, keys)
 	if err != nil {
 		zapctx.Error(ctx, "failed to delete tuple(s)", zap.NamedError("remove-relation-error", err))
 		return errors.E(op, err)
@@ -167,20 +158,12 @@ func (r *controllerRoot) CheckRelation(ctx context.Context, req apiparams.CheckR
 		return checkResp, errors.E(op, errors.CodeFailedToParseTupleKey, err)
 	}
 
-	userCheckingSelf := parsedTuple.Object.Kind == openfga.UserType && parsedTuple.Object.ID == r.user.Name
-	// Admins can check any relation, non-admins can only check their own.
-	if !(r.user.JimmAdmin || userCheckingSelf) {
-		return checkResp, errors.E(op, errors.CodeUnauthorized, "unauthorized")
-	}
-
-	allowed, err := r.jimm.AuthorizationClient().CheckRelation(ctx, *parsedTuple, false)
+	allowed, err := r.jimm.CheckRelation(ctx, r.user, *parsedTuple, false)
 	if err != nil {
 		zapctx.Error(ctx, "failed to check relation", zap.NamedError("check-relation-error", err))
 		return checkResp, errors.E(op, errors.CodeOpenFGARequestFailed, err)
 	}
-	if allowed {
-		checkResp.Allowed = allowed
-	}
+	checkResp.Allowed = allowed
 	zapctx.Debug(ctx, "check request", zap.String("allowed", strconv.FormatBool(allowed)))
 	return checkResp, nil
 }
@@ -246,10 +229,6 @@ func (r *controllerRoot) parseTuple(ctx context.Context, tuple apiparams.Relatio
 func (r *controllerRoot) ListRelationshipTuples(ctx context.Context, req apiparams.ListRelationshipTuplesRequest) (apiparams.ListRelationshipTuplesResponse, error) {
 	const op = errors.Op("jujuapi.ListRelationshipTuples")
 
-	if !r.user.JimmAdmin {
-		return apiparams.ListRelationshipTuplesResponse{}, errors.E(op, errors.CodeUnauthorized, "unauthorized")
-	}
-
 	key := &openfga.Tuple{}
 	var err error
 	if req.Tuple.TargetObject != "" {
@@ -258,7 +237,7 @@ func (r *controllerRoot) ListRelationshipTuples(ctx context.Context, req apipara
 			return apiparams.ListRelationshipTuplesResponse{}, errors.E(op, err)
 		}
 	}
-	responseTuples, ct, err := r.jimm.AuthorizationClient().ReadRelatedObjects(ctx, *key, req.PageSize, req.ContinuationToken)
+	responseTuples, ct, err := r.jimm.ListRelationshipTuples(ctx, r.user, *key, req.PageSize, req.ContinuationToken)
 	if err != nil {
 		return apiparams.ListRelationshipTuplesResponse{}, errors.E(op, err)
 	}

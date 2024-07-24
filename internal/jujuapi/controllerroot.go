@@ -30,6 +30,7 @@ import (
 )
 
 type JIMM interface {
+	JIMMRelation
 	AddAuditLogEntry(ale *dbmodel.AuditLogEntry)
 	AddCloudToController(ctx context.Context, user *openfga.User, controllerName string, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error
 	AddController(ctx context.Context, u *openfga.User, ctl *dbmodel.Controller) error
