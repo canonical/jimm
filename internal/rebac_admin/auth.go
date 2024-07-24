@@ -5,11 +5,12 @@ package rebac_admin
 import (
 	"net/http"
 
+	"github.com/juju/zaputil/zapctx"
+	"go.uber.org/zap"
+
 	"github.com/canonical/jimm/internal/auth"
 	"github.com/canonical/jimm/internal/jimm"
 	rebac_handlers "github.com/canonical/rebac-admin-ui-handlers/v1"
-	"github.com/juju/zaputil/zapctx"
-	"go.uber.org/zap"
 )
 
 func newAuthenticator(jimm *jimm.JIMM) *authenticator {
