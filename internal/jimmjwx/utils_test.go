@@ -18,7 +18,7 @@ import (
 )
 
 func newStore(t testing.TB) *vault.VaultStore {
-	client, path, roleID, roleSecretID, ok := jimmtest.VaultClient(t, "../../")
+	client, path, roleID, roleSecretID, ok := jimmtest.VaultClient(t)
 	if !ok {
 		t.Skip("vault not available")
 	}
@@ -91,7 +91,7 @@ func setupService(ctx context.Context, c *qt.C) (*jimmsvc.Service, *httptest.Ser
 	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
-	_, path, roleID, roleSecretID, ok := jimmtest.VaultClient(c, "../../")
+	_, path, roleID, roleSecretID, ok := jimmtest.VaultClient(c)
 	c.Assert(ok, qt.IsTrue)
 
 	p := jimmtest.NewTestJimmParams(c)

@@ -129,7 +129,7 @@ func TestVault(t *testing.T) {
 	ofgaClient, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
-	vaultClient, _, roleID, roleSecretID, _ := jimmtest.VaultClient(c, ".")
+	vaultClient, _, roleID, roleSecretID, _ := jimmtest.VaultClient(c)
 	p := jimmtest.NewTestJimmParams(c)
 	p.VaultAddress = "http://localhost:8200"
 	p.VaultPath = "/jimm-kv/"
