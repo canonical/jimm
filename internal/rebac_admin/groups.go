@@ -9,7 +9,7 @@ import (
 	"github.com/canonical/rebac-admin-ui-handlers/v1/resources"
 )
 
-// GroupsService implements the `GroupsService` interface.
+// groupsService implements the `GroupsService` interface.
 type groupsService struct {
 	jimm *jimm.JIMM
 }
