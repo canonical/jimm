@@ -161,7 +161,7 @@ func (r *controllerRoot) CheckRelation(ctx context.Context, req apiparams.CheckR
 	allowed, err := r.jimm.CheckRelation(ctx, r.user, *parsedTuple, false)
 	if err != nil {
 		zapctx.Error(ctx, "failed to check relation", zap.NamedError("check-relation-error", err))
-		return checkResp, errors.E(op, errors.CodeOpenFGARequestFailed, err)
+		return checkResp, errors.E(op, err)
 	}
 	checkResp.Allowed = allowed
 	zapctx.Debug(ctx, "check request", zap.String("allowed", strconv.FormatBool(allowed)))
