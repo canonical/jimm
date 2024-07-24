@@ -87,7 +87,7 @@ type JIMM struct {
 	ModelStatus_                       func(ctx context.Context, u *openfga.User, mt names.ModelTag) (*jujuparams.ModelStatus, error)
 	Offer_                             func(ctx context.Context, user *openfga.User, offer jimm.AddApplicationOfferParams) error
 	OAuthAuthenticationService_        func() jimm.OAuthAuthenticator
-	ParseTag_                          func(ctx context.Context, key string) (*ofganames.Tag, error)
+	ParseAndValidateTag_               func(ctx context.Context, key string) (*ofganames.Tag, error)
 	PubSubHub_                         func() *pubsub.Hub
 	PurgeLogs_                         func(ctx context.Context, user *openfga.User, before time.Time) (int64, error)
 	QueryModelsJq_                     func(ctx context.Context, models []dbmodel.Model, jqQuery string) (params.CrossModelQueryResponse, error)
@@ -452,11 +452,11 @@ func (j *JIMM) OAuthAuthenticationService() jimm.OAuthAuthenticator {
 	}
 	return j.OAuthAuthenticationService_()
 }
-func (j *JIMM) ParseTag(ctx context.Context, key string) (*ofganames.Tag, error) {
-	if j.ParseTag_ == nil {
+func (j *JIMM) ParseAndValidateTag(ctx context.Context, key string) (*ofganames.Tag, error) {
+	if j.ParseAndValidateTag_ == nil {
 		return nil, errors.E(errors.CodeNotImplemented)
 	}
-	return j.ParseTag_(ctx, key)
+	return j.ParseAndValidateTag_(ctx, key)
 }
 func (j *JIMM) PubSubHub() *pubsub.Hub {
 	if j.PubSubHub_ == nil {

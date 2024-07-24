@@ -15,8 +15,6 @@ import (
 	apiparams "github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/internal/common/pagination"
 	"github.com/canonical/jimm/internal/errors"
-	"github.com/canonical/jimm/internal/openfga"
-	ofganames "github.com/canonical/jimm/internal/openfga/names"
 	jimmnames "github.com/canonical/jimm/pkg/names"
 )
 
@@ -118,11 +116,8 @@ func (r *controllerRoot) ListGroups(ctx context.Context, req apiparams.ListGroup
 // within OpenFGA.
 func (r *controllerRoot) AddRelation(ctx context.Context, req apiparams.AddRelationRequest) error {
 	const op = errors.Op("jujuapi.AddRelation")
-	keys, err := r.parseTuples(ctx, req.Tuples)
-	if err != nil {
-		return errors.E(err)
-	}
-	if err := r.jimm.AddRelation(ctx, r.user, keys); err != nil {
+
+	if err := r.jimm.AddRelation(ctx, r.user, req.Tuples); err != nil {
 		zapctx.Error(ctx, "failed to add relation", zaputil.Error(err))
 		return errors.E(op, err)
 	}
@@ -134,11 +129,7 @@ func (r *controllerRoot) AddRelation(ctx context.Context, req apiparams.AddRelat
 func (r *controllerRoot) RemoveRelation(ctx context.Context, req apiparams.RemoveRelationRequest) error {
 	const op = errors.Op("jujuapi.RemoveRelation")
 
-	keys, err := r.parseTuples(ctx, req.Tuples)
-	if err != nil {
-		return errors.E(op, err)
-	}
-	err = r.jimm.RemoveRelation(ctx, r.user, keys)
+	err := r.jimm.RemoveRelation(ctx, r.user, req.Tuples)
 	if err != nil {
 		zapctx.Error(ctx, "failed to delete tuple(s)", zap.NamedError("remove-relation-error", err))
 		return errors.E(op, err)
@@ -153,12 +144,7 @@ func (r *controllerRoot) CheckRelation(ctx context.Context, req apiparams.CheckR
 	const op = errors.Op("jujuapi.CheckRelation")
 	checkResp := apiparams.CheckRelationResponse{Allowed: false}
 
-	parsedTuple, err := r.parseTuple(ctx, req.Tuple)
-	if err != nil {
-		return checkResp, errors.E(op, errors.CodeFailedToParseTupleKey, err)
-	}
-
-	allowed, err := r.jimm.CheckRelation(ctx, r.user, *parsedTuple, false)
+	allowed, err := r.jimm.CheckRelation(ctx, r.user, req.Tuple, false)
 	if err != nil {
 		zapctx.Error(ctx, "failed to check relation", zap.NamedError("check-relation-error", err))
 		return checkResp, errors.E(op, err)
@@ -168,76 +154,11 @@ func (r *controllerRoot) CheckRelation(ctx context.Context, req apiparams.CheckR
 	return checkResp, nil
 }
 
-// parseTuples translate the api request struct containing tuples to a slice of openfga tuple keys.
-// This method utilises the parseTuple method which does all the heavy lifting.
-func (r *controllerRoot) parseTuples(ctx context.Context, tuples []apiparams.RelationshipTuple) ([]openfga.Tuple, error) {
-	keys := make([]openfga.Tuple, 0, len(tuples))
-	for _, tuple := range tuples {
-		key, err := r.parseTuple(ctx, tuple)
-		if err != nil {
-			return nil, errors.E(err)
-		}
-		keys = append(keys, *key)
-	}
-	return keys, nil
-}
-
-// parseTuple takes the initial tuple from a relational request and ensures that
-// whatever format, be it JAAS or Juju tag, is resolved to the correct identifier
-// to be persisted within OpenFGA.
-func (r *controllerRoot) parseTuple(ctx context.Context, tuple apiparams.RelationshipTuple) (*openfga.Tuple, error) {
-	const op = errors.Op("jujuapi.parseTuple")
-
-	relation, err := ofganames.ParseRelation(tuple.Relation)
-	if err != nil {
-		return nil, errors.E(op, err, errors.CodeBadRequest)
-	}
-	t := openfga.Tuple{
-		Relation: relation,
-	}
-
-	// Wraps the general error that will be sent for both
-	// the object and target object, but changing the message and key
-	// to be specific to the erroneous offender.
-	parseTagError := func(msg string, key string, err error) error {
-		zapctx.Debug(ctx, msg, zap.String("key", key), zap.Error(err))
-		return errors.E(op, errors.CodeFailedToParseTupleKey, err, msg+" "+key)
-	}
-
-	if tuple.TargetObject == "" {
-		return nil, errors.E(op, errors.CodeBadRequest, "target object not specified")
-	}
-	if tuple.TargetObject != "" {
-		targetTag, err := r.jimm.ParseTag(ctx, tuple.TargetObject)
-		if err != nil {
-			return nil, parseTagError("failed to parse tuple target object key", tuple.TargetObject, err)
-		}
-		t.Target = targetTag
-	}
-	if tuple.Object != "" {
-		objectTag, err := r.jimm.ParseTag(ctx, tuple.Object)
-		if err != nil {
-			return nil, parseTagError("failed to parse tuple object key", tuple.Object, err)
-		}
-		t.Object = objectTag
-	}
-
-	return &t, nil
-}
-
 // ListRelationshipTuples returns a list of tuples matching the specified filter.
 func (r *controllerRoot) ListRelationshipTuples(ctx context.Context, req apiparams.ListRelationshipTuplesRequest) (apiparams.ListRelationshipTuplesResponse, error) {
 	const op = errors.Op("jujuapi.ListRelationshipTuples")
 
-	key := &openfga.Tuple{}
-	var err error
-	if req.Tuple.TargetObject != "" {
-		key, err = r.parseTuple(ctx, req.Tuple)
-		if err != nil {
-			return apiparams.ListRelationshipTuplesResponse{}, errors.E(op, err)
-		}
-	}
-	responseTuples, ct, err := r.jimm.ListRelationshipTuples(ctx, r.user, *key, req.PageSize, req.ContinuationToken)
+	responseTuples, ct, err := r.jimm.ListRelationshipTuples(ctx, r.user, req.Tuple, req.PageSize, req.ContinuationToken)
 	if err != nil {
 		return apiparams.ListRelationshipTuplesResponse{}, errors.E(op, err)
 	}
