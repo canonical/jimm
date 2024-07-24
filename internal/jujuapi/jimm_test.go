@@ -17,14 +17,14 @@ import (
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 
-	"github.com/canonical/jimm/api"
-	apiparams "github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/jimmtest"
 	"github.com/canonical/jimm/internal/jujuapi"
 	"github.com/canonical/jimm/internal/openfga"
+	api "github.com/canonical/jimmapi"
+	apiparams "github.com/canonical/jimmapi/params"
 )
 
 type jimmSuite struct {

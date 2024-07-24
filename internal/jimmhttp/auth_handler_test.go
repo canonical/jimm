@@ -14,11 +14,11 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/gorilla/sessions"
 
-	"github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/internal/auth"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/jimmhttp"
 	"github.com/canonical/jimm/internal/jimmtest"
+	"github.com/canonical/jimmapi/params"
 )
 
 func setupDbAndSessionStore(c *qt.C) (*db.Database, sessions.Store) {

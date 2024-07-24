@@ -17,7 +17,6 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwt"
 	"golang.org/x/oauth2"
 
-	apiparams "github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/jimm"
@@ -25,6 +24,7 @@ import (
 	"github.com/canonical/jimm/internal/jimmtest"
 	"github.com/canonical/jimm/internal/openfga"
 	"github.com/canonical/jimm/internal/rpc"
+	apiparams "github.com/canonical/jimmapi/params"
 )
 
 type message struct {

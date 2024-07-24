@@ -16,9 +16,9 @@ import (
 	"github.com/juju/juju/cmd/modelcmd"
 	"github.com/juju/juju/jujuclient"
 
-	"github.com/canonical/jimm/api"
-	apiparams "github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/internal/errors"
+	api "github.com/canonical/jimmapi"
+	apiparams "github.com/canonical/jimmapi/params"
 )
 
 const (

@@ -12,7 +12,6 @@ import (
 	"github.com/juju/names/v5"
 	"github.com/juju/version"
 
-	"github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
@@ -22,6 +21,7 @@ import (
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 	"github.com/canonical/jimm/internal/pubsub"
 	jimmnames "github.com/canonical/jimm/pkg/names"
+	"github.com/canonical/jimmapi/params"
 )
 
 // JIMM is a default implementation of the jujuapi.JIMM interface. Every method

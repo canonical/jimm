@@ -16,10 +16,10 @@ import (
 	"github.com/juju/juju/rpc/params"
 	jujuparams "github.com/juju/juju/rpc/params"
 
-	"github.com/canonical/jimm/api"
-	apiparams "github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/internal/errors"
 	jimmnames "github.com/canonical/jimm/pkg/names"
+	api "github.com/canonical/jimmapi"
+	apiparams "github.com/canonical/jimmapi/params"
 )
 
 var (

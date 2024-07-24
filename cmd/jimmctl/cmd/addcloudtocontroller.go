@@ -18,8 +18,8 @@ import (
 	"github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 
-	"github.com/canonical/jimm/api"
-	apiparams "github.com/canonical/jimm/api/params"
+	api "github.com/canonical/jimmapi"
+	apiparams "github.com/canonical/jimmapi/params"
 	_ "github.com/juju/juju/provider/all"
 
 	"github.com/canonical/jimm/internal/errors"

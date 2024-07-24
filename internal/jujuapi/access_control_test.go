@@ -15,14 +15,14 @@ import (
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 
-	"github.com/canonical/jimm/api"
-	apiparams "github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/jimmtest"
 	"github.com/canonical/jimm/internal/jujuapi"
 	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 	"github.com/canonical/jimm/pkg/names"
+	api "github.com/canonical/jimmapi"
+	apiparams "github.com/canonical/jimmapi/params"
 )
 
 type accessControlSuite struct {

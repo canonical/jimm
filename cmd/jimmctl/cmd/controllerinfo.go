@@ -13,7 +13,7 @@ import (
 	"github.com/juju/juju/jujuclient"
 	"sigs.k8s.io/yaml"
 
-	apiparams "github.com/canonical/jimm/api/params"
+	apiparams "github.com/canonical/jimmapi/params"
 )
 
 var (

@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimmapi/params"
 	"github.com/itchyny/gojq"
 	"go.uber.org/zap"
 

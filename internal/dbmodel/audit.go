@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"time"
 
-	apiparams "github.com/canonical/jimm/api/params"
+	apiparams "github.com/canonical/jimmapi/params"
 )
 
 // An AuditLogEntry is an entry in the audit log.
