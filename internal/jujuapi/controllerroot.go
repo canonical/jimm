@@ -20,6 +20,7 @@ import (
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/jimm"
+	"github.com/canonical/jimm/internal/jimm/common"
 	"github.com/canonical/jimm/internal/jimm/credentials"
 	"github.com/canonical/jimm/internal/jujuapi/rpc"
 	"github.com/canonical/jimm/internal/openfga"
@@ -76,7 +77,7 @@ type JIMM interface {
 	InitiateInternalMigration(ctx context.Context, user *openfga.User, modelTag names.ModelTag, targetController string) (jujuparams.InitiateMigrationResult, error)
 	InitiateMigration(ctx context.Context, user *openfga.User, spec jujuparams.MigrationSpec) (jujuparams.InitiateMigrationResult, error)
 	ListApplicationOffers(ctx context.Context, user *openfga.User, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error)
-	ListGroups(ctx context.Context, user *openfga.User) ([]dbmodel.GroupEntry, error)
+	ListGroups(ctx context.Context, user *openfga.User, filter common.LimitOffsetPagination) ([]dbmodel.GroupEntry, error)
 	ModelDefaultsForCloud(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag) (jujuparams.ModelDefaultsResult, error)
 	ModelInfo(ctx context.Context, u *openfga.User, mt names.ModelTag) (*jujuparams.ModelInfo, error)
 	ModelStatus(ctx context.Context, u *openfga.User, mt names.ModelTag) (*jujuparams.ModelStatus, error)

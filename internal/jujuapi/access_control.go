@@ -14,6 +14,7 @@ import (
 
 	apiparams "github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/jimm/common"
 	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 	jimmnames "github.com/canonical/jimm/pkg/names"
@@ -93,10 +94,11 @@ func (r *controllerRoot) RemoveGroup(ctx context.Context, req apiparams.RemoveGr
 }
 
 // ListGroup lists relational access control groups within JIMMs DB.
-func (r *controllerRoot) ListGroups(ctx context.Context) (apiparams.ListGroupResponse, error) {
+func (r *controllerRoot) ListGroups(ctx context.Context, req apiparams.ListGroupsRequest) (apiparams.ListGroupResponse, error) {
 	const op = errors.Op("jujuapi.ListGroups")
 
-	groups, err := r.jimm.ListGroups(ctx, r.user)
+	filter := common.NewOffsetFilter(req.Limit, req.Offset)
+	groups, err := r.jimm.ListGroups(ctx, r.user, filter)
 	if err != nil {
 		return apiparams.ListGroupResponse{}, errors.E(op, err)
 	}
@@ -104,6 +106,7 @@ func (r *controllerRoot) ListGroups(ctx context.Context) (apiparams.ListGroupRes
 	for i, g := range groups {
 		groupsResponse[i] = apiparams.Group{
 			Name:      g.Name,
+			UUID:      g.UUID,
 			CreatedAt: g.CreatedAt.Format(time.RFC3339),
 			UpdatedAt: g.UpdatedAt.Format(time.RFC3339),
 		}

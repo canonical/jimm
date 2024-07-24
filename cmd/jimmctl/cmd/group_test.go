@@ -9,7 +9,9 @@ import (
 
 	"github.com/juju/cmd/v3/cmdtesting"
 	gc "gopkg.in/check.v1"
+	"gopkg.in/yaml.v3"
 
+	"github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/cmd/jimmctl/cmd"
 	"github.com/canonical/jimm/internal/cmdtest"
 	"github.com/canonical/jimm/internal/dbmodel"
@@ -112,6 +114,26 @@ func (s *groupSuite) TestListGroupsSuperuser(c *gc.C) {
 	c.Assert(strings.Contains(output, "test-group0"), gc.Equals, true)
 	c.Assert(strings.Contains(output, "test-group1"), gc.Equals, true)
 	c.Assert(strings.Contains(output, "test-group2"), gc.Equals, true)
+}
+
+func (s *groupSuite) TestListGroupsLimitSuperuser(c *gc.C) {
+	// alice is superuser
+	bClient := jimmtest.NewUserSessionLogin(c, "alice")
+
+	for i := 0; i < 3; i++ {
+		err := s.JimmCmdSuite.JIMM.Database.AddGroup(context.TODO(), fmt.Sprint("test-group", i))
+		c.Assert(err, gc.IsNil)
+	}
+
+	ctx, err := cmdtesting.RunCommand(c, cmd.NewListGroupsCommandForTesting(s.ClientStore(), bClient), "test-group", "--limit", "1", "--offset", "1")
+	c.Assert(err, gc.IsNil)
+	output := cmdtesting.Stdout(ctx)
+	groups := []params.Group{}
+	err = yaml.Unmarshal([]byte(output), &groups)
+	c.Assert(err, gc.IsNil)
+	c.Assert(groups, gc.HasLen, 1)
+	c.Assert(groups[0].Name, gc.Equals, "test-group1")
+	c.Assert(groups[0].UUID, gc.Not(gc.Equals), "")
 }
 
 func (s *groupSuite) TestListGroups(c *gc.C) {

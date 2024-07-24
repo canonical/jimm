@@ -195,10 +195,12 @@ func (s *accessControlSuite) TestListGroups(c *gc.C) {
 		err := client.AddGroup(&apiparams.AddGroupRequest{Name: name})
 		c.Assert(err, jc.ErrorIsNil)
 	}
-
-	groups, err := client.ListGroups()
+	req := apiparams.ListGroupsRequest{Limit: 10, Offset: 0}
+	groups, err := client.ListGroups(&req)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(groups, gc.HasLen, 4)
+	// Verify the UUID is not empty.
+	c.Assert(groups[0].UUID, gc.Not(gc.Equals), "")
 	// groups should be returned in ascending order of name
 	c.Assert(groups[0].Name, gc.Equals, "aaaFinalGroup")
 	c.Assert(groups[1].Name, gc.Equals, "test-group0")
