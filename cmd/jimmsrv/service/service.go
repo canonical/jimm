@@ -1,5 +1,7 @@
 // Copyright 2021 Canonical Ltd.
 
+// service defines the methods necessary to start a JIMM server
+// alongside all the config options that can be supplied to configure JIMM.
 package service
 
 import (
