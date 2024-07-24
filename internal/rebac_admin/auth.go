@@ -4,7 +4,6 @@ package rebac_admin
 
 import (
 	"net/http"
-	"net/http/httptest"
 
 	"github.com/canonical/jimm/internal/auth"
 	"github.com/canonical/jimm/internal/jimm"
@@ -13,20 +12,32 @@ import (
 	"go.uber.org/zap"
 )
 
-type authenticator struct {
-	jimm *jimm.JIMM
-}
-
 func newAuthenticator(jimm *jimm.JIMM) *authenticator {
 	return &authenticator{
 		jimm,
 	}
 }
 
+type dummyWriter struct{}
+
+func (d dummyWriter) Header() http.Header {
+	return http.Header{}
+}
+
+func (d dummyWriter) Write(data []byte) (int, error) {
+	return len(data), nil
+}
+
+func (d dummyWriter) WriteHeader(int) {}
+
+type authenticator struct {
+	jimm *jimm.JIMM
+}
+
 // Authenticate extracts the calling user's information from the given HTTP request
 func (a *authenticator) Authenticate(r *http.Request) (any, error) {
 	// AuthenticateBrowserSession modifies cookies in the response writer which isn't present here
-	dummyWriter := httptest.NewRecorder()
+	dummyWriter := &dummyWriter{}
 
 	ctx, err := a.jimm.OAuthAuthenticator.AuthenticateBrowserSession(r.Context(), dummyWriter, r)
 	if err != nil {
