@@ -4,9 +4,8 @@ package jimmtest
 
 import (
 	"encoding/json"
-	"os"
-	"path"
 
+	vault_test "github.com/canonical/jimm/local/vault"
 	"github.com/hashicorp/vault/api"
 )
 
@@ -16,19 +15,14 @@ type fatalF interface {
 }
 
 // VaultClient returns a new vault client for use in a test.
-func VaultClient(tb fatalF, prefix string) (*api.Client, string, string, string, bool) {
+func VaultClient(tb fatalF) (*api.Client, string, string, string, bool) {
 	cfg := api.DefaultConfig()
 	cfg.Address = "http://localhost:8200"
 	vaultClient, _ := api.NewClient(cfg)
 
-	b, err := os.ReadFile(path.Join(prefix, "./local/vault/approle.json"))
-	if err != nil {
-		wd, _ := os.Getwd()
-		panic("cannot read " + path.Join(prefix, "./local/vault/approle.json") + " " + wd)
-	}
-
+	appRole := vault_test.AppRole
 	var vaultAPISecret api.Secret
-	err = json.Unmarshal(b, &vaultAPISecret)
+	err := json.Unmarshal(appRole, &vaultAPISecret)
 	if err != nil {
 		panic("cannot unmarshal vault secret")
 	}

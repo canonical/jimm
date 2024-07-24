@@ -191,7 +191,7 @@ func TestAddController(t *testing.T) {
 func TestAddControllerWithVault(t *testing.T) {
 	c := qt.New(t)
 
-	client, path, roleID, roleSecretID, ok := jimmtest.VaultClient(c, "../../")
+	client, path, roleID, roleSecretID, ok := jimmtest.VaultClient(c)
 	if !ok {
 		c.Skip("vault not available")
 	}
