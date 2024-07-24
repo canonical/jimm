@@ -11,6 +11,7 @@ import (
 	"os"
 	"testing"
 
+	cofga "github.com/canonical/ofga"
 	qt "github.com/frankban/quicktest"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/checkers"
@@ -40,7 +41,7 @@ func TestDefaultService(t *testing.T) {
 	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 	p := jimmtest.NewTestJimmParams(c)
-	p.OpenFGAParams = jimmtest.CofgaParamsToJIMMOpenFGAParams(*cofgaParams)
+	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
 	p.InsecureSecretStorage = true
 	svc, err := jimm.NewService(context.Background(), p)
 	c.Assert(err, qt.IsNil)
@@ -59,7 +60,7 @@ func TestServiceDoesNotStartWithoutCredentialStore(t *testing.T) {
 	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 	p := jimmtest.NewTestJimmParams(c)
-	p.OpenFGAParams = jimmtest.CofgaParamsToJIMMOpenFGAParams(*cofgaParams)
+	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
 	_, err = jimm.NewService(context.Background(), p)
 	c.Assert(err, qt.ErrorMatches, "jimm cannot start without a credential store")
 }
@@ -72,7 +73,7 @@ func TestAuthenticator(t *testing.T) {
 
 	p := jimmtest.NewTestJimmParams(c)
 	p.InsecureSecretStorage = true
-	p.OpenFGAParams = jimmtest.CofgaParamsToJIMMOpenFGAParams(*cofgaParams)
+	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
 	svc, err := jimm.NewService(context.Background(), p)
 	c.Assert(err, qt.IsNil)
 	defer svc.Cleanup()
@@ -134,7 +135,7 @@ func TestVault(t *testing.T) {
 	p.VaultPath = "/jimm-kv/"
 	p.VaultRoleID = roleID
 	p.VaultRoleSecretID = roleSecretID
-	p.OpenFGAParams = jimmtest.CofgaParamsToJIMMOpenFGAParams(*cofgaParams)
+	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
 	svc, err := jimm.NewService(ctx, p)
 	c.Assert(err, qt.IsNil)
 	defer svc.Cleanup()
@@ -192,7 +193,7 @@ func TestPostgresSecretStore(t *testing.T) {
 
 	p := jimmtest.NewTestJimmParams(c)
 	p.InsecureSecretStorage = true
-	p.OpenFGAParams = jimmtest.CofgaParamsToJIMMOpenFGAParams(*cofgaParams)
+	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
 	svc, err := jimm.NewService(context.Background(), p)
 	c.Assert(err, qt.IsNil)
 	defer svc.Cleanup()
@@ -208,7 +209,7 @@ func TestOpenFGA(t *testing.T) {
 	p := jimmtest.NewTestJimmParams(c)
 	p.InsecureSecretStorage = true
 	p.ControllerAdmins = []string{"alice", "eve"}
-	p.OpenFGAParams = jimmtest.CofgaParamsToJIMMOpenFGAParams(*cofgaParams)
+	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
 	svc, err := jimm.NewService(ctx, p)
 	c.Assert(err, qt.IsNil)
 	defer svc.Cleanup()
@@ -254,7 +255,7 @@ func TestPublicKey(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	p := jimmtest.NewTestJimmParams(c)
-	p.OpenFGAParams = jimmtest.CofgaParamsToJIMMOpenFGAParams(*cofgaParams)
+	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
 	p.InsecureSecretStorage = true
 	svc, err := jimm.NewService(context.Background(), p)
 	c.Assert(err, qt.IsNil)
@@ -278,7 +279,7 @@ func TestRebacAdminApi(t *testing.T) {
 
 	p := jimmtest.NewTestJimmParams(c)
 	p.InsecureSecretStorage = true
-	p.OpenFGAParams = jimmtest.CofgaParamsToJIMMOpenFGAParams(*cofgaParams)
+	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
 
 	svc, err := jimm.NewService(context.Background(), p)
 	c.Assert(err, qt.IsNil)
@@ -352,7 +353,7 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 
 			p := jimmtest.NewTestJimmParams(c)
-			p.OpenFGAParams = jimmtest.CofgaParamsToJIMMOpenFGAParams(*cofgaParams)
+			p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
 			p.InsecureSecretStorage = true
 			svc, err := jimm.NewService(context.Background(), p)
 			c.Assert(err, qt.IsNil)
@@ -422,7 +423,7 @@ func TestDisableOAuthEndpointsWhenDashboardRedirectURLNotSet(t *testing.T) {
 	p := jimmtest.NewTestJimmParams(c)
 	p.DashboardFinalRedirectURL = ""
 	p.InsecureSecretStorage = true
-	p.OpenFGAParams = jimmtest.CofgaParamsToJIMMOpenFGAParams(*cofgaParams)
+	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
 	svc, err := jimm.NewService(context.Background(), p)
 	c.Assert(err, qt.IsNil)
 	defer svc.Cleanup()
@@ -444,7 +445,7 @@ func TestEnableOAuthEndpointsWhenDashboardRedirectURLSet(t *testing.T) {
 	p := jimmtest.NewTestJimmParams(c)
 	p.DashboardFinalRedirectURL = "some-redirect-url"
 	p.InsecureSecretStorage = true
-	p.OpenFGAParams = jimmtest.CofgaParamsToJIMMOpenFGAParams(*cofgaParams)
+	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
 
 	svc, err := jimm.NewService(context.Background(), p)
 	c.Assert(err, qt.IsNil)
@@ -456,6 +457,20 @@ func TestEnableOAuthEndpointsWhenDashboardRedirectURLSet(t *testing.T) {
 	response, err := srv.Client().Get(srv.URL + "/auth/whoami")
 	c.Assert(err, qt.IsNil)
 	c.Assert(response.StatusCode, qt.Not(qt.Equals), http.StatusNotFound)
+}
+
+// cofgaParamsToJIMMOpenFGAParams To avoid circular references, the test setup function (jimmtest.SetupTestOFGAClient)
+// does not provide us with an instance of `jimm.OpenFGAParams`, so it just returns a `cofga.OpenFGAParams` instance.
+// This method reshapes the later into the former.
+func cofgaParamsToJIMMOpenFGAParams(cofgaParams cofga.OpenFGAParams) jimm.OpenFGAParams {
+	return jimm.OpenFGAParams{
+		Scheme:    cofgaParams.Scheme,
+		Host:      cofgaParams.Host,
+		Port:      cofgaParams.Port,
+		Store:     cofgaParams.StoreID,
+		Token:     cofgaParams.Token,
+		AuthModel: cofgaParams.AuthModelID,
+	}
 }
 
 func TestCleanup(t *testing.T) {
@@ -475,7 +490,7 @@ func TestCleanupDoesNotPanic_SessionStoreRelatedCleanups(t *testing.T) {
 	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 	p := jimmtest.NewTestJimmParams(c)
-	p.OpenFGAParams = jimmtest.CofgaParamsToJIMMOpenFGAParams(*cofgaParams)
+	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
 	p.InsecureSecretStorage = true
 
 	svc, err := jimm.NewService(context.Background(), p)

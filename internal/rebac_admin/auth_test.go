@@ -4,19 +4,23 @@ package rebac_admin_test
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
-	"errors"
+	qt "github.com/frankban/quicktest"
+	"github.com/google/uuid"
 
-	"github.com/canonical/jimm"
 	"github.com/canonical/jimm/internal/auth"
+	"github.com/canonical/jimm/internal/db"
+	"github.com/canonical/jimm/internal/jimm"
 	"github.com/canonical/jimm/internal/jimmtest"
 	"github.com/canonical/jimm/internal/rebac_admin"
-	qt "github.com/frankban/quicktest"
 )
 
+// Checks if the authenticator responsible for access control to rebac admin handlers works correctly.
 func TestAuthenticate(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -35,7 +39,7 @@ func TestAuthenticate(t *testing.T) {
 			name: "failure",
 			setupMock: func(m *jimmtest.MockOAuthAuthenticator) {
 				m.AuthenticateBrowserSession_ = func(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error) {
-					return ctx, errors.New("")
+					return ctx, errors.New("some error")
 				}
 			},
 			expectedError: "failed to authenticate",
@@ -55,21 +59,24 @@ func TestAuthenticate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			c := qt.New(t)
 
-			_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
+			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
 			c.Assert(err, qt.IsNil)
-
-			p := jimmtest.NewTestJimmParams(c)
-			p.OpenFGAParams = jimmtest.CofgaParamsToJIMMOpenFGAParams(*cofgaParams)
-			p.InsecureSecretStorage = true
-			svc, err := jimm.NewService(context.Background(), p)
-			c.Assert(err, qt.IsNil)
-			defer svc.Cleanup()
 
 			mockAuthService := jimmtest.NewMockOAuthAuthenticator("")
 			tt.setupMock(&mockAuthService)
-			svc.JIMM().OAuthAuthenticator = mockAuthService
 
-			authenticator := rebac_admin.NewAuthenticator(svc.JIMM())
+			j := &jimm.JIMM{
+				UUID: uuid.NewString(),
+				Database: db.Database{
+					DB: jimmtest.PostgresDB(c, func() time.Time { return time.Now() }),
+				},
+				OpenFGAClient:      client,
+				OAuthAuthenticator: mockAuthService,
+			}
+			err = j.Database.Migrate(context.Background(), false)
+			c.Assert(err, qt.IsNil)
+
+			authenticator := rebac_admin.NewAuthenticator(j)
 
 			req := httptest.NewRequest(http.MethodGet, "/", nil)
 			_, err = authenticator.Authenticate(req)
