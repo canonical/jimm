@@ -61,15 +61,19 @@ var EntitlementsList = []resources.EntityEntitlement{
 	{EntitlementType: "administrator", EntityName: "group#member", EntityType: "serviceaccount"},
 }
 
-// EntitlementsService implements the `EntitlementsService` interface from rebac-admin-ui-handlers library
-type EntitlementsService struct{}
+// entitlementsService implements the `entitlementsService` interface from rebac-admin-ui-handlers library
+type entitlementsService struct{}
+
+func newEntitlementService() *entitlementsService {
+	return &entitlementsService{}
+}
 
 // ListEntitlements returns the list of entitlements in JSON format.
-func (s *EntitlementsService) ListEntitlements(ctx context.Context, params *resources.GetEntitlementsParams) ([]resources.EntityEntitlement, error) {
+func (s *entitlementsService) ListEntitlements(ctx context.Context, params *resources.GetEntitlementsParams) ([]resources.EntityEntitlement, error) {
 	return EntitlementsList, nil
 }
 
 // RawEntitlements returns the list of entitlements as raw text.
-func (s *EntitlementsService) RawEntitlements(ctx context.Context) (string, error) {
+func (s *entitlementsService) RawEntitlements(ctx context.Context) (string, error) {
 	return string(openfgastatic.AuthModelDSL), nil
 }
