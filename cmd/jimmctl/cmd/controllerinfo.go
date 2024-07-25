@@ -21,10 +21,13 @@ var (
 	controller-info command writes controller information contained
 	in the juju client store to a yaml file.
 
-	If a --local flag is specified, the output controller
-	public address will use the first available local API address
-	and the local CA cert of the controller, see examples below
-	for usage.
+	If a public address is specified, the output controller information
+	will contain the public address provided and omit a CA cert, this assumes
+	that the server is secured with a public certificate.
+	
+	Use the --local flag if the server is not configured with a public cert.
+
+	See examples below for usage.
 
 	Examples:
 		jimmctl controller-info <name> <filename> <public address> 
@@ -85,6 +88,9 @@ func (c *controllerInfoCommand) Init(args []string) error {
 	if c.local && len(c.publicAddress) > 0 {
 		return errors.New("cannot set both public address and local flag")
 	}
+	if !c.local && len(c.publicAddress) == 0 {
+		return errors.New("provide either a public address or use --local")
+	}
 	return nil
 }
 
@@ -111,13 +117,8 @@ func (c *controllerInfoCommand) Run(ctxt *cmd.Context) error {
 	info.TLSHostname = c.tlsHostname
 	info.PublicAddress = c.publicAddress
 	if c.local {
-		info.PublicAddress = controller.APIEndpoints[0]
 		info.CACertificate = controller.CACert
 	}
-	if info.PublicAddress == "" {
-		return errors.New("public address must be set")
-	}
-
 	data, err := yaml.Marshal(info)
 	if err != nil {
 		return errors.Mask(err)

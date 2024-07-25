@@ -21,23 +21,27 @@ import (
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 	"github.com/gorilla/sessions"
 	"github.com/juju/juju/api"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwt"
+	"golang.org/x/oauth2"
 
 	"github.com/canonical/jimm/internal/auth"
 	"github.com/canonical/jimm/internal/db"
+	jimmerrors "github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/jimm"
 	"github.com/canonical/jimm/internal/jimmhttp"
 	"github.com/canonical/jimm/internal/openfga"
 )
 
 const (
-	// Note that these values are deliberately different to make sure we're not
-	// reusing/misusing them.
-	JWTTestSecret      = "test-secret"
+	// Secrets used for auth in tests.
+	//
+	// Note that these values are deliberately different to make sure we're not reusing/misusing them.
+	JWTTestSecret      = "jwt-test-secret"
 	SessionStoreSecret = "another-test-secret"
 )
 
@@ -63,40 +67,107 @@ func (a Authenticator) Authenticate(_ context.Context, _ *jujuparams.LoginReques
 
 type MockOAuthAuthenticator struct {
 	jimm.OAuthAuthenticator
+	c SimpleTester
+	// PollingChan is used to simulate polling an OIDC server during the device flow.
+	// It expects a username to be received that will be used to generate the user's access token.
+	PollingChan     <-chan string
+	polledUsername  string
+	mockAccessToken string
 }
 
-func NewMockOAuthAuthenticator(secretKey string) MockOAuthAuthenticator {
-	return MockOAuthAuthenticator{}
+func NewMockOAuthAuthenticator(c SimpleTester, testChan <-chan string) MockOAuthAuthenticator {
+	return MockOAuthAuthenticator{c: c, PollingChan: testChan}
+}
+
+// Device is a mock implementation for the start of the device flow, returning dummy polling data.
+func (m *MockOAuthAuthenticator) Device(ctx context.Context) (*oauth2.DeviceAuthResponse, error) {
+	return &oauth2.DeviceAuthResponse{
+		DeviceCode:              "test-device-code",
+		UserCode:                "test-user-code",
+		VerificationURI:         "http://no-such-uri.canonical.com",
+		VerificationURIComplete: "http://no-such-uri.canonical.com",
+		Expiry:                  time.Now().Add(time.Minute),
+		Interval:                int64(time.Minute.Seconds()),
+	}, nil
+}
+
+// DeviceAccessToken is a mock implementation of the second step in the device flow where JIMM
+// polls an OIDC server for the device code.
+func (m *MockOAuthAuthenticator) DeviceAccessToken(ctx context.Context, res *oauth2.DeviceAuthResponse) (*oauth2.Token, error) {
+	select {
+	case username := <-m.PollingChan:
+		m.polledUsername = username
+		uuid, err := uuid.NewRandom()
+		if err != nil {
+			m.c.Fatalf("failed to generate UUID for device access token")
+		}
+		m.mockAccessToken = uuid.String()
+	case <-ctx.Done():
+		return &oauth2.Token{}, ctx.Err()
+	}
+	return &oauth2.Token{AccessToken: m.mockAccessToken}, nil
 }
 
 // VerifySessionToken provides the mock implementation for verifying session tokens.
 // Allowing JIMM tests to create their own session tokens that will always be accepted.
 // Notice the use of jwt.ParseInsecure to skip JWT signature verification.
-func (m MockOAuthAuthenticator) VerifySessionToken(token string) (jwt.Token, error) {
+func (m *MockOAuthAuthenticator) VerifySessionToken(token string) (jwt.Token, error) {
+	errorFn := func(err error) error {
+		return jimmerrors.E(err, jimmerrors.CodeUnauthorized)
+	}
 	decodedToken, err := base64.StdEncoding.DecodeString(token)
 	if err != nil {
-		return nil, errors.New("authentication failed, failed to decode token")
+		return nil, errorFn(errors.New("failed to decode token"))
 	}
 
 	parsedToken, err := jwt.ParseInsecure(decodedToken)
 	if err != nil {
-		return nil, err
+		return nil, errorFn(err)
 	}
 
 	if _, err = mail.ParseAddress(parsedToken.Subject()); err != nil {
-		return nil, errors.New("failed to parse email")
+		return nil, errorFn(errors.New("failed to parse email"))
 	}
 	return parsedToken, nil
 }
 
-func (m MockOAuthAuthenticator) AuthenticateBrowserSession(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error) {
+// ExtractAndVerifyIDToken returns an ID token where the subject is equal to the username obtained during the device flow.
+// The auth token must match the one returned during the device flow.
+// If the polled username is empty it indicates an error that the device flow was not run prior to calling this function.
+func (m *MockOAuthAuthenticator) ExtractAndVerifyIDToken(ctx context.Context, oauth2Token *oauth2.Token) (*oidc.IDToken, error) {
+	if m.polledUsername == "" {
+		return &oidc.IDToken{}, errors.New("unknown user for mock auth login")
+	}
+	if m.mockAccessToken != oauth2Token.AccessToken {
+		return &oidc.IDToken{}, errors.New("access token does not match the generated access token")
+	}
+	return &oidc.IDToken{Subject: m.polledUsername}, nil
+}
+
+// Email returns the subject from an ID token.
+func (m *MockOAuthAuthenticator) Email(idToken *oidc.IDToken) (string, error) {
+	return idToken.Subject, nil
+}
+
+// UpdateIdentity is a no-op mock.
+func (m *MockOAuthAuthenticator) UpdateIdentity(ctx context.Context, email string, token *oauth2.Token) error {
+	return nil
+}
+
+// MintSessionToken creates an unsigned session token with the email provided.
+func (m *MockOAuthAuthenticator) MintSessionToken(email string) (string, error) {
+	return newSessionToken(m.c, email, ""), nil
+}
+
+// AuthenticateBrowserSession always returns an error.
+func (m *MockOAuthAuthenticator) AuthenticateBrowserSession(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error) {
 	return ctx, errors.New("authentication failed")
 }
 
-// NewUserSessionLogin returns a login provider than be used with Juju Dial Opts
-// to define how login will take place. In this case we login using a session token
-// that the JIMM server should verify with the same test secret.
-func NewUserSessionLogin(c SimpleTester, username string) api.LoginProvider {
+// newSessionToken returns a serialised JWT that can be used in tests.
+// Tests using a mock authenticator can provide an empty signatureSecret
+// while integration tests must provide the same secret used when verifying JWTs.
+func newSessionToken(c SimpleTester, username string, signatureSecret string) string {
 	email := convertUsernameToEmail(username)
 	token, err := jwt.NewBuilder().
 		Subject(email).
@@ -105,13 +176,23 @@ func NewUserSessionLogin(c SimpleTester, username string) api.LoginProvider {
 	if err != nil {
 		c.Fatalf("failed to generate test session token")
 	}
-
-	freshToken, err := jwt.Sign(token, jwt.WithKey(jwa.HS256, []byte(JWTTestSecret)))
-	if err != nil {
-		c.Fatalf("failed to sign test session token")
+	var serialisedToken []byte
+	if signatureSecret != "" {
+		serialisedToken, err = jwt.Sign(token, jwt.WithKey(jwa.HS256, []byte(JWTTestSecret)))
+	} else {
+		serialisedToken, err = jwt.NewSerializer().Serialize(token)
 	}
+	if err != nil {
+		c.Fatalf("failed to sign/serialise token")
+	}
+	return base64.StdEncoding.EncodeToString(serialisedToken)
+}
 
-	b64Token := base64.StdEncoding.EncodeToString(freshToken)
+// NewUserSessionLogin returns a login provider than be used with Juju Dial Opts
+// to define how login will take place. In this case we login using a session token
+// that the JIMM server should verify with the same test secret.
+func NewUserSessionLogin(c SimpleTester, username string) api.LoginProvider {
+	b64Token := newSessionToken(c, username, JWTTestSecret)
 	return api.NewSessionTokenLoginProvider(b64Token, nil, nil)
 }
 

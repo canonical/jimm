@@ -1,5 +1,5 @@
 // Copyright 2023 Canonical Ltd.
-package jimm
+package service
 
 var NewOpenFGAClient = newOpenFGAClient
 

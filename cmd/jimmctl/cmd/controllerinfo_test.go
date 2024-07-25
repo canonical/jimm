@@ -199,7 +199,7 @@ func (s *controllerInfoSuite) TestControllerInfoMissingPublicAddressAndNoLocalFl
 	fname := path.Join(dir, "test.yaml")
 
 	_, err = cmdtesting.RunCommand(c, cmd.NewControllerInfoCommandForTesting(store), "controller-1", fname)
-	c.Assert(err, gc.ErrorMatches, "public address must be set")
+	c.Assert(err, gc.ErrorMatches, "provide either a public address or use --local")
 }
 
 func (s *controllerInfoSuite) TestControllerInfoCannotProvideAddrAndLocalFlag(c *gc.C) {
