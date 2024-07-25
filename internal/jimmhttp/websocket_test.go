@@ -111,11 +111,12 @@ func TestWSHandlerNilServer(t *testing.T) {
 	c.Assert(err, qt.ErrorMatches, `websocket: close 1000 \(normal\)`)
 }
 
-type authFailServer struct{}
+type authFailServer struct{ c jimmtest.SimpleTester }
 
 // GetAuthenticationService returns JIMM's oauth authentication service.
 func (s authFailServer) GetAuthenticationService() jimm.OAuthAuthenticator {
-	return jimmtest.NewMockOAuthAuthenticator("")
+	authenticator := jimmtest.NewMockOAuthAuthenticator(s.c, nil)
+	return &authenticator
 }
 
 func (s authFailServer) ServeWS(ctx context.Context, conn *websocket.Conn) {}
@@ -124,7 +125,7 @@ func TestWSHandlerAuthFailsServer(t *testing.T) {
 	c := qt.New(t)
 
 	hnd := &jimmhttp.WSHandler{
-		Server: authFailServer{},
+		Server: authFailServer{c: c},
 	}
 
 	srv := httptest.NewServer(hnd)

@@ -113,7 +113,7 @@ var (
 		Name:      "errors_total",
 		Help:      "The number of monitoring errors found.",
 	}, []string{"controller"})
-	WebsocketRequestDuration = promauto.NewSummaryVec(prometheus.SummaryOpts{
+	WebsocketRequestDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
 		Namespace: "jimm",
 		Subsystem: "websocket",
 		Name:      "request_duration_seconds",

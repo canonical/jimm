@@ -60,8 +60,9 @@ type JIMMSuite struct {
 	COFGAClient *cofga.Client
 	COFGAParams *cofga.OpenFGAParams
 
-	Server *httptest.Server
-	cancel context.CancelFunc
+	Server         *httptest.Server
+	cancel         context.CancelFunc
+	deviceFlowChan chan string
 }
 
 func (s *JIMMSuite) SetUpTest(c *gc.C) {
@@ -85,8 +86,9 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
 
-	// Note that the secret key here must match what is used in tests.
-	s.JIMM.OAuthAuthenticator = NewMockOAuthAuthenticator(JWTTestSecret)
+	s.deviceFlowChan = make(chan string, 1)
+	authenticator := NewMockOAuthAuthenticator(c, s.deviceFlowChan)
+	s.JIMM.OAuthAuthenticator = &authenticator
 
 	err = s.JIMM.Database.Migrate(ctx, false)
 	c.Assert(err, gc.Equals, nil)
@@ -245,6 +247,14 @@ func (s *JIMMSuite) AddModel(c *gc.C, owner names.UserTag, name string, cloud na
 	c.Assert(err, gc.Equals, nil)
 
 	return names.NewModelTag(mi.UUID)
+}
+
+// EnableDeviceFlow allows a test to use the device flow.
+// Call this non-blocking function before login to ensure the device flow won't block.
+//
+// This is necessary as the mock authenticator simulates polling an external OIDC server.
+func (s *JIMMSuite) EnableDeviceFlow(username string) {
+	s.deviceFlowChan <- username
 }
 
 // A JujuSuite is a suite that intialises a JIMM and adds the testing juju

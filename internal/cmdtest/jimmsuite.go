@@ -26,7 +26,7 @@ import (
 	"github.com/juju/names/v5"
 	gc "gopkg.in/check.v1"
 
-	service "github.com/canonical/jimm"
+	service "github.com/canonical/jimm/cmd/jimmsrv/service"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/jimm"

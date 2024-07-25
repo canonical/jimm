@@ -32,6 +32,11 @@ jobs:
       - name: Load ROCK into local registry
         run: make load-rock
 
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@0.23.0
+        with:
+          image-ref: 'jimm:latest'
+
       - name: Push to github package
         run: |
           new_tag=ghcr.io/canonical/jimm:${{ github.ref_name }}

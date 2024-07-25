@@ -917,6 +917,24 @@ func (s *modelManagerSuite) TestCreateModel(c *gc.C) {
 	}
 }
 
+func (s *modelManagerSuite) TestCreateDuplicateModelsFails(c *gc.C) {
+	conn := s.open(c, nil, "bob")
+	defer conn.Close()
+	createModel := func(mi jujuparams.ModelInfo) error {
+		return conn.APICall("ModelManager", 9, "", "CreateModel", jujuparams.ModelCreateArgs{
+			Name:               "my-model",
+			OwnerTag:           names.NewUserTag("bob@canonical.com").String(),
+			CloudTag:           names.NewCloudTag(jimmtest.TestCloudName).String(),
+			CloudCredentialTag: "cloudcred-" + jimmtest.TestCloudName + "_bob@canonical.com_cred",
+		}, &mi)
+	}
+	var mi jujuparams.ModelInfo
+	err := createModel(mi)
+	c.Assert(err, gc.IsNil)
+	err = createModel(mi)
+	c.Assert(err, gc.ErrorMatches, `model bob@canonical\.com/my-model already exists \(already exists\)`)
+}
+
 func (s *modelManagerSuite) TestGrantAndRevokeModel(c *gc.C) {
 	conn := s.open(c, nil, "bob")
 	defer conn.Close()

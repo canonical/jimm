@@ -24,13 +24,13 @@ type Model struct {
 	UpdatedAt time.Time
 
 	// Name is the name of the model.
-	Name string
+	Name string `gorm:"uniqueIndex:unique_model_names;not null"`
 
 	// UUID is the UUID of the model.
 	UUID sql.NullString
 
 	// Owner is identity that owns the model.
-	OwnerIdentityName string
+	OwnerIdentityName string   `gorm:"uniqueIndex:unique_model_names;not null"`
 	Owner             Identity `gorm:"foreignkey:OwnerIdentityName;references:Name"`
 
 	// Controller is the controller that is hosting the model.
