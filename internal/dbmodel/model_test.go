@@ -57,7 +57,7 @@ func TestRecreateDeletedModel(t *testing.T) {
 		CloudRegion:     cl.Regions[0],
 		CloudCredential: cred,
 	}
-	c.Check(db.Create(&m2).Error, qt.ErrorMatches, `.*violates unique constraint "models_controller_id_owner_identity_name_name_key".*`)
+	c.Check(db.Create(&m2).Error, qt.ErrorMatches, `.*violates unique constraint "unique_model_names".*`)
 
 	c.Assert(db.Delete(&m1).Error, qt.IsNil)
 	c.Check(db.First(&m1).Error, qt.Equals, gorm.ErrRecordNotFound)
@@ -187,7 +187,7 @@ func TestModelUniqueConstraint(t *testing.T) {
 			Level: "unsupported",
 		},
 	}
-	c.Assert(db.Create(&m2).Error, qt.IsNil)
+	c.Assert(db.Create(&m2).Error, qt.ErrorMatches, `ERROR: duplicate key value violates unique constraint .*`)
 
 	m3 := dbmodel.Model{
 		UUID: sql.NullString{

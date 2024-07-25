@@ -16,7 +16,7 @@ import (
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
-	"github.com/canonical/jimm"
+	jimmsvc "github.com/canonical/jimm/cmd/jimmsrv/service"
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/version"
 )
@@ -140,7 +140,7 @@ func start(ctx context.Context, s *service.Service) error {
 		return errors.E("jimm session store secret must be at least 64 characters")
 	}
 
-	jimmsvc, err := jimm.NewService(ctx, jimm.Params{
+	jimmsvc, err := jimmsvc.NewService(ctx, jimmsvc.Params{
 		ControllerUUID:    os.Getenv("JIMM_UUID"),
 		DSN:               os.Getenv("JIMM_DSN"),
 		ControllerAdmins:  strings.Fields(os.Getenv("JIMM_ADMINS")),
@@ -150,7 +150,7 @@ func start(ctx context.Context, s *service.Service) error {
 		VaultPath:         os.Getenv("VAULT_PATH"),
 		DashboardLocation: os.Getenv("JIMM_DASHBOARD_LOCATION"),
 		PublicDNSName:     os.Getenv("JIMM_DNS_NAME"),
-		OpenFGAParams: jimm.OpenFGAParams{
+		OpenFGAParams: jimmsvc.OpenFGAParams{
 			Scheme:    os.Getenv("OPENFGA_SCHEME"),
 			Host:      os.Getenv("OPENFGA_HOST"),
 			Store:     os.Getenv("OPENFGA_STORE"),
@@ -164,7 +164,7 @@ func start(ctx context.Context, s *service.Service) error {
 		MacaroonExpiryDuration:        macaroonExpiryDuration,
 		JWTExpiryDuration:             jwtExpiryDuration,
 		InsecureSecretStorage:         insecureSecretStorage,
-		OAuthAuthenticatorParams: jimm.OAuthAuthenticatorParams{
+		OAuthAuthenticatorParams: jimmsvc.OAuthAuthenticatorParams{
 			IssuerURL:           issuerURL,
 			ClientID:            clientID,
 			ClientSecret:        clientSecret,
