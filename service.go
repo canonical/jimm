@@ -387,7 +387,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 
 	s.mux.Mount("/metrics", promhttp.Handler())
 
-	s.mux.Mount("/rebac", rebacBackend.Handler(""))
+	s.mux.Mount("/rebac", rebac_admin.AuthenticateMiddleware(rebacBackend.Handler(""), &s.jimm))
 
 	mountHandler(
 		"/debug",

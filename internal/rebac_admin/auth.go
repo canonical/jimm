@@ -13,50 +13,30 @@ import (
 	rebac_handlers "github.com/canonical/rebac-admin-ui-handlers/v1"
 )
 
-func newAuthenticator(jimm *jimm.JIMM) *authenticator {
-	return &authenticator{
-		jimm,
-	}
-}
+func AuthenticateMiddleware(next http.Handler, jimm *jimm.JIMM) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx, err := jimm.OAuthAuthenticator.AuthenticateBrowserSession(r.Context(), w, r)
+		if err != nil {
+			zapctx.Error(ctx, "failed to authenticate", zap.Error(err))
+			http.Error(w, "failed to authenticate", http.StatusUnauthorized)
+			return
+		}
 
-type dummyWriter struct{}
+		identity := auth.SessionIdentityFromContext(ctx)
+		if identity == "" {
+			zapctx.Error(ctx, "no identity found in session")
+			http.Error(w, "internal authentication error", http.StatusInternalServerError)
+			return
+		}
 
-func (d dummyWriter) Header() http.Header {
-	return http.Header{}
-}
+		user, err := jimm.GetOpenFGAUserAndAuthorise(ctx, identity)
+		if err != nil {
+			zapctx.Error(ctx, "failed to get openfga user", zap.Error(err))
+			http.Error(w, "internal authentication error", http.StatusInternalServerError)
+			return
+		}
 
-func (d dummyWriter) Write(data []byte) (int, error) {
-	return len(data), nil
-}
-
-func (d dummyWriter) WriteHeader(int) {}
-
-type authenticator struct {
-	jimm *jimm.JIMM
-}
-
-// Authenticate extracts the calling user's information from the given HTTP request
-func (a *authenticator) Authenticate(r *http.Request) (any, error) {
-	// AuthenticateBrowserSession modifies cookies in the response writer which isn't present here
-	dummyWriter := &dummyWriter{}
-
-	ctx, err := a.jimm.OAuthAuthenticator.AuthenticateBrowserSession(r.Context(), dummyWriter, r)
-	if err != nil {
-		zapctx.Error(ctx, "failed to authenticate", zap.Error(err))
-		return nil, rebac_handlers.NewAuthenticationError("failed to authenticate")
-	}
-
-	identity := auth.SessionIdentityFromContext(ctx)
-	if identity == "" {
-		zapctx.Error(ctx, "no identity found in session")
-		return nil, rebac_handlers.NewAuthenticationError("no identity found in session")
-	}
-
-	user, err := a.jimm.GetOpenFGAUserAndAuthorise(ctx, identity)
-	if err != nil {
-		zapctx.Error(ctx, "failed to get openfga user", zap.Error(err))
-		return nil, rebac_handlers.NewAuthenticationError("failed to get openfga user")
-	}
-
-	return user, nil
+		ctx = rebac_handlers.ContextWithIdentity(r.Context(), user)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
 }

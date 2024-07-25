@@ -17,7 +17,7 @@ func SetupBackend(ctx context.Context, jimm *jimm.JIMM) (*rebac_handlers.ReBACAd
 	const op = errors.Op("rebac_admin.SetupBackend")
 
 	rebacBackend, err := rebac_handlers.NewReBACAdminBackend(rebac_handlers.ReBACAdminBackendParams{
-		Authenticator: newAuthenticator(jimm),
+		Authenticator: nil, // Authentication is handled by internal middleware.
 		Entitlements:  &EntitlementsService{},
 	})
 	if err != nil {

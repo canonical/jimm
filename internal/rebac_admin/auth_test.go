@@ -18,14 +18,15 @@ import (
 	"github.com/canonical/jimm/internal/jimm"
 	"github.com/canonical/jimm/internal/jimmtest"
 	"github.com/canonical/jimm/internal/rebac_admin"
+	rebac_handlers "github.com/canonical/rebac-admin-ui-handlers/v1"
 )
 
 // Checks if the authenticator responsible for access control to rebac admin handlers works correctly.
 func TestAuthenticate(t *testing.T) {
 	tests := []struct {
-		name          string
-		setupMock     func(*jimmtest.MockOAuthAuthenticator)
-		expectedError string
+		name           string
+		setupMock      func(*jimmtest.MockOAuthAuthenticator)
+		expectedStatus int
 	}{
 		{
 			name: "success",
@@ -34,6 +35,7 @@ func TestAuthenticate(t *testing.T) {
 					return auth.ContextWithSessionIdentity(ctx, "test-user@canonical.com"), nil
 				}
 			},
+			expectedStatus: http.StatusOK,
 		},
 		{
 			name: "failure",
@@ -42,7 +44,7 @@ func TestAuthenticate(t *testing.T) {
 					return ctx, errors.New("some error")
 				}
 			},
-			expectedError: "failed to authenticate",
+			expectedStatus: http.StatusUnauthorized,
 		},
 		{
 			name: "no identity",
@@ -51,7 +53,7 @@ func TestAuthenticate(t *testing.T) {
 					return ctx, nil
 				}
 			},
-			expectedError: "no identity found in session",
+			expectedStatus: http.StatusInternalServerError,
 		},
 	}
 
@@ -76,17 +78,20 @@ func TestAuthenticate(t *testing.T) {
 			err = j.Database.Migrate(context.Background(), false)
 			c.Assert(err, qt.IsNil)
 
-			authenticator := rebac_admin.NewAuthenticator(j)
-
 			req := httptest.NewRequest(http.MethodGet, "/", nil)
-			_, err = authenticator.Authenticate(req)
+			w := httptest.NewRecorder()
 
-			if tt.expectedError != "" {
-				qt.Assert(t, err, qt.Not(qt.IsNil))
-				qt.Assert(t, err.Error(), qt.Contains, tt.expectedError)
-			} else {
-				qt.Assert(t, err, qt.IsNil)
-			}
+			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				identity, err := rebac_handlers.GetIdentityFromContext(r.Context())
+				c.Assert(err, qt.IsNil)
+				c.Assert(identity, qt.Not(qt.IsNil))
+
+				w.WriteHeader(http.StatusOK)
+			})
+			middleware := rebac_admin.AuthenticateMiddleware(handler, j)
+			middleware.ServeHTTP(w, req)
+
+			c.Assert(w.Code, qt.Equals, tt.expectedStatus)
 		})
 	}
 }
