@@ -64,7 +64,7 @@ func TestAuthenticate(t *testing.T) {
 			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
 			c.Assert(err, qt.IsNil)
 
-			mockAuthService := jimmtest.NewMockOAuthAuthenticator("")
+			mockAuthService := jimmtest.NewMockOAuthAuthenticator(nil, nil)
 			tt.setupMock(&mockAuthService)
 
 			j := &jimm.JIMM{
@@ -73,7 +73,7 @@ func TestAuthenticate(t *testing.T) {
 					DB: jimmtest.PostgresDB(c, func() time.Time { return time.Now() }),
 				},
 				OpenFGAClient:      client,
-				OAuthAuthenticator: mockAuthService,
+				OAuthAuthenticator: &mockAuthService,
 			}
 			err = j.Database.Migrate(context.Background(), false)
 			c.Assert(err, qt.IsNil)
