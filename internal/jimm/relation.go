@@ -1,7 +1,9 @@
+// Copyright 2024 canonical.
 package jimm
 
 import (
 	"context"
+	"fmt"
 
 	apiparams "github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/internal/errors"
@@ -11,11 +13,9 @@ import (
 	"go.uber.org/zap"
 )
 
-type JimmTuple = apiparams.RelationshipTuple
-
 // AddRelation checks user permission and add given relations tuples.
 // At the moment user is required be admin.
-func (j *JIMM) AddRelation(ctx context.Context, user *openfga.User, tuples []JimmTuple) error {
+func (j *JIMM) AddRelation(ctx context.Context, user *openfga.User, tuples []apiparams.RelationshipTuple) error {
 	const op = errors.Op("jimm.AddRelation")
 	if !user.JimmAdmin {
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
@@ -33,7 +33,7 @@ func (j *JIMM) AddRelation(ctx context.Context, user *openfga.User, tuples []Jim
 
 // RemoveRelation checks user permission and remove given relations tuples.
 // At the moment user is required be admin.
-func (j *JIMM) RemoveRelation(ctx context.Context, user *openfga.User, tuples []JimmTuple) error {
+func (j *JIMM) RemoveRelation(ctx context.Context, user *openfga.User, tuples []apiparams.RelationshipTuple) error {
 	const op = errors.Op("jimm.RemoveRelation")
 	if !user.JimmAdmin {
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
@@ -51,7 +51,7 @@ func (j *JIMM) RemoveRelation(ctx context.Context, user *openfga.User, tuples []
 
 // CheckRelation checks user permission and return if the given tuple exists.
 // At the moment user is required be admin or checking its own relations
-func (j *JIMM) CheckRelation(ctx context.Context, user *openfga.User, tuple JimmTuple, trace bool) (_ bool, err error) {
+func (j *JIMM) CheckRelation(ctx context.Context, user *openfga.User, tuple apiparams.RelationshipTuple, trace bool) (_ bool, err error) {
 	const op = errors.Op("jimm.CheckRelation")
 	allowed := false
 	parsedTuple, err := j.parseTuple(ctx, tuple)
@@ -72,7 +72,7 @@ func (j *JIMM) CheckRelation(ctx context.Context, user *openfga.User, tuple Jimm
 
 // ListRelationshipTuples checks user permission and remove given relations tuples.
 // At the moment user is required be admin
-func (j *JIMM) ListRelationshipTuples(ctx context.Context, user *openfga.User, tuple JimmTuple, pageSize int32, continuationToken string) ([]openfga.Tuple, string, error) {
+func (j *JIMM) ListRelationshipTuples(ctx context.Context, user *openfga.User, tuple apiparams.RelationshipTuple, pageSize int32, continuationToken string) ([]openfga.Tuple, string, error) {
 	const op = errors.Op("jujuapi.ListRelationshipTuples")
 	if !user.JimmAdmin {
 		return []openfga.Tuple{}, "", errors.E(op, errors.CodeUnauthorized, "unauthorized")
@@ -126,21 +126,21 @@ func (j *JIMM) parseTuple(ctx context.Context, tuple apiparams.RelationshipTuple
 	// to be specific to the erroneous offender.
 	parseTagError := func(msg string, key string, err error) error {
 		zapctx.Debug(ctx, msg, zap.String("key", key), zap.Error(err))
-		return errors.E(op, errors.CodeFailedToParseTupleKey, err, msg+" "+key)
+		return errors.E(op, errors.CodeFailedToParseTupleKey, fmt.Sprintf("%s %s: %s", msg, key, err.Error()))
 	}
 
 	if tuple.TargetObject == "" {
 		return nil, errors.E(op, errors.CodeBadRequest, "target object not specified")
 	}
 	if tuple.TargetObject != "" {
-		targetTag, err := j.ParseAndValidateTag(ctx, tuple.TargetObject)
+		targetTag, err := j.parseAndValidateTag(ctx, tuple.TargetObject)
 		if err != nil {
 			return nil, parseTagError("failed to parse tuple target object key", tuple.TargetObject, err)
 		}
 		t.Target = targetTag
 	}
 	if tuple.Object != "" {
-		objectTag, err := j.ParseAndValidateTag(ctx, tuple.Object)
+		objectTag, err := j.parseAndValidateTag(ctx, tuple.Object)
 		if err != nil {
 			return nil, parseTagError("failed to parse tuple object key", tuple.Object, err)
 		}
