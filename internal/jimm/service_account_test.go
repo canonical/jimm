@@ -260,7 +260,7 @@ func TestGrantServiceAccountAccess(t *testing.T) {
 			if test.expectedError == "" {
 				c.Assert(err, qt.IsNil)
 				for _, tag := range test.tags {
-					parsedTag, err := jimm.parseAndValidateTag(context.Background(), tag)
+					parsedTag, err := jimm.ParseAndValidateTag(context.Background(), tag)
 					c.Assert(err, qt.IsNil)
 					tuple := openfga.Tuple{
 						Object:   parsedTag,
