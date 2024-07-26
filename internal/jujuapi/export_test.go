@@ -38,11 +38,11 @@ func RunModelAccessWatcher(w *modelAccessWatcher) {
 	go w.loop()
 }
 
-func ToJAASTag(db db.Database, tag *ofganames.Tag) (string, error) {
+func ToJAASTag(db db.Database, tag *ofganames.Tag, resolveUUIDs bool) (string, error) {
 	jimm := &jimm.JIMM{
 		Database: db,
 	}
-	return jimm.ToJAASTag(context.Background(), tag)
+	return jimm.ToJAASTag(context.Background(), tag, resolveUUIDs)
 }
 
 func NewControllerRoot(j JIMM, p Params) *controllerRoot {

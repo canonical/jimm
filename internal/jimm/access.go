@@ -390,7 +390,15 @@ func (j *JIMM) RevokeAuditLogAccess(ctx context.Context, user *openfga.User, tar
 
 // ToJAASTag converts a tag used in OpenFGA authorization model to a
 // tag used in JAAS.
-func (j *JIMM) ToJAASTag(ctx context.Context, tag *ofganames.Tag) (string, error) {
+func (j *JIMM) ToJAASTag(ctx context.Context, tag *ofganames.Tag, resolveUUIDs bool) (string, error) {
+	if !resolveUUIDs {
+		res := tag.Kind.String() + "-" + tag.ID
+		if tag.Relation.String() != "" {
+			res = res + "#" + tag.Relation.String()
+		}
+		return res, nil
+	}
+
 	switch tag.Kind {
 	case names.UserTagKind:
 		return names.UserTagKind + "-" + tag.ID, nil
