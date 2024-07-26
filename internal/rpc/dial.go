@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	"github.com/gorilla/websocket"
+	"github.com/juju/juju/core/network"
 	"github.com/juju/names/v5"
 	"github.com/juju/zaputil"
 	"github.com/juju/zaputil/zapctx"
@@ -84,10 +85,9 @@ func Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag,
 	var urls []string
 	for _, hps := range ctl.Addresses {
 		for _, hp := range hps {
-			if hp.Scope != "public" && hp.Scope != "" {
-				continue
+			if maybeReachable(hp.Scope) {
+				urls = append(urls, websocketURL(fmt.Sprintf("%s:%d", hp.Value, hp.Port), modelTag, finalPath))
 			}
-			urls = append(urls, websocketURL(fmt.Sprintf("%s:%d", hp.Value, hp.Port), modelTag, finalPath))
 		}
 	}
 	zapctx.Debug(ctx, "Dialling all URLs", zap.Any("urls", urls))
@@ -96,6 +96,21 @@ func Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag,
 		return nil, err
 	}
 	return conn, nil
+}
+
+// maybeReachable decides what kinds of links JIMM should try to connect via.
+// Local IPs like localhost for example are excluded but public IPs and Cloud local IPs are potentially reachable.
+func maybeReachable(scope string) bool {
+	switch scope {
+	case string(network.ScopeCloudLocal):
+		return true
+	case string(network.ScopePublic):
+		return true
+	case "":
+		return true
+	default:
+		return false
+	}
 }
 
 func websocketURL(s string, mt names.ModelTag, finalPath string) string {

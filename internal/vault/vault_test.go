@@ -28,7 +28,7 @@ func TestMain(m *testing.M) {
 }
 
 func newStore(t testing.TB) *vault.VaultStore {
-	client, path, roleID, secretID, ok := jimmtest.VaultClient(t, "../../")
+	client, path, roleID, secretID, ok := jimmtest.VaultClient(t)
 	if !ok {
 		t.Skip("vault not available")
 	}

@@ -138,7 +138,7 @@ func (w *Watcher) dialController(ctx context.Context, ctl *dbmodel.Controller) (
 		if !updateController {
 			return
 		}
-		if uerr := w.Database.UpdateController(ctx, ctl); err != nil {
+		if uerr := w.Database.UpdateController(ctx, ctl); uerr != nil {
 			zapctx.Error(ctx, "cannot set controller available", zap.Error(uerr))
 		}
 		// Note (alesstimec) This channel is only available in tests.

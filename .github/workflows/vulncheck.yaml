@@ -1,0 +1,20 @@
+name: Security Check
+
+on:
+  schedule:
+    - cron: "0 6 */2 * *"   # Run every 2 days at 6 am
+  workflow_dispatch:
+
+jobs:
+  govulncheck:
+    runs-on: [self-hosted, linux, X64, jammy, large]
+    name: Run govulncheck
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Security checks
+        uses: canonical/comsys-build-tools/.github/actions/security-scan@main

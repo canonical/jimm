@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 
-	"github.com/canonical/jimm"
+	jimmsvc "github.com/canonical/jimm/cmd/jimmsrv/service"
 	"github.com/canonical/jimm/internal/jimm/credentials"
 	"github.com/canonical/jimm/internal/jimmjwx"
 	"github.com/canonical/jimm/internal/jimmtest"
@@ -18,7 +18,7 @@ import (
 )
 
 func newStore(t testing.TB) *vault.VaultStore {
-	client, path, roleID, roleSecretID, ok := jimmtest.VaultClient(t, "../../")
+	client, path, roleID, roleSecretID, ok := jimmtest.VaultClient(t)
 	if !ok {
 		t.Skip("vault not available")
 	}
@@ -82,7 +82,7 @@ func startAndTestRotator(c *qt.C, ctx context.Context, store credentials.Credent
 
 // setupService sets up a JIMM service with the correct params to connect to vault. It also ensures
 // that vault is wiped each time this is called. The test server is cleaned up on test completion.
-func setupService(ctx context.Context, c *qt.C) (*jimm.Service, *httptest.Server, credentials.CredentialStore) {
+func setupService(ctx context.Context, c *qt.C) (*jimmsvc.Service, *httptest.Server, credentials.CredentialStore) {
 	store := newStore(c)
 	// Ensure store is wiped
 	err := store.CleanupJWKS(ctx)
@@ -91,7 +91,7 @@ func setupService(ctx context.Context, c *qt.C) (*jimm.Service, *httptest.Server
 	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
-	_, path, roleID, roleSecretID, ok := jimmtest.VaultClient(c, "../../")
+	_, path, roleID, roleSecretID, ok := jimmtest.VaultClient(c)
 	c.Assert(ok, qt.IsTrue)
 
 	p := jimmtest.NewTestJimmParams(c)
@@ -100,7 +100,7 @@ func setupService(ctx context.Context, c *qt.C) (*jimm.Service, *httptest.Server
 	p.VaultPath = path
 	p.VaultRoleID = roleID
 	p.VaultRoleSecretID = roleSecretID
-	p.OpenFGAParams = jimm.OpenFGAParams{
+	p.OpenFGAParams = jimmsvc.OpenFGAParams{
 		Scheme:    cofgaParams.Scheme,
 		Host:      cofgaParams.Host,
 		Port:      cofgaParams.Port,
@@ -109,7 +109,7 @@ func setupService(ctx context.Context, c *qt.C) (*jimm.Service, *httptest.Server
 		AuthModel: cofgaParams.AuthModelID,
 	}
 	p.CookieSessionKey = []byte("test-secret")
-	svc, err := jimm.NewService(context.Background(), p)
+	svc, err := jimmsvc.NewService(context.Background(), p)
 
 	c.Assert(err, qt.IsNil)
 

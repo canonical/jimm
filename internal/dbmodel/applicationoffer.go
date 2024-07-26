@@ -33,7 +33,7 @@ type ApplicationOffer struct {
 	UUID string `gorm:"not null;uniqueIndex"`
 
 	// Application offer URL.
-	URL string
+	URL string `gorm:"unique;not null"`
 
 	// Endpoints contains remote endpoints for the application offer.
 	Endpoints []ApplicationOfferRemoteEndpoint
