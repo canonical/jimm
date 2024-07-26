@@ -97,7 +97,7 @@ func (j *JIMM) GrantServiceAccountAccess(ctx context.Context, u *openfga.User, s
 	tags := make([]*ofganames.Tag, 0, len(entities))
 	// Validate tags
 	for _, val := range entities {
-		tag, err := j.ParseAndValidateTag(ctx, val)
+		tag, err := j.parseAndValidateTag(ctx, val)
 		if err != nil {
 			return errors.E(op, err)
 		}
