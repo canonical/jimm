@@ -20,7 +20,7 @@ func NewUserSSHKeys(identityName string, keys []string) (*userSSHKeys, error) {
 	}, nil
 }
 
-// userSSHKey holds the SSH key for a user.
+// userSSHKeys holds the SSH keys for a user.
 type userSSHKeys struct {
 	gorm.Model
 
