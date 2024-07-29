@@ -56,8 +56,6 @@ jobs:
         # Needed to remove unused dependencies
         go mod tidy 
 
-        git add -A
-
     - name: Create Pull Request
       uses: peter-evans/create-pull-request@v6
       with:
