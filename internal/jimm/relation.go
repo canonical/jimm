@@ -1,4 +1,5 @@
 // Copyright 2024 canonical.
+
 package jimm
 
 import (
@@ -9,6 +10,7 @@ import (
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
+
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 )
@@ -49,20 +51,21 @@ func (j *JIMM) RemoveRelation(ctx context.Context, user *openfga.User, tuples []
 	return nil
 }
 
-// CheckRelation checks user permission and return if the given tuple exists.
+// CheckRelation checks user permission and return true if the given tuple exists.
 // At the moment user is required be admin or checking its own relations
 func (j *JIMM) CheckRelation(ctx context.Context, user *openfga.User, tuple apiparams.RelationshipTuple, trace bool) (_ bool, err error) {
 	const op = errors.Op("jimm.CheckRelation")
 	allowed := false
 	parsedTuple, err := j.parseTuple(ctx, tuple)
+	if err != nil {
+		return false, errors.E(op, err)
+	}
 	userCheckingSelf := parsedTuple.Object.Kind == openfga.UserType && parsedTuple.Object.ID == user.Name
 	// Admins can check any relation, non-admins can only check their own.
 	if !(user.JimmAdmin || userCheckingSelf) {
 		return allowed, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
-	if err != nil {
-		return false, errors.E(op, err)
-	}
+
 	allowed, err = j.OpenFGAClient.CheckRelation(ctx, *parsedTuple, trace)
 	if err != nil {
 		return allowed, errors.E(op, errors.CodeOpenFGARequestFailed, err)

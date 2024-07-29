@@ -10,11 +10,11 @@ import (
 	"github.com/canonical/jimm/internal/openfga"
 )
 
-// JIMMRelation is a default implementation of the jujuapi.JIMMRelation interface. Every method
+// RelationService is an implementation of the jujuapi.RelationService interface. Every method
 // has a corresponding funcion field. Whenever the method is called it
 // will delegate to the requested funcion or if the funcion is nil return
 // a NotImplemented error.
-type JIMMRelationService struct {
+type RelationService struct {
 	AddRelation_            func(ctx context.Context, user *openfga.User, tuples []apiparams.RelationshipTuple) error
 	RemoveRelation_         func(ctx context.Context, user *openfga.User, tuples []apiparams.RelationshipTuple) error
 	CheckRelation_          func(ctx context.Context, user *openfga.User, tuple apiparams.RelationshipTuple, trace bool) (_ bool, err error)
