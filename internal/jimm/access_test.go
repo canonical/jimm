@@ -474,7 +474,7 @@ func TestParseTag(t *testing.T) {
 	jimmTag := "model-" + controller.Name + ":" + user.Name + "/" + model.Name + "#administrator"
 
 	// JIMM tag syntax for models
-	tag, err := j.ParseTag(ctx, jimmTag)
+	tag, err := j.ParseAndValidateTag(ctx, jimmTag)
 	c.Assert(err, qt.IsNil)
 	c.Assert(tag.Kind.String(), qt.Equals, names.ModelTagKind)
 	c.Assert(tag.ID, qt.Equals, model.UUID.String)
@@ -483,7 +483,7 @@ func TestParseTag(t *testing.T) {
 	jujuTag := "model-" + model.UUID.String + "#administrator"
 
 	// Juju tag syntax for models
-	tag, err = j.ParseTag(ctx, jujuTag)
+	tag, err = j.ParseAndValidateTag(ctx, jujuTag)
 	c.Assert(err, qt.IsNil)
 	c.Assert(tag.ID, qt.Equals, model.UUID.String)
 	c.Assert(tag.Kind.String(), qt.Equals, names.ModelTagKind)
