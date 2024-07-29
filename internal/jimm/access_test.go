@@ -636,7 +636,11 @@ func TestResolveTupleObjectMapsGroups(t *testing.T) {
 	}
 	err = j.Database.GetGroup(ctx, group)
 	c.Assert(err, qt.IsNil)
+	// Test resolution via name and via UUID.
 	tag, err := jimm.ResolveTag(j.UUID, &j.Database, "group-"+group.Name+"#member")
+	c.Assert(err, qt.IsNil)
+	c.Assert(tag, qt.DeepEquals, ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag(group.UUID), ofganames.MemberRelation))
+	tag, err = jimm.ResolveTag(j.UUID, &j.Database, "group-"+group.UUID+"#member")
 	c.Assert(err, qt.IsNil)
 	c.Assert(tag, qt.DeepEquals, ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag(group.UUID), ofganames.MemberRelation))
 }
