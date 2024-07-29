@@ -13,6 +13,7 @@ import (
 	"github.com/juju/version"
 
 	"github.com/canonical/jimm/api/params"
+	"github.com/canonical/jimm/internal/common/pagination"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
@@ -79,7 +80,7 @@ type JIMM struct {
 	InitiateInternalMigration_         func(ctx context.Context, user *openfga.User, modelTag names.ModelTag, targetController string) (jujuparams.InitiateMigrationResult, error)
 	ListApplicationOffers_             func(ctx context.Context, user *openfga.User, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error)
 	ListControllers_                   func(ctx context.Context, user *openfga.User) ([]dbmodel.Controller, error)
-	ListGroups_                        func(ctx context.Context, user *openfga.User) ([]dbmodel.GroupEntry, error)
+	ListGroups_                        func(ctx context.Context, user *openfga.User, filter pagination.LimitOffsetPagination) ([]dbmodel.GroupEntry, error)
 	ModelDefaultsForCloud_             func(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag) (jujuparams.ModelDefaultsResult, error)
 	ModelInfo_                         func(ctx context.Context, u *openfga.User, mt names.ModelTag) (*jujuparams.ModelInfo, error)
 	ModelStatus_                       func(ctx context.Context, u *openfga.User, mt names.ModelTag) (*jujuparams.ModelStatus, error)
@@ -414,11 +415,11 @@ func (j *JIMM) ListControllers(ctx context.Context, user *openfga.User) ([]dbmod
 	}
 	return j.ListControllers_(ctx, user)
 }
-func (j *JIMM) ListGroups(ctx context.Context, user *openfga.User) ([]dbmodel.GroupEntry, error) {
+func (j *JIMM) ListGroups(ctx context.Context, user *openfga.User, filters pagination.LimitOffsetPagination) ([]dbmodel.GroupEntry, error) {
 	if j.ListGroups_ == nil {
 		return nil, errors.E(errors.CodeNotImplemented)
 	}
-	return j.ListGroups_(ctx, user)
+	return j.ListGroups_(ctx, user, filters)
 }
 func (j *JIMM) ModelDefaultsForCloud(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag) (jujuparams.ModelDefaultsResult, error) {
 	if j.ModelDefaultsForCloud_ == nil {
