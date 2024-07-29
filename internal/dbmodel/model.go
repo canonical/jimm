@@ -12,7 +12,7 @@ import (
 	"github.com/juju/names/v5"
 	"github.com/juju/version/v2"
 
-	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/v3/internal/errors"
 )
 
 // A Model is a juju model.

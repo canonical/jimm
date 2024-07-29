@@ -8,7 +8,7 @@ import (
 
 	jujucmd "github.com/juju/cmd/v3"
 
-	"github.com/canonical/jimm/cmd/jimmctl/cmd"
+	"github.com/canonical/jimm/v3/cmd/jimmctl/cmd"
 )
 
 var jimmctlDoc = `

@@ -5,7 +5,7 @@ package cloudcred_test
 import (
 	"testing"
 
-	"github.com/canonical/jimm/internal/cloudcred"
+	"github.com/canonical/jimm/v3/internal/cloudcred"
 	qt "github.com/frankban/quicktest"
 )
 

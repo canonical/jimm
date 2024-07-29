@@ -8,8 +8,8 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/canonical/jimm/internal/db"
-	"github.com/canonical/jimm/internal/jimmtest"
+	"github.com/canonical/jimm/v3/internal/db"
+	"github.com/canonical/jimm/v3/internal/jimmtest"
 )
 
 // gormDB creates a new *gorm.DB for use in tests. The newly created DB

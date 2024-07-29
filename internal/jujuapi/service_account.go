@@ -9,12 +9,12 @@ import (
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 
-	apiparams "github.com/canonical/jimm/api/params"
-	"github.com/canonical/jimm/internal/dbmodel"
-	"github.com/canonical/jimm/internal/errors"
-	"github.com/canonical/jimm/internal/jimm"
-	"github.com/canonical/jimm/internal/openfga"
-	jimmnames "github.com/canonical/jimm/pkg/names"
+	apiparams "github.com/canonical/jimm/v3/api/params"
+	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jimm"
+	"github.com/canonical/jimm/v3/internal/openfga"
+	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
 
 // service_account contains the primary RPC commands for handling service accounts within JIMM via the JIMM facade itself.

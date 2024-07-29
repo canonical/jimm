@@ -10,7 +10,7 @@ import (
 	"github.com/juju/juju/state"
 	"github.com/juju/names/v5"
 
-	"github.com/canonical/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/dbmodel"
 )
 
 func TestApplicationOfferTag(t *testing.T) {

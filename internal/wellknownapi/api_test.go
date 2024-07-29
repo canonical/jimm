@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/canonical/jimm/internal/errors"
-	"github.com/canonical/jimm/internal/jimmtest"
-	"github.com/canonical/jimm/internal/vault"
-	"github.com/canonical/jimm/internal/wellknownapi"
+	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jimmtest"
+	"github.com/canonical/jimm/v3/internal/vault"
+	"github.com/canonical/jimm/v3/internal/wellknownapi"
 	qt "github.com/frankban/quicktest"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 )

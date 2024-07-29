@@ -9,7 +9,7 @@ import (
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 
-	"github.com/canonical/jimm/internal/pubsub"
+	"github.com/canonical/jimm/v3/internal/pubsub"
 )
 
 func TestPackage(t *testing.T) {

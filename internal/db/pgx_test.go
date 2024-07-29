@@ -19,8 +19,8 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
-	"github.com/canonical/jimm/internal/db"
-	"github.com/canonical/jimm/internal/jimmtest"
+	"github.com/canonical/jimm/v3/internal/db"
+	"github.com/canonical/jimm/v3/internal/jimmtest"
 )
 
 const (

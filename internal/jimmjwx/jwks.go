@@ -16,8 +16,8 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"go.uber.org/zap"
 
-	"github.com/canonical/jimm/internal/errors"
-	"github.com/canonical/jimm/internal/jimm/credentials"
+	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jimm/credentials"
 )
 
 // JWKSService handles the creation, rotation and retrieval of JWKS for JIMM.

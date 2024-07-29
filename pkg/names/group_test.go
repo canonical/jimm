@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/canonical/jimm/pkg/names"
+	"github.com/canonical/jimm/v3/pkg/names"
 )
 
 func TestParseGroupTag(t *testing.T) {

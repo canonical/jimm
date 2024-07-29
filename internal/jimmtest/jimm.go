@@ -3,7 +3,7 @@ package jimmtest
 import (
 	"time"
 
-	jimmsvc "github.com/canonical/jimm/cmd/jimmsrv/service"
+	jimmsvc "github.com/canonical/jimm/v3/cmd/jimmsrv/service"
 	"github.com/coreos/go-oidc/v3/oidc"
 )
 

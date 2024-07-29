@@ -11,11 +11,11 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/juju/names/v5"
 
-	"github.com/canonical/jimm/internal/auth"
-	"github.com/canonical/jimm/internal/db"
-	"github.com/canonical/jimm/internal/jimm"
-	"github.com/canonical/jimm/internal/jimmtest"
-	ofganames "github.com/canonical/jimm/internal/openfga/names"
+	"github.com/canonical/jimm/v3/internal/auth"
+	"github.com/canonical/jimm/v3/internal/db"
+	"github.com/canonical/jimm/v3/internal/jimm"
+	"github.com/canonical/jimm/v3/internal/jimmtest"
+	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 )
 
 func TestGetOpenFGAUser(t *testing.T) {

@@ -8,7 +8,7 @@ import (
 	"github.com/juju/names/v5"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 
-	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/v3/internal/errors"
 )
 
 type controllerCredentials struct {
