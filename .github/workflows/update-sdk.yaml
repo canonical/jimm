@@ -11,6 +11,10 @@ on:
         description: 'SDK version'
         required: true
         default: 'v3'
+      pr-commit-message:
+        description: 'PR commit message'
+        required: true
+        default: 'Update SDK'
 
 jobs:
   build:
@@ -41,7 +45,7 @@ jobs:
         SDK_REPO: ${{ github.event.inputs.sdk-repo }}
         SDK_VERSION: ${{ github.event.inputs.sdk-version }}
       run: |
-        # Clean up old files + copy new ones
+        # Remove all in case some files are removed
         rm -rf *
         cp -r $PROJECT/pkg/.[^.]* $PROJECT/pkg/* $PROJECT/go.mod .
 
@@ -52,13 +56,14 @@ jobs:
         # Needed to remove unused dependencies
         go mod tidy 
 
-        # Commit changes
-        git config user.name github-actions
-        git config user.email github-actions@github.com
         git add -A
-        if git diff --staged --quiet; then
-          echo "No changes to commit"
-        else
-          git commit -m "Update SDK"
-          git push
-        fi
+
+    - name: Create Pull Request
+      uses: peter-evans/create-pull-request@v6
+      with:
+        token: ${{ secrets.PAT }}
+        path: ./sdk
+        branch: update-sdk-${{ github.run_number }}
+        title: Update SDK ${{ github.event.inputs.sdk-version }}
+        body: This PR updates the SDK to the latest version.
+        commit-message: ${{ github.event.inputs.pr-commit-message }}
