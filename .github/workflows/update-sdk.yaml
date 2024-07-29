@@ -31,6 +31,8 @@ jobs:
 
     - name: Setup Go
       uses: actions/setup-go@v5
+      with:
+        go-version-file: ./project/go.mod
 
     - name: Update SDK
       working-directory: ./sdk
