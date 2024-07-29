@@ -23,7 +23,7 @@ import (
 )
 
 // Checks if the authenticator responsible for access control to rebac admin handlers works correctly.
-func TestAuthenticate(t *testing.T) {
+func TestAuthenticateRebac(t *testing.T) {
 	testUser := "test-user@canonical.com"
 	tests := []struct {
 		name           string
