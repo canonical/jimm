@@ -28,6 +28,6 @@ type userSSHKeys struct {
 	IdentityName string
 	Identity     Identity `gorm:"foreignKey:IdentityName;references:Name"` // Association setup
 
-	// Key holds the users SSH keys.
+	// Keys holds the users SSH keys.
 	Keys pq.StringArray `gorm:"type:text[]"`
 }
