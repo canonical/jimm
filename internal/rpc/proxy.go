@@ -13,7 +13,6 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 
-	apiparams "github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/jimm"
@@ -21,6 +20,7 @@ import (
 	"github.com/canonical/jimm/internal/openfga"
 	"github.com/canonical/jimm/internal/servermon"
 	"github.com/canonical/jimm/internal/utils"
+	apiparams "github.com/canonical/jimm/pkg/api/params"
 	jimmnames "github.com/canonical/jimm/pkg/names"
 )
 

@@ -18,9 +18,9 @@ import (
 	"github.com/juju/juju/jujuclient"
 	"github.com/juju/juju/rpc/params"
 
-	"github.com/canonical/jimm/api"
-	apiparams "github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/pkg/api"
+	apiparams "github.com/canonical/jimm/pkg/api/params"
 )
 
 var (

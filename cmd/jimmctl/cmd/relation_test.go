@@ -19,7 +19,6 @@ import (
 	gc "gopkg.in/check.v1"
 	yamlv2 "gopkg.in/yaml.v2"
 
-	apiparams "github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/cmd/jimmctl/cmd"
 	"github.com/canonical/jimm/internal/cmdtest"
 	"github.com/canonical/jimm/internal/db"
@@ -27,6 +26,7 @@ import (
 	"github.com/canonical/jimm/internal/jimmtest"
 	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
+	apiparams "github.com/canonical/jimm/pkg/api/params"
 	jimmnames "github.com/canonical/jimm/pkg/names"
 )
 

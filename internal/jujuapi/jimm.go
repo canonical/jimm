@@ -15,12 +15,12 @@ import (
 	"github.com/juju/zaputil"
 	"github.com/juju/zaputil/zapctx"
 
-	apiparams "github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/jujuapi/rpc"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
+	apiparams "github.com/canonical/jimm/pkg/api/params"
 )
 
 func init() {

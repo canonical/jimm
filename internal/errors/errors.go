@@ -10,7 +10,7 @@ import (
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
-	apiparams "github.com/canonical/jimm/api/params"
+	apiparams "github.com/canonical/jimm/pkg/api/params"
 )
 
 // An Error is an error in the JIMM system.

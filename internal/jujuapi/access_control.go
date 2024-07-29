@@ -12,10 +12,10 @@ import (
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
-	apiparams "github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
+	apiparams "github.com/canonical/jimm/pkg/api/params"
 	jimmnames "github.com/canonical/jimm/pkg/names"
 )
 

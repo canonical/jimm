@@ -15,7 +15,6 @@ import (
 	"github.com/rogpeppe/fastuuid"
 	"golang.org/x/oauth2"
 
-	"github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
@@ -25,6 +24,7 @@ import (
 	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 	"github.com/canonical/jimm/internal/pubsub"
+	"github.com/canonical/jimm/pkg/api/params"
 	jimmnames "github.com/canonical/jimm/pkg/names"
 )
 

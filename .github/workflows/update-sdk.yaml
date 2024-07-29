@@ -1,0 +1,62 @@
+name: Update JIMM Go SDK
+
+on:
+  workflow_dispatch:
+    inputs:
+      sdk-repo:
+        description: 'SDK repository'
+        required: true
+        default: 'canonical/jimm-go-sdk'
+      sdk-version:
+        description: 'SDK version'
+        required: true
+        default: 'v3'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout project
+      uses: actions/checkout@v4
+      with:
+        path: ./project
+
+    - name: Checkout ${{ github.event.inputs.sdk-repo }}
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ github.event.inputs.sdk-repo }}
+        ref: ${{ github.event.inputs.sdk-version }}
+        path: ./sdk
+        token: ${{ secrets.PAT }}
+
+    - name: Setup Go
+      uses: actions/setup-go@v5
+
+    - name: Update SDK
+      working-directory: ./sdk
+      env:
+        PROJECT: ../project
+        SDK_REPO: ${{ github.event.inputs.sdk-repo }}
+        SDK_VERSION: ${{ github.event.inputs.sdk-version }}
+      run: |
+        # Clean up old files + copy new ones
+        rm -rf *
+        cp -r $PROJECT/pkg/.[^.]* $PROJECT/pkg/* $PROJECT/go.mod .
+
+        # Replace module references
+        find . -type f -exec sed -i "s|github.com/canonical/jimm/pkg|github.com/$SDK_REPO/$SDK_VERSION|" {} +
+        sed -i "s|module .*|module github.com/$SDK_REPO/$SDK_VERSION|" go.mod
+
+        # Needed to remove unused dependencies
+        go mod tidy 
+
+        # Commit changes
+        git config user.name github-actions
+        git config user.email github-actions@github.com
+        git add -A
+        if git diff --staged --quiet; then
+          echo "No changes to commit"
+        else
+          git commit -m "Update SDK"
+          git push
+        fi

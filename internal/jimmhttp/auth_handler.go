@@ -11,9 +11,9 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 
-	"github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/internal/auth"
 	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/pkg/api/params"
 )
 
 // These consts holds the endpoint paths for OAuth2.0 related auth.

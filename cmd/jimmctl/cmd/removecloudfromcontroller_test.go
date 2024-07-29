@@ -7,10 +7,10 @@ import (
 
 	gc "gopkg.in/check.v1"
 
-	apiparams "github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/cmd/jimmctl/cmd"
 	"github.com/canonical/jimm/internal/cmdtest"
 	"github.com/canonical/jimm/internal/jimmtest"
+	apiparams "github.com/canonical/jimm/pkg/api/params"
 )
 
 type removeCloudFromControllerSuite struct {
