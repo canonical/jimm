@@ -18,11 +18,13 @@ import (
 	"github.com/canonical/jimm/internal/jimm"
 	"github.com/canonical/jimm/internal/jimmtest"
 	"github.com/canonical/jimm/internal/middleware"
+	"github.com/canonical/jimm/internal/openfga"
 	rebac_handlers "github.com/canonical/rebac-admin-ui-handlers/v1"
 )
 
 // Checks if the authenticator responsible for access control to rebac admin handlers works correctly.
 func TestAuthenticate(t *testing.T) {
+	testUser := "test-user@canonical.com"
 	tests := []struct {
 		name           string
 		setupMock      func(*jimmtest.MockOAuthAuthenticator)
@@ -32,7 +34,7 @@ func TestAuthenticate(t *testing.T) {
 			name: "success",
 			setupMock: func(m *jimmtest.MockOAuthAuthenticator) {
 				m.AuthenticateBrowserSession_ = func(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error) {
-					return auth.ContextWithSessionIdentity(ctx, "test-user@canonical.com"), nil
+					return auth.ContextWithSessionIdentity(ctx, testUser), nil
 				}
 			},
 			expectedStatus: http.StatusOK,
@@ -85,6 +87,10 @@ func TestAuthenticate(t *testing.T) {
 				identity, err := rebac_handlers.GetIdentityFromContext(r.Context())
 				c.Assert(err, qt.IsNil)
 				c.Assert(identity, qt.Not(qt.IsNil))
+
+				user, ok := identity.(*openfga.User)
+				c.Assert(ok, qt.IsTrue)
+				c.Assert(user.Name, qt.Equals, testUser)
 
 				w.WriteHeader(http.StatusOK)
 			})
