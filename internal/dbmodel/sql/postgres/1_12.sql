@@ -1,5 +1,5 @@
 
--- 1_12.sql add the ability to store Juju users SSH public keys and enables the implementation
+-- 1_12.sql adds the ability to store Juju users SSH public keys and enables the implementation
 -- of adding users SSH keys to JIMM.
 
 CREATE TABLE user_ssh_keys (
