@@ -6,13 +6,13 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/juju/zaputil/zapctx"
+	"go.uber.org/zap"
+
 	apiparams "github.com/canonical/jimm/api/params"
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
-
-	"github.com/juju/zaputil/zapctx"
-	"go.uber.org/zap"
 )
 
 // AddRelation checks user permission and add given relations tuples.

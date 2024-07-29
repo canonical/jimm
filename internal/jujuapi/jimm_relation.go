@@ -7,7 +7,7 @@ import (
 	"github.com/canonical/jimm/internal/openfga"
 )
 
-// RelationService is an interface to collect methods of the JIMM interface who interact with OpenFGA relations
+// RelationService defines an interface used to manage relations in the authorization model.
 type RelationService interface {
 	AddRelation(ctx context.Context, user *openfga.User, tuples []apiparams.RelationshipTuple) error
 	RemoveRelation(ctx context.Context, user *openfga.User, tuples []apiparams.RelationshipTuple) error
