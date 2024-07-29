@@ -1,11 +1,11 @@
 // Copyright 2024 Canonical Ltd.
 
-package common_test
+package pagination_test
 
 import (
 	"testing"
 
-	"github.com/canonical/jimm/internal/jimm/common"
+	"github.com/canonical/jimm/internal/common/pagination"
 	qt "github.com/frankban/quicktest"
 )
 
@@ -28,21 +28,21 @@ func TestOffsetFilter(t *testing.T) {
 			desc:       "Negative values are corrected",
 			limit:      -1,
 			offset:     -1,
-			wantLimit:  common.DefaultPageSize,
+			wantLimit:  pagination.DefaultPageSize,
 			wantOffset: 0,
 		},
 		{
 			desc:       "Very large limit is reduced",
 			limit:      2000,
 			offset:     5,
-			wantLimit:  common.DefaultPageSize,
+			wantLimit:  pagination.DefaultPageSize,
 			wantOffset: 5,
 		},
 	}
 	c := qt.New(t)
 	for _, tC := range testCases {
 		c.Run(tC.desc, func(c *qt.C) {
-			filter := common.NewOffsetFilter(tC.limit, tC.offset)
+			filter := pagination.NewOffsetFilter(tC.limit, tC.offset)
 			c.Assert(filter.Limit(), qt.Equals, tC.wantLimit)
 			c.Assert(filter.Offset(), qt.Equals, tC.wantOffset)
 		})

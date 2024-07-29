@@ -17,11 +17,11 @@ import (
 	"github.com/juju/juju/state"
 	"github.com/juju/names/v5"
 
+	"github.com/canonical/jimm/internal/common/pagination"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
 	"github.com/canonical/jimm/internal/jimm"
-	"github.com/canonical/jimm/internal/jimm/common"
 	"github.com/canonical/jimm/internal/jimmjwx"
 	"github.com/canonical/jimm/internal/jimmtest"
 	"github.com/canonical/jimm/internal/openfga"
@@ -1099,7 +1099,7 @@ func TestListGroups(t *testing.T) {
 	u := openfga.NewUser(&user, ofgaClient)
 	u.JimmAdmin = true
 
-	filter := common.NewOffsetFilter(10, 0)
+	filter := pagination.NewOffsetFilter(10, 0)
 	groups, err := j.ListGroups(ctx, u, filter)
 	c.Assert(err, qt.IsNil)
 	c.Assert(groups, qt.DeepEquals, []dbmodel.GroupEntry{group})

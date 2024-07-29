@@ -18,10 +18,10 @@ import (
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
+	"github.com/canonical/jimm/internal/common/pagination"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
-	"github.com/canonical/jimm/internal/jimm/common"
 	"github.com/canonical/jimm/internal/jimmjwx"
 	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
@@ -702,7 +702,7 @@ func (j *JIMM) RemoveGroup(ctx context.Context, user *openfga.User, name string)
 }
 
 // ListGroups returns a list of groups known to JIMM.
-func (j *JIMM) ListGroups(ctx context.Context, user *openfga.User, filter common.LimitOffsetPagination) ([]dbmodel.GroupEntry, error) {
+func (j *JIMM) ListGroups(ctx context.Context, user *openfga.User, filter pagination.LimitOffsetPagination) ([]dbmodel.GroupEntry, error) {
 	const op = errors.Op("jimm.ListGroups")
 
 	if !user.JimmAdmin {

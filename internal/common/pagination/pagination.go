@@ -1,7 +1,7 @@
 // Copyright 2024 Canonical Ltd.
 
-// common holds structs and variables that are common to JIMM.
-package common
+// pagination holds common pagination patterns.
+package pagination
 
 const (
 	defaultPageSize = 50

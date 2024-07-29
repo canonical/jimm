@@ -13,8 +13,8 @@ import (
 	"go.uber.org/zap"
 
 	apiparams "github.com/canonical/jimm/api/params"
+	"github.com/canonical/jimm/internal/common/pagination"
 	"github.com/canonical/jimm/internal/errors"
-	"github.com/canonical/jimm/internal/jimm/common"
 	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 	jimmnames "github.com/canonical/jimm/pkg/names"
@@ -97,7 +97,7 @@ func (r *controllerRoot) RemoveGroup(ctx context.Context, req apiparams.RemoveGr
 func (r *controllerRoot) ListGroups(ctx context.Context, req apiparams.ListGroupsRequest) (apiparams.ListGroupResponse, error) {
 	const op = errors.Op("jujuapi.ListGroups")
 
-	filter := common.NewOffsetFilter(req.Limit, req.Offset)
+	filter := pagination.NewOffsetFilter(req.Limit, req.Offset)
 	groups, err := r.jimm.ListGroups(ctx, r.user, filter)
 	if err != nil {
 		return apiparams.ListGroupResponse{}, errors.E(op, err)

@@ -1,6 +1,6 @@
 // Copyright 2024 Canonical Ltd.
 
-package common
+package pagination
 
 var (
 	DefaultPageSize = defaultPageSize

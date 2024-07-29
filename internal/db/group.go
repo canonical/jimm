@@ -65,16 +65,6 @@ func (d *Database) GetGroup(ctx context.Context, group *dbmodel.GroupEntry) (err
 	return nil
 }
 
-type GroupFilter struct {
-	// Offset is an offset that will be added when retrieving audit logs.
-	// An empty offset is equivalent to zero.
-	Offset int
-
-	// Limit is the maximum number of audit events to return.
-	// A value of zero will ignore the limit.
-	Limit int
-}
-
 // ForEachGroup iterates through every group calling the given function
 // for each one. If the given function returns an error the iteration
 // will stop immediately and the error will be returned unmodified.
