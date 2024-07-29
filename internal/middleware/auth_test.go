@@ -86,7 +86,6 @@ func TestAuthenticate(t *testing.T) {
 			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				identity, err := rebac_handlers.GetIdentityFromContext(r.Context())
 				c.Assert(err, qt.IsNil)
-				c.Assert(identity, qt.Not(qt.IsNil))
 
 				user, ok := identity.(*openfga.User)
 				c.Assert(ok, qt.IsTrue)
@@ -94,7 +93,7 @@ func TestAuthenticate(t *testing.T) {
 
 				w.WriteHeader(http.StatusOK)
 			})
-			middleware := middleware.Authenticate(handler, j)
+			middleware := middleware.AuthenticateRebac(handler, j)
 			middleware.ServeHTTP(w, req)
 
 			c.Assert(w.Code, qt.Equals, tt.expectedStatus)

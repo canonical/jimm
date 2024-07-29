@@ -13,7 +13,8 @@ import (
 	rebac_handlers "github.com/canonical/rebac-admin-ui-handlers/v1"
 )
 
-func Authenticate(next http.Handler, jimm *jimm.JIMM) http.Handler {
+// AuthenticateViaCookie performs browser session authentication and puts an identity in the request's context
+func AuthenticateViaCookie(next http.Handler, jimm *jimm.JIMM) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx, err := jimm.OAuthAuthenticator.AuthenticateBrowserSession(r.Context(), w, r)
 		if err != nil {
@@ -21,6 +22,16 @@ func Authenticate(next http.Handler, jimm *jimm.JIMM) http.Handler {
 			http.Error(w, "failed to authenticate", http.StatusUnauthorized)
 			return
 		}
+
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+// AuthenticateRebac is a layer on top of AuthenticateViaCookie
+// It places the OpenFGA user for the session identity inside the request's context.
+func AuthenticateRebac(next http.Handler, jimm *jimm.JIMM) http.Handler {
+	return AuthenticateViaCookie(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
 
 		identity := auth.SessionIdentityFromContext(ctx)
 		if identity == "" {
@@ -38,5 +49,5 @@ func Authenticate(next http.Handler, jimm *jimm.JIMM) http.Handler {
 
 		ctx = rebac_handlers.ContextWithIdentity(ctx, user)
 		next.ServeHTTP(w, r.WithContext(ctx))
-	})
+	}), jimm)
 }
