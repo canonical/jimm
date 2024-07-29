@@ -9,7 +9,8 @@ CREATE TABLE user_ssh_keys (
     deleted_at TIMESTAMP WITH TIME ZONE,
     identity_name VARCHAR(255),
     ssh_key TEXT NOT NULL,
-    FOREIGN KEY (identity_name) REFERENCES identities(name)
+    FOREIGN KEY (identity_name) REFERENCES identities(name),
+    CONSTRAINT unique_identity_ssh_key UNIQUE(identity_name, ssh_key)
 );
 
 UPDATE versions SET major=1, minor=12 WHERE component='jimmdb';
