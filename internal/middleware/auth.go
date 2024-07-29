@@ -1,6 +1,6 @@
 // Copyright 2024 Canonical Ltd.
 
-package rebac_admin
+package middleware
 
 import (
 	"net/http"
@@ -13,7 +13,7 @@ import (
 	rebac_handlers "github.com/canonical/rebac-admin-ui-handlers/v1"
 )
 
-func AuthenticateMiddleware(next http.Handler, jimm *jimm.JIMM) http.Handler {
+func Authenticate(next http.Handler, jimm *jimm.JIMM) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx, err := jimm.OAuthAuthenticator.AuthenticateBrowserSession(r.Context(), w, r)
 		if err != nil {
@@ -36,7 +36,7 @@ func AuthenticateMiddleware(next http.Handler, jimm *jimm.JIMM) http.Handler {
 			return
 		}
 
-		ctx = rebac_handlers.ContextWithIdentity(r.Context(), user)
+		ctx = rebac_handlers.ContextWithIdentity(ctx, user)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

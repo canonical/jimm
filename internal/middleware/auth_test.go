@@ -1,6 +1,6 @@
 // Copyright 2024 Canonical Ltd.
 
-package rebac_admin_test
+package middleware_test
 
 import (
 	"context"
@@ -17,7 +17,7 @@ import (
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/jimm"
 	"github.com/canonical/jimm/internal/jimmtest"
-	"github.com/canonical/jimm/internal/rebac_admin"
+	"github.com/canonical/jimm/internal/middleware"
 	rebac_handlers "github.com/canonical/rebac-admin-ui-handlers/v1"
 )
 
@@ -88,7 +88,7 @@ func TestAuthenticate(t *testing.T) {
 
 				w.WriteHeader(http.StatusOK)
 			})
-			middleware := rebac_admin.AuthenticateMiddleware(handler, j)
+			middleware := middleware.Authenticate(handler, j)
 			middleware.ServeHTTP(w, req)
 
 			c.Assert(w.Code, qt.Equals, tt.expectedStatus)
