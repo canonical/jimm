@@ -4,6 +4,7 @@ package db_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
@@ -163,4 +164,34 @@ func (s *dbSuite) TestRemoveGroup(c *qt.C) {
 
 	err = s.Database.GetGroup(context.Background(), ge1)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+}
+
+func (s *dbSuite) TestForEachGroup(c *qt.C) {
+	err := s.Database.Migrate(context.Background(), false)
+	c.Assert(err, qt.IsNil)
+
+	addNGroups := 10
+	for i := range addNGroups {
+		err := s.Database.AddGroup(context.Background(), fmt.Sprintf("test-group-%d", i))
+		c.Assert(err, qt.IsNil)
+	}
+	firstGroups := []*dbmodel.GroupEntry{}
+	ctx := context.Background()
+	err = s.Database.ForEachGroup(ctx, 5, 0, func(ge *dbmodel.GroupEntry) error {
+		firstGroups = append(firstGroups, ge)
+		return nil
+	})
+	c.Assert(err, qt.IsNil)
+	for i := 0; i < 5; i++ {
+		c.Assert(firstGroups[i].Name, qt.Equals, fmt.Sprintf("test-group-%d", i))
+	}
+	secondGroups := []*dbmodel.GroupEntry{}
+	err = s.Database.ForEachGroup(ctx, 5, 5, func(ge *dbmodel.GroupEntry) error {
+		secondGroups = append(secondGroups, ge)
+		return nil
+	})
+	c.Assert(err, qt.IsNil)
+	for i := 0; i < 5; i++ {
+		c.Assert(secondGroups[i].Name, qt.Equals, fmt.Sprintf("test-group-%d", i+5))
+	}
 }

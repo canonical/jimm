@@ -17,6 +17,7 @@ import (
 	"github.com/juju/juju/state"
 	"github.com/juju/names/v5"
 
+	"github.com/canonical/jimm/internal/common/pagination"
 	"github.com/canonical/jimm/internal/db"
 	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/errors"
@@ -1098,7 +1099,8 @@ func TestListGroups(t *testing.T) {
 	u := openfga.NewUser(&user, ofgaClient)
 	u.JimmAdmin = true
 
-	groups, err := j.ListGroups(ctx, u)
+	filter := pagination.NewOffsetFilter(10, 0)
+	groups, err := j.ListGroups(ctx, u, filter)
 	c.Assert(err, qt.IsNil)
 	c.Assert(groups, qt.DeepEquals, []dbmodel.GroupEntry{group})
 
@@ -1113,13 +1115,14 @@ func TestListGroups(t *testing.T) {
 		err := j.AddGroup(ctx, u, name)
 		c.Assert(err, qt.IsNil)
 	}
-
-	groups, err = j.ListGroups(ctx, u)
+	groups, err = j.ListGroups(ctx, u, filter)
 	c.Assert(err, qt.IsNil)
 	sort.Slice(groups, func(i, j int) bool {
 		return groups[i].Name < groups[j].Name
 	})
 	c.Assert(groups, qt.HasLen, 5)
+	// Check that the UUID is not empty
+	c.Assert(groups[0].UUID, qt.Not(qt.Equals), "")
 	// groups should be returned in ascending order of name
 	c.Assert(groups[0].Name, qt.Equals, "aaaFinalGroup")
 	c.Assert(groups[1].Name, qt.Equals, group.Name)
