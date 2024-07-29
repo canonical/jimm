@@ -12,7 +12,7 @@ const (
 )
 
 var (
-	validGroupName      = regexp.MustCompile("^[a-zA-Z][a-zA-Z0-9._-]{4,}[a-zA-Z0-9]$")
+	validGroupName      = regexp.MustCompile("^[a-zA-Z][a-zA-Z0-9._-]+[a-zA-Z0-9]$")
 	validGroupIdSnippet = `^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}((#|\z)[a-z]+)?$`
 	validGroupId        = regexp.MustCompile(validGroupIdSnippet)
 )
