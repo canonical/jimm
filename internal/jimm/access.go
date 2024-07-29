@@ -519,10 +519,13 @@ func resolveTag(jimmUUID string, db *db.Database, tag string) (*ofganames.Tag, e
 			"Resolving JIMM tags to Juju tags for tag kind: group",
 			zap.String("group-name", trailer),
 		)
-		entry := &dbmodel.GroupEntry{
-			Name: trailer,
+		var entry dbmodel.GroupEntry
+		if resourceUUID != "" {
+			entry.UUID = resourceUUID
+		} else if trailer != "" {
+			entry.Name = trailer
 		}
-		err := db.GetGroup(ctx, entry)
+		err := db.GetGroup(ctx, &entry)
 		if err != nil {
 			return nil, errors.E(fmt.Sprintf("group %s not found", trailer))
 		}

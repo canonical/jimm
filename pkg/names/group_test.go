@@ -121,8 +121,14 @@ func TestIsValidGroupName(t *testing.T) {
 		name:             "",
 		expectedValidity: false,
 	}, {
-		name:             "short",
+		name:             "no",
 		expectedValidity: false,
+	}, {
+		name:             "foo",
+		expectedValidity: true,
+	}, {
+		name:             "short",
+		expectedValidity: true,
 	}, {
 		name:             "short1",
 		expectedValidity: true,
