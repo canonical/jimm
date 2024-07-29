@@ -26,7 +26,7 @@ type userSSHKeys struct {
 
 	// IdentityName is the unique name (email or client id) of this entity.
 	IdentityName string
-	Identity     Identity `gorm:"foreignKey:IdentityName;references:Name"` // Association setup
+	Identity     Identity `gorm:"foreignKey:IdentityName;references:Name"`
 
 	// Keys holds the users SSH keys.
 	Keys pq.StringArray `gorm:"type:text[]"`
