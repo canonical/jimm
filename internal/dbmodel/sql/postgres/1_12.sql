@@ -8,7 +8,7 @@ CREATE TABLE user_ssh_keys (
     updated_at TIMESTAMP WITH TIME ZONE,
     deleted_at TIMESTAMP WITH TIME ZONE,
     identity_name VARCHAR(255),
-    keys TEXT[] NOT NULL,
+    ssh_key TEXT NOT NULL,
     FOREIGN KEY (identity_name) REFERENCES identities(name)
 );
 

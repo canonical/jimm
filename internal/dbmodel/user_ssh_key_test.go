@@ -25,18 +25,22 @@ func TestUserSSHKey(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	// Add some keys for bob
-	bobsSSHKeys, err := dbmodel.NewUserSSHKeys(bob.Name, []string{bobsSSHKeyString1, bobsSSHKeyString2})
+	bobsSSHKey1, err := dbmodel.NewUserSSHKey(bob.Name, bobsSSHKeyString1)
 	c.Assert(err, qt.IsNil)
-	err = db.Create(bobsSSHKeys).Error
+	err = db.Create(bobsSSHKey1).Error
+	c.Assert(err, qt.IsNil)
+
+	bobsSSHKey2, err := dbmodel.NewUserSSHKey(bob.Name, bobsSSHKeyString2)
+	c.Assert(err, qt.IsNil)
+	err = db.Create(bobsSSHKey2).Error
 	c.Assert(err, qt.IsNil)
 
 	// Get bobs keys
-	retrievingBobsKeys, err := dbmodel.NewUserSSHKeys(bob.Name, nil)
-	c.Assert(err, qt.IsNil)
-	err = db.Find(retrievingBobsKeys).Error
-	c.Assert(err, qt.IsNil)
+	sshKeys := dbmodel.NewUserSSHKeys()
+	result := db.Where("identity_name = ?", bob.Name).Order("created_at ASC").Find(&sshKeys)
+	c.Assert(result.Error, qt.IsNil)
 
-	c.Assert(retrievingBobsKeys.Keys, qt.HasLen, 2)
-	c.Assert(retrievingBobsKeys.Keys[0], qt.Equals, bobsSSHKeyString1)
-	c.Assert(retrievingBobsKeys.Keys[1], qt.Equals, bobsSSHKeyString2)
+	c.Assert(sshKeys, qt.HasLen, 2)
+	c.Assert(sshKeys[0].SSHKey, qt.Equals, bobsSSHKeyString1)
+	c.Assert(sshKeys[1].SSHKey, qt.Equals, bobsSSHKeyString2)
 }

@@ -5,23 +5,28 @@ package dbmodel
 import (
 	"errors"
 
-	"github.com/lib/pq"
 	"gorm.io/gorm"
 )
 
-// NewUserSSHKeys returns a model for creating and retrieving users ssh keys.
-func NewUserSSHKeys(identityName string, keys []string) (*userSSHKeys, error) {
+// NewUserSSHKeys returns an empty slice of userSSHKey's to be populated
+// from the database.
+func NewUserSSHKeys() []userSSHKey {
+	return []userSSHKey{}
+}
+
+// NewUserSSHKey returns a model for creating and retrieving a users ssh key.
+func NewUserSSHKey(identityName string, key string) (*userSSHKey, error) {
 	if identityName == "" {
 		return nil, errors.New("identity name cannot be empty")
 	}
-	return &userSSHKeys{
+	return &userSSHKey{
 		IdentityName: identityName,
-		Keys:         keys,
+		SSHKey:       key,
 	}, nil
 }
 
-// userSSHKeys holds the SSH keys for a user.
-type userSSHKeys struct {
+// userSSHKey holds an SSH key for a user.
+type userSSHKey struct {
 	gorm.Model
 
 	// IdentityName is the unique name (email or client id) of this entity.
@@ -29,5 +34,5 @@ type userSSHKeys struct {
 	Identity     Identity `gorm:"foreignKey:IdentityName;references:Name"`
 
 	// Keys holds the users SSH keys.
-	Keys pq.StringArray `gorm:"type:text[]"`
+	SSHKey string `gorm:"type:text"`
 }
