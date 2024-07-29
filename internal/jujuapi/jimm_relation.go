@@ -8,7 +8,7 @@ import (
 )
 
 // Relation is an interface to collect methods of the JIMM interface who interact with OpenFGA relations
-type Relation interface {
+type RelationService interface {
 	AddRelation(ctx context.Context, user *openfga.User, tuples []apiparams.RelationshipTuple) error
 	RemoveRelation(ctx context.Context, user *openfga.User, tuples []apiparams.RelationshipTuple) error
 	CheckRelation(ctx context.Context, user *openfga.User, tuple apiparams.RelationshipTuple, trace bool) (_ bool, err error)

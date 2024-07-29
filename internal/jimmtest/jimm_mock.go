@@ -30,7 +30,7 @@ import (
 // will delegate to the requested funcion or if the funcion is nil return
 // a NotImplemented error.
 type JIMM struct {
-	JIMMRelation
+	JIMMRelationService
 	AddAuditLogEntry_                  func(ale *dbmodel.AuditLogEntry)
 	AddCloudToController_              func(ctx context.Context, user *openfga.User, controllerName string, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error
 	AddController_                     func(ctx context.Context, u *openfga.User, ctl *dbmodel.Controller) error

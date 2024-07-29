@@ -14,7 +14,7 @@ import (
 // has a corresponding funcion field. Whenever the method is called it
 // will delegate to the requested funcion or if the funcion is nil return
 // a NotImplemented error.
-type JIMMRelation struct {
+type JIMMRelationService struct {
 	AddRelation_            func(ctx context.Context, user *openfga.User, tuples []apiparams.RelationshipTuple) error
 	RemoveRelation_         func(ctx context.Context, user *openfga.User, tuples []apiparams.RelationshipTuple) error
 	CheckRelation_          func(ctx context.Context, user *openfga.User, tuple apiparams.RelationshipTuple, trace bool) (_ bool, err error)
