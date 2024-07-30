@@ -20,6 +20,7 @@ func SetupBackend(ctx context.Context, jimm *jimm.JIMM) (*rebac_handlers.ReBACAd
 		Authenticator: nil, // Authentication is handled by internal middleware.
 		Entitlements:  newEntitlementService(),
 		Groups:        newGroupService(jimm),
+		Identities:    newidentitiesService(jimm),
 	})
 	if err != nil {
 		zapctx.Error(ctx, "failed to create rebac admin backend", zap.Error(err))
