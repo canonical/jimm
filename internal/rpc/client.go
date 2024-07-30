@@ -13,7 +13,7 @@ import (
 	"github.com/gorilla/websocket"
 	jujuparams "github.com/juju/juju/rpc/params"
 
-	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/v3/internal/errors"
 )
 
 const (

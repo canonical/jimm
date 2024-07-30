@@ -10,7 +10,7 @@ import (
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 
-	"github.com/canonical/jimm/internal/jimmtest"
+	"github.com/canonical/jimm/v3/internal/jimmtest"
 )
 
 type cloudSuite struct {

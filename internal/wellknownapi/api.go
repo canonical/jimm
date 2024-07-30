@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/canonical/jimm/internal/errors"
-	"github.com/canonical/jimm/internal/jimm/credentials"
+	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jimm/credentials"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
 	"github.com/juju/zaputil/zapctx"

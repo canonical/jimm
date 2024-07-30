@@ -6,7 +6,7 @@ import (
 	"github.com/jackc/pgconn"
 	"gorm.io/gorm"
 
-	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/v3/internal/errors"
 )
 
 // postgresql error codes from

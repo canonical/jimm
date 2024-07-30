@@ -39,7 +39,7 @@ parts:
     - bin/jimmctl
     override-build: |
       set -e
-      go install -mod readonly -ldflags '-linkmode=external' github.com/canonical/jimm/cmd/jimmctl
+      go install -mod readonly -ldflags '-linkmode=external' github.com/canonical/jimm/v3/cmd/jimmctl
 
   wrapper:
     plugin: dump

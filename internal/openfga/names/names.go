@@ -7,8 +7,8 @@ package names
 import (
 	"fmt"
 
-	"github.com/canonical/jimm/internal/errors"
-	jimmnames "github.com/canonical/jimm/pkg/names"
+	"github.com/canonical/jimm/v3/internal/errors"
+	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 	cofga "github.com/canonical/ofga"
 
 	"github.com/juju/juju/core/permission"

@@ -7,7 +7,7 @@ import (
 
 	qt "github.com/frankban/quicktest"
 
-	"github.com/canonical/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/dbmodel"
 )
 
 func TestGroupEntry(t *testing.T) {

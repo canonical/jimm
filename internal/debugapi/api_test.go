@@ -13,9 +13,9 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/go-chi/chi/v5"
 
-	"github.com/canonical/jimm/internal/debugapi"
-	"github.com/canonical/jimm/internal/errors"
-	"github.com/canonical/jimm/version"
+	"github.com/canonical/jimm/v3/internal/debugapi"
+	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/version"
 )
 
 func setupHandlerAndRecorder(c *qt.C, startTime debugapi.StatusCheck, path string) *httptest.ResponseRecorder {

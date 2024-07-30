@@ -16,9 +16,9 @@ import (
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
-	jimmsvc "github.com/canonical/jimm/cmd/jimmsrv/service"
-	"github.com/canonical/jimm/internal/errors"
-	"github.com/canonical/jimm/version"
+	jimmsvc "github.com/canonical/jimm/v3/cmd/jimmsrv/service"
+	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/version"
 )
 
 func main() {

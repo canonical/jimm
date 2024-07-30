@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/canonical/jimm/cmd/jaas/cmd"
+	"github.com/canonical/jimm/v3/cmd/jaas/cmd"
 	jujucmd "github.com/juju/cmd/v3"
 )
 
