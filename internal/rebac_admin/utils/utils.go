@@ -25,6 +25,7 @@ func ParseFromUserToIdentity(user openfga.User) resources.Identity {
 	}
 }
 
+// CreatePagination create the pagination.LimitOffsetPagination from the *resources.GetIdentitiesParams .
 func CreatePagination(params *resources.GetIdentitiesParams) (int, pagination.LimitOffsetPagination) {
 	pageSize := -1
 	offset := 0

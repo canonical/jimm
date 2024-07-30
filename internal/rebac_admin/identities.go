@@ -1,10 +1,5 @@
 // Copyright 2024 Canonical Ltd.
 
-// GET METHOD for IDENTITY
-// GET/PATCH groups
-// GET/PATCH roles -> not implemented
-// GET/PATCH entitlements
-
 package rebac_admin
 
 import (
@@ -30,7 +25,7 @@ func newidentitiesService(jimm *jimm.JIMM) *identitiesService {
 	}
 }
 
-// ListIdentities returns a page of Identity objects of at least `size` elements if available
+// ListIdentities returns a page of Identity objects of at least `size` elements if available.
 func (s *identitiesService) ListIdentities(ctx context.Context, params *resources.GetIdentitiesParams) (*resources.PaginatedResponse[resources.Identity], error) {
 	// TODO: extract identity from auth middleware
 	// raw, _ := v1.GetIdentityFromContext(ctx)
@@ -80,7 +75,7 @@ func (s *identitiesService) UpdateIdentity(ctx context.Context, identity *resour
 	return nil, v1.NewNotImplementedError("update identity not implemented")
 }
 
-// // DeleteIdentity deletes an Identity
+// // DeleteIdentity deletes an Identity.
 func (s *identitiesService) DeleteIdentity(ctx context.Context, identityId string) (bool, error) {
 	return false, v1.NewNotImplementedError("delete identity not implemented")
 }

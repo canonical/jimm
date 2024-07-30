@@ -103,7 +103,7 @@ func (j *JIMM) FetchUser(ctx context.Context, username string) (*openfga.User, e
 	return u, nil
 }
 
-// ListUsers lists all the user.
+// ListUsers lists all the users in our database and parse them into openfga entities.
 func (j *JIMM) ListUsers(ctx context.Context, user *openfga.User, filter pagination.LimitOffsetPagination) ([]openfga.User, error) {
 	const op = errors.Op("jimm.ListUsers")
 
