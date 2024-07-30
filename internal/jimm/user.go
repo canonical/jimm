@@ -5,10 +5,11 @@ package jimm
 import (
 	"context"
 
-	"github.com/canonical/jimm/v3/internal/db"
-	"github.com/canonical/jimm/v3/internal/dbmodel"
-	"github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/internal/openfga"
+	"github.com/canonical/jimm/internal/common/pagination"
+	"github.com/canonical/jimm/internal/db"
+	"github.com/canonical/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/internal/openfga"
 )
 
 // GetOpenFGAUserAndAuthorise returns a valid OpenFGA user, authorising
@@ -82,4 +83,42 @@ func (j *JIMM) GetUser(ctx context.Context, username string) (*openfga.User, err
 	u.JimmAdmin = isJimmAdmin
 
 	return u, nil
+}
+
+// FetchUser fetches the user specified by the username and returns the user if it is found.
+// Or error "record not found".
+func (j *JIMM) FetchUser(ctx context.Context, username string) (*openfga.User, error) {
+	const op = errors.Op("jimm.GetUser")
+
+	uEntity, err := dbmodel.NewIdentity(username)
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	if err := j.Database.FetchIdentity(ctx, uEntity); err != nil {
+		return nil, err
+	}
+	u := openfga.NewUser(uEntity, j.OpenFGAClient)
+
+	return u, nil
+}
+
+// ListUsers lists all the user.
+func (j *JIMM) ListUsers(ctx context.Context, user *openfga.User, filter pagination.LimitOffsetPagination) ([]openfga.User, error) {
+	const op = errors.Op("jimm.ListUsers")
+
+	// if !user.JimmAdmin {
+	// 	return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	// }
+
+	var users []openfga.User
+	err := j.Database.ForEachIdentity(ctx, filter.Limit(), filter.Offset(), func(ge *dbmodel.Identity) error {
+		u := openfga.NewUser(ge, j.OpenFGAClient)
+		users = append(users, *u)
+		return nil
+	})
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+	return users, nil
 }

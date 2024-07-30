@@ -4,18 +4,22 @@ package jimm_test
 
 import (
 	"context"
+	"sort"
 	"testing"
 	"time"
 
 	"github.com/antonlindstrom/pgstore"
 	qt "github.com/frankban/quicktest"
+	"github.com/google/uuid"
 	"github.com/juju/names/v5"
 
-	"github.com/canonical/jimm/v3/internal/auth"
-	"github.com/canonical/jimm/v3/internal/db"
-	"github.com/canonical/jimm/v3/internal/jimm"
-	"github.com/canonical/jimm/v3/internal/jimmtest"
-	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
+	"github.com/canonical/jimm/internal/auth"
+	"github.com/canonical/jimm/internal/common/pagination"
+	"github.com/canonical/jimm/internal/db"
+	"github.com/canonical/jimm/internal/jimm"
+	"github.com/canonical/jimm/internal/jimmtest"
+	"github.com/canonical/jimm/internal/openfga"
+	ofganames "github.com/canonical/jimm/internal/openfga/names"
 )
 
 func TestGetOpenFGAUser(t *testing.T) {
@@ -91,4 +95,84 @@ func TestGetOpenFGAUser(t *testing.T) {
 	c.Assert(ofgaUser.LastLogin.Valid, qt.IsTrue)
 	// This user SHOULD be an admin, so ensure admin check is OK
 	c.Assert(ofgaUser.JimmAdmin, qt.IsTrue)
+}
+
+func TestFetchIdentity(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+	c.Assert(err, qt.IsNil)
+
+	now := time.Now().UTC().Round(time.Millisecond)
+	j := &jimm.JIMM{
+		UUID: uuid.NewString(),
+		Database: db.Database{
+			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
+		},
+		OpenFGAClient: ofgaClient,
+	}
+
+	err = j.Database.Migrate(ctx, false)
+	c.Assert(err, qt.IsNil)
+
+	user, _, _, _, _, _, _ := createTestControllerEnvironment(ctx, c, j.Database)
+	u, err := j.FetchUser(ctx, user.Name)
+	c.Assert(err, qt.IsNil)
+	c.Assert(u.Name, qt.Equals, user.Name)
+
+	_, err = j.FetchUser(ctx, "bobnotfound@canonical.com")
+	c.Assert(err, qt.ErrorMatches, "record not found")
+}
+
+func TestListUsers(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+	c.Assert(err, qt.IsNil)
+
+	now := time.Now().UTC().Round(time.Millisecond)
+	j := &jimm.JIMM{
+		UUID: uuid.NewString(),
+		Database: db.Database{
+			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
+		},
+		OpenFGAClient: ofgaClient,
+	}
+
+	err = j.Database.Migrate(ctx, false)
+	c.Assert(err, qt.IsNil)
+
+	user, _, _, _, _, _, _ := createTestControllerEnvironment(ctx, c, j.Database)
+
+	u := openfga.NewUser(&user, ofgaClient)
+
+	filter := pagination.NewOffsetFilter(10, 0)
+	users, err := j.ListUsers(ctx, u, filter)
+	c.Assert(err, qt.IsNil)
+	c.Assert(len(users), qt.Equals, 1)
+
+	userNames := []string{
+		"aabob1@canonical.com",
+		"aabob3@canonical.com",
+		"aabob5@canonical.com",
+		"aabob4@canonical.com",
+	}
+	// add users
+	for _, name := range userNames {
+		_, err := j.GetUser(ctx, name)
+		c.Assert(err, qt.IsNil)
+	}
+	users, err = j.ListUsers(ctx, u, filter)
+	c.Assert(err, qt.IsNil)
+	sort.Slice(users, func(i, j int) bool {
+		return users[i].Name < users[j].Name
+	})
+	c.Assert(users, qt.HasLen, 5)
+	// user should be returned in ascending order of name
+	c.Assert(users[0].Name, qt.Equals, userNames[0])
+	c.Assert(users[1].Name, qt.Equals, userNames[1])
+	c.Assert(users[2].Name, qt.Equals, userNames[3])
+	c.Assert(users[3].Name, qt.Equals, userNames[2])
 }
