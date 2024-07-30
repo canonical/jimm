@@ -12,7 +12,6 @@ import (
 	"github.com/juju/names/v5"
 	"github.com/juju/version"
 
-	"github.com/canonical/jimm/v3/internal/common/pagination"
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
@@ -31,10 +30,10 @@ import (
 // a NotImplemented error.
 type JIMM struct {
 	RelationService
+	GroupService
 	AddAuditLogEntry_                  func(ale *dbmodel.AuditLogEntry)
 	AddCloudToController_              func(ctx context.Context, user *openfga.User, controllerName string, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error
 	AddController_                     func(ctx context.Context, u *openfga.User, ctl *dbmodel.Controller) error
-	AddGroup_                          func(ctx context.Context, user *openfga.User, name string) (*dbmodel.GroupEntry, error)
 	AddHostedCloud_                    func(ctx context.Context, user *openfga.User, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error
 	AddModel_                          func(ctx context.Context, u *openfga.User, args *jimm.ModelCreateArgs) (*jujuparams.ModelInfo, error)
 	AddServiceAccount_                 func(ctx context.Context, u *openfga.User, clientId string) error
@@ -81,7 +80,6 @@ type JIMM struct {
 	InitiateInternalMigration_         func(ctx context.Context, user *openfga.User, modelTag names.ModelTag, targetController string) (jujuparams.InitiateMigrationResult, error)
 	ListApplicationOffers_             func(ctx context.Context, user *openfga.User, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error)
 	ListControllers_                   func(ctx context.Context, user *openfga.User) ([]dbmodel.Controller, error)
-	ListGroups_                        func(ctx context.Context, user *openfga.User, filter pagination.LimitOffsetPagination) ([]dbmodel.GroupEntry, error)
 	ModelDefaultsForCloud_             func(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag) (jujuparams.ModelDefaultsResult, error)
 	ModelInfo_                         func(ctx context.Context, u *openfga.User, mt names.ModelTag) (*jujuparams.ModelInfo, error)
 	ModelStatus_                       func(ctx context.Context, u *openfga.User, mt names.ModelTag) (*jujuparams.ModelStatus, error)
@@ -93,8 +91,6 @@ type JIMM struct {
 	RemoveCloud_                       func(ctx context.Context, u *openfga.User, ct names.CloudTag) error
 	RemoveCloudFromController_         func(ctx context.Context, u *openfga.User, controllerName string, ct names.CloudTag) error
 	RemoveController_                  func(ctx context.Context, user *openfga.User, controllerName string, force bool) error
-	RemoveGroup_                       func(ctx context.Context, user *openfga.User, name string) error
-	RenameGroup_                       func(ctx context.Context, user *openfga.User, oldName, newName string) error
 	ResourceTag_                       func() names.ControllerTag
 	RevokeAuditLogAccess_              func(ctx context.Context, user *openfga.User, targetUserTag names.UserTag) error
 	RevokeCloudAccess_                 func(ctx context.Context, user *openfga.User, ct names.CloudTag, ut names.UserTag, access string) error
@@ -133,12 +129,6 @@ func (j *JIMM) AddController(ctx context.Context, u *openfga.User, ctl *dbmodel.
 		return errors.E(errors.CodeNotImplemented)
 	}
 	return j.AddController_(ctx, u, ctl)
-}
-func (j *JIMM) AddGroup(ctx context.Context, u *openfga.User, name string) (*dbmodel.GroupEntry, error) {
-	if j.AddGroup_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
-	}
-	return j.AddGroup_(ctx, u, name)
 }
 func (j *JIMM) AddHostedCloud(ctx context.Context, user *openfga.User, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error {
 	if j.AddHostedCloud_ == nil {
@@ -415,12 +405,6 @@ func (j *JIMM) ListControllers(ctx context.Context, user *openfga.User) ([]dbmod
 	}
 	return j.ListControllers_(ctx, user)
 }
-func (j *JIMM) ListGroups(ctx context.Context, user *openfga.User, filters pagination.LimitOffsetPagination) ([]dbmodel.GroupEntry, error) {
-	if j.ListGroups_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
-	}
-	return j.ListGroups_(ctx, user, filters)
-}
 func (j *JIMM) ModelDefaultsForCloud(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag) (jujuparams.ModelDefaultsResult, error) {
 	if j.ModelDefaultsForCloud_ == nil {
 		return jujuparams.ModelDefaultsResult{}, errors.E(errors.CodeNotImplemented)
@@ -486,18 +470,6 @@ func (j *JIMM) RemoveController(ctx context.Context, user *openfga.User, control
 		return errors.E(errors.CodeNotImplemented)
 	}
 	return j.RemoveController_(ctx, user, controllerName, force)
-}
-func (j *JIMM) RemoveGroup(ctx context.Context, user *openfga.User, name string) error {
-	if j.RemoveGroup_ == nil {
-		return errors.E(errors.CodeNotImplemented)
-	}
-	return j.RemoveGroup_(ctx, user, name)
-}
-func (j *JIMM) RenameGroup(ctx context.Context, user *openfga.User, oldName, newName string) error {
-	if j.RenameGroup_ == nil {
-		return errors.E(errors.CodeNotImplemented)
-	}
-	return j.RenameGroup_(ctx, user, oldName, newName)
 }
 func (j *JIMM) ResourceTag() names.ControllerTag {
 	if j.ResourceTag_ == nil {

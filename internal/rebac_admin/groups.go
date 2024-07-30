@@ -4,17 +4,19 @@ package rebac_admin
 
 import (
 	"context"
+	"errors"
 
-	"github.com/canonical/jimm/v3/internal/jimm"
+	"github.com/canonical/jimm/v3/internal/jujuapi"
+	"github.com/canonical/jimm/v3/internal/rebac_admin/utils"
 	"github.com/canonical/rebac-admin-ui-handlers/v1/resources"
 )
 
 // groupsService implements the `GroupsService` interface.
 type groupsService struct {
-	jimm *jimm.JIMM
+	jimm jujuapi.JIMM
 }
 
-func newGroupService(jimm *jimm.JIMM) *groupsService {
+func newGroupService(jimm jujuapi.JIMM) *groupsService {
 	return &groupsService{
 		jimm,
 	}
@@ -22,22 +24,75 @@ func newGroupService(jimm *jimm.JIMM) *groupsService {
 
 // ListGroups returns a page of Group objects of at least `size` elements if available.
 func (s *groupsService) ListGroups(ctx context.Context, params *resources.GetGroupsParams) (*resources.PaginatedResponse[resources.Group], error) {
-	return nil, nil
+	user, err := utils.GetUserFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	currentPage, filter := utils.CreatePaginationFilter(params.Size, params.Page)
+	nextPage := currentPage + 1
+	groups, err := s.jimm.ListGroups(ctx, user, filter)
+	if err != nil {
+		return nil, err
+	}
+	data := make([]resources.Group, 0, len(groups))
+	for _, group := range groups {
+		data = append(data, resources.Group{Id: &group.UUID, Name: group.Name})
+	}
+	resp := resources.PaginatedResponse[resources.Group]{
+		Data: data,
+		Meta: resources.ResponseMeta{
+			Page: &currentPage,
+			Size: len(groups),
+		},
+		Next: resources.Next{Page: &nextPage},
+	}
+	return &resp, nil
 }
 
 // CreateGroup creates a single Group.
 func (s *groupsService) CreateGroup(ctx context.Context, group *resources.Group) (*resources.Group, error) {
-	return nil, nil
+	user, err := utils.GetUserFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	groupInfo, err := s.jimm.AddGroup(ctx, user, group.Name)
+	if err != nil {
+		return nil, err
+	}
+	return &resources.Group{Id: &groupInfo.UUID, Name: groupInfo.Name}, nil
 }
 
 // GetGroup returns a single Group identified by `groupId`.
 func (s *groupsService) GetGroup(ctx context.Context, groupId string) (*resources.Group, error) {
-	return nil, nil
+	user, err := utils.GetUserFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	group, err := s.jimm.GetGroupByID(ctx, user, groupId)
+	if err != nil {
+		return nil, err
+	}
+	return &resources.Group{Id: &group.UUID, Name: group.Name}, nil
 }
 
 // UpdateGroup updates a Group.
 func (s *groupsService) UpdateGroup(ctx context.Context, group *resources.Group) (*resources.Group, error) {
-	return nil, nil
+	user, err := utils.GetUserFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if group.Id == nil {
+		return nil, errors.New("missing group ID")
+	}
+	existingGroup, err := s.jimm.GetGroupByID(ctx, user, *group.Id)
+	if err != nil {
+		return nil, err
+	}
+	err = s.jimm.RenameGroup(ctx, user, existingGroup.Name, group.Name)
+	if err != nil {
+		return nil, err
+	}
+	return &resources.Group{Id: &existingGroup.UUID, Name: group.Name}, nil
 }
 
 // DeleteGroup deletes a Group identified by `groupId`.
@@ -45,7 +100,15 @@ func (s *groupsService) UpdateGroup(ctx context.Context, group *resources.Group)
 // returns (false, error) in case something went wrong.
 // implementors may want to return (false, nil) for idempotency cases.
 func (s *groupsService) DeleteGroup(ctx context.Context, groupId string) (bool, error) {
-	return false, nil
+	user, err := utils.GetUserFromContext(ctx)
+	if err != nil {
+		return false, err
+	}
+	err = s.jimm.RemoveGroup(ctx, user, groupId)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // GetGroupIdentities returns a page of identities in a Group identified by `groupId`.

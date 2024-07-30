@@ -9,11 +9,11 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/internal/jimm"
+	"github.com/canonical/jimm/v3/internal/jujuapi"
 	rebac_handlers "github.com/canonical/rebac-admin-ui-handlers/v1"
 )
 
-func SetupBackend(ctx context.Context, jimm *jimm.JIMM) (*rebac_handlers.ReBACAdminBackend, error) {
+func SetupBackend(ctx context.Context, jimm jujuapi.JIMM) (*rebac_handlers.ReBACAdminBackend, error) {
 	const op = errors.Op("rebac_admin.SetupBackend")
 
 	rebacBackend, err := rebac_handlers.NewReBACAdminBackend(rebac_handlers.ReBACAdminBackendParams{

@@ -13,7 +13,9 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/canonical/jimm/v3/internal/common/pagination"
+	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/openfga"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
@@ -49,6 +51,14 @@ var (
 const (
 	jimmControllerName = "jimm"
 )
+
+type GroupService interface {
+	AddGroup(ctx context.Context, user *openfga.User, name string) (*dbmodel.GroupEntry, error)
+	GetGroupByID(ctx context.Context, user *openfga.User, uuid string) (dbmodel.GroupEntry, error)
+	ListGroups(ctx context.Context, user *openfga.User, filter pagination.LimitOffsetPagination) ([]dbmodel.GroupEntry, error)
+	RenameGroup(ctx context.Context, user *openfga.User, oldName, newName string) error
+	RemoveGroup(ctx context.Context, user *openfga.User, name string) error
+}
 
 // AddGroup creates a group within JIMMs DB for reference by OpenFGA.
 func (r *controllerRoot) AddGroup(ctx context.Context, req apiparams.AddGroupRequest) (apiparams.AddGroupResponse, error) {
