@@ -32,8 +32,7 @@ func (s *dbSuite) TestAddUserSSHKey(c *qt.C) {
 
 	key, err := dbmodel.NewUserSSHKey(bob.Name, bobsSSHKeyString1)
 	c.Assert(err, qt.IsNil)
-	keys := []dbmodel.UserSSHKey{*key}
-	err = s.Database.AddUserSSHKeys(ctx, keys)
+	err = s.Database.AddUserSSHKey(ctx, key)
 	c.Assert(err, qt.IsNil)
 
 	retrievedKey := dbmodel.UserSSHKey{}
@@ -52,8 +51,7 @@ func (s *dbSuite) TestDeleteUserSSHKey(c *qt.C) {
 
 	key, err := dbmodel.NewUserSSHKey(bob.Name, bobsSSHKeyString1)
 	c.Assert(err, qt.IsNil)
-	keys := []dbmodel.UserSSHKey{*key}
-	err = s.Database.AddUserSSHKeys(ctx, keys)
+	err = s.Database.AddUserSSHKey(ctx, key)
 	c.Assert(err, qt.IsNil)
 
 	// Ensure key exists
@@ -87,13 +85,16 @@ func (s *dbSuite) TestListUserSSHKeys(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(keys, qt.HasLen, 0)
 
-	// Add keys
+	// Add key1
 	key1, err := dbmodel.NewUserSSHKey(bob.Name, bobsSSHKeyString1)
 	c.Assert(err, qt.IsNil)
+	err = s.Database.AddUserSSHKey(ctx, key1)
+	c.Assert(err, qt.IsNil)
+
+	// Add key2
 	key2, err := dbmodel.NewUserSSHKey(bob.Name, bobsSSHKeyString2)
 	c.Assert(err, qt.IsNil)
-	keysToAdd := []dbmodel.UserSSHKey{*key1, *key2}
-	err = s.Database.AddUserSSHKeys(ctx, keysToAdd)
+	err = s.Database.AddUserSSHKey(ctx, key2)
 	c.Assert(err, qt.IsNil)
 
 	// Get bob's keys

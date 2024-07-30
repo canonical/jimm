@@ -10,8 +10,8 @@ import (
 	"github.com/canonical/jimm/internal/servermon"
 )
 
-// AddUserSSHKeys associates a set of SSH keys to the user.
-func (d *Database) AddUserSSHKeys(ctx context.Context, userSSHKey []dbmodel.UserSSHKey) (err error) {
+// AddUserSSHKey adds a user's SSH key to the database.
+func (d *Database) AddUserSSHKey(ctx context.Context, userSSHKey *dbmodel.UserSSHKey) (err error) {
 	const op = errors.Op("db.AddUserSSHKey")
 
 	if err := d.ready(); err != nil {
@@ -23,8 +23,6 @@ func (d *Database) AddUserSSHKeys(ctx context.Context, userSSHKey []dbmodel.User
 	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
 
 	db := d.DB.WithContext(ctx)
-	// TODO(ale8k): Configure batch to a smaller size when we upgrade to GORMv2
-	// (so we can use CreateInBatches)
 	err = db.Create(userSSHKey).Error
 	if err != nil {
 		return errors.E(op, dbError(err))
