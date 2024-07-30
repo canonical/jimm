@@ -4,18 +4,18 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/canonical/jimm/v3/internal/dbmodel"
-	"github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/pkg/api/params"
 	"github.com/itchyny/gojq"
-	"go.uber.org/zap"
-
 	jujucmd "github.com/juju/cmd/v3"
 	"github.com/juju/juju/cmd/juju/status"
 	"github.com/juju/juju/cmd/juju/storage"
 	rpcparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
+	"go.uber.org/zap"
+
+	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/pkg/api/params"
 )
 
 // QueryModels queries every specified model in modelUUIDs.
