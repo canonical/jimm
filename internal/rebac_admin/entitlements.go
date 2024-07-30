@@ -9,7 +9,7 @@ import (
 	"github.com/canonical/rebac-admin-ui-handlers/v1/resources"
 )
 
-// Since these values has semantic meanings in the API, they'll probably be
+// Since these values have semantic meanings in the API, they'll probably be
 // refactored into constants provided by `rebac-admin-ui-handlers` library. So,
 // we define them here as constants, rather than repeating them as literals.
 const identity = "identity"
