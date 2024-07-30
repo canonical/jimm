@@ -67,7 +67,8 @@ func (a Authenticator) Authenticate(_ context.Context, _ *jujuparams.LoginReques
 
 type MockOAuthAuthenticator struct {
 	jimm.OAuthAuthenticator
-	c SimpleTester
+	AuthenticateBrowserSession_ func(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error)
+	c                           SimpleTester
 	// PollingChan is used to simulate polling an OIDC server during the device flow.
 	// It expects a username to be received that will be used to generate the user's access token.
 	PollingChan     <-chan string
@@ -159,8 +160,11 @@ func (m *MockOAuthAuthenticator) MintSessionToken(email string) (string, error) 
 	return newSessionToken(m.c, email, ""), nil
 }
 
-// AuthenticateBrowserSession always returns an error.
+// AuthenticateBrowserSession unless overridden by the `AuthenticateBrowserSession_` field, it will return an authentication failure error.
 func (m *MockOAuthAuthenticator) AuthenticateBrowserSession(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error) {
+	if m.AuthenticateBrowserSession_ != nil {
+		return m.AuthenticateBrowserSession_(ctx, w, req)
+	}
 	return ctx, errors.New("authentication failed")
 }
 
