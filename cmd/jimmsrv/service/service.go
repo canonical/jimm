@@ -37,6 +37,7 @@ import (
 	"github.com/canonical/jimm/internal/jujuapi"
 	"github.com/canonical/jimm/internal/jujuclient"
 	"github.com/canonical/jimm/internal/logger"
+	"github.com/canonical/jimm/internal/middleware"
 	"github.com/canonical/jimm/internal/openfga"
 	ofganames "github.com/canonical/jimm/internal/openfga/names"
 	"github.com/canonical/jimm/internal/pubsub"
@@ -389,7 +390,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 
 	s.mux.Mount("/metrics", promhttp.Handler())
 
-	s.mux.Mount("/rebac", rebacBackend.Handler(""))
+	s.mux.Mount("/rebac", middleware.AuthenticateRebac(rebacBackend.Handler(""), &s.jimm))
 
 	mountHandler(
 		"/debug",

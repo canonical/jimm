@@ -154,8 +154,6 @@ github.com/canonical/lxd v0.0.0-20231214113525-e676fc63c50a h1:Tfo/MzXK5GeG7gzSH
 github.com/canonical/lxd v0.0.0-20231214113525-e676fc63c50a/go.mod h1:UxfHGKFoRjgu1NUA9EFiR++dKvyAiT0h9HT0ffMlzjc=
 github.com/canonical/ofga v0.10.0 h1:DHXhG/DAXWWQT/I+2jzr4qm0uTIYrILmtMxd6ZqmEzE=
 github.com/canonical/ofga v0.10.0/go.mod h1:u4Ou8dbIhO7FmVlT7W3rX2roD9AOGz/CqmGh7AdF0Lo=
-github.com/canonical/rebac-admin-ui-handlers v0.0.0-20240730091905-957b381156fc h1:3BxoovR/5qCiHq/kt1HwTqXPkAXGp9ubQS+Wl3tS7nM=
-github.com/canonical/rebac-admin-ui-handlers v0.0.0-20240730091905-957b381156fc/go.mod h1:EIdBoaTHWYPkzNeUeXUBueJkglN9nQz5HLIvaOT7o1k=
 github.com/canonical/rebac-admin-ui-handlers v0.1.0 h1:Bef1N/RgQine8hHX4ZMksQz/1VKsy4DHK2XdhAzQsZs=
 github.com/canonical/rebac-admin-ui-handlers v0.1.0/go.mod h1:EIdBoaTHWYPkzNeUeXUBueJkglN9nQz5HLIvaOT7o1k=
 github.com/cenkalti/backoff/v3 v3.0.0/go.mod h1:cIeZDE3IrqwwJl6VUwCN6trj1oXrTS4rc0ij+ULvLYs=
