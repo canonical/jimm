@@ -46,7 +46,7 @@ jobs:
         SDK_VERSION: ${{ github.event.inputs.sdk-version }}
       run: |
         # Remove all in case some files are removed
-        rm -rf *
+        rm -rf .[!.]* *
         cp -r $PROJECT/pkg/.[^.]* $PROJECT/pkg/* $PROJECT/go.mod .
 
         # Replace module references
