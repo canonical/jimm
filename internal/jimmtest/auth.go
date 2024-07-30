@@ -160,7 +160,7 @@ func (m *MockOAuthAuthenticator) MintSessionToken(email string) (string, error) 
 	return newSessionToken(m.c, email, ""), nil
 }
 
-// AuthenticateBrowserSession always returns an error.
+// AuthenticateBrowserSession unless overridden by the `AuthenticateBrowserSession_` field, it will return an authentication failure error.
 func (m *MockOAuthAuthenticator) AuthenticateBrowserSession(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error) {
 	if m.AuthenticateBrowserSession_ != nil {
 		return m.AuthenticateBrowserSession_(ctx, w, req)
