@@ -13,8 +13,8 @@ import (
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/dbrootkeystore"
 
-	"github.com/canonical/jimm/internal/db"
-	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/v3/internal/db"
+	"github.com/canonical/jimm/v3/internal/errors"
 )
 
 var _ dbrootkeystore.Backing = (*db.Database)(nil)

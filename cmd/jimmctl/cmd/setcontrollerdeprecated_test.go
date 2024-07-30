@@ -6,9 +6,9 @@ import (
 	"github.com/juju/cmd/v3/cmdtesting"
 	gc "gopkg.in/check.v1"
 
-	"github.com/canonical/jimm/cmd/jimmctl/cmd"
-	"github.com/canonical/jimm/internal/cmdtest"
-	"github.com/canonical/jimm/internal/jimmtest"
+	"github.com/canonical/jimm/v3/cmd/jimmctl/cmd"
+	"github.com/canonical/jimm/v3/internal/cmdtest"
+	"github.com/canonical/jimm/v3/internal/jimmtest"
 )
 
 type setControllerDeprecatedSuite struct {

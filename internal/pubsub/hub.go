@@ -8,7 +8,7 @@ package pubsub
 import (
 	"sync"
 
-	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/juju/utils/v2/parallel"
 )
 

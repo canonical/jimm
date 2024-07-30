@@ -7,7 +7,7 @@ import (
 
 	qt "github.com/frankban/quicktest"
 
-	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/v3/internal/errors"
 )
 
 func TestEEmptyArguments(t *testing.T) {

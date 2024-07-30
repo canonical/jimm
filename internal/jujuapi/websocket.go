@@ -17,12 +17,12 @@ import (
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
-	"github.com/canonical/jimm/internal/auth"
-	"github.com/canonical/jimm/internal/dbmodel"
-	"github.com/canonical/jimm/internal/errors"
-	"github.com/canonical/jimm/internal/jimm"
-	"github.com/canonical/jimm/internal/jimmhttp"
-	jimmRPC "github.com/canonical/jimm/internal/rpc"
+	"github.com/canonical/jimm/v3/internal/auth"
+	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jimm"
+	"github.com/canonical/jimm/v3/internal/jimmhttp"
+	jimmRPC "github.com/canonical/jimm/v3/internal/rpc"
 )
 
 const (

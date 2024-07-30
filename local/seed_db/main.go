@@ -7,9 +7,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/canonical/jimm/internal/db"
-	"github.com/canonical/jimm/internal/dbmodel"
-	"github.com/canonical/jimm/internal/logger"
+	"github.com/canonical/jimm/v3/internal/db"
+	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/logger"
 	petname "github.com/dustinkirkland/golang-petname"
 	"github.com/google/uuid"
 	"github.com/juju/juju/core/crossmodel"

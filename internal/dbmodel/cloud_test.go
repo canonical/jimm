@@ -10,7 +10,7 @@ import (
 	"github.com/juju/names/v5"
 	"gorm.io/gorm"
 
-	"github.com/canonical/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/dbmodel"
 )
 
 func TestCloudTag(t *testing.T) {

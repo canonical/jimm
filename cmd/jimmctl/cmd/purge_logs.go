@@ -3,9 +3,9 @@ package cmd
 import (
 	"time"
 
-	"github.com/canonical/jimm/internal/errors"
-	"github.com/canonical/jimm/pkg/api"
-	apiparams "github.com/canonical/jimm/pkg/api/params"
+	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/pkg/api"
+	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 	"github.com/juju/cmd/v3"
 	"github.com/juju/gnuflag"
 	jujuapi "github.com/juju/juju/api"

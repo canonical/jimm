@@ -29,4 +29,4 @@ parts:
       snapcraftctl set-version `cat $SNAPCRAFT_PART_SRC/version/version.txt`
     override-build: |-
       set -e
-      go install -mod readonly -ldflags '-linkmode=external' -tags version github.com/canonical/jimm/cmd/jimmsrv
+      go install -mod readonly -ldflags '-linkmode=external' -tags version github.com/canonical/jimm/v3/cmd/jimmsrv

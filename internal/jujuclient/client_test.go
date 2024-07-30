@@ -11,8 +11,8 @@ import (
 	"github.com/juju/names/v5"
 	gc "gopkg.in/check.v1"
 
-	"github.com/canonical/jimm/internal/dbmodel"
-	"github.com/canonical/jimm/internal/jimmtest"
+	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/jimmtest"
 )
 
 type clientSuite struct {

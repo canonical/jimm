@@ -12,8 +12,8 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 
-	"github.com/canonical/jimm/internal/db"
-	"github.com/canonical/jimm/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/db"
+	"github.com/canonical/jimm/v3/internal/dbmodel"
 )
 
 var testTime = time.Date(2013, 7, 26, 0, 0, 0, 0, time.UTC)

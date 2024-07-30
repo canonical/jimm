@@ -12,10 +12,10 @@ import (
 	gc "gopkg.in/check.v1"
 	"sigs.k8s.io/yaml"
 
-	"github.com/canonical/jimm/cmd/jimmctl/cmd"
-	"github.com/canonical/jimm/internal/cmdtest"
-	"github.com/canonical/jimm/internal/jimmtest"
-	apiparams "github.com/canonical/jimm/pkg/api/params"
+	"github.com/canonical/jimm/v3/cmd/jimmctl/cmd"
+	"github.com/canonical/jimm/v3/internal/cmdtest"
+	"github.com/canonical/jimm/v3/internal/jimmtest"
+	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
 type addControllerSuite struct {

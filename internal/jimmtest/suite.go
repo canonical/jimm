@@ -18,17 +18,17 @@ import (
 	"github.com/juju/names/v5"
 	gc "gopkg.in/check.v1"
 
-	"github.com/canonical/jimm/internal/db"
-	"github.com/canonical/jimm/internal/dbmodel"
-	"github.com/canonical/jimm/internal/discharger"
-	"github.com/canonical/jimm/internal/jimm"
-	"github.com/canonical/jimm/internal/jimmhttp"
-	"github.com/canonical/jimm/internal/jimmjwx"
-	"github.com/canonical/jimm/internal/jujuclient"
-	"github.com/canonical/jimm/internal/openfga"
-	ofganames "github.com/canonical/jimm/internal/openfga/names"
-	"github.com/canonical/jimm/internal/pubsub"
-	"github.com/canonical/jimm/internal/wellknownapi"
+	"github.com/canonical/jimm/v3/internal/db"
+	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/discharger"
+	"github.com/canonical/jimm/v3/internal/jimm"
+	"github.com/canonical/jimm/v3/internal/jimmhttp"
+	"github.com/canonical/jimm/v3/internal/jimmjwx"
+	"github.com/canonical/jimm/v3/internal/jujuclient"
+	"github.com/canonical/jimm/v3/internal/openfga"
+	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
+	"github.com/canonical/jimm/v3/internal/pubsub"
+	"github.com/canonical/jimm/v3/internal/wellknownapi"
 )
 
 // ControllerUUID is the UUID of the JIMM controller used in tests.

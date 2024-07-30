@@ -21,13 +21,13 @@ import (
 	"github.com/juju/version/v2"
 	"sigs.k8s.io/yaml"
 
-	"github.com/canonical/jimm/internal/db"
-	"github.com/canonical/jimm/internal/dbmodel"
-	"github.com/canonical/jimm/internal/errors"
-	"github.com/canonical/jimm/internal/jimm"
-	"github.com/canonical/jimm/internal/jimmtest"
-	"github.com/canonical/jimm/internal/openfga"
-	ofganames "github.com/canonical/jimm/internal/openfga/names"
+	"github.com/canonical/jimm/v3/internal/db"
+	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jimm"
+	"github.com/canonical/jimm/v3/internal/jimmtest"
+	"github.com/canonical/jimm/v3/internal/openfga"
+	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 )
 
 func TestModelCreateArgs(t *testing.T) {

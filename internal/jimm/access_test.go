@@ -17,15 +17,15 @@ import (
 	"github.com/juju/juju/state"
 	"github.com/juju/names/v5"
 
-	"github.com/canonical/jimm/internal/db"
-	"github.com/canonical/jimm/internal/dbmodel"
-	"github.com/canonical/jimm/internal/errors"
-	"github.com/canonical/jimm/internal/jimm"
-	"github.com/canonical/jimm/internal/jimmjwx"
-	"github.com/canonical/jimm/internal/jimmtest"
-	"github.com/canonical/jimm/internal/openfga"
-	ofganames "github.com/canonical/jimm/internal/openfga/names"
-	jimmnames "github.com/canonical/jimm/pkg/names"
+	"github.com/canonical/jimm/v3/internal/db"
+	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jimm"
+	"github.com/canonical/jimm/v3/internal/jimmjwx"
+	"github.com/canonical/jimm/v3/internal/jimmtest"
+	"github.com/canonical/jimm/v3/internal/openfga"
+	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
+	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 	"github.com/canonical/ofga"
 )
 
@@ -636,7 +636,11 @@ func TestResolveTupleObjectMapsGroups(t *testing.T) {
 	}
 	err = j.Database.GetGroup(ctx, group)
 	c.Assert(err, qt.IsNil)
+	// Test resolution via name and via UUID.
 	tag, err := jimm.ResolveTag(j.UUID, &j.Database, "group-"+group.Name+"#member")
+	c.Assert(err, qt.IsNil)
+	c.Assert(tag, qt.DeepEquals, ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag(group.UUID), ofganames.MemberRelation))
+	tag, err = jimm.ResolveTag(j.UUID, &j.Database, "group-"+group.UUID+"#member")
 	c.Assert(err, qt.IsNil)
 	c.Assert(tag, qt.DeepEquals, ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag(group.UUID), ofganames.MemberRelation))
 }

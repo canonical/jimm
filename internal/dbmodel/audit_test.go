@@ -10,8 +10,8 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/juju/names/v5"
 
-	"github.com/canonical/jimm/internal/dbmodel"
-	apiparams "github.com/canonical/jimm/pkg/api/params"
+	"github.com/canonical/jimm/v3/internal/dbmodel"
+	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
 func TestAuditLogEntry(t *testing.T) {

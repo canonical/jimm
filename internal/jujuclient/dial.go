@@ -26,12 +26,12 @@ import (
 	"go.uber.org/zap"
 	"gopkg.in/httprequest.v1"
 
-	"github.com/canonical/jimm/internal/dbmodel"
-	"github.com/canonical/jimm/internal/errors"
-	"github.com/canonical/jimm/internal/jimm"
-	"github.com/canonical/jimm/internal/jimmjwx"
-	"github.com/canonical/jimm/internal/rpc"
-	"github.com/canonical/jimm/internal/servermon"
+	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jimm"
+	"github.com/canonical/jimm/v3/internal/jimmjwx"
+	"github.com/canonical/jimm/v3/internal/rpc"
+	"github.com/canonical/jimm/v3/internal/servermon"
 )
 
 const (

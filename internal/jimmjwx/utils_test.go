@@ -10,11 +10,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 
-	jimmsvc "github.com/canonical/jimm/cmd/jimmsrv/service"
-	"github.com/canonical/jimm/internal/jimm/credentials"
-	"github.com/canonical/jimm/internal/jimmjwx"
-	"github.com/canonical/jimm/internal/jimmtest"
-	"github.com/canonical/jimm/internal/vault"
+	jimmsvc "github.com/canonical/jimm/v3/cmd/jimmsrv/service"
+	"github.com/canonical/jimm/v3/internal/jimm/credentials"
+	"github.com/canonical/jimm/v3/internal/jimmjwx"
+	"github.com/canonical/jimm/v3/internal/jimmtest"
+	"github.com/canonical/jimm/v3/internal/vault"
 )
 
 func newStore(t testing.TB) *vault.VaultStore {

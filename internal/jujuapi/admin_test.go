@@ -17,10 +17,10 @@ import (
 	"time"
 
 	"github.com/antonlindstrom/pgstore"
-	"github.com/canonical/jimm/internal/auth"
-	"github.com/canonical/jimm/internal/dbmodel"
-	"github.com/canonical/jimm/internal/jimmtest"
-	"github.com/canonical/jimm/pkg/api/params"
+	"github.com/canonical/jimm/v3/internal/auth"
+	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/jimmtest"
+	"github.com/canonical/jimm/v3/pkg/api/params"
 	"github.com/gorilla/websocket"
 
 	"github.com/coreos/go-oidc/v3/oidc"

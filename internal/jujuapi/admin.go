@@ -11,12 +11,12 @@ import (
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 
-	"github.com/canonical/jimm/internal/auth"
-	"github.com/canonical/jimm/internal/errors"
-	"github.com/canonical/jimm/internal/jimm"
-	"github.com/canonical/jimm/internal/openfga"
-	"github.com/canonical/jimm/pkg/api/params"
-	jimmnames "github.com/canonical/jimm/pkg/names"
+	"github.com/canonical/jimm/v3/internal/auth"
+	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jimm"
+	"github.com/canonical/jimm/v3/internal/openfga"
+	"github.com/canonical/jimm/v3/pkg/api/params"
+	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
 
 // unsupportedLogin returns an appropriate error for login attempts using

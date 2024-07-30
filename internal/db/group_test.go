@@ -9,9 +9,9 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/google/uuid"
 
-	"github.com/canonical/jimm/internal/db"
-	"github.com/canonical/jimm/internal/dbmodel"
-	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/v3/internal/db"
+	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/errors"
 )
 
 func TestAddGroupUnconfiguredDatabase(t *testing.T) {

@@ -29,12 +29,12 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwt"
 	"golang.org/x/oauth2"
 
-	"github.com/canonical/jimm/internal/auth"
-	"github.com/canonical/jimm/internal/db"
-	jimmerrors "github.com/canonical/jimm/internal/errors"
-	"github.com/canonical/jimm/internal/jimm"
-	"github.com/canonical/jimm/internal/jimmhttp"
-	"github.com/canonical/jimm/internal/openfga"
+	"github.com/canonical/jimm/v3/internal/auth"
+	"github.com/canonical/jimm/v3/internal/db"
+	jimmerrors "github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jimm"
+	"github.com/canonical/jimm/v3/internal/jimmhttp"
+	"github.com/canonical/jimm/v3/internal/openfga"
 )
 
 const (

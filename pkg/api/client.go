@@ -5,7 +5,7 @@ package api
 import (
 	jujuparams "github.com/juju/juju/rpc/params"
 
-	"github.com/canonical/jimm/pkg/api/params"
+	"github.com/canonical/jimm/v3/pkg/api/params"
 )
 
 // An APICaller implements the interface required to make API calls.
