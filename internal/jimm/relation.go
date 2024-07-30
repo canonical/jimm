@@ -76,7 +76,7 @@ func (j *JIMM) CheckRelation(ctx context.Context, user *openfga.User, tuple apip
 // ListRelationshipTuples checks user permission and remove given relations tuples.
 // At the moment user is required be admin
 func (j *JIMM) ListRelationshipTuples(ctx context.Context, user *openfga.User, tuple apiparams.RelationshipTuple, pageSize int32, continuationToken string) ([]openfga.Tuple, string, error) {
-	const op = errors.Op("jujuapi.ListRelationshipTuples")
+	const op = errors.Op("jimm.ListRelationshipTuples")
 	if !user.JimmAdmin {
 		return []openfga.Tuple{}, "", errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
