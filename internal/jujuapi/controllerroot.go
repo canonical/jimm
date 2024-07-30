@@ -30,6 +30,7 @@ import (
 )
 
 type JIMM interface {
+	RelationService
 	AddAuditLogEntry(ale *dbmodel.AuditLogEntry)
 	AddCloudToController(ctx context.Context, user *openfga.User, controllerName string, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error
 	AddController(ctx context.Context, u *openfga.User, ctl *dbmodel.Controller) error
@@ -82,7 +83,6 @@ type JIMM interface {
 	ModelInfo(ctx context.Context, u *openfga.User, mt names.ModelTag) (*jujuparams.ModelInfo, error)
 	ModelStatus(ctx context.Context, u *openfga.User, mt names.ModelTag) (*jujuparams.ModelStatus, error)
 	Offer(ctx context.Context, user *openfga.User, offer jimm.AddApplicationOfferParams) error
-	ParseTag(ctx context.Context, key string) (*ofganames.Tag, error)
 	PubSubHub() *pubsub.Hub
 	PurgeLogs(ctx context.Context, user *openfga.User, before time.Time) (int64, error)
 	QueryModelsJq(ctx context.Context, models []dbmodel.Model, jqQuery string) (params.CrossModelQueryResponse, error)

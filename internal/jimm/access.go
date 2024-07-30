@@ -617,11 +617,11 @@ func resolveTag(jimmUUID string, db *db.Database, tag string) (*ofganames.Tag, e
 	return nil, errors.E("failed to map tag " + matches[1])
 }
 
-// ParseTag attempts to parse the provided key into a tag whilst additionally
+// parseAndValidateTag attempts to parse the provided key into a tag whilst additionally
 // ensuring the resource exists for said tag.
 //
 // This key may be in the form of either a JIMM tag string or Juju tag string.
-func (j *JIMM) ParseTag(ctx context.Context, key string) (*ofganames.Tag, error) {
+func (j *JIMM) parseAndValidateTag(ctx context.Context, key string) (*ofganames.Tag, error) {
 	op := errors.Op("jimm.ParseTag")
 	tupleKeySplit := strings.SplitN(key, "-", 2)
 	if len(tupleKeySplit) < 2 {

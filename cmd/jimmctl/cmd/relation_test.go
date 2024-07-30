@@ -251,7 +251,7 @@ func (s *relationSuite) TestRemoveRelationViaFileSuperuser(c *gc.C) {
 func (s *relationSuite) TestRemoveRelation(c *gc.C) {
 	// bob is not superuser
 	bClient := jimmtest.NewUserSessionLogin(c, "bob")
-	_, err := cmdtesting.RunCommand(c, cmd.NewRemoveRelationCommandForTesting(s.ClientStore(), bClient), "test-group1#member", "member", "test-group2")
+	_, err := cmdtesting.RunCommand(c, cmd.NewRemoveRelationCommandForTesting(s.ClientStore(), bClient), "group-testGroup1#member", "member", "group-testGroup2")
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
 
