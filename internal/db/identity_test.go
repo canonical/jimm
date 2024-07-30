@@ -4,6 +4,7 @@ package db_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
@@ -179,4 +180,35 @@ func (s *dbSuite) TestGetIdentityCloudCredentials(c *qt.C) {
 	credentials, err := s.Database.GetIdentityCloudCredentials(ctx, i, cloud.Name)
 	c.Check(err, qt.IsNil)
 	c.Assert(credentials, qt.DeepEquals, []dbmodel.CloudCredential{cred1, cred2})
+}
+
+func (s *dbSuite) TestForEachIdentity(c *qt.C) {
+	err := s.Database.Migrate(context.Background(), false)
+	c.Assert(err, qt.IsNil)
+
+	addNIdentity := 10
+	for i := range addNIdentity {
+		id, _ := dbmodel.NewIdentity(fmt.Sprintf("bob%d@canonical.com", i))
+		err = s.Database.GetIdentity(context.Background(), id)
+		c.Assert(err, qt.IsNil)
+	}
+	firstIdentities := []*dbmodel.Identity{}
+	ctx := context.Background()
+	err = s.Database.ForEachIdentity(ctx, 5, 0, func(ge *dbmodel.Identity) error {
+		firstIdentities = append(firstIdentities, ge)
+		return nil
+	})
+	c.Assert(err, qt.IsNil)
+	for i := 0; i < 5; i++ {
+		c.Assert(firstIdentities[i].Name, qt.Equals, fmt.Sprintf("bob%d@canonical.com", i))
+	}
+	secondIdentities := []*dbmodel.Identity{}
+	err = s.Database.ForEachIdentity(ctx, 5, 5, func(ge *dbmodel.Identity) error {
+		secondIdentities = append(secondIdentities, ge)
+		return nil
+	})
+	c.Assert(err, qt.IsNil)
+	for i := 0; i < 5; i++ {
+		c.Assert(secondIdentities[i].Name, qt.Equals, fmt.Sprintf("bob%d@canonical.com", i+5))
+	}
 }

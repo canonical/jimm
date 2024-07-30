@@ -119,3 +119,40 @@ func (d *Database) GetIdentityCloudCredentials(ctx context.Context, u *dbmodel.I
 	}
 	return credentials, nil
 }
+
+// ForEachUser iterates through every user calling the given function
+// for each one. If the given function returns an error the iteration
+// will stop immediately and the error will be returned unmodified.
+func (d *Database) ForEachIdentity(ctx context.Context, limit, offset int, f func(*dbmodel.Identity) error) (err error) {
+	const op = errors.Op("db.ForEachUSer")
+	if err := d.ready(); err != nil {
+		return errors.E(op, err)
+	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
+	db := d.DB.WithContext(ctx)
+	db = db.Order("name asc")
+	db = db.Limit(limit)
+	db = db.Offset(offset)
+	rows, err := db.Model(&dbmodel.Identity{}).Rows()
+	if err != nil {
+		return errors.E(op, err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var identity dbmodel.Identity
+		if err := db.ScanRows(rows, &identity); err != nil {
+			return errors.E(op, err)
+		}
+		if err := f(&identity); err != nil {
+			return err
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return errors.E(op, dbError(err))
+	}
+	return nil
+}
