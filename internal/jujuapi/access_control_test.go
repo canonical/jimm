@@ -1429,12 +1429,12 @@ func createTestControllerEnvironment(ctx context.Context, c *gc.C, s *accessCont
 	func()) {
 
 	db := s.JIMM.Database
-	groupUuid, err := db.AddGroup(ctx, "test-group")
+	groupEntry, err := db.AddGroup(ctx, "test-group")
 	c.Assert(err, gc.IsNil)
 	group := dbmodel.GroupEntry{Name: "test-group"}
 	err = db.GetGroup(ctx, &group)
 	c.Assert(err, gc.IsNil)
-	c.Assert(groupUuid, gc.Equals, group.UUID)
+	c.Assert(groupEntry.UUID, gc.Equals, group.UUID)
 
 	u, err := dbmodel.NewIdentity(petname.Generate(2, "-") + "@canonical.com")
 	c.Assert(err, gc.IsNil)

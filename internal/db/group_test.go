@@ -37,9 +37,9 @@ func (s *dbSuite) TestAddGroup(c *qt.C) {
 	err = s.Database.Migrate(context.Background(), false)
 	c.Assert(err, qt.IsNil)
 
-	groupUuid, err := s.Database.AddGroup(ctx, "test-group")
+	groupEntry, err := s.Database.AddGroup(ctx, "test-group")
 	c.Assert(err, qt.IsNil)
-	c.Assert(groupUuid, qt.Not(qt.Equals), "")
+	c.Assert(groupEntry.UUID, qt.Not(qt.Equals), "")
 
 	_, err = s.Database.AddGroup(ctx, "test-group")
 	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeAlreadyExists)
@@ -74,9 +74,9 @@ func (s *dbSuite) TestGetGroup(c *qt.C) {
 	err = s.Database.GetGroup(context.Background(), group)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
-	groupUuid, err := s.Database.AddGroup(context.TODO(), "test-group")
+	groupEntry, err := s.Database.AddGroup(context.TODO(), "test-group")
 	c.Assert(err, qt.IsNil)
-	c.Assert(groupUuid, qt.Equals, uuid1)
+	c.Assert(groupEntry.UUID, qt.Equals, uuid1)
 
 	err = s.Database.GetGroup(context.Background(), group)
 	c.Check(err, qt.IsNil)
@@ -89,9 +89,9 @@ func (s *dbSuite) TestGetGroup(c *qt.C) {
 		return uuid2
 	})
 
-	groupUuid, err = s.Database.AddGroup(context.Background(), "test-group1")
+	groupEntry, err = s.Database.AddGroup(context.Background(), "test-group1")
 	c.Assert(err, qt.IsNil)
-	c.Assert(groupUuid, qt.Equals, uuid2)
+	c.Assert(groupEntry.UUID, qt.Equals, uuid2)
 
 	group = &dbmodel.GroupEntry{
 		Name: "test-group1",
@@ -152,7 +152,7 @@ func (s *dbSuite) TestRemoveGroup(c *qt.C) {
 	err = s.Database.RemoveGroup(context.Background(), ge)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
-	groupUuid, err := s.Database.AddGroup(context.Background(), ge.Name)
+	groupEntry, err := s.Database.AddGroup(context.Background(), ge.Name)
 	c.Assert(err, qt.IsNil)
 
 	ge1 := &dbmodel.GroupEntry{
@@ -160,7 +160,7 @@ func (s *dbSuite) TestRemoveGroup(c *qt.C) {
 	}
 	err = s.Database.GetGroup(context.Background(), ge1)
 	c.Assert(err, qt.IsNil)
-	c.Assert(groupUuid, qt.Equals, ge1.UUID)
+	c.Assert(groupEntry.UUID, qt.Equals, ge1.UUID)
 
 	err = s.Database.RemoveGroup(context.Background(), ge1)
 	c.Check(err, qt.IsNil)

@@ -34,7 +34,7 @@ func (s *groupSuite) TestAddGroupSuperuser(c *gc.C) {
 	c.Assert(group.ID, gc.Equals, uint(1))
 	c.Assert(group.Name, gc.Equals, "test-group")
 
-	c.Assert(cmdtesting.Stdout(ctx), gc.Equals, fmt.Sprintf("uuid: %s\n", group.UUID))
+	c.Assert(cmdtesting.Stdout(ctx), gc.Matches, fmt.Sprintf(`(?s).*uuid: %s\n.*`, group.UUID))
 }
 
 func (s *groupSuite) TestAddGroup(c *gc.C) {
@@ -48,9 +48,9 @@ func (s *groupSuite) TestRenameGroupSuperuser(c *gc.C) {
 	// alice is superuser
 	bClient := jimmtest.NewUserSessionLogin(c, "alice")
 
-	groupUuid, err := s.JimmCmdSuite.JIMM.Database.AddGroup(context.TODO(), "test-group")
+	groupEntry, err := s.JimmCmdSuite.JIMM.Database.AddGroup(context.TODO(), "test-group")
 	c.Assert(err, gc.IsNil)
-	c.Assert(groupUuid, gc.Not(gc.Equals), "")
+	c.Assert(groupEntry.UUID, gc.Not(gc.Equals), "")
 
 	_, err = cmdtesting.RunCommand(c, cmd.NewRenameGroupCommandForTesting(s.ClientStore(), bClient), "test-group", "renamed-group")
 	c.Assert(err, gc.IsNil)

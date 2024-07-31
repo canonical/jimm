@@ -865,9 +865,9 @@ func TestAddGroup(t *testing.T) {
 	u := openfga.NewUser(&user, ofgaClient)
 	u.JimmAdmin = true
 
-	groupUuid, err := j.AddGroup(ctx, u, "test-group-1")
+	groupEntry, err := j.AddGroup(ctx, u, "test-group-1")
 	c.Assert(err, qt.IsNil)
-	c.Assert(groupUuid, qt.Not(qt.Equals), "")
+	c.Assert(groupEntry.UUID, qt.Not(qt.Equals), "")
 
 	_, err = j.AddGroup(ctx, u, "test-group-1")
 	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeAlreadyExists)

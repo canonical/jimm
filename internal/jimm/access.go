@@ -641,18 +641,18 @@ func (j *JIMM) ParseTag(ctx context.Context, key string) (*ofganames.Tag, error)
 }
 
 // AddGroup creates a group within JIMMs DB for reference by OpenFGA.
-func (j *JIMM) AddGroup(ctx context.Context, user *openfga.User, name string) (string, error) {
+func (j *JIMM) AddGroup(ctx context.Context, user *openfga.User, name string) (*dbmodel.GroupEntry, error) {
 	const op = errors.Op("jimm.AddGroup")
 
 	if !user.JimmAdmin {
-		return "", errors.E(op, errors.CodeUnauthorized, "unauthorized")
+		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
-	groupUuid, err := j.Database.AddGroup(ctx, name)
+	ge, err := j.Database.AddGroup(ctx, name)
 	if err != nil {
-		return "", errors.E(op, err)
+		return nil, errors.E(op, err)
 	}
-	return groupUuid, nil
+	return ge, nil
 }
 
 // RenameGroup renames a group in JIMM's DB.

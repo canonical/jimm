@@ -32,7 +32,7 @@ type JIMM struct {
 	AddAuditLogEntry_                  func(ale *dbmodel.AuditLogEntry)
 	AddCloudToController_              func(ctx context.Context, user *openfga.User, controllerName string, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error
 	AddController_                     func(ctx context.Context, u *openfga.User, ctl *dbmodel.Controller) error
-	AddGroup_                          func(ctx context.Context, user *openfga.User, name string) (string, error)
+	AddGroup_                          func(ctx context.Context, user *openfga.User, name string) (*dbmodel.GroupEntry, error)
 	AddHostedCloud_                    func(ctx context.Context, user *openfga.User, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error
 	AddModel_                          func(ctx context.Context, u *openfga.User, args *jimm.ModelCreateArgs) (*jujuparams.ModelInfo, error)
 	AddServiceAccount_                 func(ctx context.Context, u *openfga.User, clientId string) error
@@ -133,9 +133,9 @@ func (j *JIMM) AddController(ctx context.Context, u *openfga.User, ctl *dbmodel.
 	}
 	return j.AddController_(ctx, u, ctl)
 }
-func (j *JIMM) AddGroup(ctx context.Context, u *openfga.User, name string) (string, error) {
+func (j *JIMM) AddGroup(ctx context.Context, u *openfga.User, name string) (*dbmodel.GroupEntry, error) {
 	if j.AddGroup_ == nil {
-		return "", errors.E(errors.CodeNotImplemented)
+		return nil, errors.E(errors.CodeNotImplemented)
 	}
 	return j.AddGroup_(ctx, u, name)
 }

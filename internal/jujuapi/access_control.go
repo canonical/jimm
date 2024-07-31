@@ -60,12 +60,17 @@ func (r *controllerRoot) AddGroup(ctx context.Context, req apiparams.AddGroupReq
 		return resp, errors.E(op, errors.CodeBadRequest, "invalid group name")
 	}
 
-	groupUuid, err := r.jimm.AddGroup(ctx, r.user, req.Name)
+	groupEntry, err := r.jimm.AddGroup(ctx, r.user, req.Name)
 	if err != nil {
 		zapctx.Error(ctx, "failed to add group", zaputil.Error(err))
 		return resp, errors.E(op, err)
 	}
-	resp.UUID = groupUuid
+	resp = apiparams.AddGroupResponse{Group: apiparams.Group{
+		Name:      groupEntry.Name,
+		UUID:      groupEntry.UUID,
+		CreatedAt: groupEntry.CreatedAt.Format(time.RFC3339),
+		UpdatedAt: groupEntry.UpdatedAt.Format(time.RFC3339),
+	}}
 
 	return resp, nil
 }
@@ -107,6 +112,7 @@ func (r *controllerRoot) ListGroups(ctx context.Context) (apiparams.ListGroupRes
 	groupsResponse := make([]apiparams.Group, len(groups))
 	for i, g := range groups {
 		groupsResponse[i] = apiparams.Group{
+			UUID:      g.UUID,
 			Name:      g.Name,
 			CreatedAt: g.CreatedAt.Format(time.RFC3339),
 			UpdatedAt: g.UpdatedAt.Format(time.RFC3339),

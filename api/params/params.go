@@ -280,6 +280,11 @@ type AddGroupRequest struct {
 	Name string `json:"name"`
 }
 
+// AddGroupResponse holds the details of the added group.
+type AddGroupResponse struct {
+	Group
+}
+
 // RenameGroupRequest holds a request to rename a group.
 type RenameGroupRequest struct {
 	// Name holds the name of the group.
@@ -301,11 +306,6 @@ type Group struct {
 	Name      string `json:"name"`
 	CreatedAt string `json:"created_at"`
 	UpdatedAt string `json:"updated_at"`
-}
-
-// AddGroupResponse returns the UUID of the group that was added.
-type AddGroupResponse struct {
-	UUID string `json:"uuid"`
 }
 
 // ListGroupResponse returns the group tuples currently residing within OpenFGA.
