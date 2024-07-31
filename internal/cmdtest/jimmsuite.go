@@ -106,6 +106,8 @@ func (s *JimmCmdSuite) SetUpTest(c *gc.C) {
 
 	s.AddAdminUser(c, "alice@canonical.com")
 
+	// Return the same in-memory store on every invocation because
+	// the store details will be updated on every controller connection.
 	s.ClientStore = func() *jjclient.MemStore {
 		store := jjclient.NewMemStore()
 		store.CurrentControllerName = "JIMM"
