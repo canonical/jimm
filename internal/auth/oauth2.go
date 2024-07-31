@@ -27,10 +27,10 @@ import (
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/clientcredentials"
 
-	"github.com/canonical/jimm/v3/api/params"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/servermon"
+	"github.com/canonical/jimm/v3/pkg/api/params"
 )
 
 const (

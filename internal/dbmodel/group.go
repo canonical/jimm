@@ -8,7 +8,7 @@ import (
 	"github.com/juju/names/v5"
 	"gorm.io/gorm"
 
-	apiparams "github.com/canonical/jimm/v3/api/params"
+	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
 
