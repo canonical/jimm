@@ -13,7 +13,6 @@ import (
 	"github.com/canonical/jimm/v3/cmd/jimmctl/cmd"
 	"github.com/canonical/jimm/v3/internal/cmdtest"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
-	"github.com/canonical/jimm/v3/internal/jimmtest"
 )
 
 type purgeLogsSuite struct {
@@ -24,7 +23,7 @@ var _ = gc.Suite(&purgeLogsSuite{})
 
 func (s *purgeLogsSuite) TestPurgeLogsSuperuser(c *gc.C) {
 	// alice is superuser
-	bClient := jimmtest.NewUserSessionLogin(c, "alice")
+	bClient := s.SetupCLIAccess(c, "alice")
 	datastring := "2021-01-01T00:00:00Z"
 	cmdCtx, err := cmdtesting.RunCommand(c, cmd.NewPurgeLogsCommandForTesting(s.ClientStore(), bClient), datastring)
 	c.Assert(err, gc.IsNil)
@@ -35,7 +34,7 @@ func (s *purgeLogsSuite) TestPurgeLogsSuperuser(c *gc.C) {
 
 func (s *purgeLogsSuite) TestInvalidISO8601Date(c *gc.C) {
 	// alice is superuser
-	bClient := jimmtest.NewUserSessionLogin(c, "alice")
+	bClient := s.SetupCLIAccess(c, "alice")
 	datastring := "13/01/2021"
 	_, err := cmdtesting.RunCommand(c, cmd.NewPurgeLogsCommandForTesting(s.ClientStore(), bClient), datastring)
 	c.Assert(err, gc.ErrorMatches, `invalid date. Expected ISO8601 date`)
@@ -44,7 +43,7 @@ func (s *purgeLogsSuite) TestInvalidISO8601Date(c *gc.C) {
 
 func (s *purgeLogsSuite) TestPurgeLogs(c *gc.C) {
 	// bob is not superuser
-	bClient := jimmtest.NewUserSessionLogin(c, "bob")
+	bClient := s.SetupCLIAccess(c, "bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewPurgeLogsCommandForTesting(s.ClientStore(), bClient), "2021-01-01T00:00:00Z")
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
@@ -85,8 +84,8 @@ func (s *purgeLogsSuite) TestPurgeLogsFromDb(c *gc.C) {
 		c.Assert(err, gc.IsNil)
 
 		tomorrow := relativeNow.AddDate(0, 0, 1).Format(layout)
-		// alice is superuser
-		bClient := jimmtest.NewUserSessionLogin(c, "alice")
+		//alice is superuser
+		bClient := s.SetupCLIAccess(c, "alice")
 		cmdCtx, err := cmdtesting.RunCommand(c, cmd.NewPurgeLogsCommandForTesting(s.ClientStore(), bClient), tomorrow)
 		c.Assert(err, gc.IsNil)
 		// check that logs have been deleted

@@ -77,7 +77,7 @@ func (s *listControllersSuite) TestListControllersSuperuser(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
 
 	// alice is superuser
-	bClient := jimmtest.NewUserSessionLogin(c, "alice")
+	bClient := s.SetupCLIAccess(c, "alice")
 	context, err := cmdtesting.RunCommand(c, cmd.NewListControllersCommandForTesting(s.ClientStore(), bClient))
 	c.Assert(err, gc.IsNil)
 	c.Assert(cmdtesting.Stdout(context), gc.Matches, expectedSuperuserOutput)
@@ -87,7 +87,7 @@ func (s *listControllersSuite) TestListControllers(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
 
 	// bob is not superuser
-	bClient := jimmtest.NewUserSessionLogin(c, "bob")
+	bClient := s.SetupCLIAccess(c, "bob")
 	context, err := cmdtesting.RunCommand(c, cmd.NewListControllersCommandForTesting(s.ClientStore(), bClient))
 	c.Assert(err, gc.IsNil)
 	c.Assert(cmdtesting.Stdout(context), gc.Matches, expectedOutput)

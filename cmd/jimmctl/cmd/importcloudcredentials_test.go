@@ -13,7 +13,6 @@ import (
 	"github.com/canonical/jimm/v3/cmd/jimmctl/cmd"
 	"github.com/canonical/jimm/v3/internal/cmdtest"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
-	"github.com/canonical/jimm/v3/internal/jimmtest"
 )
 
 type importCloudCredentialsSuite struct {
@@ -65,7 +64,7 @@ func (s *importCloudCredentialsSuite) TestImportCloudCredentials(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	// alice is superuser
-	bClient := jimmtest.NewUserSessionLogin(c, "alice")
+	bClient := s.SetupCLIAccess(c, "alice")
 	_, err = cmdtesting.RunCommand(c, cmd.NewImportCloudCredentialsCommandForTesting(s.ClientStore(), bClient), tmpfile)
 	c.Assert(err, gc.IsNil)
 

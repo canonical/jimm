@@ -178,7 +178,7 @@ func (m *mockOAuthAuthenticator) VerifyClientCredentials(ctx context.Context, cl
 // Tests using a mock authenticator can provide an empty signatureSecret
 // while integration tests must provide the same secret used when verifying JWTs.
 func newSessionToken(c SimpleTester, username string, signatureSecret string) string {
-	email := convertUsernameToEmail(username)
+	email := ConvertUsernameToEmail(username)
 	token, err := jwt.NewBuilder().
 		Subject(email).
 		Expiration(time.Now().Add(1 * time.Hour)).
@@ -206,7 +206,7 @@ func NewUserSessionLogin(c SimpleTester, username string) api.LoginProvider {
 	return api.NewSessionTokenLoginProvider(b64Token, nil, nil)
 }
 
-func convertUsernameToEmail(username string) string {
+func ConvertUsernameToEmail(username string) string {
 	if !strings.Contains(username, "@") {
 		return username + "@canonical.com"
 	}

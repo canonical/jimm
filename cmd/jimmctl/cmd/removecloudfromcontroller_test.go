@@ -8,7 +8,6 @@ import (
 
 	"github.com/canonical/jimm/v3/cmd/jimmctl/cmd"
 	"github.com/canonical/jimm/v3/internal/cmdtest"
-	"github.com/canonical/jimm/v3/internal/jimmtest"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
@@ -26,7 +25,7 @@ func (s *removeCloudFromControllerSuite) SetUpTest(c *gc.C) {
 }
 
 func (s *removeCloudFromControllerSuite) TestRemoveCloudFromController(c *gc.C) {
-	bClient := jimmtest.NewUserSessionLogin(c, "alice@canonical.com")
+	bClient := s.SetupCLIAccess(c, "alice@canonical.com")
 
 	command := cmd.NewRemoveCloudFromControllerCommandForTesting(
 		s.ClientStore(),
@@ -48,7 +47,7 @@ func (s *removeCloudFromControllerSuite) TestRemoveCloudFromController(c *gc.C) 
 }
 
 func (s *removeCloudFromControllerSuite) TestRemoveCloudFromControllerWrongArguments(c *gc.C) {
-	bClient := jimmtest.NewUserSessionLogin(c, "alice@canonical.com")
+	bClient := s.SetupCLIAccess(c, "alice@canonical.com")
 
 	command := cmd.NewRemoveCloudFromControllerCommandForTesting(
 		s.ClientStore(),
@@ -63,7 +62,7 @@ func (s *removeCloudFromControllerSuite) TestRemoveCloudFromControllerWrongArgum
 }
 
 func (s *removeCloudFromControllerSuite) TestRemoveCloudFromControllerCloudNotFound(c *gc.C) {
-	bClient := jimmtest.NewUserSessionLogin(c, "alice@canonical.com")
+	bClient := s.SetupCLIAccess(c, "alice@canonical.com")
 
 	command := cmd.NewRemoveCloudFromControllerCommandForTesting(
 		s.ClientStore(),
