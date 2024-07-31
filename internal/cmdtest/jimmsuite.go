@@ -45,6 +45,7 @@ type JimmCmdSuite struct {
 	ClientStore func() *jjclient.MemStore
 	JIMM        *jimm.JIMM
 	cancel      context.CancelFunc
+	testUser    string
 
 	OFGAClient  *openfga.OFGAClient
 	COFGAClient *cofga.Client
@@ -128,6 +129,7 @@ func (s *JimmCmdSuite) SetUpTest(c *gc.C) {
 			PublicDNSName:  s.HTTP.URL,
 			CACert:         w.String(),
 		}
+		store.Accounts["JIMM"] = jjclient.AccountDetails{User: s.testUser}
 		return store
 	}
 }
@@ -192,6 +194,17 @@ func (s *JimmCmdSuite) AddAdminUser(c *gc.C, email string) {
 	ofgaUser := openfga.NewUser(identity, s.OFGAClient)
 	err = ofgaUser.SetControllerAccess(context.Background(), s.JIMM.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, gc.IsNil)
+}
+
+// SetupCLIAccess should be run at the start of all CLI tests that want to communicate with JIMM.
+// It will ensure a user is created in JIMM's in-memory accounts store that matches the username passed in.
+// This is necessary as Juju's CLI library validates the logged-in user matches the expected user from the accounts store.
+// This function will return a login provider that can be used to handle authentication.
+func (s *JimmCmdSuite) SetupCLIAccess(c *gc.C, username string) api.LoginProvider {
+	email := jimmtest.ConvertUsernameToEmail(username)
+	lp := jimmtest.NewUserSessionLogin(c, email)
+	s.testUser = email
+	return lp
 }
 
 // RefreshControllerAddress is a useful helper function when writing table tests for JIMM CLI

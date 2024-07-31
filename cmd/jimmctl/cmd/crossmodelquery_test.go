@@ -24,7 +24,7 @@ var _ = gc.Suite(&crossModelQuerySuite{})
 func (s *crossModelQuerySuite) TestCrossModelQueryCommand(c *gc.C) {
 	// Test setup.
 	store := s.ClientStore()
-	bClient := jimmtest.NewUserSessionLogin(c, "alice")
+	bClient := s.SetupCLIAccess(c, "alice")
 
 	s.AddController(c, "controller-2", s.APIInfo(c))
 	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/alice@canonical.com/cred")

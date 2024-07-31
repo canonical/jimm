@@ -24,7 +24,6 @@ import (
 	"github.com/canonical/jimm/v3/internal/cmdtest"
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
-	"github.com/canonical/jimm/v3/internal/jimmtest"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	jimmnames "github.com/canonical/jimm/v3/pkg/names"
@@ -38,7 +37,7 @@ var _ = gc.Suite(&relationSuite{})
 
 func (s *relationSuite) TestAddRelationSuperuser(c *gc.C) {
 	// alice is superuser
-	bClient := jimmtest.NewUserSessionLogin(c, "alice")
+	bClient := s.SetupCLIAccess(c, "alice")
 	group1 := "testGroup1"
 	group2 := "testGroup2"
 	type tuple struct {
@@ -109,7 +108,7 @@ func (s *relationSuite) TestAddRelationSuperuser(c *gc.C) {
 
 func (s *relationSuite) TestMissingParamsAddRelationSuperuser(c *gc.C) {
 	// alice is superuser
-	bClient := jimmtest.NewUserSessionLogin(c, "alice")
+	bClient := s.SetupCLIAccess(c, "alice")
 
 	_, err := cmdtesting.RunCommand(c, cmd.NewAddRelationCommandForTesting(s.ClientStore(), bClient), "foo", "bar")
 	c.Assert(err, gc.ErrorMatches, "target object not specified")
@@ -122,7 +121,7 @@ func (s *relationSuite) TestMissingParamsAddRelationSuperuser(c *gc.C) {
 
 func (s *relationSuite) TestAddRelationViaFileSuperuser(c *gc.C) {
 	// alice is superuser
-	bClient := jimmtest.NewUserSessionLogin(c, "alice")
+	bClient := s.SetupCLIAccess(c, "alice")
 	group1 := "testGroup1"
 	group2 := "testGroup2"
 	group3 := "testGroup3"
@@ -151,14 +150,14 @@ func (s *relationSuite) TestAddRelationViaFileSuperuser(c *gc.C) {
 }
 
 func (s *relationSuite) TestAddRelationRejectsUnauthorisedUsers(c *gc.C) {
-	bClient := jimmtest.NewUserSessionLogin(c, "bob")
+	bClient := s.SetupCLIAccess(c, "bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewAddRelationCommandForTesting(s.ClientStore(), bClient), "test-group1", "member", "test-group2")
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
 
 func (s *relationSuite) TestRemoveRelationSuperuser(c *gc.C) {
 	// alice is superuser
-	bClient := jimmtest.NewUserSessionLogin(c, "alice")
+	bClient := s.SetupCLIAccess(c, "alice")
 	group1 := "testGroup1"
 	group2 := "testGroup2"
 	type tuple struct {
@@ -204,7 +203,7 @@ func (s *relationSuite) TestRemoveRelationSuperuser(c *gc.C) {
 }
 
 func (s *relationSuite) TestRemoveRelationViaFileSuperuser(c *gc.C) {
-	bClient := jimmtest.NewUserSessionLogin(c, "alice")
+	bClient := s.SetupCLIAccess(c, "alice")
 	group1 := "testGroup1"
 	group2 := "testGroup2"
 	group3 := "testGroup3"
@@ -250,7 +249,7 @@ func (s *relationSuite) TestRemoveRelationViaFileSuperuser(c *gc.C) {
 
 func (s *relationSuite) TestRemoveRelation(c *gc.C) {
 	// bob is not superuser
-	bClient := jimmtest.NewUserSessionLogin(c, "bob")
+	bClient := s.SetupCLIAccess(c, "bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewRemoveRelationCommandForTesting(s.ClientStore(), bClient), "test-group1#member", "member", "test-group2")
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
@@ -343,7 +342,7 @@ func initializeEnvironment(c *gc.C, ctx context.Context, db *db.Database, u dbmo
 
 func (s *relationSuite) TestListRelations(c *gc.C) {
 	env := initializeEnvironment(c, context.Background(), &s.JIMM.Database, *s.AdminUser)
-	bClient := jimmtest.NewUserSessionLogin(c, "alice") // alice is superuser
+	bClient := s.SetupCLIAccess(c, "alice") // alice is superuser
 
 	relations := []apiparams.RelationshipTuple{{
 		Object:       "user-" + env.users[0].Name,
@@ -425,7 +424,7 @@ func (s *relationSuite) TestListRelations(c *gc.C) {
 func (s *relationSuite) TestListRelationsWithError(c *gc.C) {
 	env := initializeEnvironment(c, context.Background(), &s.JIMM.Database, *s.AdminUser)
 	// alice is superuser
-	bClient := jimmtest.NewUserSessionLogin(c, "alice")
+	bClient := s.SetupCLIAccess(c, "alice")
 
 	_, err := cmdtesting.RunCommand(c, cmd.NewAddGroupCommandForTesting(s.ClientStore(), bClient), "group-1")
 	c.Assert(err, gc.IsNil)
@@ -488,7 +487,7 @@ func (s *relationSuite) TestListRelationsWithError(c *gc.C) {
 // TODO: remove boilerplate of env setup and use initialiseEnvironment
 func (s *relationSuite) TestCheckRelationViaSuperuser(c *gc.C) {
 	ctx := context.TODO()
-	bClient := jimmtest.NewUserSessionLogin(c, "alice")
+	bClient := s.SetupCLIAccess(c, "alice")
 	ofgaClient := s.JIMM.OpenFGAClient
 
 	// Add some resources to check against
@@ -662,7 +661,7 @@ func (s *relationSuite) TestCheckRelationViaSuperuser(c *gc.C) {
 
 func (s *relationSuite) TestCheckRelation(c *gc.C) {
 	// bob is not superuser
-	bClient := jimmtest.NewUserSessionLogin(c, "bob")
+	bClient := s.SetupCLIAccess(c, "bob")
 	_, err := cmdtesting.RunCommand(
 		c,
 		cmd.NewCheckRelationCommandForTesting(s.ClientStore(), bClient),
