@@ -183,3 +183,43 @@ func TestListUsers(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(users, qt.HasLen, 0)
 }
+
+func TestCountUsers(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+	c.Assert(err, qt.IsNil)
+
+	now := time.Now().UTC().Round(time.Millisecond)
+	j := &jimm.JIMM{
+		UUID: uuid.NewString(),
+		Database: db.Database{
+			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
+		},
+		OpenFGAClient: ofgaClient,
+	}
+
+	err = j.Database.Migrate(ctx, false)
+	c.Assert(err, qt.IsNil)
+
+	user, _, _, _, _, _, _ := createTestControllerEnvironment(ctx, c, j.Database)
+
+	u := openfga.NewUser(&user, ofgaClient)
+	u.JimmAdmin = true
+
+	userNames := []string{
+		"aabob1@canonical.com",
+		"aabob3@canonical.com",
+		"aabob5@canonical.com",
+		"aabob4@canonical.com",
+	}
+	// add users
+	for _, name := range userNames {
+		_, err := j.GetUser(ctx, name)
+		c.Assert(err, qt.IsNil)
+	}
+	count, err := j.CountUsers(ctx, u)
+	c.Assert(err, qt.IsNil)
+	c.Assert(count, qt.Equals, 5)
+}
