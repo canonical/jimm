@@ -13,7 +13,13 @@ import (
 	gc "gopkg.in/check.v1"
 )
 
-func (s *proxySuite) TestDebugLogs(c *gc.C) {
+type streamProxySuite struct {
+	websocketSuite
+}
+
+var _ = gc.Suite(&streamProxySuite{})
+
+func (s *streamProxySuite) TestDebugLogs(c *gc.C) {
 	conn := s.open(c, &api.Info{ModelTag: s.Model.ResourceTag()}, "bob")
 	defer conn.Close()
 	_, err := common.StreamDebugLog(context.TODO(), conn, common.DebugLogParams{})
@@ -27,7 +33,7 @@ func (s *proxySuite) TestDebugLogs(c *gc.C) {
 // To test this we give the user model access so that the initial connection
 // can be established without the Juju controller returning an unauthorized error.
 // Then, before we call the log stream, we remove the user's model access.
-func (s *proxySuite) TestDebugLogsError(c *gc.C) {
+func (s *streamProxySuite) TestDebugLogsError(c *gc.C) {
 	fooUser, err := dbmodel.NewIdentity("foo@canonical.com")
 	c.Assert(err, gc.IsNil)
 	ctx := context.Background()

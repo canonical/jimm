@@ -118,7 +118,7 @@ func (m *mockOAuthAuthenticator) DeviceAccessToken(ctx context.Context, res *oau
 // Notice the use of jwt.ParseInsecure to skip JWT signature verification.
 func (m *mockOAuthAuthenticator) VerifySessionToken(token string) (jwt.Token, error) {
 	errorFn := func(err error) error {
-		return jimmerrors.E(err, jimmerrors.CodeUnauthorized)
+		return jimmerrors.E(err, jimmerrors.CodeSessionTokenInvalid)
 	}
 	decodedToken, err := base64.StdEncoding.DecodeString(token)
 	if err != nil {

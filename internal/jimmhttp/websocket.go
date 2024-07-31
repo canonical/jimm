@@ -33,14 +33,18 @@ type WSHandler struct {
 // been started.
 func (h *WSHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	ctx := req.Context()
-	var authErr error
-
 	if h.Server == nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	ctx, authErr = h.Server.Authenticate(ctx, w, req)
+	ctx, authErr := h.Server.Authenticate(ctx, w, req)
+	if authErr != nil {
+		zapctx.Error(ctx, "authentication error", zap.Error(authErr))
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte(authErr.Error()))
+		return
+	}
 
 	ctx = context.WithValue(ctx, contextPathKey("path"), req.URL.EscapedPath())
 	conn, err := h.Upgrader.Upgrade(w, req, nil)
@@ -60,12 +64,6 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			writeInternalServerErrorClosure(ctx, conn, err)
 		}
 	}()
-
-	if authErr != nil {
-		zapctx.Error(ctx, "authentication error", zap.Any("err", authErr), zap.Stack("stack"))
-		writeInternalServerErrorClosure(ctx, conn, authErr)
-		return
-	}
 
 	h.Server.ServeWS(ctx, conn)
 }

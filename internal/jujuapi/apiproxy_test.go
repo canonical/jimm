@@ -3,8 +3,10 @@
 package jujuapi_test
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/juju/juju/api"
 	"github.com/juju/juju/api/client/client"
@@ -17,13 +19,13 @@ import (
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 )
 
-type proxySuite struct {
+type apiProxySuite struct {
 	websocketSuite
 }
 
-var _ = gc.Suite(&proxySuite{})
+var _ = gc.Suite(&apiProxySuite{})
 
-func (s *proxySuite) TestConnectToModel(c *gc.C) {
+func (s *apiProxySuite) TestConnectToModel(c *gc.C) {
 	conn := s.open(c, &api.Info{
 		ModelTag:  s.Model.ResourceTag(),
 		SkipLogin: true,
@@ -34,33 +36,30 @@ func (s *proxySuite) TestConnectToModel(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `no such request - method Admin.TestMethod is not implemented \(not implemented\)`)
 }
 
-func (s *proxySuite) TestSessionTokenLoginProvider(c *gc.C) {
+func (s *apiProxySuite) TestSessionTokenLoginProvider(c *gc.C) {
 	ctx := context.Background()
 	alice := names.NewUserTag("alice@canonical.com")
 	aliceUser := openfga.NewUser(&dbmodel.Identity{Name: alice.Id()}, s.JIMM.OpenFGAClient)
 	err := aliceUser.SetControllerAccess(ctx, s.Model.Controller.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, gc.IsNil)
-	var cliOutput string
-	outputFunc := func(format string, a ...any) error {
-		cliOutput = fmt.Sprintf(format, a...)
-		return nil
-	}
+	var output bytes.Buffer
 	s.JIMMSuite.EnableDeviceFlow(aliceUser.Name)
 	conn, err := s.openCustomLoginProvider(c, &api.Info{
 		ModelTag:  s.Model.ResourceTag(),
 		SkipLogin: false,
-	}, "alice", api.NewSessionTokenLoginProvider("", outputFunc, func(s string) error { return nil }))
+	}, "alice", api.NewSessionTokenLoginProvider("", &output, func(s string) error { return nil }))
 	c.Assert(err, gc.IsNil)
 	defer conn.Close()
 	c.Check(err, gc.Equals, nil)
-	c.Check(cliOutput, gc.Matches, "Please visit .* and enter code.*")
+	outputNoNewLine := strings.Replace(output.String(), "\n", "", -1)
+	c.Check(outputNoNewLine, gc.Matches, `Please visit .* and enter code.*`)
 }
 
 type logger struct{}
 
 func (l logger) Errorf(string, ...interface{}) {}
 
-func (s *proxySuite) TestModelStatus(c *gc.C) {
+func (s *apiProxySuite) TestModelStatus(c *gc.C) {
 	conn := s.open(c, &api.Info{
 		ModelTag:  s.Model.ResourceTag(),
 		SkipLogin: false,
@@ -73,30 +72,27 @@ func (s *proxySuite) TestModelStatus(c *gc.C) {
 	c.Check(status.Model.Name, gc.Equals, s.Model.Name)
 }
 
-func (s *proxySuite) TestModelStatusWithoutPermission(c *gc.C) {
+func (s *apiProxySuite) TestModelStatusWithoutPermission(c *gc.C) {
 	fooUser := openfga.NewUser(&dbmodel.Identity{Name: "foo@canonical.com"}, s.JIMM.OpenFGAClient)
-	var cliOutput string
-	outputFunc := func(format string, a ...any) error {
-		cliOutput = fmt.Sprintf(format, a...)
-		return nil
-	}
+	var output bytes.Buffer
 	s.JIMMSuite.EnableDeviceFlow(fooUser.Name)
 	conn, err := s.openCustomLoginProvider(c, &api.Info{
 		ModelTag:  s.Model.ResourceTag(),
 		SkipLogin: false,
-	}, "foo", api.NewSessionTokenLoginProvider("", outputFunc, func(s string) error { return nil }))
+	}, "foo", api.NewSessionTokenLoginProvider("", &output, func(s string) error { return nil }))
 	c.Check(err, gc.ErrorMatches, "permission denied .*")
 	if conn != nil {
 		defer conn.Close()
 	}
-	c.Check(cliOutput, gc.Matches, "Please visit .* and enter code.*")
+	outputNoNewLine := strings.Replace(output.String(), "\n", "", -1)
+	c.Check(outputNoNewLine, gc.Matches, `Please visit .* and enter code.*`)
 }
 
 // TODO(Kian): This test aims to verify that JIMM gracefully handles clients that end their connection
 // during the login flow after JIMM starts polling the OIDC server.
 // After https://github.com/juju/juju/pull/17606 lands we can begin work on this.
 // The API connection's login method should be refactored use the login provider stored on the state struct.
-// func (s *proxySuite) TestDeviceFlowCancelDuringPolling(c *gc.C) {
+// func (s *apiProxySuite) TestDeviceFlowCancelDuringPolling(c *gc.C) {
 // 	ctx := context.Background()
 // 	alice := names.NewUserTag("alice@canonical.com")
 // 	aliceUser := openfga.NewUser(&dbmodel.Identity{Name: alice.Id()}, s.JIMM.OpenFGAClient)

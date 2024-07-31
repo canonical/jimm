@@ -126,7 +126,8 @@ func (r *controllerRoot) LoginWithSessionToken(ctx context.Context, req params.L
 
 	user, err := r.jimm.LoginWithSessionToken(ctx, req.SessionToken)
 	if err != nil {
-		return jujuparams.LoginResult{}, errors.E(op, err, errors.CodeUnauthorized)
+		// Don't replace the error code as it is important for the client, see [OAuthAuthenticator.VerifySessionToken]
+		return jujuparams.LoginResult{}, errors.E(op, err)
 	}
 
 	// TODO(ale8k): This isn't needed I don't think as controller roots are unique
