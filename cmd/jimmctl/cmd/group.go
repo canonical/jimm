@@ -99,6 +99,15 @@ func (c *addGroupCommand) Info() *cmd.Info {
 	})
 }
 
+// SetFlags implements Command.SetFlags.
+func (c *addGroupCommand) SetFlags(f *gnuflag.FlagSet) {
+	c.CommandBase.SetFlags(f)
+	c.out.AddFlags(f, "yaml", map[string]cmd.Formatter{
+		"yaml": cmd.FormatYaml,
+		"json": cmd.FormatJson,
+	})
+}
+
 // Init implements the cmd.Command interface.
 func (c *addGroupCommand) Init(args []string) error {
 	if len(args) < 1 {
@@ -123,16 +132,18 @@ func (c *addGroupCommand) Run(ctxt *cmd.Context) error {
 		return err
 	}
 
-	params := apiparams.AddGroupRequest{
-		Name: c.name,
-	}
-
 	client := api.NewClient(apiCaller)
-	err = client.AddGroup(&params)
+	resp, err := client.AddGroup(&apiparams.AddGroupRequest{
+		Name: c.name,
+	})
 	if err != nil {
 		return errors.E(err)
 	}
 
+	err = c.out.Write(ctxt, resp)
+	if err != nil {
+		return errors.E(err)
+	}
 	return nil
 }
 

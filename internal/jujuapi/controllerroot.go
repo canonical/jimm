@@ -33,7 +33,7 @@ type JIMM interface {
 	AddCloudToController(ctx context.Context, user *openfga.User, controllerName string, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error
 	AddController(ctx context.Context, u *openfga.User, ctl *dbmodel.Controller) error
 	AddHostedCloud(ctx context.Context, user *openfga.User, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error
-	AddGroup(ctx context.Context, user *openfga.User, name string) error
+	AddGroup(ctx context.Context, user *openfga.User, name string) (string, error)
 	AddModel(ctx context.Context, u *openfga.User, args *jimm.ModelCreateArgs) (_ *jujuparams.ModelInfo, err error)
 	AddServiceAccount(ctx context.Context, u *openfga.User, clientId string) error
 	OAuthAuthenticationService() jimm.OAuthAuthenticator

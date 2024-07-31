@@ -629,7 +629,7 @@ func TestResolveTupleObjectMapsGroups(t *testing.T) {
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
-	err = j.Database.AddGroup(ctx, "myhandsomegroupofdigletts")
+	_, err = j.Database.AddGroup(ctx, "myhandsomegroupofdigletts")
 	c.Assert(err, qt.IsNil)
 	group := &dbmodel.GroupEntry{
 		Name: "myhandsomegroupofdigletts",
@@ -759,7 +759,7 @@ func createTestControllerEnvironment(ctx context.Context, c *qt.C, db db.Databas
 	dbmodel.Cloud,
 	dbmodel.CloudCredential) {
 
-	err := db.AddGroup(ctx, "test-group")
+	_, err := db.AddGroup(ctx, "test-group")
 	c.Assert(err, qt.IsNil)
 	group := dbmodel.GroupEntry{Name: "test-group"}
 	err = db.GetGroup(ctx, &group)
@@ -865,10 +865,11 @@ func TestAddGroup(t *testing.T) {
 	u := openfga.NewUser(&user, ofgaClient)
 	u.JimmAdmin = true
 
-	err = j.AddGroup(ctx, u, "test-group-1")
+	groupUuid, err := j.AddGroup(ctx, u, "test-group-1")
 	c.Assert(err, qt.IsNil)
+	c.Assert(groupUuid, qt.Not(qt.Equals), "")
 
-	err = j.AddGroup(ctx, u, "test-group-1")
+	_, err = j.AddGroup(ctx, u, "test-group-1")
 	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeAlreadyExists)
 }
 
@@ -923,7 +924,7 @@ func TestRemoveGroupRemovesTuples(t *testing.T) {
 
 	user, group, controller, model, _, _, _ := createTestControllerEnvironment(ctx, c, j.Database)
 
-	err = j.Database.AddGroup(ctx, "test-group2")
+	_, err = j.Database.AddGroup(ctx, "test-group2")
 	c.Assert(err, qt.IsNil)
 
 	group2 := &dbmodel.GroupEntry{
@@ -1114,7 +1115,7 @@ func TestListGroups(t *testing.T) {
 	}
 
 	for _, name := range groupNames {
-		err := j.AddGroup(ctx, u, name)
+		_, err := j.AddGroup(ctx, u, name)
 		c.Assert(err, qt.IsNil)
 	}
 

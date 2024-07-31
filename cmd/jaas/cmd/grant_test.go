@@ -49,7 +49,7 @@ func (s *grantSuite) TestGrant(c *gc.C) {
 	err = s.JIMM.OpenFGAClient.AddRelation(ctx, tuple)
 	c.Assert(err, gc.IsNil)
 
-	err = s.JIMM.Database.AddGroup(ctx, "1")
+	_, err = s.JIMM.Database.AddGroup(ctx, "1")
 	c.Assert(err, gc.IsNil)
 
 	group := dbmodel.GroupEntry{

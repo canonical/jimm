@@ -52,18 +52,22 @@ const (
 )
 
 // AddGroup creates a group within JIMMs DB for reference by OpenFGA.
-func (r *controllerRoot) AddGroup(ctx context.Context, req apiparams.AddGroupRequest) error {
+func (r *controllerRoot) AddGroup(ctx context.Context, req apiparams.AddGroupRequest) (apiparams.AddGroupResponse, error) {
 	const op = errors.Op("jujuapi.AddGroup")
+	resp := apiparams.AddGroupResponse{}
 
 	if !jimmnames.IsValidGroupName(req.Name) {
-		return errors.E(op, errors.CodeBadRequest, "invalid group name")
+		return resp, errors.E(op, errors.CodeBadRequest, "invalid group name")
 	}
 
-	if err := r.jimm.AddGroup(ctx, r.user, req.Name); err != nil {
+	groupUuid, err := r.jimm.AddGroup(ctx, r.user, req.Name)
+	if err != nil {
 		zapctx.Error(ctx, "failed to add group", zaputil.Error(err))
-		return errors.E(op, err)
+		return resp, errors.E(op, err)
 	}
-	return nil
+	resp.UUID = groupUuid
+
+	return resp, nil
 }
 
 // RenameGroup renames a group within JIMMs DB for reference by OpenFGA.

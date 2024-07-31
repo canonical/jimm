@@ -250,7 +250,7 @@ func TestGrantServiceAccountAccess(t *testing.T) {
 			svcAccountIdentity.JimmAdmin = true
 			if len(test.addGroups) > 0 {
 				for _, name := range test.addGroups {
-					err := jimm.AddGroup(context.Background(), svcAccountIdentity, name)
+					_, err := jimm.AddGroup(context.Background(), svcAccountIdentity, name)
 					c.Assert(err, qt.IsNil)
 				}
 			}

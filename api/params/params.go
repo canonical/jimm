@@ -303,6 +303,11 @@ type Group struct {
 	UpdatedAt string `json:"updated_at"`
 }
 
+// AddGroupResponse returns the UUID of the group that was added.
+type AddGroupResponse struct {
+	UUID string `json:"uuid"`
+}
+
 // ListGroupResponse returns the group tuples currently residing within OpenFGA.
 type ListGroupResponse struct {
 	Groups []Group `json:"name"`
