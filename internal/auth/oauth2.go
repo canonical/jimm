@@ -48,6 +48,7 @@ const (
 
 type sessionIdentityContextKey struct{}
 
+// ContextWithSessionIdentity adds the session identity id to the provided context.
 func ContextWithSessionIdentity(ctx context.Context, sessionIdentityId any) context.Context {
 	return context.WithValue(ctx, sessionIdentityContextKey{}, sessionIdentityId)
 }
