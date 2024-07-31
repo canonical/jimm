@@ -16,9 +16,9 @@ import (
 	"github.com/juju/juju/rpc/params"
 	jujuparams "github.com/juju/juju/rpc/params"
 
-	"github.com/canonical/jimm/v3/api"
-	apiparams "github.com/canonical/jimm/v3/api/params"
 	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/pkg/api"
+	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
 

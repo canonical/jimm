@@ -13,9 +13,9 @@ import (
 	"github.com/juju/juju/jujuclient"
 	"github.com/juju/names/v5"
 
-	"github.com/canonical/jimm/v3/api"
-	apiparams "github.com/canonical/jimm/v3/api/params"
 	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/pkg/api"
+	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
 var migrateModelCommandDoc = `

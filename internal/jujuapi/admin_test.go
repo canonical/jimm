@@ -17,13 +17,8 @@ import (
 	"time"
 
 	"github.com/antonlindstrom/pgstore"
-	"github.com/canonical/jimm/v3/api/params"
-	"github.com/canonical/jimm/v3/internal/auth"
-	"github.com/canonical/jimm/v3/internal/dbmodel"
-	"github.com/canonical/jimm/v3/internal/jimmtest"
-	"github.com/gorilla/websocket"
-
 	"github.com/coreos/go-oidc/v3/oidc"
+	"github.com/gorilla/websocket"
 	"github.com/juju/errors"
 	"github.com/juju/juju/api"
 	"github.com/juju/juju/rpc/jsoncodec"
@@ -31,6 +26,11 @@ import (
 	"github.com/juju/juju/utils/proxy"
 	"github.com/juju/names/v4"
 	gc "gopkg.in/check.v1"
+
+	"github.com/canonical/jimm/v3/internal/auth"
+	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/jimmtest"
+	"github.com/canonical/jimm/v3/pkg/api/params"
 )
 
 type adminSuite struct {
