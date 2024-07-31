@@ -156,3 +156,23 @@ func (d *Database) ForEachIdentity(ctx context.Context, limit, offset int, f fun
 	}
 	return nil
 }
+
+// CountIdentities counts the number of identities.
+func (d *Database) CountIdentities(ctx context.Context) (_ int, err error) {
+	const op = errors.Op("db.CountIdentities")
+
+	if err := d.ready(); err != nil {
+		return 0, errors.E(op, err)
+	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
+	db := d.DB.WithContext(ctx)
+	var count int64
+	if err := db.Model(&dbmodel.Identity{}).Count(&count).Error; err != nil {
+		return 0, errors.E(op, err)
+	}
+	return int(count), nil
+}

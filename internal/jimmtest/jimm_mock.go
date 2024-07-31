@@ -65,6 +65,9 @@ type JIMM struct {
 	GetCredentialStore_                func() jimmcreds.CredentialStore
 	GetJimmControllerAccess_           func(ctx context.Context, user *openfga.User, tag names.UserTag) (string, error)
 	GetUser_                           func(ctx context.Context, username string) (*openfga.User, error)
+	FetchUser_                         func(ctx context.Context, username string) (*openfga.User, error)
+	CountUsers_                        func(ctx context.Context, user *openfga.User) (int, error)
+	ListUsers_                         func(ctx context.Context, user *openfga.User, filter pagination.LimitOffsetPagination) ([]openfga.User, error)
 	GetOpenFGAUserAndAuthorise_        func(ctx context.Context, email string) (*openfga.User, error)
 	GetUserCloudAccess_                func(ctx context.Context, user *openfga.User, cloud names.CloudTag) (string, error)
 	GetUserControllerAccess_           func(ctx context.Context, user *openfga.User, controller names.ControllerTag) (string, error)
@@ -321,6 +324,24 @@ func (j *JIMM) GetUser(ctx context.Context, username string) (*openfga.User, err
 		return nil, errors.E(errors.CodeNotImplemented)
 	}
 	return j.GetUser(ctx, username)
+}
+func (j *JIMM) FetchUser(ctx context.Context, username string) (*openfga.User, error) {
+	if j.FetchUser_ == nil {
+		return nil, errors.E(errors.CodeNotImplemented)
+	}
+	return j.FetchUser_(ctx, username)
+}
+func (j *JIMM) CountUsers(ctx context.Context, user *openfga.User) (int, error) {
+	if j.CountUsers_ == nil {
+		return 0, errors.E(errors.CodeNotImplemented)
+	}
+	return j.CountUsers_(ctx, user)
+}
+func (j *JIMM) ListUsers(ctx context.Context, user *openfga.User, filter pagination.LimitOffsetPagination) ([]openfga.User, error) {
+	if j.ListUsers_ == nil {
+		return nil, errors.E(errors.CodeNotImplemented)
+	}
+	return j.ListUsers_(ctx, user, filter)
 }
 func (j *JIMM) GetOpenFGAUserAndAuthorise(ctx context.Context, email string) (*openfga.User, error) {
 	if j.GetOpenFGAUserAndAuthorise_ == nil {

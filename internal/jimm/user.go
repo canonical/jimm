@@ -103,13 +103,13 @@ func (j *JIMM) FetchUser(ctx context.Context, username string) (*openfga.User, e
 	return u, nil
 }
 
-// ListUsers lists all the users in our database and parse them into openfga entities.
+// ListUsers lists a page of users in our database and parse them into openfga entities.
 func (j *JIMM) ListUsers(ctx context.Context, user *openfga.User, filter pagination.LimitOffsetPagination) ([]openfga.User, error) {
 	const op = errors.Op("jimm.ListUsers")
 
-	// if !user.JimmAdmin {
-	// 	return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
-	// }
+	if !user.JimmAdmin {
+		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
 
 	var users []openfga.User
 	err := j.Database.ForEachIdentity(ctx, filter.Limit(), filter.Offset(), func(ge *dbmodel.Identity) error {
@@ -121,4 +121,19 @@ func (j *JIMM) ListUsers(ctx context.Context, user *openfga.User, filter paginat
 		return nil, errors.E(op, err)
 	}
 	return users, nil
+}
+
+// CountUsers returns the count of all the users in our database.
+func (j *JIMM) CountUsers(ctx context.Context, user *openfga.User) (int, error) {
+	const op = errors.Op("jimm.ListUsers")
+
+	if !user.JimmAdmin {
+		return 0, errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
+
+	count, err := j.Database.CountIdentities(ctx)
+	if err != nil {
+		return 0, errors.E(op, err)
+	}
+	return count, nil
 }

@@ -64,6 +64,9 @@ type JIMM interface {
 	GetCredentialStore() credentials.CredentialStore
 	GetJimmControllerAccess(ctx context.Context, user *openfga.User, tag names.UserTag) (string, error)
 	GetUser(ctx context.Context, username string) (*openfga.User, error)
+	ListUsers(ctx context.Context, user *openfga.User, filter pagination.LimitOffsetPagination) ([]openfga.User, error)
+	FetchUser(ctx context.Context, username string) (*openfga.User, error)
+	CountUsers(ctx context.Context, user *openfga.User) (int, error)
 	GetUserCloudAccess(ctx context.Context, user *openfga.User, cloud names.CloudTag) (string, error)
 	GetUserControllerAccess(ctx context.Context, user *openfga.User, controller names.ControllerTag) (string, error)
 	GetUserModelAccess(ctx context.Context, user *openfga.User, model names.ModelTag) (string, error)

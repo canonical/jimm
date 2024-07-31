@@ -147,6 +147,7 @@ func TestListUsers(t *testing.T) {
 	user, _, _, _, _, _, _ := createTestControllerEnvironment(ctx, c, j.Database)
 
 	u := openfga.NewUser(&user, ofgaClient)
+	u.JimmAdmin = true
 
 	filter := pagination.NewOffsetFilter(10, 0)
 	users, err := j.ListUsers(ctx, u, filter)
@@ -175,4 +176,10 @@ func TestListUsers(t *testing.T) {
 	c.Assert(users[1].Name, qt.Equals, userNames[1])
 	c.Assert(users[2].Name, qt.Equals, userNames[3])
 	c.Assert(users[3].Name, qt.Equals, userNames[2])
+
+	// test offset more than number of rows
+	filter = pagination.NewOffsetFilter(10, 100)
+	users, err = j.ListUsers(ctx, u, filter)
+	c.Assert(err, qt.IsNil)
+	c.Assert(users, qt.HasLen, 0)
 }

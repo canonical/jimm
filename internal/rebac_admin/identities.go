@@ -6,20 +6,19 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/canonical/jimm/internal/jimm"
+	"github.com/canonical/jimm/internal/jujuapi"
 	"github.com/canonical/jimm/internal/openfga"
 	"github.com/canonical/jimm/internal/rebac_admin/utils"
-	"github.com/juju/zaputil/zapctx"
 
 	v1 "github.com/canonical/rebac-admin-ui-handlers/v1"
 	"github.com/canonical/rebac-admin-ui-handlers/v1/resources"
 )
 
 type identitiesService struct {
-	jimm *jimm.JIMM
+	jimm jujuapi.JIMM
 }
 
-func newidentitiesService(jimm *jimm.JIMM) *identitiesService {
+func newidentitiesService(jimm jujuapi.JIMM) *identitiesService {
 	return &identitiesService{
 		jimm: jimm,
 	}
@@ -27,14 +26,16 @@ func newidentitiesService(jimm *jimm.JIMM) *identitiesService {
 
 // ListIdentities returns a page of Identity objects of at least `size` elements if available.
 func (s *identitiesService) ListIdentities(ctx context.Context, params *resources.GetIdentitiesParams) (*resources.PaginatedResponse[resources.Identity], error) {
-	// TODO: extract identity from auth middleware
-	// raw, _ := v1.GetIdentityFromContext(ctx)
-	// user, _ := raw.(*openfga.User)
-	page, pagination := utils.CreatePagination(params)
-	zapctx.Error(ctx, fmt.Sprintf("pagination: %#v", pagination))
-	nextPage := page + 1
+	raw, _ := v1.GetIdentityFromContext(ctx)
+	user, _ := raw.(*openfga.User)
 
-	users, err := s.jimm.ListUsers(ctx, &openfga.User{}, pagination)
+	count, err := s.jimm.CountUsers(ctx, user)
+	if err != nil {
+		return nil, err
+	}
+	page, nextPage, pagination := utils.CreatePagination(params, count)
+
+	users, err := s.jimm.ListUsers(ctx, user, pagination)
 	if err != nil {
 		return nil, err
 	}
@@ -46,11 +47,12 @@ func (s *identitiesService) ListIdentities(ctx context.Context, params *resource
 	return &resources.PaginatedResponse[resources.Identity]{
 		Data: rIdentities,
 		Meta: resources.ResponseMeta{
-			Page: &page,
-			Size: pagination.Limit(),
+			Page:  &page,
+			Size:  len(rIdentities),
+			Total: &count,
 		},
 		Next: resources.Next{
-			Page: &nextPage,
+			Page: nextPage,
 		},
 	}, nil
 }

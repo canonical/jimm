@@ -25,11 +25,12 @@ func ParseFromUserToIdentity(user openfga.User) resources.Identity {
 	}
 }
 
-// CreatePagination create the pagination.LimitOffsetPagination from the *resources.GetIdentitiesParams .
-func CreatePagination(params *resources.GetIdentitiesParams) (int, pagination.LimitOffsetPagination) {
+// CreatePagination returns the current page, the next page if exists, and the pagination.LimitOffsetPagination from the *resources.GetIdentitiesParams, a .
+func CreatePagination(params *resources.GetIdentitiesParams, total int) (int, *int, pagination.LimitOffsetPagination) {
 	pageSize := -1
 	offset := 0
 	page := 0
+	var nextPage *int
 	if params != nil {
 		if params.Size != nil && params.Page != nil {
 			pageSize = *params.Size
@@ -37,5 +38,11 @@ func CreatePagination(params *resources.GetIdentitiesParams) (int, pagination.Li
 			offset = pageSize * page
 		}
 	}
-	return page, pagination.NewOffsetFilter(pageSize, offset)
+	if (page+1)*pageSize >= total {
+		nextPage = nil
+	} else {
+		nPage := page + 1
+		nextPage = &nPage
+	}
+	return page, nextPage, pagination.NewOffsetFilter(pageSize, offset)
 }
