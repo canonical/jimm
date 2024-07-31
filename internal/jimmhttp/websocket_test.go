@@ -4,6 +4,7 @@ package jimmhttp_test
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -126,11 +127,13 @@ func TestWSHandlerAuthFailsServer(t *testing.T) {
 	c.Cleanup(srv.Close)
 
 	var d websocket.Dialer
-	conn, _, err := d.Dial("ws"+strings.TrimPrefix(srv.URL, "http"), http.Header{
+	_, httpResp, err := d.Dial("ws"+strings.TrimPrefix(srv.URL, "http"), http.Header{
 		"Cookie": []string{auth.SessionName + "=naughty_cookie"},
 	})
+	defer httpResp.Body.Close()
+	c.Assert(err, qt.IsNotNil)
+	c.Assert(httpResp.StatusCode, qt.Equals, http.StatusUnauthorized)
+	bodyBytes, err := io.ReadAll(httpResp.Body)
 	c.Assert(err, qt.IsNil)
-
-	_, _, err = conn.ReadMessage()
-	c.Assert(err, qt.ErrorMatches, `websocket: close 1011 \(internal server error\): authentication failed`)
+	c.Assert(string(bodyBytes), qt.Equals, "authentication failed")
 }
