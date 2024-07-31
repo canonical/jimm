@@ -10,11 +10,11 @@ import (
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 
-	"github.com/canonical/jimm/v3/api/params"
 	"github.com/canonical/jimm/v3/internal/auth"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm"
 	"github.com/canonical/jimm/v3/internal/openfga"
+	"github.com/canonical/jimm/v3/pkg/api/params"
 	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
 

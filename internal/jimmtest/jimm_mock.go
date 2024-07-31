@@ -12,7 +12,6 @@ import (
 	"github.com/juju/names/v5"
 	"github.com/juju/version"
 
-	"github.com/canonical/jimm/v3/api/params"
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
@@ -21,6 +20,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/pubsub"
+	"github.com/canonical/jimm/v3/pkg/api/params"
 	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
 

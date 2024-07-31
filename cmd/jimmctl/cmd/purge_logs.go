@@ -3,15 +3,16 @@ package cmd
 import (
 	"time"
 
-	"github.com/canonical/jimm/v3/api"
-	apiparams "github.com/canonical/jimm/v3/api/params"
-	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/juju/cmd/v3"
 	"github.com/juju/gnuflag"
 	jujuapi "github.com/juju/juju/api"
 	jujucmd "github.com/juju/juju/cmd"
 	"github.com/juju/juju/cmd/modelcmd"
 	"github.com/juju/juju/jujuclient"
+
+	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/pkg/api"
+	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
 const purgeLogsDoc = `

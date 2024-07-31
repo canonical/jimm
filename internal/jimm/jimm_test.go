@@ -15,13 +15,13 @@ import (
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 
-	"github.com/canonical/jimm/v3/api/params"
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/jimm"
 	"github.com/canonical/jimm/v3/internal/jimmtest"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
+	"github.com/canonical/jimm/v3/pkg/api/params"
 )
 
 func TestFindAuditEvents(t *testing.T) {
