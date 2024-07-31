@@ -4,7 +4,6 @@ package jujuapi
 
 import (
 	"context"
-	stderrors "errors"
 	"sort"
 
 	"github.com/juju/juju/rpc"
@@ -123,11 +122,8 @@ func (r *controllerRoot) LoginWithSessionToken(ctx context.Context, req params.L
 	// Verify the session token
 	jwtToken, err := authenticationSvc.VerifySessionToken(req.SessionToken)
 	if err != nil {
-		var aerr *auth.AuthenticationError
-		if stderrors.As(err, &aerr) {
-			return aerr.LoginResult, nil
-		}
-		return jujuparams.LoginResult{}, errors.E(op, err, errors.CodeUnauthorized)
+		// Don't replace the error code as it is important for the client, see [OAuthAuthenticator.VerifySessionToken]
+		return jujuparams.LoginResult{}, errors.E(op, err)
 	}
 
 	// Get an OpenFGA user to place on the controllerRoot for this WS

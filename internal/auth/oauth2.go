@@ -328,7 +328,7 @@ func (as *AuthenticationService) MintSessionToken(email string) (string, error) 
 func (as *AuthenticationService) VerifySessionToken(token string) (_ jwt.Token, err error) {
 	const op = errors.Op("auth.AuthenticationService.VerifySessionToken")
 	errorFn := func(message string) error {
-		return errors.E(op, message, errors.CodeUnauthorized)
+		return errors.E(op, message, errors.CodeSessionTokenInvalid)
 	}
 	defer func() {
 		if err != nil {
