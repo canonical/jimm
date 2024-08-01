@@ -9,7 +9,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/rebac_admin/utils"
 )
 
-func TestNewConversationID(t *testing.T) {
+func TestCreatePaginationFilter(t *testing.T) {
 	c := qt.New(t)
 	page, pag := utils.CreatePaginationFilter(nil, nil)
 	defPag := pagination.NewOffsetFilter(-1, 0)

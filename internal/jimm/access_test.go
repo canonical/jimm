@@ -866,6 +866,40 @@ func TestAddGroup(t *testing.T) {
 	u := openfga.NewUser(&user, ofgaClient)
 	u.JimmAdmin = true
 
+	g, err := j.AddGroup(ctx, u, "test-group-1")
+	c.Assert(err, qt.IsNil)
+	c.Assert(g.UUID, qt.Not(qt.Equals), "")
+	c.Assert(g.Name, qt.Equals, "test-group-1")
+
+	g, err = j.AddGroup(ctx, u, "test-group-2")
+	c.Assert(err, qt.IsNil)
+	c.Assert(g.UUID, qt.Not(qt.Equals), "")
+	c.Assert(g.Name, qt.Equals, "test-group-2")
+}
+
+func TestCountGroups(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+	c.Assert(err, qt.IsNil)
+
+	now := time.Now().UTC().Round(time.Millisecond)
+	j := &jimm.JIMM{
+		UUID: uuid.NewString(),
+		Database: db.Database{
+			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
+		},
+		OpenFGAClient: ofgaClient,
+	}
+
+	err = j.Database.Migrate(ctx, false)
+	c.Assert(err, qt.IsNil)
+
+	user, _, _, _, _, _, _ := createTestControllerEnvironment(ctx, c, j.Database)
+	u := openfga.NewUser(&user, ofgaClient)
+	u.JimmAdmin = true
+
 	groupEntry, err := j.AddGroup(ctx, u, "test-group-1")
 	c.Assert(err, qt.IsNil)
 	c.Assert(groupEntry.UUID, qt.Not(qt.Equals), "")

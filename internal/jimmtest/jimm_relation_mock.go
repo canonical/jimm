@@ -20,6 +20,7 @@ import (
 // GroupService is an implementation of the jujuapi.GroupService interface.
 type GroupService struct {
 	AddGroup_     func(ctx context.Context, user *openfga.User, name string) (*dbmodel.GroupEntry, error)
+	CountGroups_  func(ctx context.Context, user *openfga.User) (int, error)
 	GetGroupByID_ func(ctx context.Context, user *openfga.User, uuid string) (dbmodel.GroupEntry, error)
 	ListGroups_   func(ctx context.Context, user *openfga.User, filter pagination.LimitOffsetPagination) ([]dbmodel.GroupEntry, error)
 	RenameGroup_  func(ctx context.Context, user *openfga.User, oldName, newName string) error
@@ -31,6 +32,13 @@ func (j *JIMM) AddGroup(ctx context.Context, u *openfga.User, name string) (*dbm
 		return nil, errors.E(errors.CodeNotImplemented)
 	}
 	return j.AddGroup_(ctx, u, name)
+}
+
+func (j *JIMM) CountGroups(ctx context.Context, user *openfga.User) (int, error) {
+	if j.CountGroups_ == nil {
+		return 0, errors.E(errors.CodeNotImplemented)
+	}
+	return j.CountGroups_(ctx, user)
 }
 
 func (j *JIMM) GetGroupByID(ctx context.Context, user *openfga.User, uuid string) (dbmodel.GroupEntry, error) {

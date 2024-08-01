@@ -30,6 +30,10 @@ func (s *groupsService) ListGroups(ctx context.Context, params *resources.GetGro
 	}
 	currentPage, filter := utils.CreatePaginationFilter(params.Size, params.Page)
 	nextPage := currentPage + 1
+	count, err := s.jimm.CountGroups(ctx, user)
+	if err != nil {
+		return nil, err
+	}
 	groups, err := s.jimm.ListGroups(ctx, user, filter)
 	if err != nil {
 		return nil, err
@@ -41,8 +45,9 @@ func (s *groupsService) ListGroups(ctx context.Context, params *resources.GetGro
 	resp := resources.PaginatedResponse[resources.Group]{
 		Data: data,
 		Meta: resources.ResponseMeta{
-			Page: &currentPage,
-			Size: len(groups),
+			Page:  &currentPage,
+			Size:  len(groups),
+			Total: &count,
 		},
 		Next: resources.Next{Page: &nextPage},
 	}
@@ -104,7 +109,11 @@ func (s *groupsService) DeleteGroup(ctx context.Context, groupId string) (bool, 
 	if err != nil {
 		return false, err
 	}
-	err = s.jimm.RemoveGroup(ctx, user, groupId)
+	existingGroup, err := s.jimm.GetGroupByID(ctx, user, groupId)
+	if err != nil {
+		return false, err
+	}
+	err = s.jimm.RemoveGroup(ctx, user, existingGroup.Name)
 	if err != nil {
 		return false, err
 	}
