@@ -134,10 +134,12 @@ func (d *Database) ForEachIdentity(ctx context.Context, limit, offset int, f fun
 	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
 
 	db := d.DB.WithContext(ctx)
-	db = db.Order("name asc")
-	db = db.Limit(limit)
-	db = db.Offset(offset)
-	rows, err := db.Model(&dbmodel.Identity{}).Rows()
+	rows, err := db.
+		Model(&dbmodel.Identity{}).
+		Order("name asc").
+		Limit(limit).
+		Offset(offset).
+		Rows()
 	if err != nil {
 		return errors.E(op, err)
 	}

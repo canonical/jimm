@@ -16,18 +16,6 @@ import (
 	qt "github.com/frankban/quicktest"
 )
 
-var testUsers []openfga.User
-
-func init() {
-	testUsers = []openfga.User{
-		*openfga.NewUser(&dbmodel.Identity{Name: "bob0@canonical.com"}, nil),
-		*openfga.NewUser(&dbmodel.Identity{Name: "bob1@canonical.com"}, nil),
-		*openfga.NewUser(&dbmodel.Identity{Name: "bob2@canonical.com"}, nil),
-		*openfga.NewUser(&dbmodel.Identity{Name: "bob3@canonical.com"}, nil),
-		*openfga.NewUser(&dbmodel.Identity{Name: "bob4@canonical.com"}, nil),
-	}
-}
-
 func TestGetIdentity(t *testing.T) {
 	c := qt.New(t)
 	jimm := jimmtest.JIMM{
@@ -55,6 +43,13 @@ func TestGetIdentity(t *testing.T) {
 }
 
 func TestListIdentities(t *testing.T) {
+	testUsers := []openfga.User{
+		*openfga.NewUser(&dbmodel.Identity{Name: "bob0@canonical.com"}, nil),
+		*openfga.NewUser(&dbmodel.Identity{Name: "bob1@canonical.com"}, nil),
+		*openfga.NewUser(&dbmodel.Identity{Name: "bob2@canonical.com"}, nil),
+		*openfga.NewUser(&dbmodel.Identity{Name: "bob3@canonical.com"}, nil),
+		*openfga.NewUser(&dbmodel.Identity{Name: "bob4@canonical.com"}, nil),
+	}
 	c := qt.New(t)
 	jimm := jimmtest.JIMM{
 		ListUsers_: func(ctx context.Context, user *openfga.User, filter pagination.LimitOffsetPagination) ([]openfga.User, error) {

@@ -16,6 +16,7 @@ import (
 	"github.com/canonical/jimm/internal/auth"
 	"github.com/canonical/jimm/internal/common/pagination"
 	"github.com/canonical/jimm/internal/db"
+	"github.com/canonical/jimm/internal/dbmodel"
 	"github.com/canonical/jimm/internal/jimm"
 	"github.com/canonical/jimm/internal/jimmtest"
 	"github.com/canonical/jimm/internal/openfga"
@@ -144,41 +145,49 @@ func TestListUsers(t *testing.T) {
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
-	user, _, _, _, _, _, _ := createTestControllerEnvironment(ctx, c, j.Database)
-
-	u := openfga.NewUser(&user, ofgaClient)
+	u := openfga.NewUser(&dbmodel.Identity{Name: "admin@canonical.com"}, ofgaClient)
 	u.JimmAdmin = true
 
 	filter := pagination.NewOffsetFilter(10, 0)
 	users, err := j.ListUsers(ctx, u, filter)
 	c.Assert(err, qt.IsNil)
-	c.Assert(len(users), qt.Equals, 1)
+	c.Assert(len(users), qt.Equals, 0)
 
 	userNames := []string{
-		"aabob1@canonical.com",
-		"aabob3@canonical.com",
-		"aabob5@canonical.com",
-		"aabob4@canonical.com",
+		"bob1@canonical.com",
+		"bob3@canonical.com",
+		"bob5@canonical.com",
+		"bob4@canonical.com",
 	}
 	// add users
 	for _, name := range userNames {
 		_, err := j.GetUser(ctx, name)
 		c.Assert(err, qt.IsNil)
 	}
+
+	// test users returned
+	filter = pagination.NewOffsetFilter(3, 0)
 	users, err = j.ListUsers(ctx, u, filter)
 	c.Assert(err, qt.IsNil)
 	sort.Slice(users, func(i, j int) bool {
 		return users[i].Name < users[j].Name
 	})
-	c.Assert(users, qt.HasLen, 5)
+	c.Assert(users, qt.HasLen, 3)
 	// user should be returned in ascending order of name
 	c.Assert(users[0].Name, qt.Equals, userNames[0])
 	c.Assert(users[1].Name, qt.Equals, userNames[1])
 	c.Assert(users[2].Name, qt.Equals, userNames[3])
-	c.Assert(users[3].Name, qt.Equals, userNames[2])
+
+	// test remaining users
+	filter = pagination.NewOffsetFilter(3, 3)
+	users, err = j.ListUsers(ctx, u, filter)
+	c.Assert(err, qt.IsNil)
+	c.Assert(users, qt.HasLen, 1)
+	// user should be returned in ascending order of name
+	c.Assert(users[0].Name, qt.Equals, userNames[2])
 
 	// test offset more than number of rows
-	filter = pagination.NewOffsetFilter(10, 100)
+	filter = pagination.NewOffsetFilter(3, 5)
 	users, err = j.ListUsers(ctx, u, filter)
 	c.Assert(err, qt.IsNil)
 	c.Assert(users, qt.HasLen, 0)
@@ -203,16 +212,14 @@ func TestCountUsers(t *testing.T) {
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
-	user, _, _, _, _, _, _ := createTestControllerEnvironment(ctx, c, j.Database)
-
-	u := openfga.NewUser(&user, ofgaClient)
+	u := openfga.NewUser(&dbmodel.Identity{Name: "admin@canonical.com"}, ofgaClient)
 	u.JimmAdmin = true
 
 	userNames := []string{
-		"aabob1@canonical.com",
-		"aabob3@canonical.com",
-		"aabob5@canonical.com",
-		"aabob4@canonical.com",
+		"bob1@canonical.com",
+		"bob3@canonical.com",
+		"bob5@canonical.com",
+		"bob4@canonical.com",
 	}
 	// add users
 	for _, name := range userNames {
@@ -221,5 +228,5 @@ func TestCountUsers(t *testing.T) {
 	}
 	count, err := j.CountUsers(ctx, u)
 	c.Assert(err, qt.IsNil)
-	c.Assert(count, qt.Equals, 5)
+	c.Assert(count, qt.Equals, 4)
 }

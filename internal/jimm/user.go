@@ -88,17 +88,17 @@ func (j *JIMM) GetUser(ctx context.Context, username string) (*openfga.User, err
 // FetchUser fetches the user specified by the username and returns the user if it is found.
 // Or error "record not found".
 func (j *JIMM) FetchUser(ctx context.Context, username string) (*openfga.User, error) {
-	const op = errors.Op("jimm.GetUser")
+	const op = errors.Op("jimm.FetchUser")
 
-	uEntity, err := dbmodel.NewIdentity(username)
+	identity, err := dbmodel.NewIdentity(username)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
 
-	if err := j.Database.FetchIdentity(ctx, uEntity); err != nil {
+	if err := j.Database.FetchIdentity(ctx, identity); err != nil {
 		return nil, err
 	}
-	u := openfga.NewUser(uEntity, j.OpenFGAClient)
+	u := openfga.NewUser(identity, j.OpenFGAClient)
 
 	return u, nil
 }
@@ -125,7 +125,7 @@ func (j *JIMM) ListUsers(ctx context.Context, user *openfga.User, filter paginat
 
 // CountUsers returns the count of all the users in our database.
 func (j *JIMM) CountUsers(ctx context.Context, user *openfga.User) (int, error) {
-	const op = errors.Op("jimm.ListUsers")
+	const op = errors.Op("jimm.CountUsers")
 
 	if !user.JimmAdmin {
 		return 0, errors.E(op, errors.CodeUnauthorized, "unauthorized")

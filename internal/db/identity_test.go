@@ -186,8 +186,7 @@ func (s *dbSuite) TestForEachIdentity(c *qt.C) {
 	err := s.Database.Migrate(context.Background(), false)
 	c.Assert(err, qt.IsNil)
 
-	addNIdentity := 10
-	for i := range addNIdentity {
+	for i := range 10 {
 		id, _ := dbmodel.NewIdentity(fmt.Sprintf("bob%d@canonical.com", i))
 		err = s.Database.GetIdentity(context.Background(), id)
 		c.Assert(err, qt.IsNil)

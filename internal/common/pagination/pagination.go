@@ -3,6 +3,8 @@
 // pagination holds common pagination patterns.
 package pagination
 
+import "github.com/canonical/rebac-admin-ui-handlers/v1/resources"
+
 const (
 	defaultPageSize = 50
 	maxPageSize     = 200
@@ -37,4 +39,26 @@ func (l LimitOffsetPagination) Limit() int {
 
 func (l LimitOffsetPagination) Offset() int {
 	return l.offset
+}
+
+// CreatePagination returns the current page, the next page if exists, and the pagination.LimitOffsetPagination from the *resources.GetIdentitiesParams, a .
+func CreatePagination(params *resources.GetIdentitiesParams, total int) (int, *int, LimitOffsetPagination) {
+	pageSize := -1
+	offset := 0
+	page := 0
+	var nextPage *int
+	if params != nil {
+		if params.Size != nil && params.Page != nil {
+			pageSize = *params.Size
+			page = *params.Page
+			offset = pageSize * page
+		}
+	}
+	if (page+1)*pageSize >= total {
+		nextPage = nil
+	} else {
+		nPage := page + 1
+		nextPage = &nPage
+	}
+	return page, nextPage, NewOffsetFilter(pageSize, offset)
 }

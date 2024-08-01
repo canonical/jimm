@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/canonical/jimm/internal/common/pagination"
 	"github.com/canonical/jimm/internal/jujuapi"
 	"github.com/canonical/jimm/internal/openfga"
 	"github.com/canonical/jimm/internal/rebac_admin/utils"
@@ -33,7 +34,7 @@ func (s *identitiesService) ListIdentities(ctx context.Context, params *resource
 	if err != nil {
 		return nil, err
 	}
-	page, nextPage, pagination := utils.CreatePagination(params, count)
+	page, nextPage, pagination := pagination.CreatePagination(params, count)
 
 	users, err := s.jimm.ListUsers(ctx, user, pagination)
 	if err != nil {
@@ -41,7 +42,7 @@ func (s *identitiesService) ListIdentities(ctx context.Context, params *resource
 	}
 	rIdentities := make([]resources.Identity, len(users))
 	for i, u := range users {
-		rIdentities[i] = utils.ParseFromUserToIdentity(u)
+		rIdentities[i] = utils.FromUserToIdentity(u)
 	}
 
 	return &resources.PaginatedResponse[resources.Identity]{
@@ -68,7 +69,7 @@ func (s *identitiesService) GetIdentity(ctx context.Context, identityId string) 
 	if err != nil {
 		return nil, v1.NewNotFoundError(fmt.Sprintf("User with id %s not found", identityId))
 	}
-	identity := utils.ParseFromUserToIdentity(*user)
+	identity := utils.FromUserToIdentity(*user)
 	return &identity, nil
 }
 
