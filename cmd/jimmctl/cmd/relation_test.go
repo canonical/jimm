@@ -440,9 +440,9 @@ func (s *relationSuite) TestListRelationsWithError(c *gc.C) {
 
 	ctx := context.Background()
 	group := &dbmodel.GroupEntry{Name: "group-1"}
-	err = s.JIMM.DB().GetGroup(ctx, group)
+	err = s.JIMM.Database.GetGroup(ctx, group)
 	c.Assert(err, gc.IsNil)
-	err = s.JIMM.DB().RemoveGroup(ctx, group)
+	err = s.JIMM.Database.RemoveGroup(ctx, group)
 	c.Assert(err, gc.IsNil)
 
 	expectedData := apiparams.ListRelationshipTuplesResponse{

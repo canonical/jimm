@@ -24,7 +24,7 @@ import (
 // If a result is erroneous, for example, bad data type parsing, the resulting struct field
 // Errors will contain a map from model UUID -> []error. Otherwise, the Results field
 // will contain model UUID -> []Jq result.
-func (j *JIMM) QueryModelsJq(ctx context.Context, models []dbmodel.Model, jqQuery string) (params.CrossModelQueryResponse, error) {
+func (j *JIMM) QueryModelsJq(ctx context.Context, modelUUIDs []string, jqQuery string) (params.CrossModelQueryResponse, error) {
 	op := errors.Op("QueryModels")
 	results := params.CrossModelQueryResponse{
 		Results: make(map[string][]any),
@@ -39,6 +39,11 @@ func (j *JIMM) QueryModelsJq(ctx context.Context, models []dbmodel.Model, jqQuer
 	// Set up a formatterParamsRetriever to handle the heavy lifting
 	// of each facade call and type conversion.
 	retriever := newFormatterParamsRetriever(j)
+
+	models, err := j.Database.GetModelsByUUID(ctx, modelUUIDs)
+	if err != nil {
+		return results, errors.E(op, "failed to get models for user")
+	}
 
 	for _, model := range models {
 		modelUUID := model.UUID.String

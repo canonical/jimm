@@ -15,6 +15,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jujuapi/rpc"
 	"github.com/canonical/jimm/v3/internal/openfga"
+	"github.com/canonical/jimm/v3/pkg/api/params"
 	jimmversion "github.com/canonical/jimm/v3/version"
 )
 
@@ -48,6 +49,16 @@ func init() {
 
 		return []int{11}
 	}
+}
+
+type controllerService interface {
+	AddController(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller) error
+	ControllerInfo(ctx context.Context, name string) (params.ControllerInfo, error)
+	ListControllers(ctx context.Context, user *openfga.User) ([]dbmodel.Controller, error)
+	GetControllerConfig(ctx context.Context, user *dbmodel.Identity) (*dbmodel.ControllerConfig, error)
+	SetControllerConfig(ctx context.Context, user *openfga.User, args jujuparams.ControllerConfigSet) error
+	RemoveController(ctx context.Context, user *openfga.User, controllerName string, force bool) error
+	SetControllerDeprecated(ctx context.Context, user *openfga.User, controllerName string, deprecated bool) error
 }
 
 // ConfigSet changes the value of specified controller configuration

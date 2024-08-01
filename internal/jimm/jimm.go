@@ -31,6 +31,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/pubsub"
+	"github.com/canonical/jimm/v3/pkg/api/params"
 )
 
 var (
@@ -450,6 +451,32 @@ func (j *JIMM) FindAuditEvents(ctx context.Context, user *openfga.User, filter d
 	}
 
 	return entries, nil
+}
+
+func (j *JIMM) ControllerInfo(ctx context.Context, name string) (params.ControllerInfo, error) {
+	const op = errors.Op("jimm.ListControllers")
+	if name == "" || strings.ToLower(name) == "jimm" {
+		srvVersion, err := j.EarliestControllerVersion(ctx)
+		if err != nil {
+			return params.ControllerInfo{}, errors.E(op, err)
+		}
+		return params.ControllerInfo{
+			Name: "jimm",
+			UUID: j.UUID,
+			// TODO(mhilton)enable setting the public address.
+			AgentVersion: srvVersion.String(),
+			Status: jujuparams.EntityStatus{
+				Status: "available",
+			},
+		}, nil
+	}
+	ctl := dbmodel.Controller{
+		Name: name,
+	}
+	if err := j.Database.GetController(ctx, &ctl); err != nil {
+		return params.ControllerInfo{}, errors.E(op, err)
+	}
+	return ctl.ToAPIControllerInfo(), nil
 }
 
 // ListControllers returns a list of controllers the user has access to.

@@ -1036,9 +1036,9 @@ func (s *accessControlSuite) TestListRelationshipTuplesWithMissingGroups(c *gc.C
 
 	// Delete a group without going through the API.
 	group := &dbmodel.GroupEntry{Name: "yellow"}
-	err = s.JIMM.DB().GetGroup(ctx, group)
+	err = s.JIMM.Database.GetGroup(ctx, group)
 	c.Assert(err, jc.ErrorIsNil)
-	err = s.JIMM.DB().RemoveGroup(ctx, group)
+	err = s.JIMM.Database.RemoveGroup(ctx, group)
 	c.Assert(err, jc.ErrorIsNil)
 
 	response, err := client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{ResolveUUIDs: true})
