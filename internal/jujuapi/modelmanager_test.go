@@ -26,11 +26,11 @@ import (
 	"github.com/juju/utils/v2"
 	gc "gopkg.in/check.v1"
 
-	"github.com/canonical/jimm/internal/dbmodel"
-	"github.com/canonical/jimm/internal/jimmtest"
-	"github.com/canonical/jimm/internal/kubetest"
-	"github.com/canonical/jimm/internal/openfga"
-	ofganames "github.com/canonical/jimm/internal/openfga/names"
+	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/jimmtest"
+	"github.com/canonical/jimm/v3/internal/kubetest"
+	"github.com/canonical/jimm/v3/internal/openfga"
+	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 )
 
 const jujuVersion = "3.5-rc1"

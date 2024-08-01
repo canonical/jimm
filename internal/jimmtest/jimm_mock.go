@@ -12,17 +12,17 @@ import (
 	"github.com/juju/names/v5"
 	"github.com/juju/version"
 
-	"github.com/canonical/jimm/api/params"
-	"github.com/canonical/jimm/internal/common/pagination"
-	"github.com/canonical/jimm/internal/db"
-	"github.com/canonical/jimm/internal/dbmodel"
-	"github.com/canonical/jimm/internal/errors"
-	"github.com/canonical/jimm/internal/jimm"
-	jimmcreds "github.com/canonical/jimm/internal/jimm/credentials"
-	"github.com/canonical/jimm/internal/openfga"
-	ofganames "github.com/canonical/jimm/internal/openfga/names"
-	"github.com/canonical/jimm/internal/pubsub"
-	jimmnames "github.com/canonical/jimm/pkg/names"
+	"github.com/canonical/jimm/v3/internal/common/pagination"
+	"github.com/canonical/jimm/v3/internal/db"
+	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jimm"
+	jimmcreds "github.com/canonical/jimm/v3/internal/jimm/credentials"
+	"github.com/canonical/jimm/v3/internal/openfga"
+	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
+	"github.com/canonical/jimm/v3/internal/pubsub"
+	"github.com/canonical/jimm/v3/pkg/api/params"
+	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
 
 // JIMM is a default implementation of the jujuapi.JIMM interface. Every method
@@ -34,7 +34,7 @@ type JIMM struct {
 	AddAuditLogEntry_                  func(ale *dbmodel.AuditLogEntry)
 	AddCloudToController_              func(ctx context.Context, user *openfga.User, controllerName string, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error
 	AddController_                     func(ctx context.Context, u *openfga.User, ctl *dbmodel.Controller) error
-	AddGroup_                          func(ctx context.Context, user *openfga.User, name string) error
+	AddGroup_                          func(ctx context.Context, user *openfga.User, name string) (*dbmodel.GroupEntry, error)
 	AddHostedCloud_                    func(ctx context.Context, user *openfga.User, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error
 	AddModel_                          func(ctx context.Context, u *openfga.User, args *jimm.ModelCreateArgs) (*jujuparams.ModelInfo, error)
 	AddServiceAccount_                 func(ctx context.Context, u *openfga.User, clientId string) error
@@ -134,9 +134,9 @@ func (j *JIMM) AddController(ctx context.Context, u *openfga.User, ctl *dbmodel.
 	}
 	return j.AddController_(ctx, u, ctl)
 }
-func (j *JIMM) AddGroup(ctx context.Context, u *openfga.User, name string) error {
+func (j *JIMM) AddGroup(ctx context.Context, u *openfga.User, name string) (*dbmodel.GroupEntry, error) {
 	if j.AddGroup_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return nil, errors.E(errors.CodeNotImplemented)
 	}
 	return j.AddGroup_(ctx, u, name)
 }

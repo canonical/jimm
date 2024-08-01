@@ -8,8 +8,8 @@ import (
 	"github.com/juju/names/v5"
 	gc "gopkg.in/check.v1"
 
-	ofganames "github.com/canonical/jimm/internal/openfga/names"
-	jimmnames "github.com/canonical/jimm/pkg/names"
+	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
+	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 	"github.com/google/uuid"
 	"github.com/juju/juju/core/permission"
 )

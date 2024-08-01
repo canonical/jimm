@@ -5,7 +5,7 @@ package rebac_admin
 import (
 	"context"
 
-	openfgastatic "github.com/canonical/jimm/openfga"
+	openfgastatic "github.com/canonical/jimm/v3/openfga"
 	"github.com/canonical/rebac-admin-ui-handlers/v1/resources"
 )
 

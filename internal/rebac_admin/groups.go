@@ -5,7 +5,7 @@ package rebac_admin
 import (
 	"context"
 
-	"github.com/canonical/jimm/internal/jimm"
+	"github.com/canonical/jimm/v3/internal/jimm"
 	"github.com/canonical/rebac-admin-ui-handlers/v1/resources"
 )
 

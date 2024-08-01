@@ -12,10 +12,10 @@ import (
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
-	apiparams "github.com/canonical/jimm/api/params"
-	"github.com/canonical/jimm/internal/common/pagination"
-	"github.com/canonical/jimm/internal/errors"
-	jimmnames "github.com/canonical/jimm/pkg/names"
+	"github.com/canonical/jimm/v3/internal/common/pagination"
+	"github.com/canonical/jimm/v3/internal/errors"
+	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
+	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
 
 // access_control contains the primary RPC commands for handling ReBAC within JIMM via the JIMM facade itself.
@@ -51,17 +51,27 @@ const (
 )
 
 // AddGroup creates a group within JIMMs DB for reference by OpenFGA.
-func (r *controllerRoot) AddGroup(ctx context.Context, req apiparams.AddGroupRequest) error {
+func (r *controllerRoot) AddGroup(ctx context.Context, req apiparams.AddGroupRequest) (apiparams.AddGroupResponse, error) {
 	const op = errors.Op("jujuapi.AddGroup")
+	resp := apiparams.AddGroupResponse{}
 
 	if !jimmnames.IsValidGroupName(req.Name) {
-		return errors.E(op, errors.CodeBadRequest, "invalid group name")
+		return resp, errors.E(op, errors.CodeBadRequest, "invalid group name")
 	}
-	if err := r.jimm.AddGroup(ctx, r.user, req.Name); err != nil {
+
+	groupEntry, err := r.jimm.AddGroup(ctx, r.user, req.Name)
+	if err != nil {
 		zapctx.Error(ctx, "failed to add group", zaputil.Error(err))
-		return errors.E(op, err)
+		return resp, errors.E(op, err)
 	}
-	return nil
+	resp = apiparams.AddGroupResponse{Group: apiparams.Group{
+		Name:      groupEntry.Name,
+		UUID:      groupEntry.UUID,
+		CreatedAt: groupEntry.CreatedAt.Format(time.RFC3339),
+		UpdatedAt: groupEntry.UpdatedAt.Format(time.RFC3339),
+	}}
+
+	return resp, nil
 }
 
 // RenameGroup renames a group within JIMMs DB for reference by OpenFGA.
@@ -102,8 +112,8 @@ func (r *controllerRoot) ListGroups(ctx context.Context, req apiparams.ListGroup
 	groupsResponse := make([]apiparams.Group, len(groups))
 	for i, g := range groups {
 		groupsResponse[i] = apiparams.Group{
-			Name:      g.Name,
 			UUID:      g.UUID,
+			Name:      g.Name,
 			CreatedAt: g.CreatedAt.Format(time.RFC3339),
 			UpdatedAt: g.UpdatedAt.Format(time.RFC3339),
 		}

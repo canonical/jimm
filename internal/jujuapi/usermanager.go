@@ -7,8 +7,8 @@ import (
 
 	jujuparams "github.com/juju/juju/rpc/params"
 
-	"github.com/canonical/jimm/internal/errors"
-	"github.com/canonical/jimm/internal/jujuapi/rpc"
+	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jujuapi/rpc"
 )
 
 func init() {

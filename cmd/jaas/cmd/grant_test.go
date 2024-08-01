@@ -10,13 +10,13 @@ import (
 	"github.com/juju/names/v5"
 	gc "gopkg.in/check.v1"
 
-	"github.com/canonical/jimm/cmd/jaas/cmd"
-	"github.com/canonical/jimm/internal/cmdtest"
-	"github.com/canonical/jimm/internal/dbmodel"
-	"github.com/canonical/jimm/internal/jimmtest"
-	"github.com/canonical/jimm/internal/openfga"
-	ofganames "github.com/canonical/jimm/internal/openfga/names"
-	jimmnames "github.com/canonical/jimm/pkg/names"
+	"github.com/canonical/jimm/v3/cmd/jaas/cmd"
+	"github.com/canonical/jimm/v3/internal/cmdtest"
+	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/jimmtest"
+	"github.com/canonical/jimm/v3/internal/openfga"
+	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
+	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
 
 type grantSuite struct {
@@ -49,7 +49,7 @@ func (s *grantSuite) TestGrant(c *gc.C) {
 	err = s.JIMM.OpenFGAClient.AddRelation(ctx, tuple)
 	c.Assert(err, gc.IsNil)
 
-	err = s.JIMM.Database.AddGroup(ctx, "1")
+	_, err = s.JIMM.Database.AddGroup(ctx, "1")
 	c.Assert(err, gc.IsNil)
 
 	group := dbmodel.GroupEntry{

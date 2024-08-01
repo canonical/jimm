@@ -8,9 +8,9 @@ import (
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 
-	"github.com/canonical/jimm/internal/db"
-	"github.com/canonical/jimm/internal/dbmodel"
-	ofganames "github.com/canonical/jimm/internal/openfga/names"
+	"github.com/canonical/jimm/v3/internal/db"
+	"github.com/canonical/jimm/v3/internal/dbmodel"
+	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 )
 
 var (

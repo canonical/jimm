@@ -12,9 +12,9 @@ import (
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
-	"github.com/canonical/jimm/internal/auth"
-	"github.com/canonical/jimm/internal/jimm"
-	"github.com/canonical/jimm/internal/servermon"
+	"github.com/canonical/jimm/v3/internal/auth"
+	"github.com/canonical/jimm/v3/internal/jimm"
+	"github.com/canonical/jimm/v3/internal/servermon"
 )
 
 // A WSHandler is an http.Handler that upgrades the connection to a

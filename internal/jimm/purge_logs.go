@@ -6,8 +6,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/canonical/jimm/internal/errors"
-	"github.com/canonical/jimm/internal/openfga"
+	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 )

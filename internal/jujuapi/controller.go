@@ -11,11 +11,11 @@ import (
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
-	"github.com/canonical/jimm/internal/dbmodel"
-	"github.com/canonical/jimm/internal/errors"
-	"github.com/canonical/jimm/internal/jujuapi/rpc"
-	"github.com/canonical/jimm/internal/openfga"
-	jimmversion "github.com/canonical/jimm/version"
+	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jujuapi/rpc"
+	"github.com/canonical/jimm/v3/internal/openfga"
+	jimmversion "github.com/canonical/jimm/v3/version"
 )
 
 func init() {

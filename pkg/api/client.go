@@ -5,7 +5,7 @@ package api
 import (
 	jujuparams "github.com/juju/juju/rpc/params"
 
-	"github.com/canonical/jimm/api/params"
+	"github.com/canonical/jimm/v3/pkg/api/params"
 )
 
 // An APICaller implements the interface required to make API calls.
@@ -117,8 +117,10 @@ func (c *Client) UpdateMigratedModel(req *params.UpdateMigratedModelRequest) err
 
 // User Groups
 // AddGroup adds the group to JIMM.
-func (c *Client) AddGroup(req *params.AddGroupRequest) error {
-	return c.caller.APICall("JIMM", 4, "", "AddGroup", req, nil)
+func (c *Client) AddGroup(req *params.AddGroupRequest) (params.AddGroupResponse, error) {
+	var resp params.AddGroupResponse
+	err := c.caller.APICall("JIMM", 4, "", "AddGroup", req, &resp)
+	return resp, err
 }
 
 // RenameGroup renames a group in JIMM.

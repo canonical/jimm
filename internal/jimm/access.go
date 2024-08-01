@@ -18,14 +18,14 @@ import (
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
-	"github.com/canonical/jimm/internal/common/pagination"
-	"github.com/canonical/jimm/internal/db"
-	"github.com/canonical/jimm/internal/dbmodel"
-	"github.com/canonical/jimm/internal/errors"
-	"github.com/canonical/jimm/internal/jimmjwx"
-	"github.com/canonical/jimm/internal/openfga"
-	ofganames "github.com/canonical/jimm/internal/openfga/names"
-	jimmnames "github.com/canonical/jimm/pkg/names"
+	"github.com/canonical/jimm/v3/internal/common/pagination"
+	"github.com/canonical/jimm/v3/internal/db"
+	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jimmjwx"
+	"github.com/canonical/jimm/v3/internal/openfga"
+	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
+	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
 
 const (
@@ -520,10 +520,13 @@ func resolveTag(jimmUUID string, db *db.Database, tag string) (*ofganames.Tag, e
 			"Resolving JIMM tags to Juju tags for tag kind: group",
 			zap.String("group-name", trailer),
 		)
-		entry := &dbmodel.GroupEntry{
-			Name: trailer,
+		var entry dbmodel.GroupEntry
+		if resourceUUID != "" {
+			entry.UUID = resourceUUID
+		} else if trailer != "" {
+			entry.Name = trailer
 		}
-		err := db.GetGroup(ctx, entry)
+		err := db.GetGroup(ctx, &entry)
 		if err != nil {
 			return nil, errors.E(fmt.Sprintf("group %s not found", trailer))
 		}
@@ -639,17 +642,18 @@ func (j *JIMM) parseAndValidateTag(ctx context.Context, key string) (*ofganames.
 }
 
 // AddGroup creates a group within JIMMs DB for reference by OpenFGA.
-func (j *JIMM) AddGroup(ctx context.Context, user *openfga.User, name string) error {
+func (j *JIMM) AddGroup(ctx context.Context, user *openfga.User, name string) (*dbmodel.GroupEntry, error) {
 	const op = errors.Op("jimm.AddGroup")
 
 	if !user.JimmAdmin {
-		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
+		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
-	if err := j.Database.AddGroup(ctx, name); err != nil {
-		return errors.E(op, err)
+	ge, err := j.Database.AddGroup(ctx, name)
+	if err != nil {
+		return nil, errors.E(op, err)
 	}
-	return nil
+	return ge, nil
 }
 
 // RenameGroup renames a group in JIMM's DB.

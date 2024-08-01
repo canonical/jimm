@@ -8,8 +8,8 @@ import (
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
-	"github.com/canonical/jimm/internal/auth"
-	"github.com/canonical/jimm/internal/jimm"
+	"github.com/canonical/jimm/v3/internal/auth"
+	"github.com/canonical/jimm/v3/internal/jimm"
 	rebac_handlers "github.com/canonical/rebac-admin-ui-handlers/v1"
 )
 

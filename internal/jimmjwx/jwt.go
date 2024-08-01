@@ -8,8 +8,8 @@ import (
 	"encoding/pem"
 	"time"
 
-	"github.com/canonical/jimm/internal/errors"
-	"github.com/canonical/jimm/internal/jimm/credentials"
+	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jimm/credentials"
 	"github.com/google/uuid"
 	"github.com/hashicorp/golang-lru/v2/expirable"
 	"github.com/juju/zaputil/zapctx"
