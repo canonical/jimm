@@ -46,7 +46,7 @@ func (j *JIMM) GetOpenFGAUserAndAuthorise(ctx context.Context, emailOrSvcAccId s
 
 	// Wrap the user in OpenFGA user for administrator check & ready to place
 	// on controllerRoot.user
-	ofgaUser := openfga.NewUser(user, j.AuthorizationClient())
+	ofgaUser := openfga.NewUser(user, j.OpenFGAClient)
 
 	// Check if user is admin
 	isJimmAdmin, err := openfga.IsAdministrator(ctx, ofgaUser, j.ResourceTag())

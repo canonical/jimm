@@ -39,7 +39,6 @@ type JIMM struct {
 	AddModel_                          func(ctx context.Context, u *openfga.User, args *jimm.ModelCreateArgs) (*jujuparams.ModelInfo, error)
 	AddServiceAccount_                 func(ctx context.Context, u *openfga.User, clientId string) error
 	Authenticate_                      func(ctx context.Context, req *jujuparams.LoginRequest) (*openfga.User, error)
-	AuthorizationClient_               func() *openfga.OFGAClient
 	ChangeModelCredential_             func(ctx context.Context, user *openfga.User, modelTag names.ModelTag, cloudCredentialTag names.CloudCredentialTag) error
 	CheckPermission_                   func(ctx context.Context, user *openfga.User, cachedPerms map[string]string, desiredPerms map[string]interface{}) (map[string]string, error)
 	CopyServiceAccountCredential_      func(ctx context.Context, u *openfga.User, svcAcc *openfga.User, cloudCredentialTag names.CloudCredentialTag) (names.CloudCredentialTag, []jujuparams.UpdateCredentialModelResult, error)
@@ -172,12 +171,6 @@ func (j *JIMM) Authenticate(ctx context.Context, req *jujuparams.LoginRequest) (
 		return nil, errors.E(errors.CodeNotImplemented)
 	}
 	return j.Authenticate_(ctx, req)
-}
-func (j *JIMM) AuthorizationClient() *openfga.OFGAClient {
-	if j.AuthorizationClient_ == nil {
-		return nil
-	}
-	return j.AuthorizationClient_()
 }
 func (j *JIMM) ChangeModelCredential(ctx context.Context, user *openfga.User, modelTag names.ModelTag, cloudCredentialTag names.CloudCredentialTag) error {
 	if j.ChangeModelCredential_ == nil {
@@ -333,7 +326,7 @@ func (j *JIMM) GetOpenFGAUserAndAuthorise(ctx context.Context, email string) (*o
 	if j.GetOpenFGAUserAndAuthorise_ == nil {
 		return nil, errors.E(errors.CodeNotImplemented)
 	}
-	return j.GetUser(ctx, email)
+	return j.GetOpenFGAUserAndAuthorise_(ctx, email)
 }
 func (j *JIMM) GetUserCloudAccess(ctx context.Context, user *openfga.User, cloud names.CloudTag) (string, error) {
 	if j.GetUserCloudAccess_ == nil {

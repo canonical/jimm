@@ -9,7 +9,6 @@ import (
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 
-	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm"
 	"github.com/canonical/jimm/v3/internal/openfga"
@@ -72,13 +71,7 @@ func (r *controllerRoot) getServiceAccount(ctx context.Context, clientID string)
 	if !ok {
 		return nil, errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
-
-	var targetIdentityModel dbmodel.Identity
-	targetIdentityModel.SetTag(names.NewUserTag(clientIdWithDomain))
-	if err := r.jimm.DB().GetIdentity(ctx, &targetIdentityModel); err != nil {
-		return nil, errors.E(err)
-	}
-	return openfga.NewUser(&targetIdentityModel, r.jimm.AuthorizationClient()), nil
+	return r.jimm.GetOpenFGAUserAndAuthorise(ctx, clientIdWithDomain)
 }
 
 // UpdateServiceAccountCredentialsCheckModels updates a set of cloud credentials' content.

@@ -119,7 +119,7 @@ func (j *JIMM) GrantServiceAccountAccess(ctx context.Context, u *openfga.User, s
 		}
 		tuples = append(tuples, tuple)
 	}
-	err := j.AuthorizationClient().AddRelation(ctx, tuples...)
+	err := j.OpenFGAClient.AddRelation(ctx, tuples...)
 	if err != nil {
 		zapctx.Error(ctx, "failed to add tuple(s)", zap.NamedError("add-relation-error", err))
 		return errors.E(op, errors.CodeOpenFGARequestFailed, err)
