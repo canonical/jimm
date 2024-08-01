@@ -12,7 +12,7 @@ import (
 	"github.com/juju/names/v5"
 	"gorm.io/gorm"
 
-	apiparams "github.com/canonical/jimm/api/params"
+	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
 // A controller represents a juju controller which is hosting models

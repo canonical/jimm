@@ -5,9 +5,9 @@ package jimmtest
 import (
 	"context"
 
-	apiparams "github.com/canonical/jimm/api/params"
-	"github.com/canonical/jimm/internal/errors"
-	"github.com/canonical/jimm/internal/openfga"
+	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/openfga"
+	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
 // RelationService is an implementation of the jujuapi.RelationService interface. Every method

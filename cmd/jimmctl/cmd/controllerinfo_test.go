@@ -10,8 +10,8 @@ import (
 	"github.com/juju/juju/jujuclient"
 	gc "gopkg.in/check.v1"
 
-	"github.com/canonical/jimm/cmd/jimmctl/cmd"
-	"github.com/canonical/jimm/internal/cmdtest"
+	"github.com/canonical/jimm/v3/cmd/jimmctl/cmd"
+	"github.com/canonical/jimm/v3/internal/cmdtest"
 )
 
 type controllerInfoSuite struct {

@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/canonical/jimm/pkg/names"
+	"github.com/canonical/jimm/v3/pkg/names"
 )
 
 func TestParseGroupTag(t *testing.T) {
@@ -121,8 +121,14 @@ func TestIsValidGroupName(t *testing.T) {
 		name:             "",
 		expectedValidity: false,
 	}, {
-		name:             "short",
+		name:             "no",
 		expectedValidity: false,
+	}, {
+		name:             "foo",
+		expectedValidity: true,
+	}, {
+		name:             "short",
+		expectedValidity: true,
 	}, {
 		name:             "short1",
 		expectedValidity: true,

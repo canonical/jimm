@@ -19,15 +19,15 @@ import (
 	gc "gopkg.in/check.v1"
 	yamlv2 "gopkg.in/yaml.v2"
 
-	apiparams "github.com/canonical/jimm/api/params"
-	"github.com/canonical/jimm/cmd/jimmctl/cmd"
-	"github.com/canonical/jimm/internal/cmdtest"
-	"github.com/canonical/jimm/internal/db"
-	"github.com/canonical/jimm/internal/dbmodel"
-	"github.com/canonical/jimm/internal/jimmtest"
-	"github.com/canonical/jimm/internal/openfga"
-	ofganames "github.com/canonical/jimm/internal/openfga/names"
-	jimmnames "github.com/canonical/jimm/pkg/names"
+	"github.com/canonical/jimm/v3/cmd/jimmctl/cmd"
+	"github.com/canonical/jimm/v3/internal/cmdtest"
+	"github.com/canonical/jimm/v3/internal/db"
+	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/jimmtest"
+	"github.com/canonical/jimm/v3/internal/openfga"
+	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
+	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
+	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
 
 type relationSuite struct {
@@ -82,9 +82,9 @@ func (s *relationSuite) TestAddRelationSuperuser(c *gc.C) {
 		},
 	}
 
-	err := s.JimmCmdSuite.JIMM.Database.AddGroup(context.Background(), group1)
+	_, err := s.JimmCmdSuite.JIMM.Database.AddGroup(context.Background(), group1)
 	c.Assert(err, gc.IsNil)
-	err = s.JimmCmdSuite.JIMM.Database.AddGroup(context.Background(), group2)
+	_, err = s.JimmCmdSuite.JIMM.Database.AddGroup(context.Background(), group2)
 	c.Assert(err, gc.IsNil)
 
 	for i, tc := range tests {
@@ -176,9 +176,9 @@ func (s *relationSuite) TestRemoveRelationSuperuser(c *gc.C) {
 	}
 
 	//Create groups and relation
-	err := s.JimmCmdSuite.JIMM.Database.AddGroup(context.Background(), group1)
+	_, err := s.JimmCmdSuite.JIMM.Database.AddGroup(context.Background(), group1)
 	c.Assert(err, gc.IsNil)
-	err = s.JimmCmdSuite.JIMM.Database.AddGroup(context.Background(), group2)
+	_, err = s.JimmCmdSuite.JIMM.Database.AddGroup(context.Background(), group2)
 	c.Assert(err, gc.IsNil)
 	totalKeys := 2
 	for _, tc := range tests {
@@ -493,7 +493,7 @@ func (s *relationSuite) TestCheckRelationViaSuperuser(c *gc.C) {
 
 	// Add some resources to check against
 	db := s.JIMM.Database
-	err := db.AddGroup(ctx, "test-group")
+	_, err := db.AddGroup(ctx, "test-group")
 	c.Assert(err, gc.IsNil)
 	group := dbmodel.GroupEntry{Name: "test-group"}
 	err = db.GetGroup(ctx, &group)

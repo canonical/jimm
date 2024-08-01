@@ -13,9 +13,9 @@ import (
 	sdk "github.com/openfga/go-sdk"
 	"gopkg.in/errgo.v1"
 
-	"github.com/canonical/jimm/internal/errors"
-	"github.com/canonical/jimm/internal/openfga"
-	auth_model "github.com/canonical/jimm/openfga"
+	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/openfga"
+	auth_model "github.com/canonical/jimm/v3/openfga"
 )
 
 var (

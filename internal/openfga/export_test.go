@@ -5,7 +5,7 @@ package openfga
 import (
 	"context"
 
-	ofganames "github.com/canonical/jimm/internal/openfga/names"
+	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 )
 
 // This is just for exporting the private function for testing. Since the private

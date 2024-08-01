@@ -6,13 +6,13 @@ import (
 	"context"
 	"strings"
 
-	"github.com/canonical/jimm/internal/errors"
-	"github.com/canonical/jimm/internal/servermon"
+	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/servermon"
 	cofga "github.com/canonical/ofga"
 	"github.com/juju/names/v5"
 
-	ofganames "github.com/canonical/jimm/internal/openfga/names"
-	jimmnames "github.com/canonical/jimm/pkg/names"
+	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
+	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
 
 var (

@@ -8,7 +8,7 @@ import (
 
 	qt "github.com/frankban/quicktest"
 
-	"github.com/canonical/jimm/pkg/names"
+	"github.com/canonical/jimm/v3/pkg/names"
 )
 
 func TestParseServiceAccountID(t *testing.T) {

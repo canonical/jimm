@@ -5,8 +5,8 @@ package jujuapi
 import (
 	"context"
 
-	apiparams "github.com/canonical/jimm/api/params"
-	"github.com/canonical/jimm/internal/openfga"
+	"github.com/canonical/jimm/v3/internal/openfga"
+	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
 // RelationService defines an interface used to manage relations in the authorization model.

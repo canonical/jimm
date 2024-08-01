@@ -11,11 +11,11 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/yaml.v3"
 
-	"github.com/canonical/jimm/api/params"
-	"github.com/canonical/jimm/cmd/jimmctl/cmd"
-	"github.com/canonical/jimm/internal/cmdtest"
-	"github.com/canonical/jimm/internal/dbmodel"
-	"github.com/canonical/jimm/internal/jimmtest"
+	"github.com/canonical/jimm/v3/cmd/jimmctl/cmd"
+	"github.com/canonical/jimm/v3/internal/cmdtest"
+	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/jimmtest"
+	"github.com/canonical/jimm/v3/pkg/api/params"
 )
 
 type groupSuite struct {
@@ -27,7 +27,7 @@ var _ = gc.Suite(&groupSuite{})
 func (s *groupSuite) TestAddGroupSuperuser(c *gc.C) {
 	// alice is superuser
 	bClient := jimmtest.NewUserSessionLogin(c, "alice")
-	_, err := cmdtesting.RunCommand(c, cmd.NewAddGroupCommandForTesting(s.ClientStore(), bClient), "test-group")
+	ctx, err := cmdtesting.RunCommand(c, cmd.NewAddGroupCommandForTesting(s.ClientStore(), bClient), "test-group")
 	c.Assert(err, gc.IsNil)
 
 	group := &dbmodel.GroupEntry{Name: "test-group"}
@@ -35,11 +35,12 @@ func (s *groupSuite) TestAddGroupSuperuser(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	c.Assert(group.ID, gc.Equals, uint(1))
 	c.Assert(group.Name, gc.Equals, "test-group")
-	c.Assert(group.UUID, gc.Not(gc.Equals), "")
+
+	c.Assert(cmdtesting.Stdout(ctx), gc.Matches, fmt.Sprintf(`(?s).*uuid: %s\n.*`, group.UUID))
 }
 
 func (s *groupSuite) TestAddGroup(c *gc.C) {
-	// bob is not superuser
+	// Unauthorised add (bob is not superuser)
 	bClient := jimmtest.NewUserSessionLogin(c, "bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewAddGroupCommandForTesting(s.ClientStore(), bClient), "test-group")
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
@@ -49,8 +50,9 @@ func (s *groupSuite) TestRenameGroupSuperuser(c *gc.C) {
 	// alice is superuser
 	bClient := jimmtest.NewUserSessionLogin(c, "alice")
 
-	err := s.JimmCmdSuite.JIMM.Database.AddGroup(context.TODO(), "test-group")
+	groupEntry, err := s.JimmCmdSuite.JIMM.Database.AddGroup(context.TODO(), "test-group")
 	c.Assert(err, gc.IsNil)
+	c.Assert(groupEntry.UUID, gc.Not(gc.Equals), "")
 
 	_, err = cmdtesting.RunCommand(c, cmd.NewRenameGroupCommandForTesting(s.ClientStore(), bClient), "test-group", "renamed-group")
 	c.Assert(err, gc.IsNil)
@@ -73,7 +75,7 @@ func (s *groupSuite) TestRemoveGroupSuperuser(c *gc.C) {
 	// alice is superuser
 	bClient := jimmtest.NewUserSessionLogin(c, "alice")
 
-	err := s.JimmCmdSuite.JIMM.Database.AddGroup(context.TODO(), "test-group")
+	_, err := s.JimmCmdSuite.JIMM.Database.AddGroup(context.TODO(), "test-group")
 	c.Assert(err, gc.IsNil)
 
 	_, err = cmdtesting.RunCommand(c, cmd.NewRemoveGroupCommandForTesting(s.ClientStore(), bClient), "test-group", "-y")
@@ -104,7 +106,7 @@ func (s *groupSuite) TestListGroupsSuperuser(c *gc.C) {
 	bClient := jimmtest.NewUserSessionLogin(c, "alice")
 
 	for i := 0; i < 3; i++ {
-		err := s.JimmCmdSuite.JIMM.Database.AddGroup(context.TODO(), fmt.Sprint("test-group", i))
+		_, err := s.JimmCmdSuite.JIMM.Database.AddGroup(context.TODO(), fmt.Sprint("test-group", i))
 		c.Assert(err, gc.IsNil)
 	}
 
@@ -121,7 +123,7 @@ func (s *groupSuite) TestListGroupsLimitSuperuser(c *gc.C) {
 	bClient := jimmtest.NewUserSessionLogin(c, "alice")
 
 	for i := 0; i < 3; i++ {
-		err := s.JimmCmdSuite.JIMM.Database.AddGroup(context.TODO(), fmt.Sprint("test-group", i))
+		_, err := s.JimmCmdSuite.JIMM.Database.AddGroup(context.TODO(), fmt.Sprint("test-group", i))
 		c.Assert(err, gc.IsNil)
 	}
 

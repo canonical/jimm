@@ -28,7 +28,7 @@ parts:
       - bin/jaas
     override-build: |
       set -e
-      CGO_ENABLED=0 go install github.com/canonical/jimm/cmd/jaas
+      CGO_ENABLED=0 go install github.com/canonical/jimm/v3/cmd/jaas
     override-prime: |
       snapcraftctl prime
       # Add all CLI commands below to make them appear top-level to Juju.

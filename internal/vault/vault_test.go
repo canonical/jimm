@@ -18,8 +18,8 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 
-	"github.com/canonical/jimm/internal/jimmtest"
-	"github.com/canonical/jimm/internal/vault"
+	"github.com/canonical/jimm/v3/internal/jimmtest"
+	"github.com/canonical/jimm/v3/internal/vault"
 )
 
 func TestMain(m *testing.M) {

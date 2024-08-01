@@ -1,0 +1,67 @@
+name: Update JIMM Go SDK
+
+on:
+  workflow_dispatch:
+    inputs:
+      sdk-repo:
+        description: 'SDK repository'
+        required: true
+        default: 'canonical/jimm-go-sdk'
+      sdk-version:
+        description: 'SDK version'
+        required: true
+        default: 'v3'
+      pr-commit-message:
+        description: 'PR commit message'
+        required: true
+        default: 'Update SDK'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout project
+      uses: actions/checkout@v4
+      with:
+        path: ./project
+
+    - name: Checkout ${{ github.event.inputs.sdk-repo }}
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ github.event.inputs.sdk-repo }}
+        ref: ${{ github.event.inputs.sdk-version }}
+        path: ./sdk
+        token: ${{ secrets.PAT }}
+
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: ./project/go.mod
+
+    - name: Update SDK
+      working-directory: ./sdk
+      env:
+        PROJECT: ../project
+        SDK_REPO: ${{ github.event.inputs.sdk-repo }}
+        SDK_VERSION: ${{ github.event.inputs.sdk-version }}
+      run: |
+        # Remove all in case some files are removed
+        rm -rf .[!.]* *
+        cp -r $PROJECT/pkg/.[^.]* $PROJECT/pkg/* $PROJECT/go.mod .
+
+        # Replace module references
+        find . -type f -exec sed -i "s|github.com/canonical/jimm/pkg|github.com/$SDK_REPO/$SDK_VERSION|" {} +
+        sed -i "s|module .*|module github.com/$SDK_REPO/$SDK_VERSION|" go.mod
+
+        # Needed to remove unused dependencies
+        go mod tidy 
+
+    - name: Create Pull Request
+      uses: peter-evans/create-pull-request@v6
+      with:
+        token: ${{ secrets.PAT }}
+        path: ./sdk
+        branch: update-sdk-${{ github.run_number }}
+        title: Update SDK ${{ github.event.inputs.sdk-version }}
+        body: This PR updates the SDK to the latest version.
+        commit-message: ${{ github.event.inputs.pr-commit-message }}

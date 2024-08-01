@@ -5,7 +5,7 @@ package jimmtest
 import (
 	"encoding/json"
 
-	vault_test "github.com/canonical/jimm/local/vault"
+	vault_test "github.com/canonical/jimm/v3/local/vault"
 	"github.com/hashicorp/vault/api"
 )
 

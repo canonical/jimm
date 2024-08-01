@@ -15,15 +15,14 @@ import (
 	jujucmdcommon "github.com/juju/juju/cmd/juju/common"
 	"github.com/juju/juju/cmd/modelcmd"
 	"github.com/juju/juju/jujuclient"
+	_ "github.com/juju/juju/provider/all"
 	"github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 
-	"github.com/canonical/jimm/api"
-	apiparams "github.com/canonical/jimm/api/params"
-	_ "github.com/juju/juju/provider/all"
-
-	"github.com/canonical/jimm/internal/errors"
-	jimmjujuapi "github.com/canonical/jimm/internal/jujuapi"
+	"github.com/canonical/jimm/v3/internal/errors"
+	jimmjujuapi "github.com/canonical/jimm/v3/internal/jujuapi"
+	"github.com/canonical/jimm/v3/pkg/api"
+	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
 var (

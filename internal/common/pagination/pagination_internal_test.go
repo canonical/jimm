@@ -5,7 +5,7 @@ package pagination_test
 import (
 	"testing"
 
-	"github.com/canonical/jimm/internal/common/pagination"
+	"github.com/canonical/jimm/v3/internal/common/pagination"
 	qt "github.com/frankban/quicktest"
 )
 

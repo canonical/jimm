@@ -10,16 +10,16 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/google/uuid"
 
-	"github.com/canonical/jimm/internal/db"
-	"github.com/canonical/jimm/internal/dbmodel"
-	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/v3/internal/db"
+	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/errors"
 )
 
 func TestAddGroupUnconfiguredDatabase(t *testing.T) {
 	c := qt.New(t)
 
 	var d db.Database
-	err := d.AddGroup(context.Background(), "test-group")
+	_, err := d.AddGroup(context.Background(), "test-group")
 	c.Check(err, qt.ErrorMatches, `database not configured`)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeServerConfiguration)
 }
@@ -32,16 +32,17 @@ func (s *dbSuite) TestAddGroup(c *qt.C) {
 		return uuid
 	})
 
-	err := s.Database.AddGroup(ctx, "test-group")
+	_, err := s.Database.AddGroup(ctx, "test-group")
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
 
 	err = s.Database.Migrate(context.Background(), false)
 	c.Assert(err, qt.IsNil)
 
-	err = s.Database.AddGroup(ctx, "test-group")
+	groupEntry, err := s.Database.AddGroup(ctx, "test-group")
 	c.Assert(err, qt.IsNil)
+	c.Assert(groupEntry.UUID, qt.Not(qt.Equals), "")
 
-	err = s.Database.AddGroup(ctx, "test-group")
+	_, err = s.Database.AddGroup(ctx, "test-group")
 	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeAlreadyExists)
 
 	ge := dbmodel.GroupEntry{
@@ -74,8 +75,9 @@ func (s *dbSuite) TestGetGroup(c *qt.C) {
 	err = s.Database.GetGroup(context.Background(), group)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
-	err = s.Database.AddGroup(context.TODO(), "test-group")
+	groupEntry, err := s.Database.AddGroup(context.TODO(), "test-group")
 	c.Assert(err, qt.IsNil)
+	c.Assert(groupEntry.UUID, qt.Equals, uuid1)
 
 	err = s.Database.GetGroup(context.Background(), group)
 	c.Check(err, qt.IsNil)
@@ -88,8 +90,9 @@ func (s *dbSuite) TestGetGroup(c *qt.C) {
 		return uuid2
 	})
 
-	err = s.Database.AddGroup(context.Background(), "test-group1")
+	groupEntry, err = s.Database.AddGroup(context.Background(), "test-group1")
 	c.Assert(err, qt.IsNil)
+	c.Assert(groupEntry.UUID, qt.Equals, uuid2)
 
 	group = &dbmodel.GroupEntry{
 		Name: "test-group1",
@@ -116,7 +119,7 @@ func (s *dbSuite) TestUpdateGroup(c *qt.C) {
 	err = s.Database.UpdateGroup(context.Background(), ge)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
-	err = s.Database.AddGroup(context.Background(), "test-group")
+	_, err = s.Database.AddGroup(context.Background(), "test-group")
 	c.Assert(err, qt.IsNil)
 
 	ge1 := &dbmodel.GroupEntry{
@@ -150,7 +153,7 @@ func (s *dbSuite) TestRemoveGroup(c *qt.C) {
 	err = s.Database.RemoveGroup(context.Background(), ge)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
-	err = s.Database.AddGroup(context.Background(), ge.Name)
+	groupEntry, err := s.Database.AddGroup(context.Background(), ge.Name)
 	c.Assert(err, qt.IsNil)
 
 	ge1 := &dbmodel.GroupEntry{
@@ -158,6 +161,7 @@ func (s *dbSuite) TestRemoveGroup(c *qt.C) {
 	}
 	err = s.Database.GetGroup(context.Background(), ge1)
 	c.Assert(err, qt.IsNil)
+	c.Assert(groupEntry.UUID, qt.Equals, ge1.UUID)
 
 	err = s.Database.RemoveGroup(context.Background(), ge1)
 	c.Check(err, qt.IsNil)
@@ -172,7 +176,7 @@ func (s *dbSuite) TestForEachGroup(c *qt.C) {
 
 	addNGroups := 10
 	for i := range addNGroups {
-		err := s.Database.AddGroup(context.Background(), fmt.Sprintf("test-group-%d", i))
+		_, err := s.Database.AddGroup(context.Background(), fmt.Sprintf("test-group-%d", i))
 		c.Assert(err, qt.IsNil)
 	}
 	firstGroups := []*dbmodel.GroupEntry{}

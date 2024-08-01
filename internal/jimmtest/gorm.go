@@ -16,8 +16,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/canonical/jimm/internal/db"
-	"github.com/canonical/jimm/internal/errors"
+	"github.com/canonical/jimm/v3/internal/db"
+	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/google/uuid"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"

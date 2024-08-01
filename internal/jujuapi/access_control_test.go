@@ -15,14 +15,14 @@ import (
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 
-	"github.com/canonical/jimm/api"
-	apiparams "github.com/canonical/jimm/api/params"
-	"github.com/canonical/jimm/internal/dbmodel"
-	"github.com/canonical/jimm/internal/jimmtest"
-	"github.com/canonical/jimm/internal/jujuapi"
-	"github.com/canonical/jimm/internal/openfga"
-	ofganames "github.com/canonical/jimm/internal/openfga/names"
-	"github.com/canonical/jimm/pkg/names"
+	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/jimmtest"
+	"github.com/canonical/jimm/v3/internal/jujuapi"
+	"github.com/canonical/jimm/v3/internal/openfga"
+	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
+	"github.com/canonical/jimm/v3/pkg/api"
+	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
+	"github.com/canonical/jimm/v3/pkg/names"
 )
 
 type accessControlSuite struct {
@@ -54,10 +54,11 @@ func (s *accessControlSuite) TestAddGroup(c *gc.C) {
 	defer conn.Close()
 
 	client := api.NewClient(conn)
-	err := client.AddGroup(&apiparams.AddGroupRequest{Name: "test-group"})
+	res, err := client.AddGroup(&apiparams.AddGroupRequest{Name: "test-group"})
 	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(res.UUID, gc.Not(gc.Equals), "")
 
-	err = client.AddGroup(&apiparams.AddGroupRequest{Name: "test-group"})
+	_, err = client.AddGroup(&apiparams.AddGroupRequest{Name: "test-group"})
 	c.Assert(err, gc.ErrorMatches, ".*already exists.*")
 }
 
@@ -72,7 +73,7 @@ func (s *accessControlSuite) TestRemoveGroup(c *gc.C) {
 	})
 	c.Assert(err, gc.ErrorMatches, ".*not found.*")
 
-	err = client.AddGroup(&apiparams.AddGroupRequest{Name: "test-group"})
+	_, err = client.AddGroup(&apiparams.AddGroupRequest{Name: "test-group"})
 	c.Assert(err, jc.ErrorIsNil)
 
 	err = client.RemoveGroup(&apiparams.RemoveGroupRequest{
@@ -168,7 +169,7 @@ func (s *accessControlSuite) TestRenameGroup(c *gc.C) {
 	})
 	c.Assert(err, gc.ErrorMatches, ".*not found.*")
 
-	err = client.AddGroup(&apiparams.AddGroupRequest{Name: "test-group"})
+	_, err = client.AddGroup(&apiparams.AddGroupRequest{Name: "test-group"})
 	c.Assert(err, jc.ErrorIsNil)
 
 	err = client.RenameGroup(&apiparams.RenameGroupRequest{
@@ -192,7 +193,7 @@ func (s *accessControlSuite) TestListGroups(c *gc.C) {
 	}
 
 	for _, name := range groupNames {
-		err := client.AddGroup(&apiparams.AddGroupRequest{Name: name})
+		_, err := client.AddGroup(&apiparams.AddGroupRequest{Name: name})
 		c.Assert(err, jc.ErrorIsNil)
 	}
 	req := apiparams.ListGroupsRequest{Limit: 10, Offset: 0}
@@ -844,9 +845,9 @@ func (s *accessControlSuite) TestListRelationshipTuples(c *gc.C) {
 	user, _, controller, model, applicationOffer, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
 	defer closeClient()
 
-	err := client.AddGroup(&apiparams.AddGroupRequest{Name: "yellow"})
+	_, err := client.AddGroup(&apiparams.AddGroupRequest{Name: "yellow"})
 	c.Assert(err, jc.ErrorIsNil)
-	err = client.AddGroup(&apiparams.AddGroupRequest{Name: "orange"})
+	_, err = client.AddGroup(&apiparams.AddGroupRequest{Name: "orange"})
 	c.Assert(err, jc.ErrorIsNil)
 
 	tuples := []apiparams.RelationshipTuple{{
@@ -891,9 +892,9 @@ func (s *accessControlSuite) TestListRelationshipTuplesAfterDeletingGroup(c *gc.
 	user, _, controller, model, applicationOffer, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
 	defer closeClient()
 
-	err := client.AddGroup(&apiparams.AddGroupRequest{Name: "yellow"})
+	_, err := client.AddGroup(&apiparams.AddGroupRequest{Name: "yellow"})
 	c.Assert(err, jc.ErrorIsNil)
-	err = client.AddGroup(&apiparams.AddGroupRequest{Name: "orange"})
+	_, err = client.AddGroup(&apiparams.AddGroupRequest{Name: "orange"})
 	c.Assert(err, jc.ErrorIsNil)
 
 	tuples := []apiparams.RelationshipTuple{{
@@ -934,9 +935,9 @@ func (s *accessControlSuite) TestListRelationshipTuplesWithMissingGroups(c *gc.C
 	_, _, _, _, _, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
 	defer closeClient()
 
-	err := client.AddGroup(&apiparams.AddGroupRequest{Name: "yellow"})
+	_, err := client.AddGroup(&apiparams.AddGroupRequest{Name: "yellow"})
 	c.Assert(err, jc.ErrorIsNil)
-	err = client.AddGroup(&apiparams.AddGroupRequest{Name: "orange"})
+	_, err = client.AddGroup(&apiparams.AddGroupRequest{Name: "orange"})
 	c.Assert(err, jc.ErrorIsNil)
 
 	tuples := []apiparams.RelationshipTuple{{
@@ -1430,11 +1431,12 @@ func createTestControllerEnvironment(ctx context.Context, c *gc.C, s *accessCont
 	func()) {
 
 	db := s.JIMM.Database
-	err := db.AddGroup(ctx, "test-group")
+	groupEntry, err := db.AddGroup(ctx, "test-group")
 	c.Assert(err, gc.IsNil)
 	group := dbmodel.GroupEntry{Name: "test-group"}
 	err = db.GetGroup(ctx, &group)
 	c.Assert(err, gc.IsNil)
+	c.Assert(groupEntry.UUID, gc.Equals, group.UUID)
 
 	u, err := dbmodel.NewIdentity(petname.Generate(2, "-") + "@canonical.com")
 	c.Assert(err, gc.IsNil)

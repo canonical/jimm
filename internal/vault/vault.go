@@ -19,8 +19,8 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"go.uber.org/zap"
 
-	"github.com/canonical/jimm/internal/errors"
-	"github.com/canonical/jimm/internal/servermon"
+	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/servermon"
 )
 
 const (

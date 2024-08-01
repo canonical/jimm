@@ -12,10 +12,10 @@ import (
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/state"
 
-	"github.com/canonical/jimm/internal/db"
-	"github.com/canonical/jimm/internal/errors"
-	"github.com/canonical/jimm/internal/jimm"
-	"github.com/canonical/jimm/internal/jimmtest"
+	"github.com/canonical/jimm/v3/internal/db"
+	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jimm"
+	"github.com/canonical/jimm/v3/internal/jimmtest"
 )
 
 var now = (time.Time{}).UTC().Round(time.Millisecond)

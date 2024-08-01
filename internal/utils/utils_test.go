@@ -5,7 +5,7 @@ import (
 
 	qt "github.com/frankban/quicktest"
 
-	"github.com/canonical/jimm/internal/utils"
+	"github.com/canonical/jimm/v3/internal/utils"
 )
 
 func TestNewConversationID(t *testing.T) {

@@ -9,7 +9,7 @@ import (
 
 	qt "github.com/frankban/quicktest"
 
-	"github.com/canonical/jimm/internal/jujuapi/rpc"
+	"github.com/canonical/jimm/v3/internal/jujuapi/rpc"
 )
 
 type S1 struct{}
