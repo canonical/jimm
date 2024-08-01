@@ -30,13 +30,13 @@ func (s *identitiesService) ListIdentities(ctx context.Context, params *resource
 	raw, _ := v1.GetIdentityFromContext(ctx)
 	user, _ := raw.(*openfga.User)
 
-	count, err := s.jimm.CountUsers(ctx, user)
+	count, err := s.jimm.CountIdentities(ctx, user)
 	if err != nil {
 		return nil, err
 	}
 	page, nextPage, pagination := pagination.CreatePagination(params, count)
 
-	users, err := s.jimm.ListUsers(ctx, user, pagination)
+	users, err := s.jimm.ListIdentities(ctx, user, pagination)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +65,7 @@ func (s *identitiesService) CreateIdentity(ctx context.Context, identity *resour
 
 // GetIdentity returns a single Identity.
 func (s *identitiesService) GetIdentity(ctx context.Context, identityId string) (*resources.Identity, error) {
-	user, err := s.jimm.FetchUser(ctx, identityId)
+	user, err := s.jimm.FetchIdentity(ctx, identityId)
 	if err != nil {
 		return nil, v1.NewNotFoundError(fmt.Sprintf("User with id %s not found", identityId))
 	}

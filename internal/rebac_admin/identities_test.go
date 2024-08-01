@@ -19,7 +19,7 @@ import (
 func TestGetIdentity(t *testing.T) {
 	c := qt.New(t)
 	jimm := jimmtest.JIMM{
-		FetchUser_: func(ctx context.Context, username string) (*openfga.User, error) {
+		FetchIdentity_: func(ctx context.Context, username string) (*openfga.User, error) {
 			if username == "bob@canonical.com" {
 				return openfga.NewUser(&dbmodel.Identity{Name: "bob@canonical.com"}, nil), nil
 			}
@@ -52,7 +52,7 @@ func TestListIdentities(t *testing.T) {
 	}
 	c := qt.New(t)
 	jimm := jimmtest.JIMM{
-		ListUsers_: func(ctx context.Context, user *openfga.User, filter pagination.LimitOffsetPagination) ([]openfga.User, error) {
+		ListIdentities_: func(ctx context.Context, user *openfga.User, filter pagination.LimitOffsetPagination) ([]openfga.User, error) {
 			start := filter.Offset()
 			end := start + filter.Limit()
 			if end > len(testUsers) {
@@ -60,7 +60,7 @@ func TestListIdentities(t *testing.T) {
 			}
 			return testUsers[start:end], nil
 		},
-		CountUsers_: func(ctx context.Context, user *openfga.User) (int, error) {
+		CountIdentities_: func(ctx context.Context, user *openfga.User) (int, error) {
 			return len(testUsers), nil
 		},
 	}
