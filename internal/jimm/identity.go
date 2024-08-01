@@ -5,10 +5,10 @@ package jimm
 import (
 	"context"
 
-	"github.com/canonical/jimm/internal/common/pagination"
-	"github.com/canonical/jimm/internal/dbmodel"
-	"github.com/canonical/jimm/internal/errors"
-	"github.com/canonical/jimm/internal/openfga"
+	"github.com/canonical/jimm/v3/internal/common/pagination"
+	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/openfga"
 )
 
 // FetchIdentity fetches the user specified by the username and returns the user if it is found.

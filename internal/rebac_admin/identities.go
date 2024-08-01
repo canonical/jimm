@@ -6,10 +6,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/canonical/jimm/internal/common/pagination"
-	"github.com/canonical/jimm/internal/jujuapi"
-	"github.com/canonical/jimm/internal/openfga"
-	"github.com/canonical/jimm/internal/rebac_admin/utils"
+	"github.com/canonical/jimm/v3/internal/common/pagination"
+	"github.com/canonical/jimm/v3/internal/jujuapi"
+	"github.com/canonical/jimm/v3/internal/openfga"
+	"github.com/canonical/jimm/v3/internal/rebac_admin/utils"
 
 	v1 "github.com/canonical/rebac-admin-ui-handlers/v1"
 	"github.com/canonical/rebac-admin-ui-handlers/v1/resources"
