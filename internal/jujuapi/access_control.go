@@ -52,18 +52,27 @@ const (
 )
 
 // AddGroup creates a group within JIMMs DB for reference by OpenFGA.
-func (r *controllerRoot) AddGroup(ctx context.Context, req apiparams.AddGroupRequest) error {
+func (r *controllerRoot) AddGroup(ctx context.Context, req apiparams.AddGroupRequest) (apiparams.AddGroupResponse, error) {
 	const op = errors.Op("jujuapi.AddGroup")
+	resp := apiparams.AddGroupResponse{}
 
 	if !jimmnames.IsValidGroupName(req.Name) {
-		return errors.E(op, errors.CodeBadRequest, "invalid group name")
+		return resp, errors.E(op, errors.CodeBadRequest, "invalid group name")
 	}
 
-	if err := r.jimm.AddGroup(ctx, r.user, req.Name); err != nil {
+	groupEntry, err := r.jimm.AddGroup(ctx, r.user, req.Name)
+	if err != nil {
 		zapctx.Error(ctx, "failed to add group", zaputil.Error(err))
-		return errors.E(op, err)
+		return resp, errors.E(op, err)
 	}
-	return nil
+	resp = apiparams.AddGroupResponse{Group: apiparams.Group{
+		Name:      groupEntry.Name,
+		UUID:      groupEntry.UUID,
+		CreatedAt: groupEntry.CreatedAt.Format(time.RFC3339),
+		UpdatedAt: groupEntry.UpdatedAt.Format(time.RFC3339),
+	}}
+
+	return resp, nil
 }
 
 // RenameGroup renames a group within JIMMs DB for reference by OpenFGA.
@@ -103,6 +112,7 @@ func (r *controllerRoot) ListGroups(ctx context.Context) (apiparams.ListGroupRes
 	groupsResponse := make([]apiparams.Group, len(groups))
 	for i, g := range groups {
 		groupsResponse[i] = apiparams.Group{
+			UUID:      g.UUID,
 			Name:      g.Name,
 			CreatedAt: g.CreatedAt.Format(time.RFC3339),
 			UpdatedAt: g.UpdatedAt.Format(time.RFC3339),

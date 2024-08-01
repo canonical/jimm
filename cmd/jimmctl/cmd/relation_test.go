@@ -82,9 +82,9 @@ func (s *relationSuite) TestAddRelationSuperuser(c *gc.C) {
 		},
 	}
 
-	err := s.JimmCmdSuite.JIMM.Database.AddGroup(context.Background(), group1)
+	_, err := s.JimmCmdSuite.JIMM.Database.AddGroup(context.Background(), group1)
 	c.Assert(err, gc.IsNil)
-	err = s.JimmCmdSuite.JIMM.Database.AddGroup(context.Background(), group2)
+	_, err = s.JimmCmdSuite.JIMM.Database.AddGroup(context.Background(), group2)
 	c.Assert(err, gc.IsNil)
 
 	for i, tc := range tests {
@@ -176,9 +176,9 @@ func (s *relationSuite) TestRemoveRelationSuperuser(c *gc.C) {
 	}
 
 	//Create groups and relation
-	err := s.JimmCmdSuite.JIMM.Database.AddGroup(context.Background(), group1)
+	_, err := s.JimmCmdSuite.JIMM.Database.AddGroup(context.Background(), group1)
 	c.Assert(err, gc.IsNil)
-	err = s.JimmCmdSuite.JIMM.Database.AddGroup(context.Background(), group2)
+	_, err = s.JimmCmdSuite.JIMM.Database.AddGroup(context.Background(), group2)
 	c.Assert(err, gc.IsNil)
 	totalKeys := 2
 	for _, tc := range tests {
@@ -493,7 +493,7 @@ func (s *relationSuite) TestCheckRelationViaSuperuser(c *gc.C) {
 
 	// Add some resources to check against
 	db := s.JIMM.Database
-	err := db.AddGroup(ctx, "test-group")
+	_, err := db.AddGroup(ctx, "test-group")
 	c.Assert(err, gc.IsNil)
 	group := dbmodel.GroupEntry{Name: "test-group"}
 	err = db.GetGroup(ctx, &group)

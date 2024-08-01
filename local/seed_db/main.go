@@ -42,7 +42,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = db.AddGroup(ctx, "test-group"); err != nil {
+	if _, err = db.AddGroup(ctx, "test-group"); err != nil {
 		fmt.Println("failed to add group to db ", err)
 		os.Exit(1)
 	}

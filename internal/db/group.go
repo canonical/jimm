@@ -17,25 +17,25 @@ var newUUID = func() string {
 }
 
 // AddGroup adds a new group.
-func (d *Database) AddGroup(ctx context.Context, name string) (err error) {
+func (d *Database) AddGroup(ctx context.Context, name string) (ge *dbmodel.GroupEntry, err error) {
 	const op = errors.Op("db.AddGroup")
 	if err := d.ready(); err != nil {
-		return errors.E(op, err)
+		return nil, errors.E(op, err)
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
 	defer durationObserver()
 	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
 
-	ge := dbmodel.GroupEntry{
+	ge = &dbmodel.GroupEntry{
 		Name: name,
 		UUID: newUUID(),
 	}
 
-	if err := d.DB.WithContext(ctx).Create(&ge).Error; err != nil {
-		return errors.E(op, dbError(err))
+	if err := d.DB.WithContext(ctx).Create(ge).Error; err != nil {
+		return nil, errors.E(op, dbError(err))
 	}
-	return nil
+	return ge, nil
 }
 
 // GetGroup returns a GroupEntry with the specified name.
