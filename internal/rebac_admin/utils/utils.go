@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/canonical/jimm/internal/openfga"
+	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/rebac-admin-ui-handlers/v1/resources"
 )
 
