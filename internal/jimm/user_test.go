@@ -70,8 +70,9 @@ func TestUpdateUserLastLogin(t *testing.T) {
 	ctx := context.Background()
 	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
+	now := time.Now().Truncate(time.Millisecond)
 	db := &db.Database{
-		DB: jimmtest.PostgresDB(c, func() time.Time { return time.Now() }),
+		DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 	}
 
 	j := &jimm.JIMM{
@@ -89,6 +90,6 @@ func TestUpdateUserLastLogin(t *testing.T) {
 	err = j.Database.GetIdentity(ctx, &user)
 	c.Assert(err, qt.IsNil)
 	c.Assert(user.DisplayName, qt.Equals, "bob")
-	c.Assert((time.Since(user.LastLogin.Time) > time.Second), qt.IsFalse)
+	c.Assert(user.LastLogin.Time, qt.Equals, now)
 	c.Assert(user.LastLogin.Valid, qt.IsTrue)
 }

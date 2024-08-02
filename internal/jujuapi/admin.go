@@ -147,7 +147,7 @@ func (r *controllerRoot) LoginWithSessionToken(ctx context.Context, req params.L
 	if err != nil {
 		return jujuparams.LoginResult{}, errors.E(op, err)
 	}
-	err = r.jimm.UpdateUserLastLogin(ctx, r.identityId)
+	err = r.jimm.UpdateUserLastLogin(ctx, email)
 	if err != nil {
 		return jujuparams.LoginResult{}, errors.E(op, err)
 	}
@@ -196,7 +196,7 @@ func (r *controllerRoot) LoginWithClientCredentials(ctx context.Context, req par
 	if err != nil {
 		return jujuparams.LoginResult{}, errors.E(op, err)
 	}
-	err = r.jimm.UpdateUserLastLogin(ctx, r.identityId)
+	err = r.jimm.UpdateUserLastLogin(ctx, clientIdWithDomain)
 	if err != nil {
 		return jujuparams.LoginResult{}, errors.E(op, err)
 	}

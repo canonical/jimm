@@ -4,6 +4,7 @@ package jimm
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
@@ -45,8 +46,10 @@ func (j *JIMM) UpdateUserLastLogin(ctx context.Context, identifier string) error
 		if err := tx.GetIdentity(ctx, user); err != nil {
 			return err
 		}
-		user.LastLogin.Time = j.Database.DB.Config.NowFunc()
-		user.LastLogin.Valid = true
+		user.LastLogin = sql.NullTime{
+			Time:  j.Database.DB.Config.NowFunc(),
+			Valid: true,
+		}
 		return tx.UpdateIdentity(ctx, user)
 	}); err != nil {
 		return errors.E(op, err)
