@@ -45,7 +45,8 @@ jobs:
         SDK_VERSION: ${{ github.event.inputs.sdk-version }}
       run: |
         # Remove all in case some files are removed
-        rm -rf .[!.]* *
+        shopt -s nullglob
+        rm -rf .[!.git]* *
         cp -r $PROJECT/pkg/.[^.]* $PROJECT/pkg/* $PROJECT/go.mod .
 
         # Replace module references
@@ -58,6 +59,7 @@ jobs:
     - name: Create Pull Request
       uses: peter-evans/create-pull-request@v6
       with:
+        token: ${{ secrets.PAT }}
         path: ./sdk
         branch: update-sdk-${{ github.run_number }}
         title: Update SDK ${{ github.event.inputs.sdk-version }}
