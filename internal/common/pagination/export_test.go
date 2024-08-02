@@ -3,6 +3,8 @@
 package pagination
 
 var (
-	DefaultPageSize = defaultPageSize
-	MaxPageSize     = maxPageSize
+	DefaultPageSize        = defaultOffsetFilterPageSize
+	MaxPageSize            = maxOffsetFilterPageSize
+	DefaultOpenFGAPageSize = defaultOpenFGAPageSize
+	MaxOpenFGAPageSize     = maxOpenFGAPageSize
 )

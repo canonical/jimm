@@ -135,12 +135,9 @@ func (j *JIMM) parseTuple(ctx context.Context, tuple apiparams.RelationshipTuple
 	if tuple.TargetObject == "" {
 		return nil, errors.E(op, errors.CodeBadRequest, "target object not specified")
 	}
-	if tuple.TargetObject != "" {
-		targetTag, err := j.parseAndValidateTag(ctx, tuple.TargetObject)
-		if err != nil {
-			return nil, parseTagError("failed to parse tuple target object key", tuple.TargetObject, err)
-		}
-		t.Target = targetTag
+	t.Target, err = j.parseAndValidateTag(ctx, tuple.TargetObject)
+	if err != nil {
+		return nil, parseTagError("failed to parse tuple target object key", tuple.TargetObject, err)
 	}
 	if tuple.Object != "" {
 		objectTag, err := j.parseAndValidateTag(ctx, tuple.Object)

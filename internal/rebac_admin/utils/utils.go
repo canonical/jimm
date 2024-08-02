@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/canonical/jimm/v3/internal/common/pagination"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/rebac-admin-ui-handlers/v1/resources"
 )
@@ -22,4 +23,19 @@ func FromUserToIdentity(user openfga.User) resources.Identity {
 		LastLogin: &lastLogin,
 		Source:    "",
 	}
+}
+
+// CreateTokenPaginationFilter returns...
+func CreateTokenPaginationFilter(size *int, token, tokenFromHeader *string) pagination.TokenPagination {
+	pageSize := 0
+	if size != nil {
+		pageSize = *size
+	}
+	var pageToken string
+	if tokenFromHeader != nil {
+		pageToken = *tokenFromHeader
+	} else if token != nil {
+		pageToken = *token
+	}
+	return pagination.NewTokenFilter(pageSize, pageToken)
 }
