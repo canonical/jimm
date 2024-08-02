@@ -105,9 +105,9 @@ type JIMM interface {
 	UpdateCloud(ctx context.Context, u *openfga.User, ct names.CloudTag, cloud jujuparams.Cloud) error
 	UpdateCloudCredential(ctx context.Context, u *openfga.User, args jimm.UpdateCloudCredentialArgs) ([]jujuparams.UpdateCredentialModelResult, error)
 	UpdateMigratedModel(ctx context.Context, user *openfga.User, modelTag names.ModelTag, targetControllerName string) error
+	UpdateUserLastLogin(ctx context.Context, identifier string) error
 	ValidateModelUpgrade(ctx context.Context, u *openfga.User, mt names.ModelTag, force bool) error
 	WatchAllModelSummaries(ctx context.Context, controller *dbmodel.Controller) (_ func() error, err error)
-	GetOpenFGAUserAndAuthorise(ctx context.Context, email string) (*openfga.User, error)
 }
 
 // controllerRoot is the root for endpoints served on controller connections.

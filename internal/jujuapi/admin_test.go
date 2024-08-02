@@ -120,6 +120,7 @@ func testBrowserLogin(c *gc.C, s *adminSuite, username, password, expectedEmail,
 
 	sessionStore, err := pgstore.NewPGStoreFromPool(sqldb, []byte("secretsecretdigletts"))
 	c.Assert(err, gc.IsNil)
+	defer sessionStore.Close()
 
 	cookie, err := jimmtest.RunBrowserLogin(
 		s.JIMM.DB(),
