@@ -272,12 +272,12 @@ func (r *controllerRoot) ListRelationshipTuples(ctx context.Context, req apipara
 	errors := []string{}
 	tuples := make([]apiparams.RelationshipTuple, len(responseTuples))
 	for i, t := range responseTuples {
-		object, err := r.jimm.ToJAASTag(ctx, t.Object)
+		object, err := r.jimm.ToJAASTag(ctx, t.Object, req.ResolveUUIDs)
 		if err != nil {
 			object = t.Object.String()
 			errors = append(errors, "failed to parse object: "+err.Error())
 		}
-		target, err := r.jimm.ToJAASTag(ctx, t.Target)
+		target, err := r.jimm.ToJAASTag(ctx, t.Target, req.ResolveUUIDs)
 		if err != nil {
 			target = t.Target.String()
 			errors = append(errors, "failed to parse target: "+err.Error())

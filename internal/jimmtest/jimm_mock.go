@@ -104,7 +104,7 @@ type JIMM struct {
 	SetControllerDeprecated_           func(ctx context.Context, user *openfga.User, controllerName string, deprecated bool) error
 	SetModelDefaults_                  func(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag, region string, configs map[string]interface{}) error
 	SetIdentityModelDefaults_          func(ctx context.Context, user *dbmodel.Identity, configs map[string]interface{}) error
-	ToJAASTag_                         func(ctx context.Context, tag *ofganames.Tag) (string, error)
+	ToJAASTag_                         func(ctx context.Context, tag *ofganames.Tag, resolveUUIDs bool) (string, error)
 	UnsetModelDefaults_                func(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag, region string, keys []string) error
 	UpdateApplicationOffer_            func(ctx context.Context, controller *dbmodel.Controller, offerUUID string, removed bool) error
 	UpdateCloud_                       func(ctx context.Context, u *openfga.User, ct names.CloudTag, cloud jujuparams.Cloud) error
@@ -564,11 +564,11 @@ func (j *JIMM) SetIdentityModelDefaults(ctx context.Context, user *dbmodel.Ident
 	}
 	return j.SetIdentityModelDefaults_(ctx, user, configs)
 }
-func (j *JIMM) ToJAASTag(ctx context.Context, tag *ofganames.Tag) (string, error) {
+func (j *JIMM) ToJAASTag(ctx context.Context, tag *ofganames.Tag, resolveUUIDs bool) (string, error) {
 	if j.ToJAASTag_ == nil {
 		return "", errors.E(errors.CodeNotImplemented)
 	}
-	return j.ToJAASTag_(ctx, tag)
+	return j.ToJAASTag_(ctx, tag, resolveUUIDs)
 }
 func (j *JIMM) UnsetModelDefaults(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag, region string, keys []string) error {
 	if j.UnsetModelDefaults_ == nil {

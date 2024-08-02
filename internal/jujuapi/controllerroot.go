@@ -99,7 +99,7 @@ type JIMM interface {
 	SetControllerConfig(ctx context.Context, u *openfga.User, args jujuparams.ControllerConfigSet) error
 	SetControllerDeprecated(ctx context.Context, user *openfga.User, controllerName string, deprecated bool) error
 	SetModelDefaults(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag, region string, configs map[string]interface{}) error
-	ToJAASTag(ctx context.Context, tag *ofganames.Tag) (string, error)
+	ToJAASTag(ctx context.Context, tag *ofganames.Tag, resolveUUIDs bool) (string, error)
 	UnsetModelDefaults(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag, region string, keys []string) error
 	UpdateApplicationOffer(ctx context.Context, controller *dbmodel.Controller, offerUUID string, removed bool) error
 	UpdateCloud(ctx context.Context, u *openfga.User, ct names.CloudTag, cloud jujuparams.Cloud) error
