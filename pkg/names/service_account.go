@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/juju/names/v5"
 )
 
@@ -81,7 +80,7 @@ func EnsureValidServiceAccountId(id string) (string, error) {
 	}
 
 	if !IsValidServiceAccountId(id) {
-		return "", errors.E(errors.CodeBadRequest, "invalid client ID")
+		return "", fmt.Errorf("invalid client id %q", id)
 	}
 	return id, nil
 }
