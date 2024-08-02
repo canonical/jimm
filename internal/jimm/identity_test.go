@@ -4,7 +4,6 @@ package jimm_test
 
 import (
 	"context"
-	"sort"
 	"testing"
 	"time"
 
@@ -90,9 +89,6 @@ func TestListIdentities(t *testing.T) {
 	filter = pagination.NewOffsetFilter(3, 0)
 	users, err = j.ListIdentities(ctx, u, filter)
 	c.Assert(err, qt.IsNil)
-	sort.Slice(users, func(i, j int) bool {
-		return users[i].Name < users[j].Name
-	})
 	c.Assert(users, qt.HasLen, 3)
 	// user should be returned in ascending order of name
 	c.Assert(users[0].Name, qt.Equals, userNames[0])

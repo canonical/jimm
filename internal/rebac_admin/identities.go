@@ -34,7 +34,7 @@ func (s *identitiesService) ListIdentities(ctx context.Context, params *resource
 	if err != nil {
 		return nil, err
 	}
-	page, nextPage, pagination := pagination.CreatePagination(params, count)
+	page, nextPage, pagination := pagination.CreatePagination(params.Size, params.Page, count)
 
 	users, err := s.jimm.ListIdentities(ctx, user, pagination)
 	if err != nil {

@@ -8,7 +8,6 @@ import (
 	qt "github.com/frankban/quicktest"
 
 	"github.com/canonical/jimm/v3/internal/common/pagination"
-	"github.com/canonical/rebac-admin-ui-handlers/v1/resources"
 )
 
 func TestOffsetFilter(t *testing.T) {
@@ -55,7 +54,7 @@ func TestCreatePagination(t *testing.T) {
 	c := qt.New(t)
 
 	// test with default page size and tot
-	page, nextPage, pag := pagination.CreatePagination(nil, 100)
+	page, nextPage, pag := pagination.CreatePagination(nil, nil, 100)
 	defPag := pagination.NewOffsetFilter(-1, 0)
 	c.Assert(page, qt.Equals, 0)
 	c.Assert(*nextPage, qt.Equals, 1)
@@ -66,10 +65,7 @@ func TestCreatePagination(t *testing.T) {
 	// test with set page size
 	pagSize := 100
 	pageNum := 1
-	page, nextPage, pag = pagination.CreatePagination(&resources.GetIdentitiesParams{
-		Size: &pagSize,
-		Page: &pageNum,
-	}, 1000)
+	page, nextPage, pag = pagination.CreatePagination(&pagSize, &pageNum, 1000)
 
 	c.Assert(page, qt.Equals, pageNum)
 	c.Assert(*nextPage, qt.Equals, pageNum+1)
@@ -79,10 +75,7 @@ func TestCreatePagination(t *testing.T) {
 	// test with set page size number 2
 	pagSize = 100
 	pageNum = 5
-	page, nextPage, pag = pagination.CreatePagination(&resources.GetIdentitiesParams{
-		Size: &pagSize,
-		Page: &pageNum,
-	}, 1000)
+	page, nextPage, pag = pagination.CreatePagination(&pagSize, &pageNum, 1000)
 
 	c.Assert(page, qt.Equals, pageNum)
 	c.Assert(*nextPage, qt.Equals, pageNum+1)
@@ -92,10 +85,7 @@ func TestCreatePagination(t *testing.T) {
 	// test with last current page and nextPage not present
 	pagSize = 10
 	pageNum = 0
-	page, nextPage, pag = pagination.CreatePagination(&resources.GetIdentitiesParams{
-		Size: &pagSize,
-		Page: &pageNum,
-	}, 10)
+	page, nextPage, pag = pagination.CreatePagination(&pagSize, &pageNum, 10)
 
 	c.Assert(page, qt.Equals, pageNum)
 	c.Assert(nextPage, qt.IsNil)
@@ -105,10 +95,7 @@ func TestCreatePagination(t *testing.T) {
 	// test with current page over the total
 	pagSize = 10
 	pageNum = 2
-	page, nextPage, _ = pagination.CreatePagination(&resources.GetIdentitiesParams{
-		Size: &pagSize,
-		Page: &pageNum,
-	}, 10)
+	page, nextPage, _ = pagination.CreatePagination(&pagSize, &pageNum, 10)
 
 	c.Assert(page, qt.Equals, pageNum)
 	c.Assert(nextPage, qt.IsNil)

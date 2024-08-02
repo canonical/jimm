@@ -5,16 +5,16 @@ package rebac_admin
 import (
 	"context"
 
-	"github.com/canonical/jimm/v3/internal/jimm"
+	"github.com/canonical/jimm/v3/internal/jujuapi"
 	"github.com/canonical/rebac-admin-ui-handlers/v1/resources"
 )
 
 // groupsService implements the `GroupsService` interface.
 type groupsService struct {
-	jimm *jimm.JIMM
+	jimm jujuapi.JIMM
 }
 
-func newGroupService(jimm *jimm.JIMM) *groupsService {
+func newGroupService(jimm jujuapi.JIMM) *groupsService {
 	return &groupsService{
 		jimm,
 	}
