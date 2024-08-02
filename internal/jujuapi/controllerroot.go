@@ -32,7 +32,7 @@ import (
 type JIMM interface {
 	GroupService
 	RelationService
-	controllerService
+	ControllerService
 	AddAuditLogEntry(ale *dbmodel.AuditLogEntry)
 	AddCloudToController(ctx context.Context, user *openfga.User, controllerName string, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error
 	AddHostedCloud(ctx context.Context, user *openfga.User, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error

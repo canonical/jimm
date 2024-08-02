@@ -51,7 +51,7 @@ func init() {
 	}
 }
 
-type controllerService interface {
+type ControllerService interface {
 	AddController(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller) error
 	ControllerInfo(ctx context.Context, name string) (params.ControllerInfo, error)
 	ListControllers(ctx context.Context, user *openfga.User) ([]dbmodel.Controller, error)
