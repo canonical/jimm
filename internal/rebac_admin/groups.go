@@ -77,6 +77,9 @@ func (s *groupsService) GetGroup(ctx context.Context, groupId string) (*resource
 	}
 	group, err := s.jimm.GetGroupByID(ctx, user, groupId)
 	if err != nil {
+		if errors.ErrorCode(err) == errors.CodeNotFound {
+			return nil, v1.NewNotFoundError("failed to find group")
+		}
 		return nil, err
 	}
 	return &resources.Group{Id: &group.UUID, Name: group.Name}, nil
