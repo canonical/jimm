@@ -85,29 +85,42 @@ func TestListIdentities(t *testing.T) {
 		c.Assert(err, qt.IsNil)
 	}
 
-	// test users returned
-	filter = pagination.NewOffsetFilter(3, 0)
-	users, err = j.ListIdentities(ctx, u, filter)
-	c.Assert(err, qt.IsNil)
-	c.Assert(users, qt.HasLen, 3)
-	// user should be returned in ascending order of name
-	c.Assert(users[0].Name, qt.Equals, userNames[0])
-	c.Assert(users[1].Name, qt.Equals, userNames[1])
-	c.Assert(users[2].Name, qt.Equals, userNames[3])
-
-	// test remaining users
-	filter = pagination.NewOffsetFilter(3, 3)
-	users, err = j.ListIdentities(ctx, u, filter)
-	c.Assert(err, qt.IsNil)
-	c.Assert(users, qt.HasLen, 1)
-	// user should be returned in ascending order of name
-	c.Assert(users[0].Name, qt.Equals, userNames[2])
-
-	// test offset more than number of rows
-	filter = pagination.NewOffsetFilter(3, 5)
-	users, err = j.ListIdentities(ctx, u, filter)
-	c.Assert(err, qt.IsNil)
-	c.Assert(users, qt.HasLen, 0)
+	testCases := []struct {
+		desc       string
+		limit      int
+		offset     int
+		identities []string
+	}{
+		{
+			desc:       "test with first ids",
+			limit:      3,
+			offset:     0,
+			identities: []string{userNames[0], userNames[1], userNames[3]},
+		},
+		{
+			desc:       "test with remianing ids",
+			limit:      3,
+			offset:     3,
+			identities: []string{userNames[2]},
+		},
+		{
+			desc:       "test out of range",
+			limit:      3,
+			offset:     6,
+			identities: []string{},
+		},
+	}
+	for _, t := range testCases {
+		c.Run(t.desc, func(c *qt.C) {
+			filter = pagination.NewOffsetFilter(t.limit, t.offset)
+			identities, err := j.ListIdentities(ctx, u, filter)
+			c.Assert(err, qt.IsNil)
+			c.Assert(identities, qt.HasLen, len(t.identities))
+			for i := range len(t.identities) {
+				c.Assert(identities[i].Name, qt.Equals, t.identities[i])
+			}
+		})
+	}
 }
 
 func TestCountIdentities(t *testing.T) {

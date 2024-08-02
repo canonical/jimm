@@ -120,7 +120,7 @@ func (d *Database) GetIdentityCloudCredentials(ctx context.Context, u *dbmodel.I
 	return credentials, nil
 }
 
-// ForEachIdentity iterates through every user calling the given function
+// ForEachIdentity iterates through every identity calling the given function
 // for each one. If the given function returns an error the iteration
 // will stop immediately and the error will be returned unmodified.
 func (d *Database) ForEachIdentity(ctx context.Context, limit, offset int, f func(*dbmodel.Identity) error) (err error) {

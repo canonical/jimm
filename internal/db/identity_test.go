@@ -211,3 +211,21 @@ func (s *dbSuite) TestForEachIdentity(c *qt.C) {
 		c.Assert(secondIdentities[i].Name, qt.Equals, fmt.Sprintf("bob%d@canonical.com", i+5))
 	}
 }
+
+func (s *dbSuite) TestForEachIdentityError(c *qt.C) {
+	err := s.Database.Migrate(context.Background(), false)
+	c.Assert(err, qt.IsNil)
+	ctx := context.Background()
+	// add one identity
+	id, _ := dbmodel.NewIdentity("bob@canonical.com")
+	err = s.Database.GetIdentity(context.Background(), id)
+	c.Assert(err, qt.IsNil)
+
+	// test error is returned
+	errTest := errors.E("test-error")
+	err = s.Database.ForEachIdentity(ctx, 5, 0, func(ge *dbmodel.Identity) error {
+		return errTest
+	})
+	c.Assert(err, qt.IsNotNil)
+	c.Assert(err.Error(), qt.Equals, errTest.Error())
+}

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/canonical/jimm/v3/internal/common/pagination"
+	"github.com/canonical/jimm/v3/internal/common/utils"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/jimmtest"
 	"github.com/canonical/jimm/v3/internal/openfga"
@@ -70,48 +71,67 @@ func TestListIdentities(t *testing.T) {
 	ctx = rebac_handlers.ContextWithIdentity(ctx, &user)
 	identitySvc := rebac_admin.NewidentitiesService(&jimm)
 
-	// test with first page
-	size := 2
-	page := 0
-	identities, err := identitySvc.ListIdentities(ctx, &resources.GetIdentitiesParams{
-		Size: &size,
-		Page: &page,
-	})
-	c.Assert(err, qt.IsNil)
-	c.Assert(*identities.Meta.Page, qt.Equals, 0)
-	c.Assert(identities.Meta.Size, qt.Equals, 2)
-	c.Assert(*identities.Next.Page, qt.Equals, 1)
-	c.Assert(*identities.Meta.Total, qt.Equals, len(testUsers))
-	c.Assert(identities.Data[0].Email, qt.Equals, testUsers[0].Name)
-	c.Assert(identities.Data[1].Email, qt.Equals, testUsers[1].Name)
-
-	// test with second page
-	size = 2
-	page = 1
-	identities, err = identitySvc.ListIdentities(ctx, &resources.GetIdentitiesParams{
-		Size: &size,
-		Page: &page,
-	})
-	c.Assert(err, qt.IsNil)
-	c.Assert(*identities.Meta.Page, qt.Equals, 1)
-	c.Assert(identities.Meta.Size, qt.Equals, 2)
-	c.Assert(*identities.Next.Page, qt.Equals, 2)
-	c.Assert(*identities.Meta.Total, qt.Equals, len(testUsers))
-	c.Assert(identities.Data[0].Email, qt.Equals, testUsers[2].Name)
-	c.Assert(identities.Data[1].Email, qt.Equals, testUsers[3].Name)
-
-	// test with last page
-	size = 2
-	page = 2
-	identities, err = identitySvc.ListIdentities(ctx, &resources.GetIdentitiesParams{
-		Size: &size,
-		Page: &page,
-	})
-	c.Assert(err, qt.IsNil)
-	c.Assert(*identities.Meta.Page, qt.Equals, 2)
-	c.Assert(identities.Meta.Size, qt.Equals, 1)
-	c.Assert(identities.Next.Page, qt.IsNil)
-	c.Assert(*identities.Meta.Total, qt.Equals, len(testUsers))
-	c.Assert(identities.Data[0].Email, qt.Equals, testUsers[4].Name)
+	testCases := []struct {
+		desc         string
+		size         *int
+		page         *int
+		wantPage     int
+		wantSize     int
+		wantTotal    int
+		wantNextpage *int
+		emails       []string
+	}{
+		{
+			desc:         "test with first page",
+			size:         utils.IntToPointer(2),
+			page:         utils.IntToPointer(0),
+			wantPage:     0,
+			wantSize:     2,
+			wantNextpage: utils.IntToPointer(1),
+			wantTotal:    len(testUsers),
+			emails:       []string{testUsers[0].Name, testUsers[1].Name},
+		},
+		{
+			desc:         "test with second page",
+			size:         utils.IntToPointer(2),
+			page:         utils.IntToPointer(1),
+			wantPage:     1,
+			wantSize:     2,
+			wantNextpage: utils.IntToPointer(2),
+			wantTotal:    len(testUsers),
+			emails:       []string{testUsers[2].Name, testUsers[3].Name},
+		},
+		{
+			desc:         "test with last page",
+			size:         utils.IntToPointer(2),
+			page:         utils.IntToPointer(2),
+			wantPage:     2,
+			wantSize:     1,
+			wantNextpage: nil,
+			wantTotal:    len(testUsers),
+			emails:       []string{testUsers[4].Name},
+		},
+	}
+	for _, t := range testCases {
+		c.Run(t.desc, func(c *qt.C) {
+			identities, err := identitySvc.ListIdentities(ctx, &resources.GetIdentitiesParams{
+				Size: t.size,
+				Page: t.page,
+			})
+			c.Assert(err, qt.IsNil)
+			c.Assert(*identities.Meta.Page, qt.Equals, t.wantPage)
+			c.Assert(identities.Meta.Size, qt.Equals, t.wantSize)
+			if t.wantNextpage == nil {
+				c.Assert(identities.Next.Page, qt.IsNil)
+			} else {
+				c.Assert(*identities.Next.Page, qt.Equals, *t.wantNextpage)
+			}
+			c.Assert(*identities.Meta.Total, qt.Equals, t.wantTotal)
+			c.Assert(identities.Data, qt.HasLen, len(t.emails))
+			for i := range len(t.emails) {
+				c.Assert(identities.Data[i].Email, qt.Equals, t.emails[i])
+			}
+		})
+	}
 
 }
