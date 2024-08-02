@@ -50,7 +50,7 @@ jobs:
         cp -r $PROJECT/pkg/.[^.]* $PROJECT/pkg/* $PROJECT/go.mod .
 
         # Replace module references
-        find . -type f -exec sed -i "s|github.com/canonical/jimm/pkg|github.com/$SDK_REPO/$SDK_VERSION|" {} +
+        find . -type f -exec sed -i "s|github.com/canonical/jimm/v3/pkg|github.com/$SDK_REPO/$SDK_VERSION|" {} +
         sed -i "s|module .*|module github.com/$SDK_REPO/$SDK_VERSION|" go.mod
 
         # Needed to remove unused dependencies
