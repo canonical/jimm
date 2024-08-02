@@ -63,8 +63,10 @@ type JIMM interface {
 	GetControllerConfig(ctx context.Context, u *dbmodel.Identity) (*dbmodel.ControllerConfig, error)
 	GetCredentialStore() credentials.CredentialStore
 	GetJimmControllerAccess(ctx context.Context, user *openfga.User, tag names.UserTag) (string, error)
+	// GetUser finds or creates the user in jimm
 	GetUser(ctx context.Context, username string) (*openfga.User, error)
 	ListIdentities(ctx context.Context, user *openfga.User, filter pagination.LimitOffsetPagination) ([]openfga.User, error)
+	// FetchIdentity finds the user in jimm or returns a not-found error
 	FetchIdentity(ctx context.Context, username string) (*openfga.User, error)
 	CountIdentities(ctx context.Context, user *openfga.User) (int, error)
 	GetUserCloudAccess(ctx context.Context, user *openfga.User, cloud names.CloudTag) (string, error)
