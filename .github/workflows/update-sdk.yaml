@@ -31,7 +31,6 @@ jobs:
         repository: ${{ github.event.inputs.sdk-repo }}
         ref: ${{ github.event.inputs.sdk-version }}
         path: ./sdk
-        token: ${{ secrets.PAT }}
 
     - name: Setup Go
       uses: actions/setup-go@v5
@@ -59,7 +58,6 @@ jobs:
     - name: Create Pull Request
       uses: peter-evans/create-pull-request@v6
       with:
-        token: ${{ secrets.PAT }}
         path: ./sdk
         branch: update-sdk-${{ github.run_number }}
         title: Update SDK ${{ github.event.inputs.sdk-version }}
