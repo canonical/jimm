@@ -10,6 +10,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/common/pagination"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/jimmtest"
+	"github.com/canonical/jimm/v3/internal/jimmtest/mocks"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/rebac_admin"
 	rebac_handlers "github.com/canonical/rebac-admin-ui-handlers/v1"
@@ -21,7 +22,7 @@ func TestCreateGroup(t *testing.T) {
 	c := qt.New(t)
 	var addErr error
 	jimm := jimmtest.JIMM{
-		GroupService: jimmtest.GroupService{
+		GroupService: mocks.GroupService{
 			AddGroup_: func(ctx context.Context, user *openfga.User, name string) (*dbmodel.GroupEntry, error) {
 				return &dbmodel.GroupEntry{UUID: "test-uuid", Name: name}, addErr
 			},
@@ -45,9 +46,9 @@ func TestUpdateGroup(t *testing.T) {
 	groupID := "group-id"
 	var renameErr error
 	jimm := jimmtest.JIMM{
-		GroupService: jimmtest.GroupService{
-			GetGroupByID_: func(ctx context.Context, user *openfga.User, uuid string) (dbmodel.GroupEntry, error) {
-				return dbmodel.GroupEntry{UUID: groupID, Name: "test-group"}, nil
+		GroupService: mocks.GroupService{
+			GetGroupByID_: func(ctx context.Context, user *openfga.User, uuid string) (*dbmodel.GroupEntry, error) {
+				return &dbmodel.GroupEntry{UUID: groupID, Name: "test-group"}, nil
 			},
 			RenameGroup_: func(ctx context.Context, user *openfga.User, oldName, newName string) error {
 				if oldName != "test-group" {
@@ -80,7 +81,7 @@ func TestListGroups(t *testing.T) {
 		{Name: "group-3"},
 	}
 	jimm := jimmtest.JIMM{
-		GroupService: jimmtest.GroupService{
+		GroupService: mocks.GroupService{
 			ListGroups_: func(ctx context.Context, user *openfga.User, filter pagination.LimitOffsetPagination) ([]dbmodel.GroupEntry, error) {
 				return returnedGroups, listErr
 			},
@@ -114,9 +115,9 @@ func TestDeleteGroup(t *testing.T) {
 	c := qt.New(t)
 	var deleteErr error
 	jimm := jimmtest.JIMM{
-		GroupService: jimmtest.GroupService{
-			GetGroupByID_: func(ctx context.Context, user *openfga.User, uuid string) (dbmodel.GroupEntry, error) {
-				return dbmodel.GroupEntry{UUID: uuid, Name: "test-group"}, nil
+		GroupService: mocks.GroupService{
+			GetGroupByID_: func(ctx context.Context, user *openfga.User, uuid string) (*dbmodel.GroupEntry, error) {
+				return &dbmodel.GroupEntry{UUID: uuid, Name: "test-group"}, nil
 			},
 			RemoveGroup_: func(ctx context.Context, user *openfga.User, name string) error {
 				if name != "test-group" {

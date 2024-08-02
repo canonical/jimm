@@ -671,17 +671,17 @@ func (j *JIMM) CountGroups(ctx context.Context, user *openfga.User) (int, error)
 }
 
 // GetGroup returns a group based on the provided UUID.
-func (j *JIMM) GetGroupByID(ctx context.Context, user *openfga.User, uuid string) (dbmodel.GroupEntry, error) {
+func (j *JIMM) GetGroupByID(ctx context.Context, user *openfga.User, uuid string) (*dbmodel.GroupEntry, error) {
 	const op = errors.Op("jimm.AddGroup")
 
 	if !user.JimmAdmin {
-		return dbmodel.GroupEntry{}, errors.E(op, errors.CodeUnauthorized, "unauthorized")
+		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 	group := dbmodel.GroupEntry{UUID: uuid}
 	if err := j.Database.GetGroup(ctx, &group); err != nil {
-		return dbmodel.GroupEntry{}, errors.E(op, err)
+		return nil, errors.E(op, err)
 	}
-	return dbmodel.GroupEntry{}, nil
+	return &group, nil
 }
 
 // RenameGroup renames a group in JIMM's DB.

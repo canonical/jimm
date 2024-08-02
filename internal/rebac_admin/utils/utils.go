@@ -25,11 +25,8 @@ func ParseFromUserToIdentity(user openfga.User) resources.Identity {
 	}
 }
 
-type Params interface {
-	resources.GetIdentitiesParams
-	resources.GetGroupsParams
-}
-
+// CreatePaginationFilter return the pageSize, which will be equal to page if page is not nil
+// and also returns a LimitOffset filter for use with paginated APIs.
 func CreatePaginationFilter(size, page *int) (int, pagination.LimitOffsetPagination) {
 	pageSize := -1
 	offset := 0

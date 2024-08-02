@@ -55,7 +55,7 @@ const (
 type GroupService interface {
 	AddGroup(ctx context.Context, user *openfga.User, name string) (*dbmodel.GroupEntry, error)
 	CountGroups(ctx context.Context, user *openfga.User) (int, error)
-	GetGroupByID(ctx context.Context, user *openfga.User, uuid string) (dbmodel.GroupEntry, error)
+	GetGroupByID(ctx context.Context, user *openfga.User, uuid string) (*dbmodel.GroupEntry, error)
 	ListGroups(ctx context.Context, user *openfga.User, filter pagination.LimitOffsetPagination) ([]dbmodel.GroupEntry, error)
 	RenameGroup(ctx context.Context, user *openfga.User, oldName, newName string) error
 	RemoveGroup(ctx context.Context, user *openfga.User, name string) error

@@ -4,11 +4,13 @@ package rebac_admin
 
 import (
 	"context"
-	"errors"
 
+	v1 "github.com/canonical/rebac-admin-ui-handlers/v1"
+	"github.com/canonical/rebac-admin-ui-handlers/v1/resources"
+
+	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jujuapi"
 	"github.com/canonical/jimm/v3/internal/rebac_admin/utils"
-	"github.com/canonical/rebac-admin-ui-handlers/v1/resources"
 )
 
 // groupsService implements the `GroupsService` interface.
@@ -87,10 +89,13 @@ func (s *groupsService) UpdateGroup(ctx context.Context, group *resources.Group)
 		return nil, err
 	}
 	if group.Id == nil {
-		return nil, errors.New("missing group ID")
+		return nil, v1.NewValidationError("missing group ID")
 	}
 	existingGroup, err := s.jimm.GetGroupByID(ctx, user, *group.Id)
 	if err != nil {
+		if errors.ErrorCode(err) == errors.CodeNotFound {
+			return nil, v1.NewNotFoundError("failed to find group")
+		}
 		return nil, err
 	}
 	err = s.jimm.RenameGroup(ctx, user, existingGroup.Name, group.Name)
@@ -111,6 +116,9 @@ func (s *groupsService) DeleteGroup(ctx context.Context, groupId string) (bool, 
 	}
 	existingGroup, err := s.jimm.GetGroupByID(ctx, user, groupId)
 	if err != nil {
+		if errors.ErrorCode(err) == errors.CodeNotFound {
+			return false, nil
+		}
 		return false, err
 	}
 	err = s.jimm.RemoveGroup(ctx, user, existingGroup.Name)

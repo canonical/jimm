@@ -1,3 +1,5 @@
+// Copyright 2024 Canonical Ltd.
+
 package utils
 
 import (
@@ -8,6 +10,8 @@ import (
 	rebac_handlers "github.com/canonical/rebac-admin-ui-handlers/v1"
 )
 
+// GetUserFromContext retrieves the OpenFGA user pointer from the context
+// returning an error if it does not exist or is not the correct type.
 func GetUserFromContext(ctx context.Context) (*openfga.User, error) {
 	raw, err := rebac_handlers.GetIdentityFromContext(ctx)
 	if err != nil {

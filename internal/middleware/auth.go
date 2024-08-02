@@ -28,7 +28,8 @@ func AuthenticateViaCookie(next http.Handler, jimm *jimm.JIMM) http.Handler {
 }
 
 // AuthenticateRebac is a layer on top of AuthenticateViaCookie
-// It places the OpenFGA user for the session identity inside the request's context.
+// It places the OpenFGA user for the session identity inside the request's context
+// and verifies that the user is a JIMM admin.
 func AuthenticateRebac(next http.Handler, jimm *jimm.JIMM) http.Handler {
 	return AuthenticateViaCookie(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -44,6 +45,11 @@ func AuthenticateRebac(next http.Handler, jimm *jimm.JIMM) http.Handler {
 		if err != nil {
 			zapctx.Error(ctx, "failed to get openfga user", zap.Error(err))
 			http.Error(w, "internal authentication error", http.StatusInternalServerError)
+			return
+		}
+		if !user.JimmAdmin {
+			w.WriteHeader(http.StatusUnauthorized)
+			w.Write([]byte("user is not an admin"))
 			return
 		}
 
