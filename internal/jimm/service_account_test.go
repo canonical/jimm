@@ -267,7 +267,7 @@ func TestGrantServiceAccountAccess(t *testing.T) {
 						Relation: ofganames.AdministratorRelation,
 						Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag(test.clientID)),
 					}
-					ok, err := jimm.AuthorizationClient().CheckRelation(context.Background(), tuple, false)
+					ok, err := jimm.OpenFGAClient.CheckRelation(context.Background(), tuple, false)
 					c.Assert(err, qt.IsNil)
 					c.Assert(ok, qt.IsTrue)
 				}

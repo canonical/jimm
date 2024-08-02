@@ -39,7 +39,6 @@ type JIMM interface {
 	AddModel(ctx context.Context, u *openfga.User, args *jimm.ModelCreateArgs) (_ *jujuparams.ModelInfo, err error)
 	AddServiceAccount(ctx context.Context, u *openfga.User, clientId string) error
 	OAuthAuthenticationService() jimm.OAuthAuthenticator
-	AuthorizationClient() *openfga.OFGAClient
 	ChangeModelCredential(ctx context.Context, user *openfga.User, modelTag names.ModelTag, cloudCredentialTag names.CloudCredentialTag) error
 	CopyServiceAccountCredential(ctx context.Context, u *openfga.User, svcAcc *openfga.User, cloudCredentialTag names.CloudCredentialTag) (names.CloudCredentialTag, []jujuparams.UpdateCredentialModelResult, error)
 	DB() *db.Database
