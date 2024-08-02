@@ -939,7 +939,7 @@ func (s *accessControlSuite) TestListRelationshipTuplesNoUUIDResolution(c *gc.C)
 	user, _, controller, model, applicationOffer, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
 	defer closeClient()
 
-	err := client.AddGroup(&apiparams.AddGroupRequest{Name: "orange"})
+	_, err := client.AddGroup(&apiparams.AddGroupRequest{Name: "orange"})
 	c.Assert(err, jc.ErrorIsNil)
 
 	tuples := []apiparams.RelationshipTuple{{
