@@ -128,7 +128,7 @@ func (s *JimmCmdSuite) SetUpTest(c *gc.C) {
 		store := jjclient.NewMemStore()
 		store.CurrentControllerName = "JIMM"
 		store.Controllers["JIMM"] = jjclient.ControllerDetails{
-			ControllerUUID: "914487b5-60e7-42bb-bd63-1adc3fd3a388",
+			ControllerUUID: jimmtest.ControllerUUID,
 			APIEndpoints:   []string{u.Host},
 			PublicDNSName:  s.HTTP.URL,
 			CACert:         w.String(),
