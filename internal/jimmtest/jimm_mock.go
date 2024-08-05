@@ -587,7 +587,7 @@ func (j *JIMM) UpdateUserLastLogin(ctx context.Context, identifier string) error
 	if j.UpdateUserLastLogin_ == nil {
 		return errors.E(errors.CodeNotImplemented)
 	}
-	return j.UpdateUserLastLogin(ctx, identifier)
+	return j.UpdateUserLastLogin_(ctx, identifier)
 }
 func (j *JIMM) IdentityModelDefaults(ctx context.Context, user *dbmodel.Identity) (map[string]interface{}, error) {
 	if j.IdentityModelDefaults_ == nil {
