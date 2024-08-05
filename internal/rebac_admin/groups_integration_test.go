@@ -119,3 +119,64 @@ func (s rebacAdminSuite) TestPatchGroupIdentitiesIntegration(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	c.Assert(allowed, gc.Equals, true)
 }
+
+func (s rebacAdminSuite) TestGetGroupEntitlementsIntegration(c *gc.C) {
+	ctx := context.Background()
+	group, err := s.JIMM.AddGroup(ctx, s.AdminUser, "test-group")
+	c.Assert(err, gc.IsNil)
+	tuple := openfga.Tuple{
+		Object:   ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag(group.UUID), ofganames.MemberRelation),
+		Relation: ofganames.AdministratorRelation,
+	}
+	var tuples []openfga.Tuple
+	for i := range 3 {
+		t := tuple
+		t.Target = ofganames.ConvertTag(names.NewModelTag(fmt.Sprintf("test-model-%d", i)))
+		tuples = append(tuples, t)
+	}
+	for i := range 3 {
+		t := tuple
+		t.Target = ofganames.ConvertTag(names.NewControllerTag(fmt.Sprintf("test-controller-%d", i)))
+		tuples = append(tuples, t)
+	}
+	err = s.JIMM.OpenFGAClient.AddRelation(ctx, tuples...)
+	c.Assert(err, gc.IsNil)
+
+	ctx = rebac_handlers.ContextWithIdentity(ctx, s.AdminUser)
+	count := 0
+	emptyPageToken := ""
+	req := resources.GetGroupsItemEntitlementsParams{NextPageToken: &emptyPageToken}
+	foundModelEntitlement := false
+	foundControllerEntitlement := false
+	for {
+		count++
+		if count > 10 {
+			c.Logf("%s looped too many times while fetching entitlements", c.TestName())
+			c.FailNow()
+		}
+		res, err := s.groupSvc.GetGroupEntitlements(ctx, group.UUID, &req)
+		c.Assert(err, gc.IsNil)
+		c.Assert(res, gc.Not(gc.IsNil))
+		if res.Meta.Size > 0 {
+			c.Assert(res.Meta.Size, gc.Equals, 3)
+			c.Assert(res.Data, gc.HasLen, 3)
+			c.Assert(res.Data[0].Entitlement, gc.Equals, ofganames.AdministratorRelation.String())
+			c.Assert(res.Data[0].EntityId, gc.Matches, "test-.*-0")
+			switch res.Data[0].EntityType {
+			case openfga.ModelType.String():
+				foundModelEntitlement = true
+			case openfga.ControllerType.String():
+				foundControllerEntitlement = true
+			}
+		}
+		if *res.Next.PageToken == "" {
+			break
+		}
+		c.Assert(*res.Meta.PageToken, gc.Equals, *req.NextPageToken)
+		c.Assert(*res.Next.PageToken, gc.Not(gc.Equals), "")
+		req.NextPageToken = res.Next.PageToken
+	}
+	c.Assert(foundModelEntitlement, gc.Equals, true)
+	c.Assert(foundControllerEntitlement, gc.Equals, true)
+
+}

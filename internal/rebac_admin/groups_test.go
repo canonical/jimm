@@ -229,3 +229,37 @@ func TestPatchGroupIdentities(t *testing.T) {
 	_, err = groupSvc.PatchGroupIdentities(ctx, newUUID.String(), operations)
 	c.Assert(err, qt.ErrorMatches, "foo")
 }
+
+func TestGetGroupEntitlements(t *testing.T) {
+	c := qt.New(t)
+	testTuple := openfga.Tuple{
+		Object:   &ofga.Entity{Kind: "user", ID: "foo"},
+		Relation: ofga.Relation("member"),
+		Target:   &ofga.Entity{Kind: "group", ID: "my-group"},
+	}
+	jimm := jimmtest.JIMM{
+		RelationService: mocks.RelationService{
+			ListRelationshipTuples_: func(ctx context.Context, user *openfga.User, tuple params.RelationshipTuple, pageSize int32, continuationToken string) ([]openfga.Tuple, string, error) {
+				return []openfga.Tuple{testTuple}, "continuation-token", nil
+			},
+		},
+	}
+	user := openfga.User{}
+	ctx := context.Background()
+	ctx = rebac_handlers.ContextWithIdentity(ctx, &user)
+	groupSvc := rebac_admin.NewGroupService(&jimm)
+
+	_, err := groupSvc.GetGroupEntitlements(ctx, "invalid-group-id", nil)
+	c.Assert(err, qt.ErrorMatches, ".* invalid group ID")
+
+	res, err := groupSvc.GetGroupEntitlements(ctx, uuid.New().String(), &resources.GetGroupsItemEntitlementsParams{})
+	c.Assert(err, qt.IsNil)
+	c.Assert(res, qt.IsNotNil)
+	c.Assert(res.Data, qt.HasLen, 1)
+	c.Assert(res.Next.PageToken, qt.Not(qt.Equals), "")
+
+	// Test using the previous tokens page token.
+	res, err = groupSvc.GetGroupEntitlements(ctx, uuid.New().String(), &resources.GetGroupsItemEntitlementsParams{NextToken: res.Next.PageToken})
+	c.Assert(err, qt.IsNil)
+	c.Assert(res, qt.IsNotNil)
+}

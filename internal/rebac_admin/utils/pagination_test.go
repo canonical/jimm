@@ -1,0 +1,179 @@
+// Copyright 2024 Canonical Ltd.
+
+package utils_test
+
+import (
+	"fmt"
+	"testing"
+
+	qt "github.com/frankban/quicktest"
+
+	"github.com/canonical/jimm/v3/internal/openfga"
+	"github.com/canonical/jimm/v3/internal/rebac_admin/utils"
+)
+
+func TestMarshalRebacToken(t *testing.T) {
+	c := qt.New(t)
+
+	tests := []struct {
+		token         utils.RebacToken
+		expectedError string
+		expectedToken string
+	}{{
+		token: utils.RebacToken{
+			Kind:         openfga.ModelType,
+			OpenFGAToken: "continuation-token",
+		},
+		expectedToken: "eyJLaW5kIjoibW9kZWwiLCJUb2tlbiI6ImNvbnRpbnVhdGlvbi10b2tlbiJ9",
+	}, {
+		token: utils.RebacToken{
+			Kind:         "",
+			OpenFGAToken: "continuation-token",
+		},
+		expectedError: "kind not specified",
+	}}
+
+	for i, test := range tests {
+		test := test
+		c.Run(fmt.Sprintf("test %d", i), func(c *qt.C) {
+			data, err := test.token.MarshalRebacToken()
+			if test.expectedError != "" {
+				c.Assert(err, qt.ErrorMatches, test.expectedError)
+			} else {
+				c.Assert(data, qt.Equals, test.expectedToken)
+			}
+		})
+	}
+}
+
+func TestUnmarshalRebacToken(t *testing.T) {
+	c := qt.New(t)
+
+	tests := []struct {
+		in            string
+		expectedToken utils.RebacToken
+		expectedError string
+	}{{
+		expectedToken: utils.RebacToken{
+			Kind:         openfga.ModelType,
+			OpenFGAToken: "continuation-token",
+		},
+		in: "eyJLaW5kIjoibW9kZWwiLCJUb2tlbiI6ImNvbnRpbnVhdGlvbi10b2tlbiJ9",
+	}}
+
+	for i, test := range tests {
+		test := test
+		c.Run(fmt.Sprintf("test %d", i), func(c *qt.C) {
+			var token utils.RebacToken
+			err := token.UnmarshalRebacToken(test.in)
+			if test.expectedError != "" {
+				c.Assert(err, qt.ErrorMatches, test.expectedError)
+			} else {
+				c.Assert(token, qt.DeepEquals, test.expectedToken)
+			}
+		})
+	}
+}
+
+func TestCreateEntitlementPaginationFilter(t *testing.T) {
+	c := qt.New(t)
+	testCases := []struct {
+		desc          string
+		nextPageToken func() string
+		expectedToken string
+		expectedKind  openfga.Kind
+		expectedErr   string
+	}{
+		{
+			desc:          "empty next page token",
+			nextPageToken: func() string { return "" },
+			expectedToken: "",
+			expectedKind:  utils.EntitlementResources[0],
+		},
+		{
+			desc: "model resource page token",
+			nextPageToken: func() string {
+				t := utils.RebacToken{Kind: openfga.ModelType, OpenFGAToken: "123"}
+				res, err := t.MarshalRebacToken()
+				c.Assert(err, qt.IsNil)
+				return res
+			},
+			expectedToken: "123",
+			expectedKind:  openfga.ModelType,
+		},
+		{
+			desc: "invalid token",
+			nextPageToken: func() string {
+				return "123"
+			},
+			expectedErr: "failed to decode pagination token.*",
+		},
+	}
+	for _, tC := range testCases {
+		t.Run(tC.desc, func(t *testing.T) {
+			input := tC.nextPageToken()
+			filter, err := utils.CreateEntitlementPaginationFilter(nil, &input, nil)
+			if tC.expectedErr == "" {
+				c.Assert(err, qt.IsNil)
+				c.Assert(filter.OriginalToken, qt.Equals, input)
+				c.Assert(filter.TargetKind, qt.Equals, tC.expectedKind)
+				c.Assert(filter.TokenPagination.Token(), qt.Equals, tC.expectedToken)
+			} else {
+				c.Assert(err, qt.ErrorMatches, tC.expectedErr)
+			}
+		})
+	}
+}
+
+func TestNextEntitlementToken(t *testing.T) {
+	c := qt.New(t)
+	testCases := []struct {
+		desc          string
+		openFGAToken  string
+		kind          openfga.Kind
+		expectedToken string
+		expectedErr   string
+	}{
+		{
+			desc:          "empty OpenFGA token - expect next resource type",
+			openFGAToken:  "",
+			kind:          utils.EntitlementResources[0],
+			expectedToken: "eyJLaW5kIjoiY2xvdWQiLCJPcGVuRkdBVG9rZW4iOiIifQ==",
+		},
+		{
+			desc:          "non-empty OpenFGA token - expect same kind and token",
+			openFGAToken:  "123",
+			kind:          openfga.ModelType,
+			expectedToken: "eyJLaW5kIjoibW9kZWwiLCJPcGVuRkdBVG9rZW4iOiIxMjMifQ==",
+		},
+		{
+			desc:         "empty kind - expect error",
+			openFGAToken: "123",
+			kind:         "",
+			expectedErr:  ".*kind not specified",
+		},
+		{
+			desc:          "last resource type but not last page - expect same kind and token",
+			openFGAToken:  "123",
+			kind:          utils.EntitlementResources[len(utils.EntitlementResources)-1],
+			expectedToken: "eyJLaW5kIjoic2VydmljZWFjY291bnQiLCJPcGVuRkdBVG9rZW4iOiIxMjMifQ==",
+		},
+		{
+			desc:          "last resource type with no more data - expect empty token",
+			openFGAToken:  "",
+			kind:          utils.EntitlementResources[len(utils.EntitlementResources)-1],
+			expectedToken: "",
+		},
+	}
+	for _, tC := range testCases {
+		t.Run(tC.desc, func(t *testing.T) {
+			token, err := utils.NextEntitlementToken(tC.kind, tC.openFGAToken)
+			if tC.expectedErr == "" {
+				c.Assert(err, qt.IsNil)
+				c.Assert(token, qt.Equals, tC.expectedToken)
+			} else {
+				c.Assert(err, qt.ErrorMatches, tC.expectedErr)
+			}
+		})
+	}
+}
