@@ -8,6 +8,7 @@ import (
 	v1 "github.com/canonical/rebac-admin-ui-handlers/v1"
 	"github.com/canonical/rebac-admin-ui-handlers/v1/resources"
 
+	"github.com/canonical/jimm/v3/internal/common/pagination"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jujuapi"
 	"github.com/canonical/jimm/v3/internal/rebac_admin/utils"
@@ -30,16 +31,16 @@ func (s *groupsService) ListGroups(ctx context.Context, params *resources.GetGro
 	if err != nil {
 		return nil, err
 	}
-	currentPage, filter := utils.CreatePaginationFilter(params.Size, params.Page)
-	nextPage := currentPage + 1
 	count, err := s.jimm.CountGroups(ctx, user)
 	if err != nil {
 		return nil, err
 	}
-	groups, err := s.jimm.ListGroups(ctx, user, filter)
+	page, nextPage, pagination := pagination.CreatePagination(params.Size, params.Page, count)
+	groups, err := s.jimm.ListGroups(ctx, user, pagination)
 	if err != nil {
 		return nil, err
 	}
+
 	data := make([]resources.Group, 0, len(groups))
 	for _, group := range groups {
 		data = append(data, resources.Group{Id: &group.UUID, Name: group.Name})
@@ -47,11 +48,11 @@ func (s *groupsService) ListGroups(ctx context.Context, params *resources.GetGro
 	resp := resources.PaginatedResponse[resources.Group]{
 		Data: data,
 		Meta: resources.ResponseMeta{
-			Page:  &currentPage,
+			Page:  &page,
 			Size:  len(groups),
 			Total: &count,
 		},
-		Next: resources.Next{Page: &nextPage},
+		Next: resources.Next{Page: nextPage},
 	}
 	return &resp, nil
 }

@@ -15,6 +15,7 @@ import (
 	"github.com/rogpeppe/fastuuid"
 	"golang.org/x/oauth2"
 
+	"github.com/canonical/jimm/v3/internal/common/pagination"
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"

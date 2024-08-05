@@ -12,6 +12,7 @@ import (
 	"github.com/juju/names/v5"
 	"github.com/juju/version"
 
+	"github.com/canonical/jimm/v3/internal/common/pagination"
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
