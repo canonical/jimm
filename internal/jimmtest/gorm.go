@@ -146,8 +146,8 @@ func dbCleanup(t Tester, gdb *gorm.DB, databaseName string) {
 		}
 	}
 	// Only delete the DB after closing connections to it.
-	_, skip_cleanup := os.LookupEnv("NO_DB_CLEANUP")
-	if !skip_cleanup {
+	_, skipCleanup := os.LookupEnv("NO_DB_CLEANUP")
+	if !skipCleanup {
 		err := DeleteDatabase(databaseName)
 		if err != nil {
 			t.Logf("failed to delete database (%s): %s", databaseName, err)
