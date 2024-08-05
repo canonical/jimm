@@ -385,7 +385,7 @@ func (j *mockJIMM) OAuthAuthenticationService() jimm.OAuthAuthenticator {
 	return j.authenticator
 }
 
-func (j *mockJIMM) GetOpenFGAUserAndAuthorise(ctx context.Context, email string) (*openfga.User, error) {
+func (j *mockJIMM) GetUser(ctx context.Context, email string) (*openfga.User, error) {
 	identity, err := dbmodel.NewIdentity(email)
 	if err != nil {
 		return nil, err
@@ -394,6 +394,10 @@ func (j *mockJIMM) GetOpenFGAUserAndAuthorise(ctx context.Context, email string)
 		identity,
 		nil,
 	), nil
+}
+
+func (j *mockJIMM) UpdateUserLastLogin(ctx context.Context, identifier string) error {
+	return nil
 }
 
 func (j *mockJIMM) GetCredentialStore() credentials.CredentialStore {

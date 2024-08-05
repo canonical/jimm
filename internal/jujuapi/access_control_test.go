@@ -830,7 +830,55 @@ func (s *accessControlSuite) TestJAASTag(c *gc.C) {
 		expectedJAASTag: "cloud-" + cloud.Name,
 	}}
 	for _, test := range tests {
-		t, err := jujuapi.ToJAASTag(db, test.tag)
+		t, err := jujuapi.ToJAASTag(db, test.tag, true)
+		if test.expectedError != "" {
+			c.Assert(err, gc.ErrorMatches, test.expectedError)
+		} else {
+			c.Assert(err, gc.IsNil)
+			c.Assert(t, gc.Equals, test.expectedJAASTag)
+		}
+	}
+}
+
+func (s *accessControlSuite) TestJAASTagNoUUIDResolution(c *gc.C) {
+	ctx := context.Background()
+	db := s.JIMM.Database
+
+	user, group, controller, model, applicationOffer, cloud, _, _, closeClient := createTestControllerEnvironment(ctx, c, s)
+	serviceAccountId := petname.Generate(2, "-") + "@serviceaccount"
+	closeClient()
+
+	tests := []struct {
+		tag             *ofganames.Tag
+		expectedJAASTag string
+		expectedError   string
+	}{{
+		tag:             ofganames.ConvertTag(user.ResourceTag()),
+		expectedJAASTag: "user-" + user.Name,
+	}, {
+		tag:             ofganames.ConvertTag(names.NewServiceAccountTag(serviceAccountId)),
+		expectedJAASTag: "serviceaccount-" + serviceAccountId,
+	}, {
+		tag:             ofganames.ConvertTag(group.ResourceTag()),
+		expectedJAASTag: "group-" + group.UUID,
+	}, {
+		tag:             ofganames.ConvertTag(controller.ResourceTag()),
+		expectedJAASTag: "controller-" + controller.UUID,
+	}, {
+		tag:             ofganames.ConvertTag(model.ResourceTag()),
+		expectedJAASTag: "model-" + model.UUID.String,
+	}, {
+		tag:             ofganames.ConvertTag(applicationOffer.ResourceTag()),
+		expectedJAASTag: "applicationoffer-" + applicationOffer.UUID,
+	}, {
+		tag:             ofganames.ConvertTag(cloud.ResourceTag()),
+		expectedJAASTag: "cloud-" + cloud.Name,
+	}, {
+		tag:             &ofganames.Tag{},
+		expectedJAASTag: "-",
+	}}
+	for _, test := range tests {
+		t, err := jujuapi.ToJAASTag(db, test.tag, false)
 		if test.expectedError != "" {
 			c.Assert(err, gc.ErrorMatches, test.expectedError)
 		} else {
@@ -871,7 +919,7 @@ func (s *accessControlSuite) TestListRelationshipTuples(c *gc.C) {
 	err = client.AddRelation(&apiparams.AddRelationRequest{Tuples: tuples})
 	c.Assert(err, jc.ErrorIsNil)
 
-	response, err := client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{})
+	response, err := client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{ResolveUUIDs: true})
 	c.Assert(err, jc.ErrorIsNil)
 	// first three tuples created during setup test
 	c.Assert(response.Tuples[12:], jc.DeepEquals, tuples)
@@ -881,9 +929,46 @@ func (s *accessControlSuite) TestListRelationshipTuples(c *gc.C) {
 		Tuple: apiparams.RelationshipTuple{
 			TargetObject: "applicationoffer-" + controller.Name + ":" + user.Name + "/" + model.Name + "." + applicationOffer.Name,
 		},
+		ResolveUUIDs: true,
 	})
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(response.Tuples, jc.DeepEquals, []apiparams.RelationshipTuple{tuples[3]})
+	c.Assert(len(response.Errors), gc.Equals, 0)
+}
+
+func (s *accessControlSuite) TestListRelationshipTuplesNoUUIDResolution(c *gc.C) {
+	ctx := context.Background()
+	user, _, controller, model, applicationOffer, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
+	defer closeClient()
+
+	_, err := client.AddGroup(&apiparams.AddGroupRequest{Name: "orange"})
+	c.Assert(err, jc.ErrorIsNil)
+
+	tuples := []apiparams.RelationshipTuple{{
+		Object:       "group-orange#member",
+		Relation:     "administrator",
+		TargetObject: "applicationoffer-" + applicationOffer.UUID,
+	}}
+
+	err = client.AddRelation(&apiparams.AddRelationRequest{Tuples: tuples})
+	c.Assert(err, jc.ErrorIsNil)
+
+	groupOrange := dbmodel.GroupEntry{Name: "orange"}
+	err = s.JIMM.DB().GetGroup(ctx, &groupOrange)
+	c.Assert(err, jc.ErrorIsNil)
+	expected := []apiparams.RelationshipTuple{{
+		Object:       "group-" + groupOrange.UUID + "#member",
+		Relation:     "administrator",
+		TargetObject: "applicationoffer-" + applicationOffer.UUID,
+	}}
+	response, err := client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{
+		Tuple: apiparams.RelationshipTuple{
+			TargetObject: "applicationoffer-" + controller.Name + ":" + user.Name + "/" + model.Name + "." + applicationOffer.Name,
+		},
+		ResolveUUIDs: false,
+	})
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(response.Tuples, jc.DeepEquals, expected)
 	c.Assert(len(response.Errors), gc.Equals, 0)
 }
 
@@ -921,7 +1006,7 @@ func (s *accessControlSuite) TestListRelationshipTuplesAfterDeletingGroup(c *gc.
 	err = client.RemoveGroup(&apiparams.RemoveGroupRequest{Name: "yellow"})
 	c.Assert(err, jc.ErrorIsNil)
 
-	response, err := client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{})
+	response, err := client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{ResolveUUIDs: true})
 	c.Assert(err, jc.ErrorIsNil)
 	// Create a new slice of tuples excluding the ones we expect to be deleted.
 	newTuples := []apiparams.RelationshipTuple{tuples[1], tuples[3]}
@@ -956,7 +1041,7 @@ func (s *accessControlSuite) TestListRelationshipTuplesWithMissingGroups(c *gc.C
 	err = s.JIMM.DB().RemoveGroup(ctx, group)
 	c.Assert(err, jc.ErrorIsNil)
 
-	response, err := client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{})
+	response, err := client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{ResolveUUIDs: true})
 	c.Assert(err, jc.ErrorIsNil)
 	tupleWithoutDBEntry := tuples[0]
 	tupleWithoutDBEntry.TargetObject = "group:" + group.UUID

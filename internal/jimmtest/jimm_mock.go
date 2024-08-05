@@ -104,13 +104,13 @@ type JIMM struct {
 	SetControllerDeprecated_           func(ctx context.Context, user *openfga.User, controllerName string, deprecated bool) error
 	SetModelDefaults_                  func(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag, region string, configs map[string]interface{}) error
 	SetIdentityModelDefaults_          func(ctx context.Context, user *dbmodel.Identity, configs map[string]interface{}) error
-	ToJAASTag_                         func(ctx context.Context, tag *ofganames.Tag) (string, error)
+	ToJAASTag_                         func(ctx context.Context, tag *ofganames.Tag, resolveUUIDs bool) (string, error)
 	UnsetModelDefaults_                func(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag, region string, keys []string) error
 	UpdateApplicationOffer_            func(ctx context.Context, controller *dbmodel.Controller, offerUUID string, removed bool) error
 	UpdateCloud_                       func(ctx context.Context, u *openfga.User, ct names.CloudTag, cloud jujuparams.Cloud) error
 	UpdateCloudCredential_             func(ctx context.Context, u *openfga.User, args jimm.UpdateCloudCredentialArgs) ([]jujuparams.UpdateCredentialModelResult, error)
 	UpdateMigratedModel_               func(ctx context.Context, user *openfga.User, modelTag names.ModelTag, targetControllerName string) error
-	UpdateServiceAccountCredentials_   func()
+	UpdateUserLastLogin_               func(ctx context.Context, identifier string) error
 	ValidateModelUpgrade_              func(ctx context.Context, u *openfga.User, mt names.ModelTag, force bool) error
 	WatchAllModelSummaries_            func(ctx context.Context, controller *dbmodel.Controller) (_ func() error, err error)
 }
@@ -552,11 +552,11 @@ func (j *JIMM) SetIdentityModelDefaults(ctx context.Context, user *dbmodel.Ident
 	}
 	return j.SetIdentityModelDefaults_(ctx, user, configs)
 }
-func (j *JIMM) ToJAASTag(ctx context.Context, tag *ofganames.Tag) (string, error) {
+func (j *JIMM) ToJAASTag(ctx context.Context, tag *ofganames.Tag, resolveUUIDs bool) (string, error) {
 	if j.ToJAASTag_ == nil {
 		return "", errors.E(errors.CodeNotImplemented)
 	}
-	return j.ToJAASTag_(ctx, tag)
+	return j.ToJAASTag_(ctx, tag, resolveUUIDs)
 }
 func (j *JIMM) UnsetModelDefaults(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag, region string, keys []string) error {
 	if j.UnsetModelDefaults_ == nil {
@@ -587,6 +587,12 @@ func (j *JIMM) UpdateMigratedModel(ctx context.Context, user *openfga.User, mode
 		return errors.E(errors.CodeNotImplemented)
 	}
 	return j.UpdateMigratedModel_(ctx, user, modelTag, targetControllerName)
+}
+func (j *JIMM) UpdateUserLastLogin(ctx context.Context, identifier string) error {
+	if j.UpdateUserLastLogin_ == nil {
+		return errors.E(errors.CodeNotImplemented)
+	}
+	return j.UpdateUserLastLogin(ctx, identifier)
 }
 func (j *JIMM) IdentityModelDefaults(ctx context.Context, user *dbmodel.Identity) (map[string]interface{}, error) {
 	if j.IdentityModelDefaults_ == nil {
