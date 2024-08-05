@@ -73,10 +73,10 @@ func (j *JIMM) CheckRelation(ctx context.Context, user *openfga.User, tuple apip
 	return allowed, nil
 }
 
-// ListRelationshipTuples checks user permission and remove given relations tuples.
-// At the moment user is required be admin
+// ListRelationshipTuples checks user permission and lists relationship tuples based of tuple struct with pagination.
+// Listing filters can be relaxedleaving empty tuple.Relation or tuple.TargetObject.
 func (j *JIMM) ListRelationshipTuples(ctx context.Context, user *openfga.User, tuple apiparams.RelationshipTuple, pageSize int32, continuationToken string) ([]openfga.Tuple, string, error) {
-	const op = errors.Op("jujuapi.ListRelationshipTuples")
+	const op = errors.Op("jimm.ListRelationshipTuples")
 	if !user.JimmAdmin {
 		return []openfga.Tuple{}, "", errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}

@@ -1,5 +1,6 @@
 package rebac_admin
 
 var (
-	NewGroupService = newGroupService
+	NewGroupService      = newGroupService
+	NewidentitiesService = newidentitiesService
 )

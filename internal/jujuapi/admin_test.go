@@ -46,6 +46,9 @@ func (s *adminSuite) SetUpTest(c *gc.C) {
 
 	sessionStore, err := pgstore.NewPGStoreFromPool(sqldb, []byte("secretsecretdigletts"))
 	c.Assert(err, gc.IsNil)
+	s.AddCleanup(func(c *gc.C) {
+		sessionStore.Close()
+	})
 
 	// Replace JIMM's mock authenticator with a real one here
 	// for testing the login flows.
@@ -117,6 +120,7 @@ func testBrowserLogin(c *gc.C, s *adminSuite, username, password, expectedEmail,
 
 	sessionStore, err := pgstore.NewPGStoreFromPool(sqldb, []byte("secretsecretdigletts"))
 	c.Assert(err, gc.IsNil)
+	defer sessionStore.Close()
 
 	cookie, err := jimmtest.RunBrowserLogin(
 		s.JIMM.DB(),
