@@ -5,6 +5,7 @@ package names
 import (
 	"fmt"
 	"strings"
+	"errors"
 
 	"github.com/juju/names/v5"
 )
@@ -80,7 +81,7 @@ func EnsureValidServiceAccountId(id string) (string, error) {
 	}
 
 	if !IsValidServiceAccountId(id) {
-		return "", fmt.Errorf("invalid client id %q", id)
+		return "", errors.New("invalid client ID")
 	}
 	return id, nil
 }
