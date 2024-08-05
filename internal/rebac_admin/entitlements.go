@@ -17,36 +17,54 @@ const group = "group"
 
 // For rebac v1 this list is kept manually.
 // The reason behind that is we want to decide what relations to expose to rebac admin ui.
-var EntitlementSchemaList = []resources.EntitlementSchema{
-	{EntityType: "applicationoffer", Entitlement: "administrator", ReceiverType: identity},
-	{EntityType: "applicationoffer", Entitlement: "administrator", ReceiverType: group},
-	{EntityType: "applicationoffer", Entitlement: "consumer", ReceiverType: identity},
-	{EntityType: "applicationoffer", Entitlement: "consumer", ReceiverType: group},
-	{EntityType: "applicationoffer", Entitlement: "reader", ReceiverType: identity},
-	{EntityType: "applicationoffer", Entitlement: "reader", ReceiverType: group},
+var EntitlementsList = []resources.EntitlementSchema{
+	// applicationoffer
+	{Entitlement: "administrator", ReceiverType: "user", EntityType: "applicationoffer"},
+	{Entitlement: "administrator", ReceiverType: "user:*", EntityType: "applicationoffer"},
+	{Entitlement: "administrator", ReceiverType: "group#member", EntityType: "applicationoffer"},
+	{Entitlement: "consumer", ReceiverType: "user", EntityType: "applicationoffer"},
+	{Entitlement: "consumer", ReceiverType: "user:*", EntityType: "applicationoffer"},
+	{Entitlement: "consumer", ReceiverType: "group#member", EntityType: "applicationoffer"},
+	{Entitlement: "reader", ReceiverType: "user", EntityType: "applicationoffer"},
+	{Entitlement: "reader", ReceiverType: "user:*", EntityType: "applicationoffer"},
+	{Entitlement: "reader", ReceiverType: "group#member", EntityType: "applicationoffer"},
 
-	{EntityType: "cloud", Entitlement: "administrator", ReceiverType: identity},
-	{EntityType: "cloud", Entitlement: "administrator", ReceiverType: group},
-	{EntityType: "cloud", Entitlement: "can_addmodel", ReceiverType: identity},
-	{EntityType: "cloud", Entitlement: "can_addmodel", ReceiverType: group},
+	// cloud
+	{Entitlement: "administrator", ReceiverType: "user", EntityType: "cloud"},
+	{Entitlement: "administrator", ReceiverType: "user:*", EntityType: "cloud"},
+	{Entitlement: "administrator", ReceiverType: "group#member", EntityType: "cloud"},
+	{Entitlement: "can_addmodel", ReceiverType: "user", EntityType: "cloud"},
+	{Entitlement: "can_addmodel", ReceiverType: "user:*", EntityType: "cloud"},
+	{Entitlement: "can_addmodel", ReceiverType: "group#member", EntityType: "cloud"},
 
-	{EntityType: "controller", Entitlement: "administrator", ReceiverType: identity},
-	{EntityType: "controller", Entitlement: "administrator", ReceiverType: group},
-	{EntityType: "controller", Entitlement: "audit_log_viewer", ReceiverType: identity},
-	{EntityType: "controller", Entitlement: "audit_log_viewer", ReceiverType: group},
+	// controller
+	{Entitlement: "administrator", ReceiverType: "user", EntityType: "controller"},
+	{Entitlement: "administrator", ReceiverType: "user:*", EntityType: "controller"},
+	{Entitlement: "administrator", ReceiverType: "group#member", EntityType: "controller"},
+	{Entitlement: "audit_log_viewer", ReceiverType: "user", EntityType: "controller"},
+	{Entitlement: "audit_log_viewer", ReceiverType: "user:*", EntityType: "controller"},
+	{Entitlement: "audit_log_viewer", ReceiverType: "group#member", EntityType: "controller"},
 
-	{EntityType: "group", Entitlement: "member", ReceiverType: identity},
-	{EntityType: "group", Entitlement: "member", ReceiverType: group},
+	// group
+	{Entitlement: "member", ReceiverType: "user", EntityType: "group"},
+	{Entitlement: "member", ReceiverType: "user:*", EntityType: "group"},
+	{Entitlement: "member", ReceiverType: "group#member", EntityType: "group"},
 
-	{EntityType: "model", Entitlement: "administrator", ReceiverType: identity},
-	{EntityType: "model", Entitlement: "administrator", ReceiverType: group},
-	{EntityType: "model", Entitlement: "reader", ReceiverType: identity},
-	{EntityType: "model", Entitlement: "reader", ReceiverType: group},
-	{EntityType: "model", Entitlement: "writer", ReceiverType: identity},
-	{EntityType: "model", Entitlement: "writer", ReceiverType: group},
+	// model
+	{Entitlement: "administrator", ReceiverType: "user", EntityType: "model"},
+	{Entitlement: "administrator", ReceiverType: "user:*", EntityType: "model"},
+	{Entitlement: "administrator", ReceiverType: "group#member", EntityType: "model"},
+	{Entitlement: "reader", ReceiverType: "user", EntityType: "model"},
+	{Entitlement: "reader", ReceiverType: "user:*", EntityType: "model"},
+	{Entitlement: "reader", ReceiverType: "group#member", EntityType: "model"},
+	{Entitlement: "writer", ReceiverType: "user", EntityType: "model"},
+	{Entitlement: "writer", ReceiverType: "user:*", EntityType: "model"},
+	{Entitlement: "writer", ReceiverType: "group#member", EntityType: "model"},
 
-	{EntityType: "serviceaccount", Entitlement: "administrator", ReceiverType: identity},
-	{EntityType: "serviceaccount", Entitlement: "administrator", ReceiverType: group},
+	// serviceaccount
+	{Entitlement: "administrator", ReceiverType: "user", EntityType: "serviceaccount"},
+	{Entitlement: "administrator", ReceiverType: "user:*", EntityType: "serviceaccount"},
+	{Entitlement: "administrator", ReceiverType: "group#member", EntityType: "serviceaccount"},
 }
 
 // entitlementsService implements the `entitlementsService` interface from rebac-admin-ui-handlers library
@@ -58,7 +76,7 @@ func newEntitlementService() *entitlementsService {
 
 // ListEntitlements returns the list of entitlements in JSON format.
 func (s *entitlementsService) ListEntitlements(ctx context.Context, params *resources.GetEntitlementsParams) ([]resources.EntitlementSchema, error) {
-	return EntitlementSchemaList, nil
+	return EntitlementsList, nil
 }
 
 // RawEntitlements returns the list of entitlements as raw text.

@@ -38,3 +38,22 @@ func (l LimitOffsetPagination) Limit() int {
 func (l LimitOffsetPagination) Offset() int {
 	return l.offset
 }
+
+// CreatePagination returns the current page, the next page if exists, and the pagination.LimitOffsetPagination from the *resources.GetIdentitiesParams.
+func CreatePagination(sizeP, pageP *int, total int) (int, *int, LimitOffsetPagination) {
+	pageSize := -1
+	offset := 0
+	page := 0
+	var nextPage *int
+
+	if sizeP != nil && pageP != nil {
+		pageSize = *sizeP
+		page = *pageP
+		offset = pageSize * page
+	}
+	if (page+1)*pageSize < total {
+		nPage := page + 1
+		nextPage = &nPage
+	}
+	return page, nextPage, NewOffsetFilter(pageSize, offset)
+}
