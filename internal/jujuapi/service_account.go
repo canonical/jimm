@@ -71,7 +71,8 @@ func (r *controllerRoot) getServiceAccount(ctx context.Context, clientID string)
 	if !ok {
 		return nil, errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
-	return r.jimm.GetOpenFGAUserAndAuthorise(ctx, clientIdWithDomain)
+
+	return r.jimm.GetUser(ctx, clientIdWithDomain)
 }
 
 // UpdateServiceAccountCredentialsCheckModels updates a set of cloud credentials' content.

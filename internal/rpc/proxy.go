@@ -61,7 +61,8 @@ type WebsocketConnectionWithMetadata struct {
 
 // JIMM represents the JIMM interface used by the proxy.
 type JIMM interface {
-	GetOpenFGAUserAndAuthorise(ctx context.Context, email string) (*openfga.User, error)
+	GetUser(ctx context.Context, identifier string) (*openfga.User, error)
+	UpdateUserLastLogin(ctx context.Context, identifier string) error
 	OAuthAuthenticationService() jimm.OAuthAuthenticator
 	GetCredentialStore() credentials.CredentialStore
 }
@@ -645,7 +646,11 @@ func (p *clientProxy) handleAdminFacade(ctx context.Context, msg *message) (clie
 		}
 		email := token.Subject()
 
-		user, err := p.jimm.GetOpenFGAUserAndAuthorise(ctx, email)
+		user, err := p.jimm.GetUser(ctx, email)
+		if err != nil {
+			return errorFnc(err)
+		}
+		err = p.jimm.UpdateUserLastLogin(ctx, email)
 		if err != nil {
 			return errorFnc(err)
 		}
@@ -677,7 +682,11 @@ func (p *clientProxy) handleAdminFacade(ctx context.Context, msg *message) (clie
 			return errorFnc(err)
 		}
 
-		user, err := p.jimm.GetOpenFGAUserAndAuthorise(ctx, clientIdWithDomain)
+		user, err := p.jimm.GetUser(ctx, clientIdWithDomain)
+		if err != nil {
+			return errorFnc(err)
+		}
+		err = p.jimm.UpdateUserLastLogin(ctx, clientIdWithDomain)
 		if err != nil {
 			return errorFnc(err)
 		}
@@ -698,7 +707,11 @@ func (p *clientProxy) handleAdminFacade(ctx context.Context, msg *message) (clie
 		if p.modelProxy.authenticatedIdentityID == "" {
 			return errorFnc(errors.E(errors.CodeUnauthorized))
 		}
-		user, err := p.jimm.GetOpenFGAUserAndAuthorise(ctx, p.modelProxy.authenticatedIdentityID)
+		user, err := p.jimm.GetUser(ctx, p.modelProxy.authenticatedIdentityID)
+		if err != nil {
+			return errorFnc(err)
+		}
+		err = p.jimm.UpdateUserLastLogin(ctx, p.modelProxy.authenticatedIdentityID)
 		if err != nil {
 			return errorFnc(err)
 		}

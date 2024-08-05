@@ -356,6 +356,7 @@ type ListRelationshipTuplesRequest struct {
 	Tuple             RelationshipTuple `json:"tuple,omitempty"`
 	PageSize          int32             `json:"page_size,omitempty"`
 	ContinuationToken string            `json:"continuation_token,omitempty"`
+	ResolveUUIDs      bool              `json:"resolve_uuids,omitempty"`
 }
 
 // ListRelationshipTuplesResponse holds the response of the ListRelationshipTuples method.

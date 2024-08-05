@@ -40,11 +40,15 @@ func AuthenticateRebac(next http.Handler, jimm *jimm.JIMM) http.Handler {
 			return
 		}
 
-		user, err := jimm.GetOpenFGAUserAndAuthorise(ctx, identity)
+		user, err := jimm.GetUser(ctx, identity)
 		if err != nil {
 			zapctx.Error(ctx, "failed to get openfga user", zap.Error(err))
 			http.Error(w, "internal authentication error", http.StatusInternalServerError)
 			return
+		}
+		err = jimm.UpdateUserLastLogin(ctx, identity)
+		if err != nil {
+			zapctx.Error(ctx, "failed to update user last login", zap.Error(err))
 		}
 
 		ctx = rebac_handlers.ContextWithIdentity(ctx, user)
