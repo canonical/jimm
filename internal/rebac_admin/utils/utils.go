@@ -11,6 +11,8 @@ import (
 	"github.com/canonical/rebac-admin-ui-handlers/v1/resources"
 )
 
+const DEFAULT_PAGE_CONTINUATION_TOKEN int32 = 50
+
 // FromUserToIdentity parses openfga.User into resources.Identity .
 func FromUserToIdentity(user openfga.User) resources.Identity {
 	id := fmt.Sprintf("%d", user.ID)

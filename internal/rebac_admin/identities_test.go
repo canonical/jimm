@@ -6,6 +6,8 @@ import (
 	"context"
 	"testing"
 
+	qt "github.com/frankban/quicktest"
+
 	"github.com/canonical/jimm/v3/internal/common/pagination"
 	"github.com/canonical/jimm/v3/internal/common/utils"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
@@ -14,7 +16,6 @@ import (
 	"github.com/canonical/jimm/v3/internal/rebac_admin"
 	rebac_handlers "github.com/canonical/rebac-admin-ui-handlers/v1"
 	"github.com/canonical/rebac-admin-ui-handlers/v1/resources"
-	qt "github.com/frankban/quicktest"
 )
 
 func TestGetIdentity(t *testing.T) {

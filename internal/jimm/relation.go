@@ -74,12 +74,13 @@ func (j *JIMM) CheckRelation(ctx context.Context, user *openfga.User, tuple apip
 }
 
 // ListRelationshipTuples checks user permission and lists relationship tuples based of tuple struct with pagination.
-// Listing filters can be relaxedleaving empty tuple.Relation or tuple.TargetObject.
+// Listing filters can be relaxedleaving empty tuple.Relation or tuple.Object.
 func (j *JIMM) ListRelationshipTuples(ctx context.Context, user *openfga.User, tuple apiparams.RelationshipTuple, pageSize int32, continuationToken string) ([]openfga.Tuple, string, error) {
 	const op = errors.Op("jimm.ListRelationshipTuples")
 	if !user.JimmAdmin {
 		return []openfga.Tuple{}, "", errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
+	// if targetObject is not specified returns all tuples.
 	parsedTuple := &openfga.Tuple{}
 	var err error
 	if tuple.TargetObject != "" {
@@ -87,6 +88,8 @@ func (j *JIMM) ListRelationshipTuples(ctx context.Context, user *openfga.User, t
 		if err != nil {
 			return []openfga.Tuple{}, "", errors.E(op, err)
 		}
+	} else if tuple.Object != "" {
+		return nil, "", errors.E(op, errors.CodeBadRequest, "it is invalid to pass an object without a target object.")
 	}
 
 	responseTuples, ct, err := j.OpenFGAClient.ReadRelatedObjects(ctx, *parsedTuple, pageSize, continuationToken)

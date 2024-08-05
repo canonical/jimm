@@ -635,8 +635,12 @@ func resolveTag(jimmUUID string, db *db.Database, tag string) (*ofganames.Tag, e
 func (j *JIMM) parseAndValidateTag(ctx context.Context, key string) (*ofganames.Tag, error) {
 	op := errors.Op("jimm.ParseTag")
 	tupleKeySplit := strings.SplitN(key, "-", 2)
-	if len(tupleKeySplit) < 2 {
-		return nil, errors.E(op, errors.CodeFailedToParseTupleKey, "tag does not have tuple key delimiter")
+	if len(tupleKeySplit) == 1 {
+		tag, err := ofganames.BlankKindTag(tupleKeySplit[0])
+		if err != nil {
+			return nil, errors.E(op, errors.CodeFailedToParseTupleKey, err)
+		}
+		return tag, nil
 	}
 	tagString := key
 	tag, err := resolveTag(j.UUID, &j.Database, tagString)
