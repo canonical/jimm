@@ -49,6 +49,8 @@ type JimmCmdSuite struct {
 	OFGAClient  *openfga.OFGAClient
 	COFGAClient *cofga.Client
 	COFGAParams *cofga.OpenFGAParams
+
+	databaseName string
 }
 
 func (s *JimmCmdSuite) SetUpTest(c *gc.C) {
@@ -67,6 +69,9 @@ func (s *JimmCmdSuite) SetUpTest(c *gc.C) {
 	s.COFGAParams = cofgaParams
 
 	s.Params = jimmtest.NewTestJimmParams(&jimmtest.GocheckTester{C: c})
+	dsn, err := url.Parse(s.Params.DSN)
+	c.Assert(err, gc.Equals, nil)
+	s.databaseName = strings.Replace(dsn.Path, "/", "", -1)
 	s.Params.PublicDNSName = u.Host
 	s.Params.ControllerAdmins = []string{"admin"}
 	s.Params.OpenFGAParams = service.OpenFGAParams{
@@ -142,6 +147,14 @@ func (s *JimmCmdSuite) TearDownTest(c *gc.C) {
 	if s.JIMM != nil && s.JIMM.Database.DB != nil {
 		if err := s.JIMM.Database.Close(); err != nil {
 			c.Logf("failed to close database connections at tear down: %s", err)
+		}
+	}
+	// Only delete the DB after closing connections to it.
+	_, skipCleanup := os.LookupEnv("NO_DB_CLEANUP")
+	if !skipCleanup {
+		err := jimmtest.DeleteDatabase(s.databaseName)
+		if err != nil {
+			c.Logf("failed to delete database (%s): %s", s.databaseName, err)
 		}
 	}
 	s.JujuConnSuite.TearDownTest(c)
