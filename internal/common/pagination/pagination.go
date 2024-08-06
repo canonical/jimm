@@ -4,8 +4,12 @@
 package pagination
 
 const (
-	defaultPageSize = 50
-	maxPageSize     = 200
+	defaultOffsetFilterPageSize = 50
+	maxOffsetFilterPageSize     = 200
+	// OpenFGA has internal limits on its page size
+	// See https://openfga.dev/docs/interacting/read-tuple-changes
+	defaultOpenFGAPageSize = 50
+	maxOpenFGAPageSize     = 100
 )
 
 type LimitOffsetPagination struct {
@@ -17,10 +21,10 @@ type LimitOffsetPagination struct {
 // If limit or offset are out of bounds, defaults will be used instead.
 func NewOffsetFilter(limit int, offset int) LimitOffsetPagination {
 	if limit < 0 {
-		limit = defaultPageSize
+		limit = defaultOffsetFilterPageSize
 	}
-	if limit > maxPageSize {
-		limit = maxPageSize
+	if limit > maxOffsetFilterPageSize {
+		limit = maxOffsetFilterPageSize
 	}
 	if offset < 0 {
 		offset = 0
@@ -39,7 +43,7 @@ func (l LimitOffsetPagination) Offset() int {
 	return l.offset
 }
 
-// CreatePagination returns the current page, the next page if exists, and the pagination.LimitOffsetPagination from the *resources.GetIdentitiesParams.
+// CreatePagination returns the current page, the next page if exists, and the pagination.LimitOffsetPagination.
 func CreatePagination(sizeP, pageP *int, total int) (int, *int, LimitOffsetPagination) {
 	pageSize := -1
 	offset := 0
@@ -56,4 +60,31 @@ func CreatePagination(sizeP, pageP *int, total int) (int, *int, LimitOffsetPagin
 		nextPage = &nPage
 	}
 	return page, nextPage, NewOffsetFilter(pageSize, offset)
+}
+
+type TokenPagination struct {
+	limit int
+	token string
+}
+
+// NewTokenFilter creates a filter for token pagination.
+func NewTokenFilter(limit int, token string) TokenPagination {
+	if limit < 0 {
+		limit = defaultOpenFGAPageSize
+	}
+	if limit > maxOpenFGAPageSize {
+		limit = maxOpenFGAPageSize
+	}
+	return TokenPagination{
+		limit: limit,
+		token: token,
+	}
+}
+
+func (l TokenPagination) Limit() int {
+	return l.limit
+}
+
+func (l TokenPagination) Token() string {
+	return l.token
 }

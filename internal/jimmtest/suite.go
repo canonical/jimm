@@ -56,7 +56,7 @@ type JIMMSuite struct {
 	// Authenticator configured.
 	JIMM *jimm.JIMM
 
-	AdminUser   *dbmodel.Identity
+	AdminUser   *openfga.User
 	OFGAClient  *openfga.OFGAClient
 	COFGAClient *cofga.Client
 	COFGAParams *cofga.OpenFGAParams
@@ -99,13 +99,13 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 	alice, err := dbmodel.NewIdentity("alice@canonical.com")
 	c.Assert(err, gc.IsNil)
 	alice.LastLogin = db.Now()
-	s.AdminUser = alice
 
-	err = s.JIMM.Database.GetIdentity(ctx, s.AdminUser)
+	err = s.JIMM.Database.GetIdentity(ctx, alice)
 	c.Assert(err, gc.Equals, nil)
 
-	adminUser := openfga.NewUser(s.AdminUser, s.OFGAClient)
-	err = adminUser.SetControllerAccess(ctx, s.JIMM.ResourceTag(), ofganames.AdministratorRelation)
+	s.AdminUser = openfga.NewUser(alice, s.OFGAClient)
+	s.AdminUser.JimmAdmin = true
+	err = s.AdminUser.SetControllerAccess(ctx, s.JIMM.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, gc.Equals, nil)
 
 	// add jimmtest.DefaultControllerUUID as a controller to JIMM
@@ -214,9 +214,7 @@ func (s *JIMMSuite) AddController(c *gc.C, name string, info *api.Info) {
 			Port:    hp.Port(),
 		}})
 	}
-	adminUser := s.NewUser(s.AdminUser)
-	adminUser.JimmAdmin = true
-	err := s.JIMM.AddController(context.Background(), adminUser, ctl)
+	err := s.JIMM.AddController(context.Background(), s.AdminUser, ctl)
 	c.Assert(err, gc.Equals, nil)
 }
 

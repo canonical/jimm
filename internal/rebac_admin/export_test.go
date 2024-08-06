@@ -4,3 +4,5 @@ var (
 	NewGroupService      = newGroupService
 	NewidentitiesService = newidentitiesService
 )
+
+type GroupsService = groupsService

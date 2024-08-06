@@ -7,15 +7,19 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/canonical/ofga"
+	rebac_handlers "github.com/canonical/rebac-admin-ui-handlers/v1"
+	"github.com/canonical/rebac-admin-ui-handlers/v1/resources"
+	qt "github.com/frankban/quicktest"
+	"github.com/google/uuid"
+
 	"github.com/canonical/jimm/v3/internal/common/pagination"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/jimmtest"
 	"github.com/canonical/jimm/v3/internal/jimmtest/mocks"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/rebac_admin"
-	rebac_handlers "github.com/canonical/rebac-admin-ui-handlers/v1"
-	"github.com/canonical/rebac-admin-ui-handlers/v1/resources"
-	qt "github.com/frankban/quicktest"
+	"github.com/canonical/jimm/v3/pkg/api/params"
 )
 
 func TestCreateGroup(t *testing.T) {
@@ -136,5 +140,92 @@ func TestDeleteGroup(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	deleteErr = errors.New("foo")
 	_, err = groupSvc.DeleteGroup(ctx, "group-id")
+	c.Assert(err, qt.ErrorMatches, "foo")
+}
+
+func TestGetGroupIdentities(t *testing.T) {
+	c := qt.New(t)
+	var listTuplesErr error
+	var getGroupErr error
+	testTuple := openfga.Tuple{
+		Object:   &ofga.Entity{Kind: "user", ID: "foo"},
+		Relation: ofga.Relation("member"),
+		Target:   &ofga.Entity{Kind: "group", ID: "my-group"},
+	}
+	jimm := jimmtest.JIMM{
+		GroupService: mocks.GroupService{
+			GetGroupByID_: func(ctx context.Context, user *openfga.User, uuid string) (*dbmodel.GroupEntry, error) {
+				return nil, getGroupErr
+			},
+		},
+		RelationService: mocks.RelationService{
+			ListRelationshipTuples_: func(ctx context.Context, user *openfga.User, tuple params.RelationshipTuple, pageSize int32, continuationToken string) ([]openfga.Tuple, string, error) {
+				return []openfga.Tuple{testTuple}, "continuation-token", listTuplesErr
+			},
+		},
+	}
+	user := openfga.User{}
+	ctx := context.Background()
+	ctx = rebac_handlers.ContextWithIdentity(ctx, &user)
+	groupSvc := rebac_admin.NewGroupService(&jimm)
+
+	_, err := groupSvc.GetGroupIdentities(ctx, "invalid-group-id", &resources.GetGroupsItemIdentitiesParams{})
+	c.Assert(err, qt.ErrorMatches, ".*invalid group ID")
+
+	newUUID := uuid.New()
+	getGroupErr = errors.New("group doesn't exist")
+	_, err = groupSvc.GetGroupIdentities(ctx, newUUID.String(), &resources.GetGroupsItemIdentitiesParams{})
+	c.Assert(err, qt.ErrorMatches, ".*group doesn't exist")
+	getGroupErr = nil
+
+	res, err := groupSvc.GetGroupIdentities(ctx, newUUID.String(), &resources.GetGroupsItemIdentitiesParams{})
+	c.Assert(err, qt.IsNil)
+	c.Assert(res, qt.IsNotNil)
+	c.Assert(res.Data, qt.HasLen, 1)
+	c.Assert(*res.Next.PageToken, qt.Equals, "continuation-token")
+
+	listTuplesErr = errors.New("foo")
+	_, err = groupSvc.GetGroupIdentities(ctx, newUUID.String(), &resources.GetGroupsItemIdentitiesParams{})
+	c.Assert(err, qt.ErrorMatches, "foo")
+}
+
+func TestPatchGroupIdentities(t *testing.T) {
+	c := qt.New(t)
+	var patchTuplesErr error
+	jimm := jimmtest.JIMM{
+		RelationService: mocks.RelationService{
+			AddRelation_: func(ctx context.Context, user *openfga.User, tuples []params.RelationshipTuple) error {
+				return patchTuplesErr
+			},
+			RemoveRelation_: func(ctx context.Context, user *openfga.User, tuples []params.RelationshipTuple) error {
+				return patchTuplesErr
+			},
+		},
+	}
+	user := openfga.User{}
+	ctx := context.Background()
+	ctx = rebac_handlers.ContextWithIdentity(ctx, &user)
+	groupSvc := rebac_admin.NewGroupService(&jimm)
+
+	_, err := groupSvc.PatchGroupIdentities(ctx, "invalid-group-id", nil)
+	c.Assert(err, qt.ErrorMatches, ".* invalid group ID")
+
+	newUUID := uuid.New()
+	operations := []resources.GroupIdentitiesPatchItem{
+		{Identity: "foo@canonical.com", Op: resources.GroupIdentitiesPatchItemOpAdd},
+		{Identity: "bar@canonical.com", Op: resources.GroupIdentitiesPatchItemOpRemove},
+	}
+	res, err := groupSvc.PatchGroupIdentities(ctx, newUUID.String(), operations)
+	c.Assert(err, qt.IsNil)
+	c.Assert(res, qt.IsTrue)
+
+	operationsWithInvalidIdentity := []resources.GroupIdentitiesPatchItem{
+		{Identity: "foo_", Op: resources.GroupIdentitiesPatchItemOpAdd},
+	}
+	_, err = groupSvc.PatchGroupIdentities(ctx, newUUID.String(), operationsWithInvalidIdentity)
+	c.Assert(err, qt.ErrorMatches, ".*invalid identity.*")
+
+	patchTuplesErr = errors.New("foo")
+	_, err = groupSvc.PatchGroupIdentities(ctx, newUUID.String(), operations)
 	c.Assert(err, qt.ErrorMatches, "foo")
 }

@@ -126,7 +126,43 @@ func TestCreatePagination(t *testing.T) {
 			}
 			c.Assert(pag.Limit(), qt.Equals, tC.wantLimit)
 			c.Assert(pag.Offset(), qt.Equals, tC.wantOffset)
+		})
+	}
+}
 
+func TestTokenFilter(t *testing.T) {
+	testToken := "test-token"
+	testCases := []struct {
+		desc      string
+		limit     int
+		token     string
+		wantLimit int
+	}{
+		{
+			desc:      "Valid value are not changed",
+			limit:     10,
+			token:     testToken,
+			wantLimit: 10,
+		},
+		{
+			desc:      "Negative values are corrected",
+			limit:     -1,
+			token:     testToken,
+			wantLimit: pagination.DefaultOpenFGAPageSize,
+		},
+		{
+			desc:      "Very large limit is reduced",
+			limit:     2000,
+			token:     testToken,
+			wantLimit: pagination.MaxOpenFGAPageSize,
+		},
+	}
+	c := qt.New(t)
+	for _, tC := range testCases {
+		c.Run(tC.desc, func(c *qt.C) {
+			filter := pagination.NewTokenFilter(tC.limit, tC.token)
+			c.Assert(filter.Limit(), qt.Equals, tC.wantLimit)
+			c.Assert(filter.Token(), qt.Equals, testToken)
 		})
 	}
 }

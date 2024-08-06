@@ -4,14 +4,19 @@ package rebac_admin
 
 import (
 	"context"
+	"fmt"
 
 	v1 "github.com/canonical/rebac-admin-ui-handlers/v1"
 	"github.com/canonical/rebac-admin-ui-handlers/v1/resources"
+	"github.com/juju/names/v5"
 
 	"github.com/canonical/jimm/v3/internal/common/pagination"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jujuapi"
+	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/rebac_admin/utils"
+	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
+	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
 
 // groupsService implements the `GroupsService` interface.
@@ -134,32 +139,112 @@ func (s *groupsService) DeleteGroup(ctx context.Context, groupId string) (bool, 
 
 // GetGroupIdentities returns a page of identities in a Group identified by `groupId`.
 func (s *groupsService) GetGroupIdentities(ctx context.Context, groupId string, params *resources.GetGroupsItemIdentitiesParams) (*resources.PaginatedResponse[resources.Identity], error) {
-	return nil, nil
+	user, err := utils.GetUserFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !jimmnames.IsValidGroupId(groupId) {
+		return nil, v1.NewValidationError("invalid group ID")
+	}
+	filter := utils.CreateTokenPaginationFilter(params.Size, params.NextToken, params.NextPageToken)
+	groupTag := jimmnames.NewGroupTag(groupId)
+	_, err = s.jimm.GetGroupByID(ctx, user, groupId)
+	if err != nil {
+		if errors.ErrorCode(err) == errors.CodeNotFound {
+			return nil, v1.NewNotFoundError("group not found")
+		}
+		return nil, err
+	}
+	tuple := apiparams.RelationshipTuple{
+		Relation:     ofganames.MemberRelation.String(),
+		TargetObject: groupTag.String(),
+	}
+	identities, nextToken, err := s.jimm.ListRelationshipTuples(ctx, user, tuple, int32(filter.Limit()), filter.Token())
+	if err != nil {
+		return nil, err
+	}
+	data := make([]resources.Identity, 0, len(identities))
+	for _, identity := range identities {
+		identifier := identity.Object.ID
+		data = append(data, resources.Identity{Email: identifier})
+	}
+	originalToken := filter.Token()
+	return &resources.PaginatedResponse[resources.Identity]{
+		Meta: resources.ResponseMeta{
+			Size:      len(data),
+			PageToken: &originalToken,
+		},
+		Next: resources.Next{
+			PageToken: &nextToken,
+		},
+		Data: data,
+	}, nil
 }
 
 // PatchGroupIdentities performs addition or removal of identities to/from a Group identified by `groupId`.
 func (s *groupsService) PatchGroupIdentities(ctx context.Context, groupId string, identityPatches []resources.GroupIdentitiesPatchItem) (bool, error) {
-	return false, nil
+	user, err := utils.GetUserFromContext(ctx)
+	if err != nil {
+		return false, err
+	}
+	if !jimmnames.IsValidGroupId(groupId) {
+		return false, v1.NewValidationError("invalid group ID")
+	}
+	groupTag := jimmnames.NewGroupTag(groupId)
+	tuple := apiparams.RelationshipTuple{
+		Relation:     ofganames.MemberRelation.String(),
+		TargetObject: groupTag.String(),
+	}
+	var toRemove []apiparams.RelationshipTuple
+	var toAdd []apiparams.RelationshipTuple
+	for _, identityPatch := range identityPatches {
+		if !names.IsValidUser(identityPatch.Identity) {
+			return false, v1.NewValidationError(fmt.Sprintf("invalid identity: %s", identityPatch.Identity))
+		}
+		identity := names.NewUserTag(identityPatch.Identity)
+		if identityPatch.Op == resources.GroupIdentitiesPatchItemOpAdd {
+			t := tuple
+			t.Object = identity.String()
+			toAdd = append(toAdd, t)
+		} else {
+			t := tuple
+			t.Object = identity.String()
+			toRemove = append(toRemove, t)
+		}
+	}
+	if toAdd != nil {
+		err := s.jimm.AddRelation(ctx, user, toAdd)
+		if err != nil {
+			return false, err
+		}
+	}
+	if toRemove != nil {
+		err := s.jimm.RemoveRelation(ctx, user, toRemove)
+		if err != nil {
+			return false, err
+		}
+	}
+	return true, nil
 }
 
 // GetGroupRoles returns a page of Roles for Group `groupId`.
 func (s *groupsService) GetGroupRoles(ctx context.Context, groupId string, params *resources.GetGroupsItemRolesParams) (*resources.PaginatedResponse[resources.Role], error) {
 	// TODO: I think we can remove this, JIMM doesn't have group roles.
-	return nil, nil
+	return nil, v1.NewNotImplementedError("get group roles not implemented")
 }
 
 // PatchGroupRoles performs addition or removal of a Role to/from a Group identified by `groupId`.
 func (s *groupsService) PatchGroupRoles(ctx context.Context, groupId string, rolePatches []resources.GroupRolesPatchItem) (bool, error) {
 	// TODO: I think we can remove this, JIMM doesn't have group roles.
-	return false, nil
+	return false, v1.NewNotImplementedError("patch group roles not implemented")
 }
 
 // GetGroupEntitlements returns a page of Entitlements for Group `groupId`.
 func (s *groupsService) GetGroupEntitlements(ctx context.Context, groupId string, params *resources.GetGroupsItemEntitlementsParams) (*resources.PaginatedResponse[resources.EntityEntitlement], error) {
-	return nil, nil
+	return nil, v1.NewNotImplementedError("get group entitlements not implemented")
 }
 
 // PatchGroupEntitlements performs addition or removal of an Entitlement to/from a Group identified by `groupId`.
 func (s *groupsService) PatchGroupEntitlements(ctx context.Context, groupId string, entitlementPatches []resources.GroupEntitlementsPatchItem) (bool, error) {
-	return false, nil
+	return false, v1.NewNotImplementedError("patch group entitlements not implemented")
 }
