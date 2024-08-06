@@ -154,7 +154,7 @@ func (s *identitiesService) PatchIdentityGroups(ctx context.Context, identityId 
 			})
 		} else if p.Op == "remove" {
 			deletions = append(deletions, apiparams.RelationshipTuple{
-				Object:       identityId,
+				Object:       objUser.ResourceTag().String(),
 				Relation:     names.MemberRelation.String(),
 				TargetObject: p.Group,
 			})

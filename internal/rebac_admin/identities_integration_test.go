@@ -22,31 +22,22 @@ type identitiesSuite struct {
 
 var _ = gc.Suite(&identitiesSuite{})
 
-func (s *identitiesSuite) TestIdentityGroups(c *gc.C) {
+func (s *identitiesSuite) TestIdentityPatchGroups(c *gc.C) {
 	// initialization
 	user := openfga.User{}
 	user.JimmAdmin = true
 	ctx := context.Background()
 	ctx = rebac_handlers.ContextWithIdentity(ctx, &user)
 	identitySvc := rebac_admin.NewidentitiesService(s.JIMM)
-	username := "bob@canonical.com"
-	s.AddAdminUser(c, username)
-	groupsSize := 10
-	groupsToAdd := make([]resources.IdentityGroupsPatchItem, groupsSize)
-	groupTags := make([]jimmnames.GroupTag, groupsSize)
-	for i := range 10 {
-		groupName := fmt.Sprintf("group-test%d", i)
-		groupTag := s.AddGroup(c, groupName)
-		groupTags[i] = groupTag
-		groupsToAdd[i] = resources.IdentityGroupsPatchItem{
-			Group: groupTag.String(),
-			Op:    resources.IdentityGroupsPatchItemOpAdd,
-		}
-
-	}
+	groupName := "group-test1"
+	username := s.AdminUser.Name
+	groupTag := s.AddGroup(c, groupName)
 
 	// test add identity group
-	changed, err := identitySvc.PatchIdentityGroups(ctx, username, groupsToAdd)
+	changed, err := identitySvc.PatchIdentityGroups(ctx, username, []resources.IdentityGroupsPatchItem{{
+		Group: groupTag.String(),
+		Op:    resources.IdentityGroupsPatchItemOpAdd,
+	}})
 	c.Assert(err, gc.IsNil)
 	c.Assert(changed, gc.Equals, true)
 
@@ -56,11 +47,52 @@ func (s *identitiesSuite) TestIdentityGroups(c *gc.C) {
 	tuples, _, err := s.JIMM.ListRelationshipTuples(ctx, &user, params.RelationshipTuple{
 		Object:       objUser.ResourceTag().String(),
 		Relation:     names.MemberRelation.String(),
-		TargetObject: groupTags[0].String(),
+		TargetObject: groupTag.String(),
 	}, 10, "")
 	c.Assert(err, gc.IsNil)
 	c.Assert(len(tuples), gc.Equals, 1)
-	c.Assert(groupTags[0].Id(), gc.Equals, tuples[0].Target.ID)
+	c.Assert(groupTag.Id(), gc.Equals, tuples[0].Target.ID)
+
+	// test user remove from group
+	changed, err = identitySvc.PatchIdentityGroups(ctx, username, []resources.IdentityGroupsPatchItem{{
+		Group: groupTag.String(),
+		Op:    resources.IdentityGroupsPatchItemOpRemove,
+	}})
+	c.Assert(err, gc.IsNil)
+	c.Assert(changed, gc.Equals, true)
+	tuples, _, err = s.JIMM.ListRelationshipTuples(ctx, &user, params.RelationshipTuple{
+		Object:       objUser.ResourceTag().String(),
+		Relation:     names.MemberRelation.String(),
+		TargetObject: groupTag.String(),
+	}, 10, "")
+	c.Assert(err, gc.IsNil)
+	c.Assert(len(tuples), gc.Equals, 0)
+}
+
+func (s *identitiesSuite) TestIdentityGetGroups(c *gc.C) {
+	// initialization
+	user := openfga.User{}
+	user.JimmAdmin = true
+	ctx := context.Background()
+	ctx = rebac_handlers.ContextWithIdentity(ctx, &user)
+	identitySvc := rebac_admin.NewidentitiesService(s.JIMM)
+	username := s.AdminUser.Name
+	groupsSize := 10
+	groupsToAdd := make([]resources.IdentityGroupsPatchItem, groupsSize)
+	groupTags := make([]jimmnames.GroupTag, groupsSize)
+	for i := range groupsSize {
+		groupName := fmt.Sprintf("group-test%d", i)
+		groupTag := s.AddGroup(c, groupName)
+		groupTags[i] = groupTag
+		groupsToAdd[i] = resources.IdentityGroupsPatchItem{
+			Group: groupTag.String(),
+			Op:    resources.IdentityGroupsPatchItemOpAdd,
+		}
+
+	}
+	changed, err := identitySvc.PatchIdentityGroups(ctx, username, groupsToAdd)
+	c.Assert(err, gc.IsNil)
+	c.Assert(changed, gc.Equals, true)
 
 	// test list identity's groups with token pagination
 	size := 3
