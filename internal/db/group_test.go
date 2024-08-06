@@ -55,6 +55,20 @@ func (s *dbSuite) TestAddGroup(c *qt.C) {
 	c.Assert(ge.UUID, qt.Equals, uuid)
 }
 
+func (s *dbSuite) TestCountGroups(c *qt.C) {
+	err := s.Database.Migrate(context.Background(), false)
+	c.Assert(err, qt.IsNil)
+
+	addNGroups := 10
+	for i := range addNGroups {
+		_, err := s.Database.AddGroup(context.Background(), fmt.Sprintf("test-group-%d", i))
+		c.Assert(err, qt.IsNil)
+	}
+	count, err := s.Database.CountGroups(context.Background())
+	c.Assert(err, qt.IsNil)
+	c.Assert(count, qt.Equals, addNGroups)
+}
+
 func (s *dbSuite) TestGetGroup(c *qt.C) {
 	uuid1 := uuid.NewString()
 	c.Patch(db.NewUUID, func() string {

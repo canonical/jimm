@@ -664,6 +664,34 @@ func (j *JIMM) AddGroup(ctx context.Context, user *openfga.User, name string) (*
 	return ge, nil
 }
 
+// CountGroups returns the number of groups that exist.
+func (j *JIMM) CountGroups(ctx context.Context, user *openfga.User) (int, error) {
+	const op = errors.Op("jimm.CountGroups")
+
+	if !user.JimmAdmin {
+		return 0, errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
+	count, err := j.Database.CountGroups(ctx)
+	if err != nil {
+		return 0, errors.E(op, err)
+	}
+	return count, nil
+}
+
+// GetGroup returns a group based on the provided UUID.
+func (j *JIMM) GetGroupByID(ctx context.Context, user *openfga.User, uuid string) (*dbmodel.GroupEntry, error) {
+	const op = errors.Op("jimm.AddGroup")
+
+	if !user.JimmAdmin {
+		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
+	group := dbmodel.GroupEntry{UUID: uuid}
+	if err := j.Database.GetGroup(ctx, &group); err != nil {
+		return nil, errors.E(op, err)
+	}
+	return &group, nil
+}
+
 // RenameGroup renames a group in JIMM's DB.
 func (j *JIMM) RenameGroup(ctx context.Context, user *openfga.User, oldName, newName string) error {
 	const op = errors.Op("jimm.RenameGroup")

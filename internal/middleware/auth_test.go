@@ -8,13 +8,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	qt "github.com/frankban/quicktest"
-	"github.com/google/uuid"
 
 	"github.com/canonical/jimm/v3/internal/auth"
-	"github.com/canonical/jimm/v3/internal/db"
+	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/jimm"
 	"github.com/canonical/jimm/v3/internal/jimmtest"
 	"github.com/canonical/jimm/v3/internal/middleware"
@@ -28,6 +26,7 @@ func TestAuthenticateRebac(t *testing.T) {
 	tests := []struct {
 		name           string
 		setupMock      func(*jimmtest.MockOAuthAuthenticator)
+		jimmAdmin      bool
 		expectedStatus int
 	}{
 		{
@@ -37,6 +36,7 @@ func TestAuthenticateRebac(t *testing.T) {
 					return auth.ContextWithSessionIdentity(ctx, testUser), nil
 				}
 			},
+			jimmAdmin:      true,
 			expectedStatus: http.StatusOK,
 		},
 		{
@@ -57,29 +57,37 @@ func TestAuthenticateRebac(t *testing.T) {
 			},
 			expectedStatus: http.StatusInternalServerError,
 		},
+		{
+			name: "not a jimm admin",
+			setupMock: func(m *jimmtest.MockOAuthAuthenticator) {
+				m.AuthenticateBrowserSession_ = func(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error) {
+					return auth.ContextWithSessionIdentity(ctx, testUser), nil
+				}
+			},
+			jimmAdmin:      false,
+			expectedStatus: http.StatusUnauthorized,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := qt.New(t)
 
-			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
-			c.Assert(err, qt.IsNil)
-
 			mockAuthService := jimmtest.NewMockOAuthAuthenticator(nil, nil)
 			tt.setupMock(&mockAuthService)
 
-			j := &jimm.JIMM{
-				UUID: uuid.NewString(),
-				Database: db.Database{
-					DB: jimmtest.PostgresDB(c, func() time.Time { return time.Now() }),
+			j := jimmtest.JIMM{
+				OAuthAuthenticationService_: func() jimm.OAuthAuthenticator {
+					return &mockAuthService
 				},
-				OpenFGAClient:      client,
-				OAuthAuthenticator: &mockAuthService,
+				GetUser_: func(ctx context.Context, username string) (*openfga.User, error) {
+					user := dbmodel.Identity{Name: username}
+					return &openfga.User{Identity: &user, JimmAdmin: tt.jimmAdmin}, nil
+				},
+				UpdateUserLastLogin_: func(ctx context.Context, identifier string) error {
+					return nil
+				},
 			}
-			err = j.Database.Migrate(context.Background(), false)
-			c.Assert(err, qt.IsNil)
-
 			req := httptest.NewRequest(http.MethodGet, "/", nil)
 			w := httptest.NewRecorder()
 
@@ -93,7 +101,7 @@ func TestAuthenticateRebac(t *testing.T) {
 
 				w.WriteHeader(http.StatusOK)
 			})
-			middleware := middleware.AuthenticateRebac(handler, j)
+			middleware := middleware.AuthenticateRebac(handler, &j)
 			middleware.ServeHTTP(w, req)
 
 			c.Assert(w.Code, qt.Equals, tt.expectedStatus)

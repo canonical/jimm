@@ -37,7 +37,7 @@ func TestOffsetFilter(t *testing.T) {
 			desc:       "Very large limit is reduced",
 			limit:      2000,
 			offset:     5,
-			wantLimit:  pagination.DefaultPageSize,
+			wantLimit:  pagination.MaxPageSize,
 			wantOffset: 5,
 		},
 	}

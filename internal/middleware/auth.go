@@ -9,14 +9,14 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/canonical/jimm/v3/internal/auth"
-	"github.com/canonical/jimm/v3/internal/jimm"
+	"github.com/canonical/jimm/v3/internal/jujuapi"
 	rebac_handlers "github.com/canonical/rebac-admin-ui-handlers/v1"
 )
 
 // AuthenticateViaCookie performs browser session authentication and puts an identity in the request's context
-func AuthenticateViaCookie(next http.Handler, jimm *jimm.JIMM) http.Handler {
+func AuthenticateViaCookie(next http.Handler, jimm jujuapi.JIMM) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx, err := jimm.OAuthAuthenticator.AuthenticateBrowserSession(r.Context(), w, r)
+		ctx, err := jimm.OAuthAuthenticationService().AuthenticateBrowserSession(r.Context(), w, r)
 		if err != nil {
 			zapctx.Error(ctx, "failed to authenticate", zap.Error(err))
 			http.Error(w, "failed to authenticate", http.StatusUnauthorized)
@@ -28,8 +28,9 @@ func AuthenticateViaCookie(next http.Handler, jimm *jimm.JIMM) http.Handler {
 }
 
 // AuthenticateRebac is a layer on top of AuthenticateViaCookie
-// It places the OpenFGA user for the session identity inside the request's context.
-func AuthenticateRebac(next http.Handler, jimm *jimm.JIMM) http.Handler {
+// It places the OpenFGA user for the session identity inside the request's context
+// and verifies that the user is a JIMM admin.
+func AuthenticateRebac(next http.Handler, jimm jujuapi.JIMM) http.Handler {
 	return AuthenticateViaCookie(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
@@ -44,6 +45,11 @@ func AuthenticateRebac(next http.Handler, jimm *jimm.JIMM) http.Handler {
 		if err != nil {
 			zapctx.Error(ctx, "failed to get openfga user", zap.Error(err))
 			http.Error(w, "internal authentication error", http.StatusInternalServerError)
+			return
+		}
+		if !user.JimmAdmin {
+			w.WriteHeader(http.StatusUnauthorized)
+			w.Write([]byte("user is not an admin"))
 			return
 		}
 		err = jimm.UpdateUserLastLogin(ctx, identity)

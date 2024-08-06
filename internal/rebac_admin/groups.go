@@ -5,8 +5,13 @@ package rebac_admin
 import (
 	"context"
 
-	"github.com/canonical/jimm/v3/internal/jujuapi"
+	v1 "github.com/canonical/rebac-admin-ui-handlers/v1"
 	"github.com/canonical/rebac-admin-ui-handlers/v1/resources"
+
+	"github.com/canonical/jimm/v3/internal/common/pagination"
+	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jujuapi"
+	"github.com/canonical/jimm/v3/internal/rebac_admin/utils"
 )
 
 // groupsService implements the `GroupsService` interface.
@@ -22,22 +27,86 @@ func newGroupService(jimm jujuapi.JIMM) *groupsService {
 
 // ListGroups returns a page of Group objects of at least `size` elements if available.
 func (s *groupsService) ListGroups(ctx context.Context, params *resources.GetGroupsParams) (*resources.PaginatedResponse[resources.Group], error) {
-	return nil, nil
+	user, err := utils.GetUserFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	count, err := s.jimm.CountGroups(ctx, user)
+	if err != nil {
+		return nil, err
+	}
+	page, nextPage, pagination := pagination.CreatePagination(params.Size, params.Page, count)
+	groups, err := s.jimm.ListGroups(ctx, user, pagination)
+	if err != nil {
+		return nil, err
+	}
+
+	data := make([]resources.Group, 0, len(groups))
+	for _, group := range groups {
+		data = append(data, resources.Group{Id: &group.UUID, Name: group.Name})
+	}
+	resp := resources.PaginatedResponse[resources.Group]{
+		Data: data,
+		Meta: resources.ResponseMeta{
+			Page:  &page,
+			Size:  len(groups),
+			Total: &count,
+		},
+		Next: resources.Next{Page: nextPage},
+	}
+	return &resp, nil
 }
 
 // CreateGroup creates a single Group.
 func (s *groupsService) CreateGroup(ctx context.Context, group *resources.Group) (*resources.Group, error) {
-	return nil, nil
+	user, err := utils.GetUserFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	groupInfo, err := s.jimm.AddGroup(ctx, user, group.Name)
+	if err != nil {
+		return nil, err
+	}
+	return &resources.Group{Id: &groupInfo.UUID, Name: groupInfo.Name}, nil
 }
 
 // GetGroup returns a single Group identified by `groupId`.
 func (s *groupsService) GetGroup(ctx context.Context, groupId string) (*resources.Group, error) {
-	return nil, nil
+	user, err := utils.GetUserFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	group, err := s.jimm.GetGroupByID(ctx, user, groupId)
+	if err != nil {
+		if errors.ErrorCode(err) == errors.CodeNotFound {
+			return nil, v1.NewNotFoundError("failed to find group")
+		}
+		return nil, err
+	}
+	return &resources.Group{Id: &group.UUID, Name: group.Name}, nil
 }
 
 // UpdateGroup updates a Group.
 func (s *groupsService) UpdateGroup(ctx context.Context, group *resources.Group) (*resources.Group, error) {
-	return nil, nil
+	user, err := utils.GetUserFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if group.Id == nil {
+		return nil, v1.NewValidationError("missing group ID")
+	}
+	existingGroup, err := s.jimm.GetGroupByID(ctx, user, *group.Id)
+	if err != nil {
+		if errors.ErrorCode(err) == errors.CodeNotFound {
+			return nil, v1.NewNotFoundError("failed to find group")
+		}
+		return nil, err
+	}
+	err = s.jimm.RenameGroup(ctx, user, existingGroup.Name, group.Name)
+	if err != nil {
+		return nil, err
+	}
+	return &resources.Group{Id: &existingGroup.UUID, Name: group.Name}, nil
 }
 
 // DeleteGroup deletes a Group identified by `groupId`.
@@ -45,7 +114,22 @@ func (s *groupsService) UpdateGroup(ctx context.Context, group *resources.Group)
 // returns (false, error) in case something went wrong.
 // implementors may want to return (false, nil) for idempotency cases.
 func (s *groupsService) DeleteGroup(ctx context.Context, groupId string) (bool, error) {
-	return false, nil
+	user, err := utils.GetUserFromContext(ctx)
+	if err != nil {
+		return false, err
+	}
+	existingGroup, err := s.jimm.GetGroupByID(ctx, user, groupId)
+	if err != nil {
+		if errors.ErrorCode(err) == errors.CodeNotFound {
+			return false, nil
+		}
+		return false, err
+	}
+	err = s.jimm.RemoveGroup(ctx, user, existingGroup.Name)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // GetGroupIdentities returns a page of identities in a Group identified by `groupId`.

@@ -20,7 +20,7 @@ func NewOffsetFilter(limit int, offset int) LimitOffsetPagination {
 		limit = defaultPageSize
 	}
 	if limit > maxPageSize {
-		limit = defaultPageSize
+		limit = maxPageSize
 	}
 	if offset < 0 {
 		offset = 0

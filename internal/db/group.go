@@ -38,6 +38,25 @@ func (d *Database) AddGroup(ctx context.Context, name string) (ge *dbmodel.Group
 	return ge, nil
 }
 
+// CountGroups returns a count of the number of groups that exist.
+func (d *Database) CountGroups(ctx context.Context) (count int, err error) {
+	const op = errors.Op("db.CountGroups")
+	if err := d.ready(); err != nil {
+		return 0, errors.E(op, err)
+	}
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
+	var c int64
+	var g dbmodel.GroupEntry
+	if err := d.DB.WithContext(ctx).Model(g).Count(&c).Error; err != nil {
+		return 0, errors.E(op, dbError(err))
+	}
+	count = int(c)
+	return count, nil
+}
+
 // GetGroup returns a GroupEntry with the specified name.
 func (d *Database) GetGroup(ctx context.Context, group *dbmodel.GroupEntry) (err error) {
 	const op = errors.Op("db.GetGroup")
