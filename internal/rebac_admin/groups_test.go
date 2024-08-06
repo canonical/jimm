@@ -63,7 +63,7 @@ func TestUpdateGroup(t *testing.T) {
 	ctx = rebac_handlers.ContextWithIdentity(ctx, &user)
 	groupSvc := rebac_admin.NewGroupService(&jimm)
 	_, err := groupSvc.UpdateGroup(ctx, &resources.Group{Name: "new-group"})
-	c.Assert(err, qt.ErrorMatches, "missing group ID")
+	c.Assert(err, qt.ErrorMatches, ".*missing group ID")
 	resp, err := groupSvc.UpdateGroup(ctx, &resources.Group{Id: &groupID, Name: "new-group"})
 	c.Assert(err, qt.IsNil)
 	c.Assert(resp, qt.DeepEquals, &resources.Group{Id: &groupID, Name: "new-group"})
