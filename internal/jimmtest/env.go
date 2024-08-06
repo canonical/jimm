@@ -200,6 +200,7 @@ func (e *Environment) addJIMMRelations(c *qt.C, jimmTag names.ControllerTag, db 
 		user.addUserRelations(c, jimmTag, db, client)
 	}
 	for _, controller := range e.Controllers {
+		//nolint:errcheck // Shouldn't fail.
 		client.AddController(context.Background(), jimmTag, controller.dbo.ResourceTag())
 	}
 	for _, cl := range e.Clouds {

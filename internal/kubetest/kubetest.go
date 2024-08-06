@@ -12,6 +12,7 @@ import (
 
 const (
 	Username = "test-kubernetes-user"
+	//nolint:gosec // Thinks its an exposed secret.
 	Password = "test-kubernetes-password"
 )
 

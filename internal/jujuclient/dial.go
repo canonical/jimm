@@ -129,6 +129,7 @@ func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag nam
 		dialer:             d,
 		ctl:                ctl,
 		mt:                 modelTag,
+		redialCount:        new(atomic.Int32),
 	}, nil
 }
 
@@ -184,7 +185,7 @@ type Connection struct {
 	broken   *uint32
 
 	dialer      *Dialer
-	redialCount atomic.Int32
+	redialCount *atomic.Int32
 	ctl         *dbmodel.Controller
 	mt          names.ModelTag
 }
@@ -215,6 +216,7 @@ func (c *Connection) hasFacadeVersion(facade string, version int) bool {
 
 func (c *Connection) redial(ctx context.Context, requiredPermissions map[string]string) error {
 	const op = errors.Op("jujuclient.redial")
+
 	dialCount := c.redialCount.Add(1)
 	if dialCount > 10 {
 		return errors.E(op, "dial count exceeded")
@@ -227,6 +229,7 @@ func (c *Connection) redial(ctx context.Context, requiredPermissions map[string]
 		return errors.E(op, err)
 	}
 	conn := api.(*Connection)
+	conn.redialCount = new(atomic.Int32)
 	c.client = conn.client
 	c.userTag = conn.userTag
 	c.facadeVersions = conn.facadeVersions

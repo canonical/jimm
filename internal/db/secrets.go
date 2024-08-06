@@ -23,12 +23,13 @@ const (
 	passwordKey = "password"
 
 	// These constants are used to create the appropriate identifiers for JWKS related data.
-	jwksKind                   = "jwks"
-	jwksPublicKeyTag           = "jwksPublicKey"
-	jwksPrivateKeyTag          = "jwksPrivateKey"
-	jwksExpiryTag              = "jwksExpiry"
-	oauthKind                  = "oauth"
-	oauthKeyTag                = "oauthKey"
+	jwksKind          = "jwks"
+	jwksPublicKeyTag  = "jwksPublicKey"
+	jwksPrivateKeyTag = "jwksPrivateKey"
+	jwksExpiryTag     = "jwksExpiry"
+	oauthKind         = "oauth"
+	oauthKeyTag       = "oauthKey"
+	//nolint:gosec // Thinks credentials hardcoded.
 	oauthSessionStoreSecretTag = "oauthSessionStoreSecret"
 )
 

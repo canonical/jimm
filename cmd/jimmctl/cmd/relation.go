@@ -415,7 +415,10 @@ func formatCheckRelationString(writer io.Writer, value interface{}) error {
 	if !ok {
 		return errors.E("failed to parse access result")
 	}
-	writer.Write([]byte((&accessResult).setMessage().Msg))
+	_, err := writer.Write([]byte((&accessResult).setMessage().Msg))
+	if err != nil {
+		return errors.E("failed to write access result", err)
+	}
 	return nil
 }
 
@@ -438,10 +441,13 @@ func (c *checkRelationCommand) Run(ctxt *cmd.Context) error {
 	if err != nil {
 		return err
 	}
-	c.out.Write(ctxt, *(&accessResult{
+	err = c.out.Write(ctxt, *(&accessResult{
 		Tuple:   c.tuple,
 		Allowed: resp.Allowed,
 	}).setMessage())
+	if err != nil {
+		return err
+	}
 	return nil
 }
 

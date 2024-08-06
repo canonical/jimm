@@ -159,7 +159,6 @@ func newRenameGroupCommand() cmd.Command {
 // renameGroupCommand renames a group.
 type renameGroupCommand struct {
 	modelcmd.ControllerCommandBase
-	out cmd.Output
 
 	store    jujuclient.ClientStore
 	dialOpts *jujuapi.DialOpts
@@ -324,8 +323,6 @@ type listGroupsCommand struct {
 
 	store    jujuclient.ClientStore
 	dialOpts *jujuapi.DialOpts
-
-	name string
 }
 
 // Info implements the cmd.Command interface.

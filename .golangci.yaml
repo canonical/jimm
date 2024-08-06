@@ -1,0 +1,67 @@
+# Golangci-lint configuration.
+#
+# If a line has a comment, it means it has been changed from the default.
+# This helps us understand what we're tweaking and why.
+
+run:
+  timeout: "5m" # Allow at least 5 minutes
+  issues-exit-code: 1
+  tests: false # Do not lint tests
+  allow-parallel-runners: false
+  allow-serial-runners: false
+  # go: "1.17" # Do not set a go limit
+
+issues:
+  exclude-use-default: true
+  exclude-case-sensitive: false
+  exclude-dirs-use-default: true
+  max-issues-per-linter: 50
+  max-same-issues: 3
+  new: false
+  fix: true
+  whole-files: false
+
+output:
+  print-issued-lines: true
+  print-linter-name: true
+  uniq-by-line: true
+  # path-prefix: # Not needed
+  show-stats: false
+  sort-results: true
+
+linters:
+  disable-all: true
+  enable:
+    # The following linters are enabled by default
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+
+    # The following linters are additional
+
+    # Bug based linters
+    - gosec
+    - sqlclosecheck
+    - reassign
+    - nilerr
+    - durationcheck
+    - bodyclose
+    # - contextcheck # Issue right now
+
+    # Style based linters
+    - promlinter
+    # - importas # optional, useful for consistent named imports
+    # - gocritic # optional 
+
+linters-settings:
+  gosec:
+    exclude-generated: false
+    severity: low
+    confidence: low
+    excludes:
+      - G601 # Implicit memory aliasing in for loop. Fixed in Go1.22+, as such exclude.
+
+

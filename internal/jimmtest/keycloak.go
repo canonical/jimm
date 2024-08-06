@@ -34,7 +34,8 @@ const (
 	keycloakAdminUsername    = "jimm"
 	keycloakAdminPassword    = "jimm"
 	keycloakAdminCLIUsername = "admin-cli"
-	keycloakAdminCLISecret   = "DOLcuE5Cd7IxuR7JE4hpAUxaLF7RlAWh"
+	//nolint:gosec // Thinks credentials exposed. Only used for test.
+	keycloakAdminCLISecret = "DOLcuE5Cd7IxuR7JE4hpAUxaLF7RlAWh"
 )
 
 // KeycloakUser represents a basic user created in Keycloak.

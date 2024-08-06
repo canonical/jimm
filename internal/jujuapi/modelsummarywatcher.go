@@ -100,7 +100,7 @@ func (r *watcherRegistry) get(id string) (*modelSummaryWatcher, error) {
 	return w, nil
 }
 
-func newModelSummaryWatcher(ctx context.Context, id string, root *controllerRoot, pubsub *pubsub.Hub, modelGetterFunc func(context.Context) ([]string, error)) (*modelSummaryWatcher, error) {
+func newModelSummaryWatcher(ctx context.Context, id string, pubsub *pubsub.Hub, modelGetterFunc func(context.Context) ([]string, error)) (*modelSummaryWatcher, error) {
 	const op = errors.Op("jujuapi.newModelSummaryWatcher")
 
 	ctx, cancelContext := context.WithCancel(ctx)
@@ -186,6 +186,7 @@ func (w *modelSummaryWatcher) Stop() error {
 	return nil
 }
 
+//nolint:unused // Used in export-test.
 func newModelAccessWatcher(ctx context.Context, period time.Duration, modelGetterFunc func(context.Context) ([]string, error)) *modelAccessWatcher {
 	return &modelAccessWatcher{
 		ctx:             ctx,

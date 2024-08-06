@@ -63,7 +63,7 @@ func (c *setControllerDeprecatedCommand) SetFlags(f *gnuflag.FlagSet) {
 
 // Init implements the cmd.Command interface.
 func (c *setControllerDeprecatedCommand) Init(args []string) error {
-	if len(args) < 0 {
+	if len(args) == 0 {
 		return errors.E("missing controller name")
 	}
 	c.controllerName, args = args[0], args[1:]

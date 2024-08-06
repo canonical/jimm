@@ -96,7 +96,7 @@ func NewJWTService(p JWTServiceParams) *JWTService {
 // and instead, a new JWT will be issued each time containing the required claims for
 // authz.
 func (j *JWTService) NewJWT(ctx context.Context, params JWTParams) ([]byte, error) {
-	jti, err := j.generateJTI(ctx)
+	jti, err := j.generateJTI()
 	if err != nil {
 		return nil, err
 	}
@@ -133,8 +133,13 @@ func (j *JWTService) NewJWT(ctx context.Context, params JWTParams) ([]byte, erro
 		return nil, err
 	}
 
-	signingKey.Set(jwk.AlgorithmKey, jwa.RS256)
-	signingKey.Set(jwk.KeyIDKey, pubKey.KeyID())
+	if err := signingKey.Set(jwk.AlgorithmKey, jwa.RS256); err != nil {
+		return nil, err
+	}
+
+	if err := signingKey.Set(jwk.KeyIDKey, pubKey.KeyID()); err != nil {
+		return nil, err
+	}
 
 	token, err := jwt.NewBuilder().
 		Audience([]string{params.Controller}).
@@ -164,7 +169,7 @@ func (j *JWTService) NewJWT(ctx context.Context, params JWTParams) ([]byte, erro
 
 // generateJTI uses a V4 UUID, giving a chance of 1 in 17Billion per year.
 // This should be good enough (hopefully) for a JWT ID.
-func (j *JWTService) generateJTI(ctx context.Context) (string, error) {
+func (j *JWTService) generateJTI() (string, error) {
 	id, err := uuid.NewRandom()
 	if err != nil {
 		return "", err

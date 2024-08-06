@@ -64,10 +64,14 @@ func rotateJWKS(ctx context.Context, credStore credentials.CredentialStore, init
 	if err != nil {
 		zapctx.Debug(ctx, "failed to get expiry", zap.Error(err))
 		zapctx.Debug(ctx, "setting initial expiry", zap.Time("time", initialExpiryTime))
-		err = putJwks(initialExpiryTime)
-		if err != nil {
-			credStore.CleanupJWKS(ctx)
-			return errors.E(err)
+		if err := putJwks(initialExpiryTime); err != nil {
+			errE := errors.E(err)
+
+			if err := credStore.CleanupJWKS(ctx); err != nil {
+				errE = errors.E(errE)
+			}
+
+			return errE
 		}
 	} else {
 		// Check it has expired.
@@ -75,10 +79,14 @@ func rotateJWKS(ctx context.Context, credStore credentials.CredentialStore, init
 		if now.After(expires) {
 			// In theory, an error should not happen anymore as the necessary
 			// components exist from the previous failed expiry attempt.
-			err = putJwks(time.Now().UTC().AddDate(0, 3, 0))
-			if err != nil {
-				credStore.CleanupJWKS(ctx)
-				return errors.E(err)
+			if err := putJwks(time.Now().UTC().AddDate(0, 3, 0)); err != nil {
+				errE := errors.E(err)
+
+				if err := credStore.CleanupJWKS(ctx); err != nil {
+					errE = errors.E(errE)
+				}
+
+				return errE
 			}
 			zapctx.Debug(ctx, "set a new JWKS", zap.String("expiry", expires.String()))
 		}

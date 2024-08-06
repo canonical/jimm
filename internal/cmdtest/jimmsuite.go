@@ -90,7 +90,7 @@ func (s *JimmCmdSuite) SetUpTest(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	s.Service = srv
 	s.JIMM = srv.JIMM()
-	s.HTTP.Config = &http.Server{Handler: srv}
+	s.HTTP.Config = &http.Server{Handler: srv, ReadHeaderTimeout: time.Second * 5}
 
 	err = s.Service.StartJWKSRotator(ctx, time.NewTicker(time.Hour).C, time.Now().UTC().AddDate(0, 3, 0))
 	c.Assert(err, gc.Equals, nil)

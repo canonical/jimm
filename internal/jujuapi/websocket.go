@@ -154,7 +154,10 @@ func (s modelProxyServer) ServeWS(ctx context.Context, clientConn *websocket.Con
 		JIMM:                    s.jimm,
 		AuthenticatedIdentityID: auth.SessionIdentityFromContext(ctx),
 	}
-	jimmRPC.ProxySockets(ctx, proxyHelpers)
+	if err := jimmRPC.ProxySockets(ctx, proxyHelpers); err != nil {
+		zapctx.Error(ctx, "failed to start jimm model proxy", zap.Error(err))
+	}
+
 }
 
 // controllerConnectionFunc returns a function that will be used to

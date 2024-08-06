@@ -51,13 +51,15 @@ func (s *LoggingSuite) setUp(c *gc.C) {
 	// Don't use the default writer for the test logging, which
 	// means we can still get logging output from tests that
 	// replace the default writer.
-	loggo.RegisterWriter(loggo.DefaultWriterName, discardWriter{})
-	loggo.RegisterWriter("loggingsuite", zaputil.NewLoggoWriter(logger))
+	err := loggo.RegisterWriter(loggo.DefaultWriterName, discardWriter{})
+	c.Assert(err, gc.IsNil)
+	err = loggo.RegisterWriter("loggingsuite", zaputil.NewLoggoWriter(logger))
+	c.Assert(err, gc.IsNil)
 	level := "DEBUG"
 	if envLevel := os.Getenv("TEST_LOGGING_CONFIG"); envLevel != "" {
 		level = envLevel
 	}
-	err := loggo.ConfigureLoggers(level)
+	err = loggo.ConfigureLoggers(level)
 	c.Assert(err, gc.Equals, nil)
 }
 
@@ -71,8 +73,7 @@ type gocheckZapWriter struct {
 }
 
 func (w gocheckZapWriter) Write(buf []byte) (int, error) {
-	w.c.Output(1, strings.TrimSuffix(string(buf), "\n"))
-	return len(buf), nil
+	return len(buf), w.c.Output(1, strings.TrimSuffix(string(buf), "\n"))
 }
 
 func (w gocheckZapWriter) Sync() error {

@@ -37,7 +37,6 @@ func NewGrantCommand() cmd.Command {
 // grantCommand grants admin access to a service account to given groups/identities.
 type grantCommand struct {
 	modelcmd.ControllerCommandBase
-	out cmd.Output
 
 	store    jujuclient.ClientStore
 	dialOpts *jujuapi.DialOpts

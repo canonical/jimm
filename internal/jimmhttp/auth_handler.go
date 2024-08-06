@@ -247,5 +247,8 @@ func writeError(ctx context.Context, w http.ResponseWriter, status int, err erro
 	if err != nil {
 		errMsg = " - " + err.Error()
 	}
-	w.Write([]byte(http.StatusText(status) + errMsg))
+	_, err = w.Write([]byte(http.StatusText(status) + errMsg))
+	if err != nil {
+		zapctx.Error(ctx, "failed to write status text error", zap.Error(err))
+	}
 }

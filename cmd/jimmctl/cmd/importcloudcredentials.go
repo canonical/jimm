@@ -17,6 +17,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/errors"
 )
 
+//nolint:gosec // Thinks a credential is exposed.
 const importCloudCredentialsDoc = `
 	import-cloud-credentials imports a set of cloud credentials
 	loaded from a file containing a series of JSON objects. The JSON

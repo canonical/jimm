@@ -147,7 +147,7 @@ func (c Connection) Cloud(ctx context.Context, tag names.CloudTag, cloud *jujupa
 		return errors.E(op, jujuerrors.Cause(err))
 	}
 	if resp.Results[0].Error != nil {
-		errors.E(op, resp.Results[0].Error)
+		return errors.E(op, resp.Results[0].Error)
 	}
 	return nil
 }

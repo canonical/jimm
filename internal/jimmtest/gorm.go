@@ -5,6 +5,7 @@ package jimmtest
 
 import (
 	"context"
+	//nolint:gosec // We're only using sha1 in tests.
 	"crypto/sha1"
 	"encoding/base64"
 	"fmt"
@@ -170,6 +171,7 @@ func computeSafeDatabaseName(suggestedName string) string {
 	re, _ := regexp.Compile(unsafeCharsPattern)
 	safeName := re.ReplaceAllString(suggestedName, "_")
 
+	//nolint:gosec // We're only using sha1 in tests.
 	hasher := sha1.New()
 	// Provide some random chars for the hash. Useful where tests
 	// have the same suite name and same test name.
@@ -195,6 +197,7 @@ var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 func randSeq(n int) string {
 	b := make([]rune, n)
 	for i := range b {
+		//nolint:gosec // We're only using rand.Intn for tests.
 		b[i] = letters[rand.Intn(len(letters))]
 	}
 	return string(b)

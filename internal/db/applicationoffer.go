@@ -48,9 +48,18 @@ func (d *Database) UpdateApplicationOffer(ctx context.Context, offer *dbmodel.Ap
 	db := d.DB.WithContext(ctx)
 	err = db.Transaction(func(tx *gorm.DB) error {
 		tx.Omit("Connections", "Endpoints", "Spaces").Save(offer)
-		tx.Model(offer).Association("Connections").Replace(offer.Connections)
-		tx.Model(offer).Association("Endpoints").Replace(offer.Endpoints)
-		tx.Model(offer).Association("Spaces").Replace(offer.Spaces)
+		err = tx.Model(offer).Association("Connections").Replace(offer.Connections)
+		if err != nil {
+			return err
+		}
+		err = tx.Model(offer).Association("Endpoints").Replace(offer.Endpoints)
+		if err != nil {
+			return err
+		}
+		err = tx.Model(offer).Association("Spaces").Replace(offer.Spaces)
+		if err != nil {
+			return err
+		}
 		return tx.Error
 	})
 	if err != nil {

@@ -15,7 +15,7 @@ import (
 // managed by JIMM as well as how many model each controller manages.
 func (j *JIMM) UpdateMetrics(ctx context.Context) {
 	controllerCount := 0
-	j.Database.ForEachController(ctx, func(c *dbmodel.Controller) error {
+	err := j.Database.ForEachController(ctx, func(c *dbmodel.Controller) error {
 		controllerCount++
 		modelGauge, err := servermon.ModelCount.GetMetricWith(prometheus.Labels{"controller": c.Name})
 		if err != nil {
@@ -30,5 +30,8 @@ func (j *JIMM) UpdateMetrics(ctx context.Context) {
 		modelGauge.Set(float64(count))
 		return nil
 	})
+	if err != nil {
+		zapctx.Error(ctx, "update metrics failed", zap.Error(err))
+	}
 	servermon.ControllerCount.Set(float64(controllerCount))
 }

@@ -161,7 +161,13 @@ func TruncateOpenFgaTuples(ctx context.Context) error {
 		return errors.E(err)
 	}
 	defer conn.Close(ctx)
-	conn.Exec(ctx, "TRUNCATE TABLE tuple;")
-	conn.Exec(ctx, "TRUNCATE TABLE changelog;")
+	_, err = conn.Exec(ctx, "TRUNCATE TABLE tuple;")
+	if err != nil {
+		return err
+	}
+	_, err = conn.Exec(ctx, "TRUNCATE TABLE changelog;")
+	if err != nil {
+		return err
+	}
 	return nil
 }

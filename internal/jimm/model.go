@@ -1000,8 +1000,10 @@ func (j *JIMM) DestroyModel(ctx context.Context, user *openfga.User, mt names.Mo
 	const op = errors.Op("jimm.DestroyModel")
 
 	if destroyStorage != nil {
+		// TODO?
 	}
 	if force != nil {
+		// TODO?
 	}
 
 	err := j.doModelAdmin(ctx, user, mt, func(m *dbmodel.Model, api API) error {

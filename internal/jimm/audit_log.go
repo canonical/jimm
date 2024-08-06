@@ -188,7 +188,7 @@ func calculateNextPollDuration(startingTime time.Time) time.Duration {
 	now := startingTime
 	nineAM := time.Date(now.Year(), now.Month(), now.Day(), pollDuration.Hours, 0, 0, 0, time.UTC)
 	nineAMDuration := nineAM.Sub(now)
-	d := time.Hour
+	var d time.Duration
 	// If 9am is behind the current time, i.e., 1pm
 	if nineAMDuration < 0 {
 		// Add 24 hours, flip it to an absolute duration, i.e., -10h == 10h
