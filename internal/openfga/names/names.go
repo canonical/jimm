@@ -41,6 +41,8 @@ var (
 
 // allRelations contains a slice of all valid relations.
 // NB: Add any new relations from the above to this slice.
+//
+//nolint:unused // Used in export_test.go
 var allRelations = []cofga.Relation{MemberRelation, AdministratorRelation, ControllerRelation, ModelRelation, ConsumerRelation, ReaderRelation, WriterRelation, CanAddModelRelation, AuditLogViewerRelation, NoRelation}
 
 // EveryoneUser is the username representing all users and is treated uniquely when used in OpenFGA tuples.

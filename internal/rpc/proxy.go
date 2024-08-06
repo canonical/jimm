@@ -162,11 +162,16 @@ func (c *writeLockConn) sendMessage(responseObject any, request *message) {
 		responseData, err := json.Marshal(responseObject)
 		if err != nil {
 			errorMsg := createErrResponse(err, request)
-			c.writeJson(errorMsg)
+			if err := c.writeJson(errorMsg); err != nil {
+				zapctx.Error(context.Background(), "failed to send error message in proxy", zap.Error(err))
+			}
+
 		}
 		msg.Response = responseData
 	}
-	c.writeJson(msg)
+	if err := c.writeJson(msg); err != nil {
+		zapctx.Error(context.Background(), "failed to write message in proxy", zap.Error(err))
+	}
 }
 
 // inflightMsgs holds only request messages that are
@@ -251,11 +256,15 @@ func (p *modelProxy) sendError(socket *writeLockConn, req *message, err error) {
 	}
 	msg := createErrResponse(err, req)
 	if msg != nil {
-		socket.writeJson(msg)
+		if err := socket.writeJson(msg); err != nil {
+			zapctx.Error(context.Background(), "failed to create err response message", zap.Error(err))
+		}
 	}
 	// An error message is a response back to the client.
 	servermon.JujuCallErrorCount.WithLabelValues(req.Type, req.Request, p.msgs.controllerUUID)
-	p.auditLogMessage(msg, true)
+	if err := p.auditLogMessage(msg, true); err != nil {
+		zapctx.Error(context.Background(), "failed to audit log message", zap.Error(err))
+	}
 }
 
 func (p *modelProxy) auditLogMessage(msg *message, isResponse bool) error {
@@ -316,7 +325,6 @@ type clientProxy struct {
 
 // start begins the client->controller proxier.
 func (p *clientProxy) start(ctx context.Context) error {
-	const op = errors.Op("rpc.clientProxy.start")
 	defer func() {
 		if p.dst != nil {
 			p.dst.conn.Close()
@@ -336,7 +344,9 @@ func (p *clientProxy) start(ctx context.Context) error {
 			p.sendError(p.src, msg, err)
 			return err
 		}
-		p.auditLogMessage(msg, false)
+		if err := p.auditLogMessage(msg, false); err != nil {
+			zapctx.Error(ctx, "failed to audit log message", zap.Error(err))
+		}
 		// All requests should be proxied as transparently as possible through to the controller
 		// except for auth related requests like Login because JIMM is auth gateway.
 		if msg.Type == "Admin" {
@@ -443,7 +453,9 @@ func (p *controllerProxy) start(ctx context.Context) error {
 			// Write back to the controller.
 			msg := p.msgs.getMessage(msg.RequestID)
 			if msg != nil {
-				p.src.writeJson(msg)
+				if err := p.src.writeJson(msg); err != nil {
+					zapctx.Error(context.Background(), "failed to write back to controller", zap.Error(err))
+				}
 			}
 			continue
 		} else {
@@ -455,7 +467,9 @@ func (p *controllerProxy) start(ctx context.Context) error {
 			}
 		}
 		p.msgs.removeMessage(msg.RequestID)
-		p.auditLogMessage(msg, true)
+		if err := p.auditLogMessage(msg, true); err != nil {
+			zapctx.Error(context.Background(), "failed to audit log message", zap.Error(err))
+		}
 		zapctx.Debug(ctx, "Writing modified message to client", zap.Any("Message", msg))
 		if err := p.dst.writeJson(msg); err != nil {
 			zapctx.Error(ctx, "controllerProxy error writing to dst", zap.Error(err))
@@ -490,7 +504,7 @@ func checkPermissionsRequired(ctx context.Context, msg *message) (map[string]any
 	var er params.ErrorResults
 	err := json.Unmarshal(msg.Response, &er)
 	if err != nil {
-		zapctx.Error(ctx, "failed to read response error")
+		zapctx.Error(ctx, "failed to read response error", zap.Error(err))
 		return permissionMap, nil
 	}
 

@@ -229,7 +229,6 @@ func (c *Connection) redial(ctx context.Context, requiredPermissions map[string]
 		return errors.E(op, err)
 	}
 	conn := api.(*Connection)
-	conn.redialCount = new(atomic.Int32)
 	c.client = conn.client
 	c.userTag = conn.userTag
 	c.facadeVersions = conn.facadeVersions

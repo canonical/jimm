@@ -33,7 +33,8 @@ func NewFakeKubernetes(c *gc.C) *httptest.Server {
 			return
 		}
 		w.Header().Set("Content-Type", req.Header.Get("Content-Type"))
-		io.Copy(w, req.Body)
+		_, err := io.Copy(w, req.Body)
+		c.Assert(err, gc.IsNil)
 	}))
 	return srv
 }

@@ -36,7 +36,7 @@ func main() {
 		DB: gdb,
 	}
 
-	db.Migrate(ctx, false)
+	err = db.Migrate(ctx, false)
 	if err != nil {
 		fmt.Println("failed to migrate to db ", err)
 		os.Exit(1)

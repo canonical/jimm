@@ -66,6 +66,7 @@ func Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag,
 		tlsConfig = &tls.Config{
 			RootCAs:    cp,
 			ServerName: ctl.TLSHostname,
+			MinVersion: tls.VersionTLS12,
 		}
 	}
 	dialer := Dialer{
