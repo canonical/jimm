@@ -25,7 +25,7 @@ func FromUserToIdentity(user openfga.User) resources.Identity {
 	}
 }
 
-// CreateTokenPaginationFilter returns...
+// CreateTokenPaginationFilter returns a token pagination filter based on the rebac admin request parameters.
 func CreateTokenPaginationFilter(size *int, token, tokenFromHeader *string) pagination.TokenPagination {
 	pageSize := 0
 	if size != nil {

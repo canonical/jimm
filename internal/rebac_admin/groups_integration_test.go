@@ -59,6 +59,17 @@ func (s rebacAdminSuite) TestGetGroupIdentitiesIntegration(c *gc.C) {
 	c.Assert(res.Data, gc.HasLen, 5)
 	c.Assert(res.Data[0].Email, gc.Equals, "foo0@canonical.com")
 
+	// Request next page
+	params.NextPageToken = res.Next.PageToken
+	res, err = s.groupSvc.GetGroupIdentities(ctx, group.UUID, params)
+	c.Assert(err, gc.IsNil)
+	c.Assert(res, gc.Not(gc.IsNil))
+	c.Assert(res.Meta.Size, gc.Equals, 5)
+	c.Assert(*res.Meta.PageToken, gc.Equals, *params.NextPageToken)
+	c.Assert(*res.Next.PageToken, gc.Equals, "")
+	c.Assert(res.Data, gc.HasLen, 5)
+	c.Assert(res.Data[0].Email, gc.Equals, "foo5@canonical.com")
+
 	// Request all items, no next page.
 	allItems := &resources.GetGroupsItemIdentitiesParams{}
 	res, err = s.groupSvc.GetGroupIdentities(ctx, group.UUID, allItems)

@@ -143,8 +143,7 @@ func (s *groupsService) GetGroupIdentities(ctx context.Context, groupId string, 
 	if err != nil {
 		return nil, err
 	}
-	ok := jimmnames.IsValidGroupId(groupId)
-	if !ok {
+	if !jimmnames.IsValidGroupId(groupId) {
 		return nil, v1.NewValidationError("invalid group ID")
 	}
 	filter := utils.CreateTokenPaginationFilter(params.Size, params.NextToken, params.NextPageToken)
@@ -181,8 +180,7 @@ func (s *groupsService) PatchGroupIdentities(ctx context.Context, groupId string
 	if err != nil {
 		return false, err
 	}
-	ok := jimmnames.IsValidGroupId(groupId)
-	if !ok {
+	if !jimmnames.IsValidGroupId(groupId) {
 		return false, v1.NewValidationError("invalid group ID")
 	}
 	groupTag := jimmnames.NewGroupTag(groupId)
@@ -193,8 +191,7 @@ func (s *groupsService) PatchGroupIdentities(ctx context.Context, groupId string
 	var toRemove []apiparams.RelationshipTuple
 	var toAdd []apiparams.RelationshipTuple
 	for _, identityPatch := range identityPatches {
-		ok := names.IsValidUser(identityPatch.Identity)
-		if !ok {
+		if !names.IsValidUser(identityPatch.Identity) {
 			return false, v1.NewValidationError(fmt.Sprintf("invalid identity: %s", identityPatch.Identity))
 		}
 		identity := names.NewUserTag(identityPatch.Identity)
