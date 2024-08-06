@@ -59,7 +59,7 @@ jobs:
     - name: Create Pull Request
       uses: peter-evans/create-pull-request@v6
       with:
-        token: ${{ secrets.PAT }}
+        token: ${{ secrets.JIMM_GO_SDK_PAT }}
         path: ./sdk
         branch: update-sdk-${{ github.run_number }}
         title: Update SDK ${{ github.event.inputs.sdk-version }}
