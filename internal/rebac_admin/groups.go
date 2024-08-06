@@ -148,6 +148,13 @@ func (s *groupsService) GetGroupIdentities(ctx context.Context, groupId string, 
 	}
 	filter := utils.CreateTokenPaginationFilter(params.Size, params.NextToken, params.NextPageToken)
 	groupTag := jimmnames.NewGroupTag(groupId)
+	_, err = s.jimm.GetGroupByID(ctx, user, groupId)
+	if err != nil {
+		if errors.ErrorCode(err) == errors.CodeNotFound {
+			return nil, v1.NewNotFoundError("group not found")
+		}
+		return nil, err
+	}
 	tuple := apiparams.RelationshipTuple{
 		Relation:     ofganames.MemberRelation.String(),
 		TargetObject: groupTag.String(),

@@ -146,12 +146,18 @@ func TestDeleteGroup(t *testing.T) {
 func TestGetGroupIdentities(t *testing.T) {
 	c := qt.New(t)
 	var listTuplesErr error
+	var getGroupErr error
 	testTuple := openfga.Tuple{
 		Object:   &ofga.Entity{Kind: "user", ID: "foo"},
 		Relation: ofga.Relation("member"),
 		Target:   &ofga.Entity{Kind: "group", ID: "my-group"},
 	}
 	jimm := jimmtest.JIMM{
+		GroupService: mocks.GroupService{
+			GetGroupByID_: func(ctx context.Context, user *openfga.User, uuid string) (*dbmodel.GroupEntry, error) {
+				return nil, getGroupErr
+			},
+		},
 		RelationService: mocks.RelationService{
 			ListRelationshipTuples_: func(ctx context.Context, user *openfga.User, tuple params.RelationshipTuple, pageSize int32, continuationToken string) ([]openfga.Tuple, string, error) {
 				return []openfga.Tuple{testTuple}, "continuation-token", listTuplesErr
@@ -164,9 +170,14 @@ func TestGetGroupIdentities(t *testing.T) {
 	groupSvc := rebac_admin.NewGroupService(&jimm)
 
 	_, err := groupSvc.GetGroupIdentities(ctx, "invalid-group-id", &resources.GetGroupsItemIdentitiesParams{})
-	c.Assert(err, qt.ErrorMatches, ".* invalid group ID")
+	c.Assert(err, qt.ErrorMatches, ".*invalid group ID")
 
 	newUUID := uuid.New()
+	getGroupErr = errors.New("group doesn't exist")
+	_, err = groupSvc.GetGroupIdentities(ctx, newUUID.String(), &resources.GetGroupsItemIdentitiesParams{})
+	c.Assert(err, qt.ErrorMatches, ".*group doesn't exist")
+	getGroupErr = nil
+
 	res, err := groupSvc.GetGroupIdentities(ctx, newUUID.String(), &resources.GetGroupsItemIdentitiesParams{})
 	c.Assert(err, qt.IsNil)
 	c.Assert(res, qt.IsNotNil)
