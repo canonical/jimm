@@ -9,17 +9,10 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/v3/cmd/jimmctl/cmd"
-	"github.com/canonical/jimm/v3/internal/cmdtest"
 	"github.com/canonical/jimm/v3/internal/jimmtest"
 )
 
-type listAuditEventsSuite struct {
-	cmdtest.JimmCmdSuite
-}
-
-var _ = gc.Suite(&listAuditEventsSuite{})
-
-func (s *listAuditEventsSuite) TestListAuditEventsSuperuser(c *gc.C) {
+func (s *cmdTestSuite) TestListAuditEventsSuperuser(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
 
 	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@canonical.com/cred")
@@ -58,7 +51,7 @@ func (s *listAuditEventsSuite) TestListAuditEventsSuperuser(c *gc.C) {
 [\s\S]*`)
 }
 
-func (s *listAuditEventsSuite) TestListAuditEventsStatus(c *gc.C) {
+func (s *cmdTestSuite) TestListAuditEventsStatus(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
 
 	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@canonical.com/cred")

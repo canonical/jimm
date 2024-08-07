@@ -11,16 +11,9 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/v3/cmd/jimmctl/cmd"
-	"github.com/canonical/jimm/v3/internal/cmdtest"
 )
 
-type controllerInfoSuite struct {
-	cmdtest.JimmCmdSuite
-}
-
-var _ = gc.Suite(&controllerInfoSuite{})
-
-func (s *controllerInfoSuite) TestControllerInfo(c *gc.C) {
+func (s *cmdTestSuite) TestControllerInfo(c *gc.C) {
 	store := s.ClientStore()
 	store.Controllers["controller-1"] = jujuclient.ControllerDetails{
 		ControllerUUID: "982b16d9-a945-4762-b684-fd4fd885aa11",
@@ -76,7 +69,7 @@ uuid: 982b16d9-a945-4762-b684-fd4fd885aa11
 `)
 }
 
-func (s *controllerInfoSuite) TestControllerInfoWithLocalFlag(c *gc.C) {
+func (s *cmdTestSuite) TestControllerInfoWithLocalFlag(c *gc.C) {
 	store := s.ClientStore()
 	store.Controllers["controller-1"] = jujuclient.ControllerDetails{
 		ControllerUUID: "982b16d9-a945-4762-b684-fd4fd885aa11",
@@ -157,7 +150,7 @@ uuid: 982b16d9-a945-4762-b684-fd4fd885aa11
 `)
 }
 
-func (s *controllerInfoSuite) TestControllerInfoMissingPublicAddressAndNoLocalFlag(c *gc.C) {
+func (s *cmdTestSuite) TestControllerInfoMissingPublicAddressAndNoLocalFlag(c *gc.C) {
 	store := s.ClientStore()
 	store.Controllers["controller-1"] = jujuclient.ControllerDetails{
 		ControllerUUID: "982b16d9-a945-4762-b684-fd4fd885aa11",
@@ -202,7 +195,7 @@ func (s *controllerInfoSuite) TestControllerInfoMissingPublicAddressAndNoLocalFl
 	c.Assert(err, gc.ErrorMatches, "provide either a public address or use --local")
 }
 
-func (s *controllerInfoSuite) TestControllerInfoCannotProvideAddrAndLocalFlag(c *gc.C) {
+func (s *cmdTestSuite) TestControllerInfoCannotProvideAddrAndLocalFlag(c *gc.C) {
 	store := s.ClientStore()
 	store.Controllers["controller-1"] = jujuclient.ControllerDetails{
 		ControllerUUID: "982b16d9-a945-4762-b684-fd4fd885aa11",
@@ -247,7 +240,7 @@ func (s *controllerInfoSuite) TestControllerInfoCannotProvideAddrAndLocalFlag(c 
 	c.Assert(err, gc.ErrorMatches, "cannot set both public address and local flag")
 }
 
-func (s *controllerInfoSuite) TestControllerInfoWithTlsFlag(c *gc.C) {
+func (s *cmdTestSuite) TestControllerInfoWithTlsFlag(c *gc.C) {
 	store := s.ClientStore()
 	store.Controllers["controller-1"] = jujuclient.ControllerDetails{
 		ControllerUUID: "982b16d9-a945-4762-b684-fd4fd885aa11",

@@ -9,7 +9,6 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/v3/cmd/jimmctl/cmd"
-	"github.com/canonical/jimm/v3/internal/cmdtest"
 	"github.com/canonical/jimm/v3/internal/jimmtest"
 )
 
@@ -47,13 +46,7 @@ volumes: \[\]
 `
 )
 
-type modelStatusSuite struct {
-	cmdtest.JimmCmdSuite
-}
-
-var _ = gc.Suite(&modelStatusSuite{})
-
-func (s *modelStatusSuite) TestModelStatusSuperuser(c *gc.C) {
+func (s *cmdTestSuite) TestModelStatusSuperuser(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
 
 	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@canonical.com/cred")
@@ -67,7 +60,7 @@ func (s *modelStatusSuite) TestModelStatusSuperuser(c *gc.C) {
 	c.Assert(cmdtesting.Stdout(context), gc.Matches, expectedModelStatusOutput)
 }
 
-func (s *modelStatusSuite) TestModelStatus(c *gc.C) {
+func (s *cmdTestSuite) TestModelStatus(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
 
 	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@canonical.com/cred")

@@ -10,18 +10,11 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/v3/cmd/jimmctl/cmd"
-	"github.com/canonical/jimm/v3/internal/cmdtest"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/jimmtest"
 )
 
-type purgeLogsSuite struct {
-	cmdtest.JimmCmdSuite
-}
-
-var _ = gc.Suite(&purgeLogsSuite{})
-
-func (s *purgeLogsSuite) TestPurgeLogsSuperuser(c *gc.C) {
+func (s *cmdTestSuite) TestPurgeLogsSuperuser(c *gc.C) {
 	// alice is superuser
 	bClient := jimmtest.NewUserSessionLogin(c, "alice")
 	datastring := "2021-01-01T00:00:00Z"
@@ -32,7 +25,7 @@ func (s *purgeLogsSuite) TestPurgeLogsSuperuser(c *gc.C) {
 	c.Assert(actual, gc.Equals, expected)
 }
 
-func (s *purgeLogsSuite) TestInvalidISO8601Date(c *gc.C) {
+func (s *cmdTestSuite) TestInvalidISO8601Date(c *gc.C) {
 	// alice is superuser
 	bClient := jimmtest.NewUserSessionLogin(c, "alice")
 	datastring := "13/01/2021"
@@ -41,14 +34,14 @@ func (s *purgeLogsSuite) TestInvalidISO8601Date(c *gc.C) {
 
 }
 
-func (s *purgeLogsSuite) TestPurgeLogs(c *gc.C) {
+func (s *cmdTestSuite) TestPurgeLogs(c *gc.C) {
 	// bob is not superuser
 	bClient := jimmtest.NewUserSessionLogin(c, "bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewPurgeLogsCommandForTesting(s.ClientStore(), bClient), "2021-01-01T00:00:00Z")
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
 
-func (s *purgeLogsSuite) TestPurgeLogsFromDb(c *gc.C) {
+func (s *cmdTestSuite) TestPurgeLogsFromDb(c *gc.C) {
 	// create logs
 	layouts := []string{
 		"2006-01-02T15:04:05-0700",

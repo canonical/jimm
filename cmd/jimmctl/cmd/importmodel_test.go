@@ -13,18 +13,11 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/v3/cmd/jimmctl/cmd"
-	"github.com/canonical/jimm/v3/internal/cmdtest"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/jimmtest"
 )
 
-type importModelSuite struct {
-	cmdtest.JimmCmdSuite
-}
-
-var _ = gc.Suite(&importModelSuite{})
-
-func (s *importModelSuite) TestImportModelSuperuser(c *gc.C) {
+func (s *cmdTestSuite) TestImportModelSuperuser(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
 
 	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@canonical.com/cred")
@@ -54,7 +47,7 @@ func (s *importModelSuite) TestImportModelSuperuser(c *gc.C) {
 	c.Check(model2.OwnerIdentityName, gc.Equals, "charlie@canonical.com")
 }
 
-func (s *importModelSuite) TestImportModelFromLocalUser(c *gc.C) {
+func (s *cmdTestSuite) TestImportModelFromLocalUser(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
 	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@canonical.com/cred")
 	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{AuthType: "empty"})
@@ -82,7 +75,7 @@ func (s *importModelSuite) TestImportModelFromLocalUser(c *gc.C) {
 	c.Check(model2.OwnerIdentityName, gc.Equals, "alice@canonical.com")
 }
 
-func (s *importModelSuite) TestImportModelUnauthorized(c *gc.C) {
+func (s *cmdTestSuite) TestImportModelUnauthorized(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
 
 	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@canonical.com/cred")
@@ -106,25 +99,25 @@ func (s *importModelSuite) TestImportModelUnauthorized(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
 
-func (s *importModelSuite) TestImportModelNoController(c *gc.C) {
+func (s *cmdTestSuite) TestImportModelNoController(c *gc.C) {
 	bClient := jimmtest.NewUserSessionLogin(c, "bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewImportModelCommandForTesting(s.ClientStore(), bClient))
 	c.Assert(err, gc.ErrorMatches, `controller not specified`)
 }
 
-func (s *importModelSuite) TestImportModelNoModelUUID(c *gc.C) {
+func (s *cmdTestSuite) TestImportModelNoModelUUID(c *gc.C) {
 	bClient := jimmtest.NewUserSessionLogin(c, "bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewImportModelCommandForTesting(s.ClientStore(), bClient), "controller-id")
 	c.Assert(err, gc.ErrorMatches, `model uuid not specified`)
 }
 
-func (s *importModelSuite) TestImportModelInvalidModelUUID(c *gc.C) {
+func (s *cmdTestSuite) TestImportModelInvalidModelUUID(c *gc.C) {
 	bClient := jimmtest.NewUserSessionLogin(c, "bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewImportModelCommandForTesting(s.ClientStore(), bClient), "controller-id", "not-a-uuid")
 	c.Assert(err, gc.ErrorMatches, `invalid model uuid`)
 }
 
-func (s *importModelSuite) TestImportModelTooManyArgs(c *gc.C) {
+func (s *cmdTestSuite) TestImportModelTooManyArgs(c *gc.C) {
 	bClient := jimmtest.NewUserSessionLogin(c, "bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewImportModelCommandForTesting(s.ClientStore(), bClient), "controller-id", "not-a-uuid", "spare-argument")
 	c.Assert(err, gc.ErrorMatches, `too many args`)

@@ -20,7 +20,6 @@ import (
 	yamlv2 "gopkg.in/yaml.v2"
 
 	"github.com/canonical/jimm/v3/cmd/jimmctl/cmd"
-	"github.com/canonical/jimm/v3/internal/cmdtest"
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/jimmtest"
@@ -30,13 +29,7 @@ import (
 	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
 
-type relationSuite struct {
-	cmdtest.JimmCmdSuite
-}
-
-var _ = gc.Suite(&relationSuite{})
-
-func (s *relationSuite) TestAddRelationSuperuser(c *gc.C) {
+func (s *cmdTestSuite) TestAddRelationSuperuser(c *gc.C) {
 	// alice is superuser
 	bClient := jimmtest.NewUserSessionLogin(c, "alice")
 	group1 := "testGroup1"
@@ -107,7 +100,7 @@ func (s *relationSuite) TestAddRelationSuperuser(c *gc.C) {
 
 }
 
-func (s *relationSuite) TestMissingParamsAddRelationSuperuser(c *gc.C) {
+func (s *cmdTestSuite) TestMissingParamsAddRelationSuperuser(c *gc.C) {
 	// alice is superuser
 	bClient := jimmtest.NewUserSessionLogin(c, "alice")
 
@@ -120,7 +113,7 @@ func (s *relationSuite) TestMissingParamsAddRelationSuperuser(c *gc.C) {
 
 }
 
-func (s *relationSuite) TestAddRelationViaFileSuperuser(c *gc.C) {
+func (s *cmdTestSuite) TestAddRelationViaFileSuperuser(c *gc.C) {
 	// alice is superuser
 	bClient := jimmtest.NewUserSessionLogin(c, "alice")
 	group1 := "testGroup1"
@@ -150,13 +143,13 @@ func (s *relationSuite) TestAddRelationViaFileSuperuser(c *gc.C) {
 	c.Assert(len(tuples), gc.Equals, 4)
 }
 
-func (s *relationSuite) TestAddRelationRejectsUnauthorisedUsers(c *gc.C) {
+func (s *cmdTestSuite) TestAddRelationRejectsUnauthorisedUsers(c *gc.C) {
 	bClient := jimmtest.NewUserSessionLogin(c, "bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewAddRelationCommandForTesting(s.ClientStore(), bClient), "test-group1", "member", "test-group2")
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
 
-func (s *relationSuite) TestRemoveRelationSuperuser(c *gc.C) {
+func (s *cmdTestSuite) TestRemoveRelationSuperuser(c *gc.C) {
 	// alice is superuser
 	bClient := jimmtest.NewUserSessionLogin(c, "alice")
 	group1 := "testGroup1"
@@ -203,7 +196,7 @@ func (s *relationSuite) TestRemoveRelationSuperuser(c *gc.C) {
 	}
 }
 
-func (s *relationSuite) TestRemoveRelationViaFileSuperuser(c *gc.C) {
+func (s *cmdTestSuite) TestRemoveRelationViaFileSuperuser(c *gc.C) {
 	bClient := jimmtest.NewUserSessionLogin(c, "alice")
 	group1 := "testGroup1"
 	group2 := "testGroup2"
@@ -248,7 +241,7 @@ func (s *relationSuite) TestRemoveRelationViaFileSuperuser(c *gc.C) {
 	}})
 }
 
-func (s *relationSuite) TestRemoveRelation(c *gc.C) {
+func (s *cmdTestSuite) TestRemoveRelation(c *gc.C) {
 	// bob is not superuser
 	bClient := jimmtest.NewUserSessionLogin(c, "bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewRemoveRelationCommandForTesting(s.ClientStore(), bClient), "test-group1#member", "member", "test-group2")
@@ -341,7 +334,7 @@ func initializeEnvironment(c *gc.C, ctx context.Context, db *db.Database, u dbmo
 	return &env
 }
 
-func (s *relationSuite) TestListRelations(c *gc.C) {
+func (s *cmdTestSuite) TestListRelations(c *gc.C) {
 	env := initializeEnvironment(c, context.Background(), &s.JIMM.Database, *s.AdminUser)
 	bClient := jimmtest.NewUserSessionLogin(c, "alice") // alice is superuser
 
@@ -422,7 +415,7 @@ func (s *relationSuite) TestListRelations(c *gc.C) {
 	c.Assert(cmdtesting.Stdout(context), gc.Equals, string(expectedYAMLData))
 }
 
-func (s *relationSuite) TestListRelationsWithError(c *gc.C) {
+func (s *cmdTestSuite) TestListRelationsWithError(c *gc.C) {
 	env := initializeEnvironment(c, context.Background(), &s.JIMM.Database, *s.AdminUser)
 	// alice is superuser
 	bClient := jimmtest.NewUserSessionLogin(c, "alice")
@@ -486,7 +479,7 @@ func (s *relationSuite) TestListRelationsWithError(c *gc.C) {
 }
 
 // TODO: remove boilerplate of env setup and use initialiseEnvironment
-func (s *relationSuite) TestCheckRelationViaSuperuser(c *gc.C) {
+func (s *cmdTestSuite) TestCheckRelationViaSuperuser(c *gc.C) {
 	ctx := context.TODO()
 	bClient := jimmtest.NewUserSessionLogin(c, "alice")
 	ofgaClient := s.JIMM.OpenFGAClient
@@ -660,7 +653,7 @@ func (s *relationSuite) TestCheckRelationViaSuperuser(c *gc.C) {
 
 }
 
-func (s *relationSuite) TestCheckRelation(c *gc.C) {
+func (s *cmdTestSuite) TestCheckRelation(c *gc.C) {
 	// bob is not superuser
 	bClient := jimmtest.NewUserSessionLogin(c, "bob")
 	_, err := cmdtesting.RunCommand(

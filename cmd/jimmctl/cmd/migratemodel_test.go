@@ -9,15 +9,8 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/v3/cmd/jimmctl/cmd"
-	"github.com/canonical/jimm/v3/internal/cmdtest"
 	"github.com/canonical/jimm/v3/internal/jimmtest"
 )
-
-type migrateModelSuite struct {
-	cmdtest.JimmCmdSuite
-}
-
-var _ = gc.Suite(&migrateModelSuite{})
 
 var migrationResultRegex = `results:
 - modeltag: model-.*
@@ -39,7 +32,7 @@ var migrationResultRegex = `results:
 // detect that a model with the same UUID already exists on the target controller.
 // This functionality is already tested in jujuapi and ideally this test would only test the CLI functionality
 // but our CLI tests are currently integration based.
-func (s *migrateModelSuite) TestMigrateModelCommandSuperuser(c *gc.C) {
+func (s *cmdTestSuite) TestMigrateModelCommandSuperuser(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
 	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@canonical.com/cred")
 	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{AuthType: "empty"})
@@ -53,7 +46,7 @@ func (s *migrateModelSuite) TestMigrateModelCommandSuperuser(c *gc.C) {
 	c.Assert(cmdtesting.Stdout(context), gc.Matches, migrationResultRegex)
 }
 
-func (s *migrateModelSuite) TestMigrateModelCommandFailsWithInvalidModelTag(c *gc.C) {
+func (s *cmdTestSuite) TestMigrateModelCommandFailsWithInvalidModelTag(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
 
 	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@canonical.com/cred")
@@ -66,7 +59,7 @@ func (s *migrateModelSuite) TestMigrateModelCommandFailsWithInvalidModelTag(c *g
 	c.Assert(err, gc.ErrorMatches, ".* is not a valid model uuid")
 }
 
-func (s *migrateModelSuite) TestMigrateModelCommandFailsWithMissingArgs(c *gc.C) {
+func (s *cmdTestSuite) TestMigrateModelCommandFailsWithMissingArgs(c *gc.C) {
 	bClient := jimmtest.NewUserSessionLogin(c, "alice")
 	_, err := cmdtesting.RunCommand(c, cmd.NewMigrateModelCommandForTesting(s.ClientStore(), bClient), "myController")
 	c.Assert(err, gc.ErrorMatches, "Missing controller name and model uuid arguments")

@@ -11,18 +11,11 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/v3/cmd/jimmctl/cmd"
-	"github.com/canonical/jimm/v3/internal/cmdtest"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/jimmtest"
 )
 
-type groupSuite struct {
-	cmdtest.JimmCmdSuite
-}
-
-var _ = gc.Suite(&groupSuite{})
-
-func (s *groupSuite) TestAddGroupSuperuser(c *gc.C) {
+func (s *cmdTestSuite) TestAddGroupSuperuser(c *gc.C) {
 	// alice is superuser
 	bClient := jimmtest.NewUserSessionLogin(c, "alice")
 	ctx, err := cmdtesting.RunCommand(c, cmd.NewAddGroupCommandForTesting(s.ClientStore(), bClient), "test-group")
@@ -37,14 +30,14 @@ func (s *groupSuite) TestAddGroupSuperuser(c *gc.C) {
 	c.Assert(cmdtesting.Stdout(ctx), gc.Matches, fmt.Sprintf(`(?s).*uuid: %s\n.*`, group.UUID))
 }
 
-func (s *groupSuite) TestAddGroup(c *gc.C) {
+func (s *cmdTestSuite) TestAddGroup(c *gc.C) {
 	// Unauthorised add (bob is not superuser)
 	bClient := jimmtest.NewUserSessionLogin(c, "bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewAddGroupCommandForTesting(s.ClientStore(), bClient), "test-group")
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
 
-func (s *groupSuite) TestRenameGroupSuperuser(c *gc.C) {
+func (s *cmdTestSuite) TestRenameGroupSuperuser(c *gc.C) {
 	// alice is superuser
 	bClient := jimmtest.NewUserSessionLogin(c, "alice")
 
@@ -62,14 +55,14 @@ func (s *groupSuite) TestRenameGroupSuperuser(c *gc.C) {
 	c.Assert(group.Name, gc.Equals, "renamed-group")
 }
 
-func (s *groupSuite) TestRenameGroup(c *gc.C) {
+func (s *cmdTestSuite) TestRenameGroup(c *gc.C) {
 	// bob is not superuser
 	bClient := jimmtest.NewUserSessionLogin(c, "bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewRenameGroupCommandForTesting(s.ClientStore(), bClient), "test-group", "renamed-group")
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
 
-func (s *groupSuite) TestRemoveGroupSuperuser(c *gc.C) {
+func (s *cmdTestSuite) TestRemoveGroupSuperuser(c *gc.C) {
 	// alice is superuser
 	bClient := jimmtest.NewUserSessionLogin(c, "alice")
 
@@ -84,7 +77,7 @@ func (s *groupSuite) TestRemoveGroupSuperuser(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, "record not found")
 }
 
-func (s *groupSuite) TestRemoveGroupWithoutFlag(c *gc.C) {
+func (s *cmdTestSuite) TestRemoveGroupWithoutFlag(c *gc.C) {
 	// alice is superuser
 	bClient := jimmtest.NewUserSessionLogin(c, "alice")
 
@@ -92,14 +85,14 @@ func (s *groupSuite) TestRemoveGroupWithoutFlag(c *gc.C) {
 	c.Assert(err.Error(), gc.Matches, "Failed to read from input.")
 }
 
-func (s *groupSuite) TestRemoveGroup(c *gc.C) {
+func (s *cmdTestSuite) TestRemoveGroup(c *gc.C) {
 	// bob is not superuser
 	bClient := jimmtest.NewUserSessionLogin(c, "bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewRemoveGroupCommandForTesting(s.ClientStore(), bClient), "test-group", "-y")
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
 
-func (s *groupSuite) TestListGroupsSuperuser(c *gc.C) {
+func (s *cmdTestSuite) TestListGroupsSuperuser(c *gc.C) {
 	// alice is superuser
 	bClient := jimmtest.NewUserSessionLogin(c, "alice")
 
@@ -116,7 +109,7 @@ func (s *groupSuite) TestListGroupsSuperuser(c *gc.C) {
 	c.Assert(strings.Contains(output, "test-group2"), gc.Equals, true)
 }
 
-func (s *groupSuite) TestListGroups(c *gc.C) {
+func (s *cmdTestSuite) TestListGroups(c *gc.C) {
 	// bob is not superuser
 	bClient := jimmtest.NewUserSessionLogin(c, "bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewListGroupsCommandForTesting(s.ClientStore(), bClient), "test-group")

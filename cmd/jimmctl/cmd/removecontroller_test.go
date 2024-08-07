@@ -7,17 +7,10 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/v3/cmd/jimmctl/cmd"
-	"github.com/canonical/jimm/v3/internal/cmdtest"
 	"github.com/canonical/jimm/v3/internal/jimmtest"
 )
 
-type removeControllerSuite struct {
-	cmdtest.JimmCmdSuite
-}
-
-var _ = gc.Suite(&removeControllerSuite{})
-
-func (s *removeControllerSuite) TestRemoveControllerSuperuser(c *gc.C) {
+func (s *cmdTestSuite) TestRemoveControllerSuperuser(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
 
 	// alice is superuser
@@ -66,7 +59,7 @@ status:
 `)
 }
 
-func (s *removeControllerSuite) TestRemoveController(c *gc.C) {
+func (s *cmdTestSuite) TestRemoveController(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
 
 	// bob is not superuser

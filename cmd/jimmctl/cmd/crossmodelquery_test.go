@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 
 	"github.com/canonical/jimm/v3/cmd/jimmctl/cmd"
-	"github.com/canonical/jimm/v3/internal/cmdtest"
 	"github.com/canonical/jimm/v3/internal/jimmtest"
 	"github.com/juju/cmd/v3/cmdtesting"
 	jujuparams "github.com/juju/juju/rpc/params"
@@ -15,13 +14,7 @@ import (
 	gc "gopkg.in/check.v1"
 )
 
-type crossModelQuerySuite struct {
-	cmdtest.JimmCmdSuite
-}
-
-var _ = gc.Suite(&crossModelQuerySuite{})
-
-func (s *crossModelQuerySuite) TestCrossModelQueryCommand(c *gc.C) {
+func (s *cmdTestSuite) TestCrossModelQueryCommand(c *gc.C) {
 	// Test setup.
 	store := s.ClientStore()
 	bClient := jimmtest.NewUserSessionLogin(c, "alice")

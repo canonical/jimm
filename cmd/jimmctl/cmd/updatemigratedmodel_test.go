@@ -11,18 +11,11 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/v3/cmd/jimmctl/cmd"
-	"github.com/canonical/jimm/v3/internal/cmdtest"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/jimmtest"
 )
 
-type updateMigratedModelSuite struct {
-	cmdtest.JimmCmdSuite
-}
-
-var _ = gc.Suite(&updateMigratedModelSuite{})
-
-func (s *updateMigratedModelSuite) TestUpdateMigratedModelSuperuser(c *gc.C) {
+func (s *cmdTestSuite) TestUpdateMigratedModelSuperuser(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
 
 	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@canonical.com/cred")
@@ -47,7 +40,7 @@ func (s *updateMigratedModelSuite) TestUpdateMigratedModelSuperuser(c *gc.C) {
 	c.Check(model2.ControllerID, gc.Not(gc.Equals), model.ControllerID)
 }
 
-func (s *updateMigratedModelSuite) TestUpdateMigratedModelUnauthorized(c *gc.C) {
+func (s *cmdTestSuite) TestUpdateMigratedModelUnauthorized(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
 
 	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@canonical.com/cred")
@@ -60,25 +53,25 @@ func (s *updateMigratedModelSuite) TestUpdateMigratedModelUnauthorized(c *gc.C) 
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
 
-func (s *updateMigratedModelSuite) TestUpdateMigratedModelNoController(c *gc.C) {
+func (s *cmdTestSuite) TestUpdateMigratedModelNoController(c *gc.C) {
 	bClient := jimmtest.NewUserSessionLogin(c, "bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewUpdateMigratedModelCommandForTesting(s.ClientStore(), bClient))
 	c.Assert(err, gc.ErrorMatches, `controller not specified`)
 }
 
-func (s *updateMigratedModelSuite) TestUpdateMigratedModelNoModelUUID(c *gc.C) {
+func (s *cmdTestSuite) TestUpdateMigratedModelNoModelUUID(c *gc.C) {
 	bClient := jimmtest.NewUserSessionLogin(c, "bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewUpdateMigratedModelCommandForTesting(s.ClientStore(), bClient), "controller-id")
 	c.Assert(err, gc.ErrorMatches, `model uuid not specified`)
 }
 
-func (s *updateMigratedModelSuite) TestUpdateMigratedModelInvalidModelUUID(c *gc.C) {
+func (s *cmdTestSuite) TestUpdateMigratedModelInvalidModelUUID(c *gc.C) {
 	bClient := jimmtest.NewUserSessionLogin(c, "bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewUpdateMigratedModelCommandForTesting(s.ClientStore(), bClient), "controller-id", "not-a-uuid")
 	c.Assert(err, gc.ErrorMatches, `invalid model uuid`)
 }
 
-func (s *updateMigratedModelSuite) TestUpdateMigratedModelTooManyArgs(c *gc.C) {
+func (s *cmdTestSuite) TestUpdateMigratedModelTooManyArgs(c *gc.C) {
 	bClient := jimmtest.NewUserSessionLogin(c, "bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewUpdateMigratedModelCommandForTesting(s.ClientStore(), bClient), "controller-id", "not-a-uuid", "spare-argument")
 	c.Assert(err, gc.ErrorMatches, `too many args`)

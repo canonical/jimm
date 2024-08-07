@@ -7,17 +7,10 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/v3/cmd/jimmctl/cmd"
-	"github.com/canonical/jimm/v3/internal/cmdtest"
 	"github.com/canonical/jimm/v3/internal/jimmtest"
 )
 
-type setControllerDeprecatedSuite struct {
-	cmdtest.JimmCmdSuite
-}
-
-var _ = gc.Suite(&setControllerDeprecatedSuite{})
-
-func (s *setControllerDeprecatedSuite) TestSetControllerDeprecatedSuperuser(c *gc.C) {
+func (s *cmdTestSuite) TestSetControllerDeprecatedSuperuser(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
 
 	// alice is superuser
@@ -66,7 +59,7 @@ status:
 `)
 }
 
-func (s *setControllerDeprecatedSuite) TestSetControllerDeprecated(c *gc.C) {
+func (s *cmdTestSuite) TestSetControllerDeprecated(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
 
 	// bob is not superuser

@@ -11,16 +11,9 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/v3/cmd/jimmctl/cmd"
-	"github.com/canonical/jimm/v3/internal/cmdtest"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/jimmtest"
 )
-
-type importCloudCredentialsSuite struct {
-	cmdtest.JimmCmdSuite
-}
-
-var _ = gc.Suite(&importCloudCredentialsSuite{})
 
 const creds = `{
 	"_id": "aws/alice@canonical.com/test1",
@@ -44,7 +37,7 @@ const creds = `{
 	"attributes": {}
 }`
 
-func (s *importCloudCredentialsSuite) TestImportCloudCredentials(c *gc.C) {
+func (s *cmdTestSuite) TestImportCloudCredentials(c *gc.C) {
 	err := s.JIMM.Database.AddCloud(context.Background(), &dbmodel.Cloud{
 		Name:    "aws",
 		Type:    "kubernetes",

@@ -13,18 +13,11 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/canonical/jimm/v3/cmd/jimmctl/cmd"
-	"github.com/canonical/jimm/v3/internal/cmdtest"
 	"github.com/canonical/jimm/v3/internal/jimmtest"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
-type addControllerSuite struct {
-	cmdtest.JimmCmdSuite
-}
-
-var _ = gc.Suite(&addControllerSuite{})
-
-func (s *addControllerSuite) TestAddControllerSuperuser(c *gc.C) {
+func (s *cmdTestSuite) TestAddControllerSuperuser(c *gc.C) {
 	info := s.APIInfo(c)
 	params := apiparams.AddControllerRequest{
 		UUID:          info.ControllerUUID,
@@ -88,7 +81,7 @@ status:
 	c.Assert(password, gc.Equals, info.Password)
 }
 
-func (s *addControllerSuite) TestAddController(c *gc.C) {
+func (s *cmdTestSuite) TestAddController(c *gc.C) {
 	info := s.APIInfo(c)
 	params := apiparams.AddControllerRequest{
 		Name:          "controller-1",

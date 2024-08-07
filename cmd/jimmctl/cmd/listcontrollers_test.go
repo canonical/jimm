@@ -7,7 +7,6 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/v3/cmd/jimmctl/cmd"
-	"github.com/canonical/jimm/v3/internal/cmdtest"
 	"github.com/canonical/jimm/v3/internal/jimmtest"
 )
 
@@ -67,13 +66,7 @@ var (
 `
 )
 
-type listControllersSuite struct {
-	cmdtest.JimmCmdSuite
-}
-
-var _ = gc.Suite(&listControllersSuite{})
-
-func (s *listControllersSuite) TestListControllersSuperuser(c *gc.C) {
+func (s *cmdTestSuite) TestListControllersSuperuser(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
 
 	// alice is superuser
@@ -83,7 +76,7 @@ func (s *listControllersSuite) TestListControllersSuperuser(c *gc.C) {
 	c.Assert(cmdtesting.Stdout(context), gc.Matches, expectedSuperuserOutput)
 }
 
-func (s *listControllersSuite) TestListControllers(c *gc.C) {
+func (s *cmdTestSuite) TestListControllers(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
 
 	// bob is not superuser
