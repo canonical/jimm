@@ -244,9 +244,8 @@ func TestProxySockets(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
-	srvController := newServer(func(conn *websocket.Conn) error {
-		return echo(conn)
-	})
+	srvController := newServer(echo)
+
 	errChan := make(chan error)
 	srvJIMM := newServer(func(connClient *websocket.Conn) error {
 		testTokenGen := testTokenGenerator{}
@@ -293,9 +292,7 @@ func TestCancelProxySockets(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	srvController := newServer(func(conn *websocket.Conn) error {
-		return echo(conn)
-	})
+	srvController := newServer(echo)
 
 	errChan := make(chan error)
 	srvJIMM := newServer(func(connClient *websocket.Conn) error {
@@ -335,9 +332,7 @@ func TestProxySocketsAuditLogs(t *testing.T) {
 
 	ctx := context.Background()
 
-	srvController := newServer(func(conn *websocket.Conn) error {
-		return echo(conn)
-	})
+	srvController := newServer(echo)
 	auditLogs := make([]*dbmodel.AuditLogEntry, 0)
 
 	errChan := make(chan error)
@@ -428,7 +423,8 @@ func newServer(f func(*websocket.Conn) error) *server {
 	cp.AddCert(srv.Certificate())
 	srv.dialer = &rpc.Dialer{
 		TLSConfig: &tls.Config{
-			RootCAs: cp,
+			RootCAs:    cp,
+			MinVersion: tls.VersionTLS12,
 		},
 	}
 	return &srv
@@ -445,15 +441,17 @@ func handleWS(f func(*websocket.Conn) error) http.Handler {
 		defer c.Close()
 		err = f(c)
 		var cm []byte
-		if err == nil {
+		switch {
+		case err == nil:
 			cm = websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")
-		} else if websocket.IsCloseError(err) {
+		case websocket.IsCloseError(err):
 			ce := err.(*websocket.CloseError)
 			cm = websocket.FormatCloseMessage(ce.Code, ce.Text)
-		} else {
+		default:
 			cm = websocket.FormatCloseMessage(websocket.CloseInternalServerErr, err.Error())
 		}
-		c.WriteControl(websocket.CloseMessage, cm, time.Time{})
+		_ = c.WriteControl(websocket.CloseMessage, cm, time.Time{})
+
 	})
 }
 

@@ -62,6 +62,7 @@ func TestStripPathElement(t *testing.T) {
 
 			hnd.ServeHTTP(rr, req)
 			resp := rr.Result()
+			defer resp.Body.Close()
 			c.Check(resp.StatusCode, qt.Equals, http.StatusOK)
 		})
 	}

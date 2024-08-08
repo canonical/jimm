@@ -39,6 +39,7 @@ func TestDebugInfo(t *testing.T) {
 	rr := setupHandlerAndRecorder(c, debugapi.ServerStartTime, "/info")
 
 	resp := rr.Result()
+	defer resp.Body.Close()
 	c.Check(resp.StatusCode, qt.Equals, http.StatusOK)
 	buf, err := io.ReadAll(resp.Body)
 	c.Assert(err, qt.IsNil)
@@ -54,6 +55,7 @@ func TestDebugStatus(t *testing.T) {
 	rr := setupHandlerAndRecorder(c, debugapi.ServerStartTime, "/status")
 
 	resp := rr.Result()
+	defer resp.Body.Close()
 	c.Check(resp.StatusCode, qt.Equals, http.StatusOK)
 	buf, err := io.ReadAll(resp.Body)
 	c.Assert(err, qt.IsNil)
@@ -76,6 +78,7 @@ func TestDebugStatusStatusError(t *testing.T) {
 	}), "/status")
 
 	resp := rr.Result()
+	defer resp.Body.Close()
 	c.Check(resp.StatusCode, qt.Equals, http.StatusOK)
 	buf, err := io.ReadAll(resp.Body)
 	c.Assert(err, qt.IsNil)

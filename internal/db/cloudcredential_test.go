@@ -207,6 +207,7 @@ func TestForEachCloudCredentialUnconfiguredDatabase(t *testing.T) {
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeServerConfiguration)
 }
 
+//nolint:gosec // Thinks hardcoded credentials.
 const forEachCloudCredentialEnv = `clouds:
 - name: cloud-1
   regions:

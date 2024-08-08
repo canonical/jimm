@@ -6,7 +6,7 @@
 run:
   timeout: "5m" # Allow at least 5 minutes
   issues-exit-code: 1
-  tests: false # Do not lint tests
+  tests: true
   allow-parallel-runners: false
   allow-serial-runners: false
   # go: "1.17" # Do not set a go limit
@@ -54,7 +54,8 @@ linters:
     # Style based linters
     - promlinter
     # - importas # optional, useful for consistent named imports
-    # - gocritic # optional 
+    - gocritic
+    - gocognit
 
 linters-settings:
   gosec:
@@ -63,5 +64,6 @@ linters-settings:
     confidence: low
     excludes:
       - G601 # Implicit memory aliasing in for loop. Fixed in Go1.22+, as such exclude.
-
+  gocognit:
+    min-complexity: 30
 

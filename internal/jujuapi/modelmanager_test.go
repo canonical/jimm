@@ -258,11 +258,11 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 	mt4 := s.AddModel(c, names.NewUserTag("charlie@canonical.com"), "model-4", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, s.Model2.CloudCredential.ResourceTag())
 
 	// TODO (alesstimec) change once granting has been re-implemented
-	//conn := s.open(c, nil, "charlie")
-	//defer conn.Close()
-	//client := modelmanager.NewClient(conn)
-	//err := client.GrantModel("bob@canonical.com", "write", mt4.Id())
-	//c.Assert(err, gc.Equals, nil)
+	// conn := s.open(c, nil, "charlie")
+	// defer conn.Close()
+	// client := modelmanager.NewClient(conn)
+	// err := client.GrantModel("bob@canonical.com", "write", mt4.Id())
+	// c.Assert(err, gc.Equals, nil)
 
 	bobIdentity, err := dbmodel.NewIdentity("bob@canonical.com")
 	c.Assert(err, gc.IsNil)
@@ -272,8 +272,8 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 
 	mt5 := s.AddModel(c, names.NewUserTag("charlie@canonical.com"), "model-5", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, s.Model2.CloudCredential.ResourceTag())
 	// TODO (alesstimec) change once granting has been re-implemented
-	//err = client.GrantModel("bob@canonical.com", "admin", mt5.Id())
-	//c.Assert(err, gc.Equals, nil)
+	// err = client.GrantModel("bob@canonical.com", "admin", mt5.Id())
+	// c.Assert(err, gc.Equals, nil)
 	err = bob.SetModelAccess(context.Background(), mt5, ofganames.AdministratorRelation)
 	c.Assert(err, gc.Equals, nil)
 

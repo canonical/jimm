@@ -124,16 +124,17 @@ func (c Controller) ToAPIControllerInfo() apiparams.ControllerInfo {
 	ci.CloudRegion = c.CloudRegion
 	ci.Username = c.AdminIdentityName
 	ci.AgentVersion = c.AgentVersion
-	if c.UnavailableSince.Valid {
+	switch {
+	case c.UnavailableSince.Valid:
 		ci.Status = jujuparams.EntityStatus{
 			Status: "unavailable",
 			Since:  &c.UnavailableSince.Time,
 		}
-	} else if c.Deprecated {
+	case c.Deprecated:
 		ci.Status = jujuparams.EntityStatus{
 			Status: "deprecated",
 		}
-	} else {
+	default:
 		ci.Status = jujuparams.EntityStatus{
 			Status: "available",
 		}

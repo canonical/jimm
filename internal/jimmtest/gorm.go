@@ -168,7 +168,7 @@ const maxDatabaseNameLength = 63
 // sure no name collisions occur and also future calls with the same suggested
 // database name results in the same safe name.
 func computeSafeDatabaseName(suggestedName string) string {
-	re, _ := regexp.Compile(unsafeCharsPattern)
+	re := regexp.MustCompile(unsafeCharsPattern)
 	safeName := re.ReplaceAllString(suggestedName, "_")
 
 	//nolint:gosec // We're only using sha1 in tests.

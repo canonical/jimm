@@ -365,8 +365,8 @@ func (s *applicationOffersSuite) TestDestroyOffers(c *gc.C) {
 	// i need to fetch the offer so that i can manually set read
 	// permission for charlie
 	//
-	//err = client.GrantOffer("charlie@canonical.com", "read", offerURL)
-	//c.Assert(err, jc.ErrorIsNil)
+	// err = client.GrantOffer("charlie@canonical.com", "read", offerURL)
+	// c.Assert(err, jc.ErrorIsNil)
 	offer := dbmodel.ApplicationOffer{
 		URL: offerURL,
 	}

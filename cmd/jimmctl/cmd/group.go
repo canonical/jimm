@@ -283,7 +283,7 @@ func (c *removeGroupCommand) Run(ctxt *cmd.Context) error {
 		if err != nil {
 			return errors.E(err, "Failed to read from input.")
 		}
-		text = strings.Replace(text, "\n", "", -1)
+		text = strings.ReplaceAll(text, "\n", "")
 		if !(text == "y" || text == "Y") {
 			return nil
 		}

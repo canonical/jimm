@@ -75,11 +75,9 @@ func (j *JIMM) Offer(ctx context.Context, user *openfga.User, offer AddApplicati
 	err = j.Database.GetApplicationOffer(ctx, &offerCheck)
 	if err == nil {
 		return errors.E(fmt.Sprintf("offer %s already exists, please use a different name", offerURL.String()), errors.CodeAlreadyExists)
-	} else {
-		if errors.ErrorCode(err) != errors.CodeNotFound {
-			// Anything besides Not Found is a problem.
-			return errors.E(op, err)
-		}
+	} else if errors.ErrorCode(err) != errors.CodeNotFound {
+		// Anything besides Not Found is a problem.
+		return errors.E(op, err)
 	}
 
 	api, err := j.dial(ctx, &model.Controller, names.ModelTag{})
@@ -459,8 +457,7 @@ func (j *JIMM) RevokeOfferAccess(ctx context.Context, user *openfga.User, offerU
 		stillHasAccess := false
 		switch targetRelation {
 		case ofganames.AdministratorRelation:
-			switch currentRelation {
-			case ofganames.AdministratorRelation:
+			if currentRelation == ofganames.AdministratorRelation {
 				stillHasAccess = true
 			}
 		case ofganames.ConsumerRelation:

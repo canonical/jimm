@@ -87,11 +87,12 @@ func (d *Database) GetApplicationOffer(ctx context.Context, offer *dbmodel.Appli
 	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
 	db := d.DB.WithContext(ctx)
 
-	if offer.UUID != "" {
+	switch {
+	case offer.UUID != "":
 		db = db.Where("uuid = ?", offer.UUID)
-	} else if offer.URL != "" {
+	case offer.URL != "":
 		db = db.Where("url = ?", offer.URL)
-	} else {
+	default:
 		return errors.E(op, "missing offer UUID or URL")
 	}
 	db = db.Preload("Connections")

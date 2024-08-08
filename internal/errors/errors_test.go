@@ -13,7 +13,9 @@ import (
 func TestEEmptyArguments(t *testing.T) {
 	c := qt.New(t)
 
-	c.Assert(func() { errors.E() }, qt.PanicMatches, `call to errors.E with no arguments`)
+	c.Assert(func() {
+		_ = errors.E()
+	}, qt.PanicMatches, `call to errors.E with no arguments`)
 }
 
 func TestEUnknownType(t *testing.T) {

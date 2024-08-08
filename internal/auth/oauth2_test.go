@@ -28,7 +28,7 @@ import (
 
 func setupTestAuthSvc(ctx context.Context, c *qt.C, expiry time.Duration) (*auth.AuthenticationService, *db.Database, sessions.Store, func()) {
 	db := &db.Database{
-		DB: jimmtest.PostgresDB(c, func() time.Time { return time.Now() }),
+		DB: jimmtest.PostgresDB(c, time.Now),
 	}
 	c.Assert(db.Migrate(ctx, false), qt.IsNil)
 
@@ -251,7 +251,8 @@ func TestVerifyClientCredentials(t *testing.T) {
 
 	const (
 		// these are valid client credentials hardcoded into the jimm realm
-		validClientID     = "test-client-id"
+		validClientID = "test-client-id"
+		//nolint:gosec // Thinks hardcoded credentials.
 		validClientSecret = "2M2blFbO4GX4zfggQpivQSxwWX1XGgNf"
 	)
 
@@ -265,7 +266,7 @@ func TestVerifyClientCredentials(t *testing.T) {
 	c.Assert(err, qt.ErrorMatches, "invalid client credentials")
 }
 
-func assertSetCookiesIsCorrect(c *qt.C, rec *httptest.ResponseRecorder, parsedCookies []*http.Cookie) {
+func assertSetCookiesIsCorrect(c *qt.C, parsedCookies []*http.Cookie) {
 	assertHasCookie := func(name string, cookies []*http.Cookie) {
 		found := false
 		for _, v := range cookies {
@@ -298,7 +299,7 @@ func TestCreateBrowserSession(t *testing.T) {
 
 	cookies := rec.Header().Get("Set-Cookie")
 	parsedCookies := jimmtest.ParseCookies(cookies)
-	assertSetCookiesIsCorrect(c, rec, parsedCookies)
+	assertSetCookiesIsCorrect(c, parsedCookies)
 
 	req.AddCookie(&http.Cookie{
 		Name:  auth.SessionName,
@@ -345,7 +346,7 @@ func TestAuthenticateBrowserSessionAndLogout(t *testing.T) {
 	// Assert Set-Cookie present
 	setCookieCookies := rec.Header().Get("Set-Cookie")
 	parsedCookies := jimmtest.ParseCookies(setCookieCookies)
-	assertSetCookiesIsCorrect(c, rec, parsedCookies)
+	assertSetCookiesIsCorrect(c, parsedCookies)
 
 	// Test logout does indeed remove the cookie for us
 	err = authSvc.Logout(ctx, rec, req)
@@ -454,7 +455,7 @@ func TestAuthenticateBrowserSessionHandlesExpiredAccessTokens(t *testing.T) {
 	// Assert Set-Cookie present
 	setCookieCookies := rec.Header().Get("Set-Cookie")
 	parsedCookies := jimmtest.ParseCookies(setCookieCookies)
-	assertSetCookiesIsCorrect(c, rec, parsedCookies)
+	assertSetCookiesIsCorrect(c, parsedCookies)
 }
 
 func TestAuthenticateBrowserSessionHandlesMissingOrExpiredRefreshTokens(t *testing.T) {
@@ -492,7 +493,8 @@ func TestAuthenticateBrowserSessionHandlesMissingOrExpiredRefreshTokens(t *testi
 	// And we're missing a refresh token (the same case would apply for an expired refresh token
 	// or any scenario where the token source cannot refresh the access token)
 	u.RefreshToken = ""
-	db.UpdateIdentity(ctx, u)
+	err = db.UpdateIdentity(ctx, u)
+	c.Assert(err, qt.IsNil)
 
 	// AuthenticateBrowserSession should fail to refresh the users session and delete
 	// the current session, giving us the same cookie back with a max-age of -1.

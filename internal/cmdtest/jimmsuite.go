@@ -71,7 +71,7 @@ func (s *JimmCmdSuite) SetUpTest(c *gc.C) {
 	s.Params = jimmtest.NewTestJimmParams(&jimmtest.GocheckTester{C: c})
 	dsn, err := url.Parse(s.Params.DSN)
 	c.Assert(err, gc.Equals, nil)
-	s.databaseName = strings.Replace(dsn.Path, "/", "", -1)
+	s.databaseName = strings.ReplaceAll(dsn.Path, "/", "")
 	s.Params.PublicDNSName = u.Host
 	s.Params.ControllerAdmins = []string{"admin"}
 	s.Params.OpenFGAParams = service.OpenFGAParams{

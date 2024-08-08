@@ -12,9 +12,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/servermon"
 )
 
-var newUUID = func() string {
-	return uuid.NewString()
-}
+var newUUID = uuid.NewString
 
 // AddGroup adds a new group.
 func (d *Database) AddGroup(ctx context.Context, name string) (ge *dbmodel.GroupEntry, err error) {

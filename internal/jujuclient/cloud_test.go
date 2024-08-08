@@ -216,7 +216,7 @@ func (s *cloudSuite) TestClouds(c *gc.C) {
 	clouds, err := s.API.Clouds(context.Background())
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(clouds, jc.DeepEquals, map[names.CloudTag]jujuparams.Cloud{
-		names.NewCloudTag(jimmtest.TestCloudName): jujuparams.Cloud{
+		names.NewCloudTag(jimmtest.TestCloudName): {
 			Type:             jimmtest.TestProviderType,
 			AuthTypes:        []string{"empty", "userpass"},
 			Endpoint:         jimmtest.TestCloudEndpoint,

@@ -24,7 +24,7 @@ import (
 func setupDbAndSessionStore(c *qt.C) (*db.Database, sessions.Store) {
 	// Setup db ahead of time so we have access to session store
 	db := &db.Database{
-		DB: jimmtest.PostgresDB(c, func() time.Time { return time.Now() }),
+		DB: jimmtest.PostgresDB(c, time.Now),
 	}
 	c.Assert(db.Migrate(context.Background(), false), qt.IsNil)
 
@@ -130,8 +130,10 @@ func TestCallbackFailsNoState(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	defer s.Close()
 
-	callbackURL := s.URL + jimmhttp.AuthResourceBasePath + jimmhttp.CallbackEndpoint
-	res, err := http.Get(callbackURL)
+	u, err := url.Parse(s.URL)
+	c.Assert(err, qt.IsNil)
+	u = u.JoinPath(jimmhttp.AuthResourceBasePath, jimmhttp.CallbackEndpoint)
+	res, err := http.Get(u.String())
 	c.Assert(err, qt.IsNil)
 
 	defer res.Body.Close()

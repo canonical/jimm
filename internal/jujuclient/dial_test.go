@@ -90,14 +90,6 @@ func (s *dialSuite) TestDial(c *gc.C) {
 	c.Check(addrs, jc.DeepEquals, info.Addrs)
 }
 
-type cExtended struct {
-	*gc.C
-}
-
-func (t *cExtended) Name() string {
-	return t.TestName()
-}
-
 func (s *dialSuite) TestDialWithJWT(c *gc.C) {
 	ctx := context.Background()
 

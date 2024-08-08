@@ -76,11 +76,11 @@ type MacaroonDischarger struct {
 }
 
 // GetDischargerMux returns a mux that can handle macaroon bakery requests for the provided discharger.
-func GetDischargerMux(MacaroonDischarger *MacaroonDischarger, rootPath string) *http.ServeMux {
+func GetDischargerMux(macaroonDischarger *MacaroonDischarger, rootPath string) *http.ServeMux {
 	discharger := httpbakery.NewDischarger(
 		httpbakery.DischargerParams{
-			Key:     &MacaroonDischarger.kp,
-			Checker: httpbakery.ThirdPartyCaveatCheckerFunc(MacaroonDischarger.CheckThirdPartyCaveat),
+			Key:     &macaroonDischarger.kp,
+			Checker: httpbakery.ThirdPartyCaveatCheckerFunc(macaroonDischarger.CheckThirdPartyCaveat),
 		},
 	)
 	dischargeMux := http.NewServeMux()

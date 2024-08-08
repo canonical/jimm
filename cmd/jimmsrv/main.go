@@ -35,6 +35,8 @@ func main() {
 }
 
 // start initialises the jimmsrv service.
+//
+//nolint:gocognit // Start function to be ignored.
 func start(ctx context.Context, s *service.Service) error {
 	zapctx.Info(ctx, "jimm info",
 		zap.String("version", version.VersionInfo.Version),

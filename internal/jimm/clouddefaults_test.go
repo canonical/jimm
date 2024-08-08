@@ -133,7 +133,7 @@ func TestSetCloudDefaults(t *testing.T) {
 			}
 			c.Assert(j.Database.DB.Create(&cloud).Error, qt.IsNil)
 
-			j.Database.SetCloudDefaults(ctx, &dbmodel.CloudDefaults{
+			err = j.Database.SetCloudDefaults(ctx, &dbmodel.CloudDefaults{
 				IdentityName: user.Name,
 				Identity:     *user,
 				CloudID:      cloud.ID,
@@ -144,6 +144,7 @@ func TestSetCloudDefaults(t *testing.T) {
 					"key2": "a test string",
 				},
 			})
+			c.Assert(err, qt.IsNil)
 
 			defaults := map[string]interface{}{
 				"key1": float64(42),
@@ -179,7 +180,6 @@ func TestSetCloudDefaults(t *testing.T) {
 
 			cloud := dbmodel.Cloud{
 				Name: "test-cloud-1",
-				Type: "test-provider",
 				Regions: []dbmodel.CloudRegion{{
 					Name: "test-region",
 				}},
@@ -209,7 +209,6 @@ func TestSetCloudDefaults(t *testing.T) {
 
 			cloud := dbmodel.Cloud{
 				Name: "test-cloud-1",
-				Type: "test-provider",
 				Regions: []dbmodel.CloudRegion{{
 					Name: "test-region",
 				}},

@@ -43,6 +43,7 @@ func TestDashboardNotConfigured(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	hnd.ServeHTTP(rr, req)
 	resp := rr.Result()
+	defer resp.Body.Close()
 	c.Check(resp.StatusCode, qt.Equals, http.StatusNotFound)
 }
 
@@ -55,6 +56,7 @@ func TestDashboardRedirect(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	hnd.ServeHTTP(rr, req)
 	resp := rr.Result()
+	defer resp.Body.Close()
 	c.Check(resp.StatusCode, qt.Equals, http.StatusPermanentRedirect)
 	c.Check(resp.Header.Get("Location"), qt.Equals, "https://example.com/dashboard")
 }
@@ -68,6 +70,7 @@ func TestInvalidLocation(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	hnd.ServeHTTP(rr, req)
 	resp := rr.Result()
+	defer resp.Body.Close()
 	c.Check(resp.StatusCode, qt.Equals, http.StatusNotFound)
 }
 
@@ -75,7 +78,7 @@ func TestLocationNotDirectory(t *testing.T) {
 	c := qt.New(t)
 
 	dir := c.TempDir()
-	err := os.WriteFile(filepath.Join(dir, "test"), []byte(testFile), 0444)
+	err := os.WriteFile(filepath.Join(dir, "test"), []byte(testFile), 0600)
 	c.Assert(err, qt.Equals, nil)
 
 	hnd := dashboard.Handler(context.Background(), filepath.Join(dir, "test"), "http://jimm.canonical.com")
@@ -84,5 +87,6 @@ func TestLocationNotDirectory(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	hnd.ServeHTTP(rr, req)
 	resp := rr.Result()
+	defer resp.Body.Close()
 	c.Check(resp.StatusCode, qt.Equals, http.StatusNotFound)
 }

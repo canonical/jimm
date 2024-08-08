@@ -72,6 +72,7 @@ func TestWellknownAPIJWKSJSONHandles404(t *testing.T) {
 	rr := setupHandlerAndRecorder(c, "/jwks.json", store)
 
 	resp := rr.Result()
+	defer resp.Body.Close()
 	code := rr.Code
 	b, err := io.ReadAll(resp.Body)
 	c.Assert(err, qt.IsNil)
@@ -100,6 +101,7 @@ func TestWellknownAPIJWKSJSONHandles500(t *testing.T) {
 	rr := setupHandlerAndRecorder(c, "/jwks.json", store)
 
 	resp := rr.Result()
+	defer resp.Body.Close()
 	code := rr.Code
 	b, err := io.ReadAll(resp.Body)
 
@@ -135,6 +137,7 @@ func TestWellknownAPIJWKSJSONHandles200(t *testing.T) {
 	rr := setupHandlerAndRecorder(c, "/jwks.json", store)
 
 	resp := rr.Result()
+	defer resp.Body.Close()
 	code := rr.Code
 	b, err := io.ReadAll(resp.Body)
 

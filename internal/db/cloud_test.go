@@ -369,6 +369,7 @@ controllers:
 		Name: "test-cloud-1",
 	}
 	err = s.Database.GetCloud(ctx, &cl)
+	c.Assert(err, qt.IsNil)
 
 	crp = cl.Regions[0].Controllers[0]
 

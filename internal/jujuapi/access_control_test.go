@@ -5,7 +5,6 @@ package jujuapi_test
 import (
 	"context"
 	"database/sql"
-	"strconv"
 	"time"
 
 	petname "github.com/dustinkirkland/golang-petname"
@@ -89,15 +88,17 @@ func (s *accessControlSuite) TestRemoveGroupRemovesTuples(c *gc.C) {
 	user, group, controller, model, _, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
 	defer closeClient()
 
-	db.AddGroup(ctx, "test-group2")
+	_, err := db.AddGroup(ctx, "test-group2")
+	c.Assert(err, gc.IsNil)
+
 	group2 := &dbmodel.GroupEntry{
 		Name: "test-group2",
 	}
-	err := db.GetGroup(ctx, group2)
+	err = db.GetGroup(ctx, group2)
 	c.Assert(err, gc.IsNil)
 
 	tuples := []openfga.Tuple{
-		//This tuple should remain as it has no relation to group2
+		// This tuple should remain as it has no relation to group2
 		{
 			Object:   ofganames.ConvertTag(user.ResourceTag()),
 			Relation: "member",
@@ -133,7 +134,7 @@ func (s *accessControlSuite) TestRemoveGroupRemovesTuples(c *gc.C) {
 
 	err = s.JIMM.OpenFGAClient.AddRelation(context.Background(), tuples...)
 	c.Assert(err, gc.IsNil)
-	//Check user has access to model and controller through group2
+	// Check user has access to model and controller through group2
 	checkResp, err := client.CheckRelation(&apiparams.CheckRelationRequest{Tuple: checkAccessTupleController})
 	c.Assert(err, gc.IsNil)
 	c.Assert(checkResp.Allowed, gc.Equals, true)
@@ -148,7 +149,7 @@ func (s *accessControlSuite) TestRemoveGroupRemovesTuples(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	c.Assert(len(resp.Tuples), gc.Equals, 13)
 
-	//Check user access has been revoked.
+	// Check user access has been revoked.
 	checkResp, err = client.CheckRelation(&apiparams.CheckRelationRequest{Tuple: checkAccessTupleController})
 	c.Assert(err, gc.IsNil)
 	c.Assert(checkResp.Allowed, gc.Equals, false)
@@ -222,10 +223,6 @@ func createTuple(object, relation, target string) openfga.Tuple {
 	}
 }
 
-func stringGroupID(id uint) string {
-	return strconv.FormatUint(uint64(id), 10)
-}
-
 // TestAddRelation currently verifies the following test cases,
 // when new relation control is to be added, please update this comment:
 // user -> group
@@ -249,11 +246,13 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 	user, group, controller, model, offer, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
 	defer closeClient()
 
-	db.AddGroup(ctx, "test-group2")
+	_, err := db.AddGroup(ctx, "test-group2")
+	c.Assert(err, gc.IsNil)
+
 	group2 := &dbmodel.GroupEntry{
 		Name: "test-group2",
 	}
-	err := db.GetGroup(ctx, group2)
+	err = db.GetGroup(ctx, group2)
 	c.Assert(err, gc.IsNil)
 
 	c.Assert(err, gc.IsNil)
@@ -303,7 +302,7 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 			err:         false,
 			changesType: "controller",
 		},
-		//Test user -> group
+		// Test user -> group
 		{
 			input: tuple{"user-" + user.Name, "member", "group-" + group.Name},
 			want: createTuple(
@@ -314,7 +313,7 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 			err:         false,
 			changesType: "group",
 		},
-		//Test username with dots and @ -> group
+		// Test username with dots and @ -> group
 		{
 			input: tuple{"user-" + "kelvin.lina.test@canonical.com", "member", "group-" + group.Name},
 			want: createTuple(
@@ -325,7 +324,7 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 			err:         false,
 			changesType: "group",
 		},
-		//Test group -> controller
+		// Test group -> controller
 		{
 			input: tuple{"group-" + "test-group#member", "administrator", "controller-" + controller.UUID},
 			want: createTuple(
@@ -336,7 +335,7 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 			err:         false,
 			changesType: "controller",
 		},
-		//Test user -> model by name
+		// Test user -> model by name
 		{
 			input: tuple{"user-" + user.Name, "writer", "model-" + controller.Name + ":" + user.Name + "/" + model.Name},
 			want: createTuple(
@@ -462,7 +461,8 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 	for i, tc := range tagTests {
 		c.Logf("running test %d", i)
 		if i != 0 {
-			s.COFGAClient.RemoveRelation(ctx, tc.want)
+			err = s.COFGAClient.RemoveRelation(ctx, tc.want)
+			c.Assert(err, gc.IsNil)
 		}
 		err := client.AddRelation(&apiparams.AddRelationRequest{
 			Tuples: []apiparams.RelationshipTuple{
@@ -557,7 +557,7 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 			err:         false,
 			changesType: "controller",
 		},
-		//Test user -> group
+		// Test user -> group
 		{
 			toAdd: openfga.Tuple{
 				Object:   ofganames.ConvertTag(user.ResourceTag()),
@@ -573,7 +573,7 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 			err:         false,
 			changesType: "group",
 		},
-		//Test group -> controller
+		// Test group -> controller
 		{
 			toAdd: openfga.Tuple{
 				Object:   ofganames.ConvertTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
@@ -589,7 +589,7 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 			err:         false,
 			changesType: "controller",
 		},
-		//Test user -> model by name
+		// Test user -> model by name
 		{
 			toAdd: openfga.Tuple{
 				Object:   ofganames.ConvertTag(user.ResourceTag()),

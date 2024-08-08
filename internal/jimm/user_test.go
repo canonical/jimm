@@ -24,7 +24,7 @@ func TestGetUser(t *testing.T) {
 	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 	db := &db.Database{
-		DB: jimmtest.PostgresDB(c, func() time.Time { return time.Now() }),
+		DB: jimmtest.PostgresDB(c, time.Now),
 	}
 
 	j := &jimm.JIMM{

@@ -71,7 +71,7 @@ func (suite *openFGATestSuite) TestRemovingTuplesFromOFGASucceeds(c *gc.C) {
 
 	groupUUID := uuid.NewString()
 
-	//Create tuples before writing to db
+	// Create tuples before writing to db
 	user1 := ofganames.ConvertTag(names.NewUserTag("bob"))
 	tuple1 := openfga.Tuple{
 		Object:   user1,
@@ -86,14 +86,14 @@ func (suite *openFGATestSuite) TestRemovingTuplesFromOFGASucceeds(c *gc.C) {
 		Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(groupUUID)),
 	}
 
-	//Delete before insert should fail
+	// Delete before insert should fail
 	err := suite.ofgaClient.RemoveRelation(ctx, tuple1, tuple2)
 	c.Assert(strings.Contains(err.Error(), "cannot delete a tuple which does not exist"), gc.Equals, true)
 
 	err = suite.ofgaClient.AddRelation(ctx, tuple1, tuple2)
 	c.Assert(err, gc.IsNil)
 
-	//Delete after insert should succeed.
+	// Delete after insert should succeed.
 	err = suite.ofgaClient.RemoveRelation(ctx, tuple1, tuple2)
 	c.Assert(err, gc.IsNil)
 	changes, err := suite.cofgaClient.ReadChanges(ctx, "group", 99, "")

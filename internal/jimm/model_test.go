@@ -3283,6 +3283,7 @@ func TestValidateModelUpgrade(t *testing.T) {
 	}
 }
 
+//nolint:gosec // Thinks credentials hardcoded.
 const updateModelCredentialTestEnv = `clouds:
 - name: test-cloud
   type: test-provider

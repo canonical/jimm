@@ -179,7 +179,7 @@ type addRelationCommand struct {
 	relation     string
 	targetObject string
 
-	filename string //optional
+	filename string // optional
 }
 
 // Info implements the cmd.Command interface.
@@ -270,7 +270,7 @@ type removeRelationCommand struct {
 	relation     string
 	targetObject string
 
-	filename string //optional
+	filename string // optional
 }
 
 // Info implements the cmd.Command interface.

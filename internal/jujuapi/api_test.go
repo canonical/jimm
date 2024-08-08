@@ -58,5 +58,7 @@ func (s *apiSuite) TestModelCommandsModelNotFoundf(c *gc.C) {
 	if err != nil {
 		c.Assert(err, gc.ErrorMatches, "websocket: bad handshake")
 	}
+	defer response.Body.Close()
+
 	c.Assert(response.StatusCode, gc.Equals, http.StatusNotFound)
 }

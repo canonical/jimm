@@ -46,19 +46,20 @@ func (d *Database) GetModel(ctx context.Context, model *dbmodel.Model) (err erro
 	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
 
 	db := d.DB.WithContext(ctx)
-	if model.UUID.Valid {
+	switch {
+	case model.UUID.Valid:
 		db = db.Where("uuid = ?", model.UUID.String)
 		if model.ControllerID != 0 {
 			db = db.Where("controller_id = ?", model.ControllerID)
 		}
-	} else if model.ID != 0 {
+	case model.ID != 0:
 		db = db.Where("id = ?", model.ID)
-	} else if model.OwnerIdentityName != "" && model.Name != "" {
+	case model.OwnerIdentityName != "" && model.Name != "":
 		db = db.Where("owner_identity_name = ? AND name = ?", model.OwnerIdentityName, model.Name)
-	} else if model.ControllerID != 0 {
-		// TODO(ales): fix ordering of where fields and handle error to represent what is *actually* required.
+	case model.ControllerID != 0:
+		// TODO: fix ordering of where fields and handle error to represent what is *actually* required.
 		db = db.Where("controller_id = ?", model.ControllerID)
-	} else {
+	default:
 		return errors.E(op, "missing id or uuid", errors.CodeBadRequest)
 	}
 

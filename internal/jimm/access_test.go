@@ -13,7 +13,6 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/google/uuid"
 	"github.com/juju/juju/core/crossmodel"
-	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/state"
 	"github.com/juju/names/v5"
 
@@ -28,27 +27,6 @@ import (
 	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 	"github.com/canonical/ofga"
 )
-
-// testAuthenticator is an authenticator implementation intended
-// for testing the token generator.
-type testAuthenticator struct {
-	username string
-	err      error
-}
-
-// Authenticate implements the Authenticate method of the Authenticator interface.
-func (ta *testAuthenticator) Authenticate(ctx context.Context, req *jujuparams.LoginRequest) (*openfga.User, error) {
-	if ta.err != nil {
-		return nil, ta.err
-	}
-	i, err := dbmodel.NewIdentity(ta.username)
-	if err != nil {
-		return nil, err
-	}
-	return &openfga.User{
-		Identity: i,
-	}, nil
-}
 
 // testDatabase is a database implementation intended for testing the token generator.
 type testDatabase struct {
@@ -493,19 +471,15 @@ func TestResolveJIMM(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
-	ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
-	c.Assert(err, qt.IsNil)
-
 	now := time.Now().UTC().Round(time.Millisecond)
 	j := &jimm.JIMM{
 		UUID: uuid.NewString(),
 		Database: db.Database{
 			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 		},
-		OpenFGAClient: ofgaClient,
 	}
 
-	err = j.Database.Migrate(ctx, false)
+	err := j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
 	jimmTag := "controller-jimm"
@@ -519,19 +493,15 @@ func TestResolveTupleObjectMapsApplicationOffersUUIDs(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
-	ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
-	c.Assert(err, qt.IsNil)
-
 	now := time.Now().UTC().Round(time.Millisecond)
 	j := &jimm.JIMM{
 		UUID: uuid.NewString(),
 		Database: db.Database{
 			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 		},
-		OpenFGAClient: ofgaClient,
 	}
 
-	err = j.Database.Migrate(ctx, false)
+	err := j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
 	user, _, controller, model, offer, _, _ := createTestControllerEnvironment(ctx, c, j.Database)
@@ -547,19 +517,15 @@ func TestResolveTupleObjectMapsModelUUIDs(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
-	ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
-	c.Assert(err, qt.IsNil)
-
 	now := time.Now().UTC().Round(time.Millisecond)
 	j := &jimm.JIMM{
 		UUID: uuid.NewString(),
 		Database: db.Database{
 			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 		},
-		OpenFGAClient: ofgaClient,
 	}
 
-	err = j.Database.Migrate(ctx, false)
+	err := j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
 	user, _, controller, model, _, _, _ := createTestControllerEnvironment(ctx, c, j.Database)
@@ -575,19 +541,15 @@ func TestResolveTupleObjectMapsControllerUUIDs(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
-	ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
-	c.Assert(err, qt.IsNil)
-
 	now := time.Now().UTC().Round(time.Millisecond)
 	j := &jimm.JIMM{
 		UUID: uuid.NewString(),
 		Database: db.Database{
 			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 		},
-		OpenFGAClient: ofgaClient,
 	}
 
-	err = j.Database.Migrate(ctx, false)
+	err := j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
 	cloud := dbmodel.Cloud{
@@ -614,19 +576,15 @@ func TestResolveTupleObjectMapsGroups(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
-	ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
-	c.Assert(err, qt.IsNil)
-
 	now := time.Now().UTC().Round(time.Millisecond)
 	j := &jimm.JIMM{
 		UUID: uuid.NewString(),
 		Database: db.Database{
 			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 		},
-		OpenFGAClient: ofgaClient,
 	}
 
-	err = j.Database.Migrate(ctx, false)
+	err := j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
 	_, err = j.Database.AddGroup(ctx, "myhandsomegroupofdigletts")
@@ -649,19 +607,15 @@ func TestResolveTagObjectMapsUsers(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
-	ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
-	c.Assert(err, qt.IsNil)
-
 	now := time.Now().UTC().Round(time.Millisecond)
 	j := &jimm.JIMM{
 		UUID: uuid.NewString(),
 		Database: db.Database{
 			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 		},
-		OpenFGAClient: ofgaClient,
 	}
 
-	err = j.Database.Migrate(ctx, false)
+	err := j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
 	tag, err := jimm.ResolveTag(j.UUID, &j.Database, "user-alex@canonical.com-werly#member")
@@ -673,19 +627,15 @@ func TestResolveTupleObjectHandlesErrors(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
-	ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
-	c.Assert(err, qt.IsNil)
-
 	now := time.Now().UTC().Round(time.Millisecond)
 	j := &jimm.JIMM{
 		UUID: uuid.NewString(),
 		Database: db.Database{
 			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 		},
-		OpenFGAClient: ofgaClient,
 	}
 
-	err = j.Database.Migrate(ctx, false)
+	err := j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
 	_, _, controller, model, offer, _, _ := createTestControllerEnvironment(ctx, c, j.Database)
@@ -934,7 +884,7 @@ func TestRemoveGroupRemovesTuples(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	tuples := []openfga.Tuple{
-		//This tuple should remain as it has no relation to group2
+		// This tuple should remain as it has no relation to group2
 		{
 			Object:   ofganames.ConvertTag(user.ResourceTag()),
 			Relation: "member",

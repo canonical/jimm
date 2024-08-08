@@ -288,16 +288,17 @@ func (w *Watcher) watchController(ctx context.Context, ctl *dbmodel.Controller) 
 			ControllerID: ctl.ID,
 		}
 		err := w.Database.GetModel(ctx, &m)
-		if err == nil {
+		switch {
+		case err == nil:
 			st := modelState{
 				id:       m.ID,
 				machines: make(map[string]int64),
 				units:    make(map[string]bool),
 			}
 			modelStates[uuid] = &st
-		} else if errors.ErrorCode(err) == errors.CodeNotFound {
+		case errors.ErrorCode(err) == errors.CodeNotFound:
 			modelStates[uuid] = nil
-		} else {
+		default:
 			zapctx.Error(ctx, "cannot get model", zap.Error(err))
 		}
 		return modelStates[uuid]

@@ -66,7 +66,7 @@ func TestSetIdentityModelDefaults(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 			c.Assert(j.Database.DB.Create(i).Error, qt.IsNil)
 
-			j.Database.SetIdentityModelDefaults(ctx, &dbmodel.IdentityModelDefaults{
+			err = j.Database.SetIdentityModelDefaults(ctx, &dbmodel.IdentityModelDefaults{
 				IdentityName: i.Name,
 				Identity:     *i,
 				Defaults: map[string]interface{}{
@@ -74,6 +74,7 @@ func TestSetIdentityModelDefaults(t *testing.T) {
 					"key2": "a test string",
 				},
 			})
+			c.Assert(err, qt.IsNil)
 
 			defaults := map[string]interface{}{
 				"key1": float64(42),

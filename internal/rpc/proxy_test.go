@@ -263,8 +263,10 @@ func TestProxySocketsAdminFacade(t *testing.T) {
 				},
 				AuthenticatedIdentityID: test.authenticateEntityID,
 			}
-			go rpc.ProxySockets(ctx, helpers)
-
+			go func() {
+				err = rpc.ProxySockets(ctx, helpers)
+				c.Assert(err, qt.IsNil)
+			}()
 			data, err := json.Marshal(test.messageToSend)
 			c.Assert(err, qt.IsNil)
 			select {
@@ -373,7 +375,11 @@ func (m *mockOAuthAuthenticator) VerifySessionToken(token string) (jwt.Token, er
 		return nil, m.err
 	}
 	t := jwt.New()
-	t.Set(jwt.SubjectKey, m.email)
+
+	if err := t.Set(jwt.SubjectKey, m.email); err != nil {
+		return nil, err
+	}
+
 	return t, nil
 }
 
