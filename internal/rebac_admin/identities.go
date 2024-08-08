@@ -12,11 +12,11 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/rebac_admin/utils"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
-	"github.com/juju/zaputil/zapctx"
-	"go.uber.org/zap"
 
 	v1 "github.com/canonical/rebac-admin-ui-handlers/v1"
 	"github.com/canonical/rebac-admin-ui-handlers/v1/resources"
+	"github.com/juju/zaputil/zapctx"
+	"go.uber.org/zap"
 )
 
 type identitiesService struct {
@@ -146,18 +146,15 @@ func (s *identitiesService) PatchIdentityGroups(ctx context.Context, identityId 
 	additions := make([]apiparams.RelationshipTuple, 0)
 	deletions := make([]apiparams.RelationshipTuple, 0)
 	for _, p := range groupPatches {
+		t := apiparams.RelationshipTuple{
+			Object:       objUser.ResourceTag().String(),
+			Relation:     names.MemberRelation.String(),
+			TargetObject: p.Group,
+		}
 		if p.Op == "add" {
-			additions = append(additions, apiparams.RelationshipTuple{
-				Object:       objUser.ResourceTag().String(),
-				Relation:     names.MemberRelation.String(),
-				TargetObject: p.Group,
-			})
+			additions = append(additions, t)
 		} else if p.Op == "remove" {
-			deletions = append(deletions, apiparams.RelationshipTuple{
-				Object:       objUser.ResourceTag().String(),
-				Relation:     names.MemberRelation.String(),
-				TargetObject: p.Group,
-			})
+			deletions = append(deletions, t)
 		}
 	}
 	if len(additions) > 0 {

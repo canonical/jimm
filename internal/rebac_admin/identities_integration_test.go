@@ -4,16 +4,15 @@ import (
 	"context"
 	"fmt"
 
+	rebac_handlers "github.com/canonical/rebac-admin-ui-handlers/v1"
+	"github.com/canonical/rebac-admin-ui-handlers/v1/resources"
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/v3/internal/jimmtest"
-	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/rebac_admin"
 	"github.com/canonical/jimm/v3/pkg/api/params"
 	jimmnames "github.com/canonical/jimm/v3/pkg/names"
-	rebac_handlers "github.com/canonical/rebac-admin-ui-handlers/v1"
-	"github.com/canonical/rebac-admin-ui-handlers/v1/resources"
 )
 
 type identitiesSuite struct {
@@ -24,10 +23,8 @@ var _ = gc.Suite(&identitiesSuite{})
 
 func (s *identitiesSuite) TestIdentityPatchGroups(c *gc.C) {
 	// initialization
-	user := openfga.User{}
-	user.JimmAdmin = true
 	ctx := context.Background()
-	ctx = rebac_handlers.ContextWithIdentity(ctx, &user)
+	ctx = rebac_handlers.ContextWithIdentity(ctx, s.AdminUser)
 	identitySvc := rebac_admin.NewidentitiesService(s.JIMM)
 	groupName := "group-test1"
 	username := s.AdminUser.Name
@@ -44,7 +41,7 @@ func (s *identitiesSuite) TestIdentityPatchGroups(c *gc.C) {
 	// test user added to groups
 	objUser, err := s.JIMM.FetchIdentity(ctx, username)
 	c.Assert(err, gc.IsNil)
-	tuples, _, err := s.JIMM.ListRelationshipTuples(ctx, &user, params.RelationshipTuple{
+	tuples, _, err := s.JIMM.ListRelationshipTuples(ctx, s.AdminUser, params.RelationshipTuple{
 		Object:       objUser.ResourceTag().String(),
 		Relation:     names.MemberRelation.String(),
 		TargetObject: groupTag.String(),
@@ -60,7 +57,7 @@ func (s *identitiesSuite) TestIdentityPatchGroups(c *gc.C) {
 	}})
 	c.Assert(err, gc.IsNil)
 	c.Assert(changed, gc.Equals, true)
-	tuples, _, err = s.JIMM.ListRelationshipTuples(ctx, &user, params.RelationshipTuple{
+	tuples, _, err = s.JIMM.ListRelationshipTuples(ctx, s.AdminUser, params.RelationshipTuple{
 		Object:       objUser.ResourceTag().String(),
 		Relation:     names.MemberRelation.String(),
 		TargetObject: groupTag.String(),
@@ -71,10 +68,8 @@ func (s *identitiesSuite) TestIdentityPatchGroups(c *gc.C) {
 
 func (s *identitiesSuite) TestIdentityGetGroups(c *gc.C) {
 	// initialization
-	user := openfga.User{}
-	user.JimmAdmin = true
 	ctx := context.Background()
-	ctx = rebac_handlers.ContextWithIdentity(ctx, &user)
+	ctx = rebac_handlers.ContextWithIdentity(ctx, s.AdminUser)
 	identitySvc := rebac_admin.NewidentitiesService(s.JIMM)
 	username := s.AdminUser.Name
 	groupsSize := 10
@@ -103,12 +98,12 @@ func (s *identitiesSuite) TestIdentityGetGroups(c *gc.C) {
 			NextToken: &token,
 		})
 		c.Assert(err, gc.IsNil)
-		if *groups.Next.PageToken == "" {
-			break
-		}
 		token = *groups.Next.PageToken
 		for j := 0; j < len(groups.Data); j++ {
 			c.Assert(groups.Data[j].Name, gc.Equals, groupTags[i+j].Id())
+		}
+		if *groups.Next.PageToken == "" {
+			break
 		}
 	}
 }

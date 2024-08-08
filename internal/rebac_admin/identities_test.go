@@ -4,18 +4,22 @@ package rebac_admin_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
+	"github.com/canonical/ofga"
+	rebac_handlers "github.com/canonical/rebac-admin-ui-handlers/v1"
+	"github.com/canonical/rebac-admin-ui-handlers/v1/resources"
 	qt "github.com/frankban/quicktest"
 
 	"github.com/canonical/jimm/v3/internal/common/pagination"
 	"github.com/canonical/jimm/v3/internal/common/utils"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/jimmtest"
+	"github.com/canonical/jimm/v3/internal/jimmtest/mocks"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/rebac_admin"
-	rebac_handlers "github.com/canonical/rebac-admin-ui-handlers/v1"
-	"github.com/canonical/rebac-admin-ui-handlers/v1/resources"
+	"github.com/canonical/jimm/v3/pkg/api/params"
 )
 
 func TestGetIdentity(t *testing.T) {
@@ -134,5 +138,86 @@ func TestListIdentities(t *testing.T) {
 			}
 		})
 	}
+}
 
+func TestGetIdentityGroups(t *testing.T) {
+	c := qt.New(t)
+	var listTuplesErr error
+	testTuple := openfga.Tuple{
+		Object:   &ofga.Entity{Kind: "user", ID: "foo"},
+		Relation: ofga.Relation("member"),
+		Target:   &ofga.Entity{Kind: "group", ID: "my-group"},
+	}
+	jimm := jimmtest.JIMM{
+		FetchIdentity_: func(ctx context.Context, username string) (*openfga.User, error) {
+			if username == "bob@canonical.com" {
+				return openfga.NewUser(&dbmodel.Identity{Name: "bob@canonical.com"}, nil), nil
+			}
+			return nil, dbmodel.IdentityCreationError
+		},
+		RelationService: mocks.RelationService{
+			ListRelationshipTuples_: func(ctx context.Context, user *openfga.User, tuple params.RelationshipTuple, pageSize int32, continuationToken string) ([]openfga.Tuple, string, error) {
+				return []openfga.Tuple{testTuple}, "continuation-token", listTuplesErr
+			},
+		},
+	}
+	user := openfga.User{}
+	ctx := context.Background()
+	ctx = rebac_handlers.ContextWithIdentity(ctx, &user)
+	idSvc := rebac_admin.NewidentitiesService(&jimm)
+
+	_, err := idSvc.GetIdentityGroups(ctx, "bob-not-found@canonical.com", &resources.GetIdentitiesItemGroupsParams{})
+	c.Assert(err, qt.ErrorMatches, ".*not found")
+	username := "bob@canonical.com"
+
+	res, err := idSvc.GetIdentityGroups(ctx, username, &resources.GetIdentitiesItemGroupsParams{})
+	c.Assert(err, qt.IsNil)
+	c.Assert(res, qt.IsNotNil)
+	c.Assert(res.Data, qt.HasLen, 1)
+	c.Assert(*res.Next.PageToken, qt.Equals, "continuation-token")
+
+	listTuplesErr = errors.New("foo")
+	_, err = idSvc.GetIdentityGroups(ctx, username, &resources.GetIdentitiesItemGroupsParams{})
+	c.Assert(err, qt.ErrorMatches, "foo")
+}
+
+func TestPatchIdentityGroups(t *testing.T) {
+	c := qt.New(t)
+	var patchTuplesErr error
+	jimm := jimmtest.JIMM{
+		FetchIdentity_: func(ctx context.Context, username string) (*openfga.User, error) {
+			if username == "bob@canonical.com" {
+				return openfga.NewUser(&dbmodel.Identity{Name: "bob@canonical.com"}, nil), nil
+			}
+			return nil, dbmodel.IdentityCreationError
+		},
+		RelationService: mocks.RelationService{
+			AddRelation_: func(ctx context.Context, user *openfga.User, tuples []params.RelationshipTuple) error {
+				return patchTuplesErr
+			},
+			RemoveRelation_: func(ctx context.Context, user *openfga.User, tuples []params.RelationshipTuple) error {
+				return patchTuplesErr
+			},
+		},
+	}
+	user := openfga.User{}
+	ctx := context.Background()
+	ctx = rebac_handlers.ContextWithIdentity(ctx, &user)
+	idSvc := rebac_admin.NewidentitiesService(&jimm)
+
+	_, err := idSvc.PatchIdentityGroups(ctx, "bob-not-found@canonical.com", nil)
+	c.Assert(err, qt.ErrorMatches, ".* not found")
+
+	username := "bob@canonical.com"
+	operations := []resources.IdentityGroupsPatchItem{
+		{Group: "test-group1", Op: resources.IdentityGroupsPatchItemOpAdd},
+		{Group: "test-group2", Op: resources.IdentityGroupsPatchItemOpRemove},
+	}
+	res, err := idSvc.PatchIdentityGroups(ctx, username, operations)
+	c.Assert(err, qt.IsNil)
+	c.Assert(res, qt.IsTrue)
+
+	patchTuplesErr = errors.New("foo")
+	_, err = idSvc.PatchIdentityGroups(ctx, username, operations)
+	c.Assert(err, qt.ErrorMatches, ".*foo")
 }
