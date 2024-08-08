@@ -321,7 +321,7 @@ class JimmCharm(SystemdCharm):
             "vault_path": "charm-jimm-creds",
         }
         with open(self._env_filename(VAULT_PART), "wt") as f:
-            f.write(self._render_template("jimm-vault.env", **args))
+            f.write(self._render_template("jimm-vault.env", **args)) # what about this vault.env?
 
     def _install_snap(self):
         self.unit.status = MaintenanceStatus("installing snap")

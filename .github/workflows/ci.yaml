@@ -28,10 +28,7 @@ jobs:
         run: sudo snap install juju-db --channel 4.4/stable
 
       - name: Add volume files
-        run: |
-          touch ./local/vault/approle.json
-          touch ./local/vault/roleid.txt
-          touch ./local/vault/vault.env
+        run: touch ./local/vault/approle.json
 
       - name: Create test certs
         run: make certs
@@ -65,10 +62,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Add volume files
-        run: |
-          touch ./local/vault/approle.json
-          touch ./local/vault/roleid.txt
-          touch ./local/vault/vault.env
+        run: touch ./local/vault/approle.json
 
       - name: Run Smoke Test
         run: docker compose --profile dev up -d --wait --timestamps

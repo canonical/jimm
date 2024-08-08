@@ -49,12 +49,9 @@ echo "/jimm-kv accessible by policy jimm-app"
 vault secrets enable -version=2 -path /jimm-kv kv
 echo "Creating approle auth file."
 VAULT_TOKEN=$JIMM_SECRET_WRAPPED vault unwrap > /vault/approle_tmp.yaml
-echo "$JIMM_ROLE_ID" > /vault/roleid.txt
 
 jq ".data.role_id = \"$JIMM_ROLE_ID\"" /vault/approle_tmp.yaml > /vault/approle.json
 role_id=$(cat /vault/approle.json | jq -r ".data.role_id")
 role_secret_id=$(cat /vault/approle.json | jq -r ".data.secret_id")
-echo "VAULT_ROLE_ID=$role_id" > /vault/vault.env
-echo "VAULT_ROLE_SECRET_ID=$role_secret_id" >> /vault/vault.env
 wait
 

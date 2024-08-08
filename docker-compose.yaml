@@ -76,8 +76,7 @@ services:
     volumes:
       - ./:/jimm/
       - ./local/vault/approle.json:/vault/approle.json:rw
-      - ./local/vault/roleid.txt:/vault/roleid.txt:rw
-      - ./local/vault/vault.env:/vault/vault.env:rw
+
     healthcheck:
       test: [ "CMD", "curl", "http://jimm.localhost:80" ]
       interval: 5s
@@ -140,8 +139,6 @@ services:
       - ./local/vault/init.sh:/vault/init.sh
       - ./local/vault/policy.hcl:/vault/policy.hcl
       - ./local/vault/approle.json:/vault/approle.json
-      - ./local/vault/roleid.txt:/vault/roleid.txt:rw
-      - ./local/vault/vault.env:/vault/vault.env:rw
     command: /vault/init.sh
     depends_on:
       db:

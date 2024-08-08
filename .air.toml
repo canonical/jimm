@@ -4,7 +4,7 @@ tmp_dir = "tmp"
 
 [build]
   args_bin = []
-  bin = "env $(cat /vault/vault.env | xargs) ./tmp/jimm"
+  bin = "./tmp/jimm"
   cmd = "go build -gcflags='all=-N -l' -buildvcs=false -o ./tmp/jimm ./cmd/jimmsrv"
   delay = 1000
   exclude_dir = [".vscode", "assets", "tmp", "vendor", "testdata"]
@@ -12,7 +12,7 @@ tmp_dir = "tmp"
   exclude_regex = ["_test.go"]
   exclude_unchanged = false
   follow_symlink = false
-  full_bin = "env $(cat /vault/vault.env | xargs) dlv exec --accept-multiclient --log --headless --continue --listen :2345 --api-version 2 ./tmp/jimm"
+  full_bin = "dlv exec --accept-multiclient --log --headless --continue --listen :2345 --api-version 2 ./tmp/jimm"
   include_dir = []
   include_ext = ["go", "tpl", "tmpl", "html"]
   kill_delay = "0s"
