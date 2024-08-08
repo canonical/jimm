@@ -1,13 +1,9 @@
 name: Cache on default branch
-on:
-  push:
-    branches:
-      - v3
-  
+on: push
 
 jobs:
   go_cache:
-    name: Install And Cache Go dependencies
+    name: Install And Cache Go Dependencies and Build Artifacts
     runs-on: ubuntu-22.04
     timeout-minutes: 15
     steps:
@@ -21,6 +17,6 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version-file: 'go.mod'
-      
-      - name: Build and Test
-        run: go mod tidy
+
+      - name: Build
+        run: go build ./...
