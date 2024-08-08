@@ -1,5 +1,9 @@
 name: Cache on default branch
-on: push
+on:
+  push:
+    branches:
+      - v3
+      - "feature*"
 
 jobs:
   go_cache:
@@ -17,6 +21,12 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version-file: 'go.mod'
+
+      - name: Add volume files
+        run: |
+          touch ./local/vault/approle.json
+          touch ./local/vault/roleid.txt
+          touch ./local/vault/vault.env
 
       - name: Build
         run: go build ./...
