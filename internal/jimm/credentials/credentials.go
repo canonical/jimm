@@ -1,4 +1,4 @@
-// Copyright 2023 canonical.
+// Copyright 2024 Canonical.
 
 // Package credentials provides abstractions/definitions for credential storage
 // backends and caching mechanisms.

@@ -1,4 +1,4 @@
-// Copyright 2021 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package vault
 
@@ -219,8 +219,7 @@ func (s *VaultStore) CleanupJWKS(ctx context.Context) (err error) {
 	if err != nil {
 		return errors.E(op, err)
 	}
-	// Vault does not return errors on deletion requests where
-	// the secret does not exist. As such we just return the last known error.
+
 	if err = client.KVv2(s.KVPath).Delete(ctx, s.getJWKSExpiryPath()); err != nil {
 		return errors.E(op, err)
 	}

@@ -1,3 +1,4 @@
+// Copyright 2024 Canonical.
 package openfga_test
 
 import (

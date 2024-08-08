@@ -1,3 +1,4 @@
+// Copyright 2024 Canonical.
 package debugapi_test
 
 import (

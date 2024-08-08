@@ -1,3 +1,4 @@
+// Copyright 2024 Canonical.
 package jimmjwx_test
 
 import (
@@ -7,11 +8,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/canonical/jimm/v3/internal/jimmjwx"
 	qt "github.com/frankban/quicktest"
 	"github.com/lestrrat-go/iter/arrayiter"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/lestrrat-go/jwx/v2/jwt"
+
+	"github.com/canonical/jimm/v3/internal/jimmjwx"
 )
 
 func TestRegisterJWKSCacheRegistersTheCacheSuccessfully(t *testing.T) {

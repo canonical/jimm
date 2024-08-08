@@ -1,4 +1,4 @@
-// Copyright 2023 canonical.
+// Copyright 2024 Canonical.
 
 package openfga
 
@@ -6,12 +6,12 @@ import (
 	"context"
 	"strings"
 
-	"github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/internal/servermon"
 	cofga "github.com/canonical/ofga"
 	"github.com/juju/names/v5"
 
+	"github.com/canonical/jimm/v3/internal/errors"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
+	"github.com/canonical/jimm/v3/internal/servermon"
 	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
 

@@ -7,4 +7,4 @@ In the .vscode folder of this repository you will find it is defined as the lint
 To install, please install the golangci-lint binary or install it via "go install".
 
 The version this was tested with is:
-`go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.57.0`
+```go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.59.1```

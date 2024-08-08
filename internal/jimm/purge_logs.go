@@ -1,4 +1,4 @@
-// Copyright 2023 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package jimm
 
@@ -6,10 +6,11 @@ import (
 	"context"
 	"time"
 
-	"github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
+
+	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/openfga"
 )
 
 // PurgeLogs removes all audit logs before the given timestamp. Only JIMM

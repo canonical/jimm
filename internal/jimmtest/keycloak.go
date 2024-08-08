@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package jimmtest
 
@@ -12,10 +12,11 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/google/uuid"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
+
+	"github.com/canonical/jimm/v3/internal/errors"
 )
 
 // These constants are based on the `docker-compose.yaml` and `local/keycloak/jimm-realm.json` content.

@@ -1,5 +1,4 @@
-// Copyright 2020 Canonical Ltd.
-// Licensed under the AGPLv3, see LICENCE file for details.
+// Copyright 2024 Canonical.
 
 // Package dashboard contains a single function that creates a handler for
 // serving the JAAS Dashboard.

@@ -1,4 +1,4 @@
-// Copyright 2023 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package jimm_test
 
@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/canonical/ofga"
 	petname "github.com/dustinkirkland/golang-petname"
 	qt "github.com/frankban/quicktest"
 	"github.com/google/uuid"
@@ -25,7 +26,6 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	jimmnames "github.com/canonical/jimm/v3/pkg/names"
-	"github.com/canonical/ofga"
 )
 
 // testDatabase is a database implementation intended for testing the token generator.

@@ -1,4 +1,4 @@
-// Copyright 2018 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package kubetest
 
@@ -12,7 +12,7 @@ import (
 
 const (
 	Username = "test-kubernetes-user"
-	//nolint:gosec // Thinks its an exposed secret.
+	//nolint:gosec // Thinks it's an exposed secret.
 	Password = "test-kubernetes-password"
 )
 

@@ -1,4 +1,4 @@
-// Copyright 2020 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 // Package jujuclient is the client JIMM uses to connect to juju
 // controllers. The jujuclient uses the juju RPC API directly using

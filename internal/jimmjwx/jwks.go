@@ -1,4 +1,4 @@
-// Copyright 2023 canonical.
+// Copyright 2024 Canonical.
 
 package jimmjwx
 
@@ -66,8 +66,7 @@ func rotateJWKS(ctx context.Context, credStore credentials.CredentialStore, init
 		zapctx.Debug(ctx, "setting initial expiry", zap.Time("time", initialExpiryTime))
 		err = putJwks(initialExpiryTime)
 		if err != nil {
-			jwksErr := credStore.CleanupJWKS(ctx)
-			if jwksErr != nil {
+			if jwksErr := credStore.CleanupJWKS(ctx); jwksErr != nil {
 				zapctx.Error(ctx, "failed to cleanup jwks", zap.Error(jwksErr))
 			}
 			return errors.E(err)
@@ -80,8 +79,7 @@ func rotateJWKS(ctx context.Context, credStore credentials.CredentialStore, init
 			// components exist from the previous failed expiry attempt.
 			err = putJwks(time.Now().UTC().AddDate(0, 3, 0))
 			if err != nil {
-				jwksErr := credStore.CleanupJWKS(ctx)
-				if jwksErr != nil {
+				if jwksErr := credStore.CleanupJWKS(ctx); jwksErr != nil {
 					zapctx.Error(ctx, "failed to cleanup jwks", zap.Error(jwksErr))
 				}
 				return errors.E(err)

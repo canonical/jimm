@@ -56,6 +56,9 @@ linters:
     # - importas # optional, useful for consistent named imports
     - gocritic
     - gocognit
+    - goheader
+    - importas
+    - gci
 
 linters-settings:
   gosec:
@@ -66,4 +69,23 @@ linters-settings:
       - G601 # Implicit memory aliasing in for loop. Fixed in Go1.22+, as such exclude.
   gocognit:
     min-complexity: 30
-
+  goheader:
+    template: |-
+      Copyright 2024 Canonical.
+  importas:
+    no-unaliased: false
+    no-extra-aliases: false
+    alias:
+      - pkg: github.com/juju/juju/rpc/params
+        alias: jujuparams
+      - pkg: github.com/canonical/jimm/v3/internal/openfga/names
+        alias: ofganames
+      - pkg: github.com/frankban/quicktest
+        alias: qt
+  gci:
+    skip-generated: true
+    custom-order: true
+    sections:
+      - standard
+      - default
+      - localmodule

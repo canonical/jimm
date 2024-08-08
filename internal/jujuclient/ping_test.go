@@ -1,13 +1,14 @@
-// Copyright 2021 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package jujuclient_test
 
 import (
 	"context"
 
-	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/juju/names/v5"
 	gc "gopkg.in/check.v1"
+
+	"github.com/canonical/jimm/v3/internal/dbmodel"
 )
 
 type pingSuite struct {

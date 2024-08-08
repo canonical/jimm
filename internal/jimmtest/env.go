@@ -1,4 +1,4 @@
-// Copyright 2021 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package jimmtest
 
@@ -200,8 +200,8 @@ func (e *Environment) addJIMMRelations(c *qt.C, jimmTag names.ControllerTag, db 
 		user.addUserRelations(c, jimmTag, db, client)
 	}
 	for _, controller := range e.Controllers {
-		//nolint:errcheck // Shouldn't fail.
-		client.AddController(context.Background(), jimmTag, controller.dbo.ResourceTag())
+		err := client.AddController(context.Background(), jimmTag, controller.dbo.ResourceTag())
+		c.Assert(err, qt.IsNil)
 	}
 	for _, cl := range e.Clouds {
 		cl.addCloudRelations(c, jimmTag, db, client)

@@ -1,4 +1,4 @@
-// Copyright 2023 canonical.
+// Copyright 2024 Canonical.
 package wellknownapi_test
 
 import (
@@ -11,12 +11,13 @@ import (
 	"testing"
 	"time"
 
+	qt "github.com/frankban/quicktest"
+	"github.com/lestrrat-go/jwx/v2/jwk"
+
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimmtest"
 	"github.com/canonical/jimm/v3/internal/vault"
 	"github.com/canonical/jimm/v3/internal/wellknownapi"
-	qt "github.com/frankban/quicktest"
-	"github.com/lestrrat-go/jwx/v2/jwk"
 )
 
 func newStore(t testing.TB) *vault.VaultStore {

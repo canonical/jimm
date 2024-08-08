@@ -1,4 +1,4 @@
-// Copyright 2024 canonical.
+// Copyright 2024 Canonical.
 
 package auth_test
 
@@ -16,14 +16,15 @@ import (
 	"time"
 
 	"github.com/antonlindstrom/pgstore"
+	"github.com/coreos/go-oidc/v3/oidc"
+	qt "github.com/frankban/quicktest"
+	"github.com/gorilla/sessions"
+
 	"github.com/canonical/jimm/v3/internal/auth"
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimmtest"
-	"github.com/coreos/go-oidc/v3/oidc"
-	qt "github.com/frankban/quicktest"
-	"github.com/gorilla/sessions"
 )
 
 func setupTestAuthSvc(ctx context.Context, c *qt.C, expiry time.Duration) (*auth.AuthenticationService, *db.Database, sessions.Store, func()) {

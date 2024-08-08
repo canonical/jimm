@@ -1,4 +1,4 @@
-// Copyright 2023 canonical.
+// Copyright 2024 Canonical.
 
 // Package names holds functions used by other jimm components to
 // create valid OpenFGA tags.
@@ -7,12 +7,12 @@ package names
 import (
 	"fmt"
 
-	"github.com/canonical/jimm/v3/internal/errors"
-	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 	cofga "github.com/canonical/ofga"
-
 	"github.com/juju/juju/core/permission"
 	"github.com/juju/names/v5"
+
+	"github.com/canonical/jimm/v3/internal/errors"
+	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
 
 // Relation Types
@@ -41,8 +41,6 @@ var (
 
 // allRelations contains a slice of all valid relations.
 // NB: Add any new relations from the above to this slice.
-//
-//nolint:unused // Used in export_test.go
 var allRelations = []cofga.Relation{MemberRelation, AdministratorRelation, ControllerRelation, ModelRelation, ConsumerRelation, ReaderRelation, WriterRelation, CanAddModelRelation, AuditLogViewerRelation, NoRelation}
 
 // EveryoneUser is the username representing all users and is treated uniquely when used in OpenFGA tuples.

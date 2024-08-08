@@ -1,15 +1,16 @@
-// Copyright 2016 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package jujuapi
 
 import (
 	"context"
 
+	jujuparams "github.com/juju/juju/rpc/params"
+
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/jimm"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
-	jujuparams "github.com/juju/juju/rpc/params"
 )
 
 var (
