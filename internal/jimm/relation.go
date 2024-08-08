@@ -78,7 +78,7 @@ func (j *JIMM) CheckRelation(ctx context.Context, user *openfga.User, tuple apip
 func (j *JIMM) ListRelationshipTuples(ctx context.Context, user *openfga.User, tuple apiparams.RelationshipTuple, pageSize int32, continuationToken string) ([]openfga.Tuple, string, error) {
 	const op = errors.Op("jimm.ListRelationshipTuples")
 	if !user.JimmAdmin {
-		return []openfga.Tuple{}, "", errors.E(op, errors.CodeUnauthorized, "unauthorized")
+		return nil, "", errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 	// if targetObject is not specified returns all tuples.
 	parsedTuple := &openfga.Tuple{}
@@ -86,7 +86,7 @@ func (j *JIMM) ListRelationshipTuples(ctx context.Context, user *openfga.User, t
 	if tuple.TargetObject != "" {
 		parsedTuple, err = j.parseTuple(ctx, tuple)
 		if err != nil {
-			return []openfga.Tuple{}, "", errors.E(op, err)
+			return nil, "", errors.E(op, err)
 		}
 	} else if tuple.Object != "" {
 		return nil, "", errors.E(op, errors.CodeBadRequest, "it is invalid to pass an object without a target object.")
@@ -94,7 +94,7 @@ func (j *JIMM) ListRelationshipTuples(ctx context.Context, user *openfga.User, t
 
 	responseTuples, ct, err := j.OpenFGAClient.ReadRelatedObjects(ctx, *parsedTuple, pageSize, continuationToken)
 	if err != nil {
-		return []openfga.Tuple{}, "", errors.E(op, err)
+		return nil, "", errors.E(op, err)
 	}
 	return responseTuples, ct, nil
 }

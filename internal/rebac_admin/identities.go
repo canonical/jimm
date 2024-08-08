@@ -31,8 +31,10 @@ func newidentitiesService(jimm jujuapi.JIMM) *identitiesService {
 
 // ListIdentities returns a page of Identity objects of at least `size` elements if available.
 func (s *identitiesService) ListIdentities(ctx context.Context, params *resources.GetIdentitiesParams) (*resources.PaginatedResponse[resources.Identity], error) {
-	raw, _ := v1.GetIdentityFromContext(ctx)
-	user, _ := raw.(*openfga.User)
+	user, err := utils.GetUserFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	count, err := s.jimm.CountIdentities(ctx, user)
 	if err != nil {
@@ -99,8 +101,10 @@ func (s *identitiesService) PatchIdentityRoles(ctx context.Context, identityId s
 
 // GetIdentityGroups returns a page of Groups for identity `identityId`.
 func (s *identitiesService) GetIdentityGroups(ctx context.Context, identityId string, params *resources.GetIdentitiesItemGroupsParams) (*resources.PaginatedResponse[resources.Group], error) {
-	raw, _ := v1.GetIdentityFromContext(ctx)
-	user, _ := raw.(*openfga.User)
+	user, err := utils.GetUserFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 	objUser, err := s.jimm.FetchIdentity(ctx, identityId)
 	if err != nil {
 		return nil, v1.NewNotFoundError(fmt.Sprintf("User with id %s not found", identityId))
@@ -118,6 +122,7 @@ func (s *identitiesService) GetIdentityGroups(ctx context.Context, identityId st
 	groups := make([]resources.Group, len(tuples))
 	for i, t := range tuples {
 		groups[i] = resources.Group{
+			Id:   &t.Target.ID,
 			Name: t.Target.ID,
 		}
 	}
@@ -136,8 +141,10 @@ func (s *identitiesService) GetIdentityGroups(ctx context.Context, identityId st
 
 // PatchIdentityGroups performs addition or removal of a Group to/from an Identity.
 func (s *identitiesService) PatchIdentityGroups(ctx context.Context, identityId string, groupPatches []resources.IdentityGroupsPatchItem) (bool, error) {
-	raw, _ := v1.GetIdentityFromContext(ctx)
-	user, _ := raw.(*openfga.User)
+	user, err := utils.GetUserFromContext(ctx)
+	if err != nil {
+		return false, err
+	}
 
 	objUser, err := s.jimm.FetchIdentity(ctx, identityId)
 	if err != nil {

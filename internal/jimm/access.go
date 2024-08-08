@@ -633,7 +633,7 @@ func resolveTag(jimmUUID string, db *db.Database, tag string) (*ofganames.Tag, e
 //
 // This key may be in the form of either a JIMM tag string or Juju tag string.
 func (j *JIMM) parseAndValidateTag(ctx context.Context, key string) (*ofganames.Tag, error) {
-	op := errors.Op("jimm.ParseTag")
+	op := errors.Op("jimm.parseAndValidateTag")
 	tupleKeySplit := strings.SplitN(key, "-", 2)
 	if len(tupleKeySplit) == 1 {
 		tag, err := ofganames.BlankKindTag(tupleKeySplit[0])

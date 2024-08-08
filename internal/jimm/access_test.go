@@ -497,8 +497,7 @@ func TestParseAndValidateTag(t *testing.T) {
 	c.Assert(tag.Kind.String(), qt.Equals, names.ModelTagKind)
 
 	// JIMM tag not valid
-	kindTag = ""
-	_, err = j.ParseAndValidateTag(ctx, kindTag)
+	_, err = j.ParseAndValidateTag(ctx, "")
 	c.Assert(err, qt.ErrorMatches, "unknown tag kind")
 }
 
