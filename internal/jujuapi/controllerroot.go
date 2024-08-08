@@ -11,7 +11,6 @@ import (
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
-	"github.com/juju/version"
 	"github.com/rogpeppe/fastuuid"
 	"golang.org/x/oauth2"
 
@@ -45,7 +44,6 @@ type JIMM interface {
 	DestroyOffer(ctx context.Context, user *openfga.User, offerURL string, force bool) error
 	DumpModel(ctx context.Context, u *openfga.User, mt names.ModelTag, simplified bool) (string, error)
 	DumpModelDB(ctx context.Context, u *openfga.User, mt names.ModelTag) (map[string]interface{}, error)
-	EarliestControllerVersion(ctx context.Context) (version.Number, error)
 	FindApplicationOffers(ctx context.Context, user *openfga.User, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error)
 	FindAuditEvents(ctx context.Context, user *openfga.User, filter db.AuditLogFilter) ([]dbmodel.AuditLogEntry, error)
 	ForEachCloud(ctx context.Context, user *openfga.User, f func(*dbmodel.Cloud) error) error

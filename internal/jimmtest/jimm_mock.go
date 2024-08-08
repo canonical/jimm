@@ -10,7 +10,6 @@ import (
 	"github.com/google/uuid"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
-	"github.com/juju/version"
 
 	"github.com/canonical/jimm/v3/internal/common/pagination"
 	"github.com/canonical/jimm/v3/internal/db"
@@ -33,8 +32,7 @@ import (
 type JIMM struct {
 	mocks.RelationService
 	mocks.GroupService
-	ControllerService
-	AddController_                     func(ctx context.Context, u *openfga.User, ctl *dbmodel.Controller) error
+	mocks.ControllerService
 	AddAuditLogEntry_                  func(ale *dbmodel.AuditLogEntry)
 	AddCloudToController_              func(ctx context.Context, user *openfga.User, controllerName string, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error
 	AddHostedCloud_                    func(ctx context.Context, user *openfga.User, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error
@@ -48,7 +46,6 @@ type JIMM struct {
 	DestroyOffer_                      func(ctx context.Context, user *openfga.User, offerURL string, force bool) error
 	DumpModel_                         func(ctx context.Context, u *openfga.User, mt names.ModelTag, simplified bool) (string, error)
 	DumpModelDB_                       func(ctx context.Context, u *openfga.User, mt names.ModelTag) (map[string]interface{}, error)
-	EarliestControllerVersion_         func(ctx context.Context) (version.Number, error)
 	FindApplicationOffers_             func(ctx context.Context, user *openfga.User, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error)
 	FindAuditEvents_                   func(ctx context.Context, user *openfga.User, filter db.AuditLogFilter) ([]dbmodel.AuditLogEntry, error)
 	ForEachCloud_                      func(ctx context.Context, user *openfga.User, f func(*dbmodel.Cloud) error) error
@@ -191,12 +188,6 @@ func (j *JIMM) DumpModelDB(ctx context.Context, u *openfga.User, mt names.ModelT
 		return nil, errors.E(errors.CodeNotImplemented)
 	}
 	return j.DumpModelDB_(ctx, u, mt)
-}
-func (j *JIMM) EarliestControllerVersion(ctx context.Context) (version.Number, error) {
-	if j.EarliestControllerVersion_ == nil {
-		return version.Number{}, errors.E(errors.CodeNotImplemented)
-	}
-	return j.EarliestControllerVersion_(ctx)
 }
 func (j *JIMM) FindApplicationOffers(ctx context.Context, user *openfga.User, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error) {
 	if j.FindApplicationOffers_ == nil {

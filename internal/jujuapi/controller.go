@@ -8,6 +8,7 @@ import (
 
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
+	"github.com/juju/version"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
@@ -54,6 +55,7 @@ func init() {
 type ControllerService interface {
 	AddController(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller) error
 	ControllerInfo(ctx context.Context, name string) (params.ControllerInfo, error)
+	EarliestControllerVersion(ctx context.Context) (version.Number, error)
 	ListControllers(ctx context.Context, user *openfga.User) ([]dbmodel.Controller, error)
 	GetControllerConfig(ctx context.Context, user *dbmodel.Identity) (*dbmodel.ControllerConfig, error)
 	SetControllerConfig(ctx context.Context, user *openfga.User, args jujuparams.ControllerConfigSet) error
