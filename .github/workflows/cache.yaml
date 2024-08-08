@@ -1,5 +1,9 @@
 name: Cache on default branch
-on: push
+on:
+  push:
+    branches:
+      - v3
+      - "feature*"
 
 jobs:
   go_cache:
