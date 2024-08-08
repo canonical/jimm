@@ -1,0 +1,26 @@
+name: Cache on default branch
+on:
+  push:
+    branches:
+      - v3
+  
+
+jobs:
+  go_cache:
+    name: Install And Cache Go dependencies
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-tags: true
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version-file: 'go.mod'
+      
+      - name: Build and Test
+        run: go mod tidy
