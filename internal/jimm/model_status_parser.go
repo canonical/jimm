@@ -9,7 +9,7 @@ import (
 	jujucmd "github.com/juju/cmd/v3"
 	"github.com/juju/juju/cmd/juju/status"
 	"github.com/juju/juju/cmd/juju/storage"
-	rpcparams "github.com/juju/juju/rpc/params"
+	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
@@ -162,7 +162,7 @@ func (f *formatterParamsRetriever) dialModel(ctx context.Context) error {
 
 // getModelStatus calls the FullStatus facade to return the full status for the current model
 // loaded in the formatterParamsRetriever.
-func (f *formatterParamsRetriever) getModelStatus(ctx context.Context) (*rpcparams.FullStatus, error) {
+func (f *formatterParamsRetriever) getModelStatus(ctx context.Context) (*jujuparams.FullStatus, error) {
 	modelStatus, err := f.api.Status(ctx, nil)
 	if err != nil {
 		zapctx.Error(ctx, "failed to call FullStatus", zap.String("controller-uuid", f.model.Controller.UUID), zap.String("model-uuid", f.model.UUID.String), zap.Error(err))
@@ -200,17 +200,17 @@ func newStorageListAPI(ctx context.Context, api API) storageListAPI {
 }
 
 // ListStorageDetails implements storage.StorageListAPI. (From Juju)
-func (s *storageListAPI) ListStorageDetails() ([]rpcparams.StorageDetails, error) {
+func (s *storageListAPI) ListStorageDetails() ([]jujuparams.StorageDetails, error) {
 	return s.api.ListStorageDetails(s.ctx)
 }
 
 // ListFilesystems implements storage.StorageListAPI. (From Juju)
-func (s *storageListAPI) ListFilesystems(machines []string) ([]rpcparams.FilesystemDetailsListResult, error) {
+func (s *storageListAPI) ListFilesystems(machines []string) ([]jujuparams.FilesystemDetailsListResult, error) {
 	return s.api.ListFilesystems(s.ctx, machines)
 }
 
 // ListVolumes implements storage.StorageListAPI. (From Juju)
-func (s *storageListAPI) ListVolumes(machines []string) ([]rpcparams.VolumeDetailsListResult, error) {
+func (s *storageListAPI) ListVolumes(machines []string) ([]jujuparams.VolumeDetailsListResult, error) {
 	return s.api.ListVolumes(s.ctx, machines)
 }
 
