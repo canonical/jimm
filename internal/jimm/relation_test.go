@@ -20,6 +20,7 @@ import (
 )
 
 func TestListRelationshipTuples(t *testing.T) {
+	// setup
 	c := qt.New(t)
 	ctx := context.Background()
 
@@ -62,60 +63,109 @@ func TestListRelationshipTuples(t *testing.T) {
 		},
 	})
 	c.Assert(err, qt.IsNil)
+	type ExpectedTuple struct {
+		expectedRelation string
+		expectedTargetId string
+	}
+	// test
+	testCases := []struct {
+		description    string
+		object         string
+		relation       string
+		targetObject   string
+		expectedError  error
+		expectedLength int
+		expectedTuples []ExpectedTuple
+	}{
+		{
+			description:    "test listing all relations of all entities",
+			object:         "",
+			relation:       "",
+			targetObject:   "",
+			expectedError:  nil,
+			expectedLength: 3,
+		},
+		{
+			description:    "test listing a specific relation",
+			object:         user.Tag().String(),
+			relation:       names.ReaderRelation.String(),
+			targetObject:   model.ResourceTag().String(),
+			expectedError:  nil,
+			expectedLength: 1,
+			expectedTuples: []ExpectedTuple{
+				{
 
-	// test listing all relations of all entities
-	tuples, _, err := j.ListRelationshipTuples(ctx, u, apiparams.RelationshipTuple{
-		Object:       "",
-		Relation:     "",
-		TargetObject: "",
-	}, 10, "")
-	c.Assert(err, qt.IsNil)
-	c.Assert(len(tuples), qt.Equals, 3)
+					expectedRelation: names.ReaderRelation.String(),
+					expectedTargetId: model.Tag().Id(),
+				},
+			},
+		},
+		{
+			description:    "test listing all relations between two entities leaving relation empty",
+			object:         user.Tag().String(),
+			relation:       "",
+			targetObject:   model.ResourceTag().String(),
+			expectedError:  nil,
+			expectedLength: 2,
+			expectedTuples: []ExpectedTuple{
+				{
+					expectedRelation: names.ReaderRelation.String(),
+					expectedTargetId: model.Tag().Id(),
+				},
+				{
+					expectedRelation: names.WriterRelation.String(),
+					expectedTargetId: model.Tag().Id(),
+				},
+			},
+		},
+		{
+			description:    "test listing all relations of a specific target entity",
+			object:         "",
+			relation:       "",
+			targetObject:   model.ResourceTag().String(),
+			expectedError:  nil,
+			expectedLength: 2,
+			expectedTuples: []ExpectedTuple{
+				{
+					expectedRelation: names.ReaderRelation.String(),
+					expectedTargetId: model.Tag().Id(),
+				},
+				{
+					expectedRelation: names.WriterRelation.String(),
+					expectedTargetId: model.Tag().Id(),
+				},
+			},
+		},
+		{
+			description:    "test listing all relations of specific object entity",
+			object:         user.ResourceTag().String(),
+			relation:       names.ReaderRelation.String(),
+			targetObject:   "model",
+			expectedError:  nil,
+			expectedLength: 1,
+			expectedTuples: []ExpectedTuple{
+				{
+					expectedRelation: names.ReaderRelation.String(),
+					expectedTargetId: model.Tag().Id(),
+				},
+			},
+		},
+	}
 
-	// test listing a specific relation
-	tuples, _, err = j.ListRelationshipTuples(ctx, u, apiparams.RelationshipTuple{
-		Object:       user.Tag().String(),
-		Relation:     names.ReaderRelation.String(),
-		TargetObject: model.ResourceTag().String(),
-	}, 10, "")
-	c.Assert(err, qt.IsNil)
-	c.Assert(tuples, qt.HasLen, 1)
-	c.Assert(names.ReaderRelation.String(), qt.Equals, tuples[0].Relation.String())
-	c.Assert(model.Tag().Id(), qt.Equals, tuples[0].Target.ID)
-
-	// test listing all relations between two entities leaving relation empty
-	tuples, _, err = j.ListRelationshipTuples(ctx, u, apiparams.RelationshipTuple{
-		Object:       user.Tag().String(),
-		Relation:     "",
-		TargetObject: model.ResourceTag().String(),
-	}, 10, "")
-	c.Assert(err, qt.IsNil)
-	c.Assert(tuples, qt.HasLen, 2)
-	c.Assert(names.ReaderRelation.String(), qt.Equals, tuples[0].Relation.String())
-	c.Assert(model.Tag().Id(), qt.Equals, tuples[0].Target.ID)
-	c.Assert(names.WriterRelation.String(), qt.Equals, tuples[1].Relation.String())
-	c.Assert(model.Tag().Id(), qt.Equals, tuples[1].Target.ID)
-
-	// test listing all relations of a specific target entity
-	tuples, _, err = j.ListRelationshipTuples(ctx, u, apiparams.RelationshipTuple{
-		Object:       "",
-		Relation:     "",
-		TargetObject: model.ResourceTag().String(),
-	}, 10, "")
-	c.Assert(err, qt.IsNil)
-	c.Assert(tuples, qt.HasLen, 2)
-	c.Assert(names.ReaderRelation.String(), qt.Equals, tuples[0].Relation.String())
-	c.Assert(model.Tag().Id(), qt.Equals, tuples[0].Target.ID)
-	c.Assert(names.WriterRelation.String(), qt.Equals, tuples[1].Relation.String())
-	c.Assert(model.Tag().Id(), qt.Equals, tuples[1].Target.ID)
-
-	// test listing all relations of specific object entity
-	tuples, _, err = j.ListRelationshipTuples(ctx, u, apiparams.RelationshipTuple{
-		Object:       user.ResourceTag().String(),
-		Relation:     names.ReaderRelation.String(),
-		TargetObject: "model",
-	}, 10, "")
-	c.Assert(err, qt.IsNil)
-	c.Assert(tuples, qt.HasLen, 1)
+	for _, t := range testCases {
+		c.Run(t.description, func(c *qt.C) {
+			tuples, _, err := j.ListRelationshipTuples(ctx, u, apiparams.RelationshipTuple{
+				Object:       t.object,
+				Relation:     t.relation,
+				TargetObject: t.targetObject,
+			}, 10, "")
+			c.Assert(err, qt.Equals, t.expectedError)
+			c.Assert(tuples, qt.HasLen, t.expectedLength)
+			for i, expectedTuple := range t.expectedTuples {
+				c.Assert(tuples[i].Relation.String(), qt.Equals, expectedTuple.expectedRelation)
+				c.Assert(tuples[i].Target.ID, qt.Equals, expectedTuple.expectedTargetId)
+			}
+		})
+	}
 
 }
