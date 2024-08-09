@@ -8,8 +8,6 @@ import (
 	"strings"
 
 	"github.com/juju/names/v5"
-
-	"github.com/canonical/jimm/v3/internal/errors"
 )
 
 const (
