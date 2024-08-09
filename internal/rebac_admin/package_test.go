@@ -1,3 +1,5 @@
+// Copyright 2024 Canonical Ltd.
+
 package rebac_admin_test
 
 import (
