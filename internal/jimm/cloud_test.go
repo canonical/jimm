@@ -1061,6 +1061,7 @@ func TestGrantCloudAccess(t *testing.T) {
 				Err: tt.dialError,
 			}
 			j := &jimm.JIMM{
+				UUID: jimmtest.ControllerUUID,
 				Database: db.Database{
 					DB: jimmtest.PostgresDB(c, nil),
 				},
@@ -1360,6 +1361,7 @@ func TestRevokeCloudAccess(t *testing.T) {
 				Err: tt.dialError,
 			}
 			j := &jimm.JIMM{
+				UUID: jimmtest.ControllerUUID,
 				Database: db.Database{
 					DB: jimmtest.PostgresDB(c, nil),
 				},

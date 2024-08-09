@@ -15,8 +15,7 @@ type revokeAuditLogAccessSuite struct {
 	cmdtest.JimmCmdSuite
 }
 
-// TODO (alesstimec) uncomment when grant/revoke is implemented
-// var _ = gc.Suite(&revokeAuditLogAccessSuite{})
+var _ = gc.Suite(&revokeAuditLogAccessSuite{})
 
 func (s *revokeAuditLogAccessSuite) TestRevokeAuditLogAccessSuperuser(c *gc.C) {
 	// alice is superuser

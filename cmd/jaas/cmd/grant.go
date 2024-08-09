@@ -3,8 +3,6 @@
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/juju/cmd/v3"
 	jujuapi "github.com/juju/juju/api"
 	jujucmd "github.com/juju/juju/cmd"
@@ -37,6 +35,7 @@ func NewGrantCommand() cmd.Command {
 // grantCommand grants admin access to a service account to given groups/identities.
 type grantCommand struct {
 	modelcmd.ControllerCommandBase
+	out cmd.Output
 
 	store    jujuclient.ClientStore
 	dialOpts *jujuapi.DialOpts
@@ -91,6 +90,9 @@ func (c *grantCommand) Run(ctxt *cmd.Context) error {
 	if err != nil {
 		return errors.E(err)
 	}
-	fmt.Fprintln(ctxt.Stdout, "access granted")
+	err = c.out.Write(ctxt, "access granted")
+	if err != nil {
+		return errors.E(err)
+	}
 	return nil
 }
