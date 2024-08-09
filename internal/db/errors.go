@@ -1,4 +1,4 @@
-// Copyright 2020 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package db
 
@@ -21,8 +21,8 @@ func dbError(err error) error {
 	if err == gorm.ErrRecordNotFound {
 		code = errors.CodeNotFound
 	}
-	switch e := err.(type) {
-	case *pgconn.PgError:
+
+	if e, ok := err.(*pgconn.PgError); ok {
 		if e.Code == pgUniqueViolation {
 			code = errors.CodeAlreadyExists
 		}

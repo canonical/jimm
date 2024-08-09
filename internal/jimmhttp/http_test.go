@@ -1,4 +1,4 @@
-// Copyright 2021 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package jimmhttp_test
 
@@ -62,6 +62,7 @@ func TestStripPathElement(t *testing.T) {
 
 			hnd.ServeHTTP(rr, req)
 			resp := rr.Result()
+			defer resp.Body.Close()
 			c.Check(resp.StatusCode, qt.Equals, http.StatusOK)
 		})
 	}

@@ -1,4 +1,4 @@
-// Copyright 2023 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package cmd_test
 
@@ -175,7 +175,7 @@ func (s *relationSuite) TestRemoveRelationSuperuser(c *gc.C) {
 		{testName: "Remove Group Relation", input: tuple{user: "group-" + group1 + "#member", relation: "member", target: "group-" + group2}, err: false},
 	}
 
-	//Create groups and relation
+	// Create groups and relation
 	_, err := s.JimmCmdSuite.JIMM.Database.AddGroup(context.Background(), group1)
 	c.Assert(err, gc.IsNil)
 	_, err = s.JimmCmdSuite.JIMM.Database.AddGroup(context.Background(), group2)

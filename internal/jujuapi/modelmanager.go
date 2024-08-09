@@ -1,4 +1,4 @@
-// Copyright 2016 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package jujuapi
 
@@ -130,10 +130,8 @@ func (r *controllerRoot) ModelInfo(ctx context.Context, args jujuparams.Entities
 				err = errors.E(op, errors.CodeUnauthorized, "unauthorized")
 			}
 			results[i].Error = mapError(errors.E(op, err))
-		} else {
-			if r.controllerUUIDMasking {
-				results[i].Result.ControllerUUID = r.params.ControllerUUID
-			}
+		} else if r.controllerUUIDMasking {
+			results[i].Result.ControllerUUID = r.params.ControllerUUID
 		}
 	}
 	return jujuparams.ModelInfoResults{

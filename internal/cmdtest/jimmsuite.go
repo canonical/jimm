@@ -1,4 +1,4 @@
-// Copyright 2021 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 // Package cmdtest provides the test suite used for CLI tests
 // as well as helper functions used for integration based CLI tests.
@@ -71,7 +71,7 @@ func (s *JimmCmdSuite) SetUpTest(c *gc.C) {
 	s.Params = jimmtest.NewTestJimmParams(&jimmtest.GocheckTester{C: c})
 	dsn, err := url.Parse(s.Params.DSN)
 	c.Assert(err, gc.Equals, nil)
-	s.databaseName = strings.Replace(dsn.Path, "/", "", -1)
+	s.databaseName = strings.ReplaceAll(dsn.Path, "/", "")
 	s.Params.PublicDNSName = u.Host
 	s.Params.ControllerAdmins = []string{"admin"}
 	s.Params.OpenFGAParams = service.OpenFGAParams{
@@ -90,7 +90,7 @@ func (s *JimmCmdSuite) SetUpTest(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	s.Service = srv
 	s.JIMM = srv.JIMM()
-	s.HTTP.Config = &http.Server{Handler: srv}
+	s.HTTP.Config = &http.Server{Handler: srv, ReadHeaderTimeout: time.Second * 5}
 
 	err = s.Service.StartJWKSRotator(ctx, time.NewTicker(time.Hour).C, time.Now().UTC().AddDate(0, 3, 0))
 	c.Assert(err, gc.Equals, nil)

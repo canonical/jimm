@@ -1,11 +1,10 @@
-// Copyright 2024 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/juju/cmd/v3"
+	"github.com/juju/gnuflag"
 	jujuapi "github.com/juju/juju/api"
 	jujucmd "github.com/juju/juju/cmd"
 	"github.com/juju/juju/cmd/modelcmd"
@@ -58,6 +57,14 @@ func (c *grantCommand) Info() *cmd.Info {
 }
 
 // Init implements the cmd.Command interface.
+func (c *grantCommand) SetFlags(f *gnuflag.FlagSet) {
+	c.CommandBase.SetFlags(f)
+	c.out.AddFlags(f, "smart", map[string]cmd.Formatter{
+		"smart": cmd.FormatSmart,
+	})
+}
+
+// Init implements the cmd.Command interface.
 func (c *grantCommand) Init(args []string) error {
 	if len(args) < 1 {
 		return errors.E("client ID not specified")
@@ -92,6 +99,11 @@ func (c *grantCommand) Run(ctxt *cmd.Context) error {
 	if err != nil {
 		return errors.E(err)
 	}
-	fmt.Fprintln(ctxt.Stdout, "access granted")
+	err = c.out.Write(ctxt, "access granted")
+	if err != nil {
+		return errors.E(err)
+	}
+
+	// fmt.Fprintf(ctxt.Stdout, "access granted")
 	return nil
 }

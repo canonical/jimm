@@ -1,4 +1,4 @@
-// Copyright 2020 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package jimm_test
 
@@ -1399,6 +1399,7 @@ func TestGetCloudCredential(t *testing.T) {
 	}
 }
 
+//nolint:gosec // Thinks credentials hardcoded.
 const forEachUserCloudCredentialEnv = `clouds:
 - name: cloud-1
   regions:
@@ -1521,6 +1522,7 @@ func TestForEachUserCloudCredential(t *testing.T) {
 	}
 }
 
+//nolint:gosec // Thinks credentials hardcoded.
 const getCloudCredentialAttributesEnv = `clouds:
 - name: test-cloud
   type: gce

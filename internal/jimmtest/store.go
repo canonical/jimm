@@ -1,3 +1,4 @@
+// Copyright 2024 Canonical.
 package jimmtest
 
 import (
@@ -93,7 +94,7 @@ func (s *InMemoryCredentialStore) PutControllerCredentials(ctx context.Context, 
 
 	if s.controllerCredentials == nil {
 		s.controllerCredentials = map[string]controllerCredentials{
-			controllerName: controllerCredentials{
+			controllerName: {
 				username: username,
 				password: password,
 			},

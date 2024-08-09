@@ -1,4 +1,4 @@
-// Copyright 2020 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package jimm
 
@@ -998,11 +998,6 @@ func (j *JIMM) RevokeModelAccess(ctx context.Context, user *openfga.User, mt nam
 // the juju API will not have it's code masked.
 func (j *JIMM) DestroyModel(ctx context.Context, user *openfga.User, mt names.ModelTag, destroyStorage, force *bool, maxWait, timeout *time.Duration) error {
 	const op = errors.Op("jimm.DestroyModel")
-
-	if destroyStorage != nil {
-	}
-	if force != nil {
-	}
 
 	err := j.doModelAdmin(ctx, user, mt, func(m *dbmodel.Model, api API) error {
 		if err := api.DestroyModel(ctx, mt, destroyStorage, force, maxWait, timeout); err != nil {

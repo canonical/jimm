@@ -1,4 +1,4 @@
-// Copyright 2023 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package db
 
@@ -7,14 +7,15 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/canonical/jimm/v3/internal/dbmodel"
-	"github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/internal/servermon"
 	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"go.uber.org/zap"
 	"gorm.io/gorm/clause"
+
+	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/servermon"
 )
 
 const (
@@ -23,12 +24,13 @@ const (
 	passwordKey = "password"
 
 	// These constants are used to create the appropriate identifiers for JWKS related data.
-	jwksKind                   = "jwks"
-	jwksPublicKeyTag           = "jwksPublicKey"
-	jwksPrivateKeyTag          = "jwksPrivateKey"
-	jwksExpiryTag              = "jwksExpiry"
-	oauthKind                  = "oauth"
-	oauthKeyTag                = "oauthKey"
+	jwksKind          = "jwks"
+	jwksPublicKeyTag  = "jwksPublicKey"
+	jwksPrivateKeyTag = "jwksPrivateKey"
+	jwksExpiryTag     = "jwksExpiry"
+	oauthKind         = "oauth"
+	oauthKeyTag       = "oauthKey"
+	//nolint:gosec // Thinks credentials hardcoded.
 	oauthSessionStoreSecretTag = "oauthSessionStoreSecret"
 )
 

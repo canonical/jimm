@@ -1,18 +1,19 @@
-// Copyright 2023 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package cmd_test
 
 import (
 	"encoding/json"
 
-	"github.com/canonical/jimm/v3/cmd/jimmctl/cmd"
-	"github.com/canonical/jimm/v3/internal/cmdtest"
-	"github.com/canonical/jimm/v3/internal/jimmtest"
 	"github.com/juju/cmd/v3/cmdtesting"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/testing/factory"
 	"github.com/juju/names/v5"
 	gc "gopkg.in/check.v1"
+
+	"github.com/canonical/jimm/v3/cmd/jimmctl/cmd"
+	"github.com/canonical/jimm/v3/internal/cmdtest"
+	"github.com/canonical/jimm/v3/internal/jimmtest"
 )
 
 type crossModelQuerySuite struct {

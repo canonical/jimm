@@ -1,4 +1,4 @@
-// Copyright 2020 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package jimm_test
 
@@ -303,8 +303,10 @@ func TestRevokeOfferAccess(t *testing.T) {
 			return env.users[1], env.users[4], env.applicationOffers[0].URL, jujuparams.OfferConsumeAccess
 		},
 		setup: func(env *environment, client *openfga.OFGAClient) {
-			openfga.NewUser(&env.users[4], client).SetApplicationOfferAccess(ctx, env.applicationOffers[0].ResourceTag(), ofganames.ConsumerRelation)
-			openfga.NewUser(&env.users[4], client).SetApplicationOfferAccess(ctx, env.applicationOffers[0].ResourceTag(), ofganames.AdministratorRelation)
+			err := openfga.NewUser(&env.users[4], client).SetApplicationOfferAccess(ctx, env.applicationOffers[0].ResourceTag(), ofganames.ConsumerRelation)
+			c.Assert(err, qt.IsNil)
+			err = openfga.NewUser(&env.users[4], client).SetApplicationOfferAccess(ctx, env.applicationOffers[0].ResourceTag(), ofganames.AdministratorRelation)
+			c.Assert(err, qt.IsNil)
 		},
 		expectedError:              "unable to completely revoke given access due to other relations.*jimmctl.*",
 		expectedAccessLevelOnError: "admin",
@@ -314,8 +316,10 @@ func TestRevokeOfferAccess(t *testing.T) {
 			return env.users[1], env.users[4], env.applicationOffers[0].URL, jujuparams.OfferReadAccess
 		},
 		setup: func(env *environment, client *openfga.OFGAClient) {
-			openfga.NewUser(&env.users[4], client).SetApplicationOfferAccess(ctx, env.applicationOffers[0].ResourceTag(), ofganames.ReaderRelation)
-			openfga.NewUser(&env.users[4], client).SetApplicationOfferAccess(ctx, env.applicationOffers[0].ResourceTag(), ofganames.AdministratorRelation)
+			err := openfga.NewUser(&env.users[4], client).SetApplicationOfferAccess(ctx, env.applicationOffers[0].ResourceTag(), ofganames.ReaderRelation)
+			c.Assert(err, qt.IsNil)
+			err = openfga.NewUser(&env.users[4], client).SetApplicationOfferAccess(ctx, env.applicationOffers[0].ResourceTag(), ofganames.AdministratorRelation)
+			c.Assert(err, qt.IsNil)
 		},
 		expectedError:              "unable to completely revoke given access due to other relations.*jimmctl.*",
 		expectedAccessLevelOnError: "admin",
@@ -325,8 +329,10 @@ func TestRevokeOfferAccess(t *testing.T) {
 			return env.users[1], env.users[4], env.applicationOffers[0].URL, jujuparams.OfferReadAccess
 		},
 		setup: func(env *environment, client *openfga.OFGAClient) {
-			openfga.NewUser(&env.users[4], client).SetApplicationOfferAccess(ctx, env.applicationOffers[0].ResourceTag(), ofganames.ReaderRelation)
-			openfga.NewUser(&env.users[4], client).SetApplicationOfferAccess(ctx, env.applicationOffers[0].ResourceTag(), ofganames.ConsumerRelation)
+			err := openfga.NewUser(&env.users[4], client).SetApplicationOfferAccess(ctx, env.applicationOffers[0].ResourceTag(), ofganames.ReaderRelation)
+			c.Assert(err, qt.IsNil)
+			err = openfga.NewUser(&env.users[4], client).SetApplicationOfferAccess(ctx, env.applicationOffers[0].ResourceTag(), ofganames.ConsumerRelation)
+			c.Assert(err, qt.IsNil)
 		},
 		expectedError:              "unable to completely revoke given access due to other relations.*jimmctl.*",
 		expectedAccessLevelOnError: "consume",

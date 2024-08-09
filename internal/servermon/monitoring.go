@@ -1,4 +1,4 @@
-// Copyright 2016 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 // The servermon package is used to update statistics used
 // for monitoring the API server.
@@ -122,13 +122,13 @@ var (
 	ModelCount = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "jimm",
 		Subsystem: "system",
-		Name:      "model_count",
+		Name:      "model",
 		Help:      "The number of models managed per controller attached to JIMM.",
 	}, []string{"controller"})
 	ControllerCount = promauto.NewGauge(prometheus.GaugeOpts{
 		Namespace: "jimm",
 		Subsystem: "system",
-		Name:      "controller_count",
+		Name:      "controller",
 		Help:      "The number of controllers managed by JIMM.",
 	})
 )

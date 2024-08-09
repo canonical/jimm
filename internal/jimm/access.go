@@ -1,4 +1,4 @@
-// Copyright 2020 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package jimm
 
@@ -259,7 +259,7 @@ func (auth *JWTGenerator) MakeLoginToken(ctx context.Context, user *openfga.User
 	for _, cloudRegion := range ctl.CloudRegions {
 		clouds[cloudRegion.CloudRegion.Cloud.ResourceTag()] = true
 	}
-	for cloudTag, _ := range clouds {
+	for cloudTag := range clouds {
 		accessLevel, err := auth.accessChecker.GetUserCloudAccess(ctx, auth.user, cloudTag)
 		if err != nil {
 			zapctx.Error(ctx, "cloud access check failed", zap.Error(err))

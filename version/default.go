@@ -1,4 +1,4 @@
-// Copyright 2021 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 // +build !version
 //go:build !version

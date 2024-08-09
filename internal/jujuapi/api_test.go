@@ -1,4 +1,4 @@
-// Copyright 2016 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package jujuapi_test
 
@@ -58,5 +58,7 @@ func (s *apiSuite) TestModelCommandsModelNotFoundf(c *gc.C) {
 	if err != nil {
 		c.Assert(err, gc.ErrorMatches, "websocket: bad handshake")
 	}
+	defer response.Body.Close()
+
 	c.Assert(response.StatusCode, gc.Equals, http.StatusNotFound)
 }

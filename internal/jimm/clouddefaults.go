@@ -1,3 +1,4 @@
+// Copyright 2024 Canonical.
 package jimm
 
 import (
@@ -111,9 +112,6 @@ func (j *JIMM) ModelDefaultsForCloud(ctx context.Context, user *dbmodel.Identity
 			}
 			result.Config[k] = d
 		}
-	}
-	if err != nil {
-		return jujuparams.ModelDefaultsResult{}, errors.E(op, err)
 	}
 	return result, nil
 }

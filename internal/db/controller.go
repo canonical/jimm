@@ -1,14 +1,15 @@
-// Copyright 2020 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package db
 
 import (
 	"context"
 
+	"gorm.io/gorm/clause"
+
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/servermon"
-	"gorm.io/gorm/clause"
 )
 
 // AddController stores the controller information.

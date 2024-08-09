@@ -1,4 +1,4 @@
-// Copyright 2020 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package jimm
 
@@ -228,6 +228,7 @@ func (j *JIMM) EarliestControllerVersion(ctx context.Context) (version.Number, e
 				zap.String("version", controller.AgentVersion),
 				zap.String("controller", controller.Name),
 			)
+			//nolint:nilerr // We wish to log without an error returned, TODO: Check with Ales
 			return nil
 		}
 		if v == nil || versionNumber.Compare(*v) < 0 {
@@ -242,42 +243,6 @@ func (j *JIMM) EarliestControllerVersion(ctx context.Context) (version.Number, e
 		return version.Number{}, nil
 	}
 	return *v, nil
-}
-
-// controllerAccessLevel holds the controller access level for a user.
-type controllerAccessLevel string
-
-const (
-	// noAccess allows a user no permissions at all.
-	noAccess controllerAccessLevel = ""
-
-	// loginAccess allows a user to log-ing into the subject.
-	loginAccess controllerAccessLevel = "login"
-
-	// superuserAccess allows user unrestricted permissions in the subject.
-	superuserAccess controllerAccessLevel = "superuser"
-)
-
-// validate returns error if the current is not a valid access level.
-func (a controllerAccessLevel) validate() error {
-	switch a {
-	case noAccess, loginAccess, superuserAccess:
-		return nil
-	}
-	return errors.E(fmt.Sprintf("invalid access level %q", a))
-}
-
-func (a controllerAccessLevel) value() int {
-	switch a {
-	case noAccess:
-		return 0
-	case loginAccess:
-		return 1
-	case superuserAccess:
-		return 2
-	default:
-		return -1
-	}
 }
 
 // GetJimmControllerAccess returns the JIMM controller access level for the
@@ -407,7 +372,7 @@ func (j *JIMM) ImportModel(ctx context.Context, user *openfga.User, controllerNa
 	// fetch cloud credential used by the model
 	cloudTag, err := names.ParseCloudTag(modelInfo.CloudTag)
 	if err != nil {
-		errors.E(op, err)
+		return errors.E(op, err)
 	}
 	// Note that the model already has a cloud credential configured which it will use when deploying new
 	// applications. JIMM needs some cloud credential reference to be able to import the model so use any
@@ -467,7 +432,11 @@ func (j *JIMM) ImportModel(ctx context.Context, user *openfga.User, controllerNa
 	if err != nil {
 		return errors.E(op, err)
 	}
-	defer modelAPI.ModelWatcherStop(ctx, watcherID)
+	defer func() {
+		if err := modelAPI.ModelWatcherStop(ctx, watcherID); err != nil {
+			zapctx.Error(ctx, "failed to stop model watcher", zap.Error(err))
+		}
+	}()
 
 	deltas, err := modelAPI.ModelWatcherNext(ctx, watcherID)
 	if err != nil {

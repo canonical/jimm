@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package cmd_test
 
@@ -7,6 +7,8 @@ import (
 	"fmt"
 
 	"github.com/juju/cmd/v3/cmdtesting"
+	jujucloud "github.com/juju/juju/cloud"
+	"github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	gc "gopkg.in/check.v1"
 
@@ -18,8 +20,6 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	jimmnames "github.com/canonical/jimm/v3/pkg/names"
-	jujucloud "github.com/juju/juju/cloud"
-	"github.com/juju/juju/rpc/params"
 )
 
 type updateCredentialsSuite struct {

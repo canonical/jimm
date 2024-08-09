@@ -1,4 +1,4 @@
-// Copyright 2020 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package jimm
 
@@ -56,9 +56,7 @@ func (j *JIMM) GetCloud(ctx context.Context, user *openfga.User, tag names.Cloud
 
 	accessLevel, err := j.GetUserCloudAccess(ctx, user, tag)
 	if err != nil {
-		if err != nil {
-			return dbmodel.Cloud{}, errors.E(op, err)
-		}
+		return dbmodel.Cloud{}, errors.E(op, err)
 	}
 
 	switch accessLevel {
@@ -406,25 +404,6 @@ func (j *JIMM) AddHostedCloud(ctx context.Context, user *openfga.User, tag names
 		)
 	}
 	return nil
-}
-
-func randomController() func(controllers []dbmodel.CloudRegionControllerPriority) (dbmodel.Controller, error) {
-	return func(controllers []dbmodel.CloudRegionControllerPriority) (dbmodel.Controller, error) {
-		shuffleRegionControllers(controllers)
-		return controllers[0].Controller, nil
-	}
-}
-
-func findController(controllerName string) func(controllers []dbmodel.CloudRegionControllerPriority) (dbmodel.Controller, error) {
-	return func(controllers []dbmodel.CloudRegionControllerPriority) (dbmodel.Controller, error) {
-		for _, crp := range controllers {
-			crp := crp
-			if crp.Controller.Name == controllerName {
-				return crp.Controller, nil
-			}
-		}
-		return dbmodel.Controller{}, errors.E("controller not found", errors.CodeNotFound)
-	}
 }
 
 // addControllerCloud creates the hosted cloud defined by the given tag and

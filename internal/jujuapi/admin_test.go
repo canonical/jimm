@@ -1,4 +1,4 @@
-// Copyright 2016 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package jujuapi_test
 
@@ -266,6 +266,8 @@ func (s *adminSuite) TestDeviceLogin(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, "failed to decode token.*")
 
 	// Test token base64 encoded passes authentication
+	//
+	//nolint:gosimple
 	err = conn.APICall("Admin", 4, "", "LoginWithSessionToken", params.LoginWithSessionTokenRequest{SessionToken: sessionTokenResp.SessionToken}, &loginResult)
 	c.Assert(err, gc.IsNil)
 	c.Assert(loginResult.UserInfo.Identity, gc.Equals, "user-"+user.Email)
@@ -336,7 +338,8 @@ func (s *adminSuite) TestLoginWithClientCredentials(c *gc.C) {
 
 	const (
 		// these are valid client credentials hardcoded into the jimm realm
-		validClientID     = "test-client-id"
+		validClientID = "test-client-id"
+		//nolint:gosec // Thinks credentials hardcoded.
 		validClientSecret = "2M2blFbO4GX4zfggQpivQSxwWX1XGgNf"
 	)
 

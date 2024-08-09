@@ -1,0 +1,90 @@
+# Golangci-lint configuration.
+#
+# If a line has a comment, it means it has been changed from the default.
+# This helps us understand what we're tweaking and why.
+
+run:
+  timeout: "5m" # Allow at least 5 minutes
+  issues-exit-code: 1
+  tests: true
+  allow-parallel-runners: false
+  allow-serial-runners: false
+  # go: "1.17" # Do not set a go limit
+
+issues:
+  exclude-use-default: true
+  exclude-case-sensitive: false
+  exclude-dirs-use-default: true
+  max-issues-per-linter: 50
+  max-same-issues: 3
+  new: false
+  fix: true
+  whole-files: false
+
+output:
+  print-issued-lines: true
+  print-linter-name: true
+  uniq-by-line: true
+  # path-prefix: # Not needed
+  show-stats: false
+  sort-results: true
+
+linters:
+  disable-all: true
+  enable:
+    # The following linters are enabled by default
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+
+    # The following linters are additional
+
+    # Bug based linters
+    - gosec
+    - sqlclosecheck
+    - reassign
+    - nilerr
+    - durationcheck
+    - bodyclose
+    # - contextcheck # Issue right now
+
+    # Style based linters
+    - promlinter
+    - gocritic
+    # - gocognit # To be fixed
+    - goheader
+    - importas
+    - gci
+
+linters-settings:
+  gosec:
+    exclude-generated: false
+    severity: low
+    confidence: low
+    excludes:
+      - G601 # Implicit memory aliasing in for loop. Fixed in Go1.22+, as such exclude.
+  gocognit:
+    min-complexity: 30
+  goheader:
+    template: |-
+      Copyright 2024 Canonical.
+  importas:
+    no-unaliased: false
+    no-extra-aliases: false
+    alias:
+      - pkg: github.com/juju/juju/rpc/params
+        alias: jujuparams
+      - pkg: github.com/canonical/jimm/v3/internal/openfga/names
+        alias: ofganames
+      - pkg: github.com/frankban/quicktest
+        alias: qt
+  gci:
+    skip-generated: true
+    custom-order: true
+    sections:
+      - standard
+      - default
+      - localmodule
