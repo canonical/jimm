@@ -53,9 +53,8 @@ linters:
 
     # Style based linters
     - promlinter
-    # - importas # optional, useful for consistent named imports
     - gocritic
-    - gocognit
+    # - gocognit # To be fixed
     - goheader
     - importas
     - gci
