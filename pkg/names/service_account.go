@@ -3,6 +3,7 @@
 package names
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -19,6 +20,11 @@ const (
 	// ServiceAccountDomain is the @domain suffix that service account IDs should
 	// have.
 	ServiceAccountDomain = "serviceaccount"
+)
+
+var (
+	// ErrInvalidClientID indicates an invalid client ID error.
+	ErrInvalidClientID = errors.New("invalid client ID")
 )
 
 // Service accounts are an OIDC/OAuth concept which allows for machine<->machine communication.
@@ -82,7 +88,7 @@ func EnsureValidServiceAccountId(id string) (string, error) {
 	}
 
 	if !IsValidServiceAccountId(id) {
-		return "", errors.E(errors.CodeBadRequest, "invalid client ID")
+		return "", ErrInvalidClientID
 	}
 	return id, nil
 }

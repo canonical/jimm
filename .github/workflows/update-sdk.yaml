@@ -31,7 +31,6 @@ jobs:
         repository: ${{ github.event.inputs.sdk-repo }}
         ref: ${{ github.event.inputs.sdk-version }}
         path: ./sdk
-        token: ${{ secrets.PAT }}
 
     - name: Setup Go
       uses: actions/setup-go@v5
@@ -46,11 +45,12 @@ jobs:
         SDK_VERSION: ${{ github.event.inputs.sdk-version }}
       run: |
         # Remove all in case some files are removed
-        rm -rf .[!.]* *
+        shopt -s nullglob
+        rm -rf .[!.git]* *
         cp -r $PROJECT/pkg/.[^.]* $PROJECT/pkg/* $PROJECT/go.mod .
 
         # Replace module references
-        find . -type f -exec sed -i "s|github.com/canonical/jimm/pkg|github.com/$SDK_REPO/$SDK_VERSION|" {} +
+        find . -type f -exec sed -i "s|github.com/canonical/jimm/v3/pkg|github.com/$SDK_REPO/$SDK_VERSION|" {} +
         sed -i "s|module .*|module github.com/$SDK_REPO/$SDK_VERSION|" go.mod
 
         # Needed to remove unused dependencies
@@ -59,7 +59,7 @@ jobs:
     - name: Create Pull Request
       uses: peter-evans/create-pull-request@v6
       with:
-        token: ${{ secrets.PAT }}
+        token: ${{ secrets.JIMM_GO_SDK_PAT }}
         path: ./sdk
         branch: update-sdk-${{ github.run_number }}
         title: Update SDK ${{ github.event.inputs.sdk-version }}
