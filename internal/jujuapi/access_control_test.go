@@ -461,8 +461,11 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 	for i, tc := range tagTests {
 		c.Logf("running test %d", i)
 		if i != 0 {
-			err = s.COFGAClient.RemoveRelation(ctx, tc.want)
-			c.Assert(err, gc.IsNil)
+			// Needed due to removing original added relations for this test.
+			// Without, we cannot add the relations.
+			//
+			//nolint:errcheck
+			s.COFGAClient.RemoveRelation(ctx, tc.want)
 		}
 		err := client.AddRelation(&apiparams.AddRelationRequest{
 			Tuples: []apiparams.RelationshipTuple{
