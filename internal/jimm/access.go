@@ -553,11 +553,18 @@ func (t *tagResolver) groupTag(ctx context.Context, db *db.Database) (*ofga.Enti
 	} else if t.trailer != "" {
 		entry.Name = t.trailer
 	}
+
 	err := db.GetGroup(ctx, &entry)
 	if err != nil {
 		return nil, errors.E(fmt.Sprintf("group %s not found", t.trailer))
 	}
-	return ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag(entry.UUID), t.relation), nil
+
+	gt, err := jimmnames.ParseGroupTag(entry.UUID)
+	if err != nil {
+		return nil, errors.E(err)
+	}
+
+	return ofganames.ConvertTagWithRelation(gt, t.relation), nil
 }
 
 func (t *tagResolver) controllerTag(ctx context.Context, jimmUUID string, db *db.Database) (*ofga.Entity, error) {
