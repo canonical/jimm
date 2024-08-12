@@ -574,7 +574,7 @@ func grantEveryoneAddModelAndSetupCloudControllerRelation(ctx context.Context, j
 		if err := j.grantEveryoneAddModelForCloud(ctx, cloud, cloudTag); err != nil {
 			return err
 		}
-		if err := j.addCloudControllerRelation(ctx, cloud, ctl); err != nil {
+		if err := j.addCloudControllerRelation(ctx, cloud, *ctl); err != nil {
 			return err
 		}
 	}
