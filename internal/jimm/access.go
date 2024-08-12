@@ -533,7 +533,12 @@ func (t *tagResolver) userTag(ctx context.Context) (*ofga.Entity, error) {
 		"Resolving JIMM tags to Juju tags for tag kind: user",
 		zap.String("user-name", t.trailer),
 	)
-	return ofganames.ConvertTagWithRelation(names.NewUserTag(t.trailer), t.relation), nil
+
+	ut, err := names.ParseUserTag(t.trailer)
+	if err != nil {
+		return nil, errors.E(err)
+	}
+	return ofganames.ConvertTagWithRelation(ut, t.relation), nil
 }
 
 func (t *tagResolver) groupTag(ctx context.Context, db *db.Database) (*ofga.Entity, error) {
@@ -625,16 +630,7 @@ func (t *tagResolver) applicationOfferTag(ctx context.Context, db *db.Database) 
 			zapctx.Debug(
 				ctx,
 				"failed to parse application offer url",
-				zap.String(
-					"url",
-					fmt.Sprintf(
-						"%s:%s/%s.%s",
-						t.controllerName,
-						t.userName,
-						t.modelName,
-						t.offerName,
-					),
-				),
+				zap.String("url", fmt.Sprintf("%s:%s/%s.%s", t.controllerName, t.userName, t.modelName, t.offerName)),
 				zaputil.Error(err),
 			)
 			return nil, errors.E("failed to parse offer url", err)
@@ -655,7 +651,11 @@ func (t *tagResolver) serviceAccountTag(ctx context.Context) (*ofga.Entity, erro
 		"Resolving JIMM tags to Juju tags for tag kind: serviceaccount",
 		zap.String("serviceaccount-name", t.trailer),
 	)
-	return ofganames.ConvertTagWithRelation(jimmnames.NewServiceAccountTag(t.trailer), t.relation), nil
+	st, err := jimmnames.ParseServiceAccountTag(t.trailer)
+	if err != nil {
+		return nil, errors.E(err)
+	}
+	return ofganames.ConvertTagWithRelation(st, t.relation), nil
 }
 
 // resolveTag resolves JIMM tag [of any kind available] (i.e., controller-mycontroller:alex@canonical.com/mymodel.myoffer)
