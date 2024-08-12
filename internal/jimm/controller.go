@@ -52,157 +52,49 @@ var (
 func (j *JIMM) AddController(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller) error {
 	const op = errors.Op("jimm.AddController")
 
-	if !user.JimmAdmin {
-		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	if err := j.checkJimmAdmin(user); err != nil {
+		return errors.E(op, err)
 	}
 
-	api, err := j.dial(ctx, ctl, names.ModelTag{})
+	api, err := j.dialController(ctx, ctl)
 	if err != nil {
-		zapctx.Error(ctx, "failed to dial the controller", zaputil.Error(err))
-		return errors.E(op, err, "failed to dial the controller")
+		return errors.E(op, err)
 	}
 	defer api.Close()
 
-	var ms jujuparams.ModelSummary
-	if err := api.ControllerModelSummary(ctx, &ms); err != nil {
-		zapctx.Error(ctx, "failed to get model summary", zaputil.Error(err))
-		return errors.E(op, err, "failed to get model summary")
-	}
-	ct, err := names.ParseCloudTag(ms.CloudTag)
-	if err != nil {
-		return errors.E(op, err, "failed to parse the cloud tag")
-	}
-	ctl.CloudName = ct.Id()
-	ctl.CloudRegion = ms.CloudRegion
-	// TODO(mhilton) add the controller model?
-
-	clouds, err := api.Clouds(ctx)
-	if err != nil {
-		return errors.E(op, err, "failed to fetch controller clouds")
-	}
-
-	var dbClouds []dbmodel.Cloud
-	for tag, cld := range clouds {
-		var cloud dbmodel.Cloud
-		cloud.FromJujuCloud(cld)
-		cloud.Name = tag.Id()
-		dbClouds = append(dbClouds, cloud)
-	}
-
-	credentialsStored := false
-	if j.CredentialStore != nil {
-		err := j.CredentialStore.PutControllerCredentials(ctx, ctl.Name, ctl.AdminIdentityName, ctl.AdminPassword)
-		if err != nil {
-			return errors.E(op, err, "failed to store controller credentials")
-		}
-		credentialsStored = true
-	}
-
-	err = j.Database.Transaction(func(tx *db.Database) error {
-		for i := range dbClouds {
-			cloud := dbmodel.Cloud{
-				Name: dbClouds[i].Name,
-			}
-			if err := tx.GetCloud(ctx, &cloud); err != nil {
-				if errors.ErrorCode(err) != errors.CodeNotFound {
-					zapctx.Error(ctx, "failed to fetch the cloud", zaputil.Error(err), zap.String("cloud-name", dbClouds[i].Name))
-					return err
-				}
-				err := tx.AddCloud(ctx, &dbClouds[i])
-				if err != nil && errors.ErrorCode(err) != errors.CodeAlreadyExists {
-					zapctx.Error(ctx, "failed to add cloud", zaputil.Error(err))
-					return err
-				}
-				if err := tx.GetCloud(ctx, &cloud); err != nil {
-					zapctx.Error(ctx, "failed to fetch the cloud", zaputil.Error(err), zap.String("cloud-name", dbClouds[i].Name))
-					return err
-				}
-			}
-			for _, reg := range dbClouds[i].Regions {
-				if cloud.Region(reg.Name).ID != 0 {
-					continue
-				}
-				reg.CloudName = cloud.Name
-				if err := tx.AddCloudRegion(ctx, &reg); err != nil {
-					zapctx.Error(ctx, "failed to add cloud region", zaputil.Error(err))
-					return err
-				}
-				cloud.Regions = append(cloud.Regions, reg)
-			}
-			for _, cr := range dbClouds[i].Regions {
-				reg := cloud.Region(cr.Name)
-				priority := dbmodel.CloudRegionControllerPrioritySupported
-				if cloud.Name == ctl.CloudName && cr.Name == ctl.CloudRegion {
-					priority = dbmodel.CloudRegionControllerPriorityDeployed
-				}
-				ctl.CloudRegions = append(ctl.CloudRegions, dbmodel.CloudRegionControllerPriority{
-					CloudRegion: reg,
-					Priority:    uint(priority),
-				})
-			}
-		}
-		// if we already stored controller credentials in CredentialStore
-		// we should not store them plain text in JIMM's DB.
-		if credentialsStored {
-			ctl.AdminIdentityName = ""
-			ctl.AdminPassword = ""
-		}
-		if err := tx.AddController(ctx, ctl); err != nil {
-			if errors.ErrorCode(err) == errors.CodeAlreadyExists {
-				zapctx.Error(ctx, "failed to add controller", zaputil.Error(err))
-				return errors.E(op, err, fmt.Sprintf("controller %q already exists", ctl.Name))
-			}
-			zapctx.Error(ctx, "failed to add controller", zaputil.Error(err))
-			return err
-		}
-		return nil
-	})
-
+	ms, err := getControllerModelSummary(ctx, api)
 	if err != nil {
 		return errors.E(op, err)
 	}
 
-	for _, cloud := range dbClouds {
-		// If this cloud is the one used by the controller model then
-		// it is available to all users. Other clouds require `juju grant-cloud` to add permissions.
-		if cloud.ResourceTag().String() == ms.CloudTag {
-			everyoneTag := names.NewUserTag(ofganames.EveryoneUser)
-			everyoneIdentity, err := dbmodel.NewIdentity(everyoneTag.Id())
-			if err != nil {
-				zapctx.Error(ctx, "failed to create identity model", zap.Error(err))
-				return errors.E(op, err)
-			}
-			everyone := openfga.NewUser(
-				everyoneIdentity,
-				j.OpenFGAClient,
-			)
-			if err := everyone.SetCloudAccess(ctx, cloud.ResourceTag(), ofganames.CanAddModelRelation); err != nil {
-				zapctx.Error(ctx, "failed to grant everyone add-model access", zap.Error(err))
-			}
-		}
-
-		// Add controller relation between the cloud and the added controller.
-		err = j.OpenFGAClient.AddCloudController(ctx, cloud.ResourceTag(), ctl.ResourceTag())
-		if err != nil {
-			zapctx.Error(
-				ctx,
-				"failed to add controller relation between controller and cloud",
-				zap.String("controller", ctl.ResourceTag().Id()),
-				zap.String("cloud", cloud.ResourceTag().Id()),
-				zap.Error(err),
-			)
-		}
+	ct, err := names.ParseCloudTag(ms.CloudTag)
+	if err != nil {
+		return errors.E(op, err)
 	}
 
-	// Finally add a controller relation between JIMM and the added controller.
-	err = j.OpenFGAClient.AddController(ctx, j.ResourceTag(), ctl.ResourceTag())
+	ctl.CloudName = ct.Id()
+	ctl.CloudRegion = ms.CloudRegion
+
+	dbClouds, err := fetchClouds(ctx, api)
 	if err != nil {
-		zapctx.Error(
-			ctx,
-			"failed to add controller relation between JIMM and controller",
-			zap.String("controller", ctl.ResourceTag().Id()),
-			zap.Error(err),
-		)
+		return errors.E(op, err)
+	}
+
+	credentialsStored, err := storeControllerCredentials(ctx, j, ctl)
+	if err != nil {
+		return errors.E(op, err)
+	}
+
+	if err := addCloudsAndController(ctx, j, ctl, dbClouds, credentialsStored); err != nil {
+		return errors.E(op, err)
+	}
+
+	if err := grantEveryoneAddModelAndSetupCloudControllerRelation(ctx, j, ctl, dbClouds, ms.CloudTag); err != nil {
+		return errors.E(op, err)
+	}
+
+	if err := j.addJIMMControllerRelation(ctx, ctl); err != nil {
+		return errors.E(op, err)
 	}
 
 	return nil
@@ -641,4 +533,165 @@ func (j *JIMM) InitiateMigration(ctx context.Context, user *openfga.User, spec j
 		return result, errors.E(op, err)
 	}
 	return result, nil
+}
+
+// addJIMMControllerRelation adds a controller relation between the JIMM controller
+// and another controller.
+func (j *JIMM) addJIMMControllerRelation(ctx context.Context, ctl *dbmodel.Controller) error {
+	err := j.OpenFGAClient.AddController(ctx, j.ResourceTag(), ctl.ResourceTag())
+	if err != nil {
+		zapctx.Error(
+			ctx,
+			"failed to add controller relation between JIMM and controller",
+			zap.String("controller", ctl.ResourceTag().Id()),
+			zap.Error(err),
+		)
+	}
+	return err
+}
+
+// grantEveryoneAddModelForCloud grants everyone the ability to add-model for this cloud.
+func (j *JIMM) grantEveryoneAddModelForCloud(ctx context.Context, cloud dbmodel.Cloud, cloudTag string) error {
+	if cloud.ResourceTag().String() == cloudTag {
+		everyoneTag := names.NewUserTag(ofganames.EveryoneUser)
+		everyoneIdentity, err := dbmodel.NewIdentity(everyoneTag.Id())
+		if err != nil {
+			zapctx.Error(ctx, "failed to create identity model", zap.Error(err))
+			return err
+		}
+		everyone := openfga.NewUser(everyoneIdentity, j.OpenFGAClient)
+		if err := everyone.SetCloudAccess(ctx, cloud.ResourceTag(), ofganames.CanAddModelRelation); err != nil {
+			zapctx.Error(ctx, "failed to grant everyone add-model access", zap.Error(err))
+		}
+	}
+	return nil
+}
+
+// grantEveryoneAddModelAndSetupCloudControllerRelation grants everyone add-model to the cloud
+// and then adds a cloud to controller relation.
+func grantEveryoneAddModelAndSetupCloudControllerRelation(ctx context.Context, j *JIMM, ctl *dbmodel.Controller, dbClouds []dbmodel.Cloud, cloudTag string) error {
+	for _, cloud := range dbClouds {
+		if err := j.grantEveryoneAddModelForCloud(ctx, cloud, cloudTag); err != nil {
+			return err
+		}
+		if err := j.addCloudControllerRelation(ctx, cloud, ctl); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// storeControllerCredentials stores the credentials for the controller in the configured credential store.
+func storeControllerCredentials(ctx context.Context, j *JIMM, ctl *dbmodel.Controller) (bool, error) {
+	if j.CredentialStore != nil {
+		err := j.CredentialStore.PutControllerCredentials(ctx, ctl.Name, ctl.AdminIdentityName, ctl.AdminPassword)
+		if err != nil {
+			return false, errors.E(err, "failed to store controller credentials")
+		}
+		return true, nil
+	}
+	return false, nil
+}
+
+// getControllerModelSummary gets the controller model summary for this API connection.
+func getControllerModelSummary(ctx context.Context, api API) (jujuparams.ModelSummary, error) {
+	var ms jujuparams.ModelSummary
+	if err := api.ControllerModelSummary(ctx, &ms); err != nil {
+		zapctx.Error(ctx, "failed to get model summary", zaputil.Error(err))
+		return ms, err
+	}
+	return ms, nil
+}
+
+// fetchClouds gets the clouds supported by the controller of this API connection
+// and maps them into a dbmodel.Cloud.
+func fetchClouds(ctx context.Context, api API) ([]dbmodel.Cloud, error) {
+	clouds, err := api.Clouds(ctx)
+	if err != nil {
+		return nil, errors.E(err, "failed to fetch controller clouds")
+	}
+
+	var dbClouds []dbmodel.Cloud
+	for tag, cld := range clouds {
+		var cloud dbmodel.Cloud
+		cloud.FromJujuCloud(cld)
+		cloud.Name = tag.Id()
+		dbClouds = append(dbClouds, cloud)
+	}
+	return dbClouds, nil
+}
+
+// addCloudsAndController adds the clouds supported by this controller AND the controller
+// to JIMM's database.
+func addCloudsAndController(ctx context.Context, j *JIMM, ctl *dbmodel.Controller, dbClouds []dbmodel.Cloud, credentialsStored bool) error {
+	return j.Database.Transaction(func(tx *db.Database) error {
+		if err := j.addClouds(ctx, tx, dbClouds, ctl); err != nil {
+			return err
+		}
+
+		if credentialsStored {
+			ctl.AdminIdentityName = ""
+			ctl.AdminPassword = ""
+		}
+
+		if err := tx.AddController(ctx, ctl); err != nil {
+			if errors.ErrorCode(err) == errors.CodeAlreadyExists {
+				zapctx.Error(ctx, "failed to add controller", zaputil.Error(err))
+				return errors.E(errors.CodeAlreadyExists, fmt.Sprintf("controller %q already exists", ctl.Name))
+			}
+			zapctx.Error(ctx, "failed to add controller", zaputil.Error(err))
+			return err
+		}
+		return nil
+	})
+}
+
+func (j *JIMM) addClouds(ctx context.Context, tx *db.Database, dbClouds []dbmodel.Cloud, ctl *dbmodel.Controller) error {
+	for i := range dbClouds {
+		cloud := dbmodel.Cloud{Name: dbClouds[i].Name}
+		if err := tx.GetCloud(ctx, &cloud); err != nil {
+			if errors.ErrorCode(err) != errors.CodeNotFound {
+				zapctx.Error(ctx, "failed to fetch the cloud", zaputil.Error(err), zap.String("cloud-name", dbClouds[i].Name))
+				return err
+			}
+			if err := tx.AddCloud(ctx, &dbClouds[i]); err != nil && errors.ErrorCode(err) != errors.CodeAlreadyExists {
+				zapctx.Error(ctx, "failed to add cloud", zaputil.Error(err))
+				return err
+			}
+			if err := tx.GetCloud(ctx, &cloud); err != nil {
+				zapctx.Error(ctx, "failed to fetch the cloud", zaputil.Error(err), zap.String("cloud-name", dbClouds[i].Name))
+				return err
+			}
+		}
+		if err := j.addCloudRegions(ctx, tx, dbClouds[i], cloud, ctl); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (j *JIMM) addCloudRegions(ctx context.Context, tx *db.Database, dbCloud dbmodel.Cloud, cloud dbmodel.Cloud, ctl *dbmodel.Controller) error {
+	for _, reg := range dbCloud.Regions {
+		if cloud.Region(reg.Name).ID != 0 {
+			continue
+		}
+		reg.CloudName = cloud.Name
+		if err := tx.AddCloudRegion(ctx, &reg); err != nil {
+			zapctx.Error(ctx, "failed to add cloud region", zaputil.Error(err))
+			return err
+		}
+		cloud.Regions = append(cloud.Regions, reg)
+	}
+	for _, cr := range dbCloud.Regions {
+		reg := cloud.Region(cr.Name)
+		priority := dbmodel.CloudRegionControllerPrioritySupported
+		if cloud.Name == ctl.CloudName && cr.Name == ctl.CloudRegion {
+			priority = dbmodel.CloudRegionControllerPriorityDeployed
+		}
+		ctl.CloudRegions = append(ctl.CloudRegions, dbmodel.CloudRegionControllerPriority{
+			CloudRegion: reg,
+			Priority:    uint(priority),
+		})
+	}
+	return nil
 }
