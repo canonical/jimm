@@ -450,7 +450,7 @@ func TestJWTGeneratorMakeToken(t *testing.T) {
 	}
 }
 
-func TestParseTag(t *testing.T) {
+func TestParseAndValidateTag(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
@@ -488,6 +488,17 @@ func TestParseTag(t *testing.T) {
 	c.Assert(tag.ID, qt.Equals, model.UUID.String)
 	c.Assert(tag.Kind.String(), qt.Equals, names.ModelTagKind)
 	c.Assert(tag.Relation.String(), qt.Equals, "administrator")
+
+	// JIMM tag only kind
+	kindTag := "model"
+	tag, err = j.ParseAndValidateTag(ctx, kindTag)
+	c.Assert(err, qt.IsNil)
+	c.Assert(tag.ID, qt.Equals, "")
+	c.Assert(tag.Kind.String(), qt.Equals, names.ModelTagKind)
+
+	// JIMM tag not valid
+	_, err = j.ParseAndValidateTag(ctx, "")
+	c.Assert(err, qt.ErrorMatches, "unknown tag kind")
 }
 
 func TestResolveJIMM(t *testing.T) {
