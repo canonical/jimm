@@ -58,7 +58,7 @@ func (j *JIMM) AddController(ctx context.Context, user *openfga.User, ctl *dbmod
 
 	api, err := j.dialController(ctx, ctl)
 	if err != nil {
-		return errors.E(op, err)
+		return errors.E(op, "failed to dial the controller", err)
 	}
 	defer api.Close()
 
