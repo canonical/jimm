@@ -16,8 +16,6 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/internal/jimm"
-	"github.com/canonical/jimm/v3/internal/jimm/credentials"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/servermon"
 	"github.com/canonical/jimm/v3/internal/utils"
@@ -60,12 +58,14 @@ type WebsocketConnectionWithMetadata struct {
 	ModelName      string
 }
 
-// JIMM represents the JIMM interface used by the proxy.
-type JIMM interface {
-	GetUser(ctx context.Context, identifier string) (*openfga.User, error)
-	UpdateUserLastLogin(ctx context.Context, identifier string) error
-	OAuthAuthenticationService() jimm.OAuthAuthenticator
-	GetCredentialStore() credentials.CredentialStore
+// LoginService represents the LoginService interface used by the proxy.
+// Currently this is a duplicate of the [jujuapi.LoginService].
+type LoginService interface {
+	LoginDevice(ctx context.Context) (*oauth2.DeviceAuthResponse, error)
+	GetDeviceSessionToken(ctx context.Context, deviceOAuthResponse *oauth2.DeviceAuthResponse) (string, error)
+	LoginClientCredentials(ctx context.Context, clientID string, clientSecret string) (*openfga.User, error)
+	LoginWithSessionToken(ctx context.Context, sessionToken string) (*openfga.User, error)
+	LoginWithSessionCookie(ctx context.Context, identityID string) (*openfga.User, error)
 }
 
 // ProxyHelpers contains all the necessary helpers for proxying a Juju client
@@ -75,7 +75,7 @@ type ProxyHelpers struct {
 	TokenGen                TokenGenerator
 	ConnectController       func(context.Context) (WebsocketConnectionWithMetadata, error)
 	AuditLog                func(*dbmodel.AuditLogEntry)
-	JIMM                    JIMM
+	LoginService            LoginService
 	AuthenticatedIdentityID string
 }
 
@@ -104,7 +104,7 @@ func ProxySockets(ctx context.Context, helpers ProxyHelpers) error {
 			tokenGen:                helpers.TokenGen,
 			auditLog:                helpers.AuditLog,
 			conversationId:          utils.NewConversationID(),
-			jimm:                    helpers.JIMM,
+			loginService:            helpers.LoginService,
 			authenticatedIdentityID: helpers.AuthenticatedIdentityID,
 		},
 		errChan:              errChan,
@@ -242,7 +242,7 @@ type modelProxy struct {
 	msgs                    *inflightMsgs
 	auditLog                func(*dbmodel.AuditLogEntry)
 	tokenGen                TokenGenerator
-	jimm                    JIMM
+	loginService            LoginService
 	modelName               string
 	conversationId          string
 	authenticatedIdentityID string
@@ -619,7 +619,7 @@ func (p *clientProxy) handleAdminFacade(ctx context.Context, msg *message) (clie
 	}
 	switch msg.Request {
 	case "LoginDevice":
-		deviceResponse, err := jimm.LoginDevice(ctx, p.jimm.OAuthAuthenticationService())
+		deviceResponse, err := p.loginService.LoginDevice(ctx)
 		if err != nil {
 			return errorFnc(err)
 		}
@@ -635,7 +635,7 @@ func (p *clientProxy) handleAdminFacade(ctx context.Context, msg *message) (clie
 		msg.Response = data
 		return msg, nil, nil
 	case "GetDeviceSessionToken":
-		sessionToken, err := jimm.GetDeviceSessionToken(ctx, p.jimm.OAuthAuthenticationService(), p.jimm.GetCredentialStore(), p.deviceOAuthResponse)
+		sessionToken, err := p.loginService.GetDeviceSessionToken(ctx, p.deviceOAuthResponse)
 		if err != nil {
 			return errorFnc(err)
 		}
@@ -654,18 +654,7 @@ func (p *clientProxy) handleAdminFacade(ctx context.Context, msg *message) (clie
 			return errorFnc(err)
 		}
 
-		// Verify the session token
-		token, err := p.jimm.OAuthAuthenticationService().VerifySessionToken(request.SessionToken)
-		if err != nil {
-			return errorFnc(err)
-		}
-		email := token.Subject()
-
-		user, err := p.jimm.GetUser(ctx, email)
-		if err != nil {
-			return errorFnc(err)
-		}
-		err = p.jimm.UpdateUserLastLogin(ctx, email)
+		user, err := p.loginService.LoginWithSessionToken(ctx, request.SessionToken)
 		if err != nil {
 			return errorFnc(err)
 		}
@@ -675,7 +664,7 @@ func (p *clientProxy) handleAdminFacade(ctx context.Context, msg *message) (clie
 			return errorFnc(err)
 		}
 		data, err := json.Marshal(params.LoginRequest{
-			AuthTag: names.NewUserTag(email).String(),
+			AuthTag: names.NewUserTag(user.Name).String(),
 			Token:   base64.StdEncoding.EncodeToString(jwt),
 		})
 		if err != nil {
@@ -692,16 +681,7 @@ func (p *clientProxy) handleAdminFacade(ctx context.Context, msg *message) (clie
 		if err != nil {
 			return errorFnc(err)
 		}
-		err = p.jimm.OAuthAuthenticationService().VerifyClientCredentials(ctx, request.ClientID, request.ClientSecret)
-		if err != nil {
-			return errorFnc(err)
-		}
-
-		user, err := p.jimm.GetUser(ctx, clientIdWithDomain)
-		if err != nil {
-			return errorFnc(err)
-		}
-		err = p.jimm.UpdateUserLastLogin(ctx, clientIdWithDomain)
+		user, err := p.loginService.LoginClientCredentials(ctx, request.ClientID, request.ClientSecret)
 		if err != nil {
 			return errorFnc(err)
 		}
@@ -719,14 +699,7 @@ func (p *clientProxy) handleAdminFacade(ctx context.Context, msg *message) (clie
 		}
 		return controllerLoginMessageFnc(data)
 	case "LoginWithSessionCookie":
-		if p.modelProxy.authenticatedIdentityID == "" {
-			return errorFnc(errors.E(errors.CodeUnauthorized))
-		}
-		user, err := p.jimm.GetUser(ctx, p.modelProxy.authenticatedIdentityID)
-		if err != nil {
-			return errorFnc(err)
-		}
-		err = p.jimm.UpdateUserLastLogin(ctx, p.modelProxy.authenticatedIdentityID)
+		user, err := p.loginService.LoginWithSessionCookie(ctx, p.modelProxy.authenticatedIdentityID)
 		if err != nil {
 			return errorFnc(err)
 		}

@@ -60,3 +60,17 @@ func (j *JIMM) dialController(ctx context.Context, ctl *dbmodel.Controller) (API
 	}
 	return api, nil
 }
+
+// UserLogin fetches a user based on their username and updates their last login time.
+func (j *JIMM) UserLogin(ctx context.Context, username string) (*openfga.User, error) {
+	const op = errors.Op("jimm.UserLogin")
+	user, err := j.GetUser(ctx, username)
+	if err != nil {
+		return nil, errors.E(op, err, errors.CodeUnauthorized)
+	}
+	err = j.UpdateUserLastLogin(ctx, username)
+	if err != nil {
+		return nil, errors.E(op, err, errors.CodeUnauthorized)
+	}
+	return user, nil
+}

@@ -151,7 +151,7 @@ func (s modelProxyServer) ServeWS(ctx context.Context, clientConn *websocket.Con
 		TokenGen:                &jwtGenerator,
 		ConnectController:       connectionFunc,
 		AuditLog:                auditLogger,
-		JIMM:                    s.jimm,
+		LoginService:            s.jimm,
 		AuthenticatedIdentityID: auth.SessionIdentityFromContext(ctx),
 	}
 	if err := jimmRPC.ProxySockets(ctx, proxyHelpers); err != nil {
