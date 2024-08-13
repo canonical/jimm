@@ -5,6 +5,7 @@ package jujuapi_test
 import (
 	"context"
 	"database/sql"
+	"slices"
 	"time"
 
 	petname "github.com/dustinkirkland/golang-petname"
@@ -20,6 +21,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/pkg/api"
+	"github.com/canonical/jimm/v3/pkg/api/params"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 	"github.com/canonical/jimm/v3/pkg/names"
 )
@@ -973,6 +975,12 @@ func (s *accessControlSuite) TestListRelationshipTuplesNoUUIDResolution(c *gc.C)
 	c.Assert(len(response.Errors), gc.Equals, 0)
 }
 
+func getGroupIndexByName(groups []params.Group, name string) int {
+	return slices.IndexFunc(groups, func(g params.Group) bool {
+		return g.Name == name
+	})
+}
+
 func (s *accessControlSuite) TestListRelationshipTuplesAfterDeletingGroup(c *gc.C) {
 	ctx := context.Background()
 	user, _, controller, model, applicationOffer, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
@@ -983,20 +991,25 @@ func (s *accessControlSuite) TestListRelationshipTuplesAfterDeletingGroup(c *gc.
 	_, err = client.AddGroup(&apiparams.AddGroupRequest{Name: "orange"})
 	c.Assert(err, jc.ErrorIsNil)
 
+	groups, _ := client.ListGroups()
+
+	yellowGroupUUID := groups[getGroupIndexByName(groups, "yellow")].UUID
+	orangeGroupUUID := groups[getGroupIndexByName(groups, "orange")].UUID
+
 	tuples := []apiparams.RelationshipTuple{{
-		Object:       "group-orange#member",
+		Object:       "group-" + orangeGroupUUID + "#member",
 		Relation:     "member",
-		TargetObject: "group-yellow",
+		TargetObject: "group-" + yellowGroupUUID,
 	}, {
 		Object:       "user-" + user.Name,
 		Relation:     "member",
-		TargetObject: "group-orange",
+		TargetObject: "group-" + orangeGroupUUID,
 	}, {
-		Object:       "group-yellow#member",
+		Object:       "group-" + yellowGroupUUID + "#member",
 		Relation:     "administrator",
 		TargetObject: "controller-" + controller.Name,
 	}, {
-		Object:       "group-orange#member",
+		Object:       "group-" + orangeGroupUUID + "#member",
 		Relation:     "administrator",
 		TargetObject: "applicationoffer-" + controller.Name + ":" + user.Name + "/" + model.Name + "." + applicationOffer.Name,
 	}}
@@ -1010,9 +1023,18 @@ func (s *accessControlSuite) TestListRelationshipTuplesAfterDeletingGroup(c *gc.
 	response, err := client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{ResolveUUIDs: true})
 	c.Assert(err, jc.ErrorIsNil)
 	// Create a new slice of tuples excluding the ones we expect to be deleted.
-	newTuples := []apiparams.RelationshipTuple{tuples[1], tuples[3]}
-	// first three tuples created during setup test
-	c.Assert(response.Tuples[12:], jc.DeepEquals, newTuples)
+	responseTuples := response.Tuples[12:]
+	c.Assert(responseTuples, gc.HasLen, 2)
+
+	expectedUserToGroupTuple := tuples[1]
+	expectedGroupToOfferTuple := tuples[3]
+
+	// Update the target to the group name
+	expectedUserToGroupTuple.TargetObject = "group-orange"
+	c.Assert(responseTuples[0], gc.DeepEquals, expectedUserToGroupTuple)
+	expectedGroupToOfferTuple.Object = "group-orange#member"
+	c.Assert(responseTuples[1], gc.DeepEquals, expectedGroupToOfferTuple)
+
 	c.Assert(len(response.Errors), gc.Equals, 0)
 }
 

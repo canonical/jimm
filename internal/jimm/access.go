@@ -534,11 +534,11 @@ func (t *tagResolver) userTag(ctx context.Context) (*ofga.Entity, error) {
 		zap.String("user-name", t.trailer),
 	)
 
-	ut, err := names.ParseUserTag(t.trailer)
-	if err != nil {
-		return nil, errors.E(err)
+	valid := names.IsValidUser(t.trailer)
+	if !valid {
+		return nil, errors.E("invalid user")
 	}
-	return ofganames.ConvertTagWithRelation(ut, t.relation), nil
+	return ofganames.ConvertTagWithRelation(names.NewUserTag(t.trailer), t.relation), nil
 }
 
 func (t *tagResolver) groupTag(ctx context.Context, db *db.Database) (*ofga.Entity, error) {
@@ -559,12 +559,7 @@ func (t *tagResolver) groupTag(ctx context.Context, db *db.Database) (*ofga.Enti
 		return nil, errors.E(fmt.Sprintf("group %s not found", t.trailer))
 	}
 
-	gt, err := jimmnames.ParseGroupTag(entry.UUID)
-	if err != nil {
-		return nil, errors.E(err)
-	}
-
-	return ofganames.ConvertTagWithRelation(gt, t.relation), nil
+	return ofganames.ConvertTagWithRelation(entry.ResourceTag(), t.relation), nil
 }
 
 func (t *tagResolver) controllerTag(ctx context.Context, jimmUUID string, db *db.Database) (*ofga.Entity, error) {
@@ -591,7 +586,7 @@ func (t *tagResolver) controllerTag(ctx context.Context, jimmUUID string, db *db
 	if err != nil {
 		return nil, errors.E("controller not found")
 	}
-	return ofganames.ConvertTagWithRelation(names.NewControllerTag(controller.UUID), t.relation), nil
+	return ofganames.ConvertTagWithRelation(controller.ResourceTag(), t.relation), nil
 }
 
 func (t *tagResolver) modelTag(ctx context.Context, db *db.Database) (*ofga.Entity, error) {
@@ -650,7 +645,7 @@ func (t *tagResolver) applicationOfferTag(ctx context.Context, db *db.Database) 
 		return nil, errors.E("application offer not found")
 	}
 
-	return ofganames.ConvertTagWithRelation(names.NewApplicationOfferTag(offer.UUID), t.relation), nil
+	return ofganames.ConvertTagWithRelation(offer.ResourceTag(), t.relation), nil
 }
 func (t *tagResolver) serviceAccountTag(ctx context.Context) (*ofga.Entity, error) {
 	zapctx.Debug(
