@@ -51,7 +51,7 @@ func (r *controllerRoot) LoginDevice(ctx context.Context) (params.LoginDeviceRes
 
 	deviceResponse, err := r.jimm.LoginDevice(ctx)
 	if err != nil {
-		return response, errors.E(op, err)
+		return response, errors.E(op, err, errors.CodeUnauthorized)
 	}
 	// NOTE: As this is on the controller root struct, and a new controller root
 	// is created per WS, it is EXPECTED that the subsequent call to GetDeviceSessionToken
@@ -75,7 +75,7 @@ func (r *controllerRoot) GetDeviceSessionToken(ctx context.Context) (params.GetD
 
 	token, err := r.jimm.GetDeviceSessionToken(ctx, r.deviceOAuthResponse)
 	if err != nil {
-		return response, errors.E(op, err)
+		return response, errors.E(op, err, errors.CodeUnauthorized)
 	}
 
 	response.SessionToken = token
@@ -93,7 +93,7 @@ func (r *controllerRoot) LoginWithSessionCookie(ctx context.Context) (jujuparams
 
 	user, err := r.jimm.LoginWithSessionCookie(ctx, r.identityId)
 	if err != nil {
-		return jujuparams.LoginResult{}, errors.E(op, err)
+		return jujuparams.LoginResult{}, errors.E(op, err, errors.CodeUnauthorized)
 	}
 
 	r.mu.Lock()

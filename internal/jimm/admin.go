@@ -15,7 +15,11 @@ import (
 // LoginDevice starts the device login flow.
 func (j *JIMM) LoginDevice(ctx context.Context) (*oauth2.DeviceAuthResponse, error) {
 	const op = errors.Op("jimm.LoginDevice")
-	return j.OAuthAuthenticator.Device(ctx)
+	resp, err := j.OAuthAuthenticator.Device(ctx)
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+	return resp, nil
 }
 
 // GetDeviceSessionToken polls an OIDC server while a user logs in and returns a session token scoped to the user's identity.
@@ -54,12 +58,12 @@ func (j *JIMM) LoginClientCredentials(ctx context.Context, clientID string, clie
 	const op = errors.Op("jimm.LoginClientCredentials")
 	clientIdWithDomain, err := names.EnsureValidServiceAccountId(clientID)
 	if err != nil {
-		return nil, errors.E("invalid client ID")
+		return nil, errors.E(op, "invalid client ID")
 	}
 
 	err = j.OAuthAuthenticator.VerifyClientCredentials(ctx, clientID, clientSecret)
 	if err != nil {
-		return nil, errors.E(op, err, errors.CodeUnauthorized)
+		return nil, errors.E(op, err)
 	}
 
 	return j.UserLogin(ctx, clientIdWithDomain)
@@ -70,7 +74,7 @@ func (j *JIMM) LoginWithSessionToken(ctx context.Context, sessionToken string) (
 	const op = errors.Op("jimm.LoginWithSessionToken")
 	jwtToken, err := j.OAuthAuthenticator.VerifySessionToken(sessionToken)
 	if err != nil {
-		return nil, errors.E(op, err, errors.CodeUnauthorized)
+		return nil, errors.E(op, err)
 	}
 
 	email := jwtToken.Subject()
@@ -81,7 +85,7 @@ func (j *JIMM) LoginWithSessionToken(ctx context.Context, sessionToken string) (
 func (j *JIMM) LoginWithSessionCookie(ctx context.Context, identityID string) (*openfga.User, error) {
 	const op = errors.Op("jimm.LoginWithSessionCookie")
 	if identityID == "" {
-		return nil, errors.E(op, "missing identity ID")
+		return nil, errors.E(op, "missing cookie identity")
 	}
 	return j.UserLogin(ctx, identityID)
 }

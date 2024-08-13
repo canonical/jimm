@@ -175,11 +175,7 @@ func (s *adminSuite) TestBrowserLoginNoCookie(c *gc.C) {
 
 	lr := &jujuparams.LoginResult{}
 	err := conn.APICall("Admin", 4, "", "LoginWithSessionCookie", nil, lr)
-	c.Assert(
-		err,
-		gc.ErrorMatches,
-		"authentication failed",
-	)
+	c.Assert(err, gc.ErrorMatches, `missing cookie identity \(unauthorized access\)`)
 }
 
 // TestDeviceLogin takes a test user through the flow of logging into jimm
