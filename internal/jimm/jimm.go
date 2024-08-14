@@ -31,7 +31,6 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/pubsub"
-	"github.com/canonical/jimm/v3/pkg/api/params"
 )
 
 var (
@@ -456,31 +455,16 @@ func (j *JIMM) FindAuditEvents(ctx context.Context, user *openfga.User, filter d
 // ControllerInfo returns info about a controller connected to JIMM.
 // If name is "jimm" or empty it will return info about JIMM itself.
 // Note that JIMM's controller name is "jaas" currently kept that way purely for historical
-// reasons, this can likely be changed going when a better name is decided.
-func (j *JIMM) ControllerInfo(ctx context.Context, name string) (params.ControllerInfo, error) {
+// reasons, this can possibly be changed going when a better name is decided.
+func (j *JIMM) ControllerInfo(ctx context.Context, name string) (*dbmodel.Controller, error) {
 	const op = errors.Op("jimm.ListControllers")
-	if name == "" || strings.ToLower(name) == "jimm" {
-		srvVersion, err := j.EarliestControllerVersion(ctx)
-		if err != nil {
-			return params.ControllerInfo{}, errors.E(op, err)
-		}
-		return params.ControllerInfo{
-			Name: "jaas",
-			UUID: j.UUID,
-			// TODO(mhilton)enable setting the public address.
-			AgentVersion: srvVersion.String(),
-			Status: jujuparams.EntityStatus{
-				Status: "available",
-			},
-		}, nil
-	}
 	ctl := dbmodel.Controller{
 		Name: name,
 	}
 	if err := j.Database.GetController(ctx, &ctl); err != nil {
-		return params.ControllerInfo{}, errors.E(op, err)
+		return nil, errors.E(op, err)
 	}
-	return ctl.ToAPIControllerInfo(), nil
+	return &ctl, nil
 }
 
 // ListControllers returns a list of controllers the user has access to.

@@ -20,6 +20,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jujuapi/rpc"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
+	"github.com/canonical/jimm/v3/pkg/api/params"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
@@ -210,11 +211,20 @@ func (r *controllerRoot) ListControllers(ctx context.Context) (apiparams.ListCon
 	if !r.user.JimmAdmin {
 		// if the user isn't a controller admin return JAAS
 		// itself as the only controller.
-		jimmCtrl, err := r.jimm.ControllerInfo(ctx, "jimm")
+		srvVersion, err := r.jimm.EarliestControllerVersion(ctx)
 		if err != nil {
 			return apiparams.ListControllersResponse{}, errors.E(op, err)
 		}
-		controllers := []apiparams.ControllerInfo{jimmCtrl}
+		jimmCtl := params.ControllerInfo{
+			Name: "jaas",
+			UUID: r.params.ControllerUUID,
+			// TODO(mhilton)enable setting the public address.
+			AgentVersion: srvVersion.String(),
+			Status: jujuparams.EntityStatus{
+				Status: "available",
+			},
+		}
+		controllers := []apiparams.ControllerInfo{jimmCtl}
 		return apiparams.ListControllersResponse{Controllers: controllers}, nil
 	}
 	dbControllers, err := r.jimm.ListControllers(ctx, r.user)
@@ -242,7 +252,7 @@ func (r *controllerRoot) RemoveController(ctx context.Context, req apiparams.Rem
 	if err := r.jimm.RemoveController(ctx, r.user, req.Name, req.Force); err != nil {
 		return apiparams.ControllerInfo{}, errors.E(op, err)
 	}
-	return ctl, nil
+	return ctl.ToAPIControllerInfo(), nil
 }
 
 // SetControllerDeprecated sets the deprecated status of a controller.
@@ -256,7 +266,7 @@ func (r *controllerRoot) SetControllerDeprecated(ctx context.Context, req apipar
 	if err != nil {
 		return apiparams.ControllerInfo{}, errors.E(op, err)
 	}
-	return ctl, nil
+	return ctl.ToAPIControllerInfo(), nil
 }
 
 // maxLimit is the maximum number of audit-log entries that will be

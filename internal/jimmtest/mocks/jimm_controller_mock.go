@@ -6,7 +6,6 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/openfga"
-	"github.com/canonical/jimm/v3/pkg/api/params"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/version"
 )
@@ -14,7 +13,7 @@ import (
 // ControllerService is an implementation of the jujuapi.ControllerService interface.
 type ControllerService struct {
 	AddController_             func(ctx context.Context, u *openfga.User, ctl *dbmodel.Controller) error
-	ControllerInfo_            func(ctx context.Context, name string) (params.ControllerInfo, error)
+	ControllerInfo_            func(ctx context.Context, name string) (*dbmodel.Controller, error)
 	GetControllerConfig_       func(ctx context.Context, u *dbmodel.Identity) (*dbmodel.ControllerConfig, error)
 	EarliestControllerVersion_ func(ctx context.Context) (version.Number, error)
 	ListControllers_           func(ctx context.Context, user *openfga.User) ([]dbmodel.Controller, error)
@@ -30,9 +29,9 @@ func (j *ControllerService) AddController(ctx context.Context, u *openfga.User, 
 	return j.AddController_(ctx, u, ctl)
 }
 
-func (j *ControllerService) ControllerInfo(ctx context.Context, name string) (params.ControllerInfo, error) {
+func (j *ControllerService) ControllerInfo(ctx context.Context, name string) (*dbmodel.Controller, error) {
 	if j.ControllerInfo_ == nil {
-		return params.ControllerInfo{}, errors.E(errors.CodeNotImplemented)
+		return nil, errors.E(errors.CodeNotImplemented)
 	}
 	return j.ControllerInfo_(ctx, name)
 }
