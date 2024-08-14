@@ -16,6 +16,7 @@ import (
 	"github.com/canonical/jimm/v3/pkg/api/params"
 )
 
+// LoginService defines the set of methods used for login to JIMM.
 type LoginService interface {
 	// LoginDevice is step 1 in the device flow and returns the OIDC server that the client should use for login.
 	LoginDevice(ctx context.Context) (*oauth2.DeviceAuthResponse, error)

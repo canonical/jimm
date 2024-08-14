@@ -92,6 +92,10 @@ func ProxySockets(ctx context.Context, helpers ProxyHelpers) error {
 		zapctx.Error(ctx, "Missing audit log function")
 		return errors.E(op, "Missing audit log function")
 	}
+	if helpers.LoginService == nil {
+		zapctx.Error(ctx, "Missing login service function")
+		return errors.E(op, "Missing login service function")
+	}
 	errChan := make(chan error, 2)
 	msgInFlight := inflightMsgs{messages: make(map[uint64]*message)}
 	client := writeLockConn{conn: helpers.ConnClient}

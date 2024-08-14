@@ -65,7 +65,6 @@ type JIMM struct {
 	GetControllerConfig_               func(ctx context.Context, u *dbmodel.Identity) (*dbmodel.ControllerConfig, error)
 	GetCredentialStore_                func() jimmcreds.CredentialStore
 	GetJimmControllerAccess_           func(ctx context.Context, user *openfga.User, tag names.UserTag) (string, error)
-	GetUser_                           func(ctx context.Context, username string) (*openfga.User, error)
 	GetUserCloudAccess_                func(ctx context.Context, user *openfga.User, cloud names.CloudTag) (string, error)
 	GetUserControllerAccess_           func(ctx context.Context, user *openfga.User, controller names.ControllerTag) (string, error)
 	GetUserModelAccess_                func(ctx context.Context, user *openfga.User, model names.ModelTag) (string, error)
@@ -112,6 +111,7 @@ type JIMM struct {
 	UpdateCloudCredential_             func(ctx context.Context, u *openfga.User, args jimm.UpdateCloudCredentialArgs) ([]jujuparams.UpdateCredentialModelResult, error)
 	UpdateMigratedModel_               func(ctx context.Context, user *openfga.User, modelTag names.ModelTag, targetControllerName string) error
 	UpdateUserLastLogin_               func(ctx context.Context, identifier string) error
+	UserLogin_                         func(ctx context.Context, identityName string) (*openfga.User, error)
 	ValidateModelUpgrade_              func(ctx context.Context, u *openfga.User, mt names.ModelTag, force bool) error
 	WatchAllModelSummaries_            func(ctx context.Context, controller *dbmodel.Controller) (_ func() error, err error)
 }
@@ -322,12 +322,6 @@ func (j *JIMM) GetJimmControllerAccess(ctx context.Context, user *openfga.User, 
 		return "", errors.E(errors.CodeNotImplemented)
 	}
 	return j.GetJimmControllerAccess_(ctx, user, tag)
-}
-func (j *JIMM) GetUser(ctx context.Context, username string) (*openfga.User, error) {
-	if j.GetUser_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
-	}
-	return j.GetUser_(ctx, username)
 }
 func (j *JIMM) GetUserCloudAccess(ctx context.Context, user *openfga.User, cloud names.CloudTag) (string, error) {
 	if j.GetUserCloudAccess_ == nil {
@@ -600,6 +594,12 @@ func (j *JIMM) UpdateUserLastLogin(ctx context.Context, identifier string) error
 		return errors.E(errors.CodeNotImplemented)
 	}
 	return j.UpdateUserLastLogin(ctx, identifier)
+}
+func (j *JIMM) UserLogin(ctx context.Context, identityName string) (*openfga.User, error) {
+	if j.UserLogin_ == nil {
+		return nil, errors.E(errors.CodeNotImplemented)
+	}
+	return j.UserLogin_(ctx, identityName)
 }
 func (j *JIMM) IdentityModelDefaults(ctx context.Context, user *dbmodel.Identity) (map[string]interface{}, error) {
 	if j.IdentityModelDefaults_ == nil {
