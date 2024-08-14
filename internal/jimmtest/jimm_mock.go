@@ -110,7 +110,6 @@ type JIMM struct {
 	UpdateCloud_                       func(ctx context.Context, u *openfga.User, ct names.CloudTag, cloud jujuparams.Cloud) error
 	UpdateCloudCredential_             func(ctx context.Context, u *openfga.User, args jimm.UpdateCloudCredentialArgs) ([]jujuparams.UpdateCredentialModelResult, error)
 	UpdateMigratedModel_               func(ctx context.Context, user *openfga.User, modelTag names.ModelTag, targetControllerName string) error
-	UpdateUserLastLogin_               func(ctx context.Context, identifier string) error
 	UserLogin_                         func(ctx context.Context, identityName string) (*openfga.User, error)
 	ValidateModelUpgrade_              func(ctx context.Context, u *openfga.User, mt names.ModelTag, force bool) error
 	WatchAllModelSummaries_            func(ctx context.Context, controller *dbmodel.Controller) (_ func() error, err error)
@@ -588,12 +587,6 @@ func (j *JIMM) UpdateMigratedModel(ctx context.Context, user *openfga.User, mode
 		return errors.E(errors.CodeNotImplemented)
 	}
 	return j.UpdateMigratedModel_(ctx, user, modelTag, targetControllerName)
-}
-func (j *JIMM) UpdateUserLastLogin(ctx context.Context, identifier string) error {
-	if j.UpdateUserLastLogin_ == nil {
-		return errors.E(errors.CodeNotImplemented)
-	}
-	return j.UpdateUserLastLogin(ctx, identifier)
 }
 func (j *JIMM) UserLogin(ctx context.Context, identityName string) (*openfga.User, error) {
 	if j.UserLogin_ == nil {
