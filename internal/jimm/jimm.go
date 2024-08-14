@@ -453,9 +453,6 @@ func (j *JIMM) FindAuditEvents(ctx context.Context, user *openfga.User, filter d
 }
 
 // ControllerInfo returns info about a controller connected to JIMM.
-// If name is "jimm" or empty it will return info about JIMM itself.
-// Note that JIMM's controller name is "jaas" currently kept that way purely for historical
-// reasons, this can possibly be changed going when a better name is decided.
 func (j *JIMM) ControllerInfo(ctx context.Context, name string) (*dbmodel.Controller, error) {
 	const op = errors.Op("jimm.ListControllers")
 	ctl := dbmodel.Controller{

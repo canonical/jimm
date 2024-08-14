@@ -205,6 +205,8 @@ func (r *controllerRoot) AddController(ctx context.Context, req apiparams.AddCon
 
 // ListControllers returns the list of juju controllers hosting models
 // as part of this JAAS system.
+// If the user is not an admin, they will only receive information about
+// JIMM itself - note that the controller name returned is "jaas".
 func (r *controllerRoot) ListControllers(ctx context.Context) (apiparams.ListControllersResponse, error) {
 	const op = errors.Op("jujuapi.ListControllersV3")
 
