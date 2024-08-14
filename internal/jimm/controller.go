@@ -83,6 +83,8 @@ func (j *JIMM) AddController(ctx context.Context, user *openfga.User, ctl *dbmod
 
 	dbClouds := convertJujuCloudsToDbClouds(clouds)
 
+	// TODO(ale8k): This shouldn't be necessary to check, but tests need updating
+	// to set insecure credential store explicitly.
 	if j.CredentialStore != nil {
 		err := j.CredentialStore.PutControllerCredentials(ctx, ctl.Name, ctl.AdminIdentityName, ctl.AdminPassword)
 		if err != nil {

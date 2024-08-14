@@ -653,11 +653,11 @@ func (t *tagResolver) serviceAccountTag(ctx context.Context) (*ofga.Entity, erro
 		"Resolving JIMM tags to Juju tags for tag kind: serviceaccount",
 		zap.String("serviceaccount-name", t.trailer),
 	)
-	st, err := jimmnames.ParseServiceAccountTag(t.trailer)
-	if err != nil {
-		return nil, errors.E(err)
+	if !jimmnames.IsValidServiceAccountId(t.trailer) {
+		return nil, errors.E("invalid service account id")
 	}
-	return ofganames.ConvertTagWithRelation(st, t.relation), nil
+
+	return ofganames.ConvertTagWithRelation(jimmnames.NewServiceAccountTag(t.trailer), t.relation), nil
 }
 
 // resolveTag resolves JIMM tag [of any kind available] (i.e., controller-mycontroller:alex@canonical.com/mymodel.myoffer)
