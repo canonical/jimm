@@ -58,7 +58,7 @@ func (j *JIMM) AddController(ctx context.Context, user *openfga.User, ctl *dbmod
 
 	api, err := j.dialController(ctx, ctl)
 	if err != nil {
-		return err
+		return errors.E(op, "failed to dial the controller", err)
 	}
 	defer api.Close()
 
@@ -83,13 +83,11 @@ func (j *JIMM) AddController(ctx context.Context, user *openfga.User, ctl *dbmod
 
 	dbClouds := convertJujuCloudsToDbClouds(clouds)
 
-	credentialsStored := false
 	if j.CredentialStore != nil {
 		err := j.CredentialStore.PutControllerCredentials(ctx, ctl.Name, ctl.AdminIdentityName, ctl.AdminPassword)
 		if err != nil {
 			return errors.E(op, err, "failed to store controller credentials")
 		}
-		credentialsStored = true
 	}
 
 	err = j.Database.Transaction(func(tx *db.Database) error {
@@ -135,12 +133,11 @@ func (j *JIMM) AddController(ctx context.Context, user *openfga.User, ctl *dbmod
 				})
 			}
 		}
-		// if we already stored controller credentials in CredentialStore
-		// we should not store them plain text in JIMM's DB.
-		if credentialsStored {
-			ctl.AdminIdentityName = ""
-			ctl.AdminPassword = ""
-		}
+		// Do not store controller credentials, they're in our "CredentialStore".
+		// whether that be Vault or Postgres.
+		ctl.AdminIdentityName = ""
+		ctl.AdminPassword = ""
+
 		if err := tx.AddController(ctx, ctl); err != nil {
 			if errors.ErrorCode(err) == errors.CodeAlreadyExists {
 				zapctx.Error(ctx, "failed to add controller", zaputil.Error(err))
