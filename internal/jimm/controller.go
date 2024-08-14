@@ -62,16 +62,17 @@ func (j *JIMM) AddController(ctx context.Context, user *openfga.User, ctl *dbmod
 	}
 	defer api.Close()
 
-	modelSummary, err := getControllerModelSummary(ctx, op, api)
+	modelSummary, err := getControllerModelSummary(ctx, api)
 	if err != nil {
-		return err
+		return errors.E(op, err, "failed to get model summary")
 	}
 
-	ct, err := names.ParseCloudTag(modelSummary.CloudTag)
+	cloudName, err := getCloudName(modelSummary)
 	if err != nil {
 		return errors.E(op, err, "failed to parse the cloud tag")
 	}
-	ctl.CloudName = ct.Id()
+
+	ctl.CloudName = cloudName
 	ctl.CloudRegion = modelSummary.CloudRegion
 	// TODO(mhilton) add the controller model?
 
@@ -80,13 +81,7 @@ func (j *JIMM) AddController(ctx context.Context, user *openfga.User, ctl *dbmod
 		return errors.E(op, err, "failed to fetch controller clouds")
 	}
 
-	var dbClouds []dbmodel.Cloud
-	for tag, cld := range clouds {
-		var cloud dbmodel.Cloud
-		cloud.FromJujuCloud(cld)
-		cloud.Name = tag.Id()
-		dbClouds = append(dbClouds, cloud)
-	}
+	dbClouds := convertJujuCloudsToDbClouds(clouds)
 
 	credentialsStored := false
 	if j.CredentialStore != nil {
@@ -207,14 +202,33 @@ func (j *JIMM) AddController(ctx context.Context, user *openfga.User, ctl *dbmod
 	return nil
 }
 
+func convertJujuCloudsToDbClouds(clouds map[names.CloudTag]jujuparams.Cloud) []dbmodel.Cloud {
+	var dbClouds []dbmodel.Cloud
+	for tag, cld := range clouds {
+		var cloud dbmodel.Cloud
+		cloud.FromJujuCloud(cld)
+		cloud.Name = tag.Id()
+		dbClouds = append(dbClouds, cloud)
+	}
+	return dbClouds
+}
+
 // getControllerModelSummary returns the controllers model summary.
-func getControllerModelSummary(ctx context.Context, op errors.Op, api API) (jujuparams.ModelSummary, error) {
+func getControllerModelSummary(ctx context.Context, api API) (jujuparams.ModelSummary, error) {
 	var ms jujuparams.ModelSummary
 	if err := api.ControllerModelSummary(ctx, &ms); err != nil {
 		zapctx.Error(ctx, "failed to get model summary", zaputil.Error(err))
-		return ms, errors.E(op, err, "failed to get model summary")
+		return ms, err
 	}
 	return ms, nil
+}
+
+func getCloudName(modelSummary jujuparams.ModelSummary) (string, error) {
+	cloudTag, err := names.ParseCloudTag(modelSummary.CloudTag)
+	if err != nil {
+		return "", err
+	}
+	return cloudTag.Id(), nil
 }
 
 // EarliestControllerVersion returns the earliest agent version
