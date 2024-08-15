@@ -140,6 +140,5 @@ func TestWSHandlerAuthFailsServer(t *testing.T) {
 	c.Assert(httpResp.StatusCode, qt.Equals, http.StatusUnauthorized)
 	bodyBytes, err := io.ReadAll(httpResp.Body)
 	c.Assert(err, qt.IsNil)
-	defer httpResp.Body.Close()
 	c.Assert(string(bodyBytes), qt.Equals, "authentication failed")
 }

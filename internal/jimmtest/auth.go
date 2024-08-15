@@ -198,6 +198,7 @@ func NewUserSessionLogin(c SimpleTester, username string) api.LoginProvider {
 	return api.NewSessionTokenLoginProvider(b64Token, nil, nil)
 }
 
+// ConvertUsernameToEmail appends an "@canonical.com" domain to a string if it doesn't already contain a domain.
 func ConvertUsernameToEmail(username string) string {
 	if !strings.Contains(username, "@") {
 		return username + "@canonical.com"
