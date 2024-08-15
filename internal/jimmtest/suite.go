@@ -1,4 +1,4 @@
-// Copyright 2020 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package jimmtest
 
@@ -6,6 +6,7 @@ import (
 	"context"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -63,6 +64,7 @@ type JIMMSuite struct {
 	Server         *httptest.Server
 	cancel         context.CancelFunc
 	deviceFlowChan chan string
+	databaseName   string
 }
 
 func (s *JIMMSuite) SetUpTest(c *gc.C) {
@@ -70,7 +72,8 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 	s.OFGAClient, s.COFGAClient, s.COFGAParams, err = SetupTestOFGAClient(c.TestName())
 	c.Assert(err, gc.IsNil)
 
-	pgdb := PostgresDB(GocheckTester{c}, nil)
+	pgdb, databaseName := PostgresDBWithDbName(GocheckTester{c}, nil)
+	s.databaseName = databaseName
 
 	// Setup OpenFGA.
 	s.JIMM = &jimm.JIMM{
@@ -150,6 +153,14 @@ func (s *JIMMSuite) TearDownTest(c *gc.C) {
 	}
 	if err := s.JIMM.Database.Close(); err != nil {
 		c.Logf("failed to close database connections at tear down: %s", err)
+	}
+	// Only delete the DB after closing connections to it.
+	_, skipCleanup := os.LookupEnv("NO_DB_CLEANUP")
+	if !skipCleanup {
+		err := DeleteDatabase(s.databaseName)
+		if err != nil {
+			c.Logf("failed to delete database (%s): %s", s.databaseName, err)
+		}
 	}
 }
 

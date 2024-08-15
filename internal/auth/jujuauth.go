@@ -1,4 +1,4 @@
-// Copyright 2021 canonical.
+// Copyright 2024 Canonical.
 
 package auth
 

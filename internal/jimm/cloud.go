@@ -1,4 +1,4 @@
-// Copyright 2020 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package jimm
 
@@ -56,9 +56,7 @@ func (j *JIMM) GetCloud(ctx context.Context, user *openfga.User, tag names.Cloud
 
 	accessLevel, err := j.GetUserCloudAccess(ctx, user, tag)
 	if err != nil {
-		if err != nil {
-			return dbmodel.Cloud{}, errors.E(op, err)
-		}
+		return dbmodel.Cloud{}, errors.E(op, err)
 	}
 
 	switch accessLevel {
@@ -186,106 +184,33 @@ var DefaultReservedCloudNames = []string{
 func (j *JIMM) AddCloudToController(ctx context.Context, user *openfga.User, controllerName string, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error {
 	const op = errors.Op("jimm.AddCloudToController")
 
-	controller := dbmodel.Controller{
-		Name: controllerName,
-	}
-	err := j.Database.GetController(ctx, &controller)
-	if err != nil {
-		return errors.E(op, errors.CodeNotFound, "controller not found")
-	}
-
-	isAdministrator, err := openfga.IsAdministrator(ctx, user, controller.ResourceTag())
+	controller, err := j.getControllerByName(ctx, controllerName)
 	if err != nil {
 		return errors.E(op, err)
 	}
 
-	if !isAdministrator {
-		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	if err := j.checkControllerAdminAccess(ctx, user, controller); err != nil {
+		return errors.E(op, err)
 	}
 
-	// Ensure the new cloud could not mask the name of a known public cloud.
-	reservedNames := j.ReservedCloudNames
-	if len(reservedNames) == 0 {
-		reservedNames = DefaultReservedCloudNames
-	}
-	for _, n := range reservedNames {
-		if tag.Id() == n {
-			return errors.E(op, errors.CodeAlreadyExists, fmt.Sprintf("cloud %q already exists", tag.Id()))
-		}
+	if err := checkReservedCloudNames(tag, j.ReservedCloudNames); err != nil {
+		return errors.E(op, err)
 	}
 
-	if cloud.HostCloudRegion != "" {
-		parts := strings.SplitN(cloud.HostCloudRegion, "/", 2)
-		if len(parts) != 2 || parts[0] == "" {
-			return errors.E(op, errors.CodeIncompatibleClouds, fmt.Sprintf("cloud host region %q has invalid cloud/region format", cloud.HostCloudRegion))
-		}
-		region, err := j.Database.FindRegion(ctx, parts[0], parts[1])
-		if err != nil {
-			if errors.ErrorCode(err) == errors.CodeNotFound {
-				return errors.E(op, err, errors.CodeIncompatibleClouds, fmt.Sprintf("unable to find cloud/region %q", cloud.HostCloudRegion))
-			}
-			return errors.E(op, err)
-		}
-		allowedAddModel, err := user.IsAllowedAddModel(ctx, region.Cloud.ResourceTag())
-		if err != nil {
-			return errors.E(op, err)
-		}
-
-		if !allowedAddModel {
-			return errors.E(op, errors.CodeUnauthorized, fmt.Sprintf("missing access to %q", cloud.HostCloudRegion))
-		}
-
-		if region.Cloud.HostCloudRegion != "" {
-			// Do not support creating a new cloud on an already hosted
-			// cloud.
-			return errors.E(op, errors.CodeIncompatibleClouds, fmt.Sprintf("cloud already hosted %q", cloud.HostCloudRegion))
-		}
-
-		found := false
-		for _, rc := range region.Controllers {
-			if rc.Controller.Name == controllerName {
-				found = true
-				break
-			}
-		}
-		if !found {
-			return errors.E(op, errors.CodeNotFound, "controller not found")
-		}
+	if err := validateCloudRegion(ctx, &j.Database, user, cloud, controllerName); err != nil {
+		return errors.E(op, err)
 	}
 
-	var dbCloud dbmodel.Cloud
-	dbCloud.FromJujuCloud(cloud)
-	dbCloud.Name = tag.Id()
-
-	ccloud, err := j.addControllerCloud(ctx, &controller, user.ResourceTag(), tag, cloud, force)
+	dbCloud, err := j.addCloudToDatabase(ctx, controller, user, tag, cloud, force)
 	if err != nil {
 		return errors.E(op, err)
 	}
 
-	dbCloud.FromJujuCloud(*ccloud)
-	for i := range dbCloud.Regions {
-		dbCloud.Regions[i].Controllers = []dbmodel.CloudRegionControllerPriority{{
-			ControllerID: controller.ID,
-			Priority:     dbmodel.CloudRegionControllerPrioritySupported,
-		}}
-	}
-	if err := j.Database.AddCloud(ctx, &dbCloud); err != nil {
+	// TODO(ale8k): We've added the cloud to the db, but the access failed.
+	// This call needs to be idempotent.
+	if err := j.addCloudControllerRelation(ctx, dbCloud, controller); err != nil {
 		return errors.E(op, err)
 	}
-
-	err = j.OpenFGAClient.AddCloudController(ctx, dbCloud.ResourceTag(), controller.ResourceTag())
-	if err != nil {
-		zapctx.Error(
-			ctx,
-			"failed to add controller relation between controller and cloud",
-			zap.String("controller", controller.ResourceTag().Id()),
-			zap.String("cloud", dbCloud.ResourceTag().Id()),
-			zap.Error(err),
-		)
-	}
-
-	// TODO(Kian) CSS-6081 Give user access to the cloud here and potentially everyone.
-
 	return nil
 }
 
@@ -406,25 +331,6 @@ func (j *JIMM) AddHostedCloud(ctx context.Context, user *openfga.User, tag names
 		)
 	}
 	return nil
-}
-
-func randomController() func(controllers []dbmodel.CloudRegionControllerPriority) (dbmodel.Controller, error) {
-	return func(controllers []dbmodel.CloudRegionControllerPriority) (dbmodel.Controller, error) {
-		shuffleRegionControllers(controllers)
-		return controllers[0].Controller, nil
-	}
-}
-
-func findController(controllerName string) func(controllers []dbmodel.CloudRegionControllerPriority) (dbmodel.Controller, error) {
-	return func(controllers []dbmodel.CloudRegionControllerPriority) (dbmodel.Controller, error) {
-		for _, crp := range controllers {
-			crp := crp
-			if crp.Controller.Name == controllerName {
-				return crp.Controller, nil
-			}
-		}
-		return dbmodel.Controller{}, errors.E("controller not found", errors.CodeNotFound)
-	}
 }
 
 // addControllerCloud creates the hosted cloud defined by the given tag and
@@ -834,4 +740,106 @@ func (j *JIMM) RemoveCloudFromController(ctx context.Context, user *openfga.User
 	}
 
 	return nil
+}
+
+// addCloudControllerRelation adds a controller relation between a cloud and controller.
+func (j *JIMM) addCloudControllerRelation(ctx context.Context, cloud dbmodel.Cloud, ctl *dbmodel.Controller) error {
+	err := j.OpenFGAClient.AddCloudController(ctx, cloud.ResourceTag(), ctl.ResourceTag())
+	if err != nil {
+		zapctx.Error(
+			ctx,
+			"failed to add controller relation between controller and cloud",
+			zap.String("controller", ctl.ResourceTag().Id()),
+			zap.String("cloud", cloud.ResourceTag().Id()),
+			zap.Error(err),
+		)
+	}
+	return err
+}
+
+// validateCloudRegion validates that the cloud region:
+//
+// - Exists
+// - The user can add models using this cloud
+// - The host cloud region is set
+// - The controller we wish to add a cloud to is in the region
+func validateCloudRegion(ctx context.Context, db *db.Database, user *openfga.User, cloud jujuparams.Cloud, controllerName string) error {
+	if cloud.HostCloudRegion == "" {
+		return nil
+	}
+
+	parts := strings.SplitN(cloud.HostCloudRegion, "/", 2)
+	if len(parts) != 2 || parts[0] == "" {
+		return errors.E(errors.CodeIncompatibleClouds, fmt.Sprintf("cloud host region %q has invalid cloud/region format", cloud.HostCloudRegion))
+	}
+
+	region, err := db.FindRegion(ctx, parts[0], parts[1])
+	if err != nil {
+		if errors.ErrorCode(err) == errors.CodeNotFound {
+			return errors.E(errors.CodeIncompatibleClouds, fmt.Sprintf("unable to find cloud/region %q", cloud.HostCloudRegion))
+		}
+		return err
+	}
+
+	allowedAddModel, err := user.IsAllowedAddModel(ctx, region.Cloud.ResourceTag())
+	if err != nil {
+		return err
+	}
+	if !allowedAddModel {
+		return errors.E(errors.CodeUnauthorized, fmt.Sprintf("missing access to %q", cloud.HostCloudRegion))
+	}
+
+	if region.Cloud.HostCloudRegion != "" {
+		return errors.E(errors.CodeIncompatibleClouds, fmt.Sprintf("cloud already hosted %q", cloud.HostCloudRegion))
+	}
+
+	for _, rc := range region.Controllers {
+		if rc.Controller.Name == controllerName {
+			return nil
+		}
+	}
+	return errors.E(errors.CodeNotFound, "controller not found")
+}
+
+// checkReservedCloudNames checks if the tag intended to be added to JIMM
+// is a reserved name.
+func checkReservedCloudNames(tag names.CloudTag, reservedCloudNames []string) error {
+	reservedNames := reservedCloudNames
+	if len(reservedNames) == 0 {
+		reservedNames = DefaultReservedCloudNames
+	}
+	for _, n := range reservedNames {
+		if tag.Id() == n {
+			return errors.E(errors.CodeAlreadyExists, fmt.Sprintf("cloud %q already exists", tag.Id()))
+		}
+	}
+	return nil
+}
+
+// addCloudToDatabase adds the cloud to the database for this controller.
+// Additionally, it sets the cloud to controller access relation.
+func (j *JIMM) addCloudToDatabase(ctx context.Context, controller *dbmodel.Controller, user *openfga.User, tag names.CloudTag, cloud jujuparams.Cloud, force bool) (dbmodel.Cloud, error) {
+	const op = errors.Op("jimm.addCloudToDatabase")
+
+	var dbCloud dbmodel.Cloud
+	dbCloud.FromJujuCloud(cloud)
+	dbCloud.Name = tag.Id()
+
+	ccloud, err := j.addControllerCloud(ctx, controller, user.ResourceTag(), tag, cloud, force)
+	if err != nil {
+		return dbCloud, errors.E(op, err)
+	}
+
+	dbCloud.FromJujuCloud(*ccloud)
+	for i := range dbCloud.Regions {
+		dbCloud.Regions[i].Controllers = []dbmodel.CloudRegionControllerPriority{{
+			ControllerID: controller.ID,
+			Priority:     dbmodel.CloudRegionControllerPrioritySupported,
+		}}
+	}
+	if err := j.Database.AddCloud(ctx, &dbCloud); err != nil {
+		return dbCloud, errors.E(op, err)
+	}
+
+	return dbCloud, nil
 }

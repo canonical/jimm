@@ -1,4 +1,4 @@
-// Copyright 2023 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package cmd
 
@@ -179,7 +179,7 @@ type addRelationCommand struct {
 	relation     string
 	targetObject string
 
-	filename string //optional
+	filename string // optional
 }
 
 // Info implements the cmd.Command interface.
@@ -270,7 +270,7 @@ type removeRelationCommand struct {
 	relation     string
 	targetObject string
 
-	filename string //optional
+	filename string // optional
 }
 
 // Info implements the cmd.Command interface.
@@ -415,7 +415,10 @@ func formatCheckRelationString(writer io.Writer, value interface{}) error {
 	if !ok {
 		return errors.E("failed to parse access result")
 	}
-	writer.Write([]byte((&accessResult).setMessage().Msg))
+	_, err := writer.Write([]byte((&accessResult).setMessage().Msg))
+	if err != nil {
+		return errors.E("failed to write access result", err)
+	}
 	return nil
 }
 
@@ -438,10 +441,13 @@ func (c *checkRelationCommand) Run(ctxt *cmd.Context) error {
 	if err != nil {
 		return err
 	}
-	c.out.Write(ctxt, *(&accessResult{
+	err = c.out.Write(ctxt, *(&accessResult{
 		Tuple:   c.tuple,
 		Allowed: resp.Allowed,
 	}).setMessage())
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -494,7 +500,8 @@ type listRelationsCommand struct {
 	store    jujuclient.ClientStore
 	dialOpts *jujuapi.DialOpts
 
-	tuple apiparams.RelationshipTuple
+	tuple        apiparams.RelationshipTuple
+	resolveUUIDs bool
 }
 
 // Info implements the cmd.Command interface.
@@ -525,6 +532,7 @@ func (c *listRelationsCommand) SetFlags(f *gnuflag.FlagSet) {
 	f.StringVar(&c.tuple.Object, "object", "", "relation object")
 	f.StringVar(&c.tuple.Relation, "relation", "", "relation name")
 	f.StringVar(&c.tuple.TargetObject, "target", "", "relation target object")
+	f.BoolVar(&c.resolveUUIDs, "resolve", true, "resolves UUIDs to human readable tags")
 }
 
 // Run implements Command.Run.
@@ -541,8 +549,9 @@ func (c *listRelationsCommand) Run(ctxt *cmd.Context) error {
 
 	client := api.NewClient(apiCaller)
 	params := apiparams.ListRelationshipTuplesRequest{
-		Tuple:    c.tuple,
-		PageSize: defaultPageSize,
+		Tuple:        c.tuple,
+		PageSize:     defaultPageSize,
+		ResolveUUIDs: c.resolveUUIDs,
 	}
 	result, err := fetchRelations(client, params)
 	if err != nil {

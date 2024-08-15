@@ -1,4 +1,4 @@
-// Copyright 2021 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package jimmhttp_test
 
@@ -31,8 +31,9 @@ func TestWSHandler(t *testing.T) {
 	c.Cleanup(srv.Close)
 
 	var d websocket.Dialer
-	conn, _, err := d.Dial("ws"+strings.TrimPrefix(srv.URL, "http"), nil)
+	conn, resp, err := d.Dial("ws"+strings.TrimPrefix(srv.URL, "http"), nil)
 	c.Assert(err, qt.IsNil)
+	defer resp.Body.Close()
 
 	err = conn.WriteMessage(websocket.TextMessage, []byte("test!"))
 	c.Assert(err, qt.IsNil)
@@ -77,8 +78,9 @@ func TestWSHandlerPanic(t *testing.T) {
 	c.Cleanup(srv.Close)
 
 	var d websocket.Dialer
-	conn, _, err := d.Dial("ws"+strings.TrimPrefix(srv.URL, "http"), nil)
+	conn, resp, err := d.Dial("ws"+strings.TrimPrefix(srv.URL, "http"), nil)
 	c.Assert(err, qt.IsNil)
+	defer resp.Body.Close()
 
 	_, _, err = conn.ReadMessage()
 	c.Assert(err, qt.ErrorMatches, `websocket: close 1011 \(internal server error\): test`)
@@ -103,9 +105,12 @@ func TestWSHandlerNilServer(t *testing.T) {
 	c.Cleanup(srv.Close)
 
 	var d websocket.Dialer
-	_, resp, err := d.Dial("ws"+strings.TrimPrefix(srv.URL, "http"), nil)
-	c.Assert(err, qt.IsNotNil)
-	c.Assert(resp.StatusCode, qt.Equals, http.StatusInternalServerError)
+	conn, resp, err := d.Dial("ws"+strings.TrimPrefix(srv.URL, "http"), nil)
+	c.Assert(err, qt.IsNil)
+	defer resp.Body.Close()
+
+	_, _, err = conn.ReadMessage()
+	c.Assert(err, qt.ErrorMatches, `websocket: close 1000 \(normal\)`)
 }
 
 type authFailServer struct{ c jimmtest.SimpleTester }
@@ -135,5 +140,6 @@ func TestWSHandlerAuthFailsServer(t *testing.T) {
 	c.Assert(httpResp.StatusCode, qt.Equals, http.StatusUnauthorized)
 	bodyBytes, err := io.ReadAll(httpResp.Body)
 	c.Assert(err, qt.IsNil)
+	defer httpResp.Body.Close()
 	c.Assert(string(bodyBytes), qt.Equals, "authentication failed")
 }

@@ -1,10 +1,9 @@
-// Copyright 2021 Canonical Ltd.
+// Copyright 2024 Canonical.
 package cmd_test
 
 import (
 	"github.com/juju/cmd/v3/cmdtesting"
 	jujutesting "github.com/juju/testing"
-
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/v3/cmd/jimmctl/cmd"

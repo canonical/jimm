@@ -1,4 +1,4 @@
-// Copyright 2021 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package jimm
 
@@ -237,7 +237,11 @@ func (w *Watcher) watchController(ctx context.Context, ctl *dbmodel.Controller) 
 	if err != nil {
 		return errors.E(op, err)
 	}
-	defer api.AllModelWatcherStop(ctx, id)
+	defer func() {
+		if err := api.AllModelWatcherStop(ctx, id); err != nil {
+			zapctx.Error(ctx, "failed to stop all model watcher", zap.Error(err))
+		}
+	}()
 
 	checkDyingModel := func(m *dbmodel.Model) error {
 		if m.Life == state.Dying.String() || m.Life == state.Dead.String() {
@@ -284,16 +288,17 @@ func (w *Watcher) watchController(ctx context.Context, ctl *dbmodel.Controller) 
 			ControllerID: ctl.ID,
 		}
 		err := w.Database.GetModel(ctx, &m)
-		if err == nil {
+		switch {
+		case err == nil:
 			st := modelState{
 				id:       m.ID,
 				machines: make(map[string]int64),
 				units:    make(map[string]bool),
 			}
 			modelStates[uuid] = &st
-		} else if errors.ErrorCode(err) == errors.CodeNotFound {
+		case errors.ErrorCode(err) == errors.CodeNotFound:
 			modelStates[uuid] = nil
-		} else {
+		default:
 			zapctx.Error(ctx, "cannot get model", zap.Error(err))
 		}
 		return modelStates[uuid]
@@ -374,7 +379,11 @@ func (w *Watcher) watchAllModelSummaries(ctx context.Context, ctl *dbmodel.Contr
 	if err != nil {
 		return errors.E(op, err)
 	}
-	defer api.ModelSummaryWatcherStop(ctx, id)
+	defer func() {
+		if err := api.ModelSummaryWatcherStop(ctx, id); err != nil {
+			zapctx.Error(ctx, "failed to stop model summary watcher", zap.Error(err))
+		}
+	}()
 
 	// modelIDs contains the set of models running on the
 	// controller that JIMM is interested in.

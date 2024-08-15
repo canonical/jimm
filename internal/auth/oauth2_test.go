@@ -1,4 +1,4 @@
-// Copyright 2024 canonical.
+// Copyright 2024 Canonical.
 
 package auth_test
 
@@ -16,19 +16,20 @@ import (
 	"time"
 
 	"github.com/antonlindstrom/pgstore"
+	"github.com/coreos/go-oidc/v3/oidc"
+	qt "github.com/frankban/quicktest"
+	"github.com/gorilla/sessions"
+
 	"github.com/canonical/jimm/v3/internal/auth"
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimmtest"
-	"github.com/coreos/go-oidc/v3/oidc"
-	qt "github.com/frankban/quicktest"
-	"github.com/gorilla/sessions"
 )
 
-func setupTestAuthSvc(ctx context.Context, c *qt.C, expiry time.Duration) (*auth.AuthenticationService, *db.Database, sessions.Store) {
+func setupTestAuthSvc(ctx context.Context, c *qt.C, expiry time.Duration) (*auth.AuthenticationService, *db.Database, sessions.Store, func()) {
 	db := &db.Database{
-		DB: jimmtest.PostgresDB(c, func() time.Time { return time.Now() }),
+		DB: jimmtest.PostgresDB(c, time.Now),
 	}
 	c.Assert(db.Migrate(ctx, false), qt.IsNil)
 
@@ -51,8 +52,11 @@ func setupTestAuthSvc(ctx context.Context, c *qt.C, expiry time.Duration) (*auth
 		JWTSessionKey:       "secret-key",
 	})
 	c.Assert(err, qt.IsNil)
-
-	return authSvc, db, sessionStore
+	cleanup := func() {
+		db.Close()
+		sessionStore.Close()
+	}
+	return authSvc, db, sessionStore, cleanup
 }
 
 // This test requires the local docker compose to be running and keycloak
@@ -61,7 +65,8 @@ func TestAuthCodeURL(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
-	authSvc, _, _ := setupTestAuthSvc(ctx, c, time.Hour)
+	authSvc, _, _, cleanup := setupTestAuthSvc(ctx, c, time.Hour)
+	defer cleanup()
 
 	url, state, err := authSvc.AuthCodeURL()
 	c.Assert(err, qt.IsNil)
@@ -89,7 +94,8 @@ func TestDevice(t *testing.T) {
 
 	ctx := context.Background()
 
-	authSvc, db, _ := setupTestAuthSvc(ctx, c, time.Hour)
+	authSvc, db, _, cleanup := setupTestAuthSvc(ctx, c, time.Hour)
+	defer cleanup()
 
 	res, err := authSvc.Device(ctx)
 	c.Assert(err, qt.IsNil)
@@ -179,7 +185,8 @@ func TestSessionTokens(t *testing.T) {
 
 	ctx := context.Background()
 
-	authSvc, _, _ := setupTestAuthSvc(ctx, c, time.Hour)
+	authSvc, _, _, cleanup := setupTestAuthSvc(ctx, c, time.Hour)
+	defer cleanup()
 
 	token, err := authSvc.MintSessionToken("jimm-test@canonical.com")
 	c.Assert(err, qt.IsNil)
@@ -196,7 +203,8 @@ func TestSessionTokenRejectsExpiredToken(t *testing.T) {
 	ctx := context.Background()
 
 	noDuration := time.Duration(0)
-	authSvc, _, _ := setupTestAuthSvc(ctx, c, noDuration)
+	authSvc, _, _, cleanup := setupTestAuthSvc(ctx, c, noDuration)
+	defer cleanup()
 
 	token, err := authSvc.MintSessionToken("jimm-test@canonical.com")
 	c.Assert(err, qt.IsNil)
@@ -213,7 +221,8 @@ func TestSessionTokenRejectsEmptyToken(t *testing.T) {
 	ctx := context.Background()
 
 	noDuration := time.Duration(0)
-	authSvc, _, _ := setupTestAuthSvc(ctx, c, noDuration)
+	authSvc, _, _, cleanup := setupTestAuthSvc(ctx, c, noDuration)
+	defer cleanup()
 
 	_, err := authSvc.VerifySessionToken("")
 	c.Assert(err, qt.ErrorMatches, `no token presented`)
@@ -225,7 +234,8 @@ func TestSessionTokenValidatesEmail(t *testing.T) {
 
 	ctx := context.Background()
 
-	authSvc, _, _ := setupTestAuthSvc(ctx, c, time.Hour)
+	authSvc, _, _, cleanup := setupTestAuthSvc(ctx, c, time.Hour)
+	defer cleanup()
 
 	token, err := authSvc.MintSessionToken("")
 	c.Assert(err, qt.IsNil)
@@ -242,11 +252,13 @@ func TestVerifyClientCredentials(t *testing.T) {
 
 	const (
 		// these are valid client credentials hardcoded into the jimm realm
-		validClientID     = "test-client-id"
+		validClientID = "test-client-id"
+		//nolint:gosec // Thinks hardcoded credentials.
 		validClientSecret = "2M2blFbO4GX4zfggQpivQSxwWX1XGgNf"
 	)
 
-	authSvc, _, _ := setupTestAuthSvc(ctx, c, time.Hour)
+	authSvc, _, _, cleanup := setupTestAuthSvc(ctx, c, time.Hour)
+	defer cleanup()
 
 	err := authSvc.VerifyClientCredentials(ctx, validClientID, validClientSecret)
 	c.Assert(err, qt.IsNil)
@@ -255,7 +267,7 @@ func TestVerifyClientCredentials(t *testing.T) {
 	c.Assert(err, qt.ErrorMatches, "invalid client credentials")
 }
 
-func assertSetCookiesIsCorrect(c *qt.C, rec *httptest.ResponseRecorder, parsedCookies []*http.Cookie) {
+func assertSetCookiesIsCorrect(c *qt.C, parsedCookies []*http.Cookie) {
 	assertHasCookie := func(name string, cookies []*http.Cookie) {
 		found := false
 		for _, v := range cookies {
@@ -276,7 +288,8 @@ func TestCreateBrowserSession(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
-	authSvc, _, sessionStore := setupTestAuthSvc(ctx, c, time.Hour)
+	authSvc, _, sessionStore, cleanup := setupTestAuthSvc(ctx, c, time.Hour)
+	defer cleanup()
 
 	rec := httptest.NewRecorder()
 	req, err := http.NewRequest("GET", "", nil)
@@ -287,7 +300,7 @@ func TestCreateBrowserSession(t *testing.T) {
 
 	cookies := rec.Header().Get("Set-Cookie")
 	parsedCookies := jimmtest.ParseCookies(cookies)
-	assertSetCookiesIsCorrect(c, rec, parsedCookies)
+	assertSetCookiesIsCorrect(c, parsedCookies)
 
 	req.AddCookie(&http.Cookie{
 		Name:  auth.SessionName,
@@ -303,7 +316,8 @@ func TestAuthenticateBrowserSessionAndLogout(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
-	authSvc, db, sessionStore := setupTestAuthSvc(ctx, c, time.Hour)
+	authSvc, db, sessionStore, cleanup := setupTestAuthSvc(ctx, c, time.Hour)
+	defer cleanup()
 
 	cookie, err := jimmtest.RunBrowserLogin(
 		db,
@@ -333,7 +347,7 @@ func TestAuthenticateBrowserSessionAndLogout(t *testing.T) {
 	// Assert Set-Cookie present
 	setCookieCookies := rec.Header().Get("Set-Cookie")
 	parsedCookies := jimmtest.ParseCookies(setCookieCookies)
-	assertSetCookiesIsCorrect(c, rec, parsedCookies)
+	assertSetCookiesIsCorrect(c, parsedCookies)
 
 	// Test logout does indeed remove the cookie for us
 	err = authSvc.Logout(ctx, rec, req)
@@ -349,7 +363,8 @@ func TestAuthenticateBrowserSessionRejectsNoneDecryptableOrDecodableCookies(t *t
 	c := qt.New(t)
 	ctx := context.Background()
 
-	authSvc, db, sessionStore := setupTestAuthSvc(ctx, c, time.Hour)
+	authSvc, db, sessionStore, cleanup := setupTestAuthSvc(ctx, c, time.Hour)
+	defer cleanup()
 
 	_, err := jimmtest.RunBrowserLogin(
 		db,
@@ -391,7 +406,8 @@ func TestAuthenticateBrowserSessionHandlesExpiredAccessTokens(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
-	authSvc, db, sessionStore := setupTestAuthSvc(ctx, c, time.Hour)
+	authSvc, db, sessionStore, cleanup := setupTestAuthSvc(ctx, c, time.Hour)
+	defer cleanup()
 
 	cookie, err := jimmtest.RunBrowserLogin(
 		db,
@@ -440,14 +456,15 @@ func TestAuthenticateBrowserSessionHandlesExpiredAccessTokens(t *testing.T) {
 	// Assert Set-Cookie present
 	setCookieCookies := rec.Header().Get("Set-Cookie")
 	parsedCookies := jimmtest.ParseCookies(setCookieCookies)
-	assertSetCookiesIsCorrect(c, rec, parsedCookies)
+	assertSetCookiesIsCorrect(c, parsedCookies)
 }
 
 func TestAuthenticateBrowserSessionHandlesMissingOrExpiredRefreshTokens(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
-	authSvc, db, sessionStore := setupTestAuthSvc(ctx, c, time.Hour)
+	authSvc, db, sessionStore, cleanup := setupTestAuthSvc(ctx, c, time.Hour)
+	defer cleanup()
 
 	cookie, err := jimmtest.RunBrowserLogin(
 		db,
@@ -477,7 +494,8 @@ func TestAuthenticateBrowserSessionHandlesMissingOrExpiredRefreshTokens(t *testi
 	// And we're missing a refresh token (the same case would apply for an expired refresh token
 	// or any scenario where the token source cannot refresh the access token)
 	u.RefreshToken = ""
-	db.UpdateIdentity(ctx, u)
+	err = db.UpdateIdentity(ctx, u)
+	c.Assert(err, qt.IsNil)
 
 	// AuthenticateBrowserSession should fail to refresh the users session and delete
 	// the current session, giving us the same cookie back with a max-age of -1.

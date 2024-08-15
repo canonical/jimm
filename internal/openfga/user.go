@@ -1,4 +1,4 @@
-// Copyright 2023 canonical.
+// Copyright 2024 Canonical.
 
 package openfga
 
@@ -6,6 +6,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/canonical/ofga"
 	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
@@ -14,7 +15,6 @@ import (
 	"github.com/canonical/jimm/v3/internal/errors"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	jimmnames "github.com/canonical/jimm/v3/pkg/names"
-	"github.com/canonical/ofga"
 )
 
 // NewUser returns a new user structure that can be used to check

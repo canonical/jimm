@@ -1,4 +1,4 @@
-// Copyright 2021 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package vault
 
@@ -29,11 +29,10 @@ const (
 )
 
 const (
-	jwksKey                    = "jwks"
-	jwksExpiryKey              = "jwks-expiry"
-	jwksPrivateKey             = "jwks-private"
-	oAuthSecretKey             = "oauth-secret"
-	oAuthSessionStoreSecretKey = "oauth-session-store-secret"
+	jwksKey        = "jwks"
+	jwksExpiryKey  = "jwks-expiry"
+	jwksPrivateKey = "jwks-private"
+	oAuthSecretKey = "oauth-secret"
 )
 
 // A VaultStore stores cloud credential attributes and
@@ -220,10 +219,15 @@ func (s *VaultStore) CleanupJWKS(ctx context.Context) (err error) {
 	if err != nil {
 		return errors.E(op, err)
 	}
-	// Vault does not return errors on deletion requests where
-	// the secret does not exist. As such we just return the last known error.
-	client.KVv2(s.KVPath).Delete(ctx, s.getJWKSExpiryPath())
-	client.KVv2(s.KVPath).Delete(ctx, s.getJWKSPath())
+
+	if err = client.KVv2(s.KVPath).Delete(ctx, s.getJWKSExpiryPath()); err != nil {
+		return errors.E(op, err)
+	}
+
+	if err = client.KVv2(s.KVPath).Delete(ctx, s.getJWKSPath()); err != nil {
+		return errors.E(op, err)
+	}
+
 	if err = client.KVv2(s.KVPath).Delete(ctx, s.getJWKSPrivateKeyPath()); err != nil {
 		return errors.E(op, err)
 	}

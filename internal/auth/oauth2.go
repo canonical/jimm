@@ -1,4 +1,4 @@
-// Copyright 2024 canonical.
+// Copyright 2024 Canonical.
 
 // Package auth provides means to authenticate users into JIMM.
 //

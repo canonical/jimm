@@ -1,4 +1,4 @@
-// Copyright 2018 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package kubetest
 
@@ -12,6 +12,7 @@ import (
 
 const (
 	Username = "test-kubernetes-user"
+	//nolint:gosec // Thinks it's an exposed secret.
 	Password = "test-kubernetes-password"
 )
 
@@ -32,7 +33,8 @@ func NewFakeKubernetes(c *gc.C) *httptest.Server {
 			return
 		}
 		w.Header().Set("Content-Type", req.Header.Get("Content-Type"))
-		io.Copy(w, req.Body)
+		_, err := io.Copy(w, req.Body)
+		c.Assert(err, gc.IsNil)
 	}))
 	return srv
 }

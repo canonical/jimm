@@ -1,10 +1,9 @@
-// Copyright 2023 canonical.
+// Copyright 2024 Canonical.
 
 package jujuapi
 
 import (
 	"context"
-	"regexp"
 	"strconv"
 	"time"
 
@@ -21,49 +20,32 @@ import (
 
 // access_control contains the primary RPC commands for handling ReBAC within JIMM via the JIMM facade itself.
 
-var (
-	// Matches juju uris, jimm user/group tags and UUIDs
-	// Performs a single match and breaks the juju URI into 10 groups, each successive group is XORD to ensure we can run
-	// this just once.
-	// The groups are as so:
-	// [0] - Entire match
-	// [1] - tag
-	// [2] - A single "-", ignored
-	// [3] - Controller name OR user name OR group name
-	// [4] - A single ":", ignored
-	// [5] - Controller user / model owner
-	// [6] - A single "/", ignored
-	// [7] - Model name
-	// [8] - A single ".", ignored
-	// [9] - Application offer name
-	// [10] - Relation specifier (i.e., #member)
-	// A complete matcher example would look like so with square-brackets denoting groups and paranthsis denoting index:
-	// (1)[controller](2)[-](3)[controller-1](4)[:](5)[alice@canonical.com-place](6)[/](7)[model-1](8)[.](9)[offer-1](10)[#relation-specifier]"
-	// In the case of something like: user-alice@wonderland or group-alices-wonderland#member, it would look like so:
-	// (1)[user](2)[-](3)[alices@wonderland]
-	// (1)[group](2)[-](3)[alices-wonderland](10)[#member]
-	// So if a group, user, UUID, controller name comes in, it will always be index 3 for them
-	// and if a relation specifier is present, it will always be index 10
-	jujuURIMatcher = regexp.MustCompile(`([a-zA-Z0-9]*)(\-|\z)([a-zA-Z0-9-@.]*)(\:|)([a-zA-Z0-9-@]*)(\/|)([a-zA-Z0-9-]*)(\.|)([a-zA-Z0-9-]*)([a-zA-Z#]*|\z)\z`)
-)
-
 const (
 	jimmControllerName = "jimm"
 )
 
 // AddGroup creates a group within JIMMs DB for reference by OpenFGA.
-func (r *controllerRoot) AddGroup(ctx context.Context, req apiparams.AddGroupRequest) error {
+func (r *controllerRoot) AddGroup(ctx context.Context, req apiparams.AddGroupRequest) (apiparams.AddGroupResponse, error) {
 	const op = errors.Op("jujuapi.AddGroup")
+	resp := apiparams.AddGroupResponse{}
 
 	if !jimmnames.IsValidGroupName(req.Name) {
-		return errors.E(op, errors.CodeBadRequest, "invalid group name")
+		return resp, errors.E(op, errors.CodeBadRequest, "invalid group name")
 	}
 
-	if err := r.jimm.AddGroup(ctx, r.user, req.Name); err != nil {
+	groupEntry, err := r.jimm.AddGroup(ctx, r.user, req.Name)
+	if err != nil {
 		zapctx.Error(ctx, "failed to add group", zaputil.Error(err))
-		return errors.E(op, err)
+		return resp, errors.E(op, err)
 	}
-	return nil
+	resp = apiparams.AddGroupResponse{Group: apiparams.Group{
+		Name:      groupEntry.Name,
+		UUID:      groupEntry.UUID,
+		CreatedAt: groupEntry.CreatedAt.Format(time.RFC3339),
+		UpdatedAt: groupEntry.UpdatedAt.Format(time.RFC3339),
+	}}
+
+	return resp, nil
 }
 
 // RenameGroup renames a group within JIMMs DB for reference by OpenFGA.
@@ -103,6 +85,7 @@ func (r *controllerRoot) ListGroups(ctx context.Context) (apiparams.ListGroupRes
 	groupsResponse := make([]apiparams.Group, len(groups))
 	for i, g := range groups {
 		groupsResponse[i] = apiparams.Group{
+			UUID:      g.UUID,
 			Name:      g.Name,
 			CreatedAt: g.CreatedAt.Format(time.RFC3339),
 			UpdatedAt: g.UpdatedAt.Format(time.RFC3339),
@@ -262,12 +245,12 @@ func (r *controllerRoot) ListRelationshipTuples(ctx context.Context, req apipara
 	errors := []string{}
 	tuples := make([]apiparams.RelationshipTuple, len(responseTuples))
 	for i, t := range responseTuples {
-		object, err := r.jimm.ToJAASTag(ctx, t.Object)
+		object, err := r.jimm.ToJAASTag(ctx, t.Object, req.ResolveUUIDs)
 		if err != nil {
 			object = t.Object.String()
 			errors = append(errors, "failed to parse object: "+err.Error())
 		}
-		target, err := r.jimm.ToJAASTag(ctx, t.Target)
+		target, err := r.jimm.ToJAASTag(ctx, t.Target, req.ResolveUUIDs)
 		if err != nil {
 			target = t.Target.String()
 			errors = append(errors, "failed to parse target: "+err.Error())

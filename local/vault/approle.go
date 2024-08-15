@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 // This package exists to hold files used to authenticate with Vault during tests.
 package vault

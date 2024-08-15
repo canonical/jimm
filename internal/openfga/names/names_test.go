@@ -1,17 +1,17 @@
-// Copyright 2023 canonical.
+// Copyright 2024 Canonical.
 
 package names_test
 
 import (
 	"testing"
 
+	"github.com/google/uuid"
+	"github.com/juju/juju/core/permission"
 	"github.com/juju/names/v5"
 	gc "gopkg.in/check.v1"
 
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	jimmnames "github.com/canonical/jimm/v3/pkg/names"
-	"github.com/google/uuid"
-	"github.com/juju/juju/core/permission"
 )
 
 func Test(t *testing.T) {

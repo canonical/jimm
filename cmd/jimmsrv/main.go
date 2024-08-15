@@ -1,4 +1,4 @@
-// Copyright 2021 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package main
 
@@ -35,6 +35,8 @@ func main() {
 }
 
 // start initialises the jimmsrv service.
+//
+//nolint:gocognit // Start function to be ignored.
 func start(ctx context.Context, s *service.Service) error {
 	zapctx.Info(ctx, "jimm info",
 		zap.String("version", version.VersionInfo.Version),
@@ -204,15 +206,19 @@ func start(ctx context.Context, s *service.Service) error {
 	}
 
 	httpsrv := &http.Server{
-		Addr:    addr,
-		Handler: jimmsvc,
+		Addr:              addr,
+		Handler:           jimmsvc,
+		ReadHeaderTimeout: time.Second * 5,
 	}
 	s.OnShutdown(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
 		zapctx.Warn(ctx, "server shutdown triggered")
-		httpsrv.Shutdown(ctx)
+		err = httpsrv.Shutdown(ctx)
+		if err != nil {
+			zapctx.Error(ctx, "failed to shutdown server gracefully", zap.Error(err))
+		}
 		jimmsvc.Cleanup()
 	})
 	s.Go(httpsrv.ListenAndServe)

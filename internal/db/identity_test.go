@@ -1,4 +1,4 @@
-// Copyright 2020 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package db_test
 
@@ -142,6 +142,7 @@ func (s *dbSuite) TestGetIdentityCloudCredentials(c *qt.C) {
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
 	i, err = dbmodel.NewIdentity("test")
+	c.Assert(err, qt.IsNil)
 	_, err = s.Database.GetIdentityCloudCredentials(ctx, i, "ec2")
 	c.Check(err, qt.IsNil)
 

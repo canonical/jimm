@@ -1,4 +1,4 @@
-// Copyright 2016 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package jujuapi
 
@@ -86,7 +86,11 @@ func (r *controllerRoot) LoginWithSessionCookie(ctx context.Context) (jujuparams
 		return jujuparams.LoginResult{}, errors.E(op, &auth.AuthenticationError{})
 	}
 
-	user, err := r.jimm.GetOpenFGAUserAndAuthorise(ctx, r.identityId)
+	user, err := r.jimm.GetUser(ctx, r.identityId)
+	if err != nil {
+		return jujuparams.LoginResult{}, errors.E(op, err)
+	}
+	err = r.jimm.UpdateUserLastLogin(ctx, r.identityId)
 	if err != nil {
 		return jujuparams.LoginResult{}, errors.E(op, err)
 	}
@@ -135,7 +139,11 @@ func (r *controllerRoot) LoginWithSessionToken(ctx context.Context, req params.L
 
 	// At this point, we know the user exists, so simply just get
 	// the user to create the session token.
-	user, err := r.jimm.GetOpenFGAUserAndAuthorise(ctx, email)
+	user, err := r.jimm.GetUser(ctx, email)
+	if err != nil {
+		return jujuparams.LoginResult{}, errors.E(op, err)
+	}
+	err = r.jimm.UpdateUserLastLogin(ctx, email)
 	if err != nil {
 		return jujuparams.LoginResult{}, errors.E(op, err)
 	}
@@ -180,7 +188,11 @@ func (r *controllerRoot) LoginWithClientCredentials(ctx context.Context, req par
 		return jujuparams.LoginResult{}, errors.E(err, errors.CodeUnauthorized)
 	}
 
-	user, err := r.jimm.GetOpenFGAUserAndAuthorise(ctx, clientIdWithDomain)
+	user, err := r.jimm.GetUser(ctx, clientIdWithDomain)
+	if err != nil {
+		return jujuparams.LoginResult{}, errors.E(op, err)
+	}
+	err = r.jimm.UpdateUserLastLogin(ctx, clientIdWithDomain)
 	if err != nil {
 		return jujuparams.LoginResult{}, errors.E(op, err)
 	}

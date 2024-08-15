@@ -1,9 +1,8 @@
-// Copyright 2021 Canonical Ltd.
+// Copyright 2024 Canonical.
 package cmd_test
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -186,7 +185,8 @@ clouds:
 			err = s.JIMM.Database.GetCloud(context.Background(), &cloud)
 			c.Assert(err, gc.IsNil)
 			controller := dbmodel.Controller{Name: "controller-1"}
-			s.JIMM.Database.GetController(context.Background(), &controller)
+			err = s.JIMM.Database.GetController(context.Background(), &controller)
+			c.Assert(err, gc.IsNil)
 			c.Assert(controller.CloudRegions[test.expectedIndex].CloudRegion.CloudName, gc.Equals, test.expectedCloudName)
 		}
 		cleanupFunc()
@@ -196,11 +196,12 @@ clouds:
 }
 
 func writeTempFile(c *gc.C, content string) (string, func()) {
-	dir, err := ioutil.TempDir("", "add-cloud-to-controller-test")
+	dir, err := os.MkdirTemp("", "add-cloud-to-controller-test")
 	c.Assert(err, gc.Equals, nil)
 
 	tmpfn := filepath.Join(dir, "tmp.yaml")
-	err = ioutil.WriteFile(tmpfn, []byte(content), 0666)
+
+	err = os.WriteFile(tmpfn, []byte(content), 0600)
 	c.Assert(err, gc.Equals, nil)
 	return tmpfn, func() {
 		os.RemoveAll(dir)

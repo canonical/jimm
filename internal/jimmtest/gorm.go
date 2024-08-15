@@ -1,10 +1,11 @@
-// Copyright 2020 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 // Package jimmtest contains useful helpers for testing JIMM.
 package jimmtest
 
 import (
 	"context"
+	//nolint:gosec // We're only using sha1 in tests.
 	"crypto/sha1"
 	"encoding/base64"
 	"fmt"
@@ -16,12 +17,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/canonical/jimm/v3/internal/db"
-	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/google/uuid"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
+
+	"github.com/canonical/jimm/v3/internal/db"
+	"github.com/canonical/jimm/v3/internal/errors"
 )
 
 // A Tester is the test interface required by this package.
@@ -84,6 +86,14 @@ var _ logger.Interface = gormLogger{}
 // In cases where you need an entirely empty database, you should use
 // `CreateEmptyDatabase` function in this package.
 func PostgresDB(t Tester, nowFunc func() time.Time) *gorm.DB {
+	db, _ := PostgresDBWithDbName(t, nowFunc)
+	return db
+}
+
+// PostgresDBWithDbName creates a Postgres DB for tests, returning the DB name.
+// Useful for GoCheck tests that don't support a cleanup function and require the DB
+// name for manual cleanup.
+func PostgresDBWithDbName(t Tester, nowFunc func() time.Time) (*gorm.DB, string) {
 	_, present := os.LookupEnv("TERSE")
 	logLevel := logger.Info
 	if present {
@@ -111,7 +121,7 @@ func PostgresDB(t Tester, nowFunc func() time.Time) *gorm.DB {
 
 	suggestedName := "jimm_test_" + t.Name()
 	t.Logf("suggested db name: %s", suggestedName)
-	_, dsn, err := createDatabaseFromTemplate(suggestedName, templateDatabaseName)
+	databaseName, dsn, err := createDatabaseFromTemplate(suggestedName, templateDatabaseName)
 	if err != nil {
 		t.Fatalf("error creating database (%s): %s", suggestedName, err)
 	}
@@ -122,6 +132,13 @@ func PostgresDB(t Tester, nowFunc func() time.Time) *gorm.DB {
 	}
 
 	t.Cleanup(func() {
+		dbCleanup(t, gdb, databaseName)
+	})
+	return gdb, databaseName
+}
+
+func dbCleanup(t Tester, gdb *gorm.DB, databaseName string) {
+	if gdb != nil {
 		sqlDB, err := gdb.DB()
 		if err != nil {
 			t.Logf("failed to get the internal DB object: %s", err)
@@ -129,9 +146,15 @@ func PostgresDB(t Tester, nowFunc func() time.Time) *gorm.DB {
 		if err := sqlDB.Close(); err != nil {
 			t.Logf("failed to close database connection: %s", err)
 		}
-	})
-
-	return gdb
+	}
+	// Only delete the DB after closing connections to it.
+	_, skipCleanup := os.LookupEnv("NO_DB_CLEANUP")
+	if !skipCleanup {
+		err := DeleteDatabase(databaseName)
+		if err != nil {
+			t.Logf("failed to delete database (%s): %s", databaseName, err)
+		}
+	}
 }
 
 const unsafeCharsPattern = "[ .:;`'\"|<>~/\\?!@#$%^&*()[\\]{}=+-]"
@@ -146,9 +169,10 @@ const maxDatabaseNameLength = 63
 // sure no name collisions occur and also future calls with the same suggested
 // database name results in the same safe name.
 func computeSafeDatabaseName(suggestedName string) string {
-	re, _ := regexp.Compile(unsafeCharsPattern)
+	re := regexp.MustCompile(unsafeCharsPattern)
 	safeName := re.ReplaceAllString(suggestedName, "_")
 
+	//nolint:gosec // We're only using sha1 in tests.
 	hasher := sha1.New()
 	// Provide some random chars for the hash. Useful where tests
 	// have the same suite name and same test name.
@@ -174,6 +198,7 @@ var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 func randSeq(n int) string {
 	b := make([]rune, n)
 	for i := range b {
+		//nolint:gosec // We're only using rand.Intn for tests.
 		b[i] = letters[rand.Intn(len(letters))]
 	}
 	return string(b)
@@ -183,6 +208,7 @@ func randSeq(n int) string {
 // best to synchronize them to happen sequentially (specially, when creating a
 // database from a template).
 var createDatabaseMutex = sync.Mutex{}
+var deleteDatabaseMutex = sync.Mutex{}
 
 // createDatabaseFromTemplate creates a Postgres database from a given template
 // and returns the created database name (which may be different than the
@@ -229,6 +255,32 @@ func createDatabaseFromTemplate(suggestedName string, templateName string) (stri
 
 	u.Path = databaseName
 	return databaseName, u.String(), nil
+}
+
+func DeleteDatabase(databaseName string) (err error) {
+	dsn := defaultDSN
+	if envTestDSN, exists := os.LookupEnv("JIMM_TEST_PGXDSN"); exists {
+		dsn = envTestDSN
+	}
+
+	deleteDatabaseMutex.Lock()
+	defer deleteDatabaseMutex.Unlock()
+
+	gdb, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	if err != nil {
+		return errors.E(fmt.Sprintf("error opening database: %s", err))
+	}
+	db, err := gdb.DB()
+	if err != nil {
+		return errors.E(fmt.Sprintf("error getting db: %s", err))
+	}
+	defer func() { err = db.Close() }()
+
+	dropDatabaseCommand := fmt.Sprintf(`DROP DATABASE IF EXISTS "%s"`, databaseName)
+	if err := gdb.Exec(dropDatabaseCommand).Error; err != nil {
+		return errors.E(fmt.Sprintf("failed to delete database (%s): %s", databaseName, err))
+	}
+	return nil
 }
 
 // createDatabase creates an empty Postgres database and returns the created
@@ -332,9 +384,12 @@ func getOrCreateTemplateDatabase() (string, string, error) {
 
 // CreateEmptyDatabase creates an empty Postgres database and returns the DSN.
 func CreateEmptyDatabase(t Tester) string {
-	_, dsn, err := createEmptyDatabase("jimm_test_" + t.Name())
+	databaseName, dsn, err := createEmptyDatabase("jimm_test_" + t.Name())
 	if err != nil {
 		t.Fatalf("error creating empty database: %s", err)
 	}
+	t.Cleanup(func() {
+		dbCleanup(t, nil, databaseName)
+	})
 	return dsn
 }

@@ -1,11 +1,10 @@
-// Copyright 2023 canonical.
+// Copyright 2024 Canonical.
 
 package jujuapi_test
 
 import (
 	"context"
 	"database/sql"
-	"strconv"
 	"time"
 
 	petname "github.com/dustinkirkland/golang-petname"
@@ -54,10 +53,11 @@ func (s *accessControlSuite) TestAddGroup(c *gc.C) {
 	defer conn.Close()
 
 	client := api.NewClient(conn)
-	err := client.AddGroup(&apiparams.AddGroupRequest{Name: "test-group"})
+	res, err := client.AddGroup(&apiparams.AddGroupRequest{Name: "test-group"})
 	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(res.UUID, gc.Not(gc.Equals), "")
 
-	err = client.AddGroup(&apiparams.AddGroupRequest{Name: "test-group"})
+	_, err = client.AddGroup(&apiparams.AddGroupRequest{Name: "test-group"})
 	c.Assert(err, gc.ErrorMatches, ".*already exists.*")
 }
 
@@ -72,7 +72,7 @@ func (s *accessControlSuite) TestRemoveGroup(c *gc.C) {
 	})
 	c.Assert(err, gc.ErrorMatches, ".*not found.*")
 
-	err = client.AddGroup(&apiparams.AddGroupRequest{Name: "test-group"})
+	_, err = client.AddGroup(&apiparams.AddGroupRequest{Name: "test-group"})
 	c.Assert(err, jc.ErrorIsNil)
 
 	err = client.RemoveGroup(&apiparams.RemoveGroupRequest{
@@ -88,15 +88,17 @@ func (s *accessControlSuite) TestRemoveGroupRemovesTuples(c *gc.C) {
 	user, group, controller, model, _, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
 	defer closeClient()
 
-	db.AddGroup(ctx, "test-group2")
+	_, err := db.AddGroup(ctx, "test-group2")
+	c.Assert(err, gc.IsNil)
+
 	group2 := &dbmodel.GroupEntry{
 		Name: "test-group2",
 	}
-	err := db.GetGroup(ctx, group2)
+	err = db.GetGroup(ctx, group2)
 	c.Assert(err, gc.IsNil)
 
 	tuples := []openfga.Tuple{
-		//This tuple should remain as it has no relation to group2
+		// This tuple should remain as it has no relation to group2
 		{
 			Object:   ofganames.ConvertTag(user.ResourceTag()),
 			Relation: "member",
@@ -132,7 +134,7 @@ func (s *accessControlSuite) TestRemoveGroupRemovesTuples(c *gc.C) {
 
 	err = s.JIMM.OpenFGAClient.AddRelation(context.Background(), tuples...)
 	c.Assert(err, gc.IsNil)
-	//Check user has access to model and controller through group2
+	// Check user has access to model and controller through group2
 	checkResp, err := client.CheckRelation(&apiparams.CheckRelationRequest{Tuple: checkAccessTupleController})
 	c.Assert(err, gc.IsNil)
 	c.Assert(checkResp.Allowed, gc.Equals, true)
@@ -147,7 +149,7 @@ func (s *accessControlSuite) TestRemoveGroupRemovesTuples(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	c.Assert(len(resp.Tuples), gc.Equals, 13)
 
-	//Check user access has been revoked.
+	// Check user access has been revoked.
 	checkResp, err = client.CheckRelation(&apiparams.CheckRelationRequest{Tuple: checkAccessTupleController})
 	c.Assert(err, gc.IsNil)
 	c.Assert(checkResp.Allowed, gc.Equals, false)
@@ -168,7 +170,7 @@ func (s *accessControlSuite) TestRenameGroup(c *gc.C) {
 	})
 	c.Assert(err, gc.ErrorMatches, ".*not found.*")
 
-	err = client.AddGroup(&apiparams.AddGroupRequest{Name: "test-group"})
+	_, err = client.AddGroup(&apiparams.AddGroupRequest{Name: "test-group"})
 	c.Assert(err, jc.ErrorIsNil)
 
 	err = client.RenameGroup(&apiparams.RenameGroupRequest{
@@ -192,7 +194,7 @@ func (s *accessControlSuite) TestListGroups(c *gc.C) {
 	}
 
 	for _, name := range groupNames {
-		err := client.AddGroup(&apiparams.AddGroupRequest{Name: name})
+		_, err := client.AddGroup(&apiparams.AddGroupRequest{Name: name})
 		c.Assert(err, jc.ErrorIsNil)
 	}
 
@@ -221,10 +223,6 @@ func createTuple(object, relation, target string) openfga.Tuple {
 	}
 }
 
-func stringGroupID(id uint) string {
-	return strconv.FormatUint(uint64(id), 10)
-}
-
 // TestAddRelation currently verifies the following test cases,
 // when new relation control is to be added, please update this comment:
 // user -> group
@@ -248,11 +246,13 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 	user, group, controller, model, offer, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
 	defer closeClient()
 
-	db.AddGroup(ctx, "test-group2")
+	_, err := db.AddGroup(ctx, "test-group2")
+	c.Assert(err, gc.IsNil)
+
 	group2 := &dbmodel.GroupEntry{
 		Name: "test-group2",
 	}
-	err := db.GetGroup(ctx, group2)
+	err = db.GetGroup(ctx, group2)
 	c.Assert(err, gc.IsNil)
 
 	c.Assert(err, gc.IsNil)
@@ -302,7 +302,7 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 			err:         false,
 			changesType: "controller",
 		},
-		//Test user -> group
+		// Test user -> group
 		{
 			input: tuple{"user-" + user.Name, "member", "group-" + group.Name},
 			want: createTuple(
@@ -313,7 +313,7 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 			err:         false,
 			changesType: "group",
 		},
-		//Test username with dots and @ -> group
+		// Test username with dots and @ -> group
 		{
 			input: tuple{"user-" + "kelvin.lina.test@canonical.com", "member", "group-" + group.Name},
 			want: createTuple(
@@ -324,7 +324,7 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 			err:         false,
 			changesType: "group",
 		},
-		//Test group -> controller
+		// Test group -> controller
 		{
 			input: tuple{"group-" + "test-group#member", "administrator", "controller-" + controller.UUID},
 			want: createTuple(
@@ -335,7 +335,7 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 			err:         false,
 			changesType: "controller",
 		},
-		//Test user -> model by name
+		// Test user -> model by name
 		{
 			input: tuple{"user-" + user.Name, "writer", "model-" + controller.Name + ":" + user.Name + "/" + model.Name},
 			want: createTuple(
@@ -461,6 +461,10 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 	for i, tc := range tagTests {
 		c.Logf("running test %d", i)
 		if i != 0 {
+			// Needed due to removing original added relations for this test.
+			// Without, we cannot add the relations.
+			//
+			//nolint:errcheck
 			s.COFGAClient.RemoveRelation(ctx, tc.want)
 		}
 		err := client.AddRelation(&apiparams.AddRelationRequest{
@@ -556,7 +560,7 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 			err:         false,
 			changesType: "controller",
 		},
-		//Test user -> group
+		// Test user -> group
 		{
 			toAdd: openfga.Tuple{
 				Object:   ofganames.ConvertTag(user.ResourceTag()),
@@ -572,7 +576,7 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 			err:         false,
 			changesType: "group",
 		},
-		//Test group -> controller
+		// Test group -> controller
 		{
 			toAdd: openfga.Tuple{
 				Object:   ofganames.ConvertTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
@@ -588,7 +592,7 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 			err:         false,
 			changesType: "controller",
 		},
-		//Test user -> model by name
+		// Test user -> model by name
 		{
 			toAdd: openfga.Tuple{
 				Object:   ofganames.ConvertTag(user.ResourceTag()),
@@ -827,7 +831,55 @@ func (s *accessControlSuite) TestJAASTag(c *gc.C) {
 		expectedJAASTag: "cloud-" + cloud.Name,
 	}}
 	for _, test := range tests {
-		t, err := jujuapi.ToJAASTag(db, test.tag)
+		t, err := jujuapi.ToJAASTag(db, test.tag, true)
+		if test.expectedError != "" {
+			c.Assert(err, gc.ErrorMatches, test.expectedError)
+		} else {
+			c.Assert(err, gc.IsNil)
+			c.Assert(t, gc.Equals, test.expectedJAASTag)
+		}
+	}
+}
+
+func (s *accessControlSuite) TestJAASTagNoUUIDResolution(c *gc.C) {
+	ctx := context.Background()
+	db := s.JIMM.Database
+
+	user, group, controller, model, applicationOffer, cloud, _, _, closeClient := createTestControllerEnvironment(ctx, c, s)
+	serviceAccountId := petname.Generate(2, "-") + "@serviceaccount"
+	closeClient()
+
+	tests := []struct {
+		tag             *ofganames.Tag
+		expectedJAASTag string
+		expectedError   string
+	}{{
+		tag:             ofganames.ConvertTag(user.ResourceTag()),
+		expectedJAASTag: "user-" + user.Name,
+	}, {
+		tag:             ofganames.ConvertTag(names.NewServiceAccountTag(serviceAccountId)),
+		expectedJAASTag: "serviceaccount-" + serviceAccountId,
+	}, {
+		tag:             ofganames.ConvertTag(group.ResourceTag()),
+		expectedJAASTag: "group-" + group.UUID,
+	}, {
+		tag:             ofganames.ConvertTag(controller.ResourceTag()),
+		expectedJAASTag: "controller-" + controller.UUID,
+	}, {
+		tag:             ofganames.ConvertTag(model.ResourceTag()),
+		expectedJAASTag: "model-" + model.UUID.String,
+	}, {
+		tag:             ofganames.ConvertTag(applicationOffer.ResourceTag()),
+		expectedJAASTag: "applicationoffer-" + applicationOffer.UUID,
+	}, {
+		tag:             ofganames.ConvertTag(cloud.ResourceTag()),
+		expectedJAASTag: "cloud-" + cloud.Name,
+	}, {
+		tag:             &ofganames.Tag{},
+		expectedJAASTag: "-",
+	}}
+	for _, test := range tests {
+		t, err := jujuapi.ToJAASTag(db, test.tag, false)
 		if test.expectedError != "" {
 			c.Assert(err, gc.ErrorMatches, test.expectedError)
 		} else {
@@ -842,9 +894,9 @@ func (s *accessControlSuite) TestListRelationshipTuples(c *gc.C) {
 	user, _, controller, model, applicationOffer, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
 	defer closeClient()
 
-	err := client.AddGroup(&apiparams.AddGroupRequest{Name: "yellow"})
+	_, err := client.AddGroup(&apiparams.AddGroupRequest{Name: "yellow"})
 	c.Assert(err, jc.ErrorIsNil)
-	err = client.AddGroup(&apiparams.AddGroupRequest{Name: "orange"})
+	_, err = client.AddGroup(&apiparams.AddGroupRequest{Name: "orange"})
 	c.Assert(err, jc.ErrorIsNil)
 
 	tuples := []apiparams.RelationshipTuple{{
@@ -868,7 +920,7 @@ func (s *accessControlSuite) TestListRelationshipTuples(c *gc.C) {
 	err = client.AddRelation(&apiparams.AddRelationRequest{Tuples: tuples})
 	c.Assert(err, jc.ErrorIsNil)
 
-	response, err := client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{})
+	response, err := client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{ResolveUUIDs: true})
 	c.Assert(err, jc.ErrorIsNil)
 	// first three tuples created during setup test
 	c.Assert(response.Tuples[12:], jc.DeepEquals, tuples)
@@ -878,9 +930,46 @@ func (s *accessControlSuite) TestListRelationshipTuples(c *gc.C) {
 		Tuple: apiparams.RelationshipTuple{
 			TargetObject: "applicationoffer-" + controller.Name + ":" + user.Name + "/" + model.Name + "." + applicationOffer.Name,
 		},
+		ResolveUUIDs: true,
 	})
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(response.Tuples, jc.DeepEquals, []apiparams.RelationshipTuple{tuples[3]})
+	c.Assert(len(response.Errors), gc.Equals, 0)
+}
+
+func (s *accessControlSuite) TestListRelationshipTuplesNoUUIDResolution(c *gc.C) {
+	ctx := context.Background()
+	user, _, controller, model, applicationOffer, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
+	defer closeClient()
+
+	_, err := client.AddGroup(&apiparams.AddGroupRequest{Name: "orange"})
+	c.Assert(err, jc.ErrorIsNil)
+
+	tuples := []apiparams.RelationshipTuple{{
+		Object:       "group-orange#member",
+		Relation:     "administrator",
+		TargetObject: "applicationoffer-" + applicationOffer.UUID,
+	}}
+
+	err = client.AddRelation(&apiparams.AddRelationRequest{Tuples: tuples})
+	c.Assert(err, jc.ErrorIsNil)
+
+	groupOrange := dbmodel.GroupEntry{Name: "orange"}
+	err = s.JIMM.DB().GetGroup(ctx, &groupOrange)
+	c.Assert(err, jc.ErrorIsNil)
+	expected := []apiparams.RelationshipTuple{{
+		Object:       "group-" + groupOrange.UUID + "#member",
+		Relation:     "administrator",
+		TargetObject: "applicationoffer-" + applicationOffer.UUID,
+	}}
+	response, err := client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{
+		Tuple: apiparams.RelationshipTuple{
+			TargetObject: "applicationoffer-" + controller.Name + ":" + user.Name + "/" + model.Name + "." + applicationOffer.Name,
+		},
+		ResolveUUIDs: false,
+	})
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(response.Tuples, jc.DeepEquals, expected)
 	c.Assert(len(response.Errors), gc.Equals, 0)
 }
 
@@ -889,9 +978,9 @@ func (s *accessControlSuite) TestListRelationshipTuplesAfterDeletingGroup(c *gc.
 	user, _, controller, model, applicationOffer, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
 	defer closeClient()
 
-	err := client.AddGroup(&apiparams.AddGroupRequest{Name: "yellow"})
+	_, err := client.AddGroup(&apiparams.AddGroupRequest{Name: "yellow"})
 	c.Assert(err, jc.ErrorIsNil)
-	err = client.AddGroup(&apiparams.AddGroupRequest{Name: "orange"})
+	_, err = client.AddGroup(&apiparams.AddGroupRequest{Name: "orange"})
 	c.Assert(err, jc.ErrorIsNil)
 
 	tuples := []apiparams.RelationshipTuple{{
@@ -918,7 +1007,7 @@ func (s *accessControlSuite) TestListRelationshipTuplesAfterDeletingGroup(c *gc.
 	err = client.RemoveGroup(&apiparams.RemoveGroupRequest{Name: "yellow"})
 	c.Assert(err, jc.ErrorIsNil)
 
-	response, err := client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{})
+	response, err := client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{ResolveUUIDs: true})
 	c.Assert(err, jc.ErrorIsNil)
 	// Create a new slice of tuples excluding the ones we expect to be deleted.
 	newTuples := []apiparams.RelationshipTuple{tuples[1], tuples[3]}
@@ -932,9 +1021,9 @@ func (s *accessControlSuite) TestListRelationshipTuplesWithMissingGroups(c *gc.C
 	_, _, _, _, _, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
 	defer closeClient()
 
-	err := client.AddGroup(&apiparams.AddGroupRequest{Name: "yellow"})
+	_, err := client.AddGroup(&apiparams.AddGroupRequest{Name: "yellow"})
 	c.Assert(err, jc.ErrorIsNil)
-	err = client.AddGroup(&apiparams.AddGroupRequest{Name: "orange"})
+	_, err = client.AddGroup(&apiparams.AddGroupRequest{Name: "orange"})
 	c.Assert(err, jc.ErrorIsNil)
 
 	tuples := []apiparams.RelationshipTuple{{
@@ -953,7 +1042,7 @@ func (s *accessControlSuite) TestListRelationshipTuplesWithMissingGroups(c *gc.C
 	err = s.JIMM.DB().RemoveGroup(ctx, group)
 	c.Assert(err, jc.ErrorIsNil)
 
-	response, err := client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{})
+	response, err := client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{ResolveUUIDs: true})
 	c.Assert(err, jc.ErrorIsNil)
 	tupleWithoutDBEntry := tuples[0]
 	tupleWithoutDBEntry.TargetObject = "group:" + group.UUID
@@ -1428,11 +1517,12 @@ func createTestControllerEnvironment(ctx context.Context, c *gc.C, s *accessCont
 	func()) {
 
 	db := s.JIMM.Database
-	err := db.AddGroup(ctx, "test-group")
+	groupEntry, err := db.AddGroup(ctx, "test-group")
 	c.Assert(err, gc.IsNil)
 	group := dbmodel.GroupEntry{Name: "test-group"}
 	err = db.GetGroup(ctx, &group)
 	c.Assert(err, gc.IsNil)
+	c.Assert(groupEntry.UUID, gc.Equals, group.UUID)
 
 	u, err := dbmodel.NewIdentity(petname.Generate(2, "-") + "@canonical.com")
 	c.Assert(err, gc.IsNil)

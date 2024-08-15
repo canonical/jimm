@@ -1,4 +1,4 @@
-// Copyright 2016 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package jujuapi_test
 
@@ -46,6 +46,9 @@ func (s *adminSuite) SetUpTest(c *gc.C) {
 
 	sessionStore, err := pgstore.NewPGStoreFromPool(sqldb, []byte("secretsecretdigletts"))
 	c.Assert(err, gc.IsNil)
+	s.AddCleanup(func(c *gc.C) {
+		sessionStore.Close()
+	})
 
 	// Replace JIMM's mock authenticator with a real one here
 	// for testing the login flows.
@@ -117,6 +120,7 @@ func testBrowserLogin(c *gc.C, s *adminSuite, username, password, expectedEmail,
 
 	sessionStore, err := pgstore.NewPGStoreFromPool(sqldb, []byte("secretsecretdigletts"))
 	c.Assert(err, gc.IsNil)
+	defer sessionStore.Close()
 
 	cookie, err := jimmtest.RunBrowserLogin(
 		s.JIMM.DB(),
@@ -262,6 +266,8 @@ func (s *adminSuite) TestDeviceLogin(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, "failed to decode token.*")
 
 	// Test token base64 encoded passes authentication
+	//
+	//nolint:gosimple
 	err = conn.APICall("Admin", 4, "", "LoginWithSessionToken", params.LoginWithSessionTokenRequest{SessionToken: sessionTokenResp.SessionToken}, &loginResult)
 	c.Assert(err, gc.IsNil)
 	c.Assert(loginResult.UserInfo.Identity, gc.Equals, "user-"+user.Email)
@@ -332,7 +338,8 @@ func (s *adminSuite) TestLoginWithClientCredentials(c *gc.C) {
 
 	const (
 		// these are valid client credentials hardcoded into the jimm realm
-		validClientID     = "test-client-id"
+		validClientID = "test-client-id"
+		//nolint:gosec // Thinks credentials hardcoded.
 		validClientSecret = "2M2blFbO4GX4zfggQpivQSxwWX1XGgNf"
 	)
 

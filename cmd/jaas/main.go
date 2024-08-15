@@ -1,4 +1,4 @@
-// Copyright 2021 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package main
 
@@ -7,8 +7,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/canonical/jimm/v3/cmd/jaas/cmd"
 	jujucmd "github.com/juju/cmd/v3"
+
+	"github.com/canonical/jimm/v3/cmd/jaas/cmd"
 )
 
 var jaasDoc = `

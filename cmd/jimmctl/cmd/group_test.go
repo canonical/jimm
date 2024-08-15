@@ -1,4 +1,4 @@
-// Copyright 2021 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package cmd_test
 
@@ -24,7 +24,7 @@ var _ = gc.Suite(&groupSuite{})
 func (s *groupSuite) TestAddGroupSuperuser(c *gc.C) {
 	// alice is superuser
 	bClient := s.SetupCLIAccess(c, "alice")
-	_, err := cmdtesting.RunCommand(c, cmd.NewAddGroupCommandForTesting(s.ClientStore(), bClient), "test-group")
+	ctx, err := cmdtesting.RunCommand(c, cmd.NewAddGroupCommandForTesting(s.ClientStore(), bClient), "test-group")
 	c.Assert(err, gc.IsNil)
 
 	group := &dbmodel.GroupEntry{Name: "test-group"}
@@ -32,7 +32,8 @@ func (s *groupSuite) TestAddGroupSuperuser(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	c.Assert(group.ID, gc.Equals, uint(1))
 	c.Assert(group.Name, gc.Equals, "test-group")
-	c.Assert(group.UUID, gc.Not(gc.Equals), "")
+
+	c.Assert(cmdtesting.Stdout(ctx), gc.Matches, fmt.Sprintf(`(?s).*uuid: %s\n.*`, group.UUID))
 }
 
 func (s *groupSuite) TestAddGroup(c *gc.C) {
@@ -46,8 +47,9 @@ func (s *groupSuite) TestRenameGroupSuperuser(c *gc.C) {
 	// alice is superuser
 	bClient := s.SetupCLIAccess(c, "alice")
 
-	err := s.JimmCmdSuite.JIMM.Database.AddGroup(context.TODO(), "test-group")
+	groupEntry, err := s.JimmCmdSuite.JIMM.Database.AddGroup(context.TODO(), "test-group")
 	c.Assert(err, gc.IsNil)
+	c.Assert(groupEntry.UUID, gc.Not(gc.Equals), "")
 
 	_, err = cmdtesting.RunCommand(c, cmd.NewRenameGroupCommandForTesting(s.ClientStore(), bClient), "test-group", "renamed-group")
 	c.Assert(err, gc.IsNil)
@@ -70,7 +72,7 @@ func (s *groupSuite) TestRemoveGroupSuperuser(c *gc.C) {
 	// alice is superuser
 	bClient := s.SetupCLIAccess(c, "alice")
 
-	err := s.JimmCmdSuite.JIMM.Database.AddGroup(context.TODO(), "test-group")
+	_, err := s.JimmCmdSuite.JIMM.Database.AddGroup(context.TODO(), "test-group")
 	c.Assert(err, gc.IsNil)
 
 	_, err = cmdtesting.RunCommand(c, cmd.NewRemoveGroupCommandForTesting(s.ClientStore(), bClient), "test-group", "-y")
@@ -101,7 +103,7 @@ func (s *groupSuite) TestListGroupsSuperuser(c *gc.C) {
 	bClient := s.SetupCLIAccess(c, "alice")
 
 	for i := 0; i < 3; i++ {
-		err := s.JimmCmdSuite.JIMM.Database.AddGroup(context.TODO(), fmt.Sprint("test-group", i))
+		_, err := s.JimmCmdSuite.JIMM.Database.AddGroup(context.TODO(), fmt.Sprint("test-group", i))
 		c.Assert(err, gc.IsNil)
 	}
 

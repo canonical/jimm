@@ -1,15 +1,16 @@
-// Copyright 2016 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package jujuapi
 
 import (
 	"context"
 
+	jujuparams "github.com/juju/juju/rpc/params"
+
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/jimm"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
-	jujuparams "github.com/juju/juju/rpc/params"
 )
 
 var (
@@ -38,11 +39,11 @@ func RunModelAccessWatcher(w *modelAccessWatcher) {
 	go w.loop()
 }
 
-func ToJAASTag(db db.Database, tag *ofganames.Tag) (string, error) {
+func ToJAASTag(db db.Database, tag *ofganames.Tag, resolveUUIDs bool) (string, error) {
 	jimm := &jimm.JIMM{
 		Database: db,
 	}
-	return jimm.ToJAASTag(context.Background(), tag)
+	return jimm.ToJAASTag(context.Background(), tag, resolveUUIDs)
 }
 
 func NewControllerRoot(j JIMM, p Params) *controllerRoot {

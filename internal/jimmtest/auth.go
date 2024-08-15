@@ -1,4 +1,4 @@
-// Copyright 2020 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package jimmtest
 
@@ -25,8 +25,10 @@ import (
 	"github.com/gorilla/sessions"
 	"github.com/juju/juju/api"
 	jujuparams "github.com/juju/juju/rpc/params"
+	"github.com/juju/zaputil/zapctx"
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwt"
+	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 
 	"github.com/canonical/jimm/v3/internal/auth"
@@ -286,7 +288,10 @@ func runBrowserLogin(db *db.Database, sessionStore sessions.Store, username, pas
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
 				cookieString = r.Header.Get("Cookie")
-				w.Write([]byte(dashboardResponse))
+				if _, err := w.Write([]byte(dashboardResponse)); err != nil {
+					zapctx.Error(context.Background(), "failed to write dashboard response", zap.Error(err))
+				}
+
 			},
 		),
 	)

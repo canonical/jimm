@@ -1,10 +1,12 @@
+// Copyright 2024 Canonical.
 package jimmtest
 
 import (
 	"time"
 
-	jimmsvc "github.com/canonical/jimm/v3/cmd/jimmsrv/service"
 	"github.com/coreos/go-oidc/v3/oidc"
+
+	jimmsvc "github.com/canonical/jimm/v3/cmd/jimmsrv/service"
 )
 
 // NewTestJimmParams returns a set of JIMM params with sensible defaults

@@ -1,4 +1,4 @@
-// Copyright 2020 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package jimm_test
 
@@ -1991,6 +1991,7 @@ func TestGrantModelAccess(t *testing.T) {
 				Err: tt.dialError,
 			}
 			j := &jimm.JIMM{
+				UUID: jimmtest.ControllerUUID,
 				Database: db.Database{
 					DB: jimmtest.PostgresDB(c, nil),
 				},
@@ -2710,6 +2711,7 @@ func TestRevokeModelAccess(t *testing.T) {
 				Err: tt.dialError,
 			}
 			j := &jimm.JIMM{
+				UUID: jimmtest.ControllerUUID,
 				Database: db.Database{
 					DB: jimmtest.PostgresDB(c, nil),
 				},
@@ -3283,6 +3285,7 @@ func TestValidateModelUpgrade(t *testing.T) {
 	}
 }
 
+//nolint:gosec // Thinks credentials hardcoded.
 const updateModelCredentialTestEnv = `clouds:
 - name: test-cloud
   type: test-provider

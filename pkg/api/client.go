@@ -1,4 +1,4 @@
-// Copyright 2020 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package api
 
@@ -117,8 +117,10 @@ func (c *Client) UpdateMigratedModel(req *params.UpdateMigratedModelRequest) err
 
 // User Groups
 // AddGroup adds the group to JIMM.
-func (c *Client) AddGroup(req *params.AddGroupRequest) error {
-	return c.caller.APICall("JIMM", 4, "", "AddGroup", req, nil)
+func (c *Client) AddGroup(req *params.AddGroupRequest) (params.AddGroupResponse, error) {
+	var resp params.AddGroupResponse
+	err := c.caller.APICall("JIMM", 4, "", "AddGroup", req, &resp)
+	return resp, err
 }
 
 // RenameGroup renames a group in JIMM.

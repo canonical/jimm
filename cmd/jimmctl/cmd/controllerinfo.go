@@ -1,4 +1,4 @@
-// Copyright 2021 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package cmd
 
@@ -123,7 +123,7 @@ func (c *controllerInfoCommand) Run(ctxt *cmd.Context) error {
 	if err != nil {
 		return errors.Mask(err)
 	}
-	err = os.WriteFile(c.file.Path, data, 0666)
+	err = os.WriteFile(c.file.Path, data, 0600)
 	if err != nil {
 		return errors.Mask(err)
 	}

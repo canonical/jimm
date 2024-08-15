@@ -1,4 +1,4 @@
-// Copyright 2021 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package db_test
 
@@ -55,7 +55,8 @@ func (s *dbSuite) TestInsertKeyGetKey(c *qt.C) {
 		RootKey: []byte("very secret"),
 	}
 
-	s.Database.InsertKey(rk)
+	err = s.Database.InsertKey(rk)
+	c.Assert(err, qt.IsNil)
 
 	rk2, err := s.Database.GetKey([]byte("test-id"))
 	c.Assert(err, qt.IsNil)

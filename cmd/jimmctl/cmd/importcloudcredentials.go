@@ -1,4 +1,4 @@
-// Copyright 2021 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package cmd
 
@@ -17,6 +17,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/errors"
 )
 
+//nolint:gosec // Thinks a credential is exposed.
 const importCloudCredentialsDoc = `
 	import-cloud-credentials imports a set of cloud credentials
 	loaded from a file containing a series of JSON objects. The JSON

@@ -1,3 +1,4 @@
+// Copyright 2024 Canonical.
 package jimmjwx_test
 
 import (
@@ -68,9 +69,8 @@ func startAndTestRotator(c *qt.C, ctx context.Context, store credentials.Credent
 			time.Sleep(500 * time.Millisecond)
 			continue
 		}
-		if ks != nil {
-			break
-		}
+		break
+
 	}
 	c.Assert(err, qt.IsNil)
 	key, ok := ks.Key(0)
