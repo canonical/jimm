@@ -188,18 +188,14 @@ func (r *controllerRoot) AddController(ctx context.Context, req apiparams.AddCon
 
 	// TODO(ale8k): Don't build dbmodel here, do it as params to AddController.
 	ctl := dbmodel.Controller{
-		UUID:          req.UUID,
-		Name:          req.Name,
-		PublicAddress: req.PublicAddress,
-		CACertificate: req.CACertificate,
-
-		// Do not store controller credentials, they're in our "CredentialStore".
-		// whether that be Vault or Postgres.
-		AdminIdentityName: "",
-		AdminPassword:     "",
-
-		TLSHostname: req.TLSHostname,
-		Addresses:   dbmodel.HostPorts{jujuparams.FromProviderHostPorts(nphps)},
+		UUID:              req.UUID,
+		Name:              req.Name,
+		PublicAddress:     req.PublicAddress,
+		CACertificate:     req.CACertificate,
+		AdminIdentityName: req.Username,
+		AdminPassword:     req.Password,
+		TLSHostname:       req.TLSHostname,
+		Addresses:         dbmodel.HostPorts{jujuparams.FromProviderHostPorts(nphps)},
 	}
 	if err := r.jimm.AddController(ctx, r.user, &ctl); err != nil {
 		zapctx.Error(ctx, "failed to add controller", zaputil.Error(err))

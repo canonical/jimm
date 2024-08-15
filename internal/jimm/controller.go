@@ -243,6 +243,11 @@ func (j *JIMM) AddController(ctx context.Context, user *openfga.User, ctl *dbmod
 		}
 	}
 
+	// Credential store will always be set either to vault or explicitly insecure,
+	// no need to be persist in db.
+	ctl.AdminIdentityName = ""
+	ctl.AdminPassword = ""
+
 	if err := storeControllerCloudsAndRegions(ctx, j, dbClouds, ctl); err != nil {
 		zapctx.Error(ctx, "failed to add controller", zaputil.Error(err))
 		if errors.ErrorCode(err) == errors.CodeAlreadyExists {
