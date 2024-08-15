@@ -41,6 +41,80 @@ var (
 	}
 )
 
+// addCloudSafeTx ensures that the cloud is added to the database. It first attempts
+// to get the cloud and if the code is errors.CodeNotFound, it will add the cloud,
+// and get the cloud again to ensure it has been added.
+func addCloudSafeTx(ctx context.Context, cloud *dbmodel.Cloud, tx *db.Database) error {
+	cloudCopy := dbmodel.Cloud{
+		Name: cloud.Name,
+	}
+	if err := tx.GetCloud(ctx, &cloudCopy); err != nil {
+		if errors.ErrorCode(err) != errors.CodeNotFound {
+			zapctx.Error(ctx, "failed to fetch the cloud", zaputil.Error(err), zap.String("cloud-name", cloud.Name))
+			return err
+		}
+		err := tx.AddCloud(ctx, cloud)
+		if err != nil && errors.ErrorCode(err) != errors.CodeAlreadyExists {
+			zapctx.Error(ctx, "failed to add cloud", zaputil.Error(err))
+			return err
+		}
+		if err := tx.GetCloud(ctx, &cloudCopy); err != nil {
+			zapctx.Error(ctx, "failed to fetch the cloud", zaputil.Error(err), zap.String("cloud-name", cloud.Name))
+			return err
+		}
+	}
+	return nil
+}
+
+// addCloudTx adds a cloud from a juju API call within a transaction.
+//
+// After the cloud has been added, it is returned.
+func addCloudTx(ctx context.Context, jujuCloud dbmodel.Cloud, tx *db.Database) (dbmodel.Cloud, error) {
+	cloud := dbmodel.Cloud{
+		Name: jujuCloud.Name,
+	}
+	if err := tx.GetCloud(ctx, &cloud); err != nil {
+		if errors.ErrorCode(err) != errors.CodeNotFound {
+			zapctx.Error(ctx, "failed to fetch the cloud", zaputil.Error(err), zap.String("cloud-name", jujuCloud.Name))
+			return cloud, err
+		}
+		err := tx.AddCloud(ctx, &jujuCloud)
+		if err != nil && errors.ErrorCode(err) != errors.CodeAlreadyExists {
+			zapctx.Error(ctx, "failed to add cloud", zaputil.Error(err))
+			return cloud, err
+		}
+		if err := tx.GetCloud(ctx, &cloud); err != nil {
+			zapctx.Error(ctx, "failed to fetch the cloud", zaputil.Error(err), zap.String("cloud-name", jujuCloud.Name))
+			return cloud, err
+		}
+	}
+	return cloud, nil
+}
+
+// addCloudRegions iterates over the regions for the passed cloud, adding them to the database in the
+// existing transaction.
+//
+// Additionally, it appends the added cloud region (to the database) to the passed
+// cloud dbmodel.Cloud. This prevents the need to get the cloud from the database again.
+//
+// TODO(ale8k): Instead of appending, just get the cloud again after the regions are added.
+func addCloudRegionsTx(ctx context.Context, cloud dbmodel.Cloud, regions []dbmodel.CloudRegion, tx *db.Database) (dbmodel.Cloud, error) {
+	for _, reg := range regions {
+		if cloud.Region(reg.Name).ID != 0 {
+			continue
+		}
+		reg.CloudName = cloud.Name
+		if err := tx.AddCloudRegion(ctx, &reg); err != nil {
+			zapctx.Error(ctx, "failed to add cloud region", zaputil.Error(err))
+			return cloud, err
+		}
+		// Append to regions so the region can be trieved
+		// with the correct cloud name for the FK.
+		// cloud.Regions = append(cloud.Regions, reg)
+	}
+	return cloud, nil
+}
+
 // AddController adds the specified controller to JIMM. Only
 // controller-admin level users may add new controllers. If the user adding
 // the controller is not authorized then an error with a code of
@@ -92,49 +166,59 @@ func (j *JIMM) AddController(ctx context.Context, user *openfga.User, ctl *dbmod
 		}
 	}
 
+	// all in single transaction
+	// get clouds from db based on controller call.
+	//
+	// add clouds that don't exist.
+	//
+	// loop regions for each cloud (from juju) and add regions
+	// now we've added the clouds for the fk.
+	//
+	// now regions added, set controller regions
+	// add controller.
+
 	err = j.Database.Transaction(func(tx *db.Database) error {
+		// Add clouds and their regions to db
 		for i := range dbClouds {
-			cloud := dbmodel.Cloud{
-				Name: dbClouds[i].Name,
+			incomingJujuCloud := dbClouds[i]
+
+			// Add the cloud
+			cloud, err := addCloudTx(ctx, incomingJujuCloud, tx)
+			if err != nil {
+				return err
 			}
+
+			// Add the clouds regions
+			_, err = addCloudRegionsTx(ctx, cloud, incomingJujuCloud.Regions, tx)
+			if err != nil {
+				return err
+			}
+			// Get the cloud again to populate it's regions (regions are preloaded)
+			// and now they can be used for updating the controllers
+			// CloudRegionsControllerPriority
 			if err := tx.GetCloud(ctx, &cloud); err != nil {
-				if errors.ErrorCode(err) != errors.CodeNotFound {
-					zapctx.Error(ctx, "failed to fetch the cloud", zaputil.Error(err), zap.String("cloud-name", dbClouds[i].Name))
-					return err
-				}
-				err := tx.AddCloud(ctx, &dbClouds[i])
-				if err != nil && errors.ErrorCode(err) != errors.CodeAlreadyExists {
-					zapctx.Error(ctx, "failed to add cloud", zaputil.Error(err))
-					return err
-				}
-				if err := tx.GetCloud(ctx, &cloud); err != nil {
-					zapctx.Error(ctx, "failed to fetch the cloud", zaputil.Error(err), zap.String("cloud-name", dbClouds[i].Name))
-					return err
-				}
+				return err
 			}
-			for _, reg := range dbClouds[i].Regions {
-				if cloud.Region(reg.Name).ID != 0 {
-					continue
-				}
-				reg.CloudName = cloud.Name
-				if err := tx.AddCloudRegion(ctx, &reg); err != nil {
-					zapctx.Error(ctx, "failed to add cloud region", zaputil.Error(err))
-					return err
-				}
-				cloud.Regions = append(cloud.Regions, reg)
-			}
-			for _, cr := range dbClouds[i].Regions {
+
+			// Set controller cloud regions
+			for _, cr := range incomingJujuCloud.Regions {
 				reg := cloud.Region(cr.Name)
+
 				priority := dbmodel.CloudRegionControllerPrioritySupported
+
 				if cloud.Name == ctl.CloudName && cr.Name == ctl.CloudRegion {
 					priority = dbmodel.CloudRegionControllerPriorityDeployed
 				}
+
 				ctl.CloudRegions = append(ctl.CloudRegions, dbmodel.CloudRegionControllerPriority{
 					CloudRegion: reg,
 					Priority:    uint(priority),
 				})
 			}
 		}
+
+		// Prepare to add controller
+
 		// Do not store controller credentials, they're in our "CredentialStore".
 		// whether that be Vault or Postgres.
 		ctl.AdminIdentityName = ""
