@@ -126,7 +126,7 @@ func (r *controllerRoot) LoginWithSessionToken(ctx context.Context, req params.L
 
 	user, err := r.jimm.LoginWithSessionToken(ctx, req.SessionToken)
 	if err != nil {
-		// Avoid replacing the comment. The Juju CLI uses it to determine when to initiate login see [OAuthAuthenticator.VerifySessionToken].
+		// Avoid masking the error code on err below. The Juju CLI uses it to determine when to initiate login see [OAuthAuthenticator.VerifySessionToken].
 		return jujuparams.LoginResult{}, errors.E(op, err)
 	}
 
