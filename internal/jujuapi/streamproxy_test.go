@@ -1,16 +1,17 @@
-// Copyright 2016 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package jujuapi_test
 
 import (
 	"context"
 
-	"github.com/canonical/jimm/v3/internal/dbmodel"
-	"github.com/canonical/jimm/v3/internal/openfga"
-	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/juju/juju/api"
 	"github.com/juju/juju/api/common"
 	gc "gopkg.in/check.v1"
+
+	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/openfga"
+	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 )
 
 type streamProxySuite struct {

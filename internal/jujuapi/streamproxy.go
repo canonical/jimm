@@ -1,3 +1,4 @@
+// Copyright 2024 Canonical.
 package jujuapi
 
 import (
@@ -6,17 +7,18 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/canonical/jimm/v3/internal/auth"
-	"github.com/canonical/jimm/v3/internal/dbmodel"
-	"github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/internal/jimmhttp"
-	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/gorilla/websocket"
 	"github.com/juju/juju/api/base"
 	jujuParams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
+
+	"github.com/canonical/jimm/v3/internal/auth"
+	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jimmhttp"
+	"github.com/canonical/jimm/v3/internal/openfga"
 )
 
 // A streamProxier serves all HTTP endpoints by proxying
