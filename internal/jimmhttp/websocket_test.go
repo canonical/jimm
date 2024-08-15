@@ -106,8 +106,9 @@ func TestWSHandlerNilServer(t *testing.T) {
 
 	var d websocket.Dialer
 	_, resp, err := d.Dial("ws"+strings.TrimPrefix(srv.URL, "http"), nil)
-	c.Assert(err, qt.IsNotNil)
+	c.Assert(err, qt.ErrorMatches, "websocket: bad handshake")
 	c.Assert(resp.StatusCode, qt.Equals, http.StatusInternalServerError)
+	defer resp.Body.Close()
 }
 
 type authFailServer struct{ c jimmtest.SimpleTester }

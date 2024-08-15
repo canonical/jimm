@@ -54,7 +54,7 @@ func (s *apiProxySuite) TestSessionTokenLoginProvider(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	defer conn.Close()
 	c.Check(err, gc.Equals, nil)
-	outputNoNewLine := strings.Replace(output.String(), "\n", "", -1)
+	outputNoNewLine := strings.ReplaceAll(output.String(), "\n", "")
 	c.Check(outputNoNewLine, gc.Matches, `Please visit .* and enter code.*`)
 }
 
@@ -87,7 +87,7 @@ func (s *apiProxySuite) TestModelStatusWithoutPermission(c *gc.C) {
 	if conn != nil {
 		defer conn.Close()
 	}
-	outputNoNewLine := strings.Replace(output.String(), "\n", "", -1)
+	outputNoNewLine := strings.ReplaceAll(output.String(), "\n", "")
 	c.Check(outputNoNewLine, gc.Matches, `Please visit .* and enter code.*`)
 }
 

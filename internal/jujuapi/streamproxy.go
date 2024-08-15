@@ -9,7 +9,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/juju/juju/api/base"
-	jujuParams "github.com/juju/juju/rpc/params"
+	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
@@ -46,12 +46,15 @@ func (s streamProxier) Authenticate(ctx context.Context, w http.ResponseWriter, 
 // ServeWS implements jimmhttp.WSServer.
 func (s streamProxier) ServeWS(ctx context.Context, clientConn *websocket.Conn) {
 	writeError := func(msg string, code errors.Code) {
-		var errResult jujuParams.ErrorResult
-		errResult.Error = &jujuParams.Error{
+		var errResult jujuparams.ErrorResult
+		errResult.Error = &jujuparams.Error{
 			Message: msg,
 			Code:    string(code),
 		}
-		clientConn.WriteJSON(errResult)
+		err := clientConn.WriteJSON(errResult)
+		if err != nil {
+			zapctx.Error(ctx, "failed to write error message to client", zap.Error(err), zap.Any("client message", errResult))
+		}
 	}
 	identity := auth.SessionIdentityFromContext(ctx)
 	if identity == "" {
