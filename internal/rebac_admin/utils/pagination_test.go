@@ -3,7 +3,6 @@
 package utils_test
 
 import (
-	"fmt"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
@@ -16,31 +15,33 @@ func TestMarshalRebacToken(t *testing.T) {
 	c := qt.New(t)
 
 	tests := []struct {
+		desc          string
 		token         utils.RebacToken
 		expectedError string
 		expectedToken string
 	}{{
+		desc: "Valid marshal token",
 		token: utils.RebacToken{
 			Kind:         openfga.ModelType,
 			OpenFGAToken: "continuation-token",
 		},
-		expectedToken: "eyJLaW5kIjoibW9kZWwiLCJUb2tlbiI6ImNvbnRpbnVhdGlvbi10b2tlbiJ9",
+		expectedToken: "eyJraW5kIjoibW9kZWwiLCJ0b2tlbiI6ImNvbnRpbnVhdGlvbi10b2tlbiJ9",
 	}, {
+		desc: "invalid - missing kind",
 		token: utils.RebacToken{
 			Kind:         "",
 			OpenFGAToken: "continuation-token",
 		},
-		expectedError: "kind not specified",
+		expectedError: "marshal rebac token: kind not specified",
 	}}
 
-	for i, test := range tests {
-		test := test
-		c.Run(fmt.Sprintf("test %d", i), func(c *qt.C) {
-			data, err := test.token.MarshalRebacToken()
-			if test.expectedError != "" {
-				c.Assert(err, qt.ErrorMatches, test.expectedError)
+	for _, tC := range tests {
+		c.Run(tC.desc, func(c *qt.C) {
+			data, err := tC.token.MarshalRebacToken()
+			if tC.expectedError != "" {
+				c.Assert(err, qt.ErrorMatches, tC.expectedError)
 			} else {
-				c.Assert(data, qt.Equals, test.expectedToken)
+				c.Assert(data, qt.Equals, tC.expectedToken)
 			}
 		})
 	}
@@ -50,26 +51,34 @@ func TestUnmarshalRebacToken(t *testing.T) {
 	c := qt.New(t)
 
 	tests := []struct {
+		desc          string
 		in            string
 		expectedToken utils.RebacToken
 		expectedError string
-	}{{
-		expectedToken: utils.RebacToken{
-			Kind:         openfga.ModelType,
-			OpenFGAToken: "continuation-token",
+	}{
+		{
+			desc: "Valid token",
+			in:   "eyJraW5kIjoibW9kZWwiLCJ0b2tlbiI6ImNvbnRpbnVhdGlvbi10b2tlbiJ9",
+			expectedToken: utils.RebacToken{
+				Kind:         openfga.ModelType,
+				OpenFGAToken: "continuation-token",
+			},
 		},
-		in: "eyJLaW5kIjoibW9kZWwiLCJUb2tlbiI6ImNvbnRpbnVhdGlvbi10b2tlbiJ9",
-	}}
+		{
+			desc:          "Invalid token",
+			in:            "abc",
+			expectedError: "marshal rebac token: illegal base64 data at input byte 0",
+		},
+	}
 
-	for i, test := range tests {
-		test := test
-		c.Run(fmt.Sprintf("test %d", i), func(c *qt.C) {
+	for _, tC := range tests {
+		c.Run(tC.desc, func(c *qt.C) {
 			var token utils.RebacToken
-			err := token.UnmarshalRebacToken(test.in)
-			if test.expectedError != "" {
-				c.Assert(err, qt.ErrorMatches, test.expectedError)
+			err := token.UnmarshalRebacToken(tC.in)
+			if tC.expectedError != "" {
+				c.Assert(err, qt.ErrorMatches, tC.expectedError)
 			} else {
-				c.Assert(token, qt.DeepEquals, test.expectedToken)
+				c.Assert(token, qt.DeepEquals, tC.expectedToken)
 			}
 		})
 	}
@@ -138,13 +147,13 @@ func TestNextEntitlementToken(t *testing.T) {
 			desc:          "empty OpenFGA token - expect next resource type",
 			openFGAToken:  "",
 			kind:          utils.EntitlementResources[0],
-			expectedToken: "eyJLaW5kIjoiY2xvdWQiLCJPcGVuRkdBVG9rZW4iOiIifQ==",
+			expectedToken: "eyJraW5kIjoiY2xvdWQiLCJ0b2tlbiI6IiJ9",
 		},
 		{
 			desc:          "non-empty OpenFGA token - expect same kind and token",
 			openFGAToken:  "123",
 			kind:          openfga.ModelType,
-			expectedToken: "eyJLaW5kIjoibW9kZWwiLCJPcGVuRkdBVG9rZW4iOiIxMjMifQ==",
+			expectedToken: "eyJraW5kIjoibW9kZWwiLCJ0b2tlbiI6IjEyMyJ9",
 		},
 		{
 			desc:         "empty kind - expect error",
@@ -156,7 +165,7 @@ func TestNextEntitlementToken(t *testing.T) {
 			desc:          "last resource type but not last page - expect same kind and token",
 			openFGAToken:  "123",
 			kind:          utils.EntitlementResources[len(utils.EntitlementResources)-1],
-			expectedToken: "eyJLaW5kIjoic2VydmljZWFjY291bnQiLCJPcGVuRkdBVG9rZW4iOiIxMjMifQ==",
+			expectedToken: "eyJraW5kIjoic2VydmljZWFjY291bnQiLCJ0b2tlbiI6IjEyMyJ9",
 		},
 		{
 			desc:          "last resource type with no more data - expect empty token",

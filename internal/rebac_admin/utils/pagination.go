@@ -99,8 +99,8 @@ func NextEntitlementToken(kind openfga.Kind, OpenFGAToken string) (string, error
 }
 
 type RebacToken struct {
-	Kind         openfga.Kind
-	OpenFGAToken string
+	Kind         openfga.Kind `json:"kind"`
+	OpenFGAToken string       `json:"token"`
 }
 
 // MarshalRebacToken marshals the rebac token into a base64 endcoded token.
