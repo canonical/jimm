@@ -452,6 +452,18 @@ func (j *JIMM) FindAuditEvents(ctx context.Context, user *openfga.User, filter d
 	return entries, nil
 }
 
+// ControllerInfo returns info about a controller connected to JIMM.
+func (j *JIMM) ControllerInfo(ctx context.Context, name string) (*dbmodel.Controller, error) {
+	const op = errors.Op("jimm.ListControllers")
+	ctl := dbmodel.Controller{
+		Name: name,
+	}
+	if err := j.Database.GetController(ctx, &ctl); err != nil {
+		return nil, errors.E(op, err)
+	}
+	return &ctl, nil
+}
+
 // ListControllers returns a list of controllers the user has access to.
 func (j *JIMM) ListControllers(ctx context.Context, user *openfga.User) ([]dbmodel.Controller, error) {
 	const op = errors.Op("jimm.ListControllers")

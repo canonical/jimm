@@ -20,6 +20,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jujuapi/rpc"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
+	"github.com/canonical/jimm/v3/pkg/api/params"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
@@ -204,6 +205,8 @@ func (r *controllerRoot) AddController(ctx context.Context, req apiparams.AddCon
 
 // ListControllers returns the list of juju controllers hosting models
 // as part of this JAAS system.
+// If the user is not an admin, they will only receive information about
+// JIMM itself - note that the controller name returned is "jaas".
 func (r *controllerRoot) ListControllers(ctx context.Context) (apiparams.ListControllersResponse, error) {
 	const op = errors.Op("jujuapi.ListControllersV3")
 
@@ -214,29 +217,28 @@ func (r *controllerRoot) ListControllers(ctx context.Context) (apiparams.ListCon
 		if err != nil {
 			return apiparams.ListControllersResponse{}, errors.E(op, err)
 		}
-		return apiparams.ListControllersResponse{
-			Controllers: []apiparams.ControllerInfo{{
-				Name: "jaas", // TODO(mhilton) make this configurable.
-				UUID: r.params.ControllerUUID,
-				// TODO(mhilton)enable setting the public address.
-				AgentVersion: srvVersion.String(),
-				Status: jujuparams.EntityStatus{
-					Status: "available",
-				},
-			}},
-		}, nil
+		jimmCtl := params.ControllerInfo{
+			Name: "jaas",
+			UUID: r.params.ControllerUUID,
+			// TODO(mhilton)enable setting the public address.
+			AgentVersion: srvVersion.String(),
+			Status: jujuparams.EntityStatus{
+				Status: "available",
+			},
+		}
+		controllers := []apiparams.ControllerInfo{jimmCtl}
+		return apiparams.ListControllersResponse{Controllers: controllers}, nil
 	}
-
-	var controllers []apiparams.ControllerInfo
-	err := r.jimm.DB().ForEachController(ctx, func(ctl *dbmodel.Controller) error {
-		controllers = append(controllers, ctl.ToAPIControllerInfo())
-		return nil
-	})
+	dbControllers, err := r.jimm.ListControllers(ctx, r.user)
 	if err != nil {
 		return apiparams.ListControllersResponse{}, errors.E(op, err)
 	}
+	controllersInfo := make([]apiparams.ControllerInfo, 0, len(dbControllers))
+	for _, ctl := range dbControllers {
+		controllersInfo = append(controllersInfo, ctl.ToAPIControllerInfo())
+	}
 	return apiparams.ListControllersResponse{
-		Controllers: controllers,
+		Controllers: controllersInfo,
 	}, nil
 }
 
@@ -244,10 +246,8 @@ func (r *controllerRoot) ListControllers(ctx context.Context) (apiparams.ListCon
 func (r *controllerRoot) RemoveController(ctx context.Context, req apiparams.RemoveControllerRequest) (apiparams.ControllerInfo, error) {
 	const op = errors.Op("jujuapi.RemoveController")
 
-	ctl := dbmodel.Controller{
-		Name: req.Name,
-	}
-	if err := r.jimm.DB().GetController(ctx, &ctl); err != nil {
+	ctl, err := r.jimm.ControllerInfo(ctx, req.Name)
+	if err != nil {
 		return apiparams.ControllerInfo{}, errors.E(op, err)
 	}
 
@@ -264,10 +264,8 @@ func (r *controllerRoot) SetControllerDeprecated(ctx context.Context, req apipar
 	if err := r.jimm.SetControllerDeprecated(ctx, r.user, req.Name, req.Deprecated); err != nil {
 		return apiparams.ControllerInfo{}, errors.E(op, err)
 	}
-	ctl := dbmodel.Controller{
-		Name: req.Name,
-	}
-	if err := r.jimm.DB().GetController(ctx, &ctl); err != nil {
+	ctl, err := r.jimm.ControllerInfo(ctx, req.Name)
+	if err != nil {
 		return apiparams.ControllerInfo{}, errors.E(op, err)
 	}
 	return ctl.ToAPIControllerInfo(), nil
@@ -455,14 +453,10 @@ func (r *controllerRoot) CrossModelQuery(ctx context.Context, req apiparams.Cros
 	if err != nil {
 		return apiparams.CrossModelQueryResponse{}, errors.E(op, errors.Code("failed to list user's model access"))
 	}
-	models, err := r.jimm.DB().GetModelsByUUID(ctx, modelUUIDs)
-	if err != nil {
-		return apiparams.CrossModelQueryResponse{}, errors.E(op, errors.Code("failed to get models for user"))
-	}
 
 	switch strings.TrimSpace(strings.ToLower(req.Type)) {
 	case "jq":
-		return r.jimm.QueryModelsJq(ctx, models, req.Query)
+		return r.jimm.QueryModelsJq(ctx, modelUUIDs, req.Query)
 	case "jimmsql":
 		return apiparams.CrossModelQueryResponse{}, errors.E(op, errors.CodeNotImplemented)
 	default:

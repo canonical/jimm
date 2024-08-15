@@ -64,7 +64,7 @@ func (s *modelManagerSuite) TestListModelSummaries(c *gc.C) {
 	), []base.UserModelSummary{{
 		Name:            "model-1",
 		UUID:            s.Model.UUID.String,
-		ControllerUUID:  "914487b5-60e7-42bb-bd63-1adc3fd3a388",
+		ControllerUUID:  jimmtest.ControllerUUID,
 		ProviderType:    jimmtest.TestProviderType,
 		DefaultSeries:   "jammy",
 		Cloud:           jimmtest.TestCloudName,
@@ -95,7 +95,7 @@ func (s *modelManagerSuite) TestListModelSummaries(c *gc.C) {
 	}, {
 		Name:            "model-3",
 		UUID:            s.Model3.UUID.String,
-		ControllerUUID:  "914487b5-60e7-42bb-bd63-1adc3fd3a388",
+		ControllerUUID:  jimmtest.ControllerUUID,
 		ProviderType:    jimmtest.TestProviderType,
 		DefaultSeries:   "jammy",
 		Cloud:           jimmtest.TestCloudName,
@@ -330,7 +330,7 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 			Name:               "model-1",
 			UUID:               s.Model.UUID.String,
 			DefaultBase:        "ubuntu@22.04/stable",
-			ControllerUUID:     "914487b5-60e7-42bb-bd63-1adc3fd3a388",
+			ControllerUUID:     jimmtest.ControllerUUID,
 			ProviderType:       jimmtest.TestProviderType,
 			CloudTag:           names.NewCloudTag(jimmtest.TestCloudName).String(),
 			CloudRegion:        jimmtest.TestCloudRegionName,
@@ -369,7 +369,7 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 			Name:               "model-3",
 			UUID:               s.Model3.UUID.String,
 			DefaultBase:        "ubuntu@22.04/stable",
-			ControllerUUID:     "914487b5-60e7-42bb-bd63-1adc3fd3a388",
+			ControllerUUID:     jimmtest.ControllerUUID,
 			ProviderType:       jimmtest.TestProviderType,
 			CloudTag:           names.NewCloudTag(jimmtest.TestCloudName).String(),
 			CloudRegion:        jimmtest.TestCloudRegionName,
@@ -400,7 +400,7 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 			Name:               "model-4",
 			UUID:               mt4.Id(),
 			DefaultBase:        "ubuntu@22.04/stable",
-			ControllerUUID:     "914487b5-60e7-42bb-bd63-1adc3fd3a388",
+			ControllerUUID:     jimmtest.ControllerUUID,
 			ProviderType:       jimmtest.TestProviderType,
 			CloudTag:           names.NewCloudTag(jimmtest.TestCloudName).String(),
 			CloudRegion:        jimmtest.TestCloudRegionName,
@@ -452,7 +452,7 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 			Name:               "model-5",
 			UUID:               mt5.Id(),
 			DefaultBase:        "ubuntu@22.04/stable",
-			ControllerUUID:     "914487b5-60e7-42bb-bd63-1adc3fd3a388",
+			ControllerUUID:     jimmtest.ControllerUUID,
 			ProviderType:       jimmtest.TestProviderType,
 			CloudTag:           names.NewCloudTag(jimmtest.TestCloudName).String(),
 			CloudRegion:        jimmtest.TestCloudRegionName,
@@ -898,7 +898,7 @@ func (s *modelManagerSuite) TestCreateModel(c *gc.C) {
 		c.Assert(mi.Name, gc.Equals, test.name)
 		c.Assert(mi.UUID, gc.Not(gc.Equals), "")
 		c.Assert(mi.OwnerTag, gc.Equals, test.ownerTag)
-		c.Assert(mi.ControllerUUID, gc.Equals, "914487b5-60e7-42bb-bd63-1adc3fd3a388")
+		c.Assert(mi.ControllerUUID, gc.Equals, jimmtest.ControllerUUID)
 		c.Assert(mi.Users, gc.Not(gc.HasLen), 0)
 		if test.credentialTag == "" {
 			c.Assert(mi.CloudCredentialTag, gc.Not(gc.Equals), "")
@@ -1415,7 +1415,7 @@ func (s *caasModelManagerSuite) TestListCAASModelSummaries(c *gc.C) {
 	), []base.UserModelSummary{{
 		Name:            "k8s-model-1",
 		UUID:            mi.UUID,
-		ControllerUUID:  "914487b5-60e7-42bb-bd63-1adc3fd3a388",
+		ControllerUUID:  jimmtest.ControllerUUID,
 		ProviderType:    "kubernetes",
 		DefaultSeries:   "jammy",
 		Cloud:           "bob-cloud",
@@ -1447,7 +1447,7 @@ func (s *caasModelManagerSuite) TestListCAASModelSummaries(c *gc.C) {
 		Name:            "model-1",
 		UUID:            s.Model.UUID.String,
 		Type:            "iaas",
-		ControllerUUID:  "914487b5-60e7-42bb-bd63-1adc3fd3a388",
+		ControllerUUID:  jimmtest.ControllerUUID,
 		ProviderType:    jimmtest.TestProviderType,
 		DefaultSeries:   "jammy",
 		Cloud:           jimmtest.TestCloudName,
@@ -1469,7 +1469,7 @@ func (s *caasModelManagerSuite) TestListCAASModelSummaries(c *gc.C) {
 		Name:            "model-3",
 		UUID:            s.Model3.UUID.String,
 		Type:            "iaas",
-		ControllerUUID:  "914487b5-60e7-42bb-bd63-1adc3fd3a388",
+		ControllerUUID:  jimmtest.ControllerUUID,
 		ProviderType:    jimmtest.TestProviderType,
 		DefaultSeries:   "jammy",
 		Cloud:           jimmtest.TestCloudName,

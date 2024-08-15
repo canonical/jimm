@@ -56,9 +56,7 @@ func (j *JIMM) GetCloud(ctx context.Context, user *openfga.User, tag names.Cloud
 
 	accessLevel, err := j.GetUserCloudAccess(ctx, user, tag)
 	if err != nil {
-		if err != nil {
-			return dbmodel.Cloud{}, errors.E(op, err)
-		}
+		return dbmodel.Cloud{}, errors.E(op, err)
 	}
 
 	switch accessLevel {

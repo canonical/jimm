@@ -115,7 +115,7 @@ func (s *adminSuite) TestBrowserLoginWithUnsafeEmail(c *gc.C) {
 func testBrowserLogin(c *gc.C, s *adminSuite, username, password, expectedEmail, expectedDisplayName string) {
 	// The setup runs a browser login with callback, ultimately retrieving
 	// a logged in user by cookie.
-	sqldb, err := s.JIMM.DB().DB.DB()
+	sqldb, err := s.JIMM.Database.DB.DB()
 	c.Assert(err, gc.IsNil)
 
 	sessionStore, err := pgstore.NewPGStoreFromPool(sqldb, []byte("secretsecretdigletts"))
@@ -123,7 +123,7 @@ func testBrowserLogin(c *gc.C, s *adminSuite, username, password, expectedEmail,
 	defer sessionStore.Close()
 
 	cookie, err := jimmtest.RunBrowserLogin(
-		s.JIMM.DB(),
+		&s.JIMM.Database,
 		sessionStore,
 		username,
 		password,
@@ -275,7 +275,7 @@ func (s *adminSuite) TestDeviceLogin(c *gc.C) {
 	updatedUser, err := dbmodel.NewIdentity(user.Email)
 	c.Assert(err, gc.IsNil)
 
-	c.Assert(s.JIMM.DB().GetIdentity(context.Background(), updatedUser), gc.IsNil)
+	c.Assert(s.JIMM.Database.GetIdentity(context.Background(), updatedUser), gc.IsNil)
 	// TODO(ale8k): Do we need to validate the token again for the test?
 	// It has just been through a verifier etc and was returned directly
 	// from the device grant?
