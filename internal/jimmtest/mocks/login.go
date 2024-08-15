@@ -1,11 +1,13 @@
+// Copyright 2024 Canonical.
 package mocks
 
 import (
 	"context"
 
+	"golang.org/x/oauth2"
+
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/openfga"
-	"golang.org/x/oauth2"
 )
 
 type LoginService struct {

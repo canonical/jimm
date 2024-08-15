@@ -251,7 +251,7 @@ func TestProxySockets(t *testing.T) {
 		testTokenGen := testTokenGenerator{}
 		f := func(context.Context) (rpc.WebsocketConnectionWithMetadata, error) {
 			connController, err := srvController.dialer.DialWebsocket(ctx, srvController.URL)
-			c.Assert(err, qt.IsNil)
+			c.Check(err, qt.IsNil)
 			return rpc.WebsocketConnectionWithMetadata{
 				Conn:      connController,
 				ModelName: "TestName",
@@ -263,8 +263,10 @@ func TestProxySockets(t *testing.T) {
 			TokenGen:          &testTokenGen,
 			ConnectController: f,
 			AuditLog:          auditLogger,
+			LoginService:      &mockLoginService{},
 		}
 		err := rpc.ProxySockets(ctx, proxyHelpers)
+		c.Check(err, qt.ErrorMatches, ".*use of closed network connection")
 		errChan <- err
 		return err
 	})
@@ -280,8 +282,17 @@ func TestProxySockets(t *testing.T) {
 	err = ws.WriteJSON(&msg)
 	c.Assert(err, qt.IsNil)
 	resp := rpc.Message{}
-	err = ws.ReadJSON(&resp)
-	c.Assert(err, qt.IsNil)
+	receiveChan := make(chan error)
+	go func() {
+		receiveChan <- ws.ReadJSON(&resp)
+	}()
+	select {
+	case err := <-receiveChan:
+		c.Assert(err, qt.IsNil)
+	case <-time.After(5 * time.Second):
+		c.Logf("took too long to read response")
+		c.FailNow()
+	}
 	c.Assert(resp.Response, qt.DeepEquals, msg.Params)
 	ws.Close()
 	<-errChan // Ensure go routines are cleaned up
@@ -299,7 +310,7 @@ func TestCancelProxySockets(t *testing.T) {
 		testTokenGen := testTokenGenerator{}
 		f := func(context.Context) (rpc.WebsocketConnectionWithMetadata, error) {
 			connController, err := srvController.dialer.DialWebsocket(ctx, srvController.URL)
-			c.Assert(err, qt.IsNil)
+			c.Check(err, qt.IsNil)
 			return rpc.WebsocketConnectionWithMetadata{
 				Conn:      connController,
 				ModelName: "TestName",
@@ -311,8 +322,10 @@ func TestCancelProxySockets(t *testing.T) {
 			TokenGen:          &testTokenGen,
 			ConnectController: f,
 			AuditLog:          auditLogger,
+			LoginService:      &mockLoginService{},
 		}
 		err := rpc.ProxySockets(ctx, proxyHelpers)
+		c.Check(err, qt.ErrorMatches, "Context cancelled")
 		errChan <- err
 		return err
 	})
@@ -323,8 +336,7 @@ func TestCancelProxySockets(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	defer ws.Close()
 	cancel()
-	err = <-errChan
-	c.Assert(err.Error(), qt.Equals, "Context cancelled")
+	<-errChan
 }
 
 func TestProxySocketsAuditLogs(t *testing.T) {
@@ -337,10 +349,11 @@ func TestProxySocketsAuditLogs(t *testing.T) {
 
 	errChan := make(chan error)
 	srvJIMM := newServer(func(connClient *websocket.Conn) error {
+		defer connClient.Close()
 		testTokenGen := testTokenGenerator{}
 		f := func(context.Context) (rpc.WebsocketConnectionWithMetadata, error) {
 			connController, err := srvController.dialer.DialWebsocket(ctx, srvController.URL)
-			c.Assert(err, qt.IsNil)
+			c.Check(err, qt.IsNil)
 			return rpc.WebsocketConnectionWithMetadata{
 				Conn:      connController,
 				ModelName: "TestModelName",
@@ -352,8 +365,10 @@ func TestProxySocketsAuditLogs(t *testing.T) {
 			TokenGen:          &testTokenGen,
 			ConnectController: f,
 			AuditLog:          auditLogger,
+			LoginService:      &mockLoginService{},
 		}
 		err := rpc.ProxySockets(ctx, proxyHelpers)
+		c.Check(err, qt.ErrorMatches, ".*use of closed network connection")
 		errChan <- err
 		return err
 	})
