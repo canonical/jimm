@@ -77,21 +77,15 @@ func getCloudName(modelSummary jujuparams.ModelSummary) (string, error) {
 //
 // After the cloud has been added, it is returned.
 func addCloudTx(ctx context.Context, jujuCloud dbmodel.Cloud, tx *db.Database) (dbmodel.Cloud, error) {
-	cloud := dbmodel.Cloud{
-		Name: jujuCloud.Name,
-	}
+	cloud := jujuCloud
 	if err := tx.GetCloud(ctx, &cloud); err != nil {
 		if errors.ErrorCode(err) != errors.CodeNotFound {
 			zapctx.Error(ctx, "failed to fetch the cloud", zaputil.Error(err), zap.String("cloud-name", jujuCloud.Name))
 			return cloud, err
 		}
-		err := tx.AddCloud(ctx, &jujuCloud)
+		err := tx.AddCloud(ctx, &cloud)
 		if err != nil && errors.ErrorCode(err) != errors.CodeAlreadyExists {
 			zapctx.Error(ctx, "failed to add cloud", zaputil.Error(err))
-			return cloud, err
-		}
-		if err := tx.GetCloud(ctx, &cloud); err != nil {
-			zapctx.Error(ctx, "failed to fetch the cloud", zaputil.Error(err), zap.String("cloud-name", jujuCloud.Name))
 			return cloud, err
 		}
 	}
@@ -103,8 +97,6 @@ func addCloudTx(ctx context.Context, jujuCloud dbmodel.Cloud, tx *db.Database) (
 //
 // Additionally, it appends the added cloud region (to the database) to the passed
 // cloud dbmodel.Cloud. This prevents the need to get the cloud from the database again.
-//
-// TODO(ale8k): Instead of appending, just get the cloud again after the regions are added.
 func addCloudRegionsTx(ctx context.Context, cloud dbmodel.Cloud, regions []dbmodel.CloudRegion, tx *db.Database) (dbmodel.Cloud, error) {
 	for _, reg := range regions {
 		if cloud.Region(reg.Name).ID != 0 {
@@ -115,9 +107,6 @@ func addCloudRegionsTx(ctx context.Context, cloud dbmodel.Cloud, regions []dbmod
 			zapctx.Error(ctx, "failed to add cloud region", zaputil.Error(err))
 			return cloud, err
 		}
-		// Append to regions so the region can be trieved
-		// with the correct cloud name for the FK.
-		// cloud.Regions = append(cloud.Regions, reg)
 	}
 	return cloud, nil
 }
@@ -174,8 +163,7 @@ func storeControllerCloudsAndRegions(ctx context.Context, j *JIMM, dbClouds []db
 				return err
 			}
 			// Get the cloud again to populate it's regions (regions are preloaded)
-			// and now they can be used for updating the controllers
-			// CloudRegionsControllerPriority
+			// and now they can be used for updating the controller's region priorities.
 			if err := tx.GetCloud(ctx, &addedCloud); err != nil {
 				return err
 			}
