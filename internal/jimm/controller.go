@@ -41,29 +41,36 @@ var (
 	}
 )
 
-// addCloudSafeTx ensures that the cloud is added to the database. It first attempts
-// to get the cloud and if the code is errors.CodeNotFound, it will add the cloud,
-// and get the cloud again to ensure it has been added.
-func addCloudSafeTx(ctx context.Context, cloud *dbmodel.Cloud, tx *db.Database) error {
-	cloudCopy := dbmodel.Cloud{
-		Name: cloud.Name,
+// convertJujuCloudsToDbClouds converts all of the incoming Juju clouds into
+// dbmodel Clouds.
+func convertJujuCloudsToDbClouds(clouds map[names.CloudTag]jujuparams.Cloud) []dbmodel.Cloud {
+	var dbClouds []dbmodel.Cloud
+	for tag, cld := range clouds {
+		var cloud dbmodel.Cloud
+		cloud.FromJujuCloud(cld)
+		cloud.Name = tag.Id()
+		dbClouds = append(dbClouds, cloud)
 	}
-	if err := tx.GetCloud(ctx, &cloudCopy); err != nil {
-		if errors.ErrorCode(err) != errors.CodeNotFound {
-			zapctx.Error(ctx, "failed to fetch the cloud", zaputil.Error(err), zap.String("cloud-name", cloud.Name))
-			return err
-		}
-		err := tx.AddCloud(ctx, cloud)
-		if err != nil && errors.ErrorCode(err) != errors.CodeAlreadyExists {
-			zapctx.Error(ctx, "failed to add cloud", zaputil.Error(err))
-			return err
-		}
-		if err := tx.GetCloud(ctx, &cloudCopy); err != nil {
-			zapctx.Error(ctx, "failed to fetch the cloud", zaputil.Error(err), zap.String("cloud-name", cloud.Name))
-			return err
-		}
+	return dbClouds
+}
+
+// getControllerModelSummary returns the controllers model summary.
+func getControllerModelSummary(ctx context.Context, api API) (jujuparams.ModelSummary, error) {
+	var ms jujuparams.ModelSummary
+	if err := api.ControllerModelSummary(ctx, &ms); err != nil {
+		zapctx.Error(ctx, "failed to get model summary", zaputil.Error(err))
+		return ms, err
 	}
-	return nil
+	return ms, nil
+}
+
+// getCloudName returns the cloud name for a model summary.
+func getCloudName(modelSummary jujuparams.ModelSummary) (string, error) {
+	cloudTag, err := names.ParseCloudTag(modelSummary.CloudTag)
+	if err != nil {
+		return "", err
+	}
+	return cloudTag.Id(), nil
 }
 
 // addCloudTx adds a cloud from a juju API call within a transaction.
@@ -113,6 +120,76 @@ func addCloudRegionsTx(ctx context.Context, cloud dbmodel.Cloud, regions []dbmod
 		// cloud.Regions = append(cloud.Regions, reg)
 	}
 	return cloud, nil
+}
+
+// Sets controller cloud region priorities for this dbmodel.Controller,
+// these priorities are set based on the following.
+//
+// Regions are defined on two fields, the cloud name and the region name.
+//
+// We have two priorities and they are set based on whether
+// the incoming region matches the controllers model region.
+//
+//  1. Priority supported:
+//     If the region is NOT the same as the controllers region,
+//     it holds this priority.
+//  2. Priority deployed:
+//     If the region is the same as the controller model,
+//     it holds this priority.
+func setCloudRegionControllerPriorities(cloud dbmodel.Cloud, regions []dbmodel.CloudRegion, controller *dbmodel.Controller) {
+	for _, cr := range regions {
+		reg := cloud.Region(cr.Name)
+
+		priority := dbmodel.CloudRegionControllerPrioritySupported
+
+		if cloud.Name == controller.CloudName && cr.Name == controller.CloudRegion {
+			priority = dbmodel.CloudRegionControllerPriorityDeployed
+		}
+
+		controller.CloudRegions = append(controller.CloudRegions, dbmodel.CloudRegionControllerPriority{
+			CloudRegion: reg,
+			Priority:    uint(priority),
+		})
+	}
+}
+
+// storeControllerComplete stores the clouds, regions, cloud region priorities and the controller itself in the database determined
+// from the incoming Juju API.Clouds() call.
+func storeControllerCloudsAndRegions(ctx context.Context, j *JIMM, dbClouds []dbmodel.Cloud, ctl *dbmodel.Controller) error {
+	return j.Database.Transaction(func(tx *db.Database) error {
+		// Add clouds and their regions to db and sets the controllers
+		// cloud region priorities
+		for i := range dbClouds {
+			incomingJujuCloud := dbClouds[i]
+
+			// Add the cloud
+			addedCloud, err := addCloudTx(ctx, incomingJujuCloud, tx)
+			if err != nil {
+				return err
+			}
+
+			// Add the clouds regions
+			_, err = addCloudRegionsTx(ctx, addedCloud, incomingJujuCloud.Regions, tx)
+			if err != nil {
+				return err
+			}
+			// Get the cloud again to populate it's regions (regions are preloaded)
+			// and now they can be used for updating the controllers
+			// CloudRegionsControllerPriority
+			if err := tx.GetCloud(ctx, &addedCloud); err != nil {
+				return err
+			}
+
+			// Update controller dbmodel's region priotiries
+			setCloudRegionControllerPriorities(addedCloud, dbClouds[i].Regions, ctl)
+		}
+
+		// Finally, add the controller with all clouds and their regions set
+		if err := tx.AddController(ctx, ctl); err != nil {
+			return err
+		}
+		return nil
+	})
 }
 
 // AddController adds the specified controller to JIMM. Only
@@ -166,76 +243,12 @@ func (j *JIMM) AddController(ctx context.Context, user *openfga.User, ctl *dbmod
 		}
 	}
 
-	// all in single transaction
-	// get clouds from db based on controller call.
-	//
-	// add clouds that don't exist.
-	//
-	// loop regions for each cloud (from juju) and add regions
-	// now we've added the clouds for the fk.
-	//
-	// now regions added, set controller regions
-	// add controller.
-
-	err = j.Database.Transaction(func(tx *db.Database) error {
-		// Add clouds and their regions to db
-		for i := range dbClouds {
-			incomingJujuCloud := dbClouds[i]
-
-			// Add the cloud
-			cloud, err := addCloudTx(ctx, incomingJujuCloud, tx)
-			if err != nil {
-				return err
-			}
-
-			// Add the clouds regions
-			_, err = addCloudRegionsTx(ctx, cloud, incomingJujuCloud.Regions, tx)
-			if err != nil {
-				return err
-			}
-			// Get the cloud again to populate it's regions (regions are preloaded)
-			// and now they can be used for updating the controllers
-			// CloudRegionsControllerPriority
-			if err := tx.GetCloud(ctx, &cloud); err != nil {
-				return err
-			}
-
-			// Set controller cloud regions
-			for _, cr := range incomingJujuCloud.Regions {
-				reg := cloud.Region(cr.Name)
-
-				priority := dbmodel.CloudRegionControllerPrioritySupported
-
-				if cloud.Name == ctl.CloudName && cr.Name == ctl.CloudRegion {
-					priority = dbmodel.CloudRegionControllerPriorityDeployed
-				}
-
-				ctl.CloudRegions = append(ctl.CloudRegions, dbmodel.CloudRegionControllerPriority{
-					CloudRegion: reg,
-					Priority:    uint(priority),
-				})
-			}
+	if err := storeControllerCloudsAndRegions(ctx, j, dbClouds, ctl); err != nil {
+		zapctx.Error(ctx, "failed to add controller", zaputil.Error(err))
+		if errors.ErrorCode(err) == errors.CodeAlreadyExists {
+			return errors.E(op, err, fmt.Sprintf("controller %q already exists", ctl.Name))
 		}
 
-		// Prepare to add controller
-
-		// Do not store controller credentials, they're in our "CredentialStore".
-		// whether that be Vault or Postgres.
-		ctl.AdminIdentityName = ""
-		ctl.AdminPassword = ""
-
-		if err := tx.AddController(ctx, ctl); err != nil {
-			if errors.ErrorCode(err) == errors.CodeAlreadyExists {
-				zapctx.Error(ctx, "failed to add controller", zaputil.Error(err))
-				return errors.E(op, err, fmt.Sprintf("controller %q already exists", ctl.Name))
-			}
-			zapctx.Error(ctx, "failed to add controller", zaputil.Error(err))
-			return err
-		}
-		return nil
-	})
-
-	if err != nil {
 		return errors.E(op, err)
 	}
 
@@ -283,35 +296,6 @@ func (j *JIMM) AddController(ctx context.Context, user *openfga.User, ctl *dbmod
 	}
 
 	return nil
-}
-
-func convertJujuCloudsToDbClouds(clouds map[names.CloudTag]jujuparams.Cloud) []dbmodel.Cloud {
-	var dbClouds []dbmodel.Cloud
-	for tag, cld := range clouds {
-		var cloud dbmodel.Cloud
-		cloud.FromJujuCloud(cld)
-		cloud.Name = tag.Id()
-		dbClouds = append(dbClouds, cloud)
-	}
-	return dbClouds
-}
-
-// getControllerModelSummary returns the controllers model summary.
-func getControllerModelSummary(ctx context.Context, api API) (jujuparams.ModelSummary, error) {
-	var ms jujuparams.ModelSummary
-	if err := api.ControllerModelSummary(ctx, &ms); err != nil {
-		zapctx.Error(ctx, "failed to get model summary", zaputil.Error(err))
-		return ms, err
-	}
-	return ms, nil
-}
-
-func getCloudName(modelSummary jujuparams.ModelSummary) (string, error) {
-	cloudTag, err := names.ParseCloudTag(modelSummary.CloudTag)
-	if err != nil {
-		return "", err
-	}
-	return cloudTag.Id(), nil
 }
 
 // EarliestControllerVersion returns the earliest agent version
