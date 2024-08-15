@@ -18,15 +18,17 @@ import (
 	jimmRPC "github.com/canonical/jimm/v3/internal/rpc"
 )
 
-// An apiProxier serves the /commands and /api server for a model by
+// apiProxier serves the /commands and /api server for a model by
 // proxying all requests through to the controller.
 type apiProxier struct {
 	apiServer
 }
 
-var extractPathInfo = regexp.MustCompile(`^\/(?P<modeluuid>\w{8}-\w{4}-\w{4}-\w{4}-\w{12})\/(?P<finalPath>.*)$`)
-var modelIndex = mustGetSubexpIndex(extractPathInfo, "modeluuid")
-var finalPathIndex = mustGetSubexpIndex(extractPathInfo, "finalPath")
+var (
+	extractPathInfo = regexp.MustCompile(`^\/(?P<modeluuid>\w{8}-\w{4}-\w{4}-\w{4}-\w{12})\/(?P<finalPath>.*)$`)
+	modelIndex      = mustGetSubexpIndex(extractPathInfo, "modeluuid")
+	finalPathIndex  = mustGetSubexpIndex(extractPathInfo, "finalPath")
+)
 
 func mustGetSubexpIndex(regex *regexp.Regexp, name string) int {
 	index := regex.SubexpIndex(name)
@@ -36,8 +38,8 @@ func mustGetSubexpIndex(regex *regexp.Regexp, name string) int {
 	return index
 }
 
-// modelInfoFromPath takes a path to a model endpoint and returns the uuid
-// and final path element. I.e. /model/<uuid>/api returns <uuid>, api, err
+// modelInfoFromPath takes a URL path to a model endpoint and returns the uuid
+// and final URL segment. I.e. /model/<uuid>/api returns <uuid>, api, err
 // Basic validation of the uuid takes place.
 func modelInfoFromPath(path string) (uuid string, finalPath string, err error) {
 	matches := extractPathInfo.FindStringSubmatch(path)
@@ -48,6 +50,9 @@ func modelInfoFromPath(path string) (uuid string, finalPath string, err error) {
 }
 
 // ServeWS implements jimmhttp.WSServer.
+// It does so by acting as a websocket proxy that intercepts auth requests
+// to authenticate the user and create a token with their permissions before
+// forwarding their requests to the appropriate Juju controller.
 func (s apiProxier) ServeWS(ctx context.Context, clientConn *websocket.Conn) {
 	jwtGenerator := jimm.NewJWTGenerator(&s.jimm.Database, s.jimm, s.jimm.JWTService)
 	connectionFunc := controllerConnectionFunc(s, &jwtGenerator)

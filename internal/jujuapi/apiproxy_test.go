@@ -36,6 +36,9 @@ func (s *apiProxySuite) TestConnectToModel(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `no such request - method Admin.TestMethod is not implemented \(not implemented\)`)
 }
 
+// TestSessionTokenLoginProvider verifies that the session token login provider works as expected.
+// We do this by using a mock authenticator that simulates polling an OIDC server and verifying that
+// the user would be prompted with a login URL and fake the user login via the `EnableDeviceFlow` method.
 func (s *apiProxySuite) TestSessionTokenLoginProvider(c *gc.C) {
 	ctx := context.Background()
 	alice := names.NewUserTag("alice@canonical.com")
