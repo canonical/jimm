@@ -4,6 +4,7 @@ package rebac_admin
 
 import (
 	"context"
+	stderrors "errors"
 	"fmt"
 
 	v1 "github.com/canonical/rebac-admin-ui-handlers/v1"
@@ -270,5 +271,51 @@ func (s *groupsService) GetGroupEntitlements(ctx context.Context, groupId string
 
 // PatchGroupEntitlements performs addition or removal of an Entitlement to/from a Group identified by `groupId`.
 func (s *groupsService) PatchGroupEntitlements(ctx context.Context, groupId string, entitlementPatches []resources.GroupEntitlementsPatchItem) (bool, error) {
-	return false, v1.NewNotImplementedError("patch group entitlements not implemented")
+	user, err := utils.GetUserFromContext(ctx)
+	if err != nil {
+		return false, err
+	}
+	if !jimmnames.IsValidGroupId(groupId) {
+		return false, v1.NewValidationError("invalid group ID")
+	}
+	groupTag := jimmnames.NewGroupTag(groupId)
+	tuple := apiparams.RelationshipTuple{
+		Object: ofganames.WithMemberRelation(groupTag.String()),
+	}
+	var toRemove []apiparams.RelationshipTuple
+	var toAdd []apiparams.RelationshipTuple
+	var errList []error
+	for _, entitlementPatch := range entitlementPatches {
+		kind := entitlementPatch.Entitlement.EntityType
+		id := entitlementPatch.Entitlement.EntityId
+		tag, err := utils.ValidateDecomposedTag(kind, id)
+		if err != nil {
+			errList = append(errList, err)
+			continue
+		}
+		t := tuple
+		t.Relation = entitlementPatch.Entitlement.Entitlement
+		t.TargetObject = tag.String()
+		if entitlementPatch.Op == resources.GroupEntitlementsPatchItemOpAdd {
+			toAdd = append(toAdd, t)
+		} else {
+			toRemove = append(toRemove, t)
+		}
+	}
+	if len(errList) > 0 {
+		return false, stderrors.Join(errList...)
+	}
+	if toAdd != nil {
+		err := s.jimm.AddRelation(ctx, user, toAdd)
+		if err != nil {
+			return false, err
+		}
+	}
+	if toRemove != nil {
+		err := s.jimm.RemoveRelation(ctx, user, toRemove)
+		if err != nil {
+			return false, err
+		}
+	}
+	return true, nil
 }

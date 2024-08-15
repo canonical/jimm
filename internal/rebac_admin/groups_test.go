@@ -263,3 +263,61 @@ func TestGetGroupEntitlements(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(res, qt.IsNotNil)
 }
+
+func TestPatchGroupEntitlements(t *testing.T) {
+	c := qt.New(t)
+	var patchTuplesErr error
+	jimm := jimmtest.JIMM{
+		RelationService: mocks.RelationService{
+			AddRelation_: func(ctx context.Context, user *openfga.User, tuples []params.RelationshipTuple) error {
+				return patchTuplesErr
+			},
+			RemoveRelation_: func(ctx context.Context, user *openfga.User, tuples []params.RelationshipTuple) error {
+				return patchTuplesErr
+			},
+		},
+	}
+	user := openfga.User{}
+	ctx := context.Background()
+	ctx = rebac_handlers.ContextWithIdentity(ctx, &user)
+	groupSvc := rebac_admin.NewGroupService(&jimm)
+
+	_, err := groupSvc.PatchGroupEntitlements(ctx, "invalid-group-id", nil)
+	c.Assert(err, qt.ErrorMatches, ".* invalid group ID")
+
+	newUUID := uuid.New()
+	operations := []resources.GroupEntitlementsPatchItem{
+		{Entitlement: resources.EntityEntitlement{
+			Entitlement: "administrator",
+			EntityId:    newUUID.String(),
+			EntityType:  "model",
+		}, Op: resources.GroupEntitlementsPatchItemOpAdd},
+		{Entitlement: resources.EntityEntitlement{
+			Entitlement: "administrator",
+			EntityId:    newUUID.String(),
+			EntityType:  "model",
+		}, Op: resources.GroupEntitlementsPatchItemOpRemove},
+	}
+	res, err := groupSvc.PatchGroupEntitlements(ctx, newUUID.String(), operations)
+	c.Assert(err, qt.IsNil)
+	c.Assert(res, qt.IsTrue)
+
+	operationsWithInvalidTag := []resources.GroupEntitlementsPatchItem{
+		{Entitlement: resources.EntityEntitlement{
+			Entitlement: "administrator",
+			EntityId:    "foo",
+			EntityType:  "invalidType",
+		}, Op: resources.GroupEntitlementsPatchItemOpAdd},
+		{Entitlement: resources.EntityEntitlement{
+			Entitlement: "administrator",
+			EntityId:    "foo1",
+			EntityType:  "invalidType2",
+		}, Op: resources.GroupEntitlementsPatchItemOpAdd},
+	}
+	_, err = groupSvc.PatchGroupEntitlements(ctx, newUUID.String(), operationsWithInvalidTag)
+	c.Assert(err, qt.ErrorMatches, `\"invalidType-foo\" is not a valid tag\n\"invalidType2-foo1\" is not a valid tag`)
+
+	patchTuplesErr = errors.New("foo")
+	_, err = groupSvc.PatchGroupEntitlements(ctx, newUUID.String(), operations)
+	c.Assert(err, qt.ErrorMatches, "foo")
+}
