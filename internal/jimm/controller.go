@@ -125,6 +125,9 @@ func addCloudRegionsTx(ctx context.Context, cloud dbmodel.Cloud, regions []dbmod
 //  2. Priority deployed:
 //     If the region is the same as the controller model,
 //     it holds this priority.
+//
+// It is expected that the cloud passed already holds references to regions
+// and these regions will be appeneded to the controllers cloud region priorities.
 func setCloudRegionControllerPriorities(cloud dbmodel.Cloud, regions []dbmodel.CloudRegion, controller *dbmodel.Controller) {
 	for _, cr := range regions {
 		reg := cloud.Region(cr.Name)

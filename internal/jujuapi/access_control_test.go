@@ -5,7 +5,6 @@ package jujuapi_test
 import (
 	"context"
 	"database/sql"
-	"slices"
 	"time"
 
 	petname "github.com/dustinkirkland/golang-petname"
@@ -21,7 +20,6 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/pkg/api"
-	"github.com/canonical/jimm/v3/pkg/api/params"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 	"github.com/canonical/jimm/v3/pkg/names"
 )
@@ -975,12 +973,6 @@ func (s *accessControlSuite) TestListRelationshipTuplesNoUUIDResolution(c *gc.C)
 	c.Assert(len(response.Errors), gc.Equals, 0)
 }
 
-func getGroupIndexByName(groups []params.Group, name string) int {
-	return slices.IndexFunc(groups, func(g params.Group) bool {
-		return g.Name == name
-	})
-}
-
 func (s *accessControlSuite) TestListRelationshipTuplesAfterDeletingGroup(c *gc.C) {
 	ctx := context.Background()
 	user, _, controller, model, applicationOffer, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
@@ -991,25 +983,20 @@ func (s *accessControlSuite) TestListRelationshipTuplesAfterDeletingGroup(c *gc.
 	_, err = client.AddGroup(&apiparams.AddGroupRequest{Name: "orange"})
 	c.Assert(err, jc.ErrorIsNil)
 
-	groups, _ := client.ListGroups()
-
-	yellowGroupUUID := groups[getGroupIndexByName(groups, "yellow")].UUID
-	orangeGroupUUID := groups[getGroupIndexByName(groups, "orange")].UUID
-
 	tuples := []apiparams.RelationshipTuple{{
-		Object:       "group-" + orangeGroupUUID + "#member",
+		Object:       "group-orange#member",
 		Relation:     "member",
-		TargetObject: "group-" + yellowGroupUUID,
+		TargetObject: "group-yellow",
 	}, {
 		Object:       "user-" + user.Name,
 		Relation:     "member",
-		TargetObject: "group-" + orangeGroupUUID,
+		TargetObject: "group-orange",
 	}, {
-		Object:       "group-" + yellowGroupUUID + "#member",
+		Object:       "group-yellow#member",
 		Relation:     "administrator",
 		TargetObject: "controller-" + controller.Name,
 	}, {
-		Object:       "group-" + orangeGroupUUID + "#member",
+		Object:       "group-orange#member",
 		Relation:     "administrator",
 		TargetObject: "applicationoffer-" + controller.Name + ":" + user.Name + "/" + model.Name + "." + applicationOffer.Name,
 	}}
