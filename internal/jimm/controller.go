@@ -402,25 +402,22 @@ func (j *JIMM) GetUserControllerAccess(ctx context.Context, user *openfga.User, 
 	return ToControllerAccessString(accessLevel), nil
 }
 
-// ImportModel imports model with the specified uuid from the controller.
+// ImportModel imports model with the specified UUID from the controller.
 func (j *JIMM) ImportModel(ctx context.Context, user *openfga.User, controllerName string, modelTag names.ModelTag, newOwner string) error {
 	const op = errors.Op("jimm.ImportModel")
 
-	if !user.JimmAdmin {
-		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	if err := j.checkJimmAdmin(user); err != nil {
+		return err
 	}
 
-	controller := dbmodel.Controller{
-		Name: controllerName,
-	}
-	err := j.Database.GetController(ctx, &controller)
+	controller, err := j.getControllerByName(ctx, controllerName)
 	if err != nil {
 		return errors.E(op, err)
 	}
 
-	api, err := j.dial(ctx, &controller, names.ModelTag{})
+	api, err := j.dialController(ctx, controller)
 	if err != nil {
-		return errors.E(op, err)
+		return errors.E(op, "failed to dial the controller", err)
 	}
 	defer api.Close()
 
@@ -438,7 +435,7 @@ func (j *JIMM) ImportModel(ctx context.Context, user *openfga.User, controllerNa
 		return errors.E(op, err)
 	}
 	model.ControllerID = controller.ID
-	model.Controller = controller
+	model.Controller = *controller
 
 	var ownerTag names.UserTag
 	if newOwner != "" {
@@ -513,18 +510,13 @@ func (j *JIMM) ImportModel(ctx context.Context, user *openfga.User, controllerNa
 		return errors.E(op, err)
 	}
 
-	regionFound := false
-	for _, cr := range cloud.Regions {
-		if cr.Name == modelInfo.CloudRegion {
-			regionFound = true
-			model.CloudRegion = cr
-			model.CloudRegionID = cr.ID
-			break
-		}
-	}
-	if !regionFound {
+	cr := cloud.Region(modelInfo.CloudRegion)
+	if cr.Name != modelInfo.CloudRegion {
 		return errors.E(op, "cloud region not found")
 	}
+
+	model.CloudRegionID = cr.ID
+	model.CloudRegion = cr
 
 	err = j.Database.AddModel(ctx, &model)
 	if err != nil {
@@ -534,7 +526,11 @@ func (j *JIMM) ImportModel(ctx context.Context, user *openfga.User, controllerNa
 		return errors.E(op, err)
 	}
 
-	modelAPI, err := j.dial(ctx, &controller, modelTag)
+	return getModelDeltas(ctx, op, j, controller, modelTag, model)
+}
+
+func getModelDeltas(ctx context.Context, op errors.Op, j *JIMM, controller *dbmodel.Controller, modelTag names.ModelTag, model dbmodel.Model) error {
+	modelAPI, err := j.dial(ctx, controller, modelTag)
 	if err != nil {
 		return errors.E(op, err)
 	}
@@ -574,7 +570,6 @@ func (j *JIMM) ImportModel(ctx context.Context, user *openfga.User, controllerNa
 			return errors.E(op, err)
 		}
 	}
-
 	return nil
 }
 
