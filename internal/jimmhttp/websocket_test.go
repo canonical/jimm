@@ -105,12 +105,10 @@ func TestWSHandlerNilServer(t *testing.T) {
 	c.Cleanup(srv.Close)
 
 	var d websocket.Dialer
-	conn, resp, err := d.Dial("ws"+strings.TrimPrefix(srv.URL, "http"), nil)
-	c.Assert(err, qt.IsNil)
+	_, resp, err := d.Dial("ws"+strings.TrimPrefix(srv.URL, "http"), nil)
+	c.Assert(err, qt.ErrorMatches, "websocket: bad handshake")
+	c.Assert(resp.StatusCode, qt.Equals, http.StatusInternalServerError)
 	defer resp.Body.Close()
-
-	_, _, err = conn.ReadMessage()
-	c.Assert(err, qt.ErrorMatches, `websocket: close 1000 \(normal\)`)
 }
 
 type authFailServer struct{ c jimmtest.SimpleTester }
