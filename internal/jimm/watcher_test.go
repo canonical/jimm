@@ -510,6 +510,7 @@ var watcherTests = []struct {
 	},
 }}
 
+//nolint:gocognit
 func TestWatcher(t *testing.T) {
 	c := qt.New(t)
 

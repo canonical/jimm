@@ -137,7 +137,7 @@ func (s *InMemoryCredentialStore) GetJWKSPrivateKey(ctx context.Context) ([]byte
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	if s.privateKey == nil || len(s.privateKey) == 0 {
+	if len(s.privateKey) == 0 {
 		return nil, errors.E(errors.CodeNotFound)
 	}
 

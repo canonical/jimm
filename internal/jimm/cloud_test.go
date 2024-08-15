@@ -1344,6 +1344,7 @@ var revokeCloudAccessTests = []struct {
 	expectError:    `failed to recognize given access: "some-unknown-access"`,
 }}
 
+//nolint:gocognit
 func TestRevokeCloudAccess(t *testing.T) {
 	c := qt.New(t)
 
@@ -1373,7 +1374,7 @@ func TestRevokeCloudAccess(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
 
-			if tt.extraInitialTuples != nil && len(tt.extraInitialTuples) > 0 {
+			if len(tt.extraInitialTuples) > 0 {
 				err = client.AddRelation(ctx, tt.extraInitialTuples...)
 				c.Assert(err, qt.IsNil)
 			}
