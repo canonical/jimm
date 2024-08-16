@@ -41,8 +41,8 @@ var (
 	}
 )
 
-// convertJujuCloudsToDbClouds converts all of the incoming Juju clouds into
-// dbmodel Clouds.
+// convertJujuCloudsToDbClouds converts all of the incoming Juju clouds (from a map) into
+// a slice of dbmodel Clouds.
 func convertJujuCloudsToDbClouds(clouds map[names.CloudTag]jujuparams.Cloud) []dbmodel.Cloud {
 	var dbClouds []dbmodel.Cloud
 	for tag, cld := range clouds {
@@ -64,8 +64,8 @@ func getControllerModelSummary(ctx context.Context, api API) (jujuparams.ModelSu
 	return ms, nil
 }
 
-// getCloudName returns the cloud name for a model summary.
-func getCloudName(modelSummary jujuparams.ModelSummary) (string, error) {
+// getCloudNameFromModelSummary returns the cloud name for a model summary.
+func getCloudNameFromModelSummary(modelSummary jujuparams.ModelSummary) (string, error) {
 	cloudTag, err := names.ParseCloudTag(modelSummary.CloudTag)
 	if err != nil {
 		return "", err
@@ -73,10 +73,28 @@ func getCloudName(modelSummary jujuparams.ModelSummary) (string, error) {
 	return cloudTag.Id(), nil
 }
 
+// addControllerTransactor adds a controller to the database ensuring it's clouds, regions
+// and region priorities have also been persisted. Additionally, it ensures the region
+// priotiries are set too.
+type addControllerTransactor struct {
+	jimm       *JIMM
+	jujuClouds []dbmodel.Cloud
+	controller *dbmodel.Controller
+}
+
+// newAddControllerTransactor creates a new addControllerTransactor.
+func newAddControllerTransactor(j *JIMM, jujuClouds []dbmodel.Cloud, ctl *dbmodel.Controller) *addControllerTransactor {
+	return &addControllerTransactor{
+		jimm:       j,
+		jujuClouds: jujuClouds,
+		controller: ctl,
+	}
+}
+
 // addCloudTx adds a cloud from a juju API call within a transaction.
 //
 // After the cloud has been added, it is returned.
-func addCloudTx(ctx context.Context, jujuCloud dbmodel.Cloud, tx *db.Database) (dbmodel.Cloud, error) {
+func (act *addControllerTransactor) addCloudTx(ctx context.Context, jujuCloud dbmodel.Cloud, tx *db.Database) (dbmodel.Cloud, error) {
 	cloud := jujuCloud
 	if err := tx.GetCloud(ctx, &cloud); err != nil {
 		if errors.ErrorCode(err) != errors.CodeNotFound {
@@ -97,7 +115,7 @@ func addCloudTx(ctx context.Context, jujuCloud dbmodel.Cloud, tx *db.Database) (
 //
 // Additionally, it appends the added cloud region (to the database) to the passed
 // cloud dbmodel.Cloud. This prevents the need to get the cloud from the database again.
-func addCloudRegionsTx(ctx context.Context, cloud dbmodel.Cloud, regions []dbmodel.CloudRegion, tx *db.Database) (dbmodel.Cloud, error) {
+func (act *addControllerTransactor) addCloudRegionsTx(ctx context.Context, cloud dbmodel.Cloud, regions []dbmodel.CloudRegion, tx *db.Database) (dbmodel.Cloud, error) {
 	for _, reg := range regions {
 		if cloud.Region(reg.Name).ID != 0 {
 			continue
@@ -127,42 +145,42 @@ func addCloudRegionsTx(ctx context.Context, cloud dbmodel.Cloud, regions []dbmod
 //     it holds this priority.
 //
 // It is expected that the cloud passed has already been loaded with the previously added
-// regions.These regions will be appended to the controller's cloud region priorities.
+// regions. These regions will be appended to the controller's cloud region priorities.
 // in preparation for adding the controller.
-func setCloudRegionControllerPriorities(cloud dbmodel.Cloud, regions []dbmodel.CloudRegion, controller *dbmodel.Controller) {
+func (act *addControllerTransactor) setCloudRegionControllerPriorities(cloud dbmodel.Cloud, regions []dbmodel.CloudRegion) {
 	for _, cr := range regions {
 		reg := cloud.Region(cr.Name)
 
 		priority := dbmodel.CloudRegionControllerPrioritySupported
 
-		if cloud.Name == controller.CloudName && cr.Name == controller.CloudRegion {
+		if cloud.Name == act.controller.CloudName && cr.Name == act.controller.CloudRegion {
 			priority = dbmodel.CloudRegionControllerPriorityDeployed
 		}
 
-		controller.CloudRegions = append(controller.CloudRegions, dbmodel.CloudRegionControllerPriority{
+		act.controller.CloudRegions = append(act.controller.CloudRegions, dbmodel.CloudRegionControllerPriority{
 			CloudRegion: reg,
 			Priority:    uint(priority),
 		})
 	}
 }
 
-// storeControllerComplete stores the clouds, regions, cloud region priorities and the controller itself in the database determined
+// Run stores the clouds, regions, cloud region priorities and the controller itself in the database determined
 // from the incoming Juju API.Clouds() call.
-func storeControllerCloudsAndRegions(ctx context.Context, j *JIMM, dbClouds []dbmodel.Cloud, ctl *dbmodel.Controller) error {
-	return j.Database.Transaction(func(tx *db.Database) error {
+func (act *addControllerTransactor) Run(ctx context.Context) error {
+	return act.jimm.Database.Transaction(func(tx *db.Database) error {
 		// Add clouds and their regions to db and sets the controllers
 		// cloud region priorities
-		for i := range dbClouds {
-			incomingJujuCloud := dbClouds[i]
+		for i := range act.jujuClouds {
+			incomingJujuCloud := act.jujuClouds[i]
 
 			// Add the cloud
-			addedCloud, err := addCloudTx(ctx, incomingJujuCloud, tx)
+			addedCloud, err := act.addCloudTx(ctx, incomingJujuCloud, tx)
 			if err != nil {
 				return err
 			}
 
 			// Add the clouds regions
-			_, err = addCloudRegionsTx(ctx, addedCloud, incomingJujuCloud.Regions, tx)
+			_, err = act.addCloudRegionsTx(ctx, addedCloud, incomingJujuCloud.Regions, tx)
 			if err != nil {
 				return err
 			}
@@ -173,11 +191,11 @@ func storeControllerCloudsAndRegions(ctx context.Context, j *JIMM, dbClouds []db
 			}
 
 			// Update controller dbmodel's region priotiries
-			setCloudRegionControllerPriorities(addedCloud, dbClouds[i].Regions, ctl)
+			act.setCloudRegionControllerPriorities(addedCloud, act.jujuClouds[i].Regions)
 		}
 
 		// Finally, add the controller with all clouds and their regions set
-		if err := tx.AddController(ctx, ctl); err != nil {
+		if err := tx.AddController(ctx, act.controller); err != nil {
 			return err
 		}
 		return nil
@@ -210,7 +228,7 @@ func (j *JIMM) AddController(ctx context.Context, user *openfga.User, ctl *dbmod
 		return errors.E(op, err, "failed to get model summary")
 	}
 
-	cloudName, err := getCloudName(modelSummary)
+	cloudName, err := getCloudNameFromModelSummary(modelSummary)
 	if err != nil {
 		return errors.E(op, err, "failed to parse the cloud tag")
 	}
@@ -240,7 +258,8 @@ func (j *JIMM) AddController(ctx context.Context, user *openfga.User, ctl *dbmod
 	ctl.AdminIdentityName = ""
 	ctl.AdminPassword = ""
 
-	if err := storeControllerCloudsAndRegions(ctx, j, dbClouds, ctl); err != nil {
+	transactor := newAddControllerTransactor(j, dbClouds, ctl)
+	if err := transactor.Run(ctx); err != nil {
 		zapctx.Error(ctx, "failed to add controller", zaputil.Error(err))
 		if errors.ErrorCode(err) == errors.CodeAlreadyExists {
 			return errors.E(op, err, fmt.Sprintf("controller %q already exists", ctl.Name))
