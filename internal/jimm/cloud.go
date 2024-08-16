@@ -208,7 +208,7 @@ func (j *JIMM) AddCloudToController(ctx context.Context, user *openfga.User, con
 
 	// TODO(ale8k): We've added the cloud to the db, but the access failed.
 	// This call needs to be idempotent.
-	if err := j.addCloudControllerRelation(ctx, dbCloud, controller); err != nil {
+	if err := j.addCloudControllerRelation(ctx, dbCloud, *controller); err != nil {
 		return errors.E(op, err)
 	}
 	return nil
@@ -743,7 +743,7 @@ func (j *JIMM) RemoveCloudFromController(ctx context.Context, user *openfga.User
 }
 
 // addCloudControllerRelation adds a controller relation between a cloud and controller.
-func (j *JIMM) addCloudControllerRelation(ctx context.Context, cloud dbmodel.Cloud, ctl *dbmodel.Controller) error {
+func (j *JIMM) addCloudControllerRelation(ctx context.Context, cloud dbmodel.Cloud, ctl dbmodel.Controller) error {
 	err := j.OpenFGAClient.AddCloudController(ctx, cloud.ResourceTag(), ctl.ResourceTag())
 	if err != nil {
 		zapctx.Error(

@@ -533,6 +533,12 @@ func (t *tagResolver) userTag(ctx context.Context) (*ofga.Entity, error) {
 		"Resolving JIMM tags to Juju tags for tag kind: user",
 		zap.String("user-name", t.trailer),
 	)
+
+	valid := names.IsValidUser(t.trailer)
+	if !valid {
+		// TODO(ale8k): Return custom error for validation check at JujuAPI
+		return nil, errors.E("invalid user")
+	}
 	return ofganames.ConvertTagWithRelation(names.NewUserTag(t.trailer), t.relation), nil
 }
 
@@ -548,11 +554,13 @@ func (t *tagResolver) groupTag(ctx context.Context, db *db.Database) (*ofga.Enti
 	} else if t.trailer != "" {
 		entry.Name = t.trailer
 	}
+
 	err := db.GetGroup(ctx, &entry)
 	if err != nil {
 		return nil, errors.E(fmt.Sprintf("group %s not found", t.trailer))
 	}
-	return ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag(entry.UUID), t.relation), nil
+
+	return ofganames.ConvertTagWithRelation(entry.ResourceTag(), t.relation), nil
 }
 
 func (t *tagResolver) controllerTag(ctx context.Context, jimmUUID string, db *db.Database) (*ofga.Entity, error) {
@@ -579,7 +587,7 @@ func (t *tagResolver) controllerTag(ctx context.Context, jimmUUID string, db *db
 	if err != nil {
 		return nil, errors.E("controller not found")
 	}
-	return ofganames.ConvertTagWithRelation(names.NewControllerTag(controller.UUID), t.relation), nil
+	return ofganames.ConvertTagWithRelation(controller.ResourceTag(), t.relation), nil
 }
 
 func (t *tagResolver) modelTag(ctx context.Context, db *db.Database) (*ofga.Entity, error) {
@@ -625,16 +633,7 @@ func (t *tagResolver) applicationOfferTag(ctx context.Context, db *db.Database) 
 			zapctx.Debug(
 				ctx,
 				"failed to parse application offer url",
-				zap.String(
-					"url",
-					fmt.Sprintf(
-						"%s:%s/%s.%s",
-						t.controllerName,
-						t.userName,
-						t.modelName,
-						t.offerName,
-					),
-				),
+				zap.String("url", fmt.Sprintf("%s:%s/%s.%s", t.controllerName, t.userName, t.modelName, t.offerName)),
 				zaputil.Error(err),
 			)
 			return nil, errors.E("failed to parse offer url", err)
@@ -647,7 +646,7 @@ func (t *tagResolver) applicationOfferTag(ctx context.Context, db *db.Database) 
 		return nil, errors.E("application offer not found")
 	}
 
-	return ofganames.ConvertTagWithRelation(names.NewApplicationOfferTag(offer.UUID), t.relation), nil
+	return ofganames.ConvertTagWithRelation(offer.ResourceTag(), t.relation), nil
 }
 func (t *tagResolver) serviceAccountTag(ctx context.Context) (*ofga.Entity, error) {
 	zapctx.Debug(
@@ -655,6 +654,11 @@ func (t *tagResolver) serviceAccountTag(ctx context.Context) (*ofga.Entity, erro
 		"Resolving JIMM tags to Juju tags for tag kind: serviceaccount",
 		zap.String("serviceaccount-name", t.trailer),
 	)
+	if !jimmnames.IsValidServiceAccountId(t.trailer) {
+		// TODO(ale8k): Return custom error for validation check at JujuAPI
+		return nil, errors.E("invalid service account id")
+	}
+
 	return ofganames.ConvertTagWithRelation(jimmnames.NewServiceAccountTag(t.trailer), t.relation), nil
 }
 
