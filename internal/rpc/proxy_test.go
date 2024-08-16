@@ -20,6 +20,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/rpc"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
+	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
 
 type message struct {
@@ -325,7 +326,11 @@ func (j *mockLoginService) LoginClientCredentials(ctx context.Context, clientID 
 	if clientID != j.clientID || clientSecret != j.clientSecret {
 		return nil, errors.E("invalid client credentials")
 	}
-	identity, err := dbmodel.NewIdentity(j.clientID)
+	clientIdWithDomain, err := jimmnames.EnsureValidServiceAccountId(clientID)
+	if err != nil {
+		return nil, errors.E("invalid client credential ID")
+	}
+	identity, err := dbmodel.NewIdentity(clientIdWithDomain)
 	if err != nil {
 		return nil, err
 	}

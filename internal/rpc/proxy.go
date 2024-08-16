@@ -612,7 +612,18 @@ func (p *clientProxy) handleAdminFacade(ctx context.Context, msg *message) (clie
 	errorFnc := func(err error) (*message, *message, error) {
 		return nil, nil, err
 	}
-	controllerLoginMessageFnc := func(data []byte) (*message, *message, error) {
+	controllerLoginMessageFnc := func(user *openfga.User) (*message, *message, error) {
+		jwt, err := p.tokenGen.MakeLoginToken(ctx, user)
+		if err != nil {
+			return errorFnc(err)
+		}
+		data, err := json.Marshal(params.LoginRequest{
+			AuthTag: names.NewUserTag(user.Name).String(),
+			Token:   base64.StdEncoding.EncodeToString(jwt),
+		})
+		if err != nil {
+			return errorFnc(err)
+		}
 		m := *msg
 		m.Type = "Admin"
 		m.Request = "Login"
@@ -662,18 +673,7 @@ func (p *clientProxy) handleAdminFacade(ctx context.Context, msg *message) (clie
 			return errorFnc(err)
 		}
 
-		jwt, err := p.tokenGen.MakeLoginToken(ctx, user)
-		if err != nil {
-			return errorFnc(err)
-		}
-		data, err := json.Marshal(params.LoginRequest{
-			AuthTag: names.NewUserTag(user.Name).String(),
-			Token:   base64.StdEncoding.EncodeToString(jwt),
-		})
-		if err != nil {
-			return errorFnc(err)
-		}
-		return controllerLoginMessageFnc(data)
+		return controllerLoginMessageFnc(user)
 	case "LoginWithClientCredentials":
 		var request apiparams.LoginWithClientCredentialsRequest
 		err := json.Unmarshal(msg.Params, &request)
@@ -685,36 +685,14 @@ func (p *clientProxy) handleAdminFacade(ctx context.Context, msg *message) (clie
 			return errorFnc(err)
 		}
 
-		jwt, err := p.tokenGen.MakeLoginToken(ctx, user)
-		if err != nil {
-			return errorFnc(err)
-		}
-		data, err := json.Marshal(params.LoginRequest{
-			AuthTag: user.ResourceTag().String(),
-			Token:   base64.StdEncoding.EncodeToString(jwt),
-		})
-		if err != nil {
-			return errorFnc(err)
-		}
-		return controllerLoginMessageFnc(data)
+		return controllerLoginMessageFnc(user)
 	case "LoginWithSessionCookie":
 		user, err := p.loginService.LoginWithSessionCookie(ctx, p.modelProxy.authenticatedIdentityID)
 		if err != nil {
 			return errorFnc(err)
 		}
 
-		jwt, err := p.tokenGen.MakeLoginToken(ctx, user)
-		if err != nil {
-			return errorFnc(err)
-		}
-		data, err := json.Marshal(params.LoginRequest{
-			AuthTag: user.ResourceTag().String(),
-			Token:   base64.StdEncoding.EncodeToString(jwt),
-		})
-		if err != nil {
-			return errorFnc(err)
-		}
-		return controllerLoginMessageFnc(data)
+		return controllerLoginMessageFnc(user)
 	case "Login":
 		return errorFnc(errors.E("JIMM does not support login from old clients", errors.CodeNotSupported))
 	default:
