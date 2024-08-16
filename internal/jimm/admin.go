@@ -56,9 +56,11 @@ func (j *JIMM) GetDeviceSessionToken(ctx context.Context, deviceOAuthResponse *o
 // LoginClientCredentials verifies a user's client ID and secret before the user is logged in.
 func (j *JIMM) LoginClientCredentials(ctx context.Context, clientID string, clientSecret string) (*openfga.User, error) {
 	const op = errors.Op("jimm.LoginClientCredentials")
+	// We expect the client to send the service account ID "as-is" and because we know that this is a clientCredentials login,
+	// we can append the @serviceaccount domain to the clientID (if not already present).
 	clientIdWithDomain, err := names.EnsureValidServiceAccountId(clientID)
 	if err != nil {
-		return nil, errors.E(op, "invalid client ID")
+		return nil, errors.E(op, err)
 	}
 
 	err = j.OAuthAuthenticator.VerifyClientCredentials(ctx, clientID, clientSecret)

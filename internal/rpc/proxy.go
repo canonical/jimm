@@ -20,7 +20,6 @@ import (
 	"github.com/canonical/jimm/v3/internal/servermon"
 	"github.com/canonical/jimm/v3/internal/utils"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
-	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
 
 const (
@@ -681,10 +680,6 @@ func (p *clientProxy) handleAdminFacade(ctx context.Context, msg *message) (clie
 		if err != nil {
 			return errorFnc(err)
 		}
-		clientIdWithDomain, err := jimmnames.EnsureValidServiceAccountId(request.ClientID)
-		if err != nil {
-			return errorFnc(err)
-		}
 		user, err := p.loginService.LoginClientCredentials(ctx, request.ClientID, request.ClientSecret)
 		if err != nil {
 			return errorFnc(err)
@@ -695,7 +690,7 @@ func (p *clientProxy) handleAdminFacade(ctx context.Context, msg *message) (clie
 			return errorFnc(err)
 		}
 		data, err := json.Marshal(params.LoginRequest{
-			AuthTag: names.NewUserTag(clientIdWithDomain).String(),
+			AuthTag: user.ResourceTag().String(),
 			Token:   base64.StdEncoding.EncodeToString(jwt),
 		})
 		if err != nil {
