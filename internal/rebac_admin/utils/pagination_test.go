@@ -11,33 +11,33 @@ import (
 	"github.com/canonical/jimm/v3/internal/rebac_admin/utils"
 )
 
-func TestMarshalRebacToken(t *testing.T) {
+func TestMarshalEntitlementToken(t *testing.T) {
 	c := qt.New(t)
 
 	tests := []struct {
 		desc          string
-		token         utils.RebacToken
+		token         utils.EntitlementPaginationToken
 		expectedError string
 		expectedToken string
 	}{{
 		desc: "Valid marshal token",
-		token: utils.RebacToken{
+		token: utils.EntitlementPaginationToken{
 			Kind:         openfga.ModelType,
 			OpenFGAToken: "continuation-token",
 		},
 		expectedToken: "eyJraW5kIjoibW9kZWwiLCJ0b2tlbiI6ImNvbnRpbnVhdGlvbi10b2tlbiJ9",
 	}, {
 		desc: "invalid - missing kind",
-		token: utils.RebacToken{
+		token: utils.EntitlementPaginationToken{
 			Kind:         "",
 			OpenFGAToken: "continuation-token",
 		},
-		expectedError: "marshal rebac token: kind not specified",
+		expectedError: "marshal entitlement token: kind not specified",
 	}}
 
 	for _, tC := range tests {
 		c.Run(tC.desc, func(c *qt.C) {
-			data, err := tC.token.MarshalRebacToken()
+			data, err := tC.token.MarshalToken()
 			if tC.expectedError != "" {
 				c.Assert(err, qt.ErrorMatches, tC.expectedError)
 			} else {
@@ -47,19 +47,19 @@ func TestMarshalRebacToken(t *testing.T) {
 	}
 }
 
-func TestUnmarshalRebacToken(t *testing.T) {
+func TestUnmarshalEntitlementToken(t *testing.T) {
 	c := qt.New(t)
 
 	tests := []struct {
 		desc          string
 		in            string
-		expectedToken utils.RebacToken
+		expectedToken utils.EntitlementPaginationToken
 		expectedError string
 	}{
 		{
 			desc: "Valid token",
 			in:   "eyJraW5kIjoibW9kZWwiLCJ0b2tlbiI6ImNvbnRpbnVhdGlvbi10b2tlbiJ9",
-			expectedToken: utils.RebacToken{
+			expectedToken: utils.EntitlementPaginationToken{
 				Kind:         openfga.ModelType,
 				OpenFGAToken: "continuation-token",
 			},
@@ -67,14 +67,14 @@ func TestUnmarshalRebacToken(t *testing.T) {
 		{
 			desc:          "Invalid token",
 			in:            "abc",
-			expectedError: "marshal rebac token: illegal base64 data at input byte 0",
+			expectedError: "marshal entitlement token: illegal base64 data at input byte 0",
 		},
 	}
 
 	for _, tC := range tests {
 		c.Run(tC.desc, func(c *qt.C) {
-			var token utils.RebacToken
-			err := token.UnmarshalRebacToken(tC.in)
+			var token utils.EntitlementPaginationToken
+			err := token.UnmarshalToken(tC.in)
 			if tC.expectedError != "" {
 				c.Assert(err, qt.ErrorMatches, tC.expectedError)
 			} else {
@@ -102,8 +102,8 @@ func TestCreateEntitlementPaginationFilter(t *testing.T) {
 		{
 			desc: "model resource page token",
 			nextPageToken: func() string {
-				t := utils.RebacToken{Kind: openfga.ModelType, OpenFGAToken: "123"}
-				res, err := t.MarshalRebacToken()
+				t := utils.EntitlementPaginationToken{Kind: openfga.ModelType, OpenFGAToken: "123"}
+				res, err := t.MarshalToken()
 				c.Assert(err, qt.IsNil)
 				return res
 			},

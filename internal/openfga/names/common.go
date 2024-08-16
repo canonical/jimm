@@ -1,7 +1,11 @@
 package names
 
-// WithMemberRelation is a convenience function to return an ID with a member
-// relation, commonly used with group types when they need a #member relation.
-func WithMemberRelation(id string) string {
-	return id + "#" + MemberRelation.String()
+import (
+	"github.com/canonical/jimm/v3/pkg/names"
+)
+
+// WithMemberRelation is a convenience function for group tags to return the tag's string
+// with a member relation, commonly used when assigning group relations.
+func WithMemberRelation(groupTag names.GroupTag) string {
+	return groupTag.String() + "#" + MemberRelation.String()
 }

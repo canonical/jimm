@@ -60,8 +60,8 @@ func CreateEntitlementPaginationFilter(size *int, token, tokenFromHeader *string
 			TargetKind:      entitlementResources[0],
 		}, nil
 	}
-	var ct RebacToken
-	err := ct.UnmarshalRebacToken(filter.Token())
+	var ct EntitlementPaginationToken
+	err := ct.UnmarshalToken(filter.Token())
 	if err != nil {
 		return EntitlementPagination{}, fmt.Errorf("failed to decode pagination token: %w", err)
 	}
@@ -76,7 +76,7 @@ func CreateEntitlementPaginationFilter(size *int, token, tokenFromHeader *string
 // for use by all GetEntitlement endpoints.
 // Use this function alongside `CreateEntitlementPaginationFilter` to page over all entitlements.
 func NextEntitlementToken(kind openfga.Kind, OpenFGAToken string) (string, error) {
-	var ct RebacToken
+	var ct EntitlementPaginationToken
 	ct.OpenFGAToken = OpenFGAToken
 	ct.Kind = kind
 	// If the OpenFGA token is empty, we are at the end of the result set for that resource.
@@ -91,37 +91,39 @@ func NextEntitlementToken(kind openfga.Kind, OpenFGAToken string) (string, error
 		}
 		ct.Kind = entitlementResources[resourceIndex+1]
 	}
-	res, err := ct.MarshalRebacToken()
+	res, err := ct.MarshalToken()
 	if err != nil {
 		return "", fmt.Errorf("failed to generate next entitlement token: %w", err)
 	}
 	return res, nil
 }
 
-type RebacToken struct {
+// EntitlementPaginationToken contains information on the current resource
+// and OpenFGA page token used when paginating over entitlements.
+type EntitlementPaginationToken struct {
 	Kind         openfga.Kind `json:"kind"`
 	OpenFGAToken string       `json:"token"`
 }
 
-// MarshalRebacToken marshals the rebac token into a base64 endcoded token.
-func (c *RebacToken) MarshalRebacToken() (string, error) {
+// MarshalToken marshals the entitlement pagination token into a base64 encoded token.
+func (c *EntitlementPaginationToken) MarshalToken() (string, error) {
 	if c.Kind == openfga.Kind("") {
-		return "", errors.New("marshal rebac token: kind not specified")
+		return "", errors.New("marshal entitlement token: kind not specified")
 	}
 
 	b, err := json.Marshal(c)
 	if err != nil {
-		return "", fmt.Errorf("marshal rebac token: %w", err)
+		return "", fmt.Errorf("marshal entitlement token: %w", err)
 	}
 
 	return base64.StdEncoding.EncodeToString(b), nil
 }
 
-// UnmarshalRebacToken unmarshals a base64 encoded rebac token.
-func (c *RebacToken) UnmarshalRebacToken(text string) error {
+// UnmarshalToken unmarshals a base64 encoded entitlement pagination token.
+func (c *EntitlementPaginationToken) UnmarshalToken(text string) error {
 	out, err := base64.StdEncoding.DecodeString(text)
 	if err != nil {
-		return fmt.Errorf("marshal rebac token: %w", err)
+		return fmt.Errorf("marshal entitlement token: %w", err)
 	}
 
 	return json.Unmarshal(out, c)

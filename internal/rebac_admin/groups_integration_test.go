@@ -148,6 +148,7 @@ func (s rebacAdminSuite) TestGetGroupEntitlementsIntegration(c *gc.C) {
 	req := resources.GetGroupsItemEntitlementsParams{NextPageToken: &emptyPageToken}
 	foundModelEntitlement := false
 	foundControllerEntitlement := false
+	totalTuples := 0
 	for {
 		count++
 		if count > 10 {
@@ -158,6 +159,7 @@ func (s rebacAdminSuite) TestGetGroupEntitlementsIntegration(c *gc.C) {
 		c.Assert(err, gc.IsNil)
 		c.Assert(res, gc.Not(gc.IsNil))
 		if res.Meta.Size > 0 {
+			totalTuples += res.Meta.Size
 			c.Assert(res.Meta.Size, gc.Equals, 3)
 			c.Assert(res.Data, gc.HasLen, 3)
 			c.Assert(res.Data[0].Entitlement, gc.Equals, ofganames.AdministratorRelation.String())
@@ -178,5 +180,5 @@ func (s rebacAdminSuite) TestGetGroupEntitlementsIntegration(c *gc.C) {
 	}
 	c.Assert(foundModelEntitlement, gc.Equals, true)
 	c.Assert(foundControllerEntitlement, gc.Equals, true)
-
+	c.Assert(totalTuples, gc.Equals, 6)
 }

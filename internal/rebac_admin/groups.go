@@ -255,7 +255,7 @@ func (s *groupsService) GetGroupEntitlements(ctx context.Context, groupId string
 	tuple := apiparams.RelationshipTuple{
 		// Groups can only be related to entities when they have the #member relation. Construct that here rather than putting
 		// the onus on the client to know this detail.
-		Object:       ofganames.WithMemberRelation(groupTag.String()),
+		Object:       ofganames.WithMemberRelation(groupTag),
 		TargetObject: string(filter.TargetKind),
 	}
 	tuples, nextToken, err := s.jimm.ListRelationshipTuples(ctx, user, tuple, int32(filter.TokenPagination.Limit()), filter.TokenPagination.Token())
