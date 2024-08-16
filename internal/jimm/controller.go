@@ -75,33 +75,35 @@ func getCloudNameFromModelSummary(modelSummary jujuparams.ModelSummary) (string,
 
 // addControllerTransactor adds a controller to the database ensuring it's clouds, regions
 // and region priorities have also been persisted. Additionally, it ensures the region
-// priotiries are set too.
+// priorities are set too.
 type addControllerTransactor struct {
 	jimm       *JIMM
 	jujuClouds []dbmodel.Cloud
 	controller *dbmodel.Controller
+	tx         *db.Database
 }
 
 // newAddControllerTransactor creates a new addControllerTransactor.
-func newAddControllerTransactor(j *JIMM, jujuClouds []dbmodel.Cloud, ctl *dbmodel.Controller) *addControllerTransactor {
+func newAddControllerTransactor(j *JIMM, jujuClouds []dbmodel.Cloud, ctl *dbmodel.Controller, tx *db.Database) *addControllerTransactor {
 	return &addControllerTransactor{
 		jimm:       j,
 		jujuClouds: jujuClouds,
 		controller: ctl,
+		tx:         tx,
 	}
 }
 
-// addCloudTx adds a cloud from a juju API call within a transaction.
+// addCloud adds a cloud from a juju API call within a transaction.
 //
 // After the cloud has been added, it is returned.
-func (act *addControllerTransactor) addCloudTx(ctx context.Context, jujuCloud dbmodel.Cloud, tx *db.Database) (dbmodel.Cloud, error) {
+func (act *addControllerTransactor) addCloud(ctx context.Context, jujuCloud dbmodel.Cloud) (dbmodel.Cloud, error) {
 	cloud := jujuCloud
-	if err := tx.GetCloud(ctx, &cloud); err != nil {
+	if err := act.tx.GetCloud(ctx, &cloud); err != nil {
 		if errors.ErrorCode(err) != errors.CodeNotFound {
 			zapctx.Error(ctx, "failed to fetch the cloud", zaputil.Error(err), zap.String("cloud-name", jujuCloud.Name))
 			return cloud, err
 		}
-		err := tx.AddCloud(ctx, &cloud)
+		err := act.tx.AddCloud(ctx, &cloud)
 		if err != nil && errors.ErrorCode(err) != errors.CodeAlreadyExists {
 			zapctx.Error(ctx, "failed to add cloud", zaputil.Error(err))
 			return cloud, err
@@ -115,13 +117,13 @@ func (act *addControllerTransactor) addCloudTx(ctx context.Context, jujuCloud db
 //
 // Additionally, it appends the added cloud region (to the database) to the passed
 // cloud dbmodel.Cloud. This prevents the need to get the cloud from the database again.
-func (act *addControllerTransactor) addCloudRegionsTx(ctx context.Context, cloud dbmodel.Cloud, regions []dbmodel.CloudRegion, tx *db.Database) (dbmodel.Cloud, error) {
+func (act *addControllerTransactor) addCloudRegions(ctx context.Context, cloud dbmodel.Cloud, regions []dbmodel.CloudRegion) (dbmodel.Cloud, error) {
 	for _, reg := range regions {
 		if cloud.Region(reg.Name).ID != 0 {
 			continue
 		}
 		reg.CloudName = cloud.Name
-		if err := tx.AddCloudRegion(ctx, &reg); err != nil {
+		if err := act.tx.AddCloudRegion(ctx, &reg); err != nil {
 			zapctx.Error(ctx, "failed to add cloud region", zaputil.Error(err))
 			return cloud, err
 		}
@@ -164,41 +166,46 @@ func (act *addControllerTransactor) setCloudRegionControllerPriorities(cloud dbm
 	}
 }
 
-// Run stores the clouds, regions, cloud region priorities and the controller itself in the database determined
-// from the incoming Juju API.Clouds() call.
+// Run runs the transactor to add a controller to JIMM.
 func (act *addControllerTransactor) Run(ctx context.Context) error {
-	return act.jimm.Database.Transaction(func(tx *db.Database) error {
-		// Add clouds and their regions to db and sets the controllers
-		// cloud region priorities
-		for i := range act.jujuClouds {
-			incomingJujuCloud := act.jujuClouds[i]
+	// Add clouds and their regions to db and sets the controllers
+	// cloud region priorities
+	for i := range act.jujuClouds {
+		incomingJujuCloud := act.jujuClouds[i]
 
-			// Add the cloud
-			addedCloud, err := act.addCloudTx(ctx, incomingJujuCloud, tx)
-			if err != nil {
-				return err
-			}
-
-			// Add the clouds regions
-			_, err = act.addCloudRegionsTx(ctx, addedCloud, incomingJujuCloud.Regions, tx)
-			if err != nil {
-				return err
-			}
-			// Get the cloud again to populate it's regions (regions are preloaded)
-			// and now they can be used for updating the controller's region priorities.
-			if err := tx.GetCloud(ctx, &addedCloud); err != nil {
-				return err
-			}
-
-			// Update controller dbmodel's region priotiries
-			act.setCloudRegionControllerPriorities(addedCloud, act.jujuClouds[i].Regions)
-		}
-
-		// Finally, add the controller with all clouds and their regions set
-		if err := tx.AddController(ctx, act.controller); err != nil {
+		// Add the cloud
+		addedCloud, err := act.addCloud(ctx, incomingJujuCloud)
+		if err != nil {
 			return err
 		}
-		return nil
+
+		// Add the clouds regions
+		_, err = act.addCloudRegions(ctx, addedCloud, incomingJujuCloud.Regions)
+		if err != nil {
+			return err
+		}
+		// Get the cloud again to populate it's regions (regions are preloaded)
+		// and now they can be used for updating the controller's region priorities.
+		if err := act.tx.GetCloud(ctx, &addedCloud); err != nil {
+			return err
+		}
+
+		// Update controller dbmodel's region priotiries
+		act.setCloudRegionControllerPriorities(addedCloud, act.jujuClouds[i].Regions)
+	}
+
+	// Finally, add the controller with all clouds and their regions set
+	if err := act.tx.AddController(ctx, act.controller); err != nil {
+		return err
+	}
+	return nil
+}
+
+// addControllerTx stores the clouds, regions, cloud region priorities and the controller itself in the database determined
+// from the incoming Juju API.Clouds() call.
+func addControllerTx(ctx context.Context, j *JIMM, jujuClouds []dbmodel.Cloud, ctl *dbmodel.Controller) error {
+	return j.Database.Transaction(func(tx *db.Database) error {
+		return newAddControllerTransactor(j, jujuClouds, ctl, tx).Run(ctx)
 	})
 }
 
@@ -258,8 +265,7 @@ func (j *JIMM) AddController(ctx context.Context, user *openfga.User, ctl *dbmod
 	ctl.AdminIdentityName = ""
 	ctl.AdminPassword = ""
 
-	transactor := newAddControllerTransactor(j, dbClouds, ctl)
-	if err := transactor.Run(ctx); err != nil {
+	if err := addControllerTx(ctx, j, dbClouds, ctl); err != nil {
 		zapctx.Error(ctx, "failed to add controller", zaputil.Error(err))
 		if errors.ErrorCode(err) == errors.CodeAlreadyExists {
 			return errors.E(op, err, fmt.Sprintf("controller %q already exists", ctl.Name))

@@ -536,6 +536,7 @@ func (t *tagResolver) userTag(ctx context.Context) (*ofga.Entity, error) {
 
 	valid := names.IsValidUser(t.trailer)
 	if !valid {
+		// TODO(ale8k): Return custom error for validation check at JujuAPI
 		return nil, errors.E("invalid user")
 	}
 	return ofganames.ConvertTagWithRelation(names.NewUserTag(t.trailer), t.relation), nil
@@ -654,6 +655,7 @@ func (t *tagResolver) serviceAccountTag(ctx context.Context) (*ofga.Entity, erro
 		zap.String("serviceaccount-name", t.trailer),
 	)
 	if !jimmnames.IsValidServiceAccountId(t.trailer) {
+		// TODO(ale8k): Return custom error for validation check at JujuAPI
 		return nil, errors.E("invalid service account id")
 	}
 
