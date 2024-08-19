@@ -526,10 +526,12 @@ func (j *JIMM) ImportModel(ctx context.Context, user *openfga.User, controllerNa
 		return errors.E(op, err)
 	}
 
-	return getModelDeltas(ctx, op, j, controller, modelTag, model)
+	return j.getModelDeltas(ctx, controller, modelTag, model)
 }
 
-func getModelDeltas(ctx context.Context, op errors.Op, j *JIMM, controller *dbmodel.Controller, modelTag names.ModelTag, model dbmodel.Model) error {
+func (j *JIMM) getModelDeltas(ctx context.Context, controller *dbmodel.Controller, modelTag names.ModelTag, model dbmodel.Model) error {
+	const op = errors.Op("jimm.getModelDeltas")
+
 	modelAPI, err := j.dialModel(ctx, controller, modelTag)
 	if err != nil {
 		return errors.E(op, err)
