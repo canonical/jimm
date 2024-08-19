@@ -17,6 +17,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm"
 	jimmcreds "github.com/canonical/jimm/v3/internal/jimm/credentials"
+	"github.com/canonical/jimm/v3/internal/jimmtest/mocks"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/pubsub"
@@ -29,6 +30,7 @@ import (
 // will delegate to the requested funcion or if the funcion is nil return
 // a NotImplemented error.
 type JIMM struct {
+	mocks.LoginService
 	AddAuditLogEntry_                  func(ale *dbmodel.AuditLogEntry)
 	AddCloudToController_              func(ctx context.Context, user *openfga.User, controllerName string, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error
 	AddController_                     func(ctx context.Context, u *openfga.User, ctl *dbmodel.Controller) error
@@ -63,7 +65,6 @@ type JIMM struct {
 	GetControllerConfig_               func(ctx context.Context, u *dbmodel.Identity) (*dbmodel.ControllerConfig, error)
 	GetCredentialStore_                func() jimmcreds.CredentialStore
 	GetJimmControllerAccess_           func(ctx context.Context, user *openfga.User, tag names.UserTag) (string, error)
-	GetUser_                           func(ctx context.Context, username string) (*openfga.User, error)
 	GetUserCloudAccess_                func(ctx context.Context, user *openfga.User, cloud names.CloudTag) (string, error)
 	GetUserControllerAccess_           func(ctx context.Context, user *openfga.User, controller names.ControllerTag) (string, error)
 	GetUserModelAccess_                func(ctx context.Context, user *openfga.User, model names.ModelTag) (string, error)
@@ -109,7 +110,7 @@ type JIMM struct {
 	UpdateCloud_                       func(ctx context.Context, u *openfga.User, ct names.CloudTag, cloud jujuparams.Cloud) error
 	UpdateCloudCredential_             func(ctx context.Context, u *openfga.User, args jimm.UpdateCloudCredentialArgs) ([]jujuparams.UpdateCredentialModelResult, error)
 	UpdateMigratedModel_               func(ctx context.Context, user *openfga.User, modelTag names.ModelTag, targetControllerName string) error
-	UpdateUserLastLogin_               func(ctx context.Context, identifier string) error
+	UserLogin_                         func(ctx context.Context, identityName string) (*openfga.User, error)
 	ValidateModelUpgrade_              func(ctx context.Context, u *openfga.User, mt names.ModelTag, force bool) error
 	WatchAllModelSummaries_            func(ctx context.Context, controller *dbmodel.Controller) (_ func() error, err error)
 }
@@ -320,12 +321,6 @@ func (j *JIMM) GetJimmControllerAccess(ctx context.Context, user *openfga.User, 
 		return "", errors.E(errors.CodeNotImplemented)
 	}
 	return j.GetJimmControllerAccess_(ctx, user, tag)
-}
-func (j *JIMM) GetUser(ctx context.Context, username string) (*openfga.User, error) {
-	if j.GetUser_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
-	}
-	return j.GetUser_(ctx, username)
 }
 func (j *JIMM) GetUserCloudAccess(ctx context.Context, user *openfga.User, cloud names.CloudTag) (string, error) {
 	if j.GetUserCloudAccess_ == nil {
@@ -593,11 +588,11 @@ func (j *JIMM) UpdateMigratedModel(ctx context.Context, user *openfga.User, mode
 	}
 	return j.UpdateMigratedModel_(ctx, user, modelTag, targetControllerName)
 }
-func (j *JIMM) UpdateUserLastLogin(ctx context.Context, identifier string) error {
-	if j.UpdateUserLastLogin_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+func (j *JIMM) UserLogin(ctx context.Context, identityName string) (*openfga.User, error) {
+	if j.UserLogin_ == nil {
+		return nil, errors.E(errors.CodeNotImplemented)
 	}
-	return j.UpdateUserLastLogin(ctx, identifier)
+	return j.UserLogin_(ctx, identityName)
 }
 func (j *JIMM) IdentityModelDefaults(ctx context.Context, user *dbmodel.Identity) (map[string]interface{}, error) {
 	if j.IdentityModelDefaults_ == nil {

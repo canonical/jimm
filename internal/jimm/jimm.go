@@ -87,11 +87,6 @@ type JIMM struct {
 	OAuthAuthenticator OAuthAuthenticator
 }
 
-// OAuthAuthenticationService returns the JIMM's authentication service.
-func (j *JIMM) OAuthAuthenticationService() OAuthAuthenticator {
-	return j.OAuthAuthenticator
-}
-
 // ResourceTag returns JIMM's controller tag stating its UUID.
 func (j *JIMM) ResourceTag() names.ControllerTag {
 	return names.NewControllerTag(j.UUID)

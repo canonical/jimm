@@ -10,6 +10,7 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/openfga"
 )
 
 var (
@@ -46,4 +47,12 @@ func NewWatcherWithDeltaProcessedChannel(db db.Database, dialer Dialer, pubsub P
 
 func (j *JIMM) ListApplicationOfferUsers(ctx context.Context, offer names.ApplicationOfferTag, user *dbmodel.Identity, accessLevel string) ([]jujuparams.OfferUserDetails, error) {
 	return j.listApplicationOfferUsers(ctx, offer, user, accessLevel)
+}
+
+func (j *JIMM) GetUser(ctx context.Context, identifier string) (*openfga.User, error) {
+	return j.getUser(ctx, identifier)
+}
+
+func (j *JIMM) UpdateUserLastLogin(ctx context.Context, identifier string) error {
+	return j.updateUserLastLogin(ctx, identifier)
 }

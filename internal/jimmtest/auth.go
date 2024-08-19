@@ -67,7 +67,7 @@ func (a Authenticator) Authenticate(_ context.Context, _ *jujuparams.LoginReques
 	return a.User, a.Err
 }
 
-type MockOAuthAuthenticator struct {
+type mockOAuthAuthenticator struct {
 	jimm.OAuthAuthenticator
 	c SimpleTester
 	// PollingChan is used to simulate polling an OIDC server during the device flow.
@@ -77,12 +77,15 @@ type MockOAuthAuthenticator struct {
 	mockAccessToken string
 }
 
-func NewMockOAuthAuthenticator(c SimpleTester, testChan <-chan string) MockOAuthAuthenticator {
-	return MockOAuthAuthenticator{c: c, PollingChan: testChan}
+// NewMockOAuthAuthenticator creates a mock authenticator for tests. An channel can be passed in
+// when testing the device flow to simulate polling an OIDC server. Provide a nil channel
+// if the device flow will not be used in the test.
+func NewMockOAuthAuthenticator(c SimpleTester, testChan <-chan string) mockOAuthAuthenticator {
+	return mockOAuthAuthenticator{c: c, PollingChan: testChan}
 }
 
 // Device is a mock implementation for the start of the device flow, returning dummy polling data.
-func (m *MockOAuthAuthenticator) Device(ctx context.Context) (*oauth2.DeviceAuthResponse, error) {
+func (m *mockOAuthAuthenticator) Device(ctx context.Context) (*oauth2.DeviceAuthResponse, error) {
 	return &oauth2.DeviceAuthResponse{
 		DeviceCode:              "test-device-code",
 		UserCode:                "test-user-code",
@@ -95,7 +98,7 @@ func (m *MockOAuthAuthenticator) Device(ctx context.Context) (*oauth2.DeviceAuth
 
 // DeviceAccessToken is a mock implementation of the second step in the device flow where JIMM
 // polls an OIDC server for the device code.
-func (m *MockOAuthAuthenticator) DeviceAccessToken(ctx context.Context, res *oauth2.DeviceAuthResponse) (*oauth2.Token, error) {
+func (m *mockOAuthAuthenticator) DeviceAccessToken(ctx context.Context, res *oauth2.DeviceAuthResponse) (*oauth2.Token, error) {
 	select {
 	case username := <-m.PollingChan:
 		m.polledUsername = username
@@ -113,7 +116,7 @@ func (m *MockOAuthAuthenticator) DeviceAccessToken(ctx context.Context, res *oau
 // VerifySessionToken provides the mock implementation for verifying session tokens.
 // Allowing JIMM tests to create their own session tokens that will always be accepted.
 // Notice the use of jwt.ParseInsecure to skip JWT signature verification.
-func (m *MockOAuthAuthenticator) VerifySessionToken(token string) (jwt.Token, error) {
+func (m *mockOAuthAuthenticator) VerifySessionToken(token string) (jwt.Token, error) {
 	errorFn := func(err error) error {
 		return jimmerrors.E(err, jimmerrors.CodeUnauthorized)
 	}
@@ -136,7 +139,7 @@ func (m *MockOAuthAuthenticator) VerifySessionToken(token string) (jwt.Token, er
 // ExtractAndVerifyIDToken returns an ID token where the subject is equal to the username obtained during the device flow.
 // The auth token must match the one returned during the device flow.
 // If the polled username is empty it indicates an error that the device flow was not run prior to calling this function.
-func (m *MockOAuthAuthenticator) ExtractAndVerifyIDToken(ctx context.Context, oauth2Token *oauth2.Token) (*oidc.IDToken, error) {
+func (m *mockOAuthAuthenticator) ExtractAndVerifyIDToken(ctx context.Context, oauth2Token *oauth2.Token) (*oidc.IDToken, error) {
 	if m.polledUsername == "" {
 		return &oidc.IDToken{}, errors.New("unknown user for mock auth login")
 	}
@@ -147,23 +150,28 @@ func (m *MockOAuthAuthenticator) ExtractAndVerifyIDToken(ctx context.Context, oa
 }
 
 // Email returns the subject from an ID token.
-func (m *MockOAuthAuthenticator) Email(idToken *oidc.IDToken) (string, error) {
+func (m *mockOAuthAuthenticator) Email(idToken *oidc.IDToken) (string, error) {
 	return idToken.Subject, nil
 }
 
 // UpdateIdentity is a no-op mock.
-func (m *MockOAuthAuthenticator) UpdateIdentity(ctx context.Context, email string, token *oauth2.Token) error {
+func (m *mockOAuthAuthenticator) UpdateIdentity(ctx context.Context, email string, token *oauth2.Token) error {
 	return nil
 }
 
 // MintSessionToken creates an unsigned session token with the email provided.
-func (m *MockOAuthAuthenticator) MintSessionToken(email string) (string, error) {
+func (m *mockOAuthAuthenticator) MintSessionToken(email string) (string, error) {
 	return newSessionToken(m.c, email, ""), nil
 }
 
 // AuthenticateBrowserSession always returns an error.
-func (m *MockOAuthAuthenticator) AuthenticateBrowserSession(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error) {
+func (m *mockOAuthAuthenticator) AuthenticateBrowserSession(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error) {
 	return ctx, errors.New("authentication failed")
+}
+
+// VerifyClientCredentials always returns a nil error.
+func (m *mockOAuthAuthenticator) VerifyClientCredentials(ctx context.Context, clientID string, clientSecret string) error {
+	return nil
 }
 
 // newSessionToken returns a serialised JWT that can be used in tests.
