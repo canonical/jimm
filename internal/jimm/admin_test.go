@@ -99,6 +99,7 @@ func TestLoginWithSessionToken(t *testing.T) {
 	token, err := jwt.NewBuilder().
 		Subject("alice@canonical.com").
 		Build()
+	c.Assert(err, qt.IsNil)
 	serialisedToken, err := jwt.NewSerializer().Serialize(token)
 	c.Assert(err, qt.IsNil)
 	b64Token := base64.StdEncoding.EncodeToString(serialisedToken)
