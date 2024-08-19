@@ -530,7 +530,7 @@ func (j *JIMM) ImportModel(ctx context.Context, user *openfga.User, controllerNa
 }
 
 func getModelDeltas(ctx context.Context, op errors.Op, j *JIMM, controller *dbmodel.Controller, modelTag names.ModelTag, model dbmodel.Model) error {
-	modelAPI, err := j.dial(ctx, controller, modelTag)
+	modelAPI, err := j.dialModel(ctx, controller, modelTag)
 	if err != nil {
 		return errors.E(op, err)
 	}
