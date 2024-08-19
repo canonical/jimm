@@ -223,6 +223,8 @@ func (w *Watcher) deltaProcessedNotification() {
 
 // watchController connects to the given controller and watches for model
 // changes on the controller.
+//
+// nolint:gocognit // We ignore watch as watchers are removed in Juju 4.0.
 func (w *Watcher) watchController(ctx context.Context, ctl *dbmodel.Controller) error {
 	const op = errors.Op("jimm.watchController")
 
