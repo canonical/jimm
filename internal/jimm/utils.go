@@ -61,7 +61,7 @@ func (j *JIMM) dialController(ctx context.Context, ctl *dbmodel.Controller) (API
 	return api, nil
 }
 
-// dialController dials a model.
+// dialModel dials a model.
 func (j *JIMM) dialModel(ctx context.Context, ctl *dbmodel.Controller, mt names.ModelTag) (API, error) {
 	api, err := j.dial(ctx, ctl, mt)
 	if err != nil {
