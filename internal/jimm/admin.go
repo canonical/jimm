@@ -84,6 +84,11 @@ func (j *JIMM) LoginWithSessionToken(ctx context.Context, sessionToken string) (
 }
 
 // LoginWithSessionCookie uses the identity ID expected to have come from a session cookie, to log the user in.
+//
+// The work to parse and store the user's identity from the session cookie takes place in internal/jimmhttp/websocket.go
+// [WSHandler.ServerHTTP] during the upgrade from an HTTP connection to a websocket. The user's identity is stored
+// and passed to this function with the assumption that the cookie contained a valid session. This function is far from
+// the session cookie logic due to the separation between the HTTP layer and Juju's RPC mechanism.
 func (j *JIMM) LoginWithSessionCookie(ctx context.Context, identityID string) (*openfga.User, error) {
 	const op = errors.Op("jimm.LoginWithSessionCookie")
 	if identityID == "" {
