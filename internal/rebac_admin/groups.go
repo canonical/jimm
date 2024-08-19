@@ -302,8 +302,8 @@ func (s *groupsService) PatchGroupEntitlements(ctx context.Context, groupId stri
 			toRemove = append(toRemove, t)
 		}
 	}
-	if len(errList) > 0 {
-		return false, stderrors.Join(errList...)
+	if err := stderrors.Join(errList...); err != nil {
+		return false, err
 	}
 	if toAdd != nil {
 		err := s.jimm.AddRelation(ctx, user, toAdd)
