@@ -108,13 +108,6 @@ func (s *JimmCmdSuite) SetUpTest(c *gc.C) {
 	s.AdminUser = i
 	s.AdminUser.LastLogin = db.Now()
 
-	err = s.JIMM.Database.GetIdentity(ctx, s.AdminUser)
-	c.Assert(err, gc.Equals, nil)
-
-	alice := openfga.NewUser(s.AdminUser, ofgaClient)
-	err = alice.SetControllerAccess(context.Background(), s.JIMM.ResourceTag(), ofganames.AdministratorRelation)
-	c.Assert(err, gc.Equals, nil)
-
 	s.AddAdminUser(c, "alice@canonical.com")
 
 	w := new(bytes.Buffer)

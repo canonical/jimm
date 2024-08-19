@@ -1010,9 +1010,18 @@ func (s *accessControlSuite) TestListRelationshipTuplesAfterDeletingGroup(c *gc.
 	response, err := client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{ResolveUUIDs: true})
 	c.Assert(err, jc.ErrorIsNil)
 	// Create a new slice of tuples excluding the ones we expect to be deleted.
-	newTuples := []apiparams.RelationshipTuple{tuples[1], tuples[3]}
-	// first three tuples created during setup test
-	c.Assert(response.Tuples[12:], jc.DeepEquals, newTuples)
+	responseTuples := response.Tuples[12:]
+	c.Assert(responseTuples, gc.HasLen, 2)
+
+	expectedUserToGroupTuple := tuples[1]
+	expectedGroupToOfferTuple := tuples[3]
+
+	// Update the target to the group name
+	expectedUserToGroupTuple.TargetObject = "group-orange"
+	c.Assert(responseTuples[0], gc.DeepEquals, expectedUserToGroupTuple)
+	expectedGroupToOfferTuple.Object = "group-orange#member"
+	c.Assert(responseTuples[1], gc.DeepEquals, expectedGroupToOfferTuple)
+
 	c.Assert(len(response.Errors), gc.Equals, 0)
 }
 
