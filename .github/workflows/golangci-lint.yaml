@@ -11,12 +11,19 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
         with:
           go-version: stable
-      - name: golangci-lint
+
+      - name: Tidy
+        run: go mod tidy
+
+      - name: Run Golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:
-          args: --timeout 50m --verbose
+          args: --timeout 30m --verbose
           version: v1.60
