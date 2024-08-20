@@ -1,0 +1,30 @@
+name: Integration Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      jimm-version:
+        description: >
+          JIMM version tag to use. This will decide the version of JIMM to start e.g. v3.1.7.
+          View all available versions at https://github.com/canonical/jimm/pkgs/container/jimm.
+        required: true
+
+jobs:
+  startjimm:
+    name: Start JIMM
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout JIMM repo
+        uses: actions/checkout@v4
+      - name: Start JIMM
+        uses: ./.github/actions/test-server
+        with:
+          jimm-version: ${{ inputs.jimm-version }}
+          juju-channel: "3/stable"
+          ghcr-pat: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create a model, deploy an application and run juju status
+        run: |
+          juju add-model foo && \
+          juju deploy haproxy && \
+          sleep 5 && \
+          juju status

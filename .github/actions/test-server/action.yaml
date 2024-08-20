@@ -1,0 +1,79 @@
+name: JIMM Server Setup
+description: "Create a JIMM environment"
+
+inputs:
+  jimm-version:
+    description: 'JIMM version tag to use. This will decide the version of JIMM to start e.g. v3.1.7'
+    required: true
+  juju-version:
+    description: 'Juju snap channel to pass to charmed-kubernetes/actions-operator'
+    required: false
+  ghcr-pat:
+    description: 'PAT Token that has package:read access to canonical/JIMM'
+    required: true
+
+output:
+  url:
+    description: 'URL where JIMM can be reached.'
+    value: "https://jimm.localhost"
+  client-id:
+    description: 'Test client ID to login to JIMM with a service account.'
+    value: "test-client-id"
+  client-secret:
+    description: 'Test client Secret to login to JIMM with a service account.'
+    value: "2M2blFbO4GX4zfggQpivQSxwWX1XGgNf"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Login to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ inputs.ghcr-pat }}
+    - name: Start server and dependencies
+      run: make integration-test-env
+      shell: bash
+      env:
+        JIMM_VERSION: ${{ inputs.jimm-version }}
+    - name: Initialise LXD
+      run: |
+        sudo lxd waitready && \
+        sudo lxd init --auto && \
+        sudo chmod a+wr /var/snap/lxd/common/lxd/unix.socket && \
+        lxc network set lxdbr0 ipv6.address none && \
+        sudo usermod -a -G lxd $USER
+      shell: bash
+    - name: Setup cloud-init script for bootstraping Juju controllers
+      run: ./local/jimm/setup-controller.sh
+      shell: bash
+      env:
+        SKIP_BOOTSTRAP: true
+        CLOUDINIT_FILE: "cloudinit.temp.yaml"
+    - name: Setup Juju Controller
+      uses: charmed-kubernetes/actions-operator@main
+      with:
+        provider: "lxd"
+        channel: "5.19/stable"
+        juju-channel: ${{ inputs.juju-channel }}
+        bootstrap-options: "--config cloudinit.temp.yaml --config login-token-refresh-url=https://jimm.localhost/.well-known/jwks.json"
+    - name: Save LXD controller name
+      id: lxd-controller
+      run: echo "name=$CONTROLLER_NAME" >> $GITHUB_OUTPUT
+      shell: bash
+    - name: Install jimmctl and yq
+      run: sudo snap install jimmctl --channel=3/stable && sudo snap install yq
+      shell: bash
+    - name: Authenticate Juju CLI
+      run: chmod -R 666 ~/.local/share/juju/*.yaml && ./local/jimm/setup-cli-auth.sh
+      shell: bash
+      # Below is a hardcoded JWT using the same test-secret used in JIMM's docker compose and allows the CLI to authenticate as the jimm-test@canonical.com user.
+      env:
+        JWT: ZXlKMGVYQWlPaUpLVjFRaUxDSmhiR2NpT2lKSVV6STFOaUo5LmV5SnBjM01pT2lKUGJteHBibVVnU2xkVUlFSjFhV3hrWlhJaUxDSnBZWFFpT2pFM01qUXlNamcyTmpBc0ltVjRjQ0k2TXprMk5EYzFNelEyTUN3aVlYVmtJam9pYW1sdGJTSXNJbk4xWWlJNkltcHBiVzB0ZEdWemRFQmpZVzV2Ym1sallXd3VZMjl0SW4wLkpTWVhXcGF6T0FnX1VFZ2hkbjlOZkVQdWxhWWlJQVdaX3BuSmRDbnJvWEk=
+    - name: Add LXD Juju controller to JIMM
+      run: ./local/jimm/add-controller.sh
+      shell: bash
+      env:
+        JIMM_CONTROLLER_NAME: "jimm"
+        CONTROLLER_NAME: ${{ steps.lxd-controller.outputs.name }}
