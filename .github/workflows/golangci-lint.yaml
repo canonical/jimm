@@ -27,3 +27,8 @@ jobs:
         with:
           args: --timeout 30m --verbose
           version: v1.60
+
+      - name: Setup tmate session
+        if: ${{ failure() }}
+        uses: mxschmitt/action-tmate@v3
+
