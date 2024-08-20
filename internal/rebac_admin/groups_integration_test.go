@@ -163,7 +163,7 @@ func (s rebacAdminSuite) TestGetGroupEntitlementsIntegration(c *gc.C) {
 	controllerEntitlementCount := 0
 	for _, entitlement := range entitlements {
 		c.Assert(entitlement.Entitlement, gc.Equals, ofganames.AdministratorRelation.String())
-		c.Assert(entitlement.EntityId, gc.Matches, "test-.*-0")
+		c.Assert(entitlement.EntityId, gc.Matches, `test-(model|controller)-\d`)
 		switch entitlement.EntityType {
 		case openfga.ModelType.String():
 			modelEntitlementCount++

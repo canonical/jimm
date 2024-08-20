@@ -171,7 +171,6 @@ func TestListRelationshipTuples(t *testing.T) {
 }
 
 func TestListObjectRelations(t *testing.T) {
-	// setup
 	c := qt.New(t)
 	ctx := context.Background()
 

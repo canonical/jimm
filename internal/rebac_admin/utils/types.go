@@ -1,10 +1,12 @@
 package utils
 
 import (
-	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/rebac-admin-ui-handlers/v1/resources"
+
+	"github.com/canonical/jimm/v3/internal/openfga"
 )
 
+// ToEntityEntitlement converts an OpenFGA tuple to an entity entitlement.
 func ToEntityEntitlement(tuple openfga.Tuple) resources.EntityEntitlement {
 	return resources.EntityEntitlement{
 		Entitlement: string(tuple.Relation),
@@ -13,6 +15,7 @@ func ToEntityEntitlement(tuple openfga.Tuple) resources.EntityEntitlement {
 	}
 }
 
+// ToEntityEntitlements converts a slice of OpenFGA tuples to a slice of entity entitlements.
 func ToEntityEntitlements(tuples []openfga.Tuple) []resources.EntityEntitlement {
 	entitlements := make([]resources.EntityEntitlement, 0, len(tuples))
 	for _, t := range tuples {

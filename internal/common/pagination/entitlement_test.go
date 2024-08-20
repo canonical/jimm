@@ -1,3 +1,5 @@
+// Copyright 2024 Canonical Ltd.
+
 package pagination_test
 
 import (

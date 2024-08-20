@@ -1,3 +1,5 @@
+// Copyright 2024 Canonical Ltd.
+
 package pagination
 
 import (
@@ -30,10 +32,12 @@ type EntitlementToken struct {
 	token string
 }
 
+// String returns the contents of the entitlement token as a string.
 func (e EntitlementToken) String() string {
 	return e.token
 }
 
+// NewEntitlementToken returns a new entitlement token based on the provided string.
 func NewEntitlementToken(token string) EntitlementToken {
 	return EntitlementToken{token: token}
 }
@@ -65,12 +69,12 @@ func DecodeEntitlementToken(token EntitlementToken) (string, openfga.Kind, error
 // of an Entitlement token that encodes the provided information together.
 //
 // Use this function alongside `DecodeEntitlementToken` to page over all entitlements.
-func NextEntitlementToken(kind openfga.Kind, OpenFGAToken string) (EntitlementToken, error) {
+func NextEntitlementToken(kind openfga.Kind, openFGAToken string) (EntitlementToken, error) {
 	var ct comboToken
-	ct.OpenFGAToken = OpenFGAToken
+	ct.OpenFGAToken = openFGAToken
 	ct.Kind = kind
 	// If the OpenFGA token is empty, we are at the end of the result set for that resource.
-	if OpenFGAToken == "" {
+	if openFGAToken == "" {
 		resourceIndex := slices.Index(entitlementResources, ct.Kind)
 		if resourceIndex == -1 {
 			return EntitlementToken{}, errors.New("failed to generate next entitlement token: unable to determine next resource")
