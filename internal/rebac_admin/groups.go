@@ -249,11 +249,13 @@ func (s *groupsService) GetGroupEntitlements(ctx context.Context, groupId string
 	}
 	filter := utils.CreateTokenPaginationFilter(params.Size, params.NextToken, params.NextPageToken)
 	group := ofganames.WithMemberRelation(jimmnames.NewGroupTag(groupId))
-	tuples, nextToken, err := s.jimm.ListObjectRelations(ctx, user, group, int32(filter.Limit()), filter.Token())
+	entitlementToken := pagination.NewEntitlementToken(filter.Token())
+	tuples, nextEntitlmentToken, err := s.jimm.ListObjectRelations(ctx, user, group, int32(filter.Limit()), entitlementToken)
 	if err != nil {
 		return nil, err
 	}
 	originalToken := filter.Token()
+	nextToken := nextEntitlmentToken.String()
 	return &resources.PaginatedResponse[resources.EntityEntitlement]{
 		Meta: resources.ResponseMeta{
 			Size:      len(tuples),

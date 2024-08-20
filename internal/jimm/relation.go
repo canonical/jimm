@@ -104,34 +104,35 @@ func (j *JIMM) ListRelationshipTuples(ctx context.Context, user *openfga.User, t
 // Useful for listing all the resources that a group or user have access to.
 //
 // This functions provides a slightly higher-level abstraction in favor of ListRelationshipTuples.
-func (j *JIMM) ListObjectRelations(ctx context.Context, user *openfga.User, object string, pageSize int32, continuationToken string) ([]openfga.Tuple, string, error) {
+func (j *JIMM) ListObjectRelations(ctx context.Context, user *openfga.User, object string, pageSize int32, entitlementToken pagination.EntitlementToken) ([]openfga.Tuple, pagination.EntitlementToken, error) {
 	const op = errors.Op("jimm.ListRelationshipTuples")
+	var e pagination.EntitlementToken
 	if !user.JimmAdmin {
-		return nil, "", errors.E(op, errors.CodeUnauthorized, "unauthorized")
+		return nil, e, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
-	continuationToken, kind, err := pagination.DecodeEntitlementToken(pagination.NewEntitlementToken(continuationToken))
+	continuationToken, kind, err := pagination.DecodeEntitlementToken(entitlementToken)
 	if err != nil {
-		return nil, "", err
+		return nil, e, err
 	}
 	tuple := &openfga.Tuple{}
 	tuple.Object, err = j.parseAndValidateTag(ctx, object)
 	if err != nil {
-		return nil, "", err
+		return nil, e, err
 	}
 	tuple.Target, err = j.parseAndValidateTag(ctx, kind.String())
 	if err != nil {
-		return nil, "", err
+		return nil, e, err
 	}
 
-	responseTuples, nextPageToken, err := j.OpenFGAClient.ReadRelatedObjects(ctx, *tuple, pageSize, continuationToken)
+	responseTuples, nextContinuationToken, err := j.OpenFGAClient.ReadRelatedObjects(ctx, *tuple, pageSize, continuationToken)
 	if err != nil {
-		return nil, "", errors.E(op, err)
+		return nil, e, errors.E(op, err)
 	}
-	nextEntitlementToken, err := pagination.NextEntitlementToken(kind, nextPageToken)
+	nextEntitlementToken, err := pagination.NextEntitlementToken(kind, nextContinuationToken)
 	if err != nil {
-		return nil, "", err
+		return nil, e, err
 	}
-	return responseTuples, nextEntitlementToken.String(), nil
+	return responseTuples, nextEntitlementToken, nil
 }
 
 // parseTuples translate the api request struct containing tuples to a slice of openfga tuple keys.

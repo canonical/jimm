@@ -10,6 +10,7 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/google/uuid"
 
+	"github.com/canonical/jimm/v3/internal/common/pagination"
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/jimm"
@@ -221,7 +222,7 @@ func TestListObjectRelations(t *testing.T) {
 	testCases := []struct {
 		description    string
 		object         string
-		initialToken   string
+		initialToken   pagination.EntitlementToken
 		expectedError  string
 		expectedLength int
 		expectedTuples []ExpectedTuple
@@ -233,7 +234,7 @@ func TestListObjectRelations(t *testing.T) {
 		},
 		{
 			description:   "invalid initial token",
-			initialToken:  "bar",
+			initialToken:  pagination.NewEntitlementToken("bar"),
 			expectedError: "failed to decode pagination token.*",
 		},
 		{
@@ -254,7 +255,7 @@ func TestListObjectRelations(t *testing.T) {
 					break
 				}
 				tuples = append(tuples, res...)
-				if nextToken == "" {
+				if nextToken.String() == "" {
 					break
 				}
 				token = nextToken
