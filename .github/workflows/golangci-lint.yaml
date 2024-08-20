@@ -19,8 +19,8 @@ jobs:
         with:
           go-version: stable
 
-      - name: Tidy
-        run: go mod tidy
+      - name: Touch approle
+        run: touch ./local/vault/approle.json
 
       - name: Run Golangci-lint
         uses: golangci/golangci-lint-action@v6
