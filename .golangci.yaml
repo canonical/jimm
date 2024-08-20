@@ -53,7 +53,7 @@ linters:
 
     # Style based linters
     - promlinter
-    # - gocritic # Test without critic
+    - gocritic # Test without critic
     - gocognit # To be fixed
     - goheader
     - importas
