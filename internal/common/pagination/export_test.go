@@ -7,4 +7,7 @@ var (
 	MaxPageSize            = maxOffsetFilterPageSize
 	DefaultOpenFGAPageSize = defaultOpenFGAPageSize
 	MaxOpenFGAPageSize     = maxOpenFGAPageSize
+	EntitlementResources   = entitlementResources
 )
+
+type ComboToken = comboToken

@@ -62,29 +62,29 @@ func CreatePagination(sizeP, pageP *int, total int) (int, *int, LimitOffsetPagin
 	return page, nextPage, NewOffsetFilter(pageSize, offset)
 }
 
-type TokenPagination struct {
+type OpenFGAPagination struct {
 	limit int
 	token string
 }
 
-// NewTokenFilter creates a filter for token pagination.
-func NewTokenFilter(limit int, token string) TokenPagination {
+// NewOpenFGAFilter creates a filter for token pagination.
+func NewOpenFGAFilter(limit int, token string) OpenFGAPagination {
 	if limit < 0 {
 		limit = defaultOpenFGAPageSize
 	}
 	if limit > maxOpenFGAPageSize {
 		limit = maxOpenFGAPageSize
 	}
-	return TokenPagination{
+	return OpenFGAPagination{
 		limit: limit,
 		token: token,
 	}
 }
 
-func (l TokenPagination) Limit() int {
+func (l OpenFGAPagination) Limit() int {
 	return l.limit
 }
 
-func (l TokenPagination) Token() string {
+func (l OpenFGAPagination) Token() string {
 	return l.token
 }

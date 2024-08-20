@@ -167,5 +167,103 @@ func TestListRelationshipTuples(t *testing.T) {
 			}
 		})
 	}
+}
 
+func TestListObjectRelations(t *testing.T) {
+	// setup
+	c := qt.New(t)
+	ctx := context.Background()
+
+	ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+	c.Assert(err, qt.IsNil)
+
+	now := time.Now().UTC().Round(time.Millisecond)
+	j := &jimm.JIMM{
+		UUID: uuid.NewString(),
+		Database: db.Database{
+			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
+		},
+		OpenFGAClient: ofgaClient,
+	}
+
+	err = j.Database.Migrate(ctx, false)
+	c.Assert(err, qt.IsNil)
+
+	u := openfga.NewUser(&dbmodel.Identity{Name: "admin@canonical.com"}, ofgaClient)
+	u.JimmAdmin = true
+
+	user, _, controller, model, _, _, _ := createTestControllerEnvironment(ctx, c, j.Database)
+	c.Assert(err, qt.IsNil)
+
+	err = j.AddRelation(ctx, u, []apiparams.RelationshipTuple{
+		{
+			Object:       user.Tag().String(),
+			Relation:     names.ReaderRelation.String(),
+			TargetObject: model.ResourceTag().String(),
+		},
+		{
+			Object:       user.Tag().String(),
+			Relation:     names.WriterRelation.String(),
+			TargetObject: model.ResourceTag().String(),
+		},
+		{
+			Object:       user.Tag().String(),
+			Relation:     names.AuditLogViewerRelation.String(),
+			TargetObject: controller.ResourceTag().String(),
+		},
+	})
+	c.Assert(err, qt.IsNil)
+	type ExpectedTuple struct {
+		expectedRelation string
+		expectedTargetId string
+	}
+
+	testCases := []struct {
+		description    string
+		object         string
+		initialToken   string
+		expectedError  string
+		expectedLength int
+		expectedTuples []ExpectedTuple
+	}{
+		{
+			description:    "test listing all relations",
+			object:         user.Tag().String(),
+			expectedLength: 3,
+		},
+		{
+			description:   "invalid initial token",
+			initialToken:  "bar",
+			expectedError: "failed to decode pagination token.*",
+		},
+		{
+			description:   "invalid user tag token",
+			object:        "foo" + user.Tag().String(),
+			expectedError: "failed to map tag foouser",
+		},
+	}
+
+	for _, t := range testCases {
+		c.Run(t.description, func(c *qt.C) {
+			token := t.initialToken
+			tuples := []openfga.Tuple{}
+			for {
+				res, nextToken, err := j.ListObjectRelations(ctx, u, t.object, 10, token)
+				if t.expectedError != "" {
+					c.Assert(err, qt.ErrorMatches, t.expectedError)
+					break
+				}
+				tuples = append(tuples, res...)
+				if nextToken == "" {
+					break
+				}
+				token = nextToken
+			}
+			c.Assert(tuples, qt.HasLen, t.expectedLength)
+			for i, expectedTuple := range t.expectedTuples {
+				c.Assert(tuples[i].Relation.String(), qt.Equals, expectedTuple.expectedRelation)
+				c.Assert(tuples[i].Target.ID, qt.Equals, expectedTuple.expectedTargetId)
+			}
+		})
+	}
 }

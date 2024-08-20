@@ -1,14 +1,12 @@
-// Copyright 2024 Canonical Ltd.
-
-package utils_test
+package pagination_test
 
 import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
 
+	"github.com/canonical/jimm/v3/internal/common/pagination"
 	"github.com/canonical/jimm/v3/internal/openfga"
-	"github.com/canonical/jimm/v3/internal/rebac_admin/utils"
 )
 
 func TestMarshalEntitlementToken(t *testing.T) {
@@ -16,19 +14,19 @@ func TestMarshalEntitlementToken(t *testing.T) {
 
 	tests := []struct {
 		desc          string
-		token         utils.EntitlementPaginationToken
+		token         pagination.ComboToken
 		expectedError string
 		expectedToken string
 	}{{
 		desc: "Valid marshal token",
-		token: utils.EntitlementPaginationToken{
+		token: pagination.ComboToken{
 			Kind:         openfga.ModelType,
 			OpenFGAToken: "continuation-token",
 		},
 		expectedToken: "eyJraW5kIjoibW9kZWwiLCJ0b2tlbiI6ImNvbnRpbnVhdGlvbi10b2tlbiJ9",
 	}, {
 		desc: "invalid - missing kind",
-		token: utils.EntitlementPaginationToken{
+		token: pagination.ComboToken{
 			Kind:         "",
 			OpenFGAToken: "continuation-token",
 		},
@@ -53,13 +51,13 @@ func TestUnmarshalEntitlementToken(t *testing.T) {
 	tests := []struct {
 		desc          string
 		in            string
-		expectedToken utils.EntitlementPaginationToken
+		expectedToken pagination.ComboToken
 		expectedError string
 	}{
 		{
 			desc: "Valid token",
 			in:   "eyJraW5kIjoibW9kZWwiLCJ0b2tlbiI6ImNvbnRpbnVhdGlvbi10b2tlbiJ9",
-			expectedToken: utils.EntitlementPaginationToken{
+			expectedToken: pagination.ComboToken{
 				Kind:         openfga.ModelType,
 				OpenFGAToken: "continuation-token",
 			},
@@ -73,7 +71,7 @@ func TestUnmarshalEntitlementToken(t *testing.T) {
 
 	for _, tC := range tests {
 		c.Run(tC.desc, func(c *qt.C) {
-			var token utils.EntitlementPaginationToken
+			var token pagination.ComboToken
 			err := token.UnmarshalToken(tC.in)
 			if tC.expectedError != "" {
 				c.Assert(err, qt.ErrorMatches, tC.expectedError)
@@ -84,36 +82,36 @@ func TestUnmarshalEntitlementToken(t *testing.T) {
 	}
 }
 
-func TestCreateEntitlementPaginationFilter(t *testing.T) {
+func TestDecodeEntitlementFilter(t *testing.T) {
 	c := qt.New(t)
 	testCases := []struct {
 		desc          string
-		nextPageToken func() string
+		nextPageToken func() pagination.EntitlementToken
 		expectedToken string
 		expectedKind  openfga.Kind
 		expectedErr   string
 	}{
 		{
 			desc:          "empty next page token",
-			nextPageToken: func() string { return "" },
+			nextPageToken: func() pagination.EntitlementToken { return pagination.NewEntitlementToken("") },
 			expectedToken: "",
-			expectedKind:  utils.EntitlementResources[0],
+			expectedKind:  pagination.EntitlementResources[0],
 		},
 		{
 			desc: "model resource page token",
-			nextPageToken: func() string {
-				t := utils.EntitlementPaginationToken{Kind: openfga.ModelType, OpenFGAToken: "123"}
+			nextPageToken: func() pagination.EntitlementToken {
+				t := pagination.ComboToken{Kind: openfga.ModelType, OpenFGAToken: "123"}
 				res, err := t.MarshalToken()
 				c.Assert(err, qt.IsNil)
-				return res
+				return pagination.NewEntitlementToken(res)
 			},
 			expectedToken: "123",
 			expectedKind:  openfga.ModelType,
 		},
 		{
 			desc: "invalid token",
-			nextPageToken: func() string {
-				return "123"
+			nextPageToken: func() pagination.EntitlementToken {
+				return pagination.NewEntitlementToken("123")
 			},
 			expectedErr: "failed to decode pagination token.*",
 		},
@@ -121,12 +119,11 @@ func TestCreateEntitlementPaginationFilter(t *testing.T) {
 	for _, tC := range testCases {
 		t.Run(tC.desc, func(t *testing.T) {
 			input := tC.nextPageToken()
-			filter, err := utils.CreateEntitlementPaginationFilter(nil, &input, nil)
+			openFGAToken, kind, err := pagination.DecodeEntitlementToken(input)
 			if tC.expectedErr == "" {
 				c.Assert(err, qt.IsNil)
-				c.Assert(filter.OriginalToken, qt.Equals, input)
-				c.Assert(filter.TargetKind, qt.Equals, tC.expectedKind)
-				c.Assert(filter.TokenPagination.Token(), qt.Equals, tC.expectedToken)
+				c.Assert(kind, qt.Equals, tC.expectedKind)
+				c.Assert(openFGAToken, qt.Equals, tC.expectedToken)
 			} else {
 				c.Assert(err, qt.ErrorMatches, tC.expectedErr)
 			}
@@ -146,7 +143,7 @@ func TestNextEntitlementToken(t *testing.T) {
 		{
 			desc:          "empty OpenFGA token - expect next resource type",
 			openFGAToken:  "",
-			kind:          utils.EntitlementResources[0],
+			kind:          pagination.EntitlementResources[0],
 			expectedToken: "eyJraW5kIjoiY2xvdWQiLCJ0b2tlbiI6IiJ9",
 		},
 		{
@@ -164,22 +161,22 @@ func TestNextEntitlementToken(t *testing.T) {
 		{
 			desc:          "last resource type but not last page - expect same kind and token",
 			openFGAToken:  "123",
-			kind:          utils.EntitlementResources[len(utils.EntitlementResources)-1],
+			kind:          pagination.EntitlementResources[len(pagination.EntitlementResources)-1],
 			expectedToken: "eyJraW5kIjoic2VydmljZWFjY291bnQiLCJ0b2tlbiI6IjEyMyJ9",
 		},
 		{
 			desc:          "last resource type with no more data - expect empty token",
 			openFGAToken:  "",
-			kind:          utils.EntitlementResources[len(utils.EntitlementResources)-1],
+			kind:          pagination.EntitlementResources[len(pagination.EntitlementResources)-1],
 			expectedToken: "",
 		},
 	}
 	for _, tC := range testCases {
 		t.Run(tC.desc, func(t *testing.T) {
-			token, err := utils.NextEntitlementToken(tC.kind, tC.openFGAToken)
+			token, err := pagination.NextEntitlementToken(tC.kind, tC.openFGAToken)
 			if tC.expectedErr == "" {
 				c.Assert(err, qt.IsNil)
-				c.Assert(token, qt.Equals, tC.expectedToken)
+				c.Assert(token.String(), qt.Equals, tC.expectedToken)
 			} else {
 				c.Assert(err, qt.ErrorMatches, tC.expectedErr)
 			}

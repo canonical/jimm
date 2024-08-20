@@ -247,42 +247,22 @@ func (s *groupsService) GetGroupEntitlements(ctx context.Context, groupId string
 	if !ok {
 		return nil, v1.NewValidationError("invalid group ID")
 	}
-	filter, err := utils.CreateEntitlementPaginationFilter(params.Size, params.NextToken, params.NextPageToken)
+	filter := utils.CreateTokenPaginationFilter(params.Size, params.NextToken, params.NextPageToken)
+	group := ofganames.WithMemberRelation(jimmnames.NewGroupTag(groupId))
+	tuples, nextToken, err := s.jimm.ListObjectRelations(ctx, user, group, int32(filter.Limit()), filter.Token())
 	if err != nil {
 		return nil, err
 	}
-	groupTag := jimmnames.NewGroupTag(groupId)
-	tuple := apiparams.RelationshipTuple{
-		// Groups can only be related to entities when they have the #member relation. Construct that here rather than putting
-		// the onus on the client to know this detail.
-		Object:       ofganames.WithMemberRelation(groupTag),
-		TargetObject: string(filter.TargetKind),
-	}
-	tuples, nextToken, err := s.jimm.ListRelationshipTuples(ctx, user, tuple, int32(filter.TokenPagination.Limit()), filter.TokenPagination.Token())
-	if err != nil {
-		return nil, err
-	}
-	data := make([]resources.EntityEntitlement, 0, len(tuples))
-	for _, tuple := range tuples {
-		data = append(data, resources.EntityEntitlement{
-			Entitlement: string(tuple.Relation),
-			EntityId:    tuple.Target.ID,
-			EntityType:  tuple.Target.Kind.String(),
-		})
-	}
-	nextEntitlementToken, err := utils.NextEntitlementToken(filter.TargetKind, nextToken)
-	if err != nil {
-		return nil, err
-	}
+	originalToken := filter.Token()
 	return &resources.PaginatedResponse[resources.EntityEntitlement]{
 		Meta: resources.ResponseMeta{
-			Size:      len(data),
-			PageToken: &filter.OriginalToken,
+			Size:      len(tuples),
+			PageToken: &originalToken,
 		},
 		Next: resources.Next{
-			PageToken: &nextEntitlementToken,
+			PageToken: &nextToken,
 		},
-		Data: data,
+		Data: utils.ToEntityEntitlements(tuples),
 	}, nil
 }
 

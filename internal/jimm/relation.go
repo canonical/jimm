@@ -9,6 +9,7 @@ import (
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
+	"github.com/canonical/jimm/v3/internal/common/pagination"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
@@ -97,6 +98,40 @@ func (j *JIMM) ListRelationshipTuples(ctx context.Context, user *openfga.User, t
 		return nil, "", errors.E(op, err)
 	}
 	return responseTuples, ct, nil
+}
+
+// ListObjectRelations lists all the tuples that an object has a direct relation with.
+// Useful for listing all the resources that a group or user have access to.
+//
+// This functions provides a slightly higher-level abstraction in favor of ListRelationshipTuples.
+func (j *JIMM) ListObjectRelations(ctx context.Context, user *openfga.User, object string, pageSize int32, continuationToken string) ([]openfga.Tuple, string, error) {
+	const op = errors.Op("jimm.ListRelationshipTuples")
+	if !user.JimmAdmin {
+		return nil, "", errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
+	continuationToken, kind, err := pagination.DecodeEntitlementToken(pagination.NewEntitlementToken(continuationToken))
+	if err != nil {
+		return nil, "", err
+	}
+	tuple := &openfga.Tuple{}
+	tuple.Object, err = j.parseAndValidateTag(ctx, object)
+	if err != nil {
+		return nil, "", err
+	}
+	tuple.Target, err = j.parseAndValidateTag(ctx, kind.String())
+	if err != nil {
+		return nil, "", err
+	}
+
+	responseTuples, nextPageToken, err := j.OpenFGAClient.ReadRelatedObjects(ctx, *tuple, pageSize, continuationToken)
+	if err != nil {
+		return nil, "", errors.E(op, err)
+	}
+	nextEntitlementToken, err := pagination.NextEntitlementToken(kind, nextPageToken)
+	if err != nil {
+		return nil, "", err
+	}
+	return responseTuples, nextEntitlementToken.String(), nil
 }
 
 // parseTuples translate the api request struct containing tuples to a slice of openfga tuple keys.

@@ -239,7 +239,7 @@ func TestGetGroupEntitlements(t *testing.T) {
 	}
 	jimm := jimmtest.JIMM{
 		RelationService: mocks.RelationService{
-			ListRelationshipTuples_: func(ctx context.Context, user *openfga.User, tuple params.RelationshipTuple, pageSize int32, continuationToken string) ([]openfga.Tuple, string, error) {
+			ListObjectRelations_: func(ctx context.Context, user *openfga.User, object string, pageSize int32, continuationToken string) ([]openfga.Tuple, string, error) {
 				return []openfga.Tuple{testTuple}, "continuation-token", nil
 			},
 		},

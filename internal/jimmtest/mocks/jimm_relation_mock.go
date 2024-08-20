@@ -16,6 +16,7 @@ type RelationService struct {
 	RemoveRelation_         func(ctx context.Context, user *openfga.User, tuples []apiparams.RelationshipTuple) error
 	CheckRelation_          func(ctx context.Context, user *openfga.User, tuple apiparams.RelationshipTuple, trace bool) (_ bool, err error)
 	ListRelationshipTuples_ func(ctx context.Context, user *openfga.User, tuple apiparams.RelationshipTuple, pageSize int32, continuationToken string) ([]openfga.Tuple, string, error)
+	ListObjectRelations_    func(ctx context.Context, user *openfga.User, object string, pageSize int32, continuationToken string) ([]openfga.Tuple, string, error)
 }
 
 func (j *RelationService) AddRelation(ctx context.Context, user *openfga.User, tuples []apiparams.RelationshipTuple) error {
@@ -44,4 +45,11 @@ func (j *RelationService) ListRelationshipTuples(ctx context.Context, user *open
 		return []openfga.Tuple{}, "", errors.E(errors.CodeNotImplemented)
 	}
 	return j.ListRelationshipTuples_(ctx, user, tuple, pageSize, continuationToken)
+}
+
+func (j *RelationService) ListObjectRelations(ctx context.Context, user *openfga.User, object string, pageSize int32, continuationToken string) ([]openfga.Tuple, string, error) {
+	if j.ListObjectRelations_ == nil {
+		return []openfga.Tuple{}, "", errors.E(errors.CodeNotImplemented)
+	}
+	return j.ListObjectRelations_(ctx, user, object, pageSize, continuationToken)
 }
