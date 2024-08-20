@@ -38,7 +38,11 @@ func NewEntitlementToken(token string) EntitlementToken {
 	return EntitlementToken{token: token}
 }
 
-// DecodeEntitlementToken accepts an entitlment token and decodes it to return
+// TODO(Kian): Move the code below into the application layer (i.e. jimm package)
+// specifically into the access related service (when one exists).
+// The details on encoding/decoding EntitlementTokens is only used by `internal/jimm`.
+
+// DecodeEntitlementToken accepts an entitlement token and decodes it to return
 // the original OpenFGA page token as well as the object Kind that was encoded in the wrapped token.
 //
 // An error is returned if the provided token could not be decoded.
