@@ -472,6 +472,7 @@ func (w *Watcher) handleDelta(ctx context.Context, modelIDf func(string) *modelS
 		var cores int64
 		machine := d.Entity.(*jujuparams.MachineInfo)
 		if machine.HardwareCharacteristics != nil && machine.HardwareCharacteristics.CpuCores != nil {
+			//nolint:gosec // We expect cpu cores to fit into int64.
 			cores = int64(*machine.HardwareCharacteristics.CpuCores)
 		}
 		sCores, ok := state.machines[eid.Id]

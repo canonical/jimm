@@ -459,6 +459,7 @@ func (m *Model) DBObject(c *qt.C, db db.Database) dbmodel.Model {
 	m.env.Controller(m.Controller)
 	migrationControllerID := sql.NullInt32{}
 	if m.MigrationController != "" {
+		//nolint:gosec // I'd will fit.
 		migrationControllerID.Int32 = int32(m.env.Controller(m.MigrationController).dbo.ID)
 		migrationControllerID.Valid = true
 	}
