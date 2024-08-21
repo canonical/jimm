@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"sync"
 	"time"
 
@@ -339,14 +340,14 @@ func (p *clientProxy) start(ctx context.Context) error {
 		msg := new(message)
 		if err := p.src.readJson(&msg); err != nil {
 			// Error reading on the socket implies it is closed, simply return.
-			return err
+			return fmt.Errorf("error reading from client: %w", err)
 		}
 		zapctx.Debug(ctx, "Read message from client", zap.Any("message", msg))
 		err := p.makeControllerConnection(ctx)
 		if err != nil {
 			zapctx.Error(ctx, "error connecting to controller", zap.Error(err))
 			p.sendError(p.src, msg, err)
-			return err
+			return fmt.Errorf("failed to connect to controller: %w", err)
 		}
 		if err := p.auditLogMessage(msg, false); err != nil {
 			zapctx.Error(ctx, "failed to audit log message", zap.Error(err))
@@ -438,7 +439,7 @@ func (p *controllerProxy) start(ctx context.Context) error {
 		msg := new(message)
 		if err := p.src.readJson(msg); err != nil {
 			// Error reading on the socket implies it is closed, simply return.
-			return err
+			return fmt.Errorf("error reading from controller: %w", err)
 		}
 		zapctx.Debug(ctx, "Received message from controller", zap.Any("Message", msg))
 		permissionsRequired, err := checkPermissionsRequired(ctx, msg)
@@ -467,7 +468,7 @@ func (p *controllerProxy) start(ctx context.Context) error {
 				zapctx.Error(ctx, "Failed to modify message", zap.Error(err))
 				p.handleError(msg, err)
 				// An error when modifying the message is a show stopper.
-				return err
+				return fmt.Errorf("error modifying controller response: %w", err)
 			}
 		}
 		p.msgs.removeMessage(msg.RequestID)
@@ -477,7 +478,7 @@ func (p *controllerProxy) start(ctx context.Context) error {
 		zapctx.Debug(ctx, "Writing modified message to client", zap.Any("Message", msg))
 		if err := p.dst.writeJson(msg); err != nil {
 			zapctx.Error(ctx, "controllerProxy error writing to dst", zap.Error(err))
-			return err
+			return fmt.Errorf("error writing message to client: %w", err)
 		}
 	}
 }
