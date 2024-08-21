@@ -20,7 +20,6 @@ echo "created cloud-init file"
 
 if [ "${SKIP_BOOTSTRAP:-false}" == true ]; then
   echo "skipping controller bootstrap"
-  echo "skipping controller bootstrap"
   exit 0
 fi
 

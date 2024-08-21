@@ -5,7 +5,7 @@ inputs:
   jimm-version:
     description: 'JIMM version tag to use. This will decide the version of JIMM to start e.g. v3.1.7'
     required: true
-  juju-version:
+  juju-channel:
     description: 'Juju snap channel to pass to charmed-kubernetes/actions-operator'
     required: false
   ghcr-pat:
