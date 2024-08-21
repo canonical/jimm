@@ -19,7 +19,10 @@ build: version/commit.txt version/version.txt
 build/server: version/commit.txt version/version.txt
 	go build -tags version ./cmd/jimmsrv
 
-check: version/commit.txt version/version.txt
+lint:
+	golangci-lint run --timeout 5m
+
+check: version/commit.txt version/version.txt lint
 	go test -timeout 30m $(PROJECT)/... -cover
 
 clean:
