@@ -28,7 +28,7 @@ func (s *addServiceAccountSuite) TestAddServiceAccount(c *gc.C) {
 	clientIDWithDomain := clientID + "@serviceaccount"
 	// alice is superuser
 	bClient := jimmtest.NewUserSessionLogin(c, "alice")
-	_, err := cmdtesting.RunCommand(c, cmd.NewAddServiceAccountCommandForTesting(s.JimmCmdSuite.ClientStore(), bClient), clientID)
+	_, err := cmdtesting.RunCommand(c, cmd.NewAddServiceAccountCommandForTesting(s.ClientStore(), bClient), clientID)
 	c.Assert(err, gc.IsNil)
 	tuple := openfga.Tuple{
 		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
@@ -40,10 +40,10 @@ func (s *addServiceAccountSuite) TestAddServiceAccount(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	c.Assert(ok, gc.Equals, true)
 	// Check that re-running the command doesn't return an error for Alice.
-	_, err = cmdtesting.RunCommand(c, cmd.NewAddServiceAccountCommandForTesting(s.JimmCmdSuite.ClientStore(), bClient), clientID)
+	_, err = cmdtesting.RunCommand(c, cmd.NewAddServiceAccountCommandForTesting(s.ClientStore(), bClient), clientID)
 	c.Assert(err, gc.IsNil)
 	// Check that re-running the command for a different user returns an error.
 	bClientBob := jimmtest.NewUserSessionLogin(c, "bob")
-	_, err = cmdtesting.RunCommand(c, cmd.NewAddServiceAccountCommandForTesting(s.JimmCmdSuite.ClientStore(), bClientBob), clientID)
-	// c.Assert(err, gc.ErrorMatches, "service account already owned")
+	_, err = cmdtesting.RunCommand(c, cmd.NewAddServiceAccountCommandForTesting(s.ClientStore(), bClientBob), clientID)
+	c.Assert(err, gc.ErrorMatches, "service account already owned")
 }
