@@ -9,7 +9,7 @@ run:
   tests: true
   allow-parallel-runners: false
   allow-serial-runners: false
-  # go: "1.17" # Do not set a go limit
+  # go: "1.23"
 
 issues:
   exclude-use-default: true
@@ -53,8 +53,8 @@ linters:
 
     # Style based linters
     - promlinter
-    - gocritic
-    - gocognit # To be fixed
+    - gocritic 
+    - gocognit
     - goheader
     - importas
     - gci

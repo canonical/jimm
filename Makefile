@@ -19,7 +19,10 @@ build: version/commit.txt version/version.txt
 build/server: version/commit.txt version/version.txt
 	go build -tags version ./cmd/jimmsrv
 
-check: version/commit.txt version/version.txt
+lint:
+	golangci-lint run --timeout 5m
+
+check: version/commit.txt version/version.txt lint
 	go test -timeout 30m $(PROJECT)/... -cover
 
 clean:
@@ -117,6 +120,7 @@ endef
 APT_BASED := $(shell command -v apt-get >/dev/null; echo $$?)
 sys-deps:
 ifeq ($(APT_BASED),0)
+	@$(call check_dep,golangci-lint,Missing Golangci-lint - install from https://golangci-lint.run/welcome/install/)
 	@$(call check_dep,go,Missing Go - install from https://go.dev/doc/install or 'sudo snap install go --classic')
 	@$(call check_dep,git,Missing Git - install with 'sudo apt install git')
 	@$(call check_dep,gcc,Missing gcc - install with 'sudo apt install build-essential')
