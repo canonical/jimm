@@ -206,6 +206,7 @@ func (o *OFGAClient) removeTuples(ctx context.Context, tuple Tuple) (err error) 
 	for {
 		// Since we're deleting the returned tuples, it's best to avoid pagination,
 		// and fresh query for the relations.
+		//nolint:gosec // The page size will not exceed int32.
 		tuples, ct, err := o.ReadRelatedObjects(ctx, tuple, int32(pageSize), "")
 		if err != nil {
 			return err

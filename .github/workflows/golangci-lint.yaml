@@ -1,0 +1,31 @@
+name: golangci-lint
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  checks: write # Optional: allow write access to checks to allow the action to annotate code in the PR.
+
+jobs:
+  golangci:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache: false
+
+      - name: Touch approle
+        run: touch ./local/vault/approle.json
+
+      - name: Run Golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          args: --timeout 30m --verbose
+          version: v1.60
+
