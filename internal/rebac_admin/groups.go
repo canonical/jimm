@@ -229,19 +229,43 @@ func (s *groupsService) PatchGroupIdentities(ctx context.Context, groupId string
 
 // GetGroupRoles returns a page of Roles for Group `groupId`.
 func (s *groupsService) GetGroupRoles(ctx context.Context, groupId string, params *resources.GetGroupsItemRolesParams) (*resources.PaginatedResponse[resources.Role], error) {
-	// TODO: I think we can remove this, JIMM doesn't have group roles.
 	return nil, v1.NewNotImplementedError("get group roles not implemented")
 }
 
 // PatchGroupRoles performs addition or removal of a Role to/from a Group identified by `groupId`.
 func (s *groupsService) PatchGroupRoles(ctx context.Context, groupId string, rolePatches []resources.GroupRolesPatchItem) (bool, error) {
-	// TODO: I think we can remove this, JIMM doesn't have group roles.
 	return false, v1.NewNotImplementedError("patch group roles not implemented")
 }
 
 // GetGroupEntitlements returns a page of Entitlements for Group `groupId`.
 func (s *groupsService) GetGroupEntitlements(ctx context.Context, groupId string, params *resources.GetGroupsItemEntitlementsParams) (*resources.PaginatedResponse[resources.EntityEntitlement], error) {
-	return nil, v1.NewNotImplementedError("get group entitlements not implemented")
+	user, err := utils.GetUserFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	ok := jimmnames.IsValidGroupId(groupId)
+	if !ok {
+		return nil, v1.NewValidationError("invalid group ID")
+	}
+	filter := utils.CreateTokenPaginationFilter(params.Size, params.NextToken, params.NextPageToken)
+	group := ofganames.WithMemberRelation(jimmnames.NewGroupTag(groupId))
+	entitlementToken := pagination.NewEntitlementToken(filter.Token())
+	tuples, nextEntitlmentToken, err := s.jimm.ListObjectRelations(ctx, user, group, int32(filter.Limit()), entitlementToken)
+	if err != nil {
+		return nil, err
+	}
+	originalToken := filter.Token()
+	nextToken := nextEntitlmentToken.String()
+	return &resources.PaginatedResponse[resources.EntityEntitlement]{
+		Meta: resources.ResponseMeta{
+			Size:      len(tuples),
+			PageToken: &originalToken,
+		},
+		Next: resources.Next{
+			PageToken: &nextToken,
+		},
+		Data: utils.ToEntityEntitlements(tuples),
+	}, nil
 }
 
 // PatchGroupEntitlements performs addition or removal of an Entitlement to/from a Group identified by `groupId`.

@@ -160,7 +160,7 @@ func TestTokenFilter(t *testing.T) {
 	c := qt.New(t)
 	for _, tC := range testCases {
 		c.Run(tC.desc, func(c *qt.C) {
-			filter := pagination.NewTokenFilter(tC.limit, tC.token)
+			filter := pagination.NewOpenFGAFilter(tC.limit, tC.token)
 			c.Assert(filter.Limit(), qt.Equals, tC.wantLimit)
 			c.Assert(filter.Token(), qt.Equals, testToken)
 		})

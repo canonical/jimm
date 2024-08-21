@@ -6,9 +6,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/canonical/rebac-admin-ui-handlers/v1/resources"
+
 	"github.com/canonical/jimm/v3/internal/common/pagination"
 	"github.com/canonical/jimm/v3/internal/openfga"
-	"github.com/canonical/rebac-admin-ui-handlers/v1/resources"
 )
 
 // FromUserToIdentity parses openfga.User into resources.Identity .
@@ -26,7 +27,7 @@ func FromUserToIdentity(user openfga.User) resources.Identity {
 }
 
 // CreateTokenPaginationFilter returns a token pagination filter based on the rebac admin request parameters.
-func CreateTokenPaginationFilter(size *int, token, tokenFromHeader *string) pagination.TokenPagination {
+func CreateTokenPaginationFilter(size *int, token, tokenFromHeader *string) pagination.OpenFGAPagination {
 	pageSize := 0
 	if size != nil {
 		pageSize = *size
@@ -37,5 +38,5 @@ func CreateTokenPaginationFilter(size *int, token, tokenFromHeader *string) pagi
 	} else if token != nil {
 		pageToken = *token
 	}
-	return pagination.NewTokenFilter(pageSize, pageToken)
+	return pagination.NewOpenFGAFilter(pageSize, pageToken)
 }

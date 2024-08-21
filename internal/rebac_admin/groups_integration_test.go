@@ -119,3 +119,61 @@ func (s rebacAdminSuite) TestPatchGroupIdentitiesIntegration(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	c.Assert(allowed, gc.Equals, true)
 }
+
+func (s rebacAdminSuite) TestGetGroupEntitlementsIntegration(c *gc.C) {
+	ctx := context.Background()
+	group, err := s.JIMM.AddGroup(ctx, s.AdminUser, "test-group")
+	c.Assert(err, gc.IsNil)
+	tuple := openfga.Tuple{
+		Object:   ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag(group.UUID), ofganames.MemberRelation),
+		Relation: ofganames.AdministratorRelation,
+	}
+	var tuples []openfga.Tuple
+	for i := range 3 {
+		t := tuple
+		t.Target = ofganames.ConvertTag(names.NewModelTag(fmt.Sprintf("test-model-%d", i)))
+		tuples = append(tuples, t)
+	}
+	for i := range 3 {
+		t := tuple
+		t.Target = ofganames.ConvertTag(names.NewControllerTag(fmt.Sprintf("test-controller-%d", i)))
+		tuples = append(tuples, t)
+	}
+	err = s.JIMM.OpenFGAClient.AddRelation(ctx, tuples...)
+	c.Assert(err, gc.IsNil)
+
+	ctx = rebac_handlers.ContextWithIdentity(ctx, s.AdminUser)
+	emptyPageToken := ""
+	req := resources.GetGroupsItemEntitlementsParams{NextPageToken: &emptyPageToken}
+	var entitlements []resources.EntityEntitlement
+	for {
+		res, err := s.groupSvc.GetGroupEntitlements(ctx, group.UUID, &req)
+		c.Assert(err, gc.IsNil)
+		c.Assert(res, gc.Not(gc.IsNil))
+		entitlements = append(entitlements, res.Data...)
+		if *res.Next.PageToken == "" {
+			break
+		}
+		c.Assert(*res.Meta.PageToken, gc.Equals, *req.NextPageToken)
+		c.Assert(*res.Next.PageToken, gc.Not(gc.Equals), "")
+		req.NextPageToken = res.Next.PageToken
+	}
+	c.Assert(entitlements, gc.HasLen, 6)
+	modelEntitlementCount := 0
+	controllerEntitlementCount := 0
+	for _, entitlement := range entitlements {
+		c.Assert(entitlement.Entitlement, gc.Equals, ofganames.AdministratorRelation.String())
+		c.Assert(entitlement.EntityId, gc.Matches, `test-(model|controller)-\d`)
+		switch entitlement.EntityType {
+		case openfga.ModelType.String():
+			modelEntitlementCount++
+		case openfga.ControllerType.String():
+			controllerEntitlementCount++
+		default:
+			c.Logf("Unexpected entitlement found of type %s", entitlement.EntityType)
+			c.FailNow()
+		}
+	}
+	c.Assert(modelEntitlementCount, gc.Equals, 3)
+	c.Assert(controllerEntitlementCount, gc.Equals, 3)
+}
