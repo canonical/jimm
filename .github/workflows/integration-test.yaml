@@ -17,11 +17,19 @@ jobs:
     steps:
       - name: Checkout JIMM repo
         uses: actions/checkout@v4
+      - name: Setup Go
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: actions/setup-go@v4
+        with:
+          go-version-file: 'go.mod'
+      - name: Go vendor to speed up docker build
+        if: ${{ github.event_name == 'pull_request' }}
+        run: go mod vendor
       - name: Start JIMM (fixed version)
         if: ${{ github.event_name == 'pull_request' }}
         uses: ./.github/actions/test-server
         with:
-          jimm-version: v3.1.7
+          jimm-version: dev
           juju-channel: "3/stable"
           ghcr-pat: ${{ secrets.GITHUB_TOKEN }}
       - name: Start JIMM (user provided version)

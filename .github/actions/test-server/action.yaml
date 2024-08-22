@@ -3,13 +3,17 @@ description: "Create a JIMM environment"
 
 inputs:
   jimm-version:
-    description: 'JIMM version tag to use. This will decide the version of JIMM to start e.g. v3.1.7'
+    description: >
+      JIMM version tag to use. This will decide the version of JIMM to start e.g. v3.1.7
+      A special tag of "dev" can be provided to use the current development version of JIMM.
     required: true
   juju-channel:
     description: 'Juju snap channel to pass to charmed-kubernetes/actions-operator'
     required: false
   ghcr-pat:
-    description: 'PAT Token that has package:read access to canonical/JIMM'
+    description: >
+      PAT Token that has package:read access to canonical/JIMM
+      The PAT token can be left empty when building the development version of JIMM.
     required: true
 
 output:
@@ -27,16 +31,22 @@ runs:
   using: "composite"
   steps:
     - name: Login to GitHub Container Registry
+      if: ${{ inputs.jimm-version != 'dev' }}
       uses: docker/login-action@v3
       with:
         registry: ghcr.io
         username: ${{ github.actor }}
         password: ${{ inputs.ghcr-pat }}
-    - name: Start server and dependencies
+    - name: Start server based on released version
+      if: ${{ inputs.jimm-version != 'dev' }}
       run: make integration-test-env
       shell: bash
       env:
         JIMM_VERSION: ${{ inputs.jimm-version }}
+    - name: Start server based on development version
+      if: ${{ inputs.jimm-version == 'dev' }}
+      run: make dev-env
+      shell: bash
     - name: Initialise LXD
       run: |
         sudo lxd waitready && \

@@ -25,7 +25,4 @@ Use the action by adding the following to a Github workflow:
 
 Note that it's recommended to pin the action version to the same version as `jimm-version` to ensure the action works as expected for that specific version of JIMM.
 
-The action accepts the following inputs:
-- `jimm-version`: The version of JIMM you want to test against.
-- `juju-channel`: The snap channel to use when installing and bootstrapping Juju.
-- `ghcr-pat`: A PAT token with package:read access that has access to the `canonical/jimm` repo.
+For full details on the inputs see `action.yaml`.
