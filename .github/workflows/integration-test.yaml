@@ -25,14 +25,14 @@ jobs:
       - name: Go vendor to speed up docker build
         if: ${{ github.event_name == 'pull_request' }}
         run: go mod vendor
-      - name: Start JIMM (fixed version)
+      - name: Start JIMM (pull request)
         if: ${{ github.event_name == 'pull_request' }}
         uses: ./.github/actions/test-server
         with:
           jimm-version: dev
           juju-channel: "3/stable"
           ghcr-pat: ${{ secrets.GITHUB_TOKEN }}
-      - name: Start JIMM (user provided version)
+      - name: Start JIMM (manual run)
         if: ${{ github.event_name == 'workflow_dispatch' }}
         uses: ./.github/actions/test-server
         with:
