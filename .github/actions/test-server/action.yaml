@@ -37,16 +37,19 @@ runs:
         registry: ghcr.io
         username: ${{ github.actor }}
         password: ${{ inputs.ghcr-pat }}
+
     - name: Start server based on released version
       if: ${{ inputs.jimm-version != 'dev' }}
       run: make integration-test-env
       shell: bash
       env:
         JIMM_VERSION: ${{ inputs.jimm-version }}
+
     - name: Start server based on development version
       if: ${{ inputs.jimm-version == 'dev' }}
       run: make dev-env
       shell: bash
+
     - name: Initialise LXD
       run: |
         sudo lxd waitready && \
@@ -55,12 +58,14 @@ runs:
         lxc network set lxdbr0 ipv6.address none && \
         sudo usermod -a -G lxd $USER
       shell: bash
+
     - name: Setup cloud-init script for bootstraping Juju controllers
       run: ./local/jimm/setup-controller.sh
       shell: bash
       env:
         SKIP_BOOTSTRAP: true
         CLOUDINIT_FILE: "cloudinit.temp.yaml"
+
     - name: Setup Juju Controller
       uses: charmed-kubernetes/actions-operator@main
       with:
@@ -68,19 +73,24 @@ runs:
         channel: "5.19/stable"
         juju-channel: ${{ inputs.juju-channel }}
         bootstrap-options: "--config cloudinit.temp.yaml --config login-token-refresh-url=https://jimm.localhost/.well-known/jwks.json"
+
+    # As described in https://github.com/charmed-kubernetes/actions-operator grab the newly setup controller name
     - name: Save LXD controller name
       id: lxd-controller
       run: echo "name=$CONTROLLER_NAME" >> $GITHUB_OUTPUT
       shell: bash
+
     - name: Install jimmctl and yq
       run: sudo snap install jimmctl --channel=3/stable && sudo snap install yq
       shell: bash
+
     - name: Authenticate Juju CLI
       run: chmod -R 666 ~/.local/share/juju/*.yaml && ./local/jimm/setup-cli-auth.sh
       shell: bash
       # Below is a hardcoded JWT using the same test-secret used in JIMM's docker compose and allows the CLI to authenticate as the jimm-test@canonical.com user.
       env:
         JWT: ZXlKMGVYQWlPaUpLVjFRaUxDSmhiR2NpT2lKSVV6STFOaUo5LmV5SnBjM01pT2lKUGJteHBibVVnU2xkVUlFSjFhV3hrWlhJaUxDSnBZWFFpT2pFM01qUXlNamcyTmpBc0ltVjRjQ0k2TXprMk5EYzFNelEyTUN3aVlYVmtJam9pYW1sdGJTSXNJbk4xWWlJNkltcHBiVzB0ZEdWemRFQmpZVzV2Ym1sallXd3VZMjl0SW4wLkpTWVhXcGF6T0FnX1VFZ2hkbjlOZkVQdWxhWWlJQVdaX3BuSmRDbnJvWEk=
+
     - name: Add LXD Juju controller to JIMM
       run: ./local/jimm/add-controller.sh
       shell: bash
