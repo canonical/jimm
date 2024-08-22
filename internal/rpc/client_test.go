@@ -266,7 +266,7 @@ func TestProxySockets(t *testing.T) {
 			LoginService:      &mockLoginService{},
 		}
 		err := rpc.ProxySockets(ctx, proxyHelpers)
-		c.Check(err, qt.ErrorMatches, ".*use of closed network connection")
+		c.Check(err, qt.ErrorMatches, "error reading from (client|controller).*")
 		errChan <- err
 		return err
 	})
@@ -368,7 +368,7 @@ func TestProxySocketsAuditLogs(t *testing.T) {
 			LoginService:      &mockLoginService{},
 		}
 		err := rpc.ProxySockets(ctx, proxyHelpers)
-		c.Check(err, qt.ErrorMatches, ".*use of closed network connection")
+		c.Check(err, qt.ErrorMatches, `error reading from (client|controller).*`)
 		errChan <- err
 		return err
 	})
