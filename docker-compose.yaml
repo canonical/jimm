@@ -22,8 +22,7 @@ services:
     
   # An instance of JIMM used in integration tests, pulled from a tag.
   jimm-test:
-    extends: jimm
-    image: ghcr.io/canonical/jimm:${JIMM_VERSION}
+    image: ghcr.io/canonical/jimm:${JIMM_VERSION:-latest}
     profiles: ["test"]
     container_name: jimm-test
     ports:
