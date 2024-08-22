@@ -105,7 +105,7 @@ func (j *JIMM) ListRelationshipTuples(ctx context.Context, user *openfga.User, t
 //
 // This functions provides a slightly higher-level abstraction in favor of ListRelationshipTuples.
 func (j *JIMM) ListObjectRelations(ctx context.Context, user *openfga.User, object string, pageSize int32, entitlementToken pagination.EntitlementToken) ([]openfga.Tuple, pagination.EntitlementToken, error) {
-	const op = errors.Op("jimm.ListRelationshipTuples")
+	const op = errors.Op("jimm.ListObjectRelations")
 	var e pagination.EntitlementToken
 	if !user.JimmAdmin {
 		return nil, e, errors.E(op, errors.CodeUnauthorized, "unauthorized")

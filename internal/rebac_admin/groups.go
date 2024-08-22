@@ -170,16 +170,19 @@ func (s *groupsService) GetGroupIdentities(ctx context.Context, groupId string, 
 		data = append(data, resources.Identity{Email: identifier})
 	}
 	originalToken := filter.Token()
-	return &resources.PaginatedResponse[resources.Identity]{
+	resp := resources.PaginatedResponse[resources.Identity]{
 		Meta: resources.ResponseMeta{
 			Size:      len(data),
 			PageToken: &originalToken,
 		},
-		Next: resources.Next{
-			PageToken: &nextToken,
-		},
 		Data: data,
-	}, nil
+	}
+	if nextToken != "" {
+		resp.Next = resources.Next{
+			PageToken: &nextToken,
+		}
+	}
+	return &resp, nil
 }
 
 // PatchGroupIdentities performs addition or removal of identities to/from a Group identified by `groupId`.
@@ -256,17 +259,20 @@ func (s *groupsService) GetGroupEntitlements(ctx context.Context, groupId string
 		return nil, err
 	}
 	originalToken := filter.Token()
-	nextToken := nextEntitlmentToken.String()
-	return &resources.PaginatedResponse[resources.EntityEntitlement]{
+	resp := resources.PaginatedResponse[resources.EntityEntitlement]{
 		Meta: resources.ResponseMeta{
 			Size:      len(tuples),
 			PageToken: &originalToken,
 		},
-		Next: resources.Next{
-			PageToken: &nextToken,
-		},
 		Data: utils.ToEntityEntitlements(tuples),
-	}, nil
+	}
+	if nextEntitlmentToken.String() != "" {
+		nextToken := nextEntitlmentToken.String()
+		resp.Next = resources.Next{
+			PageToken: &nextToken,
+		}
+	}
+	return &resp, nil
 }
 
 // PatchGroupEntitlements performs addition or removal of an Entitlement to/from a Group identified by `groupId`.
@@ -280,7 +286,7 @@ func (s *groupsService) PatchGroupEntitlements(ctx context.Context, groupId stri
 	}
 	groupTag := jimmnames.NewGroupTag(groupId)
 	tuple := apiparams.RelationshipTuple{
-		Object: ofganames.WithMemberRelation(groupTag.String()),
+		Object: ofganames.WithMemberRelation(groupTag),
 	}
 	var toRemove []apiparams.RelationshipTuple
 	var toAdd []apiparams.RelationshipTuple

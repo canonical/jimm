@@ -67,7 +67,12 @@ func TestUnmarshalEntitlementToken(t *testing.T) {
 		{
 			desc:          "Invalid token",
 			in:            "abc",
-			expectedError: "marshal entitlement token: illegal base64 data at input byte 0",
+			expectedError: "unmarshal entitlement token: illegal base64 data at input byte 0",
+		},
+		{
+			desc:          "Invalid JSON in valid Base64 string",
+			in:            "c29tZSBpbnZhbGlkIHRva2VuCg==",
+			expectedError: "failed to unmarshal combo token: invalid character 's' looking for beginning of value",
 		},
 	}
 
