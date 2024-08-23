@@ -66,8 +66,6 @@ services:
     restart: always
     ports:
       - 5432:5432
-    volumes:
-      - ./local/init.sql:/docker-entrypoint-initdb.d/init.sql
     environment:
       POSTGRES_DB: jimm
       POSTGRES_USER: jimm
