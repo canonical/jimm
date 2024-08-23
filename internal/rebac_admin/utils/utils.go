@@ -7,9 +7,11 @@ import (
 	"time"
 
 	"github.com/canonical/rebac-admin-ui-handlers/v1/resources"
+	"github.com/juju/names/v5"
 
 	"github.com/canonical/jimm/v3/internal/common/pagination"
 	"github.com/canonical/jimm/v3/internal/openfga"
+	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
 
 // FromUserToIdentity parses openfga.User into resources.Identity .
@@ -39,4 +41,10 @@ func CreateTokenPaginationFilter(size *int, token, tokenFromHeader *string) pagi
 		pageToken = *token
 	}
 	return pagination.NewOpenFGAFilter(pageSize, pageToken)
+}
+
+// ValidateDecomposedTag validates that a kind and ID are a valid Juju or JIMM tag.
+func ValidateDecomposedTag(kind string, id string) (names.Tag, error) {
+	rawTag := kind + "-" + id
+	return jimmnames.ParseTag(rawTag)
 }

@@ -117,8 +117,10 @@ func (c *comboToken) MarshalToken() (string, error) {
 func (c *comboToken) UnmarshalToken(token string) error {
 	out, err := base64.StdEncoding.DecodeString(token)
 	if err != nil {
-		return fmt.Errorf("marshal entitlement token: %w", err)
+		return fmt.Errorf("failed to decode token: %w", err)
 	}
-
-	return json.Unmarshal(out, c)
+	if err := json.Unmarshal(out, c); err != nil {
+		return fmt.Errorf("failed to unmarshal token: %w", err)
+	}
+	return nil
 }

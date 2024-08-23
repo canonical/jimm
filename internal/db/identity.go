@@ -91,7 +91,7 @@ func (d *Database) UpdateIdentity(ctx context.Context, u *dbmodel.Identity) (err
 	db := d.DB.WithContext(ctx)
 	db = db.Omit("ApplicationOffers").Omit("Clouds").Omit("CloudCredentials").Omit("Models")
 	if err := db.Save(u).Error; err != nil {
-		return errors.E(op)
+		return errors.E(op, err)
 	}
 	return nil
 }

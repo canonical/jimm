@@ -147,6 +147,7 @@ func TestGetGroupIdentities(t *testing.T) {
 	c := qt.New(t)
 	var listTuplesErr error
 	var getGroupErr error
+	var continuationToken string
 	testTuple := openfga.Tuple{
 		Object:   &ofga.Entity{Kind: "user", ID: "foo"},
 		Relation: ofga.Relation("member"),
@@ -159,8 +160,8 @@ func TestGetGroupIdentities(t *testing.T) {
 			},
 		},
 		RelationService: mocks.RelationService{
-			ListRelationshipTuples_: func(ctx context.Context, user *openfga.User, tuple params.RelationshipTuple, pageSize int32, continuationToken string) ([]openfga.Tuple, string, error) {
-				return []openfga.Tuple{testTuple}, "continuation-token", listTuplesErr
+			ListRelationshipTuples_: func(ctx context.Context, user *openfga.User, tuple params.RelationshipTuple, pageSize int32, ct string) ([]openfga.Tuple, string, error) {
+				return []openfga.Tuple{testTuple}, continuationToken, listTuplesErr
 			},
 		},
 	}
@@ -178,11 +179,18 @@ func TestGetGroupIdentities(t *testing.T) {
 	c.Assert(err, qt.ErrorMatches, ".*group doesn't exist")
 	getGroupErr = nil
 
+	continuationToken = "continuation-token"
 	res, err := groupSvc.GetGroupIdentities(ctx, newUUID.String(), &resources.GetGroupsItemIdentitiesParams{})
 	c.Assert(err, qt.IsNil)
 	c.Assert(res, qt.IsNotNil)
 	c.Assert(res.Data, qt.HasLen, 1)
 	c.Assert(*res.Next.PageToken, qt.Equals, "continuation-token")
+
+	continuationToken = ""
+	res, err = groupSvc.GetGroupIdentities(ctx, newUUID.String(), &resources.GetGroupsItemIdentitiesParams{})
+	c.Assert(err, qt.IsNil)
+	c.Assert(res, qt.IsNotNil)
+	c.Assert(res.Next.PageToken, qt.IsNil)
 
 	listTuplesErr = errors.New("foo")
 	_, err = groupSvc.GetGroupIdentities(ctx, newUUID.String(), &resources.GetGroupsItemIdentitiesParams{})
@@ -232,6 +240,8 @@ func TestPatchGroupIdentities(t *testing.T) {
 
 func TestGetGroupEntitlements(t *testing.T) {
 	c := qt.New(t)
+	var listRelationsErr error
+	var continuationToken string
 	testTuple := openfga.Tuple{
 		Object:   &ofga.Entity{Kind: "user", ID: "foo"},
 		Relation: ofga.Relation("member"),
@@ -239,8 +249,8 @@ func TestGetGroupEntitlements(t *testing.T) {
 	}
 	jimm := jimmtest.JIMM{
 		RelationService: mocks.RelationService{
-			ListObjectRelations_: func(ctx context.Context, user *openfga.User, object string, pageSize int32, continuationToken pagination.EntitlementToken) ([]openfga.Tuple, pagination.EntitlementToken, error) {
-				return []openfga.Tuple{testTuple}, pagination.NewEntitlementToken("next-page-token"), nil
+			ListObjectRelations_: func(ctx context.Context, user *openfga.User, object string, pageSize int32, ct pagination.EntitlementToken) ([]openfga.Tuple, pagination.EntitlementToken, error) {
+				return []openfga.Tuple{testTuple}, pagination.NewEntitlementToken(continuationToken), listRelationsErr
 			},
 		},
 	}
@@ -252,14 +262,83 @@ func TestGetGroupEntitlements(t *testing.T) {
 	_, err := groupSvc.GetGroupEntitlements(ctx, "invalid-group-id", nil)
 	c.Assert(err, qt.ErrorMatches, ".* invalid group ID")
 
+	continuationToken = "random-token"
 	res, err := groupSvc.GetGroupEntitlements(ctx, uuid.New().String(), &resources.GetGroupsItemEntitlementsParams{})
 	c.Assert(err, qt.IsNil)
 	c.Assert(res, qt.IsNotNil)
 	c.Assert(res.Data, qt.HasLen, 1)
-	c.Assert(res.Next.PageToken, qt.Not(qt.Equals), "")
+	c.Assert(*res.Next.PageToken, qt.Equals, "random-token")
 
-	// Test using the previous tokens page token.
-	res, err = groupSvc.GetGroupEntitlements(ctx, uuid.New().String(), &resources.GetGroupsItemEntitlementsParams{NextToken: res.Next.PageToken})
+	continuationToken = ""
+	res, err = groupSvc.GetGroupEntitlements(ctx, uuid.New().String(), &resources.GetGroupsItemEntitlementsParams{})
 	c.Assert(err, qt.IsNil)
 	c.Assert(res, qt.IsNotNil)
+	c.Assert(res.Next.PageToken, qt.IsNil)
+
+	nextToken := "some-token"
+	res, err = groupSvc.GetGroupEntitlements(ctx, uuid.New().String(), &resources.GetGroupsItemEntitlementsParams{NextToken: &nextToken})
+	c.Assert(err, qt.IsNil)
+	c.Assert(res, qt.IsNotNil)
+
+	listRelationsErr = errors.New("foo")
+	_, err = groupSvc.GetGroupEntitlements(ctx, uuid.New().String(), &resources.GetGroupsItemEntitlementsParams{})
+	c.Assert(err, qt.ErrorMatches, "foo")
+}
+
+func TestPatchGroupEntitlements(t *testing.T) {
+	c := qt.New(t)
+	var patchTuplesErr error
+	jimm := jimmtest.JIMM{
+		RelationService: mocks.RelationService{
+			AddRelation_: func(ctx context.Context, user *openfga.User, tuples []params.RelationshipTuple) error {
+				return patchTuplesErr
+			},
+			RemoveRelation_: func(ctx context.Context, user *openfga.User, tuples []params.RelationshipTuple) error {
+				return patchTuplesErr
+			},
+		},
+	}
+	user := openfga.User{}
+	ctx := context.Background()
+	ctx = rebac_handlers.ContextWithIdentity(ctx, &user)
+	groupSvc := rebac_admin.NewGroupService(&jimm)
+
+	_, err := groupSvc.PatchGroupEntitlements(ctx, "invalid-group-id", nil)
+	c.Assert(err, qt.ErrorMatches, ".* invalid group ID")
+
+	newUUID := uuid.New()
+	operations := []resources.GroupEntitlementsPatchItem{
+		{Entitlement: resources.EntityEntitlement{
+			Entitlement: "administrator",
+			EntityId:    newUUID.String(),
+			EntityType:  "model",
+		}, Op: resources.GroupEntitlementsPatchItemOpAdd},
+		{Entitlement: resources.EntityEntitlement{
+			Entitlement: "administrator",
+			EntityId:    newUUID.String(),
+			EntityType:  "model",
+		}, Op: resources.GroupEntitlementsPatchItemOpRemove},
+	}
+	res, err := groupSvc.PatchGroupEntitlements(ctx, newUUID.String(), operations)
+	c.Assert(err, qt.IsNil)
+	c.Assert(res, qt.IsTrue)
+
+	operationsWithInvalidTag := []resources.GroupEntitlementsPatchItem{
+		{Entitlement: resources.EntityEntitlement{
+			Entitlement: "administrator",
+			EntityId:    "foo",
+			EntityType:  "invalidType",
+		}, Op: resources.GroupEntitlementsPatchItemOpAdd},
+		{Entitlement: resources.EntityEntitlement{
+			Entitlement: "administrator",
+			EntityId:    "foo1",
+			EntityType:  "invalidType2",
+		}, Op: resources.GroupEntitlementsPatchItemOpAdd},
+	}
+	_, err = groupSvc.PatchGroupEntitlements(ctx, newUUID.String(), operationsWithInvalidTag)
+	c.Assert(err, qt.ErrorMatches, `\"invalidType-foo\" is not a valid tag\n\"invalidType2-foo1\" is not a valid tag`)
+
+	patchTuplesErr = errors.New("foo")
+	_, err = groupSvc.PatchGroupEntitlements(ctx, newUUID.String(), operations)
+	c.Assert(err, qt.ErrorMatches, "foo")
 }
