@@ -11,10 +11,6 @@
 /version/commit.txt
 /version/version.txt
 /tmp
-/local/vault/approle.json
-local/vault/approle.json
-local/vault/roleid.txt
-local/vault/vault.env
 
 *.crt
 *.key

@@ -35,9 +35,7 @@ services:
       - -c
       - >-
         apt update && apt install curl -y
-        && set -a && . /vault/vault.env && set +a && /usr/local/bin/jimmsrv
-    volumes:
-      - ./local/vault/vault.env:/vault/vault.env:rw
+        && /usr/local/bin/jimmsrv
 
   # An instance of JIMM used for dev, built from source with hot-reloading.
   jimm-dev:
@@ -61,7 +59,6 @@ services:
       - 2345:2345
     volumes:
       - ./:/jimm/
-      - ./local/vault/vault.env:/vault/vault.env:rw
 
   db:
     image: postgres

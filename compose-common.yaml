@@ -12,6 +12,8 @@ services:
       # Note: You can comment out the Vault ENV vars below and instead use INSECURE_SECRET_STORAGE to place secrets in Postgres.
       VAULT_ADDR: "http://vault:8200"
       VAULT_PATH: "/jimm-kv/"
+      VAULT_ROLE_ID: test-role-id
+      VAULT_ROLE_SECRET_ID: test-secret-id
       # Note: By default we should use Vault as that is the primary means of secret storage.
       # INSECURE_SECRET_STORAGE: "enabled"
       # JIMM_DASHBOARD_LOCATION: ""
