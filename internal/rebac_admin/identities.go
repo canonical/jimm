@@ -183,7 +183,33 @@ func (s *identitiesService) PatchIdentityGroups(ctx context.Context, identityId 
 
 // // GetIdentityEntitlements returns a page of Entitlements for identity `identityId`.
 func (s *identitiesService) GetIdentityEntitlements(ctx context.Context, identityId string, params *resources.GetIdentitiesItemEntitlementsParams) (*resources.PaginatedResponse[resources.EntityEntitlement], error) {
-	return nil, v1.NewNotImplementedError("get identity roles not implemented")
+	user, err := utils.GetUserFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	objUser, err := s.jimm.FetchIdentity(ctx, identityId)
+	if err != nil {
+		return nil, v1.NewNotFoundError(fmt.Sprintf("User with id %s not found", identityId))
+	}
+
+	filter := utils.CreateTokenPaginationFilter(params.Size, params.NextToken, params.NextPageToken)
+	entitlementToken := pagination.NewEntitlementToken(filter.Token())
+	tuples, nextEntitlmentToken, err := s.jimm.ListObjectRelations(ctx, user, objUser.Tag().String(), int32(filter.Limit()), entitlementToken)
+	if err != nil {
+		return nil, err
+	}
+	originalToken := filter.Token()
+	nextToken := nextEntitlmentToken.String()
+	return &resources.PaginatedResponse[resources.EntityEntitlement]{
+		Meta: resources.ResponseMeta{
+			Size:      len(tuples),
+			PageToken: &originalToken,
+		},
+		Next: resources.Next{
+			PageToken: &nextToken,
+		},
+		Data: utils.ToEntityEntitlements(tuples),
+	}, nil
 }
 
 // PatchIdentityEntitlements performs addition or removal of an Entitlement to/from an Identity.
