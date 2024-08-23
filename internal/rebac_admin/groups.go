@@ -4,7 +4,6 @@ package rebac_admin
 
 import (
 	"context"
-	stderrors "errors"
 	"fmt"
 
 	v1 "github.com/canonical/rebac-admin-ui-handlers/v1"
@@ -285,30 +284,33 @@ func (s *groupsService) PatchGroupEntitlements(ctx context.Context, groupId stri
 		return false, v1.NewValidationError("invalid group ID")
 	}
 	groupTag := jimmnames.NewGroupTag(groupId)
-	tuple := apiparams.RelationshipTuple{
-		Object: ofganames.WithMemberRelation(groupTag),
-	}
 	var toRemove []apiparams.RelationshipTuple
 	var toAdd []apiparams.RelationshipTuple
-	var errList []error
+	var errList utils.MultiErr
+	toTargetTag := func(entitlementPatch resources.GroupEntitlementsPatchItem) (names.Tag, error) {
+		return utils.ValidateDecomposedTag(
+			entitlementPatch.Entitlement.EntityType,
+			entitlementPatch.Entitlement.EntityId,
+		)
+	}
 	for _, entitlementPatch := range entitlementPatches {
-		kind := entitlementPatch.Entitlement.EntityType
-		id := entitlementPatch.Entitlement.EntityId
-		tag, err := utils.ValidateDecomposedTag(kind, id)
+		tag, err := toTargetTag(entitlementPatch)
 		if err != nil {
-			errList = append(errList, err)
+			errList.AppendError(err)
 			continue
 		}
-		t := tuple
-		t.Relation = entitlementPatch.Entitlement.Entitlement
-		t.TargetObject = tag.String()
+		t := apiparams.RelationshipTuple{
+			Object:       ofganames.WithMemberRelation(groupTag),
+			Relation:     entitlementPatch.Entitlement.Entitlement,
+			TargetObject: tag.String(),
+		}
 		if entitlementPatch.Op == resources.GroupEntitlementsPatchItemOpAdd {
 			toAdd = append(toAdd, t)
 		} else {
 			toRemove = append(toRemove, t)
 		}
 	}
-	if err := stderrors.Join(errList...); err != nil {
+	if err := errList.Error(); err != nil {
 		return false, err
 	}
 	if toAdd != nil {

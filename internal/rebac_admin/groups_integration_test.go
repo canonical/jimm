@@ -66,7 +66,7 @@ func (s rebacAdminSuite) TestGetGroupIdentitiesIntegration(c *gc.C) {
 	c.Assert(res, gc.Not(gc.IsNil))
 	c.Assert(res.Meta.Size, gc.Equals, 5)
 	c.Assert(*res.Meta.PageToken, gc.Equals, *params.NextPageToken)
-	c.Assert(*res.Next.PageToken, gc.Equals, "")
+	c.Assert(res.Next.PageToken, gc.IsNil)
 	c.Assert(res.Data, gc.HasLen, 5)
 	c.Assert(res.Data[0].Email, gc.Equals, "foo5@canonical.com")
 
@@ -75,7 +75,7 @@ func (s rebacAdminSuite) TestGetGroupIdentitiesIntegration(c *gc.C) {
 	res, err = s.groupSvc.GetGroupIdentities(ctx, group.UUID, allItems)
 	c.Assert(err, gc.IsNil)
 	c.Assert(res, gc.Not(gc.IsNil))
-	c.Assert(*res.Next.PageToken, gc.Equals, "")
+	c.Assert(res.Next.PageToken, gc.IsNil)
 }
 
 func (s rebacAdminSuite) TestPatchGroupIdentitiesIntegration(c *gc.C) {
@@ -151,7 +151,7 @@ func (s rebacAdminSuite) TestGetGroupEntitlementsIntegration(c *gc.C) {
 		c.Assert(err, gc.IsNil)
 		c.Assert(res, gc.Not(gc.IsNil))
 		entitlements = append(entitlements, res.Data...)
-		if *res.Next.PageToken == "" {
+		if res.Next.PageToken == nil {
 			break
 		}
 		c.Assert(*res.Meta.PageToken, gc.Equals, *req.NextPageToken)
@@ -254,7 +254,7 @@ func (s rebacAdminSuite) TestPatchGroupEntitlementsIntegration(c *gc.C) {
 	allowed, err := s.JIMM.OpenFGAClient.CheckRelation(ctx, tuples[0], false)
 	c.Assert(err, gc.IsNil)
 	c.Assert(allowed, gc.Equals, true)
-	// Above we have added granted the group with administrator permission to 2 model.
+	// Above we have added granted the group with administrator permission to 2 models.
 	// Below, we will request those 2 relations to be removed and add 2 different relations.
 
 	entitlementPatches := []resources.GroupEntitlementsPatchItem{
