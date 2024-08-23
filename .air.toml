@@ -4,7 +4,6 @@ tmp_dir = "tmp"
 
 [build]
   args_bin = []
-  bin = "env $(cat /vault/vault.env | xargs) ./tmp/jimm"
   cmd = "go build -gcflags='all=-N -l' -buildvcs=false -o ./tmp/jimm ./cmd/jimmsrv"
   delay = 1000
   exclude_dir = [".vscode", "assets", "tmp", "vendor", "testdata"]

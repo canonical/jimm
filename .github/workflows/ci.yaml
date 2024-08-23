@@ -54,21 +54,3 @@ jobs:
           PGSSLMODE: disable
           PGUSER: jimm
           PGPORT: 5432
-
-  smoke_test:
-    name: Smoke Test
-    runs-on: ubuntu-22.04
-    # The docker compose has a healthcheck on the JIMM container.
-    # So if the compose returns with exit code 0 then the JIMM server successfully started.
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Add volume files
-        run: |
-          touch ./local/vault/approle.json
-          touch ./local/vault/roleid.txt
-          touch ./local/vault/vault.env
-
-      - name: Run Smoke Test
-        run: docker compose --profile dev up -d --wait --timestamps

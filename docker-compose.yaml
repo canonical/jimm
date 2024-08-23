@@ -2,7 +2,7 @@ services:
   traefik:
     image: "traefik:2.9"
     container_name: traefik
-    profiles: ["dev"]
+    profiles: ["dev", "test"]
     ports:
       - "80:80"
       - "443:443"
@@ -19,8 +19,31 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
+    
+  # An instance of JIMM used in integration tests, pulled from a tag.
+  jimm-test:
+    extends:
+      file: compose-common.yaml
+      service: jimm-base
+    image: ghcr.io/canonical/jimm:${JIMM_VERSION:-latest}
+    profiles: ["test"]
+    container_name: jimm-test
+    ports:
+      - 17070:80
+    entrypoint:
+      - bash
+      - -c
+      - >-
+        apt update && apt install curl -y
+        && set -a && . /vault/vault.env && set +a && /usr/local/bin/jimmsrv
+    volumes:
+      - ./local/vault/vault.env:/vault/vault.env:rw
 
-  jimm:
+  # An instance of JIMM used for dev, built from source with hot-reloading.
+  jimm-dev:
+    extends:
+      file: compose-common.yaml
+      service: jimm-base
     image: cosmtrek/air:latest
     profiles: ["dev"]
     # working_dir value has to be the same of mapped volume
@@ -36,69 +59,9 @@ services:
     ports:
       - 17070:80
       - 2345:2345
-    environment:
-      JIMM_LOG_LEVEL: "debug"
-      JIMM_UUID: "3217dbc9-8ea9-4381-9e97-01eab0b3f6bb"
-      JIMM_DSN: "postgresql://jimm:jimm@db/jimm"
-      # Not needed for local test (yet).
-      # BAKERY_AGENT_FILE: ""
-      JIMM_ADMINS: "jimm-test@canonical.com"
-      # Note: You can comment out the Vault ENV vars below and instead use INSECURE_SECRET_STORAGE to place secrets in Postgres.
-      VAULT_ADDR: "http://vault:8200"
-      VAULT_PATH: "/jimm-kv/"
-      # Note: By default we should use Vault as that is the primary means of secret storage.
-      # INSECURE_SECRET_STORAGE: "enabled"
-      # JIMM_DASHBOARD_LOCATION: ""
-      JIMM_DNS_NAME: "jimm.localhost"
-      JIMM_LISTEN_ADDR: "0.0.0.0:80"
-      JIMM_TEST_PGXDSN: "postgresql://jimm:jimm@db/jimm"
-      JIMM_JWT_EXPIRY: 30s
-      JIMM_AUDIT_LOG_RETENTION_PERIOD_IN_DAYS: "1"
-      TEST_LOGGING_CONFIG: ""
-      BAKERY_PUBLIC_KEY: "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk="
-      BAKERY_PRIVATE_KEY: "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc="
-      OPENFGA_SCHEME: "http"
-      OPENFGA_HOST: "openfga"
-      OPENFGA_PORT: 8080
-      OPENFGA_STORE: "01GP1254CHWJC1MNGVB0WDG1T0"
-      OPENFGA_AUTH_MODEL: "01GP1EC038KHGB6JJ2XXXXCXKB"
-      OPENFGA_TOKEN: "jimm"
-      JIMM_IS_LEADER: true
-      JIMM_OAUTH_ISSUER_URL: "http://keycloak.localhost:8082/realms/jimm" # Scheme required
-      JIMM_OAUTH_CLIENT_ID: "jimm-device"
-      JIMM_OAUTH_CLIENT_SECRET: "SwjDofnbDzJDm9iyfUhEp67FfUFMY8L4"
-      JIMM_OAUTH_SCOPES: "openid profile email" # Space separated list of scopes
-      JIMM_DASHBOARD_FINAL_REDIRECT_URL: "https://jaas.ai" # Example URL
-      JIMM_ACCESS_TOKEN_EXPIRY_DURATION: 1h
-      JIMM_SECURE_SESSION_COOKIES: false
-      JIMM_SESSION_COOKIE_MAX_AGE: 86400
-      JIMM_SESSION_SECRET_KEY: Xz2RkR9g87M75xfoumhEs5OmGziIX8D88Rk5YW8FSvkBPSgeK9t5AS9IvPDJ3NnB
     volumes:
       - ./:/jimm/
-      - ./local/vault/approle.json:/vault/approle.json:rw
-      - ./local/vault/roleid.txt:/vault/roleid.txt:rw
       - ./local/vault/vault.env:/vault/vault.env:rw
-    healthcheck:
-      test: [ "CMD", "curl", "http://jimm.localhost:80" ]
-      interval: 5s
-      timeout: 5s
-      retries: 50 # Should fail after approximately (interval*retry) seconds
-    depends_on:
-      db:
-        condition: service_healthy
-      openfga:
-        condition: service_healthy
-      traefik:
-        condition: service_healthy
-      insert-hardcoded-auth-model:
-        condition: service_completed_successfully
-      keycloak:
-        condition: service_healthy
-    labels:
-      traefik.enable: true
-      traefik.http.routers.jimm.rule: Host(`jimm.localhost`)
-      traefik.http.routers.jimm.entrypoints: websecure
-      traefik.http.routers.jimm.tls: true
 
   db:
     image: postgres
@@ -193,7 +156,7 @@ services:
   # Adds the auth model and updates its authorisation model id to be the expected hard-coded id such that our local JIMM can utilise it for queries.
   # The auth model json is retrieved from file via volume mount.
   insert-hardcoded-auth-model:
-    profiles: ["dev"]
+    profiles: ["dev", "test"]
     image: governmentpaas/psql
     container_name: insert-hardcoded-auth-model
     volumes:
