@@ -93,65 +93,23 @@ services:
     cap_add:
       - IPC_LOCK
 
-  migrateopenfga:
-    image: openfga/openfga:v1.2.0
-    container_name: migrateopenfga
-    command: migrate --datastore-engine postgres --datastore-uri 'postgresql://jimm:jimm@db/jimm?sslmode=disable'
-    depends_on:
-      db:
-        condition: service_healthy
-
-  insert-hardcoded-store:
-    image: governmentpaas/psql
-    container_name: insert-hardcoded-store
-    command: psql -Atx postgresql://jimm:jimm@db/jimm?sslmode=disable -c "INSERT INTO store (id,name,created_at,updated_at) VALUES ('01GP1254CHWJC1MNGVB0WDG1T0','jimm',NOW(),NOW());"
-    depends_on:
-      migrateopenfga:
-        condition: service_completed_successfully
-
   openfga:
-    # We use our 'image' to mimic juju standard.
-    # image: openfga/openfga:latest
     build:
-      context: .
-      dockerfile: ./local/openfga/Dockerfile
+      context: ./local/openfga/
+      dockerfile: Dockerfile
     container_name: openfga
     environment:
       OPENFGA_AUTHN_METHOD: "preshared"
       OPENFGA_AUTHN_PRESHARED_KEYS: "jimm"
       OPENFGA_DATASTORE_ENGINE: "postgres"
       OPENFGA_DATASTORE_URI: "postgresql://jimm:jimm@db/jimm?sslmode=disable"
-    command: run
+    volumes:
+      - ./openfga/authorisation_model.json:/app/authorisation_model.json
     ports:
       - 8080:8080
       - 3000:3000
     depends_on:
-      migrateopenfga:
-        condition: service_completed_successfully
-      insert-hardcoded-store:
-        condition: service_completed_successfully
-    healthcheck:
-      test: [ "CMD", "curl", "http://0.0.0.0:8080/healthz" ]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
-  # Adds the auth model and updates its authorisation model id to be the expected hard-coded id such that our local JIMM can utilise it for queries.
-  # The auth model json is retrieved from file via volume mount.
-  insert-hardcoded-auth-model:
-    profiles: ["dev", "test"]
-    image: governmentpaas/psql
-    container_name: insert-hardcoded-auth-model
-    volumes:
-      - ./local/openfga/authorisation_model.json:/authorisation_model.json
-    command:
-        - /bin/sh
-        - -c
-        - |
-          wget -q -O - --header 'Content-Type: application/json' --header 'Authorization: Bearer jimm' --post-file authorisation_model.json openfga:8080/stores/01GP1254CHWJC1MNGVB0WDG1T0/authorization-models
-          psql -Atx postgresql://jimm:jimm@db/jimm?sslmode=disable -c "UPDATE authorization_model SET authorization_model_id = '01GP1EC038KHGB6JJ2XXXXCXKB' WHERE store = '01GP1254CHWJC1MNGVB0WDG1T0';"
-    depends_on:
-      openfga:
+      db:
         condition: service_healthy
 
   keycloak:
