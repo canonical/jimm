@@ -805,6 +805,12 @@ var createModelTests = []struct {
 	cloudTag:      names.NewCloudTag(jimmtest.TestCloudName).String(),
 	credentialTag: "cloudcred-" + jimmtest.TestCloudName + "_bob@canonical.com_cred",
 }, {
+	about:         "no cloud tag uses default cloud",
+	name:          "model-0",
+	ownerTag:      names.NewUserTag("bob@canonical.com").String(),
+	cloudTag:      "",
+	credentialTag: "cloudcred-" + jimmtest.TestCloudName + "_bob@canonical.com_cred",
+}, {
 	about:         "unauthorized user",
 	name:          "model-2",
 	ownerTag:      names.NewUserTag("charlie@canonical.com").String(),
@@ -860,13 +866,6 @@ var createModelTests = []struct {
 	cloudTag:      "not-a-cloud-tag",
 	credentialTag: "cloudcred-" + jimmtest.TestCloudName + "_bob@canonical.com_cred1",
 	expectError:   `"not-a-cloud-tag" is not a valid tag \(bad request\)`,
-}, {
-	about:         "no cloud tag",
-	name:          "model-8",
-	ownerTag:      names.NewUserTag("bob@canonical.com").String(),
-	cloudTag:      "",
-	credentialTag: "cloudcred-" + jimmtest.TestCloudName + "_bob@canonical.com_cred1",
-	expectError:   `no cloud specified for model; please specify one`,
 }, {
 	about:    "no credential tag selects unambigous creds",
 	name:     "model-8",
