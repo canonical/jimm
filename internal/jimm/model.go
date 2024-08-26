@@ -47,22 +47,21 @@ type ModelCreateArgs struct {
 	CloudCredential names.CloudCredentialTag
 }
 
+type ModelCreateDefaults struct {
+	DefaultCloud func() (names.CloudTag, error)
+}
+
 // FromJujuModelCreateArgs converts jujuparams.ModelCreateArgs into AddModelArgs.
-func (a *ModelCreateArgs) FromJujuModelCreateArgs(args *jujuparams.ModelCreateArgs) error {
+func (a *ModelCreateArgs) FromJujuModelCreateArgs(args *jujuparams.ModelCreateArgs, opts ModelCreateDefaults) error {
 	if args.Name == "" {
 		return errors.E("name not specified")
 	}
 	a.Name = args.Name
 	a.Config = args.Config
 	a.CloudRegion = args.CloudRegion
-	if args.CloudTag == "" {
-		return errors.E("no cloud specified for model; please specify one")
+	if err := a.parseCloud(args.CloudTag, opts.DefaultCloud); err != nil {
+		return err
 	}
-	ct, err := names.ParseCloudTag(args.CloudTag)
-	if err != nil {
-		return errors.E(err, errors.CodeBadRequest)
-	}
-	a.Cloud = ct
 
 	if args.OwnerTag == "" {
 		return errors.E("owner tag not specified")
@@ -85,6 +84,25 @@ func (a *ModelCreateArgs) FromJujuModelCreateArgs(args *jujuparams.ModelCreateAr
 		a.CloudCredential = ct
 	}
 	return nil
+}
+
+func (a *ModelCreateArgs) parseCloud(cloudTag string, defaultCloudTag func() (names.CloudTag, error)) error {
+	var err error
+	if cloudTag != "" {
+		a.Cloud, err = names.ParseCloudTag(cloudTag)
+		if err != nil {
+			return errors.E(err, errors.CodeBadRequest)
+		}
+		return nil
+	}
+	if defaultCloudTag != nil {
+		a.Cloud, err = defaultCloudTag()
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	return errors.E("no cloud specified for model; please specify one")
 }
 
 func newModelBuilder(ctx context.Context, j *JIMM) *modelBuilder {
@@ -299,7 +317,7 @@ func (b *modelBuilder) CreateDatabaseModel() *modelBuilder {
 	if b.credential == nil {
 		// try to select a valid credential
 		if err := b.selectCloudCredentials(); err != nil {
-			b.err = errors.E(err, "could not select cloud credentials")
+			b.err = errors.E(fmt.Sprintf("could not select cloud credentials: %s", err))
 			return b
 		}
 	}

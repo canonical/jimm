@@ -156,6 +156,64 @@ func TestGetCloud(t *testing.T) {
 	})
 }
 
+func TestDefaultCloud(t *testing.T) {
+	c := qt.New(t)
+
+	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+	c.Assert(err, qt.IsNil)
+
+	ctx := context.Background()
+	now := time.Now().UTC().Round(time.Millisecond)
+	j := &jimm.JIMM{
+		UUID:          uuid.NewString(),
+		OpenFGAClient: client,
+		Database: db.Database{
+			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
+		},
+	}
+
+	err = j.Database.Migrate(ctx, false)
+	c.Assert(err, qt.IsNil)
+
+	aliceIdentity, err := dbmodel.NewIdentity("alice@canonical.com")
+	c.Assert(err, qt.IsNil)
+	alice := openfga.NewUser(
+		aliceIdentity,
+		client,
+	)
+
+	cloud := &dbmodel.Cloud{
+		Name: "test-cloud-1",
+	}
+	err = j.Database.AddCloud(ctx, cloud)
+	c.Assert(err, qt.IsNil)
+
+	cloud2 := &dbmodel.Cloud{
+		Name: "test-cloud-2",
+	}
+	err = j.Database.AddCloud(ctx, cloud2)
+	c.Assert(err, qt.IsNil)
+
+	// Test access to 0 clouds.
+	_, err = j.DefaultCloud(ctx, alice)
+	c.Assert(err, qt.ErrorMatches, "no clouds available")
+
+	// Test access to 1 cloud.
+	err = alice.SetCloudAccess(context.Background(), cloud.ResourceTag(), ofganames.AdministratorRelation)
+	c.Assert(err, qt.IsNil)
+
+	defaultCloud, err := j.DefaultCloud(ctx, alice)
+	c.Assert(err, qt.IsNil)
+	c.Assert(defaultCloud.String(), qt.Equals, "cloud-test-cloud-1")
+
+	// Test access to more than 1 cloud.
+	err = alice.SetCloudAccess(context.Background(), cloud2.ResourceTag(), ofganames.AdministratorRelation)
+	c.Assert(err, qt.IsNil)
+
+	_, err = j.DefaultCloud(ctx, alice)
+	c.Assert(err, qt.ErrorMatches, "multiple clouds available; please specify one")
+}
+
 func TestForEachCloud(t *testing.T) {
 	c := qt.New(t)
 

@@ -36,6 +36,7 @@ func TestModelCreateArgs(t *testing.T) {
 	tests := []struct {
 		about         string
 		args          jujuparams.ModelCreateArgs
+		defaults      jimm.ModelCreateDefaults
 		expectedArgs  jimm.ModelCreateArgs
 		expectedError string
 	}{{
@@ -105,13 +106,30 @@ func TestModelCreateArgs(t *testing.T) {
 		},
 		expectedError: "owner tag not specified",
 	}, {
-		about: "cloud tag not specified",
+		about: "cloud tag not specified and no default configured",
 		args: jujuparams.ModelCreateArgs{
 			Name:               "test-model",
 			OwnerTag:           names.NewUserTag("alice@canonical.com").String(),
 			CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice/test-credential-1").String(),
 		},
 		expectedError: "no cloud specified for model; please specify one",
+	}, {
+		about: "cloud tag not specified but default is available",
+		args: jujuparams.ModelCreateArgs{
+			Name:               "test-model",
+			OwnerTag:           names.NewUserTag("alice@canonical.com").String(),
+			CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice/test-credential-1").String(),
+		},
+		defaults: jimm.ModelCreateDefaults{
+			DefaultCloud: func() (names.CloudTag, error) {
+				return names.NewCloudTag("test-cloud"), nil
+			}},
+		expectedArgs: jimm.ModelCreateArgs{
+			Name:            "test-model",
+			Owner:           names.NewUserTag("alice@canonical.com"),
+			Cloud:           names.NewCloudTag("test-cloud"),
+			CloudCredential: names.NewCloudCredentialTag("test-cloud/alice/test-credential-1"),
+		},
 	}}
 
 	opts := []cmp.Option{
@@ -128,7 +146,7 @@ func TestModelCreateArgs(t *testing.T) {
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
 			var a jimm.ModelCreateArgs
-			err := a.FromJujuModelCreateArgs(&test.args)
+			err := a.FromJujuModelCreateArgs(&test.args, test.defaults)
 			if test.expectedError == "" {
 				c.Assert(err, qt.IsNil)
 				c.Assert(a, qt.CmpEquals(opts...), test.expectedArgs)
@@ -924,7 +942,8 @@ func TestAddModel(t *testing.T) {
 			user.JimmAdmin = test.jimmAdmin
 
 			args := jimm.ModelCreateArgs{}
-			err = args.FromJujuModelCreateArgs(&test.args)
+			defaults := jimm.ModelCreateDefaults{}
+			err = args.FromJujuModelCreateArgs(&test.args, defaults)
 			c.Assert(err, qt.IsNil)
 
 			_, err = j.AddModel(context.Background(), user, &args)
@@ -3626,7 +3645,7 @@ controllers:
 		CloudTag:           names.NewCloudTag("test-cloud").String(),
 		CloudRegion:        "test-region-1",
 		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1").String(),
-	})
+	}, jimm.ModelCreateDefaults{})
 	c.Assert(err, qt.IsNil)
 
 	// According to controller priority for test-region-1, we would

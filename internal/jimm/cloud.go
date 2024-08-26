@@ -69,6 +69,28 @@ func (j *JIMM) GetCloud(ctx context.Context, user *openfga.User, tag names.Cloud
 	}
 }
 
+// DefaultCloud returns the default cloud to use for user requests.
+// If the user has access to 0 or more than 1 cloud an error will be returned.
+func (j *JIMM) DefaultCloud(ctx context.Context, user *openfga.User) (names.CloudTag, error) {
+	const op = errors.Op("jimm.DefaultCloud")
+	var userClouds []*dbmodel.Cloud
+	err := j.ForEachUserCloud(ctx, user, func(c *dbmodel.Cloud) error {
+		userClouds = append(userClouds, c)
+		return nil
+	})
+	if err != nil {
+		return names.CloudTag{}, errors.E(op, err)
+	}
+	switch len(userClouds) {
+	case 0:
+		return names.CloudTag{}, errors.E(op, "no clouds available")
+	case 1:
+		return userClouds[0].ResourceTag(), nil
+	default:
+		return names.CloudTag{}, errors.E(op, "multiple clouds available; please specify one")
+	}
+}
+
 // ForEachUserCloud iterates through all of the clouds a user has access to
 // calling the given function for each cloud. If the user has admin level
 // access to the cloud then the provided cloud will include all user
