@@ -9,9 +9,10 @@ import (
 	"github.com/canonical/jimm/v3/internal/common/pagination"
 	"github.com/canonical/jimm/v3/internal/jujuapi"
 	"github.com/canonical/jimm/v3/internal/openfga"
-	"github.com/canonical/jimm/v3/internal/openfga/names"
+	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/rebac_admin/utils"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
+	"github.com/juju/names/v5"
 
 	v1 "github.com/canonical/rebac-admin-ui-handlers/v1"
 	"github.com/canonical/rebac-admin-ui-handlers/v1/resources"
@@ -112,7 +113,7 @@ func (s *identitiesService) GetIdentityGroups(ctx context.Context, identityId st
 	filter := utils.CreateTokenPaginationFilter(params.Size, params.NextToken, params.NextPageToken)
 	tuples, cNextToken, err := s.jimm.ListRelationshipTuples(ctx, user, apiparams.RelationshipTuple{
 		Object:       objUser.ResourceTag().String(),
-		Relation:     names.MemberRelation.String(),
+		Relation:     ofganames.MemberRelation.String(),
 		TargetObject: openfga.GroupType.String(),
 	}, int32(filter.Limit()), filter.Token())
 
@@ -155,7 +156,7 @@ func (s *identitiesService) PatchIdentityGroups(ctx context.Context, identityId 
 	for _, p := range groupPatches {
 		t := apiparams.RelationshipTuple{
 			Object:       objUser.ResourceTag().String(),
-			Relation:     names.MemberRelation.String(),
+			Relation:     ofganames.MemberRelation.String(),
 			TargetObject: p.Group,
 		}
 		if p.Op == "add" {
@@ -214,5 +215,54 @@ func (s *identitiesService) GetIdentityEntitlements(ctx context.Context, identit
 
 // PatchIdentityEntitlements performs addition or removal of an Entitlement to/from an Identity.
 func (s *identitiesService) PatchIdentityEntitlements(ctx context.Context, identityId string, entitlementPatches []resources.IdentityEntitlementsPatchItem) (bool, error) {
-	return false, v1.NewNotImplementedError("get identity roles not implemented")
+	user, err := utils.GetUserFromContext(ctx)
+	if err != nil {
+		return false, err
+	}
+	objUser, err := s.jimm.FetchIdentity(ctx, identityId)
+	if err != nil {
+		return false, v1.NewNotFoundError(fmt.Sprintf("User with id %s not found", identityId))
+	}
+	var toAdd []apiparams.RelationshipTuple
+	var toRemove []apiparams.RelationshipTuple
+	var errList utils.MultiErr
+	toTargetTag := func(entitlementPatch resources.IdentityEntitlementsPatchItem) (names.Tag, error) {
+		return utils.ValidateDecomposedTag(
+			entitlementPatch.Entitlement.EntityType,
+			entitlementPatch.Entitlement.EntityId,
+		)
+	}
+	for _, entitlementPatch := range entitlementPatches {
+		tag, err := toTargetTag(entitlementPatch)
+		if err != nil {
+			errList.AppendError(err)
+			continue
+		}
+		t := apiparams.RelationshipTuple{
+			Object:       objUser.Tag().String(),
+			Relation:     entitlementPatch.Entitlement.Entitlement,
+			TargetObject: tag.String(),
+		}
+		if entitlementPatch.Op == resources.IdentityEntitlementsPatchItemOpAdd {
+			toAdd = append(toAdd, t)
+		} else {
+			toRemove = append(toRemove, t)
+		}
+	}
+	if err := errList.Error(); err != nil {
+		return false, err
+	}
+	if toAdd != nil {
+		err := s.jimm.AddRelation(ctx, user, toAdd)
+		if err != nil {
+			return false, err
+		}
+	}
+	if toRemove != nil {
+		err := s.jimm.RemoveRelation(ctx, user, toRemove)
+		if err != nil {
+			return false, err
+		}
+	}
+	return true, nil
 }
