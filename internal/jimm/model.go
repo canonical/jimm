@@ -55,14 +55,13 @@ func (a *ModelCreateArgs) FromJujuModelCreateArgs(args *jujuparams.ModelCreateAr
 	a.Name = args.Name
 	a.Config = args.Config
 	a.CloudRegion = args.CloudRegion
-	if args.CloudTag == "" {
-		return errors.E("no cloud specified for model; please specify one")
+	if args.CloudTag != "" {
+		ct, err := names.ParseCloudTag(args.CloudTag)
+		if err != nil {
+			return errors.E(err, errors.CodeBadRequest)
+		}
+		a.Cloud = ct
 	}
-	ct, err := names.ParseCloudTag(args.CloudTag)
-	if err != nil {
-		return errors.E(err, errors.CodeBadRequest)
-	}
-	a.Cloud = ct
 
 	if args.OwnerTag == "" {
 		return errors.E("owner tag not specified")
@@ -175,10 +174,17 @@ func (b *modelBuilder) WithConfig(cfg map[string]interface{}) *modelBuilder {
 }
 
 // WithCloud returns a builder with the specified cloud.
-func (b *modelBuilder) WithCloud(cloud names.CloudTag) *modelBuilder {
+func (b *modelBuilder) WithCloud(user *openfga.User, cloud names.CloudTag) *modelBuilder {
 	if b.err != nil {
 		return b
 	}
+
+	// if cloud was not specified then we try to determine if
+	// JIMM knows of only one cloud and use that one
+	if cloud.Id() == "" {
+		return b.withImplicitCloud(user)
+	}
+
 	c := dbmodel.Cloud{
 		Name: cloud.Id(),
 	}
@@ -188,6 +194,34 @@ func (b *modelBuilder) WithCloud(cloud names.CloudTag) *modelBuilder {
 		return b
 	}
 	b.cloud = &c
+
+	return b
+}
+
+// withImplicitCloud returns a builder with the only cloud known to JIMM. Should JIMM
+// know of multiple clouds an error will be raised.
+func (b *modelBuilder) withImplicitCloud(user *openfga.User) *modelBuilder {
+	if b.err != nil {
+		return b
+	}
+	var clouds []*dbmodel.Cloud
+	err := b.jimm.ForEachUserCloud(b.ctx, user, func(c *dbmodel.Cloud) error {
+		clouds = append(clouds, c)
+		return nil
+	})
+	if err != nil {
+		b.err = err
+		return b
+	}
+	if len(clouds) == 0 {
+		b.err = fmt.Errorf("no available clouds")
+		return b
+	}
+	if len(clouds) != 1 {
+		b.err = fmt.Errorf("no cloud specified for model; please specify one")
+		return b
+	}
+	b.cloud = clouds[0]
 
 	return b
 }
@@ -563,12 +597,11 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 		builder = builder.WithConfig(cloudDefaults.Defaults)
 	}
 
-	if args.Cloud != (names.CloudTag{}) {
-		builder = builder.WithCloud(args.Cloud)
-		if err := builder.Error(); err != nil {
-			return nil, errors.E(op, err)
-		}
+	builder = builder.WithCloud(user, args.Cloud)
+	if err := builder.Error(); err != nil {
+		return nil, errors.E(op, err)
 	}
+
 	builder = builder.WithCloudRegion(args.CloudRegion)
 	if err := builder.Error(); err != nil {
 		return nil, errors.E(op, err)

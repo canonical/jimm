@@ -861,18 +861,16 @@ var createModelTests = []struct {
 	credentialTag: "cloudcred-" + jimmtest.TestCloudName + "_bob@canonical.com_cred1",
 	expectError:   `"not-a-cloud-tag" is not a valid tag \(bad request\)`,
 }, {
-	about:         "no cloud tag",
-	name:          "model-8",
-	ownerTag:      names.NewUserTag("bob@canonical.com").String(),
-	cloudTag:      "",
-	credentialTag: "cloudcred-" + jimmtest.TestCloudName + "_bob@canonical.com_cred1",
-	expectError:   `no cloud specified for model; please specify one`,
-}, {
 	about:    "no credential tag selects unambigous creds",
 	name:     "model-8",
 	ownerTag: names.NewUserTag("bob@canonical.com").String(),
 	cloudTag: names.NewCloudTag(jimmtest.TestCloudName).String(),
 	region:   jimmtest.TestCloudRegionName,
+}, {
+	about:         "success - without a cloud tag",
+	name:          "model-9",
+	ownerTag:      names.NewUserTag("bob@canonical.com").String(),
+	credentialTag: "cloudcred-" + jimmtest.TestCloudName + "_bob@canonical.com_cred",
 }}
 
 func (s *modelManagerSuite) TestCreateModel(c *gc.C) {
