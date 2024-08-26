@@ -63,7 +63,7 @@ services:
   db:
     image: postgres
     container_name: postgres
-    restart: always
+    restart: on-failure
     ports:
       - 5432:5432
     environment:

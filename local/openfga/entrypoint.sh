@@ -20,5 +20,5 @@ wget -q -O - --header 'Content-Type: application/json' --header 'Authorization: 
 psql -Atx "$OPENFGA_DATASTORE_URI" -c "INSERT INTO store (id,name,created_at,updated_at) VALUES ('01GP1254CHWJC1MNGVB0WDG1T0','jimm',NOW(),NOW()) ON CONFLICT DO NOTHING;"
 psql -Atx "$OPENFGA_DATASTORE_URI" -c "UPDATE authorization_model SET authorization_model_id = '01GP1EC038KHGB6JJ2XXXXCXKB' WHERE store = '01GP1254CHWJC1MNGVB0WDG1T0';"
 
-# Keep container alive
-tail -f /dev/null & trap 'kill %1' TERM ; wait
+# Handle exit signals
+trap 'kill %1' TERM ; wait
