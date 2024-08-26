@@ -75,13 +75,6 @@ func TestGetCloud(t *testing.T) {
 	)
 	c.Assert(err, qt.IsNil)
 
-	everyoneIdentity, err := dbmodel.NewIdentity(ofganames.EveryoneUser)
-	c.Assert(err, qt.IsNil)
-	everyone := openfga.NewUser(
-		everyoneIdentity,
-		client,
-	)
-
 	cloud := &dbmodel.Cloud{
 		Name: "test-cloud-1",
 	}
@@ -106,7 +99,7 @@ func TestGetCloud(t *testing.T) {
 	err = client.AddCloudController(context.Background(), cloud2.ResourceTag(), j.ResourceTag())
 	c.Assert(err, qt.IsNil)
 
-	err = everyone.SetCloudAccess(context.Background(), cloud2.ResourceTag(), ofganames.CanAddModelRelation)
+	err = j.EveryoneUser().SetCloudAccess(context.Background(), cloud2.ResourceTag(), ofganames.CanAddModelRelation)
 	c.Assert(err, qt.IsNil)
 
 	_, err = j.GetCloud(ctx, alice, names.NewCloudTag("test-cloud-0"))
@@ -204,13 +197,6 @@ func TestForEachCloud(t *testing.T) {
 	)
 	daphne.JimmAdmin = true
 
-	everyoneIdentity, err := dbmodel.NewIdentity(ofganames.EveryoneUser)
-	c.Assert(err, qt.IsNil)
-	everyone := openfga.NewUser(
-		everyoneIdentity,
-		client,
-	)
-
 	cloud := &dbmodel.Cloud{
 		Name: "test-cloud-1",
 	}
@@ -230,7 +216,7 @@ func TestForEachCloud(t *testing.T) {
 
 	err = bob.SetCloudAccess(ctx, cloud2.ResourceTag(), ofganames.CanAddModelRelation)
 	c.Assert(err, qt.IsNil)
-	err = everyone.SetCloudAccess(ctx, cloud2.ResourceTag(), ofganames.CanAddModelRelation)
+	err = j.EveryoneUser().SetCloudAccess(ctx, cloud2.ResourceTag(), ofganames.CanAddModelRelation)
 	c.Assert(err, qt.IsNil)
 
 	cloud3 := &dbmodel.Cloud{
@@ -239,7 +225,7 @@ func TestForEachCloud(t *testing.T) {
 	err = j.Database.AddCloud(ctx, cloud3)
 	c.Assert(err, qt.IsNil)
 
-	err = everyone.SetCloudAccess(ctx, cloud3.ResourceTag(), ofganames.CanAddModelRelation)
+	err = j.EveryoneUser().SetCloudAccess(ctx, cloud3.ResourceTag(), ofganames.CanAddModelRelation)
 	c.Assert(err, qt.IsNil)
 
 	var clds []dbmodel.Cloud

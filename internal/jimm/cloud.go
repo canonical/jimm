@@ -23,18 +23,6 @@ import (
 // GetUserCloudAccess returns users access level for the specified cloud.
 func (j *JIMM) GetUserCloudAccess(ctx context.Context, user *openfga.User, cloud names.CloudTag) (string, error) {
 	accessLevel := user.GetCloudAccess(ctx, cloud)
-	if accessLevel == ofganames.NoRelation {
-		everyoneTag := names.NewUserTag(ofganames.EveryoneUser)
-		everyoneIdentity, err := dbmodel.NewIdentity(everyoneTag.Id())
-		if err != nil {
-			return "", err
-		}
-		everyone := openfga.NewUser(
-			everyoneIdentity,
-			j.OpenFGAClient,
-		)
-		accessLevel = everyone.GetCloudAccess(ctx, cloud)
-	}
 	return ToCloudAccessString(accessLevel), nil
 }
 
@@ -84,36 +72,11 @@ func (j *JIMM) ForEachUserCloud(ctx context.Context, user *openfga.User, f func(
 	if err != nil {
 		return errors.E(op, err, "cannot load clouds")
 	}
-	seen := make(map[string]bool, len(clouds))
 	for _, cloud := range clouds {
 		userAccess := ToCloudAccessString(user.GetCloudAccess(ctx, cloud.ResourceTag()))
 		if userAccess == "" {
 			// If user does not have access to the cloud,
 			// we skip this cloud.
-			continue
-		}
-		if err := f(&cloud); err != nil {
-			return err
-		}
-		seen[cloud.Name] = true
-	}
-
-	// Also include "public" clouds
-	everyoneDB, err := dbmodel.NewIdentity(ofganames.EveryoneUser)
-	if err != nil {
-		return errors.E(op, err)
-	}
-
-	everyone := openfga.NewUser(everyoneDB, j.OpenFGAClient)
-
-	for _, cloud := range clouds {
-		if seen[cloud.Name] {
-			continue
-		}
-		userAccess := ToCloudAccessString(everyone.GetCloudAccess(ctx, cloud.ResourceTag()))
-		if userAccess == "" {
-			// if user does not have access to the cloud,
-			// we skip this cloud
 			continue
 		}
 		if err := f(&cloud); err != nil {
