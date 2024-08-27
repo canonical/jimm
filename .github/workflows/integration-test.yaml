@@ -17,14 +17,17 @@ jobs:
     steps:
       - name: Checkout JIMM repo
         uses: actions/checkout@v4
+
       - name: Setup Go
         if: ${{ github.event_name == 'pull_request' }}
         uses: actions/setup-go@v4
         with:
           go-version-file: 'go.mod'
+
       - name: Go vendor to speed up docker build
         if: ${{ github.event_name == 'pull_request' }}
         run: go mod vendor
+
       - name: Start JIMM (pull request)
         if: ${{ github.event_name == 'pull_request' }}
         uses: ./.github/actions/test-server
@@ -32,6 +35,7 @@ jobs:
           jimm-version: dev
           juju-channel: "3/stable"
           ghcr-pat: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Start JIMM (manual run)
         if: ${{ github.event_name == 'workflow_dispatch' }}
         uses: ./.github/actions/test-server
@@ -39,6 +43,7 @@ jobs:
           jimm-version: ${{ inputs.jimm-version }}
           juju-channel: "3/stable"
           ghcr-pat: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Create a model, deploy an application and run juju status
         run: |
           juju add-model foo && \

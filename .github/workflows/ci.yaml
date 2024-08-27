@@ -27,12 +27,6 @@ jobs:
       - name: Install juju-db
         run: sudo snap install juju-db --channel 4.4/stable
 
-      - name: Add volume files
-        run: |
-          touch ./local/vault/approle.json
-          touch ./local/vault/roleid.txt
-          touch ./local/vault/vault.env
-
       - name: Create test certs
         run: make certs
 
