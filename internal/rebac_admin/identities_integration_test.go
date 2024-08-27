@@ -153,7 +153,7 @@ func (s *identitiesSuite) TestIdentityEntitlements(c *gc.C) {
 		c.Assert(err, gc.IsNil)
 		c.Assert(res, gc.Not(gc.IsNil))
 		entitlements = append(entitlements, res.Data...)
-		if *res.Next.PageToken == "" {
+		if res.Next.PageToken == nil || *res.Next.PageToken == "" {
 			break
 		}
 		c.Assert(*res.Meta.PageToken, gc.Equals, *req.NextPageToken)
