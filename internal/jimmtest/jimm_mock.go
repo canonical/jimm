@@ -21,7 +21,6 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/pubsub"
-	"github.com/canonical/jimm/v3/pkg/api/params"
 	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
 
@@ -31,32 +30,25 @@ import (
 // a NotImplemented error.
 type JIMM struct {
 	mocks.LoginService
+	mocks.ModelManager
 	AddAuditLogEntry_                  func(ale *dbmodel.AuditLogEntry)
 	AddCloudToController_              func(ctx context.Context, user *openfga.User, controllerName string, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error
 	AddController_                     func(ctx context.Context, u *openfga.User, ctl *dbmodel.Controller) error
 	AddGroup_                          func(ctx context.Context, user *openfga.User, name string) (*dbmodel.GroupEntry, error)
 	AddHostedCloud_                    func(ctx context.Context, user *openfga.User, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error
-	AddModel_                          func(ctx context.Context, u *openfga.User, args *jimm.ModelCreateArgs) (*jujuparams.ModelInfo, error)
 	AddServiceAccount_                 func(ctx context.Context, u *openfga.User, clientId string) error
 	Authenticate_                      func(ctx context.Context, req *jujuparams.LoginRequest) (*openfga.User, error)
 	AuthorizationClient_               func() *openfga.OFGAClient
-	ChangeModelCredential_             func(ctx context.Context, user *openfga.User, modelTag names.ModelTag, cloudCredentialTag names.CloudCredentialTag) error
 	CheckPermission_                   func(ctx context.Context, user *openfga.User, cachedPerms map[string]string, desiredPerms map[string]interface{}) (map[string]string, error)
 	CopyServiceAccountCredential_      func(ctx context.Context, u *openfga.User, svcAcc *openfga.User, cloudCredentialTag names.CloudCredentialTag) (names.CloudCredentialTag, []jujuparams.UpdateCredentialModelResult, error)
 	DB_                                func() *db.Database
-	DestroyModel_                      func(ctx context.Context, u *openfga.User, mt names.ModelTag, destroyStorage *bool, force *bool, maxWait *time.Duration, timeout *time.Duration) error
 	DestroyOffer_                      func(ctx context.Context, user *openfga.User, offerURL string, force bool) error
-	DumpModel_                         func(ctx context.Context, u *openfga.User, mt names.ModelTag, simplified bool) (string, error)
-	DumpModelDB_                       func(ctx context.Context, u *openfga.User, mt names.ModelTag) (map[string]interface{}, error)
 	EarliestControllerVersion_         func(ctx context.Context) (version.Number, error)
 	FindApplicationOffers_             func(ctx context.Context, user *openfga.User, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error)
 	FindAuditEvents_                   func(ctx context.Context, user *openfga.User, filter db.AuditLogFilter) ([]dbmodel.AuditLogEntry, error)
 	ForEachCloud_                      func(ctx context.Context, user *openfga.User, f func(*dbmodel.Cloud) error) error
-	ForEachModel_                      func(ctx context.Context, u *openfga.User, f func(*dbmodel.Model, jujuparams.UserAccessPermission) error) error
 	ForEachUserCloud_                  func(ctx context.Context, user *openfga.User, f func(*dbmodel.Cloud) error) error
 	ForEachUserCloudCredential_        func(ctx context.Context, u *dbmodel.Identity, ct names.CloudTag, f func(cred *dbmodel.CloudCredential) error) error
-	ForEachUserModel_                  func(ctx context.Context, u *openfga.User, f func(*dbmodel.Model, jujuparams.UserAccessPermission) error) error
-	FullModelStatus_                   func(ctx context.Context, user *openfga.User, modelTag names.ModelTag, patterns []string) (*jujuparams.FullStatus, error)
 	GetApplicationOffer_               func(ctx context.Context, user *openfga.User, offerURL string) (*jujuparams.ApplicationOfferAdminDetailsV5, error)
 	GetApplicationOfferConsumeDetails_ func(ctx context.Context, user *openfga.User, details *jujuparams.ConsumeOfferDetails, v bakery.Version) error
 	GetCloud_                          func(ctx context.Context, u *openfga.User, tag names.CloudTag) (dbmodel.Cloud, error)
@@ -73,22 +65,16 @@ type JIMM struct {
 	GrantModelAccess_                  func(ctx context.Context, user *openfga.User, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error
 	GrantOfferAccess_                  func(ctx context.Context, u *openfga.User, offerURL string, ut names.UserTag, access jujuparams.OfferAccessPermission) error
 	GrantServiceAccountAccess_         func(ctx context.Context, u *openfga.User, svcAccTag jimmnames.ServiceAccountTag, entities []string) error
-	ImportModel_                       func(ctx context.Context, user *openfga.User, controllerName string, modelTag names.ModelTag, newOwner string) error
-	IdentityModelDefaults_             func(ctx context.Context, user *dbmodel.Identity) (map[string]interface{}, error)
 	InitiateMigration_                 func(ctx context.Context, user *openfga.User, spec jujuparams.MigrationSpec) (jujuparams.InitiateMigrationResult, error)
 	InitiateInternalMigration_         func(ctx context.Context, user *openfga.User, modelTag names.ModelTag, targetController string) (jujuparams.InitiateMigrationResult, error)
 	ListApplicationOffers_             func(ctx context.Context, user *openfga.User, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error)
 	ListControllers_                   func(ctx context.Context, user *openfga.User) ([]dbmodel.Controller, error)
 	ListGroups_                        func(ctx context.Context, user *openfga.User) ([]dbmodel.GroupEntry, error)
-	ModelDefaultsForCloud_             func(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag) (jujuparams.ModelDefaultsResult, error)
-	ModelInfo_                         func(ctx context.Context, u *openfga.User, mt names.ModelTag) (*jujuparams.ModelInfo, error)
-	ModelStatus_                       func(ctx context.Context, u *openfga.User, mt names.ModelTag) (*jujuparams.ModelStatus, error)
 	Offer_                             func(ctx context.Context, user *openfga.User, offer jimm.AddApplicationOfferParams) error
 	OAuthAuthenticationService_        func() jimm.OAuthAuthenticator
 	ParseTag_                          func(ctx context.Context, key string) (*ofganames.Tag, error)
 	PubSubHub_                         func() *pubsub.Hub
 	PurgeLogs_                         func(ctx context.Context, user *openfga.User, before time.Time) (int64, error)
-	QueryModelsJq_                     func(ctx context.Context, models []dbmodel.Model, jqQuery string) (params.CrossModelQueryResponse, error)
 	RemoveCloud_                       func(ctx context.Context, u *openfga.User, ct names.CloudTag) error
 	RemoveCloudFromController_         func(ctx context.Context, u *openfga.User, controllerName string, ct names.CloudTag) error
 	RemoveController_                  func(ctx context.Context, user *openfga.User, controllerName string, force bool) error
@@ -102,17 +88,12 @@ type JIMM struct {
 	RevokeOfferAccess_                 func(ctx context.Context, user *openfga.User, offerURL string, ut names.UserTag, access jujuparams.OfferAccessPermission) (err error)
 	SetControllerConfig_               func(ctx context.Context, u *openfga.User, args jujuparams.ControllerConfigSet) error
 	SetControllerDeprecated_           func(ctx context.Context, user *openfga.User, controllerName string, deprecated bool) error
-	SetModelDefaults_                  func(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag, region string, configs map[string]interface{}) error
 	SetIdentityModelDefaults_          func(ctx context.Context, user *dbmodel.Identity, configs map[string]interface{}) error
 	ToJAASTag_                         func(ctx context.Context, tag *ofganames.Tag, resolveUUIDs bool) (string, error)
-	UnsetModelDefaults_                func(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag, region string, keys []string) error
 	UpdateApplicationOffer_            func(ctx context.Context, controller *dbmodel.Controller, offerUUID string, removed bool) error
 	UpdateCloud_                       func(ctx context.Context, u *openfga.User, ct names.CloudTag, cloud jujuparams.Cloud) error
 	UpdateCloudCredential_             func(ctx context.Context, u *openfga.User, args jimm.UpdateCloudCredentialArgs) ([]jujuparams.UpdateCredentialModelResult, error)
-	UpdateMigratedModel_               func(ctx context.Context, user *openfga.User, modelTag names.ModelTag, targetControllerName string) error
 	UserLogin_                         func(ctx context.Context, identityName string) (*openfga.User, error)
-	ValidateModelUpgrade_              func(ctx context.Context, u *openfga.User, mt names.ModelTag, force bool) error
-	WatchAllModelSummaries_            func(ctx context.Context, controller *dbmodel.Controller) (_ func() error, err error)
 }
 
 func (j *JIMM) AddAuditLogEntry(ale *dbmodel.AuditLogEntry) {
@@ -145,12 +126,6 @@ func (j *JIMM) AddHostedCloud(ctx context.Context, user *openfga.User, tag names
 	}
 	return j.AddHostedCloud_(ctx, user, tag, cloud, force)
 }
-func (j *JIMM) AddModel(ctx context.Context, u *openfga.User, args *jimm.ModelCreateArgs) (_ *jujuparams.ModelInfo, err error) {
-	if j.AddModel_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
-	}
-	return j.AddModel_(ctx, u, args)
-}
 
 func (j *JIMM) AddServiceAccount(ctx context.Context, u *openfga.User, clientId string) error {
 	if j.AddServiceAccount_ == nil {
@@ -178,12 +153,7 @@ func (j *JIMM) AuthorizationClient() *openfga.OFGAClient {
 	}
 	return j.AuthorizationClient_()
 }
-func (j *JIMM) ChangeModelCredential(ctx context.Context, user *openfga.User, modelTag names.ModelTag, cloudCredentialTag names.CloudCredentialTag) error {
-	if j.ChangeModelCredential_ == nil {
-		return errors.E(errors.CodeNotImplemented)
-	}
-	return j.ChangeModelCredential_(ctx, user, modelTag, cloudCredentialTag)
-}
+
 func (j *JIMM) CheckPermission(ctx context.Context, user *openfga.User, cachedPerms map[string]string, desiredPerms map[string]interface{}) (map[string]string, error) {
 	if j.CheckPermission_ == nil {
 		return nil, errors.E(errors.CodeNotImplemented)
@@ -196,30 +166,13 @@ func (j *JIMM) DB() *db.Database {
 	}
 	return j.DB_()
 }
-func (j *JIMM) DestroyModel(ctx context.Context, u *openfga.User, mt names.ModelTag, destroyStorage *bool, force *bool, maxWait *time.Duration, timeout *time.Duration) error {
-	if j.DestroyModel_ == nil {
-		return errors.E(errors.CodeNotImplemented)
-	}
-	return j.DestroyModel_(ctx, u, mt, destroyStorage, force, maxWait, timeout)
-}
 func (j *JIMM) DestroyOffer(ctx context.Context, user *openfga.User, offerURL string, force bool) error {
 	if j.DestroyOffer_ == nil {
 		return errors.E(errors.CodeNotImplemented)
 	}
 	return j.DestroyOffer_(ctx, user, offerURL, force)
 }
-func (j *JIMM) DumpModel(ctx context.Context, u *openfga.User, mt names.ModelTag, simplified bool) (string, error) {
-	if j.DumpModel_ == nil {
-		return "", errors.E(errors.CodeNotImplemented)
-	}
-	return j.DumpModel_(ctx, u, mt, simplified)
-}
-func (j *JIMM) DumpModelDB(ctx context.Context, u *openfga.User, mt names.ModelTag) (map[string]interface{}, error) {
-	if j.DumpModelDB_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
-	}
-	return j.DumpModelDB_(ctx, u, mt)
-}
+
 func (j *JIMM) EarliestControllerVersion(ctx context.Context) (version.Number, error) {
 	if j.EarliestControllerVersion_ == nil {
 		return version.Number{}, errors.E(errors.CodeNotImplemented)
@@ -244,12 +197,7 @@ func (j *JIMM) ForEachCloud(ctx context.Context, user *openfga.User, f func(*dbm
 	}
 	return j.ForEachCloud_(ctx, user, f)
 }
-func (j *JIMM) ForEachModel(ctx context.Context, u *openfga.User, f func(*dbmodel.Model, jujuparams.UserAccessPermission) error) error {
-	if j.ForEachModel_ == nil {
-		return errors.E(errors.CodeNotImplemented)
-	}
-	return j.ForEachModel_(ctx, u, f)
-}
+
 func (j *JIMM) ForEachUserCloud(ctx context.Context, user *openfga.User, f func(*dbmodel.Cloud) error) error {
 	if j.ForEachUserCloud_ == nil {
 		return errors.E(errors.CodeNotImplemented)
@@ -262,18 +210,7 @@ func (j *JIMM) ForEachUserCloudCredential(ctx context.Context, u *dbmodel.Identi
 	}
 	return j.ForEachUserCloudCredential_(ctx, u, ct, f)
 }
-func (j *JIMM) ForEachUserModel(ctx context.Context, u *openfga.User, f func(*dbmodel.Model, jujuparams.UserAccessPermission) error) error {
-	if j.ForEachUserModel_ == nil {
-		return errors.E(errors.CodeNotImplemented)
-	}
-	return j.ForEachUserModel_(ctx, u, f)
-}
-func (j *JIMM) FullModelStatus(ctx context.Context, user *openfga.User, modelTag names.ModelTag, patterns []string) (*jujuparams.FullStatus, error) {
-	if j.FullModelStatus_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
-	}
-	return j.FullModelStatus_(ctx, user, modelTag, patterns)
-}
+
 func (j *JIMM) GetApplicationOffer(ctx context.Context, user *openfga.User, offerURL string) (*jujuparams.ApplicationOfferAdminDetailsV5, error) {
 	if j.GetApplicationOffer_ == nil {
 		return nil, errors.E(errors.CodeNotImplemented)
@@ -372,12 +309,6 @@ func (j *JIMM) GrantServiceAccountAccess(ctx context.Context, u *openfga.User, s
 	return j.GrantServiceAccountAccess_(ctx, u, svcAccTag, entities)
 }
 
-func (j *JIMM) ImportModel(ctx context.Context, user *openfga.User, controllerName string, modelTag names.ModelTag, newOwner string) error {
-	if j.ImportModel_ == nil {
-		return errors.E(errors.CodeNotImplemented)
-	}
-	return j.ImportModel_(ctx, user, controllerName, modelTag, newOwner)
-}
 func (j *JIMM) InitiateMigration(ctx context.Context, user *openfga.User, spec jujuparams.MigrationSpec) (jujuparams.InitiateMigrationResult, error) {
 	if j.InitiateMigration_ == nil {
 		return jujuparams.InitiateMigrationResult{}, errors.E(errors.CodeNotImplemented)
@@ -408,24 +339,7 @@ func (j *JIMM) ListGroups(ctx context.Context, user *openfga.User) ([]dbmodel.Gr
 	}
 	return j.ListGroups_(ctx, user)
 }
-func (j *JIMM) ModelDefaultsForCloud(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag) (jujuparams.ModelDefaultsResult, error) {
-	if j.ModelDefaultsForCloud_ == nil {
-		return jujuparams.ModelDefaultsResult{}, errors.E(errors.CodeNotImplemented)
-	}
-	return j.ModelDefaultsForCloud_(ctx, user, cloudTag)
-}
-func (j *JIMM) ModelInfo(ctx context.Context, u *openfga.User, mt names.ModelTag) (*jujuparams.ModelInfo, error) {
-	if j.ModelInfo_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
-	}
-	return j.ModelInfo_(ctx, u, mt)
-}
-func (j *JIMM) ModelStatus(ctx context.Context, u *openfga.User, mt names.ModelTag) (*jujuparams.ModelStatus, error) {
-	if j.ModelStatus_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
-	}
-	return j.ModelStatus_(ctx, u, mt)
-}
+
 func (j *JIMM) Offer(ctx context.Context, user *openfga.User, offer jimm.AddApplicationOfferParams) error {
 	if j.Offer_ == nil {
 		return errors.E(errors.CodeNotImplemented)
@@ -456,12 +370,7 @@ func (j *JIMM) PurgeLogs(ctx context.Context, user *openfga.User, before time.Ti
 	}
 	return j.PurgeLogs_(ctx, user, before)
 }
-func (j *JIMM) QueryModelsJq(ctx context.Context, models []dbmodel.Model, jqQuery string) (params.CrossModelQueryResponse, error) {
-	if j.QueryModelsJq_ == nil {
-		return params.CrossModelQueryResponse{}, errors.E(errors.CodeNotImplemented)
-	}
-	return j.QueryModelsJq_(ctx, models, jqQuery)
-}
+
 func (j *JIMM) RemoveCloud(ctx context.Context, u *openfga.User, ct names.CloudTag) error {
 	if j.RemoveCloud_ == nil {
 		return errors.E(errors.CodeNotImplemented)
@@ -540,12 +449,7 @@ func (j *JIMM) SetControllerDeprecated(ctx context.Context, user *openfga.User, 
 	}
 	return j.SetControllerDeprecated_(ctx, user, controllerName, deprecated)
 }
-func (j *JIMM) SetModelDefaults(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag, region string, configs map[string]interface{}) error {
-	if j.SetModelDefaults_ == nil {
-		return errors.E(errors.CodeNotImplemented)
-	}
-	return j.SetModelDefaults_(ctx, user, cloudTag, region, configs)
-}
+
 func (j *JIMM) SetIdentityModelDefaults(ctx context.Context, user *dbmodel.Identity, configs map[string]interface{}) error {
 	if j.SetIdentityModelDefaults_ == nil {
 		return errors.E(errors.CodeNotImplemented)
@@ -558,12 +462,7 @@ func (j *JIMM) ToJAASTag(ctx context.Context, tag *ofganames.Tag, resolveUUIDs b
 	}
 	return j.ToJAASTag_(ctx, tag, resolveUUIDs)
 }
-func (j *JIMM) UnsetModelDefaults(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag, region string, keys []string) error {
-	if j.UnsetModelDefaults_ == nil {
-		return errors.E(errors.CodeNotImplemented)
-	}
-	return j.UnsetModelDefaults_(ctx, user, cloudTag, region, keys)
-}
+
 func (j *JIMM) UpdateApplicationOffer(ctx context.Context, controller *dbmodel.Controller, offerUUID string, removed bool) error {
 	if j.UpdateApplicationOffer_ == nil {
 		return errors.E(errors.CodeNotImplemented)
@@ -582,33 +481,10 @@ func (j *JIMM) UpdateCloudCredential(ctx context.Context, u *openfga.User, args 
 	}
 	return j.UpdateCloudCredential_(ctx, u, args)
 }
-func (j *JIMM) UpdateMigratedModel(ctx context.Context, user *openfga.User, modelTag names.ModelTag, targetControllerName string) error {
-	if j.UpdateMigratedModel_ == nil {
-		return errors.E(errors.CodeNotImplemented)
-	}
-	return j.UpdateMigratedModel_(ctx, user, modelTag, targetControllerName)
-}
+
 func (j *JIMM) UserLogin(ctx context.Context, identityName string) (*openfga.User, error) {
 	if j.UserLogin_ == nil {
 		return nil, errors.E(errors.CodeNotImplemented)
 	}
 	return j.UserLogin_(ctx, identityName)
-}
-func (j *JIMM) IdentityModelDefaults(ctx context.Context, user *dbmodel.Identity) (map[string]interface{}, error) {
-	if j.IdentityModelDefaults_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
-	}
-	return j.IdentityModelDefaults_(ctx, user)
-}
-func (j *JIMM) ValidateModelUpgrade(ctx context.Context, u *openfga.User, mt names.ModelTag, force bool) error {
-	if j.ValidateModelUpgrade_ == nil {
-		return errors.E(errors.CodeNotImplemented)
-	}
-	return j.ValidateModelUpgrade_(ctx, u, mt, force)
-}
-func (j *JIMM) WatchAllModelSummaries(ctx context.Context, controller *dbmodel.Controller) (_ func() error, err error) {
-	if j.WatchAllModelSummaries_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
-	}
-	return j.WatchAllModelSummaries_(ctx, controller)
 }
