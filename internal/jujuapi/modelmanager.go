@@ -55,6 +55,7 @@ func init() {
 	}
 }
 
+// ModelManager defines the model related operations that JIMM can perform.
 type ModelManager interface {
 	AddModel(ctx context.Context, u *openfga.User, args *jimm.ModelCreateArgs) (_ *jujuparams.ModelInfo, err error)
 	ChangeModelCredential(ctx context.Context, user *openfga.User, modelTag names.ModelTag, cloudCredentialTag names.CloudCredentialTag) error

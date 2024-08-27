@@ -15,6 +15,7 @@ import (
 	"github.com/canonical/jimm/v3/pkg/api/params"
 )
 
+// ModelManager defines the mock struct used to implement the ModelManger interface.
 type ModelManager struct {
 	AddModel_               func(ctx context.Context, u *openfga.User, args *jimm.ModelCreateArgs) (*jujuparams.ModelInfo, error)
 	ChangeModelCredential_  func(ctx context.Context, user *openfga.User, modelTag names.ModelTag, cloudCredentialTag names.CloudCredentialTag) error
