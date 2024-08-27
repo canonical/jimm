@@ -53,8 +53,6 @@ services:
         condition: service_healthy
       traefik:
         condition: service_healthy
-      insert-hardcoded-auth-model:
-        condition: service_completed_successfully
       keycloak:
         condition: service_healthy
     labels:

@@ -44,5 +44,5 @@ vault secrets enable -version=2 -path /jimm-kv kv
 # This container is now healthy
 touch /tmp/healthy
 
-# Keep container alive
-tail -f /dev/null & trap 'kill %1' TERM ; wait
+# Handle exit signals
+trap 'kill %1' TERM ; wait
