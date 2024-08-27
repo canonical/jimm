@@ -193,6 +193,14 @@ func (s *JIMMSuite) AddAdminUser(c *gc.C, email string) {
 	c.Assert(err, gc.IsNil)
 }
 
+func (s *JIMMSuite) AddUser(c *gc.C, email string) {
+	identity, err := dbmodel.NewIdentity(email)
+	c.Assert(err, gc.IsNil)
+
+	err = s.JIMM.Database.GetIdentity(context.Background(), identity)
+	c.Assert(err, gc.IsNil)
+}
+
 func (s *JIMMSuite) NewUser(u *dbmodel.Identity) *openfga.User {
 	return openfga.NewUser(u, s.OFGAClient)
 }
