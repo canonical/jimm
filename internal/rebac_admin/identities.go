@@ -200,17 +200,20 @@ func (s *identitiesService) GetIdentityEntitlements(ctx context.Context, identit
 		return nil, err
 	}
 	originalToken := filter.Token()
-	nextToken := nextEntitlmentToken.String()
-	return &resources.PaginatedResponse[resources.EntityEntitlement]{
+	resp := resources.PaginatedResponse[resources.EntityEntitlement]{
 		Meta: resources.ResponseMeta{
 			Size:      len(tuples),
 			PageToken: &originalToken,
 		},
-		Next: resources.Next{
-			PageToken: &nextToken,
-		},
 		Data: utils.ToEntityEntitlements(tuples),
-	}, nil
+	}
+	if nextEntitlmentToken.String() != "" {
+		nextToken := nextEntitlmentToken.String()
+		resp.Next = resources.Next{
+			PageToken: &nextToken,
+		}
+	}
+	return &resp, nil
 }
 
 // PatchIdentityEntitlements performs addition or removal of an Entitlement to/from an Identity.
@@ -233,7 +236,7 @@ func (s *identitiesService) PatchIdentityEntitlements(ctx context.Context, ident
 		)
 	}
 	for _, entitlementPatch := range entitlementPatches {
-		tag, err := toTargetTag(entitlementPatch)
+		targetTag, err := toTargetTag(entitlementPatch)
 		if err != nil {
 			errList.AppendError(err)
 			continue
@@ -241,7 +244,7 @@ func (s *identitiesService) PatchIdentityEntitlements(ctx context.Context, ident
 		t := apiparams.RelationshipTuple{
 			Object:       objUser.Tag().String(),
 			Relation:     entitlementPatch.Entitlement.Entitlement,
-			TargetObject: tag.String(),
+			TargetObject: targetTag.String(),
 		}
 		if entitlementPatch.Op == resources.IdentityEntitlementsPatchItemOpAdd {
 			toAdd = append(toAdd, t)
