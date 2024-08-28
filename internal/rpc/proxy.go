@@ -515,7 +515,9 @@ func checkPermissionsRequired(ctx context.Context, msg *message) (map[string]any
 
 	// Check for errors that may be a result of a bulk request.
 	for _, e := range er.Results {
-		zapctx.Debug(ctx, "received error", zap.Any("error", e))
+		if e.Error != nil {
+			zapctx.Debug(ctx, "received error", zap.Any("error", e.Error))
+		}
 		if e.Error != nil && e.Error.Code == accessRequiredErrorCode {
 			for k, v := range e.Error.Info {
 				accessLevel, ok := v.(string)

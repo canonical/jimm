@@ -80,8 +80,11 @@ runs:
       run: echo "name=$CONTROLLER_NAME" >> $GITHUB_OUTPUT
       shell: bash
 
-    - name: Install jimmctl and yq
-      run: sudo snap install jimmctl --channel=3/stable && sudo snap install yq
+    - name: Install jimmctl, jaas plugin and yq
+      run: |
+        sudo snap install jimmctl --channel=3/stable && \
+        sudo snap install jaas --channel=3/stable &&
+        sudo snap install yq
       shell: bash
 
     - name: Authenticate Juju CLI
@@ -97,3 +100,7 @@ runs:
       env:
         JIMM_CONTROLLER_NAME: "jimm"
         CONTROLLER_NAME: ${{ steps.lxd-controller.outputs.name }}
+
+    - name: Provide service account with cloud-credentials
+      run: ./local/jimm/setup-service-account.sh
+      shell: bash

@@ -7,15 +7,14 @@ import (
 	jujuapi "github.com/juju/juju/api"
 	"github.com/juju/juju/cmd/modelcmd"
 	"github.com/juju/juju/jujuclient"
+
+	"github.com/canonical/jimm/v3/internal/cmdtest"
 )
 
 func NewAddServiceAccountCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &addServiceAccountCommand{
-		store: store,
-		dialOpts: &jujuapi.DialOpts{
-			InsecureSkipVerify: true,
-			LoginProvider:      lp,
-		},
+		store:    store,
+		dialOpts: cmdtest.TestDialOpts(lp),
 	}
 
 	return modelcmd.WrapBase(cmd)
@@ -23,11 +22,8 @@ func NewAddServiceAccountCommandForTesting(store jujuclient.ClientStore, lp juju
 
 func NewListServiceAccountCredentialsCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &listServiceAccountCredentialsCommand{
-		store: store,
-		dialOpts: &jujuapi.DialOpts{
-			InsecureSkipVerify: true,
-			LoginProvider:      lp,
-		},
+		store:    store,
+		dialOpts: cmdtest.TestDialOpts(lp),
 	}
 
 	return modelcmd.WrapBase(cmd)
@@ -35,11 +31,8 @@ func NewListServiceAccountCredentialsCommandForTesting(store jujuclient.ClientSt
 
 func NewUpdateCredentialsCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &updateCredentialCommand{
-		store: store,
-		dialOpts: &jujuapi.DialOpts{
-			InsecureSkipVerify: true,
-			LoginProvider:      lp,
-		},
+		store:    store,
+		dialOpts: cmdtest.TestDialOpts(lp),
 	}
 
 	return modelcmd.WrapBase(cmd)
@@ -47,11 +40,8 @@ func NewUpdateCredentialsCommandForTesting(store jujuclient.ClientStore, lp juju
 
 func NewGrantCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &grantCommand{
-		store: store,
-		dialOpts: &jujuapi.DialOpts{
-			InsecureSkipVerify: true,
-			LoginProvider:      lp,
-		},
+		store:    store,
+		dialOpts: cmdtest.TestDialOpts(lp),
 	}
 
 	return modelcmd.WrapBase(cmd)
