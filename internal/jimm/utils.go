@@ -18,9 +18,9 @@ import (
 * Authorisation utilities
 **/
 
-// EveryoneUser is a convenience method to retrieve the "everyone" user
+// everyoneUser is a convenience method to retrieve the "everyone" user
 // whose permissions will translate into granting all users with access.
-func (j *JIMM) EveryoneUser() *openfga.User {
+func (j *JIMM) everyoneUser() *openfga.User {
 	everyoneIdentity := &dbmodel.Identity{Name: ofganames.EveryoneUser}
 	return openfga.NewUser(everyoneIdentity, j.OpenFGAClient)
 }

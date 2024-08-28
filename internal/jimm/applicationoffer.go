@@ -166,7 +166,7 @@ func (j *JIMM) Offer(ctx context.Context, user *openfga.User, offer AddApplicati
 			zap.String("application-offer", doc.UUID))
 	}
 
-	if err := j.EveryoneUser().SetApplicationOfferAccess(ctx, doc.ResourceTag(), ofganames.ReaderRelation); err != nil {
+	if err := j.everyoneUser().SetApplicationOfferAccess(ctx, doc.ResourceTag(), ofganames.ReaderRelation); err != nil {
 		zapctx.Error(
 			ctx,
 			"failed relation between user and application offer",

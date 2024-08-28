@@ -56,3 +56,7 @@ func (j *JIMM) GetUser(ctx context.Context, identifier string) (*openfga.User, e
 func (j *JIMM) UpdateUserLastLogin(ctx context.Context, identifier string) error {
 	return j.updateUserLastLogin(ctx, identifier)
 }
+
+func (j *JIMM) EveryoneUser() *openfga.User {
+	return j.everyoneUser()
+}
