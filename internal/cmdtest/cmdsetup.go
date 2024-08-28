@@ -13,9 +13,8 @@ import (
 
 func TestDialOpts(lp jujuapi.LoginProvider) *jujuapi.DialOpts {
 	return &jujuapi.DialOpts{
-		InsecureSkipVerify: true,
-		LoginProvider:      lp,
-		DialWebsocket:      getDialWebsocketWithInsecureUrl(),
+		LoginProvider: lp,
+		DialWebsocket: getDialWebsocketWithInsecureUrl(),
 	}
 }
 
