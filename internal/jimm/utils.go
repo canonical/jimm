@@ -11,11 +11,19 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/openfga"
+	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 )
 
 /**
 * Authorisation utilities
 **/
+
+// everyoneUser is a convenience method to retrieve the "everyone" user
+// whose permissions will translate into granting all users with access.
+func (j *JIMM) everyoneUser() *openfga.User {
+	everyoneIdentity := &dbmodel.Identity{Name: ofganames.EveryoneUser}
+	return openfga.NewUser(everyoneIdentity, j.OpenFGAClient)
+}
 
 // checkJimmAdmin checks if the user is a JIMM admin.
 func (j *JIMM) checkJimmAdmin(user *openfga.User) error {

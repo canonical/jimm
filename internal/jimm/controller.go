@@ -278,17 +278,7 @@ func (j *JIMM) AddController(ctx context.Context, user *openfga.User, ctl *dbmod
 		// If this cloud is the one used by the controller model then
 		// it is available to all users. Other clouds require `juju grant-cloud` to add permissions.
 		if cloud.ResourceTag().String() == modelSummary.CloudTag {
-			everyoneTag := names.NewUserTag(ofganames.EveryoneUser)
-			everyoneIdentity, err := dbmodel.NewIdentity(everyoneTag.Id())
-			if err != nil {
-				zapctx.Error(ctx, "failed to create identity model", zap.Error(err))
-				return errors.E(op, err)
-			}
-			everyone := openfga.NewUser(
-				everyoneIdentity,
-				j.OpenFGAClient,
-			)
-			if err := everyone.SetCloudAccess(ctx, cloud.ResourceTag(), ofganames.CanAddModelRelation); err != nil {
+			if err := j.everyoneUser().SetCloudAccess(ctx, cloud.ResourceTag(), ofganames.CanAddModelRelation); err != nil {
 				zapctx.Error(ctx, "failed to grant everyone add-model access", zap.Error(err))
 			}
 		}
