@@ -12,9 +12,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-tags: true
-          fetch-depth: 0
 
       - name: Setup Go
         uses: actions/setup-go@v4
@@ -27,9 +24,6 @@ jobs:
       - name: Install juju-db
         run: sudo snap install juju-db --channel 4.4/stable
 
-      - name: Create test certs
-        run: make certs
-
       - name: Start test environment
         run: docker compose up -d --wait
 
@@ -40,11 +34,3 @@ jobs:
 
       - name: Build and Test
         run: go test -mod readonly ./... -timeout 1h -cover
-        env:
-          JIMM_DSN: postgresql://jimm:jimm@localhost:5432/jimm
-          JIMM_TEST_PGXDSN: postgresql://jimm:jimm@localhost:5432/jimm
-          PGHOST: localhost
-          PGPASSWORD: jimm
-          PGSSLMODE: disable
-          PGUSER: jimm
-          PGPORT: 5432
