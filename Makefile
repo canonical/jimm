@@ -35,7 +35,7 @@ clean:
 certs:
 	@cd local/traefik/certs; ./certs.sh; cd -
 
-test-env: sys-deps certs
+test-env: sys-deps
 	@docker compose up --force-recreate -d --wait
 
 test-env-cleanup:

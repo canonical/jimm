@@ -5,15 +5,11 @@
 package cmdtest
 
 import (
-	"bytes"
 	"context"
-	"crypto/tls"
-	"encoding/pem"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -58,8 +54,7 @@ func (s *JimmCmdSuite) SetUpTest(c *gc.C) {
 	s.cancel = cancel
 
 	s.HTTP = httptest.NewUnstartedServer(nil)
-	s.HTTP.TLS = setupTLS(c)
-	u, err := url.Parse("https://" + s.HTTP.Listener.Addr().String())
+	u, err := url.Parse("http://" + s.HTTP.Listener.Addr().String())
 	c.Assert(err, gc.Equals, nil)
 
 	ofgaClient, cofgaClient, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.TestName())
@@ -95,9 +90,9 @@ func (s *JimmCmdSuite) SetUpTest(c *gc.C) {
 	err = s.Service.StartJWKSRotator(ctx, time.NewTicker(time.Hour).C, time.Now().UTC().AddDate(0, 3, 0))
 	c.Assert(err, gc.Equals, nil)
 
-	s.HTTP.StartTLS()
+	s.HTTP.Start()
 
-	// NOW we can set up the  juju conn suites
+	// Now we can set up the juju conn suites
 	s.ControllerConfigAttrs = map[string]interface{}{
 		"login-token-refresh-url": u.String() + "/.well-known/jwks.json",
 	}
@@ -110,13 +105,6 @@ func (s *JimmCmdSuite) SetUpTest(c *gc.C) {
 
 	s.AddAdminUser(c, "alice@canonical.com")
 
-	w := new(bytes.Buffer)
-	err = pem.Encode(w, &pem.Block{
-		Type:  "CERTIFICATE",
-		Bytes: s.HTTP.TLS.Certificates[0].Certificate[0],
-	})
-	c.Assert(err, gc.Equals, nil)
-
 	s.ClientStore = func() *jjclient.MemStore {
 		store := jjclient.NewMemStore()
 		store.CurrentControllerName = "JIMM"
@@ -124,7 +112,6 @@ func (s *JimmCmdSuite) SetUpTest(c *gc.C) {
 			ControllerUUID: "914487b5-60e7-42bb-bd63-1adc3fd3a388",
 			APIEndpoints:   []string{u.Host},
 			PublicDNSName:  s.HTTP.URL,
-			CACert:         w.String(),
 		}
 		return store
 	}
@@ -151,43 +138,6 @@ func (s *JimmCmdSuite) TearDownTest(c *gc.C) {
 		}
 	}
 	s.JujuConnSuite.TearDownTest(c)
-}
-
-func getRootJimmPath(c *gc.C) string {
-	path, err := os.Getwd()
-	c.Assert(err, gc.IsNil)
-	dirs := strings.Split(path, "/")
-	c.Assert(len(dirs), gc.Not(gc.Equals), 1)
-	dirs = dirs[1:]
-	jimmIndex := -1
-	// Range over dirs from the end to ensure no top-level jimm
-	// folders interfere with our search.
-	for i := len(dirs) - 1; i >= 0; i-- {
-		if dirs[i] == "jimm" {
-			jimmIndex = i + 1
-			break
-		}
-	}
-	c.Assert(jimmIndex, gc.Not(gc.Equals), -1)
-	return "/" + filepath.Join(dirs[:jimmIndex]...)
-}
-
-func setupTLS(c *gc.C) *tls.Config {
-	jimmPath := getRootJimmPath(c)
-	pathToCert := filepath.Join(jimmPath, "local/traefik/certs/server.crt")
-	localhostCert, err := os.ReadFile(pathToCert)
-	c.Assert(err, gc.IsNil, gc.Commentf("Unable to find cert at %s. Run make cert in root directory.", pathToCert))
-
-	pathToKey := filepath.Join(jimmPath, "local/traefik/certs/server.key")
-	localhostKey, err := os.ReadFile(pathToKey)
-	c.Assert(err, gc.IsNil, gc.Commentf("Unable to find key at %s. Run make cert in root directory.", pathToKey))
-
-	cert, err := tls.X509KeyPair(localhostCert, localhostKey)
-	c.Assert(err, gc.IsNil, gc.Commentf("Failed to generate certificate key pair."))
-
-	tlsConfig := new(tls.Config)
-	tlsConfig.Certificates = []tls.Certificate{cert}
-	return tlsConfig
 }
 
 func (s *JimmCmdSuite) AddAdminUser(c *gc.C, email string) {
