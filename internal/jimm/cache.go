@@ -44,7 +44,7 @@ func (d *cacheDialer) Dial(ctx context.Context, ctl *dbmodel.Controller, mt name
 		return d.dialer.Dial(ctx, ctl, mt, requiredPermissions)
 	}
 	rc := d.sfg.DoChan(ctl.Name, func() (interface{}, error) {
-		return d.dial(ctx, ctl)
+		return d.dial(ctx, ctl, requiredPermissions)
 	})
 	select {
 	case r := <-rc:
@@ -57,7 +57,7 @@ func (d *cacheDialer) Dial(ctx context.Context, ctl *dbmodel.Controller, mt name
 	}
 }
 
-func (d *cacheDialer) dial(ctx context.Context, ctl *dbmodel.Controller) (interface{}, error) {
+func (d *cacheDialer) dial(ctx context.Context, ctl *dbmodel.Controller, requiredPermissions map[string]string) (interface{}, error) {
 	d.mu.Lock()
 	capi, ok := d.conns[ctl.Name]
 	if ok {
@@ -73,7 +73,7 @@ func (d *cacheDialer) dial(ctx context.Context, ctl *dbmodel.Controller) (interf
 	d.mu.Unlock()
 
 	// We don't have a working connection to the controller, so dial one.
-	api, err := d.dialer.Dial(ctx, ctl, names.ModelTag{}, nil)
+	api, err := d.dialer.Dial(ctx, ctl, names.ModelTag{}, requiredPermissions)
 	if err != nil {
 		return nil, err
 	}
