@@ -1575,7 +1575,7 @@ var getCloudCredentialAttributesTests = []struct {
 	username:         "bob@canonical.com",
 	jimmAdmin:        true,
 	cred:             "cred-2",
-	expectAttributes: nil,
+	expectAttributes: map[string]string{},
 	expectRedacted:   nil,
 }, {
 	name:     "OwnerWithHidden",

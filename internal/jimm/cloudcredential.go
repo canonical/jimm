@@ -342,6 +342,9 @@ func (j *JIMM) GetCloudCredentialAttributes(ctx context.Context, user *openfga.U
 		err = errors.E(op, err)
 		return
 	}
+	if len(attrs) == 0 {
+		return map[string]string{}, nil, nil
+	}
 
 	if hidden {
 		return
