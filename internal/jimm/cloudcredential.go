@@ -377,8 +377,5 @@ func (j *JIMM) getCloudCredentialAttributes(ctx context.Context, cred *dbmodel.C
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
-	if len(attr) == 0 && cred.AuthType != "empty" {
-		return nil, errors.E(op, errors.CodeNotFound, "cloud-credential attributes not found")
-	}
 	return attr, nil
 }
