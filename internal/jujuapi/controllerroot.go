@@ -52,6 +52,7 @@ type JIMM interface {
 	GetCloudCredentialAttributes(ctx context.Context, u *openfga.User, cred *dbmodel.CloudCredential, hidden bool) (attrs map[string]string, redacted []string, err error)
 	GetCredentialStore() credentials.CredentialStore
 	GetJimmControllerAccess(ctx context.Context, user *openfga.User, tag names.UserTag) (string, error)
+	GetModel(ctx context.Context, uuid string) (dbmodel.Model, error)
 	// FetchIdentity finds the user in jimm or returns a not-found error
 	FetchIdentity(ctx context.Context, username string) (*openfga.User, error)
 	GetUserCloudAccess(ctx context.Context, user *openfga.User, cloud names.CloudTag) (string, error)

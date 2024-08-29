@@ -16,7 +16,6 @@ import (
 	"github.com/canonical/jimm/v3/internal/auth"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimmhttp"
-	"github.com/canonical/jimm/v3/internal/openfga"
 	jimmRPC "github.com/canonical/jimm/v3/internal/rpc"
 )
 
@@ -104,13 +103,4 @@ func (s streamProxier) ServeWS(ctx context.Context, clientConn *websocket.Conn) 
 	}
 
 	jimmRPC.ProxyStreams(ctx, clientConn, controllerStream)
-}
-
-func checkPermission(ctx context.Context, path string, u *openfga.User, mt names.ModelTag) (bool, error) {
-	switch path {
-	case "log":
-		return u.IsModelReader(ctx, mt)
-	default:
-		return false, errors.E("unknown endpoint " + path)
-	}
 }

@@ -21,6 +21,10 @@ var (
 	AuditLogUpperLimit    = maxLimit
 )
 
+func HTTPProxier(jimm JIMM) httpProxier {
+	return httpProxier{jimm: jimm}
+}
+
 func NewModelSummaryWatcher() *modelSummaryWatcher {
 	return &modelSummaryWatcher{
 		summaries: make(map[string]jujuparams.ModelAbstract),

@@ -3,6 +3,9 @@
 package jimmhttp_test
 
 import (
+	"bytes"
+	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -12,58 +15,49 @@ import (
 	"github.com/canonical/jimm/v3/internal/jimmhttp"
 )
 
-var stripPathElementTests = []struct {
-	name       string
-	url        string
-	expectVar  string
-	expectPath string
-}{{
-	name:       "simple",
-	url:        "/foo/bar",
-	expectVar:  "foo",
-	expectPath: "/bar",
-}, {
-	name:       "no_suffix",
-	url:        "/foo",
-	expectVar:  "foo",
-	expectPath: "",
-}, {
-	name:       "empty",
-	url:        "",
-	expectVar:  "",
-	expectPath: "",
-}, {
-	name:       "root",
-	url:        "/",
-	expectVar:  "",
-	expectPath: "",
-}, {
-	name:       "escaped",
-	url:        "/foo%2fbar",
-	expectVar:  "foo",
-	expectPath: "/bar",
-}}
-
-func TestStripPathElement(t *testing.T) {
+func TestHTTPHandler(t *testing.T) {
 	c := qt.New(t)
 
-	for _, test := range stripPathElementTests {
-		c.Run(test.name, func(c *qt.C) {
-			var hnd http.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				c.Check(jimmhttp.PathElementFromContext(req.Context(), "key"), qt.Equals, test.expectVar)
-				c.Check(req.URL.Path, qt.Equals, test.expectPath)
-				c.Check(req.URL.RawPath, qt.Equals, "")
-			})
-			hnd = jimmhttp.StripPathElement("key", hnd)
-
-			req, err := http.NewRequest("GET", test.url, nil)
-			c.Assert(err, qt.IsNil)
-			rr := httptest.NewRecorder()
-
-			hnd.ServeHTTP(rr, req)
-			resp := rr.Result()
-			defer resp.Body.Close()
-			c.Check(resp.StatusCode, qt.Equals, http.StatusOK)
-		})
+	hnd := &jimmhttp.HTTPHandler{
+		HTTPProxier: testHTTPServer{t: c},
 	}
+
+	srv := httptest.NewServer(hnd)
+	c.Cleanup(srv.Close)
+
+	client := http.Client{}
+
+	// test ok
+	resp, err := client.Get(srv.URL)
+	c.Assert(err, qt.IsNil)
+	defer resp.Body.Close()
+	c.Assert(err, qt.IsNil)
+	c.Assert(resp.StatusCode, qt.Equals, http.StatusOK)
+
+	// test unauthorized
+	req, err := http.NewRequest("POST", srv.URL, nil)
+	c.Assert(err, qt.IsNil)
+	req.Header.Set("Authorization", "wrong")
+	resp, err = client.Do(req)
+	c.Assert(err, qt.IsNil)
+	defer resp.Body.Close()
+	c.Assert(err, qt.IsNil)
+	c.Assert(resp.StatusCode, qt.Equals, http.StatusUnauthorized)
+}
+
+type testHTTPServer struct {
+	t testing.TB
+}
+
+func (s testHTTPServer) Authenticate(ctx context.Context, w http.ResponseWriter, req *http.Request) error {
+	if auth := req.Header.Get("Authorization"); auth == "wrong" {
+		return errors.New("error")
+	}
+	return nil
+}
+
+func (s testHTTPServer) ServeHTTP(ctx context.Context, w http.ResponseWriter, req *http.Request) {
+	var buf bytes.Buffer
+	req.Write(&buf)
+	w.Write(buf.Bytes())
 }
