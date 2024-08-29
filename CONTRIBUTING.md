@@ -1,11 +1,9 @@
 ## Filing Bugs
-
-File bugs at https://github.com/canonical/jimm/issues
+File bugs at https://github.com/canonical/jimm/issues.
 
 ## Testing
-
-Many tests in JIMM require real services to be reachable i.e. Postgres, Vault and 
-OpenFGA and an IdP (Identity Provider).
+Many tests in JIMM require real services to be reachable i.e. Postgres, Vault, OpenFGA 
+and an IdP (Identity Provider).
 
 JIMM's docker compose file provides a convenient way of starting these services.
 
@@ -15,6 +13,7 @@ Run:
 $ make test-env
 $ go test ./...
 ```
+
 ### Pre-requisite
 To check if your system has all the prequisites installed simply run `make sys-deps`.
 This will check for all test prequisites and inform you how to install them if not installed. 
@@ -29,20 +28,20 @@ Tests inside of `cmd/` and `internal/jujuapi/` are integration based, spinning u
 a Juju controller for testing. To spin up a Juju controller we use the `JujuConnSuite` which 
 in turn uses the [gocheck](http://labix.org/gocheck) test library.
 
-Because of the `JujuConnSuite`, there 2 test libraries in JIMM,
+Because of the `JujuConnSuite` and its use in JIMM's test suites, there are 2 test libraries in JIMM:
 - GoCheck based tests, identified in the function signature with `func Test(c *gc.C)`.
   - These tests normally interact with a Juju controller.
   - GoCheck should only be used when using the suites in `internal/jimmtest`.
-- Regular Go `testing.T` tests, identified in the function signature with `func Test(t *testing.T)`.
+- Stdlib `testing.T` tests, identified in the function signature with `func Test(t *testing.T)`.
   - These tests vary in their scope but do not require a Juju controller.
   - To provide assertions, the project uses [quicktest](https://github.com/frankban/quicktest), 
     a lean testing library.
 
-Because many tests rely on PostgreSQL, OpenFGA and Hashicorp Vault which are dockerised 
-you may simple run `make test-env` to be integration test ready.
+Because many tests rely on PostgreSQL, OpenFGA and Vault which are dockerised 
+you may simply run `make test-env` to be integration test ready.
 
 The above command won't start a dockerised instance of JIMM as tests are normally run locally. 
-Instead, to start a  dockerised JIMM that will auto-reload on code changes, follow the instructions 
+Instead, to start a dockerised JIMM that will auto-reload on code changes, follow the instructions 
 in `local/README.md`.
 
 ### Manual commands
