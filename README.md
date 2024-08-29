@@ -44,28 +44,16 @@ using relation based access control.
 
 ## JIMM versioning
 
-tldr; JIMM v3 is intended to support Juju v3 controllers AND the last minor version 
-of the previous major (Juju v2.9) for migration purposes.
+The versioning strategy we follow is to match JIMM's major version to the corresponding
+Juju major version we support.
 
-JIMM v0 and v1 follow a different versioning strategy than future releases. JIMM v0 was the initial
-release and used MongoDB to store state. JIMM v1 was an upgrade that switched to using PostgreSQL 
-for storing state but still retained similar functionality to v0.  
-These versions worked with Juju v2 and v3.
+Additionally JIMM will also support Juju's last minor version of the previous major to 
+support model migrations.
 
-Subsequently JIMM introduced a large shift in how the service worked:
-- JIMM now acts as a proxy between all client and Juju controller interactions. Previously 
-users were redirected to a Juju controller.
-- Juju controllers support JWT login where secure tokens are issued by JIMM.
-- JIMM acts as an authorisation gateway creating trusted short-lived JWT tokens to authorize 
-user actions against Juju controllers.
+E.g. JIMM v3 supports Juju v3 controllers AND the last minor version 
+of the previous major, v2.9.
 
-The above work encompassed a breaking change and required changes in Juju (requiring a 
-Juju controller of at least version 3.3). 
-
-Further, to better align the two projects, JIMM's versioning now aligns with Juju.
-
-As a result of this, there is no JIMM v2 and instead from JIMM v3, the versioning strategy 
-we follow is to match JIMM's major version to the corresponding Juju major version we support.
+For more information on JIMM's history and previous version strategy see [here](./doc/versioning.md).
 
 ## Binaries
 
