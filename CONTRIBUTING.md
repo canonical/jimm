@@ -71,9 +71,10 @@ $ go test ./internal/jujuapi -check.f modelManagerSuite.TestListModelSummaries -
 ```
 
 ## Building/Publishing
+Below are instructions on building the various binaries that are part of the project as well as
+some information on how they are published.
 
 ### jimmsrv
-
 To build the JIMM server run `go build ./cmd/jimmsrv`
 
 The JIMM server is published as an OCI image using 
@@ -87,7 +88,6 @@ The JIMM server is also available as a snap and can be built with `make jimm-sna
 not published to the snap store as it is intended to be used as part of a machine charm deployment.
 
 ### jimmctl
-
 To build jimmctl run `go build ./cmd/jimmctl`
 
 The jimmctl tool is published as a [Snap](https://snapcraft.io/jimmctl).
@@ -96,7 +96,6 @@ Run `make jimmctl-snap` to build the snap. The snaps are published to the Snap S
 from where they can be conveniently installed.
 
 ### jaas plugin
-
 To build the jaas plugin run `go build ./cmd/jaas`
 
 The jaas plugin is published as a [Snap](https://snapcraft.io/jaas).
