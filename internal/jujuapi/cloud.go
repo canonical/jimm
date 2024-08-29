@@ -321,7 +321,7 @@ func getIdentityCredentials(ctx context.Context, user *openfga.User, j JIMM, arg
 		}
 		var err error
 		content.Attributes, _, err = j.GetCloudCredentialAttributes(ctx, user, c, args.IncludeSecrets)
-		if err != nil {
+		if err != nil && errors.ErrorCode(err) != errors.CodeNotFound {
 			return nil, errors.E(err)
 		}
 		mas := make([]jujuparams.ModelAccess, len(c.Models))
