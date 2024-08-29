@@ -35,10 +35,10 @@ The project uses [Go modules](https://golang.org/cmd/go/#hdr-Module_maintenance)
 Go dependencies. **Note: Go 1.11 or greater needed.**
 
 A brief explanation of the various services that JIMM depends on is below:
-- Vault: User cloud-credentials and private keys are stored in Vault. Cloud-credentials are API keys that 
+- [Vault](https://www.vaultproject.io/): User cloud-credentials and private keys are stored in Vault. Cloud-credentials are API keys that 
 enable Juju to communicate with a cloud's API.
-- Postgres: All non-sensitive state is stored in Postgres.
-- OpenFGA: A distributed authorisation server where authorisation rules are stored and queried 
+- [PostgreSQL](https://www.postgresql.org/): All non-sensitive state is stored in Postgres.
+- [OpenFGA](https://openfga.dev/): A distributed authorisation server where authorisation rules are stored and queried 
 using relation based access control.
 - IdP: An identity provider which supports OAuth2.0 and OIDC.
 
