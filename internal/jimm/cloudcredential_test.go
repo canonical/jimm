@@ -1733,7 +1733,7 @@ func TestCloudCredentialAttributeStore(t *testing.T) {
 
 	// Update to an "empty" credential
 	args.Credential.AuthType = "empty"
-	args.Credential.Attributes = nil
+	args.Credential.Attributes = map[string]string{}
 	_, err = j.UpdateCloudCredential(ctx, user, args)
 	c.Assert(err, qt.IsNil)
 
