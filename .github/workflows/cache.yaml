@@ -7,7 +7,7 @@ on:
 
 jobs:
   go_cache:
-    name: Install And Cache Go Dependencies and Build Artifacts
+    name: Cache Go Dependencies and Build/Lint Artifacts
     runs-on: ubuntu-22.04
     timeout-minutes: 15
     steps:
@@ -24,3 +24,9 @@ jobs:
 
       - name: Build
         run: go build ./...
+
+      - name: Run Golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          args: --timeout 30m --verbose
+          version: v1.60
