@@ -550,7 +550,7 @@ func (t *tagResolver) groupTag(ctx context.Context, db *db.Database) (*ofga.Enti
 	)
 	var entry dbmodel.GroupEntry
 	if t.resourceUUID != "" {
-		entry.UUID = t.resourceUUID
+		return ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag(t.resourceUUID), t.relation), nil
 	} else if t.trailer != "" {
 		entry.Name = t.trailer
 	}
@@ -571,7 +571,7 @@ func (t *tagResolver) controllerTag(ctx context.Context, jimmUUID string, db *db
 	controller := dbmodel.Controller{}
 
 	if t.resourceUUID != "" {
-		controller.UUID = t.resourceUUID
+		return ofganames.ConvertTagWithRelation(names.NewControllerTag(t.resourceUUID), t.relation), nil
 	} else if t.controllerName != "" {
 		if t.controllerName == jimmControllerName {
 			return ofganames.ConvertTagWithRelation(names.NewControllerTag(jimmUUID), t.relation), nil
@@ -598,7 +598,7 @@ func (t *tagResolver) modelTag(ctx context.Context, db *db.Database) (*ofga.Enti
 	model := dbmodel.Model{}
 
 	if t.resourceUUID != "" {
-		model.UUID = sql.NullString{String: t.resourceUUID, Valid: true}
+		return ofganames.ConvertTagWithRelation(names.NewModelTag(t.resourceUUID), t.relation), nil
 	} else if t.controllerName != "" && t.userName != "" && t.modelName != "" {
 		controller := dbmodel.Controller{Name: t.controllerName}
 		err := db.GetController(ctx, &controller)
@@ -615,7 +615,7 @@ func (t *tagResolver) modelTag(ctx context.Context, db *db.Database) (*ofga.Enti
 		return nil, errors.E("model not found")
 	}
 
-	return ofganames.ConvertTagWithRelation(names.NewModelTag(model.UUID.String), t.relation), nil
+	return ofganames.ConvertTagWithRelation(model.ResourceTag(), t.relation), nil
 }
 
 func (t *tagResolver) applicationOfferTag(ctx context.Context, db *db.Database) (*ofga.Entity, error) {
@@ -626,7 +626,7 @@ func (t *tagResolver) applicationOfferTag(ctx context.Context, db *db.Database) 
 	offer := dbmodel.ApplicationOffer{}
 
 	if t.resourceUUID != "" {
-		offer.UUID = t.resourceUUID
+		return ofganames.ConvertTagWithRelation(names.NewApplicationOfferTag(t.resourceUUID), t.relation), nil
 	} else if t.controllerName != "" && t.userName != "" && t.modelName != "" && t.offerName != "" {
 		offerURL, err := crossmodel.ParseOfferURL(fmt.Sprintf("%s:%s/%s.%s", t.controllerName, t.userName, t.modelName, t.offerName))
 		if err != nil {
