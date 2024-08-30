@@ -223,3 +223,10 @@ func (c *Client) UpdateServiceAccountCredentials(req *params.UpdateServiceAccoun
 func (c *Client) GrantServiceAccountAccess(req *params.GrantServiceAccountAccess) error {
 	return c.caller.APICall("JIMM", 4, "", "GrantServiceAccountAccess", req, nil)
 }
+
+// Version returns version info of the controller.
+func (c *Client) Version() (params.VersionResponse, error) {
+	var response params.VersionResponse
+	err := c.caller.APICall("JIMM", 4, "", "Version", nil, &response)
+	return response, err
+}

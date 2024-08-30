@@ -21,6 +21,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/jujuapi/rpc"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
+	"github.com/canonical/jimm/v3/version"
 )
 
 func init() {
@@ -54,6 +55,7 @@ func init() {
 		updateServiceAccountCredentials := rpc.Method(r.UpdateServiceAccountCredentials)
 		listServiceAccountCredentials := rpc.Method(r.ListServiceAccountCredentials)
 		grantServiceAccountAccess := rpc.Method(r.GrantServiceAccountAccess)
+		version := rpc.Method(r.Version)
 
 		// JIMM Generic RPC
 		r.AddMethod("JIMM", 4, "AddController", addControllerMethod)
@@ -88,6 +90,7 @@ func init() {
 		r.AddMethod("JIMM", 4, "UpdateServiceAccountCredentials", updateServiceAccountCredentials)
 		r.AddMethod("JIMM", 4, "ListServiceAccountCredentials", listServiceAccountCredentials)
 		r.AddMethod("JIMM", 4, "GrantServiceAccountAccess", grantServiceAccountAccess)
+		r.AddMethod("JIMM", 4, "Version", version)
 
 		return []int{4}
 	}
@@ -508,4 +511,13 @@ func (r *controllerRoot) MigrateModel(ctx context.Context, args apiparams.Migrat
 	return jujuparams.InitiateMigrationResults{
 		Results: results,
 	}, nil
+}
+
+// Version is a method on the JIMM facade that returns information on the version of JIMM.
+func (r *controllerRoot) Version(ctx context.Context) (apiparams.VersionResponse, error) {
+	versionInfo := apiparams.VersionResponse{
+		Version: version.VersionInfo.Version,
+		Commit:  version.VersionInfo.GitCommit,
+	}
+	return versionInfo, nil
 }
