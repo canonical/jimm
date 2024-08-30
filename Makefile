@@ -152,7 +152,6 @@ help:
 	@echo 'make sys-deps - Install the development environment system packages.'
 	@echo 'make format - Format the source files.'
 	@echo 'make simplify - Format and simplify the source files.'
-	@echo 'make get-local-auth - Get local auth to the API WSS endpoint locally.'
 	@echo 'make rock - Build the JIMM rock.'
 	@echo 'make load-rock - Load the most recently built rock into your local docker daemon.'
 
