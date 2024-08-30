@@ -16,7 +16,7 @@ inputs:
       The PAT token can be left empty when building the development version of JIMM.
     required: true
 
-output:
+outputs:
   url:
     description: 'URL where JIMM can be reached.'
     value: "https://jimm.localhost"
@@ -26,6 +26,9 @@ output:
   client-secret:
     description: 'Test client Secret to login to JIMM with a service account.'
     value: "2M2blFbO4GX4zfggQpivQSxwWX1XGgNf"
+  ca-cert:
+    description: 'The CA certificate used to genereate the JIMM server cert.'
+    value: ${{ steps.fetch-cert.outputs.jimm-ca }}
 
 runs:
   using: "composite"
@@ -48,6 +51,14 @@ runs:
     - name: Start server based on development version
       if: ${{ inputs.jimm-version == 'dev' }}
       run: make dev-env
+      shell: bash
+
+    - name: Retrieve server CA cert.
+      id: fetch-cert
+      run: |
+        echo 'jimm-ca<<EOF' >> $GITHUB_OUTPUT
+        cat ./local/traefik/certs/ca.crt >> $GITHUB_OUTPUT
+        echo 'EOF' >> $GITHUB_OUTPUT
       shell: bash
 
     - name: Initialise LXD
