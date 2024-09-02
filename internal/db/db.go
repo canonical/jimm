@@ -1,4 +1,4 @@
-// Copyright 2020 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 // Package db contains routines to store and retrieve data from a database.
 package db

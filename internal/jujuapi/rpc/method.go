@@ -1,4 +1,4 @@
-// Copyright 2020 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package rpc
 
@@ -20,7 +20,7 @@ var (
 // Method converts the given function to an RPC method that can be used
 // with Root. The function must have a signature like:
 //
-//     f([ctx context.Context, ][objId string, ][params ParamsT]) ([ResultT, ][error])
+//	f([ctx context.Context, ][objId string, ][params ParamsT]) ([ResultT, ][error])
 //
 // Note that all parameters and return values are optional. Method will
 // panic if the given value is not a function of the correct type.
@@ -101,10 +101,8 @@ func (c methodCaller) Call(ctx context.Context, objId string, arg reflect.Value)
 	}
 	if c.flags&inObjectID == inObjectID {
 		pv = append(pv, reflect.ValueOf(objId))
-	} else {
-		if objId != "" {
-			return reflect.Value{}, errors.ErrBadId
-		}
+	} else if objId != "" {
+		return reflect.Value{}, errors.ErrBadId
 	}
 	if c.flags&inParams == inParams {
 		pv = append(pv, arg)

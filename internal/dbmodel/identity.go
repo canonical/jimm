@@ -1,4 +1,4 @@
-// Copyright 2020 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package dbmodel
 
@@ -106,7 +106,7 @@ func (i Identity) ToJujuUserInfo() jujuparams.UserInfo {
 	var ui jujuparams.UserInfo
 	ui.Username = i.Name
 	ui.DisplayName = i.DisplayName
-	ui.Access = "" //TODO(Kian) CSS-6040 Handle merging OpenFGA and Postgres information
+	ui.Access = "" // TODO(Kian) CSS-6040 Handle merging OpenFGA and Postgres information
 	ui.DateCreated = i.CreatedAt
 	if i.LastLogin.Valid {
 		ui.LastConnection = &i.LastLogin.Time

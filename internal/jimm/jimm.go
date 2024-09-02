@@ -1,4 +1,4 @@
-// Copyright 2020 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 // Package jimm contains the business logic used to manage clouds,
 // cloudcredentials and models.
@@ -85,11 +85,6 @@ type JIMM struct {
 	// OAuthAuthenticator is responsible for handling authentication
 	// via OAuth2.0 AND JWT access tokens to JIMM.
 	OAuthAuthenticator OAuthAuthenticator
-}
-
-// OAuthAuthenticationService returns the JIMM's authentication service.
-func (j *JIMM) OAuthAuthenticationService() OAuthAuthenticator {
-	return j.OAuthAuthenticator
 }
 
 // ResourceTag returns JIMM's controller tag stating its UUID.

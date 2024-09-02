@@ -1,4 +1,4 @@
-// Copyright 2020 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package jimm
 
@@ -75,11 +75,9 @@ func (j *JIMM) Offer(ctx context.Context, user *openfga.User, offer AddApplicati
 	err = j.Database.GetApplicationOffer(ctx, &offerCheck)
 	if err == nil {
 		return errors.E(fmt.Sprintf("offer %s already exists, please use a different name", offerURL.String()), errors.CodeAlreadyExists)
-	} else {
-		if errors.ErrorCode(err) != errors.CodeNotFound {
-			// Anything besides Not Found is a problem.
-			return errors.E(op, err)
-		}
+	} else if errors.ErrorCode(err) != errors.CodeNotFound {
+		// Anything besides Not Found is a problem.
+		return errors.E(op, err)
 	}
 
 	api, err := j.dial(ctx, &model.Controller, names.ModelTag{})
@@ -168,16 +166,7 @@ func (j *JIMM) Offer(ctx context.Context, user *openfga.User, offer AddApplicati
 			zap.String("application-offer", doc.UUID))
 	}
 
-	everyoneIdentity, err := dbmodel.NewIdentity(ofganames.EveryoneUser)
-	if err != nil {
-		return errors.E(op, err)
-	}
-
-	everyone := openfga.NewUser(
-		everyoneIdentity,
-		j.OpenFGAClient,
-	)
-	if err := everyone.SetApplicationOfferAccess(ctx, doc.ResourceTag(), ofganames.ReaderRelation); err != nil {
+	if err := j.everyoneUser().SetApplicationOfferAccess(ctx, doc.ResourceTag(), ofganames.ReaderRelation); err != nil {
 		zapctx.Error(
 			ctx,
 			"failed relation between user and application offer",
@@ -459,8 +448,7 @@ func (j *JIMM) RevokeOfferAccess(ctx context.Context, user *openfga.User, offerU
 		stillHasAccess := false
 		switch targetRelation {
 		case ofganames.AdministratorRelation:
-			switch currentRelation {
-			case ofganames.AdministratorRelation:
+			if currentRelation == ofganames.AdministratorRelation {
 				stillHasAccess = true
 			}
 		case ofganames.ConsumerRelation:

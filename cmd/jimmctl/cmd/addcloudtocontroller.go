@@ -1,10 +1,10 @@
-// Copyright 2021 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package cmd
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 
 	"github.com/juju/cmd/v3"
 	"github.com/juju/gnuflag"
@@ -194,7 +194,7 @@ type cloudToCommandAdapter struct {
 
 // ReadCloudData implements CloudMetadataStore.ReadCloudData.
 func (cloudToCommandAdapter) ReadCloudData(path string) ([]byte, error) {
-	return ioutil.ReadFile(path)
+	return os.ReadFile(path)
 }
 
 // ParseOneCloud implements CloudMetadataStore.ParseOneCloud.

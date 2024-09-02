@@ -1,4 +1,4 @@
-// Copyright 2016 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package jujuapi
 
@@ -129,7 +129,7 @@ func (r *controllerRoot) WatchModelSummaries(ctx context.Context) (jujuparams.Su
 		}
 		return modelUUIDs, nil
 	}
-	watcher, err := newModelSummaryWatcher(ctx, id, r, r.jimm.PubSubHub(), getModels)
+	watcher, err := newModelSummaryWatcher(ctx, id, r.jimm.PubSubHub(), getModels)
 	if err != nil {
 		return jujuparams.SummaryWatcherID{}, errors.E(op, err)
 	}
@@ -168,7 +168,7 @@ func (r *controllerRoot) WatchAllModelSummaries(ctx context.Context) (jujuparams
 		return modelUUIDs, nil
 	}
 
-	watcher, err := newModelSummaryWatcher(ctx, id, r, r.jimm.PubSubHub(), getAllModels)
+	watcher, err := newModelSummaryWatcher(ctx, id, r.jimm.PubSubHub(), getAllModels)
 	if err != nil {
 		return jujuparams.SummaryWatcherID{}, errors.E(op, err)
 	}

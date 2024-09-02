@@ -1,4 +1,4 @@
-// Copyright 2020 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 // Package dbmodel contains the model objects for the relational storage
 // database.

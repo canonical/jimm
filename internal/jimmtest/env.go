@@ -1,4 +1,4 @@
-// Copyright 2021 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package jimmtest
 
@@ -132,7 +132,7 @@ func (u User) addUserRelations(c *qt.C, jimmTag names.ControllerTag, db db.Datab
 }
 
 // addCloudRelations adds permissions the cloud should have and adds permissions for users to the cloud.
-func (cl Cloud) addCloudRelations(c *qt.C, jimmTag names.ControllerTag, db db.Database, client *openfga.OFGAClient) {
+func (cl Cloud) addCloudRelations(c *qt.C, db db.Database, client *openfga.OFGAClient) {
 	for _, u := range cl.Users {
 		dbUser := cl.env.User(u.User).DBObject(c, db)
 		var relation openfga.Relation
@@ -153,7 +153,7 @@ func (cl Cloud) addCloudRelations(c *qt.C, jimmTag names.ControllerTag, db db.Da
 }
 
 // addModelRelations adds permissions the model should have and adds permissions for users to the model.
-func (m Model) addModelRelations(c *qt.C, jimmTag names.ControllerTag, db db.Database, client *openfga.OFGAClient) {
+func (m Model) addModelRelations(c *qt.C, db db.Database, client *openfga.OFGAClient) {
 	owner := openfga.NewUser(&m.dbo.Owner, client)
 	err := owner.SetModelAccess(context.Background(), m.dbo.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, qt.IsNil)
@@ -181,7 +181,7 @@ func (m Model) addModelRelations(c *qt.C, jimmTag names.ControllerTag, db db.Dat
 }
 
 // addControllerRelations adds permissions the model should have and adds permissions for users to the controller.
-func (ctl Controller) addControllerRelations(c *qt.C, jimmTag names.ControllerTag, db db.Database, client *openfga.OFGAClient) {
+func (ctl Controller) addControllerRelations(c *qt.C, client *openfga.OFGAClient) {
 	if ctl.dbo.AdminIdentityName != "" {
 		userIdentity, err := dbmodel.NewIdentity(ctl.dbo.AdminIdentityName)
 		c.Assert(err, qt.IsNil)
@@ -202,16 +202,17 @@ func (e *Environment) addJIMMRelations(c *qt.C, jimmTag names.ControllerTag, db 
 		user.addUserRelations(c, jimmTag, db, client)
 	}
 	for _, controller := range e.Controllers {
-		client.AddController(context.Background(), jimmTag, controller.dbo.ResourceTag())
+		err := client.AddController(context.Background(), jimmTag, controller.dbo.ResourceTag())
+		c.Assert(err, qt.IsNil)
 	}
 	for _, cl := range e.Clouds {
-		cl.addCloudRelations(c, jimmTag, db, client)
+		cl.addCloudRelations(c, db, client)
 	}
 	for _, m := range e.Models {
-		m.addModelRelations(c, jimmTag, db, client)
+		m.addModelRelations(c, db, client)
 	}
 	for _, ctl := range e.Controllers {
-		ctl.addControllerRelations(c, jimmTag, db, client)
+		ctl.addControllerRelations(c, client)
 	}
 }
 
@@ -474,6 +475,7 @@ func (m *Model) DBObject(c Tester, db db.Database) dbmodel.Model {
 	m.env.Controller(m.Controller)
 	migrationControllerID := sql.NullInt32{}
 	if m.MigrationController != "" {
+		//nolint:gosec // Database IDs for tests will fit into int32.
 		migrationControllerID.Int32 = int32(m.env.Controller(m.MigrationController).dbo.ID)
 		migrationControllerID.Valid = true
 	}

@@ -1,4 +1,4 @@
-// Copyright 2020 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package jimm
 
@@ -342,6 +342,9 @@ func (j *JIMM) GetCloudCredentialAttributes(ctx context.Context, user *openfga.U
 		err = errors.E(op, err)
 		return
 	}
+	if len(attrs) == 0 {
+		return map[string]string{}, nil, nil
+	}
 
 	if hidden {
 		return
@@ -376,9 +379,6 @@ func (j *JIMM) getCloudCredentialAttributes(ctx context.Context, cred *dbmodel.C
 	attr, err := j.CredentialStore.Get(ctx, cred.ResourceTag())
 	if err != nil {
 		return nil, errors.E(op, err)
-	}
-	if len(attr) == 0 && cred.AuthType != "empty" {
-		return nil, errors.E(op, errors.CodeNotFound, "cloud-credential attributes not found")
 	}
 	return attr, nil
 }

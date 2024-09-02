@@ -1,4 +1,4 @@
-// Copyright 2021 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package service_test
 
@@ -51,6 +51,7 @@ func TestDefaultService(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	svc.ServeHTTP(rr, req)
 	resp := rr.Result()
+	defer resp.Body.Close()
 	c.Check(resp.StatusCode, qt.Equals, http.StatusOK)
 }
 
@@ -266,6 +267,7 @@ func TestPublicKey(t *testing.T) {
 
 	response, err := srv.Client().Get(srv.URL + "/macaroons/publickey")
 	c.Assert(err, qt.IsNil)
+	defer response.Body.Close()
 	data, err := io.ReadAll(response.Body)
 	c.Assert(err, qt.IsNil)
 	c.Assert(string(data), qt.Equals, `{"PublicKey":"izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk="}`)
@@ -433,6 +435,7 @@ func TestDisableOAuthEndpointsWhenDashboardRedirectURLNotSet(t *testing.T) {
 
 	response, err := srv.Client().Get(srv.URL + "/auth/whoami")
 	c.Assert(err, qt.IsNil)
+	defer response.Body.Close()
 	c.Assert(response.StatusCode, qt.Equals, http.StatusNotFound)
 }
 
@@ -456,6 +459,7 @@ func TestEnableOAuthEndpointsWhenDashboardRedirectURLSet(t *testing.T) {
 
 	response, err := srv.Client().Get(srv.URL + "/auth/whoami")
 	c.Assert(err, qt.IsNil)
+	defer response.Body.Close()
 	c.Assert(response.StatusCode, qt.Not(qt.Equals), http.StatusNotFound)
 }
 

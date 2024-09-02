@@ -1,4 +1,4 @@
-// Copyright 2023 canonical.
+// Copyright 2024 Canonical.
 
 // Package jimmjwx provides utility functions for JOSE (Javascript Object Signing and Encryption) within
 // JIMM. It currently supports the following:

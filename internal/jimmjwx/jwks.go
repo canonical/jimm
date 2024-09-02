@@ -1,4 +1,4 @@
-// Copyright 2023 canonical.
+// Copyright 2024 Canonical.
 
 package jimmjwx
 
@@ -66,7 +66,9 @@ func rotateJWKS(ctx context.Context, credStore credentials.CredentialStore, init
 		zapctx.Debug(ctx, "setting initial expiry", zap.Time("time", initialExpiryTime))
 		err = putJwks(initialExpiryTime)
 		if err != nil {
-			credStore.CleanupJWKS(ctx)
+			if jwksErr := credStore.CleanupJWKS(ctx); jwksErr != nil {
+				zapctx.Error(ctx, "failed to cleanup jwks", zap.Error(jwksErr))
+			}
 			return errors.E(err)
 		}
 	} else {
@@ -77,7 +79,9 @@ func rotateJWKS(ctx context.Context, credStore credentials.CredentialStore, init
 			// components exist from the previous failed expiry attempt.
 			err = putJwks(time.Now().UTC().AddDate(0, 3, 0))
 			if err != nil {
-				credStore.CleanupJWKS(ctx)
+				if jwksErr := credStore.CleanupJWKS(ctx); jwksErr != nil {
+					zapctx.Error(ctx, "failed to cleanup jwks", zap.Error(jwksErr))
+				}
 				return errors.E(err)
 			}
 			zapctx.Debug(ctx, "set a new JWKS", zap.String("expiry", expires.String()))
@@ -102,10 +106,6 @@ func (jwks *JWKSService) StartJWKSRotator(ctx context.Context, checkRotateRequir
 
 	credStore := jwks.credentialStore
 
-	// For logging and monitoring purposes, we have the rotator spit errors into
-	// this buffered channel ((size * amount) * 2 of errors we are currently aware of and doubling it to prevent blocks)
-	errorChan := make(chan error, 8)
-
 	if err := rotateJWKS(ctx, credStore, initialRotateRequiredTime); err != nil {
 		zapctx.Error(ctx, "Rotate JWKS error", zap.Error(err))
 		return errors.E(op, err)
@@ -117,38 +117,18 @@ func (jwks *JWKSService) StartJWKSRotator(ctx context.Context, checkRotateRequir
 	//
 	// In this case we generate a new set, which should expire in 3 months.
 	go func() {
-		defer close(errorChan)
 		for {
 			select {
 			case <-checkRotateRequired:
 				if err := rotateJWKS(ctx, credStore, initialRotateRequiredTime); err != nil {
-					errorChan <- err
+					zapctx.Error(ctx, "security failure", zap.Any("op", op), zap.NamedError("jwks-error", err))
 				}
-
 			case <-ctx.Done():
 				zapctx.Debug(ctx, "Shutdown for JWKS rotator complete.")
 				return
 			}
 		}
 	}()
-
-	// If for any reason the rotator has an error, we simply receive the error
-	// in another routine dedicated to logging said errors.
-	go func(errChan <-chan error) {
-		for err := range errChan {
-			zapctx.Error(
-				ctx,
-				"security failure",
-				zap.Any("op", op),
-				zap.NamedError("jwks-error", err),
-			)
-			select {
-			case <-ctx.Done():
-				return
-			default:
-			}
-		}
-	}(errorChan)
 
 	return nil
 }

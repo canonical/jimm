@@ -1,4 +1,4 @@
-// Copyright 2020 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package jujuclient_test
 
@@ -88,14 +88,6 @@ func (s *dialSuite) TestDial(c *gc.C) {
 		addrs[i] = fmt.Sprintf("%s:%d", addr[0].Value, addr[0].Port)
 	}
 	c.Check(addrs, jc.DeepEquals, info.Addrs)
-}
-
-type cExtended struct {
-	*gc.C
-}
-
-func (t *cExtended) Name() string {
-	return t.TestName()
 }
 
 func (s *dialSuite) TestDialWithJWT(c *gc.C) {

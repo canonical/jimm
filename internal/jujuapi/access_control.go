@@ -1,10 +1,9 @@
-// Copyright 2023 canonical.
+// Copyright 2024 Canonical.
 
 package jujuapi
 
 import (
 	"context"
-	"regexp"
 	"strconv"
 	"time"
 
@@ -21,32 +20,6 @@ import (
 )
 
 // access_control contains the primary RPC commands for handling ReBAC within JIMM via the JIMM facade itself.
-
-var (
-	// Matches juju uris, jimm user/group tags and UUIDs
-	// Performs a single match and breaks the juju URI into 10 groups, each successive group is XORD to ensure we can run
-	// this just once.
-	// The groups are as so:
-	// [0] - Entire match
-	// [1] - tag
-	// [2] - A single "-", ignored
-	// [3] - Controller name OR user name OR group name
-	// [4] - A single ":", ignored
-	// [5] - Controller user / model owner
-	// [6] - A single "/", ignored
-	// [7] - Model name
-	// [8] - A single ".", ignored
-	// [9] - Application offer name
-	// [10] - Relation specifier (i.e., #member)
-	// A complete matcher example would look like so with square-brackets denoting groups and paranthsis denoting index:
-	// (1)[controller](2)[-](3)[controller-1](4)[:](5)[alice@canonical.com-place](6)[/](7)[model-1](8)[.](9)[offer-1](10)[#relation-specifier]"
-	// In the case of something like: user-alice@wonderland or group-alices-wonderland#member, it would look like so:
-	// (1)[user](2)[-](3)[alices@wonderland]
-	// (1)[group](2)[-](3)[alices-wonderland](10)[#member]
-	// So if a group, user, UUID, controller name comes in, it will always be index 3 for them
-	// and if a relation specifier is present, it will always be index 10
-	jujuURIMatcher = regexp.MustCompile(`([a-zA-Z0-9]*)(\-|\z)([a-zA-Z0-9-@.]*)(\:|)([a-zA-Z0-9-@]*)(\/|)([a-zA-Z0-9-]*)(\.|)([a-zA-Z0-9-]*)([a-zA-Z#]*|\z)\z`)
-)
 
 const (
 	jimmControllerName = "jimm"

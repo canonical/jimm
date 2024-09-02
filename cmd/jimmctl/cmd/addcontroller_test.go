@@ -1,10 +1,9 @@
-// Copyright 2021 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package cmd_test
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -110,11 +109,11 @@ func writeYAMLTempFile(c *gc.C, payload interface{}) (string, string) {
 	data, err := yaml.Marshal(payload)
 	c.Assert(err, gc.Equals, nil)
 
-	dir, err := ioutil.TempDir("", "add-controller-test")
+	dir, err := os.MkdirTemp("", "add-controller-test")
 	c.Assert(err, gc.Equals, nil)
 
 	tmpfn := filepath.Join(dir, "tmp.yaml")
-	err = ioutil.WriteFile(tmpfn, data, 0666)
+	err = os.WriteFile(tmpfn, data, 0600)
 	c.Assert(err, gc.Equals, nil)
 	return dir, tmpfn
 }

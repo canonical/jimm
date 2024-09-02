@@ -13,30 +13,20 @@ used for integration testing within the JIMM test suite.
 
 The service is started using Docker Compose, the following services should be started:
 - JIMM (only started in the dev profile)
+- Traefik (only started in the dev profile)
 - Vault
 - Postgres
 - OpenFGA
-- Traefik
 
-> Any changes made inside the repo will automatically restart the JIMM server via a volume mount. So there's no need
-to re-run the compose continuously, but note, if you do bring the compose down, remove the volumes otherwise
-vault will not behave correctly, this can be done via `docker compose down -v`
+Some notes on the setup:
+- Local images are created in the repo's `/local/<service>` folder where any init scripts are defined for each service using the service's upstream docker image.
+- The docker compose has a base at `compose-common.yaml` for common elements to reduce duplication.
+- The compose has 2 additional profiles (dev and test). 
+  - Starting the compose with no profile will spin up the necessary components for testing.
+  - The dev profile will start JIMM in a container using [air](https://github.com/air-verse/air), a tool for auto-reloading Go code when the source changes.
+  - The test profile will start JIMM by pulling a version of the JIMM image from a container registry, useful in integration tests.
 
-Now please checkout the [Authentication Steps](#authentication-steps) to authenticate postman for local testing & Q/A.
-
-# Q/A Using Postman
-#### Setup
-1. Run `make get-local-auth`
-2. Head to postman and follow the instructions given by get-local-auth.
-#### Facades in Postman
-You will see JIMM's controller WS API broken up into separate WS requests.
-This is intentional.
-Inside of each WS request will be a set of `saved messages` (on the right-hand side), these are the calls to facades for the given API under that request.
-
-The `request name` represents the literal WS endpoint, i.e., `API = /api`.
-
-> Remember to run the `Login` message when spinning up a new WS connection, otherwise you will not be able to send subsequent calls to this WS.
-
+> Any changes made inside the repo will automatically restart the JIMM server via a volume mount + air. So there's no need to re-run the compose continuously.
 
 # Q/A Using jimmctl
 
@@ -47,7 +37,7 @@ The `request name` represents the literal WS endpoint, i.e., `API = /api`.
 1. The following commands might need to be run to work around an [LXC networking
    issue](https://github.com/docker/for-linux/issues/103#issuecomment-383607773):
    `sudo iptables -F FORWARD && sudo iptables -P FORWARD ACCEPT`.
-2. Install Juju: `sudo snap install juju --channel=3.5/stable` (minimum Juju version is `3.5`).
+2. Install Juju: `sudo snap install juju --channel=3.5/stable` (minimum required Juju version is `3.5`).
 3. Install JQ: `sudo snap install jq`.
 
 ## All-In-One scripts

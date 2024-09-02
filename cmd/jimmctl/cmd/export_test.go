@@ -1,4 +1,4 @@
-// Copyright 2021 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package cmd
 
@@ -8,6 +8,8 @@ import (
 	"github.com/juju/juju/cloud"
 	"github.com/juju/juju/cmd/modelcmd"
 	"github.com/juju/juju/jujuclient"
+
+	"github.com/canonical/jimm/v3/internal/cmdtest"
 )
 
 var (
@@ -22,11 +24,8 @@ type AccessResult = accessResult
 
 func NewListControllersCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &listControllersCommand{
-		store: store,
-		dialOpts: &jujuapi.DialOpts{
-			InsecureSkipVerify: true,
-			LoginProvider:      lp,
-		},
+		store:    store,
+		dialOpts: cmdtest.TestDialOpts(lp),
 	}
 
 	return modelcmd.WrapBase(cmd)
@@ -34,11 +33,8 @@ func NewListControllersCommandForTesting(store jujuclient.ClientStore, lp jujuap
 
 func NewModelStatusCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &modelStatusCommand{
-		store: store,
-		dialOpts: &jujuapi.DialOpts{
-			InsecureSkipVerify: true,
-			LoginProvider:      lp,
-		},
+		store:    store,
+		dialOpts: cmdtest.TestDialOpts(lp),
 	}
 
 	return modelcmd.WrapBase(cmd)
@@ -46,11 +42,8 @@ func NewModelStatusCommandForTesting(store jujuclient.ClientStore, lp jujuapi.Lo
 
 func NewGrantAuditLogAccessCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &grantAuditLogAccessCommand{
-		store: store,
-		dialOpts: &jujuapi.DialOpts{
-			InsecureSkipVerify: true,
-			LoginProvider:      lp,
-		},
+		store:    store,
+		dialOpts: cmdtest.TestDialOpts(lp),
 	}
 
 	return modelcmd.WrapBase(cmd)
@@ -58,11 +51,8 @@ func NewGrantAuditLogAccessCommandForTesting(store jujuclient.ClientStore, lp ju
 
 func NewRevokeAuditLogAccessCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &revokeAuditLogAccessCommand{
-		store: store,
-		dialOpts: &jujuapi.DialOpts{
-			InsecureSkipVerify: true,
-			LoginProvider:      lp,
-		},
+		store:    store,
+		dialOpts: cmdtest.TestDialOpts(lp),
 	}
 
 	return modelcmd.WrapBase(cmd)
@@ -70,11 +60,8 @@ func NewRevokeAuditLogAccessCommandForTesting(store jujuclient.ClientStore, lp j
 
 func NewListAuditEventsCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &listAuditEventsCommand{
-		store: store,
-		dialOpts: &jujuapi.DialOpts{
-			InsecureSkipVerify: true,
-			LoginProvider:      lp,
-		},
+		store:    store,
+		dialOpts: cmdtest.TestDialOpts(lp),
 	}
 
 	return modelcmd.WrapBase(cmd)
@@ -84,10 +71,7 @@ func NewAddCloudToControllerCommandForTesting(store jujuclient.ClientStore, lp j
 	cmd := &addCloudToControllerCommand{
 		store:           store,
 		cloudByNameFunc: cloudByNameFunc,
-		dialOpts: &jujuapi.DialOpts{
-			InsecureSkipVerify: true,
-			LoginProvider:      lp,
-		},
+		dialOpts:        cmdtest.TestDialOpts(lp),
 	}
 
 	return modelcmd.WrapBase(cmd)
@@ -97,11 +81,8 @@ type RemoveCloudFromControllerAPI = removeCloudFromControllerAPI
 
 func NewRemoveCloudFromControllerCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider, removeCloudFromControllerAPIFunc func() (RemoveCloudFromControllerAPI, error)) cmd.Command {
 	cmd := &removeCloudFromControllerCommand{
-		store: store,
-		dialOpts: &jujuapi.DialOpts{
-			InsecureSkipVerify: true,
-			LoginProvider:      lp,
-		},
+		store:                            store,
+		dialOpts:                         cmdtest.TestDialOpts(lp),
 		removeCloudFromControllerAPIFunc: removeCloudFromControllerAPIFunc,
 	}
 	if removeCloudFromControllerAPIFunc == nil {
@@ -113,11 +94,8 @@ func NewRemoveCloudFromControllerCommandForTesting(store jujuclient.ClientStore,
 
 func NewAddControllerCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &addControllerCommand{
-		store: store,
-		dialOpts: &jujuapi.DialOpts{
-			InsecureSkipVerify: true,
-			LoginProvider:      lp,
-		},
+		store:    store,
+		dialOpts: cmdtest.TestDialOpts(lp),
 	}
 
 	return modelcmd.WrapBase(cmd)
@@ -125,11 +103,8 @@ func NewAddControllerCommandForTesting(store jujuclient.ClientStore, lp jujuapi.
 
 func NewRemoveControllerCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &removeControllerCommand{
-		store: store,
-		dialOpts: &jujuapi.DialOpts{
-			InsecureSkipVerify: true,
-			LoginProvider:      lp,
-		},
+		store:    store,
+		dialOpts: cmdtest.TestDialOpts(lp),
 	}
 
 	return modelcmd.WrapBase(cmd)
@@ -145,11 +120,8 @@ func NewControllerInfoCommandForTesting(store jujuclient.ClientStore) cmd.Comman
 
 func NewSetControllerDeprecatedCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &setControllerDeprecatedCommand{
-		store: store,
-		dialOpts: &jujuapi.DialOpts{
-			InsecureSkipVerify: true,
-			LoginProvider:      lp,
-		},
+		store:    store,
+		dialOpts: cmdtest.TestDialOpts(lp),
 	}
 
 	return modelcmd.WrapBase(cmd)
@@ -157,11 +129,8 @@ func NewSetControllerDeprecatedCommandForTesting(store jujuclient.ClientStore, l
 
 func NewImportModelCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &importModelCommand{
-		store: store,
-		dialOpts: &jujuapi.DialOpts{
-			InsecureSkipVerify: true,
-			LoginProvider:      lp,
-		},
+		store:    store,
+		dialOpts: cmdtest.TestDialOpts(lp),
 	}
 
 	return modelcmd.WrapBase(cmd)
@@ -169,11 +138,8 @@ func NewImportModelCommandForTesting(store jujuclient.ClientStore, lp jujuapi.Lo
 
 func NewUpdateMigratedModelCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &updateMigratedModelCommand{
-		store: store,
-		dialOpts: &jujuapi.DialOpts{
-			InsecureSkipVerify: true,
-			LoginProvider:      lp,
-		},
+		store:    store,
+		dialOpts: cmdtest.TestDialOpts(lp),
 	}
 
 	return modelcmd.WrapBase(cmd)
@@ -181,11 +147,8 @@ func NewUpdateMigratedModelCommandForTesting(store jujuclient.ClientStore, lp ju
 
 func NewImportCloudCredentialsCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &importCloudCredentialsCommand{
-		store: store,
-		dialOpts: &jujuapi.DialOpts{
-			InsecureSkipVerify: true,
-			LoginProvider:      lp,
-		},
+		store:    store,
+		dialOpts: cmdtest.TestDialOpts(lp),
 	}
 
 	return modelcmd.WrapBase(cmd)
@@ -193,11 +156,8 @@ func NewImportCloudCredentialsCommandForTesting(store jujuclient.ClientStore, lp
 
 func NewAddGroupCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &addGroupCommand{
-		store: store,
-		dialOpts: &jujuapi.DialOpts{
-			InsecureSkipVerify: true,
-			LoginProvider:      lp,
-		},
+		store:    store,
+		dialOpts: cmdtest.TestDialOpts(lp),
 	}
 
 	return modelcmd.WrapBase(cmd)
@@ -205,11 +165,8 @@ func NewAddGroupCommandForTesting(store jujuclient.ClientStore, lp jujuapi.Login
 
 func NewRenameGroupCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &renameGroupCommand{
-		store: store,
-		dialOpts: &jujuapi.DialOpts{
-			InsecureSkipVerify: true,
-			LoginProvider:      lp,
-		},
+		store:    store,
+		dialOpts: cmdtest.TestDialOpts(lp),
 	}
 
 	return modelcmd.WrapBase(cmd)
@@ -217,11 +174,8 @@ func NewRenameGroupCommandForTesting(store jujuclient.ClientStore, lp jujuapi.Lo
 
 func NewRemoveGroupCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &removeGroupCommand{
-		store: store,
-		dialOpts: &jujuapi.DialOpts{
-			InsecureSkipVerify: true,
-			LoginProvider:      lp,
-		},
+		store:    store,
+		dialOpts: cmdtest.TestDialOpts(lp),
 	}
 
 	return modelcmd.WrapBase(cmd)
@@ -229,11 +183,8 @@ func NewRemoveGroupCommandForTesting(store jujuclient.ClientStore, lp jujuapi.Lo
 
 func NewListGroupsCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &listGroupsCommand{
-		store: store,
-		dialOpts: &jujuapi.DialOpts{
-			InsecureSkipVerify: true,
-			LoginProvider:      lp,
-		},
+		store:    store,
+		dialOpts: cmdtest.TestDialOpts(lp),
 	}
 
 	return modelcmd.WrapBase(cmd)
@@ -241,11 +192,8 @@ func NewListGroupsCommandForTesting(store jujuclient.ClientStore, lp jujuapi.Log
 
 func NewAddRelationCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &addRelationCommand{
-		store: store,
-		dialOpts: &jujuapi.DialOpts{
-			InsecureSkipVerify: true,
-			LoginProvider:      lp,
-		},
+		store:    store,
+		dialOpts: cmdtest.TestDialOpts(lp),
 	}
 
 	return modelcmd.WrapBase(cmd)
@@ -253,11 +201,8 @@ func NewAddRelationCommandForTesting(store jujuclient.ClientStore, lp jujuapi.Lo
 
 func NewRemoveRelationCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &removeRelationCommand{
-		store: store,
-		dialOpts: &jujuapi.DialOpts{
-			InsecureSkipVerify: true,
-			LoginProvider:      lp,
-		},
+		store:    store,
+		dialOpts: cmdtest.TestDialOpts(lp),
 	}
 
 	return modelcmd.WrapBase(cmd)
@@ -265,11 +210,8 @@ func NewRemoveRelationCommandForTesting(store jujuclient.ClientStore, lp jujuapi
 
 func NewListRelationsCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &listRelationsCommand{
-		store: store,
-		dialOpts: &jujuapi.DialOpts{
-			InsecureSkipVerify: true,
-			LoginProvider:      lp,
-		},
+		store:    store,
+		dialOpts: cmdtest.TestDialOpts(lp),
 	}
 
 	return modelcmd.WrapBase(cmd)
@@ -277,11 +219,8 @@ func NewListRelationsCommandForTesting(store jujuclient.ClientStore, lp jujuapi.
 
 func NewCheckRelationCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &checkRelationCommand{
-		store: store,
-		dialOpts: &jujuapi.DialOpts{
-			InsecureSkipVerify: true,
-			LoginProvider:      lp,
-		},
+		store:    store,
+		dialOpts: cmdtest.TestDialOpts(lp),
 	}
 
 	return modelcmd.WrapBase(cmd)
@@ -289,11 +228,8 @@ func NewCheckRelationCommandForTesting(store jujuclient.ClientStore, lp jujuapi.
 
 func NewCrossModelQueryCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &crossModelQueryCommand{
-		store: store,
-		dialOpts: &jujuapi.DialOpts{
-			InsecureSkipVerify: true,
-			LoginProvider:      lp,
-		},
+		store:    store,
+		dialOpts: cmdtest.TestDialOpts(lp),
 	}
 
 	return modelcmd.WrapBase(cmd)
@@ -301,11 +237,8 @@ func NewCrossModelQueryCommandForTesting(store jujuclient.ClientStore, lp jujuap
 
 func NewPurgeLogsCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &purgeLogsCommand{
-		store: store,
-		dialOpts: &jujuapi.DialOpts{
-			InsecureSkipVerify: true,
-			LoginProvider:      lp,
-		},
+		store:    store,
+		dialOpts: cmdtest.TestDialOpts(lp),
 	}
 
 	return modelcmd.WrapBase(cmd)
@@ -313,11 +246,8 @@ func NewPurgeLogsCommandForTesting(store jujuclient.ClientStore, lp jujuapi.Logi
 
 func NewMigrateModelCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &migrateModelCommand{
-		store: store,
-		dialOpts: &jujuapi.DialOpts{
-			InsecureSkipVerify: true,
-			LoginProvider:      lp,
-		},
+		store:    store,
+		dialOpts: cmdtest.TestDialOpts(lp),
 	}
 
 	return modelcmd.WrapBase(cmd)

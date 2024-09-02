@@ -1,4 +1,4 @@
-// Copyright 2021 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package jimm_test
 
@@ -510,6 +510,7 @@ var watcherTests = []struct {
 	},
 }}
 
+//nolint:gocognit
 func TestWatcher(t *testing.T) {
 	c := qt.New(t)
 

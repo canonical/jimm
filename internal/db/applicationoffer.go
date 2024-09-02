@@ -1,4 +1,4 @@
-// Copyright 2020 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package db
 
@@ -48,9 +48,18 @@ func (d *Database) UpdateApplicationOffer(ctx context.Context, offer *dbmodel.Ap
 	db := d.DB.WithContext(ctx)
 	err = db.Transaction(func(tx *gorm.DB) error {
 		tx.Omit("Connections", "Endpoints", "Spaces").Save(offer)
-		tx.Model(offer).Association("Connections").Replace(offer.Connections)
-		tx.Model(offer).Association("Endpoints").Replace(offer.Endpoints)
-		tx.Model(offer).Association("Spaces").Replace(offer.Spaces)
+		err = tx.Model(offer).Association("Connections").Replace(offer.Connections)
+		if err != nil {
+			return err
+		}
+		err = tx.Model(offer).Association("Endpoints").Replace(offer.Endpoints)
+		if err != nil {
+			return err
+		}
+		err = tx.Model(offer).Association("Spaces").Replace(offer.Spaces)
+		if err != nil {
+			return err
+		}
 		return tx.Error
 	})
 	if err != nil {
@@ -78,11 +87,12 @@ func (d *Database) GetApplicationOffer(ctx context.Context, offer *dbmodel.Appli
 	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
 	db := d.DB.WithContext(ctx)
 
-	if offer.UUID != "" {
+	switch {
+	case offer.UUID != "":
 		db = db.Where("uuid = ?", offer.UUID)
-	} else if offer.URL != "" {
+	case offer.URL != "":
 		db = db.Where("url = ?", offer.URL)
-	} else {
+	default:
 		return errors.E(op, "missing offer UUID or URL")
 	}
 	db = db.Preload("Connections")

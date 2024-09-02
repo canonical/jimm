@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package rpc_test
 
@@ -9,22 +9,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/coreos/go-oidc/v3/oidc"
 	qt "github.com/frankban/quicktest"
 	"github.com/google/uuid"
 	"github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
-	"github.com/lestrrat-go/jwx/v2/jwt"
 	"golang.org/x/oauth2"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/internal/jimm"
-	"github.com/canonical/jimm/v3/internal/jimm/credentials"
-	"github.com/canonical/jimm/v3/internal/jimmtest"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/rpc"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
+	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
 
 type message struct {
@@ -238,9 +234,11 @@ func TestProxySocketsAdminFacade(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.about, func(t *testing.T) {
 			ctx := context.Background()
+			ctx, cancelFunc := context.WithCancel(ctx)
+			defer cancelFunc()
 			clientWebsocket := newMockWebsocketConnection(10)
 			controllerWebsocket := newMockWebsocketConnection(10)
-			authenticator := &mockOAuthAuthenticator{
+			loginSvc := &mockLoginService{
 				email:        "alice@wonderland.io",
 				clientID:     clientID,
 				clientSecret: clientSecret,
@@ -257,57 +255,54 @@ func TestProxySocketsAdminFacade(t *testing.T) {
 						ControllerUUID: uuid.NewString(),
 					}, nil
 				},
-				AuditLog: func(*dbmodel.AuditLogEntry) {},
-				JIMM: &mockJIMM{
-					authenticator: authenticator,
-				},
+				AuditLog:                func(*dbmodel.AuditLogEntry) {},
+				LoginService:            loginSvc,
 				AuthenticatedIdentityID: test.authenticateEntityID,
 			}
-			go rpc.ProxySockets(ctx, helpers)
-
+			var wg sync.WaitGroup
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				err = rpc.ProxySockets(ctx, helpers)
+				c.Assert(err, qt.ErrorMatches, "Context cancelled")
+			}()
 			data, err := json.Marshal(test.messageToSend)
 			c.Assert(err, qt.IsNil)
-			select {
-			case clientWebsocket.read <- data:
-			default:
-				c.Fatal("failed to send message")
-			}
+			clientWebsocket.read <- data
 			if test.expectedClientResponse != nil {
 				select {
 				case data := <-clientWebsocket.write:
 					c.Assert(string(data), qt.JSONEquals, test.expectedClientResponse)
-				case <-time.Tick(10 * time.Minute):
-					c.Fatal("time out waiting for response")
+				case <-time.Tick(2 * time.Second):
+					c.Fatal("timed out waiting for response")
 				}
 			}
 			if test.expectedControllerMessage != nil {
 				select {
 				case data := <-controllerWebsocket.write:
 					c.Assert(string(data), qt.JSONEquals, test.expectedControllerMessage)
-				case <-time.Tick(10 * time.Minute):
-					c.Fatal("time out waiting for response")
+				case <-time.Tick(2 * time.Second):
+					c.Fatal("timed out waiting for response")
 				}
 			}
+			cancelFunc()
+			wg.Wait()
+			t.Logf("completed test %s", t.Name())
 		})
 
 	}
 }
 
-type mockOAuthAuthenticator struct {
-	jimm.OAuthAuthenticator
-
-	err error
-
+type mockLoginService struct {
+	err          error
 	email        string
 	clientID     string
 	clientSecret string
-
-	updatedEmail string
 }
 
-func (m *mockOAuthAuthenticator) Device(ctx context.Context) (*oauth2.DeviceAuthResponse, error) {
-	if m.err != nil {
-		return nil, m.err
+func (j *mockLoginService) LoginDevice(ctx context.Context) (*oauth2.DeviceAuthResponse, error) {
+	if j.err != nil {
+		return nil, j.err
 	}
 	return &oauth2.DeviceAuthResponse{
 		DeviceCode:              "test-device-code",
@@ -318,90 +313,48 @@ func (m *mockOAuthAuthenticator) Device(ctx context.Context) (*oauth2.DeviceAuth
 		Interval:                int64(time.Minute.Seconds()),
 	}, nil
 }
-
-func (m *mockOAuthAuthenticator) DeviceAccessToken(ctx context.Context, res *oauth2.DeviceAuthResponse) (*oauth2.Token, error) {
-	if m.err != nil {
-		return nil, m.err
-	}
-	return &oauth2.Token{}, nil
-}
-
-func (m *mockOAuthAuthenticator) ExtractAndVerifyIDToken(ctx context.Context, oauth2Token *oauth2.Token) (*oidc.IDToken, error) {
-	if m.err != nil {
-		return nil, m.err
-	}
-	return &oidc.IDToken{}, nil
-}
-
-func (m *mockOAuthAuthenticator) Email(idToken *oidc.IDToken) (string, error) {
-	if m.err != nil {
-		return "", m.err
-	}
-	if m.email != "" {
-		return m.email, nil
-	}
-	return "", errors.E(errors.CodeNotFound)
-}
-
-func (m *mockOAuthAuthenticator) UpdateIdentity(ctx context.Context, email string, token *oauth2.Token) error {
-	if m.err != nil {
-		return m.err
-	}
-	m.updatedEmail = email
-	return nil
-}
-
-func (m *mockOAuthAuthenticator) VerifyClientCredentials(ctx context.Context, clientID string, clientSecret string) error {
-	if m.err != nil {
-		return m.err
-	}
-	if clientID == m.clientID && clientSecret == m.clientSecret {
-		return nil
-	}
-	return errors.E(errors.CodeUnauthorized)
-}
-
-func (m *mockOAuthAuthenticator) MintSessionToken(email string) (string, error) {
-	if m.err != nil {
-		return "", m.err
+func (j *mockLoginService) GetDeviceSessionToken(ctx context.Context, deviceOAuthResponse *oauth2.DeviceAuthResponse) (string, error) {
+	if j.err != nil {
+		return "", j.err
 	}
 	return "test session token", nil
 }
-
-func (m *mockOAuthAuthenticator) VerifySessionToken(token string) (jwt.Token, error) {
-	if m.err != nil {
-		return nil, m.err
+func (j *mockLoginService) LoginClientCredentials(ctx context.Context, clientID string, clientSecret string) (*openfga.User, error) {
+	if j.err != nil {
+		return nil, j.err
 	}
-	t := jwt.New()
-	t.Set(jwt.SubjectKey, m.email)
-	return t, nil
-}
-
-type mockJIMM struct {
-	authenticator *mockOAuthAuthenticator
-}
-
-func (j *mockJIMM) OAuthAuthenticationService() jimm.OAuthAuthenticator {
-	return j.authenticator
-}
-
-func (j *mockJIMM) GetUser(ctx context.Context, email string) (*openfga.User, error) {
-	identity, err := dbmodel.NewIdentity(email)
+	if clientID != j.clientID || clientSecret != j.clientSecret {
+		return nil, errors.E("invalid client credentials")
+	}
+	clientIdWithDomain, err := jimmnames.EnsureValidServiceAccountId(clientID)
+	if err != nil {
+		return nil, errors.E("invalid client credential ID")
+	}
+	identity, err := dbmodel.NewIdentity(clientIdWithDomain)
 	if err != nil {
 		return nil, err
 	}
-	return openfga.NewUser(
-		identity,
-		nil,
-	), nil
+	return openfga.NewUser(identity, nil), nil
 }
-
-func (j *mockJIMM) UpdateUserLastLogin(ctx context.Context, identifier string) error {
-	return nil
+func (j *mockLoginService) LoginWithSessionToken(ctx context.Context, sessionToken string) (*openfga.User, error) {
+	if j.err != nil {
+		return nil, j.err
+	}
+	identity, err := dbmodel.NewIdentity(j.email)
+	if err != nil {
+		return nil, err
+	}
+	return openfga.NewUser(identity, nil), nil
 }
-
-func (j *mockJIMM) GetCredentialStore() credentials.CredentialStore {
-	return jimmtest.NewInMemoryCredentialStore()
+func (j *mockLoginService) LoginWithSessionCookie(ctx context.Context, identityID string) (*openfga.User, error) {
+	if j.err != nil {
+		return nil, j.err
+	}
+	identity, err := dbmodel.NewIdentity(j.email)
+	if err != nil {
+		return nil, err
+	}
+	return openfga.NewUser(identity, nil), nil
 }
 
 func newMockWebsocketConnection(capacity int) *mockWebsocketConnection {
@@ -414,6 +367,7 @@ func newMockWebsocketConnection(capacity int) *mockWebsocketConnection {
 type mockWebsocketConnection struct {
 	read  chan []byte
 	write chan []byte
+	once  sync.Once
 }
 
 func (w *mockWebsocketConnection) ReadJSON(v interface{}) error {
@@ -433,7 +387,7 @@ func (w *mockWebsocketConnection) WriteJSON(v interface{}) error {
 }
 
 func (w *mockWebsocketConnection) Close() error {
-	close(w.read)
+	w.once.Do(func() { close(w.read) })
 	return nil
 }
 

@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package jujuapi_test
 
@@ -187,7 +187,8 @@ func TestCopyServiceAccountCredential(t *testing.T) {
 			cr := jujuapi.NewControllerRoot(jimm, jujuapi.Params{})
 			jujuapi.SetUser(cr, user)
 			if len(test.addTuples) > 0 {
-				ofgaClient.AddRelation(context.Background(), test.addTuples...)
+				err = ofgaClient.AddRelation(context.Background(), test.addTuples...)
+				c.Assert(err, qt.IsNil)
 			}
 			res, err := cr.CopyServiceAccountCredential(context.Background(), test.args)
 			if test.expectedError == "" {
@@ -271,7 +272,8 @@ func TestGetServiceAccount(t *testing.T) {
 			jujuapi.SetUser(cr, user)
 
 			if len(test.addTuples) > 0 {
-				ofgaClient.AddRelation(context.Background(), test.addTuples...)
+				err = ofgaClient.AddRelation(context.Background(), test.addTuples...)
+				c.Assert(err, qt.IsNil)
 			}
 
 			res, err := cr.GetServiceAccount(context.Background(), test.clientID)
@@ -460,7 +462,8 @@ func TestUpdateServiceAccountCredentials(t *testing.T) {
 			jujuapi.SetUser(cr, user)
 
 			if len(test.addTuples) > 0 {
-				ofgaClient.AddRelation(context.Background(), test.addTuples...)
+				err = ofgaClient.AddRelation(context.Background(), test.addTuples...)
+				c.Assert(err, qt.IsNil)
 			}
 
 			res, err := cr.UpdateServiceAccountCredentials(context.Background(), test.args)
@@ -596,7 +599,8 @@ func TestListServiceAccountCredentials(t *testing.T) {
 			jujuapi.SetUser(cr, user)
 
 			if len(test.addTuples) > 0 {
-				ofgaClient.AddRelation(context.Background(), test.addTuples...)
+				err = ofgaClient.AddRelation(context.Background(), test.addTuples...)
+				c.Assert(err, qt.IsNil)
 			}
 
 			res, err := cr.ListServiceAccountCredentials(context.Background(), test.args)
@@ -708,7 +712,8 @@ func TestGrantServiceAccountAccess(t *testing.T) {
 			jujuapi.SetUser(cr, user)
 
 			if len(test.addTuples) > 0 {
-				ofgaClient.AddRelation(context.Background(), test.addTuples...)
+				err = ofgaClient.AddRelation(context.Background(), test.addTuples...)
+				c.Assert(err, qt.IsNil)
 			}
 
 			err = cr.GrantServiceAccountAccess(context.Background(), test.params)
@@ -740,14 +745,16 @@ func (s *serviceAccountSuite) TestUpdateServiceAccountCredentialsIntegration(c *
 		Target:   ofganames.ConvertTag(serviceAccount),
 	}
 
-	s.JIMM.OpenFGAClient.AddRelation(context.Background(), tuple)
+	err := s.JIMM.OpenFGAClient.AddRelation(context.Background(), tuple)
+	c.Assert(err, gc.IsNil)
 	cloud := &dbmodel.Cloud{
 		Name: "aws",
 	}
-	s.JIMM.Database.AddCloud(context.Background(), cloud)
+	err = s.JIMM.Database.AddCloud(context.Background(), cloud)
+	c.Assert(err, gc.IsNil)
 
 	var credResults jujuparams.UpdateCredentialResults
-	err := conn.APICall("JIMM", 4, "", "UpdateServiceAccountCredentials", params.UpdateServiceAccountCredentialsRequest{
+	err = conn.APICall("JIMM", 4, "", "UpdateServiceAccountCredentials", params.UpdateServiceAccountCredentialsRequest{
 		ClientID: "fca1f605-736e-4d1f-bcd2-aecc726923be@serviceaccount",
 		UpdateCredentialArgs: jujuparams.UpdateCredentialArgs{
 			Credentials: []jujuparams.TaggedCredential{

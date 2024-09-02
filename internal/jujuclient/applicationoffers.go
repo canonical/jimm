@@ -1,4 +1,4 @@
-// Copyright 2020 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package jujuclient
 
@@ -209,13 +209,15 @@ func (c Connection) GetApplicationOfferConsumeDetails(ctx context.Context, user 
 			OfferURLs:     []string{info.Offer.OfferURL},
 			BakeryVersion: v,
 		},
-		UserTag: user.String(),
+		// Do not include a user in the args, Juju will opt to use the user authenticated in the connection.
+		// There is a bug where setting the user tag does not behave as expected.
+		UserTag: "",
 	}
 
 	resp := jujuparams.ConsumeOfferDetailsResults{
 		Results: make([]jujuparams.ConsumeOfferDetailsResult, 1),
 	}
-	err := c.CallHighestFacadeVersion(ctx, "ApplicationOffers", []int{4, 3}, "", "GetConsumeDetails", &args, &resp)
+	err := c.CallHighestFacadeVersion(ctx, "ApplicationOffers", []int{5, 4}, "", "GetConsumeDetails", &args, &resp)
 	if err != nil {
 		return errors.E(op, jujuerrors.Cause(err))
 	}

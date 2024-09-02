@@ -1,4 +1,4 @@
-// Copyright 2021 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package jimm_test
 
@@ -67,7 +67,7 @@ func TestSetIdentityModelDefaults(t *testing.T) {
 
 			c.Assert(j.Database.DB.Create(identity).Error, qt.IsNil)
 
-			j.Database.SetIdentityModelDefaults(ctx, &dbmodel.IdentityModelDefaults{
+			err = j.Database.SetIdentityModelDefaults(ctx, &dbmodel.IdentityModelDefaults{
 				IdentityName: identity.Name,
 				Identity:     *identity,
 				Defaults: map[string]interface{}{
@@ -75,6 +75,7 @@ func TestSetIdentityModelDefaults(t *testing.T) {
 					"key2": "a test string",
 				},
 			})
+			c.Assert(err, qt.IsNil)
 
 			defaults := map[string]interface{}{
 				"key1": float64(42),
@@ -181,7 +182,7 @@ func TestIdentityModelDefaults(t *testing.T) {
 
 			c.Assert(j.Database.DB.Create(identity).Error, qt.IsNil)
 
-			j.Database.SetIdentityModelDefaults(ctx, &dbmodel.IdentityModelDefaults{
+			err = j.Database.SetIdentityModelDefaults(ctx, &dbmodel.IdentityModelDefaults{
 				IdentityName: identity.Name,
 				Identity:     *identity,
 				Defaults: map[string]interface{}{
@@ -190,6 +191,7 @@ func TestIdentityModelDefaults(t *testing.T) {
 					"key3": "a new value",
 				},
 			})
+			c.Assert(err, qt.IsNil)
 
 			return testConfig{
 				identity: identity,
