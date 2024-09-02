@@ -175,7 +175,7 @@ func TestCopyServiceAccountCredential(t *testing.T) {
 					newCredTag := names.NewCloudCredentialTag(fmt.Sprintf("%s/%s/%s", test.args.CloudName, svcAcc.Name, test.args.CredentialName))
 					return newCredTag, nil, nil
 				},
-				GetUser_: func(ctx context.Context, email string) (*openfga.User, error) {
+				UserLogin_: func(ctx context.Context, email string) (*openfga.User, error) {
 					var u dbmodel.Identity
 					u.SetTag(names.NewUserTag(email))
 					return openfga.NewUser(&u, ofgaClient), nil
@@ -259,7 +259,7 @@ func TestGetServiceAccount(t *testing.T) {
 			err = pgDb.Migrate(context.Background(), false)
 			c.Assert(err, qt.IsNil)
 			jimm := &jimmtest.JIMM{
-				GetUser_: func(ctx context.Context, email string) (*openfga.User, error) {
+				UserLogin_: func(ctx context.Context, email string) (*openfga.User, error) {
 					var u dbmodel.Identity
 					u.SetTag(names.NewUserTag(email))
 					return openfga.NewUser(&u, ofgaClient), nil
@@ -453,7 +453,7 @@ func TestUpdateServiceAccountCredentials(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 			jimm := &jimmtest.JIMM{
 				UpdateCloudCredential_: test.updateCloudCredential,
-				GetUser_:               func(ctx context.Context, email string) (*openfga.User, error) { return nil, nil },
+				UserLogin_:             func(ctx context.Context, email string) (*openfga.User, error) { return nil, nil },
 			}
 			var u dbmodel.Identity
 			u.SetTag(names.NewUserTag(test.username))
@@ -586,7 +586,7 @@ func TestListServiceAccountCredentials(t *testing.T) {
 				GetCloudCredential_:           test.getCloudCredential,
 				GetCloudCredentialAttributes_: test.getCloudCredentialAttributes,
 				ForEachUserCloudCredential_:   test.ForEachUserCloudCredential,
-				GetUser_: func(ctx context.Context, email string) (*openfga.User, error) {
+				UserLogin_: func(ctx context.Context, email string) (*openfga.User, error) {
 					var u dbmodel.Identity
 					u.SetTag(names.NewUserTag(email))
 					return openfga.NewUser(&u, ofgaClient), nil
@@ -702,7 +702,7 @@ func TestGrantServiceAccountAccess(t *testing.T) {
 			err = pgDb.Migrate(context.Background(), false)
 			c.Assert(err, qt.IsNil)
 			jimm := &jimmtest.JIMM{
-				GetUser_:                   func(ctx context.Context, email string) (*openfga.User, error) { return nil, nil },
+				UserLogin_:                 func(ctx context.Context, email string) (*openfga.User, error) { return nil, nil },
 				GrantServiceAccountAccess_: test.grantServiceAccountAccess,
 			}
 			var u dbmodel.Identity

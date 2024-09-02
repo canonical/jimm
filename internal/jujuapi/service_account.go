@@ -72,7 +72,7 @@ func (r *controllerRoot) getServiceAccount(ctx context.Context, clientID string)
 		return nil, errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
 
-	return r.jimm.GetUser(ctx, clientIdWithDomain)
+	return r.jimm.UserLogin(ctx, clientIdWithDomain)
 }
 
 // UpdateServiceAccountCredentialsCheckModels updates a set of cloud credentials' content.

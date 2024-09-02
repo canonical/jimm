@@ -1,12 +1,13 @@
-// Copyright 2024 canonical.
+// Copyright 2024 Canonical.
 
 package rebac_admin
 
 import (
 	"context"
 
-	openfgastatic "github.com/canonical/jimm/v3/openfga"
 	"github.com/canonical/rebac-admin-ui-handlers/v1/resources"
+
+	openfgastatic "github.com/canonical/jimm/v3/openfga"
 )
 
 // Since these values have semantic meanings in the API, they'll probably be

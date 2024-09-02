@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 // This package contains mocks for each JIMM service.
 // Each file contains a struct providing tests with the ability to mock

@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package jimm_test
 
@@ -239,7 +239,7 @@ func TestListObjectRelations(t *testing.T) {
 		{
 			description:   "invalid user tag token",
 			object:        "foo" + user.Tag().String(),
-			expectedError: "failed to map tag foouser",
+			expectedError: "failed to map tag, unknown kind: foouser",
 		},
 	}
 

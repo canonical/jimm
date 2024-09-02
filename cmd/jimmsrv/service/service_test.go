@@ -292,6 +292,7 @@ func TestRebacAdminApi(t *testing.T) {
 
 	response, err := srv.Client().Get(srv.URL + "/rebac/v1/swagger.json")
 	c.Assert(err, qt.IsNil)
+	defer response.Body.Close()
 	c.Assert(response.StatusCode, qt.Equals, 401)
 }
 
