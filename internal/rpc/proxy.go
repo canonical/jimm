@@ -124,7 +124,9 @@ func ProxySockets(ctx context.Context, helpers ProxyHelpers) error {
 	// No cleanup is needed on error, when the client closes the connection
 	// all go routines will proceed to error and exit.
 	case err = <-errChan:
-		zapctx.Debug(ctx, "Proxy error", zap.Error(err))
+		if err != nil {
+			zapctx.Debug(ctx, "Proxy error", zap.Error(err))
+		}
 	case <-ctx.Done():
 		err = errors.E(op, "Context cancelled")
 		zapctx.Debug(ctx, "Context cancelled")
@@ -322,7 +324,7 @@ type clientProxy struct {
 	wg                   sync.WaitGroup
 	errChan              chan error
 	createControllerConn func(context.Context) (WebsocketConnectionWithMetadata, error)
-	// mu synchronises changes to closed and modelproxy.dst, dst is is only created
+	// mu synchronises changes to closed and modelproxy.dst, dst is only created
 	// at some unspecified point in the future after a client request.
 	mu     sync.Mutex
 	closed bool
@@ -339,8 +341,8 @@ func (p *clientProxy) start(ctx context.Context) error {
 		zapctx.Debug(ctx, "Reading on client connection")
 		msg := new(message)
 		if err := p.src.readJson(&msg); err != nil {
-			// Error reading on the socket implies it is closed, simply return.
-			return fmt.Errorf("error reading from client: %w", err)
+			// Error reading on the socket implies the client closed their connection, return without error.
+			return nil
 		}
 		zapctx.Debug(ctx, "Read message from client", zap.Any("message", msg))
 		err := p.makeControllerConnection(ctx)
@@ -422,7 +424,6 @@ func (p *clientProxy) makeControllerConnection(ctx context.Context) error {
 		defer p.wg.Done()
 		p.errChan <- controllerToClient.start(ctx)
 	}()
-	zapctx.Debug(ctx, "Successfully made controller connection")
 	return nil
 }
 
@@ -438,8 +439,8 @@ func (p *controllerProxy) start(ctx context.Context) error {
 		zapctx.Debug(ctx, "Reading on controller connection")
 		msg := new(message)
 		if err := p.src.readJson(msg); err != nil {
-			// Error reading on the socket implies it is closed, simply return.
-			return fmt.Errorf("error reading from controller: %w", err)
+			// Error reading on the socket implies we've closed the connection to the controller, return without error.
+			return nil
 		}
 		zapctx.Debug(ctx, "Received message from controller", zap.Any("Message", msg))
 		permissionsRequired, err := checkPermissionsRequired(ctx, msg)
