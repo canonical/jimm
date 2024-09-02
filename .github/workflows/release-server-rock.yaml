@@ -27,7 +27,7 @@ jobs:
         run: ln -s ./rocks/jimm.yaml ./rockcraft.yaml
       
       - name: Build ROCK
-        uses: canonical/craft-actions/rockcraft-pack@1de2f7678b7ecfd # Fix to build rock due to regression in LXD 5.21 https://discourse.ubuntu.com/t/mount-root-proc-cannot-mount-proc-read-only-with-lxd-5-21-2-22f93f4-from-snap/47533
+        uses: canonical/craft-actions/rockcraft-pack@1de2f7678b7ecfd491bd8ec3c2d2f73fe722c643 # Fix to build rock due to regression in LXD 5.21 https://discourse.ubuntu.com/t/mount-root-proc-cannot-mount-proc-read-only-with-lxd-5-21-2-22f93f4-from-snap/47533
 
       - name: Load ROCK into local registry
         run: make load-rock
