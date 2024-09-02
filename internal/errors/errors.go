@@ -122,7 +122,7 @@ const (
 	CodeStillAlive                   Code = apiparams.CodeStillAlive
 	CodeUnauthorized                 Code = jujuparams.CodeUnauthorized
 	CodeUpgradeInProgress            Code = jujuparams.CodeUpgradeInProgress
-	CodeFailedToParseTupleKey        Code = "failed to parse tuple object key"
+	CodeFailedToParseTupleKey        Code = "failed to parse tuple"
 	CodeFailedToResolveTupleResource Code = "failed resolve resource"
 	CodeOpenFGARequestFailed         Code = "failed request to OpenFGA"
 	CodeJWKSRetrievalFailed          Code = "jwks retrieval failure"

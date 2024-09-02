@@ -4,6 +4,7 @@ package jujuapi
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -198,7 +199,7 @@ func (r *controllerRoot) parseTuple(ctx context.Context, tuple apiparams.Relatio
 	// to be specific to the erroneous offender.
 	parseTagError := func(msg string, key string, err error) error {
 		zapctx.Debug(ctx, msg, zap.String("key", key), zap.Error(err))
-		return errors.E(op, errors.CodeFailedToParseTupleKey, err, msg+" "+key)
+		return errors.E(op, errors.CodeFailedToParseTupleKey, fmt.Errorf("%s, key %s: %w", msg, key, err))
 	}
 
 	if tuple.TargetObject == "" {
@@ -207,14 +208,14 @@ func (r *controllerRoot) parseTuple(ctx context.Context, tuple apiparams.Relatio
 	if tuple.TargetObject != "" {
 		targetTag, err := r.jimm.ParseTag(ctx, tuple.TargetObject)
 		if err != nil {
-			return nil, parseTagError("failed to parse tuple target object key", tuple.TargetObject, err)
+			return nil, parseTagError("failed to parse tuple target", tuple.TargetObject, err)
 		}
 		t.Target = targetTag
 	}
 	if tuple.Object != "" {
 		objectTag, err := r.jimm.ParseTag(ctx, tuple.Object)
 		if err != nil {
-			return nil, parseTagError("failed to parse tuple object key", tuple.Object, err)
+			return nil, parseTagError("failed to parse tuple object", tuple.Object, err)
 		}
 		t.Object = objectTag
 	}
