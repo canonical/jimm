@@ -298,6 +298,68 @@ func TestProxySockets(t *testing.T) {
 	<-errChan // Ensure go routines are cleaned up
 }
 
+func TestProxySocketsControllerConnectionFails(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	srvController := newServer(echo)
+
+	var connController *websocket.Conn
+	errChan := make(chan error)
+	srvJIMM := newServer(func(connClient *websocket.Conn) error {
+		testTokenGen := testTokenGenerator{}
+		f := func(context.Context) (rpc.WebsocketConnectionWithMetadata, error) {
+			var err error
+			connController, err = srvController.dialer.DialWebsocket(ctx, srvController.URL)
+			c.Check(err, qt.IsNil)
+			return rpc.WebsocketConnectionWithMetadata{
+				Conn:      connController,
+				ModelName: "TestName",
+			}, nil
+		}
+		auditLogger := func(ale *dbmodel.AuditLogEntry) {}
+		proxyHelpers := rpc.ProxyHelpers{
+			ConnClient:        connClient,
+			TokenGen:          &testTokenGen,
+			ConnectController: f,
+			AuditLog:          auditLogger,
+			LoginService:      &mockLoginService{},
+		}
+		err := rpc.ProxySockets(ctx, proxyHelpers)
+		c.Check(err, qt.IsNil)
+		errChan <- err
+		return err
+	})
+
+	defer srvController.Close()
+	defer srvJIMM.Close()
+	ws, err := srvJIMM.dialer.DialWebsocket(ctx, srvJIMM.URL)
+	c.Assert(err, qt.IsNil)
+	defer ws.Close()
+
+	p := json.RawMessage(`{"Key":"TestVal"}`)
+	msg := rpc.Message{RequestID: 1, Type: "TestType", Request: "TestReq", Params: p}
+	err = ws.WriteJSON(&msg)
+	c.Assert(err, qt.IsNil)
+	resp := rpc.Message{}
+	receiveChan := make(chan error)
+	go func() {
+		receiveChan <- ws.ReadJSON(&resp)
+	}()
+	select {
+	case err := <-receiveChan:
+		c.Assert(err, qt.IsNil)
+	case <-time.After(5 * time.Second):
+		c.Logf("took too long to read response")
+		c.FailNow()
+	}
+	c.Assert(resp.Response, qt.DeepEquals, msg.Params)
+
+	// Now close the connection to the controller and ensure the model proxy is cleaned up.
+	connController.Close()
+	<-errChan // Ensure go routines are cleaned up
+}
+
 func TestCancelProxySockets(t *testing.T) {
 	c := qt.New(t)
 
