@@ -605,6 +605,10 @@ func TestResolveTupleObjectHandlesErrors(t *testing.T) {
 			input: "abc",
 			want:  "failed to setup tag resolver: tag is not properly formatted",
 		},
+		{
+			input: "model-test-unknowncontroller-1:alice@canonical.com/test-model-1",
+			want:  "model not found",
+		},
 	}
 	for i, tc := range tests {
 		t.Run(fmt.Sprintf("test %d", i), func(t *testing.T) {

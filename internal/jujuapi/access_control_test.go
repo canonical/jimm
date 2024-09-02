@@ -935,6 +935,15 @@ func (s *accessControlSuite) TestListRelationshipTuples(c *gc.C) {
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(response.Tuples, jc.DeepEquals, []apiparams.RelationshipTuple{tuples[3]})
 	c.Assert(len(response.Errors), gc.Equals, 0)
+
+	// Test error message when a resource is not found
+	_, err = client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{
+		Tuple: apiparams.RelationshipTuple{
+			TargetObject: "applicationoffer-" + "fake-offer",
+		},
+		ResolveUUIDs: true,
+	})
+	c.Assert(err, gc.ErrorMatches, "failed to parse tuple target, key applicationoffer-fake-offer: application offer not found.*")
 }
 
 func (s *accessControlSuite) TestListRelationshipTuplesNoUUIDResolution(c *gc.C) {
