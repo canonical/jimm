@@ -393,9 +393,17 @@ func (j *JIMM) ToJAASTag(ctx context.Context, tag *ofganames.Tag, resolveUUIDs b
 		return res, nil
 	}
 
+	tagToString := func(kind, id string) string {
+		res := kind + "-" + id
+		if tag.Relation.String() != "" {
+			res += "#" + tag.Relation.String()
+		}
+		return res
+	}
+
 	switch tag.Kind {
 	case names.UserTagKind:
-		return names.UserTagKind + "-" + tag.ID, nil
+		return tagToString(names.UserTagKind, tag.ID), nil
 	case jimmnames.ServiceAccountTagKind:
 		return jimmnames.ServiceAccountTagKind + "-" + tag.ID, nil
 	case names.ControllerTagKind:
@@ -409,11 +417,7 @@ func (j *JIMM) ToJAASTag(ctx context.Context, tag *ofganames.Tag, resolveUUIDs b
 		if err != nil {
 			return "", errors.E(err, fmt.Sprintf("failed to fetch controller information: %s", controller.UUID))
 		}
-		controllerString := names.ControllerTagKind + "-" + controller.Name
-		if tag.Relation.String() != "" {
-			controllerString = controllerString + "#" + tag.Relation.String()
-		}
-		return controllerString, nil
+		return tagToString(names.ControllerTagKind, controller.Name), nil
 	case names.ModelTagKind:
 		model := dbmodel.Model{
 			UUID: sql.NullString{
@@ -425,11 +429,8 @@ func (j *JIMM) ToJAASTag(ctx context.Context, tag *ofganames.Tag, resolveUUIDs b
 		if err != nil {
 			return "", errors.E(err, fmt.Sprintf("failed to fetch model information: %s", model.UUID.String))
 		}
-		modelString := names.ModelTagKind + "-" + model.Controller.Name + ":" + model.OwnerIdentityName + "/" + model.Name
-		if tag.Relation.String() != "" {
-			modelString = modelString + "#" + tag.Relation.String()
-		}
-		return modelString, nil
+		modelUserID := model.OwnerIdentityName + "/" + model.Name
+		return tagToString(names.ModelTagKind, modelUserID), nil
 	case names.ApplicationOfferTagKind:
 		ao := dbmodel.ApplicationOffer{
 			UUID: tag.ID,
@@ -438,11 +439,7 @@ func (j *JIMM) ToJAASTag(ctx context.Context, tag *ofganames.Tag, resolveUUIDs b
 		if err != nil {
 			return "", errors.E(err, fmt.Sprintf("failed to fetch application offer information: %s", ao.UUID))
 		}
-		aoString := names.ApplicationOfferTagKind + "-" + ao.Model.Controller.Name + ":" + ao.Model.OwnerIdentityName + "/" + ao.Model.Name + "." + ao.Name
-		if tag.Relation.String() != "" {
-			aoString = aoString + "#" + tag.Relation.String()
-		}
-		return aoString, nil
+		return tagToString(names.ApplicationOfferTagKind, ao.URL), nil
 	case jimmnames.GroupTagKind:
 		group := dbmodel.GroupEntry{
 			UUID: tag.ID,
@@ -451,11 +448,7 @@ func (j *JIMM) ToJAASTag(ctx context.Context, tag *ofganames.Tag, resolveUUIDs b
 		if err != nil {
 			return "", errors.E(err, fmt.Sprintf("failed to fetch group information: %s", group.UUID))
 		}
-		groupString := jimmnames.GroupTagKind + "-" + group.Name
-		if tag.Relation.String() != "" {
-			groupString = groupString + "#" + tag.Relation.String()
-		}
-		return groupString, nil
+		return tagToString(jimmnames.GroupTagKind, group.Name), nil
 	case names.CloudTagKind:
 		cloud := dbmodel.Cloud{
 			Name: tag.ID,
@@ -464,11 +457,7 @@ func (j *JIMM) ToJAASTag(ctx context.Context, tag *ofganames.Tag, resolveUUIDs b
 		if err != nil {
 			return "", errors.E(err, fmt.Sprintf("failed to fetch cloud information: %s", cloud.Name))
 		}
-		cloudString := names.CloudTagKind + "-" + cloud.Name
-		if tag.Relation.String() != "" {
-			cloudString = cloudString + "#" + tag.Relation.String()
-		}
-		return cloudString, nil
+		return tagToString(names.CloudTagKind, cloud.Name), nil
 	default:
 		return "", errors.E(fmt.Sprintf("unexpected tag kind: %v", tag.Kind))
 	}

@@ -573,7 +573,7 @@ func (s *relationSuite) TestCheckRelationViaSuperuser(c *gc.C) {
 
 	// Test reader is OK
 	userToCheck := "user-" + u.Name
-	modelToCheck := "model-" + controller.Name + ":" + u.Name + "/" + model.Name
+	modelToCheck := "model-" + u.Name + "/" + model.Name
 	cmdCtx, err := cmdtesting.RunCommand(
 		c,
 		cmd.NewCheckRelationCommandForTesting(s.ClientStore(), bClient),

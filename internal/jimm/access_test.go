@@ -447,9 +447,9 @@ func TestParseTag(t *testing.T) {
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
-	user, _, controller, model, _, _, _ := createTestControllerEnvironment(ctx, c, j.Database)
+	user, _, _, model, _, _, _ := createTestControllerEnvironment(ctx, c, j.Database)
 
-	jimmTag := "model-" + controller.Name + ":" + user.Name + "/" + model.Name + "#administrator"
+	jimmTag := "model-" + user.Name + "/" + model.Name + "#administrator"
 
 	// JIMM tag syntax for models
 	tag, err := j.ParseTag(ctx, jimmTag)
