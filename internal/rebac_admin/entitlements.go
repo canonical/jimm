@@ -10,12 +10,6 @@ import (
 	openfgastatic "github.com/canonical/jimm/v3/openfga"
 )
 
-// Since these values have semantic meanings in the API, they'll probably be
-// refactored into constants provided by `rebac-admin-ui-handlers` library. So,
-// we define them here as constants, rather than repeating them as literals.
-const identity = "identity"
-const group = "group"
-
 // For rebac v1 this list is kept manually.
 // The reason behind that is we want to decide what relations to expose to rebac admin ui.
 var EntitlementsList = []resources.EntitlementSchema{

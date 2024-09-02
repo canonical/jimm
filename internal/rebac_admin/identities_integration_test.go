@@ -245,7 +245,7 @@ func (s *identitiesSuite) TestPatchIdentityEntitlements(c *gc.C) {
 	ctx := context.Background()
 	identitySvc := rebac_admin.NewidentitiesService(s.JIMM)
 	tester := jimmtest.GocheckTester{C: c}
-	env := jimmtest.ParseEnvironment(tester, patchGroupEntitlementTestEnv)
+	env := jimmtest.ParseEnvironment(tester, patchIdentitiesEntitlementTestEnv)
 	env.PopulateDB(tester, s.JIMM.Database)
 	oldModels := []string{env.Models[0].UUID, env.Models[1].UUID}
 	newModels := []string{env.Models[2].UUID, env.Models[3].UUID}

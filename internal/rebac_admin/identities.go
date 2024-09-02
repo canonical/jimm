@@ -115,7 +115,7 @@ func (s *identitiesService) GetIdentityGroups(ctx context.Context, identityId st
 		Object:       objUser.ResourceTag().String(),
 		Relation:     ofganames.MemberRelation.String(),
 		TargetObject: openfga.GroupType.String(),
-	}, int32(filter.Limit()), filter.Token())
+	}, int32(filter.Limit()), filter.Token()) // nolint:gosec accept integer conversion
 
 	if err != nil {
 		return nil, err

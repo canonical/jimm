@@ -159,6 +159,7 @@ func (s *groupsService) GetGroupIdentities(ctx context.Context, groupId string, 
 		Relation:     ofganames.MemberRelation.String(),
 		TargetObject: groupTag.String(),
 	}
+	// nolint:gosec accept integer conversion
 	identities, nextToken, err := s.jimm.ListRelationshipTuples(ctx, user, tuple, int32(filter.Limit()), filter.Token())
 	if err != nil {
 		return nil, err
@@ -253,6 +254,7 @@ func (s *groupsService) GetGroupEntitlements(ctx context.Context, groupId string
 	filter := utils.CreateTokenPaginationFilter(params.Size, params.NextToken, params.NextPageToken)
 	group := ofganames.WithMemberRelation(jimmnames.NewGroupTag(groupId))
 	entitlementToken := pagination.NewEntitlementToken(filter.Token())
+	// nolint:gosec accept integer conversion
 	tuples, nextEntitlmentToken, err := s.jimm.ListObjectRelations(ctx, user, group, int32(filter.Limit()), entitlementToken)
 	if err != nil {
 		return nil, err
