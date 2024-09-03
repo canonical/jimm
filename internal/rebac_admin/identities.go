@@ -115,7 +115,7 @@ func (s *identitiesService) GetIdentityGroups(ctx context.Context, identityId st
 		Object:       objUser.ResourceTag().String(),
 		Relation:     ofganames.MemberRelation.String(),
 		TargetObject: openfga.GroupType.String(),
-	}, int32(filter.Limit()), filter.Token()) // nolint:gosec accept integer conversion
+	}, int32(filter.Limit()), filter.Token()) // #nosec G115 accept integer conversion
 
 	if err != nil {
 		return nil, err
@@ -195,7 +195,7 @@ func (s *identitiesService) GetIdentityEntitlements(ctx context.Context, identit
 
 	filter := utils.CreateTokenPaginationFilter(params.Size, params.NextToken, params.NextPageToken)
 	entitlementToken := pagination.NewEntitlementToken(filter.Token())
-	tuples, nextEntitlmentToken, err := s.jimm.ListObjectRelations(ctx, user, objUser.Tag().String(), int32(filter.Limit()), entitlementToken)
+	tuples, nextEntitlmentToken, err := s.jimm.ListObjectRelations(ctx, user, objUser.Tag().String(), int32(filter.Limit()), entitlementToken) // #nosec G115 accept integer conversion
 	if err != nil {
 		return nil, err
 	}
