@@ -21,6 +21,7 @@ func SetupBackend(ctx context.Context, jimm jujuapi.JIMM) (*rebac_handlers.ReBAC
 		Entitlements:  newEntitlementService(),
 		Groups:        newGroupService(jimm),
 		Identities:    newidentitiesService(jimm),
+		Resources:     newResourcesService(jimm),
 	})
 	if err != nil {
 		zapctx.Error(ctx, "failed to create rebac admin backend", zap.Error(err))

@@ -1,0 +1,105 @@
+// Copyright 2024 Canonical.
+package db
+
+import (
+	"context"
+	"database/sql"
+
+	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/servermon"
+)
+
+const MUTIPLE_PAGE_SQL = `
+(
+	SELECT 'controller' AS type, 
+		uuid AS id, 
+		name AS name, 
+		'' AS parent_id,
+		'' AS parent_name,
+		'' AS parent_type
+		FROM controllers
+)
+UNION
+(
+	SELECT 'model' AS type, 
+			models.uuid AS id, 
+			models.name AS name, 
+			controllers.uuid AS parent_id,
+			controllers.name AS parent_name,
+			'controller' AS parent_type
+	FROM models
+	JOIN controllers ON models.controller_id = controllers.id
+)
+UNION
+(
+	SELECT 'application_offer' AS type, 
+			application_offers.uuid AS id, 
+			application_offers.name AS name, 
+			models.uuid AS parent_id,
+			models.name AS parent_name,
+			'model' AS parent_type
+	FROM application_offers
+	JOIN models ON application_offers.model_id = models.id
+)
+UNION
+(
+	SELECT 'cloud' AS type, 
+			clouds.name AS id, 
+			clouds.name AS name, 
+			'' AS parent_id,
+			'' AS parent_name,
+			'' AS parent_type
+	FROM clouds
+)
+UNION
+(
+	SELECT 'service_account' AS type, 
+			identities.name AS id, 
+			identities.name AS name, 
+			'' AS parent_id,
+			'' AS parent_name,
+			'' AS parent_type
+	FROM identities
+	WHERE name NOT LIKE '%@%'
+)
+ORDER BY id
+OFFSET ?
+LIMIT  ?;
+`
+
+type Resource struct {
+	Type       string
+	UUID       sql.NullString
+	Name       string
+	ParentId   sql.NullString
+	ParentName string
+	ParentType string
+}
+
+func (d *Database) GetResources(ctx context.Context, limit, offset int) (_ []Resource, err error) {
+	const op = errors.Op("db.GetMultipleModels")
+	if err := d.ready(); err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
+	db := d.DB.WithContext(ctx)
+	rows, err := db.Raw(MUTIPLE_PAGE_SQL, offset, limit).Rows()
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	resources := make([]Resource, 0)
+	for rows.Next() {
+		var res Resource
+		err := db.ScanRows(rows, &res)
+		if err != nil {
+			return nil, err
+		}
+		resources = append(resources, res)
+	}
+	return resources, nil
+}
