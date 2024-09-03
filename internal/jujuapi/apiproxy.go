@@ -63,7 +63,7 @@ func (s apiProxier) ServeWS(ctx context.Context, clientConn *websocket.Conn) {
 		TokenGen:                &jwtGenerator,
 		ConnectController:       connectionFunc,
 		AuditLog:                auditLogger,
-		JIMM:                    s.jimm,
+		LoginService:            s.jimm,
 		AuthenticatedIdentityID: auth.SessionIdentityFromContext(ctx),
 	}
 	if err := jimmRPC.ProxySockets(ctx, proxyHelpers); err != nil {
