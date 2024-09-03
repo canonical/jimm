@@ -1,4 +1,4 @@
-// Copyright 2021 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package cmd_test
 
@@ -15,8 +15,7 @@ type grantAuditLogAccessSuite struct {
 	cmdtest.JimmCmdSuite
 }
 
-// TODO (alesstimec) uncomment once granting/revoking is reimplemented
-//var _ = gc.Suite(&grantAuditLogAccessSuite{})
+var _ = gc.Suite(&grantAuditLogAccessSuite{})
 
 func (s *grantAuditLogAccessSuite) TestGrantAuditLogAccessSuperuser(c *gc.C) {
 	// alice is superuser

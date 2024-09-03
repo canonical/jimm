@@ -1,4 +1,4 @@
-// Copyright 2020 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package db_test
 
@@ -369,6 +369,7 @@ controllers:
 		Name: "test-cloud-1",
 	}
 	err = s.Database.GetCloud(ctx, &cl)
+	c.Assert(err, qt.IsNil)
 
 	crp = cl.Regions[0].Controllers[0]
 

@@ -1,13 +1,15 @@
+// Copyright 2024 Canonical.
 package mocks
 
 import (
 	"context"
 
+	jujuparams "github.com/juju/juju/rpc/params"
+	"github.com/juju/version"
+
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/openfga"
-	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/version"
 )
 
 // ControllerService is an implementation of the jujuapi.ControllerService interface.

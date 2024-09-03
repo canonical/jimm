@@ -1,4 +1,4 @@
-// Copyright 2021 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package jimm
 
@@ -223,6 +223,8 @@ func (w *Watcher) deltaProcessedNotification() {
 
 // watchController connects to the given controller and watches for model
 // changes on the controller.
+//
+// nolint:gocognit // We ignore watch as watchers are removed in Juju 4.0.
 func (w *Watcher) watchController(ctx context.Context, ctl *dbmodel.Controller) error {
 	const op = errors.Op("jimm.watchController")
 
@@ -237,7 +239,11 @@ func (w *Watcher) watchController(ctx context.Context, ctl *dbmodel.Controller) 
 	if err != nil {
 		return errors.E(op, err)
 	}
-	defer api.AllModelWatcherStop(ctx, id)
+	defer func() {
+		if err := api.AllModelWatcherStop(ctx, id); err != nil {
+			zapctx.Error(ctx, "failed to stop all model watcher", zap.Error(err))
+		}
+	}()
 
 	checkDyingModel := func(m *dbmodel.Model) error {
 		if m.Life == state.Dying.String() || m.Life == state.Dead.String() {
@@ -284,16 +290,17 @@ func (w *Watcher) watchController(ctx context.Context, ctl *dbmodel.Controller) 
 			ControllerID: ctl.ID,
 		}
 		err := w.Database.GetModel(ctx, &m)
-		if err == nil {
+		switch {
+		case err == nil:
 			st := modelState{
 				id:       m.ID,
 				machines: make(map[string]int64),
 				units:    make(map[string]bool),
 			}
 			modelStates[uuid] = &st
-		} else if errors.ErrorCode(err) == errors.CodeNotFound {
+		case errors.ErrorCode(err) == errors.CodeNotFound:
 			modelStates[uuid] = nil
-		} else {
+		default:
 			zapctx.Error(ctx, "cannot get model", zap.Error(err))
 		}
 		return modelStates[uuid]
@@ -374,7 +381,11 @@ func (w *Watcher) watchAllModelSummaries(ctx context.Context, ctl *dbmodel.Contr
 	if err != nil {
 		return errors.E(op, err)
 	}
-	defer api.ModelSummaryWatcherStop(ctx, id)
+	defer func() {
+		if err := api.ModelSummaryWatcherStop(ctx, id); err != nil {
+			zapctx.Error(ctx, "failed to stop model summary watcher", zap.Error(err))
+		}
+	}()
 
 	// modelIDs contains the set of models running on the
 	// controller that JIMM is interested in.
@@ -461,6 +472,7 @@ func (w *Watcher) handleDelta(ctx context.Context, modelIDf func(string) *modelS
 		var cores int64
 		machine := d.Entity.(*jujuparams.MachineInfo)
 		if machine.HardwareCharacteristics != nil && machine.HardwareCharacteristics.CpuCores != nil {
+			//nolint:gosec // We expect cpu cores to fit into int64.
 			cores = int64(*machine.HardwareCharacteristics.CpuCores)
 		}
 		sCores, ok := state.machines[eid.Id]

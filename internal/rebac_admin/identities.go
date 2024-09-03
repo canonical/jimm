@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package rebac_admin
 
@@ -6,18 +6,18 @@ import (
 	"context"
 	"fmt"
 
+	v1 "github.com/canonical/rebac-admin-ui-handlers/v1"
+	"github.com/canonical/rebac-admin-ui-handlers/v1/resources"
+	"github.com/juju/names/v5"
+	"github.com/juju/zaputil/zapctx"
+	"go.uber.org/zap"
+
 	"github.com/canonical/jimm/v3/internal/common/pagination"
 	"github.com/canonical/jimm/v3/internal/jujuapi"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/rebac_admin/utils"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
-	"github.com/juju/names/v5"
-
-	v1 "github.com/canonical/rebac-admin-ui-handlers/v1"
-	"github.com/canonical/rebac-admin-ui-handlers/v1/resources"
-	"github.com/juju/zaputil/zapctx"
-	"go.uber.org/zap"
 )
 
 type identitiesService struct {
@@ -115,7 +115,7 @@ func (s *identitiesService) GetIdentityGroups(ctx context.Context, identityId st
 		Object:       objUser.ResourceTag().String(),
 		Relation:     ofganames.MemberRelation.String(),
 		TargetObject: openfga.GroupType.String(),
-	}, int32(filter.Limit()), filter.Token())
+	}, int32(filter.Limit()), filter.Token()) // #nosec G115 accept integer conversion
 
 	if err != nil {
 		return nil, err
@@ -195,7 +195,7 @@ func (s *identitiesService) GetIdentityEntitlements(ctx context.Context, identit
 
 	filter := utils.CreateTokenPaginationFilter(params.Size, params.NextToken, params.NextPageToken)
 	entitlementToken := pagination.NewEntitlementToken(filter.Token())
-	tuples, nextEntitlmentToken, err := s.jimm.ListObjectRelations(ctx, user, objUser.Tag().String(), int32(filter.Limit()), entitlementToken)
+	tuples, nextEntitlmentToken, err := s.jimm.ListObjectRelations(ctx, user, objUser.Tag().String(), int32(filter.Limit()), entitlementToken) // #nosec G115 accept integer conversion
 	if err != nil {
 		return nil, err
 	}

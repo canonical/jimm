@@ -1,4 +1,4 @@
-// Copyright 2020 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package jimm_test
 
@@ -63,17 +63,17 @@ func TestAddController(t *testing.T) {
 						"B": 0xb,
 					},
 					RegionConfig: map[string]map[string]interface{}{
-						"eu-west-1": map[string]interface{}{
+						"eu-west-1": {
 							"B": 0xb0,
 							"C": "C",
 						},
-						"eu-west-2": map[string]interface{}{
+						"eu-west-2": {
 							"B": 0xb1,
 							"D": "D",
 						},
 					},
 				},
-				names.NewCloudTag("k8s"): jujuparams.Cloud{
+				names.NewCloudTag("k8s"): {
 					Type:      "kubernetes",
 					AuthTypes: []string{"userpass"},
 					Endpoint:  "https://k8s.example.com",
@@ -206,7 +206,7 @@ func TestAddControllerWithVault(t *testing.T) {
 	api := &jimmtest.API{
 		Clouds_: func(context.Context) (map[names.CloudTag]jujuparams.Cloud, error) {
 			clouds := map[names.CloudTag]jujuparams.Cloud{
-				names.NewCloudTag("aws"): jujuparams.Cloud{
+				names.NewCloudTag("aws"): {
 					Type:             "ec2",
 					AuthTypes:        []string{"userpass"},
 					Endpoint:         "https://example.com",
@@ -229,17 +229,17 @@ func TestAddControllerWithVault(t *testing.T) {
 						"B": 0xb,
 					},
 					RegionConfig: map[string]map[string]interface{}{
-						"eu-west-1": map[string]interface{}{
+						"eu-west-1": {
 							"B": 0xb0,
 							"C": "C",
 						},
-						"eu-west-2": map[string]interface{}{
+						"eu-west-2": {
 							"B": 0xb1,
 							"D": "D",
 						},
 					},
 				},
-				names.NewCloudTag("k8s"): jujuparams.Cloud{
+				names.NewCloudTag("k8s"): {
 					Type:      "kubernetes",
 					AuthTypes: []string{"userpass"},
 					Endpoint:  "https://k8s.example.com",
@@ -1414,7 +1414,7 @@ func TestInitiateMigration(t *testing.T) {
 	c := qt.New(t)
 
 	mt1 := names.NewModelTag("00000002-0000-0000-0000-000000000003")
-	//mt2 := names.NewModelTag("00000002-0000-0000-0000-000000000004")
+	// mt2 := names.NewModelTag("00000002-0000-0000-0000-000000000004")
 
 	migrationId1 := uuid.New().String()
 

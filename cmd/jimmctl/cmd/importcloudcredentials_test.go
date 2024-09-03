@@ -1,4 +1,4 @@
-// Copyright 2021 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package cmd_test
 
@@ -22,6 +22,7 @@ type importCloudCredentialsSuite struct {
 
 var _ = gc.Suite(&importCloudCredentialsSuite{})
 
+//nolint:gosec // Thinks hardcoded creds.
 const creds = `{
 	"_id": "aws/alice@canonical.com/test1",
 	"type": "access-key",
@@ -60,7 +61,7 @@ func (s *importCloudCredentialsSuite) TestImportCloudCredentials(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	tmpfile := filepath.Join(c.MkDir(), "test.json")
-	err = os.WriteFile(tmpfile, []byte(creds), 0660)
+	err = os.WriteFile(tmpfile, []byte(creds), 0600)
 	c.Assert(err, gc.IsNil)
 
 	// alice is superuser

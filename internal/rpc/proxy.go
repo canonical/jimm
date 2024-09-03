@@ -1,9 +1,11 @@
+// Copyright 2024 Canonical.
 package rpc
 
 import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"sync"
 	"time"
 
@@ -15,13 +17,10 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/internal/jimm"
-	"github.com/canonical/jimm/v3/internal/jimm/credentials"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/servermon"
 	"github.com/canonical/jimm/v3/internal/utils"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
-	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
 
 const (
@@ -59,12 +58,14 @@ type WebsocketConnectionWithMetadata struct {
 	ModelName      string
 }
 
-// JIMM represents the JIMM interface used by the proxy.
-type JIMM interface {
-	GetUser(ctx context.Context, identifier string) (*openfga.User, error)
-	UpdateUserLastLogin(ctx context.Context, identifier string) error
-	OAuthAuthenticationService() jimm.OAuthAuthenticator
-	GetCredentialStore() credentials.CredentialStore
+// LoginService represents the LoginService interface used by the proxy.
+// Currently this is a duplicate of the [jujuapi.LoginService].
+type LoginService interface {
+	LoginDevice(ctx context.Context) (*oauth2.DeviceAuthResponse, error)
+	GetDeviceSessionToken(ctx context.Context, deviceOAuthResponse *oauth2.DeviceAuthResponse) (string, error)
+	LoginClientCredentials(ctx context.Context, clientID string, clientSecret string) (*openfga.User, error)
+	LoginWithSessionToken(ctx context.Context, sessionToken string) (*openfga.User, error)
+	LoginWithSessionCookie(ctx context.Context, identityID string) (*openfga.User, error)
 }
 
 // ProxyHelpers contains all the necessary helpers for proxying a Juju client
@@ -74,7 +75,7 @@ type ProxyHelpers struct {
 	TokenGen                TokenGenerator
 	ConnectController       func(context.Context) (WebsocketConnectionWithMetadata, error)
 	AuditLog                func(*dbmodel.AuditLogEntry)
-	JIMM                    JIMM
+	LoginService            LoginService
 	AuthenticatedIdentityID string
 }
 
@@ -91,6 +92,10 @@ func ProxySockets(ctx context.Context, helpers ProxyHelpers) error {
 		zapctx.Error(ctx, "Missing audit log function")
 		return errors.E(op, "Missing audit log function")
 	}
+	if helpers.LoginService == nil {
+		zapctx.Error(ctx, "Missing login service function")
+		return errors.E(op, "Missing login service function")
+	}
 	errChan := make(chan error, 2)
 	msgInFlight := inflightMsgs{messages: make(map[uint64]*message)}
 	client := writeLockConn{conn: helpers.ConnClient}
@@ -103,7 +108,7 @@ func ProxySockets(ctx context.Context, helpers ProxyHelpers) error {
 			tokenGen:                helpers.TokenGen,
 			auditLog:                helpers.AuditLog,
 			conversationId:          utils.NewConversationID(),
-			jimm:                    helpers.JIMM,
+			loginService:            helpers.LoginService,
 			authenticatedIdentityID: helpers.AuthenticatedIdentityID,
 		},
 		errChan:              errChan,
@@ -162,11 +167,16 @@ func (c *writeLockConn) sendMessage(responseObject any, request *message) {
 		responseData, err := json.Marshal(responseObject)
 		if err != nil {
 			errorMsg := createErrResponse(err, request)
-			c.writeJson(errorMsg)
+			if err := c.writeJson(errorMsg); err != nil {
+				zapctx.Error(context.Background(), "failed to send error message in proxy", zap.Error(err))
+			}
+
 		}
 		msg.Response = responseData
 	}
-	c.writeJson(msg)
+	if err := c.writeJson(msg); err != nil {
+		zapctx.Error(context.Background(), "failed to write message in proxy", zap.Error(err))
+	}
 }
 
 // inflightMsgs holds only request messages that are
@@ -236,7 +246,7 @@ type modelProxy struct {
 	msgs                    *inflightMsgs
 	auditLog                func(*dbmodel.AuditLogEntry)
 	tokenGen                TokenGenerator
-	jimm                    JIMM
+	loginService            LoginService
 	modelName               string
 	conversationId          string
 	authenticatedIdentityID string
@@ -251,11 +261,15 @@ func (p *modelProxy) sendError(socket *writeLockConn, req *message, err error) {
 	}
 	msg := createErrResponse(err, req)
 	if msg != nil {
-		socket.writeJson(msg)
+		if err := socket.writeJson(msg); err != nil {
+			zapctx.Error(context.Background(), "failed to create err response message", zap.Error(err))
+		}
 	}
 	// An error message is a response back to the client.
 	servermon.JujuCallErrorCount.WithLabelValues(req.Type, req.Request, p.msgs.controllerUUID)
-	p.auditLogMessage(msg, true)
+	if err := p.auditLogMessage(msg, true); err != nil {
+		zapctx.Error(context.Background(), "failed to audit log message", zap.Error(err))
+	}
 }
 
 func (p *modelProxy) auditLogMessage(msg *message, isResponse bool) error {
@@ -316,7 +330,6 @@ type clientProxy struct {
 
 // start begins the client->controller proxier.
 func (p *clientProxy) start(ctx context.Context) error {
-	const op = errors.Op("rpc.clientProxy.start")
 	defer func() {
 		if p.dst != nil {
 			p.dst.conn.Close()
@@ -327,16 +340,18 @@ func (p *clientProxy) start(ctx context.Context) error {
 		msg := new(message)
 		if err := p.src.readJson(&msg); err != nil {
 			// Error reading on the socket implies it is closed, simply return.
-			return err
+			return fmt.Errorf("error reading from client: %w", err)
 		}
 		zapctx.Debug(ctx, "Read message from client", zap.Any("message", msg))
 		err := p.makeControllerConnection(ctx)
 		if err != nil {
 			zapctx.Error(ctx, "error connecting to controller", zap.Error(err))
 			p.sendError(p.src, msg, err)
-			return err
+			return fmt.Errorf("failed to connect to controller: %w", err)
 		}
-		p.auditLogMessage(msg, false)
+		if err := p.auditLogMessage(msg, false); err != nil {
+			zapctx.Error(ctx, "failed to audit log message", zap.Error(err))
+		}
 		// All requests should be proxied as transparently as possible through to the controller
 		// except for auth related requests like Login because JIMM is auth gateway.
 		if msg.Type == "Admin" {
@@ -424,7 +439,7 @@ func (p *controllerProxy) start(ctx context.Context) error {
 		msg := new(message)
 		if err := p.src.readJson(msg); err != nil {
 			// Error reading on the socket implies it is closed, simply return.
-			return err
+			return fmt.Errorf("error reading from controller: %w", err)
 		}
 		zapctx.Debug(ctx, "Received message from controller", zap.Any("Message", msg))
 		permissionsRequired, err := checkPermissionsRequired(ctx, msg)
@@ -443,7 +458,9 @@ func (p *controllerProxy) start(ctx context.Context) error {
 			// Write back to the controller.
 			msg := p.msgs.getMessage(msg.RequestID)
 			if msg != nil {
-				p.src.writeJson(msg)
+				if err := p.src.writeJson(msg); err != nil {
+					zapctx.Error(context.Background(), "failed to write back to controller", zap.Error(err))
+				}
 			}
 			continue
 		} else {
@@ -451,15 +468,17 @@ func (p *controllerProxy) start(ctx context.Context) error {
 				zapctx.Error(ctx, "Failed to modify message", zap.Error(err))
 				p.handleError(msg, err)
 				// An error when modifying the message is a show stopper.
-				return err
+				return fmt.Errorf("error modifying controller response: %w", err)
 			}
 		}
 		p.msgs.removeMessage(msg.RequestID)
-		p.auditLogMessage(msg, true)
+		if err := p.auditLogMessage(msg, true); err != nil {
+			zapctx.Error(context.Background(), "failed to audit log message", zap.Error(err))
+		}
 		zapctx.Debug(ctx, "Writing modified message to client", zap.Any("Message", msg))
 		if err := p.dst.writeJson(msg); err != nil {
 			zapctx.Error(ctx, "controllerProxy error writing to dst", zap.Error(err))
-			return err
+			return fmt.Errorf("error writing message to client: %w", err)
 		}
 	}
 }
@@ -490,13 +509,15 @@ func checkPermissionsRequired(ctx context.Context, msg *message) (map[string]any
 	var er params.ErrorResults
 	err := json.Unmarshal(msg.Response, &er)
 	if err != nil {
-		zapctx.Error(ctx, "failed to read response error")
+		zapctx.Error(ctx, "failed to read response error", zap.Error(err))
 		return permissionMap, nil
 	}
 
 	// Check for errors that may be a result of a bulk request.
 	for _, e := range er.Results {
-		zapctx.Debug(ctx, "received error", zap.Any("error", e))
+		if e.Error != nil {
+			zapctx.Debug(ctx, "received error", zap.Any("error", e.Error))
+		}
 		if e.Error != nil && e.Error.Code == accessRequiredErrorCode {
 			for k, v := range e.Error.Info {
 				accessLevel, ok := v.(string)
@@ -594,7 +615,18 @@ func (p *clientProxy) handleAdminFacade(ctx context.Context, msg *message) (clie
 	errorFnc := func(err error) (*message, *message, error) {
 		return nil, nil, err
 	}
-	controllerLoginMessageFnc := func(data []byte) (*message, *message, error) {
+	controllerLoginMessageFnc := func(user *openfga.User) (*message, *message, error) {
+		jwt, err := p.tokenGen.MakeLoginToken(ctx, user)
+		if err != nil {
+			return errorFnc(err)
+		}
+		data, err := json.Marshal(params.LoginRequest{
+			AuthTag: names.NewUserTag(user.Name).String(),
+			Token:   base64.StdEncoding.EncodeToString(jwt),
+		})
+		if err != nil {
+			return errorFnc(err)
+		}
 		m := *msg
 		m.Type = "Admin"
 		m.Request = "Login"
@@ -604,7 +636,7 @@ func (p *clientProxy) handleAdminFacade(ctx context.Context, msg *message) (clie
 	}
 	switch msg.Request {
 	case "LoginDevice":
-		deviceResponse, err := jimm.LoginDevice(ctx, p.jimm.OAuthAuthenticationService())
+		deviceResponse, err := p.loginService.LoginDevice(ctx)
 		if err != nil {
 			return errorFnc(err)
 		}
@@ -620,7 +652,7 @@ func (p *clientProxy) handleAdminFacade(ctx context.Context, msg *message) (clie
 		msg.Response = data
 		return msg, nil, nil
 	case "GetDeviceSessionToken":
-		sessionToken, err := jimm.GetDeviceSessionToken(ctx, p.jimm.OAuthAuthenticationService(), p.jimm.GetCredentialStore(), p.deviceOAuthResponse)
+		sessionToken, err := p.loginService.GetDeviceSessionToken(ctx, p.deviceOAuthResponse)
 		if err != nil {
 			return errorFnc(err)
 		}
@@ -639,95 +671,31 @@ func (p *clientProxy) handleAdminFacade(ctx context.Context, msg *message) (clie
 			return errorFnc(err)
 		}
 
-		// Verify the session token
-		token, err := p.jimm.OAuthAuthenticationService().VerifySessionToken(request.SessionToken)
-		if err != nil {
-			return errorFnc(err)
-		}
-		email := token.Subject()
-
-		user, err := p.jimm.GetUser(ctx, email)
-		if err != nil {
-			return errorFnc(err)
-		}
-		err = p.jimm.UpdateUserLastLogin(ctx, email)
+		user, err := p.loginService.LoginWithSessionToken(ctx, request.SessionToken)
 		if err != nil {
 			return errorFnc(err)
 		}
 
-		jwt, err := p.tokenGen.MakeLoginToken(ctx, user)
-		if err != nil {
-			return errorFnc(err)
-		}
-		data, err := json.Marshal(params.LoginRequest{
-			AuthTag: names.NewUserTag(email).String(),
-			Token:   base64.StdEncoding.EncodeToString(jwt),
-		})
-		if err != nil {
-			return errorFnc(err)
-		}
-		return controllerLoginMessageFnc(data)
+		return controllerLoginMessageFnc(user)
 	case "LoginWithClientCredentials":
 		var request apiparams.LoginWithClientCredentialsRequest
 		err := json.Unmarshal(msg.Params, &request)
 		if err != nil {
 			return errorFnc(err)
 		}
-		clientIdWithDomain, err := jimmnames.EnsureValidServiceAccountId(request.ClientID)
-		if err != nil {
-			return errorFnc(err)
-		}
-		err = p.jimm.OAuthAuthenticationService().VerifyClientCredentials(ctx, request.ClientID, request.ClientSecret)
+		user, err := p.loginService.LoginClientCredentials(ctx, request.ClientID, request.ClientSecret)
 		if err != nil {
 			return errorFnc(err)
 		}
 
-		user, err := p.jimm.GetUser(ctx, clientIdWithDomain)
-		if err != nil {
-			return errorFnc(err)
-		}
-		err = p.jimm.UpdateUserLastLogin(ctx, clientIdWithDomain)
-		if err != nil {
-			return errorFnc(err)
-		}
-
-		jwt, err := p.tokenGen.MakeLoginToken(ctx, user)
-		if err != nil {
-			return errorFnc(err)
-		}
-		data, err := json.Marshal(params.LoginRequest{
-			AuthTag: names.NewUserTag(clientIdWithDomain).String(),
-			Token:   base64.StdEncoding.EncodeToString(jwt),
-		})
-		if err != nil {
-			return errorFnc(err)
-		}
-		return controllerLoginMessageFnc(data)
+		return controllerLoginMessageFnc(user)
 	case "LoginWithSessionCookie":
-		if p.modelProxy.authenticatedIdentityID == "" {
-			return errorFnc(errors.E(errors.CodeUnauthorized))
-		}
-		user, err := p.jimm.GetUser(ctx, p.modelProxy.authenticatedIdentityID)
-		if err != nil {
-			return errorFnc(err)
-		}
-		err = p.jimm.UpdateUserLastLogin(ctx, p.modelProxy.authenticatedIdentityID)
+		user, err := p.loginService.LoginWithSessionCookie(ctx, p.modelProxy.authenticatedIdentityID)
 		if err != nil {
 			return errorFnc(err)
 		}
 
-		jwt, err := p.tokenGen.MakeLoginToken(ctx, user)
-		if err != nil {
-			return errorFnc(err)
-		}
-		data, err := json.Marshal(params.LoginRequest{
-			AuthTag: user.ResourceTag().String(),
-			Token:   base64.StdEncoding.EncodeToString(jwt),
-		})
-		if err != nil {
-			return errorFnc(err)
-		}
-		return controllerLoginMessageFnc(data)
+		return controllerLoginMessageFnc(user)
 	case "Login":
 		return errorFnc(errors.E("JIMM does not support login from old clients", errors.CodeNotSupported))
 	default:

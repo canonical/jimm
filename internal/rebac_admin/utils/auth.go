@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package utils
 
@@ -6,8 +6,9 @@ import (
 	"context"
 	"errors"
 
-	"github.com/canonical/jimm/v3/internal/openfga"
 	rebac_handlers "github.com/canonical/rebac-admin-ui-handlers/v1"
+
+	"github.com/canonical/jimm/v3/internal/openfga"
 )
 
 // GetUserFromContext retrieves the OpenFGA user pointer from the context

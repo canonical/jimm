@@ -1,4 +1,4 @@
-// Copyright 2021 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package rpc_test
 
@@ -244,15 +244,14 @@ func TestProxySockets(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
-	srvController := newServer(func(conn *websocket.Conn) error {
-		return echo(conn)
-	})
+	srvController := newServer(echo)
+
 	errChan := make(chan error)
 	srvJIMM := newServer(func(connClient *websocket.Conn) error {
 		testTokenGen := testTokenGenerator{}
 		f := func(context.Context) (rpc.WebsocketConnectionWithMetadata, error) {
 			connController, err := srvController.dialer.DialWebsocket(ctx, srvController.URL)
-			c.Assert(err, qt.IsNil)
+			c.Check(err, qt.IsNil)
 			return rpc.WebsocketConnectionWithMetadata{
 				Conn:      connController,
 				ModelName: "TestName",
@@ -264,8 +263,10 @@ func TestProxySockets(t *testing.T) {
 			TokenGen:          &testTokenGen,
 			ConnectController: f,
 			AuditLog:          auditLogger,
+			LoginService:      &mockLoginService{},
 		}
 		err := rpc.ProxySockets(ctx, proxyHelpers)
+		c.Check(err, qt.ErrorMatches, "error reading from (client|controller).*")
 		errChan <- err
 		return err
 	})
@@ -281,8 +282,17 @@ func TestProxySockets(t *testing.T) {
 	err = ws.WriteJSON(&msg)
 	c.Assert(err, qt.IsNil)
 	resp := rpc.Message{}
-	err = ws.ReadJSON(&resp)
-	c.Assert(err, qt.IsNil)
+	receiveChan := make(chan error)
+	go func() {
+		receiveChan <- ws.ReadJSON(&resp)
+	}()
+	select {
+	case err := <-receiveChan:
+		c.Assert(err, qt.IsNil)
+	case <-time.After(5 * time.Second):
+		c.Logf("took too long to read response")
+		c.FailNow()
+	}
 	c.Assert(resp.Response, qt.DeepEquals, msg.Params)
 	ws.Close()
 	<-errChan // Ensure go routines are cleaned up
@@ -293,16 +303,14 @@ func TestCancelProxySockets(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	srvController := newServer(func(conn *websocket.Conn) error {
-		return echo(conn)
-	})
+	srvController := newServer(echo)
 
 	errChan := make(chan error)
 	srvJIMM := newServer(func(connClient *websocket.Conn) error {
 		testTokenGen := testTokenGenerator{}
 		f := func(context.Context) (rpc.WebsocketConnectionWithMetadata, error) {
 			connController, err := srvController.dialer.DialWebsocket(ctx, srvController.URL)
-			c.Assert(err, qt.IsNil)
+			c.Check(err, qt.IsNil)
 			return rpc.WebsocketConnectionWithMetadata{
 				Conn:      connController,
 				ModelName: "TestName",
@@ -314,8 +322,10 @@ func TestCancelProxySockets(t *testing.T) {
 			TokenGen:          &testTokenGen,
 			ConnectController: f,
 			AuditLog:          auditLogger,
+			LoginService:      &mockLoginService{},
 		}
 		err := rpc.ProxySockets(ctx, proxyHelpers)
+		c.Check(err, qt.ErrorMatches, "Context cancelled")
 		errChan <- err
 		return err
 	})
@@ -326,8 +336,7 @@ func TestCancelProxySockets(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	defer ws.Close()
 	cancel()
-	err = <-errChan
-	c.Assert(err.Error(), qt.Equals, "Context cancelled")
+	<-errChan
 }
 
 func TestProxySocketsAuditLogs(t *testing.T) {
@@ -335,17 +344,16 @@ func TestProxySocketsAuditLogs(t *testing.T) {
 
 	ctx := context.Background()
 
-	srvController := newServer(func(conn *websocket.Conn) error {
-		return echo(conn)
-	})
+	srvController := newServer(echo)
 	auditLogs := make([]*dbmodel.AuditLogEntry, 0)
 
 	errChan := make(chan error)
 	srvJIMM := newServer(func(connClient *websocket.Conn) error {
+		defer connClient.Close()
 		testTokenGen := testTokenGenerator{}
 		f := func(context.Context) (rpc.WebsocketConnectionWithMetadata, error) {
 			connController, err := srvController.dialer.DialWebsocket(ctx, srvController.URL)
-			c.Assert(err, qt.IsNil)
+			c.Check(err, qt.IsNil)
 			return rpc.WebsocketConnectionWithMetadata{
 				Conn:      connController,
 				ModelName: "TestModelName",
@@ -357,8 +365,10 @@ func TestProxySocketsAuditLogs(t *testing.T) {
 			TokenGen:          &testTokenGen,
 			ConnectController: f,
 			AuditLog:          auditLogger,
+			LoginService:      &mockLoginService{},
 		}
 		err := rpc.ProxySockets(ctx, proxyHelpers)
+		c.Check(err, qt.ErrorMatches, `error reading from (client|controller).*`)
 		errChan <- err
 		return err
 	})
@@ -428,7 +438,8 @@ func newServer(f func(*websocket.Conn) error) *server {
 	cp.AddCert(srv.Certificate())
 	srv.dialer = &rpc.Dialer{
 		TLSConfig: &tls.Config{
-			RootCAs: cp,
+			RootCAs:    cp,
+			MinVersion: tls.VersionTLS12,
 		},
 	}
 	return &srv
@@ -445,15 +456,17 @@ func handleWS(f func(*websocket.Conn) error) http.Handler {
 		defer c.Close()
 		err = f(c)
 		var cm []byte
-		if err == nil {
+		switch {
+		case err == nil:
 			cm = websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")
-		} else if websocket.IsCloseError(err) {
+		case websocket.IsCloseError(err):
 			ce := err.(*websocket.CloseError)
 			cm = websocket.FormatCloseMessage(ce.Code, ce.Text)
-		} else {
+		default:
 			cm = websocket.FormatCloseMessage(websocket.CloseInternalServerErr, err.Error())
 		}
-		c.WriteControl(websocket.CloseMessage, cm, time.Time{})
+		_ = c.WriteControl(websocket.CloseMessage, cm, time.Time{})
+
 	})
 }
 

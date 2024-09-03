@@ -1,4 +1,4 @@
-// Copyright 2020 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package jimm_test
 
@@ -104,14 +104,6 @@ func TestModelCreateArgs(t *testing.T) {
 			CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice/test-credential-1").String(),
 		},
 		expectedError: "owner tag not specified",
-	}, {
-		about: "cloud tag not specified",
-		args: jujuparams.ModelCreateArgs{
-			Name:               "test-model",
-			OwnerTag:           names.NewUserTag("alice@canonical.com").String(),
-			CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice/test-credential-1").String(),
-		},
-		expectedError: "no cloud specified for model; please specify one",
 	}}
 
 	opts := []cmp.Option{
@@ -886,6 +878,198 @@ users:
 		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1").String(),
 	},
 	expectError: "unauthorized",
+}, {
+	name: "CreateModelWithImplicitCloud",
+	env: `
+clouds:
+- name: test-cloud
+  type: test-provider
+  regions:
+  - name: test-region-1
+  users:
+  - user: alice@canonical.com
+    access: add-model
+user-defaults:
+- user: alice@canonical.com
+  defaults:
+    key4: value4
+cloud-defaults:
+- user: alice@canonical.com
+  cloud: test-cloud
+  region: test-region-1
+  defaults:
+    key1: value1
+    key2: value2
+- user: alice@canonical.com
+  cloud: test-cloud
+  defaults:
+    key3: value3
+cloud-credentials:
+- name: test-credential-1
+  owner: alice@canonical.com
+  cloud: test-cloud
+  auth-type: empty
+controllers:
+- name: controller-1
+  uuid: 00000000-0000-0000-0000-0000-0000000000001
+  cloud: test-cloud
+  region: test-region-1
+  cloud-regions:
+  - cloud: test-cloud
+    region: test-region-1
+    priority: 0
+- name: controller-2
+  uuid: 00000000-0000-0000-0000-0000-0000000000002
+  cloud: test-cloud
+  region: test-region-1
+  cloud-regions:
+  - cloud: test-cloud
+    region: test-region-1
+    priority: 2
+`[1:],
+	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
+		return nil, nil
+	},
+	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
+		return nil
+	},
+	createModel: assertConfig(map[string]interface{}{
+		"key4": "value4",
+	}, createModel(`
+uuid: 00000001-0000-0000-0000-0000-000000000001
+status:
+  status: started
+  info: running a test
+life: alive
+users:
+- user: alice@canonical.com
+  access: admin
+- user: bob
+  access: read
+`[1:])),
+	username:  "alice@canonical.com",
+	jimmAdmin: true,
+	args: jujuparams.ModelCreateArgs{
+		Name:               "test-model",
+		OwnerTag:           names.NewUserTag("alice@canonical.com").String(),
+		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1").String(),
+	},
+	expectModel: dbmodel.Model{
+		Name: "test-model",
+		UUID: sql.NullString{
+			String: "00000001-0000-0000-0000-0000-000000000001",
+			Valid:  true,
+		},
+		Owner: dbmodel.Identity{
+			Name: "alice@canonical.com",
+		},
+		Controller: dbmodel.Controller{
+			Name:        "controller-2",
+			UUID:        "00000000-0000-0000-0000-0000-0000000000002",
+			CloudName:   "test-cloud",
+			CloudRegion: "test-region-1",
+		},
+		CloudRegion: dbmodel.CloudRegion{
+			Cloud: dbmodel.Cloud{
+				Name: "test-cloud",
+				Type: "test-provider",
+			},
+			Name: "test-region-1",
+		},
+		CloudCredential: dbmodel.CloudCredential{
+			Name:     "test-credential-1",
+			AuthType: "empty",
+		},
+		Life: state.Alive.String(),
+		Status: dbmodel.Status{
+			Status: "started",
+			Info:   "running a test",
+		},
+	},
+}, {
+	name: "CreateModelWithImplicitCloudAndMultipleClouds",
+	env: `
+clouds:
+- name: test-cloud
+  type: test-provider
+  regions:
+  - name: test-region-1
+  users:
+  - user: alice@canonical.com
+    access: add-model
+- name: test-cloud-2
+  type: test-provider-2
+  regions:
+  - name: test-region-2
+  users:
+  - user: alice@canonical.com
+    access: add-model
+user-defaults:
+- user: alice@canonical.com
+  defaults:
+    key4: value4
+cloud-defaults:
+- user: alice@canonical.com
+  cloud: test-cloud
+  region: test-region-1
+  defaults:
+    key1: value1
+    key2: value2
+- user: alice@canonical.com
+  cloud: test-cloud
+  defaults:
+    key3: value3
+cloud-credentials:
+- name: test-credential-1
+  owner: alice@canonical.com
+  cloud: test-cloud
+  auth-type: empty
+controllers:
+- name: controller-1
+  uuid: 00000000-0000-0000-0000-0000-0000000000001
+  cloud: test-cloud
+  region: test-region-1
+  cloud-regions:
+  - cloud: test-cloud
+    region: test-region-1
+    priority: 0
+- name: controller-2
+  uuid: 00000000-0000-0000-0000-0000-0000000000002
+  cloud: test-cloud
+  region: test-region-1
+  cloud-regions:
+  - cloud: test-cloud
+    region: test-region-1
+    priority: 2
+`[1:],
+	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
+		return nil, nil
+	},
+	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
+		return nil
+	},
+	createModel: assertConfig(map[string]interface{}{
+		"key4": "value4",
+	}, createModel(`
+uuid: 00000001-0000-0000-0000-0000-000000000001
+status:
+  status: started
+  info: running a test
+life: alive
+users:
+- user: alice@canonical.com
+  access: admin
+- user: bob
+  access: read
+`[1:])),
+	username:  "alice@canonical.com",
+	jimmAdmin: true,
+	args: jujuparams.ModelCreateArgs{
+		Name:               "test-model",
+		OwnerTag:           names.NewUserTag("alice@canonical.com").String(),
+		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1").String(),
+	},
+	expectError: "no cloud specified for model; please specify one",
 }}
 
 func TestAddModel(t *testing.T) {
@@ -982,6 +1166,9 @@ func createModel(template string) func(context.Context, *jujuparams.ModelCreateA
 
 func assertConfig(config map[string]interface{}, fnc func(context.Context, *jujuparams.ModelCreateArgs, *jujuparams.ModelInfo) error) func(context.Context, *jujuparams.ModelCreateArgs, *jujuparams.ModelInfo) error {
 	return func(ctx context.Context, args *jujuparams.ModelCreateArgs, mi *jujuparams.ModelInfo) error {
+		if args.CloudTag == "" {
+			return errors.E("cloud not specified")
+		}
 		if len(config) != len(args.Config) {
 			return errors.E(fmt.Sprintf("expected %d config settings, got %d", len(config), len(args.Config)))
 		}
@@ -1991,6 +2178,7 @@ func TestGrantModelAccess(t *testing.T) {
 				Err: tt.dialError,
 			}
 			j := &jimm.JIMM{
+				UUID: jimmtest.ControllerUUID,
 				Database: db.Database{
 					DB: jimmtest.PostgresDB(c, nil),
 				},
@@ -2693,6 +2881,7 @@ var revokeModelAccessTests = []struct {
 	expectError:    `failed to recognize given access: "some-unknown-access"`,
 }}
 
+//nolint:gocognit
 func TestRevokeModelAccess(t *testing.T) {
 	c := qt.New(t)
 
@@ -2710,6 +2899,7 @@ func TestRevokeModelAccess(t *testing.T) {
 				Err: tt.dialError,
 			}
 			j := &jimm.JIMM{
+				UUID: jimmtest.ControllerUUID,
 				Database: db.Database{
 					DB: jimmtest.PostgresDB(c, nil),
 				},
@@ -2720,7 +2910,7 @@ func TestRevokeModelAccess(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
 
-			if tt.extraInitialTuples != nil && len(tt.extraInitialTuples) > 0 {
+			if len(tt.extraInitialTuples) > 0 {
 				err = client.AddRelation(ctx, tt.extraInitialTuples...)
 				c.Assert(err, qt.IsNil)
 			}
@@ -3283,6 +3473,7 @@ func TestValidateModelUpgrade(t *testing.T) {
 	}
 }
 
+//nolint:gosec // Thinks credentials hardcoded.
 const updateModelCredentialTestEnv = `clouds:
 - name: test-cloud
   type: test-provider

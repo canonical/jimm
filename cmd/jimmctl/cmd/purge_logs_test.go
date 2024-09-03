@@ -1,3 +1,4 @@
+// Copyright 2024 Canonical.
 package cmd_test
 
 import (
@@ -84,7 +85,7 @@ func (s *purgeLogsSuite) TestPurgeLogsFromDb(c *gc.C) {
 		c.Assert(err, gc.IsNil)
 
 		tomorrow := relativeNow.AddDate(0, 0, 1).Format(layout)
-		//alice is superuser
+		// alice is superuser
 		bClient := jimmtest.NewUserSessionLogin(c, "alice")
 		cmdCtx, err := cmdtesting.RunCommand(c, cmd.NewPurgeLogsCommandForTesting(s.ClientStore(), bClient), tomorrow)
 		c.Assert(err, gc.IsNil)

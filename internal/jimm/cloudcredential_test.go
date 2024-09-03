@@ -1,10 +1,11 @@
-// Copyright 2020 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package jimm_test
 
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -1399,6 +1400,7 @@ func TestGetCloudCredential(t *testing.T) {
 	}
 }
 
+//nolint:gosec // Thinks credentials hardcoded.
 const forEachUserCloudCredentialEnv = `clouds:
 - name: cloud-1
   regions:
@@ -1521,6 +1523,7 @@ func TestForEachUserCloudCredential(t *testing.T) {
 	}
 }
 
+//nolint:gosec // Thinks credentials hardcoded.
 const getCloudCredentialAttributesEnv = `clouds:
 - name: test-cloud
   type: gce
@@ -1536,6 +1539,10 @@ cloud-credentials:
     client-id: 1234
     private-key: super-secret
     project-id: 5678
+- name: cred-2
+  cloud: test-cloud
+  owner: bob@canonical.com
+  auth-type: certificate
 users:
 - username: alice@canonical.com
   controller-access: superuser
@@ -1547,6 +1554,7 @@ var getCloudCredentialAttributesTests = []struct {
 	username         string
 	hidden           bool
 	jimmAdmin        bool
+	cred             string
 	expectAttributes map[string]string
 	expectRedacted   []string
 	expectError      string
@@ -1555,6 +1563,7 @@ var getCloudCredentialAttributesTests = []struct {
 	name:      "OwnerNoHidden",
 	username:  "bob@canonical.com",
 	jimmAdmin: true,
+	cred:      "cred-1",
 	expectAttributes: map[string]string{
 		"client-email": "bob@example.com",
 		"client-id":    "1234",
@@ -1562,9 +1571,17 @@ var getCloudCredentialAttributesTests = []struct {
 	},
 	expectRedacted: []string{"private-key"},
 }, {
+	name:             "OwnerNoAttributes",
+	username:         "bob@canonical.com",
+	jimmAdmin:        true,
+	cred:             "cred-2",
+	expectAttributes: map[string]string{},
+	expectRedacted:   nil,
+}, {
 	name:     "OwnerWithHidden",
 	username: "bob@canonical.com",
 	hidden:   true,
+	cred:     "cred-1",
 	expectAttributes: map[string]string{
 		"client-email": "bob@example.com",
 		"client-id":    "1234",
@@ -1575,6 +1592,7 @@ var getCloudCredentialAttributesTests = []struct {
 	name:      "SuperUserNoHidden",
 	username:  "alice@canonical.com",
 	jimmAdmin: true,
+	cred:      "cred-1",
 	expectAttributes: map[string]string{
 		"client-email": "bob@example.com",
 		"client-id":    "1234",
@@ -1586,11 +1604,13 @@ var getCloudCredentialAttributesTests = []struct {
 	username:        "alice@canonical.com",
 	hidden:          true,
 	jimmAdmin:       true,
+	cred:            "cred-1",
 	expectError:     `unauthorized`,
 	expectErrorCode: errors.CodeUnauthorized,
 }, {
 	name:            "OtherUserUnauthorized",
 	username:        "charlie@canonical.com",
+	cred:            "cred-1",
 	expectError:     `unauthorized`,
 	expectErrorCode: errors.CodeUnauthorized,
 }}
@@ -1621,7 +1641,8 @@ func TestGetCloudCredentialAttributes(t *testing.T) {
 			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
 			u := env.User("bob@canonical.com").DBObject(c, j.Database)
 			userBob := openfga.NewUser(&u, client)
-			cred, err := j.GetCloudCredential(ctx, userBob, names.NewCloudCredentialTag("test-cloud/bob@canonical.com/cred-1"))
+			credTag := fmt.Sprintf("test-cloud/bob@canonical.com/%s", test.cred)
+			cred, err := j.GetCloudCredential(ctx, userBob, names.NewCloudCredentialTag(credTag))
 			c.Assert(err, qt.IsNil)
 
 			u = env.User(test.username).DBObject(c, j.Database)
@@ -1712,7 +1733,7 @@ func TestCloudCredentialAttributeStore(t *testing.T) {
 
 	// Update to an "empty" credential
 	args.Credential.AuthType = "empty"
-	args.Credential.Attributes = nil
+	args.Credential.Attributes = map[string]string{}
 	_, err = j.UpdateCloudCredential(ctx, user, args)
 	c.Assert(err, qt.IsNil)
 

@@ -19,7 +19,10 @@ build: version/commit.txt version/version.txt
 build/server: version/commit.txt version/version.txt
 	go build -tags version ./cmd/jimmsrv
 
-check: version/commit.txt version/version.txt
+lint:
+	golangci-lint run --timeout 5m
+
+check: version/commit.txt version/version.txt lint
 	go test -timeout 30m $(PROJECT)/... -cover
 
 clean:
@@ -32,22 +35,23 @@ clean:
 certs:
 	@cd local/traefik/certs; ./certs.sh; cd -
 
-test-env: sys-deps certs
-	@touch ./local/vault/approle.json && touch ./local/vault/roleid.txt && touch ./local/vault/vault.env
+test-env: sys-deps
 	@docker compose up --force-recreate -d --wait
 
 test-env-cleanup:
 	@docker compose down -v --remove-orphans
 
 dev-env-setup: sys-deps certs
-	@touch ./local/vault/approle.json && touch ./local/vault/roleid.txt && touch ./local/vault/vault.env
 	@make version/commit.txt && make version/version.txt
 
 dev-env: dev-env-setup
-	@docker compose --profile dev up --force-recreate
+	@docker compose --profile dev up -d --force-recreate --wait
 
 dev-env-cleanup:
 	@docker compose --profile dev down -v --remove-orphans
+
+integration-test-env: dev-env-setup
+	@JIMM_VERSION=$(JIMM_VERSION) docker compose --profile test up -d --force-recreate --wait
 
 # Reformat all source files.
 format:
@@ -113,16 +117,25 @@ define check_dep
 	fi
 endef
 
-# Install packages required to develop JIMM and run tests.
+# Install packages required to develop JIMM and/or run tests.
 APT_BASED := $(shell command -v apt-get >/dev/null; echo $$?)
 sys-deps:
 ifeq ($(APT_BASED),0)
+# golangci-lint is necessary for linting.
+	@$(call check_dep,golangci-lint,Missing Golangci-lint - install from https://golangci-lint.run/welcome/install/)
+# Go acts as the test runner.
 	@$(call check_dep,go,Missing Go - install from https://go.dev/doc/install or 'sudo snap install go --classic')
+# Git is useful to have.
 	@$(call check_dep,git,Missing Git - install with 'sudo apt install git')
+# GCC is required for the compilation process.
 	@$(call check_dep,gcc,Missing gcc - install with 'sudo apt install build-essential')
+# yq is necessary for some scripts that process controller-info yaml files.
 	@$(call check_dep,yq,Missing yq - install with 'sudo snap install yq')
-	@$(call check_dep,gcc,Missing microk8s - install latest none-classic from snapstore')
+# Microk8s is required if you want to start a Juju controller on Microk8s.
+	@$(call check_dep,microk8s,Missing microk8s - install with 'sudo snap install microk8s')
+# Docker is required to start the test dependencies in containers.
 	@$(call check_dep,docker,Missing Docker - install from https://docs.docker.com/engine/install/)
+# juju-db is required for tests that use Juju's test fixture, requiring MongoDB.
 	@$(call check_dep,juju-db.mongo,Missing juju-db - install with 'sudo snap install juju-db --channel=4.4/stable')
 else
 	@echo sys-deps runs only on systems with apt-get
@@ -139,7 +152,6 @@ help:
 	@echo 'make sys-deps - Install the development environment system packages.'
 	@echo 'make format - Format the source files.'
 	@echo 'make simplify - Format and simplify the source files.'
-	@echo 'make get-local-auth - Get local auth to the API WSS endpoint locally.'
 	@echo 'make rock - Build the JIMM rock.'
 	@echo 'make load-rock - Load the most recently built rock into your local docker daemon.'
 

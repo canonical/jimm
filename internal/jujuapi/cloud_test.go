@@ -1,4 +1,4 @@
-// Copyright 2016 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package jujuapi_test
 
@@ -725,6 +725,33 @@ func (s *cloudSuite) TestCredentialContents(c *gc.C) {
 				Model:  "model1",
 				Access: "admin",
 			}},
+		},
+	}})
+}
+
+func (s *cloudSuite) TestCredentialContentsWithEmptyAttributes(c *gc.C) {
+	conn := s.open(c, nil, "test")
+	defer conn.Close()
+	client := cloudapi.NewClient(conn)
+	credentialTag := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/test@canonical.com/cred3")
+	err := client.AddCredential(
+		credentialTag.String(),
+		cloud.NewCredential(
+			"certificate",
+			nil,
+		),
+	)
+	c.Assert(err, gc.Equals, nil)
+	creds, err := client.CredentialContents(jimmtest.TestCloudName, "cred3", false)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(creds, jc.DeepEquals, []jujuparams.CredentialContentResult{{
+		Result: &jujuparams.ControllerCredentialInfo{
+			Content: jujuparams.CredentialContent{
+				Name:       "cred3",
+				Cloud:      jimmtest.TestCloudName,
+				AuthType:   "certificate",
+				Attributes: nil,
+			},
 		},
 	}})
 }

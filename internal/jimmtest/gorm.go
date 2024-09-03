@@ -1,10 +1,11 @@
-// Copyright 2020 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 // Package jimmtest contains useful helpers for testing JIMM.
 package jimmtest
 
 import (
 	"context"
+	//nolint:gosec // We're only using sha1 in tests.
 	"crypto/sha1"
 	"encoding/base64"
 	"fmt"
@@ -16,12 +17,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/canonical/jimm/v3/internal/db"
-	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/google/uuid"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
+
+	"github.com/canonical/jimm/v3/internal/db"
+	"github.com/canonical/jimm/v3/internal/errors"
 )
 
 // A Tester is the test interface required by this package.
@@ -167,9 +169,10 @@ const maxDatabaseNameLength = 63
 // sure no name collisions occur and also future calls with the same suggested
 // database name results in the same safe name.
 func computeSafeDatabaseName(suggestedName string) string {
-	re, _ := regexp.Compile(unsafeCharsPattern)
+	re := regexp.MustCompile(unsafeCharsPattern)
 	safeName := re.ReplaceAllString(suggestedName, "_")
 
+	//nolint:gosec // We're only using sha1 in tests.
 	hasher := sha1.New()
 	// Provide some random chars for the hash. Useful where tests
 	// have the same suite name and same test name.
@@ -195,6 +198,7 @@ var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 func randSeq(n int) string {
 	b := make([]rune, n)
 	for i := range b {
+		//nolint:gosec // We're only using rand.Intn for tests.
 		b[i] = letters[rand.Intn(len(letters))]
 	}
 	return string(b)

@@ -1,3 +1,4 @@
+// Copyright 2024 Canonical.
 package jimmtest
 
 import (
@@ -161,7 +162,14 @@ func TruncateOpenFgaTuples(ctx context.Context) error {
 		return errors.E(err)
 	}
 	defer conn.Close(ctx)
-	conn.Exec(ctx, "TRUNCATE TABLE tuple;")
-	conn.Exec(ctx, "TRUNCATE TABLE changelog;")
+
+	if _, err := conn.Exec(ctx, "TRUNCATE TABLE tuple;"); err != nil {
+		return err
+	}
+
+	if _, err := conn.Exec(ctx, "TRUNCATE TABLE changelog;"); err != nil {
+		return err
+	}
+
 	return nil
 }

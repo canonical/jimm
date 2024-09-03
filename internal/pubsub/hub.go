@@ -1,4 +1,4 @@
-// Copyright 2020 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 // Package pubsub contains an implementation of a simple pubsub
 // mechanism that passes messages about models between
@@ -8,8 +8,9 @@ package pubsub
 import (
 	"sync"
 
-	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/juju/utils/v2/parallel"
+
+	"github.com/canonical/jimm/v3/internal/errors"
 )
 
 // HandlerFunc takes two arguments - a model ID and the message about this model.

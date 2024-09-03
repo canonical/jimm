@@ -1,4 +1,4 @@
-// Copyright 2021 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package cmd
 
@@ -159,7 +159,6 @@ func newRenameGroupCommand() cmd.Command {
 // renameGroupCommand renames a group.
 type renameGroupCommand struct {
 	modelcmd.ControllerCommandBase
-	out cmd.Output
 
 	store    jujuclient.ClientStore
 	dialOpts *jujuapi.DialOpts
@@ -284,7 +283,7 @@ func (c *removeGroupCommand) Run(ctxt *cmd.Context) error {
 		if err != nil {
 			return errors.E(err, "Failed to read from input.")
 		}
-		text = strings.Replace(text, "\n", "", -1)
+		text = strings.ReplaceAll(text, "\n", "")
 		if !(text == "y" || text == "Y") {
 			return nil
 		}
@@ -325,7 +324,6 @@ type listGroupsCommand struct {
 	store    jujuclient.ClientStore
 	dialOpts *jujuapi.DialOpts
 
-	name   string
 	limit  int
 	offset int
 }

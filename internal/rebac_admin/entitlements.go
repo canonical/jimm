@@ -1,19 +1,14 @@
-// Copyright 2024 canonical.
+// Copyright 2024 Canonical.
 
 package rebac_admin
 
 import (
 	"context"
 
-	openfgastatic "github.com/canonical/jimm/v3/openfga"
 	"github.com/canonical/rebac-admin-ui-handlers/v1/resources"
-)
 
-// Since these values have semantic meanings in the API, they'll probably be
-// refactored into constants provided by `rebac-admin-ui-handlers` library. So,
-// we define them here as constants, rather than repeating them as literals.
-const identity = "identity"
-const group = "group"
+	openfgastatic "github.com/canonical/jimm/v3/openfga"
+)
 
 // For rebac v1 this list is kept manually.
 // The reason behind that is we want to decide what relations to expose to rebac admin ui.

@@ -1,23 +1,37 @@
-// Copyright 2016 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package jujuapi
 
 import (
 	"context"
-	stderrors "errors"
+	"net/http"
 	"sort"
 
 	"github.com/juju/juju/rpc"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
+	"golang.org/x/oauth2"
 
-	"github.com/canonical/jimm/v3/internal/auth"
 	"github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/internal/jimm"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/pkg/api/params"
-	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
+
+// LoginService defines the set of methods used for login to JIMM.
+type LoginService interface {
+	// AuthenticateBrowserSession authenticates a session cookie is valid.
+	AuthenticateBrowserSession(ctx context.Context, w http.ResponseWriter, r *http.Request) (context.Context, error)
+	// LoginDevice is step 1 in the device flow and returns the OIDC server that the client should use for login.
+	LoginDevice(ctx context.Context) (*oauth2.DeviceAuthResponse, error)
+	// GetDeviceSessionToken polls the OIDC server waiting for the client to login and return a user scoped session token.
+	GetDeviceSessionToken(ctx context.Context, deviceOAuthResponse *oauth2.DeviceAuthResponse) (string, error)
+	// LoginWithClientCredentials verifies a user by their client credentials.
+	LoginClientCredentials(ctx context.Context, clientID string, clientSecret string) (*openfga.User, error)
+	// LoginWithSessionToken verifies a user based on their session token.
+	LoginWithSessionToken(ctx context.Context, sessionToken string) (*openfga.User, error)
+	// LoginWithSessionCookie verifies a user based on an identity from a cookie obtained during websocket upgrade.
+	LoginWithSessionCookie(ctx context.Context, identityID string) (*openfga.User, error)
+}
 
 // unsupportedLogin returns an appropriate error for login attempts using
 // old version of the Admin facade.
@@ -39,9 +53,9 @@ func (r *controllerRoot) LoginDevice(ctx context.Context) (params.LoginDeviceRes
 	const op = errors.Op("jujuapi.LoginDevice")
 	response := params.LoginDeviceResponse{}
 
-	deviceResponse, err := jimm.LoginDevice(ctx, r.jimm.OAuthAuthenticationService())
+	deviceResponse, err := r.jimm.LoginDevice(ctx)
 	if err != nil {
-		return response, errors.E(op, err)
+		return response, errors.E(op, err, errors.CodeUnauthorized)
 	}
 	// NOTE: As this is on the controller root struct, and a new controller root
 	// is created per WS, it is EXPECTED that the subsequent call to GetDeviceSessionToken
@@ -63,9 +77,9 @@ func (r *controllerRoot) GetDeviceSessionToken(ctx context.Context) (params.GetD
 	const op = errors.Op("jujuapi.GetDeviceSessionToken")
 	response := params.GetDeviceSessionTokenResponse{}
 
-	token, err := jimm.GetDeviceSessionToken(ctx, r.jimm.OAuthAuthenticationService(), r.jimm.GetCredentialStore(), r.deviceOAuthResponse)
+	token, err := r.jimm.GetDeviceSessionToken(ctx, r.deviceOAuthResponse)
 	if err != nil {
-		return response, errors.E(op, err)
+		return response, errors.E(op, err, errors.CodeUnauthorized)
 	}
 
 	response.SessionToken = token
@@ -81,19 +95,9 @@ func (r *controllerRoot) GetDeviceSessionToken(ctx context.Context) (params.GetD
 func (r *controllerRoot) LoginWithSessionCookie(ctx context.Context) (jujuparams.LoginResult, error) {
 	const op = errors.Op("jujuapi.LoginWithSessionCookie")
 
-	// If no identity ID has come through, then no cookie was present
-	// and as such authentication has failed.
-	if r.identityId == "" {
-		return jujuparams.LoginResult{}, errors.E(op, &auth.AuthenticationError{})
-	}
-
-	user, err := r.jimm.GetUser(ctx, r.identityId)
+	user, err := r.jimm.LoginWithSessionCookie(ctx, r.identityId)
 	if err != nil {
-		return jujuparams.LoginResult{}, errors.E(op, err)
-	}
-	err = r.jimm.UpdateUserLastLogin(ctx, r.identityId)
-	if err != nil {
-		return jujuparams.LoginResult{}, errors.E(op, err)
+		return jujuparams.LoginResult{}, errors.E(op, err, errors.CodeUnauthorized)
 	}
 
 	r.mu.Lock()
@@ -122,34 +126,10 @@ func (r *controllerRoot) LoginWithSessionCookie(ctx context.Context) (jujuparams
 // such that subsequent facade method calls can access the authenticated user.
 func (r *controllerRoot) LoginWithSessionToken(ctx context.Context, req params.LoginWithSessionTokenRequest) (jujuparams.LoginResult, error) {
 	const op = errors.Op("jujuapi.LoginWithSessionToken")
-	authenticationSvc := r.jimm.OAuthAuthenticationService()
 
-	// Verify the session token
-	jwtToken, err := authenticationSvc.VerifySessionToken(req.SessionToken)
+	user, err := r.jimm.LoginWithSessionToken(ctx, req.SessionToken)
 	if err != nil {
-		var aerr *auth.AuthenticationError
-		if stderrors.As(err, &aerr) {
-			return aerr.LoginResult, nil
-		}
 		return jujuparams.LoginResult{}, errors.E(op, err, errors.CodeUnauthorized)
-	}
-
-	// Get an OpenFGA user to place on the controllerRoot for this WS
-	// such that:
-	//
-	//	- Subsequent calls are aware of the user
-	//	- Authorisation checks are done against the openfga.User
-	email := jwtToken.Subject()
-
-	// At this point, we know the user exists, so simply just get
-	// the user to create the session token.
-	user, err := r.jimm.GetUser(ctx, email)
-	if err != nil {
-		return jujuparams.LoginResult{}, errors.E(op, err)
-	}
-	err = r.jimm.UpdateUserLastLogin(ctx, email)
-	if err != nil {
-		return jujuparams.LoginResult{}, errors.E(op, err)
 	}
 
 	// TODO(ale8k): This isn't needed I don't think as controller roots are unique
@@ -178,27 +158,9 @@ func (r *controllerRoot) LoginWithSessionToken(ctx context.Context, req params.L
 func (r *controllerRoot) LoginWithClientCredentials(ctx context.Context, req params.LoginWithClientCredentialsRequest) (jujuparams.LoginResult, error) {
 	const op = errors.Op("jujuapi.LoginWithClientCredentials")
 
-	clientIdWithDomain, err := jimmnames.EnsureValidServiceAccountId(req.ClientID)
-	if err != nil {
-		return jujuparams.LoginResult{}, errors.E("invalid client ID")
-	}
-
-	authenticationSvc := r.jimm.OAuthAuthenticationService()
-	if authenticationSvc == nil {
-		return jujuparams.LoginResult{}, errors.E("authentication service not specified")
-	}
-	err = authenticationSvc.VerifyClientCredentials(ctx, req.ClientID, req.ClientSecret)
+	user, err := r.jimm.LoginClientCredentials(ctx, req.ClientID, req.ClientSecret)
 	if err != nil {
 		return jujuparams.LoginResult{}, errors.E(err, errors.CodeUnauthorized)
-	}
-
-	user, err := r.jimm.GetUser(ctx, clientIdWithDomain)
-	if err != nil {
-		return jujuparams.LoginResult{}, errors.E(op, err)
-	}
-	err = r.jimm.UpdateUserLastLogin(ctx, clientIdWithDomain)
-	if err != nil {
-		return jujuparams.LoginResult{}, errors.E(op, err)
 	}
 
 	r.mu.Lock()

@@ -1,4 +1,4 @@
-// Copyright 2020 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package params
 
@@ -219,7 +219,7 @@ type FindAuditEventsRequest struct {
 // A ListControllersResponse is the response that is sent in a
 // ListControllers method.
 type ListControllersResponse struct {
-	Controllers []ControllerInfo `json:"controllers",yaml:"controllers"`
+	Controllers []ControllerInfo `json:"controllers" yaml:"controllers"`
 }
 
 // A RemoveControllerRequest is the request that is sent in a
@@ -307,15 +307,15 @@ type ListGroupsRequest struct {
 
 // Group holds the details of a group currently residing in JIMM.
 type Group struct {
-	UUID      string `json:"uuid",yaml:"uuid"`
-	Name      string `json:"name",yaml:"name"`
-	CreatedAt string `json:"created_at",yaml:"created_at"`
-	UpdatedAt string `json:"updated_at",yaml:"updated_at"`
+	UUID      string `json:"uuid" yaml:"uuid"`
+	Name      string `json:"name" yaml:"name"`
+	CreatedAt string `json:"created_at" yaml:"created_at"`
+	UpdatedAt string `json:"updated_at" yaml:"updated_at"`
 }
 
 // ListGroupResponse returns the group tuples currently residing within OpenFGA.
 type ListGroupResponse struct {
-	Groups []Group `json:"name",yaml:"name"`
+	Groups []Group `json:"name" yaml:"name"`
 }
 
 // RelationshipTuple represents a OpenFGA Tuple.
@@ -348,7 +348,7 @@ type CheckRelationRequest struct {
 // CheckRelationResponse simple responds with an object containing a boolean of 'allowed' or not
 // when a check for access is requested.
 type CheckRelationResponse struct {
-	Allowed bool `json:"allowed",yaml:"allowed"`
+	Allowed bool `json:"allowed" yaml:"allowed"`
 }
 
 // ListRelationshipTuplesRequests holds the request information to list tuples.
@@ -378,8 +378,8 @@ type CrossModelQueryRequest struct {
 //   - Results - A map of each iterated JQ output result. The key for this map is the model UUID.
 //   - Errors - A map of each iterated JQ *or* Status call error. The key for this map is the model UUID.
 type CrossModelQueryResponse struct {
-	Results map[string][]any    `json:"results",yaml:"results"`
-	Errors  map[string][]string `json:"errors",yaml:"errors"`
+	Results map[string][]any    `json:"results" yaml:"results"`
+	Errors  map[string][]string `json:"errors" yaml:"errors"`
 }
 
 // PurgeLogsRequest is the request used to purge logs.
@@ -415,9 +415,9 @@ type LoginDeviceResponse struct {
 	// VerificationURI holds the URI that the user must navigate to
 	// when entering their "user-code" to consent to this authorisation
 	// request.
-	VerificationURI string `json:"verification-uri",yaml:"verification-uri"`
+	VerificationURI string `json:"verification-uri" yaml:"verification-uri"`
 	// UserCode holds the one-time use user consent code.
-	UserCode string `json:"user-code",yaml:"user-code"`
+	UserCode string `json:"user-code" yaml:"user-code"`
 }
 
 // GetDeviceSessionTokenResponse returns a session token to be used against
@@ -427,7 +427,7 @@ type GetDeviceSessionTokenResponse struct {
 	// SessionToken is a base64 encoded JWT capable of authenticating
 	// a user. The JWT contains the users email address in the subject,
 	// and this is used to identify this user.
-	SessionToken string `json:"session-token",yaml:"session-token"`
+	SessionToken string `json:"session-token" yaml:"session-token"`
 }
 
 // LoginWithSessionTokenRequest accepts a session token minted by JIMM and logs
@@ -494,6 +494,6 @@ type GrantServiceAccountAccess struct {
 
 // WhoamiResponse holds the response for a /auth/whoami call.
 type WhoamiResponse struct {
-	DisplayName string `json:"display-name",yaml:"display-name"`
-	Email       string `json:"email",yaml:"email"`
+	DisplayName string `json:"display-name" yaml:"display-name"`
+	Email       string `json:"email" yaml:"email"`
 }

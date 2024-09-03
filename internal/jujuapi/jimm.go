@@ -1,4 +1,4 @@
-// Copyright 2016 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package jujuapi
 
@@ -176,15 +176,6 @@ func (r *controllerRoot) AddController(ctx context.Context, req apiparams.AddCon
 		}
 	}
 
-	ctl := dbmodel.Controller{
-		UUID:              req.UUID,
-		Name:              req.Name,
-		PublicAddress:     req.PublicAddress,
-		CACertificate:     req.CACertificate,
-		AdminIdentityName: req.Username,
-		AdminPassword:     req.Password,
-		TLSHostname:       req.TLSHostname,
-	}
 	nphps, err := network.ParseProviderHostPorts(req.APIAddresses...)
 	if err != nil {
 		return apiparams.ControllerInfo{}, errors.E(op, errors.CodeBadRequest, err)
@@ -195,7 +186,18 @@ func (r *controllerRoot) AddController(ctx context.Context, req apiparams.AddCon
 			nphps[i].Scope = network.ScopePublic
 		}
 	}
-	ctl.Addresses = dbmodel.HostPorts{jujuparams.FromProviderHostPorts(nphps)}
+
+	// TODO(ale8k): Don't build dbmodel here, do it as params to AddController.
+	ctl := dbmodel.Controller{
+		UUID:              req.UUID,
+		Name:              req.Name,
+		PublicAddress:     req.PublicAddress,
+		CACertificate:     req.CACertificate,
+		AdminIdentityName: req.Username,
+		AdminPassword:     req.Password,
+		TLSHostname:       req.TLSHostname,
+		Addresses:         dbmodel.HostPorts{jujuparams.FromProviderHostPorts(nphps)},
+	}
 	if err := r.jimm.AddController(ctx, r.user, &ctl); err != nil {
 		zapctx.Error(ctx, "failed to add controller", zaputil.Error(err))
 		return apiparams.ControllerInfo{}, errors.E(op, err)

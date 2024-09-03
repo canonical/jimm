@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package rebac_admin_test
 
@@ -6,6 +6,9 @@ import (
 	"context"
 	"fmt"
 
+	rebac_handlers "github.com/canonical/rebac-admin-ui-handlers/v1"
+	"github.com/canonical/rebac-admin-ui-handlers/v1/resources"
+	"github.com/juju/names/v5"
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/v3/internal/jimmtest"
@@ -13,9 +16,6 @@ import (
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/rebac_admin"
 	jimmnames "github.com/canonical/jimm/v3/pkg/names"
-	rebac_handlers "github.com/canonical/rebac-admin-ui-handlers/v1"
-	"github.com/canonical/rebac-admin-ui-handlers/v1/resources"
-	"github.com/juju/names/v5"
 )
 
 type rebacAdminSuite struct {

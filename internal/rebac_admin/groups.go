@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package rebac_admin
 
@@ -159,7 +159,7 @@ func (s *groupsService) GetGroupIdentities(ctx context.Context, groupId string, 
 		Relation:     ofganames.MemberRelation.String(),
 		TargetObject: groupTag.String(),
 	}
-	identities, nextToken, err := s.jimm.ListRelationshipTuples(ctx, user, tuple, int32(filter.Limit()), filter.Token())
+	identities, nextToken, err := s.jimm.ListRelationshipTuples(ctx, user, tuple, int32(filter.Limit()), filter.Token()) // #nosec G115 accept integer conversion
 	if err != nil {
 		return nil, err
 	}
@@ -253,7 +253,8 @@ func (s *groupsService) GetGroupEntitlements(ctx context.Context, groupId string
 	filter := utils.CreateTokenPaginationFilter(params.Size, params.NextToken, params.NextPageToken)
 	group := ofganames.WithMemberRelation(jimmnames.NewGroupTag(groupId))
 	entitlementToken := pagination.NewEntitlementToken(filter.Token())
-	tuples, nextEntitlmentToken, err := s.jimm.ListObjectRelations(ctx, user, group, int32(filter.Limit()), entitlementToken)
+	// nolint:gosec accept integer conversion
+	tuples, nextEntitlmentToken, err := s.jimm.ListObjectRelations(ctx, user, group, int32(filter.Limit()), entitlementToken) // #nosec G115 accept integer conversion
 	if err != nil {
 		return nil, err
 	}

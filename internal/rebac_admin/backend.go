@@ -1,16 +1,16 @@
-// Copyright 2024 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package rebac_admin
 
 import (
 	"context"
 
+	rebac_handlers "github.com/canonical/rebac-admin-ui-handlers/v1"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jujuapi"
-	rebac_handlers "github.com/canonical/rebac-admin-ui-handlers/v1"
 )
 
 func SetupBackend(ctx context.Context, jimm jujuapi.JIMM) (*rebac_handlers.ReBACAdminBackend, error) {

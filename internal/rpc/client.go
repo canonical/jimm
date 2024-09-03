@@ -1,4 +1,4 @@
-// Copyright 2021 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package rpc
 
@@ -12,6 +12,8 @@ import (
 
 	"github.com/gorilla/websocket"
 	jujuparams "github.com/juju/juju/rpc/params"
+	"github.com/juju/zaputil/zapctx"
+	"go.uber.org/zap"
 
 	"github.com/canonical/jimm/v3/internal/errors"
 )
@@ -99,7 +101,10 @@ func (c *Client) handleError(err error) {
 	if !c.closing {
 		// We haven't sent a close message yet, so try to send one.
 		cm := websocket.FormatCloseMessage(websocket.CloseProtocolError, err.Error())
-		c.conn.WriteControl(websocket.CloseMessage, cm, time.Time{})
+		err := c.conn.WriteControl(websocket.CloseMessage, cm, time.Time{})
+		if err != nil {
+			zapctx.Error(context.Background(), "failed to write socket closure message", zap.Error(err))
+		}
 	}
 	c.err = err
 	c.conn.Close()
@@ -128,7 +133,10 @@ func (c *Client) handleRequest(msg *message) {
 	// Note we're ignoring any write error here as any subsequent write
 	// will also error and that will be able to process the error more
 	// appropriately.
-	c.conn.WriteJSON(resp)
+	err := c.conn.WriteJSON(resp)
+	if err != nil {
+		zapctx.Error(context.Background(), "failed to write JSON resp", zap.Error(err))
+	}
 }
 
 func (c *Client) handleResponse(msg *message) {
@@ -181,6 +189,7 @@ func (c *Client) Call(ctx context.Context, facade string, version int, id, metho
 		return errors.E(op, err)
 	}
 	ch := make(chan struct{})
+	//nolint:staticcheck // Not sure why Martin made this a **. Ignore for now.
 	respMsg := new(*message)
 	c.msgs[req.RequestID] = inflight{
 		ch:  ch,
@@ -194,28 +203,26 @@ func (c *Client) Call(ctx context.Context, facade string, version int, id, metho
 
 	select {
 	case <-ch:
-		if respMsg != nil {
-			permissionsRequired, err := checkPermissionsRequired(ctx, *respMsg)
-			if err != nil {
-				return err
+		permissionsRequired, err := checkPermissionsRequired(ctx, *respMsg)
+		if err != nil {
+			return err
+		}
+		if permissionsRequired != nil {
+			return &Error{
+				Code: PermissionCheckRequiredErrorCode,
+				Info: permissionsRequired,
 			}
-			if permissionsRequired != nil {
-				return &Error{
-					Code: PermissionCheckRequiredErrorCode,
-					Info: permissionsRequired,
-				}
+		}
+		if (*respMsg).Error != "" {
+			return &Error{
+				Message: (*respMsg).Error,
+				Code:    (*respMsg).ErrorCode,
+				Info:    (*respMsg).ErrorInfo,
 			}
-			if (*respMsg).Error != "" {
-				return &Error{
-					Message: (*respMsg).Error,
-					Code:    (*respMsg).ErrorCode,
-					Info:    (*respMsg).ErrorInfo,
-				}
-			}
-			if resp != nil {
-				if err := json.Unmarshal([]byte((*respMsg).Response), &resp); err != nil {
-					return errors.E(op, err)
-				}
+		}
+		if resp != nil {
+			if err := json.Unmarshal([]byte((*respMsg).Response), &resp); err != nil {
+				return errors.E(op, err)
 			}
 		}
 		return nil

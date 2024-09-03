@@ -1,22 +1,22 @@
-// Copyright 2024 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package middleware
 
 import (
 	"net/http"
 
+	rebac_handlers "github.com/canonical/rebac-admin-ui-handlers/v1"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
 	"github.com/canonical/jimm/v3/internal/auth"
 	"github.com/canonical/jimm/v3/internal/jujuapi"
-	rebac_handlers "github.com/canonical/rebac-admin-ui-handlers/v1"
 )
 
 // AuthenticateViaCookie performs browser session authentication and puts an identity in the request's context
 func AuthenticateViaCookie(next http.Handler, jimm jujuapi.JIMM) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx, err := jimm.OAuthAuthenticationService().AuthenticateBrowserSession(r.Context(), w, r)
+		ctx, err := jimm.AuthenticateBrowserSession(r.Context(), w, r)
 		if err != nil {
 			zapctx.Error(ctx, "failed to authenticate", zap.Error(err))
 			http.Error(w, "failed to authenticate", http.StatusUnauthorized)
@@ -41,7 +41,7 @@ func AuthenticateRebac(next http.Handler, jimm jujuapi.JIMM) http.Handler {
 			return
 		}
 
-		user, err := jimm.GetUser(ctx, identity)
+		user, err := jimm.UserLogin(ctx, identity)
 		if err != nil {
 			zapctx.Error(ctx, "failed to get openfga user", zap.Error(err))
 			http.Error(w, "internal authentication error", http.StatusInternalServerError)
@@ -49,12 +49,8 @@ func AuthenticateRebac(next http.Handler, jimm jujuapi.JIMM) http.Handler {
 		}
 		if !user.JimmAdmin {
 			w.WriteHeader(http.StatusUnauthorized)
-			w.Write([]byte("user is not an admin"))
+			_, _ = w.Write([]byte("user is not an admin"))
 			return
-		}
-		err = jimm.UpdateUserLastLogin(ctx, identity)
-		if err != nil {
-			zapctx.Error(ctx, "failed to update user last login", zap.Error(err))
 		}
 
 		ctx = rebac_handlers.ContextWithIdentity(ctx, user)

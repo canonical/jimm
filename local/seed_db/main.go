@@ -1,3 +1,4 @@
+// Copyright 2024 Canonical.
 package main
 
 import (
@@ -7,15 +8,16 @@ import (
 	"os"
 	"time"
 
-	"github.com/canonical/jimm/v3/internal/db"
-	"github.com/canonical/jimm/v3/internal/dbmodel"
-	"github.com/canonical/jimm/v3/internal/logger"
 	petname "github.com/dustinkirkland/golang-petname"
 	"github.com/google/uuid"
 	"github.com/juju/juju/core/crossmodel"
 	"github.com/juju/juju/state"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+
+	"github.com/canonical/jimm/v3/internal/db"
+	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/logger"
 )
 
 // A simple script to seed a local database for schema testing.
@@ -36,7 +38,7 @@ func main() {
 		DB: gdb,
 	}
 
-	db.Migrate(ctx, false)
+	err = db.Migrate(ctx, false)
 	if err != nil {
 		fmt.Println("failed to migrate to db ", err)
 		os.Exit(1)

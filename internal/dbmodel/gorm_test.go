@@ -1,4 +1,4 @@
-// Copyright 2020 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package dbmodel_test
 
@@ -18,6 +18,9 @@ import (
 // migrations for those objects.
 func gormDB(t testing.TB) *gorm.DB {
 	database := db.Database{DB: jimmtest.PostgresDB(t, nil)}
-	database.Migrate(context.Background(), false)
+	err := database.Migrate(context.Background(), false)
+	if err != nil {
+		t.Fail()
+	}
 	return database.DB
 }

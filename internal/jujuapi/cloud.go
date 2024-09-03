@@ -1,4 +1,4 @@
-// Copyright 2016 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package jujuapi
 
@@ -481,8 +481,8 @@ func (r *controllerRoot) UpdateCloud(ctx context.Context, args jujuparams.Update
 	results := jujuparams.ErrorResults{
 		Results: make([]jujuparams.ErrorResult, len(args.Clouds)),
 	}
-	for i, arg := range args.Clouds {
-		err := r.updateCloud(ctx, arg)
+	for i := range args.Clouds {
+		err := r.updateCloud()
 		if err != nil {
 			results.Results[i].Error = mapError(err)
 		}
@@ -490,7 +490,7 @@ func (r *controllerRoot) UpdateCloud(ctx context.Context, args jujuparams.Update
 	return results, nil
 }
 
-func (r *controllerRoot) updateCloud(ctx context.Context, args jujuparams.AddCloudArgs) error {
+func (r *controllerRoot) updateCloud() error {
 	// TODO(mhilton) work out how to support updating clouds, for now
 	// tell everyone they're not allowed.
 	return errors.E(errors.CodeForbidden, "permission denied")

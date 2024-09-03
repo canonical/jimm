@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package middleware_test
 
@@ -9,60 +9,52 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	rebac_handlers "github.com/canonical/rebac-admin-ui-handlers/v1"
 	qt "github.com/frankban/quicktest"
 
 	"github.com/canonical/jimm/v3/internal/auth"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
-	"github.com/canonical/jimm/v3/internal/jimm"
 	"github.com/canonical/jimm/v3/internal/jimmtest"
+	"github.com/canonical/jimm/v3/internal/jimmtest/mocks"
 	"github.com/canonical/jimm/v3/internal/middleware"
 	"github.com/canonical/jimm/v3/internal/openfga"
-	rebac_handlers "github.com/canonical/rebac-admin-ui-handlers/v1"
 )
 
 // Checks if the authenticator responsible for access control to rebac admin handlers works correctly.
 func TestAuthenticateRebac(t *testing.T) {
 	testUser := "test-user@canonical.com"
 	tests := []struct {
-		name           string
-		setupMock      func(*jimmtest.MockOAuthAuthenticator)
-		jimmAdmin      bool
-		expectedStatus int
+		name                   string
+		mockAuthBrowserSession func(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error)
+		jimmAdmin              bool
+		expectedStatus         int
 	}{
 		{
 			name: "success",
-			setupMock: func(m *jimmtest.MockOAuthAuthenticator) {
-				m.AuthenticateBrowserSession_ = func(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error) {
-					return auth.ContextWithSessionIdentity(ctx, testUser), nil
-				}
+			mockAuthBrowserSession: func(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error) {
+				return auth.ContextWithSessionIdentity(ctx, testUser), nil
 			},
 			jimmAdmin:      true,
 			expectedStatus: http.StatusOK,
 		},
 		{
 			name: "failure",
-			setupMock: func(m *jimmtest.MockOAuthAuthenticator) {
-				m.AuthenticateBrowserSession_ = func(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error) {
-					return ctx, errors.New("some error")
-				}
+			mockAuthBrowserSession: func(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error) {
+				return ctx, errors.New("some error")
 			},
 			expectedStatus: http.StatusUnauthorized,
 		},
 		{
 			name: "no identity",
-			setupMock: func(m *jimmtest.MockOAuthAuthenticator) {
-				m.AuthenticateBrowserSession_ = func(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error) {
-					return ctx, nil
-				}
+			mockAuthBrowserSession: func(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error) {
+				return ctx, nil
 			},
 			expectedStatus: http.StatusInternalServerError,
 		},
 		{
 			name: "not a jimm admin",
-			setupMock: func(m *jimmtest.MockOAuthAuthenticator) {
-				m.AuthenticateBrowserSession_ = func(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error) {
-					return auth.ContextWithSessionIdentity(ctx, testUser), nil
-				}
+			mockAuthBrowserSession: func(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error) {
+				return auth.ContextWithSessionIdentity(ctx, testUser), nil
 			},
 			jimmAdmin:      false,
 			expectedStatus: http.StatusUnauthorized,
@@ -73,19 +65,15 @@ func TestAuthenticateRebac(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			c := qt.New(t)
 
-			mockAuthService := jimmtest.NewMockOAuthAuthenticator(nil, nil)
-			tt.setupMock(&mockAuthService)
-
 			j := jimmtest.JIMM{
-				OAuthAuthenticationService_: func() jimm.OAuthAuthenticator {
-					return &mockAuthService
+				LoginService: mocks.LoginService{
+					AuthenticateBrowserSession_: func(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error) {
+						return tt.mockAuthBrowserSession(ctx, w, req)
+					},
 				},
-				GetUser_: func(ctx context.Context, username string) (*openfga.User, error) {
+				UserLogin_: func(ctx context.Context, username string) (*openfga.User, error) {
 					user := dbmodel.Identity{Name: username}
 					return &openfga.User{Identity: &user, JimmAdmin: tt.jimmAdmin}, nil
-				},
-				UpdateUserLastLogin_: func(ctx context.Context, identifier string) error {
-					return nil
 				},
 			}
 			req := httptest.NewRequest(http.MethodGet, "/", nil)

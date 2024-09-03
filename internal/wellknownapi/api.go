@@ -1,4 +1,4 @@
-// Copyright 2023 canonical.
+// Copyright 2024 Canonical.
 package wellknownapi
 
 import (
@@ -7,12 +7,13 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/internal/jimm/credentials"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
+
+	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jimm/credentials"
 )
 
 // WellKnownHandler holds the grouped router to be mounted and

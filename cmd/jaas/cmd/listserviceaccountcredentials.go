@@ -1,4 +1,4 @@
-// Copyright 2021 Canonical Ltd.
+// Copyright 2024 Canonical.
 
 package cmd
 
@@ -31,6 +31,7 @@ This command only shows credentials uploaded to the controller that belong to th
 Client-side credentials should be managed via the juju credentials command.
 
 `
+	//nolint:gosec // Believes credentials are exposed but aren't.
 	listServiceAccountCredentialsExamples = `
     juju list-service-account-credentials <client-id> 
     juju list-service-account-credentials <client-id> --show-secrets
