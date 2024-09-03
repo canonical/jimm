@@ -945,7 +945,7 @@ func (s *accessControlSuite) TestListRelationshipTuples(c *gc.C) {
 		},
 		ResolveUUIDs: true,
 	})
-	c.Assert(err, gc.ErrorMatches, "failed to parse tuple target, key applicationoffer-fake-offer: application offer not found.*")
+	c.Assert(err, gc.ErrorMatches, "failed to parse tuple target object key applicationoffer-fake-offer: application offer not found.*")
 }
 
 func (s *accessControlSuite) TestListRelationshipTuplesNoUUIDResolution(c *gc.C) {
