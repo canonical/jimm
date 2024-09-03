@@ -24,6 +24,8 @@ import (
 // A streamProxier serves all HTTP endpoints by proxying
 // messages between the controller and client.
 type streamProxier struct {
+	// TODO(Kian): Refactor the apiServer to use the JIMM API rather than a concrete struct
+	// then we can write unit tests for the stream proxier.
 	apiServer
 }
 
@@ -56,9 +58,10 @@ func (s streamProxier) ServeWS(ctx context.Context, clientConn *websocket.Conn) 
 			zapctx.Error(ctx, "failed to write error message to client", zap.Error(err), zap.Any("client message", errResult))
 		}
 	}
-	identity := auth.SessionIdentityFromContext(ctx)
-	if identity == "" {
-		writeError("identity not found", errors.CodeUnauthorized)
+	user, err := s.jimm.UserLogin(ctx, auth.SessionIdentityFromContext(ctx))
+	if err != nil {
+		zapctx.Error(ctx, "user login error", zap.Error(err))
+		writeError(err.Error(), errors.CodeUnauthorized)
 		return
 	}
 	uuid, finalPath, err := modelInfoFromPath(jimmhttp.PathElementFromContext(ctx, "path"))
@@ -67,32 +70,19 @@ func (s streamProxier) ServeWS(ctx context.Context, clientConn *websocket.Conn) 
 		writeError(fmt.Sprintf("error parsing path: %s", err.Error()), errors.CodeBadRequest)
 		return
 	}
-	i, err := dbmodel.NewIdentity(identity)
+	model, err := s.getModel(ctx, uuid)
 	if err != nil {
-		writeError(err.Error(), errors.CodeNotFound)
+		writeError(err.Error(), errors.CodeModelNotFound)
 		return
 	}
-	user := openfga.NewUser(i, s.jimm.OpenFGAClient)
-	model := dbmodel.Model{
-		UUID: sql.NullString{
-			String: uuid,
-			Valid:  uuid != "",
-		},
-	}
-	if err := s.jimm.Database.GetModel(context.Background(), &model); err != nil {
-		zapctx.Error(ctx, "failed to find model", zap.String("uuid", uuid), zap.Error(err))
-		writeError(fmt.Sprintf("failed to find model: %s", err.Error()), errors.CodeModelNotFound)
-		return
-	}
-	mt := model.ResourceTag()
-	if ok, err := checkPermission(ctx, finalPath, user, mt); err != nil {
+	if ok, err := checkPermission(ctx, finalPath, user, model.ResourceTag()); err != nil {
 		writeError(err.Error(), errors.CodeUnauthorized)
 		return
 	} else if !ok {
-		writeError("unauthorized", errors.CodeUnauthorized)
+		writeError(fmt.Sprintf("unauthorized access to endpoint: %s", finalPath), errors.CodeUnauthorized)
 		return
 	}
-	api, err := s.jimm.Dialer.Dial(ctx, &model.Controller, mt, nil)
+	api, err := s.jimm.Dialer.Dial(ctx, &model.Controller, model.ResourceTag(), nil)
 	if err != nil {
 		zapctx.Error(ctx, "failed to dial controller", zap.Error(err))
 		writeError(fmt.Sprintf("failed to dial controller: %s", err.Error()), errors.CodeConnectionFailed)
@@ -105,23 +95,45 @@ func (s streamProxier) ServeWS(ctx context.Context, clientConn *websocket.Conn) 
 		writeError(fmt.Sprintf("failed to connect stream: %s", err.Error()), errors.CodeConnectionFailed)
 		return
 	}
+	proxyStreams(clientConn, controllerStream)
+}
+
+func (s streamProxier) getModel(ctx context.Context, modelUUID string) (dbmodel.Model, error) {
+	model := dbmodel.Model{
+		UUID: sql.NullString{
+			String: modelUUID,
+			Valid:  modelUUID != "",
+		},
+	}
+	if err := s.jimm.Database.GetModel(context.Background(), &model); err != nil {
+		zapctx.Error(ctx, "failed to find model", zap.String("uuid", modelUUID), zap.Error(err))
+		return dbmodel.Model{}, fmt.Errorf("failed to find model: %s", err.Error())
+	}
+	return model, nil
+}
+
+// proxyStreams starts a simple proxy for 2 websockets.
+// After starting the proxy we listen for the first error
+// returned and then close both connections before waiting
+// for an error from the second connection.
+func proxyStreams(src, dst base.Stream) {
 	errChan := make(chan error, 2)
-	go func() { errChan <- proxy(controllerStream, clientConn) }()
-	go func() { errChan <- proxy(clientConn, controllerStream) }()
+	go func() { errChan <- proxy(src, dst) }()
+	go func() { errChan <- proxy(dst, src) }()
 	<-errChan
-	controllerStream.Close()
-	clientConn.Close()
+	dst.Close()
+	src.Close()
 	<-errChan
 }
 
-func proxy(in base.Stream, out base.Stream) error {
+func proxy(src base.Stream, dst base.Stream) error {
 	for {
 		var data map[string]any
-		err := in.ReadJSON(&data)
+		err := src.ReadJSON(&data)
 		if err != nil {
 			return err
 		}
-		err = out.WriteJSON(data)
+		err = dst.WriteJSON(data)
 		if err != nil {
 			return err
 		}

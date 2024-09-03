@@ -43,7 +43,9 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		zapctx.Error(ctx, "authentication error", zap.Error(authErr))
 		w.WriteHeader(http.StatusUnauthorized)
 		_, err := w.Write([]byte(authErr.Error()))
-		zapctx.Error(ctx, "failed to write authentication error", zap.Error(err))
+		if err != nil {
+			zapctx.Error(ctx, "failed to write authentication error", zap.Error(err))
+		}
 		return
 	}
 

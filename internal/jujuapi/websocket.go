@@ -159,7 +159,7 @@ func mustGetSubexpIndex(regex *regexp.Regexp, name string) int {
 	return index
 }
 
-// modelInfoFromPath takes a URL path to a model endpoint and returns the uuid
+// modelInfoFromPath takes a path to a model endpoint and returns the uuid
 // and final URL segment. I.e. /model/<uuid>/api returns <uuid>, api, err
 // Basic validation of the uuid takes place.
 func modelInfoFromPath(path string) (uuid string, finalPath string, err error) {
@@ -171,9 +171,8 @@ func modelInfoFromPath(path string) (uuid string, finalPath string, err error) {
 }
 
 // ServeWS implements jimmhttp.WSServer.
-// It does so by acting as a websocket proxy that intercepts auth requests
-// to authenticate the user and create a token with their permissions before
-// forwarding their requests to the appropriate Juju controller.
+// We act as a proxier, handling auth on requests before forwarding the
+// requests to the appropriate Juju controller.
 func (s apiProxier) ServeWS(ctx context.Context, clientConn *websocket.Conn) {
 	jwtGenerator := jimm.NewJWTGenerator(&s.jimm.Database, s.jimm, s.jimm.JWTService)
 	connectionFunc := controllerConnectionFunc(s, &jwtGenerator)

@@ -53,5 +53,5 @@ func (s *streamProxySuite) TestDebugLogsError(c *gc.C) {
 	err = s.JIMM.OpenFGAClient.RemoveRelation(ctx, tuple)
 	c.Assert(err, gc.IsNil)
 	_, err = common.StreamDebugLog(context.TODO(), conn, common.DebugLogParams{})
-	c.Assert(err, gc.ErrorMatches, "unauthorized")
+	c.Assert(err, gc.ErrorMatches, "unauthorized access to endpoint: log")
 }
