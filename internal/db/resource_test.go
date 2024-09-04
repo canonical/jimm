@@ -12,10 +12,10 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 )
 
-func (s *dbSuite) SetupDB(c *qt.C) (dbmodel.Model, dbmodel.Controller, dbmodel.Cloud) {
+func SetupDB(c *qt.C, database *db.Database) (dbmodel.Model, dbmodel.Controller, dbmodel.Cloud) {
 	u, err := dbmodel.NewIdentity("bob@canonical.com")
 	c.Assert(err, qt.IsNil)
-	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
+	c.Assert(database.DB.Create(&u).Error, qt.IsNil)
 
 	cloud := dbmodel.Cloud{
 		Name: "test-cloud",
@@ -24,7 +24,7 @@ func (s *dbSuite) SetupDB(c *qt.C) (dbmodel.Model, dbmodel.Controller, dbmodel.C
 			Name: "test-region",
 		}},
 	}
-	c.Assert(s.Database.DB.Create(&cloud).Error, qt.IsNil)
+	c.Assert(database.DB.Create(&cloud).Error, qt.IsNil)
 
 	cred := dbmodel.CloudCredential{
 		Name:     "test-cred",
@@ -32,7 +32,7 @@ func (s *dbSuite) SetupDB(c *qt.C) (dbmodel.Model, dbmodel.Controller, dbmodel.C
 		Owner:    *u,
 		AuthType: "empty",
 	}
-	c.Assert(s.Database.DB.Create(&cred).Error, qt.IsNil)
+	c.Assert(database.DB.Create(&cred).Error, qt.IsNil)
 
 	controller := dbmodel.Controller{
 		Name:        "test-controller",
@@ -40,7 +40,7 @@ func (s *dbSuite) SetupDB(c *qt.C) (dbmodel.Model, dbmodel.Controller, dbmodel.C
 		CloudName:   "test-cloud",
 		CloudRegion: "test-region",
 	}
-	err = s.Database.AddController(context.Background(), &controller)
+	err = database.AddController(context.Background(), &controller)
 	c.Assert(err, qt.Equals, nil)
 
 	model := dbmodel.Model{
@@ -64,7 +64,7 @@ func (s *dbSuite) SetupDB(c *qt.C) (dbmodel.Model, dbmodel.Controller, dbmodel.C
 			Level: "unsupported",
 		},
 	}
-	err = s.Database.AddModel(context.Background(), &model)
+	err = database.AddModel(context.Background(), &model)
 	c.Assert(err, qt.Equals, nil)
 	return model, controller, cloud
 }
@@ -77,7 +77,7 @@ func (s *dbSuite) TestGetResources(c *qt.C) {
 	c.Assert(err, qt.Equals, nil)
 	c.Assert(res, qt.HasLen, 0)
 	// create one model, one controller, one cloud
-	model, controller, cloud := s.SetupDB(c)
+	model, controller, cloud := SetupDB(c, s.Database)
 	res, err = s.Database.ListResources(ctx, 10, 0)
 	c.Assert(err, qt.Equals, nil)
 	c.Assert(res, qt.HasLen, 3)

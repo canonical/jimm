@@ -19,7 +19,7 @@ type resourcesSuite struct {
 
 var _ = gc.Suite(&resourcesSuite{})
 
-// patchIdentitiesEntitlementTestEnv is used to create entries in JIMM's database.
+// resourcesTestEnv is used to create entries in JIMM's database.
 // The rebacAdminSuite does not spin up a Juju controller so we cannot use
 // regular JIMM methods to create resources. It is also necessary to have resources
 // present in the database in order for ListRelationshipTuples to work correctly.

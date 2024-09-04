@@ -29,8 +29,8 @@ func FromUserToIdentity(user openfga.User) resources.Identity {
 	}
 }
 
-// FromUserToIdentity parses openfga.User into resources.Identity .
-func FromDbResourcesToResources(res db.Resource) resources.Resource {
+// ToRebacResource parses db.Resource into resources.Resource.
+func ToRebacResource(res db.Resource) resources.Resource {
 	r := resources.Resource{
 		Entity: resources.Entity{
 			Id:   res.ID.String,
