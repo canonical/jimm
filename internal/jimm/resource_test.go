@@ -3,7 +3,6 @@ package jimm_test
 
 import (
 	"context"
-	"slices"
 	"testing"
 	"time"
 
@@ -35,10 +34,9 @@ func TestGetResources(t *testing.T) {
 
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
-	user, _, controller, model, applicationOffer, cloud, _ := createTestControllerEnvironment(ctx, c, j.Database)
+	_, _, controller, model, applicationOffer, cloud, _ := createTestControllerEnvironment(ctx, c, j.Database)
 
-	ids := []string{user.Name, controller.UUID, model.UUID.String, applicationOffer.UUID, cloud.Name}
-	slices.Sort(ids)
+	ids := []string{applicationOffer.UUID, cloud.Name, controller.UUID, model.UUID.String}
 
 	u := openfga.NewUser(&dbmodel.Identity{Name: "admin@canonical.com"}, ofgaClient)
 	u.JimmAdmin = true
@@ -59,7 +57,7 @@ func TestGetResources(t *testing.T) {
 			desc:       "test with remianing ids",
 			limit:      3,
 			offset:     3,
-			identities: []string{ids[3], ids[4]},
+			identities: []string{ids[3]},
 		},
 		{
 			desc:       "test out of range",

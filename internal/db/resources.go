@@ -12,27 +12,6 @@ import (
 // MULTI_TABLES_RAW_SQL contains the raw query fetching entities from multiple tables, with their respective entity parents.
 const MULTI_TABLES_RAW_SQL = `
 (
-	SELECT 'controller' AS type, 
-		controllers.uuid AS id, 
-		controllers.name AS name, 
-		'' AS parent_id,
-		'' AS parent_name,
-		'' AS parent_type
-		FROM controllers
-)
-UNION
-(
-	SELECT 'model' AS type, 
-			models.uuid AS id, 
-			models.name AS name, 
-			controllers.uuid AS parent_id,
-			controllers.name AS parent_name,
-			'controller' AS parent_type
-	FROM models
-	JOIN controllers ON models.controller_id = controllers.id
-)
-UNION
-(
 	SELECT 'application_offer' AS type, 
 			application_offers.uuid AS id, 
 			application_offers.name AS name, 
@@ -54,6 +33,27 @@ UNION
 )
 UNION
 (
+	SELECT 'controller' AS type, 
+		controllers.uuid AS id, 
+		controllers.name AS name, 
+		'' AS parent_id,
+		'' AS parent_name,
+		'' AS parent_type
+		FROM controllers
+)
+UNION
+(
+	SELECT 'model' AS type, 
+			models.uuid AS id, 
+			models.name AS name, 
+			controllers.uuid AS parent_id,
+			controllers.name AS parent_name,
+			'controller' AS parent_type
+	FROM models
+	JOIN controllers ON models.controller_id = controllers.id
+)
+UNION
+(
 	SELECT 'service_account' AS type, 
 			identities.name AS id, 
 			identities.name AS name, 
@@ -61,9 +61,9 @@ UNION
 			'' AS parent_name,
 			'' AS parent_type
 	FROM identities
-	WHERE name NOT LIKE '%@%'
+	WHERE name LIKE '%@serviceaccount'
 )
-ORDER BY id
+ORDER BY type, id
 OFFSET ?
 LIMIT  ?;
 `

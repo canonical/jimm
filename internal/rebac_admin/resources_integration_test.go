@@ -3,7 +3,6 @@ package rebac_admin_test
 
 import (
 	"context"
-	"slices"
 
 	rebac_handlers "github.com/canonical/rebac-admin-ui-handlers/v1"
 	"github.com/canonical/rebac-admin-ui-handlers/v1/resources"
@@ -73,18 +72,29 @@ func (s *resourcesSuite) TestPatchIdentityEntitlements(c *gc.C) {
 	tester := jimmtest.GocheckTester{C: c}
 	env := jimmtest.ParseEnvironment(tester, resourcesTestEnv)
 	env.PopulateDB(tester, s.JIMM.Database)
-	ids := make([]string, 0)
-	for _, m := range env.Models {
-		ids = append(ids, m.UUID)
+	type testEntity struct {
+		Id       string
+		ParentId string
+	}
+	ids := make([]testEntity, 0)
+	for _, c := range env.Clouds {
+		ids = append(ids, testEntity{
+			Id:       c.Name,
+			ParentId: "",
+		})
 	}
 	for _, c := range env.Controllers {
-		ids = append(ids, c.UUID)
+		ids = append(ids, testEntity{
+			Id:       c.UUID,
+			ParentId: "",
+		})
 	}
-	for _, c := range env.Clouds {
-		ids = append(ids, c.Name)
+	for _, m := range env.Models {
+		ids = append(ids, testEntity{
+			Id:       m.UUID,
+			ParentId: env.Controller(m.Controller).UUID,
+		})
 	}
-
-	slices.Sort(ids)
 
 	testCases := []struct {
 		desc         string
@@ -93,7 +103,7 @@ func (s *resourcesSuite) TestPatchIdentityEntitlements(c *gc.C) {
 		wantPage     int
 		wantSize     int
 		wantNextpage *int
-		ids          []string
+		ids          []testEntity
 	}{
 		{
 			desc:         "test with first page",
@@ -102,7 +112,7 @@ func (s *resourcesSuite) TestPatchIdentityEntitlements(c *gc.C) {
 			wantPage:     0,
 			wantSize:     2,
 			wantNextpage: utils.IntToPointer(1),
-			ids:          []string{ids[0], ids[1]},
+			ids:          []testEntity{ids[0], ids[1]},
 		},
 		{
 			desc:         "test with second page",
@@ -111,7 +121,7 @@ func (s *resourcesSuite) TestPatchIdentityEntitlements(c *gc.C) {
 			wantPage:     1,
 			wantSize:     2,
 			wantNextpage: utils.IntToPointer(2),
-			ids:          []string{ids[2], ids[3]},
+			ids:          []testEntity{ids[2], ids[3]},
 		},
 		{
 			desc:         "test with last page",
@@ -120,7 +130,7 @@ func (s *resourcesSuite) TestPatchIdentityEntitlements(c *gc.C) {
 			wantPage:     2,
 			wantSize:     1,
 			wantNextpage: nil,
-			ids:          []string{ids[4]},
+			ids:          []testEntity{ids[4]},
 		},
 	}
 	for _, t := range testCases {
@@ -138,7 +148,10 @@ func (s *resourcesSuite) TestPatchIdentityEntitlements(c *gc.C) {
 			c.Assert(*resources.Next.Page, gc.Equals, *t.wantNextpage)
 		}
 		for i := range len(t.ids) {
-			c.Assert(resources.Data[i].Entity.Id, gc.Equals, t.ids[i])
+			c.Assert(resources.Data[i].Entity.Id, gc.Equals, t.ids[i].Id)
+			if t.ids[i].ParentId != "" {
+				c.Assert(resources.Data[i].Parent.Id, gc.Equals, t.ids[i].ParentId)
+			}
 		}
 	}
 

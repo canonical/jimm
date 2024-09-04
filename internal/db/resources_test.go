@@ -12,10 +12,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 )
 
-func (s *dbSuite) Setup(c *qt.C) (dbmodel.Model, dbmodel.Controller, dbmodel.Cloud) {
-	err := s.Database.Migrate(context.Background(), true)
-	c.Assert(err, qt.Equals, nil)
-
+func (s *dbSuite) SetupDB(c *qt.C) (dbmodel.Model, dbmodel.Controller, dbmodel.Cloud) {
 	u, err := dbmodel.NewIdentity("bob@canonical.com")
 	c.Assert(err, qt.IsNil)
 	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
@@ -73,10 +70,15 @@ func (s *dbSuite) Setup(c *qt.C) (dbmodel.Model, dbmodel.Controller, dbmodel.Clo
 }
 
 func (s *dbSuite) TestGetResources(c *qt.C) {
-	// create one model, one controller, one cloud
-	model, controller, cloud := s.Setup(c)
 	ctx := context.Background()
+	err := s.Database.Migrate(context.Background(), true)
+	c.Assert(err, qt.Equals, nil)
 	res, err := s.Database.ListResources(ctx, 10, 0)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(res, qt.HasLen, 0)
+	// create one model, one controller, one cloud
+	model, controller, cloud := s.SetupDB(c)
+	res, err = s.Database.ListResources(ctx, 10, 0)
 	c.Assert(err, qt.Equals, nil)
 	c.Assert(res, qt.HasLen, 3)
 	for _, r := range res {
