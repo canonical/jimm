@@ -360,11 +360,11 @@ func (s *relationSuite) TestListRelations(c *gc.C) {
 	}, {
 		Object:       "group-group-1#member",
 		Relation:     "administrator",
-		TargetObject: "model-" + env.controllers[0].Name + ":" + env.models[0].OwnerIdentityName + "/" + env.models[0].Name,
+		TargetObject: "model-" + env.models[0].OwnerIdentityName + "/" + env.models[0].Name,
 	}, {
 		Object:       "user-" + env.users[1].Name,
 		Relation:     "administrator",
-		TargetObject: "applicationoffer-" + env.controllers[0].Name + ":" + env.applicationOffers[0].Model.OwnerIdentityName + "/" + env.applicationOffers[0].Model.Name + "." + env.applicationOffers[0].Name,
+		TargetObject: "applicationoffer-" + env.applicationOffers[0].URL,
 	}, {
 		Object:       "user-" + env.users[0].Name,
 		Relation:     "administrator",
@@ -573,7 +573,7 @@ func (s *relationSuite) TestCheckRelationViaSuperuser(c *gc.C) {
 
 	// Test reader is OK
 	userToCheck := "user-" + u.Name
-	modelToCheck := "model-" + controller.Name + ":" + u.Name + "/" + model.Name
+	modelToCheck := "model-" + u.Name + "/" + model.Name
 	cmdCtx, err := cmdtesting.RunCommand(
 		c,
 		cmd.NewCheckRelationCommandForTesting(s.ClientStore(), bClient),
