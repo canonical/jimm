@@ -20,6 +20,7 @@ import (
 	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/rs/cors"
 	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -81,6 +82,10 @@ type OAuthAuthenticatorParams struct {
 
 	// SessionCookieMaxAge holds the max age for session cookies in seconds.
 	SessionCookieMaxAge int
+
+	// SecureSessionCookies determines if HTTPS must be enabled in order for JIMM
+	// to set cookies when creating browser based sessions.
+	SecureSessionCookies bool
 
 	// JWTSessionKey holds the secret key used for signing/verifying JWT tokens.
 	// See internal/auth/oauth2.go AuthenticationService.SessionSecretkey for more details.
@@ -175,14 +180,14 @@ type Params struct {
 	// the /callback in an authorisation code OAuth2.0 flow to finish the flow.
 	DashboardFinalRedirectURL string
 
-	// SecureSessionCookies determines if HTTPS must be enabled in order for JIMM
-	// to set cookies when creating browser based sessions.
-	SecureSessionCookies bool
-
 	// CookieSessionKey is a randomly generated secret passed via config used for signing
 	// cookie data. The recommended length is 32/64 characters from the Gorilla securecookie lib.
 	// https://github.com/gorilla/securecookie/blob/main/securecookie.go#L124
 	CookieSessionKey []byte
+
+	// CorsAllowedOrigins represents all addresses that are valid for cross-origin
+	// requests. A wildcard '*' is accepted to allow all cross-origin requests.
+	CorsAllowedOrigins []string
 }
 
 // A Service is the implementation of a JIMM server.
@@ -347,6 +352,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 			SessionTokenExpiry:  p.OAuthAuthenticatorParams.SessionTokenExpiry,
 			SessionCookieMaxAge: p.OAuthAuthenticatorParams.SessionCookieMaxAge,
 			JWTSessionKey:       p.OAuthAuthenticatorParams.JWTSessionKey,
+			SecureCookies:       p.OAuthAuthenticatorParams.SecureSessionCookies,
 			Store:               &s.jimm.Database,
 			SessionStore:        sessionStore,
 			RedirectURL:         redirectUrl,
@@ -380,6 +386,14 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		return nil, errors.E(op, err, "failed to parse final redirect url for the dashboard")
 	}
 
+	// Setup CORS middleware
+	corsOpts := cors.New(cors.Options{
+		AllowedOrigins:   p.CorsAllowedOrigins,
+		AllowedMethods:   []string{"GET"},
+		AllowCredentials: true,
+	})
+	s.mux.Use(corsOpts.Handler)
+
 	// Setup all HTTP handlers.
 	mountHandler := func(path string, h jimmhttp.JIMMHttpHandler) {
 		s.mux.Mount(path, h.Routes())
@@ -406,7 +420,6 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		oauthHandler, err := jimmhttp.NewOAuthHandler(jimmhttp.OAuthHandlerParams{
 			Authenticator:             authSvc,
 			DashboardFinalRedirectURL: p.DashboardFinalRedirectURL,
-			SecureCookies:             p.SecureSessionCookies,
 		})
 		if err != nil {
 			zapctx.Error(ctx, "failed to setup authentication handler", zap.Error(err))
