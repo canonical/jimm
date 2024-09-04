@@ -53,9 +53,8 @@ func (s *resourcesService) ListResources(ctx context.Context, params *resources.
 	}, nil
 }
 
-// We fetch one record more than the page size.
-// Then, we set the next page if we have this many records.
-// If it does we return the records minus 1 and advide the consumer there is another page.
+// getNextPageAndResources checks for the expectedPageSize of the resources.
+// If there is enough records we return the records minus 1 and advice the consumer there is another page.
 // Otherwise we return the records we have and set next page as empty.
 func getNextPageAndResources(currentPage, expectedPageSize int, resources []db.Resource) (*int, []db.Resource) {
 	var nextPage *int

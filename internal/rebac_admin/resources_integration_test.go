@@ -21,8 +21,7 @@ var _ = gc.Suite(&resourcesSuite{})
 
 // resourcesTestEnv is used to create entries in JIMM's database.
 // The rebacAdminSuite does not spin up a Juju controller so we cannot use
-// regular JIMM methods to create resources. It is also necessary to have resources
-// present in the database in order for ListRelationshipTuples to work correctly.
+// regular JIMM methods to create resources.
 const resourcesTestEnv = `clouds:
 - name: test-cloud
   type: test-provider
