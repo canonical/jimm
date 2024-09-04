@@ -95,7 +95,7 @@ func (s streamProxier) ServeWS(ctx context.Context, clientConn *websocket.Conn) 
 		writeError(fmt.Sprintf("failed to connect stream: %s", err.Error()), errors.CodeConnectionFailed)
 		return
 	}
-	proxyStreams(clientConn, controllerStream)
+	proxyStreams(ctx, clientConn, controllerStream)
 }
 
 func (s streamProxier) getModel(ctx context.Context, modelUUID string) (dbmodel.Model, error) {
@@ -116,14 +116,20 @@ func (s streamProxier) getModel(ctx context.Context, modelUUID string) (dbmodel.
 // After starting the proxy we listen for the first error
 // returned and then close both connections before waiting
 // for an error from the second connection.
-func proxyStreams(src, dst base.Stream) {
+func proxyStreams(ctx context.Context, src, dst base.Stream) {
 	errChan := make(chan error, 2)
 	go func() { errChan <- proxy(src, dst) }()
 	go func() { errChan <- proxy(dst, src) }()
-	<-errChan
+	err := <-errChan
+	if err != nil {
+		zapctx.Error(ctx, "error from stream proxy", zap.Error(err))
+	}
 	dst.Close()
 	src.Close()
-	<-errChan
+	err = <-errChan
+	if err != nil {
+		zapctx.Error(ctx, "error from stream proxy", zap.Error(err))
+	}
 }
 
 func proxy(src base.Stream, dst base.Stream) error {
@@ -131,13 +137,20 @@ func proxy(src base.Stream, dst base.Stream) error {
 		var data map[string]any
 		err := src.ReadJSON(&data)
 		if err != nil {
-			return err
+			if unexpectedReadError(err) {
+				return err
+			}
+			return nil
 		}
 		err = dst.WriteJSON(data)
 		if err != nil {
 			return err
 		}
 	}
+}
+
+func unexpectedReadError(err error) bool {
+	return false
 }
 
 func checkPermission(ctx context.Context, path string, u *openfga.User, mt names.ModelTag) (bool, error) {

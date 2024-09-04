@@ -42,7 +42,7 @@ func ModelHandler(ctx context.Context, jimm *jimm.JIMM, p Params) http.Handler {
 			jimm: jimm,
 		}},
 	})
-	mux.Handle("/{uuid}/", &jimmhttp.WSHandler{
+	mux.Handle("/{uuid}/log", &jimmhttp.WSHandler{
 		Upgrader: websocketUpgrader,
 		Server: &streamProxier{apiServer: apiServer{
 			jimm: jimm,
