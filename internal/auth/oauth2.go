@@ -432,7 +432,7 @@ func (as *AuthenticationService) VerifyClientCredentials(ctx context.Context, cl
 // Note browsers require cookies with the same-site policy as 'none' to additionally have the secure flag set.
 func sessionCrossOriginSafe(session *sessions.Session, secure bool) *sessions.Session {
 	session.Options.Secure = secure                  // Ensures only sent with HTTPS
-	session.Options.HttpOnly = false                 // Allow Javascript to read it
+	session.Options.HttpOnly = true                  // Don't allow Javascript to modify cookie
 	session.Options.SameSite = http.SameSiteNoneMode // Allow cross-origin requests via Javascript
 	return session
 }
