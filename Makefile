@@ -62,10 +62,10 @@ simplify:
 	gofmt -w -l -s .
 
 # Generate version information
-version/commit.txt: FORCE
+version/commit.txt:
 	git rev-parse --verify HEAD > version/commit.txt
 
-version/version.txt: FORCE
+version/version.txt:
 	if [ -z "$(GIT_VERSION)" ]; then \
         echo "dev" > version/version.txt; \
     else \
@@ -155,6 +155,4 @@ help:
 	@echo 'make rock - Build the JIMM rock.'
 	@echo 'make load-rock - Load the most recently built rock into your local docker daemon.'
 
-.PHONY: build check install release clean format server simplify sys-deps help FORCE
-
-FORCE:
+.PHONY: build check install release clean format server simplify sys-deps help
