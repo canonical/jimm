@@ -61,11 +61,7 @@ models:
   owner: alice@canonical.com
 `
 
-// TestPatchIdentityEntitlements tests the patching of entitlements for a specific identityId,
-// adding and removing relations after the setup.
-// Setup: add user to a group, and add models to the user.
-func (s *resourcesSuite) TestPatchIdentityEntitlements(c *gc.C) {
-	// initialization
+func (s *resourcesSuite) TestListResources(c *gc.C) {
 	ctx := context.Background()
 	ctx = rebac_handlers.ContextWithIdentity(ctx, s.AdminUser)
 	resourcesSvc := rebac_admin.NewResourcesService(s.JIMM)
@@ -134,7 +130,6 @@ func (s *resourcesSuite) TestPatchIdentityEntitlements(c *gc.C) {
 		},
 	}
 	for _, t := range testCases {
-
 		resources, err := resourcesSvc.ListResources(ctx, &resources.GetResourcesParams{
 			Size: t.size,
 			Page: t.page,
@@ -154,5 +149,4 @@ func (s *resourcesSuite) TestPatchIdentityEntitlements(c *gc.C) {
 			}
 		}
 	}
-
 }

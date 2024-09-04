@@ -9,8 +9,8 @@ import (
 	"github.com/canonical/jimm/v3/internal/servermon"
 )
 
-// MULTI_TABLES_RAW_SQL contains the raw query fetching entities from multiple tables, with their respective entity parents.
-const MULTI_TABLES_RAW_SQL = `
+// RESOURCES_RAW_SQL contains the raw query fetching entities from multiple tables, with their respective entity parents.
+const RESOURCES_RAW_SQL = `
 (
 	SELECT 'application_offer' AS type, 
 			application_offers.uuid AS id, 
@@ -80,7 +80,7 @@ type Resource struct {
 // ListResources returns a list of models, clouds, controllers, service accounts, and application offers, with its respective parents.
 // It has been implemented with a raw query because this is a specific implementation for the ReBAC Admin UI.
 func (d *Database) ListResources(ctx context.Context, limit, offset int) (_ []Resource, err error) {
-	const op = errors.Op("db.GetMultipleModels")
+	const op = errors.Op("db.ListResources")
 	if err := d.ready(); err != nil {
 		return nil, errors.E(op, err)
 	}
@@ -90,7 +90,7 @@ func (d *Database) ListResources(ctx context.Context, limit, offset int) (_ []Re
 	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
 
 	db := d.DB.WithContext(ctx)
-	rows, err := db.Raw(MULTI_TABLES_RAW_SQL, offset, limit).Rows()
+	rows, err := db.Raw(RESOURCES_RAW_SQL, offset, limit).Rows()
 	if err != nil {
 		return nil, err
 	}
