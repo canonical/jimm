@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
@@ -312,6 +313,15 @@ func (p *modelProxy) auditLogMessage(msg *message, isResponse bool) error {
 	return nil
 }
 
+func unexpectedReadError(err error) bool {
+	closeError := websocket.IsUnexpectedCloseError(err,
+		websocket.CloseNormalClosure,
+		websocket.CloseNoStatusReceived,
+		websocket.CloseAbnormalClosure)
+	_, unmarshalError := err.(*json.InvalidUnmarshalError)
+	return closeError || unmarshalError
+}
+
 // clientProxy proxies messages from client->controller.
 type clientProxy struct {
 	modelProxy
@@ -332,7 +342,10 @@ func (p *clientProxy) start(ctx context.Context) error {
 		zapctx.Debug(ctx, "Reading on client connection")
 		msg := new(message)
 		if err := p.src.readJson(&msg); err != nil {
-			//lint:ignore nilerr an error reading on the socket implies the client closed their connection, return without error.
+			if unexpectedReadError(err) {
+				zapctx.Error(ctx, "unexpected client read error", zap.Error(err))
+				return err
+			}
 			return nil
 		}
 		zapctx.Debug(ctx, "Read message from client", zap.Any("message", msg))
@@ -423,7 +436,10 @@ func (p *controllerProxy) start(ctx context.Context) error {
 		zapctx.Debug(ctx, "Reading on controller connection")
 		msg := new(message)
 		if err := p.src.readJson(msg); err != nil {
-			//lint:ignore nilerr an error reading on the socket implies we've closed the connection to the controller, return without error.
+			if unexpectedReadError(err) {
+				zapctx.Error(ctx, "unexpected controller read error", zap.Error(err))
+				return err
+			}
 			return nil
 		}
 		zapctx.Debug(ctx, "Received message from controller", zap.Any("Message", msg))
