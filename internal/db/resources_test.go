@@ -12,7 +12,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 )
 
-func (s *dbSuite) Setup(c *qt.C) {
+func (s *dbSuite) Setup(c *qt.C) (dbmodel.Model, dbmodel.Controller, dbmodel.Cloud) {
 	err := s.Database.Migrate(context.Background(), true)
 	c.Assert(err, qt.Equals, nil)
 
@@ -69,13 +69,25 @@ func (s *dbSuite) Setup(c *qt.C) {
 	}
 	err = s.Database.AddModel(context.Background(), &model)
 	c.Assert(err, qt.Equals, nil)
+	return model, controller, cloud
 }
 
 func (s *dbSuite) TestGetResources(c *qt.C) {
 	// create one model, one controller, one cloud
-	s.Setup(c)
+	model, controller, cloud := s.Setup(c)
 	ctx := context.Background()
-	res, err := s.Database.GetResources(ctx, 10, 0)
+	res, err := s.Database.ListResources(ctx, 10, 0)
 	c.Assert(err, qt.Equals, nil)
 	c.Assert(res, qt.HasLen, 3)
+	for _, r := range res {
+		switch r.Type {
+		case "model":
+			c.Assert(r.ID.String, qt.Equals, model.UUID.String)
+			c.Assert(r.ParentId.String, qt.Equals, controller.UUID)
+		case "controller":
+			c.Assert(r.ID.String, qt.Equals, controller.UUID)
+		case "cloud":
+			c.Assert(r.ID.String, qt.Equals, cloud.Name)
+		}
+	}
 }

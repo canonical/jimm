@@ -4,6 +4,7 @@ package rebac_admin
 var (
 	NewGroupService      = newGroupService
 	NewidentitiesService = newidentitiesService
+	NewResourcesService  = newResourcesService
 )
 
 type GroupsService = groupsService

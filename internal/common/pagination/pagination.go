@@ -62,6 +62,22 @@ func CreatePagination(sizeP, pageP *int, total int) (int, *int, LimitOffsetPagin
 	return page, nextPage, NewOffsetFilter(pageSize, offset)
 }
 
+// CreatePagination returns the current page, the page size, and the pagination.LimitOffsetPagination.
+// This method is different approach to the method `CreatePagination` when we don't have the total number of records.
+func CreatePaginationWithoutTotal(sizeP, pageP *int) (int, int, LimitOffsetPagination) {
+	pageSize := -1
+	offset := 0
+	page := 0
+
+	if sizeP != nil && pageP != nil {
+		pageSize = *sizeP
+		page = *pageP
+		offset = pageSize * page
+	}
+
+	return page, pageSize + 1, NewOffsetFilter(pageSize+1, offset)
+}
+
 type OpenFGAPagination struct {
 	limit int
 	token string

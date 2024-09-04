@@ -9,11 +9,12 @@ import (
 	"github.com/canonical/jimm/v3/internal/servermon"
 )
 
-const MUTIPLE_PAGE_SQL = `
+// MULTI_TABLES_RAW_SQL contains the raw query fetching entities from multiple tables, with their respective entity parents.
+const MULTI_TABLES_RAW_SQL = `
 (
 	SELECT 'controller' AS type, 
-		uuid AS id, 
-		name AS name, 
+		controllers.uuid AS id, 
+		controllers.name AS name, 
 		'' AS parent_id,
 		'' AS parent_name,
 		'' AS parent_type
@@ -69,14 +70,16 @@ LIMIT  ?;
 
 type Resource struct {
 	Type       string
-	UUID       sql.NullString
+	ID         sql.NullString
 	Name       string
 	ParentId   sql.NullString
 	ParentName string
 	ParentType string
 }
 
-func (d *Database) GetResources(ctx context.Context, limit, offset int) (_ []Resource, err error) {
+// ListResources returns a list of models, clouds, controllers, service accounts, and application offers, with its respective parents.
+// It has been implemented with a raw query because this is a specific implementation for the ReBAC Admin UI.
+func (d *Database) ListResources(ctx context.Context, limit, offset int) (_ []Resource, err error) {
 	const op = errors.Op("db.GetMultipleModels")
 	if err := d.ready(); err != nil {
 		return nil, errors.E(op, err)
@@ -87,7 +90,7 @@ func (d *Database) GetResources(ctx context.Context, limit, offset int) (_ []Res
 	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
 
 	db := d.DB.WithContext(ctx)
-	rows, err := db.Raw(MUTIPLE_PAGE_SQL, offset, limit).Rows()
+	rows, err := db.Raw(MULTI_TABLES_RAW_SQL, offset, limit).Rows()
 	if err != nil {
 		return nil, err
 	}
