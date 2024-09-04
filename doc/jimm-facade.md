@@ -1,6 +1,9 @@
 JIMM Facade
 ===========
 
+>This document is out of date and requires rework to include details
+>on new JIMM specific facades.
+
 In addition to the facades required to emulate a juju controller, JIMM
 also advertises a JIMM facade with some additional features.
 
