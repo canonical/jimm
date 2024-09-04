@@ -23,11 +23,19 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Fix to build rock due to regression in LXD 5.21/stable https://discourse.ubuntu.com/t/mount-root-proc-cannot-mount-proc-read-only-with-lxd-5-21-2-22f93f4-from-snap/47533
+      - name: Setup LXD
+        uses: canonical/setup-lxd@main
+        with:
+          channel: 5.21/candidate
+
       - name: ln rockcraft.yaml
         run: ln -s ./rocks/jimm.yaml ./rockcraft.yaml
       
       - name: Build ROCK
-        uses: canonical/craft-actions/rockcraft-pack@main
+        run: |
+          /usr/bin/sudo snap install --channel stable --classic rockcraft && \
+          rockcraft pack --verbosity trace --use-lxd
 
       - name: Load ROCK into local registry
         run: make load-rock

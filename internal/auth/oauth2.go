@@ -77,6 +77,8 @@ type AuthenticationService struct {
 	sessionTokenExpiry time.Duration
 	// sessionCookieMaxAge holds the max age for session cookies in seconds.
 	sessionCookieMaxAge int
+	// secureCookies decides whether to set the secure flag on cookies.
+	secureCookies bool
 	// jwtSessionKey holds the secret key used for signing/verifying JWT tokens.
 	// According to https://datatracker.ietf.org/doc/html/rfc7518 minimum key lengths are
 	// HSXXX e.g. HS256 - 256 bits, RSA - at least 2048 bits.
@@ -119,6 +121,9 @@ type AuthenticationServiceParams struct {
 
 	// SessionCookieMaxAge holds the max age for session cookies in seconds.
 	SessionCookieMaxAge int
+
+	// SecureCookies decides whether to set the secure flag on cookies.
+	SecureCookies bool
 
 	// JWTSessionKey holds the secret key used for signing/verifying JWT tokens.
 	// See AuthenticationService.JWTSessionKey for more details.
@@ -164,6 +169,7 @@ func NewAuthenticationService(ctx context.Context, params AuthenticationServiceP
 		db:                  params.Store,
 		sessionStore:        params.SessionStore,
 		sessionCookieMaxAge: params.SessionCookieMaxAge,
+		secureCookies:       params.SecureCookies,
 	}, nil
 }
 
@@ -421,13 +427,23 @@ func (as *AuthenticationService) VerifyClientCredentials(ctx context.Context, cl
 	return nil
 }
 
+// sessionCrossOriginSafe sets parameters on the session that allow its use in cross-origin requests.
+// Options are not saved to the database so this must be called whenever a session cookie will be returned to a client.
+//
+// Note browsers require cookies with the same-site policy as 'none' to additionally have the secure flag set.
+func sessionCrossOriginSafe(session *sessions.Session, secure bool) *sessions.Session {
+	session.Options.Secure = secure                  // Ensures only sent with HTTPS
+	session.Options.HttpOnly = true                  // Don't allow Javascript to modify cookie
+	session.Options.SameSite = http.SameSiteNoneMode // Allow cross-origin requests via Javascript
+	return session
+}
+
 // CreateBrowserSession creates a session and updates the cookie for a browser
 // login callback.
 func (as *AuthenticationService) CreateBrowserSession(
 	ctx context.Context,
 	w http.ResponseWriter,
 	r *http.Request,
-	secureCookies bool,
 	email string,
 ) error {
 	const op = errors.Op("auth.AuthenticationService.CreateBrowserSession")
@@ -439,8 +455,7 @@ func (as *AuthenticationService) CreateBrowserSession(
 
 	session.IsNew = true                            // Sets cookie to a fresh new cookie
 	session.Options.MaxAge = as.sessionCookieMaxAge // Expiry in seconds
-	session.Options.Secure = secureCookies          // Ensures only sent with HTTPS
-	session.Options.HttpOnly = false                // Allow Javascript to read it
+	session = sessionCrossOriginSafe(session, as.secureCookies)
 
 	session.Values[SessionIdentityKey] = email
 	if err = session.Save(r, w); err != nil {
@@ -466,6 +481,7 @@ func (as *AuthenticationService) AuthenticateBrowserSession(ctx context.Context,
 	if err != nil {
 		return ctx, errors.E(op, err, "failed to retrieve session")
 	}
+	session = sessionCrossOriginSafe(session, as.secureCookies)
 
 	identityId, ok := session.Values[SessionIdentityKey]
 	if !ok {
