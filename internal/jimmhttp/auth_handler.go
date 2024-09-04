@@ -34,7 +34,6 @@ type OAuthHandler struct {
 	Router                    *chi.Mux
 	authenticator             BrowserOAuthAuthenticator
 	dashboardFinalRedirectURL string
-	secureCookies             bool
 }
 
 // OAuthHandlerParams holds the parameters to configure the OAuthHandler.
@@ -45,10 +44,6 @@ type OAuthHandlerParams struct {
 	// DashboardFinalRedirectURL is the final redirection URL to send users to
 	// upon completing the authorisation code flow.
 	DashboardFinalRedirectURL string
-
-	// SessionCookies determines if HTTPS must be enabled in order for JIMM
-	// to set cookies when creating browser based sessions.
-	SecureCookies bool
 }
 
 // BrowserOAuthAuthenticator handles authorisation code authentication within JIMM
@@ -63,7 +58,6 @@ type BrowserOAuthAuthenticator interface {
 		ctx context.Context,
 		w http.ResponseWriter,
 		r *http.Request,
-		secureCookies bool,
 		email string,
 	) error
 	Logout(ctx context.Context, w http.ResponseWriter, req *http.Request) error
@@ -83,7 +77,6 @@ func NewOAuthHandler(p OAuthHandlerParams) (*OAuthHandler, error) {
 		Router:                    chi.NewRouter(),
 		authenticator:             p.Authenticator,
 		dashboardFinalRedirectURL: p.DashboardFinalRedirectURL,
-		secureCookies:             p.SecureCookies,
 	}, nil
 }
 
@@ -173,7 +166,6 @@ func (oah *OAuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		ctx,
 		w,
 		r,
-		oah.secureCookies,
 		email,
 	); err != nil {
 		writeError(ctx, w, http.StatusInternalServerError, err, "failed to setup session")

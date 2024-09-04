@@ -23,6 +23,7 @@ func (j *JIMM) LoginDevice(ctx context.Context) (*oauth2.DeviceAuthResponse, err
 	return resp, nil
 }
 
+// AuthenticateBrowserSession authenticates a browser login.
 func (j *JIMM) AuthenticateBrowserSession(ctx context.Context, w http.ResponseWriter, r *http.Request) (context.Context, error) {
 	return j.OAuthAuthenticator.AuthenticateBrowserSession(ctx, w, r)
 }

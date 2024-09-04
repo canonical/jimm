@@ -59,6 +59,7 @@ require (
 	github.com/lestrrat-go/iter v1.0.2
 	github.com/lestrrat-go/jwx/v2 v2.0.21
 	github.com/oklog/ulid/v2 v2.1.0
+	github.com/rs/cors v1.11.1
 	github.com/stretchr/testify v1.9.0
 	golang.org/x/oauth2 v0.16.0
 	gopkg.in/errgo.v1 v1.0.1

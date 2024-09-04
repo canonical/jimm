@@ -41,15 +41,21 @@ runs:
         username: ${{ github.actor }}
         password: ${{ inputs.ghcr-pat }}
 
+    # We can't use a make target here because a composite action
+    # doesn't have a .git folder when checked out.
     - name: Start server based on released version
       if: ${{ inputs.jimm-version != 'dev' }}
-      run: make integration-test-env
+      run: |
+        cd local/traefik/certs; ./certs.sh; cd - && \
+        docker compose --profile test up -d --wait
       shell: bash
+      working-directory: ${{ github.action_path }}/../../..
       env:
         JIMM_VERSION: ${{ inputs.jimm-version }}
 
     - name: Start server based on development version
       if: ${{ inputs.jimm-version == 'dev' }}
+      working-directory: ${{ github.action_path }}/../../..
       run: make dev-env
       shell: bash
 
@@ -59,6 +65,7 @@ runs:
         echo 'jimm-ca<<EOF' >> $GITHUB_OUTPUT
         cat ./local/traefik/certs/ca.crt >> $GITHUB_OUTPUT
         echo 'EOF' >> $GITHUB_OUTPUT
+      working-directory: ${{ github.action_path }}/../../..
       shell: bash
 
     - name: Initialise LXD
@@ -73,6 +80,7 @@ runs:
     - name: Setup cloud-init script for bootstraping Juju controllers
       run: ./local/jimm/setup-controller.sh
       shell: bash
+      working-directory: ${{ github.action_path }}/../../..
       env:
         SKIP_BOOTSTRAP: true
         CLOUDINIT_FILE: "cloudinit.temp.yaml"
@@ -83,7 +91,7 @@ runs:
         provider: "lxd"
         channel: "5.19/stable"
         juju-channel: ${{ inputs.juju-channel }}
-        bootstrap-options: "--config cloudinit.temp.yaml --config login-token-refresh-url=https://jimm.localhost/.well-known/jwks.json"
+        bootstrap-options: "--config ${{ github.action_path }}/../../../cloudinit.temp.yaml --config login-token-refresh-url=https://jimm.localhost/.well-known/jwks.json"
 
     # As described in https://github.com/charmed-kubernetes/actions-operator grab the newly setup controller name
     - name: Save LXD controller name
@@ -100,6 +108,7 @@ runs:
 
     - name: Authenticate Juju CLI
       run: chmod -R 666 ~/.local/share/juju/*.yaml && ./local/jimm/setup-cli-auth.sh
+      working-directory: ${{ github.action_path }}/../../..
       shell: bash
       # Below is a hardcoded JWT using the same test-secret used in JIMM's docker compose and allows the CLI to authenticate as the jimm-test@canonical.com user.
       env:
@@ -107,6 +116,7 @@ runs:
 
     - name: Add LXD Juju controller to JIMM
       run: ./local/jimm/add-controller.sh
+      working-directory: ${{ github.action_path }}/../../..
       shell: bash
       env:
         JIMM_CONTROLLER_NAME: "jimm"
@@ -114,4 +124,5 @@ runs:
 
     - name: Provide service account with cloud-credentials
       run: ./local/jimm/setup-service-account.sh
+      working-directory: ${{ github.action_path }}/../../..
       shell: bash
