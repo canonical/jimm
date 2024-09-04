@@ -239,6 +239,7 @@ func SetupTestDashboardCallbackHandler(browserURL string, db *db.Database, sessi
 		SessionStore:        sessionStore,
 		SessionCookieMaxAge: 60,
 		JWTSessionKey:       "test-secret",
+		SecureCookies:       false,
 	})
 	if err != nil {
 		return nil, err
@@ -247,7 +248,6 @@ func SetupTestDashboardCallbackHandler(browserURL string, db *db.Database, sessi
 	h, err := jimmhttp.NewOAuthHandler(jimmhttp.OAuthHandlerParams{
 		Authenticator:             authSvc,
 		DashboardFinalRedirectURL: browserURL,
-		SecureCookies:             false,
 	})
 	if err != nil {
 		return nil, err
