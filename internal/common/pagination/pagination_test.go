@@ -130,6 +130,18 @@ func TestCreatePagination(t *testing.T) {
 	}
 }
 
+// test the requested size is 1 more than then page size.
+func TestCreatePaginationWithoutTotal(t *testing.T) {
+	c := qt.New(t)
+	pPage := utils.IntToPointer(0)
+	pSize := utils.IntToPointer(10)
+	page, size, pag := pagination.CreatePaginationWithoutTotal(pSize, pPage)
+	c.Assert(page, qt.Equals, 0)
+	c.Assert(pag.Limit(), qt.Equals, 11)
+	c.Assert(pag.Offset(), qt.Equals, 0)
+	c.Assert(size, qt.Equals, 11)
+}
+
 func TestTokenFilter(t *testing.T) {
 	testToken := "test-token"
 	testCases := []struct {

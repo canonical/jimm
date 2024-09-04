@@ -44,22 +44,37 @@ func (l LimitOffsetPagination) Offset() int {
 }
 
 // CreatePagination returns the current page, the next page if exists, and the pagination.LimitOffsetPagination.
-func CreatePagination(sizeP, pageP *int, total int) (int, *int, LimitOffsetPagination) {
+func CreatePagination(sizeP, pageP *int, total int) (currentPage int, nextPage *int, _ LimitOffsetPagination) {
 	pageSize := -1
 	offset := 0
-	page := 0
-	var nextPage *int
 
 	if sizeP != nil && pageP != nil {
 		pageSize = *sizeP
-		page = *pageP
-		offset = pageSize * page
+		currentPage = *pageP
+		offset = pageSize * currentPage
 	}
-	if (page+1)*pageSize < total {
-		nPage := page + 1
+	if (currentPage+1)*pageSize < total {
+		nPage := currentPage + 1
 		nextPage = &nPage
 	}
-	return page, nextPage, NewOffsetFilter(pageSize, offset)
+	return currentPage, nextPage, NewOffsetFilter(pageSize, offset)
+}
+
+// CreatePagination returns the current page, the expected page size, and the pagination.LimitOffsetPagination.
+// This method is different approach to the method `CreatePagination` when we don't have the total number of records.
+// We return the expectedPageSize, which is pageSize +1, so we fetch one record more from the db.
+// We then check the resulting records are enough to advice the consumers to ask for one more page or not.
+func CreatePaginationWithoutTotal(sizeP, pageP *int) (currentPage int, expectedPageSize int, _ LimitOffsetPagination) {
+	pageSize := -1
+	offset := 0
+
+	if sizeP != nil && pageP != nil {
+		pageSize = *sizeP
+		currentPage = *pageP
+		offset = pageSize * currentPage
+	}
+	expectedPageSize = pageSize + 1
+	return currentPage, expectedPageSize, NewOffsetFilter(pageSize+1, offset)
 }
 
 type OpenFGAPagination struct {

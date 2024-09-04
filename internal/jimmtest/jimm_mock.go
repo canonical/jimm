@@ -68,6 +68,7 @@ type JIMM struct {
 	InitiateMigration_                 func(ctx context.Context, user *openfga.User, spec jujuparams.MigrationSpec) (jujuparams.InitiateMigrationResult, error)
 	InitiateInternalMigration_         func(ctx context.Context, user *openfga.User, modelTag names.ModelTag, targetController string) (jujuparams.InitiateMigrationResult, error)
 	ListApplicationOffers_             func(ctx context.Context, user *openfga.User, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error)
+	ListResources_                     func(ctx context.Context, user *openfga.User, filter pagination.LimitOffsetPagination) ([]db.Resource, error)
 	Offer_                             func(ctx context.Context, user *openfga.User, offer jimm.AddApplicationOfferParams) error
 	PubSubHub_                         func() *pubsub.Hub
 	PurgeLogs_                         func(ctx context.Context, user *openfga.User, before time.Time) (int64, error)
@@ -299,6 +300,12 @@ func (j *JIMM) ListApplicationOffers(ctx context.Context, user *openfga.User, fi
 		return nil, errors.E(errors.CodeNotImplemented)
 	}
 	return j.ListApplicationOffers_(ctx, user, filters...)
+}
+func (j *JIMM) ListResources(ctx context.Context, user *openfga.User, filter pagination.LimitOffsetPagination) ([]db.Resource, error) {
+	if j.ListResources_ == nil {
+		return nil, errors.E(errors.CodeNotImplemented)
+	}
+	return j.ListResources_(ctx, user, filter)
 }
 func (j *JIMM) Offer(ctx context.Context, user *openfga.User, offer jimm.AddApplicationOfferParams) error {
 	if j.Offer_ == nil {

@@ -10,6 +10,7 @@ import (
 	"github.com/juju/names/v5"
 
 	"github.com/canonical/jimm/v3/internal/common/pagination"
+	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
@@ -26,6 +27,27 @@ func FromUserToIdentity(user openfga.User) resources.Identity {
 		LastLogin: &lastLogin,
 		Source:    "",
 	}
+}
+
+// ToRebacResource parses db.Resource into resources.Resource.
+func ToRebacResource(res db.Resource) resources.Resource {
+	r := resources.Resource{
+		Entity: resources.Entity{
+			Id:   res.ID.String,
+			Name: res.Name,
+			Type: res.Type,
+		},
+	}
+	// the parent is populated only for models and application offers.
+	// the parent type is set empty from the query.
+	if res.ParentType != "" {
+		r.Parent = &resources.Entity{
+			Id:   res.ParentId.String,
+			Name: res.ParentName,
+			Type: res.ParentType,
+		}
+	}
+	return r
 }
 
 // CreateTokenPaginationFilter returns a token pagination filter based on the rebac admin request parameters.
