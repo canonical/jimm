@@ -4,6 +4,7 @@ package jimm
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"math/rand"
 	"sort"
@@ -684,6 +685,20 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 	}
 
 	return mi, nil
+}
+
+func (j *JIMM) GetModel(ctx context.Context, uuid string) (dbmodel.Model, error) {
+	model := dbmodel.Model{
+		UUID: sql.NullString{
+			String: uuid,
+			Valid:  uuid != "",
+		},
+	}
+	if err := j.Database.GetModel(context.Background(), &model); err != nil {
+		zapctx.Error(ctx, "failed to find model", zap.String("uuid", uuid), zap.Error(err))
+		return dbmodel.Model{}, fmt.Errorf("failed to get model: %s", err.Error())
+	}
+	return model, nil
 }
 
 // ModelInfo returns the model info for the model with the given ModelTag.

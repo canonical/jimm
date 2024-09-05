@@ -23,6 +23,8 @@ var _ = gc.Suite(&streamProxySuite{})
 func (s *streamProxySuite) TestDebugLogs(c *gc.C) {
 	conn := s.open(c, &api.Info{ModelTag: s.Model.ResourceTag()}, "bob")
 	defer conn.Close()
+	// Note this is enough to test that a client can make connection for streaming logs.
+	// No actual logs come through either because of the JujuConnSuite or the fact that there is no application deployed.
 	_, err := common.StreamDebugLog(context.TODO(), conn, common.DebugLogParams{})
 	c.Assert(err, gc.IsNil)
 }

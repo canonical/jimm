@@ -341,16 +341,17 @@ func (c *Connection) Context() context.Context {
 // when making the initial HTTP request.
 func (c *Connection) ConnectStream(path string, attrs url.Values) (base.Stream, error) {
 	const op = errors.Op("jujuclient.ConnectStream")
+	modelTag, ok := c.ModelTag()
+	if !ok {
+		return nil, errors.E(op, "no model found")
+	}
+
 	user, pass, err := c.dialer.ControllerCredentialsStore.GetControllerCredentials(c.ctx, c.ctl.Name)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
 	requestHeader := jujuhttp.BasicAuthHeader(names.NewUserTag(user).String(), pass)
 
-	modelTag, ok := c.ModelTag()
-	if !ok {
-		return nil, errors.E(op, "no model found")
-	}
 	conn, err := rpc.Dial(c.ctx, c.ctl, modelTag, path, requestHeader)
 	if err != nil {
 		return nil, errors.E(op, err)

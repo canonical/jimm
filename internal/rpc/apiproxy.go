@@ -321,10 +321,7 @@ func unexpectedReadError(err error) bool {
 		return true
 	}
 	_, unmarshalError := err.(*json.InvalidUnmarshalError)
-	if unmarshalError {
-		return true
-	}
-	return false
+	return unmarshalError
 }
 
 // clientProxy proxies messages from client->controller.
