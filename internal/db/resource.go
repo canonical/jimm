@@ -12,6 +12,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/servermon"
 )
 
+const ApplicationOffersQueryKey = "application_offers"
 const SELECT_APPLICATION_OFFERS = `
 'application_offer' AS type, 
 application_offers.uuid AS id, 
@@ -21,6 +22,7 @@ models.name AS parent_name,
 'model' AS parent_type
 `
 
+const CloudsQueryKey = "clouds"
 const SELECT_CLOUDS = `
 'cloud' AS type, 
 clouds.name AS id, 
@@ -30,6 +32,7 @@ clouds.name AS name,
 '' AS parent_type
 `
 
+const ControllersQueryKey = "controllers"
 const SELECT_CONTROLLERS = `
 'controller' AS type, 
 controllers.uuid AS id, 
@@ -39,6 +42,7 @@ controllers.name AS name,
 '' AS parent_type
 `
 
+const ModelsQueryKey = "models"
 const SELECT_MODELS = `
 'model' AS type, 
 models.uuid AS id, 
@@ -48,6 +52,7 @@ controllers.name AS parent_name,
 'controller' AS parent_type
 `
 
+const ServiceAccountQueryKey = "identities"
 const SELECT_IDENTITIES = `
 'service_account' AS type, 
 identities.name AS id, 
@@ -100,6 +105,9 @@ func (d *Database) ListResources(ctx context.Context, limit, offset int, nameFil
 	return resources, nil
 }
 
+// buildQuery is an utility function to build the database query according to two optional parameters.
+// nameFilter: used to match resources name.
+// typeFilter used to match resources type. If this is not empty the resources are fetched from a single table.
 func buildQuery(db *gorm.DB, offset, limit int, nameFilter, typeFilter string) (*gorm.DB, error) {
 	query := `
 	? UNION ? UNION ? UNION ? UNION ?
@@ -126,11 +134,11 @@ func buildQuery(db *gorm.DB, offset, limit int, nameFilter, typeFilter string) (
 		Where("name LIKE '%@serviceaccount'")
 
 	queries := map[string]*gorm.DB{
-		"application_offers": applicationOffersQuery,
-		"clouds":             cloudsQuery,
-		"controllers":        controllersQuery,
-		"models":             modelsQuery,
-		"identities":         serviceAccountsQuery,
+		ApplicationOffersQueryKey: applicationOffersQuery,
+		CloudsQueryKey:            cloudsQuery,
+		ControllersQueryKey:       controllersQuery,
+		ModelsQueryKey:            modelsQuery,
+		ServiceAccountQueryKey:    serviceAccountsQuery,
 	}
 	// we add the where clause only if the nameFilter is filled
 	if nameFilter != "" {
