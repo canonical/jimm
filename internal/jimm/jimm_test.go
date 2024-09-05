@@ -172,7 +172,7 @@ func TestFindAuditEvents(t *testing.T) {
 	}
 }
 
-const testListCoControllersEnv = `clouds:
+const testControllersEnv = `clouds:
 - name: test
   type: test
   regions:
@@ -207,6 +207,31 @@ users:
   controller-access: "no-access"
 `
 
+func TestControllerInfo(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := context.Background()
+	now := time.Now().UTC().Round(time.Millisecond)
+
+	j := &jimm.JIMM{
+		UUID: uuid.NewString(),
+		Database: db.Database{
+			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
+		},
+	}
+	err := j.Database.Migrate(ctx, false)
+	c.Assert(err, qt.IsNil)
+	env := jimmtest.ParseEnvironment(c, testControllersEnv)
+	env.PopulateDB(c, j.Database)
+
+	ctl, err := j.ControllerInfo(ctx, "test1")
+	c.Assert(err, qt.IsNil)
+	c.Assert(ctl.Name, qt.Equals, "test1")
+
+	_, err = j.ControllerInfo(ctx, "does-not-exist")
+	c.Assert(err, qt.ErrorMatches, "controller not found")
+}
+
 func TestListControllers(t *testing.T) {
 	c := qt.New(t)
 
@@ -227,7 +252,7 @@ func TestListControllers(t *testing.T) {
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
-	env := jimmtest.ParseEnvironment(c, testListCoControllersEnv)
+	env := jimmtest.ParseEnvironment(c, testControllersEnv)
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
 
 	tests := []struct {

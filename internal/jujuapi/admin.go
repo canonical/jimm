@@ -4,6 +4,7 @@ package jujuapi
 
 import (
 	"context"
+	"net/http"
 	"sort"
 
 	"github.com/juju/juju/rpc"
@@ -18,6 +19,8 @@ import (
 
 // LoginService defines the set of methods used for login to JIMM.
 type LoginService interface {
+	// AuthenticateBrowserSession authenticates a session cookie is valid.
+	AuthenticateBrowserSession(ctx context.Context, w http.ResponseWriter, r *http.Request) (context.Context, error)
 	// LoginDevice is step 1 in the device flow and returns the OIDC server that the client should use for login.
 	LoginDevice(ctx context.Context) (*oauth2.DeviceAuthResponse, error)
 	// GetDeviceSessionToken polls the OIDC server waiting for the client to login and return a user scoped session token.

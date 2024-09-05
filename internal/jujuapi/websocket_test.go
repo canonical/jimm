@@ -48,7 +48,7 @@ func (s *websocketSuite) SetUpTest(c *gc.C) {
 
 	s.BootstrapSuite.SetUpTest(c)
 
-	s.Params.ControllerUUID = "914487b5-60e7-42bb-bd63-1adc3fd3a388"
+	s.Params.ControllerUUID = jimmtest.ControllerUUID
 
 	mux := http.NewServeMux()
 	mux.Handle("/api", jujuapi.APIHandler(ctx, s.JIMM, s.Params))
