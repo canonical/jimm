@@ -70,6 +70,8 @@ func SetupDB(c *qt.C, database *db.Database) (dbmodel.Model, dbmodel.Controller,
 	sa, err := dbmodel.NewIdentity(clientIDWithDomain)
 	c.Assert(err, qt.Equals, nil)
 	err = database.GetIdentity(context.Background(), sa)
+	c.Assert(err, qt.Equals, nil)
+
 	return model, controller, cloud, *sa
 }
 
