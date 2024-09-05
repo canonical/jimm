@@ -30,7 +30,8 @@ func (s *resourcesService) ListResources(ctx context.Context, params *resources.
 		return nil, err
 	}
 	currentPage, expectedPageSize, pagination := pagination.CreatePaginationWithoutTotal(params.Size, params.Page)
-	res, err := s.jimm.ListResources(ctx, user, pagination)
+	nameFilter, typeFilter := utils.GetNameAndTypeResourceFilter(params.EntityName, params.EntityType)
+	res, err := s.jimm.ListResources(ctx, user, pagination, nameFilter, typeFilter)
 	if err != nil {
 		return nil, err
 	}
