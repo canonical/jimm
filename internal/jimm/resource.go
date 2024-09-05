@@ -18,5 +18,5 @@ func (j *JIMM) ListResources(ctx context.Context, user *openfga.User, filter pag
 		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
-	return j.Database.ListResources(ctx, filter.Limit(), filter.Offset())
+	return j.Database.ListResources(ctx, filter.Limit(), filter.Offset(), "")
 }
