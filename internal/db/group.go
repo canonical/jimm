@@ -36,6 +36,25 @@ func (d *Database) AddGroup(ctx context.Context, name string) (ge *dbmodel.Group
 	return ge, nil
 }
 
+// CountGroups returns a count of the number of groups that exist.
+func (d *Database) CountGroups(ctx context.Context) (count int, err error) {
+	const op = errors.Op("db.CountGroups")
+	if err := d.ready(); err != nil {
+		return 0, errors.E(op, err)
+	}
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
+	var c int64
+	var g dbmodel.GroupEntry
+	if err := d.DB.WithContext(ctx).Model(g).Count(&c).Error; err != nil {
+		return 0, errors.E(op, dbError(err))
+	}
+	count = int(c)
+	return count, nil
+}
+
 // GetGroup returns a GroupEntry with the specified name.
 func (d *Database) GetGroup(ctx context.Context, group *dbmodel.GroupEntry) (err error) {
 	const op = errors.Op("db.GetGroup")
@@ -66,7 +85,7 @@ func (d *Database) GetGroup(ctx context.Context, group *dbmodel.GroupEntry) (err
 // ForEachGroup iterates through every group calling the given function
 // for each one. If the given function returns an error the iteration
 // will stop immediately and the error will be returned unmodified.
-func (d *Database) ForEachGroup(ctx context.Context, f func(*dbmodel.GroupEntry) error) (err error) {
+func (d *Database) ForEachGroup(ctx context.Context, limit, offset int, f func(*dbmodel.GroupEntry) error) (err error) {
 	const op = errors.Op("db.ForEachGroup")
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
@@ -77,7 +96,10 @@ func (d *Database) ForEachGroup(ctx context.Context, f func(*dbmodel.GroupEntry)
 	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
 
 	db := d.DB.WithContext(ctx)
-	rows, err := db.Model(&dbmodel.GroupEntry{}).Order("name asc").Rows()
+	db = db.Order("name asc")
+	db = db.Limit(limit)
+	db = db.Offset(offset)
+	rows, err := db.Model(&dbmodel.GroupEntry{}).Rows()
 	if err != nil {
 		return errors.E(op, err)
 	}

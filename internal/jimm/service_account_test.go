@@ -260,14 +260,14 @@ func TestGrantServiceAccountAccess(t *testing.T) {
 			if test.expectedError == "" {
 				c.Assert(err, qt.IsNil)
 				for _, tag := range test.tags {
-					parsedTag, err := jimm.ParseTag(context.Background(), tag)
+					parsedTag, err := jimm.ParseAndValidateTag(context.Background(), tag)
 					c.Assert(err, qt.IsNil)
 					tuple := openfga.Tuple{
 						Object:   parsedTag,
 						Relation: ofganames.AdministratorRelation,
 						Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag(test.clientID)),
 					}
-					ok, err := jimm.AuthorizationClient().CheckRelation(context.Background(), tuple, false)
+					ok, err := jimm.OpenFGAClient.CheckRelation(context.Background(), tuple, false)
 					c.Assert(err, qt.IsNil)
 					c.Assert(ok, qt.IsTrue)
 				}

@@ -50,6 +50,7 @@ func setupTestAuthSvc(ctx context.Context, c *qt.C, expiry time.Duration) (*auth
 		SessionStore:        sessionStore,
 		SessionCookieMaxAge: 60,
 		JWTSessionKey:       "secret-key",
+		SecureCookies:       false,
 	})
 	c.Assert(err, qt.IsNil)
 	cleanup := func() {
@@ -295,7 +296,7 @@ func TestCreateBrowserSession(t *testing.T) {
 	req, err := http.NewRequest("GET", "", nil)
 	c.Assert(err, qt.IsNil)
 
-	err = authSvc.CreateBrowserSession(ctx, rec, req, false, "jimm-test@canonical.com")
+	err = authSvc.CreateBrowserSession(ctx, rec, req, "jimm-test@canonical.com")
 	c.Assert(err, qt.IsNil)
 
 	cookies := rec.Header().Get("Set-Cookie")
@@ -508,6 +509,6 @@ func TestAuthenticateBrowserSessionHandlesMissingOrExpiredRefreshTokens(t *testi
 	c.Assert(
 		setCookieCookies,
 		qt.Equals,
-		"jimm-browser-session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT; Max-Age=0",
+		"jimm-browser-session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT; Max-Age=0; HttpOnly; SameSite=None",
 	)
 }

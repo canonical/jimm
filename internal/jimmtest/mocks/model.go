@@ -30,7 +30,7 @@ type ModelManager struct {
 	ModelDefaultsForCloud_  func(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag) (jujuparams.ModelDefaultsResult, error)
 	ModelInfo_              func(ctx context.Context, u *openfga.User, mt names.ModelTag) (*jujuparams.ModelInfo, error)
 	ModelStatus_            func(ctx context.Context, u *openfga.User, mt names.ModelTag) (*jujuparams.ModelStatus, error)
-	QueryModelsJq_          func(ctx context.Context, models []dbmodel.Model, jqQuery string) (params.CrossModelQueryResponse, error)
+	QueryModelsJq_          func(ctx context.Context, models []string, jqQuery string) (params.CrossModelQueryResponse, error)
 	SetModelDefaults_       func(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag, region string, configs map[string]interface{}) error
 	UnsetModelDefaults_     func(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag, region string, keys []string) error
 	UpdateMigratedModel_    func(ctx context.Context, user *openfga.User, modelTag names.ModelTag, targetControllerName string) error
@@ -120,7 +120,7 @@ func (j *ModelManager) ModelStatus(ctx context.Context, u *openfga.User, mt name
 	return j.ModelStatus_(ctx, u, mt)
 }
 
-func (j *ModelManager) QueryModelsJq(ctx context.Context, models []dbmodel.Model, jqQuery string) (params.CrossModelQueryResponse, error) {
+func (j *ModelManager) QueryModelsJq(ctx context.Context, models []string, jqQuery string) (params.CrossModelQueryResponse, error) {
 	if j.QueryModelsJq_ == nil {
 		return params.CrossModelQueryResponse{}, errors.E(errors.CodeNotImplemented)
 	}

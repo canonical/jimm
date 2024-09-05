@@ -18,6 +18,7 @@ import (
 	"github.com/juju/juju/state"
 	"github.com/juju/names/v5"
 
+	"github.com/canonical/jimm/v3/internal/common/pagination"
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
@@ -428,7 +429,7 @@ func TestJWTGeneratorMakeToken(t *testing.T) {
 	}
 }
 
-func TestParseTag(t *testing.T) {
+func TestParseAndValidateTag(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
@@ -452,7 +453,7 @@ func TestParseTag(t *testing.T) {
 	jimmTag := "model-" + user.Name + "/" + model.Name + "#administrator"
 
 	// JIMM tag syntax for models
-	tag, err := j.ParseTag(ctx, jimmTag)
+	tag, err := j.ParseAndValidateTag(ctx, jimmTag)
 	c.Assert(err, qt.IsNil)
 	c.Assert(tag.Kind.String(), qt.Equals, names.ModelTagKind)
 	c.Assert(tag.ID, qt.Equals, model.UUID.String)
@@ -461,11 +462,22 @@ func TestParseTag(t *testing.T) {
 	jujuTag := "model-" + model.UUID.String + "#administrator"
 
 	// Juju tag syntax for models
-	tag, err = j.ParseTag(ctx, jujuTag)
+	tag, err = j.ParseAndValidateTag(ctx, jujuTag)
 	c.Assert(err, qt.IsNil)
 	c.Assert(tag.ID, qt.Equals, model.UUID.String)
 	c.Assert(tag.Kind.String(), qt.Equals, names.ModelTagKind)
 	c.Assert(tag.Relation.String(), qt.Equals, "administrator")
+
+	// JIMM tag only kind
+	kindTag := "model"
+	tag, err = j.ParseAndValidateTag(ctx, kindTag)
+	c.Assert(err, qt.IsNil)
+	c.Assert(tag.ID, qt.Equals, "")
+	c.Assert(tag.Kind.String(), qt.Equals, names.ModelTagKind)
+
+	// JIMM tag not valid
+	_, err = j.ParseAndValidateTag(ctx, "")
+	c.Assert(err, qt.ErrorMatches, "unknown tag kind")
 }
 
 func TestResolveTags(t *testing.T) {
@@ -746,8 +758,44 @@ func TestAddGroup(t *testing.T) {
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
-	user, _, _, _, _, _, _ := createTestControllerEnvironment(ctx, c, j.Database)
-	u := openfga.NewUser(&user, ofgaClient)
+	dbU, err := dbmodel.NewIdentity(petname.Generate(2, "-"+"canonical.com"))
+	c.Assert(err, qt.IsNil)
+	u := openfga.NewUser(dbU, ofgaClient)
+	u.JimmAdmin = true
+
+	g, err := j.AddGroup(ctx, u, "test-group-1")
+	c.Assert(err, qt.IsNil)
+	c.Assert(g.UUID, qt.Not(qt.Equals), "")
+	c.Assert(g.Name, qt.Equals, "test-group-1")
+
+	g, err = j.AddGroup(ctx, u, "test-group-2")
+	c.Assert(err, qt.IsNil)
+	c.Assert(g.UUID, qt.Not(qt.Equals), "")
+	c.Assert(g.Name, qt.Equals, "test-group-2")
+}
+
+func TestCountGroups(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+	c.Assert(err, qt.IsNil)
+
+	now := time.Now().UTC().Round(time.Millisecond)
+	j := &jimm.JIMM{
+		UUID: uuid.NewString(),
+		Database: db.Database{
+			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
+		},
+		OpenFGAClient: ofgaClient,
+	}
+
+	err = j.Database.Migrate(ctx, false)
+	c.Assert(err, qt.IsNil)
+
+	dbU, err := dbmodel.NewIdentity(petname.Generate(2, "-"+"canonical.com"))
+	c.Assert(err, qt.IsNil)
+	u := openfga.NewUser(dbU, ofgaClient)
 	u.JimmAdmin = true
 
 	groupEntry, err := j.AddGroup(ctx, u, "test-group-1")
@@ -756,6 +804,39 @@ func TestAddGroup(t *testing.T) {
 
 	_, err = j.AddGroup(ctx, u, "test-group-1")
 	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeAlreadyExists)
+}
+
+func TestGetGroupByID(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+	c.Assert(err, qt.IsNil)
+
+	now := time.Now().UTC().Round(time.Millisecond)
+	j := &jimm.JIMM{
+		UUID: uuid.NewString(),
+		Database: db.Database{
+			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
+		},
+		OpenFGAClient: ofgaClient,
+	}
+
+	err = j.Database.Migrate(ctx, false)
+	c.Assert(err, qt.IsNil)
+
+	dbU, err := dbmodel.NewIdentity(petname.Generate(2, "-"+"canonical.com"))
+	c.Assert(err, qt.IsNil)
+	u := openfga.NewUser(dbU, ofgaClient)
+	u.JimmAdmin = true
+
+	groupEntry, err := j.AddGroup(ctx, u, "test-group-1")
+	c.Assert(err, qt.IsNil)
+	c.Assert(groupEntry.UUID, qt.Not(qt.Equals), "")
+
+	gotGroup, err := j.GetGroupByID(ctx, u, groupEntry.UUID)
+	c.Assert(err, qt.IsNil)
+	c.Assert(gotGroup, qt.DeepEquals, groupEntry)
 }
 
 func TestRemoveGroup(t *testing.T) {
@@ -988,7 +1069,8 @@ func TestListGroups(t *testing.T) {
 	u := openfga.NewUser(&user, ofgaClient)
 	u.JimmAdmin = true
 
-	groups, err := j.ListGroups(ctx, u)
+	filter := pagination.NewOffsetFilter(10, 0)
+	groups, err := j.ListGroups(ctx, u, filter)
 	c.Assert(err, qt.IsNil)
 	c.Assert(groups, qt.DeepEquals, []dbmodel.GroupEntry{group})
 
@@ -1003,13 +1085,14 @@ func TestListGroups(t *testing.T) {
 		_, err := j.AddGroup(ctx, u, name)
 		c.Assert(err, qt.IsNil)
 	}
-
-	groups, err = j.ListGroups(ctx, u)
+	groups, err = j.ListGroups(ctx, u, filter)
 	c.Assert(err, qt.IsNil)
 	sort.Slice(groups, func(i, j int) bool {
 		return groups[i].Name < groups[j].Name
 	})
 	c.Assert(groups, qt.HasLen, 5)
+	// Check that the UUID is not empty
+	c.Assert(groups[0].UUID, qt.Not(qt.Equals), "")
 	// groups should be returned in ascending order of name
 	c.Assert(groups[0].Name, qt.Equals, "aaaFinalGroup")
 	c.Assert(groups[1].Name, qt.Equals, group.Name)

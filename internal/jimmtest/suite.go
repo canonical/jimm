@@ -30,6 +30,7 @@ import (
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/pubsub"
 	"github.com/canonical/jimm/v3/internal/wellknownapi"
+	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
 
 // ControllerUUID is the UUID of the JIMM controller used in tests.
@@ -56,7 +57,7 @@ type JIMMSuite struct {
 	// Authenticator configured.
 	JIMM *jimm.JIMM
 
-	AdminUser   *dbmodel.Identity
+	AdminUser   *openfga.User
 	OFGAClient  *openfga.OFGAClient
 	COFGAClient *cofga.Client
 	COFGAParams *cofga.OpenFGAParams
@@ -99,13 +100,13 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 	alice, err := dbmodel.NewIdentity("alice@canonical.com")
 	c.Assert(err, gc.IsNil)
 	alice.LastLogin = db.Now()
-	s.AdminUser = alice
 
-	err = s.JIMM.Database.GetIdentity(ctx, s.AdminUser)
+	err = s.JIMM.Database.GetIdentity(ctx, alice)
 	c.Assert(err, gc.Equals, nil)
 
-	adminUser := openfga.NewUser(s.AdminUser, s.OFGAClient)
-	err = adminUser.SetControllerAccess(ctx, s.JIMM.ResourceTag(), ofganames.AdministratorRelation)
+	s.AdminUser = openfga.NewUser(alice, s.OFGAClient)
+	s.AdminUser.JimmAdmin = true
+	err = s.AdminUser.SetControllerAccess(ctx, s.JIMM.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, gc.Equals, nil)
 
 	// add jimmtest.DefaultControllerUUID as a controller to JIMM
@@ -192,6 +193,14 @@ func (s *JIMMSuite) AddAdminUser(c *gc.C, email string) {
 	c.Assert(err, gc.IsNil)
 }
 
+func (s *JIMMSuite) AddUser(c *gc.C, email string) {
+	identity, err := dbmodel.NewIdentity(email)
+	c.Assert(err, gc.IsNil)
+
+	err = s.JIMM.Database.GetIdentity(context.Background(), identity)
+	c.Assert(err, gc.IsNil)
+}
+
 func (s *JIMMSuite) NewUser(u *dbmodel.Identity) *openfga.User {
 	return openfga.NewUser(u, s.OFGAClient)
 }
@@ -214,9 +223,7 @@ func (s *JIMMSuite) AddController(c *gc.C, name string, info *api.Info) {
 			Port:    hp.Port(),
 		}})
 	}
-	adminUser := s.NewUser(s.AdminUser)
-	adminUser.JimmAdmin = true
-	err := s.JIMM.AddController(context.Background(), adminUser, ctl)
+	err := s.JIMM.AddController(context.Background(), s.AdminUser, ctl)
 	c.Assert(err, gc.Equals, nil)
 }
 
@@ -258,6 +265,13 @@ func (s *JIMMSuite) AddModel(c *gc.C, owner names.UserTag, name string, cloud na
 	c.Assert(err, gc.Equals, nil)
 
 	return names.NewModelTag(mi.UUID)
+}
+
+func (s *JIMMSuite) AddGroup(c *gc.C, groupName string) jimmnames.GroupTag {
+	ctx := context.Background()
+	group, err := s.JIMM.AddGroup(ctx, s.AdminUser, groupName)
+	c.Assert(err, gc.Equals, nil)
+	return group.ResourceTag()
 }
 
 // EnableDeviceFlow allows a test to use the device flow.

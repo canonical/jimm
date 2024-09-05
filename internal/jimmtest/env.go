@@ -38,11 +38,13 @@ type Environment struct {
 	UserDefaults     []UserDefaults    `json:"user-defaults"`
 }
 
-func ParseEnvironment(c *qt.C, env string) *Environment {
+func ParseEnvironment(c Tester, env string) *Environment {
 	var e Environment
 
 	err := yaml.Unmarshal([]byte(env), &e)
-	c.Assert(err, qt.IsNil)
+	if err != nil {
+		c.Fatalf("err is not nil: %s", err)
+	}
 
 	return &e
 }
@@ -220,7 +222,7 @@ func (e *Environment) PopulateDBAndPermissions(c *qt.C, jimmTag names.Controller
 	e.addJIMMRelations(c, jimmTag, db, client)
 }
 
-func (e *Environment) PopulateDB(c *qt.C, db db.Database) {
+func (e *Environment) PopulateDB(c Tester, db db.Database) {
 	for i := range e.Users {
 		e.Users[i].env = e
 		e.Users[i].DBObject(c, db)
@@ -261,7 +263,7 @@ type UserDefaults struct {
 	dbo dbmodel.IdentityModelDefaults
 }
 
-func (cd *UserDefaults) DBObject(c *qt.C, db db.Database) dbmodel.IdentityModelDefaults {
+func (cd *UserDefaults) DBObject(c Tester, db db.Database) dbmodel.IdentityModelDefaults {
 	if cd.dbo.ID != 0 {
 		return cd.dbo
 	}
@@ -270,7 +272,10 @@ func (cd *UserDefaults) DBObject(c *qt.C, db db.Database) dbmodel.IdentityModelD
 	cd.dbo.Defaults = cd.Defaults
 
 	err := db.SetIdentityModelDefaults(context.Background(), &cd.dbo)
-	c.Assert(err, qt.IsNil)
+	if err != nil {
+		c.Fatalf("err is not nil: %s", err)
+	}
+
 	return cd.dbo
 }
 
@@ -285,7 +290,7 @@ type CloudDefaults struct {
 	dbo dbmodel.CloudDefaults
 }
 
-func (cd *CloudDefaults) DBObject(c *qt.C, db db.Database) dbmodel.CloudDefaults {
+func (cd *CloudDefaults) DBObject(c Tester, db db.Database) dbmodel.CloudDefaults {
 	if cd.dbo.ID != 0 {
 		return cd.dbo
 	}
@@ -296,7 +301,10 @@ func (cd *CloudDefaults) DBObject(c *qt.C, db db.Database) dbmodel.CloudDefaults
 	cd.dbo.Defaults = cd.Defaults
 
 	err := db.SetCloudDefaults(context.Background(), &cd.dbo)
-	c.Assert(err, qt.IsNil)
+	if err != nil {
+		c.Fatalf("err is not nil: %s", err)
+	}
+
 	return cd.dbo
 }
 
@@ -320,7 +328,7 @@ type CloudRegion struct {
 
 // DBObject returns a database object for the specified cloud, suitable
 // for adding to the database.
-func (cl *Cloud) DBObject(c *qt.C, db db.Database) dbmodel.Cloud {
+func (cl *Cloud) DBObject(c Tester, db db.Database) dbmodel.Cloud {
 	if cl.dbo.ID != 0 {
 		return cl.dbo
 	}
@@ -335,7 +343,10 @@ func (cl *Cloud) DBObject(c *qt.C, db db.Database) dbmodel.Cloud {
 	}
 
 	err := db.AddCloud(context.Background(), &cl.dbo)
-	c.Assert(err, qt.IsNil)
+	if err != nil {
+		c.Fatalf("err is not nil: %s", err)
+	}
+
 	return cl.dbo
 }
 
@@ -352,7 +363,7 @@ type CloudCredential struct {
 	dbo dbmodel.CloudCredential
 }
 
-func (cc *CloudCredential) DBObject(c *qt.C, db db.Database) dbmodel.CloudCredential {
+func (cc *CloudCredential) DBObject(c Tester, db db.Database) dbmodel.CloudCredential {
 	if cc.dbo.ID != 0 {
 		return cc.dbo
 	}
@@ -365,7 +376,10 @@ func (cc *CloudCredential) DBObject(c *qt.C, db db.Database) dbmodel.CloudCreden
 	cc.dbo.Attributes = cc.Attributes
 
 	err := db.SetCloudCredential(context.Background(), &cc.dbo)
-	c.Assert(err, qt.IsNil)
+	if err != nil {
+		c.Fatalf("err is not nil: %s", err)
+	}
+
 	return cc.dbo
 }
 
@@ -385,7 +399,7 @@ type Controller struct {
 	dbo dbmodel.Controller
 }
 
-func (ctl *Controller) DBObject(c *qt.C, db db.Database) dbmodel.Controller {
+func (ctl *Controller) DBObject(c Tester, db db.Database) dbmodel.Controller {
 	if ctl.dbo.ID != 0 {
 		return ctl.dbo
 	}
@@ -406,7 +420,9 @@ func (ctl *Controller) DBObject(c *qt.C, db db.Database) dbmodel.Controller {
 	}
 
 	err := db.AddController(context.Background(), &ctl.dbo)
-	c.Assert(err, qt.IsNil)
+	if err != nil {
+		c.Fatalf("err is not nil: %s", err)
+	}
 
 	return ctl.dbo
 }
@@ -445,7 +461,7 @@ type Model struct {
 	dbo dbmodel.Model
 }
 
-func (m *Model) DBObject(c *qt.C, db db.Database) dbmodel.Model {
+func (m *Model) DBObject(c Tester, db db.Database) dbmodel.Model {
 	if m.dbo.ID != 0 {
 		return m.dbo
 	}
@@ -480,7 +496,10 @@ func (m *Model) DBObject(c *qt.C, db db.Database) dbmodel.Model {
 	m.dbo.Units = m.Units
 
 	err := db.AddModel(context.Background(), &m.dbo)
-	c.Assert(err, qt.IsNil)
+	if err != nil {
+		c.Fatalf("err is not nil: %s", err)
+	}
+
 	return m.dbo
 }
 
@@ -493,15 +512,18 @@ type User struct {
 	dbo dbmodel.Identity
 }
 
-func (u *User) DBObject(c *qt.C, db db.Database) dbmodel.Identity {
+func (u *User) DBObject(c Tester, db db.Database) dbmodel.Identity {
 	if u.dbo.ID != 0 {
 		return u.dbo
 	}
 	u.dbo.Name = u.Username
 	u.dbo.DisplayName = u.DisplayName
 
-	err := db.UpdateIdentity(context.Background(), &u.dbo)
-	c.Assert(err, qt.IsNil)
+	err := db.GetIdentity(context.Background(), &u.dbo)
+	if err != nil {
+		c.Fatalf("err is not nil: %s", err)
+	}
+
 	return u.dbo
 }
 

@@ -91,7 +91,7 @@ func (s *jimmSuite) TestListControllersUnauthorized(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	c.Check(cis, jc.DeepEquals, []apiparams.ControllerInfo{{
 		Name:         "jaas",
-		UUID:         "914487b5-60e7-42bb-bd63-1adc3fd3a388",
+		UUID:         jimmtest.ControllerUUID,
 		AgentVersion: s.Model.Controller.AgentVersion,
 		Status: jujuparams.EntityStatus{
 			Status: "available",

@@ -37,7 +37,7 @@ type testSetup struct {
 
 func getAuthModelDefinition() (*sdk.AuthorizationModel, error) {
 	authModel := sdk.AuthorizationModel{}
-	err := json.Unmarshal(auth_model.AuthModelFile, &authModel)
+	err := json.Unmarshal(auth_model.AuthModelJSON, &authModel)
 	if err != nil {
 		return nil, err
 	}

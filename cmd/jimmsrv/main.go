@@ -142,6 +142,8 @@ func start(ctx context.Context, s *service.Service) error {
 		return errors.E("jimm session store secret must be at least 64 characters")
 	}
 
+	corsAllowedOrigins := strings.Split(os.Getenv("CORS_ALLOWED_ORIGINS"), " ")
+
 	jimmsvc, err := jimmsvc.NewService(ctx, jimmsvc.Params{
 		ControllerUUID:    os.Getenv("JIMM_UUID"),
 		DSN:               os.Getenv("JIMM_DSN"),
@@ -167,17 +169,18 @@ func start(ctx context.Context, s *service.Service) error {
 		JWTExpiryDuration:             jwtExpiryDuration,
 		InsecureSecretStorage:         insecureSecretStorage,
 		OAuthAuthenticatorParams: jimmsvc.OAuthAuthenticatorParams{
-			IssuerURL:           issuerURL,
-			ClientID:            clientID,
-			ClientSecret:        clientSecret,
-			Scopes:              scopesParsed,
-			SessionTokenExpiry:  sessionTokenExpiryDuration,
-			SessionCookieMaxAge: sessionCookieMaxAgeInt,
-			JWTSessionKey:       sessionSecretKey,
+			IssuerURL:            issuerURL,
+			ClientID:             clientID,
+			ClientSecret:         clientSecret,
+			Scopes:               scopesParsed,
+			SessionTokenExpiry:   sessionTokenExpiryDuration,
+			SessionCookieMaxAge:  sessionCookieMaxAgeInt,
+			JWTSessionKey:        sessionSecretKey,
+			SecureSessionCookies: secureSessionCookies,
 		},
 		DashboardFinalRedirectURL: os.Getenv("JIMM_DASHBOARD_FINAL_REDIRECT_URL"),
-		SecureSessionCookies:      secureSessionCookies,
 		CookieSessionKey:          []byte(sessionSecretKey),
+		CorsAllowedOrigins:        corsAllowedOrigins,
 	})
 	if err != nil {
 		return err
