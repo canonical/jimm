@@ -323,6 +323,9 @@ type listGroupsCommand struct {
 
 	store    jujuclient.ClientStore
 	dialOpts *jujuapi.DialOpts
+
+	limit  int
+	offset int
 }
 
 // Info implements the cmd.Command interface.
@@ -349,6 +352,8 @@ func (c *listGroupsCommand) SetFlags(f *gnuflag.FlagSet) {
 		"yaml": cmd.FormatYaml,
 		"json": cmd.FormatJson,
 	})
+	f.IntVar(&c.limit, "limit", 0, "The maximum number of groups to return")
+	f.IntVar(&c.offset, "offset", 0, "The offset to use when requesting groups")
 }
 
 // Run implements Command.Run.
@@ -364,7 +369,8 @@ func (c *listGroupsCommand) Run(ctxt *cmd.Context) error {
 	}
 
 	client := api.NewClient(apiCaller)
-	groups, err := client.ListGroups()
+	req := apiparams.ListGroupsRequest{Limit: c.limit, Offset: c.offset}
+	groups, err := client.ListGroups(&req)
 	if err != nil {
 		return errors.E(err)
 	}

@@ -197,10 +197,12 @@ func (s *accessControlSuite) TestListGroups(c *gc.C) {
 		_, err := client.AddGroup(&apiparams.AddGroupRequest{Name: name})
 		c.Assert(err, jc.ErrorIsNil)
 	}
-
-	groups, err := client.ListGroups()
+	req := apiparams.ListGroupsRequest{Limit: 10, Offset: 0}
+	groups, err := client.ListGroups(&req)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(groups, gc.HasLen, 4)
+	// Verify the UUID is not empty.
+	c.Assert(groups[0].UUID, gc.Not(gc.Equals), "")
 	// groups should be returned in ascending order of name
 	c.Assert(groups[0].Name, gc.Equals, "aaaFinalGroup")
 	c.Assert(groups[1].Name, gc.Equals, "test-group0")
@@ -943,7 +945,7 @@ func (s *accessControlSuite) TestListRelationshipTuples(c *gc.C) {
 		},
 		ResolveUUIDs: true,
 	})
-	c.Assert(err, gc.ErrorMatches, "failed to parse tuple target, key applicationoffer-fake-offer: application offer not found.*")
+	c.Assert(err, gc.ErrorMatches, "failed to parse tuple target object key applicationoffer-fake-offer: application offer not found.*")
 }
 
 func (s *accessControlSuite) TestListRelationshipTuplesNoUUIDResolution(c *gc.C) {
@@ -1055,9 +1057,9 @@ func (s *accessControlSuite) TestListRelationshipTuplesWithMissingGroups(c *gc.C
 
 	// Delete a group without going through the API.
 	group := &dbmodel.GroupEntry{Name: "yellow"}
-	err = s.JIMM.DB().GetGroup(ctx, group)
+	err = s.JIMM.Database.GetGroup(ctx, group)
 	c.Assert(err, jc.ErrorIsNil)
-	err = s.JIMM.DB().RemoveGroup(ctx, group)
+	err = s.JIMM.Database.RemoveGroup(ctx, group)
 	c.Assert(err, jc.ErrorIsNil)
 
 	response, err := client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{ResolveUUIDs: true})

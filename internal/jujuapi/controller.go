@@ -8,6 +8,7 @@ import (
 
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
+	"github.com/juju/version"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
@@ -48,6 +49,18 @@ func init() {
 
 		return []int{11}
 	}
+}
+
+// ControllerService defines the methods used to manage controllers.
+type ControllerService interface {
+	AddController(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller) error
+	ControllerInfo(ctx context.Context, name string) (*dbmodel.Controller, error)
+	EarliestControllerVersion(ctx context.Context) (version.Number, error)
+	ListControllers(ctx context.Context, user *openfga.User) ([]dbmodel.Controller, error)
+	GetControllerConfig(ctx context.Context, user *dbmodel.Identity) (*dbmodel.ControllerConfig, error)
+	SetControllerConfig(ctx context.Context, user *openfga.User, args jujuparams.ControllerConfigSet) error
+	RemoveController(ctx context.Context, user *openfga.User, controllerName string, force bool) error
+	SetControllerDeprecated(ctx context.Context, user *openfga.User, controllerName string, deprecated bool) error
 }
 
 // ConfigSet changes the value of specified controller configuration

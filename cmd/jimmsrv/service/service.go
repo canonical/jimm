@@ -38,9 +38,11 @@ import (
 	"github.com/canonical/jimm/v3/internal/jujuapi"
 	"github.com/canonical/jimm/v3/internal/jujuclient"
 	"github.com/canonical/jimm/v3/internal/logger"
+	"github.com/canonical/jimm/v3/internal/middleware"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/pubsub"
+	"github.com/canonical/jimm/v3/internal/rebac_admin"
 	"github.com/canonical/jimm/v3/internal/vault"
 	"github.com/canonical/jimm/v3/internal/wellknownapi"
 )
@@ -386,6 +388,11 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		return nil, errors.E(op, err, "failed to parse final redirect url for the dashboard")
 	}
 
+	rebacBackend, err := rebac_admin.SetupBackend(ctx, &s.jimm)
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+
 	// Setup CORS middleware
 	corsOpts := cors.New(cors.Options{
 		AllowedOrigins:   p.CorsAllowedOrigins,
@@ -400,6 +407,8 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	}
 
 	s.mux.Mount("/metrics", promhttp.Handler())
+
+	s.mux.Mount("/rebac", middleware.AuthenticateRebac(rebacBackend.Handler(""), &s.jimm))
 
 	mountHandler(
 		"/debug",

@@ -3,6 +3,7 @@ package mocks
 
 import (
 	"context"
+	"net/http"
 
 	"golang.org/x/oauth2"
 
@@ -11,11 +12,19 @@ import (
 )
 
 type LoginService struct {
-	LoginDevice_            func(ctx context.Context) (*oauth2.DeviceAuthResponse, error)
-	GetDeviceSessionToken_  func(ctx context.Context, deviceOAuthResponse *oauth2.DeviceAuthResponse) (string, error)
-	LoginClientCredentials_ func(ctx context.Context, clientID string, clientSecret string) (*openfga.User, error)
-	LoginWithSessionToken_  func(ctx context.Context, sessionToken string) (*openfga.User, error)
-	LoginWithSessionCookie_ func(ctx context.Context, identityID string) (*openfga.User, error)
+	AuthenticateBrowserSession_ func(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error)
+	LoginDevice_                func(ctx context.Context) (*oauth2.DeviceAuthResponse, error)
+	GetDeviceSessionToken_      func(ctx context.Context, deviceOAuthResponse *oauth2.DeviceAuthResponse) (string, error)
+	LoginClientCredentials_     func(ctx context.Context, clientID string, clientSecret string) (*openfga.User, error)
+	LoginWithSessionToken_      func(ctx context.Context, sessionToken string) (*openfga.User, error)
+	LoginWithSessionCookie_     func(ctx context.Context, identityID string) (*openfga.User, error)
+}
+
+func (j *LoginService) AuthenticateBrowserSession(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error) {
+	if j.AuthenticateBrowserSession_ == nil {
+		return nil, errors.E(errors.CodeNotImplemented)
+	}
+	return j.AuthenticateBrowserSession_(ctx, w, req)
 }
 
 func (j *LoginService) LoginDevice(ctx context.Context) (*oauth2.DeviceAuthResponse, error) {

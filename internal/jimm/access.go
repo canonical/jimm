@@ -17,6 +17,7 @@ import (
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
+	"github.com/canonical/jimm/v3/internal/common/pagination"
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
@@ -662,15 +663,19 @@ func resolveTag(jimmUUID string, db *db.Database, tag string) (*ofganames.Tag, e
 	return nil, errors.E(errors.CodeBadRequest, fmt.Sprintf("failed to map tag, unknown kind: %s", tagKind))
 }
 
-// ParseTag attempts to parse the provided key into a tag whilst additionally
+// parseAndValidateTag attempts to parse the provided key into a tag whilst additionally
 // ensuring the resource exists for said tag.
 //
 // This key may be in the form of either a JIMM tag string or Juju tag string.
-func (j *JIMM) ParseTag(ctx context.Context, key string) (*ofganames.Tag, error) {
-	op := errors.Op("jimm.ParseTag")
+func (j *JIMM) parseAndValidateTag(ctx context.Context, key string) (*ofganames.Tag, error) {
+	op := errors.Op("jimm.parseAndValidateTag")
 	tupleKeySplit := strings.SplitN(key, "-", 2)
-	if len(tupleKeySplit) < 2 {
-		return nil, errors.E(op, errors.CodeFailedToParseTupleKey, "tag does not have tuple key delimiter")
+	if len(tupleKeySplit) == 1 {
+		tag, err := ofganames.BlankKindTag(tupleKeySplit[0])
+		if err != nil {
+			return nil, errors.E(op, errors.CodeFailedToParseTupleKey, err)
+		}
+		return tag, nil
 	}
 	tagString := key
 	tag, err := resolveTag(j.UUID, &j.Database, tagString)
@@ -696,6 +701,34 @@ func (j *JIMM) AddGroup(ctx context.Context, user *openfga.User, name string) (*
 		return nil, errors.E(op, err)
 	}
 	return ge, nil
+}
+
+// CountGroups returns the number of groups that exist.
+func (j *JIMM) CountGroups(ctx context.Context, user *openfga.User) (int, error) {
+	const op = errors.Op("jimm.CountGroups")
+
+	if !user.JimmAdmin {
+		return 0, errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
+	count, err := j.Database.CountGroups(ctx)
+	if err != nil {
+		return 0, errors.E(op, err)
+	}
+	return count, nil
+}
+
+// GetGroup returns a group based on the provided UUID.
+func (j *JIMM) GetGroupByID(ctx context.Context, user *openfga.User, uuid string) (*dbmodel.GroupEntry, error) {
+	const op = errors.Op("jimm.AddGroup")
+
+	if !user.JimmAdmin {
+		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
+	group := dbmodel.GroupEntry{UUID: uuid}
+	if err := j.Database.GetGroup(ctx, &group); err != nil {
+		return nil, errors.E(op, err)
+	}
+	return &group, nil
 }
 
 // RenameGroup renames a group in JIMM's DB.
@@ -748,7 +781,7 @@ func (j *JIMM) RemoveGroup(ctx context.Context, user *openfga.User, name string)
 }
 
 // ListGroups returns a list of groups known to JIMM.
-func (j *JIMM) ListGroups(ctx context.Context, user *openfga.User) ([]dbmodel.GroupEntry, error) {
+func (j *JIMM) ListGroups(ctx context.Context, user *openfga.User, filter pagination.LimitOffsetPagination) ([]dbmodel.GroupEntry, error) {
 	const op = errors.Op("jimm.ListGroups")
 
 	if !user.JimmAdmin {
@@ -756,7 +789,7 @@ func (j *JIMM) ListGroups(ctx context.Context, user *openfga.User) ([]dbmodel.Gr
 	}
 
 	var groups []dbmodel.GroupEntry
-	err := j.Database.ForEachGroup(ctx, func(ge *dbmodel.GroupEntry) error {
+	err := j.Database.ForEachGroup(ctx, filter.Limit(), filter.Offset(), func(ge *dbmodel.GroupEntry) error {
 		groups = append(groups, *ge)
 		return nil
 	})

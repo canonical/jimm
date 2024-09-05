@@ -4,6 +4,7 @@ package jimm
 
 import (
 	"context"
+	"net/http"
 
 	"golang.org/x/oauth2"
 
@@ -20,6 +21,11 @@ func (j *JIMM) LoginDevice(ctx context.Context) (*oauth2.DeviceAuthResponse, err
 		return nil, errors.E(op, err)
 	}
 	return resp, nil
+}
+
+// AuthenticateBrowserSession authenticates a browser login.
+func (j *JIMM) AuthenticateBrowserSession(ctx context.Context, w http.ResponseWriter, r *http.Request) (context.Context, error) {
+	return j.OAuthAuthenticator.AuthenticateBrowserSession(ctx, w, r)
 }
 
 // GetDeviceSessionToken polls an OIDC server while a user logs in and returns a session token scoped to the user's identity.
