@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
@@ -121,22 +122,18 @@ func ProxySockets(ctx context.Context, helpers ProxyHelpers) error {
 	}()
 	var err error
 	select {
-	// No cleanup is needed on error, when the client closes the connection
-	// all go routines will proceed to error and exit.
 	case err = <-errChan:
-		zapctx.Debug(ctx, "Proxy error", zap.Error(err))
+		if err != nil {
+			zapctx.Debug(ctx, "Proxy error", zap.Error(err))
+		}
 	case <-ctx.Done():
 		err = errors.E(op, "Context cancelled")
 		zapctx.Debug(ctx, "Context cancelled")
-		helpers.ConnClient.Close()
-		clProxy.mu.Lock()
-		clProxy.closed = true
-		// TODO(Kian): Test removing close on dst below. The client connection should do it.
-		if clProxy.dst != nil {
-			clProxy.dst.conn.Close()
-		}
-		clProxy.mu.Unlock()
 	}
+	// Close the client connection to ensure everything is cleaned up.
+	// Normally the client would do this but we also do it here in case the
+	// connection to the controller fails and we want to trigger cleanup.
+	helpers.ConnClient.Close()
 	clProxy.wg.Wait()
 	return err
 }
@@ -316,16 +313,22 @@ func (p *modelProxy) auditLogMessage(msg *message, isResponse bool) error {
 	return nil
 }
 
+func unexpectedReadError(err error) bool {
+	closeError := websocket.IsUnexpectedCloseError(err,
+		websocket.CloseNormalClosure,
+		websocket.CloseNoStatusReceived,
+		websocket.CloseAbnormalClosure)
+	_, unmarshalError := err.(*json.InvalidUnmarshalError)
+	return closeError || unmarshalError
+}
+
 // clientProxy proxies messages from client->controller.
 type clientProxy struct {
 	modelProxy
 	wg                   sync.WaitGroup
 	errChan              chan error
 	createControllerConn func(context.Context) (WebsocketConnectionWithMetadata, error)
-	// mu synchronises changes to closed and modelproxy.dst, dst is is only created
-	// at some unspecified point in the future after a client request.
-	mu     sync.Mutex
-	closed bool
+	connectController    sync.Once
 }
 
 // start begins the client->controller proxier.
@@ -339,8 +342,11 @@ func (p *clientProxy) start(ctx context.Context) error {
 		zapctx.Debug(ctx, "Reading on client connection")
 		msg := new(message)
 		if err := p.src.readJson(&msg); err != nil {
-			// Error reading on the socket implies it is closed, simply return.
-			return fmt.Errorf("error reading from client: %w", err)
+			if unexpectedReadError(err) {
+				zapctx.Error(ctx, "unexpected client read error", zap.Error(err))
+				return err
+			}
+			return nil
 		}
 		zapctx.Debug(ctx, "Read message from client", zap.Any("message", msg))
 		err := p.makeControllerConnection(ctx)
@@ -387,43 +393,35 @@ func (p *clientProxy) start(ctx context.Context) error {
 // proxying requests from the controller to the client.
 func (p *clientProxy) makeControllerConnection(ctx context.Context) error {
 	const op = errors.Op("rpc.makeControllerConnection")
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	if p.dst != nil {
-		return nil
-	}
-	// Checking closed ensures we don't have a race condition with a cancelled context.
-	if p.closed {
-		err := errors.E(op, "Client connection closed while starting controller connection")
-		return err
-	}
-	connWithMetadata, err := p.createControllerConn(ctx)
-	if err != nil {
-		return err
-	}
+	var createConnErr error
+	// Create the controller connection once.
+	p.connectController.Do(func() {
+		connWithMetadata, err := p.createControllerConn(ctx)
+		if err != nil {
+			createConnErr = errors.E(op, err)
+		}
 
-	p.msgs.controllerUUID = connWithMetadata.ControllerUUID
-
-	p.modelName = connWithMetadata.ModelName
-	p.dst = &writeLockConn{conn: connWithMetadata.Conn}
-	controllerToClient := controllerProxy{
-		modelProxy: modelProxy{
-			src:            p.dst,
-			dst:            p.src,
-			msgs:           p.msgs,
-			auditLog:       p.auditLog,
-			tokenGen:       p.tokenGen,
-			modelName:      p.modelName,
-			conversationId: p.conversationId,
-		},
-	}
-	p.wg.Add(1)
-	go func() {
-		defer p.wg.Done()
-		p.errChan <- controllerToClient.start(ctx)
-	}()
-	zapctx.Debug(ctx, "Successfully made controller connection")
-	return nil
+		p.msgs.controllerUUID = connWithMetadata.ControllerUUID
+		p.modelName = connWithMetadata.ModelName
+		p.dst = &writeLockConn{conn: connWithMetadata.Conn}
+		controllerToClient := controllerProxy{
+			modelProxy: modelProxy{
+				src:            p.dst,
+				dst:            p.src,
+				msgs:           p.msgs,
+				auditLog:       p.auditLog,
+				tokenGen:       p.tokenGen,
+				modelName:      p.modelName,
+				conversationId: p.conversationId,
+			},
+		}
+		p.wg.Add(1)
+		go func() {
+			defer p.wg.Done()
+			p.errChan <- controllerToClient.start(ctx)
+		}()
+	})
+	return createConnErr
 }
 
 // controllerProxy proxies messages from controller->client with the caveat that
@@ -438,8 +436,11 @@ func (p *controllerProxy) start(ctx context.Context) error {
 		zapctx.Debug(ctx, "Reading on controller connection")
 		msg := new(message)
 		if err := p.src.readJson(msg); err != nil {
-			// Error reading on the socket implies it is closed, simply return.
-			return fmt.Errorf("error reading from controller: %w", err)
+			if unexpectedReadError(err) {
+				zapctx.Error(ctx, "unexpected controller read error", zap.Error(err))
+				return err
+			}
+			return nil
 		}
 		zapctx.Debug(ctx, "Received message from controller", zap.Any("Message", msg))
 		permissionsRequired, err := checkPermissionsRequired(ctx, msg)
