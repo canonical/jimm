@@ -310,7 +310,7 @@ func TestProxySocketsControllerConnectionFails(t *testing.T) {
 		testTokenGen := testTokenGenerator{}
 		f := func(context.Context) (rpc.WebsocketConnectionWithMetadata, error) {
 			var err error
-			connController, err = srvController.dialer.DialWebsocket(ctx, srvController.URL)
+			connController, err = srvController.dialer.DialWebsocket(ctx, srvController.URL, nil)
 			c.Check(err, qt.IsNil)
 			return rpc.WebsocketConnectionWithMetadata{
 				Conn:      connController,
@@ -333,7 +333,7 @@ func TestProxySocketsControllerConnectionFails(t *testing.T) {
 
 	defer srvController.Close()
 	defer srvJIMM.Close()
-	ws, err := srvJIMM.dialer.DialWebsocket(ctx, srvJIMM.URL)
+	ws, err := srvJIMM.dialer.DialWebsocket(ctx, srvJIMM.URL, nil)
 	c.Assert(err, qt.IsNil)
 	defer ws.Close()
 

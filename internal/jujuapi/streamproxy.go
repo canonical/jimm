@@ -8,7 +8,6 @@ import (
 	"net/http"
 
 	"github.com/gorilla/websocket"
-	"github.com/juju/juju/api/base"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
@@ -19,6 +18,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimmhttp"
 	"github.com/canonical/jimm/v3/internal/openfga"
+	jimmRPC "github.com/canonical/jimm/v3/internal/rpc"
 )
 
 // A streamProxier serves all HTTP endpoints by proxying
@@ -95,7 +95,7 @@ func (s streamProxier) ServeWS(ctx context.Context, clientConn *websocket.Conn) 
 		writeError(fmt.Sprintf("failed to connect stream: %s", err.Error()), errors.CodeConnectionFailed)
 		return
 	}
-	proxyStreams(ctx, clientConn, controllerStream)
+	jimmRPC.ProxyStreams(ctx, clientConn, controllerStream)
 }
 
 func (s streamProxier) getModel(ctx context.Context, modelUUID string) (dbmodel.Model, error) {
@@ -110,47 +110,6 @@ func (s streamProxier) getModel(ctx context.Context, modelUUID string) (dbmodel.
 		return dbmodel.Model{}, fmt.Errorf("failed to find model: %s", err.Error())
 	}
 	return model, nil
-}
-
-// proxyStreams starts a simple proxy for 2 websockets.
-// After starting the proxy we listen for the first error
-// returned and then close both connections before waiting
-// for an error from the second connection.
-func proxyStreams(ctx context.Context, src, dst base.Stream) {
-	errChan := make(chan error, 2)
-	go func() { errChan <- proxy(src, dst) }()
-	go func() { errChan <- proxy(dst, src) }()
-	err := <-errChan
-	if err != nil {
-		zapctx.Error(ctx, "error from stream proxy", zap.Error(err))
-	}
-	dst.Close()
-	src.Close()
-	err = <-errChan
-	if err != nil {
-		zapctx.Error(ctx, "error from stream proxy", zap.Error(err))
-	}
-}
-
-func proxy(src base.Stream, dst base.Stream) error {
-	for {
-		var data map[string]any
-		err := src.ReadJSON(&data)
-		if err != nil {
-			if unexpectedReadError(err) {
-				return err
-			}
-			return nil
-		}
-		err = dst.WriteJSON(data)
-		if err != nil {
-			return err
-		}
-	}
-}
-
-func unexpectedReadError(err error) bool {
-	return false
 }
 
 func checkPermission(ctx context.Context, path string, u *openfga.User, mt names.ModelTag) (bool, error) {
