@@ -118,7 +118,7 @@ func (d *Database) ListResources(ctx context.Context, limit, offset int, namePre
 func buildQuery(db *gorm.DB, offset, limit int, namePrefixFilter, typeFilter string) (*gorm.DB, error) {
 	// if namePrefixEmpty set to true we have a 'TRUE IS TRUE' in the SQL WHERE statement, which disable the filtering.
 	namePrefixEmpty := namePrefixFilter == ""
-	namePrefixFilter = namePrefixFilter + "%"
+	namePrefixFilter += "%"
 
 	applicationOffersQuery := db.Select(selectApplicationOffers).
 		Model(&dbmodel.ApplicationOffer{}).
