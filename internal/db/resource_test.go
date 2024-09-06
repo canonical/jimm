@@ -128,13 +128,22 @@ func (s *dbSuite) TestGetResourcesWithNameTypeFilter(c *qt.C) {
 			expectedUUIDs: []string{model.UUID.String},
 		},
 		{
-			description:   "filter name test",
+			description:   "filter name test prefix",
 			nameFilter:    "test",
 			limit:         10,
 			offset:        0,
 			typeFilter:    "",
 			expectedSize:  3,
 			expectedUUIDs: []string{cloud.Name, controller.UUID, model.UUID.String},
+		},
+		{
+			description:   "filter name controller suffix",
+			nameFilter:    "controller",
+			limit:         10,
+			offset:        0,
+			typeFilter:    "",
+			expectedSize:  0,
+			expectedUUIDs: []string{},
 		},
 		{
 			description:   "filter only models",

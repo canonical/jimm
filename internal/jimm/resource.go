@@ -11,12 +11,12 @@ import (
 )
 
 // ListResources returns a list of resources known to JIMM with a pagination filter.
-func (j *JIMM) ListResources(ctx context.Context, user *openfga.User, filter pagination.LimitOffsetPagination, nameFilter, typeFilter string) ([]db.Resource, error) {
+func (j *JIMM) ListResources(ctx context.Context, user *openfga.User, filter pagination.LimitOffsetPagination, namePrefixFilter, typeFilter string) ([]db.Resource, error) {
 	const op = errors.Op("jimm.ListResources")
 
 	if !user.JimmAdmin {
 		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
-	return j.Database.ListResources(ctx, filter.Limit(), filter.Offset(), nameFilter, typeFilter)
+	return j.Database.ListResources(ctx, filter.Limit(), filter.Offset(), namePrefixFilter, typeFilter)
 }

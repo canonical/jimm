@@ -149,7 +149,7 @@ func (s *resourcesSuite) TestListResources(c *gc.C) {
 			ids: func() []testEntity {
 				filteredIds := make([]testEntity, 0)
 				for _, id := range ids {
-					if strings.Contains(id.Name, "model") {
+					if strings.HasPrefix(id.Name, "model") {
 						filteredIds = append(filteredIds, id)
 					}
 				}

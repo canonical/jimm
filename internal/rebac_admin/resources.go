@@ -32,7 +32,7 @@ func (s *resourcesService) ListResources(ctx context.Context, params *resources.
 		return nil, err
 	}
 	currentPage, expectedPageSize, pagination := pagination.CreatePaginationWithoutTotal(params.Size, params.Page)
-	nameFilter, typeFilter := utils.GetNameAndTypeResourceFilter(params.EntityName, params.EntityType)
+	namePrefixFilter, typeFilter := utils.GetNameAndTypeResourceFilter(params.EntityName, params.EntityType)
 	if typeFilter != "" {
 		typeFilter, err = validateAndConvertResourceFilter(typeFilter)
 		if err != nil {
@@ -40,7 +40,7 @@ func (s *resourcesService) ListResources(ctx context.Context, params *resources.
 		}
 	}
 
-	res, err := s.jimm.ListResources(ctx, user, pagination, nameFilter, typeFilter)
+	res, err := s.jimm.ListResources(ctx, user, pagination, namePrefixFilter, typeFilter)
 	if err != nil {
 		return nil, err
 	}
