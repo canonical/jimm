@@ -116,31 +116,27 @@ func (d *Database) ListResources(ctx context.Context, limit, offset int, namePre
 // namePrefixFilter: used to match resources name prefix.
 // typeFilter: used to match resources type. If this is not empty the resources are fetched from a single table.
 func buildQuery(db *gorm.DB, offset, limit int, namePrefixFilter, typeFilter string) (*gorm.DB, error) {
-	// if namePrefixEmpty set to true we have a 'TRUE IS TRUE' in the SQL WHERE statement, which disable the filtering.
-	namePrefixEmpty := namePrefixFilter == ""
-	namePrefixFilter += "%"
-
 	applicationOffersQuery := db.Select(selectApplicationOffers).
 		Model(&dbmodel.ApplicationOffer{}).
-		Where("? IS TRUE OR application_offers.name LIKE ?", namePrefixEmpty, namePrefixFilter).
+		Where("(CASE WHEN ? = '' THEN TRUE ELSE application_offers.name LIKE ? END)", namePrefixFilter, namePrefixFilter+"%").
 		Joins("JOIN models ON application_offers.model_id = models.id")
 
 	cloudsQuery := db.Select(selectClouds).
 		Model(&dbmodel.Cloud{}).
-		Where("? IS TRUE OR clouds.name LIKE ?", namePrefixEmpty, namePrefixFilter)
+		Where("(CASE WHEN ? = '' THEN TRUE ELSE clouds.name LIKE ? END)", namePrefixFilter, namePrefixFilter+"%")
 
 	controllersQuery := db.Select(selectControllers).
 		Model(&dbmodel.Controller{}).
-		Where("? IS TRUE OR controllers.name LIKE ?", namePrefixEmpty, namePrefixFilter)
+		Where("(CASE WHEN ? = '' THEN TRUE ELSE controllers.name LIKE ? END)", namePrefixFilter, namePrefixFilter+"%")
 
 	modelsQuery := db.Select(selectModels).
 		Model(&dbmodel.Model{}).
-		Where("? IS TRUE OR models.name LIKE ?", namePrefixEmpty, namePrefixFilter).
+		Where("(CASE WHEN ? = '' THEN TRUE ELSE models.name LIKE ? END)", namePrefixFilter, namePrefixFilter+"%").
 		Joins("JOIN controllers ON models.controller_id = controllers.id")
 
 	serviceAccountsQuery := db.Select(selectIdentities).
 		Model(&dbmodel.Identity{}).
-		Where("name LIKE '%@serviceaccount' AND (? IS TRUE OR identities.name LIKE ?)", namePrefixEmpty, namePrefixFilter)
+		Where("name LIKE '%@serviceaccount' AND (CASE WHEN ? = '' THEN TRUE ELSE identities.name LIKE ? END)", namePrefixFilter, namePrefixFilter+"%")
 
 	// if the typeFilter is set we only return the query for that specif entityType, otherwise the union.
 	if typeFilter == "" {

@@ -192,6 +192,16 @@ func (s *resourcesSuite) TestListResources(c *gc.C) {
 				return filteredIds
 			}(),
 		},
+		{
+			desc:         "test big page with model entity type",
+			size:         utils.IntToPointer(10),
+			page:         utils.IntToPointer(0),
+			typeFilter:   rebac_admin.Model,
+			wantPage:     0,
+			wantSize:     3,
+			wantNextpage: nil,
+			ids:          []testEntity{},
+		},
 	}
 	for _, t := range testCases {
 		resources, err := resourcesSvc.ListResources(ctx, &resources.GetResourcesParams{
