@@ -330,7 +330,10 @@ func (as *AuthenticationService) MintSessionToken(email string) (string, error) 
 // access token JWT, returning the parsed token.
 //
 // The subject of the token contains the user's email and can be used
-// for user object creation
+// for user object creation.
+//
+// The error code returned here is used by the Juju CLI to know when to start a
+// device login flow, prompting the user to login again.
 func (as *AuthenticationService) VerifySessionToken(token string) (_ jwt.Token, err error) {
 	const op = errors.Op("auth.AuthenticationService.VerifySessionToken")
 	errorFn := func(message string) error {

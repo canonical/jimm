@@ -1,4 +1,5 @@
 // Copyright 2024 Canonical.
+
 package jujuapi
 
 import (
@@ -19,7 +20,7 @@ import (
 	jimmRPC "github.com/canonical/jimm/v3/internal/rpc"
 )
 
-// A streamProxier serves all HTTP endpoints by proxying
+// A streamProxier serves the the /log endpoint by proxying
 // messages between the controller and client.
 type streamProxier struct {
 	// TODO(Kian): Refactor the apiServer to use the JIMM API rather than a concrete struct
@@ -71,17 +72,19 @@ func (s streamProxier) ServeWS(ctx context.Context, clientConn *websocket.Conn) 
 		return
 	}
 
-	model, err := s.jimm.GetModel(ctx, uuid)
-	if err != nil {
-		writeError(err.Error(), errors.CodeModelNotFound)
-		return
-	}
+	modelTag := names.NewModelTag(uuid)
 
-	if ok, err := checkPermission(ctx, finalPath, user, model.ResourceTag()); err != nil {
+	if ok, err := checkPermission(ctx, finalPath, user, modelTag); err != nil {
 		writeError(err.Error(), errors.CodeUnauthorized)
 		return
 	} else if !ok {
 		writeError(fmt.Sprintf("unauthorized access to endpoint: %s", finalPath), errors.CodeUnauthorized)
+		return
+	}
+
+	model, err := s.jimm.GetModel(ctx, uuid)
+	if err != nil {
+		writeError(err.Error(), errors.CodeModelNotFound)
 		return
 	}
 
