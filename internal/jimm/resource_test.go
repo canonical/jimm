@@ -69,7 +69,7 @@ func TestGetResources(t *testing.T) {
 	for _, t := range testCases {
 		c.Run(t.desc, func(c *qt.C) {
 			filter := pagination.NewOffsetFilter(t.limit, t.offset)
-			resources, err := j.ListResources(ctx, u, filter)
+			resources, err := j.ListResources(ctx, u, filter, "", "")
 			c.Assert(err, qt.IsNil)
 			c.Assert(resources, qt.HasLen, len(t.identities))
 			for i := range len(t.identities) {
