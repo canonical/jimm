@@ -17,7 +17,6 @@ import (
 	"github.com/canonical/jimm/v3/internal/cmdtest"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/internal/jimmtest"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 )
@@ -166,7 +165,7 @@ clouds:
 		c.Log(test.about)
 		tmpfile, cleanupFunc := writeTempFile(c, test.cloudInfo)
 
-		bClient := jimmtest.NewUserSessionLogin(c, "bob@canonical.com")
+		bClient := s.SetupCLIAccess(c, "bob@canonical.com")
 		// Running the command succeeds
 		newCmd := cmd.NewAddCloudToControllerCommandForTesting(s.ClientStore(), bClient, test.cloudByNameFunc)
 		var err error

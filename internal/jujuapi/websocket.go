@@ -44,9 +44,42 @@ type apiServer struct {
 	params  Params
 }
 
-// GetAuthenticationService returns JIMM's oauth authentication service.
-func (s *apiServer) GetAuthenticationService() jimm.OAuthAuthenticator {
-	return s.jimm.OAuthAuthenticator
+// Authenticate implements jimmhttp.Authenticate and handles browser authentication
+// when a session cookie is present, ultimately placing the identity resolved from
+// the cookie within the passed context.
+//
+// It updates the response header on authentication errors with a InternalServerError,
+// and as such is safe to return from your handler upon error without updating
+// the response statuses.
+func (s *apiServer) Authenticate(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error) {
+	// We perform cookie authentication at the HTTP layer instead of WS
+	// due to limitations of setting and retrieving cookies in the WS layer.
+	//
+	// If no cookie is present, we expect 1 of 3 scenarios:
+	// 1. It's a device session token login.
+	// 2. It's a client credential login.
+	// 3. It's an "expired" cookie login, and as such no cookie
+	//	  has been sent with the request. The handling of this is within
+	//    LoginWithSessionCookie, in which, due to no identityId being present
+	//    we know the cookie expired or a request with no cookie was made.
+	_, err := req.Cookie(auth.SessionName)
+
+	// Now we know a cookie is present, so let's try perform a cookie login / logic
+	// as presumably a cookie of this name should only ever be present in the case
+	// the browser performs a connection.
+	if err == nil {
+		ctx, err = s.jimm.OAuthAuthenticator.AuthenticateBrowserSession(ctx, w, req)
+		if err != nil {
+			zapctx.Error(ctx, "authenticate browser session failed", zap.Error(err))
+			// Something went wrong when trying to perform the authentication
+			// of the cookie.
+			return ctx, err
+		}
+	}
+
+	// If there's an error due to failure to find the cookie, just return the context
+	// and move on presuming it's a device or client credentials login.
+	return ctx, nil
 }
 
 // ServeWS implements jimmhttp.WSServer.
@@ -106,15 +139,17 @@ func mapError(err error) *jujuparams.Error {
 	}
 }
 
-// A modelProxyServer serves the /commands and /api server for a model by
+// apiProxier serves the /commands and /api server for a model by
 // proxying all requests through to the controller.
-type modelProxyServer struct {
-	jimm *jimm.JIMM
+type apiProxier struct {
+	apiServer
 }
 
-var extractPathInfo = regexp.MustCompile(`^\/?model\/(?P<modeluuid>\w{8}-\w{4}-\w{4}-\w{4}-\w{12})\/(?P<finalPath>.*)$`)
-var modelIndex = mustGetSubexpIndex(extractPathInfo, "modeluuid")
-var finalPathIndex = mustGetSubexpIndex(extractPathInfo, "finalPath")
+var (
+	extractPathInfo = regexp.MustCompile(`^\/(?P<modeluuid>\w{8}-\w{4}-\w{4}-\w{4}-\w{12})\/(?P<finalPath>.*)$`)
+	modelIndex      = mustGetSubexpIndex(extractPathInfo, "modeluuid")
+	finalPathIndex  = mustGetSubexpIndex(extractPathInfo, "finalPath")
+)
 
 func mustGetSubexpIndex(regex *regexp.Regexp, name string) int {
 	index := regex.SubexpIndex(name)
@@ -125,7 +160,7 @@ func mustGetSubexpIndex(regex *regexp.Regexp, name string) int {
 }
 
 // modelInfoFromPath takes a path to a model endpoint and returns the uuid
-// and final path element. I.e. /model/<uuid>/api return <uuid>,api,err
+// and final URL segment. I.e. /model/<uuid>/api returns <uuid>, api, err
 // Basic validation of the uuid takes place.
 func modelInfoFromPath(path string) (uuid string, finalPath string, err error) {
 	matches := extractPathInfo.FindStringSubmatch(path)
@@ -135,13 +170,10 @@ func modelInfoFromPath(path string) (uuid string, finalPath string, err error) {
 	return matches[modelIndex], matches[finalPathIndex], nil
 }
 
-// GetAuthenticationService returns JIMM's oauth authentication service.
-func (s modelProxyServer) GetAuthenticationService() jimm.OAuthAuthenticator {
-	return s.jimm.OAuthAuthenticator
-}
-
 // ServeWS implements jimmhttp.WSServer.
-func (s modelProxyServer) ServeWS(ctx context.Context, clientConn *websocket.Conn) {
+// We act as a proxier, handling auth on requests before forwarding the
+// requests to the appropriate Juju controller.
+func (s apiProxier) ServeWS(ctx context.Context, clientConn *websocket.Conn) {
 	jwtGenerator := jimm.NewJWTGenerator(&s.jimm.Database, s.jimm, s.jimm.JWTService)
 	connectionFunc := controllerConnectionFunc(s, &jwtGenerator)
 	zapctx.Debug(ctx, "Starting proxier")
@@ -157,12 +189,11 @@ func (s modelProxyServer) ServeWS(ctx context.Context, clientConn *websocket.Con
 	if err := jimmRPC.ProxySockets(ctx, proxyHelpers); err != nil {
 		zapctx.Error(ctx, "failed to start jimm model proxy", zap.Error(err))
 	}
-
 }
 
 // controllerConnectionFunc returns a function that will be used to
 // connect to a controller when a client makes a request.
-func controllerConnectionFunc(s modelProxyServer, jwtGenerator *jimm.JWTGenerator) func(context.Context) (jimmRPC.WebsocketConnectionWithMetadata, error) {
+func controllerConnectionFunc(s apiProxier, jwtGenerator *jimm.JWTGenerator) func(context.Context) (jimmRPC.WebsocketConnectionWithMetadata, error) {
 	return func(ctx context.Context) (jimmRPC.WebsocketConnectionWithMetadata, error) {
 		const op = errors.Op("proxy.controllerConnectionFunc")
 		path := jimmhttp.PathElementFromContext(ctx, "path")
@@ -185,7 +216,7 @@ func controllerConnectionFunc(s modelProxyServer, jwtGenerator *jimm.JWTGenerato
 		jwtGenerator.SetTags(m.ResourceTag(), m.Controller.ResourceTag())
 		mt := m.ResourceTag()
 		zapctx.Debug(ctx, "Dialing Controller", zap.String("path", path))
-		controllerConn, err := jimmRPC.Dial(ctx, &m.Controller, mt, finalPath)
+		controllerConn, err := jimmRPC.Dial(ctx, &m.Controller, mt, finalPath, nil)
 		if err != nil {
 			zapctx.Error(ctx, "cannot dial controller", zap.String("controller", m.Controller.Name), zap.Error(err))
 			return jimmRPC.WebsocketConnectionWithMetadata{}, err

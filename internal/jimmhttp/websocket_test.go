@@ -4,6 +4,7 @@ package jimmhttp_test
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -14,7 +15,7 @@ import (
 	"github.com/gorilla/websocket"
 
 	"github.com/canonical/jimm/v3/internal/auth"
-	"github.com/canonical/jimm/v3/internal/jimm"
+	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimmhttp"
 	"github.com/canonical/jimm/v3/internal/jimmtest"
 )
@@ -49,6 +50,10 @@ type echoServer struct {
 	t testing.TB
 }
 
+func (s echoServer) Authenticate(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error) {
+	return ctx, nil
+}
+
 func (s echoServer) ServeWS(ctx context.Context, conn *websocket.Conn) {
 	for {
 		mt, p, err := conn.ReadMessage()
@@ -60,11 +65,6 @@ func (s echoServer) ServeWS(ctx context.Context, conn *websocket.Conn) {
 			return
 		}
 	}
-}
-
-// GetAuthenticationService returns JIMM's oauth authentication service.
-func (s echoServer) GetAuthenticationService() jimm.OAuthAuthenticator {
-	return nil
 }
 
 func TestWSHandlerPanic(t *testing.T) {
@@ -88,9 +88,8 @@ func TestWSHandlerPanic(t *testing.T) {
 
 type panicServer struct{}
 
-// GetAuthenticationService returns JIMM's oauth authentication service.
-func (s panicServer) GetAuthenticationService() jimm.OAuthAuthenticator {
-	return nil
+func (s panicServer) Authenticate(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error) {
+	return ctx, nil
 }
 
 func (s panicServer) ServeWS(ctx context.Context, conn *websocket.Conn) {
@@ -106,20 +105,16 @@ func TestWSHandlerNilServer(t *testing.T) {
 	c.Cleanup(srv.Close)
 
 	var d websocket.Dialer
-	conn, resp, err := d.Dial("ws"+strings.TrimPrefix(srv.URL, "http"), nil)
-	c.Assert(err, qt.IsNil)
+	_, resp, err := d.Dial("ws"+strings.TrimPrefix(srv.URL, "http"), nil)
+	c.Assert(err, qt.ErrorMatches, "websocket: bad handshake")
+	c.Assert(resp.StatusCode, qt.Equals, http.StatusInternalServerError)
 	defer resp.Body.Close()
-
-	_, _, err = conn.ReadMessage()
-	c.Assert(err, qt.ErrorMatches, `websocket: close 1000 \(normal\)`)
 }
 
 type authFailServer struct{ c jimmtest.SimpleTester }
 
-// GetAuthenticationService returns JIMM's oauth authentication service.
-func (s authFailServer) GetAuthenticationService() jimm.OAuthAuthenticator {
-	authenticator := jimmtest.NewMockOAuthAuthenticator(s.c, nil)
-	return &authenticator
+func (s authFailServer) Authenticate(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error) {
+	return ctx, errors.E("authentication failed")
 }
 
 func (s authFailServer) ServeWS(ctx context.Context, conn *websocket.Conn) {}
@@ -135,12 +130,13 @@ func TestWSHandlerAuthFailsServer(t *testing.T) {
 	c.Cleanup(srv.Close)
 
 	var d websocket.Dialer
-	conn, resp, err := d.Dial("ws"+strings.TrimPrefix(srv.URL, "http"), http.Header{
+	_, httpResp, err := d.Dial("ws"+strings.TrimPrefix(srv.URL, "http"), http.Header{
 		"Cookie": []string{auth.SessionName + "=naughty_cookie"},
 	})
+	defer httpResp.Body.Close()
+	c.Assert(err, qt.IsNotNil)
+	c.Assert(httpResp.StatusCode, qt.Equals, http.StatusUnauthorized)
+	bodyBytes, err := io.ReadAll(httpResp.Body)
 	c.Assert(err, qt.IsNil)
-	defer resp.Body.Close()
-
-	_, _, err = conn.ReadMessage()
-	c.Assert(err, qt.ErrorMatches, `websocket: close 1011 \(internal server error\): authentication failed`)
+	c.Assert(string(bodyBytes), qt.Equals, "authentication failed")
 }

@@ -16,7 +16,6 @@ import (
 	"github.com/canonical/jimm/v3/internal/cmdtest"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/jimm"
-	"github.com/canonical/jimm/v3/internal/jimmtest"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	jimmnames "github.com/canonical/jimm/v3/pkg/names"
@@ -35,7 +34,7 @@ func (s *updateCredentialsSuite) TestUpdateCredentialsWithLocalCredentials(c *gc
 	clientIDWithDomain := clientID + "@serviceaccount"
 
 	// alice is superuser
-	bClient := jimmtest.NewUserSessionLogin(c, "alice")
+	bClient := s.SetupCLIAccess(c, "alice")
 
 	sa, err := dbmodel.NewIdentity(clientIDWithDomain)
 	c.Assert(err, gc.IsNil)
@@ -90,7 +89,7 @@ func (s *updateCredentialsSuite) TestUpdateCredentialsWithLocalCredentials(c *gc
 }
 
 func (s *updateCredentialsSuite) TestCloudNotInLocalStore(c *gc.C) {
-	bClient := jimmtest.NewUserSessionLogin(c, "alice")
+	bClient := s.SetupCLIAccess(c, "alice")
 	_, err := cmdtesting.RunCommand(c, cmd.NewUpdateCredentialsCommandForTesting(s.ClientStore(), bClient),
 		"00000000-0000-0000-0000-000000000000",
 		"non-existing-cloud",
@@ -101,7 +100,7 @@ func (s *updateCredentialsSuite) TestCloudNotInLocalStore(c *gc.C) {
 }
 
 func (s *updateCredentialsSuite) TestCredentialNotInLocalStore(c *gc.C) {
-	bClient := jimmtest.NewUserSessionLogin(c, "alice")
+	bClient := s.SetupCLIAccess(c, "alice")
 
 	clientStore := s.ClientStore()
 	err := clientStore.UpdateCredential("some-cloud", jujucloud.CloudCredential{
@@ -144,7 +143,7 @@ func (s *updateCredentialsSuite) TestUpdateServiceAccountCredentialFromControlle
 	}
 	_, err = s.JIMM.UpdateCloudCredential(ctx, u, updateArgs)
 	c.Assert(err, gc.IsNil)
-	bClient := jimmtest.NewUserSessionLogin(c, "alice")
+	bClient := s.SetupCLIAccess(c, "alice")
 	cmdContext, err := cmdtesting.RunCommand(c, cmd.NewUpdateCredentialsCommandForTesting(s.ClientStore(), bClient), clientID, "aws", "foo")
 	c.Assert(err, gc.IsNil)
 	c.Assert(cmdtesting.Stdout(cmdContext), gc.Equals, `credentialtag: cloudcred-aws_abda51b2-d735-4794-a8bd-49c506baa4af@serviceaccount_foo
@@ -192,7 +191,7 @@ func (s *updateCredentialsSuite) TestMissingArgs(c *gc.C) {
 		expectedError: "too many args",
 	}}
 
-	bClient := jimmtest.NewUserSessionLogin(c, "alice")
+	bClient := s.SetupCLIAccess(c, "alice")
 	clientStore := s.ClientStore()
 	for _, t := range tests {
 		_, err := cmdtesting.RunCommand(c, cmd.NewUpdateCredentialsCommandForTesting(clientStore, bClient), t.args...)

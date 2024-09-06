@@ -377,7 +377,8 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		Expiry: p.JWTExpiryDuration,
 	})
 	s.jimm.Dialer = &jujuclient.Dialer{
-		JWTService: s.jimm.JWTService,
+		ControllerCredentialsStore: s.jimm.CredentialStore,
+		JWTService:                 s.jimm.JWTService,
 	}
 
 	if !p.DisableConnectionCache {
@@ -452,7 +453,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	}
 
 	s.mux.Handle("/api", jujuapi.APIHandler(ctx, &s.jimm, params))
-	s.mux.Handle("/model/*", jujuapi.ModelHandler(ctx, &s.jimm, params))
+	s.mux.Handle("/model/*", http.StripPrefix("/model", jujuapi.ModelHandler(ctx, &s.jimm, params)))
 	// If the request is not for a known path assume it is part of the dashboard.
 	// If dashboard location env var is not defined, do not handle a dashboard.
 	if p.DashboardLocation != "" {

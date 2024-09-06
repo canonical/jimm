@@ -121,6 +121,7 @@ const (
 	CodeServerConfiguration          Code = "server configuration"
 	CodeStillAlive                   Code = apiparams.CodeStillAlive
 	CodeUnauthorized                 Code = jujuparams.CodeUnauthorized
+	CodeSessionTokenInvalid          Code = jujuparams.CodeSessionTokenInvalid
 	CodeUpgradeInProgress            Code = jujuparams.CodeUpgradeInProgress
 	CodeFailedToParseTupleKey        Code = "failed to parse tuple"
 	CodeFailedToResolveTupleResource Code = "failed resolve resource"
