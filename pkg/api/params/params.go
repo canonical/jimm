@@ -497,3 +497,9 @@ type WhoamiResponse struct {
 	DisplayName string `json:"display-name" yaml:"display-name"`
 	Email       string `json:"email" yaml:"email"`
 }
+
+// VersionResponse holds the response for a version call.
+type VersionResponse struct {
+	Version string `json:"version" yaml:"version"`
+	Commit  string `json:"commit" yaml:"commit"`
+}
