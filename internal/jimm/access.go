@@ -12,13 +12,12 @@ import (
 
 	"github.com/canonical/ofga"
 	"github.com/google/uuid"
-	"github.com/juju/juju/core/crossmodel"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
-	"github.com/juju/zaputil"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
+	"github.com/canonical/jimm/v3/internal/common/pagination"
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
@@ -34,28 +33,23 @@ const (
 
 var (
 	// Matches juju uris, jimm user/group tags and UUIDs
-	// Performs a single match and breaks the juju URI into 10 groups, each successive group is XORD to ensure we can run
-	// this just once.
-	// The groups are as so:
+	// Performs a single match and breaks the juju URI into 4 groups.
+	// The groups are:
 	// [0] - Entire match
 	// [1] - tag
-	// [2] - A single "-", ignored
-	// [3] - Controller name OR user name OR group name
-	// [4] - A single ":", ignored
-	// [5] - Controller user / model owner
-	// [6] - A single "/", ignored
-	// [7] - Model name
-	// [8] - A single ".", ignored
-	// [9] - Application offer name
-	// [10] - Relation specifier (i.e., #member)
+	// [2] - trailer (i.e. resource identifier)
+	// [3] - Relation specifier (i.e., #member)
 	// A complete matcher example would look like so with square-brackets denoting groups and paranthsis denoting index:
-	// (1)[controller](2)[-](3)[controller-1](4)[:](5)[alice@canonical.com-place](6)[/](7)[model-1](8)[.](9)[offer-1](10)[#relation-specifier]"
-	// In the case of something like: user-alice@wonderland or group-alices-wonderland#member, it would look like so:
-	// (1)[user](2)[-](3)[alices@wonderland]
-	// (1)[group](2)[-](3)[alices-wonderland](10)[#member]
-	// So if a group, user, UUID, controller name comes in, it will always be index 3 for them
-	// and if a relation specifier is present, it will always be index 10
-	jujuURIMatcher = regexp.MustCompile(`([a-zA-Z0-9]*)(\-|\z)([a-zA-Z0-9-@.]*)(\:|)([a-zA-Z0-9-@.]*)(\/|)([a-zA-Z0-9-]*)(\.|)([a-zA-Z0-9-]*)([a-zA-Z#]*|\z)\z`)
+	// (1)[controller][-](2)[myFavoriteController][#](3)[relation-specifier]"
+	// An example without a relation: `user-alice@wonderland`:
+	// (1)[user][-](2)[alice@wonderland]
+	// An example with a relaton `group-alices-wonderland#member`:
+	// (1)[group][-](2)[alices-wonderland][#](3)[member]
+	jujuURIMatcher = regexp.MustCompile(`([a-zA-Z0-9]*)(?:-)([^#]+)(?:#([a-zA-Z]+)|\z)`)
+
+	// modelOwnerAndNameMatcher matches a string based on the
+	// the expected form <model-owner>/<model-name>
+	modelOwnerAndNameMatcher = regexp.MustCompile(`(.+)/(.+)`)
 )
 
 // ToOfferAccessString maps relation to an application offer access string.
@@ -400,9 +394,17 @@ func (j *JIMM) ToJAASTag(ctx context.Context, tag *ofganames.Tag, resolveUUIDs b
 		return res, nil
 	}
 
+	tagToString := func(kind, id string) string {
+		res := kind + "-" + id
+		if tag.Relation.String() != "" {
+			res += "#" + tag.Relation.String()
+		}
+		return res
+	}
+
 	switch tag.Kind {
 	case names.UserTagKind:
-		return names.UserTagKind + "-" + tag.ID, nil
+		return tagToString(names.UserTagKind, tag.ID), nil
 	case jimmnames.ServiceAccountTagKind:
 		return jimmnames.ServiceAccountTagKind + "-" + tag.ID, nil
 	case names.ControllerTagKind:
@@ -416,11 +418,7 @@ func (j *JIMM) ToJAASTag(ctx context.Context, tag *ofganames.Tag, resolveUUIDs b
 		if err != nil {
 			return "", errors.E(err, fmt.Sprintf("failed to fetch controller information: %s", controller.UUID))
 		}
-		controllerString := names.ControllerTagKind + "-" + controller.Name
-		if tag.Relation.String() != "" {
-			controllerString = controllerString + "#" + tag.Relation.String()
-		}
-		return controllerString, nil
+		return tagToString(names.ControllerTagKind, controller.Name), nil
 	case names.ModelTagKind:
 		model := dbmodel.Model{
 			UUID: sql.NullString{
@@ -432,11 +430,8 @@ func (j *JIMM) ToJAASTag(ctx context.Context, tag *ofganames.Tag, resolveUUIDs b
 		if err != nil {
 			return "", errors.E(err, fmt.Sprintf("failed to fetch model information: %s", model.UUID.String))
 		}
-		modelString := names.ModelTagKind + "-" + model.Controller.Name + ":" + model.OwnerIdentityName + "/" + model.Name
-		if tag.Relation.String() != "" {
-			modelString = modelString + "#" + tag.Relation.String()
-		}
-		return modelString, nil
+		modelUserID := model.OwnerIdentityName + "/" + model.Name
+		return tagToString(names.ModelTagKind, modelUserID), nil
 	case names.ApplicationOfferTagKind:
 		ao := dbmodel.ApplicationOffer{
 			UUID: tag.ID,
@@ -445,11 +440,7 @@ func (j *JIMM) ToJAASTag(ctx context.Context, tag *ofganames.Tag, resolveUUIDs b
 		if err != nil {
 			return "", errors.E(err, fmt.Sprintf("failed to fetch application offer information: %s", ao.UUID))
 		}
-		aoString := names.ApplicationOfferTagKind + "-" + ao.Model.Controller.Name + ":" + ao.Model.OwnerIdentityName + "/" + ao.Model.Name + "." + ao.Name
-		if tag.Relation.String() != "" {
-			aoString = aoString + "#" + tag.Relation.String()
-		}
-		return aoString, nil
+		return tagToString(names.ApplicationOfferTagKind, ao.URL), nil
 	case jimmnames.GroupTagKind:
 		group := dbmodel.GroupEntry{
 			UUID: tag.ID,
@@ -458,11 +449,7 @@ func (j *JIMM) ToJAASTag(ctx context.Context, tag *ofganames.Tag, resolveUUIDs b
 		if err != nil {
 			return "", errors.E(err, fmt.Sprintf("failed to fetch group information: %s", group.UUID))
 		}
-		groupString := jimmnames.GroupTagKind + "-" + group.Name
-		if tag.Relation.String() != "" {
-			groupString = groupString + "#" + tag.Relation.String()
-		}
-		return groupString, nil
+		return tagToString(jimmnames.GroupTagKind, group.Name), nil
 	case names.CloudTagKind:
 		cloud := dbmodel.Cloud{
 			Name: tag.ID,
@@ -471,59 +458,43 @@ func (j *JIMM) ToJAASTag(ctx context.Context, tag *ofganames.Tag, resolveUUIDs b
 		if err != nil {
 			return "", errors.E(err, fmt.Sprintf("failed to fetch cloud information: %s", cloud.Name))
 		}
-		cloudString := names.CloudTagKind + "-" + cloud.Name
-		if tag.Relation.String() != "" {
-			cloudString = cloudString + "#" + tag.Relation.String()
-		}
-		return cloudString, nil
+		return tagToString(names.CloudTagKind, cloud.Name), nil
 	default:
 		return "", errors.E(fmt.Sprintf("unexpected tag kind: %v", tag.Kind))
 	}
 }
 
 type tagResolver struct {
-	resourceUUID   string
-	trailer        string
-	controllerName string
-	userName       string
-	modelName      string
-	offerName      string
-	relation       ofga.Relation
+	resourceUUID string
+	trailer      string
+	relation     ofga.Relation
 }
 
 func newTagResolver(tag string) (*tagResolver, string, error) {
 	matches := jujuURIMatcher.FindStringSubmatch(tag)
+	if len(matches) != 4 {
+		return nil, "", errors.E("tag is not properly formatted", errors.CodeBadRequest)
+	}
 	tagKind := matches[1]
 	resourceUUID := ""
 	trailer := ""
-	// We first attempt to see if group3 is a uuid
-	if _, err := uuid.Parse(matches[3]); err == nil {
+	// We first attempt to see if group2 is a uuid
+	if _, err := uuid.Parse(matches[2]); err == nil {
 		// We know it's a UUID
-		resourceUUID = matches[3]
+		resourceUUID = matches[2]
 	} else {
-		// We presume it's a user or a group
-		trailer = matches[3]
+		// We presume the information the matcher needs is in the trailer
+		trailer = matches[2]
 	}
 
-	// Matchers along the way to determine segments of the string, they'll be empty
-	// if the match has failed
-	controllerName := matches[3]
-	userName := matches[5]
-	modelName := matches[7]
-	offerName := matches[9]
-	relationString := strings.TrimLeft(matches[10], "#")
-	relation, err := ofganames.ParseRelation(relationString)
+	relation, err := ofganames.ParseRelation(matches[3])
 	if err != nil {
 		return nil, "", errors.E("failed to parse relation", errors.CodeBadRequest)
 	}
 	return &tagResolver{
-		resourceUUID:   resourceUUID,
-		trailer:        trailer,
-		controllerName: controllerName,
-		userName:       userName,
-		modelName:      modelName,
-		offerName:      offerName,
-		relation:       relation,
+		resourceUUID: resourceUUID,
+		trailer:      trailer,
+		relation:     relation,
 	}, tagKind, nil
 }
 
@@ -548,12 +519,10 @@ func (t *tagResolver) groupTag(ctx context.Context, db *db.Database) (*ofga.Enti
 		"Resolving JIMM tags to Juju tags for tag kind: group",
 		zap.String("group-name", t.trailer),
 	)
-	var entry dbmodel.GroupEntry
 	if t.resourceUUID != "" {
-		entry.UUID = t.resourceUUID
-	} else if t.trailer != "" {
-		entry.Name = t.trailer
+		return ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag(t.resourceUUID), t.relation), nil
 	}
+	entry := dbmodel.GroupEntry{Name: t.trailer}
 
 	err := db.GetGroup(ctx, &entry)
 	if err != nil {
@@ -568,20 +537,14 @@ func (t *tagResolver) controllerTag(ctx context.Context, jimmUUID string, db *db
 		ctx,
 		"Resolving JIMM tags to Juju tags for tag kind: controller",
 	)
-	controller := dbmodel.Controller{}
 
 	if t.resourceUUID != "" {
-		controller.UUID = t.resourceUUID
-	} else if t.controllerName != "" {
-		if t.controllerName == jimmControllerName {
-			return ofganames.ConvertTagWithRelation(names.NewControllerTag(jimmUUID), t.relation), nil
-		}
-		controller.Name = t.controllerName
+		return ofganames.ConvertTagWithRelation(names.NewControllerTag(t.resourceUUID), t.relation), nil
 	}
-
-	// NOTE (alesstimec) Do we need to special-case the
-	// controller-jimm case - jimm controller does not exist
-	// in the database, but has a clearly defined UUID?
+	if t.trailer == jimmControllerName {
+		return ofganames.ConvertTagWithRelation(names.NewControllerTag(jimmUUID), t.relation), nil
+	}
+	controller := dbmodel.Controller{Name: t.trailer}
 
 	err := db.GetController(ctx, &controller)
 	if err != nil {
@@ -595,27 +558,25 @@ func (t *tagResolver) modelTag(ctx context.Context, db *db.Database) (*ofga.Enti
 		ctx,
 		"Resolving JIMM tags to Juju tags for tag kind: model",
 	)
-	model := dbmodel.Model{}
 
 	if t.resourceUUID != "" {
-		model.UUID = sql.NullString{String: t.resourceUUID, Valid: true}
-	} else if t.controllerName != "" && t.userName != "" && t.modelName != "" {
-		controller := dbmodel.Controller{Name: t.controllerName}
-		err := db.GetController(ctx, &controller)
-		if err != nil {
-			return nil, errors.E("controller not found")
-		}
-		model.ControllerID = controller.ID
-		model.OwnerIdentityName = t.userName
-		model.Name = t.modelName
+		return ofganames.ConvertTagWithRelation(names.NewModelTag(t.resourceUUID), t.relation), nil
 	}
+
+	model := dbmodel.Model{}
+	matches := modelOwnerAndNameMatcher.FindStringSubmatch(t.trailer)
+	if len(matches) != 3 {
+		return nil, errors.E("model name format incorrect, expected <model-owner>/<model-name>")
+	}
+	model.OwnerIdentityName = matches[1]
+	model.Name = matches[2]
 
 	err := db.GetModel(ctx, &model)
 	if err != nil {
 		return nil, errors.E("model not found")
 	}
 
-	return ofganames.ConvertTagWithRelation(names.NewModelTag(model.UUID.String), t.relation), nil
+	return ofganames.ConvertTagWithRelation(model.ResourceTag(), t.relation), nil
 }
 
 func (t *tagResolver) applicationOfferTag(ctx context.Context, db *db.Database) (*ofga.Entity, error) {
@@ -623,23 +584,11 @@ func (t *tagResolver) applicationOfferTag(ctx context.Context, db *db.Database) 
 		ctx,
 		"Resolving JIMM tags to Juju tags for tag kind: applicationoffer",
 	)
-	offer := dbmodel.ApplicationOffer{}
 
 	if t.resourceUUID != "" {
-		offer.UUID = t.resourceUUID
-	} else if t.controllerName != "" && t.userName != "" && t.modelName != "" && t.offerName != "" {
-		offerURL, err := crossmodel.ParseOfferURL(fmt.Sprintf("%s:%s/%s.%s", t.controllerName, t.userName, t.modelName, t.offerName))
-		if err != nil {
-			zapctx.Debug(
-				ctx,
-				"failed to parse application offer url",
-				zap.String("url", fmt.Sprintf("%s:%s/%s.%s", t.controllerName, t.userName, t.modelName, t.offerName)),
-				zaputil.Error(err),
-			)
-			return nil, errors.E("failed to parse offer url", err)
-		}
-		offer.URL = offerURL.String()
+		return ofganames.ConvertTagWithRelation(names.NewApplicationOfferTag(t.resourceUUID), t.relation), nil
 	}
+	offer := dbmodel.ApplicationOffer{URL: t.trailer}
 
 	err := db.GetApplicationOffer(ctx, &offer)
 	if err != nil {
@@ -648,6 +597,26 @@ func (t *tagResolver) applicationOfferTag(ctx context.Context, db *db.Database) 
 
 	return ofganames.ConvertTagWithRelation(offer.ResourceTag(), t.relation), nil
 }
+
+func (t *tagResolver) cloudTag(ctx context.Context, db *db.Database) (*ofga.Entity, error) {
+	zapctx.Debug(
+		ctx,
+		"Resolving JIMM tags to Juju tags for tag kind: cloud",
+	)
+
+	if t.resourceUUID != "" {
+		return ofganames.ConvertTagWithRelation(names.NewCloudTag(t.resourceUUID), t.relation), nil
+	}
+	cloud := dbmodel.Cloud{Name: t.trailer}
+
+	err := db.GetCloud(ctx, &cloud)
+	if err != nil {
+		return nil, errors.E("application offer not found")
+	}
+
+	return ofganames.ConvertTagWithRelation(cloud.ResourceTag(), t.relation), nil
+}
+
 func (t *tagResolver) serviceAccountTag(ctx context.Context) (*ofga.Entity, error) {
 	zapctx.Debug(
 		ctx,
@@ -672,7 +641,7 @@ func resolveTag(jimmUUID string, db *db.Database, tag string) (*ofganames.Tag, e
 	ctx := context.Background()
 	resolver, tagKind, err := newTagResolver(tag)
 	if err != nil {
-		return nil, errors.E("failed to setup tag resolver", err)
+		return nil, errors.E(fmt.Errorf("failed to setup tag resolver: %w", err))
 	}
 
 	switch tagKind {
@@ -686,21 +655,27 @@ func resolveTag(jimmUUID string, db *db.Database, tag string) (*ofganames.Tag, e
 		return resolver.modelTag(ctx, db)
 	case names.ApplicationOfferTagKind:
 		return resolver.applicationOfferTag(ctx, db)
+	case names.CloudTagKind:
+		return resolver.cloudTag(ctx, db)
 	case jimmnames.ServiceAccountTagKind:
 		return resolver.serviceAccountTag(ctx)
 	}
-	return nil, errors.E("failed to map tag " + tagKind)
+	return nil, errors.E(errors.CodeBadRequest, fmt.Sprintf("failed to map tag, unknown kind: %s", tagKind))
 }
 
-// ParseTag attempts to parse the provided key into a tag whilst additionally
+// parseAndValidateTag attempts to parse the provided key into a tag whilst additionally
 // ensuring the resource exists for said tag.
 //
 // This key may be in the form of either a JIMM tag string or Juju tag string.
-func (j *JIMM) ParseTag(ctx context.Context, key string) (*ofganames.Tag, error) {
-	op := errors.Op("jimm.ParseTag")
+func (j *JIMM) parseAndValidateTag(ctx context.Context, key string) (*ofganames.Tag, error) {
+	op := errors.Op("jimm.parseAndValidateTag")
 	tupleKeySplit := strings.SplitN(key, "-", 2)
-	if len(tupleKeySplit) < 2 {
-		return nil, errors.E(op, errors.CodeFailedToParseTupleKey, "tag does not have tuple key delimiter")
+	if len(tupleKeySplit) == 1 {
+		tag, err := ofganames.BlankKindTag(tupleKeySplit[0])
+		if err != nil {
+			return nil, errors.E(op, errors.CodeFailedToParseTupleKey, err)
+		}
+		return tag, nil
 	}
 	tagString := key
 	tag, err := resolveTag(j.UUID, &j.Database, tagString)
@@ -726,6 +701,34 @@ func (j *JIMM) AddGroup(ctx context.Context, user *openfga.User, name string) (*
 		return nil, errors.E(op, err)
 	}
 	return ge, nil
+}
+
+// CountGroups returns the number of groups that exist.
+func (j *JIMM) CountGroups(ctx context.Context, user *openfga.User) (int, error) {
+	const op = errors.Op("jimm.CountGroups")
+
+	if !user.JimmAdmin {
+		return 0, errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
+	count, err := j.Database.CountGroups(ctx)
+	if err != nil {
+		return 0, errors.E(op, err)
+	}
+	return count, nil
+}
+
+// GetGroup returns a group based on the provided UUID.
+func (j *JIMM) GetGroupByID(ctx context.Context, user *openfga.User, uuid string) (*dbmodel.GroupEntry, error) {
+	const op = errors.Op("jimm.AddGroup")
+
+	if !user.JimmAdmin {
+		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
+	group := dbmodel.GroupEntry{UUID: uuid}
+	if err := j.Database.GetGroup(ctx, &group); err != nil {
+		return nil, errors.E(op, err)
+	}
+	return &group, nil
 }
 
 // RenameGroup renames a group in JIMM's DB.
@@ -778,7 +781,7 @@ func (j *JIMM) RemoveGroup(ctx context.Context, user *openfga.User, name string)
 }
 
 // ListGroups returns a list of groups known to JIMM.
-func (j *JIMM) ListGroups(ctx context.Context, user *openfga.User) ([]dbmodel.GroupEntry, error) {
+func (j *JIMM) ListGroups(ctx context.Context, user *openfga.User, filter pagination.LimitOffsetPagination) ([]dbmodel.GroupEntry, error) {
 	const op = errors.Op("jimm.ListGroups")
 
 	if !user.JimmAdmin {
@@ -786,7 +789,7 @@ func (j *JIMM) ListGroups(ctx context.Context, user *openfga.User) ([]dbmodel.Gr
 	}
 
 	var groups []dbmodel.GroupEntry
-	err := j.Database.ForEachGroup(ctx, func(ge *dbmodel.GroupEntry) error {
+	err := j.Database.ForEachGroup(ctx, filter.Limit(), filter.Offset(), func(ge *dbmodel.GroupEntry) error {
 		groups = append(groups, *ge)
 		return nil
 	})

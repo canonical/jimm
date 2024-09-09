@@ -62,10 +62,10 @@ simplify:
 	gofmt -w -l -s .
 
 # Generate version information
-version/commit.txt: FORCE
+version/commit.txt:
 	git rev-parse --verify HEAD > version/commit.txt
 
-version/version.txt: FORCE
+version/version.txt:
 	if [ -z "$(GIT_VERSION)" ]; then \
         echo "dev" > version/version.txt; \
     else \
@@ -152,10 +152,7 @@ help:
 	@echo 'make sys-deps - Install the development environment system packages.'
 	@echo 'make format - Format the source files.'
 	@echo 'make simplify - Format and simplify the source files.'
-	@echo 'make get-local-auth - Get local auth to the API WSS endpoint locally.'
 	@echo 'make rock - Build the JIMM rock.'
 	@echo 'make load-rock - Load the most recently built rock into your local docker daemon.'
 
-.PHONY: build check install release clean format server simplify sys-deps help FORCE
-
-FORCE:
+.PHONY: build check install release clean format server simplify sys-deps help

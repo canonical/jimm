@@ -251,7 +251,7 @@ func (s *relationSuite) TestRemoveRelationViaFileSuperuser(c *gc.C) {
 func (s *relationSuite) TestRemoveRelation(c *gc.C) {
 	// bob is not superuser
 	bClient := jimmtest.NewUserSessionLogin(c, "bob")
-	_, err := cmdtesting.RunCommand(c, cmd.NewRemoveRelationCommandForTesting(s.ClientStore(), bClient), "test-group1#member", "member", "test-group2")
+	_, err := cmdtesting.RunCommand(c, cmd.NewRemoveRelationCommandForTesting(s.ClientStore(), bClient), "group-testGroup1#member", "member", "group-testGroup2")
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
 
@@ -360,11 +360,11 @@ func (s *relationSuite) TestListRelations(c *gc.C) {
 	}, {
 		Object:       "group-group-1#member",
 		Relation:     "administrator",
-		TargetObject: "model-" + env.controllers[0].Name + ":" + env.models[0].OwnerIdentityName + "/" + env.models[0].Name,
+		TargetObject: "model-" + env.models[0].OwnerIdentityName + "/" + env.models[0].Name,
 	}, {
 		Object:       "user-" + env.users[1].Name,
 		Relation:     "administrator",
-		TargetObject: "applicationoffer-" + env.controllers[0].Name + ":" + env.applicationOffers[0].Model.OwnerIdentityName + "/" + env.applicationOffers[0].Model.Name + "." + env.applicationOffers[0].Name,
+		TargetObject: "applicationoffer-" + env.applicationOffers[0].URL,
 	}, {
 		Object:       "user-" + env.users[0].Name,
 		Relation:     "administrator",
@@ -440,9 +440,9 @@ func (s *relationSuite) TestListRelationsWithError(c *gc.C) {
 
 	ctx := context.Background()
 	group := &dbmodel.GroupEntry{Name: "group-1"}
-	err = s.JIMM.DB().GetGroup(ctx, group)
+	err = s.JIMM.Database.GetGroup(ctx, group)
 	c.Assert(err, gc.IsNil)
-	err = s.JIMM.DB().RemoveGroup(ctx, group)
+	err = s.JIMM.Database.RemoveGroup(ctx, group)
 	c.Assert(err, gc.IsNil)
 
 	expectedData := apiparams.ListRelationshipTuplesResponse{
@@ -573,7 +573,7 @@ func (s *relationSuite) TestCheckRelationViaSuperuser(c *gc.C) {
 
 	// Test reader is OK
 	userToCheck := "user-" + u.Name
-	modelToCheck := "model-" + controller.Name + ":" + u.Name + "/" + model.Name
+	modelToCheck := "model-" + u.Name + "/" + model.Name
 	cmdCtx, err := cmdtesting.RunCommand(
 		c,
 		cmd.NewCheckRelationCommandForTesting(s.ClientStore(), bClient),

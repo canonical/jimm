@@ -134,9 +134,9 @@ func (c *Client) RemoveGroup(req *params.RemoveGroupRequest) error {
 }
 
 // ListGroups lists the groups in JIMM.
-func (c *Client) ListGroups() ([]params.Group, error) {
+func (c *Client) ListGroups(req *params.ListGroupsRequest) ([]params.Group, error) {
 	var resp params.ListGroupResponse
-	err := c.caller.APICall("JIMM", 4, "", "ListGroups", nil, &resp)
+	err := c.caller.APICall("JIMM", 4, "", "ListGroups", req, &resp)
 	return resp.Groups, err
 }
 

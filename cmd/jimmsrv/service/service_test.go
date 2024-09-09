@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"testing"
 
@@ -273,6 +274,29 @@ func TestPublicKey(t *testing.T) {
 	c.Assert(string(data), qt.Equals, `{"PublicKey":"izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk="}`)
 }
 
+func TestRebacAdminApi(t *testing.T) {
+	c := qt.New(t)
+
+	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
+	c.Assert(err, qt.IsNil)
+
+	p := jimmtest.NewTestJimmParams(c)
+	p.InsecureSecretStorage = true
+	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
+
+	svc, err := jimmsvc.NewService(context.Background(), p)
+	c.Assert(err, qt.IsNil)
+	defer svc.Cleanup()
+
+	srv := httptest.NewTLSServer(svc)
+	c.Cleanup(srv.Close)
+
+	response, err := srv.Client().Get(srv.URL + "/rebac/v1/swagger.json")
+	c.Assert(err, qt.IsNil)
+	defer response.Body.Close()
+	c.Assert(response.StatusCode, qt.Equals, 401)
+}
+
 func TestThirdPartyCaveatDischarge(t *testing.T) {
 	c := qt.New(t)
 
@@ -482,4 +506,47 @@ func TestCleanupDoesNotPanic_SessionStoreRelatedCleanups(t *testing.T) {
 	c.Assert(len(svc.GetCleanups()) > 0, qt.IsTrue)
 
 	svc.Cleanup()
+}
+
+func TestCORS(t *testing.T) {
+	c := qt.New(t)
+
+	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
+	c.Assert(err, qt.IsNil)
+	p := jimmtest.NewTestJimmParams(c)
+	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
+	allowedOrigin := "http://my-referrer.com"
+	p.CorsAllowedOrigins = []string{allowedOrigin}
+	p.InsecureSecretStorage = true
+
+	svc, err := jimmsvc.NewService(context.Background(), p)
+	c.Assert(err, qt.IsNil)
+	defer svc.Cleanup()
+
+	srv := httptest.NewServer(svc)
+	c.Cleanup(srv.Close)
+
+	url, err := url.Parse(srv.URL + "/debug/info")
+	c.Assert(err, qt.IsNil)
+	// Invalid origin won't receive CORS headers.
+	req := http.Request{
+		Method: "GET",
+		URL:    url,
+		Header: http.Header{"Origin": []string{"123"}},
+	}
+	response, err := srv.Client().Do(&req)
+	c.Assert(err, qt.IsNil)
+	defer response.Body.Close()
+	c.Assert(response.StatusCode, qt.Equals, http.StatusOK)
+	c.Assert(response.Header.Get("Access-Control-Allow-Credentials"), qt.Equals, "")
+	c.Assert(response.Header.Get("Access-Control-Allow-Origin"), qt.Equals, "")
+
+	// Valid origin should receive CORS headers.
+	req.Header = http.Header{"Origin": []string{allowedOrigin}}
+	response, err = srv.Client().Do(&req)
+	c.Assert(err, qt.IsNil)
+	defer response.Body.Close()
+	c.Assert(response.StatusCode, qt.Equals, http.StatusOK)
+	c.Assert(response.Header.Get("Access-Control-Allow-Credentials"), qt.Equals, "true")
+	c.Assert(response.Header.Get("Access-Control-Allow-Origin"), qt.Equals, allowedOrigin)
 }

@@ -167,8 +167,6 @@ func TestCopyServiceAccountCredential(t *testing.T) {
 			clientIdWithDomain, err := jimmnames.EnsureValidServiceAccountId(test.args.ClientID)
 			c.Assert(err, qt.IsNil)
 			jimm := &jimmtest.JIMM{
-				AuthorizationClient_: func() *openfga.OFGAClient { return ofgaClient },
-				DB_:                  func() *db.Database { return &pgDb },
 				CopyServiceAccountCredential_: func(ctx context.Context, u, svcAcc *openfga.User, cloudCredentialTag names.CloudCredentialTag) (names.CloudCredentialTag, []jujuparams.UpdateCredentialModelResult, error) {
 					c.Assert(cloudCredentialTag.Cloud().Id(), qt.Equals, test.args.CloudCredentialArg.CloudName)
 					c.Assert(cloudCredentialTag.Owner().Id(), qt.Equals, u.Name)
@@ -176,6 +174,11 @@ func TestCopyServiceAccountCredential(t *testing.T) {
 					c.Assert(svcAcc.Name, qt.Equals, clientIdWithDomain)
 					newCredTag := names.NewCloudCredentialTag(fmt.Sprintf("%s/%s/%s", test.args.CloudName, svcAcc.Name, test.args.CredentialName))
 					return newCredTag, nil, nil
+				},
+				UserLogin_: func(ctx context.Context, email string) (*openfga.User, error) {
+					var u dbmodel.Identity
+					u.SetTag(names.NewUserTag(email))
+					return openfga.NewUser(&u, ofgaClient), nil
 				},
 			}
 			var u dbmodel.Identity
@@ -256,8 +259,11 @@ func TestGetServiceAccount(t *testing.T) {
 			err = pgDb.Migrate(context.Background(), false)
 			c.Assert(err, qt.IsNil)
 			jimm := &jimmtest.JIMM{
-				AuthorizationClient_: func() *openfga.OFGAClient { return ofgaClient },
-				DB_:                  func() *db.Database { return &pgDb },
+				UserLogin_: func(ctx context.Context, email string) (*openfga.User, error) {
+					var u dbmodel.Identity
+					u.SetTag(names.NewUserTag(email))
+					return openfga.NewUser(&u, ofgaClient), nil
+				},
 			}
 			var u dbmodel.Identity
 			u.SetTag(names.NewUserTag(test.username))
@@ -446,9 +452,8 @@ func TestUpdateServiceAccountCredentials(t *testing.T) {
 			err = pgDb.Migrate(context.Background(), false)
 			c.Assert(err, qt.IsNil)
 			jimm := &jimmtest.JIMM{
-				AuthorizationClient_:   func() *openfga.OFGAClient { return ofgaClient },
 				UpdateCloudCredential_: test.updateCloudCredential,
-				DB_:                    func() *db.Database { return &pgDb },
+				UserLogin_:             func(ctx context.Context, email string) (*openfga.User, error) { return nil, nil },
 			}
 			var u dbmodel.Identity
 			u.SetTag(names.NewUserTag(test.username))
@@ -578,11 +583,14 @@ func TestListServiceAccountCredentials(t *testing.T) {
 			err = pgDb.Migrate(context.Background(), false)
 			c.Assert(err, qt.IsNil)
 			jimm := &jimmtest.JIMM{
-				AuthorizationClient_:          func() *openfga.OFGAClient { return ofgaClient },
 				GetCloudCredential_:           test.getCloudCredential,
 				GetCloudCredentialAttributes_: test.getCloudCredentialAttributes,
 				ForEachUserCloudCredential_:   test.ForEachUserCloudCredential,
-				DB_:                           func() *db.Database { return &pgDb },
+				UserLogin_: func(ctx context.Context, email string) (*openfga.User, error) {
+					var u dbmodel.Identity
+					u.SetTag(names.NewUserTag(email))
+					return openfga.NewUser(&u, ofgaClient), nil
+				},
 			}
 			var u dbmodel.Identity
 			u.SetTag(names.NewUserTag(test.username))
@@ -694,9 +702,8 @@ func TestGrantServiceAccountAccess(t *testing.T) {
 			err = pgDb.Migrate(context.Background(), false)
 			c.Assert(err, qt.IsNil)
 			jimm := &jimmtest.JIMM{
-				AuthorizationClient_:       func() *openfga.OFGAClient { return ofgaClient },
+				UserLogin_:                 func(ctx context.Context, email string) (*openfga.User, error) { return nil, nil },
 				GrantServiceAccountAccess_: test.grantServiceAccountAccess,
-				DB_:                        func() *db.Database { return &pgDb },
 			}
 			var u dbmodel.Identity
 			u.SetTag(names.NewUserTag(test.username))

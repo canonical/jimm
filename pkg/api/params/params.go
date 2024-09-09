@@ -300,6 +300,11 @@ type RemoveGroupRequest struct {
 	Name string `json:"name"`
 }
 
+type ListGroupsRequest struct {
+	Limit  int `json:"limit"`
+	Offset int `json:"offset"`
+}
+
 // Group holds the details of a group currently residing in JIMM.
 type Group struct {
 	UUID      string `json:"uuid" yaml:"uuid"`

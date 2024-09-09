@@ -197,10 +197,12 @@ func (s *accessControlSuite) TestListGroups(c *gc.C) {
 		_, err := client.AddGroup(&apiparams.AddGroupRequest{Name: name})
 		c.Assert(err, jc.ErrorIsNil)
 	}
-
-	groups, err := client.ListGroups()
+	req := apiparams.ListGroupsRequest{Limit: 10, Offset: 0}
+	groups, err := client.ListGroups(&req)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(groups, gc.HasLen, 4)
+	// Verify the UUID is not empty.
+	c.Assert(groups[0].UUID, gc.Not(gc.Equals), "")
 	// groups should be returned in ascending order of name
 	c.Assert(groups[0].Name, gc.Equals, "aaaFinalGroup")
 	c.Assert(groups[1].Name, gc.Equals, "test-group0")
@@ -337,7 +339,7 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 		},
 		// Test user -> model by name
 		{
-			input: tuple{"user-" + user.Name, "writer", "model-" + controller.Name + ":" + user.Name + "/" + model.Name},
+			input: tuple{"user-" + user.Name, "writer", "model-" + user.Name + "/" + model.Name},
 			want: createTuple(
 				"user:"+user.Name,
 				"writer",
@@ -359,7 +361,7 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 		},
 		// Test user -> applicationoffer by name
 		{
-			input: tuple{"user-" + user.Name, "consumer", "applicationoffer-" + controller.Name + ":" + user.Name + "/" + model.Name + "." + offer.Name},
+			input: tuple{"user-" + user.Name, "consumer", "applicationoffer-" + offer.URL},
 			want: createTuple(
 				"user:"+user.Name,
 				"consumer",
@@ -403,7 +405,7 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 		},
 		// Test group -> model by name
 		{
-			input: tuple{"group-" + group.Name + "#member", "writer", "model-" + controller.Name + ":" + user.Name + "/" + model.Name},
+			input: tuple{"group-" + group.Name + "#member", "writer", "model-" + user.Name + "/" + model.Name},
 			want: createTuple(
 				"group:"+group.UUID+"#member",
 				"writer",
@@ -425,7 +427,7 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 		},
 		// Test group -> applicationoffer by name
 		{
-			input: tuple{"group-" + group.Name + "#member", "consumer", "applicationoffer-" + controller.Name + ":" + user.Name + "/" + model.Name + "." + offer.Name},
+			input: tuple{"group-" + group.Name + "#member", "consumer", "applicationoffer-" + offer.URL},
 			want: createTuple(
 				"group:"+group.UUID+"#member",
 				"consumer",
@@ -599,7 +601,7 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 				Relation: "writer",
 				Target:   ofganames.ConvertTag(model.ResourceTag()),
 			},
-			toRemove: tuple{"user-" + user.Name, "writer", "model-" + controller.Name + ":" + user.Name + "/" + model.Name},
+			toRemove: tuple{"user-" + user.Name, "writer", "model-" + user.Name + "/" + model.Name},
 			want: createTuple(
 				"user:"+user.Name,
 				"writer",
@@ -631,7 +633,7 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 				Relation: "consumer",
 				Target:   ofganames.ConvertTag(offer.ResourceTag()),
 			},
-			toRemove: tuple{"user-" + user.Name, "consumer", "applicationoffer-" + controller.Name + ":" + user.Name + "/" + model.Name + "." + offer.Name},
+			toRemove: tuple{"user-" + user.Name, "consumer", "applicationoffer-" + offer.URL},
 			want: createTuple(
 				"user:"+user.Name,
 				"consumer",
@@ -695,7 +697,7 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 				Relation: "writer",
 				Target:   ofganames.ConvertTag(model.ResourceTag()),
 			},
-			toRemove: tuple{"group-" + group.Name + "#member", "writer", "model-" + controller.Name + ":" + user.Name + "/" + model.Name},
+			toRemove: tuple{"group-" + group.Name + "#member", "writer", "model-" + user.Name + "/" + model.Name},
 			want: createTuple(
 				"group:"+group.UUID+"#member",
 				"writer",
@@ -727,7 +729,7 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 				Relation: "consumer",
 				Target:   ofganames.ConvertTag(offer.ResourceTag()),
 			},
-			toRemove: tuple{"group-" + group.Name + "#member", "consumer", "applicationoffer-" + controller.Name + ":" + user.Name + "/" + model.Name + "." + offer.Name},
+			toRemove: tuple{"group-" + group.Name + "#member", "consumer", "applicationoffer-" + offer.URL},
 			want: createTuple(
 				"group:"+group.UUID+"#member",
 				"consumer",
@@ -819,10 +821,10 @@ func (s *accessControlSuite) TestJAASTag(c *gc.C) {
 		expectedJAASTag: "controller-" + controller.Name,
 	}, {
 		tag:             ofganames.ConvertTag(model.ResourceTag()),
-		expectedJAASTag: "model-" + controller.Name + ":" + user.Name + "/" + model.Name,
+		expectedJAASTag: "model-" + user.Name + "/" + model.Name,
 	}, {
 		tag:             ofganames.ConvertTag(applicationOffer.ResourceTag()),
-		expectedJAASTag: "applicationoffer-" + controller.Name + ":" + user.Name + "/" + model.Name + "." + applicationOffer.Name,
+		expectedJAASTag: "applicationoffer-" + applicationOffer.URL,
 	}, {
 		tag:           &ofganames.Tag{},
 		expectedError: "unexpected tag kind: ",
@@ -891,7 +893,7 @@ func (s *accessControlSuite) TestJAASTagNoUUIDResolution(c *gc.C) {
 
 func (s *accessControlSuite) TestListRelationshipTuples(c *gc.C) {
 	ctx := context.Background()
-	user, _, controller, model, applicationOffer, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
+	user, _, controller, _, applicationOffer, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
 	defer closeClient()
 
 	_, err := client.AddGroup(&apiparams.AddGroupRequest{Name: "yellow"})
@@ -914,7 +916,7 @@ func (s *accessControlSuite) TestListRelationshipTuples(c *gc.C) {
 	}, {
 		Object:       "group-orange#member",
 		Relation:     "administrator",
-		TargetObject: "applicationoffer-" + controller.Name + ":" + user.Name + "/" + model.Name + "." + applicationOffer.Name,
+		TargetObject: "applicationoffer-" + applicationOffer.URL,
 	}}
 
 	err = client.AddRelation(&apiparams.AddRelationRequest{Tuples: tuples})
@@ -928,18 +930,27 @@ func (s *accessControlSuite) TestListRelationshipTuples(c *gc.C) {
 
 	response, err = client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{
 		Tuple: apiparams.RelationshipTuple{
-			TargetObject: "applicationoffer-" + controller.Name + ":" + user.Name + "/" + model.Name + "." + applicationOffer.Name,
+			TargetObject: "applicationoffer-" + applicationOffer.URL,
 		},
 		ResolveUUIDs: true,
 	})
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(response.Tuples, jc.DeepEquals, []apiparams.RelationshipTuple{tuples[3]})
 	c.Assert(len(response.Errors), gc.Equals, 0)
+
+	// Test error message when a resource is not found
+	_, err = client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{
+		Tuple: apiparams.RelationshipTuple{
+			TargetObject: "applicationoffer-" + "fake-offer",
+		},
+		ResolveUUIDs: true,
+	})
+	c.Assert(err, gc.ErrorMatches, "failed to parse tuple target object key applicationoffer-fake-offer: application offer not found.*")
 }
 
 func (s *accessControlSuite) TestListRelationshipTuplesNoUUIDResolution(c *gc.C) {
 	ctx := context.Background()
-	user, _, controller, model, applicationOffer, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
+	_, _, _, _, applicationOffer, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
 	defer closeClient()
 
 	_, err := client.AddGroup(&apiparams.AddGroupRequest{Name: "orange"})
@@ -964,7 +975,7 @@ func (s *accessControlSuite) TestListRelationshipTuplesNoUUIDResolution(c *gc.C)
 	}}
 	response, err := client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{
 		Tuple: apiparams.RelationshipTuple{
-			TargetObject: "applicationoffer-" + controller.Name + ":" + user.Name + "/" + model.Name + "." + applicationOffer.Name,
+			TargetObject: "applicationoffer-" + applicationOffer.URL,
 		},
 		ResolveUUIDs: false,
 	})
@@ -975,7 +986,7 @@ func (s *accessControlSuite) TestListRelationshipTuplesNoUUIDResolution(c *gc.C)
 
 func (s *accessControlSuite) TestListRelationshipTuplesAfterDeletingGroup(c *gc.C) {
 	ctx := context.Background()
-	user, _, controller, model, applicationOffer, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
+	user, _, controller, _, applicationOffer, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
 	defer closeClient()
 
 	_, err := client.AddGroup(&apiparams.AddGroupRequest{Name: "yellow"})
@@ -998,7 +1009,7 @@ func (s *accessControlSuite) TestListRelationshipTuplesAfterDeletingGroup(c *gc.
 	}, {
 		Object:       "group-orange#member",
 		Relation:     "administrator",
-		TargetObject: "applicationoffer-" + controller.Name + ":" + user.Name + "/" + model.Name + "." + applicationOffer.Name,
+		TargetObject: "applicationoffer-" + applicationOffer.URL,
 	}}
 
 	err = client.AddRelation(&apiparams.AddRelationRequest{Tuples: tuples})
@@ -1046,9 +1057,9 @@ func (s *accessControlSuite) TestListRelationshipTuplesWithMissingGroups(c *gc.C
 
 	// Delete a group without going through the API.
 	group := &dbmodel.GroupEntry{Name: "yellow"}
-	err = s.JIMM.DB().GetGroup(ctx, group)
+	err = s.JIMM.Database.GetGroup(ctx, group)
 	c.Assert(err, jc.ErrorIsNil)
-	err = s.JIMM.DB().RemoveGroup(ctx, group)
+	err = s.JIMM.Database.RemoveGroup(ctx, group)
 	c.Assert(err, jc.ErrorIsNil)
 
 	response, err := client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{ResolveUUIDs: true})
@@ -1092,7 +1103,7 @@ func (s *accessControlSuite) TestCheckRelationOfferReaderFlow(c *gc.C) {
 	ctx := context.Background()
 	ofgaClient := s.JIMM.OpenFGAClient
 
-	user, group, controller, model, offer, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
+	user, group, _, _, offer, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
 	defer closeClient()
 
 	// Some tags (tuples) to assist in the creation of tuples within OpenFGA (such that they can be tested against)
@@ -1102,7 +1113,7 @@ func (s *accessControlSuite) TestCheckRelationOfferReaderFlow(c *gc.C) {
 
 	// JAAS style keys, to be translated and checked against UUIDs/users/groups
 	userJAASKey := "user-" + user.Name
-	offerJAASKey := "applicationoffer-" + controller.Name + ":" + user.Name + "/" + model.Name + "." + offer.Name
+	offerJAASKey := "applicationoffer-" + offer.URL
 
 	// Test direct relation to an applicationoffer from a user of a group via "reader" relation
 
@@ -1163,7 +1174,7 @@ func (s *accessControlSuite) TestCheckRelationOfferConsumerFlow(c *gc.C) {
 	ctx := context.Background()
 	ofgaClient := s.JIMM.OpenFGAClient
 
-	user, group, controller, model, offer, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
+	user, group, _, _, offer, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
 	defer closeClient()
 
 	// Some keys to assist in the creation of tuples within OpenFGA (such that they can be tested against)
@@ -1173,7 +1184,7 @@ func (s *accessControlSuite) TestCheckRelationOfferConsumerFlow(c *gc.C) {
 
 	// JAAS style keys, to be translated and checked against UUIDs/users/groups
 	userJAASKey := "user-" + user.Name
-	offerJAASKey := "applicationoffer-" + controller.Name + ":" + user.Name + "/" + model.Name + "." + offer.Name
+	offerJAASKey := "applicationoffer-" + offer.URL
 
 	// Test direct relation to an applicationoffer from a user of a group via "consumer" relation
 	userToGroupMember := openfga.Tuple{
@@ -1232,7 +1243,7 @@ func (s *accessControlSuite) TestCheckRelationModelReaderFlow(c *gc.C) {
 	ctx := context.Background()
 	ofgaClient := s.JIMM.OpenFGAClient
 
-	user, group, controller, model, _, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
+	user, group, _, model, _, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
 	defer closeClient()
 
 	// Some keys to assist in the creation of tuples within OpenFGA (such that they can be tested against)
@@ -1244,7 +1255,7 @@ func (s *accessControlSuite) TestCheckRelationModelReaderFlow(c *gc.C) {
 
 	// JAAS style keys, to be translated and checked against UUIDs/users/groups
 	userJAASKey := "user-" + user.Name
-	modelJAASKey := "model-" + controller.Name + ":" + user.Name + "/" + model.Name
+	modelJAASKey := "model-" + user.Name + "/" + model.Name
 
 	// Test direct relation to a model from a user of a group via "reader" relation
 	userToGroupMember := openfga.Tuple{
@@ -1303,7 +1314,7 @@ func (s *accessControlSuite) TestCheckRelationModelWriterFlow(c *gc.C) {
 	ctx := context.Background()
 	ofgaClient := s.JIMM.OpenFGAClient
 
-	user, group, controller, model, _, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
+	user, group, _, model, _, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
 	defer closeClient()
 
 	// Some keys to assist in the creation of tuples within OpenFGA (such that they can be tested against)
@@ -1325,7 +1336,7 @@ func (s *accessControlSuite) TestCheckRelationModelWriterFlow(c *gc.C) {
 
 	// JAAS style keys, to be translated and checked against UUIDs/users/groups
 	userJAASKey := "user-" + user.Name
-	modelJAASKey := "model-" + controller.Name + ":" + user.Name + "/" + model.Name
+	modelJAASKey := "model-" + user.Name + "/" + model.Name
 
 	err := ofgaClient.AddRelation(
 		ctx,
@@ -1386,8 +1397,8 @@ func (s *accessControlSuite) TestCheckRelationControllerAdministratorFlow(c *gc.
 	userJAASKey := "user-" + user.Name
 	groupJAASKey := "group-" + group.Name
 	controllerJAASKey := "controller-" + controller.Name
-	modelJAASKey := "model-" + controller.Name + ":" + user.Name + "/" + model.Name
-	offerJAASKey := "applicationoffer-" + controller.Name + ":" + user.Name + "/" + model.Name + "." + offer.Name
+	modelJAASKey := "model-" + user.Name + "/" + model.Name
+	offerJAASKey := "applicationoffer-" + offer.URL
 
 	// Test the administrator flow of a group user being related to a controller via administrator relation
 	userToGroup := openfga.Tuple{
