@@ -70,17 +70,18 @@ func (s *httpProxySuite) TestCharmHTTPServe(c *gc.C) {
 	expectU, expectP, err := s.JIMM.GetCredentialStore().GetControllerCredentials(ctx, s.Model.Controller.Name)
 	c.Assert(err, gc.IsNil)
 	// we expect the controller to respond with TLS
-	ts := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	fakeController := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		u, p, _ := r.BasicAuth()
 		c.Assert(u, gc.Equals, names.NewUserTag(expectU).String())
 		c.Assert(p, gc.Equals, expectP)
-		w.Write([]byte("OK"))
+		_, err = w.Write([]byte("OK"))
+		c.Assert(err, gc.IsNil)
 	}))
-	defer ts.Close()
+	defer fakeController.Close()
 	controller := s.Model.Controller
 	pemData := pem.EncodeToMemory(&pem.Block{
 		Type:  "CERTIFICATE",
-		Bytes: ts.Certificate().Raw,
+		Bytes: fakeController.Certificate().Raw,
 	})
 	controller.CACertificate = string(pemData)
 
@@ -93,7 +94,7 @@ func (s *httpProxySuite) TestCharmHTTPServe(c *gc.C) {
 		{
 			description: "good",
 			setup: func() {
-				newURL, _ := url.Parse(ts.URL)
+				newURL, _ := url.Parse(fakeController.URL)
 				controller.PublicAddress = newURL.Host
 				err = s.JIMM.Database.UpdateController(ctx, &controller)
 				c.Assert(err, gc.IsNil)
@@ -104,7 +105,7 @@ func (s *httpProxySuite) TestCharmHTTPServe(c *gc.C) {
 		{
 			description: "controller no public address, only addresses",
 			setup: func() {
-				hp, err := network.ParseMachineHostPort(ts.Listener.Addr().String())
+				hp, err := network.ParseMachineHostPort(fakeController.Listener.Addr().String())
 				c.Assert(err, gc.Equals, nil)
 				controller.Addresses = append(make([][]jujuparams.HostPort, 0), []jujuparams.HostPort{{
 					Address: jujuparams.FromMachineAddress(hp.MachineAddress),
@@ -121,7 +122,7 @@ func (s *httpProxySuite) TestCharmHTTPServe(c *gc.C) {
 		{
 			description: "controller no public address, only addresses",
 			setup: func() {
-				hp, err := network.ParseMachineHostPort(ts.Listener.Addr().String())
+				hp, err := network.ParseMachineHostPort(fakeController.Listener.Addr().String())
 				c.Assert(err, gc.Equals, nil)
 				controller.Addresses = append(make([][]jujuparams.HostPort, 0), []jujuparams.HostPort{{
 					Address: jujuparams.FromMachineAddress(hp.MachineAddress),
@@ -161,7 +162,9 @@ func (s *httpProxySuite) TestCharmHTTPServe(c *gc.C) {
 		c.Assert(err, gc.IsNil)
 		recorder := httptest.NewRecorder()
 		httpProxier.ServeHTTP(ctx, recorder, req)
-		c.Assert(recorder.Result().StatusCode, gc.Equals, test.statusExpected)
+		resp := recorder.Result()
+		defer resp.Body.Close()
+		c.Assert(resp.StatusCode, gc.Equals, test.statusExpected)
 	}
 }
 

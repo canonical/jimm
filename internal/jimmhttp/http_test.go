@@ -58,6 +58,6 @@ func (s testHTTPServer) Authenticate(ctx context.Context, w http.ResponseWriter,
 
 func (s testHTTPServer) ServeHTTP(ctx context.Context, w http.ResponseWriter, req *http.Request) {
 	var buf bytes.Buffer
-	req.Write(&buf)
-	w.Write(buf.Bytes())
+	_ = req.Write(&buf)
+	_, _ = w.Write(buf.Bytes())
 }
