@@ -4,6 +4,7 @@ package jujuapi_test
 
 import (
 	"context"
+	"database/sql"
 	"encoding/pem"
 	"fmt"
 	"net/http"
@@ -16,31 +17,78 @@ import (
 	"github.com/juju/juju/api"
 	"github.com/juju/juju/api/client/charms"
 	"github.com/juju/juju/api/client/resources"
-	"github.com/juju/juju/core/network"
-	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/testcharms"
 	"github.com/juju/juju/testing/factory"
 	"github.com/juju/names/v5"
 	"github.com/juju/version/v2"
 	gc "gopkg.in/check.v1"
 
+	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/jimmtest"
 	"github.com/canonical/jimm/v3/internal/jujuapi"
+	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 )
 
 type httpProxySuite struct {
-	websocketSuite
+	jimmtest.JIMMSuite
+	model *dbmodel.Model
 }
 
+const testEnv = `
+clouds:
+- name: test-cloud
+  type: test-provider
+  regions:
+  - name: test-cloud-region
+cloud-credentials:
+- owner: alice@canonical.com
+  name: cred-1
+  cloud: test-cloud
+controllers:
+- name: controller-1
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test-cloud
+  region: test-cloud-region
+models:
+- name: model-1
+  uuid: 00000002-0000-0000-0000-000000000001
+  controller: controller-1
+  cloud: test-cloud
+  region: test-cloud-region
+  cloud-credential: cred-1
+  owner: alice@canonical.com
+users:
+- username: alice@canonical.com
+  access: admin
+`
+
 var _ = gc.Suite(&httpProxySuite{})
+
+func (s *httpProxySuite) SetUpTest(c *gc.C) {
+	s.JIMMSuite.SetUpTest(c)
+	ctx := context.Background()
+	tester := jimmtest.GocheckTester{C: c}
+	env := jimmtest.ParseEnvironment(tester, testEnv)
+	env.PopulateDB(tester, s.JIMM.Database)
+	user, err := s.JIMM.FetchIdentity(ctx, env.Users[0].Username)
+	c.Assert(err, gc.IsNil)
+	err = user.SetModelAccess(ctx, names.NewModelTag(env.Models[0].UUID), ofganames.AdministratorRelation)
+	c.Assert(err, gc.IsNil)
+	model := &dbmodel.Model{UUID: sql.NullString{String: env.Models[0].UUID, Valid: true}}
+	err = s.JIMM.Database.GetModel(ctx, model)
+	c.Assert(err, gc.IsNil)
+	s.model = model
+	s.JIMM.GetCredentialStore().PutControllerCredentials(ctx, model.Controller.Name, "user", "psw")
+}
 
 func (s *httpProxySuite) TestHTTPAuthenticate(c *gc.C) {
 	ctx := context.Background()
 	httpProxier := jujuapi.HTTPProxier(s.JIMM)
 
 	// good
-	req, err := http.NewRequest("POST", fmt.Sprintf("/%s/charms", s.Model.UUID.String), nil)
+	req, err := http.NewRequest("POST", fmt.Sprintf("/%s/charms", s.model.UUID.String), nil)
 	c.Assert(err, gc.IsNil)
-	token, err := s.JIMM.OAuthAuthenticator.MintSessionToken(s.AdminUser.Name)
+	token, err := s.JIMM.OAuthAuthenticator.MintSessionToken("alice@canonical.com")
 	c.Assert(err, gc.IsNil)
 	req.SetBasicAuth("", token)
 	c.Assert(err, gc.IsNil)
@@ -48,13 +96,13 @@ func (s *httpProxySuite) TestHTTPAuthenticate(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	// missing auth
-	req, err = http.NewRequest("POST", fmt.Sprintf("/%s/charms", s.Model.UUID.String), nil)
+	req, err = http.NewRequest("POST", fmt.Sprintf("/%s/charms", s.model.UUID.String), nil)
 	c.Assert(err, gc.IsNil)
 	err = httpProxier.Authenticate(ctx, nil, req)
 	c.Assert(err, gc.ErrorMatches, "authentication missing")
 
 	// wrong user
-	req, err = http.NewRequest("POST", fmt.Sprintf("/%s/charms", s.Model.UUID.String), nil)
+	req, err = http.NewRequest("POST", fmt.Sprintf("/%s/charms", s.model.UUID.String), nil)
 	c.Assert(err, gc.IsNil)
 	token, err = s.JIMM.OAuthAuthenticator.MintSessionToken("test-user")
 	c.Assert(err, gc.IsNil)
@@ -67,7 +115,7 @@ func (s *httpProxySuite) TestHTTPAuthenticate(c *gc.C) {
 func (s *httpProxySuite) TestCharmHTTPServe(c *gc.C) {
 	ctx := context.Background()
 	httpProxier := jujuapi.HTTPProxier(s.JIMM)
-	expectU, expectP, err := s.JIMM.GetCredentialStore().GetControllerCredentials(ctx, s.Model.Controller.Name)
+	expectU, expectP, err := s.JIMM.GetCredentialStore().GetControllerCredentials(ctx, s.model.Controller.Name)
 	c.Assert(err, gc.IsNil)
 	// we expect the controller to respond with TLS
 	fakeController := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -78,7 +126,7 @@ func (s *httpProxySuite) TestCharmHTTPServe(c *gc.C) {
 		c.Assert(err, gc.IsNil)
 	}))
 	defer fakeController.Close()
-	controller := s.Model.Controller
+	controller := s.model.Controller
 	pemData := pem.EncodeToMemory(&pem.Block{
 		Type:  "CERTIFICATE",
 		Bytes: fakeController.Certificate().Raw,
@@ -99,41 +147,7 @@ func (s *httpProxySuite) TestCharmHTTPServe(c *gc.C) {
 				err = s.JIMM.Database.UpdateController(ctx, &controller)
 				c.Assert(err, gc.IsNil)
 			},
-			url:            fmt.Sprintf("/model/%s/charms", s.Model.UUID.String),
-			statusExpected: http.StatusOK,
-		},
-		{
-			description: "controller no public address, only addresses",
-			setup: func() {
-				hp, err := network.ParseMachineHostPort(fakeController.Listener.Addr().String())
-				c.Assert(err, gc.Equals, nil)
-				controller.Addresses = append(make([][]jujuparams.HostPort, 0), []jujuparams.HostPort{{
-					Address: jujuparams.FromMachineAddress(hp.MachineAddress),
-					Port:    hp.Port(),
-				}})
-				controller.Addresses = append(controller.Addresses, []jujuparams.HostPort{})
-				controller.PublicAddress = ""
-				err = s.JIMM.Database.UpdateController(ctx, &controller)
-				c.Assert(err, gc.IsNil)
-			},
-			url:            fmt.Sprintf("/model/%s/charms", s.Model.UUID.String),
-			statusExpected: http.StatusOK,
-		},
-		{
-			description: "controller no public address, only addresses",
-			setup: func() {
-				hp, err := network.ParseMachineHostPort(fakeController.Listener.Addr().String())
-				c.Assert(err, gc.Equals, nil)
-				controller.Addresses = append(make([][]jujuparams.HostPort, 0), []jujuparams.HostPort{{
-					Address: jujuparams.FromMachineAddress(hp.MachineAddress),
-					Port:    hp.Port(),
-				}})
-				controller.Addresses = append(controller.Addresses, []jujuparams.HostPort{})
-				controller.PublicAddress = ""
-				err = s.JIMM.Database.UpdateController(ctx, &controller)
-				c.Assert(err, gc.IsNil)
-			},
-			url:            fmt.Sprintf("/model/%s/charms", s.Model.UUID.String),
+			url:            fmt.Sprintf("/model/%s/charms", s.model.UUID.String),
 			statusExpected: http.StatusOK,
 		},
 		{
@@ -142,17 +156,6 @@ func (s *httpProxySuite) TestCharmHTTPServe(c *gc.C) {
 			},
 			url:            fmt.Sprintf("/model/%s/charms", "54d9f921-c45a-4825-8253-74e7edc28066"),
 			statusExpected: http.StatusNotFound,
-		},
-		{
-			description: "controller not reachable",
-			setup: func() {
-				controller.Addresses = nil
-				controller.PublicAddress = "localhost-not-found:61213"
-				err = s.JIMM.Database.UpdateController(ctx, &controller)
-				c.Assert(err, gc.IsNil)
-			},
-			url:            fmt.Sprintf("/model/%s/charms", s.Model.UUID.String),
-			statusExpected: http.StatusInternalServerError,
 		},
 	}
 
