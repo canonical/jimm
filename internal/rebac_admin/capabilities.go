@@ -9,7 +9,7 @@ import (
 	"github.com/canonical/rebac-admin-ui-handlers/v1/resources"
 )
 
-// CapabilitiesService implements the `CapabilitiesService` interface.
+// capabilitiesService implements the `CapabilitiesService` interface.
 type capabilitiesService struct {
 }
 
