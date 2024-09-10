@@ -15,6 +15,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/common/pagination"
 	"github.com/canonical/jimm/v3/internal/common/utils"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
+	jimmm_errors "github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimmtest"
 	"github.com/canonical/jimm/v3/internal/jimmtest/mocks"
 	"github.com/canonical/jimm/v3/internal/openfga"
@@ -29,7 +30,7 @@ func TestGetIdentity(t *testing.T) {
 			if username == "bob@canonical.com" {
 				return openfga.NewUser(&dbmodel.Identity{Name: "bob@canonical.com"}, nil), nil
 			}
-			return nil, dbmodel.IdentityCreationError
+			return nil, jimmm_errors.E(jimmm_errors.CodeNotFound)
 		},
 	}
 	user := openfga.User{}
