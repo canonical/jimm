@@ -39,7 +39,7 @@ func ProxyHTTP(ctx context.Context, ctl *dbmodel.Controller, w http.ResponseWrit
 	if ctl.PublicAddress != "" {
 		err := proxyHTTP(ctx, w, req, HTTPClientOptions{
 			TLSConfig: tlsConfig,
-			URL:       httpUrl(*req.URL, ctl.PublicAddress),
+			URL:       createURLWithNewHost(*req.URL, ctl.PublicAddress),
 		})
 		if err == nil {
 			return
@@ -49,7 +49,7 @@ func ProxyHTTP(ctx context.Context, ctl *dbmodel.Controller, w http.ResponseWrit
 		for _, hp := range hps {
 			err := proxyHTTP(ctx, w, req, HTTPClientOptions{
 				TLSConfig: tlsConfig,
-				URL:       httpUrl(*req.URL, fmt.Sprintf("%s:%d", hp.Value, hp.Port)),
+				URL:       createURLWithNewHost(*req.URL, fmt.Sprintf("%s:%d", hp.Value, hp.Port)),
 			})
 			if err == nil {
 				return
@@ -93,7 +93,8 @@ func proxyHTTP(ctx context.Context, w http.ResponseWriter, req *http.Request, op
 	return nil
 }
 
-func httpUrl(reqUrl url.URL, host string) url.URL {
+// createURLWithNewHost takes a url.URL as parameter and return a url.URL with new host set and https enforced.
+func createURLWithNewHost(reqUrl url.URL, host string) url.URL {
 	reqUrl.Scheme = "https"
 	reqUrl.Host = host
 	return reqUrl

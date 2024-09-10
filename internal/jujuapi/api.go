@@ -42,9 +42,11 @@ func ModelHandler(ctx context.Context, jimm *jimm.JIMM, p Params) http.Handler {
 			jimm: jimm,
 		}},
 	}))
+	// model is not stripped from the URL because it is needed in the proxied request
 	mux.Handle("/model/{uuid}/charms", &jimmhttp.HTTPHandler{
 		HTTPProxier: &httpProxier{jimm: jimm},
 	})
+	// model is not stripped from the URL because it is needed in the proxied request
 	mux.Handle("/model/{uuid}/applications/*", &jimmhttp.HTTPHandler{
 		HTTPProxier: &httpProxier{jimm: jimm},
 	})

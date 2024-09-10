@@ -28,14 +28,17 @@ func (s *httpProxier) Authenticate(ctx context.Context, w http.ResponseWriter, r
 	if err != nil {
 		return errors.E(errors.CodeUnauthorized, err)
 	}
-	// extract model uuid anche check permission
+	// extract model uuid and check permission
 	sPath, _ := strings.CutPrefix(req.URL.EscapedPath(), "/model")
 	uuid, _, err := modelInfoFromPath(sPath)
 	if err != nil {
 		return errors.E(errors.CodeUnauthorized, "cannot parse path")
 	}
 	access, err := s.jimm.GetUserModelAccess(ctx, user, names.NewModelTag(uuid))
-	if err != nil || (access != "admin" && access != "writer") {
+	if err != nil {
+		return errors.E(errors.CodeUnauthorized, "unauthorized")
+	}
+	if access != "admin" && access != "writer" {
 		return errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
 	return nil
