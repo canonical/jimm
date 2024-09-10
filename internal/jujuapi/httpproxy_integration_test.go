@@ -78,7 +78,8 @@ func (s *httpProxySuite) SetUpTest(c *gc.C) {
 	err = s.JIMM.Database.GetModel(ctx, model)
 	c.Assert(err, gc.IsNil)
 	s.model = model
-	s.JIMM.GetCredentialStore().PutControllerCredentials(ctx, model.Controller.Name, "user", "psw")
+	err = s.JIMM.GetCredentialStore().PutControllerCredentials(ctx, model.Controller.Name, "user", "psw")
+	c.Assert(err, gc.IsNil)
 }
 
 func (s *httpProxySuite) TestHTTPAuthenticate(c *gc.C) {
