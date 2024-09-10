@@ -1,4 +1,5 @@
 // Copyright 2024 Canonical.
+
 package rebac_admin_test
 
 import (
@@ -11,7 +12,6 @@ import (
 	qt "github.com/frankban/quicktest"
 
 	"github.com/canonical/jimm/v3/internal/jimmtest"
-	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/rebac_admin"
 )
 
@@ -20,15 +20,13 @@ func TestCapabilities(t *testing.T) {
 	c := qt.New(t)
 	jimm := jimmtest.JIMM{}
 	ctx := context.Background()
-	user := openfga.User{}
-	user.JimmAdmin = true
 	handlers, err := rebac_admin.SetupBackend(ctx, &jimm)
 	c.Assert(err, qt.IsNil)
 	testServer := httptest.NewServer(handlers.Handler(""))
 	defer testServer.Close()
 
 	// test not found endpoint
-	url := fmt.Sprintf("%s/v1%s", testServer.URL, "not-found")
+	url := fmt.Sprintf("%s/v1%s", testServer.URL, "/not-found")
 	req, err := http.NewRequest("GET", url, nil)
 	c.Assert(err, qt.IsNil)
 	resp, err := http.DefaultClient.Do(req)
@@ -46,7 +44,8 @@ func TestCapabilities(t *testing.T) {
 				resp, err := http.DefaultClient.Do(req)
 				c.Assert(err, qt.IsNil)
 				defer resp.Body.Close()
-				c.Assert(resp.StatusCode, qt.Not(qt.Equals), 404)
+				isNotFound := resp.StatusCode == 404 || resp.StatusCode == 501
+				c.Assert(isNotFound, qt.IsFalse)
 			})
 
 		}

@@ -195,7 +195,7 @@ func (s *identitiesService) GetIdentityEntitlements(ctx context.Context, identit
 	objUser, err := s.jimm.FetchIdentity(ctx, identityId)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.CodeNotFound {
-			return nil, v1.NewNotFoundError("failed to find identity")
+			return nil, v1.NewNotFoundError(fmt.Sprintf("User with id %s not found", identityId))
 		}
 		return nil, err
 	}

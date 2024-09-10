@@ -1,4 +1,5 @@
 // Copyright 2024 Canonical.
+
 package rebac_admin
 
 import (
@@ -53,10 +54,6 @@ var capabilities = []resources.Capability{
 		},
 	},
 	{
-		Endpoint: "/identities/{id}/roles",
-		Methods:  []resources.CapabilityMethods{},
-	},
-	{
 		Endpoint: "/identities/{id}/entitlements",
 		Methods: []resources.CapabilityMethods{
 			"GET",
@@ -86,27 +83,11 @@ var capabilities = []resources.Capability{
 		},
 	},
 	{
-		Endpoint: "/groups/{id}/roles",
-		Methods:  []resources.CapabilityMethods{},
-	},
-	{
 		Endpoint: "/groups/{id}/entitlements",
 		Methods: []resources.CapabilityMethods{
 			"GET",
 			"PATCH",
 		},
-	},
-	{
-		Endpoint: "/roles",
-		Methods:  []resources.CapabilityMethods{},
-	},
-	{
-		Endpoint: "/roles/{id}",
-		Methods:  []resources.CapabilityMethods{},
-	},
-	{
-		Endpoint: "/roles/{id}/entitlements",
-		Methods:  []resources.CapabilityMethods{},
 	},
 	{
 		Endpoint: "/entitlements",
