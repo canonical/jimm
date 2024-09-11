@@ -49,7 +49,7 @@ type testHTTPServer struct {
 	t testing.TB
 }
 
-func (s testHTTPServer) Authenticate(ctx context.Context, w http.ResponseWriter, req *http.Request) error {
+func (s testHTTPServer) AuthenticateAndAuthorize(ctx context.Context, w http.ResponseWriter, req *http.Request) error {
 	if auth := req.Header.Get("Authorization"); auth == "wrong" {
 		return errors.New("error")
 	}

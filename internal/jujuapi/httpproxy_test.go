@@ -96,7 +96,7 @@ func TestAuthenticate(t *testing.T) {
 			if test.token != "" {
 				req.SetBasicAuth("", test.token)
 			}
-			err = httpProxier.Authenticate(ctx, nil, req)
+			err = httpProxier.AuthenticateAndAuthorize(ctx, nil, req)
 			if test.errorMessage != "" {
 				c.Assert(err, qt.ErrorMatches, test.errorMessage)
 			} else {

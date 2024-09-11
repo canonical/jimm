@@ -1,4 +1,5 @@
 // Copyright 2024 Canonical.
+
 package jimmhttp
 
 import (
@@ -20,7 +21,7 @@ func (h *HTTPHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	authErr := h.HTTPProxier.Authenticate(ctx, w, req)
+	authErr := h.HTTPProxier.AuthenticateAndAuthorize(ctx, w, req)
 	if authErr != nil {
 		zapctx.Error(ctx, "authentication error", zap.Error(authErr))
 		w.WriteHeader(http.StatusUnauthorized)
@@ -31,7 +32,11 @@ func (h *HTTPHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	h.HTTPProxier.ServeHTTP(ctx, w, req)
 }
 
+// HTTPProxier is an interface to proxy HTTP requests to controllers.
+//
+// AuthenticateAndAuthorize handles authentication and authorization.
+// ServeHTTP proxies the request.
 type HTTPProxier interface {
-	Authenticate(ctx context.Context, w http.ResponseWriter, req *http.Request) error
+	AuthenticateAndAuthorize(ctx context.Context, w http.ResponseWriter, req *http.Request) error
 	ServeHTTP(ctx context.Context, w http.ResponseWriter, req *http.Request)
 }

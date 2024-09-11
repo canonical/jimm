@@ -93,13 +93,13 @@ func (s *httpProxySuite) TestHTTPAuthenticate(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	req.SetBasicAuth("", token)
 	c.Assert(err, gc.IsNil)
-	err = httpProxier.Authenticate(ctx, nil, req)
+	err = httpProxier.AuthenticateAndAuthorize(ctx, nil, req)
 	c.Assert(err, gc.IsNil)
 
 	// missing auth
 	req, err = http.NewRequest("POST", fmt.Sprintf("/%s/charms", s.model.UUID.String), nil)
 	c.Assert(err, gc.IsNil)
-	err = httpProxier.Authenticate(ctx, nil, req)
+	err = httpProxier.AuthenticateAndAuthorize(ctx, nil, req)
 	c.Assert(err, gc.ErrorMatches, "authentication missing")
 
 	// wrong user
@@ -109,7 +109,7 @@ func (s *httpProxySuite) TestHTTPAuthenticate(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	req.SetBasicAuth("", token)
 	c.Assert(err, gc.IsNil)
-	err = httpProxier.Authenticate(ctx, nil, req)
+	err = httpProxier.AuthenticateAndAuthorize(ctx, nil, req)
 	c.Assert(err, gc.ErrorMatches, "unauthorized")
 }
 

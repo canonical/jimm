@@ -18,7 +18,9 @@ type httpProxier struct {
 	jimm JIMM // interface
 }
 
-func (s *httpProxier) Authenticate(ctx context.Context, w http.ResponseWriter, req *http.Request) error {
+// AuthenticateAndAuthorize extracts the user from the basic auth header, the model uuid from the url path and,
+// it checks for user permissions on that model.
+func (s *httpProxier) AuthenticateAndAuthorize(ctx context.Context, w http.ResponseWriter, req *http.Request) error {
 	// extract auth token
 	_, password, ok := req.BasicAuth()
 	if !ok {
@@ -42,6 +44,7 @@ func (s *httpProxier) Authenticate(ctx context.Context, w http.ResponseWriter, r
 	return nil
 }
 
+// ServeHTTP extract the model uuid from the path to retrieve necessary information to proxy the request to the right controller.
 func (s *httpProxier) ServeHTTP(ctx context.Context, w http.ResponseWriter, req *http.Request) {
 	writeError := func(msg string, code int) {
 		w.WriteHeader(code)
