@@ -5,12 +5,14 @@ package middleware_test
 import (
 	"context"
 	"fmt"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
+	"github.com/juju/names/v5"
 	"github.com/juju/names/v5"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
@@ -20,9 +22,10 @@ import (
 	"github.com/canonical/jimm/v3/internal/middleware"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
+	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 )
 
-func TestAuthorizeUserForModelAccessTest(t *testing.T) {
+func TestAuthorizeUserForModelAccess(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 	testUser := "test-user@canonical.com"
@@ -58,7 +61,33 @@ func TestAuthorizeUserForModelAccessTest(t *testing.T) {
 	}
 	err = ofgaClient.AddRelation(ctx, tuples...)
 	c.Assert(err, qt.IsNil)
+	ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(t.Name())
+	c.Assert(err, qt.IsNil)
+	bobIdentity, err := dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, qt.IsNil)
+	bob := openfga.NewUser(bobIdentity, ofgaClient)
+	validModelUUID := "54d9f921-c45a-4825-8253-74e7edc28066"
+	notvalidModelUUID := "54d9f921-c45a-4825-8253-74e7edc28065"
+	tuples := []openfga.Tuple{
+		{
+			Object:   ofganames.ConvertTag(bob.ResourceTag()),
+			Relation: ofganames.AdministratorRelation,
+			Target:   ofganames.ConvertTag(names.NewModelTag(validModelUUID)),
+		},
+		{
+			Object:   ofganames.ConvertTag(bob.ResourceTag()),
+			Relation: ofganames.ReaderRelation,
+			Target:   ofganames.ConvertTag(names.NewModelTag(notvalidModelUUID)),
+		},
+	}
+	err = ofgaClient.AddRelation(ctx, tuples...)
+	c.Assert(err, qt.IsNil)
 	tests := []struct {
+		name               string
+		expectedStatus     int
+		path               string
+		permissionRequired string
+		errorExpected      string
 		name               string
 		expectedStatus     int
 		path               string
@@ -70,14 +99,27 @@ func TestAuthorizeUserForModelAccessTest(t *testing.T) {
 			expectedStatus:     http.StatusOK,
 			permissionRequired: "writer",
 			path:               fmt.Sprintf("/model/%s/api", validModelUUID),
+			name:               "success",
+			expectedStatus:     http.StatusOK,
+			permissionRequired: "writer",
+			path:               fmt.Sprintf("/model/%s/api", validModelUUID),
 		},
 		{
 			name:           "no uuid from path",
 			expectedStatus: http.StatusUnauthorized,
 			path:           "model",
 			errorExpected:  "cannot find uuid in URL path",
+			name:           "no uuid from path",
+			expectedStatus: http.StatusUnauthorized,
+			path:           "model",
+			errorExpected:  "cannot find uuid in URL path",
 		},
 		{
+			name:               "not enough permission",
+			expectedStatus:     http.StatusForbidden,
+			path:               fmt.Sprintf("/model/%s/api", notvalidModelUUID),
+			permissionRequired: "writer",
+			errorExpected:      "no access to the resource",
 			name:               "not enough permission",
 			expectedStatus:     http.StatusForbidden,
 			path:               fmt.Sprintf("/model/%s/api", notvalidModelUUID),
@@ -90,6 +132,7 @@ func TestAuthorizeUserForModelAccessTest(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			c := qt.New(t)
 			req := httptest.NewRequest(http.MethodGet, tt.path, nil)
+			ctx := 
 			w := httptest.NewRecorder()
 			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				user, err := middleware.ExtractUserFromContext(r.Context())
@@ -103,7 +146,7 @@ func TestAuthorizeUserForModelAccessTest(t *testing.T) {
 			} else {
 				mw = middleware.AuthorizeUserForModelAccess(handler, &jt, ofganames.WriterRelation)
 			}
-			mw.ServeHTTP(w, req)
+			mw.ServeHTTP(w, req.WithContext())
 			c.Assert(w.Code, qt.Equals, tt.expectedStatus)
 			b := w.Result().Body
 			defer b.Close()
