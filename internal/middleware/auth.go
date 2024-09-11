@@ -3,6 +3,7 @@
 package middleware
 
 import (
+	"context"
 	"net/http"
 
 	rebac_handlers "github.com/canonical/rebac-admin-ui-handlers/v1"
@@ -12,6 +13,9 @@ import (
 	"github.com/canonical/jimm/v3/internal/auth"
 	"github.com/canonical/jimm/v3/internal/jujuapi"
 )
+
+// BasicAuthUser is the unique key to extract user from context for basic-auth authentication
+type BasicAuthUser struct{}
 
 // AuthenticateViaCookie performs browser session authentication and puts an identity in the request's context
 func AuthenticateViaCookie(next http.Handler, jimm jujuapi.JIMM) http.Handler {
@@ -56,4 +60,26 @@ func AuthenticateRebac(next http.Handler, jimm jujuapi.JIMM) http.Handler {
 		ctx = rebac_handlers.ContextWithIdentity(ctx, user)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	}), jimm)
+}
+
+// AuthenticateViaBasicAuth performs basic auth authentication and puts an identity in the request's context
+func AuthenticateViaBasicAuth(next http.Handler, jimm jujuapi.JIMM) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		// extract auth token
+		_, password, ok := r.BasicAuth()
+		if !ok {
+			w.WriteHeader(http.StatusUnauthorized)
+			_, _ = w.Write([]byte("authentication missing"))
+			return
+		}
+		user, err := jimm.LoginWithSessionToken(ctx, password)
+		if err != nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			_, _ = w.Write([]byte("error authenticating the user"))
+			return
+		}
+		ctx = context.WithValue(ctx, BasicAuthUser{}, user)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
 }
