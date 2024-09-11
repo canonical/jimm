@@ -11,7 +11,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga"
 )
 
-func checkPermission(ctx context.Context, path string, u *openfga.User, mt names.ModelTag) (bool, error) {
+func checkModelAccessForUser(ctx context.Context, path string, u *openfga.User, mt names.ModelTag) (bool, error) {
 	path = strings.Split(path, "/")[0] // extract just the first segment
 	switch path {
 	case "log":

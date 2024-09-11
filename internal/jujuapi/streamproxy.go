@@ -73,7 +73,7 @@ func (s streamProxier) ServeWS(ctx context.Context, clientConn *websocket.Conn) 
 
 	modelTag := names.NewModelTag(uuid)
 
-	if ok, err := checkPermission(ctx, finalPath, user, modelTag); err != nil {
+	if ok, err := checkModelAccessForUser(ctx, finalPath, user, modelTag); err != nil {
 		writeError(err.Error(), errors.CodeUnauthorized)
 		return
 	} else if !ok {

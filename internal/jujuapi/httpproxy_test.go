@@ -11,20 +11,35 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/juju/names/v5"
 
+	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/jimmtest"
 	"github.com/canonical/jimm/v3/internal/jimmtest/mocks"
 	"github.com/canonical/jimm/v3/internal/jujuapi"
 	"github.com/canonical/jimm/v3/internal/openfga"
+	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 )
 
 func TestAuthenticate(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
+	ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+	c.Assert(err, qt.IsNil)
+	bobIdentity, err := dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, qt.IsNil)
+	bob := openfga.NewUser(bobIdentity, ofgaClient)
+	validModelUUID := "54d9f921-c45a-4825-8253-74e7edc28066"
+	tuple := openfga.Tuple{
+		Object:   ofganames.ConvertTag(bob.ResourceTag()),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag(validModelUUID)),
+	}
+	err = ofgaClient.AddRelation(ctx, tuple)
+	c.Assert(err, qt.IsNil)
 	jimmMock := jimmtest.JIMM{
 		LoginService: mocks.LoginService{
 			LoginWithSessionToken_: func(ctx context.Context, sessionToken string) (*openfga.User, error) {
 				if sessionToken == "valid_jwt" {
-					return &openfga.User{}, nil
+					return bob, nil
 				} else {
 					return nil, errors.New("invalid JWT")
 				}
@@ -33,12 +48,6 @@ func TestAuthenticate(t *testing.T) {
 		},
 		FetchIdentity_: func(ctx context.Context, username string) (*openfga.User, error) {
 			return &openfga.User{}, nil
-		},
-		GetUserModelAccess_: func(ctx context.Context, user *openfga.User, model names.ModelTag) (string, error) {
-			if model.Id() == "54d9f921-c45a-4825-8253-74e7edc28067" {
-				return "", errors.New("not auth")
-			}
-			return "admin", nil
 		},
 	}
 
@@ -75,7 +84,7 @@ func TestAuthenticate(t *testing.T) {
 		{
 			description:  "authorized user on this model",
 			token:        "valid_jwt",
-			path:         "/54d9f921-c45a-4825-8253-74e7edc28066/charms",
+			path:         "/" + validModelUUID + "/charms",
 			errorMessage: "",
 		},
 	}

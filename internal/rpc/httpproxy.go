@@ -21,6 +21,7 @@ type HTTPClientOptions struct {
 	URL       url.URL
 }
 
+// ProxyHTTP proxies the request to the controller using the info contained in dbmodel.Controller.
 func ProxyHTTP(ctx context.Context, ctl *dbmodel.Controller, w http.ResponseWriter, req *http.Request) {
 	var tlsConfig *tls.Config
 	if ctl.CACertificate != "" {
@@ -37,7 +38,7 @@ func ProxyHTTP(ctx context.Context, ctl *dbmodel.Controller, w http.ResponseWrit
 	}
 
 	if ctl.PublicAddress != "" {
-		err := proxyHTTP(ctx, w, req, HTTPClientOptions{
+		err := doRequest(ctx, w, req, HTTPClientOptions{
 			TLSConfig: tlsConfig,
 			URL:       createURLWithNewHost(*req.URL, ctl.PublicAddress),
 		})
@@ -47,7 +48,7 @@ func ProxyHTTP(ctx context.Context, ctl *dbmodel.Controller, w http.ResponseWrit
 	}
 	for _, hps := range ctl.Addresses {
 		for _, hp := range hps {
-			err := proxyHTTP(ctx, w, req, HTTPClientOptions{
+			err := doRequest(ctx, w, req, HTTPClientOptions{
 				TLSConfig: tlsConfig,
 				URL:       createURLWithNewHost(*req.URL, fmt.Sprintf("%s:%d", hp.Value, hp.Port)),
 			})
@@ -61,7 +62,7 @@ func ProxyHTTP(ctx context.Context, ctl *dbmodel.Controller, w http.ResponseWrit
 	http.Error(w, "Gateway timeout", http.StatusGatewayTimeout)
 }
 
-func proxyHTTP(ctx context.Context, w http.ResponseWriter, req *http.Request, opt HTTPClientOptions) error {
+func doRequest(ctx context.Context, w http.ResponseWriter, req *http.Request, opt HTTPClientOptions) error {
 	client := &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: opt.TLSConfig,

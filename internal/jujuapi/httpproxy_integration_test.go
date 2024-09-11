@@ -34,6 +34,8 @@ type httpProxySuite struct {
 	model *dbmodel.Model
 }
 
+var _ = gc.Suite(&httpProxySuite{})
+
 const testEnv = `
 clouds:
 - name: test-cloud
@@ -61,8 +63,6 @@ users:
 - username: alice@canonical.com
   access: admin
 `
-
-var _ = gc.Suite(&httpProxySuite{})
 
 func (s *httpProxySuite) SetUpTest(c *gc.C) {
 	s.JIMMSuite.SetUpTest(c)
