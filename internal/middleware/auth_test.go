@@ -147,7 +147,7 @@ func TestAuthenticateViaBasicAuth(t *testing.T) {
 				req.SetBasicAuth("", tt.basicAuthPassword)
 			}
 			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				identity := r.Context().Value(middleware.BasicAuthUser{})
+				identity := r.Context().Value(middleware.UserContext{})
 				user, ok := identity.(*openfga.User)
 				c.Assert(ok, qt.IsTrue)
 				c.Assert(user.Name, qt.Equals, testUser)

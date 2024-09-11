@@ -14,8 +14,8 @@ import (
 	"github.com/canonical/jimm/v3/internal/jujuapi"
 )
 
-// BasicAuthUser is the unique key to extract user from context for basic-auth authentication
-type BasicAuthUser struct{}
+// UserContext is the unique key to extract user from context for basic-auth authentication
+type UserContext struct{}
 
 // AuthenticateViaCookie performs browser session authentication and puts an identity in the request's context
 func AuthenticateViaCookie(next http.Handler, jimm jujuapi.JIMM) http.Handler {
@@ -79,7 +79,7 @@ func AuthenticateViaBasicAuth(next http.Handler, jimm jujuapi.JIMM) http.Handler
 			_, _ = w.Write([]byte("error authenticating the user"))
 			return
 		}
-		ctx = context.WithValue(ctx, BasicAuthUser{}, user)
+		ctx = context.WithValue(ctx, UserContext{}, user)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
