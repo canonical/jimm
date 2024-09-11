@@ -11,11 +11,13 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/canonical/jimm/v3/internal/auth"
+	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jujuapi"
+	"github.com/canonical/jimm/v3/internal/openfga"
 )
 
 // UserContext is the unique key to extract user from context for basic-auth authentication
-type UserContext struct{}
+type userContext struct{}
 
 // AuthenticateViaCookie performs browser session authentication and puts an identity in the request's context
 func AuthenticateViaCookie(next http.Handler, jimm jujuapi.JIMM) http.Handler {
@@ -79,7 +81,21 @@ func AuthenticateViaBasicAuth(next http.Handler, jimm jujuapi.JIMM) http.Handler
 			_, _ = w.Write([]byte("error authenticating the user"))
 			return
 		}
-		ctx = context.WithValue(ctx, UserContext{}, user)
-		next.ServeHTTP(w, r.WithContext(ctx))
+		next.ServeHTTP(w, r.WithContext(WithUserContext(ctx, user)))
 	})
+}
+
+// GetUserFromContext extracts the user from the context.
+func GetUserFromContext(ctx context.Context) (*openfga.User, error) {
+	identity := ctx.Value(userContext{})
+	user, ok := identity.(*openfga.User)
+	if !ok {
+		return nil, errors.E("cannot extract user from context")
+	}
+	return user, nil
+}
+
+// WithUserContext sets the user into the context and return the context
+func WithUserContext(ctx context.Context, user *openfga.User) context.Context {
+	return context.WithValue(ctx, userContext{}, user)
 }
