@@ -123,6 +123,13 @@ func (c *Client) AddGroup(req *params.AddGroupRequest) (params.AddGroupResponse,
 	return resp, err
 }
 
+// GetGroup returns the group with the given UUID.
+func (c *Client) GetGroup(req *params.GetGroupRequest) (params.Group, error) {
+	var resp params.GetGroupResponse
+	err := c.caller.APICall("JIMM", 4, "", "GetGroup", req, &resp)
+	return resp.Group, err
+}
+
 // RenameGroup renames a group in JIMM.
 func (c *Client) RenameGroup(req *params.RenameGroupRequest) error {
 	return c.caller.APICall("JIMM", 4, "", "RenameGroup", req, nil)
