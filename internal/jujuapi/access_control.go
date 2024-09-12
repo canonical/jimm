@@ -58,7 +58,7 @@ func (r *controllerRoot) AddGroup(ctx context.Context, req apiparams.AddGroupReq
 	return resp, nil
 }
 
-// GetGroup retrieves a group within JIMMs DB for reference by OpenFGA.
+// GetGroup returns group information based on a group ID.
 func (r *controllerRoot) GetGroup(ctx context.Context, req apiparams.GetGroupRequest) (apiparams.Group, error) {
 	const op = errors.Op("jujuapi.GetGroup")
 
