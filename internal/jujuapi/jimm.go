@@ -41,6 +41,7 @@ func init() {
 		addCloudToControllerMethod := rpc.Method(r.AddCloudToController)
 		removeCloudFromControllerMethod := rpc.Method(r.RemoveCloudFromController)
 		addGroupMethod := rpc.Method(r.AddGroup)
+		getGroupMethod := rpc.Method(r.GetGroup)
 		renameGroupMethod := rpc.Method(r.RenameGroup)
 		removeGroupMethod := rpc.Method(r.RemoveGroup)
 		listGroupsMethod := rpc.Method(r.ListGroups)
@@ -76,6 +77,7 @@ func init() {
 		r.AddMethod("JIMM", 4, "MigrateModel", migrateModel)
 		// JIMM ReBAC RPC
 		r.AddMethod("JIMM", 4, "AddGroup", addGroupMethod)
+		r.AddMethod("JIMM", 4, "GetGroup", getGroupMethod)
 		r.AddMethod("JIMM", 4, "RenameGroup", renameGroupMethod)
 		r.AddMethod("JIMM", 4, "RemoveGroup", removeGroupMethod)
 		r.AddMethod("JIMM", 4, "ListGroups", listGroupsMethod)
