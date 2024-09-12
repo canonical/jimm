@@ -285,6 +285,17 @@ type AddGroupResponse struct {
 	Group
 }
 
+// GetGroupRequest holds a request to get a group.
+type GetGroupRequest struct {
+	// UUID holds the UUID of the group to be retrieved.
+	UUID string `json:"uuid"`
+}
+
+// GetGroupResponse holds the details of the group.
+type GetGroupResponse struct {
+	Group
+}
+
 // RenameGroupRequest holds a request to rename a group.
 type RenameGroupRequest struct {
 	// Name holds the name of the group.
