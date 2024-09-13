@@ -147,12 +147,12 @@ func TestAuthenticateViaBasicAuth(t *testing.T) {
 				req.SetBasicAuth("", tt.basicAuthPassword)
 			}
 			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				user, err := middleware.GetUserFromContext(r.Context())
+				user, err := middleware.IdentityFromContext(r.Context())
 				c.Assert(err, qt.IsNil)
 				c.Assert(user.Name, qt.Equals, testUser)
 				w.WriteHeader(http.StatusOK)
 			})
-			middleware := middleware.AuthenticateViaBasicAuth(handler, &jt)
+			middleware := middleware.AuthenticateWithSessionTokenViaBasicAuth(handler, &jt)
 			middleware.ServeHTTP(w, req)
 			c.Assert(w.Code, qt.Equals, tt.expectedStatus)
 			b := w.Result().Body
