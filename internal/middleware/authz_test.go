@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	cofga "github.com/canonical/ofga"
 	qt "github.com/frankban/quicktest"
 	"github.com/go-chi/chi/v5"
 	"github.com/juju/names/v5"
@@ -62,13 +63,13 @@ func TestAuthorizeUserForModelAccess(t *testing.T) {
 		name               string
 		expectedStatus     int
 		uuidInPath         string
-		permissionRequired string
+		permissionRequired cofga.Relation
 		errorExpected      string
 	}{
 		{
 			name:               "success",
 			expectedStatus:     http.StatusOK,
-			permissionRequired: "writer",
+			permissionRequired: ofganames.WriterRelation,
 			uuidInPath:         validModelUUID,
 		},
 		{
@@ -80,7 +81,7 @@ func TestAuthorizeUserForModelAccess(t *testing.T) {
 			name:               "not enough permission",
 			expectedStatus:     http.StatusForbidden,
 			uuidInPath:         notvalidModelUUID,
-			permissionRequired: "writer",
+			permissionRequired: ofganames.WriterRelation,
 			errorExpected:      "no access to the resource",
 		},
 	}
@@ -93,12 +94,7 @@ func TestAuthorizeUserForModelAccess(t *testing.T) {
 			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
 			})
-			var h http.Handler
-			if tt.permissionRequired == "reader" {
-				h = middleware.AuthorizeUserForModelAccess(handler, &jt, ofganames.ReaderRelation)
-			} else {
-				h = middleware.AuthorizeUserForModelAccess(handler, &jt, ofganames.WriterRelation)
-			}
+			h := middleware.AuthorizeUserForModelAccess(handler, &jt, tt.permissionRequired)
 			rctx := chi.NewRouteContext()
 			rctx.URLParams.Add("uuid", tt.uuidInPath)
 			ctx := context.WithValue(req.Context(), chi.RouteCtxKey, rctx)
