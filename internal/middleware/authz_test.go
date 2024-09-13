@@ -102,7 +102,7 @@ func TestAuthorizeUserForModelAccess(t *testing.T) {
 			rctx := chi.NewRouteContext()
 			rctx.URLParams.Add("uuid", tt.uuidInPath)
 			ctx := context.WithValue(req.Context(), chi.RouteCtxKey, rctx)
-			h.ServeHTTP(w, req.WithContext(middleware.WithUserContext(ctx, bob)))
+			h.ServeHTTP(w, req.WithContext(middleware.WithIdentity(ctx, bob)))
 			c.Assert(w.Code, qt.Equals, tt.expectedStatus)
 			b := w.Result().Body
 			defer b.Close()

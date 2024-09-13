@@ -16,7 +16,7 @@ import (
 func AuthorizeUserForModelAccess(next http.Handler, jimm jujuapi.JIMM, accessNeeded cofga.Relation) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		user, err := GetUserFromContext(ctx)
+		user, err := IdentityFromContext(ctx)
 		if err != nil {
 			w.WriteHeader(http.StatusUnauthorized)
 			_, _ = w.Write([]byte(err.Error()))

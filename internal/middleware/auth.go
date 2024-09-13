@@ -16,8 +16,8 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga"
 )
 
-// UserContext is the unique key to extract user from context for basic-auth authentication
-type userContext struct{}
+// identityContextKey is the unique key to extract user from context for basic-auth authentication
+type identityContextKey struct{}
 
 // AuthenticateViaCookie performs browser session authentication and puts an identity in the request's context
 func AuthenticateViaCookie(next http.Handler, jimm jujuapi.JIMM) http.Handler {
@@ -64,8 +64,9 @@ func AuthenticateRebac(next http.Handler, jimm jujuapi.JIMM) http.Handler {
 	}), jimm)
 }
 
-// AuthenticateViaBasicAuth performs basic auth authentication and puts an identity in the request's context
-func AuthenticateViaBasicAuth(next http.Handler, jimm jujuapi.JIMM) http.Handler {
+// AuthenticateWithSessionTokenViaBasicAuth performs basic auth authentication and puts an identity in the request's context.
+// The basic-auth is composed of an empty user, and as a password a jwt token that we parse and use to authenticate the user.
+func AuthenticateWithSessionTokenViaBasicAuth(next http.Handler, jimm jujuapi.JIMM) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		// extract auth token
@@ -81,13 +82,13 @@ func AuthenticateViaBasicAuth(next http.Handler, jimm jujuapi.JIMM) http.Handler
 			_, _ = w.Write([]byte("error authenticating the user"))
 			return
 		}
-		next.ServeHTTP(w, r.WithContext(WithUserContext(ctx, user)))
+		next.ServeHTTP(w, r.WithContext(withIdentity(ctx, user)))
 	})
 }
 
-// GetUserFromContext extracts the user from the context.
-func GetUserFromContext(ctx context.Context) (*openfga.User, error) {
-	identity := ctx.Value(userContext{})
+// IdentityFromContext extracts the user from the context.
+func IdentityFromContext(ctx context.Context) (*openfga.User, error) {
+	identity := ctx.Value(identityContextKey{})
 	user, ok := identity.(*openfga.User)
 	if !ok {
 		return nil, errors.E("cannot extract user from context")
@@ -95,7 +96,7 @@ func GetUserFromContext(ctx context.Context) (*openfga.User, error) {
 	return user, nil
 }
 
-// WithUserContext sets the user into the context and return the context
-func WithUserContext(ctx context.Context, user *openfga.User) context.Context {
-	return context.WithValue(ctx, userContext{}, user)
+// withIdentity sets the user into the context and return the context
+func withIdentity(ctx context.Context, user *openfga.User) context.Context {
+	return context.WithValue(ctx, identityContextKey{}, user)
 }
