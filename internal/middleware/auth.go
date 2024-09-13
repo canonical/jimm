@@ -64,7 +64,8 @@ func AuthenticateRebac(next http.Handler, jimm jujuapi.JIMM) http.Handler {
 	}), jimm)
 }
 
-// AuthenticateWithSessionTokenViaBasicAuth performs basic auth authentication and puts an identity in the request's context
+// AuthenticateWithSessionTokenViaBasicAuth performs basic auth authentication and puts an identity in the request's context.
+// The basic-auth is composed of an empty user, and as a password a jwt token that we parse and use to authenticate the user.
 func AuthenticateWithSessionTokenViaBasicAuth(next http.Handler, jimm jujuapi.JIMM) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
