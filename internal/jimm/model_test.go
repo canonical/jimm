@@ -1230,19 +1230,8 @@ const modelInfoTestEnvWithEveryoneAccess = modelInfoTestEnv + `
     access: read
 `
 
-var modelInfoTests = []struct {
-	name            string
-	env             string
-	username        string
-	uuid            string
-	expectModelInfo *jujuparams.ModelInfo
-	expectError     string
-}{{
-	name:     "AdminUser",
-	env:      modelInfoTestEnv,
-	username: "alice@canonical.com",
-	uuid:     "00000002-0000-0000-0000-000000000001",
-	expectModelInfo: &jujuparams.ModelInfo{
+func modelInfoTestExpectedModelInfo(canReadMachineInfo bool, limitedExpectedUsers []jujuparams.ModelUserInfo) *jujuparams.ModelInfo {
+	info := jujuparams.ModelInfo{
 		Name:               "model-1",
 		Type:               "iaas",
 		UUID:               "00000002-0000-0000-0000-000000000001",
@@ -1290,86 +1279,51 @@ var modelInfoTests = []struct {
 			Level: "unsupported",
 		},
 		AgentVersion: newVersion("1.2.3"),
-	},
+	}
+	if !canReadMachineInfo {
+		info.Machines = nil
+	}
+	if limitedExpectedUsers != nil {
+		info.Users = limitedExpectedUsers
+	}
+	return &info
+}
+
+var modelInfoTests = []struct {
+	name             string
+	env              string
+	username         string
+	uuid             string
+	originModelOwner string
+	expectModelInfo  *jujuparams.ModelInfo
+	expectError      string
+}{{
+	name:             "AdminUser",
+	env:              modelInfoTestEnv,
+	username:         "alice@canonical.com",
+	uuid:             "00000002-0000-0000-0000-000000000001",
+	originModelOwner: names.NewUserTag("alice@canonical.com").String(),
+	expectModelInfo:  modelInfoTestExpectedModelInfo(true, nil),
 }, {
-	name:     "WriteUser",
-	env:      modelInfoTestEnv,
-	username: "bob@canonical.com",
-	uuid:     "00000002-0000-0000-0000-000000000001",
-	expectModelInfo: &jujuparams.ModelInfo{
-		Name:               "model-1",
-		Type:               "iaas",
-		UUID:               "00000002-0000-0000-0000-000000000001",
-		ControllerUUID:     "00000001-0000-0000-0000-000000000001",
-		ProviderType:       "test-provider",
-		DefaultSeries:      "warty",
-		CloudTag:           names.NewCloudTag("test-cloud").String(),
-		CloudRegion:        "test-cloud-region",
-		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/cred-1").String(),
-		OwnerTag:           names.NewUserTag("alice@canonical.com").String(),
-		Life:               life.Value(state.Alive.String()),
-		Status: jujuparams.EntityStatus{
-			Status: "available",
-			Info:   "OK!",
-			Since:  newDate(2020, 2, 20, 20, 2, 20, 0, time.UTC),
-		},
-		Users: []jujuparams.ModelUserInfo{{
-			UserName: "bob@canonical.com",
-			Access:   "write",
-		}},
-		Machines: []jujuparams.ModelMachineInfo{{
-			Id:          "0",
-			Hardware:    jimmtest.ParseMachineHardware("arch=amd64 mem=8096 root-disk=10240 cores=1"),
-			InstanceId:  "00000009-0000-0000-0000-0000000000000",
-			DisplayName: "Machine 0",
-			Status:      "available",
-			Message:     "OK!",
-			HasVote:     true,
-		}, {
-			Id:          "1",
-			Hardware:    jimmtest.ParseMachineHardware("arch=amd64 mem=8096 root-disk=10240 cores=2"),
-			InstanceId:  "00000009-0000-0000-0000-0000000000001",
-			DisplayName: "Machine 1",
-			Status:      "available",
-			Message:     "OK!",
-			HasVote:     true,
-		}},
-		SLA: &jujuparams.ModelSLAInfo{
-			Level: "unsupported",
-		},
-		AgentVersion: newVersion("1.2.3"),
-	},
+	name:             "WriteUser",
+	env:              modelInfoTestEnv,
+	username:         "bob@canonical.com",
+	uuid:             "00000002-0000-0000-0000-000000000001",
+	originModelOwner: names.NewUserTag("alice@canonical.com").String(),
+	expectModelInfo: modelInfoTestExpectedModelInfo(true, []jujuparams.ModelUserInfo{{
+		UserName: "bob@canonical.com",
+		Access:   "write",
+	}}),
 }, {
-	name:     "ReadUser",
-	env:      modelInfoTestEnv,
-	username: "charlie@canonical.com",
-	uuid:     "00000002-0000-0000-0000-000000000001",
-	expectModelInfo: &jujuparams.ModelInfo{
-		Name:               "model-1",
-		Type:               "iaas",
-		UUID:               "00000002-0000-0000-0000-000000000001",
-		ControllerUUID:     "00000001-0000-0000-0000-000000000001",
-		ProviderType:       "test-provider",
-		DefaultSeries:      "warty",
-		CloudTag:           names.NewCloudTag("test-cloud").String(),
-		CloudRegion:        "test-cloud-region",
-		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/cred-1").String(),
-		OwnerTag:           names.NewUserTag("alice@canonical.com").String(),
-		Life:               life.Value(state.Alive.String()),
-		Status: jujuparams.EntityStatus{
-			Status: "available",
-			Info:   "OK!",
-			Since:  newDate(2020, 2, 20, 20, 2, 20, 0, time.UTC),
-		},
-		Users: []jujuparams.ModelUserInfo{{
-			UserName: "charlie@canonical.com",
-			Access:   "read",
-		}},
-		SLA: &jujuparams.ModelSLAInfo{
-			Level: "unsupported",
-		},
-		AgentVersion: newVersion("1.2.3"),
-	},
+	name:             "ReadUser",
+	env:              modelInfoTestEnv,
+	username:         "charlie@canonical.com",
+	uuid:             "00000002-0000-0000-0000-000000000001",
+	originModelOwner: names.NewUserTag("alice@canonical.com").String(),
+	expectModelInfo: modelInfoTestExpectedModelInfo(false, []jujuparams.ModelUserInfo{{
+		UserName: "charlie@canonical.com",
+		Access:   "read",
+	}}),
 }, {
 	name:        "NoAccess",
 	env:         modelInfoTestEnv,
@@ -1383,36 +1337,22 @@ var modelInfoTests = []struct {
 	uuid:        "00000002-0000-0000-0000-000000000002",
 	expectError: "model not found",
 }, {
-	name:     "Access through everyone user",
-	env:      modelInfoTestEnvWithEveryoneAccess,
-	username: "diane@canonical.com",
-	uuid:     "00000002-0000-0000-0000-000000000001",
-	expectModelInfo: &jujuparams.ModelInfo{
-		Name:               "model-1",
-		Type:               "iaas",
-		UUID:               "00000002-0000-0000-0000-000000000001",
-		ControllerUUID:     "00000001-0000-0000-0000-000000000001",
-		ProviderType:       "test-provider",
-		DefaultSeries:      "warty",
-		CloudTag:           names.NewCloudTag("test-cloud").String(),
-		CloudRegion:        "test-cloud-region",
-		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/cred-1").String(),
-		OwnerTag:           names.NewUserTag("alice@canonical.com").String(),
-		Life:               life.Value(state.Alive.String()),
-		Status: jujuparams.EntityStatus{
-			Status: "available",
-			Info:   "OK!",
-			Since:  newDate(2020, 2, 20, 20, 2, 20, 0, time.UTC),
-		},
-		Users: []jujuparams.ModelUserInfo{{
-			UserName: "everyone@external",
-			Access:   "read",
-		}},
-		SLA: &jujuparams.ModelSLAInfo{
-			Level: "unsupported",
-		},
-		AgentVersion: newVersion("1.2.3"),
-	},
+	name:             "Access through everyone user",
+	env:              modelInfoTestEnvWithEveryoneAccess,
+	username:         "diane@canonical.com",
+	uuid:             "00000002-0000-0000-0000-000000000001",
+	originModelOwner: names.NewUserTag("alice@canonical.com").String(),
+	expectModelInfo: modelInfoTestExpectedModelInfo(false, []jujuparams.ModelUserInfo{{
+		UserName: "everyone@external",
+		Access:   "read",
+	}}),
+}, {
+	name:             "Owner field is replaced",
+	env:              modelInfoTestEnv,
+	username:         "alice@canonical.com",
+	uuid:             "00000002-0000-0000-0000-000000000001",
+	originModelOwner: names.NewUserTag("bob").String(),
+	expectModelInfo:  modelInfoTestExpectedModelInfo(true, nil),
 },
 }
 
@@ -1443,7 +1383,7 @@ func TestModelInfo(t *testing.T) {
 							mi.CloudTag = names.NewCloudTag("test-cloud").String()
 							mi.CloudRegion = "test-cloud-region"
 							mi.CloudCredentialTag = names.NewCloudCredentialTag("test-cloud/alice@canonical.com/cred-1").String()
-							mi.OwnerTag = names.NewUserTag("alice@canonical.com").String()
+							mi.OwnerTag = test.originModelOwner
 							mi.Life = life.Value(state.Alive.String())
 							mi.Status = jujuparams.EntityStatus{
 								Status: "available",
