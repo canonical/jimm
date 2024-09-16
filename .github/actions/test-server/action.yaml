@@ -89,7 +89,7 @@ runs:
       uses: charmed-kubernetes/actions-operator@main
       with:
         provider: "lxd"
-        channel: "5.19/stable"
+        channel: "5.21/stable"
         juju-channel: ${{ inputs.juju-channel }}
         bootstrap-options: "--config ${{ github.action_path }}/../../../cloudinit.temp.yaml --config login-token-refresh-url=https://jimm.localhost/.well-known/jwks.json"
 
