@@ -13,6 +13,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/canonical/jimm/v3/internal/common/pagination"
+	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jujuapi"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
@@ -74,7 +75,10 @@ func (s *identitiesService) CreateIdentity(ctx context.Context, identity *resour
 func (s *identitiesService) GetIdentity(ctx context.Context, identityId string) (*resources.Identity, error) {
 	user, err := s.jimm.FetchIdentity(ctx, identityId)
 	if err != nil {
-		return nil, v1.NewNotFoundError(fmt.Sprintf("User with id %s not found", identityId))
+		if errors.ErrorCode(err) == errors.CodeNotFound {
+			return nil, v1.NewNotFoundError(fmt.Sprintf("User with id %s not found", identityId))
+		}
+		return nil, err
 	}
 	identity := utils.FromUserToIdentity(*user)
 	return &identity, nil
@@ -190,7 +194,10 @@ func (s *identitiesService) GetIdentityEntitlements(ctx context.Context, identit
 	}
 	objUser, err := s.jimm.FetchIdentity(ctx, identityId)
 	if err != nil {
-		return nil, v1.NewNotFoundError(fmt.Sprintf("User with id %s not found", identityId))
+		if errors.ErrorCode(err) == errors.CodeNotFound {
+			return nil, v1.NewNotFoundError(fmt.Sprintf("User with id %s not found", identityId))
+		}
+		return nil, err
 	}
 
 	filter := utils.CreateTokenPaginationFilter(params.Size, params.NextToken, params.NextPageToken)

@@ -58,6 +58,23 @@ func (r *controllerRoot) AddGroup(ctx context.Context, req apiparams.AddGroupReq
 	return resp, nil
 }
 
+// GetGroup returns group information based on a group ID.
+func (r *controllerRoot) GetGroup(ctx context.Context, req apiparams.GetGroupRequest) (apiparams.Group, error) {
+	const op = errors.Op("jujuapi.GetGroup")
+
+	groupEntry, err := r.jimm.GetGroupByID(ctx, r.user, req.UUID)
+	if err != nil {
+		zapctx.Error(ctx, "failed to get group", zaputil.Error(err))
+		return apiparams.Group{}, errors.E(op, err)
+	}
+	return apiparams.Group{
+		UUID:      groupEntry.UUID,
+		Name:      groupEntry.Name,
+		CreatedAt: groupEntry.CreatedAt.Format(time.RFC3339),
+		UpdatedAt: groupEntry.UpdatedAt.Format(time.RFC3339),
+	}, nil
+}
+
 // RenameGroup renames a group within JIMMs DB for reference by OpenFGA.
 func (r *controllerRoot) RenameGroup(ctx context.Context, req apiparams.RenameGroupRequest) error {
 	const op = errors.Op("jujuapi.RenameGroup")
