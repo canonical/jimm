@@ -55,9 +55,12 @@ func (d *Dialer) Dial(_ context.Context, ctl *dbmodel.Controller, _ names.ModelT
 		return nil, d.Err
 	}
 	atomic.AddInt64(&d.open, 1)
-	ctl.UUID = d.UUID
 	if ctl.UUID == "" {
-		ctl.UUID = DefaultControllerUUID
+		if d.UUID == "" {
+			ctl.UUID = DefaultControllerUUID
+		} else {
+			ctl.UUID = d.UUID
+		}
 	}
 	ctl.AgentVersion = d.AgentVersion
 	if ctl.AgentVersion == "" {
