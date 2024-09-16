@@ -61,6 +61,23 @@ func (s *accessControlSuite) TestAddGroup(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, ".*already exists.*")
 }
 
+func (s *accessControlSuite) TestGetGroup(c *gc.C) {
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+
+	client := api.NewClient(conn)
+
+	created, err := client.AddGroup(&apiparams.AddGroupRequest{Name: "test-group"})
+	c.Assert(err, jc.ErrorIsNil)
+
+	retrieved, err := client.GetGroup(&apiparams.GetGroupRequest{UUID: created.UUID})
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(retrieved.Group, gc.DeepEquals, created.Group)
+
+	_, err = client.GetGroup(&apiparams.GetGroupRequest{UUID: "non-existent"})
+	c.Assert(err, gc.ErrorMatches, ".*not found.*")
+}
+
 func (s *accessControlSuite) TestRemoveGroup(c *gc.C) {
 	conn := s.open(c, nil, "alice")
 	defer conn.Close()

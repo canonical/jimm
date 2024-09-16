@@ -22,6 +22,7 @@ import (
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/pkg/api/params"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
+	"github.com/canonical/jimm/v3/version"
 )
 
 func init() {
@@ -40,6 +41,7 @@ func init() {
 		addCloudToControllerMethod := rpc.Method(r.AddCloudToController)
 		removeCloudFromControllerMethod := rpc.Method(r.RemoveCloudFromController)
 		addGroupMethod := rpc.Method(r.AddGroup)
+		getGroupMethod := rpc.Method(r.GetGroup)
 		renameGroupMethod := rpc.Method(r.RenameGroup)
 		removeGroupMethod := rpc.Method(r.RemoveGroup)
 		listGroupsMethod := rpc.Method(r.ListGroups)
@@ -55,6 +57,7 @@ func init() {
 		updateServiceAccountCredentials := rpc.Method(r.UpdateServiceAccountCredentials)
 		listServiceAccountCredentials := rpc.Method(r.ListServiceAccountCredentials)
 		grantServiceAccountAccess := rpc.Method(r.GrantServiceAccountAccess)
+		version := rpc.Method(r.Version)
 
 		// JIMM Generic RPC
 		r.AddMethod("JIMM", 4, "AddController", addControllerMethod)
@@ -74,6 +77,7 @@ func init() {
 		r.AddMethod("JIMM", 4, "MigrateModel", migrateModel)
 		// JIMM ReBAC RPC
 		r.AddMethod("JIMM", 4, "AddGroup", addGroupMethod)
+		r.AddMethod("JIMM", 4, "GetGroup", getGroupMethod)
 		r.AddMethod("JIMM", 4, "RenameGroup", renameGroupMethod)
 		r.AddMethod("JIMM", 4, "RemoveGroup", removeGroupMethod)
 		r.AddMethod("JIMM", 4, "ListGroups", listGroupsMethod)
@@ -89,6 +93,7 @@ func init() {
 		r.AddMethod("JIMM", 4, "UpdateServiceAccountCredentials", updateServiceAccountCredentials)
 		r.AddMethod("JIMM", 4, "ListServiceAccountCredentials", listServiceAccountCredentials)
 		r.AddMethod("JIMM", 4, "GrantServiceAccountAccess", grantServiceAccountAccess)
+		r.AddMethod("JIMM", 4, "Version", version)
 
 		return []int{4}
 	}
@@ -502,4 +507,13 @@ func (r *controllerRoot) MigrateModel(ctx context.Context, args apiparams.Migrat
 	return jujuparams.InitiateMigrationResults{
 		Results: results,
 	}, nil
+}
+
+// Version is a method on the JIMM facade that returns information on the version of JIMM.
+func (r *controllerRoot) Version(ctx context.Context) (apiparams.VersionResponse, error) {
+	versionInfo := apiparams.VersionResponse{
+		Version: version.VersionInfo.Version,
+		Commit:  version.VersionInfo.GitCommit,
+	}
+	return versionInfo, nil
 }

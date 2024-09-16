@@ -69,8 +69,11 @@ linters-settings:
   gocognit:
     min-complexity: 30
   goheader:
+    values:
+      regexp:
+        year: (\d{4})
     template: |-
-      Copyright 2024 Canonical.
+      Copyright {{year}} Canonical.
   importas:
     no-unaliased: false
     no-extra-aliases: false

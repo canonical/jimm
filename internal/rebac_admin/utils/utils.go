@@ -70,3 +70,13 @@ func ValidateDecomposedTag(kind string, id string) (names.Tag, error) {
 	rawTag := kind + "-" + id
 	return jimmnames.ParseTag(rawTag)
 }
+
+func GetNameAndTypeResourceFilter(nFilter, eFilter *string) (nameFilter, typeFilter string) {
+	if nFilter != nil {
+		nameFilter = *nFilter
+	}
+	if eFilter != nil {
+		typeFilter = *eFilter
+	}
+	return nameFilter, typeFilter
+}

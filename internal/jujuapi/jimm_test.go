@@ -888,3 +888,13 @@ func (s *jimmSuite) TestJimmModelMigrationNonSuperuser(c *gc.C) {
 	item := res.Results[0]
 	c.Assert(item.Error.Message, gc.Matches, "unauthorized access")
 }
+
+func (s *jimmSuite) TestVersion(c *gc.C) {
+	conn := s.open(c, nil, "bob")
+	defer conn.Close()
+	client := api.NewClient(conn)
+	versionInfo, err := client.Version()
+	c.Assert(err, gc.IsNil)
+	c.Assert(versionInfo.Version, gc.Not(gc.Equals), "")
+	c.Assert(versionInfo.Commit, gc.Not(gc.Equals), "")
+}
