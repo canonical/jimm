@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/canonical/ofga"
 	qt "github.com/frankban/quicktest"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/google/uuid"
@@ -920,7 +921,8 @@ func TestImportModel(t *testing.T) {
 					DB: jimmtest.PostgresDB(c, nil),
 				},
 				Dialer: &jimmtest.Dialer{
-					API: api,
+					API:  api,
+					UUID: test.expectedModel.Controller.UUID,
 				},
 				OpenFGAClient: client,
 			}
@@ -946,6 +948,14 @@ func TestImportModel(t *testing.T) {
 				c.Assert(err, qt.IsNil)
 				c.Assert(m1, jimmtest.DBObjectEquals, test.expectedModel)
 				c.Assert(user.GetModelAccess(ctx, names.NewModelTag(test.modelUUID)), qt.Equals, ofganames.AdministratorRelation)
+				controllerPermissionCheck := ofga.Tuple{
+					Object:   ofganames.ConvertTag(names.NewControllerTag(test.expectedModel.Controller.UUID)),
+					Relation: ofganames.ControllerRelation,
+					Target:   ofganames.ConvertTag(names.NewModelTag(test.modelUUID)),
+				}
+				ok, err := client.CheckRelation(ctx, controllerPermissionCheck, false)
+				c.Assert(err, qt.IsNil)
+				c.Assert(ok, qt.IsTrue)
 			} else {
 				c.Assert(err, qt.ErrorMatches, test.expectedError)
 			}
