@@ -4,6 +4,7 @@ package openfga
 
 import (
 	"context"
+	"strings"
 
 	cofga "github.com/canonical/ofga"
 	"github.com/juju/names/v5"
@@ -85,6 +86,50 @@ func publicAccessAdaptor(tt cofga.TimestampedTuple) cofga.TimestampedTuple {
 		tt.Tuple.Object.ID = ofganames.EveryoneUser
 	}
 	return tt
+}
+
+// setResourceAccess creates a relation to model the requested resource access.
+// Note that the action is idempotent (does not return error if the relation already exists).
+func (o *OFGAClient) setResourceAccess(ctx context.Context, object, target names.Tag, relation Relation) error {
+	if object == nil || target == nil {
+		return errors.E("missing object or target for relation")
+	}
+	err := o.AddRelation(ctx, Tuple{
+		Object:   ofganames.ConvertGenericTag(object),
+		Relation: relation,
+		Target:   ofganames.ConvertGenericTag(target),
+	})
+	if err != nil {
+		// if the tuple already exist we don't return an error.
+		// TODO we should opt to check against specific errors via checking their code/metadata.
+		if strings.Contains(err.Error(), "cannot write a tuple which already exists") {
+			return nil
+		}
+		return errors.E(err)
+	}
+	return nil
+}
+
+// unsetResourceAccess deletes a relation that corresponds to the requested resource access.
+// Note that the action is idempotent (does not return error if the relation does not exist).
+func (o *OFGAClient) unsetResourceAccess(ctx context.Context, object, target names.Tag, relation Relation) error {
+	if object == nil || target == nil {
+		return errors.E("missing object or target for relation")
+	}
+	err := o.RemoveRelation(ctx, Tuple{
+		Object:   ofganames.ConvertGenericTag(object),
+		Relation: relation,
+		Target:   ofganames.ConvertGenericTag(target),
+	})
+	if err != nil {
+		// if the tuple already exist we don't return an error.
+		// TODO we should opt to check against specific errors via checking their code/metadata.
+		if strings.Contains(err.Error(), "cannot delete a tuple which does not exist") {
+			return nil
+		}
+		return errors.E(err)
+	}
+	return nil
 }
 
 // getRelatedObjects returns all objects where the user has a valid relation to them.
