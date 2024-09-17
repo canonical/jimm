@@ -596,7 +596,9 @@ func (s *jimmSuite) TestImportModel(c *gc.C) {
 	conn := s.open(c, nil, "bob")
 	defer conn.Close()
 
-	err := s.JIMM.Database.DeleteModel(context.Background(), s.Model2)
+	err := s.JIMM.OpenFGAClient.RemoveControllerModel(context.Background(), s.Model2.Controller.ResourceTag(), s.Model2.ResourceTag())
+	c.Assert(err, gc.Equals, nil)
+	err = s.JIMM.Database.DeleteModel(context.Background(), s.Model2)
 	c.Assert(err, gc.Equals, nil)
 
 	req := apiparams.ImportModelRequest{
