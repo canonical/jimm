@@ -200,7 +200,7 @@ func (u *User) GetApplicationOfferAccess(ctx context.Context, resource names.App
 // SetModelAccess adds a direct relation between the user and the model.
 // Note that the action is idempotent (does not return error if the relation already exists).
 func (u *User) SetModelAccess(ctx context.Context, resource names.ModelTag, relation Relation) error {
-	return setResourceAccess(ctx, u, resource, relation)
+	return u.client.setResourceAccess(ctx, u.ResourceTag(), resource, relation)
 }
 
 // UnsetModelAccess removes direct relations between the user and the model.
@@ -212,19 +212,19 @@ func (u *User) UnsetModelAccess(ctx context.Context, resource names.ModelTag, re
 // SetControllerAccess adds a direct relation between the user and the controller.
 // Note that the action is idempotent (does not return error if the relation already exists).
 func (u *User) SetControllerAccess(ctx context.Context, resource names.ControllerTag, relation Relation) error {
-	return setResourceAccess(ctx, u, resource, relation)
+	return u.client.setResourceAccess(ctx, u.ResourceTag(), resource, relation)
 }
 
 // UnsetAuditLogViewerAccess removes a direct audit log viewer relation between the user and a controller.
 // Note that the action is idempotent (i.e., does not return error if the relation does not exist).
 func (u *User) UnsetAuditLogViewerAccess(ctx context.Context, resource names.ControllerTag) error {
-	return unsetResourceAccess(ctx, u, resource, ofganames.AuditLogViewerRelation, true)
+	return u.client.unsetResourceAccess(ctx, u.ResourceTag(), resource, ofganames.AuditLogViewerRelation)
 }
 
 // SetCloudAccess adds a direct relation between the user and the cloud.
 // Note that the action is idempotent (does not return error if the relation already exists).
 func (u *User) SetCloudAccess(ctx context.Context, resource names.CloudTag, relation Relation) error {
-	return setResourceAccess(ctx, u, resource, relation)
+	return u.client.setResourceAccess(ctx, u.ResourceTag(), resource, relation)
 }
 
 // UnsetCloudAccess removes direct relations between the user and the cloud.
@@ -236,14 +236,14 @@ func (u *User) UnsetCloudAccess(ctx context.Context, resource names.CloudTag, re
 // SetApplicationOfferAccess adds a direct relation between the user and the application offer.
 // Note that the action is idempotent (does not return error if the relation already exists).
 func (u *User) SetApplicationOfferAccess(ctx context.Context, resource names.ApplicationOfferTag, relation Relation) error {
-	return setResourceAccess(ctx, u, resource, relation)
+	return u.client.setResourceAccess(ctx, u.ResourceTag(), resource, relation)
 }
 
 // UnsetApplicationOfferAccess removes a direct relation between the user and the application offer.
 // Note that if the `ignoreMissingRelation` is set to `true`, then the action will be idempotent (i.e., does not return
 // error if the relation does not exist).
-func (u *User) UnsetApplicationOfferAccess(ctx context.Context, resource names.ApplicationOfferTag, relation Relation, ignoreMissingRelation bool) error {
-	return unsetResourceAccess(ctx, u, resource, relation, ignoreMissingRelation)
+func (u *User) UnsetApplicationOfferAccess(ctx context.Context, resource names.ApplicationOfferTag, relation Relation) error {
+	return u.client.unsetResourceAccess(ctx, u.ResourceTag(), resource, relation)
 }
 
 // ListModels returns a slice of model UUIDs that this user has the relation <relation> to.
@@ -346,11 +346,14 @@ func IsAdministrator[T administratorT](ctx context.Context, u *User, resource T)
 
 // setResourceAccess creates a relation to model the requested resource access.
 // Note that the action is idempotent (does not return error if the relation already exists).
-func setResourceAccess[T ofganames.ResourceTagger](ctx context.Context, user *User, resource T, relation Relation) error {
-	err := user.client.AddRelation(ctx, Tuple{
-		Object:   ofganames.ConvertTag(user.ResourceTag()),
+func (o *OFGAClient) setResourceAccess(ctx context.Context, object, target names.Tag, relation Relation) error {
+	if object == nil || target == nil {
+		return errors.E("missing object or target for relation")
+	}
+	err := o.AddRelation(ctx, Tuple{
+		Object:   ofganames.ConvertGenericTag(object),
 		Relation: relation,
-		Target:   ofganames.ConvertTag(resource),
+		Target:   ofganames.ConvertGenericTag(target),
 	})
 	if err != nil {
 		// if the tuple already exist we don't return an error.
@@ -360,7 +363,6 @@ func setResourceAccess[T ofganames.ResourceTagger](ctx context.Context, user *Us
 		}
 		return errors.E(err)
 	}
-
 	return nil
 }
 
@@ -417,25 +419,24 @@ func unsetMultipleResourceAccesses[T ofganames.ResourceTagger](ctx context.Conte
 }
 
 // unsetResourceAccess deletes a relation that corresponds to the requested resource access.
-// Note that if the `ignoreMissingRelation` argument is set to `true`, then the action will be idempotent (i.e., does
-// not return error if the relation does not exist).
-func unsetResourceAccess[T ofganames.ResourceTagger](ctx context.Context, user *User, resource T, relation Relation, ignoreMissingRelation bool) error {
-	err := user.client.RemoveRelation(ctx, Tuple{
-		Object:   ofganames.ConvertTag(user.ResourceTag()),
+// Note that the action is idempotent (does not return error if the relation does not exist).
+func (o *OFGAClient) unsetResourceAccess(ctx context.Context, object, target names.Tag, relation Relation) error {
+	if object == nil || target == nil {
+		return errors.E("missing object or target for relation")
+	}
+	err := o.RemoveRelation(ctx, Tuple{
+		Object:   ofganames.ConvertGenericTag(object),
 		Relation: relation,
-		Target:   ofganames.ConvertTag(resource),
+		Target:   ofganames.ConvertGenericTag(target),
 	})
 	if err != nil {
-		if ignoreMissingRelation {
-			// if the tuple does not exist we don't return an error.
-			// TODO we should opt to check against specific errors via checking their code/metadata.
-			if strings.Contains(err.Error(), "cannot delete a tuple which does not exist") {
-				return nil
-			}
+		// if the tuple already exist we don't return an error.
+		// TODO we should opt to check against specific errors via checking their code/metadata.
+		if strings.Contains(err.Error(), "cannot write a tuple which already exists") {
+			return nil
 		}
 		return errors.E(err)
 	}
-
 	return nil
 }
 
