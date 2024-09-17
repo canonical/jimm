@@ -238,7 +238,7 @@ func (o *OFGAClient) AddControllerModel(ctx context.Context, controller names.Co
 	return nil
 }
 
-// AddControllerModel removes a relation between a controller and a model.
+// RemoveControllerModel removes a relation between a controller and a model.
 func (o *OFGAClient) RemoveControllerModel(ctx context.Context, controller names.ControllerTag, model names.ModelTag) error {
 	if err := o.RemoveRelation(
 		ctx,

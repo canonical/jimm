@@ -665,7 +665,10 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 	modelTag := names.NewModelTag(mi.UUID)
 	controllerTag := builder.controller.ResourceTag()
 
-	return mi, j.addModelPermissions(ctx, ownerUser, modelTag, controllerTag)
+	if err := j.addModelPermissions(ctx, ownerUser, modelTag, controllerTag); err != nil {
+		return nil, errors.E(op, err)
+	}
+	return mi, nil
 }
 
 // addModelPermissions grants a user access to a model and sets the relation between the controller and model.
@@ -674,7 +677,7 @@ func (j *JIMM) addModelPermissions(ctx context.Context, owner *openfga.User, mt 
 	if err := j.OpenFGAClient.AddControllerModel(ctx, ct, mt); err != nil {
 		zapctx.Error(
 			ctx,
-			"failed to add controller-model relation",
+			"failed to add controller->model relation",
 			zap.String("controller", ct.Id()),
 			zap.String("model", mt.Id()),
 		)
@@ -683,7 +686,7 @@ func (j *JIMM) addModelPermissions(ctx context.Context, owner *openfga.User, mt 
 	if err := owner.SetModelAccess(ctx, mt, ofganames.AdministratorRelation); err != nil {
 		zapctx.Error(
 			ctx,
-			"failed to add administrator relation",
+			"failed to add user->model administrator relation",
 			zap.String("user", owner.Tag().Id()),
 			zap.String("model", mt.Id()),
 		)
