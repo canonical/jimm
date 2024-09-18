@@ -76,6 +76,12 @@ func ConvertTagWithRelation[RT ResourceTagger](t RT, relation cofga.Relation) *T
 // ConvertTag converts a resource tag to an OpenFGA tag where the resource tag is limited to
 // specific types of tags.
 func ConvertTag[RT ResourceTagger](t RT) *Tag {
+	tag := names.Tag(t)
+	return ConvertGenericTag(tag)
+}
+
+// ConvertGenericTag converts any tag implementing the names.tag interface to an OpenFGA tag.
+func ConvertGenericTag(t names.Tag) *Tag {
 	id := t.Id()
 	if t.Kind() == names.UserTagKind && id == EveryoneUser {
 		// A user with ID "*" represents "everyone" in OpenFGA and allows checks like
@@ -85,15 +91,6 @@ func ConvertTag[RT ResourceTagger](t RT) *Tag {
 	}
 	tag := &Tag{
 		ID:   id,
-		Kind: cofga.Kind(t.Kind()),
-	}
-	return tag
-}
-
-// ConvertGenericTag converts any tag implementing the names.tag interface to an OpenFGA tag.
-func ConvertGenericTag(t names.Tag) *Tag {
-	tag := &Tag{
-		ID:   t.Id(),
 		Kind: cofga.Kind(t.Kind()),
 	}
 	return tag
