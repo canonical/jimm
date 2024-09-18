@@ -436,7 +436,7 @@ func (j *JIMM) RevokeOfferAccess(ctx context.Context, user *openfga.User, offerU
 		if err != nil {
 			return errors.E(op, err)
 		}
-		err = tUser.UnsetApplicationOfferAccess(ctx, offer.ResourceTag(), targetRelation, false)
+		err = tUser.UnsetApplicationOfferAccess(ctx, offer.ResourceTag(), targetRelation)
 		if err != nil {
 			return errors.E(op, err, "failed to unset given access")
 		}

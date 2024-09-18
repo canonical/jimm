@@ -88,6 +88,50 @@ func publicAccessAdaptor(tt cofga.TimestampedTuple) cofga.TimestampedTuple {
 	return tt
 }
 
+// setResourceAccess creates a relation to model the requested resource access.
+// Note that the action is idempotent (does not return error if the relation already exists).
+func (o *OFGAClient) setResourceAccess(ctx context.Context, object, target names.Tag, relation Relation) error {
+	if object == nil || target == nil {
+		return errors.E("missing object or target for relation")
+	}
+	err := o.AddRelation(ctx, Tuple{
+		Object:   ofganames.ConvertGenericTag(object),
+		Relation: relation,
+		Target:   ofganames.ConvertGenericTag(target),
+	})
+	if err != nil {
+		// if the tuple already exist we don't return an error.
+		// TODO we should opt to check against specific errors via checking their code/metadata.
+		if strings.Contains(err.Error(), "cannot write a tuple which already exists") {
+			return nil
+		}
+		return errors.E(err)
+	}
+	return nil
+}
+
+// unsetResourceAccess deletes a relation that corresponds to the requested resource access.
+// Note that the action is idempotent (does not return error if the relation does not exist).
+func (o *OFGAClient) unsetResourceAccess(ctx context.Context, object, target names.Tag, relation Relation) error {
+	if object == nil || target == nil {
+		return errors.E("missing object or target for relation")
+	}
+	err := o.RemoveRelation(ctx, Tuple{
+		Object:   ofganames.ConvertGenericTag(object),
+		Relation: relation,
+		Target:   ofganames.ConvertGenericTag(target),
+	})
+	if err != nil {
+		// if the tuple already exist we don't return an error.
+		// TODO we should opt to check against specific errors via checking their code/metadata.
+		if strings.Contains(err.Error(), "cannot delete a tuple which does not exist") {
+			return nil
+		}
+		return errors.E(err)
+	}
+	return nil
+}
+
 // getRelatedObjects returns all objects where the user has a valid relation to them.
 // Such as all the groups a user resides in.
 //
@@ -225,32 +269,12 @@ func (o *OFGAClient) removeTuples(ctx context.Context, tuple Tuple) (err error) 
 
 // AddControllerModel adds a relation between a controller and a model.
 func (o *OFGAClient) AddControllerModel(ctx context.Context, controller names.ControllerTag, model names.ModelTag) error {
-	if err := o.AddRelation(
-		ctx,
-		Tuple{
-			Object:   ofganames.ConvertTag(controller),
-			Relation: ofganames.ControllerRelation,
-			Target:   ofganames.ConvertTag(model),
-		},
-	); err != nil {
-		return errors.E(err)
-	}
-	return nil
+	return o.setResourceAccess(ctx, controller, model, ofganames.ControllerRelation)
 }
 
 // RemoveControllerModel removes a relation between a controller and a model.
 func (o *OFGAClient) RemoveControllerModel(ctx context.Context, controller names.ControllerTag, model names.ModelTag) error {
-	if err := o.RemoveRelation(
-		ctx,
-		Tuple{
-			Object:   ofganames.ConvertTag(controller),
-			Relation: ofganames.ControllerRelation,
-			Target:   ofganames.ConvertTag(model),
-		},
-	); err != nil {
-		return errors.E(err)
-	}
-	return nil
+	return o.unsetResourceAccess(ctx, controller, model, ofganames.ControllerRelation)
 }
 
 // RemoveModel removes a model.
@@ -268,17 +292,7 @@ func (o *OFGAClient) RemoveModel(ctx context.Context, model names.ModelTag) erro
 
 // AddModelApplicationOffer adds a relation between a model and an application offer.
 func (o *OFGAClient) AddModelApplicationOffer(ctx context.Context, model names.ModelTag, offer names.ApplicationOfferTag) error {
-	if err := o.AddRelation(
-		ctx,
-		Tuple{
-			Object:   ofganames.ConvertTag(model),
-			Relation: ofganames.ModelRelation,
-			Target:   ofganames.ConvertTag(offer),
-		},
-	); err != nil {
-		return errors.E(err)
-	}
-	return nil
+	return o.setResourceAccess(ctx, model, offer, ofganames.ModelRelation)
 }
 
 // RemoveApplicationOffer removes an application offer.
@@ -296,6 +310,7 @@ func (o *OFGAClient) RemoveApplicationOffer(ctx context.Context, offer names.App
 
 // RemoveGroup removes a group.
 func (o *OFGAClient) RemoveGroup(ctx context.Context, group jimmnames.GroupTag) error {
+	// Remove all access to a group. I.e. user->group
 	if err := o.removeTuples(
 		ctx,
 		Tuple{
@@ -305,6 +320,7 @@ func (o *OFGAClient) RemoveGroup(ctx context.Context, group jimmnames.GroupTag) 
 	); err != nil {
 		return errors.E(err)
 	}
+	// Next remove all access that a group had. I.e. group->model
 	// We need to loop through all resource types because the OpenFGA Read API does not provide
 	// means for only specifying a user resource, it must be paired with an object type.
 	for _, kind := range resourceTypes {
@@ -340,33 +356,11 @@ func (o *OFGAClient) RemoveCloud(ctx context.Context, cloud names.CloudTag) erro
 // AddCloudController adds a controller relation between a controller and
 // a cloud.
 func (o *OFGAClient) AddCloudController(ctx context.Context, cloud names.CloudTag, controller names.ControllerTag) error {
-	if err := o.AddRelation(ctx, Tuple{
-		Object:   ofganames.ConvertTag(controller),
-		Relation: ofganames.ControllerRelation,
-		Target:   ofganames.ConvertTag(cloud),
-	}); err != nil {
-		// if the tuple already exist we don't return an error.
-		if strings.Contains(err.Error(), "cannot write a tuple which already exists") {
-			return nil
-		}
-		return errors.E(err)
-	}
-	return nil
+	return o.setResourceAccess(ctx, controller, cloud, ofganames.ControllerRelation)
 }
 
 // AddController adds a controller relation between JIMM and the added controller. Meaning
 // JIMM admins also have administrator access to the added controller
 func (o *OFGAClient) AddController(ctx context.Context, jimm names.ControllerTag, controller names.ControllerTag) error {
-	if err := o.AddRelation(ctx, Tuple{
-		Object:   ofganames.ConvertTag(jimm),
-		Relation: ofganames.ControllerRelation,
-		Target:   ofganames.ConvertTag(controller),
-	}); err != nil {
-		// if the tuple already exist we don't return an error.
-		if strings.Contains(err.Error(), "cannot write a tuple which already exists") {
-			return nil
-		}
-		return errors.E(err)
-	}
-	return nil
+	return o.setResourceAccess(ctx, jimm, controller, ofganames.ControllerRelation)
 }
