@@ -17,7 +17,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 )
 
-type HTTPClientOptions struct {
+type httpOptions struct {
 	TLSConfig *tls.Config
 	URL       url.URL
 }
@@ -39,7 +39,7 @@ func ProxyHTTP(ctx context.Context, ctl *dbmodel.Controller, w http.ResponseWrit
 	}
 
 	if ctl.PublicAddress != "" {
-		err := doRequest(ctx, w, req, HTTPClientOptions{
+		err := doRequest(ctx, w, req, httpOptions{
 			TLSConfig: tlsConfig,
 			URL:       createURLWithNewHost(*req.URL, ctl.PublicAddress),
 		})
@@ -49,12 +49,14 @@ func ProxyHTTP(ctx context.Context, ctl *dbmodel.Controller, w http.ResponseWrit
 	}
 	for _, hps := range ctl.Addresses {
 		for _, hp := range hps {
-			err := doRequest(ctx, w, req, HTTPClientOptions{
+			err := doRequest(ctx, w, req, httpOptions{
 				TLSConfig: tlsConfig,
 				URL:       createURLWithNewHost(*req.URL, fmt.Sprintf("%s:%d", hp.Value, hp.Port)),
 			})
 			if err == nil {
 				return
+			} else {
+				zapctx.Error(ctx, "failed to proxy request: continue to next addr", zaputil.Error(err))
 			}
 		}
 	}
@@ -63,18 +65,17 @@ func ProxyHTTP(ctx context.Context, ctl *dbmodel.Controller, w http.ResponseWrit
 	http.Error(w, "Gateway timeout", http.StatusGatewayTimeout)
 }
 
-func doRequest(ctx context.Context, w http.ResponseWriter, req *http.Request, opt HTTPClientOptions) error {
+func doRequest(ctx context.Context, w http.ResponseWriter, req *http.Request, opt httpOptions) error {
 	client := &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: opt.TLSConfig,
 		},
 	}
+	req = req.Clone(ctx)
 	req.RequestURI = ""
 	req.URL = &opt.URL
 	resp, err := client.Do(req)
 	if err != nil {
-		zapctx.Error(ctx, "failed to proxy request", zaputil.Error(err))
-		http.Error(w, "Server Error", http.StatusInternalServerError)
 		return err
 	}
 	defer resp.Body.Close()
@@ -85,7 +86,6 @@ func doRequest(ctx context.Context, w http.ResponseWriter, req *http.Request, op
 			w.Header().Add(k, v)
 		}
 	}
-	zapctx.Error(ctx, fmt.Sprintf("%d", resp.StatusCode))
 	w.WriteHeader(resp.StatusCode)
 	// copy body
 	_, err = io.Copy(w, resp.Body)

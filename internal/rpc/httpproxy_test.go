@@ -1,4 +1,5 @@
 // Copyright 2024 Canonical.
+
 package rpc_test
 
 import (
@@ -95,7 +96,7 @@ func TestProxyHTTP(t *testing.T) {
 				controller.Addresses = nil
 				controller.PublicAddress = "localhost-not-found:61213"
 			},
-			statusExpected: http.StatusInternalServerError,
+			statusExpected: http.StatusGatewayTimeout,
 		},
 	}
 
