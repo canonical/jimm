@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
@@ -22,6 +23,10 @@ func TestProxyHTTP(t *testing.T) {
 	ctx := context.Background()
 	// we expect the controller to respond with TLS
 	fakeController := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.String(), "unauth") {
+			w.WriteHeader(401)
+			return
+		}
 		_, err := w.Write([]byte("OK"))
 		c.Assert(err, qt.IsNil)
 	}))
@@ -36,6 +41,7 @@ func TestProxyHTTP(t *testing.T) {
 	tests := []struct {
 		description    string
 		setup          func()
+		path           string
 		statusExpected int
 	}{
 		{
@@ -75,6 +81,15 @@ func TestProxyHTTP(t *testing.T) {
 			statusExpected: http.StatusOK,
 		},
 		{
+			description: "controller responds unauthorized",
+			setup: func() {
+				newURL, _ := url.Parse(fakeController.URL)
+				controller.PublicAddress = newURL.Host
+			},
+			path:           "/unauth",
+			statusExpected: http.StatusUnauthorized,
+		},
+		{
 			description: "controller not reachable",
 			setup: func() {
 				controller.Addresses = nil
@@ -86,7 +101,7 @@ func TestProxyHTTP(t *testing.T) {
 
 	for _, test := range tests {
 		test.setup()
-		req, err := http.NewRequest("POST", "", nil)
+		req, err := http.NewRequest("POST", test.path, nil)
 		c.Assert(err, qt.IsNil)
 		recorder := httptest.NewRecorder()
 		rpc.ProxyHTTP(ctx, &controller, recorder, req)
