@@ -710,13 +710,7 @@ func (j *JIMM) ModelInfo(ctx context.Context, user *openfga.User, mt names.Model
 		return nil, errors.E(op, err)
 	}
 
-	modelAccess, err := j.GetUserModelAccess(ctx, user, mt)
-	if err != nil {
-		return nil, errors.E(op, err)
-	}
-	if modelAccess == "" {
-		// If the user doesn't have any access on the model return an
-		// unauthorized error
+	if ok, err := user.IsModelReader(ctx, mt); !ok || err != nil {
 		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
@@ -733,6 +727,19 @@ func (j *JIMM) ModelInfo(ctx context.Context, user *openfga.User, mt names.Model
 		return nil, errors.E(op, err)
 	}
 
+	return j.mergeModelInfo(ctx, user, mi, m)
+}
+
+// mergeModelInfo replaces fields on the juju model info object with
+// information from JIMM where JIMM specific information should be used.
+func (j *JIMM) mergeModelInfo(ctx context.Context, user *openfga.User, modelInfo *jujuparams.ModelInfo, jimmModel dbmodel.Model) (*jujuparams.ModelInfo, error) {
+	const op = errors.Op("jimm.mergeModelInfo")
+
+	jimmSummary := jimmModel.ToJujuModelSummary()
+	modelInfo.CloudCredentialTag = jimmSummary.CloudCredentialTag
+	modelInfo.ControllerUUID = jimmSummary.ControllerUUID
+	modelInfo.OwnerTag = jimmSummary.OwnerTag
+
 	userAccess := make(map[string]string)
 
 	for _, relation := range []openfga.Relation{
@@ -742,7 +749,7 @@ func (j *JIMM) ModelInfo(ctx context.Context, user *openfga.User, mt names.Model
 		ofganames.WriterRelation,
 		ofganames.ReaderRelation,
 	} {
-		usersWithSpecifiedRelation, err := openfga.ListUsersWithAccess(ctx, j.OpenFGAClient, mt, relation)
+		usersWithSpecifiedRelation, err := openfga.ListUsersWithAccess(ctx, j.OpenFGAClient, jimmModel.ResourceTag(), relation)
 		if err != nil {
 			return nil, errors.E(op, err)
 		}
@@ -754,6 +761,11 @@ func (j *JIMM) ModelInfo(ctx context.Context, user *openfga.User, mt names.Model
 				userAccess[u.Name] = ToModelAccessString(relation)
 			}
 		}
+	}
+
+	modelAccess, err := j.GetUserModelAccess(ctx, user, jimmModel.ResourceTag())
+	if err != nil {
+		return nil, errors.E(op, err)
 	}
 
 	users := make([]jujuparams.ModelUserInfo, 0, len(userAccess))
@@ -771,15 +783,15 @@ func (j *JIMM) ModelInfo(ctx context.Context, user *openfga.User, mt names.Model
 			})
 		}
 	}
-	mi.Users = users
+	modelInfo.Users = users
 
 	if modelAccess != "admin" && modelAccess != "write" {
 		// Users need "write" level access (or above) to see machine
 		// information.
-		mi.Machines = nil
+		modelInfo.Machines = nil
 	}
 
-	return mi, nil
+	return modelInfo, nil
 }
 
 // ModelStatus returns a jujuparams.ModelStatus for the given model. If
