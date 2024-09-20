@@ -22,7 +22,6 @@ import (
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
-	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
 
 // AddApplicationOfferParams holds parameters for the Offer method.
@@ -214,7 +213,7 @@ func (j *JIMM) GetApplicationOfferConsumeDetails(ctx context.Context, user *open
 		&offer.Model.Controller,
 		names.ModelTag{},
 		permission{
-			resource: jimmnames.NewApplicationOfferTag(offer.UUID).String(),
+			resource: names.NewApplicationOfferTag(offer.UUID).String(),
 			relation: accessLevel,
 		},
 	)
@@ -332,7 +331,7 @@ func (j *JIMM) GetApplicationOffer(ctx context.Context, user *openfga.User, offe
 		&offer.Model.Controller,
 		names.ModelTag{},
 		permission{
-			resource: jimmnames.NewApplicationOfferTag(offer.UUID).String(),
+			resource: names.NewApplicationOfferTag(offer.UUID).String(),
 			relation: accessLevel,
 		},
 	)
@@ -535,7 +534,7 @@ func (j *JIMM) UpdateApplicationOffer(ctx context.Context, controller *dbmodel.C
 		&offer.Model.Controller,
 		names.ModelTag{},
 		permission{
-			resource: jimmnames.NewApplicationOfferTag(offer.UUID).String(),
+			resource: names.NewApplicationOfferTag(offer.UUID).String(),
 			relation: string(jujuparams.OfferAdminAccess),
 		},
 	)
@@ -817,7 +816,7 @@ func (j *JIMM) doApplicationOfferAdmin(ctx context.Context, user *openfga.User, 
 		&offer.Model.Controller,
 		names.ModelTag{},
 		permission{
-			resource: jimmnames.NewApplicationOfferTag(offer.UUID).String(),
+			resource: names.NewApplicationOfferTag(offer.UUID).String(),
 			relation: string(jujuparams.OfferAdminAccess),
 		},
 	)

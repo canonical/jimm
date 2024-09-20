@@ -42,7 +42,7 @@ var (
 	// ModelType represents a model object.
 	ModelType Kind = names.ModelTagKind
 	// ApplicationOfferType represents an application offer object.
-	ApplicationOfferType Kind = jimmnames.ApplicationOfferTagKind
+	ApplicationOfferType Kind = names.ApplicationOfferTagKind
 	// CloudType represents a cloud object.
 	CloudType Kind = names.CloudTagKind
 	// ControllerType represents a controller object.
