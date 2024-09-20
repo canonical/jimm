@@ -42,11 +42,6 @@ func ParseTag(tag string) (names.Tag, error) {
 			return nil, invalidTagError(tag, kind)
 		}
 		return NewGroupTag(id), nil
-	case ApplicationOfferTagKind:
-		if !IsValidApplicationOfferTag(id) {
-			return nil, invalidTagError(tag, kind)
-		}
-		return NewApplicationOfferTag(id), nil
 	case ServiceAccountTagKind:
 		if !IsValidServiceAccountId(id) {
 			return nil, invalidTagError(tag, kind)
