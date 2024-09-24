@@ -29,8 +29,8 @@ func AuthenticateViaCookie(next http.Handler, jimm jujuapi.JIMM) http.Handler {
 }
 
 // Set of ReBAC Admin API endpoints that do not require authentication.
-var unauthenticatedEndpoints = map[string]any{
-	"/v1/swagger.json": nil,
+var unauthenticatedEndpoints = map[string]struct{}{
+	"/v1/swagger.json": {},
 }
 
 // AuthenticateRebac is a layer on top of AuthenticateViaCookie. It places the
