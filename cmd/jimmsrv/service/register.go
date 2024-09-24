@@ -14,7 +14,8 @@ import (
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 )
 
-func RegisterModelHTTPEndpoint(mux *chi.Mux, jimm *jimm.JIMM) {
+// RegisterModelHTTPEndpoints register the group of http endpoints for models, with their respective middlewares
+func RegisterModelHTTPEndpoints(mux *chi.Mux, jimm *jimm.JIMM) {
 	mux.Group(func(r chi.Router) {
 		r.Use(func(h http.Handler) http.Handler { return middleware.AuthenticateWithSessionTokenViaBasicAuth(h, jimm) })
 		r.Use(func(h http.Handler) http.Handler {
