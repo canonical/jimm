@@ -24,10 +24,8 @@ func TestHTTPHandler(t *testing.T) {
 	srv := httptest.NewServer(hnd)
 	c.Cleanup(srv.Close)
 
-	client := http.Client{}
-
 	// test ok
-	resp, err := client.Get(srv.URL)
+	resp, err := http.Get(srv.URL)
 	c.Assert(err, qt.IsNil)
 	defer resp.Body.Close()
 	c.Assert(err, qt.IsNil)

@@ -95,7 +95,7 @@ func (j *ModelManager) FullModelStatus(ctx context.Context, user *openfga.User, 
 }
 
 func (j *ModelManager) GetModel(ctx context.Context, uuid string) (dbmodel.Model, error) {
-	if j.FullModelStatus_ == nil {
+	if j.GetModel_ == nil {
 		return dbmodel.Model{}, errors.E(errors.CodeNotImplemented)
 	}
 	return j.GetModel_(ctx, uuid)
