@@ -4,6 +4,7 @@ package middleware
 
 import (
 	"net/http"
+	"strings"
 
 	rebac_handlers "github.com/canonical/rebac-admin-ui-handlers/v1"
 	"github.com/juju/zaputil/zapctx"
@@ -27,11 +28,13 @@ func AuthenticateViaCookie(next http.Handler, jimm jujuapi.JIMM) http.Handler {
 	})
 }
 
-// AuthenticateRebac is a layer on top of AuthenticateViaCookie
-// It places the OpenFGA user for the session identity inside the request's context
-// and verifies that the user is a JIMM admin.
-func AuthenticateRebac(next http.Handler, jimm jujuapi.JIMM) http.Handler {
-	return AuthenticateViaCookie(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+// AuthenticateRebac is a layer on top of AuthenticateViaCookie. It places the
+// OpenFGA user for the session identity inside the request's context and
+// verifies that the user is a JIMM admin. Note that the method needs the base
+// URL to decide if the request does not require authentication; this is to
+// safeguard against conflicting/similar endpoint names in the future.
+func AuthenticateRebac(baseURL string, next http.Handler, jimm jujuapi.JIMM) http.Handler {
+	cookieAuthenticator := AuthenticateViaCookie(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
 		identity := auth.SessionIdentityFromContext(ctx)
@@ -56,4 +59,13 @@ func AuthenticateRebac(next http.Handler, jimm jujuapi.JIMM) http.Handler {
 		ctx = rebac_handlers.ContextWithIdentity(ctx, user)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	}), jimm)
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		relativePath, _ := strings.CutPrefix(r.URL.Path, baseURL)
+		if relativePath == "/v1/swagger.json" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		cookieAuthenticator.ServeHTTP(w, r)
+	})
 }
