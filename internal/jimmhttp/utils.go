@@ -8,6 +8,9 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/juju/zaputil/zapctx"
+	"go.uber.org/zap"
 )
 
 type contextPathKey string
@@ -53,4 +56,19 @@ func splitPath(s string) (elem, remain string) {
 		return s[:n], s[n:]
 	}
 	return s, ""
+}
+
+// writeError writes an error and logs the message. It is expected that the status code
+// is an erroneous status code.
+func writeError(ctx context.Context, w http.ResponseWriter, status int, err error, logMessage string) {
+	zapctx.Error(ctx, logMessage, zap.Error(err))
+	w.WriteHeader(status)
+	errMsg := ""
+	if err != nil {
+		errMsg = " - " + err.Error()
+	}
+	_, err = w.Write([]byte(http.StatusText(status) + errMsg))
+	if err != nil {
+		zapctx.Error(ctx, "failed to write status text error", zap.Error(err))
+	}
 }

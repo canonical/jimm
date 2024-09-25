@@ -7,8 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/juju/names/v4"
-	"github.com/juju/zaputil/zapctx"
-	"go.uber.org/zap"
+	"gopkg.in/errgo.v1"
 
 	"github.com/canonical/jimm/v3/internal/jimm"
 	"github.com/canonical/jimm/v3/internal/middleware"
@@ -55,26 +54,20 @@ func (hph *HTTPProxyHandler) SetupMiddleware() {
 // ProxyHTTP extracts the model uuid from the path to proxy the request to the right controller.
 func (hph *HTTPProxyHandler) ProxyHTTP(w http.ResponseWriter, req *http.Request) {
 	ctx := req.Context()
-	writeError := func(msg string, code int) {
-		w.WriteHeader(code)
-		_, err := w.Write([]byte(msg))
-		if err != nil {
-			zapctx.Error(ctx, "cannot write to connection", zap.Error(err))
-		}
-	}
+
 	modelUUID := chi.URLParam(req, "uuid")
 	if modelUUID == "" {
-		writeError("cannot parse path", http.StatusUnprocessableEntity)
+		writeError(ctx, w, http.StatusUnprocessableEntity, errgo.New("cannot parse path"), "cannot parse path")
 		return
 	}
 	model, err := hph.jimm.GetModel(ctx, modelUUID)
 	if err != nil {
-		writeError("cannot get model", http.StatusNotFound)
+		writeError(ctx, w, http.StatusNotFound, err, "cannot get model")
 		return
 	}
 	u, p, err := hph.jimm.GetCredentialStore().GetControllerCredentials(ctx, model.Controller.Name)
 	if err != nil {
-		writeError("cannot retrieve credentials", http.StatusNotFound)
+		writeError(ctx, w, http.StatusNotFound, err, "cannot retrieve credentials")
 		return
 	}
 	req.SetBasicAuth(names.NewUserTag(u).String(), p)
