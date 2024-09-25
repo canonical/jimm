@@ -72,6 +72,6 @@ func (hph *HTTPProxyHandler) ProxyHTTP(w http.ResponseWriter, req *http.Request)
 
 	err = rpc.ProxyHTTP(ctx, &model.Controller, w, req)
 	if err != nil {
-		http.Error(w, "Gateway timeout", http.StatusGatewayTimeout)
+		writeError(ctx, w, http.StatusGatewayTimeout, err, "Gateway timeout")
 	}
 }
