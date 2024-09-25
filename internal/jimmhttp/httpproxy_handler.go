@@ -15,16 +15,19 @@ import (
 	"github.com/canonical/jimm/v3/internal/rpc"
 )
 
+// HTTPProxyHandler is an handler that provides proxying capabilities.
+// It uses the uuid in the path to proxy requests to model's controller.
 type HTTPProxyHandler struct {
 	Router *chi.Mux
 	jimm   *jimm.JIMM
 }
 
 const (
+	// all endpoints managed by this handler
 	ProxyEndpoints = "/*"
 )
 
-// NewHTTPProxyHandler creates a proxy hhtp handler.
+// NewHTTPProxyHandler creates a proxy http handler.
 func NewHTTPProxyHandler(jimm *jimm.JIMM) *HTTPProxyHandler {
 	return &HTTPProxyHandler{Router: chi.NewRouter(), jimm: jimm}
 }
@@ -34,11 +37,6 @@ func (hph *HTTPProxyHandler) Routes() chi.Router {
 	hph.SetupMiddleware()
 	hph.Router.HandleFunc(ProxyEndpoints, hph.ProxyHTTP)
 	return hph.Router
-}
-
-func (hph *HTTPProxyHandler) RegisterEndpoints(mux *chi.Mux) {
-	hph.SetupMiddleware()
-	mux.HandleFunc(ProxyEndpoints, hph.ProxyHTTP)
 }
 
 // SetupMiddleware applies authn and authz middlewares.

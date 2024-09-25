@@ -24,6 +24,7 @@ type httpOptions struct {
 }
 
 // ProxyHTTP proxies the request to the controller using the info contained in dbmodel.Controller.
+// It tries for a controller, if it errors, it logs the error and go to the next, if no controller responds it returns a 504.
 func ProxyHTTP(ctx context.Context, ctl *dbmodel.Controller, w http.ResponseWriter, req *http.Request) error {
 	var tlsConfig *tls.Config
 	if ctl.CACertificate != "" {
