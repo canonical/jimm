@@ -75,7 +75,7 @@ func (s *httpProxySuite) SetUpTest(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 }
 
-func (s *httpProxySuite) TestCharmHTTPServe(c *gc.C) {
+func (s *httpProxySuite) TestHTTPProxyHandler(c *gc.C) {
 	ctx := context.Background()
 	httpProxier := jimmhttp.NewHTTPProxyHandler(s.JIMM)
 	expectU, expectP, err := s.JIMM.GetCredentialStore().GetControllerCredentials(ctx, s.model.Controller.Name)
