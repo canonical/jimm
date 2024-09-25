@@ -18,6 +18,7 @@ import (
 // identityContextKey is the unique key to extract user from context for basic-auth authentication
 type identityContextKey struct{}
 
+// JIMMAuthner is an interface that requires authentication methods from JIMM.
 type JIMMAuthner interface {
 	AuthenticateBrowserSession(context.Context, http.ResponseWriter, *http.Request) (context.Context, error)
 	LoginWithSessionToken(ctx context.Context, sessionToken string) (*openfga.User, error)
