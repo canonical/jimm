@@ -13,6 +13,7 @@ import (
 
 	"github.com/juju/zaputil"
 	"github.com/juju/zaputil/zapctx"
+	"gopkg.in/errgo.v1"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 )
@@ -23,7 +24,7 @@ type httpOptions struct {
 }
 
 // ProxyHTTP proxies the request to the controller using the info contained in dbmodel.Controller.
-func ProxyHTTP(ctx context.Context, ctl *dbmodel.Controller, w http.ResponseWriter, req *http.Request) {
+func ProxyHTTP(ctx context.Context, ctl *dbmodel.Controller, w http.ResponseWriter, req *http.Request) error {
 	var tlsConfig *tls.Config
 	if ctl.CACertificate != "" {
 		cp := x509.NewCertPool()
@@ -44,7 +45,7 @@ func ProxyHTTP(ctx context.Context, ctl *dbmodel.Controller, w http.ResponseWrit
 			URL:       createURLWithNewHost(*req.URL, ctl.PublicAddress),
 		})
 		if err == nil {
-			return
+			return nil
 		}
 	}
 	for _, hps := range ctl.Addresses {
@@ -54,15 +55,14 @@ func ProxyHTTP(ctx context.Context, ctl *dbmodel.Controller, w http.ResponseWrit
 				URL:       createURLWithNewHost(*req.URL, fmt.Sprintf("%s:%d", hp.Value, hp.Port)),
 			})
 			if err == nil {
-				return
+				return nil
 			} else {
 				zapctx.Error(ctx, "failed to proxy request: continue to next addr", zaputil.Error(err))
 			}
 		}
 	}
 
-	zapctx.Error(ctx, "couldn't find a valid address for controller")
-	http.Error(w, "Gateway timeout", http.StatusGatewayTimeout)
+	return errgo.New("couldn't reach a valid address for controller")
 }
 
 func doRequest(ctx context.Context, w http.ResponseWriter, req *http.Request, opt httpOptions) error {

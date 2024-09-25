@@ -15,9 +15,7 @@ import (
 	"github.com/juju/names/v5"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
-	jimm_errors "github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimmtest"
-	"github.com/canonical/jimm/v3/internal/jimmtest/mocks"
 	"github.com/canonical/jimm/v3/internal/middleware"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
@@ -26,18 +24,6 @@ import (
 func TestAuthorizeUserForModelAccess(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
-	testUser := "test-user@canonical.com"
-	jt := jimmtest.JIMM{
-		LoginService: mocks.LoginService{
-			LoginWithSessionToken_: func(ctx context.Context, sessionToken string) (*openfga.User, error) {
-				if sessionToken != "good" {
-					return nil, jimm_errors.E(jimm_errors.CodeSessionTokenInvalid)
-				}
-				user := dbmodel.Identity{Name: testUser}
-				return &openfga.User{Identity: &user, JimmAdmin: true}, nil
-			},
-		},
-	}
 	ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(t.Name())
 	c.Assert(err, qt.IsNil)
 	bobIdentity, err := dbmodel.NewIdentity("bob@canonical.com")
@@ -94,7 +80,7 @@ func TestAuthorizeUserForModelAccess(t *testing.T) {
 			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
 			})
-			h := middleware.AuthorizeUserForModelAccess(handler, &jt, tt.permissionRequired)
+			h := middleware.AuthorizeUserForModelAccess(handler, tt.permissionRequired)
 			rctx := chi.NewRouteContext()
 			rctx.URLParams.Add("uuid", tt.uuidInPath)
 			ctx := context.WithValue(req.Context(), chi.RouteCtxKey, rctx)
