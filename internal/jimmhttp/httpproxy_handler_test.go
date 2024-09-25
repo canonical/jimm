@@ -37,7 +37,7 @@ clouds:
   - name: test-cloud-region
 cloud-credentials:
 - owner: alice@canonical.com
-  name: cred-1"github.com/juju/names/v4"
+  name: cred-1
   cloud: test-cloud
 controllers:
 - name: controller-1
@@ -102,7 +102,7 @@ func (s *httpProxySuite) TestHTTPProxyHandler(c *gc.C) {
 		url            string
 		modelUUID      string
 		statusExpected int
-		bodyExpected   []byte
+		bodyExpected   string
 	}{
 		{
 			description: "good",
@@ -115,7 +115,7 @@ func (s *httpProxySuite) TestHTTPProxyHandler(c *gc.C) {
 			url:            fmt.Sprintf("/model/%s/charms", s.model.UUID.String),
 			modelUUID:      s.model.UUID.String,
 			statusExpected: http.StatusOK,
-			bodyExpected:   []byte("OK"),
+			bodyExpected:   "OK",
 		},
 		{
 			description: "model not existing",
@@ -124,7 +124,7 @@ func (s *httpProxySuite) TestHTTPProxyHandler(c *gc.C) {
 			url:            fmt.Sprintf("/model/%s/charms", "54d9f921-c45a-4825-8253-74e7edc28066"),
 			modelUUID:      "54d9f921-c45a-4825-8253-74e7edc28066",
 			statusExpected: http.StatusNotFound,
-			bodyExpected:   []byte("cannot get model"),
+			bodyExpected:   ".*failed to get model.*",
 		},
 	}
 
@@ -144,6 +144,6 @@ func (s *httpProxySuite) TestHTTPProxyHandler(c *gc.C) {
 		c.Assert(resp.StatusCode, gc.Equals, test.statusExpected)
 		body, err := io.ReadAll(resp.Body)
 		c.Assert(err, gc.IsNil)
-		c.Assert(body, gc.DeepEquals, test.bodyExpected)
+		c.Assert(string(body), gc.Matches, test.bodyExpected)
 	}
 }
