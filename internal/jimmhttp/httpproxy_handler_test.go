@@ -19,7 +19,6 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/jimmhttp"
 	"github.com/canonical/jimm/v3/internal/jimmtest"
-	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 )
 
 type httpProxySuite struct {
@@ -63,12 +62,8 @@ func (s *httpProxySuite) SetUpTest(c *gc.C) {
 	tester := jimmtest.GocheckTester{C: c}
 	env := jimmtest.ParseEnvironment(tester, testEnv)
 	env.PopulateDB(tester, s.JIMM.Database)
-	user, err := s.JIMM.FetchIdentity(ctx, env.Users[0].Username)
-	c.Assert(err, gc.IsNil)
-	err = user.SetModelAccess(ctx, names.NewModelTag(env.Models[0].UUID), ofganames.AdministratorRelation)
-	c.Assert(err, gc.IsNil)
 	model := &dbmodel.Model{UUID: sql.NullString{String: env.Models[0].UUID, Valid: true}}
-	err = s.JIMM.Database.GetModel(ctx, model)
+	err := s.JIMM.Database.GetModel(ctx, model)
 	c.Assert(err, gc.IsNil)
 	s.model = model
 	err = s.JIMM.GetCredentialStore().PutControllerCredentials(ctx, model.Controller.Name, "user", "psw")
