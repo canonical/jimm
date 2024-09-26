@@ -161,7 +161,8 @@ func (act *addControllerTransactor) setCloudRegionControllerPriorities(cloud dbm
 
 		act.controller.CloudRegions = append(act.controller.CloudRegions, dbmodel.CloudRegionControllerPriority{
 			CloudRegion: reg,
-			Priority:    uint(priority),
+			//nolint:gosec
+			Priority: uint(priority),
 		})
 	}
 }
