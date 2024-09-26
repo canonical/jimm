@@ -18,12 +18,12 @@ import (
 
 // GroupService is an implementation of the jujuapi.GroupService interface.
 type GroupService struct {
-	AddGroup_     func(ctx context.Context, user *openfga.User, name string) (*dbmodel.GroupEntry, error)
-	CountGroups_  func(ctx context.Context, user *openfga.User) (int, error)
-	GetGroupByID_ func(ctx context.Context, user *openfga.User, uuid string) (*dbmodel.GroupEntry, error)
-	ListGroups_   func(ctx context.Context, user *openfga.User, filter pagination.LimitOffsetPagination) ([]dbmodel.GroupEntry, error)
-	RenameGroup_  func(ctx context.Context, user *openfga.User, oldName, newName string) error
-	RemoveGroup_  func(ctx context.Context, user *openfga.User, name string) error
+	AddGroup_    func(ctx context.Context, user *openfga.User, name string) (*dbmodel.GroupEntry, error)
+	CountGroups_ func(ctx context.Context, user *openfga.User) (int, error)
+	GetGroup_    func(ctx context.Context, user *openfga.User, uuid, name string) (*dbmodel.GroupEntry, error)
+	ListGroups_  func(ctx context.Context, user *openfga.User, filter pagination.LimitOffsetPagination) ([]dbmodel.GroupEntry, error)
+	RenameGroup_ func(ctx context.Context, user *openfga.User, oldName, newName string) error
+	RemoveGroup_ func(ctx context.Context, user *openfga.User, name string) error
 }
 
 func (j *GroupService) AddGroup(ctx context.Context, u *openfga.User, name string) (*dbmodel.GroupEntry, error) {
@@ -40,11 +40,11 @@ func (j *GroupService) CountGroups(ctx context.Context, user *openfga.User) (int
 	return j.CountGroups_(ctx, user)
 }
 
-func (j *GroupService) GetGroupByID(ctx context.Context, user *openfga.User, uuid string) (*dbmodel.GroupEntry, error) {
-	if j.GetGroupByID_ == nil {
+func (j *GroupService) GetGroup(ctx context.Context, user *openfga.User, uuid, name string) (*dbmodel.GroupEntry, error) {
+	if j.GetGroup_ == nil {
 		return nil, errors.E(errors.CodeNotImplemented)
 	}
-	return j.GetGroupByID_(ctx, user, uuid)
+	return j.GetGroup_(ctx, user, uuid, name)
 }
 
 func (j *GroupService) ListGroups(ctx context.Context, user *openfga.User, filters pagination.LimitOffsetPagination) ([]dbmodel.GroupEntry, error) {

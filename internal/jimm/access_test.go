@@ -806,7 +806,7 @@ func TestCountGroups(t *testing.T) {
 	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeAlreadyExists)
 }
 
-func TestGetGroupByID(t *testing.T) {
+func TestGetGroup(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
@@ -834,9 +834,13 @@ func TestGetGroupByID(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(groupEntry.UUID, qt.Not(qt.Equals), "")
 
-	gotGroup, err := j.GetGroupByID(ctx, u, groupEntry.UUID)
+	gotGroupUuid, err := j.GetGroup(ctx, u, groupEntry.UUID, "")
 	c.Assert(err, qt.IsNil)
-	c.Assert(gotGroup, qt.DeepEquals, groupEntry)
+	c.Assert(gotGroupUuid, qt.DeepEquals, groupEntry)
+
+	gotGroupName, err := j.GetGroup(ctx, u, "", groupEntry.Name)
+	c.Assert(err, qt.IsNil)
+	c.Assert(gotGroupName, qt.DeepEquals, groupEntry)
 }
 
 func TestRemoveGroup(t *testing.T) {

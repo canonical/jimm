@@ -51,7 +51,7 @@ func TestUpdateGroup(t *testing.T) {
 	var renameErr error
 	jimm := jimmtest.JIMM{
 		GroupService: mocks.GroupService{
-			GetGroupByID_: func(ctx context.Context, user *openfga.User, uuid string) (*dbmodel.GroupEntry, error) {
+			GetGroup_: func(ctx context.Context, user *openfga.User, uuid, name string) (*dbmodel.GroupEntry, error) {
 				return &dbmodel.GroupEntry{UUID: groupID, Name: "test-group"}, nil
 			},
 			RenameGroup_: func(ctx context.Context, user *openfga.User, oldName, newName string) error {
@@ -120,7 +120,7 @@ func TestDeleteGroup(t *testing.T) {
 	var deleteErr error
 	jimm := jimmtest.JIMM{
 		GroupService: mocks.GroupService{
-			GetGroupByID_: func(ctx context.Context, user *openfga.User, uuid string) (*dbmodel.GroupEntry, error) {
+			GetGroup_: func(ctx context.Context, user *openfga.User, uuid, name string) (*dbmodel.GroupEntry, error) {
 				return &dbmodel.GroupEntry{UUID: uuid, Name: "test-group"}, nil
 			},
 			RemoveGroup_: func(ctx context.Context, user *openfga.User, name string) error {
@@ -155,7 +155,7 @@ func TestGetGroupIdentities(t *testing.T) {
 	}
 	jimm := jimmtest.JIMM{
 		GroupService: mocks.GroupService{
-			GetGroupByID_: func(ctx context.Context, user *openfga.User, uuid string) (*dbmodel.GroupEntry, error) {
+			GetGroup_: func(ctx context.Context, user *openfga.User, uuid, name string) (*dbmodel.GroupEntry, error) {
 				return nil, getGroupErr
 			},
 		},
