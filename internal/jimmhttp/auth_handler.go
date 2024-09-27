@@ -1,4 +1,5 @@
 // Copyright 2024 Canonical.
+
 package jimmhttp
 
 import (
@@ -228,20 +229,5 @@ func (oah *OAuthHandler) Whoami(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Content-Type", "application/json")
 	if _, err := w.Write(b); err != nil {
 		zapctx.Error(ctx, "failed to write whoami body", zap.Error(err))
-	}
-}
-
-// writeError writes an error and logs the message. It is expected that the status code
-// is an erroneous status code.
-func writeError(ctx context.Context, w http.ResponseWriter, status int, err error, logMessage string) {
-	zapctx.Error(ctx, logMessage, zap.Error(err))
-	w.WriteHeader(status)
-	errMsg := ""
-	if err != nil {
-		errMsg = " - " + err.Error()
-	}
-	_, err = w.Write([]byte(http.StatusText(status) + errMsg))
-	if err != nil {
-		zapctx.Error(ctx, "failed to write status text error", zap.Error(err))
 	}
 }

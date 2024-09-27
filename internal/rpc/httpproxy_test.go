@@ -44,6 +44,7 @@ func TestProxyHTTP(t *testing.T) {
 		setup          func()
 		path           string
 		statusExpected int
+		errorMatches   string
 	}{
 		{
 			description: "good",
@@ -96,7 +97,7 @@ func TestProxyHTTP(t *testing.T) {
 				controller.Addresses = nil
 				controller.PublicAddress = "localhost-not-found:61213"
 			},
-			statusExpected: http.StatusGatewayTimeout,
+			errorMatches: "couldn't reach a valid address for controller",
 		},
 	}
 
@@ -105,9 +106,14 @@ func TestProxyHTTP(t *testing.T) {
 		req, err := http.NewRequest("POST", test.path, nil)
 		c.Assert(err, qt.IsNil)
 		recorder := httptest.NewRecorder()
-		rpc.ProxyHTTP(ctx, &controller, recorder, req)
-		resp := recorder.Result()
-		defer resp.Body.Close()
-		c.Assert(resp.StatusCode, qt.Equals, test.statusExpected)
+		err = rpc.ProxyHTTP(ctx, &controller, recorder, req)
+		if test.errorMatches == "" {
+			c.Assert(err, qt.IsNil)
+			resp := recorder.Result()
+			defer resp.Body.Close()
+			c.Assert(resp.StatusCode, qt.Equals, test.statusExpected)
+		} else {
+			c.Assert(err, qt.ErrorMatches, test.errorMatches)
+		}
 	}
 }

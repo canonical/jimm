@@ -25,6 +25,7 @@ type ModelManager struct {
 	ForEachModel_           func(ctx context.Context, u *openfga.User, f func(*dbmodel.Model, jujuparams.UserAccessPermission) error) error
 	ForEachUserModel_       func(ctx context.Context, u *openfga.User, f func(*dbmodel.Model, jujuparams.UserAccessPermission) error) error
 	FullModelStatus_        func(ctx context.Context, user *openfga.User, modelTag names.ModelTag, patterns []string) (*jujuparams.FullStatus, error)
+	GetModel_               func(ctx context.Context, uuid string) (dbmodel.Model, error)
 	ImportModel_            func(ctx context.Context, user *openfga.User, controllerName string, modelTag names.ModelTag, newOwner string) error
 	IdentityModelDefaults_  func(ctx context.Context, user *dbmodel.Identity) (map[string]interface{}, error)
 	ModelDefaultsForCloud_  func(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag) (jujuparams.ModelDefaultsResult, error)
@@ -91,6 +92,13 @@ func (j *ModelManager) FullModelStatus(ctx context.Context, user *openfga.User, 
 		return nil, errors.E(errors.CodeNotImplemented)
 	}
 	return j.FullModelStatus_(ctx, user, modelTag, patterns)
+}
+
+func (j *ModelManager) GetModel(ctx context.Context, uuid string) (dbmodel.Model, error) {
+	if j.GetModel_ == nil {
+		return dbmodel.Model{}, errors.E(errors.CodeNotImplemented)
+	}
+	return j.GetModel_(ctx, uuid)
 }
 
 func (j *ModelManager) ImportModel(ctx context.Context, user *openfga.User, controllerName string, modelTag names.ModelTag, newOwner string) error {

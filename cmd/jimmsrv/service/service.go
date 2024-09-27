@@ -451,8 +451,11 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		ControllerUUID: p.ControllerUUID,
 		PublicDNSName:  p.PublicDNSName,
 	}
-
 	s.mux.Handle("/api", jujuapi.APIHandler(ctx, &s.jimm, params))
+	mountHandler(
+		"/model/{uuid}/{type:charms|applications}",
+		jimmhttp.NewHTTPProxyHandler(&s.jimm),
+	)
 	s.mux.Handle("/model/*", http.StripPrefix("/model", jujuapi.ModelHandler(ctx, &s.jimm, params)))
 	// If the request is not for a known path assume it is part of the dashboard.
 	// If dashboard location env var is not defined, do not handle a dashboard.

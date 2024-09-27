@@ -9,12 +9,11 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/juju/names/v5"
 
-	"github.com/canonical/jimm/v3/internal/jujuapi"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 )
 
 // AuthorizeUserForModelAccess extract the user from the context, and checks for permission on the model uuid extracted from the path.
-func AuthorizeUserForModelAccess(next http.Handler, jimm jujuapi.JIMM, accessNeeded cofga.Relation) http.Handler {
+func AuthorizeUserForModelAccess(next http.Handler, accessNeeded cofga.Relation) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		user, err := IdentityFromContext(ctx)

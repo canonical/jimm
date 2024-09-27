@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/juju/juju/api"
 	"github.com/juju/juju/api/client/client"
 	"github.com/juju/juju/rpc/jsoncodec"
@@ -21,6 +22,7 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/jimmhttp"
 	"github.com/canonical/jimm/v3/internal/jimmtest"
 	"github.com/canonical/jimm/v3/internal/jujuapi"
 	"github.com/canonical/jimm/v3/internal/openfga"
@@ -50,9 +52,16 @@ func (s *websocketSuite) SetUpTest(c *gc.C) {
 
 	s.Params.ControllerUUID = jimmtest.ControllerUUID
 
-	mux := http.NewServeMux()
+	mux := chi.NewRouter()
+	mountHandler := func(path string, h jimmhttp.JIMMHttpHandler) {
+		mux.Mount(path, h.Routes())
+	}
 	mux.Handle("/api", jujuapi.APIHandler(ctx, s.JIMM, s.Params))
-	mux.Handle("/model/", http.StripPrefix("/model", jujuapi.ModelHandler(ctx, s.JIMM, s.Params)))
+	mountHandler(
+		"/model/{uuid}/{type:charms|applications}",
+		jimmhttp.NewHTTPProxyHandler(s.JIMM),
+	)
+	mux.Handle("/model/*", http.StripPrefix("/model", jujuapi.ModelHandler(ctx, s.JIMM, s.Params)))
 	jwks := wellknownapi.NewWellKnownHandler(s.JIMM.CredentialStore)
 	mux.HandleFunc("/.well-known/jwks.json", jwks.JWKS)
 
