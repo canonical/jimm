@@ -66,12 +66,14 @@ func (r *controllerRoot) GetGroup(ctx context.Context, req apiparams.GetGroupReq
 	var groupEntry *dbmodel.GroupEntry
 	var err error
 	switch {
+	case req.UUID != "" && req.Name != "":
+		return apiparams.Group{}, errors.E(op, errors.CodeBadRequest, "only one of UUID or Name should be provided")
 	case req.UUID != "":
 		groupEntry, err = r.jimm.GetGroupByUUID(ctx, r.user, req.UUID)
 	case req.Name != "":
 		groupEntry, err = r.jimm.GetGroupByName(ctx, r.user, req.Name)
 	default:
-		return apiparams.Group{}, errors.E(op, errors.CodeBadRequest, "invalid GetGroup request")
+		return apiparams.Group{}, errors.E(op, errors.CodeBadRequest, "no UUID or Name provided")
 	}
 	if err != nil {
 		zapctx.Error(ctx, "failed to get group", zaputil.Error(err))
