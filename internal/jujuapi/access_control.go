@@ -59,29 +59,20 @@ func (r *controllerRoot) AddGroup(ctx context.Context, req apiparams.AddGroupReq
 	return resp, nil
 }
 
-// GetGroupByUUID returns group information based on a UUID.
-func (r *controllerRoot) GetGroupByUUID(ctx context.Context, req apiparams.GetGroupByUUIDRequest) (apiparams.Group, error) {
-	const op = errors.Op("jujuapi.GetGroupByUUID")
+// GetGroup returns group information based on a UUID or name.
+func (r *controllerRoot) GetGroup(ctx context.Context, req apiparams.GetGroupRequest) (apiparams.Group, error) {
+	const op = errors.Op("jujuapi.GetGroup")
 
-	groupEntry, err := r.jimm.GetGroupByUUID(ctx, r.user, req.UUID)
-	if err != nil {
-		zapctx.Error(ctx, "failed to get group", zaputil.Error(err))
-		return apiparams.Group{}, errors.E(op, err)
+	var groupEntry *dbmodel.GroupEntry
+	var err error
+	switch {
+	case req.UUID != "":
+		groupEntry, err = r.jimm.GetGroupByUUID(ctx, r.user, req.UUID)
+	case req.Name != "":
+		groupEntry, err = r.jimm.GetGroupByName(ctx, r.user, req.Name)
+	default:
+		return apiparams.Group{}, errors.E(op, errors.CodeBadRequest, "invalid GetGroup request")
 	}
-
-	return apiparams.Group{
-		UUID:      groupEntry.UUID,
-		Name:      groupEntry.Name,
-		CreatedAt: groupEntry.CreatedAt.Format(time.RFC3339),
-		UpdatedAt: groupEntry.UpdatedAt.Format(time.RFC3339),
-	}, nil
-}
-
-// GetGroupByName returns group information based on a name.
-func (r *controllerRoot) GetGroupByName(ctx context.Context, req apiparams.GetGroupByNameRequest) (apiparams.Group, error) {
-	const op = errors.Op("jujuapi.GetGroupByName")
-
-	groupEntry, err := r.jimm.GetGroupByName(ctx, r.user, req.Name)
 	if err != nil {
 		zapctx.Error(ctx, "failed to get group", zaputil.Error(err))
 		return apiparams.Group{}, errors.E(op, err)
