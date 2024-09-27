@@ -841,6 +841,12 @@ func TestGetGroup(t *testing.T) {
 	gotGroupName, err := j.GetGroupByName(ctx, u, groupEntry.Name)
 	c.Assert(err, qt.IsNil)
 	c.Assert(gotGroupName, qt.DeepEquals, groupEntry)
+
+	_, err = j.GetGroupByUUID(ctx, u, "non-existent")
+	c.Assert(err, qt.Not(qt.IsNil))
+
+	_, err = j.GetGroupByName(ctx, u, "non-existent")
+	c.Assert(err, qt.Not(qt.IsNil))
 }
 
 func TestRemoveGroup(t *testing.T) {
