@@ -70,15 +70,18 @@ func (s *accessControlSuite) TestGetGroup(c *gc.C) {
 	created, err := client.AddGroup(&apiparams.AddGroupRequest{Name: "test-group"})
 	c.Assert(err, jc.ErrorIsNil)
 
-	retrievedUuid, err := client.GetGroup(&apiparams.GetGroupRequest{UUID: created.UUID})
+	retrievedUuid, err := client.GetGroupByUUID(&apiparams.GetGroupByUUIDRequest{UUID: created.UUID})
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(retrievedUuid.Group, gc.DeepEquals, created.Group)
 
-	retrievedName, err := client.GetGroup(&apiparams.GetGroupRequest{Name: created.Name})
+	retrievedName, err := client.GetGroupByName(&apiparams.GetGroupByNameRequest{Name: created.Name})
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(retrievedName.Group, gc.DeepEquals, created.Group)
 
-	_, err = client.GetGroup(&apiparams.GetGroupRequest{UUID: "non-existent"})
+	_, err = client.GetGroupByUUID(&apiparams.GetGroupByUUIDRequest{UUID: "non-existent"})
+	c.Assert(err, gc.ErrorMatches, ".*not found.*")
+
+	_, err = client.GetGroupByName(&apiparams.GetGroupByNameRequest{Name: "non-existent"})
 	c.Assert(err, gc.ErrorMatches, ".*not found.*")
 }
 

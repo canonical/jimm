@@ -123,10 +123,17 @@ func (c *Client) AddGroup(req *params.AddGroupRequest) (params.AddGroupResponse,
 	return resp, err
 }
 
-// GetGroup returns the group with the given UUID.
-func (c *Client) GetGroup(req *params.GetGroupRequest) (params.GetGroupResponse, error) {
+// GetGroupByUUID returns the group with the given UUID.
+func (c *Client) GetGroupByUUID(req *params.GetGroupByUUIDRequest) (params.GetGroupResponse, error) {
 	var resp params.GetGroupResponse
-	err := c.caller.APICall("JIMM", 4, "", "GetGroup", req, &resp)
+	err := c.caller.APICall("JIMM", 4, "", "GetGroupByUUID", req, &resp)
+	return resp, err
+}
+
+// GetGroupByName returns the group with the given name.
+func (c *Client) GetGroupByName(req *params.GetGroupByNameRequest) (params.GetGroupResponse, error) {
+	var resp params.GetGroupResponse
+	err := c.caller.APICall("JIMM", 4, "", "GetGroupByName", req, &resp)
 	return resp, err
 }
 
