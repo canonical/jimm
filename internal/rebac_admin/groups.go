@@ -81,7 +81,7 @@ func (s *groupsService) GetGroup(ctx context.Context, groupId string) (*resource
 	if err != nil {
 		return nil, err
 	}
-	group, err := s.jimm.GetGroup(ctx, user, groupId, "")
+	group, err := s.jimm.GetGroupByUUID(ctx, user, groupId)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.CodeNotFound {
 			return nil, v1.NewNotFoundError("failed to find group")
@@ -100,7 +100,7 @@ func (s *groupsService) UpdateGroup(ctx context.Context, group *resources.Group)
 	if group.Id == nil {
 		return nil, v1.NewValidationError("missing group ID")
 	}
-	existingGroup, err := s.jimm.GetGroup(ctx, user, *group.Id, "")
+	existingGroup, err := s.jimm.GetGroupByUUID(ctx, user, *group.Id)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.CodeNotFound {
 			return nil, v1.NewNotFoundError("failed to find group")
@@ -123,7 +123,7 @@ func (s *groupsService) DeleteGroup(ctx context.Context, groupId string) (bool, 
 	if err != nil {
 		return false, err
 	}
-	existingGroup, err := s.jimm.GetGroup(ctx, user, groupId, "")
+	existingGroup, err := s.jimm.GetGroupByUUID(ctx, user, groupId)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.CodeNotFound {
 			return false, nil
@@ -148,7 +148,7 @@ func (s *groupsService) GetGroupIdentities(ctx context.Context, groupId string, 
 	}
 	filter := utils.CreateTokenPaginationFilter(params.Size, params.NextToken, params.NextPageToken)
 	groupTag := jimmnames.NewGroupTag(groupId)
-	_, err = s.jimm.GetGroup(ctx, user, groupId, "")
+	_, err = s.jimm.GetGroupByUUID(ctx, user, groupId)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.CodeNotFound {
 			return nil, v1.NewNotFoundError("group not found")

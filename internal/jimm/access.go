@@ -717,18 +717,27 @@ func (j *JIMM) CountGroups(ctx context.Context, user *openfga.User) (int, error)
 	return count, nil
 }
 
-// GetGroup returns a group based on the provided UUID or name.
-func (j *JIMM) GetGroup(ctx context.Context, user *openfga.User, uuid, name string) (*dbmodel.GroupEntry, error) {
-	const op = errors.Op("jimm.AddGroup")
+// getGroup returns a group based on the provided UUID or name.
+func (j *JIMM) getGroup(ctx context.Context, user *openfga.User, group *dbmodel.GroupEntry) (*dbmodel.GroupEntry, error) {
+	const op = errors.Op("jimm.getGroup")
 
 	if !user.JimmAdmin {
 		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
-	group := dbmodel.GroupEntry{UUID: uuid, Name: name}
-	if err := j.Database.GetGroup(ctx, &group); err != nil {
+	if err := j.Database.GetGroup(ctx, group); err != nil {
 		return nil, errors.E(op, err)
 	}
-	return &group, nil
+	return group, nil
+}
+
+// GetGroupByUUID returns a group based on the provided UUID.
+func (j *JIMM) GetGroupByUUID(ctx context.Context, user *openfga.User, uuid string) (*dbmodel.GroupEntry, error) {
+	return j.getGroup(ctx, user, &dbmodel.GroupEntry{UUID: uuid})
+}
+
+// GetGroupByName returns a group based on the provided name.
+func (j *JIMM) GetGroupByName(ctx context.Context, user *openfga.User, name string) (*dbmodel.GroupEntry, error) {
+	return j.getGroup(ctx, user, &dbmodel.GroupEntry{Name: name})
 }
 
 // RenameGroup renames a group in JIMM's DB.

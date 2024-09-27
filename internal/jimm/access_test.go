@@ -834,11 +834,11 @@ func TestGetGroup(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(groupEntry.UUID, qt.Not(qt.Equals), "")
 
-	gotGroupUuid, err := j.GetGroup(ctx, u, groupEntry.UUID, "")
+	gotGroupUuid, err := j.GetGroupByUUID(ctx, u, groupEntry.UUID)
 	c.Assert(err, qt.IsNil)
 	c.Assert(gotGroupUuid, qt.DeepEquals, groupEntry)
 
-	gotGroupName, err := j.GetGroup(ctx, u, "", groupEntry.Name)
+	gotGroupName, err := j.GetGroupByName(ctx, u, groupEntry.Name)
 	c.Assert(err, qt.IsNil)
 	c.Assert(gotGroupName, qt.DeepEquals, groupEntry)
 }
