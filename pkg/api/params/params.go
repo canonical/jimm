@@ -285,10 +285,12 @@ type AddGroupResponse struct {
 	Group
 }
 
-// GetGroupRequest holds a request to get a group.
+// GetGroupRequest holds a request to get a group by UUID or name.
 type GetGroupRequest struct {
 	// UUID holds the UUID of the group to be retrieved.
 	UUID string `json:"uuid"`
+	// Name holds the name of the group to be retrieved.
+	Name string `json:"name"`
 }
 
 // GetGroupResponse holds the details of the group.

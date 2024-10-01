@@ -28,7 +28,8 @@ const (
 type GroupService interface {
 	AddGroup(ctx context.Context, user *openfga.User, name string) (*dbmodel.GroupEntry, error)
 	CountGroups(ctx context.Context, user *openfga.User) (int, error)
-	GetGroupByID(ctx context.Context, user *openfga.User, uuid string) (*dbmodel.GroupEntry, error)
+	GetGroupByUUID(ctx context.Context, user *openfga.User, uuid string) (*dbmodel.GroupEntry, error)
+	GetGroupByName(ctx context.Context, user *openfga.User, name string) (*dbmodel.GroupEntry, error)
 	ListGroups(ctx context.Context, user *openfga.User, filter pagination.LimitOffsetPagination) ([]dbmodel.GroupEntry, error)
 	RenameGroup(ctx context.Context, user *openfga.User, oldName, newName string) error
 	RemoveGroup(ctx context.Context, user *openfga.User, name string) error
@@ -58,15 +59,27 @@ func (r *controllerRoot) AddGroup(ctx context.Context, req apiparams.AddGroupReq
 	return resp, nil
 }
 
-// GetGroup returns group information based on a group ID.
+// GetGroup returns group information based on a UUID or name.
 func (r *controllerRoot) GetGroup(ctx context.Context, req apiparams.GetGroupRequest) (apiparams.Group, error) {
 	const op = errors.Op("jujuapi.GetGroup")
 
-	groupEntry, err := r.jimm.GetGroupByID(ctx, r.user, req.UUID)
+	var groupEntry *dbmodel.GroupEntry
+	var err error
+	switch {
+	case req.UUID != "" && req.Name != "":
+		return apiparams.Group{}, errors.E(op, errors.CodeBadRequest, "only one of UUID or Name should be provided")
+	case req.UUID != "":
+		groupEntry, err = r.jimm.GetGroupByUUID(ctx, r.user, req.UUID)
+	case req.Name != "":
+		groupEntry, err = r.jimm.GetGroupByName(ctx, r.user, req.Name)
+	default:
+		return apiparams.Group{}, errors.E(op, errors.CodeBadRequest, "no UUID or Name provided")
+	}
 	if err != nil {
 		zapctx.Error(ctx, "failed to get group", zaputil.Error(err))
 		return apiparams.Group{}, errors.E(op, err)
 	}
+
 	return apiparams.Group{
 		UUID:      groupEntry.UUID,
 		Name:      groupEntry.Name,
