@@ -80,6 +80,9 @@ func (s *accessControlSuite) TestGetGroup(c *gc.C) {
 
 	_, err = client.GetGroup(&apiparams.GetGroupRequest{UUID: "non-existent"})
 	c.Assert(err, gc.ErrorMatches, ".*not found.*")
+
+	_, err = client.GetGroup(&apiparams.GetGroupRequest{Name: created.Name, UUID: created.UUID})
+	c.Assert(err, gc.ErrorMatches, ".*only one of.*")
 }
 
 func (s *accessControlSuite) TestRemoveGroup(c *gc.C) {
