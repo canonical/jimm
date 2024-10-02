@@ -35,7 +35,6 @@ require (
 	golang.org/x/net v0.26.0 // indirect
 	golang.org/x/sync v0.7.0
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
-	gopkg.in/macaroon-bakery.v2 v2.3.0
 	gopkg.in/macaroon.v2 v2.1.0
 	gorm.io/driver/postgres v1.0.5
 	gorm.io/gorm v1.20.6
