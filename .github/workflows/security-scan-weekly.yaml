@@ -1,0 +1,25 @@
+name: Security Scan Weekly
+
+on:
+  schedule:
+    - cron: "0 0 * * 1" # Runs every Monday at 00:00 UTC.
+  workflow_dispatch:
+
+jobs:
+  security-scan:
+    runs-on: [ubuntu-latest]
+    name: Security Scan
+    strategy:
+      matrix:
+        branch: [v3]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.branch }}
+
+      - name: Security scan
+        uses: canonical/comsys-build-tools/.github/actions/security-scan-upload@main
+        with: 
+          upload-github-security: true
+          upload-sarif-artifact: true
