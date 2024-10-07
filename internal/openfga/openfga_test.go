@@ -197,6 +197,35 @@ func (s *openFGATestSuite) TestAddControllerModel(c *gc.C) {
 	c.Assert(allowed, gc.Equals, true)
 }
 
+func (s *openFGATestSuite) TestRemoveControllerModel(c *gc.C) {
+	modelUUID, err := uuid.NewRandom()
+	c.Assert(err, gc.IsNil)
+	controllerUUID, err := uuid.NewRandom()
+	c.Assert(err, gc.IsNil)
+
+	controller := names.NewControllerTag(controllerUUID.String())
+	model := names.NewModelTag(modelUUID.String())
+
+	err = s.ofgaClient.AddControllerModel(context.Background(), controller, model)
+	c.Assert(err, gc.IsNil)
+
+	tuple := openfga.Tuple{
+		Object:   ofganames.ConvertTag(controller),
+		Relation: "controller",
+		Target:   ofganames.ConvertTag(model),
+	}
+	allowed, err := s.ofgaClient.CheckRelation(context.Background(), tuple, false)
+	c.Assert(err, gc.IsNil)
+	c.Assert(allowed, gc.Equals, true)
+
+	err = s.ofgaClient.RemoveControllerModel(context.Background(), controller, model)
+	c.Assert(err, gc.IsNil)
+
+	allowed, err = s.ofgaClient.CheckRelation(context.Background(), tuple, false)
+	c.Assert(err, gc.IsNil)
+	c.Assert(allowed, gc.Equals, false)
+}
+
 func (s *openFGATestSuite) TestRemoveModel(c *gc.C) {
 	modelUUID, err := uuid.NewRandom()
 	c.Assert(err, gc.IsNil)

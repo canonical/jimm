@@ -22,7 +22,6 @@ import (
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
-	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
 
 var defaultDischargeExpiry = 15 * time.Minute
@@ -120,7 +119,7 @@ func (md *MacaroonDischarger) CheckThirdPartyCaveat(ctx context.Context, req *ht
 		return nil, checkers.ErrCaveatNotRecognized
 	}
 
-	offerTag := jimmnames.NewApplicationOfferTag(offerUUID)
+	offerTag := names.NewApplicationOfferTag(offerUUID)
 
 	i, err := dbmodel.NewIdentity(userTag.Id())
 	if err != nil {

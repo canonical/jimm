@@ -662,31 +662,17 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 
 	mi := builder.JujuModelInfo()
 
-	if err := j.OpenFGAClient.AddControllerModel(
-		ctx,
-		builder.controller.ResourceTag(),
-		builder.model.ResourceTag(),
-	); err != nil {
-		zapctx.Error(
-			ctx,
-			"failed to add controller-model relation",
-			zap.String("controller", builder.controller.UUID),
-			zap.String("model", builder.model.UUID.String),
-		)
-	}
-	err = openfga.NewUser(owner, j.OpenFGAClient).SetModelAccess(ctx, names.NewModelTag(mi.UUID), ofganames.AdministratorRelation)
-	if err != nil {
-		zapctx.Error(
-			ctx,
-			"failed to add administrator relation",
-			zap.String("user", owner.Tag().String()),
-			zap.String("model", builder.model.UUID.String),
-		)
-	}
+	ownerUser := openfga.NewUser(owner, j.OpenFGAClient)
+	modelTag := names.NewModelTag(mi.UUID)
+	controllerTag := builder.controller.ResourceTag()
 
+	if err := j.addModelPermissions(ctx, ownerUser, modelTag, controllerTag); err != nil {
+		return nil, errors.E(op, err)
+	}
 	return mi, nil
 }
 
+// GetModel retrieves a model object by the model UUID.
 func (j *JIMM) GetModel(ctx context.Context, uuid string) (dbmodel.Model, error) {
 	model := dbmodel.Model{
 		UUID: sql.NullString{
@@ -699,6 +685,30 @@ func (j *JIMM) GetModel(ctx context.Context, uuid string) (dbmodel.Model, error)
 		return dbmodel.Model{}, fmt.Errorf("failed to get model: %s", err.Error())
 	}
 	return model, nil
+}
+
+// addModelPermissions grants a user access to a model and sets the relation between the controller and model.
+// Call this when adding/importing a model to set the necessary permissions.
+func (j *JIMM) addModelPermissions(ctx context.Context, owner *openfga.User, mt names.ModelTag, ct names.ControllerTag) error {
+	if err := j.OpenFGAClient.AddControllerModel(ctx, ct, mt); err != nil {
+		zapctx.Error(
+			ctx,
+			"failed to add controller->model relation",
+			zap.String("controller", ct.Id()),
+			zap.String("model", mt.Id()),
+		)
+		return err
+	}
+	if err := owner.SetModelAccess(ctx, mt, ofganames.AdministratorRelation); err != nil {
+		zapctx.Error(
+			ctx,
+			"failed to add user->model administrator relation",
+			zap.String("user", owner.Tag().Id()),
+			zap.String("model", mt.Id()),
+		)
+		return err
+	}
+	return nil
 }
 
 // ModelInfo returns the model info for the model with the given ModelTag.
@@ -716,13 +726,7 @@ func (j *JIMM) ModelInfo(ctx context.Context, user *openfga.User, mt names.Model
 		return nil, errors.E(op, err)
 	}
 
-	modelAccess, err := j.GetUserModelAccess(ctx, user, mt)
-	if err != nil {
-		return nil, errors.E(op, err)
-	}
-	if modelAccess == "" {
-		// If the user doesn't have any access on the model return an
-		// unauthorized error
+	if ok, err := user.IsModelReader(ctx, mt); !ok || err != nil {
 		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
@@ -739,6 +743,19 @@ func (j *JIMM) ModelInfo(ctx context.Context, user *openfga.User, mt names.Model
 		return nil, errors.E(op, err)
 	}
 
+	return j.mergeModelInfo(ctx, user, mi, m)
+}
+
+// mergeModelInfo replaces fields on the juju model info object with
+// information from JIMM where JIMM specific information should be used.
+func (j *JIMM) mergeModelInfo(ctx context.Context, user *openfga.User, modelInfo *jujuparams.ModelInfo, jimmModel dbmodel.Model) (*jujuparams.ModelInfo, error) {
+	const op = errors.Op("jimm.mergeModelInfo")
+
+	jimmSummary := jimmModel.ToJujuModelSummary()
+	modelInfo.CloudCredentialTag = jimmSummary.CloudCredentialTag
+	modelInfo.ControllerUUID = jimmSummary.ControllerUUID
+	modelInfo.OwnerTag = jimmSummary.OwnerTag
+
 	userAccess := make(map[string]string)
 
 	for _, relation := range []openfga.Relation{
@@ -748,7 +765,7 @@ func (j *JIMM) ModelInfo(ctx context.Context, user *openfga.User, mt names.Model
 		ofganames.WriterRelation,
 		ofganames.ReaderRelation,
 	} {
-		usersWithSpecifiedRelation, err := openfga.ListUsersWithAccess(ctx, j.OpenFGAClient, mt, relation)
+		usersWithSpecifiedRelation, err := openfga.ListUsersWithAccess(ctx, j.OpenFGAClient, jimmModel.ResourceTag(), relation)
 		if err != nil {
 			return nil, errors.E(op, err)
 		}
@@ -760,6 +777,11 @@ func (j *JIMM) ModelInfo(ctx context.Context, user *openfga.User, mt names.Model
 				userAccess[u.Name] = ToModelAccessString(relation)
 			}
 		}
+	}
+
+	modelAccess, err := j.GetUserModelAccess(ctx, user, jimmModel.ResourceTag())
+	if err != nil {
+		return nil, errors.E(op, err)
 	}
 
 	users := make([]jujuparams.ModelUserInfo, 0, len(userAccess))
@@ -777,15 +799,15 @@ func (j *JIMM) ModelInfo(ctx context.Context, user *openfga.User, mt names.Model
 			})
 		}
 	}
-	mi.Users = users
+	modelInfo.Users = users
 
 	if modelAccess != "admin" && modelAccess != "write" {
 		// Users need "write" level access (or above) to see machine
 		// information.
-		mi.Machines = nil
+		modelInfo.Machines = nil
 	}
 
-	return mi, nil
+	return modelInfo, nil
 }
 
 // ModelStatus returns a jujuparams.ModelStatus for the given model. If

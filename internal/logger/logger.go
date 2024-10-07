@@ -11,25 +11,8 @@ import (
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gorm.io/gorm/logger"
 )
-
-// A BakeryLogger is an implementation of a bakery.Logger that logs using
-// zapctx.
-type BakeryLogger struct{}
-
-// Infof implements bakery.Logger, it logs at INFO level.
-func (BakeryLogger) Infof(ctx context.Context, f string, args ...interface{}) {
-	zapctx.Info(ctx, fmt.Sprintf(f, args...))
-}
-
-// Debugf implements bakery.Logger, it logs at DEBUG level.
-func (BakeryLogger) Debugf(ctx context.Context, f string, args ...interface{}) {
-	zapctx.Debug(ctx, fmt.Sprintf(f, args...))
-}
-
-var _ bakery.Logger = BakeryLogger{}
 
 // GormLogger is an implementation of gorm's logger.Interface that logs
 // using zapctx.
