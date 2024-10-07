@@ -161,7 +161,8 @@ func (act *addControllerTransactor) setCloudRegionControllerPriorities(cloud dbm
 
 		act.controller.CloudRegions = append(act.controller.CloudRegions, dbmodel.CloudRegionControllerPriority{
 			CloudRegion: reg,
-			Priority:    uint(priority),
+			//nolint:gosec
+			Priority: uint(priority),
 		})
 	}
 }
@@ -455,14 +456,10 @@ func (j *JIMM) ImportModel(ctx context.Context, user *openfga.User, controllerNa
 	// Note that only the new owner is given access. All previous users that had access according to Juju
 	// are discarded as access must now be governed by JIMM and OpenFGA.
 	ofgaUser := openfga.NewUser(&ownerUser, j.OpenFGAClient)
-	if err := ofgaUser.SetModelAccess(ctx, modelTag, ofganames.AdministratorRelation); err != nil {
-		zapctx.Error(
-			ctx,
-			"failed to set model admin",
-			zap.String("owner", ownerUser.Name),
-			zap.String("model", modelTag.String()),
-			zap.Error(err),
-		)
+	controllerTag := model.Controller.ResourceTag()
+
+	if err := j.addModelPermissions(ctx, ofgaUser, modelTag, controllerTag); err != nil {
+		return errors.E(op, err)
 	}
 
 	// TODO(CSS-5458): Remove the below section on cloud credentials once we no longer persist the relation between

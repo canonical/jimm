@@ -294,7 +294,10 @@ func TestRebacAdminApi(t *testing.T) {
 	response, err := srv.Client().Get(srv.URL + "/rebac/v1/swagger.json")
 	c.Assert(err, qt.IsNil)
 	defer response.Body.Close()
-	c.Assert(response.StatusCode, qt.Equals, 401)
+
+	// The `/swagger.json` endpoint doesn't require authentication, so the returned
+	// status code should be 200.
+	c.Assert(response.StatusCode, qt.Equals, 200)
 }
 
 func TestThirdPartyCaveatDischarge(t *testing.T) {

@@ -123,7 +123,7 @@ func (c *Client) AddGroup(req *params.AddGroupRequest) (params.AddGroupResponse,
 	return resp, err
 }
 
-// GetGroup returns the group with the given UUID.
+// GetGroup returns the group with the given UUID or name. Only one should be provided.
 func (c *Client) GetGroup(req *params.GetGroupRequest) (params.GetGroupResponse, error) {
 	var resp params.GetGroupResponse
 	err := c.caller.APICall("JIMM", 4, "", "GetGroup", req, &resp)

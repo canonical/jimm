@@ -409,7 +409,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 
 	s.mux.Mount("/metrics", promhttp.Handler())
 
-	s.mux.Mount("/rebac", middleware.AuthenticateRebac(rebacBackend.Handler(""), &s.jimm))
+	s.mux.Mount("/rebac", middleware.AuthenticateRebac("/rebac", rebacBackend.Handler(""), &s.jimm))
 
 	mountHandler(
 		"/debug",
@@ -451,12 +451,17 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		ControllerUUID: p.ControllerUUID,
 		PublicDNSName:  p.PublicDNSName,
 	}
-	s.mux.Handle("/api", jujuapi.APIHandler(ctx, &s.jimm, params))
+
+	// Websockets require extra care when cookies are used for authentication
+	// to avoid CSRF attacks. https://portswigger.net/web-security/websockets/cross-site-websocket-hijacking
+	websocketCors := middleware.NewWebsocketCors(p.CorsAllowedOrigins)
+	s.mux.Handle("/api", websocketCors.Handler(jujuapi.APIHandler(ctx, &s.jimm, params)))
+	s.mux.Handle("/model/*", websocketCors.Handler(http.StripPrefix("/model", jujuapi.ModelHandler(ctx, &s.jimm, params))))
 	mountHandler(
 		"/model/{uuid}/{type:charms|applications}",
 		jimmhttp.NewHTTPProxyHandler(&s.jimm),
 	)
-	s.mux.Handle("/model/*", http.StripPrefix("/model", jujuapi.ModelHandler(ctx, &s.jimm, params)))
+
 	// If the request is not for a known path assume it is part of the dashboard.
 	// If dashboard location env var is not defined, do not handle a dashboard.
 	if p.DashboardLocation != "" {

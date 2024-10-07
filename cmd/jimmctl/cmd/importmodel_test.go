@@ -66,6 +66,8 @@ func (s *importModelSuite) TestImportModelFromLocalUser(c *gc.C) {
 	model.SetTag(mt)
 	err := s.JIMM.Database.GetModel(context.Background(), &model)
 	c.Assert(err, gc.Equals, nil)
+	err = s.JIMM.OpenFGAClient.RemoveControllerModel(context.Background(), model.Controller.ResourceTag(), model.ResourceTag())
+	c.Assert(err, gc.Equals, nil)
 	err = s.JIMM.Database.DeleteModel(context.Background(), &model)
 	c.Assert(err, gc.Equals, nil)
 

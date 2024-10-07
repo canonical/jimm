@@ -35,7 +35,6 @@ require (
 	golang.org/x/net v0.27.0 // indirect
 	golang.org/x/sync v0.7.0
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
-	gopkg.in/macaroon-bakery.v2 v2.3.0
 	gopkg.in/macaroon.v2 v2.1.0
 	gorm.io/driver/postgres v1.0.5
 	gorm.io/gorm v1.20.6
@@ -45,7 +44,7 @@ require (
 require (
 	github.com/antonlindstrom/pgstore v0.0.0-20220421113606-e3a6e3fed12a
 	github.com/canonical/ofga v0.10.0
-	github.com/canonical/rebac-admin-ui-handlers v0.1.1
+	github.com/canonical/rebac-admin-ui-handlers v0.1.2
 	github.com/coreos/go-oidc/v3 v3.9.0
 	github.com/dustinkirkland/golang-petname v0.0.0-20231002161417-6a283f1aaaf2
 	github.com/go-chi/chi/v5 v5.0.12
