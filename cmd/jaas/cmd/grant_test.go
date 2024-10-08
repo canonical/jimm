@@ -13,7 +13,6 @@ import (
 	"github.com/canonical/jimm/v3/cmd/jaas/cmd"
 	"github.com/canonical/jimm/v3/internal/cmdtest"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
-	"github.com/canonical/jimm/v3/internal/jimmtest"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	jimmnames "github.com/canonical/jimm/v3/pkg/names"
@@ -32,7 +31,7 @@ func (s *grantSuite) TestGrant(c *gc.C) {
 	clientIdWithDomain := clientID + "@serviceaccount"
 
 	// alice is superuser
-	bClient := jimmtest.NewUserSessionLogin(c, "alice")
+	bClient := s.SetupCLIAccess(c, "alice")
 
 	sa, err := dbmodel.NewIdentity(clientIdWithDomain)
 	c.Assert(err, gc.IsNil)
@@ -94,7 +93,7 @@ func (s *grantSuite) TestMissingArgs(c *gc.C) {
 		expectedError: "user/group not specified",
 	}}
 
-	bClient := jimmtest.NewUserSessionLogin(c, "alice")
+	bClient := s.SetupCLIAccess(c, "alice")
 	clientStore := s.ClientStore()
 	for _, t := range tests {
 		_, err := cmdtesting.RunCommand(c, cmd.NewGrantCommandForTesting(clientStore, bClient), t.args...)

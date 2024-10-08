@@ -36,9 +36,17 @@ func APIHandler(ctx context.Context, jimm *jimm.JIMM, p Params) http.Handler {
 // ModelHandler creates an http.Handler for "/model" endpoints.
 func ModelHandler(ctx context.Context, jimm *jimm.JIMM, p Params) http.Handler {
 	mux := http.NewServeMux()
-	mux.Handle("/", &jimmhttp.WSHandler{
+	mux.Handle("/{uuid}/api", &jimmhttp.WSHandler{
 		Upgrader: websocketUpgrader,
-		Server:   modelProxyServer{jimm: jimm},
+		Server: &apiProxier{apiServer: apiServer{
+			jimm: jimm,
+		}},
+	})
+	mux.Handle("/{uuid}/log", &jimmhttp.WSHandler{
+		Upgrader: websocketUpgrader,
+		Server: &streamProxier{apiServer: apiServer{
+			jimm: jimm,
+		}},
 	})
 	return mux
 }

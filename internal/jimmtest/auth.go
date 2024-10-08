@@ -118,7 +118,7 @@ func (m *mockOAuthAuthenticator) DeviceAccessToken(ctx context.Context, res *oau
 // Notice the use of jwt.ParseInsecure to skip JWT signature verification.
 func (m *mockOAuthAuthenticator) VerifySessionToken(token string) (jwt.Token, error) {
 	errorFn := func(err error) error {
-		return jimmerrors.E(err, jimmerrors.CodeUnauthorized)
+		return jimmerrors.E(err, jimmerrors.CodeSessionTokenInvalid)
 	}
 	decodedToken, err := base64.StdEncoding.DecodeString(token)
 	if err != nil {
@@ -178,7 +178,7 @@ func (m *mockOAuthAuthenticator) VerifyClientCredentials(ctx context.Context, cl
 // Tests using a mock authenticator can provide an empty signatureSecret
 // while integration tests must provide the same secret used when verifying JWTs.
 func newSessionToken(c SimpleTester, username string, signatureSecret string) string {
-	email := convertUsernameToEmail(username)
+	email := ConvertUsernameToEmail(username)
 	token, err := jwt.NewBuilder().
 		Subject(email).
 		Expiration(time.Now().Add(1 * time.Hour)).
@@ -206,7 +206,8 @@ func NewUserSessionLogin(c SimpleTester, username string) api.LoginProvider {
 	return api.NewSessionTokenLoginProvider(b64Token, nil, nil)
 }
 
-func convertUsernameToEmail(username string) string {
+// ConvertUsernameToEmail appends an "@canonical.com" domain to a string if it doesn't already contain a domain.
+func ConvertUsernameToEmail(username string) string {
 	if !strings.Contains(username, "@") {
 		return username + "@canonical.com"
 	}

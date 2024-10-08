@@ -213,7 +213,7 @@ func TestSessionTokenRejectsExpiredToken(t *testing.T) {
 
 	_, err = authSvc.VerifySessionToken(token)
 	c.Assert(err, qt.ErrorMatches, `JIMM session token expired`)
-	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeUnauthorized)
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeSessionTokenInvalid)
 }
 
 func TestSessionTokenRejectsEmptyToken(t *testing.T) {
@@ -227,7 +227,7 @@ func TestSessionTokenRejectsEmptyToken(t *testing.T) {
 
 	_, err := authSvc.VerifySessionToken("")
 	c.Assert(err, qt.ErrorMatches, `no token presented`)
-	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeUnauthorized)
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeSessionTokenInvalid)
 }
 
 func TestSessionTokenValidatesEmail(t *testing.T) {
@@ -244,7 +244,7 @@ func TestSessionTokenValidatesEmail(t *testing.T) {
 
 	_, err = authSvc.VerifySessionToken(token)
 	c.Assert(err, qt.ErrorMatches, "failed to parse email")
-	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeUnauthorized)
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeSessionTokenInvalid)
 }
 
 func TestVerifyClientCredentials(t *testing.T) {

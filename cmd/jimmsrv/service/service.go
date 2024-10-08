@@ -377,7 +377,8 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		Expiry: p.JWTExpiryDuration,
 	})
 	s.jimm.Dialer = &jujuclient.Dialer{
-		JWTService: s.jimm.JWTService,
+		ControllerCredentialsStore: s.jimm.CredentialStore,
+		JWTService:                 s.jimm.JWTService,
 	}
 
 	if !p.DisableConnectionCache {
@@ -455,7 +456,11 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	// to avoid CSRF attacks. https://portswigger.net/web-security/websockets/cross-site-websocket-hijacking
 	websocketCors := middleware.NewWebsocketCors(p.CorsAllowedOrigins)
 	s.mux.Handle("/api", websocketCors.Handler(jujuapi.APIHandler(ctx, &s.jimm, params)))
-	s.mux.Handle("/model/*", websocketCors.Handler(jujuapi.ModelHandler(ctx, &s.jimm, params)))
+	s.mux.Handle("/model/*", websocketCors.Handler(http.StripPrefix("/model", jujuapi.ModelHandler(ctx, &s.jimm, params))))
+	mountHandler(
+		"/model/{uuid}/{type:charms|applications}",
+		jimmhttp.NewHTTPProxyHandler(&s.jimm),
+	)
 
 	// If the request is not for a known path assume it is part of the dashboard.
 	// If dashboard location env var is not defined, do not handle a dashboard.

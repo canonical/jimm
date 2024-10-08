@@ -11,7 +11,6 @@ import (
 
 	"github.com/canonical/jimm/v3/cmd/jaas/cmd"
 	"github.com/canonical/jimm/v3/internal/cmdtest"
-	"github.com/canonical/jimm/v3/internal/jimmtest"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	jimmnames "github.com/canonical/jimm/v3/pkg/names"
@@ -27,7 +26,7 @@ func (s *addServiceAccountSuite) TestAddServiceAccount(c *gc.C) {
 	clientID := "abda51b2-d735-4794-a8bd-49c506baa4af"
 	clientIDWithDomain := clientID + "@serviceaccount"
 	// alice is superuser
-	bClient := jimmtest.NewUserSessionLogin(c, "alice")
+	bClient := s.SetupCLIAccess(c, "alice")
 	_, err := cmdtesting.RunCommand(c, cmd.NewAddServiceAccountCommandForTesting(s.ClientStore(), bClient), clientID)
 	c.Assert(err, gc.IsNil)
 	tuple := openfga.Tuple{
@@ -43,7 +42,7 @@ func (s *addServiceAccountSuite) TestAddServiceAccount(c *gc.C) {
 	_, err = cmdtesting.RunCommand(c, cmd.NewAddServiceAccountCommandForTesting(s.ClientStore(), bClient), clientID)
 	c.Assert(err, gc.IsNil)
 	// Check that re-running the command for a different user returns an error.
-	bClientBob := jimmtest.NewUserSessionLogin(c, "bob")
+	bClientBob := s.SetupCLIAccess(c, "bob")
 	_, err = cmdtesting.RunCommand(c, cmd.NewAddServiceAccountCommandForTesting(s.ClientStore(), bClientBob), clientID)
 	c.Assert(err, gc.ErrorMatches, "service account already owned")
 }

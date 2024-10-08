@@ -8,7 +8,6 @@ import (
 
 	"github.com/canonical/jimm/v3/cmd/jimmctl/cmd"
 	"github.com/canonical/jimm/v3/internal/cmdtest"
-	"github.com/canonical/jimm/v3/internal/jimmtest"
 )
 
 type revokeAuditLogAccessSuite struct {
@@ -19,14 +18,14 @@ var _ = gc.Suite(&revokeAuditLogAccessSuite{})
 
 func (s *revokeAuditLogAccessSuite) TestRevokeAuditLogAccessSuperuser(c *gc.C) {
 	// alice is superuser
-	bClient := jimmtest.NewUserSessionLogin(c, "alice")
+	bClient := s.SetupCLIAccess(c, "alice")
 	_, err := cmdtesting.RunCommand(c, cmd.NewRevokeAuditLogAccessCommandForTesting(s.ClientStore(), bClient), "bob@canonical.com")
 	c.Assert(err, gc.IsNil)
 }
 
 func (s *revokeAuditLogAccessSuite) TestRevokeAuditLogAccess(c *gc.C) {
 	// bob is not superuser
-	bClient := jimmtest.NewUserSessionLogin(c, "bob")
+	bClient := s.SetupCLIAccess(c, "bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewRevokeAuditLogAccessCommandForTesting(s.ClientStore(), bClient), "bob@canonical.com")
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }

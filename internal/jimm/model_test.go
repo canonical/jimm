@@ -1182,6 +1182,72 @@ func assertConfig(config map[string]interface{}, fnc func(context.Context, *juju
 
 }
 
+const getModelTestEnv = `clouds:
+- name: test-cloud
+  type: test-provider
+  regions:
+  - name: test-cloud-region
+cloud-credentials:
+- owner: alice@canonical.com
+  name: cred-1
+  cloud: test-cloud
+controllers:
+- name: controller-1
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test-cloud
+  region: test-cloud-region
+models:
+- name: model-1
+  type: iaas
+  uuid: 00000002-0000-0000-0000-000000000001
+  controller: controller-1
+  default-series: warty
+  cloud: test-cloud
+  region: test-cloud-region
+  cloud-credential: cred-1
+  owner: alice@canonical.com
+  life: alive
+  status:
+    status: available
+    info: "OK!"
+    since: 2020-02-20T20:02:20Z
+  sla:
+    level: unsupported
+  agent-version: 1.2.3
+`
+
+func TestGetModel(t *testing.T) {
+	ctx := context.Background()
+	c := qt.New(t)
+
+	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), t.Name())
+	c.Assert(err, qt.IsNil)
+
+	j := &jimm.JIMM{
+		UUID:          uuid.NewString(),
+		OpenFGAClient: client,
+		Database: db.Database{
+			DB: jimmtest.PostgresDB(c, nil),
+		},
+	}
+	err = j.Database.Migrate(ctx, false)
+	c.Assert(err, qt.IsNil)
+
+	env := jimmtest.ParseEnvironment(c, getModelTestEnv)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
+
+	// Get model
+	model, err := j.GetModel(ctx, env.Models[0].UUID)
+	c.Assert(err, qt.IsNil)
+	c.Assert(model.UUID.String, qt.Equals, env.Models[0].UUID)
+	c.Assert(model.Name, qt.Equals, env.Models[0].Name)
+	c.Assert(model.ControllerID, qt.Equals, env.Models[0].DBObject(c, j.Database).ControllerID)
+
+	// Get model that doesn't exist
+	_, err = j.GetModel(ctx, "fake-uuid")
+	c.Assert(err, qt.ErrorMatches, "failed to get model: model not found")
+}
+
 // Note that this env does not give the everyone user access to the model.
 const modelInfoTestEnv = `clouds:
 - name: test-cloud

@@ -314,12 +314,14 @@ func (p *modelProxy) auditLogMessage(msg *message, isResponse bool) error {
 }
 
 func unexpectedReadError(err error) bool {
-	closeError := websocket.IsUnexpectedCloseError(err,
+	if websocket.IsUnexpectedCloseError(err,
 		websocket.CloseNormalClosure,
 		websocket.CloseNoStatusReceived,
-		websocket.CloseAbnormalClosure)
+		websocket.CloseAbnormalClosure) {
+		return true
+	}
 	_, unmarshalError := err.(*json.InvalidUnmarshalError)
-	return closeError || unmarshalError
+	return unmarshalError
 }
 
 // clientProxy proxies messages from client->controller.

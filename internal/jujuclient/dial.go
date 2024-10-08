@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
+	jujuhttp "github.com/juju/http/v2"
 	"github.com/juju/juju/api/base"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
@@ -39,10 +40,18 @@ const (
 	jujuClientVersion = "3.2.4"
 )
 
+// A ControllerCredentialsStore is a store for controller credentials.
+type ControllerCredentialsStore interface {
+	// GetControllerCredentials retrieves the credentials for the given controller from a vault
+	// service.
+	GetControllerCredentials(ctx context.Context, controllerName string) (string, string, error)
+}
+
 // A Dialer is an implementation of a jimm.Dialer that adapts a juju API
 // connection to provide a jimm API.
 type Dialer struct {
-	JWTService *jimmjwx.JWTService
+	ControllerCredentialsStore ControllerCredentialsStore
+	JWTService                 *jimmjwx.JWTService
 }
 
 func (d *Dialer) createLoginRequest(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, p map[string]string) (*jujuparams.LoginRequest, error) {
@@ -77,7 +86,7 @@ func (d *Dialer) createLoginRequest(ctx context.Context, ctl *dbmodel.Controller
 func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, requiredPermissions map[string]string) (jimm.API, error) {
 	const op = errors.Op("jujuclient.Dial")
 
-	conn, err := rpc.Dial(ctx, ctl, modelTag, "")
+	conn, err := rpc.Dial(ctx, ctl, modelTag, "", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -331,7 +340,23 @@ func (c *Connection) Context() context.Context {
 // The given parameters are used as URL query values
 // when making the initial HTTP request.
 func (c *Connection) ConnectStream(path string, attrs url.Values) (base.Stream, error) {
-	return nil, errors.E(errors.CodeNotImplemented)
+	const op = errors.Op("jujuclient.ConnectStream")
+	modelTag, ok := c.ModelTag()
+	if !ok {
+		return nil, errors.E(op, "no model found")
+	}
+
+	user, pass, err := c.dialer.ControllerCredentialsStore.GetControllerCredentials(c.ctx, c.ctl.Name)
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+	requestHeader := jujuhttp.BasicAuthHeader(names.NewUserTag(user).String(), pass)
+
+	conn, err := rpc.Dial(c.ctx, c.ctl, modelTag, path, requestHeader)
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+	return conn, nil
 }
 
 // ConnectControllerStream connects to the given HTTP websocket

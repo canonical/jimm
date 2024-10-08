@@ -8,6 +8,7 @@ import (
 	"context"
 	"database/sql"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -148,6 +149,8 @@ type OAuthAuthenticator interface {
 	//
 	// The subject of the token contains the user's email and can be used
 	// for user object creation.
+	// If verification fails, return error with code CodeInvalidSessionToken
+	// to indicate to the client to retry login.
 	VerifySessionToken(token string) (jwt.Token, error)
 
 	// UpdateIdentity updates the database with the display name and access token set for the user.
@@ -250,6 +253,9 @@ type API interface {
 
 	// DestroyModel destroys a model.
 	DestroyModel(context.Context, names.ModelTag, *bool, *bool, *time.Duration, *time.Duration) error
+
+	// ConnectStream creates a new connection to a streaming endpoint.
+	ConnectStream(string, url.Values) (base.Stream, error)
 
 	// DumpModel collects a database-agnostic dump of a model.
 	DumpModel(context.Context, names.ModelTag, bool) (string, error)
