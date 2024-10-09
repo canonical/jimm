@@ -73,27 +73,6 @@ if [ "$_help" == "true" ]; then
     exit 0
 fi
 
-## Check if the server is running
-if ! curl -s "$_host/health"; then
-    function onexit {
-        curl "$_host/shutdown"
-        wait $_PID1
-        echo "Server shut down"
-    }
-    trap onexit EXIT
-
-    ## Run server in background
-    go build -o server ./cmd
-    bash -c 'sleep 1 && ./server' &
-    _PID1=$!
-
-    echo waiting for the server to be ready
-    while ! curl -s "$_host/ready"
-    do
-        sleep 0.1
-    done
-fi
-
 _opts='-w "\n"'
 if [ "$_bail_on_error" == "true" ]; then
     _opts="--fail-with-body $_opts"
