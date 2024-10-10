@@ -46,15 +46,12 @@ jobs:
       run: |
         # Remove all in case some files are removed
         shopt -s nullglob
-        rm -rf .[!.git]* *
-        cp -r $PROJECT/pkg/.[^.]* $PROJECT/pkg/* $PROJECT/go.mod .
+        rm -rf .[!.git]* !(go.mod|go.sum)
+        cp -r $PROJECT/pkg/.[^.]* $PROJECT/pkg/* .
 
         # Replace module references
         find . -type f -exec sed -i "s|github.com/canonical/jimm/v3/pkg|github.com/$SDK_REPO/$SDK_VERSION|" {} +
         sed -i "s|module .*|module github.com/$SDK_REPO/$SDK_VERSION|" go.mod
-
-        # Needed to remove unused dependencies
-        go mod tidy 
 
     - name: Create Pull Request
       uses: peter-evans/create-pull-request@v6
