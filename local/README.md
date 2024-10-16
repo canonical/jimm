@@ -47,7 +47,7 @@ We have two all-in-one scripts, namely:
 These scripts respectively spin up jimm in compose, setup controllers in the targeted environment
 and handle connectivity. Finally, adding a test model to Q/A against.
 
-Please ensure you've run "make dev-env-setup" first though!
+Please ensure you've run "make dev-env-setup" first though and to run them from the project root.
 
 ## Manual
 ### Controller set up
