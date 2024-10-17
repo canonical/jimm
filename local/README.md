@@ -5,6 +5,7 @@ with the local Q/A environment. This environment is additionally
 used for integration testing within the JIMM test suite.
 
 # Starting the environment
+
 1. Ensure you have `make` installed `sudo apt install make`
 2. Check for system dependencies with `make sys-deps` this will inform you of any missing dependencies and how to install them.
 3. Set up necessary prerequisites with `make dev-env-setup`
@@ -20,7 +21,7 @@ The service is started using Docker Compose, the following services should be st
 
 Some notes on the setup:
 - Local images are created in the repo's `/local/<service>` folder where any init scripts are defined for each service using the service's upstream docker image.
-- The docker compose has a base at `compose-common.yaml` for common elements to reduce duplication.
+- The docker compose has a base at `docker-compose.common.yaml` for common elements to reduce duplication.
 - The compose has 2 additional profiles (dev and test). 
   - Starting the compose with no profile will spin up the necessary components for testing.
   - The dev profile will start JIMM in a container using [air](https://github.com/air-verse/air), a tool for auto-reloading Go code when the source changes.
@@ -41,6 +42,7 @@ Some notes on the setup:
 3. Install JQ: `sudo snap install jq`.
 
 ## All-In-One commands
+
 We have two all-in-one commands, namely:
 - LXD: run `make qa-lxd`
 - K8s: run `make qa-microk8s`
@@ -51,6 +53,7 @@ and handle connectivity. Finally, adding a test model to Q/A against.
 Please ensure you've run "make dev-env-setup" first though.
 
 ## Manual
+
 ### Controller set up
 
 Note that you can export an environment variable `CONTROLLER_NAME` and re-run steps 3. and 4. below to create multiple Juju
@@ -64,6 +67,7 @@ controllers that will be controlled by JIMM.
 5. `juju add-model test`                          - Adds a model to qa-lxd via JIMM.
 
 # Helpful tidbits!
+
 > Note: For any secure step to work, ensure you've run the local traefik certs script!
 
 - To access vault UI, the URL is: `http://localhost:8200/ui` and the root key is `token`.
