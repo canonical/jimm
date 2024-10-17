@@ -23,7 +23,7 @@ services:
   # An instance of JIMM used in integration tests, pulled from a tag.
   jimm-test:
     extends:
-      file: compose-common.yaml
+      file: docker-compose.common.yaml
       service: jimm-base
     image: ghcr.io/canonical/jimm:${JIMM_VERSION:-latest}
     profiles: ["test"]
@@ -40,7 +40,7 @@ services:
   # An instance of JIMM used for dev, built from source with hot-reloading.
   jimm-dev:
     extends:
-      file: compose-common.yaml
+      file: docker-compose.common.yaml
       service: jimm-base
     image: cosmtrek/air:latest
     profiles: ["dev"]
