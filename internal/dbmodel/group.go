@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/juju/names/v5"
-	"gorm.io/gorm"
 
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 	jimmnames "github.com/canonical/jimm/v3/pkg/names"
@@ -14,7 +13,10 @@ import (
 
 // A GroupEntry holds information about a user group.
 type GroupEntry struct {
-	gorm.Model
+	// Note this doesn't use the standard gorm.Model to avoid soft-deletes.
+	ID        uint `gorm:"primarykey"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
 
 	// Name holds the name of the group.
 	Name string `gorm:"index;column:name"`
