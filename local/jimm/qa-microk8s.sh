@@ -22,7 +22,7 @@ cleanup() {
     fi
 
     echo "Tearing down compose..."
-    compose_teardown_output=$(docker compose --project-directory ../../ --file ../../docker-compose.yaml --profile dev down -v 2>&1) || true
+    compose_teardown_output=$(docker compose --profile dev down -v 2>&1) || true
     if [ $? -ne 0 ]; then
         echo "$compose_teardown_output"
     fi
@@ -30,12 +30,12 @@ cleanup() {
 
 cleanup
 
-docker compose --project-directory ../../ --file ../../docker-compose.yaml --profile dev up -d
+docker compose --profile dev up -d
 
 juju login jimm.localhost -c jimm-dev
 
-./setup-microk8s-controller.sh
-./add-microk8s-controller.sh
+./local/jimm/setup-microk8s-controller.sh
+./local/jimm/add-microk8s-controller.sh
 
 # Add a test model
 juju add-model test microk8s
