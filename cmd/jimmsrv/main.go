@@ -144,6 +144,8 @@ func start(ctx context.Context, s *service.Service) error {
 
 	corsAllowedOrigins := strings.Split(os.Getenv("CORS_ALLOWED_ORIGINS"), " ")
 
+	logSQL, _ := strconv.ParseBool(os.Getenv("JIMM_LOG_SQL"))
+
 	jimmsvc, err := jimmsvc.NewService(ctx, jimmsvc.Params{
 		ControllerUUID:    os.Getenv("JIMM_UUID"),
 		DSN:               os.Getenv("JIMM_DSN"),
@@ -181,6 +183,7 @@ func start(ctx context.Context, s *service.Service) error {
 		DashboardFinalRedirectURL: os.Getenv("JIMM_DASHBOARD_FINAL_REDIRECT_URL"),
 		CookieSessionKey:          []byte(sessionSecretKey),
 		CorsAllowedOrigins:        corsAllowedOrigins,
+		LogSQL:                    logSQL,
 	})
 	if err != nil {
 		return err

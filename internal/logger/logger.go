@@ -16,7 +16,9 @@ import (
 
 // GormLogger is an implementation of gorm's logger.Interface that logs
 // using zapctx.
-type GormLogger struct{}
+type GormLogger struct {
+	LogSQL bool
+}
 
 // LogMode implements the LogMode function of logger.Interface. This always
 // returns an identical implementation, the log level is handled by zap.
@@ -40,7 +42,11 @@ func (GormLogger) Info(ctx context.Context, f string, args ...interface{}) {
 }
 
 // Trace implements logger.Interface, it logs at DEBUG level.
-func (GormLogger) Trace(ctx context.Context, begin time.Time, fc func() (string, int64), err error) {
+func (g GormLogger) Trace(ctx context.Context, begin time.Time, fc func() (string, int64), err error) {
+	// Avoid logging SQL to prevent leaking secrets
+	if !g.LogSQL {
+		return
+	}
 	ce := zapctx.Logger(ctx).Check(zapcore.DebugLevel, "TRACE")
 	if ce == nil {
 		return

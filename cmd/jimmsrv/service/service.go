@@ -190,6 +190,10 @@ type Params struct {
 	// CorsAllowedOrigins represents all addresses that are valid for cross-origin
 	// requests. A wildcard '*' is accepted to allow all cross-origin requests.
 	CorsAllowedOrigins []string
+
+	// LogSQL determines whether ORM queries are printed when debug logs are enabled.
+	// This may leak secrets in logs when sensitive values are stored in the DB like OAuth tokens.
+	LogSQL bool
 }
 
 // A Service is the implementation of a JIMM server.
@@ -296,7 +300,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	}
 
 	var err error
-	s.jimm.Database.DB, err = openDB(ctx, p.DSN)
+	s.jimm.Database.DB, err = openDB(ctx, p.DSN, p.LogSQL)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
@@ -515,7 +519,7 @@ func (s *Service) setupSessionStore(ctx context.Context, sessionSecret []byte) (
 	return store, nil
 }
 
-func openDB(ctx context.Context, dsn string) (*gorm.DB, error) {
+func openDB(ctx context.Context, dsn string, logSQL bool) (*gorm.DB, error) {
 	zapctx.Info(ctx, "connecting database")
 
 	var dialect gorm.Dialector
@@ -528,7 +532,7 @@ func openDB(ctx context.Context, dsn string) (*gorm.DB, error) {
 		return nil, errors.E(errors.CodeServerConfiguration, "unsupported DSN")
 	}
 	return gorm.Open(dialect, &gorm.Config{
-		Logger: logger.GormLogger{},
+		Logger: logger.GormLogger{LogSQL: logSQL},
 		NowFunc: func() time.Time {
 			// This is to set the timestamp precision at the service level.
 			return time.Now().Truncate(time.Microsecond)
