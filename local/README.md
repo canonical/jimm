@@ -40,14 +40,15 @@ Some notes on the setup:
 2. Install Juju: `sudo snap install juju --channel=3.5/stable` (minimum required Juju version is `3.5`).
 3. Install JQ: `sudo snap install jq`.
 
-## All-In-One scripts
-We have two all-in-one scripts, namely:
-- qa-lxd.sh
-- qa-microk8s.sh
+## All-In-One commands
+We have two all-in-one commands, namely:
+- LXD: run `make qa-lxd`
+- K8s: run `make qa-microk8s`
+
 These scripts respectively spin up jimm in compose, setup controllers in the targeted environment
 and handle connectivity. Finally, adding a test model to Q/A against.
 
-Please ensure you've run "make dev-env-setup" first though!
+Please ensure you've run "make dev-env-setup" first though.
 
 ## Manual
 ### Controller set up

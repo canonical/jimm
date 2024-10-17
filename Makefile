@@ -50,6 +50,12 @@ dev-env: dev-env-setup
 dev-env-cleanup:
 	@docker compose --profile dev down -v --remove-orphans
 
+qa-microk8s:
+	@./local/jimm/qa-microk8s.sh
+
+qa-lxd:
+	@./local/jimm/qa-lxd.sh
+
 integration-test-env: dev-env-setup
 	@JIMM_VERSION=$(JIMM_VERSION) docker compose --profile test up -d --force-recreate --wait
 

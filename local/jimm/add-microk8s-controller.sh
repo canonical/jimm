@@ -24,7 +24,7 @@ microk8s.kubectl patch -n controller-qa-microk8s svc/controller-service --type='
 
 # 172.17.0.1 is dockers host interface, enabling access the host machines host network
 # despite being in a strictly confined docker compose network.
-docker compose exec jimm bash -c "echo '172.17.0.1 juju-apiserver' >> /etc/hosts"
+docker compose exec jimm-dev bash -c "echo '172.17.0.1 juju-apiserver' >> /etc/hosts"
 
 ./jimmctl controller-info --local qa-microk8s ./qa-microk8s-controller.yaml
 
