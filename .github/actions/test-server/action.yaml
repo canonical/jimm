@@ -15,6 +15,10 @@ inputs:
       PAT Token that has package:read access to canonical/JIMM
       The PAT token can be left empty when building the development version of JIMM.
     required: true
+  python-version:
+    description: Python version to install in the setup-python action.
+    default: "3.12"
+    required: false
 
 outputs:
   url:
@@ -84,6 +88,12 @@ runs:
       env:
         SKIP_BOOTSTRAP: true
         CLOUDINIT_FILE: "cloudinit.temp.yaml"
+
+    # See: https://github.com/charmed-kubernetes/actions-operator/issues/82
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
 
     - name: Setup Juju Controller
       uses: charmed-kubernetes/actions-operator@main
