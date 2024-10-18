@@ -59,6 +59,7 @@ services:
       - 2345:2345
     volumes:
       - ./:/jimm/
+      - go-modules:/go/pkg/mod
 
   db:
     image: postgres
@@ -133,3 +134,6 @@ services:
       interval: 5s
       timeout: 10s
       retries: 30
+
+volumes:
+  go-modules:
