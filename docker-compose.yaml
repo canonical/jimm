@@ -42,18 +42,14 @@ services:
     extends:
       file: docker-compose.common.yaml
       service: jimm-base
-    image: cosmtrek/air:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
     profiles: ["dev"]
     # working_dir value has to be the same of mapped volume
     hostname: jimm.localhost
     working_dir: /jimm
     container_name: jimm
-    entrypoint:
-      - bash
-      - -c
-      - >-
-        go install github.com/go-delve/delve/cmd/dlv@latest
-        && air
     ports:
       - 17070:80
       - 2345:2345
