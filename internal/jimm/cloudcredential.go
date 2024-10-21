@@ -14,9 +14,9 @@ import (
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
-	"github.com/canonical/jimm/v3/internal/cloudcred"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jimm/cloudcred"
 	"github.com/canonical/jimm/v3/internal/openfga"
 )
 
