@@ -17,10 +17,10 @@ import (
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm"
 	jimmcreds "github.com/canonical/jimm/v3/internal/jimm/credentials"
-	"github.com/canonical/jimm/v3/internal/jimmtest/mocks"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/pubsub"
+	"github.com/canonical/jimm/v3/internal/testutils/jimmtest/mocks"
 	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
 
