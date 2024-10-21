@@ -55,8 +55,8 @@ services:
       - 2345:2345
     volumes:
       - ./:/jimm/
-      - go-modules:/go/pkg/mod
-      - go-cache:/root/.cache/go-build
+      - go-modules:/go/pkg/mod # cache modules to improve startup
+      - go-cache:/root/.cache/go-build # cache build's artifacts to startup
 
   db:
     image: postgres
