@@ -1,5 +1,5 @@
 // Copyright 2024 Canonical.
-package wellknownapi_test
+package jimmhttp_test
 
 import (
 	"context"
@@ -15,9 +15,9 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwk"
 
 	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jimmhttp"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 	"github.com/canonical/jimm/v3/internal/vault"
-	"github.com/canonical/jimm/v3/internal/wellknownapi"
 )
 
 func newStore(t testing.TB) *vault.VaultStore {
@@ -52,8 +52,8 @@ func getJWKS(c *qt.C) jwk.Set {
 	return set
 }
 
-func setupHandlerAndRecorder(c *qt.C, path string, store *vault.VaultStore) *httptest.ResponseRecorder {
-	handler := wellknownapi.NewWellKnownHandler(store).Routes()
+func setupWellknownHandlerAndRecorder(c *qt.C, path string, store *vault.VaultStore) *httptest.ResponseRecorder {
+	handler := jimmhttp.NewWellKnownHandler(store).Routes()
 	rr := httptest.NewRecorder()
 	req, err := http.NewRequest("GET", path, nil)
 	c.Assert(err, qt.IsNil)
@@ -70,7 +70,7 @@ func TestWellknownAPIJWKSJSONHandles404(t *testing.T) {
 	err := store.CleanupJWKS(ctx)
 	c.Assert(err, qt.IsNil)
 
-	rr := setupHandlerAndRecorder(c, "/jwks.json", store)
+	rr := setupWellknownHandlerAndRecorder(c, "/jwks.json", store)
 
 	resp := rr.Result()
 	defer resp.Body.Close()
@@ -99,7 +99,7 @@ func TestWellknownAPIJWKSJSONHandles500(t *testing.T) {
 	err = store.PutJWKS(ctx, jwks)
 	c.Assert(err, qt.IsNil)
 
-	rr := setupHandlerAndRecorder(c, "/jwks.json", store)
+	rr := setupWellknownHandlerAndRecorder(c, "/jwks.json", store)
 
 	resp := rr.Result()
 	defer resp.Body.Close()
@@ -135,7 +135,7 @@ func TestWellknownAPIJWKSJSONHandles200(t *testing.T) {
 	err = store.PutJWKSExpiry(ctx, expiry)
 	c.Assert(err, qt.IsNil)
 
-	rr := setupHandlerAndRecorder(c, "/jwks.json", store)
+	rr := setupWellknownHandlerAndRecorder(c, "/jwks.json", store)
 
 	resp := rr.Result()
 	defer resp.Body.Close()

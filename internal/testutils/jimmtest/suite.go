@@ -29,7 +29,6 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/pubsub"
-	"github.com/canonical/jimm/v3/internal/wellknownapi"
 	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
 
@@ -120,7 +119,7 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 
 	mountHandler(
 		"/.well-known",
-		wellknownapi.NewWellKnownHandler(s.JIMM.CredentialStore),
+		jimmhttp.NewWellKnownHandler(s.JIMM.CredentialStore),
 	)
 	macaroonDischarger := s.setupMacaroonDischarger(c)
 	localDischargePath := "/macaroons"
