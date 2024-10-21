@@ -26,7 +26,6 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/canonical/jimm/v3/internal/auth"
-	"github.com/canonical/jimm/v3/internal/dashboard"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/debugapi"
 	"github.com/canonical/jimm/v3/internal/discharger"
@@ -138,13 +137,6 @@ type Params struct {
 	// VaultPath is the path on the vault server which hosts the kv
 	// secrets engine JIMM will use to store secrets.
 	VaultPath string
-
-	// DashboardLocation contains the location where the JAAS dashboard
-	// can be found. If this location parses as an absolute URL then
-	// requests to /dashboard will redirect to that URL. If this is a
-	// filesystem path then the dashboard files will be served from
-	// that path.
-	DashboardLocation string
 
 	// PublicDNSName is the name to advertise as the public address of
 	// the juju controller.
@@ -465,12 +457,6 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		"/model/{uuid}/{type:charms|applications}",
 		jimmhttp.NewHTTPProxyHandler(&s.jimm),
 	)
-
-	// If the request is not for a known path assume it is part of the dashboard.
-	// If dashboard location env var is not defined, do not handle a dashboard.
-	if p.DashboardLocation != "" {
-		s.mux.Handle("/", dashboard.Handler(ctx, p.DashboardLocation, p.PublicDNSName))
-	}
 
 	return s, nil
 }
