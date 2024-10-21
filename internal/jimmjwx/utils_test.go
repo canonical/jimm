@@ -14,7 +14,7 @@ import (
 	jimmsvc "github.com/canonical/jimm/v3/cmd/jimmsrv/service"
 	"github.com/canonical/jimm/v3/internal/jimm/credentials"
 	"github.com/canonical/jimm/v3/internal/jimmjwx"
-	"github.com/canonical/jimm/v3/internal/jimmtest"
+	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 	"github.com/canonical/jimm/v3/internal/vault"
 )
 

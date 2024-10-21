@@ -13,8 +13,8 @@ import (
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/jimm"
-	"github.com/canonical/jimm/v3/internal/jimmtest"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
+	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
 
 func TestGetUser(t *testing.T) {

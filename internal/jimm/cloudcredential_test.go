@@ -22,9 +22,9 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm"
-	"github.com/canonical/jimm/v3/internal/jimmtest"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
+	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
 
 func TestUpdateCloudCredential(t *testing.T) {
