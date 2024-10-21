@@ -42,7 +42,6 @@ import (
 	"github.com/canonical/jimm/v3/internal/pubsub"
 	"github.com/canonical/jimm/v3/internal/rebac_admin"
 	"github.com/canonical/jimm/v3/internal/vault"
-	"github.com/canonical/jimm/v3/internal/wellknownapi"
 )
 
 const (
@@ -416,7 +415,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	)
 	mountHandler(
 		"/.well-known",
-		wellknownapi.NewWellKnownHandler(s.jimm.CredentialStore),
+		jimmhttp.NewWellKnownHandler(s.jimm.CredentialStore),
 	)
 
 	if p.DashboardFinalRedirectURL == "" {

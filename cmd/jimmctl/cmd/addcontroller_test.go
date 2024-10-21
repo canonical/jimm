@@ -12,7 +12,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/canonical/jimm/v3/cmd/jimmctl/cmd"
-	"github.com/canonical/jimm/v3/internal/cmdtest"
+	"github.com/canonical/jimm/v3/internal/testutils/cmdtest"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )

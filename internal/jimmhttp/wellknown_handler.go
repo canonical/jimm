@@ -1,5 +1,5 @@
 // Copyright 2024 Canonical.
-package wellknownapi
+package jimmhttp
 
 import (
 	"fmt"
