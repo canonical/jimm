@@ -10,7 +10,7 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/v3/internal/common/utils"
-	"github.com/canonical/jimm/v3/internal/rebac_admin"
+	"github.com/canonical/jimm/v3/internal/jimmhttp/rebac_admin"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
 

@@ -11,8 +11,8 @@ import (
 	"github.com/canonical/jimm/v3/internal/common/pagination"
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jimmhttp/rebac_admin/utils"
 	"github.com/canonical/jimm/v3/internal/jujuapi"
-	"github.com/canonical/jimm/v3/internal/rebac_admin/utils"
 )
 
 type resourcesService struct {
