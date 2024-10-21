@@ -16,7 +16,7 @@ import (
 	"github.com/juju/utils/v2"
 	gc "gopkg.in/check.v1"
 
-	"github.com/canonical/jimm/v3/internal/jimmtest"
+	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
 
 type modelmanagerSuite struct {

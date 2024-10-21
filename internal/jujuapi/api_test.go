@@ -12,8 +12,8 @@ import (
 	"github.com/gorilla/websocket"
 	gc "gopkg.in/check.v1"
 
-	"github.com/canonical/jimm/v3/internal/jimmtest"
 	"github.com/canonical/jimm/v3/internal/jujuapi"
+	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
 
 type apiSuite struct {
