@@ -56,6 +56,7 @@ services:
     volumes:
       - ./:/jimm/
       - go-modules:/go/pkg/mod
+      - go-cache:/root/.cache/go-build
 
   db:
     image: postgres
@@ -133,3 +134,4 @@ services:
 
 volumes:
   go-modules:
+  go-cache:
