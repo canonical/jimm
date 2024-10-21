@@ -7,7 +7,7 @@ import (
 
 	qt "github.com/frankban/quicktest"
 
-	"github.com/canonical/jimm/v3/internal/cloudcred"
+	"github.com/canonical/jimm/v3/internal/jimm/cloudcred"
 )
 
 func TestIsVisibleAttribute(t *testing.T) {
