@@ -19,7 +19,7 @@ import (
 	"github.com/canonical/jimm/v3/version"
 )
 
-func setupHandlerAndRecorder(c *qt.C, startTime jimmhttp.StatusCheck, path string) *httptest.ResponseRecorder {
+func setupDebugHandlerAndRecorder(c *qt.C, startTime jimmhttp.StatusCheck, path string) *httptest.ResponseRecorder {
 	r := (&jimmhttp.DebugHandler{
 		Router: chi.NewRouter(),
 		StatusChecks: map[string]jimmhttp.StatusCheck{
@@ -37,7 +37,7 @@ func setupHandlerAndRecorder(c *qt.C, startTime jimmhttp.StatusCheck, path strin
 func TestDebugInfo(t *testing.T) {
 	c := qt.New(t)
 
-	rr := setupHandlerAndRecorder(c, jimmhttp.ServerStartTime, "/info")
+	rr := setupDebugHandlerAndRecorder(c, jimmhttp.ServerStartTime, "/info")
 
 	resp := rr.Result()
 	defer resp.Body.Close()
@@ -53,7 +53,7 @@ func TestDebugStatus(t *testing.T) {
 	startTime, err := jimmhttp.ServerStartTime.Check(ctx)
 	c.Assert(err, qt.IsNil)
 
-	rr := setupHandlerAndRecorder(c, jimmhttp.ServerStartTime, "/status")
+	rr := setupDebugHandlerAndRecorder(c, jimmhttp.ServerStartTime, "/status")
 
 	resp := rr.Result()
 	defer resp.Body.Close()
@@ -74,7 +74,7 @@ func TestDebugStatus(t *testing.T) {
 func TestDebugStatusStatusError(t *testing.T) {
 	c := qt.New(t)
 
-	rr := setupHandlerAndRecorder(c, jimmhttp.MakeStatusCheck("Test", func(context.Context) (interface{}, error) {
+	rr := setupDebugHandlerAndRecorder(c, jimmhttp.MakeStatusCheck("Test", func(context.Context) (interface{}, error) {
 		return nil, errors.E("test error")
 	}), "/status")
 
