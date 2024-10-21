@@ -44,7 +44,7 @@ services:
       service: jimm-base
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: ./local/Dockerfile
     profiles: ["dev"]
     # working_dir value has to be the same of mapped volume
     hostname: jimm.localhost
