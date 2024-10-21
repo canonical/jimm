@@ -27,7 +27,6 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/auth"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
-	"github.com/canonical/jimm/v3/internal/debugapi"
 	"github.com/canonical/jimm/v3/internal/discharger"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm"
@@ -409,9 +408,9 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 
 	mountHandler(
 		"/debug",
-		debugapi.NewDebugHandler(
-			map[string]debugapi.StatusCheck{
-				"start_time": debugapi.ServerStartTime,
+		jimmhttp.NewDebugHandler(
+			map[string]jimmhttp.StatusCheck{
+				"start_time": jimmhttp.ServerStartTime,
 			},
 		),
 	)
