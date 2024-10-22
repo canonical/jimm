@@ -15,6 +15,7 @@ import (
 	"github.com/antonlindstrom/pgstore"
 	cofga "github.com/canonical/ofga"
 	"github.com/go-chi/chi/v5"
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
 	vaultapi "github.com/hashicorp/vault/api"
 	"github.com/juju/names/v5"
@@ -184,6 +185,10 @@ type Params struct {
 	// LogSQL determines whether ORM queries are printed when debug logs are enabled.
 	// This may leak secrets in logs when sensitive values are stored in the DB like OAuth tokens.
 	LogSQL bool
+
+	// LogLevel is the default logger is set.
+	// Setting this to "debug" enables the requests logger as well.
+	LogLevel string
 }
 
 // A Service is the implementation of a JIMM server.
@@ -273,6 +278,12 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	s := new(Service)
 	s.mux = chi.NewRouter()
 
+	// chi middlewares
+	if p.LogLevel == "debug" {
+		s.mux.Use(chimiddleware.RequestLogger(&logger.HTTPLogFormatter{}))
+	}
+	s.mux.Use(chimiddleware.Recoverer)
+
 	// Setup all dependency services
 
 	if p.ControllerUUID == "" {
@@ -319,7 +330,6 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	if err := ensureControllerAdministrators(ctx, openFGAclient, p.ControllerUUID, p.ControllerAdmins); err != nil {
 		return nil, errors.E(op, err, "failed to ensure controller admins")
 	}
-
 	if err := s.setupCredentialStore(ctx, p); err != nil {
 		return nil, errors.E(op, err)
 	}
