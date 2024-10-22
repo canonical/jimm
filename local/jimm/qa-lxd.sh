@@ -23,7 +23,7 @@ cleanup() {
     fi
 
     echo "Tearing down compose..."
-    compose_teardown_output=$(docker compose --profile dev down -v 2>&1) || true
+    compose_teardown_output=$(docker compose --profile dev down 2>&1) || true
     if [ $? -ne 0 ]; then
         echo "$compose_teardown_output"
     fi
