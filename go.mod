@@ -2,6 +2,26 @@ module github.com/canonical/jimm/v3
 
 go 1.23
 
+// Juju based dependencies
+require (
+	github.com/juju/charm/v12 v12.1.1
+	github.com/juju/cmd/v3 v3.0.16
+	github.com/juju/errors v1.0.0
+	github.com/juju/gnuflag v1.0.0
+	github.com/juju/http/v2 v2.0.1
+	github.com/juju/juju v0.0.0-20240912164120-31b4b0914740 // v3.5.4 (https://github.com/juju/juju/releases/tag/v3.5.4)
+	github.com/juju/loggo v1.0.0
+	github.com/juju/names/v4 v4.0.0
+	github.com/juju/names/v5 v5.0.0
+	github.com/juju/rpcreflect v1.2.0
+	github.com/juju/testing v1.1.0
+	github.com/juju/utils/v2 v2.0.0-20210305225158-eedbe7b6b3e2
+	github.com/juju/version v0.0.0-20210303051006-2015802527a8
+	github.com/juju/version/v2 v2.0.1
+	github.com/juju/zaputil v0.0.0-20190326175239-ef53049637ac
+)
+
+// Other dependencies
 require (
 	github.com/antonlindstrom/pgstore v0.0.0-20220421113606-e3a6e3fed12a
 	github.com/canonical/go-service v1.0.0
@@ -24,21 +44,6 @@ require (
 	github.com/itchyny/gojq v0.12.12
 	github.com/jackc/pgconn v1.14.3
 	github.com/jackc/pgx/v4 v4.18.3
-	github.com/juju/charm/v12 v12.1.1
-	github.com/juju/cmd/v3 v3.0.16
-	github.com/juju/errors v1.0.0
-	github.com/juju/gnuflag v1.0.0
-	github.com/juju/http/v2 v2.0.1
-	github.com/juju/juju v0.0.0-20240912164120-31b4b0914740 // v3.5.4 (https://github.com/juju/juju/releases/tag/v3.5.4)
-	github.com/juju/loggo v1.0.0
-	github.com/juju/names/v4 v4.0.0
-	github.com/juju/names/v5 v5.0.0
-	github.com/juju/rpcreflect v1.2.0
-	github.com/juju/testing v1.1.0
-	github.com/juju/utils/v2 v2.0.0-20210305225158-eedbe7b6b3e2
-	github.com/juju/version v0.0.0-20210303051006-2015802527a8
-	github.com/juju/version/v2 v2.0.1
-	github.com/juju/zaputil v0.0.0-20190326175239-ef53049637ac
 	github.com/lestrrat-go/iter v1.0.2
 	github.com/lestrrat-go/jwx/v2 v2.0.21
 	github.com/oklog/ulid/v2 v2.1.0
@@ -61,6 +66,7 @@ require (
 	sigs.k8s.io/yaml v1.3.0
 )
 
+// Indirect
 require (
 	cloud.google.com/go/compute/metadata v0.3.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.12.0 // indirect
