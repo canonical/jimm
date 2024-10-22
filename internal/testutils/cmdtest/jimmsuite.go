@@ -30,6 +30,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
+	"github.com/canonical/jimm/v3/internal/testutils/loggingsuite"
 )
 
 type JimmCmdSuite struct {
@@ -49,6 +50,8 @@ type JimmCmdSuite struct {
 	COFGAParams *cofga.OpenFGAParams
 
 	databaseName string
+
+	loggingsuite.LoggingSuite
 }
 
 func (s *JimmCmdSuite) SetUpTest(c *gc.C) {

@@ -21,37 +21,48 @@ func TestLogSetup(t *testing.T) {
 	}()
 
 	tests := []struct {
-		logLevel string
-		logLocal bool
+		description string
+		logLevel    string
+		devMode     bool
 	}{
 		{
-			logLevel: "info",
-			logLocal: true,
+
+			description: "info and dev model",
+			logLevel:    "info",
+			devMode:     true,
 		},
 		{
-			logLevel: "info",
-			logLocal: false,
+			description: "info and prod model",
+			logLevel:    "info",
+			devMode:     false,
 		},
 		{
-			logLevel: "",
-			logLocal: false,
+			description: "default log mode",
+			logLevel:    "",
+			devMode:     false,
 		},
 		{
-			logLevel: "error",
-			logLocal: false,
+			description: "error and dev model",
+			logLevel:    "error",
+			devMode:     true,
 		},
 		{
-			logLevel: "error",
-			logLocal: true,
+			description: "error and prod model",
+			logLevel:    "error",
+			devMode:     false,
 		},
 		{
-			logLevel: "not_exisiting_level",
-			logLocal: true,
+			description: "not existing level",
+			logLevel:    "not_exisiting_level",
+			devMode:     true,
 		},
 	}
 
-	for _, t := range tests {
-		logger.SetupLogger(ctx, t.logLevel, t.logLocal)
-		zapctx.Info(ctx, "test log")
+	for _, tt := range tests {
+		t.Run(tt.description, func(t *testing.T) {
+			logger.SetupLogger(ctx, tt.logLevel, tt.devMode)
+			zapctx.Info(ctx, "test log")
+		})
+
 	}
 }

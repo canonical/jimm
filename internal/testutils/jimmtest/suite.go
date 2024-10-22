@@ -30,6 +30,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/pubsub"
+	"github.com/canonical/jimm/v3/internal/testutils/loggingsuite"
 	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
 
@@ -287,7 +288,7 @@ func (s *JIMMSuite) EnableDeviceFlow(username string) {
 type JujuSuite struct {
 	JIMMSuite
 	corejujutesting.JujuConnSuite
-	LoggingSuite
+	loggingsuite.LoggingSuite
 }
 
 func (s *JujuSuite) SetUpSuite(c *gc.C) {

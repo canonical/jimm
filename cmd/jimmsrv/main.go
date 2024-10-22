@@ -40,8 +40,8 @@ func main() {
 //nolint:gocognit // Start function to be ignored.
 func start(ctx context.Context, s *service.Service) error {
 	logLevel := os.Getenv("JIMM_LOG_LEVEL")
-	logLocal, _ := strconv.ParseBool(os.Getenv("JIMM_LOG_LOCAL"))
-	logger.SetupLogger(ctx, logLevel, logLocal)
+	logDevMode, _ := strconv.ParseBool(os.Getenv("JIMM_LOG_DEV_MODE"))
+	logger.SetupLogger(ctx, logLevel, logDevMode)
 	zapctx.Info(ctx, "jimm info",
 		zap.String("version", version.VersionInfo.Version),
 		zap.String("commit", version.VersionInfo.GitCommit),
