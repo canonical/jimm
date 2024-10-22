@@ -2,8 +2,6 @@ module github.com/canonical/jimm/v3
 
 go 1.23
 
-toolchain go1.23.2
-
 require (
 	github.com/antonlindstrom/pgstore v0.0.0-20220421113606-e3a6e3fed12a
 	github.com/canonical/go-service v1.0.0
