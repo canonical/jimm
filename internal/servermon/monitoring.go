@@ -131,6 +131,12 @@ var (
 		Name:      "controller",
 		Help:      "The number of controllers managed by JIMM.",
 	})
+	ResponseTimeHistogram = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Namespace: "jimm",
+		Name:      "http",
+		Help:      "request_duration_seconds",
+		Buckets:   []float64{.005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10},
+	}, []string{"route", "method"})
 )
 
 // DurationObserver returns a function that, when run with `defer` will
