@@ -18,6 +18,7 @@ import (
 
 	jimmsvc "github.com/canonical/jimm/v3/cmd/jimmsrv/service"
 	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/logger"
 	"github.com/canonical/jimm/v3/version"
 )
 
@@ -38,15 +39,13 @@ func main() {
 //
 //nolint:gocognit // Start function to be ignored.
 func start(ctx context.Context, s *service.Service) error {
+	logLevel := os.Getenv("JIMM_LOG_LEVEL")
+	logLocal, _ := strconv.ParseBool(os.Getenv("JIMM_LOG_LOCAL"))
+	logger.SetupLogger(ctx, logLevel, logLocal)
 	zapctx.Info(ctx, "jimm info",
 		zap.String("version", version.VersionInfo.Version),
 		zap.String("commit", version.VersionInfo.GitCommit),
 	)
-	if logLevel := os.Getenv("JIMM_LOG_LEVEL"); logLevel != "" {
-		if err := zapctx.LogLevel.UnmarshalText([]byte(logLevel)); err != nil {
-			zapctx.Error(ctx, "cannot set log level", zap.Error(err))
-		}
-	}
 	// TODO(mhilton) access logs?
 	addr := os.Getenv("JIMM_LISTEN_ADDR")
 	if addr == "" {
@@ -183,6 +182,7 @@ func start(ctx context.Context, s *service.Service) error {
 		CookieSessionKey:          []byte(sessionSecretKey),
 		CorsAllowedOrigins:        corsAllowedOrigins,
 		LogSQL:                    logSQL,
+		LogLevel:                  logLevel,
 	})
 	if err != nil {
 		return err

@@ -41,6 +41,7 @@ require (
 	github.com/juju/zaputil v0.0.0-20190326175239-ef53049637ac
 	github.com/lestrrat-go/iter v1.0.2
 	github.com/lestrrat-go/jwx/v2 v2.0.21
+	github.com/mattn/go-colorable v0.1.13
 	github.com/oklog/ulid/v2 v2.1.0
 	github.com/openfga/go-sdk v0.2.2
 	github.com/prometheus/client_golang v1.19.1
@@ -230,7 +231,6 @@ require (
 	github.com/lunixbochs/vtclean v1.0.0 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
-	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.15 // indirect
 	github.com/mattn/go-sqlite3 v2.0.3+incompatible // indirect

@@ -26,6 +26,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/jimm"
+	"github.com/canonical/jimm/v3/internal/logger"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
@@ -52,6 +53,7 @@ type JimmCmdSuite struct {
 
 func (s *JimmCmdSuite) SetUpTest(c *gc.C) {
 	ctx, cancel := context.WithCancel(context.Background())
+	logger.SetupLogger(ctx, "debug", true)
 	s.cancel = cancel
 
 	s.HTTP = httptest.NewUnstartedServer(nil)
