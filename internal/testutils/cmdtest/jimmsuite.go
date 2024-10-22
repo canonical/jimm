@@ -54,6 +54,16 @@ type JimmCmdSuite struct {
 	loggingsuite.LoggingSuite
 }
 
+func (s *JimmCmdSuite) SetUpSuite(c *gc.C) {
+	s.JujuConnSuite.SetUpSuite(c)
+	s.LoggingSuite.SetUpSuite(c)
+}
+
+func (s *JimmCmdSuite) TearDownSuite(c *gc.C) {
+	s.LoggingSuite.TearDownSuite(c)
+	s.JujuConnSuite.TearDownSuite(c)
+}
+
 func (s *JimmCmdSuite) SetUpTest(c *gc.C) {
 	ctx, cancel := context.WithCancel(context.Background())
 	logger.SetupLogger(ctx, "debug", true)
