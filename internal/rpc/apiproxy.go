@@ -401,6 +401,7 @@ func (p *clientProxy) makeControllerConnection(ctx context.Context) error {
 		connWithMetadata, err := p.createControllerConn(ctx)
 		if err != nil {
 			createConnErr = errors.E(op, err)
+			return
 		}
 
 		p.msgs.controllerUUID = connWithMetadata.ControllerUUID
