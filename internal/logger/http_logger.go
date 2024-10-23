@@ -27,11 +27,18 @@ func (l *httpLogEntry) Write(status, bytes int, header http.Header, elapsed time
 	if status != 0 {
 		fields = append(fields, zap.Int("status", status))
 	}
-	fields = append(fields, zap.String("method", l.request.Method),
+	fields = append(fields,
+		zap.String("method", l.request.Method),
 		zap.String("path", l.request.RequestURI),
-		zap.String("elapsed", elapsed.String()))
+		zap.String("elapsed", elapsed.String()),
+	)
 
-	zapctx.Debug(l.request.Context(), "request", fields...)
+	if status != 200 {
+		zapctx.Debug(l.request.Context(), "request", fields...)
+	} else {
+		zapctx.Warn(l.request.Context(), "request", fields...)
+	}
+
 }
 
 // Panic is called when the request handler panicked.

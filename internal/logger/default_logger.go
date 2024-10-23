@@ -30,7 +30,7 @@ func SetupLogger(ctx context.Context, logLevel string, devMode bool) {
 			zapcore.NewConsoleEncoder(devConfig),
 			zapcore.AddSync(colorable.NewColorableStdout()),
 			pLogLevel,
-		))
+		), zap.AddCaller())
 		zapctx.Default = developLogger
 	} else {
 		prodConfig := zap.NewProductionConfig()
