@@ -26,11 +26,9 @@ import (
 	"github.com/canonical/jimm/v3/internal/jimmhttp"
 	"github.com/canonical/jimm/v3/internal/jimmjwx"
 	"github.com/canonical/jimm/v3/internal/jujuclient"
-	"github.com/canonical/jimm/v3/internal/logger"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/pubsub"
-	"github.com/canonical/jimm/v3/internal/testutils/loggingsuite"
 	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
 
@@ -70,9 +68,6 @@ type JIMMSuite struct {
 }
 
 func (s *JIMMSuite) SetUpTest(c *gc.C) {
-	ctx, cancel := context.WithCancel(context.Background())
-	logger.SetupLogger(ctx, "debug", true)
-	s.cancel = cancel
 	var err error
 	s.OFGAClient, s.COFGAClient, s.COFGAParams, err = SetupTestOFGAClient(c.TestName())
 	c.Assert(err, gc.IsNil)
@@ -90,6 +85,10 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 		UUID:            ControllerUUID,
 		OpenFGAClient:   s.OFGAClient,
 	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	s.cancel = cancel
+
 	s.deviceFlowChan = make(chan string, 1)
 	authenticator := NewMockOAuthAuthenticator(c, s.deviceFlowChan)
 	s.JIMM.OAuthAuthenticator = &authenticator
@@ -288,7 +287,7 @@ func (s *JIMMSuite) EnableDeviceFlow(username string) {
 type JujuSuite struct {
 	JIMMSuite
 	corejujutesting.JujuConnSuite
-	loggingsuite.LoggingSuite
+	LoggingSuite
 }
 
 func (s *JujuSuite) SetUpSuite(c *gc.C) {

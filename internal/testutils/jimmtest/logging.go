@@ -1,16 +1,16 @@
 // Copyright 2024 Canonical.
-package loggingsuite
+package jimmtest
 
 import (
-	"context"
 	"os"
+	"strings"
 
 	"github.com/juju/loggo"
 	"github.com/juju/zaputil"
 	"github.com/juju/zaputil/zapctx"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	gc "gopkg.in/check.v1"
-
-	"github.com/canonical/jimm/v3/internal/logger"
 )
 
 // LoggingSuite is a replacement for github.com/juju/testing.LoggingSuite
@@ -34,14 +34,27 @@ func (s *LoggingSuite) TearDownTest(c *gc.C) {
 }
 
 func (s *LoggingSuite) setUp(c *gc.C) {
-	logger.SetupLogger(context.Background(), "debug", true)
+	output := gocheckZapWriter{c}
+	logger := zap.New(zapcore.NewCore(
+		zapcore.NewConsoleEncoder(zapcore.EncoderConfig{
+			LevelKey:    "level",
+			MessageKey:  "msg",
+			EncodeLevel: zapcore.CapitalLevelEncoder,
+			EncodeTime:  zapcore.ISO8601TimeEncoder,
+		}),
+		output,
+		zap.DebugLevel,
+	))
+
+	zapctx.Default = logger
+
 	loggo.ResetLogging()
 	// Don't use the default writer for the test logging, which
 	// means we can still get logging output from tests that
 	// replace the default writer.
 	err := loggo.RegisterWriter(loggo.DefaultWriterName, discardWriter{})
 	c.Assert(err, gc.IsNil)
-	err = loggo.RegisterWriter("loggingsuite", zaputil.NewLoggoWriter(zapctx.Default))
+	err = loggo.RegisterWriter("loggingsuite", zaputil.NewLoggoWriter(logger))
 	c.Assert(err, gc.IsNil)
 	level := "DEBUG"
 	if envLevel := os.Getenv("TEST_LOGGING_CONFIG"); envLevel != "" {
@@ -54,4 +67,16 @@ func (s *LoggingSuite) setUp(c *gc.C) {
 type discardWriter struct{}
 
 func (discardWriter) Write(entry loggo.Entry) {
+}
+
+type gocheckZapWriter struct {
+	c *gc.C
+}
+
+func (w gocheckZapWriter) Write(buf []byte) (int, error) {
+	return len(buf), w.c.Output(1, strings.TrimSuffix(string(buf), "\n"))
+}
+
+func (w gocheckZapWriter) Sync() error {
+	return nil
 }

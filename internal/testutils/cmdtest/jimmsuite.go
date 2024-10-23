@@ -26,11 +26,9 @@ import (
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/jimm"
-	"github.com/canonical/jimm/v3/internal/logger"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
-	"github.com/canonical/jimm/v3/internal/testutils/loggingsuite"
 )
 
 type JimmCmdSuite struct {
@@ -50,23 +48,10 @@ type JimmCmdSuite struct {
 	COFGAParams *cofga.OpenFGAParams
 
 	databaseName string
-
-	loggingsuite.LoggingSuite
-}
-
-func (s *JimmCmdSuite) SetUpSuite(c *gc.C) {
-	s.JujuConnSuite.SetUpSuite(c)
-	s.LoggingSuite.SetUpSuite(c)
-}
-
-func (s *JimmCmdSuite) TearDownSuite(c *gc.C) {
-	s.LoggingSuite.TearDownSuite(c)
-	s.JujuConnSuite.TearDownSuite(c)
 }
 
 func (s *JimmCmdSuite) SetUpTest(c *gc.C) {
 	ctx, cancel := context.WithCancel(context.Background())
-	logger.SetupLogger(ctx, "debug", true)
 	s.cancel = cancel
 
 	s.HTTP = httptest.NewUnstartedServer(nil)
