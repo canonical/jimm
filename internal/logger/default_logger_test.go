@@ -13,12 +13,6 @@ import (
 // TestLogSetup tests log setup with different configurations and checks for panic.
 func TestLogSetup(t *testing.T) {
 	ctx := context.Background()
-	defer func() {
-		r := recover()
-		if r != nil {
-			t.Errorf("The code panic")
-		}
-	}()
 
 	tests := []struct {
 		description string
@@ -60,9 +54,14 @@ func TestLogSetup(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
+			defer func() {
+				r := recover()
+				if r != nil {
+					t.Errorf("The code panic")
+				}
+			}()
 			logger.SetupLogger(ctx, tt.logLevel, tt.devMode)
 			zapctx.Info(ctx, "test log")
 		})
-
 	}
 }
