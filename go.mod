@@ -4,6 +4,26 @@ go 1.23
 
 toolchain go1.23.2
 
+// Juju based dependencies
+require (
+	github.com/juju/charm/v12 v12.1.1
+	github.com/juju/cmd/v3 v3.0.16
+	github.com/juju/errors v1.0.0
+	github.com/juju/gnuflag v1.0.0
+	github.com/juju/http/v2 v2.0.1
+	github.com/juju/juju v0.0.0-20240912164120-31b4b0914740 // v3.5.4 (https://github.com/juju/juju/releases/tag/v3.5.4)
+	github.com/juju/loggo v1.0.0
+	github.com/juju/names/v4 v4.0.0
+	github.com/juju/names/v5 v5.0.0
+	github.com/juju/rpcreflect v1.2.0
+	github.com/juju/testing v1.1.0
+	github.com/juju/utils/v2 v2.0.0-20210305225158-eedbe7b6b3e2
+	github.com/juju/version v0.0.0-20210303051006-2015802527a8
+	github.com/juju/version/v2 v2.0.1
+	github.com/juju/zaputil v0.0.0-20190326175239-ef53049637ac
+)
+
+// Other dependencies
 require (
 	github.com/antonlindstrom/pgstore v0.0.0-20220421113606-e3a6e3fed12a
 	github.com/canonical/go-service v1.0.0
@@ -63,6 +83,7 @@ require (
 	sigs.k8s.io/yaml v1.4.0
 )
 
+// Indirect
 require (
 	cloud.google.com/go/auth v0.9.9 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.4 // indirect
