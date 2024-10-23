@@ -273,6 +273,8 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	s := new(Service)
 	s.mux = chi.NewRouter()
 
+	s.mux.Use(middleware.MeasureHTTPResponseTime)
+
 	// Setup all dependency services
 
 	if p.ControllerUUID == "" {
