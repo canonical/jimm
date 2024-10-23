@@ -186,6 +186,7 @@ require (
 	github.com/juju/blobstore/v3 v3.0.2 // indirect
 	github.com/juju/clock v1.1.1 // indirect
 	github.com/juju/collections v1.0.4 // indirect
+	github.com/juju/description/v5 v5.0.4 // indirect
 	github.com/juju/featureflag v1.0.0 // indirect
 	github.com/juju/go4 v0.0.0-20160222163258-40d72ab9641a // indirect
 	github.com/juju/gojsonpointer v0.0.0-20150204194629-afe8b77aa08f // indirect
@@ -342,8 +343,6 @@ require (
 	sigs.k8s.io/json v0.0.0-20241014173422-cfa47c3a1cc8 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 )
-
-require github.com/juju/description/v5 v5.0.4 // indirect
 
 replace (
 	github.com/altoros/gosigma => github.com/juju/gosigma v0.0.0-20170523021020-a27b59fe2be9
