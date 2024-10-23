@@ -7,7 +7,7 @@ toolchain go1.23.2
 // Juju based dependencies
 require (
 	github.com/juju/charm/v12 v12.1.1
-	github.com/juju/cmd/v3 v3.0.16
+	github.com/juju/cmd/v3 v3.1.0
 	github.com/juju/errors v1.0.0
 	github.com/juju/gnuflag v1.0.0
 	github.com/juju/http/v2 v2.0.1
@@ -16,7 +16,7 @@ require (
 	github.com/juju/names/v4 v4.0.0
 	github.com/juju/names/v5 v5.0.0
 	github.com/juju/rpcreflect v1.2.0
-	github.com/juju/testing v1.1.0
+	github.com/juju/testing v1.2.0
 	github.com/juju/utils/v2 v2.0.0-20210305225158-eedbe7b6b3e2
 	github.com/juju/version v0.0.0-20210303051006-2015802527a8
 	github.com/juju/version/v2 v2.0.1
@@ -46,21 +46,6 @@ require (
 	github.com/itchyny/gojq v0.12.16
 	github.com/jackc/pgconn v1.14.3
 	github.com/jackc/pgx/v4 v4.18.3
-	github.com/juju/charm/v12 v12.1.1
-	github.com/juju/cmd/v3 v3.1.0
-	github.com/juju/errors v1.0.0
-	github.com/juju/gnuflag v1.0.0
-	github.com/juju/http/v2 v2.0.1
-	github.com/juju/juju v0.0.0-20241018065045-344491d7f1d9
-	github.com/juju/loggo v1.0.0
-	github.com/juju/names/v4 v4.0.0
-	github.com/juju/names/v5 v5.0.0
-	github.com/juju/rpcreflect v1.2.0
-	github.com/juju/testing v1.2.0
-	github.com/juju/utils/v2 v2.0.0-20210305225158-eedbe7b6b3e2
-	github.com/juju/version v0.0.0-20210303051006-2015802527a8
-	github.com/juju/version/v2 v2.0.1
-	github.com/juju/zaputil v0.0.0-20190326175239-ef53049637ac
 	github.com/lestrrat-go/iter v1.0.2
 	github.com/lestrrat-go/jwx/v2 v2.1.1
 	github.com/oklog/ulid/v2 v2.1.0
@@ -94,7 +79,6 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v3 v3.0.0-beta.2 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v2 v2.0.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/keyvault/armkeyvault v1.4.0 // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/msi/armmsi v1.2.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork v1.1.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources v1.2.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions v1.3.0 // indirect
@@ -202,7 +186,6 @@ require (
 	github.com/juju/blobstore/v3 v3.0.2 // indirect
 	github.com/juju/clock v1.1.1 // indirect
 	github.com/juju/collections v1.0.4 // indirect
-	github.com/juju/description/v7 v7.0.2 // indirect
 	github.com/juju/featureflag v1.0.0 // indirect
 	github.com/juju/go4 v0.0.0-20160222163258-40d72ab9641a // indirect
 	github.com/juju/gojsonpointer v0.0.0-20150204194629-afe8b77aa08f // indirect
@@ -359,6 +342,8 @@ require (
 	sigs.k8s.io/json v0.0.0-20241014173422-cfa47c3a1cc8 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 )
+
+require github.com/juju/description/v5 v5.0.4 // indirect
 
 replace (
 	github.com/altoros/gosigma => github.com/juju/gosigma v0.0.0-20170523021020-a27b59fe2be9
