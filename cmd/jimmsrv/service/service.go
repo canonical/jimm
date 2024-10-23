@@ -278,10 +278,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	s := new(Service)
 	s.mux = chi.NewRouter()
 
-	// chi middlewares
-	if p.LogLevel == "debug" {
-		s.mux.Use(chimiddleware.RequestLogger(&logger.HTTPLogFormatter{}))
-	}
+	s.mux.Use(chimiddleware.RequestLogger(&logger.HTTPLogFormatter{}))
 
 	// Setup all dependency services
 
