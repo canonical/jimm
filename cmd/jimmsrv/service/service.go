@@ -282,7 +282,6 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	if p.LogLevel == "debug" {
 		s.mux.Use(chimiddleware.RequestLogger(&logger.HTTPLogFormatter{}))
 	}
-	s.mux.Use(chimiddleware.Recoverer)
 
 	// Setup all dependency services
 
