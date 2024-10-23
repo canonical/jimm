@@ -3,6 +3,7 @@
 services:
   jimm-base:
     environment:
+      JIMM_LOG_DEV_MODE: "true" # enable pretty logs
       JIMM_LOG_LEVEL: "debug"
       JIMM_LOG_SQL: "false"
       JIMM_UUID: "3217dbc9-8ea9-4381-9e97-01eab0b3f6bb"
