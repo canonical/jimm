@@ -23,8 +23,9 @@ func (rec *statusRecorder) WriteHeader(statusCode int) {
 	rec.ResponseWriter.WriteHeader(statusCode)
 }
 
-// MeasureResponseTime tracks response time of requests.
-func MeasureResponseTime(next http.Handler) http.Handler {
+// MeasureHTTPResponseTime tracks response time of HTTP requests.
+// We don't track websocket requests.
+func MeasureHTTPResponseTime(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Check the upgrade header because we only track http endpoints
 		if r.Header.Get("Upgrade") == "websocket" {
