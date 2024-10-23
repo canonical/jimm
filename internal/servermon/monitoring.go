@@ -133,8 +133,9 @@ var (
 	})
 	ResponseTimeHistogram = promauto.NewHistogramVec(prometheus.HistogramOpts{
 		Namespace: "jimm",
-		Name:      "http",
-		Help:      "request_duration_seconds",
+		Subsystem: "http",
+		Name:      "request_duration_seconds",
+		Help:      "The duration of handling an HTTP request in seconds.",
 		Buckets:   []float64{.005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10},
 	}, []string{"route", "method", "status_code"})
 )
