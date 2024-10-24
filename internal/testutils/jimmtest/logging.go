@@ -2,11 +2,23 @@
 package jimmtest
 
 import (
+	"fmt"
+
+	"github.com/juju/loggo"
 	"github.com/juju/zaputil/zapctx"
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/v3/internal/logger"
 )
+
+func init() {
+	go func() {
+		fmt.Println("RESETTING")
+		for {
+			loggo.ResetLogging()
+		}
+	}()
+}
 
 // LoggingSuite is a replacement for github.com/juju/testing.LoggingSuite
 // zap logging but also replaces the global loggo logger.
