@@ -5,6 +5,7 @@ package rpc_test
 import (
 	"context"
 	"encoding/json"
+	goerr "errors"
 	"sync"
 	"testing"
 	"time"
@@ -69,6 +70,7 @@ func TestProxySocketsAdminFacade(t *testing.T) {
 		expectedClientResponse    *message
 		expectedControllerMessage *message
 		oauthAuthenticatorError   error
+		expectConnectTofail       bool
 	}{{
 		about: "login device call - client gets response with both user code and verification uri",
 		messageToSend: message{
@@ -229,6 +231,12 @@ func TestProxySocketsAdminFacade(t *testing.T) {
 			ErrorCode: "unauthorized access",
 		},
 		oauthAuthenticatorError: errors.E(errors.CodeUnauthorized),
+	}, {
+		about:               "connection to controller fails",
+		expectConnectTofail: true,
+		expectedClientResponse: &message{
+			Error: "controller connection error",
+		},
 	}}
 
 	for _, test := range tests {
@@ -249,6 +257,9 @@ func TestProxySocketsAdminFacade(t *testing.T) {
 				ConnClient: clientWebsocket,
 				TokenGen:   &mockTokenGenerator{},
 				ConnectController: func(ctx context.Context) (rpc.WebsocketConnectionWithMetadata, error) {
+					if test.expectConnectTofail {
+						return rpc.WebsocketConnectionWithMetadata{}, goerr.New("controller connection error")
+					}
 					return rpc.WebsocketConnectionWithMetadata{
 						Conn:           controllerWebsocket,
 						ModelName:      "test model",
@@ -264,7 +275,11 @@ func TestProxySocketsAdminFacade(t *testing.T) {
 			go func() {
 				defer wg.Done()
 				err = rpc.ProxySockets(ctx, helpers)
-				c.Assert(err, qt.ErrorMatches, "Context cancelled")
+				if test.expectConnectTofail {
+					c.Assert(err, qt.ErrorMatches, "failed to connect to controller: controller connection error")
+				} else {
+					c.Assert(err, qt.ErrorMatches, "Context cancelled")
+				}
 			}()
 			data, err := json.Marshal(test.messageToSend)
 			c.Assert(err, qt.IsNil)
@@ -289,7 +304,6 @@ func TestProxySocketsAdminFacade(t *testing.T) {
 			wg.Wait()
 			t.Logf("completed test %s", t.Name())
 		})
-
 	}
 }
 
