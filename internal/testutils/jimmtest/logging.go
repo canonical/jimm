@@ -11,6 +11,8 @@ import (
 	"github.com/canonical/jimm/v3/internal/logger"
 )
 
+// init is a workaround to reset the logger coming from the loggo library.
+// This is to prevent juju debug logs from cluttering our tests output.
 func init() {
 	ticker := time.NewTicker(100 * time.Millisecond)
 	done := make(chan bool)

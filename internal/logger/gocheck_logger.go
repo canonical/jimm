@@ -1,4 +1,5 @@
 // Copyright 2024 Canonical.
+
 package logger
 
 import (
@@ -7,6 +8,8 @@ import (
 	gc "gopkg.in/check.v1"
 )
 
+// NewGoCheckLogger create a logger to be used by the gocheck test library.
+// The logs are shown only when the test fails.
 func NewGoCheckLogger(c *gc.C) *zap.Logger {
 	output := gocheckZapWriter{c}
 
