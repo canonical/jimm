@@ -2,7 +2,7 @@
 package jimmtest
 
 import (
-	"fmt"
+	"time"
 
 	"github.com/juju/loggo"
 	"github.com/juju/zaputil/zapctx"
@@ -12,10 +12,16 @@ import (
 )
 
 func init() {
+	ticker := time.NewTicker(100 * time.Millisecond)
+	done := make(chan bool)
 	go func() {
-		fmt.Println("RESETTING")
 		for {
-			loggo.ResetLogging()
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
+				loggo.ResetLogging()
+			}
 		}
 	}()
 }
@@ -43,4 +49,5 @@ func (s *LoggingSuite) TearDownTest(c *gc.C) {
 func (s *LoggingSuite) setUp(c *gc.C) {
 	goCheckLogger := logger.NewGoCheckLogger(c)
 	zapctx.Default = goCheckLogger
+	loggo.ResetLogging()
 }
