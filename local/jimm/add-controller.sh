@@ -26,6 +26,7 @@ if [ $jimmctlAvailable -ne 0 ]; then
     echo "Building jimmctl..."
     # Build jimmctl so we may add a controller.
     go build ./cmd/jimmctl
+    sudo ln -s $PWD/jimmctl /usr/local/bin/jimmctl
     echo "Built jimmctl."
     echo 
 else

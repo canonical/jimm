@@ -128,7 +128,7 @@ APT_BASED := $(shell command -v apt-get >/dev/null; echo $$?)
 sys-deps:
 ifeq ($(APT_BASED),0)
 # golangci-lint is necessary for linting.
-	@$(call check_dep,golangci-lint,Missing Golangci-lint - install from https://golangci-lint.run/welcome/install/)
+	@$(call check_dep,golangci-lint,Missing Golangci-lint - install from https://golangci-lint.run/welcome/install/ or 'sudo snap install golangci-lint --classic')
 # Go acts as the test runner.
 	@$(call check_dep,go,Missing Go - install from https://go.dev/doc/install or 'sudo snap install go --classic')
 # Git is useful to have.
@@ -138,9 +138,9 @@ ifeq ($(APT_BASED),0)
 # yq is necessary for some scripts that process controller-info yaml files.
 	@$(call check_dep,yq,Missing yq - install with 'sudo snap install yq')
 # Microk8s is required if you want to start a Juju controller on Microk8s.
-	@$(call check_dep,microk8s,Missing microk8s - install with 'sudo snap install microk8s')
+	@$(call check_dep,microk8s,Missing microk8s - install with 'sudo snap install microk8s --channel=1.30-strict/stable')
 # Docker is required to start the test dependencies in containers.
-	@$(call check_dep,docker,Missing Docker - install from https://docs.docker.com/engine/install/)
+	@$(call check_dep,docker,Missing Docker - install from https://docs.docker.com/engine/install/ or 'sudo snap install docker')
 # juju-db is required for tests that use Juju's test fixture, requiring MongoDB.
 	@$(call check_dep,juju-db.mongo,Missing juju-db - install with 'sudo snap install juju-db --channel=4.4/stable')
 else
