@@ -120,17 +120,24 @@ func (s *identitiesService) GetIdentityGroups(ctx context.Context, identityId st
 		Relation:     ofganames.MemberRelation.String(),
 		TargetObject: openfga.GroupType.String(),
 	}, int32(filter.Limit()), filter.Token()) // #nosec G115 accept integer conversion
-
 	if err != nil {
 		return nil, err
 	}
+
 	groups := make([]resources.Group, len(tuples))
 	for i, t := range tuples {
+		dbGroup, err := s.jimm.GetGroupByUUID(ctx, user, t.Target.ID)
+		if err != nil {
+			// Handle the case where the group was removed from the DB but a lingering OpenFGA tuple still exists.
+			// Don't return an error as that would prevent a user from viewing their groups, instead show the group as "removed".
+			dbGroup.Name = "(removed)"
+		}
 		groups[i] = resources.Group{
 			Id:   &t.Target.ID,
-			Name: t.Target.ID,
+			Name: dbGroup.Name,
 		}
 	}
+
 	originalToken := filter.Token()
 	return &resources.PaginatedResponse[resources.Group]{
 		Data: groups,

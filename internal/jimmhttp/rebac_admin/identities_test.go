@@ -147,7 +147,7 @@ func TestGetIdentityGroups(t *testing.T) {
 	testTuple := openfga.Tuple{
 		Object:   &ofga.Entity{Kind: "user", ID: "foo"},
 		Relation: ofga.Relation("member"),
-		Target:   &ofga.Entity{Kind: "group", ID: "my-group"},
+		Target:   &ofga.Entity{Kind: "group", ID: "my-group-id"},
 	}
 	jimm := jimmtest.JIMM{
 		FetchIdentity_: func(ctx context.Context, username string) (*openfga.User, error) {
@@ -159,6 +159,11 @@ func TestGetIdentityGroups(t *testing.T) {
 		RelationService: mocks.RelationService{
 			ListRelationshipTuples_: func(ctx context.Context, user *openfga.User, tuple params.RelationshipTuple, pageSize int32, continuationToken string) ([]openfga.Tuple, string, error) {
 				return []openfga.Tuple{testTuple}, "continuation-token", listTuplesErr
+			},
+		},
+		GroupService: mocks.GroupService{
+			GetGroupByUUID_: func(ctx context.Context, user *openfga.User, uuid string) (*dbmodel.GroupEntry, error) {
+				return &dbmodel.GroupEntry{Name: "fake-group-name"}, nil
 			},
 		},
 	}
@@ -175,6 +180,8 @@ func TestGetIdentityGroups(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(res, qt.IsNotNil)
 	c.Assert(res.Data, qt.HasLen, 1)
+	c.Assert(*res.Data[0].Id, qt.Equals, "my-group-id")
+	c.Assert(res.Data[0].Name, qt.Equals, "fake-group-name")
 	c.Assert(*res.Next.PageToken, qt.Equals, "continuation-token")
 
 	listTuplesErr = errors.New("foo")

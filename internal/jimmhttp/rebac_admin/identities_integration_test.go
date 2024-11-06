@@ -103,7 +103,8 @@ func (s *identitiesSuite) TestIdentityGetGroups(c *gc.C) {
 		c.Assert(err, gc.IsNil)
 		token = *groups.Next.PageToken
 		for j := 0; j < len(groups.Data); j++ {
-			c.Assert(groups.Data[j].Name, gc.Equals, groupTags[i+j].Id())
+			c.Assert(groups.Data[j].Name, gc.Equals, fmt.Sprintf("group-test%d", i+j))
+			c.Assert(groupTags[j].Id(), gc.Matches, `\w*-\w*-\w*-\w*-\w*`)
 		}
 		if *groups.Next.PageToken == "" {
 			break
