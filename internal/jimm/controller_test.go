@@ -888,7 +888,7 @@ func TestImportModel(t *testing.T) {
 			info.OwnerTag = names.NewUserTag("alice@canonical.com").String()
 			return nil
 		},
-		expectedError: `model already exists`,
+		expectedError: `model (.*) already exists`,
 	}}
 
 	for _, test := range tests {

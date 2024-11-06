@@ -103,7 +103,7 @@ func (m *Model) SetTag(t names.ModelTag) {
 	m.UUID.Valid = true
 }
 
-// FromModelUpdate updates the model from the given ModelUpdate.
+// SwitchOwner updates the model owner.
 func (m *Model) SwitchOwner(u *Identity) {
 	m.OwnerIdentityName = u.Name
 	m.Owner = *u
