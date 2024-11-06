@@ -29,7 +29,6 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/pubsub"
-	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
 
 // ControllerUUID is the UUID of the JIMM controller used in tests.
@@ -267,11 +266,11 @@ func (s *JIMMSuite) AddModel(c *gc.C, owner names.UserTag, name string, cloud na
 	return names.NewModelTag(mi.UUID)
 }
 
-func (s *JIMMSuite) AddGroup(c *gc.C, groupName string) jimmnames.GroupTag {
+func (s *JIMMSuite) AddGroup(c *gc.C, groupName string) dbmodel.GroupEntry {
 	ctx := context.Background()
 	group, err := s.JIMM.AddGroup(ctx, s.AdminUser, groupName)
 	c.Assert(err, gc.Equals, nil)
-	return group.ResourceTag()
+	return *group
 }
 
 // EnableDeviceFlow allows a test to use the device flow.

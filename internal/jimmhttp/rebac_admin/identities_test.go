@@ -11,6 +11,7 @@ import (
 	rebac_handlers "github.com/canonical/rebac-admin-ui-handlers/v1"
 	"github.com/canonical/rebac-admin-ui-handlers/v1/resources"
 	qt "github.com/frankban/quicktest"
+	"github.com/google/uuid"
 
 	"github.com/canonical/jimm/v3/internal/common/pagination"
 	"github.com/canonical/jimm/v3/internal/common/utils"
@@ -210,9 +211,11 @@ func TestPatchIdentityGroups(t *testing.T) {
 	c.Assert(err, qt.ErrorMatches, ".* not found")
 
 	username := "bob@canonical.com"
+	group1ID := uuid.New()
+	group2ID := uuid.New()
 	operations := []resources.IdentityGroupsPatchItem{
-		{Group: "test-group1", Op: resources.IdentityGroupsPatchItemOpAdd},
-		{Group: "test-group2", Op: resources.IdentityGroupsPatchItemOpRemove},
+		{Group: group1ID.String(), Op: resources.IdentityGroupsPatchItemOpAdd},
+		{Group: group2ID.String(), Op: resources.IdentityGroupsPatchItemOpRemove},
 	}
 	res, err := idSvc.PatchIdentityGroups(ctx, username, operations)
 	c.Assert(err, qt.IsNil)
@@ -221,4 +224,10 @@ func TestPatchIdentityGroups(t *testing.T) {
 	patchTuplesErr = errors.New("foo")
 	_, err = idSvc.PatchIdentityGroups(ctx, username, operations)
 	c.Assert(err, qt.ErrorMatches, ".*foo")
+
+	invalidGroupName := []resources.IdentityGroupsPatchItem{
+		{Group: "test-group1", Op: resources.IdentityGroupsPatchItemOpAdd},
+	}
+	_, err = idSvc.PatchIdentityGroups(ctx, "bob@canonical.com", invalidGroupName)
+	c.Assert(err, qt.ErrorMatches, "Bad Request: ID test-group1 is not a valid group ID")
 }

@@ -31,11 +31,11 @@ func (s *identitiesSuite) TestIdentityPatchGroups(c *gc.C) {
 	identitySvc := rebac_admin.NewidentitiesService(s.JIMM)
 	groupName := "group-test1"
 	username := s.AdminUser.Name
-	groupTag := s.AddGroup(c, groupName)
+	group := s.AddGroup(c, groupName)
 
 	// test add identity group
 	changed, err := identitySvc.PatchIdentityGroups(ctx, username, []resources.IdentityGroupsPatchItem{{
-		Group: groupTag.String(),
+		Group: group.UUID,
 		Op:    resources.IdentityGroupsPatchItemOpAdd,
 	}})
 	c.Assert(err, gc.IsNil)
@@ -47,15 +47,15 @@ func (s *identitiesSuite) TestIdentityPatchGroups(c *gc.C) {
 	tuples, _, err := s.JIMM.ListRelationshipTuples(ctx, s.AdminUser, params.RelationshipTuple{
 		Object:       objUser.ResourceTag().String(),
 		Relation:     ofganames.MemberRelation.String(),
-		TargetObject: groupTag.String(),
+		TargetObject: group.ResourceTag().String(),
 	}, 10, "")
 	c.Assert(err, gc.IsNil)
 	c.Assert(len(tuples), gc.Equals, 1)
-	c.Assert(groupTag.Id(), gc.Equals, tuples[0].Target.ID)
+	c.Assert(group.UUID, gc.Equals, tuples[0].Target.ID)
 
 	// test user remove from group
 	changed, err = identitySvc.PatchIdentityGroups(ctx, username, []resources.IdentityGroupsPatchItem{{
-		Group: groupTag.String(),
+		Group: group.UUID,
 		Op:    resources.IdentityGroupsPatchItemOpRemove,
 	}})
 	c.Assert(err, gc.IsNil)
@@ -63,7 +63,7 @@ func (s *identitiesSuite) TestIdentityPatchGroups(c *gc.C) {
 	tuples, _, err = s.JIMM.ListRelationshipTuples(ctx, s.AdminUser, params.RelationshipTuple{
 		Object:       objUser.ResourceTag().String(),
 		Relation:     ofganames.MemberRelation.String(),
-		TargetObject: groupTag.String(),
+		TargetObject: group.ResourceTag().String(),
 	}, 10, "")
 	c.Assert(err, gc.IsNil)
 	c.Assert(len(tuples), gc.Equals, 0)
@@ -80,10 +80,10 @@ func (s *identitiesSuite) TestIdentityGetGroups(c *gc.C) {
 	groupTags := make([]jimmnames.GroupTag, groupsSize)
 	for i := range groupsSize {
 		groupName := fmt.Sprintf("group-test%d", i)
-		groupTag := s.AddGroup(c, groupName)
-		groupTags[i] = groupTag
+		group := s.AddGroup(c, groupName)
+		groupTags[i] = group.ResourceTag()
 		groupsToAdd[i] = resources.IdentityGroupsPatchItem{
-			Group: groupTag.String(),
+			Group: group.UUID,
 			Op:    resources.IdentityGroupsPatchItemOpAdd,
 		}
 
@@ -117,13 +117,13 @@ func (s *identitiesSuite) TestIdentityEntitlements(c *gc.C) {
 	// initialization
 	ctx := context.Background()
 	identitySvc := rebac_admin.NewidentitiesService(s.JIMM)
-	groupTag := s.AddGroup(c, "test-group")
+	group := s.AddGroup(c, "test-group")
 	user := names.NewUserTag("test-user@canonical.com")
 	s.AddUser(c, user.Id())
 	err := s.JIMM.OpenFGAClient.AddRelation(ctx, openfga.Tuple{
 		Object:   ofganames.ConvertTag(user),
 		Relation: ofganames.MemberRelation,
-		Target:   ofganames.ConvertTag(groupTag),
+		Target:   ofganames.ConvertTag(group.ResourceTag()),
 	})
 	c.Assert(err, gc.IsNil)
 	tuple := openfga.Tuple{

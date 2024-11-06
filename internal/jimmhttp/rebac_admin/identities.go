@@ -19,6 +19,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
+	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
 
 type identitiesService struct {
@@ -158,10 +159,13 @@ func (s *identitiesService) PatchIdentityGroups(ctx context.Context, identityId 
 	additions := make([]apiparams.RelationshipTuple, 0)
 	deletions := make([]apiparams.RelationshipTuple, 0)
 	for _, p := range groupPatches {
+		if !jimmnames.IsValidGroupId(p.Group) {
+			return false, v1.NewValidationError(fmt.Sprintf("ID %s is not a valid group ID", p.Group))
+		}
 		t := apiparams.RelationshipTuple{
 			Object:       objUser.ResourceTag().String(),
 			Relation:     ofganames.MemberRelation.String(),
-			TargetObject: p.Group,
+			TargetObject: jimmnames.NewGroupTag(p.Group).String(),
 		}
 		if p.Op == "add" {
 			additions = append(additions, t)
