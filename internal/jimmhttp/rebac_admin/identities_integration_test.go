@@ -10,6 +10,7 @@ import (
 	"github.com/juju/names/v5"
 	gc "gopkg.in/check.v1"
 
+	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/jimmhttp/rebac_admin"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
@@ -110,6 +111,46 @@ func (s *identitiesSuite) TestIdentityGetGroups(c *gc.C) {
 			break
 		}
 	}
+}
+
+// TestIdentityGetGroupsWithMissingDbGroup tests the behaviour
+// of GetIdentityGroups when a tuple lingers in OpenFGA but the group
+// has been removed from the database.
+func (s *identitiesSuite) TestIdentityGetGroupsWithMissingDbGroup(c *gc.C) {
+	// initialization
+	ctx := context.Background()
+	ctx = rebac_handlers.ContextWithIdentity(ctx, s.AdminUser)
+	identitySvc := rebac_admin.NewidentitiesService(s.JIMM)
+	username := s.AdminUser.Name
+
+	group1 := s.AddGroup(c, "group1")
+	group2 := s.AddGroup(c, "group2")
+
+	baseTuple := openfga.Tuple{
+		Object:   ofganames.ConvertTag(s.AdminUser.ResourceTag()),
+		Relation: ofganames.MemberRelation,
+	}
+	group1Access := baseTuple
+	group1Access.Target = ofganames.ConvertTag(group1)
+	group2Access := baseTuple
+	group2Access.Target = ofganames.ConvertTag(group2)
+
+	err := s.JIMM.OpenFGAClient.AddRelation(ctx, group1Access, group2Access)
+	c.Assert(err, gc.IsNil)
+
+	groups, err := identitySvc.GetIdentityGroups(ctx, username, &resources.GetIdentitiesItemGroupsParams{})
+	c.Assert(err, gc.IsNil)
+	c.Assert(groups.Data, gc.HasLen, 2)
+
+	groupToDelete := dbmodel.GroupEntry{Name: "group2"}
+	err = s.JIMM.Database.GetGroup(ctx, &groupToDelete)
+	c.Assert(err, gc.IsNil)
+	err = s.JIMM.Database.RemoveGroup(ctx, &groupToDelete)
+	c.Assert(err, gc.IsNil)
+
+	groups, err = identitySvc.GetIdentityGroups(ctx, username, &resources.GetIdentitiesItemGroupsParams{})
+	c.Assert(err, gc.IsNil)
+	c.Assert(groups.Data, gc.HasLen, 1)
 }
 
 // TestIdentityEntitlements tests the listing of entitlements for a specific identityId.

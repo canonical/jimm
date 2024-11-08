@@ -124,18 +124,21 @@ func (s *identitiesService) GetIdentityGroups(ctx context.Context, identityId st
 		return nil, err
 	}
 
-	groups := make([]resources.Group, len(tuples))
-	for i, t := range tuples {
+	groups := make([]resources.Group, 0, len(tuples))
+	for _, t := range tuples {
 		dbGroup, err := s.jimm.GetGroupByUUID(ctx, user, t.Target.ID)
 		if err != nil {
 			// Handle the case where the group was removed from the DB but a lingering OpenFGA tuple still exists.
 			// Don't return an error as that would prevent a user from viewing their groups, instead show the group as "removed".
-			dbGroup.Name = "(removed)"
+			if errors.ErrorCode(err) == errors.CodeNotFound {
+				continue
+			}
+			return nil, err
 		}
-		groups[i] = resources.Group{
+		groups = append(groups, resources.Group{
 			Id:   &t.Target.ID,
 			Name: dbGroup.Name,
-		}
+		})
 	}
 
 	originalToken := filter.Token()
