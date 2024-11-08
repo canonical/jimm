@@ -14,6 +14,7 @@ JIMM_CONTROLLER_NAME="${JIMM_CONTROLLER_NAME:-jimm-dev}"
 CONTROLLER_NAME="${CONTROLLER_NAME:-qa-lxd}"
 CONTROLLER_YAML_PATH="${CONTROLLER_NAME}".yaml
 CLIENT_CREDENTIAL_NAME="${CLIENT_CREDENTIAL_NAME:-localhost}"
+JIMMCTL="jimmctl"
 
 echo
 echo "JIMM controller name is: $JIMM_CONTROLLER_NAME"
@@ -22,7 +23,7 @@ echo "Target controller path is: $CONTROLLER_YAML_PATH"
 echo
 which jimmctl
 jimmctlAvailable=$?
-if [ $jimmctlAvailable -ne 0 ]; then
+if [ $jimmctlAvailable -ne 0 ] && [ ! -f ./jimmctl ]; then
     echo "Building jimmctl..."
     # Build jimmctl so we may add a controller.
     go build ./cmd/jimmctl
@@ -30,6 +31,9 @@ if [ $jimmctlAvailable -ne 0 ]; then
     echo 
 else
     echo "jimmctl available, skipping build"
+fi
+if [ -f ./jimmctl ]; then
+    JIMMCTL="./jimmctl"
 fi
 if which jimmctl | grep -q 'snap'; then
     CONTROLLER_YAML_PATH="$HOME/snap/jimmctl/common/$CONTROLLER_YAML_PATH"
@@ -40,7 +44,7 @@ echo "Switching juju controller to $JIMM_CONTROLLER_NAME"
 juju switch "$JIMM_CONTROLLER_NAME"
 echo
 echo "Retrieving controller info for $CONTROLLER_NAME"
-jimmctl controller-info --local "$CONTROLLER_NAME" "$CONTROLLER_YAML_PATH" --tls-hostname juju-apiserver
+$JIMMCTL controller-info --local "$CONTROLLER_NAME" "$CONTROLLER_YAML_PATH" --tls-hostname juju-apiserver
 if [[ -f "$CONTROLLER_YAML_PATH" ]]; then
     echo "Controller info retrieved."
 else
@@ -49,7 +53,7 @@ else
 fi
 echo
 echo "Adding controller from path: $CONTROLLER_YAML_PATH"
-jimmctl add-controller "$CONTROLLER_YAML_PATH"
+$JIMMCTL add-controller "$CONTROLLER_YAML_PATH"
 echo
 echo "Updating cloud credentials for: $JIMM_CONTROLLER_NAME, from client credential: $CLIENT_CREDENTIAL_NAME"
 juju update-credentials "$CLIENT_CREDENTIAL_NAME" --controller "$JIMM_CONTROLLER_NAME"
