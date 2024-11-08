@@ -872,18 +872,53 @@ func (s *cloudSuite) TestModifyCloudAccessUnauthorized(c *gc.C) {
 }
 
 func (s *cloudSuite) TestUpdateCloud(c *gc.C) {
-	conn := s.open(c, nil, "test")
+	// Connect as admin user (alice)
+	conn := s.open(c, nil, "alice")
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
-	err := client.UpdateCloud(cloud.Cloud{
+
+	// First, add the cloud
+	err := client.AddCloud(cloud.Cloud{
 		Name:             "test-cloud",
 		Type:             "kubernetes",
 		AuthTypes:        cloud.AuthTypes{cloud.CertificateAuthType},
 		Endpoint:         "https://0.1.2.3:5678",
 		IdentityEndpoint: "https://0.1.2.3:5679",
 		StorageEndpoint:  "https://0.1.2.3:5680",
+		HostCloudRegion:  jimmtest.TestCloudName + "/" + jimmtest.TestCloudRegionName,
+	}, false)
+	c.Assert(err, gc.IsNil)
+
+	// Next, update the storage endpoint
+	newStorageEndpointValue := "https://0.1.2.3:5681"
+	err = client.UpdateCloud(cloud.Cloud{
+		Name:             "test-cloud",
+		Type:             "kubernetes",
+		AuthTypes:        cloud.AuthTypes{cloud.CertificateAuthType},
+		Endpoint:         "https://0.1.2.3:5678",
+		IdentityEndpoint: "https://0.1.2.3:5679",
+		StorageEndpoint:  newStorageEndpointValue,
+		HostCloudRegion:  jimmtest.TestCloudName + "/" + jimmtest.TestCloudRegionName,
 	})
-	c.Assert(jujuparams.IsCodeForbidden(err), gc.Equals, true, gc.Commentf("%#v", err))
+	c.Assert(err, gc.IsNil)
+
+	info, err := client.CloudInfo([]names.CloudTag{names.NewCloudTag("test-cloud")})
+	c.Assert(err, gc.IsNil)
+
+	c.Assert(info, gc.HasLen, 1)
+	c.Assert(info[0].Cloud.StorageEndpoint, gc.Equals, newStorageEndpointValue)
+
+	// Now attempt to update the name erroneously
+	err = client.UpdateCloud(cloud.Cloud{
+		Name:             "test-cloud%", // Invalid tag
+		Type:             "kubernetes",
+		AuthTypes:        cloud.AuthTypes{cloud.CertificateAuthType},
+		Endpoint:         "https://0.1.2.3:5678",
+		IdentityEndpoint: "https://0.1.2.3:5679",
+		StorageEndpoint:  newStorageEndpointValue,
+		HostCloudRegion:  jimmtest.TestCloudName + "/" + jimmtest.TestCloudRegionName,
+	})
+	c.Assert(err, gc.ErrorMatches, "cloud \"\" not found")
 }
 
 func (s *cloudSuite) TestCloudInfo(c *gc.C) {

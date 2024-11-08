@@ -600,24 +600,27 @@ func (j *JIMM) UpdateCloud(ctx context.Context, user *openfga.User, ct names.Clo
 	// do this in a transaction so that the local view cannot finish in
 	// an inconsistent state.
 	err = j.Database.Transaction(func(db *db.Database) error {
+		var transactionCloud dbmodel.Cloud
+		transactionCloud.SetTag(ct)
 
-		var c dbmodel.Cloud
-		c.SetTag(ct)
-		if err := db.GetCloud(ctx, &c); err != nil {
+		if err := db.GetCloud(ctx, &transactionCloud); err != nil {
 			return err
 		}
-		c.FromJujuCloud(cloud)
-		for i := range c.Regions {
-			if len(c.Regions[i].Controllers) == 0 {
-				for _, ctl := range controllers {
-					c.Regions[i].Controllers = append(c.Regions[i].Controllers, dbmodel.CloudRegionControllerPriority{
-						Controller: ctl,
-						Priority:   dbmodel.CloudRegionControllerPrioritySupported,
-					})
-				}
-			}
+		transactionCloud.FromJujuCloud(cloud)
+
+		// Set the region controller priorities again for this transactions dbmodel.Cloud.
+		for i := range transactionCloud.Regions {
+			transactionCloud.Regions[i].Controllers = c.Regions[i].Controllers
+			// if len(transactionCloud.Regions[i].Controllers) == 0 {
+			// 	for _, ctl := range controllers {
+			// 		transactionCloud.Regions[i].Controllers = append(transactionCloud.Regions[i].Controllers, dbmodel.CloudRegionControllerPriority{
+			// 			Controller: ctl,
+			// 			Priority:   dbmodel.CloudRegionControllerPrioritySupported,
+			// 		})
+			// 	}
+			// }
 		}
-		return db.UpdateCloud(ctx, &c)
+		return db.UpdateCloud(ctx, &transactionCloud)
 	})
 
 	if err != nil {
