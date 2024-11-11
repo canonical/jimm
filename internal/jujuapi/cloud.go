@@ -483,11 +483,13 @@ func (r *controllerRoot) UpdateCloud(ctx context.Context, args jujuparams.Update
 	}
 
 	for i, cloud := range args.Clouds {
-		ct, err := names.ParseCloudTag("cloud-" + cloud.Name)
-		if err != nil {
-			results.Results[i].Error = mapError(err)
+		if !names.IsValidCloud(cloud.Name) {
+			results.Results[i].Error = mapError(errors.E(errors.CodeBadRequest, "invalid cloud name"))
+			continue
 		}
-		err = r.jimm.UpdateCloud(ctx, r.user, ct, cloud.Cloud)
+		ct := names.NewCloudTag(cloud.Name)
+
+		err := r.jimm.UpdateCloud(ctx, r.user, ct, cloud.Cloud)
 		if err != nil {
 			results.Results[i].Error = mapError(err)
 		}

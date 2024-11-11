@@ -918,6 +918,7 @@ func (s *cloudSuite) TestUpdateCloud(c *gc.C) {
 		StorageEndpoint:  newStorageEndpointValue,
 		HostCloudRegion:  jimmtest.TestCloudName + "/" + jimmtest.TestCloudRegionName,
 	})
+
 	c.Assert(err, gc.ErrorMatches, "cloud \"\" not found")
 }
 
