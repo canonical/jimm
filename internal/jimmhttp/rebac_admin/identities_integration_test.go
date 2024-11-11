@@ -310,3 +310,36 @@ func (s *identitiesSuite) TestPatchIdentityEntitlements(c *gc.C) {
 		c.Assert(allowed, gc.Equals, true)
 	}
 }
+
+// TestPatchIdentityEntitlementsForCloudAccess tests granting access to a cloud.
+func (s *identitiesSuite) TestPatchIdentityEntitlementsForCloudAccess(c *gc.C) {
+	// initialization
+	ctx := context.Background()
+	identitySvc := rebac_admin.NewidentitiesService(s.JIMM)
+	tester := jimmtest.GocheckTester{C: c}
+	env := jimmtest.ParseEnvironment(tester, patchIdentitiesEntitlementTestEnv)
+	env.PopulateDB(tester, s.JIMM.Database)
+	user := names.NewUserTag("test-user@canonical.com")
+	s.AddUser(c, user.Id())
+
+	cloudEntitlement := []resources.IdentityEntitlementsPatchItem{
+		{Entitlement: resources.EntityEntitlement{
+			Entitlement: ofganames.AdministratorRelation.String(),
+			EntityId:    "test-cloud",
+			EntityType:  openfga.CloudType.String(),
+		}, Op: resources.IdentityEntitlementsPatchItemOpAdd},
+	}
+	ctx = rebac_handlers.ContextWithIdentity(ctx, s.AdminUser)
+	res, err := identitySvc.PatchIdentityEntitlements(ctx, user.Id(), cloudEntitlement)
+	c.Assert(err, gc.IsNil)
+	c.Assert(res, gc.Equals, true)
+
+	tuple := openfga.Tuple{
+		Object:   ofganames.ConvertTag(user),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewCloudTag("test-cloud")),
+	}
+	exists, err := s.JIMM.OpenFGAClient.CheckRelation(ctx, tuple, false)
+	c.Assert(err, gc.IsNil)
+	c.Assert(exists, gc.Equals, true)
+}
