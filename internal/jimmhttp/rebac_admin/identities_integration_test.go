@@ -113,11 +113,10 @@ func (s *identitiesSuite) TestIdentityGetGroups(c *gc.C) {
 	}
 }
 
-// TestIdentityGetGroupsWithMissingDbGroup tests the behaviour
+// TestGetIdentityGroupsWithDeletedDbGroup tests the behaviour
 // of GetIdentityGroups when a tuple lingers in OpenFGA but the group
 // has been removed from the database.
-func (s *identitiesSuite) TestIdentityGetGroupsWithMissingDbGroup(c *gc.C) {
-	// initialization
+func (s *identitiesSuite) TestGetIdentityGroupsWithDeletedDbGroup(c *gc.C) {
 	ctx := context.Background()
 	ctx = rebac_handlers.ContextWithIdentity(ctx, s.AdminUser)
 	identitySvc := rebac_admin.NewidentitiesService(s.JIMM)

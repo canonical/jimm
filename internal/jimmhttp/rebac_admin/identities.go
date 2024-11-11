@@ -129,7 +129,7 @@ func (s *identitiesService) GetIdentityGroups(ctx context.Context, identityId st
 		dbGroup, err := s.jimm.GetGroupByUUID(ctx, user, t.Target.ID)
 		if err != nil {
 			// Handle the case where the group was removed from the DB but a lingering OpenFGA tuple still exists.
-			// Don't return an error as that would prevent a user from viewing their groups, instead show the group as "removed".
+			// Don't return an error as that would prevent a user from viewing their groups, instead drop the group from the result.
 			if errors.ErrorCode(err) == errors.CodeNotFound {
 				continue
 			}
