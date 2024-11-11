@@ -611,7 +611,7 @@ func (t *tagResolver) cloudTag(ctx context.Context, db *db.Database) (*ofga.Enti
 
 	err := db.GetCloud(ctx, &cloud)
 	if err != nil {
-		return nil, errors.E("application offer not found")
+		return nil, errors.E("cloud not found")
 	}
 
 	return ofganames.ConvertTagWithRelation(cloud.ResourceTag(), t.relation), nil
