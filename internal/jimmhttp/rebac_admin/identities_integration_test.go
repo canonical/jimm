@@ -130,9 +130,9 @@ func (s *identitiesSuite) TestGetIdentityGroupsWithDeletedDbGroup(c *gc.C) {
 		Relation: ofganames.MemberRelation,
 	}
 	group1Access := baseTuple
-	group1Access.Target = ofganames.ConvertTag(group1)
+	group1Access.Target = ofganames.ConvertTag(group1.ResourceTag())
 	group2Access := baseTuple
-	group2Access.Target = ofganames.ConvertTag(group2)
+	group2Access.Target = ofganames.ConvertTag(group2.ResourceTag())
 
 	err := s.JIMM.OpenFGAClient.AddRelation(ctx, group1Access, group2Access)
 	c.Assert(err, gc.IsNil)
