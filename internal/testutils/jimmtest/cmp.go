@@ -47,6 +47,7 @@ var DBObjectEquals = qt.CmpEquals(
 	cmpopts.IgnoreFields(dbmodel.CloudRegionControllerPriority{}, "CloudRegionID", "ControllerID"),
 	cmpopts.IgnoreFields(dbmodel.Controller{}, "ID", "UpdatedAt", "CreatedAt"),
 	cmpopts.IgnoreFields(dbmodel.Model{}, "ID", "CreatedAt", "UpdatedAt", "OwnerIdentityName", "ControllerID", "CloudRegionID", "CloudCredentialID"),
+	cmpopts.IgnoreFields(dbmodel.ApplicationOffer{}, "ID", "CreatedAt", "UpdatedAt", "ModelID"),
 )
 
 // CmpEquals uses cmp.Diff (see http://godoc.org/github.com/google/go-cmp/cmp#Diff)

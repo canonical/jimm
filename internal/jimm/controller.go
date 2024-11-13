@@ -398,6 +398,7 @@ type modelImporter struct {
 	model         dbmodel.Model
 	modelInfo     jujuparams.ModelInfo
 	originalOwner names.UserTag
+	offersToAdd   []jujuparams.ApplicationOfferAdminDetailsV5
 }
 
 func newModelImporter(jimm *JIMM) modelImporter {
@@ -429,6 +430,16 @@ func (m *modelImporter) fetchModelInfo(ctx context.Context, controllerName strin
 	m.originalOwner, err = names.ParseUserTag(m.modelInfo.OwnerTag)
 	if err != nil {
 		return errors.E(fmt.Sprintf("invalid username %s from original model owner", m.modelInfo.OwnerTag))
+	}
+
+	m.offersToAdd, err = api.ListApplicationOffers(ctx, []jujuparams.OfferFilter{
+		{
+			OwnerName: m.originalOwner.Id(),
+			ModelName: m.modelInfo.Name,
+		},
+	})
+	if err != nil {
+		return err
 	}
 
 	// fill in data from model info
@@ -476,6 +487,13 @@ func (m *modelImporter) addPermissions(ctx context.Context) error {
 
 	if err := m.jimm.addModelPermissions(ctx, ofgaUser, m.model.ResourceTag(), controllerTag); err != nil {
 		return err
+	}
+
+	for _, offer := range m.offersToAdd {
+		err := m.jimm.OpenFGAClient.AddModelApplicationOffer(ctx, m.model.ResourceTag(), names.NewApplicationOfferTag(offer.OfferUUID))
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -540,6 +558,17 @@ func (m *modelImporter) save(ctx context.Context) error {
 				return fmt.Errorf("model (%s) already exists", m.model.Name)
 			}
 			return err
+		}
+		for _, offer := range m.offersToAdd {
+			var dbOffer dbmodel.ApplicationOffer
+			dbOffer.FromJujuApplicationOfferAdminDetailsV5(offer)
+			dbOffer.ModelID = m.model.ID
+			if err := m.jimm.Database.AddApplicationOffer(ctx, &dbOffer); err != nil {
+				if errors.ErrorCode(err) == errors.CodeAlreadyExists {
+					return fmt.Errorf("offer with URL %s already exists", offer.OfferURL)
+				}
+				return err
+			}
 		}
 		return nil
 	})
