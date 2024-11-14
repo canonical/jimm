@@ -29,13 +29,14 @@ const (
 )
 
 type Environment struct {
-	Clouds           []Cloud           `json:"clouds"`
-	CloudCredentials []CloudCredential `json:"cloud-credentials"`
-	CloudDefaults    []CloudDefaults   `json:"cloud-defaults"`
-	Controllers      []Controller      `json:"controllers"`
-	Models           []Model           `json:"models"`
-	Users            []User            `json:"users"`
-	UserDefaults     []UserDefaults    `json:"user-defaults"`
+	ApplicationOffers []ApplicationOffer `json:"application-offers"`
+	Clouds            []Cloud            `json:"clouds"`
+	CloudCredentials  []CloudCredential  `json:"cloud-credentials"`
+	CloudDefaults     []CloudDefaults    `json:"cloud-defaults"`
+	Controllers       []Controller       `json:"controllers"`
+	Models            []Model            `json:"models"`
+	Users             []User             `json:"users"`
+	UserDefaults      []UserDefaults     `json:"user-defaults"`
 }
 
 func ParseEnvironment(c Tester, env string) *Environment {
@@ -47,6 +48,15 @@ func ParseEnvironment(c Tester, env string) *Environment {
 	}
 
 	return &e
+}
+
+func (e *Environment) ApplicationOffer(url string) *ApplicationOffer {
+	for i := range e.ApplicationOffers {
+		if e.ApplicationOffers[i].URL == url {
+			return &e.ApplicationOffers[i]
+		}
+	}
+	return nil
 }
 
 func (e *Environment) Cloud(name string) *Cloud {
@@ -227,7 +237,6 @@ func (e *Environment) PopulateDB(c Tester, db db.Database) {
 		e.Users[i].env = e
 		e.Users[i].DBObject(c, db)
 	}
-
 	for i := range e.Clouds {
 		e.Clouds[i].env = e
 		e.Clouds[i].DBObject(c, db)
@@ -252,6 +261,52 @@ func (e *Environment) PopulateDB(c Tester, db db.Database) {
 		e.UserDefaults[i].env = e
 		e.UserDefaults[i].DBObject(c, db)
 	}
+	for i := range e.ApplicationOffers {
+		e.ApplicationOffers[i].env = e
+		e.ApplicationOffers[i].DBObject(c, db)
+	}
+}
+
+// ApplicationOffer represents Juju application offers.
+type ApplicationOffer struct {
+	ModelName              string `json:"model-name"`
+	ModelOwner             string `json:"model-owner"`
+	ApplicationName        string `json:"application-name"`
+	ApplicationDescription string `json:"application-description"`
+	Name                   string `json:"name"`
+	UUID                   string `json:"uuid"`
+	URL                    string `json:"url"`
+	// The fields below cannot currently be set by the yaml declaration
+	// but they don't need to be populated at the moment.
+	// Endpoints []ApplicationOfferRemoteEndpoint
+	// Spaces []ApplicationOfferRemoteSpace
+	// Bindings StringMap
+	// Connections []ApplicationOfferConnection
+	CharmURL string `json:"charm-url"`
+
+	env *Environment
+	dbo dbmodel.ApplicationOffer
+}
+
+func (cd *ApplicationOffer) DBObject(c Tester, db db.Database) dbmodel.ApplicationOffer {
+	if cd.dbo.ID != 0 {
+		return cd.dbo
+	}
+
+	cd.dbo.Model = cd.env.Model(cd.ModelOwner, cd.ModelName).DBObject(c, db)
+	cd.dbo.ApplicationName = cd.ApplicationName
+	cd.dbo.ApplicationDescription = cd.ApplicationDescription
+	cd.dbo.Name = cd.Name
+	cd.dbo.UUID = cd.UUID
+	cd.dbo.URL = cd.URL
+	cd.dbo.CharmURL = cd.CharmURL
+
+	err := db.AddApplicationOffer(context.Background(), &cd.dbo)
+	if err != nil {
+		c.Fatalf("err is not nil: %s", err)
+	}
+
+	return cd.dbo
 }
 
 // UserDefaults represents user's default configuration for a new model.
