@@ -103,8 +103,8 @@ func (m *Model) SetTag(t names.ModelTag) {
 	m.UUID.Valid = true
 }
 
-// SwitchOwner updates the model owner.
-func (m *Model) SwitchOwner(u *Identity) {
+// SetOwner updates the model owner.
+func (m *Model) SetOwner(u *Identity) {
 	m.OwnerIdentityName = u.Name
 	m.Owner = *u
 }

@@ -394,17 +394,28 @@ func (j *JIMM) GetUserControllerAccess(ctx context.Context, user *openfga.User, 
 }
 
 type modelImporter struct {
-	jimm          *JIMM
-	model         dbmodel.Model
-	modelInfo     jujuparams.ModelInfo
+	jimm      *JIMM
+	model     dbmodel.Model
+	modelInfo jujuparams.ModelInfo
+	// newOwner may be nil if the user wants to keep the original owner.
+	newOwner      *names.UserTag
 	originalOwner names.UserTag
 	offersToAdd   []jujuparams.ApplicationOfferAdminDetailsV5
 }
 
-func newModelImporter(jimm *JIMM) modelImporter {
-	return modelImporter{
+func newModelImporter(jimm *JIMM, newOwner string) (modelImporter, error) {
+	modelImporter := modelImporter{
 		jimm: jimm,
 	}
+	if newOwner == "" {
+		return modelImporter, nil
+	}
+	if !names.IsValidUser(newOwner) {
+		return modelImporter, errors.E(errors.CodeBadRequest, "invalid new username for new model owner")
+	}
+	newOwnerTag := names.NewUserTag(newOwner)
+	modelImporter.newOwner = &newOwnerTag
+	return modelImporter, nil
 }
 
 func (m *modelImporter) fetchModelInfo(ctx context.Context, controllerName string, modelTag names.ModelTag) error {
@@ -453,13 +464,10 @@ func (m *modelImporter) fetchModelInfo(ctx context.Context, controllerName strin
 	return nil
 }
 
-func (m *modelImporter) setModelOwner(ctx context.Context, newOwner string) error {
+func (m *modelImporter) setModelOwner(ctx context.Context) error {
 	var ownerTag names.UserTag
-	if newOwner != "" {
-		if !names.IsValidUser(newOwner) {
-			return errors.E(errors.CodeBadRequest, "invalid new username for new model owner")
-		}
-		ownerTag = names.NewUserTag(newOwner)
+	if m.newOwner != nil {
+		ownerTag = *m.newOwner
 	} else {
 		ownerTag = m.originalOwner
 	}
@@ -474,7 +482,7 @@ func (m *modelImporter) setModelOwner(ctx context.Context, newOwner string) erro
 	if err != nil {
 		return errors.E(err)
 	}
-	m.model.SwitchOwner(&owner)
+	m.model.SetOwner(&owner)
 
 	return nil
 }
@@ -574,7 +582,8 @@ func (m *modelImporter) save(ctx context.Context) error {
 	})
 }
 
-// ImportModel imports model with the specified UUID from the controller.
+// ImportModel imports a model and existing offers into JIMM.  A new owner  must be set to
+// represent the external user who will own this model (if the original owner is a local user).
 func (j *JIMM) ImportModel(ctx context.Context, user *openfga.User, controllerName string, modelTag names.ModelTag, newOwner string) error {
 	const op = errors.Op("jimm.ImportModel")
 
@@ -582,12 +591,16 @@ func (j *JIMM) ImportModel(ctx context.Context, user *openfga.User, controllerNa
 		return err
 	}
 
-	importer := newModelImporter(j)
+	importer, err := newModelImporter(j, newOwner)
+	if err != nil {
+		return errors.E(op, err)
+	}
+
 	if err := importer.fetchModelInfo(ctx, controllerName, modelTag); err != nil {
 		return errors.E(op, err)
 	}
 
-	if err := importer.setModelOwner(ctx, newOwner); err != nil {
+	if err := importer.setModelOwner(ctx); err != nil {
 		return errors.E(op, err)
 	}
 
