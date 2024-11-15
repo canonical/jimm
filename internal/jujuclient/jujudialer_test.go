@@ -1,0 +1,40 @@
+// Copyright 2024 Canonical.
+package jujuclient_test
+
+import (
+	"context"
+
+	"github.com/juju/names/v5"
+	gc "gopkg.in/check.v1"
+
+	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/jujuclient"
+	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
+)
+
+type jujuDialerSuite struct {
+	jimmtest.JujuSuite
+}
+
+var _ = gc.Suite(&jujuDialerSuite{})
+
+func (s *jujuDialerSuite) getControllerToDial(c *gc.C) *dbmodel.Controller {
+	info := s.APIInfo(c)
+	return &dbmodel.Controller{
+		UUID:          info.ControllerUUID,
+		Name:          s.ControllerConfig.ControllerName(),
+		CACertificate: info.CACert,
+		PublicAddress: info.Addrs[0],
+	}
+}
+
+func (s *jujuDialerSuite) TestJujuDialer(c *gc.C) {
+	ctx := context.Background()
+
+	dialer := jujuclient.JujuDialer{
+		JWTService: s.JIMM.JWTService,
+	}
+	conn, err := dialer.Dial(ctx, s.getControllerToDial(c), names.ModelTag{}, nil)
+	c.Assert(err, gc.IsNil)
+	defer conn.Close()
+}
