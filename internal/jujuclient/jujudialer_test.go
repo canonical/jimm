@@ -34,7 +34,10 @@ func (s *jujuDialerSuite) TestJujuDialer(c *gc.C) {
 	dialer := jujuclient.JujuDialer{
 		JWTService: s.JIMM.JWTService,
 	}
-	conn, err := dialer.Dial(ctx, s.getControllerToDial(c), names.ModelTag{}, nil)
+
+	ctl := s.getControllerToDial(c)
+
+	conn, err := dialer.Dial(ctx, ctl, names.ModelTag{}, nil)
 	c.Assert(err, gc.IsNil)
 	defer conn.Close()
 }

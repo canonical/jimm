@@ -10,7 +10,7 @@ require (
 	github.com/juju/gnuflag v1.0.0
 	github.com/juju/http/v2 v2.0.1
 	github.com/juju/juju v0.0.0-20240912164120-31b4b0914740 // v3.5.4 (https://github.com/juju/juju/releases/tag/v3.5.4)
-	github.com/juju/loggo v1.0.0
+	github.com/juju/loggo v1.0.0 // indirect
 	github.com/juju/names/v4 v4.0.0
 	github.com/juju/names/v5 v5.0.0
 	github.com/juju/rpcreflect v1.2.0
@@ -337,6 +337,15 @@ require (
 	k8s.io/utils v0.0.0-20231127182322-b307cd553661 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
+)
+
+require github.com/docker/docker v20.10.17+incompatible
+
+require (
+	github.com/Microsoft/go-winio v0.5.2 // indirect
+	github.com/docker/go-connections v0.4.0 // indirect
+	github.com/docker/go-units v0.5.0 // indirect
+	github.com/opencontainers/image-spec v1.0.3-0.20211202183452-c5a74bcca799 // indirect
 )
 
 replace (
