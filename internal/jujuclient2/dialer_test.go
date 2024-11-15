@@ -1,14 +1,16 @@
 // Copyright 2024 Canonical.
-package jujuclient_test
+package jujuclient2_test
 
 import (
 	"context"
+	"testing"
 
+	jujutesting "github.com/juju/juju/testing"
 	"github.com/juju/names/v5"
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
-	"github.com/canonical/jimm/v3/internal/jujuclient"
+	"github.com/canonical/jimm/v3/internal/jujuclient2"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
 
@@ -17,6 +19,10 @@ type jujuDialerSuite struct {
 }
 
 var _ = gc.Suite(&jujuDialerSuite{})
+
+func TestPackage(t *testing.T) {
+	jujutesting.MgoTestPackage(t)
+}
 
 func (s *jujuDialerSuite) getControllerToDial(c *gc.C) *dbmodel.Controller {
 	info := s.APIInfo(c)
@@ -31,7 +37,7 @@ func (s *jujuDialerSuite) getControllerToDial(c *gc.C) *dbmodel.Controller {
 func (s *jujuDialerSuite) TestJujuDialer(c *gc.C) {
 	ctx := context.Background()
 
-	dialer := jujuclient.JujuDialer{
+	dialer := jujuclient2.JujuDialer{
 		JWTService: s.JIMM.JWTService,
 	}
 
