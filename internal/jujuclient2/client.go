@@ -161,6 +161,7 @@ type MiscClient interface {
 }
 
 // JujuClient holds all the internal juju clients that JIMM requires.
+// TODO(ale8k): This will be defined in JIMM
 type JujuClient interface {
 	// ModelManager returns the ModelManager client.
 	ModelManager(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag) (ModelManagerClient, error)
