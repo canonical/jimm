@@ -42,6 +42,11 @@ func ParseTag(tag string) (names.Tag, error) {
 			return nil, invalidTagError(tag, kind)
 		}
 		return NewGroupTag(id), nil
+	case RoleTagKind:
+		if !IsValidRoleId(id) {
+			return nil, invalidTagError(tag, kind)
+		}
+		return NewRoleTag(id), nil
 	case ServiceAccountTagKind:
 		if !IsValidServiceAccountId(id) {
 			return nil, invalidTagError(tag, kind)

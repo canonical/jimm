@@ -110,29 +110,60 @@ func (j *JIMM) ListObjectRelations(ctx context.Context, user *openfga.User, obje
 	if !user.JimmAdmin {
 		return nil, e, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
-	continuationToken, kind, err := pagination.DecodeEntitlementToken(entitlementToken)
+	responseTuples, nextToken, err := j.getObjectRelationsPage(ctx, object, pageSize, entitlementToken)
 	if err != nil {
-		return nil, e, err
+		return nil, e, errors.E(op, err)
 	}
+	// verify next page contains some entries. Otherwise return empty nextToken.
+	if len(responseTuples) == int(pageSize) && nextToken.String() != "" {
+		responseTuples, _, err := j.getObjectRelationsPage(ctx, object, 1, nextToken)
+		if err != nil {
+			return nil, e, errors.E(op, "error getting next page to verify it cointains something", err)
+		}
+		if len(responseTuples) == 0 {
+			nextToken = pagination.EntitlementToken{}
+		}
+	}
+	return responseTuples, nextToken, nil
+}
+
+func (j *JIMM) getObjectRelationsPage(ctx context.Context, object string, pageSize int32, entitlementToken pagination.EntitlementToken) ([]openfga.Tuple, pagination.EntitlementToken, error) {
+	var err error
+	var e pagination.EntitlementToken
 	tuple := &openfga.Tuple{}
 	tuple.Object, err = j.parseAndValidateTag(ctx, object)
 	if err != nil {
 		return nil, e, err
 	}
-	tuple.Target, err = j.parseAndValidateTag(ctx, kind.String())
-	if err != nil {
-		return nil, e, err
+	var responseTuples []openfga.Tuple
+	nextToken := entitlementToken
+	// loop around entity kinds, each with a different continuation token.
+	for {
+		nextContinuationToken, kind, err := pagination.DecodeEntitlementToken(nextToken)
+		if err != nil {
+			return nil, e, err
+		}
+		tuple.Target, err = j.parseAndValidateTag(ctx, kind.String())
+		if err != nil {
+			return nil, e, err
+		}
+		t, nextContinuationToken, err := j.OpenFGAClient.ReadRelatedObjects(ctx, *tuple, pageSize, nextContinuationToken)
+		if err != nil {
+			return nil, e, err
+		}
+		responseTuples = append(responseTuples, t...)
+		// nolint:gosec
+		pageSize -= int32(len(t))
+		nextToken, err = pagination.NextEntitlementToken(kind, nextContinuationToken)
+		if err != nil {
+			return nil, e, err
+		}
+		// break on a full page or no other entries.
+		if pageSize <= 0 || nextToken.String() == "" {
+			break
+		}
 	}
-
-	responseTuples, nextContinuationToken, err := j.OpenFGAClient.ReadRelatedObjects(ctx, *tuple, pageSize, continuationToken)
-	if err != nil {
-		return nil, e, errors.E(op, err)
-	}
-	nextEntitlementToken, err := pagination.NextEntitlementToken(kind, nextContinuationToken)
-	if err != nil {
-		return nil, e, err
-	}
-	return responseTuples, nextEntitlementToken, nil
+	return responseTuples, nextToken, nil
 }
 
 // parseTuples translate the api request struct containing tuples to a slice of openfga tuple keys.

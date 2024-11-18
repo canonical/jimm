@@ -177,18 +177,10 @@ func (s rebacAdminSuite) TestGetGroupEntitlementsIntegration(c *gc.C) {
 	emptyPageToken := ""
 	req := resources.GetGroupsItemEntitlementsParams{NextPageToken: &emptyPageToken}
 	var entitlements []resources.EntityEntitlement
-	for {
-		res, err := s.groupSvc.GetGroupEntitlements(ctx, group.UUID, &req)
-		c.Assert(err, gc.IsNil)
-		c.Assert(res, gc.Not(gc.IsNil))
-		entitlements = append(entitlements, res.Data...)
-		if res.Next.PageToken == nil {
-			break
-		}
-		c.Assert(*res.Meta.PageToken, gc.Equals, *req.NextPageToken)
-		c.Assert(*res.Next.PageToken, gc.Not(gc.Equals), "")
-		req.NextPageToken = res.Next.PageToken
-	}
+	res, err := s.groupSvc.GetGroupEntitlements(ctx, group.UUID, &req)
+	c.Assert(err, gc.IsNil)
+	c.Assert(res, gc.Not(gc.IsNil))
+	entitlements = append(entitlements, res.Data...)
 	c.Assert(entitlements, gc.HasLen, 6)
 	modelEntitlementCount := 0
 	controllerEntitlementCount := 0

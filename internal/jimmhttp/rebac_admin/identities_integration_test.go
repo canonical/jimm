@@ -221,18 +221,10 @@ func (s *identitiesSuite) TestIdentityEntitlements(c *gc.C) {
 	emptyPageToken := ""
 	req := resources.GetIdentitiesItemEntitlementsParams{NextPageToken: &emptyPageToken}
 	var entitlements []resources.EntityEntitlement
-	for {
-		res, err := identitySvc.GetIdentityEntitlements(ctx, user.Id(), &req)
-		c.Assert(err, gc.IsNil)
-		c.Assert(res, gc.Not(gc.IsNil))
-		entitlements = append(entitlements, res.Data...)
-		if res.Next.PageToken == nil || *res.Next.PageToken == "" {
-			break
-		}
-		c.Assert(*res.Meta.PageToken, gc.Equals, *req.NextPageToken)
-		c.Assert(*res.Next.PageToken, gc.Not(gc.Equals), "")
-		req.NextPageToken = res.Next.PageToken
-	}
+	res, err := identitySvc.GetIdentityEntitlements(ctx, user.Id(), &req)
+	c.Assert(err, gc.IsNil)
+	c.Assert(res, gc.Not(gc.IsNil))
+	entitlements = append(entitlements, res.Data...)
 	c.Assert(entitlements, gc.HasLen, 7)
 	modelEntitlementCount := 0
 	controllerEntitlementCount := 0
