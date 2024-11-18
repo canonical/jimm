@@ -487,6 +487,8 @@ func (m *modelImporter) setModelOwner(ctx context.Context) error {
 	return nil
 }
 
+// addPermissions grants the model owner with admin access to the model
+// and, in turn, admin access to any offers within the model.
 func (m *modelImporter) addPermissions(ctx context.Context) error {
 	// Note that only the new owner is given access. All previous users that had access according to Juju
 	// are discarded as access must now be governed by JIMM and OpenFGA.
