@@ -393,7 +393,199 @@ func (j *JIMM) GetUserControllerAccess(ctx context.Context, user *openfga.User, 
 	return ToControllerAccessString(accessLevel), nil
 }
 
-// ImportModel imports model with the specified UUID from the controller.
+type modelImporter struct {
+	jimm      *JIMM
+	model     dbmodel.Model
+	modelInfo jujuparams.ModelInfo
+	// newOwner may be nil if the user wants to keep the original owner.
+	newOwner      *names.UserTag
+	originalOwner names.UserTag
+	offersToAdd   []jujuparams.ApplicationOfferAdminDetailsV5
+}
+
+func newModelImporter(jimm *JIMM, newOwner string) (modelImporter, error) {
+	modelImporter := modelImporter{
+		jimm: jimm,
+	}
+	if newOwner == "" {
+		return modelImporter, nil
+	}
+	if !names.IsValidUser(newOwner) {
+		return modelImporter, errors.E(errors.CodeBadRequest, "invalid new username for new model owner")
+	}
+	newOwnerTag := names.NewUserTag(newOwner)
+	modelImporter.newOwner = &newOwnerTag
+	return modelImporter, nil
+}
+
+func (m *modelImporter) fetchModelInfo(ctx context.Context, controllerName string, modelTag names.ModelTag) error {
+	controller, err := m.jimm.getControllerByName(ctx, controllerName)
+	if err != nil {
+		return err
+	}
+
+	api, err := m.jimm.dialController(ctx, controller)
+	if err != nil {
+		return errors.E("failed to dial the controller", err)
+	}
+	defer api.Close()
+
+	m.modelInfo = jujuparams.ModelInfo{
+		UUID: modelTag.Id(),
+	}
+	err = api.ModelInfo(ctx, &m.modelInfo)
+	if err != nil {
+		return err
+	}
+
+	m.originalOwner, err = names.ParseUserTag(m.modelInfo.OwnerTag)
+	if err != nil {
+		return errors.E(fmt.Sprintf("invalid username %s from original model owner", m.modelInfo.OwnerTag))
+	}
+
+	m.offersToAdd, err = api.ListApplicationOffers(ctx, []jujuparams.OfferFilter{
+		{
+			OwnerName: m.originalOwner.Id(),
+			ModelName: m.modelInfo.Name,
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	// fill in data from model info
+	err = m.model.FromJujuModelInfo(m.modelInfo)
+	if err != nil {
+		return err
+	}
+	m.model.ControllerID = controller.ID
+	m.model.Controller = *controller
+
+	return nil
+}
+
+func (m *modelImporter) setModelOwner(ctx context.Context) error {
+	var ownerTag names.UserTag
+	if m.newOwner != nil {
+		ownerTag = *m.newOwner
+	} else {
+		ownerTag = m.originalOwner
+	}
+
+	if ownerTag.IsLocal() {
+		return errors.E("cannot import model from local user, try --owner to switch the model owner")
+	}
+	owner := dbmodel.Identity{}
+	owner.SetTag(ownerTag)
+
+	err := m.jimm.Database.GetIdentity(ctx, &owner)
+	if err != nil {
+		return errors.E(err)
+	}
+	m.model.SetOwner(&owner)
+
+	return nil
+}
+
+// addPermissions grants the model owner with admin access to the model
+// and, in turn, admin access to any offers within the model.
+func (m *modelImporter) addPermissions(ctx context.Context) error {
+	// Note that only the new owner is given access. All previous users that had access according to Juju
+	// are discarded as access must now be governed by JIMM and OpenFGA.
+	ofgaUser := openfga.NewUser(&m.model.Owner, m.jimm.OpenFGAClient)
+	controllerTag := m.model.Controller.ResourceTag()
+
+	if err := m.jimm.addModelPermissions(ctx, ofgaUser, m.model.ResourceTag(), controllerTag); err != nil {
+		return err
+	}
+
+	for _, offer := range m.offersToAdd {
+		err := m.jimm.OpenFGAClient.AddModelApplicationOffer(ctx, m.model.ResourceTag(), names.NewApplicationOfferTag(offer.OfferUUID))
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (m *modelImporter) setCloudCredential(ctx context.Context) error {
+	// fetch cloud credential used by the model
+	cloudTag, err := names.ParseCloudTag(m.modelInfo.CloudTag)
+	if err != nil {
+		return err
+	}
+
+	// Note that the model already has a cloud credential configured which it will use when deploying new
+	// applications. JIMM needs some cloud credential reference to be able to import the model so use any
+	// credential against the cloud the model is deployed against. Even using the correct cloud for the
+	// credential is not strictly necessary, but will help prevent the user thinking they can create new
+	// models on the incoming cloud.
+	allCredentials, err := m.jimm.Database.GetIdentityCloudCredentials(ctx, &m.model.Owner, cloudTag.Id())
+	if err != nil {
+		return err
+	}
+	if len(allCredentials) == 0 {
+		return errors.E(errors.CodeNotFound, fmt.Sprintf("Failed to find cloud credential for user %s on cloud %s", m.model.Owner.Name, cloudTag.Id()))
+	}
+	cloudCredential := allCredentials[0]
+
+	m.model.CloudCredentialID = cloudCredential.ID
+	m.model.CloudCredential = cloudCredential
+
+	return nil
+}
+
+func (m *modelImporter) setModelCloud(ctx context.Context) error {
+	// fetch the cloud used by the model
+	cloudTag, err := names.ParseCloudTag(m.modelInfo.CloudTag)
+	if err != nil {
+		return err
+	}
+	cloud := dbmodel.Cloud{Name: cloudTag.Id()}
+	err = m.jimm.Database.GetCloud(ctx, &cloud)
+	if err != nil {
+		zapctx.Error(ctx, "failed to get cloud", zap.String("cloud", cloud.Name))
+		return err
+	}
+
+	cr := cloud.Region(m.modelInfo.CloudRegion)
+	if cr.Name != m.modelInfo.CloudRegion {
+		return errors.E("cloud region not found")
+	}
+
+	m.model.CloudRegionID = cr.ID
+	m.model.CloudRegion = cr
+
+	return nil
+}
+
+func (m *modelImporter) save(ctx context.Context) error {
+	return m.jimm.Database.Transaction(func(d *db.Database) error {
+		err := m.jimm.Database.AddModel(ctx, &m.model)
+		if err != nil {
+			if errors.ErrorCode(err) == errors.CodeAlreadyExists {
+				return fmt.Errorf("model (%s) already exists", m.model.Name)
+			}
+			return err
+		}
+		for _, offer := range m.offersToAdd {
+			var dbOffer dbmodel.ApplicationOffer
+			dbOffer.FromJujuApplicationOfferAdminDetailsV5(offer)
+			dbOffer.ModelID = m.model.ID
+			if err := m.jimm.Database.AddApplicationOffer(ctx, &dbOffer); err != nil {
+				if errors.ErrorCode(err) == errors.CodeAlreadyExists {
+					return fmt.Errorf("offer with URL %s already exists", offer.OfferURL)
+				}
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+// ImportModel imports a model and existing offers into JIMM.  A new owner  must be set to
+// represent the external user who will own this model (if the original owner is a local user).
 func (j *JIMM) ImportModel(ctx context.Context, user *openfga.User, controllerName string, modelTag names.ModelTag, newOwner string) error {
 	const op = errors.Op("jimm.ImportModel")
 
@@ -401,125 +593,46 @@ func (j *JIMM) ImportModel(ctx context.Context, user *openfga.User, controllerNa
 		return err
 	}
 
-	controller, err := j.getControllerByName(ctx, controllerName)
+	importer, err := newModelImporter(j, newOwner)
 	if err != nil {
 		return errors.E(op, err)
 	}
 
-	api, err := j.dialController(ctx, controller)
-	if err != nil {
-		return errors.E(op, "failed to dial the controller", err)
-	}
-	defer api.Close()
-
-	modelInfo := jujuparams.ModelInfo{
-		UUID: modelTag.Id(),
-	}
-	err = api.ModelInfo(ctx, &modelInfo)
-	if err != nil {
+	if err := importer.fetchModelInfo(ctx, controllerName, modelTag); err != nil {
 		return errors.E(op, err)
 	}
-	model := dbmodel.Model{}
-	// fill in data from model info
-	err = model.FromJujuModelInfo(modelInfo)
-	if err != nil {
+
+	if err := importer.setModelOwner(ctx); err != nil {
 		return errors.E(op, err)
 	}
-	model.ControllerID = controller.ID
-	model.Controller = *controller
 
-	var ownerTag names.UserTag
-	if newOwner != "" {
-		// Switch the model to be owned by the specified user.
-		if !names.IsValidUser(newOwner) {
-			return errors.E(op, errors.CodeBadRequest, "invalid new username for new model owner")
-		}
-		ownerTag = names.NewUserTag(newOwner)
-	} else {
-		// Use the model owner user
-		ownerTag, err = names.ParseUserTag(modelInfo.OwnerTag)
-		if err != nil {
-			return errors.E(op, fmt.Sprintf("invalid username %s from original model owner", modelInfo.OwnerTag))
-		}
-	}
-	if ownerTag.IsLocal() {
-		return errors.E(op, "cannot import model from local user, try --owner to switch the model owner")
-	}
-	ownerUser := dbmodel.Identity{}
-	ownerUser.SetTag(ownerTag)
-	err = j.Database.GetIdentity(ctx, &ownerUser)
-	if err != nil {
-		return errors.E(op, err)
-	}
-	model.SwitchOwner(&ownerUser)
-
-	// Note that only the new owner is given access. All previous users that had access according to Juju
-	// are discarded as access must now be governed by JIMM and OpenFGA.
-	ofgaUser := openfga.NewUser(&ownerUser, j.OpenFGAClient)
-	controllerTag := model.Controller.ResourceTag()
-
-	if err := j.addModelPermissions(ctx, ofgaUser, modelTag, controllerTag); err != nil {
+	if err := importer.addPermissions(ctx); err != nil {
 		return errors.E(op, err)
 	}
 
 	// TODO(CSS-5458): Remove the below section on cloud credentials once we no longer persist the relation between
-	// cloud credentials and models
-
-	// fetch cloud credential used by the model
-	cloudTag, err := names.ParseCloudTag(modelInfo.CloudTag)
-	if err != nil {
-		return errors.E(op, err)
-	}
-	// Note that the model already has a cloud credential configured which it will use when deploying new
-	// applications. JIMM needs some cloud credential reference to be able to import the model so use any
-	// credential against the cloud the model is deployed against. Even using the correct cloud for the
-	// credential is not strictly necessary, but will help prevent the user thinking they can create new
-	// models on the incoming cloud.
-	allCredentials, err := j.Database.GetIdentityCloudCredentials(ctx, &ownerUser, cloudTag.Id())
-	if err != nil {
-		return errors.E(op, err)
-	}
-	if len(allCredentials) == 0 {
-		return errors.E(op, errors.CodeNotFound, fmt.Sprintf("Failed to find cloud credential for user %s on cloud %s", ownerUser.Name, cloudTag.Id()))
-	}
-	cloudCredential := allCredentials[0]
-
-	model.CloudCredentialID = cloudCredential.ID
-	model.CloudCredential = cloudCredential
-
-	// fetch the cloud used by the model
-	cloud := dbmodel.Cloud{
-		Name: cloudCredential.CloudName,
-	}
-	err = j.Database.GetCloud(ctx, &cloud)
-	if err != nil {
-		zapctx.Error(ctx, "failed to get cloud", zap.String("cloud", cloud.Name))
+	// cloud credentials and models.
+	// Update: We need to investigate this further, if a user updates their cloud-credential it will update the credential
+	// on this model.
+	if err := importer.setCloudCredential(ctx); err != nil {
 		return errors.E(op, err)
 	}
 
-	cr := cloud.Region(modelInfo.CloudRegion)
-	if cr.Name != modelInfo.CloudRegion {
-		return errors.E(op, "cloud region not found")
-	}
-
-	model.CloudRegionID = cr.ID
-	model.CloudRegion = cr
-
-	err = j.Database.AddModel(ctx, &model)
-	if err != nil {
-		if errors.ErrorCode(err) == errors.CodeAlreadyExists {
-			return errors.E(op, err, "model already exists")
-		}
+	if err := importer.setModelCloud(ctx); err != nil {
 		return errors.E(op, err)
 	}
 
-	return j.handleModelDeltas(ctx, controller, modelTag, model)
+	if err := importer.save(ctx); err != nil {
+		return errors.E(op, err)
+	}
+
+	return importer.handleModelDeltas(ctx)
 }
 
-func (j *JIMM) handleModelDeltas(ctx context.Context, controller *dbmodel.Controller, modelTag names.ModelTag, model dbmodel.Model) error {
+func (m *modelImporter) handleModelDeltas(ctx context.Context) error {
 	const op = errors.Op("jimm.getModelDeltas")
 
-	modelAPI, err := j.dialModel(ctx, controller, modelTag)
+	modelAPI, err := m.jimm.dialModel(ctx, &m.model.Controller, m.model.ResourceTag())
 	if err != nil {
 		return errors.E(op, err)
 	}
@@ -541,9 +654,9 @@ func (j *JIMM) handleModelDeltas(ctx context.Context, controller *dbmodel.Contro
 	}
 
 	modelIDf := func(uuid string) *modelState {
-		if uuid == model.UUID.String {
+		if uuid == m.model.UUID.String {
 			return &modelState{
-				id:       model.ID,
+				id:       m.model.ID,
 				machines: make(map[string]int64),
 				units:    make(map[string]bool),
 			}
@@ -552,7 +665,7 @@ func (j *JIMM) handleModelDeltas(ctx context.Context, controller *dbmodel.Contro
 	}
 
 	w := &Watcher{
-		Database: j.Database,
+		Database: m.jimm.Database,
 	}
 	for _, d := range deltas {
 		if err := w.handleDelta(ctx, modelIDf, d); err != nil {

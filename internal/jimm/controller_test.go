@@ -495,6 +495,7 @@ func TestImportModel(t *testing.T) {
 		expectedModel  dbmodel.Model
 		expectedError  string
 		deltas         []jujuparams.Delta
+		offers         []jujuparams.ApplicationOfferAdminDetailsV5
 	}{{
 		about:          "model imported",
 		user:           "alice@canonical.com",
@@ -888,7 +889,114 @@ func TestImportModel(t *testing.T) {
 			info.OwnerTag = names.NewUserTag("alice@canonical.com").String()
 			return nil
 		},
-		expectedError: `model already exists`,
+		expectedError: `model (.*) already exists`,
+	}, {
+		about:          "import model with offers",
+		user:           "alice@canonical.com",
+		controllerName: "test-controller",
+		newOwner:       "",
+		modelUUID:      "00000002-0000-0000-0000-000000000001",
+		jimmAdmin:      true,
+		modelInfo: func(_ context.Context, info *jujuparams.ModelInfo) error {
+			info.Name = "test-model"
+			info.Type = "test-type"
+			info.UUID = "00000002-0000-0000-0000-000000000001"
+			info.ControllerUUID = "00000001-0000-0000-0000-000000000001"
+			info.DefaultSeries = "test-series"
+			info.CloudTag = names.NewCloudTag("test-cloud").String()
+			info.CloudRegion = "test-region"
+			info.CloudCredentialTag = names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential").String()
+			info.CloudCredentialValidity = &trueValue
+			info.OwnerTag = names.NewUserTag("alice@canonical.com").String()
+			info.Life = life.Alive
+			info.Status = jujuparams.EntityStatus{
+				Status: status.Status("ok"),
+				Info:   "test-info",
+				Since:  &now,
+			}
+			info.SLA = &jujuparams.ModelSLAInfo{
+				Level: "essential",
+				Owner: "alice@canonical.com",
+			}
+			info.AgentVersion = newVersion("2.1.0")
+			return nil
+		},
+		expectedModel: dbmodel.Model{
+			Name: "test-model",
+			UUID: sql.NullString{
+				String: "00000002-0000-0000-0000-000000000001",
+				Valid:  true,
+			},
+			Owner: dbmodel.Identity{
+				Name:        "alice@canonical.com",
+				DisplayName: "Alice",
+			},
+			Controller: dbmodel.Controller{
+				Name:         "test-controller",
+				UUID:         "00000001-0000-0000-0000-000000000001",
+				CloudName:    "test-cloud",
+				CloudRegion:  "test-region-1",
+				AgentVersion: "3.2.1",
+			},
+			CloudRegion: dbmodel.CloudRegion{
+				Cloud: dbmodel.Cloud{
+					Name: "test-cloud",
+					Type: "test",
+				},
+				Name: "test-region",
+			},
+			CloudCredential: dbmodel.CloudCredential{
+				Name: "test-credential",
+			},
+			Type:          "test-type",
+			DefaultSeries: "test-series",
+			Life:          state.Alive.String(),
+			Status: dbmodel.Status{
+				Status: "ok",
+				Info:   "test-info",
+				Since: sql.NullTime{
+					Valid: true,
+					Time:  now,
+				},
+				Version: "2.1.0",
+			},
+			SLA: dbmodel.SLA{
+				Level: "essential",
+				Owner: "alice@canonical.com",
+			},
+			Offers: []dbmodel.ApplicationOffer{
+				{
+					ApplicationName: "app1",
+					URL:             "url1",
+					UUID:            "00000001-0000-0000-0000-000000000001",
+					Name:            "offer1",
+				},
+				{
+					ApplicationName: "app2",
+					URL:             "url2",
+					UUID:            "00000001-0000-0000-0000-000000000002",
+					Name:            "offer2",
+				},
+			},
+		},
+		offers: []jujuparams.ApplicationOfferAdminDetailsV5{
+			{
+				ApplicationOfferDetailsV5: jujuparams.ApplicationOfferDetailsV5{
+					OfferUUID: "00000001-0000-0000-0000-000000000001",
+					OfferName: "offer1",
+					OfferURL:  "url1",
+				},
+				ApplicationName: "app1",
+			},
+			{
+				ApplicationOfferDetailsV5: jujuparams.ApplicationOfferDetailsV5{
+					OfferUUID: "00000001-0000-0000-0000-000000000002",
+					OfferName: "offer2",
+					OfferURL:  "url2",
+				},
+				ApplicationName: "app2",
+			},
+		},
 	}}
 
 	for _, test := range tests {
@@ -909,6 +1017,9 @@ func TestImportModel(t *testing.T) {
 				},
 				WatchAll_: func(context.Context) (string, error) {
 					return test.about, nil
+				},
+				ListApplicationOffers_: func(ctx context.Context, of []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error) {
+					return test.offers, nil
 				},
 			}
 
@@ -956,6 +1067,17 @@ func TestImportModel(t *testing.T) {
 				ok, err := client.CheckRelation(ctx, controllerPermissionCheck, false)
 				c.Assert(err, qt.IsNil)
 				c.Assert(ok, qt.IsTrue)
+
+				for _, offer := range test.expectedModel.Offers {
+					offerPermissionCheck := ofga.Tuple{
+						Object:   ofganames.ConvertTag(names.NewUserTag(test.user)),
+						Relation: ofganames.AdministratorRelation,
+						Target:   ofganames.ConvertTag(names.NewApplicationOfferTag(offer.UUID)),
+					}
+					ok, err := client.CheckRelation(ctx, offerPermissionCheck, false)
+					c.Assert(err, qt.IsNil)
+					c.Assert(ok, qt.IsTrue)
+				}
 			} else {
 				c.Assert(err, qt.ErrorMatches, test.expectedError)
 			}
