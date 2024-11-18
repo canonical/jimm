@@ -43,13 +43,6 @@ tuples:
       relation: assignee
       object: role:ro-role-6
 
-    # - user: group:gr-group-1#member
-    #   relation: member
-    #   object: group:gr-group-2
-    # - user: user:*
-    #   relation: member
-    #   object: group:gr-group-3
-
     # Controller (co)
     - user: user:co-user-1
       relation: administrator
