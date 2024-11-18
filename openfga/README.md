@@ -26,3 +26,7 @@ go install github.com/openfga/cli/cmd/fga@latest
 5. Save the file over the existing authorisation_model.json
 6. Add tests to tests.fga.yaml - Learn more [here](https://openfga.dev/docs/modeling/testing)
 7. Run them via: `make test-auth-model`
+
+## Test Structure
+In order to avoid the potential entanglement of separate tests the tuples are artifically split into groups using this naming convention: (type):(2-letter test name)-(type)-(id)
+The GitHub action supports running all tests in a directory, but keeping them in a single file improves the local development experience because the CLI does not.
