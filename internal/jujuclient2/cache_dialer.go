@@ -63,7 +63,7 @@ func (cjd *cacheJujuDialer) Dial(ctx context.Context, ctl *dbmodel.Controller, m
 
 	ctlUuid := ctl.ResourceTag().Id()
 
-	v, err, _ := cjd.sf.Do(ctlUuid, func() (interface{}, error) {
+	v, err, _ := cjd.sf.Do(ctlUuid, func() (any, error) {
 		cjd.mu.Lock()
 		conn, exists := cjd.conns[ctlUuid]
 		cjd.mu.Unlock()
