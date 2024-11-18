@@ -1,12 +1,5 @@
-# OpenFGA CLI instructions
-#
-# Installation: https://github.com/openfga/cli?tab=readme-ov-file#installation
-# Command: fga model test --tests tests.fga.yaml
-
 model_file: ./authorisation_model.fga
 
-# In order to avoid the potential entanglement of separate tests the tuples are artifically split into groups using this naming convention: (type):(2-letter test name)-(type)-(id)
-# The GitHub action supports running all tests in a directory, but keeping them in a single file improves the local development experience because the CLI does not.
 tuples:
     # Group (gr)
     - user: user:gr-user-1
@@ -18,6 +11,37 @@ tuples:
     - user: user:*
       relation: member
       object: group:gr-group-3
+
+    # Role (ro)
+    # User to role direct
+    - user: user:ro-user-1
+      relation: assignee
+      object: role:ro-role-1
+
+    # User to role via group
+    - user: user:ro-user-2
+      relation: member
+      object: group:ro-group-1
+
+    - user: group:ro-group-1#member
+      relation: assignee
+      object: role:ro-role-2
+
+    # Wildcard user to role
+    - user: user:*
+      relation: assignee
+      object: role:ro-role-3
+
+    # Many roles one user
+    - user: user:ro-user-3
+      relation: assignee
+      object: role:ro-role-4
+    - user: user:ro-user-3
+      relation: assignee
+      object: role:ro-role-5
+    - user: user:ro-user-3
+      relation: assignee
+      object: role:ro-role-6
 
     # Controller (co)
     - user: user:co-user-1
@@ -166,6 +190,38 @@ tests:
                 - group:gr-group-1
                 - group:gr-group-2
                 - group:gr-group-3
+
+    # Ensures:
+    # - User can directly become an assignee of a role
+    # - User may go through a group to be indirectly an assignee
+    # - Wildcarded user can have direct assignee of a role
+    # - User can hold many roles
+    - name: Role
+      check:
+        - user: user:ro-user-1
+          object: role:ro-role-1
+          assertions:
+            assignee: true
+
+        - user: user:ro-user-2
+          object: role:ro-role-2
+          assertions:
+            assignee: true
+        
+        - user: user:ro-user-3
+          object: role:ro-role-3
+          assertions:
+            assignee: true
+
+      list_objects:
+        - user: user:ro-user-3
+          type: role
+          assertions:
+            assignee:
+              - role:ro-role-3 # From user:*
+              - role:ro-role-4
+              - role:ro-role-5
+              - role:ro-role-6
             
     # Checks whether:
     # - all or invididual users, or group members can become administators and audit_log_viewers of a controller
