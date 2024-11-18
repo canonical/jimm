@@ -1,7 +1,8 @@
 # openfga
 
 ## Introduction
-The OpenFGA package holds our authorisation model and a go embed. It also holds
+The OpenFGA package holds our authorisation model and a go embed to pass the auth model into tests.
+It also holds
 tests to ensure the authorisation model is working correctly.
 
 ## Requirements
