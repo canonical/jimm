@@ -648,7 +648,6 @@ func (j *JIMM) enrichOfferDetails(ctx context.Context, user *openfga.User, dbOff
 	}
 
 	offerDetail.Users = users
-	offerDetail.OfferURL = dbOffer.URL
 
 	return offerDetail, nil
 }
@@ -802,11 +801,12 @@ func (j *JIMM) listApplicationOffersForModel(ctx context.Context, user *openfga.
 	offerDetails := make([]jujuparams.ApplicationOfferAdminDetailsV5, len(offers))
 	for i, offer := range offers {
 		var offerDetail jujuparams.ApplicationOfferAdminDetailsV5
-		offerDetail.OfferUUID = offer.UUID
+		offerDetail.OfferURL = offer.URL
 		err := api.GetApplicationOffer(ctx, &offerDetail)
 		if err != nil {
 			return nil, err
 		}
+
 		enrichedDetails, err := j.enrichOfferDetails(ctx, user, offer, offerDetail)
 		if err != nil {
 			return nil, err

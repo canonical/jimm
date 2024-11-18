@@ -2502,8 +2502,8 @@ func TestListApplicationOffers(t *testing.T) {
 		Dialer: &jimmtest.Dialer{
 			API: &jimmtest.API{
 				GetApplicationOffer_: func(ctx context.Context, aoadv *jujuparams.ApplicationOfferAdminDetailsV5) error {
-					switch aoadv.OfferUUID {
-					case "00000012-0000-0000-0000-000000000001":
+					switch aoadv.OfferURL {
+					case "test-offer-url":
 						*aoadv = jujuparams.ApplicationOfferAdminDetailsV5{
 							ApplicationOfferDetailsV5: jujuparams.ApplicationOfferDetailsV5{
 								SourceModelTag:         "00000011-0000-0000-0000-000000000001",
@@ -2527,12 +2527,12 @@ func TestListApplicationOffers(t *testing.T) {
 								Endpoint:       "an-endpoint",
 							}},
 						}
-					case "00000012-0000-0000-0000-000000000002":
+					case "test-offer-url-2":
 						*aoadv = jujuparams.ApplicationOfferAdminDetailsV5{
 							ApplicationOfferDetailsV5: jujuparams.ApplicationOfferDetailsV5{
 								SourceModelTag:         "00000011-0000-0000-0000-000000000002",
 								OfferUUID:              "00000012-0000-0000-0000-000000000002",
-								OfferURL:               "test-offer-url",
+								OfferURL:               "test-offer-url-2",
 								OfferName:              "offer-2",
 								ApplicationDescription: "app description 2",
 								Endpoints: []jujuparams.RemoteEndpoint{{
@@ -2551,12 +2551,12 @@ func TestListApplicationOffers(t *testing.T) {
 								Endpoint:       "an-endpoint",
 							}},
 						}
-					case "00000012-0000-0000-0000-000000000003":
+					case "test-offer-url-3":
 						*aoadv = jujuparams.ApplicationOfferAdminDetailsV5{
 							ApplicationOfferDetailsV5: jujuparams.ApplicationOfferDetailsV5{
 								SourceModelTag:         "00000011-0000-0000-0000-000000000003",
 								OfferUUID:              "00000012-0000-0000-0000-000000000003",
-								OfferURL:               "test-offer-url",
+								OfferURL:               "test-offer-url-3",
 								OfferName:              "offer-3",
 								ApplicationDescription: "app description 3",
 								Endpoints: []jujuparams.RemoteEndpoint{{
@@ -2660,7 +2660,7 @@ func TestListApplicationOffers(t *testing.T) {
 		ApplicationOfferDetailsV5: jujuparams.ApplicationOfferDetailsV5{
 			SourceModelTag:         "00000011-0000-0000-0000-000000000003",
 			OfferUUID:              "00000012-0000-0000-0000-000000000003",
-			OfferURL:               "test-offer-url",
+			OfferURL:               "test-offer-url-3",
 			OfferName:              "offer-3",
 			ApplicationDescription: "app description 3",
 			Endpoints: []jujuparams.RemoteEndpoint{{
@@ -2724,7 +2724,7 @@ func TestListApplicationOffers(t *testing.T) {
 		ApplicationOfferDetailsV5: jujuparams.ApplicationOfferDetailsV5{
 			SourceModelTag:         "00000011-0000-0000-0000-000000000002",
 			OfferUUID:              "00000012-0000-0000-0000-000000000002",
-			OfferURL:               "test-offer-url",
+			OfferURL:               "test-offer-url-2",
 			OfferName:              "offer-2",
 			ApplicationDescription: "app description 2",
 			Endpoints: []jujuparams.RemoteEndpoint{{
