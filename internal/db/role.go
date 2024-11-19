@@ -82,7 +82,7 @@ func (d *Database) UpdateRoleName(ctx context.Context, uuid, name string) (err e
 	model := d.DB.WithContext(ctx).Model(&dbmodel.RoleEntry{})
 	model.Where("uuid = ?", uuid)
 	if model.Update("name", name).RowsAffected == 0 {
-		return errors.E(op, "role does not exist")
+		return errors.E(op, errors.CodeNotFound, "role not found")
 	}
 
 	return nil

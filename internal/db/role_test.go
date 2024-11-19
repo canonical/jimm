@@ -88,7 +88,8 @@ func (s *dbSuite) TestUpdateRoleName(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 
 	err = s.Database.UpdateRoleName(context.Background(), "blah", "blah")
-	c.Check(err, qt.ErrorMatches, "role does not exist")
+	c.Check(err, qt.ErrorMatches, "role not found")
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
 	err = s.Database.UpdateRoleName(context.Background(), "", "")
 	c.Check(err, qt.ErrorMatches, "uuid must be specified")
