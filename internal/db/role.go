@@ -59,8 +59,8 @@ func (d *Database) GetRole(ctx context.Context, role *dbmodel.RoleEntry) (err er
 	return nil
 }
 
-// UpdateRole updates the role identified by its ID or UUID.
-func (d *Database) UpdateRole(ctx context.Context, role *dbmodel.RoleEntry) (err error) {
+// UpdateRoleName updates the role name identified by its ID or UUID.
+func (d *Database) UpdateRoleName(ctx context.Context, role *dbmodel.RoleEntry) (err error) {
 	const op = errors.Op("db.UpdateRole")
 
 	if role.ID == 0 {

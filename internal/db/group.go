@@ -108,8 +108,8 @@ func (d *Database) ListGroups(ctx context.Context, limit, offset int, match stri
 	return groups, nil
 }
 
-// UpdateGroup updates the group identified by its ID.
-func (d *Database) UpdateGroup(ctx context.Context, group *dbmodel.GroupEntry) (err error) {
+// UpdateGroupName updates the group name identified by its ID or UUID.
+func (d *Database) UpdateGroupName(ctx context.Context, group *dbmodel.GroupEntry) (err error) {
 	const op = errors.Op("db.UpdateGroup")
 
 	if group.ID == 0 {

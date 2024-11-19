@@ -14,7 +14,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/errors"
 )
 
-func (s *dbSuite) TestDatabase_AddRole(c *qt.C) {
+func (s *dbSuite) TestAddRole(c *qt.C) {
 	ctx := context.Background()
 
 	uuid := uuid.NewString()
@@ -45,7 +45,7 @@ func (s *dbSuite) TestDatabase_AddRole(c *qt.C) {
 	c.Assert(re.UUID, qt.Equals, uuid)
 }
 
-func (s *dbSuite) TestDatabase_GetRole(c *qt.C) {
+func (s *dbSuite) TestGetRole(c *qt.C) {
 	uuid1 := uuid.NewString()
 	c.Patch(db.NewUUID, func() string {
 		return uuid1
@@ -95,55 +95,55 @@ func (s *dbSuite) TestDatabase_GetRole(c *qt.C) {
 	c.Assert(role.UUID, qt.Equals, uuid2)
 }
 
-func (s *dbSuite) TestDatabase_UpdateRole(c *qt.C) {
-	err := s.Database.UpdateRole(context.Background(), &dbmodel.RoleEntry{Name: "test-role"})
+func (s *dbSuite) TestUpdateRoleName(c *qt.C) {
+	err := s.Database.UpdateRoleName(context.Background(), &dbmodel.RoleEntry{Name: "test-role"})
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
 	err = s.Database.Migrate(context.Background(), false)
 	c.Assert(err, qt.IsNil)
 
-	ge := &dbmodel.RoleEntry{
+	re := &dbmodel.RoleEntry{
 		Name: "test-role",
 	}
 
-	err = s.Database.UpdateRole(context.Background(), ge)
+	err = s.Database.UpdateRoleName(context.Background(), re)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
 	_, err = s.Database.AddRole(context.Background(), "test-role")
 	c.Assert(err, qt.IsNil)
 
-	ge1 := &dbmodel.RoleEntry{
+	re1 := &dbmodel.RoleEntry{
 		Name: "test-role",
 	}
-	err = s.Database.GetRole(context.Background(), ge1)
+	err = s.Database.GetRole(context.Background(), re1)
 	c.Assert(err, qt.IsNil)
 
-	ge1.Name = "renamed-role"
-	err = s.Database.UpdateRole(context.Background(), ge1)
+	re1.Name = "renamed-role"
+	err = s.Database.UpdateRoleName(context.Background(), re1)
 	c.Check(err, qt.IsNil)
 
-	ge2 := &dbmodel.RoleEntry{
+	re2 := &dbmodel.RoleEntry{
 		Name: "renamed-role",
 	}
-	err = s.Database.GetRole(context.Background(), ge2)
+	err = s.Database.GetRole(context.Background(), re2)
 	c.Check(err, qt.IsNil)
-	c.Assert(ge2, qt.DeepEquals, ge1)
+	c.Assert(re2, qt.DeepEquals, re1)
 }
 
-func (s *dbSuite) TestDatabase_RemoveRole(c *qt.C) {
+func (s *dbSuite) TestRemoveRole(c *qt.C) {
 	err := s.Database.RemoveRole(context.Background(), &dbmodel.RoleEntry{Name: "test-role"})
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
 	err = s.Database.Migrate(context.Background(), false)
 	c.Assert(err, qt.IsNil)
 
-	ge := &dbmodel.RoleEntry{
+	re := &dbmodel.RoleEntry{
 		Name: "test-role",
 	}
-	err = s.Database.RemoveRole(context.Background(), ge)
+	err = s.Database.RemoveRole(context.Background(), re)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
-	roleEntry, err := s.Database.AddRole(context.Background(), ge.Name)
+	roleEntry, err := s.Database.AddRole(context.Background(), re.Name)
 	c.Assert(err, qt.IsNil)
 
 	ge1 := &dbmodel.RoleEntry{
@@ -160,7 +160,7 @@ func (s *dbSuite) TestDatabase_RemoveRole(c *qt.C) {
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 }
 
-func (s *dbSuite) TestDatabase_ListRole(c *qt.C) {
+func (s *dbSuite) TestListRole(c *qt.C) {
 	err := s.Database.Migrate(context.Background(), false)
 	c.Assert(err, qt.IsNil)
 
@@ -204,7 +204,7 @@ func (s *dbSuite) TestDatabase_ListRole(c *qt.C) {
 	c.Assert(matchedRoles[0].UUID, qt.Equals, tg.UUID)
 }
 
-func (s *dbSuite) TestDatabase_CountRoles(c *qt.C) {
+func (s *dbSuite) TestCountRoles(c *qt.C) {
 	err := s.Database.Migrate(context.Background(), false)
 	c.Assert(err, qt.IsNil)
 
