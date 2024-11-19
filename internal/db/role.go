@@ -109,35 +109,47 @@ func (d *Database) RemoveRole(ctx context.Context, role *dbmodel.RoleEntry) (err
 	return nil
 }
 
-// ForEachRole iterates through all role entries applying the provided callback function.
-func (d *Database) ForEachRole(ctx context.Context, f func(*dbmodel.RoleEntry) error) (err error) {
-	const op = errors.Op("db.ForEachRole")
+// ListRoles returns a paginated list of Roles defined by limit and offset.
+// match is used to fuzzy find based on entries' name or uuid using the LIKE operator (ex. LIKE %<match>%).
+func (d *Database) ListRoles(ctx context.Context, limit, offset int, match string) (_ []dbmodel.RoleEntry, err error) {
+	const op = errors.Op("db.ListRoles")
 	if err := d.ready(); err != nil {
-		return errors.E(op, err)
+		return nil, errors.E(op, err)
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
 	defer durationObserver()
 	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
 
-	db := d.DB.WithContext(ctx).Model(&dbmodel.RoleEntry{})
+	db := d.DB.WithContext(ctx)
+	if match != "" {
+		db = db.Where("name LIKE ? OR uuid LIKE ?", "%"+match+"%", "%"+match+"%")
+	}
+	db = db.Order("name asc")
+	db = db.Limit(limit)
+	db = db.Offset(offset)
+	var Roles []dbmodel.RoleEntry
+	if err := db.Find(&Roles).Error; err != nil {
+		return nil, errors.E(op, dbError(err))
+	}
+	return Roles, nil
+}
 
-	rows, err := db.Rows()
-	if err != nil {
-		return errors.E(op, err)
+// CountRoles returns a count of the number of Roles that exist.
+func (d *Database) CountRoles(ctx context.Context) (count int, err error) {
+	const op = errors.Op("db.CountRoles")
+	if err := d.ready(); err != nil {
+		return 0, errors.E(op, err)
 	}
-	defer rows.Close()
-	for rows.Next() {
-		var ale dbmodel.RoleEntry
-		if err := db.ScanRows(rows, &ale); err != nil {
-			return errors.E(op, err)
-		}
-		if err := f(&ale); err != nil {
-			return err
-		}
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
+	var c int64
+	var g dbmodel.RoleEntry
+	if err := d.DB.WithContext(ctx).Model(g).Count(&c).Error; err != nil {
+		return 0, errors.E(op, dbError(err))
 	}
-	if rows.Err() != nil {
-		return errors.E(op, rows.Err())
-	}
-	return nil
+	count = int(c)
+	return count, nil
 }

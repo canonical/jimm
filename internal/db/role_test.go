@@ -4,7 +4,7 @@ package db_test
 
 import (
 	"context"
-	"sort"
+	"fmt"
 
 	qt "github.com/frankban/quicktest"
 	"github.com/google/uuid"
@@ -160,36 +160,60 @@ func (s *dbSuite) TestDatabase_RemoveRole(c *qt.C) {
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 }
 
-func (s *dbSuite) TestDatabase_ForEachRole(c *qt.C) {
-	ctx := context.Background()
-
+func (s *dbSuite) TestDatabase_ListRole(c *qt.C) {
 	err := s.Database.Migrate(context.Background(), false)
 	c.Assert(err, qt.IsNil)
 
-	_, err = s.Database.AddRole(ctx, "role-1")
+	addNRoles := 10
+	for i := range addNRoles {
+		_, err := s.Database.AddRole(context.Background(), fmt.Sprintf("test-role-%d", i))
+		c.Assert(err, qt.IsNil)
+	}
+	ctx := context.Background()
+	firstRoles, err := s.Database.ListRoles(ctx, 5, 0, "")
+	c.Assert(err, qt.IsNil)
+	for i := 0; i < 5; i++ {
+		c.Assert(firstRoles[i].Name, qt.Equals, fmt.Sprintf("test-role-%d", i))
+	}
+	secondRoles, err := s.Database.ListRoles(ctx, 5, 5, "")
+	c.Assert(err, qt.IsNil)
+	for i := 0; i < 5; i++ {
+		c.Assert(secondRoles[i].Name, qt.Equals, fmt.Sprintf("test-role-%d", i+5))
+	}
+
+	matchedRoles, err := s.Database.ListRoles(ctx, 5, 0, "role-1")
+	c.Assert(err, qt.IsNil)
+	c.Assert(matchedRoles, qt.HasLen, 1)
+	c.Assert(matchedRoles[0].Name, qt.Equals, "test-role-1")
+
+	matchedRoles, err = s.Database.ListRoles(ctx, 5, 0, "%not-existing%")
+	c.Assert(err, qt.IsNil)
+	c.Assert(matchedRoles, qt.HasLen, 0)
+
+	tg, err := s.Database.AddRole(context.Background(), "\\%test-role")
 	c.Assert(err, qt.IsNil)
 
-	_, err = s.Database.AddRole(ctx, "role-2")
+	matchedRoles, err = s.Database.ListRoles(ctx, 5, 0, "\\%t")
+	c.Assert(err, qt.IsNil)
+	c.Assert(matchedRoles, qt.HasLen, 1)
+	c.Assert(matchedRoles[0].UUID, qt.Equals, tg.UUID)
+
+	matchedRoles, err = s.Database.ListRoles(ctx, 5, 0, tg.UUID)
+	c.Assert(err, qt.IsNil)
+	c.Assert(matchedRoles, qt.HasLen, 1)
+	c.Assert(matchedRoles[0].UUID, qt.Equals, tg.UUID)
+}
+
+func (s *dbSuite) TestDatabase_CountRoles(c *qt.C) {
+	err := s.Database.Migrate(context.Background(), false)
 	c.Assert(err, qt.IsNil)
 
-	_, err = s.Database.AddRole(ctx, "role-3")
+	addNRoles := 10
+	for i := range addNRoles {
+		_, err := s.Database.AddRole(context.Background(), fmt.Sprintf("test-role-%d", i))
+		c.Assert(err, qt.IsNil)
+	}
+	count, err := s.Database.CountRoles(context.Background())
 	c.Assert(err, qt.IsNil)
-
-	var roleNames []string
-
-	err = s.Database.ForEachRole(ctx, func(re *dbmodel.RoleEntry) error {
-		roleNames = append(roleNames, re.Name)
-		return nil
-	})
-	c.Assert(err, qt.IsNil)
-
-	sort.Slice(roleNames, func(i, j int) bool {
-		return i < j
-	})
-
-	c.Assert(roleNames, qt.DeepEquals, []string{
-		"role-1",
-		"role-2",
-		"role-3",
-	})
+	c.Assert(count, qt.Equals, addNRoles)
 }
