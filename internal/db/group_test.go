@@ -184,7 +184,7 @@ func (s *dbSuite) TestRemoveGroup(c *qt.C) {
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 }
 
-func (s *dbSuite) TestListGroup(c *qt.C) {
+func (s *dbSuite) TestListGroups(c *qt.C) {
 	err := s.Database.Migrate(context.Background(), false)
 	c.Assert(err, qt.IsNil)
 
