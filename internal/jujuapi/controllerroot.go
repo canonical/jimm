@@ -33,6 +33,7 @@ type JIMM interface {
 	ControllerService
 	LoginService
 	ModelManager
+	RoleService
 	AddAuditLogEntry(ale *dbmodel.AuditLogEntry)
 	AddCloudToController(ctx context.Context, user *openfga.User, controllerName string, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error
 	AddHostedCloud(ctx context.Context, user *openfga.User, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error

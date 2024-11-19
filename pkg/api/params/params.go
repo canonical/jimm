@@ -379,6 +379,65 @@ type ListRelationshipTuplesResponse struct {
 	ContinuationToken string              `json:"continuation_token,omitempty" yaml:"continuation_token,omitempty"`
 }
 
+// Role request parameters / responses:
+
+// AddRoleRequest holds a request to add a group.
+type AddRoleRequest struct {
+	// Name holds the name of the group.
+	Name string `json:"name"`
+}
+
+// AddRoleResponse holds the details of the added group.
+type AddRoleResponse struct {
+	Role
+}
+
+// GetRoleRequest holds a request to get a group by UUID or name.
+type GetRoleRequest struct {
+	// UUID holds the UUID of the group to be retrieved.
+	UUID string `json:"uuid"`
+	// Name holds the name of the group to be retrieved.
+	Name string `json:"name"`
+}
+
+// GetRoleResponse holds the details of the group.
+type GetRoleResponse struct {
+	Role
+}
+
+// RenameRoleRequest holds a request to rename a group.
+type RenameRoleRequest struct {
+	// Name holds the name of the group.
+	Name string `json:"name"`
+
+	// NewName holds the new name of the group.
+	NewName string `json:"new-name"`
+}
+
+// RemoveRoleRequest holds a request to remove a group.
+type RemoveRoleRequest struct {
+	// Name holds the name of the group.
+	Name string `json:"name"`
+}
+
+type ListRolesRequest struct {
+	Limit  int `json:"limit"`
+	Offset int `json:"offset"`
+}
+
+// Role holds the details of a group currently residing in JIMM.
+type Role struct {
+	UUID      string `json:"uuid" yaml:"uuid"`
+	Name      string `json:"name" yaml:"name"`
+	CreatedAt string `json:"created_at" yaml:"created_at"`
+	UpdatedAt string `json:"updated_at" yaml:"updated_at"`
+}
+
+// ListRoleResponse returns the group tuples currently residing within OpenFGA.
+type ListRoleResponse struct {
+	Roles []Role `json:"name" yaml:"name"`
+}
+
 // CrossModelQueryRequest holds the parameters to perform a cross model query against
 // JSON model statuses for every model this user has access to.
 type CrossModelQueryRequest struct {

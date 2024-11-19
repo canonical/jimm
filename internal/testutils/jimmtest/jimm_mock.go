@@ -31,6 +31,7 @@ import (
 type JIMM struct {
 	mocks.RelationService
 	mocks.GroupService
+	mocks.RoleService
 	mocks.ControllerService
 	mocks.LoginService
 	mocks.ModelManager
