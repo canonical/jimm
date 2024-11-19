@@ -63,11 +63,8 @@ func (d *Database) GetRole(ctx context.Context, role *dbmodel.RoleEntry) (err er
 func (d *Database) UpdateRoleName(ctx context.Context, role *dbmodel.RoleEntry) (err error) {
 	const op = errors.Op("db.UpdateRole")
 
-	if role.ID == 0 {
-		return errors.E(errors.CodeNotFound)
-	}
-	if role.UUID == "" {
-		return errors.E("role uuid not specified", errors.CodeNotFound)
+	if role.ID == 0 && role.UUID == "" {
+		return errors.E("neither role UUID or ID specified", errors.CodeNotFound)
 	}
 
 	if err := d.ready(); err != nil {
@@ -88,11 +85,8 @@ func (d *Database) UpdateRoleName(ctx context.Context, role *dbmodel.RoleEntry) 
 func (d *Database) RemoveRole(ctx context.Context, role *dbmodel.RoleEntry) (err error) {
 	const op = errors.Op("db.RemoveRole")
 
-	if role.ID == 0 {
-		return errors.E(errors.CodeNotFound)
-	}
-	if role.UUID == "" {
-		return errors.E(errors.CodeNotFound)
+	if role.ID == 0 && role.UUID == "" {
+		return errors.E("neither role UUID or ID specified", errors.CodeNotFound)
 	}
 
 	if err := d.ready(); err != nil {

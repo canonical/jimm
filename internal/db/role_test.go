@@ -98,7 +98,13 @@ func (s *dbSuite) TestUpdateRoleName(c *qt.C) {
 	err = s.Database.Migrate(context.Background(), false)
 	c.Assert(err, qt.IsNil)
 
-	re := &dbmodel.RoleEntry{
+	re := &dbmodel.RoleEntry{}
+
+	err = s.Database.UpdateRoleName(context.Background(), re)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+	c.Check(err, qt.ErrorMatches, ".*neither role UUID or ID specified.*")
+
+	re = &dbmodel.RoleEntry{
 		Name: "test-role",
 	}
 
@@ -133,7 +139,13 @@ func (s *dbSuite) TestRemoveRole(c *qt.C) {
 	err = s.Database.Migrate(context.Background(), false)
 	c.Assert(err, qt.IsNil)
 
-	re := &dbmodel.RoleEntry{
+	re := &dbmodel.RoleEntry{}
+
+	err = s.Database.UpdateRoleName(context.Background(), re)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+	c.Check(err, qt.ErrorMatches, ".*neither role UUID or ID specified.*")
+
+	re = &dbmodel.RoleEntry{
 		Name: "test-role",
 	}
 	err = s.Database.RemoveRole(context.Background(), re)
