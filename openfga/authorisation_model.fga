@@ -20,10 +20,6 @@ type controller
     define audit_log_viewer: [user, user:*, group#member] or administrator
     define controller: [controller]
 
-type group
-  relations
-    define member: [user, user:*, group#member]
-
 type model
   relations
     define administrator: [user, user:*, group#member] or administrator from controller
@@ -31,8 +27,16 @@ type model
     define reader: [user, user:*, group#member] or writer
     define writer: [user, user:*, group#member] or administrator
 
-type user
-
 type serviceaccount
   relations
     define administrator: [user, user:*, group#member]
+
+type user
+
+type role
+ relations
+   define assignee: [user, user:*, group#member]
+
+type group
+  relations
+    define member: [user, user:*, group#member]
