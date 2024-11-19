@@ -19,11 +19,9 @@ VS Marketplace Link: https://marketplace.visualstudio.com/items?itemName=openfga
 go install github.com/openfga/cli/cmd/fga@latest
 
 ## Adding / modifying [to] the authorsation model
-1. Open the authorisation_model.fga 
-2. Make your modification
-3. Run: `make transform-auth-model`
-6. Add tests to tests.fga.yaml - Learn more [here](https://openfga.dev/docs/modeling/testing)
-7. Run them via: `make test-auth-model`
+1. Modify authorisation_model.fga 
+2. Add tests to tests.fga.yaml - Learn more [here](https://openfga.dev/docs/modeling/testing)
+3. Run them via: `make test-auth-model`
 
 ## Test Structure
 In order to avoid the potential entanglement of separate tests the tuples are artifically split into groups using this naming convention: (type):(2-letter test name)-(type)-(id)

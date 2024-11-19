@@ -102,7 +102,7 @@ services:
       OPENFGA_DATASTORE_ENGINE: "postgres"
       OPENFGA_DATASTORE_URI: "postgresql://jimm:jimm@db/jimm?sslmode=disable"
     volumes:
-      - ./openfga/authorisation_model.json:/app/authorisation_model.json
+      - ./openfga/authorisation_model.fga:/app/authorisation_model.fga
     ports:
       - 8080:8080
       - 3000:3000

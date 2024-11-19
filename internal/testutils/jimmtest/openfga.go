@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v4"
 	"github.com/oklog/ulid/v2"
 	sdk "github.com/openfga/go-sdk"
+	"github.com/openfga/language/pkg/go/transformer"
 	"gopkg.in/errgo.v1"
 
 	"github.com/canonical/jimm/v3/internal/errors"
@@ -36,8 +37,9 @@ type testSetup struct {
 }
 
 func getAuthModelDefinition() (*sdk.AuthorizationModel, error) {
+	authModelJSON := transformer.MustTransformDSLToJSON(string(auth_model.AuthModelDSL))
 	authModel := sdk.AuthorizationModel{}
-	err := json.Unmarshal(auth_model.AuthModelJSON, &authModel)
+	err := json.Unmarshal([]byte(authModelJSON), &authModel)
 	if err != nil {
 		return nil, err
 	}

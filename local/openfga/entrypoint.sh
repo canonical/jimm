@@ -2,13 +2,14 @@
 
 # This script starts the OpenFGA server, migrates the associated database and applies JIMM's auth model.
 # It also manually edits the authorization_model_id to a hardcoded value for easier testing.
-# Note that this script expects an authorisation_model.json file to be present. We provide that file
+# Note that this script expects an authorisation_model.fga file to be present. We provide that file
 # by mounting the file from the host rather than putting it into the Docker container to avoid duplication.
 
 set -e
 
 # Migrate the database
 ./openfga migrate --datastore-engine postgres --datastore-uri "$OPENFGA_DATASTORE_URI"
+./fga model transform --file ./authorisation_model.fga --output-format json > ./authorisation_model.json
 
 ./openfga run &
 sleep 3

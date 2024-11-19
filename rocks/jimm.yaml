@@ -21,7 +21,7 @@ parts:
         source: .
         source-type: local
         build-snaps:
-          - go/1.22/stable
+          - go/1.23/stable
         build-packages:
           - git
           - make 
@@ -39,7 +39,9 @@ parts:
             # place it in bin
             cp -r ./internal/dbmodel/sql $CRAFT_PART_INSTALL/usr/local/bin/sql
 
-            # Copied for the charm to collect and apply, not this container itself
+            # Convert the OpenFGA auth model to JSON and place a copy in the ROCK
+            # Used by the charm to apply to the OpenFGA server, not by the container itself
             mkdir -p $CRAFT_PART_INSTALL/root/openfga/
-            cp ./openfga/authorisation_model.json $CRAFT_PART_INSTALL/root/openfga/authorisation_model.json
-
+            # Note that we can't use go run directly (https://github.com/canonical/rockcraft/issues/755)
+            go install github.com/openfga/cli/cmd/fga@latest
+            /root/go/bin/fga model transform --file ./openfga/authorisation_model.fga --output-format json > $CRAFT_PART_INSTALL/root/openfga/authorisation_model.json
