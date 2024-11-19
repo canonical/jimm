@@ -51,17 +51,13 @@ func (s *dbSuite) TestGetRole(c *qt.C) {
 		return uuid1
 	})
 
-	err := s.Database.GetRole(context.Background(), &dbmodel.RoleEntry{
-		Name: "test-role",
-	})
+	err := s.Database.GetRole(context.Background(), &dbmodel.RoleEntry{})
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
 
 	err = s.Database.Migrate(context.Background(), false)
 	c.Assert(err, qt.IsNil)
 
-	role := &dbmodel.RoleEntry{
-		Name: "test-role",
-	}
+	role := &dbmodel.RoleEntry{}
 	err = s.Database.GetRole(context.Background(), role)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
