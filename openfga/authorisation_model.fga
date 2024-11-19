@@ -41,4 +41,3 @@ type serviceaccount
   relations
     define administrator: [user, user:*, group#member, role#assignee]
 
-
