@@ -652,6 +652,7 @@ func (j *JIMM) enrichOfferDetails(ctx context.Context, user *openfga.User, dbOff
 	return offerDetail, nil
 }
 
+// applicationOfferFilters converts user filter parameters to database filter types.
 func (j *JIMM) applicationOfferFilters(ctx context.Context, jujuFilters ...jujuparams.OfferFilter) ([]db.ApplicationOfferFilter, error) {
 	filters := []db.ApplicationOfferFilter{}
 	for _, f := range jujuFilters {

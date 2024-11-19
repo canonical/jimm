@@ -147,7 +147,7 @@ func ApplicationOfferFilterByDescription(substring string) ApplicationOfferFilte
 	}
 }
 
-// ApplicationOfferFilterByModel filters application offers by model name.
+// ApplicationOfferFilterByModel filters application offers by model name and owner.
 func ApplicationOfferFilterByModel(modelName, modelOwner string) ApplicationOfferFilter {
 	return func(db *gorm.DB) *gorm.DB {
 		tx := db.Joins("JOIN models ON models.id = offers.model_id").
