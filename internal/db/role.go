@@ -59,7 +59,7 @@ func (d *Database) GetRole(ctx context.Context, role *dbmodel.RoleEntry) (err er
 	return nil
 }
 
-// UpdateRoleName updates the role name identified by its ID or UUID.
+// UpdateRoleName updates the role name identified by its ID and UUID.
 func (d *Database) UpdateRoleName(ctx context.Context, role *dbmodel.RoleEntry) (err error) {
 	const op = errors.Op("db.UpdateRole")
 
