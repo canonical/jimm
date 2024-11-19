@@ -32,7 +32,7 @@ func (d *Database) AddRole(ctx context.Context, name string) (re *dbmodel.RoleEn
 	return re, nil
 }
 
-// GetRole populates the provided *dbmodel.RoleEntry based on ID, name or UUID.
+// GetRole populates the provided *dbmodel.RoleEntry based on name or UUID.
 func (d *Database) GetRole(ctx context.Context, role *dbmodel.RoleEntry) (err error) {
 	const op = errors.Op("db.GetRole")
 	if err := d.ready(); err != nil {
@@ -42,6 +42,10 @@ func (d *Database) GetRole(ctx context.Context, role *dbmodel.RoleEntry) (err er
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
 	defer durationObserver()
 	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
+	if role.UUID == "" && role.Name == "" {
+		return errors.E(op, "must specify uuid or name")
+	}
 
 	db := d.DB.WithContext(ctx)
 	if role.ID != 0 {
@@ -59,12 +63,12 @@ func (d *Database) GetRole(ctx context.Context, role *dbmodel.RoleEntry) (err er
 	return nil
 }
 
-// UpdateRoleName updates the role name identified by its ID and UUID.
-func (d *Database) UpdateRoleName(ctx context.Context, role *dbmodel.RoleEntry) (err error) {
+// UpdateRoleName updates the name of a role identified by UUID.
+func (d *Database) UpdateRoleName(ctx context.Context, uuid, name string) (err error) {
 	const op = errors.Op("db.UpdateRole")
 
-	if role.ID == 0 && role.UUID == "" {
-		return errors.E("neither role UUID or ID specified", errors.CodeNotFound)
+	if uuid == "" {
+		return errors.E(op, "uuid must be specified")
 	}
 
 	if err := d.ready(); err != nil {
@@ -75,9 +79,12 @@ func (d *Database) UpdateRoleName(ctx context.Context, role *dbmodel.RoleEntry) 
 	defer durationObserver()
 	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
 
-	if err := d.DB.WithContext(ctx).Save(role).Error; err != nil {
-		return errors.E(op, dbError(err))
+	model := d.DB.WithContext(ctx).Model(&dbmodel.RoleEntry{})
+	model.Where("uuid = ?", uuid)
+	if model.Update("name", name).RowsAffected == 0 {
+		return errors.E(op, "role does not exist")
 	}
+
 	return nil
 }
 

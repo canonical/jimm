@@ -12,6 +12,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
 
 func (s *dbSuite) TestAddRole(c *qt.C) {
@@ -59,57 +60,38 @@ func (s *dbSuite) TestGetRole(c *qt.C) {
 
 	role := &dbmodel.RoleEntry{}
 	err = s.Database.GetRole(context.Background(), role)
-	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+	c.Check(err, qt.ErrorMatches, "must specify uuid or name")
 
-	roleEntry, err := s.Database.AddRole(context.TODO(), "test-role")
+	re1, err := s.Database.AddRole(context.TODO(), "test-role")
 	c.Assert(err, qt.IsNil)
-	c.Assert(roleEntry.UUID, qt.Equals, uuid1)
+	c.Assert(re1.UUID, qt.Equals, uuid1)
 
-	err = s.Database.GetRole(context.Background(), role)
-	c.Check(err, qt.IsNil)
-	c.Assert(role.ID, qt.Equals, uint(1))
-	c.Assert(role.Name, qt.Equals, "test-role")
-	c.Assert(role.UUID, qt.Equals, uuid1)
-
-	uuid2 := uuid.NewString()
-	c.Patch(db.NewUUID, func() string {
-		return uuid2
-	})
-
-	roleEntry, err = s.Database.AddRole(context.Background(), "test-role1")
-	c.Assert(err, qt.IsNil)
-	c.Assert(roleEntry.UUID, qt.Equals, uuid2)
-
-	role = &dbmodel.RoleEntry{
-		Name: "test-role1",
+	// Get by UUID
+	re2 := &dbmodel.RoleEntry{
+		UUID: uuid1,
 	}
+	err = s.Database.GetRole(context.Background(), re2)
+	c.Assert(err, qt.IsNil)
+	c.Assert(re1, jimmtest.DBObjectEquals, re2)
 
-	err = s.Database.GetRole(context.Background(), role)
-	c.Check(err, qt.IsNil)
-	c.Assert(role.ID, qt.Equals, uint(2))
-	c.Assert(role.Name, qt.Equals, "test-role1")
-	c.Assert(role.UUID, qt.Equals, uuid2)
+	// Get by name
+	re3 := &dbmodel.RoleEntry{
+		Name: "test-role",
+	}
+	err = s.Database.GetRole(context.Background(), re3)
+	c.Assert(err, qt.IsNil)
+	c.Assert(re1, jimmtest.DBObjectEquals, re3)
 }
 
 func (s *dbSuite) TestUpdateRoleName(c *qt.C) {
-	err := s.Database.UpdateRoleName(context.Background(), &dbmodel.RoleEntry{Name: "test-role"})
-	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
-
-	err = s.Database.Migrate(context.Background(), false)
+	err := s.Database.Migrate(context.Background(), false)
 	c.Assert(err, qt.IsNil)
 
-	re := &dbmodel.RoleEntry{}
+	err = s.Database.UpdateRoleName(context.Background(), "blah", "blah")
+	c.Check(err, qt.ErrorMatches, "role does not exist")
 
-	err = s.Database.UpdateRoleName(context.Background(), re)
-	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
-	c.Check(err, qt.ErrorMatches, ".*neither role UUID or ID specified.*")
-
-	re = &dbmodel.RoleEntry{
-		Name: "test-role",
-	}
-
-	err = s.Database.UpdateRoleName(context.Background(), re)
-	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+	err = s.Database.UpdateRoleName(context.Background(), "", "")
+	c.Check(err, qt.ErrorMatches, "uuid must be specified")
 
 	_, err = s.Database.AddRole(context.Background(), "test-role")
 	c.Assert(err, qt.IsNil)
@@ -120,16 +102,15 @@ func (s *dbSuite) TestUpdateRoleName(c *qt.C) {
 	err = s.Database.GetRole(context.Background(), re1)
 	c.Assert(err, qt.IsNil)
 
-	re1.Name = "renamed-role"
-	err = s.Database.UpdateRoleName(context.Background(), re1)
+	err = s.Database.UpdateRoleName(context.Background(), re1.UUID, "renamed-role")
 	c.Check(err, qt.IsNil)
 
 	re2 := &dbmodel.RoleEntry{
-		Name: "renamed-role",
+		UUID: re1.UUID,
 	}
 	err = s.Database.GetRole(context.Background(), re2)
 	c.Check(err, qt.IsNil)
-	c.Assert(re2, qt.DeepEquals, re1)
+	c.Assert(re2.Name, qt.Equals, "renamed-role")
 }
 
 func (s *dbSuite) TestRemoveRole(c *qt.C) {
@@ -139,13 +120,7 @@ func (s *dbSuite) TestRemoveRole(c *qt.C) {
 	err = s.Database.Migrate(context.Background(), false)
 	c.Assert(err, qt.IsNil)
 
-	re := &dbmodel.RoleEntry{}
-
-	err = s.Database.UpdateRoleName(context.Background(), re)
-	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
-	c.Check(err, qt.ErrorMatches, ".*neither role UUID or ID specified.*")
-
-	re = &dbmodel.RoleEntry{
+	re := &dbmodel.RoleEntry{
 		Name: "test-role",
 	}
 	err = s.Database.RemoveRole(context.Background(), re)
