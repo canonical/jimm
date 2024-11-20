@@ -6,8 +6,10 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	qt "github.com/frankban/quicktest"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/google/uuid"
 
 	"github.com/canonical/jimm/v3/internal/db"
@@ -120,17 +122,13 @@ func (s *dbSuite) TestGetGroup(c *qt.C) {
 }
 
 func (s *dbSuite) TestUpdateGroupName(c *qt.C) {
-	err := s.Database.UpdateGroupName(context.Background(), &dbmodel.GroupEntry{Name: "test-group"})
-	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+	err := s.Database.UpdateGroupName(context.Background(), "test-group", "new-name")
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
 
 	err = s.Database.Migrate(context.Background(), false)
 	c.Assert(err, qt.IsNil)
 
-	ge := &dbmodel.GroupEntry{
-		Name: "test-group",
-	}
-
-	err = s.Database.UpdateGroupName(context.Background(), ge)
+	err = s.Database.UpdateGroupName(context.Background(), "test-group", "new-name")
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
 	_, err = s.Database.AddGroup(context.Background(), "test-group")
@@ -143,7 +141,7 @@ func (s *dbSuite) TestUpdateGroupName(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 
 	ge1.Name = "renamed-group"
-	err = s.Database.UpdateGroupName(context.Background(), ge1)
+	err = s.Database.UpdateGroupName(context.Background(), ge1.UUID, ge1.Name)
 	c.Check(err, qt.IsNil)
 
 	ge2 := &dbmodel.GroupEntry{
@@ -151,7 +149,7 @@ func (s *dbSuite) TestUpdateGroupName(c *qt.C) {
 	}
 	err = s.Database.GetGroup(context.Background(), ge2)
 	c.Check(err, qt.IsNil)
-	c.Assert(ge2, qt.DeepEquals, ge1)
+	c.Assert(ge2, qt.CmpEquals(cmpopts.IgnoreTypes(time.Time{})), ge1)
 }
 
 func (s *dbSuite) TestRemoveGroup(c *qt.C) {

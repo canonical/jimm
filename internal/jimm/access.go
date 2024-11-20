@@ -755,9 +755,8 @@ func (j *JIMM) RenameGroup(ctx context.Context, user *openfga.User, oldName, new
 	if err != nil {
 		return errors.E(op, err)
 	}
-	group.Name = newName
 
-	if err := j.Database.UpdateGroupName(ctx, group); err != nil {
+	if err := j.Database.UpdateGroupName(ctx, group.UUID, newName); err != nil {
 		return errors.E(op, err)
 	}
 	return nil

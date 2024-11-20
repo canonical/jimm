@@ -62,6 +62,10 @@ func (d *Database) GetGroup(ctx context.Context, group *dbmodel.GroupEntry) (err
 		return errors.E(op, err)
 	}
 
+	if group.UUID == "" && group.Name == "" {
+		return errors.E(op, "must specify uuid or name")
+	}
+
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
 	defer durationObserver()
 	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
@@ -108,15 +112,12 @@ func (d *Database) ListGroups(ctx context.Context, limit, offset int, match stri
 	return groups, nil
 }
 
-// UpdateGroupName updates the group name identified by its ID or UUID.
-func (d *Database) UpdateGroupName(ctx context.Context, group *dbmodel.GroupEntry) (err error) {
+// UpdateGroupName updates the name of the group identified by its UUID.
+func (d *Database) UpdateGroupName(ctx context.Context, uuid, name string) (err error) {
 	const op = errors.Op("db.UpdateGroup")
 
-	if group.ID == 0 {
-		return errors.E(errors.CodeNotFound)
-	}
-	if group.UUID == "" {
-		return errors.E("group uuid not specified", errors.CodeNotFound)
+	if uuid == "" {
+		return errors.E(op, "uuid must be specified")
 	}
 
 	if err := d.ready(); err != nil {
@@ -127,8 +128,10 @@ func (d *Database) UpdateGroupName(ctx context.Context, group *dbmodel.GroupEntr
 	defer durationObserver()
 	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
 
-	if err := d.DB.WithContext(ctx).Save(group).Error; err != nil {
-		return errors.E(op, dbError(err))
+	model := d.DB.WithContext(ctx).Model(&dbmodel.GroupEntry{})
+	model.Where("uuid = ?", uuid)
+	if model.Update("name", name).RowsAffected == 0 {
+		return errors.E(op, errors.CodeNotFound, "group not found")
 	}
 	return nil
 }
@@ -137,11 +140,8 @@ func (d *Database) UpdateGroupName(ctx context.Context, group *dbmodel.GroupEntr
 func (d *Database) RemoveGroup(ctx context.Context, group *dbmodel.GroupEntry) (err error) {
 	const op = errors.Op("db.RemoveGroup")
 
-	if group.ID == 0 {
-		return errors.E(errors.CodeNotFound)
-	}
-	if group.UUID == "" {
-		return errors.E(errors.CodeNotFound)
+	if group.ID == 0 && group.UUID == "" {
+		return errors.E("neither UUID or ID specified", errors.CodeNotFound)
 	}
 
 	if err := d.ready(); err != nil {
