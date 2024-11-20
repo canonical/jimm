@@ -17,7 +17,7 @@ import (
 
 var (
 	// resourceTypes contains a list of all resource kinds (i.e. tags) used throughout JIMM.
-	resourceTypes = [...]string{names.UserTagKind, names.ModelTagKind, names.ControllerTagKind, names.ApplicationOfferTagKind, jimmnames.GroupTagKind, jimmnames.ServiceAccountTagKind}
+	resourceTypes = [...]string{names.UserTagKind, names.ModelTagKind, names.ControllerTagKind, names.ApplicationOfferTagKind, jimmnames.GroupTagKind, jimmnames.ServiceAccountTagKind, jimmnames.RoleTagKind}
 )
 
 // Tuple represents a relation between an object and a target.
@@ -39,18 +39,20 @@ type Relation = cofga.Relation
 // Juju/JIMM objects. These are included here for ease of use
 // and avoiding string constants.
 var (
+	// UserType represents a user object.
+	UserType Kind = names.UserTagKind
 	// ModelType represents a model object.
 	ModelType Kind = names.ModelTagKind
+	// GroupType represents a group object.
+	GroupType Kind = jimmnames.GroupTagKind
+	// RoleType represents a role object.
+	RoleType Kind = jimmnames.RoleTagKind
 	// ApplicationOfferType represents an application offer object.
 	ApplicationOfferType Kind = names.ApplicationOfferTagKind
 	// CloudType represents a cloud object.
 	CloudType Kind = names.CloudTagKind
 	// ControllerType represents a controller object.
 	ControllerType Kind = names.ControllerTagKind
-	// GroupType represents a group object.
-	GroupType Kind = jimmnames.GroupTagKind
-	// UserType represents a user object.
-	UserType Kind = names.UserTagKind
 	// ServiceAccountType represents a service account.
 	ServiceAccountType Kind = jimmnames.ServiceAccountTagKind
 )
@@ -304,6 +306,38 @@ func (o *OFGAClient) RemoveApplicationOffer(ctx context.Context, offer names.App
 		},
 	); err != nil {
 		return errors.E(err)
+	}
+	return nil
+}
+
+// RemoveRole removes a role.
+func (o *OFGAClient) RemoveRole(ctx context.Context, role jimmnames.RoleTag) error {
+	// Remove all access to a group. I.e. user->group
+	if err := o.removeTuples(
+		ctx,
+		Tuple{
+			Relation: ofganames.AssigneeRelation,
+			Target:   ofganames.ConvertTag(role),
+		},
+	); err != nil {
+		return errors.E(err)
+	}
+	// Next remove all access that a group had. I.e. group->model
+	// We need to loop through all resource types because the OpenFGA Read API does not provide
+	// means for only specifying a user resource, it must be paired with an object type.
+	for _, kind := range resourceTypes {
+		kt, err := ofganames.BlankKindTag(kind)
+		if err != nil {
+			return errors.E(err)
+		}
+		newTuple := Tuple{
+			Object: ofganames.ConvertTagWithRelation(role, ofganames.AssigneeRelation),
+			Target: kt,
+		}
+		err = o.removeTuples(ctx, newTuple)
+		if err != nil {
+			return errors.E(err)
+		}
 	}
 	return nil
 }

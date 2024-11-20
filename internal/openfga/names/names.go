@@ -19,6 +19,8 @@ import (
 var (
 	// MemberRelation represents a member relation between entities.
 	MemberRelation cofga.Relation = "member"
+	// AssigneeRelation represents a assignee relation between entities.
+	AssigneeRelation cofga.Relation = "assignee"
 	// AdministratorRelation represents an administrator relation between entities.
 	AdministratorRelation cofga.Relation = "administrator"
 	// ControllerRelation represents a controller relation between entities.
@@ -59,7 +61,8 @@ type ResourceTagger interface {
 		names.ModelTag |
 		names.ApplicationOfferTag |
 		names.CloudTag |
-		jimmnames.ServiceAccountTag
+		jimmnames.ServiceAccountTag |
+		jimmnames.RoleTag
 
 	Id() string
 	Kind() string
@@ -102,9 +105,13 @@ func ConvertGenericTag(t names.Tag) *Tag {
 // applicationoffer resource, so we specify user as BlankKindTag("controller"))
 func BlankKindTag(kind string) (*Tag, error) {
 	switch kind {
-	case names.UserTagKind, jimmnames.GroupTagKind,
-		names.ControllerTagKind, names.ModelTagKind,
-		names.ApplicationOfferTagKind, names.CloudTagKind,
+	case names.UserTagKind,
+		jimmnames.GroupTagKind,
+		jimmnames.RoleTagKind,
+		names.ControllerTagKind,
+		names.ModelTagKind,
+		names.ApplicationOfferTagKind,
+		names.CloudTagKind,
 		jimmnames.ServiceAccountTagKind:
 		return &Tag{
 			Kind: cofga.Kind(kind),
