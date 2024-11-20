@@ -310,7 +310,7 @@ func (o *OFGAClient) RemoveApplicationOffer(ctx context.Context, offer names.App
 	return nil
 }
 
-// RemoveRole removes a group.
+// RemoveRole removes a role.
 func (o *OFGAClient) RemoveRole(ctx context.Context, role jimmnames.RoleTag) error {
 	// Remove all access to a group. I.e. user->group
 	if err := o.removeTuples(
