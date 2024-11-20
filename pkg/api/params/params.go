@@ -381,42 +381,42 @@ type ListRelationshipTuplesResponse struct {
 
 // Role request parameters / responses:
 
-// AddRoleRequest holds a request to add a group.
+// AddRoleRequest holds a request to add a role.
 type AddRoleRequest struct {
-	// Name holds the name of the group.
+	// Name holds the name of the role.
 	Name string `json:"name"`
 }
 
-// AddRoleResponse holds the details of the added group.
+// AddRoleResponse holds the details of the added role.
 type AddRoleResponse struct {
 	Role
 }
 
-// GetRoleRequest holds a request to get a group by UUID or name.
+// GetRoleRequest holds a request to get a role by UUID or name.
 type GetRoleRequest struct {
-	// UUID holds the UUID of the group to be retrieved.
+	// UUID holds the UUID of the role to be retrieved.
 	UUID string `json:"uuid"`
-	// Name holds the name of the group to be retrieved.
+	// Name holds the name of the role to be retrieved.
 	Name string `json:"name"`
 }
 
-// GetRoleResponse holds the details of the group.
+// GetRoleResponse holds the details of the role.
 type GetRoleResponse struct {
 	Role
 }
 
-// RenameRoleRequest holds a request to rename a group.
+// RenameRoleRequest holds a request to rename a role.
 type RenameRoleRequest struct {
-	// Name holds the name of the group.
+	// Name holds the name of the role.
 	Name string `json:"name"`
 
-	// NewName holds the new name of the group.
+	// NewName holds the new name of the role.
 	NewName string `json:"new-name"`
 }
 
-// RemoveRoleRequest holds a request to remove a group.
+// RemoveRoleRequest holds a request to remove a role.
 type RemoveRoleRequest struct {
-	// Name holds the name of the group.
+	// Name holds the name of the role.
 	Name string `json:"name"`
 }
 
@@ -425,7 +425,7 @@ type ListRolesRequest struct {
 	Offset int `json:"offset"`
 }
 
-// Role holds the details of a group currently residing in JIMM.
+// Role holds the details of a role currently residing in JIMM.
 type Role struct {
 	UUID      string `json:"uuid" yaml:"uuid"`
 	Name      string `json:"name" yaml:"name"`
@@ -433,7 +433,7 @@ type Role struct {
 	UpdatedAt string `json:"updated_at" yaml:"updated_at"`
 }
 
-// ListRoleResponse returns the group tuples currently residing within OpenFGA.
+// ListRoleResponse returns the role tuples currently residing within OpenFGA.
 type ListRoleResponse struct {
 	Roles []Role `json:"name" yaml:"name"`
 }
