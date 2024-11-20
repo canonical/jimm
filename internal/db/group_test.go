@@ -119,8 +119,8 @@ func (s *dbSuite) TestGetGroup(c *qt.C) {
 	c.Assert(group.UUID, qt.Equals, uuid2)
 }
 
-func (s *dbSuite) TestUpdateGroup(c *qt.C) {
-	err := s.Database.UpdateGroup(context.Background(), &dbmodel.GroupEntry{Name: "test-group"})
+func (s *dbSuite) TestUpdateGroupName(c *qt.C) {
+	err := s.Database.UpdateGroupName(context.Background(), &dbmodel.GroupEntry{Name: "test-group"})
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
 	err = s.Database.Migrate(context.Background(), false)
@@ -130,7 +130,7 @@ func (s *dbSuite) TestUpdateGroup(c *qt.C) {
 		Name: "test-group",
 	}
 
-	err = s.Database.UpdateGroup(context.Background(), ge)
+	err = s.Database.UpdateGroupName(context.Background(), ge)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
 	_, err = s.Database.AddGroup(context.Background(), "test-group")
@@ -143,7 +143,7 @@ func (s *dbSuite) TestUpdateGroup(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 
 	ge1.Name = "renamed-group"
-	err = s.Database.UpdateGroup(context.Background(), ge1)
+	err = s.Database.UpdateGroupName(context.Background(), ge1)
 	c.Check(err, qt.IsNil)
 
 	ge2 := &dbmodel.GroupEntry{
@@ -184,7 +184,7 @@ func (s *dbSuite) TestRemoveGroup(c *qt.C) {
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 }
 
-func (s *dbSuite) TestForEachGroup(c *qt.C) {
+func (s *dbSuite) TestListGroups(c *qt.C) {
 	err := s.Database.Migrate(context.Background(), false)
 	c.Assert(err, qt.IsNil)
 
