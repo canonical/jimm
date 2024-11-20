@@ -316,13 +316,13 @@ func (s *dbSuite) TestFindApplicationOffers(c *qt.C) {
 	}, {
 		about: "filter by model",
 		filters: []db.ApplicationOfferFilter{
-			db.ApplicationOfferFilterByModel(env.model.Name),
+			db.ApplicationOfferFilterByModel(env.model.Name, env.model.OwnerIdentityName),
 		},
 		expectedOffers: []dbmodel.ApplicationOffer{offer1, offer2, offer3},
 	}, {
 		about: "filter by model - not found",
 		filters: []db.ApplicationOfferFilter{
-			db.ApplicationOfferFilterByModel("no such model"),
+			db.ApplicationOfferFilterByModel("no such model", "no owner"),
 		},
 		expectedOffers: []dbmodel.ApplicationOffer{},
 	}, {
@@ -454,7 +454,7 @@ func (s *dbSuite) TestFindApplicationOffers(c *qt.C) {
 	}, {
 		about: "filter by model and application",
 		filters: []db.ApplicationOfferFilter{
-			db.ApplicationOfferFilterByModel(env.model.Name),
+			db.ApplicationOfferFilterByModel(env.model.Name, env.model.OwnerIdentityName),
 			db.ApplicationOfferFilterByApplication("app-1"),
 		},
 		expectedOffers: []dbmodel.ApplicationOffer{offer1, offer2, offer3},

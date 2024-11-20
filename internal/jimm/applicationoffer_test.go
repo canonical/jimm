@@ -2455,6 +2455,28 @@ models:
   sla:
     level: unsupported
   agent-version: 1.2.3
+application-offers:
+- name: offer-1
+  url: test-offer-url
+  uuid: 00000012-0000-0000-0000-000000000001
+  model-name: model-1
+  model-owner: bob@canonical.com
+  application-name: application-1
+  application-description: app description 1
+- name: offer-2
+  url: test-offer-url-2
+  uuid: 00000012-0000-0000-0000-000000000002
+  model-name: model-1
+  model-owner: bob@canonical.com
+  application-name: application-2
+  application-description: app description 2
+- name: offer-3
+  url: test-offer-url-3
+  uuid: 00000012-0000-0000-0000-000000000003
+  model-name: model-2
+  model-owner: alice@canonical.com
+  application-name: application-3
+  application-description: app description 3
 `
 
 func TestListApplicationOffers(t *testing.T) {
@@ -2479,10 +2501,10 @@ func TestListApplicationOffers(t *testing.T) {
 		Database:      db,
 		Dialer: &jimmtest.Dialer{
 			API: &jimmtest.API{
-				ListApplicationOffers_: func(_ context.Context, filters []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error) {
-					switch filters[0].ModelName {
-					case "model-1":
-						return []jujuparams.ApplicationOfferAdminDetailsV5{{
+				GetApplicationOffer_: func(ctx context.Context, aoadv *jujuparams.ApplicationOfferAdminDetailsV5) error {
+					switch aoadv.OfferURL {
+					case "test-offer-url":
+						*aoadv = jujuparams.ApplicationOfferAdminDetailsV5{
 							ApplicationOfferDetailsV5: jujuparams.ApplicationOfferDetailsV5{
 								SourceModelTag:         "00000011-0000-0000-0000-000000000001",
 								OfferUUID:              "00000012-0000-0000-0000-000000000001",
@@ -2495,16 +2517,6 @@ func TestListApplicationOffers(t *testing.T) {
 									Interface: "unknown",
 									Limit:     1,
 								}},
-								Users: []jujuparams.OfferUserDetails{{
-									UserName: "alice@canonical.com",
-									Access:   "admin",
-								}, {
-									UserName: "eve@canonical.com",
-									Access:   "read",
-								}, {
-									UserName: "bob@canonical.com",
-									Access:   "consume",
-								}},
 							},
 							ApplicationName: "application-1",
 							CharmURL:        "charm-1",
@@ -2514,11 +2526,13 @@ func TestListApplicationOffers(t *testing.T) {
 								Username:       "charlie@canonical.com",
 								Endpoint:       "an-endpoint",
 							}},
-						}, {
+						}
+					case "test-offer-url-2":
+						*aoadv = jujuparams.ApplicationOfferAdminDetailsV5{
 							ApplicationOfferDetailsV5: jujuparams.ApplicationOfferDetailsV5{
 								SourceModelTag:         "00000011-0000-0000-0000-000000000002",
 								OfferUUID:              "00000012-0000-0000-0000-000000000002",
-								OfferURL:               "test-offer-url",
+								OfferURL:               "test-offer-url-2",
 								OfferName:              "offer-2",
 								ApplicationDescription: "app description 2",
 								Endpoints: []jujuparams.RemoteEndpoint{{
@@ -2526,16 +2540,6 @@ func TestListApplicationOffers(t *testing.T) {
 									Role:      "requirer",
 									Interface: "unknown",
 									Limit:     1,
-								}},
-								Users: []jujuparams.OfferUserDetails{{
-									UserName: "alice@canonical.com",
-									Access:   "admin",
-								}, {
-									UserName: "eve@canonical.com",
-									Access:   "read",
-								}, {
-									UserName: "bob@canonical.com",
-									Access:   "consume",
 								}},
 							},
 							ApplicationName: "application-2",
@@ -2546,13 +2550,13 @@ func TestListApplicationOffers(t *testing.T) {
 								Username:       "charlie@canonical.com",
 								Endpoint:       "an-endpoint",
 							}},
-						}}, nil
-					case "model-2":
-						return []jujuparams.ApplicationOfferAdminDetailsV5{{
+						}
+					case "test-offer-url-3":
+						*aoadv = jujuparams.ApplicationOfferAdminDetailsV5{
 							ApplicationOfferDetailsV5: jujuparams.ApplicationOfferDetailsV5{
 								SourceModelTag:         "00000011-0000-0000-0000-000000000003",
 								OfferUUID:              "00000012-0000-0000-0000-000000000003",
-								OfferURL:               "test-offer-url",
+								OfferURL:               "test-offer-url-3",
 								OfferName:              "offer-3",
 								ApplicationDescription: "app description 3",
 								Endpoints: []jujuparams.RemoteEndpoint{{
@@ -2580,9 +2584,11 @@ func TestListApplicationOffers(t *testing.T) {
 								Username:       "charlie@canonical.com",
 								Endpoint:       "an-endpoint",
 							}},
-						}}, nil
+						}
+					default:
+						return errors.E("unknown offer UUID")
 					}
-					return nil, nil
+					return nil
 				},
 			},
 		},
@@ -2654,7 +2660,7 @@ func TestListApplicationOffers(t *testing.T) {
 		ApplicationOfferDetailsV5: jujuparams.ApplicationOfferDetailsV5{
 			SourceModelTag:         "00000011-0000-0000-0000-000000000003",
 			OfferUUID:              "00000012-0000-0000-0000-000000000003",
-			OfferURL:               "test-offer-url",
+			OfferURL:               "test-offer-url-3",
 			OfferName:              "offer-3",
 			ApplicationDescription: "app description 3",
 			Endpoints: []jujuparams.RemoteEndpoint{{
@@ -2718,7 +2724,7 @@ func TestListApplicationOffers(t *testing.T) {
 		ApplicationOfferDetailsV5: jujuparams.ApplicationOfferDetailsV5{
 			SourceModelTag:         "00000011-0000-0000-0000-000000000002",
 			OfferUUID:              "00000012-0000-0000-0000-000000000002",
-			OfferURL:               "test-offer-url",
+			OfferURL:               "test-offer-url-2",
 			OfferName:              "offer-2",
 			ApplicationDescription: "app description 2",
 			Endpoints: []jujuparams.RemoteEndpoint{{
