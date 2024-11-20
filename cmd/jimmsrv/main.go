@@ -203,6 +203,9 @@ func start(ctx context.Context, s *service.Service) error {
 			}
 			return nil
 		})
+		s.Go(func() error {
+			return jimmsvc.OpenFGACleanup(ctx, time.NewTicker(6*time.Hour).C)
+		})
 	}
 
 	if isLeader {

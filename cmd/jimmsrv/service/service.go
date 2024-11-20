@@ -255,6 +255,22 @@ func (s *Service) MonitorResources(ctx context.Context) {
 	}
 }
 
+// OpenFGACleanup starts a goroutine that cleans up any orphaned tuples from OpenFGA.
+func (s *Service) OpenFGACleanup(ctx context.Context, trigger <-chan time.Time) error {
+	for {
+		select {
+		case <-trigger:
+			err := s.jimm.OpenFGACleanup(ctx)
+			if err != nil {
+				zapctx.Error(ctx, "openfga cleanup", zap.Error(err))
+				continue
+			}
+		case <-ctx.Done():
+			return nil
+		}
+	}
+}
+
 // Cleanup cleans up resources that need to be released on shutdown.
 func (s *Service) Cleanup() {
 	// Iterating over clean up function in reverse-order to avoid early clean ups.

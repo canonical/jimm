@@ -803,3 +803,62 @@ func (j *JIMM) ListGroups(ctx context.Context, user *openfga.User, pagination pa
 	}
 	return groups, nil
 }
+
+// OpenFGACleanup queries OpenFGA for all existing tuples, tries to resolve each tuple and removes those
+// that JIMM cannot resolved - orphaned tuples. JIMM not being able to resolve a tuple means that the
+// corresponding entity has been removed from JIMM's database.
+//
+// This approach to cleaning up tuples is intended to be temporary while we implement
+// a better approach to eventual consistency of JIMM's database objects and OpenFGA tuples.
+func (j *JIMM) OpenFGACleanup(ctx context.Context) error {
+	var (
+		continuationToken string
+		err               error
+		tuples            []ofga.Tuple
+	)
+	for {
+		tuples, continuationToken, err = j.OpenFGAClient.ReadRelatedObjects(ctx, openfga.Tuple{}, 20, continuationToken)
+		if err != nil {
+			zapctx.Error(ctx, "reading all tuples", zap.Error(err))
+			return err
+		}
+
+		orphanedTuples := j.orphanedTuples(ctx, tuples...)
+		if len(orphanedTuples) > 0 {
+			zapctx.Debug(ctx, "removing orphaned tuples", zap.Any("tuples", orphanedTuples))
+			err = j.OpenFGAClient.RemoveRelation(ctx, orphanedTuples...)
+			if err != nil {
+				zapctx.Warn(ctx, "failed to clean up orphaned tuples", zap.Error(err))
+			}
+		}
+		if continuationToken == "" {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+		}
+	}
+}
+
+func (j *JIMM) orphanedTuples(ctx context.Context, tuples ...openfga.Tuple) []openfga.Tuple {
+	orphanedTuples := []openfga.Tuple{}
+	for _, tuple := range tuples {
+		_, err := j.ToJAASTag(ctx, tuple.Object, true)
+		if err != nil {
+			if errors.ErrorCode(err) == errors.CodeNotFound {
+				orphanedTuples = append(orphanedTuples, tuple)
+				continue
+			}
+		}
+		_, err = j.ToJAASTag(ctx, tuple.Target, true)
+		if err != nil {
+			if errors.ErrorCode(err) == errors.CodeNotFound {
+				orphanedTuples = append(orphanedTuples, tuple)
+				continue
+			}
+		}
+	}
+	return orphanedTuples
+}
