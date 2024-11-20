@@ -106,7 +106,7 @@ func (r *controllerRoot) RemoveRole(ctx context.Context, req apiparams.RemoveRol
 	return nil
 }
 
-// ListRole lists relational access control roles within JIMMs DB.
+// ListRole lists access control roles within JIMMs DB.
 func (r *controllerRoot) ListRoles(ctx context.Context, req apiparams.ListRolesRequest) (apiparams.ListRoleResponse, error) {
 	const op = errors.Op("jujuapi.ListRoles")
 
