@@ -115,6 +115,8 @@ load-rock:
 	$(eval jimm_version := $(shell cat ./rocks/jimm.yaml | yq ".version"))
 	@sudo /snap/rockcraft/current/bin/skopeo --insecure-policy copy oci-archive:jimm_${jimm_version}_amd64.rock docker-daemon:jimm:latest
 
+auth-model-json:
+	fga model transform --file ./openfga/authorisation_model.fga > ./openfga/authorisation_model.json
 test-auth-model:
 	fga model test --tests ./openfga/tests.fga.yaml 
 

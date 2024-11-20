@@ -21,9 +21,7 @@ go install github.com/openfga/cli/cmd/fga@latest
 ## Adding / modifying [to] the authorsation model
 1. Open the authorisation_model.fga 
 2. Make your modification
-3. Open the Command Pallette using Ctrl+Shift+P (Windows) or Command+Shift+P (OSX)
-4. Select OpenFGA: Transform DSL to JSON
-5. Save the file over the existing authorisation_model.json
+3. Run: `make transform-auth-model`
 6. Add tests to tests.fga.yaml - Learn more [here](https://openfga.dev/docs/modeling/testing)
 7. Run them via: `make test-auth-model`
 

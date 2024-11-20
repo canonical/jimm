@@ -18,7 +18,7 @@ tuples:
       relation: assignee
       object: role:ro-role-1
 
-    # User to role via group
+    # User to role via group with resources
     - user: user:ro-user-2
       relation: member
       object: group:ro-group-1
@@ -27,6 +27,40 @@ tuples:
       relation: assignee
       object: role:ro-role-2
 
+    - user: role:ro-role-2#assignee
+      relation: administrator
+      object: controller:ro-controller-1
+    - user: role:ro-role-2#assignee
+      relation: audit_log_viewer
+      object: controller:ro-controller-2
+
+    - user: role:ro-role-2#assignee
+      relation: administrator
+      object: model:ro-model-1
+    - user: role:ro-role-2#assignee
+      relation: reader
+      object: model:ro-model-2
+    - user: role:ro-role-2#assignee
+      relation: writer
+      object: model:ro-model-3
+
+    - user: role:ro-role-2#assignee
+      relation: administrator
+      object: applicationoffer:ro-applicationoffer-1
+    - user: role:ro-role-2#assignee
+      relation: reader
+      object: applicationoffer:ro-applicationoffer-2
+    - user: role:ro-role-2#assignee
+      relation: consumer
+      object: applicationoffer:ro-applicationoffer-3
+
+    - user: role:ro-role-2#assignee
+      relation: administrator
+      object: cloud:ro-cloud-1
+    - user: role:ro-role-2#assignee
+      relation: can_addmodel
+      object: cloud:ro-cloud-2
+      
     # Wildcard user to role
     - user: user:*
       relation: assignee
@@ -212,6 +246,57 @@ tests:
           object: role:ro-role-3
           assertions:
             assignee: true
+
+        - user: user:ro-user-2
+          object: controller:ro-controller-1
+          assertions:
+            administrator: true
+
+        - user: user:ro-user-2
+          object: controller:ro-controller-2
+          assertions:
+            audit_log_viewer: true
+
+        - user: user:ro-user-2
+          object: model:ro-model-1
+          assertions:
+            administrator: true
+
+        - user: user:ro-user-2
+          object: model:ro-model-2
+          assertions:
+            reader: true
+
+        - user: user:ro-user-2
+          object: model:ro-model-3
+          assertions:
+            writer: true
+
+        - user: user:ro-user-2
+          object: applicationoffer:ro-applicationoffer-1
+          assertions:
+            administrator: true
+
+
+        - user: user:ro-user-2
+          object: applicationoffer:ro-applicationoffer-2
+          assertions:
+            reader: true
+
+        - user: user:ro-user-2
+          object: applicationoffer:ro-applicationoffer-3
+          assertions:
+            consumer: true
+
+        - user: user:ro-user-2
+          object: cloud:ro-cloud-1
+          assertions:
+            administrator: true
+
+        - user: user:ro-user-2
+          object: cloud:ro-cloud-2
+          assertions:
+            can_addmodel: true
 
       list_objects:
         - user: user:ro-user-3
