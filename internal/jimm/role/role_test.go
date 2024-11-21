@@ -18,9 +18,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
-	jimmtestcmp "github.com/canonical/jimm/v3/internal/testutils/jimmtest/cmp"
-	jimmtestgorm "github.com/canonical/jimm/v3/internal/testutils/jimmtest/gorm"
-	jimmtestopenfga "github.com/canonical/jimm/v3/internal/testutils/jimmtest/openfga"
+	jimmtest "github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
 
 type roleManagerSuite struct {
@@ -33,7 +31,7 @@ type roleManagerSuite struct {
 func (s *roleManagerSuite) Init(c *qt.C) {
 	// Setup DB
 	db := &db.Database{
-		DB: jimmtestgorm.PostgresDB(c, time.Now),
+		DB: jimmtest.PostgresDB(c, time.Now),
 	}
 	err := db.Migrate(context.Background(), false)
 	c.Assert(err, qt.IsNil)
@@ -41,7 +39,7 @@ func (s *roleManagerSuite) Init(c *qt.C) {
 	s.db = db
 
 	// Setup OFGA
-	ofgaClient, _, _, err := jimmtestopenfga.SetupTestOFGAClient(c.Name())
+	ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
 	s.ofgaClient = ofgaClient
@@ -69,7 +67,7 @@ func (s *roleManagerSuite) TestAddRole(c *qt.C) {
 	re, err := s.manager.AddRole(ctx, s.user, "models")
 	c.Assert(err, qt.IsNil)
 
-	c.Assert(re, jimmtestcmp.DBObjectEquals, &dbmodel.RoleEntry{
+	c.Assert(re, jimmtest.DBObjectEquals, &dbmodel.RoleEntry{
 		Name: "models",
 		UUID: re.UUID,
 		ID:   1,
