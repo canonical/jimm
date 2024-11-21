@@ -3,16 +3,13 @@ package jimmjwx_test
 
 import (
 	"context"
-	"net/http/httptest"
 	"testing"
 	"time"
 
-	"github.com/coreos/go-oidc/v3/oidc"
 	qt "github.com/frankban/quicktest"
 	"github.com/google/uuid"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 
-	jimmsvc "github.com/canonical/jimm/v3/cmd/jimmsrv/service"
 	"github.com/canonical/jimm/v3/internal/jimm/credentials"
 	"github.com/canonical/jimm/v3/internal/jimmjwx"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
@@ -84,55 +81,16 @@ func startAndTestRotator(c *qt.C, ctx context.Context, store credentials.Credent
 	return ks
 }
 
-// setupService sets up a JIMM service with the correct params to connect to vault. It also ensures
-// that vault is wiped each time this is called. The test server is cleaned up on test completion.
-func setupService(ctx context.Context, c *qt.C) (*jimmsvc.Service, *httptest.Server, credentials.CredentialStore) {
+// setupCredentialStore sets up a credential store with the correct params to connect to vault. It also ensures
+// that vault is wiped each time this is called.
+func setupCredentialStore(ctx context.Context, c *qt.C) credentials.CredentialStore {
 	store := newStore(c)
 	// Ensure store is wiped
 	err := store.CleanupJWKS(ctx)
 	c.Assert(err, qt.IsNil)
 
-	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
-	c.Assert(err, qt.IsNil)
-
-	_, path, roleID, roleSecretID, ok := jimmtest.VaultClient(c)
+	_, _, _, _, ok := jimmtest.VaultClient(c)
 	c.Assert(ok, qt.IsTrue)
 
-	p := jimmsvc.Params{
-		DSN:            jimmtest.CreateEmptyDatabase(c),
-		ControllerUUID: "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
-		PrivateKey:     "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
-		PublicKey:      "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
-		OAuthAuthenticatorParams: jimmsvc.OAuthAuthenticatorParams{
-			IssuerURL:           "http://localhost:8082/realms/jimm",
-			ClientID:            "jimm-device",
-			Scopes:              []string{oidc.ScopeOpenID, "profile", "email"},
-			SessionTokenExpiry:  time.Duration(time.Hour),
-			SessionCookieMaxAge: 60,
-			JWTSessionKey:       jimmtest.JWTTestSecret,
-		},
-		DashboardFinalRedirectURL: "dashboard-url",
-	}
-	p.VaultAddress = "http://localhost:8200"
-	p.VaultAuthPath = "/auth/approle/login"
-	p.VaultPath = path
-	p.VaultRoleID = roleID
-	p.VaultRoleSecretID = roleSecretID
-	p.OpenFGAParams = jimmsvc.OpenFGAParams{
-		Scheme:    cofgaParams.Scheme,
-		Host:      cofgaParams.Host,
-		Port:      cofgaParams.Port,
-		Store:     cofgaParams.StoreID,
-		Token:     cofgaParams.Token,
-		AuthModel: cofgaParams.AuthModelID,
-	}
-	p.CookieSessionKey = []byte("test-secret")
-	svc, err := jimmsvc.NewService(context.Background(), p)
-
-	c.Assert(err, qt.IsNil)
-
-	srv := httptest.NewTLSServer(svc)
-	c.Cleanup(func() { srv.Close() })
-
-	return svc, srv, store
+	return store
 }
