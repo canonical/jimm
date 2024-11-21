@@ -12,6 +12,7 @@ WORKDIR /app
 # Copy OpenFGA binaries from upstream image
 COPY --from=openfga/openfga:v1.2.0 /openfga /app/openfga
 COPY --from=openfga/openfga:v1.2.0 /assets /app/assets
+COPY --from=openfga/cli:latest     /fga    /app/fga
 
 COPY entrypoint.sh                /app/entrypoint.sh
 

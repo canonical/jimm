@@ -14,6 +14,7 @@ import (
 	"time"
 
 	cofga "github.com/canonical/ofga"
+	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/juju/juju/api"
 	"github.com/juju/juju/core/network"
 	corejujutesting "github.com/juju/juju/juju/testing"
@@ -64,7 +65,21 @@ func (s *JimmCmdSuite) SetUpTest(c *gc.C) {
 	s.COFGAClient = cofgaClient
 	s.COFGAParams = cofgaParams
 
-	s.Params = jimmtest.NewTestJimmParams(&jimmtest.GocheckTester{C: c})
+	s.Params = service.Params{
+		DSN:            jimmtest.CreateEmptyDatabase(&jimmtest.GocheckTester{C: c}),
+		ControllerUUID: "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
+		PrivateKey:     "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
+		PublicKey:      "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
+		OAuthAuthenticatorParams: service.OAuthAuthenticatorParams{
+			IssuerURL:           "http://localhost:8082/realms/jimm",
+			ClientID:            "jimm-device",
+			Scopes:              []string{oidc.ScopeOpenID, "profile", "email"},
+			SessionTokenExpiry:  time.Duration(time.Hour),
+			SessionCookieMaxAge: 60,
+			JWTSessionKey:       jimmtest.JWTTestSecret,
+		},
+		DashboardFinalRedirectURL: "dashboard-url",
+	}
 	dsn, err := url.Parse(s.Params.DSN)
 	c.Assert(err, gc.Equals, nil)
 	s.databaseName = strings.ReplaceAll(dsn.Path, "/", "")
