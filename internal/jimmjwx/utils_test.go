@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/coreos/go-oidc/v3/oidc"
 	qt "github.com/frankban/quicktest"
 	"github.com/google/uuid"
 	"github.com/lestrrat-go/jwx/v2/jwk"
@@ -97,7 +98,21 @@ func setupService(ctx context.Context, c *qt.C) (*jimmsvc.Service, *httptest.Ser
 	_, path, roleID, roleSecretID, ok := jimmtest.VaultClient(c)
 	c.Assert(ok, qt.IsTrue)
 
-	p := jimmtest.NewTestJimmParams(c)
+	p := jimmsvc.Params{
+		DSN:            jimmtest.CreateEmptyDatabase(c),
+		ControllerUUID: "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
+		PrivateKey:     "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
+		PublicKey:      "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
+		OAuthAuthenticatorParams: jimmsvc.OAuthAuthenticatorParams{
+			IssuerURL:           "http://localhost:8082/realms/jimm",
+			ClientID:            "jimm-device",
+			Scopes:              []string{oidc.ScopeOpenID, "profile", "email"},
+			SessionTokenExpiry:  time.Duration(time.Hour),
+			SessionCookieMaxAge: 60,
+			JWTSessionKey:       jimmtest.JWTTestSecret,
+		},
+		DashboardFinalRedirectURL: "dashboard-url",
+	}
 	p.VaultAddress = "http://localhost:8200"
 	p.VaultAuthPath = "/auth/approle/login"
 	p.VaultPath = path
