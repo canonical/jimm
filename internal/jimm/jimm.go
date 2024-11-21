@@ -24,6 +24,7 @@ import (
 	"golang.org/x/oauth2"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/canonical/jimm/v3/internal/common/pagination"
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
@@ -86,6 +87,28 @@ type JIMM struct {
 	// OAuthAuthenticator is responsible for handling authentication
 	// via OAuth2.0 AND JWT access tokens to JIMM.
 	OAuthAuthenticator OAuthAuthenticator
+
+	// RoleManager provides a means to manage roles within JIMM.
+	RoleManager RoleManager
+}
+
+// RoleManager provides a means to manage roles within JIMM.
+type RoleManager interface {
+	// AddRole adds a role to JIMM.
+	AddRole(ctx context.Context, user *openfga.User, roleName string) (*dbmodel.RoleEntry, error)
+	// GetRoleByUUID returns a role based on the provided UUID.
+	GetRoleByUUID(ctx context.Context, user *openfga.User, uuid string) (*dbmodel.RoleEntry, error)
+	// GetRoleByName returns a role based on the provided name.
+	GetRoleByName(ctx context.Context, user *openfga.User, name string) (*dbmodel.RoleEntry, error)
+	// RemoveRole removes the role from JIMM in both the store and authorisation store.
+	RemoveRole(ctx context.Context, user *openfga.User, roleName string) error
+	// RenameRole renames a role in JIMM's DB.
+	RenameRole(ctx context.Context, user *openfga.User, uuid, newName string) error
+	// ListRoles returns a list of roles known to JIMM.
+	// `match` will filter the list fuzzy matching role's name or uuid.
+	ListRoles(ctx context.Context, user *openfga.User, pagination pagination.LimitOffsetPagination, match string) ([]dbmodel.RoleEntry, error)
+	// CountRoles returns the number of roles that exist.
+	CountRoles(ctx context.Context, user *openfga.User) (int, error)
 }
 
 // ResourceTag returns JIMM's controller tag stating its UUID.

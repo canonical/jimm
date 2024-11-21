@@ -32,6 +32,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm"
 	jimmcreds "github.com/canonical/jimm/v3/internal/jimm/credentials"
+	"github.com/canonical/jimm/v3/internal/jimm/role"
 	"github.com/canonical/jimm/v3/internal/jimmhttp"
 	"github.com/canonical/jimm/v3/internal/jimmhttp/rebac_admin"
 	"github.com/canonical/jimm/v3/internal/jimmjwx"
@@ -255,6 +256,22 @@ func (s *Service) MonitorResources(ctx context.Context) {
 	}
 }
 
+// OpenFGACleanup starts a goroutine that cleans up any orphaned tuples from OpenFGA.
+func (s *Service) OpenFGACleanup(ctx context.Context, trigger <-chan time.Time) error {
+	for {
+		select {
+		case <-trigger:
+			err := s.jimm.OpenFGACleanup(ctx)
+			if err != nil {
+				zapctx.Error(ctx, "openfga cleanup", zap.Error(err))
+				continue
+			}
+		case <-ctx.Done():
+			return nil
+		}
+	}
+}
+
 // Cleanup cleans up resources that need to be released on shutdown.
 func (s *Service) Cleanup() {
 	// Iterating over clean up function in reverse-order to avoid early clean ups.
@@ -381,6 +398,12 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		ControllerCredentialsStore: s.jimm.CredentialStore,
 		JWTService:                 s.jimm.JWTService,
 	}
+
+	roleManager, err := role.NewRoleManager(&s.jimm.Database, s.jimm.OpenFGAClient)
+	if err != nil {
+		return nil, errors.E(op, err, "failed to create RoleManager")
+	}
+	s.jimm.RoleManager = roleManager
 
 	if !p.DisableConnectionCache {
 		s.jimm.Dialer = jimm.CacheDialer(s.jimm.Dialer)
