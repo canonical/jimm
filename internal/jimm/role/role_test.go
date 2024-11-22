@@ -1,5 +1,6 @@
 // Copyright 2024 Canonical.
-package role
+
+package role_test
 
 import (
 	"context"
@@ -16,13 +17,14 @@ import (
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jimm/role"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	jimmtest "github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
 
 type roleManagerSuite struct {
-	manager    *roleManager
+	manager    *role.RoleManager
 	user       *openfga.User
 	db         *db.Database
 	ofgaClient *openfga.OFGAClient
@@ -44,7 +46,7 @@ func (s *roleManagerSuite) Init(c *qt.C) {
 
 	s.ofgaClient = ofgaClient
 
-	s.manager, err = NewRoleManager(db, ofgaClient)
+	s.manager, err = role.NewRoleManager(db, ofgaClient)
 	c.Assert(err, qt.IsNil)
 
 	// Create test identity
