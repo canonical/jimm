@@ -3,6 +3,7 @@ package rebac_admin
 
 var (
 	NewGroupService       = newGroupService
+	NewRoleService        = newRoleService
 	NewidentitiesService  = newidentitiesService
 	NewResourcesService   = newResourcesService
 	NewEntitlementService = newEntitlementService
@@ -11,3 +12,4 @@ var (
 )
 
 type GroupsService = groupsService
+type RolesService = rolesService

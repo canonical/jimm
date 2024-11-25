@@ -275,6 +275,13 @@ func (s *JIMMSuite) AddGroup(c *gc.C, groupName string) dbmodel.GroupEntry {
 	return *group
 }
 
+func (s *JIMMSuite) AddRole(c *gc.C, roleName string) dbmodel.RoleEntry {
+	ctx := context.Background()
+	role, err := s.JIMM.RoleManager.AddRole(ctx, s.AdminUser, roleName)
+	c.Assert(err, gc.Equals, nil)
+	return *role
+}
+
 // EnableDeviceFlow allows a test to use the device flow.
 // Call this non-blocking function before login to ensure the device flow won't block.
 //

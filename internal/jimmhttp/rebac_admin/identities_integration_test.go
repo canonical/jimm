@@ -127,21 +127,24 @@ func (s *identitiesSuite) TestIdentityGetGroups(c *gc.C) {
 	// test list identity's groups with token pagination
 	size := 3
 	token := ""
+	totalGroups := 0
 	for i := 0; ; i += size {
 		groups, err := identitySvc.GetIdentityGroups(ctx, username, &resources.GetIdentitiesItemGroupsParams{
 			Size:      &size,
 			NextToken: &token,
 		})
 		c.Assert(err, gc.IsNil)
-		token = *groups.Next.PageToken
 		for j := 0; j < len(groups.Data); j++ {
+			totalGroups++
 			c.Assert(groups.Data[j].Name, gc.Matches, `group-test\d+`)
 			c.Assert(groupTags[j].Id(), gc.Matches, `\w*-\w*-\w*-\w*-\w*`)
 		}
-		if *groups.Next.PageToken == "" {
+		if groups.Next.PageToken == nil || *groups.Next.PageToken == "" {
 			break
 		}
+		token = *groups.Next.PageToken
 	}
+	c.Assert(totalGroups, gc.Equals, groupsSize)
 }
 
 // TestGetIdentityGroupsWithDeletedDbGroup tests the behaviour
@@ -181,6 +184,97 @@ func (s *identitiesSuite) TestGetIdentityGroupsWithDeletedDbGroup(c *gc.C) {
 	groups, err = identitySvc.GetIdentityGroups(ctx, username, &resources.GetIdentitiesItemGroupsParams{})
 	c.Assert(err, gc.IsNil)
 	c.Assert(groups.Data, gc.HasLen, 1)
+}
+
+func (s *identitiesSuite) TestIdentityPatchRoles(c *gc.C) {
+	// initialization
+	ctx := context.Background()
+	ctx = rebac_handlers.ContextWithIdentity(ctx, s.AdminUser)
+	identitySvc := rebac_admin.NewidentitiesService(s.JIMM)
+	roleName := "role-test1"
+	username := s.AdminUser.Name
+	role := s.AddRole(c, roleName)
+
+	// test add identity role
+	changed, err := identitySvc.PatchIdentityRoles(ctx, username, []resources.IdentityRolesPatchItem{{
+		Role: role.UUID,
+		Op:   resources.IdentityRolesPatchItemOpAdd,
+	}})
+	c.Assert(err, gc.IsNil)
+	c.Assert(changed, gc.Equals, true)
+
+	// test user added to roles
+	objUser, err := s.JIMM.FetchIdentity(ctx, username)
+	c.Assert(err, gc.IsNil)
+	tuples, _, err := s.JIMM.ListRelationshipTuples(ctx, s.AdminUser, params.RelationshipTuple{
+		Object:       objUser.ResourceTag().String(),
+		Relation:     ofganames.AssigneeRelation.String(),
+		TargetObject: role.ResourceTag().String(),
+	}, 10, "")
+	c.Assert(err, gc.IsNil)
+	c.Assert(len(tuples), gc.Equals, 1)
+	c.Assert(role.UUID, gc.Equals, tuples[0].Target.ID)
+
+	// test user remove from role
+	changed, err = identitySvc.PatchIdentityRoles(ctx, username, []resources.IdentityRolesPatchItem{{
+		Role: role.UUID,
+		Op:   resources.IdentityRolesPatchItemOpRemove,
+	}})
+	c.Assert(err, gc.IsNil)
+	c.Assert(changed, gc.Equals, true)
+	tuples, _, err = s.JIMM.ListRelationshipTuples(ctx, s.AdminUser, params.RelationshipTuple{
+		Object:       objUser.ResourceTag().String(),
+		Relation:     ofganames.AssigneeRelation.String(),
+		TargetObject: role.ResourceTag().String(),
+	}, 10, "")
+	c.Assert(err, gc.IsNil)
+	c.Assert(len(tuples), gc.Equals, 0)
+}
+
+func (s *identitiesSuite) TestIdentityGetRoles(c *gc.C) {
+	// initialization
+	ctx := context.Background()
+	ctx = rebac_handlers.ContextWithIdentity(ctx, s.AdminUser)
+	identitySvc := rebac_admin.NewidentitiesService(s.JIMM)
+	username := s.AdminUser.Name
+	rolesSize := 10
+	rolesToAdd := make([]resources.IdentityRolesPatchItem, rolesSize)
+	roleTags := make([]jimmnames.RoleTag, rolesSize)
+	for i := range rolesSize {
+		roleName := fmt.Sprintf("role-test%d", i)
+		role := s.AddRole(c, roleName)
+		roleTags[i] = role.ResourceTag()
+		rolesToAdd[i] = resources.IdentityRolesPatchItem{
+			Role: role.UUID,
+			Op:   resources.IdentityRolesPatchItemOpAdd,
+		}
+
+	}
+	changed, err := identitySvc.PatchIdentityRoles(ctx, username, rolesToAdd)
+	c.Assert(err, gc.IsNil)
+	c.Assert(changed, gc.Equals, true)
+
+	// test list identity's roles with token pagination
+	size := 3
+	token := ""
+	totalRoles := 0
+	for i := 0; ; i += size {
+		roles, err := identitySvc.GetIdentityRoles(ctx, username, &resources.GetIdentitiesItemRolesParams{
+			Size:      &size,
+			NextToken: &token,
+		})
+		c.Assert(err, gc.IsNil)
+		for j := 0; j < len(roles.Data); j++ {
+			totalRoles++
+			c.Assert(roles.Data[j].Name, gc.Matches, `role-test\d+`)
+			c.Assert(roleTags[j].Id(), gc.Matches, `\w*-\w*-\w*-\w*-\w*`)
+		}
+		if roles.Next.PageToken == nil || *roles.Next.PageToken == "" {
+			break
+		}
+		token = *roles.Next.PageToken
+	}
+	c.Assert(totalRoles, gc.Equals, rolesSize)
 }
 
 // TestIdentityEntitlements tests the listing of entitlements for a specific identityId.

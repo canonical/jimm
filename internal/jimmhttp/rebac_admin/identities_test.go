@@ -17,8 +17,10 @@ import (
 	"github.com/canonical/jimm/v3/internal/common/utils"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	jimmm_errors "github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jimm"
 	"github.com/canonical/jimm/v3/internal/jimmhttp/rebac_admin"
 	"github.com/canonical/jimm/v3/internal/openfga"
+	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest/mocks"
 	"github.com/canonical/jimm/v3/pkg/api/params"
@@ -237,4 +239,104 @@ func TestPatchIdentityGroups(t *testing.T) {
 	}
 	_, err = idSvc.PatchIdentityGroups(ctx, "bob@canonical.com", invalidGroupName)
 	c.Assert(err, qt.ErrorMatches, "Bad Request: ID test-group1 is not a valid group ID")
+}
+
+func TestGetIdentityRoles(t *testing.T) {
+	c := qt.New(t)
+	var listTuplesErr error
+	testTuple := openfga.Tuple{
+		Object:   &ofga.Entity{Kind: "user", ID: "foo"},
+		Relation: ofganames.AssigneeRelation,
+		Target:   &ofga.Entity{Kind: "role", ID: "my-role-id"},
+	}
+	roleManager := mocks.RoleManager{
+		GetRoleByUUID_: func(ctx context.Context, user *openfga.User, uuid string) (*dbmodel.RoleEntry, error) {
+			return &dbmodel.RoleEntry{Name: "fake-role-name"}, nil
+		},
+	}
+	jimm := jimmtest.JIMM{
+		FetchIdentity_: func(ctx context.Context, username string) (*openfga.User, error) {
+			if username == "bob@canonical.com" {
+				return openfga.NewUser(&dbmodel.Identity{Name: "bob@canonical.com"}, nil), nil
+			}
+			return nil, dbmodel.IdentityCreationError
+		},
+		RelationService: mocks.RelationService{
+			ListRelationshipTuples_: func(ctx context.Context, user *openfga.User, tuple params.RelationshipTuple, pageSize int32, continuationToken string) ([]openfga.Tuple, string, error) {
+				return []openfga.Tuple{testTuple}, "continuation-token", listTuplesErr
+			},
+		},
+		GetRoleManager_: func() jimm.RoleManager {
+			return roleManager
+		},
+	}
+	user := openfga.User{}
+	ctx := context.Background()
+	ctx = rebac_handlers.ContextWithIdentity(ctx, &user)
+	idSvc := rebac_admin.NewidentitiesService(&jimm)
+
+	_, err := idSvc.GetIdentityRoles(ctx, "bob-not-found@canonical.com", &resources.GetIdentitiesItemRolesParams{})
+	c.Assert(err, qt.ErrorMatches, ".*not found")
+	username := "bob@canonical.com"
+
+	res, err := idSvc.GetIdentityRoles(ctx, username, &resources.GetIdentitiesItemRolesParams{})
+	c.Assert(err, qt.IsNil)
+	c.Assert(res, qt.IsNotNil)
+	c.Assert(res.Data, qt.HasLen, 1)
+	c.Assert(*res.Data[0].Id, qt.Equals, "my-role-id")
+	c.Assert(res.Data[0].Name, qt.Equals, "fake-role-name")
+	c.Assert(*res.Next.PageToken, qt.Equals, "continuation-token")
+
+	listTuplesErr = errors.New("foo")
+	_, err = idSvc.GetIdentityRoles(ctx, username, &resources.GetIdentitiesItemRolesParams{})
+	c.Assert(err, qt.ErrorMatches, "foo")
+}
+
+func TestPatchIdentityRoles(t *testing.T) {
+	c := qt.New(t)
+	var patchTuplesErr error
+	jimm := jimmtest.JIMM{
+		FetchIdentity_: func(ctx context.Context, username string) (*openfga.User, error) {
+			if username == "bob@canonical.com" {
+				return openfga.NewUser(&dbmodel.Identity{Name: "bob@canonical.com"}, nil), nil
+			}
+			return nil, dbmodel.IdentityCreationError
+		},
+		RelationService: mocks.RelationService{
+			AddRelation_: func(ctx context.Context, user *openfga.User, tuples []params.RelationshipTuple) error {
+				return patchTuplesErr
+			},
+			RemoveRelation_: func(ctx context.Context, user *openfga.User, tuples []params.RelationshipTuple) error {
+				return patchTuplesErr
+			},
+		},
+	}
+	user := openfga.User{}
+	ctx := context.Background()
+	ctx = rebac_handlers.ContextWithIdentity(ctx, &user)
+	idSvc := rebac_admin.NewidentitiesService(&jimm)
+
+	_, err := idSvc.PatchIdentityRoles(ctx, "bob-not-found@canonical.com", nil)
+	c.Assert(err, qt.ErrorMatches, ".* not found")
+
+	username := "bob@canonical.com"
+	role1ID := uuid.New()
+	role2ID := uuid.New()
+	operations := []resources.IdentityRolesPatchItem{
+		{Role: role1ID.String(), Op: resources.IdentityRolesPatchItemOpAdd},
+		{Role: role2ID.String(), Op: resources.IdentityRolesPatchItemOpRemove},
+	}
+	res, err := idSvc.PatchIdentityRoles(ctx, username, operations)
+	c.Assert(err, qt.IsNil)
+	c.Assert(res, qt.IsTrue)
+
+	patchTuplesErr = errors.New("foo")
+	_, err = idSvc.PatchIdentityRoles(ctx, username, operations)
+	c.Assert(err, qt.ErrorMatches, ".*foo")
+
+	invalidRoleName := []resources.IdentityRolesPatchItem{
+		{Role: "test-role1", Op: resources.IdentityRolesPatchItemOpAdd},
+	}
+	_, err = idSvc.PatchIdentityRoles(ctx, "bob@canonical.com", invalidRoleName)
+	c.Assert(err, qt.ErrorMatches, "Bad Request: ID test-role1 is not a valid role ID")
 }
