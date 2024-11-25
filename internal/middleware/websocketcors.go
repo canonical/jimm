@@ -36,7 +36,10 @@ func (c *WebsocketCors) Handler(h http.Handler) http.Handler {
 		// include cookies. For now we enforce CORS protection on all requests
 		// because the only client that is expected to connect cross-origin
 		// is the Juju dashboard which uses cookies for auth.
-		originPresent := r.Header.Get("Origin") != ""
+		//
+		// Ignoring "http://localhost/" to support CLI clients that send this header.
+		// https://github.com/juju/juju/pull/18419
+		originPresent := r.Header.Get("Origin") != "" && r.Header.Get("Origin") != "http://localhost/"
 		if originPresent && !c.cors.OriginAllowed(r) {
 			w.WriteHeader(http.StatusForbidden)
 			return
