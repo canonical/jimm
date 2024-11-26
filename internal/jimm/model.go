@@ -553,6 +553,7 @@ func (b *modelBuilder) JujuModelInfo() *jujuparams.ModelInfo {
 // AddModel adds the specified model to JIMM.
 func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCreateArgs) (_ *jujuparams.ModelInfo, err error) {
 	const op = errors.Op("jimm.AddModel")
+	zapctx.Info(ctx, string(op))
 
 	owner, err := dbmodel.NewIdentity(args.Owner.Id())
 	if err != nil {
@@ -719,6 +720,7 @@ func (j *JIMM) addModelPermissions(ctx context.Context, owner *openfga.User, mt 
 // CodeUnauthorized.
 func (j *JIMM) ModelInfo(ctx context.Context, user *openfga.User, mt names.ModelTag) (*jujuparams.ModelInfo, error) {
 	const op = errors.Op("jimm.ModelInfo")
+	zapctx.Info(ctx, string(op))
 
 	var m dbmodel.Model
 	m.SetTag(mt)
@@ -750,6 +752,7 @@ func (j *JIMM) ModelInfo(ctx context.Context, user *openfga.User, mt names.Model
 // information from JIMM where JIMM specific information should be used.
 func (j *JIMM) mergeModelInfo(ctx context.Context, user *openfga.User, modelInfo *jujuparams.ModelInfo, jimmModel dbmodel.Model) (*jujuparams.ModelInfo, error) {
 	const op = errors.Op("jimm.mergeModelInfo")
+	zapctx.Info(ctx, string(op))
 
 	jimmSummary := jimmModel.ToJujuModelSummary()
 	modelInfo.CloudCredentialTag = jimmSummary.CloudCredentialTag
@@ -816,6 +819,7 @@ func (j *JIMM) mergeModelInfo(ctx context.Context, user *openfga.User, modelInfo
 // then the returned error will have the code CodeUnauthorized.
 func (j *JIMM) ModelStatus(ctx context.Context, user *openfga.User, mt names.ModelTag) (*jujuparams.ModelStatus, error) {
 	const op = errors.Op("jimm.ModelStatus")
+	zapctx.Info(ctx, string(op))
 
 	var ms jujuparams.ModelStatus
 	err := j.doModelAdmin(ctx, user, mt, func(_ *dbmodel.Model, api API) error {
@@ -839,6 +843,7 @@ func (j *JIMM) ModelStatus(ctx context.Context, user *openfga.User, mt names.Mod
 // function should not update the database.
 func (j *JIMM) ForEachUserModel(ctx context.Context, user *openfga.User, f func(*dbmodel.Model, jujuparams.UserAccessPermission) error) error {
 	const op = errors.Op("jimm.ForEachUserModel")
+	zapctx.Info(ctx, string(op))
 
 	errStop := errors.E("stop")
 	var iterErr error
@@ -877,6 +882,7 @@ func (j *JIMM) ForEachUserModel(ctx context.Context, user *openfga.User, f func(
 // immediately. The given function should not update the database.
 func (j *JIMM) ForEachModel(ctx context.Context, user *openfga.User, f func(*dbmodel.Model, jujuparams.UserAccessPermission) error) error {
 	const op = errors.Op("jimm.ForEachModel")
+	zapctx.Info(ctx, string(op))
 
 	if !user.JimmAdmin {
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
@@ -908,6 +914,7 @@ func (j *JIMM) ForEachModel(ctx context.Context, user *openfga.User, f func(*dbm
 // is returned.
 func (j *JIMM) GrantModelAccess(ctx context.Context, user *openfga.User, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
 	const op = errors.Op("jimm.GrantModelAccess")
+	zapctx.Info(ctx, string(op))
 
 	targetRelation, err := ToModelRelation(string(access))
 	if err != nil {
@@ -980,6 +987,7 @@ func (j *JIMM) GrantModelAccess(ctx context.Context, user *openfga.User, mt name
 // then an error with the code CodeUnauthorized is returned.
 func (j *JIMM) RevokeModelAccess(ctx context.Context, user *openfga.User, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
 	const op = errors.Op("jimm.RevokeModelAccess")
+	zapctx.Info(ctx, string(op))
 
 	targetRelation, err := ToModelRelation(string(access))
 	if err != nil {
@@ -1068,6 +1076,7 @@ func (j *JIMM) RevokeModelAccess(ctx context.Context, user *openfga.User, mt nam
 // the juju API will not have it's code masked.
 func (j *JIMM) DestroyModel(ctx context.Context, user *openfga.User, mt names.ModelTag, destroyStorage, force *bool, maxWait, timeout *time.Duration) error {
 	const op = errors.Op("jimm.DestroyModel")
+	zapctx.Info(ctx, string(op))
 
 	err := j.doModelAdmin(ctx, user, mt, func(m *dbmodel.Model, api API) error {
 		if err := api.DestroyModel(ctx, mt, destroyStorage, force, maxWait, timeout); err != nil {
@@ -1099,6 +1108,7 @@ func (j *JIMM) DestroyModel(ctx context.Context, user *openfga.User, mt names.Mo
 // error with the code CodeUnauthorized is returned.
 func (j *JIMM) DumpModel(ctx context.Context, user *openfga.User, mt names.ModelTag, simplified bool) (string, error) {
 	const op = errors.Op("jimm.DumpModel")
+	zapctx.Info(ctx, string(op))
 
 	var dump string
 	err := j.doModelAdmin(ctx, user, mt, func(m *dbmodel.Model, api API) error {
@@ -1117,6 +1127,7 @@ func (j *JIMM) DumpModel(ctx context.Context, user *openfga.User, mt names.Model
 // admin an error with the code CodeUnauthorized is returned.
 func (j *JIMM) DumpModelDB(ctx context.Context, user *openfga.User, mt names.ModelTag) (map[string]interface{}, error) {
 	const op = errors.Op("jimm.DumpModelDB")
+	zapctx.Info(ctx, string(op))
 
 	var dump map[string]interface{}
 	err := j.doModelAdmin(ctx, user, mt, func(m *dbmodel.Model, api API) error {
@@ -1138,6 +1149,7 @@ func (j *JIMM) DumpModelDB(ctx context.Context, user *openfga.User, mt names.Mod
 // CodeNotImplemented error code will be propagated back to the client.
 func (j *JIMM) ValidateModelUpgrade(ctx context.Context, user *openfga.User, mt names.ModelTag, force bool) error {
 	const op = errors.Op("jimm.ValidateModelUpgrade")
+	zapctx.Info(ctx, string(op))
 
 	err := j.doModelAdmin(ctx, user, mt, func(_ *dbmodel.Model, api API) error {
 		return api.ValidateModelUpgrade(ctx, mt, force)
@@ -1172,6 +1184,7 @@ func (j *JIMM) GetUserModelAccess(ctx context.Context, user *openfga.User, model
 
 func (j *JIMM) doModel(ctx context.Context, user *openfga.User, mt names.ModelTag, access string, f func(*dbmodel.Model, API) error) error {
 	const op = errors.Op("jimm.doModel")
+	zapctx.Info(ctx, string(op))
 
 	var m dbmodel.Model
 	m.SetTag(mt)
@@ -1220,6 +1233,7 @@ var allowedModelAccess = map[string]map[string]bool{
 // the controller and the local database.
 func (j *JIMM) ChangeModelCredential(ctx context.Context, user *openfga.User, modelTag names.ModelTag, cloudCredentialTag names.CloudCredentialTag) error {
 	const op = errors.Op("jimm.ChangeModelCredential")
+	zapctx.Info(ctx, string(op))
 
 	if !user.JimmAdmin && user.Tag() != cloudCredentialTag.Owner() {
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")

@@ -57,6 +57,13 @@ func TestWebsocketCors(t *testing.T) {
 			method:         http.MethodConnect,
 			expectedStatus: http.StatusBadRequest,
 		},
+		{
+			name:           "exception origin is allowed",
+			method:         http.MethodGet,
+			allowedOrigins: []string{"jaas.com"},
+			origin:         "http://localhost/",
+			expectedStatus: http.StatusOK,
+		},
 	}
 
 	for _, tt := range tests {

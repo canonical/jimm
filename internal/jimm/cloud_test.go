@@ -518,20 +518,6 @@ var addHostedCloudTests = []struct {
 	expectError:     `invalid cloud/region format "ec2"`,
 	expectErrorCode: errors.CodeBadRequest,
 }, {
-	name:      "UserHasNoCloudAccess",
-	username:  "bob@canonical.com",
-	cloudName: "new-cloud",
-	cloud: jujuparams.Cloud{
-		Type:             "kubernetes",
-		HostCloudRegion:  "test-provider2/test-region",
-		AuthTypes:        []string{"empty", "userpass"},
-		Endpoint:         "https://example.com",
-		IdentityEndpoint: "https://example.com/identity",
-		StorageEndpoint:  "https://example.com/storage",
-	},
-	expectError:     `missing add-model access on "test-provider2/test-region"`,
-	expectErrorCode: errors.CodeUnauthorized,
-}, {
 	name:      "HostCloudIsHosted",
 	username:  "alice@canonical.com",
 	cloudName: "new-cloud",

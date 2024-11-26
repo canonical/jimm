@@ -8,8 +8,5 @@ import (
 	_ "embed"
 )
 
-//go:embed authorisation_model.json
-var AuthModelJSON []byte
-
 //go:embed authorisation_model.fga
 var AuthModelDSL []byte

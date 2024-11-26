@@ -41,7 +41,11 @@ func (s *groupsService) ListGroups(ctx context.Context, params *resources.GetGro
 		return nil, err
 	}
 	page, nextPage, pagination := pagination.CreatePagination(params.Size, params.Page, count)
-	groups, err := s.jimm.ListGroups(ctx, user, pagination)
+	match := ""
+	if params.Filter != nil && *params.Filter != "" {
+		match = *params.Filter
+	}
+	groups, err := s.jimm.ListGroups(ctx, user, pagination, match)
 	if err != nil {
 		return nil, err
 	}

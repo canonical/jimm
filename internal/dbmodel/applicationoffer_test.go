@@ -51,14 +51,13 @@ func TestApplicationOfferUniqueConstraint(t *testing.T) {
 	c.Assert(db.Create(&m).Error, qt.IsNil)
 
 	ao := dbmodel.ApplicationOffer{
-		Name:  "offer1",
+		Name:  "offer",
 		UUID:  "00000003-0000-0000-0000-0000-000000000001",
 		URL:   "foo",
 		Model: m,
 	}
 	c.Assert(db.Create(&ao).Error, qt.IsNil)
 	ao.ID = 0
-	ao.Name = "offer2"
 	ao.UUID = "00000003-0000-0000-0000-0000-000000000002"
 	c.Assert(db.Create(&ao).Error, qt.ErrorMatches, `ERROR: duplicate key value violates unique constraint "application_offers_url_key" .*`)
 }

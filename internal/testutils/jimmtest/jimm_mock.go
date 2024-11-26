@@ -53,10 +53,11 @@ type JIMM struct {
 	GetCloudCredential_                func(ctx context.Context, user *openfga.User, tag names.CloudCredentialTag) (*dbmodel.CloudCredential, error)
 	GetCloudCredentialAttributes_      func(ctx context.Context, u *openfga.User, cred *dbmodel.CloudCredential, hidden bool) (attrs map[string]string, redacted []string, err error)
 	GetCredentialStore_                func() jimmcreds.CredentialStore
+	GetRoleManager_                    func() jimm.RoleManager
 	GetJimmControllerAccess_           func(ctx context.Context, user *openfga.User, tag names.UserTag) (string, error)
 	FetchIdentity_                     func(ctx context.Context, username string) (*openfga.User, error)
 	CountIdentities_                   func(ctx context.Context, user *openfga.User) (int, error)
-	ListIdentities_                    func(ctx context.Context, user *openfga.User, filter pagination.LimitOffsetPagination) ([]openfga.User, error)
+	ListIdentities_                    func(ctx context.Context, user *openfga.User, pagination pagination.LimitOffsetPagination, match string) ([]openfga.User, error)
 	GetUserCloudAccess_                func(ctx context.Context, user *openfga.User, cloud names.CloudTag) (string, error)
 	GetUserControllerAccess_           func(ctx context.Context, user *openfga.User, controller names.ControllerTag) (string, error)
 	GetUserModelAccess_                func(ctx context.Context, user *openfga.User, model names.ModelTag) (string, error)
@@ -209,6 +210,14 @@ func (j *JIMM) GetCredentialStore() jimmcreds.CredentialStore {
 	}
 	return j.GetCredentialStore_()
 }
+
+func (j *JIMM) GetRoleManager() jimm.RoleManager {
+	if j.GetRoleManager_ == nil {
+		return nil
+	}
+	return j.GetRoleManager_()
+}
+
 func (j *JIMM) GetJimmControllerAccess(ctx context.Context, user *openfga.User, tag names.UserTag) (string, error) {
 	if j.GetJimmControllerAccess_ == nil {
 		return "", errors.E(errors.CodeNotImplemented)
@@ -227,11 +236,11 @@ func (j *JIMM) CountIdentities(ctx context.Context, user *openfga.User) (int, er
 	}
 	return j.CountIdentities_(ctx, user)
 }
-func (j *JIMM) ListIdentities(ctx context.Context, user *openfga.User, filter pagination.LimitOffsetPagination) ([]openfga.User, error) {
+func (j *JIMM) ListIdentities(ctx context.Context, user *openfga.User, pagination pagination.LimitOffsetPagination, match string) ([]openfga.User, error) {
 	if j.ListIdentities_ == nil {
 		return nil, errors.E(errors.CodeNotImplemented)
 	}
-	return j.ListIdentities_(ctx, user, filter)
+	return j.ListIdentities_(ctx, user, pagination, match)
 }
 func (j *JIMM) GetUserCloudAccess(ctx context.Context, user *openfga.User, cloud names.CloudTag) (string, error) {
 	if j.GetUserCloudAccess_ == nil {

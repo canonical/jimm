@@ -45,7 +45,7 @@ func (d Dialer) DialWebsocket(ctx context.Context, url string, headers http.Head
 	dialer := websocket.Dialer{
 		TLSClientConfig: d.TLSConfig,
 	}
-	conn, resp, err := dialer.DialContext(context.Background(), url, headers)
+	conn, resp, err := dialer.DialContext(ctx, url, headers)
 	if err != nil {
 		zapctx.Error(ctx, "BasicDial failed", zap.Error(err))
 		return nil, errors.E(op, err)
@@ -89,7 +89,13 @@ func Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag,
 	for _, hps := range ctl.Addresses {
 		for _, hp := range hps {
 			if maybeReachable(hp.Scope) {
-				urls = append(urls, websocketURL(fmt.Sprintf("%s:%d", hp.Value, hp.Port), modelTag, finalPath))
+				var ip string
+				if hp.Type == string(network.IPv6Address) {
+					ip = fmt.Sprintf("[%s]:%d", hp.Value, hp.Port)
+				} else {
+					ip = fmt.Sprintf("%s:%d", hp.Value, hp.Port)
+				}
+				urls = append(urls, websocketURL(ip, modelTag, finalPath))
 			}
 		}
 	}

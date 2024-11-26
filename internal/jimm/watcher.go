@@ -458,11 +458,6 @@ func (w *Watcher) handleDelta(ctx context.Context, modelIDf func(string) *modelS
 		return nil
 	}
 	switch eid.Kind {
-	case "application":
-		if d.Removed {
-			return nil
-		}
-		return w.updateApplication(ctx, state.id, d.Entity.(*jujuparams.ApplicationInfo))
 	case "machine":
 		if d.Removed {
 			state.changed = true
@@ -498,6 +493,7 @@ func (w *Watcher) handleDelta(ctx context.Context, modelIDf func(string) *modelS
 			state.changed = true
 			state.units[eid.Id] = true
 		}
+	default:
 	}
 	return nil
 }
@@ -537,34 +533,6 @@ func (w *Watcher) updateModel(ctx context.Context, model *dbmodel.Model, info *j
 	})
 	if err != nil {
 		return errors.E(op, err)
-	}
-	return nil
-}
-
-func (w *Watcher) updateApplication(ctx context.Context, modelID uint, info *jujuparams.ApplicationInfo) error {
-	err := w.Database.Transaction(func(tx *db.Database) error {
-		m := dbmodel.Model{
-			ID: modelID,
-		}
-		if err := tx.GetModel(ctx, &m); err != nil {
-			return err
-		}
-		for _, o := range m.Offers {
-			if o.ApplicationName != info.Name {
-				continue
-			}
-			if o.CharmURL == info.CharmURL {
-				continue
-			}
-			o.CharmURL = info.CharmURL
-			if err := tx.UpdateApplicationOffer(ctx, &o); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		zapctx.Error(ctx, "error updating application", zap.Error(err))
 	}
 	return nil
 }

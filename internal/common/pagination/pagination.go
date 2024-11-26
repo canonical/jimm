@@ -84,7 +84,7 @@ type OpenFGAPagination struct {
 
 // NewOpenFGAFilter creates a filter for token pagination.
 func NewOpenFGAFilter(limit int, token string) OpenFGAPagination {
-	if limit < 0 {
+	if limit <= 0 {
 		limit = defaultOpenFGAPageSize
 	}
 	if limit > maxOpenFGAPageSize {

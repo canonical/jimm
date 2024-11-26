@@ -38,5 +38,5 @@ func TestEntitlements(t *testing.T) {
 	params.Filter = &match
 	entitlements, err = entitlementSvc.ListEntitlements(ctx, params)
 	c.Assert(err, qt.IsNil)
-	c.Assert(entitlements, qt.HasLen, 12)
+	c.Assert(entitlements, qt.HasLen, 0)
 }

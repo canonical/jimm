@@ -6,8 +6,10 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	qt "github.com/frankban/quicktest"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/google/uuid"
 
 	"github.com/canonical/jimm/v3/internal/db"
@@ -119,18 +121,14 @@ func (s *dbSuite) TestGetGroup(c *qt.C) {
 	c.Assert(group.UUID, qt.Equals, uuid2)
 }
 
-func (s *dbSuite) TestUpdateGroup(c *qt.C) {
-	err := s.Database.UpdateGroup(context.Background(), &dbmodel.GroupEntry{Name: "test-group"})
-	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+func (s *dbSuite) TestUpdateGroupName(c *qt.C) {
+	err := s.Database.UpdateGroupName(context.Background(), "test-group", "new-name")
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
 
 	err = s.Database.Migrate(context.Background(), false)
 	c.Assert(err, qt.IsNil)
 
-	ge := &dbmodel.GroupEntry{
-		Name: "test-group",
-	}
-
-	err = s.Database.UpdateGroup(context.Background(), ge)
+	err = s.Database.UpdateGroupName(context.Background(), "test-group", "new-name")
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
 	_, err = s.Database.AddGroup(context.Background(), "test-group")
@@ -143,7 +141,7 @@ func (s *dbSuite) TestUpdateGroup(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 
 	ge1.Name = "renamed-group"
-	err = s.Database.UpdateGroup(context.Background(), ge1)
+	err = s.Database.UpdateGroupName(context.Background(), ge1.UUID, ge1.Name)
 	c.Check(err, qt.IsNil)
 
 	ge2 := &dbmodel.GroupEntry{
@@ -151,7 +149,7 @@ func (s *dbSuite) TestUpdateGroup(c *qt.C) {
 	}
 	err = s.Database.GetGroup(context.Background(), ge2)
 	c.Check(err, qt.IsNil)
-	c.Assert(ge2, qt.DeepEquals, ge1)
+	c.Assert(ge2, qt.CmpEquals(cmpopts.IgnoreTypes(time.Time{})), ge1)
 }
 
 func (s *dbSuite) TestRemoveGroup(c *qt.C) {
@@ -184,7 +182,7 @@ func (s *dbSuite) TestRemoveGroup(c *qt.C) {
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 }
 
-func (s *dbSuite) TestForEachGroup(c *qt.C) {
+func (s *dbSuite) TestListGroups(c *qt.C) {
 	err := s.Database.Migrate(context.Background(), false)
 	c.Assert(err, qt.IsNil)
 
@@ -193,23 +191,37 @@ func (s *dbSuite) TestForEachGroup(c *qt.C) {
 		_, err := s.Database.AddGroup(context.Background(), fmt.Sprintf("test-group-%d", i))
 		c.Assert(err, qt.IsNil)
 	}
-	firstGroups := []*dbmodel.GroupEntry{}
 	ctx := context.Background()
-	err = s.Database.ForEachGroup(ctx, 5, 0, func(ge *dbmodel.GroupEntry) error {
-		firstGroups = append(firstGroups, ge)
-		return nil
-	})
+	firstGroups, err := s.Database.ListGroups(ctx, 5, 0, "")
 	c.Assert(err, qt.IsNil)
 	for i := 0; i < 5; i++ {
 		c.Assert(firstGroups[i].Name, qt.Equals, fmt.Sprintf("test-group-%d", i))
 	}
-	secondGroups := []*dbmodel.GroupEntry{}
-	err = s.Database.ForEachGroup(ctx, 5, 5, func(ge *dbmodel.GroupEntry) error {
-		secondGroups = append(secondGroups, ge)
-		return nil
-	})
+	secondGroups, err := s.Database.ListGroups(ctx, 5, 5, "")
 	c.Assert(err, qt.IsNil)
 	for i := 0; i < 5; i++ {
 		c.Assert(secondGroups[i].Name, qt.Equals, fmt.Sprintf("test-group-%d", i+5))
 	}
+
+	matchedGroups, err := s.Database.ListGroups(ctx, 5, 0, "group-1")
+	c.Assert(err, qt.IsNil)
+	c.Assert(matchedGroups, qt.HasLen, 1)
+	c.Assert(matchedGroups[0].Name, qt.Equals, "test-group-1")
+
+	matchedGroups, err = s.Database.ListGroups(ctx, 5, 0, "%not-existing%")
+	c.Assert(err, qt.IsNil)
+	c.Assert(matchedGroups, qt.HasLen, 0)
+
+	tg, err := s.Database.AddGroup(context.Background(), "\\%test-group")
+	c.Assert(err, qt.IsNil)
+
+	matchedGroups, err = s.Database.ListGroups(ctx, 5, 0, "\\%t")
+	c.Assert(err, qt.IsNil)
+	c.Assert(matchedGroups, qt.HasLen, 1)
+	c.Assert(matchedGroups[0].UUID, qt.Equals, tg.UUID)
+
+	matchedGroups, err = s.Database.ListGroups(ctx, 5, 0, tg.UUID)
+	c.Assert(err, qt.IsNil)
+	c.Assert(matchedGroups, qt.HasLen, 1)
+	c.Assert(matchedGroups[0].UUID, qt.Equals, tg.UUID)
 }

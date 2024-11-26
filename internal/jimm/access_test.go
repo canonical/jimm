@@ -610,7 +610,7 @@ func TestResolveTupleObjectHandlesErrors(t *testing.T) {
 		},
 		// Resolves bad applicationoffers where it cannot be found on the specified controller/model combo
 		{
-			input: "applicationoffer-" + controller.Name + ":alex/" + model.Name + "." + offer.Name + "fluff",
+			input: "applicationoffer-" + controller.Name + ":alex/" + model.Name + "." + offer.UUID + "fluff",
 			want:  "application offer not found",
 		},
 		{
@@ -726,11 +726,10 @@ func createTestControllerEnvironment(ctx context.Context, c *qt.C, db db.Databas
 	c.Assert(err, qt.IsNil)
 
 	offer := dbmodel.ApplicationOffer{
-		UUID:            id.String(),
-		Name:            offerName,
-		ModelID:         model.ID,
-		ApplicationName: petname.Generate(2, "-"),
-		URL:             offerURL.String(),
+		UUID:    id.String(),
+		Name:    offerName,
+		ModelID: model.ID,
+		URL:     offerURL.String(),
 	}
 	err = db.AddApplicationOffer(context.Background(), &offer)
 	c.Assert(err, qt.IsNil)
@@ -1079,8 +1078,8 @@ func TestListGroups(t *testing.T) {
 	u := openfga.NewUser(&user, ofgaClient)
 	u.JimmAdmin = true
 
-	filter := pagination.NewOffsetFilter(10, 0)
-	groups, err := j.ListGroups(ctx, u, filter)
+	pagination := pagination.NewOffsetFilter(10, 0)
+	groups, err := j.ListGroups(ctx, u, pagination, "")
 	c.Assert(err, qt.IsNil)
 	c.Assert(groups, qt.DeepEquals, []dbmodel.GroupEntry{group})
 
@@ -1095,7 +1094,7 @@ func TestListGroups(t *testing.T) {
 		_, err := j.AddGroup(ctx, u, name)
 		c.Assert(err, qt.IsNil)
 	}
-	groups, err = j.ListGroups(ctx, u, filter)
+	groups, err = j.ListGroups(ctx, u, pagination, "")
 	c.Assert(err, qt.IsNil)
 	sort.Slice(groups, func(i, j int) bool {
 		return groups[i].Name < groups[j].Name
@@ -1109,4 +1108,104 @@ func TestListGroups(t *testing.T) {
 	c.Assert(groups[2].Name, qt.Equals, "test-group0")
 	c.Assert(groups[3].Name, qt.Equals, "test-group1")
 	c.Assert(groups[4].Name, qt.Equals, "test-group2")
+}
+
+func TestOpenFGACleanup(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+	c.Assert(err, qt.IsNil)
+
+	now := time.Now().UTC().Round(time.Millisecond)
+	j := &jimm.JIMM{
+		UUID: uuid.NewString(),
+		Database: db.Database{
+			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
+		},
+		OpenFGAClient: ofgaClient,
+	}
+
+	err = j.Database.Migrate(ctx, false)
+	c.Assert(err, qt.IsNil)
+
+	// run cleanup on an empty authorizaton store
+	err = j.OpenFGACleanup(ctx)
+	c.Assert(err, qt.IsNil)
+
+	type createTagFunction func(int) *ofga.Entity
+
+	var (
+		createStringTag = func(kind openfga.Kind) createTagFunction {
+			return func(i int) *ofga.Entity {
+				return &ofga.Entity{
+					Kind: kind,
+					ID:   fmt.Sprintf("%s-%d", petname.Generate(2, "-"), i),
+				}
+			}
+		}
+
+		createUUIDTag = func(kind openfga.Kind) createTagFunction {
+			return func(i int) *ofga.Entity {
+				return &ofga.Entity{
+					Kind: kind,
+					ID:   uuid.NewString(),
+				}
+			}
+		}
+	)
+
+	tagTests := []struct {
+		createObjectTag createTagFunction
+		relation        string
+		createTargetTag createTagFunction
+	}{{
+		createObjectTag: createStringTag(openfga.UserType),
+		relation:        "member",
+		createTargetTag: createStringTag(openfga.GroupType),
+	}, {
+		createObjectTag: createStringTag(openfga.UserType),
+		relation:        "administrator",
+		createTargetTag: createUUIDTag(openfga.ControllerType),
+	}, {
+		createObjectTag: createStringTag(openfga.UserType),
+		relation:        "reader",
+		createTargetTag: createUUIDTag(openfga.ModelType),
+	}, {
+		createObjectTag: createStringTag(openfga.UserType),
+		relation:        "administrator",
+		createTargetTag: createStringTag(openfga.CloudType),
+	}, {
+		createObjectTag: createStringTag(openfga.UserType),
+		relation:        "consumer",
+		createTargetTag: createUUIDTag(openfga.ApplicationOfferType),
+	}}
+
+	orphanedTuples := []ofga.Tuple{}
+	for i := 0; i < 100; i++ {
+		for _, test := range tagTests {
+			objectTag := test.createObjectTag(i)
+			targetTag := test.createTargetTag(i)
+
+			tuple := openfga.Tuple{
+				Object:   objectTag,
+				Relation: ofga.Relation(test.relation),
+				Target:   targetTag,
+			}
+			err = ofgaClient.AddRelation(ctx, tuple)
+			c.Assert(err, qt.IsNil)
+
+			orphanedTuples = append(orphanedTuples, tuple)
+		}
+	}
+
+	err = j.OpenFGACleanup(ctx)
+	c.Assert(err, qt.IsNil)
+
+	for _, tuple := range orphanedTuples {
+		c.Logf("checking relation for %+v", tuple)
+		ok, err := ofgaClient.CheckRelation(ctx, tuple, false)
+		c.Assert(err, qt.IsNil)
+		c.Assert(ok, qt.IsFalse)
+	}
 }

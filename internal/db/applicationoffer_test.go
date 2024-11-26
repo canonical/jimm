@@ -5,6 +5,7 @@ package db_test
 import (
 	"context"
 	"database/sql"
+	"sort"
 	"testing"
 	"time"
 
@@ -32,6 +33,7 @@ type testEnvironment struct {
 	cred       dbmodel.CloudCredential
 	controller dbmodel.Controller
 	model      dbmodel.Model
+	model1     dbmodel.Model
 }
 
 func initTestEnvironment(c *qt.C, db *db.Database) testEnvironment {
@@ -82,7 +84,6 @@ func initTestEnvironment(c *qt.C, db *db.Database) testEnvironment {
 		CloudCredential: env.cred,
 		Type:            "iaas",
 		IsController:    false,
-		DefaultSeries:   "warty",
 		Life:            state.Alive.String(),
 		Status: dbmodel.Status{
 			Status: "available",
@@ -91,11 +92,31 @@ func initTestEnvironment(c *qt.C, db *db.Database) testEnvironment {
 				Valid: true,
 			},
 		},
-		SLA: dbmodel.SLA{
-			Level: "unsupported",
-		},
 	}
 	c.Assert(db.DB.Create(&env.model).Error, qt.IsNil)
+
+	env.model1 = dbmodel.Model{
+		Name: "test-model-2",
+		UUID: sql.NullString{
+			String: "00000001-0000-0000-0000-0000-000000000002",
+			Valid:  true,
+		},
+		Owner:           env.u,
+		Controller:      env.controller,
+		CloudRegion:     env.cloud.Regions[0],
+		CloudCredential: env.cred,
+		Type:            "iaas",
+		IsController:    false,
+		Life:            state.Alive.String(),
+		Status: dbmodel.Status{
+			Status: "available",
+			Since: sql.NullTime{
+				Time:  time.Now(),
+				Valid: true,
+			},
+		},
+	}
+	c.Assert(db.DB.Create(&env.model1).Error, qt.IsNil)
 
 	return env
 }
@@ -104,10 +125,9 @@ func (s *dbSuite) TestAddApplicationOffer(c *qt.C) {
 	env := initTestEnvironment(c, s.Database)
 
 	offer := dbmodel.ApplicationOffer{
-		UUID:            "00000000-0000-0000-0000-000000000001",
-		Name:            "offer1",
-		ModelID:         env.model.ID,
-		ApplicationName: "app-1",
+		Name:    "offer1",
+		UUID:    "00000000-0000-0000-0000-000000000001",
+		ModelID: env.model.ID,
 	}
 	err := s.Database.AddApplicationOffer(context.Background(), &offer)
 	c.Assert(err, qt.Equals, nil)
@@ -131,12 +151,9 @@ func (s *dbSuite) TestGetApplicationOffer(c *qt.C) {
 	env := initTestEnvironment(c, s.Database)
 
 	offer := dbmodel.ApplicationOffer{
-		UUID:            "00000000-0000-0000-0000-000000000001",
-		ModelID:         env.model.ID,
-		ApplicationName: "app-1",
-		Endpoints:       []dbmodel.ApplicationOfferRemoteEndpoint{},
-		Spaces:          []dbmodel.ApplicationOfferRemoteSpace{},
-		Connections:     []dbmodel.ApplicationOfferConnection{},
+		Name:    "offer",
+		UUID:    "00000000-0000-0000-0000-000000000001",
+		ModelID: env.model.ID,
 	}
 	err := s.Database.AddApplicationOffer(context.Background(), &offer)
 	c.Assert(err, qt.Equals, nil)
@@ -156,59 +173,12 @@ func (s *dbSuite) TestGetApplicationOffer(c *qt.C) {
 	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 }
 
-func (s *dbSuite) TestUpdateApplicationOffer(c *qt.C) {
-	env := initTestEnvironment(c, s.Database)
-
-	offer := dbmodel.ApplicationOffer{
-		UUID:            "00000000-0000-0000-0000-000000000001",
-		ModelID:         env.model.ID,
-		ApplicationName: "app-1",
-		Endpoints:       []dbmodel.ApplicationOfferRemoteEndpoint{},
-		Spaces:          []dbmodel.ApplicationOfferRemoteSpace{},
-		Connections:     []dbmodel.ApplicationOfferConnection{},
-	}
-	err := s.Database.AddApplicationOffer(context.Background(), &offer)
-	c.Assert(err, qt.Equals, nil)
-
-	dbOffer := dbmodel.ApplicationOffer{
-		UUID: "00000000-0000-0000-0000-000000000001",
-	}
-	err = s.Database.GetApplicationOffer(context.Background(), &dbOffer)
-	c.Assert(err, qt.Equals, nil)
-	c.Assert(dbOffer, qt.CmpEquals(cmpopts.EquateEmpty(), cmpopts.IgnoreTypes(dbmodel.Model{})), offer)
-
-	offer1 := offer
-	offer1.Endpoints = []dbmodel.ApplicationOfferRemoteEndpoint{{
-		ApplicationOfferID: 1,
-		ApplicationOffer:   dbmodel.ApplicationOffer{},
-		Name:               "test",
-	}}
-	err = s.Database.UpdateApplicationOffer(context.Background(), &offer1)
-	c.Assert(err, qt.Equals, nil)
-
-	dbOffer = dbmodel.ApplicationOffer{
-		UUID: "00000000-0000-0000-0000-000000000001",
-	}
-	err = s.Database.GetApplicationOffer(context.Background(), &dbOffer)
-	c.Assert(err, qt.Equals, nil)
-	c.Assert(dbOffer, qt.DeepEquals, offer1)
-
-	offer3 := dbmodel.ApplicationOffer{
-		UUID:            "00000000-0000-0000-0000-000000000002",
-		ModelID:         env.model.ID,
-		ApplicationName: "app-1",
-	}
-	err = s.Database.UpdateApplicationOffer(context.Background(), &offer3)
-	c.Assert(err, qt.Not(qt.IsNil))
-}
-
 func (s *dbSuite) TestDeleteApplicationOffer(c *qt.C) {
 	env := initTestEnvironment(c, s.Database)
 
 	offer := dbmodel.ApplicationOffer{
-		UUID:            "00000000-0000-0000-0000-000000000001",
-		ModelID:         env.model.ID,
-		ApplicationName: "app-1",
+		UUID:    "00000000-0000-0000-0000-000000000001",
+		ModelID: env.model.ID,
 	}
 	err := s.Database.AddApplicationOffer(context.Background(), &offer)
 	c.Assert(err, qt.Equals, nil)
@@ -223,256 +193,49 @@ func (s *dbSuite) TestDeleteApplicationOffer(c *qt.C) {
 	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 }
 
-func (s *dbSuite) TestFindApplicationOffers(c *qt.C) {
+func (s *dbSuite) TestFindApplicationOffersByModel(c *qt.C) {
 	env := initTestEnvironment(c, s.Database)
 
 	offer1 := dbmodel.ApplicationOffer{
-		UUID:                   "00000000-0000-0000-0000-000000000001",
-		Name:                   "offer-1",
-		ModelID:                env.model.ID,
-		ApplicationName:        "app-1",
-		URL:                    "url-1",
-		ApplicationDescription: "this is a test application description",
-		Endpoints: []dbmodel.ApplicationOfferRemoteEndpoint{{
-			Name:      "test-endpoint-1",
-			Role:      "provider",
-			Interface: "http",
-		}},
+		UUID:    "00000000-0000-0000-0000-000000000001",
+		Name:    "offer-1",
+		ModelID: env.model.ID,
+		URL:     "url-1",
 	}
 	err := s.Database.AddApplicationOffer(context.Background(), &offer1)
 	c.Assert(err, qt.Equals, nil)
 
-	u, err := dbmodel.NewIdentity("alice@canonical.com")
-	c.Assert(err, qt.IsNil)
-	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
-
 	offer2 := dbmodel.ApplicationOffer{
-		UUID:                   "00000000-0000-0000-0000-000000000002",
-		Name:                   "offer-2",
-		ModelID:                env.model.ID,
-		URL:                    "url-2",
-		ApplicationName:        "app-1",
-		ApplicationDescription: "this is another test offer",
-		Endpoints: []dbmodel.ApplicationOfferRemoteEndpoint{{
-			Name:      "test-endpoint-2",
-			Role:      "requirer",
-			Interface: "db",
-		}},
+		UUID:    "00000000-0000-0000-0000-000000000002",
+		Name:    "offer-2",
+		ModelID: env.model1.ID,
+		URL:     "url-2",
 	}
 	err = s.Database.AddApplicationOffer(context.Background(), &offer2)
 	c.Assert(err, qt.Equals, nil)
 
 	offer3 := dbmodel.ApplicationOffer{
-		UUID:                   "00000000-0000-0000-0000-000000000003",
-		Name:                   "test-3",
-		ModelID:                env.model.ID,
-		URL:                    "url-3",
-		ApplicationName:        "app-1",
-		ApplicationDescription: "this is yet another application offer",
-		Endpoints: []dbmodel.ApplicationOfferRemoteEndpoint{{
-			Name:      "test-endpoint-3",
-			Role:      "requirer",
-			Interface: "http",
-		}},
+		UUID:    "00000000-0000-0000-0000-000000000003",
+		Name:    "test-3",
+		ModelID: env.model1.ID,
+		URL:     "url-3",
 	}
 	err = s.Database.AddApplicationOffer(context.Background(), &offer3)
 	c.Assert(err, qt.Equals, nil)
 
-	tests := []struct {
-		about          string
-		filters        []db.ApplicationOfferFilter
-		expectedOffers []dbmodel.ApplicationOffer
-		expectedError  string
-	}{{
-		about: "filter by offer name",
-		filters: []db.ApplicationOfferFilter{
-			db.ApplicationOfferFilterByName("offer-1"),
-		},
-		expectedOffers: []dbmodel.ApplicationOffer{offer1},
-	}, {
-		about: "filter by offer name - multiple found",
-		filters: []db.ApplicationOfferFilter{
-			db.ApplicationOfferFilterByName("offer"),
-		},
-		expectedOffers: []dbmodel.ApplicationOffer{offer1, offer2},
-	}, {
-		about: "filter by offer name - not found",
-		filters: []db.ApplicationOfferFilter{
-			db.ApplicationOfferFilterByName("no-such-offer"),
-		},
-		expectedOffers: []dbmodel.ApplicationOffer{},
-	}, {
-		about: "filter by application",
-		filters: []db.ApplicationOfferFilter{
-			db.ApplicationOfferFilterByApplication("app-1"),
-		},
-		expectedOffers: []dbmodel.ApplicationOffer{offer1, offer2, offer3},
-	}, {
-		about: "filter by application - not found",
-		filters: []db.ApplicationOfferFilter{
-			db.ApplicationOfferFilterByApplication("no such application"),
-		},
-		expectedOffers: []dbmodel.ApplicationOffer{},
-	}, {
-		about: "filter by model",
-		filters: []db.ApplicationOfferFilter{
-			db.ApplicationOfferFilterByModel(env.model.Name),
-		},
-		expectedOffers: []dbmodel.ApplicationOffer{offer1, offer2, offer3},
-	}, {
-		about: "filter by model - not found",
-		filters: []db.ApplicationOfferFilter{
-			db.ApplicationOfferFilterByModel("no such model"),
-		},
-		expectedOffers: []dbmodel.ApplicationOffer{},
-	}, {
-		about: "filter by description",
-		filters: []db.ApplicationOfferFilter{
-			db.ApplicationOfferFilterByDescription("description"),
-		},
-		expectedOffers: []dbmodel.ApplicationOffer{offer1},
-	}, {
-		about: "filter by description - multiple matches",
-		filters: []db.ApplicationOfferFilter{
-			db.ApplicationOfferFilterByDescription("test"),
-		},
-		expectedOffers: []dbmodel.ApplicationOffer{offer1, offer2},
-	}, {
-		about: "filter by description - not found",
-		filters: []db.ApplicationOfferFilter{
-			db.ApplicationOfferFilterByDescription("unknown"),
-		},
-		expectedOffers: []dbmodel.ApplicationOffer{},
-	}, {
-		about: "filter by UUID",
-		filters: []db.ApplicationOfferFilter{
-			db.ApplicationOfferFilterByUUID(
-				[]string{
-					"00000000-0000-0000-0000-000000000002",
-					"00000000-0000-0000-0000-000000000003",
-				}),
-		},
-		expectedOffers: []dbmodel.ApplicationOffer{offer2, offer3},
-	}, {
-		about: "filter by UUID and endpoint interface",
-		filters: []db.ApplicationOfferFilter{
-			db.ApplicationOfferFilterByUUID(
-				[]string{
-					"00000000-0000-0000-0000-000000000002",
-					"00000000-0000-0000-0000-000000000003",
-				}),
-			db.ApplicationOfferFilterByEndpoint(dbmodel.ApplicationOfferRemoteEndpoint{
-				Interface: "db",
-			}),
-		},
-		expectedOffers: []dbmodel.ApplicationOffer{offer2},
-	}, {
-		about: "filter by UUID twice (ensure filters are AND)",
-		filters: []db.ApplicationOfferFilter{
-			db.ApplicationOfferFilterByUUID(
-				[]string{
-					"00000000-0000-0000-0000-000000000002",
-					"00000000-0000-0000-0000-000000000003",
-				}),
-			db.ApplicationOfferFilterByUUID(
-				[]string{
-					"00000000-0000-0000-0000-000000000002",
-				}),
-		},
-		expectedOffers: []dbmodel.ApplicationOffer{offer2},
-	}, {
-		about: "filter by UUID twice (ensure filters are AND without replacement)",
-		filters: []db.ApplicationOfferFilter{
-			db.ApplicationOfferFilterByUUID(
-				[]string{
-					"00000000-0000-0000-0000-000000000001",
-					"00000000-0000-0000-0000-000000000003",
-				}),
-			db.ApplicationOfferFilterByUUID(
-				[]string{
-					"00000000-0000-0000-0000-000000000002",
-				}),
-		},
-		expectedOffers: []dbmodel.ApplicationOffer{},
-	}, {
-		about: "filter by endpoint interface",
-		filters: []db.ApplicationOfferFilter{
-			db.ApplicationOfferFilterByEndpoint(dbmodel.ApplicationOfferRemoteEndpoint{
-				Interface: "db",
-			}),
-		},
-		expectedOffers: []dbmodel.ApplicationOffer{offer2},
-	}, {
-		about: "filter by endpoint interface - not found",
-		filters: []db.ApplicationOfferFilter{
-			db.ApplicationOfferFilterByEndpoint(dbmodel.ApplicationOfferRemoteEndpoint{
-				Interface: "no-such-interface",
-			}),
-		},
-		expectedOffers: []dbmodel.ApplicationOffer{},
-	}, {
-		about: "filter by endpoint role",
-		filters: []db.ApplicationOfferFilter{
-			db.ApplicationOfferFilterByEndpoint(dbmodel.ApplicationOfferRemoteEndpoint{
-				Role: "provider",
-			}),
-		},
-		expectedOffers: []dbmodel.ApplicationOffer{offer1},
-	}, {
-		about: "filter by endpoint role - not found",
-		filters: []db.ApplicationOfferFilter{
-			db.ApplicationOfferFilterByEndpoint(dbmodel.ApplicationOfferRemoteEndpoint{
-				Role: "no-such-role",
-			}),
-		},
-		expectedOffers: []dbmodel.ApplicationOffer{},
-	}, {
-		about: "filter by endpoint name",
-		filters: []db.ApplicationOfferFilter{
-			db.ApplicationOfferFilterByEndpoint(dbmodel.ApplicationOfferRemoteEndpoint{
-				Name: "test-endpoint-2",
-			}),
-		},
-		expectedOffers: []dbmodel.ApplicationOffer{offer2},
-	}, {
-		about: "filter by endpoint name - not found",
-		filters: []db.ApplicationOfferFilter{
-			db.ApplicationOfferFilterByEndpoint(dbmodel.ApplicationOfferRemoteEndpoint{
-				Name: "no-such-endpoint",
-			}),
-		},
-		expectedOffers: []dbmodel.ApplicationOffer{},
-	}, {
-		about: "filter by endpoint name and role",
-		filters: []db.ApplicationOfferFilter{
-			db.ApplicationOfferFilterByEndpoint(dbmodel.ApplicationOfferRemoteEndpoint{
-				Name: "test-endpoint-2",
-				Role: "requirer",
-			}),
-		},
-		expectedOffers: []dbmodel.ApplicationOffer{offer2},
-	}, {
-		about: "filter by model and application",
-		filters: []db.ApplicationOfferFilter{
-			db.ApplicationOfferFilterByModel(env.model.Name),
-			db.ApplicationOfferFilterByApplication("app-1"),
-		},
-		expectedOffers: []dbmodel.ApplicationOffer{offer1, offer2, offer3},
-	}}
+	offers, err := s.Database.FindApplicationOffersByModel(context.Background(), env.model.Name, env.u.Name)
+	c.Assert(err, qt.IsNil)
+	c.Assert(offers, qt.CmpEquals(cmpopts.IgnoreTypes(dbmodel.Model{})), []dbmodel.ApplicationOffer{offer1})
+	c.Assert(offers[0].Model.UUID, qt.Equals, env.model.UUID)
 
-	for _, test := range tests {
-		c.Run(test.about, func(c *qt.C) {
-			offers, err := s.Database.FindApplicationOffers(context.Background(), test.filters...)
-			if test.expectedError == "" {
-				c.Assert(err, qt.IsNil)
-				c.Assert(offers, qt.CmpEquals(
-					cmpopts.EquateEmpty(),
-					cmpopts.IgnoreTypes(time.Time{}),
-					cmpopts.IgnoreTypes(dbmodel.Model{}),
-				), test.expectedOffers)
-			} else {
-				c.Assert(err, qt.ErrorMatches, test.expectedError)
-			}
-		})
-	}
+	offers, err = s.Database.FindApplicationOffersByModel(context.Background(), env.model1.Name, env.u.Name)
+	c.Assert(err, qt.IsNil)
+	sort.Slice(offers, func(i, j int) bool {
+		return offers[i].Name < offers[j].Name
+	})
+	c.Assert(offers, qt.CmpEquals(cmpopts.IgnoreTypes(dbmodel.Model{})), []dbmodel.ApplicationOffer{offer2, offer3})
+
+	offers, err = s.Database.FindApplicationOffersByModel(context.Background(), "no-such-model", env.u.Name)
+	c.Assert(err, qt.IsNil)
+	c.Assert(offers, qt.HasLen, 0)
 }

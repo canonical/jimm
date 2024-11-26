@@ -306,6 +306,96 @@ func (s *openFGATestSuite) TestRemoveApplicationOffer(c *gc.C) {
 	c.Assert(allowed, gc.Equals, false)
 }
 
+func (s *openFGATestSuite) TestRemoveRoleWithDirectAccess(c *gc.C) {
+	ctx := context.Background()
+
+	user1 := ofganames.ConvertTag(names.NewUserTag("user1@canonical.com"))
+	role1 := ofganames.ConvertTag(jimmnames.NewRoleTag(uuid.NewString()))
+
+	tuples := []openfga.Tuple{
+		{
+			Object:   user1,
+			Relation: ofganames.AssigneeRelation,
+			Target:   role1,
+		},
+	}
+
+	err := s.ofgaClient.AddRelation(
+		context.Background(),
+		tuples...,
+	)
+	c.Assert(err, gc.IsNil)
+
+	err = s.ofgaClient.RemoveRole(ctx, jimmnames.NewRoleTag(role1.ID))
+	c.Assert(err, gc.IsNil)
+
+	allowed, err := s.ofgaClient.CheckRelation(
+		context.TODO(),
+		openfga.Tuple{
+			Object:   user1,
+			Relation: ofganames.AssigneeRelation,
+			Target:   role1,
+		},
+		false,
+	)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(allowed, gc.Equals, false)
+}
+
+func (s *openFGATestSuite) TestRemoveRoleWithAccessViaGroup(c *gc.C) {
+	ctx := context.Background()
+
+	user1 := ofganames.ConvertTag(names.NewUserTag("user1@canonical.com"))
+	group1 := jimmnames.NewGroupTag(uuid.NewString())
+	role1 := ofganames.ConvertTag(jimmnames.NewRoleTag(uuid.NewString()))
+
+	tuples := []openfga.Tuple{
+		{
+			Object:   user1,
+			Relation: ofganames.MemberRelation,
+			Target:   ofganames.ConvertTag(group1),
+		},
+		{
+			Object:   ofganames.ConvertTagWithRelation(group1, ofganames.MemberRelation),
+			Relation: ofganames.AssigneeRelation,
+			Target:   role1,
+		},
+	}
+
+	err := s.ofgaClient.AddRelation(
+		context.Background(),
+		tuples...,
+	)
+	c.Assert(err, gc.IsNil)
+
+	allowed, err := s.ofgaClient.CheckRelation(
+		context.TODO(),
+		openfga.Tuple{
+			Object:   user1,
+			Relation: ofganames.AssigneeRelation,
+			Target:   role1,
+		},
+		false,
+	)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(allowed, gc.Equals, true)
+
+	err = s.ofgaClient.RemoveRole(ctx, jimmnames.NewRoleTag(role1.ID))
+	c.Assert(err, gc.IsNil)
+
+	allowed, err = s.ofgaClient.CheckRelation(
+		context.TODO(),
+		openfga.Tuple{
+			Object:   user1,
+			Relation: ofganames.AssigneeRelation,
+			Target:   role1,
+		},
+		false,
+	)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(allowed, gc.Equals, false)
+}
+
 func (s *openFGATestSuite) TestRemoveGroup(c *gc.C) {
 	group1 := jimmnames.NewGroupTag(uuid.NewString())
 	group2 := jimmnames.NewGroupTag(uuid.NewString())

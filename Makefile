@@ -115,6 +115,9 @@ load-rock:
 	$(eval jimm_version := $(shell cat ./rocks/jimm.yaml | yq ".version"))
 	@sudo /snap/rockcraft/current/bin/skopeo --insecure-policy copy oci-archive:jimm_${jimm_version}_amd64.rock docker-daemon:jimm:latest
 
+test-auth-model:
+	fga model test --tests ./openfga/tests.fga.yaml 
+
 define check_dep
     if ! which $(1) > /dev/null; then\
 		echo "$(2)";\
@@ -127,6 +130,8 @@ endef
 APT_BASED := $(shell command -v apt-get >/dev/null; echo $$?)
 sys-deps:
 ifeq ($(APT_BASED),0)
+# fga is required for openfga tests
+	@$(call check_deps,fga,Missing FGA client - install via 'go install github.com/openfga/cli/cmd/fga@latest')
 # golangci-lint is necessary for linting.
 	@$(call check_dep,golangci-lint,Missing Golangci-lint - install from https://golangci-lint.run/welcome/install/ or 'sudo snap install golangci-lint --classic')
 # Go acts as the test runner.

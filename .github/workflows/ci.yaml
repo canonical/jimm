@@ -17,11 +17,11 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v4
         with:
-          go-version-file: 'go.mod'
+          go-version-file: "go.mod"
 
       - name: Install dependencies
         run: sudo apt-get update -y && sudo apt-get install -y gcc git-core gnupg build-essential
-      
+
       - name: Install juju-db
         run: sudo snap install juju-db --channel 4.4/stable
 
@@ -34,4 +34,4 @@ jobs:
           store-file-path: ./openfga/tests.fga.yaml
 
       - name: Build and Test
-        run: go test -mod readonly ./... -timeout 1h -cover
+        run: TEST_LOGGING_CONFIG=ERROR go test -mod readonly ./... -timeout 1h -cover

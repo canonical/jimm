@@ -224,14 +224,6 @@ func (j *JIMM) AddHostedCloud(ctx context.Context, user *openfga.User, tag names
 		return errors.E(op, err)
 	}
 
-	allowedAddModel, err := user.IsAllowedAddModel(ctx, region.Cloud.ResourceTag())
-	if err != nil {
-		return errors.E(op, err)
-	}
-	if !allowedAddModel {
-		return errors.E(op, errors.CodeUnauthorized, fmt.Sprintf("missing add-model access on %q", cloud.HostCloudRegion))
-	}
-
 	if region.Cloud.HostCloudRegion != "" {
 		// Do not support creating a new cloud on an already hosted
 		// cloud.

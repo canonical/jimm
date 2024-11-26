@@ -30,23 +30,23 @@ func (j *JIMM) FetchIdentity(ctx context.Context, id string) (*openfga.User, err
 }
 
 // ListIdentities lists a page of users in our database and parse them into openfga entities.
-func (j *JIMM) ListIdentities(ctx context.Context, user *openfga.User, filter pagination.LimitOffsetPagination) ([]openfga.User, error) {
+// `match` will filter the list for fuzzy find on identity name.
+func (j *JIMM) ListIdentities(ctx context.Context, user *openfga.User, pagination pagination.LimitOffsetPagination, match string) ([]openfga.User, error) {
 	const op = errors.Op("jimm.ListIdentities")
 
 	if !user.JimmAdmin {
 		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
+	identities, err := j.Database.ListIdentities(ctx, pagination.Limit(), pagination.Offset(), match)
+	var users []openfga.User
 
-	var identities []openfga.User
-	err := j.Database.ForEachIdentity(ctx, filter.Limit(), filter.Offset(), func(ge *dbmodel.Identity) error {
-		u := openfga.NewUser(ge, j.OpenFGAClient)
-		identities = append(identities, *u)
-		return nil
-	})
+	for _, id := range identities {
+		users = append(users, *openfga.NewUser(&id, j.OpenFGAClient))
+	}
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
-	return identities, nil
+	return users, nil
 }
 
 // CountIdentities returns the count of all the identities in our database.

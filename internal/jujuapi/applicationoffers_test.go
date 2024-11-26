@@ -243,6 +243,7 @@ func (s *applicationOffersSuite) TestListApplicationOffers(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `at least one filter must be specified \(bad request\)`)
 
 	offers, err := client.ListOffers(crossmodel.ApplicationOfferFilter{
+		OwnerName:       s.Model.Owner.Name,
 		ModelName:       s.Model.Name,
 		ApplicationName: "test-app",
 		OfferName:       "test-offer1",
@@ -281,64 +282,63 @@ func (s *applicationOffersSuite) TestListApplicationOffers(c *gc.C) {
 }
 
 func (s *applicationOffersSuite) TestModifyOfferAccess(c *gc.C) {
-	/*
-		ctx := context.Background()
+	ctx := context.Background()
 
-		conn := s.open(c, nil, "bob@canonical.com")
-		defer conn.Close()
-		client := applicationoffers.NewClient(conn)
+	conn := s.open(c, nil, "bob@canonical.com")
+	defer conn.Close()
+	client := applicationoffers.NewClient(conn)
 
-		results, err := client.Offer(
-			s.Model.UUID.String,
-			"test-app",
-			[]string{s.endpoint.Name},
-			"bob@canonical.com",
-			"test-offer1",
-			"test offer 1 description",
-		)
-		c.Assert(err, gc.Equals, nil)
-		c.Assert(results, gc.HasLen, 1)
-		c.Assert(results[0].Error, gc.IsNil)
+	results, err := client.Offer(
+		s.Model.UUID.String,
+		"test-app",
+		[]string{s.endpoint.Name},
+		"bob@canonical.com",
+		"test-offer1",
+		"test offer 1 description",
+	)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(results, gc.HasLen, 1)
+	c.Assert(results[0].Error, gc.IsNil)
 
-		offerURL := "bob@canonical.com/model-1.test-offer1"
+	offerURL := "bob@canonical.com/model-1.test-offer1"
 
-		err = client.RevokeOffer(auth.Everyone, "read", offerURL)
-		c.Assert(err, jc.ErrorIsNil)
+	err = client.RevokeOffer(ofganames.EveryoneUser, "read", offerURL)
+	c.Assert(err, jc.ErrorIsNil)
 
-		err = client.GrantOffer("test.user@canonical.com", "unknown", offerURL)
-		c.Assert(err, gc.ErrorMatches, `"unknown" offer access not valid`)
+	err = client.GrantOffer("test.user@canonical.com", "unknown", offerURL)
+	c.Assert(err, gc.ErrorMatches, `"unknown" offer access not valid`)
 
-		err = client.GrantOffer("test.user@canonical.com", "read", "no-such-offer")
-		c.Assert(err, gc.ErrorMatches, `application offer not found`)
+	err = client.GrantOffer("test.user@canonical.com", "admin", offerURL)
+	c.Assert(err, jc.ErrorIsNil)
 
-		err = client.GrantOffer("test.user@canonical.com", "admin", offerURL)
-		c.Assert(err, jc.ErrorIsNil)
+	testUser := openfga.NewUser(
+		&dbmodel.Identity{
+			Name: "test.user@canonical.com",
+		},
+		s.OFGAClient,
+	)
 
-		testUser := dbmodel.User{
-			Username: "test.user@canonical.com",
-		}
+	offer := dbmodel.ApplicationOffer{
+		URL: offerURL,
+	}
+	err = s.JIMM.Database.GetApplicationOffer(context.Background(), &offer)
+	c.Assert(err, gc.Equals, nil)
 
-		offer := dbmodel.ApplicationOffer{
-			URL: offerURL,
-		}
-		err = s.JIMM.Database.GetApplicationOffer(ctx, &offer)
-		c.Assert(err, jc.ErrorIsNil)
-		c.Assert(offer.UserAccess(&testUser), gc.Equals, "admin")
+	testUserAccess := testUser.GetApplicationOfferAccess(ctx, offer.ResourceTag())
+	c.Assert(testUserAccess, gc.Equals, ofganames.AdministratorRelation)
 
-		err = client.RevokeOffer("test.user@canonical.com", "consume", offerURL)
-		c.Assert(err, jc.ErrorIsNil)
+	err = client.RevokeOffer("test.user@canonical.com", "admin", offerURL)
+	c.Assert(err, jc.ErrorIsNil)
 
-		err = s.JIMM.Database.GetApplicationOffer(ctx, &offer)
-		c.Assert(err, jc.ErrorIsNil)
-		c.Assert(offer.UserAccess(&testUser), gc.Equals, "read")
+	testUserAccess = testUser.GetApplicationOfferAccess(ctx, offer.ResourceTag())
+	c.Assert(testUserAccess, gc.Equals, ofganames.NoRelation)
 
-		conn3 := s.open(c, nil, "user3")
-		defer conn3.Close()
-		client3 := applicationoffers.NewClient(conn3)
+	conn3 := s.open(c, nil, "user3")
+	defer conn3.Close()
+	client3 := applicationoffers.NewClient(conn3)
 
-		err = client3.RevokeOffer("test.user@canonical.com", "read", offerURL)
-		c.Assert(err, gc.ErrorMatches, "unauthorized")
-	*/
+	err = client3.RevokeOffer("test.user@canonical.com", "read", offerURL)
+	c.Assert(err, gc.ErrorMatches, "unauthorized")
 }
 
 func (s *applicationOffersSuite) TestDestroyOffers(c *gc.C) {
@@ -396,6 +396,7 @@ func (s *applicationOffersSuite) TestDestroyOffers(c *gc.C) {
 	c.Assert(err, jc.ErrorIsNil)
 
 	offers, err := client.ListOffers(crossmodel.ApplicationOfferFilter{
+		OwnerName: s.Model.Owner.Name,
 		ModelName: s.Model.Name,
 		OfferName: "test-offer1",
 	})
@@ -437,6 +438,7 @@ func (s *applicationOffersSuite) TestFindApplicationOffers(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, "at least one filter must be specified")
 
 	offers, err := client.FindApplicationOffers(crossmodel.ApplicationOfferFilter{
+		OwnerName:       s.Model.OwnerIdentityName,
 		ModelName:       s.Model.Name,
 		ApplicationName: "test-app",
 		OfferName:       "test-offer1",

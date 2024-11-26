@@ -46,8 +46,8 @@ func NewWatcherWithDeltaProcessedChannel(db db.Database, dialer Dialer, pubsub P
 	}
 }
 
-func (j *JIMM) ListApplicationOfferUsers(ctx context.Context, offer names.ApplicationOfferTag, user *dbmodel.Identity, accessLevel string) ([]jujuparams.OfferUserDetails, error) {
-	return j.listApplicationOfferUsers(ctx, offer, user, accessLevel)
+func (j *JIMM) ListApplicationOfferUsers(ctx context.Context, offer names.ApplicationOfferTag, user *dbmodel.Identity, adminAccess bool) ([]jujuparams.OfferUserDetails, error) {
+	return j.listApplicationOfferUsers(ctx, offer, user, adminAccess)
 }
 
 func (j *JIMM) ParseAndValidateTag(ctx context.Context, key string) (*ofganames.Tag, error) {

@@ -1632,11 +1632,10 @@ func createTestControllerEnvironment(ctx context.Context, c *gc.C, s *accessCont
 	c.Assert(err, gc.IsNil)
 
 	offer := dbmodel.ApplicationOffer{
-		UUID:            id.String(),
-		Name:            offerName,
-		ModelID:         model.ID,
-		ApplicationName: petname.Generate(2, "-"),
-		URL:             offerURL.String(),
+		UUID:    id.String(),
+		Name:    offerName,
+		ModelID: model.ID,
+		URL:     offerURL.String(),
 	}
 	err = db.AddApplicationOffer(context.Background(), &offer)
 	c.Assert(err, gc.IsNil)

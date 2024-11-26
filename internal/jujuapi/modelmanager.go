@@ -9,6 +9,8 @@ import (
 
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
+	"github.com/juju/zaputil/zapctx"
+	"go.uber.org/zap"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
@@ -89,6 +91,7 @@ func (r *controllerRoot) DumpModels(ctx context.Context, args jujuparams.DumpMod
 	results := make([]jujuparams.StringResult, len(args.Entities))
 	for i, ent := range args.Entities {
 		mt, err := names.ParseModelTag(ent.Tag)
+		ctx = zapctx.WithFields(ctx, zap.String("entity", mt.String()))
 		if err != nil {
 			results[i].Error = mapError(errors.E(op, err, errors.CodeBadRequest))
 		}
@@ -144,6 +147,7 @@ func (r *controllerRoot) ModelInfo(ctx context.Context, args jujuparams.Entities
 	results := make([]jujuparams.ModelInfoResult, len(args.Entities))
 	for i, arg := range args.Entities {
 		mt, err := names.ParseModelTag(arg.Tag)
+		ctx = zapctx.WithFields(ctx, zap.String("entity", mt.String()))
 		if err != nil {
 			results[i].Error = mapError(errors.E(op, err, errors.CodeBadRequest))
 			continue
@@ -200,6 +204,7 @@ func (r *controllerRoot) DestroyModels(ctx context.Context, args jujuparams.Dest
 
 	for i, model := range args.Models {
 		mt, err := names.ParseModelTag(model.ModelTag)
+		ctx = zapctx.WithFields(ctx, zap.String("entity", mt.String()))
 		if err != nil {
 			results[i].Error = mapError(errors.E(op, err, errors.CodeBadRequest))
 			continue
@@ -228,6 +233,7 @@ func (r *controllerRoot) ModifyModelAccess(ctx context.Context, args jujuparams.
 	results := make([]jujuparams.ErrorResult, len(args.Changes))
 	for i, change := range args.Changes {
 		mt, err := names.ParseModelTag(change.ModelTag)
+		ctx = zapctx.WithFields(ctx, zap.String("entity", mt.String()))
 		if err != nil {
 			results[i].Error = mapError(errors.E(op, err, errors.CodeBadRequest))
 			continue
@@ -266,6 +272,7 @@ func (r *controllerRoot) DumpModelsDB(ctx context.Context, args jujuparams.Entit
 	results := make([]jujuparams.MapResult, len(args.Entities))
 	for i, ent := range args.Entities {
 		mt, err := names.ParseModelTag(ent.Tag)
+		ctx = zapctx.WithFields(ctx, zap.String("entity", mt.String()))
 		if err != nil {
 			results[i].Error = mapError(errors.E(op, err, errors.CodeBadRequest))
 		}
@@ -283,6 +290,7 @@ func (r *controllerRoot) DumpModelsDB(ctx context.Context, args jujuparams.Entit
 // ChangeModelCredential method.
 func (r *controllerRoot) ChangeModelCredential(ctx context.Context, args jujuparams.ChangeModelCredentialsParams) (jujuparams.ErrorResults, error) {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
+
 	defer cancel()
 	results := make([]jujuparams.ErrorResult, len(args.Models))
 	for i, arg := range args.Models {
@@ -297,6 +305,7 @@ func (r *controllerRoot) changeModelCredential(ctx context.Context, arg jujupara
 	const op = errors.Op("jujuapi.ChangeModelCredential")
 
 	mt, err := names.ParseModelTag(arg.ModelTag)
+	ctx = zapctx.WithFields(ctx, zap.String("entity", mt.String()))
 	if err != nil {
 		return errors.E(op, err, errors.CodeBadRequest)
 	}
@@ -321,6 +330,7 @@ func (r *controllerRoot) ValidateModelUpgrades(ctx context.Context, args jujupar
 	results := make([]jujuparams.ErrorResult, len(args.Models))
 	for i, arg := range args.Models {
 		modelTag, err := names.ParseModelTag(arg.ModelTag)
+		ctx = zapctx.WithFields(ctx, zap.String("entity", modelTag.String()))
 		if err != nil {
 			results[i].Error = mapError(errors.E(op, err, errors.CodeBadRequest))
 			continue
@@ -339,6 +349,7 @@ func (r *controllerRoot) SetModelDefaults(ctx context.Context, args jujuparams.S
 	results := make([]jujuparams.ErrorResult, len(args.Config))
 	for i, config := range args.Config {
 		cloudTag, err := names.ParseCloudTag(config.CloudTag)
+		ctx = zapctx.WithFields(ctx, zap.String("entity", cloudTag.String()))
 		if err != nil {
 			results[i].Error = mapError(errors.E(op, err))
 			continue
@@ -356,6 +367,7 @@ func (r *controllerRoot) UnsetModelDefaults(ctx context.Context, args jujuparams
 	results := make([]jujuparams.ErrorResult, len(args.Keys))
 	for i, key := range args.Keys {
 		cloudTag, err := names.ParseCloudTag(key.CloudTag)
+		ctx = zapctx.WithFields(ctx, zap.String("entity", cloudTag.String()))
 		if err != nil {
 			results[i].Error = mapError(err)
 			continue
@@ -377,6 +389,7 @@ func (r *controllerRoot) ModelDefaultsForClouds(ctx context.Context, args jujupa
 	result.Results = make([]jujuparams.ModelDefaultsResult, len(args.Entities))
 	for i, entity := range args.Entities {
 		cloudTag, err := names.ParseCloudTag(entity.Tag)
+		ctx = zapctx.WithFields(ctx, zap.String("entity", cloudTag.String()))
 		if err != nil {
 			result.Results[i].Error = mapError(errors.E(op, err))
 			continue

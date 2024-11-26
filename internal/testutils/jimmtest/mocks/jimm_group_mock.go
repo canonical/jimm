@@ -22,7 +22,7 @@ type GroupService struct {
 	CountGroups_    func(ctx context.Context, user *openfga.User) (int, error)
 	GetGroupByUUID_ func(ctx context.Context, user *openfga.User, uuid string) (*dbmodel.GroupEntry, error)
 	GetGroupByName_ func(ctx context.Context, user *openfga.User, name string) (*dbmodel.GroupEntry, error)
-	ListGroups_     func(ctx context.Context, user *openfga.User, filter pagination.LimitOffsetPagination) ([]dbmodel.GroupEntry, error)
+	ListGroups_     func(ctx context.Context, user *openfga.User, pagination pagination.LimitOffsetPagination, match string) ([]dbmodel.GroupEntry, error)
 	RenameGroup_    func(ctx context.Context, user *openfga.User, oldName, newName string) error
 	RemoveGroup_    func(ctx context.Context, user *openfga.User, name string) error
 }
@@ -55,11 +55,11 @@ func (j *GroupService) GetGroupByName(ctx context.Context, user *openfga.User, n
 	return j.GetGroupByName_(ctx, user, name)
 }
 
-func (j *GroupService) ListGroups(ctx context.Context, user *openfga.User, filters pagination.LimitOffsetPagination) ([]dbmodel.GroupEntry, error) {
+func (j *GroupService) ListGroups(ctx context.Context, user *openfga.User, pagination pagination.LimitOffsetPagination, match string) ([]dbmodel.GroupEntry, error) {
 	if j.ListGroups_ == nil {
 		return nil, errors.E(errors.CodeNotImplemented)
 	}
-	return j.ListGroups_(ctx, user, filters)
+	return j.ListGroups_(ctx, user, pagination, match)
 }
 
 func (j *GroupService) RemoveGroup(ctx context.Context, user *openfga.User, name string) error {

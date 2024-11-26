@@ -11,8 +11,10 @@ import (
 	"net/url"
 	"os"
 	"testing"
+	"time"
 
 	cofga "github.com/canonical/ofga"
+	"github.com/coreos/go-oidc/v3/oidc"
 	qt "github.com/frankban/quicktest"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/checkers"
@@ -36,12 +38,33 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
+// newTestJimmParams returns a set of JIMM params with sensible defaults
+// for tests. A test can override any parameter that it needs.
+// Note that newTestJimmParams will create an empty test database.
+func newTestJimmParams(t jimmtest.Tester) jimmsvc.Params {
+	return jimmsvc.Params{
+		DSN:            jimmtest.CreateEmptyDatabase(t),
+		ControllerUUID: "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
+		PrivateKey:     "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
+		PublicKey:      "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
+		OAuthAuthenticatorParams: jimmsvc.OAuthAuthenticatorParams{
+			IssuerURL:           "http://localhost:8082/realms/jimm",
+			ClientID:            "jimm-device",
+			Scopes:              []string{oidc.ScopeOpenID, "profile", "email"},
+			SessionTokenExpiry:  time.Duration(time.Hour),
+			SessionCookieMaxAge: 60,
+			JWTSessionKey:       jimmtest.JWTTestSecret,
+		},
+		DashboardFinalRedirectURL: "dashboard-url",
+	}
+}
+
 func TestDefaultService(t *testing.T) {
 	c := qt.New(t)
 
 	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
-	p := jimmtest.NewTestJimmParams(c)
+	p := newTestJimmParams(c)
 	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
 	p.InsecureSecretStorage = true
 	svc, err := jimmsvc.NewService(context.Background(), p)
@@ -61,7 +84,7 @@ func TestServiceDoesNotStartWithoutCredentialStore(t *testing.T) {
 
 	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
-	p := jimmtest.NewTestJimmParams(c)
+	p := newTestJimmParams(c)
 	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
 	_, err = jimmsvc.NewService(context.Background(), p)
 	c.Assert(err, qt.ErrorMatches, "jimm cannot start without a credential store")
@@ -73,7 +96,7 @@ func TestAuthenticator(t *testing.T) {
 	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
-	p := jimmtest.NewTestJimmParams(c)
+	p := newTestJimmParams(c)
 	p.InsecureSecretStorage = true
 	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
 	svc, err := jimmsvc.NewService(context.Background(), p)
@@ -132,7 +155,7 @@ func TestVault(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	vaultClient, _, roleID, roleSecretID, _ := jimmtest.VaultClient(c)
-	p := jimmtest.NewTestJimmParams(c)
+	p := newTestJimmParams(c)
 	p.VaultAddress = "http://localhost:8200"
 	p.VaultPath = "/jimm-kv/"
 	p.VaultRoleID = roleID
@@ -193,7 +216,7 @@ func TestPostgresSecretStore(t *testing.T) {
 	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
-	p := jimmtest.NewTestJimmParams(c)
+	p := newTestJimmParams(c)
 	p.InsecureSecretStorage = true
 	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
 	svc, err := jimmsvc.NewService(context.Background(), p)
@@ -208,7 +231,7 @@ func TestOpenFGA(t *testing.T) {
 	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
-	p := jimmtest.NewTestJimmParams(c)
+	p := newTestJimmParams(c)
 	p.InsecureSecretStorage = true
 	p.ControllerAdmins = []string{"alice", "eve"}
 	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
@@ -256,7 +279,7 @@ func TestPublicKey(t *testing.T) {
 	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
-	p := jimmtest.NewTestJimmParams(c)
+	p := newTestJimmParams(c)
 	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
 	p.InsecureSecretStorage = true
 	svc, err := jimmsvc.NewService(context.Background(), p)
@@ -280,7 +303,7 @@ func TestRebacAdminApi(t *testing.T) {
 	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
-	p := jimmtest.NewTestJimmParams(c)
+	p := newTestJimmParams(c)
 	p.InsecureSecretStorage = true
 	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
 
@@ -359,7 +382,7 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 			ofgaClient, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 			c.Assert(err, qt.IsNil)
 
-			p := jimmtest.NewTestJimmParams(c)
+			p := newTestJimmParams(c)
 			p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
 			p.InsecureSecretStorage = true
 			svc, err := jimmsvc.NewService(context.Background(), p)
@@ -427,7 +450,7 @@ func TestDisableOAuthEndpointsWhenDashboardRedirectURLNotSet(t *testing.T) {
 	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
-	p := jimmtest.NewTestJimmParams(c)
+	p := newTestJimmParams(c)
 	p.DashboardFinalRedirectURL = ""
 	p.InsecureSecretStorage = true
 	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
@@ -450,7 +473,7 @@ func TestEnableOAuthEndpointsWhenDashboardRedirectURLSet(t *testing.T) {
 	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
-	p := jimmtest.NewTestJimmParams(c)
+	p := newTestJimmParams(c)
 	p.DashboardFinalRedirectURL = "some-redirect-url"
 	p.InsecureSecretStorage = true
 	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
@@ -498,7 +521,7 @@ func TestCleanupDoesNotPanic_SessionStoreRelatedCleanups(t *testing.T) {
 
 	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
-	p := jimmtest.NewTestJimmParams(c)
+	p := newTestJimmParams(c)
 	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
 	p.InsecureSecretStorage = true
 
@@ -516,7 +539,7 @@ func TestCORS(t *testing.T) {
 
 	_, _, cofgaParams, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
-	p := jimmtest.NewTestJimmParams(c)
+	p := newTestJimmParams(c)
 	p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
 	allowedOrigin := "http://my-referrer.com"
 	p.CorsAllowedOrigins = []string{allowedOrigin}

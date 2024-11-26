@@ -15,7 +15,6 @@ import (
 	"github.com/juju/juju/core/life"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/state"
-	"github.com/juju/names/v5"
 
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
@@ -191,49 +190,6 @@ var watcherTests = []struct {
 
 		c.Check(model.Machines, qt.Equals, int64(0))
 		c.Check(model.Cores, qt.Equals, int64(0))
-	},
-}, {
-	name: "UpdateApplication",
-	initDB: func(c *qt.C, db db.Database) {
-		ctx := context.Background()
-
-		var m dbmodel.Model
-		m.SetTag(names.NewModelTag("00000002-0000-0000-0000-000000000001"))
-		err := db.GetModel(ctx, &m)
-		c.Assert(err, qt.IsNil)
-
-		err = db.AddApplicationOffer(ctx, &dbmodel.ApplicationOffer{
-			ModelID:         m.ID,
-			UUID:            "00000010-0000-0000-0000-000000000001",
-			Name:            "offer-1",
-			ApplicationName: "app-1",
-		})
-		c.Assert(err, qt.IsNil)
-	},
-	deltas: [][]jujuparams.Delta{
-		{{
-			Entity: &jujuparams.ApplicationInfo{
-				ModelUUID:       "00000002-0000-0000-0000-000000000001",
-				Name:            "app-1",
-				Exposed:         true,
-				CharmURL:        "cs:app-1",
-				Life:            life.Value(state.Alive.String()),
-				MinUnits:        1,
-				WorkloadVersion: "2",
-			},
-		}},
-		nil,
-	},
-	checkDB: func(c *qt.C, db db.Database) {
-		ctx := context.Background()
-
-		var m dbmodel.Model
-		m.SetTag(names.NewModelTag("00000002-0000-0000-0000-000000000001"))
-		err := db.GetModel(ctx, &m)
-		c.Assert(err, qt.IsNil)
-
-		c.Assert(m.Offers, qt.HasLen, 1)
-		c.Assert(m.Offers[0].CharmURL, qt.Equals, "cs:app-1")
 	},
 }, {
 	name: "AddUnit",

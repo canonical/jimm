@@ -183,7 +183,7 @@ func (s *dbSuite) TestGetIdentityCloudCredentials(c *qt.C) {
 	c.Assert(credentials, qt.DeepEquals, []dbmodel.CloudCredential{cred1, cred2})
 }
 
-func (s *dbSuite) TestForEachIdentity(c *qt.C) {
+func (s *dbSuite) TestListIdentities(c *qt.C) {
 	err := s.Database.Migrate(context.Background(), false)
 	c.Assert(err, qt.IsNil)
 
@@ -192,41 +192,20 @@ func (s *dbSuite) TestForEachIdentity(c *qt.C) {
 		err = s.Database.GetIdentity(context.Background(), id)
 		c.Assert(err, qt.IsNil)
 	}
-	firstIdentities := []*dbmodel.Identity{}
 	ctx := context.Background()
-	err = s.Database.ForEachIdentity(ctx, 5, 0, func(ge *dbmodel.Identity) error {
-		firstIdentities = append(firstIdentities, ge)
-		return nil
-	})
+	firstIdentities, err := s.Database.ListIdentities(ctx, 5, 0, "")
 	c.Assert(err, qt.IsNil)
 	for i := 0; i < 5; i++ {
 		c.Assert(firstIdentities[i].Name, qt.Equals, fmt.Sprintf("bob%d@canonical.com", i))
 	}
-	secondIdentities := []*dbmodel.Identity{}
-	err = s.Database.ForEachIdentity(ctx, 5, 5, func(ge *dbmodel.Identity) error {
-		secondIdentities = append(secondIdentities, ge)
-		return nil
-	})
+	secondIdentities, err := s.Database.ListIdentities(ctx, 5, 5, "")
 	c.Assert(err, qt.IsNil)
 	for i := 0; i < 5; i++ {
 		c.Assert(secondIdentities[i].Name, qt.Equals, fmt.Sprintf("bob%d@canonical.com", i+5))
 	}
-}
 
-func (s *dbSuite) TestForEachIdentityError(c *qt.C) {
-	err := s.Database.Migrate(context.Background(), false)
+	filteredIdentities, err := s.Database.ListIdentities(ctx, 5, 0, "bob0")
 	c.Assert(err, qt.IsNil)
-	ctx := context.Background()
-	// add one identity
-	id, _ := dbmodel.NewIdentity("bob@canonical.com")
-	err = s.Database.GetIdentity(context.Background(), id)
-	c.Assert(err, qt.IsNil)
-
-	// test error is returned
-	errTest := errors.E("test-error")
-	err = s.Database.ForEachIdentity(ctx, 5, 0, func(ge *dbmodel.Identity) error {
-		return errTest
-	})
-	c.Assert(err, qt.IsNotNil)
-	c.Assert(err.Error(), qt.Equals, errTest.Error())
+	c.Assert(filteredIdentities, qt.HasLen, 1)
+	c.Assert(filteredIdentities[0].Name, qt.Equals, "bob0@canonical.com")
 }

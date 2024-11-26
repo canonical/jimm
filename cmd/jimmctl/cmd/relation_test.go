@@ -324,14 +324,12 @@ func initializeEnvironment(c *gc.C, ctx context.Context, db *db.Database, u dbmo
 	env.models = []dbmodel.Model{model}
 
 	offer := dbmodel.ApplicationOffer{
-		ID:              1,
-		UUID:            "436b2264-d8f8-4e24-b16f-dd43c4116528",
-		URL:             env.controllers[0].Name + ":" + env.models[0].OwnerIdentityName + "/" + env.models[0].Name + ".testoffer1",
-		Name:            "testoffer1",
-		ModelID:         model.ID,
-		Model:           model,
-		ApplicationName: "test-app",
-		CharmURL:        "cs:test-app:17",
+		ID:      1,
+		UUID:    "436b2264-d8f8-4e24-b16f-dd43c4116528",
+		URL:     env.controllers[0].Name + ":" + env.models[0].OwnerIdentityName + "/" + env.models[0].Name + ".testoffer1",
+		Name:    "testoffer1",
+		ModelID: model.ID,
+		Model:   model,
 	}
 	err = db.AddApplicationOffer(ctx, &offer)
 	c.Assert(err, gc.IsNil)

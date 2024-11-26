@@ -89,8 +89,7 @@ func (s *entitlementsService) ListEntitlements(ctx context.Context, params *reso
 
 	for _, entitlement := range entitlementsList {
 		if strings.Contains(entitlement.Entitlement, match) ||
-			strings.Contains(entitlement.EntityType, match) ||
-			strings.Contains(entitlement.ReceiverType, match) {
+			strings.Contains(entitlement.EntityType, match) {
 			entitlementsFilteredList = append(entitlementsFilteredList, entitlement)
 		}
 	}

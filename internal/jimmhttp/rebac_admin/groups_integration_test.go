@@ -30,6 +30,37 @@ func (s *rebacAdminSuite) SetUpTest(c *gc.C) {
 
 var _ = gc.Suite(&rebacAdminSuite{})
 
+func (s rebacAdminSuite) TestListGroupsWithFilterIntegration(c *gc.C) {
+	ctx := context.Background()
+	for i := range 10 {
+		_, err := s.JIMM.AddGroup(ctx, s.AdminUser, fmt.Sprintf("test-group-filter-%d", i))
+		c.Assert(err, gc.IsNil)
+	}
+
+	ctx = rebac_handlers.ContextWithIdentity(ctx, s.AdminUser)
+	pageSize := 5
+	page := 0
+	params := &resources.GetGroupsParams{Size: &pageSize, Page: &page}
+	res, err := s.groupSvc.ListGroups(ctx, params)
+	c.Assert(err, gc.IsNil)
+	c.Assert(res, gc.Not(gc.IsNil))
+	c.Assert(res.Meta.Size, gc.Equals, 5)
+
+	match := "group-filter-1"
+	params.Filter = &match
+	res, err = s.groupSvc.ListGroups(ctx, params)
+	c.Assert(err, gc.IsNil)
+	c.Assert(res, gc.Not(gc.IsNil))
+	c.Assert(len(res.Data), gc.Equals, 1)
+
+	match = "group"
+	params.Filter = &match
+	res, err = s.groupSvc.ListGroups(ctx, params)
+	c.Assert(err, gc.IsNil)
+	c.Assert(res, gc.Not(gc.IsNil))
+	c.Assert(len(res.Data), gc.Equals, pageSize)
+}
+
 func (s rebacAdminSuite) TestGetGroupIdentitiesIntegration(c *gc.C) {
 	ctx := context.Background()
 	group, err := s.JIMM.AddGroup(ctx, s.AdminUser, "test-group")
@@ -146,18 +177,10 @@ func (s rebacAdminSuite) TestGetGroupEntitlementsIntegration(c *gc.C) {
 	emptyPageToken := ""
 	req := resources.GetGroupsItemEntitlementsParams{NextPageToken: &emptyPageToken}
 	var entitlements []resources.EntityEntitlement
-	for {
-		res, err := s.groupSvc.GetGroupEntitlements(ctx, group.UUID, &req)
-		c.Assert(err, gc.IsNil)
-		c.Assert(res, gc.Not(gc.IsNil))
-		entitlements = append(entitlements, res.Data...)
-		if res.Next.PageToken == nil {
-			break
-		}
-		c.Assert(*res.Meta.PageToken, gc.Equals, *req.NextPageToken)
-		c.Assert(*res.Next.PageToken, gc.Not(gc.Equals), "")
-		req.NextPageToken = res.Next.PageToken
-	}
+	res, err := s.groupSvc.GetGroupEntitlements(ctx, group.UUID, &req)
+	c.Assert(err, gc.IsNil)
+	c.Assert(res, gc.Not(gc.IsNil))
+	entitlements = append(entitlements, res.Data...)
 	c.Assert(entitlements, gc.HasLen, 6)
 	modelEntitlementCount := 0
 	controllerEntitlementCount := 0

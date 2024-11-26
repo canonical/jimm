@@ -120,13 +120,12 @@ func (d *Database) GetIdentityCloudCredentials(ctx context.Context, u *dbmodel.I
 	return credentials, nil
 }
 
-// ForEachIdentity iterates through every identity calling the given function
-// for each one. If the given function returns an error the iteration
-// will stop immediately and the error will be returned unmodified.
-func (d *Database) ForEachIdentity(ctx context.Context, limit, offset int, f func(*dbmodel.Identity) error) (err error) {
-	const op = errors.Op("db.ForEachUSer")
+// ListIdentities returns a paginated list of identities defined by limit and offset.
+// match is used to fuzzy find based on entries' name using the LIKE operator (ex. LIKE %<match>%).
+func (d *Database) ListIdentities(ctx context.Context, limit, offset int, match string) (_ []dbmodel.Identity, err error) {
+	const op = errors.Op("db.ListIdentities")
 	if err := d.ready(); err != nil {
-		return errors.E(op, err)
+		return nil, errors.E(op, err)
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
@@ -134,29 +133,17 @@ func (d *Database) ForEachIdentity(ctx context.Context, limit, offset int, f fun
 	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
 
 	db := d.DB.WithContext(ctx)
-	rows, err := db.
-		Model(&dbmodel.Identity{}).
-		Order("name asc").
-		Limit(limit).
-		Offset(offset).
-		Rows()
-	if err != nil {
-		return errors.E(op, err)
+	if match != "" {
+		db = db.Where("name LIKE ?", "%"+match+"%")
 	}
-	defer rows.Close()
-	for rows.Next() {
-		var identity dbmodel.Identity
-		if err := db.ScanRows(rows, &identity); err != nil {
-			return errors.E(op, err)
-		}
-		if err := f(&identity); err != nil {
-			return err
-		}
+	db = db.Order("name asc")
+	db = db.Limit(limit)
+	db = db.Offset(offset)
+	var identities []dbmodel.Identity
+	if err := db.Find(&identities).Error; err != nil {
+		return nil, errors.E(op, dbError(err))
 	}
-	if err := rows.Err(); err != nil {
-		return errors.E(op, dbError(err))
-	}
-	return nil
+	return identities, nil
 }
 
 // CountIdentities counts the number of identities.

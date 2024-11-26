@@ -379,6 +379,65 @@ type ListRelationshipTuplesResponse struct {
 	ContinuationToken string              `json:"continuation_token,omitempty" yaml:"continuation_token,omitempty"`
 }
 
+// Role request parameters / responses:
+
+// AddRoleRequest holds a request to add a role.
+type AddRoleRequest struct {
+	// Name holds the name of the role.
+	Name string `json:"name"`
+}
+
+// AddRoleResponse holds the details of the added role.
+type AddRoleResponse struct {
+	Role
+}
+
+// GetRoleRequest holds a request to get a role by UUID or name.
+type GetRoleRequest struct {
+	// UUID holds the UUID of the role to be retrieved.
+	UUID string `json:"uuid"`
+	// Name holds the name of the role to be retrieved.
+	Name string `json:"name"`
+}
+
+// GetRoleResponse holds the details of the role.
+type GetRoleResponse struct {
+	Role
+}
+
+// RenameRoleRequest holds a request to rename a role.
+type RenameRoleRequest struct {
+	// Name holds the name of the role.
+	Name string `json:"name"`
+	// NewName holds the new name of the role.
+	NewName string `json:"new-name"`
+}
+
+// RemoveRoleRequest holds a request to remove a role.
+type RemoveRoleRequest struct {
+	// Name holds the name of the role.
+	Name string `json:"name"`
+}
+
+// ListRolesRequest holds a request to list roles.
+type ListRolesRequest struct {
+	Limit  int `json:"limit"`
+	Offset int `json:"offset"`
+}
+
+// Role holds the details of a role currently.
+type Role struct {
+	UUID      string `json:"uuid" yaml:"uuid"`
+	Name      string `json:"name" yaml:"name"`
+	CreatedAt string `json:"created_at" yaml:"created_at"`
+	UpdatedAt string `json:"updated_at" yaml:"updated_at"`
+}
+
+// ListRoleResponse contains a list of roles
+type ListRoleResponse struct {
+	Roles []Role `json:"name" yaml:"name"`
+}
+
 // CrossModelQueryRequest holds the parameters to perform a cross model query against
 // JSON model statuses for every model this user has access to.
 type CrossModelQueryRequest struct {

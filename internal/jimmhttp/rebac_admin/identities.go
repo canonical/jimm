@@ -44,8 +44,11 @@ func (s *identitiesService) ListIdentities(ctx context.Context, params *resource
 		return nil, err
 	}
 	page, nextPage, pagination := pagination.CreatePagination(params.Size, params.Page, count)
-
-	users, err := s.jimm.ListIdentities(ctx, user, pagination)
+	match := ""
+	if params.Filter != nil && *params.Filter != "" {
+		match = *params.Filter
+	}
+	users, err := s.jimm.ListIdentities(ctx, user, pagination, match)
 	if err != nil {
 		return nil, err
 	}

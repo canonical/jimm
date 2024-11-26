@@ -121,11 +121,10 @@ func main() {
 	offerName := petname.Generate(2, "-")
 	offerURL, _ := crossmodel.ParseOfferURL(controller.Name + ":" + u.Name + "/" + model.Name + "." + offerName)
 	offer := dbmodel.ApplicationOffer{
-		UUID:            id.String(),
-		Name:            offerName,
-		ModelID:         model.ID,
-		ApplicationName: petname.Generate(2, "-"),
-		URL:             offerURL.String(),
+		UUID:    id.String(),
+		Name:    offerName,
+		ModelID: model.ID,
+		URL:     offerURL.String(),
 	}
 	if err = db.AddApplicationOffer(context.Background(), &offer); err != nil {
 		fmt.Println("failed to add application offer to db ", err)

@@ -49,6 +49,11 @@ func init() {
 		removeRelationMethod := rpc.Method(r.RemoveRelation)
 		checkRelationMethod := rpc.Method(r.CheckRelation)
 		listRelationshipTuplesMethod := rpc.Method(r.ListRelationshipTuples)
+		addRoleMethod := rpc.Method(r.AddRole)
+		getRoleMethod := rpc.Method(r.GetRole)
+		renameRoleMethod := rpc.Method(r.RenameRole)
+		removeRoleMethod := rpc.Method(r.RemoveRole)
+		listRolesMethod := rpc.Method(r.ListRoles)
 		crossModelQueryMethod := rpc.Method(r.CrossModelQuery)
 		purgeLogsMethod := rpc.Method(r.PurgeLogs)
 		migrateModel := rpc.Method(r.MigrateModel)
@@ -85,6 +90,11 @@ func init() {
 		r.AddMethod("JIMM", 4, "RemoveRelation", removeRelationMethod)
 		r.AddMethod("JIMM", 4, "CheckRelation", checkRelationMethod)
 		r.AddMethod("JIMM", 4, "ListRelationshipTuples", listRelationshipTuplesMethod)
+		r.AddMethod("JIMM", 4, "AddRole", addRoleMethod)
+		r.AddMethod("JIMM", 4, "GetRole", getRoleMethod)
+		r.AddMethod("JIMM", 4, "RenameRole", renameRoleMethod)
+		r.AddMethod("JIMM", 4, "RemoveRole", removeRoleMethod)
+		r.AddMethod("JIMM", 4, "ListRoles", listRolesMethod)
 		// JIMM Cross-model queries
 		r.AddMethod("JIMM", 4, "CrossModelQuery", crossModelQueryMethod)
 		// JIMM Service Accounts

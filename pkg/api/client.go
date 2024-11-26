@@ -147,6 +147,39 @@ func (c *Client) ListGroups(req *params.ListGroupsRequest) ([]params.Group, erro
 	return resp.Groups, err
 }
 
+// User Roles
+
+// AddRole adds the Role to JIMM.
+func (c *Client) AddRole(req *params.AddRoleRequest) (params.AddRoleResponse, error) {
+	var resp params.AddRoleResponse
+	err := c.caller.APICall("JIMM", 4, "", "AddRole", req, &resp)
+	return resp, err
+}
+
+// GetRole returns the Role with the given UUID or name. Only one should be provided.
+func (c *Client) GetRole(req *params.GetRoleRequest) (params.GetRoleResponse, error) {
+	var resp params.GetRoleResponse
+	err := c.caller.APICall("JIMM", 4, "", "GetRole", req, &resp)
+	return resp, err
+}
+
+// RenameRole renames a Role in JIMM.
+func (c *Client) RenameRole(req *params.RenameRoleRequest) error {
+	return c.caller.APICall("JIMM", 4, "", "RenameRole", req, nil)
+}
+
+// RemoveRole removes a Role in JIMM.
+func (c *Client) RemoveRole(req *params.RemoveRoleRequest) error {
+	return c.caller.APICall("JIMM", 4, "", "RemoveRole", req, nil)
+}
+
+// ListRoles lists the Roles in JIMM.
+func (c *Client) ListRoles(req *params.ListRolesRequest) ([]params.Role, error) {
+	var resp params.ListRoleResponse
+	err := c.caller.APICall("JIMM", 4, "", "ListRoles", req, &resp)
+	return resp.Roles, err
+}
+
 // Tuple management
 
 // AddRelation adds a relational tuple in JIMM.

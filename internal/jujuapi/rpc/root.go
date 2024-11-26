@@ -50,6 +50,9 @@ func (r *Root) FindMethod(rootName string, version int, methodName string) (rpcr
 		return rootMethodCaller{
 			MethodCaller: caller,
 			r:            r,
+			methodName:   methodName,
+			facadeName:   rootName,
+			version:      version,
 		}, nil
 	}
 	return nil, &rpcreflect.CallNotImplementedError{
@@ -97,13 +100,19 @@ func (r *Root) end(callID uint64) {
 // canceled.
 type rootMethodCaller struct {
 	rpcreflect.MethodCaller
-
 	r *Root
+
+	methodName string
+	facadeName string
+	version    int
 }
 
 // Call implements rpcreflect.MethodCaller.Call.
 func (c rootMethodCaller) Call(ctx context.Context, objID string, arg reflect.Value) (reflect.Value, error) {
 	ctx, callID := c.r.start(ctx)
 	defer c.r.end(callID)
+	ctx = zapctx.WithFields(ctx, zap.String("facade", c.facadeName))
+	ctx = zapctx.WithFields(ctx, zap.String("method", c.methodName))
+	ctx = zapctx.WithFields(ctx, zap.Int("version", c.version))
 	return c.MethodCaller.Call(ctx, objID, arg)
 }

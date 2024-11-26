@@ -86,7 +86,7 @@ func TestListGroups(t *testing.T) {
 	}
 	jimm := jimmtest.JIMM{
 		GroupService: mocks.GroupService{
-			ListGroups_: func(ctx context.Context, user *openfga.User, filter pagination.LimitOffsetPagination) ([]dbmodel.GroupEntry, error) {
+			ListGroups_: func(ctx context.Context, user *openfga.User, pagination pagination.LimitOffsetPagination, match string) ([]dbmodel.GroupEntry, error) {
 				return returnedGroups, listErr
 			},
 			CountGroups_: func(ctx context.Context, user *openfga.User) (int, error) {
