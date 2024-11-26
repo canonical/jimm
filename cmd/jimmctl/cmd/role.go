@@ -275,7 +275,7 @@ func (c *removeRoleCommand) Run(ctxt *cmd.Context) error {
 	if !c.force {
 		reader := bufio.NewReader(ctxt.Stdin)
 		// Using Fprintf over c.out.write to avoid printing a new line.
-		_, err := fmt.Fprintf(ctxt.Stdout, "This will also delele all associated relations.\nConfirm you would like to delete role %q (y/N): ", c.name)
+		_, err := fmt.Fprintf(ctxt.Stdout, "This will also delete all associated relations.\nConfirm you would like to delete role %q (y/N): ", c.name)
 		if err != nil {
 			return err
 		}

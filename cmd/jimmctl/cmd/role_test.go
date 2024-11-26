@@ -30,7 +30,7 @@ func (s *roleSuite) TestAddRoleSuperuser(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	role := &dbmodel.RoleEntry{Name: "test-role"}
-	err = s.JimmCmdSuite.JIMM.Database.GetRole(context.TODO(), role)
+	err = s.JimmCmdSuite.JIMM.Database.GetRole(context.Background(), role)
 	c.Assert(err, gc.IsNil)
 	c.Assert(role.ID, gc.Equals, uint(1))
 	c.Assert(role.Name, gc.Equals, "test-role")

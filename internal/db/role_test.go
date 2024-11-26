@@ -62,7 +62,7 @@ func (s *dbSuite) TestGetRole(c *qt.C) {
 	err = s.Database.GetRole(context.Background(), role)
 	c.Check(err, qt.ErrorMatches, "must specify uuid or name")
 
-	re1, err := s.Database.AddRole(context.TODO(), "test-role")
+	re1, err := s.Database.AddRole(context.Background(), "test-role")
 	c.Assert(err, qt.IsNil)
 	c.Assert(re1.UUID, qt.Equals, uuid1)
 
