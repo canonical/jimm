@@ -15,13 +15,11 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
-	"github.com/canonical/jimm/v3/internal/jujuapi"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 	"github.com/canonical/jimm/v3/pkg/api"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
-	"github.com/canonical/jimm/v3/pkg/names"
 )
 
 type accessControlSuite struct {
@@ -815,102 +813,6 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 			c.Assert(*key.User, gc.DeepEquals, tc.want.Object.String())
 			c.Assert(*key.Relation, gc.DeepEquals, tc.want.Relation.String())
 			c.Assert(*key.Object, gc.DeepEquals, tc.want.Target.String())
-		}
-	}
-}
-
-func (s *accessControlSuite) TestJAASTag(c *gc.C) {
-	ctx := context.Background()
-	db := s.JIMM.Database
-
-	user, group, controller, model, applicationOffer, cloud, _, _, closeClient := createTestControllerEnvironment(ctx, c, s)
-	serviceAccountId := petname.Generate(2, "-") + "@serviceaccount"
-	closeClient()
-
-	tests := []struct {
-		tag             *ofganames.Tag
-		expectedJAASTag string
-		expectedError   string
-	}{{
-		tag:             ofganames.ConvertTag(user.ResourceTag()),
-		expectedJAASTag: "user-" + user.Name,
-	}, {
-		tag:             ofganames.ConvertTag(names.NewServiceAccountTag(serviceAccountId)),
-		expectedJAASTag: "serviceaccount-" + serviceAccountId,
-	}, {
-		tag:             ofganames.ConvertTag(group.ResourceTag()),
-		expectedJAASTag: "group-" + group.Name,
-	}, {
-		tag:             ofganames.ConvertTag(controller.ResourceTag()),
-		expectedJAASTag: "controller-" + controller.Name,
-	}, {
-		tag:             ofganames.ConvertTag(model.ResourceTag()),
-		expectedJAASTag: "model-" + user.Name + "/" + model.Name,
-	}, {
-		tag:             ofganames.ConvertTag(applicationOffer.ResourceTag()),
-		expectedJAASTag: "applicationoffer-" + applicationOffer.URL,
-	}, {
-		tag:           &ofganames.Tag{},
-		expectedError: "unexpected tag kind: ",
-	}, {
-		tag:             ofganames.ConvertTag(cloud.ResourceTag()),
-		expectedJAASTag: "cloud-" + cloud.Name,
-	}}
-	for _, test := range tests {
-		t, err := jujuapi.ToJAASTag(db, test.tag, true)
-		if test.expectedError != "" {
-			c.Assert(err, gc.ErrorMatches, test.expectedError)
-		} else {
-			c.Assert(err, gc.IsNil)
-			c.Assert(t, gc.Equals, test.expectedJAASTag)
-		}
-	}
-}
-
-func (s *accessControlSuite) TestJAASTagNoUUIDResolution(c *gc.C) {
-	ctx := context.Background()
-	db := s.JIMM.Database
-
-	user, group, controller, model, applicationOffer, cloud, _, _, closeClient := createTestControllerEnvironment(ctx, c, s)
-	serviceAccountId := petname.Generate(2, "-") + "@serviceaccount"
-	closeClient()
-
-	tests := []struct {
-		tag             *ofganames.Tag
-		expectedJAASTag string
-		expectedError   string
-	}{{
-		tag:             ofganames.ConvertTag(user.ResourceTag()),
-		expectedJAASTag: "user-" + user.Name,
-	}, {
-		tag:             ofganames.ConvertTag(names.NewServiceAccountTag(serviceAccountId)),
-		expectedJAASTag: "serviceaccount-" + serviceAccountId,
-	}, {
-		tag:             ofganames.ConvertTag(group.ResourceTag()),
-		expectedJAASTag: "group-" + group.UUID,
-	}, {
-		tag:             ofganames.ConvertTag(controller.ResourceTag()),
-		expectedJAASTag: "controller-" + controller.UUID,
-	}, {
-		tag:             ofganames.ConvertTag(model.ResourceTag()),
-		expectedJAASTag: "model-" + model.UUID.String,
-	}, {
-		tag:             ofganames.ConvertTag(applicationOffer.ResourceTag()),
-		expectedJAASTag: "applicationoffer-" + applicationOffer.UUID,
-	}, {
-		tag:             ofganames.ConvertTag(cloud.ResourceTag()),
-		expectedJAASTag: "cloud-" + cloud.Name,
-	}, {
-		tag:             &ofganames.Tag{},
-		expectedJAASTag: "-",
-	}}
-	for _, test := range tests {
-		t, err := jujuapi.ToJAASTag(db, test.tag, false)
-		if test.expectedError != "" {
-			c.Assert(err, gc.ErrorMatches, test.expectedError)
-		} else {
-			c.Assert(err, gc.IsNil)
-			c.Assert(t, gc.Equals, test.expectedJAASTag)
 		}
 	}
 }

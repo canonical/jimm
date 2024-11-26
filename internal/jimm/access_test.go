@@ -638,6 +638,129 @@ func TestResolveTupleObjectHandlesErrors(t *testing.T) {
 	}
 }
 
+func TestToJAASTag(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	now := time.Now().UTC().Round(time.Millisecond)
+	j := &jimm.JIMM{
+		UUID: uuid.NewString(),
+		Database: db.Database{
+			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
+		},
+	}
+
+	err := j.Database.Migrate(ctx, false)
+	c.Assert(err, qt.IsNil)
+
+	user, group, controller, model, applicationOffer, cloud, _, role := createTestControllerEnvironment(ctx, c, j.Database)
+
+	serviceAccountId := petname.Generate(2, "-") + "@serviceaccount"
+
+	tests := []struct {
+		tag             *ofganames.Tag
+		expectedJAASTag string
+		expectedError   string
+	}{{
+		tag:             ofganames.ConvertTag(user.ResourceTag()),
+		expectedJAASTag: "user-" + user.Name,
+	}, {
+		tag:             ofganames.ConvertTag(jimmnames.NewServiceAccountTag(serviceAccountId)),
+		expectedJAASTag: "serviceaccount-" + serviceAccountId,
+	}, {
+		tag:             ofganames.ConvertTag(group.ResourceTag()),
+		expectedJAASTag: "group-" + group.Name,
+	}, {
+		tag:             ofganames.ConvertTag(controller.ResourceTag()),
+		expectedJAASTag: "controller-" + controller.Name,
+	}, {
+		tag:             ofganames.ConvertTag(model.ResourceTag()),
+		expectedJAASTag: "model-" + user.Name + "/" + model.Name,
+	}, {
+		tag:             ofganames.ConvertTag(applicationOffer.ResourceTag()),
+		expectedJAASTag: "applicationoffer-" + applicationOffer.URL,
+	}, {
+		tag:           &ofganames.Tag{},
+		expectedError: "unexpected tag kind: ",
+	}, {
+		tag:             ofganames.ConvertTag(cloud.ResourceTag()),
+		expectedJAASTag: "cloud-" + cloud.Name,
+	}, {
+		tag:             ofganames.ConvertTag(role.ResourceTag()),
+		expectedJAASTag: "role-" + role.Name,
+	}}
+	for _, test := range tests {
+		t, err := j.ToJAASTag(ctx, test.tag, true)
+		if test.expectedError != "" {
+			c.Assert(err, qt.ErrorMatches, test.expectedError)
+		} else {
+			c.Assert(err, qt.IsNil)
+			c.Assert(t, qt.Equals, test.expectedJAASTag)
+		}
+	}
+}
+
+func TestToJAASTagNoUUIDResolution(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	now := time.Now().UTC().Round(time.Millisecond)
+	j := &jimm.JIMM{
+		UUID: uuid.NewString(),
+		Database: db.Database{
+			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
+		},
+	}
+
+	err := j.Database.Migrate(ctx, false)
+	c.Assert(err, qt.IsNil)
+
+	user, group, controller, model, applicationOffer, cloud, _, role := createTestControllerEnvironment(ctx, c, j.Database)
+	serviceAccountId := petname.Generate(2, "-") + "@serviceaccount"
+
+	tests := []struct {
+		tag             *ofganames.Tag
+		expectedJAASTag string
+		expectedError   string
+	}{{
+		tag:             ofganames.ConvertTag(user.ResourceTag()),
+		expectedJAASTag: "user-" + user.Name,
+	}, {
+		tag:             ofganames.ConvertTag(jimmnames.NewServiceAccountTag(serviceAccountId)),
+		expectedJAASTag: "serviceaccount-" + serviceAccountId,
+	}, {
+		tag:             ofganames.ConvertTag(group.ResourceTag()),
+		expectedJAASTag: "group-" + group.UUID,
+	}, {
+		tag:             ofganames.ConvertTag(controller.ResourceTag()),
+		expectedJAASTag: "controller-" + controller.UUID,
+	}, {
+		tag:             ofganames.ConvertTag(model.ResourceTag()),
+		expectedJAASTag: "model-" + model.UUID.String,
+	}, {
+		tag:             ofganames.ConvertTag(applicationOffer.ResourceTag()),
+		expectedJAASTag: "applicationoffer-" + applicationOffer.UUID,
+	}, {
+		tag:             ofganames.ConvertTag(cloud.ResourceTag()),
+		expectedJAASTag: "cloud-" + cloud.Name,
+	}, {
+		tag:             ofganames.ConvertTag(role.ResourceTag()),
+		expectedJAASTag: "role-" + role.UUID,
+	}, {
+		tag:             &ofganames.Tag{},
+		expectedJAASTag: "-",
+	}}
+	for _, test := range tests {
+		t, err := j.ToJAASTag(ctx, test.tag, false)
+		if test.expectedError != "" {
+			c.Assert(err, qt.ErrorMatches, test.expectedError)
+		} else {
+			c.Assert(err, qt.IsNil)
+			c.Assert(t, qt.Equals, test.expectedJAASTag)
+		}
+	}
+}
+
 // createTestControllerEnvironment is a utility function creating the necessary components of adding a:
 //   - user
 //   - user group
