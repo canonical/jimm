@@ -18,6 +18,7 @@ func NewAuthCommand() *jujucmd.SuperCommand {
 	})
 	cmd.Register(NewGroupCommand())
 	cmd.Register(NewRelationCommand())
+	cmd.Register(NewRoleCommand())
 
 	return cmd
 }

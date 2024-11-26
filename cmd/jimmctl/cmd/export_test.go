@@ -154,6 +154,42 @@ func NewImportCloudCredentialsCommandForTesting(store jujuclient.ClientStore, lp
 	return modelcmd.WrapBase(cmd)
 }
 
+func NewAddRoleCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
+	cmd := &addRoleCommand{
+		store:    store,
+		dialOpts: cmdtest.TestDialOpts(lp),
+	}
+
+	return modelcmd.WrapBase(cmd)
+}
+
+func NewRenameRoleCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
+	cmd := &renameRoleCommand{
+		store:    store,
+		dialOpts: cmdtest.TestDialOpts(lp),
+	}
+
+	return modelcmd.WrapBase(cmd)
+}
+
+func NewRemoveRoleCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
+	cmd := &removeRoleCommand{
+		store:    store,
+		dialOpts: cmdtest.TestDialOpts(lp),
+	}
+
+	return modelcmd.WrapBase(cmd)
+}
+
+func NewListRolesCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
+	cmd := &listRolesCommand{
+		store:    store,
+		dialOpts: cmdtest.TestDialOpts(lp),
+	}
+
+	return modelcmd.WrapBase(cmd)
+}
+
 func NewAddGroupCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &addGroupCommand{
 		store:    store,
