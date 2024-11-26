@@ -43,7 +43,7 @@ func TestListRelationshipTuples(t *testing.T) {
 	u := openfga.NewUser(&dbmodel.Identity{Name: "admin@canonical.com"}, ofgaClient)
 	u.JimmAdmin = true
 
-	user, _, controller, model, _, _, _ := createTestControllerEnvironment(ctx, c, j.Database)
+	user, _, controller, model, _, _, _, _ := createTestControllerEnvironment(ctx, c, j.Database)
 	c.Assert(err, qt.IsNil)
 
 	err = j.AddRelation(ctx, u, []apiparams.RelationshipTuple{
@@ -192,7 +192,7 @@ func TestListObjectRelations(t *testing.T) {
 	u := openfga.NewUser(&dbmodel.Identity{Name: "admin@canonical.com"}, ofgaClient)
 	u.JimmAdmin = true
 
-	user, group, controller, model, _, cloud, _ := createTestControllerEnvironment(ctx, c, j.Database)
+	user, group, controller, model, _, cloud, _, _ := createTestControllerEnvironment(ctx, c, j.Database)
 	c.Assert(err, qt.IsNil)
 
 	err = j.AddRelation(ctx, u, []apiparams.RelationshipTuple{

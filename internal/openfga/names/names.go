@@ -43,7 +43,7 @@ var (
 
 // allRelations contains a slice of all valid relations.
 // NB: Add any new relations from the above to this slice.
-var allRelations = []cofga.Relation{MemberRelation, AdministratorRelation, ControllerRelation, ModelRelation, ConsumerRelation, ReaderRelation, WriterRelation, CanAddModelRelation, AuditLogViewerRelation, NoRelation}
+var allRelations = []cofga.Relation{MemberRelation, AdministratorRelation, ControllerRelation, ModelRelation, ConsumerRelation, ReaderRelation, WriterRelation, CanAddModelRelation, AuditLogViewerRelation, AssigneeRelation, NoRelation}
 
 // EveryoneUser is the username representing all users and is treated uniquely when used in OpenFGA tuples.
 const EveryoneUser = "everyone@external"
@@ -171,6 +171,8 @@ func ParseRelation(relationString string) (cofga.Relation, error) {
 		return CanAddModelRelation, nil
 	case AuditLogViewerRelation.String():
 		return AuditLogViewerRelation, nil
+	case AssigneeRelation.String():
+		return AssigneeRelation, nil
 	default:
 		return cofga.Relation(""), errors.E(op, fmt.Sprintf("unknown relation %s", relationString))
 

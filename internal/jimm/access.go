@@ -450,6 +450,15 @@ func (j *JIMM) ToJAASTag(ctx context.Context, tag *ofganames.Tag, resolveUUIDs b
 			return "", errors.E(err, fmt.Sprintf("failed to fetch group information: %s", group.UUID))
 		}
 		return tagToString(jimmnames.GroupTagKind, group.Name), nil
+	case jimmnames.RoleTagKind:
+		role := dbmodel.RoleEntry{
+			UUID: tag.ID,
+		}
+		err := j.Database.GetRole(ctx, &role)
+		if err != nil {
+			return "", errors.E(err, fmt.Sprintf("failed to fetch role information: %s", role.UUID))
+		}
+		return tagToString(jimmnames.RoleTagKind, role.Name), nil
 	case names.CloudTagKind:
 		cloud := dbmodel.Cloud{
 			Name: tag.ID,
@@ -527,6 +536,25 @@ func (t *tagResolver) groupTag(ctx context.Context, db *db.Database) (*ofga.Enti
 	err := db.GetGroup(ctx, &entry)
 	if err != nil {
 		return nil, errors.E(fmt.Sprintf("group %s not found", t.trailer))
+	}
+
+	return ofganames.ConvertTagWithRelation(entry.ResourceTag(), t.relation), nil
+}
+
+func (t *tagResolver) roleTag(ctx context.Context, db *db.Database) (*ofga.Entity, error) {
+	zapctx.Debug(
+		ctx,
+		"Resolving JIMM tags to Juju tags for tag kind: role",
+		zap.String("role-name", t.trailer),
+	)
+	if t.resourceUUID != "" {
+		return ofganames.ConvertTagWithRelation(jimmnames.NewRoleTag(t.resourceUUID), t.relation), nil
+	}
+	entry := dbmodel.RoleEntry{Name: t.trailer}
+
+	err := db.GetRole(ctx, &entry)
+	if err != nil {
+		return nil, errors.E(fmt.Sprintf("role %s not found", t.trailer))
 	}
 
 	return ofganames.ConvertTagWithRelation(entry.ResourceTag(), t.relation), nil
@@ -649,6 +677,8 @@ func resolveTag(jimmUUID string, db *db.Database, tag string) (*ofganames.Tag, e
 		return resolver.userTag(ctx)
 	case jimmnames.GroupTagKind:
 		return resolver.groupTag(ctx, db)
+	case jimmnames.RoleTagKind:
+		return resolver.roleTag(ctx, db)
 	case names.ControllerTagKind:
 		return resolver.controllerTag(ctx, jimmUUID, db)
 	case names.ModelTagKind:
