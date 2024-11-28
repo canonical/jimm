@@ -2,7 +2,6 @@
 package jujuclient2
 
 import (
-	"context"
 	"sync"
 	"time"
 
@@ -26,6 +25,7 @@ type cacheJujuDialer struct {
 	sf singleflight.Group
 
 	// conns stores the connections.
+	// TODO(ale8k): Use sync.Map and delete mux.
 	conns map[string]api.Connection
 
 	// cleanupIntervalTicker cleans up broken connections in the cache.
@@ -48,17 +48,19 @@ func NewCacheDialer(d JujuDialer, cleanupInterval time.Duration) *cacheJujuDiale
 }
 
 // Dial works like so:
-// - Use singleflight for:
+//
+// It uses a singleflight for:
 //   - Preventing duplicate cache inserts
 //   - Allow only one routine to access the cache at a time
 //
-// - Use a map of connections for:
+// It uses a map of connections for:
 //   - Preventing the need to connect multiple times to the same controller
 //
-// - Mux to protect the map (there are libs for this though, perhaps use one of those)
-func (cjd *cacheJujuDialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, requiredPermissions map[string]string) (api.Connection, error) {
+// It uses a mux for:
+//   - Mux to protect the map (there are libs for this though, perhaps use one of those)
+func (cjd *cacheJujuDialer) Dial(ctl *dbmodel.Controller, modelTag names.ModelTag, requiredPermissions map[string]string) (api.Connection, error) {
 	if modelTag.Id() != "" {
-		return cjd.dialer.Dial(ctx, ctl, modelTag, requiredPermissions)
+		return cjd.dialer.Dial(ctl, modelTag, requiredPermissions)
 	}
 
 	ctlUuid := ctl.ResourceTag().Id()
@@ -72,7 +74,7 @@ func (cjd *cacheJujuDialer) Dial(ctx context.Context, ctl *dbmodel.Controller, m
 			return conn, nil
 		}
 
-		conn, err := cjd.dialer.Dial(ctx, ctl, modelTag, requiredPermissions)
+		conn, err := cjd.dialer.Dial(ctl, modelTag, requiredPermissions)
 		if err != nil {
 			return nil, err
 		}

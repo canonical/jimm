@@ -2,7 +2,6 @@
 package jujuclient2_test
 
 import (
-	"context"
 	"testing"
 
 	jujutesting "github.com/juju/juju/testing"
@@ -35,15 +34,13 @@ func (s *jujuDialerSuite) getControllerToDial(c *gc.C) *dbmodel.Controller {
 }
 
 func (s *jujuDialerSuite) TestJujuDialer(c *gc.C) {
-	ctx := context.Background()
-
 	dialer := jujuclient2.JujuDialer{
 		JWTService: s.JIMM.JWTService,
 	}
 
 	ctl := s.getControllerToDial(c)
 
-	conn, err := dialer.Dial(ctx, ctl, names.ModelTag{}, nil)
+	conn, err := dialer.Dial(ctl, names.ModelTag{}, nil)
 	c.Assert(err, gc.IsNil)
 	defer conn.Close()
 }

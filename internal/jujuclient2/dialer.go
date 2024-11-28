@@ -87,12 +87,16 @@ func (jlp *JWTLoginProvider) AuthHeader() (http.Header, error) {
 	return nil, nil
 }
 
+type ControllerFinder interface {
+	GetController(ctx context.Context, controller *dbmodel.Controller) (err error)
+}
 type JujuDialer struct {
+	cf         ControllerFinder
 	JWTService *jimmjwx.JWTService
 }
 
 // TODO(ale8k): Don't pass a dbmodel.Controller, create params for this.
-func (jd *JujuDialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, requiredPermissions map[string]string) (api.Connection, error) {
+func (jd *JujuDialer) Dial(ctl *dbmodel.Controller, modelTag names.ModelTag, requiredPermissions map[string]string) (api.Connection, error) {
 	cfg := connector.SimpleConfig{}
 	if ctl.PublicAddress != "" {
 		cfg.ControllerAddresses = []string{ctl.PublicAddress}

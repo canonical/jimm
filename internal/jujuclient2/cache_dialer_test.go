@@ -2,7 +2,6 @@
 package jujuclient2
 
 import (
-	"context"
 	"time"
 	"unsafe"
 
@@ -30,7 +29,6 @@ func (s *cacheDialerSuite) getControllerToDial(c *gc.C) *dbmodel.Controller {
 }
 
 func (s *cacheDialerSuite) TestCacheDialer(c *gc.C) {
-	ctx := context.Background()
 
 	dialer := NewCacheDialer(JujuDialer{
 		JWTService: s.JIMM.JWTService,
@@ -39,7 +37,7 @@ func (s *cacheDialerSuite) TestCacheDialer(c *gc.C) {
 	ctl := s.getControllerToDial(c)
 
 	// Dial controller
-	conn, err := dialer.Dial(ctx, ctl, names.ModelTag{}, nil)
+	conn, err := dialer.Dial(ctl, names.ModelTag{}, nil)
 	c.Assert(err, gc.IsNil)
 
 	// Check conn is cached
@@ -53,7 +51,7 @@ func (s *cacheDialerSuite) TestCacheDialer(c *gc.C) {
 	c.Assert(connAddr, gc.Equals, cachedConnAddr)
 
 	// Dial again and check cache is used
-	conn2, err := dialer.Dial(ctx, ctl, names.ModelTag{}, nil)
+	conn2, err := dialer.Dial(ctl, names.ModelTag{}, nil)
 	c.Assert(err, gc.IsNil)
 
 	// Address check
@@ -69,7 +67,7 @@ func (s *cacheDialerSuite) TestCacheDialer(c *gc.C) {
 
 	// Dial a final time, and address should be different as it's a new conn
 	// instance
-	conn3, err := dialer.Dial(ctx, ctl, names.ModelTag{}, nil)
+	conn3, err := dialer.Dial(ctl, names.ModelTag{}, nil)
 	c.Assert(err, gc.IsNil)
 	defer conn3.Close()
 
