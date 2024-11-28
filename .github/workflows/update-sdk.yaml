@@ -32,11 +32,6 @@ jobs:
         ref: ${{ github.event.inputs.sdk-version }}
         path: ./sdk
 
-    - name: Setup Go
-      uses: actions/setup-go@v5
-      with:
-        go-version-file: ./project/go.mod
-
     - name: Update SDK
       working-directory: ./sdk
       env:
@@ -45,7 +40,7 @@ jobs:
         SDK_VERSION: ${{ github.event.inputs.sdk-version }}
       run: |
         # Remove all in case some files are removed
-        shopt -s nullglob
+        shopt -s nullglob extglob
         rm -rf .[!.git]* !(go.mod|go.sum)
         cp -r $PROJECT/pkg/.[^.]* $PROJECT/pkg/* .
 

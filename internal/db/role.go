@@ -127,8 +127,12 @@ func (d *Database) ListRoles(ctx context.Context, limit, offset int, match strin
 		db = db.Where("name LIKE ? OR uuid LIKE ?", "%"+match+"%", "%"+match+"%")
 	}
 	db = db.Order("name asc")
-	db = db.Limit(limit)
-	db = db.Offset(offset)
+	if limit > 0 {
+		db = db.Limit(limit)
+	}
+	if offset > 0 {
+		db = db.Offset(offset)
+	}
 	var Roles []dbmodel.RoleEntry
 	if err := db.Find(&Roles).Error; err != nil {
 		return nil, errors.E(op, dbError(err))

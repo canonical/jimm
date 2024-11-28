@@ -109,9 +109,13 @@ func (s *groupSuite) TestListGroupsSuperuser(c *gc.C) {
 		c.Assert(err, gc.IsNil)
 	}
 
-	ctx, err := cmdtesting.RunCommand(c, cmd.NewListGroupsCommandForTesting(s.ClientStore(), bClient), "test-group")
+	ctx, err := cmdtesting.RunCommand(c, cmd.NewListGroupsCommandForTesting(s.ClientStore(), bClient))
 	c.Assert(err, gc.IsNil)
 	output := cmdtesting.Stdout(ctx)
+	groups := []params.Group{}
+	err = yaml.Unmarshal([]byte(output), &groups)
+	c.Assert(err, gc.IsNil)
+	c.Log(groups)
 	c.Assert(strings.Contains(output, "test-group0"), gc.Equals, true)
 	c.Assert(strings.Contains(output, "test-group1"), gc.Equals, true)
 	c.Assert(strings.Contains(output, "test-group2"), gc.Equals, true)
@@ -126,7 +130,7 @@ func (s *groupSuite) TestListGroupsLimitSuperuser(c *gc.C) {
 		c.Assert(err, gc.IsNil)
 	}
 
-	ctx, err := cmdtesting.RunCommand(c, cmd.NewListGroupsCommandForTesting(s.ClientStore(), bClient), "test-group", "--limit", "1", "--offset", "1")
+	ctx, err := cmdtesting.RunCommand(c, cmd.NewListGroupsCommandForTesting(s.ClientStore(), bClient), "--limit", "1", "--offset", "1")
 	c.Assert(err, gc.IsNil)
 	output := cmdtesting.Stdout(ctx)
 	groups := []params.Group{}
@@ -140,6 +144,6 @@ func (s *groupSuite) TestListGroupsLimitSuperuser(c *gc.C) {
 func (s *groupSuite) TestListGroups(c *gc.C) {
 	// bob is not superuser
 	bClient := s.SetupCLIAccess(c, "bob")
-	_, err := cmdtesting.RunCommand(c, cmd.NewListGroupsCommandForTesting(s.ClientStore(), bClient), "test-group")
+	_, err := cmdtesting.RunCommand(c, cmd.NewListGroupsCommandForTesting(s.ClientStore(), bClient))
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }

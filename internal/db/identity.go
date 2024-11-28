@@ -137,8 +137,12 @@ func (d *Database) ListIdentities(ctx context.Context, limit, offset int, match 
 		db = db.Where("name LIKE ?", "%"+match+"%")
 	}
 	db = db.Order("name asc")
-	db = db.Limit(limit)
-	db = db.Offset(offset)
+	if limit > 0 {
+		db = db.Limit(limit)
+	}
+	if offset > 0 {
+		db = db.Offset(offset)
+	}
 	var identities []dbmodel.Identity
 	if err := db.Find(&identities).Error; err != nil {
 		return nil, errors.E(op, dbError(err))

@@ -98,8 +98,12 @@ func (d *Database) ForEachAuditLogEntry(ctx context.Context, filter AuditLogFilt
 	if filter.SortTime {
 		db = db.Order("time DESC")
 	}
-	db = db.Limit(filter.Limit)
-	db = db.Offset(filter.Offset)
+	if filter.Limit > 0 {
+		db = db.Limit(filter.Limit)
+	}
+	if filter.Offset > 0 {
+		db = db.Offset(filter.Offset)
+	}
 
 	rows, err := db.Rows()
 	if err != nil {

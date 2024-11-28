@@ -339,7 +339,7 @@ func (c *listGroupsCommand) Info() *cmd.Info {
 
 // Init implements the cmd.Command interface.
 func (c *listGroupsCommand) Init(args []string) error {
-	if len(args) > 1 {
+	if len(args) > 0 {
 		return errors.E("too many args")
 	}
 	return nil
