@@ -87,11 +87,7 @@ func (jlp *JWTLoginProvider) AuthHeader() (http.Header, error) {
 	return nil, nil
 }
 
-type ControllerFinder interface {
-	GetController(ctx context.Context, controller *dbmodel.Controller) (err error)
-}
 type JujuDialer struct {
-	cf         ControllerFinder
 	JWTService *jimmjwx.JWTService
 }
 

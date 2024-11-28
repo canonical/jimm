@@ -29,7 +29,6 @@ func (s *cacheDialerSuite) getControllerToDial(c *gc.C) *dbmodel.Controller {
 }
 
 func (s *cacheDialerSuite) TestCacheDialer(c *gc.C) {
-
 	dialer := NewCacheDialer(JujuDialer{
 		JWTService: s.JIMM.JWTService,
 	}, time.Millisecond*500)
