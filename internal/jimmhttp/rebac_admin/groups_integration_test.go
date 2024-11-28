@@ -151,6 +151,67 @@ func (s rebacAdminSuite) TestPatchGroupIdentitiesIntegration(c *gc.C) {
 	c.Assert(allowed, gc.Equals, true)
 }
 
+func (s rebacAdminSuite) TestGetGroupRolesIntegration(c *gc.C) {
+	ctx := context.Background()
+	group := s.AddGroup(c, "test-group")
+	role := s.AddRole(c, "test-role")
+	tuple := openfga.Tuple{
+		Object:   ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag(group.UUID), ofganames.MemberRelation),
+		Relation: ofganames.AssigneeRelation,
+		Target:   ofganames.ConvertTag(jimmnames.NewRoleTag(role.UUID)),
+	}
+	err := s.JIMM.OpenFGAClient.AddRelation(ctx, tuple)
+	c.Assert(err, gc.IsNil)
+
+	params := &resources.GetGroupsItemRolesParams{}
+	ctx = rebac_handlers.ContextWithIdentity(ctx, s.AdminUser)
+	res, err := s.groupSvc.GetGroupRoles(ctx, group.UUID, params)
+	c.Assert(err, gc.IsNil)
+	c.Assert(res, gc.Not(gc.IsNil))
+	c.Assert(res.Meta.Size, gc.Equals, 1)
+	c.Assert(*res.Meta.PageToken, gc.Equals, "")
+	c.Assert(res.Next.PageToken, gc.IsNil)
+	c.Assert(res.Data, gc.HasLen, 1)
+	c.Assert(res.Data[0].Id, gc.Not(gc.IsNil))
+	c.Assert(*res.Data[0].Id, gc.Equals, role.UUID)
+	c.Assert(res.Data[0].Name, gc.Equals, role.Name)
+}
+
+func (s rebacAdminSuite) TestPatchGroupRolesIntegration(c *gc.C) {
+	ctx := context.Background()
+	group := s.AddGroup(c, "test-group")
+	role := s.AddRole(c, "test-role")
+
+	// Assign the role to the group.
+	rolePatches := []resources.GroupRolesPatchItem{
+		{Role: role.UUID, Op: resources.GroupRolesPatchItemOpAdd},
+	}
+	ctx = rebac_handlers.ContextWithIdentity(ctx, s.AdminUser)
+	res, err := s.groupSvc.PatchGroupRoles(ctx, group.UUID, rolePatches)
+	c.Assert(err, gc.IsNil)
+	c.Assert(res, gc.Equals, true)
+
+	checkTuple := openfga.Tuple{
+		Object:   ofganames.ConvertTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
+		Relation: ofganames.AssigneeRelation,
+		Target:   ofganames.ConvertTag(role.ResourceTag()),
+	}
+	allowed, err := s.JIMM.OpenFGAClient.CheckRelation(ctx, checkTuple, false)
+	c.Assert(err, gc.IsNil)
+	c.Assert(allowed, gc.Equals, true)
+
+	// Remove the role from the group.
+	rolePatches[0].Op = resources.GroupRolesPatchItemOpRemove
+	ctx = rebac_handlers.ContextWithIdentity(ctx, s.AdminUser)
+	res, err = s.groupSvc.PatchGroupRoles(ctx, group.UUID, rolePatches)
+	c.Assert(err, gc.IsNil)
+	c.Assert(res, gc.Equals, true)
+
+	allowed, err = s.JIMM.OpenFGAClient.CheckRelation(ctx, checkTuple, false)
+	c.Assert(err, gc.IsNil)
+	c.Assert(allowed, gc.Equals, false)
+}
+
 func (s rebacAdminSuite) TestGetGroupEntitlementsIntegration(c *gc.C) {
 	ctx := context.Background()
 	group, err := s.JIMM.AddGroup(ctx, s.AdminUser, "test-group")

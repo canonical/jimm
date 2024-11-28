@@ -15,8 +15,11 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/common/pagination"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
+	jimmerr "github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jimm"
 	"github.com/canonical/jimm/v3/internal/jimmhttp/rebac_admin"
 	"github.com/canonical/jimm/v3/internal/openfga"
+	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest/mocks"
 	"github.com/canonical/jimm/v3/pkg/api/params"
@@ -235,6 +238,122 @@ func TestPatchGroupIdentities(t *testing.T) {
 
 	patchTuplesErr = errors.New("foo")
 	_, err = groupSvc.PatchGroupIdentities(ctx, newUUID.String(), operations)
+	c.Assert(err, qt.ErrorMatches, "foo")
+}
+
+func TestGetGroupRoles(t *testing.T) {
+	c := qt.New(t)
+	var listTuplesErr error
+	var getGroupErr error
+	var getRoleErr error
+	var continuationToken string
+
+	testTuple := openfga.Tuple{
+		Object:   &ofga.Entity{Kind: "group", ID: "foo", Relation: ofganames.MemberRelation},
+		Relation: ofganames.AssigneeRelation,
+		Target:   &ofga.Entity{Kind: "role", ID: "my-role"},
+	}
+	roleManager := mocks.RoleManager{
+		GetRoleByUUID_: func(ctx context.Context, user *openfga.User, uuid string) (*dbmodel.RoleEntry, error) {
+			return &dbmodel.RoleEntry{}, getRoleErr
+		},
+	}
+	jimm := jimmtest.JIMM{
+		GetRoleManager_: func() jimm.RoleManager {
+			return roleManager
+		},
+		GroupService: mocks.GroupService{
+			GetGroupByUUID_: func(ctx context.Context, user *openfga.User, uuid string) (*dbmodel.GroupEntry, error) {
+				return nil, getGroupErr
+			},
+		},
+		RelationService: mocks.RelationService{
+			ListRelationshipTuples_: func(ctx context.Context, user *openfga.User, tuple params.RelationshipTuple, pageSize int32, ct string) ([]openfga.Tuple, string, error) {
+				return []openfga.Tuple{testTuple}, continuationToken, listTuplesErr
+			},
+		},
+	}
+
+	user := openfga.User{}
+	ctx := context.Background()
+	ctx = rebac_handlers.ContextWithIdentity(ctx, &user)
+	groupSvc := rebac_admin.NewGroupService(&jimm)
+
+	_, err := groupSvc.GetGroupRoles(ctx, "invalid-group-id", &resources.GetGroupsItemRolesParams{})
+	c.Assert(err, qt.ErrorMatches, ".*invalid group ID")
+
+	newUUID := uuid.New()
+	getGroupErr = errors.New("group doesn't exist")
+	_, err = groupSvc.GetGroupRoles(ctx, newUUID.String(), &resources.GetGroupsItemRolesParams{})
+	c.Assert(err, qt.ErrorMatches, ".*group doesn't exist")
+	getGroupErr = nil
+
+	getRoleErr = jimmerr.E("role doesn't exist", jimmerr.CodeNotFound)
+	_, err = groupSvc.GetGroupRoles(ctx, newUUID.String(), &resources.GetGroupsItemRolesParams{})
+	c.Assert(err, qt.IsNil)
+	getRoleErr = nil
+
+	getRoleErr = errors.New("could not connect to DB")
+	_, err = groupSvc.GetGroupRoles(ctx, newUUID.String(), &resources.GetGroupsItemRolesParams{})
+	c.Assert(err, qt.ErrorMatches, ".*could not connect to DB")
+	getRoleErr = nil
+
+	continuationToken = "continuation-token"
+	res, err := groupSvc.GetGroupRoles(ctx, newUUID.String(), &resources.GetGroupsItemRolesParams{})
+	c.Assert(err, qt.IsNil)
+	c.Assert(res, qt.IsNotNil)
+	c.Assert(res.Data, qt.HasLen, 1)
+	c.Assert(*res.Next.PageToken, qt.Equals, "continuation-token")
+
+	continuationToken = ""
+	res, err = groupSvc.GetGroupRoles(ctx, newUUID.String(), &resources.GetGroupsItemRolesParams{})
+	c.Assert(err, qt.IsNil)
+	c.Assert(res, qt.IsNotNil)
+	c.Assert(res.Next.PageToken, qt.IsNil)
+
+	listTuplesErr = errors.New("foo")
+	_, err = groupSvc.GetGroupRoles(ctx, newUUID.String(), &resources.GetGroupsItemRolesParams{})
+	c.Assert(err, qt.ErrorMatches, "foo")
+}
+
+func TestPatchGroupRoles(t *testing.T) {
+	c := qt.New(t)
+	var patchTuplesErr error
+	jimm := jimmtest.JIMM{
+		RelationService: mocks.RelationService{
+			AddRelation_: func(ctx context.Context, user *openfga.User, tuples []params.RelationshipTuple) error {
+				return patchTuplesErr
+			},
+			RemoveRelation_: func(ctx context.Context, user *openfga.User, tuples []params.RelationshipTuple) error {
+				return patchTuplesErr
+			},
+		},
+	}
+	user := openfga.User{}
+	ctx := context.Background()
+	ctx = rebac_handlers.ContextWithIdentity(ctx, &user)
+	groupSvc := rebac_admin.NewGroupService(&jimm)
+
+	_, err := groupSvc.PatchGroupRoles(ctx, "invalid-group-id", nil)
+	c.Assert(err, qt.ErrorMatches, ".* invalid group ID")
+
+	newUUID := uuid.New()
+	operations := []resources.GroupRolesPatchItem{
+		{Role: uuid.NewString(), Op: resources.GroupRolesPatchItemOpAdd},
+		{Role: uuid.NewString(), Op: resources.GroupRolesPatchItemOpRemove},
+	}
+	res, err := groupSvc.PatchGroupRoles(ctx, newUUID.String(), operations)
+	c.Assert(err, qt.IsNil)
+	c.Assert(res, qt.IsTrue)
+
+	operationsWithInvalidIdentity := []resources.GroupRolesPatchItem{
+		{Role: "foo_", Op: resources.GroupRolesPatchItemOpAdd},
+	}
+	_, err = groupSvc.PatchGroupRoles(ctx, newUUID.String(), operationsWithInvalidIdentity)
+	c.Assert(err, qt.ErrorMatches, ".*invalid role ID.*")
+
+	patchTuplesErr = errors.New("foo")
+	_, err = groupSvc.PatchGroupRoles(ctx, newUUID.String(), operations)
 	c.Assert(err, qt.ErrorMatches, "foo")
 }
 

@@ -14,6 +14,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimmhttp/rebac_admin/utils"
 	"github.com/canonical/jimm/v3/internal/jujuapi"
+	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 	jimmnames "github.com/canonical/jimm/v3/pkg/names"
@@ -236,12 +237,116 @@ func (s *groupsService) PatchGroupIdentities(ctx context.Context, groupId string
 
 // GetGroupRoles returns a page of Roles for Group `groupId`.
 func (s *groupsService) GetGroupRoles(ctx context.Context, groupId string, params *resources.GetGroupsItemRolesParams) (*resources.PaginatedResponse[resources.Role], error) {
-	return nil, v1.NewNotImplementedError("get group roles not implemented")
+	user, err := utils.GetUserFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if !jimmnames.IsValidGroupId(groupId) {
+		return nil, v1.NewValidationError("invalid group ID")
+	}
+
+	filter := utils.CreateTokenPaginationFilter(params.Size, params.NextToken, params.NextPageToken)
+	groupTag := jimmnames.NewGroupTag(groupId)
+	_, err = s.jimm.GetGroupByUUID(ctx, user, groupId)
+	if err != nil {
+		if errors.ErrorCode(err) == errors.CodeNotFound {
+			return nil, v1.NewNotFoundError("group not found")
+		}
+		return nil, err
+	}
+
+	tuple := apiparams.RelationshipTuple{
+		Object:       ofganames.WithMemberRelation(groupTag),
+		Relation:     ofganames.AssigneeRelation.String(),
+		TargetObject: openfga.RoleType.String(),
+	}
+	roles, nextToken, err := s.jimm.ListRelationshipTuples(ctx, user, tuple, int32(filter.Limit()), filter.Token()) // #nosec G115 accept integer conversion
+	if err != nil {
+		return nil, err
+	}
+
+	data := make([]resources.Role, 0, len(roles))
+	for _, role := range roles {
+		roleUUID := role.Target.ID
+		roleEntry, err := s.jimm.GetRoleManager().GetRoleByUUID(ctx, user, roleUUID)
+		if err != nil {
+			// If a role does not exist in the database but a linger tuple exists, drop the role from the results.
+			if errors.ErrorCode(err) == errors.CodeNotFound {
+				continue
+			}
+			return nil, err
+		}
+		data = append(data, resources.Role{
+			Id:   &roleUUID,
+			Name: roleEntry.Name,
+		},
+		)
+	}
+
+	originalToken := filter.Token()
+	resp := resources.PaginatedResponse[resources.Role]{
+		Meta: resources.ResponseMeta{
+			Size:      len(data),
+			PageToken: &originalToken,
+		},
+		Data: data,
+	}
+	if nextToken != "" {
+		resp.Next = resources.Next{
+			PageToken: &nextToken,
+		}
+	}
+	return &resp, nil
 }
 
-// PatchGroupRoles performs addition or removal of a Role to/from a Group identified by `groupId`.
+// PatchGroupRoles performs addition or removal of a group to/from a role identified by `groupId`.
 func (s *groupsService) PatchGroupRoles(ctx context.Context, groupId string, rolePatches []resources.GroupRolesPatchItem) (bool, error) {
-	return false, v1.NewNotImplementedError("patch group roles not implemented")
+	user, err := utils.GetUserFromContext(ctx)
+	if err != nil {
+		return false, err
+	}
+	if !jimmnames.IsValidGroupId(groupId) {
+		return false, v1.NewValidationError("invalid group ID")
+	}
+
+	groupTag := jimmnames.NewGroupTag(groupId)
+	tuple := apiparams.RelationshipTuple{
+		Object:   ofganames.WithMemberRelation(groupTag),
+		Relation: ofganames.AssigneeRelation.String(),
+	}
+
+	var toRemove []apiparams.RelationshipTuple
+	var toAdd []apiparams.RelationshipTuple
+	for _, rolePatch := range rolePatches {
+		if !jimmnames.IsValidRoleId(rolePatch.Role) {
+			return false, v1.NewValidationError(fmt.Sprintf("invalid role ID: %s", rolePatch.Role))
+		}
+		role := jimmnames.NewRoleTag(rolePatch.Role)
+		if rolePatch.Op == resources.GroupRolesPatchItemOpAdd {
+			t := tuple
+			t.TargetObject = role.String()
+			toAdd = append(toAdd, t)
+		} else {
+			t := tuple
+			t.TargetObject = role.String()
+			toRemove = append(toRemove, t)
+		}
+	}
+
+	if toAdd != nil {
+		err := s.jimm.AddRelation(ctx, user, toAdd)
+		if err != nil {
+			return false, err
+		}
+	}
+	if toRemove != nil {
+		err := s.jimm.RemoveRelation(ctx, user, toRemove)
+		if err != nil {
+			return false, err
+		}
+	}
+	return true, nil
 }
 
 // GetGroupEntitlements returns a page of Entitlements for Group `groupId`.
