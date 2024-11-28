@@ -26,13 +26,13 @@ func TestEntitlements(t *testing.T) {
 	params.Filter = &match
 	entitlements, err = entitlementSvc.ListEntitlements(ctx, params)
 	c.Assert(err, qt.IsNil)
-	c.Assert(entitlements, qt.HasLen, 15)
+	c.Assert(entitlements, qt.HasLen, 20)
 
 	match = "cloud"
 	params.Filter = &match
 	entitlements, err = entitlementSvc.ListEntitlements(ctx, params)
 	c.Assert(err, qt.IsNil)
-	c.Assert(entitlements, qt.HasLen, 6)
+	c.Assert(entitlements, qt.HasLen, 8)
 
 	match = "#member"
 	params.Filter = &match

@@ -90,6 +90,28 @@ var capabilities = []resources.Capability{
 		},
 	},
 	{
+		Endpoint: "/groups/{id}/roles",
+		Methods: []resources.CapabilityMethods{
+			"GET",
+			"PATCH",
+		},
+	},
+	{
+		Endpoint: "/roles",
+		Methods: []resources.CapabilityMethods{
+			"GET",
+			"POST",
+		},
+	},
+	{
+		Endpoint: "/roles/{id}",
+		Methods: []resources.CapabilityMethods{
+			"GET",
+			"PUT",
+			"DELETE",
+		},
+	},
+	{
 		Endpoint: "/entitlements",
 		Methods: []resources.CapabilityMethods{
 			"GET",

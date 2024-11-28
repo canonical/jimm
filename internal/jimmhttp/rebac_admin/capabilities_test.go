@@ -46,7 +46,7 @@ func TestCapabilities(t *testing.T) {
 				defer resp.Body.Close()
 				// 404 is for not found endpoints and 501 is for "not implemented" endpoints in the rebac-admin-ui-handlers library
 				isNotFound := resp.StatusCode == 404 || resp.StatusCode == 501
-				c.Assert(isNotFound, qt.IsFalse)
+				c.Assert(isNotFound, qt.IsFalse, qt.Commentf("failed for url %s, method %s", url, m))
 			})
 
 		}

@@ -25,28 +25,35 @@ var entitlementsList = []resources.EntitlementSchema{
 	{Entitlement: "administrator", ReceiverType: "user", EntityType: ApplicationOffer},
 	{Entitlement: "administrator", ReceiverType: "user:*", EntityType: ApplicationOffer},
 	{Entitlement: "administrator", ReceiverType: "group#member", EntityType: ApplicationOffer},
+	{Entitlement: "administrator", ReceiverType: "role#assignee", EntityType: ApplicationOffer},
 	{Entitlement: "consumer", ReceiverType: "user", EntityType: ApplicationOffer},
 	{Entitlement: "consumer", ReceiverType: "user:*", EntityType: ApplicationOffer},
 	{Entitlement: "consumer", ReceiverType: "group#member", EntityType: ApplicationOffer},
+	{Entitlement: "consumer", ReceiverType: "role#assignee", EntityType: ApplicationOffer},
 	{Entitlement: "reader", ReceiverType: "user", EntityType: ApplicationOffer},
 	{Entitlement: "reader", ReceiverType: "user:*", EntityType: ApplicationOffer},
 	{Entitlement: "reader", ReceiverType: "group#member", EntityType: ApplicationOffer},
+	{Entitlement: "reader", ReceiverType: "role#assignee", EntityType: ApplicationOffer},
 
 	// cloud
 	{Entitlement: "administrator", ReceiverType: "user", EntityType: Cloud},
 	{Entitlement: "administrator", ReceiverType: "user:*", EntityType: Cloud},
 	{Entitlement: "administrator", ReceiverType: "group#member", EntityType: Cloud},
+	{Entitlement: "administrator", ReceiverType: "role#assignee", EntityType: Cloud},
 	{Entitlement: "can_addmodel", ReceiverType: "user", EntityType: Cloud},
 	{Entitlement: "can_addmodel", ReceiverType: "user:*", EntityType: Cloud},
 	{Entitlement: "can_addmodel", ReceiverType: "group#member", EntityType: Cloud},
+	{Entitlement: "can_addmodel", ReceiverType: "role#assignee", EntityType: Cloud},
 
 	// controller
 	{Entitlement: "administrator", ReceiverType: "user", EntityType: Controller},
 	{Entitlement: "administrator", ReceiverType: "user:*", EntityType: Controller},
 	{Entitlement: "administrator", ReceiverType: "group#member", EntityType: Controller},
+	{Entitlement: "administrator", ReceiverType: "role#assignee", EntityType: Controller},
 	{Entitlement: "audit_log_viewer", ReceiverType: "user", EntityType: Controller},
 	{Entitlement: "audit_log_viewer", ReceiverType: "user:*", EntityType: Controller},
 	{Entitlement: "audit_log_viewer", ReceiverType: "group#member", EntityType: Controller},
+	{Entitlement: "audit_log_viewer", ReceiverType: "role#assignee", EntityType: Controller},
 
 	// group
 	{Entitlement: "member", ReceiverType: "user", EntityType: Group},
@@ -57,17 +64,21 @@ var entitlementsList = []resources.EntitlementSchema{
 	{Entitlement: "administrator", ReceiverType: "user", EntityType: Model},
 	{Entitlement: "administrator", ReceiverType: "user:*", EntityType: Model},
 	{Entitlement: "administrator", ReceiverType: "group#member", EntityType: Model},
+	{Entitlement: "administrator", ReceiverType: "role#assignee", EntityType: Model},
 	{Entitlement: "reader", ReceiverType: "user", EntityType: Model},
 	{Entitlement: "reader", ReceiverType: "user:*", EntityType: Model},
 	{Entitlement: "reader", ReceiverType: "group#member", EntityType: Model},
+	{Entitlement: "reader", ReceiverType: "role#assignee", EntityType: Model},
 	{Entitlement: "writer", ReceiverType: "user", EntityType: Model},
 	{Entitlement: "writer", ReceiverType: "user:*", EntityType: Model},
 	{Entitlement: "writer", ReceiverType: "group#member", EntityType: Model},
+	{Entitlement: "writer", ReceiverType: "role#assignee", EntityType: Model},
 
 	// serviceaccount
 	{Entitlement: "administrator", ReceiverType: "user", EntityType: ServiceAccount},
 	{Entitlement: "administrator", ReceiverType: "user:*", EntityType: ServiceAccount},
 	{Entitlement: "administrator", ReceiverType: "group#member", EntityType: ServiceAccount},
+	{Entitlement: "administrator", ReceiverType: "role#assignee", EntityType: ServiceAccount},
 }
 
 // entitlementsService implements the `entitlementsService` interface from rebac-admin-ui-handlers library
