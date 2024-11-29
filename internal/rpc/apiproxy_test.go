@@ -70,7 +70,8 @@ func TestProxySocketsAdminFacade(t *testing.T) {
 		expectedClientResponse    *message
 		expectedControllerMessage *message
 		oauthAuthenticatorError   error
-		expectConnectTofail       bool
+		expectProxyError          bool
+		proxyErrorMessage         string
 	}{{
 		about: "login device call - client gets response with both user code and verification uri",
 		messageToSend: message{
@@ -232,11 +233,12 @@ func TestProxySocketsAdminFacade(t *testing.T) {
 		},
 		oauthAuthenticatorError: errors.E(errors.CodeUnauthorized),
 	}, {
-		about:               "connection to controller fails",
-		expectConnectTofail: true,
+		about:            "connection to controller fails",
+		expectProxyError: true,
 		expectedClientResponse: &message{
 			Error: "controller connection error",
 		},
+		proxyErrorMessage: "failed to connect to controller: controller connection error",
 	}}
 
 	for _, test := range tests {
@@ -257,7 +259,7 @@ func TestProxySocketsAdminFacade(t *testing.T) {
 				ConnClient: clientWebsocket,
 				TokenGen:   &mockTokenGenerator{},
 				ConnectController: func(ctx context.Context) (rpc.WebsocketConnectionWithMetadata, error) {
-					if test.expectConnectTofail {
+					if test.expectProxyError {
 						return rpc.WebsocketConnectionWithMetadata{}, goerr.New("controller connection error")
 					}
 					return rpc.WebsocketConnectionWithMetadata{
@@ -275,8 +277,8 @@ func TestProxySocketsAdminFacade(t *testing.T) {
 			go func() {
 				defer wg.Done()
 				err = rpc.ProxySockets(ctx, helpers)
-				if test.expectConnectTofail {
-					c.Assert(err, qt.ErrorMatches, "failed to connect to controller: controller connection error")
+				if test.expectProxyError {
+					c.Assert(err, qt.ErrorMatches, test.proxyErrorMessage)
 				} else {
 					c.Assert(err, qt.ErrorMatches, "Context cancelled")
 				}
@@ -300,7 +302,9 @@ func TestProxySocketsAdminFacade(t *testing.T) {
 					c.Fatal("timed out waiting for response")
 				}
 			}
-			cancelFunc()
+			if !test.expectProxyError {
+				cancelFunc()
+			}
 			wg.Wait()
 			t.Logf("completed test %s", t.Name())
 		})
