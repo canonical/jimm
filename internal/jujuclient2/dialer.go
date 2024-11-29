@@ -5,9 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"net"
 	"net/http"
-	"strconv"
 
 	"github.com/juju/juju/api"
 	"github.com/juju/juju/api/base"
@@ -15,7 +13,6 @@ import (
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 
-	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/jimmjwx"
 )
 
@@ -91,25 +88,32 @@ type JujuDialer struct {
 	JWTService *jimmjwx.JWTService
 }
 
+type DialParams struct {
+	CACertificate string
+	Addresses     []string
+	ControllerTag names.ControllerTag
+	ModelTag      names.ModelTag
+	Permissions   map[string]string
+}
+
 // TODO(ale8k): Don't pass a dbmodel.Controller, create params for this.
-func (jd *JujuDialer) Dial(ctl *dbmodel.Controller, modelTag names.ModelTag, requiredPermissions map[string]string) (api.Connection, error) {
+func (jd *JujuDialer) Dial(opts DialParams) (api.Connection, error) {
 	cfg := connector.SimpleConfig{}
-	if ctl.PublicAddress != "" {
-		cfg.ControllerAddresses = []string{ctl.PublicAddress}
-	} else {
-		for _, hps := range ctl.Addresses {
-			for _, hp := range hps {
-				cfg.ControllerAddresses = append(cfg.ControllerAddresses, net.JoinHostPort(hp.Value, strconv.Itoa(hp.Port)))
-			}
-		}
+	// if opts.ctl != "" {
+	// 	cfg.ControllerAddresses = []string{ctl.PublicAddress}
+	// } else {
+	// 	for _, hps := range ctl.Addresses {
+	// 		for _, hp := range hps {
+	// 			cfg.ControllerAddresses = append(cfg.ControllerAddresses, net.JoinHostPort(hp.Value, strconv.Itoa(hp.Port)))
+	// 		}
+	// 	}
+	// }
+	cfg.ControllerAddresses = opts.Addresses
+	cfg.CACert = opts.CACertificate
+	if opts.ModelTag.Id() != "" {
+		cfg.ModelUUID = opts.ModelTag.Id()
 	}
 
-	if ctl.CACertificate != "" {
-		cfg.CACert = ctl.CACertificate
-	}
-	if modelTag.Id() != "" {
-		cfg.ModelUUID = modelTag.Id()
-	}
 	// TODO(ale8k):
 	// Required for now as the simple config checks for user/clientid
 	// Perhaps have a separate validation method that is run after creation
@@ -118,9 +122,9 @@ func (jd *JujuDialer) Dial(ctl *dbmodel.Controller, modelTag names.ModelTag, req
 
 	loginProvider := &JWTLoginProvider{
 		JWTService:    jd.JWTService,
-		ControllerTag: ctl.ResourceTag(),
-		ModelTag:      modelTag,
-		Permissions:   requiredPermissions,
+		ControllerTag: opts.ControllerTag,
+		ModelTag:      opts.ModelTag,
+		Permissions:   opts.Permissions,
 	}
 	connector, err := connector.NewSimple(
 		cfg,

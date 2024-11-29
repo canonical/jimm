@@ -8,7 +8,6 @@ import (
 	"github.com/juju/names/v5"
 	gc "gopkg.in/check.v1"
 
-	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
 
@@ -18,13 +17,12 @@ type cacheDialerSuite struct {
 
 var _ = gc.Suite(&cacheDialerSuite{})
 
-func (s *cacheDialerSuite) getControllerToDial(c *gc.C) *dbmodel.Controller {
+func (s *cacheDialerSuite) getDialParams(c *gc.C) DialParams {
 	info := s.APIInfo(c)
-	return &dbmodel.Controller{
-		UUID:          info.ControllerUUID,
-		Name:          s.ControllerConfig.ControllerName(),
+	return DialParams{
+		ControllerTag: names.NewControllerTag(info.ControllerUUID),
+		Addresses:     info.Addrs,
 		CACertificate: info.CACert,
-		PublicAddress: info.Addrs[0],
 	}
 }
 
@@ -33,14 +31,14 @@ func (s *cacheDialerSuite) TestCacheDialer(c *gc.C) {
 		JWTService: s.JIMM.JWTService,
 	}, time.Millisecond*500)
 
-	ctl := s.getControllerToDial(c)
+	p := s.getDialParams(c)
 
 	// Dial controller
-	conn, err := dialer.Dial(ctl, names.ModelTag{}, nil)
+	conn, err := dialer.Dial(p)
 	c.Assert(err, gc.IsNil)
 
 	// Check conn is cached
-	cachedConn, ok := dialer.conns[ctl.UUID]
+	cachedConn, ok := dialer.conns[p.ControllerTag.Id()]
 	c.Assert(ok, gc.Equals, true)
 	c.Assert(conn, gc.DeepEquals, cachedConn)
 
@@ -50,7 +48,7 @@ func (s *cacheDialerSuite) TestCacheDialer(c *gc.C) {
 	c.Assert(connAddr, gc.Equals, cachedConnAddr)
 
 	// Dial again and check cache is used
-	conn2, err := dialer.Dial(ctl, names.ModelTag{}, nil)
+	conn2, err := dialer.Dial(p)
 	c.Assert(err, gc.IsNil)
 
 	// Address check
@@ -61,12 +59,12 @@ func (s *cacheDialerSuite) TestCacheDialer(c *gc.C) {
 	// Sleep double the cleanup to ensure it is cleaned up.
 	time.Sleep(time.Second * 1)
 
-	_, ok = dialer.conns[ctl.UUID]
+	_, ok = dialer.conns[p.ControllerTag.Id()]
 	c.Assert(ok, gc.Equals, false)
 
 	// Dial a final time, and address should be different as it's a new conn
 	// instance
-	conn3, err := dialer.Dial(ctl, names.ModelTag{}, nil)
+	conn3, err := dialer.Dial(p)
 	c.Assert(err, gc.IsNil)
 	defer conn3.Close()
 

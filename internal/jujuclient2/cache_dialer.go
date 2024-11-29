@@ -6,10 +6,7 @@ import (
 	"time"
 
 	"github.com/juju/juju/api"
-	"github.com/juju/names/v5"
 	"golang.org/x/sync/singleflight"
-
-	"github.com/canonical/jimm/v3/internal/dbmodel"
 )
 
 // cacheJujuDialer caches connections and if one is broken, attempts to re-establish it.
@@ -58,12 +55,12 @@ func NewCacheDialer(d JujuDialer, cleanupInterval time.Duration) *cacheJujuDiale
 //
 // It uses a mux for:
 //   - Mux to protect the map (there are libs for this though, perhaps use one of those)
-func (cjd *cacheJujuDialer) Dial(ctl *dbmodel.Controller, modelTag names.ModelTag, requiredPermissions map[string]string) (api.Connection, error) {
-	if modelTag.Id() != "" {
-		return cjd.dialer.Dial(ctl, modelTag, requiredPermissions)
+func (cjd *cacheJujuDialer) Dial(p DialParams) (api.Connection, error) {
+	if p.ModelTag.Id() != "" {
+		return cjd.dialer.Dial(p)
 	}
 
-	ctlUuid := ctl.ResourceTag().Id()
+	ctlUuid := p.ControllerTag.Id()
 
 	v, err, _ := cjd.sf.Do(ctlUuid, func() (any, error) {
 		cjd.mu.Lock()
@@ -74,7 +71,7 @@ func (cjd *cacheJujuDialer) Dial(ctl *dbmodel.Controller, modelTag names.ModelTa
 			return conn, nil
 		}
 
-		conn, err := cjd.dialer.Dial(ctl, modelTag, requiredPermissions)
+		conn, err := cjd.dialer.Dial(p)
 		if err != nil {
 			return nil, err
 		}

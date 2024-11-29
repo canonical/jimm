@@ -15,7 +15,7 @@ import (
 	reflect "reflect"
 	time "time"
 
-	dbmodel "github.com/canonical/jimm/v3/internal/dbmodel"
+	jujuclient2 "github.com/canonical/jimm/v3/internal/jujuclient2"
 	api "github.com/juju/juju/api"
 	base "github.com/juju/juju/api/base"
 	client "github.com/juju/juju/api/client/client"
@@ -949,16 +949,16 @@ func (m *MockDialer) EXPECT() *MockDialerMockRecorder {
 }
 
 // Dial mocks base method.
-func (m *MockDialer) Dial(ctl *dbmodel.Controller, modelTag names.ModelTag, requiredPermissions map[string]string) (api.Connection, error) {
+func (m *MockDialer) Dial(arg0 jujuclient2.DialParams) (api.Connection, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Dial", ctl, modelTag, requiredPermissions)
+	ret := m.ctrl.Call(m, "Dial", arg0)
 	ret0, _ := ret[0].(api.Connection)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Dial indicates an expected call of Dial.
-func (mr *MockDialerMockRecorder) Dial(ctl, modelTag, requiredPermissions any) *gomock.Call {
+func (mr *MockDialerMockRecorder) Dial(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Dial", reflect.TypeOf((*MockDialer)(nil).Dial), ctl, modelTag, requiredPermissions)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Dial", reflect.TypeOf((*MockDialer)(nil).Dial), arg0)
 }

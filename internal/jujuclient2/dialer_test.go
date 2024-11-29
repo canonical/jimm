@@ -8,7 +8,6 @@ import (
 	"github.com/juju/names/v5"
 	gc "gopkg.in/check.v1"
 
-	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/jujuclient2"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
@@ -23,13 +22,12 @@ func TestPackage(t *testing.T) {
 	jujutesting.MgoTestPackage(t)
 }
 
-func (s *jujuDialerSuite) getControllerToDial(c *gc.C) *dbmodel.Controller {
+func (s *jujuDialerSuite) getDialParams(c *gc.C) jujuclient2.DialParams {
 	info := s.APIInfo(c)
-	return &dbmodel.Controller{
-		UUID:          info.ControllerUUID,
-		Name:          s.ControllerConfig.ControllerName(),
+	return jujuclient2.DialParams{
+		ControllerTag: names.NewControllerTag(info.ControllerUUID),
+		Addresses:     info.Addrs,
 		CACertificate: info.CACert,
-		PublicAddress: info.Addrs[0],
 	}
 }
 
@@ -38,9 +36,9 @@ func (s *jujuDialerSuite) TestJujuDialer(c *gc.C) {
 		JWTService: s.JIMM.JWTService,
 	}
 
-	ctl := s.getControllerToDial(c)
+	p := s.getDialParams(c)
 
-	conn, err := dialer.Dial(ctl, names.ModelTag{}, nil)
+	conn, err := dialer.Dial(p)
 	c.Assert(err, gc.IsNil)
 	defer conn.Close()
 }
