@@ -1,5 +1,5 @@
 // Copyright 2024 Canonical.
-package jujuclient2
+package jujuclient2_test
 
 import (
 	"time"
@@ -8,6 +8,7 @@ import (
 	"github.com/juju/names/v5"
 	gc "gopkg.in/check.v1"
 
+	"github.com/canonical/jimm/v3/internal/jujuclient2"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
 
@@ -17,9 +18,9 @@ type cacheDialerSuite struct {
 
 var _ = gc.Suite(&cacheDialerSuite{})
 
-func (s *cacheDialerSuite) getDialParams(c *gc.C) DialParams {
+func (s *cacheDialerSuite) getDialParams(c *gc.C) jujuclient2.DialParams {
 	info := s.APIInfo(c)
-	return DialParams{
+	return jujuclient2.DialParams{
 		ControllerTag: names.NewControllerTag(info.ControllerUUID),
 		Addresses:     info.Addrs,
 		CACertificate: info.CACert,
@@ -27,7 +28,7 @@ func (s *cacheDialerSuite) getDialParams(c *gc.C) DialParams {
 }
 
 func (s *cacheDialerSuite) TestCacheDialer(c *gc.C) {
-	dialer := NewCacheDialer(JujuDialer{
+	dialer := jujuclient2.NewCacheDialer(jujuclient2.JujuDialer{
 		JWTService: s.JIMM.JWTService,
 	}, time.Millisecond*500)
 
@@ -38,7 +39,7 @@ func (s *cacheDialerSuite) TestCacheDialer(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	// Check conn is cached
-	cachedConn, ok := dialer.conns[p.ControllerTag.Id()]
+	cachedConn, ok := dialer.Conns[p.ControllerTag.Id()]
 	c.Assert(ok, gc.Equals, true)
 	c.Assert(conn, gc.DeepEquals, cachedConn)
 
@@ -59,7 +60,7 @@ func (s *cacheDialerSuite) TestCacheDialer(c *gc.C) {
 	// Sleep double the cleanup to ensure it is cleaned up.
 	time.Sleep(time.Second * 1)
 
-	_, ok = dialer.conns[p.ControllerTag.Id()]
+	_, ok = dialer.Conns[p.ControllerTag.Id()]
 	c.Assert(ok, gc.Equals, false)
 
 	// Dial a final time, and address should be different as it's a new conn

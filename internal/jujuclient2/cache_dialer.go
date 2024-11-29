@@ -21,9 +21,9 @@ type cacheJujuDialer struct {
 	// sf to handle duplicates when attempting to insert a connection for the same controller.
 	sf singleflight.Group
 
-	// conns stores the connections.
+	// Conns stores the connections.
 	// TODO(ale8k): Use sync.Map and delete mux.
-	conns map[string]api.Connection
+	Conns map[string]api.Connection
 
 	// cleanupIntervalTicker cleans up broken connections in the cache.
 	cleanupIntervalTicker *time.Ticker
@@ -38,7 +38,7 @@ func NewCacheDialer(d JujuDialer, cleanupInterval time.Duration) *cacheJujuDiale
 	cjd := &cacheJujuDialer{
 		dialer:                d,
 		cleanupIntervalTicker: time.NewTicker(cleanupInterval),
-		conns:                 make(map[string]api.Connection),
+		Conns:                 make(map[string]api.Connection),
 	}
 	go cjd.cleanupConnections()
 	return cjd
@@ -64,7 +64,7 @@ func (cjd *cacheJujuDialer) Dial(p DialParams) (api.Connection, error) {
 
 	v, err, _ := cjd.sf.Do(ctlUuid, func() (any, error) {
 		cjd.mu.Lock()
-		conn, exists := cjd.conns[ctlUuid]
+		conn, exists := cjd.Conns[ctlUuid]
 		cjd.mu.Unlock()
 
 		if exists && !conn.IsBroken() {
@@ -77,7 +77,7 @@ func (cjd *cacheJujuDialer) Dial(p DialParams) (api.Connection, error) {
 		}
 
 		cjd.mu.Lock()
-		cjd.conns[ctlUuid] = conn
+		cjd.Conns[ctlUuid] = conn
 		cjd.mu.Unlock()
 
 		return conn, nil
@@ -98,11 +98,11 @@ func (cjd *cacheJujuDialer) Dial(p DialParams) (api.Connection, error) {
 func (cd *cacheJujuDialer) cleanupConnections() {
 	for range cd.cleanupIntervalTicker.C {
 		cd.mu.Lock()
-		for key, conn := range cd.conns {
+		for key, conn := range cd.Conns {
 			if conn.IsBroken() {
 				conn.Close() // TODO(ale8k): Do we need this?
 				cd.sf.Forget(conn.ControllerTag().Id())
-				delete(cd.conns, key)
+				delete(cd.Conns, key)
 			}
 		}
 		cd.mu.Unlock()

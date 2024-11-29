@@ -50,7 +50,7 @@ func TestJujuClientOptionCorrectlyMocks(t *testing.T) {
 		ChangeModelCredential(gomock.Any(), gomock.Any()).
 		Return(errors.New("mocked client"))
 
-	jjc := jujuclient2.NewJujuClient(
+	jjc := jujuclient2.NewJujuClientFactory(
 		mockDialer,
 		jujuclient2.WithNewModelManager(mockMmc),
 	)
