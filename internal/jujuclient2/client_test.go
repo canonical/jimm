@@ -13,6 +13,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/jujuclient2/mocks"
 )
 
+// Attempt 1
 type jimm struct {
 	ModelManagerFactory jujuclient2.ModelManagerClientFactoryFunc
 }
@@ -36,6 +37,7 @@ func TestModelManagerGetterFunc(t *testing.T) {
 	mmc.ChangeModelCredential(names.ModelTag{}, names.CloudCredentialTag{})
 }
 
+// Attempt 2
 func TestJujuClientOptionCorrectlyMocks(t *testing.T) {
 	c := qt.New(t)
 	ctl := gomock.NewController(c)

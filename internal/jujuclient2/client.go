@@ -3,6 +3,7 @@ package jujuclient2
 
 import (
 	"github.com/juju/juju/api"
+	"github.com/juju/juju/api/client/applicationoffers"
 	"github.com/juju/juju/api/client/modelmanager"
 )
 
@@ -65,4 +66,32 @@ func (c *clientFactory) ModelManager(p DialParams) (ModelManagerClient, error) {
 	}
 
 	return c.newModelManager(conn), nil
+}
+
+type modelmanagerClient = modelmanager.Client
+type applicationoffersClient = applicationoffers.Client
+
+// attempt 3 (flatten all clients together)
+
+type ClientFactory struct {
+	d cacheJujuDialer
+}
+
+func (c *ClientFactory) Connect(params DialParams) (*JClient, error) {
+	conn, err := c.d.Dial(params)
+	if err != nil {
+		return nil, err
+	}
+
+	j := JClient{
+		*modelmanager.NewClient(conn),
+		*applicationoffers.NewClient(conn),
+	}
+
+	return &j, nil
+}
+
+type JClient struct {
+	modelmanagerClient
+	applicationoffersClient
 }
