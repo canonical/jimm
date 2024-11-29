@@ -14,7 +14,6 @@ import (
 	"github.com/canonical/jimm/v3/internal/common/pagination"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/internal/openfga"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
@@ -25,16 +24,6 @@ const (
 	jimmControllerName = "jimm"
 )
 
-type GroupService interface {
-	AddGroup(ctx context.Context, user *openfga.User, name string) (*dbmodel.GroupEntry, error)
-	CountGroups(ctx context.Context, user *openfga.User) (int, error)
-	GetGroupByUUID(ctx context.Context, user *openfga.User, uuid string) (*dbmodel.GroupEntry, error)
-	GetGroupByName(ctx context.Context, user *openfga.User, name string) (*dbmodel.GroupEntry, error)
-	ListGroups(ctx context.Context, user *openfga.User, pagination pagination.LimitOffsetPagination, match string) ([]dbmodel.GroupEntry, error)
-	RenameGroup(ctx context.Context, user *openfga.User, oldName, newName string) error
-	RemoveGroup(ctx context.Context, user *openfga.User, name string) error
-}
-
 // AddGroup creates a group within JIMMs DB for reference by OpenFGA.
 func (r *controllerRoot) AddGroup(ctx context.Context, req apiparams.AddGroupRequest) (apiparams.AddGroupResponse, error) {
 	const op = errors.Op("jujuapi.AddGroup")
@@ -44,7 +33,7 @@ func (r *controllerRoot) AddGroup(ctx context.Context, req apiparams.AddGroupReq
 		return resp, errors.E(op, errors.CodeBadRequest, "invalid group name")
 	}
 
-	groupEntry, err := r.jimm.AddGroup(ctx, r.user, req.Name)
+	groupEntry, err := r.jimm.GetGroupManager().AddGroup(ctx, r.user, req.Name)
 	if err != nil {
 		zapctx.Error(ctx, "failed to add group", zaputil.Error(err))
 		return resp, errors.E(op, err)
@@ -69,9 +58,9 @@ func (r *controllerRoot) GetGroup(ctx context.Context, req apiparams.GetGroupReq
 	case req.UUID != "" && req.Name != "":
 		return apiparams.Group{}, errors.E(op, errors.CodeBadRequest, "only one of UUID or Name should be provided")
 	case req.UUID != "":
-		groupEntry, err = r.jimm.GetGroupByUUID(ctx, r.user, req.UUID)
+		groupEntry, err = r.jimm.GetGroupManager().GetGroupByUUID(ctx, r.user, req.UUID)
 	case req.Name != "":
-		groupEntry, err = r.jimm.GetGroupByName(ctx, r.user, req.Name)
+		groupEntry, err = r.jimm.GetGroupManager().GetGroupByName(ctx, r.user, req.Name)
 	default:
 		return apiparams.Group{}, errors.E(op, errors.CodeBadRequest, "no UUID or Name provided")
 	}
@@ -96,7 +85,7 @@ func (r *controllerRoot) RenameGroup(ctx context.Context, req apiparams.RenameGr
 		return errors.E(op, errors.CodeBadRequest, "invalid group name")
 	}
 
-	if err := r.jimm.RenameGroup(ctx, r.user, req.Name, req.NewName); err != nil {
+	if err := r.jimm.GetGroupManager().RenameGroup(ctx, r.user, req.Name, req.NewName); err != nil {
 		zapctx.Error(ctx, "failed to rename group", zaputil.Error(err))
 		return errors.E(op, err)
 	}
@@ -107,7 +96,7 @@ func (r *controllerRoot) RenameGroup(ctx context.Context, req apiparams.RenameGr
 func (r *controllerRoot) RemoveGroup(ctx context.Context, req apiparams.RemoveGroupRequest) error {
 	const op = errors.Op("jujuapi.RemoveGroup")
 
-	if err := r.jimm.RemoveGroup(ctx, r.user, req.Name); err != nil {
+	if err := r.jimm.GetGroupManager().RemoveGroup(ctx, r.user, req.Name); err != nil {
 		zapctx.Error(ctx, "failed to remove group", zaputil.Error(err))
 		return errors.E(op, err)
 	}
@@ -119,7 +108,7 @@ func (r *controllerRoot) ListGroups(ctx context.Context, req apiparams.ListGroup
 	const op = errors.Op("jujuapi.ListGroups")
 
 	pagination := pagination.NewOffsetFilter(req.Limit, req.Offset)
-	groups, err := r.jimm.ListGroups(ctx, r.user, pagination, "")
+	groups, err := r.jimm.GetGroupManager().ListGroups(ctx, r.user, pagination, "")
 	if err != nil {
 		return apiparams.ListGroupResponse{}, errors.E(op, err)
 	}

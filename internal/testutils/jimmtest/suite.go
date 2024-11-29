@@ -270,7 +270,7 @@ func (s *JIMMSuite) AddModel(c *gc.C, owner names.UserTag, name string, cloud na
 
 func (s *JIMMSuite) AddGroup(c *gc.C, groupName string) dbmodel.GroupEntry {
 	ctx := context.Background()
-	group, err := s.JIMM.AddGroup(ctx, s.AdminUser, groupName)
+	group, err := s.JIMM.GroupManager.AddGroup(ctx, s.AdminUser, groupName)
 	c.Assert(err, gc.Equals, nil)
 	return *group
 }

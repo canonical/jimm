@@ -34,7 +34,7 @@ func TestGetResources(t *testing.T) {
 
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
-	_, _, controller, model, applicationOffer, cloud, _, _ := createTestControllerEnvironment(ctx, c, j.Database)
+	_, _, controller, model, applicationOffer, cloud, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, j.Database)
 
 	ids := []string{applicationOffer.UUID, cloud.Name, controller.UUID, model.UUID.String}
 

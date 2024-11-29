@@ -37,7 +37,7 @@ func TestFetchIdentity(t *testing.T) {
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
-	user, _, _, _, _, _, _, _ := createTestControllerEnvironment(ctx, c, j.Database)
+	user, _, _, _, _, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, j.Database)
 	u, err := j.FetchIdentity(ctx, user.Name)
 	c.Assert(err, qt.IsNil)
 	c.Assert(u.Name, qt.Equals, user.Name)

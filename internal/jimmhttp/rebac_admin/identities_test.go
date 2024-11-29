@@ -152,6 +152,11 @@ func TestGetIdentityGroups(t *testing.T) {
 		Relation: ofga.Relation("member"),
 		Target:   &ofga.Entity{Kind: "group", ID: "my-group-id"},
 	}
+	groupService := mocks.GroupService{
+		GetGroupByUUID_: func(ctx context.Context, user *openfga.User, uuid string) (*dbmodel.GroupEntry, error) {
+			return &dbmodel.GroupEntry{Name: "fake-group-name"}, nil
+		},
+	}
 	jimm := jimmtest.JIMM{
 		FetchIdentity_: func(ctx context.Context, username string) (*openfga.User, error) {
 			if username == "bob@canonical.com" {
@@ -164,10 +169,8 @@ func TestGetIdentityGroups(t *testing.T) {
 				return []openfga.Tuple{testTuple}, "continuation-token", listTuplesErr
 			},
 		},
-		GroupService: mocks.GroupService{
-			GetGroupByUUID_: func(ctx context.Context, user *openfga.User, uuid string) (*dbmodel.GroupEntry, error) {
-				return &dbmodel.GroupEntry{Name: "fake-group-name"}, nil
-			},
+		GetGroupManager_: func() jimm.GroupManager {
+			return &groupService
 		},
 	}
 	user := openfga.User{}

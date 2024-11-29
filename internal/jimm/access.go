@@ -17,7 +17,6 @@ import (
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
-	"github.com/canonical/jimm/v3/internal/common/pagination"
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
@@ -716,122 +715,6 @@ func (j *JIMM) parseAndValidateTag(ctx context.Context, key string) (*ofganames.
 	zapctx.Debug(ctx, "resolved JIMM tag", zap.String("tag", tag.String()))
 
 	return tag, nil
-}
-
-// AddGroup creates a group within JIMMs DB for reference by OpenFGA.
-func (j *JIMM) AddGroup(ctx context.Context, user *openfga.User, name string) (*dbmodel.GroupEntry, error) {
-	const op = errors.Op("jimm.AddGroup")
-
-	if !user.JimmAdmin {
-		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
-	}
-
-	ge, err := j.Database.AddGroup(ctx, name)
-	if err != nil {
-		return nil, errors.E(op, err)
-	}
-	return ge, nil
-}
-
-// CountGroups returns the number of groups that exist.
-func (j *JIMM) CountGroups(ctx context.Context, user *openfga.User) (int, error) {
-	const op = errors.Op("jimm.CountGroups")
-
-	if !user.JimmAdmin {
-		return 0, errors.E(op, errors.CodeUnauthorized, "unauthorized")
-	}
-	count, err := j.Database.CountGroups(ctx)
-	if err != nil {
-		return 0, errors.E(op, err)
-	}
-	return count, nil
-}
-
-// getGroup returns a group based on the provided UUID or name.
-func (j *JIMM) getGroup(ctx context.Context, user *openfga.User, group *dbmodel.GroupEntry) (*dbmodel.GroupEntry, error) {
-	const op = errors.Op("jimm.getGroup")
-
-	if !user.JimmAdmin {
-		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
-	}
-	if err := j.Database.GetGroup(ctx, group); err != nil {
-		return nil, errors.E(op, err)
-	}
-	return group, nil
-}
-
-// GetGroupByUUID returns a group based on the provided UUID.
-func (j *JIMM) GetGroupByUUID(ctx context.Context, user *openfga.User, uuid string) (*dbmodel.GroupEntry, error) {
-	return j.getGroup(ctx, user, &dbmodel.GroupEntry{UUID: uuid})
-}
-
-// GetGroupByName returns a group based on the provided name.
-func (j *JIMM) GetGroupByName(ctx context.Context, user *openfga.User, name string) (*dbmodel.GroupEntry, error) {
-	return j.getGroup(ctx, user, &dbmodel.GroupEntry{Name: name})
-}
-
-// RenameGroup renames a group in JIMM's DB.
-func (j *JIMM) RenameGroup(ctx context.Context, user *openfga.User, oldName, newName string) error {
-	const op = errors.Op("jimm.RenameGroup")
-
-	if !user.JimmAdmin {
-		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
-	}
-
-	group := &dbmodel.GroupEntry{
-		Name: oldName,
-	}
-	err := j.Database.GetGroup(ctx, group)
-	if err != nil {
-		return errors.E(op, err)
-	}
-
-	if err := j.Database.UpdateGroupName(ctx, group.UUID, newName); err != nil {
-		return errors.E(op, err)
-	}
-	return nil
-}
-
-// RemoveGroup removes a group within JIMMs DB for reference by OpenFGA.
-func (j *JIMM) RemoveGroup(ctx context.Context, user *openfga.User, name string) error {
-	const op = errors.Op("jimm.RemoveGroup")
-
-	if !user.JimmAdmin {
-		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
-	}
-
-	group := &dbmodel.GroupEntry{
-		Name: name,
-	}
-	err := j.Database.GetGroup(ctx, group)
-	if err != nil {
-		return errors.E(op, err)
-	}
-	err = j.OpenFGAClient.RemoveGroup(ctx, group.ResourceTag())
-	if err != nil {
-		return errors.E(op, err)
-	}
-
-	if err := j.Database.RemoveGroup(ctx, group); err != nil {
-		return errors.E(op, err)
-	}
-	return nil
-}
-
-// ListGroups returns a list of groups known to JIMM.
-// `match` will filter the list fuzzy matching group's name or uuid.
-func (j *JIMM) ListGroups(ctx context.Context, user *openfga.User, pagination pagination.LimitOffsetPagination, match string) ([]dbmodel.GroupEntry, error) {
-	const op = errors.Op("jimm.ListGroups")
-
-	if !user.JimmAdmin {
-		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
-	}
-
-	groups, err := j.Database.ListGroups(ctx, pagination.Limit(), pagination.Offset(), match)
-	if err != nil {
-		return nil, errors.E(op, err)
-	}
-	return groups, nil
 }
 
 // OpenFGACleanup queries OpenFGA for all existing tuples, tries to resolve each tuple and removes those

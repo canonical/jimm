@@ -4,9 +4,7 @@ package jimm_test
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
-	"sort"
 	"testing"
 	"time"
 
@@ -14,11 +12,8 @@ import (
 	petname "github.com/dustinkirkland/golang-petname"
 	qt "github.com/frankban/quicktest"
 	"github.com/google/uuid"
-	"github.com/juju/juju/core/crossmodel"
-	"github.com/juju/juju/state"
 	"github.com/juju/names/v5"
 
-	"github.com/canonical/jimm/v3/internal/common/pagination"
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
@@ -448,7 +443,7 @@ func TestParseAndValidateTag(t *testing.T) {
 	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
-	user, _, _, model, _, _, _, _ := createTestControllerEnvironment(ctx, c, j.Database)
+	user, _, _, model, _, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, j.Database)
 
 	jimmTag := "model-" + user.Name + "/" + model.Name + "#administrator"
 
@@ -495,7 +490,7 @@ func TestResolveTags(t *testing.T) {
 	err := j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
-	identity, group, controller, model, offer, cloud, _, role := createTestControllerEnvironment(ctx, c, j.Database)
+	identity, group, controller, model, offer, cloud, _, role := jimmtest.CreateTestControllerEnvironment(ctx, c, j.Database)
 
 	testCases := []struct {
 		desc     string
@@ -583,7 +578,7 @@ func TestResolveTupleObjectHandlesErrors(t *testing.T) {
 	err := j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
-	_, _, controller, model, offer, _, _, _ := createTestControllerEnvironment(ctx, c, j.Database)
+	_, _, controller, model, offer, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, j.Database)
 
 	type test struct {
 		input string
@@ -653,7 +648,7 @@ func TestToJAASTag(t *testing.T) {
 	err := j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
-	user, group, controller, model, applicationOffer, cloud, _, role := createTestControllerEnvironment(ctx, c, j.Database)
+	user, group, controller, model, applicationOffer, cloud, _, role := jimmtest.CreateTestControllerEnvironment(ctx, c, j.Database)
 
 	serviceAccountId := petname.Generate(2, "-") + "@serviceaccount"
 
@@ -715,7 +710,7 @@ func TestToJAASTagNoUUIDResolution(t *testing.T) {
 	err := j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
-	user, group, controller, model, applicationOffer, cloud, _, role := createTestControllerEnvironment(ctx, c, j.Database)
+	user, group, controller, model, applicationOffer, cloud, _, role := jimmtest.CreateTestControllerEnvironment(ctx, c, j.Database)
 	serviceAccountId := petname.Generate(2, "-") + "@serviceaccount"
 
 	tests := []struct {
@@ -759,491 +754,6 @@ func TestToJAASTagNoUUIDResolution(t *testing.T) {
 			c.Assert(t, qt.Equals, test.expectedJAASTag)
 		}
 	}
-}
-
-// createTestControllerEnvironment is a utility function creating the necessary components of adding a:
-//   - user
-//   - user group
-//   - controller
-//   - model
-//   - application offer
-//   - cloud
-//   - cloud credential
-//   - role
-//
-// Into the test database, returning the dbmodels to be utilised for values within tests.
-//
-// It returns all of the latter, but in addition to those, also:
-//   - an api client to make calls to an httptest instance of the server
-//   - a closure containing a function to close the connection
-//
-// TODO(ale8k): Make this an implicit thing on the JIMM suite per test & refactor the current state.
-// and make the suite argument an interface of the required calls we use here.
-func createTestControllerEnvironment(ctx context.Context, c *qt.C, db db.Database) (
-	dbmodel.Identity,
-	dbmodel.GroupEntry,
-	dbmodel.Controller,
-	dbmodel.Model,
-	dbmodel.ApplicationOffer,
-	dbmodel.Cloud,
-	dbmodel.CloudCredential,
-	dbmodel.RoleEntry) {
-
-	_, err := db.AddGroup(ctx, "test-group")
-	c.Assert(err, qt.IsNil)
-	group := dbmodel.GroupEntry{Name: "test-group"}
-	err = db.GetGroup(ctx, &group)
-	c.Assert(err, qt.IsNil)
-
-	u, err := dbmodel.NewIdentity(petname.Generate(2, "-"+"canonical.com"))
-	c.Assert(err, qt.IsNil)
-
-	c.Assert(db.DB.Create(u).Error, qt.IsNil)
-
-	cloud := dbmodel.Cloud{
-		Name: petname.Generate(2, "-"),
-		Type: "aws",
-		Regions: []dbmodel.CloudRegion{{
-			Name: petname.Generate(2, "-"),
-		}},
-	}
-	c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
-	id, _ := uuid.NewRandom()
-	controller := dbmodel.Controller{
-		Name:        petname.Generate(2, "-"),
-		UUID:        id.String(),
-		CloudName:   cloud.Name,
-		CloudRegion: cloud.Regions[0].Name,
-		CloudRegions: []dbmodel.CloudRegionControllerPriority{{
-			Priority:      0,
-			CloudRegionID: cloud.Regions[0].ID,
-		}},
-	}
-	err = db.AddController(ctx, &controller)
-	c.Assert(err, qt.IsNil)
-
-	cred := dbmodel.CloudCredential{
-		Name:              petname.Generate(2, "-"),
-		CloudName:         cloud.Name,
-		OwnerIdentityName: u.Name,
-		AuthType:          "empty",
-	}
-	err = db.SetCloudCredential(ctx, &cred)
-	c.Assert(err, qt.IsNil)
-
-	model := dbmodel.Model{
-		Name: petname.Generate(2, "-"),
-		UUID: sql.NullString{
-			String: id.String(),
-			Valid:  true,
-		},
-		OwnerIdentityName: u.Name,
-		ControllerID:      controller.ID,
-		CloudRegionID:     cloud.Regions[0].ID,
-		CloudCredentialID: cred.ID,
-		Life:              state.Alive.String(),
-		Status: dbmodel.Status{
-			Status: "available",
-			Since: sql.NullTime{
-				Time:  time.Now().UTC().Truncate(time.Millisecond),
-				Valid: true,
-			},
-		},
-	}
-
-	err = db.AddModel(ctx, &model)
-	c.Assert(err, qt.IsNil)
-
-	offerName := petname.Generate(2, "-")
-	offerURL, err := crossmodel.ParseOfferURL(controller.Name + ":" + u.Name + "/" + model.Name + "." + offerName)
-	c.Assert(err, qt.IsNil)
-
-	offer := dbmodel.ApplicationOffer{
-		UUID:    id.String(),
-		Name:    offerName,
-		ModelID: model.ID,
-		URL:     offerURL.String(),
-	}
-	err = db.AddApplicationOffer(context.Background(), &offer)
-	c.Assert(err, qt.IsNil)
-	c.Assert(len(offer.UUID), qt.Equals, 36)
-
-	role, err := db.AddRole(ctx, petname.Generate(2, "-"))
-	c.Assert(err, qt.IsNil)
-
-	return *u, group, controller, model, offer, cloud, cred, *role
-}
-
-func TestAddGroup(t *testing.T) {
-	c := qt.New(t)
-	ctx := context.Background()
-
-	ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
-	c.Assert(err, qt.IsNil)
-
-	now := time.Now().UTC().Round(time.Millisecond)
-	j := &jimm.JIMM{
-		UUID: uuid.NewString(),
-		Database: db.Database{
-			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
-		},
-		OpenFGAClient: ofgaClient,
-	}
-
-	err = j.Database.Migrate(ctx, false)
-	c.Assert(err, qt.IsNil)
-
-	dbU, err := dbmodel.NewIdentity(petname.Generate(2, "-"+"canonical.com"))
-	c.Assert(err, qt.IsNil)
-	u := openfga.NewUser(dbU, ofgaClient)
-	u.JimmAdmin = true
-
-	g, err := j.AddGroup(ctx, u, "test-group-1")
-	c.Assert(err, qt.IsNil)
-	c.Assert(g.UUID, qt.Not(qt.Equals), "")
-	c.Assert(g.Name, qt.Equals, "test-group-1")
-
-	g, err = j.AddGroup(ctx, u, "test-group-2")
-	c.Assert(err, qt.IsNil)
-	c.Assert(g.UUID, qt.Not(qt.Equals), "")
-	c.Assert(g.Name, qt.Equals, "test-group-2")
-}
-
-func TestCountGroups(t *testing.T) {
-	c := qt.New(t)
-	ctx := context.Background()
-
-	ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
-	c.Assert(err, qt.IsNil)
-
-	now := time.Now().UTC().Round(time.Millisecond)
-	j := &jimm.JIMM{
-		UUID: uuid.NewString(),
-		Database: db.Database{
-			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
-		},
-		OpenFGAClient: ofgaClient,
-	}
-
-	err = j.Database.Migrate(ctx, false)
-	c.Assert(err, qt.IsNil)
-
-	dbU, err := dbmodel.NewIdentity(petname.Generate(2, "-"+"canonical.com"))
-	c.Assert(err, qt.IsNil)
-	u := openfga.NewUser(dbU, ofgaClient)
-	u.JimmAdmin = true
-
-	groupEntry, err := j.AddGroup(ctx, u, "test-group-1")
-	c.Assert(err, qt.IsNil)
-	c.Assert(groupEntry.UUID, qt.Not(qt.Equals), "")
-
-	_, err = j.AddGroup(ctx, u, "test-group-1")
-	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeAlreadyExists)
-}
-
-func TestGetGroup(t *testing.T) {
-	c := qt.New(t)
-	ctx := context.Background()
-
-	ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
-	c.Assert(err, qt.IsNil)
-
-	now := time.Now().UTC().Round(time.Millisecond)
-	j := &jimm.JIMM{
-		UUID: uuid.NewString(),
-		Database: db.Database{
-			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
-		},
-		OpenFGAClient: ofgaClient,
-	}
-
-	err = j.Database.Migrate(ctx, false)
-	c.Assert(err, qt.IsNil)
-
-	dbU, err := dbmodel.NewIdentity(petname.Generate(2, "-"+"canonical.com"))
-	c.Assert(err, qt.IsNil)
-	u := openfga.NewUser(dbU, ofgaClient)
-	u.JimmAdmin = true
-
-	groupEntry, err := j.AddGroup(ctx, u, "test-group-1")
-	c.Assert(err, qt.IsNil)
-	c.Assert(groupEntry.UUID, qt.Not(qt.Equals), "")
-
-	gotGroupUuid, err := j.GetGroupByUUID(ctx, u, groupEntry.UUID)
-	c.Assert(err, qt.IsNil)
-	c.Assert(gotGroupUuid, qt.DeepEquals, groupEntry)
-
-	gotGroupName, err := j.GetGroupByName(ctx, u, groupEntry.Name)
-	c.Assert(err, qt.IsNil)
-	c.Assert(gotGroupName, qt.DeepEquals, groupEntry)
-
-	_, err = j.GetGroupByUUID(ctx, u, "non-existent")
-	c.Assert(err, qt.Not(qt.IsNil))
-
-	_, err = j.GetGroupByName(ctx, u, "non-existent")
-	c.Assert(err, qt.Not(qt.IsNil))
-}
-
-func TestRemoveGroup(t *testing.T) {
-	c := qt.New(t)
-	ctx := context.Background()
-
-	ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
-	c.Assert(err, qt.IsNil)
-
-	now := time.Now().UTC().Round(time.Millisecond)
-	j := &jimm.JIMM{
-		UUID: uuid.NewString(),
-		Database: db.Database{
-			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
-		},
-		OpenFGAClient: ofgaClient,
-	}
-
-	err = j.Database.Migrate(ctx, false)
-	c.Assert(err, qt.IsNil)
-
-	user, group, _, _, _, _, _, _ := createTestControllerEnvironment(ctx, c, j.Database)
-	u := openfga.NewUser(&user, ofgaClient)
-	u.JimmAdmin = true
-
-	err = j.RemoveGroup(ctx, u, group.Name)
-	c.Assert(err, qt.IsNil)
-
-	err = j.RemoveGroup(ctx, u, group.Name)
-	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
-}
-
-func TestRemoveGroupRemovesTuples(t *testing.T) {
-	c := qt.New(t)
-	ctx := context.Background()
-
-	ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
-	c.Assert(err, qt.IsNil)
-
-	now := time.Now().UTC().Round(time.Millisecond)
-	j := &jimm.JIMM{
-		UUID: uuid.NewString(),
-		Database: db.Database{
-			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
-		},
-		OpenFGAClient: ofgaClient,
-	}
-
-	err = j.Database.Migrate(ctx, false)
-	c.Assert(err, qt.IsNil)
-
-	user, group, controller, model, _, _, _, _ := createTestControllerEnvironment(ctx, c, j.Database)
-
-	_, err = j.Database.AddGroup(ctx, "test-group2")
-	c.Assert(err, qt.IsNil)
-
-	group2 := &dbmodel.GroupEntry{
-		Name: "test-group2",
-	}
-	err = j.Database.GetGroup(ctx, group2)
-	c.Assert(err, qt.IsNil)
-
-	tuples := []openfga.Tuple{
-		// This tuple should remain as it has no relation to group2
-		{
-			Object:   ofganames.ConvertTag(user.ResourceTag()),
-			Relation: "member",
-			Target:   ofganames.ConvertTag(group.ResourceTag()),
-		},
-		// Below tuples should all be removed as they relate to group2
-		{
-			Object:   ofganames.ConvertTag(user.ResourceTag()),
-			Relation: "member",
-			Target:   ofganames.ConvertTag(group2.ResourceTag()),
-		},
-		{
-			Object:   ofganames.ConvertTagWithRelation(group2.ResourceTag(), ofganames.MemberRelation),
-			Relation: "member",
-			Target:   ofganames.ConvertTag(group.ResourceTag()),
-		},
-		{
-			Object:   ofganames.ConvertTagWithRelation(group2.ResourceTag(), ofganames.MemberRelation),
-			Relation: "administrator",
-			Target:   ofganames.ConvertTag(controller.ResourceTag()),
-		},
-		{
-			Object:   ofganames.ConvertTagWithRelation(group2.ResourceTag(), ofganames.MemberRelation),
-			Relation: "writer",
-			Target:   ofganames.ConvertTag(model.ResourceTag()),
-		},
-	}
-
-	err = ofgaClient.AddRelation(ctx, tuples...)
-	c.Assert(err, qt.IsNil)
-
-	u := openfga.NewUser(&user, ofgaClient)
-	u.JimmAdmin = true
-
-	err = j.RemoveGroup(ctx, u, group.Name)
-	c.Assert(err, qt.IsNil)
-
-	err = j.RemoveGroup(ctx, u, group.Name)
-	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
-
-	remainingTuples, _, err := ofgaClient.ReadRelatedObjects(ctx, ofga.Tuple{}, 0, "")
-	c.Assert(err, qt.IsNil)
-	c.Assert(remainingTuples, qt.HasLen, 3)
-
-	err = j.RemoveGroup(ctx, u, group2.Name)
-	c.Assert(err, qt.IsNil)
-
-	remainingTuples, _, err = ofgaClient.ReadRelatedObjects(ctx, ofga.Tuple{}, 0, "")
-	c.Assert(err, qt.IsNil)
-	c.Assert(remainingTuples, qt.HasLen, 0)
-}
-
-func TestRenameGroup(t *testing.T) {
-	c := qt.New(t)
-	ctx := context.Background()
-
-	ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
-	c.Assert(err, qt.IsNil)
-
-	now := time.Now().UTC().Round(time.Millisecond)
-	j := &jimm.JIMM{
-		UUID: uuid.NewString(),
-		Database: db.Database{
-			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
-		},
-		OpenFGAClient: ofgaClient,
-	}
-
-	err = j.Database.Migrate(ctx, false)
-	c.Assert(err, qt.IsNil)
-
-	user, group, controller, model, _, _, _, _ := createTestControllerEnvironment(ctx, c, j.Database)
-
-	u := openfga.NewUser(&user, ofgaClient)
-	u.JimmAdmin = true
-
-	tuples := []openfga.Tuple{
-		{
-			Object:   ofganames.ConvertTag(user.ResourceTag()),
-			Relation: "member",
-			Target:   ofganames.ConvertTag(group.ResourceTag()),
-		},
-		{
-			Object:   ofganames.ConvertTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
-			Relation: "administrator",
-			Target:   ofganames.ConvertTag(controller.ResourceTag()),
-		},
-		{
-			Object:   ofganames.ConvertTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
-			Relation: "writer",
-			Target:   ofganames.ConvertTag(model.ResourceTag()),
-		},
-	}
-
-	err = ofgaClient.AddRelation(ctx, tuples...)
-	c.Assert(err, qt.IsNil)
-
-	err = j.RenameGroup(ctx, u, group.Name, "test-new-group")
-	c.Assert(err, qt.IsNil)
-
-	group.Name = "test-new-group"
-
-	// check the user still has member relation to the group
-	allowed, err := ofgaClient.CheckRelation(
-		ctx,
-		ofga.Tuple{
-			Object:   ofganames.ConvertTag(u.ResourceTag()),
-			Relation: "member",
-			Target:   ofganames.ConvertTag(group.ResourceTag()),
-		},
-		false,
-	)
-	c.Assert(err, qt.IsNil)
-	c.Assert(allowed, qt.IsTrue)
-
-	// check the user still has writer relation to the model via the
-	// group membership
-	allowed, err = ofgaClient.CheckRelation(
-		ctx,
-		ofga.Tuple{
-			Object:   ofganames.ConvertTag(u.ResourceTag()),
-			Relation: "writer",
-			Target:   ofganames.ConvertTag(model.ResourceTag()),
-		},
-		false,
-	)
-	c.Assert(err, qt.IsNil)
-	c.Assert(allowed, qt.IsTrue)
-
-	// check the user still has administrator relation to the controller
-	// via group membership
-	allowed, err = ofgaClient.CheckRelation(
-		ctx,
-		ofga.Tuple{
-			Object:   ofganames.ConvertTag(u.ResourceTag()),
-			Relation: "administrator",
-			Target:   ofganames.ConvertTag(controller.ResourceTag()),
-		},
-		false,
-	)
-	c.Assert(err, qt.IsNil)
-	c.Assert(allowed, qt.IsTrue)
-}
-
-func TestListGroups(t *testing.T) {
-	c := qt.New(t)
-	ctx := context.Background()
-
-	ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
-	c.Assert(err, qt.IsNil)
-
-	now := time.Now().UTC().Round(time.Millisecond)
-	j := &jimm.JIMM{
-		UUID: uuid.NewString(),
-		Database: db.Database{
-			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
-		},
-		OpenFGAClient: ofgaClient,
-	}
-
-	err = j.Database.Migrate(ctx, false)
-	c.Assert(err, qt.IsNil)
-
-	user, group, _, _, _, _, _, _ := createTestControllerEnvironment(ctx, c, j.Database)
-
-	u := openfga.NewUser(&user, ofgaClient)
-	u.JimmAdmin = true
-
-	pagination := pagination.NewOffsetFilter(10, 0)
-	groups, err := j.ListGroups(ctx, u, pagination, "")
-	c.Assert(err, qt.IsNil)
-	c.Assert(groups, qt.DeepEquals, []dbmodel.GroupEntry{group})
-
-	groupNames := []string{
-		"test-group0",
-		"test-group1",
-		"test-group2",
-		"aaaFinalGroup",
-	}
-
-	for _, name := range groupNames {
-		_, err := j.AddGroup(ctx, u, name)
-		c.Assert(err, qt.IsNil)
-	}
-	groups, err = j.ListGroups(ctx, u, pagination, "")
-	c.Assert(err, qt.IsNil)
-	sort.Slice(groups, func(i, j int) bool {
-		return groups[i].Name < groups[j].Name
-	})
-	c.Assert(groups, qt.HasLen, 5)
-	// Check that the UUID is not empty
-	c.Assert(groups[0].UUID, qt.Not(qt.Equals), "")
-	// groups should be returned in ascending order of name
-	c.Assert(groups[0].Name, qt.Equals, "aaaFinalGroup")
-	c.Assert(groups[1].Name, qt.Equals, group.Name)
-	c.Assert(groups[2].Name, qt.Equals, "test-group0")
-	c.Assert(groups[3].Name, qt.Equals, "test-group1")
-	c.Assert(groups[4].Name, qt.Equals, "test-group2")
 }
 
 func TestOpenFGACleanup(t *testing.T) {

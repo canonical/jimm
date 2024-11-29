@@ -90,6 +90,9 @@ type JIMM struct {
 
 	// RoleManager provides a means to manage roles within JIMM.
 	RoleManager RoleManager
+
+	// RoleManager provides a means to manage groups within JIMM.
+	GroupManager GroupManager
 }
 
 // RoleManager provides a means to manage roles within JIMM.
@@ -109,6 +112,25 @@ type RoleManager interface {
 	ListRoles(ctx context.Context, user *openfga.User, pagination pagination.LimitOffsetPagination, match string) ([]dbmodel.RoleEntry, error)
 	// CountRoles returns the number of roles that exist.
 	CountRoles(ctx context.Context, user *openfga.User) (int, error)
+}
+
+// GroupManager provides a means to manage groups within JIMM.
+type GroupManager interface {
+	// AddGroup adds a role to JIMM.
+	AddGroup(ctx context.Context, user *openfga.User, roleName string) (*dbmodel.GroupEntry, error)
+	// GetGroupByUUID returns a role based on the provided UUID.
+	GetGroupByUUID(ctx context.Context, user *openfga.User, uuid string) (*dbmodel.GroupEntry, error)
+	// GetGroupByName returns a role based on the provided name.
+	GetGroupByName(ctx context.Context, user *openfga.User, name string) (*dbmodel.GroupEntry, error)
+	// RemoveGroup removes the role from JIMM in both the store and authorisation store.
+	RemoveGroup(ctx context.Context, user *openfga.User, roleName string) error
+	// RenameGroup renames a role in JIMM's DB.
+	RenameGroup(ctx context.Context, user *openfga.User, uuid, newName string) error
+	// ListGroups returns a list of roles known to JIMM.
+	// `match` will filter the list fuzzy matching role's name or uuid.
+	ListGroups(ctx context.Context, user *openfga.User, pagination pagination.LimitOffsetPagination, match string) ([]dbmodel.GroupEntry, error)
+	// CountGroups returns the number of roles that exist.
+	CountGroups(ctx context.Context, user *openfga.User) (int, error)
 }
 
 // ResourceTag returns JIMM's controller tag stating its UUID.
@@ -133,6 +155,10 @@ func (j *JIMM) AuthorizationClient() *openfga.OFGAClient {
 
 func (j *JIMM) GetRoleManager() RoleManager {
 	return j.RoleManager
+}
+
+func (j *JIMM) GetGroupManager() GroupManager {
+	return j.GroupManager
 }
 
 // OAuthAuthenticator is responsible for handling authentication

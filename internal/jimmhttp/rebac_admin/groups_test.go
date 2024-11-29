@@ -28,11 +28,14 @@ import (
 func TestCreateGroup(t *testing.T) {
 	c := qt.New(t)
 	var addErr error
+	groupService := mocks.GroupService{
+		AddGroup_: func(ctx context.Context, user *openfga.User, name string) (*dbmodel.GroupEntry, error) {
+			return &dbmodel.GroupEntry{UUID: "test-uuid", Name: name}, addErr
+		},
+	}
 	jimm := jimmtest.JIMM{
-		GroupService: mocks.GroupService{
-			AddGroup_: func(ctx context.Context, user *openfga.User, name string) (*dbmodel.GroupEntry, error) {
-				return &dbmodel.GroupEntry{UUID: "test-uuid", Name: name}, addErr
-			},
+		GetGroupManager_: func() jimm.GroupManager {
+			return &groupService
 		},
 	}
 	user := openfga.User{}
@@ -52,17 +55,20 @@ func TestUpdateGroup(t *testing.T) {
 	c := qt.New(t)
 	groupID := "group-id"
 	var renameErr error
+	groupService := mocks.GroupService{
+		GetGroupByUUID_: func(ctx context.Context, user *openfga.User, uuid string) (*dbmodel.GroupEntry, error) {
+			return &dbmodel.GroupEntry{UUID: groupID, Name: "test-group"}, nil
+		},
+		RenameGroup_: func(ctx context.Context, user *openfga.User, oldName, newName string) error {
+			if oldName != "test-group" {
+				return errors.New("invalid old group name")
+			}
+			return renameErr
+		},
+	}
 	jimm := jimmtest.JIMM{
-		GroupService: mocks.GroupService{
-			GetGroupByUUID_: func(ctx context.Context, user *openfga.User, uuid string) (*dbmodel.GroupEntry, error) {
-				return &dbmodel.GroupEntry{UUID: groupID, Name: "test-group"}, nil
-			},
-			RenameGroup_: func(ctx context.Context, user *openfga.User, oldName, newName string) error {
-				if oldName != "test-group" {
-					return errors.New("invalid old group name")
-				}
-				return renameErr
-			},
+		GetGroupManager_: func() jimm.GroupManager {
+			return &groupService
 		},
 	}
 	user := openfga.User{}
@@ -87,14 +93,17 @@ func TestListGroups(t *testing.T) {
 		{Name: "group-2"},
 		{Name: "group-3"},
 	}
+	groupService := mocks.GroupService{
+		ListGroups_: func(ctx context.Context, user *openfga.User, pagination pagination.LimitOffsetPagination, match string) ([]dbmodel.GroupEntry, error) {
+			return returnedGroups, listErr
+		},
+		CountGroups_: func(ctx context.Context, user *openfga.User) (int, error) {
+			return 10, nil
+		},
+	}
 	jimm := jimmtest.JIMM{
-		GroupService: mocks.GroupService{
-			ListGroups_: func(ctx context.Context, user *openfga.User, pagination pagination.LimitOffsetPagination, match string) ([]dbmodel.GroupEntry, error) {
-				return returnedGroups, listErr
-			},
-			CountGroups_: func(ctx context.Context, user *openfga.User) (int, error) {
-				return 10, nil
-			},
+		GetGroupManager_: func() jimm.GroupManager {
+			return &groupService
 		},
 	}
 	expected := []resources.Group{}
@@ -121,17 +130,20 @@ func TestListGroups(t *testing.T) {
 func TestDeleteGroup(t *testing.T) {
 	c := qt.New(t)
 	var deleteErr error
+	groupService := mocks.GroupService{
+		GetGroupByUUID_: func(ctx context.Context, user *openfga.User, uuid string) (*dbmodel.GroupEntry, error) {
+			return &dbmodel.GroupEntry{UUID: uuid, Name: "test-group"}, nil
+		},
+		RemoveGroup_: func(ctx context.Context, user *openfga.User, name string) error {
+			if name != "test-group" {
+				return errors.New("invalid name provided")
+			}
+			return deleteErr
+		},
+	}
 	jimm := jimmtest.JIMM{
-		GroupService: mocks.GroupService{
-			GetGroupByUUID_: func(ctx context.Context, user *openfga.User, uuid string) (*dbmodel.GroupEntry, error) {
-				return &dbmodel.GroupEntry{UUID: uuid, Name: "test-group"}, nil
-			},
-			RemoveGroup_: func(ctx context.Context, user *openfga.User, name string) error {
-				if name != "test-group" {
-					return errors.New("invalid name provided")
-				}
-				return deleteErr
-			},
+		GetGroupManager_: func() jimm.GroupManager {
+			return &groupService
 		},
 	}
 	user := openfga.User{}
@@ -156,11 +168,14 @@ func TestGetGroupIdentities(t *testing.T) {
 		Relation: ofga.Relation("member"),
 		Target:   &ofga.Entity{Kind: "group", ID: "my-group"},
 	}
+	groupService := mocks.GroupService{
+		GetGroupByUUID_: func(ctx context.Context, user *openfga.User, uuid string) (*dbmodel.GroupEntry, error) {
+			return nil, getGroupErr
+		},
+	}
 	jimm := jimmtest.JIMM{
-		GroupService: mocks.GroupService{
-			GetGroupByUUID_: func(ctx context.Context, user *openfga.User, uuid string) (*dbmodel.GroupEntry, error) {
-				return nil, getGroupErr
-			},
+		GetGroupManager_: func() jimm.GroupManager {
+			return &groupService
 		},
 		RelationService: mocks.RelationService{
 			ListRelationshipTuples_: func(ctx context.Context, user *openfga.User, tuple params.RelationshipTuple, pageSize int32, ct string) ([]openfga.Tuple, string, error) {
@@ -258,14 +273,17 @@ func TestGetGroupRoles(t *testing.T) {
 			return &dbmodel.RoleEntry{}, getRoleErr
 		},
 	}
+	groupService := mocks.GroupService{
+		GetGroupByUUID_: func(ctx context.Context, user *openfga.User, uuid string) (*dbmodel.GroupEntry, error) {
+			return nil, getGroupErr
+		},
+	}
 	jimm := jimmtest.JIMM{
 		GetRoleManager_: func() jimm.RoleManager {
 			return roleManager
 		},
-		GroupService: mocks.GroupService{
-			GetGroupByUUID_: func(ctx context.Context, user *openfga.User, uuid string) (*dbmodel.GroupEntry, error) {
-				return nil, getGroupErr
-			},
+		GetGroupManager_: func() jimm.GroupManager {
+			return &groupService
 		},
 		RelationService: mocks.RelationService{
 			ListRelationshipTuples_: func(ctx context.Context, user *openfga.User, tuple params.RelationshipTuple, pageSize int32, ct string) ([]openfga.Tuple, string, error) {
