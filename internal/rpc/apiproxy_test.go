@@ -70,8 +70,7 @@ func TestProxySocketsAdminFacade(t *testing.T) {
 		expectedClientResponse    *message
 		expectedControllerMessage *message
 		oauthAuthenticatorError   error
-		expectProxyError          bool
-		proxyErrorMessage         string
+		expectedProxyError        string
 	}{{
 		about: "login device call - client gets response with both user code and verification uri",
 		messageToSend: message{
@@ -233,19 +232,21 @@ func TestProxySocketsAdminFacade(t *testing.T) {
 		},
 		oauthAuthenticatorError: errors.E(errors.CodeUnauthorized),
 	}, {
-		about:            "connection to controller fails",
-		expectProxyError: true,
+		about: "connection to controller fails",
 		expectedClientResponse: &message{
 			Error: "controller connection error",
 		},
-		proxyErrorMessage: "failed to connect to controller: controller connection error",
+		expectedProxyError: "failed to connect to controller: controller connection error",
 	}}
 
 	for _, test := range tests {
 		t.Run(test.about, func(t *testing.T) {
+			proxyError := test.expectedProxyError != ""
+
 			ctx := context.Background()
 			ctx, cancelFunc := context.WithCancel(ctx)
 			defer cancelFunc()
+
 			clientWebsocket := newMockWebsocketConnection(10)
 			controllerWebsocket := newMockWebsocketConnection(10)
 			loginSvc := &mockLoginService{
@@ -259,7 +260,7 @@ func TestProxySocketsAdminFacade(t *testing.T) {
 				ConnClient: clientWebsocket,
 				TokenGen:   &mockTokenGenerator{},
 				ConnectController: func(ctx context.Context) (rpc.WebsocketConnectionWithMetadata, error) {
-					if test.expectProxyError {
+					if proxyError {
 						return rpc.WebsocketConnectionWithMetadata{}, goerr.New("controller connection error")
 					}
 					return rpc.WebsocketConnectionWithMetadata{
@@ -277,8 +278,8 @@ func TestProxySocketsAdminFacade(t *testing.T) {
 			go func() {
 				defer wg.Done()
 				err = rpc.ProxySockets(ctx, helpers)
-				if test.expectProxyError {
-					c.Assert(err, qt.ErrorMatches, test.proxyErrorMessage)
+				if proxyError {
+					c.Assert(err, qt.ErrorMatches, test.expectedProxyError)
 				} else {
 					c.Assert(err, qt.ErrorMatches, "Context cancelled")
 				}
@@ -302,7 +303,7 @@ func TestProxySocketsAdminFacade(t *testing.T) {
 					c.Fatal("timed out waiting for response")
 				}
 			}
-			if !test.expectProxyError {
+			if !proxyError {
 				cancelFunc()
 			}
 			wg.Wait()
