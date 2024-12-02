@@ -15,6 +15,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/jimm"
+	"github.com/canonical/jimm/v3/internal/jimm/group"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
@@ -240,9 +241,12 @@ func TestGrantServiceAccountAccess(t *testing.T) {
 			}
 			err = pgDb.Migrate(context.Background(), false)
 			c.Assert(err, qt.IsNil)
+			groupManager, err := group.NewGroupManager(&pgDb, ofgaClient)
+			c.Assert(err, qt.IsNil)
 			jimm := &jimm.JIMM{
 				Database:      pgDb,
 				OpenFGAClient: ofgaClient,
+				GroupManager:  groupManager,
 			}
 			var u dbmodel.Identity
 			u.SetTag(names.NewUserTag(test.clientID))
