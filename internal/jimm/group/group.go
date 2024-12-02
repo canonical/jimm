@@ -13,7 +13,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga"
 )
 
-// permissionManager provides a means to manage roles within JIMM.
+// groupManager provides a means to manage groups within JIMM.
 type groupManager struct {
 	store   *db.Database
 	authSvc *openfga.OFGAClient
@@ -23,10 +23,10 @@ type groupManager struct {
 // creation, modification, and removal.
 func NewGroupManager(store *db.Database, authSvc *openfga.OFGAClient) (*groupManager, error) {
 	if store == nil {
-		return nil, errors.E("role store cannot be nil")
+		return nil, errors.E("group store cannot be nil")
 	}
 	if authSvc == nil {
-		return nil, errors.E("role authorisation service cannot be nil")
+		return nil, errors.E("group authorisation service cannot be nil")
 	}
 	return &groupManager{store, authSvc}, nil
 }

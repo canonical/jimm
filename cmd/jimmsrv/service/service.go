@@ -32,6 +32,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm"
 	jimmcreds "github.com/canonical/jimm/v3/internal/jimm/credentials"
+	"github.com/canonical/jimm/v3/internal/jimm/group"
 	"github.com/canonical/jimm/v3/internal/jimm/role"
 	"github.com/canonical/jimm/v3/internal/jimmhttp"
 	"github.com/canonical/jimm/v3/internal/jimmhttp/rebac_admin"
@@ -404,6 +405,12 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		return nil, errors.E(op, err, "failed to create RoleManager")
 	}
 	s.jimm.RoleManager = roleManager
+
+	groupManager, err := group.NewGroupManager(&s.jimm.Database, s.jimm.OpenFGAClient)
+	if err != nil {
+		return nil, errors.E(op, err, "failed to create GroupManager")
+	}
+	s.jimm.GroupManager = groupManager
 
 	if !p.DisableConnectionCache {
 		s.jimm.Dialer = jimm.CacheDialer(s.jimm.Dialer)
