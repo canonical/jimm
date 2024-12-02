@@ -1,4 +1,6 @@
 // Copyright 2024 Canonical.
+
+// The group package provides business logic for handling group related methods..
 package group
 
 import (
@@ -92,14 +94,22 @@ func (j *groupManager) RenameGroup(ctx context.Context, user *openfga.User, oldN
 	group := &dbmodel.GroupEntry{
 		Name: oldName,
 	}
-	err := j.store.GetGroup(ctx, group)
+
+	err := j.store.Transaction(func(d *db.Database) error {
+		err := j.store.GetGroup(ctx, group)
+		if err != nil {
+			return err
+		}
+
+		if err := j.store.UpdateGroupName(ctx, group.UUID, newName); err != nil {
+			return err
+		}
+		return nil
+	})
 	if err != nil {
 		return errors.E(op, err)
 	}
 
-	if err := j.store.UpdateGroupName(ctx, group.UUID, newName); err != nil {
-		return errors.E(op, err)
-	}
 	return nil
 }
 
@@ -114,16 +124,22 @@ func (j *groupManager) RemoveGroup(ctx context.Context, user *openfga.User, name
 	group := &dbmodel.GroupEntry{
 		Name: name,
 	}
-	err := j.store.GetGroup(ctx, group)
-	if err != nil {
-		return errors.E(op, err)
-	}
-	err = j.authSvc.RemoveGroup(ctx, group.ResourceTag())
+	err := j.store.Transaction(func(d *db.Database) error {
+		err := j.store.GetGroup(ctx, group)
+		if err != nil {
+			return err
+		}
+		if err := j.store.RemoveGroup(ctx, group); err != nil {
+			return err
+		}
+		return nil
+	})
 	if err != nil {
 		return errors.E(op, err)
 	}
 
-	if err := j.store.RemoveGroup(ctx, group); err != nil {
+	err = j.authSvc.RemoveGroup(ctx, group.ResourceTag())
+	if err != nil {
 		return errors.E(op, err)
 	}
 	return nil
