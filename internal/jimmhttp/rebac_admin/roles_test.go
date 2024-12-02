@@ -165,11 +165,14 @@ func TestGetRoleEntitlements(t *testing.T) {
 		Relation: ofga.Relation("member"),
 		Target:   &ofga.Entity{Kind: "role", ID: "my-role"},
 	}
+	permissionManager := mocks.PermissionManager{
+		ListObjectRelations_: func(ctx context.Context, user *openfga.User, object string, pageSize int32, ct pagination.EntitlementToken) ([]openfga.Tuple, pagination.EntitlementToken, error) {
+			return []openfga.Tuple{testTuple}, pagination.NewEntitlementToken(continuationToken), listRelationsErr
+		},
+	}
 	jimm := jimmtest.JIMM{
-		RelationService: mocks.RelationService{
-			ListObjectRelations_: func(ctx context.Context, user *openfga.User, object string, pageSize int32, ct pagination.EntitlementToken) ([]openfga.Tuple, pagination.EntitlementToken, error) {
-				return []openfga.Tuple{testTuple}, pagination.NewEntitlementToken(continuationToken), listRelationsErr
-			},
+		PermissionManager_: func() jimm.PermissionManager {
+			return &permissionManager
 		},
 	}
 	user := openfga.User{}
@@ -206,14 +209,17 @@ func TestGetRoleEntitlements(t *testing.T) {
 func TestPatchRoleEntitlements(t *testing.T) {
 	c := qt.New(t)
 	var patchTuplesErr error
+	permissionManager := mocks.PermissionManager{
+		AddRelation_: func(ctx context.Context, user *openfga.User, tuples []params.RelationshipTuple) error {
+			return patchTuplesErr
+		},
+		RemoveRelation_: func(ctx context.Context, user *openfga.User, tuples []params.RelationshipTuple) error {
+			return patchTuplesErr
+		},
+	}
 	jimm := jimmtest.JIMM{
-		RelationService: mocks.RelationService{
-			AddRelation_: func(ctx context.Context, user *openfga.User, tuples []params.RelationshipTuple) error {
-				return patchTuplesErr
-			},
-			RemoveRelation_: func(ctx context.Context, user *openfga.User, tuples []params.RelationshipTuple) error {
-				return patchTuplesErr
-			},
+		PermissionManager_: func() jimm.PermissionManager {
+			return &permissionManager
 		},
 	}
 	user := openfga.User{}

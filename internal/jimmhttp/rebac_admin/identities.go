@@ -109,7 +109,7 @@ func (s *identitiesService) GetIdentityRoles(ctx context.Context, identityId str
 		return nil, v1.NewNotFoundError(fmt.Sprintf("User with id %s not found", identityId))
 	}
 	filter := utils.CreateTokenPaginationFilter(params.Size, params.NextToken, params.NextPageToken)
-	tuples, cNextToken, err := s.jimm.ListRelationshipTuples(ctx, user, apiparams.RelationshipTuple{
+	tuples, cNextToken, err := s.jimm.PermissionManager().ListRelationshipTuples(ctx, user, apiparams.RelationshipTuple{
 		Object:       objUser.ResourceTag().String(),
 		Relation:     ofganames.AssigneeRelation.String(),
 		TargetObject: openfga.RoleType.String(),
@@ -178,14 +178,14 @@ func (s *identitiesService) PatchIdentityRoles(ctx context.Context, identityId s
 		}
 	}
 	if len(additions) > 0 {
-		err = s.jimm.AddRelation(ctx, user, additions)
+		err = s.jimm.PermissionManager().AddRelation(ctx, user, additions)
 		if err != nil {
 			zapctx.Error(context.Background(), "cannot add relations", zap.Error(err))
 			return false, v1.NewUnknownError(err.Error())
 		}
 	}
 	if len(deletions) > 0 {
-		err = s.jimm.RemoveRelation(ctx, user, deletions)
+		err = s.jimm.PermissionManager().RemoveRelation(ctx, user, deletions)
 		if err != nil {
 			zapctx.Error(context.Background(), "cannot remove relations", zap.Error(err))
 			return false, v1.NewUnknownError(err.Error())
@@ -205,7 +205,7 @@ func (s *identitiesService) GetIdentityGroups(ctx context.Context, identityId st
 		return nil, v1.NewNotFoundError(fmt.Sprintf("User with id %s not found", identityId))
 	}
 	filter := utils.CreateTokenPaginationFilter(params.Size, params.NextToken, params.NextPageToken)
-	tuples, cNextToken, err := s.jimm.ListRelationshipTuples(ctx, user, apiparams.RelationshipTuple{
+	tuples, cNextToken, err := s.jimm.PermissionManager().ListRelationshipTuples(ctx, user, apiparams.RelationshipTuple{
 		Object:       objUser.ResourceTag().String(),
 		Relation:     ofganames.MemberRelation.String(),
 		TargetObject: openfga.GroupType.String(),
@@ -274,14 +274,14 @@ func (s *identitiesService) PatchIdentityGroups(ctx context.Context, identityId 
 		}
 	}
 	if len(additions) > 0 {
-		err = s.jimm.AddRelation(ctx, user, additions)
+		err = s.jimm.PermissionManager().AddRelation(ctx, user, additions)
 		if err != nil {
 			zapctx.Error(context.Background(), "cannot add relations", zap.Error(err))
 			return false, v1.NewUnknownError(err.Error())
 		}
 	}
 	if len(deletions) > 0 {
-		err = s.jimm.RemoveRelation(ctx, user, deletions)
+		err = s.jimm.PermissionManager().RemoveRelation(ctx, user, deletions)
 		if err != nil {
 			zapctx.Error(context.Background(), "cannot remove relations", zap.Error(err))
 			return false, v1.NewUnknownError(err.Error())
@@ -306,7 +306,7 @@ func (s *identitiesService) GetIdentityEntitlements(ctx context.Context, identit
 
 	filter := utils.CreateTokenPaginationFilter(params.Size, params.NextToken, params.NextPageToken)
 	entitlementToken := pagination.NewEntitlementToken(filter.Token())
-	tuples, nextEntitlmentToken, err := s.jimm.ListObjectRelations(ctx, user, objUser.Tag().String(), int32(filter.Limit()), entitlementToken) // #nosec G115 accept integer conversion
+	tuples, nextEntitlmentToken, err := s.jimm.PermissionManager().ListObjectRelations(ctx, user, objUser.Tag().String(), int32(filter.Limit()), entitlementToken) // #nosec G115 accept integer conversion
 	if err != nil {
 		return nil, err
 	}
@@ -367,13 +367,13 @@ func (s *identitiesService) PatchIdentityEntitlements(ctx context.Context, ident
 		return false, err
 	}
 	if toAdd != nil {
-		err := s.jimm.AddRelation(ctx, user, toAdd)
+		err := s.jimm.PermissionManager().AddRelation(ctx, user, toAdd)
 		if err != nil {
 			return false, err
 		}
 	}
 	if toRemove != nil {
-		err := s.jimm.RemoveRelation(ctx, user, toRemove)
+		err := s.jimm.PermissionManager().RemoveRelation(ctx, user, toRemove)
 		if err != nil {
 			return false, err
 		}

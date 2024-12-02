@@ -15,6 +15,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm"
+	"github.com/canonical/jimm/v3/internal/jimm/permissions"
 	"github.com/canonical/jimm/v3/internal/jujuapi/rpc"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
@@ -411,9 +412,9 @@ func (r *controllerRoot) modifyCloudAccess(ctx context.Context, change jujuparam
 	var modifyf func(context.Context, *openfga.User, names.CloudTag, names.UserTag, string) error
 	switch change.Action {
 	case jujuparams.GrantCloudAccess:
-		modifyf = r.jimm.GrantCloudAccess
+		modifyf = r.jimm.PermissionManager().GrantCloudAccess
 	case jujuparams.RevokeCloudAccess:
-		modifyf = r.jimm.RevokeCloudAccess
+		modifyf = r.jimm.PermissionManager().RevokeCloudAccess
 	default:
 		return errors.E(op, errors.CodeBadRequest, fmt.Sprintf("unsupported modify cloud action %q", change.Action))
 	}
@@ -520,7 +521,7 @@ func (r *controllerRoot) ListCloudInfo(ctx context.Context, args jujuparams.List
 		results = append(results, jujuparams.ListCloudInfoResult{
 			Result: &jujuparams.ListCloudInfo{
 				CloudDetails: c.ToJujuCloudDetails(),
-				Access:       jimm.ToCloudAccessString(r.user.GetCloudAccess(ctx, c.ResourceTag())),
+				Access:       permissions.ToCloudAccessString(r.user.GetCloudAccess(ctx, c.ResourceTag())),
 			},
 		})
 		return nil

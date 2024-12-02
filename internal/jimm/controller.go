@@ -348,51 +348,6 @@ func (j *JIMM) EarliestControllerVersion(ctx context.Context) (version.Number, e
 	return *v, nil
 }
 
-// GetJimmControllerAccess returns the JIMM controller access level for the
-// requested user.
-func (j *JIMM) GetJimmControllerAccess(ctx context.Context, user *openfga.User, tag names.UserTag) (string, error) {
-	const op = errors.Op("jimm.GetJIMMControllerAccess")
-
-	// If the authenticated user is requesting the access level
-	// for him/her-self then we return that - either the user
-	// is a JIMM admin (aka "superuser"), or they have a "login"
-	// access level.
-	if user.Name == tag.Id() {
-		if user.JimmAdmin {
-			return "superuser", nil
-		}
-		return "login", nil
-	}
-
-	// Only JIMM administrators are allowed to see the access
-	// level of somebody else.
-	if !user.JimmAdmin {
-		return "", errors.E(op, errors.CodeUnauthorized, "unauthorized")
-	}
-
-	var targetUser dbmodel.Identity
-	targetUser.SetTag(tag)
-	targetUserTag := openfga.NewUser(&targetUser, j.OpenFGAClient)
-
-	// Check if the user is jimm administrator.
-	isAdmin, err := openfga.IsAdministrator(ctx, targetUserTag, j.ResourceTag())
-	if err != nil {
-		zapctx.Error(ctx, "failed to check access rights", zap.Error(err))
-		return "", errors.E(op, err)
-	}
-	if isAdmin {
-		return "superuser", nil
-	}
-
-	return "login", nil
-}
-
-// GetUserControllerAccess returns the user's level of access to the desired controller.
-func (j *JIMM) GetUserControllerAccess(ctx context.Context, user *openfga.User, controller names.ControllerTag) (string, error) {
-	accessLevel := user.GetControllerAccess(ctx, controller)
-	return ToControllerAccessString(accessLevel), nil
-}
-
 type modelImporter struct {
 	jimm      *JIMM
 	model     dbmodel.Model

@@ -32,12 +32,16 @@ import (
 	"github.com/canonical/jimm/v3/internal/jimm/credentials"
 	"github.com/canonical/jimm/v3/internal/jimm/group"
 	"github.com/canonical/jimm/v3/internal/jimm/identity"
+	"github.com/canonical/jimm/v3/internal/jimm/jujuauth"
 	"github.com/canonical/jimm/v3/internal/jimm/login"
+	"github.com/canonical/jimm/v3/internal/jimm/permissions"
 	"github.com/canonical/jimm/v3/internal/jimm/role"
 	"github.com/canonical/jimm/v3/internal/jimmjwx"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/pubsub"
+	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
+	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
 
 var (
@@ -168,6 +172,47 @@ type LoginManager interface {
 	UserLogin(ctx context.Context, identity string) (*openfga.User, error)
 }
 
+// PermissionManager provides a way to manage permissions within JIMM.
+type PermissionManager interface {
+	// These methods handle generic permission management through manipulation of OpenFGA tuples.
+
+	// AddRelation creates the provided slice of tuples.
+	AddRelation(ctx context.Context, user *openfga.User, tuples []apiparams.RelationshipTuple) error
+	// RemoveRelation removes the provided slice of tuples.
+	RemoveRelation(ctx context.Context, user *openfga.User, tuples []apiparams.RelationshipTuple) error
+	// CheckRelation checks whether the provided tuple provides access.
+	CheckRelation(ctx context.Context, user *openfga.User, tuple apiparams.RelationshipTuple, trace bool) (bool, error)
+	// ListRelationshipTuples lists a page of tuples based on the provided tuple constraints.
+	ListRelationshipTuples(ctx context.Context, user *openfga.User, tuple apiparams.RelationshipTuple, pageSize int32, continuationToken string) ([]openfga.Tuple, string, error)
+	// ListObjectRelations lists all the tuples that an object has a direct relation with.
+	ListObjectRelations(ctx context.Context, user *openfga.User, object string, pageSize int32, entitlementToken pagination.EntitlementToken) ([]openfga.Tuple, pagination.EntitlementToken, error)
+
+	// These methods
+	GetJimmControllerAccess(ctx context.Context, user *openfga.User, tag names.UserTag) (string, error)
+	GetUserCloudAccess(ctx context.Context, user *openfga.User, cloud names.CloudTag) (string, error)
+	GetUserControllerAccess(ctx context.Context, user *openfga.User, controller names.ControllerTag) (string, error)
+	GetUserModelAccess(ctx context.Context, user *openfga.User, model names.ModelTag) (string, error)
+
+	// GrantAuditLogAccess grants a user access to read audit logs.
+	GrantAuditLogAccess(ctx context.Context, user *openfga.User, targetUserTag names.UserTag) error
+	GrantCloudAccess(ctx context.Context, user *openfga.User, ct names.CloudTag, ut names.UserTag, access string) error
+	GrantModelAccess(ctx context.Context, user *openfga.User, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error
+	GrantOfferAccess(ctx context.Context, u *openfga.User, offerURL string, ut names.UserTag, access jujuparams.OfferAccessPermission) error
+	// GrantServiceAccountAccess grants a user access to manage a service account.
+	GrantServiceAccountAccess(ctx context.Context, u *openfga.User, svcAccTag jimmnames.ServiceAccountTag, entities []string) error
+
+	// RevokeAuditLogAccess revokes a user's access to read audit logs.
+	RevokeAuditLogAccess(ctx context.Context, user *openfga.User, targetUserTag names.UserTag) error
+	RevokeCloudAccess(ctx context.Context, user *openfga.User, ct names.CloudTag, ut names.UserTag, access string) error
+	RevokeModelAccess(ctx context.Context, user *openfga.User, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error
+	RevokeOfferAccess(ctx context.Context, user *openfga.User, offerURL string, ut names.UserTag, access jujuparams.OfferAccessPermission) (err error)
+
+	// OpenFGACleanup removes tuples that are no longer valid.
+	OpenFGACleanup(ctx context.Context) error
+	// ToJAASTag converts a tag used in OpenFGA authorization model to a tag used in JAAS.
+	ToJAASTag(ctx context.Context, tag *ofganames.Tag, resolveUUIDs bool) (string, error)
+}
+
 // Parameters holds the services and static fields passed to the jimm.New() constructor.
 // You can provide mock implementations of certain services where necessary for dependency injection.
 type Parameters struct {
@@ -287,6 +332,12 @@ func New(p Parameters) (*JIMM, error) {
 	}
 	j.loginManager = loginManager
 
+	permissionManager, err := permissions.NewPermissionManager(j.Database, j.OpenFGAClient, j.UUID, j.ResourceTag())
+	if err != nil {
+		return nil, err
+	}
+	j.permissionManager = permissionManager
+
 	return j, nil
 }
 
@@ -308,6 +359,8 @@ type JIMM struct {
 
 	// loginManager provides a means to authenticate and login/create users/identities within JIMM.
 	loginManager LoginManager
+
+	permissionManager PermissionManager
 }
 
 // ResourceTag returns JIMM's controller tag stating its UUID.
@@ -338,6 +391,18 @@ func (j *JIMM) IdentityManager() IdentityManager {
 // Login manager returns a manager that enables login and authentication.
 func (j *JIMM) LoginManager() LoginManager {
 	return j.loginManager
+}
+
+func (j *JIMM) PermissionManager() PermissionManager {
+	return j.permissionManager
+}
+
+func (j *JIMM) NewJujuAuthenticator() (jujuauth.TokenGenerator, error) {
+	accessChecker, err := permissions.NewPermissionManager(j.Database, j.OpenFGAClient, j.UUID, j.ResourceTag())
+	if err != nil {
+		return jujuauth.TokenGenerator{}, err
+	}
+	return jujuauth.New(j.Database, accessChecker, j.JWTService), nil
 }
 
 type permission struct {

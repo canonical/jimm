@@ -8,8 +8,6 @@ import (
 
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
-	"github.com/juju/zaputil/zapctx"
-	"go.uber.org/zap"
 
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/openfga"
@@ -88,42 +86,4 @@ func (j *JIMM) CopyServiceAccountCredential(ctx context.Context, u *openfga.User
 		SkipUpdate:    false,
 	})
 	return newTag, modelRes, err
-}
-
-// GrantServiceAccountAccess creates an administrator relation between the tags provided
-// and the service account. The provided tags must be users or groups (with the member relation)
-// otherwise OpenFGA will report an error.
-func (j *JIMM) GrantServiceAccountAccess(ctx context.Context, u *openfga.User, svcAccTag jimmnames.ServiceAccountTag, entities []string) error {
-	op := errors.Op("jimm.GrantServiceAccountAccess")
-	tags := make([]*ofganames.Tag, 0, len(entities))
-	// Validate tags
-	for _, val := range entities {
-		tag, err := j.parseAndValidateTag(ctx, val)
-		if err != nil {
-			return errors.E(op, err)
-		}
-		if tag.Kind != openfga.UserType && tag.Kind != openfga.GroupType {
-			return errors.E(op, "invalid entity - not user or group")
-		}
-		if tag.Kind == openfga.GroupType {
-			tag.Relation = ofganames.MemberRelation
-		}
-		tags = append(tags, tag)
-	}
-	tuples := make([]openfga.Tuple, 0, len(tags))
-	svcAccEntity := ofganames.ConvertTag(svcAccTag)
-	for _, tag := range tags {
-		tuple := openfga.Tuple{
-			Object:   tag,
-			Relation: ofganames.AdministratorRelation,
-			Target:   svcAccEntity,
-		}
-		tuples = append(tuples, tuple)
-	}
-	err := j.OpenFGAClient.AddRelation(ctx, tuples...)
-	if err != nil {
-		zapctx.Error(ctx, "failed to add tuple(s)", zap.NamedError("add-relation-error", err))
-		return errors.E(op, errors.CodeOpenFGARequestFailed, err)
-	}
-	return nil
 }

@@ -9,22 +9,16 @@ import (
 
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
-	"github.com/juju/zaputil"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jimm/permissions"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 )
-
-// GetUserCloudAccess returns users access level for the specified cloud.
-func (j *JIMM) GetUserCloudAccess(ctx context.Context, user *openfga.User, cloud names.CloudTag) (string, error) {
-	accessLevel := user.GetCloudAccess(ctx, cloud)
-	return ToCloudAccessString(accessLevel), nil
-}
 
 // GetCloud retrieves the cloud for the given cloud tag. If the cloud
 // cannot be found then an error with the code CodeNotFound is
@@ -42,7 +36,7 @@ func (j *JIMM) GetCloud(ctx context.Context, user *openfga.User, tag names.Cloud
 		return cl, errors.E(op, err)
 	}
 
-	accessLevel, err := j.GetUserCloudAccess(ctx, user, tag)
+	accessLevel, err := j.permissionManager.GetUserCloudAccess(ctx, user, tag)
 	if err != nil {
 		return dbmodel.Cloud{}, errors.E(op, err)
 	}
@@ -73,7 +67,7 @@ func (j *JIMM) ForEachUserCloud(ctx context.Context, user *openfga.User, f func(
 		return errors.E(op, err, "cannot load clouds")
 	}
 	for _, cloud := range clouds {
-		userAccess := ToCloudAccessString(user.GetCloudAccess(ctx, cloud.ResourceTag()))
+		userAccess := permissions.ToCloudAccessString(user.GetCloudAccess(ctx, cloud.ResourceTag()))
 		if userAccess == "" {
 			// If user does not have access to the cloud,
 			// we skip this cloud.
@@ -421,146 +415,6 @@ func (j *JIMM) doCloudAdmin(ctx context.Context, user *openfga.User, ct names.Cl
 	return nil
 }
 
-// GrantCloudAccess grants the given access level on the given cloud to the
-// given user. If the cloud is not found then an error with the code
-// CodeNotFound is returned. If the authenticated user does not have admin
-// access to the cloud then an error with the code CodeUnauthorized is
-// returned.
-func (j *JIMM) GrantCloudAccess(ctx context.Context, user *openfga.User, ct names.CloudTag, ut names.UserTag, access string) error {
-	const op = errors.Op("jimm.GrantCloudAccess")
-
-	targetRelation, err := ToCloudRelation(access)
-	if err != nil {
-		zapctx.Debug(
-			ctx,
-			"failed to recognize given access",
-			zaputil.Error(err),
-			zap.String("access", string(access)),
-		)
-		return errors.E(op, errors.CodeBadRequest, fmt.Sprintf("failed to recognize given access: %q", access), err)
-	}
-
-	err = j.doCloudAdmin(ctx, user, ct, func(_ *dbmodel.Cloud, _ API) error {
-		targetUser := &dbmodel.Identity{}
-		targetUser.SetTag(ut)
-		if err := j.Database.GetIdentity(ctx, targetUser); err != nil {
-			return err
-		}
-		targetOfgaUser := openfga.NewUser(targetUser, j.OpenFGAClient)
-
-		currentRelation := targetOfgaUser.GetCloudAccess(ctx, ct)
-		switch targetRelation {
-		case ofganames.CanAddModelRelation:
-			switch currentRelation {
-			case ofganames.NoRelation:
-				break
-			default:
-				return nil
-			}
-		case ofganames.AdministratorRelation:
-			switch currentRelation {
-			case ofganames.NoRelation, ofganames.CanAddModelRelation:
-				break
-			default:
-				return nil
-			}
-		}
-
-		if err := targetOfgaUser.SetCloudAccess(ctx, ct, targetRelation); err != nil {
-			return errors.E(err, op, "failed to set cloud access")
-		}
-		return nil
-	})
-
-	if err != nil {
-		zapctx.Error(
-			ctx,
-			"failed to grant cloud access",
-			zaputil.Error(err),
-			zap.String("targetUser", string(ut.Id())),
-			zap.String("cloud", string(ct.Id())),
-			zap.String("access", string(access)),
-		)
-		return errors.E(op, err)
-	}
-	return nil
-}
-
-// RevokeCloudAccess revokes the given access level on the given cloud from
-// the given user. If the cloud is not found then an error with the code
-// CodeNotFound is returned. If the authenticated user does not have admin
-// access to the cloud then an error with the code CodeUnauthorized is
-// returned.
-func (j *JIMM) RevokeCloudAccess(ctx context.Context, user *openfga.User, ct names.CloudTag, ut names.UserTag, access string) error {
-	const op = errors.Op("jimm.RevokeCloudAccess")
-
-	targetRelation, err := ToCloudRelation(access)
-	if err != nil {
-		zapctx.Debug(
-			ctx,
-			"failed to recognize given access",
-			zaputil.Error(err),
-			zap.String("access", string(access)),
-		)
-		return errors.E(op, errors.CodeBadRequest, fmt.Sprintf("failed to recognize given access: %q", access), err)
-	}
-
-	err = j.doCloudAdmin(ctx, user, ct, func(_ *dbmodel.Cloud, _ API) error {
-		targetUser := &dbmodel.Identity{}
-		targetUser.SetTag(ut)
-		if err := j.Database.GetIdentity(ctx, targetUser); err != nil {
-			return err
-		}
-		targetOfgaUser := openfga.NewUser(targetUser, j.OpenFGAClient)
-
-		currentRelation := targetOfgaUser.GetCloudAccess(ctx, ct)
-
-		var relationsToRevoke []openfga.Relation
-		switch targetRelation {
-		case ofganames.CanAddModelRelation:
-			switch currentRelation {
-			case ofganames.NoRelation:
-				return nil
-			default:
-				// If we're revoking "add-model" access, in addition to the "add-model" relation, we should also revoke the
-				// "admin" relation. That's because having an "admin" relation indirectly grants the "add-model" permission
-				// to the user.
-				relationsToRevoke = []openfga.Relation{
-					ofganames.CanAddModelRelation,
-					ofganames.AdministratorRelation,
-				}
-			}
-		case ofganames.AdministratorRelation:
-			switch currentRelation {
-			case ofganames.NoRelation, ofganames.CanAddModelRelation:
-				return nil
-			default:
-				relationsToRevoke = []openfga.Relation{
-					ofganames.AdministratorRelation,
-				}
-			}
-		}
-
-		if err := targetOfgaUser.UnsetCloudAccess(ctx, ct, relationsToRevoke...); err != nil {
-			return errors.E(err, op, "failed to unset cloud access")
-		}
-		return nil
-	})
-
-	if err != nil {
-		zapctx.Error(
-			ctx,
-			"failed to revoke cloud access",
-			zaputil.Error(err),
-			zap.String("targetUser", string(ut.Id())),
-			zap.String("cloud", string(ct.Id())),
-			zap.String("access", string(access)),
-		)
-		return errors.E(op, err)
-	}
-	return nil
-}
-
 // RemoveCloud removes the given cloud from JAAS If the cloud is not found
 // then an error with the code CodeNotFound is returned. If the
 // authenticated user does not have admin access to the cloud then an error
@@ -607,7 +461,7 @@ func (j *JIMM) UpdateCloud(ctx context.Context, user *openfga.User, ct names.Clo
 	if err := j.Database.GetCloud(ctx, &c); err != nil {
 		return errors.E(op, err)
 	}
-	cloudAccess, err := j.GetUserCloudAccess(ctx, user, c.ResourceTag())
+	cloudAccess, err := j.permissionManager.GetUserCloudAccess(ctx, user, c.ResourceTag())
 	if err != nil {
 		return errors.E(op, err)
 	}
