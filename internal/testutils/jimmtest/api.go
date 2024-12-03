@@ -149,6 +149,7 @@ type API struct {
 	ModelStatus_                       func(context.Context, *jujuparams.ModelStatus) error
 	ModelSummaryWatcherNext_           func(context.Context, string) ([]jujuparams.ModelAbstract, error)
 	ModelSummaryWatcherStop_           func(context.Context, string) error
+	ListModelSummaries_                func(context.Context, jujuparams.ModelSummariesRequest) (jujuparams.ModelSummaryResults, error)
 	ModelWatcherNext_                  func(ctx context.Context, id string) ([]jujuparams.Delta, error)
 	ModelWatcherStop_                  func(ctx context.Context, id string) error
 	Offer_                             func(context.Context, crossmodel.OfferURL, jujuparams.AddApplicationOffer) error
@@ -356,6 +357,13 @@ func (a *API) ModelSummaryWatcherStop(ctx context.Context, id string) error {
 		return errors.E(errors.CodeNotImplemented)
 	}
 	return a.ModelSummaryWatcherStop_(ctx, id)
+}
+
+func (a *API) ListModelSummaries(ctx context.Context, req jujuparams.ModelSummariesRequest) (jujuparams.ModelSummaryResults, error) {
+	if a.ListModelSummaries_ == nil {
+		return jujuparams.ModelSummaryResults{}, errors.E(errors.CodeNotImplemented)
+	}
+	return a.ListModelSummaries_(ctx, req)
 }
 
 func (a *API) Offer(ctx context.Context, offerURL crossmodel.OfferURL, aao jujuparams.AddApplicationOffer) error {

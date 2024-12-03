@@ -208,6 +208,22 @@ func (c Connection) ControllerModelSummary(ctx context.Context, ms *jujuparams.M
 	return errors.E(op, "controller model not found", errors.CodeNotFound)
 }
 
+// ListModelSummaries retrieves the list of model summaries from the controler
+func (c Connection) ListModelSummaries(ctx context.Context, ms jujuparams.ModelSummariesRequest) (jujuparams.ModelSummaryResults, error) {
+	const op = errors.Op("jujuclient.ControllerModelSummary")
+	args := jujuparams.ModelSummariesRequest{
+		UserTag: c.userTag,
+		All:     ms.All,
+	}
+	var resp jujuparams.ModelSummaryResults
+	err := c.Call(ctx, "ModelManager", 9, "", "ListModelSummaries", &args, &resp)
+	if err != nil {
+		return jujuparams.ModelSummaryResults{}, errors.E(op, jujuerrors.Cause(err))
+	}
+
+	return resp, nil
+}
+
 // ValidateModelUpgrade validates if a model is allowed to perform an upgrade. It
 // uses ValidateModelUpgrades on the ModelManager facade.
 func (c Connection) ValidateModelUpgrade(ctx context.Context, model names.ModelTag, force bool) error {

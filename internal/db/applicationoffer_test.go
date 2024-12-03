@@ -7,7 +7,6 @@ import (
 	"database/sql"
 	"sort"
 	"testing"
-	"time"
 
 	qt "github.com/frankban/quicktest"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -82,16 +81,7 @@ func initTestEnvironment(c *qt.C, db *db.Database) testEnvironment {
 		Controller:      env.controller,
 		CloudRegion:     env.cloud.Regions[0],
 		CloudCredential: env.cred,
-		Type:            "iaas",
-		IsController:    false,
 		Life:            state.Alive.String(),
-		Status: dbmodel.Status{
-			Status: "available",
-			Since: sql.NullTime{
-				Time:  time.Now(),
-				Valid: true,
-			},
-		},
 	}
 	c.Assert(db.DB.Create(&env.model).Error, qt.IsNil)
 
@@ -105,16 +95,7 @@ func initTestEnvironment(c *qt.C, db *db.Database) testEnvironment {
 		Controller:      env.controller,
 		CloudRegion:     env.cloud.Regions[0],
 		CloudCredential: env.cred,
-		Type:            "iaas",
-		IsController:    false,
 		Life:            state.Alive.String(),
-		Status: dbmodel.Status{
-			Status: "available",
-			Since: sql.NullTime{
-				Time:  time.Now(),
-				Valid: true,
-			},
-		},
 	}
 	c.Assert(db.DB.Create(&env.model1).Error, qt.IsNil)
 

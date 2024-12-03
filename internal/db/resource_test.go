@@ -53,16 +53,7 @@ func SetupDB(c *qt.C, database *db.Database) (dbmodel.Model, dbmodel.Controller,
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
 		CloudCredentialID: cred.ID,
-		Type:              "iaas",
-		DefaultSeries:     "warty",
 		Life:              state.Alive.String(),
-		Status: dbmodel.Status{
-			Status: "available",
-			Since:  db.Now(),
-		},
-		SLA: dbmodel.SLA{
-			Level: "unsupported",
-		},
 	}
 	err = database.AddModel(context.Background(), &model)
 	c.Assert(err, qt.Equals, nil)

@@ -484,21 +484,10 @@ func (m *Model) DBObject(c Tester, db *db.Database) dbmodel.Model {
 		migrationControllerID.Int32 = int32(m.env.Controller(m.MigrationController).dbo.ID)
 		migrationControllerID.Valid = true
 	}
-	m.dbo.MigrationControllerID = migrationControllerID
 	m.dbo.CloudRegion = m.env.Cloud(m.Cloud).DBObject(c, db).Region(m.CloudRegion)
 	m.dbo.CloudCredential = m.env.CloudCredential(m.Owner, m.Cloud, m.CloudCredential).DBObject(c, db)
 
-	m.dbo.Type = m.Type
-	m.dbo.DefaultSeries = m.DefaultSeries
 	m.dbo.Life = m.Life
-	m.dbo.Status.FromJujuEntityStatus(m.Status)
-	m.dbo.Status.Version = m.AgentVersion
-	if m.SLA != nil {
-		m.dbo.SLA.FromJujuModelSLAInfo(*m.SLA)
-	}
-	m.dbo.Cores = m.Cores
-	m.dbo.Machines = m.Machines
-	m.dbo.Units = m.Units
 
 	err := db.AddModel(context.Background(), &m.dbo)
 	if err != nil {

@@ -343,9 +343,9 @@ func (w *Watcher) watchController(ctx context.Context, ctl *dbmodel.Controller) 
 						machines++
 						cores += n
 					}
-					m.Cores = cores
-					m.Machines = machines
-					m.Units = int64(len(v.units))
+					// m.Cores = cores
+					// m.Machines = machines
+					// m.Units = int64(len(v.units))
 					if err := tx.UpdateModel(ctx, &m); err != nil {
 						return err
 					}

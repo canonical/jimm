@@ -430,6 +430,9 @@ type API interface {
 	// filter.
 	ListApplicationOffers(context.Context, []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error)
 
+	// ListModelSummaries lists models summaries
+	ListModelSummaries(context.Context, jujuparams.ModelSummariesRequest) (jujuparams.ModelSummaryResults, error)
+
 	// ModelInfo fetches a model's ModelInfo.
 	ModelInfo(context.Context, *jujuparams.ModelInfo) error
 
