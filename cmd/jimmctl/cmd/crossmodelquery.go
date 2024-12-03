@@ -15,20 +15,20 @@ import (
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
-var (
+const (
 	// stdinMarkers contains file names that are taken to be stdin.
 	crossModelQueryDoc = `
-query-models command queries all models available to the current user
+The query-models command queries all models available to the current user
 performing the query against each model status individually, returning
 the collated query responses for each model.
 
-The query will run against the exact output of "juju status --format json",
+The query runs against the output of "juju status --format json",
 as such you can format your query against an output like this.
 
-The queries will expect a JQ query string.
-
-Example:
-	jimmctl query-models '.applications | with_entries(select(.key=="nginx-ingress-integrator"))'
+The queries expect a JQ query string.
+`
+	crossModelQueryExample = `
+    jimmctl query-models '.applications | with_entries(select(.key=="nginx-ingress-integrator"))'
 `
 )
 
@@ -80,9 +80,11 @@ func (c *crossModelQueryCommand) SetFlags(f *gnuflag.FlagSet) {
 // Info implements modelcmd.Command.
 func (c *crossModelQueryCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:    "query-models",
-		Purpose: "Query model statuses",
-		Doc:     crossModelQueryDoc,
+		Name:     "query-models",
+		Args:     "<query>",
+		Purpose:  "Query model statuses",
+		Doc:      crossModelQueryDoc,
+		Examples: crossModelQueryExample,
 	})
 }
 

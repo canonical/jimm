@@ -20,13 +20,16 @@ import (
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
-var listAuditEventsCommandDoc = `
-	list-audit-events command displays matching audit events.
-
-	Example:
-		jimmctl list-audit-events --after <time> --before <time> --user-tag <user-tag> --limit <limit>
-		jimmctl audit-events --after <time> --format yaml
+const (
+	listAuditEventsCommandDoc = `
+The list-audit-events command displays matching audit events.
 `
+	listAuditEventsCommandExample = `
+    jimmctl list-audit-events --after 2020-01-01T15:00:00 --before 2020-01-01T15:00:00 --user-tag user@canonical.com --limit 50
+	jimmctl list-audit-events --method CreateModel
+    jimmctl audit-events --after 2020-01-01T15:00:00 --format yaml
+`
+)
 
 // NewListAuditEventsCommand returns a command to list audit events matching
 // specified criteria.
@@ -51,10 +54,11 @@ type listAuditEventsCommand struct {
 
 func (c *listAuditEventsCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:    "list-audit-events",
-		Purpose: "Displays audit events",
-		Doc:     listAuditEventsCommandDoc,
-		Aliases: []string{"audit-events"},
+		Name:     "list-audit-events",
+		Purpose:  "Displays audit events",
+		Doc:      listAuditEventsCommandDoc,
+		Examples: listAuditEventsCommandExample,
+		Aliases:  []string{"audit-events"},
 	})
 }
 
@@ -66,8 +70,8 @@ func (c *listAuditEventsCommand) SetFlags(f *gnuflag.FlagSet) {
 		"json":    cmd.FormatJson,
 		"tabular": formatTabular,
 	})
-	f.StringVar(&c.args.After, "after", "", "display events that happened after specified time")
-	f.StringVar(&c.args.Before, "before", "", "display events that happened before specified time")
+	f.StringVar(&c.args.After, "after", "", "display events that happened after a specified time, formatted as RFC3339")
+	f.StringVar(&c.args.Before, "before", "", "display events that happened before specified time, formatted as RFC3339")
 	f.StringVar(&c.args.UserTag, "user-tag", "", "display events performed by authenticated user")
 	f.StringVar(&c.args.Method, "method", "", "display events for a specific method call")
 	f.StringVar(&c.args.Model, "model", "", "display events for a specific model (model name is controller/model)")

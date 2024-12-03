@@ -30,7 +30,7 @@ const (
 	defaultPageSize     = 50
 )
 
-var (
+const (
 	relationDoc = `
 relation command enables relation management for jimm
 `
@@ -90,65 +90,59 @@ This will grant/revoke the relation to all users within TeamA:
 `
 
 	addRelationDoc = `
-add command adds relation to jimm.
+The add command adds relation to jimm.
+` + genericConstraintsDoc
 
-Example:
-	jimmctl auth relation add <object> <relation> <target_object>
-	jimmctl auth relation add -f <filename>
-` + genericConstraintsDoc +
-		`
-Examples:
-jimmctl auth relation add user-Alice member group-MyGroup
-jimmctl auth relation add group-MyTeam#member loginer controller-MyController
+	addRelationExample = `
+    jimmctl auth relation add user-alice@canonical.com member group-mygroup
+    jimmctl auth relation add group-MyTeam#member admin model-mymodel
+	jimmctl auth relation add -f /path/to/file.yaml
 `
 
 	removeRelationDoc = `
-remove command removes a relation from jimm.
+The remove command removes a relation from jimm.
+` + genericConstraintsDoc
 
-Example:
-	jimmctl auth relation remove <object> <relation> <target_object>
-	jimmctl auth relation remove -f <filename>
-	` + genericConstraintsDoc +
-		`
-Examples:
-jimmctl auth relation remove user-Alice member group-MyGroup
-jimmctl auth relation remove group-MyTeam#member loginer controller-MyController`
+	removeRelationExample = `
+    jimmctl auth relation remove user-alice@canonical.com member group-mygroup
+    jimmctl auth relation remove group-MyTeam#member admin model-mymodel
+	jimmctl auth relation remove -f /path/to/file.yaml
+`
 
 	checkRelationDoc = `
 Verifies the access between resources.
-
-Example:
-jimmctl auth relation check user-alice@canonical.com administrator controller-aws-controller-1
-
-Example:
-	jimmctl auth relation check <object> <relation> <target_object>
-	jimmctl auth relation check -f <filename>
-	`
+`
+	checkRelationExample = `
+    jimmctl auth relation check user-alice@canonical.com administrator controller-aws-controller-1
+`
 
 	listRelationsDoc = `
-list relations known to jimm. Using the "target", "relation"
-and "object" flags, only those relations matching the filter
-will be returned.
-Examples:
-	jimmctl auth relation list
-	returns the list of all relations
+List relations known to jimm. Using the "target", "relation" and "object" flags, 
+only those relations matching the filter will be returned.
+`
 
-	jimmctl auth relation list --target <target_object>
-	returns the list of relations, where target object
-	matches the specified one
+	listRelationsExample = `
+List all relations
 
-	jimmctl auth relation list --target <target_object>  --relation <relation>
-	returns the list of relations, where target object
-	and relation match the specified ones
+    jimmctl auth relation list
+	
+List relations where the target object match
+
+    jimmctl auth relation list --target model-mymodel
+
+List relations where the target object and relation match
+
+	jimmctl auth relation list --target model-mymodel  --relation admin
 `
 )
 
 // NewRelationCommand returns a command for relation management.
 func NewRelationCommand() *cmd.SuperCommand {
 	cmd := jujucmd.NewSuperCommand(cmd.SuperCommandParams{
-		Name:    "relation",
-		Doc:     relationDoc,
-		Purpose: "Relation management.",
+		Name:        "relation",
+		UsagePrefix: "auth",
+		Doc:         relationDoc,
+		Purpose:     "Relation management.",
 	})
 	cmd.Register(newAddRelationCommand())
 	cmd.Register(newRemoveRelationCommand())
@@ -185,9 +179,11 @@ type addRelationCommand struct {
 // Info implements the cmd.Command interface.
 func (c *addRelationCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:    "add",
-		Purpose: "Add relation to jimm.",
-		Doc:     addRelationDoc,
+		Name:     "add",
+		Args:     "<object> <relation> <target_object>",
+		Purpose:  "Add relation to jimm.",
+		Doc:      addRelationDoc,
+		Examples: addRelationExample,
 	})
 }
 
@@ -276,9 +272,11 @@ type removeRelationCommand struct {
 // Info implements the cmd.Command interface.
 func (c *removeRelationCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:    "remove",
-		Purpose: "Remove relation from jimm.",
-		Doc:     removeRelationDoc,
+		Name:     "remove",
+		Args:     "<object> <relation> <target_object>",
+		Purpose:  "Remove relation from jimm.",
+		Doc:      removeRelationDoc,
+		Examples: removeRelationExample,
 	})
 }
 
@@ -380,9 +378,11 @@ func newCheckRelationCommand() cmd.Command {
 // Info implements the cmd.Command interface.
 func (c *checkRelationCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:    "check",
-		Purpose: "Check access to a resource.",
-		Doc:     checkRelationDoc,
+		Name:     "check",
+		Args:     "<object> <relation> <target_object>",
+		Purpose:  "Check access to a resource.",
+		Doc:      checkRelationDoc,
+		Examples: checkRelationExample,
 	})
 }
 
@@ -507,9 +507,10 @@ type listRelationsCommand struct {
 // Info implements the cmd.Command interface.
 func (c *listRelationsCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:    "list",
-		Purpose: "List relations.",
-		Doc:     listRelationsDoc,
+		Name:     "list",
+		Purpose:  "List relations.",
+		Doc:      listRelationsDoc,
+		Examples: listRelationsExample,
 	})
 }
 

@@ -18,13 +18,14 @@ import (
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
-var (
+const (
 	removeCloudFromControllerCommandDoc = `
-	remove-cloud-from-controller command removes the specified cloud from the 
-	specified controller in jimm.
+The remove-cloud-from-controller command removes the specified cloud from the 
+specified controller in jimm.
+`
 
-	Example:
-		jimmctl remove-cloud-from-controller <controller_name> <cloud_name> 
+	removeCloudFromControllerCommandExample = `
+    jimmctl remove-cloud-from-controller mycontroller mycloud
 `
 )
 
@@ -63,9 +64,11 @@ type removeCloudFromControllerAPI interface {
 // Info implements Command.Info.
 func (c *removeCloudFromControllerCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:    "remove-cloud-from-controller",
-		Purpose: "Remove cloud from specific controller in jimm",
-		Doc:     removeCloudFromControllerCommandDoc,
+		Name:     "remove-cloud-from-controller",
+		Args:     "<controller_name> <cloud_name>",
+		Purpose:  "Remove cloud from specific controller in jimm",
+		Doc:      removeCloudFromControllerCommandDoc,
+		Examples: removeCloudFromControllerCommandExample,
 	})
 }
 

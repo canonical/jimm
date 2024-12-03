@@ -18,17 +18,19 @@ import (
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
-var migrateModelCommandDoc = `
-	The migrate command migrates a model(s) to a new controller. Specify
-	a model-uuid to migrate and the destination controller name.
+const (
+	migrateModelCommandDoc = `
+The migrate command migrates a model(s) to a new controller. Specify
+a model-uuid to migrate and the destination controller name.
 
-	Note that multiple models can be targeted for migration by supplying
-	multiple model uuids.
-
-	Example:
-		jimmctl migrate <controller-name> <model-uuid> 
-		jimmctl migrate <controller-name> <model-uuid> <model-uuid> <model-uuid>
+Note that multiple models can be targeted for migration by supplying
+multiple model uuids.
 `
+	migrateModelCommandExample = `
+    jimmctl migrate mycontroller 2cb433a6-04eb-4ec4-9567-90426d20a004 
+    jimmctl migrate mycontroller 2cb433a6-04eb-4ec4-9567-90426d20a004 fd469983-27c2-423b-bebf-84f616fb036b ...
+`
+)
 
 // NewMigrateModelCommand returns a command to migrate models.
 func NewMigrateModelCommand() cmd.Command {
@@ -52,9 +54,11 @@ type migrateModelCommand struct {
 
 func (c *migrateModelCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:    "migrate",
-		Purpose: "Migrate models to the target controller",
-		Doc:     migrateModelCommandDoc,
+		Name:     "migrate",
+		Args:     "<controller name> <model uuid> [<model uuid>...]",
+		Purpose:  "Migrate models to the target controller",
+		Doc:      migrateModelCommandDoc,
+		Examples: migrateModelCommandExample,
 	})
 }
 

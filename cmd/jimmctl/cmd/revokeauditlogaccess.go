@@ -16,12 +16,14 @@ import (
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
-var revokeAuditLogAccessDoc = `
-	revoke-audit-log-access revokes user access to audit logs.
-
-	Example:
-		jimmctl revoke-audit-log-access <username> 
+const (
+	revokeAuditLogAccessDoc = `
+The revoke-audit-log-access revokes user access to audit logs.
 `
+	revokeAuditLogAccessExample = `
+    jimmctl revoke-audit-log-access user@canonical.com
+`
+)
 
 // NewrevokeAuditLogAccess returns a command used to revoke
 // users access to audit logs.
@@ -45,9 +47,11 @@ type revokeAuditLogAccessCommand struct {
 
 func (c *revokeAuditLogAccessCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:    "revoke-audit-log-access",
-		Purpose: "revokes access to audit logs.",
-		Doc:     revokeAuditLogAccessDoc,
+		Name:     "revoke-audit-log-access",
+		Args:     "<user>",
+		Purpose:  "revokes access to audit logs.",
+		Doc:      revokeAuditLogAccessDoc,
+		Examples: revokeAuditLogAccessExample,
 	})
 }
 
