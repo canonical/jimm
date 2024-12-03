@@ -44,4 +44,4 @@ parts:
             mkdir -p $CRAFT_PART_INSTALL/root/openfga/
             # Note that we can't use go run directly (https://github.com/canonical/rockcraft/issues/755)
             go install github.com/openfga/cli/cmd/fga@latest
-            /root/go/bin/fga model transform --file ./openfga/authorisation_model.fga --output-format json > $CRAFT_PART_INSTALL/root/openfga/authorisation_model.json
+            $GOBIN/fga model transform --file ./openfga/authorisation_model.fga --output-format json > $CRAFT_PART_INSTALL/root/openfga/authorisation_model.json
