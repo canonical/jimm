@@ -7,7 +7,7 @@ import (
 )
 
 const authDoc = `
-The auth command enables users to manage authorisation model used by JIMM.
+The auth command enables user access management.
 `
 
 func NewAuthCommand() *jujucmd.SuperCommand {
