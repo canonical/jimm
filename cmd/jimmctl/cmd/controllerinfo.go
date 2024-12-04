@@ -70,7 +70,7 @@ func (c *controllerInfoCommand) Info() *cmd.Info {
 func (c *controllerInfoCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.CommandBase.SetFlags(f)
 	f.BoolVar(&c.local, "local", false, "If local flag is specified, then the local API address and CA cert of the controller will be used.")
-	f.StringVar(&c.tlsHostname, "tls-hostname", "", "Specify the hostname for TLS verfiication.")
+	f.StringVar(&c.tlsHostname, "tls-hostname", "", "Specify the hostname for TLS verification.")
 }
 
 // Init implements the cmd.Command interface.
