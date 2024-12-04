@@ -5,7 +5,7 @@ go 1.23
 // Juju based dependencies
 require (
 	github.com/juju/charm/v12 v12.1.1
-	github.com/juju/cmd/v3 v3.0.16
+	github.com/juju/cmd/v3 v3.1.1
 	github.com/juju/errors v1.0.0
 	github.com/juju/gnuflag v1.0.0
 	github.com/juju/http/v2 v2.0.1

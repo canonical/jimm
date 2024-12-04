@@ -1,0 +1,63 @@
+name: Publish Docs
+
+# This workflow builds jimmctl and generates a markdown formatted
+# documentation reference before converting the doc to rst and 
+# making a PR to the jaas-documentation repo to update the docs.
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v3*'
+
+jobs:
+  publish-jimmctl-docs:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        fetch-tags: true
+    - run: git fetch --tags --force origin # https://github.com/actions/checkout/issues/882 & https://github.com/actions/checkout/issues/290 
+
+    - name: Build jimmctl
+      run: go build ./cmd/jimmctl/
+
+      # Default doc name is documentation.md which can't be changed via flags.
+    - name: Generate docs
+      run: ./jimmctl documentation --out .
+
+    - name: Convert doc to reStructuredText
+      uses: docker://pandoc/core:3.5
+      with:
+        args: "documentation.md -o documentation.rst --wrap=none"
+
+      # We do this because the original doc doesn't have a top level heading.: 
+    - name: Create final doc with title
+      run: |
+        echo "Jimmctl Reference" > jimmctl-reference.rst
+        echo "#################" >> jimmctl-reference.rst
+        echo "" >> jimmctl-reference.rst
+        cat documentation.rst >> jimmctl-reference.rst
+    
+    - name: Checkout docs
+      uses: actions/checkout@v4
+      with:
+        repository: 'canonical/jaas-documentation'
+        ref: 'v3'
+        path: ./jaas-documentation
+  
+    - name: Update Docs
+      working-directory: ./jaas-documentation
+      run: cp ../jimmctl-reference.rst ./reference/jimmctl.rst
+
+    - name: Create Pull Request
+      uses: peter-evans/create-pull-request@v6
+      with:
+        token: ${{ secrets.JIMM_GO_SDK_PAT }}
+        path: ./jaas-documentation
+        branch: update-jimmctl-${{ github.run_number }}
+        title: Update jimmctl reference doc
+        body: This PR updates the jimmctl reference doc.
+        commit-message: Updated jimmctl reference for release ${{ github.event.ref }}
