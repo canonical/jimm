@@ -112,6 +112,19 @@ func (s *resourcesSuite) TestListResources(c *gc.C) {
 		ids          []testEntity
 	}{
 		{
+			desc:     "test default sizes",
+			wantPage: 0,
+			wantSize: 5,
+			ids:      ids,
+		},
+		{
+			desc:     "test default sizes",
+			page:     utils.IntToPointer(0),
+			wantPage: 0,
+			wantSize: 5,
+			ids:      ids,
+		},
+		{
 			desc:         "test with first page",
 			size:         utils.IntToPointer(2),
 			page:         utils.IntToPointer(0),

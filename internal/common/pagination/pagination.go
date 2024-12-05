@@ -20,7 +20,7 @@ type LimitOffsetPagination struct {
 // NewOffsetFilter creates a filter for limit/offset pagination.
 // If limit or offset are out of bounds, defaults will be used instead.
 func NewOffsetFilter(limit int, offset int) LimitOffsetPagination {
-	if limit < 0 {
+	if limit <= 0 {
 		limit = defaultOffsetFilterPageSize
 	}
 	if limit > maxOffsetFilterPageSize {
