@@ -55,7 +55,7 @@ jobs:
     - name: Create Pull Request
       uses: peter-evans/create-pull-request@v6
       with:
-        token: ${{ secrets.JIMM_GO_SDK_PAT }}
+        token: ${{ secrets.JIMM_DOCS_TOKEN }}
         path: ./jaas-documentation
         branch: update-jimmctl-${{ github.run_number }}
         title: Update jimmctl reference doc
