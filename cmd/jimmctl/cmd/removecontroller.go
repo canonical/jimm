@@ -15,13 +15,14 @@ import (
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
-var (
+const (
 	removeControllerCommandDoc = `
-	remove-controller command removes a controller from jimm.
+The remove-controller command removes a controller from jimm.
+`
 
-	Example:
-		jimmctl remove-controller <name> 
-		jimmctl remove-controller <name> --force
+	removeControllerCommandExample = `
+    jimmctl remove-controller mycontroller 
+    jimmctl remove-controller mycontroller --force
 `
 )
 
@@ -46,9 +47,11 @@ type removeControllerCommand struct {
 
 func (c *removeControllerCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:    "remove-controller",
-		Purpose: "Remove controller from jimm",
-		Doc:     removeControllerCommandDoc,
+		Name:     "remove-controller",
+		Args:     "<name>",
+		Purpose:  "Remove controller from jimm",
+		Doc:      removeControllerCommandDoc,
+		Examples: removeControllerCommandExample,
 	})
 }
 

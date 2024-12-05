@@ -17,24 +17,27 @@ import (
 	"github.com/canonical/jimm/v3/internal/errors"
 )
 
-//nolint:gosec // Thinks a credential is exposed.
-const importCloudCredentialsDoc = `
-	import-cloud-credentials imports a set of cloud credentials
-	loaded from a file containing a series of JSON objects. The JSON
-	objects specifying the credentials should be of the form:
+const (
+	//nolint:gosec // Thinks a credential is exposed.
+	importCloudCredentialsDoc = `
+The import-cloud-credentials imports a set of cloud credentials
+loaded from a file containing a series of JSON objects. The JSON
+objects specifying the credentials should be of the form:
 
-	{
-		"_id": <cloud-credential-id>,
-		"type": <credential-type>,
-		"attributes": {
-			<key1>: <value1>,
-			...
-		}
+{
+	"_id": <cloud-credential-id>,
+	"type": <credential-type>,
+	"attributes": {
+		<key1>: <value1>,
+		...
 	}
-
-	Example:
-		jimmctl import-cloud-credentials creds.json
+}
 `
+	//nolint:gosec // Thinks a credential is exposed.
+	importCloudCredentialsExample = `
+    jimmctl import-cloud-credentials ./path/creds.json
+`
+)
 
 // NewImportCloudCredentialsCommand returns a command to import cloud
 // credentials.
@@ -58,10 +61,11 @@ type importCloudCredentialsCommand struct {
 // Info implements cmd.Command interface.
 func (c *importCloudCredentialsCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:    "import-cloud-credentials",
-		Args:    "<credentials file>",
-		Purpose: "Import cloud credentials to jimm",
-		Doc:     importCloudCredentialsDoc,
+		Name:     "import-cloud-credentials",
+		Args:     "<filepath>",
+		Purpose:  "Import cloud credentials to jimm",
+		Doc:      importCloudCredentialsDoc,
+		Examples: importCloudCredentialsExample,
 	})
 }
 

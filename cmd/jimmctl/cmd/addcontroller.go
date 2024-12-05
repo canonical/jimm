@@ -21,11 +21,11 @@ var (
 	stdinMarkers = []string{"-"}
 
 	addControllerCommandDoc = `
-	add-controller command adds a controller to jimm.
-
-	Example:
-		jimmctl add-controller <filename> 
-		jimmctl add-controller <filename> --format json
+The add-controller command adds a controller to jimm.
+`
+	addControllerCommandExample = `
+    jimmctl add-controller ./controller-info 
+    jimmctl add-controller ./controller-info.yaml --format json
 `
 )
 
@@ -50,9 +50,11 @@ type addControllerCommand struct {
 
 func (c *addControllerCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:    "add-controller",
-		Purpose: "Add controller to jimm",
-		Doc:     addControllerCommandDoc,
+		Name:     "add-controller",
+		Purpose:  "Add controller to jimm",
+		Args:     "<filepath>",
+		Doc:      addControllerCommandDoc,
+		Examples: addControllerCommandExample,
 	})
 }
 

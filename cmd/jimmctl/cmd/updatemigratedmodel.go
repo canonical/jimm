@@ -15,13 +15,15 @@ import (
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
-const updateMigratedModelCommandDoc = `
-	update-migrated-model updates a model known to JIMM that has
-	been migrated externally to a different JAAS controller.
-
-	Example:
-		jimmctl update-migrated-model <controller name> <model-uuid>
+const (
+	updateMigratedModelCommandDoc = `
+The update-migrated-model updates a model known to JIMM that has
+been migrated externally to a different JAAS controller.
 `
+	updateMigratedModelCommandExample = `
+    jimmctl update-migrated-model mycontroller e0bf3abf-7029-4e48-9c26-68a7b6e02947
+`
+)
 
 // NewUpdateMigratedModelCommand returns a command to update the controller
 // running a model.
@@ -45,10 +47,11 @@ type updateMigratedModelCommand struct {
 // Info implements the cmd.Command interface.
 func (c *updateMigratedModelCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:    "update-migrated-model",
-		Args:    "<controller name> <model uuid>",
-		Purpose: "Update the controller running a model.",
-		Doc:     updateMigratedModelCommandDoc,
+		Name:     "update-migrated-model",
+		Args:     "<controller name> <model uuid>",
+		Purpose:  "Update the controller running a model.",
+		Doc:      updateMigratedModelCommandDoc,
+		Examples: updateMigratedModelCommandExample,
 	})
 }
 

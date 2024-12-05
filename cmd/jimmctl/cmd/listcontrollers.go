@@ -14,14 +14,16 @@ import (
 	"github.com/canonical/jimm/v3/pkg/api"
 )
 
-var listControllersComandDoc = `
-	list-controllers command displays controller information
-	for all controllers known to JIMM.
-
-	Example:
-		jimmctl controllers 
-		jimmctl controllers --format json --output ~/tmp/controllers.json
+const (
+	listControllersCommandDoc = `
+The list-controllers command displays controller information
+for all controllers known to JIMM.
 `
+	listControllersCommandExample = `
+    jimmctl controllers 
+    jimmctl controllers --format json
+`
+)
 
 // NewListControllersCommand returns a command to list controller information.
 func NewListControllersCommand() cmd.Command {
@@ -44,10 +46,11 @@ type listControllersCommand struct {
 
 func (c *listControllersCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:    "controllers",
-		Purpose: "Lists all controllers known to JIMM.",
-		Doc:     listControllersComandDoc,
-		Aliases: []string{"list-controllers"},
+		Name:     "controllers",
+		Purpose:  "Lists all controllers known to JIMM.",
+		Doc:      listControllersCommandDoc,
+		Examples: listControllersCommandExample,
+		Aliases:  []string{"list-controllers"},
 	})
 }
 

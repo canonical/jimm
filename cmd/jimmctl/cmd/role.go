@@ -20,38 +20,39 @@ import (
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
-var (
+const (
 	roleDoc = `
-role command enables role management for jimm
+The role command enables role management for jimm
 `
 
 	addRoleDoc = `
-add command adds role to jimm.
-
-Example:
-	jimmctl auth role add <name> 
+The add command adds role to jimm.
 `
+
+	addRoleExample = `
+    jimmctl auth role add myrole 
+`
+
 	renameRoleDoc = `
-rename command renames a role in jimm.
-
-Example:
-	jimmctl auth role rename <name> <new name>
+The rename command renames a role in jimm.
 `
+	renameRoleExample = `
+    jimmctl auth role rename myrole newrolename
+`
+
 	removeRoleDoc = `
-rename command removes a role in jimm.
+The remove command removes a role in jimm.
+`
 
-Usage:
--y	Remove role without promping for confirmation
-
-Example:
-	jimmctl auth role remove <name>
+	removeRoleExample = `
+    jimmctl auth role remove myrole
 `
 
 	listRolesDoc = `
-list command lists all roles in jimm.
-
-Example:
-	jimmctl auth role list
+The list command lists all roles in jimm.
+`
+	listRolesExample = `
+    jimmctl auth role list
 `
 )
 
@@ -93,9 +94,11 @@ type addRoleCommand struct {
 // Info implements the cmd.Command interface.
 func (c *addRoleCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:    "add",
-		Purpose: "Add role to jimm.",
-		Doc:     addRoleDoc,
+		Name:     "add",
+		Args:     "<role name>",
+		Purpose:  "Add role to jimm.",
+		Doc:      addRoleDoc,
+		Examples: addRoleExample,
 	})
 }
 
@@ -170,9 +173,11 @@ type renameRoleCommand struct {
 // Info implements the cmd.Command interface.
 func (c *renameRoleCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:    "rename",
-		Purpose: "Rename a role.",
-		Doc:     renameRoleDoc,
+		Name:     "rename",
+		Args:     "<role name> <new role name>",
+		Purpose:  "Rename a role.",
+		Doc:      renameRoleDoc,
+		Examples: renameRoleExample,
 	})
 }
 
@@ -238,9 +243,11 @@ type removeRoleCommand struct {
 // Info implements the cmd.Command interface.
 func (c *removeRoleCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:    "remove",
-		Purpose: "Remove a role.",
-		Doc:     removeRoleDoc,
+		Name:     "remove",
+		Args:     "<role name>",
+		Purpose:  "Remove a role.",
+		Doc:      removeRoleDoc,
+		Examples: removeRoleExample,
 	})
 }
 
@@ -331,9 +338,10 @@ type listRolesCommand struct {
 // Info implements the cmd.Command interface.
 func (c *listRolesCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:    "list",
-		Purpose: "List all roles.",
-		Doc:     listRolesDoc,
+		Name:     "list",
+		Purpose:  "List all roles.",
+		Doc:      listRolesDoc,
+		Examples: listRolesExample,
 	})
 }
 

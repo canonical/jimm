@@ -16,22 +16,20 @@ import (
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
-var (
+const (
 	controllerInfoCommandDoc = `
-	controller-info command writes controller information contained
-	in the juju client store to a yaml file.
+The controller-info command writes controller information contained
+in the juju client store to a yaml file.
 
-	If a public address is specified, the output controller information
-	will contain the public address provided and omit a CA cert, this assumes
-	that the server is secured with a public certificate.
-	
-	Use the --local flag if the server is not configured with a public cert.
+If a public address is specified, the output controller information
+will contain the public address provided and omit a CA cert, this assumes
+that the server is secured with a public certificate.
 
-	See examples below for usage.
-
-	Examples:
-		jimmctl controller-info <name> <filename> <public address> 
-		jimmctl controller-info <name> <filename> --local
+Use the --local flag if the server is not configured with a public address.
+`
+	controllerInfoCommandExample = `
+    jimmctl controller-info mycontroller ./destination/file.yaml mycontroller.example.com 
+    jimmctl controller-info mycontroller ./destination/file.yaml --local
 `
 )
 
@@ -60,9 +58,11 @@ type controllerInfoCommand struct {
 
 func (c *controllerInfoCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:    "controller-info",
-		Purpose: "Stores controller info to a yaml file",
-		Doc:     controllerInfoCommandDoc,
+		Name:     "controller-info",
+		Args:     "<name> <filepath> [<public address>]",
+		Purpose:  "Stores controller info to a yaml file",
+		Doc:      controllerInfoCommandDoc,
+		Examples: controllerInfoCommandExample,
 	})
 }
 
@@ -70,7 +70,7 @@ func (c *controllerInfoCommand) Info() *cmd.Info {
 func (c *controllerInfoCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.CommandBase.SetFlags(f)
 	f.BoolVar(&c.local, "local", false, "If local flag is specified, then the local API address and CA cert of the controller will be used.")
-	f.StringVar(&c.tlsHostname, "tls-hostname", "", "Specify the hostname for TLS verfiication.")
+	f.StringVar(&c.tlsHostname, "tls-hostname", "", "Specify the hostname for TLS verification.")
 }
 
 // Init implements the cmd.Command interface.

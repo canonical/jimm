@@ -16,20 +16,21 @@ import (
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
-const importModelCommandDoc = `
-	import-model imports a model running on a controller to jimm.
+const (
+	importModelCommandDoc = `
+The import-model imports a model running on a controller to jimm.
 
-	When importing, it is necessary for JIMM to contain a set of cloud credentials
-	that represent a user's access to the incoming model's cloud. 
+When importing, it is necessary for JIMM to contain a set of cloud credentials
+that represent a user's access to the incoming model's cloud. 
 
-	The --owner command is necessary when importing a model created by a 
-	local user and it will switch the model owner to the desired external user.
-	E.g. --owner my-user@canonical.com
-
-	Example:
-		jimmctl import-model <controller name> <model-uuid>
-		jimmctl import-model <controller name> <model-uuid> --owner <username>
+The --owner command is necessary when importing a model created by a 
+local user and it will switch the model owner to the desired external user.
 `
+	importModelCommandExample = `
+    jimmctl import-model mycontroller ac30d6ae-0bed-4398-bba7-75d49e39f189
+    jimmctl import-model mycontroller ac30d6ae-0bed-4398-bba7-75d49e39f189 --owner user@canonical.com
+`
+)
 
 // NewImportModelCommand returns a command to import a model.
 func NewImportModelCommand() cmd.Command {
@@ -52,15 +53,17 @@ type importModelCommand struct {
 // Info implements the cmd.Command interface.
 func (c *importModelCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:    "import-model",
-		Args:    "<controller name> <model uuid>",
-		Purpose: "Import a model to jimm",
-		Doc:     importModelCommandDoc,
+		Name:     "import-model",
+		Args:     "<controller name> <model uuid>",
+		Purpose:  "Import a model to jimm",
+		Doc:      importModelCommandDoc,
+		Examples: importModelCommandExample,
 	})
 }
 
 // SetFlags implements Command.SetFlags.
 func (c *importModelCommand) SetFlags(f *gnuflag.FlagSet) {
+	c.CommandBase.SetFlags(f)
 	f.StringVar(&c.req.Owner, "owner", "", "switch the model owner to the desired user")
 }
 

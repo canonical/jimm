@@ -25,18 +25,18 @@ import (
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
-var (
+const (
 	addCloudToControllerCommandDoc = `
-	add-cloud-to-controller command adds the specified cloud to a specific 
-	controller on jimm.
+The add-cloud-to-controller command adds the specified cloud to a specific 
+controller on jimm.
 
-	One can specify a cloud definition via a yaml file passed with the --cloud 
-	flag. If the flag is missing, the command will assume the cloud definition
-	is already known and will error otherwise.
-
-	Example:
-		jimmctl add-cloud-to-controller <controller_name> <cloud_name>
-		jimmctl add-cloud-to-controller <controller_name> <cloud_name> --cloud=<cloud_file_path> 
+One can specify a cloud definition via a yaml file passed with the --cloud 
+flag. If the flag is missing, the command will assume the cloud definition
+is already known and will error otherwise.
+`
+	addCloudToControllerExample = `
+    jimmctl add-cloud-to-controller mycontroller mycloud
+    jimmctl add-cloud-to-controller mycontroller mycloud --cloud=./cloud-definition.yaml
 `
 )
 
@@ -78,9 +78,11 @@ type addCloudToControllerCommand struct {
 // Info implements Command.Info.
 func (c *addCloudToControllerCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:    "add-cloud-to-controller",
-		Purpose: "Add cloud to specific controller in jimm",
-		Doc:     addCloudToControllerCommandDoc,
+		Name:     "add-cloud-to-controller",
+		Args:     "<controller_name> <cloud_name>",
+		Purpose:  "Add cloud to specific controller in jimm",
+		Doc:      addCloudToControllerCommandDoc,
+		Examples: addCloudToControllerExample,
 	})
 }
 

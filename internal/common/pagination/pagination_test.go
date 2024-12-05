@@ -27,6 +27,13 @@ func TestOffsetFilter(t *testing.T) {
 			wantOffset: 5,
 		},
 		{
+			desc:       "Valid value are not changed",
+			limit:      0,
+			offset:     0,
+			wantLimit:  pagination.DefaultPageSize,
+			wantOffset: 0,
+		},
+		{
 			desc:       "Negative values are corrected",
 			limit:      -1,
 			offset:     -1,

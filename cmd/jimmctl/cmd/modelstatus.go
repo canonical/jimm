@@ -16,13 +16,15 @@ import (
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
-var modelStatusCommandDoc = `
-	model-status command displays full model status.
-
-	Example:
-		jimmctl model-status <model uuid> 
-		jimmctl model-status <model uuid> --format yaml
+const (
+	modelStatusCommandDoc = `
+The model-status command displays full model status.
 `
+	modelStatusCommandExample = `
+    jimmctl model-status 2cb433a6-04eb-4ec4-9567-90426d20a004 
+    jimmctl model-status 2cb433a6-04eb-4ec4-9567-90426d20a004 --format yaml
+`
+)
 
 // NewModelStatusCommand returns a command to display full model status.
 func NewModelStatusCommand() cmd.Command {
@@ -46,9 +48,11 @@ type modelStatusCommand struct {
 
 func (c *modelStatusCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:    "model-status",
-		Purpose: "Displays full model status",
-		Doc:     modelStatusCommandDoc,
+		Name:     "model-status",
+		Args:     "<model uuid>",
+		Purpose:  "Displays full model status",
+		Doc:      modelStatusCommandDoc,
+		Examples: modelStatusCommandExample,
 	})
 }
 

@@ -15,12 +15,14 @@ import (
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
-var setControllerDeprecatedDoc = `
-	set-controller-deprecated sets the deprecated status of a controller.
-
-	Example:
-		jimmctl set-controller-deprecated <name> --false 
+const (
+	setControllerDeprecatedDoc = `
+The set-controller-deprecated sets the deprecated status of a controller.
 `
+	setControllerDeprecatedExample = `
+    jimmctl set-controller-deprecated mycontroller
+`
+)
 
 // NewSetControllerDeprecatedCommand returns a command used to grant
 // users access to audit logs.
@@ -46,9 +48,11 @@ type setControllerDeprecatedCommand struct {
 
 func (c *setControllerDeprecatedCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:    "set-controller-deprecated",
-		Purpose: "Sets controller deprecated status.",
-		Doc:     setControllerDeprecatedDoc,
+		Name:     "set-controller-deprecated",
+		Args:     "<controller name>",
+		Purpose:  "Sets controller deprecated status.",
+		Doc:      setControllerDeprecatedDoc,
+		Examples: setControllerDeprecatedExample,
 	})
 }
 

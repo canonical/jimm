@@ -6,15 +6,16 @@ import (
 	jujucmd "github.com/juju/cmd/v3"
 )
 
-var authDoc = `
-auth enables users to manage authorisation model used by JIMM.
+const authDoc = `
+The auth command enables user access management.
 `
 
 func NewAuthCommand() *jujucmd.SuperCommand {
 	cmd := jujucmd.NewSuperCommand(jujucmd.SuperCommandParams{
-		Name:    "auth",
-		Doc:     authDoc,
-		Purpose: "Authorisation model management.",
+		Name:        "auth",
+		UsagePrefix: "jimmctl",
+		Doc:         authDoc,
+		Purpose:     "Authorisation model management.",
 	})
 	cmd.Register(NewGroupCommand())
 	cmd.Register(NewRelationCommand())

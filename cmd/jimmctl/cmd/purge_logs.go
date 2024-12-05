@@ -16,14 +16,18 @@ import (
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
-const purgeLogsDoc = `
-	purge-audit-logs purges logs from the database before the given date.
+const (
+	purgeLogsDoc = `
+The purge-audit-logs purges logs from the database before the given date.
 
-	Examples:
-		jimmctl purge-audit-logs 2021-02-03
-		jimmctl purge-audit-logs 2021-02-03T00
-		jimmctl purge-audit-logs 2021-02-03T15:04:05Z	
+The provided date must be formatted as an ISO8601 date string.
 `
+	purgeLogsExample = `
+    jimmctl purge-audit-logs 2021-02-03
+    jimmctl purge-audit-logs 2021-02-03T00
+    jimmctl purge-audit-logs 2021-02-03T15:04:05Z	
+`
+)
 
 // NewPurgeLogsCommand returns a command to purge logs.
 func NewPurgeLogsCommand() cmd.Command {
@@ -46,10 +50,11 @@ type purgeLogsCommand struct {
 // Info implements Command.Info. It returns the command information.
 func (c *purgeLogsCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:    "purge-audit-logs",
-		Args:    "<ISO8601 date>",
-		Purpose: "purges audit logs from the database before the given date",
-		Doc:     purgeLogsDoc,
+		Name:     "purge-audit-logs",
+		Args:     "<date>",
+		Purpose:  "purge audit logs from the database before the given date",
+		Doc:      purgeLogsDoc,
+		Examples: purgeLogsExample,
 	})
 }
 

@@ -20,47 +20,46 @@ import (
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
-var (
+const (
 	groupDoc = `
-group command enables group management for jimm
+The group command enables group management for jimm
 `
 
 	addGroupDoc = `
-add command adds group to jimm.
-
-Example:
-	jimmctl auth group add <name> 
+The add command adds group to jimm.
+`
+	addGroupExample = `
+    jimmctl auth group add mygroup
 `
 	renameGroupDoc = `
-rename command renames a group in jimm.
-
-Example:
-	jimmctl auth group rename <name> <new name>
+The rename command renames a group in jimm.
+`
+	renameGroupExample = `
+    jimmctl auth group rename mygroup newgroup
 `
 	removeGroupDoc = `
-rename command removes a group in jimm.
+The remove command removes a group in jimm.
+`
 
-Usage:
--y	Remove group without promping for confirmation
-
-Example:
-	jimmctl auth group remove <name>
+	removeGroupExample = `
+    jimmctl auth group remove mygroup
 `
 
 	listGroupsDoc = `
-list command lists all groups in jimm.
-
-Example:
-	jimmctl auth group list
+The list command lists all groups in jimm.
+`
+	listGroupsExample = `
+    jimmctl auth group list
 `
 )
 
 // NewGroupCommand returns a command for group management.
 func NewGroupCommand() *jujucmdv3.SuperCommand {
 	cmd := jujucmd.NewSuperCommand(jujucmdv3.SuperCommandParams{
-		Name:    "group",
-		Doc:     groupDoc,
-		Purpose: "Group management.",
+		Name:        "group",
+		UsagePrefix: "auth",
+		Doc:         groupDoc,
+		Purpose:     "Group management.",
 	})
 	cmd.Register(newAddGroupCommand())
 	cmd.Register(newRenameGroupCommand())
@@ -93,9 +92,11 @@ type addGroupCommand struct {
 // Info implements the cmd.Command interface.
 func (c *addGroupCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:    "add",
-		Purpose: "Add group to jimm.",
-		Doc:     addGroupDoc,
+		Name:     "add",
+		Args:     "<name>",
+		Purpose:  "Add group to jimm.",
+		Doc:      addGroupDoc,
+		Examples: addGroupExample,
 	})
 }
 
@@ -170,9 +171,11 @@ type renameGroupCommand struct {
 // Info implements the cmd.Command interface.
 func (c *renameGroupCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:    "rename",
-		Purpose: "Rename a group.",
-		Doc:     renameGroupDoc,
+		Name:     "rename",
+		Args:     "<name> <new name>",
+		Purpose:  "Rename a group.",
+		Doc:      renameGroupDoc,
+		Examples: renameGroupExample,
 	})
 }
 
@@ -238,9 +241,11 @@ type removeGroupCommand struct {
 // Info implements the cmd.Command interface.
 func (c *removeGroupCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:    "remove",
-		Purpose: "Remove a group.",
-		Doc:     removeGroupDoc,
+		Name:     "remove",
+		Args:     "<name>",
+		Purpose:  "Remove a group.",
+		Doc:      removeGroupDoc,
+		Examples: removeGroupExample,
 	})
 }
 
@@ -331,9 +336,10 @@ type listGroupsCommand struct {
 // Info implements the cmd.Command interface.
 func (c *listGroupsCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:    "list",
-		Purpose: "List all groups.",
-		Doc:     listGroupsDoc,
+		Name:     "list",
+		Purpose:  "List all groups.",
+		Doc:      listGroupsDoc,
+		Examples: listGroupsExample,
 	})
 }
 

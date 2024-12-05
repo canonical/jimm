@@ -16,12 +16,15 @@ import (
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
-var grantAuditLogAccessDoc = `
-	grant-audit-log-access grants user access to audit logs.
-
-	Example:
-		jimmctl grant-audit-log-access <username> 
+const (
+	grantAuditLogAccessDoc = `
+Grants a user access to read audit logs.
 `
+
+	grantAuditLogAccessExamples = `
+    jimmctl grant-audit-log-access <username> 
+`
+)
 
 // NewGrantAuditLogAccessCommand returns a command used to grant
 // users access to audit logs.
@@ -45,9 +48,11 @@ type grantAuditLogAccessCommand struct {
 
 func (c *grantAuditLogAccessCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:    "grant-audit-log-access",
-		Purpose: "Grants access to audit logs.",
-		Doc:     grantAuditLogAccessDoc,
+		Name:     "grant-audit-log-access",
+		Args:     "<username>",
+		Purpose:  "Grants access to audit logs.",
+		Doc:      grantAuditLogAccessDoc,
+		Examples: grantAuditLogAccessExamples,
 	})
 }
 
