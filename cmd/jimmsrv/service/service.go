@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/antonlindstrom/pgstore"
+	service "github.com/canonical/go-service"
 	cofga "github.com/canonical/ofga"
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
@@ -27,13 +28,12 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/canonical/jimm/v3/internal/auth"
+	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/discharger"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm"
 	jimmcreds "github.com/canonical/jimm/v3/internal/jimm/credentials"
-	"github.com/canonical/jimm/v3/internal/jimm/group"
-	"github.com/canonical/jimm/v3/internal/jimm/role"
 	"github.com/canonical/jimm/v3/internal/jimmhttp"
 	"github.com/canonical/jimm/v3/internal/jimmhttp/rebac_admin"
 	"github.com/canonical/jimm/v3/internal/jimmjwx"
@@ -100,6 +100,9 @@ type Params struct {
 	// ControllerUUID contains the UUID of the JIMM controller, if this
 	// is not set a random UUID will be generated.
 	ControllerUUID string
+
+	// IsLeader indicates that this is the JIMM leader unit.
+	IsLeader bool
 
 	// DSN is the data source name that the JIMM service will use to
 	// connect to its database. If this is empty an in-memory database
@@ -195,14 +198,17 @@ type Params struct {
 
 // A Service is the implementation of a JIMM server.
 type Service struct {
-	jimm jimm.JIMM
+	jimm *jimm.JIMM
+
+	isLeader              bool
+	auditLogCleanupPeriod int
 
 	mux      *chi.Mux
 	cleanups []func() error
 }
 
 func (s *Service) JIMM() *jimm.JIMM {
-	return &s.jimm
+	return s.jimm
 }
 
 // ServeHTTP implements http.Handler.
@@ -236,10 +242,6 @@ func (s *Service) WatchModelSummaries(ctx context.Context) error {
 
 // StartJWKSRotator see internal/jimmjwx/jwks.go for details.
 func (s *Service) StartJWKSRotator(ctx context.Context, checkRotateRequired <-chan time.Time, initialRotateRequiredTime time.Time) error {
-	if s.jimm.JWKService == nil {
-		zapctx.Warn(ctx, "not starting JWKS rotation")
-		return nil
-	}
 	return s.jimm.JWKService.StartJWKSRotator(ctx, checkRotateRequired, initialRotateRequiredTime)
 }
 
@@ -290,66 +292,52 @@ func (s *Service) AddCleanup(f func() error) {
 }
 
 // NewService creates a new Service using the given params.
+//
+//nolint:gocognit // NewService function to be ignored.
 func NewService(ctx context.Context, p Params) (*Service, error) {
 	const op = errors.Op("NewService")
 
 	s := new(Service)
-	s.mux = chi.NewRouter()
 
-	s.mux.Use(chimiddleware.RequestLogger(&logger.HTTPLogFormatter{}))
-	s.mux.Use(middleware.MeasureHTTPResponseTime)
-
-	// Setup all dependency services
-
-	if p.ControllerUUID == "" {
-		controllerUUID, err := uuid.NewRandom()
-		if err != nil {
-			return nil, errors.E(op, err)
-		}
-		p.ControllerUUID = controllerUUID.String()
+	jimmParameters := jimm.Parameters{
+		UUID:   p.ControllerUUID,
+		Pubsub: &pubsub.Hub{MaxConcurrency: 50},
 	}
-	s.jimm.UUID = p.ControllerUUID
-	s.jimm.Pubsub = &pubsub.Hub{MaxConcurrency: 50}
+	// Setup all dependency services
+	if jimmParameters.UUID == "" {
+		jimmParameters.UUID = uuid.NewString()
+	}
 
 	if p.DSN == "" {
 		return nil, errors.E(op, "missing DSN")
 	}
 
-	var err error
-	s.jimm.Database.DB, err = openDB(ctx, p.DSN, p.LogSQL)
+	database, err := openDB(ctx, p.DSN, p.LogSQL)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
-	if err := s.jimm.Database.Migrate(ctx, false); err != nil {
-		return nil, errors.E(op, err)
+	db := &db.Database{
+		DB: database,
 	}
-
-	if p.AuditLogRetentionPeriodInDays != "" {
-		period, err := strconv.Atoi(p.AuditLogRetentionPeriodInDays)
-		if err != nil {
-			return nil, errors.E(op, "failed to parse audit log retention period")
-		}
-		if period < 0 {
-			return nil, errors.E(op, "retention period cannot be less than 0")
-		}
-		if period != 0 {
-			jimm.NewAuditLogCleanupService(s.jimm.Database, period).Start(ctx)
-		}
-	}
+	jimmParameters.Database = db
 
 	openFGAclient, err := newOpenFGAClient(ctx, p.OpenFGAParams)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
-	s.jimm.OpenFGAClient = openFGAclient
+	jimmParameters.OpenFGAClient = openFGAclient
+
 	if err := ensureControllerAdministrators(ctx, openFGAclient, p.ControllerUUID, p.ControllerAdmins); err != nil {
 		return nil, errors.E(op, err, "failed to ensure controller admins")
 	}
-	if err := s.setupCredentialStore(ctx, p); err != nil {
+
+	credentialStore, err := s.setupCredentialStore(ctx, p, db)
+	if err != nil {
 		return nil, errors.E(op, err)
 	}
+	jimmParameters.CredentialStore = credentialStore
 
-	sessionStore, err := s.setupSessionStore(ctx, p.CookieSessionKey)
+	sessionStore, err := s.setupSessionStore(ctx, p.CookieSessionKey, db)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
@@ -374,12 +362,12 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 			SessionCookieMaxAge: p.OAuthAuthenticatorParams.SessionCookieMaxAge,
 			JWTSessionKey:       p.OAuthAuthenticatorParams.JWTSessionKey,
 			SecureCookies:       p.OAuthAuthenticatorParams.SecureSessionCookies,
-			Store:               &s.jimm.Database,
+			Store:               db,
 			SessionStore:        sessionStore,
 			RedirectURL:         redirectUrl,
 		},
 	)
-	s.jimm.OAuthAuthenticator = authSvc
+	jimmParameters.OAuthAuthenticator = authSvc
 	if err != nil {
 		zapctx.Error(ctx, "failed to setup authentication service", zap.Error(err))
 		return nil, errors.E(op, err, "failed to setup authentication service")
@@ -389,41 +377,35 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		p.JWTExpiryDuration = 24 * time.Hour
 	}
 
-	s.jimm.JWKService = jimmjwx.NewJWKSService(s.jimm.CredentialStore)
-	s.jimm.JWTService = jimmjwx.NewJWTService(jimmjwx.JWTServiceParams{
+	jimmParameters.JWKService = jimmjwx.NewJWKSService(credentialStore)
+	jimmParameters.JWTService = jimmjwx.NewJWTService(jimmjwx.JWTServiceParams{
 		Host:   p.PublicDNSName,
-		Store:  s.jimm.CredentialStore,
+		Store:  credentialStore,
 		Expiry: p.JWTExpiryDuration,
 	})
-	s.jimm.Dialer = &jujuclient.Dialer{
-		ControllerCredentialsStore: s.jimm.CredentialStore,
-		JWTService:                 s.jimm.JWTService,
+	jimmParameters.Dialer = &jujuclient.Dialer{
+		ControllerCredentialsStore: credentialStore,
+		JWTService:                 jimmParameters.JWTService,
 	}
-
-	roleManager, err := role.NewRoleManager(&s.jimm.Database, s.jimm.OpenFGAClient)
-	if err != nil {
-		return nil, errors.E(op, err, "failed to create RoleManager")
-	}
-	s.jimm.RoleManager = roleManager
-
-	groupManager, err := group.NewGroupManager(&s.jimm.Database, s.jimm.OpenFGAClient)
-	if err != nil {
-		return nil, errors.E(op, err, "failed to create GroupManager")
-	}
-	s.jimm.GroupManager = groupManager
 
 	if !p.DisableConnectionCache {
-		s.jimm.Dialer = jimm.CacheDialer(s.jimm.Dialer)
+		jimmParameters.Dialer = jimm.CacheDialer(jimmParameters.Dialer)
 	}
 
 	if _, err := url.Parse(p.DashboardFinalRedirectURL); err != nil {
 		return nil, errors.E(op, err, "failed to parse final redirect url for the dashboard")
 	}
 
-	rebacBackend, err := rebac_admin.SetupBackend(ctx, &s.jimm)
+	// instantiate jimm
+	s.jimm, err = jimm.New(jimmParameters)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
+
+	s.mux = chi.NewRouter()
+
+	s.mux.Use(chimiddleware.RequestLogger(&logger.HTTPLogFormatter{}))
+	s.mux.Use(middleware.MeasureHTTPResponseTime)
 
 	// Setup CORS middleware
 	corsOpts := cors.New(cors.Options{
@@ -440,7 +422,12 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 
 	s.mux.Mount("/metrics", promhttp.Handler())
 
-	s.mux.Mount("/rebac", middleware.AuthenticateRebac("/rebac", rebacBackend.Handler(""), &s.jimm))
+	rebacBackend, err := rebac_admin.SetupBackend(ctx, s.jimm)
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	s.mux.Mount("/rebac", middleware.AuthenticateRebac("/rebac", rebacBackend.Handler(""), s.jimm))
 
 	mountHandler(
 		"/debug",
@@ -486,14 +473,67 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	// Websockets require extra care when cookies are used for authentication
 	// to avoid CSRF attacks. https://portswigger.net/web-security/websockets/cross-site-websocket-hijacking
 	websocketCors := middleware.NewWebsocketCors(p.CorsAllowedOrigins)
-	s.mux.Handle("/api", websocketCors.Handler(jujuapi.APIHandler(ctx, &s.jimm, params)))
-	s.mux.Handle("/model/*", websocketCors.Handler(http.StripPrefix("/model", jujuapi.ModelHandler(ctx, &s.jimm, params))))
+	s.mux.Handle("/api", websocketCors.Handler(jujuapi.APIHandler(ctx, s.jimm, params)))
+	s.mux.Handle("/model/*", websocketCors.Handler(http.StripPrefix("/model", jujuapi.ModelHandler(ctx, s.jimm, params))))
 	mountHandler(
 		"/model/{uuid}/{type:charms|applications}",
-		jimmhttp.NewHTTPProxyHandler(&s.jimm),
+		jimmhttp.NewHTTPProxyHandler(s.jimm),
 	)
 
+	if p.AuditLogRetentionPeriodInDays != "" {
+		var err error
+		s.auditLogCleanupPeriod, err = strconv.Atoi(p.AuditLogRetentionPeriodInDays)
+		if err != nil {
+			return nil, errors.E(op, "failed to parse audit log retention period")
+		}
+		if s.auditLogCleanupPeriod < 0 {
+			return nil, errors.E(op, "retention period cannot be less than 0")
+		}
+	}
+	s.isLeader = p.IsLeader
+
 	return s, nil
+}
+
+func (s *Service) StartServices(ctx context.Context, svc *service.Service) {
+	// on the leader unit we start additional routines
+	if s.isLeader {
+		// the leader unit connects to all controllers' AllWatcher
+		svc.Go(func() error {
+			return s.WatchControllers(ctx)
+		})
+
+		// audit log cleanup routine
+		if s.auditLogCleanupPeriod != 0 {
+			svc.Go(func() error {
+				jimm.NewAuditLogCleanupService(s.jimm.Database, s.auditLogCleanupPeriod).Start(ctx)
+				return nil
+			})
+		}
+
+		// the JWKS rotator
+		svc.Go(func() error {
+			if err := s.StartJWKSRotator(ctx, time.NewTicker(time.Hour).C, time.Now().UTC().AddDate(0, 3, 0)); err != nil {
+				zapctx.Error(ctx, "failed to start JWKS rotator", zap.Error(err))
+				return err
+			}
+			return nil
+		})
+
+		// OpenFGA cleanup - cleans up all orphaned tuples
+		svc.Go(func() error {
+			return s.OpenFGACleanup(ctx, time.NewTicker(6*time.Hour).C)
+		})
+	}
+
+	// all units periodically update their controller/model metrics
+	svc.Go(func() error {
+		s.MonitorResources(ctx)
+		return nil
+	})
+
+	// all units watch for model summaries
+	svc.Go(func() error { return s.WatchModelSummaries(ctx) })
 }
 
 // setupDischarger set JIMM up as a discharger of 3rd party caveats addressed to it. This is intended
@@ -506,21 +546,17 @@ func (s *Service) setupDischarger(p Params) (*discharger.MacaroonDischarger, err
 		MacaroonExpiryDuration: p.MacaroonExpiryDuration,
 		ControllerUUID:         p.ControllerUUID,
 	}
-	MacaroonDischarger, err := discharger.NewMacaroonDischarger(cfg, &s.jimm.Database, s.jimm.OpenFGAClient)
+	MacaroonDischarger, err := discharger.NewMacaroonDischarger(cfg, s.jimm.Database, s.jimm.OpenFGAClient)
 	if err != nil {
 		return nil, errors.E(err)
 	}
 	return MacaroonDischarger, nil
 }
 
-func (s *Service) setupSessionStore(ctx context.Context, sessionSecret []byte) (*pgstore.PGStore, error) {
+func (s *Service) setupSessionStore(ctx context.Context, sessionSecret []byte, db *db.Database) (*pgstore.PGStore, error) {
 	const op = errors.Op("setupSessionStore")
 
-	if s.jimm.CredentialStore == nil {
-		return nil, errors.E(op, "credential store is not configured")
-	}
-
-	sqlDb, err := s.jimm.Database.DB.DB()
+	sqlDb, err := db.DB.DB()
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
@@ -561,27 +597,25 @@ func openDB(ctx context.Context, dsn string, logSQL bool) (*gorm.DB, error) {
 	})
 }
 
-func (s *Service) setupCredentialStore(ctx context.Context, p Params) error {
+func (s *Service) setupCredentialStore(ctx context.Context, p Params, db *db.Database) (jimmcreds.CredentialStore, error) {
 	const op = errors.Op("newSecretStore")
 
 	// Only enable Postgres storage for secrets if explicitly enabled.
 	if p.InsecureSecretStorage {
 		zapctx.Warn(ctx, "using plaintext postgres for secret storage")
-		s.jimm.CredentialStore = &s.jimm.Database
-		return nil
+		return db, nil
 	}
 
 	vs, err := newVaultStore(ctx, p)
 	if err != nil {
 		zapctx.Error(ctx, "Vault Store error", zap.Error(err))
-		return errors.E(op, err)
+		return nil, errors.E(op, err)
 	}
 	if vs != nil {
-		s.jimm.CredentialStore = vs
-		return nil
+		return vs, nil
 	}
 
-	return errors.E(op, "jimm cannot start without a credential store")
+	return nil, errors.E(op, "jimm cannot start without a credential store")
 }
 
 func newVaultStore(ctx context.Context, p Params) (jimmcreds.CredentialStore, error) {

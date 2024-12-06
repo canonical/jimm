@@ -339,7 +339,7 @@ func initializeEnvironment(c *gc.C, ctx context.Context, db *db.Database, u dbmo
 }
 
 func (s *relationSuite) TestListRelations(c *gc.C) {
-	env := initializeEnvironment(c, context.Background(), &s.JIMM.Database, *s.AdminUser)
+	env := initializeEnvironment(c, context.Background(), s.JIMM.Database, *s.AdminUser)
 	bClient := s.SetupCLIAccess(c, "alice") // alice is superuser
 
 	relations := []apiparams.RelationshipTuple{{
@@ -420,7 +420,7 @@ func (s *relationSuite) TestListRelations(c *gc.C) {
 }
 
 func (s *relationSuite) TestListRelationsWithError(c *gc.C) {
-	env := initializeEnvironment(c, context.Background(), &s.JIMM.Database, *s.AdminUser)
+	env := initializeEnvironment(c, context.Background(), s.JIMM.Database, *s.AdminUser)
 	// alice is superuser
 	bClient := s.SetupCLIAccess(c, "alice")
 

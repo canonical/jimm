@@ -112,7 +112,7 @@ func (s *groupManagerSuite) TestRemoveGroup(c *qt.C) {
 	c.Parallel()
 	ctx := context.Background()
 
-	_, group, _, _, _, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, *s.db)
+	_, group, _, _, _, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
 
 	err := s.manager.RemoveGroup(ctx, s.adminUser, group.Name)
 	c.Assert(err, qt.IsNil)
@@ -125,7 +125,7 @@ func (s *groupManagerSuite) TestRemoveGroupRemovesTuples(c *qt.C) {
 	c.Parallel()
 	ctx := context.Background()
 
-	user, group, controller, model, _, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, *s.db)
+	user, group, controller, model, _, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
 
 	_, err := s.db.AddGroup(ctx, "test-group2")
 	c.Assert(err, qt.IsNil)
@@ -191,7 +191,7 @@ func (s *groupManagerSuite) TestRenameGroup(c *qt.C) {
 	c.Parallel()
 	ctx := context.Background()
 
-	user, group, controller, model, _, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, *s.db)
+	user, group, controller, model, _, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
 
 	tuples := []openfga.Tuple{
 		{
@@ -265,7 +265,7 @@ func (s *groupManagerSuite) TestListGroups(c *qt.C) {
 	c.Parallel()
 	ctx := context.Background()
 
-	user, group, _, _, _, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, *s.db)
+	user, group, _, _, _, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
 
 	u := openfga.NewUser(&user, s.ofgaClient)
 	u.JimmAdmin = true

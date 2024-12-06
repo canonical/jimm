@@ -32,7 +32,7 @@ func TestCreateRole(t *testing.T) {
 		},
 	}
 	jimm := jimmtest.JIMM{
-		GetRoleManager_: func() jimm.RoleManager {
+		RoleManager_: func() jimm.RoleManager {
 			return roleManager
 		},
 	}
@@ -65,7 +65,7 @@ func TestUpdateRole(t *testing.T) {
 		},
 	}
 	jimm := jimmtest.JIMM{
-		GetRoleManager_: func() jimm.RoleManager {
+		RoleManager_: func() jimm.RoleManager {
 			return roleManager
 		},
 	}
@@ -100,7 +100,7 @@ func TestListRoles(t *testing.T) {
 		},
 	}
 	jimm := jimmtest.JIMM{
-		GetRoleManager_: func() jimm.RoleManager {
+		RoleManager_: func() jimm.RoleManager {
 			return roleManager
 		},
 	}
@@ -128,7 +128,7 @@ func TestListRoles(t *testing.T) {
 func TestDeleteRole(t *testing.T) {
 	c := qt.New(t)
 	var deleteErr error
-	RoleManager := mocks.RoleManager{
+	roleManager := mocks.RoleManager{
 		GetRoleByUUID_: func(ctx context.Context, user *openfga.User, uuid string) (*dbmodel.RoleEntry, error) {
 			return &dbmodel.RoleEntry{UUID: uuid, Name: "test-role"}, nil
 		},
@@ -140,8 +140,8 @@ func TestDeleteRole(t *testing.T) {
 		},
 	}
 	jimm := jimmtest.JIMM{
-		GetRoleManager_: func() jimm.RoleManager {
-			return RoleManager
+		RoleManager_: func() jimm.RoleManager {
+			return roleManager
 		},
 	}
 	user := openfga.User{}

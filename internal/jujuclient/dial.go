@@ -103,7 +103,7 @@ func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag nam
 	var res jujuparams.LoginResult
 	if err := client.Call(ctx, "Admin", 3, "", "Login", loginRequest, &res); err != nil {
 		client.Close()
-		return nil, errors.E(op, errors.CodeConnectionFailed, "authentication failed", err)
+		return nil, errors.E(op, errors.CodeConnectionFailed, err)
 	}
 
 	ct, err := names.ParseControllerTag(res.ControllerTag)

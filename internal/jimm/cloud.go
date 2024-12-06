@@ -160,7 +160,7 @@ func (j *JIMM) AddCloudToController(ctx context.Context, user *openfga.User, con
 		return errors.E(op, err)
 	}
 
-	if err := validateCloudRegion(ctx, &j.Database, user, cloud, controllerName); err != nil {
+	if err := validateCloudRegion(ctx, j.Database, user, cloud, controllerName); err != nil {
 		return errors.E(op, err)
 	}
 

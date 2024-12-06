@@ -58,7 +58,7 @@ func (s *adminSuite) SetUpTest(c *gc.C) {
 		ClientSecret:        "SwjDofnbDzJDm9iyfUhEp67FfUFMY8L4",
 		Scopes:              []string{oidc.ScopeOpenID, "profile", "email"},
 		SessionTokenExpiry:  time.Hour,
-		Store:               &s.JIMM.Database,
+		Store:               s.JIMM.Database,
 		SessionStore:        sessionStore,
 		SessionCookieMaxAge: 60,
 		JWTSessionKey:       "test-secret",
@@ -124,7 +124,7 @@ func testBrowserLogin(c *gc.C, s *adminSuite, username, password, expectedEmail,
 	defer sessionStore.Close()
 
 	cookie, err := jimmtest.RunBrowserLogin(
-		&s.JIMM.Database,
+		s.JIMM.Database,
 		sessionStore,
 		username,
 		password,

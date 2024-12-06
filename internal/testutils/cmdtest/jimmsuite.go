@@ -99,6 +99,7 @@ func (s *JimmCmdSuite) SetUpTest(c *gc.C) {
 
 	srv, err := service.NewService(ctx, s.Params)
 	c.Assert(err, gc.Equals, nil)
+
 	s.Service = srv
 	s.JIMM = srv.JIMM()
 	s.HTTP.Config = &http.Server{Handler: srv, ReadHeaderTimeout: time.Second * 5}

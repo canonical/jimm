@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/canonical/ofga"
 	qt "github.com/frankban/quicktest"
@@ -24,7 +23,6 @@ import (
 	semversion "github.com/juju/version"
 	"gopkg.in/macaroon.v2"
 
-	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm"
@@ -37,7 +35,6 @@ import (
 func TestAddController(t *testing.T) {
 	c := qt.New(t)
 
-	now := time.Now().UTC().Round(time.Millisecond)
 	api := &jimmtest.API{
 		Clouds_: func(context.Context) (map[names.CloudTag]jujuparams.Cloud, error) {
 			clouds := map[names.CloudTag]jujuparams.Cloud{
@@ -130,28 +127,18 @@ func TestAddController(t *testing.T) {
 		},
 	}
 
-	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
-	c.Assert(err, qt.IsNil)
-
-	j := &jimm.JIMM{
-		UUID: uuid.NewString(),
-		Database: db.Database{
-			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
-		},
+	j := jimmtest.NewJIMM(c, &jimm.Parameters{
 		Dialer: &jimmtest.Dialer{
 			API: api,
 		},
-		OpenFGAClient: client,
-	}
+	})
 
 	ctx := context.Background()
-	err = j.Database.Migrate(ctx, false)
-	c.Assert(err, qt.IsNil)
 
 	u, err := dbmodel.NewIdentity("alice@canonical.com")
 	c.Assert(err, qt.IsNil)
 
-	alice := openfga.NewUser(u, client)
+	alice := openfga.NewUser(u, j.OpenFGAClient)
 	alice.JimmAdmin = true
 	err = alice.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, qt.IsNil)
@@ -203,7 +190,6 @@ func TestAddControllerWithVault(t *testing.T) {
 		KVPath:       path,
 	}
 
-	now := time.Now().UTC().Round(time.Millisecond)
 	api := &jimmtest.API{
 		Clouds_: func(context.Context) (map[names.CloudTag]jujuparams.Cloud, error) {
 			clouds := map[names.CloudTag]jujuparams.Cloud{
@@ -296,29 +282,19 @@ func TestAddControllerWithVault(t *testing.T) {
 		},
 	}
 
-	ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
-	c.Assert(err, qt.IsNil)
-
-	j := &jimm.JIMM{
-		UUID: uuid.NewString(),
-		Database: db.Database{
-			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
-		},
+	j := jimmtest.NewJIMM(c, &jimm.Parameters{
 		Dialer: &jimmtest.Dialer{
 			API: api,
 		},
 		CredentialStore: store,
-		OpenFGAClient:   ofgaClient,
-	}
+	})
 
 	ctx := context.Background()
-	err = j.Database.Migrate(ctx, false)
-	c.Assert(err, qt.IsNil)
 
 	u, err := dbmodel.NewIdentity("alice@canonical.com")
 	c.Assert(err, qt.IsNil)
 
-	alice := openfga.NewUser(u, ofgaClient)
+	alice := openfga.NewUser(u, j.OpenFGAClient)
 	alice.JimmAdmin = true
 
 	err = alice.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
@@ -403,24 +379,11 @@ func TestEarliestControllerVersion(t *testing.T) {
 	c := qt.New(t)
 
 	ctx := context.Background()
-	now := time.Now().UTC().Round(time.Millisecond)
 
-	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
-	c.Assert(err, qt.IsNil)
-
-	j := &jimm.JIMM{
-		UUID: uuid.NewString(),
-		Database: db.Database{
-			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
-		},
-		OpenFGAClient: client,
-	}
-
-	err = j.Database.Migrate(ctx, false)
-	c.Assert(err, qt.IsNil)
+	j := jimmtest.NewJIMM(c, nil)
 
 	env := jimmtest.ParseEnvironment(c, testEarliestControllerVersionEnv)
-	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
 
 	v, err := j.EarliestControllerVersion(ctx)
 	c.Assert(err, qt.Equals, nil)
@@ -481,8 +444,6 @@ models:
 func TestImportModel(t *testing.T) {
 	c := qt.New(t)
 	trueValue := true
-
-	now := time.Now().UTC().Truncate(time.Millisecond)
 
 	tests := []struct {
 		about          string
@@ -1015,32 +976,23 @@ func TestImportModel(t *testing.T) {
 				},
 			}
 
-			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.about)
-			c.Assert(err, qt.IsNil)
-
-			j := &jimm.JIMM{
-				UUID: uuid.NewString(),
-				Database: db.Database{
-					DB: jimmtest.PostgresDB(c, nil),
-				},
+			j := jimmtest.NewJIMM(c, &jimm.Parameters{
 				Dialer: &jimmtest.Dialer{
 					API:  api,
 					UUID: test.expectedModel.Controller.UUID,
 				},
-				OpenFGAClient: client,
-			}
+			})
+
 			ctx := context.Background()
-			err = j.Database.Migrate(ctx, false)
-			c.Assert(err, qt.IsNil)
 
 			env := jimmtest.ParseEnvironment(c, testImportModelEnv)
-			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
+			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
 
 			dbUser := env.User(test.user).DBObject(c, j.Database)
-			user := openfga.NewUser(&dbUser, client)
+			user := openfga.NewUser(&dbUser, j.OpenFGAClient)
 			user.JimmAdmin = test.jimmAdmin
 
-			err = j.ImportModel(ctx, user, test.controllerName, names.NewModelTag(test.modelUUID), test.newOwner)
+			err := j.ImportModel(ctx, user, test.controllerName, names.NewModelTag(test.modelUUID), test.newOwner)
 			if test.expectedError == "" {
 				c.Assert(err, qt.IsNil)
 
@@ -1056,7 +1008,7 @@ func TestImportModel(t *testing.T) {
 					Relation: ofganames.ControllerRelation,
 					Target:   ofganames.ConvertTag(names.NewModelTag(test.modelUUID)),
 				}
-				ok, err := client.CheckRelation(ctx, controllerPermissionCheck, false)
+				ok, err := j.OpenFGAClient.CheckRelation(ctx, controllerPermissionCheck, false)
 				c.Assert(err, qt.IsNil)
 				c.Assert(ok, qt.IsTrue)
 
@@ -1066,7 +1018,7 @@ func TestImportModel(t *testing.T) {
 						Relation: ofganames.AdministratorRelation,
 						Target:   ofganames.ConvertTag(names.NewApplicationOfferTag(offer.UUID)),
 					}
-					ok, err := client.CheckRelation(ctx, offerPermissionCheck, false)
+					ok, err := j.OpenFGAClient.CheckRelation(ctx, offerPermissionCheck, false)
 					c.Assert(err, qt.IsNil)
 					c.Assert(ok, qt.IsTrue)
 				}
@@ -1139,15 +1091,7 @@ func TestSetControllerConfig(t *testing.T) {
 
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
-			j := &jimm.JIMM{
-				UUID: uuid.NewString(),
-				Database: db.Database{
-					DB: jimmtest.PostgresDB(c, nil),
-				},
-			}
-			ctx := context.Background()
-			err := j.Database.Migrate(ctx, false)
-			c.Assert(err, qt.IsNil)
+			j := jimmtest.NewJIMM(c, nil)
 
 			env := jimmtest.ParseEnvironment(c, testControllerConfigEnv)
 			env.PopulateDB(c, j.Database)
@@ -1156,7 +1100,9 @@ func TestSetControllerConfig(t *testing.T) {
 			user := openfga.NewUser(&dbUser, nil)
 			user.JimmAdmin = test.jimmAdmin
 
-			err = j.SetControllerConfig(ctx, user, test.args)
+			ctx := context.Background()
+
+			err := j.SetControllerConfig(ctx, user, test.args)
 			if test.expectedError == "" {
 				c.Assert(err, qt.IsNil)
 
@@ -1216,15 +1162,7 @@ func TestGetControllerConfig(t *testing.T) {
 
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
-			j := &jimm.JIMM{
-				UUID: uuid.NewString(),
-				Database: db.Database{
-					DB: jimmtest.PostgresDB(c, nil),
-				},
-			}
-			ctx := context.Background()
-			err := j.Database.Migrate(ctx, false)
-			c.Assert(err, qt.IsNil)
+			j := jimmtest.NewJIMM(c, nil)
 
 			env := jimmtest.ParseEnvironment(c, testImportModelEnv)
 			env.PopulateDB(c, j.Database)
@@ -1237,7 +1175,9 @@ func TestGetControllerConfig(t *testing.T) {
 			user := openfga.NewUser(&dbUser, nil)
 			user.JimmAdmin = test.jimmAdmin
 
-			err = j.SetControllerConfig(ctx, superuser, jujuparams.ControllerConfigSet{
+			ctx := context.Background()
+
+			err := j.SetControllerConfig(ctx, superuser, jujuparams.ControllerConfigSet{
 				Config: map[string]interface{}{
 					"key1": "value1",
 				},
@@ -1364,20 +1304,13 @@ func TestUpdateMigratedModel(t *testing.T) {
 
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
-			j := &jimm.JIMM{
-				UUID: uuid.NewString(),
-				Database: db.Database{
-					DB: jimmtest.PostgresDB(c, nil),
-				},
+			j := jimmtest.NewJIMM(c, &jimm.Parameters{
 				Dialer: &jimmtest.Dialer{
 					API: &jimmtest.API{
 						ModelInfo_: test.modelInfo,
 					},
 				},
-			}
-			ctx := context.Background()
-			err := j.Database.Migrate(ctx, false)
-			c.Assert(err, qt.IsNil)
+			})
 
 			env := jimmtest.ParseEnvironment(c, testUpdateMigratedModelEnv)
 			env.PopulateDB(c, j.Database)
@@ -1386,7 +1319,9 @@ func TestUpdateMigratedModel(t *testing.T) {
 			user := openfga.NewUser(&dbUser, nil)
 			user.JimmAdmin = test.jimmAdmin
 
-			err = j.UpdateMigratedModel(ctx, user, test.model, test.targetController)
+			ctx := context.Background()
+
+			err := j.UpdateMigratedModel(ctx, user, test.model, test.targetController)
 			if test.expectedError != "" {
 				c.Assert(err, qt.ErrorMatches, test.expectedError)
 			} else {
@@ -1419,25 +1354,15 @@ users:
 func TestGetControllerAccess(t *testing.T) {
 	c := qt.New(t)
 
-	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
-	c.Assert(err, qt.IsNil)
+	j := jimmtest.NewJIMM(c, nil)
 
-	j := &jimm.JIMM{
-		UUID: uuid.NewString(),
-		Database: db.Database{
-			DB: jimmtest.PostgresDB(c, nil),
-		},
-		OpenFGAClient: client,
-	}
 	ctx := context.Background()
-	err = j.Database.Migrate(ctx, false)
-	c.Assert(err, qt.IsNil)
 
 	env := jimmtest.ParseEnvironment(c, testGetControllerAccessEnv)
-	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
 
 	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
-	alice := openfga.NewUser(&dbUser, client)
+	alice := openfga.NewUser(&dbUser, j.OpenFGAClient)
 	alice.JimmAdmin = true
 
 	access, err := j.GetJimmControllerAccess(ctx, alice, names.NewUserTag("alice@canonical.com"))
@@ -1453,7 +1378,7 @@ func TestGetControllerAccess(t *testing.T) {
 	c.Check(access, qt.Equals, "login")
 
 	dbUser = env.User("bob@canonical.com").DBObject(c, j.Database)
-	alice = openfga.NewUser(&dbUser, client)
+	alice = openfga.NewUser(&dbUser, j.OpenFGAClient)
 	access, err = j.GetJimmControllerAccess(ctx, alice, names.NewUserTag("bob@canonical.com"))
 	c.Assert(err, qt.IsNil)
 	c.Check(access, qt.Equals, "login")
@@ -1721,24 +1646,10 @@ func TestInitiateMigration(t *testing.T) {
 
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
-			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
-			c.Assert(err, qt.IsNil)
-
-			j := &jimm.JIMM{
-				UUID: uuid.NewString(),
-				Database: db.Database{
-					DB: jimmtest.PostgresDB(c, nil),
-				},
-				OpenFGAClient: client,
-				Dialer:        &testDialer{},
-			}
-
-			ctx := context.Background()
-			err = j.Database.Migrate(ctx, false)
-			c.Assert(err, qt.IsNil)
+			j := jimmtest.NewJIMM(c, nil)
 
 			env := jimmtest.ParseEnvironment(c, testInitiateMigrationEnv)
-			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
+			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
 
 			c.Patch(jimm.NewControllerClient, func(api base.APICallCloser) jimm.ControllerClient {
 				return &testControllerClient{
@@ -1746,7 +1657,7 @@ func TestInitiateMigration(t *testing.T) {
 				}
 			})
 
-			user := test.user(client)
+			user := test.user(j.OpenFGAClient)
 
 			result, err := j.InitiateMigration(context.Background(), user, test.spec)
 			if test.expectedError == "" {
@@ -1757,12 +1668,6 @@ func TestInitiateMigration(t *testing.T) {
 			}
 		})
 	}
-}
-
-type testDialer struct{}
-
-func (d *testDialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, requiredPermissions map[string]string) (jimm.API, error) {
-	return (jimm.API)(nil), nil
 }
 
 type result struct {

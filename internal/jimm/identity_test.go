@@ -5,15 +5,11 @@ package jimm_test
 import (
 	"context"
 	"testing"
-	"time"
 
 	qt "github.com/frankban/quicktest"
-	"github.com/google/uuid"
 
 	"github.com/canonical/jimm/v3/internal/common/pagination"
-	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
-	"github.com/canonical/jimm/v3/internal/jimm"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
@@ -22,20 +18,7 @@ func TestFetchIdentity(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
-	ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
-	c.Assert(err, qt.IsNil)
-
-	now := time.Now().UTC().Round(time.Millisecond)
-	j := &jimm.JIMM{
-		UUID: uuid.NewString(),
-		Database: db.Database{
-			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
-		},
-		OpenFGAClient: ofgaClient,
-	}
-
-	err = j.Database.Migrate(ctx, false)
-	c.Assert(err, qt.IsNil)
+	j := jimmtest.NewJIMM(c, nil)
 
 	user, _, _, _, _, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, j.Database)
 	u, err := j.FetchIdentity(ctx, user.Name)
@@ -50,22 +33,9 @@ func TestListIdentities(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
-	ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
-	c.Assert(err, qt.IsNil)
+	j := jimmtest.NewJIMM(c, nil)
 
-	now := time.Now().UTC().Round(time.Millisecond)
-	j := &jimm.JIMM{
-		UUID: uuid.NewString(),
-		Database: db.Database{
-			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
-		},
-		OpenFGAClient: ofgaClient,
-	}
-
-	err = j.Database.Migrate(ctx, false)
-	c.Assert(err, qt.IsNil)
-
-	u := openfga.NewUser(&dbmodel.Identity{Name: "admin@canonical.com"}, ofgaClient)
+	u := openfga.NewUser(&dbmodel.Identity{Name: "admin@canonical.com"}, j.OpenFGAClient)
 	u.JimmAdmin = true
 
 	pag := pagination.NewOffsetFilter(10, 0)
@@ -135,22 +105,9 @@ func TestCountIdentities(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
-	ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
-	c.Assert(err, qt.IsNil)
+	j := jimmtest.NewJIMM(c, nil)
 
-	now := time.Now().UTC().Round(time.Millisecond)
-	j := &jimm.JIMM{
-		UUID: uuid.NewString(),
-		Database: db.Database{
-			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
-		},
-		OpenFGAClient: ofgaClient,
-	}
-
-	err = j.Database.Migrate(ctx, false)
-	c.Assert(err, qt.IsNil)
-
-	u := openfga.NewUser(&dbmodel.Identity{Name: "admin@canonical.com"}, ofgaClient)
+	u := openfga.NewUser(&dbmodel.Identity{Name: "admin@canonical.com"}, j.OpenFGAClient)
 	u.JimmAdmin = true
 
 	userNames := []string{

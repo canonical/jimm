@@ -29,6 +29,8 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm/credentials"
+	"github.com/canonical/jimm/v3/internal/jimm/group"
+	"github.com/canonical/jimm/v3/internal/jimm/role"
 	"github.com/canonical/jimm/v3/internal/jimmjwx"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
@@ -40,126 +42,6 @@ var (
 		return j.InitiateMigration(ctx, user, spec)
 	}
 )
-
-// A JIMM provides the business logic for managing resources in the JAAS
-// system. A single JIMM instance is shared by all concurrent API
-// connections therefore the JIMM object itself does not contain any per-
-// request state.
-type JIMM struct {
-	// Database is the database used by JIMM, this provides direct access
-	// to the data store. Any client accessing the database directly is
-	// responsible for ensuring that the authenticated user has access to
-	// the data.
-	Database db.Database
-
-	// Dialer is the API dialer JIMM uses to contact juju controllers. if
-	// this is not configured all connection attempts will fail.
-	Dialer Dialer
-
-	// CredentialStore is a store for the attributes of a
-	// cloud credential and controller credentials. If this is
-	// not configured then the attributes
-	// are stored in the standard database.
-	CredentialStore credentials.CredentialStore
-
-	// Pubsub is a pub-sub hub used for buffering model summaries.
-	Pubsub *pubsub.Hub
-
-	// ReservedCloudNames is the list of names that cannot be used for
-	// hosted clouds. If this is empty then DefaultReservedCloudNames
-	// is used.
-	ReservedCloudNames []string
-
-	// UUID holds the UUID of the JIMM controller.
-	UUID string
-
-	// OpenFGAClient holds the client used to interact
-	// with the OpenFGA ReBAC system.
-	OpenFGAClient *openfga.OFGAClient
-
-	// JWKService holds a service responsible for generating and delivering a JWKS
-	// for consumption within Juju controllers.
-	JWKService *jimmjwx.JWKSService
-
-	// JWTService is responsible for minting JWTs to access controllers.
-	JWTService *jimmjwx.JWTService
-
-	// OAuthAuthenticator is responsible for handling authentication
-	// via OAuth2.0 AND JWT access tokens to JIMM.
-	OAuthAuthenticator OAuthAuthenticator
-
-	// RoleManager provides a means to manage roles within JIMM.
-	RoleManager RoleManager
-
-	// RoleManager provides a means to manage groups within JIMM.
-	GroupManager GroupManager
-}
-
-// RoleManager provides a means to manage roles within JIMM.
-type RoleManager interface {
-	// AddRole adds a role to JIMM.
-	AddRole(ctx context.Context, user *openfga.User, roleName string) (*dbmodel.RoleEntry, error)
-	// GetRoleByUUID returns a role based on the provided UUID.
-	GetRoleByUUID(ctx context.Context, user *openfga.User, uuid string) (*dbmodel.RoleEntry, error)
-	// GetRoleByName returns a role based on the provided name.
-	GetRoleByName(ctx context.Context, user *openfga.User, name string) (*dbmodel.RoleEntry, error)
-	// RemoveRole removes the role from JIMM in both the store and authorisation store.
-	RemoveRole(ctx context.Context, user *openfga.User, roleName string) error
-	// RenameRole renames a role in JIMM's DB.
-	RenameRole(ctx context.Context, user *openfga.User, uuid, newName string) error
-	// ListRoles returns a list of roles known to JIMM.
-	// `match` will filter the list fuzzy matching role's name or uuid.
-	ListRoles(ctx context.Context, user *openfga.User, pagination pagination.LimitOffsetPagination, match string) ([]dbmodel.RoleEntry, error)
-	// CountRoles returns the number of roles that exist.
-	CountRoles(ctx context.Context, user *openfga.User) (int, error)
-}
-
-// GroupManager provides a means to manage groups within JIMM.
-type GroupManager interface {
-	// AddGroup adds a role to JIMM.
-	AddGroup(ctx context.Context, user *openfga.User, roleName string) (*dbmodel.GroupEntry, error)
-	// GetGroupByUUID returns a role based on the provided UUID.
-	GetGroupByUUID(ctx context.Context, user *openfga.User, uuid string) (*dbmodel.GroupEntry, error)
-	// GetGroupByName returns a role based on the provided name.
-	GetGroupByName(ctx context.Context, user *openfga.User, name string) (*dbmodel.GroupEntry, error)
-	// RemoveGroup removes the role from JIMM in both the store and authorisation store.
-	RemoveGroup(ctx context.Context, user *openfga.User, roleName string) error
-	// RenameGroup renames a role in JIMM's DB.
-	RenameGroup(ctx context.Context, user *openfga.User, uuid, newName string) error
-	// ListGroups returns a list of roles known to JIMM.
-	// `match` will filter the list fuzzy matching role's name or uuid.
-	ListGroups(ctx context.Context, user *openfga.User, pagination pagination.LimitOffsetPagination, match string) ([]dbmodel.GroupEntry, error)
-	// CountGroups returns the number of roles that exist.
-	CountGroups(ctx context.Context, user *openfga.User) (int, error)
-}
-
-// ResourceTag returns JIMM's controller tag stating its UUID.
-func (j *JIMM) ResourceTag() names.ControllerTag {
-	return names.NewControllerTag(j.UUID)
-}
-
-// DB returns the database used by JIMM.
-func (j *JIMM) DB() *db.Database {
-	return &j.Database
-}
-
-// PubsubHub returns the pub-sub hub used for buffering model summaries.
-func (j *JIMM) PubSubHub() *pubsub.Hub {
-	return j.Pubsub
-}
-
-// AuthorizationClient return the OpenFGA client used by JIMM.
-func (j *JIMM) AuthorizationClient() *openfga.OFGAClient {
-	return j.OpenFGAClient
-}
-
-func (j *JIMM) GetRoleManager() RoleManager {
-	return j.RoleManager
-}
-
-func (j *JIMM) GetGroupManager() GroupManager {
-	return j.GroupManager
-}
 
 // OAuthAuthenticator is responsible for handling authentication
 // via OAuth2.0 AND JWT access tokens to JIMM.
@@ -217,6 +99,206 @@ type OAuthAuthenticator interface {
 	// retrieving new access tokens upon expiry. If this cannot be done, the cookie
 	// is deleted and an error is returned.
 	AuthenticateBrowserSession(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error)
+}
+
+// RoleManager provides a means to manage roles within JIMM.
+type RoleManager interface {
+	// AddRole adds a role to JIMM.
+	AddRole(ctx context.Context, user *openfga.User, roleName string) (*dbmodel.RoleEntry, error)
+	// GetRoleByUUID returns a role based on the provided UUID.
+	GetRoleByUUID(ctx context.Context, user *openfga.User, uuid string) (*dbmodel.RoleEntry, error)
+	// GetRoleByName returns a role based on the provided name.
+	GetRoleByName(ctx context.Context, user *openfga.User, name string) (*dbmodel.RoleEntry, error)
+	// RemoveRole removes the role from JIMM in both the store and authorisation store.
+	RemoveRole(ctx context.Context, user *openfga.User, roleName string) error
+	// RenameRole renames a role in JIMM's DB.
+	RenameRole(ctx context.Context, user *openfga.User, uuid, newName string) error
+	// ListRoles returns a list of roles known to JIMM.
+	// `match` will filter the list fuzzy matching role's name or uuid.
+	ListRoles(ctx context.Context, user *openfga.User, pagination pagination.LimitOffsetPagination, match string) ([]dbmodel.RoleEntry, error)
+	// CountRoles returns the number of roles that exist.
+	CountRoles(ctx context.Context, user *openfga.User) (int, error)
+}
+
+// GroupManager provides a means to manage groups within JIMM.
+type GroupManager interface {
+	// AddGroup adds a role to JIMM.
+	AddGroup(ctx context.Context, user *openfga.User, roleName string) (*dbmodel.GroupEntry, error)
+	// GetGroupByUUID returns a role based on the provided UUID.
+	GetGroupByUUID(ctx context.Context, user *openfga.User, uuid string) (*dbmodel.GroupEntry, error)
+	// GetGroupByName returns a role based on the provided name.
+	GetGroupByName(ctx context.Context, user *openfga.User, name string) (*dbmodel.GroupEntry, error)
+	// RemoveGroup removes the role from JIMM in both the store and authorisation store.
+	RemoveGroup(ctx context.Context, user *openfga.User, roleName string) error
+	// RenameGroup renames a role in JIMM's DB.
+	RenameGroup(ctx context.Context, user *openfga.User, uuid, newName string) error
+	// ListGroups returns a list of roles known to JIMM.
+	// `match` will filter the list fuzzy matching role's name or uuid.
+	ListGroups(ctx context.Context, user *openfga.User, pagination pagination.LimitOffsetPagination, match string) ([]dbmodel.GroupEntry, error)
+	// CountGroups returns the number of roles that exist.
+	CountGroups(ctx context.Context, user *openfga.User) (int, error)
+}
+
+// Parameters holds the services and static fields passed to the jimm.New() constructor.
+// You can provide mock implementations of certain services where necessary for dependency injection.
+type Parameters struct {
+	// Database is the database used by JIMM, this provides direct access
+	// to the data store. Any client accessing the database directly is
+	// responsible for ensuring that the authenticated user has access to
+	// the data.
+	Database *db.Database
+
+	// Dialer is the API dialer JIMM uses to contact juju controllers. if
+	// this is not configured all connection attempts will fail.
+	Dialer Dialer
+
+	// CredentialStore is a store for the attributes of a
+	// cloud credential and controller credentials. If this is
+	// not configured then the attributes
+	// are stored in the standard database.
+	CredentialStore credentials.CredentialStore
+
+	// Pubsub is a pub-sub hub used for buffering model summaries.
+	Pubsub *pubsub.Hub
+
+	// ReservedCloudNames is the list of names that cannot be used for
+	// hosted clouds. If this is empty then DefaultReservedCloudNames
+	// is used.
+	ReservedCloudNames []string
+
+	// UUID holds the UUID of the JIMM controller.
+	UUID string
+
+	// OpenFGAClient holds the client used to interact
+	// with the OpenFGA ReBAC system.
+	OpenFGAClient *openfga.OFGAClient
+
+	// JWKService holds a service responsible for generating and delivering a JWKS
+	// for consumption within Juju controllers.
+	JWKService *jimmjwx.JWKSService
+
+	// JWTService is responsible for minting JWTs to access controllers.
+	JWTService *jimmjwx.JWTService
+
+	// OAuthAuthenticator is responsible for handling authentication
+	// via OAuth2.0 AND JWT access tokens to JIMM.
+	OAuthAuthenticator OAuthAuthenticator
+}
+
+func (p *Parameters) Validate() error {
+	if p.Database == nil {
+		return errors.E("missing database")
+	}
+
+	if p.Dialer == nil {
+		return errors.E("missing dialer")
+	}
+
+	if p.CredentialStore == nil {
+		return errors.E("missing credential store")
+	}
+
+	if p.Pubsub == nil {
+		return errors.E("missing pubsub hub")
+	}
+
+	if p.UUID == "" {
+		return errors.E("missing uuid")
+	}
+
+	if p.OpenFGAClient == nil {
+		return errors.E("missing openfga client")
+	}
+
+	if p.JWKService == nil {
+		return errors.E("missing jwks service")
+	}
+
+	if p.JWTService == nil {
+		return errors.E("missing jwt service")
+	}
+
+	if p.OAuthAuthenticator == nil {
+		return errors.E("missing oauth authenticator")
+	}
+
+	return nil
+}
+
+// New returns a new instance of JIMM.
+// See [Option] and [Parameters] to better understand how to perform dependency injection.
+// Primitives like the dialer or authentication service can be mocked at a low level,
+// alternatively top business layer objects like the RoleManager can be mocked instead.
+func New(p Parameters) (*JIMM, error) {
+	if err := p.Validate(); err != nil {
+		return nil, err
+	}
+
+	j := &JIMM{
+		Parameters: p,
+	}
+
+	if err := j.Database.Migrate(context.Background(), false); err != nil {
+		return nil, errors.E(err)
+	}
+
+	roleManager, err := role.NewRoleManager(j.Database, p.OpenFGAClient)
+	if err != nil {
+		return nil, err
+	}
+	j.roleManager = roleManager
+
+	groupManager, err := group.NewGroupManager(j.Database, p.OpenFGAClient)
+	if err != nil {
+		return nil, err
+	}
+	j.groupManager = groupManager
+
+	return j, nil
+}
+
+// A JIMM provides the business logic for managing resources in the JAAS
+// system. A single JIMM instance is shared by all concurrent API
+// connections therefore the JIMM object itself does not contain any per-
+// request state.
+type JIMM struct {
+	Parameters
+
+	// roleManager provides a means to manage roles within JIMM.
+	roleManager RoleManager
+
+	// groupManager provides a means to manage groups within JIMM.
+	groupManager GroupManager
+}
+
+// ResourceTag returns JIMM's controller tag stating its UUID.
+func (j *JIMM) ResourceTag() names.ControllerTag {
+	return names.NewControllerTag(j.UUID)
+}
+
+// DB returns the database used by JIMM.
+func (j *JIMM) DB() *db.Database {
+	return j.Database
+}
+
+// PubsubHub returns the pub-sub hub used for buffering model summaries.
+func (j *JIMM) PubSubHub() *pubsub.Hub {
+	return j.Pubsub
+}
+
+// AuthorizationClient return the OpenFGA client used by JIMM.
+func (j *JIMM) AuthorizationClient() *openfga.OFGAClient {
+	return j.OpenFGAClient
+}
+
+// RoleManager returns a manager that enables role management.
+func (j *JIMM) RoleManager() RoleManager {
+	return j.roleManager
+}
+
+// GroupManager returns a manager that enables group management.
+func (j *JIMM) GroupManager() GroupManager {
+	return j.groupManager
 }
 
 // GetCredentialStore returns the credential store used by JIMM.
@@ -649,7 +731,7 @@ func (j *JIMM) FullModelStatus(ctx context.Context, user *openfga.User, modelTag
 
 type migrationControllerID = uint
 
-func fillMigrationTarget(db db.Database, credStore credentials.CredentialStore, controllerName string) (jujuparams.MigrationTargetInfo, migrationControllerID, error) {
+func fillMigrationTarget(db *db.Database, credStore credentials.CredentialStore, controllerName string) (jujuparams.MigrationTargetInfo, migrationControllerID, error) {
 	dbController := dbmodel.Controller{
 		Name: controllerName,
 	}

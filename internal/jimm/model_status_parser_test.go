@@ -7,13 +7,11 @@ import (
 	"time"
 
 	qt "github.com/frankban/quicktest"
-	"github.com/google/uuid"
 	"github.com/juju/juju/core/life"
 	"github.com/juju/juju/core/status"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/state"
 
-	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
@@ -326,15 +324,7 @@ func TestQueryModelsJq(t *testing.T) {
 	ctx := context.Background()
 
 	// Test setup
-	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
-	c.Assert(err, qt.IsNil)
-
-	j := &jimm.JIMM{
-		UUID: uuid.NewString(),
-		Database: db.Database{
-			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
-		},
-		OpenFGAClient: client,
+	j := jimmtest.NewJIMM(c, &jimm.Parameters{
 		Dialer: jimmtest.ModelDialerMap{
 			"10000000-0000-0000-0000-000000000000": &jimmtest.Dialer{
 				API: &jimmtest.API{
@@ -429,10 +419,7 @@ func TestQueryModelsJq(t *testing.T) {
 				},
 			},
 		},
-	}
-
-	err = j.Database.Migrate(ctx, false)
-	c.Assert(err, qt.IsNil)
+	})
 
 	env := jimmtest.ParseEnvironment(c, crossModelQueryEnv)
 	env.PopulateDB(c, j.Database)

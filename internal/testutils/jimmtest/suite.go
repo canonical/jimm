@@ -23,8 +23,6 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/discharger"
 	"github.com/canonical/jimm/v3/internal/jimm"
-	"github.com/canonical/jimm/v3/internal/jimm/group"
-	"github.com/canonical/jimm/v3/internal/jimm/role"
 	"github.com/canonical/jimm/v3/internal/jimmhttp"
 	"github.com/canonical/jimm/v3/internal/jimmjwx"
 	"github.com/canonical/jimm/v3/internal/jujuclient"
@@ -39,6 +37,7 @@ const ControllerUUID = "c1991ce8-96c2-497d-8e2a-e0cc42ca3aca"
 // A GocheckTester adapts a gc.C to the Tester interface.
 type GocheckTester struct {
 	*gc.C
+	AddCleanup func(func())
 }
 
 // Name implements Tester.Name.
@@ -47,7 +46,11 @@ func (t GocheckTester) Name() string {
 }
 
 func (t GocheckTester) Cleanup(f func()) {
-	t.C.Logf("warning: gocheck does not support Cleanup functions; make sure you're using suite's tear-down method")
+	if t.AddCleanup != nil {
+		t.AddCleanup(f)
+	} else {
+		t.C.Logf("warning: gocheck does not support Cleanup functions; make sure you're using suite's tear-down method")
+	}
 }
 
 // A JIMMSuite is a suite that initialises a JIMM.
@@ -62,63 +65,53 @@ type JIMMSuite struct {
 	COFGAClient *cofga.Client
 	COFGAParams *cofga.OpenFGAParams
 
-	Server         *httptest.Server
-	cancel         context.CancelFunc
-	deviceFlowChan chan string
-	databaseName   string
+	Server          *httptest.Server
+	cancel          context.CancelFunc
+	deviceFlowChan  chan string
+	databaseName    string
+	databaseCleanup []func()
 }
 
 func (s *JIMMSuite) SetUpTest(c *gc.C) {
 	var err error
-	s.OFGAClient, s.COFGAClient, s.COFGAParams, err = SetupTestOFGAClient(c.TestName())
-	c.Assert(err, gc.IsNil)
-
-	pgdb, databaseName := PostgresDBWithDbName(GocheckTester{c}, nil)
-	s.databaseName = databaseName
-	// Setup OpenFGA.
-	s.JIMM = &jimm.JIMM{
-		Database: db.Database{
-			DB: pgdb,
-		},
-		CredentialStore: NewInMemoryCredentialStore(),
-		Pubsub:          &pubsub.Hub{MaxConcurrency: 10},
-		UUID:            ControllerUUID,
-		OpenFGAClient:   s.OFGAClient,
-	}
-
-	roleManager, err := role.NewRoleManager(&s.JIMM.Database, s.OFGAClient)
-	c.Assert(err, gc.IsNil)
-	s.JIMM.RoleManager = roleManager
-
-	groupManager, err := group.NewGroupManager(&s.JIMM.Database, s.OFGAClient)
-	c.Assert(err, gc.IsNil)
-	s.JIMM.GroupManager = groupManager
 
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
 
+	// Setup OpenFGA.
+	s.OFGAClient, s.COFGAClient, s.COFGAParams, err = SetupTestOFGAClient(c.TestName())
+	c.Assert(err, gc.IsNil)
+
+	gct := &GocheckTester{
+		C: c,
+		AddCleanup: func(f func()) {
+			s.databaseCleanup = append(s.databaseCleanup, f)
+		},
+	}
+
+	pgdb, databaseName := PostgresDBWithDbName(gct, nil)
+	s.databaseName = databaseName
+
 	s.deviceFlowChan = make(chan string, 1)
 	authenticator := NewMockOAuthAuthenticator(c, s.deviceFlowChan)
-	s.JIMM.OAuthAuthenticator = &authenticator
 
-	err = s.JIMM.Database.Migrate(ctx, false)
+	database := &db.Database{
+		DB: pgdb,
+	}
+	err = database.Migrate(ctx, false)
 	c.Assert(err, gc.Equals, nil)
 
 	alice, err := dbmodel.NewIdentity("alice@canonical.com")
 	c.Assert(err, gc.IsNil)
 	alice.LastLogin = db.Now()
 
-	err = s.JIMM.Database.GetIdentity(ctx, alice)
+	err = database.GetIdentity(ctx, alice)
 	c.Assert(err, gc.Equals, nil)
 
 	s.AdminUser = openfga.NewUser(alice, s.OFGAClient)
 	s.AdminUser.JimmAdmin = true
-	err = s.AdminUser.SetControllerAccess(ctx, s.JIMM.ResourceTag(), ofganames.AdministratorRelation)
-	c.Assert(err, gc.Equals, nil)
 
-	// add jimmtest.DefaultControllerUUID as a controller to JIMM
-	err = s.OFGAClient.AddController(ctx, s.JIMM.ResourceTag(), names.NewControllerTag("982b16d9-a945-4762-b684-fd4fd885aa10"))
-	c.Assert(err, gc.Equals, nil)
+	credentialStore := NewInMemoryCredentialStore()
 
 	mux := chi.NewRouter()
 	mountHandler := func(path string, h jimmhttp.JIMMHttpHandler) {
@@ -127,29 +120,49 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 
 	mountHandler(
 		"/.well-known",
-		jimmhttp.NewWellKnownHandler(s.JIMM.CredentialStore),
+		jimmhttp.NewWellKnownHandler(credentialStore),
 	)
-	macaroonDischarger := s.setupMacaroonDischarger(c)
+	macaroonDischarger := setupMacaroonDischarger(c, ControllerUUID, database, s.OFGAClient)
 	localDischargePath := "/macaroons"
 	mux.Handle(localDischargePath+"/*", discharger.GetDischargerMux(macaroonDischarger, localDischargePath))
 
 	s.Server = httptest.NewServer(mux)
 
-	s.JIMM.JWKService = jimmjwx.NewJWKSService(s.JIMM.CredentialStore)
-	err = s.JIMM.JWKService.StartJWKSRotator(ctx, time.NewTicker(time.Hour).C, time.Now().UTC().AddDate(0, 3, 0))
-	c.Assert(err, gc.Equals, nil)
-
 	u, _ := url.Parse(s.Server.URL)
 
-	s.JIMM.JWTService = jimmjwx.NewJWTService(jimmjwx.JWTServiceParams{
+	jwksService := jimmjwx.NewJWKSService(credentialStore)
+	err = jwksService.StartJWKSRotator(ctx, time.NewTicker(time.Hour).C, time.Now().UTC().AddDate(0, 3, 0))
+	c.Assert(err, gc.Equals, nil)
+
+	jwtService := jimmjwx.NewJWTService(jimmjwx.JWTServiceParams{
 		Host:   u.Host,
-		Store:  s.JIMM.CredentialStore,
+		Store:  credentialStore,
 		Expiry: time.Minute,
 	})
-	s.JIMM.Dialer = &jujuclient.Dialer{
-		ControllerCredentialsStore: s.JIMM.CredentialStore,
-		JWTService:                 s.JIMM.JWTService,
-	}
+
+	s.JIMM = NewJIMM(gct, &jimm.Parameters{
+		UUID:     ControllerUUID,
+		Database: database,
+		Dialer: &jujuclient.Dialer{
+			ControllerCredentialsStore: credentialStore,
+			JWTService:                 jwtService,
+		},
+		CredentialStore:    credentialStore,
+		Pubsub:             &pubsub.Hub{MaxConcurrency: 10},
+		OpenFGAClient:      s.OFGAClient,
+		OAuthAuthenticator: &authenticator,
+
+		JWKService: jwksService,
+		JWTService: jwtService,
+	})
+
+	err = s.AdminUser.SetControllerAccess(ctx, s.JIMM.ResourceTag(), ofganames.AdministratorRelation)
+	c.Assert(err, gc.Equals, nil)
+
+	// add jimmtest.DefaultControllerUUID as a controller to JIMM
+	err = s.OFGAClient.AddController(ctx, s.JIMM.ResourceTag(), names.NewControllerTag(DefaultControllerUUID))
+	c.Assert(err, gc.Equals, nil)
+
 }
 
 func (s *JIMMSuite) TearDownTest(c *gc.C) {
@@ -162,6 +175,11 @@ func (s *JIMMSuite) TearDownTest(c *gc.C) {
 	if err := s.JIMM.Database.Close(); err != nil {
 		c.Logf("failed to close database connections at tear down: %s", err)
 	}
+
+	for _, cleanup := range s.databaseCleanup {
+		cleanup()
+	}
+
 	// Only delete the DB after closing connections to it.
 	_, skipCleanup := os.LookupEnv("NO_DB_CLEANUP")
 	if !skipCleanup {
@@ -172,14 +190,14 @@ func (s *JIMMSuite) TearDownTest(c *gc.C) {
 	}
 }
 
-func (s *JIMMSuite) setupMacaroonDischarger(c *gc.C) *discharger.MacaroonDischarger {
+func setupMacaroonDischarger(c *gc.C, uuid string, db *db.Database, ofgaClient *openfga.OFGAClient) *discharger.MacaroonDischarger {
 	cfg := discharger.MacaroonDischargerConfig{
 		MacaroonExpiryDuration: 1 * time.Hour,
-		ControllerUUID:         s.JIMM.UUID,
+		ControllerUUID:         uuid,
 		PrivateKey:             "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
 		PublicKey:              "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
 	}
-	macaroonDischarger, err := discharger.NewMacaroonDischarger(cfg, &s.JIMM.Database, s.JIMM.OpenFGAClient)
+	macaroonDischarger, err := discharger.NewMacaroonDischarger(cfg, db, ofgaClient)
 	c.Assert(err, gc.IsNil)
 	return macaroonDischarger
 }
@@ -277,14 +295,14 @@ func (s *JIMMSuite) AddModel(c *gc.C, owner names.UserTag, name string, cloud na
 
 func (s *JIMMSuite) AddGroup(c *gc.C, groupName string) dbmodel.GroupEntry {
 	ctx := context.Background()
-	group, err := s.JIMM.GroupManager.AddGroup(ctx, s.AdminUser, groupName)
+	group, err := s.JIMM.GroupManager().AddGroup(ctx, s.AdminUser, groupName)
 	c.Assert(err, gc.Equals, nil)
 	return *group
 }
 
 func (s *JIMMSuite) AddRole(c *gc.C, roleName string) dbmodel.RoleEntry {
 	ctx := context.Background()
-	role, err := s.JIMM.RoleManager.AddRole(ctx, s.AdminUser, roleName)
+	role, err := s.JIMM.RoleManager().AddRole(ctx, s.AdminUser, roleName)
 	c.Assert(err, gc.Equals, nil)
 	return *role
 }

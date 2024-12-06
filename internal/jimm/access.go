@@ -707,7 +707,7 @@ func (j *JIMM) parseAndValidateTag(ctx context.Context, key string) (*ofganames.
 		return tag, nil
 	}
 	tagString := key
-	tag, err := resolveTag(j.UUID, &j.Database, tagString)
+	tag, err := resolveTag(j.UUID, j.Database, tagString)
 	if err != nil {
 		zapctx.Debug(ctx, "failed to resolve tuple object", zap.Error(err))
 		return nil, errors.E(op, errors.CodeFailedToResolveTupleResource, err)

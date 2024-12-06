@@ -5,17 +5,13 @@ package jimm_test
 import (
 	"context"
 	"testing"
-	"time"
 
 	qt "github.com/frankban/quicktest"
-	"github.com/google/uuid"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 
-	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/jimm"
-	"github.com/canonical/jimm/v3/internal/jimm/group"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
@@ -26,18 +22,14 @@ func TestAddServiceAccount(t *testing.T) {
 	c := qt.New(t)
 
 	ctx := context.Background()
-	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
-	c.Assert(err, qt.IsNil)
-	j := &jimm.JIMM{
-		OpenFGAClient: client,
-	}
-	c.Assert(err, qt.IsNil)
+
+	j := jimmtest.NewJIMM(c, nil)
 
 	bob, err := dbmodel.NewIdentity("bob@canonical.com")
 	c.Assert(err, qt.IsNil)
 	user := openfga.NewUser(
 		bob,
-		client,
+		j.OpenFGAClient,
 	)
 	clientID := "39caae91-b914-41ae-83f8-c7b86ca5ad5a@serviceaccount"
 	err = j.AddServiceAccount(ctx, user, clientID)
@@ -49,7 +41,7 @@ func TestAddServiceAccount(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	userAlice := openfga.NewUser(
 		alive,
-		client,
+		j.OpenFGAClient,
 	)
 	err = j.AddServiceAccount(ctx, userAlice, clientID)
 	c.Assert(err, qt.ErrorMatches, "service account already owned")
@@ -59,8 +51,7 @@ func TestCopyServiceAccountCredential(t *testing.T) {
 	c := qt.New(t)
 
 	ctx := context.Background()
-	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
-	c.Assert(err, qt.IsNil)
+
 	api := &jimmtest.API{
 		CheckCredentialModels_: func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 			return []jujuparams.UpdateCredentialModelResult{}, nil
@@ -69,29 +60,23 @@ func TestCopyServiceAccountCredential(t *testing.T) {
 			return []jujuparams.UpdateCredentialModelResult{}, nil
 		},
 	}
-	j := &jimm.JIMM{
-		UUID: uuid.NewString(),
-		Database: db.Database{
-			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
-		},
+
+	j := jimmtest.NewJIMM(c, &jimm.Parameters{
 		Dialer: &jimmtest.Dialer{
 			API: api,
 		},
-		OpenFGAClient: client,
-	}
+	})
 
-	err = j.Database.Migrate(ctx, false)
-	c.Assert(err, qt.IsNil)
 	svcAccId, err := dbmodel.NewIdentity("39caae91-b914-41ae-83f8-c7b86ca5ad5a@serviceaccount")
 	c.Assert(err, qt.IsNil)
 	c.Assert(j.Database.DB.Create(&svcAccId).Error, qt.IsNil)
-	svcAcc := openfga.NewUser(svcAccId, client)
+	svcAcc := openfga.NewUser(svcAccId, j.OpenFGAClient)
 	u, err := dbmodel.NewIdentity("alice@canonical.com")
 	c.Assert(err, qt.IsNil)
 
 	c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
 
-	user := openfga.NewUser(u, client)
+	user := openfga.NewUser(u, j.OpenFGAClient)
 
 	err = user.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, qt.IsNil)
@@ -147,26 +132,17 @@ func TestCopyServiceAccountCredentialWithMissingCredential(t *testing.T) {
 	c := qt.New(t)
 
 	ctx := context.Background()
-	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
-	c.Assert(err, qt.IsNil)
-	j := &jimm.JIMM{
-		UUID: uuid.NewString(),
-		Database: db.Database{
-			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
-		},
-		OpenFGAClient: client,
-	}
 
-	err = j.Database.Migrate(ctx, false)
-	c.Assert(err, qt.IsNil)
+	j := jimmtest.NewJIMM(c, nil)
+
 	svcAccId, err := dbmodel.NewIdentity("39caae91-b914-41ae-83f8-c7b86ca5ad5a@serviceaccount")
 	c.Assert(err, qt.IsNil)
 	c.Assert(j.Database.DB.Create(&svcAccId).Error, qt.IsNil)
-	svcAcc := openfga.NewUser(svcAccId, client)
+	svcAcc := openfga.NewUser(svcAccId, j.OpenFGAClient)
 	u, err := dbmodel.NewIdentity("alice@canonical.com")
 	c.Assert(err, qt.IsNil)
 	c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
-	user := openfga.NewUser(u, client)
+	user := openfga.NewUser(u, j.OpenFGAClient)
 
 	cred := dbmodel.CloudCredential{
 		Name:              "test-credential-1",
@@ -234,44 +210,32 @@ func TestGrantServiceAccountAccess(t *testing.T) {
 	for _, test := range tests {
 		test := test
 		c.Run(test.about, func(c *qt.C) {
-			ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
-			c.Assert(err, qt.IsNil)
-			pgDb := db.Database{
-				DB: jimmtest.PostgresDB(c, nil),
-			}
-			err = pgDb.Migrate(context.Background(), false)
-			c.Assert(err, qt.IsNil)
-			groupManager, err := group.NewGroupManager(&pgDb, ofgaClient)
-			c.Assert(err, qt.IsNil)
-			jimm := &jimm.JIMM{
-				Database:      pgDb,
-				OpenFGAClient: ofgaClient,
-				GroupManager:  groupManager,
-			}
+			j := jimmtest.NewJIMM(c, nil)
+
 			var u dbmodel.Identity
 			u.SetTag(names.NewUserTag(test.clientID))
-			svcAccountIdentity := openfga.NewUser(&u, ofgaClient)
+			svcAccountIdentity := openfga.NewUser(&u, j.OpenFGAClient)
 			svcAccountIdentity.JimmAdmin = true
 			if len(test.addGroups) > 0 {
 				for _, name := range test.addGroups {
-					_, err := jimm.GroupManager.AddGroup(context.Background(), svcAccountIdentity, name)
+					_, err := j.GroupManager().AddGroup(context.Background(), svcAccountIdentity, name)
 					c.Assert(err, qt.IsNil)
 				}
 			}
 			svcAccountTag := jimmnames.NewServiceAccountTag(test.clientID)
 
-			err = jimm.GrantServiceAccountAccess(context.Background(), svcAccountIdentity, svcAccountTag, test.tags)
+			err := j.GrantServiceAccountAccess(context.Background(), svcAccountIdentity, svcAccountTag, test.tags)
 			if test.expectedError == "" {
 				c.Assert(err, qt.IsNil)
 				for _, tag := range test.tags {
-					parsedTag, err := jimm.ParseAndValidateTag(context.Background(), tag)
+					parsedTag, err := j.ParseAndValidateTag(context.Background(), tag)
 					c.Assert(err, qt.IsNil)
 					tuple := openfga.Tuple{
 						Object:   parsedTag,
 						Relation: ofganames.AdministratorRelation,
 						Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag(test.clientID)),
 					}
-					ok, err := jimm.OpenFGAClient.CheckRelation(context.Background(), tuple, false)
+					ok, err := j.OpenFGAClient.CheckRelation(context.Background(), tuple, false)
 					c.Assert(err, qt.IsNil)
 					c.Assert(ok, qt.IsTrue)
 				}

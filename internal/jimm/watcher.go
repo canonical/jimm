@@ -28,7 +28,7 @@ type Publisher interface {
 // A Watcher watches juju controllers for changes to all models.
 type Watcher struct {
 	// Database is the database used by the Watcher.
-	Database db.Database
+	Database *db.Database
 
 	// Dialer is the API dialer JIMM uses to contact juju controllers. if
 	// this is not configured all connection attempts will fail.

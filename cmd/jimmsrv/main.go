@@ -183,35 +183,13 @@ func start(ctx context.Context, s *service.Service) error {
 		CorsAllowedOrigins:        corsAllowedOrigins,
 		LogSQL:                    logSQL,
 		LogLevel:                  logLevel,
+		IsLeader:                  os.Getenv("JIMM_IS_LEADER") != "",
 	})
 	if err != nil {
 		return err
 	}
 
-	isLeader := os.Getenv("JIMM_IS_LEADER") != ""
-	if isLeader {
-		s.Go(func() error { return jimmsvc.WatchControllers(ctx) }) // Deletes dead/dying models, updates model config.
-	}
-	s.Go(func() error { return jimmsvc.WatchModelSummaries(ctx) })
-
-	if isLeader {
-		zapctx.Info(ctx, "attempting to start JWKS rotator and generate OAuth secret key")
-		s.Go(func() error {
-			if err := jimmsvc.StartJWKSRotator(ctx, time.NewTicker(time.Hour).C, time.Now().UTC().AddDate(0, 3, 0)); err != nil {
-				zapctx.Error(ctx, "failed to start JWKS rotator", zap.Error(err))
-				return err
-			}
-			return nil
-		})
-		s.Go(func() error {
-			return jimmsvc.OpenFGACleanup(ctx, time.NewTicker(6*time.Hour).C)
-		})
-	}
-
-	if isLeader {
-		// No need for s.Go() since this routine doesn't return an error.
-		go jimmsvc.MonitorResources(ctx)
-	}
+	jimmsvc.StartServices(ctx, s)
 
 	httpsrv := &http.Server{
 		Addr:              addr,

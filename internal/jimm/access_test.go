@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/canonical/ofga"
 	petname "github.com/dustinkirkland/golang-petname"
@@ -14,7 +13,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/juju/names/v5"
 
-	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm"
@@ -111,21 +109,10 @@ func (t *testJWTService) NewJWT(ctx context.Context, params jimmjwx.JWTParams) (
 func TestAuditLogAccess(t *testing.T) {
 	c := qt.New(t)
 
-	ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
-	c.Assert(err, qt.IsNil)
+	j := jimmtest.NewJIMM(c, nil)
 
-	now := time.Now().UTC().Round(time.Millisecond)
-	j := &jimm.JIMM{
-		UUID: uuid.NewString(),
-		Database: db.Database{
-			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
-		},
-		OpenFGAClient: ofgaClient,
-	}
 	ctx := context.Background()
 
-	err = j.Database.Migrate(ctx, false)
-	c.Assert(err, qt.IsNil)
 	i, err := dbmodel.NewIdentity("alice")
 	c.Assert(err, qt.IsNil)
 	adminUser := openfga.NewUser(i, j.OpenFGAClient)
@@ -428,20 +415,7 @@ func TestParseAndValidateTag(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
-	ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
-	c.Assert(err, qt.IsNil)
-
-	now := time.Now().UTC().Round(time.Millisecond)
-	j := &jimm.JIMM{
-		UUID: uuid.NewString(),
-		Database: db.Database{
-			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
-		},
-		OpenFGAClient: ofgaClient,
-	}
-
-	err = j.Database.Migrate(ctx, false)
-	c.Assert(err, qt.IsNil)
+	j := jimmtest.NewJIMM(c, nil)
 
 	user, _, _, model, _, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, j.Database)
 
@@ -479,16 +453,7 @@ func TestResolveTags(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
-	now := time.Now().UTC().Round(time.Millisecond)
-	j := &jimm.JIMM{
-		UUID: uuid.NewString(),
-		Database: db.Database{
-			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
-		},
-	}
-
-	err := j.Database.Migrate(ctx, false)
-	c.Assert(err, qt.IsNil)
+	j := jimmtest.NewJIMM(c, nil)
 
 	identity, group, controller, model, offer, cloud, _, role := jimmtest.CreateTestControllerEnvironment(ctx, c, j.Database)
 
@@ -556,7 +521,7 @@ func TestResolveTags(t *testing.T) {
 
 	for _, tC := range testCases {
 		t.Run(tC.desc, func(t *testing.T) {
-			jujuTag, err := jimm.ResolveTag(j.UUID, &j.Database, tC.input)
+			jujuTag, err := jimm.ResolveTag(j.UUID, j.Database, tC.input)
 			c.Assert(err, qt.IsNil)
 			c.Assert(jujuTag, qt.DeepEquals, tC.expected)
 		})
@@ -567,16 +532,7 @@ func TestResolveTupleObjectHandlesErrors(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
-	now := time.Now().UTC().Round(time.Millisecond)
-	j := &jimm.JIMM{
-		UUID: uuid.NewString(),
-		Database: db.Database{
-			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
-		},
-	}
-
-	err := j.Database.Migrate(ctx, false)
-	c.Assert(err, qt.IsNil)
+	j := jimmtest.NewJIMM(c, nil)
 
 	_, _, controller, model, offer, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, j.Database)
 
@@ -627,7 +583,7 @@ func TestResolveTupleObjectHandlesErrors(t *testing.T) {
 	}
 	for i, tc := range tests {
 		t.Run(fmt.Sprintf("test %d", i), func(t *testing.T) {
-			_, err := jimm.ResolveTag(j.UUID, &j.Database, tc.input)
+			_, err := jimm.ResolveTag(j.UUID, j.Database, tc.input)
 			c.Assert(err, qt.ErrorMatches, tc.want)
 		})
 	}
@@ -637,16 +593,7 @@ func TestToJAASTag(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
-	now := time.Now().UTC().Round(time.Millisecond)
-	j := &jimm.JIMM{
-		UUID: uuid.NewString(),
-		Database: db.Database{
-			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
-		},
-	}
-
-	err := j.Database.Migrate(ctx, false)
-	c.Assert(err, qt.IsNil)
+	j := jimmtest.NewJIMM(c, nil)
 
 	user, group, controller, model, applicationOffer, cloud, _, role := jimmtest.CreateTestControllerEnvironment(ctx, c, j.Database)
 
@@ -699,16 +646,7 @@ func TestToJAASTagNoUUIDResolution(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
-	now := time.Now().UTC().Round(time.Millisecond)
-	j := &jimm.JIMM{
-		UUID: uuid.NewString(),
-		Database: db.Database{
-			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
-		},
-	}
-
-	err := j.Database.Migrate(ctx, false)
-	c.Assert(err, qt.IsNil)
+	j := jimmtest.NewJIMM(c, nil)
 
 	user, group, controller, model, applicationOffer, cloud, _, role := jimmtest.CreateTestControllerEnvironment(ctx, c, j.Database)
 	serviceAccountId := petname.Generate(2, "-") + "@serviceaccount"
@@ -760,23 +698,10 @@ func TestOpenFGACleanup(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
-	ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
-	c.Assert(err, qt.IsNil)
-
-	now := time.Now().UTC().Round(time.Millisecond)
-	j := &jimm.JIMM{
-		UUID: uuid.NewString(),
-		Database: db.Database{
-			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
-		},
-		OpenFGAClient: ofgaClient,
-	}
-
-	err = j.Database.Migrate(ctx, false)
-	c.Assert(err, qt.IsNil)
+	j := jimmtest.NewJIMM(c, nil)
 
 	// run cleanup on an empty authorizaton store
-	err = j.OpenFGACleanup(ctx)
+	err := j.OpenFGACleanup(ctx)
 	c.Assert(err, qt.IsNil)
 
 	type createTagFunction func(int) *ofga.Entity
@@ -838,7 +763,7 @@ func TestOpenFGACleanup(t *testing.T) {
 				Relation: ofga.Relation(test.relation),
 				Target:   targetTag,
 			}
-			err = ofgaClient.AddRelation(ctx, tuple)
+			err = j.OpenFGAClient.AddRelation(ctx, tuple)
 			c.Assert(err, qt.IsNil)
 
 			orphanedTuples = append(orphanedTuples, tuple)
@@ -850,7 +775,7 @@ func TestOpenFGACleanup(t *testing.T) {
 
 	for _, tuple := range orphanedTuples {
 		c.Logf("checking relation for %+v", tuple)
-		ok, err := ofgaClient.CheckRelation(ctx, tuple, false)
+		ok, err := j.OpenFGAClient.CheckRelation(ctx, tuple, false)
 		c.Assert(err, qt.IsNil)
 		c.Assert(ok, qt.IsFalse)
 	}

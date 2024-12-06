@@ -4,15 +4,11 @@ package jimm_test
 import (
 	"context"
 	"testing"
-	"time"
 
 	qt "github.com/frankban/quicktest"
-	"github.com/google/uuid"
 
 	"github.com/canonical/jimm/v3/internal/common/pagination"
-	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
-	"github.com/canonical/jimm/v3/internal/jimm"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
@@ -20,25 +16,14 @@ import (
 func TestGetResources(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
-	ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
-	c.Assert(err, qt.IsNil)
 
-	now := time.Now().UTC().Round(time.Millisecond)
-	j := &jimm.JIMM{
-		UUID: uuid.NewString(),
-		Database: db.Database{
-			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
-		},
-		OpenFGAClient: ofgaClient,
-	}
+	j := jimmtest.NewJIMM(c, nil)
 
-	err = j.Database.Migrate(ctx, false)
-	c.Assert(err, qt.IsNil)
 	_, _, controller, model, applicationOffer, cloud, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, j.Database)
 
 	ids := []string{applicationOffer.UUID, cloud.Name, controller.UUID, model.UUID.String}
 
-	u := openfga.NewUser(&dbmodel.Identity{Name: "admin@canonical.com"}, ofgaClient)
+	u := openfga.NewUser(&dbmodel.Identity{Name: "admin@canonical.com"}, j.OpenFGAClient)
 	u.JimmAdmin = true
 
 	testCases := []struct {

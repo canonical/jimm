@@ -5,14 +5,11 @@ package jimm_test
 import (
 	"context"
 	"testing"
-	"time"
 
 	qt "github.com/frankban/quicktest"
-	"github.com/google/uuid"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 
-	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm"
@@ -24,41 +21,29 @@ import (
 func TestGetCloud(t *testing.T) {
 	c := qt.New(t)
 
-	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
-	c.Assert(err, qt.IsNil)
-
 	ctx := context.Background()
-	now := time.Now().UTC().Round(time.Millisecond)
-	j := &jimm.JIMM{
-		UUID:          uuid.NewString(),
-		OpenFGAClient: client,
-		Database: db.Database{
-			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
-		},
-	}
 
-	err = j.Database.Migrate(ctx, false)
-	c.Assert(err, qt.IsNil)
+	j := jimmtest.NewJIMM(c, nil)
 
 	aliceIdentity, err := dbmodel.NewIdentity("alice@canonical.com")
 	c.Assert(err, qt.IsNil)
 	alice := openfga.NewUser(
 		aliceIdentity,
-		client,
+		j.OpenFGAClient,
 	)
 
 	bobIdentity, err := dbmodel.NewIdentity("bob@canonical.com")
 	c.Assert(err, qt.IsNil)
 	bob := openfga.NewUser(
 		bobIdentity,
-		client,
+		j.OpenFGAClient,
 	)
 
 	charlieIdentity, err := dbmodel.NewIdentity("charlie@canonical.com")
 	c.Assert(err, qt.IsNil)
 	charlie := openfga.NewUser(
 		charlieIdentity,
-		client,
+		j.OpenFGAClient,
 	)
 
 	// daphne is a jimm administrator
@@ -66,7 +51,7 @@ func TestGetCloud(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	daphne := openfga.NewUser(
 		daphneIdentity,
-		client,
+		j.OpenFGAClient,
 	)
 	err = daphne.SetControllerAccess(
 		context.Background(),
@@ -81,7 +66,7 @@ func TestGetCloud(t *testing.T) {
 	err = j.Database.AddCloud(ctx, cloud)
 	c.Assert(err, qt.IsNil)
 
-	err = client.AddCloudController(context.Background(), cloud.ResourceTag(), j.ResourceTag())
+	err = j.OpenFGAClient.AddCloudController(context.Background(), cloud.ResourceTag(), j.ResourceTag())
 	c.Assert(err, qt.IsNil)
 
 	err = alice.SetCloudAccess(context.Background(), cloud.ResourceTag(), ofganames.AdministratorRelation)
@@ -96,7 +81,7 @@ func TestGetCloud(t *testing.T) {
 	err = j.Database.AddCloud(ctx, cloud2)
 	c.Assert(err, qt.IsNil)
 
-	err = client.AddCloudController(context.Background(), cloud2.ResourceTag(), j.ResourceTag())
+	err = j.OpenFGAClient.AddCloudController(context.Background(), cloud2.ResourceTag(), j.ResourceTag())
 	c.Assert(err, qt.IsNil)
 
 	err = j.EveryoneUser().SetCloudAccess(context.Background(), cloud2.ResourceTag(), ofganames.CanAddModelRelation)
@@ -151,49 +136,36 @@ func TestGetCloud(t *testing.T) {
 
 func TestForEachCloud(t *testing.T) {
 	c := qt.New(t)
-
-	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
-	c.Assert(err, qt.IsNil)
-
 	ctx := context.Background()
-	now := time.Now().UTC().Round(time.Millisecond)
-	j := &jimm.JIMM{
-		UUID:          "test-jimm-uuid",
-		OpenFGAClient: client,
-		Database: db.Database{
-			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
-		},
-	}
 
-	err = j.Database.Migrate(ctx, false)
-	c.Assert(err, qt.IsNil)
+	j := jimmtest.NewJIMM(c, nil)
 
 	aliceIdentity, err := dbmodel.NewIdentity("alice@canonical.com")
 	c.Assert(err, qt.IsNil)
 	alice := openfga.NewUser(
 		aliceIdentity,
-		client,
+		j.OpenFGAClient,
 	)
 
 	bobIdentity, err := dbmodel.NewIdentity("bob@canonical.com")
 	c.Assert(err, qt.IsNil)
 	bob := openfga.NewUser(
 		bobIdentity,
-		client,
+		j.OpenFGAClient,
 	)
 
 	charlieIdentity, err := dbmodel.NewIdentity("charlie@canonical.com")
 	c.Assert(err, qt.IsNil)
 	charlie := openfga.NewUser(
 		charlieIdentity,
-		client,
+		j.OpenFGAClient,
 	)
 
 	daphneIdentity, err := dbmodel.NewIdentity("daphne@canonical.com")
 	c.Assert(err, qt.IsNil)
 	daphne := openfga.NewUser(
 		daphneIdentity,
-		client,
+		j.OpenFGAClient,
 	)
 	daphne.JimmAdmin = true
 
@@ -570,42 +542,31 @@ func TestAddHostedCloud(t *testing.T) {
 		c.Run(test.name, func(c *qt.C) {
 			ctx := context.Background()
 
-			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.name)
-			c.Assert(err, qt.IsNil)
-
 			api := &jimmtest.API{
 				AddCloud_:         test.addCloud,
 				GrantCloudAccess_: test.grantCloudAccess,
 				Cloud_:            test.cloud_,
 			}
-
 			dialer := &jimmtest.Dialer{
 				Err: test.dialError,
 				API: api,
 			}
-			j := &jimm.JIMM{
-				UUID: uuid.NewString(),
-				Database: db.Database{
-					DB: jimmtest.PostgresDB(c, nil),
-				},
-				Dialer:        dialer,
-				OpenFGAClient: client,
-			}
+
+			j := jimmtest.NewJIMM(c, &jimm.Parameters{
+				Dialer: dialer,
+			})
 
 			// since dialer is set up to dial a controller with UUID set to
 			// jimmtest.DefaultControllerUUID we need to add a controller
 			// relation between that controller and JIMM
-			err = client.AddController(context.Background(), j.ResourceTag(), names.NewControllerTag(jimmtest.DefaultControllerUUID))
-			c.Assert(err, qt.IsNil)
-
-			err = j.Database.Migrate(ctx, false)
+			err := j.OpenFGAClient.AddController(context.Background(), j.ResourceTag(), names.NewControllerTag(jimmtest.DefaultControllerUUID))
 			c.Assert(err, qt.IsNil)
 
 			env := jimmtest.ParseEnvironment(c, addHostedCloudTestEnv)
-			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
+			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
 
 			dbUser := env.User(test.username).DBObject(c, j.Database)
-			user := openfga.NewUser(&dbUser, client)
+			user := openfga.NewUser(&dbUser, j.OpenFGAClient)
 
 			err = j.AddHostedCloud(ctx, user, names.NewCloudTag(test.cloudName), test.cloud, false)
 			c.Assert(dialer.IsClosed(), qt.Equals, true)
@@ -850,9 +811,6 @@ func TestAddCloudToController(t *testing.T) {
 		c.Run(test.name, func(c *qt.C) {
 			ctx := context.Background()
 
-			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.name)
-			c.Assert(err, qt.IsNil)
-
 			api := &jimmtest.API{
 				AddCloud_:         test.addCloud,
 				GrantCloudAccess_: test.grantCloudAccess,
@@ -863,29 +821,22 @@ func TestAddCloudToController(t *testing.T) {
 				Err: test.dialError,
 				API: api,
 			}
-			j := &jimm.JIMM{
-				UUID: uuid.NewString(),
-				Database: db.Database{
-					DB: jimmtest.PostgresDB(c, nil),
-				},
-				Dialer:        dialer,
-				OpenFGAClient: client,
-			}
+
+			j := jimmtest.NewJIMM(c, &jimm.Parameters{
+				Dialer: dialer,
+			})
 
 			// since dialer is set up to dial a controller with UUID set to
 			// jimmtest.DefaultControllerUUID we need to add a controller
 			// relation between that controller and JIMM
-			err = client.AddController(context.Background(), j.ResourceTag(), names.NewControllerTag(jimmtest.DefaultControllerUUID))
-			c.Assert(err, qt.IsNil)
-
-			err = j.Database.Migrate(ctx, false)
+			err := j.OpenFGAClient.AddController(context.Background(), j.ResourceTag(), names.NewControllerTag(jimmtest.DefaultControllerUUID))
 			c.Assert(err, qt.IsNil)
 
 			env := jimmtest.ParseEnvironment(c, addHostedCloudTestEnv)
-			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
+			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
 
 			dbUser := env.User(test.username).DBObject(c, j.Database)
-			user := openfga.NewUser(&dbUser, client)
+			user := openfga.NewUser(&dbUser, j.OpenFGAClient)
 
 			// Note that the force flag has no effect here because the Juju responses are mocked.
 			err = j.AddCloudToController(ctx, user, test.controllerName, names.NewCloudTag(test.cloudName), test.cloud, false)
@@ -1024,30 +975,22 @@ func TestGrantCloudAccess(t *testing.T) {
 		c.Run(tt.name, func(c *qt.C) {
 			ctx := context.Background()
 
-			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), tt.name)
-			c.Assert(err, qt.IsNil)
-
 			env := jimmtest.ParseEnvironment(c, tt.env)
 			dialer := &jimmtest.Dialer{
 				API: &jimmtest.API{},
 				Err: tt.dialError,
 			}
-			j := &jimm.JIMM{
-				UUID: jimmtest.ControllerUUID,
-				Database: db.Database{
-					DB: jimmtest.PostgresDB(c, nil),
-				},
-				Dialer:        dialer,
-				OpenFGAClient: client,
-			}
-			err = j.Database.Migrate(ctx, false)
-			c.Assert(err, qt.IsNil)
-			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
+
+			j := jimmtest.NewJIMM(c, &jimm.Parameters{
+				Dialer: dialer,
+			})
+
+			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
 
 			dbUser := env.User(tt.username).DBObject(c, j.Database)
-			user := openfga.NewUser(&dbUser, client)
+			user := openfga.NewUser(&dbUser, j.OpenFGAClient)
 
-			err = j.GrantCloudAccess(ctx, user, names.NewCloudTag(tt.cloud), names.NewUserTag(tt.targetUsername), tt.access)
+			err := j.GrantCloudAccess(ctx, user, names.NewCloudTag(tt.cloud), names.NewUserTag(tt.targetUsername), tt.access)
 			c.Assert(dialer.IsClosed(), qt.Equals, true)
 			if tt.expectError != "" {
 				c.Check(err, qt.ErrorMatches, tt.expectError)
@@ -1058,7 +1001,7 @@ func TestGrantCloudAccess(t *testing.T) {
 			}
 			c.Assert(err, qt.IsNil)
 			for _, tuple := range tt.expectRelations {
-				value, err := client.CheckRelation(ctx, tuple, false)
+				value, err := j.OpenFGAClient.CheckRelation(ctx, tuple, false)
 				c.Assert(err, qt.IsNil)
 				c.Assert(value, qt.IsTrue, qt.Commentf("expected the tuple to exist after granting"))
 			}
@@ -1325,44 +1268,35 @@ func TestRevokeCloudAccess(t *testing.T) {
 		c.Run(tt.name, func(c *qt.C) {
 			ctx := context.Background()
 
-			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), tt.name)
-			c.Assert(err, qt.IsNil)
-
 			env := jimmtest.ParseEnvironment(c, tt.env)
 			dialer := &jimmtest.Dialer{
 				API: &jimmtest.API{},
 				Err: tt.dialError,
 			}
-			j := &jimm.JIMM{
-				UUID: jimmtest.ControllerUUID,
-				Database: db.Database{
-					DB: jimmtest.PostgresDB(c, nil),
-				},
-				Dialer:        dialer,
-				OpenFGAClient: client,
-			}
 
-			err = j.Database.Migrate(ctx, false)
-			c.Assert(err, qt.IsNil)
-			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
+			j := jimmtest.NewJIMM(c, &jimm.Parameters{
+				Dialer: dialer,
+			})
+
+			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
 
 			if len(tt.extraInitialTuples) > 0 {
-				err = client.AddRelation(ctx, tt.extraInitialTuples...)
+				err := j.OpenFGAClient.AddRelation(ctx, tt.extraInitialTuples...)
 				c.Assert(err, qt.IsNil)
 			}
 
 			if tt.expectRemovedRelations != nil {
 				for _, tuple := range tt.expectRemovedRelations {
-					value, err := client.CheckRelation(ctx, tuple, false)
+					value, err := j.OpenFGAClient.CheckRelation(ctx, tuple, false)
 					c.Assert(err, qt.IsNil)
 					c.Assert(value, qt.IsTrue, qt.Commentf("expected the tuple to exist before revoking"))
 				}
 			}
 
 			dbUser := env.User(tt.username).DBObject(c, j.Database)
-			user := openfga.NewUser(&dbUser, client)
+			user := openfga.NewUser(&dbUser, j.OpenFGAClient)
 
-			err = j.RevokeCloudAccess(ctx, user, names.NewCloudTag(tt.cloud), names.NewUserTag(tt.targetUsername), tt.access)
+			err := j.RevokeCloudAccess(ctx, user, names.NewCloudTag(tt.cloud), names.NewUserTag(tt.targetUsername), tt.access)
 			c.Assert(dialer.IsClosed(), qt.Equals, true)
 			if tt.expectError != "" {
 				c.Check(err, qt.ErrorMatches, tt.expectError)
@@ -1374,14 +1308,14 @@ func TestRevokeCloudAccess(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 			if tt.expectRemovedRelations != nil {
 				for _, tuple := range tt.expectRemovedRelations {
-					value, err := client.CheckRelation(ctx, tuple, false)
+					value, err := j.OpenFGAClient.CheckRelation(ctx, tuple, false)
 					c.Assert(err, qt.IsNil)
 					c.Assert(value, qt.IsFalse, qt.Commentf("expected the tuple to be removed after revoking"))
 				}
 			}
 			if tt.expectRelations != nil {
 				for _, tuple := range tt.expectRelations {
-					value, err := client.CheckRelation(ctx, tuple, false)
+					value, err := j.OpenFGAClient.CheckRelation(ctx, tuple, false)
 					c.Assert(err, qt.IsNil)
 					c.Assert(value, qt.IsTrue, qt.Commentf("expected the tuple to exist after revoking"))
 				}
@@ -1487,16 +1421,11 @@ func TestRemoveCloud(t *testing.T) {
 				},
 				Err: test.dialError,
 			}
-			j := &jimm.JIMM{
-				UUID: uuid.NewString(),
-				Database: db.Database{
-					DB: jimmtest.PostgresDB(c, nil),
-				},
-				Dialer:        dialer,
-				OpenFGAClient: client,
-			}
-			err = j.Database.Migrate(ctx, false)
-			c.Assert(err, qt.IsNil)
+
+			j := jimmtest.NewJIMM(c, &jimm.Parameters{
+				Dialer: dialer,
+			})
+
 			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
 
 			dbUser := env.User(test.username).DBObject(c, j.Database)
@@ -1715,9 +1644,6 @@ func TestUpdateCloud(t *testing.T) {
 		c.Run(test.name, func(c *qt.C) {
 			ctx := context.Background()
 
-			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.name)
-			c.Assert(err, qt.IsNil)
-
 			env := jimmtest.ParseEnvironment(c, test.env)
 			dialer := &jimmtest.Dialer{
 				API: &jimmtest.API{
@@ -1727,23 +1653,18 @@ func TestUpdateCloud(t *testing.T) {
 				UUID:         "00000001-0000-0000-0000-000000000001",
 				AgentVersion: "1",
 			}
-			j := &jimm.JIMM{
-				UUID: uuid.NewString(),
-				Database: db.Database{
-					DB: jimmtest.PostgresDB(c, nil),
-				},
-				Dialer:        dialer,
-				OpenFGAClient: client,
-			}
-			err = j.Database.Migrate(ctx, false)
-			c.Assert(err, qt.IsNil)
-			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
+
+			j := jimmtest.NewJIMM(c, &jimm.Parameters{
+				Dialer: dialer,
+			})
+
+			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
 
 			dbUser := env.User(test.username).DBObject(c, j.Database)
-			user := openfga.NewUser(&dbUser, client)
+			user := openfga.NewUser(&dbUser, j.OpenFGAClient)
 
 			tag := names.NewCloudTag(test.cloud)
-			err = j.UpdateCloud(ctx, user, tag, test.update)
+			err := j.UpdateCloud(ctx, user, tag, test.update)
 			c.Assert(dialer.IsClosed(), qt.Equals, true)
 			if test.expectError != "" {
 				c.Check(err, qt.ErrorMatches, test.expectError)
@@ -1911,9 +1832,6 @@ func TestRemoveFromControllerCloud(t *testing.T) {
 		c.Run(test.name, func(c *qt.C) {
 			ctx := context.Background()
 
-			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.name)
-			c.Assert(err, qt.IsNil)
-
 			env := jimmtest.ParseEnvironment(c, test.env)
 			dialer := &jimmtest.Dialer{
 				API: &jimmtest.API{
@@ -1921,22 +1839,17 @@ func TestRemoveFromControllerCloud(t *testing.T) {
 				},
 				Err: test.dialError,
 			}
-			j := &jimm.JIMM{
-				UUID: uuid.NewString(),
-				Database: db.Database{
-					DB: jimmtest.PostgresDB(c, nil),
-				},
-				Dialer:        dialer,
-				OpenFGAClient: client,
-			}
-			err = j.Database.Migrate(ctx, false)
-			c.Assert(err, qt.IsNil)
-			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
+
+			j := jimmtest.NewJIMM(c, &jimm.Parameters{
+				Dialer: dialer,
+			})
+
+			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
 
 			dbUser := env.User(test.username).DBObject(c, j.Database)
-			user := openfga.NewUser(&dbUser, client)
+			user := openfga.NewUser(&dbUser, j.OpenFGAClient)
 
-			err = j.RemoveCloudFromController(ctx, user, test.controllerName, names.NewCloudTag(test.cloud))
+			err := j.RemoveCloudFromController(ctx, user, test.controllerName, names.NewCloudTag(test.cloud))
 			c.Assert(dialer.IsClosed(), qt.Equals, true)
 			if test.expectError != "" {
 				c.Check(err, qt.ErrorMatches, test.expectError)

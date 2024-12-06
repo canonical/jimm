@@ -28,7 +28,7 @@ func WatchController(w *Watcher, ctx context.Context, ctl *dbmodel.Controller) e
 	return w.watchController(ctx, ctl)
 }
 
-func NewWatcherWithControllerUnavailableChan(db db.Database, dialer Dialer, pubsub Publisher, testChannel chan error) *Watcher {
+func NewWatcherWithControllerUnavailableChan(db *db.Database, dialer Dialer, pubsub Publisher, testChannel chan error) *Watcher {
 	return &Watcher{
 		Pubsub:                    pubsub,
 		Database:                  db,
@@ -37,7 +37,7 @@ func NewWatcherWithControllerUnavailableChan(db db.Database, dialer Dialer, pubs
 	}
 }
 
-func NewWatcherWithDeltaProcessedChannel(db db.Database, dialer Dialer, pubsub Publisher, testChannel chan bool) *Watcher {
+func NewWatcherWithDeltaProcessedChannel(db *db.Database, dialer Dialer, pubsub Publisher, testChannel chan bool) *Watcher {
 	return &Watcher{
 		Pubsub:             pubsub,
 		Database:           db,

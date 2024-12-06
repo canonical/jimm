@@ -11,14 +11,12 @@ import (
 	"time"
 
 	qt "github.com/frankban/quicktest"
-	"github.com/google/uuid"
 	"github.com/juju/juju/core/life"
 	"github.com/juju/juju/core/status"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 
-	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm"
@@ -30,7 +28,6 @@ import (
 func TestUpdateCloudCredential(t *testing.T) {
 	c := qt.New(t)
 
-	now := time.Now().UTC().Round(time.Millisecond)
 	arch := "amd64"
 	mem := uint64(8096)
 	cores := uint64(8)
@@ -40,16 +37,16 @@ func TestUpdateCloudCredential(t *testing.T) {
 		checkCredentialErrors  []error
 		updateCredentialErrors []error
 		jimmAdmin              bool
-		createEnv              func(*qt.C, *jimm.JIMM, *openfga.OFGAClient) (*dbmodel.Identity, jimm.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string)
+		createEnv              func(*qt.C, *jimm.JIMM) (*dbmodel.Identity, jimm.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string)
 	}{{
 		about:     "all ok",
 		jimmAdmin: true,
-		createEnv: func(c *qt.C, j *jimm.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, jimm.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
+		createEnv: func(c *qt.C, j *jimm.JIMM) (*dbmodel.Identity, jimm.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
 			u, err := dbmodel.NewIdentity("alice@canonical.com")
 			c.Assert(err, qt.IsNil)
 			c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
 
-			user := openfga.NewUser(u, client)
+			user := openfga.NewUser(u, j.OpenFGAClient)
 			err = user.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 
@@ -157,13 +154,13 @@ func TestUpdateCloudCredential(t *testing.T) {
 		about:                  "update credential error returned by controller",
 		jimmAdmin:              true,
 		updateCredentialErrors: []error{nil, errors.E("test error")},
-		createEnv: func(c *qt.C, j *jimm.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, jimm.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
+		createEnv: func(c *qt.C, j *jimm.JIMM) (*dbmodel.Identity, jimm.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
 			u, err := dbmodel.NewIdentity("alice@canonical.com")
 			c.Assert(err, qt.IsNil)
 
 			c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
 
-			user := openfga.NewUser(u, client)
+			user := openfga.NewUser(u, j.OpenFGAClient)
 
 			err = user.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
@@ -248,13 +245,13 @@ func TestUpdateCloudCredential(t *testing.T) {
 		jimmAdmin:              true,
 		checkCredentialErrors:  []error{errors.E("test error")},
 		updateCredentialErrors: []error{nil},
-		createEnv: func(c *qt.C, j *jimm.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, jimm.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
+		createEnv: func(c *qt.C, j *jimm.JIMM) (*dbmodel.Identity, jimm.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
 			u, err := dbmodel.NewIdentity("alice@canonical.com")
 			c.Assert(err, qt.IsNil)
 
 			c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
 
-			user := openfga.NewUser(u, client)
+			user := openfga.NewUser(u, j.OpenFGAClient)
 
 			err = user.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
@@ -332,13 +329,13 @@ func TestUpdateCloudCredential(t *testing.T) {
 	}, {
 		about:     "user is controller superuser",
 		jimmAdmin: true,
-		createEnv: func(c *qt.C, j *jimm.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, jimm.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
+		createEnv: func(c *qt.C, j *jimm.JIMM) (*dbmodel.Identity, jimm.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
 			u, err := dbmodel.NewIdentity("alice@canonical.com")
 			c.Assert(err, qt.IsNil)
 
 			c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
 
-			alice := openfga.NewUser(u, client)
+			alice := openfga.NewUser(u, j.OpenFGAClient)
 			alice.JimmAdmin = true
 
 			err = alice.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
@@ -361,7 +358,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 			err = alice.SetCloudAccess(context.Background(), cloud.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 
-			e := openfga.NewUser(eve, client)
+			e := openfga.NewUser(eve, j.OpenFGAClient)
 			err = e.SetCloudAccess(context.Background(), cloud.ResourceTag(), ofganames.CanAddModelRelation)
 			c.Assert(err, qt.IsNil)
 
@@ -456,13 +453,13 @@ func TestUpdateCloudCredential(t *testing.T) {
 		about:                 "skip check, which would return an error",
 		checkCredentialErrors: []error{errors.E("test error")},
 		jimmAdmin:             true,
-		createEnv: func(c *qt.C, j *jimm.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, jimm.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
+		createEnv: func(c *qt.C, j *jimm.JIMM) (*dbmodel.Identity, jimm.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
 			u, err := dbmodel.NewIdentity("alice@canonical.com")
 			c.Assert(err, qt.IsNil)
 
 			c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
 
-			user := openfga.NewUser(u, client)
+			user := openfga.NewUser(u, j.OpenFGAClient)
 
 			err = user.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
@@ -569,13 +566,13 @@ func TestUpdateCloudCredential(t *testing.T) {
 	}, {
 		about:     "skip update",
 		jimmAdmin: true,
-		createEnv: func(c *qt.C, j *jimm.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, jimm.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
+		createEnv: func(c *qt.C, j *jimm.JIMM) (*dbmodel.Identity, jimm.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
 			u, err := dbmodel.NewIdentity("alice@canonical.com")
 			c.Assert(err, qt.IsNil)
 
 			c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
 
-			user := openfga.NewUser(u, client)
+			user := openfga.NewUser(u, j.OpenFGAClient)
 
 			err = user.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
@@ -775,27 +772,21 @@ func TestUpdateCloudCredential(t *testing.T) {
 				},
 			}
 
-			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
-			c.Assert(err, qt.IsNil)
+			j := jimmtest.NewJIMM(
+				c,
+				&jimm.Parameters{
+					Dialer: &jimmtest.Dialer{
+						API: api,
+					},
+				},
+				jimmtest.UnsetCredentialStore, // this test relies on credential attributes being stored in postgres
+			)
 
-			j := &jimm.JIMM{
-				UUID: uuid.NewString(),
-				Database: db.Database{
-					DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
-				},
-				Dialer: &jimmtest.Dialer{
-					API: api,
-				},
-				OpenFGAClient: client,
-			}
+			u, arg, expectedCredential, expectedError := test.createEnv(c, j)
+			user := openfga.NewUser(u, j.OpenFGAClient)
+			user.JimmAdmin = test.jimmAdmin
 
 			ctx := context.Background()
-			err = j.Database.Migrate(ctx, false)
-			c.Assert(err, qt.IsNil)
-
-			u, arg, expectedCredential, expectedError := test.createEnv(c, j, client)
-			user := openfga.NewUser(u, client)
-			user.JimmAdmin = test.jimmAdmin
 
 			result, err := j.UpdateCloudCredential(ctx, user, arg)
 			if expectedError == "" {
@@ -811,6 +802,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 				}
 				err = j.Database.GetCloudCredential(ctx, &credential)
 				c.Assert(err, qt.Equals, nil)
+
 				c.Assert(credential, jimmtest.DBObjectEquals, expectedCredential)
 			} else {
 				c.Assert(err, qt.ErrorMatches, expectedError)
@@ -823,9 +815,6 @@ func TestUpdateCloudCredentialForUnknownUser(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
-	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
-	c.Assert(err, qt.IsNil)
-
 	env := jimmtest.ParseEnvironment(c, `clouds:
 - name: test-cloud
   type: `+jimmtest.TestProviderType+`
@@ -835,24 +824,18 @@ users:
 - username: alice@canonical.com
   controller-access: superuser
 `)
-	j := &jimm.JIMM{
-		UUID: uuid.NewString(),
-		Database: db.Database{
-			DB: jimmtest.PostgresDB(c, nil),
-		},
+
+	j := jimmtest.NewJIMM(c, &jimm.Parameters{
 		Dialer: &jimmtest.Dialer{
 			API: &jimmtest.API{},
 		},
-		OpenFGAClient: client,
-	}
+	})
 
-	err = j.Database.Migrate(ctx, false)
-	c.Assert(err, qt.IsNil)
-	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
 	u := env.User("alice@canonical.com").DBObject(c, j.Database)
-	user := openfga.NewUser(&u, client)
+	user := openfga.NewUser(&u, j.OpenFGAClient)
 	user.JimmAdmin = true
-	_, err = j.UpdateCloudCredential(ctx, user, jimm.UpdateCloudCredentialArgs{
+	_, err := j.UpdateCloudCredential(ctx, user, jimm.UpdateCloudCredentialArgs{
 		CredentialTag: names.NewCloudCredentialTag("test-cloud/bob@canonical.com/test"),
 		Credential: jujuparams.CloudCredential{
 			AuthType: "empty",
@@ -864,7 +847,6 @@ users:
 func TestRevokeCloudCredential(t *testing.T) {
 	c := qt.New(t)
 
-	now := time.Now().UTC().Round(time.Millisecond)
 	arch := "amd64"
 	mem := uint64(8096)
 	cores := uint64(8)
@@ -1238,27 +1220,16 @@ func TestRevokeCloudCredential(t *testing.T) {
 				},
 			}
 
-			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.about)
-			c.Assert(err, qt.IsNil)
-
-			j := &jimm.JIMM{
-				UUID: uuid.NewString(),
-				Database: db.Database{
-					DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
-				},
+			j := jimmtest.NewJIMM(c, &jimm.Parameters{
 				Dialer: &jimmtest.Dialer{
 					API: api,
 				},
-				OpenFGAClient: client,
-			}
+			})
+
+			user, tag, expectedError := test.createEnv(c, j, j.OpenFGAClient)
 
 			ctx := context.Background()
-			err = j.Database.Migrate(ctx, false)
-			c.Assert(err, qt.IsNil)
-
-			user, tag, expectedError := test.createEnv(c, j, client)
-
-			err = j.RevokeCloudCredential(ctx, user, tag, false)
+			err := j.RevokeCloudCredential(ctx, user, tag, false)
 			if expectedError == "" {
 				c.Assert(err, qt.Equals, nil)
 
@@ -1275,8 +1246,6 @@ func TestRevokeCloudCredential(t *testing.T) {
 
 func TestGetCloudCredential(t *testing.T) {
 	c := qt.New(t)
-
-	now := time.Now().UTC().Round(time.Millisecond)
 
 	tests := []struct {
 		about                  string
@@ -1372,24 +1341,12 @@ func TestGetCloudCredential(t *testing.T) {
 	}}
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
-			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.about)
-			c.Assert(err, qt.IsNil)
 
-			j := &jimm.JIMM{
-				UUID: uuid.NewString(),
-				Database: db.Database{
-					DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
-				},
-				OpenFGAClient: client,
-			}
+			j := jimmtest.NewJIMM(c, nil)
 
-			ctx := context.Background()
-			err = j.Database.Migrate(ctx, false)
-			c.Assert(err, qt.IsNil)
-
-			u, tag, expectedCredential, expectedError := test.createEnv(c, j, client)
-			user := openfga.NewUser(u, client)
-			credential, err := j.GetCloudCredential(ctx, user, tag)
+			u, tag, expectedCredential, expectedError := test.createEnv(c, j, j.OpenFGAClient)
+			user := openfga.NewUser(u, j.OpenFGAClient)
+			credential, err := j.GetCloudCredential(context.Background(), user, tag)
 			if expectedError == "" {
 				c.Assert(err, qt.Equals, nil)
 				c.Assert(credential, jimmtest.DBObjectEquals, &expectedCredential)
@@ -1483,19 +1440,9 @@ func TestForEachUserCloudCredential(t *testing.T) {
 			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.name)
 			c.Assert(err, qt.IsNil)
 
+			j := jimmtest.NewJIMM(c, nil)
+
 			env := jimmtest.ParseEnvironment(c, test.env)
-			j := &jimm.JIMM{
-				UUID: uuid.NewString(),
-				Database: db.Database{
-					DB: jimmtest.PostgresDB(c, nil),
-				},
-				Dialer: &jimmtest.Dialer{
-					API: &jimmtest.API{},
-				},
-				OpenFGAClient: client,
-			}
-			err = j.Database.Migrate(ctx, false)
-			c.Assert(err, qt.IsNil)
 			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
 			u := env.User(test.username).DBObject(c, j.Database)
 
@@ -1622,31 +1569,18 @@ func TestGetCloudCredentialAttributes(t *testing.T) {
 		c.Run(test.name, func(c *qt.C) {
 			ctx := context.Background()
 
-			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.name)
-			c.Assert(err, qt.IsNil)
+			j := jimmtest.NewJIMM(c, nil)
 
 			env := jimmtest.ParseEnvironment(c, getCloudCredentialAttributesEnv)
-			j := &jimm.JIMM{
-				UUID: uuid.NewString(),
-				Database: db.Database{
-					DB: jimmtest.PostgresDB(c, nil),
-				},
-				Dialer: &jimmtest.Dialer{
-					API: &jimmtest.API{},
-				},
-				OpenFGAClient: client,
-			}
-			err = j.Database.Migrate(ctx, false)
-			c.Assert(err, qt.IsNil)
-			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
+			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
 			u := env.User("bob@canonical.com").DBObject(c, j.Database)
-			userBob := openfga.NewUser(&u, client)
+			userBob := openfga.NewUser(&u, j.OpenFGAClient)
 			credTag := fmt.Sprintf("test-cloud/bob@canonical.com/%s", test.cred)
 			cred, err := j.GetCloudCredential(ctx, userBob, names.NewCloudCredentialTag(credTag))
 			c.Assert(err, qt.IsNil)
 
 			u = env.User(test.username).DBObject(c, j.Database)
-			userTest := openfga.NewUser(&u, client)
+			userTest := openfga.NewUser(&u, j.OpenFGAClient)
 			userTest.JimmAdmin = test.jimmAdmin
 			attr, redacted, err := j.GetCloudCredentialAttributes(ctx, userTest, cred, test.hidden)
 			if test.expectError != "" {
@@ -1673,18 +1607,10 @@ func TestCloudCredentialAttributeStore(t *testing.T) {
 	attrStore := testCloudCredentialAttributeStore{
 		attrs: make(map[string]map[string]string),
 	}
-	j := &jimm.JIMM{
-		UUID: uuid.NewString(),
-		Database: db.Database{
-			DB: jimmtest.PostgresDB(c, nil),
-		},
-		Dialer: &jimmtest.Dialer{
-			API: &jimmtest.API{},
-		},
+
+	j := jimmtest.NewJIMM(c, &jimm.Parameters{
 		CredentialStore: attrStore,
-	}
-	err = j.Database.Migrate(ctx, false)
-	c.Assert(err, qt.IsNil)
+	})
 
 	env := jimmtest.ParseEnvironment(c, `clouds:
 - name: test

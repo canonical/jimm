@@ -35,7 +35,7 @@ func (s *rolesService) ListRoles(ctx context.Context, params *resources.GetRoles
 	if err != nil {
 		return nil, err
 	}
-	count, err := s.jimm.GetRoleManager().CountRoles(ctx, user)
+	count, err := s.jimm.RoleManager().CountRoles(ctx, user)
 	if err != nil {
 		return nil, err
 	}
@@ -44,7 +44,7 @@ func (s *rolesService) ListRoles(ctx context.Context, params *resources.GetRoles
 	if params.Filter != nil && *params.Filter != "" {
 		match = *params.Filter
 	}
-	roles, err := s.jimm.GetRoleManager().ListRoles(ctx, user, pagination, match)
+	roles, err := s.jimm.RoleManager().ListRoles(ctx, user, pagination, match)
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +71,7 @@ func (s *rolesService) CreateRole(ctx context.Context, role *resources.Role) (*r
 	if err != nil {
 		return nil, err
 	}
-	roleInfo, err := s.jimm.GetRoleManager().AddRole(ctx, user, role.Name)
+	roleInfo, err := s.jimm.RoleManager().AddRole(ctx, user, role.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +84,7 @@ func (s *rolesService) GetRole(ctx context.Context, roleId string) (*resources.R
 	if err != nil {
 		return nil, err
 	}
-	role, err := s.jimm.GetRoleManager().GetRoleByUUID(ctx, user, roleId)
+	role, err := s.jimm.RoleManager().GetRoleByUUID(ctx, user, roleId)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.CodeNotFound {
 			return nil, v1.NewNotFoundError("failed to find role")
@@ -103,14 +103,14 @@ func (s *rolesService) UpdateRole(ctx context.Context, role *resources.Role) (*r
 	if role.Id == nil {
 		return nil, v1.NewValidationError("missing role ID")
 	}
-	existingRole, err := s.jimm.GetRoleManager().GetRoleByUUID(ctx, user, *role.Id)
+	existingRole, err := s.jimm.RoleManager().GetRoleByUUID(ctx, user, *role.Id)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.CodeNotFound {
 			return nil, v1.NewNotFoundError("failed to find role")
 		}
 		return nil, err
 	}
-	err = s.jimm.GetRoleManager().RenameRole(ctx, user, existingRole.Name, role.Name)
+	err = s.jimm.RoleManager().RenameRole(ctx, user, existingRole.Name, role.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -126,14 +126,14 @@ func (s *rolesService) DeleteRole(ctx context.Context, roleId string) (bool, err
 	if err != nil {
 		return false, err
 	}
-	existingRole, err := s.jimm.GetRoleManager().GetRoleByUUID(ctx, user, roleId)
+	existingRole, err := s.jimm.RoleManager().GetRoleByUUID(ctx, user, roleId)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.CodeNotFound {
 			return false, nil
 		}
 		return false, err
 	}
-	err = s.jimm.GetRoleManager().RemoveRole(ctx, user, existingRole.Name)
+	err = s.jimm.RoleManager().RemoveRole(ctx, user, existingRole.Name)
 	if err != nil {
 		return false, err
 	}

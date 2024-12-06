@@ -21,20 +21,8 @@ func TestGetUser(t *testing.T) {
 	c := qt.New(t)
 
 	ctx := context.Background()
-	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
-	c.Assert(err, qt.IsNil)
-	db := &db.Database{
-		DB: jimmtest.PostgresDB(c, time.Now),
-	}
 
-	j := &jimm.JIMM{
-		UUID:          "test",
-		Database:      *db,
-		OpenFGAClient: client,
-	}
-
-	err = j.Database.Migrate(ctx, false)
-	c.Assert(err, qt.IsNil)
+	j := jimmtest.NewJIMM(c, nil)
 
 	ofgaUser, err := j.GetUser(ctx, "bob@canonical.com.com")
 	c.Assert(err, qt.IsNil)
@@ -68,23 +56,17 @@ func TestUpdateUserLastLogin(t *testing.T) {
 	c := qt.New(t)
 
 	ctx := context.Background()
-	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
-	c.Assert(err, qt.IsNil)
+
 	now := time.Now().Truncate(time.Millisecond)
 	db := &db.Database{
 		DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 	}
 
-	j := &jimm.JIMM{
-		UUID:          "test",
-		Database:      *db,
-		OpenFGAClient: client,
-	}
+	j := jimmtest.NewJIMM(c, &jimm.Parameters{
+		Database: db,
+	})
 
-	err = j.Database.Migrate(ctx, false)
-	c.Assert(err, qt.IsNil)
-
-	err = j.UpdateUserLastLogin(ctx, "bob@canonical.com.com")
+	err := j.UpdateUserLastLogin(ctx, "bob@canonical.com.com")
 	c.Assert(err, qt.IsNil)
 	user := dbmodel.Identity{Name: "bob@canonical.com.com"}
 	err = j.Database.GetIdentity(ctx, &user)

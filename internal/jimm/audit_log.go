@@ -130,7 +130,7 @@ func (o recorder) HandleReply(r rpc.Request, header *rpc.Header, body interface{
 // on a defined retention period. The retention period is in DAYS.
 type auditLogCleanupService struct {
 	auditLogRetentionPeriodInDays int
-	db                            db.Database
+	db                            *db.Database
 }
 
 // pollTimeOfDay holds the time hour, minutes and seconds to poll at.
@@ -146,7 +146,7 @@ var pollDuration = pollTimeOfDay{
 
 // NewAuditLogCleanupService returns a service capable of cleaning up audit logs
 // on a defined retention period. The retention period is in DAYS.
-func NewAuditLogCleanupService(db db.Database, auditLogRetentionPeriodInDays int) *auditLogCleanupService {
+func NewAuditLogCleanupService(db *db.Database, auditLogRetentionPeriodInDays int) *auditLogCleanupService {
 	return &auditLogCleanupService{
 		auditLogRetentionPeriodInDays: auditLogRetentionPeriodInDays,
 		db:                            db,

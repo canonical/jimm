@@ -169,7 +169,7 @@ func TestGetIdentityGroups(t *testing.T) {
 				return []openfga.Tuple{testTuple}, "continuation-token", listTuplesErr
 			},
 		},
-		GetGroupManager_: func() jimm.GroupManager {
+		GroupManager_: func() jimm.GroupManager {
 			return &groupManager
 		},
 	}
@@ -269,7 +269,7 @@ func TestGetIdentityRoles(t *testing.T) {
 				return []openfga.Tuple{testTuple}, "continuation-token", listTuplesErr
 			},
 		},
-		GetRoleManager_: func() jimm.RoleManager {
+		RoleManager_: func() jimm.RoleManager {
 			return roleManager
 		},
 	}

@@ -31,7 +31,7 @@ import (
 //
 // TODO(ale8k): Make this an implicit thing on the JIMM suite per test & refactor the current state.
 // and make the suite argument an interface of the required calls we use here.
-func CreateTestControllerEnvironment(ctx context.Context, c *qt.C, db db.Database) (
+func CreateTestControllerEnvironment(ctx context.Context, c *qt.C, db *db.Database) (
 	dbmodel.Identity,
 	dbmodel.GroupEntry,
 	dbmodel.Controller,

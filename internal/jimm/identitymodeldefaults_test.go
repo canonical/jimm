@@ -5,7 +5,6 @@ package jimm_test
 import (
 	"context"
 	"testing"
-	"time"
 
 	qt "github.com/frankban/quicktest"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -21,7 +20,6 @@ func TestSetIdentityModelDefaults(t *testing.T) {
 	c := qt.New(t)
 
 	ctx := context.Background()
-	now := time.Now()
 
 	type testConfig struct {
 		identity         *dbmodel.Identity
@@ -119,17 +117,11 @@ func TestSetIdentityModelDefaults(t *testing.T) {
 
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
-			j := &jimm.JIMM{
-				Database: db.Database{
-					DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
-				},
-			}
-			err := j.Database.Migrate(ctx, true)
-			c.Assert(err, qt.Equals, nil)
+			j := jimmtest.NewJIMM(c, nil)
 
 			testConfig := test.setup(c, j)
 
-			err = j.SetIdentityModelDefaults(ctx, testConfig.identity, testConfig.defaults)
+			err := j.SetIdentityModelDefaults(ctx, testConfig.identity, testConfig.defaults)
 			if testConfig.expectedError == "" {
 				c.Assert(err, qt.Equals, nil)
 				dbDefaults := dbmodel.IdentityModelDefaults{
@@ -149,7 +141,6 @@ func TestIdentityModelDefaults(t *testing.T) {
 	c := qt.New(t)
 
 	ctx := context.Background()
-	now := time.Now()
 
 	type testConfig struct {
 		identity         *dbmodel.Identity
@@ -206,13 +197,7 @@ func TestIdentityModelDefaults(t *testing.T) {
 
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
-			j := &jimm.JIMM{
-				Database: db.Database{
-					DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
-				},
-			}
-			err := j.Database.Migrate(ctx, true)
-			c.Assert(err, qt.Equals, nil)
+			j := jimmtest.NewJIMM(c, nil)
 
 			testConfig := test.setup(c, j)
 

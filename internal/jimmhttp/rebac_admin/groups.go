@@ -37,7 +37,7 @@ func (s *groupsService) ListGroups(ctx context.Context, params *resources.GetGro
 	if err != nil {
 		return nil, err
 	}
-	count, err := s.jimm.GetGroupManager().CountGroups(ctx, user)
+	count, err := s.jimm.GroupManager().CountGroups(ctx, user)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +46,7 @@ func (s *groupsService) ListGroups(ctx context.Context, params *resources.GetGro
 	if params.Filter != nil && *params.Filter != "" {
 		match = *params.Filter
 	}
-	groups, err := s.jimm.GetGroupManager().ListGroups(ctx, user, pagination, match)
+	groups, err := s.jimm.GroupManager().ListGroups(ctx, user, pagination, match)
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +73,7 @@ func (s *groupsService) CreateGroup(ctx context.Context, group *resources.Group)
 	if err != nil {
 		return nil, err
 	}
-	groupInfo, err := s.jimm.GetGroupManager().AddGroup(ctx, user, group.Name)
+	groupInfo, err := s.jimm.GroupManager().AddGroup(ctx, user, group.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +86,7 @@ func (s *groupsService) GetGroup(ctx context.Context, groupId string) (*resource
 	if err != nil {
 		return nil, err
 	}
-	group, err := s.jimm.GetGroupManager().GetGroupByUUID(ctx, user, groupId)
+	group, err := s.jimm.GroupManager().GetGroupByUUID(ctx, user, groupId)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.CodeNotFound {
 			return nil, v1.NewNotFoundError("failed to find group")
@@ -105,14 +105,14 @@ func (s *groupsService) UpdateGroup(ctx context.Context, group *resources.Group)
 	if group.Id == nil {
 		return nil, v1.NewValidationError("missing group ID")
 	}
-	existingGroup, err := s.jimm.GetGroupManager().GetGroupByUUID(ctx, user, *group.Id)
+	existingGroup, err := s.jimm.GroupManager().GetGroupByUUID(ctx, user, *group.Id)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.CodeNotFound {
 			return nil, v1.NewNotFoundError("failed to find group")
 		}
 		return nil, err
 	}
-	err = s.jimm.GetGroupManager().RenameGroup(ctx, user, existingGroup.Name, group.Name)
+	err = s.jimm.GroupManager().RenameGroup(ctx, user, existingGroup.Name, group.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -128,14 +128,14 @@ func (s *groupsService) DeleteGroup(ctx context.Context, groupId string) (bool, 
 	if err != nil {
 		return false, err
 	}
-	existingGroup, err := s.jimm.GetGroupManager().GetGroupByUUID(ctx, user, groupId)
+	existingGroup, err := s.jimm.GroupManager().GetGroupByUUID(ctx, user, groupId)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.CodeNotFound {
 			return false, nil
 		}
 		return false, err
 	}
-	err = s.jimm.GetGroupManager().RemoveGroup(ctx, user, existingGroup.Name)
+	err = s.jimm.GroupManager().RemoveGroup(ctx, user, existingGroup.Name)
 	if err != nil {
 		return false, err
 	}
@@ -153,7 +153,7 @@ func (s *groupsService) GetGroupIdentities(ctx context.Context, groupId string, 
 	}
 	filter := utils.CreateTokenPaginationFilter(params.Size, params.NextToken, params.NextPageToken)
 	groupTag := jimmnames.NewGroupTag(groupId)
-	_, err = s.jimm.GetGroupManager().GetGroupByUUID(ctx, user, groupId)
+	_, err = s.jimm.GroupManager().GetGroupByUUID(ctx, user, groupId)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.CodeNotFound {
 			return nil, v1.NewNotFoundError("group not found")
@@ -248,7 +248,7 @@ func (s *groupsService) GetGroupRoles(ctx context.Context, groupId string, param
 
 	filter := utils.CreateTokenPaginationFilter(params.Size, params.NextToken, params.NextPageToken)
 	groupTag := jimmnames.NewGroupTag(groupId)
-	_, err = s.jimm.GetGroupManager().GetGroupByUUID(ctx, user, groupId)
+	_, err = s.jimm.GroupManager().GetGroupByUUID(ctx, user, groupId)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.CodeNotFound {
 			return nil, v1.NewNotFoundError("group not found")
@@ -269,7 +269,7 @@ func (s *groupsService) GetGroupRoles(ctx context.Context, groupId string, param
 	data := make([]resources.Role, 0, len(roles))
 	for _, role := range roles {
 		roleUUID := role.Target.ID
-		roleEntry, err := s.jimm.GetRoleManager().GetRoleByUUID(ctx, user, roleUUID)
+		roleEntry, err := s.jimm.RoleManager().GetRoleByUUID(ctx, user, roleUUID)
 		if err != nil {
 			// If a role does not exist in the database but a linger tuple exists, drop the role from the results.
 			if errors.ErrorCode(err) == errors.CodeNotFound {

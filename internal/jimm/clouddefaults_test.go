@@ -5,7 +5,6 @@ package jimm_test
 import (
 	"context"
 	"testing"
-	"time"
 
 	qt "github.com/frankban/quicktest"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -23,7 +22,6 @@ func TestSetCloudDefaults(t *testing.T) {
 	c := qt.New(t)
 
 	ctx := context.Background()
-	now := time.Now()
 
 	type testConfig struct {
 		user             *dbmodel.Identity
@@ -232,17 +230,11 @@ func TestSetCloudDefaults(t *testing.T) {
 
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
-			j := &jimm.JIMM{
-				Database: db.Database{
-					DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
-				},
-			}
-			err := j.Database.Migrate(ctx, true)
-			c.Assert(err, qt.Equals, nil)
+			j := jimmtest.NewJIMM(c, nil)
 
 			testConfig := test.setup(c, j)
 
-			err = j.SetModelDefaults(ctx, testConfig.user, testConfig.cloud, testConfig.region, testConfig.defaults)
+			err := j.SetModelDefaults(ctx, testConfig.user, testConfig.cloud, testConfig.region, testConfig.defaults)
 			if testConfig.expectedError == "" {
 				c.Assert(err, qt.Equals, nil)
 				dbDefaults := dbmodel.CloudDefaults{
@@ -266,7 +258,6 @@ func TestUnsetCloudDefaults(t *testing.T) {
 	c := qt.New(t)
 
 	ctx := context.Background()
-	now := time.Now()
 
 	type testConfig struct {
 		user             *dbmodel.Identity
@@ -425,17 +416,11 @@ func TestUnsetCloudDefaults(t *testing.T) {
 
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
-			j := &jimm.JIMM{
-				Database: db.Database{
-					DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
-				},
-			}
-			err := j.Database.Migrate(ctx, true)
-			c.Assert(err, qt.Equals, nil)
+			j := jimmtest.NewJIMM(c, nil)
 
 			testConfig := test.setup(c, j)
 
-			err = j.UnsetModelDefaults(ctx, testConfig.user, testConfig.cloud, testConfig.region, testConfig.keys)
+			err := j.UnsetModelDefaults(ctx, testConfig.user, testConfig.cloud, testConfig.region, testConfig.keys)
 			if testConfig.expectedError == "" {
 				c.Assert(err, qt.Equals, nil)
 				dbDefaults := dbmodel.CloudDefaults{
@@ -459,15 +444,8 @@ func TestModelDefaultsForCloud(t *testing.T) {
 	c := qt.New(t)
 
 	ctx := context.Background()
-	now := time.Now()
 
-	j := &jimm.JIMM{
-		Database: db.Database{
-			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
-		},
-	}
-	err := j.Database.Migrate(ctx, true)
-	c.Assert(err, qt.Equals, nil)
+	j := jimmtest.NewJIMM(c, nil)
 
 	user, err := dbmodel.NewIdentity("bob@canonical.com")
 	c.Assert(err, qt.IsNil)

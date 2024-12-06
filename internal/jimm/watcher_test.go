@@ -86,9 +86,9 @@ models:
 
 var watcherTests = []struct {
 	name    string
-	initDB  func(*qt.C, db.Database)
+	initDB  func(*qt.C, *db.Database)
 	deltas  [][]jujuparams.Delta
-	checkDB func(*qt.C, db.Database)
+	checkDB func(*qt.C, *db.Database)
 }{{
 	name: "AddMachine",
 	deltas: [][]jujuparams.Delta{
@@ -104,7 +104,7 @@ var watcherTests = []struct {
 		}},
 		nil,
 	},
-	checkDB: func(c *qt.C, db db.Database) {
+	checkDB: func(c *qt.C, db *db.Database) {
 		ctx := context.Background()
 
 		model := dbmodel.Model{
@@ -140,7 +140,7 @@ var watcherTests = []struct {
 		}},
 		nil,
 	},
-	checkDB: func(c *qt.C, db db.Database) {
+	checkDB: func(c *qt.C, db *db.Database) {
 		ctx := context.Background()
 
 		model := dbmodel.Model{
@@ -176,7 +176,7 @@ var watcherTests = []struct {
 		}},
 		nil,
 	},
-	checkDB: func(c *qt.C, db db.Database) {
+	checkDB: func(c *qt.C, db *db.Database) {
 		ctx := context.Background()
 
 		model := dbmodel.Model{
@@ -202,7 +202,7 @@ var watcherTests = []struct {
 		}},
 		nil,
 	},
-	checkDB: func(c *qt.C, db db.Database) {
+	checkDB: func(c *qt.C, db *db.Database) {
 		ctx := context.Background()
 
 		model := dbmodel.Model{
@@ -233,7 +233,7 @@ var watcherTests = []struct {
 		}},
 		nil,
 	},
-	checkDB: func(c *qt.C, db db.Database) {
+	checkDB: func(c *qt.C, db *db.Database) {
 		ctx := context.Background()
 
 		model := dbmodel.Model{
@@ -265,7 +265,7 @@ var watcherTests = []struct {
 		}},
 		nil,
 	},
-	checkDB: func(c *qt.C, db db.Database) {
+	checkDB: func(c *qt.C, db *db.Database) {
 		ctx := context.Background()
 
 		model := dbmodel.Model{
@@ -292,7 +292,7 @@ var watcherTests = []struct {
 		}},
 		nil,
 	},
-	checkDB: func(c *qt.C, db db.Database) {
+	checkDB: func(c *qt.C, db *db.Database) {
 		ctx := context.Background()
 
 		model := dbmodel.Model{
@@ -328,7 +328,7 @@ var watcherTests = []struct {
 		}},
 		nil,
 	},
-	checkDB: func(c *qt.C, db db.Database) {
+	checkDB: func(c *qt.C, db *db.Database) {
 		ctx := context.Background()
 
 		model := dbmodel.Model{
@@ -376,7 +376,7 @@ var watcherTests = []struct {
 		}},
 		nil,
 	},
-	checkDB: func(c *qt.C, db db.Database) {
+	checkDB: func(c *qt.C, db *db.Database) {
 		ctx := context.Background()
 
 		model := dbmodel.Model{
@@ -400,7 +400,7 @@ var watcherTests = []struct {
 		}},
 		nil,
 	},
-	checkDB: func(c *qt.C, db db.Database) {
+	checkDB: func(c *qt.C, db *db.Database) {
 		ctx := context.Background()
 
 		model := dbmodel.Model{
@@ -424,7 +424,7 @@ var watcherTests = []struct {
 		}},
 		nil,
 	},
-	checkDB: func(c *qt.C, db db.Database) {
+	checkDB: func(c *qt.C, db *db.Database) {
 		ctx := context.Background()
 
 		model := dbmodel.Model{
@@ -481,7 +481,7 @@ func TestWatcher(t *testing.T) {
 			deltaProcessedChannel := make(chan bool, len(test.deltas))
 
 			w := jimm.NewWatcherWithDeltaProcessedChannel(
-				db.Database{
+				&db.Database{
 					DB: jimmtest.PostgresDB(c, nil),
 				},
 				&jimmtest.Dialer{
@@ -645,7 +645,7 @@ func TestModelSummaryWatcher(t *testing.T) {
 
 			w := &jimm.Watcher{
 				Pubsub: publisher,
-				Database: db.Database{
+				Database: &db.Database{
 					DB: jimmtest.PostgresDB(c, nil),
 				},
 				Dialer: &jimmtest.Dialer{
@@ -728,7 +728,7 @@ func TestWatcherSetsControllerUnavailable(t *testing.T) {
 
 	controllerUnavailableChannel := make(chan error, 1)
 	w := jimm.NewWatcherWithControllerUnavailableChan(
-		db.Database{
+		&db.Database{
 			DB: jimmtest.PostgresDB(c, nil),
 		},
 		&jimmtest.Dialer{
@@ -774,7 +774,7 @@ func TestWatcherClearsControllerUnavailable(t *testing.T) {
 	defer cancel()
 
 	w := jimm.Watcher{
-		Database: db.Database{
+		Database: &db.Database{
 			DB: jimmtest.PostgresDB(c, nil),
 		},
 		Dialer: &jimmtest.Dialer{
@@ -846,7 +846,7 @@ func TestWatcherRemoveDyingModelsOnStartup(t *testing.T) {
 
 	w := &jimm.Watcher{
 		Pubsub: &testPublisher{},
-		Database: db.Database{
+		Database: &db.Database{
 			DB: jimmtest.PostgresDB(c, nil),
 		},
 		Dialer: &jimmtest.Dialer{
@@ -935,7 +935,7 @@ func TestWatcherIgnoreDeltasForModelsFromIncorrectController(t *testing.T) {
 	nextC := make(chan []jujuparams.Delta)
 	w := &jimm.Watcher{
 		Pubsub: &testPublisher{},
-		Database: db.Database{
+		Database: &db.Database{
 			DB: jimmtest.PostgresDB(c, nil),
 		},
 		Dialer: jimmtest.DialerMap{

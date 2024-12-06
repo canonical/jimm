@@ -120,7 +120,7 @@ func (s *identitiesService) GetIdentityRoles(ctx context.Context, identityId str
 
 	roles := make([]resources.Role, 0, len(tuples))
 	for _, t := range tuples {
-		dbRole, err := s.jimm.GetRoleManager().GetRoleByUUID(ctx, user, t.Target.ID)
+		dbRole, err := s.jimm.RoleManager().GetRoleByUUID(ctx, user, t.Target.ID)
 		if err != nil {
 			// Handle the case where the role was removed from the DB but a lingering OpenFGA tuple still exists.
 			// Don't return an error as that would prevent a user from viewing their groups, instead drop the role from the result.
@@ -216,7 +216,7 @@ func (s *identitiesService) GetIdentityGroups(ctx context.Context, identityId st
 
 	groups := make([]resources.Group, 0, len(tuples))
 	for _, t := range tuples {
-		dbGroup, err := s.jimm.GetGroupManager().GetGroupByUUID(ctx, user, t.Target.ID)
+		dbGroup, err := s.jimm.GroupManager().GetGroupByUUID(ctx, user, t.Target.ID)
 		if err != nil {
 			// Handle the case where the group was removed from the DB but a lingering OpenFGA tuple still exists.
 			// Don't return an error as that would prevent a user from viewing their groups, instead drop the group from the result.

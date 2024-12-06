@@ -183,7 +183,6 @@ func TestRevokeOfferAccess(t *testing.T) {
 	c := qt.New(t)
 
 	ctx := context.Background()
-	now := time.Now().UTC().Round(time.Millisecond)
 
 	tests := []struct {
 		about                      string
@@ -328,31 +327,18 @@ func TestRevokeOfferAccess(t *testing.T) {
 
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
-
-			db := db.Database{
-				DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
-			}
-			err := db.Migrate(ctx, false)
-			c.Assert(err, qt.IsNil)
-
-			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.about)
-			c.Assert(err, qt.IsNil)
-
 			jimmUUID := uuid.NewString()
 
-			environment := initializeEnvironment(c, ctx, &db, client, jimmUUID)
-
-			j := &jimm.JIMM{
-				UUID:          jimmUUID,
-				OpenFGAClient: client,
-				Database:      db,
+			j := jimmtest.NewJIMM(c, &jimm.Parameters{
 				Dialer: &jimmtest.Dialer{
 					API: &jimmtest.API{},
 				},
-			}
+			})
+
+			environment := initializeEnvironment(c, ctx, j.Database, j.OpenFGAClient, jimmUUID)
 
 			if test.setup != nil {
-				test.setup(environment, client)
+				test.setup(environment, j.OpenFGAClient)
 			}
 			authenticatedUser, offerUser, offerURL, revokeAccessLevel := test.parameterFunc(environment)
 
@@ -360,13 +346,13 @@ func TestRevokeOfferAccess(t *testing.T) {
 				offer := dbmodel.ApplicationOffer{
 					URL: offerURL,
 				}
-				err := db.GetApplicationOffer(ctx, &offer)
+				err := j.Database.GetApplicationOffer(ctx, &offer)
 				c.Assert(err, qt.IsNil)
-				appliedRelation := openfga.NewUser(&offerUser, client).GetApplicationOfferAccess(ctx, offer.ResourceTag())
+				appliedRelation := openfga.NewUser(&offerUser, j.OpenFGAClient).GetApplicationOfferAccess(ctx, offer.ResourceTag())
 				c.Assert(jimm.ToOfferAccessString(appliedRelation), qt.Equals, expectedAppliedRelation)
 			}
 
-			err = j.RevokeOfferAccess(ctx, openfga.NewUser(&authenticatedUser, client), offerURL, offerUser.ResourceTag(), revokeAccessLevel)
+			err := j.RevokeOfferAccess(ctx, openfga.NewUser(&authenticatedUser, j.OpenFGAClient), offerURL, offerUser.ResourceTag(), revokeAccessLevel)
 			if test.expectedError == "" {
 				c.Assert(err, qt.IsNil)
 				assertAppliedRelation(test.expectedAccessLevel)
@@ -384,7 +370,6 @@ func TestGrantOfferAccess(t *testing.T) {
 	c := qt.New(t)
 
 	ctx := context.Background()
-	now := time.Now().UTC().Round(time.Millisecond)
 
 	tests := []struct {
 		about               string
@@ -497,40 +482,29 @@ func TestGrantOfferAccess(t *testing.T) {
 
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
-
-			db := db.Database{
-				DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
-			}
-			err := db.Migrate(ctx, false)
-			c.Assert(err, qt.IsNil)
-
-			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.about)
-			c.Assert(err, qt.IsNil)
-
 			jimmUUID := uuid.NewString()
 
-			environment := initializeEnvironment(c, ctx, &db, client, jimmUUID)
-			authenticatedUser, offerUser, offerURL, grantAccessLevel := test.parameterFunc(environment)
+			j := jimmtest.NewJIMM(c, &jimm.Parameters{
+				UUID: jimmUUID,
 
-			j := &jimm.JIMM{
-				UUID:          jimmUUID,
-				OpenFGAClient: client,
-				Database:      db,
 				Dialer: &jimmtest.Dialer{
 					API: &jimmtest.API{},
 				},
-			}
+			})
 
-			err = j.GrantOfferAccess(ctx, openfga.NewUser(&authenticatedUser, client), offerURL, offerUser.ResourceTag(), grantAccessLevel)
+			environment := initializeEnvironment(c, ctx, j.Database, j.OpenFGAClient, jimmUUID)
+			authenticatedUser, offerUser, offerURL, grantAccessLevel := test.parameterFunc(environment)
+
+			err := j.GrantOfferAccess(ctx, openfga.NewUser(&authenticatedUser, j.OpenFGAClient), offerURL, offerUser.ResourceTag(), grantAccessLevel)
 			if test.expectedError == "" {
 				c.Assert(err, qt.IsNil)
 
 				offer := dbmodel.ApplicationOffer{
 					URL: offerURL,
 				}
-				err = db.GetApplicationOffer(ctx, &offer)
+				err = j.Database.GetApplicationOffer(ctx, &offer)
 				c.Assert(err, qt.IsNil)
-				appliedRelation := openfga.NewUser(&offerUser, client).GetApplicationOfferAccess(ctx, offer.ResourceTag())
+				appliedRelation := openfga.NewUser(&offerUser, j.OpenFGAClient).GetApplicationOfferAccess(ctx, offer.ResourceTag())
 				c.Assert(jimm.ToOfferAccessString(appliedRelation), qt.Equals, test.expectedAccessLevel)
 			} else {
 				c.Assert(err, qt.ErrorMatches, test.expectedError)
@@ -548,7 +522,7 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now().UTC().Round(time.Millisecond)
 
-	db := db.Database{
+	db := &db.Database{
 		DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 	}
 	err = db.Migrate(ctx, false)
@@ -647,8 +621,7 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 	err = openfga.NewUser(uAll, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.ReaderRelation)
 	c.Assert(err, qt.IsNil)
 
-	j := &jimm.JIMM{
-		UUID:          uuid.NewString(),
+	j := jimmtest.NewJIMM(c, &jimm.Parameters{
 		OpenFGAClient: client,
 		Database:      db,
 		Dialer: &jimmtest.Dialer{
@@ -685,7 +658,7 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 				},
 			},
 		},
-	}
+	})
 
 	tests := []struct {
 		about                string
@@ -809,17 +782,8 @@ func TestGetApplicationOffer(t *testing.T) {
 	c := qt.New(t)
 
 	ctx := context.Background()
-	now := time.Now().UTC().Round(time.Millisecond)
 
-	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
-	c.Assert(err, qt.IsNil)
-
-	j := &jimm.JIMM{
-		UUID:          uuid.NewString(),
-		OpenFGAClient: client,
-		Database: db.Database{
-			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
-		},
+	j := jimmtest.NewJIMM(c, &jimm.Parameters{
 		Dialer: &jimmtest.Dialer{
 			API: &jimmtest.API{
 				GetApplicationOffer_: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetailsV5) error {
@@ -857,10 +821,7 @@ func TestGetApplicationOffer(t *testing.T) {
 				},
 			},
 		},
-	}
-
-	err = j.Database.Migrate(ctx, false)
-	c.Assert(err, qt.IsNil)
+	})
 
 	u, err := dbmodel.NewIdentity("alice@canonical.com")
 	c.Assert(err, qt.IsNil)
@@ -930,11 +891,11 @@ func TestGetApplicationOffer(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	// user u is administrator of the test offer
-	err = openfga.NewUser(u, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.AdministratorRelation)
+	err = openfga.NewUser(u, j.OpenFGAClient).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, qt.IsNil)
 
 	// user u1 is reader of the test offer
-	err = openfga.NewUser(u1, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.ReaderRelation)
+	err = openfga.NewUser(u1, j.OpenFGAClient).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.ReaderRelation)
 	c.Assert(err, qt.IsNil)
 
 	tests := []struct {
@@ -1014,7 +975,7 @@ func TestGetApplicationOffer(t *testing.T) {
 
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
-			details, err := j.GetApplicationOffer(ctx, openfga.NewUser(test.user, client), test.offerURL)
+			details, err := j.GetApplicationOffer(ctx, openfga.NewUser(test.user, j.OpenFGAClient), test.offerURL)
 			if test.expectedError == "" {
 				c.Assert(err, qt.IsNil)
 				sort.Slice(details.Users, func(i, j int) bool {
@@ -1031,13 +992,12 @@ func TestGetApplicationOffer(t *testing.T) {
 func TestOffer(t *testing.T) {
 	c := qt.New(t)
 
-	now := time.Now().UTC().Round(time.Millisecond)
 	tests := []struct {
 		about                       string
 		getApplicationOffer         func(context.Context, *jujuparams.ApplicationOfferAdminDetailsV5) error
 		grantApplicationOfferAccess func(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error
 		offer                       func(context.Context, crossmodel.OfferURL, jujuparams.AddApplicationOffer) error
-		createEnv                   func(*qt.C, db.Database, *openfga.OFGAClient) (dbmodel.Identity, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error))
+		createEnv                   func(*qt.C, *db.Database, *openfga.OFGAClient) (dbmodel.Identity, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error))
 	}{{
 		about: "all ok",
 		getApplicationOffer: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetailsV5) error {
@@ -1073,7 +1033,7 @@ func TestOffer(t *testing.T) {
 		offer: func(context.Context, crossmodel.OfferURL, jujuparams.AddApplicationOffer) error {
 			return nil
 		},
-		createEnv: func(c *qt.C, db db.Database, client *openfga.OFGAClient) (dbmodel.Identity, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
+		createEnv: func(c *qt.C, db *db.Database, client *openfga.OFGAClient) (dbmodel.Identity, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
 			ctx := context.Background()
 
 			u, err := dbmodel.NewIdentity("alice@canonical.com")
@@ -1163,7 +1123,7 @@ func TestOffer(t *testing.T) {
 		offer: func(context.Context, crossmodel.OfferURL, jujuparams.AddApplicationOffer) error {
 			return errors.E("a silly error")
 		},
-		createEnv: func(c *qt.C, db db.Database, client *openfga.OFGAClient) (dbmodel.Identity, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
+		createEnv: func(c *qt.C, db *db.Database, client *openfga.OFGAClient) (dbmodel.Identity, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
 			ctx := context.Background()
 
 			u, err := dbmodel.NewIdentity("alice@canonical.com")
@@ -1250,7 +1210,7 @@ func TestOffer(t *testing.T) {
 		offer: func(context.Context, crossmodel.OfferURL, jujuparams.AddApplicationOffer) error {
 			return nil
 		},
-		createEnv: func(c *qt.C, db db.Database, client *openfga.OFGAClient) (dbmodel.Identity, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
+		createEnv: func(c *qt.C, db *db.Database, client *openfga.OFGAClient) (dbmodel.Identity, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
 			u, err := dbmodel.NewIdentity("alice@canonical.com")
 			c.Assert(err, qt.IsNil)
 
@@ -1282,7 +1242,7 @@ func TestOffer(t *testing.T) {
 		offer: func(context.Context, crossmodel.OfferURL, jujuparams.AddApplicationOffer) error {
 			return errors.E(errors.CodeNotFound, "application test-app")
 		},
-		createEnv: func(c *qt.C, db db.Database, client *openfga.OFGAClient) (dbmodel.Identity, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
+		createEnv: func(c *qt.C, db *db.Database, client *openfga.OFGAClient) (dbmodel.Identity, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
 			ctx := context.Background()
 
 			u, err := dbmodel.NewIdentity("alice@canonical.com")
@@ -1371,7 +1331,7 @@ func TestOffer(t *testing.T) {
 		offer: func(context.Context, crossmodel.OfferURL, jujuparams.AddApplicationOffer) error {
 			return nil
 		},
-		createEnv: func(c *qt.C, db db.Database, client *openfga.OFGAClient) (dbmodel.Identity, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
+		createEnv: func(c *qt.C, db *db.Database, client *openfga.OFGAClient) (dbmodel.Identity, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
 			ctx := context.Background()
 
 			u, err := dbmodel.NewIdentity("alice@canonical.com")
@@ -1462,7 +1422,7 @@ func TestOffer(t *testing.T) {
 		offer: func(context.Context, crossmodel.OfferURL, jujuparams.AddApplicationOffer) error {
 			return nil
 		},
-		createEnv: func(c *qt.C, db db.Database, client *openfga.OFGAClient) (dbmodel.Identity, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
+		createEnv: func(c *qt.C, db *db.Database, client *openfga.OFGAClient) (dbmodel.Identity, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
 			ctx := context.Background()
 
 			u, err := dbmodel.NewIdentity("alice@canonical.com")
@@ -1549,7 +1509,7 @@ func TestOffer(t *testing.T) {
 		offer: func(context.Context, crossmodel.OfferURL, jujuparams.AddApplicationOffer) error {
 			return errors.E("application offer already exists")
 		},
-		createEnv: func(c *qt.C, db db.Database, client *openfga.OFGAClient) (dbmodel.Identity, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
+		createEnv: func(c *qt.C, db *db.Database, client *openfga.OFGAClient) (dbmodel.Identity, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
 			ctx := context.Background()
 
 			u, err := dbmodel.NewIdentity("alice@canonical.com")
@@ -1636,26 +1596,17 @@ func TestOffer(t *testing.T) {
 				Offer_:                       test.offer,
 			}
 
-			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.about)
-			c.Assert(err, qt.IsNil)
-
-			j := &jimm.JIMM{
-				Database: db.Database{
-					DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
-				},
+			j := jimmtest.NewJIMM(c, &jimm.Parameters{
 				Dialer: &jimmtest.Dialer{
 					API: api,
 				},
-				OpenFGAClient: client,
-			}
+			})
 
 			ctx := context.Background()
-			err = j.Database.Migrate(ctx, false)
-			c.Assert(err, qt.IsNil)
 
-			u, offerArgs, expectedOffer, errorAssertion := test.createEnv(c, j.Database, client)
+			u, offerArgs, expectedOffer, errorAssertion := test.createEnv(c, j.Database, j.OpenFGAClient)
 
-			err = j.Offer(context.Background(), openfga.NewUser(&u, client), offerArgs)
+			err := j.Offer(context.Background(), openfga.NewUser(&u, j.OpenFGAClient), offerArgs)
 			if errorAssertion == nil {
 				c.Assert(err, qt.IsNil)
 
@@ -1676,9 +1627,8 @@ func TestOffer(t *testing.T) {
 func TestOfferAssertOpenFGARelationsExist(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
-	now := time.Now().UTC().Round(time.Millisecond)
 
-	createEnv := func(c *qt.C, db db.Database, client *openfga.OFGAClient) (dbmodel.Identity, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
+	createEnv := func(c *qt.C, db *db.Database, client *openfga.OFGAClient) (dbmodel.Identity, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
 		ctx := context.Background()
 
 		u, err := dbmodel.NewIdentity("alice@canonical.com")
@@ -1794,27 +1744,16 @@ func TestOfferAssertOpenFGARelationsExist(t *testing.T) {
 		},
 	}
 
-	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
-	c.Assert(err, qt.IsNil)
-
-	j := &jimm.JIMM{
-		UUID: uuid.NewString(),
-		Database: db.Database{
-			DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
-		},
+	j := jimmtest.NewJIMM(c, &jimm.Parameters{
 		Dialer: &jimmtest.Dialer{
 			API:  api,
 			UUID: "00000000-0000-0000-0000-0000-0000000000001",
 		},
-		OpenFGAClient: client,
-	}
+	})
 
-	err = j.Database.Migrate(ctx, false)
-	c.Assert(err, qt.IsNil)
+	u, offerArgs, expectedOffer, _ := createEnv(c, j.Database, j.OpenFGAClient)
 
-	u, offerArgs, expectedOffer, _ := createEnv(c, j.Database, client)
-
-	err = j.Offer(context.Background(), openfga.NewUser(&u, client), offerArgs)
+	err := j.Offer(context.Background(), openfga.NewUser(&u, j.OpenFGAClient), offerArgs)
 	c.Assert(err, qt.IsNil)
 
 	offer := dbmodel.ApplicationOffer{
@@ -1825,7 +1764,7 @@ func TestOfferAssertOpenFGARelationsExist(t *testing.T) {
 	c.Assert(offer, qt.CmpEquals(cmpopts.EquateEmpty(), cmpopts.IgnoreTypes(time.Time{}, gorm.Model{}), cmpopts.IgnoreTypes(dbmodel.Model{})), expectedOffer)
 
 	// check the controller relation was created
-	exists, err := client.CheckRelation(
+	exists, err := j.OpenFGAClient.CheckRelation(
 		context.Background(),
 		openfga.Tuple{
 			Object:   ofganames.ConvertTag(offerArgs.ModelTag),
@@ -1838,7 +1777,7 @@ func TestOfferAssertOpenFGARelationsExist(t *testing.T) {
 	c.Assert(exists, qt.IsTrue)
 
 	// check the user has administrator rights on the offer
-	exists, err = client.CheckRelation(
+	exists, err = j.OpenFGAClient.CheckRelation(
 		context.Background(),
 		openfga.Tuple{
 			Object:   ofganames.ConvertTag(u.ResourceTag()),
@@ -1933,7 +1872,6 @@ func TestDestroyOffer(t *testing.T) {
 	c := qt.New(t)
 
 	ctx := context.Background()
-	now := time.Now().UTC().Round(time.Millisecond)
 
 	destroyErrorsChannel := make(chan error, 1)
 
@@ -1982,24 +1920,7 @@ func TestDestroyOffer(t *testing.T) {
 
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
-
-			db := db.Database{
-				DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
-			}
-			err := db.Migrate(ctx, false)
-			c.Assert(err, qt.IsNil)
-
-			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.about)
-			c.Assert(err, qt.IsNil)
-
-			jimmUUID := uuid.NewString()
-
-			environment := initializeEnvironment(c, ctx, &db, client, jimmUUID)
-			authenticatedUser, offerURL := test.parameterFunc(environment)
-
-			j := &jimm.JIMM{
-				UUID:     jimmUUID,
-				Database: db,
+			j := jimmtest.NewJIMM(c, &jimm.Parameters{
 				Dialer: &jimmtest.Dialer{
 					API: &jimmtest.API{
 						DestroyApplicationOffer_: func(context.Context, string, bool) error {
@@ -2012,8 +1933,10 @@ func TestDestroyOffer(t *testing.T) {
 						},
 					},
 				},
-				OpenFGAClient: client,
-			}
+			})
+
+			environment := initializeEnvironment(c, ctx, j.Database, j.OpenFGAClient, j.UUID)
+			authenticatedUser, offerURL := test.parameterFunc(environment)
 
 			if test.destroyError != "" {
 				select {
@@ -2021,14 +1944,14 @@ func TestDestroyOffer(t *testing.T) {
 				default:
 				}
 			}
-			err = j.DestroyOffer(ctx, openfga.NewUser(&authenticatedUser, client), offerURL, true)
+			err := j.DestroyOffer(ctx, openfga.NewUser(&authenticatedUser, j.OpenFGAClient), offerURL, true)
 			if test.expectedError == "" {
 				c.Assert(err, qt.IsNil)
 
 				offer := dbmodel.ApplicationOffer{
 					URL: offerURL,
 				}
-				err = db.GetApplicationOffer(ctx, &offer)
+				err = j.Database.GetApplicationOffer(ctx, &offer)
 				c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 			} else {
 				c.Assert(err, qt.ErrorMatches, test.expectedError)
@@ -2041,7 +1964,6 @@ func TestFindApplicationOffers(t *testing.T) {
 	c := qt.New(t)
 
 	ctx := context.Background()
-	now := time.Now().UTC().Round(time.Millisecond)
 
 	expectedOffer := jujuparams.ApplicationOfferAdminDetailsV5{
 		ApplicationOfferDetailsV5: jujuparams.ApplicationOfferDetailsV5{
@@ -2107,23 +2029,7 @@ func TestFindApplicationOffers(t *testing.T) {
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
 
-			db := db.Database{
-				DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
-			}
-			err := db.Migrate(ctx, false)
-			c.Assert(err, qt.IsNil)
-
-			client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name(), test.about)
-			c.Assert(err, qt.IsNil)
-
-			jimmUUID := uuid.NewString()
-
-			environment := initializeEnvironment(c, ctx, &db, client, jimmUUID)
-			user, accessLevel, filters := test.parameterFunc(environment)
-
-			j := &jimm.JIMM{
-				UUID:     jimmUUID,
-				Database: db,
+			j := jimmtest.NewJIMM(c, &jimm.Parameters{
 				Dialer: &jimmtest.Dialer{
 					API: &jimmtest.API{
 						FindApplicationOffers_: func(ctx context.Context, of []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error) {
@@ -2134,10 +2040,12 @@ func TestFindApplicationOffers(t *testing.T) {
 						},
 					},
 				},
-				OpenFGAClient: client,
-			}
+			})
 
-			offers, err := j.FindApplicationOffers(ctx, openfga.NewUser(&user, client), filters...)
+			environment := initializeEnvironment(c, ctx, j.Database, j.OpenFGAClient, j.UUID)
+			user, accessLevel, filters := test.parameterFunc(environment)
+
+			offers, err := j.FindApplicationOffers(ctx, openfga.NewUser(&user, j.OpenFGAClient), filters...)
 			if test.expectedError == "" {
 				c.Assert(err, qt.IsNil)
 				if test.expectedOffer != nil {
@@ -2288,22 +2196,10 @@ func TestListApplicationOffers(t *testing.T) {
 	c := qt.New(t)
 
 	ctx := context.Background()
-	now := time.Now().UTC().Round(time.Millisecond)
 
-	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
-	c.Assert(err, qt.IsNil)
-
-	db := db.Database{
-		DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
-	}
-	err = db.Migrate(ctx, false)
-	c.Assert(err, qt.IsNil)
 	env := jimmtest.ParseEnvironment(c, listApplicationsTestEnv)
 
-	j := &jimm.JIMM{
-		UUID:          uuid.NewString(),
-		OpenFGAClient: client,
-		Database:      db,
+	j := jimmtest.NewJIMM(c, &jimm.Parameters{
 		Dialer: &jimmtest.Dialer{
 			API: &jimmtest.API{
 				ListApplicationOffers_: func(_ context.Context, filters []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error) {
@@ -2416,8 +2312,9 @@ func TestListApplicationOffers(t *testing.T) {
 				},
 			},
 		},
-	}
-	env.PopulateDBAndPermissions(c, j.ResourceTag(), db, client)
+	})
+
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
 	tuples := []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
@@ -2455,11 +2352,11 @@ func TestListApplicationOffers(t *testing.T) {
 		Relation: ofganames.ConsumerRelation,
 		Target:   ofganames.ConvertTag(names.NewApplicationOfferTag("00000012-0000-0000-0000-000000000003")),
 	}}
-	err = client.AddRelation(context.Background(), tuples...)
+	err := j.OpenFGAClient.AddRelation(context.Background(), tuples...)
 	c.Assert(err, qt.IsNil)
 
-	u := env.User("alice@canonical.com").DBObject(c, db)
-	_, err = j.ListApplicationOffers(ctx, openfga.NewUser(&u, client))
+	u := env.User("alice@canonical.com").DBObject(c, j.Database)
+	_, err = j.ListApplicationOffers(ctx, openfga.NewUser(&u, j.OpenFGAClient))
 	c.Assert(err, qt.ErrorMatches, `at least one filter must be specified`)
 
 	filters := []jujuparams.OfferFilter{{
@@ -2469,7 +2366,7 @@ func TestListApplicationOffers(t *testing.T) {
 		ModelName: "model-2",
 	}}
 
-	offers, err := j.ListApplicationOffers(ctx, openfga.NewUser(&u, client), filters...)
+	offers, err := j.ListApplicationOffers(ctx, openfga.NewUser(&u, j.OpenFGAClient), filters...)
 	c.Assert(err, qt.IsNil)
 
 	for i := range offers {

@@ -34,7 +34,7 @@ func TestCreateGroup(t *testing.T) {
 		},
 	}
 	jimm := jimmtest.JIMM{
-		GetGroupManager_: func() jimm.GroupManager {
+		GroupManager_: func() jimm.GroupManager {
 			return &groupManager
 		},
 	}
@@ -67,7 +67,7 @@ func TestUpdateGroup(t *testing.T) {
 		},
 	}
 	jimm := jimmtest.JIMM{
-		GetGroupManager_: func() jimm.GroupManager {
+		GroupManager_: func() jimm.GroupManager {
 			return &groupManager
 		},
 	}
@@ -102,7 +102,7 @@ func TestListGroups(t *testing.T) {
 		},
 	}
 	jimm := jimmtest.JIMM{
-		GetGroupManager_: func() jimm.GroupManager {
+		GroupManager_: func() jimm.GroupManager {
 			return &groupManager
 		},
 	}
@@ -142,7 +142,7 @@ func TestDeleteGroup(t *testing.T) {
 		},
 	}
 	jimm := jimmtest.JIMM{
-		GetGroupManager_: func() jimm.GroupManager {
+		GroupManager_: func() jimm.GroupManager {
 			return &groupManager
 		},
 	}
@@ -174,7 +174,7 @@ func TestGetGroupIdentities(t *testing.T) {
 		},
 	}
 	jimm := jimmtest.JIMM{
-		GetGroupManager_: func() jimm.GroupManager {
+		GroupManager_: func() jimm.GroupManager {
 			return &groupManager
 		},
 		RelationService: mocks.RelationService{
@@ -279,10 +279,10 @@ func TestGetGroupRoles(t *testing.T) {
 		},
 	}
 	jimm := jimmtest.JIMM{
-		GetRoleManager_: func() jimm.RoleManager {
+		RoleManager_: func() jimm.RoleManager {
 			return roleManager
 		},
-		GetGroupManager_: func() jimm.GroupManager {
+		GroupManager_: func() jimm.GroupManager {
 			return &groupManager
 		},
 		RelationService: mocks.RelationService{

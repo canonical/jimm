@@ -22,7 +22,7 @@ func TestAuditLogCleanupServicePurgesLogs(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now().UTC().Round(time.Millisecond)
 
-	db := db.Database{
+	db := &db.Database{
 		DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 	}
 

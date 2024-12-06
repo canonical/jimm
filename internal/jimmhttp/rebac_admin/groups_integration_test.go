@@ -33,7 +33,7 @@ var _ = gc.Suite(&rebacAdminSuite{})
 func (s rebacAdminSuite) TestListGroupsWithFilterIntegration(c *gc.C) {
 	ctx := context.Background()
 	for i := range 10 {
-		_, err := s.JIMM.GroupManager.AddGroup(ctx, s.AdminUser, fmt.Sprintf("test-group-filter-%d", i))
+		_, err := s.JIMM.GroupManager().AddGroup(ctx, s.AdminUser, fmt.Sprintf("test-group-filter-%d", i))
 		c.Assert(err, gc.IsNil)
 	}
 
@@ -63,7 +63,7 @@ func (s rebacAdminSuite) TestListGroupsWithFilterIntegration(c *gc.C) {
 
 func (s rebacAdminSuite) TestGetGroupIdentitiesIntegration(c *gc.C) {
 	ctx := context.Background()
-	group, err := s.JIMM.GroupManager.AddGroup(ctx, s.AdminUser, "test-group")
+	group, err := s.JIMM.GroupManager().AddGroup(ctx, s.AdminUser, "test-group")
 	c.Assert(err, gc.IsNil)
 	tuple := openfga.Tuple{
 		Relation: ofganames.MemberRelation,
@@ -111,7 +111,7 @@ func (s rebacAdminSuite) TestGetGroupIdentitiesIntegration(c *gc.C) {
 
 func (s rebacAdminSuite) TestPatchGroupIdentitiesIntegration(c *gc.C) {
 	ctx := context.Background()
-	group, err := s.JIMM.GroupManager.AddGroup(ctx, s.AdminUser, "test-group")
+	group, err := s.JIMM.GroupManager().AddGroup(ctx, s.AdminUser, "test-group")
 	c.Assert(err, gc.IsNil)
 	tuple := openfga.Tuple{
 		Relation: ofganames.MemberRelation,
@@ -214,7 +214,7 @@ func (s rebacAdminSuite) TestPatchGroupRolesIntegration(c *gc.C) {
 
 func (s rebacAdminSuite) TestGetGroupEntitlementsIntegration(c *gc.C) {
 	ctx := context.Background()
-	group, err := s.JIMM.GroupManager.AddGroup(ctx, s.AdminUser, "test-group")
+	group, err := s.JIMM.GroupManager().AddGroup(ctx, s.AdminUser, "test-group")
 	c.Assert(err, gc.IsNil)
 	tuple := openfga.Tuple{
 		Object:   ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag(group.UUID), ofganames.MemberRelation),
@@ -320,7 +320,7 @@ func (s rebacAdminSuite) TestPatchGroupEntitlementsIntegration(c *gc.C) {
 	oldModels := []string{env.Models[0].UUID, env.Models[1].UUID}
 	newModels := []string{env.Models[2].UUID, env.Models[3].UUID}
 
-	group, err := s.JIMM.GroupManager.AddGroup(ctx, s.AdminUser, "test-group")
+	group, err := s.JIMM.GroupManager().AddGroup(ctx, s.AdminUser, "test-group")
 	c.Assert(err, gc.IsNil)
 	tuple := openfga.Tuple{
 		Object:   ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag(group.UUID), ofganames.MemberRelation),

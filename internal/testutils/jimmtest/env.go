@@ -132,7 +132,7 @@ func (e *Environment) User(name string) *User {
 }
 
 // addUserRelations adds permissions the user should have.
-func (u User) addUserRelations(c *qt.C, jimmTag names.ControllerTag, db db.Database, client *openfga.OFGAClient) {
+func (u User) addUserRelations(c *qt.C, jimmTag names.ControllerTag, db *db.Database, client *openfga.OFGAClient) {
 	if u.ControllerAccess == "superuser" {
 		dbUser := u.DBObject(c, db)
 		u := openfga.NewUser(&dbUser, client)
@@ -142,7 +142,7 @@ func (u User) addUserRelations(c *qt.C, jimmTag names.ControllerTag, db db.Datab
 }
 
 // addCloudRelations adds permissions the cloud should have and adds permissions for users to the cloud.
-func (cl Cloud) addCloudRelations(c *qt.C, db db.Database, client *openfga.OFGAClient) {
+func (cl Cloud) addCloudRelations(c *qt.C, db *db.Database, client *openfga.OFGAClient) {
 	for _, u := range cl.Users {
 		dbUser := cl.env.User(u.User).DBObject(c, db)
 		var relation openfga.Relation
@@ -163,7 +163,7 @@ func (cl Cloud) addCloudRelations(c *qt.C, db db.Database, client *openfga.OFGAC
 }
 
 // addModelRelations adds permissions the model should have and adds permissions for users to the model.
-func (m Model) addModelRelations(c *qt.C, db db.Database, client *openfga.OFGAClient) {
+func (m Model) addModelRelations(c *qt.C, db *db.Database, client *openfga.OFGAClient) {
 	owner := openfga.NewUser(&m.dbo.Owner, client)
 	err := owner.SetModelAccess(context.Background(), m.dbo.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, qt.IsNil)
@@ -207,7 +207,7 @@ func (ctl Controller) addControllerRelations(c *qt.C, client *openfga.OFGAClient
 	c.Assert(err, qt.IsNil)
 }
 
-func (e *Environment) addJIMMRelations(c *qt.C, jimmTag names.ControllerTag, db db.Database, client *openfga.OFGAClient) {
+func (e *Environment) addJIMMRelations(c *qt.C, jimmTag names.ControllerTag, db *db.Database, client *openfga.OFGAClient) {
 	for _, user := range e.Users {
 		user.addUserRelations(c, jimmTag, db, client)
 	}
@@ -226,13 +226,13 @@ func (e *Environment) addJIMMRelations(c *qt.C, jimmTag names.ControllerTag, db 
 	}
 }
 
-func (e *Environment) PopulateDBAndPermissions(c *qt.C, jimmTag names.ControllerTag, db db.Database, client *openfga.OFGAClient) {
+func (e *Environment) PopulateDBAndPermissions(c *qt.C, jimmTag names.ControllerTag, db *db.Database, client *openfga.OFGAClient) {
 	e.PopulateDB(c, db)
 	c.Assert(client, qt.IsNotNil)
 	e.addJIMMRelations(c, jimmTag, db, client)
 }
 
-func (e *Environment) PopulateDB(c Tester, db db.Database) {
+func (e *Environment) PopulateDB(c Tester, db *db.Database) {
 	for i := range e.Users {
 		e.Users[i].env = e
 		e.Users[i].DBObject(c, db)
@@ -279,7 +279,7 @@ type ApplicationOffer struct {
 	dbo dbmodel.ApplicationOffer
 }
 
-func (cd *ApplicationOffer) DBObject(c Tester, db db.Database) dbmodel.ApplicationOffer {
+func (cd *ApplicationOffer) DBObject(c Tester, db *db.Database) dbmodel.ApplicationOffer {
 	if cd.dbo.ID != 0 {
 		return cd.dbo
 	}
@@ -307,7 +307,7 @@ type UserDefaults struct {
 	dbo dbmodel.IdentityModelDefaults
 }
 
-func (cd *UserDefaults) DBObject(c Tester, db db.Database) dbmodel.IdentityModelDefaults {
+func (cd *UserDefaults) DBObject(c Tester, db *db.Database) dbmodel.IdentityModelDefaults {
 	if cd.dbo.ID != 0 {
 		return cd.dbo
 	}
@@ -334,7 +334,7 @@ type CloudDefaults struct {
 	dbo dbmodel.CloudDefaults
 }
 
-func (cd *CloudDefaults) DBObject(c Tester, db db.Database) dbmodel.CloudDefaults {
+func (cd *CloudDefaults) DBObject(c Tester, db *db.Database) dbmodel.CloudDefaults {
 	if cd.dbo.ID != 0 {
 		return cd.dbo
 	}
@@ -372,7 +372,7 @@ type CloudRegion struct {
 
 // DBObject returns a database object for the specified cloud, suitable
 // for adding to the database.
-func (cl *Cloud) DBObject(c Tester, db db.Database) dbmodel.Cloud {
+func (cl *Cloud) DBObject(c Tester, db *db.Database) dbmodel.Cloud {
 	if cl.dbo.ID != 0 {
 		return cl.dbo
 	}
@@ -407,7 +407,7 @@ type CloudCredential struct {
 	dbo dbmodel.CloudCredential
 }
 
-func (cc *CloudCredential) DBObject(c Tester, db db.Database) dbmodel.CloudCredential {
+func (cc *CloudCredential) DBObject(c Tester, db *db.Database) dbmodel.CloudCredential {
 	if cc.dbo.ID != 0 {
 		return cc.dbo
 	}
@@ -443,7 +443,7 @@ type Controller struct {
 	dbo dbmodel.Controller
 }
 
-func (ctl *Controller) DBObject(c Tester, db db.Database) dbmodel.Controller {
+func (ctl *Controller) DBObject(c Tester, db *db.Database) dbmodel.Controller {
 	if ctl.dbo.ID != 0 {
 		return ctl.dbo
 	}
@@ -505,7 +505,7 @@ type Model struct {
 	dbo dbmodel.Model
 }
 
-func (m *Model) DBObject(c Tester, db db.Database) dbmodel.Model {
+func (m *Model) DBObject(c Tester, db *db.Database) dbmodel.Model {
 	if m.dbo.ID != 0 {
 		return m.dbo
 	}
@@ -556,7 +556,7 @@ type User struct {
 	dbo dbmodel.Identity
 }
 
-func (u *User) DBObject(c Tester, db db.Database) dbmodel.Identity {
+func (u *User) DBObject(c Tester, db *db.Database) dbmodel.Identity {
 	if u.dbo.ID != 0 {
 		return u.dbo
 	}
