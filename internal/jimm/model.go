@@ -822,7 +822,8 @@ func (j *JIMM) ModelStatus(ctx context.Context, user *openfga.User, mt names.Mod
 	zapctx.Info(ctx, string(op))
 
 	var ms jujuparams.ModelStatus
-	err := j.doModelAdmin(ctx, user, mt, func(_ *dbmodel.Model, api API) error {
+	err := j.doModelAdmin(ctx, user, mt, func(m *dbmodel.Model, api API) error {
+		ms.OwnerTag = m.Owner.Tag().String()
 		ms.ModelTag = mt.String()
 		return api.ModelStatus(ctx, &ms)
 	})

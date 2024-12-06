@@ -1540,7 +1540,6 @@ var modelStatusTests = []struct {
 		ms.HostedMachineCount = 10
 		ms.ApplicationCount = 3
 		ms.UnitCount = 20
-		ms.OwnerTag = names.NewUserTag("alice@canonical.com").String()
 		return nil
 	},
 	username: "alice@canonical.com",
