@@ -914,21 +914,6 @@ func TestImportModel(t *testing.T) {
 		c.Run(test.about, func(c *qt.C) {
 			api := &jimmtest.API{
 				ModelInfo_: test.modelInfo,
-				ModelWatcherNext_: func(ctx context.Context, id string) ([]jujuparams.Delta, error) {
-					if id != test.about {
-						return nil, errors.E("incorrect id")
-					}
-					return test.deltas, nil
-				},
-				ModelWatcherStop_: func(ctx context.Context, id string) error {
-					if id != test.about {
-						return errors.E("incorrect id")
-					}
-					return nil
-				},
-				WatchAll_: func(context.Context) (string, error) {
-					return test.about, nil
-				},
 				ListApplicationOffers_: func(ctx context.Context, of []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error) {
 					return test.offers, nil
 				},

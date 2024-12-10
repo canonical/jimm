@@ -24,10 +24,6 @@ var (
 	ResolveTag                     = resolveTag
 )
 
-func WatchController(w *Watcher, ctx context.Context, ctl *dbmodel.Controller) error {
-	return w.watchController(ctx, ctl)
-}
-
 func NewWatcherWithControllerUnavailableChan(db *db.Database, dialer Dialer, pubsub Publisher, testChannel chan error) *Watcher {
 	return &Watcher{
 		Pubsub:                    pubsub,

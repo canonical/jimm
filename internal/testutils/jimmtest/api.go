@@ -122,8 +122,6 @@ type API struct {
 	base.APICaller
 
 	AddCloud_                          func(context.Context, names.CloudTag, jujuparams.Cloud, bool) error
-	AllModelWatcherNext_               func(context.Context, string) ([]jujuparams.Delta, error)
-	AllModelWatcherStop_               func(context.Context, string) error
 	ChangeModelCredential_             func(context.Context, names.ModelTag, names.CloudCredentialTag) error
 	CheckCredentialModels_             func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error)
 	Close_                             func() error
@@ -150,8 +148,6 @@ type API struct {
 	ModelSummaryWatcherNext_           func(context.Context, string) ([]jujuparams.ModelAbstract, error)
 	ModelSummaryWatcherStop_           func(context.Context, string) error
 	ListModelSummaries_                func(context.Context, jujuparams.ModelSummariesRequest) (jujuparams.ModelSummaryResults, error)
-	ModelWatcherNext_                  func(ctx context.Context, id string) ([]jujuparams.Delta, error)
-	ModelWatcherStop_                  func(ctx context.Context, id string) error
 	Offer_                             func(context.Context, crossmodel.OfferURL, jujuparams.AddApplicationOffer) error
 	Ping_                              func(context.Context) error
 	RemoveCloud_                       func(context.Context, names.CloudTag) error
@@ -165,9 +161,7 @@ type API struct {
 	UpdateCloud_                       func(context.Context, names.CloudTag, jujuparams.Cloud) error
 	UpdateCredential_                  func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error)
 	ValidateModelUpgrade_              func(context.Context, names.ModelTag, bool) error
-	WatchAll_                          func(context.Context) (string, error)
 	WatchAllModelSummaries_            func(context.Context) (string, error)
-	WatchAllModels_                    func(context.Context) (string, error)
 	ListFilesystems_                   func(ctx context.Context, machines []string) ([]jujuparams.FilesystemDetailsListResult, error)
 	ListVolumes_                       func(ctx context.Context, machines []string) ([]jujuparams.VolumeDetailsListResult, error)
 	ListStorageDetails_                func(ctx context.Context) ([]jujuparams.StorageDetails, error)
@@ -178,20 +172,6 @@ func (a *API) AddCloud(ctx context.Context, tag names.CloudTag, cld jujuparams.C
 		return errors.E(errors.CodeNotImplemented)
 	}
 	return a.AddCloud_(ctx, tag, cld, force)
-}
-
-func (a *API) AllModelWatcherNext(ctx context.Context, id string) ([]jujuparams.Delta, error) {
-	if a.AllModelWatcherNext_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
-	}
-	return a.AllModelWatcherNext_(ctx, id)
-}
-
-func (a *API) AllModelWatcherStop(ctx context.Context, id string) error {
-	if a.AllModelWatcherStop_ == nil {
-		return errors.E(errors.CodeNotImplemented)
-	}
-	return a.AllModelWatcherStop_(ctx, id)
 }
 
 func (a *API) CheckCredentialModels(ctx context.Context, cred jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
@@ -458,39 +438,11 @@ func (a *API) WatchAllModelSummaries(ctx context.Context) (string, error) {
 	return a.WatchAllModelSummaries_(ctx)
 }
 
-func (a *API) WatchAllModels(ctx context.Context) (string, error) {
-	if a.WatchAllModels_ == nil {
-		return "", errors.E(errors.CodeNotImplemented)
-	}
-	return a.WatchAllModels_(ctx)
-}
-
 func (a *API) ChangeModelCredential(ctx context.Context, model names.ModelTag, cred names.CloudCredentialTag) error {
 	if a.ChangeModelCredential_ == nil {
 		return errors.E(errors.CodeNotImplemented)
 	}
 	return a.ChangeModelCredential_(ctx, model, cred)
-}
-
-func (a *API) ModelWatcherNext(ctx context.Context, id string) ([]jujuparams.Delta, error) {
-	if a.ModelWatcherNext_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
-	}
-	return a.ModelWatcherNext_(ctx, id)
-}
-
-func (a *API) ModelWatcherStop(ctx context.Context, id string) error {
-	if a.ModelWatcherStop_ == nil {
-		return errors.E(errors.CodeNotImplemented)
-	}
-	return a.ModelWatcherStop_(ctx, id)
-}
-
-func (a *API) WatchAll(ctx context.Context) (string, error) {
-	if a.WatchAll_ == nil {
-		return "", errors.E(errors.CodeNotImplemented)
-	}
-	return a.WatchAll_(ctx)
 }
 
 func (a *API) ListFilesystems(ctx context.Context, machines []string) ([]jujuparams.FilesystemDetailsListResult, error) {

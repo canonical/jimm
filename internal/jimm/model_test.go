@@ -3026,6 +3026,7 @@ var destroyModelTests = []struct {
 	timeout         *time.Duration
 	expectError     string
 	expectErrorCode errors.Code
+	expectedLife    string
 }{{
 	name:            "NotFound",
 	env:             destroyModelTestEnv,
@@ -3067,30 +3068,34 @@ var destroyModelTests = []struct {
 	force:          newBool(false),
 	maxWait:        newDuration(time.Second),
 	timeout:        newDuration(time.Second),
+	expectedLife:   "dying",
 }, {
 	name: "SuperuserSuccess",
 	env:  destroyModelTestEnv,
 	destroyModel: func(_ context.Context, _ names.ModelTag, _, _ *bool, _, _ *time.Duration) error {
 		return nil
 	},
-	username: "charlie@canonical.com",
-	uuid:     "00000002-0000-0000-0000-000000000001",
+	username:     "charlie@canonical.com",
+	uuid:         "00000002-0000-0000-0000-000000000001",
+	expectedLife: "dying",
 }, {
-	name:        "DialError",
-	env:         destroyModelTestEnv,
-	dialError:   errors.E("dial error"),
-	username:    "alice@canonical.com",
-	uuid:        "00000002-0000-0000-0000-000000000001",
-	expectError: `dial error`,
+	name:         "DialError",
+	env:          destroyModelTestEnv,
+	dialError:    errors.E("dial error"),
+	username:     "alice@canonical.com",
+	uuid:         "00000002-0000-0000-0000-000000000001",
+	expectError:  `dial error`,
+	expectedLife: "alive",
 }, {
 	name: "APIError",
 	env:  destroyModelTestEnv,
 	destroyModel: func(_ context.Context, _ names.ModelTag, _, _ *bool, _, _ *time.Duration) error {
 		return errors.E("api error")
 	},
-	username:    "charlie@canonical.com",
-	uuid:        "00000002-0000-0000-0000-000000000001",
-	expectError: `api error`,
+	username:     "charlie@canonical.com",
+	uuid:         "00000002-0000-0000-0000-000000000001",
+	expectError:  `api error`,
+	expectedLife: "alive",
 }}
 
 func TestDestroyModel(t *testing.T) {
@@ -3124,18 +3129,20 @@ func TestDestroyModel(t *testing.T) {
 				if test.expectErrorCode != "" {
 					c.Check(errors.ErrorCode(err), qt.Equals, test.expectErrorCode)
 				}
-				return
+			} else {
+				c.Assert(err, qt.IsNil)
 			}
-			c.Assert(err, qt.IsNil)
-			m := dbmodel.Model{
-				UUID: sql.NullString{
-					String: test.uuid,
-					Valid:  true,
-				},
+			if test.expectedLife != "" {
+				m := dbmodel.Model{
+					UUID: sql.NullString{
+						String: test.uuid,
+						Valid:  true,
+					},
+				}
+				err = j.Database.GetModel(ctx, &m)
+				c.Assert(err, qt.IsNil)
+				c.Assert(m.Life, qt.Equals, test.expectedLife)
 			}
-			err = j.Database.GetModel(ctx, &m)
-			c.Assert(err, qt.IsNil)
-			c.Check(m.Life, qt.Equals, state.Dying.String())
 		})
 	}
 }

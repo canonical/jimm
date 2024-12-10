@@ -349,13 +349,6 @@ type API interface {
 	// AddCloud adds a new cloud.
 	AddCloud(context.Context, names.CloudTag, jujuparams.Cloud, bool) error
 
-	// AllModelWatcherNext returns the next set of deltas from an
-	// all-model watcher.
-	AllModelWatcherNext(context.Context, string) ([]jujuparams.Delta, error)
-
-	// AllModelWatcherStop stops an all-model watcher.
-	AllModelWatcherStop(context.Context, string) error
-
 	// ChangeModelCredential replaces cloud credential for a given model with the provided one.
 	ChangeModelCredential(context.Context, names.ModelTag, names.CloudCredentialTag) error
 
@@ -446,13 +439,6 @@ type API interface {
 	// ModelSummaryWatcherStop stops a model summary watcher.
 	ModelSummaryWatcherStop(context.Context, string) error
 
-	// ModelWatcherNext receives the next set of results from the model
-	// watcher with the given id.
-	ModelWatcherNext(ctx context.Context, id string) ([]jujuparams.Delta, error)
-
-	// ModelWatcherStop stops the model watcher with the given id.
-	ModelWatcherStop(ctx context.Context, id string) error
-
 	// Offer creates a new application-offer.
 	Offer(context.Context, crossmodel.OfferURL, jujuparams.AddApplicationOffer) error
 
@@ -495,14 +481,8 @@ type API interface {
 	// ValidateModelUpgrade validates that a model can be upgraded.
 	ValidateModelUpgrade(context.Context, names.ModelTag, bool) error
 
-	// WatchAll creates a watcher that reports deltas for a specific model.
-	WatchAll(context.Context) (string, error)
-
 	// WatchAllModelSummaries creates a ModelSummaryWatcher.
 	WatchAllModelSummaries(context.Context) (string, error)
-
-	// WatchAllModels creates a megawatcher.
-	WatchAllModels(context.Context) (string, error)
 
 	// ListFilesystems lists filesystems for desired machines.
 	// If no machines provided, a list of all filesystems is returned.

@@ -216,17 +216,6 @@ func (s *Service) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	s.mux.ServeHTTP(w, req)
 }
 
-// WatchControllers connects to all controllers and starts an AllWatcher
-// monitoring all changes to models. WatchControllers finishes when the
-// given context is canceled, or there is a fatal error watching models.
-func (s *Service) WatchControllers(ctx context.Context) error {
-	w := jimm.Watcher{
-		Database: s.jimm.Database,
-		Dialer:   s.jimm.Dialer,
-	}
-	return w.Watch(ctx, 10*time.Minute)
-}
-
 // WatchModelSummaries connects to all controllers and starts a
 // ModelSummaryWatcher for all models. WatchModelSummaries finishes when
 // the given context is canceled, or there is a fatal error watching model
@@ -267,6 +256,22 @@ func (s *Service) OpenFGACleanup(ctx context.Context, trigger <-chan time.Time) 
 			err := s.jimm.OpenFGACleanup(ctx)
 			if err != nil {
 				zapctx.Error(ctx, "openfga cleanup", zap.Error(err))
+				continue
+			}
+		case <-ctx.Done():
+			return nil
+		}
+	}
+}
+
+// CleanupDyingModels triggers every `trigger` time and calls the jimm methods to cleanup dying models.
+func (s *Service) CleanupDyingModels(ctx context.Context, trigger <-chan time.Time) error {
+	for {
+		select {
+		case <-trigger:
+			err := s.jimm.CleanupDyingModels(ctx)
+			if err != nil {
+				zapctx.Error(ctx, "dying models cleanup", zap.Error(err))
 				continue
 			}
 		case <-ctx.Done():
