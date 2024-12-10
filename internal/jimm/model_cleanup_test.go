@@ -10,12 +10,10 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
-	"github.com/google/uuid"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/state"
 	"github.com/juju/names/v5"
 
-	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm"
@@ -91,17 +89,10 @@ type modelCleanupSuite struct {
 
 func (s *modelCleanupSuite) Init(c *qt.C) {
 	ctx := context.Background()
-	// Setup DB
 	var err error
 	s.ofgaClient, _, _, err = jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
-	s.jimm = &jimm.JIMM{
-		UUID:          uuid.NewString(),
-		OpenFGAClient: s.ofgaClient,
-		Database: db.Database{
-			DB: jimmtest.PostgresDB(c, time.Now),
-		},
-	}
+	s.jimm = jimmtest.NewJIMM(c, nil)
 	err = s.jimm.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 	s.jimmAdmin, err = s.jimm.GetUser(ctx, "alice@canonical.com")

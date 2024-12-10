@@ -13,7 +13,6 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/google/uuid"
 	"github.com/juju/juju/core/life"
 	"github.com/juju/juju/rpc/params"
 	jujuparams "github.com/juju/juju/rpc/params"
@@ -22,7 +21,6 @@ import (
 	"github.com/juju/version/v2"
 	"sigs.k8s.io/yaml"
 
-	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm"
@@ -1760,23 +1758,16 @@ func TestModelSummaries(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
-	client, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
-	c.Assert(err, qt.IsNil)
-	j := &jimm.JIMM{
-		UUID:          uuid.NewString(),
-		OpenFGAClient: client,
-		Database: db.Database{
-			DB: jimmtest.PostgresDB(c, nil),
-		},
-	}
-	err = j.Database.Migrate(ctx, false)
+	j := jimmtest.NewJIMM(c, nil)
+
+	err := j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
 	env := jimmtest.ParseEnvironment(c, modelSummariesTestEnv)
-	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, client)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
 
 	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
-	alice := openfga.NewUser(&dbUser, client)
+	alice := openfga.NewUser(&dbUser, j.OpenFGAClient)
 
 	tests := []struct {
 		description            string

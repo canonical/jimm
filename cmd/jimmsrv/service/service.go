@@ -503,11 +503,6 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 func (s *Service) StartServices(ctx context.Context, svc *service.Service) {
 	// on the leader unit we start additional routines
 	if s.isLeader {
-		// the leader unit connects to all controllers' AllWatcher
-		svc.Go(func() error {
-			return s.WatchControllers(ctx)
-		})
-
 		// audit log cleanup routine
 		if s.auditLogCleanupPeriod != 0 {
 			svc.Go(func() error {
@@ -528,6 +523,11 @@ func (s *Service) StartServices(ctx context.Context, svc *service.Service) {
 		// OpenFGA cleanup - cleans up all orphaned tuples
 		svc.Go(func() error {
 			return s.OpenFGACleanup(ctx, time.NewTicker(6*time.Hour).C)
+		})
+
+		// CleanupDyingModels cleanup - cleans up all dying models
+		svc.Go(func() error {
+			return s.CleanupDyingModels(ctx, time.NewTicker(time.Minute).C)
 		})
 	}
 

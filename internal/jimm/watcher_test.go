@@ -139,7 +139,7 @@ func TestModelSummaryWatcher(t *testing.T) {
 
 			w := &jimm.Watcher{
 				Pubsub: publisher,
-				Database: db.Database{
+				Database: &db.Database{
 					DB: jimmtest.PostgresDB(c, nil),
 				},
 				Dialer: &jimmtest.Dialer{
@@ -222,7 +222,7 @@ func TestWatcherSetsControllerUnavailable(t *testing.T) {
 
 	controllerUnavailableChannel := make(chan error, 1)
 	w := jimm.NewWatcherWithControllerUnavailableChan(
-		db.Database{
+		&db.Database{
 			DB: jimmtest.PostgresDB(c, nil),
 		},
 		&jimmtest.Dialer{
@@ -268,7 +268,7 @@ func TestWatcherClearsControllerUnavailable(t *testing.T) {
 	defer cancel()
 
 	w := jimm.Watcher{
-		Database: db.Database{
+		Database: &db.Database{
 			DB: jimmtest.PostgresDB(c, nil),
 		},
 		Dialer: &jimmtest.Dialer{
