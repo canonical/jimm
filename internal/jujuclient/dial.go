@@ -21,6 +21,7 @@ import (
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	jujuhttp "github.com/juju/http/v2"
 	"github.com/juju/juju/api/base"
+	"github.com/juju/juju/core/permission"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
@@ -54,15 +55,13 @@ type Dialer struct {
 	JWTService                 *jimmjwx.JWTService
 }
 
+// createLoginRequest formats a login request for Juju utilising a JWT.
 func (d *Dialer) createLoginRequest(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, p map[string]string) (*jujuparams.LoginRequest, error) {
 	// JIMM is automatically given all required permissions
-	permissions := p
-	if permissions == nil {
-		permissions = make(map[string]string)
-	}
-	permissions[ctl.ResourceTag().String()] = "superuser"
-	if modelTag.Id() != "" {
-		permissions[modelTag.String()] = "admin"
+
+	permissions, err := d.maybeCorrectPermissionMap(p, ctl)
+	if err != nil {
+		return nil, err
 	}
 
 	jwt, err := d.JWTService.NewJWT(ctx, jimmjwx.JWTParams{
@@ -80,6 +79,30 @@ func (d *Dialer) createLoginRequest(ctx context.Context, ctl *dbmodel.Controller
 		ClientVersion: jujuClientVersion,
 		Token:         jwtString,
 	}, nil
+}
+
+func (d *Dialer) maybeCorrectPermissionMap(permissions map[string]string, ctl *dbmodel.Controller) (map[string]string, error) {
+	if permissions == nil {
+		permissions = make(map[string]string)
+	}
+
+	// Check the access level for the controller.
+	access, ok := permissions[ctl.ResourceTag().String()]
+
+	// If a permission cannot be found set a required default.
+	if !ok {
+		// Minimum required permission to connect to a controller
+		// is login.
+		permissions[ctl.ResourceTag().String()] = string(permission.LoginAccess)
+	} else {
+		// If the permission was set ahead of time, we ensure it's a valid controller
+		// permission.
+		if err := permission.ValidateControllerAccess(permission.Access(access)); err != nil {
+			return nil, errors.E(err)
+		}
+	}
+
+	return permissions, nil
 }
 
 // Dial implements jimm.Dialer.
@@ -126,6 +149,7 @@ func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag nam
 
 	monitorC := make(chan struct{})
 	broken := new(uint32)
+
 	go pinger(client, ct.Id(), monitorC, broken)
 	return &Connection{
 		ctx:                ctx,
@@ -237,6 +261,7 @@ func (c *Connection) redial(ctx context.Context, requiredPermissions map[string]
 	if err = c.Close(); err != nil {
 		return errors.E(op, err)
 	}
+
 	conn := api.(*Connection)
 	c.client = conn.client
 	c.userTag = conn.userTag

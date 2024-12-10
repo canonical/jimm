@@ -17,7 +17,7 @@ import (
 // SupportsCheckCredentialModels reports whether the controller supports
 // the Cloud.CheckCredentialsModels, Cloud.RevokeCredentialsCheckModels,
 // and Cloud.UpdateCredentialsCheckModels methods.
-func (c Connection) SupportsCheckCredentialModels() bool {
+func (c *Connection) SupportsCheckCredentialModels() bool {
 	return c.hasFacadeVersion("Cloud", 3) || c.hasFacadeVersion("Cloud", 7)
 }
 
@@ -26,7 +26,7 @@ func (c Connection) SupportsCheckCredentialModels() bool {
 // credential. This method uses the CheckCredentialsModel procedure on
 // the Cloud. Any error that represents a Juju API
 // failure will be of type *APIError.
-func (c Connection) CheckCredentialModels(ctx context.Context, cred jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
+func (c *Connection) CheckCredentialModels(ctx context.Context, cred jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 	const op = errors.Op("jujuclient.CheckCredentialModels")
 	in := jujuparams.TaggedCredentials{
 		Credentials: []jujuparams.TaggedCredential{cred},
@@ -57,7 +57,7 @@ func (c Connection) CheckCredentialModels(ctx context.Context, cred jujuparams.T
 //
 // Any error that represents a Juju API failure will be of type
 // *APIError.
-func (c Connection) UpdateCredential(ctx context.Context, cred jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
+func (c *Connection) UpdateCredential(ctx context.Context, cred jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 	const op = errors.Op("jujuclient.UpdateCredential")
 	creds := jujuparams.TaggedCredentials{
 		Credentials: []jujuparams.TaggedCredential{cred},
@@ -98,7 +98,7 @@ func (c Connection) UpdateCredential(ctx context.Context, cred jujuparams.Tagged
 //
 // Any error that represents a Juju API failure will be of type
 // *APIError.
-func (c Connection) RevokeCredential(ctx context.Context, cred names.CloudCredentialTag) error {
+func (c *Connection) RevokeCredential(ctx context.Context, cred names.CloudCredentialTag) error {
 	const op = errors.Op("jujuclient.RevokeCredential")
 	out := jujuparams.ErrorResults{
 		Results: make([]jujuparams.ErrorResult, 1),
@@ -131,7 +131,7 @@ func (c Connection) RevokeCredential(ctx context.Context, cred names.CloudCreden
 
 // Cloud retrieves information about the given cloud. Cloud uses the
 // Cloud procedure on the Cloud facade.
-func (c Connection) Cloud(ctx context.Context, tag names.CloudTag, cloud *jujuparams.Cloud) error {
+func (c *Connection) Cloud(ctx context.Context, tag names.CloudTag, cloud *jujuparams.Cloud) error {
 	const op = errors.Op("jujuclient.Cloud")
 	args := jujuparams.Entities{
 		Entities: []jujuparams.Entity{{
@@ -154,7 +154,7 @@ func (c Connection) Cloud(ctx context.Context, tag names.CloudTag, cloud *jujupa
 
 // Clouds retrieves information about all available clouds. Clouds uses the
 // Clouds procedure on the Cloud facade.
-func (c Connection) Clouds(ctx context.Context) (map[names.CloudTag]jujuparams.Cloud, error) {
+func (c *Connection) Clouds(ctx context.Context) (map[names.CloudTag]jujuparams.Cloud, error) {
 	const op = errors.Op("jujuclient.Clouds")
 	var resp jujuparams.CloudsResult
 	if err := c.CallHighestFacadeVersion(ctx, "Cloud", []int{7, 1}, "", "Clouds", nil, &resp); err != nil {
@@ -175,7 +175,7 @@ func (c Connection) Clouds(ctx context.Context) (map[names.CloudTag]jujuparams.C
 
 // AddCloud adds the given cloud to a controller with the given name.
 // AddCloud uses the AddCloud procedure on the Cloud facade.
-func (c Connection) AddCloud(ctx context.Context, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error {
+func (c *Connection) AddCloud(ctx context.Context, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error {
 	const op = errors.Op("jujuclient.AddCloud")
 	args := jujuparams.AddCloudArgs{
 		Cloud: cloud,
@@ -190,7 +190,7 @@ func (c Connection) AddCloud(ctx context.Context, tag names.CloudTag, cloud juju
 
 // RemoveCloud removes the given cloud from the controller. RemoveCloud
 // uses the RemoveClouds procedure on the Cloud facade.
-func (c Connection) RemoveCloud(ctx context.Context, tag names.CloudTag) error {
+func (c *Connection) RemoveCloud(ctx context.Context, tag names.CloudTag) error {
 	const op = errors.Op("jujuclient.RemoveCloud")
 	args := jujuparams.Entities{
 		Entities: []jujuparams.Entity{{
@@ -212,7 +212,7 @@ func (c Connection) RemoveCloud(ctx context.Context, tag names.CloudTag) error {
 // GrantCloudAccess gives the given user the given access level on the
 // given cloud. GrantCloudAccess uses the ModifyCloudAccess procedure on
 // the Cloud facade.
-func (c Connection) GrantCloudAccess(ctx context.Context, cloudTag names.CloudTag, userTag names.UserTag, access string) error {
+func (c *Connection) GrantCloudAccess(ctx context.Context, cloudTag names.CloudTag, userTag names.UserTag, access string) error {
 	const op = errors.Op("jujuclient.GrantCloudAccess")
 	args := jujuparams.ModifyCloudAccessRequest{
 		Changes: []jujuparams.ModifyCloudAccess{{
@@ -239,7 +239,7 @@ func (c Connection) GrantCloudAccess(ctx context.Context, cloudTag names.CloudTa
 // RevokeCloudAccess revokes the given access level on the given cloud from
 // the given user. RevokeCloudAccess uses the ModifyCloudAccess procedure
 // on the Cloud facade.
-func (c Connection) RevokeCloudAccess(ctx context.Context, cloudTag names.CloudTag, userTag names.UserTag, access string) error {
+func (c *Connection) RevokeCloudAccess(ctx context.Context, cloudTag names.CloudTag, userTag names.UserTag, access string) error {
 	const op = errors.Op("jujuclient.RevokeCloudAccess")
 	args := jujuparams.ModifyCloudAccessRequest{
 		Changes: []jujuparams.ModifyCloudAccess{{
@@ -265,7 +265,7 @@ func (c Connection) RevokeCloudAccess(ctx context.Context, cloudTag names.CloudT
 
 // CloudInfo retrieves information about the cloud with the given name.
 // CloudInfo uses the CloudInfo procedure on the Cloud facade.
-func (c Connection) CloudInfo(ctx context.Context, tag names.CloudTag, ci *jujuparams.CloudInfo) error {
+func (c *Connection) CloudInfo(ctx context.Context, tag names.CloudTag, ci *jujuparams.CloudInfo) error {
 	const op = errors.Op("jujuclient.CloudInfo")
 	args := jujuparams.Entities{
 		Entities: []jujuparams.Entity{{Tag: tag.String()}},
@@ -288,7 +288,7 @@ func (c Connection) CloudInfo(ctx context.Context, tag names.CloudTag, ci *jujup
 
 // UpdateCloud updates the given cloud with the given cloud definition.
 // UpdateCloud uses the UpdateCloud procedure on the cloud facade.
-func (c Connection) UpdateCloud(ctx context.Context, tag names.CloudTag, cloud jujuparams.Cloud) error {
+func (c *Connection) UpdateCloud(ctx context.Context, tag names.CloudTag, cloud jujuparams.Cloud) error {
 	const op = errors.Op("jujuclient.UpdateCloud")
 
 	args := jujuparams.UpdateCloudArgs{

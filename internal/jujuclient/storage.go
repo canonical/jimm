@@ -14,7 +14,7 @@ import (
 
 // ListFilesystems lists filesystems for desired machines.
 // If no machines provided, a list of all filesystems is returned.
-func (c Connection) ListFilesystems(ctx context.Context, machines []string) ([]jujuparams.FilesystemDetailsListResult, error) {
+func (c *Connection) ListFilesystems(ctx context.Context, machines []string) ([]jujuparams.FilesystemDetailsListResult, error) {
 	const op = errors.Op("jujuclient.ListFilesystems")
 
 	filters := make([]jujuparams.FilesystemFilter, len(machines))
@@ -49,7 +49,7 @@ func (c Connection) ListFilesystems(ctx context.Context, machines []string) ([]j
 
 // ListVolumes lists volumes for desired machines.
 // If no machines provided, a list of all volumes is returned.
-func (c Connection) ListVolumes(ctx context.Context, machines []string) ([]jujuparams.VolumeDetailsListResult, error) {
+func (c *Connection) ListVolumes(ctx context.Context, machines []string) ([]jujuparams.VolumeDetailsListResult, error) {
 	const op = errors.Op("jujuclient.ListVolumes")
 
 	filters := make([]jujuparams.VolumeFilter, len(machines))
@@ -80,7 +80,7 @@ func (c Connection) ListVolumes(ctx context.Context, machines []string) ([]jujup
 }
 
 // ListStorageDetails lists all storage.
-func (c Connection) ListStorageDetails(ctx context.Context) ([]jujuparams.StorageDetails, error) {
+func (c *Connection) ListStorageDetails(ctx context.Context) ([]jujuparams.StorageDetails, error) {
 	const op = errors.Op("jujuclient.ListStorageDetails")
 
 	args := jujuparams.StorageFilters{

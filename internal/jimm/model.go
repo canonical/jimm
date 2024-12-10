@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	jujupermission "github.com/juju/juju/core/permission"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/state"
 	"github.com/juju/names/v5"
@@ -469,10 +468,6 @@ func (b *modelBuilder) CreateControllerModel() *modelBuilder {
 		b.ctx,
 		b.controller,
 		names.ModelTag{},
-		permission{
-			resource: b.cloud.ResourceTag().String(),
-			relation: string(jujupermission.AddModelAccess),
-		},
 	)
 	if err != nil {
 		b.err = errors.E(err)

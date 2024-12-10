@@ -217,10 +217,6 @@ func (j *JIMM) GetApplicationOfferConsumeDetails(ctx context.Context, user *open
 		ctx,
 		&offer.Model.Controller,
 		names.ModelTag{},
-		permission{
-			resource: names.NewApplicationOfferTag(offer.UUID).String(),
-			relation: accessLevel,
-		},
 	)
 	if err != nil {
 		return errors.E(op, err)
@@ -366,10 +362,6 @@ func (j *JIMM) GetApplicationOffer(ctx context.Context, user *openfga.User, offe
 		ctx,
 		&offer.Model.Controller,
 		names.ModelTag{},
-		permission{
-			resource: names.NewApplicationOfferTag(offer.UUID).String(),
-			relation: accessLevel,
-		},
 	)
 	if err != nil {
 		return nil, errors.E(op, err)
@@ -706,10 +698,6 @@ func (j *JIMM) doApplicationOfferAdmin(ctx context.Context, user *openfga.User, 
 		ctx,
 		&offer.Model.Controller,
 		names.ModelTag{},
-		permission{
-			resource: names.NewApplicationOfferTag(offer.UUID).String(),
-			relation: string(jujuparams.OfferAdminAccess),
-		},
 	)
 	if err != nil {
 		return errors.E(op, err)

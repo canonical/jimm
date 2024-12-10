@@ -16,7 +16,7 @@ import (
 
 // Offer creates a new ApplicationOffer on the controller. Offer uses the
 // Offer procedure on the ApplicationOffers facade.
-func (c Connection) Offer(ctx context.Context, offerURL crossmodel.OfferURL, offer jujuparams.AddApplicationOffer) error {
+func (c *Connection) Offer(ctx context.Context, offerURL crossmodel.OfferURL, offer jujuparams.AddApplicationOffer) error {
 	const op = errors.Op("jujuclient.Offer")
 	args := jujuparams.AddApplicationOffers{
 		Offers: []jujuparams.AddApplicationOffer{offer},
@@ -64,7 +64,7 @@ func (c Connection) Offer(ctx context.Context, offerURL crossmodel.OfferURL, off
 // ListApplicationOffers lists ApplicationOffers on the controller matching
 // the given filters. ListApplicationOffers uses the ListApplicationOffers
 // procedure on the ApplicationOffers facade.
-func (c Connection) ListApplicationOffers(ctx context.Context, filters []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error) {
+func (c *Connection) ListApplicationOffers(ctx context.Context, filters []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error) {
 	const op = errors.Op("jujuclient.ListApplicationOffers")
 	args := jujuparams.OfferFilters{
 		Filters: filters,
@@ -81,7 +81,7 @@ func (c Connection) ListApplicationOffers(ctx context.Context, filters []jujupar
 // FindApplicationOffers finds ApplicationOffers on the controller matching
 // the given filters. FindApplicationOffers uses the FindApplicationOffers
 // procedure on the ApplicationOffers facade.
-func (c Connection) FindApplicationOffers(ctx context.Context, filters []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error) {
+func (c *Connection) FindApplicationOffers(ctx context.Context, filters []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error) {
 	const op = errors.Op("jujuclient.FindApplicationOffers")
 	args := jujuparams.OfferFilters{
 		Filters: filters,
@@ -100,7 +100,7 @@ func (c Connection) FindApplicationOffers(ctx context.Context, filters []jujupar
 // OfferURL the rest of the structure will be filled in by the API request.
 // GetApplicationOffer uses the ApplicationOffers procedure on the
 // ApplicationOffers facade.
-func (c Connection) GetApplicationOffer(ctx context.Context, info *jujuparams.ApplicationOfferAdminDetailsV5) error {
+func (c *Connection) GetApplicationOffer(ctx context.Context, info *jujuparams.ApplicationOfferAdminDetailsV5) error {
 	const op = errors.Op("jujuclient.GetApplicationOffer")
 	args := jujuparams.OfferURLs{
 		OfferURLs: []string{info.OfferURL},
@@ -123,7 +123,7 @@ func (c Connection) GetApplicationOffer(ctx context.Context, info *jujuparams.Ap
 // GrantApplicationOfferAccess grants the specified permission to the
 // given user on the given application offer. GrantApplicationOfferAccess
 // uses the ModifyOfferAccess procedure on the ApplicationOffers facade..
-func (c Connection) GrantApplicationOfferAccess(ctx context.Context, offerURL string, user names.UserTag, access jujuparams.OfferAccessPermission) error {
+func (c *Connection) GrantApplicationOfferAccess(ctx context.Context, offerURL string, user names.UserTag, access jujuparams.OfferAccessPermission) error {
 	const op = errors.Op("jujuclient.GrantApplicationOfferAccess")
 	args := jujuparams.ModifyOfferAccessRequest{
 		Changes: []jujuparams.ModifyOfferAccess{{
@@ -150,7 +150,7 @@ func (c Connection) GrantApplicationOfferAccess(ctx context.Context, offerURL st
 // RevokeApplicationOfferAccess revokes the specified permission from the
 // given user on the given application offer. RevokeApplicationOfferAccess
 // uses the ModifyOfferAccess procedure on the ApplicationOffers facade.
-func (c Connection) RevokeApplicationOfferAccess(ctx context.Context, offerURL string, user names.UserTag, access jujuparams.OfferAccessPermission) error {
+func (c *Connection) RevokeApplicationOfferAccess(ctx context.Context, offerURL string, user names.UserTag, access jujuparams.OfferAccessPermission) error {
 	const op = errors.Op("jujuclient.RevokeApplicationOfferAccess")
 	args := jujuparams.ModifyOfferAccessRequest{
 		Changes: []jujuparams.ModifyOfferAccess{{
@@ -177,7 +177,7 @@ func (c Connection) RevokeApplicationOfferAccess(ctx context.Context, offerURL s
 // DestroyApplicationOffer destroys the given application offer.
 // DestroyApplicationOffer uses the DestroyOffers procedure
 // from the ApplicationOffers facade.
-func (c Connection) DestroyApplicationOffer(ctx context.Context, offer string, force bool) error {
+func (c *Connection) DestroyApplicationOffer(ctx context.Context, offer string, force bool) error {
 	const op = errors.Op("jujuclient.DestroyApplicationOffer")
 	args := jujuparams.DestroyApplicationOffers{
 		OfferURLs: []string{offer},
@@ -202,7 +202,7 @@ func (c Connection) DestroyApplicationOffer(ctx context.Context, offer string, f
 // must include an Offer.OfferURL and the rest of the structure will be
 // filled in by the API call. GetApplicationOfferConsumeDetails uses the
 // GetConsumeDetails procedure on the ApplicationOffers facade.
-func (c Connection) GetApplicationOfferConsumeDetails(ctx context.Context, user names.UserTag, info *jujuparams.ConsumeOfferDetails, v bakery.Version) error {
+func (c *Connection) GetApplicationOfferConsumeDetails(ctx context.Context, user names.UserTag, info *jujuparams.ConsumeOfferDetails, v bakery.Version) error {
 	const op = errors.Op("jujuclient.GetApplicationOfferConsumeDetails")
 	args := jujuparams.ConsumeOfferDetailsArg{
 		OfferURLs: jujuparams.OfferURLs{

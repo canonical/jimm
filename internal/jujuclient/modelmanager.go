@@ -19,7 +19,7 @@ import (
 // from the Create model call. If there is an error returned it will be
 // of type *APIError. CreateModel uses the Create model procedure on the
 // ModelManager facade.
-func (c Connection) CreateModel(ctx context.Context, args *jujuparams.ModelCreateArgs, info *jujuparams.ModelInfo) error {
+func (c *Connection) CreateModel(ctx context.Context, args *jujuparams.ModelCreateArgs, info *jujuparams.ModelInfo) error {
 	const op = errors.Op("jujuclient.CreateModel")
 	if err := c.Call(ctx, "ModelManager", 9, "", "CreateModel", args, info); err != nil {
 		return errors.E(op, jujuerrors.Cause(err))
@@ -33,7 +33,7 @@ func (c Connection) CreateModel(ctx context.Context, args *jujuparams.ModelCreat
 // then the resulting error response will be of type *APIError. ModelInfo
 // will use the ModelInfo procedure from the ModelManager version 9
 // facade if it is available, falling back to version 3.
-func (c Connection) ModelInfo(ctx context.Context, info *jujuparams.ModelInfo) error {
+func (c *Connection) ModelInfo(ctx context.Context, info *jujuparams.ModelInfo) error {
 	const op = errors.Op("jujuclient.ModelInfo")
 	args := jujuparams.Entities{
 		Entities: []jujuparams.Entity{{
@@ -62,7 +62,7 @@ func (c Connection) ModelInfo(ctx context.Context, info *jujuparams.ModelInfo) e
 // that is returned from the API will be of type *APIError.
 // GrantJIMMModelAdmin uses the ModifyModelAccess procedure on the
 // ModelManager facade.
-func (c Connection) GrantJIMMModelAdmin(ctx context.Context, tag names.ModelTag) error {
+func (c *Connection) GrantJIMMModelAdmin(ctx context.Context, tag names.ModelTag) error {
 	const op = errors.Op("jujuclient.GrantJIMMModelAdmin")
 	args := jujuparams.ModifyModelAccessRequest{
 		Changes: []jujuparams.ModifyModelAccess{{
@@ -88,7 +88,7 @@ func (c Connection) GrantJIMMModelAdmin(ctx context.Context, tag names.ModelTag)
 // DumpModel dumps debugging details for the given model. If the simplied
 // dump is requested then a simplified dump is returned. DumpModel uses the
 // DumpModels method on the ModelManager facade.
-func (c Connection) DumpModel(ctx context.Context, tag names.ModelTag, simplified bool) (string, error) {
+func (c *Connection) DumpModel(ctx context.Context, tag names.ModelTag, simplified bool) (string, error) {
 	const op = errors.Op("jujuclient.DumpModel")
 	args := jujuparams.DumpModelRequest{
 		Entities: []jujuparams.Entity{{
@@ -111,7 +111,7 @@ func (c Connection) DumpModel(ctx context.Context, tag names.ModelTag, simplifie
 
 // DumpModelDB dumps the controller database entry given model.
 // DumpModelDB uses the DumpModelsDB method on the ModelManager facade..
-func (c Connection) DumpModelDB(ctx context.Context, tag names.ModelTag) (map[string]interface{}, error) {
+func (c *Connection) DumpModelDB(ctx context.Context, tag names.ModelTag) (map[string]interface{}, error) {
 	const op = errors.Op("jujuclient.DumpModelDB")
 	args := jujuparams.Entities{
 		Entities: []jujuparams.Entity{{
@@ -134,7 +134,7 @@ func (c Connection) DumpModelDB(ctx context.Context, tag names.ModelTag) (map[st
 // GrantModelAccess gives the given user the given access level on the
 // given model. GrantModelAccess uses the ModifyModelAccess procedure
 // on the ModelManager facade.
-func (c Connection) GrantModelAccess(ctx context.Context, modelTag names.ModelTag, userTag names.UserTag, access jujuparams.UserAccessPermission) error {
+func (c *Connection) GrantModelAccess(ctx context.Context, modelTag names.ModelTag, userTag names.UserTag, access jujuparams.UserAccessPermission) error {
 	const op = errors.Op("jujuclient.GrantModelAccess")
 	args := jujuparams.ModifyModelAccessRequest{
 		Changes: []jujuparams.ModifyModelAccess{{
@@ -161,7 +161,7 @@ func (c Connection) GrantModelAccess(ctx context.Context, modelTag names.ModelTa
 // RevokeModelAccess removes the given access level from the given user on
 // the given model. Revoke ModelAccess uses the ModifyModelAccess procedure
 // on the ModelManager facade.
-func (c Connection) RevokeModelAccess(ctx context.Context, modelTag names.ModelTag, userTag names.UserTag, access jujuparams.UserAccessPermission) error {
+func (c *Connection) RevokeModelAccess(ctx context.Context, modelTag names.ModelTag, userTag names.UserTag, access jujuparams.UserAccessPermission) error {
 	const op = errors.Op("jujuclient.RevokeModelAccess")
 	args := jujuparams.ModifyModelAccessRequest{
 		Changes: []jujuparams.ModifyModelAccess{{
@@ -188,7 +188,7 @@ func (c Connection) RevokeModelAccess(ctx context.Context, modelTag names.ModelT
 // ControllerModelSummary retrieves the ModelSummary for the controller
 // model. ControllerModelSummary uses the ListModelSummaries procedure on
 // the ModelManager facade.
-func (c Connection) ControllerModelSummary(ctx context.Context, ms *jujuparams.ModelSummary) error {
+func (c *Connection) ControllerModelSummary(ctx context.Context, ms *jujuparams.ModelSummary) error {
 	const op = errors.Op("jujuclient.ControllerModelSummary")
 	args := jujuparams.ModelSummariesRequest{
 		UserTag: c.userTag,
@@ -210,7 +210,7 @@ func (c Connection) ControllerModelSummary(ctx context.Context, ms *jujuparams.M
 
 // ValidateModelUpgrade validates if a model is allowed to perform an upgrade. It
 // uses ValidateModelUpgrades on the ModelManager facade.
-func (c Connection) ValidateModelUpgrade(ctx context.Context, model names.ModelTag, force bool) error {
+func (c *Connection) ValidateModelUpgrade(ctx context.Context, model names.ModelTag, force bool) error {
 	const op = errors.Op("jujuclient.ValidateModelUpgrade")
 	args := jujuparams.ValidateModelUpgradeParams{
 		Models: []jujuparams.ModelParam{{
@@ -238,7 +238,7 @@ func (c Connection) ValidateModelUpgrade(ctx context.Context, model names.ModelT
 //   - ModelManager(7).DestroyModels
 //   - ModelManager(4).DestroyModels
 //   - ModelManager(2).DestroyModels
-func (c Connection) DestroyModel(ctx context.Context, tag names.ModelTag, destroyStorage *bool, force *bool, maxWait, timeout *time.Duration) error {
+func (c *Connection) DestroyModel(ctx context.Context, tag names.ModelTag, destroyStorage *bool, force *bool, maxWait, timeout *time.Duration) error {
 	const op = errors.Op("jujuclient.DestroyModel")
 	args := jujuparams.DestroyModelsParams{
 		Models: []jujuparams.DestroyModelParams{{
@@ -269,7 +269,7 @@ func (c Connection) DestroyModel(ctx context.Context, tag names.ModelTag, destro
 // API then the resulting error response will be of type *APIError.
 // ModelStatus will use the ModelStatus procedure from the ModelManager
 // version 4 facade if it is available, falling back to version 2.
-func (c Connection) ModelStatus(ctx context.Context, status *jujuparams.ModelStatus) error {
+func (c *Connection) ModelStatus(ctx context.Context, status *jujuparams.ModelStatus) error {
 	const op = errors.Op("jujuclient.ModelStatus")
 	args := jujuparams.Entities{
 		Entities: []jujuparams.Entity{{
@@ -292,7 +292,7 @@ func (c Connection) ModelStatus(ctx context.Context, status *jujuparams.ModelSta
 }
 
 // ChangeModelCredential replaces cloud credential for a given model with the provided one.
-func (c Connection) ChangeModelCredential(ctx context.Context, model names.ModelTag, credential names.CloudCredentialTag) error {
+func (c *Connection) ChangeModelCredential(ctx context.Context, model names.ModelTag, credential names.CloudCredentialTag) error {
 	const op = errors.Op("jujuclient.ChangeModelCredential")
 
 	var out jujuparams.ErrorResults

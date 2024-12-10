@@ -306,27 +306,18 @@ func (j *JIMM) GetCredentialStore() credentials.CredentialStore {
 	return j.CredentialStore
 }
 
-type permission struct {
-	resource string
-	relation string
-}
-
 // dial dials the controller and model specified by the given Controller
 // and ModelTag. If no Dialer has been configured then an error with a
 // code of CodeConnectionFailed will be returned.
-func (j *JIMM) dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, permissons ...permission) (API, error) {
+//
+// It utilises a nil permission map to allow the controller to return
+// the expected permissions back to the caller and then redials
+// the controller with the correct permissions.
+func (j *JIMM) dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag) (API, error) {
 	if j == nil || j.Dialer == nil {
 		return nil, errors.E(errors.CodeConnectionFailed, "no dialer configured")
 	}
-	var permissionMap map[string]string
-	if len(permissons) > 0 {
-		permissionMap = make(map[string]string, len(permissons))
-		for _, p := range permissons {
-			permissionMap[p.resource] = p.relation
-		}
-	}
-
-	return j.Dialer.Dial(ctx, ctl, modelTag, permissionMap)
+	return j.Dialer.Dial(ctx, ctl, modelTag, nil)
 }
 
 // A Dialer provides a connection to a controller.

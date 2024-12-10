@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/juju/juju/core/network"
+	"github.com/juju/juju/core/permission"
 	jujuparams "github.com/juju/juju/rpc/params"
 	jujuversion "github.com/juju/juju/version"
 	"github.com/juju/names/v5"
@@ -90,10 +91,15 @@ func (s *dialSuite) TestDial(c *gc.C) {
 	c.Check(addrs, jc.DeepEquals, info.Addrs)
 }
 
+// TestDialWithJWT tests that JIMM can login to Juju controllers utilising
+// JWTs. The controller upon login returns the expected permissions. Upon receiving
+// the expected permission errors, .Call()'s redial the controller updating the permission map
+// and as such can correctly contact the controller.
 func (s *dialSuite) TestDialWithJWT(c *gc.C) {
 	ctx := context.Background()
 
 	info := s.APIInfo(c)
+
 	ctl := dbmodel.Controller{
 		UUID:          info.ControllerUUID,
 		Name:          s.ControllerConfig.ControllerName(),
@@ -105,17 +111,43 @@ func (s *dialSuite) TestDialWithJWT(c *gc.C) {
 		JWTService: s.JIMM.JWTService,
 	}
 
-	// Check dial is OK
+	// Create a model where we wish to dump its DB.
+	state := s.JujuConnSuite.Factory.MakeModel(c, nil)
+	defer state.Close()
+	model, err := state.Model()
+	c.Assert(err, gc.IsNil)
+
+	// Test 1, no permissions specified at all. And expect login to be amended.
+
+	// Dial Controller with no permissions.
 	api, err := dialer.Dial(ctx, &ctl, names.ModelTag{}, nil)
 	c.Assert(err, gc.Equals, nil)
 	defer api.Close()
-	// Check UUID matches expected
-	c.Check(ctl.UUID, gc.Equals, "deadbeef-1bad-500d-9000-4b1d0d06f00d")
-	// Check agent version matches expected
-	c.Check(ctl.AgentVersion, gc.Equals, jujuversion.Current.String())
-	addrs := make([]string, len(ctl.Addresses))
-	for i, addr := range ctl.Addresses {
-		addrs[i] = fmt.Sprintf("%s:%d", addr[0].Value, addr[0].Port)
-	}
-	c.Check(addrs, gc.DeepEquals, info.Addrs)
+
+	// We use our API dialer as when a permission cannot be found, it redials correcting the permission map.
+	// DumpModelDB requires permission.AdminAccess of a model to do this.
+	_, err = api.DumpModelDB(ctx, model.ModelTag())
+	c.Assert(err, gc.IsNil)
+
+	// Test 2, specify the wrong permission. And expect login to be amended.
+
+	// Now we attempt to dial again, but specify we have a lower level access for this model
+	// due to this, we expect a permission denied error on our call.
+	wrongpermissionapi, err := dialer.Dial(
+		ctx,
+		&ctl,
+		names.ModelTag{},
+		map[string]string{
+			model.ModelTag().String(): string(permission.ReadAccess),
+		},
+	)
+	c.Assert(err, gc.Equals, nil)
+	defer wrongpermissionapi.Close()
+
+	// DumpModelDB requires permission.AdminAccess, but we have specified read.
+	// Because a permission check required will be sent back (as we've requested the wrong
+	// access), Call() will override the wrong permission (ReadAccess) with the correct
+	// permission, in this case, admin.
+	_, err = wrongpermissionapi.DumpModelDB(ctx, model.ModelTag())
+	c.Assert(err, gc.IsNil)
 }

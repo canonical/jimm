@@ -12,7 +12,7 @@ import (
 )
 
 // Status returns the status of the juju model.
-func (c Connection) Status(ctx context.Context, patterns []string) (*jujuparams.FullStatus, error) {
+func (c *Connection) Status(ctx context.Context, patterns []string) (*jujuparams.FullStatus, error) {
 	const op = errors.Op("jujuclient.Status")
 
 	p := jujuparams.StatusParams{

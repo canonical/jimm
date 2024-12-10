@@ -13,7 +13,7 @@ import (
 
 // WatchAll initialises a new ModelWatcher. On success the watcher
 // ID is returned. This uses the WatchAll method on the Client.
-func (c Connection) WatchAll(ctx context.Context) (string, error) {
+func (c *Connection) WatchAll(ctx context.Context) (string, error) {
 	const op = errors.Op("jujuclient.WatchAll")
 	var resp jujuparams.AllWatcherId
 	if err := c.CallHighestFacadeVersion(ctx, "Client", []int{6, 1}, "", "WatchAll", nil, &resp); err != nil {
@@ -25,7 +25,7 @@ func (c Connection) WatchAll(ctx context.Context) (string, error) {
 // ModelWatcherNext receives the next set of results from the model
 // watcher with the given id. This uses the Next method on the
 // AllWatcher facade version 1.
-func (c Connection) ModelWatcherNext(ctx context.Context, id string) ([]jujuparams.Delta, error) {
+func (c *Connection) ModelWatcherNext(ctx context.Context, id string) ([]jujuparams.Delta, error) {
 	const op = errors.Op("jujuclient.ModelWatcherNext")
 	var resp jujuparams.AllWatcherNextResults
 	if err := c.CallHighestFacadeVersion(ctx, "AllWatcher", []int{3, 2, 1}, id, "Next", nil, &resp); err != nil {
@@ -36,7 +36,7 @@ func (c Connection) ModelWatcherNext(ctx context.Context, id string) ([]jujupara
 
 // ModelWatcherStop stops the model watcher with the given id. This
 // uses the Stop method on the AllWatcher facade version 1.
-func (c Connection) ModelWatcherStop(ctx context.Context, id string) error {
+func (c *Connection) ModelWatcherStop(ctx context.Context, id string) error {
 	const op = errors.Op("jujuclient.ModelWatcherStop")
 	if err := c.CallHighestFacadeVersion(ctx, "AllWatcher", []int{3, 2, 1}, id, "Stop", nil, nil); err != nil {
 		return errors.E(op, jujuerrors.Cause(err))
