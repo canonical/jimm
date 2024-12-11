@@ -1374,15 +1374,12 @@ func (s *caasModelManagerSuite) SetUpTest(c *gc.C) {
 }
 
 func (s *caasModelManagerSuite) TestCreateModelKubernetes(c *gc.C) {
-	// TODO (ashipika): remove skip when the issue is resolved
-	// Error message: enumerating features supported by environment: querying kubernetes API version: the server could not find the requested resource
-	c.Skip("k8s_issue")
 	conn := s.open(c, nil, "bob")
 	defer conn.Close()
 
 	client := modelmanager.NewClient(conn)
 	mi, err := client.CreateModel("k8s-model-1", "bob@canonical.com", "bob-cloud", "", s.cred, nil)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, gc.Equals, nil) // ERROR IS HERE
 
 	c.Assert(mi.Name, gc.Equals, "k8s-model-1")
 	c.Assert(mi.Type, gc.Equals, model.CAAS)
@@ -1393,9 +1390,6 @@ func (s *caasModelManagerSuite) TestCreateModelKubernetes(c *gc.C) {
 }
 
 func (s *caasModelManagerSuite) TestListCAASModelSummaries(c *gc.C) {
-	// TODO (ashipika): remove skip when the issue is resolved
-	// Error message: enumerating features supported by environment: querying kubernetes API version: the server could not find the requested resource
-	c.Skip("k8s_issue")
 	conn := s.open(c, nil, "bob")
 	defer conn.Close()
 
@@ -1489,9 +1483,6 @@ func (s *caasModelManagerSuite) TestListCAASModelSummaries(c *gc.C) {
 }
 
 func (s *caasModelManagerSuite) TestListCAASModels(c *gc.C) {
-	// TODO (ashipika): remove skip when the issue is resolved
-	// Error message: enumerating features supported by environment: querying kubernetes API version: the server could not find the requested resource
-	c.Skip("k8s_issue")
 	conn := s.open(c, nil, "bob")
 	defer conn.Close()
 
