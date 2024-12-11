@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
-	"time"
 
 	petname "github.com/dustinkirkland/golang-petname"
 	"github.com/google/uuid"
@@ -105,13 +104,6 @@ func main() {
 		CloudRegionID:     cloud.Regions[0].ID,
 		CloudCredentialID: cred.ID,
 		Life:              state.Alive.String(),
-		Status: dbmodel.Status{
-			Status: "available",
-			Since: sql.NullTime{
-				Time:  time.Now().UTC().Truncate(time.Millisecond),
-				Valid: true,
-			},
-		},
 	}
 	if err = db.AddModel(ctx, &model); err != nil {
 		fmt.Println("failed to add model to db ", err)

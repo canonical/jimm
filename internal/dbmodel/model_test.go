@@ -79,20 +79,7 @@ func TestModel(t *testing.T) {
 		Controller:      ctl,
 		CloudRegion:     cl.Regions[0],
 		CloudCredential: cred,
-		Type:            "iaas",
-		IsController:    false,
-		DefaultSeries:   "warty",
 		Life:            state.Alive.String(),
-		Status: dbmodel.Status{
-			Status: "available",
-			Since: sql.NullTime{
-				Time:  time.Now().Truncate(time.Millisecond),
-				Valid: true,
-			},
-		},
-		SLA: dbmodel.SLA{
-			Level: "unsupported",
-		},
 	}
 	c.Assert(db.Create(&m).Error, qt.IsNil)
 
@@ -145,20 +132,7 @@ func TestModelUniqueConstraint(t *testing.T) {
 		Controller:      ctl1,
 		CloudRegion:     cl1.Regions[0],
 		CloudCredential: cred1,
-		Type:            "iaas",
-		IsController:    false,
-		DefaultSeries:   "warty",
 		Life:            state.Alive.String(),
-		Status: dbmodel.Status{
-			Status: "available",
-			Since: sql.NullTime{
-				Time:  time.Now().Truncate(time.Millisecond),
-				Valid: true,
-			},
-		},
-		SLA: dbmodel.SLA{
-			Level: "unsupported",
-		},
 	}
 	c.Assert(db.Create(&m1).Error, qt.IsNil)
 
@@ -172,20 +146,7 @@ func TestModelUniqueConstraint(t *testing.T) {
 		Controller:      ctl2,
 		CloudRegion:     cl2.Regions[0],
 		CloudCredential: cred2,
-		Type:            "iaas",
-		IsController:    false,
-		DefaultSeries:   "jammy",
 		Life:            state.Alive.String(),
-		Status: dbmodel.Status{
-			Status: "available",
-			Since: sql.NullTime{
-				Time:  time.Now().Truncate(time.Millisecond),
-				Valid: true,
-			},
-		},
-		SLA: dbmodel.SLA{
-			Level: "unsupported",
-		},
 	}
 	c.Assert(db.Create(&m2).Error, qt.ErrorMatches, `ERROR: duplicate key value violates unique constraint .*`)
 
@@ -207,7 +168,6 @@ func TestToJujuModel(t *testing.T) {
 	c := qt.New(t)
 	db := gormDB(c)
 	cl, cred, ctl, u := initModelEnv(c, db)
-	now := time.Now().Truncate(time.Millisecond)
 	m := dbmodel.Model{
 		Name: "test-model",
 		UUID: sql.NullString{
@@ -219,20 +179,7 @@ func TestToJujuModel(t *testing.T) {
 		Controller:        ctl,
 		CloudRegion:       cl.Regions[0],
 		CloudCredential:   cred,
-		Type:              "iaas",
-		IsController:      false,
-		DefaultSeries:     "warty",
 		Life:              state.Alive.String(),
-		Status: dbmodel.Status{
-			Status: "available",
-			Since: sql.NullTime{
-				Time:  now,
-				Valid: true,
-			},
-		},
-		SLA: dbmodel.SLA{
-			Level: "unsupported",
-		},
 	}
 	m.CloudRegion.Cloud = cl
 
@@ -240,7 +187,6 @@ func TestToJujuModel(t *testing.T) {
 	c.Check(jm, qt.DeepEquals, jujuparams.Model{
 		Name:     "test-model",
 		UUID:     "00000001-0000-0000-0000-0000-000000000001",
-		Type:     "iaas",
 		OwnerTag: "user-bob@canonical.com",
 	})
 }
@@ -260,27 +206,37 @@ func TestToJujuModelSummary(t *testing.T) {
 		Controller:      ctl,
 		CloudRegion:     cl.Regions[0],
 		CloudCredential: cred,
-		Type:            "iaas",
-		IsController:    false,
-		DefaultSeries:   "warty",
 		Life:            state.Alive.String(),
-		Status: dbmodel.Status{
-			Status: "available",
-			Since: sql.NullTime{
-				Time:  now,
-				Valid: true,
-			},
-		},
-		SLA: dbmodel.SLA{
-			Level: "unsupported",
-		},
-		Machines: 1,
-		Cores:    2,
-		Units:    3,
 	}
 	m.CloudRegion.Cloud = cl
-
-	ms := m.ToJujuModelSummary()
+	modelSummaryFromController := jujuparams.ModelSummary{
+		Name:           "test-model",
+		Type:           "iaas",
+		UUID:           "00000001-0000-0000-0000-0000-000000000001",
+		ControllerUUID: "00000000-0000-0000-0000-0000-0000000000002",
+		Life:           life.Value(state.Alive.String()),
+		IsController:   false,
+		ProviderType:   "test-provider",
+		DefaultSeries:  "warty",
+		Status: jujuparams.EntityStatus{
+			Status: "available",
+			Since:  &now,
+		},
+		Counts: []jujuparams.ModelEntityCount{{
+			Entity: "machines",
+			Count:  1,
+		}, {
+			Entity: "cores",
+			Count:  2,
+		}, {
+			Entity: "units",
+			Count:  3,
+		}},
+		SLA: &jujuparams.ModelSLAInfo{
+			Level: "unsupported",
+		},
+	}
+	ms := m.MergeModelSummaryFromController(&modelSummaryFromController, "", "writer")
 	c.Check(ms, qt.DeepEquals, jujuparams.ModelSummary{
 		Name:               "test-model",
 		Type:               "iaas",
@@ -292,6 +248,7 @@ func TestToJujuModelSummary(t *testing.T) {
 		CloudTag:           "cloud-test-cloud",
 		CloudRegion:        "test-region",
 		CloudCredentialTag: "cloudcred-test-cloud_bob@canonical.com_test-cred",
+		UserAccess:         "writer",
 		OwnerTag:           "user-bob@canonical.com",
 		Life:               life.Value(state.Alive.String()),
 		Status: jujuparams.EntityStatus{
@@ -425,20 +382,7 @@ func TestModelFromJujuModelInfo(t *testing.T) {
 			Owner:     *i,
 		},
 		OwnerIdentityName: "bob@canonical.com",
-		Type:              "iaas",
-		IsController:      false,
-		DefaultSeries:     "warty",
 		Life:              state.Alive.String(),
-		Status: dbmodel.Status{
-			Status: "available",
-			Since: sql.NullTime{
-				Time:  now,
-				Valid: true,
-			},
-		},
-		SLA: dbmodel.SLA{
-			Level: "unsupported",
-		},
 	})
 }
 
@@ -463,15 +407,5 @@ func TestModelFromJujuModelUpdate(t *testing.T) {
 	c.Assert(model, qt.DeepEquals, dbmodel.Model{
 		Name: "test-model",
 		Life: state.Alive.String(),
-		Status: dbmodel.Status{
-			Status: "available",
-			Since: sql.NullTime{
-				Time:  now,
-				Valid: true,
-			},
-		},
-		SLA: dbmodel.SLA{
-			Level: "unsupported",
-		},
 	})
 }

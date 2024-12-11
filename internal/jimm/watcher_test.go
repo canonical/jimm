@@ -11,10 +11,7 @@ import (
 	"time"
 
 	qt "github.com/frankban/quicktest"
-	"github.com/juju/juju/core/instance"
-	"github.com/juju/juju/core/life"
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/juju/state"
 
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
@@ -42,16 +39,11 @@ models:
   type: iaas
   uuid: 00000002-0000-0000-0000-000000000001
   controller: controller-1
-  default-series: warty
   cloud: test-cloud
   region: test-cloud-region
   cloud-credential: cred-1
   owner: alice@canonical.com
   life: alive
-  status:
-    status: available
-    info: "OK!"
-    since: 2020-02-20T20:02:20Z
   users:
   - user: alice@canonical.com
     access: admin
@@ -59,14 +51,10 @@ models:
     access: write
   - user: charlie@canonical.com
     access: read
-  sla:
-    level: unsupported
-  agent-version: 1.2.3
 - name: model-2
   type: iaas
   uuid: 00000002-0000-0000-0000-000000000002
   controller: controller-1
-  default-series: warty
   cloud: test-cloud
   region: test-cloud-region
   cloud-credential: cred-1
@@ -76,506 +64,12 @@ models:
   type: iaas
   uuid: 00000002-0000-0000-0000-000000000003
   controller: controller-1
-  default-series: warty
   cloud: test-cloud
   region: test-cloud-region
   cloud-credential: cred-1
   owner: alice@canonical.com
   life: dead
 `
-
-var watcherTests = []struct {
-	name    string
-	initDB  func(*qt.C, *db.Database)
-	deltas  [][]jujuparams.Delta
-	checkDB func(*qt.C, *db.Database)
-}{{
-	name: "AddMachine",
-	deltas: [][]jujuparams.Delta{
-		{{
-			Entity: &jujuparams.MachineInfo{
-				ModelUUID:  "00000002-0000-0000-0000-000000000001",
-				Id:         "2",
-				InstanceId: "machine-2",
-				HardwareCharacteristics: &instance.HardwareCharacteristics{
-					CpuCores: newUint64(2),
-				},
-			},
-		}},
-		nil,
-	},
-	checkDB: func(c *qt.C, db *db.Database) {
-		ctx := context.Background()
-
-		model := dbmodel.Model{
-			UUID: sql.NullString{
-				String: "00000002-0000-0000-0000-000000000001",
-				Valid:  true,
-			},
-		}
-		err := db.GetModel(ctx, &model)
-		c.Assert(err, qt.IsNil)
-
-		c.Check(model.Machines, qt.Equals, int64(1))
-		c.Check(model.Cores, qt.Equals, int64(2))
-	},
-}, {
-	name: "UpdateMachine",
-	deltas: [][]jujuparams.Delta{
-		{{
-			Entity: &jujuparams.MachineInfo{
-				ModelUUID:  "00000002-0000-0000-0000-000000000001",
-				Id:         "0",
-				InstanceId: "machine-0",
-			},
-		}}, {{
-			Entity: &jujuparams.MachineInfo{
-				ModelUUID:  "00000002-0000-0000-0000-000000000001",
-				Id:         "0",
-				InstanceId: "machine-0",
-				HardwareCharacteristics: &instance.HardwareCharacteristics{
-					CpuCores: newUint64(4),
-				},
-			},
-		}},
-		nil,
-	},
-	checkDB: func(c *qt.C, db *db.Database) {
-		ctx := context.Background()
-
-		model := dbmodel.Model{
-			UUID: sql.NullString{
-				String: "00000002-0000-0000-0000-000000000001",
-				Valid:  true,
-			},
-		}
-		err := db.GetModel(ctx, &model)
-		c.Assert(err, qt.IsNil)
-
-		c.Check(model.Machines, qt.Equals, int64(1))
-		c.Check(model.Cores, qt.Equals, int64(4))
-	},
-}, {
-	name: "DeleteMachine",
-	deltas: [][]jujuparams.Delta{
-		{{
-			Entity: &jujuparams.MachineInfo{
-				ModelUUID:  "00000002-0000-0000-0000-000000000001",
-				Id:         "0",
-				InstanceId: "machine-0",
-				HardwareCharacteristics: &instance.HardwareCharacteristics{
-					CpuCores: newUint64(3),
-				},
-			},
-		}}, {{
-			Removed: true,
-			Entity: &jujuparams.MachineInfo{
-				ModelUUID: "00000002-0000-0000-0000-000000000001",
-				Id:        "0",
-			},
-		}},
-		nil,
-	},
-	checkDB: func(c *qt.C, db *db.Database) {
-		ctx := context.Background()
-
-		model := dbmodel.Model{
-			UUID: sql.NullString{
-				String: "00000002-0000-0000-0000-000000000001",
-				Valid:  true,
-			},
-		}
-		err := db.GetModel(ctx, &model)
-		c.Assert(err, qt.IsNil)
-
-		c.Check(model.Machines, qt.Equals, int64(0))
-		c.Check(model.Cores, qt.Equals, int64(0))
-	},
-}, {
-	name: "AddUnit",
-	deltas: [][]jujuparams.Delta{
-		{{
-			Entity: &jujuparams.UnitInfo{
-				ModelUUID: "00000002-0000-0000-0000-000000000001",
-				Name:      "app-1/2",
-			},
-		}},
-		nil,
-	},
-	checkDB: func(c *qt.C, db *db.Database) {
-		ctx := context.Background()
-
-		model := dbmodel.Model{
-			UUID: sql.NullString{
-				String: "00000002-0000-0000-0000-000000000001",
-				Valid:  true,
-			},
-		}
-		err := db.GetModel(ctx, &model)
-		c.Assert(err, qt.IsNil)
-
-		c.Check(model.Units, qt.Equals, int64(1))
-	},
-}, {
-	name: "UpdateUnit",
-	deltas: [][]jujuparams.Delta{
-		{{
-			Entity: &jujuparams.UnitInfo{
-				ModelUUID: "00000002-0000-0000-0000-000000000001",
-				Name:      "app-1/2",
-			},
-		}},
-		{{
-			Entity: &jujuparams.UnitInfo{
-				ModelUUID: "00000002-0000-0000-0000-000000000001",
-				Name:      "app-1/2",
-			},
-		}},
-		nil,
-	},
-	checkDB: func(c *qt.C, db *db.Database) {
-		ctx := context.Background()
-
-		model := dbmodel.Model{
-			UUID: sql.NullString{
-				String: "00000002-0000-0000-0000-000000000001",
-				Valid:  true,
-			},
-		}
-		err := db.GetModel(ctx, &model)
-		c.Assert(err, qt.IsNil)
-
-		c.Check(model.Units, qt.Equals, int64(1))
-	},
-}, {
-	name: "DeleteUnit",
-	deltas: [][]jujuparams.Delta{
-		{{
-			Entity: &jujuparams.UnitInfo{
-				ModelUUID: "00000002-0000-0000-0000-000000000001",
-				Name:      "app-1/0",
-			},
-		}},
-		{{
-			Removed: true,
-			Entity: &jujuparams.UnitInfo{
-				ModelUUID: "00000002-0000-0000-0000-000000000001",
-				Name:      "app-1/0",
-			},
-		}},
-		nil,
-	},
-	checkDB: func(c *qt.C, db *db.Database) {
-		ctx := context.Background()
-
-		model := dbmodel.Model{
-			UUID: sql.NullString{
-				String: "00000002-0000-0000-0000-000000000001",
-				Valid:  true,
-			},
-		}
-		err := db.GetModel(ctx, &model)
-		c.Assert(err, qt.IsNil)
-
-		c.Check(model.Units, qt.Equals, int64(0))
-	},
-}, {
-	name: "UnknownModelsIgnored",
-	deltas: [][]jujuparams.Delta{
-		{{
-			Entity: &jujuparams.ModelUpdate{
-				ModelUUID: "00000002-0000-0000-0000-000000000004",
-				Name:      "new-model",
-				Owner:     "charlie@canonical.com",
-				Life:      "starting",
-			},
-		}},
-		nil,
-	},
-	checkDB: func(c *qt.C, db *db.Database) {
-		ctx := context.Background()
-
-		model := dbmodel.Model{
-			UUID: sql.NullString{
-				String: "00000002-0000-0000-0000-000000000004",
-				Valid:  true,
-			},
-		}
-		err := db.GetModel(ctx, &model)
-		c.Check(err, qt.ErrorMatches, `model not found`)
-		c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
-	},
-}, {
-	name: "UpdateModel",
-	deltas: [][]jujuparams.Delta{
-		{{
-			Entity: &jujuparams.ModelUpdate{
-				ModelUUID:      "00000002-0000-0000-0000-000000000001",
-				Name:           "model-1",
-				Owner:          "alice@canonical.com",
-				Life:           life.Value(state.Alive.String()),
-				ControllerUUID: "00000001-0000-0000-0000-000000000001",
-				Status: jujuparams.StatusInfo{
-					Current: "available",
-					Message: "updated status message",
-					Version: "1.2.3",
-				},
-				SLA: jujuparams.ModelSLAInfo{
-					Level: "1",
-					Owner: "me",
-				},
-			},
-		}},
-		nil,
-	},
-	checkDB: func(c *qt.C, db *db.Database) {
-		ctx := context.Background()
-
-		model := dbmodel.Model{
-			UUID: sql.NullString{
-				String: "00000002-0000-0000-0000-000000000001",
-				Valid:  true,
-			},
-		}
-		err := db.GetModel(ctx, &model)
-		c.Assert(err, qt.IsNil)
-		// zero any uninteresting associations
-		// TODO(mhilton) don't fetch these in the first place.
-		model.Owner = dbmodel.Identity{}
-		model.CloudCredential = dbmodel.CloudCredential{}
-		model.CloudRegion = dbmodel.CloudRegion{}
-		model.Controller = dbmodel.Controller{}
-		c.Check(model, jimmtest.DBObjectEquals, dbmodel.Model{
-			UUID: sql.NullString{
-				String: "00000002-0000-0000-0000-000000000001",
-				Valid:  true,
-			},
-			Name:          "model-1",
-			Type:          "iaas",
-			DefaultSeries: "warty",
-			Life:          state.Alive.String(),
-			Status: dbmodel.Status{
-				Status:  "available",
-				Info:    "updated status message",
-				Version: "1.2.3",
-			},
-			SLA: dbmodel.SLA{
-				Level: "1",
-				Owner: "me",
-			},
-		})
-	},
-}, {
-	name: "DeleteDyingModel",
-	deltas: [][]jujuparams.Delta{
-		{{
-			Removed: true,
-			Entity: &jujuparams.ModelUpdate{
-				ModelUUID: "00000002-0000-0000-0000-000000000002",
-			},
-		}},
-		nil,
-	},
-	checkDB: func(c *qt.C, db *db.Database) {
-		ctx := context.Background()
-
-		model := dbmodel.Model{
-			UUID: sql.NullString{
-				String: "00000002-0000-0000-0000-000000000002",
-				Valid:  true,
-			},
-		}
-		err := db.GetModel(ctx, &model)
-		c.Check(err, qt.ErrorMatches, `model not found`)
-		c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
-	},
-}, {
-	name: "DeleteDeadModel",
-	deltas: [][]jujuparams.Delta{
-		{{
-			Removed: true,
-			Entity: &jujuparams.ModelUpdate{
-				ModelUUID: "00000002-0000-0000-0000-000000000003",
-			},
-		}},
-		nil,
-	},
-	checkDB: func(c *qt.C, db *db.Database) {
-		ctx := context.Background()
-
-		model := dbmodel.Model{
-			UUID: sql.NullString{
-				String: "00000002-0000-0000-0000-000000000003",
-				Valid:  true,
-			},
-		}
-		err := db.GetModel(ctx, &model)
-		c.Check(err, qt.ErrorMatches, `model not found`)
-		c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
-	},
-}, {
-	name: "DeleteLivingModelFails",
-	deltas: [][]jujuparams.Delta{
-		{{
-			Removed: true,
-			Entity: &jujuparams.ModelUpdate{
-				ModelUUID: "00000002-0000-0000-0000-000000000001",
-			},
-		}},
-		nil,
-	},
-	checkDB: func(c *qt.C, db *db.Database) {
-		ctx := context.Background()
-
-		model := dbmodel.Model{
-			UUID: sql.NullString{
-				String: "00000002-0000-0000-0000-000000000001",
-				Valid:  true,
-			},
-		}
-		err := db.GetModel(ctx, &model)
-		c.Assert(err, qt.IsNil)
-		// zero any uninteresting associations
-		// TODO(mhilton) don't fetch these in the first place.
-		model.Owner = dbmodel.Identity{}
-		model.CloudCredential = dbmodel.CloudCredential{}
-		model.CloudRegion = dbmodel.CloudRegion{}
-		model.Controller = dbmodel.Controller{}
-		c.Check(model, jimmtest.DBObjectEquals, dbmodel.Model{
-			UUID: sql.NullString{
-				String: "00000002-0000-0000-0000-000000000001",
-				Valid:  true,
-			},
-			Name:          "model-1",
-			Type:          "iaas",
-			DefaultSeries: "warty",
-			Life:          state.Alive.String(),
-			Status: dbmodel.Status{
-				Status: "available",
-				Info:   "OK!",
-				Since: sql.NullTime{
-					Time:  time.Date(2020, 2, 20, 20, 2, 20, 0, time.UTC),
-					Valid: true,
-				},
-				Version: "1.2.3",
-			},
-			SLA: dbmodel.SLA{
-				Level: "unsupported",
-			},
-		})
-	},
-}}
-
-//nolint:gocognit
-func TestWatcher(t *testing.T) {
-	c := qt.New(t)
-
-	for _, test := range watcherTests {
-		c.Run(test.name, func(c *qt.C) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			nextC := make(chan []jujuparams.Delta, len(test.deltas))
-			var stopped uint32
-
-			deltaProcessedChannel := make(chan bool, len(test.deltas))
-
-			w := jimm.NewWatcherWithDeltaProcessedChannel(
-				&db.Database{
-					DB: jimmtest.PostgresDB(c, nil),
-				},
-				&jimmtest.Dialer{
-					API: &jimmtest.API{
-						AllModelWatcherNext_: func(ctx context.Context, id string) ([]jujuparams.Delta, error) {
-							if id != test.name {
-								return nil, errors.E("incorrect id")
-							}
-
-							select {
-							case <-ctx.Done():
-								return nil, ctx.Err()
-							case d, ok := <-nextC:
-								c.Logf("AllModelWatcherNext received %#v, %v", d, ok)
-								if ok {
-									return d, nil
-								}
-								cancel()
-								<-ctx.Done()
-								return nil, ctx.Err()
-							}
-						},
-						AllModelWatcherStop_: func(ctx context.Context, id string) error {
-							if id != test.name {
-								return errors.E("incorrect id")
-							}
-							atomic.StoreUint32(&stopped, 1)
-							return nil
-						},
-						WatchAllModels_: func(context.Context) (string, error) {
-							return test.name, nil
-						},
-						ModelInfo_: func(_ context.Context, info *jujuparams.ModelInfo) error {
-							switch info.UUID {
-							case "00000002-0000-0000-0000-000000000002":
-								return errors.E(errors.CodeNotFound)
-							case "00000002-0000-0000-0000-000000000003":
-								return errors.E(errors.CodeUnauthorized)
-							default:
-								c.Errorf("unexpected model uuid: %s", info.UUID)
-								return errors.E("unexpected API call")
-							}
-
-						},
-					},
-				},
-				nil,
-				deltaProcessedChannel,
-			)
-
-			env := jimmtest.ParseEnvironment(c, testWatcherEnv)
-			err := w.Database.Migrate(ctx, false)
-			c.Assert(err, qt.IsNil)
-			env.PopulateDB(c, w.Database)
-
-			if test.initDB != nil {
-				test.initDB(c, w.Database)
-			}
-
-			var wg sync.WaitGroup
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				err := w.Watch(ctx, time.Millisecond)
-				checkIfContextCanceled(c, ctx, err)
-			}()
-
-			validDeltas := 0
-			for _, d := range test.deltas {
-				select {
-				case nextC <- d:
-					if d != nil {
-						validDeltas++
-					}
-				case <-ctx.Done():
-					c.Fatal("context closed prematurely")
-				}
-			}
-
-			for i := 0; i < validDeltas; i++ {
-				select {
-				case <-deltaProcessedChannel:
-				case <-ctx.Done():
-					c.Fatal("context closed prematurely")
-				}
-			}
-
-			close(nextC)
-			wg.Wait()
-
-			test.checkDB(c, w.Database)
-		})
-	}
-}
 
 var modelSummaryWatcherTests = []struct {
 	name           string
@@ -747,7 +241,7 @@ func TestWatcherSetsControllerUnavailable(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		err := w.Watch(ctx, time.Millisecond)
+		err := w.WatchAllModelSummaries(ctx, time.Millisecond)
 		checkIfContextCanceled(c, ctx, err)
 	}()
 
@@ -779,7 +273,7 @@ func TestWatcherClearsControllerUnavailable(t *testing.T) {
 		},
 		Dialer: &jimmtest.Dialer{
 			API: &jimmtest.API{
-				AllModelWatcherNext_: func(_ context.Context, _ string) ([]jujuparams.Delta, error) {
+				ModelSummaryWatcherNext_: func(ctx context.Context, s string) ([]jujuparams.ModelAbstract, error) {
 					cancel()
 					<-ctx.Done()
 					return nil, ctx.Err()
@@ -793,9 +287,10 @@ func TestWatcherClearsControllerUnavailable(t *testing.T) {
 					}
 					return errors.E(errors.CodeNotFound)
 				},
-				WatchAllModels_: func(ctx context.Context) (string, error) {
+				WatchAllModelSummaries_: func(ctx context.Context) (string, error) {
 					return "1234", nil
 				},
+				SupportsModelSummaryWatcher_: true,
 			},
 		},
 		Pubsub: &testPublisher{},
@@ -824,7 +319,7 @@ func TestWatcherClearsControllerUnavailable(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		err := w.Watch(ctx, time.Millisecond)
+		err := w.WatchAllModelSummaries(ctx, time.Millisecond)
 		checkIfContextCanceled(c, ctx, err)
 	}()
 	wg.Wait()
@@ -836,206 +331,6 @@ func TestWatcherClearsControllerUnavailable(t *testing.T) {
 	err = w.Database.GetController(context.Background(), &ctl)
 	c.Assert(err, qt.IsNil)
 	c.Assert(ctl.UnavailableSince.Valid, qt.IsFalse)
-}
-
-func TestWatcherRemoveDyingModelsOnStartup(t *testing.T) {
-	c := qt.New(t)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	w := &jimm.Watcher{
-		Pubsub: &testPublisher{},
-		Database: &db.Database{
-			DB: jimmtest.PostgresDB(c, nil),
-		},
-		Dialer: &jimmtest.Dialer{
-			API: &jimmtest.API{
-				AllModelWatcherNext_: func(_ context.Context, _ string) ([]jujuparams.Delta, error) {
-					cancel()
-					<-ctx.Done()
-					return nil, ctx.Err()
-				},
-				ModelInfo_: func(_ context.Context, info *jujuparams.ModelInfo) error {
-					switch info.UUID {
-					default:
-						c.Errorf("unexpected model uuid: %s", info.UUID)
-					case "00000002-0000-0000-0000-000000000002":
-					case "00000002-0000-0000-0000-000000000003":
-					}
-					return errors.E(errors.CodeNotFound)
-				},
-				WatchAllModels_: func(ctx context.Context) (string, error) {
-					return "1234", nil
-				},
-			},
-		},
-	}
-	env := jimmtest.ParseEnvironment(c, testWatcherEnv)
-	err := w.Database.Migrate(ctx, false)
-	c.Assert(err, qt.IsNil)
-	env.PopulateDB(c, w.Database)
-
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		err := w.Watch(ctx, time.Millisecond)
-		checkIfContextCanceled(c, ctx, err)
-	}()
-	wg.Wait()
-
-	m := dbmodel.Model{
-		UUID: sql.NullString{
-			String: "00000002-0000-0000-0000-000000000002",
-			Valid:  true,
-		},
-	}
-	err = w.Database.GetModel(context.Background(), &m)
-	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
-}
-
-const testWatcherIgnoreDeltasForModelsFromIncorrectControllerEnv = `clouds:
-- name: test-cloud
-  type: test-provider
-  regions:
-  - name: test-cloud-region
-cloud-credentials:
-- owner: alice@canonical.com
-  name: cred-1
-  cloud: test-cloud
-controllers:
-- name: controller-1
-  uuid: 00000001-0000-0000-0000-000000000001
-  cloud: test-cloud
-  region: test-cloud-region
-- name: controller-2
-  uuid: 00000001-0000-0000-0000-000000000002
-  cloud: test-cloud
-  region: test-cloud-region
-models:
-- name: model-1
-  type: iaas
-  uuid: 00000002-0000-0000-0000-000000000001
-  controller: controller-1
-  default-series: warty
-  cloud: test-cloud
-  region: test-cloud-region
-  cloud-credential: cred-1
-  owner: alice@canonical.com
-  life: alive
-`
-
-func TestWatcherIgnoreDeltasForModelsFromIncorrectController(t *testing.T) {
-	c := qt.New(t)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	nextC := make(chan []jujuparams.Delta)
-	w := &jimm.Watcher{
-		Pubsub: &testPublisher{},
-		Database: &db.Database{
-			DB: jimmtest.PostgresDB(c, nil),
-		},
-		Dialer: jimmtest.DialerMap{
-			"controller-1": &jimmtest.Dialer{
-				API: &jimmtest.API{
-					AllModelWatcherNext_: func(_ context.Context, _ string) ([]jujuparams.Delta, error) {
-						<-ctx.Done()
-						return nil, ctx.Err()
-					},
-					WatchAllModels_: func(ctx context.Context) (string, error) {
-						return "1234", nil
-					},
-				},
-			},
-			"controller-2": &jimmtest.Dialer{
-				API: &jimmtest.API{
-					AllModelWatcherNext_: func(_ context.Context, _ string) ([]jujuparams.Delta, error) {
-						select {
-						case <-ctx.Done():
-							return nil, ctx.Err()
-						case d, ok := <-nextC:
-							if ok {
-								return d, nil
-							}
-							cancel()
-							<-ctx.Done()
-							return nil, ctx.Err()
-						}
-
-					},
-					WatchAllModels_: func(ctx context.Context) (string, error) {
-						return "1234", nil
-					},
-				},
-			},
-		},
-	}
-	env := jimmtest.ParseEnvironment(c, testWatcherIgnoreDeltasForModelsFromIncorrectControllerEnv)
-	err := w.Database.Migrate(ctx, false)
-	c.Assert(err, qt.IsNil)
-	env.PopulateDB(c, w.Database)
-
-	m1 := dbmodel.Model{
-		UUID: sql.NullString{
-			String: "00000002-0000-0000-0000-000000000001",
-			Valid:  true,
-		},
-	}
-	err = w.Database.GetModel(context.Background(), &m1)
-	c.Assert(err, qt.IsNil)
-
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		err := w.Watch(ctx, time.Millisecond)
-		checkIfContextCanceled(c, ctx, err)
-	}()
-
-	nextC <- []jujuparams.Delta{{
-		Entity: &jujuparams.ModelUpdate{
-			ModelUUID: "00000002-0000-0000-0000-000000000001",
-			Name:      "model-1",
-			Owner:     "alice@canonical.com",
-			Life:      life.Value(state.Alive.String()),
-			Status: jujuparams.StatusInfo{
-				Current: "busy",
-			},
-		},
-	}}
-	nextC <- []jujuparams.Delta{{
-		Entity: &jujuparams.MachineInfo{
-			ModelUUID: "00000002-0000-0000-0000-000000000001",
-			Id:        "0",
-		},
-	}}
-	nextC <- []jujuparams.Delta{{
-		Entity: &jujuparams.ApplicationInfo{
-			ModelUUID: "00000002-0000-0000-0000-000000000001",
-			Name:      "app-1",
-		},
-	}}
-	nextC <- []jujuparams.Delta{{
-		Entity: &jujuparams.UnitInfo{
-			ModelUUID: "00000002-0000-0000-0000-000000000001",
-			Name:      "app-1/0",
-		},
-	}}
-	close(nextC)
-
-	wg.Wait()
-	m2 := dbmodel.Model{
-		UUID: sql.NullString{
-			String: "00000002-0000-0000-0000-000000000001",
-			Valid:  true,
-		},
-	}
-	err = w.Database.GetModel(context.Background(), &m2)
-	c.Assert(err, qt.IsNil)
-	c.Check(m2, qt.DeepEquals, m1)
 }
 
 func checkIfContextCanceled(c *qt.C, ctx context.Context, err error) {
@@ -1063,8 +358,4 @@ func (p *testPublisher) Publish(model string, content interface{}) <-chan struct
 	done := make(chan struct{})
 	close(done)
 	return done
-}
-
-func newUint64(i uint64) *uint64 {
-	return &i
 }

@@ -10,7 +10,6 @@ import (
 	"os"
 	"sort"
 	"strings"
-	"time"
 
 	petname "github.com/dustinkirkland/golang-petname"
 	"github.com/google/uuid"
@@ -542,13 +541,6 @@ func (s *relationSuite) TestCheckRelationViaSuperuser(c *gc.C) {
 		CloudRegionID:     cloud.Regions[0].ID,
 		CloudCredentialID: cred.ID,
 		Life:              "alive",
-		Status: dbmodel.Status{
-			Status: "available",
-			Since: sql.NullTime{
-				Time:  time.Now().UTC().Truncate(time.Millisecond),
-				Valid: true,
-			},
-		},
 	}
 
 	err = db.AddModel(ctx, &model)

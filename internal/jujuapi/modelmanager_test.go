@@ -44,17 +44,17 @@ var _ = gc.Suite(&modelManagerSuite{})
 func (s *modelManagerSuite) TestListModelSummaries(c *gc.C) {
 	conn := s.open(c, nil, "bob")
 	defer conn.Close()
-
 	// Add some machines and units to test the counts.
-	s.Model.Machines = 1
-	s.Model.Cores = 2
-	s.Model.Units = 1
 	ctx := context.Background()
 	err := s.JIMM.Database.UpdateModel(ctx, s.Model)
 	c.Assert(err, gc.Equals, nil)
-
+	stateMachine1, err := s.StatePool.Get(s.Model.Tag().Id())
+	c.Assert(err, gc.Equals, nil)
+	f := factory.NewFactory(stateMachine1.State, s.StatePool)
+	f.MakeMachine(c, &factory.MachineParams{})
+	f.MakeUnit(c, &factory.UnitParams{})
 	client := modelmanager.NewClient(conn)
-	models, err := client.ListModelSummaries("bob@canonical.com", false)
+	models, err := client.ListModelSummaries("bob@canonical.com", true)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(models, jimmtest.CmpEquals(
 		cmpopts.IgnoreTypes(&time.Time{}),
@@ -79,9 +79,6 @@ func (s *modelManagerSuite) TestListModelSummaries(c *gc.C) {
 		ModelUserAccess: "admin",
 		Counts: []base.EntityCount{{
 			Entity: "machines",
-			Count:  1,
-		}, {
-			Entity: "cores",
 			Count:  2,
 		}, {
 			Entity: "units",
@@ -90,7 +87,8 @@ func (s *modelManagerSuite) TestListModelSummaries(c *gc.C) {
 		AgentVersion: &jujuversion.Current,
 		Type:         "iaas",
 		SLA: &base.SLASummary{
-			Level: "unsupported",
+			Level: "",
+			Owner: "bob@canonical.com",
 		},
 	}, {
 		Name:            "model-3",
@@ -108,20 +106,12 @@ func (s *modelManagerSuite) TestListModelSummaries(c *gc.C) {
 			Data:   map[string]interface{}{},
 		},
 		ModelUserAccess: "read",
-		Counts: []base.EntityCount{{
-			Entity: "machines",
-			Count:  0,
-		}, {
-			Entity: "cores",
-			Count:  0,
-		}, {
-			Entity: "units",
-			Count:  0,
-		}},
-		AgentVersion: &jujuversion.Current,
-		Type:         "iaas",
+		Counts:          []base.EntityCount{},
+		AgentVersion:    &jujuversion.Current,
+		Type:            "iaas",
 		SLA: &base.SLASummary{
-			Level: "unsupported",
+			Level: "",
+			Owner: "charlie@canonical.com",
 		},
 	}})
 }
@@ -131,7 +121,14 @@ func (s *modelManagerSuite) TestListModelSummariesWithoutControllerUUIDMasking(c
 	defer conn1.Close()
 	err := conn1.APICall("JIMM", 4, "", "DisableControllerUUIDMasking", nil, nil)
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
-
+	stateMachine3, err := s.StatePool.Get(s.Model3.Tag().Id())
+	c.Assert(err, gc.Equals, nil)
+	f := factory.NewFactory(stateMachine3.State, s.StatePool)
+	f.MakeMachine(c, &factory.MachineParams{
+		Characteristics: &instance.HardwareCharacteristics{
+			Arch: newString("bbc-micro"),
+		},
+	})
 	s.AddAdminUser(c, "adam@canonical.com")
 
 	// we need to make bob jimm admin to disable controller UUID masking
@@ -162,7 +159,7 @@ func (s *modelManagerSuite) TestListModelSummariesWithoutControllerUUIDMasking(c
 	c.Assert(err, gc.Equals, nil)
 
 	client := modelmanager.NewClient(conn)
-	models, err := client.ListModelSummaries("bob", false)
+	models, err := client.ListModelSummaries("bob@canonical.com", false)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(models, jimmtest.CmpEquals(
 		cmpopts.IgnoreTypes(&time.Time{}),
@@ -185,20 +182,12 @@ func (s *modelManagerSuite) TestListModelSummariesWithoutControllerUUIDMasking(c
 			Data:   map[string]interface{}{},
 		},
 		ModelUserAccess: "admin",
-		Counts: []base.EntityCount{{
-			Entity: "machines",
-			Count:  0,
-		}, {
-			Entity: "cores",
-			Count:  0,
-		}, {
-			Entity: "units",
-			Count:  0,
-		}},
-		AgentVersion: &jujuversion.Current,
-		Type:         "iaas",
+		Counts:          []base.EntityCount{},
+		AgentVersion:    &jujuversion.Current,
+		Type:            "iaas",
 		SLA: &base.SLASummary{
-			Level: "unsupported",
+			Level: "",
+			Owner: "bob@canonical.com",
 		},
 	}, {
 		Name:            "model-3",
@@ -216,20 +205,17 @@ func (s *modelManagerSuite) TestListModelSummariesWithoutControllerUUIDMasking(c
 			Data:   map[string]interface{}{},
 		},
 		ModelUserAccess: "read",
-		Counts: []base.EntityCount{{
-			Entity: "machines",
-			Count:  0,
-		}, {
-			Entity: "cores",
-			Count:  0,
-		}, {
-			Entity: "units",
-			Count:  0,
-		}},
+		Counts: []base.EntityCount{
+			{
+				Entity: "machines",
+				Count:  1,
+			},
+		},
 		AgentVersion: &jujuversion.Current,
 		Type:         "iaas",
 		SLA: &base.SLASummary{
-			Level: "unsupported",
+			Level: "",
+			Owner: "charlie@canonical.com",
 		},
 	}})
 }
@@ -303,7 +289,6 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 	conn := s.open(c, nil, "bob")
 	defer conn.Close()
 	client := modelmanager.NewClient(conn)
-
 	models, err := client.ModelInfo([]names.ModelTag{
 		s.Model.ResourceTag(),
 		s.Model2.ResourceTag(),

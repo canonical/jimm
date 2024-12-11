@@ -5,7 +5,6 @@ package jujuapi_test
 import (
 	"context"
 	"database/sql"
-	"time"
 
 	petname "github.com/dustinkirkland/golang-petname"
 	"github.com/google/uuid"
@@ -1517,13 +1516,6 @@ func createTestControllerEnvironment(ctx context.Context, c *gc.C, s *accessCont
 		CloudRegionID:     cloud.Regions[0].ID,
 		CloudCredentialID: cred.ID,
 		Life:              state.Alive.String(),
-		Status: dbmodel.Status{
-			Status: "available",
-			Since: sql.NullTime{
-				Time:  time.Now().UTC().Truncate(time.Millisecond),
-				Valid: true,
-			},
-		},
 	}
 
 	err = db.AddModel(ctx, &model)

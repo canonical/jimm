@@ -71,6 +71,7 @@ type ModelManager interface {
 	ImportModel(ctx context.Context, user *openfga.User, controllerName string, modelTag names.ModelTag, newOwner string) error
 	ModelDefaultsForCloud(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag) (jujuparams.ModelDefaultsResult, error)
 	ModelInfo(ctx context.Context, u *openfga.User, mt names.ModelTag) (*jujuparams.ModelInfo, error)
+	ModelSummaries(ctx context.Context, user *openfga.User, maskingControllerUUID string) (jujuparams.ModelSummaryResults, error)
 	ModelStatus(ctx context.Context, u *openfga.User, mt names.ModelTag) (*jujuparams.ModelStatus, error)
 	QueryModelsJq(ctx context.Context, models []string, jqQuery string) (params.CrossModelQueryResponse, error)
 	SetModelDefaults(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag, region string, configs map[string]interface{}) error
@@ -108,27 +109,16 @@ func (r *controllerRoot) DumpModels(ctx context.Context, args jujuparams.DumpMod
 // authenticated user has access to. The request parameter is ignored.
 func (r *controllerRoot) ListModelSummaries(ctx context.Context, _ jujuparams.ModelSummariesRequest) (jujuparams.ModelSummaryResults, error) {
 	const op = errors.Op("jujuapi.ListModelSummaries")
-
-	var results []jujuparams.ModelSummaryResult
-	err := r.jimm.ForEachUserModel(ctx, r.user, func(m *dbmodel.Model, access jujuparams.UserAccessPermission) error {
-		// TODO(Kian) CSS-6040 Refactor the below to use a better abstraction for Postgres/OpenFGA to Juju types.
-		ms := m.ToJujuModelSummary()
-		ms.UserAccess = access
-		if r.controllerUUIDMasking {
-			ms.ControllerUUID = r.params.ControllerUUID
-		}
-		result := jujuparams.ModelSummaryResult{
-			Result: &ms,
-		}
-		results = append(results, result)
-		return nil
-	})
+	maskingControllerUUID := ""
+	if r.controllerUUIDMasking {
+		maskingControllerUUID = r.params.ControllerUUID
+	}
+	res, err := r.jimm.ModelSummaries(ctx, r.user, maskingControllerUUID)
 	if err != nil {
 		return jujuparams.ModelSummaryResults{}, errors.E(op, err)
 	}
-	return jujuparams.ModelSummaryResults{
-		Results: results,
-	}, nil
+
+	return res, nil
 }
 
 // ListModels returns the models that the authenticated user
