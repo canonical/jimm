@@ -3,7 +3,6 @@
     "go.lintFlags": [
         "--fast"
     ],
-    "go.lintOnSave": "workspace",
     "go.testEnvVars": {
         "JIMM_TEST_LOG_SQL": "false",
         "TEST_LOGGING_CONFIG": "ERROR" // this is the logging level for juju connsuite logs
