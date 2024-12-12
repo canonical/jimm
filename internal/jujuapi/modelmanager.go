@@ -71,7 +71,7 @@ type ModelManager interface {
 	ImportModel(ctx context.Context, user *openfga.User, controllerName string, modelTag names.ModelTag, newOwner string) error
 	ModelDefaultsForCloud(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag) (jujuparams.ModelDefaultsResult, error)
 	ModelInfo(ctx context.Context, u *openfga.User, mt names.ModelTag) (*jujuparams.ModelInfo, error)
-	ModelSummaries(ctx context.Context, user *openfga.User, maskingControllerUUID string) (jujuparams.ModelSummaryResults, error)
+	ListModelSummaries(ctx context.Context, user *openfga.User, maskingControllerUUID string) (jujuparams.ModelSummaryResults, error)
 	ModelStatus(ctx context.Context, u *openfga.User, mt names.ModelTag) (*jujuparams.ModelStatus, error)
 	QueryModelsJq(ctx context.Context, models []string, jqQuery string) (params.CrossModelQueryResponse, error)
 	SetModelDefaults(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag, region string, configs map[string]interface{}) error
@@ -113,7 +113,7 @@ func (r *controllerRoot) ListModelSummaries(ctx context.Context, _ jujuparams.Mo
 	if r.controllerUUIDMasking {
 		maskingControllerUUID = r.params.ControllerUUID
 	}
-	res, err := r.jimm.ModelSummaries(ctx, r.user, maskingControllerUUID)
+	res, err := r.jimm.ListModelSummaries(ctx, r.user, maskingControllerUUID)
 	if err != nil {
 		return jujuparams.ModelSummaryResults{}, errors.E(op, err)
 	}

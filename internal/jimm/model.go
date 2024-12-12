@@ -761,10 +761,10 @@ func (m *modelSummariesMap) addModelSummary(summary jujuparams.ModelSummaryResul
 	m.modelSummaries[summary.Result.UUID] = summary
 }
 
-// ModelSummaries returns the list of modelsummary the user has access to.
+// ListModelSummaries returns the list of modelsummary the user has access to.
 // It queries the controllers and then merge the info from the JIMM db.
-func (j *JIMM) ModelSummaries(ctx context.Context, user *openfga.User, maskingControllerUUID string) (jujuparams.ModelSummaryResults, error) {
-	const op = errors.Op("jimm.ModelSummaries")
+func (j *JIMM) ListModelSummaries(ctx context.Context, user *openfga.User, maskingControllerUUID string) (jujuparams.ModelSummaryResults, error) {
+	const op = errors.Op("jimm.ListModelSummaries")
 
 	modelSummariesSafeMap := modelSummariesMap{}
 	modelSummaryResults := []jujuparams.ModelSummaryResult{}
@@ -1147,10 +1147,10 @@ func (j *JIMM) RevokeModelAccess(ctx context.Context, user *openfga.User, mt nam
 		return errors.E(op, errors.CodeBadRequest, fmt.Sprintf("failed to recognize given access: %q", access), err)
 	}
 
-	requiredAccess := "admin"
+	requiredAccess := ofganames.AdministratorRelation
 	if user.Tag() == ut {
 		// If the user is attempting to revoke their own access.
-		requiredAccess = "read"
+		requiredAccess = ofganames.ReaderRelation
 	}
 
 	err = j.doModel(ctx, user, mt, requiredAccess, func(_ *dbmodel.Model, _ API) error {
@@ -1326,7 +1326,7 @@ func (j *JIMM) ValidateModelUpgrade(ctx context.Context, user *openfga.User, mt 
 // returned from the dial operation. If the given function returns an error
 // that error will be returned with the code unmasked.
 func (j *JIMM) doModelAdmin(ctx context.Context, user *openfga.User, mt names.ModelTag, f func(*dbmodel.Model, API) error) error {
-	return j.doModel(ctx, user, mt, "admin", f)
+	return j.doModel(ctx, user, mt, ofganames.AdministratorRelation, f)
 }
 
 // GetUserModelAccess returns the access level a user has against a specific model.
@@ -1335,7 +1335,7 @@ func (j *JIMM) GetUserModelAccess(ctx context.Context, user *openfga.User, model
 	return ToModelAccessString(accessLevel), nil
 }
 
-func (j *JIMM) doModel(ctx context.Context, user *openfga.User, mt names.ModelTag, access string, f func(*dbmodel.Model, API) error) error {
+func (j *JIMM) doModel(ctx context.Context, user *openfga.User, mt names.ModelTag, requireRelation openfga.Relation, f func(*dbmodel.Model, API) error) error {
 	const op = errors.Op("jimm.doModel")
 	zapctx.Info(ctx, string(op))
 
@@ -1346,11 +1346,12 @@ func (j *JIMM) doModel(ctx context.Context, user *openfga.User, mt names.ModelTa
 		return errors.E(op, err)
 	}
 
-	accessLevel, err := j.GetUserModelAccess(ctx, user, mt)
+	hasAccess, err := user.HasModelRelation(ctx, mt, requireRelation)
 	if err != nil {
 		return errors.E(op, err)
 	}
-	if !allowedModelAccess[access][accessLevel] {
+
+	if !hasAccess {
 		// If the user doesn't have correct access on the model return
 		// an unauthorized error.
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
@@ -1365,21 +1366,6 @@ func (j *JIMM) doModel(ctx context.Context, user *openfga.User, mt names.ModelTa
 		return errors.E(op, err)
 	}
 	return nil
-}
-
-var allowedModelAccess = map[string]map[string]bool{
-	"admin": {
-		"admin": true,
-	},
-	"write": {
-		"admin": true,
-		"write": true,
-	},
-	"read": {
-		"admin": true,
-		"write": true,
-		"read":  true,
-	},
 }
 
 // ChangeModelCredential changes the credential used with a model on both

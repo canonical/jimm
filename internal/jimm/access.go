@@ -23,6 +23,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/jimmjwx"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
+	"github.com/canonical/jimm/v3/internal/servermon"
 	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
 
@@ -723,10 +724,13 @@ func (j *JIMM) parseAndValidateTag(ctx context.Context, key string) (*ofganames.
 //
 // This approach to cleaning up tuples is intended to be temporary while we implement
 // a better approach to eventual consistency of JIMM's database objects and OpenFGA tuples.
-func (j *JIMM) OpenFGACleanup(ctx context.Context) error {
+func (j *JIMM) OpenFGACleanup(ctx context.Context) (err error) {
+	const op = errors.Op("jimm.CleanupDyingModels")
+	zapctx.Info(ctx, string(op))
+	durationObserver := servermon.DurationObserver(servermon.JimmMethodsDurationHistogram, string(op))
+	defer durationObserver()
 	var (
 		continuationToken string
-		err               error
 		tuples            []ofga.Tuple
 	)
 	for {

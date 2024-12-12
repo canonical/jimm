@@ -79,6 +79,15 @@ func (u *User) IsModelWriter(ctx context.Context, resource names.ModelTag) (bool
 	return isWriter, nil
 }
 
+// HasModelRelation returns true if user has the specified relation to the model.
+func (u *User) HasModelRelation(ctx context.Context, resource names.ModelTag, relation Relation) (bool, error) {
+	hasRelation, err := checkRelation(ctx, u, resource, relation)
+	if err != nil {
+		return false, errors.E(err)
+	}
+	return hasRelation, nil
+}
+
 // IsServiceAccountAdmin returns true if the user has administrator relation to the service account.
 func (u *User) IsServiceAccountAdmin(ctx context.Context, clientID jimmnames.ServiceAccountTag) (bool, error) {
 	isAdmin, err := checkRelation(ctx, u, clientID, ofganames.AdministratorRelation)

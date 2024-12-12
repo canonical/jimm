@@ -133,6 +133,18 @@ func (s *userTestSuite) TestModelAccess(c *gc.C) {
 	allowed, err = adamUser.IsModelWriter(ctx, model)
 	c.Assert(err, gc.IsNil)
 	c.Assert(allowed, gc.Equals, false)
+
+	allowed, err = eveUser.HasModelRelation(ctx, model, ofganames.ReaderRelation)
+	c.Assert(err, gc.IsNil)
+	c.Assert(allowed, gc.Equals, true)
+
+	allowed, err = eveUser.HasModelRelation(ctx, model, ofganames.AdministratorRelation)
+	c.Assert(err, gc.IsNil)
+	c.Assert(allowed, gc.Equals, true)
+
+	allowed, err = adamUser.HasModelRelation(ctx, model, ofganames.ReaderRelation)
+	c.Assert(err, gc.IsNil)
+	c.Assert(allowed, gc.Equals, false)
 }
 
 func (s *userTestSuite) TestSetModelAccess(c *gc.C) {
