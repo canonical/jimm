@@ -31,6 +31,13 @@ var (
 		Help:      "Histogram of database query time in seconds",
 		Buckets:   []float64{.005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10},
 	}, []string{"method"})
+	JimmMethodsDurationHistogram = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Namespace: "jimm",
+		Subsystem: "jimm",
+		Name:      "op_duration_seconds",
+		Help:      "Histogram of jimm operations time in seconds",
+		Buckets:   []float64{.005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10},
+	}, []string{"method"})
 	DBQueryErrorCount = promauto.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "jimm",
 		Subsystem: "db",
@@ -101,12 +108,6 @@ var (
 		Name:      "models_created_fail_total",
 		Help:      "The number of fails attempting to create models.",
 	})
-	MonitorDeltasReceivedCount = promauto.NewCounterVec(prometheus.CounterOpts{
-		Namespace: "jimm",
-		Subsystem: "monitor",
-		Name:      "deltas_received_total",
-		Help:      "The number of watcher deltas received.",
-	}, []string{"controller"})
 	MonitorErrorsCount = promauto.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "jimm",
 		Subsystem: "monitor",

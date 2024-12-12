@@ -17,6 +17,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/jimm"
 	"github.com/canonical/jimm/v3/internal/jujuapi/rpc"
 	"github.com/canonical/jimm/v3/internal/openfga"
+	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 )
 
 func init() {
@@ -276,30 +277,18 @@ func collapseUpdateCredentialResults(args jujuparams.TaggedCredentials, updateRe
 	return results
 }
 
-func userModelAccess(ctx context.Context, user *openfga.User, model names.ModelTag) (string, error) {
-	isModelAdmin, err := openfga.IsAdministrator(ctx, user, model)
-	if err != nil {
-		return "", errors.E(err)
+func userModelAccess(ctx context.Context, user *openfga.User, model names.ModelTag) string {
+	userRelation := user.GetModelAccess(ctx, model)
+	switch userRelation {
+	case ofganames.AdministratorRelation:
+		return "admin"
+	case ofganames.WriterRelation:
+		return "write"
+	case ofganames.ReaderRelation:
+		return "read"
+	default:
+		return ""
 	}
-	if isModelAdmin {
-		return "admin", nil
-	}
-	hasWriteAccess, err := user.IsModelWriter(ctx, model)
-	if err != nil {
-		return "", errors.E(err)
-	}
-	if hasWriteAccess {
-		return "write", nil
-	}
-	hasReadAccess, err := user.IsModelReader(ctx, model)
-	if err != nil {
-		return "", errors.E(err)
-	}
-	if hasReadAccess {
-		return "read", nil
-	}
-
-	return "", nil
 }
 
 // CredentialContents implements the CredentialContents method of the Cloud (v5) facade.
@@ -326,13 +315,9 @@ func getIdentityCredentials(ctx context.Context, user *openfga.User, j JIMM, arg
 		}
 		mas := make([]jujuparams.ModelAccess, len(c.Models))
 		for i, m := range c.Models {
-			userModelAccess, err := userModelAccess(ctx, user, m.ResourceTag())
-			if err != nil {
-				return nil, errors.E(err)
-			}
 			mas[i] = jujuparams.ModelAccess{
 				Model:  m.Name,
-				Access: userModelAccess,
+				Access: userModelAccess(ctx, user, m.ResourceTag()),
 			}
 		}
 		return &jujuparams.ControllerCredentialInfo{

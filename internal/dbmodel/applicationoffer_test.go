@@ -43,9 +43,6 @@ func TestApplicationOfferUniqueConstraint(t *testing.T) {
 		Controller:      ctl,
 		CloudRegion:     cl.Regions[0],
 		CloudCredential: cred,
-		Type:            "iaas",
-		IsController:    false,
-		DefaultSeries:   "warty",
 		Life:            state.Alive.String(),
 	}
 	c.Assert(db.Create(&m).Error, qt.IsNil)

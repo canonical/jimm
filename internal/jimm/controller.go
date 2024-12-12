@@ -629,52 +629,6 @@ func (j *JIMM) ImportModel(ctx context.Context, user *openfga.User, controllerNa
 		return errors.E(op, err)
 	}
 
-	return importer.handleModelDeltas(ctx)
-}
-
-func (m *modelImporter) handleModelDeltas(ctx context.Context) error {
-	const op = errors.Op("jimm.getModelDeltas")
-
-	modelAPI, err := m.jimm.dialModel(ctx, &m.model.Controller, m.model.ResourceTag())
-	if err != nil {
-		return errors.E(op, err)
-	}
-	defer modelAPI.Close()
-
-	watcherID, err := modelAPI.WatchAll(ctx)
-	if err != nil {
-		return errors.E(op, err)
-	}
-	defer func() {
-		if err := modelAPI.ModelWatcherStop(ctx, watcherID); err != nil {
-			zapctx.Error(ctx, "failed to stop model watcher", zap.Error(err))
-		}
-	}()
-
-	deltas, err := modelAPI.ModelWatcherNext(ctx, watcherID)
-	if err != nil {
-		return errors.E(op, err)
-	}
-
-	modelIDf := func(uuid string) *modelState {
-		if uuid == m.model.UUID.String {
-			return &modelState{
-				id:       m.model.ID,
-				machines: make(map[string]int64),
-				units:    make(map[string]bool),
-			}
-		}
-		return nil
-	}
-
-	w := &Watcher{
-		Database: m.jimm.Database,
-	}
-	for _, d := range deltas {
-		if err := w.handleDelta(ctx, modelIDf, d); err != nil {
-			return errors.E(op, err)
-		}
-	}
 	return nil
 }
 

@@ -2121,19 +2121,13 @@ controllers:
   region: test-cloud-region
 models:
 - name: model-1
-  type: iaas
   uuid: 00000002-0000-0000-0000-000000000001
   controller: controller-1
-  default-series: warty
   cloud: test-cloud
   region: test-cloud-region
   cloud-credential: cred-1
   owner: bob@canonical.com
   life: alive
-  status:
-    status: available
-    info: "OK!"
-    since: 2020-02-20T20:02:20Z
   users:
   - user: alice@canonical.com
     access: admin
@@ -2141,23 +2135,14 @@ models:
     access: admin
   - user: charlie@canonical.com
     access: read
-  sla:
-    level: unsupported
-  agent-version: 1.2.3
 - name: model-2
-  type: iaas
   uuid: 00000002-0000-0000-0000-000000000002
   controller: controller-1
-  default-series: warty
   cloud: test-cloud
   region: test-cloud-region
   cloud-credential: cred-1
   owner: alice@canonical.com
   life: alive
-  status:
-    status: available
-    info: "OK!"
-    since: 2020-02-20T20:02:20Z
   users:
   - user: alice@canonical.com
     access: admin
@@ -2165,9 +2150,6 @@ models:
     access: write
   - user: charlie@canonical.com
     access: read
-  sla:
-    level: unsupported
-  agent-version: 1.2.3
 application-offers:
 - name: offer-1
   url: test-offer-url

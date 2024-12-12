@@ -5,7 +5,6 @@ package jimmtest
 import (
 	"context"
 	"database/sql"
-	"time"
 
 	petname "github.com/dustinkirkland/golang-petname"
 	qt "github.com/frankban/quicktest"
@@ -94,13 +93,6 @@ func CreateTestControllerEnvironment(ctx context.Context, c *qt.C, db *db.Databa
 		CloudRegionID:     cloud.Regions[0].ID,
 		CloudCredentialID: cred.ID,
 		Life:              state.Alive.String(),
-		Status: dbmodel.Status{
-			Status: "available",
-			Since: sql.NullTime{
-				Time:  time.Now().UTC().Truncate(time.Millisecond),
-				Valid: true,
-			},
-		},
 	}
 
 	err = db.AddModel(ctx, &model)
