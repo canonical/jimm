@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/juju/juju/api/base"
 	"github.com/juju/juju/core/life"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/state"
@@ -287,4 +288,42 @@ func (s *modelmanagerSuite) TestChangeModelCredential(c *gc.C) {
 
 	err = s.API.ChangeModelCredential(ctx, names.NewModelTag(info.UUID), ct)
 	c.Assert(err, gc.Equals, nil)
+}
+
+func (s *modelmanagerSuite) TestListModels(c *gc.C) {
+	ctx := context.Background()
+
+	var info jujuparams.ModelInfo
+	err := s.API.CreateModel(ctx, &jujuparams.ModelCreateArgs{
+		Name:     "test-model",
+		OwnerTag: names.NewUserTag("test-user@canonical.com").String(),
+	}, &info)
+	c.Assert(err, gc.Equals, nil)
+
+	models, err := s.API.ListModels(ctx)
+	c.Assert(err, gc.IsNil)
+	c.Assert(
+		models,
+		jimmtest.CmpEquals(
+			cmpopts.IgnoreTypes(
+				&time.Time{},
+			),
+		),
+		[]base.UserModel{
+			{
+				Name:           "controller",
+				UUID:           "deadbeef-0bad-400d-8000-4b1d0d06f00d",
+				Type:           "iaas",
+				Owner:          "admin",
+				LastConnection: nil,
+			},
+			{
+				Name:           "test-model",
+				UUID:           info.UUID,
+				Type:           "iaas",
+				Owner:          "test-user@canonical.com",
+				LastConnection: nil,
+			},
+		},
+	)
 }

@@ -165,6 +165,7 @@ type API struct {
 	ListFilesystems_                   func(ctx context.Context, machines []string) ([]jujuparams.FilesystemDetailsListResult, error)
 	ListVolumes_                       func(ctx context.Context, machines []string) ([]jujuparams.VolumeDetailsListResult, error)
 	ListStorageDetails_                func(ctx context.Context) ([]jujuparams.StorageDetails, error)
+	ListModels_                        func(ctx context.Context) ([]base.UserModel, error)
 }
 
 func (a *API) AddCloud(ctx context.Context, tag names.CloudTag, cld jujuparams.Cloud, force bool) error {
@@ -464,6 +465,13 @@ func (a *API) ListStorageDetails(ctx context.Context) ([]jujuparams.StorageDetai
 		return nil, errors.E(errors.CodeNotImplemented)
 	}
 	return a.ListStorageDetails_(ctx)
+}
+
+func (a *API) ListModels(ctx context.Context) ([]base.UserModel, error) {
+	if a.ListModels_ == nil {
+		return nil, errors.E(errors.CodeNotImplemented)
+	}
+	return a.ListModels_(ctx)
 }
 
 var _ jimm.API = &API{}
