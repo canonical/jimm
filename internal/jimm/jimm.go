@@ -494,6 +494,15 @@ type API interface {
 
 	// ListStorageDetails lists all storage.
 	ListStorageDetails(ctx context.Context) ([]jujuparams.StorageDetails, error)
+
+	// ListModels returns the models that the specified user
+	// has access to in the current server.  Only that controller owner
+	// can list models for any user (at this stage).  Other users
+	// can only ask about their own models.
+	//
+	// In our wrapper, we ask for the owner. So expect ALL models from
+	// the controller.
+	ListModels(ctx context.Context) ([]base.UserModel, error)
 }
 
 // forEachController runs a given function on multiple controllers

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
+	"github.com/juju/juju/api/base"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"github.com/rogpeppe/fastuuid"
@@ -84,6 +85,7 @@ type JIMM interface {
 	UpdateCloud(ctx context.Context, u *openfga.User, ct names.CloudTag, cloud jujuparams.Cloud) error
 	UpdateCloudCredential(ctx context.Context, u *openfga.User, args jimm.UpdateCloudCredentialArgs) ([]jujuparams.UpdateCredentialModelResult, error)
 	UserLogin(ctx context.Context, identityName string) (*openfga.User, error)
+	ListModels(ctx context.Context, user *openfga.User) ([]base.UserModel, error)
 }
 
 // controllerRoot is the root for endpoints served on controller connections.

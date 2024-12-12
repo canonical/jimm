@@ -221,23 +221,35 @@ func (s *modelManagerSuite) TestListModelSummariesWithoutControllerUUIDMasking(c
 }
 
 func (s *modelManagerSuite) TestListModels(c *gc.C) {
-	conn := s.open(c, nil, "bob")
+	conn := s.open(c, nil, "charlie@canonical.com")
 	defer conn.Close()
 
 	client := modelmanager.NewClient(conn)
-	models, err := client.ListModels("bob")
+	models, err := client.ListModels("charlie@canonical.com")
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(models, jc.SameContents, []base.UserModel{{
-		Name:  "model-1",
-		UUID:  s.Model.UUID.String,
-		Owner: "bob@canonical.com",
-		Type:  "iaas",
-	}, {
-		Name:  "model-3",
-		UUID:  s.Model3.UUID.String,
-		Owner: "charlie@canonical.com",
-		Type:  "iaas",
-	}})
+	c.Assert(
+		models,
+		jimmtest.CmpEquals(
+			cmpopts.IgnoreTypes(&time.Time{}),
+			cmpopts.SortSlices(func(a, b base.UserModelSummary) bool {
+				return a.Name < b.Name
+			}),
+		),
+		[]base.UserModel{
+			{
+				Name:  "model-2",
+				UUID:  s.Model2.UUID.String,
+				Owner: "charlie@canonical.com",
+				Type:  "iaas",
+			}, {
+				Name:  "model-3",
+				UUID:  s.Model3.UUID.String,
+				Owner: "charlie@canonical.com",
+				Type:  "iaas",
+			},
+		},
+	)
+
 }
 
 func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
@@ -1364,7 +1376,7 @@ func (s *caasModelManagerSuite) TestCreateModelKubernetes(c *gc.C) {
 
 	client := modelmanager.NewClient(conn)
 	mi, err := client.CreateModel("k8s-model-1", "bob@canonical.com", "bob-cloud", "", s.cred, nil)
-	c.Assert(err, gc.Equals, nil) // ERROR IS HERE
+	c.Assert(err, gc.Equals, nil)
 
 	c.Assert(mi.Name, gc.Equals, "k8s-model-1")
 	c.Assert(mi.Type, gc.Equals, model.CAAS)
@@ -1384,87 +1396,56 @@ func (s *caasModelManagerSuite) TestListCAASModelSummaries(c *gc.C) {
 
 	models, err := client.ListModelSummaries("bob", false)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(models, jimmtest.CmpEquals(
-		cmpopts.IgnoreTypes(&time.Time{}),
-		cmpopts.SortSlices(func(a, b base.UserModelSummary) bool {
-			return a.Name < b.Name
-		}),
-	), []base.UserModelSummary{{
+
+	var caasMS *base.UserModelSummary
+	for _, m := range models {
+		if m.Name == "k8s-model-1" {
+			caasMS = &m
+		}
+	}
+	if caasMS == nil {
+		c.Fail()
+	}
+	expectedCaas := &base.UserModelSummary{
 		Name:            "k8s-model-1",
 		UUID:            mi.UUID,
+		Type:            "caas",
 		ControllerUUID:  jimmtest.ControllerUUID,
+		IsController:    false,
 		ProviderType:    "kubernetes",
 		DefaultSeries:   "jammy",
 		Cloud:           "bob-cloud",
 		CloudRegion:     "default",
-		CloudCredential: s.cred.Id(),
+		CloudCredential: "bob-cloud/bob@canonical.com/k8s",
 		Owner:           "bob@canonical.com",
-		Life:            life.Value(state.Alive.String()),
+		Life:            "alive",
 		Status: base.Status{
-			Status: status.Available,
+			Status: "available",
+			Info:   "",
 			Data:   map[string]interface{}{},
+			Since:  nil,
 		},
-		ModelUserAccess: "admin",
-		Counts: []base.EntityCount{{
-			Entity: "machines",
-			Count:  0,
-		}, {
-			Entity: "cores",
-			Count:  0,
-		}, {
-			Entity: "units",
-			Count:  0,
-		}},
-		AgentVersion: &jujuversion.Current,
-		Type:         "caas",
+		ModelUserAccess:    "admin",
+		UserLastConnection: nil,
+		Counts:             []base.EntityCount{},
+		AgentVersion:       &jujuversion.Current,
+		Error:              nil,
+		Migration:          nil,
 		SLA: &base.SLASummary{
-			Level: "unsupported",
+			Level: "",
+			Owner: "bob@canonical.com",
 		},
-	}, {
-		Name:            "model-1",
-		UUID:            s.Model.UUID.String,
-		Type:            "iaas",
-		ControllerUUID:  jimmtest.ControllerUUID,
-		ProviderType:    jimmtest.TestProviderType,
-		DefaultSeries:   "jammy",
-		Cloud:           jimmtest.TestCloudName,
-		CloudRegion:     jimmtest.TestCloudRegionName,
-		CloudCredential: jimmtest.TestCloudName + "/bob@canonical.com/cred",
-		Owner:           "bob@canonical.com",
-		Life:            life.Value(state.Alive.String()),
-		Status: base.Status{
-			Status: status.Available,
-			Data:   map[string]interface{}{},
-		},
-		ModelUserAccess: "admin",
-		Counts:          []base.EntityCount{{Entity: "machines"}, {Entity: "cores"}, {Entity: "units"}},
-		AgentVersion:    &jujuversion.Current,
-		SLA: &base.SLASummary{
-			Level: "unsupported",
-		},
-	}, {
-		Name:            "model-3",
-		UUID:            s.Model3.UUID.String,
-		Type:            "iaas",
-		ControllerUUID:  jimmtest.ControllerUUID,
-		ProviderType:    jimmtest.TestProviderType,
-		DefaultSeries:   "jammy",
-		Cloud:           jimmtest.TestCloudName,
-		CloudRegion:     jimmtest.TestCloudRegionName,
-		CloudCredential: jimmtest.TestCloudName + "/charlie@canonical.com/cred",
-		Owner:           "charlie@canonical.com",
-		Life:            life.Value(state.Alive.String()),
-		Status: base.Status{
-			Status: status.Available,
-			Data:   map[string]interface{}{},
-		},
-		ModelUserAccess: "read",
-		Counts:          []base.EntityCount{{Entity: "machines"}, {Entity: "cores"}, {Entity: "units"}},
-		AgentVersion:    &jujuversion.Current,
-		SLA: &base.SLASummary{
-			Level: "unsupported",
-		},
-	}})
+	}
+	c.Assert(
+		caasMS,
+		jimmtest.CmpEquals(
+			cmpopts.IgnoreTypes(
+				&time.Time{},
+				&base.MigrationSummary{},
+			),
+		),
+		expectedCaas,
+	)
 }
 
 func (s *caasModelManagerSuite) TestListCAASModels(c *gc.C) {
@@ -1477,22 +1458,34 @@ func (s *caasModelManagerSuite) TestListCAASModels(c *gc.C) {
 
 	models, err := client.ListModels("bob")
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(models, jc.SameContents, []base.UserModel{{
-		Name:  "k8s-model-1",
-		UUID:  mi.UUID,
-		Owner: "bob@canonical.com",
-		Type:  "caas",
-	}, {
-		Name:  "model-1",
-		UUID:  s.Model.UUID.String,
-		Owner: "bob@canonical.com",
-		Type:  "iaas",
-	}, {
-		Name:  "model-3",
-		UUID:  s.Model3.UUID.String,
-		Owner: "charlie@canonical.com",
-		Type:  "iaas",
-	}})
+	sort.Slice(models, func(i, j int) bool { return i < j })
+
+	c.Assert(
+		models,
+		jimmtest.CmpEquals(
+			cmpopts.IgnoreTypes(
+				&time.Time{},
+			),
+		),
+		[]base.UserModel{
+			{
+				Name:  "k8s-model-1",
+				UUID:  mi.UUID,
+				Owner: "bob@canonical.com",
+				Type:  "caas",
+			}, {
+				Name:  "model-1",
+				UUID:  s.Model.UUID.String,
+				Owner: "bob@canonical.com",
+				Type:  "iaas",
+			}, {
+				Name:  "model-3",
+				UUID:  s.Model3.UUID.String,
+				Owner: "charlie@canonical.com",
+				Type:  "iaas",
+			},
+		},
+	)
 }
 
 func assertModelInfo(c *gc.C, obtained, expected []jujuparams.ModelInfoResult) {

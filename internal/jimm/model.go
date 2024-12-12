@@ -7,11 +7,13 @@ import (
 	"database/sql"
 	"fmt"
 	"math/rand"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/juju/juju/api/base"
 	jujupermission "github.com/juju/juju/core/permission"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/state"
@@ -779,10 +781,12 @@ func (j *JIMM) ModelSummaries(ctx context.Context, user *openfga.User, maskingCo
 			model      *dbmodel.Model
 			userAccess jujuparams.UserAccessPermission
 		}{model: m, userAccess: uap})
+
 		if _, ok := uniqueControllerMap[m.Controller.UUID]; !ok {
 			uniqueControllers = append(uniqueControllers, m.Controller)
 			uniqueControllerMap[m.Controller.UUID] = struct{}{}
 		}
+
 		return nil
 	})
 	if err != nil {
@@ -827,6 +831,68 @@ func (j *JIMM) ModelSummaries(ctx context.Context, user *openfga.User, maskingCo
 	return jujuparams.ModelSummaryResults{
 		Results: modelSummaryResults,
 	}, nil
+}
+
+func (j *JIMM) ListModels(ctx context.Context, user *openfga.User) ([]base.UserModel, error) {
+	const op = errors.Op("jimm.ListModels")
+	zapctx.Info(ctx, string(op))
+
+	// Get models uuids user has access to
+	uuids, err := user.ListModels(ctx, ofganames.ReaderRelation)
+	if err != nil {
+		return nil, errors.E(op, err, "failed to list models")
+	}
+
+	// Get the models themselves
+	models, err := j.DB().GetModelsByUUID(ctx, uuids)
+	if err != nil {
+		return nil, errors.E(op, err, "failed to get models by uuid")
+	}
+
+	// Find the controllers these models reside on and remove duplicates
+	var controllers []dbmodel.Controller
+	seen := make(map[uint]bool)
+	for _, model := range models {
+		if seen[model.ControllerID] {
+			continue
+		}
+		seen[model.ControllerID] = true
+		controllers = append(controllers, model.Controller)
+	}
+
+	// Call controllers for their models. We always call as admin, and we're
+	// filtering ourselves. We do this rather than send the user to be 100%
+	// certain that the models do belong to user according to OpenFGA. We could
+	// in theory rely on Juju correctly returning the models (by owner), but this
+	// is more reliable.
+	var userModels []base.UserModel
+	var mutex sync.Mutex
+	err = j.forEachController(ctx, controllers, func(_ *dbmodel.Controller, api API) error {
+		ums, err := api.ListModels(ctx)
+		if err != nil {
+			return err
+		}
+		mutex.Lock()
+		defer mutex.Unlock()
+
+		// Filter the models returned according to the uuids
+		// returned from OpenFGA for read access.
+		//
+		// NOTE: We skip controller models as ListModels is used for login and register.
+		// The models returned are stored locally and used for reference. In the case of JIMM,
+		// we do not want to show the controller models.
+		for _, m := range ums {
+			if slices.Contains(uuids, m.UUID) {
+				userModels = append(userModels, m)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, errors.E(op, err, "failed to list models")
+	}
+
+	return userModels, nil
 }
 
 // mergeModelInfo replaces fields on the juju model info object with

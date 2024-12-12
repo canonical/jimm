@@ -124,7 +124,34 @@ func (r *controllerRoot) ListModelSummaries(ctx context.Context, _ jujuparams.Mo
 // ListModels returns the models that the authenticated user
 // has access to. The user parameter is ignored.
 func (r *controllerRoot) ListModels(ctx context.Context, _ jujuparams.Entity) (jujuparams.UserModelList, error) {
-	return r.allModels(ctx)
+	const op = errors.Op("jujuapi.ListModels")
+	zapctx.Info(ctx, string(op))
+
+	res := jujuparams.UserModelList{}
+
+	models, err := r.jimm.ListModels(ctx, r.user)
+	if err != nil {
+		return res, err
+	}
+
+	for _, m := range models {
+		if !names.IsValidUser(m.Owner) {
+			zapctx.Error(ctx, fmt.Sprintf("%s is not a valid user", m.Owner))
+		}
+		ownerTag := names.NewUserTag(m.Owner)
+
+		res.UserModels = append(res.UserModels, jujuparams.UserModel{
+			Model: jujuparams.Model{
+				Name:     m.Name,
+				UUID:     m.UUID,
+				Type:     string(m.Type),
+				OwnerTag: ownerTag.String(),
+			},
+			LastConnection: m.LastConnection,
+		})
+	}
+
+	return res, nil
 }
 
 // ModelInfo implements the ModelManager facade's ModelInfo method.

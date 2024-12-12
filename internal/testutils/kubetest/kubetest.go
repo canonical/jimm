@@ -26,7 +26,8 @@ func NewFakeKubernetes(c *gc.C) *httptest.Server {
 		switch req.URL.Path {
 		case "/version":
 			w.Header().Set("Content-Type", "application/json")
-			w.Write([]byte(`{"major":"1","minor":"21","gitVersion":"v1.21.0"}`))
+			_, err := w.Write([]byte(`{"major":"1","minor":"21","gitVersion":"v1.21.0"}`))
+			c.Assert(err, gc.IsNil)
 		case "/api/v1/namespaces":
 			if req.Method != "POST" {
 				w.WriteHeader(http.StatusMethodNotAllowed)
@@ -37,10 +38,12 @@ func NewFakeKubernetes(c *gc.C) *httptest.Server {
 			c.Assert(err, gc.IsNil)
 		case "/api":
 			w.Header().Set("Content-Type", "application/json")
-			w.Write([]byte(`{"versions":["v1"]}`))
+			_, err := w.Write([]byte(`{"versions":["v1"]}`))
+			c.Assert(err, gc.IsNil)
 		case "/apis":
 			w.Header().Set("Content-Type", "application/json")
-			w.Write([]byte(`{"groups":[{"name":"apps","versions":[{"groupVersion":"apps/v1","version":"v1"}]}]}`))
+			_, err := w.Write([]byte(`{"groups":[{"name":"apps","versions":[{"groupVersion":"apps/v1","version":"v1"}]}]}`))
+			c.Assert(err, gc.IsNil)
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
