@@ -2,7 +2,7 @@
 <!-- *(mandatory)* Detail your pull request, with the what, why and how. -->
 
 ## Engineering checklist
-*Check only items that apply*
+<!-- *Check only items that apply* -->
 
 - [ ] Documentation updated
 - [ ] Covered by unit tests
