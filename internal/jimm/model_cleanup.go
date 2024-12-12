@@ -12,15 +12,18 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/servermon"
 )
 
 // CleanupDyingModels loops over dying models, contacting the respective controller.
 // And deleting the model from our database if the error is `NotFound` which means the model was successfully deleted.
-func (j *JIMM) CleanupDyingModels(ctx context.Context) error {
+func (j *JIMM) CleanupDyingModels(ctx context.Context) (err error) {
 	const op = errors.Op("jimm.CleanupDyingModels")
 	zapctx.Info(ctx, string(op))
+	durationObserver := servermon.DurationObserver(servermon.JimmMethodsDurationHistogram, string(op))
+	defer durationObserver()
 
-	err := j.DB().ForEachModel(ctx, func(m *dbmodel.Model) error {
+	err = j.DB().ForEachModel(ctx, func(m *dbmodel.Model) error {
 		if m.Life != state.Dying.String() {
 			return nil
 		}

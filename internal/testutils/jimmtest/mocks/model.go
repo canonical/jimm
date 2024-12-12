@@ -25,7 +25,7 @@ type ModelManager struct {
 	ForEachModel_           func(ctx context.Context, u *openfga.User, f func(*dbmodel.Model, jujuparams.UserAccessPermission) error) error
 	ForEachUserModel_       func(ctx context.Context, u *openfga.User, f func(*dbmodel.Model, jujuparams.UserAccessPermission) error) error
 	FullModelStatus_        func(ctx context.Context, user *openfga.User, modelTag names.ModelTag, patterns []string) (*jujuparams.FullStatus, error)
-	ModelSummaries_         func(ctx context.Context, user *openfga.User, maskingControllerUUID string) (jujuparams.ModelSummaryResults, error)
+	ListModelSummaries_     func(ctx context.Context, user *openfga.User, maskingControllerUUID string) (jujuparams.ModelSummaryResults, error)
 	GetModel_               func(ctx context.Context, uuid string) (dbmodel.Model, error)
 	ImportModel_            func(ctx context.Context, user *openfga.User, controllerName string, modelTag names.ModelTag, newOwner string) error
 	IdentityModelDefaults_  func(ctx context.Context, user *dbmodel.Identity) (map[string]interface{}, error)
@@ -129,11 +129,11 @@ func (j *ModelManager) ModelStatus(ctx context.Context, u *openfga.User, mt name
 	return j.ModelStatus_(ctx, u, mt)
 }
 
-func (j *ModelManager) ModelSummaries(ctx context.Context, u *openfga.User, maskingControllerUUID string) (jujuparams.ModelSummaryResults, error) {
-	if j.ModelSummaries_ == nil {
+func (j *ModelManager) ListModelSummaries(ctx context.Context, u *openfga.User, maskingControllerUUID string) (jujuparams.ModelSummaryResults, error) {
+	if j.ListModelSummaries_ == nil {
 		return jujuparams.ModelSummaryResults{}, errors.E(errors.CodeNotImplemented)
 	}
-	return j.ModelSummaries_(ctx, u, maskingControllerUUID)
+	return j.ListModelSummaries_(ctx, u, maskingControllerUUID)
 }
 
 func (j *ModelManager) QueryModelsJq(ctx context.Context, models []string, jqQuery string) (params.CrossModelQueryResponse, error) {

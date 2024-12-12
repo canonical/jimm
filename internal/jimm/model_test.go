@@ -1972,7 +1972,7 @@ func TestModelSummaries(t *testing.T) {
 					},
 				},
 			}
-			summaries, err := j.ModelSummaries(ctx, alice, "")
+			summaries, err := j.ListModelSummaries(ctx, alice, "")
 			c.Check(err, qt.IsNil)
 			c.Check(summaries.Results, qt.HasLen, t.expectedSummariesSize)
 			c.Check(summaries.Results, qt.DeepEquals, t.expectedSummaries)

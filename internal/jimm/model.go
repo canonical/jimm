@@ -759,10 +759,10 @@ func (m *modelSummariesMap) addModelSummary(summary jujuparams.ModelSummaryResul
 	m.modelSummaries[summary.Result.UUID] = summary
 }
 
-// ModelSummaries returns the list of modelsummary the user has access to.
+// ListModelSummaries returns the list of modelsummary the user has access to.
 // It queries the controllers and then merge the info from the JIMM db.
-func (j *JIMM) ModelSummaries(ctx context.Context, user *openfga.User, maskingControllerUUID string) (jujuparams.ModelSummaryResults, error) {
-	const op = errors.Op("jimm.ModelSummaries")
+func (j *JIMM) ListModelSummaries(ctx context.Context, user *openfga.User, maskingControllerUUID string) (jujuparams.ModelSummaryResults, error) {
+	const op = errors.Op("jimm.ListModelSummaries")
 
 	modelSummariesSafeMap := modelSummariesMap{}
 	modelSummaryResults := []jujuparams.ModelSummaryResult{}
