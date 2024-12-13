@@ -1370,6 +1370,12 @@ func (j *JIMM) ListModels(ctx context.Context, user *openfga.User) ([]base.UserM
 		return nil, errors.E(op, err, "failed to get models by uuid")
 	}
 
+	// Create map for lookup later
+	modelsMap := make(map[string]dbmodel.Model)
+	for _, m := range models {
+		modelsMap[m.UUID.String] = m
+	}
+
 	// Find the controllers these models reside on and remove duplicates
 	var controllers []dbmodel.Controller
 	seen := make(map[uint]bool)
@@ -1406,15 +1412,8 @@ func (j *JIMM) ListModels(ctx context.Context, user *openfga.User) ([]base.UserM
 		for _, um := range ums {
 			// Filter models that match authorised uuids list
 			if slices.Contains(uuids, um.UUID) {
-				// Find that model in the db models
-				index := slices.IndexFunc(models, func(m dbmodel.Model) bool {
-					return m.UUID.String == um.UUID
-				})
-				if index != -1 {
-					// Override owner and append to result
-					um.Owner = models[index].OwnerIdentityName
-					userModels = append(userModels, um)
-				}
+				um.Owner = modelsMap[um.UUID].OwnerIdentityName
+				userModels = append(userModels, um)
 			}
 		}
 		return nil
