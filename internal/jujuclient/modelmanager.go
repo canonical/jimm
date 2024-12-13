@@ -333,7 +333,7 @@ func (c Connection) ChangeModelCredential(ctx context.Context, model names.Model
 // can list models for any user (at this stage).  Other users
 // can only ask about their own models.
 //
-// In our wrapper, we ask for the owner. So expect ALL models from
+// In our wrapper, we ask as the controller admin. So expect ALL models from
 // the controller.
 func (c Connection) ListModels(ctx context.Context) ([]base.UserModel, error) {
 	return modelmanager.NewClient(&c).ListModels("admin")

@@ -1358,13 +1358,13 @@ func (j *JIMM) ListModels(ctx context.Context, user *openfga.User) ([]base.UserM
 	const op = errors.Op("jimm.ListModels")
 	zapctx.Info(ctx, string(op))
 
-	// Get models uuids user has access to
+	// Get uuids of models the user has access to
 	uuids, err := user.ListModels(ctx, ofganames.ReaderRelation)
 	if err != nil {
-		return nil, errors.E(op, err, "failed to list models")
+		return nil, errors.E(op, err, "failed to list user models")
 	}
 
-	// Get the models themselves
+	// Get the models from the database
 	models, err := j.DB().GetModelsByUUID(ctx, uuids)
 	if err != nil {
 		return nil, errors.E(op, err, "failed to get models by uuid")
