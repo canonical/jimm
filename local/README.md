@@ -74,3 +74,4 @@ controllers that will be controlled by JIMM.
 - The WS API for JIMM Controller is under: `ws://localhost:17070` (http direct) and `wss://jimm.localhost` for secure.
 - You can verify local deployment with: `curl http://localhost:17070/debug/status` and `curl https://jimm.localhost/debug/status`
 - Traefik is available on `http://localhost:8089`.
+- You can generate db schemas from the running deployment postgres to inspect the raw sql by using `make generate-schemas`.
