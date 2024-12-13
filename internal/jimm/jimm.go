@@ -495,11 +495,7 @@ type API interface {
 	// ListStorageDetails lists all storage.
 	ListStorageDetails(ctx context.Context) ([]jujuparams.StorageDetails, error)
 
-	// ListModels returns UserModel's for the user that is logged in. If the user logged
-	// in is "admin" they may specify another user's models.
-	//
-	// In our wrapper, we ask as the controller admin. So expect ALL models from
-	// the controller.
+	// ListModels returns all UserModel's on the controller.
 	ListModels(ctx context.Context) ([]base.UserModel, error)
 }
 

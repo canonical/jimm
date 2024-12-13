@@ -1399,9 +1399,10 @@ func (j *JIMM) ListModels(ctx context.Context, user *openfga.User) ([]base.UserM
 		// Filter the models returned according to the uuids
 		// returned from OpenFGA for read access.
 		//
-		// NOTE: We skip controller models as ListModels is used for login and register.
-		// The models returned are stored locally and used for reference. In the case of JIMM,
-		// we do not want to show the controller models.
+		// NOTE: The controller models are skipped because we do not relate users
+		// to controller models, we skip the controller models as ListModels is used for
+		// login and register - the models returned are stored locally and used for reference.
+		// In the case of JIMM, we do not want to show the controller models.
 		for _, um := range ums {
 			// Filter models that match authorised uuids list
 			if slices.Contains(uuids, um.UUID) {
