@@ -16,25 +16,37 @@ const (
 	Password = "test-kubernetes-password"
 )
 
-// NewFakeKubernetes creates a minimal kubernetes API server which
-// response to just the API calls required by the tests.
 func NewFakeKubernetes(c *gc.C) *httptest.Server {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		if req.URL.Path != "/api/v1/namespaces" {
-			w.WriteHeader(http.StatusNotFound)
-			return
-		}
-		if req.Method != "POST" {
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			return
-		}
 		if username, password, ok := req.BasicAuth(); !ok || username != Username || password != Password {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
-		w.Header().Set("Content-Type", req.Header.Get("Content-Type"))
-		_, err := io.Copy(w, req.Body)
-		c.Assert(err, gc.IsNil)
+
+		switch req.URL.Path {
+		case "/version":
+			w.Header().Set("Content-Type", "application/json")
+			_, err := w.Write([]byte(`{"major":"1","minor":"21","gitVersion":"v1.21.0"}`))
+			c.Assert(err, gc.IsNil)
+		case "/api/v1/namespaces":
+			if req.Method != "POST" {
+				w.WriteHeader(http.StatusMethodNotAllowed)
+				return
+			}
+			w.Header().Set("Content-Type", req.Header.Get("Content-Type"))
+			_, err := io.Copy(w, req.Body)
+			c.Assert(err, gc.IsNil)
+		case "/api":
+			w.Header().Set("Content-Type", "application/json")
+			_, err := w.Write([]byte(`{"versions":["v1"]}`))
+			c.Assert(err, gc.IsNil)
+		case "/apis":
+			w.Header().Set("Content-Type", "application/json")
+			_, err := w.Write([]byte(`{"groups":[{"name":"apps","versions":[{"groupVersion":"apps/v1","version":"v1"}]}]}`))
+			c.Assert(err, gc.IsNil)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
 	}))
 	return srv
 }

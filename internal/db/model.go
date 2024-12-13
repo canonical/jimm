@@ -176,6 +176,9 @@ func (d *Database) ForEachModel(ctx context.Context, f func(m *dbmodel.Model) er
 
 // GetModelsByUUID retrieves a list of models where the model UUIDs are in
 // the provided modelUUIDs slice.
+//
+// If the UUID cannot be resolved to a model, it is skipped from the result and
+// no error is returned.
 func (d *Database) GetModelsByUUID(ctx context.Context, modelUUIDs []string) (_ []dbmodel.Model, err error) {
 	const op = errors.Op("db.GetModelsByUUID")
 

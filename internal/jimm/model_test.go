@@ -13,6 +13,7 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/juju/juju/api/base"
 	"github.com/juju/juju/core/life"
 	"github.com/juju/juju/rpc/params"
 	jujuparams "github.com/juju/juju/rpc/params"
@@ -3802,6 +3803,199 @@ controllers:
 	c.Assert(err, qt.IsNil)
 	// and assert that controller-3 was used.
 	c.Assert(model.Controller.Name, qt.Equals, "controller-3")
+}
+
+const listModelsTestEnv = `clouds:
+- name: test-cloud
+  type: test-provider
+  regions:
+  - name: test-cloud-region
+cloud-credentials:
+- owner: alice@canonical.com
+  name: cred-1
+  cloud: test-cloud
+
+controllers:
+- name: controller-1
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test-cloud
+  region: test-cloud-region
+
+- name: controller-2
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test-cloud
+  region: test-cloud-region
+
+models:
+- name: model-1
+  uuid: 00000002-0000-0000-0000-000000000001
+  controller: controller-1
+  cloud: test-cloud
+  region: test-cloud-region
+  cloud-credential: cred-1
+  owner: alice@canonical.com
+  life: alive
+  users:
+  - user: alice@canonical.com
+    access: admin
+  - user: bob@canonical.com
+    access: admin
+
+- name: model-2
+  uuid: 00000002-0000-0000-0000-000000000002
+  controller: controller-1
+  cloud: test-cloud
+  region: test-cloud-region
+  cloud-credential: cred-1
+  owner: alice@canonical.com
+  life: alive
+  users:
+  - user: alice@canonical.com
+    access: admin
+  - user: bob@canonical.com
+    access: write
+  sla:
+    level: unsupported
+
+- name: model-3
+  uuid: 00000002-0000-0000-0000-000000000003
+  controller: controller-2
+  cloud: test-cloud
+  region: test-cloud-region
+  cloud-credential: cred-1
+  owner: alice@canonical.com
+  life: alive
+  users:
+  - user: alice@canonical.com
+    access: admin
+  - user: bob@canonical.com
+    access: read
+
+- name: model-4
+  uuid: 00000002-0000-0000-0000-000000000004
+  controller: controller-1
+  cloud: test-cloud
+  region: test-cloud-region
+  cloud-credential: cred-1
+  owner: alice@canonical.com
+  life: alive
+  users:
+  - user: alice@canonical.com
+    access: admin
+
+users:
+- username: alice@canonical.com
+  controller-access: superuser
+`
+
+var modelListTests = []struct {
+	name                           string
+	env                            string
+	username                       string
+	expectedUserModels             []base.UserModel
+	expectedError                  string
+	listModelsMockByControllerName map[string]func(context.Context) ([]base.UserModel, error)
+}{
+	{
+		name:     "Bob lists models across controllers 1 and 2",
+		env:      listModelsTestEnv,
+		username: "bob@canonical.com",
+		expectedUserModels: []base.UserModel{
+			{UUID: "00000002-0000-0000-0000-000000000001", Owner: "alice@canonical.com"},
+			{UUID: "00000002-0000-0000-0000-000000000002", Owner: "alice@canonical.com"},
+			{UUID: "00000002-0000-0000-0000-000000000003", Owner: "alice@canonical.com"},
+		},
+		listModelsMockByControllerName: map[string]func(context.Context) ([]base.UserModel, error){
+			"controller-1": func(ctx context.Context) ([]base.UserModel, error) {
+				return []base.UserModel{
+					{UUID: "00000002-0000-0000-0000-000000000001"},
+					{UUID: "00000002-0000-0000-0000-000000000002"},
+				}, nil
+			},
+			"controller-2": func(ctx context.Context) ([]base.UserModel, error) {
+				return []base.UserModel{
+					{UUID: "00000002-0000-0000-0000-000000000003"},
+				}, nil
+			},
+		},
+	},
+	{
+		name:     "Alice lists models across controllers 1 and 2",
+		env:      listModelsTestEnv,
+		username: "alice@canonical.com",
+		expectedUserModels: []base.UserModel{
+			{UUID: "00000002-0000-0000-0000-000000000001", Owner: "alice@canonical.com"},
+			{UUID: "00000002-0000-0000-0000-000000000002", Owner: "alice@canonical.com"},
+			{UUID: "00000002-0000-0000-0000-000000000003", Owner: "alice@canonical.com"},
+			{UUID: "00000002-0000-0000-0000-000000000004", Owner: "alice@canonical.com"},
+		},
+		listModelsMockByControllerName: map[string]func(context.Context) ([]base.UserModel, error){
+			"controller-1": func(ctx context.Context) ([]base.UserModel, error) {
+				return []base.UserModel{
+					{UUID: "00000002-0000-0000-0000-000000000001"},
+					{UUID: "00000002-0000-0000-0000-000000000002"},
+					{UUID: "00000002-0000-0000-0000-000000000004"},
+				}, nil
+			},
+			"controller-2": func(ctx context.Context) ([]base.UserModel, error) {
+				return []base.UserModel{
+					{UUID: "00000002-0000-0000-0000-000000000003"},
+				}, nil
+			},
+		},
+	},
+	{
+		name:               "Alice lists models across controllers 1 and 2",
+		env:                listModelsTestEnv,
+		username:           "alice@canonical.com",
+		expectedUserModels: []base.UserModel{},
+		expectedError:      "failed to list models",
+		listModelsMockByControllerName: map[string]func(context.Context) ([]base.UserModel, error){
+			"controller-1": func(ctx context.Context) ([]base.UserModel, error) {
+				return []base.UserModel{}, errors.E("test error")
+			},
+		},
+	},
+}
+
+func TestListModels(t *testing.T) {
+	c := qt.New(t)
+
+	for _, test := range modelListTests {
+		c.Run(
+			test.name,
+			func(c *qt.C) {
+				j := jimmtest.NewJIMM(c, &jimm.Parameters{
+					Dialer: jimmtest.DialerMap{
+						"controller-1": &jimmtest.Dialer{
+							API: &jimmtest.API{
+								ListModels_: test.listModelsMockByControllerName["controller-1"],
+							},
+						},
+						"controller-2": &jimmtest.Dialer{
+							API: &jimmtest.API{
+								ListModels_: test.listModelsMockByControllerName["controller-2"],
+							},
+						},
+					},
+				})
+
+				env := jimmtest.ParseEnvironment(c, test.env)
+				env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+
+				dbUser, err := dbmodel.NewIdentity(test.username)
+				c.Assert(err, qt.IsNil)
+				user := openfga.NewUser(dbUser, j.OpenFGAClient)
+
+				models, err := j.ListModels(context.Background(), user)
+				if test.expectedError != "" {
+					c.Assert(err, qt.ErrorMatches, test.expectedError)
+				} else {
+					c.Assert(models, qt.ContentEquals, test.expectedUserModels)
+				}
+			},
+		)
+	}
 }
 
 func newBool(b bool) *bool {

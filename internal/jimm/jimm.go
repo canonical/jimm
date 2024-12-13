@@ -494,6 +494,9 @@ type API interface {
 
 	// ListStorageDetails lists all storage.
 	ListStorageDetails(ctx context.Context) ([]jujuparams.StorageDetails, error)
+
+	// ListModels returns all UserModel's on the controller.
+	ListModels(ctx context.Context) ([]base.UserModel, error)
 }
 
 // forEachController runs a given function on multiple controllers

@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/google/uuid"
+	"github.com/juju/juju/api/base"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 
@@ -87,6 +88,7 @@ type JIMM struct {
 	UpdateCloud_                       func(ctx context.Context, u *openfga.User, ct names.CloudTag, cloud jujuparams.Cloud) error
 	UpdateCloudCredential_             func(ctx context.Context, u *openfga.User, args jimm.UpdateCloudCredentialArgs) ([]jujuparams.UpdateCredentialModelResult, error)
 	UserLogin_                         func(ctx context.Context, identityName string) (*openfga.User, error)
+	ListModels_                        func(ctx context.Context, user *openfga.User) ([]base.UserModel, error)
 }
 
 func (j *JIMM) AddAuditLogEntry(ale *dbmodel.AuditLogEntry) {
@@ -425,4 +427,10 @@ func (j *JIMM) UserLogin(ctx context.Context, identityName string) (*openfga.Use
 		return nil, errors.E(errors.CodeNotImplemented)
 	}
 	return j.UserLogin_(ctx, identityName)
+}
+func (j *JIMM) ListModels(ctx context.Context, user *openfga.User) ([]base.UserModel, error) {
+	if j.ListModels_ == nil {
+		return nil, errors.E(errors.CodeNotImplemented)
+	}
+	return j.ListModels_(ctx, user)
 }

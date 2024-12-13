@@ -7,6 +7,8 @@ import (
 	"time"
 
 	jujuerrors "github.com/juju/errors"
+	"github.com/juju/juju/api/base"
+	"github.com/juju/juju/api/client/modelmanager"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 
@@ -324,4 +326,13 @@ func (c Connection) ChangeModelCredential(ctx context.Context, model names.Model
 		return errors.E(op, err)
 	}
 	return out.OneError()
+}
+
+// ListModels returns UserModel's for the user that is logged in. If the user logged
+// in is "admin" they may specify another user's models.
+//
+// In our wrapper, we ask as the controller admin. So expect ALL models from
+// the controller.
+func (c Connection) ListModels(ctx context.Context) ([]base.UserModel, error) {
+	return modelmanager.NewClient(&c).ListModels("admin")
 }
