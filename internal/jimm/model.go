@@ -1372,14 +1372,11 @@ func (j *JIMM) ListModels(ctx context.Context, user *openfga.User) ([]base.UserM
 
 	// Create map for lookup later
 	modelsMap := make(map[string]dbmodel.Model)
-	for _, m := range models {
-		modelsMap[m.UUID.String] = m
-	}
-
 	// Find the controllers these models reside on and remove duplicates
 	var controllers []dbmodel.Controller
 	seen := make(map[uint]bool)
 	for _, model := range models {
+		modelsMap[model.UUID.String] = model // Set map for lookup
 		if seen[model.ControllerID] {
 			continue
 		}
