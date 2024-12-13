@@ -7,7 +7,6 @@ import (
 	"database/sql"
 	"fmt"
 	"math/rand"
-	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -1406,15 +1405,12 @@ func (j *JIMM) ListModels(ctx context.Context, user *openfga.User) ([]base.UserM
 		// controller models to users, and as such, they will not appear in the
 		// authorised uuid map.
 		for _, um := range ums {
-			// Filter models that match authorised uuids list
-			if slices.Contains(uuids, um.UUID) {
-				mapModel, ok := modelsMap[um.UUID]
-				if !ok {
-					continue
-				}
-				um.Owner = mapModel.OwnerIdentityName
-				userModels = append(userModels, um)
+			mapModel, ok := modelsMap[um.UUID]
+			if !ok {
+				continue
 			}
+			um.Owner = mapModel.OwnerIdentityName
+			userModels = append(userModels, um)
 		}
 		return nil
 	})
