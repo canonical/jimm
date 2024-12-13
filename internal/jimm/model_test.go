@@ -3901,9 +3901,9 @@ var modelListTests = []struct {
 		env:      listModelsTestEnv,
 		username: "bob@canonical.com",
 		expectedUserModels: []base.UserModel{
-			{UUID: "00000002-0000-0000-0000-000000000001"},
-			{UUID: "00000002-0000-0000-0000-000000000002"},
-			{UUID: "00000002-0000-0000-0000-000000000003"},
+			{UUID: "00000002-0000-0000-0000-000000000001", Owner: "alice@canonical.com"},
+			{UUID: "00000002-0000-0000-0000-000000000002", Owner: "alice@canonical.com"},
+			{UUID: "00000002-0000-0000-0000-000000000003", Owner: "alice@canonical.com"},
 		},
 		listModelsMockByControllerName: map[string]func(context.Context) ([]base.UserModel, error){
 			"controller-1": func(ctx context.Context) ([]base.UserModel, error) {
@@ -3924,10 +3924,10 @@ var modelListTests = []struct {
 		env:      listModelsTestEnv,
 		username: "alice@canonical.com",
 		expectedUserModels: []base.UserModel{
-			{UUID: "00000002-0000-0000-0000-000000000001"},
-			{UUID: "00000002-0000-0000-0000-000000000002"},
-			{UUID: "00000002-0000-0000-0000-000000000003"},
-			{UUID: "00000002-0000-0000-0000-000000000004"},
+			{UUID: "00000002-0000-0000-0000-000000000001", Owner: "alice@canonical.com"},
+			{UUID: "00000002-0000-0000-0000-000000000002", Owner: "alice@canonical.com"},
+			{UUID: "00000002-0000-0000-0000-000000000003", Owner: "alice@canonical.com"},
+			{UUID: "00000002-0000-0000-0000-000000000004", Owner: "alice@canonical.com"},
 		},
 		listModelsMockByControllerName: map[string]func(context.Context) ([]base.UserModel, error){
 			"controller-1": func(ctx context.Context) ([]base.UserModel, error) {

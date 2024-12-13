@@ -570,6 +570,7 @@ func (s *dbSuite) TestGetModelsByUUID(c *qt.C) {
 	sort.Slice(models, func(i, j int) bool {
 		return models[i].UUID.String < models[j].UUID.String
 	})
+	c.Assert(models, qt.HasLen, 3)
 	c.Check(models[0].UUID.String, qt.Equals, "00000002-0000-0000-0000-000000000001")
 	c.Check(models[0].Controller.Name, qt.Not(qt.Equals), "")
 	c.Check(models[1].UUID.String, qt.Equals, "00000002-0000-0000-0000-000000000002")

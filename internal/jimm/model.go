@@ -1402,9 +1402,18 @@ func (j *JIMM) ListModels(ctx context.Context, user *openfga.User) ([]base.UserM
 		// NOTE: We skip controller models as ListModels is used for login and register.
 		// The models returned are stored locally and used for reference. In the case of JIMM,
 		// we do not want to show the controller models.
-		for _, m := range ums {
-			if slices.Contains(uuids, m.UUID) {
-				userModels = append(userModels, m)
+		for _, um := range ums {
+			// Filter models that match authorised uuids list
+			if slices.Contains(uuids, um.UUID) {
+				// Find that model in the db models
+				index := slices.IndexFunc(models, func(m dbmodel.Model) bool {
+					return m.UUID.String == um.UUID
+				})
+				if index != -1 {
+					// Override owner and append to result
+					um.Owner = models[index].OwnerIdentityName
+					userModels = append(userModels, um)
+				}
 			}
 		}
 		return nil
