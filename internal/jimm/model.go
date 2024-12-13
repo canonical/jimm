@@ -7,7 +7,6 @@ import (
 	"database/sql"
 	"fmt"
 	"math/rand"
-	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -1372,14 +1371,11 @@ func (j *JIMM) ListModels(ctx context.Context, user *openfga.User) ([]base.UserM
 
 	// Create map for lookup later
 	modelsMap := make(map[string]dbmodel.Model)
-	for _, m := range models {
-		modelsMap[m.UUID.String] = m
-	}
-
 	// Find the controllers these models reside on and remove duplicates
 	var controllers []dbmodel.Controller
 	seen := make(map[uint]bool)
 	for _, model := range models {
+		modelsMap[model.UUID.String] = model // Set map for lookup
 		if seen[model.ControllerID] {
 			continue
 		}
@@ -1405,16 +1401,16 @@ func (j *JIMM) ListModels(ctx context.Context, user *openfga.User) ([]base.UserM
 		// Filter the models returned according to the uuids
 		// returned from OpenFGA for read access.
 		//
-		// NOTE: The controller models are skipped because we do not relate users
-		// to controller models, we skip the controller models as ListModels is used for
-		// login and register - the models returned are stored locally and used for reference.
-		// In the case of JIMM, we do not want to show the controller models.
+		// NOTE: Controller models are not included because we never relate
+		// controller models to users, and as such, they will not appear in the
+		// authorised uuid map.
 		for _, um := range ums {
-			// Filter models that match authorised uuids list
-			if slices.Contains(uuids, um.UUID) {
-				um.Owner = modelsMap[um.UUID].OwnerIdentityName
-				userModels = append(userModels, um)
+			mapModel, ok := modelsMap[um.UUID]
+			if !ok {
+				continue
 			}
+			um.Owner = mapModel.OwnerIdentityName
+			userModels = append(userModels, um)
 		}
 		return nil
 	})
