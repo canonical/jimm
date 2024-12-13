@@ -169,9 +169,11 @@ func (r *controllerRoot) WatchAllModelSummaries(ctx context.Context) (jujuparams
 	}, nil
 }
 
-// AllModels implments the AllModels command on the Controller facade.
+// AllModels is used for list-controllers, show-controller, kill-controller and destroy-controller,
+// we currently do not support this via JIMM. If in the future we do, this method will need implementing.
 func (r *controllerRoot) AllModels(ctx context.Context) (jujuparams.UserModelList, error) {
-	return r.allModels(ctx)
+	const op = errors.Op("jujuapi.AllModels")
+	return jujuparams.UserModelList{}, errors.E(op, errors.CodeNotSupported)
 }
 
 // allModels returns all the models the logged in user has access to.

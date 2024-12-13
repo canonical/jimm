@@ -76,25 +76,12 @@ func (s *controllerSuite) TestMongoVersion(c *gc.C) {
 }
 
 func (s *controllerSuite) TestAllModels(c *gc.C) {
-	conn := s.open(c, nil, "bob")
+	conn := s.open(c, nil, "alice")
 	defer conn.Close()
 	client := controllerapi.NewClient(conn)
-
-	models, err := client.AllModels()
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(models, jc.SameContents, []base.UserModel{{
-		Name:           "model-1",
-		UUID:           s.Model.UUID.String,
-		Owner:          "bob@canonical.com",
-		LastConnection: nil,
-		Type:           "iaas",
-	}, {
-		Name:           "model-3",
-		UUID:           s.Model3.UUID.String,
-		Owner:          "charlie@canonical.com",
-		LastConnection: nil,
-		Type:           "iaas",
-	}})
+	_, err := client.AllModels()
+	c.Assert(err, gc.ErrorMatches, `not supported \(not supported\)`)
+	c.Assert(jujuparams.IsCodeNotSupported(err), gc.Equals, true)
 }
 
 func (s *controllerSuite) TestModelStatus(c *gc.C) {
