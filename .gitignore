@@ -22,3 +22,5 @@ qa-lxd
 /cloudinit.temp.yaml
 
 local/traefik/certs/ca.srl
+
+db_schemas
