@@ -247,6 +247,7 @@ func (b *modelBuilder) WithCloudRegion(region string) *modelBuilder {
 				continue
 			}
 			region = r.Name
+			break
 		}
 	}
 	// loop through all cloud regions
@@ -579,22 +580,6 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 		return nil, errors.E(op, err)
 	}
 
-	// fetch cloud defaults
-	// TODO(SimoneDutto): we should get the implicit cloud and then get the defaults.
-	if args.Cloud != (names.CloudTag{}) {
-		cloudDefaults := dbmodel.CloudDefaults{
-			IdentityName: user.Name,
-			Cloud: dbmodel.Cloud{
-				Name: args.Cloud.Id(),
-			},
-		}
-		err = j.Database.CloudDefaults(ctx, &cloudDefaults)
-		if err != nil && errors.ErrorCode(err) != errors.CodeNotFound {
-			return nil, errors.E(op, "failed to fetch cloud defaults")
-		}
-		builder = builder.WithConfig(cloudDefaults.Defaults)
-	}
-
 	builder = builder.WithCloud(user, args.Cloud)
 	if err := builder.Error(); err != nil {
 		return nil, errors.E(op, err)
@@ -604,6 +589,28 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 	if err := builder.Error(); err != nil {
 		return nil, errors.E(op, err)
 	}
+	// fetch cloud defaults
+	cloudDefaults := dbmodel.CloudDefaults{
+		IdentityName: user.Name,
+		Cloud:        *builder.cloud,
+	}
+	err = j.Database.CloudDefaults(ctx, &cloudDefaults)
+	if err != nil && errors.ErrorCode(err) != errors.CodeNotFound {
+		return nil, errors.E(op, "failed to fetch cloud defaults")
+	}
+	builder = builder.WithConfig(cloudDefaults.Defaults)
+
+	// fetch cloud region defaults
+	cloudRegionDefaults := dbmodel.CloudDefaults{
+		IdentityName: user.Name,
+		Cloud:        *builder.cloud,
+		Region:       builder.cloudRegion,
+	}
+	err = j.Database.CloudDefaults(ctx, &cloudRegionDefaults)
+	if err != nil && errors.ErrorCode(err) != errors.CodeNotFound {
+		return nil, errors.E(op, "failed to fetch cloud defaults")
+	}
+	builder = builder.WithConfig(cloudRegionDefaults.Defaults)
 
 	// at this point we know which cloud will host the model and
 	// we must check the user has add-model permission on the cloud
@@ -613,22 +620,6 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 	}
 	if !canAddModel {
 		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
-	}
-
-	// fetch cloud region defaults
-	if args.Cloud != (names.CloudTag{}) && builder.cloudRegion != "" {
-		cloudRegionDefaults := dbmodel.CloudDefaults{
-			IdentityName: user.Name,
-			Cloud: dbmodel.Cloud{
-				Name: args.Cloud.Id(),
-			},
-			Region: builder.cloudRegion,
-		}
-		err = j.Database.CloudDefaults(ctx, &cloudRegionDefaults)
-		if err != nil && errors.ErrorCode(err) != errors.CodeNotFound {
-			return nil, errors.E(op, "failed to fetch cloud defaults")
-		}
-		builder = builder.WithConfig(cloudRegionDefaults.Defaults)
 	}
 
 	// last but not least, use the provided config values
