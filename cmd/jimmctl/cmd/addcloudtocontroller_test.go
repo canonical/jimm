@@ -44,7 +44,7 @@ func (s *addCloudToControllerSuite) SetUpTest(c *gc.C) {
 		Regions: []dbmodel.CloudRegion{{Name: "default", CloudName: "test-cloud"}},
 	})
 	c.Assert(err, gc.IsNil)
-	region, err := s.JIMM.Database.FindRegion(context.Background(), "kubernetes", "default")
+	region, err := s.JIMM.Database.FindRegionByCloudType(context.Background(), "kubernetes", "default")
 	c.Assert(err, gc.IsNil)
 
 	// We grant user bob administrator access to JIMM and the added

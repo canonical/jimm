@@ -420,6 +420,124 @@ var addHostedCloudTests = []struct {
 		Config:         dbmodel.Map{"A": string("a")},
 	},
 }, {
+	name: "Success - with cloud name and region",
+	addCloud: func(context.Context, names.CloudTag, jujuparams.Cloud, bool) error {
+		return nil
+	},
+	grantCloudAccess: func(context.Context, names.CloudTag, names.UserTag, string) error {
+		return nil
+	},
+	cloud_: func(_ context.Context, _ names.CloudTag, cld *jujuparams.Cloud) error {
+		cld.Type = "kubernetes"
+		cld.HostCloudRegion = "test-cloud/test-region"
+		cld.AuthTypes = []string{"empty", "userpass"}
+		cld.Endpoint = "https://example.com"
+		cld.IdentityEndpoint = "https://example.com/identity"
+		cld.StorageEndpoint = "https://example.com/storage"
+		cld.Regions = []jujuparams.CloudRegion{{
+			Name: "default",
+		}}
+		cld.CACertificates = []string{"CACERT"}
+		cld.Config = map[string]interface{}{"A": "a"}
+		cld.RegionConfig = map[string]map[string]interface{}{
+			"default": {"B": 2},
+		}
+		return nil
+	},
+	username:  "bob@canonical.com",
+	cloudName: "new-cloud",
+	cloud: jujuparams.Cloud{
+		Type:             "kubernetes",
+		HostCloudRegion:  "test-cloud/test-region",
+		AuthTypes:        []string{"empty", "userpass"},
+		Endpoint:         "https://example.com",
+		IdentityEndpoint: "https://example.com/identity",
+		StorageEndpoint:  "https://example.com/storage",
+	},
+	expectCloud: dbmodel.Cloud{
+		Name:             "new-cloud",
+		Type:             "kubernetes",
+		HostCloudRegion:  "test-cloud/test-region",
+		AuthTypes:        []string{"empty", "userpass"},
+		Endpoint:         "https://example.com",
+		IdentityEndpoint: "https://example.com/identity",
+		StorageEndpoint:  "https://example.com/storage",
+		Regions: []dbmodel.CloudRegion{{
+			Name:   "default",
+			Config: dbmodel.Map{"B": float64(2)},
+			Controllers: []dbmodel.CloudRegionControllerPriority{{
+				Controller: dbmodel.Controller{
+					Name:        "test-controller",
+					UUID:        "00000001-0000-0000-0000-000000000001",
+					CloudName:   "test-cloud",
+					CloudRegion: "test-region",
+				},
+				Priority: 1,
+			}},
+		}},
+		CACertificates: dbmodel.Strings{"CACERT"},
+		Config:         dbmodel.Map{"A": string("a")},
+	},
+}, {
+	name: "Success - with cloud name",
+	addCloud: func(context.Context, names.CloudTag, jujuparams.Cloud, bool) error {
+		return nil
+	},
+	grantCloudAccess: func(context.Context, names.CloudTag, names.UserTag, string) error {
+		return nil
+	},
+	cloud_: func(_ context.Context, _ names.CloudTag, cld *jujuparams.Cloud) error {
+		cld.Type = "kubernetes"
+		cld.HostCloudRegion = "test-cloud/test-region"
+		cld.AuthTypes = []string{"empty", "userpass"}
+		cld.Endpoint = "https://example.com"
+		cld.IdentityEndpoint = "https://example.com/identity"
+		cld.StorageEndpoint = "https://example.com/storage"
+		cld.Regions = []jujuparams.CloudRegion{{
+			Name: "default",
+		}}
+		cld.CACertificates = []string{"CACERT"}
+		cld.Config = map[string]interface{}{"A": "a"}
+		cld.RegionConfig = map[string]map[string]interface{}{
+			"default": {"B": 2},
+		}
+		return nil
+	},
+	username:  "bob@canonical.com",
+	cloudName: "new-cloud",
+	cloud: jujuparams.Cloud{
+		Type:             "kubernetes",
+		HostCloudRegion:  "test-cloud",
+		AuthTypes:        []string{"empty", "userpass"},
+		Endpoint:         "https://example.com",
+		IdentityEndpoint: "https://example.com/identity",
+		StorageEndpoint:  "https://example.com/storage",
+	},
+	expectCloud: dbmodel.Cloud{
+		Name:             "new-cloud",
+		Type:             "kubernetes",
+		HostCloudRegion:  "test-cloud/test-region",
+		AuthTypes:        []string{"empty", "userpass"},
+		Endpoint:         "https://example.com",
+		IdentityEndpoint: "https://example.com/identity",
+		StorageEndpoint:  "https://example.com/storage",
+		Regions: []dbmodel.CloudRegion{{
+			Name:   "default",
+			Config: dbmodel.Map{"B": float64(2)},
+			Controllers: []dbmodel.CloudRegionControllerPriority{{
+				Controller: dbmodel.Controller{
+					Name:        "test-controller",
+					UUID:        "00000001-0000-0000-0000-000000000001",
+					CloudName:   "test-cloud",
+					CloudRegion: "test-region",
+				},
+				Priority: 1,
+			}},
+		}},
+		CACertificates: dbmodel.Strings{"CACERT"},
+		Config:         dbmodel.Map{"A": string("a")},
+	},
+}, {
 	name:      "CloudWithReservedName",
 	username:  "bob@canonical.com",
 	cloudName: "aws",
@@ -481,13 +599,13 @@ var addHostedCloudTests = []struct {
 	cloudName: "new-cloud",
 	cloud: jujuparams.Cloud{
 		Type:             "kubernetes",
-		HostCloudRegion:  "ec2",
+		HostCloudRegion:  "ec2/eu-central-1/2",
 		AuthTypes:        []string{"empty", "userpass"},
 		Endpoint:         "https://example.com",
 		IdentityEndpoint: "https://example.com/identity",
 		StorageEndpoint:  "https://example.com/storage",
 	},
-	expectError:     `invalid cloud/region format "ec2"`,
+	expectError:     `invalid cloud/region format "ec2/eu-central-1/2"`,
 	expectErrorCode: errors.CodeBadRequest,
 }, {
 	name:      "HostCloudIsHosted",

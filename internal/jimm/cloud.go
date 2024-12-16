@@ -177,16 +177,69 @@ func (j *JIMM) AddCloudToController(ctx context.Context, user *openfga.User, con
 	return nil
 }
 
+func (j *JIMM) determineHostCloudRegion(ctx context.Context, hostCloudRegion string) (*dbmodel.CloudRegion, error) {
+	// if the hostCloudRegion does not contain '/', then we consider it to be
+	// the cloud name
+	if !strings.Contains(hostCloudRegion, "/") {
+		cl := dbmodel.Cloud{
+			Name: hostCloudRegion,
+		}
+		if err := j.Database.GetCloud(ctx, &cl); err != nil {
+			return nil, errors.E(errors.CodeNotFound, "unable to find host cloud %q", hostCloudRegion)
+		}
+		if len(cl.Regions) > 1 {
+			return nil, errors.E(errors.CodeBadRequest, "unable to determine a unique region for host cloud %q - consider specifying the host cloud region", hostCloudRegion)
+		}
+		if len(cl.Regions) == 0 {
+			return nil, errors.E(errors.CodeBadRequest, "the host cloud %q does not have a valid region", hostCloudRegion)
+		}
+		return &cl.Regions[0], nil
+	}
+
+	parts := strings.Split(hostCloudRegion, "/")
+	if len(parts) != 2 || parts[0] == "" {
+		return nil, errors.E(errors.CodeBadRequest, fmt.Sprintf("invalid cloud/region format %q", hostCloudRegion))
+	}
+
+	findRegionFunctions := []func(context.Context, string, string) (*dbmodel.CloudRegion, error){
+		j.Database.FindRegionByCloudType,
+		j.Database.FindRegionByCloudName,
+	}
+
+	var err error
+	var region *dbmodel.CloudRegion
+	for _, findRegionFunction := range findRegionFunctions {
+		region, err = findRegionFunction(ctx, parts[0], parts[1])
+		if err == nil {
+			break
+		}
+	}
+	if err != nil {
+		if errors.ErrorCode(err) == errors.CodeNotFound {
+			return nil, errors.E(err, errors.CodeNotFound, fmt.Sprintf("unable to find cloud/region %q", hostCloudRegion))
+		}
+		return nil, err
+	}
+	return region, nil
+}
+
 // AddHostedCloud adds the cloud defined by the given tag and cloud to the
 // JAAS system. The cloud will be created on a controller running on the
 // requested host cloud-region and the cloud created there. If the given
 // user does not have add-model access to JAAS then an error with a code of
 // CodeUnauthorized will be returned (please note this differs from juju
-// which requires admin controller access to create clouds). If the
-// requested cloud cannot be created on this JAAS system an error with a
-// code of CodeIncompatibleClouds will be returned. If there is an error
-// returned by the controller when creating the cloud then that error code
-// will be preserved.
+// which requires admin controller access to create clouds).
+// Returned errors:
+//   - If the host cloud is not specified an error with a code CodeCloudRegionRequired  will
+//     be returned.
+//   - If the specified host cloud (or could region) could not be found an error with a
+//     code CodeNotFound will be returned.
+//   - If the host cloud region is not specified and the specified host cloud has
+//     multiple regions (or no regions) an error with a code CodeBadRequest will be returned.
+//   - If the requested cloud cannot be created on this JAAS system an error with a
+//     code of CodeIncompatibleClouds will be returned.
+//   - If there is an error returned by the controller when creating the cloud
+//     then that error code will be preserved.
 func (j *JIMM) AddHostedCloud(ctx context.Context, user *openfga.User, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error {
 	const op = errors.Op("jimm.AddHostedCloud")
 
@@ -213,14 +266,9 @@ func (j *JIMM) AddHostedCloud(ctx context.Context, user *openfga.User, tag names
 	if cloud.HostCloudRegion == "" {
 		return errors.E(op, errors.CodeCloudRegionRequired, "cloud host region not specified")
 	}
-	parts := strings.SplitN(cloud.HostCloudRegion, "/", 2)
-	if len(parts) != 2 || parts[0] == "" {
-		return errors.E(op, errors.CodeBadRequest, fmt.Sprintf("invalid cloud/region format %q", cloud.HostCloudRegion))
-	}
-	region, err := j.Database.FindRegion(ctx, parts[0], parts[1])
-	if errors.ErrorCode(err) == errors.CodeNotFound {
-		return errors.E(op, err, errors.CodeNotFound, fmt.Sprintf("unable to find cloud/region %q", cloud.HostCloudRegion))
-	} else if err != nil {
+
+	region, err := j.determineHostCloudRegion(ctx, cloud.HostCloudRegion)
+	if err != nil {
 		return errors.E(op, err)
 	}
 
@@ -728,7 +776,7 @@ func validateCloudRegion(ctx context.Context, db *db.Database, user *openfga.Use
 		return errors.E(errors.CodeIncompatibleClouds, fmt.Sprintf("cloud host region %q has invalid cloud/region format", cloud.HostCloudRegion))
 	}
 
-	region, err := db.FindRegion(ctx, parts[0], parts[1])
+	region, err := db.FindRegionByCloudType(ctx, parts[0], parts[1])
 	if err != nil {
 		if errors.ErrorCode(err) == errors.CodeNotFound {
 			return errors.E(errors.CodeIncompatibleClouds, fmt.Sprintf("unable to find cloud/region %q", cloud.HostCloudRegion))

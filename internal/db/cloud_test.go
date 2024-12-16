@@ -217,13 +217,13 @@ func TestFindRegionUnconfiguredDatabase(t *testing.T) {
 	c := qt.New(t)
 
 	var d db.Database
-	cr, err := d.FindRegion(context.Background(), "", "")
+	cr, err := d.FindRegionByCloudType(context.Background(), "", "")
 	c.Check(err, qt.ErrorMatches, `database not configured`)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeServerConfiguration)
 	c.Check(cr, qt.IsNil)
 }
 
-func (s *dbSuite) TestFindRegion(c *qt.C) {
+func (s *dbSuite) TestFindRegionByCloudType(c *qt.C) {
 	ctx := context.Background()
 
 	err := s.Database.Migrate(ctx, false)
@@ -246,7 +246,7 @@ controllers:
 `)
 	env.PopulateDB(c, s.Database)
 
-	cr, err := s.Database.FindRegion(ctx, "testp", "test-region")
+	cr, err := s.Database.FindRegionByCloudType(ctx, "testp", "test-region")
 	c.Assert(err, qt.IsNil)
 	c.Check(cr, jimmtest.DBObjectEquals, &dbmodel.CloudRegion{
 		Cloud: dbmodel.Cloud{
@@ -265,7 +265,52 @@ controllers:
 		}},
 	})
 
-	_, err = s.Database.FindRegion(ctx, "no-such", "region")
+	_, err = s.Database.FindRegionByCloudType(ctx, "no-such", "region")
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+}
+func (s *dbSuite) TestFindRegionByCloudName(c *qt.C) {
+	ctx := context.Background()
+
+	err := s.Database.Migrate(ctx, false)
+	c.Assert(err, qt.IsNil)
+
+	env := jimmtest.ParseEnvironment(c, `clouds:
+- name: test
+  type: testp
+  regions:
+  - name: test-region
+controllers:
+- name: test
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test
+  region: test-region
+  cloud-regions:
+  - cloud: test
+    region: test-region
+    priority: 1
+`)
+	env.PopulateDB(c, s.Database)
+
+	cr, err := s.Database.FindRegionByCloudName(ctx, "test", "test-region")
+	c.Assert(err, qt.IsNil)
+	c.Check(cr, jimmtest.DBObjectEquals, &dbmodel.CloudRegion{
+		Cloud: dbmodel.Cloud{
+			Name: "test",
+			Type: "testp",
+		},
+		Name: "test-region",
+		Controllers: []dbmodel.CloudRegionControllerPriority{{
+			Controller: dbmodel.Controller{
+				Name:        "test",
+				UUID:        "00000001-0000-0000-0000-000000000001",
+				CloudName:   "test",
+				CloudRegion: "test-region",
+			},
+			Priority: 1,
+		}},
+	})
+
+	_, err = s.Database.FindRegionByCloudName(ctx, "no-such", "region")
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 }
 

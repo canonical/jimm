@@ -152,9 +152,9 @@ func (d *Database) AddCloudRegion(ctx context.Context, cr *dbmodel.CloudRegion) 
 	return nil
 }
 
-// FindRegion finds a region with the given name on a cloud with the given
-// provider type.
-func (d *Database) FindRegion(ctx context.Context, providerType, name string) (_ *dbmodel.CloudRegion, err error) {
+// FindRegionByCloudType finds a region with the given name on a cloud with the given
+// cloud type.
+func (d *Database) FindRegionByCloudType(ctx context.Context, providerType, regionName string) (_ *dbmodel.CloudRegion, err error) {
 	const op = errors.Op("db.FindRegion")
 	if err := d.ready(); err != nil {
 		return nil, errors.E(op, err)
@@ -166,7 +166,30 @@ func (d *Database) FindRegion(ctx context.Context, providerType, name string) (_
 
 	db := d.DB.WithContext(ctx)
 	db = db.Preload("Cloud").Preload("Controllers").Preload("Controllers.Controller")
-	db = db.Model(dbmodel.CloudRegion{}).Joins("INNER JOIN clouds ON clouds.name = cloud_regions.cloud_name").Where("clouds.type = ? AND cloud_regions.name = ?", providerType, name)
+	db = db.Model(dbmodel.CloudRegion{}).Joins("INNER JOIN clouds ON clouds.name = cloud_regions.cloud_name").Where("clouds.type = ? AND cloud_regions.name = ?", providerType, regionName)
+
+	var region dbmodel.CloudRegion
+	if err := db.First(&region).Error; err != nil {
+		return nil, errors.E(op, dbError(err))
+	}
+	return &region, nil
+}
+
+// FindRegionByCloudName finds a region with the given name on a cloud with the given
+// name.
+func (d *Database) FindRegionByCloudName(ctx context.Context, cloudName, regionName string) (_ *dbmodel.CloudRegion, err error) {
+	const op = errors.Op("db.FindRegion")
+	if err := d.ready(); err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
+	db := d.DB.WithContext(ctx)
+	db = db.Preload("Cloud").Preload("Controllers").Preload("Controllers.Controller")
+	db = db.Model(dbmodel.CloudRegion{}).Joins("INNER JOIN clouds ON clouds.name = cloud_regions.cloud_name").Where("clouds.name = ? AND cloud_regions.name = ?", cloudName, regionName)
 
 	var region dbmodel.CloudRegion
 	if err := db.First(&region).Error; err != nil {
