@@ -173,10 +173,6 @@ type Parameters struct {
 	// with the OpenFGA ReBAC system.
 	OpenFGAClient *openfga.OFGAClient
 
-	// JWKService holds a service responsible for generating and delivering a JWKS
-	// for consumption within Juju controllers.
-	JWKService *jimmjwx.JWKSService
-
 	// JWTService is responsible for minting JWTs to access controllers.
 	JWTService *jimmjwx.JWTService
 
@@ -208,10 +204,6 @@ func (p *Parameters) Validate() error {
 
 	if p.OpenFGAClient == nil {
 		return errors.E("missing openfga client")
-	}
-
-	if p.JWKService == nil {
-		return errors.E("missing jwks service")
 	}
 
 	if p.JWTService == nil {
