@@ -1,6 +1,6 @@
 // Copyright 2024 Canonical.
 
-package jwtgenerator_test
+package jujuauth_test
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/internal/jimm/jwtgenerator"
+	"github.com/canonical/jimm/v3/internal/jimm/jujuauth"
 	"github.com/canonical/jimm/v3/internal/jimmjwx"
 	"github.com/canonical/jimm/v3/internal/openfga"
 )
@@ -238,7 +238,7 @@ func TestJWTGeneratorMakeLoginToken(t *testing.T) {
 	}}
 
 	for _, test := range tests {
-		generator := jwtgenerator.New(test.database, test.accessChecker, test.jwtService)
+		generator := jujuauth.New(test.database, test.accessChecker, test.jwtService)
 		generator.SetTags(mt, ct)
 
 		i, err := dbmodel.NewIdentity(test.username)
@@ -311,7 +311,7 @@ func TestJWTGeneratorMakeToken(t *testing.T) {
 	}}
 
 	for _, test := range tests {
-		generator := jwtgenerator.New(
+		generator := jujuauth.New(
 			&testDatabase{
 				ctl: dbmodel.Controller{
 					CloudRegions: []dbmodel.CloudRegionControllerPriority{{
