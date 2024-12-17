@@ -3,15 +3,12 @@
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/juju/cmd/v3"
 	"github.com/juju/gnuflag"
 	jujuapi "github.com/juju/juju/api"
 	jujucmd "github.com/juju/juju/cmd"
 	"github.com/juju/juju/cmd/modelcmd"
 	"github.com/juju/juju/jujuclient"
-	"github.com/juju/names/v5"
 
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/pkg/api"
@@ -20,15 +17,24 @@ import (
 
 const (
 	migrateModelCommandDoc = `
-The migrate command migrates a model(s) to a new controller. Specify
-a model-uuid to migrate and the destination controller name.
+The migrate commands migrates a model, or many models between two controllers
+registered within JIMM. 
 
-Note that multiple models can be targeted for migration by supplying
-multiple model uuids.
+You may specify a model name (of the form owner/name) or model UUID.
+
+For example, JIMM is aware of controller-a and controller-b and controller-a has
+models:
+	- alice@canonical.com/model-a
+	- 2cb433a6-04eb-4ec4-9567-90426d20a004
+
+You may run the migrate command like so to migrate the two models
+from controller-a to controller-b:
+	jimmctl migrate controller-b model-a 2cb433a6-04eb-4ec4-9567-90426d20a004
+
 `
 	migrateModelCommandExample = `
     jimmctl migrate mycontroller 2cb433a6-04eb-4ec4-9567-90426d20a004 
-    jimmctl migrate mycontroller 2cb433a6-04eb-4ec4-9567-90426d20a004 fd469983-27c2-423b-bebf-84f616fb036b ...
+    jimmctl migrate mycontroller model-a model-b fd469983-27c2-423b-bebf-84f616fb036b ... 
 `
 )
 
@@ -49,7 +55,7 @@ type migrateModelCommand struct {
 	store            jujuclient.ClientStore
 	dialOpts         *jujuapi.DialOpts
 	targetController string
-	modelTags        []string
+	modelTargets     []string
 }
 
 func (c *migrateModelCommand) Info() *cmd.Info {
@@ -74,19 +80,14 @@ func (c *migrateModelCommand) SetFlags(f *gnuflag.FlagSet) {
 // Init implements the cmd.Command interface.
 func (c *migrateModelCommand) Init(args []string) error {
 	if len(args) < 2 {
-		return errors.E("Missing controller name and model uuid arguments")
+		return errors.E("Missing controller name and model target arguments")
 	}
 	for i, arg := range args {
 		if i == 0 {
 			c.targetController = arg
 			continue
 		}
-		mt := names.NewModelTag(arg)
-		_, err := names.ParseModelTag(mt.String())
-		if err != nil {
-			return errors.E(err, fmt.Sprintf("%s is not a valid model uuid", arg))
-		}
-		c.modelTags = append(c.modelTags, mt.String())
+		c.modelTargets = append(c.modelTargets, arg)
 	}
 	return nil
 }
@@ -105,8 +106,8 @@ func (c *migrateModelCommand) Run(ctxt *cmd.Context) error {
 
 	client := api.NewClient(apiCaller)
 	specs := []apiparams.MigrateModelInfo{}
-	for _, model := range c.modelTags {
-		specs = append(specs, apiparams.MigrateModelInfo{ModelTag: model, TargetController: c.targetController})
+	for _, model := range c.modelTargets {
+		specs = append(specs, apiparams.MigrateModelInfo{TargetModelNameOrUUID: model, TargetController: c.targetController})
 	}
 	req := apiparams.MigrateModelRequest{Specs: specs}
 	events, err := client.MigrateModel(&req)

@@ -855,15 +855,22 @@ func (s *jimmSuite) TestJimmModelMigrationSuperuser(c *gc.C) {
 
 	res, err := client.MigrateModel(&apiparams.MigrateModelRequest{
 		Specs: []apiparams.MigrateModelInfo{
-			{ModelTag: mt.String(), TargetController: "controller-1"},
+			{TargetModelNameOrUUID: mt.Id(), TargetController: "controller-1"},
+			{TargetModelNameOrUUID: "charlie@canonical.com/model-20", TargetController: "controller-1"},
 		},
 	})
 	c.Assert(err, gc.IsNil)
-	c.Assert(res.Results, gc.HasLen, 1)
+	c.Assert(res.Results, gc.HasLen, 2)
+
 	item := res.Results[0]
 	c.Assert(item.ModelTag, gc.Equals, mt.String())
 	c.Assert(item.MigrationId, gc.Equals, "")
 	c.Assert(item.Error.Message, gc.Matches, "target prechecks failed: model with same UUID already exists .*")
+
+	item2 := res.Results[1]
+	c.Assert(item2.ModelTag, gc.Equals, mt.String())
+	c.Assert(item2.MigrationId, gc.Equals, "")
+	c.Assert(item2.Error.Message, gc.Matches, "target prechecks failed: model with same UUID already exists .*")
 }
 
 func (s *jimmSuite) TestJimmModelMigrationNonSuperuser(c *gc.C) {
@@ -882,7 +889,7 @@ func (s *jimmSuite) TestJimmModelMigrationNonSuperuser(c *gc.C) {
 
 	res, err := client.MigrateModel(&apiparams.MigrateModelRequest{
 		Specs: []apiparams.MigrateModelInfo{
-			{ModelTag: mt.String(), TargetController: "controller-1"},
+			{TargetModelNameOrUUID: mt.Id(), TargetController: "controller-1"},
 		},
 	})
 	c.Assert(err, gc.IsNil)
