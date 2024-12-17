@@ -1,7 +1,7 @@
 // Copyright 2024 Canonical.
 
-// jwtgenerator generates JWT tokens to authenticate
-// and authorize messages to Juju controllers.
+// Package jwtgenerator generates JWT tokens to
+// authenticate and authorize messages to Juju controllers.
 // This package is more specialised than a generic
 // JWT token generator as it crafts Juju specific
 // permissions that are added as claims to the JWT
@@ -22,15 +22,15 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga"
 )
 
-// jwtGeneratorDatabase specifies the database interface used by the
+// generatorDatabase specifies the database interface used by the
 // JWT generator.
-type jwtGeneratorDatabase interface {
+type generatorDatabase interface {
 	GetController(ctx context.Context, controller *dbmodel.Controller) error
 }
 
-// jwtGeneratorAccessChecker specifies the access checker used by the JWT
+// generatorAccessChecker specifies the access checker used by the JWT
 // generator to obtain user's access rights to various entities.
-type jwtGeneratorAccessChecker interface {
+type generatorAccessChecker interface {
 	GetUserModelAccess(context.Context, *openfga.User, names.ModelTag) (string, error)
 	GetUserControllerAccess(context.Context, *openfga.User, names.ControllerTag) (string, error)
 	GetUserCloudAccess(context.Context, *openfga.User, names.CloudTag) (string, error)
@@ -44,8 +44,8 @@ type jwtService interface {
 
 // JWTGenerator provides the necessary state and methods to authorize a user and generate JWT tokens.
 type JWTGenerator struct {
-	database      jwtGeneratorDatabase
-	accessChecker jwtGeneratorAccessChecker
+	database      generatorDatabase
+	accessChecker generatorAccessChecker
 	jwtService    jwtService
 
 	mu             sync.Mutex
@@ -57,7 +57,7 @@ type JWTGenerator struct {
 }
 
 // New returns a new JWTGenerator.
-func New(database jwtGeneratorDatabase, accessChecker jwtGeneratorAccessChecker, jwtService jwtService) JWTGenerator {
+func New(database generatorDatabase, accessChecker generatorAccessChecker, jwtService jwtService) JWTGenerator {
 	return JWTGenerator{
 		database:      database,
 		accessChecker: accessChecker,

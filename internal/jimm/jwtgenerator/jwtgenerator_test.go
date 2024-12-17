@@ -1,4 +1,5 @@
 // Copyright 2024 Canonical.
+
 package jwtgenerator_test
 
 import (
