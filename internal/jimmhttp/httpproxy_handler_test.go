@@ -66,14 +66,14 @@ func (s *httpProxySuite) SetUpTest(c *gc.C) {
 	err := s.JIMM.Database.GetModel(ctx, model)
 	c.Assert(err, gc.IsNil)
 	s.model = model
-	err = s.JIMM.GetCredentialStore().PutControllerCredentials(ctx, model.Controller.Name, "user", "psw")
+	err = s.JIMM.CredentialStore.PutControllerCredentials(ctx, model.Controller.Name, "user", "psw")
 	c.Assert(err, gc.IsNil)
 }
 
 func (s *httpProxySuite) TestHTTPProxyHandler(c *gc.C) {
 	ctx := context.Background()
 	httpProxier := jimmhttp.NewHTTPProxyHandler(s.JIMM)
-	expectU, expectP, err := s.JIMM.GetCredentialStore().GetControllerCredentials(ctx, s.model.Controller.Name)
+	expectU, expectP, err := s.JIMM.CredentialStore.GetControllerCredentials(ctx, s.model.Controller.Name)
 	c.Assert(err, gc.IsNil)
 	// we expect the controller to respond with TLS
 	fakeController := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
