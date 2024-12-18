@@ -43,7 +43,7 @@ func (s *dbSuite) TestAddCloud(c *qt.C) {
 	err := s.Database.AddCloud(ctx, &cl)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
 
-	err = s.Database.Migrate(context.Background(), false)
+	err = s.Database.Migrate(context.Background())
 	c.Assert(err, qt.IsNil)
 
 	err = s.Database.AddCloud(ctx, &cl)
@@ -82,7 +82,7 @@ func (s *dbSuite) TestGetCloud(c *qt.C) {
 	err := s.Database.GetCloud(ctx, &cl)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
 
-	err = s.Database.Migrate(context.Background(), false)
+	err = s.Database.Migrate(context.Background())
 	c.Assert(err, qt.IsNil)
 
 	err = s.Database.GetCloud(ctx, &cl)
@@ -123,7 +123,7 @@ func (s *dbSuite) TestGetClouds(c *qt.C) {
 	_, err := s.Database.GetClouds(ctx)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
 
-	err = s.Database.Migrate(context.Background(), false)
+	err = s.Database.Migrate(context.Background())
 	c.Assert(err, qt.IsNil)
 
 	clouds, err := s.Database.GetClouds(ctx)
@@ -177,7 +177,7 @@ func (s *dbSuite) TestUpdateCloud(c *qt.C) {
 	err := s.Database.UpdateCloud(ctx, &cl)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
 
-	err = s.Database.Migrate(context.Background(), false)
+	err = s.Database.Migrate(context.Background())
 	c.Assert(err, qt.IsNil)
 
 	err = s.Database.UpdateCloud(ctx, &cl)
@@ -226,7 +226,7 @@ func TestFindRegionUnconfiguredDatabase(t *testing.T) {
 func (s *dbSuite) TestFindRegionByCloudType(c *qt.C) {
 	ctx := context.Background()
 
-	err := s.Database.Migrate(ctx, false)
+	err := s.Database.Migrate(ctx)
 	c.Assert(err, qt.IsNil)
 
 	env := jimmtest.ParseEnvironment(c, `clouds:
@@ -271,7 +271,7 @@ controllers:
 func (s *dbSuite) TestFindRegionByCloudName(c *qt.C) {
 	ctx := context.Background()
 
-	err := s.Database.Migrate(ctx, false)
+	err := s.Database.Migrate(ctx)
 	c.Assert(err, qt.IsNil)
 
 	env := jimmtest.ParseEnvironment(c, `clouds:
@@ -341,7 +341,7 @@ func (s *dbSuite) TestDeleteCloud(c *qt.C) {
 	err := s.Database.DeleteCloud(ctx, &cl)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
 
-	err = s.Database.Migrate(context.Background(), false)
+	err = s.Database.Migrate(context.Background())
 	c.Assert(err, qt.IsNil)
 
 	err = s.Database.AddCloud(ctx, &cl)
@@ -379,7 +379,7 @@ func (s *dbSuite) TestDeleteCloudRegionControllerPriority(c *qt.C) {
 	err := s.Database.DeleteCloudRegionControllerPriority(ctx, &crp)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
 
-	err = s.Database.Migrate(context.Background(), false)
+	err = s.Database.Migrate(context.Background())
 	c.Assert(err, qt.IsNil)
 
 	env := jimmtest.ParseEnvironment(c, `clouds:

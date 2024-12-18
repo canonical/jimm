@@ -1783,7 +1783,7 @@ func TestModelSummaries(t *testing.T) {
 
 	j := jimmtest.NewJIMM(c, nil)
 
-	err := j.Database.Migrate(ctx, false)
+	err := j.Database.Migrate(ctx)
 	c.Assert(err, qt.IsNil)
 
 	env := jimmtest.ParseEnvironment(c, modelSummariesTestEnv)

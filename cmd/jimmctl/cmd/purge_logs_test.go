@@ -74,7 +74,7 @@ func (s *purgeLogsSuite) TestPurgeLogsFromDb(c *gc.C) {
 			IdentityTag: names.NewUserTag("alice@canonical.com").String(),
 		}
 
-		err := s.JIMM.Database.Migrate(context.Background(), false)
+		err := s.JIMM.Database.Migrate(context.Background())
 		c.Assert(err, gc.IsNil)
 		err = s.JIMM.Database.AddAuditLogEntry(ctx, &ale)
 		c.Assert(err, gc.IsNil)

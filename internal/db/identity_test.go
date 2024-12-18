@@ -33,7 +33,7 @@ func (s *dbSuite) TestGetIdentity(c *qt.C) {
 	c.Check(err, qt.ErrorMatches, `upgrade in progress`)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
 
-	err = s.Database.Migrate(ctx, false)
+	err = s.Database.Migrate(ctx)
 	c.Assert(err, qt.IsNil)
 
 	u, err := dbmodel.NewIdentity("bob@canonical.com")
@@ -83,7 +83,7 @@ func (s *dbSuite) TestUpdateIdentity(c *qt.C) {
 	c.Check(err, qt.ErrorMatches, `upgrade in progress`)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
 
-	err = s.Database.Migrate(ctx, false)
+	err = s.Database.Migrate(ctx)
 	c.Assert(err, qt.IsNil)
 
 	u, err := dbmodel.NewIdentity("bob@canonical.com")
@@ -133,7 +133,7 @@ func TestGetIdentityCloudCredentialsUnconfiguredDatabase(t *testing.T) {
 func (s *dbSuite) TestGetIdentityCloudCredentials(c *qt.C) {
 	ctx := context.Background()
 
-	err := s.Database.Migrate(ctx, false)
+	err := s.Database.Migrate(ctx)
 	c.Assert(err, qt.IsNil)
 
 	i, err := dbmodel.NewIdentity("idontexist")
@@ -184,7 +184,7 @@ func (s *dbSuite) TestGetIdentityCloudCredentials(c *qt.C) {
 }
 
 func (s *dbSuite) TestListIdentities(c *qt.C) {
-	err := s.Database.Migrate(context.Background(), false)
+	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.IsNil)
 
 	for i := range 10 {

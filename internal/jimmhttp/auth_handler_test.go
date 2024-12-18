@@ -27,7 +27,7 @@ func setupDbAndSessionStore(c *qt.C) (*db.Database, sessions.Store) {
 	db := &db.Database{
 		DB: jimmtest.PostgresDB(c, time.Now),
 	}
-	c.Assert(db.Migrate(context.Background(), false), qt.IsNil)
+	c.Assert(db.Migrate(context.Background()), qt.IsNil)
 
 	sqlDb, err := db.DB.DB()
 	c.Assert(err, qt.IsNil)

@@ -231,7 +231,7 @@ func New(p Parameters) (*JIMM, error) {
 		Parameters: p,
 	}
 
-	if err := j.Database.Migrate(context.Background(), false); err != nil {
+	if err := j.Database.Migrate(context.Background()); err != nil {
 		return nil, errors.E(err)
 	}
 

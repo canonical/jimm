@@ -190,7 +190,7 @@ func (s *adminSuite) TestDeviceLogin(c *gc.C) {
 	}, "test")
 	defer conn.Close()
 
-	err := s.JIMM.Database.Migrate(context.Background(), false)
+	err := s.JIMM.Database.Migrate(context.Background())
 	c.Assert(err, gc.IsNil)
 
 	// Create a user in keycloak

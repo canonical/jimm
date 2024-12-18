@@ -93,7 +93,7 @@ func (s *modelCleanupSuite) Init(c *qt.C) {
 	s.ofgaClient, _, _, err = jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 	s.jimm = jimmtest.NewJIMM(c, nil)
-	err = s.jimm.Database.Migrate(ctx, false)
+	err = s.jimm.Database.Migrate(ctx)
 	c.Assert(err, qt.IsNil)
 	s.jimmAdmin, err = s.jimm.GetUser(ctx, "alice@canonical.com")
 	c.Assert(err, qt.IsNil)

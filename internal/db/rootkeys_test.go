@@ -42,7 +42,7 @@ func TestInsertKeyUnconfiguredDatabase(t *testing.T) {
 }
 
 func (s *dbSuite) TestInsertKeyGetKey(c *qt.C) {
-	err := s.Database.Migrate(context.Background(), false)
+	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.IsNil)
 
 	_, err = s.Database.GetKey([]byte("test-id"))
@@ -74,7 +74,7 @@ func TestFindLatestKeyUnconfiguredDatabase(t *testing.T) {
 }
 
 func (s *dbSuite) TestFindLatestKey(c *qt.C) {
-	err := s.Database.Migrate(context.Background(), false)
+	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.IsNil)
 
 	now := time.Now().UTC().Round(time.Millisecond)

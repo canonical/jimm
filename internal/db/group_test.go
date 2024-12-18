@@ -37,7 +37,7 @@ func (s *dbSuite) TestAddGroup(c *qt.C) {
 	_, err := s.Database.AddGroup(ctx, "test-group")
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
 
-	err = s.Database.Migrate(context.Background(), false)
+	err = s.Database.Migrate(context.Background())
 	c.Assert(err, qt.IsNil)
 
 	groupEntry, err := s.Database.AddGroup(ctx, "test-group")
@@ -58,7 +58,7 @@ func (s *dbSuite) TestAddGroup(c *qt.C) {
 }
 
 func (s *dbSuite) TestCountGroups(c *qt.C) {
-	err := s.Database.Migrate(context.Background(), false)
+	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.IsNil)
 
 	addNGroups := 10
@@ -82,7 +82,7 @@ func (s *dbSuite) TestGetGroup(c *qt.C) {
 	})
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
 
-	err = s.Database.Migrate(context.Background(), false)
+	err = s.Database.Migrate(context.Background())
 	c.Assert(err, qt.IsNil)
 
 	group := &dbmodel.GroupEntry{
@@ -125,7 +125,7 @@ func (s *dbSuite) TestUpdateGroupName(c *qt.C) {
 	err := s.Database.UpdateGroupName(context.Background(), "test-group", "new-name")
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
 
-	err = s.Database.Migrate(context.Background(), false)
+	err = s.Database.Migrate(context.Background())
 	c.Assert(err, qt.IsNil)
 
 	err = s.Database.UpdateGroupName(context.Background(), "test-group", "new-name")
@@ -156,7 +156,7 @@ func (s *dbSuite) TestRemoveGroup(c *qt.C) {
 	err := s.Database.RemoveGroup(context.Background(), &dbmodel.GroupEntry{Name: "test-group"})
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
-	err = s.Database.Migrate(context.Background(), false)
+	err = s.Database.Migrate(context.Background())
 	c.Assert(err, qt.IsNil)
 
 	ge := &dbmodel.GroupEntry{
@@ -183,7 +183,7 @@ func (s *dbSuite) TestRemoveGroup(c *qt.C) {
 }
 
 func (s *dbSuite) TestListGroups(c *qt.C) {
-	err := s.Database.Migrate(context.Background(), false)
+	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.IsNil)
 
 	addNGroups := 10

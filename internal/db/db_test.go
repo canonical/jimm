@@ -21,12 +21,12 @@ type dbSuite struct {
 
 func (s *dbSuite) TestMigrate(c *qt.C) {
 	// Migrate from an empty database should work.
-	err := s.Database.Migrate(context.Background(), false)
+	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.IsNil)
 
 	// Attempting to migrate to the version that is already there should
 	// also work.
-	err = s.Database.Migrate(context.Background(), false)
+	err = s.Database.Migrate(context.Background())
 	c.Assert(err, qt.IsNil)
 }
 
@@ -34,7 +34,7 @@ func TestMigrateUnconfiguredDatabase(t *testing.T) {
 	c := qt.New(t)
 
 	var database db.Database
-	err := database.Migrate(context.Background(), false)
+	err := database.Migrate(context.Background())
 	c.Check(err, qt.ErrorMatches, `database not configured`)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeServerConfiguration)
 }
@@ -57,7 +57,7 @@ func (s *dbSuite) TestTransaction(c *qt.C) {
 	c.Check(err, qt.ErrorMatches, `upgrade in progress`)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
 
-	err = s.Database.Migrate(context.Background(), false)
+	err = s.Database.Migrate(context.Background())
 	c.Assert(err, qt.IsNil)
 	i, err := dbmodel.NewIdentity("bob@canonical.com")
 	c.Assert(err, qt.IsNil)

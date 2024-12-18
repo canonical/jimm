@@ -187,7 +187,7 @@ func TestModelSummaryWatcher(t *testing.T) {
 			}
 
 			env := jimmtest.ParseEnvironment(c, testWatcherEnv)
-			err := w.Database.Migrate(ctx, false)
+			err := w.Database.Migrate(ctx)
 			c.Assert(err, qt.IsNil)
 			env.PopulateDB(c, w.Database)
 
@@ -233,7 +233,7 @@ func TestWatcherSetsControllerUnavailable(t *testing.T) {
 	)
 
 	env := jimmtest.ParseEnvironment(c, testWatcherEnv)
-	err := w.Database.Migrate(ctx, false)
+	err := w.Database.Migrate(ctx)
 	c.Assert(err, qt.IsNil)
 	env.PopulateDB(c, w.Database)
 
@@ -297,7 +297,7 @@ func TestWatcherClearsControllerUnavailable(t *testing.T) {
 	}
 
 	env := jimmtest.ParseEnvironment(c, testWatcherEnv)
-	err := w.Database.Migrate(ctx, false)
+	err := w.Database.Migrate(ctx)
 	c.Assert(err, qt.IsNil)
 	env.PopulateDB(c, w.Database)
 

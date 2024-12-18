@@ -525,7 +525,7 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 	db := &db.Database{
 		DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 	}
-	err = db.Migrate(ctx, false)
+	err = db.Migrate(ctx)
 	c.Assert(err, qt.IsNil)
 
 	u, err := dbmodel.NewIdentity("alice@canonical.com")

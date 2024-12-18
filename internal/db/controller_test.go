@@ -26,7 +26,7 @@ func TestAddControllerUnconfiguredDatabase(t *testing.T) {
 }
 
 func (s *dbSuite) TestAddController(c *qt.C) {
-	err := s.Database.Migrate(context.Background(), true)
+	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.Equals, nil)
 
 	cloud := dbmodel.Cloud{
@@ -57,7 +57,7 @@ func (s *dbSuite) TestAddController(c *qt.C) {
 }
 
 func (s *dbSuite) TestGetController(c *qt.C) {
-	err := s.Database.Migrate(context.Background(), true)
+	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.Equals, nil)
 
 	cloud := dbmodel.Cloud{
@@ -134,7 +134,7 @@ controllers:
 
 func (s *dbSuite) TestForEachController(c *qt.C) {
 	ctx := context.Background()
-	err := s.Database.Migrate(context.Background(), true)
+	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.Equals, nil)
 
 	env := jimmtest.ParseEnvironment(c, testForEachControllerEnv)
@@ -169,7 +169,7 @@ func TestUpdateControllerUnconfiguredDatabase(t *testing.T) {
 }
 
 func (s *dbSuite) TestUpdateController(c *qt.C) {
-	err := s.Database.Migrate(context.Background(), true)
+	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.Equals, nil)
 
 	cloud := dbmodel.Cloud{
@@ -219,7 +219,7 @@ func (s *dbSuite) TestUpdateController(c *qt.C) {
 }
 
 func (s *dbSuite) TestDeleteController(c *qt.C) {
-	err := s.Database.Migrate(context.Background(), true)
+	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.Equals, nil)
 
 	cloud := dbmodel.Cloud{
@@ -317,7 +317,7 @@ models:
 
 func (s *dbSuite) TestForEachControllerModel(c *qt.C) {
 	ctx := context.Background()
-	err := s.Database.Migrate(context.Background(), true)
+	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.Equals, nil)
 
 	env := jimmtest.ParseEnvironment(c, testForEachControllerModelEnv)

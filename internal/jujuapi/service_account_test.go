@@ -162,7 +162,7 @@ func TestCopyServiceAccountCredential(t *testing.T) {
 			pgDb := db.Database{
 				DB: jimmtest.PostgresDB(c, nil),
 			}
-			err = pgDb.Migrate(context.Background(), false)
+			err = pgDb.Migrate(context.Background())
 			c.Assert(err, qt.IsNil)
 			clientIdWithDomain, err := jimmnames.EnsureValidServiceAccountId(test.args.ClientID)
 			c.Assert(err, qt.IsNil)
@@ -256,7 +256,7 @@ func TestGetServiceAccount(t *testing.T) {
 			pgDb := db.Database{
 				DB: jimmtest.PostgresDB(c, nil),
 			}
-			err = pgDb.Migrate(context.Background(), false)
+			err = pgDb.Migrate(context.Background())
 			c.Assert(err, qt.IsNil)
 			jimm := &jimmtest.JIMM{
 				UserLogin_: func(ctx context.Context, email string) (*openfga.User, error) {
@@ -449,7 +449,7 @@ func TestUpdateServiceAccountCredentials(t *testing.T) {
 			pgDb := db.Database{
 				DB: jimmtest.PostgresDB(c, nil),
 			}
-			err = pgDb.Migrate(context.Background(), false)
+			err = pgDb.Migrate(context.Background())
 			c.Assert(err, qt.IsNil)
 			jimm := &jimmtest.JIMM{
 				UpdateCloudCredential_: test.updateCloudCredential,
@@ -580,7 +580,7 @@ func TestListServiceAccountCredentials(t *testing.T) {
 			pgDb := db.Database{
 				DB: jimmtest.PostgresDB(c, nil),
 			}
-			err = pgDb.Migrate(context.Background(), false)
+			err = pgDb.Migrate(context.Background())
 			c.Assert(err, qt.IsNil)
 			jimm := &jimmtest.JIMM{
 				GetCloudCredential_:           test.getCloudCredential,
@@ -699,7 +699,7 @@ func TestGrantServiceAccountAccess(t *testing.T) {
 			pgDb := db.Database{
 				DB: jimmtest.PostgresDB(c, nil),
 			}
-			err = pgDb.Migrate(context.Background(), false)
+			err = pgDb.Migrate(context.Background())
 			c.Assert(err, qt.IsNil)
 			jimm := &jimmtest.JIMM{
 				UserLogin_:                 func(ctx context.Context, email string) (*openfga.User, error) { return nil, nil },

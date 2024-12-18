@@ -19,7 +19,7 @@ import (
 func (s *dbSuite) TestModelDefaults(c *qt.C) {
 	ctx := context.Background()
 
-	err := s.Database.Migrate(ctx, true)
+	err := s.Database.Migrate(ctx)
 	c.Assert(err, qt.Equals, nil)
 
 	u, err := dbmodel.NewIdentity("bob@canonical.com")

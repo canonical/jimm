@@ -31,7 +31,7 @@ func setupTestAuthSvc(ctx context.Context, c *qt.C, expiry time.Duration) (*auth
 	db := &db.Database{
 		DB: jimmtest.PostgresDB(c, time.Now),
 	}
-	c.Assert(db.Migrate(ctx, false), qt.IsNil)
+	c.Assert(db.Migrate(ctx), qt.IsNil)
 
 	sqldb, err := db.DB.DB()
 	c.Assert(err, qt.IsNil)
