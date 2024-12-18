@@ -35,10 +35,6 @@ parts:
             make build/server
             cp ./jimmsrv $CRAFT_PART_INSTALL/usr/local/bin
 
-            # The location of SQL files isn't configurable right now, as such we just 
-            # place it in bin
-            cp -r ./internal/dbmodel/sql $CRAFT_PART_INSTALL/usr/local/bin/sql
-
             # Convert the OpenFGA auth model to JSON and place a copy in the ROCK
             # Used by the charm to apply to the OpenFGA server, not by the container itself
             mkdir -p $CRAFT_PART_INSTALL/root/openfga/

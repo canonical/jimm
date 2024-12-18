@@ -6,5 +6,3 @@ ALTER TABLE cloud_credentials
       FOREIGN KEY (cloud_name)
       REFERENCES clouds(name)
       ON DELETE CASCADE;
-
-UPDATE versions SET major=1, minor=3 WHERE component='jimmdb';

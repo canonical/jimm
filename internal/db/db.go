@@ -6,15 +6,27 @@ package db
 import (
 	"context"
 	"database/sql"
+	stderr "errors"
 	"fmt"
 	"path"
 	"sync/atomic"
 	"time"
 
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/postgres"
+	"github.com/golang-migrate/migrate/v4/source/iofs"
+	"github.com/juju/zaputil/zapctx"
+	"go.uber.org/zap"
 	"gorm.io/gorm"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
+)
+
+// Use a custom table name so that we don't run into collisions when OpenFGA or other tools
+// are using the same DB as JIMM in our Docker Compose setup.
+const (
+	migrationTableName = "jimm_schema_migrations"
 )
 
 // A Database provides access to the database model. A Database instance
@@ -49,57 +61,116 @@ func (d *Database) Transaction(f func(*Database) error) error {
 	})
 }
 
+type migrationLogger struct {
+	logger  *zap.Logger
+	verbose bool
+}
+
+func (l migrationLogger) Printf(format string, v ...interface{}) {
+	line := fmt.Sprintf(format, v...)
+	// Remove unneeded new lines since the zap logger adds them.
+	if line[len(line)-1] == '\n' {
+		line = line[:len(line)-1]
+	}
+	l.logger.Info(line)
+}
+
+func (l migrationLogger) Verbose() bool {
+	return l.verbose
+}
+
 // Migrate migrates the configured database to have the structure required
-// by the current data model. Unless forced the migration will only be
-// performed if there is either no current database, or the major version
-// of the current database is the same as the target database. If the
-// current database is incompatible then an error with a code of
-// errors.CodeServerConfiguration will be returned. If force is requested
-// then the migration will be performed no matter what the current version
-// is. The force parameter should only be set when the migration is
-// initiated by a user request.
-func (d *Database) Migrate(ctx context.Context, force bool) error {
+// by the current data model. If the database is not configured then an error
+// with a code of errors.CodeServerConfiguration will be returned.
+func (d *Database) Migrate(ctx context.Context) error {
 	const op = errors.Op("db.Migrate")
 	if d == nil || d.DB == nil {
 		return errors.E(op, errors.CodeServerConfiguration, "database not configured")
 	}
 	db := d.DB.WithContext(ctx)
-	schema, _ := dbmodel.SQL.ReadFile(path.Join("sql", db.Name(), "versions.sql"))
-	if err := db.Exec(string(schema)).Error; err != nil {
-		return errors.E(op, dbError(err))
+
+	sqlDB, err := db.DB()
+	if err != nil {
+		return errors.E(op, fmt.Errorf("unable to obtain raw DB: %w", err))
+	}
+	conn, err := sqlDB.Conn(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to obtain DB conn: %w", err)
 	}
 
-	for {
-		v := dbmodel.Version{Component: dbmodel.Component, Major: 1, Minor: 0}
-		if err := db.FirstOrCreate(&v).Error; err != nil {
-			return errors.E(op, dbError(err))
-		}
-		if dbmodel.Major == v.Major && dbmodel.Minor <= v.Minor {
-			// The database is already at, or past, our current version.
-			// Nothing to do.
-			atomic.StoreUint32(&d.migrated, 1)
-			return nil
-		}
-		if v.Major != dbmodel.Major && !force {
-			return errors.E(op, errors.CodeServerConfiguration, fmt.Sprintf("database has incompatible version %d.%d", v.Major, v.Minor))
-		}
-		// The major versions are unchanged, the database can be migrated.
-		v.Minor += 1
-		schema, err := dbmodel.SQL.ReadFile(path.Join("sql", db.Name(), fmt.Sprintf("%d_%d.sql", v.Major, v.Minor)))
-		if err != nil {
-			return errors.E(op, err)
-		}
+	sqlDir, err := iofs.New(dbmodel.SQL, path.Join("sql", db.Name()))
+	if err != nil {
+		return errors.E(op, fmt.Errorf("unable to create new sql filesys: %w", err))
+	}
 
-		err = db.Transaction(func(tx *gorm.DB) error {
-			if err := tx.Exec(string(schema)).Error; err != nil {
-				return err
-			}
-			return nil
-		})
-		if err != nil {
-			return errors.E(op, dbError(err))
+	driver, err := postgres.WithConnection(ctx, conn, &postgres.Config{MigrationsTable: MigrationTableName})
+	if err != nil {
+		return errors.E(op, fmt.Errorf("unable to create new driver instance: %w", err))
+	}
+
+	// DB name is left blank because it is contained in the driver/DB connection.
+	m, err := migrate.NewWithInstance("iofs", sqlDir, "", driver)
+	if err != nil {
+		return errors.E(op, fmt.Errorf("unable to create new migrator: %w", err))
+	}
+	defer m.Close()
+
+	// Setup custom logger for consistent output.
+	logger := migrationLogger{logger: zapctx.Logger(ctx), verbose: false}
+	m.Log = logger
+
+	if err := d.handleDeprecatedMigrations(ctx, m); err != nil {
+		return errors.E(op, fmt.Errorf("failed to handle deprecated migrations: %w", err))
+	}
+
+	v, dirty, err := m.Version()
+	if err != nil {
+		if !stderr.Is(err, migrate.ErrNilVersion) {
+			return errors.E(op, fmt.Errorf("failed to get db version: %w", err))
 		}
 	}
+
+	if dirty {
+		// nolint:gosec
+		workingVersion := int(v) - 1
+		zapctx.Info(ctx, "dirty database, reverting version", zap.Int("version", workingVersion))
+		if err := m.Force(workingVersion); err != nil {
+			return errors.E(op, fmt.Errorf("failed to fix dirty db version: %w", err))
+		}
+	}
+
+	if err := m.Up(); err != nil {
+		if !stderr.Is(err, migrate.ErrNoChange) {
+			return errors.E(op, fmt.Errorf("failed to migrate db: %w", err))
+		}
+	}
+
+	atomic.StoreUint32(&d.migrated, 1)
+	return nil
+}
+
+// This method is used for handling deployments that are live when we made the
+// switch from a home-grown migration library to golang-migrate. To avoid running
+// migrations twice, we check if the old "versions" table exists and make golang-migrate
+// aware of which migrations have been run using the Force() method.
+func (d *Database) handleDeprecatedMigrations(ctx context.Context, m *migrate.Migrate) error {
+	var version int
+	err := d.DB.Raw("SELECT minor FROM versions;").Row().Scan(&version)
+	if err != nil {
+		// The versions table may already be deleted. Other errors are ignored intentionally.
+		zapctx.Debug(ctx, "no minor version from deprecated migrations table", zap.Error(err))
+		//nolint:nilerr
+		return nil
+	}
+	if version == 0 {
+		return nil
+	}
+	zapctx.Debug(ctx, "forcing db version", zap.Int("version", version))
+	err = m.Force(version)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // ready checks that the database is ready to accept requests. An error is
