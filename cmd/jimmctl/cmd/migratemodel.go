@@ -22,15 +22,6 @@ registered within JIMM.
 
 You may specify a model name (of the form owner/name) or model UUID.
 
-For example, JIMM is aware of controller-a and controller-b and controller-a has
-models:
-	- user@domain.com/model-a
-	- 2cb433a6-04eb-4ec4-9567-90426d20a004
-
-You may run the migrate command like so to migrate the two models
-from controller-a to controller-b:
-	jimmctl migrate controller-b user@domain.com/model-a 2cb433a6-04eb-4ec4-9567-90426d20a004
-
 `
 	migrateModelCommandExample = `
     jimmctl migrate mycontroller 2cb433a6-04eb-4ec4-9567-90426d20a004 fd469983-27c2-423b-bebf-84f616fb036b ...
