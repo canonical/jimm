@@ -6,6 +6,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"embed"
 	stderr "errors"
 	"fmt"
 	"path"
@@ -26,7 +27,7 @@ import (
 // Use a custom table name so that we don't run into collisions when OpenFGA or other tools
 // are using the same DB as JIMM in our Docker Compose setup.
 const (
-	migrationTableName = "jimm_schema_migrations"
+	MigrationTableName = "jimm_schema_migrations"
 )
 
 // A Database provides access to the database model. A Database instance
@@ -87,46 +88,54 @@ func (d *Database) Migrate(ctx context.Context) error {
 	if d == nil || d.DB == nil {
 		return errors.E(op, errors.CodeServerConfiguration, "database not configured")
 	}
-	db := d.DB.WithContext(ctx)
 
+	err := d.migrateFromSource(ctx, dbmodel.SQL, path.Join("sql", d.DB.Name()))
+	if err != nil {
+		return errors.E(op, err)
+	}
+	return nil
+}
+
+func (d *Database) migrateFromSource(ctx context.Context, fs embed.FS, sqlPath string) error {
+	sqlDir, err := iofs.New(fs, sqlPath)
+	if err != nil {
+		return fmt.Errorf("unable to create new sql filesys: %w", err)
+	}
+
+	db := d.DB.WithContext(ctx)
 	sqlDB, err := db.DB()
 	if err != nil {
-		return errors.E(op, fmt.Errorf("unable to obtain raw DB: %w", err))
+		return fmt.Errorf("failed to obtain raw DB: %w", err)
 	}
 	conn, err := sqlDB.Conn(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to obtain DB conn: %w", err)
 	}
 
-	sqlDir, err := iofs.New(dbmodel.SQL, path.Join("sql", db.Name()))
-	if err != nil {
-		return errors.E(op, fmt.Errorf("unable to create new sql filesys: %w", err))
-	}
-
 	driver, err := postgres.WithConnection(ctx, conn, &postgres.Config{MigrationsTable: MigrationTableName})
 	if err != nil {
-		return errors.E(op, fmt.Errorf("unable to create new driver instance: %w", err))
+		return fmt.Errorf("unable to create new driver instance: %w", err)
 	}
 
 	// DB name is left blank because it is contained in the driver/DB connection.
 	m, err := migrate.NewWithInstance("iofs", sqlDir, "", driver)
 	if err != nil {
-		return errors.E(op, fmt.Errorf("unable to create new migrator: %w", err))
+		return fmt.Errorf("unable to create new migrator: %w", err)
 	}
 	defer m.Close()
 
 	// Setup custom logger for consistent output.
-	logger := migrationLogger{logger: zapctx.Logger(ctx), verbose: false}
+	logger := migrationLogger{logger: zapctx.Logger(ctx)}
 	m.Log = logger
 
 	if err := d.handleDeprecatedMigrations(ctx, m); err != nil {
-		return errors.E(op, fmt.Errorf("failed to handle deprecated migrations: %w", err))
+		return fmt.Errorf("failed to handle deprecated migrations: %w", err)
 	}
 
 	v, dirty, err := m.Version()
 	if err != nil {
 		if !stderr.Is(err, migrate.ErrNilVersion) {
-			return errors.E(op, fmt.Errorf("failed to get db version: %w", err))
+			return fmt.Errorf("failed to get db version: %w", err)
 		}
 	}
 
@@ -135,13 +144,13 @@ func (d *Database) Migrate(ctx context.Context) error {
 		workingVersion := int(v) - 1
 		zapctx.Info(ctx, "dirty database, reverting version", zap.Int("version", workingVersion))
 		if err := m.Force(workingVersion); err != nil {
-			return errors.E(op, fmt.Errorf("failed to fix dirty db version: %w", err))
+			return fmt.Errorf("failed to fix dirty db version: %w", err)
 		}
 	}
 
 	if err := m.Up(); err != nil {
 		if !stderr.Is(err, migrate.ErrNoChange) {
-			return errors.E(op, fmt.Errorf("failed to migrate db: %w", err))
+			return fmt.Errorf("failed to migrate db: %w", err)
 		}
 	}
 

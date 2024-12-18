@@ -2,6 +2,11 @@
 
 package db
 
+import (
+	"context"
+	"embed"
+)
+
 var (
 	JwksKind                   = jwksKind
 	JwksPublicKeyTag           = jwksPublicKeyTag
@@ -12,3 +17,7 @@ var (
 	OAuthSessionStoreSecretTag = oauthSessionStoreSecretTag
 	NewUUID                    = &newUUID
 )
+
+func (d *Database) MigrateFromSource(ctx context.Context, fs embed.FS, sqlPath string) error {
+	return d.migrateFromSource(ctx, fs, sqlPath)
+}
