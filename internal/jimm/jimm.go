@@ -174,10 +174,6 @@ type Parameters struct {
 	// with the OpenFGA ReBAC system.
 	OpenFGAClient *openfga.OFGAClient
 
-	// JWKService holds a service responsible for generating and delivering a JWKS
-	// for consumption within Juju controllers.
-	JWKService *jimmjwx.JWKSService
-
 	// JWTService is responsible for minting JWTs to access controllers.
 	JWTService *jimmjwx.JWTService
 
@@ -209,10 +205,6 @@ func (p *Parameters) Validate() error {
 
 	if p.OpenFGAClient == nil {
 		return errors.E("missing openfga client")
-	}
-
-	if p.JWKService == nil {
-		return errors.E("missing jwks service")
 	}
 
 	if p.JWTService == nil {
@@ -277,19 +269,9 @@ func (j *JIMM) ResourceTag() names.ControllerTag {
 	return names.NewControllerTag(j.UUID)
 }
 
-// DB returns the database used by JIMM.
-func (j *JIMM) DB() *db.Database {
-	return j.Database
-}
-
 // PubsubHub returns the pub-sub hub used for buffering model summaries.
 func (j *JIMM) PubSubHub() *pubsub.Hub {
 	return j.Pubsub
-}
-
-// AuthorizationClient return the OpenFGA client used by JIMM.
-func (j *JIMM) AuthorizationClient() *openfga.OFGAClient {
-	return j.OpenFGAClient
 }
 
 // RoleManager returns a manager that enables role management.
@@ -300,11 +282,6 @@ func (j *JIMM) RoleManager() RoleManager {
 // GroupManager returns a manager that enables group management.
 func (j *JIMM) GroupManager() GroupManager {
 	return j.groupManager
-}
-
-// GetCredentialStore returns the credential store used by JIMM.
-func (j *JIMM) GetCredentialStore() credentials.CredentialStore {
-	return j.CredentialStore
 }
 
 type permission struct {

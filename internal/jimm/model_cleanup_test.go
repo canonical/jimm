@@ -135,7 +135,7 @@ func (s *modelCleanupSuite) TestPollModelsDying(c *qt.C) {
 			Valid:  true,
 		},
 	}
-	err = s.jimm.DB().GetModel(ctx, &model)
+	err = s.jimm.Database.GetModel(ctx, &model)
 	c.Assert(err, qt.ErrorMatches, "model not found")
 
 	model = dbmodel.Model{
@@ -144,7 +144,7 @@ func (s *modelCleanupSuite) TestPollModelsDying(c *qt.C) {
 			Valid:  true,
 		},
 	}
-	err = s.jimm.DB().GetModel(ctx, &model)
+	err = s.jimm.Database.GetModel(ctx, &model)
 	c.Assert(err, qt.IsNil)
 }
 
@@ -174,7 +174,7 @@ func (s *modelCleanupSuite) TestPollModelsDyingControllerErrors(c *qt.C) {
 			Valid:  true,
 		},
 	}
-	err = s.jimm.DB().GetModel(ctx, &model)
+	err = s.jimm.Database.GetModel(ctx, &model)
 	c.Assert(err, qt.IsNil)
 	c.Assert(model.Life, qt.Equals, state.Dying.String())
 }

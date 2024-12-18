@@ -891,7 +891,7 @@ func (s *accessControlSuite) TestListRelationshipTuplesNoUUIDResolution(c *gc.C)
 	c.Assert(err, jc.ErrorIsNil)
 
 	groupOrange := dbmodel.GroupEntry{Name: "orange"}
-	err = s.JIMM.DB().GetGroup(ctx, &groupOrange)
+	err = s.JIMM.Database.GetGroup(ctx, &groupOrange)
 	c.Assert(err, jc.ErrorIsNil)
 	expected := []apiparams.RelationshipTuple{{
 		Object:       "group-" + groupOrange.UUID + "#member",

@@ -198,7 +198,8 @@ type Params struct {
 
 // A Service is the implementation of a JIMM server.
 type Service struct {
-	jimm *jimm.JIMM
+	jimm       *jimm.JIMM
+	jwkService *jimmjwx.JWKSService
 
 	isLeader              bool
 	auditLogCleanupPeriod int
@@ -231,7 +232,7 @@ func (s *Service) WatchModelSummaries(ctx context.Context) error {
 
 // StartJWKSRotator see internal/jimmjwx/jwks.go for details.
 func (s *Service) StartJWKSRotator(ctx context.Context, checkRotateRequired <-chan time.Time, initialRotateRequiredTime time.Time) error {
-	return s.jimm.JWKService.StartJWKSRotator(ctx, checkRotateRequired, initialRotateRequiredTime)
+	return s.jwkService.StartJWKSRotator(ctx, checkRotateRequired, initialRotateRequiredTime)
 }
 
 // MonitorResources periodically updates metrics.
@@ -382,7 +383,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		p.JWTExpiryDuration = 24 * time.Hour
 	}
 
-	jimmParameters.JWKService = jimmjwx.NewJWKSService(credentialStore)
+	s.jwkService = jimmjwx.NewJWKSService(credentialStore)
 	jimmParameters.JWTService = jimmjwx.NewJWTService(jimmjwx.JWTServiceParams{
 		Host:   p.PublicDNSName,
 		Store:  credentialStore,

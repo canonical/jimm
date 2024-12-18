@@ -152,7 +152,6 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 		OpenFGAClient:      s.OFGAClient,
 		OAuthAuthenticator: &authenticator,
 
-		JWKService: jwksService,
 		JWTService: jwtService,
 	})
 

@@ -1355,7 +1355,7 @@ func (j *JIMM) ListModels(ctx context.Context, user *openfga.User) ([]base.UserM
 	}
 
 	// Get the models from the database
-	models, err := j.DB().GetModelsByUUID(ctx, uuids)
+	models, err := j.Database.GetModelsByUUID(ctx, uuids)
 	if err != nil {
 		return nil, errors.E(op, err, "failed to get models by uuid")
 	}

@@ -23,7 +23,7 @@ func (j *JIMM) CleanupDyingModels(ctx context.Context) (err error) {
 	durationObserver := servermon.DurationObserver(servermon.JimmMethodsDurationHistogram, string(op))
 	defer durationObserver()
 
-	err = j.DB().ForEachModel(ctx, func(m *dbmodel.Model) error {
+	err = j.Database.ForEachModel(ctx, func(m *dbmodel.Model) error {
 		if m.Life != state.Dying.String() {
 			return nil
 		}
@@ -37,7 +37,7 @@ func (j *JIMM) CleanupDyingModels(ctx context.Context) (err error) {
 		if err := api.ModelInfo(ctx, &jujuparams.ModelInfo{UUID: m.UUID.String}); err != nil {
 			// Some versions of juju return unauthorized for models that cannot be found.
 			if errors.ErrorCode(err) == errors.CodeNotFound || errors.ErrorCode(err) == errors.CodeUnauthorized {
-				if err := j.DB().DeleteModel(ctx, m); err != nil {
+				if err := j.Database.DeleteModel(ctx, m); err != nil {
 					zapctx.Error(ctx, fmt.Sprintf("cannot delete model %s: %s\n", m.UUID.String, err))
 				} else {
 					return nil
