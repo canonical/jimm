@@ -31,7 +31,6 @@ func NewJIMM(t Tester, additionalParameters *jimm.Parameters, options ...Option)
 		UUID:               uuid.NewString(),
 		Dialer:             &Dialer{},
 		Pubsub:             &pubsub.Hub{},
-		JWKService:         &jimmjwx.JWKSService{},
 		JWTService:         &jimmjwx.JWTService{},
 		OAuthAuthenticator: &auth,
 	}
@@ -57,9 +56,6 @@ func NewJIMM(t Tester, additionalParameters *jimm.Parameters, options ...Option)
 		}
 		if additionalParameters.OpenFGAClient != nil {
 			p.OpenFGAClient = additionalParameters.OpenFGAClient
-		}
-		if additionalParameters.JWKService != nil {
-			p.JWKService = additionalParameters.JWKService
 		}
 		if additionalParameters.JWTService != nil {
 			p.JWTService = additionalParameters.JWTService
