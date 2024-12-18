@@ -21,6 +21,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm"
+	"github.com/canonical/jimm/v3/internal/jimm/jujuauth"
 	"github.com/canonical/jimm/v3/internal/jimmhttp"
 	jimmRPC "github.com/canonical/jimm/v3/internal/rpc"
 )
@@ -172,7 +173,7 @@ func modelInfoFromPath(path string) (uuid string, finalPath string, err error) {
 // We act as a proxier, handling auth on requests before forwarding the
 // requests to the appropriate Juju controller.
 func (s apiProxier) ServeWS(ctx context.Context, clientConn *websocket.Conn) {
-	jwtGenerator := jimm.NewJWTGenerator(s.jimm.Database, s.jimm, s.jimm.JWTService)
+	jwtGenerator := jujuauth.New(s.jimm.Database, s.jimm, s.jimm.JWTService)
 	connectionFunc := controllerConnectionFunc(s, &jwtGenerator)
 	zapctx.Debug(ctx, "Starting proxier")
 	auditLogger := s.jimm.AddAuditLogEntry
@@ -191,7 +192,7 @@ func (s apiProxier) ServeWS(ctx context.Context, clientConn *websocket.Conn) {
 
 // controllerConnectionFunc returns a function that will be used to
 // connect to a controller when a client makes a request.
-func controllerConnectionFunc(s apiProxier, jwtGenerator *jimm.JWTGenerator) func(context.Context) (jimmRPC.WebsocketConnectionWithMetadata, error) {
+func controllerConnectionFunc(s apiProxier, jwtGenerator *jujuauth.TokenGenerator) func(context.Context) (jimmRPC.WebsocketConnectionWithMetadata, error) {
 	return func(ctx context.Context) (jimmRPC.WebsocketConnectionWithMetadata, error) {
 		const op = errors.Op("proxy.controllerConnectionFunc")
 		path := jimmhttp.PathElementFromContext(ctx, "path")
