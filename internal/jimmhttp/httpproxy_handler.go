@@ -63,7 +63,7 @@ func (hph *HTTPProxyHandler) ProxyHTTP(w http.ResponseWriter, req *http.Request)
 		writeError(ctx, w, http.StatusNotFound, err, "cannot get model")
 		return
 	}
-	u, p, err := hph.jimm.GetCredentialStore().GetControllerCredentials(ctx, model.Controller.Name)
+	u, p, err := hph.jimm.CredentialStore.GetControllerCredentials(ctx, model.Controller.Name)
 	if err != nil {
 		writeError(ctx, w, http.StatusNotFound, err, "cannot retrieve credentials")
 		return

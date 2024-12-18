@@ -76,7 +76,7 @@ func (s *updateCredentialsSuite) TestUpdateCredentialsWithLocalCredentials(c *gc
   models: []
 `)
 
-	ofgaUser := openfga.NewUser(sa, s.JIMM.AuthorizationClient())
+	ofgaUser := openfga.NewUser(sa, s.JIMM.OpenFGAClient)
 	cloudCredentialTag := names.NewCloudCredentialTag("test-cloud/" + clientIDWithDomain + "/test-credentials")
 	cloudCredential2, err := s.JIMM.GetCloudCredential(ctx, ofgaUser, cloudCredentialTag)
 	c.Assert(err, gc.IsNil)
