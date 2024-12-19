@@ -745,7 +745,7 @@ func (j *JIMM) InitiateInternalMigration(ctx context.Context, user *openfga.User
 	if err != nil {
 		s := strings.Split(modelNameOrUUID, "/")
 		if len(s) != 2 {
-			return jujuparams.InitiateMigrationResult{}, errors.E(op, "missing model name")
+			return jujuparams.InitiateMigrationResult{}, errors.E(op, "invalid model target")
 		}
 
 		owner, name := s[0], s[1]

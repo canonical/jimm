@@ -796,10 +796,10 @@ func TestInitiateInternalMigration(t *testing.T) {
 		migrateInfo:   params.MigrateModelInfo{TargetModelNameOrUUID: "00000002-0000-0000-0000-000000000002", TargetController: "myController"},
 		expectedError: "model not found",
 	}, {
-		about:         "a missing model name",
+		about:         "a missing model target",
 		user:          "alice@canonical.com",
 		migrateInfo:   params.MigrateModelInfo{TargetModelNameOrUUID: "alice@canonical.com", TargetController: "myController"},
-		expectedError: "missing model name",
+		expectedError: "invalid model target",
 	}, {
 		about:         "using an invalid user name",
 		user:          "alice@canonical.com",
