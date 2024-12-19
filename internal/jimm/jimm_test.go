@@ -778,16 +778,39 @@ func TestInitiateInternalMigration(t *testing.T) {
 		migrateInfo   params.MigrateModelInfo
 		expectedError string
 	}{{
-		about:       "success",
+		about:       "success with uuid",
 		user:        "alice@canonical.com",
-		migrateInfo: params.MigrateModelInfo{ModelTag: "model-00000002-0000-0000-0000-000000000001", TargetController: "myController"},
+		migrateInfo: params.MigrateModelInfo{TargetModelNameOrUUID: "00000002-0000-0000-0000-000000000001", TargetController: "myController"},
+	}, {
+		about:       "a success with name",
+		user:        "alice@canonical.com",
+		migrateInfo: params.MigrateModelInfo{TargetModelNameOrUUID: "alice@canonical.com/model-1", TargetController: "myController"},
 	}, {
 		about:         "model doesn't exist",
 		user:          "alice@canonical.com",
-		migrateInfo:   params.MigrateModelInfo{ModelTag: "model-00000002-0000-0000-0000-000000000002", TargetController: "myController"},
+		migrateInfo:   params.MigrateModelInfo{TargetModelNameOrUUID: "00000002-0000-0000-0000-000000000002", TargetController: "myController"},
 		expectedError: "model not found",
-	},
-	}
+	}, {
+		about:         "model doesn't exist",
+		user:          "alice@canonical.com",
+		migrateInfo:   params.MigrateModelInfo{TargetModelNameOrUUID: "00000002-0000-0000-0000-000000000002", TargetController: "myController"},
+		expectedError: "model not found",
+	}, {
+		about:         "a missing model target",
+		user:          "alice@canonical.com",
+		migrateInfo:   params.MigrateModelInfo{TargetModelNameOrUUID: "alice@canonical.com", TargetController: "myController"},
+		expectedError: "invalid model target",
+	}, {
+		about:         "using an invalid user name",
+		user:          "alice@canonical.com",
+		migrateInfo:   params.MigrateModelInfo{TargetModelNameOrUUID: "*bad wolf*@canonical.com/model-1", TargetController: "myController"},
+		expectedError: "invalid user name",
+	}, {
+		about:         "using an invalid model name",
+		user:          "alice@canonical.com",
+		migrateInfo:   params.MigrateModelInfo{TargetModelNameOrUUID: "alice@canonical.com/*bad wolf*", TargetController: "myController"},
+		expectedError: "invalid model name",
+	}}
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
 			c.Patch(jimm.InitiateMigration, func(ctx context.Context, j *jimm.JIMM, user *openfga.User, spec jujuparams.MigrationSpec) (jujuparams.InitiateMigrationResult, error) {
@@ -806,9 +829,14 @@ func TestInitiateInternalMigration(t *testing.T) {
 
 			dbUser := env.User(test.user).DBObject(c, j.Database)
 			user := openfga.NewUser(&dbUser, nil)
-			mt, err := names.ParseModelTag(test.migrateInfo.ModelTag)
 			c.Assert(err, qt.IsNil)
-			res, err := j.InitiateInternalMigration(ctx, user, mt, test.migrateInfo.TargetController)
+
+			res, err := j.InitiateInternalMigration(
+				ctx,
+				user,
+				test.migrateInfo.TargetModelNameOrUUID,
+				test.migrateInfo.TargetController,
+			)
 			if test.expectedError != "" {
 				c.Assert(err, qt.ErrorMatches, test.expectedError)
 			} else {

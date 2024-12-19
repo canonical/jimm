@@ -471,8 +471,8 @@ type PurgeLogsResponse struct {
 // target controller must be specified with both the source model and
 // target controller residing within JIMM.
 type MigrateModelInfo struct {
-	// ModelTag is a tag of the form "model-<UIID>"
-	ModelTag string `json:"model-tag"`
+	// TargetModelNameOrUUID can be either the model name or model UUID.
+	TargetModelNameOrUUID string `json:"model-tag"`
 	// TargetController is the controller name of the form "<name>"
 	TargetController string `json:"target-controller"`
 }

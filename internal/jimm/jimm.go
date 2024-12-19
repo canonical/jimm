@@ -14,6 +14,7 @@ import (
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
+	"github.com/google/uuid"
 	"github.com/juju/juju/api/base"
 	"github.com/juju/juju/core/crossmodel"
 	jujuparams "github.com/juju/juju/rpc/params"
@@ -730,25 +731,45 @@ func fillMigrationTarget(db *db.Database, credStore credentials.CredentialStore,
 }
 
 // InitiateInternalMigration initiates a model migration between two controllers within JIMM.
-func (j *JIMM) InitiateInternalMigration(ctx context.Context, user *openfga.User, modelTag names.ModelTag, targetController string) (jujuparams.InitiateMigrationResult, error) {
+func (j *JIMM) InitiateInternalMigration(ctx context.Context, user *openfga.User, modelNameOrUUID string, targetController string) (jujuparams.InitiateMigrationResult, error) {
 	const op = errors.Op("jimm.InitiateInternalMigration")
 
 	migrationTarget, _, err := fillMigrationTarget(j.Database, j.CredentialStore, targetController)
 	if err != nil {
 		return jujuparams.InitiateMigrationResult{}, errors.E(op, err)
 	}
-	// Check that the model exists
-	model := dbmodel.Model{
-		UUID: sql.NullString{
-			String: modelTag.Id(),
+
+	model := dbmodel.Model{}
+	// Check if the user is providing a model UUID or name
+	_, err = uuid.Parse(modelNameOrUUID)
+	if err != nil {
+		s := strings.Split(modelNameOrUUID, "/")
+		if len(s) != 2 {
+			return jujuparams.InitiateMigrationResult{}, errors.E(op, "invalid model target")
+		}
+
+		owner, name := s[0], s[1]
+		if !names.IsValidUser(owner) {
+			return jujuparams.InitiateMigrationResult{}, errors.E(op, "invalid user name")
+		}
+		if !names.IsValidModelName(name) {
+			return jujuparams.InitiateMigrationResult{}, errors.E(op, "invalid model name")
+		}
+
+		model.Name = name
+		model.OwnerIdentityName = owner
+	} else {
+		model.UUID = sql.NullString{
+			String: modelNameOrUUID,
 			Valid:  true,
-		},
+		}
 	}
+
 	err = j.Database.GetModel(ctx, &model)
 	if err != nil {
 		return jujuparams.InitiateMigrationResult{}, errors.E(op, err)
 	}
-	spec := jujuparams.MigrationSpec{ModelTag: modelTag.String(), TargetInfo: migrationTarget}
+	spec := jujuparams.MigrationSpec{ModelTag: model.ResourceTag().String(), TargetInfo: migrationTarget}
 	result, err := initiateMigration(ctx, j, user, spec)
 	if err != nil {
 		return result, errors.E(op, err)

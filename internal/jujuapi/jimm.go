@@ -501,13 +501,9 @@ func (r *controllerRoot) MigrateModel(ctx context.Context, args apiparams.Migrat
 	const op = errors.Op("jujuapi.MigrateModel")
 
 	results := make([]jujuparams.InitiateMigrationResult, len(args.Specs))
+
 	for i, arg := range args.Specs {
-		mt, err := names.ParseModelTag(arg.ModelTag)
-		if err != nil {
-			results[i].Error = mapError(errors.E(op, err))
-			continue
-		}
-		result, err := r.jimm.InitiateInternalMigration(ctx, r.user, mt, arg.TargetController)
+		result, err := r.jimm.InitiateInternalMigration(ctx, r.user, arg.TargetModelNameOrUUID, arg.TargetController)
 		if err != nil {
 			result.Error = mapError(errors.E(op, err))
 		}
