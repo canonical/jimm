@@ -74,7 +74,7 @@ func (s *identitiesSuite) TestIdentityPatchGroups(c *gc.C) {
 	c.Assert(changed, gc.Equals, true)
 
 	// test user added to groups
-	objUser, err := s.JIMM.FetchIdentity(ctx, username)
+	objUser, err := s.JIMM.IdentityManager().FetchIdentity(ctx, username)
 	c.Assert(err, gc.IsNil)
 	tuples, _, err := s.JIMM.ListRelationshipTuples(ctx, s.AdminUser, params.RelationshipTuple{
 		Object:       objUser.ResourceTag().String(),
@@ -204,7 +204,7 @@ func (s *identitiesSuite) TestIdentityPatchRoles(c *gc.C) {
 	c.Assert(changed, gc.Equals, true)
 
 	// test user added to roles
-	objUser, err := s.JIMM.FetchIdentity(ctx, username)
+	objUser, err := s.JIMM.IdentityManager().FetchIdentity(ctx, username)
 	c.Assert(err, gc.IsNil)
 	tuples, _, err := s.JIMM.ListRelationshipTuples(ctx, s.AdminUser, params.RelationshipTuple{
 		Object:       objUser.ResourceTag().String(),

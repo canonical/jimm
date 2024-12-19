@@ -28,12 +28,17 @@ import (
 
 func TestGetIdentity(t *testing.T) {
 	c := qt.New(t)
-	jimm := jimmtest.JIMM{
+	identityManager := mocks.IdentityManager{
 		FetchIdentity_: func(ctx context.Context, username string) (*openfga.User, error) {
 			if username == "bob@canonical.com" {
 				return openfga.NewUser(&dbmodel.Identity{Name: "bob@canonical.com"}, nil), nil
 			}
 			return nil, jimmm_errors.E(jimmm_errors.CodeNotFound)
+		},
+	}
+	jimm := jimmtest.JIMM{
+		IdentityManager_: func() jimm.IdentityManager {
+			return &identityManager
 		},
 	}
 	user := openfga.User{}
@@ -61,7 +66,7 @@ func TestListIdentities(t *testing.T) {
 		*openfga.NewUser(&dbmodel.Identity{Name: "bob4@canonical.com"}, nil),
 	}
 	c := qt.New(t)
-	jimm := jimmtest.JIMM{
+	identityManager := mocks.IdentityManager{
 		ListIdentities_: func(ctx context.Context, user *openfga.User, pagination pagination.LimitOffsetPagination, match string) ([]openfga.User, error) {
 			start := pagination.Offset()
 			end := start + pagination.Limit()
@@ -72,6 +77,11 @@ func TestListIdentities(t *testing.T) {
 		},
 		CountIdentities_: func(ctx context.Context, user *openfga.User) (int, error) {
 			return len(testUsers), nil
+		},
+	}
+	jimm := jimmtest.JIMM{
+		IdentityManager_: func() jimm.IdentityManager {
+			return &identityManager
 		},
 	}
 	user := openfga.User{}
@@ -157,12 +167,17 @@ func TestGetIdentityGroups(t *testing.T) {
 			return &dbmodel.GroupEntry{Name: "fake-group-name"}, nil
 		},
 	}
-	jimm := jimmtest.JIMM{
-		FetchIdentity_: func(ctx context.Context, username string) (*openfga.User, error) {
-			if username == "bob@canonical.com" {
+	identityManager := mocks.IdentityManager{
+		FetchIdentity_: func(ctx context.Context, id string) (*openfga.User, error) {
+			if id == "bob@canonical.com" {
 				return openfga.NewUser(&dbmodel.Identity{Name: "bob@canonical.com"}, nil), nil
 			}
 			return nil, dbmodel.IdentityCreationError
+		},
+	}
+	jimm := jimmtest.JIMM{
+		IdentityManager_: func() jimm.IdentityManager {
+			return &identityManager
 		},
 		RelationService: mocks.RelationService{
 			ListRelationshipTuples_: func(ctx context.Context, user *openfga.User, tuple params.RelationshipTuple, pageSize int32, continuationToken string) ([]openfga.Tuple, string, error) {
@@ -198,12 +213,17 @@ func TestGetIdentityGroups(t *testing.T) {
 func TestPatchIdentityGroups(t *testing.T) {
 	c := qt.New(t)
 	var patchTuplesErr error
-	jimm := jimmtest.JIMM{
-		FetchIdentity_: func(ctx context.Context, username string) (*openfga.User, error) {
-			if username == "bob@canonical.com" {
+	identityManager := mocks.IdentityManager{
+		FetchIdentity_: func(ctx context.Context, id string) (*openfga.User, error) {
+			if id == "bob@canonical.com" {
 				return openfga.NewUser(&dbmodel.Identity{Name: "bob@canonical.com"}, nil), nil
 			}
 			return nil, dbmodel.IdentityCreationError
+		},
+	}
+	jimm := jimmtest.JIMM{
+		IdentityManager_: func() jimm.IdentityManager {
+			return &identityManager
 		},
 		RelationService: mocks.RelationService{
 			AddRelation_: func(ctx context.Context, user *openfga.User, tuples []params.RelationshipTuple) error {
@@ -257,12 +277,17 @@ func TestGetIdentityRoles(t *testing.T) {
 			return &dbmodel.RoleEntry{Name: "fake-role-name"}, nil
 		},
 	}
-	jimm := jimmtest.JIMM{
-		FetchIdentity_: func(ctx context.Context, username string) (*openfga.User, error) {
-			if username == "bob@canonical.com" {
+	identityManager := mocks.IdentityManager{
+		FetchIdentity_: func(ctx context.Context, id string) (*openfga.User, error) {
+			if id == "bob@canonical.com" {
 				return openfga.NewUser(&dbmodel.Identity{Name: "bob@canonical.com"}, nil), nil
 			}
 			return nil, dbmodel.IdentityCreationError
+		},
+	}
+	jimm := jimmtest.JIMM{
+		IdentityManager_: func() jimm.IdentityManager {
+			return &identityManager
 		},
 		RelationService: mocks.RelationService{
 			ListRelationshipTuples_: func(ctx context.Context, user *openfga.User, tuple params.RelationshipTuple, pageSize int32, continuationToken string) ([]openfga.Tuple, string, error) {
@@ -298,12 +323,17 @@ func TestGetIdentityRoles(t *testing.T) {
 func TestPatchIdentityRoles(t *testing.T) {
 	c := qt.New(t)
 	var patchTuplesErr error
-	jimm := jimmtest.JIMM{
-		FetchIdentity_: func(ctx context.Context, username string) (*openfga.User, error) {
-			if username == "bob@canonical.com" {
+	identityManager := mocks.IdentityManager{
+		FetchIdentity_: func(ctx context.Context, id string) (*openfga.User, error) {
+			if id == "bob@canonical.com" {
 				return openfga.NewUser(&dbmodel.Identity{Name: "bob@canonical.com"}, nil), nil
 			}
 			return nil, dbmodel.IdentityCreationError
+		},
+	}
+	jimm := jimmtest.JIMM{
+		IdentityManager_: func() jimm.IdentityManager {
+			return &identityManager
 		},
 		RelationService: mocks.RelationService{
 			AddRelation_: func(ctx context.Context, user *openfga.User, tuples []params.RelationshipTuple) error {

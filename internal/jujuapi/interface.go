@@ -32,7 +32,6 @@ type JIMM interface {
 	AddHostedCloud(ctx context.Context, user *openfga.User, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error
 	AddServiceAccount(ctx context.Context, u *openfga.User, clientId string) error
 	CopyServiceAccountCredential(ctx context.Context, u *openfga.User, svcAcc *openfga.User, cloudCredentialTag names.CloudCredentialTag) (names.CloudCredentialTag, []jujuparams.UpdateCredentialModelResult, error)
-	CountIdentities(ctx context.Context, user *openfga.User) (int, error)
 	DestroyOffer(ctx context.Context, user *openfga.User, offerURL string, force bool) error
 	FindApplicationOffers(ctx context.Context, user *openfga.User, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error)
 	FindAuditEvents(ctx context.Context, user *openfga.User, filter db.AuditLogFilter) ([]dbmodel.AuditLogEntry, error)
@@ -46,9 +45,8 @@ type JIMM interface {
 	GetCloudCredentialAttributes(ctx context.Context, u *openfga.User, cred *dbmodel.CloudCredential, hidden bool) (attrs map[string]string, redacted []string, err error)
 	RoleManager() jimm.RoleManager
 	GroupManager() jimm.GroupManager
+	IdentityManager() jimm.IdentityManager
 	GetJimmControllerAccess(ctx context.Context, user *openfga.User, tag names.UserTag) (string, error)
-	// FetchIdentity finds the user in jimm or returns a not-found error
-	FetchIdentity(ctx context.Context, username string) (*openfga.User, error)
 	GetUserCloudAccess(ctx context.Context, user *openfga.User, cloud names.CloudTag) (string, error)
 	GetUserControllerAccess(ctx context.Context, user *openfga.User, controller names.ControllerTag) (string, error)
 	GetUserModelAccess(ctx context.Context, user *openfga.User, model names.ModelTag) (string, error)
@@ -60,7 +58,6 @@ type JIMM interface {
 	InitiateInternalMigration(ctx context.Context, user *openfga.User, modelNameOrUUID string, targetController string) (jujuparams.InitiateMigrationResult, error)
 	InitiateMigration(ctx context.Context, user *openfga.User, spec jujuparams.MigrationSpec) (jujuparams.InitiateMigrationResult, error)
 	ListApplicationOffers(ctx context.Context, user *openfga.User, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error)
-	ListIdentities(ctx context.Context, user *openfga.User, pagination pagination.LimitOffsetPagination, match string) ([]openfga.User, error)
 	ListModels(ctx context.Context, user *openfga.User) ([]base.UserModel, error)
 	ListResources(ctx context.Context, user *openfga.User, filter pagination.LimitOffsetPagination, namePrefixFilter, typeFilter string) ([]db.Resource, error)
 	Offer(ctx context.Context, user *openfga.User, offer jimm.AddApplicationOfferParams) error
