@@ -90,7 +90,7 @@ func TestAuthenticateRebac(t *testing.T) {
 				AuthenticateBrowserSession_: func(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error) {
 					return tt.mockAuthBrowserSession(ctx, w, req)
 				},
-				UpdateLastLogin_: func(ctx context.Context, username string) (*openfga.User, error) {
+				UserLogin_: func(ctx context.Context, username string) (*openfga.User, error) {
 					user := dbmodel.Identity{Name: username}
 					return &openfga.User{Identity: &user, JimmAdmin: tt.jimmAdmin}, nil
 				},

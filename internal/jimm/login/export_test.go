@@ -10,6 +10,6 @@ import (
 // Login is a type alias to export loginManager for use in tests.
 type LoginManager = loginManager
 
-func (j *LoginManager) GetOrCreateUser(ctx context.Context, identifier string) (*openfga.User, error) {
-	return j.getOrCreateUser(ctx, identifier)
+func (j *LoginManager) GetOrCreateIdentity(ctx context.Context, identifier string) (*openfga.User, error) {
+	return j.getOrCreateIdentity(ctx, identifier)
 }

@@ -18,7 +18,7 @@ type LoginManager struct {
 	LoginClientCredentials_     func(ctx context.Context, clientID string, clientSecret string) (*openfga.User, error)
 	LoginWithSessionToken_      func(ctx context.Context, sessionToken string) (*openfga.User, error)
 	LoginWithSessionCookie_     func(ctx context.Context, identityID string) (*openfga.User, error)
-	UpdateLastLogin_            func(ctx context.Context, identityName string) (*openfga.User, error)
+	UserLogin_                  func(ctx context.Context, identityName string) (*openfga.User, error)
 }
 
 func (j *LoginManager) AuthenticateBrowserSession(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error) {
@@ -63,9 +63,9 @@ func (j *LoginManager) LoginWithSessionCookie(ctx context.Context, identityID st
 	return j.LoginWithSessionCookie_(ctx, identityID)
 }
 
-func (j *LoginManager) UpdateLastLogin(ctx context.Context, identityName string) (*openfga.User, error) {
-	if j.UpdateLastLogin_ == nil {
+func (j *LoginManager) UserLogin(ctx context.Context, identityName string) (*openfga.User, error) {
+	if j.UserLogin_ == nil {
 		return nil, errors.E(errors.CodeNotImplemented)
 	}
-	return j.UpdateLastLogin_(ctx, identityName)
+	return j.UserLogin(ctx, identityName)
 }

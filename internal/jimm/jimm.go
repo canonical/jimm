@@ -150,13 +150,20 @@ type IdentityManager interface {
 }
 
 type LoginManager interface {
+	// AuthenticateBrowserSession authenticates a browser login.
 	AuthenticateBrowserSession(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error)
+	// LoginDevice starts the device login flow.
 	LoginDevice(ctx context.Context) (*oauth2.DeviceAuthResponse, error)
+	// GetDeviceSessionToken returns a session token scoped to the user's identity.
 	GetDeviceSessionToken(ctx context.Context, deviceOAuthResponse *oauth2.DeviceAuthResponse) (string, error)
+	// LoginClientCredentials logs in a user with client credentials.
 	LoginClientCredentials(ctx context.Context, clientID string, clientSecret string) (*openfga.User, error)
+	// LoginWithSessionToken logs in a user with a session token.
 	LoginWithSessionToken(ctx context.Context, sessionToken string) (*openfga.User, error)
+	// LoginWithSessionCookie logs in a user assuming cookie auth was done previously.
 	LoginWithSessionCookie(ctx context.Context, identityID string) (*openfga.User, error)
-	UpdateLastLogin(ctx context.Context, identityName string) (*openfga.User, error)
+	// UserLogin creates/fetches an identity based on the identity provided and returns an openfga user object.
+	UserLogin(ctx context.Context, identity string) (*openfga.User, error)
 }
 
 // Parameters holds the services and static fields passed to the jimm.New() constructor.

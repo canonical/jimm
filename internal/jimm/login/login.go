@@ -3,6 +3,7 @@ package login
 
 import (
 	"context"
+	"database/sql"
 	"net/http"
 
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -11,6 +12,7 @@ import (
 	"golang.org/x/oauth2"
 
 	"github.com/canonical/jimm/v3/internal/db"
+	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	jimmnames "github.com/canonical/jimm/v3/pkg/names"
@@ -154,7 +156,7 @@ func (j *loginManager) LoginClientCredentials(ctx context.Context, clientID stri
 		return nil, errors.E(op, err)
 	}
 
-	return j.UpdateLastLogin(ctx, clientIdWithDomain)
+	return j.UserLogin(ctx, clientIdWithDomain)
 }
 
 // LoginWithSessionToken verifies a user's session token before the user is logged in.
@@ -166,7 +168,7 @@ func (j *loginManager) LoginWithSessionToken(ctx context.Context, sessionToken s
 	}
 
 	email := jwtToken.Subject()
-	return j.UpdateLastLogin(ctx, email)
+	return j.UserLogin(ctx, email)
 }
 
 // LoginWithSessionCookie uses the identity ID expected to have come from a session cookie, to log the user in.
@@ -180,5 +182,52 @@ func (j *loginManager) LoginWithSessionCookie(ctx context.Context, identityID st
 	if identityID == "" {
 		return nil, errors.E(op, "missing cookie identity")
 	}
-	return j.UpdateLastLogin(ctx, identityID)
+	return j.UserLogin(ctx, identityID)
+}
+
+// UserLogin fetches the identity specified by a user's email or a service account ID
+// and returns an openfga User that can be used to verify permissions.
+// It will create a new identity if one does not exist.
+// The identity's last login time is updated.
+func (j *loginManager) UserLogin(ctx context.Context, identifier string) (*openfga.User, error) {
+	const op = errors.Op("jimm.UpdateLastLogin")
+	ofgaUser, err := j.getOrCreateIdentity(ctx, identifier)
+	if err != nil {
+		return nil, errors.E(op, err, errors.CodeUnauthorized)
+	}
+	err = j.updateLastLogin(ctx, ofgaUser.Identity)
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+	return ofgaUser, nil
+}
+
+func (j *loginManager) getOrCreateIdentity(ctx context.Context, identifier string) (*openfga.User, error) {
+	const op = errors.Op("jimm.getOrCreateIdentity")
+
+	identity, err := dbmodel.NewIdentity(identifier)
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	if err := j.store.GetIdentity(ctx, identity); err != nil {
+		return nil, err
+	}
+	ofgaUser := openfga.NewUser(identity, j.authSvc)
+
+	isJimmAdmin, err := openfga.IsAdministrator(ctx, ofgaUser, j.jimmTag)
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+	ofgaUser.JimmAdmin = isJimmAdmin
+
+	return ofgaUser, nil
+}
+
+func (j *loginManager) updateLastLogin(ctx context.Context, identity *dbmodel.Identity) error {
+	identity.LastLogin = sql.NullTime{
+		Time:  j.store.DB.Config.NowFunc(),
+		Valid: true,
+	}
+	return j.store.UpdateIdentity(ctx, identity)
 }
