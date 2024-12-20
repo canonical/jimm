@@ -1,3 +1,3 @@
--- 1_15.sql is a migration to delete controller configs
+-- delete controller configs table
 
 DROP TABLE controller_configs;

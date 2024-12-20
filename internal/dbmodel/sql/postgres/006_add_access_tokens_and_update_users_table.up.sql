@@ -1,5 +1,5 @@
--- 1_6.sql is a migration that adds access tokens to the user table
--- and is a migration that renames `user` to `identity`.
+-- adds access tokens to the user table
+-- and renames `user` to `identity`.
 
 ALTER TABLE users ADD COLUMN access_token TEXT;
 ALTER TABLE users ADD COLUMN refresh_token TEXT;

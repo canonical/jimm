@@ -1,4 +1,4 @@
--- 1_13.sql is a migration that introduces the concept of roles to JIMM.
+-- introduces the concept of roles to JIMM.
 
 CREATE TABLE IF NOT EXISTS roles (
    id BIGSERIAL PRIMARY KEY,

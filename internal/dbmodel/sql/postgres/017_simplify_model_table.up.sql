@@ -1,4 +1,4 @@
--- 1_17.sql remove non essential fields from model.
+-- remove non essential fields from model.
 
 ALTER TABLE models DROP COLUMN default_series, DROP COLUMN migration_controller_id, DROP COLUMN is_controller, DROP COLUMN cores, 
  DROP COLUMN machines, DROP COLUMN units, DROP COLUMN type, DROP COLUMN status_status, DROP COLUMN status_info, DROP COLUMN status_data, 

@@ -1,4 +1,4 @@
--- 1_14.sql is a migration simplifies application offers
+-- simplifies application offers
 
 DROP INDEX IF EXISTS idx_application_offer_connections_deleted_at;
 DROP INDEX IF EXISTS idx_application_offer_remote_endpoints_deleted_at;

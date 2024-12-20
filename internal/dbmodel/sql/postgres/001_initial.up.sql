@@ -1,4 +1,4 @@
--- 1_1.sql initialises an empty database.
+-- initialises an empty database.
 
 CREATE TABLE IF NOT EXISTS audit_log (
 	id BIGSERIAL PRIMARY KEY,

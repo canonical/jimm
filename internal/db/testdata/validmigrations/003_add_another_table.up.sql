@@ -1,4 +1,4 @@
--- 1_3.sql is a migration that adds an controller table.
+-- adds a controller table.
 
 CREATE TABLE IF NOT EXISTS controller (
 	id BIGSERIAL PRIMARY KEY,

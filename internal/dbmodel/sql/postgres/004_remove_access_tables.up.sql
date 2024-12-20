@@ -1,4 +1,4 @@
--- 1_4.sql is a migration that removes unused tables and columns previously used for access checks.
+-- removes unused tables and columns previously used for access checks.
 
 DROP TABLE IF EXISTS user_application_offer_access;
 DROP TABLE IF EXISTS user_cloud_access;

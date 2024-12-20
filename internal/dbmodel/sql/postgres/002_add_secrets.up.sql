@@ -1,4 +1,4 @@
--- 1_2.sql is a migration that adds a secrets table.
+-- adds a secrets table.
 
 CREATE TABLE IF NOT EXISTS secrets (
 	id BIGSERIAL PRIMARY KEY,

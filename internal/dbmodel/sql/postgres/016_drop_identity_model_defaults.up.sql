@@ -1,3 +1,3 @@
--- 1_16.sql is a migration to delete identitymodel defaults
+-- delete identitymodel defaults table
 
 DROP TABLE identity_model_defaults;
