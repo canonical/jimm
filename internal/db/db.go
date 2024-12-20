@@ -22,6 +22,7 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/logger"
 )
 
 // Use a custom table name so that we don't run into collisions when OpenFGA or other tools
@@ -60,24 +61,6 @@ func (d *Database) Transaction(f func(*Database) error) error {
 		d.DB = tx
 		return f(&d)
 	})
-}
-
-type migrationLogger struct {
-	logger  *zap.Logger
-	verbose bool
-}
-
-func (l migrationLogger) Printf(format string, v ...interface{}) {
-	line := fmt.Sprintf(format, v...)
-	// Remove unneeded new lines since the zap logger adds them.
-	if line[len(line)-1] == '\n' {
-		line = line[:len(line)-1]
-	}
-	l.logger.Info(line)
-}
-
-func (l migrationLogger) Verbose() bool {
-	return l.verbose
 }
 
 // Migrate migrates the configured database to have the structure required
@@ -125,7 +108,7 @@ func (d *Database) migrateFromSource(ctx context.Context, fs embed.FS, sqlPath s
 	defer m.Close()
 
 	// Setup custom logger for consistent output.
-	logger := migrationLogger{logger: zapctx.Logger(ctx)}
+	logger := logger.MigrationLogger{Logger: zapctx.Logger(ctx)}
 	m.Log = logger
 
 	if err := d.handleDeprecatedMigrations(ctx, m); err != nil {
