@@ -16,6 +16,7 @@ var (
 	OAuthKeyTag                = oauthKeyTag
 	OAuthSessionStoreSecretTag = oauthSessionStoreSecretTag
 	NewUUID                    = &newUUID
+	MigrationTableName         = migrationTableName
 )
 
 func (d *Database) MigrateFromSource(ctx context.Context, fs embed.FS, sqlPath string) error {

@@ -28,7 +28,7 @@ import (
 // Use a custom table name so that we don't run into collisions when OpenFGA or other tools
 // are using the same DB as JIMM in our Docker Compose setup.
 const (
-	MigrationTableName = "jimm_schema_migrations"
+	migrationTableName = "jimm_schema_migrations"
 )
 
 // A Database provides access to the database model. A Database instance
@@ -95,7 +95,7 @@ func (d *Database) migrateFromSource(ctx context.Context, fs embed.FS, sqlPath s
 		return fmt.Errorf("failed to obtain DB conn: %w", err)
 	}
 
-	driver, err := postgres.WithConnection(ctx, conn, &postgres.Config{MigrationsTable: MigrationTableName})
+	driver, err := postgres.WithConnection(ctx, conn, &postgres.Config{MigrationsTable: migrationTableName})
 	if err != nil {
 		return fmt.Errorf("unable to create new driver instance: %w", err)
 	}
