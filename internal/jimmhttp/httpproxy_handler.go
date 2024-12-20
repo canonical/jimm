@@ -42,7 +42,7 @@ func (hph *HTTPProxyHandler) Routes() chi.Router {
 // SetupMiddleware applies authn and authz middlewares.
 func (hph *HTTPProxyHandler) SetupMiddleware() {
 	hph.Router.Use(func(h http.Handler) http.Handler {
-		return middleware.AuthenticateWithSessionTokenViaBasicAuth(h, hph.jimm)
+		return middleware.AuthenticateWithSessionTokenViaBasicAuth(h, hph.jimm.LoginManager())
 	})
 	hph.Router.Use(func(h http.Handler) http.Handler {
 		return middleware.AuthorizeUserForModelAccess(h, ofganames.WriterRelation)

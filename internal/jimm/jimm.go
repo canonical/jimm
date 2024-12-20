@@ -149,6 +149,16 @@ type IdentityManager interface {
 	CountIdentities(ctx context.Context, user *openfga.User) (int, error)
 }
 
+type LoginManager interface {
+	AuthenticateBrowserSession(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error)
+	LoginDevice(ctx context.Context) (*oauth2.DeviceAuthResponse, error)
+	GetDeviceSessionToken(ctx context.Context, deviceOAuthResponse *oauth2.DeviceAuthResponse) (string, error)
+	LoginClientCredentials(ctx context.Context, clientID string, clientSecret string) (*openfga.User, error)
+	LoginWithSessionToken(ctx context.Context, sessionToken string) (*openfga.User, error)
+	LoginWithSessionCookie(ctx context.Context, identityID string) (*openfga.User, error)
+	UpdateLastLogin(ctx context.Context, identityName string) (*openfga.User, error)
+}
+
 // Parameters holds the services and static fields passed to the jimm.New() constructor.
 // You can provide mock implementations of certain services where necessary for dependency injection.
 type Parameters struct {
@@ -279,6 +289,8 @@ type JIMM struct {
 	groupManager GroupManager
 
 	identityManager IdentityManager
+
+	loginManager LoginManager
 }
 
 // ResourceTag returns JIMM's controller tag stating its UUID.
@@ -304,6 +316,10 @@ func (j *JIMM) GroupManager() GroupManager {
 // IdentityManager returns a manager that enables identity (user/service-account) management.
 func (j *JIMM) IdentityManager() IdentityManager {
 	return j.identityManager
+}
+
+func (j *JIMM) LoginManager() LoginManager {
+	return j.loginManager
 }
 
 type permission struct {

@@ -32,7 +32,6 @@ import (
 type JIMM struct {
 	mocks.RelationService
 	mocks.ControllerService
-	mocks.LoginService
 	mocks.ModelManager
 	AddAuditLogEntry_                  func(ale *dbmodel.AuditLogEntry)
 	AddCloudToController_              func(ctx context.Context, user *openfga.User, controllerName string, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error
@@ -64,6 +63,7 @@ type JIMM struct {
 	GrantServiceAccountAccess_         func(ctx context.Context, u *openfga.User, svcAccTag jimmnames.ServiceAccountTag, entities []string) error
 	GroupManager_                      func() jimm.GroupManager
 	IdentityManager_                   func() jimm.IdentityManager
+	LoginManager_                      func() jimm.LoginManager
 	InitiateInternalMigration_         func(ctx context.Context, user *openfga.User, modelNameOrUUID string, targetController string) (jujuparams.InitiateMigrationResult, error)
 	InitiateMigration_                 func(ctx context.Context, user *openfga.User, spec jujuparams.MigrationSpec) (jujuparams.InitiateMigrationResult, error)
 	ListApplicationOffers_             func(ctx context.Context, user *openfga.User, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error)
@@ -229,6 +229,13 @@ func (j *JIMM) IdentityManager() jimm.IdentityManager {
 		return nil
 	}
 	return j.IdentityManager_()
+}
+
+func (j *JIMM) LoginManager() jimm.LoginManager {
+	if j.LoginManager_ == nil {
+		return nil
+	}
+	return j.LoginManager_()
 }
 
 func (j *JIMM) GetJimmControllerAccess(ctx context.Context, user *openfga.User, tag names.UserTag) (string, error) {

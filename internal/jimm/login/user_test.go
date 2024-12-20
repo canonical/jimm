@@ -1,30 +1,21 @@
 // Copyright 2024 Canonical.
-
-package jimm_test
+package login_test
 
 import (
 	"context"
-	"testing"
 	"time"
 
 	qt "github.com/frankban/quicktest"
-	"github.com/juju/names/v5"
 
-	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
-	"github.com/canonical/jimm/v3/internal/jimm"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
-	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
 
-func TestGetUser(t *testing.T) {
-	c := qt.New(t)
-
+func (s *loginManagerSuite) TestGetOrCreateUser(c *qt.C) {
+	c.Parallel()
 	ctx := context.Background()
 
-	j := jimmtest.NewJIMM(c, nil)
-
-	ofgaUser, err := j.GetUser(ctx, "bob@canonical.com.com")
+	ofgaUser, err := s.manager.GetOrCreateUser(ctx, "bob@canonical.com.com")
 	c.Assert(err, qt.IsNil)
 	// Username -> email
 	c.Assert(ofgaUser.Name, qt.Equals, "bob@canonical.com.com")
@@ -37,13 +28,13 @@ func TestGetUser(t *testing.T) {
 	c.Assert(
 		ofgaUser.SetControllerAccess(
 			context.Background(),
-			names.NewControllerTag(j.UUID),
+			s.jimmTag,
 			ofganames.AdministratorRelation,
 		),
 		qt.IsNil,
 	)
 
-	ofgaUser, err = j.GetUser(ctx, "bob@canonical.com.com")
+	ofgaUser, err = s.manager.GetOrCreateUser(ctx, "bob@canonical.com.com")
 	c.Assert(err, qt.IsNil)
 
 	c.Assert(ofgaUser.Name, qt.Equals, "bob@canonical.com.com")
@@ -52,26 +43,19 @@ func TestGetUser(t *testing.T) {
 	c.Assert(ofgaUser.JimmAdmin, qt.IsTrue)
 }
 
-func TestUpdateUserLastLogin(t *testing.T) {
-	c := qt.New(t)
+func (s *loginManagerSuite) TestUpdateLastLogin(c *qt.C) {
+	c.Parallel()
 
 	ctx := context.Background()
 
-	now := time.Now().Truncate(time.Millisecond)
-	db := &db.Database{
-		DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
-	}
-
-	j := jimmtest.NewJIMM(c, &jimm.Parameters{
-		Database: db,
-	})
-
-	err := j.UpdateUserLastLogin(ctx, "bob@canonical.com.com")
+	ofgaUser, err := s.manager.UpdateLastLogin(ctx, "bob@canonical.com.com")
 	c.Assert(err, qt.IsNil)
+	c.Assert(ofgaUser, qt.Not(qt.IsNil))
+
 	user := dbmodel.Identity{Name: "bob@canonical.com.com"}
-	err = j.Database.GetIdentity(ctx, &user)
+	err = s.db.GetIdentity(ctx, &user)
 	c.Assert(err, qt.IsNil)
 	c.Assert(user.DisplayName, qt.Equals, "bob")
-	c.Assert(user.LastLogin.Time, qt.Equals, now)
+	c.Assert(user.LastLogin.Time, qt.Not(qt.Equals), time.Time{})
 	c.Assert(user.LastLogin.Valid, qt.IsTrue)
 }

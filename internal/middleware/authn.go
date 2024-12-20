@@ -23,7 +23,7 @@ type identityContextKey struct{}
 type JIMMAuthner interface {
 	AuthenticateBrowserSession(context.Context, http.ResponseWriter, *http.Request) (context.Context, error)
 	LoginWithSessionToken(ctx context.Context, sessionToken string) (*openfga.User, error)
-	UserLogin(ctx context.Context, identityName string) (*openfga.User, error)
+	UpdateLastLogin(ctx context.Context, identityName string) (*openfga.User, error)
 }
 
 // AuthenticateViaCookie performs browser session authentication and puts an identity in the request's context
@@ -61,7 +61,7 @@ func AuthenticateRebac(baseURL string, next http.Handler, jimm JIMMAuthner) http
 			return
 		}
 
-		user, err := jimm.UserLogin(ctx, identity)
+		user, err := jimm.UpdateLastLogin(ctx, identity)
 		if err != nil {
 			zapctx.Error(ctx, "failed to get openfga user", zap.Error(err))
 			http.Error(w, "internal authentication error", http.StatusInternalServerError)

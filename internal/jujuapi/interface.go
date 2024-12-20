@@ -25,7 +25,6 @@ import (
 type JIMM interface {
 	RelationService
 	ControllerService
-	LoginService
 	ModelManager
 	AddAuditLogEntry(ale *dbmodel.AuditLogEntry)
 	AddCloudToController(ctx context.Context, user *openfga.User, controllerName string, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error
@@ -46,6 +45,7 @@ type JIMM interface {
 	RoleManager() jimm.RoleManager
 	GroupManager() jimm.GroupManager
 	IdentityManager() jimm.IdentityManager
+	LoginManager() jimm.LoginManager
 	GetJimmControllerAccess(ctx context.Context, user *openfga.User, tag names.UserTag) (string, error)
 	GetUserCloudAccess(ctx context.Context, user *openfga.User, cloud names.CloudTag) (string, error)
 	GetUserControllerAccess(ctx context.Context, user *openfga.User, controller names.ControllerTag) (string, error)
@@ -75,5 +75,4 @@ type JIMM interface {
 	ToJAASTag(ctx context.Context, tag *ofganames.Tag, resolveUUIDs bool) (string, error)
 	UpdateCloud(ctx context.Context, u *openfga.User, ct names.CloudTag, cloud jujuparams.Cloud) error
 	UpdateCloudCredential(ctx context.Context, u *openfga.User, args jimm.UpdateCloudCredentialArgs) ([]jujuparams.UpdateCredentialModelResult, error)
-	UserLogin(ctx context.Context, identityName string) (*openfga.User, error)
 }
