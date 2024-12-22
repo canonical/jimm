@@ -338,6 +338,8 @@ func New(p Parameters) (*JIMM, error) {
 	}
 	j.permissionManager = permissionManager
 
+	j.jujuAuthFactory = jujuauth.NewFactory(j.Database, j.JWTService, permissionManager)
+
 	return j, nil
 }
 
@@ -361,6 +363,8 @@ type JIMM struct {
 	loginManager LoginManager
 
 	permissionManager PermissionManager
+
+	jujuAuthFactory *jujuauth.Factory
 }
 
 // ResourceTag returns JIMM's controller tag stating its UUID.
@@ -397,12 +401,8 @@ func (j *JIMM) PermissionManager() PermissionManager {
 	return j.permissionManager
 }
 
-func (j *JIMM) NewJujuAuthenticator() (jujuauth.TokenGenerator, error) {
-	accessChecker, err := permissions.NewPermissionManager(j.Database, j.OpenFGAClient, j.UUID, j.ResourceTag())
-	if err != nil {
-		return jujuauth.TokenGenerator{}, err
-	}
-	return jujuauth.New(j.Database, accessChecker, j.JWTService), nil
+func (j *JIMM) NewJujuAuthenticator() jujuauth.TokenGenerator {
+	return j.jujuAuthFactory.New()
 }
 
 type permission struct {
