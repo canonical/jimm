@@ -4,7 +4,6 @@ package permissions_test
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"testing"
 
@@ -1215,155 +1214,52 @@ func TestDetermineAccessLevelAfterGrant(t *testing.T) {
 	}
 }
 
-type environment struct {
-	users             []dbmodel.Identity
-	clouds            []dbmodel.Cloud
-	credentials       []dbmodel.CloudCredential
-	controllers       []dbmodel.Controller
-	models            []dbmodel.Model
-	applicationOffers []dbmodel.ApplicationOffer
-}
-
-var initializeEnvironment = func(c *qt.C, ctx context.Context, db *db.Database, client *openfga.OFGAClient, jimmUUID string) *environment {
-	env := environment{}
-
-	// Alice is a model admin, but not a superuser or offer admin.
-	u, err := dbmodel.NewIdentity("alice@canonical.com")
-	c.Assert(err, qt.IsNil)
-	c.Assert(db.DB.Create(u).Error, qt.IsNil)
-
-	u1, err := dbmodel.NewIdentity("eve@canonical.com")
-	c.Assert(err, qt.IsNil)
-	c.Assert(db.DB.Create(u1).Error, qt.IsNil)
-
-	u2, err := dbmodel.NewIdentity("bob@canonical.com")
-	c.Assert(err, qt.IsNil)
-	c.Assert(db.DB.Create(u2).Error, qt.IsNil)
-
-	u3, err := dbmodel.NewIdentity("fred@canonical.com")
-	c.Assert(err, qt.IsNil)
-	c.Assert(db.DB.Create(u3).Error, qt.IsNil)
-
-	u4, err := dbmodel.NewIdentity("grant@canonical.com")
-	c.Assert(err, qt.IsNil)
-	c.Assert(db.DB.Create(u4).Error, qt.IsNil)
-
-	// Jane is an offer admin, but not a superuser or model admin.
-	u5, err := dbmodel.NewIdentity("jane@canonical.com")
-	c.Assert(err, qt.IsNil)
-	c.Assert(db.DB.Create(u5).Error, qt.IsNil)
-
-	// Joe is a superuser, but not a model or offer admin.
-	u6, err := dbmodel.NewIdentity("joe@canonical.com")
-	c.Assert(err, qt.IsNil)
-	c.Assert(db.DB.Create(u6).Error, qt.IsNil)
-
-	err = openfga.NewUser(u6, client).SetControllerAccess(ctx, names.NewControllerTag(jimmUUID), ofganames.AdministratorRelation)
-	c.Assert(err, qt.IsNil)
-
-	env.users = []dbmodel.Identity{*u, *u1, *u2, *u3, *u4, *u5, *u6}
-
-	cloud := dbmodel.Cloud{
-		Name: "test-cloud",
-		Type: "test-provider",
-		Regions: []dbmodel.CloudRegion{{
-			Name: "test-region-1",
-		}},
-	}
-	c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
-	env.clouds = []dbmodel.Cloud{cloud}
-
-	// user u is administrator of the test-cloud
-	err = openfga.NewUser(u, client).SetCloudAccess(ctx, cloud.ResourceTag(), ofganames.AdministratorRelation)
-	c.Assert(err, qt.IsNil)
-
-	controller := dbmodel.Controller{
-		Name:          "test-controller-1",
-		UUID:          "00000000-0000-0000-0000-0000-0000000000001",
-		PublicAddress: "test-public-address",
-		CACertificate: "test-ca-cert",
-		CloudName:     cloud.Name,
-		CloudRegion:   cloud.Regions[0].Name,
-		CloudRegions: []dbmodel.CloudRegionControllerPriority{{
-			Priority:      0,
-			CloudRegionID: cloud.Regions[0].ID,
-		}},
-	}
-	err = db.AddController(ctx, &controller)
-	c.Assert(err, qt.IsNil)
-	env.controllers = []dbmodel.Controller{controller}
-
-	err = client.AddCloudController(context.Background(), cloud.ResourceTag(), controller.ResourceTag())
-	c.Assert(err, qt.IsNil)
-
-	err = client.AddController(context.Background(), names.NewControllerTag(jimmUUID), controller.ResourceTag())
-	c.Assert(err, qt.IsNil)
-
-	cred := dbmodel.CloudCredential{
-		Name:              "test-credential-1",
-		CloudName:         cloud.Name,
-		OwnerIdentityName: u.Name,
-		AuthType:          "empty",
-	}
-	err = db.SetCloudCredential(ctx, &cred)
-	c.Assert(err, qt.IsNil)
-	env.credentials = []dbmodel.CloudCredential{cred}
-
-	model := dbmodel.Model{
-		Name: "test-model",
-		UUID: sql.NullString{
-			String: "00000000-0000-0000-0000-0000-0000000000003",
-			Valid:  true,
-		},
-		OwnerIdentityName: u.Name,
-		ControllerID:      controller.ID,
-		CloudRegionID:     cloud.Regions[0].ID,
-		CloudCredentialID: cred.ID,
-	}
-	err = db.AddModel(ctx, &model)
-	c.Assert(err, qt.IsNil)
-	env.models = []dbmodel.Model{model}
-
-	// user u is administrator of the test-model
-	err = openfga.NewUser(u, client).SetModelAccess(ctx, model.ResourceTag(), ofganames.AdministratorRelation)
-	c.Assert(err, qt.IsNil)
-
-	err = client.AddControllerModel(context.Background(), controller.ResourceTag(), model.ResourceTag())
-	c.Assert(err, qt.IsNil)
-
-	offer := dbmodel.ApplicationOffer{
-		ID:      1,
-		UUID:    "00000000-0000-0000-0000-0000-0000000000011",
-		URL:     "test-offer-url",
-		Name:    "test-offer",
-		ModelID: model.ID,
-		Model:   model,
-	}
-	err = db.AddApplicationOffer(ctx, &offer)
-	c.Assert(err, qt.IsNil)
-	env.applicationOffers = []dbmodel.ApplicationOffer{offer}
-
-	err = client.AddModelApplicationOffer(context.Background(), model.ResourceTag(), offer.ResourceTag())
-	c.Assert(err, qt.IsNil)
-
-	// user u1 is administrator of the test-offer
-	err = openfga.NewUser(u1, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.AdministratorRelation)
-	c.Assert(err, qt.IsNil)
-
-	// user u2 is consumer of the test-offer
-	err = openfga.NewUser(u2, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.ConsumerRelation)
-	c.Assert(err, qt.IsNil)
-
-	// user u3 is reader of the test-offer
-	err = openfga.NewUser(u3, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.ReaderRelation)
-	c.Assert(err, qt.IsNil)
-
-	// user u5 is administrator of the test-offer
-	err = openfga.NewUser(u5, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.AdministratorRelation)
-	c.Assert(err, qt.IsNil)
-
-	return &env
-}
+const revokeAndGrantOfferAccessTestEnv = `clouds:
+- name: test-cloud
+  type: test-provider
+  regions:
+  - name: test-region-1
+cloud-credentials:
+- owner: alice@canonical.com
+  name: test-credential-1
+  cloud: test-cloud
+controllers:
+- name: test-controller-1
+  uuid: 00000000-0000-0000-0000-0000-0000000000001
+  cloud: test-cloud
+  region: test-region-1
+models:
+- name: test-model
+  uuid: 00000000-0000-0000-0000-0000-0000000000003
+  controller: test-controller-1
+  cloud: test-cloud
+  region: test-region-1
+  cloud-credential: test-credential-1
+  owner: alice@canonical.com
+  life: alive
+application-offers:
+- name: test-offer
+  url: test-offer-url
+  uuid: 00000000-0000-0000-0000-0000-0000000000011
+  model-name: test-model
+  model-owner: alice@canonical.com
+  application-name: application-1
+  application-description: app description 1
+  users:
+  - user: eve@canonical.com
+    access: admin
+  - user: jane@canonical.com
+    access: admin
+  - user: bob@canonical.com
+    access: consume
+  - user: fred@canonical.com
+    access: read
+users:
+- username: grant@canonical.com
+  controller-access: login
+- username: joe@canonical.com
+  controller-access: superuser
+`
 
 func TestRevokeOfferAccess(t *testing.T) {
 	c := qt.New(t)
@@ -1372,139 +1268,146 @@ func TestRevokeOfferAccess(t *testing.T) {
 
 	tests := []struct {
 		about                      string
-		parameterFunc              func(*environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission)
-		setup                      func(*environment, *openfga.OFGAClient)
+		parameterFunc              func(*jimmtest.Environment, *db.Database) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission)
+		setup                      func(*jimmtest.Environment, *db.Database, *openfga.OFGAClient)
 		expectedError              string
 		expectedAccessLevel        string
 		expectedAccessLevelOnError string // This expectation is meant to ensure there'll be no unpredicted behavior (like changing existing relations) after an error has occurred
 	}{{
 		about: "admin revokes a model admin user's admin access - an error returns (relation is indirect)",
-		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
-			return env.users[1], env.users[0], "test-offer-url", jujuparams.OfferAdminAccess
+		parameterFunc: func(env *jimmtest.Environment, db *db.Database) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
+			return env.User("eve@canonical.com").DBObject(c, db), env.User("alice@canonical.com").DBObject(c, db), "test-offer-url", jujuparams.OfferAdminAccess
 		},
 		expectedError:              "unable to completely revoke given access due to other relations.*",
 		expectedAccessLevelOnError: "admin",
 	}, {
 		about: "model admin revokes an admin user admin access - user has no access",
-		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
-			return env.users[0], env.users[1], "test-offer-url", jujuparams.OfferAdminAccess
+		parameterFunc: func(env *jimmtest.Environment, db *db.Database) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
+			return env.User("alice@canonical.com").DBObject(c, db), env.User("eve@canonical.com").DBObject(c, db), "test-offer-url", jujuparams.OfferAdminAccess
+
 		},
 		expectedAccessLevel: "",
 	}, {
 		about: "admin revokes an admin user admin access - user has no access",
-		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
-			return env.users[5], env.users[1], "test-offer-url", jujuparams.OfferAdminAccess
+		parameterFunc: func(env *jimmtest.Environment, db *db.Database) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
+			return env.User("jane@canonical.com").DBObject(c, db), env.User("eve@canonical.com").DBObject(c, db), "test-offer-url", jujuparams.OfferAdminAccess
 		},
 		expectedAccessLevel: "",
 	}, {
 		about: "superuser revokes an admin user admin access - user has no access",
-		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
-			return env.users[6], env.users[1], "test-offer-url", jujuparams.OfferAdminAccess
+		parameterFunc: func(env *jimmtest.Environment, db *db.Database) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
+			return env.User("joe@canonical.com").DBObject(c, db), env.User("eve@canonical.com").DBObject(c, db), "test-offer-url", jujuparams.OfferAdminAccess
 		},
 		expectedAccessLevel: "",
 	}, {
 		about: "admin revokes an admin user read access - an error returns (no direct relation to remove)",
-		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
-			return env.users[0], env.users[1], "test-offer-url", jujuparams.OfferReadAccess
+		parameterFunc: func(env *jimmtest.Environment, db *db.Database) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
+			return env.User("alice@canonical.com").DBObject(c, db), env.User("eve@canonical.com").DBObject(c, db), "test-offer-url", jujuparams.OfferReadAccess
 		},
 		expectedError:              "unable to completely revoke given access due to other relations.*",
 		expectedAccessLevelOnError: "admin",
 	}, {
 		about: "admin revokes a consume user admin access - user keeps consume access",
-		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
-			return env.users[0], env.users[2], "test-offer-url", jujuparams.OfferAdminAccess
+		parameterFunc: func(env *jimmtest.Environment, db *db.Database) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
+			return env.User("alice@canonical.com").DBObject(c, db), env.User("bob@canonical.com").DBObject(c, db), "test-offer-url", jujuparams.OfferAdminAccess
 		},
 		expectedAccessLevel: "consume",
 	}, {
 		about: "admin revokes a consume user consume access - user has no access",
-		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
-			return env.users[0], env.users[2], "test-offer-url", jujuparams.OfferConsumeAccess
+		parameterFunc: func(env *jimmtest.Environment, db *db.Database) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
+			return env.User("alice@canonical.com").DBObject(c, db), env.User("bob@canonical.com").DBObject(c, db), "test-offer-url", jujuparams.OfferConsumeAccess
 		},
 		expectedAccessLevel: "",
 	}, {
 		about: "admin revokes a consume user read access - user still has consume access",
-		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
-			return env.users[0], env.users[2], "test-offer-url", jujuparams.OfferReadAccess
+		parameterFunc: func(env *jimmtest.Environment, db *db.Database) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
+			return env.User("alice@canonical.com").DBObject(c, db), env.User("bob@canonical.com").DBObject(c, db), "test-offer-url", jujuparams.OfferReadAccess
 		},
 		expectedError:              "unable to completely revoke given access due to other relations.*",
 		expectedAccessLevelOnError: "consume",
 	}, {
 		about: "admin revokes a read user admin access - user keeps read access",
-		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
-			return env.users[0], env.users[3], "test-offer-url", jujuparams.OfferAdminAccess
+		parameterFunc: func(env *jimmtest.Environment, db *db.Database) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
+			return env.User("alice@canonical.com").DBObject(c, db), env.User("fred@canonical.com").DBObject(c, db), "test-offer-url", jujuparams.OfferAdminAccess
 		},
 		expectedAccessLevel: "read",
 	}, {
 		about: "admin revokes a read user consume access - user keeps read access",
-		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
-			return env.users[0], env.users[3], "test-offer-url", jujuparams.OfferConsumeAccess
+		parameterFunc: func(env *jimmtest.Environment, db *db.Database) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
+			return env.User("alice@canonical.com").DBObject(c, db), env.User("fred@canonical.com").DBObject(c, db), "test-offer-url", jujuparams.OfferConsumeAccess
 		},
 		expectedAccessLevel: "read",
 	}, {
 		about: "admin revokes a read user read access - user has no access",
-		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
-			return env.users[0], env.users[3], "test-offer-url", jujuparams.OfferReadAccess
+		parameterFunc: func(env *jimmtest.Environment, db *db.Database) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
+			return env.User("alice@canonical.com").DBObject(c, db), env.User("fred@canonical.com").DBObject(c, db), "test-offer-url", jujuparams.OfferReadAccess
 		},
 		expectedAccessLevel: "",
 	}, {
 		about: "admin tries to revoke access to user that does not have access - user continues to have no access",
-		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
-			return env.users[0], env.users[4], "test-offer-url", jujuparams.OfferReadAccess
+		parameterFunc: func(env *jimmtest.Environment, db *db.Database) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
+			return env.User("alice@canonical.com").DBObject(c, db), env.User("grant@canonical.com").DBObject(c, db), "test-offer-url", jujuparams.OfferReadAccess
 		},
 		expectedAccessLevel: "",
 	}, {
 		about: "user with consume access cannot revoke access",
-		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
-			return env.users[2], env.users[3], "test-offer-url", jujuparams.OfferReadAccess
+		parameterFunc: func(env *jimmtest.Environment, db *db.Database) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
+			return env.User("bob@canonical.com").DBObject(c, db), env.User("fred@canonical.com").DBObject(c, db), "test-offer-url", jujuparams.OfferReadAccess
 		},
 		expectedError: "unauthorized",
 	}, {
 		about: "user with read access cannot revoke access",
-		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
-			return env.users[3], env.users[3], "test-offer-url", jujuparams.OfferReadAccess
+		parameterFunc: func(env *jimmtest.Environment, db *db.Database) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
+			return env.User("fred@canonical.com").DBObject(c, db), env.User("fred@canonical.com").DBObject(c, db), "test-offer-url", jujuparams.OfferReadAccess
 		},
 		expectedError: "unauthorized",
 	}, {
 		about: "no such offer",
-		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
-			return env.users[3], env.users[3], "no-such-offer", jujuparams.OfferReadAccess
+		parameterFunc: func(env *jimmtest.Environment, db *db.Database) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
+			return env.User("fred@canonical.com").DBObject(c, db), env.User("fred@canonical.com").DBObject(c, db), "no-such-offer", jujuparams.OfferReadAccess
 		},
 		expectedError: "application offer not found",
 	}, {
 		about: "admin revokes another user (who is direct admin+consumer) their consume access - an error returns (saying user still has access; hinting to use 'jimmctl' for advanced cases)",
-		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
-			return env.users[1], env.users[4], env.applicationOffers[0].URL, jujuparams.OfferConsumeAccess
+		parameterFunc: func(env *jimmtest.Environment, db *db.Database) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
+			return env.User("eve@canonical.com").DBObject(c, db), env.User("grant@canonical.com").DBObject(c, db), "test-offer-url", jujuparams.OfferConsumeAccess
 		},
-		setup: func(env *environment, client *openfga.OFGAClient) {
-			err := openfga.NewUser(&env.users[4], client).SetApplicationOfferAccess(ctx, env.applicationOffers[0].ResourceTag(), ofganames.ConsumerRelation)
+		setup: func(env *jimmtest.Environment, db *db.Database, client *openfga.OFGAClient) {
+			u := env.User("grant@canonical.com").DBObject(c, db)
+			offer := env.ApplicationOffer("test-offer-url").DBObject(c, db)
+			err := openfga.NewUser(&u, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.ConsumerRelation)
 			c.Assert(err, qt.IsNil)
-			err = openfga.NewUser(&env.users[4], client).SetApplicationOfferAccess(ctx, env.applicationOffers[0].ResourceTag(), ofganames.AdministratorRelation)
+			err = openfga.NewUser(&u, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 		},
 		expectedError:              "unable to completely revoke given access due to other relations.*jimmctl.*",
 		expectedAccessLevelOnError: "admin",
 	}, {
 		about: "admin revokes another user (who is direct admin+reader) their read access - an error returns (saying user still has access; hinting to use 'jimmctl' for advanced cases)",
-		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
-			return env.users[1], env.users[4], env.applicationOffers[0].URL, jujuparams.OfferReadAccess
+		parameterFunc: func(env *jimmtest.Environment, db *db.Database) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
+			return env.User("eve@canonical.com").DBObject(c, db), env.User("grant@canonical.com").DBObject(c, db), "test-offer-url", jujuparams.OfferReadAccess
 		},
-		setup: func(env *environment, client *openfga.OFGAClient) {
-			err := openfga.NewUser(&env.users[4], client).SetApplicationOfferAccess(ctx, env.applicationOffers[0].ResourceTag(), ofganames.ReaderRelation)
+		setup: func(env *jimmtest.Environment, db *db.Database, client *openfga.OFGAClient) {
+			u := env.User("grant@canonical.com").DBObject(c, db)
+			offer := env.ApplicationOffer("test-offer-url").DBObject(c, db)
+			err := openfga.NewUser(&u, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.ReaderRelation)
 			c.Assert(err, qt.IsNil)
-			err = openfga.NewUser(&env.users[4], client).SetApplicationOfferAccess(ctx, env.applicationOffers[0].ResourceTag(), ofganames.AdministratorRelation)
+			err = openfga.NewUser(&u, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 		},
 		expectedError:              "unable to completely revoke given access due to other relations.*jimmctl.*",
 		expectedAccessLevelOnError: "admin",
 	}, {
 		about: "admin revokes another user (who is direct consumer+reader) their read access - an error returns (saying user still has access; hinting to use 'jimmctl' for advanced cases)",
-		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
-			return env.users[1], env.users[4], env.applicationOffers[0].URL, jujuparams.OfferReadAccess
+		parameterFunc: func(env *jimmtest.Environment, db *db.Database) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
+			return env.User("eve@canonical.com").DBObject(c, db), env.User("grant@canonical.com").DBObject(c, db), "test-offer-url", jujuparams.OfferReadAccess
 		},
-		setup: func(env *environment, client *openfga.OFGAClient) {
-			err := openfga.NewUser(&env.users[4], client).SetApplicationOfferAccess(ctx, env.applicationOffers[0].ResourceTag(), ofganames.ReaderRelation)
+		setup: func(env *jimmtest.Environment, db *db.Database, client *openfga.OFGAClient) {
+			u := env.User("grant@canonical.com").DBObject(c, db)
+			offer := env.ApplicationOffer("test-offer-url").DBObject(c, db)
+			err := openfga.NewUser(&u, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.ReaderRelation)
 			c.Assert(err, qt.IsNil)
-			err = openfga.NewUser(&env.users[4], client).SetApplicationOfferAccess(ctx, env.applicationOffers[0].ResourceTag(), ofganames.ConsumerRelation)
+			err = openfga.NewUser(&u, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.ConsumerRelation)
 			c.Assert(err, qt.IsNil)
 		},
 		expectedError:              "unable to completely revoke given access due to other relations.*jimmctl.*",
@@ -1513,20 +1416,15 @@ func TestRevokeOfferAccess(t *testing.T) {
 
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
-			jimmUUID := uuid.NewString()
+			j := jimmtest.NewJIMM(c, &jimm.Parameters{})
 
-			j := jimmtest.NewJIMM(c, &jimm.Parameters{
-				Dialer: &jimmtest.Dialer{
-					API: &jimmtest.API{},
-				},
-			})
-
-			environment := initializeEnvironment(c, ctx, j.Database, j.OpenFGAClient, jimmUUID)
+			env := jimmtest.ParseEnvironment(c, revokeAndGrantOfferAccessTestEnv)
+			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
 
 			if test.setup != nil {
-				test.setup(environment, j.OpenFGAClient)
+				test.setup(env, j.Database, j.OpenFGAClient)
 			}
-			authenticatedUser, offerUser, offerURL, revokeAccessLevel := test.parameterFunc(environment)
+			authenticatedUser, offerUser, offerURL, revokeAccessLevel := test.parameterFunc(env, j.Database)
 
 			assertAppliedRelation := func(expectedAppliedRelation string) {
 				offer := dbmodel.ApplicationOffer{
@@ -1559,127 +1457,121 @@ func TestGrantOfferAccess(t *testing.T) {
 
 	tests := []struct {
 		about               string
-		parameterFunc       func(*environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission)
+		parameterFunc       func(*jimmtest.Environment, *db.Database) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission)
 		expectedError       string
 		expectedAccessLevel string
 	}{{
 		about: "model admin grants an admin user admin access - admin user keeps admin",
-		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
-			return env.users[0], env.users[1], "test-offer-url", jujuparams.OfferAdminAccess
+		parameterFunc: func(env *jimmtest.Environment, db *db.Database) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
+			return env.User("alice@canonical.com").DBObject(c, db), env.User("eve@canonical.com").DBObject(c, db), "test-offer-url", jujuparams.OfferAdminAccess
 		},
 		expectedAccessLevel: "admin",
 	}, {
 		about: "model admin grants an admin user consume access - admin user keeps admin",
-		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
-			return env.users[0], env.users[1], "test-offer-url", jujuparams.OfferConsumeAccess
+		parameterFunc: func(env *jimmtest.Environment, db *db.Database) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
+			return env.User("alice@canonical.com").DBObject(c, db), env.User("eve@canonical.com").DBObject(c, db), "test-offer-url", jujuparams.OfferConsumeAccess
 		},
 		expectedAccessLevel: "admin",
 	}, {
 		about: "model admin grants an admin user read access - admin user keeps admin",
-		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
-			return env.users[0], env.users[1], "test-offer-url", jujuparams.OfferReadAccess
+		parameterFunc: func(env *jimmtest.Environment, db *db.Database) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
+			return env.User("alice@canonical.com").DBObject(c, db), env.User("eve@canonical.com").DBObject(c, db), "test-offer-url", jujuparams.OfferReadAccess
 		},
 		expectedAccessLevel: "admin",
 	}, {
 		about: "model admin grants a consume user admin access - user gets admin access",
-		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
-			return env.users[0], env.users[2], "test-offer-url", jujuparams.OfferAdminAccess
+		parameterFunc: func(env *jimmtest.Environment, db *db.Database) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
+			return env.User("alice@canonical.com").DBObject(c, db), env.User("bob@canonical.com").DBObject(c, db), "test-offer-url", jujuparams.OfferAdminAccess
 		},
 		expectedAccessLevel: "admin",
 	}, {
 		about: "admin grants a consume user admin access - user gets admin access",
-		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
-			return env.users[5], env.users[2], "test-offer-url", jujuparams.OfferAdminAccess
+		parameterFunc: func(env *jimmtest.Environment, db *db.Database) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
+			return env.User("jane@canonical.com").DBObject(c, db), env.User("bob@canonical.com").DBObject(c, db), "test-offer-url", jujuparams.OfferAdminAccess
 		},
 		expectedAccessLevel: "admin",
 	}, {
 		about: "superuser grants a consume user admin access - user gets admin access",
-		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
-			return env.users[6], env.users[2], "test-offer-url", jujuparams.OfferAdminAccess
+		parameterFunc: func(env *jimmtest.Environment, db *db.Database) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
+			return env.User("joe@canonical.com").DBObject(c, db), env.User("bob@canonical.com").DBObject(c, db), "test-offer-url", jujuparams.OfferAdminAccess
 		},
 		expectedAccessLevel: "admin",
 	}, {
 		about: "admin grants a consume user consume access - user keeps consume access",
-		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
-			return env.users[0], env.users[2], "test-offer-url", jujuparams.OfferConsumeAccess
+		parameterFunc: func(env *jimmtest.Environment, db *db.Database) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
+			return env.User("alice@canonical.com").DBObject(c, db), env.User("bob@canonical.com").DBObject(c, db), "test-offer-url", jujuparams.OfferConsumeAccess
 		},
 		expectedAccessLevel: "consume",
 	}, {
 		about: "admin grants a consume user read access - use keeps consume access",
-		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
-			return env.users[0], env.users[2], "test-offer-url", jujuparams.OfferReadAccess
+		parameterFunc: func(env *jimmtest.Environment, db *db.Database) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
+			return env.User("alice@canonical.com").DBObject(c, db), env.User("bob@canonical.com").DBObject(c, db), "test-offer-url", jujuparams.OfferReadAccess
 		},
 		expectedAccessLevel: "consume",
 	}, {
 		about: "admin grants a read user admin access - user gets admin access",
-		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
-			return env.users[0], env.users[3], "test-offer-url", jujuparams.OfferAdminAccess
+		parameterFunc: func(env *jimmtest.Environment, db *db.Database) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
+			return env.User("alice@canonical.com").DBObject(c, db), env.User("fred@canonical.com").DBObject(c, db), "test-offer-url", jujuparams.OfferAdminAccess
 		},
 		expectedAccessLevel: "admin",
 	}, {
 		about: "admin grants a read user consume access - user gets consume access",
-		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
-			return env.users[0], env.users[3], "test-offer-url", jujuparams.OfferConsumeAccess
+		parameterFunc: func(env *jimmtest.Environment, db *db.Database) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
+			return env.User("alice@canonical.com").DBObject(c, db), env.User("fred@canonical.com").DBObject(c, db), "test-offer-url", jujuparams.OfferConsumeAccess
 		},
 		expectedAccessLevel: "consume",
 	}, {
 		about: "admin grants a read user read access - user keeps read access",
-		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
-			return env.users[0], env.users[3], "test-offer-url", jujuparams.OfferReadAccess
+		parameterFunc: func(env *jimmtest.Environment, db *db.Database) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
+			return env.User("alice@canonical.com").DBObject(c, db), env.User("fred@canonical.com").DBObject(c, db), "test-offer-url", jujuparams.OfferReadAccess
 		},
 		expectedAccessLevel: "read",
 	}, {
 		about: "no such offer",
-		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
-			return env.users[0], env.users[3], "no-such-offer", jujuparams.OfferReadAccess
+		parameterFunc: func(env *jimmtest.Environment, db *db.Database) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
+			return env.User("alice@canonical.com").DBObject(c, db), env.User("fred@canonical.com").DBObject(c, db), "no-such-offer", jujuparams.OfferReadAccess
 		},
 		expectedError: "application offer not found",
 	}, {
 		about: "user with consume rights cannot grant any rights",
-		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
-			return env.users[2], env.users[4], "test-offer-url", jujuparams.OfferConsumeAccess
+		parameterFunc: func(env *jimmtest.Environment, db *db.Database) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
+			return env.User("bob@canonical.com").DBObject(c, db), env.User("grant@canonical.com").DBObject(c, db), "test-offer-url", jujuparams.OfferConsumeAccess
 		},
 		expectedError: "unauthorized",
 	}, {
 		about: "user with read rights cannot grant any rights",
-		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
-			return env.users[3], env.users[4], "test-offer-url", jujuparams.OfferConsumeAccess
+		parameterFunc: func(env *jimmtest.Environment, db *db.Database) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
+			return env.User("fred@canonical.com").DBObject(c, db), env.User("grant@canonical.com").DBObject(c, db), "test-offer-url", jujuparams.OfferConsumeAccess
 		},
 		expectedError: "unauthorized",
 	}, {
 		about: "admin grants new user admin access - new user has admin access",
-		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
-			return env.users[0], env.users[4], "test-offer-url", jujuparams.OfferAdminAccess
+		parameterFunc: func(env *jimmtest.Environment, db *db.Database) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
+			return env.User("alice@canonical.com").DBObject(c, db), env.User("grant@canonical.com").DBObject(c, db), "test-offer-url", jujuparams.OfferAdminAccess
 		},
 		expectedAccessLevel: "admin",
 	}, {
 		about: "admin grants new user consume access - new user has consume access",
-		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
-			return env.users[0], env.users[4], "test-offer-url", jujuparams.OfferConsumeAccess
+		parameterFunc: func(env *jimmtest.Environment, db *db.Database) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
+			return env.User("alice@canonical.com").DBObject(c, db), env.User("grant@canonical.com").DBObject(c, db), "test-offer-url", jujuparams.OfferConsumeAccess
 		},
 		expectedAccessLevel: "consume",
 	}, {
 		about: "admin grants new user read access - new user has read access",
-		parameterFunc: func(env *environment) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
-			return env.users[0], env.users[4], "test-offer-url", jujuparams.OfferReadAccess
+		parameterFunc: func(env *jimmtest.Environment, db *db.Database) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
+			return env.User("alice@canonical.com").DBObject(c, db), env.User("grant@canonical.com").DBObject(c, db), "test-offer-url", jujuparams.OfferReadAccess
 		},
 		expectedAccessLevel: "read",
 	}}
 
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
-			jimmUUID := uuid.NewString()
+			j := jimmtest.NewJIMM(c, &jimm.Parameters{})
 
-			j := jimmtest.NewJIMM(c, &jimm.Parameters{
-				UUID: jimmUUID,
+			env := jimmtest.ParseEnvironment(c, revokeAndGrantOfferAccessTestEnv)
+			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
 
-				Dialer: &jimmtest.Dialer{
-					API: &jimmtest.API{},
-				},
-			})
-
-			environment := initializeEnvironment(c, ctx, j.Database, j.OpenFGAClient, jimmUUID)
-			authenticatedUser, offerUser, offerURL, grantAccessLevel := test.parameterFunc(environment)
+			authenticatedUser, offerUser, offerURL, grantAccessLevel := test.parameterFunc(env, j.Database)
 
 			err := j.PermissionManager().GrantOfferAccess(ctx, openfga.NewUser(&authenticatedUser, j.OpenFGAClient), offerURL, offerUser.ResourceTag(), grantAccessLevel)
 			if test.expectedError == "" {

@@ -197,6 +197,29 @@ func (ctl Controller) addControllerRelations(c *qt.C, client *openfga.OFGAClient
 	c.Assert(err, qt.IsNil)
 }
 
+// addAppOfferRelations adds permissions the application offer should have and adds permissions for users to the offer.
+func (ao ApplicationOffer) addAppOfferRelations(c *qt.C, db *db.Database, client *openfga.OFGAClient) {
+	for _, u := range ao.Users {
+		dbUser := ao.env.User(u.User).DBObject(c, db)
+		var relation openfga.Relation
+		switch u.Access {
+		case "admin":
+			relation = ofganames.AdministratorRelation
+		case "consume":
+			relation = ofganames.ConsumerRelation
+		case "read":
+			relation = ofganames.ReaderRelation
+		default:
+			c.Fatalf("unknown application offer access: %s %s", dbUser.Name, u.Access)
+		}
+		user := openfga.NewUser(&dbUser, client)
+		err := user.SetApplicationOfferAccess(context.Background(), ao.dbo.ResourceTag(), relation)
+		c.Assert(err, qt.IsNil)
+	}
+	err := client.AddModelApplicationOffer(context.Background(), ao.dbo.Model.ResourceTag(), ao.dbo.ResourceTag())
+	c.Assert(err, qt.IsNil)
+}
+
 func (e *Environment) addJIMMRelations(c *qt.C, jimmTag names.ControllerTag, db *db.Database, client *openfga.OFGAClient) {
 	for _, user := range e.Users {
 		user.addUserRelations(c, jimmTag, db, client)
@@ -213,6 +236,9 @@ func (e *Environment) addJIMMRelations(c *qt.C, jimmTag names.ControllerTag, db 
 	}
 	for _, ctl := range e.Controllers {
 		ctl.addControllerRelations(c, client)
+	}
+	for _, appOffer := range e.ApplicationOffers {
+		appOffer.addAppOfferRelations(c, db, client)
 	}
 }
 
@@ -255,11 +281,12 @@ func (e *Environment) PopulateDB(c Tester, db *db.Database) {
 
 // ApplicationOffer represents Juju application offers.
 type ApplicationOffer struct {
-	ModelName  string `json:"model-name"`
-	ModelOwner string `json:"model-owner"`
-	Name       string `json:"name"`
-	UUID       string `json:"uuid"`
-	URL        string `json:"url"`
+	ModelName  string       `json:"model-name"`
+	ModelOwner string       `json:"model-owner"`
+	Name       string       `json:"name"`
+	UUID       string       `json:"uuid"`
+	URL        string       `json:"url"`
+	Users      []UserAccess `json:"users"`
 
 	env *Environment
 	dbo dbmodel.ApplicationOffer
