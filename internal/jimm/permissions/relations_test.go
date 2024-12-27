@@ -16,16 +16,13 @@ import (
 )
 
 func (s *permissionManagerSuite) TestListRelationshipTuples(c *qt.C) {
-	// setup
 	c.Parallel()
 	ctx := context.Background()
 
-	j := jimmtest.NewJIMM(c, nil)
-
-	u := openfga.NewUser(&dbmodel.Identity{Name: "admin@canonical.com"}, j.OpenFGAClient)
+	u := openfga.NewUser(&dbmodel.Identity{Name: "admin@canonical.com"}, s.ofgaClient)
 	u.JimmAdmin = true
 
-	user, _, controller, model, _, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, j.Database)
+	user, _, controller, model, _, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
 
 	err := s.manager.AddRelation(ctx, u, []apiparams.RelationshipTuple{
 		{
@@ -45,6 +42,7 @@ func (s *permissionManagerSuite) TestListRelationshipTuples(c *qt.C) {
 		},
 	})
 	c.Assert(err, qt.IsNil)
+
 	type ExpectedTuple struct {
 		expectedRelation string
 		expectedTargetId string
@@ -65,7 +63,7 @@ func (s *permissionManagerSuite) TestListRelationshipTuples(c *qt.C) {
 			relation:       "",
 			targetObject:   "",
 			expectedError:  nil,
-			expectedLength: 3,
+			expectedLength: 4,
 		},
 		{
 			description:    "test listing a specific relation",
@@ -155,12 +153,10 @@ func (s *permissionManagerSuite) TestListObjectRelations(c *qt.C) {
 	c.Parallel()
 	ctx := context.Background()
 
-	j := jimmtest.NewJIMM(c, nil)
-
-	u := openfga.NewUser(&dbmodel.Identity{Name: "admin@canonical.com"}, j.OpenFGAClient)
+	u := openfga.NewUser(&dbmodel.Identity{Name: "admin@canonical.com"}, s.ofgaClient)
 	u.JimmAdmin = true
 
-	user, group, controller, model, _, cloud, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, j.Database)
+	user, group, controller, model, _, cloud, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
 
 	err := s.manager.AddRelation(ctx, u, []apiparams.RelationshipTuple{
 		{

@@ -116,7 +116,6 @@ func (s *permissionManagerSuite) TestGrantServiceAccountAccess(c *qt.C) {
 	}}
 
 	for _, test := range tests {
-		test := test
 		c.Run(test.about, func(c *qt.C) {
 			if len(test.addGroups) > 0 {
 				for _, name := range test.addGroups {
