@@ -340,6 +340,8 @@ func resolveTag(jimmUUID string, db *db.Database, tag string) (*ofganames.Tag, e
 		return resolver.userTag(ctx)
 	case jimmnames.GroupTagKind:
 		return resolver.groupTag(ctx, db)
+	case jimmnames.RoleTagKind:
+		return resolver.roleTag(ctx, db)
 	case names.ControllerTagKind:
 		return resolver.controllerTag(ctx, jimmUUID, db)
 	case names.ModelTagKind:

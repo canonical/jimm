@@ -187,10 +187,8 @@ type PermissionManager interface {
 	// ListObjectRelations lists all the tuples that an object has a direct relation with.
 	ListObjectRelations(ctx context.Context, user *openfga.User, object string, pageSize int32, entitlementToken pagination.EntitlementToken) ([]openfga.Tuple, pagination.EntitlementToken, error)
 
-	// These methods
 	GetJimmControllerAccess(ctx context.Context, user *openfga.User, tag names.UserTag) (string, error)
 	GetUserCloudAccess(ctx context.Context, user *openfga.User, cloud names.CloudTag) (string, error)
-	GetUserControllerAccess(ctx context.Context, user *openfga.User, controller names.ControllerTag) (string, error)
 	GetUserModelAccess(ctx context.Context, user *openfga.User, model names.ModelTag) (string, error)
 
 	// GrantAuditLogAccess grants a user access to read audit logs.

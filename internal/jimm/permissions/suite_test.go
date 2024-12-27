@@ -56,9 +56,9 @@ func (s *permissionManagerSuite) Init(c *qt.C) {
 	i, err := dbmodel.NewIdentity("alice")
 	c.Assert(err, qt.IsNil)
 	s.adminUser = openfga.NewUser(i, ofgaClient)
+	s.adminUser.JimmAdmin = true
 
-	adminUser := openfga.NewUser(i, ofgaClient)
-	err = adminUser.SetControllerAccess(ctx, ctlTag, ofganames.AdministratorRelation)
+	err = s.adminUser.SetControllerAccess(ctx, ctlTag, ofganames.AdministratorRelation)
 	c.Assert(err, qt.IsNil)
 
 	i2, err := dbmodel.NewIdentity("bob")

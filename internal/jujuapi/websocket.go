@@ -173,10 +173,7 @@ func modelInfoFromPath(path string) (uuid string, finalPath string, err error) {
 // We act as a proxier, handling auth on requests before forwarding the
 // requests to the appropriate Juju controller.
 func (s apiProxier) ServeWS(ctx context.Context, clientConn *websocket.Conn) {
-	jwtGenerator, err := s.jimm.NewJujuAuthenticator()
-	if err != nil {
-		zapctx.Error(ctx, "failed to create new Juju authenticator", zap.Error(err))
-	}
+	jwtGenerator := s.jimm.NewJujuAuthenticator()
 	connectionFunc := controllerConnectionFunc(s, &jwtGenerator)
 	zapctx.Debug(ctx, "Starting proxier")
 	auditLogger := s.jimm.AddAuditLogEntry
