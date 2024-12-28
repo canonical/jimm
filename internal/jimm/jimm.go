@@ -32,6 +32,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/jimm/credentials"
 	"github.com/canonical/jimm/v3/internal/jimm/group"
 	"github.com/canonical/jimm/v3/internal/jimm/identity"
+	"github.com/canonical/jimm/v3/internal/jimm/login"
 	"github.com/canonical/jimm/v3/internal/jimm/role"
 	"github.com/canonical/jimm/v3/internal/jimmjwx"
 	"github.com/canonical/jimm/v3/internal/openfga"
@@ -278,6 +279,12 @@ func New(p Parameters) (*JIMM, error) {
 		return nil, err
 	}
 	j.identityManager = identityManager
+
+	loginManager, err := login.NewLoginManager(j.Database, j.OpenFGAClient, j.OAuthAuthenticator, j.ResourceTag())
+	if err != nil {
+		return nil, err
+	}
+	j.loginManager = loginManager
 
 	return j, nil
 }
