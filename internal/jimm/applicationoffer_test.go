@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package jimm_test
 
@@ -1790,16 +1790,6 @@ func TestListApplicationOffers(t *testing.T) {
 										Interface: "unknown",
 										Limit:     1,
 									}},
-									Users: []jujuparams.OfferUserDetails{{
-										UserName: "alice@canonical.com",
-										Access:   "admin",
-									}, {
-										UserName: "eve@canonical.com",
-										Access:   "read",
-									}, {
-										UserName: "bob@canonical.com",
-										Access:   "consume",
-									}},
 								},
 								ApplicationName: "application-1",
 								CharmURL:        "charm-1",
@@ -1821,16 +1811,6 @@ func TestListApplicationOffers(t *testing.T) {
 										Role:      "requirer",
 										Interface: "unknown",
 										Limit:     1,
-									}},
-									Users: []jujuparams.OfferUserDetails{{
-										UserName: "alice@canonical.com",
-										Access:   "admin",
-									}, {
-										UserName: "eve@canonical.com",
-										Access:   "read",
-									}, {
-										UserName: "bob@canonical.com",
-										Access:   "consume",
 									}},
 								},
 								ApplicationName: "application-2",
@@ -1855,16 +1835,6 @@ func TestListApplicationOffers(t *testing.T) {
 										Role:      "requirer",
 										Interface: "unknown",
 										Limit:     1,
-									}},
-									Users: []jujuparams.OfferUserDetails{{
-										UserName: "alice@canonical.com",
-										Access:   "admin",
-									}, {
-										UserName: "eve@canonical.com",
-										Access:   "read",
-									}, {
-										UserName: "bob@canonical.com",
-										Access:   "consume",
 									}},
 								},
 								ApplicationName: "application-3",
@@ -1962,7 +1932,7 @@ func TestListApplicationOffers(t *testing.T) {
 				Access:   "admin",
 			}, {
 				UserName: "bob@canonical.com",
-				Access:   "consume",
+				Access:   "admin",
 			}, {
 				UserName: "eve@canonical.com",
 				Access:   "read",
@@ -1994,7 +1964,7 @@ func TestListApplicationOffers(t *testing.T) {
 				Access:   "admin",
 			}, {
 				UserName: "bob@canonical.com",
-				Access:   "consume",
+				Access:   "admin",
 			}, {
 				UserName: "eve@canonical.com",
 				Access:   "read",
