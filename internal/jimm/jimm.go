@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 // Package jimm contains the business logic used to manage clouds,
 // cloudcredentials and models.
@@ -141,6 +141,8 @@ type GroupManager interface {
 	CountGroups(ctx context.Context, user *openfga.User) (int, error)
 }
 
+// IdentityManager provides a means to fetch identities in JIMM.
+// Identities cannot be created here, that can only be done via login.
 type IdentityManager interface {
 	FetchIdentity(ctx context.Context, id string) (*openfga.User, error)
 	ListIdentities(ctx context.Context, user *openfga.User, pagination pagination.LimitOffsetPagination, match string) ([]openfga.User, error)
@@ -299,6 +301,7 @@ func (j *JIMM) GroupManager() GroupManager {
 	return j.groupManager
 }
 
+// IdentityManager returns a manager that enables identity (user/service-account) management.
 func (j *JIMM) IdentityManager() IdentityManager {
 	return j.identityManager
 }

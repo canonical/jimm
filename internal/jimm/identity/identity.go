@@ -42,9 +42,8 @@ func (j *identityManager) FetchIdentity(ctx context.Context, id string) (*openfg
 	if err := j.store.FetchIdentity(ctx, identity); err != nil {
 		return nil, err
 	}
-	u := openfga.NewUser(identity, j.authSvc)
 
-	return u, nil
+	return openfga.NewUser(identity, j.authSvc), nil
 }
 
 // ListIdentities lists a page of users in our database and parse them into openfga entities.
