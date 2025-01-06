@@ -1,12 +1,16 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 package jujuauth
 
+// Factory holds the necessary components for producing new stateful
+// Juju authenticator objects. Because these objects are
+// stateful, it is expected that a new one is used for each connection.
 type Factory struct {
 	db            GeneratorDatabase
 	jwtService    JWTService
 	accessChecker GeneratorAccessChecker
 }
 
+// NewFactory returns a new factory object.
 func NewFactory(db GeneratorDatabase, jwtService JWTService, accessChecker GeneratorAccessChecker) *Factory {
 	return &Factory{
 		db:            db,
@@ -15,6 +19,7 @@ func NewFactory(db GeneratorDatabase, jwtService JWTService, accessChecker Gener
 	}
 }
 
+// New returns a new Juju token generator.
 func (f *Factory) New() TokenGenerator {
-	return New(f.db, f.accessChecker, f.jwtService)
+	return new(f.db, f.accessChecker, f.jwtService)
 }

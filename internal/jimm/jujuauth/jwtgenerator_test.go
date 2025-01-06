@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package jujuauth_test
 
@@ -238,7 +238,8 @@ func TestJWTGeneratorMakeLoginToken(t *testing.T) {
 	}}
 
 	for _, test := range tests {
-		generator := jujuauth.New(test.database, test.accessChecker, test.jwtService)
+		authFactory := jujuauth.NewFactory(test.database, test.jwtService, test.accessChecker)
+		generator := authFactory.New()
 		generator.SetTags(mt, ct)
 
 		i, err := dbmodel.NewIdentity(test.username)
@@ -311,7 +312,7 @@ func TestJWTGeneratorMakeToken(t *testing.T) {
 	}}
 
 	for _, test := range tests {
-		generator := jujuauth.New(
+		authFactory := jujuauth.NewFactory(
 			&testDatabase{
 				ctl: dbmodel.Controller{
 					CloudRegions: []dbmodel.CloudRegionControllerPriority{{
@@ -323,6 +324,7 @@ func TestJWTGeneratorMakeToken(t *testing.T) {
 					}},
 				},
 			},
+			test.jwtService,
 			&testAccessChecker{
 				modelAccess: map[string]string{
 					mt.String(): "admin",
@@ -336,8 +338,8 @@ func TestJWTGeneratorMakeToken(t *testing.T) {
 				permissions:        test.checkPermissions,
 				permissionCheckErr: test.checkPermissionsError,
 			},
-			test.jwtService,
 		)
+		generator := authFactory.New()
 		generator.SetTags(mt, ct)
 
 		i, err := dbmodel.NewIdentity("eve@canonical.com")
