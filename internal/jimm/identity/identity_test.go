@@ -1,4 +1,5 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
+
 package identity_test
 
 import (
@@ -29,7 +30,7 @@ func (s *identityManagerSuite) Init(c *qt.C) {
 	db := &db.Database{
 		DB: jimmtest.PostgresDB(c, time.Now),
 	}
-	err := db.Migrate(context.Background(), false)
+	err := db.Migrate(context.Background())
 	c.Assert(err, qt.IsNil)
 
 	s.db = db

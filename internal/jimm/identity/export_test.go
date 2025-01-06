@@ -1,4 +1,5 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
+
 package identity
 
 // Identity is a type alias to export identityManager for use in tests.
