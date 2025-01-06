@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 package mocks
 
 import (
@@ -67,5 +67,5 @@ func (j *LoginManager) UserLogin(ctx context.Context, identityName string) (*ope
 	if j.UserLogin_ == nil {
 		return nil, errors.E(errors.CodeNotImplemented)
 	}
-	return j.UserLogin(ctx, identityName)
+	return j.UserLogin_(ctx, identityName)
 }

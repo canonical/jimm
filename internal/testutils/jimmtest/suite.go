@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package jimmtest
 
@@ -10,7 +10,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/antonlindstrom/pgstore"
 	cofga "github.com/canonical/ofga"
+	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/go-chi/chi/v5"
 	"github.com/juju/juju/api"
 	"github.com/juju/juju/core/network"
@@ -19,6 +21,7 @@ import (
 	"github.com/juju/names/v5"
 	gc "gopkg.in/check.v1"
 
+	"github.com/canonical/jimm/v3/internal/auth"
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/discharger"
@@ -53,6 +56,11 @@ func (t GocheckTester) Cleanup(f func()) {
 	}
 }
 
+// jimmModifiers controls how JIMM is initialised.
+type jimmModifiers struct {
+	useRealAuthN bool
+}
+
 // A JIMMSuite is a suite that initialises a JIMM.
 type JIMMSuite struct {
 	// JIMM is a JIMM that can be used in tests. JIMM is initialised in
@@ -70,6 +78,8 @@ type JIMMSuite struct {
 	deviceFlowChan  chan string
 	databaseName    string
 	databaseCleanup []func()
+
+	modifiers jimmModifiers
 }
 
 func (s *JIMMSuite) SetUpTest(c *gc.C) {
@@ -92,9 +102,6 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 	pgdb, databaseName := PostgresDBWithDbName(gct, nil)
 	s.databaseName = databaseName
 
-	s.deviceFlowChan = make(chan string, 1)
-	authenticator := NewMockOAuthAuthenticator(c, s.deviceFlowChan)
-
 	database := &db.Database{
 		DB: pgdb,
 	}
@@ -112,6 +119,15 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 	s.AdminUser.JimmAdmin = true
 
 	credentialStore := NewInMemoryCredentialStore()
+
+	var authenticator jimm.OAuthAuthenticator
+	if s.modifiers.useRealAuthN {
+		authenticator = s.realAuthenticationService(c, database)
+	} else {
+		s.deviceFlowChan = make(chan string, 1)
+		a := NewMockOAuthAuthenticator(c, s.deviceFlowChan)
+		authenticator = &a
+	}
 
 	mux := chi.NewRouter()
 	mountHandler := func(path string, h jimmhttp.JIMMHttpHandler) {
@@ -150,7 +166,7 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 		CredentialStore:    credentialStore,
 		Pubsub:             &pubsub.Hub{MaxConcurrency: 10},
 		OpenFGAClient:      s.OFGAClient,
-		OAuthAuthenticator: &authenticator,
+		OAuthAuthenticator: authenticator,
 
 		JWTService: jwtService,
 	})
@@ -187,6 +203,36 @@ func (s *JIMMSuite) TearDownTest(c *gc.C) {
 			c.Logf("failed to delete database (%s): %s", s.databaseName, err)
 		}
 	}
+}
+
+func (s *JIMMSuite) UseRealAuthentication(c *gc.C) {
+	s.modifiers.useRealAuthN = true
+}
+
+func (s *JIMMSuite) realAuthenticationService(c *gc.C, db *db.Database) *auth.AuthenticationService {
+	sqldb, err := db.DB.DB()
+	c.Assert(err, gc.IsNil)
+
+	sessionStore, err := pgstore.NewPGStoreFromPool(sqldb, []byte("secretsecretdigletts"))
+	c.Assert(err, gc.IsNil)
+	s.databaseCleanup = append(s.databaseCleanup, func() {
+		sessionStore.Close()
+	})
+
+	authSvc, err := auth.NewAuthenticationService(context.Background(), auth.AuthenticationServiceParams{
+		IssuerURL:           "http://localhost:8082/realms/jimm",
+		ClientID:            "jimm-device",
+		ClientSecret:        "SwjDofnbDzJDm9iyfUhEp67FfUFMY8L4",
+		Scopes:              []string{oidc.ScopeOpenID, "profile", "email"},
+		SessionTokenExpiry:  time.Hour,
+		Store:               db,
+		SessionStore:        sessionStore,
+		SessionCookieMaxAge: 60,
+		JWTSessionKey:       "test-secret",
+		SecureCookies:       false,
+	})
+	c.Assert(err, gc.IsNil)
+	return authSvc
 }
 
 func setupMacaroonDischarger(c *gc.C, uuid string, db *db.Database, ofgaClient *openfga.OFGAClient) *discharger.MacaroonDischarger {

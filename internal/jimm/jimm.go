@@ -302,8 +302,10 @@ type JIMM struct {
 	// groupManager provides a means to manage groups within JIMM.
 	groupManager GroupManager
 
+	// identityManager provides a means to manage identities within JIMM.
 	identityManager IdentityManager
 
+	// loginManager provides a means to authenticate and login/create users/identities within JIMM.
 	loginManager LoginManager
 }
 

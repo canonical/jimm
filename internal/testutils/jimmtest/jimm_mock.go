@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package jimmtest
 
@@ -84,7 +84,6 @@ type JIMM struct {
 	UpdateApplicationOffer_            func(ctx context.Context, controller *dbmodel.Controller, offerUUID string, removed bool) error
 	UpdateCloud_                       func(ctx context.Context, u *openfga.User, ct names.CloudTag, cloud jujuparams.Cloud) error
 	UpdateCloudCredential_             func(ctx context.Context, u *openfga.User, args jimm.UpdateCloudCredentialArgs) ([]jujuparams.UpdateCredentialModelResult, error)
-	UserLogin_                         func(ctx context.Context, identityName string) (*openfga.User, error)
 	ListModels_                        func(ctx context.Context, user *openfga.User) ([]base.UserModel, error)
 }
 
@@ -408,12 +407,6 @@ func (j *JIMM) UpdateCloudCredential(ctx context.Context, u *openfga.User, args 
 		return nil, errors.E(errors.CodeNotImplemented)
 	}
 	return j.UpdateCloudCredential_(ctx, u, args)
-}
-func (j *JIMM) UserLogin(ctx context.Context, identityName string) (*openfga.User, error) {
-	if j.UserLogin_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
-	}
-	return j.UserLogin_(ctx, identityName)
 }
 func (j *JIMM) ListModels(ctx context.Context, user *openfga.User) ([]base.UserModel, error) {
 	if j.ListModels_ == nil {
