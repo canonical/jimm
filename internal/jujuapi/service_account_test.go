@@ -737,9 +737,9 @@ func TestGrantServiceAccountAccess(t *testing.T) {
 				GrantServiceAccountAccess_: test.grantServiceAccountAccess,
 			}
 			jimm := &jimmtest.JIMM{
-				LoginManager_: func() jimm.LoginManager{
+				LoginManager_: func() jimm.LoginManager {
 					return &loginManager
-				}
+				},
 				PermissionManager_: func() jimm.PermissionManager {
 					return &permissionManager
 				},
