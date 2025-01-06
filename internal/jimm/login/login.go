@@ -1,4 +1,5 @@
 // Copyright 2025 Canonical.
+
 package login
 
 import (
@@ -91,6 +92,9 @@ func NewLoginManager(store *db.Database, authSvc *openfga.OFGAClient, oAuthAuthe
 	}
 	if authSvc == nil {
 		return nil, errors.E("login authorisation service cannot be nil")
+	}
+	if oAuthAuthenticator == nil {
+		return nil, errors.E("oauth service cannot be nil")
 	}
 	return &loginManager{store, authSvc, oAuthAuthenticator, jimmTag}, nil
 }

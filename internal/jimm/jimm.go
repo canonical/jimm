@@ -150,6 +150,7 @@ type IdentityManager interface {
 	CountIdentities(ctx context.Context, user *openfga.User) (int, error)
 }
 
+// LoginManager provides methods for login/authentication and creates identities (users).
 type LoginManager interface {
 	// AuthenticateBrowserSession authenticates a browser login.
 	AuthenticateBrowserSession(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error)
@@ -334,6 +335,7 @@ func (j *JIMM) IdentityManager() IdentityManager {
 	return j.identityManager
 }
 
+// Login manager returns a manager that enables login and authentication.
 func (j *JIMM) LoginManager() LoginManager {
 	return j.loginManager
 }
