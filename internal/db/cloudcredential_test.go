@@ -27,7 +27,7 @@ func TestSetCloudCredentialUnconfiguredDatabase(t *testing.T) {
 }
 
 func (s *dbSuite) TestSetCloudCredentialInvalidTag(c *qt.C) {
-	err := s.Database.Migrate(context.Background(), true)
+	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.Equals, nil)
 
 	u, err := dbmodel.NewIdentity("bob@canonical.com")
@@ -54,7 +54,7 @@ func (s *dbSuite) TestSetCloudCredentialInvalidTag(c *qt.C) {
 }
 
 func (s *dbSuite) TestSetCloudCredential(c *qt.C) {
-	err := s.Database.Migrate(context.Background(), true)
+	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.Equals, nil)
 
 	u, err := dbmodel.NewIdentity("bob@canonical.com")
@@ -90,7 +90,7 @@ func (s *dbSuite) TestSetCloudCredential(c *qt.C) {
 }
 
 func (s *dbSuite) TestSetCloudCredentialUpdate(c *qt.C) {
-	err := s.Database.Migrate(context.Background(), true)
+	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.Equals, nil)
 
 	u, err := dbmodel.NewIdentity("bob@canonical.com")
@@ -159,7 +159,7 @@ func TestGetCloudCredentialUnconfiguredDatabase(t *testing.T) {
 }
 
 func (s *dbSuite) TestGetCloudCredential(c *qt.C) {
-	err := s.Database.Migrate(context.Background(), true)
+	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.Equals, nil)
 
 	u, err := dbmodel.NewIdentity("bob@canonical.com")
@@ -276,7 +276,7 @@ func (s *dbSuite) TestForEachCloudCredential(c *qt.C) {
 	ctx := context.Background()
 
 	env := jimmtest.ParseEnvironment(c, forEachCloudCredentialEnv)
-	err := s.Database.Migrate(ctx, false)
+	err := s.Database.Migrate(ctx)
 	c.Assert(err, qt.IsNil)
 	env.PopulateDB(c, s.Database)
 

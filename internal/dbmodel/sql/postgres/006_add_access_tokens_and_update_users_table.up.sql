@@ -1,5 +1,6 @@
--- 1_6.sql is a migration that adds access tokens to the user table
--- and is a migration that renames `user` to `identity`.
+-- adds access tokens to the user table
+-- and renames `user` to `identity`.
+
 ALTER TABLE users ADD COLUMN access_token TEXT;
 ALTER TABLE users ADD COLUMN refresh_token TEXT;
 ALTER TABLE users ADD COLUMN access_token_expiry TIMESTAMP WITH TIME ZONE;
@@ -38,5 +39,3 @@ ALTER INDEX IF EXISTS idx_audit_log_user_tag RENAME TO idx_audit_log_identity_ta
 --   - user_application_offer_access
 --   - user_cloud_access
 --   - user_model_access
-
-UPDATE versions SET major=1, minor=6 WHERE component='jimmdb';

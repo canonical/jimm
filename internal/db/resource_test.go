@@ -68,7 +68,7 @@ func SetupDB(c *qt.C, database *db.Database) (dbmodel.Model, dbmodel.Controller,
 
 func (s *dbSuite) TestGetResources(c *qt.C) {
 	ctx := context.Background()
-	err := s.Database.Migrate(context.Background(), true)
+	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.Equals, nil)
 	res, err := s.Database.ListResources(ctx, 10, 0, "", "")
 	c.Assert(err, qt.Equals, nil)
@@ -95,7 +95,7 @@ func (s *dbSuite) TestGetResources(c *qt.C) {
 
 func (s *dbSuite) TestGetResourcesWithNameTypeFilter(c *qt.C) {
 	ctx := context.Background()
-	err := s.Database.Migrate(context.Background(), true)
+	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.Equals, nil)
 	// create one model, one controller, one cloud
 	model, controller, cloud, sva := SetupDB(c, s.Database)

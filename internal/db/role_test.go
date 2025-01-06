@@ -26,7 +26,7 @@ func (s *dbSuite) TestAddRole(c *qt.C) {
 	_, err := s.Database.AddRole(ctx, "test-role")
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
 
-	err = s.Database.Migrate(context.Background(), false)
+	err = s.Database.Migrate(context.Background())
 	c.Assert(err, qt.IsNil)
 
 	roleEntry, err := s.Database.AddRole(ctx, "test-role")
@@ -55,7 +55,7 @@ func (s *dbSuite) TestGetRole(c *qt.C) {
 	err := s.Database.GetRole(context.Background(), &dbmodel.RoleEntry{})
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
 
-	err = s.Database.Migrate(context.Background(), false)
+	err = s.Database.Migrate(context.Background())
 	c.Assert(err, qt.IsNil)
 
 	role := &dbmodel.RoleEntry{}
@@ -84,7 +84,7 @@ func (s *dbSuite) TestGetRole(c *qt.C) {
 }
 
 func (s *dbSuite) TestUpdateRoleName(c *qt.C) {
-	err := s.Database.Migrate(context.Background(), false)
+	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.IsNil)
 
 	err = s.Database.UpdateRoleName(context.Background(), "blah", "blah")
@@ -118,7 +118,7 @@ func (s *dbSuite) TestRemoveRole(c *qt.C) {
 	err := s.Database.RemoveRole(context.Background(), &dbmodel.RoleEntry{Name: "test-role"})
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
-	err = s.Database.Migrate(context.Background(), false)
+	err = s.Database.Migrate(context.Background())
 	c.Assert(err, qt.IsNil)
 
 	re := &dbmodel.RoleEntry{
@@ -145,7 +145,7 @@ func (s *dbSuite) TestRemoveRole(c *qt.C) {
 }
 
 func (s *dbSuite) TestListRole(c *qt.C) {
-	err := s.Database.Migrate(context.Background(), false)
+	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.IsNil)
 
 	addNRoles := 10
@@ -189,7 +189,7 @@ func (s *dbSuite) TestListRole(c *qt.C) {
 }
 
 func (s *dbSuite) TestCountRoles(c *qt.C) {
-	err := s.Database.Migrate(context.Background(), false)
+	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.IsNil)
 
 	addNRoles := 10

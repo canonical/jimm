@@ -715,7 +715,7 @@ func TestFillMigrationTarget(t *testing.T) {
 			db := &db.Database{
 				DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 			}
-			err := db.Migrate(ctx, false)
+			err := db.Migrate(ctx)
 			c.Assert(err, qt.IsNil)
 
 			store := jimmtest.NewInMemoryCredentialStore()

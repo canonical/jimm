@@ -98,7 +98,7 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 	database := &db.Database{
 		DB: pgdb,
 	}
-	err = database.Migrate(ctx, false)
+	err = database.Migrate(ctx)
 	c.Assert(err, gc.Equals, nil)
 
 	alice, err := dbmodel.NewIdentity("alice@canonical.com")

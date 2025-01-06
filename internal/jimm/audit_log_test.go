@@ -31,7 +31,7 @@ func TestAuditLogCleanupServicePurgesLogs(t *testing.T) {
 	})
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
 
-	err = db.Migrate(context.Background(), true)
+	err = db.Migrate(context.Background())
 	c.Assert(err, qt.IsNil)
 
 	// A log from 1 day ago

@@ -19,7 +19,7 @@ import (
 var testTime = time.Date(2013, 7, 26, 0, 0, 0, 0, time.UTC)
 
 func (s *dbSuite) TestInsertSecret(c *qt.C) {
-	err := s.Database.Migrate(context.Background(), true)
+	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.Equals, nil)
 
 	u := dbmodel.Secret{
@@ -39,7 +39,7 @@ func (s *dbSuite) TestInsertSecret(c *qt.C) {
 }
 
 func (s *dbSuite) TestUpsertSecret(c *qt.C) {
-	err := s.Database.Migrate(context.Background(), true)
+	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.Equals, nil)
 	ctx := context.Background()
 
@@ -66,7 +66,7 @@ func (s *dbSuite) TestUpsertSecret(c *qt.C) {
 }
 
 func (s *dbSuite) TestGetSecret(c *qt.C) {
-	err := s.Database.Migrate(context.Background(), true)
+	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.Equals, nil)
 	ctx := context.Background()
 
@@ -85,7 +85,7 @@ func (s *dbSuite) TestGetSecret(c *qt.C) {
 }
 
 func (s *dbSuite) TestGetSecretFailsWithoutTypeAndTag(c *qt.C) {
-	err := s.Database.Migrate(context.Background(), true)
+	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.Equals, nil)
 	ctx := context.Background()
 	secret := dbmodel.Secret{}
@@ -93,7 +93,7 @@ func (s *dbSuite) TestGetSecretFailsWithoutTypeAndTag(c *qt.C) {
 }
 
 func (s *dbSuite) TestDeleteSecretFailsWithoutTypeAndTag(c *qt.C) {
-	err := s.Database.Migrate(context.Background(), true)
+	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.Equals, nil)
 	ctx := context.Background()
 
@@ -102,7 +102,7 @@ func (s *dbSuite) TestDeleteSecretFailsWithoutTypeAndTag(c *qt.C) {
 }
 
 func (s *dbSuite) TestDeleteSecret(c *qt.C) {
-	err := s.Database.Migrate(context.Background(), true)
+	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.Equals, nil)
 	ctx := context.Background()
 
@@ -121,7 +121,7 @@ func (s *dbSuite) TestDeleteSecret(c *qt.C) {
 }
 
 func (s *dbSuite) TestPutAndGetCloudCredential(c *qt.C) {
-	err := s.Database.Migrate(context.Background(), true)
+	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.Equals, nil)
 	ctx := context.Background()
 	cloudCred := names.NewCloudCredentialTag("foo/bar/bob")
@@ -140,7 +140,7 @@ func (s *dbSuite) TestPutAndGetCloudCredential(c *qt.C) {
 }
 
 func (s *dbSuite) TestPutAndGetControllerCredential(c *qt.C) {
-	err := s.Database.Migrate(context.Background(), true)
+	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.Equals, nil)
 	ctx := context.Background()
 	controllerName := "beef1beef2-0000-0000-000011112222"
@@ -159,7 +159,7 @@ func (s *dbSuite) TestPutAndGetControllerCredential(c *qt.C) {
 }
 
 func (s *dbSuite) TestGetMissingControllerCredentialDoesNotError(c *qt.C) {
-	err := s.Database.Migrate(context.Background(), true)
+	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.Equals, nil)
 	ctx := context.Background()
 	controllerName := "beef1beef2-0000-0000-000011112222"
@@ -197,7 +197,7 @@ func getJWKS(c *qt.C) jwk.Set {
 }
 
 func (s *dbSuite) TestPutAndGetJWKS(c *qt.C) {
-	err := s.Database.Migrate(context.Background(), true)
+	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.Equals, nil)
 	ctx := context.Background()
 	jwks := getJWKS(c)
@@ -225,7 +225,7 @@ func (s *dbSuite) TestPutAndGetJWKS(c *qt.C) {
 }
 
 func (s *dbSuite) TestPutAndGetJwksExpiry(c *qt.C) {
-	err := s.Database.Migrate(context.Background(), true)
+	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.Equals, nil)
 	ctx := context.Background()
 	expiryTime := time.Date(2023, 7, 26, 0, 0, 0, 0, time.UTC)
@@ -243,7 +243,7 @@ func (s *dbSuite) TestPutAndGetJwksExpiry(c *qt.C) {
 }
 
 func (s *dbSuite) TestPutAndGetJwksPrivateKey(c *qt.C) {
-	err := s.Database.Migrate(context.Background(), true)
+	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.Equals, nil)
 	ctx := context.Background()
 	pem := []byte("123")
@@ -261,7 +261,7 @@ func (s *dbSuite) TestPutAndGetJwksPrivateKey(c *qt.C) {
 }
 
 func (s *dbSuite) TestCleanupJWKS(c *qt.C) {
-	err := s.Database.Migrate(context.Background(), true)
+	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.Equals, nil)
 	ctx := context.Background()
 	pem := []byte("123")

@@ -18,7 +18,7 @@ import (
 // migrations for those objects.
 func gormDB(t testing.TB) *gorm.DB {
 	database := db.Database{DB: jimmtest.PostgresDB(t, nil)}
-	err := database.Migrate(context.Background(), false)
+	err := database.Migrate(context.Background())
 	if err != nil {
 		t.Fail()
 	}

@@ -296,7 +296,7 @@ func createTemplateDatabase() (string, string, error) {
 	database := db.Database{
 		DB: gdb,
 	}
-	if err := database.Migrate(context.Background(), true); err != nil {
+	if err := database.Migrate(context.Background()); err != nil {
 		return "", "", errors.E(err, "error applying migrations on template database")
 	}
 	sqlDB, err := gdb.DB()

@@ -1,4 +1,5 @@
--- 1_14.sql is a migration simplifies application offers
+-- simplifies application offers
+
 DROP INDEX IF EXISTS idx_application_offer_connections_deleted_at;
 DROP INDEX IF EXISTS idx_application_offer_remote_endpoints_deleted_at;
 DROP INDEX IF EXISTS idx_application_offer_remote_spaces_deleted_at;
@@ -14,6 +15,3 @@ ALTER TABLE application_offers DROP COLUMN IF EXISTS application_name;
 ALTER TABLE application_offers DROP COLUMN IF EXISTS application_description;
 ALTER TABLE application_offers DROP COLUMN IF EXISTS bindings;
 ALTER TABLE application_offers DROP COLUMN IF EXISTS charm_url;
-
-UPDATE versions SET major=1, minor=14 WHERE component='jimmdb';
-

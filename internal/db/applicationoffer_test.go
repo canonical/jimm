@@ -36,7 +36,7 @@ type testEnvironment struct {
 }
 
 func initTestEnvironment(c *qt.C, db *db.Database) testEnvironment {
-	err := db.Migrate(context.Background(), true)
+	err := db.Migrate(context.Background())
 	c.Assert(err, qt.Equals, nil)
 
 	env := testEnvironment{}

@@ -28,7 +28,7 @@ func TestAddModelUnconfiguredDatabase(t *testing.T) {
 }
 
 func (s *dbSuite) TestAddModel(c *qt.C) {
-	err := s.Database.Migrate(context.Background(), true)
+	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.Equals, nil)
 
 	u, err := dbmodel.NewIdentity("bob@canonical.com")
@@ -90,7 +90,7 @@ func (s *dbSuite) TestAddModel(c *qt.C) {
 }
 
 func (s *dbSuite) TestGetModel(c *qt.C) {
-	err := s.Database.Migrate(context.Background(), true)
+	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.Equals, nil)
 
 	u, err := dbmodel.NewIdentity("bob@canonical.com")
@@ -182,7 +182,7 @@ func (s *dbSuite) TestGetModel(c *qt.C) {
 }
 
 func (s *dbSuite) TestUpdateModel(c *qt.C) {
-	err := s.Database.Migrate(context.Background(), true)
+	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.Equals, nil)
 
 	i, err := dbmodel.NewIdentity("bob@canonical.com")
@@ -249,7 +249,7 @@ func TestDeleteModelUnconfiguredDatabase(t *testing.T) {
 }
 
 func (s *dbSuite) TestDeleteModel(c *qt.C) {
-	err := s.Database.Migrate(context.Background(), true)
+	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.Equals, nil)
 
 	i, err := dbmodel.NewIdentity("bob@canonical.com")
@@ -312,7 +312,7 @@ func (s *dbSuite) TestDeleteModel(c *qt.C) {
 }
 
 func (s *dbSuite) TestGetModelsUsingCredential(c *qt.C) {
-	err := s.Database.Migrate(context.Background(), true)
+	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.Equals, nil)
 
 	i, err := dbmodel.NewIdentity("bob@canonical.com")
@@ -468,7 +468,7 @@ models:
 
 func (s *dbSuite) TestForEachModel(c *qt.C) {
 	ctx := context.Background()
-	err := s.Database.Migrate(context.Background(), true)
+	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.Equals, nil)
 
 	env := jimmtest.ParseEnvironment(c, testForEachModelEnv)
@@ -554,7 +554,7 @@ func TestGetModelsByUUIDlUnconfiguredDatabase(t *testing.T) {
 
 func (s *dbSuite) TestGetModelsByUUID(c *qt.C) {
 	ctx := context.Background()
-	err := s.Database.Migrate(context.Background(), true)
+	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.Equals, nil)
 
 	env := jimmtest.ParseEnvironment(c, testGetModelsByUUIDEnv)
@@ -580,7 +580,7 @@ func (s *dbSuite) TestGetModelsByUUID(c *qt.C) {
 }
 
 func (s *dbSuite) TestGetModelsByController(c *qt.C) {
-	err := s.Database.Migrate(context.Background(), true)
+	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.Equals, nil)
 
 	cloud := dbmodel.Cloud{
@@ -692,7 +692,7 @@ models:
 `
 
 func (s *dbSuite) TestCountModelsByController(c *qt.C) {
-	err := s.Database.Migrate(context.Background(), true)
+	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.Equals, nil)
 
 	env := jimmtest.ParseEnvironment(c, testCountModelsByControllerEnv)

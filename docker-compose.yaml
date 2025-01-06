@@ -101,6 +101,7 @@ services:
       OPENFGA_AUTHN_PRESHARED_KEYS: "jimm"
       OPENFGA_DATASTORE_ENGINE: "postgres"
       OPENFGA_DATASTORE_URI: "postgresql://jimm:jimm@db/jimm?sslmode=disable"
+      OPENFGA_LOG_LEVEL: "warn"
     volumes:
       - ./openfga/authorisation_model.fga:/app/authorisation_model.fga
     ports:

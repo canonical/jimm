@@ -35,7 +35,7 @@ func (s *dbSuite) TestAddAuditLogEntry(c *qt.C) {
 	err := s.Database.AddAuditLogEntry(ctx, &ale)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
 
-	err = s.Database.Migrate(context.Background(), false)
+	err = s.Database.Migrate(context.Background())
 	c.Assert(err, qt.IsNil)
 
 	err = s.Database.AddAuditLogEntry(ctx, &ale)
@@ -117,7 +117,7 @@ func (s *dbSuite) TestForEachAuditLogEntry(c *qt.C) {
 	err := s.Database.ForEachAuditLogEntry(context.Background(), db.AuditLogFilter{}, nil)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
 
-	err = s.Database.Migrate(context.Background(), false)
+	err = s.Database.Migrate(context.Background())
 	c.Assert(err, qt.IsNil)
 
 	for i := range testAuditLogEntries {
@@ -159,7 +159,7 @@ func (s *dbSuite) TestDeleteAuditLogsBefore(c *qt.C) {
 	})
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
 
-	err = s.Database.Migrate(context.Background(), true)
+	err = s.Database.Migrate(context.Background())
 	c.Assert(err, qt.IsNil)
 
 	// Delete all when none exist
@@ -221,7 +221,7 @@ func (s *dbSuite) TestPurgeLogsFromDb(c *qt.C) {
 		IdentityTag: names.NewUserTag("alice@canonical.com").String(),
 	}
 
-	err := s.Database.Migrate(context.Background(), false)
+	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.IsNil)
 	err = s.Database.AddAuditLogEntry(ctx, &ale)
 	c.Assert(err, qt.IsNil)
