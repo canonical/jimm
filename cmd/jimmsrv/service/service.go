@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 // service defines the methods necessary to start a JIMM server
 // alongside all the config options that can be supplied to configure JIMM.
@@ -27,6 +27,7 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
+	"github.com/canonical/jimm/v3/internal/auditlog"
 	"github.com/canonical/jimm/v3/internal/auth"
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
@@ -507,7 +508,7 @@ func (s *Service) StartServices(ctx context.Context, svc *service.Service) {
 		// audit log cleanup routine
 		if s.auditLogCleanupPeriod != 0 {
 			svc.Go(func() error {
-				jimm.NewAuditLogCleanupService(s.jimm.Database, s.auditLogCleanupPeriod).Start(ctx)
+				auditlog.NewCleanupService(s.jimm.Database, s.auditLogCleanupPeriod).Start(ctx)
 				return nil
 			})
 		}

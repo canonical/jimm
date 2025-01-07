@@ -1,6 +1,6 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
-package jimm
+package auditlog
 
 import (
 	"context"
@@ -19,21 +19,21 @@ import (
 	"github.com/canonical/jimm/v3/internal/utils"
 )
 
-// AuditLoggerBackend defines the interface used by the DbAuditLogger to store
+// LogBackend defines the interface used by the DbAuditLogger to store
 // audit events.
-type AuditLoggerBackend interface {
+type LogBackend interface {
 	AddAuditLogEntry(*dbmodel.AuditLogEntry)
 }
 
-type DbAuditLogger struct {
-	backend        AuditLoggerBackend
+type Logger struct {
+	backend        LogBackend
 	conversationId string
 	getUser        func() names.UserTag
 }
 
-// NewDbAuditLogger returns a new audit logger that logs to the database.
-func NewDbAuditLogger(backend AuditLoggerBackend, getUserFunc func() names.UserTag) DbAuditLogger {
-	logger := DbAuditLogger{
+// NewLogger returns a new audit logger that logs to the provided backend.
+func NewLogger(backend LogBackend, getUserFunc func() names.UserTag) Logger {
+	logger := Logger{
 		backend:        backend,
 		conversationId: utils.NewConversationID(),
 		getUser:        getUserFunc,
@@ -41,7 +41,7 @@ func NewDbAuditLogger(backend AuditLoggerBackend, getUserFunc func() names.UserT
 	return logger
 }
 
-func (r DbAuditLogger) newAuditLogEntry(header *rpc.Header) dbmodel.AuditLogEntry {
+func (r Logger) newEntry(header *rpc.Header) dbmodel.AuditLogEntry {
 	ale := dbmodel.AuditLogEntry{
 		Time:           time.Now().UTC().Round(time.Millisecond),
 		MessageId:      header.RequestId,
@@ -52,8 +52,8 @@ func (r DbAuditLogger) newAuditLogEntry(header *rpc.Header) dbmodel.AuditLogEntr
 }
 
 // LogRequest creates an audit log entry from a client request.
-func (r DbAuditLogger) LogRequest(header *rpc.Header, body interface{}) error {
-	ale := r.newAuditLogEntry(header)
+func (r Logger) LogRequest(header *rpc.Header, body interface{}) error {
+	ale := r.newEntry(header)
 	ale.ObjectId = header.Request.Id
 	ale.FacadeName = header.Request.Type
 	ale.FacadeMethod = header.Request.Action
@@ -71,7 +71,7 @@ func (r DbAuditLogger) LogRequest(header *rpc.Header, body interface{}) error {
 }
 
 // LogResponse creates an audit log entry from a controller response.
-func (o DbAuditLogger) LogResponse(r rpc.Request, header *rpc.Header, body interface{}) error {
+func (o Logger) LogResponse(r rpc.Request, header *rpc.Header, body interface{}) error {
 	var allErrors params.ErrorResults
 	bulkError, ok := body.(params.ErrorResults)
 	if ok {
@@ -87,7 +87,7 @@ func (o DbAuditLogger) LogResponse(r rpc.Request, header *rpc.Header, body inter
 	if err != nil {
 		return err
 	}
-	ale := o.newAuditLogEntry(header)
+	ale := o.newEntry(header)
 	ale.ObjectId = r.Id
 	ale.FacadeName = r.Type
 	ale.FacadeMethod = r.Action
@@ -101,12 +101,12 @@ func (o DbAuditLogger) LogResponse(r rpc.Request, header *rpc.Header, body inter
 // recorder implements an rpc.Recorder.
 type recorder struct {
 	start          time.Time
-	logger         DbAuditLogger
+	logger         Logger
 	conversationId string
 }
 
 // NewRecorder returns a new recorder struct useful for recording RPC events.
-func NewRecorder(logger DbAuditLogger) recorder {
+func NewRecorder(logger Logger) recorder {
 	return recorder{
 		start:          time.Now(),
 		conversationId: utils.NewConversationID(),
@@ -126,9 +126,9 @@ func (o recorder) HandleReply(r rpc.Request, header *rpc.Header, body interface{
 	return o.logger.LogResponse(r, header, body)
 }
 
-// AuditLogCleanupService is a service capable of cleaning up audit logs
+// cleanupService is a service capable of cleaning up audit logs
 // on a defined retention period. The retention period is in DAYS.
-type auditLogCleanupService struct {
+type cleanupService struct {
 	auditLogRetentionPeriodInDays int
 	db                            *db.Database
 }
@@ -144,10 +144,10 @@ var pollDuration = pollTimeOfDay{
 	Hours: 9,
 }
 
-// NewAuditLogCleanupService returns a service capable of cleaning up audit logs
+// NewCleanupService returns a service capable of cleaning up audit logs
 // on a defined retention period. The retention period is in DAYS.
-func NewAuditLogCleanupService(db *db.Database, auditLogRetentionPeriodInDays int) *auditLogCleanupService {
-	return &auditLogCleanupService{
+func NewCleanupService(db *db.Database, auditLogRetentionPeriodInDays int) *cleanupService {
+	return &cleanupService{
 		auditLogRetentionPeriodInDays: auditLogRetentionPeriodInDays,
 		db:                            db,
 	}
@@ -155,14 +155,14 @@ func NewAuditLogCleanupService(db *db.Database, auditLogRetentionPeriodInDays in
 
 // Start starts a routine which checks daily for any logs
 // needed to be cleaned up.
-func (a *auditLogCleanupService) Start(ctx context.Context) {
+func (a *cleanupService) Start(ctx context.Context) {
 	go a.poll(ctx)
 }
 
 // poll is designed to be run in a routine where it can be cancelled safely
 // from the service's context. It calculates the poll duration at 9am each day
 // UTC.
-func (a *auditLogCleanupService) poll(ctx context.Context) {
+func (a *cleanupService) poll(ctx context.Context) {
 
 	for {
 		select {

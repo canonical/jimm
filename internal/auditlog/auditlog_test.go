@@ -1,6 +1,6 @@
 // Copyright 2025 Canonical.
 
-package jimm_test
+package auditlog_test
 
 import (
 	"context"
@@ -9,10 +9,10 @@ import (
 
 	qt "github.com/frankban/quicktest"
 
+	"github.com/canonical/jimm/v3/internal/auditlog"
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/internal/jimm"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
 
@@ -55,10 +55,10 @@ func TestAuditLogCleanupServicePurgesLogs(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(logs, qt.HasLen, 3)
 
-	jimm.PollDuration.Hours = now.Hour()
-	jimm.PollDuration.Minutes = now.Minute()
-	jimm.PollDuration.Seconds = now.Second() + 2
-	svc := jimm.NewAuditLogCleanupService(db, 1)
+	auditlog.PollDuration.Hours = now.Hour()
+	auditlog.PollDuration.Minutes = now.Minute()
+	auditlog.PollDuration.Seconds = now.Second() + 2
+	svc := auditlog.NewCleanupService(db, 1)
 	svc.Start(ctx)
 
 	// Check 2 were purged
@@ -73,11 +73,11 @@ func TestCalculateNextPollDuration(t *testing.T) {
 
 	// Test where 9am is behind 12pm
 	startingTime := time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC)
-	d := jimm.CalculateNextPollDuration(startingTime)
+	d := auditlog.CalculateNextPollDuration(startingTime)
 	c.Assert(d, qt.Equals, time.Hour*21)
 
 	// Test where 9am is ahead of 7pm
 	startingTime = time.Date(2023, 1, 1, 7, 0, 0, 0, time.UTC)
-	d = jimm.CalculateNextPollDuration(startingTime)
+	d = auditlog.CalculateNextPollDuration(startingTime)
 	c.Assert(d, qt.Equals, time.Hour*2)
 }

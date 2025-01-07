@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package jujuapi
 
@@ -11,8 +11,8 @@ import (
 	"github.com/rogpeppe/fastuuid"
 	"golang.org/x/oauth2"
 
+	"github.com/canonical/jimm/v3/internal/auditlog"
 	"github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/internal/jimm"
 	"github.com/canonical/jimm/v3/internal/jujuapi/rpc"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	jimmnames "github.com/canonical/jimm/v3/pkg/names"
@@ -135,8 +135,8 @@ func (r *controllerRoot) setupUUIDGenerator() error {
 	return nil
 }
 
-func (r *controllerRoot) newAuditLogger() jimm.DbAuditLogger {
-	return jimm.NewDbAuditLogger(r.jimm, r.getUser)
+func (r *controllerRoot) newAuditLogger() auditlog.Logger {
+	return auditlog.NewLogger(r.jimm, r.getUser)
 }
 
 // getUser implements jujuapi.root interface to return the currently logged in user.
