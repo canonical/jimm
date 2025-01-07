@@ -11,14 +11,27 @@ import (
 
 	qt "github.com/frankban/quicktest"
 
+	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/jimm"
 	"github.com/canonical/jimm/v3/internal/jimmhttp/rebac_admin"
+	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
+	"github.com/canonical/jimm/v3/internal/testutils/jimmtest/mocks"
 )
 
 // test capabilities are reachable
 func TestCapabilities(t *testing.T) {
 	c := qt.New(t)
-	jimm := jimmtest.JIMM{}
+	identityManager := mocks.IdentityManager{
+		FetchIdentity_: func(ctx context.Context, id string) (*openfga.User, error) {
+			return openfga.NewUser(&dbmodel.Identity{Name: id}, nil), nil
+		},
+	}
+	jimm := jimmtest.JIMM{
+		IdentityManager_: func() jimm.IdentityManager {
+			return &identityManager
+		},
+	}
 	ctx := context.Background()
 	handlers, err := rebac_admin.SetupBackend(ctx, &jimm)
 	c.Assert(err, qt.IsNil)

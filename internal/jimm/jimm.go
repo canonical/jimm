@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 // Package jimm contains the business logic used to manage clouds,
 // cloudcredentials and models.
@@ -31,6 +31,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm/credentials"
 	"github.com/canonical/jimm/v3/internal/jimm/group"
+	"github.com/canonical/jimm/v3/internal/jimm/identity"
 	"github.com/canonical/jimm/v3/internal/jimm/role"
 	"github.com/canonical/jimm/v3/internal/jimmjwx"
 	"github.com/canonical/jimm/v3/internal/openfga"
@@ -140,6 +141,14 @@ type GroupManager interface {
 	CountGroups(ctx context.Context, user *openfga.User) (int, error)
 }
 
+// IdentityManager provides a means to fetch identities in JIMM.
+// Identities cannot be created here, that can only be done via login.
+type IdentityManager interface {
+	FetchIdentity(ctx context.Context, id string) (*openfga.User, error)
+	ListIdentities(ctx context.Context, user *openfga.User, pagination pagination.LimitOffsetPagination, match string) ([]openfga.User, error)
+	CountIdentities(ctx context.Context, user *openfga.User) (int, error)
+}
+
 // Parameters holds the services and static fields passed to the jimm.New() constructor.
 // You can provide mock implementations of certain services where necessary for dependency injection.
 type Parameters struct {
@@ -235,17 +244,23 @@ func New(p Parameters) (*JIMM, error) {
 		return nil, errors.E(err)
 	}
 
-	roleManager, err := role.NewRoleManager(j.Database, p.OpenFGAClient)
+	roleManager, err := role.NewRoleManager(j.Database, j.OpenFGAClient)
 	if err != nil {
 		return nil, err
 	}
 	j.roleManager = roleManager
 
-	groupManager, err := group.NewGroupManager(j.Database, p.OpenFGAClient)
+	groupManager, err := group.NewGroupManager(j.Database, j.OpenFGAClient)
 	if err != nil {
 		return nil, err
 	}
 	j.groupManager = groupManager
+
+	identityManager, err := identity.NewIdentityManager(j.Database, j.OpenFGAClient)
+	if err != nil {
+		return nil, err
+	}
+	j.identityManager = identityManager
 
 	return j, nil
 }
@@ -262,6 +277,8 @@ type JIMM struct {
 
 	// groupManager provides a means to manage groups within JIMM.
 	groupManager GroupManager
+
+	identityManager IdentityManager
 }
 
 // ResourceTag returns JIMM's controller tag stating its UUID.
@@ -282,6 +299,11 @@ func (j *JIMM) RoleManager() RoleManager {
 // GroupManager returns a manager that enables group management.
 func (j *JIMM) GroupManager() GroupManager {
 	return j.groupManager
+}
+
+// IdentityManager returns a manager that enables identity (user/service-account) management.
+func (j *JIMM) IdentityManager() IdentityManager {
+	return j.identityManager
 }
 
 type permission struct {
