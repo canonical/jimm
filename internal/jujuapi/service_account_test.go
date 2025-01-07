@@ -69,10 +69,15 @@ func TestAddServiceAccount(t *testing.T) {
 	for _, test := range tests {
 		test := test
 		c.Run(test.about, func(c *qt.C) {
-			jimm := &jimmtest.JIMM{
+			svcAccManager := mocks.ServiceAccountManager{
 				AddServiceAccount_: func(_ context.Context, _ *openfga.User, clientID string) error {
 					c.Assert(clientID, qt.Equals, test.addedClientId)
 					return nil
+				},
+			}
+			jimm := &jimmtest.JIMM{
+				ServiceAccountManager_: func() jimm.ServiceAccountManager {
+					return &svcAccManager
 				},
 			}
 			cr := jujuapi.NewControllerRoot(jimm, jujuapi.Params{})
@@ -174,7 +179,7 @@ func TestCopyServiceAccountCredential(t *testing.T) {
 					return openfga.NewUser(&u, ofgaClient), nil
 				},
 			}
-			jimm := &jimmtest.JIMM{
+			svcAccManager := mocks.ServiceAccountManager{
 				CopyServiceAccountCredential_: func(ctx context.Context, u, svcAcc *openfga.User, cloudCredentialTag names.CloudCredentialTag) (names.CloudCredentialTag, []jujuparams.UpdateCredentialModelResult, error) {
 					c.Assert(cloudCredentialTag.Cloud().Id(), qt.Equals, test.args.CloudCredentialArg.CloudName)
 					c.Assert(cloudCredentialTag.Owner().Id(), qt.Equals, u.Name)
@@ -182,6 +187,11 @@ func TestCopyServiceAccountCredential(t *testing.T) {
 					c.Assert(svcAcc.Name, qt.Equals, clientIdWithDomain)
 					newCredTag := names.NewCloudCredentialTag(fmt.Sprintf("%s/%s/%s", test.args.CloudName, svcAcc.Name, test.args.CredentialName))
 					return newCredTag, nil, nil
+				},
+			}
+			jimm := &jimmtest.JIMM{
+				ServiceAccountManager_: func() jimm.ServiceAccountManager {
+					return &svcAccManager
 				},
 				LoginManager_: func() jimm.LoginManager {
 					return &loginManager

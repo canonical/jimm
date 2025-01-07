@@ -31,18 +31,17 @@ type JIMM struct {
 	mocks.ControllerService
 	mocks.ModelManager
 
-	AuditLogManager_   func() jimm.AuditLogManager
-	GroupManager_      func() jimm.GroupManager
-	IdentityManager_   func() jimm.IdentityManager
-	LoginManager_      func() jimm.LoginManager
-	RoleManager_       func() jimm.RoleManager
-	PermissionManager_ func() jimm.PermissionManager
+	AuditLogManager_       func() jimm.AuditLogManager
+	GroupManager_          func() jimm.GroupManager
+	IdentityManager_       func() jimm.IdentityManager
+	LoginManager_          func() jimm.LoginManager
+	RoleManager_           func() jimm.RoleManager
+	PermissionManager_     func() jimm.PermissionManager
+	ServiceAccountManager_ func() jimm.ServiceAccountManager
 
 	AddAuditLogEntry_                  func(ale *dbmodel.AuditLogEntry)
 	AddCloudToController_              func(ctx context.Context, user *openfga.User, controllerName string, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error
 	AddHostedCloud_                    func(ctx context.Context, user *openfga.User, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error
-	AddServiceAccount_                 func(ctx context.Context, u *openfga.User, clientId string) error
-	CopyServiceAccountCredential_      func(ctx context.Context, u *openfga.User, svcAcc *openfga.User, cloudCredentialTag names.CloudCredentialTag) (names.CloudCredentialTag, []jujuparams.UpdateCredentialModelResult, error)
 	DestroyOffer_                      func(ctx context.Context, user *openfga.User, offerURL string, force bool) error
 	FindApplicationOffers_             func(ctx context.Context, user *openfga.User, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error)
 	FindAuditEvents_                   func(ctx context.Context, user *openfga.User, filter db.AuditLogFilter) ([]dbmodel.AuditLogEntry, error)
@@ -90,21 +89,6 @@ func (j *JIMM) AddHostedCloud(ctx context.Context, user *openfga.User, tag names
 	}
 	return j.AddHostedCloud_(ctx, user, tag, cloud, force)
 }
-
-func (j *JIMM) AddServiceAccount(ctx context.Context, u *openfga.User, clientId string) error {
-	if j.AddServiceAccount_ == nil {
-		return errors.E(errors.CodeNotImplemented)
-	}
-	return j.AddServiceAccount_(ctx, u, clientId)
-}
-
-func (j *JIMM) CopyServiceAccountCredential(ctx context.Context, u *openfga.User, svcAcc *openfga.User, cloudCredentialTag names.CloudCredentialTag) (names.CloudCredentialTag, []jujuparams.UpdateCredentialModelResult, error) {
-	if j.CopyServiceAccountCredential_ == nil {
-		return names.CloudCredentialTag{}, nil, errors.E(errors.CodeNotImplemented)
-	}
-	return j.CopyServiceAccountCredential_(ctx, u, svcAcc, cloudCredentialTag)
-}
-
 func (j *JIMM) DestroyOffer(ctx context.Context, user *openfga.User, offerURL string, force bool) error {
 	if j.DestroyOffer_ == nil {
 		return errors.E(errors.CodeNotImplemented)
@@ -221,6 +205,13 @@ func (j *JIMM) AuditLogManager() jimm.AuditLogManager {
 		return nil
 	}
 	return j.AuditLogManager_()
+}
+
+func (j *JIMM) ServiceAccountManager() jimm.ServiceAccountManager {
+	if j.ServiceAccountManager_ == nil {
+		return nil
+	}
+	return j.ServiceAccountManager_()
 }
 
 func (j *JIMM) InitiateMigration(ctx context.Context, user *openfga.User, spec jujuparams.MigrationSpec) (jujuparams.InitiateMigrationResult, error) {
