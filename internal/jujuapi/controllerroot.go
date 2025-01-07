@@ -89,7 +89,7 @@ func (r *controllerRoot) masquerade(ctx context.Context, userTag string) (*openf
 	if !r.user.JimmAdmin {
 		return nil, errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
-	user, err := r.jimm.UserLogin(ctx, ut.Id())
+	user, err := r.jimm.LoginManager().UserLogin(ctx, ut.Id())
 	if err != nil {
 		return nil, err
 	}

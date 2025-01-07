@@ -18,7 +18,6 @@ import (
 	jimm_errors "github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/middleware"
 	"github.com/canonical/jimm/v3/internal/openfga"
-	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest/mocks"
 )
 
@@ -87,11 +86,9 @@ func TestAuthenticateRebac(t *testing.T) {
 
 	for _, tt := range tests {
 		c.Run(tt.name, func(c *qt.C) {
-			j := jimmtest.JIMM{
-				LoginService: mocks.LoginService{
-					AuthenticateBrowserSession_: func(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error) {
-						return tt.mockAuthBrowserSession(ctx, w, req)
-					},
+			loginManager := mocks.LoginManager{
+				AuthenticateBrowserSession_: func(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error) {
+					return tt.mockAuthBrowserSession(ctx, w, req)
 				},
 				UserLogin_: func(ctx context.Context, username string) (*openfga.User, error) {
 					user := dbmodel.Identity{Name: username}
@@ -124,7 +121,7 @@ func TestAuthenticateRebac(t *testing.T) {
 				})
 			}
 
-			middleware := middleware.AuthenticateRebac(baseURL, handler, &j)
+			middleware := middleware.AuthenticateRebac(baseURL, handler, &loginManager)
 			middleware.ServeHTTP(w, req)
 
 			c.Assert(w.Code, qt.Equals, tt.expectedStatus)
@@ -139,15 +136,13 @@ func TestAuthenticateRebac(t *testing.T) {
 
 func TestAuthenticateViaBasicAuth(t *testing.T) {
 	testUser := "test-user@canonical.com"
-	jt := jimmtest.JIMM{
-		LoginService: mocks.LoginService{
-			LoginWithSessionToken_: func(ctx context.Context, sessionToken string) (*openfga.User, error) {
-				if sessionToken != "good" {
-					return nil, jimm_errors.E(jimm_errors.CodeSessionTokenInvalid)
-				}
-				user := dbmodel.Identity{Name: testUser}
-				return &openfga.User{Identity: &user, JimmAdmin: true}, nil
-			},
+	loginManager := mocks.LoginManager{
+		LoginWithSessionToken_: func(ctx context.Context, sessionToken string) (*openfga.User, error) {
+			if sessionToken != "good" {
+				return nil, jimm_errors.E(jimm_errors.CodeSessionTokenInvalid)
+			}
+			user := dbmodel.Identity{Name: testUser}
+			return &openfga.User{Identity: &user, JimmAdmin: true}, nil
 		},
 	}
 	tests := []struct {
@@ -190,7 +185,7 @@ func TestAuthenticateViaBasicAuth(t *testing.T) {
 				c.Assert(user.Name, qt.Equals, testUser)
 				w.WriteHeader(http.StatusOK)
 			})
-			middleware := middleware.AuthenticateWithSessionTokenViaBasicAuth(handler, &jt)
+			middleware := middleware.AuthenticateWithSessionTokenViaBasicAuth(handler, &loginManager)
 			middleware.ServeHTTP(w, req)
 			c.Assert(w.Code, qt.Equals, tt.expectedStatus)
 			b := w.Result().Body

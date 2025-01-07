@@ -95,7 +95,11 @@ func (s *modelCleanupSuite) Init(c *qt.C) {
 	s.jimm = jimmtest.NewJIMM(c, nil)
 	err = s.jimm.Database.Migrate(ctx)
 	c.Assert(err, qt.IsNil)
-	s.jimmAdmin, err = s.jimm.GetUser(ctx, "alice@canonical.com")
+
+	i, err := dbmodel.NewIdentity("alice@canonical.com")
+	c.Assert(err, qt.IsNil)
+	s.jimmAdmin = openfga.NewUser(i, s.ofgaClient)
+	s.jimmAdmin.JimmAdmin = true
 	c.Assert(err, qt.IsNil)
 
 	s.env = jimmtest.ParseEnvironment(c, modelPollerTestEnv)

@@ -32,6 +32,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/jimm/credentials"
 	"github.com/canonical/jimm/v3/internal/jimm/group"
 	"github.com/canonical/jimm/v3/internal/jimm/identity"
+	"github.com/canonical/jimm/v3/internal/jimm/login"
 	"github.com/canonical/jimm/v3/internal/jimm/role"
 	"github.com/canonical/jimm/v3/internal/jimmjwx"
 	"github.com/canonical/jimm/v3/internal/openfga"
@@ -149,6 +150,24 @@ type IdentityManager interface {
 	CountIdentities(ctx context.Context, user *openfga.User) (int, error)
 }
 
+// LoginManager provides methods for login/authentication and creates identities (users).
+type LoginManager interface {
+	// AuthenticateBrowserSession authenticates a browser login.
+	AuthenticateBrowserSession(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error)
+	// LoginDevice starts the device login flow.
+	LoginDevice(ctx context.Context) (*oauth2.DeviceAuthResponse, error)
+	// GetDeviceSessionToken returns a session token scoped to the user's identity.
+	GetDeviceSessionToken(ctx context.Context, deviceOAuthResponse *oauth2.DeviceAuthResponse) (string, error)
+	// LoginClientCredentials logs in a user with client credentials.
+	LoginClientCredentials(ctx context.Context, clientID string, clientSecret string) (*openfga.User, error)
+	// LoginWithSessionToken logs in a user with a session token.
+	LoginWithSessionToken(ctx context.Context, sessionToken string) (*openfga.User, error)
+	// LoginWithSessionCookie logs in a user assuming cookie auth was done previously.
+	LoginWithSessionCookie(ctx context.Context, identityID string) (*openfga.User, error)
+	// UserLogin creates/fetches an identity based on the identity provided and returns an openfga user object.
+	UserLogin(ctx context.Context, identity string) (*openfga.User, error)
+}
+
 // Parameters holds the services and static fields passed to the jimm.New() constructor.
 // You can provide mock implementations of certain services where necessary for dependency injection.
 type Parameters struct {
@@ -262,6 +281,12 @@ func New(p Parameters) (*JIMM, error) {
 	}
 	j.identityManager = identityManager
 
+	loginManager, err := login.NewLoginManager(j.Database, j.OpenFGAClient, j.OAuthAuthenticator, j.ResourceTag())
+	if err != nil {
+		return nil, err
+	}
+	j.loginManager = loginManager
+
 	return j, nil
 }
 
@@ -278,7 +303,11 @@ type JIMM struct {
 	// groupManager provides a means to manage groups within JIMM.
 	groupManager GroupManager
 
+	// identityManager provides a means to manage identities within JIMM.
 	identityManager IdentityManager
+
+	// loginManager provides a means to authenticate and login/create users/identities within JIMM.
+	loginManager LoginManager
 }
 
 // ResourceTag returns JIMM's controller tag stating its UUID.
@@ -304,6 +333,11 @@ func (j *JIMM) GroupManager() GroupManager {
 // IdentityManager returns a manager that enables identity (user/service-account) management.
 func (j *JIMM) IdentityManager() IdentityManager {
 	return j.identityManager
+}
+
+// Login manager returns a manager that enables login and authentication.
+func (j *JIMM) LoginManager() LoginManager {
+	return j.loginManager
 }
 
 type permission struct {

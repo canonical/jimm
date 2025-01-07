@@ -53,7 +53,7 @@ func (r *controllerRoot) LoginDevice(ctx context.Context) (params.LoginDeviceRes
 	const op = errors.Op("jujuapi.LoginDevice")
 	response := params.LoginDeviceResponse{}
 
-	deviceResponse, err := r.jimm.LoginDevice(ctx)
+	deviceResponse, err := r.jimm.LoginManager().LoginDevice(ctx)
 	if err != nil {
 		return response, errors.E(op, err, errors.CodeUnauthorized)
 	}
@@ -77,7 +77,7 @@ func (r *controllerRoot) GetDeviceSessionToken(ctx context.Context) (params.GetD
 	const op = errors.Op("jujuapi.GetDeviceSessionToken")
 	response := params.GetDeviceSessionTokenResponse{}
 
-	token, err := r.jimm.GetDeviceSessionToken(ctx, r.deviceOAuthResponse)
+	token, err := r.jimm.LoginManager().GetDeviceSessionToken(ctx, r.deviceOAuthResponse)
 	if err != nil {
 		return response, errors.E(op, err, errors.CodeUnauthorized)
 	}
@@ -95,7 +95,7 @@ func (r *controllerRoot) GetDeviceSessionToken(ctx context.Context) (params.GetD
 func (r *controllerRoot) LoginWithSessionCookie(ctx context.Context) (jujuparams.LoginResult, error) {
 	const op = errors.Op("jujuapi.LoginWithSessionCookie")
 
-	user, err := r.jimm.LoginWithSessionCookie(ctx, r.identityId)
+	user, err := r.jimm.LoginManager().LoginWithSessionCookie(ctx, r.identityId)
 	if err != nil {
 		return jujuparams.LoginResult{}, errors.E(op, err, errors.CodeUnauthorized)
 	}
@@ -127,7 +127,7 @@ func (r *controllerRoot) LoginWithSessionCookie(ctx context.Context) (jujuparams
 func (r *controllerRoot) LoginWithSessionToken(ctx context.Context, req params.LoginWithSessionTokenRequest) (jujuparams.LoginResult, error) {
 	const op = errors.Op("jujuapi.LoginWithSessionToken")
 
-	user, err := r.jimm.LoginWithSessionToken(ctx, req.SessionToken)
+	user, err := r.jimm.LoginManager().LoginWithSessionToken(ctx, req.SessionToken)
 	if err != nil {
 		// Avoid masking the error code on err below. The Juju CLI uses it to determine when to initiate login see [OAuthAuthenticator.VerifySessionToken].
 		return jujuparams.LoginResult{}, errors.E(op, err)
@@ -159,7 +159,7 @@ func (r *controllerRoot) LoginWithSessionToken(ctx context.Context, req params.L
 func (r *controllerRoot) LoginWithClientCredentials(ctx context.Context, req params.LoginWithClientCredentialsRequest) (jujuparams.LoginResult, error) {
 	const op = errors.Op("jujuapi.LoginWithClientCredentials")
 
-	user, err := r.jimm.LoginClientCredentials(ctx, req.ClientID, req.ClientSecret)
+	user, err := r.jimm.LoginManager().LoginClientCredentials(ctx, req.ClientID, req.ClientSecret)
 	if err != nil {
 		return jujuparams.LoginResult{}, errors.E(err, errors.CodeUnauthorized)
 	}

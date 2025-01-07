@@ -58,7 +58,7 @@ func (s streamProxier) ServeWS(ctx context.Context, clientConn *websocket.Conn) 
 		}
 	}
 
-	user, err := s.jimm.UserLogin(ctx, auth.SessionIdentityFromContext(ctx))
+	user, err := s.jimm.LoginManager().UserLogin(ctx, auth.SessionIdentityFromContext(ctx))
 	if err != nil {
 		zapctx.Error(ctx, "user login error", zap.Error(err))
 		writeError(err.Error(), errors.CodeUnauthorized)

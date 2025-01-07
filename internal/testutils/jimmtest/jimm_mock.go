@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package jimmtest
 
@@ -32,7 +32,6 @@ import (
 type JIMM struct {
 	mocks.RelationService
 	mocks.ControllerService
-	mocks.LoginService
 	mocks.ModelManager
 	AddAuditLogEntry_                  func(ale *dbmodel.AuditLogEntry)
 	AddCloudToController_              func(ctx context.Context, user *openfga.User, controllerName string, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error
@@ -64,6 +63,7 @@ type JIMM struct {
 	GrantServiceAccountAccess_         func(ctx context.Context, u *openfga.User, svcAccTag jimmnames.ServiceAccountTag, entities []string) error
 	GroupManager_                      func() jimm.GroupManager
 	IdentityManager_                   func() jimm.IdentityManager
+	LoginManager_                      func() jimm.LoginManager
 	InitiateInternalMigration_         func(ctx context.Context, user *openfga.User, modelNameOrUUID string, targetController string) (jujuparams.InitiateMigrationResult, error)
 	InitiateMigration_                 func(ctx context.Context, user *openfga.User, spec jujuparams.MigrationSpec) (jujuparams.InitiateMigrationResult, error)
 	ListApplicationOffers_             func(ctx context.Context, user *openfga.User, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error)
@@ -84,7 +84,6 @@ type JIMM struct {
 	UpdateApplicationOffer_            func(ctx context.Context, controller *dbmodel.Controller, offerUUID string, removed bool) error
 	UpdateCloud_                       func(ctx context.Context, u *openfga.User, ct names.CloudTag, cloud jujuparams.Cloud) error
 	UpdateCloudCredential_             func(ctx context.Context, u *openfga.User, args jimm.UpdateCloudCredentialArgs) ([]jujuparams.UpdateCredentialModelResult, error)
-	UserLogin_                         func(ctx context.Context, identityName string) (*openfga.User, error)
 	ListModels_                        func(ctx context.Context, user *openfga.User) ([]base.UserModel, error)
 }
 
@@ -229,6 +228,13 @@ func (j *JIMM) IdentityManager() jimm.IdentityManager {
 		return nil
 	}
 	return j.IdentityManager_()
+}
+
+func (j *JIMM) LoginManager() jimm.LoginManager {
+	if j.LoginManager_ == nil {
+		return nil
+	}
+	return j.LoginManager_()
 }
 
 func (j *JIMM) GetJimmControllerAccess(ctx context.Context, user *openfga.User, tag names.UserTag) (string, error) {
@@ -401,12 +407,6 @@ func (j *JIMM) UpdateCloudCredential(ctx context.Context, u *openfga.User, args 
 		return nil, errors.E(errors.CodeNotImplemented)
 	}
 	return j.UpdateCloudCredential_(ctx, u, args)
-}
-func (j *JIMM) UserLogin(ctx context.Context, identityName string) (*openfga.User, error) {
-	if j.UserLogin_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
-	}
-	return j.UserLogin_(ctx, identityName)
 }
 func (j *JIMM) ListModels(ctx context.Context, user *openfga.User) ([]base.UserModel, error) {
 	if j.ListModels_ == nil {

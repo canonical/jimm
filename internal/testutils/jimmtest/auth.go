@@ -109,6 +109,8 @@ func (m *mockOAuthAuthenticator) DeviceAccessToken(ctx context.Context, res *oau
 		m.mockAccessToken = uuid.String()
 	case <-ctx.Done():
 		return &oauth2.Token{}, ctx.Err()
+	case <-time.After(1 * time.Second):
+		return nil, errors.New("no user found, make sure to set the PollingChan field and pass a username before starting the test")
 	}
 	return &oauth2.Token{AccessToken: m.mockAccessToken}, nil
 }

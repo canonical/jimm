@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package jujuapi_test
 
@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/antonlindstrom/pgstore"
-	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gorilla/websocket"
 	"github.com/juju/errors"
 	"github.com/juju/juju/api"
@@ -27,7 +26,6 @@ import (
 	"github.com/juju/names/v5"
 	gc "gopkg.in/check.v1"
 
-	"github.com/canonical/jimm/v3/internal/auth"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 	"github.com/canonical/jimm/v3/pkg/api/params"
@@ -38,34 +36,8 @@ type adminSuite struct {
 }
 
 func (s *adminSuite) SetUpTest(c *gc.C) {
+	s.UseRealAuthentication(c)
 	s.websocketSuite.SetUpTest(c)
-	ctx := context.Background()
-
-	sqldb, err := s.JIMM.Database.DB.DB()
-	c.Assert(err, gc.IsNil)
-
-	sessionStore, err := pgstore.NewPGStoreFromPool(sqldb, []byte("secretsecretdigletts"))
-	c.Assert(err, gc.IsNil)
-	s.AddCleanup(func(c *gc.C) {
-		sessionStore.Close()
-	})
-
-	// Replace JIMM's mock authenticator with a real one here
-	// for testing the login flows.
-	authSvc, err := auth.NewAuthenticationService(ctx, auth.AuthenticationServiceParams{
-		IssuerURL:           "http://localhost:8082/realms/jimm",
-		ClientID:            "jimm-device",
-		ClientSecret:        "SwjDofnbDzJDm9iyfUhEp67FfUFMY8L4",
-		Scopes:              []string{oidc.ScopeOpenID, "profile", "email"},
-		SessionTokenExpiry:  time.Hour,
-		Store:               s.JIMM.Database,
-		SessionStore:        sessionStore,
-		SessionCookieMaxAge: 60,
-		JWTSessionKey:       "test-secret",
-		SecureCookies:       false,
-	})
-	c.Assert(err, gc.Equals, nil)
-	s.JIMM.OAuthAuthenticator = authSvc
 }
 
 var _ = gc.Suite(&adminSuite{})
