@@ -96,6 +96,9 @@ func NewLoginManager(store *db.Database, authSvc *openfga.OFGAClient, oAuthAuthe
 	if oAuthAuthenticator == nil {
 		return nil, errors.E("oauth service cannot be nil")
 	}
+	if jimmTag.Id() == "" {
+		return nil, errors.E("invalid jimm controller tag")
+	}
 	return &loginManager{store, authSvc, oAuthAuthenticator, jimmTag}, nil
 }
 
