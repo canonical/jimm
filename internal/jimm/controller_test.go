@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package jimm_test
 
@@ -174,6 +174,94 @@ func TestAddController(t *testing.T) {
 	err = j.Database.GetController(ctx, &ctl4)
 	c.Assert(err, qt.IsNil)
 	c.Check(ctl4, qt.CmpEquals(cmpopts.EquateEmpty(), cmpopts.IgnoreTypes(dbmodel.CloudRegion{})), ctl3)
+}
+
+func TestAddControllerWithCloudWithoutRegions(t *testing.T) {
+	c := qt.New(t)
+
+	api := &jimmtest.API{
+		Clouds_: func(context.Context) (map[names.CloudTag]jujuparams.Cloud, error) {
+			clouds := map[names.CloudTag]jujuparams.Cloud{
+				names.NewCloudTag("k8s"): {
+					Type:      "kubernetes",
+					AuthTypes: []string{"userpass"},
+					Endpoint:  "https://k8s.example.com",
+				},
+			}
+			return clouds, nil
+		},
+		CloudInfo_: func(_ context.Context, tag names.CloudTag, ci *jujuparams.CloudInfo) error {
+			if tag.Id() != "k8s" {
+				c.Errorf("CloudInfo called for unexpected cloud %q", tag)
+				return errors.E("unexpected cloud")
+			}
+			ci.Type = "kubernetes"
+			ci.AuthTypes = []string{"userpass"}
+			ci.Endpoint = "https://k8s.example.com"
+			return nil
+		},
+		ControllerModelSummary_: func(_ context.Context, ms *jujuparams.ModelSummary) error {
+			ms.Name = "controller"
+			ms.UUID = "5fddf0ed-83d5-47e8-ae7b-a4b27fc04a9f"
+			ms.Type = "iaas"
+			ms.ControllerUUID = jimmtest.DefaultControllerUUID
+			ms.IsController = true
+			ms.ProviderType = "ec2"
+			ms.DefaultSeries = "warty"
+			ms.CloudTag = "cloud-k8s"
+			ms.OwnerTag = "user-admin"
+			ms.Life = life.Value(state.Alive.String())
+			ms.Status = jujuparams.EntityStatus{
+				Status: "available",
+			}
+			ms.UserAccess = "admin"
+			ms.AgentVersion = newVersion("1.2.3")
+			return nil
+		},
+	}
+
+	j := jimmtest.NewJIMM(c, &jimm.Parameters{
+		Dialer: &jimmtest.Dialer{
+			API: api,
+		},
+	})
+
+	ctx := context.Background()
+
+	u, err := dbmodel.NewIdentity("alice@canonical.com")
+	c.Assert(err, qt.IsNil)
+
+	alice := openfga.NewUser(u, j.OpenFGAClient)
+	alice.JimmAdmin = true
+	err = alice.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
+	c.Assert(err, qt.IsNil)
+
+	ctl1 := dbmodel.Controller{
+		Name:              "test-controller",
+		AdminIdentityName: "admin",
+		AdminPassword:     "5ecret",
+		PublicAddress:     "example.com:443",
+	}
+	err = j.AddController(context.Background(), alice, &ctl1)
+	c.Assert(err, qt.IsNil)
+
+	ctl2 := dbmodel.Controller{
+		Name: "test-controller",
+	}
+	err = j.Database.GetController(ctx, &ctl2)
+	c.Assert(err, qt.IsNil)
+	c.Check(ctl2, qt.CmpEquals(cmpopts.EquateEmpty(), cmpopts.IgnoreTypes(dbmodel.CloudRegion{})), ctl1)
+	c.Check(ctl2.CloudRegion, qt.Equals, "default")
+
+	cloud := dbmodel.Cloud{
+		Name: "k8s",
+	}
+	err = j.Database.GetCloud(ctx, &cloud)
+	c.Assert(err, qt.IsNil)
+	c.Assert(cloud.Regions, qt.HasLen, 1)
+	c.Assert(cloud.Regions[0].Name, qt.Equals, "default")
+	c.Assert(cloud.Regions[0].Controllers, qt.HasLen, 1)
+	c.Assert(cloud.Regions[0].Controllers[0].Controller.Name, qt.Equals, ctl1.Name)
 }
 
 func TestAddControllerWithVault(t *testing.T) {

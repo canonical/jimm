@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package jimm
 
@@ -251,6 +251,22 @@ func (j *JIMM) AddController(ctx context.Context, user *openfga.User, ctl *dbmod
 	}
 
 	dbClouds := convertJujuCloudsToDbClouds(clouds)
+
+	for i, cloud := range dbClouds {
+		// in case this cloud has no regions (as happens for
+		// some MAAS and k8s clouds), we create one region
+		// named `default`
+		if len(cloud.Regions) == 0 {
+			dbClouds[i].Regions = []dbmodel.CloudRegion{{
+				CloudName: cloud.Name,
+				Name:      "default",
+			}}
+			if cloud.Name == ctl.CloudName {
+				ctl.CloudRegion = "default"
+			}
+
+		}
+	}
 
 	// TODO(ale8k): This shouldn't be necessary to check, but tests need updating
 	// to set insecure credential store explicitly.
