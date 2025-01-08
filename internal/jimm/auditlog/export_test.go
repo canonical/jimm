@@ -2,10 +2,16 @@
 
 package auditlog
 
+import "context"
+
 // AuditLogManager is a type alias to export auditLogManager for use in tests.
 type AuditLogManager = auditLogManager
+type PollTimeOfDay = pollTimeOfDay
 
 var (
-	PollDuration              = pollDuration
 	CalculateNextPollDuration = calculateNextPollDuration
 )
+
+func (j *auditLogManager) Cleanup(ctx context.Context) {
+	j.cleanup(ctx)
+}
