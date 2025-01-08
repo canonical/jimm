@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package jujuclient
 
@@ -209,9 +209,7 @@ func (c Connection) GetApplicationOfferConsumeDetails(ctx context.Context, user 
 			OfferURLs:     []string{info.Offer.OfferURL},
 			BakeryVersion: v,
 		},
-		// Do not include a user in the args, Juju will opt to use the user authenticated in the connection.
-		// There is a bug where setting the user tag does not behave as expected.
-		UserTag: "",
+		UserTag: user.String(),
 	}
 
 	resp := jujuparams.ConsumeOfferDetailsResults{
