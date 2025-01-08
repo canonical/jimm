@@ -17,7 +17,6 @@ import (
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
-	"github.com/canonical/jimm/v3/internal/auditlog"
 	"github.com/canonical/jimm/v3/internal/auth"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
@@ -101,7 +100,7 @@ func (s *apiServer) Kill() {
 }
 
 // serveRoot serves an RPC root object on a websocket connection.
-func serveRoot(ctx context.Context, root root, logger auditlog.Logger, wsConn *websocket.Conn) {
+func serveRoot(ctx context.Context, root root, logger AuditLogger, wsConn *websocket.Conn) {
 	// Note that although NewConn accepts a `RecorderFactory` input, the call to conn.ServeRoot
 	// also accepts a `RecorderFactory` and will override anything set during the call to NewConn.
 	conn := rpc.NewConn(
@@ -109,7 +108,7 @@ func serveRoot(ctx context.Context, root root, logger auditlog.Logger, wsConn *w
 		nil,
 	)
 	rpcRecorderFactory := func() rpc.Recorder {
-		return auditlog.NewRecorder(logger)
+		return NewRecorder(logger)
 	}
 	conn.ServeRoot(root, rpcRecorderFactory, func(err error) error {
 		return mapError(err)

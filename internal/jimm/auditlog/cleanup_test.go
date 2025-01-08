@@ -1,5 +1,4 @@
 // Copyright 2025 Canonical.
-
 package auditlog_test
 
 import (
@@ -9,61 +8,51 @@ import (
 
 	qt "github.com/frankban/quicktest"
 
-	"github.com/canonical/jimm/v3/internal/auditlog"
-	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
+	"github.com/canonical/jimm/v3/internal/jimm/auditlog"
 )
 
-func TestAuditLogCleanupServicePurgesLogs(t *testing.T) {
-	c := qt.New(t)
-
+func (s *auditLogManagerSuite) TestAuditLogCleanupServicePurgesLogs(c *qt.C) {
+	c.Parallel()
 	ctx := context.Background()
 	now := time.Now().UTC().Round(time.Millisecond)
 
-	db := &db.Database{
-		DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
-	}
-
-	err := db.AddAuditLogEntry(ctx, &dbmodel.AuditLogEntry{
+	err := s.db.AddAuditLogEntry(ctx, &dbmodel.AuditLogEntry{
 		Time: now.AddDate(0, 0, -1),
 	})
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
 
-	err = db.Migrate(context.Background())
-	c.Assert(err, qt.IsNil)
-
 	// A log from 1 day ago
-	c.Assert(db.AddAuditLogEntry(ctx, &dbmodel.AuditLogEntry{
+	c.Assert(s.db.AddAuditLogEntry(ctx, &dbmodel.AuditLogEntry{
 		Time: now.AddDate(0, 0, -1),
 	}), qt.IsNil)
 
 	// A log from 2 days ago
-	c.Assert(db.AddAuditLogEntry(ctx, &dbmodel.AuditLogEntry{
+	c.Assert(s.db.AddAuditLogEntry(ctx, &dbmodel.AuditLogEntry{
 		Time: now.AddDate(0, 0, -2),
 	}), qt.IsNil)
 
 	// A log from 3 days ago
-	c.Assert(db.AddAuditLogEntry(ctx, &dbmodel.AuditLogEntry{
+	c.Assert(s.db.AddAuditLogEntry(ctx, &dbmodel.AuditLogEntry{
 		Time: now.AddDate(0, 0, -3),
 	}), qt.IsNil)
 
 	// Check 3 created
 	logs := make([]dbmodel.AuditLogEntry, 0)
-	err = db.DB.Find(&logs).Error
+	err = s.db.DB.Find(&logs).Error
 	c.Assert(err, qt.IsNil)
 	c.Assert(logs, qt.HasLen, 3)
 
 	auditlog.PollDuration.Hours = now.Hour()
 	auditlog.PollDuration.Minutes = now.Minute()
 	auditlog.PollDuration.Seconds = now.Second() + 2
-	svc := auditlog.NewCleanupService(db, 1)
-	svc.Start(ctx)
+	// Suite is setup to clean logs more than 1 day old.
+	s.manager.StartCleanup(ctx)
 
 	// Check 2 were purged
 	logs = make([]dbmodel.AuditLogEntry, 0)
-	err = db.DB.Find(&logs).Error
+	err = s.db.DB.Find(&logs).Error
 	c.Assert(err, qt.IsNil)
 	c.Assert(logs, qt.HasLen, 3)
 }

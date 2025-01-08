@@ -27,7 +27,6 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
-	"github.com/canonical/jimm/v3/internal/auditlog"
 	"github.com/canonical/jimm/v3/internal/auth"
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
@@ -202,8 +201,7 @@ type Service struct {
 	jimm       *jimm.JIMM
 	jwkService *jimmjwx.JWKSService
 
-	isLeader              bool
-	auditLogCleanupPeriod int
+	isLeader bool
 
 	mux      *chi.Mux
 	cleanups []func() error
@@ -313,6 +311,17 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	// Setup all dependency services
 	if jimmParameters.UUID == "" {
 		jimmParameters.UUID = uuid.NewString()
+	}
+
+	if p.AuditLogRetentionPeriodInDays != "" {
+		retentionPeriod, err := strconv.Atoi(p.AuditLogRetentionPeriodInDays)
+		if err != nil {
+			return nil, errors.E(op, "failed to parse audit log retention period")
+		}
+		if retentionPeriod < 0 {
+			return nil, errors.E(op, "retention period cannot be less than 0")
+		}
+		jimmParameters.AuditLogRetentionDays = retentionPeriod
 	}
 
 	if p.DSN == "" {
@@ -487,16 +496,6 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		jimmhttp.NewHTTPProxyHandler(s.jimm),
 	)
 
-	if p.AuditLogRetentionPeriodInDays != "" {
-		var err error
-		s.auditLogCleanupPeriod, err = strconv.Atoi(p.AuditLogRetentionPeriodInDays)
-		if err != nil {
-			return nil, errors.E(op, "failed to parse audit log retention period")
-		}
-		if s.auditLogCleanupPeriod < 0 {
-			return nil, errors.E(op, "retention period cannot be less than 0")
-		}
-	}
 	s.isLeader = p.IsLeader
 
 	return s, nil
@@ -506,12 +505,10 @@ func (s *Service) StartServices(ctx context.Context, svc *service.Service) {
 	// on the leader unit we start additional routines
 	if s.isLeader {
 		// audit log cleanup routine
-		if s.auditLogCleanupPeriod != 0 {
-			svc.Go(func() error {
-				auditlog.NewCleanupService(s.jimm.Database, s.auditLogCleanupPeriod).Start(ctx)
-				return nil
-			})
-		}
+		svc.Go(func() error {
+			s.jimm.AuditLogManager().StartCleanup(ctx)
+			return nil
+		})
 
 		// the JWKS rotator
 		svc.Go(func() error {

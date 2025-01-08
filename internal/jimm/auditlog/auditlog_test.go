@@ -45,7 +45,7 @@ func (s *auditLogManagerSuite) Init(c *qt.C) {
 
 	s.jimmTag = names.NewControllerTag("foo")
 
-	s.manager, err = auditlog.NewAuditLogManager(db, ofgaClient, s.jimmTag)
+	s.manager, err = auditlog.NewAuditLogManager(db, ofgaClient, s.jimmTag, 1)
 	c.Assert(err, qt.IsNil)
 
 	// Create test identity

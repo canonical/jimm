@@ -21,14 +21,15 @@ import (
 
 // auditLogManager provides a means to manage audit logs within JIMM.
 type auditLogManager struct {
-	store   *db.Database
-	authSvc *openfga.OFGAClient
-	jimmTag names.ControllerTag
+	store                 *db.Database
+	authSvc               *openfga.OFGAClient
+	jimmTag               names.ControllerTag
+	retentionPeriodInDays int
 }
 
 // NewAuditLogManager returns a new auditLog manager that provides audit Log
 // creation, and removal.
-func NewAuditLogManager(store *db.Database, authSvc *openfga.OFGAClient, jimmTag names.ControllerTag) (*auditLogManager, error) {
+func NewAuditLogManager(store *db.Database, authSvc *openfga.OFGAClient, jimmTag names.ControllerTag, retentionDays int) (*auditLogManager, error) {
 	if store == nil {
 		return nil, errors.E("auditlog store cannot be nil")
 	}
@@ -38,7 +39,7 @@ func NewAuditLogManager(store *db.Database, authSvc *openfga.OFGAClient, jimmTag
 	if jimmTag.String() == "" {
 		return nil, errors.E("auditlog jimm tag cannot be empty")
 	}
-	return &auditLogManager{store, authSvc, jimmTag}, nil
+	return &auditLogManager{store, authSvc, jimmTag, retentionDays}, nil
 }
 
 // addAuditLogEntry causes an entry to be added the the audit log.

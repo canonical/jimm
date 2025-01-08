@@ -225,6 +225,8 @@ type AuditLogManager interface {
 	FindAuditEvents(ctx context.Context, user *openfga.User, filter db.AuditLogFilter) ([]dbmodel.AuditLogEntry, error)
 	// PurgeLogs removes logs older than the specified date.
 	PurgeLogs(ctx context.Context, user *openfga.User, before time.Time) (int64, error)
+	// StartCleanup removes log older than the retention period.
+	StartCleanup(ctx context.Context)
 }
 
 // Parameters holds the services and static fields passed to the jimm.New() constructor.
@@ -267,6 +269,10 @@ type Parameters struct {
 	// OAuthAuthenticator is responsible for handling authentication
 	// via OAuth2.0 AND JWT access tokens to JIMM.
 	OAuthAuthenticator OAuthAuthenticator
+
+	// AuditLogRetentionDays is the number of days to keep audit logs.
+	// The default value of 0 indicates that logs will never be deleted.
+	AuditLogRetentionDays int
 }
 
 func (p *Parameters) Validate() error {
@@ -354,7 +360,7 @@ func New(p Parameters) (*JIMM, error) {
 
 	j.jujuAuthFactory = jujuauth.NewFactory(j.Database, j.JWTService, permissionManager)
 
-	auditLogManager, err := auditlog.NewAuditLogManager(j.Database, j.OpenFGAClient, j.ResourceTag())
+	auditLogManager, err := auditlog.NewAuditLogManager(j.Database, j.OpenFGAClient, j.ResourceTag(), p.AuditLogRetentionDays)
 	if err != nil {
 		return nil, err
 	}
