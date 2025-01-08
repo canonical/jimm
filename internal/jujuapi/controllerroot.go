@@ -136,7 +136,7 @@ func (r *controllerRoot) setupUUIDGenerator() error {
 }
 
 func (r *controllerRoot) newAuditLogger() auditlog.Logger {
-	return auditlog.NewLogger(r.jimm, r.getUser)
+	return auditlog.NewLogger(r.jimm.AuditLogManager(), r.getUser)
 }
 
 // getUser implements jujuapi.root interface to return the currently logged in user.
