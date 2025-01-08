@@ -19,7 +19,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/utils"
 )
 
-// LogBackend defines the interface used by the DbAuditLogger to store
+// LogBackend defines the interface used by the Logger to store
 // audit events.
 type LogBackend interface {
 	AddAuditLogEntry(*dbmodel.AuditLogEntry)
