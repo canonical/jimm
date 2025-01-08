@@ -209,6 +209,11 @@ func (c Connection) GetApplicationOfferConsumeDetails(ctx context.Context, user 
 			OfferURLs:     []string{info.Offer.OfferURL},
 			BakeryVersion: v,
 		},
+		// We need to specify the user tag, because the juju controller returns a macaroon
+		// with a third party caveat instructing the discharger to verify that the stated
+		// user has `consume` access to the offer. If the user tag is left empty juju
+		// will assume the logged-in user and since jimm is dialing the controller as
+		// `admin` user that causes an issue.
 		UserTag: user.String(),
 	}
 
