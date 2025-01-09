@@ -134,7 +134,7 @@ func (r *controllerRoot) setupUUIDGenerator() error {
 	return nil
 }
 
-func (r *controllerRoot) newAuditLogger() AuditLogger {
+func (r *controllerRoot) newAuditLogger() auditLogger {
 	return newAuditLogger(r.jimm.AuditLogManager(), r.getUser)
 }
 

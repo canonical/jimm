@@ -1,6 +1,6 @@
 // Copyright 2025 Canonical.
 
-// The auditlot package provides business logic for handling audit log related methods.
+// The auditlog package provides business logic for handling audit log related methods.
 package auditlog
 
 import (

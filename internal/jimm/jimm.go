@@ -219,6 +219,7 @@ type PermissionManager interface {
 	ToJAASTag(ctx context.Context, tag *ofganames.Tag, resolveUUIDs bool) (string, error)
 }
 
+// AuditLogManager provides methods to add/find/cleanup audit logs.
 type AuditLogManager interface {
 	// AddAuditLogEntry saves an audit log entry.
 	AddAuditLogEntry(ale *dbmodel.AuditLogEntry)

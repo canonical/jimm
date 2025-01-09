@@ -100,7 +100,7 @@ func (s *apiServer) Kill() {
 }
 
 // serveRoot serves an RPC root object on a websocket connection.
-func serveRoot(ctx context.Context, root root, logger AuditLogger, wsConn *websocket.Conn) {
+func serveRoot(ctx context.Context, root root, logger auditLogger, wsConn *websocket.Conn) {
 	// Note that although NewConn accepts a `RecorderFactory` input, the call to conn.ServeRoot
 	// also accepts a `RecorderFactory` and will override anything set during the call to NewConn.
 	conn := rpc.NewConn(

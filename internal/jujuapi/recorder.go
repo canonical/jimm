@@ -24,15 +24,17 @@ type LogBackend interface {
 	AddAuditLogEntry(ale *dbmodel.AuditLogEntry)
 }
 
-type AuditLogger struct {
+// auditLogger determines how to convert Juju RPC messages to the desired
+// format and then sends logs to the backend for persistence.
+type auditLogger struct {
 	backend        LogBackend
 	conversationId string
 	getUser        func() names.UserTag
 }
 
 // newAuditLogger returns a new audit logger that logs to the provided backend.
-func newAuditLogger(backend LogBackend, getUserFunc func() names.UserTag) AuditLogger {
-	logger := AuditLogger{
+func newAuditLogger(backend LogBackend, getUserFunc func() names.UserTag) auditLogger {
+	logger := auditLogger{
 		backend:        backend,
 		conversationId: utils.NewConversationID(),
 		getUser:        getUserFunc,
@@ -40,7 +42,7 @@ func newAuditLogger(backend LogBackend, getUserFunc func() names.UserTag) AuditL
 	return logger
 }
 
-func (r AuditLogger) newEntry(header *rpc.Header) dbmodel.AuditLogEntry {
+func (r auditLogger) newEntry(header *rpc.Header) dbmodel.AuditLogEntry {
 	ale := dbmodel.AuditLogEntry{
 		Time:           time.Now().UTC().Round(time.Millisecond),
 		MessageId:      header.RequestId,
@@ -51,7 +53,7 @@ func (r AuditLogger) newEntry(header *rpc.Header) dbmodel.AuditLogEntry {
 }
 
 // LogRequest creates an audit log entry from a client request.
-func (r AuditLogger) LogRequest(header *rpc.Header, body interface{}) error {
+func (r auditLogger) LogRequest(header *rpc.Header, body interface{}) error {
 	ale := r.newEntry(header)
 	ale.ObjectId = header.Request.Id
 	ale.FacadeName = header.Request.Type
@@ -70,7 +72,7 @@ func (r AuditLogger) LogRequest(header *rpc.Header, body interface{}) error {
 }
 
 // LogResponse creates an audit log entry from a controller response.
-func (o AuditLogger) LogResponse(r rpc.Request, header *rpc.Header, body interface{}) error {
+func (o auditLogger) LogResponse(r rpc.Request, header *rpc.Header, body interface{}) error {
 	var allErrors params.ErrorResults
 	bulkError, ok := body.(params.ErrorResults)
 	if ok {
@@ -100,12 +102,12 @@ func (o AuditLogger) LogResponse(r rpc.Request, header *rpc.Header, body interfa
 // recorder implements an rpc.Recorder.
 type recorder struct {
 	start          time.Time
-	logger         AuditLogger
+	logger         auditLogger
 	conversationId string
 }
 
 // NewRecorder returns a new recorder struct useful for recording RPC events.
-func NewRecorder(logger AuditLogger) recorder {
+func NewRecorder(logger auditLogger) recorder {
 	return recorder{
 		start:          time.Now(),
 		conversationId: utils.NewConversationID(),
