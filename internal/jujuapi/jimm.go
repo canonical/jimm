@@ -368,7 +368,7 @@ func (r *controllerRoot) GrantAuditLogAccess(ctx context.Context, req apiparams.
 		return errors.E(op, err, errors.CodeBadRequest)
 	}
 
-	err = r.jimm.GrantAuditLogAccess(ctx, r.user, ut)
+	err = r.jimm.PermissionManager().GrantAuditLogAccess(ctx, r.user, ut)
 	if err != nil {
 		return errors.E(op, err)
 	}
@@ -386,7 +386,7 @@ func (r *controllerRoot) RevokeAuditLogAccess(ctx context.Context, req apiparams
 		return errors.E(op, err, errors.CodeBadRequest)
 	}
 
-	err = r.jimm.RevokeAuditLogAccess(ctx, r.user, ut)
+	err = r.jimm.PermissionManager().RevokeAuditLogAccess(ctx, r.user, ut)
 	if err != nil {
 		return errors.E(op, err)
 	}

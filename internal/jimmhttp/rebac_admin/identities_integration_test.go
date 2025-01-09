@@ -76,7 +76,7 @@ func (s *identitiesSuite) TestIdentityPatchGroups(c *gc.C) {
 	// test user added to groups
 	objUser, err := s.JIMM.IdentityManager().FetchIdentity(ctx, username)
 	c.Assert(err, gc.IsNil)
-	tuples, _, err := s.JIMM.ListRelationshipTuples(ctx, s.AdminUser, params.RelationshipTuple{
+	tuples, _, err := s.JIMM.PermissionManager().ListRelationshipTuples(ctx, s.AdminUser, params.RelationshipTuple{
 		Object:       objUser.ResourceTag().String(),
 		Relation:     ofganames.MemberRelation.String(),
 		TargetObject: group.ResourceTag().String(),
@@ -92,7 +92,7 @@ func (s *identitiesSuite) TestIdentityPatchGroups(c *gc.C) {
 	}})
 	c.Assert(err, gc.IsNil)
 	c.Assert(changed, gc.Equals, true)
-	tuples, _, err = s.JIMM.ListRelationshipTuples(ctx, s.AdminUser, params.RelationshipTuple{
+	tuples, _, err = s.JIMM.PermissionManager().ListRelationshipTuples(ctx, s.AdminUser, params.RelationshipTuple{
 		Object:       objUser.ResourceTag().String(),
 		Relation:     ofganames.MemberRelation.String(),
 		TargetObject: group.ResourceTag().String(),
@@ -206,7 +206,7 @@ func (s *identitiesSuite) TestIdentityPatchRoles(c *gc.C) {
 	// test user added to roles
 	objUser, err := s.JIMM.IdentityManager().FetchIdentity(ctx, username)
 	c.Assert(err, gc.IsNil)
-	tuples, _, err := s.JIMM.ListRelationshipTuples(ctx, s.AdminUser, params.RelationshipTuple{
+	tuples, _, err := s.JIMM.PermissionManager().ListRelationshipTuples(ctx, s.AdminUser, params.RelationshipTuple{
 		Object:       objUser.ResourceTag().String(),
 		Relation:     ofganames.AssigneeRelation.String(),
 		TargetObject: role.ResourceTag().String(),
@@ -222,7 +222,7 @@ func (s *identitiesSuite) TestIdentityPatchRoles(c *gc.C) {
 	}})
 	c.Assert(err, gc.IsNil)
 	c.Assert(changed, gc.Equals, true)
-	tuples, _, err = s.JIMM.ListRelationshipTuples(ctx, s.AdminUser, params.RelationshipTuple{
+	tuples, _, err = s.JIMM.PermissionManager().ListRelationshipTuples(ctx, s.AdminUser, params.RelationshipTuple{
 		Object:       objUser.ResourceTag().String(),
 		Relation:     ofganames.AssigneeRelation.String(),
 		TargetObject: role.ResourceTag().String(),

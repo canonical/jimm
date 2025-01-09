@@ -164,7 +164,7 @@ func (s *groupsService) GetGroupIdentities(ctx context.Context, groupId string, 
 		Relation:     ofganames.MemberRelation.String(),
 		TargetObject: groupTag.String(),
 	}
-	identities, nextToken, err := s.jimm.ListRelationshipTuples(ctx, user, tuple, int32(filter.Limit()), filter.Token()) // #nosec G115 accept integer conversion
+	identities, nextToken, err := s.jimm.PermissionManager().ListRelationshipTuples(ctx, user, tuple, int32(filter.Limit()), filter.Token()) // #nosec G115 accept integer conversion
 	if err != nil {
 		return nil, err
 	}
@@ -221,13 +221,13 @@ func (s *groupsService) PatchGroupIdentities(ctx context.Context, groupId string
 		}
 	}
 	if toAdd != nil {
-		err := s.jimm.AddRelation(ctx, user, toAdd)
+		err := s.jimm.PermissionManager().AddRelation(ctx, user, toAdd)
 		if err != nil {
 			return false, err
 		}
 	}
 	if toRemove != nil {
-		err := s.jimm.RemoveRelation(ctx, user, toRemove)
+		err := s.jimm.PermissionManager().RemoveRelation(ctx, user, toRemove)
 		if err != nil {
 			return false, err
 		}
@@ -261,7 +261,7 @@ func (s *groupsService) GetGroupRoles(ctx context.Context, groupId string, param
 		Relation:     ofganames.AssigneeRelation.String(),
 		TargetObject: openfga.RoleType.String(),
 	}
-	roles, nextToken, err := s.jimm.ListRelationshipTuples(ctx, user, tuple, int32(filter.Limit()), filter.Token()) // #nosec G115 accept integer conversion
+	roles, nextToken, err := s.jimm.PermissionManager().ListRelationshipTuples(ctx, user, tuple, int32(filter.Limit()), filter.Token()) // #nosec G115 accept integer conversion
 	if err != nil {
 		return nil, err
 	}
@@ -335,13 +335,13 @@ func (s *groupsService) PatchGroupRoles(ctx context.Context, groupId string, rol
 	}
 
 	if toAdd != nil {
-		err := s.jimm.AddRelation(ctx, user, toAdd)
+		err := s.jimm.PermissionManager().AddRelation(ctx, user, toAdd)
 		if err != nil {
 			return false, err
 		}
 	}
 	if toRemove != nil {
-		err := s.jimm.RemoveRelation(ctx, user, toRemove)
+		err := s.jimm.PermissionManager().RemoveRelation(ctx, user, toRemove)
 		if err != nil {
 			return false, err
 		}
@@ -363,7 +363,7 @@ func (s *groupsService) GetGroupEntitlements(ctx context.Context, groupId string
 	group := ofganames.WithMemberRelation(jimmnames.NewGroupTag(groupId))
 	entitlementToken := pagination.NewEntitlementToken(filter.Token())
 	// nolint:gosec accept integer conversion
-	tuples, nextEntitlmentToken, err := s.jimm.ListObjectRelations(ctx, user, group, int32(filter.Limit()), entitlementToken) // #nosec G115 accept integer conversion
+	tuples, nextEntitlmentToken, err := s.jimm.PermissionManager().ListObjectRelations(ctx, user, group, int32(filter.Limit()), entitlementToken) // #nosec G115 accept integer conversion
 	if err != nil {
 		return nil, err
 	}
@@ -424,13 +424,13 @@ func (s *groupsService) PatchGroupEntitlements(ctx context.Context, groupId stri
 		return false, err
 	}
 	if toAdd != nil {
-		err := s.jimm.AddRelation(ctx, user, toAdd)
+		err := s.jimm.PermissionManager().AddRelation(ctx, user, toAdd)
 		if err != nil {
 			return false, err
 		}
 	}
 	if toRemove != nil {
-		err := s.jimm.RemoveRelation(ctx, user, toRemove)
+		err := s.jimm.PermissionManager().RemoveRelation(ctx, user, toRemove)
 		if err != nil {
 			return false, err
 		}

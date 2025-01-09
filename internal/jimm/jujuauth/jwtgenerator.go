@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 // Package jujuauth generates JWT tokens to
 // authenticate and authorize messages to Juju controllers.
@@ -56,8 +56,8 @@ type TokenGenerator struct {
 	callCount      int
 }
 
-// New returns a new JWTGenerator.
-func New(database GeneratorDatabase, accessChecker GeneratorAccessChecker, jwtService JWTService) TokenGenerator {
+// newTokenGenerator returns a new TokenGenerator.
+func newTokenGenerator(database GeneratorDatabase, accessChecker GeneratorAccessChecker, jwtService JWTService) TokenGenerator {
 	return TokenGenerator{
 		database:      database,
 		accessChecker: accessChecker,

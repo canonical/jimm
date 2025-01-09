@@ -130,7 +130,7 @@ func (r *controllerRoot) ListGroups(ctx context.Context, req apiparams.ListGroup
 func (r *controllerRoot) AddRelation(ctx context.Context, req apiparams.AddRelationRequest) error {
 	const op = errors.Op("jujuapi.AddRelation")
 
-	if err := r.jimm.AddRelation(ctx, r.user, req.Tuples); err != nil {
+	if err := r.jimm.PermissionManager().AddRelation(ctx, r.user, req.Tuples); err != nil {
 		zapctx.Error(ctx, "failed to add relation", zaputil.Error(err))
 		return errors.E(op, err)
 	}
@@ -142,7 +142,7 @@ func (r *controllerRoot) AddRelation(ctx context.Context, req apiparams.AddRelat
 func (r *controllerRoot) RemoveRelation(ctx context.Context, req apiparams.RemoveRelationRequest) error {
 	const op = errors.Op("jujuapi.RemoveRelation")
 
-	err := r.jimm.RemoveRelation(ctx, r.user, req.Tuples)
+	err := r.jimm.PermissionManager().RemoveRelation(ctx, r.user, req.Tuples)
 	if err != nil {
 		zapctx.Error(ctx, "failed to delete tuple(s)", zap.NamedError("remove-relation-error", err))
 		return errors.E(op, err)
@@ -157,7 +157,7 @@ func (r *controllerRoot) CheckRelation(ctx context.Context, req apiparams.CheckR
 	const op = errors.Op("jujuapi.CheckRelation")
 	checkResp := apiparams.CheckRelationResponse{Allowed: false}
 
-	allowed, err := r.jimm.CheckRelation(ctx, r.user, req.Tuple, false)
+	allowed, err := r.jimm.PermissionManager().CheckRelation(ctx, r.user, req.Tuple, false)
 	if err != nil {
 		zapctx.Error(ctx, "failed to check relation", zap.NamedError("check-relation-error", err))
 		return checkResp, errors.E(op, err)
@@ -171,19 +171,19 @@ func (r *controllerRoot) CheckRelation(ctx context.Context, req apiparams.CheckR
 func (r *controllerRoot) ListRelationshipTuples(ctx context.Context, req apiparams.ListRelationshipTuplesRequest) (apiparams.ListRelationshipTuplesResponse, error) {
 	const op = errors.Op("jujuapi.ListRelationshipTuples")
 
-	responseTuples, ct, err := r.jimm.ListRelationshipTuples(ctx, r.user, req.Tuple, req.PageSize, req.ContinuationToken)
+	responseTuples, ct, err := r.jimm.PermissionManager().ListRelationshipTuples(ctx, r.user, req.Tuple, req.PageSize, req.ContinuationToken)
 	if err != nil {
 		return apiparams.ListRelationshipTuplesResponse{}, errors.E(op, err)
 	}
 	errors := []string{}
 	tuples := make([]apiparams.RelationshipTuple, len(responseTuples))
 	for i, t := range responseTuples {
-		object, err := r.jimm.ToJAASTag(ctx, t.Object, req.ResolveUUIDs)
+		object, err := r.jimm.PermissionManager().ToJAASTag(ctx, t.Object, req.ResolveUUIDs)
 		if err != nil {
 			object = t.Object.String()
 			errors = append(errors, "failed to parse object: "+err.Error())
 		}
-		target, err := r.jimm.ToJAASTag(ctx, t.Target, req.ResolveUUIDs)
+		target, err := r.jimm.PermissionManager().ToJAASTag(ctx, t.Target, req.ResolveUUIDs)
 		if err != nil {
 			target = t.Target.String()
 			errors = append(errors, "failed to parse target: "+err.Error())

@@ -250,7 +250,7 @@ func (r *controllerRoot) GetControllerAccess(ctx context.Context, args jujuparam
 			results[i].Error = mapError(errors.E(op, err, errors.CodeBadRequest))
 			continue
 		}
-		access, err := r.jimm.GetJimmControllerAccess(ctx, r.user, tag)
+		access, err := r.jimm.PermissionManager().GetJimmControllerAccess(ctx, r.user, tag)
 		if err != nil {
 			results[i].Error = mapError(errors.E(op, err))
 			continue

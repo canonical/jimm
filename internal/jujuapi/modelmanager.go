@@ -261,9 +261,9 @@ func (r *controllerRoot) ModifyModelAccess(ctx context.Context, args jujuparams.
 		}
 		switch change.Action {
 		case jujuparams.GrantModelAccess:
-			err = r.jimm.GrantModelAccess(ctx, r.user, mt, user, change.Access)
+			err = r.jimm.PermissionManager().GrantModelAccess(ctx, r.user, mt, user, change.Access)
 		case jujuparams.RevokeModelAccess:
-			err = r.jimm.RevokeModelAccess(ctx, r.user, mt, user, change.Access)
+			err = r.jimm.PermissionManager().RevokeModelAccess(ctx, r.user, mt, user, change.Access)
 		default:
 			err = errors.E(op, errors.CodeBadRequest, fmt.Sprintf("invalid action %q", change.Action))
 		}

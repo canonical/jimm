@@ -144,5 +144,5 @@ func (r *controllerRoot) GrantServiceAccountAccess(ctx context.Context, req apip
 	}
 	svcAccTag := jimmnames.NewServiceAccountTag(clientIdWithDomain)
 
-	return r.jimm.GrantServiceAccountAccess(ctx, r.user, svcAccTag, req.Entities)
+	return r.jimm.PermissionManager().GrantServiceAccountAccess(ctx, r.user, svcAccTag, req.Entities)
 }

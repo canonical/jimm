@@ -1206,52 +1206,6 @@ func TestUpdateMigratedModel(t *testing.T) {
 	}
 }
 
-const testGetControllerAccessEnv = `
-users:
-- username: alice@canonical.com
-  display-name: Alice
-  controller-access: superuser
-- username: bob@canonical.com
-  display-name: Bob
-  controller-access: login
-`
-
-func TestGetControllerAccess(t *testing.T) {
-	c := qt.New(t)
-
-	j := jimmtest.NewJIMM(c, nil)
-
-	ctx := context.Background()
-
-	env := jimmtest.ParseEnvironment(c, testGetControllerAccessEnv)
-	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
-
-	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
-	alice := openfga.NewUser(&dbUser, j.OpenFGAClient)
-	alice.JimmAdmin = true
-
-	access, err := j.GetJimmControllerAccess(ctx, alice, names.NewUserTag("alice@canonical.com"))
-	c.Assert(err, qt.IsNil)
-	c.Check(access, qt.Equals, "superuser")
-
-	access, err = j.GetJimmControllerAccess(ctx, alice, names.NewUserTag("bob@canonical.com"))
-	c.Assert(err, qt.IsNil)
-	c.Check(access, qt.Equals, "login")
-
-	access, err = j.GetJimmControllerAccess(ctx, alice, names.NewUserTag("charlie@canonical.com"))
-	c.Assert(err, qt.IsNil)
-	c.Check(access, qt.Equals, "login")
-
-	dbUser = env.User("bob@canonical.com").DBObject(c, j.Database)
-	alice = openfga.NewUser(&dbUser, j.OpenFGAClient)
-	access, err = j.GetJimmControllerAccess(ctx, alice, names.NewUserTag("bob@canonical.com"))
-	c.Assert(err, qt.IsNil)
-	c.Check(access, qt.Equals, "login")
-
-	_, err = j.GetJimmControllerAccess(ctx, alice, names.NewUserTag("alice@canonical.com"))
-	c.Assert(err, qt.ErrorMatches, "unauthorized")
-}
-
 const testInitiateMigrationEnv = `clouds:
 - name: test-cloud
   type: test

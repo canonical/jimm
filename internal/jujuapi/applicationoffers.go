@@ -175,12 +175,12 @@ func (r *controllerRoot) modifyOfferAccess(ctx context.Context, change jujuparam
 	}
 	switch change.Action {
 	case jujuparams.GrantOfferAccess:
-		if err := r.jimm.GrantOfferAccess(ctx, r.user, change.OfferURL, ut, change.Access); err != nil {
+		if err := r.jimm.PermissionManager().GrantOfferAccess(ctx, r.user, change.OfferURL, ut, change.Access); err != nil {
 			return errors.E(op, err)
 		}
 		return nil
 	case jujuparams.RevokeOfferAccess:
-		if err := r.jimm.RevokeOfferAccess(ctx, r.user, change.OfferURL, ut, change.Access); err != nil {
+		if err := r.jimm.PermissionManager().RevokeOfferAccess(ctx, r.user, change.OfferURL, ut, change.Access); err != nil {
 			return errors.E(op, err)
 		}
 		return nil

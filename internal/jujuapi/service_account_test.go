@@ -733,10 +733,15 @@ func TestGrantServiceAccountAccess(t *testing.T) {
 					return nil, nil
 				},
 			}
-			jimm := &jimmtest.JIMM{
+			permissionManager := mocks.PermissionManager{
 				GrantServiceAccountAccess_: test.grantServiceAccountAccess,
+			}
+			jimm := &jimmtest.JIMM{
 				LoginManager_: func() jimm.LoginManager {
 					return &loginManager
+				},
+				PermissionManager_: func() jimm.PermissionManager {
+					return &permissionManager
 				},
 			}
 			var u dbmodel.Identity

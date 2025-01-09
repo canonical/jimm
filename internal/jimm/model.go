@@ -23,6 +23,7 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jimm/permissions"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 )
@@ -851,12 +852,12 @@ func (j *JIMM) mergeModelInfo(ctx context.Context, user *openfga.User, modelInfo
 			// access privilege, we want to make sure the user has not
 			// already been recorded with a higher access level.
 			if _, ok := userAccess[u.Name]; !ok {
-				userAccess[u.Name] = ToModelAccessString(relation)
+				userAccess[u.Name] = permissions.ToModelAccessString(relation)
 			}
 		}
 	}
 
-	modelAccess, err := j.GetUserModelAccess(ctx, user, jimmModel.ResourceTag())
+	modelAccess, err := j.permissionManager.GetUserModelAccess(ctx, user, jimmModel.ResourceTag())
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
@@ -925,7 +926,7 @@ func (j *JIMM) ForEachUserModel(ctx context.Context, user *openfga.User, f func(
 	err := j.Database.ForEachModel(ctx, func(m *dbmodel.Model) error {
 		model := *m
 
-		access, err := j.GetUserModelAccess(ctx, user, model.ResourceTag())
+		access, err := j.permissionManager.GetUserModelAccess(ctx, user, model.ResourceTag())
 		if err != nil {
 			return errors.E(op, err)
 		}
@@ -980,169 +981,6 @@ func (j *JIMM) ForEachModel(ctx context.Context, user *openfga.User, f func(*dbm
 	default:
 		return errors.E(op, err)
 	}
-}
-
-// GrantModelAccess grants the given access level on the given model to
-// the given user. If the model is not found then an error with the code
-// CodeNotFound is returned. If the authenticated user does not have
-// admin access to the model then an error with the code CodeUnauthorized
-// is returned.
-func (j *JIMM) GrantModelAccess(ctx context.Context, user *openfga.User, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
-	const op = errors.Op("jimm.GrantModelAccess")
-	zapctx.Info(ctx, string(op))
-
-	targetRelation, err := ToModelRelation(string(access))
-	if err != nil {
-		zapctx.Debug(
-			ctx,
-			"failed to recognize given access",
-			zaputil.Error(err),
-			zap.String("access", string(access)),
-		)
-		return errors.E(op, errors.CodeBadRequest, fmt.Sprintf("failed to recognize given access: %q", access), err)
-	}
-
-	err = j.doModelAdmin(ctx, user, mt, func(_ *dbmodel.Model, _ API) error {
-		targetUser := &dbmodel.Identity{}
-		targetUser.SetTag(ut)
-		if err := j.Database.GetIdentity(ctx, targetUser); err != nil {
-			return err
-		}
-		targetOfgaUser := openfga.NewUser(targetUser, j.OpenFGAClient)
-
-		currentRelation := targetOfgaUser.GetModelAccess(ctx, mt)
-		switch targetRelation {
-		case ofganames.ReaderRelation:
-			switch currentRelation {
-			case ofganames.NoRelation:
-				break
-			default:
-				return nil
-			}
-		case ofganames.WriterRelation:
-			switch currentRelation {
-			case ofganames.NoRelation, ofganames.ReaderRelation:
-				break
-			default:
-				return nil
-			}
-		case ofganames.AdministratorRelation:
-			switch currentRelation {
-			case ofganames.NoRelation, ofganames.ReaderRelation, ofganames.WriterRelation:
-				break
-			default:
-				return nil
-			}
-		}
-
-		if err := targetOfgaUser.SetModelAccess(ctx, mt, targetRelation); err != nil {
-			return errors.E(err, op, "failed to set model access")
-		}
-		return nil
-	})
-
-	if err != nil {
-		zapctx.Error(
-			ctx,
-			"failed to grant model access",
-			zaputil.Error(err),
-			zap.String("targetUser", string(ut.Id())),
-			zap.String("model", string(mt.Id())),
-			zap.String("access", string(access)),
-		)
-		return errors.E(op, err)
-	}
-	return nil
-}
-
-// RevokeModelAccess revokes the given access level on the given model from
-// the given user. If the model is not found then an error with the code
-// CodeNotFound is returned. If the authenticated user does not have admin
-// access to the model, and is not attempting to revoke their own access,
-// then an error with the code CodeUnauthorized is returned.
-func (j *JIMM) RevokeModelAccess(ctx context.Context, user *openfga.User, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
-	const op = errors.Op("jimm.RevokeModelAccess")
-	zapctx.Info(ctx, string(op))
-
-	targetRelation, err := ToModelRelation(string(access))
-	if err != nil {
-		zapctx.Debug(
-			ctx,
-			"failed to recognize given access",
-			zaputil.Error(err),
-			zap.String("access", string(access)),
-		)
-		return errors.E(op, errors.CodeBadRequest, fmt.Sprintf("failed to recognize given access: %q", access), err)
-	}
-
-	requiredAccess := ofganames.AdministratorRelation
-	if user.Tag() == ut {
-		// If the user is attempting to revoke their own access.
-		requiredAccess = ofganames.ReaderRelation
-	}
-
-	err = j.doModel(ctx, user, mt, requiredAccess, func(_ *dbmodel.Model, _ API) error {
-		targetUser := &dbmodel.Identity{}
-		targetUser.SetTag(ut)
-		if err := j.Database.GetIdentity(ctx, targetUser); err != nil {
-			return err
-		}
-		targetOfgaUser := openfga.NewUser(targetUser, j.OpenFGAClient)
-
-		currentRelation := targetOfgaUser.GetModelAccess(ctx, mt)
-
-		var relationsToRevoke []openfga.Relation
-		switch targetRelation {
-		case ofganames.ReaderRelation:
-			switch currentRelation {
-			case ofganames.NoRelation:
-				return nil
-			default:
-				relationsToRevoke = []openfga.Relation{
-					ofganames.ReaderRelation,
-					ofganames.WriterRelation,
-					ofganames.AdministratorRelation,
-				}
-			}
-		case ofganames.WriterRelation:
-			switch currentRelation {
-			case ofganames.NoRelation, ofganames.ReaderRelation:
-				return nil
-			default:
-				relationsToRevoke = []openfga.Relation{
-					ofganames.WriterRelation,
-					ofganames.AdministratorRelation,
-				}
-			}
-		case ofganames.AdministratorRelation:
-			switch currentRelation {
-			case ofganames.NoRelation, ofganames.ReaderRelation, ofganames.WriterRelation:
-				return nil
-			default:
-				relationsToRevoke = []openfga.Relation{
-					ofganames.AdministratorRelation,
-				}
-			}
-		}
-
-		if err := targetOfgaUser.UnsetModelAccess(ctx, mt, relationsToRevoke...); err != nil {
-			return errors.E(err, op, "failed to unset model access")
-		}
-		return nil
-	})
-
-	if err != nil {
-		zapctx.Error(
-			ctx,
-			"failed to revoke model access",
-			zaputil.Error(err),
-			zap.String("targetUser", string(ut.Id())),
-			zap.String("model", string(mt.Id())),
-			zap.String("access", string(access)),
-		)
-		return errors.E(op, err)
-	}
-	return nil
 }
 
 // DestroyModel starts the process of destroying the given model. If the
@@ -1255,12 +1093,6 @@ func (j *JIMM) ValidateModelUpgrade(ctx context.Context, user *openfga.User, mt 
 // that error will be returned with the code unmasked.
 func (j *JIMM) doModelAdmin(ctx context.Context, user *openfga.User, mt names.ModelTag, f func(*dbmodel.Model, API) error) error {
 	return j.doModel(ctx, user, mt, ofganames.AdministratorRelation, f)
-}
-
-// GetUserModelAccess returns the access level a user has against a specific model.
-func (j *JIMM) GetUserModelAccess(ctx context.Context, user *openfga.User, model names.ModelTag) (string, error) {
-	accessLevel := user.GetModelAccess(ctx, model)
-	return ToModelAccessString(accessLevel), nil
 }
 
 func (j *JIMM) doModel(ctx context.Context, user *openfga.User, mt names.ModelTag, requireRelation openfga.Relation, f func(*dbmodel.Model, API) error) error {

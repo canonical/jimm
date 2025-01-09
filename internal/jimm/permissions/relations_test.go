@@ -1,10 +1,9 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
-package jimm_test
+package permissions_test
 
 import (
 	"context"
-	"testing"
 
 	qt "github.com/frankban/quicktest"
 
@@ -16,19 +15,16 @@ import (
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
-func TestListRelationshipTuples(t *testing.T) {
-	// setup
-	c := qt.New(t)
+func (s *permissionManagerSuite) TestListRelationshipTuples(c *qt.C) {
+	c.Parallel()
 	ctx := context.Background()
 
-	j := jimmtest.NewJIMM(c, nil)
-
-	u := openfga.NewUser(&dbmodel.Identity{Name: "admin@canonical.com"}, j.OpenFGAClient)
+	u := openfga.NewUser(&dbmodel.Identity{Name: "admin@canonical.com"}, s.ofgaClient)
 	u.JimmAdmin = true
 
-	user, _, controller, model, _, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, j.Database)
+	user, _, controller, model, _, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
 
-	err := j.AddRelation(ctx, u, []apiparams.RelationshipTuple{
+	err := s.manager.AddRelation(ctx, u, []apiparams.RelationshipTuple{
 		{
 			Object:       user.Tag().String(),
 			Relation:     names.ReaderRelation.String(),
@@ -46,6 +42,7 @@ func TestListRelationshipTuples(t *testing.T) {
 		},
 	})
 	c.Assert(err, qt.IsNil)
+
 	type ExpectedTuple struct {
 		expectedRelation string
 		expectedTargetId string
@@ -66,7 +63,7 @@ func TestListRelationshipTuples(t *testing.T) {
 			relation:       "",
 			targetObject:   "",
 			expectedError:  nil,
-			expectedLength: 3,
+			expectedLength: 4,
 		},
 		{
 			description:    "test listing a specific relation",
@@ -137,7 +134,7 @@ func TestListRelationshipTuples(t *testing.T) {
 
 	for _, t := range testCases {
 		c.Run(t.description, func(c *qt.C) {
-			tuples, _, err := j.ListRelationshipTuples(ctx, u, apiparams.RelationshipTuple{
+			tuples, _, err := s.manager.ListRelationshipTuples(ctx, s.adminUser, apiparams.RelationshipTuple{
 				Object:       t.object,
 				Relation:     t.relation,
 				TargetObject: t.targetObject,
@@ -152,18 +149,16 @@ func TestListRelationshipTuples(t *testing.T) {
 	}
 }
 
-func TestListObjectRelations(t *testing.T) {
-	c := qt.New(t)
+func (s *permissionManagerSuite) TestListObjectRelations(c *qt.C) {
+	c.Parallel()
 	ctx := context.Background()
 
-	j := jimmtest.NewJIMM(c, nil)
-
-	u := openfga.NewUser(&dbmodel.Identity{Name: "admin@canonical.com"}, j.OpenFGAClient)
+	u := openfga.NewUser(&dbmodel.Identity{Name: "admin@canonical.com"}, s.ofgaClient)
 	u.JimmAdmin = true
 
-	user, group, controller, model, _, cloud, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, j.Database)
+	user, group, controller, model, _, cloud, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
 
-	err := j.AddRelation(ctx, u, []apiparams.RelationshipTuple{
+	err := s.manager.AddRelation(ctx, u, []apiparams.RelationshipTuple{
 		{
 			Object:       user.Tag().String(),
 			Relation:     names.ReaderRelation.String(),
@@ -250,7 +245,7 @@ func TestListObjectRelations(t *testing.T) {
 			tuples := []openfga.Tuple{}
 			numPages := 0
 			for {
-				res, nextToken, err := j.ListObjectRelations(ctx, u, t.object, t.pageSize, token)
+				res, nextToken, err := s.manager.ListObjectRelations(ctx, s.adminUser, t.object, t.pageSize, token)
 				if t.expectedError != "" {
 					c.Assert(err, qt.ErrorMatches, t.expectedError)
 					break

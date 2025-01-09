@@ -254,7 +254,7 @@ func (s *Service) OpenFGACleanup(ctx context.Context, trigger <-chan time.Time) 
 	for {
 		select {
 		case <-trigger:
-			err := s.jimm.OpenFGACleanup(ctx)
+			err := s.jimm.PermissionManager().OpenFGACleanup(ctx)
 			if err != nil {
 				zapctx.Error(ctx, "openfga cleanup", zap.Error(err))
 				continue

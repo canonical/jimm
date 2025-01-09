@@ -22,6 +22,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jimm/permissions"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 )
@@ -279,7 +280,7 @@ func (j *JIMM) listApplicationOfferUsers(ctx context.Context, offer names.Applic
 			if users[user.Name] != "" {
 				continue
 			}
-			users[user.Name] = ToOfferAccessString(relation)
+			users[user.Name] = permissions.ToOfferAccessString(relation)
 		}
 	}
 
@@ -388,122 +389,6 @@ func (j *JIMM) GetApplicationOffer(ctx context.Context, user *openfga.User, offe
 	}
 
 	return &offerDetails, nil
-}
-
-// GrantOfferAccess grants rights for an application offer.
-func (j *JIMM) GrantOfferAccess(ctx context.Context, user *openfga.User, offerURL string, ut names.UserTag, access jujuparams.OfferAccessPermission) error {
-	const op = errors.Op("jimm.GrantOfferAccess")
-
-	identity, err := dbmodel.NewIdentity(ut.Id())
-	if err != nil {
-		return errors.E(op, err)
-	}
-
-	err = j.doApplicationOfferAdmin(ctx, user, offerURL, func(offer *dbmodel.ApplicationOffer, api API) error {
-		tUser := openfga.NewUser(identity, j.OpenFGAClient)
-		currentRelation := tUser.GetApplicationOfferAccess(ctx, offer.ResourceTag())
-		currentAccessLevel := ToOfferAccessString(currentRelation)
-		targetAccessLevel := determineAccessLevelAfterGrant(currentAccessLevel, string(access))
-
-		// NOTE (alesstimec) not removing the current access level as it might be an
-		// indirect relation.
-		if targetAccessLevel != currentAccessLevel {
-			relation, err := ToOfferRelation(targetAccessLevel)
-			if err != nil {
-				return errors.E(op, err)
-			}
-			err = tUser.SetApplicationOfferAccess(ctx, offer.ResourceTag(), relation)
-			if err != nil {
-				return errors.E(op, err)
-			}
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		return errors.E(op, err)
-	}
-	return nil
-}
-
-func determineAccessLevelAfterGrant(currentAccessLevel, grantAccessLevel string) string {
-	switch currentAccessLevel {
-	case string(jujuparams.OfferAdminAccess):
-		return string(jujuparams.OfferAdminAccess)
-	case string(jujuparams.OfferConsumeAccess):
-		switch grantAccessLevel {
-		case string(jujuparams.OfferAdminAccess):
-			return string(jujuparams.OfferAdminAccess)
-		default:
-			return string(jujuparams.OfferConsumeAccess)
-		}
-	case string(jujuparams.OfferReadAccess):
-		switch grantAccessLevel {
-		case string(jujuparams.OfferAdminAccess):
-			return string(jujuparams.OfferAdminAccess)
-		case string(jujuparams.OfferConsumeAccess):
-			return string(jujuparams.OfferConsumeAccess)
-		default:
-			return string(jujuparams.OfferReadAccess)
-		}
-	default:
-		return grantAccessLevel
-	}
-}
-
-// RevokeOfferAccess revokes rights for an application offer.
-func (j *JIMM) RevokeOfferAccess(ctx context.Context, user *openfga.User, offerURL string, ut names.UserTag, access jujuparams.OfferAccessPermission) (err error) {
-	const op = errors.Op("jimm.RevokeOfferAccess")
-
-	identity, err := dbmodel.NewIdentity(ut.Id())
-	if err != nil {
-		return errors.E(op, err)
-	}
-
-	err = j.doApplicationOfferAdmin(ctx, user, offerURL, func(offer *dbmodel.ApplicationOffer, api API) error {
-		tUser := openfga.NewUser(identity, j.OpenFGAClient)
-		targetRelation, err := ToOfferRelation(string(access))
-		if err != nil {
-			return errors.E(op, err)
-		}
-		err = tUser.UnsetApplicationOfferAccess(ctx, offer.ResourceTag(), targetRelation)
-		if err != nil {
-			return errors.E(op, err, "failed to unset given access")
-		}
-
-		// Checking if the target user still has the given access to the
-		// application offer (which is possible because of indirect relations),
-		// and if so, returning an informative error.
-		currentRelation := tUser.GetApplicationOfferAccess(ctx, offer.ResourceTag())
-		stillHasAccess := false
-		switch targetRelation {
-		case ofganames.AdministratorRelation:
-			if currentRelation == ofganames.AdministratorRelation {
-				stillHasAccess = true
-			}
-		case ofganames.ConsumerRelation:
-			switch currentRelation {
-			case ofganames.AdministratorRelation, ofganames.ConsumerRelation:
-				stillHasAccess = true
-			}
-		case ofganames.ReaderRelation:
-			switch currentRelation {
-			case ofganames.AdministratorRelation, ofganames.ConsumerRelation, ofganames.ReaderRelation:
-				stillHasAccess = true
-			}
-		}
-
-		if stillHasAccess {
-			return errors.E(op, "unable to completely revoke given access due to other relations; try to remove them as well, or use 'jimmctl' for more control")
-		}
-		return nil
-	})
-
-	if err != nil {
-		return errors.E(op, err)
-	}
-	return nil
 }
 
 // DestroyOffer removes the application offer.

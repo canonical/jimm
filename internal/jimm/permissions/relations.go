@@ -1,6 +1,6 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
-package jimm
+package permissions
 
 import (
 	"context"
@@ -18,7 +18,7 @@ import (
 
 // AddRelation checks user permission and add given relations tuples.
 // At the moment user is required be admin.
-func (j *JIMM) AddRelation(ctx context.Context, user *openfga.User, tuples []apiparams.RelationshipTuple) error {
+func (j *permissionManager) AddRelation(ctx context.Context, user *openfga.User, tuples []apiparams.RelationshipTuple) error {
 	const op = errors.Op("jimm.AddRelation")
 	if !user.JimmAdmin {
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
@@ -27,7 +27,7 @@ func (j *JIMM) AddRelation(ctx context.Context, user *openfga.User, tuples []api
 	if err != nil {
 		return errors.E(err)
 	}
-	err = j.OpenFGAClient.AddRelation(ctx, parsedTuples...)
+	err = j.authSvc.AddRelation(ctx, parsedTuples...)
 	if err != nil {
 		return errors.E(op, errors.CodeOpenFGARequestFailed, err)
 	}
@@ -36,7 +36,7 @@ func (j *JIMM) AddRelation(ctx context.Context, user *openfga.User, tuples []api
 
 // RemoveRelation checks user permission and remove given relations tuples.
 // At the moment user is required be admin.
-func (j *JIMM) RemoveRelation(ctx context.Context, user *openfga.User, tuples []apiparams.RelationshipTuple) error {
+func (j *permissionManager) RemoveRelation(ctx context.Context, user *openfga.User, tuples []apiparams.RelationshipTuple) error {
 	const op = errors.Op("jimm.RemoveRelation")
 	if !user.JimmAdmin {
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
@@ -45,7 +45,7 @@ func (j *JIMM) RemoveRelation(ctx context.Context, user *openfga.User, tuples []
 	if err != nil {
 		return errors.E(op, err)
 	}
-	err = j.OpenFGAClient.RemoveRelation(ctx, parsedTuples...)
+	err = j.authSvc.RemoveRelation(ctx, parsedTuples...)
 	if err != nil {
 		return errors.E(op, errors.CodeOpenFGARequestFailed, err)
 	}
@@ -54,7 +54,7 @@ func (j *JIMM) RemoveRelation(ctx context.Context, user *openfga.User, tuples []
 
 // CheckRelation checks user permission and return true if the given tuple exists.
 // At the moment user is required be admin or checking its own relations
-func (j *JIMM) CheckRelation(ctx context.Context, user *openfga.User, tuple apiparams.RelationshipTuple, trace bool) (_ bool, err error) {
+func (j *permissionManager) CheckRelation(ctx context.Context, user *openfga.User, tuple apiparams.RelationshipTuple, trace bool) (_ bool, err error) {
 	const op = errors.Op("jimm.CheckRelation")
 	allowed := false
 	parsedTuple, err := j.parseTuple(ctx, tuple)
@@ -67,7 +67,7 @@ func (j *JIMM) CheckRelation(ctx context.Context, user *openfga.User, tuple apip
 		return allowed, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
-	allowed, err = j.OpenFGAClient.CheckRelation(ctx, *parsedTuple, trace)
+	allowed, err = j.authSvc.CheckRelation(ctx, *parsedTuple, trace)
 	if err != nil {
 		return allowed, errors.E(op, errors.CodeOpenFGARequestFailed, err)
 	}
@@ -76,7 +76,7 @@ func (j *JIMM) CheckRelation(ctx context.Context, user *openfga.User, tuple apip
 
 // ListRelationshipTuples checks user permission and lists relationship tuples based of tuple struct with pagination.
 // Listing filters can be relaxed: optionally exclude tuple.Relation or tuple.Object or specify only tuple.TargetObject.Kind.
-func (j *JIMM) ListRelationshipTuples(ctx context.Context, user *openfga.User, tuple apiparams.RelationshipTuple, pageSize int32, continuationToken string) ([]openfga.Tuple, string, error) {
+func (j *permissionManager) ListRelationshipTuples(ctx context.Context, user *openfga.User, tuple apiparams.RelationshipTuple, pageSize int32, continuationToken string) ([]openfga.Tuple, string, error) {
 	const op = errors.Op("jimm.ListRelationshipTuples")
 	if !user.JimmAdmin {
 		return nil, "", errors.E(op, errors.CodeUnauthorized, "unauthorized")
@@ -93,7 +93,7 @@ func (j *JIMM) ListRelationshipTuples(ctx context.Context, user *openfga.User, t
 		return nil, "", errors.E(op, errors.CodeBadRequest, "it is invalid to pass an object without a target object.")
 	}
 
-	responseTuples, ct, err := j.OpenFGAClient.ReadRelatedObjects(ctx, *parsedTuple, pageSize, continuationToken)
+	responseTuples, ct, err := j.authSvc.ReadRelatedObjects(ctx, *parsedTuple, pageSize, continuationToken)
 	if err != nil {
 		return nil, "", errors.E(op, err)
 	}
@@ -104,7 +104,7 @@ func (j *JIMM) ListRelationshipTuples(ctx context.Context, user *openfga.User, t
 // Useful for listing all the resources that a group or user have access to.
 //
 // This functions provides a slightly higher-level abstraction in favor of ListRelationshipTuples.
-func (j *JIMM) ListObjectRelations(ctx context.Context, user *openfga.User, object string, pageSize int32, entitlementToken pagination.EntitlementToken) ([]openfga.Tuple, pagination.EntitlementToken, error) {
+func (j *permissionManager) ListObjectRelations(ctx context.Context, user *openfga.User, object string, pageSize int32, entitlementToken pagination.EntitlementToken) ([]openfga.Tuple, pagination.EntitlementToken, error) {
 	const op = errors.Op("jimm.ListObjectRelations")
 	var e pagination.EntitlementToken
 	if !user.JimmAdmin {
@@ -127,7 +127,7 @@ func (j *JIMM) ListObjectRelations(ctx context.Context, user *openfga.User, obje
 	return responseTuples, nextToken, nil
 }
 
-func (j *JIMM) getObjectRelationsPage(ctx context.Context, object string, pageSize int32, entitlementToken pagination.EntitlementToken) ([]openfga.Tuple, pagination.EntitlementToken, error) {
+func (j *permissionManager) getObjectRelationsPage(ctx context.Context, object string, pageSize int32, entitlementToken pagination.EntitlementToken) ([]openfga.Tuple, pagination.EntitlementToken, error) {
 	var err error
 	var e pagination.EntitlementToken
 	tuple := &openfga.Tuple{}
@@ -147,7 +147,7 @@ func (j *JIMM) getObjectRelationsPage(ctx context.Context, object string, pageSi
 		if err != nil {
 			return nil, e, err
 		}
-		t, nextContinuationToken, err := j.OpenFGAClient.ReadRelatedObjects(ctx, *tuple, pageSize, nextContinuationToken)
+		t, nextContinuationToken, err := j.authSvc.ReadRelatedObjects(ctx, *tuple, pageSize, nextContinuationToken)
 		if err != nil {
 			return nil, e, err
 		}
@@ -168,7 +168,7 @@ func (j *JIMM) getObjectRelationsPage(ctx context.Context, object string, pageSi
 
 // parseTuples translate the api request struct containing tuples to a slice of openfga tuple keys.
 // This method utilises the parseTuple method which does all the heavy lifting.
-func (j *JIMM) parseTuples(ctx context.Context, tuples []apiparams.RelationshipTuple) ([]openfga.Tuple, error) {
+func (j *permissionManager) parseTuples(ctx context.Context, tuples []apiparams.RelationshipTuple) ([]openfga.Tuple, error) {
 	keys := make([]openfga.Tuple, 0, len(tuples))
 	for _, tuple := range tuples {
 		key, err := j.parseTuple(ctx, tuple)
@@ -183,7 +183,7 @@ func (j *JIMM) parseTuples(ctx context.Context, tuples []apiparams.RelationshipT
 // parseTuple takes the initial tuple from a relational request and ensures that
 // whatever format, be it JAAS or Juju tag, is resolved to the correct identifier
 // to be persisted within OpenFGA.
-func (j *JIMM) parseTuple(ctx context.Context, tuple apiparams.RelationshipTuple) (*openfga.Tuple, error) {
+func (j *permissionManager) parseTuple(ctx context.Context, tuple apiparams.RelationshipTuple) (*openfga.Tuple, error) {
 	const op = errors.Op("jujuapi.parseTuple")
 
 	relation, err := ofganames.ParseRelation(tuple.Relation)

@@ -1,6 +1,6 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
-package jimm
+package permissions
 
 import (
 	"context"
@@ -11,7 +11,6 @@ import (
 
 	"github.com/canonical/ofga"
 	"github.com/google/uuid"
-	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
@@ -19,9 +18,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
-	"github.com/canonical/jimm/v3/internal/servermon"
 	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
 
@@ -50,183 +47,9 @@ var (
 	modelOwnerAndNameMatcher = regexp.MustCompile(`(.+)/(.+)`)
 )
 
-// ToOfferAccessString maps relation to an application offer access string.
-func ToOfferAccessString(relation openfga.Relation) string {
-	switch relation {
-	case ofganames.AdministratorRelation:
-		return string(jujuparams.OfferAdminAccess)
-	case ofganames.ConsumerRelation:
-		return string(jujuparams.OfferConsumeAccess)
-	case ofganames.ReaderRelation:
-		return string(jujuparams.OfferReadAccess)
-	default:
-		return ""
-	}
-}
-
-// ToCloudAccessString maps relation to a cloud access string.
-func ToCloudAccessString(relation openfga.Relation) string {
-	switch relation {
-	case ofganames.AdministratorRelation:
-		return "admin"
-	case ofganames.CanAddModelRelation:
-		return "add-model"
-	default:
-		return ""
-	}
-}
-
-// ToModelAccessString maps relation to a model access string.
-func ToModelAccessString(relation openfga.Relation) string {
-	switch relation {
-	case ofganames.AdministratorRelation:
-		return "admin"
-	case ofganames.WriterRelation:
-		return "write"
-	case ofganames.ReaderRelation:
-		return "read"
-	default:
-		return ""
-	}
-}
-
-// ToModelAccessString maps relation to a controller access string.
-func ToControllerAccessString(relation openfga.Relation) string {
-	switch relation {
-	case ofganames.AdministratorRelation:
-		return "superuser"
-	default:
-		return "login"
-	}
-}
-
-// ToCloudRelation returns a valid relation for the cloud. Access level
-// string can be either "admin", in which case the administrator relation
-// is returned, or "add-model", in which case the can_addmodel relation is
-// returned.
-func ToCloudRelation(accessLevel string) (openfga.Relation, error) {
-	switch accessLevel {
-	case "admin":
-		return ofganames.AdministratorRelation, nil
-	case "add-model":
-		return ofganames.CanAddModelRelation, nil
-	default:
-		return ofganames.NoRelation, errors.E("unknown cloud access")
-	}
-}
-
-// ToModelRelation returns a valid relation for the model.
-func ToModelRelation(accessLevel string) (openfga.Relation, error) {
-	switch accessLevel {
-	case "admin":
-		return ofganames.AdministratorRelation, nil
-	case "write":
-		return ofganames.WriterRelation, nil
-	case "read":
-		return ofganames.ReaderRelation, nil
-	default:
-		return ofganames.NoRelation, errors.E("unknown model access")
-	}
-}
-
-// ToOfferRelation returns a valid relation for the application offer.
-func ToOfferRelation(accessLevel string) (openfga.Relation, error) {
-	switch accessLevel {
-	case "":
-		return ofganames.NoRelation, nil
-	case string(jujuparams.OfferAdminAccess):
-		return ofganames.AdministratorRelation, nil
-	case string(jujuparams.OfferConsumeAccess):
-		return ofganames.ConsumerRelation, nil
-	case string(jujuparams.OfferReadAccess):
-		return ofganames.ReaderRelation, nil
-	default:
-		return ofganames.NoRelation, errors.E("unknown application offer access")
-	}
-}
-
-// CheckPermission loops over the desired permissions in desiredPerms and adds these permissions
-// to cachedPerms if they exist. If the user does not have any of the desired permissions then an
-// error is returned.
-// Note that cachedPerms map is modified and returned.
-func (j *JIMM) CheckPermission(ctx context.Context, user *openfga.User, cachedPerms map[string]string, desiredPerms map[string]interface{}) (map[string]string, error) {
-	const op = errors.Op("jimm.CheckPermission")
-	for key, val := range desiredPerms {
-		if _, ok := cachedPerms[key]; !ok {
-			stringVal, ok := val.(string)
-			if !ok {
-				return nil, errors.E(op, fmt.Sprintf("failed to get permission assertion: expected %T, got %T", stringVal, val))
-			}
-			tag, err := names.ParseTag(key)
-			if err != nil {
-				return cachedPerms, errors.E(op, fmt.Sprintf("failed to parse tag %s", key))
-			}
-			relation, err := ofganames.ConvertJujuRelation(stringVal)
-			if err != nil {
-				return cachedPerms, errors.E(op, fmt.Sprintf("failed to parse relation %s", stringVal), err)
-			}
-			check, err := openfga.CheckRelation(ctx, user, tag, relation)
-			if err != nil {
-				return cachedPerms, errors.E(op, err)
-			}
-			if !check {
-				return cachedPerms, errors.E(op, fmt.Sprintf("Missing permission for %s:%s", key, val))
-			}
-			cachedPerms[key] = stringVal
-		}
-	}
-	return cachedPerms, nil
-}
-
-// GrantAuditLogAccess grants audit log access for the target user.
-func (j *JIMM) GrantAuditLogAccess(ctx context.Context, user *openfga.User, targetUserTag names.UserTag) error {
-	const op = errors.Op("jimm.GrantAuditLogAccess")
-
-	access := user.GetControllerAccess(ctx, j.ResourceTag())
-	if access != ofganames.AdministratorRelation {
-		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
-	}
-
-	targetUser := &dbmodel.Identity{}
-	targetUser.SetTag(targetUserTag)
-	err := j.Database.GetIdentity(ctx, targetUser)
-	if err != nil {
-		return errors.E(op, err)
-	}
-
-	err = openfga.NewUser(targetUser, j.OpenFGAClient).SetControllerAccess(ctx, j.ResourceTag(), ofganames.AuditLogViewerRelation)
-	if err != nil {
-		return errors.E(op, err)
-	}
-	return nil
-}
-
-// RevokeAuditLogAccess revokes audit log access for the target user.
-func (j *JIMM) RevokeAuditLogAccess(ctx context.Context, user *openfga.User, targetUserTag names.UserTag) error {
-	const op = errors.Op("jimm.RevokeAuditLogAccess")
-
-	access := user.GetControllerAccess(ctx, j.ResourceTag())
-	if access != ofganames.AdministratorRelation {
-		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
-	}
-
-	targetUser := &dbmodel.Identity{}
-	targetUser.SetTag(targetUserTag)
-	err := j.Database.GetIdentity(ctx, targetUser)
-	if err != nil {
-		return errors.E(op, err)
-	}
-
-	err = openfga.NewUser(targetUser, j.OpenFGAClient).UnsetAuditLogViewerAccess(ctx, j.ResourceTag())
-	if err != nil {
-		return errors.E(op, err)
-	}
-	return nil
-}
-
 // ToJAASTag converts a tag used in OpenFGA authorization model to a
 // tag used in JAAS.
-func (j *JIMM) ToJAASTag(ctx context.Context, tag *ofganames.Tag, resolveUUIDs bool) (string, error) {
+func (j *permissionManager) ToJAASTag(ctx context.Context, tag *ofganames.Tag, resolveUUIDs bool) (string, error) {
 	if !resolveUUIDs {
 		res := tag.Kind.String() + "-" + tag.ID
 		if tag.Relation.String() != "" {
@@ -249,13 +72,13 @@ func (j *JIMM) ToJAASTag(ctx context.Context, tag *ofganames.Tag, resolveUUIDs b
 	case jimmnames.ServiceAccountTagKind:
 		return jimmnames.ServiceAccountTagKind + "-" + tag.ID, nil
 	case names.ControllerTagKind:
-		if tag.ID == j.ResourceTag().Id() {
+		if tag.ID == j.jimmTag.Id() {
 			return "controller-jimm", nil
 		}
 		controller := dbmodel.Controller{
 			UUID: tag.ID,
 		}
-		err := j.Database.GetController(ctx, &controller)
+		err := j.store.GetController(ctx, &controller)
 		if err != nil {
 			return "", errors.E(err, fmt.Sprintf("failed to fetch controller information: %s", controller.UUID))
 		}
@@ -267,7 +90,7 @@ func (j *JIMM) ToJAASTag(ctx context.Context, tag *ofganames.Tag, resolveUUIDs b
 				Valid:  true,
 			},
 		}
-		err := j.Database.GetModel(ctx, &model)
+		err := j.store.GetModel(ctx, &model)
 		if err != nil {
 			return "", errors.E(err, fmt.Sprintf("failed to fetch model information: %s", model.UUID.String))
 		}
@@ -277,7 +100,7 @@ func (j *JIMM) ToJAASTag(ctx context.Context, tag *ofganames.Tag, resolveUUIDs b
 		ao := dbmodel.ApplicationOffer{
 			UUID: tag.ID,
 		}
-		err := j.Database.GetApplicationOffer(ctx, &ao)
+		err := j.store.GetApplicationOffer(ctx, &ao)
 		if err != nil {
 			return "", errors.E(err, fmt.Sprintf("failed to fetch application offer information: %s", ao.UUID))
 		}
@@ -286,7 +109,7 @@ func (j *JIMM) ToJAASTag(ctx context.Context, tag *ofganames.Tag, resolveUUIDs b
 		group := dbmodel.GroupEntry{
 			UUID: tag.ID,
 		}
-		err := j.Database.GetGroup(ctx, &group)
+		err := j.store.GetGroup(ctx, &group)
 		if err != nil {
 			return "", errors.E(err, fmt.Sprintf("failed to fetch group information: %s", group.UUID))
 		}
@@ -295,7 +118,7 @@ func (j *JIMM) ToJAASTag(ctx context.Context, tag *ofganames.Tag, resolveUUIDs b
 		role := dbmodel.RoleEntry{
 			UUID: tag.ID,
 		}
-		err := j.Database.GetRole(ctx, &role)
+		err := j.store.GetRole(ctx, &role)
 		if err != nil {
 			return "", errors.E(err, fmt.Sprintf("failed to fetch role information: %s", role.UUID))
 		}
@@ -304,7 +127,7 @@ func (j *JIMM) ToJAASTag(ctx context.Context, tag *ofganames.Tag, resolveUUIDs b
 		cloud := dbmodel.Cloud{
 			Name: tag.ID,
 		}
-		err := j.Database.GetCloud(ctx, &cloud)
+		err := j.store.GetCloud(ctx, &cloud)
 		if err != nil {
 			return "", errors.E(err, fmt.Sprintf("failed to fetch cloud information: %s", cloud.Name))
 		}
@@ -382,25 +205,6 @@ func (t *tagResolver) groupTag(ctx context.Context, db *db.Database) (*ofga.Enti
 	return ofganames.ConvertTagWithRelation(entry.ResourceTag(), t.relation), nil
 }
 
-func (t *tagResolver) roleTag(ctx context.Context, db *db.Database) (*ofga.Entity, error) {
-	zapctx.Debug(
-		ctx,
-		"Resolving JIMM tags to Juju tags for tag kind: role",
-		zap.String("role-name", t.trailer),
-	)
-	if t.resourceUUID != "" {
-		return ofganames.ConvertTagWithRelation(jimmnames.NewRoleTag(t.resourceUUID), t.relation), nil
-	}
-	entry := dbmodel.RoleEntry{Name: t.trailer}
-
-	err := db.GetRole(ctx, &entry)
-	if err != nil {
-		return nil, errors.E(fmt.Sprintf("role %s not found", t.trailer))
-	}
-
-	return ofganames.ConvertTagWithRelation(entry.ResourceTag(), t.relation), nil
-}
-
 func (t *tagResolver) controllerTag(ctx context.Context, jimmUUID string, db *db.Database) (*ofga.Entity, error) {
 	zapctx.Debug(
 		ctx,
@@ -420,6 +224,25 @@ func (t *tagResolver) controllerTag(ctx context.Context, jimmUUID string, db *db
 		return nil, errors.E("controller not found")
 	}
 	return ofganames.ConvertTagWithRelation(controller.ResourceTag(), t.relation), nil
+}
+
+func (t *tagResolver) roleTag(ctx context.Context, db *db.Database) (*ofga.Entity, error) {
+	zapctx.Debug(
+		ctx,
+		"Resolving JIMM tags to Juju tags for tag kind: role",
+		zap.String("role-name", t.trailer),
+	)
+	if t.resourceUUID != "" {
+		return ofganames.ConvertTagWithRelation(jimmnames.NewRoleTag(t.resourceUUID), t.relation), nil
+	}
+	entry := dbmodel.RoleEntry{Name: t.trailer}
+
+	err := db.GetRole(ctx, &entry)
+	if err != nil {
+		return nil, errors.E(fmt.Sprintf("role %s not found", t.trailer))
+	}
+
+	return ofganames.ConvertTagWithRelation(entry.ResourceTag(), t.relation), nil
 }
 
 func (t *tagResolver) modelTag(ctx context.Context, db *db.Database) (*ofga.Entity, error) {
@@ -538,7 +361,7 @@ func resolveTag(jimmUUID string, db *db.Database, tag string) (*ofganames.Tag, e
 // ensuring the resource exists for said tag.
 //
 // This key may be in the form of either a JIMM tag string or Juju tag string.
-func (j *JIMM) parseAndValidateTag(ctx context.Context, key string) (*ofganames.Tag, error) {
+func (j *permissionManager) parseAndValidateTag(ctx context.Context, key string) (*ofganames.Tag, error) {
 	op := errors.Op("jimm.parseAndValidateTag")
 	tupleKeySplit := strings.SplitN(key, "-", 2)
 	if len(tupleKeySplit) == 1 {
@@ -549,7 +372,7 @@ func (j *JIMM) parseAndValidateTag(ctx context.Context, key string) (*ofganames.
 		return tag, nil
 	}
 	tagString := key
-	tag, err := resolveTag(j.UUID, j.Database, tagString)
+	tag, err := resolveTag(j.jimmUUID, j.store, tagString)
 	if err != nil {
 		zapctx.Debug(ctx, "failed to resolve tuple object", zap.Error(err))
 		return nil, errors.E(op, errors.CodeFailedToResolveTupleResource, err)
@@ -557,66 +380,4 @@ func (j *JIMM) parseAndValidateTag(ctx context.Context, key string) (*ofganames.
 	zapctx.Debug(ctx, "resolved JIMM tag", zap.String("tag", tag.String()))
 
 	return tag, nil
-}
-
-// OpenFGACleanup queries OpenFGA for all existing tuples, tries to resolve each tuple and removes those
-// that JIMM cannot resolved - orphaned tuples. JIMM not being able to resolve a tuple means that the
-// corresponding entity has been removed from JIMM's database.
-//
-// This approach to cleaning up tuples is intended to be temporary while we implement
-// a better approach to eventual consistency of JIMM's database objects and OpenFGA tuples.
-func (j *JIMM) OpenFGACleanup(ctx context.Context) (err error) {
-	const op = errors.Op("jimm.CleanupDyingModels")
-	zapctx.Info(ctx, string(op))
-	durationObserver := servermon.DurationObserver(servermon.JimmMethodsDurationHistogram, string(op))
-	defer durationObserver()
-	var (
-		continuationToken string
-		tuples            []ofga.Tuple
-	)
-	for {
-		tuples, continuationToken, err = j.OpenFGAClient.ReadRelatedObjects(ctx, openfga.Tuple{}, 20, continuationToken)
-		if err != nil {
-			zapctx.Error(ctx, "reading all tuples", zap.Error(err))
-			return err
-		}
-
-		orphanedTuples := j.orphanedTuples(ctx, tuples...)
-		if len(orphanedTuples) > 0 {
-			zapctx.Debug(ctx, "removing orphaned tuples", zap.Any("tuples", orphanedTuples))
-			err = j.OpenFGAClient.RemoveRelation(ctx, orphanedTuples...)
-			if err != nil {
-				zapctx.Warn(ctx, "failed to clean up orphaned tuples", zap.Error(err))
-			}
-		}
-		if continuationToken == "" {
-			return nil
-		}
-		select {
-		case <-ctx.Done():
-			return nil
-		default:
-		}
-	}
-}
-
-func (j *JIMM) orphanedTuples(ctx context.Context, tuples ...openfga.Tuple) []openfga.Tuple {
-	orphanedTuples := []openfga.Tuple{}
-	for _, tuple := range tuples {
-		_, err := j.ToJAASTag(ctx, tuple.Object, true)
-		if err != nil {
-			if errors.ErrorCode(err) == errors.CodeNotFound {
-				orphanedTuples = append(orphanedTuples, tuple)
-				continue
-			}
-		}
-		_, err = j.ToJAASTag(ctx, tuple.Target, true)
-		if err != nil {
-			if errors.ErrorCode(err) == errors.CodeNotFound {
-				orphanedTuples = append(orphanedTuples, tuple)
-				continue
-			}
-		}
-	}
-	return orphanedTuples
 }

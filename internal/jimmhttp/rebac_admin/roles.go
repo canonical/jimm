@@ -154,7 +154,7 @@ func (s *rolesService) GetRoleEntitlements(ctx context.Context, roleId string, p
 	role := ofganames.WithAssigneeRelation(jimmnames.NewRoleTag(roleId))
 	entitlementToken := pagination.NewEntitlementToken(filter.Token())
 	// nolint:gosec accept integer conversion
-	tuples, nextEntitlmentToken, err := s.jimm.ListObjectRelations(ctx, user, role, int32(filter.Limit()), entitlementToken) // #nosec G115 accept integer conversion
+	tuples, nextEntitlmentToken, err := s.jimm.PermissionManager().ListObjectRelations(ctx, user, role, int32(filter.Limit()), entitlementToken) // #nosec G115 accept integer conversion
 	if err != nil {
 		return nil, err
 	}
@@ -215,13 +215,13 @@ func (s *rolesService) PatchRoleEntitlements(ctx context.Context, roleId string,
 		return false, err
 	}
 	if toAdd != nil {
-		err := s.jimm.AddRelation(ctx, user, toAdd)
+		err := s.jimm.PermissionManager().AddRelation(ctx, user, toAdd)
 		if err != nil {
 			return false, err
 		}
 	}
 	if toRemove != nil {
-		err := s.jimm.RemoveRelation(ctx, user, toRemove)
+		err := s.jimm.PermissionManager().RemoveRelation(ctx, user, toRemove)
 		if err != nil {
 			return false, err
 		}

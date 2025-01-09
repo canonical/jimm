@@ -173,14 +173,17 @@ func TestGetGroupIdentities(t *testing.T) {
 			return nil, getGroupErr
 		},
 	}
+	permissionManager := mocks.PermissionManager{
+		ListRelationshipTuples_: func(ctx context.Context, user *openfga.User, tuple params.RelationshipTuple, pageSize int32, ct string) ([]openfga.Tuple, string, error) {
+			return []openfga.Tuple{testTuple}, continuationToken, listTuplesErr
+		},
+	}
 	jimm := jimmtest.JIMM{
 		GroupManager_: func() jimm.GroupManager {
 			return &groupManager
 		},
-		RelationService: mocks.RelationService{
-			ListRelationshipTuples_: func(ctx context.Context, user *openfga.User, tuple params.RelationshipTuple, pageSize int32, ct string) ([]openfga.Tuple, string, error) {
-				return []openfga.Tuple{testTuple}, continuationToken, listTuplesErr
-			},
+		PermissionManager_: func() jimm.PermissionManager {
+			return &permissionManager
 		},
 	}
 	user := openfga.User{}
@@ -218,14 +221,17 @@ func TestGetGroupIdentities(t *testing.T) {
 func TestPatchGroupIdentities(t *testing.T) {
 	c := qt.New(t)
 	var patchTuplesErr error
+	permissionManager := mocks.PermissionManager{
+		AddRelation_: func(ctx context.Context, user *openfga.User, tuples []params.RelationshipTuple) error {
+			return patchTuplesErr
+		},
+		RemoveRelation_: func(ctx context.Context, user *openfga.User, tuples []params.RelationshipTuple) error {
+			return patchTuplesErr
+		},
+	}
 	jimm := jimmtest.JIMM{
-		RelationService: mocks.RelationService{
-			AddRelation_: func(ctx context.Context, user *openfga.User, tuples []params.RelationshipTuple) error {
-				return patchTuplesErr
-			},
-			RemoveRelation_: func(ctx context.Context, user *openfga.User, tuples []params.RelationshipTuple) error {
-				return patchTuplesErr
-			},
+		PermissionManager_: func() jimm.PermissionManager {
+			return &permissionManager
 		},
 	}
 	user := openfga.User{}
@@ -278,6 +284,11 @@ func TestGetGroupRoles(t *testing.T) {
 			return nil, getGroupErr
 		},
 	}
+	permissionManager := mocks.PermissionManager{
+		ListRelationshipTuples_: func(ctx context.Context, user *openfga.User, tuple params.RelationshipTuple, pageSize int32, ct string) ([]openfga.Tuple, string, error) {
+			return []openfga.Tuple{testTuple}, continuationToken, listTuplesErr
+		},
+	}
 	jimm := jimmtest.JIMM{
 		RoleManager_: func() jimm.RoleManager {
 			return roleManager
@@ -285,10 +296,8 @@ func TestGetGroupRoles(t *testing.T) {
 		GroupManager_: func() jimm.GroupManager {
 			return &groupManager
 		},
-		RelationService: mocks.RelationService{
-			ListRelationshipTuples_: func(ctx context.Context, user *openfga.User, tuple params.RelationshipTuple, pageSize int32, ct string) ([]openfga.Tuple, string, error) {
-				return []openfga.Tuple{testTuple}, continuationToken, listTuplesErr
-			},
+		PermissionManager_: func() jimm.PermissionManager {
+			return &permissionManager
 		},
 	}
 
@@ -337,14 +346,17 @@ func TestGetGroupRoles(t *testing.T) {
 func TestPatchGroupRoles(t *testing.T) {
 	c := qt.New(t)
 	var patchTuplesErr error
+	permissionManager := mocks.PermissionManager{
+		AddRelation_: func(ctx context.Context, user *openfga.User, tuples []params.RelationshipTuple) error {
+			return patchTuplesErr
+		},
+		RemoveRelation_: func(ctx context.Context, user *openfga.User, tuples []params.RelationshipTuple) error {
+			return patchTuplesErr
+		},
+	}
 	jimm := jimmtest.JIMM{
-		RelationService: mocks.RelationService{
-			AddRelation_: func(ctx context.Context, user *openfga.User, tuples []params.RelationshipTuple) error {
-				return patchTuplesErr
-			},
-			RemoveRelation_: func(ctx context.Context, user *openfga.User, tuples []params.RelationshipTuple) error {
-				return patchTuplesErr
-			},
+		PermissionManager_: func() jimm.PermissionManager {
+			return &permissionManager
 		},
 	}
 	user := openfga.User{}
@@ -384,11 +396,14 @@ func TestGetGroupEntitlements(t *testing.T) {
 		Relation: ofga.Relation("member"),
 		Target:   &ofga.Entity{Kind: "group", ID: "my-group"},
 	}
+	permissionManager := mocks.PermissionManager{
+		ListObjectRelations_: func(ctx context.Context, user *openfga.User, object string, pageSize int32, ct pagination.EntitlementToken) ([]openfga.Tuple, pagination.EntitlementToken, error) {
+			return []openfga.Tuple{testTuple}, pagination.NewEntitlementToken(continuationToken), listRelationsErr
+		},
+	}
 	jimm := jimmtest.JIMM{
-		RelationService: mocks.RelationService{
-			ListObjectRelations_: func(ctx context.Context, user *openfga.User, object string, pageSize int32, ct pagination.EntitlementToken) ([]openfga.Tuple, pagination.EntitlementToken, error) {
-				return []openfga.Tuple{testTuple}, pagination.NewEntitlementToken(continuationToken), listRelationsErr
-			},
+		PermissionManager_: func() jimm.PermissionManager {
+			return &permissionManager
 		},
 	}
 	user := openfga.User{}
@@ -425,14 +440,17 @@ func TestGetGroupEntitlements(t *testing.T) {
 func TestPatchGroupEntitlements(t *testing.T) {
 	c := qt.New(t)
 	var patchTuplesErr error
+	permissionManager := mocks.PermissionManager{
+		AddRelation_: func(ctx context.Context, user *openfga.User, tuples []params.RelationshipTuple) error {
+			return patchTuplesErr
+		},
+		RemoveRelation_: func(ctx context.Context, user *openfga.User, tuples []params.RelationshipTuple) error {
+			return patchTuplesErr
+		},
+	}
 	jimm := jimmtest.JIMM{
-		RelationService: mocks.RelationService{
-			AddRelation_: func(ctx context.Context, user *openfga.User, tuples []params.RelationshipTuple) error {
-				return patchTuplesErr
-			},
-			RemoveRelation_: func(ctx context.Context, user *openfga.User, tuples []params.RelationshipTuple) error {
-				return patchTuplesErr
-			},
+		PermissionManager_: func() jimm.PermissionManager {
+			return &permissionManager
 		},
 	}
 	user := openfga.User{}
