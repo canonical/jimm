@@ -23,6 +23,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
+	"github.com/canonical/jimm/v3/internal/vault"
 )
 
 func TestUpdateCloudCredential(t *testing.T) {
@@ -771,7 +772,6 @@ func TestUpdateCloudCredential(t *testing.T) {
 						API: api,
 					},
 				},
-				jimmtest.UsePostgresAsCredentialStore, // this test relies on credential attributes being stored in postgres
 			)
 
 			u, arg, expectedCredential, expectedError := test.createEnv(c, j)
@@ -1365,15 +1365,9 @@ cloud-credentials:
 - name: cred-1
   cloud: cloud-1
   owner: alice@canonical.com
-  attributes:
-    k1: v1
-    k2: v2
 - name: cred-2
   cloud: cloud-1
   owner: bob@canonical.com
-  attributes:
-    k1: v1
-    k2: v2
 - name: cred-3
   cloud: cloud-2
   owner: alice@canonical.com
@@ -1474,11 +1468,6 @@ cloud-credentials:
   cloud: test-cloud
   owner: bob@canonical.com
   auth-type: oauth2
-  attributes:
-    client-email: bob@example.com
-    client-id: 1234
-    private-key: super-secret
-    project-id: 5678
 - name: cred-2
   cloud: test-cloud
   owner: bob@canonical.com
@@ -1495,6 +1484,7 @@ var getCloudCredentialAttributesTests = []struct {
 	hidden           bool
 	jimmAdmin        bool
 	cred             string
+	skipAttributes   bool
 	expectAttributes map[string]string
 	expectRedacted   []string
 	expectError      string
@@ -1515,6 +1505,7 @@ var getCloudCredentialAttributesTests = []struct {
 	username:         "bob@canonical.com",
 	jimmAdmin:        true,
 	cred:             "cred-2",
+	skipAttributes:   true,
 	expectAttributes: map[string]string{},
 	expectRedacted:   nil,
 }, {
@@ -1556,37 +1547,66 @@ var getCloudCredentialAttributesTests = []struct {
 }}
 
 func TestGetCloudCredentialAttributes(t *testing.T) {
-	c := qt.New(t)
+	attributes := map[string]string{
+		"client-email": "bob@example.com",
+		"client-id":    "1234",
+		"private-key":  "super-secret",
+		"project-id":   "5678",
+	}
 
 	for _, test := range getCloudCredentialAttributesTests {
-		c.Run(test.name, func(c *qt.C) {
-			ctx := context.Background()
+		c := qt.New(t)
+		// Run each test twice, once with Vault as a credential store
+		// and again with Postgres as a credential store.
+		client, path, roleID, roleSecretID, ok := jimmtest.VaultClient(c)
+		c.Assert(ok, qt.IsTrue)
+		vaultStore := &vault.VaultStore{
+			Client:       client,
+			RoleID:       roleID,
+			RoleSecretID: roleSecretID,
+			KVPath:       path,
+		}
+		jimmWithVault := jimm.Parameters{CredentialStore: vaultStore}
 
-			j := jimmtest.NewJIMM(c, nil)
+		testF := func(jp *jimm.Parameters) func(c *qt.C) {
+			return func(c *qt.C) {
+				ctx := context.Background()
 
-			env := jimmtest.ParseEnvironment(c, getCloudCredentialAttributesEnv)
-			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
-			u := env.User("bob@canonical.com").DBObject(c, j.Database)
-			userBob := openfga.NewUser(&u, j.OpenFGAClient)
-			credTag := fmt.Sprintf("test-cloud/bob@canonical.com/%s", test.cred)
-			cred, err := j.GetCloudCredential(ctx, userBob, names.NewCloudCredentialTag(credTag))
-			c.Assert(err, qt.IsNil)
+				j := jimmtest.NewJIMM(c, jp)
 
-			u = env.User(test.username).DBObject(c, j.Database)
-			userTest := openfga.NewUser(&u, j.OpenFGAClient)
-			userTest.JimmAdmin = test.jimmAdmin
-			attr, redacted, err := j.GetCloudCredentialAttributes(ctx, userTest, cred, test.hidden)
-			if test.expectError != "" {
-				c.Check(err, qt.ErrorMatches, test.expectError)
-				if test.expectErrorCode != "" {
-					c.Check(errors.ErrorCode(err), qt.Equals, test.expectErrorCode)
+				env := jimmtest.ParseEnvironment(c, getCloudCredentialAttributesEnv)
+				env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+
+				u := env.User("bob@canonical.com").DBObject(c, j.Database)
+				userBob := openfga.NewUser(&u, j.OpenFGAClient)
+
+				credTag := names.NewCloudCredentialTag(fmt.Sprintf("test-cloud/bob@canonical.com/%s", test.cred))
+				cred, err := j.GetCloudCredential(ctx, userBob, credTag)
+				c.Assert(err, qt.IsNil)
+
+				if !test.skipAttributes {
+					err = j.CredentialStore.Put(ctx, credTag, attributes)
+					c.Assert(err, qt.IsNil)
 				}
-				return
+
+				u = env.User(test.username).DBObject(c, j.Database)
+				userTest := openfga.NewUser(&u, j.OpenFGAClient)
+				userTest.JimmAdmin = test.jimmAdmin
+				attr, redacted, err := j.GetCloudCredentialAttributes(ctx, userTest, cred, test.hidden)
+				if test.expectError != "" {
+					c.Check(err, qt.ErrorMatches, test.expectError)
+					if test.expectErrorCode != "" {
+						c.Check(errors.ErrorCode(err), qt.Equals, test.expectErrorCode)
+					}
+					return
+				}
+				c.Assert(err, qt.IsNil)
+				c.Check(attr, qt.DeepEquals, test.expectAttributes)
+				c.Check(redacted, qt.DeepEquals, test.expectRedacted)
 			}
-			c.Assert(err, qt.IsNil)
-			c.Check(attr, qt.DeepEquals, test.expectAttributes)
-			c.Check(redacted, qt.DeepEquals, test.expectRedacted)
-		})
+		}
+		c.Run(test.name+"-postgres", testF(nil))
+		c.Run(test.name+"-vault", testF(&jimmWithVault))
 	}
 }
 

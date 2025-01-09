@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package cmd_test
 
@@ -23,7 +23,6 @@ var (
     -----END CERTIFICATE-----
   cloudtag: cloud-` + jimmtest.TestCloudName + `
   cloudregion: ` + jimmtest.TestCloudRegionName + `
-  username: admin
   agentversion: .*
   status:
     status: available
@@ -41,7 +40,6 @@ var (
     -----END CERTIFICATE-----
   cloudtag: cloud-` + jimmtest.TestCloudName + `
   cloudregion: ` + jimmtest.TestCloudRegionName + `
-  username: admin
   agentversion: .*
   status:
     status: available
@@ -57,7 +55,6 @@ var (
   cacertificate: ""
   cloudtag: ""
   cloudregion: ""
-  username: ""
   agentversion: .*
   status:
     status: available

@@ -138,9 +138,12 @@ var addModelTests = []struct {
 	createModel         func(ctx context.Context, args *jujuparams.ModelCreateArgs, mi *jujuparams.ModelInfo) error
 	username            string
 	jimmAdmin           bool
-	args                jujuparams.ModelCreateArgs
-	expectModel         dbmodel.Model
-	expectError         string
+	// This cloudCredTag is used to manually populate a dummy cloud credential
+	// into JIMM's credential store and then applied onto args before adding a model.
+	cloudCredTag names.CloudCredentialTag
+	args         jujuparams.ModelCreateArgs
+	expectModel  dbmodel.Model
+	expectError  string
 }{{
 	name: "CreateModelWithCloudRegion",
 	env: `
@@ -208,14 +211,14 @@ users:
 - user: bob
   access: read
 `[1:])),
-	username:  "alice@canonical.com",
-	jimmAdmin: true,
+	username:     "alice@canonical.com",
+	jimmAdmin:    true,
+	cloudCredTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
 	args: jujuparams.ModelCreateArgs{
-		Name:               "test-model",
-		OwnerTag:           names.NewUserTag("alice@canonical.com").String(),
-		CloudTag:           names.NewCloudTag("test-cloud").String(),
-		CloudRegion:        "test-region-1",
-		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1").String(),
+		Name:        "test-model",
+		OwnerTag:    names.NewUserTag("alice@canonical.com").String(),
+		CloudTag:    names.NewCloudTag("test-cloud").String(),
+		CloudRegion: "test-region-1",
 	},
 	expectModel: dbmodel.Model{
 		Name: "test-model",
@@ -312,15 +315,15 @@ users:
 - user: bob
   access: read
 `[1:])),
-	username:  "alice@canonical.com",
-	jimmAdmin: true,
+	username:     "alice@canonical.com",
+	jimmAdmin:    true,
+	cloudCredTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
 	args: jujuparams.ModelCreateArgs{
 		Name:     "test-model",
 		OwnerTag: names.NewUserTag("alice@canonical.com").String(),
 		CloudTag: names.NewCloudTag("test-cloud").String(),
 		// Creating a model without specifying the cloud region
-		CloudRegion:        "",
-		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1").String(),
+		CloudRegion: "",
 	},
 	expectModel: dbmodel.Model{
 		Name: "test-model",
@@ -417,14 +420,14 @@ users:
 - user: bob
   access: read
 `[1:])),
-	username:  "alice@canonical.com",
-	jimmAdmin: true,
+	username:     "alice@canonical.com",
+	jimmAdmin:    true,
+	cloudCredTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
 	args: jujuparams.ModelCreateArgs{
-		Name:               "test-model",
-		OwnerTag:           names.NewUserTag("alice@canonical.com").String(),
-		CloudTag:           names.NewCloudTag("test-cloud").String(),
-		CloudRegion:        "test-region-1",
-		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1").String(),
+		Name:        "test-model",
+		OwnerTag:    names.NewUserTag("alice@canonical.com").String(),
+		CloudTag:    names.NewCloudTag("test-cloud").String(),
+		CloudRegion: "test-region-1",
 	},
 	expectModel: dbmodel.Model{
 		Name: "test-model",
@@ -513,14 +516,14 @@ users:
 - user: bob
   access: read
 `[1:]),
-	username:  "alice@canonical.com",
-	jimmAdmin: true,
+	username:     "alice@canonical.com",
+	jimmAdmin:    true,
+	cloudCredTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
 	args: jujuparams.ModelCreateArgs{
-		Name:               "test-model",
-		OwnerTag:           names.NewUserTag("bob@canonical.com").String(),
-		CloudTag:           names.NewCloudTag("test-cloud").String(),
-		CloudRegion:        "test-region-1",
-		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1").String(),
+		Name:        "test-model",
+		OwnerTag:    names.NewUserTag("bob@canonical.com").String(),
+		CloudTag:    names.NewCloudTag("test-cloud").String(),
+		CloudRegion: "test-region-1",
 	},
 	expectModel: dbmodel.Model{
 		Name: "test-model",
@@ -607,13 +610,13 @@ users:
 - user: bob
   access: read
 `[1:]),
-	username: "alice@canonical.com",
+	username:     "alice@canonical.com",
+	cloudCredTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
 	args: jujuparams.ModelCreateArgs{
-		Name:               "test-model",
-		OwnerTag:           names.NewUserTag("bob@canonical.com").String(),
-		CloudTag:           names.NewCloudTag("test-cloud").String(),
-		CloudRegion:        "test-region-1",
-		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1").String(),
+		Name:        "test-model",
+		OwnerTag:    names.NewUserTag("bob@canonical.com").String(),
+		CloudTag:    names.NewCloudTag("test-cloud").String(),
+		CloudRegion: "test-region-1",
 	},
 	expectError: "unauthorized",
 }, {
@@ -659,14 +662,14 @@ controllers:
 	createModel: func(ctx context.Context, args *jujuparams.ModelCreateArgs, mi *jujuparams.ModelInfo) error {
 		return errors.E("a test error")
 	},
-	username:  "alice@canonical.com",
-	jimmAdmin: true,
+	username:     "alice@canonical.com",
+	jimmAdmin:    true,
+	cloudCredTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
 	args: jujuparams.ModelCreateArgs{
-		Name:               "test-model",
-		OwnerTag:           names.NewUserTag("alice@canonical.com").String(),
-		CloudTag:           names.NewCloudTag("test-cloud").String(),
-		CloudRegion:        "test-region-1",
-		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1").String(),
+		Name:        "test-model",
+		OwnerTag:    names.NewUserTag("alice@canonical.com").String(),
+		CloudTag:    names.NewCloudTag("test-cloud").String(),
+		CloudRegion: "test-region-1",
 	},
 	expectError: "a test error",
 }, {
@@ -737,14 +740,14 @@ users:
 - user: bob
   access: read
 `[1:]),
-	username:  "alice@canonical.com",
-	jimmAdmin: true,
+	username:     "alice@canonical.com",
+	jimmAdmin:    true,
+	cloudCredTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
 	args: jujuparams.ModelCreateArgs{
-		Name:               "test-model",
-		OwnerTag:           names.NewUserTag("alice@canonical.com").String(),
-		CloudTag:           names.NewCloudTag("test-cloud").String(),
-		CloudRegion:        "test-region-1",
-		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1").String(),
+		Name:        "test-model",
+		OwnerTag:    names.NewUserTag("alice@canonical.com").String(),
+		CloudTag:    names.NewCloudTag("test-cloud").String(),
+		CloudRegion: "test-region-1",
 	},
 	expectError: "model alice@canonical.com/test-model already exists",
 }, {
@@ -799,14 +802,14 @@ users:
 - user: bob
   access: read
 `[1:]),
-	username:  "alice@canonical.com",
-	jimmAdmin: true,
+	username:     "alice@canonical.com",
+	jimmAdmin:    true,
+	cloudCredTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
 	args: jujuparams.ModelCreateArgs{
-		Name:               "test-model",
-		OwnerTag:           names.NewUserTag("alice@canonical.com").String(),
-		CloudTag:           names.NewCloudTag("test-cloud").String(),
-		CloudRegion:        "test-region-1",
-		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1").String(),
+		Name:        "test-model",
+		OwnerTag:    names.NewUserTag("alice@canonical.com").String(),
+		CloudTag:    names.NewCloudTag("test-cloud").String(),
+		CloudRegion: "test-region-1",
 	},
 	expectError: "failed to update cloud credential: a silly error",
 }, {
@@ -856,14 +859,14 @@ users:
 - user: alice@canonical.com
   access: admin
 `[1:]),
-	username:  "alice@canonical.com",
-	jimmAdmin: true,
+	username:     "alice@canonical.com",
+	jimmAdmin:    true,
+	cloudCredTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
 	args: jujuparams.ModelCreateArgs{
-		Name:               "test-model",
-		OwnerTag:           names.NewUserTag("alice@canonical.com").String(),
-		CloudTag:           names.NewCloudTag("test-cloud").String(),
-		CloudRegion:        "test-region-1",
-		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1").String(),
+		Name:        "test-model",
+		OwnerTag:    names.NewUserTag("alice@canonical.com").String(),
+		CloudTag:    names.NewCloudTag("test-cloud").String(),
+		CloudRegion: "test-region-1",
 	},
 	expectError: "unauthorized",
 }, {
@@ -936,12 +939,12 @@ users:
 - user: bob
   access: read
 `[1:])),
-	username:  "alice@canonical.com",
-	jimmAdmin: true,
+	username:     "alice@canonical.com",
+	jimmAdmin:    true,
+	cloudCredTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
 	args: jujuparams.ModelCreateArgs{
-		Name:               "test-model",
-		OwnerTag:           names.NewUserTag("alice@canonical.com").String(),
-		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1").String(),
+		Name:     "test-model",
+		OwnerTag: names.NewUserTag("alice@canonical.com").String(),
 	},
 	expectModel: dbmodel.Model{
 		Name: "test-model",
@@ -1043,12 +1046,12 @@ users:
 - user: bob
   access: read
 `[1:])),
-	username:  "alice@canonical.com",
-	jimmAdmin: true,
+	username:     "alice@canonical.com",
+	jimmAdmin:    true,
+	cloudCredTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
 	args: jujuparams.ModelCreateArgs{
-		Name:               "test-model",
-		OwnerTag:           names.NewUserTag("alice@canonical.com").String(),
-		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1").String(),
+		Name:     "test-model",
+		OwnerTag: names.NewUserTag("alice@canonical.com").String(),
 	},
 	expectError: "no cloud specified for model; please specify one",
 }}
@@ -1073,12 +1076,16 @@ func TestAddModel(t *testing.T) {
 			env := jimmtest.ParseEnvironment(c, test.env)
 			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
 
+			err := j.CredentialStore.Put(ctx, test.cloudCredTag, map[string]string{"key": "value"})
+			c.Assert(err, qt.IsNil)
+
 			dbUser := env.User(test.username).DBObject(c, j.Database)
 			user := openfga.NewUser(&dbUser, j.OpenFGAClient)
 			user.JimmAdmin = test.jimmAdmin
 
+			test.args.CloudCredentialTag = test.cloudCredTag.String()
 			args := jimm.ModelCreateArgs{}
-			err := args.FromJujuModelCreateArgs(&test.args)
+			err = args.FromJujuModelCreateArgs(&test.args)
 			c.Assert(err, qt.IsNil)
 
 			_, err = j.AddModel(context.Background(), user, &args)
@@ -2683,7 +2690,11 @@ func TestUpdateModelCredential(t *testing.T) {
 			dbUser := env.User(test.username).DBObject(c, j.Database)
 			user := openfga.NewUser(&dbUser, j.OpenFGAClient)
 
-			err := j.ChangeModelCredential(
+			testAttributes := map[string]string{"key": "value"}
+			err := j.CredentialStore.Put(ctx, names.NewCloudCredentialTag(test.credential), testAttributes)
+			c.Assert(err, qt.IsNil)
+
+			err = j.ChangeModelCredential(
 				ctx,
 				user,
 				names.NewModelTag(test.uuid),
@@ -2799,13 +2810,17 @@ controllers:
 	err = j.Database.DeleteController(ctx, &controller)
 	c.Assert(err, qt.IsNil)
 
+	cloudCredTag := names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1")
+	err = j.CredentialStore.Put(ctx, cloudCredTag, map[string]string{"key": "value"})
+	c.Assert(err, qt.IsNil)
+
 	args := jimm.ModelCreateArgs{}
 	err = args.FromJujuModelCreateArgs(&jujuparams.ModelCreateArgs{
 		Name:               "test-model",
 		OwnerTag:           names.NewUserTag("alice@canonical.com").String(),
 		CloudTag:           names.NewCloudTag("test-cloud").String(),
 		CloudRegion:        "test-region-1",
-		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1").String(),
+		CloudCredentialTag: cloudCredTag.String(),
 	})
 	c.Assert(err, qt.IsNil)
 

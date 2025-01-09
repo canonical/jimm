@@ -237,12 +237,14 @@ func TestAddControllerWithCloudWithoutRegions(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	ctl1 := dbmodel.Controller{
-		Name:              "test-controller",
-		AdminIdentityName: "admin",
-		AdminPassword:     "5ecret",
-		PublicAddress:     "example.com:443",
+		Name:          "test-controller",
+		PublicAddress: "example.com:443",
 	}
-	err = j.AddController(context.Background(), alice, &ctl1)
+	ctlCreds := jimm.ControllerCreds{
+		AdminIdentityName: "user",
+		AdminPassword:     "secret",
+	}
+	err = j.AddController(context.Background(), alice, &ctl1, ctlCreds)
 	c.Assert(err, qt.IsNil)
 
 	ctl2 := dbmodel.Controller{

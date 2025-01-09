@@ -17,15 +17,6 @@ var now = (time.Time{}).UTC().Round(time.Millisecond)
 
 type Option func(j *jimm.JIMM)
 
-var (
-	UnsetCredentialStore Option = func(j *jimm.JIMM) {
-		j.CredentialStore = nil
-	}
-	UsePostgresAsCredentialStore Option = func(j *jimm.JIMM) {
-		j.CredentialStore = j.Database
-	}
-)
-
 func NewJIMM(t Tester, additionalParameters *jimm.Parameters, options ...Option) *jimm.JIMM {
 
 	auth := NewMockOAuthAuthenticator(t, nil)

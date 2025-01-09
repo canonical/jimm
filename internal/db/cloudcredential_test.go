@@ -209,15 +209,9 @@ cloud-credentials:
 - name: cred-1
   cloud: cloud-1
   owner: alice@canonical.com
-  attributes:
-    k1: v1
-    k2: v2
 - name: cred-2
   cloud: cloud-1
   owner: bob@canonical.com
-  attributes:
-    k1: v1
-    k2: v2
 - name: cred-3
   cloud: cloud-2
   owner: alice@canonical.com

@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package jimm_test
 
@@ -112,6 +112,10 @@ func TestCopyServiceAccountCredential(t *testing.T) {
 		AuthType:          "empty",
 	}
 	err = j.Database.SetCloudCredential(context.Background(), &cred)
+	c.Assert(err, qt.Equals, nil)
+
+	credAttr := map[string]string{"key": "value"}
+	err = j.CredentialStore.Put(ctx, cred.ResourceTag(), credAttr)
 	c.Assert(err, qt.Equals, nil)
 
 	_, res, err := j.CopyServiceAccountCredential(ctx, user, svcAcc, cred.ResourceTag())

@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package dbmodel_test
 
@@ -179,7 +179,6 @@ func TestToAPIControllerInfo(t *testing.T) {
 		CACertificate: "ca-cert",
 		CloudTag:      names.NewCloudTag("test-cloud").String(),
 		CloudRegion:   "test-region",
-		Username:      "admin",
 		AgentVersion:  "1.2.3",
 		Status: jujuparams.EntityStatus{
 			Status: "available",
