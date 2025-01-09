@@ -339,7 +339,7 @@ func New(p Parameters) (*JIMM, error) {
 	}
 	j.loginManager = loginManager
 
-	permissionManager, err := permissions.NewPermissionManager(j.Database, j.OpenFGAClient, j.UUID, j.ResourceTag())
+	permissionManager, err := permissions.NewManager(j.Database, j.OpenFGAClient, j.UUID, j.ResourceTag())
 	if err != nil {
 		return nil, err
 	}

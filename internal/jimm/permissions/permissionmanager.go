@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 // The permissions package provides business logic for handling user permissions.
 package permissions
@@ -20,9 +20,9 @@ type permissionManager struct {
 	tag  names.ControllerTag
 }
 
-// NewPermissionManager returns a new permission manager that provides
+// NewManager returns a new permission manager that provides
 // permission handling and resolution of JAAS tags.
-func NewPermissionManager(store *db.Database, authSvc *openfga.OFGAClient, uuid string, tag names.ControllerTag) (*permissionManager, error) {
+func NewManager(store *db.Database, authSvc *openfga.OFGAClient, uuid string, tag names.ControllerTag) (*permissionManager, error) {
 	if store == nil {
 		return nil, errors.E("permission store cannot be nil")
 	}

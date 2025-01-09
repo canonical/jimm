@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package permissions_test
 
@@ -49,7 +49,7 @@ func (s *permissionManagerSuite) Init(c *qt.C) {
 	ctlTag := names.NewControllerTag(uuid.String())
 	s.ctlTag = ctlTag
 
-	s.manager, err = permissions.NewPermissionManager(db, ofgaClient, uuid.String(), ctlTag)
+	s.manager, err = permissions.NewManager(db, ofgaClient, uuid.String(), ctlTag)
 	c.Assert(err, qt.IsNil)
 
 	// Create test identity

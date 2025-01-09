@@ -1,4 +1,5 @@
 // Copyright 2025 Canonical.
+
 package jujuauth
 
 // Factory holds the necessary components for producing new stateful
