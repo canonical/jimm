@@ -18,6 +18,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jimm"
 	"github.com/canonical/jimm/v3/internal/jujuapi/rpc"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/pkg/api/params"
@@ -204,16 +205,18 @@ func (r *controllerRoot) AddController(ctx context.Context, req apiparams.AddCon
 
 	// TODO(ale8k): Don't build dbmodel here, do it as params to AddController.
 	ctl := dbmodel.Controller{
-		UUID:              req.UUID,
-		Name:              req.Name,
-		PublicAddress:     req.PublicAddress,
-		CACertificate:     req.CACertificate,
+		UUID:          req.UUID,
+		Name:          req.Name,
+		PublicAddress: req.PublicAddress,
+		CACertificate: req.CACertificate,
+		TLSHostname:   req.TLSHostname,
+		Addresses:     dbmodel.HostPorts{jujuparams.FromProviderHostPorts(nphps)},
+	}
+	ctlCreds := jimm.ControllerCreds{
 		AdminIdentityName: req.Username,
 		AdminPassword:     req.Password,
-		TLSHostname:       req.TLSHostname,
-		Addresses:         dbmodel.HostPorts{jujuparams.FromProviderHostPorts(nphps)},
 	}
-	if err := r.jimm.AddController(ctx, r.user, &ctl); err != nil {
+	if err := r.jimm.AddController(ctx, r.user, &ctl, ctlCreds); err != nil {
 		zapctx.Error(ctx, "failed to add controller", zaputil.Error(err))
 		return apiparams.ControllerInfo{}, errors.E(op, err)
 	}

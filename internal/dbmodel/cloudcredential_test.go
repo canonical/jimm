@@ -40,10 +40,6 @@ func TestCloudCredential(t *testing.T) {
 		Owner:    *i,
 		AuthType: "empty",
 		Label:    "test label",
-		Attributes: dbmodel.StringMap{
-			"a": "b",
-			"c": "d",
-		},
 	}
 	result := db.Create(&cred)
 	c.Assert(result.Error, qt.IsNil)

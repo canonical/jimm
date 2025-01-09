@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package db
 
@@ -35,7 +35,7 @@ func (d *Database) SetCloudCredential(ctx context.Context, cred *dbmodel.CloudCr
 			{Name: "owner_identity_name"},
 			{Name: "name"},
 		},
-		DoUpdates: clause.AssignmentColumns([]string{"auth_type", "label", "attributes_in_vault", "attributes", "valid"}),
+		DoUpdates: clause.AssignmentColumns([]string{"auth_type", "label", "valid"}),
 	}).Create(&cred).Error; err != nil {
 		return errors.E(op, dbError(err))
 	}

@@ -278,12 +278,14 @@ func (s *JIMMSuite) NewUser(u *dbmodel.Identity) *openfga.User {
 
 func (s *JIMMSuite) AddController(c *gc.C, name string, info *api.Info) {
 	ctl := &dbmodel.Controller{
-		UUID:              info.ControllerUUID,
-		Name:              name,
+		UUID:          info.ControllerUUID,
+		Name:          name,
+		CACertificate: info.CACert,
+		Addresses:     nil,
+	}
+	ctlCreds := jimm.ControllerCreds{
 		AdminIdentityName: info.Tag.Id(),
 		AdminPassword:     info.Password,
-		CACertificate:     info.CACert,
-		Addresses:         nil,
 	}
 	ctl.Addresses = make(dbmodel.HostPorts, 0, len(info.Addrs))
 	for _, addr := range info.Addrs {
@@ -294,7 +296,7 @@ func (s *JIMMSuite) AddController(c *gc.C, name string, info *api.Info) {
 			Port:    hp.Port(),
 		}})
 	}
-	err := s.JIMM.AddController(context.Background(), s.AdminUser, ctl)
+	err := s.JIMM.AddController(context.Background(), s.AdminUser, ctl, ctlCreds)
 	c.Assert(err, gc.Equals, nil)
 }
 

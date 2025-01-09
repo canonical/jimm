@@ -31,13 +31,6 @@ type CloudCredential struct {
 	// Label is an optional label for the credential.
 	Label string
 
-	// AttributesInVault indicates whether the attributes are stored in
-	// the configured vault key-value store, rather than this database.
-	AttributesInVault bool
-
-	// Attributes contains the attributes of the credential.
-	Attributes StringMap
-
 	// Valid stores whether the cloud-credential is known to be valid.
 	Valid sql.NullBool
 

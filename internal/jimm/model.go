@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package jimm
 
@@ -539,13 +539,8 @@ func (b *modelBuilder) CreateControllerModel() *modelBuilder {
 
 func (b *modelBuilder) updateCredential(ctx context.Context, api API, cred *dbmodel.CloudCredential) error {
 	var err error
-	cred1 := *cred
-	cred1.Attributes, err = b.jimm.getCloudCredentialAttributes(ctx, cred)
-	if err != nil {
-		return err
-	}
 
-	_, err = b.jimm.updateControllerCloudCredential(ctx, &cred1, api.UpdateCredential)
+	_, err = b.jimm.updateControllerCloudCredential(ctx, cred, api.UpdateCredential)
 	return err
 }
 

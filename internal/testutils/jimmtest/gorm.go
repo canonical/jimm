@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 // Package jimmtest contains useful helpers for testing JIMM.
 package jimmtest
@@ -65,7 +65,7 @@ func PostgresDBWithDbName(t Tester, nowFunc func() time.Time) (*gorm.DB, string)
 
 	templateDatabaseName, _, err := getOrCreateTemplateDatabase()
 	if err != nil {
-		t.Fatalf("template database does not exist")
+		t.Fatalf("template database does not exist: %s", err)
 	}
 
 	suggestedName := "jimm_test_" + t.Name()
@@ -322,7 +322,7 @@ func getOrCreateTemplateDatabase() (string, string, error) {
 
 	templateName, templateDSN, err := createTemplateDatabase()
 	if err != nil {
-		return "", "", errors.E(err, "error creating template database")
+		return "", "", fmt.Errorf("error creating template database: %w", err)
 	}
 
 	templateDatabaseDSN = templateDSN

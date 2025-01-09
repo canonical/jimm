@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package jimmtest
 
@@ -20,6 +20,9 @@ type Option func(j *jimm.JIMM)
 var (
 	UnsetCredentialStore Option = func(j *jimm.JIMM) {
 		j.CredentialStore = nil
+	}
+	UsePostgresAsCredentialStore Option = func(j *jimm.JIMM) {
+		j.CredentialStore = j.Database
 	}
 )
 

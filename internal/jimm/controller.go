@@ -218,7 +218,7 @@ func addControllerTx(ctx context.Context, j *JIMM, jujuClouds []dbmodel.Cloud, c
 // code of CodeAlreadyExists will be returned. If the controller cannot be
 // contacted then an error with a code of CodeConnectionFailed will be
 // returned.
-func (j *JIMM) AddController(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller) error {
+func (j *JIMM) AddController(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, creds ControllerCreds) error {
 	const op = errors.Op("jimm.AddController")
 
 	if err := j.checkJimmAdmin(user); err != nil {
@@ -268,19 +268,10 @@ func (j *JIMM) AddController(ctx context.Context, user *openfga.User, ctl *dbmod
 		}
 	}
 
-	// TODO(ale8k): This shouldn't be necessary to check, but tests need updating
-	// to set insecure credential store explicitly.
-	if j.CredentialStore != nil {
-		err := j.CredentialStore.PutControllerCredentials(ctx, ctl.Name, ctl.AdminIdentityName, ctl.AdminPassword)
-		if err != nil {
-			return errors.E(op, err, "failed to store controller credentials")
-		}
+	err = j.CredentialStore.PutControllerCredentials(ctx, ctl.Name, creds.AdminIdentityName, creds.AdminPassword)
+	if err != nil {
+		return errors.E(op, err, "failed to store controller credentials")
 	}
-
-	// Credential store will always be set either to vault or explicitly insecure,
-	// no need to be persist in db.
-	ctl.AdminIdentityName = ""
-	ctl.AdminPassword = ""
 
 	if err := addControllerTx(ctx, j, dbClouds, ctl); err != nil {
 		zapctx.Error(ctx, "failed to add controller", zaputil.Error(err))

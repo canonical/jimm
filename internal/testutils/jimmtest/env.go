@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package jimmtest
 
@@ -182,17 +182,6 @@ func (m Model) addModelRelations(c *qt.C, db *db.Database, client *openfga.OFGAC
 
 // addControllerRelations adds permissions the model should have and adds permissions for users to the controller.
 func (ctl Controller) addControllerRelations(c *qt.C, client *openfga.OFGAClient) {
-	if ctl.dbo.AdminIdentityName != "" {
-		userIdentity, err := dbmodel.NewIdentity(ctl.dbo.AdminIdentityName)
-		c.Assert(err, qt.IsNil)
-
-		user := openfga.NewUser(
-			userIdentity,
-			client,
-		)
-		err = user.SetControllerAccess(context.Background(), ctl.dbo.ResourceTag(), ofganames.AdministratorRelation)
-		c.Assert(err, qt.IsNil)
-	}
 	err := client.AddCloudController(context.Background(), names.NewCloudTag(ctl.Cloud), ctl.dbo.ResourceTag())
 	c.Assert(err, qt.IsNil)
 }
@@ -385,11 +374,10 @@ func (cl *Cloud) DBObject(c Tester, db *db.Database) dbmodel.Cloud {
 // A CloudCredential represents the definition of a cloud credential in a
 // test environment.
 type CloudCredential struct {
-	Owner      string            `json:"owner"`
-	Cloud      string            `json:"cloud"`
-	Name       string            `json:"name"`
-	AuthType   string            `json:"auth-type"`
-	Attributes map[string]string `json:"attributes"`
+	Owner    string `json:"owner"`
+	Cloud    string `json:"cloud"`
+	Name     string `json:"name"`
+	AuthType string `json:"auth-type"`
 
 	env *Environment
 	dbo dbmodel.CloudCredential
@@ -405,7 +393,6 @@ func (cc *CloudCredential) DBObject(c Tester, db *db.Database) dbmodel.CloudCred
 	cc.dbo.Owner = cc.env.User(cc.Owner).DBObject(c, db)
 	cc.dbo.OwnerIdentityName = cc.dbo.Owner.Name
 	cc.dbo.AuthType = cc.AuthType
-	cc.dbo.Attributes = cc.Attributes
 
 	err := db.SetCloudCredential(context.Background(), &cc.dbo)
 	if err != nil {
@@ -418,14 +405,12 @@ func (cc *CloudCredential) DBObject(c Tester, db *db.Database) dbmodel.CloudCred
 // A Controller represents the definition of a controller in a test
 // environment.
 type Controller struct {
-	Name          string                          `json:"name"`
-	UUID          string                          `json:"uuid"`
-	Cloud         string                          `json:"cloud"`
-	CloudRegion   string                          `json:"region"`
-	CloudRegions  []CloudRegionControllerPriority `json:"cloud-regions"`
-	AgentVersion  string                          `json:"agent-version"`
-	AdminUser     string                          `json:"admin-user"`
-	AdminPassword string                          `json:"admin-password"`
+	Name         string                          `json:"name"`
+	UUID         string                          `json:"uuid"`
+	Cloud        string                          `json:"cloud"`
+	CloudRegion  string                          `json:"region"`
+	CloudRegions []CloudRegionControllerPriority `json:"cloud-regions"`
+	AgentVersion string                          `json:"agent-version"`
 
 	env *Environment
 	dbo dbmodel.Controller
@@ -438,8 +423,6 @@ func (ctl *Controller) DBObject(c Tester, db *db.Database) dbmodel.Controller {
 	ctl.dbo.Name = ctl.Name
 	ctl.dbo.UUID = ctl.UUID
 	ctl.dbo.AgentVersion = ctl.AgentVersion
-	ctl.dbo.AdminIdentityName = ctl.AdminUser
-	ctl.dbo.AdminPassword = ctl.AdminPassword
 	ctl.dbo.CloudName = ctl.Cloud
 	ctl.dbo.CloudRegion = ctl.CloudRegion
 	ctl.dbo.CloudRegions = make([]dbmodel.CloudRegionControllerPriority, len(ctl.CloudRegions))
