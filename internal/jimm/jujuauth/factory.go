@@ -22,5 +22,5 @@ func NewFactory(db GeneratorDatabase, jwtService JWTService, accessChecker Gener
 
 // New returns a new Juju token generator.
 func (f *Factory) New() TokenGenerator {
-	return new(f.db, f.accessChecker, f.jwtService)
+	return newTokenGenerator(f.db, f.accessChecker, f.jwtService)
 }

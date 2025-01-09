@@ -13,11 +13,10 @@ import (
 
 // permissionManager provides a means to manage roles within JIMM.
 type permissionManager struct {
-	store   *db.Database
-	authSvc *openfga.OFGAClient
-	// JIMM's UUID and tag
-	uuid string
-	tag  names.ControllerTag
+	store    *db.Database
+	authSvc  *openfga.OFGAClient
+	jimmUUID string
+	jimmTag  names.ControllerTag
 }
 
 // NewManager returns a new permission manager that provides

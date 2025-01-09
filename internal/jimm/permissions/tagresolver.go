@@ -72,7 +72,7 @@ func (j *permissionManager) ToJAASTag(ctx context.Context, tag *ofganames.Tag, r
 	case jimmnames.ServiceAccountTagKind:
 		return jimmnames.ServiceAccountTagKind + "-" + tag.ID, nil
 	case names.ControllerTagKind:
-		if tag.ID == j.tag.Id() {
+		if tag.ID == j.jimmTag.Id() {
 			return "controller-jimm", nil
 		}
 		controller := dbmodel.Controller{
@@ -372,7 +372,7 @@ func (j *permissionManager) parseAndValidateTag(ctx context.Context, key string)
 		return tag, nil
 	}
 	tagString := key
-	tag, err := resolveTag(j.uuid, j.store, tagString)
+	tag, err := resolveTag(j.jimmUUID, j.store, tagString)
 	if err != nil {
 		zapctx.Debug(ctx, "failed to resolve tuple object", zap.Error(err))
 		return nil, errors.E(op, errors.CodeFailedToResolveTupleResource, err)

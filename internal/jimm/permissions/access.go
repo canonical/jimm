@@ -137,7 +137,7 @@ func (j *permissionManager) GetUserModelAccess(ctx context.Context, user *openfg
 func (j *permissionManager) GrantAuditLogAccess(ctx context.Context, user *openfga.User, targetUserTag names.UserTag) error {
 	const op = errors.Op("jimm.GrantAuditLogAccess")
 
-	access := user.GetControllerAccess(ctx, j.tag)
+	access := user.GetControllerAccess(ctx, j.jimmTag)
 	if access != ofganames.AdministratorRelation {
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
@@ -149,7 +149,7 @@ func (j *permissionManager) GrantAuditLogAccess(ctx context.Context, user *openf
 		return errors.E(op, err)
 	}
 
-	err = openfga.NewUser(targetUser, j.authSvc).SetControllerAccess(ctx, j.tag, ofganames.AuditLogViewerRelation)
+	err = openfga.NewUser(targetUser, j.authSvc).SetControllerAccess(ctx, j.jimmTag, ofganames.AuditLogViewerRelation)
 	if err != nil {
 		return errors.E(op, err)
 	}
@@ -160,7 +160,7 @@ func (j *permissionManager) GrantAuditLogAccess(ctx context.Context, user *openf
 func (j *permissionManager) RevokeAuditLogAccess(ctx context.Context, user *openfga.User, targetUserTag names.UserTag) error {
 	const op = errors.Op("jimm.RevokeAuditLogAccess")
 
-	access := user.GetControllerAccess(ctx, j.tag)
+	access := user.GetControllerAccess(ctx, j.jimmTag)
 	if access != ofganames.AdministratorRelation {
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
@@ -172,7 +172,7 @@ func (j *permissionManager) RevokeAuditLogAccess(ctx context.Context, user *open
 		return errors.E(op, err)
 	}
 
-	err = openfga.NewUser(targetUser, j.authSvc).UnsetAuditLogViewerAccess(ctx, j.tag)
+	err = openfga.NewUser(targetUser, j.authSvc).UnsetAuditLogViewerAccess(ctx, j.jimmTag)
 	if err != nil {
 		return errors.E(op, err)
 	}
@@ -277,7 +277,7 @@ func (j *permissionManager) GetJimmControllerAccess(ctx context.Context, user *o
 	targetUserTag := openfga.NewUser(&targetUser, j.authSvc)
 
 	// Check if the user is jimm administrator.
-	isAdmin, err := openfga.IsAdministrator(ctx, targetUserTag, j.tag)
+	isAdmin, err := openfga.IsAdministrator(ctx, targetUserTag, j.jimmTag)
 	if err != nil {
 		zapctx.Error(ctx, "failed to check access rights", zap.Error(err))
 		return "", errors.E(op, err)

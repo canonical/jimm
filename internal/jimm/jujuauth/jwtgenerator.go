@@ -56,8 +56,8 @@ type TokenGenerator struct {
 	callCount      int
 }
 
-// new returns a new JWTGenerator.
-func new(database GeneratorDatabase, accessChecker GeneratorAccessChecker, jwtService JWTService) TokenGenerator {
+// newTokenGenerator returns a new TokenGenerator.
+func newTokenGenerator(database GeneratorDatabase, accessChecker GeneratorAccessChecker, jwtService JWTService) TokenGenerator {
 	return TokenGenerator{
 		database:      database,
 		accessChecker: accessChecker,
