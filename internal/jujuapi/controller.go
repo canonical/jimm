@@ -12,6 +12,7 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jimm"
 	"github.com/canonical/jimm/v3/internal/jujuapi/rpc"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	jimmversion "github.com/canonical/jimm/v3/version"
@@ -51,7 +52,7 @@ func init() {
 
 // ControllerService defines the methods used to manage controllers.
 type ControllerService interface {
-	AddController(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller) error
+	AddController(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, creds jimm.ControllerCreds) error
 	ControllerInfo(ctx context.Context, name string) (*dbmodel.Controller, error)
 	EarliestControllerVersion(ctx context.Context) (version.Number, error)
 	ListControllers(ctx context.Context, user *openfga.User) ([]dbmodel.Controller, error)

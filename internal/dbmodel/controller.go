@@ -32,14 +32,6 @@ type Controller struct {
 	// purposes.
 	UUID string `gorm:"not null"`
 
-	// AdminIdentityName is the identity name that JIMM uses to connect to the
-	// controller.
-	AdminIdentityName string
-
-	// AdminPassword is the password that JIMM uses to connect to the
-	// controller.
-	AdminPassword string
-
 	// CACertificate is the CA certificate required to access this
 	// controller. This is only set if the controller endpoint's
 	// certificate is not signed by a public CA.
@@ -112,7 +104,6 @@ func (c Controller) ToAPIControllerInfo() apiparams.ControllerInfo {
 	var ci apiparams.ControllerInfo
 	ci.Name = c.Name
 	ci.UUID = c.UUID
-	ci.Username = c.AdminIdentityName
 	ci.PublicAddress = c.PublicAddress
 	for _, hps := range c.Addresses {
 		for _, hp := range hps {
@@ -122,7 +113,6 @@ func (c Controller) ToAPIControllerInfo() apiparams.ControllerInfo {
 	ci.CACertificate = c.CACertificate
 	ci.CloudTag = names.NewCloudTag(c.CloudName).String()
 	ci.CloudRegion = c.CloudRegion
-	ci.Username = c.AdminIdentityName
 	ci.AgentVersion = c.AgentVersion
 	switch {
 	case c.UnavailableSince.Valid:

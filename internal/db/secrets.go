@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package db
 
@@ -126,6 +126,9 @@ func (d *Database) Get(ctx context.Context, tag names.CloudCredentialTag) (_ map
 	secret := dbmodel.NewSecret(tag.Kind(), tag.String(), nil)
 	err = d.GetSecret(ctx, &secret)
 	if err != nil {
+		if errors.ErrorCode(err) == errors.CodeNotFound {
+			return nil, nil
+		}
 		zapctx.Error(ctx, "failed to get secret data", zap.Error(err))
 		return nil, errors.E(op, err)
 	}

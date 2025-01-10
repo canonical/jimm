@@ -38,12 +38,10 @@ func (s *clientSuite) TestStatus(c *gc.C) {
 
 	info := s.APIInfo(c)
 	ctl := dbmodel.Controller{
-		UUID:              info.ControllerUUID,
-		Name:              s.ControllerConfig.ControllerName(),
-		CACertificate:     info.CACert,
-		AdminIdentityName: info.Tag.Id(),
-		AdminPassword:     info.Password,
-		PublicAddress:     info.Addrs[0],
+		UUID:          info.ControllerUUID,
+		Name:          s.ControllerConfig.ControllerName(),
+		CACertificate: info.CACert,
+		PublicAddress: info.Addrs[0],
 	}
 
 	models, err := s.API.UpdateCredential(ctx, cred)

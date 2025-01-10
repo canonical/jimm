@@ -144,12 +144,14 @@ func TestAddController(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	ctl1 := dbmodel.Controller{
-		Name:              "test-controller",
-		AdminIdentityName: "admin",
-		AdminPassword:     "5ecret",
-		PublicAddress:     "example.com:443",
+		Name:          "test-controller",
+		PublicAddress: "example.com:443",
 	}
-	err = j.AddController(context.Background(), alice, &ctl1)
+	ctlCreds := jimm.ControllerCreds{
+		AdminIdentityName: "user",
+		AdminPassword:     "secret",
+	}
+	err = j.AddController(context.Background(), alice, &ctl1, ctlCreds)
 	c.Assert(err, qt.IsNil)
 
 	ctl2 := dbmodel.Controller{
@@ -160,12 +162,10 @@ func TestAddController(t *testing.T) {
 	c.Check(ctl2, qt.CmpEquals(cmpopts.EquateEmpty(), cmpopts.IgnoreTypes(dbmodel.CloudRegion{})), ctl1)
 
 	ctl3 := dbmodel.Controller{
-		Name:              "test-controller-2",
-		AdminIdentityName: "admin",
-		AdminPassword:     "5ecret",
-		PublicAddress:     "example.com:443",
+		Name:          "test-controller-2",
+		PublicAddress: "example.com:443",
 	}
-	err = j.AddController(context.Background(), alice, &ctl3)
+	err = j.AddController(context.Background(), alice, &ctl3, ctlCreds)
 	c.Assert(err, qt.IsNil)
 
 	ctl4 := dbmodel.Controller{
@@ -237,12 +237,14 @@ func TestAddControllerWithCloudWithoutRegions(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	ctl1 := dbmodel.Controller{
-		Name:              "test-controller",
-		AdminIdentityName: "admin",
-		AdminPassword:     "5ecret",
-		PublicAddress:     "example.com:443",
+		Name:          "test-controller",
+		PublicAddress: "example.com:443",
 	}
-	err = j.AddController(context.Background(), alice, &ctl1)
+	ctlCreds := jimm.ControllerCreds{
+		AdminIdentityName: "user",
+		AdminPassword:     "secret",
+	}
+	err = j.AddController(context.Background(), alice, &ctl1, ctlCreds)
 	c.Assert(err, qt.IsNil)
 
 	ctl2 := dbmodel.Controller{
@@ -389,15 +391,15 @@ func TestAddControllerWithVault(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	ctl1 := dbmodel.Controller{
-		Name:              "test-controller",
-		AdminIdentityName: "admin",
-		AdminPassword:     "5ecret",
-		PublicAddress:     "example.com:443",
+		Name:          "test-controller",
+		PublicAddress: "example.com:443",
 	}
-	err = j.AddController(context.Background(), alice, &ctl1)
+	ctlCreds := jimm.ControllerCreds{
+		AdminIdentityName: "admin",
+		AdminPassword:     "secret",
+	}
+	err = j.AddController(context.Background(), alice, &ctl1, ctlCreds)
 	c.Assert(err, qt.IsNil)
-	c.Assert(ctl1.AdminIdentityName, qt.Equals, "")
-	c.Assert(ctl1.AdminPassword, qt.Equals, "")
 
 	ctl2 := dbmodel.Controller{
 		Name: "test-controller",
@@ -409,18 +411,14 @@ func TestAddControllerWithVault(t *testing.T) {
 	username, password, err := store.GetControllerCredentials(ctx, ctl1.Name)
 	c.Assert(err, qt.IsNil)
 	c.Assert(username, qt.Equals, "admin")
-	c.Assert(password, qt.Equals, "5ecret")
+	c.Assert(password, qt.Equals, "secret")
 
 	ctl3 := dbmodel.Controller{
-		Name:              "test-controller-2",
-		AdminIdentityName: "admin",
-		AdminPassword:     "5ecretToo",
-		PublicAddress:     "example.com:443",
+		Name:          "test-controller-2",
+		PublicAddress: "example.com:443",
 	}
-	err = j.AddController(context.Background(), alice, &ctl3)
+	err = j.AddController(context.Background(), alice, &ctl3, ctlCreds)
 	c.Assert(err, qt.IsNil)
-	c.Assert(ctl3.AdminIdentityName, qt.Equals, "")
-	c.Assert(ctl3.AdminPassword, qt.Equals, "")
 
 	ctl4 := dbmodel.Controller{
 		Name: "test-controller-2",
@@ -432,7 +430,7 @@ func TestAddControllerWithVault(t *testing.T) {
 	username, password, err = store.GetControllerCredentials(ctx, ctl4.Name)
 	c.Assert(err, qt.IsNil)
 	c.Assert(username, qt.Equals, "admin")
-	c.Assert(password, qt.Equals, "5ecretToo")
+	c.Assert(password, qt.Equals, "secret")
 }
 
 const testEarliestControllerVersionEnv = `clouds:

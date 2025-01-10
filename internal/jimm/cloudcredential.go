@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package jimm
 
@@ -41,7 +41,6 @@ func (j *JIMM) GetCloudCredential(ctx context.Context, user *openfga.User, tag n
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
-	credential.Attributes = nil
 
 	return &credential, nil
 }
@@ -177,7 +176,6 @@ func (j *JIMM) UpdateCloudCredential(ctx context.Context, user *openfga.User, ar
 	}
 
 	credential.AuthType = args.Credential.AuthType
-	credential.Attributes = args.Credential.Attributes
 
 	if !args.SkipCheck {
 		err := j.forEachController(ctx, controllers, func(ctl *dbmodel.Controller, api API) error {
@@ -204,7 +202,7 @@ func (j *JIMM) UpdateCloudCredential(ctx context.Context, user *openfga.User, ar
 		return result, nil
 	}
 
-	if err := j.updateCredential(ctx, &credential); err != nil {
+	if err := j.updateCredential(ctx, &credential, args.Credential.Attributes); err != nil {
 		return result, errors.E(op, err)
 	}
 
@@ -227,31 +225,17 @@ func (j *JIMM) UpdateCloudCredential(ctx context.Context, user *openfga.User, ar
 }
 
 // updateCredential updates the credential stored in JIMM's database.
-func (j *JIMM) updateCredential(ctx context.Context, credential *dbmodel.CloudCredential) error {
+func (j *JIMM) updateCredential(ctx context.Context, credential *dbmodel.CloudCredential, attr map[string]string) error {
 	const op = errors.Op("jimm.updateCredential")
 
-	if j.CredentialStore == nil {
-		zapctx.Debug(ctx, "credential store is nil!")
-		credential.AttributesInVault = false
-		if err := j.Database.SetCloudCredential(ctx, credential); err != nil {
-			return errors.E(op, err)
-		}
-		return nil
-	}
-
-	credential1 := *credential
-	credential1.Attributes = nil
-	credential1.AttributesInVault = true
-	if err := j.Database.SetCloudCredential(ctx, &credential1); err != nil {
+	if err := j.Database.SetCloudCredential(ctx, credential); err != nil {
 		zapctx.Error(ctx, "failed to store credential id", zap.Error(err))
 		return errors.E(op, err)
 	}
-	if err := j.CredentialStore.Put(ctx, credential.ResourceTag(), credential.Attributes); err != nil {
+	if err := j.CredentialStore.Put(ctx, credential.ResourceTag(), attr); err != nil {
 		zapctx.Error(ctx, "failed to store credentials", zap.Error(err))
 		return errors.E(op, err)
 	}
-
-	zapctx.Info(ctx, "credential store location", zap.Bool("vault", credential.AttributesInVault))
 
 	return nil
 }
@@ -263,13 +247,9 @@ func (j *JIMM) updateControllerCloudCredential(
 ) ([]jujuparams.UpdateCredentialModelResult, error) {
 	const op = errors.Op("jimm.updateControllerCloudCredential")
 
-	attr := cred.Attributes
-	if attr == nil {
-		var err error
-		attr, err = j.getCloudCredentialAttributes(ctx, cred)
-		if err != nil {
-			return nil, errors.E(op, err)
-		}
+	attr, err := j.getCloudCredentialAttributes(ctx, cred)
+	if err != nil {
+		return nil, errors.E(op, err)
 	}
 
 	models, err := f(ctx, jujuparams.TaggedCredential{
@@ -302,7 +282,6 @@ func (j *JIMM) ForEachUserCloudCredential(ctx context.Context, u *dbmodel.Identi
 	errStop := errors.E("stop")
 	var iterErr error
 	err := j.Database.ForEachCloudCredential(ctx, u.Name, cloud, func(cred *dbmodel.CloudCredential) error {
-		cred.Attributes = nil
 		iterErr = f(cred)
 		if iterErr != nil {
 			return errStop
@@ -365,17 +344,6 @@ func (j *JIMM) GetCloudCredentialAttributes(ctx context.Context, user *openfga.U
 func (j *JIMM) getCloudCredentialAttributes(ctx context.Context, cred *dbmodel.CloudCredential) (map[string]string, error) {
 	const op = errors.Op("jimm.getCloudCredentialAttributes")
 
-	if !cred.AttributesInVault {
-		if err := j.Database.GetCloudCredential(ctx, cred); err != nil {
-			return nil, errors.E(op, err)
-		}
-		return map[string]string(cred.Attributes), nil
-	}
-
-	// Attributes have to be loaded from vault.
-	if j.CredentialStore == nil {
-		return nil, errors.E(op, errors.CodeServerConfiguration, "vault not configured")
-	}
 	attr, err := j.CredentialStore.Get(ctx, cred.ResourceTag())
 	if err != nil {
 		return nil, errors.E(op, err)

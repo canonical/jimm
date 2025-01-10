@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package db_test
 
@@ -119,11 +119,6 @@ func (s *dbSuite) TestSetCloudCredentialUpdate(c *qt.C) {
 	cred.Cloud.Regions = nil
 
 	cred.Label = "test label"
-	cred.Attributes = dbmodel.StringMap{
-		"key1": "value1",
-		"key2": "value2",
-	}
-	cred.AttributesInVault = true
 	cred.Valid = sql.NullBool{
 		Bool:  true,
 		Valid: true,
@@ -139,12 +134,7 @@ func (s *dbSuite) TestSetCloudCredentialUpdate(c *qt.C) {
 	err = s.Database.GetCloudCredential(context.Background(), &dbCred)
 	c.Assert(err, qt.Equals, nil)
 	c.Assert(dbCred, jimmtest.DBObjectEquals, cred)
-	c.Assert(dbCred.Attributes, qt.DeepEquals, dbmodel.StringMap{
-		"key1": "value1",
-		"key2": "value2",
-	})
 	c.Assert(dbCred.Label, qt.Equals, "test label")
-	c.Assert(dbCred.AttributesInVault, qt.IsTrue)
 	c.Assert(dbCred.Valid.Valid, qt.IsTrue)
 	c.Assert(dbCred.Valid.Bool, qt.IsTrue)
 }
@@ -219,15 +209,9 @@ cloud-credentials:
 - name: cred-1
   cloud: cloud-1
   owner: alice@canonical.com
-  attributes:
-    k1: v1
-    k2: v2
 - name: cred-2
   cloud: cloud-1
   owner: bob@canonical.com
-  attributes:
-    k1: v1
-    k2: v2
 - name: cred-3
   cloud: cloud-2
   owner: alice@canonical.com

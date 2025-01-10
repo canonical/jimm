@@ -245,9 +245,7 @@ type Parameters struct {
 	Dialer Dialer
 
 	// CredentialStore is a store for the attributes of a
-	// cloud credential and controller credentials. If this is
-	// not configured then the attributes
-	// are stored in the standard database.
+	// cloud credential and controller credentials.
 	CredentialStore credentials.CredentialStore
 
 	// Pubsub is a pub-sub hub used for buffering model summaries.
@@ -814,15 +812,9 @@ func fillMigrationTarget(db *db.Database, credStore credentials.CredentialStore,
 	if err != nil {
 		return jujuparams.MigrationTargetInfo{}, 0, err
 	}
-	adminUser := dbController.AdminIdentityName
-	adminPass := dbController.AdminPassword
-	if adminPass == "" {
-		u, p, err := credStore.GetControllerCredentials(ctx, controllerName)
-		if err != nil {
-			return jujuparams.MigrationTargetInfo{}, 0, err
-		}
-		adminUser = u
-		adminPass = p
+	adminUser, adminPass, err := credStore.GetControllerCredentials(ctx, controllerName)
+	if err != nil {
+		return jujuparams.MigrationTargetInfo{}, 0, err
 	}
 	if adminUser == "" || adminPass == "" {
 		return jujuparams.MigrationTargetInfo{}, 0, errors.E("missing target controller credentials")

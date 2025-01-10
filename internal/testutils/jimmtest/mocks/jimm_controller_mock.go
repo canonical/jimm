@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package mocks
 
@@ -9,12 +9,13 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jimm"
 	"github.com/canonical/jimm/v3/internal/openfga"
 )
 
 // ControllerService is an implementation of the jujuapi.ControllerService interface.
 type ControllerService struct {
-	AddController_             func(ctx context.Context, u *openfga.User, ctl *dbmodel.Controller) error
+	AddController_             func(ctx context.Context, u *openfga.User, ctl *dbmodel.Controller, creds jimm.ControllerCreds) error
 	ControllerInfo_            func(ctx context.Context, name string) (*dbmodel.Controller, error)
 	EarliestControllerVersion_ func(ctx context.Context) (version.Number, error)
 	ListControllers_           func(ctx context.Context, user *openfga.User) ([]dbmodel.Controller, error)
@@ -22,11 +23,11 @@ type ControllerService struct {
 	SetControllerDeprecated_   func(ctx context.Context, user *openfga.User, controllerName string, deprecated bool) error
 }
 
-func (j *ControllerService) AddController(ctx context.Context, u *openfga.User, ctl *dbmodel.Controller) error {
+func (j *ControllerService) AddController(ctx context.Context, u *openfga.User, ctl *dbmodel.Controller, creds jimm.ControllerCreds) error {
 	if j.AddController_ == nil {
 		return errors.E(errors.CodeNotImplemented)
 	}
-	return j.AddController_(ctx, u, ctl)
+	return j.AddController_(ctx, u, ctl, creds)
 }
 
 func (j *ControllerService) ControllerInfo(ctx context.Context, name string) (*dbmodel.Controller, error) {

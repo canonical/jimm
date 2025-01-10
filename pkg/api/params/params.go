@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package params
 
@@ -167,10 +167,6 @@ type ControllerInfo struct {
 
 	// CloudRegion is the region that this controller is running in.
 	CloudRegion string `json:"cloud-region,omitempty"`
-
-	// Username contains the username that JIMM uses to connect to the
-	// controller.
-	Username string `json:"username"`
 
 	// The version of the juju agent running on the controller.
 	AgentVersion string `json:"agent-version"`

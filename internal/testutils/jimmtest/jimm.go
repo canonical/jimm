@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package jimmtest
 
@@ -16,12 +16,6 @@ import (
 var now = (time.Time{}).UTC().Round(time.Millisecond)
 
 type Option func(j *jimm.JIMM)
-
-var (
-	UnsetCredentialStore Option = func(j *jimm.JIMM) {
-		j.CredentialStore = nil
-	}
-)
 
 func NewJIMM(t Tester, additionalParameters *jimm.Parameters, options ...Option) *jimm.JIMM {
 

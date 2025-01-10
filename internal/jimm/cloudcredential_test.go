@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package jimm_test
 
@@ -23,6 +23,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
+	"github.com/canonical/jimm/v3/internal/vault"
 )
 
 func TestUpdateCloudCredential(t *testing.T) {
@@ -31,6 +32,10 @@ func TestUpdateCloudCredential(t *testing.T) {
 	arch := "amd64"
 	mem := uint64(8096)
 	cores := uint64(8)
+	testAttributes := map[string]string{
+		"key1": "value1",
+		"key2": "value2",
+	}
 
 	tests := []struct {
 		about                  string
@@ -99,6 +104,9 @@ func TestUpdateCloudCredential(t *testing.T) {
 			err = j.Database.SetCloudCredential(context.Background(), &cred)
 			c.Assert(err, qt.Equals, nil)
 
+			err = j.CredentialStore.Put(context.Background(), cred.ResourceTag(), testAttributes)
+			c.Assert(err, qt.Equals, nil)
+
 			cred.Cloud = dbmodel.Cloud{
 				Name: "test-cloud",
 				Type: "test-provider",
@@ -116,20 +124,13 @@ func TestUpdateCloudCredential(t *testing.T) {
 			arg := jimm.UpdateCloudCredentialArgs{
 				CredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
 				Credential: jujuparams.CloudCredential{
-					Attributes: map[string]string{
-						"key1": "value1",
-						"key2": "value2",
-					},
-					AuthType: "test-auth-type",
+					Attributes: testAttributes,
+					AuthType:   "test-auth-type",
 				},
 			}
 
 			expectedCredential := cred
 			expectedCredential.AuthType = "test-auth-type"
-			expectedCredential.Attributes = map[string]string{
-				"key1": "value1",
-				"key2": "value2",
-			}
 
 			m := dbmodel.Model{
 				UUID: sql.NullString{
@@ -214,6 +215,9 @@ func TestUpdateCloudCredential(t *testing.T) {
 			err = j.Database.SetCloudCredential(context.Background(), &cred)
 			c.Assert(err, qt.Equals, nil)
 
+			err = j.CredentialStore.Put(context.Background(), cred.ResourceTag(), testAttributes)
+			c.Assert(err, qt.Equals, nil)
+
 			cred.Cloud = dbmodel.Cloud{
 				Name: "test-cloud",
 				Type: "test-provider",
@@ -231,11 +235,8 @@ func TestUpdateCloudCredential(t *testing.T) {
 			arg := jimm.UpdateCloudCredentialArgs{
 				CredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
 				Credential: jujuparams.CloudCredential{
-					Attributes: map[string]string{
-						"key1": "value1",
-						"key2": "value2",
-					},
-					AuthType: "test-auth-type",
+					Attributes: testAttributes,
+					AuthType:   "test-auth-type",
 				},
 			}
 			return u, arg, dbmodel.CloudCredential{}, "test error"
@@ -305,6 +306,9 @@ func TestUpdateCloudCredential(t *testing.T) {
 			err = j.Database.SetCloudCredential(context.Background(), &cred)
 			c.Assert(err, qt.Equals, nil)
 
+			err = j.CredentialStore.Put(context.Background(), cred.ResourceTag(), testAttributes)
+			c.Assert(err, qt.Equals, nil)
+
 			_, err = j.AddModel(context.Background(), user, &jimm.ModelCreateArgs{
 				Name:            "test-model",
 				Owner:           names.NewUserTag(u.Name),
@@ -317,11 +321,8 @@ func TestUpdateCloudCredential(t *testing.T) {
 			arg := jimm.UpdateCloudCredentialArgs{
 				CredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
 				Credential: jujuparams.CloudCredential{
-					Attributes: map[string]string{
-						"key1": "value1",
-						"key2": "value2",
-					},
-					AuthType: "test-auth-type",
+					Attributes: testAttributes,
+					AuthType:   "test-auth-type",
 				},
 			}
 			return u, arg, dbmodel.CloudCredential{}, "test error"
@@ -399,6 +400,9 @@ func TestUpdateCloudCredential(t *testing.T) {
 			err = j.Database.SetCloudCredential(context.Background(), &cred)
 			c.Assert(err, qt.Equals, nil)
 
+			err = j.CredentialStore.Put(context.Background(), cred.ResourceTag(), testAttributes)
+			c.Assert(err, qt.Equals, nil)
+
 			mi, err := j.AddModel(context.Background(), alice, &jimm.ModelCreateArgs{
 				Name:            "test-model",
 				Owner:           names.NewUserTag("eve@canonical.com"),
@@ -411,11 +415,8 @@ func TestUpdateCloudCredential(t *testing.T) {
 			arg := jimm.UpdateCloudCredentialArgs{
 				CredentialTag: names.NewCloudCredentialTag("test-cloud/eve@canonical.com/test-credential-1"),
 				Credential: jujuparams.CloudCredential{
-					Attributes: map[string]string{
-						"key1": "value1",
-						"key2": "value2",
-					},
-					AuthType: "test-auth-type",
+					Attributes: testAttributes,
+					AuthType:   "test-auth-type",
 				},
 			}
 			m := dbmodel.Model{
@@ -441,12 +442,8 @@ func TestUpdateCloudCredential(t *testing.T) {
 					Type: cloud.Type,
 				},
 				OwnerIdentityName: eve.Name,
-				Attributes: map[string]string{
-					"key1": "value1",
-					"key2": "value2",
-				},
-				AuthType: "test-auth-type",
-				Models:   []dbmodel.Model{m},
+				AuthType:          "test-auth-type",
+				Models:            []dbmodel.Model{m},
 			}, ""
 		},
 	}, {
@@ -513,6 +510,9 @@ func TestUpdateCloudCredential(t *testing.T) {
 			err = j.Database.SetCloudCredential(context.Background(), &cred)
 			c.Assert(err, qt.Equals, nil)
 
+			err = j.CredentialStore.Put(context.Background(), cred.ResourceTag(), testAttributes)
+			c.Assert(err, qt.Equals, nil)
+
 			cred.Cloud = dbmodel.Cloud{
 				Name: "test-cloud",
 				Type: "test-provider",
@@ -530,21 +530,14 @@ func TestUpdateCloudCredential(t *testing.T) {
 			arg := jimm.UpdateCloudCredentialArgs{
 				CredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
 				Credential: jujuparams.CloudCredential{
-					Attributes: map[string]string{
-						"key1": "value1",
-						"key2": "value2",
-					},
-					AuthType: "test-auth-type",
+					Attributes: testAttributes,
+					AuthType:   "test-auth-type",
 				},
 				SkipCheck: true,
 			}
 
 			expectedCredential := cred
 			expectedCredential.AuthType = "test-auth-type"
-			expectedCredential.Attributes = map[string]string{
-				"key1": "value1",
-				"key2": "value2",
-			}
 			m := dbmodel.Model{
 				UUID: sql.NullString{
 					String: mi.UUID,
@@ -626,6 +619,9 @@ func TestUpdateCloudCredential(t *testing.T) {
 			err = j.Database.SetCloudCredential(context.Background(), &cred)
 			c.Assert(err, qt.Equals, nil)
 
+			err = j.CredentialStore.Put(context.Background(), cred.ResourceTag(), testAttributes)
+			c.Assert(err, qt.Equals, nil)
+
 			cred.Cloud = dbmodel.Cloud{
 				Name: "test-cloud",
 				Type: "test-provider",
@@ -642,11 +638,8 @@ func TestUpdateCloudCredential(t *testing.T) {
 			arg := jimm.UpdateCloudCredentialArgs{
 				CredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
 				Credential: jujuparams.CloudCredential{
-					Attributes: map[string]string{
-						"key1": "value1",
-						"key2": "value2",
-					},
-					AuthType: "test-auth-type",
+					Attributes: testAttributes,
+					AuthType:   "test-auth-type",
 				},
 				SkipUpdate: true,
 			}
@@ -779,7 +772,6 @@ func TestUpdateCloudCredential(t *testing.T) {
 						API: api,
 					},
 				},
-				jimmtest.UnsetCredentialStore, // this test relies on credential attributes being stored in postgres
 			)
 
 			u, arg, expectedCredential, expectedError := test.createEnv(c, j)
@@ -804,6 +796,10 @@ func TestUpdateCloudCredential(t *testing.T) {
 				c.Assert(err, qt.Equals, nil)
 
 				c.Assert(credential, jimmtest.DBObjectEquals, expectedCredential)
+
+				gotAttributes, err := j.CredentialStore.Get(ctx, credential.ResourceTag())
+				c.Assert(err, qt.Equals, nil)
+				c.Assert(gotAttributes, qt.DeepEquals, testAttributes)
 			} else {
 				c.Assert(err, qt.ErrorMatches, expectedError)
 			}
@@ -1369,15 +1365,9 @@ cloud-credentials:
 - name: cred-1
   cloud: cloud-1
   owner: alice@canonical.com
-  attributes:
-    k1: v1
-    k2: v2
 - name: cred-2
   cloud: cloud-1
   owner: bob@canonical.com
-  attributes:
-    k1: v1
-    k2: v2
 - name: cred-3
   cloud: cloud-2
   owner: alice@canonical.com
@@ -1450,9 +1440,6 @@ func TestForEachUserCloudCredential(t *testing.T) {
 			if test.f == nil {
 				test.f = func(cred *dbmodel.CloudCredential) error {
 					credentials = append(credentials, cred.Tag().String())
-					if cred.Attributes != nil {
-						return errors.E("credential contains attributes")
-					}
 					return nil
 				}
 			}
@@ -1481,11 +1468,6 @@ cloud-credentials:
   cloud: test-cloud
   owner: bob@canonical.com
   auth-type: oauth2
-  attributes:
-    client-email: bob@example.com
-    client-id: 1234
-    private-key: super-secret
-    project-id: 5678
 - name: cred-2
   cloud: test-cloud
   owner: bob@canonical.com
@@ -1502,6 +1484,7 @@ var getCloudCredentialAttributesTests = []struct {
 	hidden           bool
 	jimmAdmin        bool
 	cred             string
+	skipAttributes   bool
 	expectAttributes map[string]string
 	expectRedacted   []string
 	expectError      string
@@ -1522,6 +1505,7 @@ var getCloudCredentialAttributesTests = []struct {
 	username:         "bob@canonical.com",
 	jimmAdmin:        true,
 	cred:             "cred-2",
+	skipAttributes:   true,
 	expectAttributes: map[string]string{},
 	expectRedacted:   nil,
 }, {
@@ -1563,37 +1547,66 @@ var getCloudCredentialAttributesTests = []struct {
 }}
 
 func TestGetCloudCredentialAttributes(t *testing.T) {
-	c := qt.New(t)
+	attributes := map[string]string{
+		"client-email": "bob@example.com",
+		"client-id":    "1234",
+		"private-key":  "super-secret",
+		"project-id":   "5678",
+	}
 
 	for _, test := range getCloudCredentialAttributesTests {
-		c.Run(test.name, func(c *qt.C) {
-			ctx := context.Background()
+		c := qt.New(t)
+		// Run each test twice, once with Vault as a credential store
+		// and again with Postgres as a credential store.
+		client, path, roleID, roleSecretID, ok := jimmtest.VaultClient(c)
+		c.Assert(ok, qt.IsTrue)
+		vaultStore := &vault.VaultStore{
+			Client:       client,
+			RoleID:       roleID,
+			RoleSecretID: roleSecretID,
+			KVPath:       path,
+		}
+		jimmWithVault := jimm.Parameters{CredentialStore: vaultStore}
 
-			j := jimmtest.NewJIMM(c, nil)
+		testF := func(jp *jimm.Parameters) func(c *qt.C) {
+			return func(c *qt.C) {
+				ctx := context.Background()
 
-			env := jimmtest.ParseEnvironment(c, getCloudCredentialAttributesEnv)
-			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
-			u := env.User("bob@canonical.com").DBObject(c, j.Database)
-			userBob := openfga.NewUser(&u, j.OpenFGAClient)
-			credTag := fmt.Sprintf("test-cloud/bob@canonical.com/%s", test.cred)
-			cred, err := j.GetCloudCredential(ctx, userBob, names.NewCloudCredentialTag(credTag))
-			c.Assert(err, qt.IsNil)
+				j := jimmtest.NewJIMM(c, jp)
 
-			u = env.User(test.username).DBObject(c, j.Database)
-			userTest := openfga.NewUser(&u, j.OpenFGAClient)
-			userTest.JimmAdmin = test.jimmAdmin
-			attr, redacted, err := j.GetCloudCredentialAttributes(ctx, userTest, cred, test.hidden)
-			if test.expectError != "" {
-				c.Check(err, qt.ErrorMatches, test.expectError)
-				if test.expectErrorCode != "" {
-					c.Check(errors.ErrorCode(err), qt.Equals, test.expectErrorCode)
+				env := jimmtest.ParseEnvironment(c, getCloudCredentialAttributesEnv)
+				env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+
+				u := env.User("bob@canonical.com").DBObject(c, j.Database)
+				userBob := openfga.NewUser(&u, j.OpenFGAClient)
+
+				credTag := names.NewCloudCredentialTag(fmt.Sprintf("test-cloud/bob@canonical.com/%s", test.cred))
+				cred, err := j.GetCloudCredential(ctx, userBob, credTag)
+				c.Assert(err, qt.IsNil)
+
+				if !test.skipAttributes {
+					err = j.CredentialStore.Put(ctx, credTag, attributes)
+					c.Assert(err, qt.IsNil)
 				}
-				return
+
+				u = env.User(test.username).DBObject(c, j.Database)
+				userTest := openfga.NewUser(&u, j.OpenFGAClient)
+				userTest.JimmAdmin = test.jimmAdmin
+				attr, redacted, err := j.GetCloudCredentialAttributes(ctx, userTest, cred, test.hidden)
+				if test.expectError != "" {
+					c.Check(err, qt.ErrorMatches, test.expectError)
+					if test.expectErrorCode != "" {
+						c.Check(errors.ErrorCode(err), qt.Equals, test.expectErrorCode)
+					}
+					return
+				}
+				c.Assert(err, qt.IsNil)
+				c.Check(attr, qt.DeepEquals, test.expectAttributes)
+				c.Check(redacted, qt.DeepEquals, test.expectRedacted)
 			}
-			c.Assert(err, qt.IsNil)
-			c.Check(attr, qt.DeepEquals, test.expectAttributes)
-			c.Check(redacted, qt.DeepEquals, test.expectRedacted)
-		})
+		}
+		c.Run(test.name+"-postgres", testF(nil))
+		c.Run(test.name+"-vault", testF(&jimmWithVault))
 	}
 }
 
@@ -1651,7 +1664,6 @@ func TestCloudCredentialAttributeStore(t *testing.T) {
 			Name: "test",
 			Type: "test-provider",
 		},
-		AttributesInVault: true,
 	})
 	attr, _, err := j.GetCloudCredentialAttributes(ctx, user, &cred, true)
 	c.Assert(err, qt.IsNil)

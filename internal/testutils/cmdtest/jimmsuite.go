@@ -196,12 +196,14 @@ func (s *JimmCmdSuite) RefreshControllerAddress(c *gc.C) {
 
 func (s *JimmCmdSuite) AddController(c *gc.C, name string, info *api.Info) {
 	ctl := &dbmodel.Controller{
-		UUID:              info.ControllerUUID,
-		Name:              name,
+		UUID:          info.ControllerUUID,
+		Name:          name,
+		CACertificate: info.CACert,
+		Addresses:     nil,
+	}
+	ctlCreds := jimm.ControllerCreds{
 		AdminIdentityName: info.Tag.Id(),
 		AdminPassword:     info.Password,
-		CACertificate:     info.CACert,
-		Addresses:         nil,
 	}
 	ctl.Addresses = make(dbmodel.HostPorts, 0, len(info.Addrs))
 	for _, addr := range info.Addrs {
@@ -214,7 +216,7 @@ func (s *JimmCmdSuite) AddController(c *gc.C, name string, info *api.Info) {
 	}
 	adminUser := openfga.NewUser(s.AdminUser, s.OFGAClient)
 	adminUser.JimmAdmin = true
-	err := s.JIMM.AddController(context.Background(), adminUser, ctl)
+	err := s.JIMM.AddController(context.Background(), adminUser, ctl, ctlCreds)
 	c.Assert(err, gc.Equals, nil)
 }
 
