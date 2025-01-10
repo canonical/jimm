@@ -232,6 +232,7 @@ type AuditLogManager interface {
 	StartCleanup(ctx context.Context)
 }
 
+// ServiceAccountManager provides methods to assign ownerhsip and credentials to service accounts.
 type ServiceAccountManager interface {
 	// AddServiceAccount assigns an unowned service account to the provided user.
 	AddServiceAccount(ctx context.Context, u *openfga.User, clientId string) error
