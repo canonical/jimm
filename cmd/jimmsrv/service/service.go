@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 // service defines the methods necessary to start a JIMM server
 // alongside all the config options that can be supplied to configure JIMM.
@@ -201,8 +201,7 @@ type Service struct {
 	jimm       *jimm.JIMM
 	jwkService *jimmjwx.JWKSService
 
-	isLeader              bool
-	auditLogCleanupPeriod int
+	isLeader bool
 
 	mux      *chi.Mux
 	cleanups []func() error
@@ -312,6 +311,17 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	// Setup all dependency services
 	if jimmParameters.UUID == "" {
 		jimmParameters.UUID = uuid.NewString()
+	}
+
+	if p.AuditLogRetentionPeriodInDays != "" {
+		retentionPeriod, err := strconv.Atoi(p.AuditLogRetentionPeriodInDays)
+		if err != nil {
+			return nil, errors.E(op, "failed to parse audit log retention period")
+		}
+		if retentionPeriod < 0 {
+			return nil, errors.E(op, "retention period cannot be less than 0")
+		}
+		jimmParameters.AuditLogRetentionDays = retentionPeriod
 	}
 
 	if p.DSN == "" {
@@ -486,16 +496,6 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		jimmhttp.NewHTTPProxyHandler(s.jimm),
 	)
 
-	if p.AuditLogRetentionPeriodInDays != "" {
-		var err error
-		s.auditLogCleanupPeriod, err = strconv.Atoi(p.AuditLogRetentionPeriodInDays)
-		if err != nil {
-			return nil, errors.E(op, "failed to parse audit log retention period")
-		}
-		if s.auditLogCleanupPeriod < 0 {
-			return nil, errors.E(op, "retention period cannot be less than 0")
-		}
-	}
 	s.isLeader = p.IsLeader
 
 	return s, nil
@@ -505,12 +505,10 @@ func (s *Service) StartServices(ctx context.Context, svc *service.Service) {
 	// on the leader unit we start additional routines
 	if s.isLeader {
 		// audit log cleanup routine
-		if s.auditLogCleanupPeriod != 0 {
-			svc.Go(func() error {
-				jimm.NewAuditLogCleanupService(s.jimm.Database, s.auditLogCleanupPeriod).Start(ctx)
-				return nil
-			})
-		}
+		svc.Go(func() error {
+			s.jimm.AuditLogManager().StartCleanup(ctx)
+			return nil
+		})
 
 		// the JWKS rotator
 		svc.Go(func() error {

@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package jujuapi
 
@@ -100,7 +100,7 @@ func (s *apiServer) Kill() {
 }
 
 // serveRoot serves an RPC root object on a websocket connection.
-func serveRoot(ctx context.Context, root root, logger jimm.DbAuditLogger, wsConn *websocket.Conn) {
+func serveRoot(ctx context.Context, root root, logger auditLogger, wsConn *websocket.Conn) {
 	// Note that although NewConn accepts a `RecorderFactory` input, the call to conn.ServeRoot
 	// also accepts a `RecorderFactory` and will override anything set during the call to NewConn.
 	conn := rpc.NewConn(
@@ -108,7 +108,7 @@ func serveRoot(ctx context.Context, root root, logger jimm.DbAuditLogger, wsConn
 		nil,
 	)
 	rpcRecorderFactory := func() rpc.Recorder {
-		return jimm.NewRecorder(logger)
+		return NewRecorder(logger)
 	}
 	conn.ServeRoot(root, rpcRecorderFactory, func(err error) error {
 		return mapError(err)
@@ -176,7 +176,7 @@ func (s apiProxier) ServeWS(ctx context.Context, clientConn *websocket.Conn) {
 	jwtGenerator := s.jimm.NewJujuAuthenticator()
 	connectionFunc := controllerConnectionFunc(s, &jwtGenerator)
 	zapctx.Debug(ctx, "Starting proxier")
-	auditLogger := s.jimm.AddAuditLogEntry
+	auditLogger := s.jimm.AuditLogManager().AddAuditLogEntry
 	proxyHelpers := jimmRPC.ProxyHelpers{
 		ConnClient:              clientConn,
 		TokenGen:                &jwtGenerator,
