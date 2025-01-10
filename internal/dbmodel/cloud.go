@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package dbmodel
 
@@ -181,6 +181,14 @@ type CloudRegion struct {
 	// Controllers contains any controllers that can provide service for
 	// this cloud-region.
 	Controllers []CloudRegionControllerPriority
+
+	// Virtual, if true, indicates that a cloud was reported to have
+	// no cloud regions so we created a virtual "default" regions for it.
+	// This is necessary because Juju seems inconsistent in how they manage
+	// clouds with no regions; e.g. maas or k8s clouds may not have regions,
+	// yet for some cloud juju creates a "default" region, while for others
+	// it does not.
+	Virtual bool
 }
 
 // ToJujuCloudRegion converts a CloudRegion into a jujuparams.CloudRegion.

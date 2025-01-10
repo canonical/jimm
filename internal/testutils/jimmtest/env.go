@@ -344,7 +344,8 @@ type Cloud struct {
 // A CloudRegion represents the definition of a cloud region in a test
 // environment.
 type CloudRegion struct {
-	Name string `json:"name"`
+	Name    string `json:"name"`
+	Virtual bool   `json:"virtual"`
 }
 
 // DBObject returns a database object for the specified cloud, suitable
@@ -359,7 +360,8 @@ func (cl *Cloud) DBObject(c Tester, db *db.Database) dbmodel.Cloud {
 	cl.dbo.HostCloudRegion = cl.HostCloudRegion
 	for _, r := range cl.Regions {
 		cl.dbo.Regions = append(cl.dbo.Regions, dbmodel.CloudRegion{
-			Name: r.Name,
+			Name:    r.Name,
+			Virtual: r.Virtual,
 		})
 	}
 

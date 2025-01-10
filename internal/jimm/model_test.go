@@ -1054,6 +1054,106 @@ users:
 		OwnerTag: names.NewUserTag("alice@canonical.com").String(),
 	},
 	expectError: "no cloud specified for model; please specify one",
+}, {
+	name: "CreateModelOnACloudWithNoRegions",
+	// test-cloud has one virtual cloud region
+	env: `
+clouds:
+- name: test-cloud
+  type: test-provider
+  regions:
+  - name: default
+    virtual: true
+  users:
+  - user: alice@canonical.com
+    access: add-model
+cloud-credentials:
+- name: test-credential-1
+  owner: alice@canonical.com
+  cloud: test-cloud
+  auth-type: empty
+controllers:
+- name: controller-1
+  uuid: 00000000-0000-0000-0000-0000-0000000000001
+  cloud: test-cloud
+  region: default
+  cloud-regions:
+  - cloud: test-cloud
+    region: default
+    priority: 0
+- name: controller-2
+  uuid: 00000000-0000-0000-0000-0000-0000000000002
+  cloud: test-cloud
+  region: default
+  cloud-regions:
+  - cloud: test-cloud
+    region: default
+    priority: 2
+`[1:],
+	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
+		return nil, nil
+	},
+	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
+		return nil
+	},
+	createModel: assertCreateModelArgs(&jujuparams.ModelCreateArgs{
+		Name:     "test-model",
+		OwnerTag: names.NewUserTag("alice@canonical.com").String(),
+		CloudTag: names.NewCloudTag("test-cloud").String(),
+		// we expect cloud region to be empty, because it is a virtual "default" region
+		CloudRegion:        "",
+		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1").String(),
+	}, createModel(`
+uuid: 00000001-0000-0000-0000-0000-000000000001
+status:
+  status: started
+  info: running a test
+life: alive
+users:
+- user: alice@canonical.com
+  access: admin
+- user: bob
+  access: read
+`[1:])),
+	username:     "alice@canonical.com",
+	jimmAdmin:    true,
+	cloudCredTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
+	args: jujuparams.ModelCreateArgs{
+		Name:     "test-model",
+		OwnerTag: names.NewUserTag("alice@canonical.com").String(),
+		CloudTag: names.NewCloudTag("test-cloud").String(),
+		// Creating a model without specifying the cloud region
+		CloudRegion: "",
+	},
+	expectModel: dbmodel.Model{
+		Name: "test-model",
+		UUID: sql.NullString{
+			String: "00000001-0000-0000-0000-0000-000000000001",
+			Valid:  true,
+		},
+		Owner: dbmodel.Identity{
+			Name: "alice@canonical.com",
+		},
+		Controller: dbmodel.Controller{
+			Name:        "controller-2",
+			UUID:        "00000000-0000-0000-0000-0000-0000000000002",
+			CloudName:   "test-cloud",
+			CloudRegion: "default",
+		},
+		CloudRegion: dbmodel.CloudRegion{
+			Cloud: dbmodel.Cloud{
+				Name: "test-cloud",
+				Type: "test-provider",
+			},
+			Name:    "default",
+			Virtual: true,
+		},
+		CloudCredential: dbmodel.CloudCredential{
+			Name:     "test-credential-1",
+			AuthType: "empty",
+		},
+		Life: state.Alive.String(),
+	},
 }}
 
 func TestAddModel(t *testing.T) {
@@ -1151,8 +1251,29 @@ func assertConfig(config map[string]interface{}, fnc func(context.Context, *juju
 		}
 		for k, v := range args.Config {
 			if config[k] != v {
-				return errors.E(fmt.Sprintf("config value mismatch for key %s", k))
+				return errors.E(fmt.Sprintf("config value mismatch for key %s: %s -> %s", k, config[k], v))
 			}
+		}
+		return fnc(ctx, args, mi)
+	}
+}
+
+func assertCreateModelArgs(expectedArgs *jujuparams.ModelCreateArgs, fnc func(context.Context, *jujuparams.ModelCreateArgs, *jujuparams.ModelInfo) error) func(context.Context, *jujuparams.ModelCreateArgs, *jujuparams.ModelInfo) error {
+	return func(ctx context.Context, args *jujuparams.ModelCreateArgs, mi *jujuparams.ModelInfo) error {
+		if expectedArgs.Name != args.Name {
+			return fmt.Errorf("name mismatch: expected %q, got %q", expectedArgs.Name, args.Name)
+		}
+		if expectedArgs.OwnerTag != args.OwnerTag {
+			return fmt.Errorf("owner mismatch: expected %q, got %q", expectedArgs.Name, args.Name)
+		}
+		if expectedArgs.CloudTag != args.CloudTag {
+			return fmt.Errorf("cloud mismatch: expected %q, got %q", expectedArgs.Name, args.Name)
+		}
+		if expectedArgs.CloudRegion != args.CloudRegion {
+			return fmt.Errorf("cloud region mismatch: expected %q, got %q", expectedArgs.Name, args.Name)
+		}
+		if expectedArgs.CloudCredentialTag != args.CloudCredentialTag {
+			return fmt.Errorf("credential mismatch: expected %q, got %q", expectedArgs.Name, args.Name)
 		}
 		return fnc(ctx, args, mi)
 	}

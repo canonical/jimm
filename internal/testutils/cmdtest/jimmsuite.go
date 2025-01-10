@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 // Package cmdtest provides the test suite used for CLI tests
 // as well as helper functions used for integration based CLI tests.
