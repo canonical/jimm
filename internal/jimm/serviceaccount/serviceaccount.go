@@ -15,6 +15,8 @@ import (
 	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
 
+// CredentialCopier defines how the service account manager can copy
+// a user's own credentials to a service account.
 type CredentialCopier interface {
 	CopyCredential(ctx context.Context, originalUser *openfga.User, newUser *openfga.User, cred names.CloudCredentialTag) (names.CloudCredentialTag, []jujuparams.UpdateCredentialModelResult, error)
 }
