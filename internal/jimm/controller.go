@@ -260,6 +260,7 @@ func (j *JIMM) AddController(ctx context.Context, user *openfga.User, ctl *dbmod
 			dbClouds[i].Regions = []dbmodel.CloudRegion{{
 				CloudName: cloud.Name,
 				Name:      "default",
+				Virtual:   true,
 			}}
 			if cloud.Name == ctl.CloudName {
 				ctl.CloudRegion = "default"

@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package db_test
 
@@ -35,7 +35,8 @@ func (s *dbSuite) TestAddCloud(c *qt.C) {
 		IdentityEndpoint: "https://identity.example.com",
 		StorageEndpoint:  "https://storage.example.com",
 		Regions: []dbmodel.CloudRegion{{
-			Name: "test-cloud-region",
+			Name:    "test-cloud-region",
+			Virtual: true,
 		}},
 		CACertificates: dbmodel.Strings{"CACERT 1", "CACERT 2"},
 	}

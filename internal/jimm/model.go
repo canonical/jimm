@@ -103,16 +103,17 @@ type modelBuilder struct {
 
 	jimm *JIMM
 
-	name          string
-	config        map[string]interface{}
-	owner         *dbmodel.Identity
-	credential    *dbmodel.CloudCredential
-	controller    *dbmodel.Controller
-	cloud         *dbmodel.Cloud
-	cloudRegion   string
-	cloudRegionID uint
-	model         *dbmodel.Model
-	modelInfo     *jujuparams.ModelInfo
+	name               string
+	config             map[string]interface{}
+	owner              *dbmodel.Identity
+	credential         *dbmodel.CloudCredential
+	controller         *dbmodel.Controller
+	cloud              *dbmodel.Cloud
+	cloudRegion        string
+	cloudRegionID      uint
+	cloudRegionVirtual bool
+	model              *dbmodel.Model
+	modelInfo          *jujuparams.ModelInfo
 }
 
 // Error returns the error that occurred in the process
@@ -138,14 +139,21 @@ func (b *modelBuilder) jujuModelCreateArgs() (*jujuparams.ModelCreateArgs, error
 		return nil, errors.E("credentials not specified")
 	}
 
-	return &jujuparams.ModelCreateArgs{
+	args := &jujuparams.ModelCreateArgs{
 		Name:               b.name,
 		OwnerTag:           b.owner.Tag().String(),
 		Config:             b.config,
 		CloudTag:           b.cloud.Tag().String(),
 		CloudRegion:        b.cloudRegion,
 		CloudCredentialTag: b.credential.Tag().String(),
-	}, nil
+	}
+	// if this cloud region is a virtual one (cloud did not report
+	// any regions and we added a "default" region), we will
+	// not send a cloud region to the controller.
+	if b.cloudRegionVirtual {
+		args.CloudRegion = ""
+	}
+	return args, nil
 }
 
 // WithOwner returns a builder with the specified owner.
@@ -268,7 +276,8 @@ func (b *modelBuilder) WithCloudRegion(region string) *modelBuilder {
 
 		// and select the first controller in the slice
 		b.cloudRegion = region
-		b.cloudRegionID = regionControllers[0].CloudRegionID
+		b.cloudRegionID = r.ID
+		b.cloudRegionVirtual = r.Virtual
 		b.controller = &regionControllers[0].Controller
 
 		break
