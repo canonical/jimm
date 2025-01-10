@@ -31,6 +31,7 @@ type JIMM struct {
 	mocks.ControllerService
 	mocks.ModelManager
 
+	AuditLogManager_   func() jimm.AuditLogManager
 	GroupManager_      func() jimm.GroupManager
 	IdentityManager_   func() jimm.IdentityManager
 	LoginManager_      func() jimm.LoginManager
@@ -213,6 +214,13 @@ func (j *JIMM) PermissionManager() jimm.PermissionManager {
 		return nil
 	}
 	return j.PermissionManager_()
+}
+
+func (j *JIMM) AuditLogManager() jimm.AuditLogManager {
+	if j.AuditLogManager_ == nil {
+		return nil
+	}
+	return j.AuditLogManager_()
 }
 
 func (j *JIMM) InitiateMigration(ctx context.Context, user *openfga.User, spec jujuparams.MigrationSpec) (jujuparams.InitiateMigrationResult, error) {

@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package jujuapi
 
@@ -343,7 +343,7 @@ func (r *controllerRoot) FindAuditEvents(ctx context.Context, req apiparams.Find
 	if err != nil {
 		return apiparams.AuditEvents{}, errors.E(op, err)
 	}
-	entries, err := r.jimm.FindAuditEvents(ctx, r.user, filter)
+	entries, err := r.jimm.AuditLogManager().FindAuditEvents(ctx, r.user, filter)
 	if err != nil {
 		return apiparams.AuditEvents{}, errors.E(op, err)
 	}
@@ -485,7 +485,7 @@ func (r *controllerRoot) CrossModelQuery(ctx context.Context, req apiparams.Cros
 func (r *controllerRoot) PurgeLogs(ctx context.Context, req apiparams.PurgeLogsRequest) (apiparams.PurgeLogsResponse, error) {
 	const op = errors.Op("jujuapi.PurgeLogs")
 
-	deleted_count, err := r.jimm.PurgeLogs(ctx, r.user, req.Date)
+	deleted_count, err := r.jimm.AuditLogManager().PurgeLogs(ctx, r.user, req.Date)
 	if err != nil {
 		return apiparams.PurgeLogsResponse{}, errors.E(op, err)
 	}

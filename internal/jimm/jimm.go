@@ -19,9 +19,7 @@ import (
 	"github.com/juju/juju/core/crossmodel"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
-	"github.com/juju/zaputil/zapctx"
 	"github.com/lestrrat-go/jwx/v2/jwt"
-	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 	"golang.org/x/sync/errgroup"
 
@@ -29,6 +27,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jimm/auditlog"
 	"github.com/canonical/jimm/v3/internal/jimm/credentials"
 	"github.com/canonical/jimm/v3/internal/jimm/group"
 	"github.com/canonical/jimm/v3/internal/jimm/identity"
@@ -220,6 +219,18 @@ type PermissionManager interface {
 	ToJAASTag(ctx context.Context, tag *ofganames.Tag, resolveUUIDs bool) (string, error)
 }
 
+// AuditLogManager provides methods to add/find/cleanup audit logs.
+type AuditLogManager interface {
+	// AddAuditLogEntry saves an audit log entry.
+	AddAuditLogEntry(ale *dbmodel.AuditLogEntry)
+	// FindAuditEvents queries for audit log entries that match the specified filter(s).
+	FindAuditEvents(ctx context.Context, user *openfga.User, filter db.AuditLogFilter) ([]dbmodel.AuditLogEntry, error)
+	// PurgeLogs removes logs older than the specified date.
+	PurgeLogs(ctx context.Context, user *openfga.User, before time.Time) (int64, error)
+	// StartCleanup removes log older than the retention period.
+	StartCleanup(ctx context.Context)
+}
+
 // Parameters holds the services and static fields passed to the jimm.New() constructor.
 // You can provide mock implementations of certain services where necessary for dependency injection.
 type Parameters struct {
@@ -260,6 +271,10 @@ type Parameters struct {
 	// OAuthAuthenticator is responsible for handling authentication
 	// via OAuth2.0 AND JWT access tokens to JIMM.
 	OAuthAuthenticator OAuthAuthenticator
+
+	// AuditLogRetentionDays is the number of days to keep audit logs.
+	// The default value of 0 indicates that logs will never be deleted.
+	AuditLogRetentionDays int
 }
 
 func (p *Parameters) Validate() error {
@@ -347,6 +362,12 @@ func New(p Parameters) (*JIMM, error) {
 
 	j.jujuAuthFactory = jujuauth.NewFactory(j.Database, j.JWTService, permissionManager)
 
+	auditLogManager, err := auditlog.NewAuditLogManager(j.Database, j.OpenFGAClient, j.ResourceTag(), p.AuditLogRetentionDays)
+	if err != nil {
+		return nil, err
+	}
+	j.auditLogManager = auditLogManager
+
 	return j, nil
 }
 
@@ -372,6 +393,9 @@ type JIMM struct {
 	permissionManager PermissionManager
 
 	jujuAuthFactory *jujuauth.Factory
+
+	// auditLogManager provides a means to manage audit logs within JIMM.
+	auditLogManager AuditLogManager
 }
 
 // ResourceTag returns JIMM's controller tag stating its UUID.
@@ -399,7 +423,7 @@ func (j *JIMM) IdentityManager() IdentityManager {
 	return j.identityManager
 }
 
-// Login manager returns a manager that enables login and authentication.
+// LoginManager returns a manager that enables login and authentication.
 func (j *JIMM) LoginManager() LoginManager {
 	return j.loginManager
 }
@@ -414,6 +438,11 @@ func (j *JIMM) PermissionManager() PermissionManager {
 // requests to a Juju controller.
 func (j *JIMM) NewJujuAuthenticator() jujuauth.TokenGenerator {
 	return j.jujuAuthFactory.New()
+}
+
+// AuditLogManager returns a manager that handles audit logging.
+func (j *JIMM) AuditLogManager() AuditLogManager {
+	return j.auditLogManager
 }
 
 type permission struct {
@@ -631,57 +660,6 @@ func (j *JIMM) forEachController(ctx context.Context, controllers []dbmodel.Cont
 		})
 	}
 	return eg.Wait()
-}
-
-// addAuditLogEntry causes an entry to be added the the audit log.
-func (j *JIMM) AddAuditLogEntry(ale *dbmodel.AuditLogEntry) {
-	ctx := context.Background()
-	redactSensitiveParams(ale)
-	if err := j.Database.AddAuditLogEntry(ctx, ale); err != nil {
-		zapctx.Error(ctx, "cannot store audit log entry", zap.Error(err), zap.Any("entry", *ale))
-	}
-}
-
-var sensitiveMethods = map[string]struct{}{
-	"login":                 {},
-	"logindevice":           {},
-	"getdevicesessiontoken": {},
-	"loginwithsessiontoken": {},
-	"addcredentials":        {},
-	"updatecredentials":     {}}
-var redactJSON = dbmodel.JSON(`{"params":"redacted"}`)
-
-func redactSensitiveParams(ale *dbmodel.AuditLogEntry) {
-	if ale.Params == nil {
-		return
-	}
-	method := strings.ToLower(ale.FacadeMethod)
-	if _, ok := sensitiveMethods[method]; ok {
-		newRedactMessage := make(dbmodel.JSON, len(redactJSON))
-		copy(newRedactMessage, redactJSON)
-		ale.Params = newRedactMessage
-	}
-}
-
-// FindAuditEvents returns audit events matching the given filter.
-func (j *JIMM) FindAuditEvents(ctx context.Context, user *openfga.User, filter db.AuditLogFilter) ([]dbmodel.AuditLogEntry, error) {
-	const op = errors.Op("jimm.FindAuditEvents")
-
-	access := user.GetAuditLogViewerAccess(ctx, j.ResourceTag())
-	if access != ofganames.AuditLogViewerRelation {
-		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
-	}
-
-	var entries []dbmodel.AuditLogEntry
-	err := j.Database.ForEachAuditLogEntry(ctx, filter, func(entry *dbmodel.AuditLogEntry) error {
-		entries = append(entries, *entry)
-		return nil
-	})
-	if err != nil {
-		return nil, errors.E(op, err)
-	}
-
-	return entries, nil
 }
 
 // ControllerInfo returns info about a controller connected to JIMM.
