@@ -247,7 +247,6 @@ func (j *JIMM) updateControllerCloudCredential(
 ) ([]jujuparams.UpdateCredentialModelResult, error) {
 	const op = errors.Op("jimm.updateControllerCloudCredential")
 
-	var err error
 	attr, err := j.getCloudCredentialAttributes(ctx, cred)
 	if err != nil {
 		return nil, errors.E(op, err)
