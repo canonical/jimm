@@ -22,9 +22,10 @@ func (s *dbSuite) TestCreateSSHKey(c *qt.C) {
 	c.Assert(s.Database.DB.Create(u).Error, qt.IsNil)
 
 	key := dbmodel.SSHKey{
-		Identity:   *u,
-		PublicKey:  []byte("foo"),
-		KeyComment: "bar",
+		Identity:       *u,
+		PublicKey:      []byte("foo"),
+		KeyComment:     "bar",
+		MD5Fingerprint: "fake-fingerprint",
 	}
 	err = s.Database.AddSSHKey(context.Background(), &key)
 	c.Assert(err, qt.IsNil)
@@ -40,7 +41,7 @@ func (s *dbSuite) TestCreateSSHKey(c *qt.C) {
 	c.Assert(err, qt.ErrorMatches, `.*duplicate key value violates unique constraint.*`)
 }
 
-func (s *dbSuite) TestListSSHKeys(c *qt.C) {
+func (s *dbSuite) TestListSSHKeysForUser(c *qt.C) {
 	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.Equals, nil)
 
@@ -52,24 +53,26 @@ func (s *dbSuite) TestListSSHKeys(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(s.Database.DB.Create(u2).Error, qt.IsNil)
 
-	key := dbmodel.SSHKey{Identity: *u, PublicKey: []byte("foo"), KeyComment: "bar"}
+	key := dbmodel.SSHKey{Identity: *u, PublicKey: []byte("foo"), KeyComment: "bar", MD5Fingerprint: "fake-fingerprint"}
 	c.Assert(s.Database.DB.Create(&key).Error, qt.IsNil)
 
-	key2 := dbmodel.SSHKey{Identity: *u, PublicKey: []byte("foo2"), KeyComment: "bar2"}
+	key2 := dbmodel.SSHKey{Identity: *u, PublicKey: []byte("foo2"), KeyComment: "bar2", MD5Fingerprint: "fake-fingerprint"}
 	c.Assert(s.Database.DB.Create(&key2).Error, qt.IsNil)
 
 	// Key3 is owned by Alice and should not be returned.
-	key3 := dbmodel.SSHKey{Identity: *u2, PublicKey: []byte("foo3"), KeyComment: "bar3"}
+	key3 := dbmodel.SSHKey{Identity: *u2, PublicKey: []byte("foo3"), KeyComment: "bar3", MD5Fingerprint: "fake-fingerprint"}
 	c.Assert(s.Database.DB.Create(&key3).Error, qt.IsNil)
 
-	gotKeys, err := s.Database.ListSSHKeys(context.Background(), "bob@canonical.com")
+	gotKeys, err := s.Database.ListSSHKeysForUser(context.Background(), "bob@canonical.com")
 	c.Assert(err, qt.IsNil)
 	c.Assert(gotKeys, qt.HasLen, 2)
 	c.Assert(gotKeys[0].IdentityName, qt.Equals, "bob@canonical.com")
 	c.Assert(gotKeys[0].KeyComment, qt.Equals, "bar")
+	c.Assert(gotKeys[0].MD5Fingerprint, qt.Equals, "fake-fingerprint")
 	c.Assert(string(gotKeys[0].PublicKey), qt.Equals, "foo")
 	c.Assert(gotKeys[1].IdentityName, qt.Equals, "bob@canonical.com")
 	c.Assert(gotKeys[1].KeyComment, qt.Equals, "bar2")
+	c.Assert(gotKeys[1].MD5Fingerprint, qt.Equals, "fake-fingerprint")
 	c.Assert(string(gotKeys[1].PublicKey), qt.Equals, "foo2")
 }
 
@@ -91,11 +94,11 @@ func (s *dbSuite) TestRemoveSSHKeyByFingerprint(c *qt.C) {
 	publicKey, err := gossh.NewPublicKey(&rsaKey.PublicKey)
 	c.Assert(err, qt.IsNil)
 
-	key := dbmodel.SSHKey{Identity: *u, PublicKey: publicKey.Marshal(), KeyComment: "bar"}
+	key := dbmodel.SSHKey{Identity: *u, PublicKey: publicKey.Marshal(), KeyComment: "bar", MD5Fingerprint: gossh.FingerprintLegacyMD5(publicKey)}
 	c.Assert(s.Database.DB.Create(&key).Error, qt.IsNil)
 
 	// key2 with the same public-key but different owner should not be deleted.
-	key2 := dbmodel.SSHKey{Identity: *u2, PublicKey: publicKey.Marshal(), KeyComment: "bar"}
+	key2 := dbmodel.SSHKey{Identity: *u2, PublicKey: publicKey.Marshal(), KeyComment: "bar", MD5Fingerprint: gossh.FingerprintLegacyMD5(publicKey)}
 	c.Assert(s.Database.DB.Create(&key2).Error, qt.IsNil)
 
 	var keyCount int64

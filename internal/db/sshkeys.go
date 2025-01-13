@@ -4,9 +4,6 @@ package db
 
 import (
 	"context"
-	"fmt"
-
-	gossh "golang.org/x/crypto/ssh"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
@@ -42,27 +39,19 @@ func (d *Database) RemoveSSHKeyByFingerprint(ctx context.Context, identityName s
 	defer durationObserver()
 	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
 
-	var keys []dbmodel.SSHKey
-	if err := d.DB.Where("identity_name = ?", identityName).Find(&keys).Error; err != nil {
+	query := d.DB.Where("identity_name = ?", identityName).
+		Where("md5_fingerprint = ?", fingerprint).
+		Delete(&dbmodel.SSHKey{})
+
+	if err := query.Error; err != nil {
 		return errors.E(op, dbError(err))
 	}
 
-	// It is expected that we only have 1 key that matches this fingerprint
-	// because of the unique constraint between users and public keys.
-	for _, key := range keys {
-		fp, err := calculateSSHFingerprint(key.PublicKey)
-		if err != nil {
-			return errors.E(op, err)
-		}
-		if fp == fingerprint {
-			if err := d.DB.WithContext(ctx).Delete(key).Error; err != nil {
-				return errors.E(op, dbError(err))
-			}
-			return nil
-		}
+	if query.RowsAffected == 0 {
+		return errors.E(op, errors.CodeNotFound, "key not found")
 	}
 
-	return errors.E(op, errors.CodeNotFound, "key not found")
+	return nil
 }
 
 // RemoveSSHKeyByComment removes a user's ssh key identified by its comment.
@@ -89,9 +78,9 @@ func (d *Database) RemoveSSHKeyByComment(ctx context.Context, identityName strin
 	return nil
 }
 
-// ListSSHKeys all a user's SSH keys.
-func (d *Database) ListSSHKeys(ctx context.Context, identityName string) (keys []dbmodel.SSHKey, err error) {
-	const op = errors.Op("db.ListSSHKeys")
+// ListSSHKeysForUser lists all user's SSH keys.
+func (d *Database) ListSSHKeysForUser(ctx context.Context, identityName string) (keys []dbmodel.SSHKey, err error) {
+	const op = errors.Op("db.ListSSHKeysForUser")
 
 	if err := d.ready(); err != nil {
 		return nil, errors.E(op, err)
@@ -106,14 +95,4 @@ func (d *Database) ListSSHKeys(ctx context.Context, identityName string) (keys [
 	}
 
 	return keys, nil
-}
-
-// calculateSSHFingerprint parses an SSH public key and returns its MD5 fingerprint
-func calculateSSHFingerprint(publicKey []byte) (string, error) {
-	parsedKey, err := gossh.ParsePublicKey(publicKey)
-	if err != nil {
-		return "", fmt.Errorf("invalid SSH key: %v", err)
-	}
-
-	return gossh.FingerprintLegacyMD5(parsedKey), nil
 }
