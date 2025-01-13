@@ -30,9 +30,11 @@ require (
 	github.com/coreos/go-oidc/v3 v3.11.0
 	github.com/dustinkirkland/golang-petname v0.0.0-20231002161417-6a283f1aaaf2
 	github.com/frankban/quicktest v1.14.6
+	github.com/gliderlabs/ssh v0.3.8
 	github.com/go-chi/chi/v5 v5.0.12
 	github.com/go-chi/render v1.0.2
 	github.com/go-macaroon-bakery/macaroon-bakery/v3 v3.0.1
+	github.com/golang-migrate/migrate/v4 v4.17.1
 	github.com/google/go-cmp v0.6.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/sessions v1.2.1
@@ -314,7 +316,7 @@ require (
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/mock v0.5.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/crypto v0.31.0 // indirect
+	golang.org/x/crypto v0.31.0
 	golang.org/x/exp v0.0.0-20240904232852-e7e105dedf7e // indirect
 	golang.org/x/net v0.30.0 // indirect
 	golang.org/x/sys v0.28.0 // indirect
@@ -346,9 +348,8 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 )
 
-require github.com/golang-migrate/migrate/v4 v4.17.1
-
 require (
+	github.com/anmitsu/go-shlex v0.0.0-20200514113438-38f4b401e2be // indirect
 	github.com/klauspost/compress v1.17.7 // indirect
 	github.com/moby/patternmatcher v0.6.0 // indirect
 	github.com/moby/sys/sequential v0.6.0 // indirect
