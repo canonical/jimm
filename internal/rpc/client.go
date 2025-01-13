@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package rpc
 
@@ -203,16 +203,6 @@ func (c *Client) Call(ctx context.Context, facade string, version int, id, metho
 
 	select {
 	case <-ch:
-		permissionsRequired, err := checkPermissionsRequired(ctx, *respMsg)
-		if err != nil {
-			return err
-		}
-		if permissionsRequired != nil {
-			return &Error{
-				Code: PermissionCheckRequiredErrorCode,
-				Info: permissionsRequired,
-			}
-		}
 		if (*respMsg).Error != "" {
 			return &Error{
 				Message: (*respMsg).Error,

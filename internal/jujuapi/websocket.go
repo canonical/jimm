@@ -24,6 +24,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/jimm/jujuauth"
 	"github.com/canonical/jimm/v3/internal/jimmhttp"
 	jimmRPC "github.com/canonical/jimm/v3/internal/rpc"
+	"github.com/canonical/jimm/v3/internal/rpcproxy"
 )
 
 const (
@@ -177,7 +178,7 @@ func (s apiProxier) ServeWS(ctx context.Context, clientConn *websocket.Conn) {
 	connectionFunc := controllerConnectionFunc(s, &jwtGenerator)
 	zapctx.Debug(ctx, "Starting proxier")
 	auditLogger := s.jimm.AuditLogManager().AddAuditLogEntry
-	proxyHelpers := jimmRPC.ProxyHelpers{
+	proxyHelpers := rpcproxy.ProxyHelpers{
 		ConnClient:              clientConn,
 		TokenGen:                &jwtGenerator,
 		ConnectController:       connectionFunc,
@@ -185,22 +186,22 @@ func (s apiProxier) ServeWS(ctx context.Context, clientConn *websocket.Conn) {
 		LoginService:            s.jimm.LoginManager(),
 		AuthenticatedIdentityID: auth.SessionIdentityFromContext(ctx),
 	}
-	if err := jimmRPC.ProxySockets(ctx, proxyHelpers); err != nil {
+	if err := rpcproxy.ProxySockets(ctx, proxyHelpers); err != nil {
 		zapctx.Error(ctx, "failed to start jimm model proxy", zap.Error(err))
 	}
 }
 
 // controllerConnectionFunc returns a function that will be used to
 // connect to a controller when a client makes a request.
-func controllerConnectionFunc(s apiProxier, jwtGenerator *jujuauth.TokenGenerator) func(context.Context) (jimmRPC.WebsocketConnectionWithMetadata, error) {
-	return func(ctx context.Context) (jimmRPC.WebsocketConnectionWithMetadata, error) {
+func controllerConnectionFunc(s apiProxier, jwtGenerator *jujuauth.TokenGenerator) func(context.Context) (rpcproxy.WebsocketConnectionWithMetadata, error) {
+	return func(ctx context.Context) (rpcproxy.WebsocketConnectionWithMetadata, error) {
 		const op = errors.Op("proxy.controllerConnectionFunc")
 		path := jimmhttp.PathElementFromContext(ctx, "path")
 		zapctx.Debug(ctx, "grabbing model info from path", zap.String("path", path))
 		uuid, finalPath, err := modelInfoFromPath(path)
 		if err != nil {
 			zapctx.Error(ctx, "error parsing path", zap.Error(err))
-			return jimmRPC.WebsocketConnectionWithMetadata{}, errors.E(op, err)
+			return rpcproxy.WebsocketConnectionWithMetadata{}, errors.E(op, err)
 		}
 		m := dbmodel.Model{
 			UUID: sql.NullString{
@@ -210,7 +211,7 @@ func controllerConnectionFunc(s apiProxier, jwtGenerator *jujuauth.TokenGenerato
 		}
 		if err := s.jimm.Database.GetModel(context.Background(), &m); err != nil {
 			zapctx.Error(ctx, "failed to find model", zap.String("uuid", uuid), zap.Error(err))
-			return jimmRPC.WebsocketConnectionWithMetadata{}, errors.E(err, errors.CodeNotFound)
+			return rpcproxy.WebsocketConnectionWithMetadata{}, errors.E(err, errors.CodeNotFound)
 		}
 		jwtGenerator.SetTags(m.ResourceTag(), m.Controller.ResourceTag())
 		mt := m.ResourceTag()
@@ -218,10 +219,10 @@ func controllerConnectionFunc(s apiProxier, jwtGenerator *jujuauth.TokenGenerato
 		controllerConn, err := jimmRPC.Dial(ctx, &m.Controller, mt, finalPath, nil)
 		if err != nil {
 			zapctx.Error(ctx, "cannot dial controller", zap.String("controller", m.Controller.Name), zap.Error(err))
-			return jimmRPC.WebsocketConnectionWithMetadata{}, err
+			return rpcproxy.WebsocketConnectionWithMetadata{}, err
 		}
 		fullModelName := m.Controller.Name + "/" + m.Name
-		return jimmRPC.WebsocketConnectionWithMetadata{
+		return rpcproxy.WebsocketConnectionWithMetadata{
 			Conn:           controllerConn,
 			ControllerUUID: m.Controller.UUID,
 			ModelName:      fullModelName,

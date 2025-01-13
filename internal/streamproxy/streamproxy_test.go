@@ -1,5 +1,6 @@
-// Copyright 2024 Canonical.
-package rpc_test
+// Copyright 2025 Canonical.
+
+package streamproxy_test
 
 import (
 	"context"
@@ -11,7 +12,8 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/gorilla/websocket"
 
-	"github.com/canonical/jimm/v3/internal/rpc"
+	"github.com/canonical/jimm/v3/internal/streamproxy"
+	"github.com/canonical/jimm/v3/internal/testutils/rpctest"
 )
 
 func echoSingleMessage(c *websocket.Conn) error {
@@ -54,18 +56,16 @@ func TestStreamProxy(t *testing.T) {
 	ctx := context.Background()
 
 	doneChan := make(chan error)
-	srvController := newServer(echoSingleMessage)
-	srvJIMM := newServer(func(connClient *websocket.Conn) error {
-		connController, err := srvController.dialer.DialWebsocket(ctx, srvController.URL, nil)
-		c.Assert(err, qt.IsNil)
-		rpc.ProxyStreams(ctx, connClient, connController)
+	srvController := rpctest.NewServer(echoSingleMessage)
+	srvJIMM := rpctest.NewServer(func(connClient *websocket.Conn) error {
+		connController := srvController.Dialer.DialWebsocket(c, srvController.URL)
+		streamproxy.ProxyStreams(ctx, connClient, connController)
 		doneChan <- nil
 		return nil
 	})
 	defer srvController.Close()
 	defer srvJIMM.Close()
-	ws, err := srvJIMM.dialer.DialWebsocket(ctx, srvJIMM.URL, nil)
-	c.Assert(err, qt.IsNil)
+	ws := srvJIMM.Dialer.DialWebsocket(c, srvJIMM.URL)
 	defer ws.Close()
 
 	verifyEcho(c, ws, "")
@@ -79,18 +79,16 @@ func TestStreamProxyStoppedController(t *testing.T) {
 	ctx := context.Background()
 
 	doneChan := make(chan error)
-	srvController := newServer(func(c *websocket.Conn) error { return errors.New("stopped") })
-	srvJIMM := newServer(func(connClient *websocket.Conn) error {
-		connController, err := srvController.dialer.DialWebsocket(ctx, srvController.URL, nil)
-		c.Assert(err, qt.IsNil)
-		rpc.ProxyStreams(ctx, connClient, connController)
+	srvController := rpctest.NewServer(func(c *websocket.Conn) error { return errors.New("stopped") })
+	srvJIMM := rpctest.NewServer(func(connClient *websocket.Conn) error {
+		connController := srvController.Dialer.DialWebsocket(c, srvController.URL)
+		streamproxy.ProxyStreams(ctx, connClient, connController)
 		doneChan <- nil
 		return nil
 	})
 	defer srvController.Close()
 	defer srvJIMM.Close()
-	ws, err := srvJIMM.dialer.DialWebsocket(ctx, srvJIMM.URL, nil)
-	c.Assert(err, qt.IsNil)
+	ws := srvJIMM.Dialer.DialWebsocket(c, srvJIMM.URL)
 	defer ws.Close()
 
 	verifyEcho(c, ws, ".*abnormal closure.*")
@@ -104,18 +102,16 @@ func TestStreamProxyStoppedMidwayController(t *testing.T) {
 	ctx := context.Background()
 
 	doneChan := make(chan error)
-	srvController := newServer(echoSingleMessage)
-	srvJIMM := newServer(func(connClient *websocket.Conn) error {
-		connController, err := srvController.dialer.DialWebsocket(ctx, srvController.URL, nil)
-		c.Assert(err, qt.IsNil)
-		rpc.ProxyStreams(ctx, connClient, connController)
+	srvController := rpctest.NewServer(echoSingleMessage)
+	srvJIMM := rpctest.NewServer(func(connClient *websocket.Conn) error {
+		connController := srvController.Dialer.DialWebsocket(c, srvController.URL)
+		streamproxy.ProxyStreams(ctx, connClient, connController)
 		doneChan <- nil
 		return nil
 	})
 	defer srvController.Close()
 	defer srvJIMM.Close()
-	ws, err := srvJIMM.dialer.DialWebsocket(ctx, srvJIMM.URL, nil)
-	c.Assert(err, qt.IsNil)
+	ws := srvJIMM.Dialer.DialWebsocket(c, srvJIMM.URL)
 	defer ws.Close()
 
 	verifyEcho(c, ws, "")

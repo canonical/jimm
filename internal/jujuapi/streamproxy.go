@@ -17,7 +17,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimmhttp"
 	"github.com/canonical/jimm/v3/internal/openfga"
-	jimmRPC "github.com/canonical/jimm/v3/internal/rpc"
+	"github.com/canonical/jimm/v3/internal/streamproxy"
 )
 
 // A streamProxier serves the the /log endpoint by proxying
@@ -103,7 +103,7 @@ func (s streamProxier) ServeWS(ctx context.Context, clientConn *websocket.Conn) 
 		return
 	}
 
-	jimmRPC.ProxyStreams(ctx, clientConn, controllerStream)
+	streamproxy.ProxyStreams(ctx, clientConn, controllerStream)
 }
 
 func checkPermission(ctx context.Context, path string, u *openfga.User, mt names.ModelTag) (bool, error) {
