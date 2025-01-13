@@ -27,7 +27,7 @@ func (r *controllerRoot) AddServiceAccount(ctx context.Context, req apiparams.Ad
 		return errors.E(op, errors.CodeBadRequest, err)
 	}
 
-	return r.jimm.AddServiceAccount(ctx, r.user, clientIdWithDomain)
+	return r.jimm.ServiceAccountManager().AddServiceAccount(ctx, r.user, clientIdWithDomain)
 }
 
 // CopyServiceAccountCredential copies a users cloud-credential to a service account.
@@ -43,7 +43,7 @@ func (r *controllerRoot) CopyServiceAccountCredential(ctx context.Context, req a
 	if !names.IsValidCloudCredential(credId) {
 		return jujuparams.UpdateCredentialResult{}, errors.E(op, fmt.Sprintf("%s is not a valid cloud credential tag", credId))
 	}
-	newTag, modelRes, err := r.jimm.CopyServiceAccountCredential(ctx, r.user, svcAccIdentity, names.NewCloudCredentialTag(credId))
+	newTag, modelRes, err := r.jimm.ServiceAccountManager().CopyServiceAccountCredential(ctx, r.user, svcAccIdentity, names.NewCloudCredentialTag(credId))
 	res := jujuparams.UpdateCredentialResult{
 		CredentialTag: newTag.String(),
 		Error:         mapError(err),

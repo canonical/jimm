@@ -350,3 +350,38 @@ func (j *JIMM) getCloudCredentialAttributes(ctx context.Context, cred *dbmodel.C
 	}
 	return attr, nil
 }
+
+// CopyCredential copies a cloud credential from one user to another.
+func (j *JIMM) CopyCredential(ctx context.Context, originalUser *openfga.User, newUser *openfga.User, cred names.CloudCredentialTag) (names.CloudCredentialTag, []jujuparams.UpdateCredentialModelResult, error) {
+	op := errors.Op("jimm.CopyCredential")
+
+	credential, err := j.GetCloudCredential(ctx, originalUser, cred)
+	if err != nil {
+		return names.CloudCredentialTag{}, nil, errors.E(op, err)
+	}
+
+	attr, err := j.getCloudCredentialAttributes(ctx, credential)
+	if err != nil {
+		return names.CloudCredentialTag{}, nil, errors.E(op, err)
+	}
+
+	newCredID := fmt.Sprintf("%s/%s/%s", cred.Cloud().Id(), newUser.Name, cred.Name())
+	if !names.IsValidCloudCredential(newCredID) {
+		return names.CloudCredentialTag{}, nil, errors.E(op, fmt.Sprintf("new credential ID %s is not a valid cloud credential tag", newCredID))
+	}
+
+	newCredential := jujuparams.CloudCredential{
+		AuthType:   credential.AuthType,
+		Attributes: attr,
+	}
+	newTag := names.NewCloudCredentialTag(newCredID)
+
+	modelRes, err := j.UpdateCloudCredential(ctx, newUser, UpdateCloudCredentialArgs{
+		CredentialTag: newTag,
+		Credential:    newCredential,
+		SkipCheck:     false,
+		SkipUpdate:    false,
+	})
+
+	return newTag, modelRes, err
+}
