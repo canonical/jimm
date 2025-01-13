@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package rebac_admin
 
@@ -40,7 +40,7 @@ func (s *resourcesService) ListResources(ctx context.Context, params *resources.
 		}
 	}
 
-	res, err := s.jimm.ListResources(ctx, user, pagination, namePrefixFilter, typeFilter)
+	res, err := s.jimm.PermissionManager().ListResources(ctx, user, pagination, namePrefixFilter, typeFilter)
 	if err != nil {
 		return nil, err
 	}
