@@ -1,4 +1,5 @@
 // Copyright 2025 Canonical.
+
 package db_test
 
 import (
@@ -34,6 +35,9 @@ func (s *dbSuite) TestCreateSSHKey(c *qt.C) {
 	c.Assert(gotKey.IdentityName, qt.Equals, "bob@canonical.com")
 	c.Assert(string(gotKey.PublicKey), qt.Equals, "foo")
 	c.Assert(gotKey.KeyComment, qt.Equals, "bar")
+
+	err = s.Database.AddSSHKey(context.Background(), &key)
+	c.Assert(err, qt.ErrorMatches, `.*duplicate key value violates unique constraint.*`)
 }
 
 func (s *dbSuite) TestListSSHKeys(c *qt.C) {
