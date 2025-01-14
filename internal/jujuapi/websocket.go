@@ -185,6 +185,7 @@ func (s apiProxier) ServeWS(ctx context.Context, clientConn *websocket.Conn) {
 		AuditLog:                auditLogger,
 		LoginService:            s.jimm.LoginManager(),
 		AuthenticatedIdentityID: auth.SessionIdentityFromContext(ctx),
+		SSHKeyManager:           s.jimm.SSHKeyManager(),
 	}
 	if err := rpcproxy.ProxySockets(ctx, proxyHelpers); err != nil {
 		zapctx.Error(ctx, "failed to start jimm model proxy", zap.Error(err))

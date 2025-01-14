@@ -2,4 +2,7 @@
 
 package rpcproxy
 
-type Message = message
+type (
+	Message          = message
+	KeyManagerFacade = keyManagerFacade
+)
