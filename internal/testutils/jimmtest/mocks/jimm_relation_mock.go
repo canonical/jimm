@@ -9,6 +9,7 @@ import (
 	"github.com/juju/names/v5"
 
 	"github.com/canonical/jimm/v3/internal/common/pagination"
+	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/openfga"
@@ -24,6 +25,7 @@ type PermissionManager struct {
 	CheckRelation_          func(ctx context.Context, user *openfga.User, tuple apiparams.RelationshipTuple, trace bool) (_ bool, err error)
 	ListRelationshipTuples_ func(ctx context.Context, user *openfga.User, tuple apiparams.RelationshipTuple, pageSize int32, continuationToken string) ([]openfga.Tuple, string, error)
 	ListObjectRelations_    func(ctx context.Context, user *openfga.User, object string, pageSize int32, continuationToken pagination.EntitlementToken) ([]openfga.Tuple, pagination.EntitlementToken, error)
+	ListResources_          func(ctx context.Context, user *openfga.User, filter pagination.LimitOffsetPagination, namePrefixFilter, typeFilter string) ([]db.Resource, error)
 
 	GetJimmControllerAccess_   func(ctx context.Context, user *openfga.User, tag names.UserTag) (string, error)
 	GetUserCloudAccess_        func(ctx context.Context, user *openfga.User, cloud names.CloudTag) (string, error)
@@ -78,6 +80,13 @@ func (j *PermissionManager) ListObjectRelations(ctx context.Context, user *openf
 		return []openfga.Tuple{}, pagination.EntitlementToken{}, errors.E(errors.CodeNotImplemented)
 	}
 	return j.ListObjectRelations_(ctx, user, object, pageSize, entitlementToken)
+}
+
+func (j *PermissionManager) ListResources(ctx context.Context, user *openfga.User, filter pagination.LimitOffsetPagination, namePrefixFilter, typeFilter string) ([]db.Resource, error) {
+	if j.ListResources_ == nil {
+		return nil, errors.E(errors.CodeNotImplemented)
+	}
+	return j.ListResources_(ctx, user, filter, namePrefixFilter, typeFilter)
 }
 
 func (j *PermissionManager) GetJimmControllerAccess(ctx context.Context, user *openfga.User, tag names.UserTag) (string, error) {

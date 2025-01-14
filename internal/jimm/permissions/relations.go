@@ -10,6 +10,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/canonical/jimm/v3/internal/common/pagination"
+	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
@@ -125,6 +126,17 @@ func (j *permissionManager) ListObjectRelations(ctx context.Context, user *openf
 		}
 	}
 	return responseTuples, nextToken, nil
+}
+
+// ListResources returns a list of resources known to JIMM with a pagination filter.
+func (j *permissionManager) ListResources(ctx context.Context, user *openfga.User, filter pagination.LimitOffsetPagination, namePrefixFilter, typeFilter string) ([]db.Resource, error) {
+	const op = errors.Op("jimm.ListResources")
+
+	if !user.JimmAdmin {
+		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
+
+	return j.store.ListResources(ctx, filter.Limit(), filter.Offset(), namePrefixFilter, typeFilter)
 }
 
 func (j *permissionManager) getObjectRelationsPage(ctx context.Context, object string, pageSize int32, entitlementToken pagination.EntitlementToken) ([]openfga.Tuple, pagination.EntitlementToken, error) {
