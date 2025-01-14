@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package main
 
@@ -209,5 +209,6 @@ func start(ctx context.Context, s *service.Service) error {
 	})
 	s.Go(httpsrv.ListenAndServe)
 	zapctx.Info(ctx, "Successfully started JIMM server")
+
 	return nil
 }
