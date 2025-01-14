@@ -40,7 +40,7 @@ func (s *listServiceAccountCredentialsSuite) TestListServiceAccountCredentials(c
 	user, err := dbmodel.NewIdentity("alice@canonical.com")
 	c.Assert(err, gc.IsNil)
 	u := openfga.NewUser(user, s.OFGAClient)
-	err = s.JIMM.AddServiceAccount(ctx, u, clientIDWithDomain)
+	err = s.JIMM.ServiceAccountManager().AddServiceAccount(ctx, u, clientIDWithDomain)
 	c.Assert(err, gc.IsNil)
 	svcAcc, err := dbmodel.NewIdentity(clientIDWithDomain)
 	c.Assert(err, gc.IsNil)

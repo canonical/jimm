@@ -35,6 +35,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/jimm/login"
 	"github.com/canonical/jimm/v3/internal/jimm/permissions"
 	"github.com/canonical/jimm/v3/internal/jimm/role"
+	"github.com/canonical/jimm/v3/internal/jimm/serviceaccount"
 	"github.com/canonical/jimm/v3/internal/jimmjwx"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
@@ -231,6 +232,14 @@ type AuditLogManager interface {
 	StartCleanup(ctx context.Context)
 }
 
+// ServiceAccountManager provides methods to assign ownerhsip and credentials to service accounts.
+type ServiceAccountManager interface {
+	// AddServiceAccount assigns an unowned service account to the provided user.
+	AddServiceAccount(ctx context.Context, u *openfga.User, clientId string) error
+	// CopyServiceAccountCredential copies a cloud-credential from a user to a service account.
+	CopyServiceAccountCredential(ctx context.Context, u *openfga.User, svcAcc *openfga.User, cred names.CloudCredentialTag) (names.CloudCredentialTag, []jujuparams.UpdateCredentialModelResult, error)
+}
+
 // Parameters holds the services and static fields passed to the jimm.New() constructor.
 // You can provide mock implementations of certain services where necessary for dependency injection.
 type Parameters struct {
@@ -366,6 +375,12 @@ func New(p Parameters) (*JIMM, error) {
 	}
 	j.auditLogManager = auditLogManager
 
+	svcAccManager, err := serviceaccount.NewServiceAccountManager(j.Database, j.OpenFGAClient, j)
+	if err != nil {
+		return nil, err
+	}
+	j.serviceAccountManager = svcAccManager
+
 	return j, nil
 }
 
@@ -394,6 +409,9 @@ type JIMM struct {
 
 	// auditLogManager provides a means to manage audit logs within JIMM.
 	auditLogManager AuditLogManager
+
+	// serviceAccountManager provides a means to manage service accounts within JIMM.
+	serviceAccountManager ServiceAccountManager
 }
 
 // ResourceTag returns JIMM's controller tag stating its UUID.
@@ -441,6 +459,12 @@ func (j *JIMM) NewJujuAuthenticator() jujuauth.TokenGenerator {
 // AuditLogManager returns a manager that handles audit logging.
 func (j *JIMM) AuditLogManager() AuditLogManager {
 	return j.auditLogManager
+}
+
+// ServiceAccountManager returns a manager that enables operations
+// related to service accounts.
+func (j *JIMM) ServiceAccountManager() ServiceAccountManager {
+	return j.serviceAccountManager
 }
 
 type permission struct {
