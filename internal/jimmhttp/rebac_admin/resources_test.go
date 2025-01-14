@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package rebac_admin_test
 
@@ -13,16 +13,23 @@ import (
 	"github.com/canonical/jimm/v3/internal/common/pagination"
 	"github.com/canonical/jimm/v3/internal/common/utils"
 	"github.com/canonical/jimm/v3/internal/db"
+	"github.com/canonical/jimm/v3/internal/jimm"
 	"github.com/canonical/jimm/v3/internal/jimmhttp/rebac_admin"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
+	"github.com/canonical/jimm/v3/internal/testutils/jimmtest/mocks"
 )
 
 func TestListResources(t *testing.T) {
 	c := qt.New(t)
-	jimm := jimmtest.JIMM{
+	permissionManager := mocks.PermissionManager{
 		ListResources_: func(ctx context.Context, user *openfga.User, filter pagination.LimitOffsetPagination, nameFilter, typeFilter string) ([]db.Resource, error) {
 			return []db.Resource{}, nil
+		},
+	}
+	jimm := jimmtest.JIMM{
+		PermissionManager_: func() jimm.PermissionManager {
+			return &permissionManager
 		},
 	}
 	user := openfga.User{}

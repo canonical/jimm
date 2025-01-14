@@ -186,6 +186,8 @@ type PermissionManager interface {
 	ListRelationshipTuples(ctx context.Context, user *openfga.User, tuple apiparams.RelationshipTuple, pageSize int32, continuationToken string) ([]openfga.Tuple, string, error)
 	// ListObjectRelations lists all the tuples that an object has a direct relation with.
 	ListObjectRelations(ctx context.Context, user *openfga.User, object string, pageSize int32, entitlementToken pagination.EntitlementToken) ([]openfga.Tuple, pagination.EntitlementToken, error)
+	// ListResources lists all resources known to JIMM.
+	ListResources(ctx context.Context, user *openfga.User, filter pagination.LimitOffsetPagination, namePrefixFilter, typeFilter string) ([]db.Resource, error)
 
 	// GetJimmControllerAccess returns the user's level of access to JIMM.
 	GetJimmControllerAccess(ctx context.Context, user *openfga.User, tag names.UserTag) (string, error)
