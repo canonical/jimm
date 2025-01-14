@@ -6,6 +6,9 @@ import (
 	gossh "golang.org/x/crypto/ssh"
 )
 
+// PublicKey holds a public key and key comment.
+// The public key is any key that is supported by
+// the crypto/ssh PublicKey interface.
 type PublicKey struct {
 	gossh.PublicKey
 	Comment string
