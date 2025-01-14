@@ -36,6 +36,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/jimm/permissions"
 	"github.com/canonical/jimm/v3/internal/jimm/role"
 	"github.com/canonical/jimm/v3/internal/jimm/serviceaccount"
+	"github.com/canonical/jimm/v3/internal/jimm/sshkeys"
 	"github.com/canonical/jimm/v3/internal/jimmjwx"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
@@ -242,6 +243,18 @@ type ServiceAccountManager interface {
 	CopyServiceAccountCredential(ctx context.Context, u *openfga.User, svcAcc *openfga.User, cred names.CloudCredentialTag) (names.CloudCredentialTag, []jujuparams.UpdateCredentialModelResult, error)
 }
 
+// SSHKeyManager provides a means to manage SSH keys within JIMM.
+type SSHKeyManager interface {
+	// AddUserPublicKey saves a user's public key.
+	AddUserPublicKey(ctx context.Context, user *openfga.User, publicKey sshkeys.PublicKey) error
+	// ListUserPublicKeys lists a user's public keys.
+	ListUserPublicKeys(ctx context.Context, user *openfga.User) ([]sshkeys.PublicKey, error)
+	// RemoveUserKeyByComment removes a user's public key(s) by the key comment.
+	RemoveUserKeyByComment(ctx context.Context, user *openfga.User, comment string) error
+	// RemoveUserKeyByFingerprint removes a user's public key(s) by the key fingerprint.
+	RemoveUserKeyByFingerprint(ctx context.Context, user *openfga.User, fingerprint string) error
+}
+
 // Parameters holds the services and static fields passed to the jimm.New() constructor.
 // You can provide mock implementations of certain services where necessary for dependency injection.
 type Parameters struct {
@@ -383,6 +396,12 @@ func New(p Parameters) (*JIMM, error) {
 	}
 	j.serviceAccountManager = svcAccManager
 
+	sshKeyManager, err := sshkeys.NewSSHKeyManager(j.Database)
+	if err != nil {
+		return nil, err
+	}
+	j.sshKeyManager = sshKeyManager
+
 	return j, nil
 }
 
@@ -414,6 +433,9 @@ type JIMM struct {
 
 	// serviceAccountManager provides a means to manage service accounts within JIMM.
 	serviceAccountManager ServiceAccountManager
+
+	// sshKeyManager provides a means to manage SSH keys within JIMM.
+	sshKeyManager SSHKeyManager
 }
 
 // ResourceTag returns JIMM's controller tag stating its UUID.
