@@ -23,8 +23,3 @@ type message struct {
 	ErrorInfo map[string]interface{} `json:"error-info,omitempty"`
 	Response  json.RawMessage        `json:"response,omitempty"`
 }
-
-// isRequest returns whether the message is a request
-func (m message) isRequest() bool {
-	return m.Type != "" && m.Request != ""
-}
