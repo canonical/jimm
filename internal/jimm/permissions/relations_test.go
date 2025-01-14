@@ -267,7 +267,7 @@ func (s *permissionManagerSuite) TestListObjectRelations(c *qt.C) {
 	}
 }
 
-func (s *permissionManagerSuite) TestGetResources(c *qt.C) {
+func (s *permissionManagerSuite) TestListResources(c *qt.C) {
 	c.Parallel()
 	ctx := context.Background()
 
