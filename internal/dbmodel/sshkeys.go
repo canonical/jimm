@@ -18,6 +18,8 @@ type SSHKey struct {
 
 	// PublicKey holds the user's public SSH key.
 	PublicKey []byte `gorm:"uniqueIndex:unique_identity_ssh_key"`
+	// MD5Fingerprint is the MD5 fingerprint of the public key.
+	MD5Fingerprint string
 	// KeyComment holds a user provided comment.
 	KeyComment string
 }

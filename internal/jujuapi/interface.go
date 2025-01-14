@@ -10,8 +10,6 @@ import (
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 
-	"github.com/canonical/jimm/v3/internal/common/pagination"
-	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/jimm"
 	"github.com/canonical/jimm/v3/internal/openfga"
@@ -46,7 +44,6 @@ type JIMM interface {
 	InitiateMigration(ctx context.Context, user *openfga.User, spec jujuparams.MigrationSpec) (jujuparams.InitiateMigrationResult, error)
 	ListApplicationOffers(ctx context.Context, user *openfga.User, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error)
 	ListModels(ctx context.Context, user *openfga.User) ([]base.UserModel, error)
-	ListResources(ctx context.Context, user *openfga.User, filter pagination.LimitOffsetPagination, namePrefixFilter, typeFilter string) ([]db.Resource, error)
 	Offer(ctx context.Context, user *openfga.User, offer jimm.AddApplicationOfferParams) error
 	PubSubHub() *pubsub.Hub
 	RemoveCloud(ctx context.Context, u *openfga.User, ct names.CloudTag) error

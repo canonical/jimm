@@ -266,3 +266,49 @@ func (s *permissionManagerSuite) TestListObjectRelations(c *qt.C) {
 		})
 	}
 }
+
+func (s *permissionManagerSuite) TestListResources(c *qt.C) {
+	c.Parallel()
+	ctx := context.Background()
+
+	_, _, controller, model, applicationOffer, cloud, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
+
+	ids := []string{applicationOffer.UUID, cloud.Name, controller.UUID, model.UUID.String}
+
+	testCases := []struct {
+		desc       string
+		limit      int
+		offset     int
+		identities []string
+	}{
+		{
+			desc:       "test with first resources",
+			limit:      3,
+			offset:     0,
+			identities: []string{ids[0], ids[1], ids[2]},
+		},
+		{
+			desc:       "test with remianing ids",
+			limit:      3,
+			offset:     3,
+			identities: []string{ids[3]},
+		},
+		{
+			desc:       "test out of range",
+			limit:      3,
+			offset:     6,
+			identities: []string{},
+		},
+	}
+	for _, t := range testCases {
+		c.Run(t.desc, func(c *qt.C) {
+			filter := pagination.NewOffsetFilter(t.limit, t.offset)
+			resources, err := s.manager.ListResources(ctx, s.adminUser, filter, "", "")
+			c.Assert(err, qt.IsNil)
+			c.Assert(resources, qt.HasLen, len(t.identities))
+			for i := range len(t.identities) {
+				c.Assert(resources[i].ID.String, qt.Equals, t.identities[i])
+			}
+		})
+	}
+}
