@@ -13,6 +13,7 @@ import (
 	"github.com/juju/utils/v3/ssh"
 	gossh "golang.org/x/crypto/ssh"
 
+	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm/sshkeys"
 	"github.com/canonical/jimm/v3/internal/openfga"
 )
@@ -60,6 +61,7 @@ func (s *keyManagerFacade) AddKeys(ctx context.Context, args jujuparams.ModifyUs
 	var res []jujuparams.ErrorResult
 	errF := func(err error, msg string) jujuparams.ErrorResult {
 		return jujuparams.ErrorResult{Error: &jujuparams.Error{
+			Code:    string(errors.ErrorCode(err)),
 			Message: fmt.Sprintf("%s: %s", msg, err.Error()),
 		}}
 	}
@@ -87,6 +89,7 @@ func (s *keyManagerFacade) DeleteKeys(ctx context.Context, args jujuparams.Modif
 	var res []jujuparams.ErrorResult
 	errF := func(err error, msg string) jujuparams.ErrorResult {
 		return jujuparams.ErrorResult{Error: &jujuparams.Error{
+			Code:    string(errors.ErrorCode(err)),
 			Message: fmt.Sprintf("%s: %s", msg, err.Error()),
 		}}
 	}
