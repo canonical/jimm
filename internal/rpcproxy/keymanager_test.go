@@ -86,7 +86,7 @@ func (k *keyManagerFacadeSuite) TestListKeysShort(c *qt.C) {
 	c.Assert(res.Results[0].Result, qt.HasLen, 2)
 	c.Assert(res.Results[0].Result[0], qt.Matches, `.+ \(comment-1\)`)
 	c.Assert(isFingerprintRegex.MatchString(res.Results[0].Result[0]), qt.IsTrue)
-	c.Assert(res.Results[1].Result[1], qt.Matches, `.+ \(comment-2\)`)
+	c.Assert(res.Results[0].Result[1], qt.Matches, `.+ \(comment-2\)`)
 	c.Assert(isFingerprintRegex.MatchString(res.Results[0].Result[1]), qt.IsTrue)
 }
 

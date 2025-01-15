@@ -28,6 +28,8 @@ type keyManagerFacade struct {
 	user *openfga.User
 }
 
+// ListKeys lists the authenticated user's SSH keys
+// in the format defined in args.
 func (s *keyManagerFacade) ListKeys(ctx context.Context, args jujuparams.ListSSHKeys) (jujuparams.StringsResults, error) {
 	keys, err := s.ListUserPublicKeys(ctx, s.user)
 	if err != nil {
@@ -52,6 +54,8 @@ func (s *keyManagerFacade) ListKeys(ctx context.Context, args jujuparams.ListSSH
 	return jujuparams.StringsResults{Results: []jujuparams.StringsResult{res}}, nil
 }
 
+// AddKeys saves the SSH keys defined in args and associates them
+// with the authenticated user.
 func (s *keyManagerFacade) AddKeys(ctx context.Context, args jujuparams.ModifyUserSSHKeys) (jujuparams.ErrorResults, error) {
 	var res []jujuparams.ErrorResult
 	errF := func(err error, msg string) jujuparams.ErrorResult {
@@ -77,6 +81,8 @@ func (s *keyManagerFacade) AddKeys(ctx context.Context, args jujuparams.ModifyUs
 	return jujuparams.ErrorResults{Results: res}, nil
 }
 
+// DeleteKeys removes saved keys associated with the authenticated user
+// and finds keys to remove either by comment or fingerprint.
 func (s *keyManagerFacade) DeleteKeys(ctx context.Context, args jujuparams.ModifyUserSSHKeys) (jujuparams.ErrorResults, error) {
 	var res []jujuparams.ErrorResult
 	errF := func(err error, msg string) jujuparams.ErrorResult {
