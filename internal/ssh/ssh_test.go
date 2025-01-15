@@ -36,6 +36,7 @@ type sshSuite struct {
 	jumpSSHServer            ssh.Server
 	jumpServerPort           int
 	privateKey               gossh.Signer
+	hostKey                  gossh.Signer
 	testInDestinationServerF func(fm ssh.ForwardMessage)
 	received                 chan bool
 }
@@ -71,13 +72,29 @@ func (s *sshSuite) Init(c *qt.C) {
 	port, err = jimmtest.GetFreePort()
 	c.Assert(err, qt.IsNil)
 	s.jumpServerPort = port
-	s.jumpSSHServer, err = ssh.NewJumpSSHServer(context.Background(), port, resolver{})
+	k, err := rsa.GenerateKey(rand.Reader, 2048)
+	c.Assert(err, qt.IsNil)
+	hostKey := pem.EncodeToMemory(
+		&pem.Block{
+			Type:  "RSA PRIVATE KEY",
+			Bytes: x509.MarshalPKCS1PrivateKey(k),
+		},
+	)
+	s.hostKey, err = gossh.ParsePrivateKey(hostKey)
+	c.Assert(err, qt.IsNil)
+
+	s.jumpSSHServer, err = ssh.NewJumpServer(context.Background(),
+		ssh.Config{
+			Port:    fmt.Sprint(port),
+			HostKey: hostKey},
+		resolver{},
+	)
 	c.Assert(err, qt.IsNil)
 	go func() {
 		_ = s.jumpSSHServer.ListenAndServe()
 	}()
 
-	k, err := rsa.GenerateKey(rand.Reader, 2048)
+	k, err = rsa.GenerateKey(rand.Reader, 2048)
 	c.Assert(err, qt.IsNil)
 	keyPEM := pem.EncodeToMemory(
 		&pem.Block{
@@ -98,8 +115,7 @@ func (s *sshSuite) Init(c *qt.C) {
 
 func (s *sshSuite) TestSSHJump(c *qt.C) {
 	client, err := gossh.Dial("tcp", fmt.Sprintf(":%d", s.jumpServerPort), &gossh.ClientConfig{
-		//nolint:gosec // this will be removed once we handle hostkeys
-		HostKeyCallback: gossh.InsecureIgnoreHostKey(),
+		HostKeyCallback: gossh.FixedHostKey(s.hostKey.PublicKey()),
 		Auth: []gossh.AuthMethod{
 			gossh.PublicKeys(s.privateKey),
 		},
@@ -130,8 +146,7 @@ func (s *sshSuite) TestSSHJump(c *qt.C) {
 
 func (s *sshSuite) TestSSHJumpDialFail(c *qt.C) {
 	_, err := gossh.Dial("tcp", fmt.Sprintf(":%d", 1), &gossh.ClientConfig{
-		//nolint:gosec // this will be removed once we handle hostkeys
-		HostKeyCallback: gossh.InsecureIgnoreHostKey(),
+		HostKeyCallback: gossh.FixedHostKey(s.hostKey.PublicKey()),
 		Auth: []gossh.AuthMethod{
 			gossh.PublicKeys(s.privateKey),
 		},
@@ -142,8 +157,7 @@ func (s *sshSuite) TestSSHJumpDialFail(c *qt.C) {
 func (s *sshSuite) TestSSHFinalDestinationDialFail(c *qt.C) {
 
 	client, err := gossh.Dial("tcp", fmt.Sprintf(":%d", s.jumpServerPort), &gossh.ClientConfig{
-		//nolint:gosec // this will be removed once we handle hostkeys
-		HostKeyCallback: gossh.InsecureIgnoreHostKey(),
+		HostKeyCallback: gossh.FixedHostKey(s.hostKey.PublicKey()),
 		Auth: []gossh.AuthMethod{
 			gossh.PublicKeys(s.privateKey),
 		},

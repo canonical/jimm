@@ -25,7 +25,7 @@ type Resolver interface {
 	AddrFromModelUUID(ctx context.Context, user openfga.User, modelUUID string) (string, error)
 }
 
-// fowardMessage is the struct holding the information about the jump message received by the ssh client.
+// forwardMessage is the struct holding the information about the jump message received by the ssh client.
 type forwardMessage struct {
 	DestAddr string
 	DestPort uint32
@@ -40,16 +40,23 @@ type Server struct {
 	resolver Resolver
 }
 
-// NewJumpSSHServer creates the jump server struct.
-func NewJumpSSHServer(ctx context.Context, port int, resolver Resolver) (Server, error) {
-	zapctx.Info(ctx, "NewSSHServer")
+// Config is the struct holding the configuration for the jump server.
+type Config struct {
+	Port                     string
+	HostKey                  []byte
+	MaxConcurrentConnections string
+}
+
+// NewJumpServer creates the jump server struct.
+func NewJumpServer(ctx context.Context, config Config, resolver Resolver) (Server, error) {
+	zapctx.Info(ctx, "NewJumpServer")
 
 	if resolver == nil {
 		return Server{}, fmt.Errorf("Cannot create JumpSSHServer with a nil resolver.")
 	}
 	server := Server{
 		Server: &ssh.Server{
-			Addr: fmt.Sprintf(":%d", port),
+			Addr: fmt.Sprintf(":%s", config.Port),
 			ChannelHandlers: map[string]ssh.ChannelHandler{
 				"direct-tcpip": directTCPIPHandler(resolver),
 			},
@@ -59,6 +66,11 @@ func NewJumpSSHServer(ctx context.Context, port int, resolver Resolver) (Server,
 		},
 		resolver: resolver,
 	}
+	s, err := gossh.ParsePrivateKey([]byte(config.HostKey))
+	if err != nil {
+		return Server{}, fmt.Errorf("Cannot parse hostkey.")
+	}
+	server.AddHostKey(s)
 
 	return server, nil
 }
