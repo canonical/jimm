@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package rpc_test
 
@@ -6,28 +6,24 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/json"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"time"
 
 	qt "github.com/frankban/quicktest"
 	"github.com/gorilla/websocket"
-	"github.com/juju/names/v5"
 
-	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/rpc"
+	"github.com/canonical/jimm/v3/internal/testutils/rpctest"
 )
 
 func TestDialError(t *testing.T) {
 	c := qt.New(t)
 
-	srv := newServer(echo)
+	srv := newServer(rpctest.Echo)
 	defer srv.Close()
 	d := *srv.dialer
 	d.TLSConfig = nil
@@ -38,7 +34,7 @@ func TestDialError(t *testing.T) {
 func TestDial(t *testing.T) {
 	c := qt.New(t)
 
-	srv := newServer(echo)
+	srv := newServer(rpctest.Echo)
 	defer srv.Close()
 	conn, err := srv.dialer.Dial(context.Background(), srv.URL, nil)
 	c.Assert(err, qt.IsNil)
@@ -48,7 +44,7 @@ func TestDial(t *testing.T) {
 func TestBasicDial(t *testing.T) {
 	c := qt.New(t)
 
-	srv := newServer(echo)
+	srv := newServer(rpctest.Echo)
 	defer srv.Close()
 	conn, err := srv.dialer.DialWebsocket(context.Background(), srv.URL, nil)
 	c.Assert(err, qt.IsNil)
@@ -58,7 +54,7 @@ func TestBasicDial(t *testing.T) {
 func TestCallSuccess(t *testing.T) {
 	c := qt.New(t)
 
-	srv := newServer(echo)
+	srv := newServer(rpctest.Echo)
 	defer srv.Close()
 	conn, err := srv.dialer.Dial(context.Background(), srv.URL, nil)
 	c.Assert(err, qt.IsNil)
@@ -76,7 +72,7 @@ func TestCallSuccess(t *testing.T) {
 func TestCallCanceledContext(t *testing.T) {
 	c := qt.New(t)
 
-	srv := newServer(echo)
+	srv := newServer(rpctest.Echo)
 	defer srv.Close()
 	conn, err := srv.dialer.Dial(context.Background(), srv.URL, nil)
 	c.Assert(err, qt.IsNil)
@@ -137,7 +133,7 @@ func TestCallErrorResponse(t *testing.T) {
 		if err := conn.WriteJSON(resp); err != nil {
 			return err
 		}
-		return echo(conn)
+		return rpctest.Echo(conn)
 	})
 	defer srv.Close()
 	conn, err := srv.dialer.Dial(context.Background(), srv.URL, nil)
@@ -181,7 +177,7 @@ func TestClientReceiveRequest(t *testing.T) {
 		if err := conn.WriteJSON(req2); err != nil {
 			return err
 		}
-		return echo(conn)
+		return rpctest.Echo(conn)
 	})
 	defer srv.Close()
 	conn, err := srv.dialer.Dial(context.Background(), srv.URL, nil)
@@ -211,7 +207,7 @@ func TestClientReceiveInvalidMessage(t *testing.T) {
 		if err := conn.WriteJSON(struct{}{}); err != nil {
 			return err
 		}
-		return echo(conn)
+		return rpctest.Echo(conn)
 	})
 	defer srv.Close()
 	conn, err := srv.dialer.Dial(context.Background(), srv.URL, nil)
@@ -224,268 +220,6 @@ func TestClientReceiveInvalidMessage(t *testing.T) {
 	c.Check(res, qt.Equals, "")
 }
 
-type testTokenGenerator struct{}
-
-func (p *testTokenGenerator) MakeLoginToken(ctx context.Context, user *openfga.User) ([]byte, error) {
-	return nil, nil
-}
-
-func (p *testTokenGenerator) MakeToken(ctx context.Context, permissionMap map[string]interface{}) ([]byte, error) {
-	return nil, nil
-}
-
-func (p *testTokenGenerator) SetTags(names.ModelTag, names.ControllerTag) {
-}
-
-func (p *testTokenGenerator) GetUser() names.UserTag {
-	return names.NewUserTag("testUser")
-}
-
-func TestProxySockets(t *testing.T) {
-	c := qt.New(t)
-	ctx := context.Background()
-
-	srvController := newServer(echo)
-
-	errChan := make(chan error)
-	srvJIMM := newServer(func(connClient *websocket.Conn) error {
-		testTokenGen := testTokenGenerator{}
-		f := func(context.Context) (rpc.WebsocketConnectionWithMetadata, error) {
-			connController, err := srvController.dialer.DialWebsocket(ctx, srvController.URL, nil)
-			c.Check(err, qt.IsNil)
-			return rpc.WebsocketConnectionWithMetadata{
-				Conn:      connController,
-				ModelName: "TestName",
-			}, nil
-		}
-		auditLogger := func(ale *dbmodel.AuditLogEntry) {}
-		proxyHelpers := rpc.ProxyHelpers{
-			ConnClient:        connClient,
-			TokenGen:          &testTokenGen,
-			ConnectController: f,
-			AuditLog:          auditLogger,
-			LoginService:      &mockLoginService{},
-		}
-		err := rpc.ProxySockets(ctx, proxyHelpers)
-		c.Check(err, qt.IsNil)
-		errChan <- err
-		return err
-	})
-
-	defer srvController.Close()
-	defer srvJIMM.Close()
-	ws, err := srvJIMM.dialer.DialWebsocket(ctx, srvJIMM.URL, nil)
-	c.Assert(err, qt.IsNil)
-	defer ws.Close()
-
-	p := json.RawMessage(`{"Key":"TestVal"}`)
-	msg := rpc.Message{RequestID: 1, Type: "TestType", Request: "TestReq", Params: p}
-	err = ws.WriteJSON(&msg)
-	c.Assert(err, qt.IsNil)
-	resp := rpc.Message{}
-	receiveChan := make(chan error)
-	go func() {
-		receiveChan <- ws.ReadJSON(&resp)
-	}()
-	select {
-	case err := <-receiveChan:
-		c.Assert(err, qt.IsNil)
-	case <-time.After(5 * time.Second):
-		c.Logf("took too long to read response")
-		c.FailNow()
-	}
-	c.Assert(resp.Response, qt.DeepEquals, msg.Params)
-	ws.Close()
-	<-errChan // Ensure go routines are cleaned up
-}
-
-func TestProxySocketsControllerConnectionFails(t *testing.T) {
-	c := qt.New(t)
-	ctx := context.Background()
-
-	srvController := newServer(echo)
-
-	var connController *websocket.Conn
-	errChan := make(chan error)
-	srvJIMM := newServer(func(connClient *websocket.Conn) error {
-		testTokenGen := testTokenGenerator{}
-		f := func(context.Context) (rpc.WebsocketConnectionWithMetadata, error) {
-			var err error
-			connController, err = srvController.dialer.DialWebsocket(ctx, srvController.URL, nil)
-			c.Check(err, qt.IsNil)
-			return rpc.WebsocketConnectionWithMetadata{
-				Conn:      connController,
-				ModelName: "TestName",
-			}, nil
-		}
-		auditLogger := func(ale *dbmodel.AuditLogEntry) {}
-		proxyHelpers := rpc.ProxyHelpers{
-			ConnClient:        connClient,
-			TokenGen:          &testTokenGen,
-			ConnectController: f,
-			AuditLog:          auditLogger,
-			LoginService:      &mockLoginService{},
-		}
-		err := rpc.ProxySockets(ctx, proxyHelpers)
-		c.Check(err, qt.IsNil)
-		errChan <- err
-		return err
-	})
-
-	defer srvController.Close()
-	defer srvJIMM.Close()
-	ws, err := srvJIMM.dialer.DialWebsocket(ctx, srvJIMM.URL, nil)
-	c.Assert(err, qt.IsNil)
-	defer ws.Close()
-
-	p := json.RawMessage(`{"Key":"TestVal"}`)
-	msg := rpc.Message{RequestID: 1, Type: "TestType", Request: "TestReq", Params: p}
-	err = ws.WriteJSON(&msg)
-	c.Assert(err, qt.IsNil)
-	resp := rpc.Message{}
-	receiveChan := make(chan error)
-	go func() {
-		receiveChan <- ws.ReadJSON(&resp)
-	}()
-	select {
-	case err := <-receiveChan:
-		c.Assert(err, qt.IsNil)
-	case <-time.After(5 * time.Second):
-		c.Logf("took too long to read response")
-		c.FailNow()
-	}
-	c.Assert(resp.Response, qt.DeepEquals, msg.Params)
-
-	// Now close the connection to the controller and ensure the model proxy is cleaned up.
-	connController.Close()
-	<-errChan // Ensure go routines are cleaned up
-}
-
-func TestCancelProxySockets(t *testing.T) {
-	c := qt.New(t)
-
-	ctx, cancel := context.WithCancel(context.Background())
-
-	srvController := newServer(echo)
-
-	errChan := make(chan error)
-	srvJIMM := newServer(func(connClient *websocket.Conn) error {
-		testTokenGen := testTokenGenerator{}
-		f := func(context.Context) (rpc.WebsocketConnectionWithMetadata, error) {
-			connController, err := srvController.dialer.DialWebsocket(ctx, srvController.URL, nil)
-			c.Check(err, qt.IsNil)
-			return rpc.WebsocketConnectionWithMetadata{
-				Conn:      connController,
-				ModelName: "TestName",
-			}, nil
-		}
-		auditLogger := func(ale *dbmodel.AuditLogEntry) {}
-		proxyHelpers := rpc.ProxyHelpers{
-			ConnClient:        connClient,
-			TokenGen:          &testTokenGen,
-			ConnectController: f,
-			AuditLog:          auditLogger,
-			LoginService:      &mockLoginService{},
-		}
-		err := rpc.ProxySockets(ctx, proxyHelpers)
-		c.Check(err, qt.ErrorMatches, "Context cancelled")
-		errChan <- err
-		return err
-	})
-
-	defer srvController.Close()
-	defer srvJIMM.Close()
-	ws, err := srvJIMM.dialer.DialWebsocket(ctx, srvJIMM.URL, nil)
-	c.Assert(err, qt.IsNil)
-	defer ws.Close()
-	cancel()
-	<-errChan
-}
-
-func TestProxySocketsAuditLogs(t *testing.T) {
-	c := qt.New(t)
-
-	ctx := context.Background()
-
-	srvController := newServer(echo)
-	auditLogs := make([]*dbmodel.AuditLogEntry, 0)
-
-	errChan := make(chan error)
-	srvJIMM := newServer(func(connClient *websocket.Conn) error {
-		defer connClient.Close()
-		testTokenGen := testTokenGenerator{}
-		f := func(context.Context) (rpc.WebsocketConnectionWithMetadata, error) {
-			connController, err := srvController.dialer.DialWebsocket(ctx, srvController.URL, nil)
-			c.Check(err, qt.IsNil)
-			return rpc.WebsocketConnectionWithMetadata{
-				Conn:      connController,
-				ModelName: "TestModelName",
-			}, nil
-		}
-		auditLogger := func(ale *dbmodel.AuditLogEntry) { auditLogs = append(auditLogs, ale) }
-		proxyHelpers := rpc.ProxyHelpers{
-			ConnClient:        connClient,
-			TokenGen:          &testTokenGen,
-			ConnectController: f,
-			AuditLog:          auditLogger,
-			LoginService:      &mockLoginService{},
-		}
-		err := rpc.ProxySockets(ctx, proxyHelpers)
-		c.Check(err, qt.IsNil)
-		errChan <- err
-		return err
-	})
-
-	defer srvController.Close()
-	defer srvJIMM.Close()
-	ws, err := srvJIMM.dialer.DialWebsocket(ctx, srvJIMM.URL, nil)
-	c.Assert(err, qt.IsNil)
-	defer ws.Close()
-
-	p := json.RawMessage(`{"Key":"TestVal"}`)
-	msg := rpc.Message{RequestID: 1, Type: "TestType", Request: "TestReq", Params: p}
-	err = ws.WriteJSON(&msg)
-	c.Assert(err, qt.IsNil)
-	resp := rpc.Message{}
-	err = ws.ReadJSON(&resp)
-	c.Assert(err, qt.IsNil)
-	ws.Close()
-	<-errChan // Ensure go routines are cleaned up
-	c.Assert(auditLogs, qt.HasLen, 2)
-	expectedEvents := []*dbmodel.AuditLogEntry{{
-		ID:             auditLogs[0].ID,
-		Time:           auditLogs[0].Time,
-		Model:          "TestModelName",
-		ConversationId: auditLogs[0].ConversationId,
-		MessageId:      1,
-		FacadeName:     "TestType",
-		FacadeMethod:   "TestReq",
-		FacadeVersion:  0,
-		ObjectId:       "",
-		IdentityTag:    "user-testUser",
-		IsResponse:     false,
-		Params:         dbmodel.JSON(p),
-		Errors:         nil,
-	}, {
-		ID:             auditLogs[1].ID,
-		Time:           auditLogs[1].Time,
-		Model:          "TestModelName",
-		ConversationId: auditLogs[1].ConversationId,
-		MessageId:      1,
-		FacadeName:     "",
-		FacadeMethod:   "",
-		FacadeVersion:  0,
-		ObjectId:       "",
-		IdentityTag:    "user-testUser",
-		IsResponse:     true,
-		Params:         nil,
-		Errors:         auditLogs[1].Errors,
-	},
-	}
-	c.Assert(auditLogs, qt.DeepEquals, expectedEvents)
-
-}
-
 type server struct {
 	*httptest.Server
 
@@ -495,7 +229,7 @@ type server struct {
 
 func newServer(f func(*websocket.Conn) error) *server {
 	var srv server
-	srv.Server = httptest.NewTLSServer(handleWS(f))
+	srv.Server = httptest.NewTLSServer(rpctest.HandleWS(f))
 	srv.URL = "ws" + strings.TrimPrefix(srv.Server.URL, "http")
 	cp := x509.NewCertPool()
 	cp.AddCert(srv.Certificate())
@@ -513,7 +247,7 @@ func newIPv6Server(f func(*websocket.Conn) error) *server {
 	l, _ := net.Listen("tcp", "[::1]:0")
 	server := httptest.Server{
 		Listener: l,
-		Config:   &http.Server{Handler: handleWS(f)}, //nolint:gosec
+		Config:   &http.Server{Handler: rpctest.HandleWS(f)}, //nolint:gosec
 	}
 	server.StartTLS()
 	srv.Server = &server
@@ -527,47 +261,4 @@ func newIPv6Server(f func(*websocket.Conn) error) *server {
 		},
 	}
 	return &srv
-}
-
-func handleWS(f func(*websocket.Conn) error) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		var u websocket.Upgrader
-		c, err := u.Upgrade(w, req, nil)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		defer c.Close()
-		err = f(c)
-		var cm []byte
-		closeError, isCloseError := err.(*websocket.CloseError)
-		switch {
-		case err == nil:
-			cm = websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")
-		case isCloseError:
-			cm = websocket.FormatCloseMessage(closeError.Code, closeError.Text)
-		default:
-			cm = websocket.FormatCloseMessage(websocket.CloseInternalServerErr, err.Error())
-		}
-		_ = c.WriteControl(websocket.CloseMessage, cm, time.Time{})
-
-	})
-}
-
-func echo(c *websocket.Conn) error {
-	for {
-		msg := make(map[string]interface{})
-		if err := c.ReadJSON(&msg); err != nil {
-			return err
-		}
-		delete(msg, "type")
-		delete(msg, "version")
-		delete(msg, "id")
-		delete(msg, "request")
-		msg["response"] = msg["params"]
-		delete(msg, "params")
-		if err := c.WriteJSON(msg); err != nil {
-			return err
-		}
-	}
 }

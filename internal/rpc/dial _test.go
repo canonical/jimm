@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package rpc_test
 
@@ -15,12 +15,13 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/rpc"
+	"github.com/canonical/jimm/v3/internal/testutils/rpctest"
 )
 
 func TestDialIPv4(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
-	fakeController := newServer(echo)
+	fakeController := newServer(rpctest.Echo)
 	defer fakeController.Close()
 	controller := dbmodel.Controller{}
 	pemData := pem.EncodeToMemory(&pem.Block{
@@ -44,7 +45,7 @@ func TestDialIPv4(t *testing.T) {
 func TestDialIPv6(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
-	fakeController := newIPv6Server(echo)
+	fakeController := newIPv6Server(rpctest.Echo)
 	defer fakeController.Close()
 	controller := dbmodel.Controller{}
 	pemData := pem.EncodeToMemory(&pem.Block{

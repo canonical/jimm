@@ -1,10 +1,12 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
-package rpc
+package streamproxy
 
 import (
 	"context"
+	"encoding/json"
 
+	"github.com/gorilla/websocket"
 	"github.com/juju/juju/api/base"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
@@ -45,4 +47,15 @@ func proxy(src base.Stream, dst base.Stream) error {
 			return err
 		}
 	}
+}
+
+func unexpectedReadError(err error) bool {
+	if websocket.IsUnexpectedCloseError(err,
+		websocket.CloseNormalClosure,
+		websocket.CloseNoStatusReceived,
+		websocket.CloseAbnormalClosure) {
+		return true
+	}
+	_, unmarshalError := err.(*json.InvalidUnmarshalError)
+	return unmarshalError
 }

@@ -1,5 +1,5 @@
 // Copyright 2025 Canonical.
 
-package rpc
+package rpcproxy
 
 type Message = message

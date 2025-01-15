@@ -1,6 +1,6 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
-package rpc_test
+package rpcproxy_test
 
 import (
 	"context"
@@ -19,24 +19,13 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/openfga"
-	"github.com/canonical/jimm/v3/internal/rpc"
+	"github.com/canonical/jimm/v3/internal/rpcproxy"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
 
-type message struct {
-	RequestID uint64                 `json:"request-id,omitempty"`
-	Type      string                 `json:"type,omitempty"`
-	Version   int                    `json:"version,omitempty"`
-	ID        string                 `json:"id,omitempty"`
-	Request   string                 `json:"request,omitempty"`
-	Params    json.RawMessage        `json:"params,omitempty"`
-	Error     string                 `json:"error,omitempty"`
-	ErrorCode string                 `json:"error-code,omitempty"`
-	ErrorInfo map[string]interface{} `json:"error-info,omitempty"`
-	Response  json.RawMessage        `json:"response,omitempty"`
-}
-
+// This test verifies that the ProxySockets function
+// correctly handles login and authentication.
 func TestProxySocketsAdminFacade(t *testing.T) {
 	c := qt.New(t)
 
@@ -65,72 +54,72 @@ func TestProxySocketsAdminFacade(t *testing.T) {
 
 	tests := []struct {
 		about                     string
-		messageToSend             message
+		messageToSend             rpcproxy.Message
 		authenticateEntityID      string
-		expectedClientResponse    *message
-		expectedControllerMessage *message
+		expectedClientResponse    *rpcproxy.Message
+		expectedControllerMessage *rpcproxy.Message
 		oauthAuthenticatorError   error
 		expectedProxyError        string
 	}{{
 		about: "login device call - client gets response with both user code and verification uri",
-		messageToSend: message{
+		messageToSend: rpcproxy.Message{
 			RequestID: 1,
 			Type:      "Admin",
 			Version:   4,
 			Request:   "LoginDevice",
 		},
-		expectedClientResponse: &message{
+		expectedClientResponse: &rpcproxy.Message{
 			RequestID: 1,
 			Response:  []byte(`{"verification-uri":"http://no-such-uri.canonical.com","user-code":"test-user-code"}`),
 		},
 	}, {
 		about: "login device call, but the authenticator returns an error",
-		messageToSend: message{
+		messageToSend: rpcproxy.Message{
 			RequestID: 1,
 			Type:      "Admin",
 			Version:   4,
 			Request:   "LoginDevice",
 		},
-		expectedClientResponse: &message{
+		expectedClientResponse: &rpcproxy.Message{
 			RequestID: 1,
 			Error:     "a silly error",
 		},
 		oauthAuthenticatorError: errors.E("a silly error"),
 	}, {
 		about: "get device session token call - client gets response with a session token",
-		messageToSend: message{
+		messageToSend: rpcproxy.Message{
 			RequestID: 1,
 			Type:      "Admin",
 			Version:   4,
 			Request:   "GetDeviceSessionToken",
 		},
-		expectedClientResponse: &message{
+		expectedClientResponse: &rpcproxy.Message{
 			RequestID: 1,
 			Response:  []byte(`{"session-token":"test session token"}`),
 		},
 	}, {
 		about: "get device session token call, but the authenticator returns an error",
-		messageToSend: message{
+		messageToSend: rpcproxy.Message{
 			RequestID: 1,
 			Type:      "Admin",
 			Version:   4,
 			Request:   "GetDeviceSessionToken",
 		},
-		expectedClientResponse: &message{
+		expectedClientResponse: &rpcproxy.Message{
 			RequestID: 1,
 			Error:     "a silly error",
 		},
 		oauthAuthenticatorError: errors.E("a silly error"),
 	}, {
 		about: "login with session token - a login message is sent to the controller",
-		messageToSend: message{
+		messageToSend: rpcproxy.Message{
 			RequestID: 1,
 			Type:      "Admin",
 			Version:   4,
 			Request:   "LoginWithSessionToken",
 			Params:    []byte(`{"client-id": "test session token"}`),
 		},
-		expectedControllerMessage: &message{
+		expectedControllerMessage: &rpcproxy.Message{
 			RequestID: 1,
 			Type:      "Admin",
 			Version:   3,
@@ -139,14 +128,14 @@ func TestProxySocketsAdminFacade(t *testing.T) {
 		},
 	}, {
 		about: "login with session token, but authenticator returns an error",
-		messageToSend: message{
+		messageToSend: rpcproxy.Message{
 			RequestID: 1,
 			Type:      "Admin",
 			Version:   4,
 			Request:   "LoginWithSessionToken",
 			Params:    []byte(`{"client-id": "test session token"}`),
 		},
-		expectedClientResponse: &message{
+		expectedClientResponse: &rpcproxy.Message{
 			RequestID: 1,
 			Error:     "unauthorized access",
 			ErrorCode: "unauthorized access",
@@ -154,14 +143,14 @@ func TestProxySocketsAdminFacade(t *testing.T) {
 		oauthAuthenticatorError: errors.E(errors.CodeUnauthorized),
 	}, {
 		about: "login with client credentials - a login message is sent to the controller",
-		messageToSend: message{
+		messageToSend: rpcproxy.Message{
 			RequestID: 1,
 			Type:      "Admin",
 			Version:   4,
 			Request:   "LoginWithClientCredentials",
 			Params:    ccData,
 		},
-		expectedControllerMessage: &message{
+		expectedControllerMessage: &rpcproxy.Message{
 			RequestID: 1,
 			Type:      "Admin",
 			Version:   3,
@@ -170,14 +159,14 @@ func TestProxySocketsAdminFacade(t *testing.T) {
 		},
 	}, {
 		about: "login with client credentials, but authenticator returns an error",
-		messageToSend: message{
+		messageToSend: rpcproxy.Message{
 			RequestID: 1,
 			Type:      "Admin",
 			Version:   4,
 			Request:   "LoginWithClientCredentials",
 			Params:    ccData,
 		},
-		expectedClientResponse: &message{
+		expectedClientResponse: &rpcproxy.Message{
 			RequestID: 1,
 			Error:     "unauthorized access",
 			ErrorCode: "unauthorized access",
@@ -185,14 +174,14 @@ func TestProxySocketsAdminFacade(t *testing.T) {
 		oauthAuthenticatorError: errors.E(errors.CodeUnauthorized),
 	}, {
 		about: "any other message - gets forwarded directly to the controller",
-		messageToSend: message{
+		messageToSend: rpcproxy.Message{
 			RequestID: 1,
 			Type:      "Client",
 			Version:   7,
 			Request:   "AnyMethod",
 			Params:    []byte(`{"key":"value"}`),
 		},
-		expectedControllerMessage: &message{
+		expectedControllerMessage: &rpcproxy.Message{
 			RequestID: 1,
 			Type:      "Client",
 			Version:   7,
@@ -201,7 +190,7 @@ func TestProxySocketsAdminFacade(t *testing.T) {
 		},
 	}, {
 		about: "login with session cookie - a login message is sent to the controller",
-		messageToSend: message{
+		messageToSend: rpcproxy.Message{
 			RequestID: 1,
 			Type:      "Admin",
 			Version:   4,
@@ -209,7 +198,7 @@ func TestProxySocketsAdminFacade(t *testing.T) {
 			Params:    ccData,
 		},
 		authenticateEntityID: "alice@wonderland.io",
-		expectedControllerMessage: &message{
+		expectedControllerMessage: &rpcproxy.Message{
 			RequestID: 1,
 			Type:      "Admin",
 			Version:   3,
@@ -218,14 +207,14 @@ func TestProxySocketsAdminFacade(t *testing.T) {
 		},
 	}, {
 		about: "login with session cookie - but there was no identity id in the cookie",
-		messageToSend: message{
+		messageToSend: rpcproxy.Message{
 			RequestID: 1,
 			Type:      "Admin",
 			Version:   4,
 			Request:   "LoginWithSessionCookie",
 			Params:    ccData,
 		},
-		expectedClientResponse: &message{
+		expectedClientResponse: &rpcproxy.Message{
 			RequestID: 1,
 			Error:     "unauthorized access",
 			ErrorCode: "unauthorized access",
@@ -233,7 +222,7 @@ func TestProxySocketsAdminFacade(t *testing.T) {
 		oauthAuthenticatorError: errors.E(errors.CodeUnauthorized),
 	}, {
 		about: "connection to controller fails",
-		expectedClientResponse: &message{
+		expectedClientResponse: &rpcproxy.Message{
 			Error: "controller connection error",
 		},
 		expectedProxyError: "failed to connect to controller: controller connection error",
@@ -256,14 +245,14 @@ func TestProxySocketsAdminFacade(t *testing.T) {
 				err:          test.oauthAuthenticatorError,
 			}
 
-			helpers := rpc.ProxyHelpers{
+			helpers := rpcproxy.ProxyHelpers{
 				ConnClient: clientWebsocket,
 				TokenGen:   &mockTokenGenerator{},
-				ConnectController: func(ctx context.Context) (rpc.WebsocketConnectionWithMetadata, error) {
+				ConnectController: func(ctx context.Context) (rpcproxy.WebsocketConnectionWithMetadata, error) {
 					if proxyError {
-						return rpc.WebsocketConnectionWithMetadata{}, goerr.New("controller connection error")
+						return rpcproxy.WebsocketConnectionWithMetadata{}, goerr.New("controller connection error")
 					}
-					return rpc.WebsocketConnectionWithMetadata{
+					return rpcproxy.WebsocketConnectionWithMetadata{
 						Conn:           controllerWebsocket,
 						ModelName:      "test model",
 						ControllerUUID: uuid.NewString(),
@@ -277,7 +266,7 @@ func TestProxySocketsAdminFacade(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				err = rpc.ProxySockets(ctx, helpers)
+				err = rpcproxy.ProxySockets(ctx, helpers)
 				if proxyError {
 					c.Assert(err, qt.ErrorMatches, test.expectedProxyError)
 				} else {
