@@ -491,6 +491,12 @@ func (j *JIMM) ServiceAccountManager() ServiceAccountManager {
 	return j.serviceAccountManager
 }
 
+// SSHKeyManager returns a manager that enables operations
+// related to ssh keys.
+func (j *JIMM) SSHKeyManager() SSHKeyManager {
+	return j.sshKeyManager
+}
+
 type permission struct {
 	resource string
 	relation string
