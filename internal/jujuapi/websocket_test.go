@@ -1,11 +1,14 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package jujuapi_test
 
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/pem"
 	"fmt"
 	"net/http"
@@ -16,9 +19,12 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/juju/juju/api"
 	"github.com/juju/juju/api/client/client"
+	"github.com/juju/juju/api/client/keymanager"
 	"github.com/juju/juju/rpc/jsoncodec"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
+	"github.com/juju/utils/v3/ssh"
+	gossh "golang.org/x/crypto/ssh"
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
@@ -247,6 +253,62 @@ func (s *apiProxySuite) TestModelStatusWithoutPermission(c *gc.C) {
 	}
 	outputNoNewLine := strings.ReplaceAll(output.String(), "\n", "")
 	c.Check(outputNoNewLine, gc.Matches, `Please visit .* and enter code.*`)
+}
+
+// TestSSHKeyManager verifies e2e that the model proxy correctly handles
+// KeyManager facade related calls by using a real Juju client.
+func (s *apiProxySuite) TestSSHKeyManager(c *gc.C) {
+	conn := s.open(c, &api.Info{
+		ModelTag:  s.Model.ResourceTag(),
+		SkipLogin: false,
+	}, "alice@canonical.com")
+	defer conn.Close()
+	client := keymanager.NewClient(conn)
+
+	// Make an OpenSSH formatted authorised key.
+	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	c.Assert(err, gc.IsNil)
+	pubKey, err := gossh.NewPublicKey(&privKey.PublicKey)
+	c.Assert(err, gc.IsNil)
+
+	// Add the key
+	keyComment := "myComment"
+	openSSHAuthorizedKey := marshalAuthorizedKeyWithComment(pubKey, keyComment)
+	res, err := client.AddKeys("unused", openSSHAuthorizedKey)
+	c.Assert(err, gc.IsNil)
+	c.Assert(res, gc.HasLen, 0)
+
+	// List the keys
+	keys, err := client.ListKeys(ssh.Fingerprints)
+	c.Assert(err, gc.IsNil)
+	c.Assert(keys, gc.HasLen, 1)
+	c.Assert(keys[0].Result, gc.HasLen, 1)
+	c.Assert(keys[0].Result[0], gc.Equals, fmt.Sprintf("%s (%s)", gossh.FingerprintLegacyMD5(pubKey), keyComment))
+
+	// Delete the key
+	res, err = client.DeleteKeys("unused", gossh.FingerprintLegacyMD5(pubKey))
+	c.Assert(err, gc.IsNil)
+	c.Assert(res, gc.HasLen, 0)
+
+	// List the keys
+	keys, err = client.ListKeys(ssh.Fingerprints)
+	c.Assert(err, gc.IsNil)
+	c.Assert(keys, gc.HasLen, 1)
+	c.Assert(keys[0].Result, gc.HasLen, 0)
+}
+
+func marshalAuthorizedKeyWithComment(key gossh.PublicKey, comment string) string {
+	// Errors from the buffer's Write..() methods are always nil.
+	b := &bytes.Buffer{}
+	b.WriteString(key.Type())
+	b.WriteByte(' ')
+	e := base64.NewEncoder(base64.StdEncoding, b)
+	_, _ = e.Write(key.Marshal())
+	e.Close()
+	b.WriteByte(' ')
+	b.WriteString(comment)
+	b.WriteByte('\n')
+	return b.String()
 }
 
 // TODO(Kian): This test aims to verify that JIMM gracefully handles clients that end their connection
