@@ -69,9 +69,7 @@ func (k *keyManagerFacadeSuite) Init(c *qt.C) {
 			return k.removeKeyByFingerprintF(ctx, user, fingerprint)
 		},
 	}
-	k.keyManagerFacade = rpcproxy.KeyManagerFacade{
-		SSHKeyManager: &keyManager,
-	}
+	k.keyManagerFacade = rpcproxy.NewKeyManagerFacade(&keyManager, nil)
 }
 
 var isFingerprintRegex = regexp.MustCompile(`[0-9a-f]{2}(:[0-9a-f]{2}){15}`)

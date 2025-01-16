@@ -760,7 +760,7 @@ func (p *clientProxy) handleKeyManagerFacade(ctx context.Context, msg *message) 
 		msg.Response = resp
 		return msg, nil
 	}
-	keyManager := keyManagerFacade{SSHKeyManager: p.sshKeyManager, user: p.user}
+	keyManager := keyManagerFacade{keyManager: p.sshKeyManager, user: p.user}
 
 	switch msg.Request {
 	case "ListKeys":

@@ -25,14 +25,14 @@ var isFingerprintRegexp = regexp.MustCompile("^[0-9a-f]{2}(:[0-9a-f]{2}){15}$")
 // the api layer logic for SSH key management methods that are currently
 // used by the rpcProxy.
 type keyManagerFacade struct {
-	SSHKeyManager
-	user *openfga.User
+	keyManager SSHKeyManager
+	user       *openfga.User
 }
 
 // ListKeys lists the authenticated user's SSH keys
 // in the format defined in args.
 func (s *keyManagerFacade) ListKeys(ctx context.Context, args jujuparams.ListSSHKeys) (jujuparams.StringsResults, error) {
-	keys, err := s.ListUserPublicKeys(ctx, s.user)
+	keys, err := s.keyManager.ListUserPublicKeys(ctx, s.user)
 	if err != nil {
 		return jujuparams.StringsResults{}, err
 	}
@@ -75,7 +75,7 @@ func (s *keyManagerFacade) AddKeys(ctx context.Context, args jujuparams.ModifyUs
 			PublicKey: out,
 			Comment:   comment,
 		}
-		if err := s.AddUserPublicKey(ctx, s.user, parsedKey); err != nil {
+		if err := s.keyManager.AddUserPublicKey(ctx, s.user, parsedKey); err != nil {
 			res = append(res, errF(err, fmt.Sprintf("Failed to add key (comment %s)", comment)))
 		}
 	}
@@ -96,12 +96,12 @@ func (s *keyManagerFacade) DeleteKeys(ctx context.Context, args jujuparams.Modif
 
 	for _, key := range args.Keys {
 		if isFingerprintRegexp.MatchString(key) {
-			err := s.RemoveUserKeyByFingerprint(ctx, s.user, key)
+			err := s.keyManager.RemoveUserKeyByFingerprint(ctx, s.user, key)
 			if err != nil {
 				res = append(res, errF(err, fmt.Sprintf("Failed to remove key by fingerprint (%s)", key)))
 			}
 		} else {
-			err := s.RemoveUserKeyByComment(ctx, s.user, key)
+			err := s.keyManager.RemoveUserKeyByComment(ctx, s.user, key)
 			if err != nil {
 				res = append(res, errF(err, fmt.Sprintf("Failed to remove key by comment (%s)", key)))
 			}
