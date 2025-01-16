@@ -71,11 +71,11 @@ func (s *keyManagerFacade) AddKeys(ctx context.Context, args jujuparams.ModifyUs
 		if err != nil {
 			res = append(res, errF(err, fmt.Sprintf("Failed to parse key (entry %d)", i)))
 		}
-		jimmKey := sshkeys.PublicKey{
+		parsedKey := sshkeys.PublicKey{
 			PublicKey: out,
 			Comment:   comment,
 		}
-		if err := s.AddUserPublicKey(ctx, s.user, jimmKey); err != nil {
+		if err := s.AddUserPublicKey(ctx, s.user, parsedKey); err != nil {
 			res = append(res, errF(err, fmt.Sprintf("Failed to add key (comment %s)", comment)))
 		}
 	}
@@ -111,8 +111,10 @@ func (s *keyManagerFacade) DeleteKeys(ctx context.Context, args jujuparams.Modif
 	return jujuparams.ErrorResults{Results: res}, nil
 }
 
+// marshalAuthorizedKeyWithComment marshals a public key + comment
+// into an OpenSSH formatted authorized key string.
+// Copied from gossh.MarshalAuthorizedKey with an addition for the comment.
 func marshalAuthorizedKeyWithComment(key sshkeys.PublicKey) string {
-	// Copied from gossh.MarshalAuthorizedKey with an addition for the comment.
 	// Errors from the buffer's Write..() methods are always nil.
 	b := &bytes.Buffer{}
 	b.WriteString(key.Type())
@@ -126,6 +128,10 @@ func marshalAuthorizedKeyWithComment(key sshkeys.PublicKey) string {
 	return b.String()
 }
 
+// fingerprintWithComment renders a short form version of a public
+// key, displayed by the Juju CLI as '<fingerprint> (<comment>)'.
+// Rendered on the server side as no strong types are defined for
+// sharing keys between server and client.
 func fingerprintWithComment(key sshkeys.PublicKey) string {
 	fingerprint := gossh.FingerprintLegacyMD5(key)
 	return fmt.Sprintf("%s (%s)", fingerprint, key.Comment)

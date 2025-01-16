@@ -281,6 +281,10 @@ func TestProxySocketsAuditLogs(t *testing.T) {
 
 }
 
+// TestProxySocketsSSHKeys verifies that the
+// SSH KeyManager methods are wired up properly.
+// E.g. that a call with method name AddKeys calls
+// the KeyManager's AddKeys method.
 func TestProxySocketsSSHKeys(t *testing.T) {
 	c := qt.New(t)
 
@@ -380,6 +384,12 @@ func TestProxySocketsSSHKeys(t *testing.T) {
 			expectedChanResult: "remove-keys-fingerprint",
 			params:             mustMarshal(jujuparams.ModifyUserSSHKeys{Keys: []string{"79:fc:60:93:ec:ce:42:fe:15:61:f2:fb:d6:22:43:6e"}}),
 		},
+		{
+			name:        "Invalid method called",
+			request:     "InvalidMethod",
+			expectedErr: "unknown key manager request",
+			params:      []byte{},
+		},
 	}
 
 	for i, test := range tests {
@@ -391,18 +401,19 @@ func TestProxySocketsSSHKeys(t *testing.T) {
 			resp := rpcproxy.Message{}
 			err = ws.ReadJSON(&resp)
 			c.Assert(err, qt.IsNil)
-			if test.expectedErr == "" {
-				c.Assert(resp.Error, qt.Equals, "")
-			} else {
-				c.Assert(err, qt.Matches, test.expectedErr)
+			if test.expectedErr != "" {
+				c.Assert(resp.Error, qt.Matches, test.expectedErr)
+				return
 			}
 
+			c.Assert(resp.Error, qt.Equals, "")
 			select {
 			case res := <-sshFacadeChan:
 				c.Assert(res, qt.Equals, test.expectedChanResult)
 			case <-time.After(100 * time.Millisecond):
 				c.Error("Expected SSH method was not called")
 			}
+
 		})
 	}
 	ws.Close()
