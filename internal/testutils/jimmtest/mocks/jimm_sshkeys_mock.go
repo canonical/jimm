@@ -14,6 +14,7 @@ type SSHKeyManager struct {
 	ListUserPublicKeys_         func(ctx context.Context, user *openfga.User) ([]sshkeys.PublicKey, error)
 	RemoveUserKeyByComment_     func(ctx context.Context, user *openfga.User, comment string) error
 	RemoveUserKeyByFingerprint_ func(ctx context.Context, user *openfga.User, fingerprint string) error
+	VerifyPublicKey_            func(ctx context.Context, claimUser string, publicKey []byte) (bool, error)
 }
 
 func (j *SSHKeyManager) AddUserPublicKey(ctx context.Context, user *openfga.User, publicKey sshkeys.PublicKey) error {
@@ -39,4 +40,11 @@ func (j *SSHKeyManager) RemoveUserKeyByFingerprint(ctx context.Context, user *op
 		return errors.E(errors.CodeNotImplemented)
 	}
 	return j.RemoveUserKeyByFingerprint_(ctx, user, fingerprint)
+}
+
+func (j *SSHKeyManager) VerifyPublicKey(ctx context.Context, claimUser string, publicKey []byte) (bool, error) {
+	if j.VerifyPublicKey_ == nil {
+		return true, nil
+	}
+	return j.VerifyPublicKey_(ctx, claimUser, publicKey)
 }
