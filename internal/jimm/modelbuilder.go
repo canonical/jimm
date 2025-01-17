@@ -1,4 +1,5 @@
 // Copyright 2025 Canonical.
+
 package jimm
 
 import (
@@ -318,6 +319,8 @@ func (b *modelBuilder) Cleanup() {
 	}
 }
 
+// UpdateDatabaseModel persists the information about the model
+// retrieved from Juju to our database.
 func (b *modelBuilder) UpdateDatabaseModel() *modelBuilder {
 	if b.err != nil {
 		return b
