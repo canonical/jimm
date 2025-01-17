@@ -1,27 +1,23 @@
-// Copyright 2025 Canonical.
-
-package jimm
+package model
 
 import (
 	"context"
 	"fmt"
 
-	jujupermission "github.com/juju/juju/core/permission"
+	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/openfga"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"github.com/juju/zaputil"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
-
-	"github.com/canonical/jimm/v3/internal/dbmodel"
-	"github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/internal/openfga"
 )
 
-func newModelBuilder(ctx context.Context, j *JIMM) *modelBuilder {
+func newModelBuilder(ctx context.Context, mm *modelManager) *modelBuilder {
 	return &modelBuilder{
-		ctx:  ctx,
-		jimm: j,
+		ctx: ctx,
+		mm:  mm,
 	}
 }
 
@@ -29,7 +25,7 @@ type modelBuilder struct {
 	ctx context.Context
 	err error
 
-	jimm *JIMM
+	mm *modelManager
 
 	name               string
 	config             map[string]interface{}
@@ -129,7 +125,7 @@ func (b *modelBuilder) WithCloud(user *openfga.User, cloud names.CloudTag) *mode
 		Name: cloud.Id(),
 	}
 
-	if err := b.jimm.Database.GetCloud(b.ctx, &c); err != nil {
+	if err := b.mm.store.GetCloud(b.ctx, &c); err != nil {
 		b.err = err
 		return b
 	}
@@ -145,7 +141,7 @@ func (b *modelBuilder) withImplicitCloud(user *openfga.User) *modelBuilder {
 		return b
 	}
 	var clouds []*dbmodel.Cloud
-	err := b.jimm.ForEachUserCloud(b.ctx, user, func(c *dbmodel.Cloud) error {
+	err := b.mm.cloudManager.ForEachUserCloud(b.ctx, user, func(c *dbmodel.Cloud) error {
 		clouds = append(clouds, c)
 		return nil
 	})
@@ -227,7 +223,7 @@ func (b *modelBuilder) WithCloudCredential(credentialTag names.CloudCredentialTa
 		CloudName:         credentialTag.Cloud().Id(),
 		OwnerIdentityName: credentialTag.Owner().Id(),
 	}
-	err := b.jimm.Database.GetCloudCredential(b.ctx, &credential)
+	err := b.mm.store.GetCloudCredential(b.ctx, &credential)
 	if err != nil {
 		b.err = errors.E(err, fmt.Sprintf("failed to fetch cloud credentials %s", credential.Path()))
 	}
@@ -288,7 +284,7 @@ func (b *modelBuilder) CreateDatabaseModel() *modelBuilder {
 		CloudRegionID:     b.cloudRegionID,
 	}
 
-	err := b.jimm.Database.AddModel(b.ctx, b.model)
+	err := b.mm.store.AddModel(b.ctx, b.model)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.CodeAlreadyExists {
 			b.err = errors.E(err, fmt.Sprintf("model %s/%s already exists", b.owner.Name, b.name))
@@ -314,13 +310,11 @@ func (b *modelBuilder) Cleanup() {
 	// the model should be deleted from the database regardless of the request
 	// context expiration
 	ctx := context.Background()
-	if derr := b.jimm.Database.DeleteModel(ctx, b.model); derr != nil {
+	if derr := b.mm.store.DeleteModel(ctx, b.model); derr != nil {
 		zapctx.Error(ctx, "failed to delete model", zap.String("model", b.model.Name), zap.String("owner", b.model.Owner.Name), zaputil.Error(derr))
 	}
 }
 
-// UpdateDatabaseModel persists the information about the model
-// retrieved from Juju to our database.
 func (b *modelBuilder) UpdateDatabaseModel() *modelBuilder {
 	if b.err != nil {
 		return b
@@ -339,7 +333,7 @@ func (b *modelBuilder) UpdateDatabaseModel() *modelBuilder {
 	b.model.CloudCredential = dbmodel.CloudCredential{}
 	b.model.CloudRegion = dbmodel.CloudRegion{}
 
-	err = b.jimm.Database.UpdateModel(b.ctx, b.model)
+	err = b.mm.store.UpdateModel(b.ctx, b.model)
 	if err != nil {
 		b.err = errors.E(err, "failed to store model information")
 		return b
@@ -381,7 +375,7 @@ func (b *modelBuilder) selectCloudCredentials() error {
 	if b.cloud == nil {
 		return errors.E("cloud not specified")
 	}
-	credentials, err := b.jimm.Database.GetIdentityCloudCredentials(b.ctx, b.owner, b.cloud.Name)
+	credentials, err := b.mm.store.GetIdentityCloudCredentials(b.ctx, b.owner, b.cloud.Name)
 	if err != nil {
 		return errors.E(err, "failed to fetch user cloud credentials")
 	}
@@ -408,14 +402,10 @@ func (b *modelBuilder) CreateControllerModel() *modelBuilder {
 		return b
 	}
 
-	api, err := b.jimm.dial(
+	api, err := b.mm.dial(
 		b.ctx,
 		b.controller,
 		names.ModelTag{},
-		permission{
-			resource: b.cloud.ResourceTag().String(),
-			relation: string(jujupermission.AddModelAccess),
-		},
 	)
 	if err != nil {
 		b.err = errors.E(err)
@@ -461,17 +451,6 @@ func (b *modelBuilder) CreateControllerModel() *modelBuilder {
 		return b
 	}
 
-	// Grant JIMM admin access to the model. Note that if this fails,
-	// the local database entry will be deleted but the model
-	// will remain on the controller and will trigger the "already exists
-	// in the backend controller" message above when the user
-	// attempts to create a model with the same name again.
-	if err := api.GrantJIMMModelAdmin(b.ctx, names.NewModelTag(info.UUID)); err != nil {
-		zapctx.Error(b.ctx, "leaked model", zap.String("model", info.UUID), zaputil.Error(err))
-		b.err = errors.E(err)
-		return b
-	}
-
 	b.modelInfo = &info
 	return b
 }
@@ -479,7 +458,7 @@ func (b *modelBuilder) CreateControllerModel() *modelBuilder {
 func (b *modelBuilder) updateCredential(ctx context.Context, api API, cred *dbmodel.CloudCredential) error {
 	var err error
 
-	_, err = b.jimm.updateControllerCloudCredential(ctx, cred, api.UpdateCredential)
+	_, err = b.mm.controllerManager.UpdateControllerCloudCredential(ctx, cred, api.UpdateCredential)
 	return err
 }
 

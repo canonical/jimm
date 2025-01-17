@@ -21,6 +21,7 @@ import (
 	"github.com/juju/juju/state"
 	"github.com/juju/names/v5"
 	semversion "github.com/juju/version"
+	"github.com/juju/version/v2"
 	"gopkg.in/macaroon.v2"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
@@ -1469,6 +1470,12 @@ func TestInitiateMigration(t *testing.T) {
 			}
 		})
 	}
+}
+
+// newVersion wraps version.MustParse to return a *version.Number
+func newVersion(s string) *version.Number {
+	n := version.MustParse(s)
+	return &n
 }
 
 type result struct {

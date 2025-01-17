@@ -1,13 +1,12 @@
 // Copyright 2025 Canonical.
 
-package jimm_test
+package model_test
 
 import (
 	"context"
 	"database/sql"
 	"fmt"
 	"sort"
-	"testing"
 	"time"
 
 	qt "github.com/frankban/quicktest"
@@ -22,15 +21,49 @@ import (
 	"github.com/juju/version/v2"
 	"sigs.k8s.io/yaml"
 
+	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm"
+	"github.com/canonical/jimm/v3/internal/jimm/juju/model"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
 
-func TestModelCreateArgs(t *testing.T) {
-	c := qt.New(t)
+type modelManagerSuite struct {
+	manager    *model.ModelManager
+	user       *openfga.User
+	db         *db.Database
+	ofgaClient *openfga.OFGAClient
+}
+
+func (s *modelManagerSuite) Init(c *qt.C) {
+	// Setup DB
+	db := &db.Database{
+		DB: jimmtest.PostgresDB(c, time.Now),
+	}
+	err := db.Migrate(context.Background())
+	c.Assert(err, qt.IsNil)
+
+	s.db = db
+
+	// Setup OFGA
+	ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+	c.Assert(err, qt.IsNil)
+
+	s.ofgaClient = ofgaClient
+
+	s.manager, err = model.NewModelManager(db, ofgaClient, dialer, permissionManager, controllerManager, cloudManager)
+	c.Assert(err, qt.IsNil)
+
+	// Create test identity
+	i, err := dbmodel.NewIdentity("alice")
+	c.Assert(err, qt.IsNil)
+	s.user = openfga.NewUser(i, ofgaClient)
+}
+
+func (s *modelManagerSuite) TestModelCreateArgs(c *qt.C) {
+	c.Parallel()
 
 	tests := []struct {
 		about         string
@@ -1156,8 +1189,8 @@ users:
 	},
 }}
 
-func TestAddModel(t *testing.T) {
-	c := qt.New(t)
+func (s *modelManagerSuite) TestAddModel(c *qt.C) {
+	c.Parallel()
 
 	for _, test := range addModelTests {
 		c.Run(test.name, func(c *qt.C) {
@@ -1305,9 +1338,9 @@ models:
   life: alive
 `
 
-func TestGetModel(t *testing.T) {
+func (s *modelManagerSuite) TestGetModel(c *qt.C) {
 	ctx := context.Background()
-	c := qt.New(t)
+	c.Parallel()
 
 	j := jimmtest.NewJIMM(c, nil)
 
@@ -1491,8 +1524,8 @@ var modelInfoTests = []struct {
 },
 }
 
-func TestModelInfo(t *testing.T) {
-	c := qt.New(t)
+func (s *modelManagerSuite) TestModelInfo(c *qt.C) {
+	c.Parallel()
 
 	for _, test := range modelInfoTests {
 		c.Run(test.name, func(c *qt.C) {
@@ -1655,8 +1688,8 @@ var modelStatusTests = []struct {
 	expectError: "test error",
 }}
 
-func TestModelStatus(t *testing.T) {
-	c := qt.New(t)
+func (s *modelManagerSuite) TestModelStatus(c *qt.C) {
+	c.Parallel()
 
 	for _, test := range modelStatusTests {
 		c.Run(test.name, func(c *qt.C) {
@@ -1760,8 +1793,8 @@ users:
   controller-access: superuser
 `
 
-func TestForEachUserModel(t *testing.T) {
-	c := qt.New(t)
+func (s *modelManagerSuite) TestForEachUserModel(c *qt.C) {
+	c.Parallel()
 	ctx := context.Background()
 
 	j := jimmtest.NewJIMM(c, nil)
@@ -1821,8 +1854,8 @@ func TestForEachUserModel(t *testing.T) {
 	}})
 }
 
-func TestForEachModel(t *testing.T) {
-	c := qt.New(t)
+func (s *modelManagerSuite) TestForEachModel(c *qt.C) {
+	c.Parallel()
 	ctx := context.Background()
 
 	j := jimmtest.NewJIMM(c, nil)
@@ -1904,8 +1937,8 @@ users:
   controller-access: superuser
 `
 
-func TestModelSummaries(t *testing.T) {
-	c := qt.New(t)
+func (s *modelManagerSuite) TestModelSummaries(c *qt.C) {
+	c.Parallel()
 	ctx := context.Background()
 
 	j := jimmtest.NewJIMM(c, nil)
@@ -2248,8 +2281,8 @@ var destroyModelTests = []struct {
 	expectedLife: "alive",
 }}
 
-func TestDestroyModel(t *testing.T) {
-	c := qt.New(t)
+func (s *modelManagerSuite) TestDestroyModel(c *qt.C) {
+	c.Parallel()
 
 	for _, test := range destroyModelTests {
 		c.Run(test.name, func(c *qt.C) {
@@ -2366,8 +2399,8 @@ var dumpModelTests = []struct {
 	expectError: `api error`,
 }}
 
-func TestDumpModel(t *testing.T) {
-	c := qt.New(t)
+func (s *modelManagerSuite) TestDumpModel(c *qt.C) {
+	c.Parallel()
 
 	for _, test := range dumpModelTests {
 		c.Run(test.name, func(c *qt.C) {
@@ -2468,8 +2501,8 @@ var dumpModelDBTests = []struct {
 	expectError: `api error`,
 }}
 
-func TestDumpModelDB(t *testing.T) {
-	c := qt.New(t)
+func (s *modelManagerSuite) TestDumpModelDB(c *qt.C) {
+	c.Parallel()
 
 	for _, test := range dumpModelDBTests {
 		c.Run(test.name, func(c *qt.C) {
@@ -2575,8 +2608,8 @@ var validateModelUpgradeTests = []struct {
 	expectError: `api error`,
 }}
 
-func TestValidateModelUpgrade(t *testing.T) {
-	c := qt.New(t)
+func (s *modelManagerSuite) TestValidateModelUpgrade(c *qt.C) {
+	c.Parallel()
 
 	for _, test := range validateModelUpgradeTests {
 		c.Run(test.name, func(c *qt.C) {
@@ -2787,8 +2820,8 @@ var updateModelCredentialTests = []struct {
 	expectError: "an error",
 }}
 
-func TestUpdateModelCredential(t *testing.T) {
-	c := qt.New(t)
+func (s *modelManagerSuite) TestUpdateModelCredential(c *qt.C) {
+	c.Parallel()
 
 	for _, test := range updateModelCredentialTests {
 		c.Run(test.name, func(c *qt.C) {
@@ -2843,8 +2876,8 @@ func TestUpdateModelCredential(t *testing.T) {
 	}
 }
 
-func TestAddModelDeletedController(t *testing.T) {
-	c := qt.New(t)
+func (s *modelManagerSuite) TestAddModelDeletedController(c *qt.C) {
+	c.Parallel()
 
 	api := &jimmtest.API{
 		UpdateCredential_: func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
@@ -3124,8 +3157,8 @@ var modelListTests = []struct {
 	},
 }
 
-func TestListModels(t *testing.T) {
-	c := qt.New(t)
+func (s *modelManagerSuite) TestListModels(c *qt.C) {
+	c.Parallel()
 
 	for _, test := range modelListTests {
 		c.Run(
