@@ -4,7 +4,9 @@ package sshkeys
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/gliderlabs/ssh"
 	gossh "golang.org/x/crypto/ssh"
 
 	"github.com/canonical/jimm/v3/internal/db"
@@ -26,7 +28,7 @@ func NewSSHKeyManager(store *db.Database) (*sshKeyManager, error) {
 }
 
 // AddUserPublicKey saves a user's public key.
-func (rm *sshKeyManager) AddUserPublicKey(ctx context.Context, user *openfga.User, publicKey PublicKey) error {
+func (sm *sshKeyManager) AddUserPublicKey(ctx context.Context, user *openfga.User, publicKey PublicKey) error {
 	const op = errors.Op("sshkeys.AddUserPublicKey")
 
 	if ok, reason := publicKey.valid(); !ok {
@@ -39,18 +41,43 @@ func (rm *sshKeyManager) AddUserPublicKey(ctx context.Context, user *openfga.Use
 		MD5Fingerprint: gossh.FingerprintLegacyMD5(publicKey),
 		KeyComment:     publicKey.Comment,
 	}
-	err := rm.store.AddSSHKey(ctx, &k)
+	err := sm.store.AddSSHKey(ctx, &k)
 	if err != nil {
 		return errors.E(op, err)
 	}
 	return nil
 }
 
+// VerifyPublicKey lists the key for a user and compares the key to find a match.
+func (sm *sshKeyManager) VerifyPublicKey(ctx context.Context, claimUser string, publicKey []byte) (bool, error) {
+	const op = errors.Op("sshkeys.VerifyPublicKey")
+
+	dbKeys, err := sm.store.ListSSHKeysForUser(ctx, claimUser)
+	if err != nil {
+		return false, errors.E(op, err)
+	}
+	publicKeyToCompare, err := gossh.ParsePublicKey(publicKey)
+	if err != nil {
+		return false, errors.E(op, err)
+	}
+	for _, key := range dbKeys {
+		k, err := gossh.ParsePublicKey(key.PublicKey)
+		if err != nil {
+			return false, errors.E(op, err)
+		}
+		if ssh.KeysEqual(k, publicKeyToCompare) {
+			return true, nil
+		}
+	}
+	return false, fmt.Errorf("cannot find a matching key for this user.")
+
+}
+
 // ListUserPublicKeys lists a user's public keys.
-func (rm *sshKeyManager) ListUserPublicKeys(ctx context.Context, user *openfga.User) ([]PublicKey, error) {
+func (sm *sshKeyManager) ListUserPublicKeys(ctx context.Context, user *openfga.User) ([]PublicKey, error) {
 	const op = errors.Op("sshkeys.ListUserPublicKeys")
 
-	dbKeys, err := rm.store.ListSSHKeysForUser(ctx, user.Name)
+	dbKeys, err := sm.store.ListSSHKeysForUser(ctx, user.Name)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
@@ -66,10 +93,10 @@ func (rm *sshKeyManager) ListUserPublicKeys(ctx context.Context, user *openfga.U
 }
 
 // RemoveUserKeyByComment removes a user's public key(s) by the key comment.
-func (rm *sshKeyManager) RemoveUserKeyByComment(ctx context.Context, user *openfga.User, comment string) error {
+func (sm *sshKeyManager) RemoveUserKeyByComment(ctx context.Context, user *openfga.User, comment string) error {
 	const op = errors.Op("sshkeys.RemoveUserKeyByComment")
 
-	err := rm.store.RemoveSSHKeyByComment(ctx, user.Name, comment)
+	err := sm.store.RemoveSSHKeyByComment(ctx, user.Name, comment)
 	if err != nil {
 		return errors.E(op, err)
 	}
@@ -77,10 +104,10 @@ func (rm *sshKeyManager) RemoveUserKeyByComment(ctx context.Context, user *openf
 }
 
 // RemoveUserKeyByFingerprint removes a user's public key by the key fingerprint.
-func (rm *sshKeyManager) RemoveUserKeyByFingerprint(ctx context.Context, user *openfga.User, fingerprint string) error {
+func (sm *sshKeyManager) RemoveUserKeyByFingerprint(ctx context.Context, user *openfga.User, fingerprint string) error {
 	const op = errors.Op("sshkeys.RemoveUserKeyByFingerprint")
 
-	err := rm.store.RemoveSSHKeyByFingerprint(ctx, user.Name, fingerprint)
+	err := sm.store.RemoveSSHKeyByFingerprint(ctx, user.Name, fingerprint)
 	if err != nil {
 		return errors.E(op, err)
 	}
