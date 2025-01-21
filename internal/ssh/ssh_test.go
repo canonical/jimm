@@ -116,17 +116,15 @@ func (s *sshSuite) Init(c *qt.C) {
 			HostKey:                  hostKey,
 			MaxConcurrentConnections: 10,
 		},
-		mocks.SSHAuthorizer{
+		mocks.SSHManager{
 			PublicKeyHandler_: func(ctx context.Context, claimUser string, key []byte) (*openfga.User, error) {
 				if claimUser == "alice" {
 					return userWithAccess, nil
 				}
 				return userWithoutAccess, nil
 			},
-		},
-		mocks.SSHResolver{
-			AddrFromModelUUID_: func(ctx context.Context, user *openfga.User, modelTag names.ModelTag) (string, error) {
-				return "", nil
+			ResolveAddressesFromModelUUID_: func(ctx context.Context, modelUUID string) ([]string, error) {
+				return []string{""}, nil
 			},
 		})
 	c.Assert(err, qt.IsNil)

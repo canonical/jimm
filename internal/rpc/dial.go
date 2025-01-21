@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package rpc
 
@@ -15,7 +15,6 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/juju/juju/core/network"
 	"github.com/juju/names/v5"
-	"github.com/juju/zaputil"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
@@ -54,10 +53,8 @@ func (d Dialer) DialWebsocket(ctx context.Context, url string, headers http.Head
 	return conn, nil
 }
 
-// Dial connects to the controller/model and returns a raw websocket
-// that can be used as is.
-// It accepts the endpoints to dial, normally /api or /commands.
-func Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, finalPath string, headers http.Header) (*websocket.Conn, error) {
+// GetAddressesAndTLSConfig returns the addresses and TLS configuration for the given controller.
+func GetAddressesAndTLSConfig(ctx context.Context, ctl *dbmodel.Controller) ([]string, *tls.Config) {
 	var tlsConfig *tls.Config
 	if ctl.CACertificate != "" {
 		cp := x509.NewCertPool()
@@ -71,21 +68,14 @@ func Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag,
 			MinVersion: tls.VersionTLS12,
 		}
 	}
-	dialer := Dialer{
-		TLSConfig: tlsConfig,
-	}
 
 	if ctl.PublicAddress != "" {
 		// If there is a public-address configured it is almost
-		// certainly the one we want to use, try it first.
-		conn, err := dialer.DialWebsocket(ctx, websocketURL(ctl.PublicAddress, modelTag, finalPath), headers)
-		if err != nil {
-			zapctx.Error(ctx, "failed to dial public address", zaputil.Error(err))
-		} else {
-			return conn, nil
-		}
+		// certainly the one we want to use.
+		return []string{ctl.PublicAddress}, tlsConfig
 	}
-	var urls []string
+
+	var addrs []string
 	for _, hps := range ctl.Addresses {
 		for _, hp := range hps {
 			if maybeReachable(hp.Scope) {
@@ -95,12 +85,27 @@ func Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag,
 				} else {
 					ip = fmt.Sprintf("%s:%d", hp.Value, hp.Port)
 				}
-				urls = append(urls, websocketURL(ip, modelTag, finalPath))
+				addrs = append(addrs, ip)
 			}
 		}
 	}
-	zapctx.Debug(ctx, "Dialling all URLs", zap.Any("urls", urls))
-	conn, err := dialAll(ctx, &dialer, urls, headers)
+	return addrs, tlsConfig
+}
+
+// Dial connects to the controller/model and returns a raw websocket
+// that can be used as is.
+// It accepts the endpoints to dial, normally /api or /commands.
+func Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, finalPath string, headers http.Header) (*websocket.Conn, error) {
+	addrs, tlsConfig := GetAddressesAndTLSConfig(ctx, ctl)
+	dialer := Dialer{
+		TLSConfig: tlsConfig,
+	}
+	var websocketUrls []string
+	for _, addr := range addrs {
+		websocketUrls = append(websocketUrls, websocketURL(addr, modelTag, finalPath))
+	}
+	zapctx.Debug(ctx, "Dialling all URLs", zap.Any("urls", websocketUrls))
+	conn, err := dialAll(ctx, &dialer, websocketUrls, headers)
 	if err != nil {
 		return nil, err
 	}

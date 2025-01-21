@@ -25,17 +25,14 @@ const defaultMaxConcurrentConnections = 100
 
 type publicKeySSHUserKey struct{}
 
-// SSHAuthorizer is the interface to authorize users via public key.
-type SSHAuthorizer interface {
+// SSHManager is the interface to enable the ssh server to operate. Performing public key verification and
+// resolving addresses from model uuids.
+type SSHManager interface {
 	// PublicKeyHandler is the method to verify the public key of the user. It returns a user if successful.
 	PublicKeyHandler(ctx context.Context, claimUser string, key []byte) (*openfga.User, error)
-}
 
-// TODO(simonedutto): this is going to change to reuse as much as our dial logic as we possibly can.
-// SSHResolver is the interface to resolve controller's addresses.
-type SSHResolver interface {
-	// AddrFromModelUUID is the method to resolve the address of the controller to contact given the model UUID.
-	AddrFromModelUUID(ctx context.Context, user *openfga.User, modelTag names.ModelTag) (string, error)
+	// ResolveAddressesFromModelUUID is the method to resolve the address of the controller to contact given the model UUID.
+	ResolveAddressesFromModelUUID(ctx context.Context, modelUUID string) ([]string, error)
 }
 
 // forwardMessage is the struct holding the information about the jump message received by the ssh client.
@@ -63,21 +60,21 @@ type Server struct {
 }
 
 // NewJumpServer creates the jump server struct.
-func NewJumpServer(ctx context.Context, config Config, sshAuthorizer SSHAuthorizer, sshResolver SSHResolver) (Server, error) {
+func NewJumpServer(ctx context.Context, config Config, sshManager SSHManager) (Server, error) {
 	zapctx.Info(ctx, "NewJumpServer")
 
-	if sshResolver == nil {
-		return Server{}, fmt.Errorf("Cannot create JumpSSHServer with a nil resolver.")
+	if sshManager == nil {
+		return Server{}, fmt.Errorf("Cannot create JumpSSHServer with a nil ssh manager.")
 	}
 	config = setConfigDefaults(config)
 	server := Server{
 		Server: &ssh.Server{
 			Addr: fmt.Sprintf(":%s", config.Port),
 			ChannelHandlers: map[string]ssh.ChannelHandler{
-				"direct-tcpip": directTCPIPHandler(sshResolver),
+				"direct-tcpip": directTCPIPHandler(sshManager),
 			},
 			PublicKeyHandler: func(ctx ssh.Context, key ssh.PublicKey) bool {
-				user, err := sshAuthorizer.PublicKeyHandler(ctx, ctx.User(), key.Marshal())
+				user, err := sshManager.PublicKeyHandler(ctx, ctx.User(), key.Marshal())
 				if err != nil {
 					zapctx.Debug(ctx, fmt.Sprintf("cannot verify key for user %s", ctx.User()), zap.Error(err))
 					return false
@@ -122,7 +119,7 @@ func (srv Server) ListenAndServe() error {
 	return srv.Serve(ln)
 }
 
-func directTCPIPHandler(sshResolver SSHResolver) func(srv *ssh.Server, conn *gossh.ServerConn, newChan gossh.NewChannel, ctx ssh.Context) {
+func directTCPIPHandler(sshManager SSHManager) func(srv *ssh.Server, conn *gossh.ServerConn, newChan gossh.NewChannel, ctx ssh.Context) {
 	return func(srv *ssh.Server, conn *gossh.ServerConn, newChan gossh.NewChannel, ctx ssh.Context) {
 		d := forwardMessage{}
 		k := newChan.ExtraData()
@@ -139,29 +136,20 @@ func directTCPIPHandler(sshResolver SSHResolver) func(srv *ssh.Server, conn *gos
 			return
 		}
 		modelTag := names.NewModelTag(d.DestAddr)
-		user, err := fetchAndAuthorizeUser(ctx, modelTag)
+		// user is now ignored, but it will be needed for the jwt auth next-up.
+		_, err := fetchAndAuthorizeUser(ctx, modelTag)
 		if err != nil {
 			rejectConnectionAndLogError(ctx, newChan, err.Error(), err)
 			return
 		}
-		addr, err := sshResolver.AddrFromModelUUID(ctx, user, modelTag)
+		addrs, err := sshManager.ResolveAddressesFromModelUUID(ctx, modelTag.Id())
 		if err != nil {
 			rejectConnectionAndLogError(ctx, newChan, "failed to resolve address from model uuid", err)
 			return
 		}
-		dest := net.JoinHostPort(addr, fmt.Sprint(d.DestPort))
-		// this is temporary. The way we dial to the controller will heavily change.
-		client, err := gossh.Dial("tcp", dest, &gossh.ClientConfig{
-			//nolint:gosec // this will be removed once we handle hostkeys
-			HostKeyCallback: gossh.InsecureIgnoreHostKey(),
-			Auth: []gossh.AuthMethod{
-				gossh.PasswordCallback(func() (secret string, err error) {
-					return "jwt", nil
-				}),
-			},
-		})
+		client, err := dialControllerSSHServer(addrs, d.DestPort)
 		if err != nil {
-			rejectConnectionAndLogError(ctx, newChan, fmt.Sprintf("failed to connect to %s: %v", dest, err), err)
+			rejectConnectionAndLogError(ctx, newChan, fmt.Sprintf("failed to dial controller ssh: %v", err), err)
 			return
 		}
 
