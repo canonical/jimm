@@ -32,7 +32,7 @@ import (
 type sshSuite struct {
 	destinationJujuSSHServer *gliderssh.Server
 	destinationServerPort    int
-	jumpSSHServer            *gliderssh.Server
+	jumpSSHServer            ssh.Server
 	jumpServerPort           int
 	privateKey               gossh.Signer
 	hostKey                  gossh.Signer
@@ -112,8 +112,9 @@ func (s *sshSuite) Init(c *qt.C) {
 
 	jumpServer, err := ssh.NewJumpServer(context.Background(),
 		ssh.Config{
-			Port:    fmt.Sprint(port),
-			HostKey: hostKey,
+			Port:                     fmt.Sprint(port),
+			HostKey:                  hostKey,
+			MaxConcurrentConnections: 10,
 		},
 		mocks.SSHAuthorizer{
 			PublicKeyHandler_: func(ctx context.Context, claimUser string, key []byte) (*openfga.User, error) {
@@ -267,6 +268,36 @@ func (s *sshSuite) TestSSHFinalDestinationDialFail(c *qt.C) {
 	}
 	_, _, err = client.OpenChannel("direct-tcpip", gossh.Marshal(&msg))
 	c.Assert(err, qt.ErrorMatches, ".*connect failed.*")
+}
+
+func (s *sshSuite) TestMaxConcurrentConnections(c *qt.C) {
+	// fill the max of concurrent connection
+	maxConcurrentConnections := 10
+	clients := make([]*gossh.Client, 0)
+	for range maxConcurrentConnections {
+		client, err := gossh.Dial("tcp", fmt.Sprintf(":%d", s.jumpServerPort), &gossh.ClientConfig{
+			HostKeyCallback: gossh.FixedHostKey(s.hostKey.PublicKey()),
+			Auth: []gossh.AuthMethod{
+				gossh.PublicKeys(s.privateKey),
+			},
+			User: "alice",
+		})
+		c.Check(err, qt.IsNil)
+		clients = append(clients, client)
+	}
+	// this connection is dropped when we are at maximum connections
+	_, err := gossh.Dial("tcp", fmt.Sprintf(":%d", s.jumpServerPort), &gossh.ClientConfig{
+		HostKeyCallback: gossh.FixedHostKey(s.hostKey.PublicKey()),
+		Auth: []gossh.AuthMethod{
+			gossh.PublicKeys(s.privateKey),
+		},
+		User:    "alice",
+		Timeout: 50 * time.Millisecond,
+	})
+	c.Check(err, qt.ErrorMatches, ".*connection reset.*")
+	for _, client := range clients {
+		client.Close()
+	}
 }
 
 func TestIdentityManager(t *testing.T) {

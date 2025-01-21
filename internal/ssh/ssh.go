@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"time"
 
 	"github.com/gliderlabs/ssh"
 	"github.com/juju/names/v5"
@@ -17,8 +18,10 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga"
 )
 
-// juju_ssh_default_port is the default port we expect the juju controllers to respond on.
-const juju_ssh_default_port = 17022
+// jujuSSHDefaultPort is the default port we expect the juju controllers to respond on.
+const jujuSSHDefaultPort = 17022
+const defaultAcceptConnectionTimeout = time.Second
+const defaultMaxConcurrentConnections = 100
 
 type publicKeySSHUserKey struct{}
 
@@ -47,38 +50,76 @@ type forwardMessage struct {
 type Config struct {
 	Port                     string
 	HostKey                  []byte
-	MaxConcurrentConnections string
+	MaxConcurrentConnections int
+	AcceptConnectionTimeout  time.Duration
+}
+
+// Server is the struct holding the jump server and some
+type Server struct {
+	*ssh.Server
+
+	maxConcurrentConnections int
+	acceptConnectionTimeout  time.Duration
 }
 
 // NewJumpServer creates the jump server struct.
-func NewJumpServer(ctx context.Context, config Config, sshAuthorizer SSHAuthorizer, sshResolver SSHResolver) (*ssh.Server, error) {
+func NewJumpServer(ctx context.Context, config Config, sshAuthorizer SSHAuthorizer, sshResolver SSHResolver) (Server, error) {
 	zapctx.Info(ctx, "NewJumpServer")
 
 	if sshResolver == nil {
-		return nil, fmt.Errorf("Cannot create JumpSSHServer with a nil resolver.")
+		return Server{}, fmt.Errorf("Cannot create JumpSSHServer with a nil resolver.")
 	}
-	server := &ssh.Server{
-		Addr: fmt.Sprintf(":%s", config.Port),
-		ChannelHandlers: map[string]ssh.ChannelHandler{
-			"direct-tcpip": directTCPIPHandler(sshResolver),
+	config = setConfigDefaults(config)
+	server := Server{
+		Server: &ssh.Server{
+			Addr: fmt.Sprintf(":%s", config.Port),
+			ChannelHandlers: map[string]ssh.ChannelHandler{
+				"direct-tcpip": directTCPIPHandler(sshResolver),
+			},
+			PublicKeyHandler: func(ctx ssh.Context, key ssh.PublicKey) bool {
+				user, err := sshAuthorizer.PublicKeyHandler(ctx, ctx.User(), key.Marshal())
+				if err != nil {
+					zapctx.Debug(ctx, fmt.Sprintf("cannot verify key for user %s", ctx.User()), zap.Error(err))
+					return false
+				}
+				ctx.SetValue(publicKeySSHUserKey{}, user)
+				return true
+			},
 		},
-		PublicKeyHandler: func(ctx ssh.Context, key ssh.PublicKey) bool {
-			user, err := sshAuthorizer.PublicKeyHandler(ctx, ctx.User(), key.Marshal())
-			if err != nil {
-				zapctx.Debug(ctx, fmt.Sprintf("cannot verify key for user %s", ctx.User()), zap.Error(err))
-				return false
-			}
-			ctx.SetValue(publicKeySSHUserKey{}, user)
-			return true
-		},
+		maxConcurrentConnections: config.MaxConcurrentConnections,
+		acceptConnectionTimeout:  config.AcceptConnectionTimeout,
 	}
 	hostKey, err := gossh.ParsePrivateKey([]byte(config.HostKey))
 	if err != nil {
-		return nil, fmt.Errorf("Cannot parse hostkey.")
+		return Server{}, fmt.Errorf("Cannot parse hostkey.")
 	}
 	server.AddHostKey(hostKey)
 
 	return server, nil
+}
+
+// setConfigDefaults sets the default values for the configuration.
+func setConfigDefaults(config Config) Config {
+	if config.Port == "" {
+		config.Port = fmt.Sprint(jujuSSHDefaultPort)
+	}
+	if config.MaxConcurrentConnections <= 0 {
+		config.MaxConcurrentConnections = defaultMaxConcurrentConnections
+	}
+	if config.AcceptConnectionTimeout <= 0 {
+		config.AcceptConnectionTimeout = defaultAcceptConnectionTimeout
+	}
+	return config
+}
+
+// ListenAndServe create a LimitListenerWithTimeout and Serve requests.
+func (srv Server) ListenAndServe() error {
+	ln, err := net.Listen("tcp", srv.Addr)
+	ln = limitListenerWithTimeout(ln, srv.maxConcurrentConnections, srv.acceptConnectionTimeout)
+	if err != nil {
+		return err
+	}
+	return srv.Serve(ln)
 }
 
 func directTCPIPHandler(sshResolver SSHResolver) func(srv *ssh.Server, conn *gossh.ServerConn, newChan gossh.NewChannel, ctx ssh.Context) {
@@ -91,7 +132,7 @@ func directTCPIPHandler(sshResolver SSHResolver) func(srv *ssh.Server, conn *gos
 			return
 		}
 		if d.DestPort == 0 {
-			d.DestPort = juju_ssh_default_port
+			d.DestPort = jujuSSHDefaultPort
 		}
 		if !names.IsValidModel(d.DestAddr) {
 			rejectConnectionAndLogError(ctx, newChan, "invalid model uuid", nil)
