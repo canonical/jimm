@@ -43,6 +43,46 @@ services:
       JIMM_SECURE_SESSION_COOKIES: false
       JIMM_SESSION_COOKIE_MAX_AGE: 86400
       JIMM_SESSION_SECRET_KEY: Xz2RkR9g87M75xfoumhEs5OmGziIX8D88Rk5YW8FSvkBPSgeK9t5AS9IvPDJ3NnB
+      JIMM_SSH_PORT: 17022
+      JIMM_SSH_HOST_KEY: |-
+        -----BEGIN OPENSSH PRIVATE KEY-----
+        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
+        -----END OPENSSH PRIVATE KEY-----
     healthcheck:
       test: [ "CMD", "curl", "http://jimm.localhost:80" ]
       interval: 5s

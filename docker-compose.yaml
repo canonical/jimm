@@ -52,6 +52,7 @@ services:
     container_name: jimm
     ports:
       - 17070:80
+      - 17022:17022
       - 2345:2345
     volumes:
       - ./:/jimm/

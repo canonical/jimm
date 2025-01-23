@@ -67,6 +67,7 @@ func NewJumpServer(ctx context.Context, config Config, sshManager SSHManager) (S
 		return Server{}, fmt.Errorf("Cannot create JumpSSHServer with a nil ssh manager.")
 	}
 	config = setConfigDefaults(config)
+
 	server := Server{
 		Server: &ssh.Server{
 			Addr: fmt.Sprintf(":%s", config.Port),

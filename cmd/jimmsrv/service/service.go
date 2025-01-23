@@ -194,6 +194,9 @@ type Params struct {
 	// LogLevel is the default logger is set.
 	// Setting this to "debug" enables the requests logger as well.
 	LogLevel string
+
+	// HostKeyFingerprints is the fingerprint of the SSH public host key.
+	HostKeyFingerprints map[string]string
 }
 
 // A Service is the implementation of a JIMM server.
@@ -495,6 +498,9 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		"/model/{uuid}/{type:charms|applications}",
 		jimmhttp.NewHTTPProxyHandler(s.jimm),
 	)
+
+	// serve the ssh public key fingerprint
+	s.mux.Get("/ssh/public-key-fingerprints", jimmhttp.WriteFingerprints(p.HostKeyFingerprints))
 
 	s.isLeader = p.IsLeader
 
