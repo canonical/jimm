@@ -58,7 +58,7 @@ func (hph *HTTPProxyHandler) ProxyHTTP(w http.ResponseWriter, req *http.Request)
 		writeError(ctx, w, http.StatusUnprocessableEntity, errgo.New("cannot parse path"), "cannot parse path")
 		return
 	}
-	model, err := hph.jimm.GetModel(ctx, modelUUID)
+	model, err := hph.jimm.JujuManager().GetModel(ctx, modelUUID)
 	if err != nil {
 		writeError(ctx, w, http.StatusNotFound, err, "cannot get model")
 		return

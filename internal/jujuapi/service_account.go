@@ -10,7 +10,7 @@ import (
 	"github.com/juju/names/v5"
 
 	"github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/internal/jimm"
+	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 	jimmnames "github.com/canonical/jimm/v3/pkg/names"
@@ -98,7 +98,7 @@ func (r *controllerRoot) UpdateServiceAccountCredentials(ctx context.Context, re
 		var tag names.CloudCredentialTag
 		tag, err = names.ParseCloudCredentialTag(credential.Tag)
 		if err == nil {
-			res, err = r.jimm.UpdateCloudCredential(ctx, targetIdentity, jimm.UpdateCloudCredentialArgs{
+			res, err = r.jimm.JujuManager().UpdateCloudCredential(ctx, targetIdentity, juju.UpdateCloudCredentialArgs{
 				CredentialTag: tag,
 				Credential:    credential.Credential,
 				// Check that all credentials are valid.

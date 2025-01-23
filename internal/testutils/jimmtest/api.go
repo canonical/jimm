@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package jimmtest
 
@@ -17,19 +17,19 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/internal/jimm"
+	"github.com/canonical/jimm/v3/internal/jimm/juju"
 )
 
 // DefaultControllerUUID is the controller UUID returned by Dialer if
 // the is no configured controller UUID.
 const DefaultControllerUUID = "982b16d9-a945-4762-b684-fd4fd885aa10"
 
-// A Dialer is a jimm.Dialer that either returns an error if Err is
+// A Dialer is a juju.Dialer that either returns an error if Err is
 // non-zero, or returns the value of API. The number of open API
 // connections is tracked.
 type Dialer struct {
 	// API contains the API implementation to return, if Err is nil.
-	API jimm.API
+	API juju.API
 
 	// Err contains the error to return when a Dial is attempted.
 	Err error
@@ -49,8 +49,8 @@ type Dialer struct {
 	open int64
 }
 
-// Dialer implements jimm.Dialer.
-func (d *Dialer) Dial(_ context.Context, ctl *dbmodel.Controller, _ names.ModelTag, _ map[string]string) (jimm.API, error) {
+// Dialer implements juju.Dialer.
+func (d *Dialer) Dial(_ context.Context, ctl *dbmodel.Controller, _ names.ModelTag, _ map[string]string) (juju.API, error) {
 	if d.Err != nil {
 		return nil, d.Err
 	}
@@ -80,7 +80,7 @@ func (d *Dialer) IsClosed() bool {
 
 // apiWrapper is the API implementation used by Dialer to track usage.
 type apiWrapper struct {
-	jimm.API
+	juju.API
 	open *int64
 }
 
@@ -92,29 +92,29 @@ func (w apiWrapper) Close() error {
 
 // ModelDialerMap enables the dialing of many models on the same controller,
 // it is designed such that should you need to query multiple models, you can.
-type ModelDialerMap map[string]jimm.Dialer
+type ModelDialerMap map[string]juju.Dialer
 
-// Dial implements jimm.Dialer.
-func (m ModelDialerMap) Dial(ctx context.Context, ctl *dbmodel.Controller, mt names.ModelTag, _ map[string]string) (jimm.API, error) {
+// Dial implements juju.Dialer.
+func (m ModelDialerMap) Dial(ctx context.Context, ctl *dbmodel.Controller, mt names.ModelTag, _ map[string]string) (juju.API, error) {
 	if d, ok := m[mt.Id()]; ok {
 		return d.Dial(ctx, ctl, mt, nil)
 	}
 	return nil, errors.E(fmt.Sprintf("dialer not configured for controller %s", ctl.Name))
 }
 
-// A DialerMap implements a jimm.Dialer that uses a different Dialer for
+// A DialerMap implements a juju.Dialer that uses a different Dialer for
 // each controller. The DialerMap is keyed by controller name.
-type DialerMap map[string]jimm.Dialer
+type DialerMap map[string]juju.Dialer
 
-// Dial implements jimm.Dialer.
-func (m DialerMap) Dial(ctx context.Context, ctl *dbmodel.Controller, mt names.ModelTag, _ map[string]string) (jimm.API, error) {
+// Dial implements juju.Dialer.
+func (m DialerMap) Dial(ctx context.Context, ctl *dbmodel.Controller, mt names.ModelTag, _ map[string]string) (juju.API, error) {
 	if d, ok := m[ctl.Name]; ok {
 		return d.Dial(ctx, ctl, mt, nil)
 	}
 	return nil, errors.E(fmt.Sprintf("dialer not configured for controller %s", ctl.Name))
 }
 
-// API is a default implementation of the jimm.API interface. Every method
+// API is a default implementation of the juju.API interface. Every method
 // has a corresponding function field. Whenever the method is called it
 // will delegate to the requested function or if the function is nil return
 // a NotImplemented error.
@@ -474,4 +474,4 @@ func (a *API) ListModels(ctx context.Context) ([]base.UserModel, error) {
 	return a.ListModels_(ctx)
 }
 
-var _ jimm.API = &API{}
+var _ juju.API = &API{}

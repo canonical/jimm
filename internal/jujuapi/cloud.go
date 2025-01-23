@@ -14,7 +14,7 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/internal/jimm"
+	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/jimm/permissions"
 	"github.com/canonical/jimm/v3/internal/jujuapi/rpc"
 	"github.com/canonical/jimm/v3/internal/openfga"
@@ -89,7 +89,7 @@ func (r *controllerRoot) Cloud(ctx context.Context, ents jujuparams.Entities) (j
 			cloudResults[i].Error = mapError(errors.E(op, errors.CodeBadRequest, err))
 			continue
 		}
-		cloud, err := r.jimm.GetCloud(ctx, r.user, tag)
+		cloud, err := r.jimm.JujuManager().GetCloud(ctx, r.user, tag)
 		if err != nil {
 			cloudResults[i].Error = mapError(errors.E(op, err))
 			continue
@@ -109,7 +109,7 @@ func (r *controllerRoot) Clouds(ctx context.Context) (jujuparams.CloudsResult, e
 	res := jujuparams.CloudsResult{
 		Clouds: make(map[string]jujuparams.Cloud),
 	}
-	err := r.jimm.ForEachUserCloud(ctx, r.user, func(cld *dbmodel.Cloud) error {
+	err := r.jimm.JujuManager().ForEachUserCloud(ctx, r.user, func(cld *dbmodel.Cloud) error {
 		res.Clouds[cld.Tag().String()] = cld.ToJujuCloud()
 		return nil
 	})
@@ -135,7 +135,7 @@ func (r *controllerRoot) UserCredentials(ctx context.Context, userclouds jujupar
 			results[i].Error = mapError(errors.E(op, err, errors.CodeBadRequest))
 			continue
 		}
-		err = r.jimm.ForEachUserCloudCredential(ctx, user.Identity, cld, func(c *dbmodel.CloudCredential) error {
+		err = r.jimm.JujuManager().ForEachUserCloudCredential(ctx, user.Identity, cld, func(c *dbmodel.CloudCredential) error {
 			results[i].Result = append(results[i].Result, c.Tag().String())
 			return nil
 		})
@@ -171,7 +171,7 @@ func (r *controllerRoot) revokeCredential(ctx context.Context, tag string, force
 	if err != nil {
 		return errors.E(op, err, errors.CodeBadRequest)
 	}
-	if err := r.jimm.RevokeCloudCredential(ctx, r.user.Identity, ct, force); err != nil {
+	if err := r.jimm.JujuManager().RevokeCloudCredential(ctx, r.user.Identity, ct, force); err != nil {
 		return errors.E(op, err)
 	}
 	return nil
@@ -202,14 +202,14 @@ func (r *controllerRoot) credential(ctx context.Context, cloudCredentialTag stri
 		return nil, errors.E(op, err, errors.CodeBadRequest)
 	}
 
-	cred, err := r.jimm.GetCloudCredential(ctx, r.user, cct)
+	cred, err := r.jimm.JujuManager().GetCloudCredential(ctx, r.user, cct)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
 	cc := jujuparams.CloudCredential{
 		AuthType: cred.AuthType,
 	}
-	cc.Attributes, cc.Redacted, err = r.jimm.GetCloudCredentialAttributes(ctx, r.user, cred, false)
+	cc.Attributes, cc.Redacted, err = r.jimm.JujuManager().GetCloudCredentialAttributes(ctx, r.user, cred, false)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
@@ -223,7 +223,7 @@ func (r *controllerRoot) AddCloud(ctx context.Context, args jujuparams.AddCloudA
 	if args.Force != nil && *args.Force {
 		force = true
 	}
-	if err := r.jimm.AddHostedCloud(ctx, r.user, names.NewCloudTag(args.Name), args.Cloud, force); err != nil {
+	if err := r.jimm.JujuManager().AddHostedCloud(ctx, r.user, names.NewCloudTag(args.Name), args.Cloud, force); err != nil {
 		return errors.E(op, err)
 	}
 	return nil
@@ -310,7 +310,7 @@ func getIdentityCredentials(ctx context.Context, user *openfga.User, j JIMM, arg
 			content.Valid = &c.Valid.Bool
 		}
 		var err error
-		content.Attributes, _, err = j.GetCloudCredentialAttributes(ctx, user, c, args.IncludeSecrets)
+		content.Attributes, _, err = j.JujuManager().GetCloudCredentialAttributes(ctx, user, c, args.IncludeSecrets)
 		if err != nil {
 			return nil, errors.E(err)
 		}
@@ -330,7 +330,7 @@ func getIdentityCredentials(ctx context.Context, user *openfga.User, j JIMM, arg
 	results := make([]jujuparams.CredentialContentResult, len(args.Credentials))
 	for i, arg := range args.Credentials {
 		cct := names.NewCloudCredentialTag(fmt.Sprintf("%s/%s/%s", arg.CloudName, user.Name, arg.CredentialName))
-		cred, err := j.GetCloudCredential(ctx, user, cct)
+		cred, err := j.JujuManager().GetCloudCredential(ctx, user, cct)
 		if err != nil {
 			results[i].Error = mapError(errors.E(op, err))
 			continue
@@ -344,7 +344,7 @@ func getIdentityCredentials(ctx context.Context, user *openfga.User, j JIMM, arg
 		return jujuparams.CredentialContentResults{Results: results}, nil
 	}
 
-	err := j.ForEachUserCloudCredential(ctx, user.Identity, names.CloudTag{}, func(c *dbmodel.CloudCredential) error {
+	err := j.JujuManager().ForEachUserCloudCredential(ctx, user.Identity, names.CloudTag{}, func(c *dbmodel.CloudCredential) error {
 		var result jujuparams.CredentialContentResult
 		var err error
 		result.Result, err = credentialContents(c)
@@ -374,7 +374,7 @@ func (r *controllerRoot) RemoveClouds(ctx context.Context, args jujuparams.Entit
 			result.Results[i].Error = mapError(errors.E(op, err))
 			continue
 		}
-		err = r.jimm.RemoveCloud(ctx, r.user, tag)
+		err = r.jimm.JujuManager().RemoveCloud(ctx, r.user, tag)
 		if err != nil {
 			result.Results[i].Error = mapError(errors.E(op, err))
 		}
@@ -454,7 +454,7 @@ func (r *controllerRoot) updateCredential(ctx context.Context, cred jujuparams.T
 	if err != nil {
 		return nil, errors.E(err, errors.CodeBadRequest)
 	}
-	return r.jimm.UpdateCloudCredential(ctx, r.user, jimm.UpdateCloudCredentialArgs{
+	return r.jimm.JujuManager().UpdateCloudCredential(ctx, r.user, juju.UpdateCloudCredentialArgs{
 		CredentialTag: tag,
 		Credential:    cred.Credential,
 		SkipCheck:     skipCheck,
@@ -493,7 +493,7 @@ func (r *controllerRoot) CloudInfo(ctx context.Context, args jujuparams.Entities
 			results[i].Error = mapError(errors.E(op, err, errors.CodeBadRequest))
 			continue
 		}
-		cloud, err := r.jimm.GetCloud(ctx, r.user, tag)
+		cloud, err := r.jimm.JujuManager().GetCloud(ctx, r.user, tag)
 		if err != nil {
 			results[i].Error = mapError(errors.E(op, err))
 			continue
@@ -511,9 +511,9 @@ func (r *controllerRoot) CloudInfo(ctx context.Context, args jujuparams.Entities
 func (r *controllerRoot) ListCloudInfo(ctx context.Context, args jujuparams.ListCloudsRequest) (jujuparams.ListCloudInfoResults, error) {
 	const op = errors.Op("jujuapi.ListCloudInfo")
 
-	listF := r.jimm.ForEachUserCloud
+	listF := r.jimm.JujuManager().ForEachUserCloud
 	if args.All {
-		listF = r.jimm.ForEachCloud
+		listF = r.jimm.JujuManager().ForEachCloud
 	}
 
 	var results []jujuparams.ListCloudInfoResult

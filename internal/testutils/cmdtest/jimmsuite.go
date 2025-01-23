@@ -27,6 +27,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/jimm"
+	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
@@ -201,7 +202,7 @@ func (s *JimmCmdSuite) AddController(c *gc.C, name string, info *api.Info) {
 		CACertificate: info.CACert,
 		Addresses:     nil,
 	}
-	ctlCreds := jimm.ControllerCreds{
+	ctlCreds := juju.ControllerCreds{
 		AdminIdentityName: info.Tag.Id(),
 		AdminPassword:     info.Password,
 	}
@@ -216,7 +217,7 @@ func (s *JimmCmdSuite) AddController(c *gc.C, name string, info *api.Info) {
 	}
 	adminUser := openfga.NewUser(s.AdminUser, s.OFGAClient)
 	adminUser.JimmAdmin = true
-	err := s.JIMM.AddController(context.Background(), adminUser, ctl, ctlCreds)
+	err := s.JIMM.JujuManager().AddController(context.Background(), adminUser, ctl, ctlCreds)
 	c.Assert(err, gc.Equals, nil)
 }
 
@@ -227,7 +228,7 @@ func (s *JimmCmdSuite) UpdateCloudCredential(c *gc.C, tag names.CloudCredentialT
 	user := openfga.NewUser(u, s.JIMM.OpenFGAClient)
 	err = s.JIMM.Database.GetIdentity(ctx, u)
 	c.Assert(err, gc.Equals, nil)
-	_, err = s.JIMM.UpdateCloudCredential(ctx, user, jimm.UpdateCloudCredentialArgs{
+	_, err = s.JIMM.JujuManager().UpdateCloudCredential(ctx, user, juju.UpdateCloudCredentialArgs{
 		CredentialTag: tag,
 		Credential:    cred,
 		SkipCheck:     true,
@@ -245,7 +246,7 @@ func (s *JimmCmdSuite) AddModel(c *gc.C, owner names.UserTag, name string, cloud
 	)
 	err = s.JIMM.Database.GetIdentity(ctx, u.Identity)
 	c.Assert(err, gc.Equals, nil)
-	mi, err := s.JIMM.AddModel(ctx, u, &jimm.ModelCreateArgs{
+	mi, err := s.JIMM.JujuManager().AddModel(ctx, u, &juju.ModelCreateArgs{
 		Name:            name,
 		Owner:           owner,
 		Cloud:           cloud,

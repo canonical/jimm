@@ -12,7 +12,7 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/internal/jimm"
+	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/jujuapi/rpc"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	jimmversion "github.com/canonical/jimm/v3/version"
@@ -52,7 +52,7 @@ func init() {
 
 // ControllerService defines the methods used to manage controllers.
 type ControllerService interface {
-	AddController(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, creds jimm.ControllerCreds) error
+	AddController(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, creds juju.ControllerCreds) error
 	ControllerInfo(ctx context.Context, name string) (*dbmodel.Controller, error)
 	EarliestControllerVersion(ctx context.Context) (version.Number, error)
 	ListControllers(ctx context.Context, user *openfga.User) ([]dbmodel.Controller, error)
@@ -86,7 +86,7 @@ func (r *controllerRoot) IdentityProviderURL(ctx context.Context) (jujuparams.St
 func (r *controllerRoot) ControllerVersion(ctx context.Context) (jujuparams.ControllerVersionResults, error) {
 	const op = errors.Op("jujuapi.ControllerVersion")
 
-	srvVersion, err := r.jimm.EarliestControllerVersion(ctx)
+	srvVersion, err := r.jimm.JujuManager().EarliestControllerVersion(ctx)
 	if err != nil {
 		return jujuparams.ControllerVersionResults{}, errors.E(op, err)
 	}
@@ -149,7 +149,7 @@ func (r *controllerRoot) WatchAllModelSummaries(ctx context.Context) (jujuparams
 
 	getAllModels := func(ctx context.Context) ([]string, error) {
 		var modelUUIDs []string
-		err := r.jimm.ForEachModel(ctx, r.user, func(m *dbmodel.Model, _ jujuparams.UserAccessPermission) error {
+		err := r.jimm.JujuManager().ForEachModel(ctx, r.user, func(m *dbmodel.Model, _ jujuparams.UserAccessPermission) error {
 			modelUUIDs = append(modelUUIDs, m.UUID.String)
 			return nil
 		})
@@ -180,7 +180,7 @@ func (r *controllerRoot) allModels(ctx context.Context) (jujuparams.UserModelLis
 	const op = errors.Op("jujuapi.AllModels")
 
 	var models []jujuparams.UserModel
-	err := r.jimm.ForEachUserModel(ctx, r.user, func(m *dbmodel.Model, _ jujuparams.UserAccessPermission) error {
+	err := r.jimm.JujuManager().ForEachUserModel(ctx, r.user, func(m *dbmodel.Model, _ jujuparams.UserAccessPermission) error {
 		// TODO(Kian) CSS-6040 Refactor the below to use a better abstraction for Postgres/OpenFGA to Juju types.
 		var um jujuparams.UserModel
 		um.Model = m.ToJujuModel()
@@ -208,7 +208,7 @@ func (r *controllerRoot) ModelStatus(ctx context.Context, args jujuparams.Entiti
 			results[i].Error = mapError(errors.E(op, err, errors.CodeBadRequest))
 			continue
 		}
-		status, err := r.jimm.ModelStatus(ctx, r.user, mt)
+		status, err := r.jimm.JujuManager().ModelStatus(ctx, r.user, mt)
 		if err != nil {
 			results[i].Error = mapError(errors.E(op, err))
 			continue
@@ -274,7 +274,7 @@ func (r *controllerRoot) InitiateMigration(ctx context.Context, args jujuparams.
 
 	results := make([]jujuparams.InitiateMigrationResult, len(args.Specs))
 	for i, spec := range args.Specs {
-		result, err := r.jimm.InitiateMigration(ctx, r.user, spec)
+		result, err := r.jimm.JujuManager().InitiateMigration(ctx, r.user, spec)
 		if err != nil {
 			result.Error = mapError(errors.E(op, err))
 		}

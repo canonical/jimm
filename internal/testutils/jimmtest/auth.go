@@ -34,7 +34,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/auth"
 	"github.com/canonical/jimm/v3/internal/db"
 	jimmerrors "github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/internal/jimm"
+	"github.com/canonical/jimm/v3/internal/jimm/login"
 	"github.com/canonical/jimm/v3/internal/jimmhttp"
 	"github.com/canonical/jimm/v3/internal/openfga"
 )
@@ -68,7 +68,7 @@ func (a Authenticator) Authenticate(_ context.Context, _ *jujuparams.LoginReques
 }
 
 type mockOAuthAuthenticator struct {
-	jimm.OAuthAuthenticator
+	login.OAuthAuthenticator
 	c SimpleTester
 	// PollingChan is used to simulate polling an OIDC server during the device flow.
 	// It expects a username to be received that will be used to generate the user's access token.

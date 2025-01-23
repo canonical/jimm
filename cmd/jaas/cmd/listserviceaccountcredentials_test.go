@@ -14,7 +14,7 @@ import (
 
 	"github.com/canonical/jimm/v3/cmd/jaas/cmd"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
-	"github.com/canonical/jimm/v3/internal/jimm"
+	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/testutils/cmdtest"
 )
@@ -48,11 +48,11 @@ func (s *listServiceAccountCredentialsSuite) TestListServiceAccountCredentials(c
 	c.Assert(err, gc.IsNil)
 	svcAccIdentity := openfga.NewUser(svcAcc, s.OFGAClient)
 	// Create cloud-credential for service account.
-	updateArgs := jimm.UpdateCloudCredentialArgs{
+	updateArgs := juju.UpdateCloudCredentialArgs{
 		CredentialTag: names.NewCloudCredentialTag(fmt.Sprintf("aws/%s/foo", clientIDWithDomain)),
 		Credential:    params.CloudCredential{Attributes: map[string]string{"foo": "bar"}},
 	}
-	_, err = s.JIMM.UpdateCloudCredential(ctx, svcAccIdentity, updateArgs)
+	_, err = s.JIMM.JujuManager().UpdateCloudCredential(ctx, svcAccIdentity, updateArgs)
 	c.Assert(err, gc.IsNil)
 
 	testCases := []struct {

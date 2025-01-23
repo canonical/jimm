@@ -14,7 +14,7 @@ import (
 
 	"github.com/canonical/jimm/v3/cmd/jaas/cmd"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
-	"github.com/canonical/jimm/v3/internal/jimm"
+	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/testutils/cmdtest"
@@ -78,9 +78,9 @@ func (s *updateCredentialsSuite) TestUpdateCredentialsWithLocalCredentials(c *gc
 
 	ofgaUser := openfga.NewUser(sa, s.JIMM.OpenFGAClient)
 	cloudCredentialTag := names.NewCloudCredentialTag("test-cloud/" + clientIDWithDomain + "/test-credentials")
-	cloudCredential2, err := s.JIMM.GetCloudCredential(ctx, ofgaUser, cloudCredentialTag)
+	cloudCredential2, err := s.JIMM.JujuManager().GetCloudCredential(ctx, ofgaUser, cloudCredentialTag)
 	c.Assert(err, gc.IsNil)
-	attrs, _, err := s.JIMM.GetCloudCredentialAttributes(ctx, ofgaUser, cloudCredential2, true)
+	attrs, _, err := s.JIMM.JujuManager().GetCloudCredentialAttributes(ctx, ofgaUser, cloudCredential2, true)
 	c.Assert(err, gc.IsNil)
 
 	c.Assert(attrs, gc.DeepEquals, map[string]string{
@@ -137,11 +137,11 @@ func (s *updateCredentialsSuite) TestUpdateServiceAccountCredentialFromControlle
 		Regions: []dbmodel.CloudRegion{{Name: "default", CloudName: "test-cloud"}},
 	})
 	c.Assert(err, gc.IsNil)
-	updateArgs := jimm.UpdateCloudCredentialArgs{
+	updateArgs := juju.UpdateCloudCredentialArgs{
 		CredentialTag: names.NewCloudCredentialTag(fmt.Sprintf("aws/%s/foo", user.Name)),
 		Credential:    params.CloudCredential{Attributes: map[string]string{"key": "bar"}},
 	}
-	_, err = s.JIMM.UpdateCloudCredential(ctx, u, updateArgs)
+	_, err = s.JIMM.JujuManager().UpdateCloudCredential(ctx, u, updateArgs)
 	c.Assert(err, gc.IsNil)
 	bClient := s.SetupCLIAccess(c, "alice")
 	cmdContext, err := cmdtesting.RunCommand(c, cmd.NewUpdateCredentialsCommandForTesting(s.ClientStore(), bClient), clientID, "aws", "foo")
@@ -163,7 +163,7 @@ models: []
 	err = s.JIMM.Database.GetIdentity(ctx, svcAcc)
 	c.Assert(err, gc.IsNil)
 	svcAccIdentity := openfga.NewUser(svcAcc, s.OFGAClient)
-	attr, _, err := s.JIMM.GetCloudCredentialAttributes(ctx, svcAccIdentity, &newCred, true)
+	attr, _, err := s.JIMM.JujuManager().GetCloudCredentialAttributes(ctx, svcAccIdentity, &newCred, true)
 	c.Assert(err, gc.IsNil)
 	c.Assert(attr, gc.DeepEquals, updateArgs.Credential.Attributes)
 }

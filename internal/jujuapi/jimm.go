@@ -18,7 +18,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/internal/jimm"
+	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/jujuapi/rpc"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/pkg/api/params"
@@ -165,7 +165,7 @@ func (r *controllerRoot) AddCloudToController(ctx context.Context, req apiparams
 	if req.Force != nil && *req.Force {
 		force = true
 	}
-	if err := r.jimm.AddCloudToController(ctx, r.user, req.ControllerName, names.NewCloudTag(req.Name), req.Cloud, force); err != nil {
+	if err := r.jimm.JujuManager().AddCloudToController(ctx, r.user, req.ControllerName, names.NewCloudTag(req.Name), req.Cloud, force); err != nil {
 		return errors.E(op, err)
 	}
 	return nil
@@ -212,11 +212,11 @@ func (r *controllerRoot) AddController(ctx context.Context, req apiparams.AddCon
 		TLSHostname:   req.TLSHostname,
 		Addresses:     dbmodel.HostPorts{jujuparams.FromProviderHostPorts(nphps)},
 	}
-	ctlCreds := jimm.ControllerCreds{
+	ctlCreds := juju.ControllerCreds{
 		AdminIdentityName: req.Username,
 		AdminPassword:     req.Password,
 	}
-	if err := r.jimm.AddController(ctx, r.user, &ctl, ctlCreds); err != nil {
+	if err := r.jimm.JujuManager().AddController(ctx, r.user, &ctl, ctlCreds); err != nil {
 		zapctx.Error(ctx, "failed to add controller", zaputil.Error(err))
 		return apiparams.ControllerInfo{}, errors.E(op, err)
 	}
@@ -233,7 +233,7 @@ func (r *controllerRoot) ListControllers(ctx context.Context) (apiparams.ListCon
 	if !r.user.JimmAdmin {
 		// if the user isn't a controller admin return JAAS
 		// itself as the only controller.
-		srvVersion, err := r.jimm.EarliestControllerVersion(ctx)
+		srvVersion, err := r.jimm.JujuManager().EarliestControllerVersion(ctx)
 		if err != nil {
 			return apiparams.ListControllersResponse{}, errors.E(op, err)
 		}
@@ -249,7 +249,7 @@ func (r *controllerRoot) ListControllers(ctx context.Context) (apiparams.ListCon
 		controllers := []apiparams.ControllerInfo{jimmCtl}
 		return apiparams.ListControllersResponse{Controllers: controllers}, nil
 	}
-	dbControllers, err := r.jimm.ListControllers(ctx, r.user)
+	dbControllers, err := r.jimm.JujuManager().ListControllers(ctx, r.user)
 	if err != nil {
 		return apiparams.ListControllersResponse{}, errors.E(op, err)
 	}
@@ -266,12 +266,12 @@ func (r *controllerRoot) ListControllers(ctx context.Context) (apiparams.ListCon
 func (r *controllerRoot) RemoveController(ctx context.Context, req apiparams.RemoveControllerRequest) (apiparams.ControllerInfo, error) {
 	const op = errors.Op("jujuapi.RemoveController")
 
-	ctl, err := r.jimm.ControllerInfo(ctx, req.Name)
+	ctl, err := r.jimm.JujuManager().ControllerInfo(ctx, req.Name)
 	if err != nil {
 		return apiparams.ControllerInfo{}, errors.E(op, err)
 	}
 
-	if err := r.jimm.RemoveController(ctx, r.user, req.Name, req.Force); err != nil {
+	if err := r.jimm.JujuManager().RemoveController(ctx, r.user, req.Name, req.Force); err != nil {
 		return apiparams.ControllerInfo{}, errors.E(op, err)
 	}
 	return ctl.ToAPIControllerInfo(), nil
@@ -281,10 +281,10 @@ func (r *controllerRoot) RemoveController(ctx context.Context, req apiparams.Rem
 func (r *controllerRoot) SetControllerDeprecated(ctx context.Context, req apiparams.SetControllerDeprecatedRequest) (apiparams.ControllerInfo, error) {
 	const op = errors.Op("jujuapi.SetControllerDeprecated")
 
-	if err := r.jimm.SetControllerDeprecated(ctx, r.user, req.Name, req.Deprecated); err != nil {
+	if err := r.jimm.JujuManager().SetControllerDeprecated(ctx, r.user, req.Name, req.Deprecated); err != nil {
 		return apiparams.ControllerInfo{}, errors.E(op, err)
 	}
-	ctl, err := r.jimm.ControllerInfo(ctx, req.Name)
+	ctl, err := r.jimm.JujuManager().ControllerInfo(ctx, req.Name)
 	if err != nil {
 		return apiparams.ControllerInfo{}, errors.E(op, err)
 	}
@@ -405,7 +405,7 @@ func (r *controllerRoot) FullModelStatus(ctx context.Context, req apiparams.Full
 		return jujuparams.FullStatus{}, errors.E(op, err, errors.CodeBadRequest)
 	}
 
-	status, err := r.jimm.FullModelStatus(ctx, r.user, mt, req.Patterns)
+	status, err := r.jimm.JujuManager().FullModelStatus(ctx, r.user, mt, req.Patterns)
 	if err != nil {
 		return jujuparams.FullStatus{}, errors.E(op, err)
 	}
@@ -426,7 +426,7 @@ func (r *controllerRoot) UpdateMigratedModel(ctx context.Context, req apiparams.
 	if err != nil {
 		return errors.E(op, err, errors.CodeBadRequest)
 	}
-	err = r.jimm.UpdateMigratedModel(ctx, r.user, mt, req.TargetController)
+	err = r.jimm.JujuManager().UpdateMigratedModel(ctx, r.user, mt, req.TargetController)
 	if err != nil {
 		return errors.E(op, err)
 	}
@@ -443,7 +443,7 @@ func (r *controllerRoot) ImportModel(ctx context.Context, req apiparams.ImportMo
 		return errors.E(op, err, errors.CodeBadRequest)
 	}
 
-	err = r.jimm.ImportModel(ctx, r.user, req.Controller, mt, req.Owner)
+	err = r.jimm.JujuManager().ImportModel(ctx, r.user, req.Controller, mt, req.Owner)
 	if err != nil {
 		return errors.E(op, err)
 	}
@@ -457,7 +457,7 @@ func (r *controllerRoot) RemoveCloudFromController(ctx context.Context, req apip
 	if err != nil {
 		return errors.E(op, err, errors.CodeBadRequest)
 	}
-	if err := r.jimm.RemoveCloudFromController(ctx, r.user, req.ControllerName, ct); err != nil {
+	if err := r.jimm.JujuManager().RemoveCloudFromController(ctx, r.user, req.ControllerName, ct); err != nil {
 		return errors.E(op, err)
 	}
 	return nil
@@ -476,7 +476,7 @@ func (r *controllerRoot) CrossModelQuery(ctx context.Context, req apiparams.Cros
 
 	switch strings.TrimSpace(strings.ToLower(req.Type)) {
 	case "jq":
-		return r.jimm.QueryModelsJq(ctx, modelUUIDs, req.Query)
+		return r.jimm.JujuManager().QueryModelsJq(ctx, modelUUIDs, req.Query)
 	case "jimmsql":
 		return apiparams.CrossModelQueryResponse{}, errors.E(op, errors.CodeNotImplemented)
 	default:
@@ -506,7 +506,7 @@ func (r *controllerRoot) MigrateModel(ctx context.Context, args apiparams.Migrat
 	results := make([]jujuparams.InitiateMigrationResult, len(args.Specs))
 
 	for i, arg := range args.Specs {
-		result, err := r.jimm.InitiateInternalMigration(ctx, r.user, arg.TargetModelNameOrUUID, arg.TargetController)
+		result, err := r.jimm.JujuManager().InitiateInternalMigration(ctx, r.user, arg.TargetModelNameOrUUID, arg.TargetController)
 		if err != nil {
 			result.Error = mapError(errors.E(op, err))
 		}
