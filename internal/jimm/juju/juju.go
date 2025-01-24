@@ -37,6 +37,15 @@ func NewJujuManager(store *db.Database, authSvc *openfga.OFGAClient,
 	if authSvc == nil {
 		return nil, errors.E("role authorisation service cannot be nil")
 	}
+	if credentialStore == nil {
+		return nil, errors.E("credential store cannot be nil")
+	}
+	if permissionManager == nil {
+		return nil, errors.E("permission manager cannot be nil")
+	}
+	if resourceTag.Id() == "" {
+		return nil, errors.E("invalid jimm controller tag")
+	}
 	return &JIMM{
 		Database:           store,
 		OpenFGAClient:      authSvc,

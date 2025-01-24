@@ -22,6 +22,9 @@ type parameters struct {
 }
 
 func NewTestJujuManager(c *qt.C, p *parameters) *juju.JIMM {
+	if p == nil {
+		p = &parameters{}
+	}
 	db := &db.Database{
 		DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
 	}
@@ -38,6 +41,13 @@ func NewTestJujuManager(c *qt.C, p *parameters) *juju.JIMM {
 
 	permissionManager, err := permissions.NewManager(db, ofgaClient, jimmUUID, jimmResourceTag)
 	c.Assert(err, qt.IsNil)
+
+	if p.CredentialStore == nil {
+		p.CredentialStore = db
+	}
+	if p.Dialer == nil {
+		p.Dialer = &jimmtest.Dialer{}
+	}
 
 	jujuManager, err := juju.NewJujuManager(db, ofgaClient,
 		p.CredentialStore, permissionManager,
