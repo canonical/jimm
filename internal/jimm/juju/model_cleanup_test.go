@@ -83,25 +83,20 @@ users:
 type modelCleanupSuite struct {
 	jujuManager *juju.JIMM
 	jimmAdmin   *openfga.User
-	ofgaClient  *openfga.OFGAClient
 	env         *jimmtest.Environment
 }
 
 func (s *modelCleanupSuite) Init(c *qt.C) {
-	ctx := context.Background()
-	var err error
 	s.jujuManager = NewTestJujuManager(c, nil)
-	err = s.jujuManager.Database.Migrate(ctx)
-	c.Assert(err, qt.IsNil)
 
 	i, err := dbmodel.NewIdentity("alice@canonical.com")
 	c.Assert(err, qt.IsNil)
-	s.jimmAdmin = openfga.NewUser(i, s.ofgaClient)
+	s.jimmAdmin = openfga.NewUser(i, s.jujuManager.OpenFGAClient)
 	s.jimmAdmin.JimmAdmin = true
 	c.Assert(err, qt.IsNil)
 
 	s.env = jimmtest.ParseEnvironment(c, modelPollerTestEnv)
-	s.env.PopulateDBAndPermissions(c, s.jujuManager.ResourceTag(), s.jujuManager.Database, s.ofgaClient)
+	s.env.PopulateDBAndPermissions(c, s.jujuManager.ResourceTag(), s.jujuManager.Database, s.jujuManager.OpenFGAClient)
 }
 
 func (s *modelCleanupSuite) TestPollModelsDying(c *qt.C) {
