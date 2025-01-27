@@ -284,7 +284,7 @@ func (b *modelBuilder) CreateDatabaseModel() *modelBuilder {
 		Name:              b.name,
 		ControllerID:      b.controller.ID,
 		Owner:             *b.owner,
-		CloudCredentialID: b.credential.ID,
+		CloudCredentialID: &b.credential.ID,
 		CloudRegionID:     b.cloudRegionID,
 	}
 
@@ -334,9 +334,9 @@ func (b *modelBuilder) UpdateDatabaseModel() *modelBuilder {
 	// we know which credentials and cloud region was used
 	// - ignore this information returned by the controller
 	//   because we need IDs to properly update the model
-	b.model.CloudCredentialID = b.credential.ID
+	b.model.CloudCredentialID = &b.credential.ID
 	b.model.CloudRegionID = b.cloudRegionID
-	b.model.CloudCredential = dbmodel.CloudCredential{}
+	b.model.CloudCredential = b.credential
 	b.model.CloudRegion = dbmodel.CloudRegion{}
 
 	err = b.jimm.Database.UpdateModel(b.ctx, b.model)

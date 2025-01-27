@@ -357,27 +357,17 @@ func (j *JIMM) EarliestControllerVersion(ctx context.Context) (version.Number, e
 }
 
 type modelImporter struct {
-	jimm      *JIMM
-	model     dbmodel.Model
-	modelInfo jujuparams.ModelInfo
-	// newOwner may be nil if the user wants to keep the original owner.
-	newOwner      *names.UserTag
-	originalOwner names.UserTag
-	offersToAdd   []jujuparams.ApplicationOfferAdminDetailsV5
+	jimm        *JIMM
+	model       dbmodel.Model
+	modelInfo   jujuparams.ModelInfo
+	owner       names.UserTag
+	offersToAdd []jujuparams.ApplicationOfferAdminDetailsV5
 }
 
-func newModelImporter(jimm *JIMM, newOwner string) (modelImporter, error) {
+func newModelImporter(jimm *JIMM) (modelImporter, error) {
 	modelImporter := modelImporter{
 		jimm: jimm,
 	}
-	if newOwner == "" {
-		return modelImporter, nil
-	}
-	if !names.IsValidUser(newOwner) {
-		return modelImporter, errors.E(errors.CodeBadRequest, "invalid new username for new model owner")
-	}
-	newOwnerTag := names.NewUserTag(newOwner)
-	modelImporter.newOwner = &newOwnerTag
 	return modelImporter, nil
 }
 
@@ -401,14 +391,14 @@ func (m *modelImporter) fetchModelInfo(ctx context.Context, controllerName strin
 		return err
 	}
 
-	m.originalOwner, err = names.ParseUserTag(m.modelInfo.OwnerTag)
+	m.owner, err = names.ParseUserTag(m.modelInfo.OwnerTag)
 	if err != nil {
 		return errors.E(fmt.Sprintf("invalid username %s from original model owner", m.modelInfo.OwnerTag))
 	}
 
 	m.offersToAdd, err = api.ListApplicationOffers(ctx, []jujuparams.OfferFilter{
 		{
-			OwnerName: m.originalOwner.Id(),
+			OwnerName: m.owner.Id(),
 			ModelName: m.modelInfo.Name,
 		},
 	})
@@ -427,19 +417,9 @@ func (m *modelImporter) fetchModelInfo(ctx context.Context, controllerName strin
 	return nil
 }
 
-func (m *modelImporter) setModelOwner(ctx context.Context) error {
-	var ownerTag names.UserTag
-	if m.newOwner != nil {
-		ownerTag = *m.newOwner
-	} else {
-		ownerTag = m.originalOwner
-	}
-
-	if ownerTag.IsLocal() {
-		return errors.E("cannot import model from local user, try --owner to switch the model owner")
-	}
+func (m *modelImporter) ensureModelOwner(ctx context.Context) error {
 	owner := dbmodel.Identity{}
-	owner.SetTag(ownerTag)
+	owner.SetTag(m.owner)
 
 	err := m.jimm.Database.GetIdentity(ctx, &owner)
 	if err != nil {
@@ -453,8 +433,8 @@ func (m *modelImporter) setModelOwner(ctx context.Context) error {
 // addPermissions grants the model owner with admin access to the model
 // and, in turn, admin access to any offers within the model.
 func (m *modelImporter) addPermissions(ctx context.Context) error {
-	// Note that only the new owner is given access. All previous users that had access according to Juju
-	// are discarded as access must now be governed by JIMM and OpenFGA.
+	// Note that only the new owner is given access. All local Juju users' access
+	// is not modelled in JIMM and access must now be governed by JIMM and OpenFGA.
 	ofgaUser := openfga.NewUser(&m.model.Owner, m.jimm.OpenFGAClient)
 	controllerTag := m.model.Controller.ResourceTag()
 
@@ -473,28 +453,31 @@ func (m *modelImporter) addPermissions(ctx context.Context) error {
 }
 
 func (m *modelImporter) setCloudCredential(ctx context.Context) error {
-	// fetch cloud credential used by the model
-	cloudTag, err := names.ParseCloudTag(m.modelInfo.CloudTag)
+	// To support imports of models created by local users, we
+	// don't enforce that a cloud-credential exists in JIMM.
+	if m.owner.IsLocal() {
+		m.model.CloudCredentialID = nil
+		m.model.CloudCredential = nil
+		return nil
+	}
+
+	cloudCredTag, err := names.ParseCloudCredentialTag(m.modelInfo.CloudCredentialTag)
 	if err != nil {
 		return err
 	}
 
-	// Note that the model already has a cloud credential configured which it will use when deploying new
-	// applications. JIMM needs some cloud credential reference to be able to import the model so use any
-	// credential against the cloud the model is deployed against. Even using the correct cloud for the
-	// credential is not strictly necessary, but will help prevent the user thinking they can create new
-	// models on the incoming cloud.
-	allCredentials, err := m.jimm.Database.GetIdentityCloudCredentials(ctx, &m.model.Owner, cloudTag.Id())
-	if err != nil {
-		return err
-	}
-	if len(allCredentials) == 0 {
-		return errors.E(errors.CodeNotFound, fmt.Sprintf("Failed to find cloud credential for user %s on cloud %s", m.model.Owner.Name, cloudTag.Id()))
-	}
-	cloudCredential := allCredentials[0]
+	cc := dbmodel.CloudCredential{}
+	cc.SetTag(cloudCredTag)
 
-	m.model.CloudCredentialID = cloudCredential.ID
-	m.model.CloudCredential = cloudCredential
+	// When importing a model from an external user (e.g. bob@canonical.com), check that we have the model's
+	// cloud credential, as the model may have been removed from JIMM then re-added.
+	err = m.jimm.Database.GetCloudCredential(ctx, &cc)
+	if err != nil {
+		return errors.E(err, fmt.Sprintf("Failed to find cloud credential %s for user %s on cloud %s: %s", cloudCredTag.Name(), cloudCredTag.Owner().Id(), cloudCredTag.Cloud().Id(), err.Error()))
+	}
+
+	m.model.CloudCredentialID = &cc.ID
+	m.model.CloudCredential = &cc
 
 	return nil
 }
@@ -559,7 +542,7 @@ func (j *JIMM) ImportModel(ctx context.Context, user *openfga.User, controllerNa
 		return err
 	}
 
-	importer, err := newModelImporter(j, newOwner)
+	importer, err := newModelImporter(j)
 	if err != nil {
 		return errors.E(op, err)
 	}
@@ -568,7 +551,7 @@ func (j *JIMM) ImportModel(ctx context.Context, user *openfga.User, controllerNa
 		return errors.E(op, err)
 	}
 
-	if err := importer.setModelOwner(ctx); err != nil {
+	if err := importer.ensureModelOwner(ctx); err != nil {
 		return errors.E(op, err)
 	}
 
@@ -576,10 +559,6 @@ func (j *JIMM) ImportModel(ctx context.Context, user *openfga.User, controllerNa
 		return errors.E(op, err)
 	}
 
-	// TODO(CSS-5458): Remove the below section on cloud credentials once we no longer persist the relation between
-	// cloud credentials and models.
-	// Update: We need to investigate this further, if a user updates their cloud-credential it will update the credential
-	// on this model.
 	if err := importer.setCloudCredential(ctx); err != nil {
 		return errors.E(op, err)
 	}

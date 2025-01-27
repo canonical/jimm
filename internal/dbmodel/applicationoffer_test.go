@@ -42,7 +42,7 @@ func TestApplicationOfferUniqueConstraint(t *testing.T) {
 		Owner:           u,
 		Controller:      ctl,
 		CloudRegion:     cl.Regions[0],
-		CloudCredential: cred,
+		CloudCredential: &cred,
 		Life:            state.Alive.String(),
 	}
 	c.Assert(db.Create(&m).Error, qt.IsNil)

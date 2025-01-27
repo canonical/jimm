@@ -80,7 +80,7 @@ func initTestEnvironment(c *qt.C, db *db.Database) testEnvironment {
 		Owner:           env.u,
 		Controller:      env.controller,
 		CloudRegion:     env.cloud.Regions[0],
-		CloudCredential: env.cred,
+		CloudCredential: &env.cred,
 		Life:            state.Alive.String(),
 	}
 	c.Assert(db.DB.Create(&env.model).Error, qt.IsNil)
@@ -94,7 +94,7 @@ func initTestEnvironment(c *qt.C, db *db.Database) testEnvironment {
 		Owner:           env.u,
 		Controller:      env.controller,
 		CloudRegion:     env.cloud.Regions[0],
-		CloudCredential: env.cred,
+		CloudCredential: &env.cred,
 		Life:            state.Alive.String(),
 	}
 	c.Assert(db.DB.Create(&env.model1).Error, qt.IsNil)

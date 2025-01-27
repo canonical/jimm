@@ -144,7 +144,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 			// TODO(mhilton) don't fetch these in the first place.
 			m.Owner = dbmodel.Identity{}
 			m.Controller = dbmodel.Controller{}
-			m.CloudCredential = dbmodel.CloudCredential{}
+			m.CloudCredential = nil
 			m.CloudRegion = dbmodel.CloudRegion{}
 
 			expectedCredential.Models = []dbmodel.Model{m}
@@ -431,7 +431,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 			// TODO(mhilton) don't fetch these in the first place.
 			m.Owner = dbmodel.Identity{}
 			m.Controller = dbmodel.Controller{}
-			m.CloudCredential = dbmodel.CloudCredential{}
+			m.CloudCredential = nil
 			m.CloudRegion = dbmodel.CloudRegion{}
 
 			return u, arg, dbmodel.CloudCredential{
@@ -550,7 +550,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 			// TODO(mhilton) don't fetch these in the first place.
 			m.Owner = dbmodel.Identity{}
 			m.Controller = dbmodel.Controller{}
-			m.CloudCredential = dbmodel.CloudCredential{}
+			m.CloudCredential = nil
 			m.CloudRegion = dbmodel.CloudRegion{}
 			expectedCredential.Models = []dbmodel.Model{m}
 
@@ -656,7 +656,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 			// TODO(mhilton) don't fetch these in the first place.
 			m.Owner = dbmodel.Identity{}
 			m.Controller = dbmodel.Controller{}
-			m.CloudCredential = dbmodel.CloudCredential{}
+			m.CloudCredential = nil
 			m.CloudRegion = dbmodel.CloudRegion{}
 			cred.Models = []dbmodel.Model{m}
 

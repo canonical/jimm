@@ -91,7 +91,7 @@ func CreateTestControllerEnvironment(ctx context.Context, c *qt.C, db *db.Databa
 		OwnerIdentityName: u.Name,
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
-		CloudCredentialID: cred.ID,
+		CloudCredentialID: &cred.ID,
 		Life:              state.Alive.String(),
 	}
 

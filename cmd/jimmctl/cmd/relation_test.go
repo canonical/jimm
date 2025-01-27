@@ -316,7 +316,7 @@ func initializeEnvironment(c *gc.C, ctx context.Context, db *db.Database, u dbmo
 		OwnerIdentityName: u.Name,
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
-		CloudCredentialID: cred.ID,
+		CloudCredentialID: &cred.ID,
 	}
 	err = db.AddModel(ctx, &model)
 	c.Assert(err, gc.IsNil)
@@ -539,7 +539,7 @@ func (s *relationSuite) TestCheckRelationViaSuperuser(c *gc.C) {
 		OwnerIdentityName: u.Name,
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
-		CloudCredentialID: cred.ID,
+		CloudCredentialID: &cred.ID,
 		Life:              "alive",
 	}
 

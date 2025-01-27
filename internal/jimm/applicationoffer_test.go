@@ -132,7 +132,7 @@ var initializeEnvironment = func(c *qt.C, ctx context.Context, db *db.Database, 
 		OwnerIdentityName: u.Name,
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
-		CloudCredentialID: cred.ID,
+		CloudCredentialID: &cred.ID,
 	}
 	err = db.AddModel(ctx, &model)
 	c.Assert(err, qt.IsNil)
@@ -252,7 +252,7 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 		OwnerIdentityName: u.Name,
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
-		CloudCredentialID: cred.ID,
+		CloudCredentialID: &cred.ID,
 	}
 	err = db.AddModel(ctx, &model)
 	c.Assert(err, qt.IsNil)
@@ -541,7 +541,7 @@ func TestGetApplicationOffer(t *testing.T) {
 		OwnerIdentityName: u.Name,
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
-		CloudCredentialID: cred.ID,
+		CloudCredentialID: &cred.ID,
 	}
 	err = j.Database.AddModel(ctx, &model)
 	c.Assert(err, qt.IsNil)
@@ -750,7 +750,7 @@ func TestOffer(t *testing.T) {
 				OwnerIdentityName: u.Name,
 				ControllerID:      controller.ID,
 				CloudRegionID:     cloud.Regions[0].ID,
-				CloudCredentialID: cred.ID,
+				CloudCredentialID: &cred.ID,
 			}
 			err = db.AddModel(ctx, &model)
 			c.Assert(err, qt.IsNil)
@@ -840,7 +840,7 @@ func TestOffer(t *testing.T) {
 				OwnerIdentityName: u.Name,
 				ControllerID:      controller.ID,
 				CloudRegionID:     cloud.Regions[0].ID,
-				CloudCredentialID: cred.ID,
+				CloudCredentialID: &cred.ID,
 			}
 			err = db.AddModel(ctx, &model)
 			c.Assert(err, qt.IsNil)
@@ -960,7 +960,7 @@ func TestOffer(t *testing.T) {
 				OwnerIdentityName: u.Name,
 				ControllerID:      controller.ID,
 				CloudRegionID:     cloud.Regions[0].ID,
-				CloudCredentialID: cred.ID,
+				CloudCredentialID: &cred.ID,
 			}
 			err = db.AddModel(ctx, &model)
 			c.Assert(err, qt.IsNil)
@@ -1052,7 +1052,7 @@ func TestOffer(t *testing.T) {
 				OwnerIdentityName: u.Name,
 				ControllerID:      controller.ID,
 				CloudRegionID:     cloud.Regions[0].ID,
-				CloudCredentialID: cred.ID,
+				CloudCredentialID: &cred.ID,
 			}
 			err = db.AddModel(ctx, &model)
 			c.Assert(err, qt.IsNil)
@@ -1139,7 +1139,7 @@ func TestOffer(t *testing.T) {
 				OwnerIdentityName: u.Name,
 				ControllerID:      controller.ID,
 				CloudRegionID:     cloud.Regions[0].ID,
-				CloudCredentialID: cred.ID,
+				CloudCredentialID: &cred.ID,
 			}
 			err = db.AddModel(ctx, &model)
 			c.Assert(err, qt.IsNil)
@@ -1226,7 +1226,7 @@ func TestOffer(t *testing.T) {
 				OwnerIdentityName: u.Name,
 				ControllerID:      controller.ID,
 				CloudRegionID:     cloud.Regions[0].ID,
-				CloudCredentialID: cred.ID,
+				CloudCredentialID: &cred.ID,
 			}
 			err = db.AddModel(ctx, &model)
 			c.Assert(err, qt.IsNil)
@@ -1345,7 +1345,7 @@ func TestOfferAssertOpenFGARelationsExist(t *testing.T) {
 			OwnerIdentityName: u.Name,
 			ControllerID:      controller.ID,
 			CloudRegionID:     cloud.Regions[0].ID,
-			CloudCredentialID: cred.ID,
+			CloudCredentialID: &cred.ID,
 		}
 		err = db.AddModel(ctx, &model)
 		c.Assert(err, qt.IsNil)

@@ -70,7 +70,7 @@ func (s *dbSuite) TestAddModel(c *qt.C) {
 		OwnerIdentityName: u.Name,
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
-		CloudCredentialID: cred.ID,
+		CloudCredentialID: &cred.ID,
 		Life:              state.Alive.String(),
 	}
 	m1 := model
@@ -135,8 +135,8 @@ func (s *dbSuite) TestGetModel(c *qt.C) {
 		Controller:        controller,
 		CloudRegionID:     cloud.Regions[0].ID,
 		CloudRegion:       cloud.Regions[0],
-		CloudCredentialID: cred.ID,
-		CloudCredential:   cred,
+		CloudCredentialID: &cred.ID,
+		CloudCredential:   &cred,
 		Life:              state.Alive.String(),
 	}
 	model.CloudCredential.Cloud = dbmodel.Cloud{}
@@ -220,7 +220,7 @@ func (s *dbSuite) TestUpdateModel(c *qt.C) {
 		OwnerIdentityName: i.Name,
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
-		CloudCredentialID: cred.ID,
+		CloudCredentialID: &cred.ID,
 		Life:              state.Alive.String(),
 	}
 	err = s.Database.AddModel(context.Background(), &model)
@@ -288,7 +288,7 @@ func (s *dbSuite) TestDeleteModel(c *qt.C) {
 		ControllerID:      controller.ID,
 		Controller:        controller,
 		CloudRegionID:     cloud.Regions[0].ID,
-		CloudCredentialID: cred.ID,
+		CloudCredentialID: &cred.ID,
 		Life:              state.Alive.String(),
 	}
 
@@ -362,7 +362,7 @@ func (s *dbSuite) TestGetModelsUsingCredential(c *qt.C) {
 		OwnerIdentityName: i.Name,
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
-		CloudCredentialID: cred1.ID,
+		CloudCredentialID: &cred1.ID,
 		Life:              state.Alive.String(),
 	}
 	err = s.Database.AddModel(context.Background(), &model1)
@@ -377,7 +377,7 @@ func (s *dbSuite) TestGetModelsUsingCredential(c *qt.C) {
 		OwnerIdentityName: i.Name,
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
-		CloudCredentialID: cred2.ID,
+		CloudCredentialID: &cred2.ID,
 		Life:              state.Alive.String(),
 	}
 	err = s.Database.AddModel(context.Background(), &model2)
@@ -398,7 +398,7 @@ func (s *dbSuite) TestGetModelsUsingCredential(c *qt.C) {
 		ControllerID:      controller.ID,
 		Controller:        controller,
 		CloudRegionID:     cloud.Regions[0].ID,
-		CloudCredentialID: cred1.ID,
+		CloudCredentialID: &cred1.ID,
 		Life:              state.Alive.String(),
 	}})
 
@@ -622,7 +622,7 @@ func (s *dbSuite) TestGetModelsByController(c *qt.C) {
 		Owner:           *u,
 		Controller:      controller,
 		CloudRegion:     cloud.Regions[0],
-		CloudCredential: cred,
+		CloudCredential: &cred,
 		Life:            state.Alive.String(),
 	}, {
 		Name: "test-model-2",
@@ -633,7 +633,7 @@ func (s *dbSuite) TestGetModelsByController(c *qt.C) {
 		Owner:           *u,
 		Controller:      controller,
 		CloudRegion:     cloud.Regions[0],
-		CloudCredential: cred,
+		CloudCredential: &cred,
 		Life:            state.Alive.String(),
 	}}
 	for _, m := range models {

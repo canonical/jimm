@@ -86,7 +86,7 @@ func TestControllerModels(t *testing.T) {
 		Owner:           u1,
 		Controller:      ctl,
 		CloudRegion:     cl.Regions[0],
-		CloudCredential: cred,
+		CloudCredential: &cred,
 	}
 	c.Assert(db.Create(&m1).Error, qt.IsNil)
 	u2, err := dbmodel.NewIdentity("charlie@canonical.com")
@@ -103,7 +103,7 @@ func TestControllerModels(t *testing.T) {
 		Owner:           *u2,
 		Controller:      ctl,
 		CloudRegion:     cl.Regions[0],
-		CloudCredential: cred,
+		CloudCredential: &cred,
 	}
 	c.Assert(db.Create(&m2).Error, qt.IsNil)
 

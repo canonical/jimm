@@ -102,7 +102,7 @@ func main() {
 		OwnerIdentityName: u.Name,
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
-		CloudCredentialID: cred.ID,
+		CloudCredentialID: &cred.ID,
 		Life:              state.Alive.String(),
 	}
 	if err = db.AddModel(ctx, &model); err != nil {

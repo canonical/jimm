@@ -365,7 +365,6 @@ func (j *JIMM) mergeModelInfo(ctx context.Context, user *openfga.User, modelInfo
 	const op = errors.Op("jimm.mergeModelInfo")
 	zapctx.Info(ctx, string(op))
 
-	modelInfo.CloudCredentialTag = jimmModel.CloudCredential.Tag().String()
 	modelInfo.ControllerUUID = jimmModel.Controller.UUID
 	modelInfo.OwnerTag = jimmModel.Owner.Tag().String()
 
@@ -699,8 +698,8 @@ func (j *JIMM) ChangeModelCredential(ctx context.Context, user *openfga.User, mo
 		return errors.E(op, err)
 	}
 
-	m.CloudCredential = credential
-	m.CloudCredentialID = credential.ID
+	m.CloudCredential = &credential
+	m.CloudCredentialID = &credential.ID
 	err = j.Database.UpdateModel(ctx, m)
 	if err != nil {
 		return errors.E(op, err)

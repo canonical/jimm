@@ -40,8 +40,8 @@ type Model struct {
 	CloudRegion   CloudRegion
 
 	// CloudCredential is the credential used with the model.
-	CloudCredentialID uint
-	CloudCredential   CloudCredential `gorm:"foreignkey:CloudCredentialID;references:ID"`
+	CloudCredentialID *uint
+	CloudCredential   *CloudCredential `gorm:"foreignkey:CloudCredentialID;references:ID"`
 
 	// Life holds the life status of the model.
 	Life string
@@ -102,15 +102,11 @@ func (m *Model) FromJujuModelInfo(info jujuparams.ModelInfo) error {
 		}
 		m.CloudRegion.Cloud.Name = ct.Id()
 	}
-	if info.CloudCredentialTag != "" {
-		cct, err := names.ParseCloudCredentialTag(info.CloudCredentialTag)
-		if err != nil {
-			return errors.E(err)
-		}
-		m.CloudCredential.Name = cct.Name()
-		m.CloudCredential.CloudName = cct.Cloud().Id()
-		m.CloudCredential.Owner.Name = cct.Owner().Id()
-	}
+	// Note that we ignore the cloud-credential from
+	// the controller here because in all cases JIMM
+	// either knows the credential used (because it
+	// created the model) or it doesn't have access
+	// to the credential and doesn't care (imported models).
 
 	return nil
 }
@@ -134,6 +130,8 @@ func (m Model) ToJujuModel() jujuparams.Model {
 // It uses the info from the controller and JIMM's db to fill the jujuparams.ModelSummary.
 // maskingControllerUUID is used to mask the controllerUUID with the JIMM's one.
 // access is the user access level got from JIMM.
+// This function indicates which fields JIMM is authoritative and which can come directly
+// from Juju.
 func (m Model) MergeModelSummaryFromController(modelSummaryFromController *jujuparams.ModelSummary, maskingControllerUUID string, access jujuparams.UserAccessPermission) jujuparams.ModelSummary {
 	if modelSummaryFromController == nil {
 		modelSummaryFromController = &jujuparams.ModelSummary{}
@@ -148,7 +146,7 @@ func (m Model) MergeModelSummaryFromController(modelSummaryFromController *jujup
 	modelSummaryFromController.ProviderType = m.CloudRegion.Cloud.Type
 	modelSummaryFromController.CloudTag = m.CloudRegion.Cloud.Tag().String()
 	modelSummaryFromController.CloudRegion = m.CloudRegion.Name
-	modelSummaryFromController.CloudCredentialTag = m.CloudCredential.Tag().String()
+	// modelSummaryFromController.CloudCredentialTag = m.CloudCredential.Tag().String()
 	modelSummaryFromController.OwnerTag = m.Owner.Tag().String()
 	modelSummaryFromController.Life = life.Value(m.Life)
 	modelSummaryFromController.UserAccess = access

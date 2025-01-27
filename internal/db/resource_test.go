@@ -52,7 +52,7 @@ func SetupDB(c *qt.C, database *db.Database) (dbmodel.Model, dbmodel.Controller,
 		OwnerIdentityName: u.Name,
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
-		CloudCredentialID: cred.ID,
+		CloudCredentialID: &cred.ID,
 		Life:              state.Alive.String(),
 	}
 	err = database.AddModel(context.Background(), &model)

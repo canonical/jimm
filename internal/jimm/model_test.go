@@ -242,7 +242,7 @@ users:
 			},
 			Name: "test-region-1",
 		},
-		CloudCredential: dbmodel.CloudCredential{
+		CloudCredential: &dbmodel.CloudCredential{
 			Name:     "test-credential-1",
 			AuthType: "empty",
 		},
@@ -347,7 +347,7 @@ users:
 			},
 			Name: "test-region-1",
 		},
-		CloudCredential: dbmodel.CloudCredential{
+		CloudCredential: &dbmodel.CloudCredential{
 			Name:     "test-credential-1",
 			AuthType: "empty",
 		},
@@ -451,7 +451,7 @@ users:
 			},
 			Name: "test-region-1",
 		},
-		CloudCredential: dbmodel.CloudCredential{
+		CloudCredential: &dbmodel.CloudCredential{
 			Name:     "test-credential-1",
 			AuthType: "empty",
 		},
@@ -547,7 +547,7 @@ users:
 			},
 			Name: "test-region-1",
 		},
-		CloudCredential: dbmodel.CloudCredential{
+		CloudCredential: &dbmodel.CloudCredential{
 			Name:     "test-credential-1",
 			AuthType: "empty",
 		},
@@ -968,7 +968,7 @@ users:
 			},
 			Name: "test-region-1",
 		},
-		CloudCredential: dbmodel.CloudCredential{
+		CloudCredential: &dbmodel.CloudCredential{
 			Name:     "test-credential-1",
 			AuthType: "empty",
 		},
@@ -1148,7 +1148,7 @@ users:
 			Name:    "default",
 			Virtual: true,
 		},
-		CloudCredential: dbmodel.CloudCredential{
+		CloudCredential: &dbmodel.CloudCredential{
 			Name:     "test-credential-1",
 			AuthType: "empty",
 		},
@@ -2701,7 +2701,7 @@ var updateModelCredentialTests = []struct {
 			},
 			Name: "test-cloud-region",
 		},
-		CloudCredential: dbmodel.CloudCredential{
+		CloudCredential: &dbmodel.CloudCredential{
 			Name: "cred-2",
 		},
 	},

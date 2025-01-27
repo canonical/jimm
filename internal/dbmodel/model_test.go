@@ -46,7 +46,7 @@ func TestRecreateDeletedModel(t *testing.T) {
 		Name:            "test-1",
 		Controller:      ctl,
 		CloudRegion:     cl.Regions[0],
-		CloudCredential: cred,
+		CloudCredential: &cred,
 	}
 	c.Assert(db.Create(&m1).Error, qt.IsNil)
 
@@ -55,7 +55,7 @@ func TestRecreateDeletedModel(t *testing.T) {
 		Name:            "test-1",
 		Controller:      ctl,
 		CloudRegion:     cl.Regions[0],
-		CloudCredential: cred,
+		CloudCredential: &cred,
 	}
 	c.Check(db.Create(&m2).Error, qt.ErrorMatches, `.*violates unique constraint "unique_model_names".*`)
 
@@ -78,7 +78,7 @@ func TestModel(t *testing.T) {
 		Owner:           u,
 		Controller:      ctl,
 		CloudRegion:     cl.Regions[0],
-		CloudCredential: cred,
+		CloudCredential: &cred,
 		Life:            state.Alive.String(),
 	}
 	c.Assert(db.Create(&m).Error, qt.IsNil)
@@ -131,7 +131,7 @@ func TestModelUniqueConstraint(t *testing.T) {
 		Owner:           u,
 		Controller:      ctl1,
 		CloudRegion:     cl1.Regions[0],
-		CloudCredential: cred1,
+		CloudCredential: &cred1,
 		Life:            state.Alive.String(),
 	}
 	c.Assert(db.Create(&m1).Error, qt.IsNil)
@@ -145,7 +145,7 @@ func TestModelUniqueConstraint(t *testing.T) {
 		Owner:           u,
 		Controller:      ctl2,
 		CloudRegion:     cl2.Regions[0],
-		CloudCredential: cred2,
+		CloudCredential: &cred2,
 		Life:            state.Alive.String(),
 	}
 	c.Assert(db.Create(&m2).Error, qt.ErrorMatches, `ERROR: duplicate key value violates unique constraint .*`)
@@ -178,7 +178,7 @@ func TestToJujuModel(t *testing.T) {
 		Owner:             u,
 		Controller:        ctl,
 		CloudRegion:       cl.Regions[0],
-		CloudCredential:   cred,
+		CloudCredential:   &cred,
 		Life:              state.Alive.String(),
 	}
 	m.CloudRegion.Cloud = cl
@@ -205,7 +205,7 @@ func TestToJujuModelSummary(t *testing.T) {
 		Owner:           u,
 		Controller:      ctl,
 		CloudRegion:     cl.Regions[0],
-		CloudCredential: cred,
+		CloudCredential: &cred,
 		Life:            state.Alive.String(),
 	}
 	m.CloudRegion.Cloud = cl
@@ -376,11 +376,7 @@ func TestModelFromJujuModelInfo(t *testing.T) {
 				Name: "test-cloud",
 			},
 		},
-		CloudCredential: dbmodel.CloudCredential{
-			Name:      "test-cred",
-			CloudName: "test-cloud",
-			Owner:     *i,
-		},
+		CloudCredential:   nil,
 		OwnerIdentityName: "bob@canonical.com",
 		Life:              state.Alive.String(),
 	})

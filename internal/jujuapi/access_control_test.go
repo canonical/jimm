@@ -1514,7 +1514,7 @@ func createTestControllerEnvironment(ctx context.Context, c *gc.C, s *accessCont
 		OwnerIdentityName: u.Name,
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
-		CloudCredentialID: cred.ID,
+		CloudCredentialID: &cred.ID,
 		Life:              state.Alive.String(),
 	}
 

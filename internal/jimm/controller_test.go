@@ -668,7 +668,7 @@ func TestImportModel(t *testing.T) {
 				},
 				Name: "test-region",
 			},
-			CloudCredential: dbmodel.CloudCredential{
+			CloudCredential: &dbmodel.CloudCredential{
 				Name: "test-credential",
 			},
 			Life: state.Alive.String(),
@@ -677,7 +677,7 @@ func TestImportModel(t *testing.T) {
 		about:          "model from local user imported",
 		user:           "alice@canonical.com",
 		controllerName: "test-controller",
-		newOwner:       "alice@canonical.com",
+		newOwner:       "local-user",
 		modelUUID:      "00000002-0000-0000-0000-000000000001",
 		jimmAdmin:      true,
 		modelInfo: func(_ context.Context, info *jujuparams.ModelInfo) error {
@@ -724,8 +724,11 @@ func TestImportModel(t *testing.T) {
 				Valid:  true,
 			},
 			Owner: dbmodel.Identity{
-				Name:        "alice@canonical.com",
-				DisplayName: "Alice",
+				Name: "local-user",
+				// TODO: Fix how we create users so that this field gets populated
+				// Not a big deal for local users since this field is only used
+				// on login and we never allow login for local users in JIMM.
+				DisplayName: "",
 			},
 			Controller: dbmodel.Controller{
 				Name:         "test-controller",
@@ -741,55 +744,8 @@ func TestImportModel(t *testing.T) {
 				},
 				Name: "test-region",
 			},
-			CloudCredential: dbmodel.CloudCredential{
-				Name: "test-credential",
-			},
-			Life: state.Alive.String(),
-		},
-	}, {
-		about:          "new model owner is local user",
-		user:           "alice@canonical.com",
-		controllerName: "test-controller",
-		newOwner:       "bob",
-		modelUUID:      "00000002-0000-0000-0000-000000000001",
-		expectedError:  "cannot import model from local user, try --owner to switch the model owner",
-		jimmAdmin:      true,
-		modelInfo: func(_ context.Context, info *jujuparams.ModelInfo) error {
-			info.Name = "test-model"
-			info.Type = "test-type"
-			info.UUID = "00000002-0000-0000-0000-000000000001"
-			info.ControllerUUID = "00000001-0000-0000-0000-000000000001"
-			info.DefaultSeries = "test-series"
-			info.CloudTag = names.NewCloudTag("test-cloud").String()
-			info.CloudRegion = "test-region"
-			info.CloudCredentialTag = names.NewCloudCredentialTag("test-cloud/local-user/test-credential").String()
-			info.CloudCredentialValidity = &trueValue
-			info.OwnerTag = names.NewUserTag("local-user").String()
-			info.Life = life.Alive
-			info.Status = jujuparams.EntityStatus{
-				Status: status.Status("available"),
-				Info:   "test-info",
-				Since:  &now,
-			}
-			info.Users = []jujuparams.ModelUserInfo{{
-				UserName: "local-user",
-				Access:   jujuparams.ModelAdminAccess,
-			}, {
-				UserName: "another-user",
-				Access:   jujuparams.ModelReadAccess,
-			}}
-			info.Machines = []jujuparams.ModelMachineInfo{{
-				Id:          "test-machine",
-				DisplayName: "Test machine",
-				Status:      "test-status",
-				Message:     "test-message",
-			}}
-			info.SLA = &jujuparams.ModelSLAInfo{
-				Level: "essential",
-				Owner: "local-user",
-			}
-			info.AgentVersion = newVersion("2.1.0")
-			return nil
+			CloudCredential: nil,
+			Life:            state.Alive.String(),
 		},
 	}, {
 		about:          "model not found",
@@ -802,27 +758,6 @@ func TestImportModel(t *testing.T) {
 			return errors.E(errors.CodeNotFound, "model not found")
 		},
 		expectedError: "model not found",
-	}, {
-		about:          "fail import from local user without newOwner flag",
-		user:           "alice@canonical.com",
-		controllerName: "test-controller",
-		newOwner:       "",
-		modelUUID:      "00000002-0000-0000-0000-000000000001",
-		jimmAdmin:      true,
-		modelInfo: func(_ context.Context, info *jujuparams.ModelInfo) error {
-			info.Name = "test-model"
-			info.Type = "test-type"
-			info.UUID = "00000002-0000-0000-0000-000000000001"
-			info.ControllerUUID = "00000001-0000-0000-0000-000000000001"
-			info.DefaultSeries = "test-series"
-			info.CloudTag = names.NewCloudTag("test-cloud").String()
-			info.CloudRegion = "test-region"
-			info.CloudCredentialTag = names.NewCloudCredentialTag("test-cloud/alice@canonical.com/unknown-credential").String()
-			info.CloudCredentialValidity = &trueValue
-			info.OwnerTag = names.NewUserTag("local-user").String()
-			return nil
-		},
-		expectedError: `cannot import model from local user, try --owner to switch the model owner`,
 	}, {
 		about:          "cloud credentials not found",
 		user:           "alice@canonical.com",
@@ -843,7 +778,7 @@ func TestImportModel(t *testing.T) {
 			info.OwnerTag = names.NewUserTag("alice@canonical.com").String()
 			return nil
 		},
-		expectedError: `Failed to find cloud credential for user alice@canonical.com on cloud invalid-cloud`,
+		expectedError: `Failed to find cloud credential unknown-credential for user alice@canonical.com on cloud invalid-cloud: cloudcredential .* not found`,
 	}, {
 		about:          "cloud region not found",
 		user:           "alice@canonical.com",
@@ -962,7 +897,7 @@ func TestImportModel(t *testing.T) {
 				},
 				Name: "test-region",
 			},
-			CloudCredential: dbmodel.CloudCredential{
+			CloudCredential: &dbmodel.CloudCredential{
 				Name: "test-credential",
 			},
 			Life: state.Alive.String(),

@@ -497,7 +497,8 @@ func (m *Model) DBObject(c Tester, db *db.Database) dbmodel.Model {
 		migrationControllerID.Valid = true
 	}
 	m.dbo.CloudRegion = m.env.Cloud(m.Cloud).DBObject(c, db).Region(m.CloudRegion)
-	m.dbo.CloudCredential = m.env.CloudCredential(m.Owner, m.Cloud, m.CloudCredential).DBObject(c, db)
+	cc := m.env.CloudCredential(m.Owner, m.Cloud, m.CloudCredential).DBObject(c, db)
+	m.dbo.CloudCredential = &cc
 
 	m.dbo.Life = m.Life
 
