@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package dbmodel
 
@@ -146,7 +146,6 @@ func (m Model) MergeModelSummaryFromController(modelSummaryFromController *jujup
 	modelSummaryFromController.ProviderType = m.CloudRegion.Cloud.Type
 	modelSummaryFromController.CloudTag = m.CloudRegion.Cloud.Tag().String()
 	modelSummaryFromController.CloudRegion = m.CloudRegion.Name
-	// modelSummaryFromController.CloudCredentialTag = m.CloudCredential.Tag().String()
 	modelSummaryFromController.OwnerTag = m.Owner.Tag().String()
 	modelSummaryFromController.Life = life.Value(m.Life)
 	modelSummaryFromController.UserAccess = access

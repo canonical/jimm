@@ -1,4 +1,5 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
+
 package mocks
 
 import (
@@ -27,7 +28,7 @@ type ModelManager struct {
 	FullModelStatus_        func(ctx context.Context, user *openfga.User, modelTag names.ModelTag, patterns []string) (*jujuparams.FullStatus, error)
 	ListModelSummaries_     func(ctx context.Context, user *openfga.User, maskingControllerUUID string) (jujuparams.ModelSummaryResults, error)
 	GetModel_               func(ctx context.Context, uuid string) (dbmodel.Model, error)
-	ImportModel_            func(ctx context.Context, user *openfga.User, controllerName string, modelTag names.ModelTag, newOwner string) error
+	ImportModel_            func(ctx context.Context, user *openfga.User, controllerName string, modelTag names.ModelTag) error
 	IdentityModelDefaults_  func(ctx context.Context, user *dbmodel.Identity) (map[string]interface{}, error)
 	ModelDefaultsForCloud_  func(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag) (jujuparams.ModelDefaultsResult, error)
 	ModelInfo_              func(ctx context.Context, u *openfga.User, mt names.ModelTag) (*jujuparams.ModelInfo, error)
@@ -102,11 +103,11 @@ func (j *ModelManager) GetModel(ctx context.Context, uuid string) (dbmodel.Model
 	return j.GetModel_(ctx, uuid)
 }
 
-func (j *ModelManager) ImportModel(ctx context.Context, user *openfga.User, controllerName string, modelTag names.ModelTag, newOwner string) error {
+func (j *ModelManager) ImportModel(ctx context.Context, user *openfga.User, controllerName string, modelTag names.ModelTag) error {
 	if j.ImportModel_ == nil {
 		return errors.E(errors.CodeNotImplemented)
 	}
-	return j.ImportModel_(ctx, user, controllerName, modelTag, newOwner)
+	return j.ImportModel_(ctx, user, controllerName, modelTag)
 }
 
 func (j *ModelManager) ModelDefaultsForCloud(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag) (jujuparams.ModelDefaultsResult, error) {

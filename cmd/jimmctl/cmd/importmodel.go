@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package cmd
 
@@ -64,7 +64,6 @@ func (c *importModelCommand) Info() *cmd.Info {
 // SetFlags implements Command.SetFlags.
 func (c *importModelCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.CommandBase.SetFlags(f)
-	f.StringVar(&c.req.Owner, "owner", "", "switch the model owner to the desired user")
 }
 
 // Init implements the cmd.Command interface.

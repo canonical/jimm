@@ -537,7 +537,6 @@ func TestImportModel(t *testing.T) {
 		controllerName string
 		modelUUID      string
 		modelInfo      func(context.Context, *jujuparams.ModelInfo) error
-		newOwner       string
 		jimmAdmin      bool
 		expectedModel  dbmodel.Model
 		expectedError  string
@@ -547,7 +546,6 @@ func TestImportModel(t *testing.T) {
 		about:          "model imported",
 		user:           "alice@canonical.com",
 		controllerName: "test-controller",
-		newOwner:       "",
 		modelUUID:      "00000002-0000-0000-0000-000000000001",
 		jimmAdmin:      true,
 		modelInfo: func(_ context.Context, info *jujuparams.ModelInfo) error {
@@ -677,7 +675,6 @@ func TestImportModel(t *testing.T) {
 		about:          "model from local user imported",
 		user:           "alice@canonical.com",
 		controllerName: "test-controller",
-		newOwner:       "local-user",
 		modelUUID:      "00000002-0000-0000-0000-000000000001",
 		jimmAdmin:      true,
 		modelInfo: func(_ context.Context, info *jujuparams.ModelInfo) error {
@@ -751,7 +748,6 @@ func TestImportModel(t *testing.T) {
 		about:          "model not found",
 		user:           "alice@canonical.com",
 		controllerName: "test-controller",
-		newOwner:       "",
 		modelUUID:      "00000002-0000-0000-0000-000000000001",
 		jimmAdmin:      true,
 		modelInfo: func(_ context.Context, info *jujuparams.ModelInfo) error {
@@ -762,7 +758,6 @@ func TestImportModel(t *testing.T) {
 		about:          "cloud credentials not found",
 		user:           "alice@canonical.com",
 		controllerName: "test-controller",
-		newOwner:       "",
 		modelUUID:      "00000002-0000-0000-0000-000000000001",
 		jimmAdmin:      true,
 		modelInfo: func(_ context.Context, info *jujuparams.ModelInfo) error {
@@ -783,7 +778,6 @@ func TestImportModel(t *testing.T) {
 		about:          "cloud region not found",
 		user:           "alice@canonical.com",
 		controllerName: "test-controller",
-		newOwner:       "",
 		modelUUID:      "00000002-0000-0000-0000-000000000001",
 		jimmAdmin:      true,
 		modelInfo: func(_ context.Context, info *jujuparams.ModelInfo) error {
@@ -804,7 +798,6 @@ func TestImportModel(t *testing.T) {
 		about:          "not allowed if not superuser",
 		user:           "bob@canonical.com",
 		controllerName: "test-controller",
-		newOwner:       "",
 		modelUUID:      "00000002-0000-0000-0000-000000000001",
 		jimmAdmin:      false,
 		modelInfo: func(_ context.Context, info *jujuparams.ModelInfo) error {
@@ -825,7 +818,6 @@ func TestImportModel(t *testing.T) {
 		about:          "model already exists",
 		user:           "alice@canonical.com",
 		controllerName: "test-controller",
-		newOwner:       "",
 		modelUUID:      "00000002-0000-0000-0000-000000000002",
 		jimmAdmin:      true,
 		modelInfo: func(_ context.Context, info *jujuparams.ModelInfo) error {
@@ -846,7 +838,6 @@ func TestImportModel(t *testing.T) {
 		about:          "import model with offers",
 		user:           "alice@canonical.com",
 		controllerName: "test-controller",
-		newOwner:       "",
 		modelUUID:      "00000002-0000-0000-0000-000000000001",
 		jimmAdmin:      true,
 		modelInfo: func(_ context.Context, info *jujuparams.ModelInfo) error {
@@ -956,7 +947,7 @@ func TestImportModel(t *testing.T) {
 			user := openfga.NewUser(&dbUser, j.OpenFGAClient)
 			user.JimmAdmin = test.jimmAdmin
 
-			err := j.ImportModel(ctx, user, test.controllerName, names.NewModelTag(test.modelUUID), test.newOwner)
+			err := j.ImportModel(ctx, user, test.controllerName, names.NewModelTag(test.modelUUID))
 			if test.expectedError == "" {
 				c.Assert(err, qt.IsNil)
 

@@ -535,7 +535,7 @@ func (m *modelImporter) save(ctx context.Context) error {
 
 // ImportModel imports a model and existing offers into JIMM.  A new owner  must be set to
 // represent the external user who will own this model (if the original owner is a local user).
-func (j *JIMM) ImportModel(ctx context.Context, user *openfga.User, controllerName string, modelTag names.ModelTag, newOwner string) error {
+func (j *JIMM) ImportModel(ctx context.Context, user *openfga.User, controllerName string, modelTag names.ModelTag) error {
 	const op = errors.Op("jimm.ImportModel")
 
 	if err := j.checkJimmAdmin(user); err != nil {

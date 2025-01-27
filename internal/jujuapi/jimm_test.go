@@ -604,7 +604,6 @@ func (s *jimmSuite) TestImportModel(c *gc.C) {
 	req := apiparams.ImportModelRequest{
 		Controller: "controller-1",
 		ModelTag:   s.Model2.Tag().String(),
-		Owner:      "",
 	}
 	err = conn.APICall("JIMM", 4, "", "ImportModel", &req, nil)
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
