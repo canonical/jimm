@@ -26,7 +26,7 @@ jobs:
 
       # Default doc name is documentation.md which can't be changed via flags.
     - name: Generate docs
-      run: ./jimmctl documentation --out .
+      run: ./jimmctl documentation --no-index=true --out .
 
     - name: Convert doc to reStructuredText
       uses: docker://pandoc/core:3.5
@@ -36,8 +36,8 @@ jobs:
       # We do this because the original doc doesn't have a top level heading.: 
     - name: Create final doc with title
       run: |
-        echo "Jimmctl Reference" > jimmctl-reference.rst
-        echo "#################" >> jimmctl-reference.rst
+        echo "``jimmctl`` Reference" > jimmctl-reference.rst
+        echo "#####################" >> jimmctl-reference.rst
         echo "" >> jimmctl-reference.rst
         cat documentation.rst >> jimmctl-reference.rst
     
