@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 // Package auth provides means to authenticate users into JIMM.
 //
@@ -493,9 +493,9 @@ func (as *AuthenticationService) AuthenticateBrowserSession(ctx context.Context,
 
 	err = as.validateAndUpdateAccessToken(ctx, identityId)
 	if err != nil {
-		if err := as.deleteSession(session, w, req); err != nil {
-			return ctx, errors.E(op, err, "failed to delete session after getting an invalid token")
-		}
+		// If the user's access token AND refresh token have expired
+		// then we will fail authentication here.
+		zapctx.Error(ctx, "failed to validate and update status token", zap.Error(err))
 		return ctx, errors.E(op, err)
 	}
 
@@ -636,11 +636,11 @@ func (as *AuthenticationService) refreshIdentitiesToken(ctx context.Context, ema
 	// Get a new access and refresh token (token source only has Token())
 	newToken, err := tSrc.Token()
 	if err != nil {
-		return errors.E(op, err, "failed to refresh token")
+		return errors.E(op, err, fmt.Errorf("failed to refresh token: %w", err))
 	}
 
 	if err := as.UpdateIdentity(ctx, email, newToken); err != nil {
-		return errors.E(op, err, "failed to update identity")
+		return errors.E(op, err, fmt.Errorf("failed to update identity: %w", err))
 	}
 
 	return nil
