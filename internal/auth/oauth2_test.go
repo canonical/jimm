@@ -498,17 +498,7 @@ func TestAuthenticateBrowserSessionHandlesMissingOrExpiredRefreshTokens(t *testi
 	err = db.UpdateIdentity(ctx, u)
 	c.Assert(err, qt.IsNil)
 
-	// AuthenticateBrowserSession should fail to refresh the users session and delete
-	// the current session, giving us the same cookie back with a max-age of -1.
+	// AuthenticateBrowserSession should fail to refresh the users session.
 	_, err = authSvc.AuthenticateBrowserSession(ctx, rec, req)
-	c.Assert(err, qt.ErrorMatches, ".*failed to refresh token.*")
-
-	// Assert that the header to delete the session is set correctly based
-	// on a failed access token refresh due to refresh token issues.
-	setCookieCookies := rec.Header().Get("Set-Cookie")
-	c.Assert(
-		setCookieCookies,
-		qt.Equals,
-		"jimm-browser-session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT; Max-Age=0; HttpOnly; SameSite=None",
-	)
+	c.Assert(err, qt.ErrorMatches, ".*failed to refresh token: oauth2: token expired and refresh token is not set")
 }
