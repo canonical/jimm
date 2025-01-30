@@ -184,7 +184,7 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 	ctx := context.Background()
 
 	api := jimmtest.API{}
-	j := NewTestJujuManager(c, &parameters{
+	j := newTestJujuManager(c, &parameters{
 		Dialer: &jimmtest.Dialer{
 			UUID: "00000000-0000-0000-0000-0000-0000000000001",
 			API:  &api,
@@ -440,7 +440,7 @@ func TestGetApplicationOffer(t *testing.T) {
 
 	ctx := context.Background()
 
-	j := NewTestJujuManager(c, &parameters{
+	j := newTestJujuManager(c, &parameters{
 		Dialer: &jimmtest.Dialer{
 			API: &jimmtest.API{
 				GetApplicationOffer_: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetailsV5) error {
@@ -1253,7 +1253,7 @@ func TestOffer(t *testing.T) {
 				Offer_:                       test.offer,
 			}
 
-			j := NewTestJujuManager(c, &parameters{
+			j := newTestJujuManager(c, &parameters{
 				Dialer: &jimmtest.Dialer{
 					API: api,
 				},
@@ -1401,7 +1401,7 @@ func TestOfferAssertOpenFGARelationsExist(t *testing.T) {
 		},
 	}
 
-	j := NewTestJujuManager(c, &parameters{
+	j := newTestJujuManager(c, &parameters{
 		Dialer: &jimmtest.Dialer{
 			API:  api,
 			UUID: "00000000-0000-0000-0000-0000-0000000000001",
@@ -1499,7 +1499,7 @@ func TestDestroyOffer(t *testing.T) {
 
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
-			j := NewTestJujuManager(c, &parameters{
+			j := newTestJujuManager(c, &parameters{
 				Dialer: &jimmtest.Dialer{
 					API: &jimmtest.API{
 						DestroyApplicationOffer_: func(context.Context, string, bool) error {
@@ -1608,7 +1608,7 @@ func TestFindApplicationOffers(t *testing.T) {
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
 
-			j := NewTestJujuManager(c, &parameters{
+			j := newTestJujuManager(c, &parameters{
 				Dialer: &jimmtest.Dialer{
 					API: &jimmtest.API{
 						FindApplicationOffers_: func(ctx context.Context, of []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error) {
@@ -1760,7 +1760,7 @@ func TestListApplicationOffers(t *testing.T) {
 
 	env := jimmtest.ParseEnvironment(c, listApplicationsTestEnv)
 
-	j := NewTestJujuManager(c, &parameters{
+	j := newTestJujuManager(c, &parameters{
 		Dialer: &jimmtest.Dialer{
 			API: &jimmtest.API{
 				ListApplicationOffers_: func(_ context.Context, filters []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error) {

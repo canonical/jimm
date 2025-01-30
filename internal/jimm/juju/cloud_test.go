@@ -23,7 +23,7 @@ func TestGetCloud(t *testing.T) {
 
 	ctx := context.Background()
 
-	j := NewTestJujuManager(c, nil)
+	j := newTestJujuManager(c, nil)
 
 	aliceIdentity, err := dbmodel.NewIdentity("alice@canonical.com")
 	c.Assert(err, qt.IsNil)
@@ -138,7 +138,7 @@ func TestForEachCloud(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
-	j := NewTestJujuManager(c, nil)
+	j := newTestJujuManager(c, nil)
 
 	aliceIdentity, err := dbmodel.NewIdentity("alice@canonical.com")
 	c.Assert(err, qt.IsNil)
@@ -670,7 +670,7 @@ func TestAddHostedCloud(t *testing.T) {
 				API: api,
 			}
 
-			j := NewTestJujuManager(c, &parameters{
+			j := newTestJujuManager(c, &parameters{
 				Dialer: dialer,
 			})
 
@@ -940,7 +940,7 @@ func TestAddCloudToController(t *testing.T) {
 				API: api,
 			}
 
-			j := NewTestJujuManager(c, &parameters{
+			j := newTestJujuManager(c, &parameters{
 				Dialer: dialer,
 			})
 
@@ -1070,7 +1070,7 @@ func TestRemoveCloud(t *testing.T) {
 				Err: test.dialError,
 			}
 
-			j := NewTestJujuManager(c, &parameters{
+			j := newTestJujuManager(c, &parameters{
 				Dialer: dialer,
 			})
 
@@ -1302,7 +1302,7 @@ func TestUpdateCloud(t *testing.T) {
 				AgentVersion: "1",
 			}
 
-			j := NewTestJujuManager(c, &parameters{
+			j := newTestJujuManager(c, &parameters{
 				Dialer: dialer,
 			})
 
@@ -1488,7 +1488,7 @@ func TestRemoveFromControllerCloud(t *testing.T) {
 				Err: test.dialError,
 			}
 
-			j := NewTestJujuManager(c, &parameters{
+			j := newTestJujuManager(c, &parameters{
 				Dialer: dialer,
 			})
 

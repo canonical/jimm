@@ -62,7 +62,7 @@ func TestControllerInfo(t *testing.T) {
 
 	ctx := context.Background()
 
-	j := NewTestJujuManager(c, nil)
+	j := newTestJujuManager(c, nil)
 
 	env := jimmtest.ParseEnvironment(c, testControllersEnv)
 	env.PopulateDB(c, j.Database)
@@ -80,7 +80,7 @@ func TestListControllers(t *testing.T) {
 
 	ctx := context.Background()
 
-	j := NewTestJujuManager(c, nil)
+	j := newTestJujuManager(c, nil)
 
 	env := jimmtest.ParseEnvironment(c, testControllersEnv)
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
@@ -155,7 +155,7 @@ func TestSetControllerDeprecated(t *testing.T) {
 
 	ctx := context.Background()
 
-	j := NewTestJujuManager(c, nil)
+	j := newTestJujuManager(c, nil)
 
 	env := jimmtest.ParseEnvironment(c, testSetControllerDeprecatedEnv)
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
@@ -287,7 +287,7 @@ func TestRemoveController(t *testing.T) {
 
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
-			j := NewTestJujuManager(c, nil)
+			j := newTestJujuManager(c, nil)
 
 			env := jimmtest.ParseEnvironment(c, removeControllerTestEnv)
 			env.PopulateDB(c, j.Database)
@@ -365,7 +365,7 @@ func TestRemoveAndAddController(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
-	j := NewTestJujuManager(c, nil)
+	j := newTestJujuManager(c, nil)
 
 	env := jimmtest.ParseEnvironment(c, removeAndAddControllerTestEnv)
 	env.PopulateDB(c, j.Database)
@@ -511,7 +511,7 @@ func TestFullModelStatus(t *testing.T) {
 				Status_: test.statusFunc,
 			}
 
-			j := NewTestJujuManager(c, &parameters{
+			j := newTestJujuManager(c, &parameters{
 				Dialer: &jimmtest.Dialer{
 					API: api,
 				},
@@ -685,7 +685,7 @@ func TestInitiateInternalMigration(t *testing.T) {
 			err := store.PutControllerCredentials(context.Background(), test.migrateInfo.TargetController, "admin", "test-secret")
 			c.Assert(err, qt.IsNil)
 
-			j := NewTestJujuManager(c, &parameters{
+			j := newTestJujuManager(c, &parameters{
 				CredentialStore: store,
 			})
 

@@ -1161,7 +1161,7 @@ func TestAddModel(t *testing.T) {
 
 	for _, test := range addModelTests {
 		c.Run(test.name, func(c *qt.C) {
-			j := NewTestJujuManager(c, &parameters{
+			j := newTestJujuManager(c, &parameters{
 				Dialer: &jimmtest.Dialer{
 					API: &jimmtest.API{
 						UpdateCredential_:    test.updateCredential,
@@ -1309,7 +1309,7 @@ func TestGetModel(t *testing.T) {
 	ctx := context.Background()
 	c := qt.New(t)
 
-	j := NewTestJujuManager(c, nil)
+	j := newTestJujuManager(c, nil)
 
 	env := jimmtest.ParseEnvironment(c, getModelTestEnv)
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
@@ -1496,7 +1496,7 @@ func TestModelInfo(t *testing.T) {
 
 	for _, test := range modelInfoTests {
 		c.Run(test.name, func(c *qt.C) {
-			j := NewTestJujuManager(c, &parameters{
+			j := newTestJujuManager(c, &parameters{
 				Dialer: &jimmtest.Dialer{
 					API: &jimmtest.API{
 						ModelInfo_: func(_ context.Context, mi *jujuparams.ModelInfo) error {
@@ -1665,7 +1665,7 @@ func TestModelStatus(t *testing.T) {
 					ModelStatus_: test.modelStatus,
 				},
 			}
-			j := NewTestJujuManager(c, &parameters{
+			j := newTestJujuManager(c, &parameters{
 				Dialer: dialer,
 			})
 
@@ -1764,7 +1764,7 @@ func TestForEachUserModel(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
-	j := NewTestJujuManager(c, nil)
+	j := newTestJujuManager(c, nil)
 
 	env := jimmtest.ParseEnvironment(c, forEachModelTestEnv)
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
@@ -1825,7 +1825,7 @@ func TestForEachModel(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
-	j := NewTestJujuManager(c, nil)
+	j := newTestJujuManager(c, nil)
 
 	env := jimmtest.ParseEnvironment(c, forEachModelTestEnv)
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
@@ -1908,7 +1908,7 @@ func TestModelSummaries(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
-	j := NewTestJujuManager(c, nil)
+	j := newTestJujuManager(c, nil)
 
 	err := j.Database.Migrate(ctx)
 	c.Assert(err, qt.IsNil)
@@ -2262,7 +2262,7 @@ func TestDestroyModel(t *testing.T) {
 				Err: test.dialError,
 			}
 
-			j := NewTestJujuManager(c, &parameters{
+			j := newTestJujuManager(c, &parameters{
 				Dialer: dialer,
 			})
 
@@ -2379,7 +2379,7 @@ func TestDumpModel(t *testing.T) {
 				},
 				Err: test.dialError,
 			}
-			j := NewTestJujuManager(c, &parameters{
+			j := newTestJujuManager(c, &parameters{
 				Dialer: dialer,
 			})
 
@@ -2481,7 +2481,7 @@ func TestDumpModelDB(t *testing.T) {
 				},
 				Err: test.dialError,
 			}
-			j := NewTestJujuManager(c, &parameters{
+			j := newTestJujuManager(c, &parameters{
 				Dialer: dialer,
 			})
 
@@ -2589,7 +2589,7 @@ func TestValidateModelUpgrade(t *testing.T) {
 				Err: test.dialError,
 			}
 
-			j := NewTestJujuManager(c, &parameters{
+			j := newTestJujuManager(c, &parameters{
 				Dialer: dialer,
 			})
 
@@ -2801,7 +2801,7 @@ func TestUpdateModelCredential(t *testing.T) {
 				},
 				Err: test.dialError,
 			}
-			j := NewTestJujuManager(c, &parameters{
+			j := newTestJujuManager(c, &parameters{
 				Dialer: dialer,
 			})
 
@@ -2867,7 +2867,7 @@ users:
 `[1:]),
 	}
 
-	j := NewTestJujuManager(c, &parameters{
+	j := newTestJujuManager(c, &parameters{
 		Dialer: &jimmtest.Dialer{
 			API: api,
 		},
@@ -3131,7 +3131,7 @@ func TestListModels(t *testing.T) {
 		c.Run(
 			test.name,
 			func(c *qt.C) {
-				j := NewTestJujuManager(c, &parameters{
+				j := newTestJujuManager(c, &parameters{
 					Dialer: jimmtest.DialerMap{
 						"controller-1": &jimmtest.Dialer{
 							API: &jimmtest.API{

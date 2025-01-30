@@ -1,4 +1,5 @@
 // Copyright 2025 Canonical.
+
 package juju_test
 
 import (
@@ -323,7 +324,7 @@ func TestQueryModelsJq(t *testing.T) {
 	ctx := context.Background()
 
 	// Test setup
-	j := NewTestJujuManager(c, &parameters{
+	j := newTestJujuManager(c, &parameters{
 		Dialer: jimmtest.ModelDialerMap{
 			"10000000-0000-0000-0000-000000000000": &jimmtest.Dialer{
 				API: &jimmtest.API{

@@ -229,7 +229,7 @@ func TestSetCloudDefaults(t *testing.T) {
 
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
-			j := NewTestJujuManager(c, nil)
+			j := newTestJujuManager(c, nil)
 
 			testConfig := test.setup(c, j)
 
@@ -415,7 +415,7 @@ func TestUnsetCloudDefaults(t *testing.T) {
 
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
-			j := NewTestJujuManager(c, nil)
+			j := newTestJujuManager(c, nil)
 
 			testConfig := test.setup(c, j)
 
@@ -444,7 +444,7 @@ func TestModelDefaultsForCloud(t *testing.T) {
 
 	ctx := context.Background()
 
-	j := NewTestJujuManager(c, nil)
+	j := newTestJujuManager(c, nil)
 
 	user, err := dbmodel.NewIdentity("bob@canonical.com")
 	c.Assert(err, qt.IsNil)

@@ -1,4 +1,5 @@
 // Copyright 2025 Canonical.
+
 package juju
 
 import (
@@ -80,6 +81,7 @@ func (j *JIMM) dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names
 	return j.Dialer.Dial(ctx, ctl, modelTag, permissionMap)
 }
 
+// ResourceTag returns JIMM's controller tag stating its UUID.
 func (j *JIMM) ResourceTag() names.ControllerTag {
 	return j.resourceTag
 }

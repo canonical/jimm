@@ -87,7 +87,7 @@ type modelCleanupSuite struct {
 }
 
 func (s *modelCleanupSuite) Init(c *qt.C) {
-	s.jujuManager = NewTestJujuManager(c, nil)
+	s.jujuManager = newTestJujuManager(c, nil)
 
 	i, err := dbmodel.NewIdentity("alice@canonical.com")
 	c.Assert(err, qt.IsNil)

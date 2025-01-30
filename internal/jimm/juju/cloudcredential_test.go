@@ -765,7 +765,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 				},
 			}
 
-			j := NewTestJujuManager(
+			j := newTestJujuManager(
 				c,
 				&parameters{
 					Dialer: &jimmtest.Dialer{
@@ -821,7 +821,7 @@ users:
   controller-access: superuser
 `)
 
-	j := NewTestJujuManager(c, &parameters{
+	j := newTestJujuManager(c, &parameters{
 		Dialer: &jimmtest.Dialer{
 			API: &jimmtest.API{},
 		},
@@ -1216,7 +1216,7 @@ func TestRevokeCloudCredential(t *testing.T) {
 				},
 			}
 
-			j := NewTestJujuManager(c, &parameters{
+			j := newTestJujuManager(c, &parameters{
 				Dialer: &jimmtest.Dialer{
 					API: api,
 				},
@@ -1338,7 +1338,7 @@ func TestGetCloudCredential(t *testing.T) {
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
 
-			j := NewTestJujuManager(c, nil)
+			j := newTestJujuManager(c, nil)
 
 			u, tag, expectedCredential, expectedError := test.createEnv(c, j, j.OpenFGAClient)
 			user := openfga.NewUser(u, j.OpenFGAClient)
@@ -1427,7 +1427,7 @@ func TestForEachUserCloudCredential(t *testing.T) {
 		c.Run(test.name, func(c *qt.C) {
 			ctx := context.Background()
 
-			j := NewTestJujuManager(c, nil)
+			j := newTestJujuManager(c, nil)
 
 			env := jimmtest.ParseEnvironment(c, test.env)
 			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
@@ -1569,7 +1569,7 @@ func TestGetCloudCredentialAttributes(t *testing.T) {
 			return func(c *qt.C) {
 				ctx := context.Background()
 
-				j := NewTestJujuManager(c, jp)
+				j := newTestJujuManager(c, jp)
 
 				env := jimmtest.ParseEnvironment(c, getCloudCredentialAttributesEnv)
 				env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
@@ -1615,7 +1615,7 @@ func TestCloudCredentialAttributeStore(t *testing.T) {
 		attrs: make(map[string]map[string]string),
 	}
 
-	j := NewTestJujuManager(c, &parameters{
+	j := newTestJujuManager(c, &parameters{
 		CredentialStore: attrStore,
 	})
 
@@ -1749,7 +1749,7 @@ func TestCopyCredential(t *testing.T) {
 		},
 	}
 
-	j := NewTestJujuManager(c, &parameters{
+	j := newTestJujuManager(c, &parameters{
 		Dialer: &jimmtest.Dialer{
 			API: api,
 		},
@@ -1821,7 +1821,7 @@ func TestCopyCredentialWithMissingCredential(t *testing.T) {
 
 	ctx := context.Background()
 
-	j := NewTestJujuManager(c, nil)
+	j := newTestJujuManager(c, nil)
 
 	svcAccId, err := dbmodel.NewIdentity("39caae91-b914-41ae-83f8-c7b86ca5ad5a@serviceaccount")
 	c.Assert(err, qt.IsNil)

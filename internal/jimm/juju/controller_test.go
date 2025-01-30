@@ -127,7 +127,7 @@ func TestAddController(t *testing.T) {
 		},
 	}
 
-	j := NewTestJujuManager(c, &parameters{
+	j := newTestJujuManager(c, &parameters{
 		Dialer: &jimmtest.Dialer{
 			API: api,
 		},
@@ -220,7 +220,7 @@ func TestAddControllerWithCloudWithoutRegions(t *testing.T) {
 		},
 	}
 
-	j := NewTestJujuManager(c, &parameters{
+	j := newTestJujuManager(c, &parameters{
 		Dialer: &jimmtest.Dialer{
 			API: api,
 		},
@@ -372,7 +372,7 @@ func TestAddControllerWithVault(t *testing.T) {
 		},
 	}
 
-	j := NewTestJujuManager(c, &parameters{
+	j := newTestJujuManager(c, &parameters{
 		Dialer: &jimmtest.Dialer{
 			API: api,
 		},
@@ -466,7 +466,7 @@ func TestEarliestControllerVersion(t *testing.T) {
 
 	ctx := context.Background()
 
-	j := NewTestJujuManager(c, nil)
+	j := newTestJujuManager(c, nil)
 
 	env := jimmtest.ParseEnvironment(c, testEarliestControllerVersionEnv)
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
@@ -1005,7 +1005,7 @@ func TestImportModel(t *testing.T) {
 				},
 			}
 
-			j := NewTestJujuManager(c, &parameters{
+			j := newTestJujuManager(c, &parameters{
 				Dialer: &jimmtest.Dialer{
 					API:  api,
 					UUID: test.expectedModel.Controller.UUID,
@@ -1167,7 +1167,7 @@ func TestUpdateMigratedModel(t *testing.T) {
 
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
-			j := NewTestJujuManager(c, &parameters{
+			j := newTestJujuManager(c, &parameters{
 				Dialer: &jimmtest.Dialer{
 					API: &jimmtest.API{
 						ModelInfo_: test.modelInfo,
@@ -1447,7 +1447,7 @@ func TestInitiateMigration(t *testing.T) {
 
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
-			j := NewTestJujuManager(c, nil)
+			j := newTestJujuManager(c, nil)
 
 			env := jimmtest.ParseEnvironment(c, testInitiateMigrationEnv)
 			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)

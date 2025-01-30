@@ -1,4 +1,5 @@
 // Copyright 2025 Canonical.
+
 package juju_test
 
 import (
@@ -21,7 +22,7 @@ type parameters struct {
 	CredentialStore credentials.CredentialStore
 }
 
-func NewTestJujuManager(c *qt.C, p *parameters) *juju.JIMM {
+func newTestJujuManager(c *qt.C, p *parameters) *juju.JIMM {
 	if p == nil {
 		p = &parameters{}
 	}
