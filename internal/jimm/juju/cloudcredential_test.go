@@ -42,11 +42,11 @@ func TestUpdateCloudCredential(t *testing.T) {
 		checkCredentialErrors  []error
 		updateCredentialErrors []error
 		jimmAdmin              bool
-		createEnv              func(*qt.C, *juju.JIMM) (*dbmodel.Identity, juju.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string)
+		createEnv              func(*qt.C, *juju.JujuManager) (*dbmodel.Identity, juju.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string)
 	}{{
 		about:     "all ok",
 		jimmAdmin: true,
-		createEnv: func(c *qt.C, j *juju.JIMM) (*dbmodel.Identity, juju.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
+		createEnv: func(c *qt.C, j *juju.JujuManager) (*dbmodel.Identity, juju.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
 			u, err := dbmodel.NewIdentity("alice@canonical.com")
 			c.Assert(err, qt.IsNil)
 			c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
@@ -155,7 +155,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 		about:                  "update credential error returned by controller",
 		jimmAdmin:              true,
 		updateCredentialErrors: []error{nil, errors.E("test error")},
-		createEnv: func(c *qt.C, j *juju.JIMM) (*dbmodel.Identity, juju.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
+		createEnv: func(c *qt.C, j *juju.JujuManager) (*dbmodel.Identity, juju.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
 			u, err := dbmodel.NewIdentity("alice@canonical.com")
 			c.Assert(err, qt.IsNil)
 
@@ -246,7 +246,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 		jimmAdmin:              true,
 		checkCredentialErrors:  []error{errors.E("test error")},
 		updateCredentialErrors: []error{nil},
-		createEnv: func(c *qt.C, j *juju.JIMM) (*dbmodel.Identity, juju.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
+		createEnv: func(c *qt.C, j *juju.JujuManager) (*dbmodel.Identity, juju.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
 			u, err := dbmodel.NewIdentity("alice@canonical.com")
 			c.Assert(err, qt.IsNil)
 
@@ -330,7 +330,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 	}, {
 		about:     "user is controller superuser",
 		jimmAdmin: true,
-		createEnv: func(c *qt.C, j *juju.JIMM) (*dbmodel.Identity, juju.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
+		createEnv: func(c *qt.C, j *juju.JujuManager) (*dbmodel.Identity, juju.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
 			u, err := dbmodel.NewIdentity("alice@canonical.com")
 			c.Assert(err, qt.IsNil)
 
@@ -450,7 +450,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 		about:                 "skip check, which would return an error",
 		checkCredentialErrors: []error{errors.E("test error")},
 		jimmAdmin:             true,
-		createEnv: func(c *qt.C, j *juju.JIMM) (*dbmodel.Identity, juju.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
+		createEnv: func(c *qt.C, j *juju.JujuManager) (*dbmodel.Identity, juju.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
 			u, err := dbmodel.NewIdentity("alice@canonical.com")
 			c.Assert(err, qt.IsNil)
 
@@ -559,7 +559,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 	}, {
 		about:     "skip update",
 		jimmAdmin: true,
-		createEnv: func(c *qt.C, j *juju.JIMM) (*dbmodel.Identity, juju.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
+		createEnv: func(c *qt.C, j *juju.JujuManager) (*dbmodel.Identity, juju.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
 			u, err := dbmodel.NewIdentity("alice@canonical.com")
 			c.Assert(err, qt.IsNil)
 
@@ -850,10 +850,10 @@ func TestRevokeCloudCredential(t *testing.T) {
 	tests := []struct {
 		about                  string
 		revokeCredentialErrors []error
-		createEnv              func(*qt.C, *juju.JIMM, *openfga.OFGAClient) (*dbmodel.Identity, names.CloudCredentialTag, string)
+		createEnv              func(*qt.C, *juju.JujuManager, *openfga.OFGAClient) (*dbmodel.Identity, names.CloudCredentialTag, string)
 	}{{
 		about: "credential revoked",
-		createEnv: func(c *qt.C, j *juju.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, names.CloudCredentialTag, string) {
+		createEnv: func(c *qt.C, j *juju.JujuManager, client *openfga.OFGAClient) (*dbmodel.Identity, names.CloudCredentialTag, string) {
 			u, err := dbmodel.NewIdentity("alice@canonical.com")
 			c.Assert(err, qt.IsNil)
 
@@ -927,7 +927,7 @@ func TestRevokeCloudCredential(t *testing.T) {
 			Message: "credential not found",
 			Code:    jujuparams.CodeNotFound,
 		}},
-		createEnv: func(c *qt.C, j *juju.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, names.CloudCredentialTag, string) {
+		createEnv: func(c *qt.C, j *juju.JujuManager, client *openfga.OFGAClient) (*dbmodel.Identity, names.CloudCredentialTag, string) {
 			u, err := dbmodel.NewIdentity("alice@canonical.com")
 			c.Assert(err, qt.IsNil)
 
@@ -997,7 +997,7 @@ func TestRevokeCloudCredential(t *testing.T) {
 		},
 	}, {
 		about: "credential still used by a model",
-		createEnv: func(c *qt.C, j *juju.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, names.CloudCredentialTag, string) {
+		createEnv: func(c *qt.C, j *juju.JujuManager, client *openfga.OFGAClient) (*dbmodel.Identity, names.CloudCredentialTag, string) {
 			u, err := dbmodel.NewIdentity("alice@canonical.com")
 			c.Assert(err, qt.IsNil)
 
@@ -1072,7 +1072,7 @@ func TestRevokeCloudCredential(t *testing.T) {
 		},
 	}, {
 		about: "user not owner of credentials - unauthorizer error",
-		createEnv: func(c *qt.C, j *juju.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, names.CloudCredentialTag, string) {
+		createEnv: func(c *qt.C, j *juju.JujuManager, client *openfga.OFGAClient) (*dbmodel.Identity, names.CloudCredentialTag, string) {
 			u, err := dbmodel.NewIdentity("alice@canonical.com")
 			c.Assert(err, qt.IsNil)
 
@@ -1090,7 +1090,7 @@ func TestRevokeCloudCredential(t *testing.T) {
 	}, {
 		about:                  "error revoking credential on controller",
 		revokeCredentialErrors: []error{errors.E("test error")},
-		createEnv: func(c *qt.C, j *juju.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, names.CloudCredentialTag, string) {
+		createEnv: func(c *qt.C, j *juju.JujuManager, client *openfga.OFGAClient) (*dbmodel.Identity, names.CloudCredentialTag, string) {
 			u, err := dbmodel.NewIdentity("alice@canonical.com")
 			c.Assert(err, qt.IsNil)
 
@@ -1246,10 +1246,10 @@ func TestGetCloudCredential(t *testing.T) {
 	tests := []struct {
 		about                  string
 		revokeCredentialErrors []error
-		createEnv              func(*qt.C, *juju.JIMM, *openfga.OFGAClient) (*dbmodel.Identity, names.CloudCredentialTag, dbmodel.CloudCredential, string)
+		createEnv              func(*qt.C, *juju.JujuManager, *openfga.OFGAClient) (*dbmodel.Identity, names.CloudCredentialTag, dbmodel.CloudCredential, string)
 	}{{
 		about: "all ok",
-		createEnv: func(c *qt.C, j *juju.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, names.CloudCredentialTag, dbmodel.CloudCredential, string) {
+		createEnv: func(c *qt.C, j *juju.JujuManager, client *openfga.OFGAClient) (*dbmodel.Identity, names.CloudCredentialTag, dbmodel.CloudCredential, string) {
 			u, err := dbmodel.NewIdentity("alice@canonical.com")
 			c.Assert(err, qt.IsNil)
 
@@ -1319,7 +1319,7 @@ func TestGetCloudCredential(t *testing.T) {
 		},
 	}, {
 		about: "credential not found",
-		createEnv: func(c *qt.C, j *juju.JIMM, client *openfga.OFGAClient) (*dbmodel.Identity, names.CloudCredentialTag, dbmodel.CloudCredential, string) {
+		createEnv: func(c *qt.C, j *juju.JujuManager, client *openfga.OFGAClient) (*dbmodel.Identity, names.CloudCredentialTag, dbmodel.CloudCredential, string) {
 			u, err := dbmodel.NewIdentity("alice@canonical.com")
 			c.Assert(err, qt.IsNil)
 

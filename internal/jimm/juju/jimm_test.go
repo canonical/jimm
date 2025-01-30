@@ -678,7 +678,7 @@ func TestInitiateInternalMigration(t *testing.T) {
 	}}
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
-			c.Patch(juju.InitiateMigration, func(ctx context.Context, j *juju.JIMM, user *openfga.User, spec jujuparams.MigrationSpec) (jujuparams.InitiateMigrationResult, error) {
+			c.Patch(juju.InitiateMigration, func(ctx context.Context, j *juju.JujuManager, user *openfga.User, spec jujuparams.MigrationSpec) (jujuparams.InitiateMigrationResult, error) {
 				return jujuparams.InitiateMigrationResult{}, nil
 			})
 			store := jimmtest.NewInMemoryCredentialStore()

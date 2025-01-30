@@ -26,7 +26,7 @@ import (
 // If a result is erroneous, for example, bad data type parsing, the resulting struct field
 // Errors will contain a map from model UUID -> []error. Otherwise, the Results field
 // will contain model UUID -> []Jq result.
-func (j *JIMM) QueryModelsJq(ctx context.Context, modelUUIDs []string, jqQuery string) (params.CrossModelQueryResponse, error) {
+func (j *JujuManager) QueryModelsJq(ctx context.Context, modelUUIDs []string, jqQuery string) (params.CrossModelQueryResponse, error) {
 	op := errors.Op("QueryModels")
 	results := params.CrossModelQueryResponse{
 		Results: make(map[string][]any),
@@ -111,12 +111,12 @@ func (j *JIMM) QueryModelsJq(ctx context.Context, modelUUIDs []string, jqQuery s
 // Next, simply call GetParams.
 type formatterParamsRetriever struct {
 	model *dbmodel.Model
-	jimm  *JIMM
+	jimm  *JujuManager
 	api   API
 }
 
 // newFormatterParamsRetriever returns a formatterParamsRetriever.
-func newFormatterParamsRetriever(j *JIMM) *formatterParamsRetriever {
+func newFormatterParamsRetriever(j *JujuManager) *formatterParamsRetriever {
 	return &formatterParamsRetriever{
 		jimm: j,
 	}

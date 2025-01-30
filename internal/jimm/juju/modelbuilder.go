@@ -18,7 +18,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga"
 )
 
-func newModelBuilder(ctx context.Context, j *JIMM) *modelBuilder {
+func newModelBuilder(ctx context.Context, j *JujuManager) *modelBuilder {
 	return &modelBuilder{
 		ctx:  ctx,
 		jimm: j,
@@ -29,7 +29,7 @@ type modelBuilder struct {
 	ctx context.Context
 	err error
 
-	jimm *JIMM
+	jimm *JujuManager
 
 	name               string
 	config             map[string]interface{}

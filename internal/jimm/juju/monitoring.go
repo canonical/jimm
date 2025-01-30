@@ -15,7 +15,7 @@ import (
 
 // UpdateMetrics updates metrics for the total numbers of controllers
 // managed by JIMM as well as how many model each controller manages.
-func (j *JIMM) UpdateMetrics(ctx context.Context) {
+func (j *JujuManager) UpdateMetrics(ctx context.Context) {
 	controllerCount := 0
 	err := j.Database.ForEachController(ctx, func(c *dbmodel.Controller) error {
 		controllerCount++

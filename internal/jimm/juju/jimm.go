@@ -20,7 +20,7 @@ import (
 )
 
 var (
-	initiateMigration = func(ctx context.Context, j *JIMM, user *openfga.User, spec jujuparams.MigrationSpec) (jujuparams.InitiateMigrationResult, error) {
+	initiateMigration = func(ctx context.Context, j *JujuManager, user *openfga.User, spec jujuparams.MigrationSpec) (jujuparams.InitiateMigrationResult, error) {
 		return j.InitiateMigration(ctx, user, spec)
 	}
 )
@@ -33,7 +33,7 @@ var (
 // before returning, any error returned will be the first error
 // encountered when connecting to the controller or returned from the given
 // function.
-func (j *JIMM) forEachController(ctx context.Context, controllers []dbmodel.Controller, f func(*dbmodel.Controller, API) error) error {
+func (j *JujuManager) forEachController(ctx context.Context, controllers []dbmodel.Controller, f func(*dbmodel.Controller, API) error) error {
 	eg := new(errgroup.Group)
 	for i := range controllers {
 		i := i
@@ -50,7 +50,7 @@ func (j *JIMM) forEachController(ctx context.Context, controllers []dbmodel.Cont
 }
 
 // ControllerInfo returns info about a controller connected to JIMM.
-func (j *JIMM) ControllerInfo(ctx context.Context, name string) (*dbmodel.Controller, error) {
+func (j *JujuManager) ControllerInfo(ctx context.Context, name string) (*dbmodel.Controller, error) {
 	const op = errors.Op("jimm.ListControllers")
 	ctl := dbmodel.Controller{
 		Name: name,
@@ -62,7 +62,7 @@ func (j *JIMM) ControllerInfo(ctx context.Context, name string) (*dbmodel.Contro
 }
 
 // ListControllers returns a list of controllers the user has access to.
-func (j *JIMM) ListControllers(ctx context.Context, user *openfga.User) ([]dbmodel.Controller, error) {
+func (j *JujuManager) ListControllers(ctx context.Context, user *openfga.User) ([]dbmodel.Controller, error) {
 	const op = errors.Op("jimm.ListControllers")
 
 	if !user.JimmAdmin {
@@ -83,7 +83,7 @@ func (j *JIMM) ListControllers(ctx context.Context, user *openfga.User) ([]dbmod
 
 // SetControllerDeprecated records if the controller is to be deprecated.
 // No new models or clouds can be added to a deprecated controller.
-func (j *JIMM) SetControllerDeprecated(ctx context.Context, user *openfga.User, controllerName string, deprecated bool) error {
+func (j *JujuManager) SetControllerDeprecated(ctx context.Context, user *openfga.User, controllerName string, deprecated bool) error {
 	const op = errors.Op("jimm.SetControllerDeprecated")
 
 	if !user.JimmAdmin {
@@ -111,7 +111,7 @@ func (j *JIMM) SetControllerDeprecated(ctx context.Context, user *openfga.User, 
 }
 
 // RemoveController removes a controller.
-func (j *JIMM) RemoveController(ctx context.Context, user *openfga.User, controllerName string, force bool) error {
+func (j *JujuManager) RemoveController(ctx context.Context, user *openfga.User, controllerName string, force bool) error {
 	const op = errors.Op("jimm.RemoveController")
 
 	if !user.JimmAdmin {
@@ -159,7 +159,7 @@ func (j *JIMM) RemoveController(ctx context.Context, user *openfga.User, control
 }
 
 // FullModelStatus returns the full status of the juju model.
-func (j *JIMM) FullModelStatus(ctx context.Context, user *openfga.User, modelTag names.ModelTag, patterns []string) (*jujuparams.FullStatus, error) {
+func (j *JujuManager) FullModelStatus(ctx context.Context, user *openfga.User, modelTag names.ModelTag, patterns []string) (*jujuparams.FullStatus, error) {
 	const op = errors.Op("jimm.RemoveController")
 
 	if !user.JimmAdmin {
@@ -222,7 +222,7 @@ func fillMigrationTarget(db *db.Database, credStore credentials.CredentialStore,
 }
 
 // InitiateInternalMigration initiates a model migration between two controllers within JIMM.
-func (j *JIMM) InitiateInternalMigration(ctx context.Context, user *openfga.User, modelNameOrUUID string, targetController string) (jujuparams.InitiateMigrationResult, error) {
+func (j *JujuManager) InitiateInternalMigration(ctx context.Context, user *openfga.User, modelNameOrUUID string, targetController string) (jujuparams.InitiateMigrationResult, error) {
 	const op = errors.Op("jimm.InitiateInternalMigration")
 
 	migrationTarget, _, err := fillMigrationTarget(j.Database, j.CredentialStore, targetController)
