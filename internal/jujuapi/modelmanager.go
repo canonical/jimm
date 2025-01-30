@@ -14,7 +14,7 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/internal/jimm"
+	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/jujuapi/rpc"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/servermon"
@@ -59,7 +59,7 @@ func init() {
 
 // ModelManager defines the model related operations that JIMM can perform.
 type ModelManager interface {
-	AddModel(ctx context.Context, u *openfga.User, args *jimm.ModelCreateArgs) (_ *jujuparams.ModelInfo, err error)
+	AddModel(ctx context.Context, u *openfga.User, args *juju.ModelCreateArgs) (_ *jujuparams.ModelInfo, err error)
 	ChangeModelCredential(ctx context.Context, user *openfga.User, modelTag names.ModelTag, cloudCredentialTag names.CloudCredentialTag) error
 	DestroyModel(ctx context.Context, u *openfga.User, mt names.ModelTag, destroyStorage *bool, force *bool, maxWait *time.Duration, timeout *time.Duration) error
 	DumpModel(ctx context.Context, u *openfga.User, mt names.ModelTag, simplified bool) (string, error)
@@ -95,7 +95,7 @@ func (r *controllerRoot) DumpModels(ctx context.Context, args jujuparams.DumpMod
 		if err != nil {
 			results[i].Error = mapError(errors.E(op, err, errors.CodeBadRequest))
 		}
-		results[i].Result, err = r.jimm.DumpModel(ctx, r.user, mt, args.Simplified)
+		results[i].Result, err = r.jimm.JujuManager().DumpModel(ctx, r.user, mt, args.Simplified)
 		if err != nil {
 			results[i].Error = mapError(errors.E(op, err))
 		}
@@ -113,7 +113,7 @@ func (r *controllerRoot) ListModelSummaries(ctx context.Context, _ jujuparams.Mo
 	if r.controllerUUIDMasking {
 		maskingControllerUUID = r.params.ControllerUUID
 	}
-	res, err := r.jimm.ListModelSummaries(ctx, r.user, maskingControllerUUID)
+	res, err := r.jimm.JujuManager().ListModelSummaries(ctx, r.user, maskingControllerUUID)
 	if err != nil {
 		return jujuparams.ModelSummaryResults{}, errors.E(op, err)
 	}
@@ -129,7 +129,7 @@ func (r *controllerRoot) ListModels(ctx context.Context, _ jujuparams.Entity) (j
 
 	res := jujuparams.UserModelList{}
 
-	models, err := r.jimm.ListModels(ctx, r.user)
+	models, err := r.jimm.JujuManager().ListModels(ctx, r.user)
 	if err != nil {
 		return res, err
 	}
@@ -168,7 +168,7 @@ func (r *controllerRoot) ModelInfo(ctx context.Context, args jujuparams.Entities
 			results[i].Error = mapError(errors.E(op, err, errors.CodeBadRequest))
 			continue
 		}
-		results[i].Result, err = r.jimm.ModelInfo(ctx, r.user, mt)
+		results[i].Result, err = r.jimm.JujuManager().ModelInfo(ctx, r.user, mt)
 		if err != nil {
 			if errors.ErrorCode(err) == errors.CodeNotFound {
 				// Map not-found errors to unauthorized, this is what juju
@@ -192,11 +192,11 @@ func (r *controllerRoot) CreateModel(ctx context.Context, args jujuparams.ModelC
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	var mca jimm.ModelCreateArgs
+	var mca juju.ModelCreateArgs
 	if err := mca.FromJujuModelCreateArgs(&args); err != nil {
 		return jujuparams.ModelInfo{}, errors.E(op, err)
 	}
-	info, err := r.jimm.AddModel(ctx, r.user, &mca)
+	info, err := r.jimm.JujuManager().AddModel(ctx, r.user, &mca)
 	if err != nil {
 		servermon.ModelsCreatedFailCount.Inc()
 		return jujuparams.ModelInfo{}, errors.E(op, err)
@@ -226,7 +226,7 @@ func (r *controllerRoot) DestroyModels(ctx context.Context, args jujuparams.Dest
 			continue
 		}
 
-		if err := r.jimm.DestroyModel(ctx, r.user, mt, model.DestroyStorage, model.Force, model.MaxWait, model.Timeout); err != nil {
+		if err := r.jimm.JujuManager().DestroyModel(ctx, r.user, mt, model.DestroyStorage, model.Force, model.MaxWait, model.Timeout); err != nil {
 			if errors.ErrorCode(err) != errors.CodeNotFound {
 				// It isn't an error to try and destroy an already
 				// destroyed model.
@@ -292,7 +292,7 @@ func (r *controllerRoot) DumpModelsDB(ctx context.Context, args jujuparams.Entit
 		if err != nil {
 			results[i].Error = mapError(errors.E(op, err, errors.CodeBadRequest))
 		}
-		results[i].Result, err = r.jimm.DumpModelDB(ctx, r.user, mt)
+		results[i].Result, err = r.jimm.JujuManager().DumpModelDB(ctx, r.user, mt)
 		if err != nil {
 			results[i].Error = mapError(errors.E(op, err))
 		}
@@ -329,7 +329,7 @@ func (r *controllerRoot) changeModelCredential(ctx context.Context, arg jujupara
 	if err != nil {
 		return errors.E(op, err, errors.CodeBadRequest)
 	}
-	if err := r.jimm.ChangeModelCredential(ctx, r.user, mt, cct); err != nil {
+	if err := r.jimm.JujuManager().ChangeModelCredential(ctx, r.user, mt, cct); err != nil {
 		return errors.E(op, err)
 	}
 	return nil
@@ -351,7 +351,7 @@ func (r *controllerRoot) ValidateModelUpgrades(ctx context.Context, args jujupar
 			results[i].Error = mapError(errors.E(op, err, errors.CodeBadRequest))
 			continue
 		}
-		results[i].Error = mapError(r.jimm.ValidateModelUpgrade(ctx, r.user, modelTag, args.Force))
+		results[i].Error = mapError(r.jimm.JujuManager().ValidateModelUpgrade(ctx, r.user, modelTag, args.Force))
 	}
 	return jujuparams.ErrorResults{
 		Results: results,
@@ -370,7 +370,7 @@ func (r *controllerRoot) SetModelDefaults(ctx context.Context, args jujuparams.S
 			results[i].Error = mapError(errors.E(op, err))
 			continue
 		}
-		results[i].Error = mapError(r.jimm.SetModelDefaults(ctx, r.user.Identity, cloudTag, config.CloudRegion, config.Config))
+		results[i].Error = mapError(r.jimm.JujuManager().SetModelDefaults(ctx, r.user.Identity, cloudTag, config.CloudRegion, config.Config))
 	}
 
 	return jujuparams.ErrorResults{
@@ -388,7 +388,7 @@ func (r *controllerRoot) UnsetModelDefaults(ctx context.Context, args jujuparams
 			results[i].Error = mapError(err)
 			continue
 		}
-		results[i].Error = mapError(r.jimm.UnsetModelDefaults(ctx, r.user.Identity, cloudTag, key.CloudRegion, key.Keys))
+		results[i].Error = mapError(r.jimm.JujuManager().UnsetModelDefaults(ctx, r.user.Identity, cloudTag, key.CloudRegion, key.Keys))
 	}
 
 	return jujuparams.ErrorResults{
@@ -410,7 +410,7 @@ func (r *controllerRoot) ModelDefaultsForClouds(ctx context.Context, args jujupa
 			result.Results[i].Error = mapError(errors.E(op, err))
 			continue
 		}
-		defaults, err := r.jimm.ModelDefaultsForCloud(ctx, r.user.Identity, cloudTag)
+		defaults, err := r.jimm.JujuManager().ModelDefaultsForCloud(ctx, r.user.Identity, cloudTag)
 		if err != nil {
 			result.Results[i].Error = mapError(errors.E(op, err))
 			continue

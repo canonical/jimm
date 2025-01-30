@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 // Package jujuclient is the client JIMM uses to connect to juju
 // controllers. The jujuclient uses the juju RPC API directly using
@@ -29,7 +29,7 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/internal/jimm"
+	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/jimmjwx"
 	"github.com/canonical/jimm/v3/internal/rpc"
 	"github.com/canonical/jimm/v3/internal/servermon"
@@ -83,7 +83,7 @@ func (d *Dialer) createLoginRequest(ctx context.Context, ctl *dbmodel.Controller
 }
 
 // Dial implements jimm.Dialer.
-func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, requiredPermissions map[string]string) (jimm.API, error) {
+func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, requiredPermissions map[string]string) (juju.API, error) {
 	const op = errors.Op("jujuclient.Dial")
 
 	conn, err := rpc.Dial(ctx, ctl, modelTag, "", nil)

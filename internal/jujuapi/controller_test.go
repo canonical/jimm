@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package jujuapi_test
 
@@ -22,9 +22,11 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jimm"
 	"github.com/canonical/jimm/v3/internal/jujuapi"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
+	"github.com/canonical/jimm/v3/internal/testutils/jimmtest/mocks"
 	jimmversion "github.com/canonical/jimm/v3/version"
 )
 
@@ -344,8 +346,13 @@ func TestInitiateMigration(t *testing.T) {
 	for _, test := range tests {
 		test := test
 		c.Run(test.about, func(c *qt.C) {
-			jimm := &jimmtest.JIMM{
+			jujuManager := mocks.JujuManager{
 				InitiateMigration_: test.initiateMigration,
+			}
+			jimm := &jimmtest.JIMM{
+				JujuManager_: func() jimm.JujuManager {
+					return &jujuManager
+				},
 			}
 			cr := jujuapi.NewControllerRoot(jimm, jujuapi.Params{})
 

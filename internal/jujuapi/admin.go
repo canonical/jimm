@@ -105,7 +105,7 @@ func (r *controllerRoot) LoginWithSessionCookie(ctx context.Context) (jujuparams
 	r.mu.Unlock()
 
 	// Get server version for LoginResult
-	srvVersion, err := r.jimm.EarliestControllerVersion(ctx)
+	srvVersion, err := r.jimm.JujuManager().EarliestControllerVersion(ctx)
 	if err != nil {
 		return jujuparams.LoginResult{}, errors.E(op, err)
 	}
@@ -140,7 +140,7 @@ func (r *controllerRoot) LoginWithSessionToken(ctx context.Context, req params.L
 	r.mu.Unlock()
 
 	// Get server version for LoginResult
-	srvVersion, err := r.jimm.EarliestControllerVersion(ctx)
+	srvVersion, err := r.jimm.JujuManager().EarliestControllerVersion(ctx)
 	if err != nil {
 		return jujuparams.LoginResult{}, errors.E(op, err)
 	}
@@ -169,7 +169,7 @@ func (r *controllerRoot) LoginWithClientCredentials(ctx context.Context, req par
 	r.mu.Unlock()
 
 	// Get server version for LoginResult
-	srvVersion, err := r.jimm.EarliestControllerVersion(ctx)
+	srvVersion, err := r.jimm.JujuManager().EarliestControllerVersion(ctx)
 	if err != nil {
 		return jujuparams.LoginResult{}, errors.E(op, err)
 	}

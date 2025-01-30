@@ -218,7 +218,7 @@ require (
 	github.com/juju/schema v1.2.0 // indirect
 	github.com/juju/txn/v3 v3.0.2 // indirect
 	github.com/juju/usso v1.0.1 // indirect
-	github.com/juju/utils/v3 v3.2.0 // indirect
+	github.com/juju/utils/v3 v3.2.0
 	github.com/juju/viddy v0.0.0-beta5 // indirect
 	github.com/juju/webbrowser v1.0.0 // indirect
 	github.com/juju/worker/v3 v3.5.0 // indirect

@@ -1,4 +1,5 @@
 // Copyright 2025 Canonical.
+
 package jujuclient_test
 
 import (

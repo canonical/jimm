@@ -12,7 +12,7 @@ import (
 	"github.com/juju/names/v5"
 
 	"github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/internal/jimm"
+	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/jujuapi/rpc"
 	"github.com/canonical/jimm/v3/internal/openfga"
 )
@@ -61,7 +61,7 @@ func (r *controllerRoot) offer(ctx context.Context, args jujuparams.AddApplicati
 	if err != nil {
 		return errors.E(op, errors.CodeBadRequest, err)
 	}
-	err = r.jimm.Offer(ctx, r.user, jimm.AddApplicationOfferParams{
+	err = r.jimm.JujuManager().Offer(ctx, r.user, juju.AddApplicationOfferParams{
 		ModelTag:               mt,
 		OwnerTag:               offerOwnerTag,
 		OfferName:              args.OfferName,
@@ -118,7 +118,7 @@ func (r *controllerRoot) getConsumeDetails(ctx context.Context, user *openfga.Us
 			OfferURL: ourl.AsLocal().Path(),
 		},
 	}
-	if err := r.jimm.GetApplicationOfferConsumeDetails(ctx, user, &details, v); err != nil {
+	if err := r.jimm.JujuManager().GetApplicationOfferConsumeDetails(ctx, user, &details, v); err != nil {
 		return jujuparams.ConsumeOfferDetails{}, errors.E(op, err)
 	}
 	return details, nil
@@ -129,7 +129,7 @@ func (r *controllerRoot) ListApplicationOffers(ctx context.Context, args jujupar
 	const op = errors.Op("jujuapi.ListApplicationOffers")
 	results := jujuparams.QueryApplicationOffersResultsV5{}
 
-	offers, err := r.jimm.ListApplicationOffers(ctx, r.user, args.Filters...)
+	offers, err := r.jimm.JujuManager().ListApplicationOffers(ctx, r.user, args.Filters...)
 	if err != nil {
 		return results, errors.E(op, err)
 	}
@@ -145,7 +145,7 @@ func (r *controllerRoot) FindApplicationOffers(ctx context.Context, args jujupar
 	const op = errors.Op("jujuapi.FindApplicationOffers")
 	results := jujuparams.QueryApplicationOffersResultsV5{}
 
-	offers, err := r.jimm.FindApplicationOffers(ctx, r.user, args.Filters...)
+	offers, err := r.jimm.JujuManager().FindApplicationOffers(ctx, r.user, args.Filters...)
 	if err != nil {
 		return results, errors.E(op, err)
 	}
@@ -196,7 +196,7 @@ func (r *controllerRoot) DestroyOffers(ctx context.Context, args jujuparams.Dest
 	}
 
 	for i, offerURL := range args.OfferURLs {
-		results.Results[i].Error = mapError(r.jimm.DestroyOffer(ctx, r.user, offerURL, args.Force))
+		results.Results[i].Error = mapError(r.jimm.JujuManager().DestroyOffer(ctx, r.user, offerURL, args.Force))
 	}
 	return results, nil
 }
@@ -206,7 +206,7 @@ func (r *controllerRoot) ApplicationOffers(ctx context.Context, args jujuparams.
 		Results: make([]jujuparams.ApplicationOfferResult, len(args.OfferURLs)),
 	}
 	for i, offerURL := range args.OfferURLs {
-		details, err := r.jimm.GetApplicationOffer(ctx, r.user, offerURL)
+		details, err := r.jimm.JujuManager().GetApplicationOffer(ctx, r.user, offerURL)
 		result.Results[i] = jujuparams.ApplicationOfferResult{
 			Result: details,
 			Error:  mapError(err),

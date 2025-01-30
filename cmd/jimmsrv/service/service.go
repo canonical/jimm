@@ -34,6 +34,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm"
 	jimmcreds "github.com/canonical/jimm/v3/internal/jimm/credentials"
+	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/jimmhttp"
 	"github.com/canonical/jimm/v3/internal/jimmhttp/rebac_admin"
 	"github.com/canonical/jimm/v3/internal/jimmjwx"
@@ -224,7 +225,7 @@ func (s *Service) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 // the given context is canceled, or there is a fatal error watching model
 // summaries.
 func (s *Service) WatchModelSummaries(ctx context.Context) error {
-	w := jimm.Watcher{
+	w := juju.Watcher{
 		Database: s.jimm.Database,
 		Dialer:   s.jimm.Dialer,
 		Pubsub:   s.jimm.Pubsub,
@@ -239,12 +240,12 @@ func (s *Service) StartJWKSRotator(ctx context.Context, checkRotateRequired <-ch
 
 // MonitorResources periodically updates metrics.
 func (s *Service) MonitorResources(ctx context.Context) {
-	s.jimm.UpdateMetrics(ctx)
+	s.jimm.JujuManager().UpdateMetrics(ctx)
 	ticker := time.NewTicker(5 * time.Minute)
 	for {
 		select {
 		case <-ticker.C:
-			s.jimm.UpdateMetrics(ctx)
+			s.jimm.JujuManager().UpdateMetrics(ctx)
 		case <-ctx.Done():
 			return
 		}
@@ -272,7 +273,7 @@ func (s *Service) CleanupDyingModels(ctx context.Context, trigger <-chan time.Ti
 	for {
 		select {
 		case <-trigger:
-			err := s.jimm.CleanupDyingModels(ctx)
+			err := s.jimm.JujuManager().CleanupDyingModels(ctx)
 			if err != nil {
 				zapctx.Error(ctx, "dying models cleanup", zap.Error(err))
 				continue
@@ -408,7 +409,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	}
 
 	if !p.DisableConnectionCache {
-		jimmParameters.Dialer = jimm.CacheDialer(jimmParameters.Dialer)
+		jimmParameters.Dialer = juju.CacheDialer(jimmParameters.Dialer)
 	}
 
 	if _, err := url.Parse(p.DashboardFinalRedirectURL); err != nil {

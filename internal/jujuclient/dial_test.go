@@ -14,7 +14,7 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
-	"github.com/canonical/jimm/v3/internal/jimm"
+	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/jujuclient"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
@@ -22,8 +22,8 @@ import (
 type jujuclientSuite struct {
 	jimmtest.JujuSuite
 
-	Dialer jimm.Dialer
-	API    jimm.API
+	Dialer juju.Dialer
+	API    juju.API
 }
 
 func (s *jujuclientSuite) SetUpTest(c *gc.C) {

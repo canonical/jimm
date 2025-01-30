@@ -4,10 +4,14 @@ package serviceaccount_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
+	"time"
 
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
+	jujuparams "github.com/juju/juju/rpc/params"
+	"github.com/juju/names/v5"
 
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
@@ -23,19 +27,35 @@ type serviceAccountManagerSuite struct {
 	ofgaClient *openfga.OFGAClient
 }
 
-func (s *serviceAccountManagerSuite) Init(c *qt.C) {
-	j := jimmtest.NewJIMM(c, nil)
-	s.db = j.Database
-	s.ofgaClient = j.OpenFGAClient
+type credentialCopier struct{}
 
-	var err error
-	s.manager, err = serviceaccount.NewServiceAccountManager(j.Database, j.OpenFGAClient, j)
+func (cc *credentialCopier) CopyCredential(ctx context.Context, originalUser *openfga.User, newUser *openfga.User, cred names.CloudCredentialTag) (names.CloudCredentialTag, []jujuparams.UpdateCredentialModelResult, error) {
+	newCredID := fmt.Sprintf("%s/%s/%s", cred.Cloud().Id(), newUser.Name, cred.Name())
+	newTag := names.NewCloudCredentialTag(newCredID)
+	return newTag, nil, nil
+}
+
+func (s *serviceAccountManagerSuite) Init(c *qt.C) {
+	db := &db.Database{
+		DB: jimmtest.PostgresDB(c, time.Now),
+	}
+	err := db.Migrate(context.Background())
+	c.Assert(err, qt.IsNil)
+
+	s.db = db
+
+	ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+	c.Assert(err, qt.IsNil)
+
+	s.ofgaClient = ofgaClient
+
+	s.manager, err = serviceaccount.NewServiceAccountManager(db, ofgaClient, &credentialCopier{})
 	c.Assert(err, qt.IsNil)
 
 	// Create test identity
 	i, err := dbmodel.NewIdentity("alice")
 	c.Assert(err, qt.IsNil)
-	s.user = openfga.NewUser(i, j.OpenFGAClient)
+	s.user = openfga.NewUser(i, ofgaClient)
 }
 
 func (s *serviceAccountManagerSuite) TestAddServiceAccount(c *qt.C) {

@@ -15,6 +15,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/jimm"
+	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/jujuapi"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
@@ -314,7 +315,7 @@ func TestUpdateServiceAccountCredentials(t *testing.T) {
 
 	tests := []struct {
 		about                 string
-		updateCloudCredential func(ctx context.Context, u *openfga.User, args jimm.UpdateCloudCredentialArgs) ([]jujuparams.UpdateCredentialModelResult, error)
+		updateCloudCredential func(ctx context.Context, u *openfga.User, args juju.UpdateCloudCredentialArgs) ([]jujuparams.UpdateCredentialModelResult, error)
 		args                  params.UpdateServiceAccountCredentialsRequest
 		username              string
 		addTuples             []openfga.Tuple
@@ -322,7 +323,7 @@ func TestUpdateServiceAccountCredentials(t *testing.T) {
 		expectedError         string
 	}{{
 		about: "Valid request without domain",
-		updateCloudCredential: func(ctx context.Context, u *openfga.User, args jimm.UpdateCloudCredentialArgs) ([]jujuparams.UpdateCredentialModelResult, error) {
+		updateCloudCredential: func(ctx context.Context, u *openfga.User, args juju.UpdateCloudCredentialArgs) ([]jujuparams.UpdateCredentialModelResult, error) {
 			return nil, nil
 		},
 		expectedResult: jujuparams.UpdateCredentialResults{
@@ -360,7 +361,7 @@ func TestUpdateServiceAccountCredentials(t *testing.T) {
 		}},
 	}, {
 		about: "Valid request with domain",
-		updateCloudCredential: func(ctx context.Context, u *openfga.User, args jimm.UpdateCloudCredentialArgs) ([]jujuparams.UpdateCredentialModelResult, error) {
+		updateCloudCredential: func(ctx context.Context, u *openfga.User, args juju.UpdateCloudCredentialArgs) ([]jujuparams.UpdateCredentialModelResult, error) {
 			return nil, nil
 		},
 		expectedResult: jujuparams.UpdateCredentialResults{
@@ -398,7 +399,7 @@ func TestUpdateServiceAccountCredentials(t *testing.T) {
 		}},
 	}, {
 		about: "Invalid Credential Tag",
-		updateCloudCredential: func(ctx context.Context, u *openfga.User, args jimm.UpdateCloudCredentialArgs) ([]jujuparams.UpdateCredentialModelResult, error) {
+		updateCloudCredential: func(ctx context.Context, u *openfga.User, args juju.UpdateCloudCredentialArgs) ([]jujuparams.UpdateCredentialModelResult, error) {
 			return nil, nil
 		},
 		expectedResult: jujuparams.UpdateCredentialResults{
@@ -429,7 +430,7 @@ func TestUpdateServiceAccountCredentials(t *testing.T) {
 		}},
 	}, {
 		about: "Invalid Service account ID",
-		updateCloudCredential: func(ctx context.Context, u *openfga.User, args jimm.UpdateCloudCredentialArgs) ([]jujuparams.UpdateCredentialModelResult, error) {
+		updateCloudCredential: func(ctx context.Context, u *openfga.User, args juju.UpdateCloudCredentialArgs) ([]jujuparams.UpdateCredentialModelResult, error) {
 			return nil, nil
 		},
 		args: params.UpdateServiceAccountCredentialsRequest{
@@ -446,7 +447,7 @@ func TestUpdateServiceAccountCredentials(t *testing.T) {
 		expectedError: "invalid client ID",
 	}, {
 		about: "Missing service account administrator permission",
-		updateCloudCredential: func(ctx context.Context, u *openfga.User, args jimm.UpdateCloudCredentialArgs) ([]jujuparams.UpdateCredentialModelResult, error) {
+		updateCloudCredential: func(ctx context.Context, u *openfga.User, args juju.UpdateCloudCredentialArgs) ([]jujuparams.UpdateCredentialModelResult, error) {
 			return nil, nil
 		},
 		args: params.UpdateServiceAccountCredentialsRequest{
@@ -479,8 +480,13 @@ func TestUpdateServiceAccountCredentials(t *testing.T) {
 					return nil, nil
 				},
 			}
-			jimm := &jimmtest.JIMM{
+			jujuManager := mocks.JujuManager{
 				UpdateCloudCredential_: test.updateCloudCredential,
+			}
+			jimm := &jimmtest.JIMM{
+				JujuManager_: func() jimm.JujuManager {
+					return &jujuManager
+				},
 				LoginManager_: func() jimm.LoginManager {
 					return &loginManager
 				},
@@ -620,10 +626,15 @@ func TestListServiceAccountCredentials(t *testing.T) {
 					return openfga.NewUser(&u, ofgaClient), nil
 				},
 			}
-			jimm := &jimmtest.JIMM{
+			jujuManager := mocks.JujuManager{
 				GetCloudCredential_:           test.getCloudCredential,
 				GetCloudCredentialAttributes_: test.getCloudCredentialAttributes,
 				ForEachUserCloudCredential_:   test.ForEachUserCloudCredential,
+			}
+			jimm := &jimmtest.JIMM{
+				JujuManager_: func() jimm.JujuManager {
+					return &jujuManager
+				},
 				LoginManager_: func() jimm.LoginManager {
 					return &loginManager
 				},

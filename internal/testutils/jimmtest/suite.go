@@ -26,6 +26,8 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/discharger"
 	"github.com/canonical/jimm/v3/internal/jimm"
+	"github.com/canonical/jimm/v3/internal/jimm/juju"
+	"github.com/canonical/jimm/v3/internal/jimm/login"
 	"github.com/canonical/jimm/v3/internal/jimmhttp"
 	"github.com/canonical/jimm/v3/internal/jimmjwx"
 	"github.com/canonical/jimm/v3/internal/jujuclient"
@@ -120,7 +122,7 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 
 	credentialStore := NewInMemoryCredentialStore()
 
-	var authenticator jimm.OAuthAuthenticator
+	var authenticator login.OAuthAuthenticator
 	if s.modifiers.useRealAuthN {
 		authenticator = s.realAuthenticationService(c, database)
 	} else {
@@ -283,7 +285,7 @@ func (s *JIMMSuite) AddController(c *gc.C, name string, info *api.Info) {
 		CACertificate: info.CACert,
 		Addresses:     nil,
 	}
-	ctlCreds := jimm.ControllerCreds{
+	ctlCreds := juju.ControllerCreds{
 		AdminIdentityName: info.Tag.Id(),
 		AdminPassword:     info.Password,
 	}
@@ -296,7 +298,7 @@ func (s *JIMMSuite) AddController(c *gc.C, name string, info *api.Info) {
 			Port:    hp.Port(),
 		}})
 	}
-	err := s.JIMM.AddController(context.Background(), s.AdminUser, ctl, ctlCreds)
+	err := s.JIMM.JujuManager().AddController(context.Background(), s.AdminUser, ctl, ctlCreds)
 	c.Assert(err, gc.Equals, nil)
 }
 
@@ -308,7 +310,7 @@ func (s *JIMMSuite) UpdateCloudCredential(c *gc.C, tag names.CloudCredentialTag,
 	user := openfga.NewUser(u, s.JIMM.OpenFGAClient)
 	err = s.JIMM.Database.GetIdentity(ctx, u)
 	c.Assert(err, gc.Equals, nil)
-	_, err = s.JIMM.UpdateCloudCredential(ctx, user, jimm.UpdateCloudCredentialArgs{
+	_, err = s.JIMM.JujuManager().UpdateCloudCredential(ctx, user, juju.UpdateCloudCredentialArgs{
 		CredentialTag: tag,
 		Credential:    cred,
 		SkipCheck:     true,
@@ -324,7 +326,7 @@ func (s *JIMMSuite) AddModel(c *gc.C, owner names.UserTag, name string, cloud na
 
 	err = s.JIMM.Database.GetIdentity(ctx, u)
 	c.Assert(err, gc.Equals, nil)
-	mi, err := s.JIMM.AddModel(ctx, s.NewUser(u), &jimm.ModelCreateArgs{
+	mi, err := s.JIMM.JujuManager().AddModel(ctx, s.NewUser(u), &juju.ModelCreateArgs{
 		Name:            name,
 		Owner:           owner,
 		Cloud:           cloud,

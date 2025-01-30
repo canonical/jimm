@@ -6,22 +6,15 @@ package jimm
 
 import (
 	"context"
-	"database/sql"
 	"net/http"
-	"net/url"
-	"strings"
 	"time"
 
-	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
-	"github.com/google/uuid"
 	"github.com/juju/juju/api/base"
-	"github.com/juju/juju/core/crossmodel"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
-	"github.com/lestrrat-go/jwx/v2/jwt"
+	"github.com/juju/version"
 	"golang.org/x/oauth2"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/canonical/jimm/v3/internal/common/pagination"
 	"github.com/canonical/jimm/v3/internal/db"
@@ -31,6 +24,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/jimm/credentials"
 	"github.com/canonical/jimm/v3/internal/jimm/group"
 	"github.com/canonical/jimm/v3/internal/jimm/identity"
+	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/jimm/jujuauth"
 	"github.com/canonical/jimm/v3/internal/jimm/login"
 	"github.com/canonical/jimm/v3/internal/jimm/permissions"
@@ -42,73 +36,10 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/pubsub"
+	"github.com/canonical/jimm/v3/pkg/api/params"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
-
-var (
-	initiateMigration = func(ctx context.Context, j *JIMM, user *openfga.User, spec jujuparams.MigrationSpec) (jujuparams.InitiateMigrationResult, error) {
-		return j.InitiateMigration(ctx, user, spec)
-	}
-)
-
-// OAuthAuthenticator is responsible for handling authentication
-// via OAuth2.0 AND JWT access tokens to JIMM.
-type OAuthAuthenticator interface {
-	// Device initiates a device flow login and is step ONE of TWO.
-	//
-	// This is done via retrieving a:
-	// - Device code
-	// - User code
-	// - VerificationURI
-	// - Interval
-	// - Expiry
-	// From the device /auth endpoint.
-	//
-	// The verification uri and user code is sent to the user, as they must enter the code
-	// into the uri.
-	//
-	// The interval, expiry and device code and used to poll the token endpoint for completion.
-	Device(ctx context.Context) (*oauth2.DeviceAuthResponse, error)
-
-	// DeviceAccessToken continues and collect an access token during the device login flow
-	// and is step TWO.
-	//
-	// See Device(...) godoc for more info pertaining to the flow.
-	DeviceAccessToken(ctx context.Context, res *oauth2.DeviceAuthResponse) (*oauth2.Token, error)
-
-	// ExtractAndVerifyIDToken extracts the id token from the extras claims of an oauth2 token
-	// and performs signature verification of the token.
-	ExtractAndVerifyIDToken(ctx context.Context, oauth2Token *oauth2.Token) (*oidc.IDToken, error)
-
-	// Email retrieves the users email from an id token via the email claim
-	Email(idToken *oidc.IDToken) (string, error)
-
-	// MintSessionToken mints a session token to be used when logging into JIMM
-	// via an access token. The token only contains the user's email for authentication.
-	MintSessionToken(email string) (string, error)
-
-	// VerifySessionToken symmetrically verifies the validty of the signature on the
-	// access token JWT, returning the parsed token.
-	//
-	// The subject of the token contains the user's email and can be used
-	// for user object creation.
-	// If verification fails, return error with code CodeInvalidSessionToken
-	// to indicate to the client to retry login.
-	VerifySessionToken(token string) (jwt.Token, error)
-
-	// UpdateIdentity updates the database with the display name and access token set for the user.
-	// And, if present, a refresh token.
-	UpdateIdentity(ctx context.Context, email string, token *oauth2.Token) error
-
-	// VerifyClientCredentials verifies the provided client ID and client secret.
-	VerifyClientCredentials(ctx context.Context, clientID string, clientSecret string) error
-
-	// AuthenticateBrowserSession updates the session for a browser, additionally
-	// retrieving new access tokens upon expiry. If this cannot be done, the cookie
-	// is deleted and an error is returned.
-	AuthenticateBrowserSession(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error)
-}
 
 // RoleManager provides a means to manage roles within JIMM.
 type RoleManager interface {
@@ -268,6 +199,70 @@ type SSHManager interface {
 	ResolveAddressesFromModelUUID(ctx context.Context, modelUUID string) ([]string, error)
 }
 
+// JujuManager is the interface to manage all Juju related operations.
+type JujuManager interface {
+	// Controller related methods
+
+	AddController(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, creds juju.ControllerCreds) error
+	ControllerInfo(ctx context.Context, name string) (*dbmodel.Controller, error)
+	EarliestControllerVersion(ctx context.Context) (version.Number, error)
+	ListControllers(ctx context.Context, user *openfga.User) ([]dbmodel.Controller, error)
+	RemoveController(ctx context.Context, user *openfga.User, controllerName string, force bool) error
+	SetControllerDeprecated(ctx context.Context, user *openfga.User, controllerName string, deprecated bool) error
+
+	// Model related methods
+
+	AddModel(ctx context.Context, u *openfga.User, args *juju.ModelCreateArgs) (_ *jujuparams.ModelInfo, err error)
+	ChangeModelCredential(ctx context.Context, user *openfga.User, modelTag names.ModelTag, cloudCredentialTag names.CloudCredentialTag) error
+	DestroyModel(ctx context.Context, u *openfga.User, mt names.ModelTag, destroyStorage *bool, force *bool, maxWait *time.Duration, timeout *time.Duration) error
+	DumpModel(ctx context.Context, u *openfga.User, mt names.ModelTag, simplified bool) (string, error)
+	DumpModelDB(ctx context.Context, u *openfga.User, mt names.ModelTag) (map[string]interface{}, error)
+	ForEachModel(ctx context.Context, u *openfga.User, f func(*dbmodel.Model, jujuparams.UserAccessPermission) error) error
+	ForEachUserModel(ctx context.Context, u *openfga.User, f func(*dbmodel.Model, jujuparams.UserAccessPermission) error) error
+	FullModelStatus(ctx context.Context, user *openfga.User, modelTag names.ModelTag, patterns []string) (*jujuparams.FullStatus, error)
+	GetModel(ctx context.Context, uuid string) (dbmodel.Model, error)
+	ImportModel(ctx context.Context, user *openfga.User, controllerName string, modelTag names.ModelTag, newOwner string) error
+	ModelDefaultsForCloud(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag) (jujuparams.ModelDefaultsResult, error)
+	ModelInfo(ctx context.Context, u *openfga.User, mt names.ModelTag) (*jujuparams.ModelInfo, error)
+	ListModelSummaries(ctx context.Context, user *openfga.User, maskingControllerUUID string) (jujuparams.ModelSummaryResults, error)
+	ModelStatus(ctx context.Context, u *openfga.User, mt names.ModelTag) (*jujuparams.ModelStatus, error)
+	QueryModelsJq(ctx context.Context, models []string, jqQuery string) (params.CrossModelQueryResponse, error)
+	SetModelDefaults(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag, region string, configs map[string]interface{}) error
+	UnsetModelDefaults(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag, region string, keys []string) error
+	UpdateMigratedModel(ctx context.Context, user *openfga.User, modelTag names.ModelTag, targetControllerName string) error
+	ValidateModelUpgrade(ctx context.Context, u *openfga.User, mt names.ModelTag, force bool) error
+
+	// Other methods
+
+	AddCloudToController(ctx context.Context, user *openfga.User, controllerName string, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error
+	AddHostedCloud(ctx context.Context, user *openfga.User, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error
+	CopyCredential(ctx context.Context, originalUser *openfga.User, newUser *openfga.User, cred names.CloudCredentialTag) (names.CloudCredentialTag, []jujuparams.UpdateCredentialModelResult, error)
+	DestroyOffer(ctx context.Context, user *openfga.User, offerURL string, force bool) error
+	FindApplicationOffers(ctx context.Context, user *openfga.User, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error)
+	ForEachCloud(ctx context.Context, user *openfga.User, f func(*dbmodel.Cloud) error) error
+	ForEachUserCloud(ctx context.Context, user *openfga.User, f func(*dbmodel.Cloud) error) error
+	ForEachUserCloudCredential(ctx context.Context, u *dbmodel.Identity, ct names.CloudTag, f func(cred *dbmodel.CloudCredential) error) error
+	GetApplicationOffer(ctx context.Context, user *openfga.User, offerURL string) (*jujuparams.ApplicationOfferAdminDetailsV5, error)
+	GetApplicationOfferConsumeDetails(ctx context.Context, user *openfga.User, details *jujuparams.ConsumeOfferDetails, v bakery.Version) error
+	GetCloud(ctx context.Context, u *openfga.User, tag names.CloudTag) (dbmodel.Cloud, error)
+	GetCloudCredential(ctx context.Context, user *openfga.User, tag names.CloudCredentialTag) (*dbmodel.CloudCredential, error)
+	GetCloudCredentialAttributes(ctx context.Context, u *openfga.User, cred *dbmodel.CloudCredential, hidden bool) (attrs map[string]string, redacted []string, err error)
+	InitiateInternalMigration(ctx context.Context, user *openfga.User, modelNameOrUUID string, targetController string) (jujuparams.InitiateMigrationResult, error)
+	InitiateMigration(ctx context.Context, user *openfga.User, spec jujuparams.MigrationSpec) (jujuparams.InitiateMigrationResult, error)
+	ListApplicationOffers(ctx context.Context, user *openfga.User, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error)
+	ListModels(ctx context.Context, user *openfga.User) ([]base.UserModel, error)
+	Offer(ctx context.Context, user *openfga.User, offer juju.AddApplicationOfferParams) error
+	RemoveCloud(ctx context.Context, u *openfga.User, ct names.CloudTag) error
+	RemoveCloudFromController(ctx context.Context, u *openfga.User, controllerName string, ct names.CloudTag) error
+	RevokeCloudCredential(ctx context.Context, user *dbmodel.Identity, tag names.CloudCredentialTag, force bool) error
+	UpdateCloud(ctx context.Context, u *openfga.User, ct names.CloudTag, cloud jujuparams.Cloud) error
+	UpdateCloudCredential(ctx context.Context, u *openfga.User, args juju.UpdateCloudCredentialArgs) ([]jujuparams.UpdateCredentialModelResult, error)
+
+	// These are methods on the Juju manager that don't need to be mocked and can be removed from this interface later.
+	UpdateMetrics(ctx context.Context)
+	CleanupDyingModels(ctx context.Context) error
+}
+
 // Parameters holds the services and static fields passed to the jimm.New() constructor.
 // You can provide mock implementations of certain services where necessary for dependency injection.
 type Parameters struct {
@@ -279,7 +274,7 @@ type Parameters struct {
 
 	// Dialer is the API dialer JIMM uses to contact juju controllers. if
 	// this is not configured all connection attempts will fail.
-	Dialer Dialer
+	Dialer juju.Dialer
 
 	// CredentialStore is a store for the attributes of a
 	// cloud credential and controller credentials.
@@ -305,7 +300,7 @@ type Parameters struct {
 
 	// OAuthAuthenticator is responsible for handling authentication
 	// via OAuth2.0 AND JWT access tokens to JIMM.
-	OAuthAuthenticator OAuthAuthenticator
+	OAuthAuthenticator login.OAuthAuthenticator
 
 	// AuditLogRetentionDays is the number of days to keep audit logs.
 	// The default value of 0 indicates that logs will never be deleted.
@@ -360,6 +355,7 @@ func New(p Parameters) (*JIMM, error) {
 	j := &JIMM{
 		Parameters: p,
 	}
+	jimmResourceTag := names.NewControllerTag(j.UUID)
 
 	if err := j.Database.Migrate(context.Background()); err != nil {
 		return nil, errors.E(err)
@@ -383,13 +379,13 @@ func New(p Parameters) (*JIMM, error) {
 	}
 	j.identityManager = identityManager
 
-	loginManager, err := login.NewLoginManager(j.Database, j.OpenFGAClient, j.OAuthAuthenticator, j.ResourceTag())
+	loginManager, err := login.NewLoginManager(j.Database, j.OpenFGAClient, j.OAuthAuthenticator, jimmResourceTag)
 	if err != nil {
 		return nil, err
 	}
 	j.loginManager = loginManager
 
-	permissionManager, err := permissions.NewManager(j.Database, j.OpenFGAClient, j.UUID, j.ResourceTag())
+	permissionManager, err := permissions.NewManager(j.Database, j.OpenFGAClient, j.UUID, jimmResourceTag)
 	if err != nil {
 		return nil, err
 	}
@@ -397,13 +393,22 @@ func New(p Parameters) (*JIMM, error) {
 
 	j.jujuAuthFactory = jujuauth.NewFactory(j.Database, j.JWTService, permissionManager)
 
-	auditLogManager, err := auditlog.NewAuditLogManager(j.Database, j.OpenFGAClient, j.ResourceTag(), p.AuditLogRetentionDays)
+	jujuManager, err := juju.NewJujuManager(j.Database, j.OpenFGAClient,
+		j.CredentialStore, j.permissionManager,
+		jimmResourceTag, p.ReservedCloudNames,
+		j.Dialer)
+	if err != nil {
+		return nil, err
+	}
+	j.jujuManager = jujuManager
+
+	auditLogManager, err := auditlog.NewAuditLogManager(j.Database, j.OpenFGAClient, jimmResourceTag, p.AuditLogRetentionDays)
 	if err != nil {
 		return nil, err
 	}
 	j.auditLogManager = auditLogManager
 
-	svcAccManager, err := serviceaccount.NewServiceAccountManager(j.Database, j.OpenFGAClient, j)
+	svcAccManager, err := serviceaccount.NewServiceAccountManager(j.Database, j.OpenFGAClient, j.jujuManager)
 	if err != nil {
 		return nil, err
 	}
@@ -415,7 +420,7 @@ func New(p Parameters) (*JIMM, error) {
 	}
 	j.sshKeyManager = sshKeyManager
 
-	sshManager, err := ssh.NewSSHManager(j.identityManager, j, j.sshKeyManager)
+	sshManager, err := ssh.NewSSHManager(j.identityManager, j.jujuManager, j.sshKeyManager)
 	if err != nil {
 		return nil, err
 	}
@@ -457,6 +462,8 @@ type JIMM struct {
 
 	// sshManager provides a means to manage SSH operations withing JIMM.
 	sshManager SSHManager
+
+	jujuManager JujuManager
 }
 
 // ResourceTag returns JIMM's controller tag stating its UUID.
@@ -524,438 +531,8 @@ func (j *JIMM) SSHManager() SSHManager {
 	return j.sshManager
 }
 
-type permission struct {
-	resource string
-	relation string
-}
-
-// dial dials the controller and model specified by the given Controller
-// and ModelTag. If no Dialer has been configured then an error with a
-// code of CodeConnectionFailed will be returned.
-func (j *JIMM) dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, permissons ...permission) (API, error) {
-	if j == nil || j.Dialer == nil {
-		return nil, errors.E(errors.CodeConnectionFailed, "no dialer configured")
-	}
-	var permissionMap map[string]string
-	if len(permissons) > 0 {
-		permissionMap = make(map[string]string, len(permissons))
-		for _, p := range permissons {
-			permissionMap[p.resource] = p.relation
-		}
-	}
-
-	return j.Dialer.Dial(ctx, ctl, modelTag, permissionMap)
-}
-
-// A Dialer provides a connection to a controller.
-type Dialer interface {
-	// Dial creates an API connection to a controller. If the given
-	// model-tag is non-zero the connection will be to that model,
-	// otherwise the connection is to the controller. After successfully
-	// dialing the controller the UUID, AgentVersion and HostPorts fields
-	// in the given controller should be updated to the values provided
-	// by the controller.
-	Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, requiredPermissions map[string]string) (API, error)
-}
-
-// An API is the interface JIMM uses to access the API on a controller.
-type API interface {
-	// API implements the base.APICallCloser so that we can
-	// use the juju api clients to interact with juju controllers.
-	base.APICallCloser
-
-	// AddCloud adds a new cloud.
-	AddCloud(context.Context, names.CloudTag, jujuparams.Cloud, bool) error
-
-	// ChangeModelCredential replaces cloud credential for a given model with the provided one.
-	ChangeModelCredential(context.Context, names.ModelTag, names.CloudCredentialTag) error
-
-	// CheckCredentialModels checks that an updated credential can be used
-	// with the associated models.
-	CheckCredentialModels(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error)
-
-	// Close closes the API connection.
-	Close() error
-
-	// Cloud fetches the cloud data for the given cloud.
-	Cloud(context.Context, names.CloudTag, *jujuparams.Cloud) error
-
-	// CloudInfo fetches the cloud information for the cloud with the given
-	// tag.
-	CloudInfo(context.Context, names.CloudTag, *jujuparams.CloudInfo) error
-
-	// Clouds returns the set of clouds supported by the controller.
-	Clouds(context.Context) (map[names.CloudTag]jujuparams.Cloud, error)
-
-	// ControllerModelSummary fetches the model summary of the model on the
-	// controller that hosts the controller machines.
-	ControllerModelSummary(context.Context, *jujuparams.ModelSummary) error
-
-	// CreateModel creates a new model.
-	CreateModel(context.Context, *jujuparams.ModelCreateArgs, *jujuparams.ModelInfo) error
-
-	// DestroyApplicationOffer destroys an application offer.
-	DestroyApplicationOffer(context.Context, string, bool) error
-
-	// DestroyModel destroys a model.
-	DestroyModel(context.Context, names.ModelTag, *bool, *bool, *time.Duration, *time.Duration) error
-
-	// ConnectStream creates a new connection to a streaming endpoint.
-	ConnectStream(string, url.Values) (base.Stream, error)
-
-	// DumpModel collects a database-agnostic dump of a model.
-	DumpModel(context.Context, names.ModelTag, bool) (string, error)
-
-	// DumpModelDB collects a database dump of a model.
-	DumpModelDB(context.Context, names.ModelTag) (map[string]interface{}, error)
-
-	// FindApplicationOffers finds application offers that match the
-	// filter.
-	FindApplicationOffers(context.Context, []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error)
-
-	// GetApplicationOffer completes the given ApplicationOfferAdminDetails
-	// structure.
-	GetApplicationOffer(context.Context, *jujuparams.ApplicationOfferAdminDetailsV5) error
-
-	// GetApplicationOfferConsumeDetails gets the details required to
-	// consume an application offer
-	GetApplicationOfferConsumeDetails(context.Context, names.UserTag, *jujuparams.ConsumeOfferDetails, bakery.Version) error
-
-	// GrantApplicationOfferAccess grants access to an application offer to
-	// a user.
-	GrantApplicationOfferAccess(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error
-
-	// GrantCloudAccess grants cloud access to a user.
-	GrantCloudAccess(context.Context, names.CloudTag, names.UserTag, string) error
-
-	// GrantJIMMModelAdmin makes the JIMM user an admin on a model.
-	GrantJIMMModelAdmin(context.Context, names.ModelTag) error
-
-	// GrantModelAccess grants model access to a user.
-	GrantModelAccess(context.Context, names.ModelTag, names.UserTag, jujuparams.UserAccessPermission) error
-
-	// IsBroken returns true if the API connection has failed.
-	IsBroken() bool
-
-	// ListApplicationOffers lists application offers that match the
-	// filter.
-	ListApplicationOffers(context.Context, []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error)
-
-	// ListModelSummaries lists models summaries
-	ListModelSummaries(context.Context, jujuparams.ModelSummariesRequest) (jujuparams.ModelSummaryResults, error)
-
-	// ModelInfo fetches a model's ModelInfo.
-	ModelInfo(context.Context, *jujuparams.ModelInfo) error
-
-	// ModelStatus fetches a model's ModelStatus.
-	ModelStatus(context.Context, *jujuparams.ModelStatus) error
-
-	// ModelSummaryWatcherNext returns the next set of model summaries from
-	// the watcher.
-	ModelSummaryWatcherNext(context.Context, string) ([]jujuparams.ModelAbstract, error)
-
-	// ModelSummaryWatcherStop stops a model summary watcher.
-	ModelSummaryWatcherStop(context.Context, string) error
-
-	// Offer creates a new application-offer.
-	Offer(context.Context, crossmodel.OfferURL, jujuparams.AddApplicationOffer) error
-
-	// Ping tests the connection is working.
-	Ping(context.Context) error
-
-	// RemoveCloud removes a cloud.
-	RemoveCloud(context.Context, names.CloudTag) error
-
-	// RevokeApplicationOfferAccess revokes access to an application offer
-	// from a user.
-	RevokeApplicationOfferAccess(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error
-
-	// RevokeCloudAccess revokes cloud access from a user.
-	RevokeCloudAccess(context.Context, names.CloudTag, names.UserTag, string) error
-
-	// RevokeCredential revokes a credential.
-	RevokeCredential(context.Context, names.CloudCredentialTag) error
-
-	// RevokeModelAccess revokes model access from a user.
-	RevokeModelAccess(context.Context, names.ModelTag, names.UserTag, jujuparams.UserAccessPermission) error
-
-	// SupportsCheckCredentialModels returns true if the
-	// CheckCredentialModels method can be used.
-	SupportsCheckCredentialModels() bool
-
-	// SupportsModelSummaryWatcher returns true if the connection supports
-	// a ModelSummaryWatcher.
-	SupportsModelSummaryWatcher() bool
-
-	// Status returns the status of the juju model.
-	Status(ctx context.Context, patterns []string) (*jujuparams.FullStatus, error)
-
-	// UpdateCloud updates a cloud definition.
-	UpdateCloud(context.Context, names.CloudTag, jujuparams.Cloud) error
-
-	// UpdateCredential updates a credential.
-	UpdateCredential(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error)
-
-	// ValidateModelUpgrade validates that a model can be upgraded.
-	ValidateModelUpgrade(context.Context, names.ModelTag, bool) error
-
-	// WatchAllModelSummaries creates a ModelSummaryWatcher.
-	WatchAllModelSummaries(context.Context) (string, error)
-
-	// ListFilesystems lists filesystems for desired machines.
-	// If no machines provided, a list of all filesystems is returned.
-	ListFilesystems(ctx context.Context, machines []string) ([]jujuparams.FilesystemDetailsListResult, error)
-
-	// ListVolumes lists volumes for desired machines.
-	// If no machines provided, a list of all volumes is returned.
-	ListVolumes(ctx context.Context, machines []string) ([]jujuparams.VolumeDetailsListResult, error)
-
-	// ListStorageDetails lists all storage.
-	ListStorageDetails(ctx context.Context) ([]jujuparams.StorageDetails, error)
-
-	// ListModels returns all UserModel's on the controller.
-	ListModels(ctx context.Context) ([]base.UserModel, error)
-}
-
-// forEachController runs a given function on multiple controllers
-// simultaneously. A connection is established to every controller in the
-// given list concurrently and then the given function is called with the
-// controller and API connection to use to perform the controller
-// operation. ForEachConnection waits until all operations have finished
-// before returning, any error returned will be the first error
-// encountered when connecting to the controller or returned from the given
-// function.
-func (j *JIMM) forEachController(ctx context.Context, controllers []dbmodel.Controller, f func(*dbmodel.Controller, API) error) error {
-	eg := new(errgroup.Group)
-	for i := range controllers {
-		i := i
-		eg.Go(func() error {
-			api, err := j.dial(ctx, &controllers[i], names.ModelTag{})
-			if err != nil {
-				return err
-			}
-			defer api.Close()
-			return f(&controllers[i], api)
-		})
-	}
-	return eg.Wait()
-}
-
-// ControllerInfo returns info about a controller connected to JIMM.
-func (j *JIMM) ControllerInfo(ctx context.Context, name string) (*dbmodel.Controller, error) {
-	const op = errors.Op("jimm.ListControllers")
-	ctl := dbmodel.Controller{
-		Name: name,
-	}
-	if err := j.Database.GetController(ctx, &ctl); err != nil {
-		return nil, errors.E(op, err)
-	}
-	return &ctl, nil
-}
-
-// ListControllers returns a list of controllers the user has access to.
-func (j *JIMM) ListControllers(ctx context.Context, user *openfga.User) ([]dbmodel.Controller, error) {
-	const op = errors.Op("jimm.ListControllers")
-
-	if !user.JimmAdmin {
-		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
-	}
-
-	var controllers []dbmodel.Controller
-	err := j.Database.ForEachController(ctx, func(c *dbmodel.Controller) error {
-		controllers = append(controllers, *c)
-		return nil
-	})
-	if err != nil {
-		return nil, errors.E(op, err)
-	}
-
-	return controllers, nil
-}
-
-// SetControllerDeprecated records if the controller is to be deprecated.
-// No new models or clouds can be added to a deprecated controller.
-func (j *JIMM) SetControllerDeprecated(ctx context.Context, user *openfga.User, controllerName string, deprecated bool) error {
-	const op = errors.Op("jimm.SetControllerDeprecated")
-
-	if !user.JimmAdmin {
-		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
-	}
-
-	// Update the local database with the updated cloud definition. We
-	// do this in a transaction so that the local view cannot finish in
-	// an inconsistent state.
-	err := j.Database.Transaction(func(db *db.Database) error {
-		c := dbmodel.Controller{
-			Name: controllerName,
-		}
-		if err := db.GetController(ctx, &c); err != nil {
-			return err
-		}
-		c.Deprecated = deprecated
-		return db.UpdateController(ctx, &c)
-	})
-	if err != nil {
-		return errors.E(op, err)
-	}
-
-	return nil
-}
-
-// RemoveController removes a controller.
-func (j *JIMM) RemoveController(ctx context.Context, user *openfga.User, controllerName string, force bool) error {
-	const op = errors.Op("jimm.RemoveController")
-
-	if !user.JimmAdmin {
-		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
-	}
-
-	// Update the local database with the updated cloud definition. We
-	// do this in a transaction so that the local view cannot finish in
-	// an inconsistent state.
-	err := j.Database.Transaction(func(db *db.Database) error {
-		c := dbmodel.Controller{
-			Name: controllerName,
-		}
-		if err := db.GetController(ctx, &c); err != nil {
-			return err
-		}
-
-		// if c.UnavailableSince is valid, then we can delete is
-		// if c.UnavailableSince is no valid, then we can't delete is
-		// if force is true, we can always delete is
-		if !(force || c.UnavailableSince.Valid) {
-			return errors.E(errors.CodeStillAlive, "controller is still alive")
-		}
-
-		models, err := db.GetModelsByController(ctx, c)
-		if err != nil {
-			return err
-		}
-		// Delete its models first.
-		for _, model := range models {
-			err := db.DeleteModel(ctx, &model)
-			if err != nil {
-				return err
-			}
-		}
-
-		// Then delete the controller
-		return db.DeleteController(ctx, &c)
-	})
-	if err != nil {
-		return errors.E(op, err)
-	}
-
-	return nil
-}
-
-// FullModelStatus returns the full status of the juju model.
-func (j *JIMM) FullModelStatus(ctx context.Context, user *openfga.User, modelTag names.ModelTag, patterns []string) (*jujuparams.FullStatus, error) {
-	const op = errors.Op("jimm.RemoveController")
-
-	if !user.JimmAdmin {
-		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
-	}
-
-	model := dbmodel.Model{
-		UUID: sql.NullString{
-			String: modelTag.Id(),
-			Valid:  true,
-		},
-	}
-	err := j.Database.GetModel(ctx, &model)
-	if err != nil {
-		return nil, errors.E(op, err)
-	}
-
-	api, err := j.dial(ctx, &model.Controller, modelTag)
-	if err != nil {
-		return nil, errors.E(op, err)
-	}
-
-	status, err := api.Status(ctx, patterns)
-	if err != nil {
-		return nil, errors.E(op, err)
-	}
-
-	return status, nil
-}
-
-type migrationControllerID = uint
-
-func fillMigrationTarget(db *db.Database, credStore credentials.CredentialStore, controllerName string) (jujuparams.MigrationTargetInfo, migrationControllerID, error) {
-	dbController := dbmodel.Controller{
-		Name: controllerName,
-	}
-	ctx := context.Background()
-	err := db.GetController(ctx, &dbController)
-	if err != nil {
-		return jujuparams.MigrationTargetInfo{}, 0, err
-	}
-	adminUser, adminPass, err := credStore.GetControllerCredentials(ctx, controllerName)
-	if err != nil {
-		return jujuparams.MigrationTargetInfo{}, 0, err
-	}
-	if adminUser == "" || adminPass == "" {
-		return jujuparams.MigrationTargetInfo{}, 0, errors.E("missing target controller credentials")
-	}
-	// Should we verify controller can access the cloud where the model is currently hosted?
-	apiControllerInfo := dbController.ToAPIControllerInfo()
-	targetInfo := jujuparams.MigrationTargetInfo{
-		ControllerTag: dbController.ResourceTag().String(),
-		Addrs:         apiControllerInfo.APIAddresses,
-		CACert:        dbController.CACertificate,
-		// The target user must be the admin user as external users don't have username/password credentials.
-		AuthTag:  names.NewUserTag(adminUser).String(),
-		Password: adminPass,
-	}
-	return targetInfo, dbController.ID, nil
-}
-
-// InitiateInternalMigration initiates a model migration between two controllers within JIMM.
-func (j *JIMM) InitiateInternalMigration(ctx context.Context, user *openfga.User, modelNameOrUUID string, targetController string) (jujuparams.InitiateMigrationResult, error) {
-	const op = errors.Op("jimm.InitiateInternalMigration")
-
-	migrationTarget, _, err := fillMigrationTarget(j.Database, j.CredentialStore, targetController)
-	if err != nil {
-		return jujuparams.InitiateMigrationResult{}, errors.E(op, err)
-	}
-
-	model := dbmodel.Model{}
-	// Check if the user is providing a model UUID or name
-	_, err = uuid.Parse(modelNameOrUUID)
-	if err != nil {
-		s := strings.Split(modelNameOrUUID, "/")
-		if len(s) != 2 {
-			return jujuparams.InitiateMigrationResult{}, errors.E(op, "invalid model target")
-		}
-
-		owner, name := s[0], s[1]
-		if !names.IsValidUser(owner) {
-			return jujuparams.InitiateMigrationResult{}, errors.E(op, "invalid user name")
-		}
-		if !names.IsValidModelName(name) {
-			return jujuparams.InitiateMigrationResult{}, errors.E(op, "invalid model name")
-		}
-
-		model.Name = name
-		model.OwnerIdentityName = owner
-	} else {
-		model.UUID = sql.NullString{
-			String: modelNameOrUUID,
-			Valid:  true,
-		}
-	}
-
-	err = j.Database.GetModel(ctx, &model)
-	if err != nil {
-		return jujuparams.InitiateMigrationResult{}, errors.E(op, err)
-	}
-	spec := jujuparams.MigrationSpec{ModelTag: model.ResourceTag().String(), TargetInfo: migrationTarget}
-	result, err := initiateMigration(ctx, j, user, spec)
-	if err != nil {
-		return result, errors.E(op, err)
-	}
-	return result, nil
+// JujuManager returns a manager that enables operations
+// related to Juju resources.
+func (j *JIMM) JujuManager() JujuManager {
+	return j.jujuManager
 }
