@@ -17,7 +17,6 @@ import (
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/internal/jimm"
 	"github.com/canonical/jimm/v3/internal/jimm/permissions"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
@@ -394,15 +393,16 @@ func TestGrantModelAccess(t *testing.T) {
 		c.Run(tt.name, func(c *qt.C) {
 			ctx := context.Background()
 
-			j := jimmtest.NewJIMM(c, &jimm.Parameters{})
+			s := permissionManagerSuite{}
+			s.Init(c)
 
 			env := jimmtest.ParseEnvironment(c, tt.env)
-			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+			env.PopulateDBAndPermissions(c, s.ctlTag, s.db, s.ofgaClient)
 
-			dbUser := env.User(tt.username).DBObject(c, j.Database)
-			user := openfga.NewUser(&dbUser, j.OpenFGAClient)
+			dbUser := env.User(tt.username).DBObject(c, s.db)
+			user := openfga.NewUser(&dbUser, s.ofgaClient)
 
-			err := j.PermissionManager().GrantModelAccess(ctx, user, names.NewModelTag(tt.uuid), names.NewUserTag(tt.targetUsername), jujuparams.UserAccessPermission(tt.access))
+			err := s.manager.GrantModelAccess(ctx, user, names.NewModelTag(tt.uuid), names.NewUserTag(tt.targetUsername), jujuparams.UserAccessPermission(tt.access))
 			if tt.expectError != "" {
 				c.Check(err, qt.ErrorMatches, tt.expectError)
 				if tt.expectErrorCode != "" {
@@ -412,7 +412,7 @@ func TestGrantModelAccess(t *testing.T) {
 			}
 			c.Assert(err, qt.IsNil)
 			for _, tuple := range tt.expectRelations {
-				value, err := j.OpenFGAClient.CheckRelation(ctx, tuple, false)
+				value, err := s.ofgaClient.CheckRelation(ctx, tuple, false)
 				c.Assert(err, qt.IsNil)
 				c.Assert(value, qt.IsTrue, qt.Commentf("expected the tuple to exist after granting"))
 			}
@@ -1088,28 +1088,29 @@ func TestRevokeModelAccess(t *testing.T) {
 		c.Run(tt.name, func(c *qt.C) {
 			ctx := context.Background()
 
-			j := jimmtest.NewJIMM(c, &jimm.Parameters{})
+			s := permissionManagerSuite{}
+			s.Init(c)
 
 			env := jimmtest.ParseEnvironment(c, tt.env)
-			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+			env.PopulateDBAndPermissions(c, s.ctlTag, s.db, s.ofgaClient)
 
 			if len(tt.extraInitialTuples) > 0 {
-				err := j.OpenFGAClient.AddRelation(ctx, tt.extraInitialTuples...)
+				err := s.ofgaClient.AddRelation(ctx, tt.extraInitialTuples...)
 				c.Assert(err, qt.IsNil)
 			}
 
 			if tt.expectRemovedRelations != nil {
 				for _, tuple := range tt.expectRemovedRelations {
-					value, err := j.OpenFGAClient.CheckRelation(ctx, tuple, false)
+					value, err := s.ofgaClient.CheckRelation(ctx, tuple, false)
 					c.Assert(err, qt.IsNil)
 					c.Assert(value, qt.IsTrue, qt.Commentf("expected the tuple to exist before revoking"))
 				}
 			}
 
-			dbUser := env.User(tt.username).DBObject(c, j.Database)
-			user := openfga.NewUser(&dbUser, j.OpenFGAClient)
+			dbUser := env.User(tt.username).DBObject(c, s.db)
+			user := openfga.NewUser(&dbUser, s.ofgaClient)
 
-			err := j.PermissionManager().RevokeModelAccess(ctx, user, names.NewModelTag(tt.uuid), names.NewUserTag(tt.targetUsername), jujuparams.UserAccessPermission(tt.access))
+			err := s.manager.RevokeModelAccess(ctx, user, names.NewModelTag(tt.uuid), names.NewUserTag(tt.targetUsername), jujuparams.UserAccessPermission(tt.access))
 			if tt.expectError != "" {
 				c.Check(err, qt.ErrorMatches, tt.expectError)
 				if tt.expectErrorCode != "" {
@@ -1120,14 +1121,14 @@ func TestRevokeModelAccess(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 			if tt.expectRemovedRelations != nil {
 				for _, tuple := range tt.expectRemovedRelations {
-					value, err := j.OpenFGAClient.CheckRelation(ctx, tuple, false)
+					value, err := s.ofgaClient.CheckRelation(ctx, tuple, false)
 					c.Assert(err, qt.IsNil)
 					c.Assert(value, qt.IsFalse, qt.Commentf("expected the tuple to be removed after revoking"))
 				}
 			}
 			if tt.expectRelations != nil {
 				for _, tuple := range tt.expectRelations {
-					value, err := j.OpenFGAClient.CheckRelation(ctx, tuple, false)
+					value, err := s.ofgaClient.CheckRelation(ctx, tuple, false)
 					c.Assert(err, qt.IsNil)
 					c.Assert(value, qt.IsTrue, qt.Commentf("expected the tuple to exist after revoking"))
 				}
@@ -1416,27 +1417,28 @@ func TestRevokeOfferAccess(t *testing.T) {
 
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
-			j := jimmtest.NewJIMM(c, &jimm.Parameters{})
+			s := permissionManagerSuite{}
+			s.Init(c)
 
 			env := jimmtest.ParseEnvironment(c, revokeAndGrantOfferAccessTestEnv)
-			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+			env.PopulateDBAndPermissions(c, s.ctlTag, s.db, s.ofgaClient)
 
 			if test.setup != nil {
-				test.setup(env, j.Database, j.OpenFGAClient)
+				test.setup(env, s.db, s.ofgaClient)
 			}
-			authenticatedUser, offerUser, offerURL, revokeAccessLevel := test.parameterFunc(env, j.Database)
+			authenticatedUser, offerUser, offerURL, revokeAccessLevel := test.parameterFunc(env, s.db)
 
 			assertAppliedRelation := func(expectedAppliedRelation string) {
 				offer := dbmodel.ApplicationOffer{
 					URL: offerURL,
 				}
-				err := j.Database.GetApplicationOffer(ctx, &offer)
+				err := s.db.GetApplicationOffer(ctx, &offer)
 				c.Assert(err, qt.IsNil)
-				appliedRelation := openfga.NewUser(&offerUser, j.OpenFGAClient).GetApplicationOfferAccess(ctx, offer.ResourceTag())
+				appliedRelation := openfga.NewUser(&offerUser, s.ofgaClient).GetApplicationOfferAccess(ctx, offer.ResourceTag())
 				c.Assert(permissions.ToOfferAccessString(appliedRelation), qt.Equals, expectedAppliedRelation)
 			}
 
-			err := j.PermissionManager().RevokeOfferAccess(ctx, openfga.NewUser(&authenticatedUser, j.OpenFGAClient), offerURL, offerUser.ResourceTag(), revokeAccessLevel)
+			err := s.manager.RevokeOfferAccess(ctx, openfga.NewUser(&authenticatedUser, s.ofgaClient), offerURL, offerUser.ResourceTag(), revokeAccessLevel)
 			if test.expectedError == "" {
 				c.Assert(err, qt.IsNil)
 				assertAppliedRelation(test.expectedAccessLevel)
@@ -1566,23 +1568,24 @@ func TestGrantOfferAccess(t *testing.T) {
 
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
-			j := jimmtest.NewJIMM(c, &jimm.Parameters{})
+			s := permissionManagerSuite{}
+			s.Init(c)
 
 			env := jimmtest.ParseEnvironment(c, revokeAndGrantOfferAccessTestEnv)
-			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+			env.PopulateDBAndPermissions(c, s.ctlTag, s.db, s.ofgaClient)
 
-			authenticatedUser, offerUser, offerURL, grantAccessLevel := test.parameterFunc(env, j.Database)
+			authenticatedUser, offerUser, offerURL, grantAccessLevel := test.parameterFunc(env, s.db)
 
-			err := j.PermissionManager().GrantOfferAccess(ctx, openfga.NewUser(&authenticatedUser, j.OpenFGAClient), offerURL, offerUser.ResourceTag(), grantAccessLevel)
+			err := s.manager.GrantOfferAccess(ctx, openfga.NewUser(&authenticatedUser, s.ofgaClient), offerURL, offerUser.ResourceTag(), grantAccessLevel)
 			if test.expectedError == "" {
 				c.Assert(err, qt.IsNil)
 
 				offer := dbmodel.ApplicationOffer{
 					URL: offerURL,
 				}
-				err = j.Database.GetApplicationOffer(ctx, &offer)
+				err = s.db.GetApplicationOffer(ctx, &offer)
 				c.Assert(err, qt.IsNil)
-				appliedRelation := openfga.NewUser(&offerUser, j.OpenFGAClient).GetApplicationOfferAccess(ctx, offer.ResourceTag())
+				appliedRelation := openfga.NewUser(&offerUser, s.ofgaClient).GetApplicationOfferAccess(ctx, offer.ResourceTag())
 				c.Assert(permissions.ToOfferAccessString(appliedRelation), qt.Equals, test.expectedAccessLevel)
 			} else {
 				c.Assert(err, qt.ErrorMatches, test.expectedError)
@@ -1701,14 +1704,15 @@ func TestGrantCloudAccess(t *testing.T) {
 
 			env := jimmtest.ParseEnvironment(c, tt.env)
 
-			j := jimmtest.NewJIMM(c, &jimm.Parameters{})
+			s := permissionManagerSuite{}
+			s.Init(c)
 
-			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+			env.PopulateDBAndPermissions(c, s.ctlTag, s.db, s.ofgaClient)
 
-			dbUser := env.User(tt.username).DBObject(c, j.Database)
-			user := openfga.NewUser(&dbUser, j.OpenFGAClient)
+			dbUser := env.User(tt.username).DBObject(c, s.db)
+			user := openfga.NewUser(&dbUser, s.ofgaClient)
 
-			err := j.PermissionManager().GrantCloudAccess(ctx, user, names.NewCloudTag(tt.cloud), names.NewUserTag(tt.targetUsername), tt.access)
+			err := s.manager.GrantCloudAccess(ctx, user, names.NewCloudTag(tt.cloud), names.NewUserTag(tt.targetUsername), tt.access)
 			if tt.expectError != "" {
 				c.Check(err, qt.ErrorMatches, tt.expectError)
 				if tt.expectErrorCode != "" {
@@ -1718,7 +1722,7 @@ func TestGrantCloudAccess(t *testing.T) {
 			}
 			c.Assert(err, qt.IsNil)
 			for _, tuple := range tt.expectRelations {
-				value, err := j.OpenFGAClient.CheckRelation(ctx, tuple, false)
+				value, err := s.ofgaClient.CheckRelation(ctx, tuple, false)
 				c.Assert(err, qt.IsNil)
 				c.Assert(value, qt.IsTrue, qt.Commentf("expected the tuple to exist after granting"))
 			}
@@ -1977,27 +1981,28 @@ func TestRevokeCloudAccess(t *testing.T) {
 
 			env := jimmtest.ParseEnvironment(c, tt.env)
 
-			j := jimmtest.NewJIMM(c, &jimm.Parameters{})
+			s := permissionManagerSuite{}
+			s.Init(c)
 
-			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+			env.PopulateDBAndPermissions(c, s.ctlTag, s.db, s.ofgaClient)
 
 			if len(tt.extraInitialTuples) > 0 {
-				err := j.OpenFGAClient.AddRelation(ctx, tt.extraInitialTuples...)
+				err := s.ofgaClient.AddRelation(ctx, tt.extraInitialTuples...)
 				c.Assert(err, qt.IsNil)
 			}
 
 			if tt.expectRemovedRelations != nil {
 				for _, tuple := range tt.expectRemovedRelations {
-					value, err := j.OpenFGAClient.CheckRelation(ctx, tuple, false)
+					value, err := s.ofgaClient.CheckRelation(ctx, tuple, false)
 					c.Assert(err, qt.IsNil)
 					c.Assert(value, qt.IsTrue, qt.Commentf("expected the tuple to exist before revoking"))
 				}
 			}
 
-			dbUser := env.User(tt.username).DBObject(c, j.Database)
-			user := openfga.NewUser(&dbUser, j.OpenFGAClient)
+			dbUser := env.User(tt.username).DBObject(c, s.db)
+			user := openfga.NewUser(&dbUser, s.ofgaClient)
 
-			err := j.PermissionManager().RevokeCloudAccess(ctx, user, names.NewCloudTag(tt.cloud), names.NewUserTag(tt.targetUsername), tt.access)
+			err := s.manager.RevokeCloudAccess(ctx, user, names.NewCloudTag(tt.cloud), names.NewUserTag(tt.targetUsername), tt.access)
 			if tt.expectError != "" {
 				c.Check(err, qt.ErrorMatches, tt.expectError)
 				if tt.expectErrorCode != "" {
@@ -2008,14 +2013,14 @@ func TestRevokeCloudAccess(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 			if tt.expectRemovedRelations != nil {
 				for _, tuple := range tt.expectRemovedRelations {
-					value, err := j.OpenFGAClient.CheckRelation(ctx, tuple, false)
+					value, err := s.ofgaClient.CheckRelation(ctx, tuple, false)
 					c.Assert(err, qt.IsNil)
 					c.Assert(value, qt.IsFalse, qt.Commentf("expected the tuple to be removed after revoking"))
 				}
 			}
 			if tt.expectRelations != nil {
 				for _, tuple := range tt.expectRelations {
-					value, err := j.OpenFGAClient.CheckRelation(ctx, tuple, false)
+					value, err := s.ofgaClient.CheckRelation(ctx, tuple, false)
 					c.Assert(err, qt.IsNil)
 					c.Assert(value, qt.IsTrue, qt.Commentf("expected the tuple to exist after revoking"))
 				}
