@@ -27,7 +27,7 @@ import (
 // of CodeNotFound will be returned. If the given user is not a controller
 // superuser or the owner of the credentials then an error with a code of
 // CodeUnauthorized will be returned.
-func (j *JIMM) GetCloudCredential(ctx context.Context, user *openfga.User, tag names.CloudCredentialTag) (*dbmodel.CloudCredential, error) {
+func (j *JujuManager) GetCloudCredential(ctx context.Context, user *openfga.User, tag names.CloudCredentialTag) (*dbmodel.CloudCredential, error) {
 	const op = errors.Op("jimm.GetCloudCredential")
 
 	if !user.JimmAdmin && user.Name != tag.Owner().Id() {
@@ -47,7 +47,7 @@ func (j *JIMM) GetCloudCredential(ctx context.Context, user *openfga.User, tag n
 
 // RevokeCloudCredential checks that the credential with the given path
 // can be revoked  and revokes the credential.
-func (j *JIMM) RevokeCloudCredential(ctx context.Context, user *dbmodel.Identity, tag names.CloudCredentialTag, force bool) error {
+func (j *JujuManager) RevokeCloudCredential(ctx context.Context, user *dbmodel.Identity, tag names.CloudCredentialTag, force bool) error {
 	const op = errors.Op("jimm.RevokeCloudCredential")
 
 	if user.Name != tag.Owner().Id() {
@@ -129,7 +129,7 @@ type UpdateCloudCredentialArgs struct {
 // UpdateCloudCredential checks that the credential can be updated
 // and updates it in the local database and all controllers
 // to which it is deployed.
-func (j *JIMM) UpdateCloudCredential(ctx context.Context, user *openfga.User, args UpdateCloudCredentialArgs) ([]jujuparams.UpdateCredentialModelResult, error) {
+func (j *JujuManager) UpdateCloudCredential(ctx context.Context, user *openfga.User, args UpdateCloudCredentialArgs) ([]jujuparams.UpdateCredentialModelResult, error) {
 	const op = errors.Op("jimm.UpdateCloudCredential")
 
 	var resultMu sync.Mutex
@@ -225,7 +225,7 @@ func (j *JIMM) UpdateCloudCredential(ctx context.Context, user *openfga.User, ar
 }
 
 // updateCredential updates the credential stored in JIMM's database.
-func (j *JIMM) updateCredential(ctx context.Context, credential *dbmodel.CloudCredential, attr map[string]string) error {
+func (j *JujuManager) updateCredential(ctx context.Context, credential *dbmodel.CloudCredential, attr map[string]string) error {
 	const op = errors.Op("jimm.updateCredential")
 
 	if err := j.Database.SetCloudCredential(ctx, credential); err != nil {
@@ -240,7 +240,7 @@ func (j *JIMM) updateCredential(ctx context.Context, credential *dbmodel.CloudCr
 	return nil
 }
 
-func (j *JIMM) updateControllerCloudCredential(
+func (j *JujuManager) updateControllerCloudCredential(
 	ctx context.Context,
 	cred *dbmodel.CloudCredential,
 	f func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error),
@@ -271,7 +271,7 @@ func (j *JIMM) updateControllerCloudCredential(
 // calling the function will not contain any attributes,
 // GetCloudCredentialAttributes should be used to retrive the credential
 // attributes if needed. The given function should not update the database.
-func (j *JIMM) ForEachUserCloudCredential(ctx context.Context, u *dbmodel.Identity, ct names.CloudTag, f func(cred *dbmodel.CloudCredential) error) error {
+func (j *JujuManager) ForEachUserCloudCredential(ctx context.Context, u *dbmodel.Identity, ct names.CloudTag, f func(cred *dbmodel.CloudCredential) error) error {
 	const op = errors.Op("jimm.ForEachUserCloudCredential")
 
 	var cloud string
@@ -302,7 +302,7 @@ func (j *JIMM) ForEachUserCloudCredential(ctx context.Context, u *dbmodel.Identi
 // returned. Only the credential owner can retrieve hidden attributes any
 // other user, including controller superusers, will receive an error with
 // the code CodeUnauthorized.
-func (j *JIMM) GetCloudCredentialAttributes(ctx context.Context, user *openfga.User, cred *dbmodel.CloudCredential, hidden bool) (attrs map[string]string, redacted []string, err error) {
+func (j *JujuManager) GetCloudCredentialAttributes(ctx context.Context, user *openfga.User, cred *dbmodel.CloudCredential, hidden bool) (attrs map[string]string, redacted []string, err error) {
 	const op = errors.Op("jimm.GetCloudCredentialAttributes")
 
 	if hidden {
@@ -341,7 +341,7 @@ func (j *JIMM) GetCloudCredentialAttributes(ctx context.Context, user *openfga.U
 }
 
 // getCloudCredentialAttributes retrieves the attributes for a cloud credential.
-func (j *JIMM) getCloudCredentialAttributes(ctx context.Context, cred *dbmodel.CloudCredential) (map[string]string, error) {
+func (j *JujuManager) getCloudCredentialAttributes(ctx context.Context, cred *dbmodel.CloudCredential) (map[string]string, error) {
 	const op = errors.Op("jimm.getCloudCredentialAttributes")
 
 	attr, err := j.CredentialStore.Get(ctx, cred.ResourceTag())
@@ -352,7 +352,7 @@ func (j *JIMM) getCloudCredentialAttributes(ctx context.Context, cred *dbmodel.C
 }
 
 // CopyCredential copies a cloud credential from one user to another.
-func (j *JIMM) CopyCredential(ctx context.Context, originalUser *openfga.User, newUser *openfga.User, cred names.CloudCredentialTag) (names.CloudCredentialTag, []jujuparams.UpdateCredentialModelResult, error) {
+func (j *JujuManager) CopyCredential(ctx context.Context, originalUser *openfga.User, newUser *openfga.User, cred names.CloudCredentialTag) (names.CloudCredentialTag, []jujuparams.UpdateCredentialModelResult, error) {
 	op := errors.Op("jimm.CopyCredential")
 
 	credential, err := j.GetCloudCredential(ctx, originalUser, cred)

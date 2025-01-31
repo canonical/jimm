@@ -22,7 +22,7 @@ type parameters struct {
 	CredentialStore credentials.CredentialStore
 }
 
-func newTestJujuManager(c *qt.C, p *parameters) *juju.JIMM {
+func newTestJujuManager(c *qt.C, p *parameters) *juju.JujuManager {
 	if p == nil {
 		p = &parameters{}
 	}

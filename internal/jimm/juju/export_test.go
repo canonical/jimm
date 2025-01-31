@@ -37,10 +37,10 @@ func NewWatcherWithDeltaProcessedChannel(db *db.Database, dialer Dialer, pubsub 
 	}
 }
 
-func (j *JIMM) ListApplicationOfferUsers(ctx context.Context, offer names.ApplicationOfferTag, user *dbmodel.Identity, adminAccess bool) ([]jujuparams.OfferUserDetails, error) {
+func (j *JujuManager) ListApplicationOfferUsers(ctx context.Context, offer names.ApplicationOfferTag, user *dbmodel.Identity, adminAccess bool) ([]jujuparams.OfferUserDetails, error) {
 	return j.listApplicationOfferUsers(ctx, offer, user, adminAccess)
 }
 
-func (j *JIMM) EveryoneUser() *openfga.User {
+func (j *JujuManager) EveryoneUser() *openfga.User {
 	return j.everyoneUser()
 }

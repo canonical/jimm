@@ -90,7 +90,7 @@ func (a *ModelCreateArgs) FromJujuModelCreateArgs(args *jujuparams.ModelCreateAr
 }
 
 // AddModel adds the specified model to JIMM.
-func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCreateArgs) (_ *jujuparams.ModelInfo, err error) {
+func (j *JujuManager) AddModel(ctx context.Context, user *openfga.User, args *ModelCreateArgs) (_ *jujuparams.ModelInfo, err error) {
 	const op = errors.Op("jimm.AddModel")
 	zapctx.Info(ctx, string(op))
 
@@ -197,7 +197,7 @@ func (j *JIMM) AddModel(ctx context.Context, user *openfga.User, args *ModelCrea
 }
 
 // GetModel retrieves a model object by the model UUID.
-func (j *JIMM) GetModel(ctx context.Context, uuid string) (dbmodel.Model, error) {
+func (j *JujuManager) GetModel(ctx context.Context, uuid string) (dbmodel.Model, error) {
 	model := dbmodel.Model{
 		UUID: sql.NullString{
 			String: uuid,
@@ -213,7 +213,7 @@ func (j *JIMM) GetModel(ctx context.Context, uuid string) (dbmodel.Model, error)
 
 // addModelPermissions grants a user access to a model and sets the relation between the controller and model.
 // Call this when adding/importing a model to set the necessary permissions.
-func (j *JIMM) addModelPermissions(ctx context.Context, owner *openfga.User, mt names.ModelTag, ct names.ControllerTag) error {
+func (j *JujuManager) addModelPermissions(ctx context.Context, owner *openfga.User, mt names.ModelTag, ct names.ControllerTag) error {
 	if err := j.OpenFGAClient.AddControllerModel(ctx, ct, mt); err != nil {
 		zapctx.Error(
 			ctx,
@@ -241,7 +241,7 @@ func (j *JIMM) addModelPermissions(ctx context.Context, owner *openfga.User, mt 
 // error will have the code CodeNotFound. If the given user does not have
 // access to the model then the returned error will have the code
 // CodeUnauthorized.
-func (j *JIMM) ModelInfo(ctx context.Context, user *openfga.User, mt names.ModelTag) (*jujuparams.ModelInfo, error) {
+func (j *JujuManager) ModelInfo(ctx context.Context, user *openfga.User, mt names.ModelTag) (*jujuparams.ModelInfo, error) {
 	const op = errors.Op("jimm.ModelInfo")
 	zapctx.Info(ctx, string(op))
 
@@ -289,7 +289,7 @@ func (m *modelSummariesMap) addModelSummary(summary jujuparams.ModelSummaryResul
 
 // ListModelSummaries returns the list of modelsummary the user has access to.
 // It queries the controllers and then merge the info from the JIMM db.
-func (j *JIMM) ListModelSummaries(ctx context.Context, user *openfga.User, maskingControllerUUID string) (jujuparams.ModelSummaryResults, error) {
+func (j *JujuManager) ListModelSummaries(ctx context.Context, user *openfga.User, maskingControllerUUID string) (jujuparams.ModelSummaryResults, error) {
 	const op = errors.Op("jimm.ListModelSummaries")
 
 	modelSummariesSafeMap := modelSummariesMap{}
@@ -361,7 +361,7 @@ func (j *JIMM) ListModelSummaries(ctx context.Context, user *openfga.User, maski
 
 // mergeModelInfo replaces fields on the juju model info object with
 // information from JIMM where JIMM specific information should be used.
-func (j *JIMM) mergeModelInfo(ctx context.Context, user *openfga.User, modelInfo *jujuparams.ModelInfo, jimmModel dbmodel.Model) (*jujuparams.ModelInfo, error) {
+func (j *JujuManager) mergeModelInfo(ctx context.Context, user *openfga.User, modelInfo *jujuparams.ModelInfo, jimmModel dbmodel.Model) (*jujuparams.ModelInfo, error) {
 	const op = errors.Op("jimm.mergeModelInfo")
 	zapctx.Info(ctx, string(op))
 
@@ -427,7 +427,7 @@ func (j *JIMM) mergeModelInfo(ctx context.Context, user *openfga.User, modelInfo
 // the model doesn't exist then the returned error will have the code
 // CodeNotFound, If the given user does not have admin access to the model
 // then the returned error will have the code CodeUnauthorized.
-func (j *JIMM) ModelStatus(ctx context.Context, user *openfga.User, mt names.ModelTag) (*jujuparams.ModelStatus, error) {
+func (j *JujuManager) ModelStatus(ctx context.Context, user *openfga.User, mt names.ModelTag) (*jujuparams.ModelStatus, error) {
 	const op = errors.Op("jimm.ModelStatus")
 	zapctx.Info(ctx, string(op))
 
@@ -452,7 +452,7 @@ func (j *JIMM) ModelStatus(ctx context.Context, user *openfga.User, mt names.Mod
 // the system. If the given function returns an error the error will be
 // returned unmodified and iteration will stop immediately. The given
 // function should not update the database.
-func (j *JIMM) ForEachUserModel(ctx context.Context, user *openfga.User, f func(*dbmodel.Model, jujuparams.UserAccessPermission) error) error {
+func (j *JujuManager) ForEachUserModel(ctx context.Context, user *openfga.User, f func(*dbmodel.Model, jujuparams.UserAccessPermission) error) error {
 	const op = errors.Op("jimm.ForEachUserModel")
 	zapctx.Info(ctx, string(op))
 
@@ -491,7 +491,7 @@ func (j *JIMM) ForEachUserModel(ctx context.Context, user *openfga.User, f func(
 // the user is not a controller admin. If the given function returns an
 // error the error will be returned unmodified and iteration will stop
 // immediately. The given function should not update the database.
-func (j *JIMM) ForEachModel(ctx context.Context, user *openfga.User, f func(*dbmodel.Model, jujuparams.UserAccessPermission) error) error {
+func (j *JujuManager) ForEachModel(ctx context.Context, user *openfga.User, f func(*dbmodel.Model, jujuparams.UserAccessPermission) error) error {
 	const op = errors.Op("jimm.ForEachModel")
 	zapctx.Info(ctx, string(op))
 
@@ -522,7 +522,7 @@ func (j *JIMM) ForEachModel(ctx context.Context, user *openfga.User, f func(*dbm
 // given user is not a controller superuser or a model admin an error
 // with a code of CodeUnauthorized is returned. Any error returned from
 // the juju API will not have it's code masked.
-func (j *JIMM) DestroyModel(ctx context.Context, user *openfga.User, mt names.ModelTag, destroyStorage, force *bool, maxWait, timeout *time.Duration) error {
+func (j *JujuManager) DestroyModel(ctx context.Context, user *openfga.User, mt names.ModelTag, destroyStorage, force *bool, maxWait, timeout *time.Duration) error {
 	const op = errors.Op("jimm.DestroyModel")
 	zapctx.Info(ctx, string(op))
 
@@ -560,7 +560,7 @@ func (j *JIMM) DestroyModel(ctx context.Context, user *openfga.User, mt names.Mo
 // juju controller. If simplified is true a simpllified dump is requested.
 // If the given user is not a controller superuser or a model admin an
 // error with the code CodeUnauthorized is returned.
-func (j *JIMM) DumpModel(ctx context.Context, user *openfga.User, mt names.ModelTag, simplified bool) (string, error) {
+func (j *JujuManager) DumpModel(ctx context.Context, user *openfga.User, mt names.ModelTag, simplified bool) (string, error) {
 	const op = errors.Op("jimm.DumpModel")
 	zapctx.Info(ctx, string(op))
 
@@ -579,7 +579,7 @@ func (j *JIMM) DumpModel(ctx context.Context, user *openfga.User, mt names.Model
 // DumpModelDB retrieves a database dump of the given model from its juju
 // controller. If the given user is not a controller superuser or a model
 // admin an error with the code CodeUnauthorized is returned.
-func (j *JIMM) DumpModelDB(ctx context.Context, user *openfga.User, mt names.ModelTag) (map[string]interface{}, error) {
+func (j *JujuManager) DumpModelDB(ctx context.Context, user *openfga.User, mt names.ModelTag) (map[string]interface{}, error) {
 	const op = errors.Op("jimm.DumpModelDB")
 	zapctx.Info(ctx, string(op))
 
@@ -601,7 +601,7 @@ func (j *JIMM) DumpModelDB(ctx context.Context, user *openfga.User, mt names.Mod
 // error returned from the API will have the code maintained therefore if
 // the controller doesn't support the ValidateModelUpgrades command the
 // CodeNotImplemented error code will be propagated back to the client.
-func (j *JIMM) ValidateModelUpgrade(ctx context.Context, user *openfga.User, mt names.ModelTag, force bool) error {
+func (j *JujuManager) ValidateModelUpgrade(ctx context.Context, user *openfga.User, mt names.ModelTag, force bool) error {
 	const op = errors.Op("jimm.ValidateModelUpgrade")
 	zapctx.Info(ctx, string(op))
 
@@ -626,11 +626,11 @@ func (j *JIMM) ValidateModelUpgrade(ctx context.Context, user *openfga.User, mt 
 // the model then the returned error will have the same code as the error
 // returned from the dial operation. If the given function returns an error
 // that error will be returned with the code unmasked.
-func (j *JIMM) doModelAdmin(ctx context.Context, user *openfga.User, mt names.ModelTag, f func(*dbmodel.Model, API) error) error {
+func (j *JujuManager) doModelAdmin(ctx context.Context, user *openfga.User, mt names.ModelTag, f func(*dbmodel.Model, API) error) error {
 	return j.doModel(ctx, user, mt, ofganames.AdministratorRelation, f)
 }
 
-func (j *JIMM) doModel(ctx context.Context, user *openfga.User, mt names.ModelTag, requireRelation openfga.Relation, f func(*dbmodel.Model, API) error) error {
+func (j *JujuManager) doModel(ctx context.Context, user *openfga.User, mt names.ModelTag, requireRelation openfga.Relation, f func(*dbmodel.Model, API) error) error {
 	const op = errors.Op("jimm.doModel")
 	zapctx.Info(ctx, string(op))
 
@@ -665,7 +665,7 @@ func (j *JIMM) doModel(ctx context.Context, user *openfga.User, mt names.ModelTa
 
 // ChangeModelCredential changes the credential used with a model on both
 // the controller and the local database.
-func (j *JIMM) ChangeModelCredential(ctx context.Context, user *openfga.User, modelTag names.ModelTag, cloudCredentialTag names.CloudCredentialTag) error {
+func (j *JujuManager) ChangeModelCredential(ctx context.Context, user *openfga.User, modelTag names.ModelTag, cloudCredentialTag names.CloudCredentialTag) error {
 	const op = errors.Op("jimm.ChangeModelCredential")
 	zapctx.Info(ctx, string(op))
 
@@ -711,7 +711,7 @@ func (j *JIMM) ChangeModelCredential(ctx context.Context, user *openfga.User, mo
 
 // ListModels list the models that the user has access to. It intentionally excludes the
 // controller model as this call is used within the context of login and register commands.
-func (j *JIMM) ListModels(ctx context.Context, user *openfga.User) ([]base.UserModel, error) {
+func (j *JujuManager) ListModels(ctx context.Context, user *openfga.User) ([]base.UserModel, error) {
 	const op = errors.Op("jimm.ListModels")
 	zapctx.Info(ctx, string(op))
 

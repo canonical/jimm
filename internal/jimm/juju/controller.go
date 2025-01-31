@@ -77,14 +77,14 @@ func getCloudNameFromModelSummary(modelSummary jujuparams.ModelSummary) (string,
 // and region priorities have also been persisted. Additionally, it ensures the region
 // priorities are set too.
 type addControllerTransactor struct {
-	jimm       *JIMM
+	jimm       *JujuManager
 	jujuClouds []dbmodel.Cloud
 	controller *dbmodel.Controller
 	tx         *db.Database
 }
 
 // newAddControllerTransactor creates a new addControllerTransactor.
-func newAddControllerTransactor(j *JIMM, jujuClouds []dbmodel.Cloud, ctl *dbmodel.Controller, tx *db.Database) *addControllerTransactor {
+func newAddControllerTransactor(j *JujuManager, jujuClouds []dbmodel.Cloud, ctl *dbmodel.Controller, tx *db.Database) *addControllerTransactor {
 	return &addControllerTransactor{
 		jimm:       j,
 		jujuClouds: jujuClouds,
@@ -204,7 +204,7 @@ func (act *addControllerTransactor) Run(ctx context.Context) error {
 
 // addControllerTx stores the clouds, regions, cloud region priorities and the controller itself in the database determined
 // from the incoming Juju API.Clouds() call.
-func addControllerTx(ctx context.Context, j *JIMM, jujuClouds []dbmodel.Cloud, ctl *dbmodel.Controller) error {
+func addControllerTx(ctx context.Context, j *JujuManager, jujuClouds []dbmodel.Cloud, ctl *dbmodel.Controller) error {
 	return j.Database.Transaction(func(tx *db.Database) error {
 		return newAddControllerTransactor(j, jujuClouds, ctl, tx).Run(ctx)
 	})
@@ -218,7 +218,7 @@ func addControllerTx(ctx context.Context, j *JIMM, jujuClouds []dbmodel.Cloud, c
 // code of CodeAlreadyExists will be returned. If the controller cannot be
 // contacted then an error with a code of CodeConnectionFailed will be
 // returned.
-func (j *JIMM) AddController(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, creds ControllerCreds) error {
+func (j *JujuManager) AddController(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, creds ControllerCreds) error {
 	const op = errors.Op("jimm.AddController")
 
 	if err := j.checkJimmAdmin(user); err != nil {
@@ -323,7 +323,7 @@ func (j *JIMM) AddController(ctx context.Context, user *openfga.User, ctl *dbmod
 // that any of the available public controllers is known to be running.
 // If there are no available controllers or none of their versions are
 // known, it returns the zero version.
-func (j *JIMM) EarliestControllerVersion(ctx context.Context) (version.Number, error) {
+func (j *JujuManager) EarliestControllerVersion(ctx context.Context) (version.Number, error) {
 	const op = errors.Op("jimm.EarliestControllerVersion")
 	var v *version.Number
 
@@ -357,7 +357,7 @@ func (j *JIMM) EarliestControllerVersion(ctx context.Context) (version.Number, e
 }
 
 type modelImporter struct {
-	jimm      *JIMM
+	jimm      *JujuManager
 	model     dbmodel.Model
 	modelInfo jujuparams.ModelInfo
 	// newOwner may be nil if the user wants to keep the original owner.
@@ -366,7 +366,7 @@ type modelImporter struct {
 	offersToAdd   []jujuparams.ApplicationOfferAdminDetailsV5
 }
 
-func newModelImporter(jimm *JIMM, newOwner string) (modelImporter, error) {
+func newModelImporter(jimm *JujuManager, newOwner string) (modelImporter, error) {
 	modelImporter := modelImporter{
 		jimm: jimm,
 	}
@@ -552,7 +552,7 @@ func (m *modelImporter) save(ctx context.Context) error {
 
 // ImportModel imports a model and existing offers into JIMM.  A new owner  must be set to
 // represent the external user who will own this model (if the original owner is a local user).
-func (j *JIMM) ImportModel(ctx context.Context, user *openfga.User, controllerName string, modelTag names.ModelTag, newOwner string) error {
+func (j *JujuManager) ImportModel(ctx context.Context, user *openfga.User, controllerName string, modelTag names.ModelTag, newOwner string) error {
 	const op = errors.Op("jimm.ImportModel")
 
 	if err := j.checkJimmAdmin(user); err != nil {
@@ -597,7 +597,7 @@ func (j *JIMM) ImportModel(ctx context.Context, user *openfga.User, controllerNa
 
 // UpdateMigratedModel asserts that the model has been migrated to the
 // specified controller and updates the internal model representation.
-func (j *JIMM) UpdateMigratedModel(ctx context.Context, user *openfga.User, modelTag names.ModelTag, targetControllerName string) error {
+func (j *JujuManager) UpdateMigratedModel(ctx context.Context, user *openfga.User, modelTag names.ModelTag, targetControllerName string) error {
 	const op = errors.Op("jimm.UpdateMigratedModel")
 
 	if !user.JimmAdmin {
@@ -657,7 +657,7 @@ func (j *JIMM) UpdateMigratedModel(ctx context.Context, user *openfga.User, mode
 // InitiateMigration triggers the migration of the specified model to a target controller.
 // externalMigration indicates whether this model is moving to a controller managed by
 // JIMM or not.
-func (j *JIMM) InitiateMigration(ctx context.Context, user *openfga.User, spec jujuparams.MigrationSpec) (jujuparams.InitiateMigrationResult, error) {
+func (j *JujuManager) InitiateMigration(ctx context.Context, user *openfga.User, spec jujuparams.MigrationSpec) (jujuparams.InitiateMigrationResult, error) {
 	const op = errors.Op("jimm.InitiateMigration")
 
 	result := jujuparams.InitiateMigrationResult{

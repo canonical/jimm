@@ -18,7 +18,7 @@ const (
 )
 
 // SetModelDefaults writes new default model setting values for the specified cloud/region.
-func (j *JIMM) SetModelDefaults(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag, region string, configs map[string]interface{}) error {
+func (j *JujuManager) SetModelDefaults(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag, region string, configs map[string]interface{}) error {
 	const op = errors.Op("jimm.SetModelDefaults")
 
 	var keys strings.Builder
@@ -68,7 +68,7 @@ func (j *JIMM) SetModelDefaults(ctx context.Context, user *dbmodel.Identity, clo
 }
 
 // UnsetModelDefaults resets  default model setting values for the specified cloud/region.
-func (j *JIMM) UnsetModelDefaults(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag, region string, keys []string) error {
+func (j *JujuManager) UnsetModelDefaults(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag, region string, keys []string) error {
 	const op = errors.Op("jimm.UnsetModelDefaults")
 
 	defaults := dbmodel.CloudDefaults{
@@ -86,7 +86,7 @@ func (j *JIMM) UnsetModelDefaults(ctx context.Context, user *dbmodel.Identity, c
 }
 
 // ModelDefaultsForCloud returns the default config values for the specified cloud.
-func (j *JIMM) ModelDefaultsForCloud(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag) (jujuparams.ModelDefaultsResult, error) {
+func (j *JujuManager) ModelDefaultsForCloud(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag) (jujuparams.ModelDefaultsResult, error) {
 	const op = errors.Op("jimm.ModelDefaultsForCloud")
 	result := jujuparams.ModelDefaultsResult{
 		Config: make(map[string]jujuparams.ModelDefaults),

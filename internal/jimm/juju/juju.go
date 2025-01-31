@@ -14,9 +14,8 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga"
 )
 
-// JIMM is a placeholder name for jujuManager.
-// This struct manages all business logic with Juju resources.
-type JIMM struct {
+// JujuManager handles all business logic with Juju resources.
+type JujuManager struct {
 	Database           *db.Database
 	OpenFGAClient      *openfga.OFGAClient
 	CredentialStore    credentials.CredentialStore
@@ -31,7 +30,7 @@ type JIMM struct {
 func NewJujuManager(store *db.Database, authSvc *openfga.OFGAClient,
 	credentialStore credentials.CredentialStore, permissionManager PermissionChecker,
 	resourceTag names.ControllerTag, reservedCloudNames []string,
-	dialer Dialer) (*JIMM, error) {
+	dialer Dialer) (*JujuManager, error) {
 	if store == nil {
 		return nil, errors.E("role store cannot be nil")
 	}
@@ -47,7 +46,7 @@ func NewJujuManager(store *db.Database, authSvc *openfga.OFGAClient,
 	if resourceTag.Id() == "" {
 		return nil, errors.E("invalid jimm controller tag")
 	}
-	return &JIMM{
+	return &JujuManager{
 		Database:           store,
 		OpenFGAClient:      authSvc,
 		CredentialStore:    credentialStore,
@@ -66,7 +65,7 @@ type permission struct {
 // dial dials the controller and model specified by the given Controller
 // and ModelTag. If no Dialer has been configured then an error with a
 // code of CodeConnectionFailed will be returned.
-func (j *JIMM) dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, permissons ...permission) (API, error) {
+func (j *JujuManager) dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, permissons ...permission) (API, error) {
 	if j == nil || j.Dialer == nil {
 		return nil, errors.E(errors.CodeConnectionFailed, "no dialer configured")
 	}
@@ -82,6 +81,6 @@ func (j *JIMM) dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names
 }
 
 // ResourceTag returns JIMM's controller tag stating its UUID.
-func (j *JIMM) ResourceTag() names.ControllerTag {
+func (j *JujuManager) ResourceTag() names.ControllerTag {
 	return j.resourceTag
 }

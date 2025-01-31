@@ -26,7 +26,7 @@ import (
 // If a result is erroneous, for example, bad data type parsing, the resulting struct field
 // Errors will contain a map from model UUID -> []error. Otherwise, the Results field
 // will contain model UUID -> []Jq result.
-func (j *JIMM) QueryModelsJq(ctx context.Context, modelUUIDs []string, jqQuery string) (params.CrossModelQueryResponse, error) {
+func (j *JujuManager) QueryModelsJq(ctx context.Context, modelUUIDs []string, jqQuery string) (params.CrossModelQueryResponse, error) {
 	op := errors.Op("QueryModels")
 	results := params.CrossModelQueryResponse{
 		Results: make(map[string][]any),
@@ -110,15 +110,15 @@ func (j *JIMM) QueryModelsJq(ctx context.Context, modelUUIDs []string, jqQuery s
 // First, call LoadModel, this will retrieve a model from JIMM's database.
 // Next, simply call GetParams.
 type formatterParamsRetriever struct {
-	model *dbmodel.Model
-	jimm  *JIMM
-	api   API
+	model       *dbmodel.Model
+	jujuManager *JujuManager
+	api         API
 }
 
 // newFormatterParamsRetriever returns a formatterParamsRetriever.
-func newFormatterParamsRetriever(j *JIMM) *formatterParamsRetriever {
+func newFormatterParamsRetriever(j *JujuManager) *formatterParamsRetriever {
 	return &formatterParamsRetriever{
-		jimm: j,
+		jujuManager: j,
 	}
 }
 
@@ -158,7 +158,7 @@ func (f *formatterParamsRetriever) dialModel(ctx context.Context) error {
 	if !ok {
 		return errors.E(errors.Op("failed to parse model tag"))
 	}
-	api, err := f.jimm.dial(ctx, &f.model.Controller, modelTag)
+	api, err := f.jujuManager.dial(ctx, &f.model.Controller, modelTag)
 	if err != nil {
 		zapctx.Error(ctx, "failed to dial controller for model", zap.String("controller-uuid", f.model.Controller.UUID), zap.String("model-uuid", f.model.UUID.String), zap.Error(err))
 	}

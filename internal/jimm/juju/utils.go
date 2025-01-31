@@ -21,13 +21,13 @@ import (
 
 // everyoneUser is a convenience method to retrieve the "everyone" user
 // whose permissions will translate into granting all users with access.
-func (j *JIMM) everyoneUser() *openfga.User {
+func (j *JujuManager) everyoneUser() *openfga.User {
 	everyoneIdentity := &dbmodel.Identity{Name: ofganames.EveryoneUser}
 	return openfga.NewUser(everyoneIdentity, j.OpenFGAClient)
 }
 
 // checkJimmAdmin checks if the user is a JIMM admin.
-func (j *JIMM) checkJimmAdmin(user *openfga.User) error {
+func (j *JujuManager) checkJimmAdmin(user *openfga.User) error {
 	if !user.JimmAdmin {
 		return errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
@@ -35,7 +35,7 @@ func (j *JIMM) checkJimmAdmin(user *openfga.User) error {
 }
 
 // checkAdminAccess checks if the user is an admin of the controller.
-func (j *JIMM) checkControllerAdminAccess(ctx context.Context, user *openfga.User, controller *dbmodel.Controller) error {
+func (j *JujuManager) checkControllerAdminAccess(ctx context.Context, user *openfga.User, controller *dbmodel.Controller) error {
 	isAdministrator, err := openfga.IsAdministrator(ctx, user, controller.ResourceTag())
 	if err != nil {
 		return err
@@ -51,7 +51,7 @@ func (j *JIMM) checkControllerAdminAccess(ctx context.Context, user *openfga.Use
 **/
 
 // getController gets the controller from the database by name.
-func (j *JIMM) getControllerByName(ctx context.Context, controllerName string) (*dbmodel.Controller, error) {
+func (j *JujuManager) getControllerByName(ctx context.Context, controllerName string) (*dbmodel.Controller, error) {
 	controller := dbmodel.Controller{Name: controllerName}
 	err := j.Database.GetController(ctx, &controller)
 	if err != nil {
@@ -61,7 +61,7 @@ func (j *JIMM) getControllerByName(ctx context.Context, controllerName string) (
 }
 
 // dialController dials a controller.
-func (j *JIMM) dialController(ctx context.Context, ctl *dbmodel.Controller) (API, error) {
+func (j *JujuManager) dialController(ctx context.Context, ctl *dbmodel.Controller) (API, error) {
 	api, err := j.dial(ctx, ctl, names.ModelTag{})
 	if err != nil {
 		zapctx.Error(ctx, "failed to dial the controller", zaputil.Error(err))

@@ -1394,7 +1394,7 @@ var removeCloudFromControllerTests = []struct {
 	controllerName  string
 	expectError     string
 	expectErrorCode errors.Code
-	assertSuccess   func(c *qt.C, j *juju.JIMM)
+	assertSuccess   func(c *qt.C, j *juju.JujuManager)
 }{{
 	name:            "CloudNotFound",
 	username:        "alice@canonical.com",
@@ -1414,7 +1414,7 @@ var removeCloudFromControllerTests = []struct {
 	username:       "alice@canonical.com",
 	cloud:          "test",
 	controllerName: "controller-2",
-	assertSuccess: func(c *qt.C, j *juju.JIMM) {
+	assertSuccess: func(c *qt.C, j *juju.JujuManager) {
 		cloud := dbmodel.Cloud{
 			Name: "test",
 		}
@@ -1438,7 +1438,7 @@ var removeCloudFromControllerTests = []struct {
 	username:       "alice@canonical.com",
 	cloud:          "test-cloud-2",
 	controllerName: "controller-2",
-	assertSuccess: func(c *qt.C, j *juju.JIMM) {
+	assertSuccess: func(c *qt.C, j *juju.JujuManager) {
 		cloud := dbmodel.Cloud{
 			Name: "test-cloud-2",
 		}

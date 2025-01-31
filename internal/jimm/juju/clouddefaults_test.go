@@ -33,11 +33,11 @@ func TestSetCloudDefaults(t *testing.T) {
 
 	tests := []struct {
 		about     string
-		setup     func(c *qt.C, j *juju.JIMM) testConfig
+		setup     func(c *qt.C, j *juju.JujuManager) testConfig
 		assertion func(c *qt.C, db *db.Database)
 	}{{
 		about: "defaults do not exist yet - defaults created",
-		setup: func(c *qt.C, j *juju.JIMM) testConfig {
+		setup: func(c *qt.C, j *juju.JujuManager) testConfig {
 			user, err := dbmodel.NewIdentity("bob@canonical.com")
 			c.Assert(err, qt.IsNil)
 			c.Assert(j.Database.DB.Create(user).Error, qt.IsNil)
@@ -76,7 +76,7 @@ func TestSetCloudDefaults(t *testing.T) {
 		},
 	}, {
 		about: "set defaults without region - defaults created",
-		setup: func(c *qt.C, j *juju.JIMM) testConfig {
+		setup: func(c *qt.C, j *juju.JujuManager) testConfig {
 			user, err := dbmodel.NewIdentity("bob@canonical.com")
 			c.Assert(err, qt.IsNil)
 
@@ -115,7 +115,7 @@ func TestSetCloudDefaults(t *testing.T) {
 		},
 	}, {
 		about: "defaults already exist - defaults updated",
-		setup: func(c *qt.C, j *juju.JIMM) testConfig {
+		setup: func(c *qt.C, j *juju.JujuManager) testConfig {
 			user, err := dbmodel.NewIdentity("bob@canonical.com")
 			c.Assert(err, qt.IsNil)
 
@@ -169,7 +169,7 @@ func TestSetCloudDefaults(t *testing.T) {
 		},
 	}, {
 		about: "cloudregion does not exist",
-		setup: func(c *qt.C, j *juju.JIMM) testConfig {
+		setup: func(c *qt.C, j *juju.JujuManager) testConfig {
 			user, err := dbmodel.NewIdentity("bob@canonical.com")
 			c.Assert(err, qt.IsNil)
 
@@ -198,7 +198,7 @@ func TestSetCloudDefaults(t *testing.T) {
 		},
 	}, {
 		about: "cannot set agent-version",
-		setup: func(c *qt.C, j *juju.JIMM) testConfig {
+		setup: func(c *qt.C, j *juju.JujuManager) testConfig {
 			user, err := dbmodel.NewIdentity("bob@canonical.com")
 			c.Assert(err, qt.IsNil)
 
@@ -269,11 +269,11 @@ func TestUnsetCloudDefaults(t *testing.T) {
 
 	tests := []struct {
 		about     string
-		setup     func(c *qt.C, j *juju.JIMM) testConfig
+		setup     func(c *qt.C, j *juju.JujuManager) testConfig
 		assertion func(c *qt.C, db *db.Database)
 	}{{
 		about: "all ok - keys removed from the defaults map",
-		setup: func(c *qt.C, j *juju.JIMM) testConfig {
+		setup: func(c *qt.C, j *juju.JujuManager) testConfig {
 			user, err := dbmodel.NewIdentity("bob@canonical.com")
 			c.Assert(err, qt.IsNil)
 
@@ -328,7 +328,7 @@ func TestUnsetCloudDefaults(t *testing.T) {
 		},
 	}, {
 		about: "unset without region - keys removed from the defaults map",
-		setup: func(c *qt.C, j *juju.JIMM) testConfig {
+		setup: func(c *qt.C, j *juju.JujuManager) testConfig {
 			user, err := dbmodel.NewIdentity("bob@canonical.com")
 			c.Assert(err, qt.IsNil)
 
@@ -382,7 +382,7 @@ func TestUnsetCloudDefaults(t *testing.T) {
 		},
 	}, {
 		about: "cloudregiondefaults not found",
-		setup: func(c *qt.C, j *juju.JIMM) testConfig {
+		setup: func(c *qt.C, j *juju.JujuManager) testConfig {
 			user, err := dbmodel.NewIdentity("bob@canonical.com")
 			c.Assert(err, qt.IsNil)
 

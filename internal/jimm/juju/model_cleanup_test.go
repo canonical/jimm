@@ -81,7 +81,7 @@ users:
 `
 
 type modelCleanupSuite struct {
-	jujuManager *juju.JIMM
+	jujuManager *juju.JujuManager
 	jimmAdmin   *openfga.User
 	env         *jimmtest.Environment
 }
