@@ -1154,6 +1154,76 @@ users:
 		},
 		Life: state.Alive.String(),
 	},
+}, {
+	name: "CreateModelWithDeprecatedControllers",
+	env: `
+clouds:
+- name: test-cloud
+  type: test-provider
+  regions:
+  - name: test-region-1
+  users:
+  - user: alice@canonical.com
+    access: add-model
+cloud-defaults:
+- user: alice@canonical.com
+  cloud: test-cloud
+  region: test-region-1
+  defaults:
+    key1: value1
+    key2: value2
+- user: alice@canonical.com
+  cloud: test-cloud
+  defaults:
+    key3: value3
+cloud-credentials:
+- name: test-credential-1
+  owner: alice@canonical.com
+  cloud: test-cloud
+  auth-type: empty
+controllers:
+- name: controller-1
+  uuid: 00000000-0000-0000-0000-0000-0000000000001
+  cloud: test-cloud
+  region: test-region-1
+  deprecated: true
+  cloud-regions:
+  - cloud: test-cloud
+    region: test-region-1
+    priority: 0
+`[1:],
+	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
+		return nil, nil
+	},
+	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
+		return nil
+	},
+	createModel: assertConfig(map[string]interface{}{
+		"key1": "value1",
+		"key2": "value2",
+		"key3": "value3",
+	}, createModel(`
+uuid: 00000001-0000-0000-0000-0000-000000000001
+status:
+  status: started
+  info: running a test
+life: alive
+users:
+- user: alice@canonical.com
+  access: admin
+- user: bob
+  access: read
+`[1:])),
+	username:     "alice@canonical.com",
+	jimmAdmin:    true,
+	cloudCredTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
+	args: jujuparams.ModelCreateArgs{
+		Name:        "test-model",
+		OwnerTag:    names.NewUserTag("alice@canonical.com").String(),
+		CloudTag:    names.NewCloudTag("test-cloud").String(),
+		CloudRegion: "test-region-1",
+	},
+	expectError: "unsupported cloud region test-cloud/test-region-1",
 }}
 
 func TestAddModel(t *testing.T) {

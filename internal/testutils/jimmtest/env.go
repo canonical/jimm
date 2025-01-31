@@ -413,6 +413,7 @@ type Controller struct {
 	CloudRegion  string                          `json:"region"`
 	CloudRegions []CloudRegionControllerPriority `json:"cloud-regions"`
 	AgentVersion string                          `json:"agent-version"`
+	Deprecated   bool                            `json:"deprecated,omitempty"`
 
 	env *Environment
 	dbo dbmodel.Controller
@@ -428,6 +429,7 @@ func (ctl *Controller) DBObject(c Tester, db *db.Database) dbmodel.Controller {
 	ctl.dbo.CloudName = ctl.Cloud
 	ctl.dbo.CloudRegion = ctl.CloudRegion
 	ctl.dbo.CloudRegions = make([]dbmodel.CloudRegionControllerPriority, len(ctl.CloudRegions))
+	ctl.dbo.Deprecated = ctl.Deprecated
 	for i, cr := range ctl.CloudRegions {
 		cl := ctl.env.Cloud(cr.Cloud).DBObject(c, db)
 		ctl.dbo.CloudRegions[i] = dbmodel.CloudRegionControllerPriority{

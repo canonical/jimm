@@ -193,8 +193,13 @@ func (b *modelBuilder) WithCloudRegion(region string) *modelBuilder {
 		if r.Name != region {
 			continue
 		}
-		// consider all possible controllers for that region
-		regionControllers := r.Controllers
+		// consider all non-deprecated controller for the region
+		var regionControllers []dbmodel.CloudRegionControllerPriority
+		for _, ctrl := range r.Controllers {
+			if !ctrl.Controller.Deprecated {
+				regionControllers = append(regionControllers, ctrl)
+			}
+		}
 		if len(regionControllers) == 0 {
 			b.err = errors.E(errors.CodeBadRequest, fmt.Sprintf("unsupported cloud region %s/%s", b.cloud.Name, region))
 			return b
