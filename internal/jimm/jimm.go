@@ -195,8 +195,9 @@ type SSHManager interface {
 	// PublicKeyHandler is the method to verify the public key of the user. It returns a user if successful.
 	PublicKeyHandler(ctx context.Context, claimUser string, key []byte) (*openfga.User, error)
 
-	// ResolveAddressesFromModelUUID is the method to resolve the address of the controller to contact given the model UUID.
-	ResolveAddressesFromModelUUID(ctx context.Context, modelUUID string) ([]string, error)
+	// ControllerInfoFromModelUUID is the method to resolve the address of the controller to contact given the model UUID and
+	// a valid JWT To connect to the controller.
+	ControllerInfoFromModelUUID(ctx context.Context, modelUUID string, user *openfga.User) (ssh.ControllerInfo, error)
 }
 
 // JujuManager is the interface to manage all Juju related operations.
@@ -420,7 +421,7 @@ func New(p Parameters) (*JIMM, error) {
 	}
 	j.sshKeyManager = sshKeyManager
 
-	sshManager, err := ssh.NewSSHManager(j.identityManager, j.jujuManager, j.sshKeyManager)
+	sshManager, err := ssh.NewSSHManager(j.identityManager, j.jujuManager, j.sshKeyManager, j.jujuAuthFactory)
 	if err != nil {
 		return nil, err
 	}

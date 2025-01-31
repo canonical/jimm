@@ -15,6 +15,7 @@ import (
 	"go.uber.org/zap"
 	gossh "golang.org/x/crypto/ssh"
 
+	jimmssh "github.com/canonical/jimm/v3/internal/jimm/ssh"
 	"github.com/canonical/jimm/v3/internal/openfga"
 )
 
@@ -31,8 +32,9 @@ type SSHManager interface {
 	// PublicKeyHandler is the method to verify the public key of the user. It returns a user if successful.
 	PublicKeyHandler(ctx context.Context, claimUser string, key []byte) (*openfga.User, error)
 
-	// ResolveAddressesFromModelUUID is the method to resolve the address of the controller to contact given the model UUID.
-	ResolveAddressesFromModelUUID(ctx context.Context, modelUUID string) ([]string, error)
+	// ControllerInfoFromModelUUID is the method to resolve the address of the controller to contact given the model UUID and
+	// a valid JWT To connect to the controller.
+	ControllerInfoFromModelUUID(ctx context.Context, modelUUID string, user *openfga.User) (jimmssh.ControllerInfo, error)
 }
 
 // forwardMessage is the struct holding the information about the jump message received by the ssh client.
@@ -137,18 +139,17 @@ func directTCPIPHandler(sshManager SSHManager) func(srv *ssh.Server, conn *gossh
 			return
 		}
 		modelTag := names.NewModelTag(d.DestAddr)
-		// user is now ignored, but it will be needed for the jwt auth next-up.
-		_, err := fetchAndAuthorizeUser(ctx, modelTag)
+		user, err := fetchAndAuthorizeUser(ctx, modelTag)
 		if err != nil {
 			rejectConnectionAndLogError(ctx, newChan, err.Error(), err)
 			return
 		}
-		addrs, err := sshManager.ResolveAddressesFromModelUUID(ctx, modelTag.Id())
+		connInfo, err := sshManager.ControllerInfoFromModelUUID(ctx, modelTag.Id(), user)
 		if err != nil {
-			rejectConnectionAndLogError(ctx, newChan, "failed to resolve address from model uuid", err)
+			rejectConnectionAndLogError(ctx, newChan, "failed to get connection info", err)
 			return
 		}
-		client, err := dialControllerSSHServer(addrs, d.DestPort)
+		client, err := dialControllerSSHServer(connInfo, d.DestPort)
 		if err != nil {
 			rejectConnectionAndLogError(ctx, newChan, fmt.Sprintf("failed to dial controller ssh: %v", err), err)
 			return

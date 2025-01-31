@@ -407,13 +407,14 @@ func (cc *CloudCredential) DBObject(c Tester, db *db.Database) dbmodel.CloudCred
 // A Controller represents the definition of a controller in a test
 // environment.
 type Controller struct {
-	Name         string                          `json:"name"`
-	UUID         string                          `json:"uuid"`
-	Cloud        string                          `json:"cloud"`
-	CloudRegion  string                          `json:"region"`
-	CloudRegions []CloudRegionControllerPriority `json:"cloud-regions"`
-	AgentVersion string                          `json:"agent-version"`
-	Deprecated   bool                            `json:"deprecated,omitempty"`
+	Name          string                          `json:"name"`
+	UUID          string                          `json:"uuid"`
+	Cloud         string                          `json:"cloud"`
+	CloudRegion   string                          `json:"region"`
+	CloudRegions  []CloudRegionControllerPriority `json:"cloud-regions"`
+	AgentVersion  string                          `json:"agent-version"`
+	PublicAddress string                          `json:"public-address"`
+	Deprecated    bool                            `json:"deprecated,omitempty"`
 
 	env *Environment
 	dbo dbmodel.Controller
@@ -428,6 +429,7 @@ func (ctl *Controller) DBObject(c Tester, db *db.Database) dbmodel.Controller {
 	ctl.dbo.AgentVersion = ctl.AgentVersion
 	ctl.dbo.CloudName = ctl.Cloud
 	ctl.dbo.CloudRegion = ctl.CloudRegion
+	ctl.dbo.PublicAddress = ctl.PublicAddress
 	ctl.dbo.CloudRegions = make([]dbmodel.CloudRegionControllerPriority, len(ctl.CloudRegions))
 	ctl.dbo.Deprecated = ctl.Deprecated
 	for i, cr := range ctl.CloudRegions {

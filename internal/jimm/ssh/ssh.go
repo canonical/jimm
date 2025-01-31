@@ -10,9 +10,18 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jimm/jujuauth"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/rpc"
 )
+
+// ControllerInfo is the struct holding the infomation to contact a controller
+type ControllerInfo struct {
+	// addresses to dial the controller
+	Addresses []string
+	// JWT to authenticate to the controller
+	JWT string
+}
 
 // IdentityManager provides a means to fetch an identity from the identity service.
 type IdentityManager interface {
@@ -29,8 +38,13 @@ type SSHKeyManager interface {
 	VerifyPublicKey(ctx context.Context, claimUser string, publicKey []byte) (bool, error)
 }
 
+// JWTGeneratorFactory provides a means to create a token generator.
+type JWTGeneratorFactory interface {
+	New() jujuauth.TokenGenerator
+}
+
 // NewSSHManager returns a new SSHManager that offers jimm functionality to the SSHJumpServer.
-func NewSSHManager(identityManager IdentityManager, modelManager ModelManager, sshKeyManager SSHKeyManager) (*sshManager, error) {
+func NewSSHManager(identityManager IdentityManager, modelManager ModelManager, sshKeyManager SSHKeyManager, jwtFactory JWTGeneratorFactory) (*sshManager, error) {
 	if identityManager == nil {
 		return nil, errors.E("identityManager cannot be nil")
 	}
@@ -40,10 +54,14 @@ func NewSSHManager(identityManager IdentityManager, modelManager ModelManager, s
 	if sshKeyManager == nil {
 		return nil, errors.E("sshManager cannot be nil")
 	}
+	if jwtFactory == nil {
+		return nil, errors.E("jwtFactory cannot be nil")
+	}
 	return &sshManager{
 		modelManager:    modelManager,
 		identityManager: identityManager,
 		sshKeyManager:   sshKeyManager,
+		jwtFactory:      jwtFactory,
 	}, nil
 }
 
@@ -52,6 +70,7 @@ type sshManager struct {
 	modelManager    ModelManager
 	identityManager IdentityManager
 	sshKeyManager   SSHKeyManager
+	jwtFactory      JWTGeneratorFactory
 }
 
 // PublicKeyHandler is the method to verify the public key of the user. It first checks for the public key and then fetches the user.
@@ -69,19 +88,27 @@ func (s *sshManager) PublicKeyHandler(ctx context.Context, claimUser string, key
 	return user, nil
 }
 
-// ResolveAddressesFromModelUUID is the method to resolve the address of the controller to contact given the model UUID.
-func (s *sshManager) ResolveAddressesFromModelUUID(ctx context.Context, modelUUID string) ([]string, error) {
-	zapctx.Info(ctx, "ResolveAddressesFromModelUUID")
-
+// ControllerInfoFromModelUUID is the method to resolve the address of the controller to contact given the model UUID and
+// a valid JWT To connect to the controller.
+func (s *sshManager) ControllerInfoFromModelUUID(ctx context.Context, modelUUID string, user *openfga.User) (ControllerInfo, error) {
+	zapctx.Info(ctx, "ControllerInfoFromModelUUID")
 	model, err := s.modelManager.GetModel(ctx, modelUUID)
 	if err != nil {
-		return nil, errors.E(err, "cannot find model")
+		return ControllerInfo{}, errors.E(err, "cannot find model")
 	}
-
 	addrs, _ := rpc.GetAddressesAndTLSConfig(ctx, &model.Controller)
 	if len(addrs) == 0 {
-		return nil, errors.E(err, "cannot find addresses for model's controller")
+		return ControllerInfo{}, errors.E(err, "cannot find addresses for model's controller")
+	}
+	jwtGenerator := s.jwtFactory.New()
+	jwtGenerator.SetTags(model.ResourceTag(), model.Controller.ResourceTag())
+	jwt, err := jwtGenerator.MakeLoginToken(ctx, user)
+	if err != nil {
+		return ControllerInfo{}, errors.E(err, "cannot generate jwt")
 	}
 
-	return addrs, nil
+	return ControllerInfo{
+		Addresses: addrs,
+		JWT:       string(jwt),
+	}, nil
 }
