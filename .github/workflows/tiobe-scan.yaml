@@ -18,6 +18,7 @@ jobs:
         mode: qserver
         project: jimm
         branchdir: .
+        branchname: v3
         viewerUrl: https://canonical.tiobe.com/tiobeweb/TICS/api/cfg?name=default
         ticsAuthToken: ${{ secrets.TICSAUTHTOKEN }}
         installTics: true
