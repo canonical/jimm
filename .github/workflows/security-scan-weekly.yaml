@@ -6,9 +6,9 @@ on:
   workflow_dispatch:
 
 jobs:
-  security-scan:
+  repo-security-scan:
     runs-on: [ubuntu-latest]
-    name: Security Scan
+    name: Repo Security Scan
     strategy:
       matrix:
         branch: [v3]
@@ -23,3 +23,19 @@ jobs:
         with: 
           upload-github-security: "true"
           upload-sarif-artifact: "true"
+
+  container-security-scan:
+    runs-on: [ubuntu-latest]
+    name: Container Security Scan
+    steps:
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: 'ghcr.io/canonical/jimm:latest'
+          format: 'sarif'
+          output: 'container-trivy-results.sarif'
+
+      - name: Upload container Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'container-trivy-results.sarif'
