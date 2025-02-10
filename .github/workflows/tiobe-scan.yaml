@@ -12,6 +12,31 @@ jobs:
     - name: Checkout the project
       uses: actions/checkout@v4
 
+    - name: Setup Go
+      uses: actions/setup-go@v4
+      with:
+        go-version-file: "go.mod"
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update -y && sudo apt-get install -y gcc git-core gnupg build-essential
+        go install honnef.co/go/tools/cmd/staticcheck@v0.5.1
+        go install github.com/axw/gocov/gocov@v1.1.0
+        go install github.com/AlekSi/gocov-xml@v1.1.0
+
+    - name: Install juju-db
+      run: sudo snap install juju-db --channel 4.4/stable
+
+    - name: Start test environment
+      run: docker compose up -d --wait
+    
+    - name: Test and generate coverage report
+      run: |
+        TEST_LOGGING_CONFIG=ERROR go test -mod readonly ./... -timeout 1h -coverprofile=coverage.out
+        gocov convert coverage.out > coverage.json
+        mkdir .coverage
+        gocov-xml < coverage.json > .coverage/coverage.xml
+
     - name: Run TICS analysis with github-action
       uses: tiobe/tics-github-action@v3
       with:
