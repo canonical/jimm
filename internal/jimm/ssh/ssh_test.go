@@ -17,7 +17,6 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
-	"github.com/canonical/jimm/v3/internal/jimm"
 	"github.com/canonical/jimm/v3/internal/jimm/identity"
 	"github.com/canonical/jimm/v3/internal/jimm/jujuauth"
 	"github.com/canonical/jimm/v3/internal/jimm/permissions"
@@ -34,7 +33,7 @@ type sshManagerSuite struct {
 	allowedModelUUID      string
 	allowedControllerUUID string
 
-	sshManager jimm.SSHManager
+	sshManager *ssh.SSHManager
 
 	userWithAccess    *openfga.User
 	userWithoutAccess *openfga.User

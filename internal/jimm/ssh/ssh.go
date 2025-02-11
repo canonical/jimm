@@ -4,9 +4,13 @@ package ssh
 
 import (
 	"context"
+	goerr "errors"
 	"fmt"
+	"net"
+	"time"
 
 	"github.com/juju/zaputil/zapctx"
+	gossh "golang.org/x/crypto/ssh"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
@@ -14,6 +18,9 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/rpc"
 )
+
+// jujuSSHDefaultPort is the default port we expect the juju controllers to respond on.
+const jujuSSHDefaultPort = 17022
 
 // ControllerInfo is the struct holding the infomation to contact a controller
 type ControllerInfo struct {
@@ -88,9 +95,9 @@ func (s *sshManager) PublicKeyHandler(ctx context.Context, claimUser string, key
 	return user, nil
 }
 
-// ControllerInfoFromModelUUID is the method to resolve the address of the controller to contact given the model UUID and
+// controllerInfoFromModelUUID is the method to resolve the address of the controller to contact given the model UUID and
 // a valid JWT To connect to the controller.
-func (s *sshManager) ControllerInfoFromModelUUID(ctx context.Context, modelUUID string, user *openfga.User) (ControllerInfo, error) {
+func (s *sshManager) controllerInfoFromModelUUID(ctx context.Context, modelUUID string, user *openfga.User) (ControllerInfo, error) {
 	zapctx.Info(ctx, "ControllerInfoFromModelUUID")
 	model, err := s.modelManager.GetModel(ctx, modelUUID)
 	if err != nil {
@@ -111,4 +118,43 @@ func (s *sshManager) ControllerInfoFromModelUUID(ctx context.Context, modelUUID 
 		Addresses: addrs,
 		JWT:       string(jwt),
 	}, nil
+}
+
+// DialControllerSSHServer determines which controller holds the desired
+// model and dials the controller returning an SSH connection to the controller.
+// We intentionally don't accept user input for the port to disallow the
+// user from probing for open ports on the Juju controller.
+func (s *sshManager) DialControllerSSHServer(ctx context.Context, modelUUID string, user *openfga.User) (*gossh.Client, error) {
+	connInfo, err := s.controllerInfoFromModelUUID(ctx, modelUUID, user)
+	if err != nil {
+		return nil, err
+	}
+	// TODO: Dial the controller and request it's SSH port
+	// here or save it when we add a controller to JIMM.
+	destPort := jujuSSHDefaultPort
+	var client *gossh.Client
+	var errs []error
+
+	for _, addr := range connInfo.Addresses {
+		dest := net.JoinHostPort(addr, fmt.Sprint(destPort))
+		client, err = gossh.Dial("tcp", dest, &gossh.ClientConfig{
+			User: "jimm",
+			//nolint:gosec // this will be removed once we handle hostkeys
+			HostKeyCallback: gossh.InsecureIgnoreHostKey(),
+			Auth: []gossh.AuthMethod{
+				gossh.PasswordCallback(func() (secret string, err error) {
+					return connInfo.JWT, nil
+				}),
+			},
+			Timeout: 5 * time.Second,
+		})
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	if client == nil {
+		return nil, errors.E(goerr.Join(errs...), "cannot dial controller")
+	}
+	return client, nil
 }
