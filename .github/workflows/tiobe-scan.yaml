@@ -24,6 +24,23 @@ jobs:
         go install github.com/axw/gocov/gocov@v1.1.0
         go install github.com/AlekSi/gocov-xml@v1.1.0
 
+    - name: Install Docker
+      run: |
+        sudo apt-get update -y
+        sudo apt-get install -y \
+          ca-certificates \
+          curl \
+          gnupg \
+          lsb-release
+        sudo mkdir -p /etc/apt/keyrings
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+        echo \
+          "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+          $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+        sudo apt-get update -y
+        sudo snap install docker # installing via apt doesn't work, because you can't start systemctl services.
+        sudo apt-get install -y docker-compose-plugin
+    
     - name: Install juju-db
       run: sudo snap install juju-db --channel 4.4/stable
 
@@ -34,7 +51,7 @@ jobs:
       run: |
         TEST_LOGGING_CONFIG=ERROR go test -mod readonly ./... -timeout 1h -coverprofile=coverage.out
         gocov convert coverage.out > coverage.json
-        mkdir .coverage
+        mkdir -p .coverage
         gocov-xml < coverage.json > .coverage/coverage.xml
 
     - name: Run TICS analysis with github-action
@@ -46,3 +63,6 @@ jobs:
         viewerUrl: https://canonical.tiobe.com/tiobeweb/TICS/api/cfg?name=default
         ticsAuthToken: ${{ secrets.TICSAUTHTOKEN }}
         installTics: true
+
+    - name: echo URL to TIOBE dashboard
+      run: echo "Go here to see the results: https://canonical.tiobe.com/tiobeweb/TICS/Explorer.html#axes=ProjectGroup(PrivateRepos),Project(jimm)"
