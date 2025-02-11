@@ -29,6 +29,7 @@
 package limitlistener
 
 import (
+	"errors"
 	"net"
 	"sync"
 	"time"
@@ -36,7 +37,7 @@ import (
 
 // N.B.:
 // This is a copypaste of netutil.LimiLister (link: https://cs.opensource.google/go/x/net/+/refs/tags/v0.34.0:netutil/listen.go),
-// but we add a timeout so when we are at the limit we actively close connections instead of waiting indefinetely. (Look at line 44)
+// but we add a timeout so when we are at the limit we actively close connections instead of waiting indefinetely.
 
 // ListenerWithTimeout returns a Listener that accepts at most n simultaneous
 // connections from the provided Listener, and it timeouts when the max
@@ -85,13 +86,15 @@ func (l *limitListener) Accept() (net.Conn, error) {
 		// the aforementioned issue) seem to assume that Accept will be called to
 		// completion, and may otherwise fail to clean up the client end of pending
 		// connections.
-		for {
-			c, err := l.Listener.Accept()
-			if err != nil {
-				return nil, err
-			}
-			c.Close()
+		// (With Timeout changes): We cannot tell here whether acquire failed
+		// due to a timeout or because the listener was closed so simply close the
+		// incoming connection and return an error.
+		c, err := l.Listener.Accept()
+		if err != nil {
+			return nil, err
 		}
+		c.Close()
+		return nil, errors.New("failed to acquire lock, either the listener is closed or the maximum number of connections has been reached.")
 	}
 
 	c, err := l.Listener.Accept()
