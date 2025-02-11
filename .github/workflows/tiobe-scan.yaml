@@ -65,4 +65,5 @@ jobs:
         installTics: true
 
     - name: echo URL to TIOBE dashboard
-      run: echo "Go here to see the results: https://canonical.tiobe.com/tiobeweb/TICS/Explorer.html#axes=ProjectGroup(PrivateRepos),Project(jimm)"
+      run: |
+        echo 'Go here to see the results: https://canonical.tiobe.com/tiobeweb/TICS/Explorer.html#axes=ProjectGroup(PrivateRepos),Project(jimm)'
