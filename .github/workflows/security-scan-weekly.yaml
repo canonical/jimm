@@ -23,3 +23,4 @@ jobs:
         with: 
           upload-github-security: "true"
           upload-sarif-artifact: "true"
+          container-name: "ghcr.io/canonical/jimm:latest"
