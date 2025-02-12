@@ -95,9 +95,9 @@ func (s *sshManager) PublicKeyHandler(ctx context.Context, claimUser string, key
 	return user, nil
 }
 
-// controllerInfoFromModelUUID is the method to resolve the address of the controller to contact given the model UUID and
+// ControllerInfoFromModelUUID is the method to resolve the address of the controller to contact given the model UUID and
 // a valid JWT To connect to the controller.
-func (s *sshManager) controllerInfoFromModelUUID(ctx context.Context, modelUUID string, user *openfga.User) (ControllerInfo, error) {
+func (s *sshManager) ControllerInfoFromModelUUID(ctx context.Context, modelUUID string, user *openfga.User) (ControllerInfo, error) {
 	zapctx.Info(ctx, "ControllerInfoFromModelUUID")
 	model, err := s.modelManager.GetModel(ctx, modelUUID)
 	if err != nil {
@@ -120,22 +120,19 @@ func (s *sshManager) controllerInfoFromModelUUID(ctx context.Context, modelUUID 
 	}, nil
 }
 
-// DialControllerSSHServer determines which controller holds the desired
-// model and dials the controller returning an SSH connection to the controller.
-// We intentionally don't accept user input for the port to disallow the
+// DialControllerSSHServer dials the controller and returns
+// an SSH connection.
+// We don't accept user input for the port to disallow the
 // user from probing for open ports on the Juju controller.
-func (s *sshManager) DialControllerSSHServer(ctx context.Context, modelUUID string, user *openfga.User) (*gossh.Client, error) {
-	connInfo, err := s.controllerInfoFromModelUUID(ctx, modelUUID, user)
-	if err != nil {
-		return nil, err
-	}
+func (s *sshManager) DialControllerSSHServer(ctx context.Context, ctrlInfo ControllerInfo, user *openfga.User) (*gossh.Client, error) {
 	// TODO: Dial the controller and request it's SSH port
 	// here or save it when we add a controller to JIMM.
 	destPort := jujuSSHDefaultPort
 	var client *gossh.Client
+	var err error
 	var errs []error
 
-	for _, addr := range connInfo.Addresses {
+	for _, addr := range ctrlInfo.Addresses {
 		dest := net.JoinHostPort(addr, fmt.Sprint(destPort))
 		client, err = gossh.Dial("tcp", dest, &gossh.ClientConfig{
 			User: "jimm",
@@ -143,7 +140,7 @@ func (s *sshManager) DialControllerSSHServer(ctx context.Context, modelUUID stri
 			HostKeyCallback: gossh.InsecureIgnoreHostKey(),
 			Auth: []gossh.AuthMethod{
 				gossh.PasswordCallback(func() (secret string, err error) {
-					return connInfo.JWT, nil
+					return ctrlInfo.JWT, nil
 				}),
 			},
 			Timeout: 5 * time.Second,
