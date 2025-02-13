@@ -17,10 +17,10 @@ import (
 
 	jimmssh "github.com/canonical/jimm/v3/internal/jimm/ssh"
 	"github.com/canonical/jimm/v3/internal/openfga"
+	"github.com/canonical/jimm/v3/internal/ssh/limitlistener"
 )
 
-// jujuSSHDefaultPort is the default port we expect the juju controllers to respond on.
-const jujuSSHDefaultPort = 17022
+const defaultSSHPort = 17022
 const defaultAcceptConnectionTimeout = time.Second
 const defaultMaxConcurrentConnections = 100
 
@@ -32,9 +32,12 @@ type SSHManager interface {
 	// PublicKeyHandler is the method to verify the public key of the user. It returns a user if successful.
 	PublicKeyHandler(ctx context.Context, claimUser string, key []byte) (*openfga.User, error)
 
-	// ControllerInfoFromModelUUID is the method to resolve the address of the controller to contact given the model UUID and
-	// a valid JWT To connect to the controller.
+	// ControllerInfoFromModelUUID uses the given model UUID to return the address of the controller to
+	// contact and a valid JWT To authenticate to the controller.
 	ControllerInfoFromModelUUID(ctx context.Context, modelUUID string, user *openfga.User) (jimmssh.ControllerInfo, error)
+
+	// DialControllerSSHServer dials the controller using the provided controller info.
+	DialControllerSSHServer(ctx context.Context, ctrlInfo jimmssh.ControllerInfo, user *openfga.User) (*gossh.Client, error)
 }
 
 // forwardMessage is the struct holding the information about the jump message received by the ssh client.
@@ -101,7 +104,7 @@ func NewJumpServer(ctx context.Context, config Config, sshManager SSHManager) (S
 // setConfigDefaults sets the default values for the configuration.
 func setConfigDefaults(config Config) Config {
 	if config.Port == "" {
-		config.Port = fmt.Sprint(jujuSSHDefaultPort)
+		config.Port = fmt.Sprint(defaultSSHPort)
 	}
 	if config.MaxConcurrentConnections <= 0 {
 		config.MaxConcurrentConnections = defaultMaxConcurrentConnections
@@ -115,7 +118,7 @@ func setConfigDefaults(config Config) Config {
 // ListenAndServe create a LimitListenerWithTimeout and Serve requests.
 func (srv Server) ListenAndServe() error {
 	ln, err := net.Listen("tcp", srv.Addr)
-	ln = limitListenerWithTimeout(ln, srv.maxConcurrentConnections, srv.acceptConnectionTimeout)
+	ln = limitlistener.ListenerWithTimeout(ln, srv.maxConcurrentConnections, srv.acceptConnectionTimeout)
 	if err != nil {
 		return err
 	}
@@ -131,9 +134,9 @@ func directTCPIPHandler(sshManager SSHManager) func(srv *ssh.Server, conn *gossh
 			rejectConnectionAndLogError(ctx, newChan, "failed to parse channel data", err)
 			return
 		}
-		if d.DestPort == 0 {
-			d.DestPort = jujuSSHDefaultPort
-		}
+
+		// TODO: Parse destAddr from a virtual hostname.
+
 		if !names.IsValidModel(d.DestAddr) {
 			rejectConnectionAndLogError(ctx, newChan, "invalid model uuid", nil)
 			return
@@ -144,29 +147,28 @@ func directTCPIPHandler(sshManager SSHManager) func(srv *ssh.Server, conn *gossh
 			rejectConnectionAndLogError(ctx, newChan, err.Error(), err)
 			return
 		}
+
 		connInfo, err := sshManager.ControllerInfoFromModelUUID(ctx, modelTag.Id(), user)
 		if err != nil {
-			rejectConnectionAndLogError(ctx, newChan, "failed to get connection info", err)
-			return
-		}
-		client, err := dialControllerSSHServer(connInfo, d.DestPort)
-		if err != nil {
-			rejectConnectionAndLogError(ctx, newChan, fmt.Sprintf("failed to dial controller ssh: %v", err), err)
+			rejectConnectionAndLogError(ctx, newChan, "failed to get controller connection info", err)
 			return
 		}
 
-		dstChan, reqs, err := client.OpenChannel("direct-tcpip", gossh.Marshal(d))
+		client, err := sshManager.DialControllerSSHServer(ctx, connInfo, user)
 		if err != nil {
-			rejectConnectionAndLogError(ctx, newChan, "failed to open destination channel", err)
+			rejectConnectionAndLogError(ctx, newChan, "failed to dial controller", err)
 			return
 		}
-		// gossh.Request are requests sent outside of the normal stream of data (ex. pty-req for an interactive session).
-		// Since we only need the raw data to redirect, we can discard them.
-		go gossh.DiscardRequests(reqs)
 
-		srcDest, reqs, err := newChan.Accept()
+		controllerConn, err := client.Dial("tcp", fmt.Sprintf("%s:22", d.DestAddr))
 		if err != nil {
-			dstChan.Close()
+			rejectConnectionAndLogError(ctx, newChan, "failed to create tunnel to controller", err)
+			return
+		}
+
+		clientConn, reqs, err := newChan.Accept()
+		if err != nil {
+			rejectConnectionAndLogError(ctx, newChan, "failed to accept channel creation request", err)
 			return
 		}
 		// gossh.Request are requests sent outside of the normal stream of data (ex. pty-req for an interactive session).
@@ -174,22 +176,22 @@ func directTCPIPHandler(sshManager SSHManager) func(srv *ssh.Server, conn *gossh
 		go gossh.DiscardRequests(reqs)
 
 		go func() {
-			defer srcDest.Close()
-			defer dstChan.Close()
-			_, err := io.Copy(srcDest, dstChan)
+			defer clientConn.Close()
+			defer controllerConn.Close()
+			_, err = io.Copy(clientConn, controllerConn)
 			if err != nil {
-				rejectConnectionAndLogError(ctx, newChan, "failed to copy data from src to dts", err)
+				zapctx.Error(ctx, "ssh client to controller error", zap.Error(err))
 			}
+
 		}()
 		go func() {
-			defer srcDest.Close()
-			defer dstChan.Close()
-			_, err := io.Copy(dstChan, srcDest)
+			defer clientConn.Close()
+			defer controllerConn.Close()
+			_, err = io.Copy(controllerConn, clientConn)
 			if err != nil {
-				rejectConnectionAndLogError(ctx, newChan, "failed to copy data from dst to src", err)
+				zapctx.Error(ctx, "ssh controller to client error", zap.Error(err))
 			}
 		}()
-		zapctx.Info(ctx, fmt.Sprintf("Proxying connection from %s:%d to %s:%d \n", d.SrcAddr, d.SrcPort, d.DestAddr, d.DestPort))
 	}
 }
 

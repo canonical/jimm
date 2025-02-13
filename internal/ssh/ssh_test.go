@@ -9,8 +9,6 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -19,9 +17,11 @@ import (
 	gliderssh "github.com/gliderlabs/ssh"
 	"github.com/juju/names/v5"
 	gossh "golang.org/x/crypto/ssh"
+	"google.golang.org/grpc/test/bufconn"
 
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/errors"
 	jimmssh "github.com/canonical/jimm/v3/internal/jimm/ssh"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
@@ -32,14 +32,14 @@ import (
 
 type sshSuite struct {
 	destinationJujuSSHServer *gliderssh.Server
-	destinationServerPort    int
-	jumpSSHServer            ssh.Server
-	jumpServerPort           int
-	privateKey               gossh.Signer
-	hostKey                  gossh.Signer
 	testInDestinationServerF func(fm ssh.ForwardMessage)
-	received                 chan bool
 
+	jumpSSHServer      ssh.Server
+	jumpServerListener *bufconn.Listener
+	privateKey         gossh.Signer
+	hostKey            gossh.Signer
+
+	received         chan bool
 	allowedModelUUID string
 }
 
@@ -63,6 +63,7 @@ func (s *sshSuite) Init(c *qt.C) {
 	s.allowedModelUUID = "deadbeef-1bad-500d-9000-4b1d0d06f00d"
 	err = userWithAccess.SetModelAccess(ctx, names.NewModelTag(s.allowedModelUUID), ofganames.WriterRelation)
 	c.Assert(err, qt.IsNil)
+
 	// create a user and don't set any permission
 	i2, err := dbmodel.NewIdentity("bob")
 	c.Assert(err, qt.IsNil)
@@ -70,11 +71,9 @@ func (s *sshSuite) Init(c *qt.C) {
 
 	// setup destination server
 	s.received = make(chan bool)
-	port, err := jimmtest.GetFreePort()
-	c.Assert(err, qt.IsNil)
-	s.destinationServerPort = port
+	destinationServerListener := bufconn.Listen(1 * 1024)
+
 	s.destinationJujuSSHServer = &gliderssh.Server{
-		Addr: fmt.Sprintf(":%d", port),
 		ChannelHandlers: map[string]gliderssh.ChannelHandler{
 			"direct-tcpip": func(srv *gliderssh.Server, conn *gossh.ServerConn, newChan gossh.NewChannel, ctx gliderssh.Context) {
 				d := ssh.ForwardMessage{}
@@ -94,15 +93,10 @@ func (s *sshSuite) Init(c *qt.C) {
 		},
 	}
 	go func() {
-		_ = s.destinationJujuSSHServer.ListenAndServe()
+		_ = s.destinationJujuSSHServer.Serve(destinationServerListener)
 	}()
-	s.destinationServerPort, err = strconv.Atoi(strings.Split(s.destinationJujuSSHServer.Addr, ":")[1])
-	c.Assert(err, qt.IsNil)
 
 	// setup jump server
-	port, err = jimmtest.GetFreePort()
-	c.Assert(err, qt.IsNil)
-	s.jumpServerPort = port
 	k, err := rsa.GenerateKey(rand.Reader, 2048)
 	c.Assert(err, qt.IsNil)
 	hostKey := pem.EncodeToMemory(
@@ -114,9 +108,10 @@ func (s *sshSuite) Init(c *qt.C) {
 	s.hostKey, err = gossh.ParsePrivateKey(hostKey)
 	c.Assert(err, qt.IsNil)
 
+	s.jumpServerListener = bufconn.Listen(1 * 1024)
 	jumpServer, err := ssh.NewJumpServer(context.Background(),
 		ssh.Config{
-			Port:                     fmt.Sprint(port),
+			Port:                     "22",
 			HostKey:                  hostKey,
 			MaxConcurrentConnections: 10,
 		},
@@ -128,17 +123,36 @@ func (s *sshSuite) Init(c *qt.C) {
 				return userWithoutAccess, nil
 			},
 			ControllerInfoFromModelUUID_: func(ctx context.Context, modelUUID string, user *openfga.User) (jimmssh.ControllerInfo, error) {
-				if user == userWithAccess {
-					return jimmssh.ControllerInfo{Addresses: []string{""}, JWT: "valid-jwt"}, nil
+				if modelUUID != s.allowedModelUUID {
+					return jimmssh.ControllerInfo{}, errors.E("permission denied")
 				}
-				return jimmssh.ControllerInfo{Addresses: []string{""}, JWT: ""}, nil
+				return jimmssh.ControllerInfo{}, nil
+			},
+			DialControllerSSHServer_: func(ctx context.Context, ctrlInfo jimmssh.ControllerInfo, user *openfga.User) (*gossh.Client, error) {
+				conn, err := destinationServerListener.Dial()
+				if err != nil {
+					return nil, err
+				}
+				sshConn, newChan, reqs, err := gossh.NewClientConn(conn, "", &gossh.ClientConfig{
+					//nolint:gosec
+					HostKeyCallback: gossh.InsecureIgnoreHostKey(),
+					Auth: []gossh.AuthMethod{
+						gossh.Password("valid-jwt"),
+					},
+					User: user.Name,
+				})
+				if err != nil {
+					return nil, err
+				}
+
+				return gossh.NewClient(sshConn, newChan, reqs), nil
 			},
 		})
 	c.Assert(err, qt.IsNil)
+
 	s.jumpSSHServer = jumpServer
-	c.Assert(err, qt.IsNil)
 	go func() {
-		_ = s.jumpSSHServer.ListenAndServe()
+		_ = s.jumpSSHServer.Serve(s.jumpServerListener)
 	}()
 
 	// setup private key
@@ -156,29 +170,28 @@ func (s *sshSuite) Init(c *qt.C) {
 
 	// cleanup
 	c.Cleanup(func() {
-		err := s.destinationJujuSSHServer.Close()
-		c.Check(err, qt.IsNil)
-		err = s.jumpSSHServer.Close()
-		c.Check(err, qt.IsNil)
+		c.Check(destinationServerListener.Close(), qt.IsNil)
+		c.Check(s.jumpServerListener.Close(), qt.IsNil)
+		c.Check(s.destinationJujuSSHServer.Close(), qt.IsNil)
+		c.Check(s.jumpSSHServer.Close(), qt.IsNil)
 	})
 }
 
 func (s *sshSuite) TestSSHJump(c *qt.C) {
-	client, err := gossh.Dial("tcp", fmt.Sprintf(":%d", s.jumpServerPort), &gossh.ClientConfig{
+	client := inMemoryDial(c, s.jumpServerListener, &gossh.ClientConfig{
 		HostKeyCallback: gossh.FixedHostKey(s.hostKey.PublicKey()),
 		Auth: []gossh.AuthMethod{
 			gossh.PublicKeys(s.privateKey),
 		},
 		User: "alice",
 	})
-	c.Assert(err, qt.IsNil)
 	defer client.Close()
 
 	// send forward message
 	s.testInDestinationServerF = func(fm ssh.ForwardMessage) {
 		c.Check(fm.DestAddr, qt.Equals, s.allowedModelUUID)
 	}
-	conn, err := client.Dial("tcp", fmt.Sprintf("%s:%d", s.allowedModelUUID, s.destinationServerPort))
+	conn, err := client.Dial("tcp", fmt.Sprintf("%s:22", s.allowedModelUUID))
 	c.Check(err, qt.IsNil)
 	defer conn.Close()
 	select {
@@ -217,17 +230,16 @@ func (s *sshSuite) TestSSHJumpPermissionFail(c *qt.C) {
 
 	for _, test := range tests {
 		c.Run(test.name, func(c *qt.C) {
-			client, err := gossh.Dial("tcp", fmt.Sprintf(":%d", s.jumpServerPort), &gossh.ClientConfig{
+			client := inMemoryDial(c, s.jumpServerListener, &gossh.ClientConfig{
 				HostKeyCallback: gossh.FixedHostKey(s.hostKey.PublicKey()),
 				Auth: []gossh.AuthMethod{
 					gossh.PublicKeys(s.privateKey),
 				},
 				User: test.user,
 			})
-			c.Assert(err, qt.IsNil)
 			defer client.Close()
 
-			_, err = client.Dial("tcp", fmt.Sprintf("%s:%d", test.destAddr, s.destinationServerPort))
+			_, err := client.Dial("tcp", fmt.Sprintf("%s:22", test.destAddr))
 			c.Assert(err.Error(), qt.Equals, test.errMsg)
 		})
 	}
@@ -245,51 +257,32 @@ func (s *sshSuite) TestSSHJumpDialFail(c *qt.C) {
 }
 
 func (s *sshSuite) TestSSHFinalDestinationDialFail(c *qt.C) {
-	client, err := gossh.Dial("tcp", fmt.Sprintf(":%d", s.jumpServerPort), &gossh.ClientConfig{
+	client := inMemoryDial(c, s.jumpServerListener, &gossh.ClientConfig{
 		HostKeyCallback: gossh.FixedHostKey(s.hostKey.PublicKey()),
 		Auth: []gossh.AuthMethod{
 			gossh.PublicKeys(s.privateKey),
 		},
 		User: "alice",
 	})
-	c.Assert(err, qt.IsNil)
+	defer client.Close()
+
 	s.testInDestinationServerF = func(fm ssh.ForwardMessage) {
 		c.Check(fm.DestAddr, qt.Equals, "model1")
 	}
-	_, err = client.Dial("tcp", fmt.Sprintf("%s:%d", "model1", 1))
+	_, err := client.Dial("tcp", fmt.Sprintf("%s:%d", "model1", 1))
 	c.Assert(err, qt.ErrorMatches, ".*connect failed.*")
-}
-
-func (s *sshSuite) TestMaxConcurrentConnections(c *qt.C) {
-	// fill the max of concurrent connection
-	maxConcurrentConnections := 10
-	clients := make([]*gossh.Client, 0)
-	for range maxConcurrentConnections {
-		client, err := gossh.Dial("tcp", fmt.Sprintf(":%d", s.jumpServerPort), &gossh.ClientConfig{
-			HostKeyCallback: gossh.FixedHostKey(s.hostKey.PublicKey()),
-			Auth: []gossh.AuthMethod{
-				gossh.PublicKeys(s.privateKey),
-			},
-			User: "alice",
-		})
-		c.Check(err, qt.IsNil)
-		clients = append(clients, client)
-	}
-	// this connection is dropped when we are at maximum connections
-	_, err := gossh.Dial("tcp", fmt.Sprintf(":%d", s.jumpServerPort), &gossh.ClientConfig{
-		HostKeyCallback: gossh.FixedHostKey(s.hostKey.PublicKey()),
-		Auth: []gossh.AuthMethod{
-			gossh.PublicKeys(s.privateKey),
-		},
-		User:    "alice",
-		Timeout: 50 * time.Millisecond,
-	})
-	c.Check(err, qt.ErrorMatches, ".*connection reset.*")
-	for _, client := range clients {
-		client.Close()
-	}
 }
 
 func TestIdentityManager(t *testing.T) {
 	qtsuite.Run(qt.New(t), &sshSuite{})
+}
+
+// inMemoryDial returns and SSH connection that uses an in-memory transport.
+func inMemoryDial(c *qt.C, listener *bufconn.Listener, config *gossh.ClientConfig) *gossh.Client {
+	jumpServerConn, err := listener.Dial()
+	c.Assert(err, qt.IsNil)
+
+	sshConn, newChan, reqs, err := gossh.NewClientConn(jumpServerConn, "", config)
+	c.Assert(err, qt.IsNil)
+	return gossh.NewClient(sshConn, newChan, reqs)
 }

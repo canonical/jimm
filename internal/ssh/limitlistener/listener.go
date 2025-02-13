@@ -26,7 +26,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-package ssh
+package limitlistener
 
 import (
 	"net"
@@ -38,10 +38,10 @@ import (
 // This is a copypaste of netutil.LimiLister (link: https://cs.opensource.google/go/x/net/+/refs/tags/v0.34.0:netutil/listen.go),
 // but we add a timeout so when we are at the limit we actively close connections instead of waiting indefinetely. (Look at line 44)
 
-// limitListenerWithTimeout returns a Listener that accepts at most n simultaneous
+// ListenerWithTimeout returns a Listener that accepts at most n simultaneous
 // connections from the provided Listener, and it timeouts when the max
 // has been reached and no seats has been freed for the timeout period.
-func limitListenerWithTimeout(l net.Listener, n int, timeout time.Duration) net.Listener {
+func ListenerWithTimeout(l net.Listener, n int, timeout time.Duration) net.Listener {
 	return &limitListener{
 		Listener: l,
 		sem:      make(chan struct{}, n),

@@ -14,6 +14,7 @@ import (
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"github.com/juju/version"
+	gossh "golang.org/x/crypto/ssh"
 	"golang.org/x/oauth2"
 
 	"github.com/canonical/jimm/v3/internal/common/pagination"
@@ -195,9 +196,12 @@ type SSHManager interface {
 	// PublicKeyHandler is the method to verify the public key of the user. It returns a user if successful.
 	PublicKeyHandler(ctx context.Context, claimUser string, key []byte) (*openfga.User, error)
 
-	// ControllerInfoFromModelUUID is the method to resolve the address of the controller to contact given the model UUID and
+	// ControllerInfoFromModelUUID resolves the address of the controller to contact given the model UUID and
 	// a valid JWT To connect to the controller.
 	ControllerInfoFromModelUUID(ctx context.Context, modelUUID string, user *openfga.User) (ssh.ControllerInfo, error)
+
+	// DialControllerSSHServer dials the controller using the provided details.
+	DialControllerSSHServer(ctx context.Context, ctrlInfo ssh.ControllerInfo, user *openfga.User) (*gossh.Client, error)
 }
 
 // JujuManager is the interface to manage all Juju related operations.
