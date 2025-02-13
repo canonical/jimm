@@ -21,6 +21,8 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/errors"
+	jimmssh "github.com/canonical/jimm/v3/internal/jimm/ssh"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/ssh"
@@ -120,7 +122,13 @@ func (s *sshSuite) Init(c *qt.C) {
 				}
 				return userWithoutAccess, nil
 			},
-			DialControllerSSHServer_: func(ctx context.Context, modelUUID string, user *openfga.User) (*gossh.Client, error) {
+			ControllerInfoFromModelUUID_: func(ctx context.Context, modelUUID string, user *openfga.User) (jimmssh.ControllerInfo, error) {
+				if modelUUID != s.allowedModelUUID {
+					return jimmssh.ControllerInfo{}, errors.E("permission denied")
+				}
+				return jimmssh.ControllerInfo{}, nil
+			},
+			DialControllerSSHServer_: func(ctx context.Context, ctrlInfo jimmssh.ControllerInfo, user *openfga.User) (*gossh.Client, error) {
 				conn, err := destinationServerListener.Dial()
 				if err != nil {
 					return nil, err
@@ -269,6 +277,7 @@ func TestIdentityManager(t *testing.T) {
 	qtsuite.Run(qt.New(t), &sshSuite{})
 }
 
+// inMemoryDial returns and SSH connection that uses an in-memory transport.
 func inMemoryDial(c *qt.C, listener *bufconn.Listener, config *gossh.ClientConfig) *gossh.Client {
 	jumpServerConn, err := listener.Dial()
 	c.Assert(err, qt.IsNil)

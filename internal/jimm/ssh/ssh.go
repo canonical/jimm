@@ -122,8 +122,6 @@ func (s *sshManager) ControllerInfoFromModelUUID(ctx context.Context, modelUUID 
 
 // DialControllerSSHServer dials the controller and returns
 // an SSH connection.
-// We don't accept user input for the port to disallow the
-// user from probing for open ports on the Juju controller.
 func (s *sshManager) DialControllerSSHServer(ctx context.Context, ctrlInfo ControllerInfo, user *openfga.User) (*gossh.Client, error) {
 	// TODO: Dial the controller and request it's SSH port
 	// here or save it when we add a controller to JIMM.

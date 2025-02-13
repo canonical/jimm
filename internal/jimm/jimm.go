@@ -196,8 +196,12 @@ type SSHManager interface {
 	// PublicKeyHandler is the method to verify the public key of the user. It returns a user if successful.
 	PublicKeyHandler(ctx context.Context, claimUser string, key []byte) (*openfga.User, error)
 
-	// DialControllerSSHServer dials the controller hosting the specific model UUID.
-	DialControllerSSHServer(ctx context.Context, modelUUID string, user *openfga.User) (*gossh.Client, error)
+	// ControllerInfoFromModelUUID resolves the address of the controller to contact given the model UUID and
+	// a valid JWT To connect to the controller.
+	ControllerInfoFromModelUUID(ctx context.Context, modelUUID string, user *openfga.User) (ssh.ControllerInfo, error)
+
+	// DialControllerSSHServer dials the controller using the provided details.
+	DialControllerSSHServer(ctx context.Context, ctrlInfo ssh.ControllerInfo, user *openfga.User) (*gossh.Client, error)
 }
 
 // JujuManager is the interface to manage all Juju related operations.

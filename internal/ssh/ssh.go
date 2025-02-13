@@ -36,7 +36,7 @@ type SSHManager interface {
 	// contact and a valid JWT To authenticate to the controller.
 	ControllerInfoFromModelUUID(ctx context.Context, modelUUID string, user *openfga.User) (jimmssh.ControllerInfo, error)
 
-	// DialControllerSSHServer dials the controller hosting the specific model UUID.
+	// DialControllerSSHServer dials the controller using the provided controller info.
 	DialControllerSSHServer(ctx context.Context, ctrlInfo jimmssh.ControllerInfo, user *openfga.User) (*gossh.Client, error)
 }
 
