@@ -18,9 +18,11 @@ COPY entrypoint.sh                /app/entrypoint.sh
 
 ENTRYPOINT [ "/app/entrypoint.sh" ]
 
+# Opt to check for a file rather than the OpenFGA itself
+# because we perform some DB migrations after starting the server.
 HEALTHCHECK \
     --start-period=5s \
     --interval=1s \
-    --timeout=5s \
-    --retries=10 \
-        CMD [ "curl", "http://0.0.0.0:8080/healthz" ]
+    --timeout=1s \
+    --retries=30 \
+        CMD [ "/bin/sh", "-c", "[ -f /tmp/healthy ]" ]
