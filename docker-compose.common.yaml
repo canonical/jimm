@@ -97,6 +97,12 @@ services:
         condition: service_healthy
       keycloak:
         condition: service_healthy
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 20s
     labels:
       traefik.enable: true
       traefik.http.routers.jimm.rule: Host(`jimm.localhost`)
