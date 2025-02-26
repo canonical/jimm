@@ -97,6 +97,8 @@ services:
         condition: service_healthy
       keycloak:
         condition: service_healthy
+      vault:
+        condition: service_healthy
     deploy:
       restart_policy:
         condition: on-failure
