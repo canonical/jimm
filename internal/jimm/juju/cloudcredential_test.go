@@ -922,11 +922,8 @@ func TestRevokeCloudCredential(t *testing.T) {
 			return u, tag, ""
 		},
 	}, {
-		about: "credential revoked - controller returns a not found error",
-		revokeCredentialErrors: []error{&errors.Error{
-			Message: "credential not found",
-			Code:    jujuparams.CodeNotFound,
-		}},
+		about:                  "credential revoked - controller returns a not found error",
+		revokeCredentialErrors: []error{errors.E("credential not found", jujuparams.CodeNotFound)},
 		createEnv: func(c *qt.C, j *juju.JujuManager, client *openfga.OFGAClient) (*dbmodel.Identity, names.CloudCredentialTag, string) {
 			u, err := dbmodel.NewIdentity("alice@canonical.com")
 			c.Assert(err, qt.IsNil)

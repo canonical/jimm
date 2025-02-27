@@ -1,8 +1,9 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package errors_test
 
 import (
+	stderr "errors"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
@@ -33,5 +34,20 @@ func TestE(t *testing.T) {
 
 	err = errors.E(errors.Op("test.op2"), err)
 	c.Check(err, qt.ErrorMatches, `an error happened`)
+	c.Check(errors.ErrorCode(err), qt.Equals, code)
+}
+
+func TestWrappedErrors(t *testing.T) {
+	c := qt.New(t)
+
+	err := stderr.New("foo")
+
+	code := errors.Code("test code")
+	err = errors.E(errors.Op("test.op"), code, "reason", err)
+	c.Check(err.Error(), qt.Equals, `reason: foo`)
+	c.Check(errors.ErrorCode(err), qt.Equals, code)
+
+	err = errors.E(errors.Op("test.op2"), err, "more info")
+	c.Check(err.Error(), qt.Equals, `more info: reason: foo`)
 	c.Check(errors.ErrorCode(err), qt.Equals, code)
 }

@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 // Package errors contains types to help handle errors in the system.
 package errors
@@ -21,18 +21,12 @@ type Error struct {
 	// Code is a code attached to the error.
 	Code Code
 
-	// Message is a human-readable error description.
-	Message string
-
 	// Err contains the underlying error, if there is one.
 	Err error
 }
 
 // Error implements the error interface.
 func (e *Error) Error() string {
-	if e.Message != "" {
-		return e.Message
-	}
 	if e.Err != nil {
 		return e.Err.Error()
 	}
@@ -69,6 +63,7 @@ func E(args ...interface{}) error {
 	}
 	var setCode bool
 	var e Error
+	var message string
 	for _, arg := range args {
 		switch v := arg.(type) {
 		case Op:
@@ -79,21 +74,29 @@ func E(args ...interface{}) error {
 		case error:
 			e.Err = v
 		case string:
-			e.Message = v
+			message = v
 		default:
 			zapctx.Default.DPanic("unknown type passed to errors.E", zap.String("type", fmt.Sprintf("%T", arg)), zap.Any("value", arg))
 			return fmt.Errorf("unknown type (%T) passed to errors.E", arg)
 		}
 	}
-	if setCode {
-		return &e
-	}
+
 	// the caller didn't explicitly set the code for this error, attempt
 	// to copy the code from the wrapped error. The interface used to
 	// extract error codes is compatible with both the Error type and juju
 	// API Error types.
-	if ec, ok := e.Err.(interface{ ErrorCode() string }); ok {
-		e.Code = Code(ec.ErrorCode())
+	if !setCode {
+		if ec, ok := e.Err.(interface{ ErrorCode() string }); ok {
+			e.Code = Code(ec.ErrorCode())
+		}
+	}
+	// Extract nested errors and bring them to the top.
+	if message != "" {
+		if e.Err != nil {
+			e.Err = fmt.Errorf("%s: %w", message, e.Err)
+		} else {
+			e.Err = fmt.Errorf("%s", message)
+		}
 	}
 	return &e
 }
