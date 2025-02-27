@@ -19,6 +19,10 @@ inputs:
     description: Python version to install in the setup-python action.
     default: "3.12"
     required: false
+  dump-logs:
+    description: 'Dump JIMM container logs at the end of the action.'
+    required: false
+    default: "false"
 
 outputs:
   url:
@@ -143,12 +147,7 @@ runs:
       shell: bash
     
     - name: Dump JIMM container logs
-      if: always()
-      run: docker logs ${{ env.container_name }} > jimm_container_logs.txt
-      shell: bash
-    
-    - name: Upload JIMM container logs
-      if: always()
-      uses: actions/upload-artifact@v4
+      if: failure() || inputs.dump-logs == 'true'
+      uses: gacts/run-and-post-run@v1
       with:
-        path: jimm_container_logs.txt
+        post: docker logs ${{ env.container_name }}
