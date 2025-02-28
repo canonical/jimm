@@ -61,9 +61,6 @@ func TestBrowserLoginAndLogout(t *testing.T) {
 	// Login
 	db, sessionStore := setupDbAndSessionStore(c)
 
-	pgSession := sessionStore.(*pgstore.PGStore)
-	pgSession.Cleanup(time.Nanosecond)
-
 	cookie, jimmHTTPServer, err := jimmtest.RunBrowserLoginAndKeepServerRunning(
 		db,
 		sessionStore,

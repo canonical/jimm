@@ -34,7 +34,7 @@ jobs:
         uses: ./.github/actions/test-server
         with:
           jimm-version: dev
-          juju-channel: "3/edge" # Temporary change while 3.6.3 is on 3/stable and broken with JIMM.
+          juju-channel: "3.6/edge" # Temporary change while 3.6.3 is on 3/stable and broken with JIMM.
           ghcr-pat: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Start JIMM (manual run)
@@ -42,7 +42,7 @@ jobs:
         uses: ./.github/actions/test-server
         with:
           jimm-version: ${{ inputs.jimm-version }}
-          juju-channel: "3/edge" # Temporary change while 3.6.3 is on 3/stable and broken with JIMM.
+          juju-channel: "3.6/edge" # Temporary change while 3.6.3 is on 3/stable and broken with JIMM.
           ghcr-pat: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create a model, deploy an application and run juju status
