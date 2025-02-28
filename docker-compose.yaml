@@ -129,7 +129,8 @@ services:
     ports:
       - "8082:8082"
     healthcheck:
-      test: [ "CMD", "curl", "http://localhost:8082/health/ready" ]
+      # Ensure we only return exit code 0 on Status 200 https://www.keycloak.org/observability/health#_curl
+      test: [ "CMD", "curl", "--head", "-fsS", "http://localhost:8082/health/ready" ]
       interval: 5s
       timeout: 10s
       retries: 30
