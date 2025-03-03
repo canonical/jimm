@@ -718,13 +718,13 @@ func (j *JujuManager) ListModels(ctx context.Context, user *openfga.User) ([]bas
 	// Get uuids of models the user has access to
 	uuids, err := user.ListModels(ctx, ofganames.ReaderRelation)
 	if err != nil {
-		return nil, errors.E(op, err, "failed to list user models")
+		return nil, errors.E(op, fmt.Sprintf("failed to list user models: %v", err))
 	}
 
 	// Get the models from the database
 	models, err := j.Database.GetModelsByUUID(ctx, uuids)
 	if err != nil {
-		return nil, errors.E(op, err, "failed to get models by uuid")
+		return nil, errors.E(op, fmt.Sprintf("failed to get models by uuid: %v", err))
 	}
 
 	// Create map for lookup later
@@ -773,7 +773,7 @@ func (j *JujuManager) ListModels(ctx context.Context, user *openfga.User) ([]bas
 		return nil
 	})
 	if err != nil {
-		return nil, errors.E(op, err, "failed to list models")
+		return nil, errors.E(op, fmt.Sprintf("failed to list models: %v", err))
 	}
 
 	return userModels, nil
