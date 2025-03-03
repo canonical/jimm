@@ -30,7 +30,7 @@ import (
 const (
 	requestTimeout        = 1 * time.Minute
 	maxRequestConcurrency = 10
-	pingTimeout           = 90 * time.Second
+	pingTimeout           = 180 * time.Second
 )
 
 // A root is an rpc.Root enhanced so that it can notify on ping requests.
