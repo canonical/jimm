@@ -62,22 +62,23 @@ type limitListener struct {
 // acquire acquires the limiting semaphore. Returns true if successfully
 // acquired, false if the listener is closed and the semaphore is not
 // acquired.
-func (l *limitListener) acquire() bool {
+func (l *limitListener) acquire() (ok, closed bool) {
 	select {
 	case <-l.done:
-		return false
+		return false, true
 	case l.sem <- struct{}{}:
-		return true
+		return true, false
 	// we add a timeout here, so the connection is closed when the timeout has passed instead of waiting.
 	case <-time.After(l.timeout):
-		return false
+		return false, false
 	}
 }
 func (l *limitListener) release() { <-l.sem }
 
 // Accept waits for and returns the next connection to the listener, by checking the semaphore and the timeout.
 func (l *limitListener) Accept() (net.Conn, error) {
-	if !l.acquire() {
+	ok, closed := l.acquire()
+	if closed {
 		// If the semaphore isn't acquired because the listener was closed, expect
 		// that this call to accept won't block, but immediately return an error.
 		// If it instead returns a spurious connection (due to a bug in the
@@ -86,8 +87,17 @@ func (l *limitListener) Accept() (net.Conn, error) {
 		// the aforementioned issue) seem to assume that Accept will be called to
 		// completion, and may otherwise fail to clean up the client end of pending
 		// connections.
-		// (With Timeout changes): We cannot tell here whether acquire failed
-		// due to a timeout or because the listener was closed so simply close the
+		for {
+			c, err := l.Listener.Accept()
+			if err != nil {
+				return nil, err
+			}
+			c.Close()
+		}
+	}
+	if !ok {
+		// (With Timeout changes): If the listener is not closed but we failed to
+		// acquire a lock, we know that acquire experienced a timeout so close the
 		// incoming connection and return an error.
 		c, err := l.Listener.Accept()
 		if err != nil {
