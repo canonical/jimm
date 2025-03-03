@@ -59,9 +59,10 @@ type limitListener struct {
 	timeout   time.Duration // timeout for acquiring the connection
 }
 
-// acquire acquires the limiting semaphore. Returns true if successfully
-// acquired, false if the listener is closed and the semaphore is not
-// acquired.
+// acquire acquires the limiting semaphore. Returns two booleans, where the
+// first is true if successfully acquired, false if the timeout was reached
+// and the semaphore is not acquired. The second boolean indicates whether
+// the listener was closed.
 func (l *limitListener) acquire() (ok, closed bool) {
 	select {
 	case <-l.done:
@@ -104,7 +105,7 @@ func (l *limitListener) Accept() (net.Conn, error) {
 			return nil, err
 		}
 		c.Close()
-		return nil, errors.New("failed to acquire lock, either the listener is closed or the maximum number of connections has been reached.")
+		return nil, errors.New("failed to acquire lock, the maximum number of connections has been reached.")
 	}
 
 	c, err := l.Listener.Accept()
