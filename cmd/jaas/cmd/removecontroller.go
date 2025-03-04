@@ -17,12 +17,12 @@ import (
 
 const (
 	removeControllerCommandDoc = `
-The remove-controller command removes a controller from jimm.
+Removes a controller from jimm.
 `
 
 	removeControllerCommandExample = `
-    jimmctl remove-controller mycontroller 
-    jimmctl remove-controller mycontroller --force
+    juju remove-controller mycontroller 
+    juju remove-controller mycontroller --force
 `
 )
 
@@ -52,6 +52,7 @@ func (c *removeControllerCommand) Info() *cmd.Info {
 		Purpose:  "Remove controller from jimm",
 		Doc:      removeControllerCommandDoc,
 		Examples: removeControllerCommandExample,
+		Aliases:  []string{"unregister-controller"},
 	})
 }
 

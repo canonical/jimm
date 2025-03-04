@@ -22,7 +22,7 @@ Grants a user access to read audit logs.
 `
 
 	grantAuditLogAccessExamples = `
-    jimmctl grant-audit-log-access <username> 
+    juju grant-audit-log <username> 
 `
 )
 
@@ -48,7 +48,7 @@ type grantAuditLogAccessCommand struct {
 
 func (c *grantAuditLogAccessCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:     "grant-audit-log-access",
+		Name:     "grant-audit-log",
 		Args:     "<username>",
 		Purpose:  "Grants access to audit logs.",
 		Doc:      grantAuditLogAccessDoc,

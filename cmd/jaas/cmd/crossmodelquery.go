@@ -18,9 +18,9 @@ import (
 const (
 	// stdinMarkers contains file names that are taken to be stdin.
 	crossModelQueryDoc = `
-The query-models command queries all models available to the current user
-performing the query against each model status individually, returning
-the collated query responses for each model.
+Queries all models available to the current user performing the
+query against each model status individually, returning the 
+collated query responses for each model.
 
 The query runs against the output of "juju status --format json",
 as such you can format your query against an output like this.
@@ -28,7 +28,7 @@ as such you can format your query against an output like this.
 The queries expect a JQ query string.
 `
 	crossModelQueryExample = `
-    jimmctl query-models '.applications | with_entries(select(.key=="nginx-ingress-integrator"))'
+    juju query-models '.applications | with_entries(select(.key=="nginx-ingress-integrator"))'
 `
 )
 

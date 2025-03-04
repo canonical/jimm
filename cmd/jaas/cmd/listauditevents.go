@@ -22,12 +22,12 @@ import (
 
 const (
 	listAuditEventsCommandDoc = `
-The list-audit-events command displays matching audit events.
+Returns audit log events.
 `
 	listAuditEventsCommandExample = `
-    jimmctl list-audit-events --after 2020-01-01T15:00:00 --before 2020-01-01T15:00:00 --user-tag user@canonical.com --limit 50
-	jimmctl list-audit-events --method CreateModel
-    jimmctl audit-events --after 2020-01-01T15:00:00 --format yaml
+    juju list-audit-events --after 2020-01-01T15:00:00 --before 2020-01-01T15:00:00 --user-tag user@canonical.com --limit 50
+	juju list-audit-events --method CreateModel
+    juju audit-events --after 2020-01-01T15:00:00 --format yaml
 `
 )
 

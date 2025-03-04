@@ -17,10 +17,10 @@ import (
 
 const (
 	setControllerDeprecatedDoc = `
-The set-controller-deprecated sets the deprecated status of a controller.
+Sets the deprecated status of a controller.
 `
 	setControllerDeprecatedExample = `
-    jimmctl set-controller-deprecated mycontroller
+    juju set-controller-deprecated mycontroller
 `
 )
 

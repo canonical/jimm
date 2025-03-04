@@ -18,8 +18,7 @@ import (
 
 const (
 	controllerInfoCommandDoc = `
-The controller-info command writes controller information contained
-in the juju client store to a yaml file.
+Writes controller information contained in the juju client store to a yaml file.
 
 If a public address is specified, the output controller information
 will contain the public address provided and omit a CA cert, this assumes
@@ -28,8 +27,8 @@ that the server is secured with a public certificate.
 Use the --local flag if the server is not configured with a public address.
 `
 	controllerInfoCommandExample = `
-    jimmctl controller-info mycontroller ./destination/file.yaml mycontroller.example.com 
-    jimmctl controller-info mycontroller ./destination/file.yaml --local
+    juju controller-info mycontroller ./destination/file.yaml mycontroller.example.com 
+    juju controller-info mycontroller ./destination/file.yaml --local
 `
 )
 

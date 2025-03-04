@@ -181,15 +181,6 @@ func NewUpdateMigratedModelCommandForTesting(store jujuclient.ClientStore, lp ju
 	return modelcmd.WrapBase(cmd)
 }
 
-func NewImportCloudCredentialsCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
-	cmd := &importCloudCredentialsCommand{
-		store:    store,
-		dialOpts: cmdtest.TestDialOpts(lp),
-	}
-
-	return modelcmd.WrapBase(cmd)
-}
-
 func NewAddRoleCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &addRoleCommand{
 		store:    store,

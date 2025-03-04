@@ -21,11 +21,11 @@ var (
 	stdinMarkers = []string{"-"}
 
 	addControllerCommandDoc = `
-The add-controller command adds a controller to jimm.
+Registers a controller with jimm.
 `
 	addControllerCommandExample = `
-    jimmctl add-controller ./controller-info 
-    jimmctl add-controller ./controller-info.yaml --format json
+    juju add-controller ./controller-info 
+    juju add-controller ./controller-info.yaml --format json
 `
 )
 
@@ -55,6 +55,7 @@ func (c *addControllerCommand) Info() *cmd.Info {
 		Args:     "<filepath>",
 		Doc:      addControllerCommandDoc,
 		Examples: addControllerCommandExample,
+		Aliases:  []string{"register-controller"},
 	})
 }
 
