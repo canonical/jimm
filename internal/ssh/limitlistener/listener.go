@@ -29,6 +29,7 @@
 package limitlistener
 
 import (
+	"errors"
 	"net"
 	"sync"
 	"time"
@@ -36,7 +37,7 @@ import (
 
 // N.B.:
 // This is a copypaste of netutil.LimiLister (link: https://cs.opensource.google/go/x/net/+/refs/tags/v0.34.0:netutil/listen.go),
-// but we add a timeout so when we are at the limit we actively close connections instead of waiting indefinetely. (Look at line 44)
+// but we add a timeout so when we are at the limit we actively close connections instead of waiting indefinetely.
 
 // ListenerWithTimeout returns a Listener that accepts at most n simultaneous
 // connections from the provided Listener, and it timeouts when the max
@@ -58,25 +59,27 @@ type limitListener struct {
 	timeout   time.Duration // timeout for acquiring the connection
 }
 
-// acquire acquires the limiting semaphore. Returns true if successfully
-// acquired, false if the listener is closed and the semaphore is not
-// acquired.
-func (l *limitListener) acquire() bool {
+// acquire acquires the limiting semaphore. Returns two booleans, where the
+// first is true if successfully acquired, false if the timeout was reached
+// and the semaphore is not acquired. The second boolean indicates whether
+// the listener was closed.
+func (l *limitListener) acquire() (ok, closed bool) {
 	select {
 	case <-l.done:
-		return false
+		return false, true
 	case l.sem <- struct{}{}:
-		return true
+		return true, false
 	// we add a timeout here, so the connection is closed when the timeout has passed instead of waiting.
 	case <-time.After(l.timeout):
-		return false
+		return false, false
 	}
 }
 func (l *limitListener) release() { <-l.sem }
 
 // Accept waits for and returns the next connection to the listener, by checking the semaphore and the timeout.
 func (l *limitListener) Accept() (net.Conn, error) {
-	if !l.acquire() {
+	ok, closed := l.acquire()
+	if closed {
 		// If the semaphore isn't acquired because the listener was closed, expect
 		// that this call to accept won't block, but immediately return an error.
 		// If it instead returns a spurious connection (due to a bug in the
@@ -92,6 +95,17 @@ func (l *limitListener) Accept() (net.Conn, error) {
 			}
 			c.Close()
 		}
+	}
+	if !ok {
+		// (With Timeout changes): If the listener is not closed but we failed to
+		// acquire a lock, we know that acquire experienced a timeout so close the
+		// incoming connection and return an error.
+		c, err := l.Listener.Accept()
+		if err != nil {
+			return nil, err
+		}
+		c.Close()
+		return nil, errors.New("failed to acquire lock, the maximum number of connections has been reached.")
 	}
 
 	c, err := l.Listener.Accept()
