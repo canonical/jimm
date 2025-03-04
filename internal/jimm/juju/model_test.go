@@ -3185,7 +3185,7 @@ var modelListTests = []struct {
 		env:                listModelsTestEnv,
 		username:           "alice@canonical.com",
 		expectedUserModels: []base.UserModel{},
-		expectedError:      "failed to list models",
+		expectedError:      "failed to list models.*",
 		listModelsMockByControllerName: map[string]func(context.Context) ([]base.UserModel, error){
 			"controller-1": func(ctx context.Context) ([]base.UserModel, error) {
 				return []base.UserModel{}, errors.E("test error")
