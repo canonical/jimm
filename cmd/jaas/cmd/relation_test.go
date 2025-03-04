@@ -186,7 +186,7 @@ func (s *relationSuite) TestRemoveRelationSuperuser(c *gc.C) {
 	}
 
 	for _, tc := range tests {
-		_, err := cmdtesting.RunCommand(c, cmd.NewRemoveRelationCommandForTesting(s.ClientStore(), bClient), tc.input.user, tc.input.relation, tc.input.target)
+		_, err := cmdtesting.RunCommand(c, cmd.NewRemovePermissionCommandForTesting(s.ClientStore(), bClient), tc.input.user, tc.input.relation, tc.input.target)
 		c.Log("Test: " + tc.testName)
 		if tc.err {
 			c.Assert(err, gc.ErrorMatches, tc.message)
@@ -224,7 +224,7 @@ func (s *relationSuite) TestRemoveRelationViaFileSuperuser(c *gc.C) {
 	_, err = cmdtesting.RunCommand(c, cmd.NewAddRelationCommandForTesting(s.ClientStore(), bClient), "-f", file.Name())
 	c.Assert(err, gc.IsNil)
 
-	_, err = cmdtesting.RunCommand(c, cmd.NewRemoveRelationCommandForTesting(s.ClientStore(), bClient), "-f", file.Name())
+	_, err = cmdtesting.RunCommand(c, cmd.NewRemovePermissionCommandForTesting(s.ClientStore(), bClient), "-f", file.Name())
 	c.Assert(err, gc.IsNil)
 
 	tuples, ct, err := s.JimmCmdSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), openfga.Tuple{}, 50, "")
@@ -249,7 +249,7 @@ func (s *relationSuite) TestRemoveRelationViaFileSuperuser(c *gc.C) {
 func (s *relationSuite) TestRemoveRelation(c *gc.C) {
 	// bob is not superuser
 	bClient := s.SetupCLIAccess(c, "bob")
-	_, err := cmdtesting.RunCommand(c, cmd.NewRemoveRelationCommandForTesting(s.ClientStore(), bClient), "group-testGroup1#member", "member", "group-testGroup2")
+	_, err := cmdtesting.RunCommand(c, cmd.NewRemovePermissionCommandForTesting(s.ClientStore(), bClient), "group-testGroup1#member", "member", "group-testGroup2")
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
 
@@ -397,7 +397,7 @@ func (s *relationSuite) TestListRelations(c *gc.C) {
 		relations...,
 	)}
 
-	context, err := cmdtesting.RunCommand(c, cmd.NewListRelationsCommandForTesting(s.ClientStore(), bClient), "--format", "tabular")
+	context, err := cmdtesting.RunCommand(c, cmd.NewListPermissionsCommandForTesting(s.ClientStore(), bClient), "--format", "tabular")
 	c.Assert(err, gc.IsNil)
 	var builder strings.Builder
 	err = cmd.FormatRelationsTabular(&builder, &expectedData)
@@ -406,14 +406,14 @@ func (s *relationSuite) TestListRelations(c *gc.C) {
 
 	expectedJSONData, err := json.Marshal(expectedData)
 	c.Assert(err, gc.IsNil)
-	context, err = cmdtesting.RunCommand(c, cmd.NewListRelationsCommandForTesting(s.ClientStore(), bClient), "--format", "json")
+	context, err = cmdtesting.RunCommand(c, cmd.NewListPermissionsCommandForTesting(s.ClientStore(), bClient), "--format", "json")
 	c.Assert(err, gc.IsNil)
 	c.Assert(strings.TrimRight(cmdtesting.Stdout(context), "\n"), gc.Equals, string(expectedJSONData))
 
 	// Necessary to use yamlv2 to match what Juju does.
 	expectedYAMLData, err := yamlv2.Marshal(expectedData)
 	c.Assert(err, gc.IsNil)
-	context, err = cmdtesting.RunCommand(c, cmd.NewListRelationsCommandForTesting(s.ClientStore(), bClient))
+	context, err = cmdtesting.RunCommand(c, cmd.NewListPermissionsCommandForTesting(s.ClientStore(), bClient))
 	c.Assert(err, gc.IsNil)
 	c.Assert(cmdtesting.Stdout(context), gc.Equals, string(expectedYAMLData))
 }
@@ -465,15 +465,15 @@ func (s *relationSuite) TestListRelationsWithError(c *gc.C) {
 	expectedYAMLData, err := yamlv2.Marshal(expectedData)
 	c.Assert(err, gc.IsNil)
 
-	context, err := cmdtesting.RunCommand(c, cmd.NewListRelationsCommandForTesting(s.ClientStore(), bClient), "--format", "json")
+	context, err := cmdtesting.RunCommand(c, cmd.NewListPermissionsCommandForTesting(s.ClientStore(), bClient), "--format", "json")
 	c.Assert(err, gc.IsNil)
 	c.Assert(strings.TrimRight(cmdtesting.Stdout(context), "\n"), gc.Equals, string(expectedJSONData))
 
-	context, err = cmdtesting.RunCommand(c, cmd.NewListRelationsCommandForTesting(s.ClientStore(), bClient))
+	context, err = cmdtesting.RunCommand(c, cmd.NewListPermissionsCommandForTesting(s.ClientStore(), bClient))
 	c.Assert(err, gc.IsNil)
 	c.Assert(cmdtesting.Stdout(context), gc.Equals, string(expectedYAMLData))
 
-	context, err = cmdtesting.RunCommand(c, cmd.NewListRelationsCommandForTesting(s.ClientStore(), bClient), "--format", "tabular")
+	context, err = cmdtesting.RunCommand(c, cmd.NewListPermissionsCommandForTesting(s.ClientStore(), bClient), "--format", "tabular")
 	c.Assert(err, gc.IsNil)
 	var builder strings.Builder
 	err = cmd.FormatRelationsTabular(&builder, &expectedData)
@@ -565,7 +565,7 @@ func (s *relationSuite) TestCheckRelationViaSuperuser(c *gc.C) {
 	modelToCheck := "model-" + u.Name + "/" + model.Name
 	cmdCtx, err := cmdtesting.RunCommand(
 		c,
-		cmd.NewCheckRelationCommandForTesting(s.ClientStore(), bClient),
+		cmd.NewCheckPermissionCommandForTesting(s.ClientStore(), bClient),
 		userToCheck,
 		"reader",
 		modelToCheck,
@@ -582,7 +582,7 @@ func (s *relationSuite) TestCheckRelationViaSuperuser(c *gc.C) {
 	// Test writer is NOT OK
 	cmdCtx, err = cmdtesting.RunCommand(
 		c,
-		cmd.NewCheckRelationCommandForTesting(s.ClientStore(), bClient),
+		cmd.NewCheckPermissionCommandForTesting(s.ClientStore(), bClient),
 		userToCheck,
 		"writer",
 		modelToCheck,
@@ -598,7 +598,7 @@ func (s *relationSuite) TestCheckRelationViaSuperuser(c *gc.C) {
 	// Test format JSON
 	cmdCtx, err = cmdtesting.RunCommand(
 		c,
-		cmd.NewCheckRelationCommandForTesting(s.ClientStore(), bClient),
+		cmd.NewCheckPermissionCommandForTesting(s.ClientStore(), bClient),
 		userToCheck,
 		"reader",
 		modelToCheck,
@@ -623,7 +623,7 @@ func (s *relationSuite) TestCheckRelationViaSuperuser(c *gc.C) {
 	// Test format YAML
 	cmdCtx, err = cmdtesting.RunCommand(
 		c,
-		cmd.NewCheckRelationCommandForTesting(s.ClientStore(), bClient),
+		cmd.NewCheckPermissionCommandForTesting(s.ClientStore(), bClient),
 		userToCheck,
 		"reader",
 		modelToCheck,
@@ -654,7 +654,7 @@ func (s *relationSuite) TestCheckRelation(c *gc.C) {
 	bClient := s.SetupCLIAccess(c, "bob")
 	_, err := cmdtesting.RunCommand(
 		c,
-		cmd.NewCheckRelationCommandForTesting(s.ClientStore(), bClient),
+		cmd.NewCheckPermissionCommandForTesting(s.ClientStore(), bClient),
 		"user-diglett",
 		"reader",
 		"controller-jimm",

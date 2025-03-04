@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/juju/cmd/v3"
-	jujucmdv3 "github.com/juju/cmd/v3"
 	"github.com/juju/gnuflag"
 	jujuapi "github.com/juju/juju/api"
 	jujucmd "github.com/juju/juju/cmd"
@@ -21,56 +20,36 @@ import (
 )
 
 const (
-	groupDoc = `
-The group command enables group management for jimm
-`
-
 	addGroupDoc = `
-The add command adds group to jimm.
+Adds a group.
 `
 	addGroupExample = `
-    jimmctl auth group add mygroup
+    juju add-group
 `
 	renameGroupDoc = `
-The rename command renames a group in jimm.
+Renames a group.
 `
 	renameGroupExample = `
-    jimmctl auth group rename mygroup newgroup
+    juju rename-group mygroup newgroup
 `
 	removeGroupDoc = `
-The remove command removes a group in jimm.
+Removes a group.
 `
 
 	removeGroupExample = `
-    jimmctl auth group remove mygroup
+    juju remove-group mygroup
 `
 
 	listGroupsDoc = `
-The list command lists all groups in jimm.
+Lists all groups.
 `
 	listGroupsExample = `
-    jimmctl auth group list
+    juju list-groups
 `
 )
 
-// NewGroupCommand returns a command for group management.
-func NewGroupCommand() *jujucmdv3.SuperCommand {
-	cmd := jujucmd.NewSuperCommand(jujucmdv3.SuperCommandParams{
-		Name:        "group",
-		UsagePrefix: "auth",
-		Doc:         groupDoc,
-		Purpose:     "Group management.",
-	})
-	cmd.Register(newAddGroupCommand())
-	cmd.Register(newRenameGroupCommand())
-	cmd.Register(newRemoveGroupCommand())
-	cmd.Register(newListGroupsCommand())
-
-	return cmd
-}
-
-// newAddGroupCommand returns a command to add a group.
-func newAddGroupCommand() cmd.Command {
+// NewAddGroupCommand returns a command to add a group.
+func NewAddGroupCommand() cmd.Command {
 	cmd := &addGroupCommand{
 		store: jujuclient.NewFileClientStore(),
 	}
@@ -92,7 +71,7 @@ type addGroupCommand struct {
 // Info implements the cmd.Command interface.
 func (c *addGroupCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:     "add",
+		Name:     "add-group",
 		Args:     "<name>",
 		Purpose:  "Add group to jimm.",
 		Doc:      addGroupDoc,
@@ -148,8 +127,8 @@ func (c *addGroupCommand) Run(ctxt *cmd.Context) error {
 	return nil
 }
 
-// newRenameGroupCommand returns a command to rename a group.
-func newRenameGroupCommand() cmd.Command {
+// NewRenameGroupCommand returns a command to rename a group.
+func NewRenameGroupCommand() cmd.Command {
 	cmd := &renameGroupCommand{
 		store: jujuclient.NewFileClientStore(),
 	}
@@ -171,7 +150,7 @@ type renameGroupCommand struct {
 // Info implements the cmd.Command interface.
 func (c *renameGroupCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:     "rename",
+		Name:     "rename-group",
 		Args:     "<name> <new name>",
 		Purpose:  "Rename a group.",
 		Doc:      renameGroupDoc,
@@ -217,8 +196,8 @@ func (c *renameGroupCommand) Run(ctxt *cmd.Context) error {
 	return nil
 }
 
-// newRemoveGroupCommand returns a command to Remove a group.
-func newRemoveGroupCommand() cmd.Command {
+// NewRemoveGroupCommand returns a command to Remove a group.
+func NewRemoveGroupCommand() cmd.Command {
 	cmd := &removeGroupCommand{
 		store: jujuclient.NewFileClientStore(),
 	}
@@ -241,7 +220,7 @@ type removeGroupCommand struct {
 // Info implements the cmd.Command interface.
 func (c *removeGroupCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:     "remove",
+		Name:     "remove-group",
 		Args:     "<name>",
 		Purpose:  "Remove a group.",
 		Doc:      removeGroupDoc,
@@ -312,8 +291,8 @@ func (c *removeGroupCommand) Run(ctxt *cmd.Context) error {
 	return nil
 }
 
-// newListGroupsCommand returns a command to list all groups.
-func newListGroupsCommand() cmd.Command {
+// NewListGroupsCommand returns a command to list all groups.
+func NewListGroupsCommand() cmd.Command {
 	cmd := &listGroupsCommand{
 		store: jujuclient.NewFileClientStore(),
 	}
@@ -336,10 +315,11 @@ type listGroupsCommand struct {
 // Info implements the cmd.Command interface.
 func (c *listGroupsCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:     "list",
+		Name:     "list-groups",
 		Purpose:  "List all groups.",
 		Doc:      listGroupsDoc,
 		Examples: listGroupsExample,
+		Aliases:  []string{"groups"},
 	})
 }
 

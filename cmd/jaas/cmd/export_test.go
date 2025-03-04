@@ -263,7 +263,7 @@ func NewListGroupsCommandForTesting(store jujuclient.ClientStore, lp jujuapi.Log
 }
 
 func NewAddRelationCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
-	cmd := &addRelationCommand{
+	cmd := &addPermission{
 		store:    store,
 		dialOpts: cmdtest.TestDialOpts(lp),
 	}
@@ -271,8 +271,8 @@ func NewAddRelationCommandForTesting(store jujuclient.ClientStore, lp jujuapi.Lo
 	return modelcmd.WrapBase(cmd)
 }
 
-func NewRemoveRelationCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
-	cmd := &removeRelationCommand{
+func NewRemovePermissionCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
+	cmd := &removePermissionCommand{
 		store:    store,
 		dialOpts: cmdtest.TestDialOpts(lp),
 	}
@@ -280,8 +280,8 @@ func NewRemoveRelationCommandForTesting(store jujuclient.ClientStore, lp jujuapi
 	return modelcmd.WrapBase(cmd)
 }
 
-func NewListRelationsCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
-	cmd := &listRelationsCommand{
+func NewListPermissionsCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
+	cmd := &listPermissionsCommand{
 		store:    store,
 		dialOpts: cmdtest.TestDialOpts(lp),
 	}
@@ -289,8 +289,8 @@ func NewListRelationsCommandForTesting(store jujuclient.ClientStore, lp jujuapi.
 	return modelcmd.WrapBase(cmd)
 }
 
-func NewCheckRelationCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
-	cmd := &checkRelationCommand{
+func NewCheckPermissionCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
+	cmd := &checkPermissionCommand{
 		store:    store,
 		dialOpts: cmdtest.TestDialOpts(lp),
 	}
