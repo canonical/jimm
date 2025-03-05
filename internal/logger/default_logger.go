@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package logger
 
@@ -35,6 +35,7 @@ func SetupLogger(ctx context.Context, logLevel string, devMode bool) {
 	} else {
 		prodConfig := zap.NewProductionConfig()
 		prodConfig.Level = zap.NewAtomicLevelAt(pLogLevel)
+		prodConfig.DisableStacktrace = true       // Disable stacktraces in prod as they are overly verbose and clutter the logs.
 		proLogger := zap.Must(prodConfig.Build()) // this panics if an error is encountered during Build
 		zapctx.Default = proLogger
 	}

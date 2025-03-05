@@ -179,13 +179,13 @@ type ServiceAccountManager interface {
 // SSHKeyManager provides a means to manage SSH keys within JIMM.
 type SSHKeyManager interface {
 	// AddUserPublicKey saves a user's public key.
-	AddUserPublicKey(ctx context.Context, user *openfga.User, publicKey sshkeys.PublicKey) error
+	AddUserPublicKey(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, publicKey sshkeys.PublicKey) error
 	// ListUserPublicKeys lists a user's public keys.
-	ListUserPublicKeys(ctx context.Context, user *openfga.User) ([]sshkeys.PublicKey, error)
+	ListUserPublicKeys(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter) ([]sshkeys.PublicKey, error)
 	// RemoveUserKeyByComment removes a user's public key(s) by the key comment.
-	RemoveUserKeyByComment(ctx context.Context, user *openfga.User, comment string) error
+	RemoveUserKeyByComment(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, comment string) error
 	// RemoveUserKeyByFingerprint removes a user's public key(s) by the key fingerprint.
-	RemoveUserKeyByFingerprint(ctx context.Context, user *openfga.User, fingerprint string) error
+	RemoveUserKeyByFingerprint(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, fingerprint string) error
 	// VerifyPublicKey lists the key for a user and compares the key to find a match.
 	VerifyPublicKey(ctx context.Context, claimUser string, publicKey []byte) (bool, error)
 }

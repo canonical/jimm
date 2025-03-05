@@ -18,6 +18,7 @@ import (
 	"github.com/juju/utils/v3/ssh"
 	gossh "golang.org/x/crypto/ssh"
 
+	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/jimm/sshkeys"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/rpcproxy"
@@ -54,18 +55,17 @@ func (k *keyManagerFacadeSuite) Init(c *qt.C) {
 		PublicKey: pubKey2,
 		Comment:   "comment-2",
 	}
-
 	keyManager := mocks.SSHKeyManager{
-		ListUserPublicKeys_: func(ctx context.Context, user *openfga.User) ([]sshkeys.PublicKey, error) {
+		ListUserPublicKeys_: func(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter) ([]sshkeys.PublicKey, error) {
 			return []sshkeys.PublicKey{k.key1, k.key2}, nil
 		},
-		AddUserPublicKey_: func(ctx context.Context, user *openfga.User, publicKey sshkeys.PublicKey) error {
+		AddUserPublicKey_: func(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, publicKey sshkeys.PublicKey) error {
 			return k.addKeyF(ctx, user, publicKey)
 		},
-		RemoveUserKeyByComment_: func(ctx context.Context, user *openfga.User, comment string) error {
+		RemoveUserKeyByComment_: func(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, comment string) error {
 			return k.removeKeyByCommentF(ctx, user, comment)
 		},
-		RemoveUserKeyByFingerprint_: func(ctx context.Context, user *openfga.User, fingerprint string) error {
+		RemoveUserKeyByFingerprint_: func(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, fingerprint string) error {
 			return k.removeKeyByFingerprintF(ctx, user, fingerprint)
 		},
 	}
