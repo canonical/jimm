@@ -23,6 +23,13 @@ inputs:
     description: 'Dump JIMM container logs at the end of the action.'
     required: false
     default: "false"
+  use-charmed-k8s-action:
+    description: |
+      If set to true the action will use the charmed-kubernetes/actions-operator to bootstrap a Juju controller via Juju snap.
+      If set to false the workflow calling this action needs to provide the Juju binary in the PATH, that the action will use 
+      to bootstrap a controller.
+    required: false
+    default: 'true'
 
 outputs:
   url:
@@ -87,7 +94,9 @@ runs:
         sudo lxd init --auto && \
         sudo chmod a+wr /var/snap/lxd/common/lxd/unix.socket && \
         lxc network set lxdbr0 ipv6.address none && \
-        sudo usermod -a -G lxd $USER
+        sudo usermod -a -G lxd $USER && \
+        sudo iptables -F FORWARD && \
+        sudo iptables -P FORWARD ACCEPT
       shell: bash
 
     - name: Setup cloud-init script for bootstraping Juju controllers
@@ -95,7 +104,8 @@ runs:
       shell: bash
       working-directory: ${{ github.action_path }}/../../..
       env:
-        SKIP_BOOTSTRAP: true
+        # skip bootstrap in case we use the charmed k8s action
+        SKIP_BOOTSTRAP: ${{ inputs.use-charmed-k8s-action == 'true'}} 
         CLOUDINIT_FILE: "cloudinit.temp.yaml"
 
     # See: https://github.com/charmed-kubernetes/actions-operator/issues/82
@@ -105,6 +115,7 @@ runs:
         python-version: ${{ inputs.python-version }}
 
     - name: Setup Juju Controller
+      if: ${{ inputs.use-charmed-k8s-action == 'true' }}
       uses: charmed-kubernetes/actions-operator@main
       with:
         provider: "lxd"

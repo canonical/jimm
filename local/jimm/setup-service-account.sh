@@ -10,6 +10,8 @@ SERVICE_ACCOUNT_ID="${SERVICE_ACCOUNT_ID:-test-client-id}"
 CLOUD="${CLOUD:-localhost}"
 CREDENTIAL_NAME="${CREDENTIAL_NAME:-localhost}"
 
-juju add-service-account "$SERVICE_ACCOUNT_ID"
-juju update-service-account-credential "$SERVICE_ACCOUNT_ID" "$CLOUD" "$CREDENTIAL_NAME"
+# the reason we use `/snap/jaas/current/bin/jaas` instead of `juju` is because we can't access jaas commands when we build juju
+# instead of using the snap. 
+/snap/jaas/current/bin/jaas add-service-account "$SERVICE_ACCOUNT_ID"
+/snap/jaas/current/bin/jaas update-service-account-credential "$SERVICE_ACCOUNT_ID" "$CLOUD" "$CREDENTIAL_NAME"
 jimmctl auth relation add user-"$SERVICE_ACCOUNT_ID"@serviceaccount administrator controller-jimm
