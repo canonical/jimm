@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package jimmjwx
 
@@ -124,7 +124,7 @@ func (jwks *JWKSService) StartJWKSRotator(ctx context.Context, checkRotateRequir
 					zapctx.Error(ctx, "security failure", zap.Any("op", op), zap.NamedError("jwks-error", err))
 				}
 			case <-ctx.Done():
-				zapctx.Debug(ctx, "Shutdown for JWKS rotator complete.")
+				zapctx.Debug(ctx, "shutdown for JWKS rotator complete.")
 				return
 			}
 		}
