@@ -20,6 +20,7 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 
+	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm/sshkeys"
@@ -36,13 +37,13 @@ const (
 // SSHKeyManager is an interface for managing SSH keys.
 type SSHKeyManager interface {
 	// AddUserPublicKey saves a user's public key.
-	AddUserPublicKey(ctx context.Context, user *openfga.User, publicKey sshkeys.PublicKey) error
+	AddUserPublicKey(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, publicKey sshkeys.PublicKey) error
 	// ListUserPublicKeys lists a user's public keys.
-	ListUserPublicKeys(ctx context.Context, user *openfga.User) ([]sshkeys.PublicKey, error)
+	ListUserPublicKeys(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter) ([]sshkeys.PublicKey, error)
 	// RemoveUserKeyByComment removes a user's public key(s) by the key comment.
-	RemoveUserKeyByComment(ctx context.Context, user *openfga.User, comment string) error
+	RemoveUserKeyByComment(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, comment string) error
 	// RemoveUserKeyByFingerprint removes a user's public key(s) by the key fingerprint.
-	RemoveUserKeyByFingerprint(ctx context.Context, user *openfga.User, fingerprint string) error
+	RemoveUserKeyByFingerprint(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, fingerprint string) error
 }
 
 // TokenGenerator authenticates a user and generates a JWT token.
@@ -74,6 +75,7 @@ type WebsocketConnectionWithMetadata struct {
 	Conn           WebsocketConnection
 	ControllerUUID string
 	ModelName      string
+	ModelUUID      string
 }
 
 // LoginService represents the LoginService interface used by the proxy.
@@ -269,6 +271,7 @@ type modelProxy struct {
 	sshKeyManager           SSHKeyManager
 	loginService            LoginService
 	modelName               string
+	modelUUID               string
 	conversationId          string
 	authenticatedIdentityID string
 
@@ -444,6 +447,7 @@ func (p *clientProxy) makeControllerConnection(ctx context.Context) error {
 
 		p.msgs.controllerUUID = connWithMetadata.ControllerUUID
 		p.modelName = connWithMetadata.ModelName
+		p.modelUUID = connWithMetadata.ModelUUID
 		p.dst = &writeLockConn{conn: connWithMetadata.Conn}
 		controllerToClient := controllerProxy{
 			modelProxy: modelProxy{
@@ -760,7 +764,7 @@ func (p *clientProxy) handleKeyManagerFacade(ctx context.Context, msg *message) 
 		msg.Response = resp
 		return msg, nil
 	}
-	keyManager := keyManagerFacade{keyManager: p.sshKeyManager, user: p.user}
+	keyManager := keyManagerFacade{keyManager: p.sshKeyManager, user: p.user, modelUUID: p.modelUUID}
 
 	switch msg.Request {
 	case "ListKeys":

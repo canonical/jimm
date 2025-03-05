@@ -227,6 +227,7 @@ func controllerConnectionFunc(s apiProxier, jwtGenerator *jujuauth.TokenGenerato
 			Conn:           controllerConn,
 			ControllerUUID: m.Controller.UUID,
 			ModelName:      fullModelName,
+			ModelUUID:      uuid,
 		}, nil
 	}
 }

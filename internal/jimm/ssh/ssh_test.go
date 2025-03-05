@@ -78,16 +78,17 @@ func (s *sshManagerSuite) Init(c *qt.C) {
 	uuid := "00000002-0000-0000-0000-000000000001"
 	jimmTag := names.NewControllerTag(uuid)
 	// Setup DB
-	db := &db.Database{
+
+	database := &db.Database{
 		DB: jimmtest.PostgresDB(c, time.Now),
 	}
-	err := db.Migrate(context.Background())
+	err := database.Migrate(context.Background())
 	c.Assert(err, qt.IsNil)
 	// Setup OFGA
 	ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
-	identityManager, err := identity.NewIdentityManager(db, ofgaClient)
+	identityManager, err := identity.NewIdentityManager(database, ofgaClient)
 	c.Assert(err, qt.IsNil)
 
 	// this is a mock non-mock model manager, bandaid until we have a real model manager to avoid creating a whole jimm.
@@ -99,26 +100,26 @@ func (s *sshManagerSuite) Init(c *qt.C) {
 					Valid:  true,
 				},
 			}
-			err := db.GetModel(ctx, &m)
+			err := database.GetModel(ctx, &m)
 			return m, err
 		},
 	}
-	permissionManager, err := permissions.NewManager(db, ofgaClient, uuid, jimmTag)
+	permissionManager, err := permissions.NewManager(database, ofgaClient, uuid, jimmTag)
 	c.Assert(err, qt.IsNil)
-	jwtFactory := jujuauth.NewFactory(db, mocks.JWTService{
+	jwtFactory := jujuauth.NewFactory(database, mocks.JWTService{
 		NewJWT_: func(ctx context.Context, j jimmjwx.JWTParams) ([]byte, error) {
 			return []byte("jwt"), nil
 		},
 	}, permissionManager)
 
-	sshKeyManager, err := sshkeys.NewSSHKeyManager(db)
+	sshKeyManager, err := sshkeys.NewSSHKeyManager(database)
 	c.Assert(err, qt.IsNil)
 
 	s.sshManager, err = ssh.NewSSHManager(identityManager, &modelManager, sshKeyManager, jwtFactory)
 	c.Assert(err, qt.IsNil)
 	env := jimmtest.ParseEnvironment(c, testSSHManagerEnv)
-	env.PopulateDB(c, db)
-	env.PopulateDBAndPermissions(c, jimmTag, db, ofgaClient)
+	env.PopulateDB(c, database)
+	env.PopulateDBAndPermissions(c, jimmTag, database, ofgaClient)
 	// create a user and set permission for one model
 	s.userWithAccess, err = identityManager.FetchIdentity(ctx, env.Users[0].Username)
 	c.Assert(err, qt.IsNil)
@@ -128,7 +129,7 @@ func (s *sshManagerSuite) Init(c *qt.C) {
 	// create a user without access
 	i2, err := dbmodel.NewIdentity("bob")
 	c.Assert(err, qt.IsNil)
-	c.Assert(db.DB.Create(i2).Error, qt.IsNil)
+	c.Assert(database.DB.Create(i2).Error, qt.IsNil)
 	s.userWithoutAccess = openfga.NewUser(i2, ofgaClient)
 	// setup public key
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
@@ -139,7 +140,7 @@ func (s *sshManagerSuite) Init(c *qt.C) {
 	s.publicKey = sshkeys.PublicKey{PublicKey: pubKey, Comment: "myComment"}
 
 	c.Assert(err, qt.IsNil)
-	err = sshKeyManager.AddUserPublicKey(ctx, s.userWithAccess, s.publicKey)
+	err = sshKeyManager.AddUserPublicKey(ctx, s.userWithAccess, db.SSHKeyModelFilter{ModelUUID: s.allowedModelUUID}, s.publicKey)
 	c.Assert(err, qt.IsNil)
 }
 

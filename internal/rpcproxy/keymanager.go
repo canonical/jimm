@@ -13,6 +13,7 @@ import (
 	"github.com/juju/utils/v3/ssh"
 	gossh "golang.org/x/crypto/ssh"
 
+	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm/sshkeys"
 	"github.com/canonical/jimm/v3/internal/openfga"
@@ -27,12 +28,13 @@ var isFingerprintRegexp = regexp.MustCompile("^[0-9a-f]{2}(:[0-9a-f]{2}){15}$")
 type keyManagerFacade struct {
 	keyManager SSHKeyManager
 	user       *openfga.User
+	modelUUID  string
 }
 
 // ListKeys lists the authenticated user's SSH keys
 // in the format defined in args.
 func (s *keyManagerFacade) ListKeys(ctx context.Context, args jujuparams.ListSSHKeys) (jujuparams.StringsResults, error) {
-	keys, err := s.keyManager.ListUserPublicKeys(ctx, s.user)
+	keys, err := s.keyManager.ListUserPublicKeys(ctx, s.user, db.SSHKeyModelFilter{ModelUUID: s.modelUUID})
 	if err != nil {
 		return jujuparams.StringsResults{}, err
 	}
@@ -75,7 +77,7 @@ func (s *keyManagerFacade) AddKeys(ctx context.Context, args jujuparams.ModifyUs
 			PublicKey: out,
 			Comment:   comment,
 		}
-		if err := s.keyManager.AddUserPublicKey(ctx, s.user, parsedKey); err != nil {
+		if err := s.keyManager.AddUserPublicKey(ctx, s.user, db.SSHKeyModelFilter{ModelUUID: s.modelUUID}, parsedKey); err != nil {
 			res = append(res, errF(err, fmt.Sprintf("Failed to add key (comment %s)", comment)))
 		}
 	}
@@ -96,12 +98,12 @@ func (s *keyManagerFacade) DeleteKeys(ctx context.Context, args jujuparams.Modif
 
 	for _, key := range args.Keys {
 		if isFingerprintRegexp.MatchString(key) {
-			err := s.keyManager.RemoveUserKeyByFingerprint(ctx, s.user, key)
+			err := s.keyManager.RemoveUserKeyByFingerprint(ctx, s.user, db.SSHKeyModelFilter{ModelUUID: s.modelUUID}, key)
 			if err != nil {
 				res = append(res, errF(err, fmt.Sprintf("Failed to remove key by fingerprint (%s)", key)))
 			}
 		} else {
-			err := s.keyManager.RemoveUserKeyByComment(ctx, s.user, key)
+			err := s.keyManager.RemoveUserKeyByComment(ctx, s.user, db.SSHKeyModelFilter{ModelUUID: s.modelUUID}, key)
 			if err != nil {
 				res = append(res, errF(err, fmt.Sprintf("Failed to remove key by comment (%s)", key)))
 			}

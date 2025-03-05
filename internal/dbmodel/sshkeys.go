@@ -16,6 +16,10 @@ type SSHKey struct {
 	IdentityName string   `gorm:"uniqueIndex:unique_identity_ssh_key"`
 	Identity     Identity `gorm:"foreignKey:IdentityName;references:Name"`
 
+	// IdentityName is the unique name (email or client-id) of this entity.
+	ModelUUID string `gorm:"uniqueIndex:unique_identity_ssh_key"`
+	Model     Model  `gorm:"foreignKey:ModelUUID;references:uuid"`
+
 	// PublicKey holds the user's public SSH key.
 	PublicKey []byte `gorm:"uniqueIndex:unique_identity_ssh_key"`
 	// MD5Fingerprint is the MD5 fingerprint of the public key.

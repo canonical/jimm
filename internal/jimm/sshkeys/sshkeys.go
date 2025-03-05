@@ -28,7 +28,7 @@ func NewSSHKeyManager(store *db.Database) (*sshKeyManager, error) {
 }
 
 // AddUserPublicKey saves a user's public key.
-func (sm *sshKeyManager) AddUserPublicKey(ctx context.Context, user *openfga.User, publicKey PublicKey) error {
+func (sm *sshKeyManager) AddUserPublicKey(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, publicKey PublicKey) error {
 	const op = errors.Op("sshkeys.AddUserPublicKey")
 
 	if ok, reason := publicKey.valid(); !ok {
@@ -37,6 +37,7 @@ func (sm *sshKeyManager) AddUserPublicKey(ctx context.Context, user *openfga.Use
 
 	k := dbmodel.SSHKey{
 		IdentityName:   user.Name,
+		ModelUUID:      model.ModelUUID,
 		PublicKey:      publicKey.Marshal(),
 		MD5Fingerprint: gossh.FingerprintLegacyMD5(publicKey),
 		KeyComment:     publicKey.Comment,
@@ -52,7 +53,7 @@ func (sm *sshKeyManager) AddUserPublicKey(ctx context.Context, user *openfga.Use
 func (sm *sshKeyManager) VerifyPublicKey(ctx context.Context, claimUser string, publicKey []byte) (bool, error) {
 	const op = errors.Op("sshkeys.VerifyPublicKey")
 
-	dbKeys, err := sm.store.ListSSHKeysForUser(ctx, claimUser)
+	dbKeys, err := sm.store.ListSSHKeysForUser(ctx, claimUser, db.SSHKeyModelFilter{All: true})
 	if err != nil {
 		return false, errors.E(op, err)
 	}
@@ -74,10 +75,10 @@ func (sm *sshKeyManager) VerifyPublicKey(ctx context.Context, claimUser string, 
 }
 
 // ListUserPublicKeys lists a user's public keys.
-func (sm *sshKeyManager) ListUserPublicKeys(ctx context.Context, user *openfga.User) ([]PublicKey, error) {
+func (sm *sshKeyManager) ListUserPublicKeys(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter) ([]PublicKey, error) {
 	const op = errors.Op("sshkeys.ListUserPublicKeys")
 
-	dbKeys, err := sm.store.ListSSHKeysForUser(ctx, user.Name)
+	dbKeys, err := sm.store.ListSSHKeysForUser(ctx, user.Name, model)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
@@ -93,10 +94,10 @@ func (sm *sshKeyManager) ListUserPublicKeys(ctx context.Context, user *openfga.U
 }
 
 // RemoveUserKeyByComment removes a user's public key(s) by the key comment.
-func (sm *sshKeyManager) RemoveUserKeyByComment(ctx context.Context, user *openfga.User, comment string) error {
+func (sm *sshKeyManager) RemoveUserKeyByComment(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, comment string) error {
 	const op = errors.Op("sshkeys.RemoveUserKeyByComment")
 
-	err := sm.store.RemoveSSHKeyByComment(ctx, user.Name, comment)
+	err := sm.store.RemoveSSHKeyByComment(ctx, user.Name, model, comment)
 	if err != nil {
 		return errors.E(op, err)
 	}
@@ -104,10 +105,10 @@ func (sm *sshKeyManager) RemoveUserKeyByComment(ctx context.Context, user *openf
 }
 
 // RemoveUserKeyByFingerprint removes a user's public key by the key fingerprint.
-func (sm *sshKeyManager) RemoveUserKeyByFingerprint(ctx context.Context, user *openfga.User, fingerprint string) error {
+func (sm *sshKeyManager) RemoveUserKeyByFingerprint(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, fingerprint string) error {
 	const op = errors.Op("sshkeys.RemoveUserKeyByFingerprint")
 
-	err := sm.store.RemoveSSHKeyByFingerprint(ctx, user.Name, fingerprint)
+	err := sm.store.RemoveSSHKeyByFingerprint(ctx, user.Name, model, fingerprint)
 	if err != nil {
 		return errors.E(op, err)
 	}

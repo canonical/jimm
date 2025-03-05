@@ -14,6 +14,7 @@ import (
 	"github.com/juju/names/v5"
 	"github.com/juju/utils/v3/ssh"
 
+	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/jimm/sshkeys"
 	"github.com/canonical/jimm/v3/internal/openfga"
@@ -313,21 +314,25 @@ func TestProxySocketsSSHKeys(t *testing.T) {
 				email: "alice@canonical.com",
 			},
 			SSHKeyManager: &mocks.SSHKeyManager{
-				AddUserPublicKey_: func(ctx context.Context, user *openfga.User, publicKey sshkeys.PublicKey) error {
+				AddUserPublicKey_: func(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, publicKey sshkeys.PublicKey) error {
 					sshFacadeChan <- "add-keys"
 					return nil
 				},
-				ListUserPublicKeys_: func(ctx context.Context, user *openfga.User) ([]sshkeys.PublicKey, error) {
+				ListUserPublicKeys_: func(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter) ([]sshkeys.PublicKey, error) {
 					sshFacadeChan <- "list-keys"
 					return nil, nil
 				},
-				RemoveUserKeyByComment_: func(ctx context.Context, user *openfga.User, comment string) error {
+				RemoveUserKeyByComment_: func(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, comment string) error {
 					sshFacadeChan <- "remove-keys-comment"
 					return nil
 				},
-				RemoveUserKeyByFingerprint_: func(ctx context.Context, user *openfga.User, fingerprint string) error {
+				RemoveUserKeyByFingerprint_: func(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, fingerprint string) error {
 					sshFacadeChan <- "remove-keys-fingerprint"
 					return nil
+				},
+				VerifyPublicKey_: func(ctx context.Context, claimUser string, publicKey []byte) (bool, error) {
+					sshFacadeChan <- "verify-key"
+					return true, nil
 				},
 			},
 		}

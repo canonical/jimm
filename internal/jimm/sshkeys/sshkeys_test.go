@@ -27,9 +27,11 @@ type sshKeysManagerSuite struct {
 	db         *db.Database
 	ofgaClient *openfga.OFGAClient
 	pubKey     sshkeys.PublicKey
+	modelUUID  string
 }
 
 func (s *sshKeysManagerSuite) Init(c *qt.C) {
+	ctx := context.Background()
 	// Setup DB
 	db := &db.Database{
 		DB: jimmtest.PostgresDB(c, time.Now),
@@ -38,21 +40,19 @@ func (s *sshKeysManagerSuite) Init(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 
 	s.db = db
-
+	user, _, _, model, _, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
 	// Setup OFGA
 	ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
 	s.ofgaClient = ofgaClient
 
+	s.modelUUID = model.UUID.String
 	s.manager, err = sshkeys.NewSSHKeyManager(db)
 	c.Assert(err, qt.IsNil)
 
 	// Create test identity
-	i, err := dbmodel.NewIdentity("alice")
-	c.Assert(err, qt.IsNil)
-	c.Assert(db.DB.Create(i).Error, qt.IsNil)
-	s.user = openfga.NewUser(i, ofgaClient)
+	s.user = openfga.NewUser(&user, ofgaClient)
 
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	c.Assert(err, qt.IsNil)
@@ -60,19 +60,20 @@ func (s *sshKeysManagerSuite) Init(c *qt.C) {
 	pubKey, err := gossh.NewPublicKey(&key.PublicKey)
 	c.Assert(err, qt.IsNil)
 	s.pubKey = sshkeys.PublicKey{PublicKey: pubKey, Comment: "myComment"}
+
 }
 
 func (s *sshKeysManagerSuite) TestAddUserPublicKey(c *qt.C) {
 	c.Parallel()
 	ctx := context.Background()
 
-	err := s.manager.AddUserPublicKey(ctx, s.user, s.pubKey)
+	err := s.manager.AddUserPublicKey(ctx, s.user, db.SSHKeyModelFilter{ModelUUID: s.modelUUID}, s.pubKey)
 	c.Assert(err, qt.IsNil)
 
 	var dbKey dbmodel.SSHKey
 	c.Assert(s.db.DB.First(&dbKey).Error, qt.IsNil)
 	c.Assert(dbKey.ID, qt.Not(qt.Equals), 0)
-	c.Assert(dbKey.IdentityName, qt.Equals, "alice")
+	c.Assert(dbKey.IdentityName, qt.Equals, s.user.Name)
 	c.Assert(dbKey.PublicKey, qt.DeepEquals, s.pubKey.Marshal())
 	c.Assert(dbKey.MD5Fingerprint, qt.Equals, gossh.FingerprintLegacyMD5(s.pubKey))
 	c.Assert(dbKey.KeyComment, qt.Equals, s.pubKey.Comment)
@@ -82,10 +83,10 @@ func (s *sshKeysManagerSuite) TestListUserPublicKeys(c *qt.C) {
 	c.Parallel()
 	ctx := context.Background()
 
-	err := s.manager.AddUserPublicKey(ctx, s.user, s.pubKey)
+	err := s.manager.AddUserPublicKey(ctx, s.user, db.SSHKeyModelFilter{ModelUUID: s.modelUUID}, s.pubKey)
 	c.Assert(err, qt.IsNil)
 
-	keys, err := s.manager.ListUserPublicKeys(ctx, s.user)
+	keys, err := s.manager.ListUserPublicKeys(ctx, s.user, db.SSHKeyModelFilter{ModelUUID: s.modelUUID})
 	c.Assert(err, qt.IsNil)
 
 	c.Assert(keys, qt.HasLen, 1)
@@ -97,14 +98,14 @@ func (s *sshKeysManagerSuite) TestVerifyPublicKeys(c *qt.C) {
 	c.Parallel()
 	ctx := context.Background()
 
-	err := s.manager.AddUserPublicKey(ctx, s.user, s.pubKey)
+	err := s.manager.AddUserPublicKey(ctx, s.user, db.SSHKeyModelFilter{ModelUUID: s.modelUUID}, s.pubKey)
 	c.Assert(err, qt.IsNil)
 
 	rawKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	c.Assert(err, qt.IsNil)
 	anotherPubKey, err := gossh.NewPublicKey(&rawKey.PublicKey)
 	c.Assert(err, qt.IsNil)
-	err = s.manager.AddUserPublicKey(ctx, s.user, sshkeys.PublicKey{PublicKey: anotherPubKey, Comment: "myComment"})
+	err = s.manager.AddUserPublicKey(ctx, s.user, db.SSHKeyModelFilter{ModelUUID: s.modelUUID}, sshkeys.PublicKey{PublicKey: anotherPubKey, Comment: "myComment"})
 	c.Assert(err, qt.IsNil)
 
 	rawKey, err = rsa.GenerateKey(rand.Reader, 2048)
@@ -176,13 +177,13 @@ func (s *sshKeysManagerSuite) TestRemoveUserKeyByComment(c *qt.C) {
 	c.Parallel()
 	ctx := context.Background()
 
-	err := s.manager.AddUserPublicKey(ctx, s.user, s.pubKey)
+	err := s.manager.AddUserPublicKey(ctx, s.user, db.SSHKeyModelFilter{ModelUUID: s.modelUUID}, s.pubKey)
 	c.Assert(err, qt.IsNil)
 
 	var key dbmodel.SSHKey
 	c.Assert(s.db.DB.First(&dbmodel.SSHKey{}).First(&key).Error, qt.IsNil)
 
-	err = s.manager.RemoveUserKeyByComment(ctx, s.user, s.pubKey.Comment)
+	err = s.manager.RemoveUserKeyByComment(ctx, s.user, db.SSHKeyModelFilter{ModelUUID: s.modelUUID}, s.pubKey.Comment)
 	c.Assert(err, qt.IsNil)
 
 	c.Assert(s.db.DB.First(&dbmodel.SSHKey{}).Error, qt.Equals, gorm.ErrRecordNotFound)
@@ -192,13 +193,13 @@ func (s *sshKeysManagerSuite) TestRemoveUserKeyByFingerprint(c *qt.C) {
 	c.Parallel()
 	ctx := context.Background()
 
-	err := s.manager.AddUserPublicKey(ctx, s.user, s.pubKey)
+	err := s.manager.AddUserPublicKey(ctx, s.user, db.SSHKeyModelFilter{ModelUUID: s.modelUUID}, s.pubKey)
 	c.Assert(err, qt.IsNil)
 
 	var key dbmodel.SSHKey
 	c.Assert(s.db.DB.First(&dbmodel.SSHKey{}).First(&key).Error, qt.IsNil)
 
-	err = s.manager.RemoveUserKeyByFingerprint(ctx, s.user, gossh.FingerprintLegacyMD5(s.pubKey))
+	err = s.manager.RemoveUserKeyByFingerprint(ctx, s.user, db.SSHKeyModelFilter{ModelUUID: s.modelUUID}, gossh.FingerprintLegacyMD5(s.pubKey))
 	c.Assert(err, qt.IsNil)
 
 	c.Assert(s.db.DB.First(&dbmodel.SSHKey{}).Error, qt.Equals, gorm.ErrRecordNotFound)
