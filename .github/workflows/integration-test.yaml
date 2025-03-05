@@ -56,3 +56,19 @@ jobs:
         run: |
           # TODO(simonedutto): improve this test when juju ssh controller is implemented.
           nc -zv localhost 17022
+
+      - name: Stop the application container
+        run: docker stop jimm
+  
+      - name: Check logs for shutdown message
+        run: |
+          APP_CONTAINER=jimm
+          LOGS=$(docker logs "$APP_CONTAINER" -n 20)
+          echo "$LOGS"
+          
+          if echo "$LOGS" | grep -q "jimm shutdown complete"; then
+            echo "Graceful shutdown confirmed."
+          else
+            echo "Graceful shutdown message not found!"
+            exit 1
+          fi
