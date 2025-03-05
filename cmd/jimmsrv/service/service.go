@@ -247,6 +247,7 @@ func (s *Service) MonitorResources(ctx context.Context) {
 		case <-ticker.C:
 			s.jimm.JujuManager().UpdateMetrics(ctx)
 		case <-ctx.Done():
+			zapctx.Info(ctx, "exiting resource monitor polling")
 			return
 		}
 	}
@@ -263,6 +264,7 @@ func (s *Service) OpenFGACleanup(ctx context.Context, trigger <-chan time.Time) 
 				continue
 			}
 		case <-ctx.Done():
+			zapctx.Info(ctx, "exiting OpenFGA cleanup polling")
 			return nil
 		}
 	}
@@ -279,6 +281,7 @@ func (s *Service) CleanupDyingModels(ctx context.Context, trigger <-chan time.Ti
 				continue
 			}
 		case <-ctx.Done():
+			zapctx.Info(ctx, "exiting dying model cleanup polling")
 			return nil
 		}
 	}

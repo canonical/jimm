@@ -78,6 +78,7 @@ func (w *Watcher) WatchAllModelSummaries(ctx context.Context, interval time.Dura
 		}
 		select {
 		case <-ctx.Done():
+			zapctx.Info(ctx, "exiting model summary watcher polling")
 			return ctx.Err()
 		case <-ticker.C:
 		}

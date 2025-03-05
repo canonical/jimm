@@ -30,7 +30,7 @@ func main() {
 	})
 	err := s.Wait()
 
-	zapctx.Error(context.Background(), "shutdown", zap.Error(err))
+	zapctx.Error(context.Background(), "jimm shutdown complete", zap.Error(err))
 	if _, ok := err.(*service.SignalError); !ok {
 		os.Exit(1)
 	}
@@ -207,19 +207,8 @@ func start(ctx context.Context, s *service.Service) error {
 		Handler:           jimmsvc,
 		ReadHeaderTimeout: time.Second * 5,
 	}
-	s.OnShutdown(func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
 
-		zapctx.Warn(ctx, "server shutdown triggered")
-		err = httpsrv.Shutdown(ctx)
-		if err != nil {
-			zapctx.Error(ctx, "failed to shutdown server gracefully", zap.Error(err))
-		}
-		jimmsvc.Cleanup()
-	})
-	s.Go(httpsrv.ListenAndServe)
-	zapctx.Info(ctx, "Successfully started JIMM server")
+	// intentionally ignore the error because invalid values are handled by the jump server.
 	maxConccurentConncetions, _ := strconv.Atoi(os.Getenv("JIMM_SSH_MAX_CONCURRENT_CONNECTIONS"))
 
 	sshServer, err := ssh.NewJumpServer(ctx, ssh.Config{
@@ -227,10 +216,28 @@ func start(ctx context.Context, s *service.Service) error {
 		HostKey:                  []byte(hostKeyRaw),
 		MaxConcurrentConnections: maxConccurentConncetions,
 	}, jimmsvc.JIMM().SSHManager())
-	if err != nil {
-		return err
-	}
+
+	s.OnShutdown(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		zapctx.Warn(ctx, "HTTP server shutdown triggered")
+		err = httpsrv.Shutdown(ctx)
+		if err != nil {
+			zapctx.Error(ctx, "failed to shutdown HTTP server gracefully", zap.Error(err))
+		}
+
+		zapctx.Warn(ctx, "SSH server shutdown triggered")
+		err = sshServer.Shutdown(ctx)
+		if err != nil {
+			zapctx.Error(ctx, "failed to shutdown SSH server gracefully", zap.Error(err))
+		}
+
+		jimmsvc.Cleanup()
+	})
+	s.Go(httpsrv.ListenAndServe)
+	zapctx.Info(ctx, "Started JIMM HTTP server")
 	s.Go(sshServer.ListenAndServe)
-	zapctx.Info(ctx, "Successfully started JIMM ssh server")
+	zapctx.Info(ctx, "Started JIMM SSH server")
 	return nil
 }
