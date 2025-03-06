@@ -51,7 +51,7 @@ func (s *adminSuite) TestLoginToController(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `JIMM does not support login from old clients \(not supported\)`)
 	var resp jujuparams.RedirectInfoResult
 	err = conn.APICall("Admin", 3, "", "RedirectInfo", nil, &resp)
-	c.Assert(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeNotImplemented)
+	c.Assert(err, gc.ErrorMatches, "(?s).*not implemented.*")
 }
 
 // TestBrowserLogin takes a test user through the flow of logging into jimm

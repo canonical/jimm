@@ -1,3 +1,5 @@
+// Copyright 2025 Canonical.
+
 package mocks
 
 import (

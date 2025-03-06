@@ -197,7 +197,7 @@ func (s *apiProxySuite) TestConnectToModel(c *gc.C) {
 	defer conn.Close()
 	var resp map[string]interface{}
 	err := conn.APICall("Admin", 3, "", "TestMethod", nil, &resp)
-	c.Assert(err, gc.ErrorMatches, `no such request - method Admin.TestMethod is not implemented \(not implemented\)`)
+	c.Assert(err, gc.ErrorMatches, `(?s).*no such request - method Admin.TestMethod is not implemented \(not implemented\).*`)
 }
 
 // TestSessionTokenLoginProvider verifies that the session token login provider works as expected.

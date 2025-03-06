@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package jujuapi_test
 
@@ -33,7 +33,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/testutils/kubetest"
 )
 
-const jujuVersion = "3.5.4"
+const jujuVersion = "3.6.4"
 
 type modelManagerSuite struct {
 	websocketSuite
@@ -58,6 +58,7 @@ func (s *modelManagerSuite) TestListModelSummaries(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(models, jimmtest.CmpEquals(
 		cmpopts.IgnoreTypes(&time.Time{}),
+		cmpopts.IgnoreFields(base.UserModelSummary{}, "DefaultSeries"),
 		cmpopts.SortSlices(func(a, b base.UserModelSummary) bool {
 			return a.Name < b.Name
 		}),
@@ -163,6 +164,7 @@ func (s *modelManagerSuite) TestListModelSummariesWithoutControllerUUIDMasking(c
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(models, jimmtest.CmpEquals(
 		cmpopts.IgnoreTypes(&time.Time{}),
+		cmpopts.IgnoreFields(base.UserModelSummary{}, "DefaultSeries"),
 		cmpopts.SortSlices(func(a, b base.UserModelSummary) bool {
 			return a.Name < b.Name
 		}),
@@ -255,13 +257,6 @@ func (s *modelManagerSuite) TestListModels(c *gc.C) {
 func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 	mt4 := s.AddModel(c, names.NewUserTag("charlie@canonical.com"), "model-4", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, s.Model2.CloudCredential.ResourceTag())
 
-	// TODO (alesstimec) change once granting has been re-implemented
-	// conn := s.open(c, nil, "charlie")
-	// defer conn.Close()
-	// client := modelmanager.NewClient(conn)
-	// err := client.GrantModel("bob@canonical.com", "write", mt4.Id())
-	// c.Assert(err, gc.Equals, nil)
-
 	bobIdentity, err := dbmodel.NewIdentity("bob@canonical.com")
 	c.Assert(err, gc.IsNil)
 	bob := openfga.NewUser(bobIdentity, s.OFGAClient)
@@ -326,7 +321,6 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 		Result: &jujuparams.ModelInfo{
 			Name:               "model-1",
 			UUID:               s.Model.UUID.String,
-			DefaultBase:        "ubuntu@22.04/stable",
 			ControllerUUID:     jimmtest.ControllerUUID,
 			ProviderType:       jimmtest.TestProviderType,
 			CloudTag:           names.NewCloudTag(jimmtest.TestCloudName).String(),
@@ -365,7 +359,6 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 		Result: &jujuparams.ModelInfo{
 			Name:               "model-3",
 			UUID:               s.Model3.UUID.String,
-			DefaultBase:        "ubuntu@22.04/stable",
 			ControllerUUID:     jimmtest.ControllerUUID,
 			ProviderType:       jimmtest.TestProviderType,
 			CloudTag:           names.NewCloudTag(jimmtest.TestCloudName).String(),
@@ -396,7 +389,6 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 		Result: &jujuparams.ModelInfo{
 			Name:               "model-4",
 			UUID:               mt4.Id(),
-			DefaultBase:        "ubuntu@22.04/stable",
 			ControllerUUID:     jimmtest.ControllerUUID,
 			ProviderType:       jimmtest.TestProviderType,
 			CloudTag:           names.NewCloudTag(jimmtest.TestCloudName).String(),
@@ -448,7 +440,6 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 		Result: &jujuparams.ModelInfo{
 			Name:               "model-5",
 			UUID:               mt5.Id(),
-			DefaultBase:        "ubuntu@22.04/stable",
 			ControllerUUID:     jimmtest.ControllerUUID,
 			ProviderType:       jimmtest.TestProviderType,
 			CloudTag:           names.NewCloudTag(jimmtest.TestCloudName).String(),
@@ -558,7 +549,6 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 		Result: &jujuparams.ModelInfo{
 			Name:               "model-1",
 			UUID:               s.Model.UUID.String,
-			DefaultBase:        "ubuntu@22.04/stable",
 			ControllerUUID:     "deadbeef-1bad-500d-9000-4b1d0d06f00d",
 			ProviderType:       jimmtest.TestProviderType,
 			CloudTag:           names.NewCloudTag(jimmtest.TestCloudName).String(),
@@ -592,7 +582,6 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 		Result: &jujuparams.ModelInfo{
 			Name:               "model-2",
 			UUID:               s.Model2.UUID.String,
-			DefaultBase:        "ubuntu@22.04/stable",
 			ControllerUUID:     "deadbeef-1bad-500d-9000-4b1d0d06f00d",
 			ProviderType:       jimmtest.TestProviderType,
 			CloudTag:           names.NewCloudTag(jimmtest.TestCloudName).String(),
@@ -629,7 +618,6 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 		Result: &jujuparams.ModelInfo{
 			Name:               "model-3",
 			UUID:               s.Model3.UUID.String,
-			DefaultBase:        "ubuntu@22.04/stable",
 			ControllerUUID:     "deadbeef-1bad-500d-9000-4b1d0d06f00d",
 			ProviderType:       jimmtest.TestProviderType,
 			CloudTag:           names.NewCloudTag(jimmtest.TestCloudName).String(),
@@ -687,7 +675,6 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 		Result: &jujuparams.ModelInfo{
 			Name:               "model-4",
 			UUID:               mt4.Id(),
-			DefaultBase:        "ubuntu@22.04/stable",
 			ControllerUUID:     "deadbeef-1bad-500d-9000-4b1d0d06f00d",
 			ProviderType:       jimmtest.TestProviderType,
 			CloudTag:           names.NewCloudTag(jimmtest.TestCloudName).String(),
@@ -745,7 +732,6 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 		Result: &jujuparams.ModelInfo{
 			Name:               "model-5",
 			UUID:               mt5.Id(),
-			DefaultBase:        "ubuntu@22.04/stable",
 			ControllerUUID:     "deadbeef-1bad-500d-9000-4b1d0d06f00d",
 			ProviderType:       jimmtest.TestProviderType,
 			CloudTag:           names.NewCloudTag(jimmtest.TestCloudName).String(),
@@ -1439,6 +1425,10 @@ func (s *caasModelManagerSuite) TestListCAASModelSummaries(c *gc.C) {
 	c.Assert(
 		caasMS,
 		jimmtest.CmpEquals(
+			cmpopts.IgnoreFields(
+				base.UserModelSummary{},
+				"DefaultSeries",
+			),
 			cmpopts.IgnoreTypes(
 				&time.Time{},
 				&base.MigrationSummary{},
@@ -1494,6 +1484,7 @@ func assertModelInfo(c *gc.C, obtained, expected []jujuparams.ModelInfoResult) {
 		// we don't care about its specific value.
 		if obtained[i].Result != nil {
 			obtained[i].Result.DefaultSeries = ""
+			obtained[i].Result.DefaultBase = ""
 		}
 	}
 	for i := range obtained {
