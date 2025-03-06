@@ -214,7 +214,7 @@ func (s *apiProxySuite) TestSessionTokenLoginProvider(c *gc.C) {
 	conn, err := s.openCustomLoginProvider(c, &api.Info{
 		ModelTag:  s.Model.ResourceTag(),
 		SkipLogin: false,
-	}, "alice", api.NewSessionTokenLoginProvider("", &output, func(s string) error { return nil }))
+	}, "alice", api.NewSessionTokenLoginProvider("", &output, func(s string) {}))
 	c.Assert(err, gc.IsNil)
 	defer conn.Close()
 	c.Check(err, gc.Equals, nil)
@@ -246,7 +246,7 @@ func (s *apiProxySuite) TestModelStatusWithoutPermission(c *gc.C) {
 	conn, err := s.openCustomLoginProvider(c, &api.Info{
 		ModelTag:  s.Model.ResourceTag(),
 		SkipLogin: false,
-	}, "foo", api.NewSessionTokenLoginProvider("", &output, func(s string) error { return nil }))
+	}, "foo", api.NewSessionTokenLoginProvider("", &output, func(s string) {}))
 	c.Check(err, gc.ErrorMatches, "permission denied .*")
 	if conn != nil {
 		defer conn.Close()
