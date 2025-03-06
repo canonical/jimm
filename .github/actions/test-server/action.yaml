@@ -78,6 +78,8 @@ runs:
       working-directory: ${{ github.action_path }}/../../..
       run: make dev-env
       shell: bash
+      env: 
+        JIMM_TARGET: smoke
 
     - name: Retrieve server CA cert.
       id: fetch-cert
