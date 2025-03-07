@@ -52,22 +52,6 @@ func (s *controllerSuite) TestControllerConfigSetNotSupported(c *gc.C) {
 	c.Assert(jujuparams.IsCodeNotSupported(err), gc.Equals, true)
 }
 
-func (s *controllerSuite) TestModelConfig(c *gc.C) {
-	conn := s.open(c, nil, "test")
-	defer conn.Close()
-	client := controllerapi.NewClient(conn)
-	_, err := client.ModelConfig()
-	c.Assert(err, gc.ErrorMatches, `not supported \(not supported\)`)
-	c.Assert(jujuparams.IsCodeNotSupported(err), gc.Equals, true)
-
-	conn = s.open(c, nil, "alice")
-	defer conn.Close()
-	client = controllerapi.NewClient(conn)
-	_, err = client.ModelConfig()
-	c.Assert(err, gc.ErrorMatches, `not supported \(not supported\)`)
-	c.Assert(jujuparams.IsCodeNotSupported(err), gc.Equals, true)
-}
-
 func (s *controllerSuite) TestMongoVersion(c *gc.C) {
 	conn := s.open(c, nil, "alice")
 	defer conn.Close()

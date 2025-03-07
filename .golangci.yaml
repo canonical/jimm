@@ -24,10 +24,10 @@ issues:
 output:
   print-issued-lines: true
   print-linter-name: true
-  uniq-by-line: true
-  # path-prefix: # Not needed
   show-stats: false
   sort-results: true
+  formats:
+    - format: github-actions
 
 linters:
   disable-all: true
