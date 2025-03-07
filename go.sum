@@ -633,8 +633,8 @@ github.com/juju/idmclient/v2 v2.0.0 h1:PsGa092JGy6iFNHZCcao+bigVsTyz1C+tHNRdYmKv
 github.com/juju/idmclient/v2 v2.0.0/go.mod h1:EOiFbPmnkqKvCUS/DHpDRWhL7eKF0AJaTvMjIYlIUak=
 github.com/juju/jsonschema v1.0.0 h1:2ScR9hhVdHxft+Te3fnclVx61MmlikHNEOirTGi+hV4=
 github.com/juju/jsonschema v1.0.0/go.mod h1:SlFW+jFtpWX0P4Tb+zTTPR4ufttLrnJIdQPePxVEfkM=
-github.com/juju/juju v0.0.0-20250306082356-9e0134400291 h1:finPefM98NPEnM/H5O6/+UxKNXDsyZhtqDGPbQPPPRQ=
-github.com/juju/juju v0.0.0-20250306082356-9e0134400291/go.mod h1:T1X9TxVM+foktBrtuQSbsQp6tzmjaPqKcp0jkkZ0UBI=
+github.com/juju/juju v0.0.0-20250306114340-d7a40b3e3801 h1:tM4K4fgLmwsUKGqZ890SgOiPu9X/sjLhbTlDoeK2URU=
+github.com/juju/juju v0.0.0-20250306114340-d7a40b3e3801/go.mod h1:T1X9TxVM+foktBrtuQSbsQp6tzmjaPqKcp0jkkZ0UBI=
 github.com/juju/loggo v0.0.0-20170605014607-8232ab8918d9/go.mod h1:vgyd7OREkbtVEN/8IXZe5Ooef3LQePvuBm9UWj6ZL8U=
 github.com/juju/loggo v0.0.0-20190212223446-d976af380377/go.mod h1:vgyd7OREkbtVEN/8IXZe5Ooef3LQePvuBm9UWj6ZL8U=
 github.com/juju/loggo v0.0.0-20200526014432-9ce3a2e09b5e/go.mod h1:vgyd7OREkbtVEN/8IXZe5Ooef3LQePvuBm9UWj6ZL8U=
