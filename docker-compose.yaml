@@ -42,9 +42,12 @@ services:
     extends:
       file: docker-compose.common.yaml
       service: jimm-base
+    # In order to switch the target image you need to run compose with --build
+    # Changing target is mainly useful in CI, so local environments can just rely on the default.
     build:
-      context: .
-      dockerfile: ./local/Dockerfile
+      context: ./local/jimm/
+      dockerfile: Dockerfile
+      target: ${JIMM_TARGET:-dev}
     profiles: ["dev"]
     # working_dir value has to be the same of mapped volume
     hostname: jimm.localhost
