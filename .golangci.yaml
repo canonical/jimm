@@ -9,7 +9,6 @@ run:
   tests: true
   allow-parallel-runners: false
   allow-serial-runners: false
-  # go: "1.23"
 
 issues:
   exclude-use-default: true
