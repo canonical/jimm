@@ -4,8 +4,6 @@ package db_test
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/rsa"
 	"database/sql"
 	"testing"
 	"time"
@@ -95,10 +93,9 @@ func (s *sshKeysSuite) TestRemoveSSHKeyByFingerprint(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(s.Database.DB.Create(u2).Error, qt.IsNil)
 
-	//nolint:gosec // Don't need secure bits for test.
-	rsaKey, err := rsa.GenerateKey(rand.Reader, 512)
+	rsaKey, err := jimmtest.TestRSAKey()
 	c.Assert(err, qt.IsNil)
-	publicKey, err := gossh.NewPublicKey(&rsaKey.PublicKey)
+	publicKey, err := gossh.NewPublicKey(rsaKey.Public())
 	c.Assert(err, qt.IsNil)
 
 	key := dbmodel.SSHKey{

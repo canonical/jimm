@@ -1,7 +1,9 @@
-# Installing delve in the image to avoid running go install in running containers
-FROM cosmtrek/air:latest AS dev
+# Installing delve in the image to avoid running go install in running containers.
+# Installing air to avoid breakages when we update our Go version before a new air image is available.
+FROM golang:1.24 AS dev
 
 RUN go install github.com/go-delve/delve/cmd/dlv@latest
+RUN go install github.com/air-verse/air@latest
 
 ENTRYPOINT [ "air" ]
 
