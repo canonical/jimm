@@ -1,4 +1,5 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
+
 package jimmtest
 
 import (
@@ -84,7 +85,7 @@ func SetupTestOFGAClient(names ...string) (*openfga.OFGAClient, *cofga.Client, *
 	}
 	cofgaClient, err := cofga.NewClient(ctx, cofgaParams)
 	if err != nil {
-		return nil, nil, nil, errgo.Notef(err, "failed to create ofga client")
+		return nil, nil, nil, errgo.Notef(err, "failed to create ofga client for test name %s and store ID %s", testName, storeID)
 	}
 
 	if authModel == nil {
