@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/juju/cmd/v3"
-	jujucmdv3 "github.com/juju/cmd/v3"
 	"github.com/juju/gnuflag"
 	jujuapi "github.com/juju/juju/api"
 	jujucmd "github.com/juju/juju/cmd"
@@ -21,58 +20,39 @@ import (
 )
 
 const (
-	roleDoc = `
-The role command enables role management for jimm
-`
-
 	addRoleDoc = `
-The add command adds role to jimm.
+Adds a role.
 `
 
 	addRoleExample = `
-    jimmctl auth role add myrole 
+    juju add-role myrole 
 `
 
 	renameRoleDoc = `
-The rename command renames a role in jimm.
+Renames a role.
 `
 	renameRoleExample = `
-    jimmctl auth role rename myrole newrolename
+    juju rename-role myrole newrolename
 `
 
 	removeRoleDoc = `
-The remove command removes a role in jimm.
+Removes a role.
 `
 
 	removeRoleExample = `
-    jimmctl auth role remove myrole
+    juju remove-role remove myrole
 `
 
 	listRolesDoc = `
-The list command lists all roles in jimm.
+Lists all roles.
 `
 	listRolesExample = `
-    jimmctl auth role list
+    juju list-roles list
 `
 )
 
-// NewRoleCommand returns a command for role management.
-func NewRoleCommand() *jujucmdv3.SuperCommand {
-	cmd := jujucmd.NewSuperCommand(jujucmdv3.SuperCommandParams{
-		Name:    "role",
-		Doc:     roleDoc,
-		Purpose: "Role management.",
-	})
-	cmd.Register(newAddRoleCommand())
-	cmd.Register(newRenameRoleCommand())
-	cmd.Register(newRemoveRoleCommand())
-	cmd.Register(newListRolesCommand())
-
-	return cmd
-}
-
-// newAddRoleCommand returns a command to add a role.
-func newAddRoleCommand() cmd.Command {
+// NewAddRoleCommand returns a command to add a role.
+func NewAddRoleCommand() cmd.Command {
 	cmd := &addRoleCommand{
 		store: jujuclient.NewFileClientStore(),
 	}
@@ -94,7 +74,7 @@ type addRoleCommand struct {
 // Info implements the cmd.Command interface.
 func (c *addRoleCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:     "add",
+		Name:     "add-role",
 		Args:     "<role name>",
 		Purpose:  "Add role to jimm.",
 		Doc:      addRoleDoc,
@@ -150,8 +130,8 @@ func (c *addRoleCommand) Run(ctxt *cmd.Context) error {
 	return nil
 }
 
-// newRenameRoleCommand returns a command to rename a role.
-func newRenameRoleCommand() cmd.Command {
+// NewRenameRoleCommand returns a command to rename a role.
+func NewRenameRoleCommand() cmd.Command {
 	cmd := &renameRoleCommand{
 		store: jujuclient.NewFileClientStore(),
 	}
@@ -173,7 +153,7 @@ type renameRoleCommand struct {
 // Info implements the cmd.Command interface.
 func (c *renameRoleCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:     "rename",
+		Name:     "rename-role",
 		Args:     "<role name> <new role name>",
 		Purpose:  "Rename a role.",
 		Doc:      renameRoleDoc,
@@ -219,8 +199,8 @@ func (c *renameRoleCommand) Run(ctxt *cmd.Context) error {
 	return nil
 }
 
-// newRemoveRoleCommand returns a command to Remove a role.
-func newRemoveRoleCommand() cmd.Command {
+// NewRemoveRoleCommand returns a command to Remove a role.
+func NewRemoveRoleCommand() cmd.Command {
 	cmd := &removeRoleCommand{
 		store: jujuclient.NewFileClientStore(),
 	}
@@ -243,7 +223,7 @@ type removeRoleCommand struct {
 // Info implements the cmd.Command interface.
 func (c *removeRoleCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:     "remove",
+		Name:     "remove-role",
 		Args:     "<role name>",
 		Purpose:  "Remove a role.",
 		Doc:      removeRoleDoc,
@@ -314,8 +294,8 @@ func (c *removeRoleCommand) Run(ctxt *cmd.Context) error {
 	return nil
 }
 
-// newListRolesCommand returns a command to list all roles.
-func newListRolesCommand() cmd.Command {
+// NewListRolesCommand returns a command to list all roles.
+func NewListRolesCommand() cmd.Command {
 	cmd := &listRolesCommand{
 		store: jujuclient.NewFileClientStore(),
 	}
@@ -338,10 +318,11 @@ type listRolesCommand struct {
 // Info implements the cmd.Command interface.
 func (c *listRolesCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:     "list",
+		Name:     "list-roles",
 		Purpose:  "List all roles.",
 		Doc:      listRolesDoc,
 		Examples: listRolesExample,
+		Aliases:  []string{"roles"},
 	})
 }
 

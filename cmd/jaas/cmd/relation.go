@@ -31,10 +31,13 @@ const (
 )
 
 const (
-	relationDoc = `
-relation command enables relation management for jimm
-`
 	genericConstraintsDoc = `
+This command works at a low-level and commands like 'juju grant'
+should be preferred in most cases.
+
+Permissions in JIMM consist of an object, a relation and a target object.
+These are used to define access control between resources.
+
 The object and target object must be of the form <tag>-<objectname> or <tag>-<object-uuid>
 E.g. "user-Alice" or "controller-MyController"
 
@@ -52,7 +55,7 @@ E.g. "user-Alice" or "controller-MyController"
         }
     ]
 
-Certain constraints apply when creating/removing a relation, namely:
+Certain constraints apply when creating/removing permissions, namely:
 Object may be one of:
 
 	user tag                = "user-<name>"
@@ -84,85 +87,69 @@ If target_object is an application offer, the relation can be one of:
 
 
 Additionally, if the object is a group, a userset can be applied by adding #member as follows.
-This will grant/revoke the relation to all users within TeamA:
+This will grant/revoke access to all users within TeamA:
 
 	group-TeamA#member administrator controller-MyController
 `
 
-	addRelationDoc = `
-The add command adds relation to jimm.
+	addPermissionDoc = `
+Grants access to a resource.
 ` + genericConstraintsDoc
 
 	addRelationExample = `
-    jimmctl auth relation add user-alice@canonical.com member group-mygroup
-    jimmctl auth relation add group-MyTeam#member admin model-mymodel
-	jimmctl auth relation add -f /path/to/file.yaml
+    juju add-permission user-alice@canonical.com member group-mygroup
+    juju add-permission group-MyTeam#member admin model-mymodel
+	juju add-permission -f /path/to/file.yaml
 `
 
-	removeRelationDoc = `
-The remove command removes a relation from jimm.
+	removePermissionDoc = `
+Revokes access to a resource.
 ` + genericConstraintsDoc
 
-	removeRelationExample = `
-    jimmctl auth relation remove user-alice@canonical.com member group-mygroup
-    jimmctl auth relation remove group-MyTeam#member admin model-mymodel
-	jimmctl auth relation remove -f /path/to/file.yaml
+	removePermissionExample = `
+    juju remove-permission user-alice@canonical.com member group-mygroup
+    juju remove-permission group-MyTeam#member admin model-mymodel
+	juju remove-permission -f /path/to/file.yaml
 `
 
-	checkRelationDoc = `
-Verifies the access between resources.
+	checkPermissionDoc = `
+Verifies access to a resource.
 `
-	checkRelationExample = `
-    jimmctl auth relation check user-alice@canonical.com administrator controller-aws-controller-1
-`
-
-	listRelationsDoc = `
-List relations known to jimm. Using the "target", "relation" and "object" flags, 
-only those relations matching the filter will be returned.
+	checkPermissionExample = `
+    juju check-permission user-alice@canonical.com administrator controller-aws-controller-1
 `
 
-	listRelationsExample = `
-List all relations
+	listPermissionsDoc = `
+List permissions known to jimm. Using the "target", "relation" and "object" flags, 
+only those permissions matching the filter will be returned.
+`
 
-    jimmctl auth relation list
+	listPermissionsExample = `
+List all permissions
+
+    juju list-permissions
 	
-List relations where the target object match
+List permissions where the target object match
 
-    jimmctl auth relation list --target model-mymodel
+    juju list-permissions --target model-mymodel
 
-List relations where the target object and relation match
+List permissions where the target object and relation match
 
-	jimmctl auth relation list --target model-mymodel  --relation admin
+	juju list-permissions --target model-mymodel  --relation admin
 `
 )
 
-// NewRelationCommand returns a command for relation management.
-func NewRelationCommand() *cmd.SuperCommand {
-	cmd := jujucmd.NewSuperCommand(cmd.SuperCommandParams{
-		Name:        "relation",
-		UsagePrefix: "auth",
-		Doc:         relationDoc,
-		Purpose:     "Relation management.",
-	})
-	cmd.Register(newAddRelationCommand())
-	cmd.Register(newRemoveRelationCommand())
-	cmd.Register(newCheckRelationCommand())
-	cmd.Register(newListRelationsCommand())
-
-	return cmd
-}
-
-// newAddRelationCommand returns a command to add a relation.
-func newAddRelationCommand() cmd.Command {
-	cmd := &addRelationCommand{
+// NewAddPermissionCommand returns a command to grant access.
+func NewAddPermissionCommand() cmd.Command {
+	cmd := &addPermission{
 		store: jujuclient.NewFileClientStore(),
 	}
 
 	return modelcmd.WrapBase(cmd)
 }
 
-// addRelationCommand adds a relation.
-type addRelationCommand struct {
+// addPermission adds permission.
+type addPermission struct {
 	modelcmd.ControllerCommandBase
 	out cmd.Output
 
@@ -177,18 +164,18 @@ type addRelationCommand struct {
 }
 
 // Info implements the cmd.Command interface.
-func (c *addRelationCommand) Info() *cmd.Info {
+func (c *addPermission) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:     "add",
+		Name:     "add-permission",
 		Args:     "<object> <relation> <target_object>",
 		Purpose:  "Add relation to jimm.",
-		Doc:      addRelationDoc,
+		Doc:      addPermissionDoc,
 		Examples: addRelationExample,
 	})
 }
 
 // Init implements the cmd.Command interface.
-func (c *addRelationCommand) Init(args []string) error {
+func (c *addPermission) Init(args []string) error {
 	if c.filename != "" {
 		return nil
 	}
@@ -201,7 +188,7 @@ func (c *addRelationCommand) Init(args []string) error {
 }
 
 // SetFlags implements Command.SetFlags.
-func (c *addRelationCommand) SetFlags(f *gnuflag.FlagSet) {
+func (c *addPermission) SetFlags(f *gnuflag.FlagSet) {
 	c.CommandBase.SetFlags(f)
 	c.out.AddFlags(f, "yaml", map[string]cmd.Formatter{
 		"yaml": cmd.FormatYaml,
@@ -211,7 +198,7 @@ func (c *addRelationCommand) SetFlags(f *gnuflag.FlagSet) {
 }
 
 // Run implements Command.Run.
-func (c *addRelationCommand) Run(ctxt *cmd.Context) error {
+func (c *addPermission) Run(ctxt *cmd.Context) error {
 	currentController, err := c.store.CurrentController()
 	if err != nil {
 		return errors.E(err, "could not determine controller")
@@ -245,17 +232,17 @@ func (c *addRelationCommand) Run(ctxt *cmd.Context) error {
 	return nil
 }
 
-// newRemoveRelationCommand returns a command to remove a relation.
-func newRemoveRelationCommand() cmd.Command {
-	cmd := &removeRelationCommand{
+// NewRemovePermissionCommand returns a command to remove access.
+func NewRemovePermissionCommand() cmd.Command {
+	cmd := &removePermissionCommand{
 		store: jujuclient.NewFileClientStore(),
 	}
 
 	return modelcmd.WrapBase(cmd)
 }
 
-// removeRelationCommand removes a relation.
-type removeRelationCommand struct {
+// removePermissionCommand revokes access.
+type removePermissionCommand struct {
 	modelcmd.ControllerCommandBase
 	out cmd.Output
 
@@ -270,18 +257,18 @@ type removeRelationCommand struct {
 }
 
 // Info implements the cmd.Command interface.
-func (c *removeRelationCommand) Info() *cmd.Info {
+func (c *removePermissionCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:     "remove",
+		Name:     "remove-permission",
 		Args:     "<object> <relation> <target_object>",
 		Purpose:  "Remove relation from jimm.",
-		Doc:      removeRelationDoc,
-		Examples: removeRelationExample,
+		Doc:      removePermissionDoc,
+		Examples: removePermissionExample,
 	})
 }
 
 // Init implements the cmd.Command interface.
-func (c *removeRelationCommand) Init(args []string) error {
+func (c *removePermissionCommand) Init(args []string) error {
 	if c.filename != "" {
 		return nil
 	}
@@ -294,7 +281,7 @@ func (c *removeRelationCommand) Init(args []string) error {
 }
 
 // SetFlags implements Command.SetFlags.
-func (c *removeRelationCommand) SetFlags(f *gnuflag.FlagSet) {
+func (c *removePermissionCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.CommandBase.SetFlags(f)
 	c.out.AddFlags(f, "yaml", map[string]cmd.Formatter{
 		"yaml": cmd.FormatYaml,
@@ -304,7 +291,7 @@ func (c *removeRelationCommand) SetFlags(f *gnuflag.FlagSet) {
 }
 
 // Run implements Command.Run.
-func (c *removeRelationCommand) Run(ctxt *cmd.Context) error {
+func (c *removePermissionCommand) Run(ctxt *cmd.Context) error {
 	currentController, err := c.store.CurrentController()
 	if err != nil {
 		return errors.E(err, "could not determine controller")
@@ -338,8 +325,8 @@ func (c *removeRelationCommand) Run(ctxt *cmd.Context) error {
 	return nil
 }
 
-// checkRelationCommand holds the fields required to check a relation.
-type checkRelationCommand struct {
+// checkPermissionCommand holds the fields required to check for access.
+type checkPermissionCommand struct {
 	modelcmd.ControllerCommandBase
 	out      cmd.Output
 	store    jujuclient.ClientStore
@@ -366,9 +353,9 @@ func (ar *accessResult) setMessage() *accessResult {
 	return ar
 }
 
-// newCheckRelationCommand
-func newCheckRelationCommand() cmd.Command {
-	cmd := &checkRelationCommand{
+// NewCheckPermissionCommand
+func NewCheckPermissionCommand() cmd.Command {
+	cmd := &checkPermissionCommand{
 		store: jujuclient.NewFileClientStore(),
 	}
 
@@ -376,18 +363,18 @@ func newCheckRelationCommand() cmd.Command {
 }
 
 // Info implements the cmd.Command interface.
-func (c *checkRelationCommand) Info() *cmd.Info {
+func (c *checkPermissionCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:     "check",
+		Name:     "check-permission",
 		Args:     "<object> <relation> <target_object>",
 		Purpose:  "Check access to a resource.",
-		Doc:      checkRelationDoc,
-		Examples: checkRelationExample,
+		Doc:      checkPermissionDoc,
+		Examples: checkPermissionExample,
 	})
 }
 
 // SetFlags implements Command.SetFlags.
-func (c *checkRelationCommand) SetFlags(f *gnuflag.FlagSet) {
+func (c *checkPermissionCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.CommandBase.SetFlags(f)
 	c.out.AddFlags(f, "smart", map[string]cmd.Formatter{
 		"smart": formatCheckRelationString,
@@ -397,7 +384,7 @@ func (c *checkRelationCommand) SetFlags(f *gnuflag.FlagSet) {
 }
 
 // Init implements the cmd.Command interface.
-func (c *checkRelationCommand) Init(args []string) error {
+func (c *checkPermissionCommand) Init(args []string) error {
 	err := verifyTupleArguments(args)
 	if err != nil {
 		return errors.E(err)
@@ -423,7 +410,7 @@ func formatCheckRelationString(writer io.Writer, value interface{}) error {
 }
 
 // Run implements Command.Run.
-func (c *checkRelationCommand) Run(ctxt *cmd.Context) error {
+func (c *checkPermissionCommand) Run(ctxt *cmd.Context) error {
 	currentController, err := c.store.CurrentController()
 	if err != nil {
 		return errors.E(err, "could not determine controller")
@@ -467,7 +454,7 @@ func readTupleFile(filename string) ([]apiparams.RelationshipTuple, error) {
 	return res, nil
 }
 
-// verifyTupleArguments is used across relation commands to verify the number of arguments.
+// verifyTupleArguments is used across permission commands to verify the number of arguments.
 func verifyTupleArguments(args []string) error {
 	switch len(args) {
 	default:
@@ -483,17 +470,17 @@ func verifyTupleArguments(args []string) error {
 	return nil
 }
 
-// newListRelationsCommand returns a command to list relations.
-func newListRelationsCommand() cmd.Command {
-	cmd := &listRelationsCommand{
+// NewListPermissionsCommand returns a command to list permissions.
+func NewListPermissionsCommand() cmd.Command {
+	cmd := &listPermissionsCommand{
 		store: jujuclient.NewFileClientStore(),
 	}
 
 	return modelcmd.WrapBase(cmd)
 }
 
-// listRelationsCommand adds a relation.
-type listRelationsCommand struct {
+// listPermissionsCommand lists permissions.
+type listPermissionsCommand struct {
 	modelcmd.ControllerCommandBase
 	out cmd.Output
 
@@ -505,17 +492,18 @@ type listRelationsCommand struct {
 }
 
 // Info implements the cmd.Command interface.
-func (c *listRelationsCommand) Info() *cmd.Info {
+func (c *listPermissionsCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:     "list",
+		Name:     "list-permissions",
 		Purpose:  "List relations.",
-		Doc:      listRelationsDoc,
-		Examples: listRelationsExample,
+		Doc:      listPermissionsDoc,
+		Examples: listPermissionsExample,
+		Aliases:  []string{"permissions"},
 	})
 }
 
 // Init implements the cmd.Command interface.
-func (c *listRelationsCommand) Init(args []string) error {
+func (c *listPermissionsCommand) Init(args []string) error {
 	if len(args) > 0 {
 		return errors.E("too many args")
 	}
@@ -523,7 +511,7 @@ func (c *listRelationsCommand) Init(args []string) error {
 }
 
 // SetFlags implements Command.SetFlags.
-func (c *listRelationsCommand) SetFlags(f *gnuflag.FlagSet) {
+func (c *listPermissionsCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.CommandBase.SetFlags(f)
 	c.out.AddFlags(f, "yaml", map[string]cmd.Formatter{
 		"yaml":    cmd.FormatYaml,
@@ -537,7 +525,7 @@ func (c *listRelationsCommand) SetFlags(f *gnuflag.FlagSet) {
 }
 
 // Run implements Command.Run.
-func (c *listRelationsCommand) Run(ctxt *cmd.Context) error {
+func (c *listPermissionsCommand) Run(ctxt *cmd.Context) error {
 	currentController, err := c.store.CurrentController()
 	if err != nil {
 		return errors.E(err, "could not determine controller")
