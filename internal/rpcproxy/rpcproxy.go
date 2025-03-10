@@ -369,7 +369,6 @@ func (p *clientProxy) start(ctx context.Context) error {
 		}
 	}()
 	for {
-		zapctx.Debug(ctx, "Reading on client connection")
 		msg := new(message)
 		if err := p.src.readJson(&msg); err != nil {
 			if unexpectedReadError(err) {
@@ -378,7 +377,6 @@ func (p *clientProxy) start(ctx context.Context) error {
 			}
 			return nil
 		}
-		zapctx.Debug(ctx, "Read message from client", zap.Any("message", msg))
 		err := p.makeControllerConnection(ctx)
 		if err != nil {
 			zapctx.Error(ctx, "error connecting to controller", zap.Error(err))
@@ -391,7 +389,6 @@ func (p *clientProxy) start(ctx context.Context) error {
 		// All requests should be proxied as transparently as possible through to the controller
 		// except for auth related requests like Login because JIMM is auth gateway.
 		if msg.Type == "Admin" {
-			zapctx.Debug(ctx, "handling an Admin facade call")
 			toClient, toController, err := p.handleAdminFacade(ctx, msg)
 			if err != nil {
 				p.sendError(p.src, msg, err)
@@ -412,7 +409,6 @@ func (p *clientProxy) start(ctx context.Context) error {
 		// because it is a model level facade. In Juju 4 we want to move this
 		// to a controller level facade and place the logic in jujuapi.
 		if msg.Type == "KeyManager" {
-			zapctx.Debug(ctx, "handling a KeyManager facade call")
 			toClient, err := p.handleKeyManagerFacade(ctx, msg)
 			if err != nil {
 				p.sendError(p.src, msg, err)
@@ -422,7 +418,6 @@ func (p *clientProxy) start(ctx context.Context) error {
 			continue
 		}
 		p.msgs.addMessage(msg)
-		zapctx.Debug(ctx, "Writing to controller")
 		if err := p.dst.writeJson(msg); err != nil {
 			zapctx.Error(ctx, "clientProxy error writing to dst", zap.Error(err))
 			p.sendError(p.src, msg, err)
@@ -478,7 +473,6 @@ type controllerProxy struct {
 // start implements the controller->client proxier.
 func (p *controllerProxy) start(ctx context.Context) error {
 	for {
-		zapctx.Debug(ctx, "Reading on controller connection")
 		msg := new(message)
 		if err := p.src.readJson(msg); err != nil {
 			if unexpectedReadError(err) {
@@ -487,7 +481,6 @@ func (p *controllerProxy) start(ctx context.Context) error {
 			}
 			return nil
 		}
-		zapctx.Debug(ctx, "Received message from controller", zap.Any("Message", msg))
 		permissionsRequired, err := checkPermissionsRequired(ctx, msg)
 		if err != nil {
 			zapctx.Error(ctx, "failed to determine if more permissions required", zap.Error(err))
@@ -521,7 +514,6 @@ func (p *controllerProxy) start(ctx context.Context) error {
 		if err := p.auditLogMessage(msg, true); err != nil {
 			zapctx.Error(context.Background(), "failed to audit log message", zap.Error(err))
 		}
-		zapctx.Debug(ctx, "Writing modified message to client", zap.Any("Message", msg))
 		if err := p.dst.writeJson(msg); err != nil {
 			zapctx.Error(ctx, "controllerProxy error writing to dst", zap.Error(err))
 			return fmt.Errorf("error writing message to client: %w", err)
@@ -561,10 +553,8 @@ func checkPermissionsRequired(ctx context.Context, msg *message) (map[string]any
 
 	// Check for errors that may be a result of a bulk request.
 	for _, e := range er.Results {
-		if e.Error != nil {
-			zapctx.Debug(ctx, "received error", zap.Any("error", e.Error))
-		}
 		if e.Error != nil && e.Error.Code == accessRequiredErrorCode {
+			zapctx.Debug(ctx, "received error", zap.Any("error", e.Error))
 			for k, v := range e.Error.Info {
 				accessLevel, ok := v.(string)
 				if !ok {
