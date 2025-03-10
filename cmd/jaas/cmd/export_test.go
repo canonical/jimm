@@ -146,14 +146,6 @@ func NewUnregisterControllerCommandForTesting(store jujuclient.ClientStore, lp j
 	return modelcmd.WrapBase(cmd)
 }
 
-func NewControllerInfoCommandForTesting(store jujuclient.ClientStore) cmd.Command {
-	cmd := &controllerInfoCommand{
-		store: store,
-	}
-
-	return modelcmd.WrapBase(cmd)
-}
-
 func NewSetControllerDeprecatedCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &setControllerDeprecatedCommand{
 		store:    store,
