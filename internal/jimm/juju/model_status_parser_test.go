@@ -720,7 +720,7 @@ func TestQueryModelsJq(t *testing.T) {
 			{
 			  "filesystems": {
 				"myapp/0/0": {
-				  "Attachments": {
+				  "attachments": {
 					"containers": {
 					  "myapp/0/1": {
 						"life": "alive",

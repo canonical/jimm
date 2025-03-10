@@ -4,34 +4,16 @@ package jujuapi
 
 import (
 	"context"
-	"net/http"
 	"sort"
 
 	"github.com/juju/juju/rpc"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
-	"golang.org/x/oauth2"
 
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/pkg/api/params"
 )
-
-// LoginService defines the set of methods used for login to JIMM.
-type LoginService interface {
-	// AuthenticateBrowserSession authenticates a session cookie is valid.
-	AuthenticateBrowserSession(ctx context.Context, w http.ResponseWriter, r *http.Request) (context.Context, error)
-	// LoginDevice is step 1 in the device flow and returns the OIDC server that the client should use for login.
-	LoginDevice(ctx context.Context) (*oauth2.DeviceAuthResponse, error)
-	// GetDeviceSessionToken polls the OIDC server waiting for the client to login and return a user scoped session token.
-	GetDeviceSessionToken(ctx context.Context, deviceOAuthResponse *oauth2.DeviceAuthResponse) (string, error)
-	// LoginWithClientCredentials verifies a user by their client credentials.
-	LoginClientCredentials(ctx context.Context, clientID string, clientSecret string) (*openfga.User, error)
-	// LoginWithSessionToken verifies a user based on their session token.
-	LoginWithSessionToken(ctx context.Context, sessionToken string) (*openfga.User, error)
-	// LoginWithSessionCookie verifies a user based on an identity from a cookie obtained during websocket upgrade.
-	LoginWithSessionCookie(ctx context.Context, identityID string) (*openfga.User, error)
-}
 
 // unsupportedLogin returns an appropriate error for login attempts using
 // old version of the Admin facade.

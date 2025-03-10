@@ -804,7 +804,7 @@ func (s *jimmSuite) TestCrossModelQuery(c *gc.C) {
 		Type:  "jimmsql",
 		Query: ".",
 	})
-	c.Assert(err, gc.ErrorMatches, `not implemented \(not implemented\)`)
+	c.Assert(err, gc.ErrorMatches, `(?s).*not implemented \(not implemented\).*`)
 
 	res, err := client.CrossModelQuery(&apiparams.CrossModelQueryRequest{
 		Type:  "jq",

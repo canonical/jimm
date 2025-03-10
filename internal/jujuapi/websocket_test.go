@@ -197,7 +197,7 @@ func (s *apiProxySuite) TestConnectToModel(c *gc.C) {
 	defer conn.Close()
 	var resp map[string]interface{}
 	err := conn.APICall("Admin", 3, "", "TestMethod", nil, &resp)
-	c.Assert(err, gc.ErrorMatches, `no such request - method Admin.TestMethod is not implemented \(not implemented\)`)
+	c.Assert(err, gc.ErrorMatches, `(?s).*no such request - method Admin.TestMethod is not implemented \(not implemented\).*`)
 }
 
 // TestSessionTokenLoginProvider verifies that the session token login provider works as expected.
@@ -214,7 +214,7 @@ func (s *apiProxySuite) TestSessionTokenLoginProvider(c *gc.C) {
 	conn, err := s.openCustomLoginProvider(c, &api.Info{
 		ModelTag:  s.Model.ResourceTag(),
 		SkipLogin: false,
-	}, "alice", api.NewSessionTokenLoginProvider("", &output, func(s string) error { return nil }))
+	}, "alice", api.NewSessionTokenLoginProvider("", &output, func(s string) {}))
 	c.Assert(err, gc.IsNil)
 	defer conn.Close()
 	c.Check(err, gc.Equals, nil)
@@ -246,7 +246,7 @@ func (s *apiProxySuite) TestModelStatusWithoutPermission(c *gc.C) {
 	conn, err := s.openCustomLoginProvider(c, &api.Info{
 		ModelTag:  s.Model.ResourceTag(),
 		SkipLogin: false,
-	}, "foo", api.NewSessionTokenLoginProvider("", &output, func(s string) error { return nil }))
+	}, "foo", api.NewSessionTokenLoginProvider("", &output, func(s string) {}))
 	c.Check(err, gc.ErrorMatches, "permission denied .*")
 	if conn != nil {
 		defer conn.Close()

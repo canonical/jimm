@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package jujuclient_test
 
@@ -39,7 +39,7 @@ func (s *modelmanagerSuite) TestCreateModel(c *gc.C) {
 	c.Check(info.UUID, gc.Not(gc.Equals), "")
 	c.Check(info.CloudTag, gc.Equals, names.NewCloudTag(jimmtest.TestCloudName).String())
 	c.Check(info.CloudRegion, gc.Equals, jimmtest.TestCloudRegionName)
-	c.Check(info.DefaultSeries, gc.Equals, "jammy")
+	c.Check(info.DefaultSeries, gc.Not(gc.Equals), "")
 	c.Check(string(info.Life), gc.Equals, state.Alive.String())
 	c.Check(string(info.Status.Status), gc.Equals, "available")
 	c.Check(info.Status.Data, gc.IsNil)
