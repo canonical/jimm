@@ -17,13 +17,13 @@ import (
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
-type addControllerSuite struct {
+type registerControllerSuite struct {
 	cmdtest.JimmCmdSuite
 }
 
-var _ = gc.Suite(&addControllerSuite{})
+var _ = gc.Suite(&registerControllerSuite{})
 
-func (s *addControllerSuite) TestAddControllerSuperuser(c *gc.C) {
+func (s *registerControllerSuite) TestAddControllerSuperuser(c *gc.C) {
 	info := s.APIInfo(c)
 	params := apiparams.AddControllerRequest{
 		UUID:          info.ControllerUUID,
@@ -38,7 +38,7 @@ func (s *addControllerSuite) TestAddControllerSuperuser(c *gc.C) {
 
 	// alice is superuser
 	bClient := s.SetupCLIAccess(c, "alice")
-	ctx, err := cmdtesting.RunCommand(c, cmd.NewAddControllerCommandForTesting(s.ClientStore(), bClient), tmpfile)
+	ctx, err := cmdtesting.RunCommand(c, cmd.NewRegisterControllerCommandForTesting(s.ClientStore(), bClient), tmpfile)
 	c.Assert(err, gc.IsNil)
 	c.Assert(cmdtesting.Stdout(ctx), gc.Matches, `name: controller-1
 uuid: deadbeef-1bad-500d-9000-4b1d0d06f00d
@@ -87,7 +87,7 @@ status:
 	c.Assert(password, gc.Equals, info.Password)
 }
 
-func (s *addControllerSuite) TestAddController(c *gc.C) {
+func (s *registerControllerSuite) TestAddController(c *gc.C) {
 	info := s.APIInfo(c)
 	params := apiparams.AddControllerRequest{
 		Name:          "controller-1",
@@ -101,7 +101,7 @@ func (s *addControllerSuite) TestAddController(c *gc.C) {
 
 	// bob is not superuser
 	bClient := s.SetupCLIAccess(c, "bob")
-	_, err := cmdtesting.RunCommand(c, cmd.NewAddControllerCommandForTesting(s.ClientStore(), bClient), tmpfile)
+	_, err := cmdtesting.RunCommand(c, cmd.NewRegisterControllerCommandForTesting(s.ClientStore(), bClient), tmpfile)
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
 

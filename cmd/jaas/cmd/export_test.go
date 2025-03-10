@@ -128,8 +128,8 @@ func NewRemoveCloudFromControllerCommandForTesting(store jujuclient.ClientStore,
 	return modelcmd.WrapBase(cmd)
 }
 
-func NewAddControllerCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
-	cmd := &addControllerCommand{
+func NewRegisterControllerCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
+	cmd := &registerControllerCommand{
 		store:    store,
 		dialOpts: cmdtest.TestDialOpts(lp),
 	}
