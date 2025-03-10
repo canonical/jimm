@@ -17,7 +17,7 @@ import (
 
 const (
 	unregisterControllerCommandDoc = `
-Deregisters a controller from jimm.
+Deregisters a controller from JIMM.
 `
 
 	unregisterControllerCommandExample = `

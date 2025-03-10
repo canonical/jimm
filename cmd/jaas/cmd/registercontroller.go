@@ -21,7 +21,7 @@ var (
 	stdinMarkers = []string{"-"}
 
 	registerControllerCommandDoc = `
-Registers a controller with jimm.
+Registers a controller with JIMM.
 `
 	registerControllerCommandExample = `
     juju register-controller ./controller-info 

@@ -120,7 +120,7 @@ Verifies access to a resource.
 `
 
 	listPermissionsDoc = `
-List permissions known to jimm. Using the "target", "relation" and "object" flags, 
+List permissions known to JIMM. Using the "target", "relation" and "object" flags, 
 only those permissions matching the filter will be returned.
 `
 
@@ -168,7 +168,7 @@ func (c *addPermission) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
 		Name:     "add-permission",
 		Args:     "<object> <relation> <target_object>",
-		Purpose:  "Add relation to jimm.",
+		Purpose:  "Add relation to JIMM.",
 		Doc:      addPermissionDoc,
 		Examples: addRelationExample,
 	})
@@ -261,7 +261,7 @@ func (c *removePermissionCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
 		Name:     "remove-permission",
 		Args:     "<object> <relation> <target_object>",
-		Purpose:  "Remove relation from jimm.",
+		Purpose:  "Remove relation from JIMM.",
 		Doc:      removePermissionDoc,
 		Examples: removePermissionExample,
 	})

@@ -20,7 +20,7 @@ import (
 
 const (
 	removeCloudFromControllerCommandDoc = `
-Removes the specified cloud from the specified controller in jimm.
+Removes the specified cloud from the specified controller in JIMM.
 `
 
 	removeCloudFromControllerCommandExample = `
