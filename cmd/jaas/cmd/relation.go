@@ -32,7 +32,7 @@ const (
 
 const (
 	genericConstraintsDoc = `
-This command work at a low-level and commands like 'juju grant'
+This command works at a low-level and commands like 'juju grant'
 should be preferred in most cases.
 
 Permissions in JIMM consist of an object, a relation and a target object.
@@ -139,7 +139,7 @@ List permissions where the target object and relation match
 `
 )
 
-// NewAddPermissionCommand returns a command to add a relation.
+// NewAddPermissionCommand returns a command to grant access.
 func NewAddPermissionCommand() cmd.Command {
 	cmd := &addPermission{
 		store: jujuclient.NewFileClientStore(),
@@ -148,7 +148,7 @@ func NewAddPermissionCommand() cmd.Command {
 	return modelcmd.WrapBase(cmd)
 }
 
-// addPermission adds a relation.
+// addPermission adds permission.
 type addPermission struct {
 	modelcmd.ControllerCommandBase
 	out cmd.Output
@@ -232,7 +232,7 @@ func (c *addPermission) Run(ctxt *cmd.Context) error {
 	return nil
 }
 
-// NewRemovePermissionCommand returns a command to remove a relation.
+// NewRemovePermissionCommand returns a command to remove access.
 func NewRemovePermissionCommand() cmd.Command {
 	cmd := &removePermissionCommand{
 		store: jujuclient.NewFileClientStore(),
@@ -241,7 +241,7 @@ func NewRemovePermissionCommand() cmd.Command {
 	return modelcmd.WrapBase(cmd)
 }
 
-// removePermissionCommand removes a relation.
+// removePermissionCommand revokes access.
 type removePermissionCommand struct {
 	modelcmd.ControllerCommandBase
 	out cmd.Output
@@ -325,7 +325,7 @@ func (c *removePermissionCommand) Run(ctxt *cmd.Context) error {
 	return nil
 }
 
-// checkPermissionCommand holds the fields required to check a relation.
+// checkPermissionCommand holds the fields required to check for access.
 type checkPermissionCommand struct {
 	modelcmd.ControllerCommandBase
 	out      cmd.Output
@@ -454,7 +454,7 @@ func readTupleFile(filename string) ([]apiparams.RelationshipTuple, error) {
 	return res, nil
 }
 
-// verifyTupleArguments is used across relation commands to verify the number of arguments.
+// verifyTupleArguments is used across permission commands to verify the number of arguments.
 func verifyTupleArguments(args []string) error {
 	switch len(args) {
 	default:
@@ -470,7 +470,7 @@ func verifyTupleArguments(args []string) error {
 	return nil
 }
 
-// NewListPermissionsCommand returns a command to list relations.
+// NewListPermissionsCommand returns a command to list permissions.
 func NewListPermissionsCommand() cmd.Command {
 	cmd := &listPermissionsCommand{
 		store: jujuclient.NewFileClientStore(),
@@ -479,7 +479,7 @@ func NewListPermissionsCommand() cmd.Command {
 	return modelcmd.WrapBase(cmd)
 }
 
-// listPermissionsCommand adds a relation.
+// listPermissionsCommand lists permissions.
 type listPermissionsCommand struct {
 	modelcmd.ControllerCommandBase
 	out cmd.Output
