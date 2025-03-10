@@ -11,18 +11,18 @@ import (
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
 
-type removeControllerSuite struct {
+type unregisterControllerSuite struct {
 	cmdtest.JimmCmdSuite
 }
 
-var _ = gc.Suite(&removeControllerSuite{})
+var _ = gc.Suite(&unregisterControllerSuite{})
 
-func (s *removeControllerSuite) TestRemoveControllerSuperuser(c *gc.C) {
+func (s *unregisterControllerSuite) TestUnregisterControllerSuperuser(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
 
 	// alice is superuser
 	bClient := s.SetupCLIAccess(c, "alice")
-	context, err := cmdtesting.RunCommand(c, cmd.NewRemoveControllerCommandForTesting(s.ClientStore(), bClient), "controller-1", "--force")
+	context, err := cmdtesting.RunCommand(c, cmd.NewUnregisterControllerCommandForTesting(s.ClientStore(), bClient), "controller-1", "--force")
 	c.Assert(err, gc.IsNil)
 	c.Assert(cmdtesting.Stdout(context), gc.Matches, `name: controller-1
 uuid: deadbeef-1bad-500d-9000-4b1d0d06f00d
@@ -66,11 +66,11 @@ status:
 `)
 }
 
-func (s *removeControllerSuite) TestRemoveController(c *gc.C) {
+func (s *unregisterControllerSuite) TestUnregisterController(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
 
 	// bob is not superuser
 	bClient := s.SetupCLIAccess(c, "bob")
-	_, err := cmdtesting.RunCommand(c, cmd.NewRemoveControllerCommandForTesting(s.ClientStore(), bClient), "controller-1", "--force")
+	_, err := cmdtesting.RunCommand(c, cmd.NewUnregisterControllerCommandForTesting(s.ClientStore(), bClient), "controller-1", "--force")
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }

@@ -137,8 +137,8 @@ func NewRegisterControllerCommandForTesting(store jujuclient.ClientStore, lp juj
 	return modelcmd.WrapBase(cmd)
 }
 
-func NewRemoveControllerCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
-	cmd := &removeControllerCommand{
+func NewUnregisterControllerCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
+	cmd := &unregisterControllerCommand{
 		store:    store,
 		dialOpts: cmdtest.TestDialOpts(lp),
 	}
