@@ -16,12 +16,11 @@ import (
 
 const (
 	listControllersCommandDoc = `
-The list-controllers command displays controller information
-for all controllers known to JIMM.
+Displays controller information for all controllers known to JIMM.
 `
 	listControllersCommandExample = `
-    jimmctl controllers 
-    jimmctl controllers --format json
+    juju controllers 
+    juju controllers --format json
 `
 )
 

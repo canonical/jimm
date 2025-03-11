@@ -19,14 +19,14 @@ import (
 
 const (
 	purgeLogsDoc = `
-The purge-audit-logs purges logs from the database before the given date.
+Purges logs from the database before the given date.
 
 The provided date must be formatted as an ISO8601 date string.
 `
 	purgeLogsExample = `
-    jimmctl purge-audit-logs 2021-02-03
-    jimmctl purge-audit-logs 2021-02-03T00
-    jimmctl purge-audit-logs 2021-02-03T15:04:05Z	
+    juju purge-audit-logs 2021-02-03
+    juju purge-audit-logs 2021-02-03T00
+    juju purge-audit-logs 2021-02-03T15:04:05Z	
 `
 )
 

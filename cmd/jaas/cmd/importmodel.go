@@ -18,7 +18,7 @@ import (
 
 const (
 	importModelCommandDoc = `
-The import-model imports a model running on a controller to jimm.
+Imports a model running on a controller into JIMM's state.
 
 When importing, it is necessary for JIMM to contain a set of cloud credentials
 that represent a user's access to the incoming model's cloud. 
@@ -27,8 +27,8 @@ The --owner command is necessary when importing a model created by a
 local user and it will switch the model owner to the desired external user.
 `
 	importModelCommandExample = `
-    jimmctl import-model mycontroller ac30d6ae-0bed-4398-bba7-75d49e39f189
-    jimmctl import-model mycontroller ac30d6ae-0bed-4398-bba7-75d49e39f189 --owner user@canonical.com
+    juju import-model mycontroller ac30d6ae-0bed-4398-bba7-75d49e39f189
+    juju import-model mycontroller ac30d6ae-0bed-4398-bba7-75d49e39f189 --owner user@canonical.com
 `
 )
 
@@ -58,6 +58,7 @@ func (c *importModelCommand) Info() *cmd.Info {
 		Purpose:  "Import a model to jimm",
 		Doc:      importModelCommandDoc,
 		Examples: importModelCommandExample,
+		Aliases:  []string{"register-model"},
 	})
 }
 

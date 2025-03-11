@@ -18,10 +18,10 @@ import (
 
 const (
 	revokeAuditLogAccessDoc = `
-The revoke-audit-log-access revokes user access to audit logs.
+Revokes user access to audit logs.
 `
 	revokeAuditLogAccessExample = `
-    jimmctl revoke-audit-log-access user@canonical.com
+    juju revoke-audit-log user@canonical.com
 `
 )
 
@@ -47,7 +47,7 @@ type revokeAuditLogAccessCommand struct {
 
 func (c *revokeAuditLogAccessCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:     "revoke-audit-log-access",
+		Name:     "revoke-audit-log",
 		Args:     "<user>",
 		Purpose:  "revokes access to audit logs.",
 		Doc:      revokeAuditLogAccessDoc,

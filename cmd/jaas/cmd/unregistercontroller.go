@@ -16,27 +16,27 @@ import (
 )
 
 const (
-	removeControllerCommandDoc = `
-The remove-controller command removes a controller from jimm.
+	unregisterControllerCommandDoc = `
+Deregisters a controller from JIMM.
 `
 
-	removeControllerCommandExample = `
-    jimmctl remove-controller mycontroller 
-    jimmctl remove-controller mycontroller --force
+	unregisterControllerCommandExample = `
+    juju unregister-controller mycontroller 
+    juju unregister-controller mycontroller --force
 `
 )
 
-// NewRemoveControllerCommand returns a command to remove a controller.
-func NewRemoveControllerCommand() cmd.Command {
-	cmd := &removeControllerCommand{
+// NewUnregisterControllerCommand returns a command to unregister a controller.
+func NewUnregisterControllerCommand() cmd.Command {
+	cmd := &unregisterControllerCommand{
 		store: jujuclient.NewFileClientStore(),
 	}
 
 	return modelcmd.WrapBase(cmd)
 }
 
-// removeControllerCommand remove a controller.
-type removeControllerCommand struct {
+// unregisterControllerCommand unregister a controller.
+type unregisterControllerCommand struct {
 	modelcmd.ControllerCommandBase
 	out cmd.Output
 
@@ -45,28 +45,29 @@ type removeControllerCommand struct {
 	params   apiparams.RemoveControllerRequest
 }
 
-func (c *removeControllerCommand) Info() *cmd.Info {
+func (c *unregisterControllerCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:     "remove-controller",
+		Name:     "unregister-controller",
 		Args:     "<name>",
 		Purpose:  "Remove controller from jimm",
-		Doc:      removeControllerCommandDoc,
-		Examples: removeControllerCommandExample,
+		Doc:      unregisterControllerCommandDoc,
+		Examples: unregisterControllerCommandExample,
+		Aliases:  []string{"unregister-controller"},
 	})
 }
 
 // SetFlags implements Command.SetFlags.
-func (c *removeControllerCommand) SetFlags(f *gnuflag.FlagSet) {
+func (c *unregisterControllerCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.CommandBase.SetFlags(f)
 	c.out.AddFlags(f, "yaml", map[string]cmd.Formatter{
 		"yaml": cmd.FormatYaml,
 		"json": cmd.FormatJson,
 	})
-	f.BoolVar(&c.params.Force, "force", false, "force remove a controller")
+	f.BoolVar(&c.params.Force, "force", false, "force unregister a controller")
 }
 
 // Init implements the cmd.Command interface.
-func (c *removeControllerCommand) Init(args []string) error {
+func (c *unregisterControllerCommand) Init(args []string) error {
 	if len(args) < 1 {
 		return errors.E("controller name not specified")
 	}
@@ -78,7 +79,7 @@ func (c *removeControllerCommand) Init(args []string) error {
 }
 
 // Run implements Command.Run.
-func (c *removeControllerCommand) Run(ctxt *cmd.Context) error {
+func (c *unregisterControllerCommand) Run(ctxt *cmd.Context) error {
 	currentController, err := c.store.CurrentController()
 	if err != nil {
 		return errors.E(err, "could not determine controller")

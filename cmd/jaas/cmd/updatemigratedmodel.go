@@ -17,11 +17,11 @@ import (
 
 const (
 	updateMigratedModelCommandDoc = `
-The update-migrated-model updates a model known to JIMM that has
-been migrated externally to a different JAAS controller.
+Updates a model known to JIMM that has been migrated
+externally to a different JAAS controller.
 `
 	updateMigratedModelCommandExample = `
-    jimmctl update-migrated-model mycontroller e0bf3abf-7029-4e48-9c26-68a7b6e02947
+    juju update-migrated-model mycontroller e0bf3abf-7029-4e48-9c26-68a7b6e02947
 `
 )
 

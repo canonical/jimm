@@ -128,8 +128,8 @@ func NewRemoveCloudFromControllerCommandForTesting(store jujuclient.ClientStore,
 	return modelcmd.WrapBase(cmd)
 }
 
-func NewAddControllerCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
-	cmd := &addControllerCommand{
+func NewRegisterControllerCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
+	cmd := &registerControllerCommand{
 		store:    store,
 		dialOpts: cmdtest.TestDialOpts(lp),
 	}
@@ -137,8 +137,8 @@ func NewAddControllerCommandForTesting(store jujuclient.ClientStore, lp jujuapi.
 	return modelcmd.WrapBase(cmd)
 }
 
-func NewRemoveControllerCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
-	cmd := &removeControllerCommand{
+func NewUnregisterControllerCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
+	cmd := &unregisterControllerCommand{
 		store:    store,
 		dialOpts: cmdtest.TestDialOpts(lp),
 	}
@@ -174,15 +174,6 @@ func NewImportModelCommandForTesting(store jujuclient.ClientStore, lp jujuapi.Lo
 
 func NewUpdateMigratedModelCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &updateMigratedModelCommand{
-		store:    store,
-		dialOpts: cmdtest.TestDialOpts(lp),
-	}
-
-	return modelcmd.WrapBase(cmd)
-}
-
-func NewImportCloudCredentialsCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
-	cmd := &importCloudCredentialsCommand{
 		store:    store,
 		dialOpts: cmdtest.TestDialOpts(lp),
 	}

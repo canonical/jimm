@@ -27,16 +27,15 @@ import (
 
 const (
 	addCloudToControllerCommandDoc = `
-The add-cloud-to-controller command adds the specified cloud to a specific 
-controller on jimm.
+Adds the specified cloud to a specific controller on JIMM.
 
 One can specify a cloud definition via a yaml file passed with the --cloud 
 flag. If the flag is missing, the command will assume the cloud definition
 is already known and will error otherwise.
 `
 	addCloudToControllerExample = `
-    jimmctl add-cloud-to-controller mycontroller mycloud
-    jimmctl add-cloud-to-controller mycontroller mycloud --cloud=./cloud-definition.yaml
+    juju add-cloud mycontroller mycloud
+    juju add-cloud mycontroller mycloud --cloud=./cloud-definition.yaml
 `
 )
 
@@ -78,7 +77,7 @@ type addCloudToControllerCommand struct {
 // Info implements Command.Info.
 func (c *addCloudToControllerCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:     "add-cloud-to-controller",
+		Name:     "add-cloud",
 		Args:     "<controller_name> <cloud_name>",
 		Purpose:  "Add cloud to specific controller in jimm",
 		Doc:      addCloudToControllerCommandDoc,

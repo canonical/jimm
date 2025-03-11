@@ -3,28 +3,44 @@
 package cmd_test
 
 import (
+	"context"
+	"os"
+	"path/filepath"
+
 	"github.com/juju/cmd/v3/cmdtesting"
 	gc "gopkg.in/check.v1"
+	"sigs.k8s.io/yaml"
 
 	"github.com/canonical/jimm/v3/cmd/jaas/cmd"
 	"github.com/canonical/jimm/v3/internal/testutils/cmdtest"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
+	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
-type removeControllerSuite struct {
+type registerControllerSuite struct {
 	cmdtest.JimmCmdSuite
 }
 
-var _ = gc.Suite(&removeControllerSuite{})
+var _ = gc.Suite(&registerControllerSuite{})
 
-func (s *removeControllerSuite) TestRemoveControllerSuperuser(c *gc.C) {
-	s.AddController(c, "controller-1", s.APIInfo(c))
+func (s *registerControllerSuite) TestAddControllerSuperuser(c *gc.C) {
+	info := s.APIInfo(c)
+	params := apiparams.AddControllerRequest{
+		UUID:          info.ControllerUUID,
+		Name:          "controller-1",
+		CACertificate: info.CACert,
+		APIAddresses:  info.Addrs,
+		Username:      info.Tag.Id(),
+		Password:      info.Password,
+	}
+	tmpdir, tmpfile := writeYAMLTempFile(c, params)
+	defer os.RemoveAll(tmpdir)
 
 	// alice is superuser
 	bClient := s.SetupCLIAccess(c, "alice")
-	context, err := cmdtesting.RunCommand(c, cmd.NewRemoveControllerCommandForTesting(s.ClientStore(), bClient), "controller-1", "--force")
+	ctx, err := cmdtesting.RunCommand(c, cmd.NewRegisterControllerCommandForTesting(s.ClientStore(), bClient), tmpfile)
 	c.Assert(err, gc.IsNil)
-	c.Assert(cmdtesting.Stdout(context), gc.Matches, `name: controller-1
+	c.Assert(cmdtesting.Stdout(ctx), gc.Matches, `name: controller-1
 uuid: deadbeef-1bad-500d-9000-4b1d0d06f00d
 publicaddress: \"\"
 apiaddresses:
@@ -64,13 +80,40 @@ status:
   data: .*
   since: null
 `)
+
+	username, password, err := s.JIMM.CredentialStore.GetControllerCredentials(context.Background(), "controller-1")
+	c.Assert(err, gc.IsNil)
+	c.Assert(username, gc.Equals, info.Tag.Id())
+	c.Assert(password, gc.Equals, info.Password)
 }
 
-func (s *removeControllerSuite) TestRemoveController(c *gc.C) {
-	s.AddController(c, "controller-1", s.APIInfo(c))
+func (s *registerControllerSuite) TestAddController(c *gc.C) {
+	info := s.APIInfo(c)
+	params := apiparams.AddControllerRequest{
+		Name:          "controller-1",
+		CACertificate: info.CACert,
+		APIAddresses:  info.Addrs,
+		Username:      info.Tag.Id(),
+		Password:      info.Password,
+	}
+	tmpdir, tmpfile := writeYAMLTempFile(c, params)
+	defer os.RemoveAll(tmpdir)
 
 	// bob is not superuser
 	bClient := s.SetupCLIAccess(c, "bob")
-	_, err := cmdtesting.RunCommand(c, cmd.NewRemoveControllerCommandForTesting(s.ClientStore(), bClient), "controller-1", "--force")
+	_, err := cmdtesting.RunCommand(c, cmd.NewRegisterControllerCommandForTesting(s.ClientStore(), bClient), tmpfile)
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
+}
+
+func writeYAMLTempFile(c *gc.C, payload interface{}) (string, string) {
+	data, err := yaml.Marshal(payload)
+	c.Assert(err, gc.Equals, nil)
+
+	dir, err := os.MkdirTemp("", "add-controller-test")
+	c.Assert(err, gc.Equals, nil)
+
+	tmpfn := filepath.Join(dir, "tmp.yaml")
+	err = os.WriteFile(tmpfn, data, 0600)
+	c.Assert(err, gc.Equals, nil)
+	return dir, tmpfn
 }

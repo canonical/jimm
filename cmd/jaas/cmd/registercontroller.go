@@ -20,26 +20,26 @@ var (
 	// stdinMarkers contains file names that are taken to be stdin.
 	stdinMarkers = []string{"-"}
 
-	addControllerCommandDoc = `
-The add-controller command adds a controller to jimm.
+	registerControllerCommandDoc = `
+Registers a controller with JIMM.
 `
-	addControllerCommandExample = `
-    jimmctl add-controller ./controller-info 
-    jimmctl add-controller ./controller-info.yaml --format json
+	registerControllerCommandExample = `
+    juju register-controller ./controller-info 
+    juju register-controller ./controller-info.yaml --format json
 `
 )
 
-// NewAddControllerCommand returns a command to add a controller.
-func NewAddControllerCommand() cmd.Command {
-	cmd := &addControllerCommand{
+// NewRegisterControllerCommand returns a command to add a controller.
+func NewRegisterControllerCommand() cmd.Command {
+	cmd := &registerControllerCommand{
 		store: jujuclient.NewFileClientStore(),
 	}
 
 	return modelcmd.WrapBase(cmd)
 }
 
-// addControllerCommand adds a controller.
-type addControllerCommand struct {
+// registerControllerCommand adds a controller.
+type registerControllerCommand struct {
 	modelcmd.ControllerCommandBase
 	out cmd.Output
 
@@ -48,18 +48,18 @@ type addControllerCommand struct {
 	file     cmd.FileVar
 }
 
-func (c *addControllerCommand) Info() *cmd.Info {
+func (c *registerControllerCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:     "add-controller",
+		Name:     "register-controller",
 		Purpose:  "Add controller to jimm",
 		Args:     "<filepath>",
-		Doc:      addControllerCommandDoc,
-		Examples: addControllerCommandExample,
+		Doc:      registerControllerCommandDoc,
+		Examples: registerControllerCommandExample,
 	})
 }
 
 // SetFlags implements Command.SetFlags.
-func (c *addControllerCommand) SetFlags(f *gnuflag.FlagSet) {
+func (c *registerControllerCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.CommandBase.SetFlags(f)
 	c.out.AddFlags(f, "yaml", map[string]cmd.Formatter{
 		"yaml": cmd.FormatYaml,
@@ -69,7 +69,7 @@ func (c *addControllerCommand) SetFlags(f *gnuflag.FlagSet) {
 }
 
 // Init implements the cmd.Command interface.
-func (c *addControllerCommand) Init(args []string) error {
+func (c *registerControllerCommand) Init(args []string) error {
 	if len(args) < 1 {
 		return errors.E("filename not specified")
 	}
@@ -81,7 +81,7 @@ func (c *addControllerCommand) Init(args []string) error {
 }
 
 // Run implements Command.Run.
-func (c *addControllerCommand) Run(ctxt *cmd.Context) error {
+func (c *registerControllerCommand) Run(ctxt *cmd.Context) error {
 	currentController, err := c.store.CurrentController()
 	if err != nil {
 		return errors.E(err, "could not determine controller")

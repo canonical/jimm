@@ -20,17 +20,16 @@ import (
 
 const (
 	removeCloudFromControllerCommandDoc = `
-The remove-cloud-from-controller command removes the specified cloud from the 
-specified controller in jimm.
+Removes the specified cloud from the specified controller in JIMM.
 `
 
 	removeCloudFromControllerCommandExample = `
-    jimmctl remove-cloud-from-controller mycontroller mycloud
+    juju remove-cloud mycontroller mycloud
 `
 )
 
-// NewAddControllerCommand returns a command to add a cloud to a specific
-// controller in JIMM.
+// NewRemoveCloudFromControllerCommand returns a command to
+// remove a cloud from a specific controller in JIMM.
 func NewRemoveCloudFromControllerCommand() cmd.Command {
 	cmd := &removeCloudFromControllerCommand{
 		store: jujuclient.NewFileClientStore(),
@@ -64,7 +63,7 @@ type removeCloudFromControllerAPI interface {
 // Info implements Command.Info.
 func (c *removeCloudFromControllerCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:     "remove-cloud-from-controller",
+		Name:     "remove-cloud",
 		Args:     "<controller_name> <cloud_name>",
 		Purpose:  "Remove cloud from specific controller in jimm",
 		Doc:      removeCloudFromControllerCommandDoc,
