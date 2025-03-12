@@ -96,8 +96,8 @@ func (k *keyManagerFacadeSuite) TestListKeysFull(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 
 	c.Assert(res.Results[0].Result, qt.HasLen, 2)
-	c.Assert(res.Results[0].Result[0], qt.Matches, `ssh-rsa .+ comment-1\n`)
-	c.Assert(res.Results[0].Result[1], qt.Matches, `ssh-rsa .+ comment-2\n`)
+	c.Assert(res.Results[0].Result[0], qt.Matches, `ssh-rsa .+ comment-1`)
+	c.Assert(res.Results[0].Result[1], qt.Matches, `ssh-rsa .+ comment-2`)
 }
 
 func (k *keyManagerFacadeSuite) TestAddKeys(c *qt.C) {
