@@ -126,7 +126,6 @@ func marshalAuthorizedKeyWithComment(key sshkeys.PublicKey) string {
 	e.Close()
 	b.WriteByte(' ')
 	b.WriteString(key.Comment)
-	b.WriteByte('\n')
 	return b.String()
 }
 
