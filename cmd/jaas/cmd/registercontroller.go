@@ -3,7 +3,10 @@
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/juju/cmd/v3"
+	"github.com/juju/errors"
 	"github.com/juju/gnuflag"
 	jujuapi "github.com/juju/juju/api"
 	jujucmd "github.com/juju/juju/cmd"
@@ -11,7 +14,6 @@ import (
 	"github.com/juju/juju/jujuclient"
 	"sigs.k8s.io/yaml"
 
-	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/pkg/api"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
@@ -22,14 +24,33 @@ var (
 
 	registerControllerCommandDoc = `
 Registers a controller with JIMM.
+
+Using the controller name provided, this command will inspect your
+Juju client store for details on the specified controller.
+
+Note that by default, this command assumes the controller has the public-hostname
+field set, which will define the preferred address JIMM will use to contact the
+controller. Use of a public address will also ignore any custom CA cert in your
+local client store and assumes the server is secured with a public certificate.
+
+Use the --local flag if the server is not configured with a public address or to
+ignore the controller's public-hostname and use the custom CA of the controller.
+
+A yaml formatted file can also be used as input for cases where the controller
+is not available on the client. Using the --file will validate that the provided 
+controller name matches the name in the yaml file.
+Using --file will ignore other flags like --public-address.
+
+Use the --dry-run flag to generate a sample file without registering the controller.
+This can be used later as input to register-controller.
 `
 	registerControllerCommandExample = `
-    juju register-controller ./controller-info 
-    juju register-controller ./controller-info.yaml --format json
+    juju register-controller mycontroller
+    juju register-controller mycontroller --local
 `
 )
 
-// NewRegisterControllerCommand returns a command to add a controller.
+// NewRegisterControllerCommand returns a command to register a controller.
 func NewRegisterControllerCommand() cmd.Command {
 	cmd := &registerControllerCommand{
 		store: jujuclient.NewFileClientStore(),
@@ -38,14 +59,18 @@ func NewRegisterControllerCommand() cmd.Command {
 	return modelcmd.WrapBase(cmd)
 }
 
-// registerControllerCommand adds a controller.
+// registerControllerCommand register a controller.
 type registerControllerCommand struct {
 	modelcmd.ControllerCommandBase
 	out cmd.Output
 
-	store    jujuclient.ClientStore
-	dialOpts *jujuapi.DialOpts
-	file     cmd.FileVar
+	store          jujuclient.ClientStore
+	dialOpts       *jujuapi.DialOpts
+	file           cmd.FileVar
+	local          bool
+	tlsHostname    string
+	controllerName string
+	dryRun         bool
 }
 
 func (c *registerControllerCommand) Info() *cmd.Info {
@@ -66,25 +91,44 @@ func (c *registerControllerCommand) SetFlags(f *gnuflag.FlagSet) {
 		"json": cmd.FormatJson,
 	})
 	c.file.StdinMarkers = stdinMarkers
+	f.BoolVar(&c.local, "local", false, "If local flag is specified, then the local API address and CA cert of the controller will be used.")
+	f.BoolVar(&c.dryRun, "dry-run", false, "Dry-run enabled will only print the controller details.")
+	f.StringVar(&c.tlsHostname, "tls-hostname", "", "Specify the hostname for TLS verification.")
+	f.StringVar(&c.file.Path, "file", "", "Specify a file-path for controller details, use '-' to read from stdin.")
 }
 
 // Init implements the cmd.Command interface.
 func (c *registerControllerCommand) Init(args []string) error {
 	if len(args) < 1 {
-		return errors.E("filename not specified")
+		return errors.New("controller name not specified")
 	}
-	c.file.Path = args[0]
+	c.controllerName = args[0]
 	if len(args) > 1 {
-		return errors.E("too many args")
+		return errors.New("too many args")
 	}
 	return nil
 }
 
 // Run implements Command.Run.
 func (c *registerControllerCommand) Run(ctxt *cmd.Context) error {
+	data, err := c.getControllerDetails(ctxt)
+	if err != nil {
+		return err
+	}
+	var params apiparams.AddControllerRequest
+	if err = unmarshalControllerDetails(&params, data); err != nil {
+		return err
+	}
+	if c.controllerName != params.Name {
+		return errors.New(fmt.Sprintf("provided controller name doesn't match, %s != %s", c.controllerName, params.Name))
+	}
+	if c.dryRun {
+		return c.out.Write(ctxt, params)
+	}
+
 	currentController, err := c.store.CurrentController()
 	if err != nil {
-		return errors.E(err, "could not determine controller")
+		return errors.Annotate(err, "could not determine controller")
 	}
 
 	apiCaller, err := c.NewAPIRootWithDialOpts(c.store, currentController, "", c.dialOpts)
@@ -92,33 +136,59 @@ func (c *registerControllerCommand) Run(ctxt *cmd.Context) error {
 		return err
 	}
 
-	var params apiparams.AddControllerRequest
-	if err = unmarshalYAMLFile(ctxt, &params, c.file); err != nil {
-		return errors.E(err)
-	}
-
 	client := api.NewClient(apiCaller)
 	info, err := client.AddController(&params)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	err = c.out.Write(ctxt, info)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 	return nil
 }
 
-func unmarshalYAMLFile(ctxt *cmd.Context, v interface{}, fv cmd.FileVar) error {
-	buf, err := fv.Read(ctxt)
+func unmarshalControllerDetails(v interface{}, data []byte) error {
+	err := yaml.Unmarshal(data, &v)
 	if err != nil {
-		return errors.E(err)
-	}
-
-	err = yaml.Unmarshal(buf, &v)
-	if err != nil {
-		return errors.E(err)
+		return err
 	}
 	return nil
+}
+
+func (c *registerControllerCommand) getControllerDetails(ctxt *cmd.Context) ([]byte, error) {
+	if c.file.Path != "" {
+		return c.file.Read(ctxt)
+	}
+
+	controller, err := c.store.ControllerByName(c.controllerName)
+	if err != nil {
+		return nil, errors.Mask(err)
+	}
+
+	accountDetails, err := c.store.AccountDetails(c.controllerName)
+	if err != nil {
+		return nil, errors.Mask(err)
+	}
+
+	info := apiparams.AddControllerRequest{
+		UUID:          controller.ControllerUUID,
+		Name:          c.controllerName,
+		APIAddresses:  controller.APIEndpoints,
+		Username:      accountDetails.User,
+		Password:      accountDetails.Password,
+		PublicAddress: controller.PublicDNSName,
+		TLSHostname:   c.tlsHostname,
+	}
+
+	if c.local {
+		info.PublicAddress = ""
+		info.CACertificate = controller.CACert
+	}
+	data, err := yaml.Marshal(info)
+	if err != nil {
+		return nil, errors.Mask(err)
+	}
+	return data, nil
 }
