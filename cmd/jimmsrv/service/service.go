@@ -6,6 +6,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -484,13 +485,17 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 
 	macaroonDischarger, err := s.setupDischarger(p)
 	if err != nil {
-		return nil, errors.E(op, err, "failed to set up discharger")
+		return nil, errors.E(op, fmt.Errorf("failed to set up discharger: %v", err))
 	}
 	s.mux.Handle(localDischargePath+"/*", discharger.GetDischargerMux(macaroonDischarger, localDischargePath))
 
+	publicDNS, err := parseURLWithOptionalScheme(p.PublicDNSName)
+	if err != nil {
+		return nil, errors.E(op, fmt.Errorf("failed to parse public DNS name: %v", err))
+	}
 	params := jujuapi.Params{
 		ControllerUUID: p.ControllerUUID,
-		PublicDNSName:  p.PublicDNSName,
+		PublicDNSName:  publicDNS.Host,
 	}
 
 	// Websockets require extra care when cookies are used for authentication
@@ -509,6 +514,23 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	s.isLeader = p.IsLeader
 
 	return s, nil
+}
+
+// parseURLWithOptionalScheme parses an input string
+// that may exclude a scheme, i.e. missing "http://".
+// If no scheme is provided, "https" will be used.
+func parseURLWithOptionalScheme(addr string) (*url.URL, error) {
+	uriScheme := "https"
+	// Add the schema if parsing fails or the host is empty.
+	// This avoids parsing ambiguity in url.Parse.
+	url, err := url.Parse(addr)
+	if err != nil || url.Host == "" {
+		url, err = url.Parse(uriScheme + "://" + addr)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return url, nil
 }
 
 func (s *Service) StartServices(ctx context.Context, svc *service.Service) {

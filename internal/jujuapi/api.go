@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 // Package jujuapi implements API endpoints for the juju API.
 package jujuapi
@@ -17,8 +17,8 @@ type Params struct {
 	// ControllerUUID is the UUID of the JIMM controller.
 	ControllerUUID string
 
-	// PublicDNSName is the name to advertise as the public address of
-	// the juju controller.
+	// PublicDNSName is returned to Juju clients on login.
+	// It is the hostname that will be used during TLS verification.
 	PublicDNSName string
 }
 
