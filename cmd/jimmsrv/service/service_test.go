@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package service_test
 
@@ -597,4 +597,47 @@ func TestCORS(t *testing.T) {
 	c.Assert(response.StatusCode, qt.Equals, http.StatusOK)
 	c.Assert(response.Header.Get("Access-Control-Allow-Credentials"), qt.Equals, "true")
 	c.Assert(response.Header.Get("Access-Control-Allow-Origin"), qt.Equals, allowedOrigin)
+}
+
+func TestParseURLWithOptionalSchem(t *testing.T) {
+	c := qt.New(t)
+
+	tests := []struct {
+		about       string
+		url         string
+		expected    string
+		expectError string
+	}{
+		{
+			about:    "URL with scheme",
+			url:      "https://example.com",
+			expected: "https://example.com",
+		},
+		{
+			about:    "URL without scheme",
+			url:      "example.com",
+			expected: "https://example.com",
+		},
+		{
+			about:    "URL without scheme and with path",
+			url:      "example.com/my-favorite-path",
+			expected: "https://example.com/my-favorite-path",
+		},
+		{
+			about:       "Invalid URL",
+			url:         "foo\bar",
+			expectError: `parse "https://foo\\bar": net/url: invalid control character in URL`,
+		},
+	}
+
+	for _, test := range tests {
+		c.Run(test.about, func(c *qt.C) {
+			parsedURL, err := jimmsvc.ParseURLWithOptionalScheme(test.url)
+			if test.expectError != "" {
+				c.Assert(err, qt.ErrorMatches, test.expectError)
+				return
+			}
+			c.Assert(parsedURL.String(), qt.Equals, test.expected)
+		})
+	}
 }

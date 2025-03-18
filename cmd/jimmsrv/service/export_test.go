@@ -1,8 +1,11 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package service
 
-var NewOpenFGAClient = newOpenFGAClient
+var (
+	NewOpenFGAClient           = newOpenFGAClient
+	ParseURLWithOptionalScheme = parseURLWithOptionalScheme
+)
 
 // GetCleanups export `Service.cleanups` field for testing purposes.
 func (s *Service) GetCleanups() []func() error {
