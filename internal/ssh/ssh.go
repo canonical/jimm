@@ -67,7 +67,6 @@ type Server struct {
 // NewJumpServer creates the jump server struct.
 func NewJumpServer(ctx context.Context, config Config, sshManager SSHManager) (Server, error) {
 	zapctx.Info(ctx, "NewJumpServer")
-
 	if sshManager == nil {
 		return Server{}, fmt.Errorf("Cannot create JumpSSHServer with a nil ssh manager.")
 	}
@@ -239,8 +238,10 @@ func ConnCallback(maxConcurrentConnections int) ssh.ConnCallback {
 			if err != nil {
 				zapctx.Error(ctx, "failed to write to connection", zap.Error(err))
 			}
-			// if ConnCallback returns a nil net.Conn, the connection is closed.
-			return nil
+			// The connection is close before returning, otherwise
+			// the context is not cancelled and the counter is not decremented.
+			conn.Close()
+			return conn
 		}
 		return conn
 	}

@@ -39,8 +39,9 @@ type sshSuite struct {
 	privateKey         gossh.Signer
 	hostKey            gossh.Signer
 
-	received         chan bool
-	allowedModelUUID string
+	received                 chan bool
+	allowedModelUUID         string
+	maxConcurrentConnections int
 }
 
 func (s *sshSuite) Init(c *qt.C) {
@@ -109,11 +110,12 @@ func (s *sshSuite) Init(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 
 	s.jumpServerListener = bufconn.Listen(1 * 1024)
+	s.maxConcurrentConnections = 10
 	jumpServer, err := ssh.NewJumpServer(context.Background(),
 		ssh.Config{
 			Port:                     "22",
 			HostKey:                  hostKey,
-			MaxConcurrentConnections: 10,
+			MaxConcurrentConnections: s.maxConcurrentConnections,
 		},
 		mocks.SSHManager{
 			PublicKeyHandler_: func(ctx context.Context, claimUser string, key []byte) (*openfga.User, error) {
@@ -274,30 +276,35 @@ func (s *sshSuite) TestSSHFinalDestinationDialFail(c *qt.C) {
 }
 
 func (s *sshSuite) TestSSHServerMaxConnections(c *qt.C) {
-	clients := make([]*gossh.Client, 0, 10)
-	config := &gossh.ClientConfig{
-		HostKeyCallback: gossh.FixedHostKey(s.hostKey.PublicKey()),
-		Auth: []gossh.AuthMethod{
-			gossh.PublicKeys(s.privateKey),
-		},
-		User: "alice",
-	}
-	for range 10 {
+	// the reason we repeat this test 2 times is to make sure that closing the connections on
+	// the first iteration completely resets the counter on the ssh server side.
+	for range 2 {
+		clients := make([]*gossh.Client, 0, s.maxConcurrentConnections)
+		config := &gossh.ClientConfig{
+			HostKeyCallback: gossh.FixedHostKey(s.hostKey.PublicKey()),
+			Auth: []gossh.AuthMethod{
+				gossh.PublicKeys(s.privateKey),
+			},
+			User: "alice",
+		}
+		for range s.maxConcurrentConnections {
+			client := inMemoryDial(c, s.jumpServerListener, config)
+			clients = append(clients, client)
+		}
+		jumpServerConn, err := s.jumpServerListener.Dial()
+		c.Assert(err, qt.IsNil)
+
+		_, _, _, err = gossh.NewClientConn(jumpServerConn, "", config)
+		c.Assert(err, qt.ErrorMatches, ".*handshake failed: EOF.*")
+
+		// close the connections
+		for _, client := range clients {
+			client.Close()
+		}
+		// check the next connection is accepted
 		client := inMemoryDial(c, s.jumpServerListener, config)
-		clients = append(clients, client)
-	}
-	jumpServerConn, err := s.jumpServerListener.Dial()
-	c.Assert(err, qt.IsNil)
-
-	_, _, _, err = gossh.NewClientConn(jumpServerConn, "", config)
-	c.Assert(err, qt.ErrorMatches, ".*handshake failed: EOF.*")
-
-	// close the connections
-	for _, client := range clients {
 		client.Close()
 	}
-	// check the next connection is accepted
-	inMemoryDial(c, s.jumpServerListener, config)
 }
 
 func TestIdentityManager(t *testing.T) {
