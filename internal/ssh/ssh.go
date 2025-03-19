@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"sync/atomic"
 	"time"
 
 	"github.com/gliderlabs/ssh"
@@ -17,7 +18,6 @@ import (
 
 	jimmssh "github.com/canonical/jimm/v3/internal/jimm/ssh"
 	"github.com/canonical/jimm/v3/internal/openfga"
-	"github.com/canonical/jimm/v3/internal/ssh/limitlistener"
 )
 
 const defaultSSHPort = 17022
@@ -88,6 +88,7 @@ func NewJumpServer(ctx context.Context, config Config, sshManager SSHManager) (S
 				ctx.SetValue(publicKeySSHUserKey{}, user)
 				return true
 			},
+			ConnCallback: ConnCallback(config.MaxConcurrentConnections),
 		},
 		maxConcurrentConnections: config.MaxConcurrentConnections,
 		acceptConnectionTimeout:  config.AcceptConnectionTimeout,
@@ -118,7 +119,6 @@ func setConfigDefaults(config Config) Config {
 // ListenAndServe create a LimitListenerWithTimeout and Serve requests.
 func (srv Server) ListenAndServe() error {
 	ln, err := net.Listen("tcp", srv.Addr)
-	ln = limitlistener.ListenerWithTimeout(ln, srv.maxConcurrentConnections, srv.acceptConnectionTimeout)
 	if err != nil {
 		return err
 	}
@@ -217,5 +217,31 @@ func rejectConnectionAndLogError(ctx context.Context, newChan gossh.NewChannel, 
 	err = newChan.Reject(gossh.ConnectionFailed, msg)
 	if err != nil {
 		zapctx.Error(ctx, msg, zap.Error(err))
+	}
+}
+
+// ConnCallback returns a ConnCallback function that limits the number of concurrent connections.
+func ConnCallback(maxConcurrentConnections int) ssh.ConnCallback {
+	n := atomic.Int32{}
+	return func(ctx ssh.Context, conn net.Conn) net.Conn {
+		current := n.Add(1)
+		go func() {
+			<-ctx.Done()
+			n.Add(-1)
+		}()
+		if int(current) > maxConcurrentConnections {
+			// set the deadline because we don't want to block the connection to write an error.
+			err := conn.SetWriteDeadline(time.Now().Add(100 * time.Millisecond))
+			if err != nil {
+				zapctx.Error(ctx, "failed to write to connection", zap.Error(err))
+			}
+			_, err = conn.Write([]byte("too many connections.\n"))
+			if err != nil {
+				zapctx.Error(ctx, "failed to write to connection", zap.Error(err))
+			}
+			// if ConnCallback returns a nil net.Conn, the connection is closed.
+			return nil
+		}
+		return conn
 	}
 }

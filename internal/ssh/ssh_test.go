@@ -273,6 +273,33 @@ func (s *sshSuite) TestSSHFinalDestinationDialFail(c *qt.C) {
 	c.Assert(err, qt.ErrorMatches, ".*connect failed.*")
 }
 
+func (s *sshSuite) TestSSHServerMaxConnections(c *qt.C) {
+	clients := make([]*gossh.Client, 0, 10)
+	config := &gossh.ClientConfig{
+		HostKeyCallback: gossh.FixedHostKey(s.hostKey.PublicKey()),
+		Auth: []gossh.AuthMethod{
+			gossh.PublicKeys(s.privateKey),
+		},
+		User: "alice",
+	}
+	for range 10 {
+		client := inMemoryDial(c, s.jumpServerListener, config)
+		clients = append(clients, client)
+	}
+	jumpServerConn, err := s.jumpServerListener.Dial()
+	c.Assert(err, qt.IsNil)
+
+	_, _, _, err = gossh.NewClientConn(jumpServerConn, "", config)
+	c.Assert(err, qt.ErrorMatches, ".*handshake failed: EOF.*")
+
+	// close the connections
+	for _, client := range clients {
+		client.Close()
+	}
+	// check the next connection is accepted
+	inMemoryDial(c, s.jumpServerListener, config)
+}
+
 func TestIdentityManager(t *testing.T) {
 	qtsuite.Run(qt.New(t), &sshSuite{})
 }
