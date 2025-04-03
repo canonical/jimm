@@ -52,12 +52,15 @@ func (j *auditLogManager) AddAuditLogEntry(ale *dbmodel.AuditLogEntry) {
 }
 
 var sensitiveMethods = map[string]struct{}{
-	"login":                 {},
-	"logindevice":           {},
-	"getdevicesessiontoken": {},
-	"loginwithsessiontoken": {},
-	"addcredentials":        {},
-	"updatecredentials":     {}}
+	"addcredentials":             {},
+	"getdevicesessiontoken":      {},
+	"login":                      {},
+	"logindevice":                {},
+	"loginwithclientcredentials": {},
+	"loginwithsessioncookie":     {},
+	"loginwithsessiontoken":      {},
+	"updatecredentials":          {},
+}
 var redactJSON = dbmodel.JSON(`{"params":"redacted"}`)
 
 func redactSensitiveParams(ale *dbmodel.AuditLogEntry) {

@@ -10,6 +10,9 @@ type PollTimeOfDay = pollTimeOfDay
 
 var (
 	CalculateNextPollDuration = calculateNextPollDuration
+	RedactSensitiveParams     = redactSensitiveParams
+	RedactJSON                = redactJSON
+	SensitiveMethods          = &sensitiveMethods
 )
 
 func (j *auditLogManager) Cleanup(ctx context.Context) {

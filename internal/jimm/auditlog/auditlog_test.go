@@ -67,6 +67,43 @@ func (s *auditLogManagerSuite) Init(c *qt.C) {
 	s.user = openfga.NewUser(i3, ofgaClient)
 }
 
+func (s *auditLogManagerSuite) TestRedactSensitiveParams(c *qt.C) {
+	newEntry := func(method string) dbmodel.AuditLogEntry {
+		return dbmodel.AuditLogEntry{
+			FacadeMethod: method,
+			Params:       dbmodel.JSON(`{"params":"super secret"}`),
+		}
+	}
+
+	c.Patch(auditlog.SensitiveMethods, map[string]struct{}{
+		"sensitivemethod": {},
+	})
+
+	tests := []struct {
+		about          string
+		entry          dbmodel.AuditLogEntry
+		expectedParams dbmodel.JSON
+	}{{
+		about:          "sensitivemethod's params are redacted",
+		entry:          newEntry("SensitiveMethod"),
+		expectedParams: auditlog.RedactJSON,
+	}, {
+		about: "some other method",
+		entry: dbmodel.AuditLogEntry{
+			FacadeMethod: "SomeOtherMethod",
+			Params:       dbmodel.JSON(`{"params":"nothing secret"}`),
+		},
+		expectedParams: dbmodel.JSON(`{"params":"nothing secret"}`),
+	}}
+	for _, test := range tests {
+		e := test.entry
+		c.Run(test.about, func(c *qt.C) {
+			auditlog.RedactSensitiveParams(&e)
+			c.Assert(e.Params, qt.DeepEquals, test.expectedParams)
+		})
+	}
+}
+
 func (s *auditLogManagerSuite) TestFindAuditEvents(c *qt.C) {
 	c.Parallel()
 
