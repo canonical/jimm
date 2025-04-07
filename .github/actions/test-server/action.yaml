@@ -30,6 +30,18 @@ inputs:
       to bootstrap a controller.
     required: false
     default: 'true'
+  provider:
+    description: The type of provider to use for Juju workloads.
+    required: false
+    default: 'lxd'
+    type: choice
+    options:
+      - lxd
+      - microk8s
+  microk8s-channel:
+    description: The microk8s snap channel to use when bootstrapping a microk8s provider.
+    required: false
+    default: '1.32-strict/stable'
 
 outputs:
   url:
@@ -44,6 +56,9 @@ outputs:
   ca-cert:
     description: 'The CA certificate used to genereate the JIMM server cert.'
     value: ${{ steps.fetch-cert.outputs.jimm-ca }}
+  controller-name:
+    description: Name of the Juju controller
+    value: ${{ steps.controller-name.outputs.name }}
 
 runs:
   using: "composite"
@@ -82,6 +97,7 @@ runs:
         JIMM_TARGET: smoke
 
     - name: Retrieve server CA cert.
+      if: ${{ inputs.provider == 'lxd' }}
       id: fetch-cert
       run: |
         echo 'jimm-ca<<EOF' >> $GITHUB_OUTPUT
@@ -91,6 +107,7 @@ runs:
       shell: bash
 
     - name: Initialise LXD
+      if: ${{ inputs.provider == 'lxd' }}
       run: |
         sudo lxd waitready && \
         sudo lxd init --auto && \
@@ -102,6 +119,7 @@ runs:
       shell: bash
 
     - name: Setup cloud-init script for bootstraping Juju controllers
+      if: ${{ inputs.provider == 'lxd' }}
       run: ./local/jimm/setup-controller.sh
       shell: bash
       working-directory: ${{ github.action_path }}/../../..
@@ -116,8 +134,8 @@ runs:
       with:
         python-version: ${{ inputs.python-version }}
 
-    - name: Setup Juju Controller
-      if: ${{ inputs.use-charmed-k8s-action == 'true' }}
+    - name: Setup Juju Controller with LXD
+      if: ${{ inputs.use-charmed-k8s-action == 'true' && inputs.provider == 'lxd' }}
       uses: charmed-kubernetes/actions-operator@main
       with:
         provider: "lxd"
@@ -125,9 +143,20 @@ runs:
         juju-channel: ${{ inputs.juju-channel }}
         bootstrap-options: "--config ${{ github.action_path }}/../../../cloudinit.temp.yaml --config login-token-refresh-url=https://jimm.localhost/.well-known/jwks.json"
 
+    - name: Setup Juju Controller with microk8s
+      if: ${{ inputs.provider == 'microk8s' }}
+      uses: charmed-kubernetes/actions-operator@main
+      with:
+        provider: "microk8s"
+        channel: ${{ inputs.microk8s-channel }}
+        microk8s-addons: "storage dns rbac host-access metallb:10.64.140.43-10.64.140.49"
+        juju-channel: ${{ inputs.juju-channel }}
+        microk8s-group: snap_microk8s
+        bootstrap-options: "--config login-token-refresh-url=http://10.0.1.1:17070/.well-known/jwks.json"
+
     # As described in https://github.com/charmed-kubernetes/actions-operator grab the newly setup controller name
     - name: Save LXD controller name
-      id: lxd-controller
+      id: controller-name
       run: echo "name=$CONTROLLER_NAME" >> $GITHUB_OUTPUT
       shell: bash
 
@@ -147,17 +176,25 @@ runs:
         JWT: ZXlKMGVYQWlPaUpLVjFRaUxDSmhiR2NpT2lKSVV6STFOaUo5LmV5SnBjM01pT2lKUGJteHBibVVnU2xkVUlFSjFhV3hrWlhJaUxDSnBZWFFpT2pFM01qUXlNamcyTmpBc0ltVjRjQ0k2TXprMk5EYzFNelEyTUN3aVlYVmtJam9pYW1sdGJTSXNJbk4xWWlJNkltcHBiVzB0ZEdWemRFQmpZVzV2Ym1sallXd3VZMjl0SW4wLkpTWVhXcGF6T0FnX1VFZ2hkbjlOZkVQdWxhWWlJQVdaX3BuSmRDbnJvWEk=
 
     - name: Add LXD Juju controller to JIMM
-      run: ./local/jimm/add-controller.sh
+      run: >
+        if [ "${{ inputs.provider }}" == "lxd" ]; then
+          ./local/jimm/add-controller.sh
+        else
+          ./local/jimm/add-microk8s-controller.sh
+        fi
       working-directory: ${{ github.action_path }}/../../..
       shell: bash
       env:
         JIMM_CONTROLLER_NAME: "jimm"
-        CONTROLLER_NAME: ${{ steps.lxd-controller.outputs.name }}
+        CONTROLLER_NAME: ${{ steps.controller-name.outputs.name }}
 
     - name: Provide service account with cloud-credentials
       run: ./local/jimm/setup-service-account.sh
       working-directory: ${{ github.action_path }}/../../..
       shell: bash
+      env:
+        CLOUD: ${{ inputs.provider == 'lxd' && 'localhost' || 'microk8s' }}
+        CREDENTIAL_NAME: ${{ inputs.provider == 'lxd' && 'localhost' || 'microk8s' }}
     
     - name: Dump JIMM container logs
       if: failure() || inputs.dump-logs == 'true'
