@@ -58,6 +58,29 @@ jobs:
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: 'govuln-results.sarif'
+      
+      #############
+      # KEV Check #
+      #############
+
+      - name: Fetch KEV list from CISA
+        shell: bash
+        run: |
+          curl -s -o ./scripts/kev.json https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json
+
+      - name: Compare Trivy results with KEV list
+        run: ./scripts/compare_kev_vulnerabilities.sh
+        shell: bash
+        env:
+          VULN_REPORT_FILE: trivy-results.sarif
+          KNOWN_CVES_FILE: kev.json
+
+      - name: Compare govuln results with KEV list
+        run: ./scripts/compare_kev_vulnerabilities.sh
+        shell: bash
+        env:
+          VULN_REPORT_FILE: govuln-results.sarif
+          KNOWN_CVES_FILE: kev.json
 
   container-security-scan:
     runs-on: [ubuntu-latest]
@@ -82,3 +105,15 @@ jobs:
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: 'jimm-container-trivy-results.sarif'
+
+      - name: Fetch KEV list from CISA
+        shell: bash
+        run: |
+          curl -s -o ./scripts/kev.json https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json
+
+      - name: Compare Trivy container scan results with KEV list
+        run: ./scripts/compare_kev_vulnerabilities.sh
+        shell: bash
+        env:
+          VULN_REPORT_FILE: jimm-container-trivy-results.sarif
+          KNOWN_CVES_FILE: kev.json
