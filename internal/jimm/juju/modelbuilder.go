@@ -227,6 +227,13 @@ func (b *modelBuilder) WithCloudCredential(credentialTag names.CloudCredentialTa
 	if b.err != nil {
 		return b
 	}
+
+	// Verify ownership of cloud credential
+	if b.owner == nil || b.owner.Name != credentialTag.Owner().Id() {
+		b.err = errors.E("model owner doesn't match cloud-credential owner", errors.CodeUnauthorized)
+		return b
+	}
+
 	credential := dbmodel.CloudCredential{
 		Name:              credentialTag.Name(),
 		CloudName:         credentialTag.Cloud().Id(),
