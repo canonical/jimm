@@ -1266,7 +1266,7 @@ controllers:
 		CloudTag:    names.NewCloudTag("test-cloud").String(),
 		CloudRegion: "test-region-1",
 	},
-	expectError: "invalid owner for cloud credential",
+	expectError: "model owner doesn't match cloud-credential owner",
 }}
 
 func TestAddModel(t *testing.T) {
