@@ -17,6 +17,9 @@ set -euo pipefail
 
 # USAGE: VULN_REPORT_FILE=my-trivy.sarif KNOWN_CVES_FILE=my-known-vulns.sarif ./compare_kev_vulnerabilities.sh
 
+# Always run from repo root, assuming we are in scripts/
+cd "$(dirname "$0")/.."
+
 KNOWN_CVES_FILE="${KNOWN_CVES_FILE:-kev.json}"
 
 # Ensure files exist
@@ -40,7 +43,7 @@ matches="$(echo "$report_cves" | grep -F -f <(echo "$known_cves") || true)"
 if [ -n "$matches" ]; then
   echo "Known vulnerabilities found:"
   echo "$matches"
-  exit 0
+  exit 1
 fi
 
 echo "No known vulnerabilities found."
