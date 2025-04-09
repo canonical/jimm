@@ -31,10 +31,42 @@ parts:
       CGO_ENABLED=0 go install github.com/canonical/jimm/v3/cmd/jaas
     override-prime: |
       snapcraftctl prime
-      # Add all CLI commands below to make them appear top-level to Juju.
+      # Add all CLI commands below as symlinks to make them appear top-level to Juju.
       ln -sf jaas bin/juju-jaas
+      ln -sf jaas bin/juju-add-cloud
+      ln -sf jaas bin/juju-add-group
+      ln -sf jaas bin/juju-add-permission
+      ln -sf jaas bin/juju-add-role
       ln -sf jaas bin/juju-add-service-account
-      ln -sf jaas bin/juju-add-service-account-credential
-      ln -sf jaas bin/juju-list-service-account-credentials
-      ln -sf jaas bin/juju-update-service-account-credential
+      ln -sf jaas bin/juju-audit-events
+      ln -sf jaas bin/juju-check-permission
+      ln -sf jaas bin/juju-controllers
+      ln -sf jaas bin/juju-grant-audit-log
       ln -sf jaas bin/juju-grant-service-account-access
+      ln -sf jaas bin/juju-groups
+      ln -sf jaas bin/juju-import-model
+      ln -sf jaas bin/juju-list-audit-events
+      ln -sf jaas bin/juju-list-controllers
+      ln -sf jaas bin/juju-list-groups
+      ln -sf jaas bin/juju-list-permissions
+      ln -sf jaas bin/juju-list-roles
+      ln -sf jaas bin/juju-list-service-account-credentials
+      ln -sf jaas bin/juju-migrate
+      ln -sf jaas bin/juju-model-status
+      ln -sf jaas bin/juju-permissions
+      ln -sf jaas bin/juju-purge-audit-logs
+      ln -sf jaas bin/juju-query-models
+      ln -sf jaas bin/juju-register-controller
+      ln -sf jaas bin/juju-register-model
+      ln -sf jaas bin/juju-remove-cloud
+      ln -sf jaas bin/juju-remove-group
+      ln -sf jaas bin/juju-remove-permission
+      ln -sf jaas bin/juju-remove-role
+      ln -sf jaas bin/juju-rename-group
+      ln -sf jaas bin/juju-rename-role
+      ln -sf jaas bin/juju-revoke-audit-log
+      ln -sf jaas bin/juju-roles
+      ln -sf jaas bin/juju-set-controller-deprecated
+      ln -sf jaas bin/juju-unregister-controller
+      ln -sf jaas bin/juju-update-migrated-model
+      ln -sf jaas bin/juju-update-service-account-credential

@@ -52,7 +52,6 @@ func (c *unregisterControllerCommand) Info() *cmd.Info {
 		Purpose:  "Remove controller from jimm",
 		Doc:      unregisterControllerCommandDoc,
 		Examples: unregisterControllerCommandExample,
-		Aliases:  []string{"unregister-controller"},
 	})
 }
 

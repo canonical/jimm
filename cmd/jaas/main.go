@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package main
 
@@ -17,20 +17,47 @@ jaas enables users to use JAAS commands from within the Juju CLI.
 
 JAAS enables enterprise functionality on top of Juju to provide
 functionality like OIDC login, control over many controllers,
-and fine-grained authorisation.
+group management, and fine-grained authorisation.
 `
 
 func NewSuperCommand() *jujucmd.SuperCommand {
-	serviceAccountCmd := jujucmd.NewSuperCommand(jujucmd.SuperCommandParams{
+	jaasCmd := jujucmd.NewSuperCommand(jujucmd.SuperCommandParams{
 		Name: "jaas",
 		Doc:  jaasDoc,
 	})
 	// Register commands here:
-	serviceAccountCmd.Register(cmd.NewAddServiceAccountCommand())
-	serviceAccountCmd.Register(cmd.NewListServiceAccountCredentialsCommand())
-	serviceAccountCmd.Register(cmd.NewUpdateCredentialCommand())
-	serviceAccountCmd.Register(cmd.NewGrantCommand())
-	return serviceAccountCmd
+	jaasCmd.Register(cmd.NewAddCloudToControllerCommand())
+	jaasCmd.Register(cmd.NewAddGroupCommand())
+	jaasCmd.Register(cmd.NewAddPermissionCommand())
+	jaasCmd.Register(cmd.NewAddRoleCommand())
+	jaasCmd.Register(cmd.NewAddServiceAccountCommand())
+	jaasCmd.Register(cmd.NewCheckPermissionCommand())
+	jaasCmd.Register(cmd.NewCrossModelQueryCommand())
+	jaasCmd.Register(cmd.NewGrantServiceAccountAccessCommand())
+	jaasCmd.Register(cmd.NewGrantAuditLogAccessCommand())
+	jaasCmd.Register(cmd.NewImportModelCommand())
+	jaasCmd.Register(cmd.NewListAuditEventsCommand())
+	jaasCmd.Register(cmd.NewListControllersCommand())
+	jaasCmd.Register(cmd.NewListGroupsCommand())
+	jaasCmd.Register(cmd.NewListPermissionsCommand())
+	jaasCmd.Register(cmd.NewListRolesCommand())
+	jaasCmd.Register(cmd.NewListServiceAccountCredentialsCommand())
+	jaasCmd.Register(cmd.NewMigrateModelCommand())
+	jaasCmd.Register(cmd.NewModelStatusCommand())
+	jaasCmd.Register(cmd.NewPurgeLogsCommand())
+	jaasCmd.Register(cmd.NewRegisterControllerCommand())
+	jaasCmd.Register(cmd.NewRemoveCloudFromControllerCommand())
+	jaasCmd.Register(cmd.NewRemovePermissionCommand())
+	jaasCmd.Register(cmd.NewRemoveGroupCommand())
+	jaasCmd.Register(cmd.NewRemoveRoleCommand())
+	jaasCmd.Register(cmd.NewRenameGroupCommand())
+	jaasCmd.Register(cmd.NewRenameRoleCommand())
+	jaasCmd.Register(cmd.NewRevokeAuditLogAccessCommand())
+	jaasCmd.Register(cmd.NewSetControllerDeprecatedCommand())
+	jaasCmd.Register(cmd.NewUnregisterControllerCommand())
+	jaasCmd.Register(cmd.NewUpdateCredentialCommand())
+	jaasCmd.Register(cmd.NewUpdateMigratedModelCommand())
+	return jaasCmd
 }
 
 const (
