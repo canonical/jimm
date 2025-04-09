@@ -58,11 +58,49 @@ jobs:
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: 'govuln-results.sarif'
+      
+      #############
+      # KEV Check #
+      #############
+
+      - name: Fetch KEV list from CISA
+        shell: bash
+        run: |
+          curl --fail --retry 3 -s -o ./kev.json https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json
+
+      - name: Compare Trivy results with KEV list
+        run: ./scripts/compare_kev_vulnerabilities.sh 2>&1 | tee kev-trivy-fs-scan.txt
+        shell: bash
+        env:
+          VULN_REPORT_FILE: trivy-results.sarif
+          KNOWN_CVES_FILE: kev.json
+
+      - name: Upload KEV Trivy scan results as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kev-trivy-fs-scan-results
+          path: 'kev-trivy-fs-scan.txt'
+
+      - name: Compare govuln results with KEV list
+        run: ./scripts/compare_kev_vulnerabilities.sh 2>&1 | tee kev-govuln-scan.txt
+        shell: bash
+        env:
+          VULN_REPORT_FILE: govuln-results.sarif
+          KNOWN_CVES_FILE: kev.json
+
+      - name: Upload KEV Govuln scan results as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kev-govuln-scan-results
+          path: 'kev-govuln-scan.txt'
 
   container-security-scan:
     runs-on: [ubuntu-latest]
     name: Container Security Scan
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Run Trivy container scanner for the latest JIMM image
         uses: aquasecurity/trivy-action@0.29.0
         with:
@@ -82,3 +120,21 @@ jobs:
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: 'jimm-container-trivy-results.sarif'
+
+      - name: Fetch KEV list from CISA
+        shell: bash
+        run: |
+          curl --fail --retry 3 -s -o ./kev.json https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json
+
+      - name: Compare Trivy container scan results with KEV list
+        run: ./scripts/compare_kev_vulnerabilities.sh 2>&1 | tee kev-trivy-container-scan.txt
+        shell: bash
+        env:
+          VULN_REPORT_FILE: jimm-container-trivy-results.sarif
+          KNOWN_CVES_FILE: kev.json
+
+      - name: Upload KEV Trivy Container scan results as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kev-trivy-container-scan-results
+          path: 'kev-trivy-container-scan.txt'

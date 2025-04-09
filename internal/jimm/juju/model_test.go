@@ -472,7 +472,7 @@ clouds:
     access: add-model
 cloud-credentials:
 - name: test-credential-1
-  owner: alice@canonical.com
+  owner: bob@canonical.com
   cloud: test-cloud
   auth-type: empty
 controllers:
@@ -518,7 +518,7 @@ users:
 `[1:]),
 	username:     "alice@canonical.com",
 	jimmAdmin:    true,
-	cloudCredTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
+	cloudCredTag: names.NewCloudCredentialTag("test-cloud/bob@canonical.com/test-credential-1"),
 	args: jujuparams.ModelCreateArgs{
 		Name:        "test-model",
 		OwnerTag:    names.NewUserTag("bob@canonical.com").String(),
@@ -1224,6 +1224,49 @@ users:
 		CloudRegion: "test-region-1",
 	},
 	expectError: "unsupported cloud region test-cloud/test-region-1",
+}, {
+	name: "CreateModelWithAnotherUsersCredential",
+	env: `
+clouds:
+- name: test-cloud
+  type: test-provider
+  regions:
+  - name: test-region-1
+  users:
+  - user: alice@canonical.com
+    access: add-model
+cloud-credentials:
+- name: test-credential-1
+  owner: bob@canonical.com
+  cloud: test-cloud
+  auth-type: empty
+controllers:
+- name: controller-1
+  uuid: 00000000-0000-0000-0000-0000-0000000000001
+  cloud: test-cloud
+  region: test-region-1
+  cloud-regions:
+  - cloud: test-cloud
+    region: test-region-1
+    priority: 0
+`[1:],
+	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
+		return nil, nil
+	},
+	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
+		return nil
+	},
+	createModel:  nil,
+	username:     "alice@canonical.com",
+	jimmAdmin:    true,
+	cloudCredTag: names.NewCloudCredentialTag("test-cloud/bob@canonical.com/test-credential-1"),
+	args: jujuparams.ModelCreateArgs{
+		Name:        "test-model",
+		OwnerTag:    names.NewUserTag("alice@canonical.com").String(),
+		CloudTag:    names.NewCloudTag("test-cloud").String(),
+		CloudRegion: "test-region-1",
+	},
+	expectError: "model owner doesn't match cloud-credential owner",
 }}
 
 func TestAddModel(t *testing.T) {
