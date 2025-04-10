@@ -70,6 +70,7 @@ type registerControllerCommand struct {
 	local          bool
 	tlsHostname    string
 	controllerName string
+	publicAddress  string
 	dryRun         bool
 }
 
@@ -95,6 +96,7 @@ func (c *registerControllerCommand) SetFlags(f *gnuflag.FlagSet) {
 	f.BoolVar(&c.dryRun, "dry-run", false, "Dry-run enabled will only print the controller details.")
 	f.StringVar(&c.tlsHostname, "tls-hostname", "", "Specify the hostname for TLS verification.")
 	f.StringVar(&c.file.Path, "file", "", "Specify a file-path for controller details, use '-' to read from stdin.")
+	f.StringVar(&c.publicAddress, "public-address", "", "Specify a custom public address to use for dialing the controller.")
 }
 
 // Init implements the cmd.Command interface.
@@ -186,6 +188,11 @@ func (c *registerControllerCommand) getControllerDetails(ctxt *cmd.Context) ([]b
 		info.PublicAddress = ""
 		info.CACertificate = controller.CACert
 	}
+
+	if c.publicAddress != "" {
+		info.PublicAddress = c.publicAddress
+	}
+
 	data, err := yaml.Marshal(info)
 	if err != nil {
 		return nil, errors.Mask(err)
