@@ -35,3 +35,24 @@ jobs:
 
       - name: Build and Test
         run: TEST_LOGGING_CONFIG=ERROR go test -mod readonly ./... -timeout 1h -cover
+
+  verify_jaas_commands:
+    name: Verify JAAS command symlinks
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version-file: "go.mod"
+
+      - name: Build JAAS binary
+        shell: bash
+        run: go build ./cmd/jaas
+
+      - name: Verify JAAS command symlinks
+        shell: bash
+        run: ./scripts/verify_jaas_commands.sh

@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package cmd
 
@@ -24,8 +24,8 @@ grant-service-account-access grants administrator access over a service account 
 `
 )
 
-// NewGrantCommand returns a command to grant admin access to a service account to given groups/identities.
-func NewGrantCommand() cmd.Command {
+// NewGrantServiceAccountAccessCommand returns a command to grant admin access to a service account to given groups/identities.
+func NewGrantServiceAccountAccessCommand() cmd.Command {
 	cmd := &grantCommand{
 		store: jujuclient.NewFileClientStore(),
 	}
