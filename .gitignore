@@ -15,7 +15,6 @@
 *.crt
 *.key
 *.csr
-/jimmctl
 /jimmsrv
 qa-lxd
 

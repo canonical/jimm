@@ -11,6 +11,6 @@ To add a new facade to JIMM, follow these steps:
 
 2. Register the new facade by creating or modifying an entry of the `facadeInit` map under the correct name in an `init()` function in its file in the `internal/jujuapi` package.
 
-3. Add a corresponding command to [jimmctl](/cmd/jimmctl).
+3. Add a corresponding command to the [jaas plugin](/cmd/jaas).
 
 4. Update the [jimm-go-sdk](https://github.com/canonical/jimm-go-sdk) repository by running the `Update SDK` workflow to make the changes available to clients (e.g. Juju Terraform provider).

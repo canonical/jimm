@@ -29,7 +29,7 @@ Some notes on the setup:
 
 > Any changes made inside the repo will automatically restart the JIMM server via a volume mount + air. So there's no need to re-run the compose continuously.
 
-# Q/A Using jimmctl
+# Q/A Setup
 
 ## Prerequisites
 

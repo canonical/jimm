@@ -57,10 +57,8 @@ For more information on JIMM's history and previous version strategy see [here](
 
 ## Binaries
 
-This repository contains 3 binaries:
+This repository contains 2 binaries:
 - jimmsrv: The JIMM server.
-- jimmctl: A CLI tool for administrators of JIMM to view audit logs, manage permissions, etc. 
-Available as a snap.
 - jaas: A plugin for the Juju CLI, extend the base set of command with extra functionality when
 communicating with a JAAS environment. 
 

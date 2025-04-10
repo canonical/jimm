@@ -39,7 +39,7 @@ ignore the controller's public-hostname and use the custom CA of the controller.
 A yaml formatted file can also be used as input for cases where the controller
 is not available on the client. Using the --file will validate that the provided 
 controller name matches the name in the yaml file.
-Using --file will ignore other flags like --public-address.
+Using --file will ignore other flags like --public-address and --local.
 
 Use the --dry-run flag to generate a sample file without registering the controller.
 This can be used later as input to register-controller.
@@ -92,7 +92,7 @@ func (c *registerControllerCommand) SetFlags(f *gnuflag.FlagSet) {
 		"json": cmd.FormatJson,
 	})
 	c.file.StdinMarkers = stdinMarkers
-	f.BoolVar(&c.local, "local", false, "If local flag is specified, then the local API address and CA cert of the controller will be used.")
+	f.BoolVar(&c.local, "local", false, "If local flag is specified, then the local API addresses and CA cert of the controller will be used.")
 	f.BoolVar(&c.dryRun, "dry-run", false, "Dry-run enabled will only print the controller details.")
 	f.StringVar(&c.tlsHostname, "tls-hostname", "", "Specify the hostname for TLS verification.")
 	f.StringVar(&c.file.Path, "file", "", "Specify a file-path for controller details, use '-' to read from stdin.")

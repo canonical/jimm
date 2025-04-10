@@ -7,13 +7,6 @@ on:
       - 'v3*'
 
 jobs:
-  build-and-release-jimmctl:
-    uses: ./.github/workflows/snap-release.yaml
-    with:
-      folder: jimmctl
-      release-channel: 3/edge
-    secrets: inherit
-
   build-and-release-jaas-plugin:
     uses: ./.github/workflows/snap-release.yaml
     with:

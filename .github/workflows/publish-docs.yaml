@@ -1,8 +1,8 @@
 name: Publish Docs
 
-# This workflow builds jimmctl and generates a markdown formatted
-# documentation reference before converting the doc to rst and 
-# making a PR to the jaas-documentation repo to update the docs.
+# This workflow builds the jaas plugin and generates a markdown 
+# formatted document before converting the doc to rst and makes
+# a PR to the jaas-documentation repo to update the docs.
 
 on:
   workflow_dispatch:
@@ -11,7 +11,7 @@ on:
       - 'v3*'
 
 jobs:
-  publish-jimmctl-docs:
+  publish-jaas-plugin-docs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
@@ -21,12 +21,12 @@ jobs:
         fetch-tags: true
     - run: git fetch --tags --force origin # https://github.com/actions/checkout/issues/882 & https://github.com/actions/checkout/issues/290 
 
-    - name: Build jimmctl
-      run: go build ./cmd/jimmctl/
+    - name: Build jaas
+      run: go build ./cmd/jaas/
 
       # Default doc name is documentation.md which can't be changed via flags.
     - name: Generate docs
-      run: ./jimmctl documentation --no-index=true --out .
+      run: ./jaas documentation --no-index=true --out .
 
     - name: Convert doc to reStructuredText
       uses: docker://pandoc/core:3.5
@@ -36,10 +36,10 @@ jobs:
       # We do this because the original doc doesn't have a top level heading.: 
     - name: Create final doc with title
       run: |
-        echo "\`\`jimmctl\`\` Reference" > jimmctl-reference.rst
-        echo "#####################" >> jimmctl-reference.rst
-        echo "" >> jimmctl-reference.rst
-        cat documentation.rst >> jimmctl-reference.rst
+        echo "\`\`jaas\`\` Reference" > jaas-reference.rst
+        echo "##################" >> jaas-reference.rst
+        echo "" >> jaas-reference.rst
+        cat documentation.rst >> jaas-reference.rst
     
     - name: Checkout docs
       uses: actions/checkout@v4
@@ -50,16 +50,16 @@ jobs:
   
     - name: Update Docs
       working-directory: ./jaas-documentation
-      run: cp ../jimmctl-reference.rst ./reference/jimmctl.rst
+      run: cp ../jaas-reference.rst ./reference/jaas.rst
 
     - name: Create Pull Request
       uses: peter-evans/create-pull-request@v6
       with:
         token: ${{ secrets.JIMM_DOCS_TOKEN }}
         path: ./jaas-documentation
-        branch: update-jimmctl-${{ github.run_number }}
-        title: Update jimmctl reference doc
+        branch: update-jaas-${{ github.run_number }}
+        title: Update jaas reference doc
         body: |
           This PR contains a generated documentation reference
-          for the jimmctl CLI tool for release ${{ github.event.ref }}.
-        commit-message: Updated jimmctl reference for release ${{ github.event.ref }}
+          for the jaas CLI tool for release ${{ github.event.ref }}.
+        commit-message: Updated jaas reference for release ${{ github.event.ref }}
