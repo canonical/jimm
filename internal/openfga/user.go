@@ -1,11 +1,13 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package openfga
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/canonical/ofga"
+	"github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
@@ -278,6 +280,49 @@ func (u *User) ListApplicationOffers(ctx context.Context, relation ofga.Relation
 		appOfferUUIDs[i] = offer.ID
 	}
 	return appOfferUUIDs, err
+}
+
+// CheckPermission returns an Unauthorized error if user is not allowed specified permission to the resource.
+func (u *User) CheckPermission(ctx context.Context, resourceTag string, permission string) error {
+	if u.client == nil {
+		return errors.E(errors.CodeUnauthorized, "cannot check permission")
+	}
+	resource, err := names.ParseTag(resourceTag)
+	if err != nil {
+		return err
+	}
+
+	var relation Relation
+	switch permission {
+	case "superuser", string(params.ModelAdminAccess):
+		relation = ofganames.AdministratorRelation
+	case string(params.ModelWriteAccess):
+		relation = ofganames.WriterRelation
+	case string(params.ModelReadAccess):
+		relation = ofganames.ReaderRelation
+	case string(params.OfferConsumeAccess):
+		relation = ofganames.ConsumerRelation
+	case string("add-cloud"):
+		relation = ofganames.CanAddModelRelation
+	}
+
+	allowed, err := u.client.CheckRelation(
+		ctx,
+		Tuple{
+			Object:   ofganames.ConvertTag(u.ResourceTag()),
+			Relation: relation,
+			Target:   ofganames.ConvertGenericTag(resource),
+		},
+		true,
+	)
+	if err != nil {
+		return err
+	}
+
+	if !allowed {
+		return errors.E(errors.CodeUnauthorized, fmt.Sprintf("user %q not allowed %q to %q", u.Name, permission, resourceTag))
+	}
+	return nil
 }
 
 type administratorT interface {

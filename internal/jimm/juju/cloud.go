@@ -340,7 +340,7 @@ func (j *JujuManager) AddHostedCloud(ctx context.Context, user *openfga.User, ta
 func (j *JujuManager) addControllerCloud(ctx context.Context, ctl *dbmodel.Controller, ut names.UserTag, tag names.CloudTag, cloud jujuparams.Cloud, force bool) (*jujuparams.Cloud, error) {
 	const op = errors.Op("jimm.addControllerCloud")
 
-	api, err := j.dial(ctx, ctl, names.ModelTag{})
+	api, err := j.dial(ctx, ctl, names.ModelTag{}, nil)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
@@ -404,7 +404,7 @@ func (j *JujuManager) doCloudAdmin(ctx context.Context, user *openfga.User, ct n
 		}
 		return errors.E(op, fmt.Sprintf("cloud administration not available for %s", ct.Id()))
 	}
-	api, err := j.dial(ctx, &c.Regions[0].Controllers[0].Controller, names.ModelTag{})
+	api, err := j.dial(ctx, &c.Regions[0].Controllers[0].Controller, names.ModelTag{}, nil)
 	if err != nil {
 		return errors.E(op, err)
 	}
@@ -557,7 +557,7 @@ func (j *JujuManager) RemoveCloudFromController(ctx context.Context, user *openf
 		return errors.E(op, "cloud not hosted by controller", errors.CodeNotFound)
 	}
 
-	api, err := j.dial(ctx, &controller, names.ModelTag{})
+	api, err := j.dial(ctx, &controller, names.ModelTag{}, nil)
 	if err != nil {
 		return errors.E(op, err)
 	}

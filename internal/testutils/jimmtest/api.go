@@ -18,6 +18,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
+	"github.com/canonical/jimm/v3/internal/openfga"
 )
 
 // DefaultControllerUUID is the controller UUID returned by Dialer if
@@ -50,7 +51,7 @@ type Dialer struct {
 }
 
 // Dialer implements juju.Dialer.
-func (d *Dialer) Dial(_ context.Context, ctl *dbmodel.Controller, _ names.ModelTag, _ map[string]string) (juju.API, error) {
+func (d *Dialer) Dial(_ context.Context, ctl *dbmodel.Controller, _ names.ModelTag, _ *openfga.User, _ map[string]string) (juju.API, error) {
 	if d.Err != nil {
 		return nil, d.Err
 	}
@@ -95,9 +96,9 @@ func (w apiWrapper) Close() error {
 type ModelDialerMap map[string]juju.Dialer
 
 // Dial implements juju.Dialer.
-func (m ModelDialerMap) Dial(ctx context.Context, ctl *dbmodel.Controller, mt names.ModelTag, _ map[string]string) (juju.API, error) {
+func (m ModelDialerMap) Dial(ctx context.Context, ctl *dbmodel.Controller, mt names.ModelTag, _ *openfga.User, _ map[string]string) (juju.API, error) {
 	if d, ok := m[mt.Id()]; ok {
-		return d.Dial(ctx, ctl, mt, nil)
+		return d.Dial(ctx, ctl, mt, nil, nil)
 	}
 	return nil, errors.E(fmt.Sprintf("dialer not configured for controller %s", ctl.Name))
 }
@@ -107,9 +108,9 @@ func (m ModelDialerMap) Dial(ctx context.Context, ctl *dbmodel.Controller, mt na
 type DialerMap map[string]juju.Dialer
 
 // Dial implements juju.Dialer.
-func (m DialerMap) Dial(ctx context.Context, ctl *dbmodel.Controller, mt names.ModelTag, _ map[string]string) (juju.API, error) {
+func (m DialerMap) Dial(ctx context.Context, ctl *dbmodel.Controller, mt names.ModelTag, _ *openfga.User, _ map[string]string) (juju.API, error) {
 	if d, ok := m[ctl.Name]; ok {
-		return d.Dial(ctx, ctl, mt, nil)
+		return d.Dial(ctx, ctl, mt, nil, nil)
 	}
 	return nil, errors.E(fmt.Sprintf("dialer not configured for controller %s", ctl.Name))
 }

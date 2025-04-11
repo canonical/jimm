@@ -630,7 +630,7 @@ func (j *JujuManager) UpdateMigratedModel(ctx context.Context, user *openfga.Use
 	}
 
 	// check the model is known to the controller
-	api, err := j.dial(ctx, &targetController, names.ModelTag{})
+	api, err := j.dial(ctx, &targetController, names.ModelTag{}, nil)
 	if err != nil {
 		return errors.E(op, err)
 	}
@@ -700,7 +700,7 @@ func (j *JujuManager) InitiateMigration(ctx context.Context, user *openfga.User,
 		return result, errors.E(op, "failed to retrieve the model from the database", err)
 	}
 
-	api, err := j.dial(ctx, &model.Controller, names.ModelTag{})
+	api, err := j.dial(ctx, &model.Controller, names.ModelTag{}, nil)
 	if err != nil {
 		return result, errors.E(op, "failed to dial the controller", err)
 	}

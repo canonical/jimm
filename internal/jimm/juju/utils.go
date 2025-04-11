@@ -62,7 +62,7 @@ func (j *JujuManager) getControllerByName(ctx context.Context, controllerName st
 
 // dialController dials a controller.
 func (j *JujuManager) dialController(ctx context.Context, ctl *dbmodel.Controller) (API, error) {
-	api, err := j.dial(ctx, ctl, names.ModelTag{})
+	api, err := j.dial(ctx, ctl, names.ModelTag{}, nil)
 	if err != nil {
 		zapctx.Error(ctx, "failed to dial the controller", zaputil.Error(err))
 		return nil, err

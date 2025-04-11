@@ -58,7 +58,7 @@ func (s *clientSuite) TestStatus(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	uuid := modelInfo.UUID
 
-	api, err := s.Dialer.Dial(context.Background(), &ctl, names.NewModelTag(uuid), nil)
+	api, err := s.Dialer.Dial(context.Background(), &ctl, names.NewModelTag(uuid), nil, nil)
 	c.Assert(err, gc.IsNil)
 
 	status, err := api.Status(ctx, []string{})

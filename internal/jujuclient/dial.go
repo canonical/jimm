@@ -21,6 +21,7 @@ import (
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	jujuhttp "github.com/juju/http/v2"
 	"github.com/juju/juju/api/base"
+	"github.com/juju/juju/rpc/params"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
@@ -30,14 +31,19 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
+	"github.com/canonical/jimm/v3/internal/jimm/permissions"
 	"github.com/canonical/jimm/v3/internal/jimmjwx"
+	"github.com/canonical/jimm/v3/internal/openfga"
+	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/rpc"
 	"github.com/canonical/jimm/v3/internal/servermon"
 )
 
 const (
-	// JIMM claims to be a 3.2.4 client.
-	jujuClientVersion = "3.2.4"
+	// JIMM claims to be a 3.6.5 client.
+	jujuClientVersion = "3.6.5"
+
+	adminUser = "admin"
 )
 
 // A ControllerCredentialsStore is a store for controller credentials.
@@ -54,20 +60,13 @@ type Dialer struct {
 	JWTService                 *jimmjwx.JWTService
 }
 
-func (d *Dialer) createLoginRequest(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, p map[string]string) (*jujuparams.LoginRequest, error) {
-	// JIMM is automatically given all required permissions
-	permissions := p
-	if permissions == nil {
-		permissions = make(map[string]string)
+func (d *Dialer) createLoginRequest1(ctx context.Context, controllerTag names.ControllerTag, userTag names.UserTag, permissions map[string]string) (*jujuparams.LoginRequest, error) {
+	if len(permissions) == 0 {
+		return nil, errors.E("")
 	}
-	permissions[ctl.ResourceTag().String()] = "superuser"
-	if modelTag.Id() != "" {
-		permissions[modelTag.String()] = "admin"
-	}
-
 	jwt, err := d.JWTService.NewJWT(ctx, jimmjwx.JWTParams{
-		Controller: ctl.UUID,
-		User:       names.NewUserTag("admin").String(),
+		Controller: controllerTag.Id(),
+		User:       userTag.String(),
 		Access:     permissions,
 	})
 	if err != nil {
@@ -76,14 +75,45 @@ func (d *Dialer) createLoginRequest(ctx context.Context, ctl *dbmodel.Controller
 	jwtString := base64.StdEncoding.EncodeToString(jwt)
 
 	return &jujuparams.LoginRequest{
-		AuthTag:       names.NewUserTag("admin").String(),
+		AuthTag:       userTag.String(),
 		ClientVersion: jujuClientVersion,
 		Token:         jwtString,
 	}, nil
 }
 
+func (d *Dialer) createAdminLoginRequest(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, additionalPermissions map[string]string) (*jujuparams.LoginRequest, error) {
+	permissions := make(map[string]string)
+	permissions[ctl.ResourceTag().String()] = "superuser"
+	if modelTag.Id() != "" {
+		permissions[modelTag.String()] = string(params.ModelAdminAccess)
+	}
+	for k, v := range additionalPermissions {
+		permissions[k] = v
+	}
+	return d.createLoginRequest1(ctx, ctl.ResourceTag(), names.NewUserTag(adminUser), permissions)
+}
+
+func (d *Dialer) createLoginRequest(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, user *openfga.User, additionalPermissions map[string]string) (*jujuparams.LoginRequest, error) {
+	p := make(map[string]string)
+	ctlRelation := user.GetControllerAccess(ctx, ctl.ResourceTag())
+	if ctlRelation == ofganames.AdministratorRelation {
+		p[ctl.ResourceTag().String()] = "superuser"
+	} else {
+		p[ctl.ResourceTag().String()] = "login"
+	}
+	modelRelation := user.GetModelAccess(ctx, modelTag)
+	if modelRelation != ofganames.NoRelation {
+		p[modelTag.String()] = permissions.ToModelAccessString(modelRelation)
+	}
+
+	for k, v := range additionalPermissions {
+		p[k] = v
+	}
+	return d.createLoginRequest1(ctx, ctl.ResourceTag(), user.ResourceTag(), p)
+}
+
 // Dial implements jimm.Dialer.
-func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, requiredPermissions map[string]string) (juju.API, error) {
+func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, user *openfga.User, withPermissions map[string]string) (juju.API, error) {
 	const op = errors.Op("jujuclient.Dial")
 
 	conn, err := rpc.Dial(ctx, ctl, modelTag, "", nil)
@@ -95,9 +125,22 @@ func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag nam
 	}
 	client := rpc.NewClient(conn)
 
-	loginRequest, err := d.createLoginRequest(ctx, ctl, modelTag, requiredPermissions)
-	if err != nil {
-		return nil, errors.E(op, err)
+	if user == nil {
+		user = &openfga.User{Identity: &dbmodel.Identity{Name: "admin"}}
+	}
+
+	var loginRequest *jujuparams.LoginRequest
+	if user.Name == adminUser {
+		loginRequest, err = d.createAdminLoginRequest(ctx, ctl, modelTag, withPermissions)
+		if err != nil {
+			return nil, errors.E(op, err)
+		}
+
+	} else {
+		loginRequest, err = d.createLoginRequest(ctx, ctl, modelTag, user, withPermissions)
+		if err != nil {
+			return nil, errors.E(op, err)
+		}
 	}
 
 	var res jujuparams.LoginResult
@@ -130,7 +173,7 @@ func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag nam
 	return &Connection{
 		ctx:                ctx,
 		client:             client,
-		userTag:            loginRequest.AuthTag,
+		user:               user,
 		facadeVersions:     facades,
 		bestFacadeVersions: bestFacadeVersions,
 		monitorC:           monitorC,
@@ -186,7 +229,6 @@ func pinger(client *rpc.Client, controller string, doneC <-chan struct{}, broken
 type Connection struct {
 	ctx                context.Context
 	client             *rpc.Client
-	userTag            string
 	facadeVersions     map[string]bool
 	bestFacadeVersions map[string]int
 
@@ -194,6 +236,7 @@ type Connection struct {
 	broken   *uint32
 
 	dialer      *Dialer
+	user        *openfga.User
 	redialCount *atomic.Int32
 	ctl         *dbmodel.Controller
 	mt          names.ModelTag
@@ -230,7 +273,19 @@ func (c *Connection) redial(ctx context.Context, requiredPermissions map[string]
 	if dialCount > 10 {
 		return errors.E(op, "dial count exceeded")
 	}
-	api, err := c.dialer.Dial(ctx, c.ctl, c.mt, requiredPermissions)
+
+	// redial is called when juju returns a "permission required" error so we
+	// must check if the user has required permissions and dial again.
+	grantedPermission := make(map[string]string)
+	for resource, permission := range requiredPermissions {
+		err := c.user.CheckPermission(ctx, resource, permission)
+		if err != nil {
+			return err
+		}
+		grantedPermission[resource] = permission
+	}
+
+	api, err := c.dialer.Dial(ctx, c.ctl, c.mt, c.user, grantedPermission)
 	if err != nil {
 		return errors.E(op, err)
 	}
@@ -239,7 +294,7 @@ func (c *Connection) redial(ctx context.Context, requiredPermissions map[string]
 	}
 	conn := api.(*Connection)
 	c.client = conn.client
-	c.userTag = conn.userTag
+	c.user = conn.user
 	c.facadeVersions = conn.facadeVersions
 	c.monitorC = conn.monitorC
 	c.broken = conn.broken

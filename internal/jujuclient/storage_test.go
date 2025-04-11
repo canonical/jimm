@@ -55,7 +55,7 @@ func (s *storageSuite) TestListFilesystems(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	uuid := modelInfo.UUID
 
-	api, err := s.Dialer.Dial(context.Background(), &ctl, names.NewModelTag(uuid), nil)
+	api, err := s.Dialer.Dial(context.Background(), &ctl, names.NewModelTag(uuid), nil, nil)
 	c.Assert(err, gc.IsNil)
 	_, err = api.ListFilesystems(ctx, nil)
 	c.Assert(err, gc.IsNil)
@@ -99,7 +99,7 @@ func (s *storageSuite) TestListVolumes(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	uuid := modelInfo.UUID
 
-	api, err := s.Dialer.Dial(context.Background(), &ctl, names.NewModelTag(uuid), nil)
+	api, err := s.Dialer.Dial(context.Background(), &ctl, names.NewModelTag(uuid), nil, nil)
 	c.Assert(err, gc.IsNil)
 	_, err = api.ListVolumes(ctx, nil)
 	c.Assert(err, gc.IsNil)
@@ -143,7 +143,7 @@ func (s *storageSuite) TestListStorageDetails(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	uuid := modelInfo.UUID
 
-	api, err := s.Dialer.Dial(context.Background(), &ctl, names.NewModelTag(uuid), nil)
+	api, err := s.Dialer.Dial(context.Background(), &ctl, names.NewModelTag(uuid), nil, nil)
 	c.Assert(err, gc.IsNil)
 	_, err = api.ListStorageDetails(ctx)
 	c.Assert(err, gc.IsNil)

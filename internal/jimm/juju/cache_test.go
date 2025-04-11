@@ -4,17 +4,20 @@ package juju_test
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"sync"
 	"sync/atomic"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
+	"github.com/google/uuid"
 	"github.com/juju/names/v5"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
+	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
 
@@ -29,7 +32,7 @@ func TestCacheDialerDialError(t *testing.T) {
 	ctl := dbmodel.Controller{
 		Name: "test-controller",
 	}
-	_, err := dialer.Dial(context.Background(), &ctl, names.ModelTag{}, nil)
+	_, err := dialer.Dial(context.Background(), &ctl, names.ModelTag{}, nil, nil)
 	c.Check(err, qt.Equals, testError)
 
 	testAPI := jimmtest.API{
@@ -37,7 +40,7 @@ func TestCacheDialerDialError(t *testing.T) {
 	}
 	testDialer.Err = nil
 	testDialer.API = &testAPI
-	api, err := dialer.Dial(context.Background(), &ctl, names.ModelTag{}, nil)
+	api, err := dialer.Dial(context.Background(), &ctl, names.ModelTag{}, nil, nil)
 	c.Assert(err, qt.IsNil)
 	c.Check(api.SupportsCheckCredentialModels(), qt.Equals, true)
 }
@@ -56,7 +59,7 @@ func TestCacheDialerDialModel(t *testing.T) {
 		Name: "test-controller",
 	}
 	mt := names.NewModelTag("00000002-0000-0000-0000-000000000001")
-	api, err := dialer.Dial(context.Background(), &ctl, mt, nil)
+	api, err := dialer.Dial(context.Background(), &ctl, mt, nil, nil)
 	c.Assert(err, qt.IsNil)
 	c.Check(api.SupportsCheckCredentialModels(), qt.Equals, true)
 
@@ -64,7 +67,7 @@ func TestCacheDialerDialModel(t *testing.T) {
 		SupportsModelSummaryWatcher_: true,
 	}
 	testDialer.API = &testAPI2
-	api, err = dialer.Dial(context.Background(), &ctl, mt, nil)
+	api, err = dialer.Dial(context.Background(), &ctl, mt, nil, nil)
 	c.Assert(err, qt.IsNil)
 	c.Check(api.SupportsModelSummaryWatcher(), qt.Equals, true)
 }
@@ -82,6 +85,7 @@ func TestCacheDialerConcurrentConnections(t *testing.T) {
 	dialer := juju.CacheDialer(testDialer)
 	ctl := dbmodel.Controller{
 		Name: "test-controller",
+		UUID: uuid.NewString(),
 	}
 
 	var wg sync.WaitGroup
@@ -89,7 +93,7 @@ func TestCacheDialerConcurrentConnections(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		go func() {
 			defer wg.Done()
-			api, err := dialer.Dial(context.Background(), &ctl, names.ModelTag{}, nil)
+			api, err := dialer.Dial(context.Background(), &ctl, names.ModelTag{}, nil, nil)
 			c.Check(err, qt.IsNil)
 			defer api.Close()
 			c.Check(api.SupportsCheckCredentialModels(), qt.Equals, true)
@@ -101,13 +105,65 @@ func TestCacheDialerConcurrentConnections(t *testing.T) {
 	}
 	wg.Wait()
 	// Get a connection from the cache.
-	api, err := dialer.Dial(context.Background(), &ctl, names.ModelTag{}, nil)
+	api, err := dialer.Dial(context.Background(), &ctl, names.ModelTag{}, nil, nil)
 	c.Check(err, qt.IsNil)
 	c.Check(api.SupportsCheckCredentialModels(), qt.Equals, true)
 	err = api.Close()
 	c.Check(err, qt.IsNil)
 
 	c.Check(atomic.LoadInt64(&testDialer.count), qt.Equals, int64(1))
+	c.Check(testDialer.dialer.(*jimmtest.Dialer).IsClosed(), qt.Equals, false)
+	err = dialer.(io.Closer).Close()
+	c.Check(err, qt.IsNil)
+	c.Check(testDialer.dialer.(*jimmtest.Dialer).IsClosed(), qt.Equals, true)
+}
+
+func TestCacheDialerWithUser(t *testing.T) {
+	c := qt.New(t)
+
+	testDialer := &countingDialer{
+		dialer: &jimmtest.Dialer{
+			API: &jimmtest.API{
+				SupportsCheckCredentialModels_: true,
+			},
+		},
+	}
+	dialer := juju.CacheDialer(testDialer)
+	ctl := dbmodel.Controller{
+		Name: "test-controller",
+		UUID: uuid.NewString(),
+	}
+	user := &openfga.User{
+		Identity: &dbmodel.Identity{
+			Name: "alice",
+		},
+	}
+
+	for i := 0; i < 10; i++ {
+		// we dial with different permissions
+		permissions := map[string]string{
+			"resource": fmt.Sprintf("%d", i),
+		}
+
+		api, err := dialer.Dial(context.Background(), &ctl, names.ModelTag{}, user, permissions)
+		c.Check(err, qt.IsNil)
+		defer api.Close()
+		c.Check(api.SupportsCheckCredentialModels(), qt.Equals, true)
+		// close our API connection twice to ensure the
+		// cache is robust to that.
+		err = api.Close()
+		c.Check(err, qt.IsNil)
+	}
+
+	// Get a connection from the cache.
+	api, err := dialer.Dial(context.Background(), &ctl, names.ModelTag{}, user, nil)
+	c.Check(err, qt.IsNil)
+	c.Check(api.SupportsCheckCredentialModels(), qt.Equals, true)
+	err = api.Close()
+	c.Check(err, qt.IsNil)
+
+	// we expect 11 connections to have been made
+	c.Check(atomic.LoadInt64(&testDialer.count), qt.Equals, int64(11))
 	c.Check(testDialer.dialer.(*jimmtest.Dialer).IsClosed(), qt.Equals, false)
 	err = dialer.(io.Closer).Close()
 	c.Check(err, qt.IsNil)
@@ -138,11 +194,11 @@ func TestCacheDialerCloseBrokenConnection(t *testing.T) {
 		Name: "test-controller",
 	}
 
-	api, err := dialer.Dial(context.Background(), &ctl, names.ModelTag{}, nil)
+	api, err := dialer.Dial(context.Background(), &ctl, names.ModelTag{}, nil, nil)
 	c.Assert(err, qt.IsNil)
 	err = api.Close()
 	c.Assert(err, qt.IsNil)
-	api2, err := dialer.Dial(context.Background(), &ctl, names.ModelTag{}, nil)
+	api2, err := dialer.Dial(context.Background(), &ctl, names.ModelTag{}, nil, nil)
 	c.Assert(err, qt.IsNil)
 	err = api2.Close()
 	c.Assert(err, qt.IsNil)
@@ -156,9 +212,9 @@ type countingDialer struct {
 	count  int64
 }
 
-func (d *countingDialer) Dial(ctx context.Context, ctl *dbmodel.Controller, mt names.ModelTag, requiredPermissions map[string]string) (juju.API, error) {
+func (d *countingDialer) Dial(ctx context.Context, ctl *dbmodel.Controller, mt names.ModelTag, user *openfga.User, requiredPermissions map[string]string) (juju.API, error) {
 	atomic.AddInt64(&d.count, 1)
-	return d.dialer.Dial(ctx, ctl, mt, requiredPermissions)
+	return d.dialer.Dial(ctx, ctl, mt, user, requiredPermissions)
 }
 
 type closeCountingAPI struct {
@@ -176,7 +232,7 @@ func TestCacheDialerContextCanceled(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	doneC := make(chan struct{})
-	dialer := juju.CacheDialer(dialerFunc(func(context.Context, *dbmodel.Controller, names.ModelTag, map[string]string) (juju.API, error) {
+	dialer := juju.CacheDialer(dialerFunc(func(context.Context, *dbmodel.Controller, names.ModelTag, *openfga.User, map[string]string) (juju.API, error) {
 		cancel()
 		<-doneC
 		return nil, errors.E("dial error")
@@ -185,14 +241,14 @@ func TestCacheDialerContextCanceled(t *testing.T) {
 		UUID: jimmtest.ControllerUUID,
 		Name: "test-controller",
 	}
-	api, err := dialer.Dial(ctx, &ctl, names.ModelTag{}, nil)
+	api, err := dialer.Dial(ctx, &ctl, names.ModelTag{}, nil, nil)
 	c.Check(err, qt.Equals, context.Canceled)
 	c.Check(api, qt.IsNil)
 	close(doneC)
 }
 
-type dialerFunc func(context.Context, *dbmodel.Controller, names.ModelTag, map[string]string) (juju.API, error)
+type dialerFunc func(context.Context, *dbmodel.Controller, names.ModelTag, *openfga.User, map[string]string) (juju.API, error)
 
-func (f dialerFunc) Dial(ctx context.Context, ctl *dbmodel.Controller, mt names.ModelTag, requiredPermissions map[string]string) (juju.API, error) {
-	return f(ctx, ctl, mt, requiredPermissions)
+func (f dialerFunc) Dial(ctx context.Context, ctl *dbmodel.Controller, mt names.ModelTag, user *openfga.User, requiredPermissions map[string]string) (juju.API, error) {
+	return f(ctx, ctl, mt, user, requiredPermissions)
 }

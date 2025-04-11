@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package jujuclient
 
@@ -68,7 +68,7 @@ func (c Connection) GrantJIMMModelAdmin(ctx context.Context, tag names.ModelTag)
 	const op = errors.Op("jujuclient.GrantJIMMModelAdmin")
 	args := jujuparams.ModifyModelAccessRequest{
 		Changes: []jujuparams.ModifyModelAccess{{
-			UserTag:  c.userTag,
+			UserTag:  c.user.ResourceTag().String(),
 			Action:   jujuparams.GrantModelAccess,
 			Access:   jujuparams.ModelAdminAccess,
 			ModelTag: tag.String(),
@@ -193,7 +193,7 @@ func (c Connection) RevokeModelAccess(ctx context.Context, modelTag names.ModelT
 func (c Connection) ControllerModelSummary(ctx context.Context, ms *jujuparams.ModelSummary) error {
 	const op = errors.Op("jujuclient.ControllerModelSummary")
 	args := jujuparams.ModelSummariesRequest{
-		UserTag: c.userTag,
+		UserTag: c.user.ResourceTag().String(),
 		All:     true,
 	}
 	var resp jujuparams.ModelSummaryResults
@@ -214,7 +214,7 @@ func (c Connection) ControllerModelSummary(ctx context.Context, ms *jujuparams.M
 func (c Connection) ListModelSummaries(ctx context.Context, ms jujuparams.ModelSummariesRequest) (jujuparams.ModelSummaryResults, error) {
 	const op = errors.Op("jujuclient.ControllerModelSummary")
 	args := jujuparams.ModelSummariesRequest{
-		UserTag: c.userTag,
+		UserTag: c.user.ResourceTag().String(),
 		All:     ms.All,
 	}
 	var resp jujuparams.ModelSummaryResults

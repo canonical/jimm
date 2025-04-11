@@ -27,7 +27,7 @@ func (s *pingSuite) TestPing(c *gc.C) {
 		CACertificate: info.CACert,
 		PublicAddress: info.Addrs[0],
 	}
-	api, err := s.Dialer.Dial(ctx, &ctl, names.ModelTag{}, nil)
+	api, err := s.Dialer.Dial(ctx, &ctl, names.ModelTag{}, nil, nil)
 	c.Assert(err, gc.Equals, nil)
 	defer api.Close()
 

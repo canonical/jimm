@@ -49,7 +49,7 @@ func (s *jujuclientSuite) SetUpTest(c *gc.C) {
 		CACertificate: info.CACert,
 		Addresses:     hpss,
 	}
-	s.API, err = s.Dialer.Dial(context.Background(), &ctl, names.ModelTag{}, nil)
+	s.API, err = s.Dialer.Dial(context.Background(), &ctl, names.ModelTag{}, nil, nil)
 	c.Assert(err, gc.Equals, nil)
 }
 
@@ -76,7 +76,7 @@ func (s *dialSuite) TestDial(c *gc.C) {
 		CACertificate: info.CACert,
 		PublicAddress: info.Addrs[0],
 	}
-	api, err := s.Dialer.Dial(context.Background(), &ctl, names.ModelTag{}, nil)
+	api, err := s.Dialer.Dial(context.Background(), &ctl, names.ModelTag{}, nil, nil)
 	c.Assert(err, gc.Equals, nil)
 	defer api.Close()
 	c.Check(ctl.UUID, gc.Equals, "deadbeef-1bad-500d-9000-4b1d0d06f00d")
@@ -104,7 +104,7 @@ func (s *dialSuite) TestDialWithJWT(c *gc.C) {
 	}
 
 	// Check dial is OK
-	api, err := dialer.Dial(ctx, &ctl, names.ModelTag{}, nil)
+	api, err := dialer.Dial(ctx, &ctl, names.ModelTag{}, nil, nil)
 	c.Assert(err, gc.Equals, nil)
 	defer api.Close()
 	// Check UUID matches expected

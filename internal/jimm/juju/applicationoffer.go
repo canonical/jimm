@@ -82,7 +82,7 @@ func (j *JujuManager) Offer(ctx context.Context, user *openfga.User, offer AddAp
 		return errors.E(op, err)
 	}
 
-	api, err := j.dial(ctx, &model.Controller, names.ModelTag{})
+	api, err := j.dial(ctx, &model.Controller, names.ModelTag{}, nil)
 	if err != nil {
 		return errors.E(op, err)
 	}
@@ -218,6 +218,7 @@ func (j *JujuManager) GetApplicationOfferConsumeDetails(ctx context.Context, use
 		ctx,
 		&offer.Model.Controller,
 		names.ModelTag{},
+		user,
 		permission{
 			resource: names.NewApplicationOfferTag(offer.UUID).String(),
 			relation: accessLevel,
@@ -348,14 +349,14 @@ func (j *JujuManager) GetApplicationOffer(ctx context.Context, user *openfga.Use
 		return nil, errors.E(op, err)
 	}
 
-	accessLevel, err := j.getUserOfferAccess(ctx, user, offer.ResourceTag())
+	reader, err := user.IsApplicationOfferReader(ctx, offer.ResourceTag())
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
 
 	// if this user does not have access to this application offer
 	// we return a not found error.
-	if accessLevel == "" {
+	if !reader {
 		return nil, errors.E(op, errors.CodeNotFound, "application offer not found")
 	}
 
@@ -367,10 +368,7 @@ func (j *JujuManager) GetApplicationOffer(ctx context.Context, user *openfga.Use
 		ctx,
 		&offer.Model.Controller,
 		names.ModelTag{},
-		permission{
-			resource: names.NewApplicationOfferTag(offer.UUID).String(),
-			relation: accessLevel,
-		},
+		nil,
 	)
 	if err != nil {
 		return nil, errors.E(op, err)
@@ -531,7 +529,7 @@ func (j *JujuManager) queryControllersForOffers(ctx context.Context, user *openf
 
 	for _, ctl := range controllers {
 		eg.Go(func() error {
-			api, err := j.dial(ctx, ctl, names.ModelTag{})
+			api, err := j.dial(ctx, ctl, names.ModelTag{}, nil)
 			if err != nil {
 				return errors.E(err)
 			}
@@ -591,10 +589,7 @@ func (j *JujuManager) doApplicationOfferAdmin(ctx context.Context, user *openfga
 		ctx,
 		&offer.Model.Controller,
 		names.ModelTag{},
-		permission{
-			resource: names.NewApplicationOfferTag(offer.UUID).String(),
-			relation: string(jujuparams.OfferAdminAccess),
-		},
+		nil,
 	)
 	if err != nil {
 		return errors.E(op, err)

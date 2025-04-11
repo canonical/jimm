@@ -4,6 +4,9 @@ package juju
 
 import (
 	"context"
+	"fmt"
+	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -13,6 +16,7 @@ import (
 	"golang.org/x/sync/singleflight"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/openfga"
 )
 
 // CacheDialer wraps the given Dialer in a cache that will share controller
@@ -38,13 +42,13 @@ type cacheDialer struct {
 }
 
 // Dial implements Dialer.Dial.
-func (d *cacheDialer) Dial(ctx context.Context, ctl *dbmodel.Controller, mt names.ModelTag, requiredPermissions map[string]string) (API, error) {
+func (d *cacheDialer) Dial(ctx context.Context, ctl *dbmodel.Controller, mt names.ModelTag, user *openfga.User, withPermissions map[string]string) (API, error) {
 	if mt.Id() != "" {
 		// connections to models are rare, so we don't cache them.
-		return d.dialer.Dial(ctx, ctl, mt, requiredPermissions)
+		return d.dialer.Dial(ctx, ctl, mt, user, withPermissions)
 	}
 	rc := d.sfg.DoChan(ctl.Name, func() (interface{}, error) {
-		return d.dial(ctx, ctl, requiredPermissions)
+		return d.dial(ctx, ctl, user, withPermissions)
 	})
 	select {
 	case r := <-rc:
@@ -57,23 +61,39 @@ func (d *cacheDialer) Dial(ctx context.Context, ctl *dbmodel.Controller, mt name
 	}
 }
 
-func (d *cacheDialer) dial(ctx context.Context, ctl *dbmodel.Controller, requiredPermissions map[string]string) (interface{}, error) {
+func connectionKey(c *dbmodel.Controller, u *openfga.User, permissions map[string]string) string {
+	if u == nil && len(permissions) == 0 {
+		return c.Name
+	}
+	p := make([]string, 0, len(permissions))
+	for k, v := range permissions {
+		p = append(p, fmt.Sprintf("%s:%s", k, v))
+	}
+	sort.Strings(p)
+	if u != nil {
+		return fmt.Sprintf("%s;%s;%s", c.Name, u.ResourceTag().Id(), strings.Join(p, ","))
+	}
+	return fmt.Sprintf("%s;%s", c.Name, strings.Join(p, ","))
+}
+
+func (d *cacheDialer) dial(ctx context.Context, ctl *dbmodel.Controller, user *openfga.User, withPermissions map[string]string) (interface{}, error) {
+	ck := connectionKey(ctl, user, withPermissions)
 	d.mu.Lock()
-	capi, ok := d.conns[ctl.Name]
+	capi, ok := d.conns[ck]
 	if ok {
 		if err := capi.Ping(ctx); err == nil {
 			d.mu.Unlock()
 			return capi, nil
 		} else {
 			zapctx.Warn(ctx, "cached connection failed", zap.Error(err))
-			delete(d.conns, ctl.Name)
+			delete(d.conns, ck)
 			capi.Close()
 		}
 	}
 	d.mu.Unlock()
 
 	// We don't have a working connection to the controller, so dial one.
-	api, err := d.dialer.Dial(ctx, ctl, names.ModelTag{}, requiredPermissions)
+	api, err := d.dialer.Dial(ctx, ctl, names.ModelTag{}, user, withPermissions)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +105,7 @@ func (d *cacheDialer) dial(ctx context.Context, ctl *dbmodel.Controller, require
 	atomic.StoreInt64(capi.refCount, 1)
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	d.conns[ctl.Name] = capi
+	d.conns[ck] = capi
 	return capi, nil
 }
 
