@@ -95,11 +95,6 @@ jimm-snap:
 	cp ./snaps/jimm/snapcraft.yaml ./snap/
 	snapcraft
 
-jimmctl-snap:
-	mkdir -p ./snap
-	cp -R ./snaps/jimmctl/* ./snap/
-	snapcraft
-
 jaas-snap:
 	mkdir -p ./snap
 	cp -R ./snaps/jaas/* ./snap/

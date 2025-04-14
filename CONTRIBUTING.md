@@ -90,18 +90,10 @@ for later use by the JIMM-k8s charm.
 The JIMM server is also available as a snap and can be built with `make jimm-snap`. This snap is 
 not published to the snap store as it is intended to be used as part of a machine charm deployment.
 
-### jimmctl
-To build jimmctl run `go build ./cmd/jimmctl`
-
-The jimmctl tool is published as a [Snap](https://snapcraft.io/jimmctl).
-
-Run `make jimmctl-snap` to build the snap. The snaps are published to the Snap Store 
-from where they can be conveniently installed.
-
 ### jaas plugin
 To build the jaas plugin run `go build ./cmd/jaas`
 
 The jaas plugin is published as a [Snap](https://snapcraft.io/jaas).
 
-Run `make jaas-snap` to build the snap. The snaps are published to the Snap Store 
+Run `make jaas-snap` to build the snap. The snap is published to the Snap Store 
 from where they can be conveniently installed.

@@ -745,7 +745,7 @@ func (j *permissionManager) RevokeOfferAccess(ctx context.Context, user *openfga
 	}
 
 	if stillHasAccess {
-		return errors.E(op, "unable to completely revoke given access due to other relations; try to remove them as well, or use 'jimmctl' for more control")
+		return errors.E(op, "unable to completely revoke given access due to other relations; try to remove them as well")
 	}
 	return nil
 }

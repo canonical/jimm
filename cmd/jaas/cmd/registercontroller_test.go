@@ -144,6 +144,36 @@ password: super-secret-password
 `)
 }
 
+func (s *registerControllerDryRunSuite) TestControllerInfoWithLocalFlagAndCustomPublicAddress(c *gc.C) {
+	store := jjclient.NewMemStore()
+	store.Controllers["controller-1"] = jujuclient.ControllerDetails{
+		ControllerUUID: "982b16d9-a945-4762-b684-fd4fd885aa11",
+		APIEndpoints:   []string{"127.0.0.1:17070"},
+		PublicDNSName:  "controller1.example.com",
+		CACert:         `foo`,
+	}
+	store.Accounts["controller-1"] = jujuclient.AccountDetails{
+		User:     "test-user",
+		Password: "super-secret-password",
+	}
+
+	ctx, err := cmdtesting.RunCommand(c, cmd.NewRegisterControllerCommandForTesting(store, nil), "controller-1", "--dry-run", "--local", "--public-address", "my-address.com:1234")
+	c.Assert(err, gc.IsNil)
+
+	data := cmdtesting.Stdout(ctx)
+	c.Assert(err, gc.IsNil)
+	c.Assert(string(data), gc.Matches, `uuid: 982b16d9-a945-4762-b684-fd4fd885aa11
+name: controller-1
+publicaddress: my-address.com:1234
+tlshostname: ""
+apiaddresses:
+- 127.0.0.1:17070
+cacertificate: foo
+username: test-user
+password: super-secret-password
+`)
+}
+
 type registerControllerSuite struct {
 	cmdtest.JimmCmdSuite
 }

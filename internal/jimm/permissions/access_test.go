@@ -1369,7 +1369,7 @@ func TestRevokeOfferAccess(t *testing.T) {
 		},
 		expectedError: "application offer not found",
 	}, {
-		about: "admin revokes another user (who is direct admin+consumer) their consume access - an error returns (saying user still has access; hinting to use 'jimmctl' for advanced cases)",
+		about: "admin revokes another user (who is direct admin+consumer) their consume access)",
 		parameterFunc: func(env *jimmtest.Environment, db *db.Database) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
 			return env.User("eve@canonical.com").DBObject(c, db), env.User("grant@canonical.com").DBObject(c, db), "test-offer-url", jujuparams.OfferConsumeAccess
 		},
@@ -1381,10 +1381,10 @@ func TestRevokeOfferAccess(t *testing.T) {
 			err = openfga.NewUser(&u, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 		},
-		expectedError:              "unable to completely revoke given access due to other relations.*jimmctl.*",
+		expectedError:              "unable to completely revoke given access due to other relations.*",
 		expectedAccessLevelOnError: "admin",
 	}, {
-		about: "admin revokes another user (who is direct admin+reader) their read access - an error returns (saying user still has access; hinting to use 'jimmctl' for advanced cases)",
+		about: "admin revokes another user (who is direct admin+reader) their read access)",
 		parameterFunc: func(env *jimmtest.Environment, db *db.Database) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
 			return env.User("eve@canonical.com").DBObject(c, db), env.User("grant@canonical.com").DBObject(c, db), "test-offer-url", jujuparams.OfferReadAccess
 		},
@@ -1396,10 +1396,10 @@ func TestRevokeOfferAccess(t *testing.T) {
 			err = openfga.NewUser(&u, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.AdministratorRelation)
 			c.Assert(err, qt.IsNil)
 		},
-		expectedError:              "unable to completely revoke given access due to other relations.*jimmctl.*",
+		expectedError:              "unable to completely revoke given access due to other relations.*",
 		expectedAccessLevelOnError: "admin",
 	}, {
-		about: "admin revokes another user (who is direct consumer+reader) their read access - an error returns (saying user still has access; hinting to use 'jimmctl' for advanced cases)",
+		about: "admin revokes another user (who is direct consumer+reader) their read access)",
 		parameterFunc: func(env *jimmtest.Environment, db *db.Database) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
 			return env.User("eve@canonical.com").DBObject(c, db), env.User("grant@canonical.com").DBObject(c, db), "test-offer-url", jujuparams.OfferReadAccess
 		},
@@ -1411,7 +1411,7 @@ func TestRevokeOfferAccess(t *testing.T) {
 			err = openfga.NewUser(&u, client).SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.ConsumerRelation)
 			c.Assert(err, qt.IsNil)
 		},
-		expectedError:              "unable to completely revoke given access due to other relations.*jimmctl.*",
+		expectedError:              "unable to completely revoke given access due to other relations.*",
 		expectedAccessLevelOnError: "consume",
 	}}
 
