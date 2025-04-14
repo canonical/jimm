@@ -36,10 +36,10 @@ jobs:
       # We do this because the original doc doesn't have a top level heading.: 
     - name: Create final doc with title
       run: |
-        echo "\`\`jaas\`\` Reference" > jaas-reference.rst
-        echo "##################" >> jaas-reference.rst
-        echo "" >> jaas-reference.rst
-        cat documentation.rst >> jaas-reference.rst
+        echo "\`\`jaas\`\` plugin" > jaas-plugin.rst
+        echo "###############" >> jaas-plugin.rst
+        echo "" >> jaas-plugin.rst
+        cat documentation.rst >> jaas-plugin.rst
     
     - name: Checkout docs
       uses: actions/checkout@v4
@@ -50,7 +50,7 @@ jobs:
   
     - name: Update Docs
       working-directory: ./jaas-documentation
-      run: cp ../jaas-reference.rst ./reference/jaas.rst
+      run: cp ../jaas-plugin.rst ./reference/jaas-plugin.rst
 
     - name: Create Pull Request
       uses: peter-evans/create-pull-request@v6

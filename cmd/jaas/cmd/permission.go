@@ -58,38 +58,38 @@ E.g. "user-Alice" or "controller-MyController"
 Certain constraints apply when creating/removing permissions, namely:
 Object may be one of:
 
-	user tag                = "user-<name>"
-	group tag               = "group-<name>"
-	controller tag          = "controller-<name>"
-	model tag               = "model-<name>"
-	application offer tag   = "offer-<name>"
+    user tag                = "user-<name>"
+    group tag               = "group-<name>"
+    controller tag          = "controller-<name>"
+    model tag               = "model-<name>"
+    application offer tag   = "offer-<name>"
 
 If target_object is a group, the relation can only be:
 
-	member
+    member
 
 If target_object is a controller, the relation can be one of:
 
-	loginer
-	administrator
+    loginer
+    administrator
 
 If target_object is a model, the relation can be one of:
 
-	reader
-	writer
-	administrator
+    reader
+    writer
+    administrator
 
 If target_object is an application offer, the relation can be one of:
 
-	reader
-	consumer
-	administrator
+    reader
+    consumer
+    administrator
 
 
 Additionally, if the object is a group, a userset can be applied by adding #member as follows.
 This will grant/revoke access to all users within TeamA:
 
-	group-TeamA#member administrator controller-MyController
+    group-TeamA#member administrator controller-MyController
 `
 
 	addPermissionDoc = `
@@ -99,7 +99,7 @@ Grants access to a resource.
 	addRelationExample = `
     juju add-permission user-alice@canonical.com member group-mygroup
     juju add-permission group-MyTeam#member admin model-mymodel
-	juju add-permission -f /path/to/file.yaml
+    juju add-permission -f /path/to/file.yaml
 `
 
 	removePermissionDoc = `
@@ -109,7 +109,7 @@ Revokes access to a resource.
 	removePermissionExample = `
     juju remove-permission user-alice@canonical.com member group-mygroup
     juju remove-permission group-MyTeam#member admin model-mymodel
-	juju remove-permission -f /path/to/file.yaml
+    juju remove-permission -f /path/to/file.yaml
 `
 
 	checkPermissionDoc = `
@@ -128,14 +128,14 @@ only those permissions matching the filter will be returned.
 List all permissions
 
     juju list-permissions
-	
+
 List permissions where the target object match
 
     juju list-permissions --target model-mymodel
 
 List permissions where the target object and relation match
 
-	juju list-permissions --target model-mymodel  --relation admin
+    juju list-permissions --target model-mymodel  --relation admin
 `
 )
 
