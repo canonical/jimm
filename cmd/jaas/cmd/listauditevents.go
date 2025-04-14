@@ -26,7 +26,7 @@ Returns audit log events.
 `
 	listAuditEventsCommandExample = `
     juju list-audit-events --after 2020-01-01T15:00:00 --before 2020-01-01T15:00:00 --user-tag user@canonical.com --limit 50
-	juju list-audit-events --method CreateModel
+    juju list-audit-events --method CreateModel
     juju audit-events --after 2020-01-01T15:00:00 --format yaml
 `
 )

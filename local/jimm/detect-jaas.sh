@@ -28,7 +28,7 @@ else
         JAAS="juju jaas"
     else
         echo "juju cli snap not detected, running jaas binary directly"
-        JAAS=$(command -v jaas)
+        JAAS="/snap/jaas/current/bin/jaas"
     fi
 fi
 
