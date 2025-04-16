@@ -54,6 +54,8 @@ type JujuManager struct {
 	UpdateCloud_                       func(ctx context.Context, u *openfga.User, ct names.CloudTag, cloud jujuparams.Cloud) error
 	UpdateCloudCredential_             func(ctx context.Context, u *openfga.User, args juju.UpdateCloudCredentialArgs) ([]jujuparams.UpdateCredentialModelResult, error)
 	ListModels_                        func(ctx context.Context, user *openfga.User) ([]base.UserModel, error)
+	GrantOfferAccessOnController_      func(ctx context.Context, user *openfga.User, ut names.UserTag, offerURL string, access jujuparams.OfferAccessPermission) error
+	RevokeOfferAccessOnController_     func(ctx context.Context, user *openfga.User, ut names.UserTag, offerURL string, access jujuparams.OfferAccessPermission) error
 
 	// These mocks can be removed soon once the jujuManager interface is updated.
 	UpdateMetrics_      func(ctx context.Context)
@@ -249,4 +251,18 @@ func (j *JujuManager) CleanupDyingModels(ctx context.Context) error {
 		return nil
 	}
 	return j.CleanupDyingModels_(ctx)
+}
+
+func (j *JujuManager) GrantOfferAccessOnController(ctx context.Context, user *openfga.User, ut names.UserTag, offerURL string, access jujuparams.OfferAccessPermission) error {
+	if j.GrantOfferAccessOnController_ == nil {
+		return nil
+	}
+	return j.GrantOfferAccessOnController_(ctx, user, ut, offerURL, access)
+}
+
+func (j *JujuManager) RevokeOfferAccessOnController(ctx context.Context, user *openfga.User, ut names.UserTag, offerURL string, access jujuparams.OfferAccessPermission) error {
+	if j.RevokeOfferAccessOnController_ == nil {
+		return nil
+	}
+	return j.RevokeOfferAccessOnController_(ctx, user, ut, offerURL, access)
 }

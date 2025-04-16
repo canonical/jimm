@@ -5,6 +5,7 @@ package jujuapi
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/juju/juju/core/crossmodel"
@@ -175,12 +176,23 @@ func (r *controllerRoot) modifyOfferAccess(ctx context.Context, change jujuparam
 	}
 	switch change.Action {
 	case jujuparams.GrantOfferAccess:
+		// We grant access on the controller because pre 3.6.6 controllers are consulting their database to check if
+		// user has access to the offer when getting consume details. This is a bug and will be fixed in the following
+		// releases of Juju.
+		if err := r.jimm.JujuManager().GrantOfferAccessOnController(ctx, r.user, ut, change.OfferURL, change.Access); err != nil {
+			if !strings.Contains(err.Error(), "user already has") {
+				return errors.E(op, err)
+			}
+		}
 		if err := r.jimm.PermissionManager().GrantOfferAccess(ctx, r.user, change.OfferURL, ut, change.Access); err != nil {
 			return errors.E(op, err)
 		}
 		return nil
 	case jujuparams.RevokeOfferAccess:
 		if err := r.jimm.PermissionManager().RevokeOfferAccess(ctx, r.user, change.OfferURL, ut, change.Access); err != nil {
+			return errors.E(op, err)
+		}
+		if err := r.jimm.JujuManager().RevokeOfferAccessOnController(ctx, r.user, ut, change.OfferURL, change.Access); err != nil {
 			return errors.E(op, err)
 		}
 		return nil

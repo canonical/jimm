@@ -2003,3 +2003,151 @@ func TestListApplicationOffers(t *testing.T) {
 		}},
 	}})
 }
+
+func TestGrantOfferAccessOnController(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+	j := newTestJujuManager(c, &parameters{
+		Dialer: &jimmtest.Dialer{
+			UUID: "00000000-0000-0000-0000-0000-0000000000001",
+			API: &jimmtest.API{
+				GrantApplicationOfferAccess_: func(ctx context.Context, s string, ut names.UserTag, oap jujuparams.OfferAccessPermission) error {
+					if s != "test-offer-url" {
+						return errors.E(errors.CodeNotFound)
+					}
+					return nil
+				},
+			},
+		},
+	})
+
+	env := jimmtest.ParseEnvironment(c, listApplicationsTestEnv)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+
+	offer := env.ApplicationOffers[0]
+
+	u, err := dbmodel.NewIdentity("alice@canonical.com")
+	c.Assert(err, qt.IsNil)
+
+	u1, err := dbmodel.NewIdentity("eve@canonical.com")
+	c.Assert(err, qt.IsNil)
+
+	u2, err := dbmodel.NewIdentity("adam@canonical.com")
+	c.Assert(err, qt.IsNil)
+
+	tuples := []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(u.ResourceTag()),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(offer.DBObject(c, j.Database).ResourceTag()),
+	}, {
+		Object:   ofganames.ConvertTag(u1.ResourceTag()),
+		Relation: ofganames.ConsumerRelation,
+		Target:   ofganames.ConvertTag(offer.DBObject(c, j.Database).ResourceTag()),
+	}, {
+		Object:   ofganames.ConvertTag(u2.ResourceTag()),
+		Relation: ofganames.ReaderRelation,
+		Target:   ofganames.ConvertTag(offer.DBObject(c, j.Database).ResourceTag()),
+	}}
+	err = j.OpenFGAClient.AddRelation(context.Background(), tuples...)
+	c.Assert(err, qt.IsNil)
+
+	tests := []struct {
+		about         string
+		user          *openfga.User
+		expectedError string
+	}{{
+		about: "admin is allowed",
+		user:  openfga.NewUser(u, j.OpenFGAClient),
+	}, {
+		about:         "consumer is not allowed",
+		user:          openfga.NewUser(u1, j.OpenFGAClient),
+		expectedError: "unauthorized",
+	}, {
+		about:         "reader is not allowed",
+		user:          openfga.NewUser(u2, j.OpenFGAClient),
+		expectedError: "unauthorized",
+	}}
+
+	for _, test := range tests {
+		err = j.GrantOfferAccessOnController(ctx, test.user, names.NewUserTag("bob@canonical.com"), offer.URL, "consume")
+		if test.expectedError != "" {
+			c.Assert(err, qt.ErrorMatches, test.expectedError)
+		} else {
+			c.Assert(err, qt.IsNil)
+		}
+	}
+}
+
+func TestRevokeOfferAccessOnController(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+	j := newTestJujuManager(c, &parameters{
+		Dialer: &jimmtest.Dialer{
+			UUID: "00000000-0000-0000-0000-0000-0000000000001",
+			API: &jimmtest.API{
+				RevokeApplicationOfferAccess_: func(ctx context.Context, s string, ut names.UserTag, oap jujuparams.OfferAccessPermission) error {
+					if s != "test-offer-url" {
+						return errors.E(errors.CodeNotFound)
+					}
+					return nil
+				},
+			},
+		},
+	})
+
+	env := jimmtest.ParseEnvironment(c, listApplicationsTestEnv)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+
+	offer := env.ApplicationOffers[0]
+
+	u, err := dbmodel.NewIdentity("alice@canonical.com")
+	c.Assert(err, qt.IsNil)
+
+	u1, err := dbmodel.NewIdentity("eve@canonical.com")
+	c.Assert(err, qt.IsNil)
+
+	u2, err := dbmodel.NewIdentity("adam@canonical.com")
+	c.Assert(err, qt.IsNil)
+
+	tuples := []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(u.ResourceTag()),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(offer.DBObject(c, j.Database).ResourceTag()),
+	}, {
+		Object:   ofganames.ConvertTag(u1.ResourceTag()),
+		Relation: ofganames.ConsumerRelation,
+		Target:   ofganames.ConvertTag(offer.DBObject(c, j.Database).ResourceTag()),
+	}, {
+		Object:   ofganames.ConvertTag(u2.ResourceTag()),
+		Relation: ofganames.ReaderRelation,
+		Target:   ofganames.ConvertTag(offer.DBObject(c, j.Database).ResourceTag()),
+	}}
+	err = j.OpenFGAClient.AddRelation(context.Background(), tuples...)
+	c.Assert(err, qt.IsNil)
+
+	tests := []struct {
+		about         string
+		user          *openfga.User
+		expectedError string
+	}{{
+		about: "admin is allowed",
+		user:  openfga.NewUser(u, j.OpenFGAClient),
+	}, {
+		about:         "consumer is not allowed",
+		user:          openfga.NewUser(u1, j.OpenFGAClient),
+		expectedError: "unauthorized",
+	}, {
+		about:         "reader is not allowed",
+		user:          openfga.NewUser(u2, j.OpenFGAClient),
+		expectedError: "unauthorized",
+	}}
+
+	for _, test := range tests {
+		err = j.RevokeOfferAccessOnController(ctx, test.user, names.NewUserTag("bob@canonical.com"), offer.URL, "consume")
+		if test.expectedError != "" {
+			c.Assert(err, qt.ErrorMatches, test.expectedError)
+		} else {
+			c.Assert(err, qt.IsNil)
+		}
+	}
+}

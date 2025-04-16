@@ -1,4 +1,5 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
+
 package jujuapi_test
 
 import (
@@ -209,6 +210,76 @@ func (s *applicationOffersSuite) TestGetConsumeDetails(c *gc.C) {
 	})
 }
 
+func (s *applicationOffersSuite) TestGetConsumeDetailsWithConsumeAccess(c *gc.C) {
+	conn := s.open(c, nil, "bob@canonical.com")
+	defer conn.Close()
+	client := applicationoffers.NewClient(conn)
+
+	results, err := client.Offer(s.Model.UUID.String, "test-app", []string{s.endpoint.Name}, "bob@canonical.com", "test-offer", "test offer description")
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(results, gc.HasLen, 1)
+	c.Assert(results[0].Error, gc.Equals, (*jujuparams.Error)(nil))
+
+	ourl := &crossmodel.OfferURL{
+		User:            "bob@canonical.com",
+		ModelName:       "model-1",
+		ApplicationName: "test-offer",
+	}
+
+	user := "regular.joe@canonical.com"
+	err = client.GrantOffer(user, string(jujuparams.OfferConsumeAccess), ourl.String())
+	c.Assert(err, gc.Equals, nil)
+
+	info := s.APIInfo(c)
+	caCert, _ := s.ControllerConfig.CACert()
+
+	conn1 := s.open(c, nil, user)
+	defer conn.Close()
+	client1 := applicationoffers.NewClient(conn1)
+
+	details, err := client1.GetConsumeDetails(ourl.String())
+	c.Assert(err, gc.Equals, nil)
+	c.Check(details.Macaroon, gc.Not(gc.IsNil))
+	details.Macaroon = nil
+	c.Check(details.Offer.OfferUUID, gc.Matches, `[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`)
+	details.Offer.OfferUUID = ""
+	sort.Slice(details.Offer.Users, func(j, k int) bool {
+		return details.Offer.Users[j].UserName < details.Offer.Users[k].UserName
+	})
+	c.Check(details, gc.DeepEquals, jujuparams.ConsumeOfferDetails{
+		Offer: &jujuparams.ApplicationOfferDetailsV5{
+			SourceModelTag:         s.Model.Tag().String(),
+			OfferURL:               ourl.Path(),
+			OfferName:              "test-offer",
+			ApplicationDescription: "test offer description",
+			Endpoints: []jujuparams.RemoteEndpoint{{
+				Name:      "url",
+				Role:      "provider",
+				Interface: "http",
+			}},
+			Users: []jujuparams.OfferUserDetails{{
+				UserName: ofganames.EveryoneUser,
+				Access:   "read",
+			}, {
+				UserName: user,
+				Access:   "consume",
+			}},
+		},
+		ControllerInfo: &jujuparams.ExternalControllerInfo{
+			ControllerTag: s.Model.Controller.Tag().String(),
+			Addrs:         info.Addrs,
+			Alias:         "controller-1",
+			CACert:        caCert,
+		},
+	})
+
+	err = client.RevokeOffer(user, string(jujuparams.OfferConsumeAccess), ourl.String())
+	c.Assert(err, gc.Equals, nil)
+
+	_, err = client1.GetConsumeDetails(ourl.String())
+	c.Assert(err, gc.ErrorMatches, "unauthorized")
+}
+
 func (s *applicationOffersSuite) TestListApplicationOffers(c *gc.C) {
 	conn := s.open(c, nil, "bob@canonical.com")
 	defer conn.Close()
@@ -311,6 +382,9 @@ func (s *applicationOffersSuite) TestModifyOfferAccess(c *gc.C) {
 	err = client.GrantOffer("test.user@canonical.com", "admin", offerURL)
 	c.Assert(err, jc.ErrorIsNil)
 
+	err = client.GrantOffer("test.user@canonical.com", "admin", offerURL)
+	c.Assert(err, jc.ErrorIsNil)
+
 	testUser := openfga.NewUser(
 		&dbmodel.Identity{
 			Name: "test.user@canonical.com",
@@ -339,6 +413,12 @@ func (s *applicationOffersSuite) TestModifyOfferAccess(c *gc.C) {
 
 	err = client3.RevokeOffer("test.user@canonical.com", "read", offerURL)
 	c.Assert(err, gc.ErrorMatches, "unauthorized")
+
+	err = client.GrantOffer("test.user@canonical.com", "admin", offerURL)
+	c.Assert(err, jc.ErrorIsNil)
+
+	err = client.GrantOffer("test.user@canonical.com", "admin", offerURL)
+	c.Assert(err, jc.ErrorIsNil)
 }
 
 func (s *applicationOffersSuite) TestDestroyOffers(c *gc.C) {

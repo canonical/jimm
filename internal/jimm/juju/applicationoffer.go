@@ -600,3 +600,17 @@ func (j *JujuManager) doApplicationOfferAdmin(ctx context.Context, user *openfga
 	}
 	return nil
 }
+
+// GrantOfferAccessOnController dials the controller in charge of the application offer and grants the user identified by `ut` the specified level of access to the offer.
+func (j *JujuManager) GrantOfferAccessOnController(ctx context.Context, user *openfga.User, ut names.UserTag, offerURL string, access jujuparams.OfferAccessPermission) error {
+	return j.doApplicationOfferAdmin(ctx, user, offerURL, func(offer *dbmodel.ApplicationOffer, api API) error {
+		return api.GrantApplicationOfferAccess(ctx, offerURL, ut, access)
+	})
+}
+
+// RevokeOfferAccessOnController dials the controller in charge of the application offer and revokes the user identified by `ut` the specified level of access to the offer.
+func (j *JujuManager) RevokeOfferAccessOnController(ctx context.Context, user *openfga.User, ut names.UserTag, offerURL string, access jujuparams.OfferAccessPermission) error {
+	return j.doApplicationOfferAdmin(ctx, user, offerURL, func(offer *dbmodel.ApplicationOffer, api API) error {
+		return api.RevokeApplicationOfferAccess(ctx, offerURL, ut, access)
+	})
+}
