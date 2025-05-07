@@ -10,6 +10,7 @@ import (
 
 	"github.com/juju/juju/api/base"
 	"github.com/juju/juju/api/controller/controller"
+	jujucontroller "github.com/juju/juju/controller"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"github.com/juju/version"
@@ -722,4 +723,26 @@ func (j *JujuManager) InitiateMigration(ctx context.Context, user *openfga.User,
 		return result, errors.E(op, err)
 	}
 	return result, nil
+}
+
+// ControllerConfig returns the controller config for the specified controller.
+func (j *JujuManager) ControllerConfig(ctx context.Context, controllerName string) (jujucontroller.Config, error) {
+	const op = errors.Op("jimm.ControllerConfig")
+
+	controller, err := j.getControllerByName(ctx, controllerName)
+	if err != nil {
+		return jujucontroller.Config{}, errors.E(op, err)
+	}
+
+	api, err := j.dialController(ctx, controller)
+	if err != nil {
+		return jujucontroller.Config{}, errors.E(op, err)
+	}
+	defer api.Close()
+
+	cfg, err := api.ControllerConfig(ctx)
+	if err != nil {
+		return jujucontroller.Config(cfg.Config), errors.E(op, err)
+	}
+	return jujucontroller.Config(cfg.Config), nil
 }

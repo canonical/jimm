@@ -476,6 +476,57 @@ func TestEarliestControllerVersion(t *testing.T) {
 	c.Assert(v, qt.DeepEquals, semversion.MustParse("2.1.0"))
 }
 
+const testControllerConfigEnv = `clouds:
+- name: test
+  type: test
+  regions:
+  - name: test-region
+cloud-credentials:
+- name: test-cred
+  cloud: test
+  owner: alice@canonical.com
+  type: empty
+controllers:
+- name: test1
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test
+  region: test-region-1
+  agent-version: 3.2.1
+`
+
+func TestControllerConfig(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := context.Background()
+
+	api := &jimmtest.API{
+		ControllerConfig_: func(_ context.Context) (jujuparams.ControllerConfigResult, error) {
+			return jujuparams.ControllerConfigResult{
+				Config: map[string]interface{}{
+					"controller-uuid": "00000001-0000-0000-0000-000000000001",
+				},
+			}, nil
+		},
+	}
+
+	j := newTestJujuManager(c, &parameters{
+		Dialer: &jimmtest.Dialer{
+			API: api,
+		},
+	})
+
+	env := jimmtest.ParseEnvironment(c, testControllerConfigEnv)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+
+	config, err := j.ControllerConfig(ctx, env.Controllers[0].Name)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(config, qt.Not(qt.IsNil))
+	c.Assert(config.SSHServerPort(), qt.Equals, 17022)
+
+	_, err = j.ControllerConfig(ctx, "not-found")
+	c.Assert(err, qt.ErrorMatches, "controller not found")
+}
+
 const testImportModelEnv = `
 users:
 - username: alice@canonical.com

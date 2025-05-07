@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/juju/juju/api/base"
+	jujucontroller "github.com/juju/juju/controller"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"github.com/juju/version"
@@ -214,6 +215,7 @@ type JujuManager interface {
 	ListControllers(ctx context.Context, user *openfga.User) ([]dbmodel.Controller, error)
 	RemoveController(ctx context.Context, user *openfga.User, controllerName string, force bool) error
 	SetControllerDeprecated(ctx context.Context, user *openfga.User, controllerName string, deprecated bool) error
+	ControllerConfig(ctx context.Context, controllerName string) (jujucontroller.Config, error)
 
 	// Model related methods
 

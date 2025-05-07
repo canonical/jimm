@@ -61,6 +61,9 @@ type API interface {
 	// controller that hosts the controller machines.
 	ControllerModelSummary(context.Context, *jujuparams.ModelSummary) error
 
+	// ControllerConfig fetches the controller configuration.
+	ControllerConfig(context.Context) (jujuparams.ControllerConfigResult, error)
+
 	// CreateModel creates a new model.
 	CreateModel(context.Context, *jujuparams.ModelCreateArgs, *jujuparams.ModelInfo) error
 

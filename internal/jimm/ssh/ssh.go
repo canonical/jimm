@@ -9,6 +9,7 @@ import (
 	"net"
 	"time"
 
+	jujucontroller "github.com/juju/juju/controller"
 	"github.com/juju/zaputil/zapctx"
 	gossh "golang.org/x/crypto/ssh"
 
@@ -19,13 +20,14 @@ import (
 	"github.com/canonical/jimm/v3/internal/rpc"
 )
 
-// jujuSSHDefaultPort is the default port we expect the juju controllers to respond on.
-const jujuSSHDefaultPort = 17022
-
 // ControllerInfo is the struct holding the infomation to contact a controller
 type ControllerInfo struct {
 	// addresses to dial the controller
 	Addresses []string
+
+	// Port to establish the SSH connection
+	Port int
+
 	// JWT to authenticate to the controller
 	JWT string
 }
@@ -35,9 +37,10 @@ type IdentityManager interface {
 	FetchIdentity(ctx context.Context, id string) (*openfga.User, error)
 }
 
-// ModelManager provides a means to fetch a model from the model service.
-type ModelManager interface {
+// JujuManager provides a means to fetch a model from the model service.
+type JujuManager interface {
 	GetModel(ctx context.Context, uuid string) (dbmodel.Model, error)
+	ControllerConfig(ctx context.Context, controllerName string) (jujucontroller.Config, error)
 }
 
 // SSHKeyManager provides a means to manage ssh keys within JIMM.
@@ -51,11 +54,11 @@ type JWTGeneratorFactory interface {
 }
 
 // NewSSHManager returns a new SSHManager that offers jimm functionality to the SSHJumpServer.
-func NewSSHManager(identityManager IdentityManager, modelManager ModelManager, sshKeyManager SSHKeyManager, jwtFactory JWTGeneratorFactory) (*sshManager, error) {
+func NewSSHManager(identityManager IdentityManager, jujuManager JujuManager, sshKeyManager SSHKeyManager, jwtFactory JWTGeneratorFactory) (*sshManager, error) {
 	if identityManager == nil {
 		return nil, errors.E("identityManager cannot be nil")
 	}
-	if modelManager == nil {
+	if jujuManager == nil {
 		return nil, errors.E("modelManager cannot be nil")
 	}
 	if sshKeyManager == nil {
@@ -65,7 +68,7 @@ func NewSSHManager(identityManager IdentityManager, modelManager ModelManager, s
 		return nil, errors.E("jwtFactory cannot be nil")
 	}
 	return &sshManager{
-		modelManager:    modelManager,
+		jujuManager:     jujuManager,
 		identityManager: identityManager,
 		sshKeyManager:   sshKeyManager,
 		jwtFactory:      jwtFactory,
@@ -74,7 +77,7 @@ func NewSSHManager(identityManager IdentityManager, modelManager ModelManager, s
 
 // sshManager provides a means to manage ssh server within JIMM.
 type sshManager struct {
-	modelManager    ModelManager
+	jujuManager     JujuManager
 	identityManager IdentityManager
 	sshKeyManager   SSHKeyManager
 	jwtFactory      JWTGeneratorFactory
@@ -99,7 +102,7 @@ func (s *sshManager) PublicKeyHandler(ctx context.Context, claimUser string, key
 // a valid JWT To connect to the controller.
 func (s *sshManager) ControllerInfoFromModelUUID(ctx context.Context, modelUUID string, user *openfga.User) (ControllerInfo, error) {
 	zapctx.Info(ctx, "ControllerInfoFromModelUUID")
-	model, err := s.modelManager.GetModel(ctx, modelUUID)
+	model, err := s.jujuManager.GetModel(ctx, modelUUID)
 	if err != nil {
 		return ControllerInfo{}, errors.E(err, "cannot find model")
 	}
@@ -107,6 +110,12 @@ func (s *sshManager) ControllerInfoFromModelUUID(ctx context.Context, modelUUID 
 	if len(addrs) == 0 {
 		return ControllerInfo{}, errors.E(err, "cannot find addresses for model's controller")
 	}
+
+	controllerConfig, err := s.jujuManager.ControllerConfig(ctx, model.Controller.Name)
+	if err != nil {
+		return ControllerInfo{}, errors.E(err, "cannot get controller config")
+	}
+
 	jwtGenerator := s.jwtFactory.New()
 	jwtGenerator.SetTags(model.ResourceTag(), model.Controller.ResourceTag())
 	jwt, err := jwtGenerator.MakeLoginToken(ctx, user)
@@ -116,6 +125,7 @@ func (s *sshManager) ControllerInfoFromModelUUID(ctx context.Context, modelUUID 
 
 	return ControllerInfo{
 		Addresses: addrs,
+		Port:      controllerConfig.SSHServerPort(),
 		JWT:       string(jwt),
 	}, nil
 }
@@ -123,15 +133,12 @@ func (s *sshManager) ControllerInfoFromModelUUID(ctx context.Context, modelUUID 
 // DialControllerSSHServer dials the controller and returns
 // an SSH connection.
 func (s *sshManager) DialControllerSSHServer(ctx context.Context, ctrlInfo ControllerInfo, user *openfga.User) (*gossh.Client, error) {
-	// TODO: Dial the controller and request it's SSH port
-	// here or save it when we add a controller to JIMM.
-	destPort := jujuSSHDefaultPort
 	var client *gossh.Client
 	var err error
 	var errs []error
 
 	for _, addr := range ctrlInfo.Addresses {
-		dest := net.JoinHostPort(addr, fmt.Sprint(destPort))
+		dest := net.JoinHostPort(addr, fmt.Sprint(ctrlInfo.Port))
 		client, err = gossh.Dial("tcp", dest, &gossh.ClientConfig{
 			User: "jimm",
 			//nolint:gosec // this will be removed once we handle hostkeys

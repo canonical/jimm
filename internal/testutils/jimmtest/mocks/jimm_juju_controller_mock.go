@@ -5,6 +5,7 @@ package mocks
 import (
 	"context"
 
+	jujucontroller "github.com/juju/juju/controller"
 	"github.com/juju/version"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
@@ -21,6 +22,7 @@ type ControllerService struct {
 	ListControllers_           func(ctx context.Context, user *openfga.User) ([]dbmodel.Controller, error)
 	RemoveController_          func(ctx context.Context, user *openfga.User, controllerName string, force bool) error
 	SetControllerDeprecated_   func(ctx context.Context, user *openfga.User, controllerName string, deprecated bool) error
+	ControllerConfig_          func(ctx context.Context, controllerName string) (jujucontroller.Config, error)
 }
 
 func (j *ControllerService) AddController(ctx context.Context, u *openfga.User, ctl *dbmodel.Controller, creds juju.ControllerCreds) error {
@@ -63,4 +65,11 @@ func (j *ControllerService) SetControllerDeprecated(ctx context.Context, user *o
 		return errors.E(errors.CodeNotImplemented)
 	}
 	return j.SetControllerDeprecated_(ctx, user, controllerName, deprecated)
+}
+
+func (j *ControllerService) ControllerConfig(ctx context.Context, controllerName string) (jujucontroller.Config, error) {
+	if j.ControllerConfig_ == nil {
+		return jujucontroller.Config{}, errors.E(errors.CodeNotImplemented)
+	}
+	return j.ControllerConfig_(ctx, controllerName)
 }

@@ -12,6 +12,8 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
+	jujucontroller "github.com/juju/juju/controller"
+	jujutesting "github.com/juju/juju/testing"
 	"github.com/juju/names/v5"
 	gossh "golang.org/x/crypto/ssh"
 
@@ -104,6 +106,20 @@ func (s *sshManagerSuite) Init(c *qt.C) {
 			return m, err
 		},
 	}
+	attrs := map[string]interface{}{
+		"ssh-server-port": "17023",
+	}
+	cfg, err := jujucontroller.NewConfig(uuid, jujutesting.CACert, attrs)
+	c.Assert(err, qt.IsNil)
+	controllerService := mocks.ControllerService{
+		ControllerConfig_: func(ctx context.Context, controllerName string) (jujucontroller.Config, error) {
+			return cfg, nil
+		},
+	}
+	jujuManager := mocks.JujuManager{
+		ModelManager:      modelManager,
+		ControllerService: controllerService,
+	}
 	permissionManager, err := permissions.NewManager(database, ofgaClient, uuid, jimmTag)
 	c.Assert(err, qt.IsNil)
 	jwtFactory := jujuauth.NewFactory(database, mocks.JWTService{
@@ -115,7 +131,7 @@ func (s *sshManagerSuite) Init(c *qt.C) {
 	sshKeyManager, err := sshkeys.NewSSHKeyManager(database)
 	c.Assert(err, qt.IsNil)
 
-	s.sshManager, err = ssh.NewSSHManager(identityManager, &modelManager, sshKeyManager, jwtFactory)
+	s.sshManager, err = ssh.NewSSHManager(identityManager, &jujuManager, sshKeyManager, jwtFactory)
 	c.Assert(err, qt.IsNil)
 	env := jimmtest.ParseEnvironment(c, testSSHManagerEnv)
 	env.PopulateDB(c, database)
@@ -165,6 +181,7 @@ func (s *sshManagerSuite) TestControllerInfoFromModelUUID(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(connInfo.Addresses, qt.HasLen, 1)
 	c.Assert(connInfo.JWT, qt.Not(qt.HasLen), 0)
+	c.Assert(connInfo.Port, qt.Equals, 17023)
 
 	// Test that the ControllerInfoFromModelUUID returns an error when the model UUID is invalid.
 	_, err = s.sshManager.ControllerInfoFromModelUUID(ctx, "not-valid", s.userWithAccess)
