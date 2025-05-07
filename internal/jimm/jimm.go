@@ -197,12 +197,12 @@ type SSHManager interface {
 	// PublicKeyHandler is the method to verify the public key of the user. It returns a user if successful.
 	PublicKeyHandler(ctx context.Context, claimUser string, key []byte) (*openfga.User, error)
 
-	// ControllerInfoFromModelUUID resolves the address of the controller to contact given the model UUID and
-	// a valid JWT To connect to the controller.
-	ControllerInfoFromModelUUID(ctx context.Context, modelUUID string, user *openfga.User) (ssh.ControllerInfo, error)
+	// DialInfo resolves the address of the controller to contact given the model UUID and
+	// returns a struct with parameters to connect and authenticate to the controller.
+	DialInfo(ctx context.Context, modelUUID string, user *openfga.User) (ssh.DialInfo, error)
 
-	// DialControllerSSHServer dials the controller using the provided details.
-	DialControllerSSHServer(ctx context.Context, ctrlInfo ssh.ControllerInfo, user *openfga.User) (*gossh.Client, error)
+	// DialController dials a controller's SSH server using the provided details.
+	DialController(ctx context.Context, ctrlInfo ssh.DialInfo, user *openfga.User) (*gossh.Client, error)
 }
 
 // JujuManager is the interface to manage all Juju related operations.
@@ -513,8 +513,8 @@ func (j *JIMM) PermissionManager() PermissionManager {
 
 // NewJujuAuthenticator returns a new token generator for authenticating
 // requests to a Juju controller.
-func (j *JIMM) NewJujuAuthenticator() jujuauth.TokenGenerator {
-	return j.jujuAuthFactory.New()
+func (j *JIMM) NewJujuAuthenticator() jujuauth.LoginTokenGenerator {
+	return j.jujuAuthFactory.NewLoginGenerator()
 }
 
 // AuditLogManager returns a manager that handles audit logging.

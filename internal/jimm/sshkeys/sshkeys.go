@@ -70,7 +70,7 @@ func (sm *sshKeyManager) VerifyPublicKey(ctx context.Context, claimUser string, 
 			return true, nil
 		}
 	}
-	return false, fmt.Errorf("cannot find a matching key for this user.")
+	return false, fmt.Errorf("cannot find a matching key for this user")
 
 }
 

@@ -2,9 +2,9 @@
 
 package jujuauth
 
-// Factory holds the necessary components for producing new stateful
-// Juju authenticator objects. Because these objects are
-// stateful, it is expected that a new one is used for each connection.
+// Factory holds the necessary components for producing
+// Juju authenticator objects. Currently a login token generator
+// and an SSH token generator are available.
 type Factory struct {
 	db            GeneratorDatabase
 	jwtService    JWTService
@@ -20,7 +20,16 @@ func NewFactory(db GeneratorDatabase, jwtService JWTService, accessChecker Gener
 	}
 }
 
-// New returns a new Juju token generator.
-func (f *Factory) New() TokenGenerator {
-	return newTokenGenerator(f.db, f.accessChecker, f.jwtService)
+// NewLoginGenerator returns a new token generator for Juju RPC login requests.
+// The LoginTokenGenerator is stateful and should be re-used for the lifetime
+// of a single connection, and recreated for each new connection.
+func (f *Factory) NewLoginGenerator() LoginTokenGenerator {
+	return newLoginTokenGenerator(f.db, f.accessChecker, f.jwtService)
+}
+
+// NewSSHGenerator returns a new token generator for Juju SSH connections.
+// The SSHToken generator is not stateful and can be re-used across
+// multiple connections.
+func (f *Factory) NewSSHGenerator() SSHTokenGenerator {
+	return newSSHTokenGenerator(f.jwtService)
 }

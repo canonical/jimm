@@ -7,11 +7,13 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"database/sql"
+	"encoding/base64"
 	"testing"
 	"time"
 
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
+	gliderssh "github.com/gliderlabs/ssh"
 	jujucontroller "github.com/juju/juju/controller"
 	jujutesting "github.com/juju/juju/testing"
 	"github.com/juju/names/v5"
@@ -31,9 +33,9 @@ import (
 )
 
 type sshManagerSuite struct {
-	publicKey             sshkeys.PublicKey
-	allowedModelUUID      string
-	allowedControllerUUID string
+	publicKey        sshkeys.PublicKey
+	allowedModelUUID string
+	database         *db.Database
 
 	sshManager *ssh.SSHManager
 
@@ -57,7 +59,7 @@ controllers:
   uuid: 00000001-0000-0000-0000-000000000001
   cloud: test
   region: test-region
-  public-address: localhost
+  public-address: localhost:1234
 
 models:
 - name: test-1
@@ -81,16 +83,16 @@ func (s *sshManagerSuite) Init(c *qt.C) {
 	jimmTag := names.NewControllerTag(uuid)
 	// Setup DB
 
-	database := &db.Database{
+	s.database = &db.Database{
 		DB: jimmtest.PostgresDB(c, time.Now),
 	}
-	err := database.Migrate(context.Background())
+	err := s.database.Migrate(context.Background())
 	c.Assert(err, qt.IsNil)
 	// Setup OFGA
 	ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
-	identityManager, err := identity.NewIdentityManager(database, ofgaClient)
+	identityManager, err := identity.NewIdentityManager(s.database, ofgaClient)
 	c.Assert(err, qt.IsNil)
 
 	// this is a mock non-mock model manager, bandaid until we have a real model manager to avoid creating a whole jimm.
@@ -102,7 +104,7 @@ func (s *sshManagerSuite) Init(c *qt.C) {
 					Valid:  true,
 				},
 			}
-			err := database.GetModel(ctx, &m)
+			err := s.database.GetModel(ctx, &m)
 			return m, err
 		},
 	}
@@ -120,32 +122,31 @@ func (s *sshManagerSuite) Init(c *qt.C) {
 		ModelManager:      modelManager,
 		ControllerService: controllerService,
 	}
-	permissionManager, err := permissions.NewManager(database, ofgaClient, uuid, jimmTag)
+	permissionManager, err := permissions.NewManager(s.database, ofgaClient, uuid, jimmTag)
 	c.Assert(err, qt.IsNil)
-	jwtFactory := jujuauth.NewFactory(database, mocks.JWTService{
+	jwtFactory := jujuauth.NewFactory(s.database, mocks.JWTService{
 		NewJWT_: func(ctx context.Context, j jimmjwx.JWTParams) ([]byte, error) {
 			return []byte("jwt"), nil
 		},
 	}, permissionManager)
 
-	sshKeyManager, err := sshkeys.NewSSHKeyManager(database)
+	sshKeyManager, err := sshkeys.NewSSHKeyManager(s.database)
 	c.Assert(err, qt.IsNil)
 
 	s.sshManager, err = ssh.NewSSHManager(identityManager, &jujuManager, sshKeyManager, jwtFactory)
 	c.Assert(err, qt.IsNil)
 	env := jimmtest.ParseEnvironment(c, testSSHManagerEnv)
-	env.PopulateDB(c, database)
-	env.PopulateDBAndPermissions(c, jimmTag, database, ofgaClient)
+	env.PopulateDB(c, s.database)
+	env.PopulateDBAndPermissions(c, jimmTag, s.database, ofgaClient)
 	// create a user and set permission for one model
 	s.userWithAccess, err = identityManager.FetchIdentity(ctx, env.Users[0].Username)
 	c.Assert(err, qt.IsNil)
 	s.allowedModelUUID = env.Models[0].UUID
-	s.allowedControllerUUID = env.Controllers[0].UUID
 
 	// create a user without access
 	i2, err := dbmodel.NewIdentity("bob")
 	c.Assert(err, qt.IsNil)
-	c.Assert(database.DB.Create(i2).Error, qt.IsNil)
+	c.Assert(s.database.DB.Create(i2).Error, qt.IsNil)
 	s.userWithoutAccess = openfga.NewUser(i2, ofgaClient)
 	// setup public key
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
@@ -170,21 +171,35 @@ func (s *sshManagerSuite) TestPublicKeyHandler(c *qt.C) {
 
 	// Test that the PublicKeyHandler returns an error when the public key is invalid.
 	_, err = s.sshManager.PublicKeyHandler(ctx, s.userWithoutAccess.Name, s.publicKey.Marshal())
-	c.Assert(err, qt.ErrorMatches, `cannot verify key for user`)
+	c.Assert(err, qt.ErrorMatches, `cannot verify key for user bob: cannot find a matching key for this user`)
 }
 
-func (s *sshManagerSuite) TestControllerInfoFromModelUUID(c *qt.C) {
+func (s *sshManagerSuite) TestDialInfo(c *qt.C) {
 	ctx := context.Background()
 
-	// Test that the ControllerInfoFromModelUUID returns the correct controller address and user when the model UUID is valid.
-	connInfo, err := s.sshManager.ControllerInfoFromModelUUID(ctx, s.allowedModelUUID, s.userWithAccess)
+	ctrl := dbmodel.Controller{Name: "test"}
+	err := s.database.GetController(ctx, &ctrl)
+	c.Assert(err, qt.IsNil)
+	c.Assert(ctrl.PublicAddress, qt.Equals, "localhost:1234")
+
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	c.Assert(err, qt.IsNil)
+	pubKey, err := gossh.NewPublicKey(&key.PublicKey)
+	c.Assert(err, qt.IsNil)
+	ctx = context.WithValue(ctx, gliderssh.ContextKeyPublicKey, pubKey)
+
+	// Test that the DialInfo returns the correct controller address and user when the model UUID is valid.
+	connInfo, err := s.sshManager.DialInfo(ctx, s.allowedModelUUID, s.userWithAccess)
 	c.Assert(err, qt.IsNil)
 	c.Assert(connInfo.Addresses, qt.HasLen, 1)
+	c.Assert(connInfo.Addresses[0], qt.Equals, "localhost")
 	c.Assert(connInfo.JWT, qt.Not(qt.HasLen), 0)
 	c.Assert(connInfo.Port, qt.Equals, 17023)
+	_, err = base64.StdEncoding.DecodeString(connInfo.JWT)
+	c.Assert(err, qt.IsNil)
 
 	// Test that the ControllerInfoFromModelUUID returns an error when the model UUID is invalid.
-	_, err = s.sshManager.ControllerInfoFromModelUUID(ctx, "not-valid", s.userWithAccess)
+	_, err = s.sshManager.DialInfo(ctx, "not-valid", s.userWithAccess)
 	c.Assert(err, qt.ErrorMatches, ".*cannot find model.*")
 }
 
