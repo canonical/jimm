@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gliderlabs/ssh"
+	"github.com/juju/juju/core/virtualhostname"
 	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
@@ -134,13 +135,18 @@ func directTCPIPHandler(sshManager SSHManager) func(srv *ssh.Server, conn *gossh
 			return
 		}
 
-		// TODO: Parse destAddr from a virtual hostname.
+		destination, err := virtualhostname.Parse(d.DestAddr)
+		if err != nil {
+			rejectConnectionAndLogError(ctx, newChan, "failed to parse destination hostname", err)
+			return
+		}
 
-		if !names.IsValidModel(d.DestAddr) {
+		if !names.IsValidModel(destination.ModelUUID()) {
 			rejectConnectionAndLogError(ctx, newChan, "invalid model uuid", nil)
 			return
 		}
-		modelTag := names.NewModelTag(d.DestAddr)
+
+		modelTag := names.NewModelTag(destination.ModelUUID())
 		user, err := fetchAndAuthorizeUser(ctx, modelTag)
 		if err != nil {
 			rejectConnectionAndLogError(ctx, newChan, err.Error(), err)
@@ -159,6 +165,7 @@ func directTCPIPHandler(sshManager SSHManager) func(srv *ssh.Server, conn *gossh
 			return
 		}
 
+		// The port below is arbitrary as the controller ignores it.
 		controllerConn, err := client.Dial("tcp", fmt.Sprintf("%s:22", d.DestAddr))
 		if err != nil {
 			rejectConnectionAndLogError(ctx, newChan, "failed to create tunnel to controller", err)
@@ -198,11 +205,11 @@ func directTCPIPHandler(sshManager SSHManager) func(srv *ssh.Server, conn *gossh
 func fetchAndAuthorizeUser(ctx ssh.Context, modelTag names.ModelTag) (*openfga.User, error) {
 	user, ok := ctx.Value(publicKeySSHUserKey{}).(*openfga.User)
 	if !ok {
-		return nil, fmt.Errorf("fo user in the context")
+		return nil, fmt.Errorf("missing user in context")
 	}
-	ok, err := user.IsModelWriter(ctx, modelTag)
+	ok, err := user.IsModelAdmin(ctx, modelTag)
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve address from model uuid")
+		return nil, fmt.Errorf("failed to check for model access: %v", err)
 	}
 	if !ok {
 		return nil, fmt.Errorf("user doesn't have permission")
