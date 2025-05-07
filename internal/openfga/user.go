@@ -81,6 +81,15 @@ func (u *User) IsModelWriter(ctx context.Context, resource names.ModelTag) (bool
 	return isWriter, nil
 }
 
+// IsModelAdmin returns true if user has administrator relation to the model.
+func (u *User) IsModelAdmin(ctx context.Context, resource names.ModelTag) (bool, error) {
+	isAdmin, err := checkRelation(ctx, u, resource, ofganames.AdministratorRelation)
+	if err != nil {
+		return false, errors.E(err)
+	}
+	return isAdmin, nil
+}
+
 // HasModelRelation returns true if user has the specified relation to the model.
 func (u *User) HasModelRelation(ctx context.Context, resource names.ModelTag, relation Relation) (bool, error) {
 	hasRelation, err := checkRelation(ctx, u, resource, relation)

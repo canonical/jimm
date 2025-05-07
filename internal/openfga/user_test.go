@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package openfga_test
 
@@ -131,6 +131,14 @@ func (s *userTestSuite) TestModelAccess(c *gc.C) {
 	c.Assert(allowed, gc.Equals, true)
 
 	allowed, err = adamUser.IsModelWriter(ctx, model)
+	c.Assert(err, gc.IsNil)
+	c.Assert(allowed, gc.Equals, false)
+
+	allowed, err = eveUser.IsModelAdmin(ctx, model)
+	c.Assert(err, gc.IsNil)
+	c.Assert(allowed, gc.Equals, true)
+
+	allowed, err = adamUser.IsModelAdmin(ctx, model)
 	c.Assert(err, gc.IsNil)
 	c.Assert(allowed, gc.Equals, false)
 

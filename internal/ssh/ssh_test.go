@@ -15,6 +15,7 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
 	gliderssh "github.com/gliderlabs/ssh"
+	"github.com/juju/juju/core/virtualhostname"
 	"github.com/juju/names/v5"
 	gossh "golang.org/x/crypto/ssh"
 	"google.golang.org/grpc/test/bufconn"
@@ -40,7 +41,7 @@ type sshSuite struct {
 	hostKey            gossh.Signer
 
 	received                 chan bool
-	allowedModelUUID         string
+	virtualHostname          virtualhostname.Info
 	maxConcurrentConnections int
 }
 
@@ -61,8 +62,9 @@ func (s *sshSuite) Init(c *qt.C) {
 	i1, err := dbmodel.NewIdentity("alice")
 	c.Assert(err, qt.IsNil)
 	userWithAccess := openfga.NewUser(i1, ofgaClient)
-	s.allowedModelUUID = "deadbeef-1bad-500d-9000-4b1d0d06f00d"
-	err = userWithAccess.SetModelAccess(ctx, names.NewModelTag(s.allowedModelUUID), ofganames.WriterRelation)
+	s.virtualHostname, err = virtualhostname.Parse("1.postgresql.deadbeef-1bad-500d-9000-4b1d0d06f00d.juju.local")
+	c.Assert(err, qt.IsNil)
+	err = userWithAccess.SetModelAccess(ctx, names.NewModelTag(s.virtualHostname.ModelUUID()), ofganames.AdministratorRelation)
 	c.Assert(err, qt.IsNil)
 
 	// create a user and don't set any permission
@@ -80,11 +82,11 @@ func (s *sshSuite) Init(c *qt.C) {
 				d := ssh.ForwardMessage{}
 				if err := gossh.Unmarshal(newChan.ExtraData(), &d); err != nil {
 					err := newChan.Reject(gossh.ConnectionFailed, "Failed to parse channel data")
-					c.Assert(err, qt.IsNil)
+					c.Check(err, qt.IsNil)
 					return
 				}
 				_, _, err := newChan.Accept()
-				c.Assert(err, qt.IsNil)
+				c.Check(err, qt.IsNil)
 				s.testInDestinationServerF(d)
 				s.received <- true
 			},
@@ -125,7 +127,7 @@ func (s *sshSuite) Init(c *qt.C) {
 				return userWithoutAccess, nil
 			},
 			ControllerInfoFromModelUUID_: func(ctx context.Context, modelUUID string, user *openfga.User) (jimmssh.ControllerInfo, error) {
-				if modelUUID != s.allowedModelUUID {
+				if modelUUID != s.virtualHostname.ModelUUID() {
 					return jimmssh.ControllerInfo{}, errors.E("permission denied")
 				}
 				return jimmssh.ControllerInfo{}, nil
@@ -191,10 +193,10 @@ func (s *sshSuite) TestSSHJump(c *qt.C) {
 
 	// send forward message
 	s.testInDestinationServerF = func(fm ssh.ForwardMessage) {
-		c.Check(fm.DestAddr, qt.Equals, s.allowedModelUUID)
+		c.Check(fm.DestAddr, qt.Equals, s.virtualHostname.String())
 	}
-	conn, err := client.Dial("tcp", fmt.Sprintf("%s:22", s.allowedModelUUID))
-	c.Check(err, qt.IsNil)
+	conn, err := client.Dial("tcp", fmt.Sprintf("%s:22", s.virtualHostname))
+	c.Assert(err, qt.IsNil)
 	defer conn.Close()
 	select {
 	case <-s.received:
@@ -204,6 +206,10 @@ func (s *sshSuite) TestSSHJump(c *qt.C) {
 }
 
 func (s *sshSuite) TestSSHJumpPermissionFail(c *qt.C) {
+	modelUUID := "982b16d9-a945-4762-b684-fd4fd885aa11"
+	fakeDestination, err := virtualhostname.NewInfoMachineTarget(modelUUID, "0")
+	c.Assert(err, qt.IsNil)
+
 	tests := []struct {
 		name     string
 		user     string
@@ -213,19 +219,19 @@ func (s *sshSuite) TestSSHJumpPermissionFail(c *qt.C) {
 		{
 			name:     "alice not allowed on this model",
 			user:     "alice",
-			destAddr: "982b16d9-a945-4762-b684-fd4fd885aa11",
+			destAddr: fakeDestination.String(),
 			errMsg:   "ssh: rejected: connect failed (user doesn't have permission)",
 		},
 		{
 			name:     "bob not allowed on this model",
 			user:     "bob",
-			destAddr: s.allowedModelUUID,
+			destAddr: s.virtualHostname.String(),
 			errMsg:   "ssh: rejected: connect failed (user doesn't have permission)",
 		},
 		{
 			name:     "not existing user",
 			user:     "mark",
-			destAddr: s.allowedModelUUID,
+			destAddr: s.virtualHostname.String(),
 			errMsg:   "ssh: rejected: connect failed (user doesn't have permission)",
 		},
 	}
@@ -258,7 +264,7 @@ func (s *sshSuite) TestSSHJumpDialFail(c *qt.C) {
 	c.Assert(err, qt.ErrorMatches, ".*connect: connection refused.*")
 }
 
-func (s *sshSuite) TestSSHFinalDestinationDialFail(c *qt.C) {
+func (s *sshSuite) TestInvalidVirtualHostname(c *qt.C) {
 	client := inMemoryDial(c, s.jumpServerListener, &gossh.ClientConfig{
 		HostKeyCallback: gossh.FixedHostKey(s.hostKey.PublicKey()),
 		Auth: []gossh.AuthMethod{
@@ -272,7 +278,7 @@ func (s *sshSuite) TestSSHFinalDestinationDialFail(c *qt.C) {
 		c.Check(fm.DestAddr, qt.Equals, "model1")
 	}
 	_, err := client.Dial("tcp", fmt.Sprintf("%s:%d", "model1", 1))
-	c.Assert(err, qt.ErrorMatches, ".*connect failed.*")
+	c.Assert(err, qt.ErrorMatches, `ssh: rejected: connect failed \(failed to parse destination hostname\)`)
 }
 
 func (s *sshSuite) TestSSHServerMaxConnections(c *qt.C) {
@@ -307,7 +313,7 @@ func (s *sshSuite) TestSSHServerMaxConnections(c *qt.C) {
 	}
 }
 
-func TestIdentityManager(t *testing.T) {
+func TestSSHSuite(t *testing.T) {
 	qtsuite.Run(qt.New(t), &sshSuite{})
 }
 
