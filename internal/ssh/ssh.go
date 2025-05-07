@@ -165,8 +165,7 @@ func directTCPIPHandler(sshManager SSHManager) func(srv *ssh.Server, conn *gossh
 			return
 		}
 
-		// The port below is arbitrary as the controller will ignore
-		// it and proxy traffic to its terminating server.
+		// The port below is arbitrary as the controller ignores it.
 		controllerConn, err := client.Dial("tcp", fmt.Sprintf("%s:22", d.DestAddr))
 		if err != nil {
 			rejectConnectionAndLogError(ctx, newChan, "failed to create tunnel to controller", err)
@@ -206,11 +205,11 @@ func directTCPIPHandler(sshManager SSHManager) func(srv *ssh.Server, conn *gossh
 func fetchAndAuthorizeUser(ctx ssh.Context, modelTag names.ModelTag) (*openfga.User, error) {
 	user, ok := ctx.Value(publicKeySSHUserKey{}).(*openfga.User)
 	if !ok {
-		return nil, fmt.Errorf("fo user in the context")
+		return nil, fmt.Errorf("missing user in context")
 	}
 	ok, err := user.IsModelAdmin(ctx, modelTag)
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve address from model uuid")
+		return nil, fmt.Errorf("failed to check for model access: %v", err)
 	}
 	if !ok {
 		return nil, fmt.Errorf("user doesn't have permission")
