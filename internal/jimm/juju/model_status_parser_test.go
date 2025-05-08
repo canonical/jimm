@@ -14,6 +14,7 @@ import (
 	"github.com/juju/juju/state"
 
 	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
 
@@ -756,4 +757,70 @@ func TestQueryModelsJq(t *testing.T) {
 		}
 	}
 	`, qt.JSONEquals, res)
+}
+
+func TestQueryModelsJqInfiniteRangeQueryTimesOut(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	c.Patch(juju.JqQueryDeadline, time.Millisecond*1)
+
+	j := newTestJujuManager(c, &parameters{
+		Dialer: jimmtest.ModelDialerMap{
+			"10000000-0000-0000-0000-000000000000": &jimmtest.Dialer{
+				API: &jimmtest.API{
+					Status_: func(_ context.Context, _ []string) (*jujuparams.FullStatus, error) {
+						return &model1, nil
+					},
+					ListFilesystems_: func(ctx context.Context, machines []string) ([]jujuparams.FilesystemDetailsListResult, error) {
+						return []jujuparams.FilesystemDetailsListResult{
+							{
+								Result: []jujuparams.FilesystemDetails{
+									{
+										FilesystemTag: "filesystem-myapp-0-0",
+										VolumeTag:     "volume-myapp-0-0",
+										Info: jujuparams.FilesystemInfo{
+											Size:         4096,
+											Pool:         "pool-1",
+											FilesystemId: "da64ec3c-0cf7-42f2-9951-35a5a3eaadc1",
+										},
+										Life: life.Alive,
+										Status: jujuparams.EntityStatus{
+											Status: status.Active,
+											Since:  &now,
+										},
+										UnitAttachments: map[string]jujuparams.FilesystemAttachmentDetails{
+											"filesystem-myapp-0-1": {
+												FilesystemAttachmentInfo: jujuparams.FilesystemAttachmentInfo{
+													MountPoint: "/home/ubuntu/myapp/.data",
+													ReadOnly:   false,
+												},
+												Life: life.Value(state.Alive.String()),
+											},
+										},
+									},
+								},
+							},
+						}, nil
+					},
+					ListVolumes_: func(ctx context.Context, machines []string) ([]jujuparams.VolumeDetailsListResult, error) {
+						return []jujuparams.VolumeDetailsListResult{}, nil
+					},
+					ListStorageDetails_: func(ctx context.Context) ([]jujuparams.StorageDetails, error) {
+						return []jujuparams.StorageDetails{}, nil
+					},
+				},
+			},
+		},
+	})
+
+	env := jimmtest.ParseEnvironment(c, crossModelQueryEnv)
+	env.PopulateDB(c, j.Database)
+
+	modelUUIDs := []string{
+		"10000000-0000-0000-0000-000000000000",
+	}
+
+	_, err := j.QueryModelsJq(ctx, modelUUIDs, "range(infinite)")
+	c.Assert(err, qt.ErrorMatches, "jq query timed out after 0.00 seconds")
 }
