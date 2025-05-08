@@ -18,6 +18,10 @@ import (
 	"github.com/canonical/jimm/v3/internal/jimmjwx"
 )
 
+const (
+	sshPublicKeyClaim = "ssh_public_key"
+)
+
 // SSHTokenGenerator provides the ability to generate JWT tokens that
 // authenticate and authorize SSH connections to Juju controllers.
 type SSHTokenGenerator struct {
@@ -36,7 +40,6 @@ func newSSHTokenGenerator(jwtService JWTService) SSHTokenGenerator {
 type SSHTokenArgs struct {
 	User           string
 	ControllerUUID string
-	Port           int
 	ModelTag       names.Tag
 	PublicKey      []byte
 }
@@ -53,7 +56,7 @@ func (s *SSHTokenGenerator) NewSSHToken(ctx context.Context, tokenArgs SSHTokenA
 			tokenArgs.ModelTag.String(): string(permission.AdminAccess),
 		},
 		ExtraClaims: map[string]any{
-			"ssh_public_key": base64.StdEncoding.EncodeToString(tokenArgs.PublicKey),
+			sshPublicKeyClaim: base64.StdEncoding.EncodeToString(tokenArgs.PublicKey),
 		},
 	})
 	if err != nil {

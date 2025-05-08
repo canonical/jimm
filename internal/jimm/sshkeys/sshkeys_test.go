@@ -142,21 +142,21 @@ func (s *sshKeysManagerSuite) TestVerifyPublicKeys(c *qt.C) {
 			user:          "not-existing",
 			key:           s.pubKey.Marshal(),
 			okExpected:    false,
-			errorExpected: "cannot find a matching key for this user.",
+			errorExpected: "cannot find a matching key for this user",
 		},
 		{
 			name:          "valid user with a not added key",
 			user:          s.user.Name,
 			key:           notAddedPublicKey.Marshal(),
 			okExpected:    false,
-			errorExpected: "cannot find a matching key for this user.",
+			errorExpected: "cannot find a matching key for this user",
 		},
 		{
 			name:          "valid user with a key added on another user",
 			user:          "bob",
 			key:           anotherPubKey.Marshal(),
 			okExpected:    false,
-			errorExpected: "cannot find a matching key for this user.",
+			errorExpected: "cannot find a matching key for this user",
 		},
 	}
 

@@ -20,6 +20,10 @@ import (
 	"github.com/canonical/jimm/v3/internal/jimm/credentials"
 )
 
+const (
+	accessClaim = "access"
+)
+
 type JWTServiceParams struct {
 	Host   string
 	Store  credentials.CredentialStore
@@ -151,11 +155,11 @@ func (j *JWTService) NewJWT(ctx context.Context, params JWTParams) ([]byte, erro
 		Subject(params.User).
 		Issuer(j.Host).
 		JwtID(jti).
-		Claim("access", params.Access).
+		Claim(accessClaim, params.Access).
 		Expiration(time.Now().Add(j.Expiry))
 
 	for k, v := range params.ExtraClaims {
-		if k == "access" {
+		if k == accessClaim {
 			return nil, errors.E("access is a reserved claim")
 		}
 		builder = builder.Claim(k, v)
