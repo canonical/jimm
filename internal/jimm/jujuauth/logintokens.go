@@ -42,8 +42,10 @@ type JWTService interface {
 	NewJWT(context.Context, jimmjwx.JWTParams) ([]byte, error)
 }
 
-// TokenGenerator provides the necessary state and methods to authorize a user and generate JWT tokens.
-type TokenGenerator struct {
+// LoginTokenGenerator provides the necessary state and
+// methods to authorize a user and generate JWT tokens
+// appropriate when logging in for RPC based communication..
+type LoginTokenGenerator struct {
 	database      GeneratorDatabase
 	accessChecker GeneratorAccessChecker
 	jwtService    JWTService
@@ -56,9 +58,9 @@ type TokenGenerator struct {
 	callCount      int
 }
 
-// newTokenGenerator returns a new TokenGenerator.
-func newTokenGenerator(database GeneratorDatabase, accessChecker GeneratorAccessChecker, jwtService JWTService) TokenGenerator {
-	return TokenGenerator{
+// newLoginTokenGenerator returns a new LoginTokenGenerator.
+func newLoginTokenGenerator(database GeneratorDatabase, accessChecker GeneratorAccessChecker, jwtService JWTService) LoginTokenGenerator {
+	return LoginTokenGenerator{
 		database:      database,
 		accessChecker: accessChecker,
 		jwtService:    jwtService,
@@ -66,13 +68,15 @@ func newTokenGenerator(database GeneratorDatabase, accessChecker GeneratorAccess
 }
 
 // SetTags implements TokenGenerator.
-func (auth *TokenGenerator) SetTags(mt names.ModelTag, ct names.ControllerTag) {
+// It sets the model and controller we are operating on
+// which will be used to set the JWT audience and claims.
+func (auth *LoginTokenGenerator) SetTags(mt names.ModelTag, ct names.ControllerTag) {
 	auth.mt = mt
 	auth.ct = ct
 }
 
 // SetTags implements TokenGenerator.
-func (auth *TokenGenerator) GetUser() names.UserTag {
+func (auth *LoginTokenGenerator) GetUser() names.UserTag {
 	if auth.user != nil {
 		return auth.user.ResourceTag()
 	}
@@ -82,7 +86,7 @@ func (auth *TokenGenerator) GetUser() names.UserTag {
 // MakeLoginToken authorizes the user based on the provided login requests and returns
 // a JWT containing claims about user's access to the controller, model (if applicable)
 // and all clouds that the controller knows about.
-func (auth *TokenGenerator) MakeLoginToken(ctx context.Context, user *openfga.User) ([]byte, error) {
+func (auth *LoginTokenGenerator) MakeLoginToken(ctx context.Context, user *openfga.User) ([]byte, error) {
 	const op = errors.Op("jimm.MakeLoginToken")
 
 	auth.mu.Lock()
@@ -148,7 +152,7 @@ func (auth *TokenGenerator) MakeLoginToken(ctx context.Context, user *openfga.Us
 // MakeToken assumes MakeLoginToken has already been called and checks the permissions
 // specified in the permissionMap. If the logged in user has all those permissions
 // a JWT will be returned with assertions confirming all those permissions.
-func (auth *TokenGenerator) MakeToken(ctx context.Context, permissionMap map[string]interface{}) ([]byte, error) {
+func (auth *LoginTokenGenerator) MakeToken(ctx context.Context, permissionMap map[string]interface{}) ([]byte, error) {
 	const op = errors.Op("jimm.MakeToken")
 
 	auth.mu.Lock()

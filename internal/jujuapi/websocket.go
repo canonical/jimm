@@ -194,7 +194,7 @@ func (s apiProxier) ServeWS(ctx context.Context, clientConn *websocket.Conn) {
 
 // controllerConnectionFunc returns a function that will be used to
 // connect to a controller when a client makes a request.
-func controllerConnectionFunc(s apiProxier, jwtGenerator *jujuauth.TokenGenerator) func(context.Context) (rpcproxy.WebsocketConnectionWithMetadata, error) {
+func controllerConnectionFunc(s apiProxier, jwtGenerator *jujuauth.LoginTokenGenerator) func(context.Context) (rpcproxy.WebsocketConnectionWithMetadata, error) {
 	return func(ctx context.Context) (rpcproxy.WebsocketConnectionWithMetadata, error) {
 		const op = errors.Op("proxy.controllerConnectionFunc")
 		path := jimmhttp.PathElementFromContext(ctx, "path")

@@ -1,4 +1,5 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
+
 package jimmjwx_test
 
 import (
@@ -81,16 +82,9 @@ func startAndTestRotator(c *qt.C, ctx context.Context, store credentials.Credent
 	return ks
 }
 
-// setupCredentialStore sets up a credential store with the correct params to connect to vault. It also ensures
-// that vault is wiped each time this is called.
-func setupCredentialStore(ctx context.Context, c *qt.C) credentials.CredentialStore {
-	store := newStore(c)
-	// Ensure store is wiped
-	err := store.CleanupJWKS(ctx)
-	c.Assert(err, qt.IsNil)
-
-	_, _, _, _, ok := jimmtest.VaultClient(c)
-	c.Assert(ok, qt.IsTrue)
+// setupCredentialStore sets up an in-memory credential store for testing.
+func setupCredentialStore(_ context.Context, _ *qt.C) credentials.CredentialStore {
+	store := jimmtest.NewInMemoryCredentialStore()
 
 	return store
 }

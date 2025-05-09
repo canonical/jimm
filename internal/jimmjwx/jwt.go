@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package jimmjwx
 
@@ -18,6 +18,10 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm/credentials"
+)
+
+const (
+	accessClaim = "access"
 )
 
 type JWTServiceParams struct {
@@ -78,7 +82,11 @@ type JWTParams struct {
 	// User is the "sub" of the JWT
 	User string
 	// Access is a claim of key/values denoting what the user wishes to access
+	// stored in a claim called "access".
 	Access map[string]string
+	// ExtraClaims contain any extra claims that should be added to the JWT.
+	// "access" is a reserved claim and will cause an error if used.
+	ExtraClaims map[string]interface{}
 }
 
 // NewJWTService returns a new JWT service for handling JIMMs JWTs.
@@ -142,14 +150,22 @@ func (j *JWTService) NewJWT(ctx context.Context, params JWTParams) ([]byte, erro
 		return nil, err
 	}
 
-	token, err := jwt.NewBuilder().
+	builder := jwt.NewBuilder().
 		Audience([]string{params.Controller}).
 		Subject(params.User).
 		Issuer(j.Host).
 		JwtID(jti).
-		Claim("access", params.Access).
-		Expiration(time.Now().Add(j.Expiry)).
-		Build()
+		Claim(accessClaim, params.Access).
+		Expiration(time.Now().Add(j.Expiry))
+
+	for k, v := range params.ExtraClaims {
+		if k == accessClaim {
+			return nil, errors.E("access is a reserved claim")
+		}
+		builder = builder.Claim(k, v)
+	}
+
+	token, err := builder.Build()
 	if err != nil {
 		zapctx.Error(ctx, "failed to create token", zap.Error(err))
 		return nil, err

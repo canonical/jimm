@@ -239,7 +239,7 @@ func TestJWTGeneratorMakeLoginToken(t *testing.T) {
 
 	for _, test := range tests {
 		authFactory := jujuauth.NewFactory(test.database, test.jwtService, test.accessChecker)
-		generator := authFactory.New()
+		generator := authFactory.NewLoginGenerator()
 		generator.SetTags(mt, ct)
 
 		i, err := dbmodel.NewIdentity(test.username)
@@ -339,7 +339,7 @@ func TestJWTGeneratorMakeToken(t *testing.T) {
 				permissionCheckErr: test.checkPermissionsError,
 			},
 		)
-		generator := authFactory.New()
+		generator := authFactory.NewLoginGenerator()
 		generator.SetTags(mt, ct)
 
 		i, err := dbmodel.NewIdentity("eve@canonical.com")

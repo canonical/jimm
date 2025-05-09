@@ -126,13 +126,13 @@ func (s *sshSuite) Init(c *qt.C) {
 				}
 				return userWithoutAccess, nil
 			},
-			ControllerInfoFromModelUUID_: func(ctx context.Context, modelUUID string, user *openfga.User) (jimmssh.ControllerInfo, error) {
+			DialInfo_: func(ctx context.Context, modelUUID string, user *openfga.User) (jimmssh.DialInfo, error) {
 				if modelUUID != s.virtualHostname.ModelUUID() {
-					return jimmssh.ControllerInfo{}, errors.E("permission denied")
+					return jimmssh.DialInfo{}, errors.E("permission denied")
 				}
-				return jimmssh.ControllerInfo{}, nil
+				return jimmssh.DialInfo{}, nil
 			},
-			DialControllerSSHServer_: func(ctx context.Context, ctrlInfo jimmssh.ControllerInfo, user *openfga.User) (*gossh.Client, error) {
+			DialController_: func(ctx context.Context, ctrlInfo jimmssh.DialInfo, user *openfga.User) (*gossh.Client, error) {
 				conn, err := destinationServerListener.Dial()
 				if err != nil {
 					return nil, err

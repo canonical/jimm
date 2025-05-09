@@ -33,12 +33,12 @@ type SSHManager interface {
 	// PublicKeyHandler is the method to verify the public key of the user. It returns a user if successful.
 	PublicKeyHandler(ctx context.Context, claimUser string, key []byte) (*openfga.User, error)
 
-	// ControllerInfoFromModelUUID uses the given model UUID to return the address of the controller to
-	// contact and a valid JWT To authenticate to the controller.
-	ControllerInfoFromModelUUID(ctx context.Context, modelUUID string, user *openfga.User) (jimmssh.ControllerInfo, error)
+	// DialInfo resolves the address of the controller to contact given the model UUID and
+	// returns a struct with parameters to connect and authenticate to the controller.
+	DialInfo(ctx context.Context, modelUUID string, user *openfga.User) (jimmssh.DialInfo, error)
 
-	// DialControllerSSHServer dials the controller using the provided controller info.
-	DialControllerSSHServer(ctx context.Context, ctrlInfo jimmssh.ControllerInfo, user *openfga.User) (*gossh.Client, error)
+	// DialController dials a controller's SSH server using the provided info.
+	DialController(ctx context.Context, dialInfo jimmssh.DialInfo, user *openfga.User) (*gossh.Client, error)
 }
 
 // forwardMessage is the struct holding the information about the jump message received by the ssh client.
@@ -153,13 +153,13 @@ func directTCPIPHandler(sshManager SSHManager) func(srv *ssh.Server, conn *gossh
 			return
 		}
 
-		connInfo, err := sshManager.ControllerInfoFromModelUUID(ctx, modelTag.Id(), user)
+		dialInfo, err := sshManager.DialInfo(ctx, modelTag.Id(), user)
 		if err != nil {
 			rejectConnectionAndLogError(ctx, newChan, "failed to get controller connection info", err)
 			return
 		}
 
-		client, err := sshManager.DialControllerSSHServer(ctx, connInfo, user)
+		client, err := sshManager.DialController(ctx, dialInfo, user)
 		if err != nil {
 			rejectConnectionAndLogError(ctx, newChan, "failed to dial controller", err)
 			return
