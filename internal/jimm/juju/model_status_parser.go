@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	stderrors "errors"
 	"fmt"
-	"time"
 
 	"github.com/itchyny/gojq"
 	jujucmd "github.com/juju/cmd/v3"
@@ -21,10 +20,6 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/pkg/api/params"
-)
-
-var (
-	jqQueryDeadline = time.Second * 5
 )
 
 // QueryModels queries every specified model in modelUUIDs.
@@ -87,7 +82,7 @@ func (j *JujuManager) QueryModelsJq(ctx context.Context, modelUUIDs []string, jq
 			return results, errors.E(op, err)
 		}
 
-		queryCtx, cancel := context.WithTimeout(ctx, jqQueryDeadline)
+		queryCtx, cancel := context.WithTimeout(ctx, j.CrossModelQueryTimeout)
 		defer cancel()
 		queryIter := query.RunWithContext(queryCtx, tempMap)
 
@@ -102,7 +97,7 @@ func (j *JujuManager) QueryModelsJq(ctx context.Context, modelUUIDs []string, jq
 			// both erreoneous and valid query results.
 			if err, ok := v.(error); ok {
 				if stderrors.Is(v.(error), context.DeadlineExceeded) {
-					return results, errors.E(op, fmt.Sprintf("jq query timed out after %.2f seconds", jqQueryDeadline.Seconds()), err)
+					return results, errors.E(op, fmt.Sprintf("jq query timed out after %.2f seconds", j.CrossModelQueryTimeout.Seconds()), err)
 				}
 				results.Errors[modelUUID] = append(results.Errors[modelUUID], "jq error: "+err.Error())
 				continue

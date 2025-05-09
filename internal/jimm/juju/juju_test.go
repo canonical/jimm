@@ -18,13 +18,18 @@ import (
 )
 
 type parameters struct {
-	Dialer          juju.Dialer
-	CredentialStore credentials.CredentialStore
+	Dialer                 juju.Dialer
+	CredentialStore        credentials.CredentialStore
+	CrossModelQueryTimeout time.Duration
 }
 
 func newTestJujuManager(c *qt.C, p *parameters) *juju.JujuManager {
 	if p == nil {
 		p = &parameters{}
+	}
+
+	if p.CrossModelQueryTimeout <= 0 {
+		p.CrossModelQueryTimeout = time.Second * 5
 	}
 	db := &db.Database{
 		DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
@@ -53,7 +58,7 @@ func newTestJujuManager(c *qt.C, p *parameters) *juju.JujuManager {
 	jujuManager, err := juju.NewJujuManager(db, ofgaClient,
 		p.CredentialStore, permissionManager,
 		jimmResourceTag, []string{},
-		p.Dialer)
+		p.Dialer, p.CrossModelQueryTimeout)
 	c.Assert(err, qt.IsNil)
 
 	return jujuManager

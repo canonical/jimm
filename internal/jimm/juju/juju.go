@@ -4,6 +4,7 @@ package juju
 
 import (
 	"context"
+	"time"
 
 	"github.com/juju/names/v5"
 
@@ -16,21 +17,28 @@ import (
 
 // JujuManager handles all business logic with Juju resources.
 type JujuManager struct {
-	Database           *db.Database
-	OpenFGAClient      *openfga.OFGAClient
-	CredentialStore    credentials.CredentialStore
-	permissionManager  PermissionChecker
-	resourceTag        names.ControllerTag
-	ReservedCloudNames []string
-	Dialer             Dialer
+	Database               *db.Database
+	OpenFGAClient          *openfga.OFGAClient
+	CredentialStore        credentials.CredentialStore
+	permissionManager      PermissionChecker
+	resourceTag            names.ControllerTag
+	ReservedCloudNames     []string
+	Dialer                 Dialer
+	CrossModelQueryTimeout time.Duration
 }
 
 // NewJujuManager returns a new JIMM struct that manages business logic associated
 // with Juju resources.
-func NewJujuManager(store *db.Database, authSvc *openfga.OFGAClient,
-	credentialStore credentials.CredentialStore, permissionManager PermissionChecker,
-	resourceTag names.ControllerTag, reservedCloudNames []string,
-	dialer Dialer) (*JujuManager, error) {
+func NewJujuManager(
+	store *db.Database,
+	authSvc *openfga.OFGAClient,
+	credentialStore credentials.CredentialStore,
+	permissionManager PermissionChecker,
+	resourceTag names.ControllerTag,
+	reservedCloudNames []string,
+	dialer Dialer,
+	crossModelQueryTimeout time.Duration,
+) (*JujuManager, error) {
 	if store == nil {
 		return nil, errors.E("role store cannot be nil")
 	}
@@ -46,14 +54,18 @@ func NewJujuManager(store *db.Database, authSvc *openfga.OFGAClient,
 	if resourceTag.Id() == "" {
 		return nil, errors.E("invalid jimm controller tag")
 	}
+	if crossModelQueryTimeout <= 0 {
+		return nil, errors.E("cross model query timeout must be greater than 0")
+	}
 	return &JujuManager{
-		Database:           store,
-		OpenFGAClient:      authSvc,
-		CredentialStore:    credentialStore,
-		permissionManager:  permissionManager,
-		resourceTag:        resourceTag,
-		ReservedCloudNames: reservedCloudNames,
-		Dialer:             dialer,
+		Database:               store,
+		OpenFGAClient:          authSvc,
+		CredentialStore:        credentialStore,
+		permissionManager:      permissionManager,
+		resourceTag:            resourceTag,
+		ReservedCloudNames:     reservedCloudNames,
+		Dialer:                 dialer,
+		CrossModelQueryTimeout: crossModelQueryTimeout,
 	}, nil
 }
 

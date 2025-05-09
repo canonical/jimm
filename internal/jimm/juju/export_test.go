@@ -17,7 +17,6 @@ var (
 	NewControllerClient = &newControllerClient
 	FillMigrationTarget = fillMigrationTarget
 	InitiateMigration   = &initiateMigration
-	JqQueryDeadline     = &jqQueryDeadline
 )
 
 func NewWatcherWithControllerUnavailableChan(db *db.Database, dialer Dialer, pubsub Publisher, testChannel chan error) *Watcher {

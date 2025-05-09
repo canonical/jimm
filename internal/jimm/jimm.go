@@ -325,6 +325,9 @@ type Parameters struct {
 	// ControllerConfig is the configuration which will be exposed when
 	// the ControllerConfig facade is called.
 	ControllerConfig config.ControllerConfig
+
+	// CrossModelQueryTimeout is the timeout for cross model queries.
+	CrossModelQueryTimeout time.Duration
 }
 
 func (p *Parameters) Validate() error {
@@ -358,6 +361,10 @@ func (p *Parameters) Validate() error {
 
 	if p.OAuthAuthenticator == nil {
 		return errors.E("missing oauth authenticator")
+	}
+
+	if p.CrossModelQueryTimeout <= 0 {
+		return errors.E("missing cross model query timeout")
 	}
 
 	return nil
@@ -413,10 +420,16 @@ func New(p Parameters) (*JIMM, error) {
 
 	j.jujuAuthFactory = jujuauth.NewFactory(j.Database, j.JWTService, permissionManager)
 
-	jujuManager, err := juju.NewJujuManager(j.Database, j.OpenFGAClient,
-		j.CredentialStore, j.permissionManager,
-		jimmResourceTag, p.ReservedCloudNames,
-		j.Dialer)
+	jujuManager, err := juju.NewJujuManager(
+		j.Database,
+		j.OpenFGAClient,
+		j.CredentialStore,
+		j.permissionManager,
+		jimmResourceTag,
+		p.ReservedCloudNames,
+		j.Dialer,
+		p.CrossModelQueryTimeout,
+	)
 	if err != nil {
 		return nil, err
 	}

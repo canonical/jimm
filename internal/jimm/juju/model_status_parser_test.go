@@ -14,7 +14,6 @@ import (
 	"github.com/juju/juju/state"
 
 	"github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
 
@@ -763,9 +762,8 @@ func TestQueryModelsJqInfiniteRangeQueryTimesOut(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
-	c.Patch(juju.JqQueryDeadline, time.Millisecond*1)
-
 	j := newTestJujuManager(c, &parameters{
+		CrossModelQueryTimeout: time.Millisecond * 1,
 		Dialer: jimmtest.ModelDialerMap{
 			"10000000-0000-0000-0000-000000000000": &jimmtest.Dialer{
 				API: &jimmtest.API{
