@@ -64,6 +64,8 @@ func (d *BasicDialer) Dial(network string, addr string, config *gossh.ClientConf
 	return gossh.Dial(network, addr, config)
 }
 
+// SSHManagerParams contains the dependencies
+// needed to create the SSHManager service.
 type SSHManagerParams struct {
 	IdentityManager IdentityManager
 	JujuManager     JujuManager
@@ -72,22 +74,29 @@ type SSHManagerParams struct {
 	Dialer          SSHDialer
 }
 
-// NewSSHManager returns a new SSHManager that offers jimm functionality to the SSHJumpServer.
-func NewSSHManager(p SSHManagerParams) (*sshManager, error) {
+func (p *SSHManagerParams) validate() error {
 	if p.IdentityManager == nil {
-		return nil, errors.E("identityManager cannot be nil")
+		return errors.E("identityManager cannot be nil")
 	}
 	if p.JujuManager == nil {
-		return nil, errors.E("jujuManager cannot be nil")
+		return errors.E("jujuManager cannot be nil")
 	}
 	if p.SSHKeyManager == nil {
-		return nil, errors.E("sshManager cannot be nil")
+		return errors.E("sshManager cannot be nil")
 	}
 	if p.JWTFactory == nil {
-		return nil, errors.E("jwtFactory cannot be nil")
+		return errors.E("jwtFactory cannot be nil")
 	}
 	if p.Dialer == nil {
-		return nil, errors.E("dialer cannot be nil")
+		return errors.E("dialer cannot be nil")
+	}
+	return nil
+}
+
+// NewSSHManager returns a new SSHManager that offers domain functionality to the SSHJumpServer.
+func NewSSHManager(p SSHManagerParams) (*sshManager, error) {
+	if err := p.validate(); err != nil {
+		return nil, err
 	}
 	return &sshManager{
 		jujuManager:     p.JujuManager,
