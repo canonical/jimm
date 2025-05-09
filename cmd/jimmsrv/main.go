@@ -185,7 +185,7 @@ func start(ctx context.Context, s *service.Service) error {
 	if crossModelQueryTimeoutRaw != "" {
 		expiry, err := time.ParseDuration(crossModelQueryTimeoutRaw)
 		if err != nil {
-			zapctx.Error(ctx, "failed to parse cross model query timeout duration", zap.Error(err))
+			return errors.E("cannot parse cross model query timeout into duration")
 		} else {
 			crossModelQueryTimeout = expiry
 		}
