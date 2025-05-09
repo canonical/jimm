@@ -51,25 +51,50 @@ type SSHKeyManager interface {
 	VerifyPublicKey(ctx context.Context, claimUser string, publicKey []byte) (bool, error)
 }
 
+// SSHDialer provides a means to establish an SSH connection.
+type SSHDialer interface {
+	Dial(network string, addr string, config *gossh.ClientConfig) (*gossh.Client, error)
+}
+
+// BasicDialer is a wrapper around the default Go x/crypto/ssh
+// dialer for cases where no changes are needed.
+type BasicDialer struct{}
+
+func (d *BasicDialer) Dial(network string, addr string, config *gossh.ClientConfig) (*gossh.Client, error) {
+	return gossh.Dial(network, addr, config)
+}
+
+type SSHManagerParams struct {
+	IdentityManager IdentityManager
+	JujuManager     JujuManager
+	SSHKeyManager   SSHKeyManager
+	JWTFactory      *jujuauth.Factory
+	Dialer          SSHDialer
+}
+
 // NewSSHManager returns a new SSHManager that offers jimm functionality to the SSHJumpServer.
-func NewSSHManager(identityManager IdentityManager, jujuManager JujuManager, sshKeyManager SSHKeyManager, jwtFactory *jujuauth.Factory) (*sshManager, error) {
-	if identityManager == nil {
+func NewSSHManager(p SSHManagerParams) (*sshManager, error) {
+	if p.IdentityManager == nil {
 		return nil, errors.E("identityManager cannot be nil")
 	}
-	if jujuManager == nil {
+	if p.JujuManager == nil {
 		return nil, errors.E("jujuManager cannot be nil")
 	}
-	if sshKeyManager == nil {
+	if p.SSHKeyManager == nil {
 		return nil, errors.E("sshManager cannot be nil")
 	}
-	if jwtFactory == nil {
+	if p.JWTFactory == nil {
 		return nil, errors.E("jwtFactory cannot be nil")
 	}
+	if p.Dialer == nil {
+		return nil, errors.E("dialer cannot be nil")
+	}
 	return &sshManager{
-		jujuManager:     jujuManager,
-		identityManager: identityManager,
-		sshKeyManager:   sshKeyManager,
-		jwtFactory:      jwtFactory,
+		jujuManager:     p.JujuManager,
+		identityManager: p.IdentityManager,
+		sshKeyManager:   p.SSHKeyManager,
+		jwtFactory:      p.JWTFactory,
+		dialer:          p.Dialer,
 	}, nil
 }
 
@@ -79,6 +104,7 @@ type sshManager struct {
 	identityManager IdentityManager
 	sshKeyManager   SSHKeyManager
 	jwtFactory      *jujuauth.Factory
+	dialer          SSHDialer
 }
 
 // PublicKeyHandler is the method to verify the public key of the user. It first checks for the public key and then fetches the user.
@@ -162,7 +188,7 @@ func (s *sshManager) DialController(ctx context.Context, dialInfo DialInfo, user
 
 	for _, addr := range dialInfo.Addresses {
 		dest := net.JoinHostPort(addr, fmt.Sprint(dialInfo.Port))
-		client, err = gossh.Dial("tcp", dest, &gossh.ClientConfig{
+		client, err = s.dialer.Dial("tcp", dest, &gossh.ClientConfig{
 			User: "jimm",
 			//nolint:gosec // this will be removed once we handle hostkeys
 			HostKeyCallback: gossh.InsecureIgnoreHostKey(),
@@ -175,11 +201,13 @@ func (s *sshManager) DialController(ctx context.Context, dialInfo DialInfo, user
 		})
 		if err != nil {
 			errs = append(errs, err)
+		} else {
+			break
 		}
 	}
 
 	if client == nil {
-		return nil, errors.E(goerr.Join(errs...), "cannot dial controller")
+		return nil, fmt.Errorf("failed to dial controller: %v", goerr.Join(errs...))
 	}
 	return client, nil
 }

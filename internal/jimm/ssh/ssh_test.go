@@ -8,6 +8,7 @@ import (
 	"crypto/rsa"
 	"database/sql"
 	"encoding/base64"
+	"errors"
 	"testing"
 	"time"
 
@@ -36,6 +37,7 @@ type sshManagerSuite struct {
 	publicKey        sshkeys.PublicKey
 	allowedModelUUID string
 	database         *db.Database
+	mockDialer       *mockDialer
 
 	sshManager *ssh.SSHManager
 
@@ -133,7 +135,16 @@ func (s *sshManagerSuite) Init(c *qt.C) {
 	sshKeyManager, err := sshkeys.NewSSHKeyManager(s.database)
 	c.Assert(err, qt.IsNil)
 
-	s.sshManager, err = ssh.NewSSHManager(identityManager, &jujuManager, sshKeyManager, jwtFactory)
+	s.mockDialer = &mockDialer{}
+
+	params := ssh.SSHManagerParams{
+		IdentityManager: identityManager,
+		JujuManager:     &jujuManager,
+		SSHKeyManager:   sshKeyManager,
+		JWTFactory:      jwtFactory,
+		Dialer:          s.mockDialer,
+	}
+	s.sshManager, err = ssh.NewSSHManager(params)
 	c.Assert(err, qt.IsNil)
 	env := jimmtest.ParseEnvironment(c, testSSHManagerEnv)
 	env.PopulateDB(c, s.database)
@@ -201,6 +212,39 @@ func (s *sshManagerSuite) TestDialInfo(c *qt.C) {
 	// Test that the ControllerInfoFromModelUUID returns an error when the model UUID is invalid.
 	_, err = s.sshManager.DialInfo(ctx, "not-valid", s.userWithAccess)
 	c.Assert(err, qt.ErrorMatches, ".*cannot find model.*")
+}
+
+type mockDialer struct {
+	validAddress string
+	callCount    int
+}
+
+func (d *mockDialer) Dial(network string, addr string, config *gossh.ClientConfig) (*gossh.Client, error) {
+	d.callCount++
+	if addr == d.validAddress {
+		return &gossh.Client{}, nil
+	}
+	return nil, errors.New("dial error")
+}
+
+func (s *sshManagerSuite) TestDialAllAddresses(c *qt.C) {
+	ctx := context.Background()
+
+	dialInfo := ssh.DialInfo{
+		Addresses: []string{"10.1.2.3", "10.1.2.4"},
+		Port:      1234,
+		JWT:       "fake-jwt",
+	}
+
+	_, err := s.sshManager.DialController(ctx, dialInfo, s.userWithAccess)
+	c.Assert(err, qt.ErrorMatches, "failed to dial controller: dial error\ndial error")
+	c.Assert(s.mockDialer.callCount, qt.Equals, 2)
+
+	s.mockDialer.validAddress = "10.1.2.4:1234"
+	// Test that DialController works when there are multiple addresses.
+	_, err = s.sshManager.DialController(ctx, dialInfo, s.userWithAccess)
+	c.Assert(err, qt.IsNil)
+	c.Assert(s.mockDialer.callCount, qt.Equals, 4)
 }
 
 func TestSSHManager(t *testing.T) {

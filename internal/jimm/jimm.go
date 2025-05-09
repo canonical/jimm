@@ -429,7 +429,14 @@ func New(p Parameters) (*JIMM, error) {
 	}
 	j.sshKeyManager = sshKeyManager
 
-	sshManager, err := ssh.NewSSHManager(j.identityManager, j.jujuManager, j.sshKeyManager, j.jujuAuthFactory)
+	sshParams := ssh.SSHManagerParams{
+		IdentityManager: j.identityManager,
+		JujuManager:     j.jujuManager,
+		SSHKeyManager:   j.sshKeyManager,
+		JWTFactory:      j.jujuAuthFactory,
+		Dialer:          &ssh.BasicDialer{},
+	}
+	sshManager, err := ssh.NewSSHManager(sshParams)
 	if err != nil {
 		return nil, err
 	}
