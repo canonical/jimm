@@ -771,35 +771,7 @@ func TestQueryModelsJqInfiniteRangeQueryTimesOut(t *testing.T) {
 						return &model1, nil
 					},
 					ListFilesystems_: func(ctx context.Context, machines []string) ([]jujuparams.FilesystemDetailsListResult, error) {
-						return []jujuparams.FilesystemDetailsListResult{
-							{
-								Result: []jujuparams.FilesystemDetails{
-									{
-										FilesystemTag: "filesystem-myapp-0-0",
-										VolumeTag:     "volume-myapp-0-0",
-										Info: jujuparams.FilesystemInfo{
-											Size:         4096,
-											Pool:         "pool-1",
-											FilesystemId: "da64ec3c-0cf7-42f2-9951-35a5a3eaadc1",
-										},
-										Life: life.Alive,
-										Status: jujuparams.EntityStatus{
-											Status: status.Active,
-											Since:  &now,
-										},
-										UnitAttachments: map[string]jujuparams.FilesystemAttachmentDetails{
-											"filesystem-myapp-0-1": {
-												FilesystemAttachmentInfo: jujuparams.FilesystemAttachmentInfo{
-													MountPoint: "/home/ubuntu/myapp/.data",
-													ReadOnly:   false,
-												},
-												Life: life.Value(state.Alive.String()),
-											},
-										},
-									},
-								},
-							},
-						}, nil
+						return []jujuparams.FilesystemDetailsListResult{}, nil
 					},
 					ListVolumes_: func(ctx context.Context, machines []string) ([]jujuparams.VolumeDetailsListResult, error) {
 						return []jujuparams.VolumeDetailsListResult{}, nil

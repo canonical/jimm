@@ -96,7 +96,7 @@ func (j *JujuManager) QueryModelsJq(ctx context.Context, modelUUIDs []string, jq
 			// query. As such, we simply append all to the errors field and continue to collect
 			// both erreoneous and valid query results.
 			if err, ok := v.(error); ok {
-				if stderrors.Is(v.(error), context.DeadlineExceeded) {
+				if stderrors.Is(err, context.DeadlineExceeded) {
 					return results, errors.E(op, fmt.Sprintf("jq query timed out after %.2f seconds", j.CrossModelQueryTimeout.Seconds()), err)
 				}
 				results.Errors[modelUUID] = append(results.Errors[modelUUID], "jq error: "+err.Error())
