@@ -18,3 +18,12 @@ func GetFingerprintsFromPrivateKey(privateKey []byte) (map[string]string, error)
 		"MD5":    gossh.FingerprintLegacyMD5(key.PublicKey()),
 	}, nil
 }
+
+// GetFingerprintsFromPublicKey returns the public key of the host key.
+func GetPublicKeyFromPrivateKey(privateKey []byte) (string, error) {
+	key, err := gossh.ParsePrivateKey(privateKey)
+	if err != nil {
+		return "", err
+	}
+	return string(gossh.MarshalAuthorizedKey(key.PublicKey())), nil
+}

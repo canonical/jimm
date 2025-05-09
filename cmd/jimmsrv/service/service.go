@@ -34,6 +34,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/discharger"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm"
+	"github.com/canonical/jimm/v3/internal/jimm/config"
 	jimmcreds "github.com/canonical/jimm/v3/internal/jimm/credentials"
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/jimmhttp"
@@ -199,6 +200,10 @@ type Params struct {
 
 	// HostKeyFingerprints is the fingerprint of the SSH public host key.
 	HostKeyFingerprints map[string]string
+
+	// ControllerConfig is the configuration to expose when the ControllerConfig
+	// facade is called.
+	ControllerConfig config.ControllerConfig
 }
 
 // A Service is the implementation of a JIMM server.
@@ -313,8 +318,9 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	s := new(Service)
 
 	jimmParameters := jimm.Parameters{
-		UUID:   p.ControllerUUID,
-		Pubsub: &pubsub.Hub{MaxConcurrency: 50},
+		UUID:             p.ControllerUUID,
+		Pubsub:           &pubsub.Hub{MaxConcurrency: 50},
+		ControllerConfig: p.ControllerConfig,
 	}
 	// Setup all dependency services
 	if jimmParameters.UUID == "" {

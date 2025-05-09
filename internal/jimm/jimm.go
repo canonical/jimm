@@ -23,6 +23,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm/auditlog"
+	"github.com/canonical/jimm/v3/internal/jimm/config"
 	"github.com/canonical/jimm/v3/internal/jimm/credentials"
 	"github.com/canonical/jimm/v3/internal/jimm/group"
 	"github.com/canonical/jimm/v3/internal/jimm/identity"
@@ -205,6 +206,12 @@ type SSHManager interface {
 	DialController(ctx context.Context, ctrlInfo ssh.DialInfo, user *openfga.User) (*gossh.Client, error)
 }
 
+// ConfigManager provides a means to retrieve the JIMM controller config to expose via facade method.
+type ConfigManager interface {
+	// GetConfig returns the configuration for the JIMM controller.
+	GetConfig() (config.ControllerConfig, error)
+}
+
 // JujuManager is the interface to manage all Juju related operations.
 type JujuManager interface {
 	// Controller related methods
@@ -314,6 +321,10 @@ type Parameters struct {
 	// AuditLogRetentionDays is the number of days to keep audit logs.
 	// The default value of 0 indicates that logs will never be deleted.
 	AuditLogRetentionDays int
+
+	// ControllerConfig is the configuration which will be exposed when
+	// the ControllerConfig facade is called.
+	ControllerConfig config.ControllerConfig
 }
 
 func (p *Parameters) Validate() error {
@@ -441,6 +452,13 @@ func New(p Parameters) (*JIMM, error) {
 		return nil, err
 	}
 	j.sshManager = sshManager
+
+	configManager, err := config.NewConfigManager(p.ControllerConfig)
+	if err != nil {
+		return nil, err
+	}
+	j.configManager = configManager
+
 	return j, nil
 }
 
@@ -479,6 +497,10 @@ type JIMM struct {
 	// sshManager provides a means to manage SSH operations withing JIMM.
 	sshManager SSHManager
 
+	// configManager provides a means to retrieve the controller config to expose via facade method.
+	configManager ConfigManager
+
+	// jujuManager provides a means to manage Juju resources within JIMM.
 	jujuManager JujuManager
 }
 
@@ -551,4 +573,10 @@ func (j *JIMM) SSHManager() SSHManager {
 // related to Juju resources.
 func (j *JIMM) JujuManager() JujuManager {
 	return j.jujuManager
+}
+
+// ConfigManager returns a manager that exposes the controller config.
+// This is used to expose the config via the ControllerConfig facade.
+func (j *JIMM) ConfigManager() ConfigManager {
+	return j.configManager
 }

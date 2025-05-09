@@ -13,6 +13,7 @@ import (
 	"github.com/juju/juju/api/base"
 	"github.com/juju/juju/api/client/modelmanager"
 	controllerapi "github.com/juju/juju/api/controller/controller"
+	jujucontroller "github.com/juju/juju/controller"
 	"github.com/juju/juju/core/life"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/state"
@@ -35,14 +36,6 @@ type controllerSuite struct {
 }
 
 var _ = gc.Suite(&controllerSuite{})
-
-func (s *controllerSuite) TestControllerConfigGetNotSupported(c *gc.C) {
-	conn := s.open(c, nil, "test")
-	defer conn.Close()
-	client := controllerapi.NewClient(conn)
-	_, err := client.ControllerConfig()
-	c.Assert(jujuparams.IsCodeNotSupported(err), gc.Equals, true)
-}
 
 func (s *controllerSuite) TestControllerConfigSetNotSupported(c *gc.C) {
 	conn := s.open(c, nil, "test")
@@ -161,6 +154,23 @@ func (s *controllerSuite) TestControllerAccess(c *gc.C) {
 
 	_, err = client.GetControllerAccess("alice@canonical.com")
 	c.Assert(err, gc.ErrorMatches, `unauthorized`)
+}
+
+func (s *controllerSuite) TestControllerConfig(c *gc.C) {
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+
+	client := controllerapi.NewClient(conn)
+	config, err := client.ControllerConfig()
+	c.Assert(err, gc.Equals, nil)
+
+	c.Assert(config[jujucontroller.ControllerUUIDKey], gc.Equals, s.JIMM.ControllerConfig.ControllerUUID)
+	c.Assert(config[jujucontroller.PublicDNSAddress], gc.Equals, s.JIMM.ControllerConfig.PublicDNSName)
+	c.Assert(config["ssh-server-hostkey"], gc.Equals, s.JIMM.ControllerConfig.SSHPublicHostKey)
+	// the reason we need to cast to float64 is because it is a map[string]interface{} and the json marshaller defaults to float64.
+	c.Assert(config[jujucontroller.SSHServerPort], gc.Equals, float64(s.JIMM.ControllerConfig.SSHPort))
+	c.Assert(config[jujucontroller.SSHMaxConcurrentConnections], gc.Equals, float64(s.JIMM.ControllerConfig.SSHMaxConcurrentConnections))
+	c.Assert(config[jujucontroller.APIPort], gc.Equals, float64(s.JIMM.ControllerConfig.APIPort))
 }
 
 type watcherSuite struct {

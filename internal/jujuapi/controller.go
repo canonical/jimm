@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 
+	jujucontroller "github.com/juju/juju/controller"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"github.com/juju/version"
@@ -220,9 +221,24 @@ func (r *controllerRoot) ModelStatus(ctx context.Context, args jujuparams.Entiti
 	}, nil
 }
 
-// ControllerConfig returns the controller's configuration.
+// ControllerConfig returns the JIMM's controller configuration.
 func (r *controllerRoot) ControllerConfig(ctx context.Context) (jujuparams.ControllerConfigResult, error) {
-	return jujuparams.ControllerConfigResult{}, errors.E(errors.CodeNotSupported)
+	const op = errors.Op("jujuapi.ControllerConfig")
+	config, err := r.jimm.ConfigManager().GetConfig()
+	if err != nil {
+		return jujuparams.ControllerConfigResult{}, errors.E(op, err)
+	}
+	cfg := make(map[string]interface{})
+	cfg[jujucontroller.ControllerUUIDKey] = config.ControllerUUID
+	cfg[jujucontroller.APIPort] = config.APIPort
+	cfg[jujucontroller.SSHServerPort] = config.SSHPort
+	// TODO: update this to use the key coming from juju when we update the juju dependency.
+	cfg["ssh-server-hostkey"] = config.SSHPublicHostKey
+	cfg[jujucontroller.SSHMaxConcurrentConnections] = config.SSHMaxConcurrentConnections
+	cfg[jujucontroller.PublicDNSAddress] = config.PublicDNSName
+	return jujuparams.ControllerConfigResult{
+		Config: cfg,
+	}, nil
 }
 
 // ModelConfig returns implements the controller facade's ModelConfig

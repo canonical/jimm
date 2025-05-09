@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -18,6 +19,7 @@ import (
 
 	jimmsvc "github.com/canonical/jimm/v3/cmd/jimmsrv/service"
 	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jimm/config"
 	"github.com/canonical/jimm/v3/internal/logger"
 	"github.com/canonical/jimm/v3/internal/ssh"
 	"github.com/canonical/jimm/v3/version"
@@ -146,6 +148,11 @@ func start(ctx context.Context, s *service.Service) error {
 	if hostKeyRaw == "" {
 		return errors.E("empty hostkey from env variable")
 	}
+	maxConcurrentConnections, _ := strconv.Atoi(os.Getenv("JIMM_SSH_MAX_CONCURRENT_CONNECTIONS"))
+	publicHostKey, err := ssh.GetPublicKeyFromPrivateKey([]byte(hostKeyRaw))
+	if err != nil {
+		return errors.E("cannot parse hostkey from env variable")
+	}
 	fingerprints, err := ssh.GetFingerprintsFromPrivateKey([]byte(hostKeyRaw))
 	if err != nil {
 		return errors.E("cannot parse hostkey from env variable")
@@ -155,8 +162,26 @@ func start(ctx context.Context, s *service.Service) error {
 
 	logSQL, _ := strconv.ParseBool(os.Getenv("JIMM_LOG_SQL"))
 
+	_, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return errors.E("failed to split host and port", zap.Error(err))
+	}
+	portInt, err := strconv.Atoi(port)
+	if err != nil {
+		return errors.E("failed to parse port", zap.Error(err))
+	}
+	sshPort := os.Getenv("JIMM_SSH_PORT")
+	if sshPort == "" {
+		return errors.E("empty ssh port from env variable")
+	}
+	sshPortInt, err := strconv.Atoi(sshPort)
+	if err != nil {
+		return errors.E("failed to parse ssh port", zap.Error(err))
+	}
+	jimmUUID := os.Getenv("JIMM_UUID")
+	publicDnsName := os.Getenv("JIMM_DNS_NAME")
 	jimmsvc, err := jimmsvc.NewService(ctx, jimmsvc.Params{
-		ControllerUUID:      os.Getenv("JIMM_UUID"),
+		ControllerUUID:      jimmUUID,
 		DSN:                 os.Getenv("JIMM_DSN"),
 		HostKeyFingerprints: fingerprints,
 		ControllerAdmins:    strings.Fields(os.Getenv("JIMM_ADMINS")),
@@ -164,7 +189,7 @@ func start(ctx context.Context, s *service.Service) error {
 		VaultRoleSecretID:   os.Getenv("VAULT_ROLE_SECRET_ID"),
 		VaultAddress:        os.Getenv("VAULT_ADDR"),
 		VaultPath:           os.Getenv("VAULT_PATH"),
-		PublicDNSName:       os.Getenv("JIMM_DNS_NAME"),
+		PublicDNSName:       publicDnsName,
 		OpenFGAParams: jimmsvc.OpenFGAParams{
 			Scheme:    os.Getenv("OPENFGA_SCHEME"),
 			Host:      os.Getenv("OPENFGA_HOST"),
@@ -195,6 +220,14 @@ func start(ctx context.Context, s *service.Service) error {
 		LogSQL:                    logSQL,
 		LogLevel:                  logLevel,
 		IsLeader:                  os.Getenv("JIMM_IS_LEADER") != "",
+		ControllerConfig: config.ControllerConfig{
+			ControllerUUID:              jimmUUID,
+			PublicDNSName:               publicDnsName,
+			APIPort:                     portInt,
+			SSHPort:                     sshPortInt,
+			SSHPublicHostKey:            publicHostKey,
+			SSHMaxConcurrentConnections: maxConcurrentConnections,
+		},
 	})
 	if err != nil {
 		return err
@@ -209,12 +242,11 @@ func start(ctx context.Context, s *service.Service) error {
 	}
 
 	// intentionally ignore the error because invalid values are handled by the jump server.
-	maxConccurentConncetions, _ := strconv.Atoi(os.Getenv("JIMM_SSH_MAX_CONCURRENT_CONNECTIONS"))
 
 	sshServer, err := ssh.NewJumpServer(ctx, ssh.Config{
-		Port:                     os.Getenv("JIMM_SSH_PORT"),
+		Port:                     sshPort,
 		HostKey:                  []byte(hostKeyRaw),
-		MaxConcurrentConnections: maxConccurentConncetions,
+		MaxConcurrentConnections: maxConcurrentConnections,
 	}, jimmsvc.JIMM().SSHManager())
 
 	s.OnShutdown(func() {

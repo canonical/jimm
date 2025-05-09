@@ -25,6 +25,7 @@ type JIMM struct {
 	JujuManager_           func() jimm.JujuManager
 	PubSubHub_             func() *pubsub.Hub
 	ResourceTag_           func() names.ControllerTag
+	ConfigManager_         func() jimm.ConfigManager
 }
 
 func (j *JIMM) RoleManager() jimm.RoleManager {
@@ -95,4 +96,11 @@ func (j *JIMM) PubSubHub() *pubsub.Hub {
 		panic("not implemented")
 	}
 	return j.PubSubHub_()
+}
+
+func (j *JIMM) ConfigManager() jimm.ConfigManager {
+	if j.ConfigManager_ == nil {
+		return nil
+	}
+	return j.ConfigManager_()
 }
