@@ -80,6 +80,7 @@ func (s *JimmCmdSuite) SetUpTest(c *gc.C) {
 			JWTSessionKey:       jimmtest.JWTTestSecret,
 		},
 		DashboardFinalRedirectURL: "dashboard-url",
+		CrossModelQueryTimeout:    time.Second * 5,
 	}
 	dsn, err := url.Parse(s.Params.DSN)
 	c.Assert(err, gc.Equals, nil)

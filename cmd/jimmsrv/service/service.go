@@ -204,6 +204,9 @@ type Params struct {
 	// ControllerConfig is the configuration to expose when the ControllerConfig
 	// facade is called.
 	ControllerConfig config.ControllerConfig
+
+	// CrossModelQueryTimeout is the timeout for cross model queries.
+	CrossModelQueryTimeout time.Duration
 }
 
 // A Service is the implementation of a JIMM server.
@@ -318,9 +321,10 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	s := new(Service)
 
 	jimmParameters := jimm.Parameters{
-		UUID:             p.ControllerUUID,
-		Pubsub:           &pubsub.Hub{MaxConcurrency: 50},
-		ControllerConfig: p.ControllerConfig,
+		UUID:                   p.ControllerUUID,
+		Pubsub:                 &pubsub.Hub{MaxConcurrency: 50},
+		ControllerConfig:       p.ControllerConfig,
+		CrossModelQueryTimeout: p.CrossModelQueryTimeout,
 	}
 	// Setup all dependency services
 	if jimmParameters.UUID == "" {
@@ -426,14 +430,12 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		return nil, errors.E(op, err, "failed to parse final redirect url for the dashboard")
 	}
 
-	// instantiate jimm
 	s.jimm, err = jimm.New(jimmParameters)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
 
 	s.mux = chi.NewRouter()
-
 	s.mux.Use(chimiddleware.RequestLogger(&logger.HTTPLogFormatter{}))
 	s.mux.Use(middleware.MeasureHTTPResponseTime)
 

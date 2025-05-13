@@ -171,6 +171,8 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 		OAuthAuthenticator: authenticator,
 
 		JWTService: jwtService,
+
+		CrossModelQueryTimeout: time.Second * 5,
 	})
 
 	err = s.AdminUser.SetControllerAccess(ctx, s.JIMM.ResourceTag(), ofganames.AdministratorRelation)

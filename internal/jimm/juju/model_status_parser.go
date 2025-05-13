@@ -5,6 +5,8 @@ package juju
 import (
 	"context"
 	"encoding/json"
+	stderrors "errors"
+	"fmt"
 
 	"github.com/itchyny/gojq"
 	jujucmd "github.com/juju/cmd/v3"
@@ -68,7 +70,7 @@ func (j *JujuManager) QueryModelsJq(ctx context.Context, modelUUIDs []string, jq
 		}
 		// We could use output.NewFormatter() from 3.0+ juju/juju, but ultimately
 		// we just want some JSON output, regardless of user formatting. As such json.Marshal
-		// *should* be OK. But TODO: make sure this is fine.
+		// *should* be OK.
 		fb, err := json.Marshal(formattedStatus)
 		if err != nil {
 			zapctx.Error(ctx, "failed to marshal formatted status", zap.String("model-uuid", modelUUID))
@@ -79,7 +81,10 @@ func (j *JujuManager) QueryModelsJq(ctx context.Context, modelUUIDs []string, jq
 		if err := json.Unmarshal(fb, &tempMap); err != nil {
 			return results, errors.E(op, err)
 		}
-		queryIter := query.RunWithContext(ctx, tempMap)
+
+		queryCtx, cancel := context.WithTimeout(ctx, j.CrossModelQueryTimeout)
+		defer cancel()
+		queryIter := query.RunWithContext(queryCtx, tempMap)
 
 		for {
 			v, ok := queryIter.Next()
@@ -91,6 +96,9 @@ func (j *JujuManager) QueryModelsJq(ctx context.Context, modelUUIDs []string, jq
 			// query. As such, we simply append all to the errors field and continue to collect
 			// both erreoneous and valid query results.
 			if err, ok := v.(error); ok {
+				if stderrors.Is(err, context.DeadlineExceeded) {
+					return results, errors.E(op, fmt.Sprintf("jq query timed out after %.2f seconds", j.CrossModelQueryTimeout.Seconds()), err)
+				}
 				results.Errors[modelUUID] = append(results.Errors[modelUUID], "jq error: "+err.Error())
 				continue
 			}

@@ -56,6 +56,7 @@ func newTestServiceParameters(t jimmtest.Tester) jimmsvc.Params {
 			JWTSessionKey:       jimmtest.JWTTestSecret,
 		},
 		DashboardFinalRedirectURL: "dashboard-url",
+		CrossModelQueryTimeout:    time.Second * 5,
 	}
 }
 

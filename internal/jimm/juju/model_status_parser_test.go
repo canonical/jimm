@@ -757,3 +757,40 @@ func TestQueryModelsJq(t *testing.T) {
 	}
 	`, qt.JSONEquals, res)
 }
+
+func TestQueryModelsJqInfiniteRangeQueryTimesOut(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	j := newTestJujuManager(c, &parameters{
+		CrossModelQueryTimeout: time.Millisecond * 1,
+		Dialer: jimmtest.ModelDialerMap{
+			"10000000-0000-0000-0000-000000000000": &jimmtest.Dialer{
+				API: &jimmtest.API{
+					Status_: func(_ context.Context, _ []string) (*jujuparams.FullStatus, error) {
+						return &model1, nil
+					},
+					ListFilesystems_: func(ctx context.Context, machines []string) ([]jujuparams.FilesystemDetailsListResult, error) {
+						return []jujuparams.FilesystemDetailsListResult{}, nil
+					},
+					ListVolumes_: func(ctx context.Context, machines []string) ([]jujuparams.VolumeDetailsListResult, error) {
+						return []jujuparams.VolumeDetailsListResult{}, nil
+					},
+					ListStorageDetails_: func(ctx context.Context) ([]jujuparams.StorageDetails, error) {
+						return []jujuparams.StorageDetails{}, nil
+					},
+				},
+			},
+		},
+	})
+
+	env := jimmtest.ParseEnvironment(c, crossModelQueryEnv)
+	env.PopulateDB(c, j.Database)
+
+	modelUUIDs := []string{
+		"10000000-0000-0000-0000-000000000000",
+	}
+
+	_, err := j.QueryModelsJq(ctx, modelUUIDs, "range(infinite)")
+	c.Assert(err, qt.ErrorMatches, "jq query timed out after 0.00 seconds")
+}

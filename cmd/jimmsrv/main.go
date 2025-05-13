@@ -180,6 +180,17 @@ func start(ctx context.Context, s *service.Service) error {
 	}
 	jimmUUID := os.Getenv("JIMM_UUID")
 	publicDnsName := os.Getenv("JIMM_DNS_NAME")
+	crossModelQueryTimeout := 5 * time.Second
+	crossModelQueryTimeoutRaw := os.Getenv("JIMM_CROSS_MODEL_QUERY_TIMEOUT")
+	if crossModelQueryTimeoutRaw != "" {
+		expiry, err := time.ParseDuration(crossModelQueryTimeoutRaw)
+		if err != nil {
+			return errors.E("cannot parse cross model query timeout into duration")
+		} else {
+			crossModelQueryTimeout = expiry
+		}
+	}
+
 	jimmsvc, err := jimmsvc.NewService(ctx, jimmsvc.Params{
 		ControllerUUID:      jimmUUID,
 		DSN:                 os.Getenv("JIMM_DSN"),
@@ -228,6 +239,7 @@ func start(ctx context.Context, s *service.Service) error {
 			SSHPublicHostKey:            publicHostKey,
 			SSHMaxConcurrentConnections: maxConcurrentConnections,
 		},
+		CrossModelQueryTimeout: crossModelQueryTimeout,
 	})
 	if err != nil {
 		return err
@@ -240,8 +252,6 @@ func start(ctx context.Context, s *service.Service) error {
 		Handler:           jimmsvc,
 		ReadHeaderTimeout: time.Second * 5,
 	}
-
-	// intentionally ignore the error because invalid values are handled by the jump server.
 
 	sshServer, err := ssh.NewJumpServer(ctx, ssh.Config{
 		Port:                     sshPort,

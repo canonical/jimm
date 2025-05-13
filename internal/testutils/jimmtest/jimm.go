@@ -57,6 +57,9 @@ func NewJIMM(t Tester, additionalParameters *jimm.Parameters, options ...Option)
 		if additionalParameters.OAuthAuthenticator != nil {
 			p.OAuthAuthenticator = additionalParameters.OAuthAuthenticator
 		}
+		if additionalParameters.CrossModelQueryTimeout > 0 {
+			p.CrossModelQueryTimeout = additionalParameters.CrossModelQueryTimeout
+		}
 	}
 
 	if p.Database == nil {
