@@ -1,0 +1,66 @@
+#!/bin/bash
+
+# This script sets up a JIMM service within docker compose on macOS and adds an LXD controller.
+# It uses the default branch of jimm for the deployment.
+#
+# It requires the following tools:
+# - multipass
+# - go
+# - jq
+
+VM_NAME="jimm"
+
+echo "Setting up env."
+vm_exists=$(multipass list --format json | jq -r ".list[] | select(.name == \"$VM_NAME\") | .name")
+if [ -n "$vm_exists" ]; then
+  echo "Please delete $VM_NAME and try again."
+  exit 1
+fi
+
+# Cleaning ./tmp. Permission issues can arise when mounting ./tmp.
+sudo rm -rf ../../tmp
+
+echo "VM does not exist, launching VM: $VM_NAME"
+multipass launch --cpus 4 docker -n $VM_NAME
+
+# Multipass detects the vm name is the same as parent working path dir and creates a fuse mount.
+# We want a classic mount to reflect changes on the host to the VM.
+echo "Setting up classic mount"
+multipass umount jimm jimm || true
+multipass mount --type=classic ../../ jimm:jimm || true 
+
+echo "Installing & setting up dependencies"
+multipass exec $VM_NAME -- sudo snap install juju
+multipass exec $VM_NAME -- sudo sudo apt-get -y install make
+multipass exec $VM_NAME -- sudo lxd init --auto
+
+echo "Setting up JIMM"
+multipass exec --working-directory /home/ubuntu/jimm $VM_NAME -- make certs
+# Re-copy and update certs (workaround to keep the same generated certs but simply update the VM's certs only)
+multipass exec --working-directory /home/ubuntu/jimm/local/traefik/certs $VM_NAME -- sudo cp ca.crt /usr/local/share/ca-certificates
+multipass exec --working-directory /home/ubuntu/jimm/local/traefik/certs $VM_NAME -- sudo update-ca-certificates
+multipass exec --working-directory /home/ubuntu/jimm $VM_NAME -- make version/commit.txt
+multipass exec --working-directory /home/ubuntu/jimm $VM_NAME -- make version/version.txt
+# TODO(ale8k): Have docker cache images somewhere that can be shared, the compose takes forever otherwise.
+multipass exec --working-directory /home/ubuntu/jimm $VM_NAME -- docker compose --profile dev up --wait -d 
+
+echo "Building JAAS CLI"
+$(cd  ../../ && go build ./cmd/jaas)
+
+echo "Setting up forwarding for keycloak login"
+./qa-lxd-mac-forward.sh "$VM_NAME" --linux
+
+echo
+echo
+echo
+echo
+
+echo "To continue the QA environment setup, please login to keycloak."
+echo "The username is: \"jimm-test\" and the password is: \"password\""
+multipass exec --working-directory /home/ubuntu/jimm $VM_NAME -- juju login jimm.localhost -c jimm-dev
+echo
+echo "Setting up LXD controller"
+multipass exec --working-directory /home/ubuntu/jimm $VM_NAME -- sudo iptables -I FORWARD -i lxdbr0 -j ACCEPT
+multipass exec --working-directory /home/ubuntu/jimm $VM_NAME -- sudo iptables -I FORWARD -o lxdbr0 -j ACCEPT
+multipass exec --working-directory /home/ubuntu/jimm $VM_NAME -- ./local/jimm/setup-controller.sh
+multipass exec --working-directory /home/ubuntu/jimm $VM_NAME -- ./local/jimm/add-controller.sh
