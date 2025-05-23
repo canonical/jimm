@@ -20,14 +20,8 @@ type ControllerConfig struct {
 	// It is the hostname that will be used during TLS verification.
 	PublicDNSName string
 
-	// APIPort is the port for API connections.
-	APIPort int
-
 	// SSHPort is the port for SSH connections.
 	SSHPort int
-
-	// SSHMaxConcurrentConnections is the maximum number of concurrent SSH connections.
-	SSHMaxConcurrentConnections int
 
 	// SSHPublicHostKey is the host key for SSH connections.
 	SSHPublicHostKey string

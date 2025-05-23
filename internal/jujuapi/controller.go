@@ -230,11 +230,9 @@ func (r *controllerRoot) ControllerConfig(ctx context.Context) (jujuparams.Contr
 	}
 	cfg := make(map[string]interface{})
 	cfg[jujucontroller.ControllerUUIDKey] = config.ControllerUUID
-	cfg[jujucontroller.APIPort] = config.APIPort
 	cfg[jujucontroller.SSHServerPort] = config.SSHPort
 	// TODO: update this to use the key coming from juju when we update the juju dependency.
-	cfg["ssh-server-hostkey"] = config.SSHPublicHostKey
-	cfg[jujucontroller.SSHMaxConcurrentConnections] = config.SSHMaxConcurrentConnections
+	cfg["ssh-host-key"] = config.SSHPublicHostKey
 	cfg[jujucontroller.PublicDNSAddress] = config.PublicDNSName
 	return jujuparams.ControllerConfigResult{
 		Config: cfg,

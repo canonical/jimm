@@ -68,14 +68,11 @@ func GetAddressesAndTLSConfig(ctx context.Context, ctl *dbmodel.Controller) ([]s
 			MinVersion: tls.VersionTLS12,
 		}
 	}
-
+	var addrs []string
 	if ctl.PublicAddress != "" {
-		// If there is a public-address configured it is almost
-		// certainly the one we want to use.
-		return []string{ctl.PublicAddress}, tlsConfig
+		addrs = append(addrs, ctl.PublicAddress)
 	}
 
-	var addrs []string
 	for _, hps := range ctl.Addresses {
 		for _, hp := range hps {
 			if maybeReachable(hp.Scope) {

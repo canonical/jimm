@@ -4,7 +4,6 @@ package main
 
 import (
 	"context"
-	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -162,14 +161,6 @@ func start(ctx context.Context, s *service.Service) error {
 
 	logSQL, _ := strconv.ParseBool(os.Getenv("JIMM_LOG_SQL"))
 
-	_, port, err := net.SplitHostPort(addr)
-	if err != nil {
-		return errors.E("failed to split host and port", zap.Error(err))
-	}
-	portInt, err := strconv.Atoi(port)
-	if err != nil {
-		return errors.E("failed to parse port", zap.Error(err))
-	}
 	sshPort := os.Getenv("JIMM_SSH_PORT")
 	if sshPort == "" {
 		return errors.E("empty ssh port from env variable")
@@ -232,12 +223,10 @@ func start(ctx context.Context, s *service.Service) error {
 		LogLevel:                  logLevel,
 		IsLeader:                  os.Getenv("JIMM_IS_LEADER") != "",
 		ControllerConfig: config.ControllerConfig{
-			ControllerUUID:              jimmUUID,
-			PublicDNSName:               publicDnsName,
-			APIPort:                     portInt,
-			SSHPort:                     sshPortInt,
-			SSHPublicHostKey:            publicHostKey,
-			SSHMaxConcurrentConnections: maxConcurrentConnections,
+			ControllerUUID:   jimmUUID,
+			PublicDNSName:    publicDnsName,
+			SSHPort:          sshPortInt,
+			SSHPublicHostKey: publicHostKey,
 		},
 		CrossModelQueryTimeout: crossModelQueryTimeout,
 	})

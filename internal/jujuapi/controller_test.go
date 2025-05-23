@@ -166,11 +166,9 @@ func (s *controllerSuite) TestControllerConfig(c *gc.C) {
 
 	c.Assert(config[jujucontroller.ControllerUUIDKey], gc.Equals, s.JIMM.ControllerConfig.ControllerUUID)
 	c.Assert(config[jujucontroller.PublicDNSAddress], gc.Equals, s.JIMM.ControllerConfig.PublicDNSName)
-	c.Assert(config["ssh-server-hostkey"], gc.Equals, s.JIMM.ControllerConfig.SSHPublicHostKey)
+	c.Assert(config["ssh-host-key"], gc.Equals, s.JIMM.ControllerConfig.SSHPublicHostKey)
 	// the reason we need to cast to float64 is because it is a map[string]interface{} and the json marshaller defaults to float64.
 	c.Assert(config[jujucontroller.SSHServerPort], gc.Equals, float64(s.JIMM.ControllerConfig.SSHPort))
-	c.Assert(config[jujucontroller.SSHMaxConcurrentConnections], gc.Equals, float64(s.JIMM.ControllerConfig.SSHMaxConcurrentConnections))
-	c.Assert(config[jujucontroller.APIPort], gc.Equals, float64(s.JIMM.ControllerConfig.APIPort))
 }
 
 type watcherSuite struct {
