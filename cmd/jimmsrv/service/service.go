@@ -279,12 +279,12 @@ func (s *Service) OpenFGACleanup(ctx context.Context, trigger <-chan time.Time) 
 	}
 }
 
-// CleanupDyingModels triggers every `trigger` time and calls the jimm methods to cleanup dying models.
-func (s *Service) CleanupDyingModels(ctx context.Context, trigger <-chan time.Time) error {
+// CleanupNotFoundModels triggers every `trigger` time and calls the jimm methods to cleanup dying models.
+func (s *Service) CleanupNotFoundModels(ctx context.Context, trigger <-chan time.Time) error {
 	for {
 		select {
 		case <-trigger:
-			err := s.jimm.JujuManager().CleanupDyingModels(ctx)
+			err := s.jimm.JujuManager().CleanupNotFoundModels(ctx)
 			if err != nil {
 				zapctx.Error(ctx, "dying models cleanup", zap.Error(err))
 				continue
@@ -564,9 +564,9 @@ func (s *Service) StartServices(ctx context.Context, svc *service.Service) {
 			return s.OpenFGACleanup(ctx, time.NewTicker(6*time.Hour).C)
 		})
 
-		// CleanupDyingModels cleanup - cleans up all dying models
+		// CleanupNotFoundModels cleanup - cleans up all models not found on the respective controller.
 		svc.Go(func() error {
-			return s.CleanupDyingModels(ctx, time.NewTicker(time.Minute).C)
+			return s.CleanupNotFoundModels(ctx, time.NewTicker(time.Minute).C)
 		})
 	}
 

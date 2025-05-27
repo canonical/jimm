@@ -119,11 +119,9 @@ func (s *modelCleanupSuite) TestPollModelsDying(c *qt.C) {
 			},
 		},
 	}
-	err := s.jujuManager.DestroyModel(ctx, s.jimmAdmin, names.NewModelTag(s.env.Models[0].UUID), nil, nil, nil, nil)
-	c.Assert(err, qt.IsNil)
 
 	// test
-	err = s.jujuManager.CleanupDyingModels(ctx)
+	err := s.jujuManager.CleanupNotFoundModels(ctx)
 	c.Assert(err, qt.IsNil)
 
 	model := dbmodel.Model{
@@ -158,11 +156,9 @@ func (s *modelCleanupSuite) TestPollModelsDyingControllerErrors(c *qt.C) {
 			},
 		},
 	}
-	err := s.jujuManager.DestroyModel(ctx, s.jimmAdmin, names.NewModelTag(s.env.Models[0].UUID), nil, nil, nil, nil)
-	c.Assert(err, qt.IsNil)
 
 	// test
-	err = s.jujuManager.CleanupDyingModels(ctx)
+	err := s.jujuManager.CleanupNotFoundModels(ctx)
 	c.Assert(err, qt.IsNil)
 
 	model := dbmodel.Model{
@@ -173,7 +169,7 @@ func (s *modelCleanupSuite) TestPollModelsDyingControllerErrors(c *qt.C) {
 	}
 	err = s.jujuManager.Database.GetModel(ctx, &model)
 	c.Assert(err, qt.IsNil)
-	c.Assert(model.Life, qt.Equals, state.Dying.String())
+	c.Assert(model.Life, qt.Equals, state.Alive.String())
 }
 
 func TestDyingModelsCleanup(t *testing.T) {

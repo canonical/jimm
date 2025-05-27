@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/juju/state"
 	"github.com/juju/zaputil/zapctx"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
@@ -15,20 +14,16 @@ import (
 	"github.com/canonical/jimm/v3/internal/servermon"
 )
 
-// CleanupDyingModels loops over dying models, contacting the respective controller.
+// CleanupNotFoundModels loops over models, contacting the respective controller.
 // And deleting the model from our database if the error is `NotFound` which means the model was successfully deleted.
-func (j *JujuManager) CleanupDyingModels(ctx context.Context) (err error) {
-	const op = errors.Op("jimm.CleanupDyingModels")
+// Before we were cleaning up models in a dying state, but this is not enough if people delete models directly from the controller.
+func (j *JujuManager) CleanupNotFoundModels(ctx context.Context) (err error) {
+	const op = errors.Op("jimm.CleanupNotFoundModels")
 	zapctx.Info(ctx, string(op))
 	durationObserver := servermon.DurationObserver(servermon.JimmMethodsDurationHistogram, string(op))
 	defer durationObserver()
 
 	err = j.Database.ForEachModel(ctx, func(m *dbmodel.Model) error {
-		if m.Life != state.Dying.String() {
-			return nil
-		}
-		// if the model is dying and not found by querying the controller we can assume it is dead.
-		// And safely delete the reference from our db.
 		api, err := j.dialController(ctx, &m.Controller)
 		if err != nil {
 			zapctx.Error(ctx, fmt.Sprintf("cannot dial controller %s: %s\n", m.Controller.UUID, err))

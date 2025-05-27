@@ -276,7 +276,7 @@ type JujuManager interface {
 
 	// These are methods on the Juju manager that don't need to be mocked and can be removed from this interface later.
 	UpdateMetrics(ctx context.Context)
-	CleanupDyingModels(ctx context.Context) error
+	CleanupNotFoundModels(ctx context.Context) error
 }
 
 // Parameters holds the services and static fields passed to the jimm.New() constructor.
