@@ -35,8 +35,9 @@ func SetupLogger(ctx context.Context, logLevel string, devMode bool) {
 	} else {
 		prodConfig := zap.NewProductionConfig()
 		prodConfig.Level = zap.NewAtomicLevelAt(pLogLevel)
-		prodConfig.DisableStacktrace = true       // Disable stacktraces in prod as they are overly verbose and clutter the logs.
-		proLogger := zap.Must(prodConfig.Build()) // this panics if an error is encountered during Build
+		prodConfig.DisableStacktrace = true                     // Disable stacktraces in prod as they are overly verbose and clutter the logs.
+		proLogger := zap.Must(prodConfig.Build())               // this panics if an error is encountered during Build
+		proLogger = proLogger.WithOptions(zap.AddCallerSkip(1)) // skip zapctx
 		zapctx.Default = proLogger
 	}
 }
