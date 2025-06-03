@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/juju/juju/api"
 	"github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
@@ -266,6 +267,7 @@ type modelProxy struct {
 	src                     *writeLockConn
 	dst                     *writeLockConn
 	msgs                    *inflightMsgs
+	anonymousLogin          bool // anonymousLogin is true if the client is not authenticated.
 	auditLog                func(*dbmodel.AuditLogEntry)
 	tokenGen                TokenGenerator
 	sshKeyManager           SSHKeyManager
@@ -573,6 +575,9 @@ func checkPermissionsRequired(ctx context.Context, msg *message) (map[string]any
 func (p *controllerProxy) redoLogin(ctx context.Context, permissions map[string]any) error {
 	const op = errors.Op("rpc.redoLogin")
 
+	if p.anonymousLogin {
+		return errors.E(op, errors.CodeUnauthorized, "Anonymous login does not support re-authentication")
+	}
 	loginMsg := p.msgs.getLoginMessage()
 	if loginMsg == nil {
 		return errors.E(op, errors.CodeUnauthorized, "Haven't received login yet")
@@ -735,6 +740,20 @@ func (p *clientProxy) handleAdminFacade(ctx context.Context, msg *message) (clie
 
 		return controllerLoginMessageFnc(user)
 	case "Login":
+		var request params.LoginRequest
+		err := json.Unmarshal(msg.Params, &request)
+		if err != nil {
+			return errorFnc(err)
+		}
+		user, err := names.ParseUserTag(request.AuthTag)
+		if err != nil {
+			return errorFnc(fmt.Errorf("invalid user tag: %v", err))
+		}
+		if user.Name() == api.AnonymousUsername {
+			p.anonymousLogin = true
+			// return the client's login message verbatim to the controller.
+			return nil, msg, nil
+		}
 		return errorFnc(errors.E("JIMM does not support login from old clients", errors.CodeNotSupported))
 	default:
 		return nil, nil, nil
