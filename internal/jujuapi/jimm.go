@@ -59,11 +59,6 @@ func init() {
 		crossModelQueryMethod := rpc.Method(r.CrossModelQuery)
 		purgeLogsMethod := rpc.Method(r.PurgeLogs)
 		migrateModel := rpc.Method(r.MigrateModel)
-		addServiceAccountMethod := rpc.Method(r.AddServiceAccount)
-		copyServiceAccountCredentialMethod := rpc.Method(r.CopyServiceAccountCredential)
-		updateServiceAccountCredentials := rpc.Method(r.UpdateServiceAccountCredentials)
-		listServiceAccountCredentials := rpc.Method(r.ListServiceAccountCredentials)
-		grantServiceAccountAccess := rpc.Method(r.GrantServiceAccountAccess)
 		version := rpc.Method(r.Version)
 
 		// JIMM Generic RPC
@@ -100,12 +95,6 @@ func init() {
 		r.AddMethod("JIMM", 4, "ListRoles", listRolesMethod)
 		// JIMM Cross-model queries
 		r.AddMethod("JIMM", 4, "CrossModelQuery", crossModelQueryMethod)
-		// JIMM Service Accounts
-		r.AddMethod("JIMM", 4, "AddServiceAccount", addServiceAccountMethod)
-		r.AddMethod("JIMM", 4, "CopyServiceAccountCredential", copyServiceAccountCredentialMethod)
-		r.AddMethod("JIMM", 4, "UpdateServiceAccountCredentials", updateServiceAccountCredentials)
-		r.AddMethod("JIMM", 4, "ListServiceAccountCredentials", listServiceAccountCredentials)
-		r.AddMethod("JIMM", 4, "GrantServiceAccountAccess", grantServiceAccountAccess)
 		r.AddMethod("JIMM", 4, "Version", version)
 
 		return []int{4}

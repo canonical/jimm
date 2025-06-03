@@ -69,8 +69,6 @@ func (j *permissionManager) ToJAASTag(ctx context.Context, tag *ofganames.Tag, r
 	switch tag.Kind {
 	case names.UserTagKind:
 		return tagToString(names.UserTagKind, tag.ID), nil
-	case jimmnames.ServiceAccountTagKind:
-		return jimmnames.ServiceAccountTagKind + "-" + tag.ID, nil
 	case names.ControllerTagKind:
 		if tag.ID == j.jimmTag.Id() {
 			return "controller-jimm", nil
@@ -309,20 +307,6 @@ func (t *tagResolver) cloudTag(ctx context.Context, db *db.Database) (*ofga.Enti
 	return ofganames.ConvertTagWithRelation(cloud.ResourceTag(), t.relation), nil
 }
 
-func (t *tagResolver) serviceAccountTag(ctx context.Context) (*ofga.Entity, error) {
-	zapctx.Debug(
-		ctx,
-		"Resolving JIMM tags to Juju tags for tag kind: serviceaccount",
-		zap.String("serviceaccount-name", t.trailer),
-	)
-	if !jimmnames.IsValidServiceAccountId(t.trailer) {
-		// TODO(ale8k): Return custom error for validation check at JujuAPI
-		return nil, errors.E("invalid service account id")
-	}
-
-	return ofganames.ConvertTagWithRelation(jimmnames.NewServiceAccountTag(t.trailer), t.relation), nil
-}
-
 // resolveTag resolves JIMM tag [of any kind available] (i.e., controller-mycontroller:alex@canonical.com/mymodel.myoffer)
 // into a juju string tag (i.e., controller-<controller uuid>).
 //
@@ -351,8 +335,6 @@ func resolveTag(jimmUUID string, db *db.Database, tag string) (*ofganames.Tag, e
 		return resolver.applicationOfferTag(ctx, db)
 	case names.CloudTagKind:
 		return resolver.cloudTag(ctx, db)
-	case jimmnames.ServiceAccountTagKind:
-		return resolver.serviceAccountTag(ctx)
 	}
 	return nil, errors.E(errors.CodeBadRequest, fmt.Sprintf("failed to map tag, unknown kind: %s", tagKind))
 }

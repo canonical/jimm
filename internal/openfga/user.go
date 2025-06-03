@@ -15,7 +15,6 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
-	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
 
 // NewUser returns a new user structure that can be used to check
@@ -97,15 +96,6 @@ func (u *User) HasModelRelation(ctx context.Context, resource names.ModelTag, re
 		return false, errors.E(err)
 	}
 	return hasRelation, nil
-}
-
-// IsServiceAccountAdmin returns true if the user has administrator relation to the service account.
-func (u *User) IsServiceAccountAdmin(ctx context.Context, clientID jimmnames.ServiceAccountTag) (bool, error) {
-	isAdmin, err := checkRelation(ctx, u, clientID, ofganames.AdministratorRelation)
-	if err != nil {
-		return false, errors.E(err)
-	}
-	return isAdmin, nil
 }
 
 // GetCloudAccess returns the relation the user has to the specified cloud.

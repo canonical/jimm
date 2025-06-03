@@ -534,45 +534,6 @@ type LoginWithClientCredentialsRequest struct {
 	ClientSecret string `json:"client-secret"`
 }
 
-// AddServiceAccountRequest holds a request to add a service account.
-type AddServiceAccountRequest struct {
-	// ClientID holds the client id of the service account.
-	ClientID string `json:"client-id"`
-}
-
-// CopyServiceAccountCredentialRequest holds a request to copy a user cloud-credential to a service account.
-type CopyServiceAccountCredentialRequest struct {
-	jujuparams.CloudCredentialArg
-	// ClientID holds the client id of the service account.
-	ClientID string `json:"client-id"`
-}
-
-// UpdateServiceAccountCredentialsRequest holds a request to update
-// a service accounts cloud credentials.
-type UpdateServiceAccountCredentialsRequest struct {
-	jujuparams.UpdateCredentialArgs
-	// ClientID holds the client id of the service account.
-	ClientID string `json:"client-id"`
-}
-
-// ListServiceAccountCredentialsRequest holds a request to list
-// a service accounts cloud credentials.
-type ListServiceAccountCredentialsRequest struct {
-	jujuparams.CloudCredentialArgs
-	// ClientID holds the client id of the service account.
-	ClientID string `json:"client-id"`
-}
-
-// ListServiceAccountCredentialsRequest holds a request to list
-// a service accounts cloud credentials.
-type GrantServiceAccountAccess struct {
-	// Entities holds a slice of entities (identities and groups)
-	// that should have administration access to the desired clientID.
-	Entities []string `json:"entities"`
-	// ClientID holds the client id of the service account.
-	ClientID string `json:"client-id"`
-}
-
 // WhoamiResponse holds the response for a /auth/whoami call.
 type WhoamiResponse struct {
 	DisplayName string `json:"display-name" yaml:"display-name"`

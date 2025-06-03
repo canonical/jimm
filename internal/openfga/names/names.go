@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 // Package names holds functions used by other jimm components to
 // create valid OpenFGA tags.
@@ -61,7 +61,6 @@ type ResourceTagger interface {
 		names.ModelTag |
 		names.ApplicationOfferTag |
 		names.CloudTag |
-		jimmnames.ServiceAccountTag |
 		jimmnames.RoleTag
 
 	Id() string
@@ -111,8 +110,7 @@ func BlankKindTag(kind string) (*Tag, error) {
 		names.ControllerTagKind,
 		names.ModelTagKind,
 		names.ApplicationOfferTagKind,
-		names.CloudTagKind,
-		jimmnames.ServiceAccountTagKind:
+		names.CloudTagKind:
 		return &Tag{
 			Kind: cofga.Kind(kind),
 		}, nil

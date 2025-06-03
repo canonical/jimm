@@ -153,6 +153,7 @@ func (j *loginManager) LoginClientCredentials(ctx context.Context, clientID stri
 	const op = errors.Op("jimm.LoginClientCredentials")
 	// We expect the client to send the service account ID "as-is" and because we know that this is a clientCredentials login,
 	// we can append the @serviceaccount domain to the clientID (if not already present).
+	// TODO(Kian): Consider inlining the function below and removing the dependency on jimmnames.
 	clientIdWithDomain, err := jimmnames.EnsureValidServiceAccountId(clientID)
 	if err != nil {
 		return nil, errors.E(op, err)
