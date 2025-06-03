@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package openfga
 
@@ -56,6 +56,16 @@ var (
 	// ServiceAccountType represents a service account.
 	ServiceAccountType Kind = jimmnames.ServiceAccountTagKind
 )
+
+// CheckResult is the result of a relation check.
+// It contains a boolean indicating whether the relation check was successful,
+// and an error if one occurred during the check.
+type CheckResult struct {
+	// Allowed indicates whether the relation check was successful.
+	Allowed bool
+	// Error contains any error that occurred during the check.
+	Error error
+}
 
 // OFGAClient contains convenient utility methods for interacting
 // with OpenFGA from OUR usecase. It wraps the provided pre-generated client

@@ -54,7 +54,7 @@ func (j *permissionManager) RemoveRelation(ctx context.Context, user *openfga.Us
 }
 
 // CheckRelation checks user permission and return true if the given tuple exists.
-// At the moment user is required be admin or checking its own relations
+// At the moment user is required be admin or checking its own relations.
 func (j *permissionManager) CheckRelation(ctx context.Context, user *openfga.User, tuple apiparams.RelationshipTuple, trace bool) (_ bool, err error) {
 	const op = errors.Op("jimm.CheckRelation")
 	allowed := false
@@ -73,6 +73,25 @@ func (j *permissionManager) CheckRelation(ctx context.Context, user *openfga.Use
 		return allowed, errors.E(op, errors.CodeOpenFGARequestFailed, err)
 	}
 	return allowed, nil
+}
+
+// CheckRelations checks user permissions and returns a slice of CheckResult for each tuple.
+// At the moment the implementation is a simple loop around CheckRelation.
+// TODO(simonedutto): this is a temporary implementation, once canonical/openfga supports BatchCheck
+// we can use that to improve performance.
+func (j *permissionManager) CheckRelations(ctx context.Context, user *openfga.User, tuples []apiparams.RelationshipTuple) ([]openfga.CheckResult, error) {
+	var results []openfga.CheckResult
+	var err error
+	for _, tuple := range tuples {
+		var result openfga.CheckResult
+		result.Allowed, err = j.CheckRelation(ctx, user, tuple, false)
+		if err != nil {
+			result.Error = err
+		}
+		results = append(results, result)
+	}
+
+	return results, nil
 }
 
 // ListRelationshipTuples checks user permission and lists relationship tuples based of tuple struct with pagination.

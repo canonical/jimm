@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package jujuapi_test
 
@@ -1427,6 +1427,18 @@ func (s *accessControlSuite) TestCheckRelationControllerAdministratorFlow(c *gc.
 		c.Assert(err, gc.IsNil)
 		c.Assert(res.Allowed, gc.Equals, tc.want)
 	}
+	// Check that the same tuples can be checked via the CheckRelations API
+	tuplesToCheck := apiparams.CheckRelationsRequest{}
+	expected := apiparams.CheckRelationsResponse{}
+	for _, tc := range tests {
+		tuplesToCheck.Tuples = append(tuplesToCheck.Tuples, tc.input)
+		expected.Results = append(expected.Results, apiparams.CheckRelationResponse{
+			Allowed: tc.want,
+		})
+	}
+	results, err := client.CheckRelations(&tuplesToCheck)
+	c.Assert(err, gc.IsNil)
+	c.Assert(results, gc.DeepEquals, expected)
 }
 
 /*

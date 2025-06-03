@@ -118,6 +118,8 @@ type PermissionManager interface {
 	RemoveRelation(ctx context.Context, user *openfga.User, tuples []apiparams.RelationshipTuple) error
 	// CheckRelation checks whether the provided tuple provides access.
 	CheckRelation(ctx context.Context, user *openfga.User, tuple apiparams.RelationshipTuple, trace bool) (bool, error)
+	// CheckRelations checks whether the provided tuples provide access.
+	CheckRelations(ctx context.Context, user *openfga.User, tuples []apiparams.RelationshipTuple) ([]openfga.CheckResult, error)
 	// ListRelationshipTuples lists a page of tuples based on the provided tuple constraints.
 	ListRelationshipTuples(ctx context.Context, user *openfga.User, tuple apiparams.RelationshipTuple, pageSize int32, continuationToken string) ([]openfga.Tuple, string, error)
 	// ListObjectRelations lists all the tuples that an object has a direct relation with.

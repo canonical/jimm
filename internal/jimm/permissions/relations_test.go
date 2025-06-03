@@ -312,3 +312,93 @@ func (s *permissionManagerSuite) TestListResources(c *qt.C) {
 		})
 	}
 }
+
+func (s *permissionManagerSuite) TestCheckPermissions(c *qt.C) {
+	c.Parallel()
+	ctx := context.Background()
+
+	u := openfga.NewUser(&dbmodel.Identity{Name: "admin@canonical.com"}, s.ofgaClient)
+	u.JimmAdmin = true
+
+	user, group, controller, model, _, cloud, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
+	tuples := []apiparams.RelationshipTuple{
+		{
+			Object:       user.Tag().String(),
+			Relation:     names.ReaderRelation.String(),
+			TargetObject: model.ResourceTag().String(),
+		},
+		{
+			Object:       user.Tag().String(),
+			Relation:     names.WriterRelation.String(),
+			TargetObject: model.ResourceTag().String(),
+		},
+		{
+			Object:       user.Tag().String(),
+			Relation:     names.AuditLogViewerRelation.String(),
+			TargetObject: controller.ResourceTag().String(),
+		},
+		{
+			Object:       user.Tag().String(),
+			Relation:     names.AdministratorRelation.String(),
+			TargetObject: controller.ResourceTag().String(),
+		},
+		{
+			Object:       user.Tag().String(),
+			Relation:     names.AdministratorRelation.String(),
+			TargetObject: cloud.ResourceTag().String(),
+		},
+		{
+			Object:       user.Tag().String(),
+			Relation:     names.CanAddModelRelation.String(),
+			TargetObject: cloud.ResourceTag().String(),
+		},
+		{
+			Object:       user.Tag().String(),
+			Relation:     names.MemberRelation.String(),
+			TargetObject: group.ResourceTag().String(),
+		},
+	}
+	err := s.manager.AddRelation(ctx, u, tuples)
+
+	c.Assert(err, qt.IsNil)
+	results, err := s.manager.CheckRelations(ctx, u, tuples)
+	c.Assert(err, qt.IsNil)
+	c.Assert(results, qt.HasLen, len(tuples))
+	for i := range tuples {
+		c.Assert(results[i].Allowed, qt.IsTrue)
+		c.Assert(results[i].Error, qt.IsNil)
+	}
+}
+
+func (s *permissionManagerSuite) TestCheckRelationsWithErrors(c *qt.C) {
+	c.Parallel()
+	ctx := context.Background()
+
+	u := openfga.NewUser(&dbmodel.Identity{Name: "admin@canonical.com"}, s.ofgaClient)
+	u.JimmAdmin = true
+
+	user, _, _, model, _, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
+	tuples := []apiparams.RelationshipTuple{
+		{
+			Object:       user.Tag().String(),
+			Relation:     names.ReaderRelation.String(),
+			TargetObject: model.ResourceTag().String(),
+		},
+	}
+
+	err := s.manager.AddRelation(ctx, u, tuples)
+	c.Assert(err, qt.IsNil)
+	tuplesToCheck := tuples
+	tuplesToCheck = append(tuplesToCheck, apiparams.RelationshipTuple{
+		Object:       "invalid-object",
+		Relation:     names.WriterRelation.String(),
+		TargetObject: model.ResourceTag().String(),
+	})
+	results, err := s.manager.CheckRelations(ctx, u, tuplesToCheck)
+	c.Assert(err, qt.IsNil)
+	c.Assert(results, qt.HasLen, len(tuplesToCheck))
+	c.Assert(results[0].Allowed, qt.IsTrue)
+	c.Assert(results[0].Error, qt.IsNil)
+	c.Assert(results[1].Allowed, qt.IsFalse)
+	c.Assert(results[1].Error, qt.IsNotNil)
+}

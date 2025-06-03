@@ -23,6 +23,7 @@ type PermissionManager struct {
 	AddRelation_            func(ctx context.Context, user *openfga.User, tuples []apiparams.RelationshipTuple) error
 	RemoveRelation_         func(ctx context.Context, user *openfga.User, tuples []apiparams.RelationshipTuple) error
 	CheckRelation_          func(ctx context.Context, user *openfga.User, tuple apiparams.RelationshipTuple, trace bool) (_ bool, err error)
+	CheckRelations_         func(ctx context.Context, user *openfga.User, tuples []apiparams.RelationshipTuple) ([]openfga.CheckResult, error)
 	ListRelationshipTuples_ func(ctx context.Context, user *openfga.User, tuple apiparams.RelationshipTuple, pageSize int32, continuationToken string) ([]openfga.Tuple, string, error)
 	ListObjectRelations_    func(ctx context.Context, user *openfga.User, object string, pageSize int32, continuationToken pagination.EntitlementToken) ([]openfga.Tuple, pagination.EntitlementToken, error)
 	ListResources_          func(ctx context.Context, user *openfga.User, filter pagination.LimitOffsetPagination, namePrefixFilter, typeFilter string) ([]db.Resource, error)
@@ -66,6 +67,13 @@ func (j *PermissionManager) CheckRelation(ctx context.Context, user *openfga.Use
 		return false, errors.E(errors.CodeNotImplemented)
 	}
 	return j.CheckRelation_(ctx, user, tuple, trace)
+}
+
+func (j *PermissionManager) CheckRelations(ctx context.Context, user *openfga.User, tuples []apiparams.RelationshipTuple) ([]openfga.CheckResult, error) {
+	if j.CheckRelations_ == nil {
+		return nil, errors.E(errors.CodeNotImplemented)
+	}
+	return j.CheckRelations_(ctx, user, tuples)
 }
 
 func (j *PermissionManager) ListRelationshipTuples(ctx context.Context, user *openfga.User, tuple apiparams.RelationshipTuple, pageSize int32, continuationToken string) ([]openfga.Tuple, string, error) {

@@ -357,7 +357,20 @@ type CheckRelationRequest struct {
 // CheckRelationResponse simple responds with an object containing a boolean of 'allowed' or not
 // when a check for access is requested.
 type CheckRelationResponse struct {
-	Allowed bool `json:"allowed" yaml:"allowed"`
+	Allowed bool   `json:"allowed" yaml:"allowed"`
+	Error   string `json:"error,omitempty" yaml:"error,omitempty"`
+}
+
+// CheckRelationsRequest holds the tuples containing the object, target object and relation that we wish
+// verify authorisation with.
+type CheckRelationsRequest struct {
+	Tuples []RelationshipTuple `json:"tuples"`
+}
+
+// CheckRelationResponse simple responds with an object containing a boolean of 'allowed' or not
+// when a check for access is requested.
+type CheckRelationsResponse struct {
+	Results []CheckRelationResponse `json:"results" yaml:"results"`
 }
 
 // ListRelationshipTuplesRequests holds the request information to list tuples.

@@ -160,11 +160,36 @@ func (r *controllerRoot) CheckRelation(ctx context.Context, req apiparams.CheckR
 	allowed, err := r.jimm.PermissionManager().CheckRelation(ctx, r.user, req.Tuple, false)
 	if err != nil {
 		zapctx.Error(ctx, "failed to check relation", zap.NamedError("check-relation-error", err))
+		checkResp.Error = err.Error()
 		return checkResp, errors.E(op, err)
 	}
 	checkResp.Allowed = allowed
 	zapctx.Debug(ctx, "check request", zap.String("allowed", strconv.FormatBool(allowed)))
 	return checkResp, nil
+}
+
+// CheckRelations performs an authorisation check for a list of tuples.
+// It returns a list of results, each with an Allowed boolean and an optional error message.
+func (r *controllerRoot) CheckRelations(ctx context.Context, req apiparams.CheckRelationsRequest) (apiparams.CheckRelationsResponse, error) {
+	const op = errors.Op("jujuapi.CheckRelations")
+	checksResp := apiparams.CheckRelationsResponse{}
+
+	results, err := r.jimm.PermissionManager().CheckRelations(ctx, r.user, req.Tuples)
+	if err != nil {
+		zapctx.Error(ctx, "failed to check relation", zap.NamedError("check-relation-error", err))
+		return checksResp, errors.E(op, err)
+	}
+	for _, result := range results {
+		resp := apiparams.CheckRelationResponse{
+			Allowed: result.Allowed,
+		}
+		if result.Error != nil {
+			resp.Error = result.Error.Error()
+		}
+		checksResp.Results = append(checksResp.Results, resp)
+	}
+
+	return checksResp, nil
 }
 
 // ListRelationshipTuples returns a list of tuples matching the specified filter.

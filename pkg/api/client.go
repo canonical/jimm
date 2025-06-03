@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package api
 
@@ -201,6 +201,13 @@ func (c *Client) CheckRelation(req *params.CheckRelationRequest) (params.CheckRe
 	var checkResp params.CheckRelationResponse
 	err := c.caller.APICall("JIMM", 4, "", "CheckRelation", req, &checkResp)
 	return checkResp, err
+}
+
+// CheckRelations performs an authorisation check for a list of tuples.
+func (c *Client) CheckRelations(req *params.CheckRelationsRequest) (params.CheckRelationsResponse, error) {
+	var checksResp params.CheckRelationsResponse
+	err := c.caller.APICall("JIMM", 4, "", "CheckRelations", req, &checksResp)
+	return checksResp, err
 }
 
 // ListRelationshipTuples returns a list of tuples matching the specified criteria.
