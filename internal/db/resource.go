@@ -54,7 +54,7 @@ controllers.name AS parent_name,
 `
 
 const unionQuery = `
-? UNION ? UNION ? UNION ? UNION ?
+? UNION ? UNION ? UNION ?
 ORDER BY type, id
 OFFSET ?
 LIMIT  ?;
@@ -69,7 +69,7 @@ type Resource struct {
 	ParentType string
 }
 
-// ListResources returns a list of models, clouds, controllers, service accounts, and application offers, with its respective parents.
+// ListResources returns a list of models, clouds, controllers, and application offers, with its respective parents.
 // It has been implemented with a raw query because this is a specific implementation for the ReBAC Admin UI.
 func (d *Database) ListResources(ctx context.Context, limit, offset int, namePrefixFilter, typeFilter string) (_ []Resource, err error) {
 	const op = errors.Op("db.ListResources")
