@@ -36,8 +36,3 @@ type cloud
     define controller: [controller]
     define administrator: [user, user:*, group#member, role#assignee] or administrator from controller
     define can_addmodel: [user, user:*, group#member, role#assignee] or administrator
-
-type serviceaccount
-  relations
-    define administrator: [user, user:*, group#member, role#assignee]
-

@@ -32,7 +32,6 @@ import (
 	"github.com/canonical/jimm/v3/internal/jimm/login"
 	"github.com/canonical/jimm/v3/internal/jimm/permissions"
 	"github.com/canonical/jimm/v3/internal/jimm/role"
-	"github.com/canonical/jimm/v3/internal/jimm/serviceaccount"
 	"github.com/canonical/jimm/v3/internal/jimm/ssh"
 	"github.com/canonical/jimm/v3/internal/jimm/sshkeys"
 	"github.com/canonical/jimm/v3/internal/jimmjwx"
@@ -41,7 +40,6 @@ import (
 	"github.com/canonical/jimm/v3/internal/pubsub"
 	"github.com/canonical/jimm/v3/pkg/api/params"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
-	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
 
 // RoleManager provides a means to manage roles within JIMM.
@@ -142,8 +140,6 @@ type PermissionManager interface {
 	GrantModelAccess(ctx context.Context, user *openfga.User, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error
 	// GrantOfferAccess grants the user the specified access to an offer.
 	GrantOfferAccess(ctx context.Context, u *openfga.User, offerURL string, ut names.UserTag, access jujuparams.OfferAccessPermission) error
-	// GrantServiceAccountAccess grants a user access to manage a service account.
-	GrantServiceAccountAccess(ctx context.Context, u *openfga.User, svcAccTag jimmnames.ServiceAccountTag, entities []string) error
 
 	// RevokeAuditLogAccess revokes a user's access to read audit logs.
 	RevokeAuditLogAccess(ctx context.Context, user *openfga.User, targetUserTag names.UserTag) error
@@ -170,14 +166,6 @@ type AuditLogManager interface {
 	PurgeLogs(ctx context.Context, user *openfga.User, before time.Time) (int64, error)
 	// StartCleanup removes log older than the retention period.
 	StartCleanup(ctx context.Context)
-}
-
-// ServiceAccountManager provides methods to assign ownerhsip and credentials to service accounts.
-type ServiceAccountManager interface {
-	// AddServiceAccount assigns an unowned service account to the provided user.
-	AddServiceAccount(ctx context.Context, u *openfga.User, clientId string) error
-	// CopyServiceAccountCredential copies a cloud-credential from a user to a service account.
-	CopyServiceAccountCredential(ctx context.Context, u *openfga.User, svcAcc *openfga.User, cred names.CloudCredentialTag) (names.CloudCredentialTag, []jujuparams.UpdateCredentialModelResult, error)
 }
 
 // SSHKeyManager provides a means to manage SSH keys within JIMM.
@@ -443,12 +431,6 @@ func New(p Parameters) (*JIMM, error) {
 	}
 	j.auditLogManager = auditLogManager
 
-	svcAccManager, err := serviceaccount.NewServiceAccountManager(j.Database, j.OpenFGAClient, j.jujuManager)
-	if err != nil {
-		return nil, err
-	}
-	j.serviceAccountManager = svcAccManager
-
 	sshKeyManager, err := sshkeys.NewSSHKeyManager(j.Database)
 	if err != nil {
 		return nil, err
@@ -503,9 +485,6 @@ type JIMM struct {
 	// auditLogManager provides a means to manage audit logs within JIMM.
 	auditLogManager AuditLogManager
 
-	// serviceAccountManager provides a means to manage service accounts within JIMM.
-	serviceAccountManager ServiceAccountManager
-
 	// sshKeyManager provides a means to manage SSH keys within JIMM.
 	sshKeyManager SSHKeyManager
 
@@ -539,7 +518,7 @@ func (j *JIMM) GroupManager() GroupManager {
 	return j.groupManager
 }
 
-// IdentityManager returns a manager that enables identity (user/service-account) management.
+// IdentityManager returns a manager that enables identity management.
 func (j *JIMM) IdentityManager() IdentityManager {
 	return j.identityManager
 }
@@ -564,12 +543,6 @@ func (j *JIMM) NewJujuAuthenticator() jujuauth.LoginTokenGenerator {
 // AuditLogManager returns a manager that handles audit logging.
 func (j *JIMM) AuditLogManager() AuditLogManager {
 	return j.auditLogManager
-}
-
-// ServiceAccountManager returns a manager that enables operations
-// related to service accounts.
-func (j *JIMM) ServiceAccountManager() ServiceAccountManager {
-	return j.serviceAccountManager
 }
 
 // SSHKeyManager returns a manager that enables operations

@@ -12,7 +12,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 )
 
-func SetupDB(c *qt.C, database *db.Database) (dbmodel.Model, dbmodel.Controller, dbmodel.Cloud, dbmodel.Identity) {
+func SetupDB(c *qt.C, database *db.Database) (dbmodel.Model, dbmodel.Controller, dbmodel.Cloud) {
 	u, err := dbmodel.NewIdentity("bob@canonical.com")
 	c.Assert(err, qt.IsNil)
 	c.Assert(database.DB.Create(&u).Error, qt.IsNil)
@@ -57,13 +57,8 @@ func SetupDB(c *qt.C, database *db.Database) (dbmodel.Model, dbmodel.Controller,
 	}
 	err = database.AddModel(context.Background(), &model)
 	c.Assert(err, qt.Equals, nil)
-	clientIDWithDomain := "abda51b2-d735-4794-a8bd-49c506baa4af@serviceaccount"
-	sa, err := dbmodel.NewIdentity(clientIDWithDomain)
-	c.Assert(err, qt.Equals, nil)
-	err = database.GetIdentity(context.Background(), sa)
-	c.Assert(err, qt.Equals, nil)
 
-	return model, controller, cloud, *sa
+	return model, controller, cloud
 }
 
 func (s *dbSuite) TestGetResources(c *qt.C) {
@@ -74,10 +69,10 @@ func (s *dbSuite) TestGetResources(c *qt.C) {
 	c.Assert(err, qt.Equals, nil)
 	c.Assert(res, qt.HasLen, 0)
 	// create one model, one controller, one cloud
-	model, controller, cloud, sva := SetupDB(c, s.Database)
+	model, controller, cloud := SetupDB(c, s.Database)
 	res, err = s.Database.ListResources(ctx, 10, 0, "", "")
 	c.Assert(err, qt.Equals, nil)
-	c.Assert(res, qt.HasLen, 4)
+	c.Assert(res, qt.HasLen, 3)
 	for _, r := range res {
 		switch r.Type {
 		case "model":
@@ -87,8 +82,6 @@ func (s *dbSuite) TestGetResources(c *qt.C) {
 			c.Assert(r.ID.String, qt.Equals, controller.UUID)
 		case "cloud":
 			c.Assert(r.ID.String, qt.Equals, cloud.Name)
-		case "service_account":
-			c.Assert(r.ID.String, qt.Equals, sva.Name)
 		}
 	}
 }
@@ -98,7 +91,7 @@ func (s *dbSuite) TestGetResourcesWithNameTypeFilter(c *qt.C) {
 	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.Equals, nil)
 	// create one model, one controller, one cloud
-	model, controller, cloud, sva := SetupDB(c, s.Database)
+	model, controller, cloud := SetupDB(c, s.Database)
 
 	tests := []struct {
 		description   string
@@ -144,24 +137,6 @@ func (s *dbSuite) TestGetResourcesWithNameTypeFilter(c *qt.C) {
 			typeFilter:    "models",
 			expectedSize:  1,
 			expectedUUIDs: []string{model.UUID.String},
-		},
-		{
-			description:   "filter only service accounts",
-			nameFilter:    "",
-			limit:         10,
-			offset:        0,
-			typeFilter:    "identities",
-			expectedSize:  1,
-			expectedUUIDs: []string{sva.Name},
-		},
-		{
-			description:   "filter only service accounts and name",
-			nameFilter:    "not-found",
-			limit:         10,
-			offset:        0,
-			typeFilter:    "identities",
-			expectedSize:  0,
-			expectedUUIDs: []string{},
 		},
 	}
 	for _, t := range tests {

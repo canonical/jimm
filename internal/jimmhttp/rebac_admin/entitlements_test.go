@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package rebac_admin_test
 
@@ -26,7 +26,7 @@ func TestEntitlements(t *testing.T) {
 	params.Filter = &match
 	entitlements, err = entitlementSvc.ListEntitlements(ctx, params)
 	c.Assert(err, qt.IsNil)
-	c.Assert(entitlements, qt.HasLen, 20)
+	c.Assert(entitlements, qt.HasLen, 16)
 
 	match = "cloud"
 	params.Filter = &match

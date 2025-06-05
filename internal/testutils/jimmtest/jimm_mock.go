@@ -15,17 +15,16 @@ import (
 // will delegate to the requested funcion or if the funcion is nil return
 // a NotImplemented error.
 type JIMM struct {
-	AuditLogManager_       func() jimm.AuditLogManager
-	GroupManager_          func() jimm.GroupManager
-	IdentityManager_       func() jimm.IdentityManager
-	LoginManager_          func() jimm.LoginManager
-	RoleManager_           func() jimm.RoleManager
-	PermissionManager_     func() jimm.PermissionManager
-	ServiceAccountManager_ func() jimm.ServiceAccountManager
-	JujuManager_           func() jimm.JujuManager
-	PubSubHub_             func() *pubsub.Hub
-	ResourceTag_           func() names.ControllerTag
-	ConfigManager_         func() jimm.ConfigManager
+	AuditLogManager_   func() jimm.AuditLogManager
+	GroupManager_      func() jimm.GroupManager
+	IdentityManager_   func() jimm.IdentityManager
+	LoginManager_      func() jimm.LoginManager
+	RoleManager_       func() jimm.RoleManager
+	PermissionManager_ func() jimm.PermissionManager
+	JujuManager_       func() jimm.JujuManager
+	PubSubHub_         func() *pubsub.Hub
+	ResourceTag_       func() names.ControllerTag
+	ConfigManager_     func() jimm.ConfigManager
 }
 
 func (j *JIMM) RoleManager() jimm.RoleManager {
@@ -68,13 +67,6 @@ func (j *JIMM) AuditLogManager() jimm.AuditLogManager {
 		return nil
 	}
 	return j.AuditLogManager_()
-}
-
-func (j *JIMM) ServiceAccountManager() jimm.ServiceAccountManager {
-	if j.ServiceAccountManager_ == nil {
-		return nil
-	}
-	return j.ServiceAccountManager_()
 }
 
 func (j *JIMM) JujuManager() jimm.JujuManager {

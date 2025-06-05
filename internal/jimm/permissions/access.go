@@ -17,7 +17,6 @@ import (
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
-	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
 
 // ToOfferAccessString maps relation to an application offer access string.
@@ -186,44 +185,6 @@ func (j *permissionManager) RevokeAuditLogAccess(ctx context.Context, user *open
 	err = openfga.NewUser(targetUser, j.authSvc).UnsetAuditLogViewerAccess(ctx, j.jimmTag)
 	if err != nil {
 		return errors.E(op, err)
-	}
-	return nil
-}
-
-// GrantServiceAccountAccess creates an administrator relation between the tags provided
-// and the service account. The provided tags must be users or groups (with the member relation)
-// otherwise OpenFGA will report an error.
-func (j *permissionManager) GrantServiceAccountAccess(ctx context.Context, u *openfga.User, svcAccTag jimmnames.ServiceAccountTag, entities []string) error {
-	op := errors.Op("jimm.GrantServiceAccountAccess")
-	tags := make([]*ofganames.Tag, 0, len(entities))
-	// Validate tags
-	for _, val := range entities {
-		tag, err := j.parseAndValidateTag(ctx, val)
-		if err != nil {
-			return errors.E(op, err)
-		}
-		if tag.Kind != openfga.UserType && tag.Kind != openfga.GroupType {
-			return errors.E(op, "invalid entity - not user or group")
-		}
-		if tag.Kind == openfga.GroupType {
-			tag.Relation = ofganames.MemberRelation
-		}
-		tags = append(tags, tag)
-	}
-	tuples := make([]openfga.Tuple, 0, len(tags))
-	svcAccEntity := ofganames.ConvertTag(svcAccTag)
-	for _, tag := range tags {
-		tuple := openfga.Tuple{
-			Object:   tag,
-			Relation: ofganames.AdministratorRelation,
-			Target:   svcAccEntity,
-		}
-		tuples = append(tuples, tuple)
-	}
-	err := j.authSvc.AddRelation(ctx, tuples...)
-	if err != nil {
-		zapctx.Error(ctx, "failed to add tuple(s)", zap.NamedError("add-relation-error", err))
-		return errors.E(op, errors.CodeOpenFGARequestFailed, err)
 	}
 	return nil
 }

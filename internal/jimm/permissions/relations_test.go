@@ -4,6 +4,7 @@ package permissions_test
 
 import (
 	"context"
+	"slices"
 
 	qt "github.com/frankban/quicktest"
 
@@ -141,6 +142,28 @@ func (s *permissionManagerSuite) TestListRelationshipTuples(c *qt.C) {
 			}, 10, "")
 			c.Assert(err, qt.Equals, t.expectedError)
 			c.Assert(tuples, qt.HasLen, t.expectedLength)
+			// Sort the tuples by relation in ascending order
+			// to ensure the order is consistent for testing.
+			sortFunc := func(a, b openfga.Tuple) int {
+				if a.Relation < b.Relation {
+					return -1
+				}
+				if a.Relation > b.Relation {
+					return 1
+				}
+				return 0
+			}
+			slices.SortFunc(tuples, sortFunc)
+			sortFuncExpected := func(a, b ExpectedTuple) int {
+				if a.expectedRelation < b.expectedRelation {
+					return -1
+				}
+				if a.expectedRelation > b.expectedRelation {
+					return 1
+				}
+				return 0
+			}
+			slices.SortFunc(t.expectedTuples, sortFuncExpected)
 			for i, expectedTuple := range t.expectedTuples {
 				c.Assert(tuples[i].Relation.String(), qt.Equals, expectedTuple.expectedRelation)
 				c.Assert(tuples[i].Target.ID, qt.Equals, expectedTuple.expectedTargetId)

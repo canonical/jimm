@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package names
 
@@ -47,11 +47,6 @@ func ParseTag(tag string) (names.Tag, error) {
 			return nil, invalidTagError(tag, kind)
 		}
 		return NewRoleTag(id), nil
-	case ServiceAccountTagKind:
-		if !IsValidServiceAccountId(id) {
-			return nil, invalidTagError(tag, kind)
-		}
-		return NewServiceAccountTag(id), nil
 	default:
 		return names.ParseTag(tag)
 	}

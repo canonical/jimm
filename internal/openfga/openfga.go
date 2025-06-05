@@ -17,7 +17,7 @@ import (
 
 var (
 	// resourceTypes contains a list of all resource kinds (i.e. tags) used throughout JIMM.
-	resourceTypes = [...]string{names.UserTagKind, names.ModelTagKind, names.ControllerTagKind, names.ApplicationOfferTagKind, jimmnames.GroupTagKind, jimmnames.ServiceAccountTagKind, jimmnames.RoleTagKind}
+	resourceTypes = [...]string{names.UserTagKind, names.ModelTagKind, names.ControllerTagKind, names.ApplicationOfferTagKind, jimmnames.GroupTagKind, jimmnames.RoleTagKind}
 )
 
 // Tuple represents a relation between an object and a target.
@@ -53,8 +53,6 @@ var (
 	CloudType Kind = names.CloudTagKind
 	// ControllerType represents a controller object.
 	ControllerType Kind = names.ControllerTagKind
-	// ServiceAccountType represents a service account.
-	ServiceAccountType Kind = jimmnames.ServiceAccountTagKind
 )
 
 // CheckResult is the result of a relation check.

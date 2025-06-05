@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package rebac_admin
 
@@ -16,7 +16,6 @@ const Cloud = "cloud"
 const Controller = "controller"
 const Group = "group"
 const Model = "model"
-const ServiceAccount = "serviceaccount"
 
 // For rebac v1 this list is kept manually.
 // The reason behind that is we want to decide what relations to expose to rebac admin ui.
@@ -73,12 +72,6 @@ var entitlementsList = []resources.EntitlementSchema{
 	{Entitlement: "writer", ReceiverType: "user:*", EntityType: Model},
 	{Entitlement: "writer", ReceiverType: "group#member", EntityType: Model},
 	{Entitlement: "writer", ReceiverType: "role#assignee", EntityType: Model},
-
-	// serviceaccount
-	{Entitlement: "administrator", ReceiverType: "user", EntityType: ServiceAccount},
-	{Entitlement: "administrator", ReceiverType: "user:*", EntityType: ServiceAccount},
-	{Entitlement: "administrator", ReceiverType: "group#member", EntityType: ServiceAccount},
-	{Entitlement: "administrator", ReceiverType: "role#assignee", EntityType: ServiceAccount},
 }
 
 // entitlementsService implements the `entitlementsService` interface from rebac-admin-ui-handlers library

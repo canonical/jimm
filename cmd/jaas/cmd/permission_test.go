@@ -361,10 +361,6 @@ func (s *relationSuite) TestListRelations(c *gc.C) {
 		Object:       "user-" + env.users[1].Name,
 		Relation:     "administrator",
 		TargetObject: "applicationoffer-" + env.applicationOffers[0].URL,
-	}, {
-		Object:       "user-" + env.users[0].Name,
-		Relation:     "administrator",
-		TargetObject: "serviceaccount-test@serviceaccount",
 	}}
 
 	for i := 0; i < cmd.DefaultPageSize+1; i++ {

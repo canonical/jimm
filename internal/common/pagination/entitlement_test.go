@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package pagination_test
 
@@ -169,7 +169,7 @@ func TestNextEntitlementToken(t *testing.T) {
 			desc:          "last resource type but not last page - expect same kind and token",
 			openFGAToken:  "123",
 			kind:          pagination.EntitlementResources[len(pagination.EntitlementResources)-1],
-			expectedToken: "eyJraW5kIjoic2VydmljZWFjY291bnQiLCJ0b2tlbiI6IjEyMyJ9",
+			expectedToken: "eyJraW5kIjoicm9sZSIsInRva2VuIjoiMTIzIn0=",
 		},
 		{
 			desc:          "last resource type with no more data - expect empty token",

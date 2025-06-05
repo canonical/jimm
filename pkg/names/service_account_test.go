@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package names_test
 
@@ -10,50 +10,6 @@ import (
 
 	"github.com/canonical/jimm/v3/pkg/names"
 )
-
-func TestParseServiceAccountID(t *testing.T) {
-	c := qt.New(t)
-	tests := []struct {
-		about      string
-		tag        string
-		expectedID string
-		err        string
-	}{{
-		about:      "Valid svc account tag",
-		tag:        "serviceaccount-1e654457-a195-4a41-8360-929c7f455d43@serviceaccount",
-		expectedID: "1e654457-a195-4a41-8360-929c7f455d43@serviceaccount",
-	}, {
-		about: "Invalid svc account tag (no domain)",
-		tag:   "serviceaccount-1e654457-a195-4a41-8360-929c7f455d43",
-		err:   ".*is not a valid serviceaccount tag",
-	}, {
-		about: "Invalid svc account tag (serviceaccounts)",
-		tag:   "serviceaccounts-1e654457-a195-4a41-8360-929c7f455d43@serviceaccount",
-		err:   ".*is not a valid tag",
-	}, {
-		about: "Invalid svc account tag (no prefix)",
-		tag:   "1e654457-a195-4a41-8360-929c7f455d43@serviceaccount",
-		err:   ".*is not a valid tag",
-	}, {
-		about: "Invalid svc account tag (missing ID)",
-		tag:   "serviceaccounts-",
-		err:   ".*is not a valid tag",
-	}}
-	for _, test := range tests {
-		test := test
-		c.Run(test.about, func(c *qt.C) {
-			gt, err := names.ParseServiceAccountTag(test.tag)
-			if test.err == "" {
-				c.Assert(err, qt.IsNil)
-				c.Assert(gt.Id(), qt.Equals, test.expectedID)
-				c.Assert(gt.Kind(), qt.Equals, "serviceaccount")
-				c.Assert(gt.String(), qt.Equals, test.tag)
-			} else {
-				c.Assert(err, qt.ErrorMatches, test.err)
-			}
-		})
-	}
-}
 
 func TestIsValidServiceAccountId(t *testing.T) {
 	c := qt.New(t)

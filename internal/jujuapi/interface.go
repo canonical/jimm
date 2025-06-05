@@ -17,7 +17,6 @@ type JIMM interface {
 	LoginManager() jimm.LoginManager
 	PermissionManager() jimm.PermissionManager
 	AuditLogManager() jimm.AuditLogManager
-	ServiceAccountManager() jimm.ServiceAccountManager
 	JujuManager() jimm.JujuManager
 	ConfigManager() jimm.ConfigManager
 

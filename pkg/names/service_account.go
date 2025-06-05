@@ -1,20 +1,21 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package names
 
 import (
 	"errors"
-	"fmt"
 	"strings"
 
 	"github.com/juju/names/v5"
 )
 
-const (
-	// ServiceAccountTagKind represents the resource "kind" that service accounts
-	// are represented as.
-	ServiceAccountTagKind = "serviceaccount"
+// Service accounts interact with JIMM in the same way as users but in
+// some scenarios, like during client-credential login, we allow the
+// client to send only a service account ID without the `@serviceaccount` domain.
+// This file provides constants and functions to validate and ensure that
+// a service account ID is correctly formatted and has the appropriate domain.
 
+const (
 	// ServiceAccountDomain is the @domain suffix that service account IDs should
 	// have.
 	ServiceAccountDomain = "serviceaccount"
@@ -24,47 +25,6 @@ var (
 	// ErrInvalidClientID indicates an invalid client ID error.
 	ErrInvalidClientID = errors.New("invalid client ID")
 )
-
-// Service accounts are an OIDC/OAuth concept which allows for machine<->machine communication.
-// Service accounts are identified by their client ID.
-
-// ServiceAccount represents a service account where id is the client ID.
-// Implements juju names.Tag.
-type ServiceAccountTag struct {
-	id string
-}
-
-// Id implements juju names.Tag.
-func (t ServiceAccountTag) Id() string { return t.id }
-
-// Kind implements juju names.Tag.
-func (t ServiceAccountTag) Kind() string { return ServiceAccountTagKind }
-
-// String implements juju names.Tag.
-func (t ServiceAccountTag) String() string { return ServiceAccountTagKind + "-" + t.Id() }
-
-// NewServiceAccountTag creates a valid ServiceAccountTag if it is possible to parse
-// the provided tag.
-func NewServiceAccountTag(clientId string) ServiceAccountTag {
-	if !IsValidServiceAccountId(clientId) {
-		panic(fmt.Sprintf("invalid client tag %q", clientId))
-	}
-
-	return ServiceAccountTag{id: clientId}
-}
-
-// ParseServiceAccountTag parses a service account tag string.
-func ParseServiceAccountTag(tag string) (ServiceAccountTag, error) {
-	t, err := ParseTag(tag)
-	if err != nil {
-		return ServiceAccountTag{}, err
-	}
-	gt, ok := t.(ServiceAccountTag)
-	if !ok {
-		return ServiceAccountTag{}, invalidTagError(tag, ServiceAccountTagKind)
-	}
-	return gt, nil
-}
 
 // IsValidServiceAccountId verifies the client id for a service account is valid
 // according to a regex internally. A valid service account ID must have a
