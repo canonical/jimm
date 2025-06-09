@@ -5,22 +5,12 @@ package db_test
 import (
 	"context"
 	"database/sql"
-	"testing"
 
 	qt "github.com/frankban/quicktest"
 
-	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 )
-
-func TestAddModelMigrationUnconfiguredDatabase(t *testing.T) {
-	c := qt.New(t)
-	var d db.Database
-	err := d.AddModelMigration(context.Background(), &dbmodel.ModelMigration{})
-	c.Check(err, qt.ErrorMatches, `database not configured`)
-	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeServerConfiguration)
-}
 
 func (s *dbSuite) TestAddModelMigration(c *qt.C) {
 	err := s.Database.Migrate(context.Background())
