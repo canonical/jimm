@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/juju/juju/api"
 	"github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
@@ -266,6 +267,7 @@ type modelProxy struct {
 	src                     *writeLockConn
 	dst                     *writeLockConn
 	msgs                    *inflightMsgs
+	anonymousLogin          bool // anonymousLogin is true if the client is not authenticated.
 	auditLog                func(*dbmodel.AuditLogEntry)
 	tokenGen                TokenGenerator
 	sshKeyManager           SSHKeyManager
@@ -570,9 +572,16 @@ func checkPermissionsRequired(ctx context.Context, msg *message) (map[string]any
 	return permissionMap, nil
 }
 
+// redoLogin sends a new login request to the controller after checking for
+// the provided permissions. This is sometimes necessary if Juju requires
+// extra permission checks for an operation. If the client performed anonymous
+// login, an error is always returned since we cannot authorize an anonymous user.
 func (p *controllerProxy) redoLogin(ctx context.Context, permissions map[string]any) error {
 	const op = errors.Op("rpc.redoLogin")
 
+	if p.anonymousLogin {
+		return errors.E(op, errors.CodeUnauthorized, "Anonymous login does not support re-authentication")
+	}
 	loginMsg := p.msgs.getLoginMessage()
 	if loginMsg == nil {
 		return errors.E(op, errors.CodeUnauthorized, "Haven't received login yet")
@@ -735,10 +744,36 @@ func (p *clientProxy) handleAdminFacade(ctx context.Context, msg *message) (clie
 
 		return controllerLoginMessageFnc(user)
 	case "Login":
-		return errorFnc(errors.E("JIMM does not support login from old clients", errors.CodeNotSupported))
+		controllerMessage, err := p.handleAnonymousLogin(msg)
+		if err != nil {
+			return errorFnc(err)
+		}
+		return nil, controllerMessage, nil
 	default:
 		return nil, nil, nil
 	}
+}
+
+// handleAnonymousLogin checks for the presence of an anonymous login request
+// and returns the message to be sent to the controller.
+// If the request is not an anonymous login request, it returns an error
+// indicating that JIMM does not support login from old clients.
+func (p *clientProxy) handleAnonymousLogin(msg *message) (*message, error) {
+	var request params.LoginRequest
+	err := json.Unmarshal(msg.Params, &request)
+	if err != nil {
+		return nil, err
+	}
+	user, err := names.ParseUserTag(request.AuthTag)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user tag: %v", err)
+	}
+	if user.Id() == api.AnonymousUsername {
+		p.anonymousLogin = true
+		// return the client's login message verbatim to the controller.
+		return msg, nil
+	}
+	return nil, errors.E("JIMM does not support login from old clients", errors.CodeNotSupported)
 }
 
 // handleKeyManagerFacade processes the key manager facade call.

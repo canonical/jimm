@@ -174,6 +174,37 @@ func TestProxySocketsAdminFacade(t *testing.T) {
 		},
 		oauthAuthenticatorError: errors.E(errors.CodeUnauthorized),
 	}, {
+		about: "login with username/password fails",
+		messageToSend: rpcproxy.Message{
+			RequestID: 1,
+			Type:      "Admin",
+			Version:   3,
+			Request:   "Login",
+			Params:    []byte(`{"auth-tag":"user-bob"}`),
+		},
+		expectedClientResponse: &rpcproxy.Message{
+			RequestID: 1,
+			Error:     "JIMM does not support login from old clients",
+			ErrorCode: "not supported",
+		},
+	}, {
+		about: "login as anonymous user succeeds",
+		messageToSend: rpcproxy.Message{
+			RequestID: 1,
+			Type:      "Admin",
+			Version:   3,
+			Request:   "Login",
+			Params:    []byte(`{"auth-tag":"user-jujuanonymous"}`),
+		},
+		// We expect the controller to receive the same message as JIMM verbatim.
+		expectedControllerMessage: &rpcproxy.Message{
+			RequestID: 1,
+			Type:      "Admin",
+			Version:   3,
+			Request:   "Login",
+			Params:    []byte(`{"auth-tag":"user-jujuanonymous"}`),
+		},
+	}, {
 		about: "any other message - gets forwarded directly to the controller",
 		messageToSend: rpcproxy.Message{
 			RequestID: 1,
@@ -231,6 +262,7 @@ func TestProxySocketsAdminFacade(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.about, func(t *testing.T) {
+			c := qt.New(t)
 			proxyError := test.expectedProxyError != ""
 
 			ctx := context.Background()
