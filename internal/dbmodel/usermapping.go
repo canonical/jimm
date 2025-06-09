@@ -21,7 +21,7 @@ type UserMapping struct {
 	// LocalUser is the local user that this mapping applies to.
 	LocalUser string
 
-	// ExtneralUserName is the external user that this local user maps to.
+	// ExternalUserName is the external user that this local user maps to.
 	ExternalUserName string   `gorm:"column:external_user"`
 	ExternalUser     Identity `gorm:"foreignkey:ExternalUserName;references:Name"`
 }

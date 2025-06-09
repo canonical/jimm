@@ -12,8 +12,6 @@ CREATE TABLE model_migrations (
     user_mapping JSONB NOT NULL
 );
 
-CREATE INDEX idx_model_migrations_model_uuid ON model_migrations (model_uuid);
-
 CREATE TABLE user_mappings (
     id SERIAL PRIMARY KEY,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
