@@ -193,23 +193,6 @@ tuples:
       relation: reader
       object: applicationoffer:ao-applicationoffer-1
     
-    # Service Account (sa)
-    - user: user:sa-user-1
-      relation: administrator
-      object: serviceaccount:sa-serviceaccount-1
-    - user: user:*
-      relation: administrator
-      object: serviceaccount:sa-serviceaccount-2
-    - user: group:sa-group-1#member
-      relation: administrator
-      object: serviceaccount:sa-serviceaccount-1
-    - user: user:sa-user-2
-      relation: member
-      object: group:sa-group-2
-    - user: group:sa-group-2#member
-      relation: administrator
-      object: serviceaccount:sa-serviceaccount-1
-
 # Tests directly correspond to the types available in JIMM's authorisation model
 tests:
     # Ensures:
@@ -534,25 +517,3 @@ tests:
             administrator: false
             consumer: false
             reader: true
-
-    # Guarantees that all or individual users, or group members can become administrators of a service account
-    - name: Service Account
-      list_objects:
-        - user: user:sa-user-1
-          type: serviceaccount
-          assertions:
-            administrator:
-              - serviceaccount:sa-serviceaccount-1
-              - serviceaccount:sa-serviceaccount-2
-        - user: group:sa-group-1#member
-          type: serviceaccount
-          assertions:
-            administrator:
-              - serviceaccount:sa-serviceaccount-1
-        - user: user:sa-user-2
-          type: serviceaccount
-          assertions:
-            administrator:
-              - serviceaccount:sa-serviceaccount-1
-              - serviceaccount:sa-serviceaccount-2
-    

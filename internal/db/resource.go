@@ -1,4 +1,5 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
+
 package db
 
 import (
@@ -52,18 +53,8 @@ controllers.name AS parent_name,
 'controller' AS parent_type
 `
 
-const ServiceAccountQueryKey = "identities"
-const selectIdentities = `
-'service_account' AS type, 
-identities.name AS id, 
-identities.name AS name, 
-'' AS parent_id,
-'' AS parent_name,
-'' AS parent_type
-`
-
 const unionQuery = `
-? UNION ? UNION ? UNION ? UNION ?
+? UNION ? UNION ? UNION ?
 ORDER BY type, id
 OFFSET ?
 LIMIT  ?;
@@ -78,7 +69,7 @@ type Resource struct {
 	ParentType string
 }
 
-// ListResources returns a list of models, clouds, controllers, service accounts, and application offers, with its respective parents.
+// ListResources returns a list of models, clouds, controllers, and application offers, with its respective parents.
 // It has been implemented with a raw query because this is a specific implementation for the ReBAC Admin UI.
 func (d *Database) ListResources(ctx context.Context, limit, offset int, namePrefixFilter, typeFilter string) (_ []Resource, err error) {
 	const op = errors.Op("db.ListResources")
@@ -134,10 +125,6 @@ func buildQuery(db *gorm.DB, offset, limit int, namePrefixFilter, typeFilter str
 		Where("(CASE WHEN ? = '' THEN TRUE ELSE models.name LIKE ? END)", namePrefixFilter, namePrefixFilter+"%").
 		Joins("JOIN controllers ON models.controller_id = controllers.id")
 
-	serviceAccountsQuery := db.Select(selectIdentities).
-		Model(&dbmodel.Identity{}).
-		Where("name LIKE '%@serviceaccount' AND (CASE WHEN ? = '' THEN TRUE ELSE identities.name LIKE ? END)", namePrefixFilter, namePrefixFilter+"%")
-
 	// if the typeFilter is set we only return the query for that specif entityType, otherwise the union.
 	if typeFilter == "" {
 		return db.
@@ -146,7 +133,6 @@ func buildQuery(db *gorm.DB, offset, limit int, namePrefixFilter, typeFilter str
 				cloudsQuery,
 				controllersQuery,
 				modelsQuery,
-				serviceAccountsQuery,
 				offset,
 				limit,
 			), nil
@@ -161,8 +147,6 @@ func buildQuery(db *gorm.DB, offset, limit int, namePrefixFilter, typeFilter str
 		query = applicationOffersQuery
 	case ModelsQueryKey:
 		query = modelsQuery
-	case ServiceAccountQueryKey:
-		query = serviceAccountsQuery
 	default:
 		// this shouldn't happen because we have validated the entityFilter at API layer
 		return nil, errors.E("this entityType does not exist")

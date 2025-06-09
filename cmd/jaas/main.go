@@ -30,10 +30,8 @@ func NewSuperCommand() *jujucmd.SuperCommand {
 	jaasCmd.Register(cmd.NewAddGroupCommand())
 	jaasCmd.Register(cmd.NewAddPermissionCommand())
 	jaasCmd.Register(cmd.NewAddRoleCommand())
-	jaasCmd.Register(cmd.NewAddServiceAccountCommand())
 	jaasCmd.Register(cmd.NewCheckPermissionCommand())
 	jaasCmd.Register(cmd.NewCrossModelQueryCommand())
-	jaasCmd.Register(cmd.NewGrantServiceAccountAccessCommand())
 	jaasCmd.Register(cmd.NewGrantAuditLogAccessCommand())
 	jaasCmd.Register(cmd.NewImportModelCommand())
 	jaasCmd.Register(cmd.NewListAuditEventsCommand())
@@ -41,7 +39,6 @@ func NewSuperCommand() *jujucmd.SuperCommand {
 	jaasCmd.Register(cmd.NewListGroupsCommand())
 	jaasCmd.Register(cmd.NewListPermissionsCommand())
 	jaasCmd.Register(cmd.NewListRolesCommand())
-	jaasCmd.Register(cmd.NewListServiceAccountCredentialsCommand())
 	jaasCmd.Register(cmd.NewMigrateModelCommand())
 	jaasCmd.Register(cmd.NewModelStatusCommand())
 	jaasCmd.Register(cmd.NewPurgeLogsCommand())
@@ -55,7 +52,6 @@ func NewSuperCommand() *jujucmd.SuperCommand {
 	jaasCmd.Register(cmd.NewRevokeAuditLogAccessCommand())
 	jaasCmd.Register(cmd.NewSetControllerDeprecatedCommand())
 	jaasCmd.Register(cmd.NewUnregisterControllerCommand())
-	jaasCmd.Register(cmd.NewUpdateCredentialCommand())
 	jaasCmd.Register(cmd.NewUpdateMigratedModelCommand())
 	return jaasCmd
 }

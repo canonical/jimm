@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package names_test
 
@@ -30,16 +30,6 @@ func TestParseTag(t *testing.T) {
 			tagString:     fmt.Sprintf("role-%s", uuid),
 			expectedTag:   names.NewRoleTag(uuid),
 			expectedValid: true,
-		},
-		{
-			tagString:     fmt.Sprintf("serviceaccount-%s@serviceaccount", uuid),
-			expectedTag:   names.NewServiceAccountTag(fmt.Sprintf("%s@serviceaccount", uuid)),
-			expectedValid: true,
-		},
-		{
-			tagString:     fmt.Sprintf("not-exisintg-%s@serviceaccount", uuid),
-			expectedTag:   names.NewServiceAccountTag(fmt.Sprintf("%s@serviceaccount", uuid)),
-			expectedValid: false,
 		},
 		{
 			tagString:     "group1",

@@ -60,91 +60,6 @@ func (s *permissionManagerSuite) TestAuditLogAccess(c *qt.C) {
 	c.Assert(err, qt.ErrorMatches, "unauthorized")
 }
 
-func (s *permissionManagerSuite) TestGrantServiceAccountAccess(c *qt.C) {
-	c.Parallel()
-
-	tests := []struct {
-		about                     string
-		grantServiceAccountAccess func(ctx context.Context, user *openfga.User, tags []string) error
-		clientID                  string
-		tags                      []string
-		username                  string
-		addGroups                 []string
-		expectedError             string
-	}{{
-		about: "Valid request",
-		grantServiceAccountAccess: func(ctx context.Context, user *openfga.User, tags []string) error {
-			return nil
-		},
-		addGroups: []string{"1"},
-		tags: []string{
-			"user-alice",
-			"user-bob",
-			"group-1#member",
-		},
-		clientID: "fca1f605-736e-4d1f-bcd2-aecc726923be@serviceaccount",
-		username: "alice",
-	}, {
-		about: "Group that doesn't exist",
-		grantServiceAccountAccess: func(ctx context.Context, user *openfga.User, tags []string) error {
-			return nil
-		},
-		tags: []string{
-			"user-alice",
-			"user-bob",
-			// This group doesn't exist.
-			"group-bar",
-		},
-		clientID:      "fca1f605-736e-4d1f-bcd2-aecc726923be@serviceaccount",
-		username:      "alice",
-		expectedError: "group bar not found",
-	}, {
-		about: "Invalid tags",
-		grantServiceAccountAccess: func(ctx context.Context, user *openfga.User, tags []string) error {
-			return nil
-		},
-		tags: []string{
-			"user-alice",
-			"user-bob",
-			"controller-jimm",
-		},
-		clientID:      "fca1f605-736e-4d1f-bcd2-aecc726923be@serviceaccount",
-		username:      "alice",
-		expectedError: "invalid entity - not user or group",
-	}}
-
-	for _, test := range tests {
-		c.Run(test.about, func(c *qt.C) {
-			if len(test.addGroups) > 0 {
-				for _, name := range test.addGroups {
-					_, err := s.db.AddGroup(context.Background(), name)
-					c.Assert(err, qt.IsNil)
-				}
-			}
-			svcAccountTag := jimmnames.NewServiceAccountTag(test.clientID)
-
-			err := s.manager.GrantServiceAccountAccess(context.Background(), s.adminUser, svcAccountTag, test.tags)
-			if test.expectedError == "" {
-				c.Assert(err, qt.IsNil)
-				for _, tag := range test.tags {
-					parsedTag, err := s.manager.ParseAndValidateTag(context.Background(), tag)
-					c.Assert(err, qt.IsNil)
-					tuple := openfga.Tuple{
-						Object:   parsedTag,
-						Relation: ofganames.AdministratorRelation,
-						Target:   ofganames.ConvertTag(jimmnames.NewServiceAccountTag(test.clientID)),
-					}
-					ok, err := s.ofgaClient.CheckRelation(context.Background(), tuple, false)
-					c.Assert(err, qt.IsNil)
-					c.Assert(ok, qt.IsTrue)
-				}
-			} else {
-				c.Assert(err, qt.ErrorMatches, test.expectedError)
-			}
-		})
-	}
-}
-
 const testGetControllerAccessEnv = `
 users:
 - username: alice@canonical.com
@@ -2217,8 +2132,8 @@ func (s *permissionManagerSuite) TestToJAASTag(c *qt.C) {
 		tag:             ofganames.ConvertTag(user.ResourceTag()),
 		expectedJAASTag: "user-" + user.Name,
 	}, {
-		tag:             ofganames.ConvertTag(jimmnames.NewServiceAccountTag(serviceAccountId)),
-		expectedJAASTag: "serviceaccount-" + serviceAccountId,
+		tag:             ofganames.ConvertTag(names.NewUserTag(serviceAccountId)),
+		expectedJAASTag: "user-" + serviceAccountId,
 	}, {
 		tag:             ofganames.ConvertTag(group.ResourceTag()),
 		expectedJAASTag: "group-" + group.Name,
@@ -2267,8 +2182,8 @@ func (s *permissionManagerSuite) TestToJAASTagNoUUIDResolution(c *qt.C) {
 		tag:             ofganames.ConvertTag(user.ResourceTag()),
 		expectedJAASTag: "user-" + user.Name,
 	}, {
-		tag:             ofganames.ConvertTag(jimmnames.NewServiceAccountTag(serviceAccountId)),
-		expectedJAASTag: "serviceaccount-" + serviceAccountId,
+		tag:             ofganames.ConvertTag(names.NewUserTag(serviceAccountId)),
+		expectedJAASTag: "user-" + serviceAccountId,
 	}, {
 		tag:             ofganames.ConvertTag(group.ResourceTag()),
 		expectedJAASTag: "group-" + group.UUID,

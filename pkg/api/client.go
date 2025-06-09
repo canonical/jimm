@@ -240,37 +240,6 @@ func (c *Client) MigrateModel(req *params.MigrateModelRequest) (*jujuparams.Init
 	return &response, err
 }
 
-// AddServiceAccount binds a service account to a user allowing them to manage it.
-func (c *Client) AddServiceAccount(req *params.AddServiceAccountRequest) error {
-	return c.caller.APICall("JIMM", 4, "", "AddServiceAccount", req, nil)
-}
-
-// CopyServiceAccountCredential copies a user cloud-credential to a service account.
-func (c *Client) CopyServiceAccountCredential(req *params.CopyServiceAccountCredentialRequest) (*jujuparams.UpdateCredentialResult, error) {
-	var response jujuparams.UpdateCredentialResult
-	err := c.caller.APICall("JIMM", 4, "", "CopyServiceAccountCredential", req, &response)
-	return &response, err
-}
-
-// ListServiceAccountCredentials lists the cloud credentials belonging to a service account.
-func (c *Client) ListServiceAccountCredentials(req *params.ListServiceAccountCredentialsRequest) (*jujuparams.CredentialContentResults, error) {
-	var response jujuparams.CredentialContentResults
-	err := c.caller.APICall("JIMM", 4, "", "ListServiceAccountCredentials", req, &response)
-	return &response, err
-}
-
-// UpdateServiceAccountCredentials updates credentials associated with a service account.
-func (c *Client) UpdateServiceAccountCredentials(req *params.UpdateServiceAccountCredentialsRequest) (*jujuparams.UpdateCredentialResults, error) {
-	var response jujuparams.UpdateCredentialResults
-	err := c.caller.APICall("JIMM", 4, "", "UpdateServiceAccountCredentials", req, &response)
-	return &response, err
-}
-
-// GrantServiceAccountAccess grants admin access to a service account to given groups/identities.
-func (c *Client) GrantServiceAccountAccess(req *params.GrantServiceAccountAccess) error {
-	return c.caller.APICall("JIMM", 4, "", "GrantServiceAccountAccess", req, nil)
-}
-
 // Version returns version info of the controller.
 func (c *Client) Version() (params.VersionResponse, error) {
 	var response params.VersionResponse

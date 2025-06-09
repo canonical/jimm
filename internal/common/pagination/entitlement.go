@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package pagination
 
@@ -24,7 +24,6 @@ var entitlementResources = []openfga.Kind{
 	openfga.ApplicationOfferType,
 	openfga.GroupType,
 	openfga.RoleType,
-	openfga.ServiceAccountType,
 }
 
 // EntitlementToken represents a wrapped OpenFGA token that contains
