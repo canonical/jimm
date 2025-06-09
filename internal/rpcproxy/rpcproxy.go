@@ -572,6 +572,10 @@ func checkPermissionsRequired(ctx context.Context, msg *message) (map[string]any
 	return permissionMap, nil
 }
 
+// redoLogin sends a new login request to the controller after checking for
+// the provided permissions. This is sometimes necessary if Juju requires
+// extra permission checks for an operation. If the client performed anonymous
+// login, an error is always returned since we cannot authorize an anonymous user.
 func (p *controllerProxy) redoLogin(ctx context.Context, permissions map[string]any) error {
 	const op = errors.Op("rpc.redoLogin")
 
@@ -740,24 +744,36 @@ func (p *clientProxy) handleAdminFacade(ctx context.Context, msg *message) (clie
 
 		return controllerLoginMessageFnc(user)
 	case "Login":
-		var request params.LoginRequest
-		err := json.Unmarshal(msg.Params, &request)
+		controllerMessage, err := p.handleAnonymousLogin(msg)
 		if err != nil {
 			return errorFnc(err)
 		}
-		user, err := names.ParseUserTag(request.AuthTag)
-		if err != nil {
-			return errorFnc(fmt.Errorf("invalid user tag: %v", err))
-		}
-		if user.Name() == api.AnonymousUsername {
-			p.anonymousLogin = true
-			// return the client's login message verbatim to the controller.
-			return nil, msg, nil
-		}
-		return errorFnc(errors.E("JIMM does not support login from old clients", errors.CodeNotSupported))
+		return nil, controllerMessage, nil
 	default:
 		return nil, nil, nil
 	}
+}
+
+// handleAnonymousLogin checks for the presence of an anonymous login request
+// and returns the message to be sent to the controller.
+// If the request is not an anonymous login request, it returns an error
+// indicating that JIMM does not support login from old clients.
+func (p *clientProxy) handleAnonymousLogin(msg *message) (*message, error) {
+	var request params.LoginRequest
+	err := json.Unmarshal(msg.Params, &request)
+	if err != nil {
+		return nil, err
+	}
+	user, err := names.ParseUserTag(request.AuthTag)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user tag: %v", err)
+	}
+	if user.Id() == api.AnonymousUsername {
+		p.anonymousLogin = true
+		// return the client's login message verbatim to the controller.
+		return msg, nil
+	}
+	return nil, errors.E("JIMM does not support login from old clients", errors.CodeNotSupported)
 }
 
 // handleKeyManagerFacade processes the key manager facade call.
