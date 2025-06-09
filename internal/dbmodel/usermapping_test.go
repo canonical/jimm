@@ -11,10 +11,10 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 )
 
-// TestUserMapping_UniqueConstraint tests that the unique constraint on
+// TestUserMappingUniqueConstraint tests that the unique constraint on
 // UserMapping is enforced correctly ensuring two rows with the same
 // ModelUUID and LocalUser cannot be created.
-func TestUserMapping_UniqueConstraint(t *testing.T) {
+func TestUserMappingUniqueConstraint(t *testing.T) {
 	c := qt.New(t)
 	db := gormDB(c)
 

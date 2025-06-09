@@ -33,6 +33,10 @@ func (s *dbSuite) TestAddUserMapping(c *qt.C) {
 	err = s.Database.AddUserMapping(ctx, userMapping)
 	c.Assert(err, qt.IsNil)
 	c.Assert(userMapping.ID, qt.Not(qt.Equals), 0)
+
+	userMapping.ID = 0 // Reset ID to ensure it is not reused
+	err = s.Database.AddUserMapping(ctx, userMapping)
+	c.Assert(err, qt.Not(qt.IsNil))
 }
 
 func (s *dbSuite) TestGetUserMapping(c *qt.C) {

@@ -22,4 +22,4 @@ CREATE TABLE user_mappings (
     CONSTRAINT unique_user_mappings_key UNIQUE(model_uuid, local_user)
 );
 
-CREATE INDEX idx_model_user_mappings_local_user ON user_mappings (model_uuid, local_user);
+CREATE INDEX idx_model_user_mappings_model_uuid ON user_mappings (model_uuid);

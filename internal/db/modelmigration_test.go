@@ -53,35 +53,9 @@ func (s *dbSuite) TestAddModelMigration(c *qt.C) {
 	c.Assert(dbMigration.ModelUUID, qt.DeepEquals, migration.ModelUUID)
 	c.Assert(dbMigration.TargetControllerID, qt.Equals, controller.ID)
 	c.Assert(dbMigration.UserMapping, qt.DeepEquals, migration.UserMapping)
-}
 
-func (s *dbSuite) TestAddModelMigrationAlreadyExists(c *qt.C) {
-	err := s.Database.Migrate(context.Background())
-	c.Assert(err, qt.Equals, nil)
-
-	cloud := dbmodel.Cloud{
-		Name: "test-cloud",
-	}
-	err = s.Database.AddCloud(context.Background(), &cloud)
-	c.Assert(err, qt.IsNil)
-
-	controller := dbmodel.Controller{
-		Name:      "test-controller",
-		UUID:      "00000000-0000-0000-0000-000000000001",
-		CloudName: cloud.Name,
-	}
-	c.Assert(s.Database.DB.Create(&controller).Error, qt.IsNil)
-
-	migration := dbmodel.ModelMigration{
-		ModelUUID:          sql.NullString{String: "00000001-0000-0000-0000-000000000001", Valid: true},
-		TargetControllerID: controller.ID,
-		UserMapping:        dbmodel.JSON([]byte(`{"local":"external"}`)),
-	}
+	migration.ID = 0 // Reset ID to ensure it is not reused
 	err = s.Database.AddModelMigration(context.Background(), &migration)
-	c.Assert(err, qt.Equals, nil)
-
-	migration2 := migration
-	err = s.Database.AddModelMigration(context.Background(), &migration2)
 	c.Assert(err, qt.Not(qt.IsNil))
 }
 

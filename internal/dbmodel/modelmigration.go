@@ -8,6 +8,9 @@ import (
 )
 
 // ModelMigration holds the information for a pending model migration.
+// It includes the model UUID, the target controller for the migration,
+// and a mapping of local users to external users that will be persisted
+// separately in the UserMapping table if the migration is successful.
 type ModelMigration struct {
 	// Note this doesn't use the standard gorm.Model to avoid soft-deletes.
 	ID        uint `gorm:"primarykey"`
@@ -16,7 +19,7 @@ type ModelMigration struct {
 	// ModelUUID is the UUID of the incoming model.
 	ModelUUID sql.NullString
 
-	// TargetControllerID is the target controller for the model undegroing migration.
+	// TargetControllerID is the target controller for the model undergoing migration.
 	TargetControllerID uint
 	TargetController   Controller
 
