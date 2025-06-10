@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/juju/juju/api/base"
+	jujucloud "github.com/juju/juju/cloud"
 	"github.com/juju/juju/core/crossmodel"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/version"
@@ -122,13 +123,12 @@ func (m DialerMap) Dial(ctx context.Context, ctl *dbmodel.Controller, mt names.M
 type API struct {
 	base.APICaller
 
-	AddCloud_                          func(context.Context, names.CloudTag, jujuparams.Cloud, bool) error
+	AddCloud_                          func(context.Context, names.CloudTag, jujucloud.Cloud, bool) error
 	ChangeModelCredential_             func(context.Context, names.ModelTag, names.CloudCredentialTag) error
 	CheckCredentialModels_             func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error)
 	Close_                             func() error
-	Cloud_                             func(context.Context, names.CloudTag, *jujuparams.Cloud) error
-	CloudInfo_                         func(context.Context, names.CloudTag, *jujuparams.CloudInfo) error
-	Clouds_                            func(context.Context) (map[names.CloudTag]jujuparams.Cloud, error)
+	Cloud_                             func(context.Context, names.CloudTag, *jujucloud.Cloud) error
+	Clouds_                            func(context.Context) (map[names.CloudTag]jujucloud.Cloud, error)
 	ControllerModelSummary_            func(context.Context, *jujuparams.ModelSummary) error
 	ControllerConfig_                  func(context.Context) (jujuparams.ControllerConfigResult, error)
 	CreateModel_                       func(context.Context, *jujuparams.ModelCreateArgs, *jujuparams.ModelInfo) error
@@ -160,7 +160,7 @@ type API struct {
 	SupportsCheckCredentialModels_     bool
 	SupportsModelSummaryWatcher_       bool
 	Status_                            func(context.Context, []string) (*jujuparams.FullStatus, error)
-	UpdateCloud_                       func(context.Context, names.CloudTag, jujuparams.Cloud) error
+	UpdateCloud_                       func(context.Context, names.CloudTag, jujucloud.Cloud) error
 	UpdateCredential_                  func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error)
 	ValidateModelUpgrade_              func(context.Context, names.ModelTag, bool) error
 	WatchAllModelSummaries_            func(context.Context) (string, error)
@@ -170,7 +170,7 @@ type API struct {
 	ListModels_                        func(ctx context.Context) ([]base.UserModel, error)
 }
 
-func (a *API) AddCloud(ctx context.Context, tag names.CloudTag, cld jujuparams.Cloud, force bool) error {
+func (a *API) AddCloud(ctx context.Context, tag names.CloudTag, cld jujucloud.Cloud, force bool) error {
 	if a.AddCloud_ == nil {
 		return errors.E(errors.CodeNotImplemented)
 	}
@@ -191,21 +191,14 @@ func (a *API) Close() error {
 	return a.Close_()
 }
 
-func (a *API) Cloud(ctx context.Context, tag names.CloudTag, ci *jujuparams.Cloud) error {
+func (a *API) Cloud(ctx context.Context, tag names.CloudTag, ci *jujucloud.Cloud) error {
 	if a.Cloud_ == nil {
 		return errors.E(errors.CodeNotImplemented)
 	}
 	return a.Cloud_(ctx, tag, ci)
 }
 
-func (a *API) CloudInfo(ctx context.Context, tag names.CloudTag, ci *jujuparams.CloudInfo) error {
-	if a.CloudInfo_ == nil {
-		return errors.E(errors.CodeNotImplemented)
-	}
-	return a.CloudInfo_(ctx, tag, ci)
-}
-
-func (a *API) Clouds(ctx context.Context) (map[names.CloudTag]jujuparams.Cloud, error) {
+func (a *API) Clouds(ctx context.Context) (map[names.CloudTag]jujucloud.Cloud, error) {
 	if a.Clouds_ == nil {
 		return nil, errors.E(errors.CodeNotImplemented)
 	}
@@ -420,7 +413,7 @@ func (a *API) Status(ctx context.Context, patterns []string) (*jujuparams.FullSt
 	return a.Status_(ctx, patterns)
 }
 
-func (a *API) UpdateCloud(ctx context.Context, tag names.CloudTag, cloud jujuparams.Cloud) error {
+func (a *API) UpdateCloud(ctx context.Context, tag names.CloudTag, cloud jujucloud.Cloud) error {
 	if a.UpdateCloud_ == nil {
 		return errors.E(errors.CodeNotImplemented)
 	}

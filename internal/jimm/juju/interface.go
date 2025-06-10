@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/juju/juju/api/base"
+	jujucloud "github.com/juju/juju/cloud"
 	"github.com/juju/juju/core/crossmodel"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
@@ -35,7 +36,7 @@ type API interface {
 	base.APICallCloser
 
 	// AddCloud adds a new cloud.
-	AddCloud(context.Context, names.CloudTag, jujuparams.Cloud, bool) error
+	AddCloud(context.Context, names.CloudTag, jujucloud.Cloud, bool) error
 
 	// ChangeModelCredential replaces cloud credential for a given model with the provided one.
 	ChangeModelCredential(context.Context, names.ModelTag, names.CloudCredentialTag) error
@@ -48,14 +49,10 @@ type API interface {
 	Close() error
 
 	// Cloud fetches the cloud data for the given cloud.
-	Cloud(context.Context, names.CloudTag, *jujuparams.Cloud) error
-
-	// CloudInfo fetches the cloud information for the cloud with the given
-	// tag.
-	CloudInfo(context.Context, names.CloudTag, *jujuparams.CloudInfo) error
+	Cloud(context.Context, names.CloudTag, *jujucloud.Cloud) error
 
 	// Clouds returns the set of clouds supported by the controller.
-	Clouds(context.Context) (map[names.CloudTag]jujuparams.Cloud, error)
+	Clouds(context.Context) (map[names.CloudTag]jujucloud.Cloud, error)
 
 	// ControllerModelSummary fetches the model summary of the model on the
 	// controller that hosts the controller machines.
@@ -97,9 +94,6 @@ type API interface {
 	// GrantApplicationOfferAccess grants access to an application offer to
 	// a user.
 	GrantApplicationOfferAccess(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error
-
-	// GrantCloudAccess grants cloud access to a user.
-	GrantCloudAccess(context.Context, names.CloudTag, names.UserTag, string) error
 
 	// GrantJIMMModelAdmin makes the JIMM user an admin on a model.
 	GrantJIMMModelAdmin(context.Context, names.ModelTag) error
@@ -143,9 +137,6 @@ type API interface {
 	// from a user.
 	RevokeApplicationOfferAccess(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error
 
-	// RevokeCloudAccess revokes cloud access from a user.
-	RevokeCloudAccess(context.Context, names.CloudTag, names.UserTag, string) error
-
 	// RevokeCredential revokes a credential.
 	RevokeCredential(context.Context, names.CloudCredentialTag) error
 
@@ -164,7 +155,7 @@ type API interface {
 	Status(ctx context.Context, patterns []string) (*jujuparams.FullStatus, error)
 
 	// UpdateCloud updates a cloud definition.
-	UpdateCloud(context.Context, names.CloudTag, jujuparams.Cloud) error
+	UpdateCloud(context.Context, names.CloudTag, jujucloud.Cloud) error
 
 	// UpdateCredential updates a credential.
 	UpdateCredential(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error)

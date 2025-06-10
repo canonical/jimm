@@ -5,6 +5,7 @@ package dbmodel
 import (
 	"time"
 
+	jujucloud "github.com/juju/juju/cloud"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"gorm.io/gorm"
@@ -105,10 +106,14 @@ func (c Cloud) ToJujuCloud() jujuparams.Cloud {
 
 // FromJujuCloud updates a Cloud object with the details from the given
 // jujuparams.Cloud.
-func (c *Cloud) FromJujuCloud(cld jujuparams.Cloud) {
+func (c *Cloud) FromJujuCloud(cld jujucloud.Cloud) {
 	c.Type = cld.Type
 	c.HostCloudRegion = cld.HostCloudRegion
-	c.AuthTypes = Strings(cld.AuthTypes)
+	authTypes := make([]string, len(cld.AuthTypes))
+	for i, at := range cld.AuthTypes {
+		authTypes[i] = string(at)
+	}
+	c.AuthTypes = authTypes
 	c.Endpoint = cld.Endpoint
 	c.IdentityEndpoint = cld.IdentityEndpoint
 	c.StorageEndpoint = cld.StorageEndpoint
@@ -203,7 +208,7 @@ func (r CloudRegion) ToJujuCloudRegion() jujuparams.CloudRegion {
 
 // FromJujuCloudRegion updates a CloudRegion object with the details from
 // the given jujuparams.CloudRegion.
-func (cr *CloudRegion) FromJujuCloudRegion(r jujuparams.CloudRegion) {
+func (cr *CloudRegion) FromJujuCloudRegion(r jujucloud.Region) {
 	cr.Name = r.Name
 	cr.Endpoint = r.Endpoint
 	cr.IdentityEndpoint = r.IdentityEndpoint
