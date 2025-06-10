@@ -36,7 +36,7 @@ type API interface {
 	base.APICallCloser
 
 	// AddCloud adds a new cloud.
-	AddCloud(context.Context, names.CloudTag, jujucloud.Cloud, bool) error
+	AddCloud(names.CloudTag, jujucloud.Cloud, bool) error
 
 	// ChangeModelCredential replaces cloud credential for a given model with the provided one.
 	ChangeModelCredential(context.Context, names.ModelTag, names.CloudCredentialTag) error
@@ -49,10 +49,10 @@ type API interface {
 	Close() error
 
 	// Cloud fetches the cloud data for the given cloud.
-	Cloud(context.Context, names.CloudTag, *jujucloud.Cloud) error
+	Cloud(names.CloudTag, *jujucloud.Cloud) error
 
 	// Clouds returns the set of clouds supported by the controller.
-	Clouds(context.Context) (map[names.CloudTag]jujucloud.Cloud, error)
+	Clouds() (map[names.CloudTag]jujucloud.Cloud, error)
 
 	// ControllerModelSummary fetches the model summary of the model on the
 	// controller that hosts the controller machines.
@@ -131,7 +131,7 @@ type API interface {
 	Ping(context.Context) error
 
 	// RemoveCloud removes a cloud.
-	RemoveCloud(context.Context, names.CloudTag) error
+	RemoveCloud(names.CloudTag) error
 
 	// RevokeApplicationOfferAccess revokes access to an application offer
 	// from a user.
@@ -155,7 +155,7 @@ type API interface {
 	Status(ctx context.Context, patterns []string) (*jujuparams.FullStatus, error)
 
 	// UpdateCloud updates a cloud definition.
-	UpdateCloud(context.Context, names.CloudTag, jujucloud.Cloud) error
+	UpdateCloud(names.CloudTag, jujucloud.Cloud) error
 
 	// UpdateCredential updates a credential.
 	UpdateCredential(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error)

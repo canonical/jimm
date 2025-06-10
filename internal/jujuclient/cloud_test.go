@@ -1,4 +1,5 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
+
 package jujuclient_test
 
 import (
@@ -210,25 +211,4 @@ func (s *cloudSuite) TestUpdateCredentialWithModels(c *gc.C) {
 		return models[i].ModelName < models[j].ModelName
 	})
 	c.Assert(models, jc.DeepEquals, expectModels)
-}
-
-func (s *cloudSuite) TestClouds(c *gc.C) {
-	clouds, err := s.API.Clouds(context.Background())
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(clouds, jc.DeepEquals, map[names.CloudTag]jujuparams.Cloud{
-		names.NewCloudTag(jimmtest.TestCloudName): {
-			Type:             jimmtest.TestProviderType,
-			AuthTypes:        []string{"empty", "userpass"},
-			Endpoint:         jimmtest.TestCloudEndpoint,
-			IdentityEndpoint: jimmtest.TestCloudIdentityEndpoint,
-			StorageEndpoint:  jimmtest.TestCloudStorageEndpoint,
-			Regions: []jujuparams.CloudRegion{{
-				Name:             jimmtest.TestCloudRegionName,
-				Endpoint:         jimmtest.TestCloudEndpoint,
-				IdentityEndpoint: jimmtest.TestCloudIdentityEndpoint,
-				StorageEndpoint:  jimmtest.TestCloudStorageEndpoint,
-			}},
-			IsControllerCloud: true,
-		},
-	})
 }

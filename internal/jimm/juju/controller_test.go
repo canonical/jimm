@@ -37,7 +37,7 @@ func TestAddController(t *testing.T) {
 	c := qt.New(t)
 
 	api := &jimmtest.API{
-		Clouds_: func(context.Context) (map[names.CloudTag]jujucloud.Cloud, error) {
+		Clouds_: func() (map[names.CloudTag]jujucloud.Cloud, error) {
 			clouds := map[names.CloudTag]jujucloud.Cloud{
 				names.NewCloudTag("aws"): {
 					Type:             "ec2",
@@ -157,7 +157,7 @@ func TestAddControllerWithCloudWithoutRegions(t *testing.T) {
 	c := qt.New(t)
 
 	api := &jimmtest.API{
-		Clouds_: func(context.Context) (map[names.CloudTag]jujucloud.Cloud, error) {
+		Clouds_: func() (map[names.CloudTag]jujucloud.Cloud, error) {
 			clouds := map[names.CloudTag]jujucloud.Cloud{
 				names.NewCloudTag("k8s"): {
 					Type:      "kubernetes",
@@ -248,7 +248,7 @@ func TestAddControllerWithVault(t *testing.T) {
 	}
 
 	api := &jimmtest.API{
-		Clouds_: func(context.Context) (map[names.CloudTag]jujucloud.Cloud, error) {
+		Clouds_: func() (map[names.CloudTag]jujucloud.Cloud, error) {
 			clouds := map[names.CloudTag]jujucloud.Cloud{
 				names.NewCloudTag("aws"): {
 					Type:             "ec2",

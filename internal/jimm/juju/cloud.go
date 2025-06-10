@@ -345,13 +345,13 @@ func (j *JujuManager) addControllerCloud(ctx context.Context, ctl *dbmodel.Contr
 		return nil, errors.E(op, err)
 	}
 	defer api.Close()
-	if err := api.AddCloud(ctx, tag, cloud, force); err != nil {
+	if err := api.AddCloud(tag, cloud, force); err != nil {
 		if errors.ErrorCode(err) != errors.CodeAlreadyExists {
 			return nil, errors.E(op, err)
 		}
 	}
 	var result jujucloud.Cloud
-	if err := api.Cloud(ctx, tag, &result); err != nil {
+	if err := api.Cloud(tag, &result); err != nil {
 		return nil, errors.E(op, err)
 	}
 
@@ -422,7 +422,7 @@ func (j *JujuManager) RemoveCloud(ctx context.Context, user *openfga.User, ct na
 		// used by any models before attempting to remove it. JIMM
 		// relies on the controller failing the RemoveClouds API
 		// request if the cloud is in use.
-		if err := api.RemoveCloud(ctx, ct); err != nil {
+		if err := api.RemoveCloud(ct); err != nil {
 			return err
 		}
 
@@ -478,7 +478,7 @@ func (j *JujuManager) UpdateCloud(ctx context.Context, user *openfga.User, ct na
 	}
 
 	err = j.forEachController(ctx, controllers, func(ctl *dbmodel.Controller, api API) error {
-		return api.UpdateCloud(ctx, ct, cloud)
+		return api.UpdateCloud(ct, cloud)
 	})
 	if err != nil {
 		return errors.E(op, err)
@@ -561,7 +561,7 @@ func (j *JujuManager) RemoveCloudFromController(ctx context.Context, user *openf
 	// used by any models before attempting to remove it. JIMM
 	// relies on the controller failing the RemoveClouds API
 	// request if the cloud is in use.
-	if err := api.RemoveCloud(ctx, ct); err != nil {
+	if err := api.RemoveCloud(ct); err != nil {
 		return errors.E(op, err)
 	}
 

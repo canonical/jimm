@@ -247,7 +247,7 @@ func (j *JujuManager) AddController(ctx context.Context, user *openfga.User, ctl
 	ctl.CloudRegion = modelSummary.CloudRegion
 	// TODO(mhilton) add the controller model?
 
-	clouds, err := api.Clouds(ctx)
+	clouds, err := api.Clouds()
 	if err != nil {
 		return errors.E(op, err, "failed to fetch controller clouds")
 	}
