@@ -117,12 +117,6 @@ type Params struct {
 	// authenticate to the controller.
 	ControllerAdmins []string
 
-	// DisableConnectionCache disables caching connections to
-	// controllers. By default controller connections are cached, if
-	// this is set then a new connection will be created for each API
-	// call. This is mostly useful for testing.
-	DisableConnectionCache bool
-
 	// VaultRoleID is the AppRole role ID.
 	VaultRoleID string
 
@@ -420,10 +414,6 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	jimmParameters.Dialer = &jujuclient.Dialer{
 		ControllerCredentialsStore: credentialStore,
 		JWTService:                 jimmParameters.JWTService,
-	}
-
-	if !p.DisableConnectionCache {
-		jimmParameters.Dialer = juju.CacheDialer(jimmParameters.Dialer)
 	}
 
 	if _, err := url.Parse(p.DashboardFinalRedirectURL); err != nil {
