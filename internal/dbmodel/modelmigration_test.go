@@ -18,7 +18,7 @@ func TestModelMigration_UniqueModelUUIDConstraint(t *testing.T) {
 	c := qt.New(t)
 	db := gormDB(c)
 	_, _, ctl, _ := initModelEnv(c, db)
-	m := dbmodel.ModelMigration{
+	m := dbmodel.IncomingModelMigration{
 		ModelUUID: sql.NullString{
 			String: "00000001-0000-0000-0000-000000000001",
 			Valid:  true,
@@ -28,7 +28,7 @@ func TestModelMigration_UniqueModelUUIDConstraint(t *testing.T) {
 	}
 	c.Assert(db.Create(&m).Error, qt.IsNil)
 
-	m2 := dbmodel.ModelMigration{
+	m2 := dbmodel.IncomingModelMigration{
 		ModelUUID: sql.NullString{
 			String: "00000001-0000-0000-0000-000000000001",
 			Valid:  true,
@@ -36,5 +36,5 @@ func TestModelMigration_UniqueModelUUIDConstraint(t *testing.T) {
 		TargetControllerID: ctl.ID,
 		UserMapping:        dbmodel.JSON([]byte(`{"new-local": "new-external"}`)),
 	}
-	c.Assert(db.Create(&m2).Error, qt.ErrorMatches, ".*duplicate key value violates unique constraint \"model_migrations_model_uuid_key\".*")
+	c.Assert(db.Create(&m2).Error, qt.ErrorMatches, ".*duplicate key value violates unique constraint \"incoming_model_migrations_model_uuid_key\".*")
 }

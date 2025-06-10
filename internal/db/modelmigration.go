@@ -13,7 +13,7 @@ import (
 // AddModelMigration stores information about an incoming model migration.
 //   - returns an error with code errors.CodeAlreadyExists if
 //     a migration row with the same model UUID already exists.
-func (d *Database) AddModelMigration(ctx context.Context, modelMigration *dbmodel.ModelMigration) (err error) {
+func (d *Database) AddModelMigration(ctx context.Context, modelMigration *dbmodel.IncomingModelMigration) (err error) {
 	const op = errors.Op("db.AddModelMigration")
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
@@ -32,7 +32,7 @@ func (d *Database) AddModelMigration(ctx context.Context, modelMigration *dbmode
 }
 
 // GetModelMigration returns model migration information based on the model UUID.
-func (d *Database) GetModelMigration(ctx context.Context, modelMigration *dbmodel.ModelMigration) (err error) {
+func (d *Database) GetModelMigration(ctx context.Context, modelMigration *dbmodel.IncomingModelMigration) (err error) {
 	const op = errors.Op("db.GetModelMigration")
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
@@ -61,7 +61,7 @@ func (d *Database) GetModelMigration(ctx context.Context, modelMigration *dbmode
 }
 
 // DeleteModelMigration removes a model migration entry from the database.
-func (d *Database) DeleteModelMigration(ctx context.Context, modelMigration *dbmodel.ModelMigration) (err error) {
+func (d *Database) DeleteModelMigration(ctx context.Context, modelMigration *dbmodel.IncomingModelMigration) (err error) {
 	const op = errors.Op("db.DeleteModelMigration")
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)

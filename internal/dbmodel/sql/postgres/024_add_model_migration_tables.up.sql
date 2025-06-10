@@ -1,10 +1,10 @@
 -- Add tables to handle model migrations
--- The model_migration table contains information
--- about ongoing migrations and their target controller.
+-- The incoming_model_migration table contains information
+-- about models migrating into JIMM and their target controller.
 -- The UserMapping table is used to map local users
 -- from migrated models to their external counterparts.
 
-CREATE TABLE model_migrations (
+CREATE TABLE incoming_model_migrations (
     id SERIAL PRIMARY KEY,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     model_uuid TEXT NOT NULL UNIQUE,
