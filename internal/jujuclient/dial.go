@@ -332,14 +332,6 @@ func (c *Connection) Context() context.Context {
 	return c.ctx
 }
 
-func (p *Connection) WithContext(ctx context.Context) *Connection {
-	// Copy the connection object with a new context so that Juju client
-	// calls that use the APICall method can use the new context.
-	conn := p
-	conn.ctx = ctx
-	return conn
-}
-
 // ConnectStream connects to the given HTTP websocket
 // endpoint path (interpreted relative to the receiver's
 // model) and returns the resulting connection.
