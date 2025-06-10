@@ -38,6 +38,7 @@ func cloudFromParams(cloudName string, p jujuparams.Cloud) cloud.Cloud {
 		Regions:           regions,
 		CACertificates:    p.CACertificates,
 		SkipTLSVerify:     p.SkipTLSVerify,
+		HostCloudRegion:   p.HostCloudRegion,
 		Config:            p.Config,
 		RegionConfig:      regionConfig,
 		IsControllerCloud: p.IsControllerCloud,

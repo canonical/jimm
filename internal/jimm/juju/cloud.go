@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	jujucloud "github.com/juju/juju/cloud"
+	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
@@ -334,9 +335,8 @@ func (j *JujuManager) AddHostedCloud(ctx context.Context, user *openfga.User, ta
 // jujuparams cloud definition. Admin access to the cloud will be granted
 // to the user identified by the given user tag. On success
 // addControllerCloud returns the definition of the cloud retrieved from
-// the controller. If the cloud already exists on the controller or the user
-// already has access to the cloud, then no error will be thrown and the
-// method will continue and return the desired cloud.
+// the controller. No error will be returned if the cloud already exists on
+// the controller or the user already has access to the cloud.
 func (j *JujuManager) addControllerCloud(ctx context.Context, ctl *dbmodel.Controller, ut names.UserTag, tag names.CloudTag, cloud jujucloud.Cloud, force bool) (*jujucloud.Cloud, error) {
 	const op = errors.Op("jimm.addControllerCloud")
 
@@ -346,7 +346,7 @@ func (j *JujuManager) addControllerCloud(ctx context.Context, ctl *dbmodel.Contr
 	}
 	defer api.Close()
 	if err := api.AddCloud(tag, cloud, force); err != nil {
-		if errors.ErrorCode(err) != errors.CodeAlreadyExists {
+		if !jujuparams.IsCodeAlreadyExists(err) {
 			return nil, errors.E(op, err)
 		}
 	}
