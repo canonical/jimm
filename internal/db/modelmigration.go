@@ -50,7 +50,7 @@ func (d *Database) GetModelMigration(ctx context.Context, modelMigration *dbmode
 		return errors.E(op, "missing uuid", errors.CodeBadRequest)
 	}
 
-	if err := db.First(&modelMigration).Error; err != nil {
+	if err := db.Preload("TargetController").First(&modelMigration).Error; err != nil {
 		err = dbError(err)
 		if errors.ErrorCode(err) == errors.CodeNotFound {
 			return errors.E(op, err, "model migration not found")
