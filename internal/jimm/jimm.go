@@ -13,6 +13,7 @@ import (
 	"github.com/juju/juju/api/base"
 	jujucloud "github.com/juju/juju/cloud"
 	jujucontroller "github.com/juju/juju/controller"
+	"github.com/juju/juju/core/migration"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"github.com/juju/version"
@@ -236,6 +237,9 @@ type JujuManager interface {
 	UnsetModelDefaults(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag, region string, keys []string) error
 	UpdateMigratedModel(ctx context.Context, user *openfga.User, modelTag names.ModelTag, targetControllerName string) error
 	ValidateModelUpgrade(ctx context.Context, u *openfga.User, mt names.ModelTag, force bool) error
+
+	// Migration related methods
+	Prechecks(ctx context.Context, user *openfga.User, model migration.ModelInfo) error
 
 	// Other methods
 

@@ -26,6 +26,7 @@ import (
 type JujuManager struct {
 	ControllerService
 	ModelManager
+	MigrationMocks
 	AddAuditLogEntry_                  func(ale *dbmodel.AuditLogEntry)
 	AddCloudToController_              func(ctx context.Context, user *openfga.User, controllerName string, tag names.CloudTag, cloud jujucloud.Cloud, force bool) error
 	AddHostedCloud_                    func(ctx context.Context, user *openfga.User, tag names.CloudTag, cloud jujucloud.Cloud, force bool) error
