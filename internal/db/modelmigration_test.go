@@ -34,7 +34,7 @@ func (s *dbSuite) TestAddModelMigration(c *qt.C) {
 		TargetControllerID: controller.ID,
 		UserMapping:        dbmodel.StringMap{"local": "external"},
 	}
-	err = s.Database.AddModelMigration(context.Background(), &migration)
+	err = s.Database.AddIncomingModelMigration(context.Background(), &migration)
 	c.Assert(err, qt.Equals, nil)
 
 	var dbMigration dbmodel.IncomingModelMigration
@@ -45,7 +45,7 @@ func (s *dbSuite) TestAddModelMigration(c *qt.C) {
 	c.Assert(dbMigration.UserMapping, qt.DeepEquals, migration.UserMapping)
 
 	migration.ID = 0 // Reset ID to ensure it is not reused
-	err = s.Database.AddModelMigration(context.Background(), &migration)
+	err = s.Database.AddIncomingModelMigration(context.Background(), &migration)
 	c.Assert(err, qt.Not(qt.IsNil))
 }
 
@@ -74,12 +74,12 @@ func (s *dbSuite) TestGetModelMigration(c *qt.C) {
 	c.Assert(s.Database.DB.Create(&migration).Error, qt.IsNil)
 
 	lookup := dbmodel.IncomingModelMigration{ModelUUID: migration.ModelUUID}
-	err = s.Database.GetModelMigration(context.Background(), &lookup)
+	err = s.Database.GetIncomingModelMigration(context.Background(), &lookup)
 	c.Assert(err, qt.Equals, nil)
 
 	// Not found
 	lookup = dbmodel.IncomingModelMigration{ModelUUID: sql.NullString{String: "no-such-uuid", Valid: true}}
-	err = s.Database.GetModelMigration(context.Background(), &lookup)
+	err = s.Database.GetIncomingModelMigration(context.Background(), &lookup)
 	c.Assert(err, qt.Not(qt.IsNil))
 	eError, ok := err.(*errors.Error)
 	c.Assert(ok, qt.IsTrue)
@@ -110,7 +110,7 @@ func (s *dbSuite) TestDeleteModelMigration(c *qt.C) {
 	}
 	c.Assert(s.Database.DB.Create(&migration).Error, qt.IsNil)
 
-	err = s.Database.DeleteModelMigration(context.Background(), &migration)
+	err = s.Database.DeleteIncomingModelMigration(context.Background(), &migration)
 	c.Assert(err, qt.Equals, nil)
 
 	var dbMigration dbmodel.IncomingModelMigration
