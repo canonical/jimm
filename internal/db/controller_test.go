@@ -342,3 +342,47 @@ func (s *dbSuite) TestForEachControllerModel(c *qt.C) {
 		"00000002-0000-0000-0000-000000000004",
 	})
 }
+
+func (s *dbSuite) TestDeleteController_MigrationActive(c *qt.C) {
+	ctx := c.Context()
+
+	err := s.Database.Migrate(ctx)
+	c.Assert(err, qt.Equals, nil)
+
+	cloud := dbmodel.Cloud{
+		Name: "test-cloud",
+	}
+	err = s.Database.AddCloud(ctx, &cloud)
+	c.Assert(err, qt.IsNil)
+
+	controller := dbmodel.Controller{
+		Name:      "test-controller",
+		UUID:      "00000000-0000-0000-0000-0000-0000000000001",
+		CloudName: "test-cloud",
+	}
+	err = s.Database.AddController(ctx, &controller)
+	c.Assert(err, qt.Equals, nil)
+
+	dbController := dbmodel.Controller{
+		UUID: controller.UUID,
+	}
+	err = s.Database.GetController(ctx, &dbController)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(dbController, qt.CmpEquals(cmpopts.EquateEmpty()), controller)
+
+	// Now we set a migration to active, and attempt to delete the controller expecting it to fail.
+	dbController.MigrationActive = true
+	c.Assert(s.Database.UpdateController(ctx, &dbController), qt.IsNil)
+
+	// Now we expect an error.
+	err = s.Database.DeleteController(ctx, &controller)
+	c.Assert(err, qt.ErrorMatches, ".*migration is in progress.*")
+
+	// Next unset the migration active.
+	dbController.MigrationActive = false
+	c.Assert(s.Database.UpdateController(ctx, &dbController), qt.IsNil)
+
+	// Now we expect no error.
+	err = s.Database.DeleteController(ctx, &controller)
+	c.Assert(err, qt.IsNil)
+}

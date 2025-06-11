@@ -23,6 +23,22 @@ type Controller struct {
 	CreatedAt time.Time
 	UpdatedAt time.Time
 
+	/**
+	* JIMM Specific fields, these are fields about controllers but are specific to JIMM,
+	* I.e., if a migration is active.
+	 */
+	// Deprecated records whether this controller is deprecated, and
+	// therefore no new models or clouds will be added to the controller.
+	Deprecated bool `gorm:"not null;default:FALSE"`
+
+	// MigrationActive determines if a migration is active. If a migration is active, then this controller
+	// cannot be deleted (handled by a trigger in the DB).
+	MigrationActive bool `gorm:"not null;default:FALSE"`
+
+	/**
+	* Juju fields, these are fields which Juju holds about controllers too.
+	 */
+
 	// Name is the name given to this controller.
 	Name string `gorm:"not null;uniqueIndex"`
 
@@ -53,10 +69,6 @@ type Controller struct {
 	// CloudRegion is the name of the cloud region which is hosting
 	// this controller.
 	CloudRegion string
-
-	// Deprecated records whether this controller is deprecated, and
-	// therefore no new models or clouds will be added to the controller.
-	Deprecated bool `gorm:"not null;default:FALSE"`
 
 	// AgentVersion holds the string representation of the controller's
 	// agent version.
