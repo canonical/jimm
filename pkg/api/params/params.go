@@ -549,7 +549,7 @@ type VersionResponse struct {
 // PrepareModelMigrationRequest holds the details to prepare JIMM
 // for a model migration.
 type PrepareModelMigrationRequest struct {
-	ModelTag             string `json:"model-tag" yaml:"model-tag"`
-	TargetControllerName string `json:"target-controller-name" yaml:"target-controller-name"`
-	UserMapping          string `json:"user-mapping" yaml:"user-mapping"`
+	ModelTag             string            `json:"model-tag" yaml:"model-tag"`
+	TargetControllerName string            `json:"target-controller-name" yaml:"target-controller-name"`
+	UserMapping          map[string]string `json:"user-mapping" yaml:"user-mapping"`
 }
