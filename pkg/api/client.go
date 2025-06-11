@@ -246,3 +246,9 @@ func (c *Client) Version() (params.VersionResponse, error) {
 	err := c.caller.APICall("JIMM", 4, "", "Version", nil, &response)
 	return response, err
 }
+
+// PrepareModelMigration prepares JIMM for an incoming ModelMigration.
+func (c *Client) PrepareModelMigration(req *params.PrepareModelMigrationRequest) error {
+	err := c.caller.APICall("JIMM", 4, "", "PrepareModelMigration", req, nil)
+	return err
+}
