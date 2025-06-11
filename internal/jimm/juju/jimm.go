@@ -281,21 +281,23 @@ func (j *JujuManager) PrepareModelMigration(
 ) error {
 	const op = errors.Op("jujumanager.PrepareModelMigration")
 
-	// TODO(ale8k): Use transaction here, to get ctl & then add the model migration
-	// Problem is our DB methods don't take a db object and instead use the instance on
-	// the db struct. Perhaps create two new methods with "TX" in the name...?
-	// Will do this in a follow up.
-	ctl, err := j.getControllerByName(ctx, targetControllerName)
-	if err != nil {
-		zapctx.Error(ctx, "failed to get controller", zap.Error(err))
-		return errors.E(op, err)
-	}
+	err := j.Database.Transaction(func(d *db.Database) error {
+		ctl := dbmodel.Controller{Name: targetControllerName}
+		if err := j.Database.GetController(ctx, &ctl); err != nil {
+			return err
+		}
 
-	if err := j.Database.AddIncomingModelMigration(ctx, &dbmodel.IncomingModelMigration{
-		ModelUUID:          sql.NullString{String: modelUUID, Valid: true},
-		TargetControllerID: ctl.ID,
-		UserMapping:        dbmodel.StringMap(userMapping),
-	}); err != nil {
+		if err := j.Database.AddIncomingModelMigration(ctx, &dbmodel.IncomingModelMigration{
+			ModelUUID:          sql.NullString{String: modelUUID, Valid: true},
+			TargetControllerID: ctl.ID,
+			UserMapping:        dbmodel.StringMap(userMapping),
+		}); err != nil {
+			return err
+		}
+
+		return nil
+	})
+	if err != nil {
 		zapctx.Error(ctx, "failed to add incoming model migration details", zap.Error(err))
 		return errors.E(op, err)
 	}
