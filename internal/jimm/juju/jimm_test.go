@@ -711,7 +711,7 @@ func TestInitiateInternalMigration(t *testing.T) {
 	}
 }
 
-const PrepareModelMigrationTestEnv = `clouds:
+const prepareModelMigrationTestEnv = `clouds:
 - name: test-cloud
   type: test-provider
   regions:
@@ -725,19 +725,6 @@ controllers:
   uuid: 00000001-0000-0000-0000-000000000001
   cloud: test-cloud
   region: test-cloud-region
-- name: myController2
-  uuid: 00000002-0000-0000-0000-000000000002
-  cloud: test-cloud
-  region: test-cloud-region
-models:
-  - name: model-1
-    uuid: 00000002-0000-0000-0000-000000000001
-    controller: myController
-    cloud: test-cloud
-    region: test-cloud-region
-    cloud-credential: cred-1
-    owner: alice@canonical.com
-    life: alive
 users:
   - username: alice@canonical.com
     controller-access: superuser
@@ -752,10 +739,10 @@ func TestPrepareModelMigration_ControllerDoesNotExist(t *testing.T) {
 		CredentialStore: store,
 	})
 
-	env := jimmtest.ParseEnvironment(c, PrepareModelMigrationTestEnv)
+	env := jimmtest.ParseEnvironment(c, prepareModelMigrationTestEnv)
 	// We delete the controller from the env, and check for this UUID
-	targetControllerName := env.Controllers[1].Name
-	env.Controllers = env.Controllers[:1]
+	targetControllerName := env.Controllers[0].Name
+	env.Controllers = env.Controllers[:0]
 	env.PopulateDB(c, j.Database)
 
 	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
@@ -765,10 +752,12 @@ func TestPrepareModelMigration_ControllerDoesNotExist(t *testing.T) {
 
 	userMapping := map[string]string{"alice": "alice@canonical.com"}
 
+	fakeModelUUID := "d9a0bd29-a76e-451f-a186-7216cac77e29"
+
 	err := j.PrepareModelMigration(
 		ctx,
 		user,
-		env.Models[0].DBObject(c, j.Database).UUID.String,
+		fakeModelUUID,
 		targetControllerName,
 		userMapping,
 	)
@@ -784,33 +773,33 @@ func TestPrepareModelMigration_Success(t *testing.T) {
 		CredentialStore: store,
 	})
 
-	env := jimmtest.ParseEnvironment(c, PrepareModelMigrationTestEnv)
+	env := jimmtest.ParseEnvironment(c, prepareModelMigrationTestEnv)
 	env.PopulateDB(c, j.Database)
 	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
 	user := openfga.NewUser(&dbUser, nil)
 	user.JimmAdmin = true
 
-	modelUUID := env.Models[0].DBObject(c, j.Database).UUID.String
+	fakeModelUUID := "d9a0bd29-a76e-451f-a186-7216cac77e29"
 	userMapping := map[string]string{"alice": "alice@canonical.com"}
-	targetController := env.Controllers[1].DBObject(c, j.Database)
+	targetController := env.Controllers[0].DBObject(c, j.Database)
 
 	err := j.PrepareModelMigration(
 		ctx,
 		user,
-		modelUUID,
+		fakeModelUUID,
 		targetController.Name,
 		userMapping,
 	)
 	c.Assert(err, qt.IsNil)
 
 	incomingMigration := &dbmodel.IncomingModelMigration{
-		ModelUUID:          sql.NullString{String: modelUUID, Valid: true},
+		ModelUUID:          sql.NullString{String: fakeModelUUID, Valid: true},
 		TargetControllerID: targetController.ID,
 	}
 	err = j.Database.GetIncomingModelMigration(ctx, incomingMigration)
 	c.Assert(err, qt.IsNil)
 
-	c.Assert(incomingMigration.ModelUUID.String, qt.Equals, modelUUID)
+	c.Assert(incomingMigration.ModelUUID.String, qt.Equals, fakeModelUUID)
 	c.Assert(incomingMigration.TargetController.UUID, qt.Equals, targetController.UUID)
 	c.Assert(incomingMigration.UserMapping, qt.DeepEquals, dbmodel.StringMap(userMapping))
 }
