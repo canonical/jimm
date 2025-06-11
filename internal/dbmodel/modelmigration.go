@@ -24,5 +24,5 @@ type IncomingModelMigration struct {
 	TargetController   Controller
 
 	// UserMapping holds a mapping of local users to external users.
-	UserMapping JSON
+	UserMapping StringMap
 }

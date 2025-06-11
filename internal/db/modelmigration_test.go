@@ -32,7 +32,7 @@ func (s *dbSuite) TestAddModelMigration(c *qt.C) {
 	migration := dbmodel.IncomingModelMigration{
 		ModelUUID:          sql.NullString{String: "00000001-0000-0000-0000-000000000001", Valid: true},
 		TargetControllerID: controller.ID,
-		UserMapping:        dbmodel.JSON([]byte(`{"local": "external"}`)),
+		UserMapping:        dbmodel.StringMap{"local": "external"},
 	}
 	err = s.Database.AddModelMigration(context.Background(), &migration)
 	c.Assert(err, qt.Equals, nil)
@@ -69,7 +69,7 @@ func (s *dbSuite) TestGetModelMigration(c *qt.C) {
 	migration := dbmodel.IncomingModelMigration{
 		ModelUUID:          sql.NullString{String: "00000001-0000-0000-0000-000000000001", Valid: true},
 		TargetControllerID: controller.ID,
-		UserMapping:        dbmodel.JSON([]byte(`{"local":"external"}`)),
+		UserMapping:        dbmodel.StringMap{"local": "external"},
 	}
 	c.Assert(s.Database.DB.Create(&migration).Error, qt.IsNil)
 
@@ -106,7 +106,7 @@ func (s *dbSuite) TestDeleteModelMigration(c *qt.C) {
 	migration := dbmodel.IncomingModelMigration{
 		ModelUUID:          sql.NullString{String: "00000001-0000-0000-0000-000000000001", Valid: true},
 		TargetControllerID: controller.ID,
-		UserMapping:        dbmodel.JSON([]byte(`{"local":"external"}`)),
+		UserMapping:        dbmodel.StringMap{"local": "external"},
 	}
 	c.Assert(s.Database.DB.Create(&migration).Error, qt.IsNil)
 
