@@ -4,7 +4,6 @@ package jujuapi
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net"
 	"strings"
@@ -550,12 +549,7 @@ func (r *controllerRoot) PrepareModelMigration(ctx context.Context, args apipara
 		}
 	}
 
-	b, err := json.Marshal(args.UserMapping)
-	if err != nil {
-		return errors.E(op, "failed to marshal user mapping")
-	}
-
-	if err := r.jimm.JujuManager().PrepareModelMigration(ctx, r.user, mt.Id(), args.TargetControllerName, b); err != nil {
+	if err := r.jimm.JujuManager().PrepareModelMigration(ctx, r.user, mt.Id(), args.TargetControllerName, args.UserMapping); err != nil {
 		return errors.E(op, err)
 	}
 

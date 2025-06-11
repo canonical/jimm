@@ -277,7 +277,7 @@ func (j *JujuManager) PrepareModelMigration(
 	user *openfga.User,
 	modelUUID string,
 	targetControllerName string,
-	userMapping []byte,
+	userMapping map[string]string,
 ) error {
 	const op = errors.Op("jujumanager.PrepareModelMigration")
 
@@ -294,7 +294,7 @@ func (j *JujuManager) PrepareModelMigration(
 	if err := j.Database.AddIncomingModelMigration(ctx, &dbmodel.IncomingModelMigration{
 		ModelUUID:          sql.NullString{String: modelUUID, Valid: true},
 		TargetControllerID: ctl.ID,
-		UserMapping:        dbmodel.JSON(userMapping),
+		UserMapping:        dbmodel.StringMap(userMapping),
 	}); err != nil {
 		zapctx.Error(ctx, "failed to add incoming model migration details", zap.Error(err))
 		return errors.E(op, err)
