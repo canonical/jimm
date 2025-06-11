@@ -763,7 +763,7 @@ func TestPrepareModelMigration_ControllerDoesNotExist(t *testing.T) {
 
 	user.JimmAdmin = true
 
-	userMapping := []byte(`{"alice":"alice@canonical.com"}`)
+	userMapping := map[string]string{"alice": "alice@canonical.com"}
 
 	err := j.PrepareModelMigration(
 		ctx,
@@ -791,7 +791,7 @@ func TestPrepareModelMigration_Success(t *testing.T) {
 	user.JimmAdmin = true
 
 	modelUUID := env.Models[0].DBObject(c, j.Database).UUID.String
-	userMapping := []byte(`{"alice": "alice@canonical.com"}`)
+	userMapping := map[string]string{"alice": "alice@canonical.com"}
 	targetController := env.Controllers[1].DBObject(c, j.Database)
 
 	err := j.PrepareModelMigration(
@@ -812,5 +812,5 @@ func TestPrepareModelMigration_Success(t *testing.T) {
 
 	c.Assert(incomingMigration.ModelUUID.String, qt.Equals, modelUUID)
 	c.Assert(incomingMigration.TargetController.UUID, qt.Equals, targetController.UUID)
-	c.Assert(incomingMigration.UserMapping, qt.DeepEquals, dbmodel.JSON(userMapping))
+	c.Assert(incomingMigration.UserMapping, qt.DeepEquals, dbmodel.StringMap(userMapping))
 }
