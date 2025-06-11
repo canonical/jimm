@@ -538,13 +538,9 @@ func (r *controllerRoot) PrepareModelMigration(ctx context.Context, args apipara
 	if !names.IsValidControllerName(args.TargetControllerName) {
 		return errors.E(op, "invalid controller name")
 	}
-	userMap := map[string]string{}
-	if err := json.Unmarshal([]byte(args.UserMapping), &userMap); err != nil {
-		return errors.E(op, "invalid user map, unable to unmarshal")
-	}
 
 	// Check each key is a valid local user and each value is a valid user and has a domain
-	for local, external := range userMap {
+	for local, external := range args.UserMapping {
 		if !names.IsValidUserName(local) {
 			return errors.E(op, fmt.Sprintf("%s is not a valid local user name", local))
 		}
@@ -554,7 +550,12 @@ func (r *controllerRoot) PrepareModelMigration(ctx context.Context, args apipara
 		}
 	}
 
-	if err := r.jimm.JujuManager().PrepareModelMigration(ctx, r.user, mt.Id(), args.TargetControllerName, []byte(args.UserMapping)); err != nil {
+	b, err := json.Marshal(args.UserMapping)
+	if err != nil {
+		return errors.E(op, "failed to marshal user mapping")
+	}
+
+	if err := r.jimm.JujuManager().PrepareModelMigration(ctx, r.user, mt.Id(), args.TargetControllerName, b); err != nil {
 		return errors.E(op, err)
 	}
 
