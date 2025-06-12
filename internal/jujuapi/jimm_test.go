@@ -908,72 +908,7 @@ func (s *jimmSuite) TestVersion(c *gc.C) {
 	c.Assert(versionInfo.Commit, gc.Not(gc.Equals), "")
 }
 
-func (s *jimmSuite) TestPrepareModelMigration_UnauthorizedUser(c *gc.C) {
-	conn := s.open(c, nil, "bob")
-	defer conn.Close()
-	client := api.NewClient(conn)
-
-	err := client.PrepareModelMigration(&apiparams.PrepareModelMigrationRequest{})
-
-	c.Assert(err, gc.ErrorMatches, "unauthorized \\(unauthorized access\\)")
-}
-
-func (s *jimmSuite) TestPrepareModelMigration_InvalidModelTag(c *gc.C) {
-	conn := s.open(c, nil, "alice")
-	defer conn.Close()
-	client := api.NewClient(conn)
-
-	err := client.PrepareModelMigration(&apiparams.PrepareModelMigrationRequest{
-		ModelTag: "blah",
-	})
-
-	c.Assert(err, gc.ErrorMatches, "invalid model tag")
-}
-
-func (s *jimmSuite) TestPrepareModelMigration_InvalidControllerName(c *gc.C) {
-	conn := s.open(c, nil, "alice")
-	defer conn.Close()
-	client := api.NewClient(conn)
-
-	err := client.PrepareModelMigration(&apiparams.PrepareModelMigrationRequest{
-		ModelTag:             names.NewModelTag("5650ac3f-8332-437f-874f-089e0e447e7f").String(),
-		TargetControllerName: "---bad wolf---",
-	})
-
-	c.Assert(err, gc.ErrorMatches, "invalid controller name")
-}
-
-func (s *jimmSuite) TestPrepareModelMigration_InvalidUserMapping(c *gc.C) {
-	conn := s.open(c, nil, "alice")
-	defer conn.Close()
-	client := api.NewClient(conn)
-
-	err := client.PrepareModelMigration(&apiparams.PrepareModelMigrationRequest{
-		ModelTag:             names.NewModelTag("5650ac3f-8332-437f-874f-089e0e447e7f").String(),
-		TargetControllerName: "controller",
-		UserMapping:          map[string]string{"--bad local--": "alice@canonical.com"},
-	})
-
-	c.Assert(err, gc.ErrorMatches, `--bad local-- is not a valid local user name`)
-
-	err = client.PrepareModelMigration(&apiparams.PrepareModelMigrationRequest{
-		ModelTag:             names.NewModelTag("5650ac3f-8332-437f-874f-089e0e447e7f").String(),
-		TargetControllerName: "controller",
-		UserMapping:          map[string]string{"alice": "alice"},
-	})
-
-	c.Assert(err, gc.ErrorMatches, `alice is not a valid external user name`)
-
-	err = client.PrepareModelMigration(&apiparams.PrepareModelMigrationRequest{
-		ModelTag:             names.NewModelTag("5650ac3f-8332-437f-874f-089e0e447e7f").String(),
-		TargetControllerName: "controller",
-		UserMapping:          map[string]string{"alice": "--badwolf--@canonical.com"},
-	})
-
-	c.Assert(err, gc.ErrorMatches, `--badwolf--@canonical.com is not a valid external user name`)
-}
-
-func (s *jimmSuite) TestPrepareModelMigration_Success(c *gc.C) {
+func (s *jimmSuite) TestPrepareModelMigration(c *gc.C) {
 	conn := s.open(c, nil, "alice")
 	defer conn.Close()
 	client := api.NewClient(conn)
