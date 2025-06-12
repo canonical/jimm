@@ -907,3 +907,19 @@ func (s *jimmSuite) TestVersion(c *gc.C) {
 	c.Assert(versionInfo.Version, gc.Not(gc.Equals), "")
 	c.Assert(versionInfo.Commit, gc.Not(gc.Equals), "")
 }
+
+func (s *jimmSuite) TestPrepareModelMigration(c *gc.C) {
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+	client := api.NewClient(conn)
+
+	ctlName := "prepare-model-migration-controller"
+	s.AddController(c, ctlName, s.APIInfo(c))
+
+	err := client.PrepareModelMigration(&apiparams.PrepareModelMigrationRequest{
+		ModelTag:             names.NewModelTag("5650ac3f-8332-437f-874f-089e0e447e7f").String(),
+		TargetControllerName: ctlName,
+		UserMapping:          map[string]string{"alice": "alice@canonical.com"}, // `{"alice": "alice@canonical.com"}`,
+	})
+	c.Assert(err, gc.IsNil)
+}

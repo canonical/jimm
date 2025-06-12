@@ -10,6 +10,8 @@ import (
 	"github.com/google/uuid"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
+	"github.com/juju/zaputil/zapctx"
+	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/canonical/jimm/v3/internal/db"
@@ -266,4 +268,39 @@ func (j *JujuManager) InitiateInternalMigration(ctx context.Context, user *openf
 		return result, errors.E(op, err)
 	}
 	return result, nil
+}
+
+// PrepareModelMigration takes the model ID from the migrating controller and stores a record
+// in the IncomingModelMigation table to prepare it for migration against the target controller's name.
+func (j *JujuManager) PrepareModelMigration(
+	ctx context.Context,
+	user *openfga.User,
+	modelUUID string,
+	targetControllerName string,
+	userMapping map[string]string,
+) error {
+	const op = errors.Op("jujumanager.PrepareModelMigration")
+
+	err := j.Database.Transaction(func(d *db.Database) error {
+		ctl := dbmodel.Controller{Name: targetControllerName}
+		if err := j.Database.GetController(ctx, &ctl); err != nil {
+			return err
+		}
+
+		if err := j.Database.AddIncomingModelMigration(ctx, &dbmodel.IncomingModelMigration{
+			ModelUUID:          sql.NullString{String: modelUUID, Valid: true},
+			TargetControllerID: ctl.ID,
+			UserMapping:        dbmodel.StringMap(userMapping),
+		}); err != nil {
+			return err
+		}
+
+		return nil
+	})
+	if err != nil {
+		zapctx.Error(ctx, "failed to add incoming model migration details", zap.Error(err))
+		return errors.E(op, err)
+	}
+
+	return nil
 }

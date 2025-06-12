@@ -694,7 +694,6 @@ func TestInitiateInternalMigration(t *testing.T) {
 
 			dbUser := env.User(test.user).DBObject(c, j.Database)
 			user := openfga.NewUser(&dbUser, nil)
-			c.Assert(err, qt.IsNil)
 
 			res, err := j.InitiateInternalMigration(
 				ctx,
@@ -710,4 +709,97 @@ func TestInitiateInternalMigration(t *testing.T) {
 			}
 		})
 	}
+}
+
+const prepareModelMigrationTestEnv = `clouds:
+- name: test-cloud
+  type: test-provider
+  regions:
+  - name: test-cloud-region
+cloud-credentials:
+  - owner: alice@canonical.com
+    name: cred-1
+    cloud: test-cloud
+controllers:
+- name: myController
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test-cloud
+  region: test-cloud-region
+users:
+  - username: alice@canonical.com
+    controller-access: superuser
+`
+
+func TestPrepareModelMigration_ControllerDoesNotExist(t *testing.T) {
+	c := qt.New(t)
+	ctx := c.Context()
+
+	store := jimmtest.NewInMemoryCredentialStore()
+	j := newTestJujuManager(c, &parameters{
+		CredentialStore: store,
+	})
+
+	env := jimmtest.ParseEnvironment(c, prepareModelMigrationTestEnv)
+	// We delete the controller from the env, and check for this UUID
+	targetControllerName := env.Controllers[0].Name
+	env.Controllers = env.Controllers[:0]
+	env.PopulateDB(c, j.Database)
+
+	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
+	user := openfga.NewUser(&dbUser, nil)
+
+	user.JimmAdmin = true
+
+	userMapping := map[string]string{"alice": "alice@canonical.com"}
+
+	fakeModelUUID := "d9a0bd29-a76e-451f-a186-7216cac77e29"
+
+	err := j.PrepareModelMigration(
+		ctx,
+		user,
+		fakeModelUUID,
+		targetControllerName,
+		userMapping,
+	)
+	c.Assert(err, qt.ErrorMatches, "controller not found")
+}
+
+func TestPrepareModelMigration_Success(t *testing.T) {
+	c := qt.New(t)
+	ctx := c.Context()
+
+	store := jimmtest.NewInMemoryCredentialStore()
+	j := newTestJujuManager(c, &parameters{
+		CredentialStore: store,
+	})
+
+	env := jimmtest.ParseEnvironment(c, prepareModelMigrationTestEnv)
+	env.PopulateDB(c, j.Database)
+	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
+	user := openfga.NewUser(&dbUser, nil)
+	user.JimmAdmin = true
+
+	fakeModelUUID := "d9a0bd29-a76e-451f-a186-7216cac77e29"
+	userMapping := map[string]string{"alice": "alice@canonical.com"}
+	targetController := env.Controllers[0].DBObject(c, j.Database)
+
+	err := j.PrepareModelMigration(
+		ctx,
+		user,
+		fakeModelUUID,
+		targetController.Name,
+		userMapping,
+	)
+	c.Assert(err, qt.IsNil)
+
+	incomingMigration := &dbmodel.IncomingModelMigration{
+		ModelUUID:          sql.NullString{String: fakeModelUUID, Valid: true},
+		TargetControllerID: targetController.ID,
+	}
+	err = j.Database.GetIncomingModelMigration(ctx, incomingMigration)
+	c.Assert(err, qt.IsNil)
+
+	c.Assert(incomingMigration.ModelUUID.String, qt.Equals, fakeModelUUID)
+	c.Assert(incomingMigration.TargetController.UUID, qt.Equals, targetController.UUID)
+	c.Assert(incomingMigration.UserMapping, qt.DeepEquals, dbmodel.StringMap(userMapping))
 }

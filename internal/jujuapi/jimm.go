@@ -60,6 +60,7 @@ func init() {
 		purgeLogsMethod := rpc.Method(r.PurgeLogs)
 		migrateModel := rpc.Method(r.MigrateModel)
 		version := rpc.Method(r.Version)
+		prepareModelMigration := rpc.Method(r.PrepareModelMigration)
 
 		// JIMM Generic RPC
 		r.AddMethod("JIMM", 4, "AddController", addControllerMethod)
@@ -96,6 +97,8 @@ func init() {
 		// JIMM Cross-model queries
 		r.AddMethod("JIMM", 4, "CrossModelQuery", crossModelQueryMethod)
 		r.AddMethod("JIMM", 4, "Version", version)
+		// JIMM Model Migrations
+		r.AddMethod("JIMM", 4, "PrepareModelMigration", prepareModelMigration)
 
 		return []int{4}
 	}
@@ -516,4 +519,39 @@ func (r *controllerRoot) Version(ctx context.Context) (apiparams.VersionResponse
 		Commit:  version.VersionInfo.GitCommit,
 	}
 	return versionInfo, nil
+}
+
+// PrepareModelMigration prepares JIMM for an incoming migration.
+func (r *controllerRoot) PrepareModelMigration(ctx context.Context, args apiparams.PrepareModelMigrationRequest) error {
+	const op = errors.Op("jujuapi.PrepareModelMigration")
+
+	if !r.user.JimmAdmin {
+		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
+
+	mt, err := names.ParseModelTag(args.ModelTag)
+	if err != nil {
+		return errors.E(op, "invalid model tag", err)
+	}
+
+	if !names.IsValidControllerName(args.TargetControllerName) {
+		return errors.E(op, "invalid controller name")
+	}
+
+	// Check each key is a valid local user and each value is a valid user and has a domain
+	for local, external := range args.UserMapping {
+		if !names.IsValidUserName(local) {
+			return errors.E(op, fmt.Sprintf("%s is not a valid local user name", local))
+		}
+
+		if !names.IsValidUser(external) || !strings.Contains(external, "@") {
+			return errors.E(op, fmt.Sprintf("%s is not a valid external user name", external))
+		}
+	}
+
+	if err := r.jimm.JujuManager().PrepareModelMigration(ctx, r.user, mt.Id(), args.TargetControllerName, args.UserMapping); err != nil {
+		return errors.E(op, err)
+	}
+
+	return nil
 }
