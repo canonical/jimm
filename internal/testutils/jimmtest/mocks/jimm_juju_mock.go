@@ -49,7 +49,7 @@ type JujuManager struct {
 	PurgeLogs_                         func(ctx context.Context, user *openfga.User, before time.Time) (int64, error)
 	RemoveCloud_                       func(ctx context.Context, u *openfga.User, ct names.CloudTag) error
 	RemoveCloudFromController_         func(ctx context.Context, u *openfga.User, controllerName string, ct names.CloudTag) error
-	RevokeCloudCredential_             func(ctx context.Context, user *dbmodel.Identity, tag names.CloudCredentialTag, force bool) error
+	RevokeCloudCredential_             func(ctx context.Context, user *dbmodel.Identity, tag names.CloudCredentialTag) error
 	UpdateApplicationOffer_            func(ctx context.Context, controller *dbmodel.Controller, offerUUID string, removed bool) error
 	UpdateCloud_                       func(ctx context.Context, u *openfga.User, ct names.CloudTag, cloud jujuparams.Cloud) error
 	UpdateCloudCredential_             func(ctx context.Context, u *openfga.User, args juju.UpdateCloudCredentialArgs) ([]jujuparams.UpdateCredentialModelResult, error)
@@ -210,11 +210,11 @@ func (j *JujuManager) RemoveCloudFromController(ctx context.Context, u *openfga.
 	}
 	return j.RemoveCloudFromController_(ctx, u, controllerName, ct)
 }
-func (j *JujuManager) RevokeCloudCredential(ctx context.Context, user *dbmodel.Identity, tag names.CloudCredentialTag, force bool) error {
+func (j *JujuManager) RevokeCloudCredential(ctx context.Context, user *dbmodel.Identity, tag names.CloudCredentialTag) error {
 	if j.RevokeCloudCredential_ == nil {
 		return errors.E(errors.CodeNotImplemented)
 	}
-	return j.RevokeCloudCredential_(ctx, user, tag, force)
+	return j.RevokeCloudCredential_(ctx, user, tag)
 }
 func (j *JujuManager) UpdateApplicationOffer(ctx context.Context, controller *dbmodel.Controller, offerUUID string, removed bool) error {
 	if j.UpdateApplicationOffer_ == nil {

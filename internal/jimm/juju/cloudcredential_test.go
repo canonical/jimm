@@ -1225,7 +1225,7 @@ func TestRevokeCloudCredential(t *testing.T) {
 			user, tag, expectedError := test.createEnv(c, j, j.OpenFGAClient)
 
 			ctx := context.Background()
-			err := j.RevokeCloudCredential(ctx, user, tag, false)
+			err := j.RevokeCloudCredential(ctx, user, tag)
 			if expectedError == "" {
 				c.Assert(err, qt.Equals, nil)
 

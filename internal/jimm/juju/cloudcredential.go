@@ -47,7 +47,7 @@ func (j *JujuManager) GetCloudCredential(ctx context.Context, user *openfga.User
 
 // RevokeCloudCredential checks that the credential with the given path
 // can be revoked  and revokes the credential.
-func (j *JujuManager) RevokeCloudCredential(ctx context.Context, user *dbmodel.Identity, tag names.CloudCredentialTag, force bool) error {
+func (j *JujuManager) RevokeCloudCredential(ctx context.Context, user *dbmodel.Identity, tag names.CloudCredentialTag) error {
 	const op = errors.Op("jimm.RevokeCloudCredential")
 
 	if user.Name != tag.Owner().Id() {
@@ -75,8 +75,10 @@ func (j *JujuManager) RevokeCloudCredential(ctx context.Context, user *dbmodel.I
 	if err != nil {
 		return errors.E(op, err)
 	}
-	// if the cloud credential is still used by any model we return an error
-	if len(models) > 0 && !force {
+	// Before we accepted the force flag to remove the credential regardless of the references count.
+	// Now we want to ensure that the credential is not used by any models before removing it to maintain
+	// referential integrity.
+	if len(models) > 0 {
 		return errors.E(op, errors.CodeBadRequest, fmt.Sprintf("cloud credential still used by %d model(s)", len(models)))
 	}
 

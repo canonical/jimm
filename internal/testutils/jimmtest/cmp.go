@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package jimmtest
 
@@ -42,7 +42,7 @@ var DBObjectEquals = qt.CmpEquals(
 	cmpopts.EquateEmpty(),
 	cmpopts.IgnoreTypes(gorm.Model{}),
 	cmpopts.IgnoreFields(dbmodel.Cloud{}, "ID", "CreatedAt", "UpdatedAt"),
-	cmpopts.IgnoreFields(dbmodel.CloudCredential{}, "CloudName", "OwnerIdentityName"),
+	cmpopts.IgnoreFields(dbmodel.CloudCredential{}, "CloudName", "OwnerIdentityName", "ID", "CreatedAt", "UpdatedAt"),
 	cmpopts.IgnoreFields(dbmodel.CloudRegion{}, "CloudName"),
 	cmpopts.IgnoreFields(dbmodel.CloudRegionControllerPriority{}, "CloudRegionID", "ControllerID"),
 	cmpopts.IgnoreFields(dbmodel.Controller{}, "ID", "UpdatedAt", "CreatedAt"),
