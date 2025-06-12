@@ -16,6 +16,9 @@ import (
 )
 
 // Prechecks checks that the model can be migrated to the target controller.
+// It does this by calling the method of the same name on the target Juju controller.
+// As part of all model migrations passing through JIMM, it modifies the model description
+// to replace any local user references with their external mapping.
 func (j *JujuManager) Prechecks(ctx context.Context, user *openfga.User, model migration.ModelInfo) error {
 	const op = errors.Op("jimm.Prechecks")
 
@@ -51,7 +54,7 @@ func (j *JujuManager) Prechecks(ctx context.Context, user *openfga.User, model m
 // modifyMigrationInfo modifies the description of the model migration
 // to replace any local user references with their external mapping.
 func (j *JujuManager) modifyMigrationInfo(model *migration.ModelInfo, userMapping dbmodel.StringMap) error {
-	if model.Owner.Domain() != "" && model.Owner.Domain() != names.LocalUserDomain {
+	if !model.Owner.IsLocal() {
 		// If the owner is not a local user, we do not modify it.
 		// This is useful when migrating a model from one JIMM
 		// controller to another, where the owner is already an external user.

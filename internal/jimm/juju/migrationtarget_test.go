@@ -170,7 +170,7 @@ func newMigrationInfo(owner string) migration.ModelInfo {
 	modelDescription.AddUser(userArgs)
 	modelInfo := migration.ModelInfo{
 		UUID:                   "00000001-0000-0000-0000-000000000001",
-		Owner:                  names.NewUserTag("bob"),
+		Owner:                  names.NewUserTag(owner),
 		Name:                   "test-model",
 		AgentVersion:           version.MustParse("3.2.1"),
 		ControllerAgentVersion: version.MustParse("3.2.1"),
