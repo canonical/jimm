@@ -19,16 +19,9 @@ import (
 )
 
 type migrationTargetUnitSuite struct {
-	cleanupFuncs []func()
 }
 
 var _ = gc.Suite(&migrationTargetUnitSuite{})
-
-func (s *migrationTargetUnitSuite) TearDownTest(c *gc.C) {
-	for _, cleanup := range s.cleanupFuncs {
-		cleanup()
-	}
-}
 
 func (s *migrationTargetUnitSuite) TestMigrationTarget(c *gc.C) {
 	ctx := context.Background()

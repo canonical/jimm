@@ -31,7 +31,7 @@ func init() {
 	facadeInit["MigrationTarget"] = func(r *controllerRoot) []int {
 		preChecks := rpc.Method(r.Prechecks)
 
-		r.AddMethod("MigrationTarget", 4, "Abort", preChecks)
+		r.AddMethod("MigrationTarget", 4, "Prechecks", preChecks)
 
 		return []int{4}
 	}
