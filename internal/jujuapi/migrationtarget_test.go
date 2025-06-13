@@ -21,6 +21,16 @@ type migrationTargetSuite struct {
 
 var _ = gc.Suite(&migrationTargetSuite{})
 
+func (s *migrationTargetSuite) TestAbort(c *gc.C) {
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+
+	modelUUID := "00000001-0000-0000-0000-000000000001"
+	client := migrationtarget.NewClient(conn)
+	err := client.Abort(modelUUID)
+	c.Assert(err, gc.ErrorMatches, `.*model migration not found`)
+}
+
 func (s *migrationTargetSuite) TestPrechecks(c *gc.C) {
 	conn := s.open(c, nil, "alice")
 	defer conn.Close()

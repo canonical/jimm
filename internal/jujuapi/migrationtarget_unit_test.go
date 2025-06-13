@@ -24,6 +24,52 @@ type migrationTargetUnitSuite struct {
 
 var _ = gc.Suite(&migrationTargetUnitSuite{})
 
+func (s *migrationTargetUnitSuite) TestAbort(c *gc.C) {
+	ctx := context.Background()
+
+	abortCalled := false
+	jujuManager := mocks.JujuManager{
+		MigrationMocks: mocks.MigrationMocks{
+			AbortMigration_: func(ctx context.Context, user *openfga.User, modelUUID string) error {
+				abortCalled = true
+				c.Check(modelUUID, gc.Equals, "00000001-0000-0000-0000-000000000001")
+				return nil
+			},
+		}}
+	jimm := &jimmtest.JIMM{
+		JujuManager_: func() jimm.JujuManager {
+			return &jujuManager
+		},
+	}
+
+	var u dbmodel.Identity
+	u.SetTag(names.NewUserTag("alice@canonical.com"))
+	user := openfga.NewUser(&u, nil)
+
+	cr := jujuapi.NewControllerRoot(jimm, jujuapi.Params{})
+	jujuapi.SetUser(cr, user)
+
+	args := jujuparams.ModelArgs{
+		ModelTag: names.NewModelTag("00000001-0000-0000-0000-000000000001").String(),
+	}
+
+	// Validate access denied without JIMM admin permissions.
+	err := cr.Abort(ctx, args)
+	c.Assert(err, gc.ErrorMatches, `unauthorized`)
+	c.Assert(abortCalled, gc.Equals, false)
+
+	// Validate the method is called when the user is a JIMM admin.
+	user.JimmAdmin = true
+	err = cr.Abort(ctx, args)
+	c.Assert(err, gc.IsNil)
+	c.Assert(abortCalled, gc.Equals, true)
+
+	// Validate that an invalid model tag is rejected.
+	args.ModelTag = "invalid-model-tag"
+	err = cr.Abort(ctx, args)
+	c.Assert(err, gc.ErrorMatches, `"invalid-model-tag" is not a valid tag`)
+}
+
 func (s *migrationTargetUnitSuite) TestPreChecks(c *gc.C) {
 	ctx := context.Background()
 

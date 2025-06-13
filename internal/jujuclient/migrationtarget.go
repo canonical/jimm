@@ -36,3 +36,9 @@ func (c Connection) AdoptResources(modelUUID string, controllerVersion version.N
 	}
 	return nil
 }
+
+// Abort aborts a model migration.
+func (c Connection) Abort(modelUUID string) error {
+	migrationTarget := migrationtarget.NewClient(&c)
+	return migrationTarget.Abort(modelUUID)
+}

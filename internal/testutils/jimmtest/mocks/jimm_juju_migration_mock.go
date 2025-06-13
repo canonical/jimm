@@ -14,6 +14,14 @@ import (
 type MigrationMocks struct {
 	Prechecks_      func(ctx context.Context, user *openfga.User, model migration.ModelInfo) error
 	AdoptResources_ func(ctx context.Context, user *openfga.User, modelUUID string, sourceControllerVersion version.Number) error
+	AbortMigration_ func(ctx context.Context, user *openfga.User, modelUUID string) error
+}
+
+func (j *MigrationMocks) AbortMigration(ctx context.Context, user *openfga.User, modelUUID string) error {
+	if j.AbortMigration_ == nil {
+		return errors.E(errors.CodeNotImplemented)
+	}
+	return j.AbortMigration_(ctx, user, modelUUID)
 }
 
 func (j *MigrationMocks) Prechecks(ctx context.Context, user *openfga.User, model migration.ModelInfo) error {

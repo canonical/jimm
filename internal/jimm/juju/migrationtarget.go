@@ -10,11 +10,51 @@ import (
 	"github.com/juju/juju/core/migration"
 	"github.com/juju/names/v5"
 	"github.com/juju/version/v2"
+	"github.com/juju/zaputil/zapctx"
+	"go.uber.org/zap"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/openfga"
 )
+
+// AbortMigration aborts a model migration with the given model UUID.
+// It does this by calling the Abort methodon the target Juju controller.
+// It also deletes the migration record from the database, but does not return an error
+// if the deletion fails, as the migration has already been aborted on the target controller.
+func (j *JujuManager) AbortMigration(ctx context.Context, user *openfga.User, modelUUID string) error {
+	const op = errors.Op("jimm.Abort")
+
+	incomingModel := dbmodel.IncomingModelMigration{
+		ModelUUID: sql.NullString{
+			String: modelUUID,
+			Valid:  true,
+		},
+	}
+	err := j.Database.GetIncomingModelMigration(ctx, &incomingModel)
+	if err != nil {
+		return errors.E(op, fmt.Errorf("failed to get model migration %q: %w", modelUUID, err))
+	}
+
+	api, err := j.dialController(ctx, &incomingModel.TargetController)
+	if err != nil {
+		return errors.E(op, fmt.Errorf("failed to dial controller: %w", err))
+	}
+	defer api.Close()
+
+	err = api.Abort(modelUUID)
+	if err != nil {
+		return errors.E(op, fmt.Errorf("failed to abort migration: %w", err))
+	}
+
+	err = j.Database.DeleteIncomingModelMigration(ctx, &incomingModel)
+	if err != nil {
+		// Don't return an error if we fail to delete the migration record,
+		// as the migration has already been aborted on the target controller.
+		zapctx.Error(ctx, "failed to delete incoming model migration", zap.Error(err), zap.String("modelUUID", modelUUID))
+	}
+	return nil
+}
 
 // Prechecks checks that the model can be migrated to the target controller.
 // It does this by calling the method of the same name on the target Juju controller.

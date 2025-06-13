@@ -37,6 +37,9 @@ type API interface {
 	// use the juju api clients to interact with juju controllers.
 	base.APICallCloser
 
+	// Abort aborts a model migration.
+	Abort(modelUUID string) error
+
 	// AddCloud adds a new cloud.
 	AddCloud(names.CloudTag, jujucloud.Cloud, bool) error
 

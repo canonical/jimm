@@ -35,6 +35,59 @@ users:
   controller-access: superuser
 `
 
+func TestAbortMigration_Success(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	modelUUID := "00000001-0000-0000-0000-000000000001"
+	abortCalled := false
+	// Validate that the API request to Juju is made.
+	api := &jimmtest.API{
+		Abort_: func(uuid string) error {
+			abortCalled = true
+			c.Check(uuid, qt.Equals, modelUUID)
+			return nil
+		},
+	}
+
+	j := newTestJujuManager(c, &parameters{
+		Dialer: &jimmtest.Dialer{
+			API: api,
+		},
+	})
+
+	env := jimmtest.ParseEnvironment(c, testMigrationEnv)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+
+	userMap := map[string]string{"bob": "alice@canonical.com"}
+	modelMigration := newIncomingMigration(userMap, env.Controller("test1").DBObject(c, j.Database))
+	err := j.Database.AddIncomingModelMigration(ctx, &modelMigration)
+	c.Assert(err, qt.IsNil)
+
+	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
+	user := openfga.NewUser(&dbUser, nil)
+
+	err = j.AbortMigration(ctx, user, modelUUID)
+	c.Assert(err, qt.IsNil)
+	c.Assert(abortCalled, qt.IsTrue)
+}
+
+func TestAbortMigration_MissingIncomingModel(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	j := newTestJujuManager(c, nil)
+
+	env := jimmtest.ParseEnvironment(c, testMigrationEnv)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+
+	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
+	user := openfga.NewUser(&dbUser, nil)
+
+	err := j.AbortMigration(ctx, user, "foo")
+	c.Assert(err, qt.ErrorMatches, `.*model migration not found`)
+}
+
 func TestPrechecks_ModifiesModelDescription(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
