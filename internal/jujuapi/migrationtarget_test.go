@@ -57,3 +57,13 @@ func (s *migrationTargetSuite) TestPrechecks(c *gc.C) {
 	err = client.Prechecks(model)
 	c.Assert(err, gc.IsNil)
 }
+
+func (s *migrationTargetSuite) TestCACert(c *gc.C) {
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+
+	client := migrationtarget.NewClient(conn)
+	cert, err := client.CACert()
+	c.Assert(err, gc.IsNil)
+	c.Assert(cert, gc.Equals, "")
+}
