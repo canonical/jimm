@@ -42,7 +42,8 @@ func init() {
 // CACert implements the CACert method of the MigrationTarget facade.
 // It is used by the source Juju controller to retrieve the CA cert of
 // the target controller during model migration, if the client did not
-// send a CA cert to the source controller.
+// send a CA cert to the source controller (possible if the controller
+// uses a public CA rather than a self-signed cert).
 //
 // The above is nonsensical because if the source controller can reach
 // the target controller (and because Juju enforces WSS), it already has
