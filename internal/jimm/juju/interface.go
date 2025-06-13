@@ -11,6 +11,7 @@ import (
 	"github.com/juju/juju/api/base"
 	jujucloud "github.com/juju/juju/cloud"
 	"github.com/juju/juju/core/crossmodel"
+	"github.com/juju/juju/core/migration"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 
@@ -129,6 +130,9 @@ type API interface {
 
 	// Ping tests the connection is working.
 	Ping(context.Context) error
+
+	// PreChecks runs pre-checks for a model migration.
+	Prechecks(model migration.ModelInfo) error
 
 	// RemoveCloud removes a cloud.
 	RemoveCloud(names.CloudTag) error
