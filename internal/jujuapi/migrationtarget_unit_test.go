@@ -4,6 +4,7 @@ package jujuapi_test
 
 import (
 	"context"
+	"errors"
 
 	"github.com/juju/juju/core/migration"
 	jujuparams "github.com/juju/juju/rpc/params"
@@ -67,6 +68,56 @@ func (s *migrationTargetUnitSuite) TestAbort(c *gc.C) {
 	// Validate that an invalid model tag is rejected.
 	args.ModelTag = "invalid-model-tag"
 	err = cr.Abort(ctx, args)
+	c.Assert(err, gc.ErrorMatches, `"invalid-model-tag" is not a valid tag`)
+}
+
+func (s *migrationTargetUnitSuite) TestCheckMachines(c *gc.C) {
+	ctx := context.Background()
+
+	checkMachinesCalled := false
+	jujuManager := mocks.JujuManager{
+		MigrationMocks: mocks.MigrationMocks{
+			CheckMachines_: func(ctx context.Context, user *openfga.User, modelUUID string) ([]error, error) {
+				checkMachinesCalled = true
+				c.Check(modelUUID, gc.Equals, "00000001-0000-0000-0000-000000000001")
+				return []error{errors.New("fake-error")}, nil
+			},
+		}}
+	jimm := &jimmtest.JIMM{
+		JujuManager_: func() jimm.JujuManager {
+			return &jujuManager
+		},
+	}
+
+	var u dbmodel.Identity
+	u.SetTag(names.NewUserTag("alice@canonical.com"))
+	user := openfga.NewUser(&u, nil)
+
+	cr := jujuapi.NewControllerRoot(jimm, jujuapi.Params{})
+	jujuapi.SetUser(cr, user)
+
+	args := jujuparams.ModelArgs{
+		ModelTag: names.NewModelTag("00000001-0000-0000-0000-000000000001").String(),
+	}
+
+	// Validate access denied without JIMM admin permissions.
+	_, err := cr.CheckMachines(ctx, args)
+	c.Assert(err, gc.ErrorMatches, `unauthorized`)
+	c.Assert(checkMachinesCalled, gc.Equals, false)
+
+	// Validate the checkMachines method is called when the user is a JIMM admin.
+	user.JimmAdmin = true
+	res, err := cr.CheckMachines(ctx, args)
+	c.Assert(err, gc.IsNil)
+	c.Assert(res.Results, gc.HasLen, 1)
+	c.Assert(res.Results[0].Error.Message, gc.Equals, "fake-error")
+	c.Assert(res.Results[0].Error.Code, gc.Equals, "")
+	c.Assert(res.Results[0].Error.Info, gc.IsNil)
+	c.Assert(checkMachinesCalled, gc.Equals, true)
+
+	// Validate that an invalid model tag is rejected.
+	args.ModelTag = "invalid-model-tag"
+	_, err = cr.CheckMachines(ctx, args)
 	c.Assert(err, gc.ErrorMatches, `"invalid-model-tag" is not a valid tag`)
 }
 

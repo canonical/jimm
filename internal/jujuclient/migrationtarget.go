@@ -42,3 +42,9 @@ func (c Connection) Abort(modelUUID string) error {
 	migrationTarget := migrationtarget.NewClient(&c)
 	return migrationTarget.Abort(modelUUID)
 }
+
+// CheckMachines compares the machines in state with the ones reported by the provider and reports any discrepancies.
+func (c Connection) CheckMachines(modelUUID string) ([]error, error) {
+	migrationTarget := migrationtarget.NewClient(&c)
+	return migrationTarget.CheckMachines(modelUUID)
+}

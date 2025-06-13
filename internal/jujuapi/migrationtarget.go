@@ -33,11 +33,13 @@ func init() {
 		preChecks := rpc.Method(r.Prechecks)
 		caCert := rpc.Method(r.CACert)
 		adoptResources := rpc.Method(r.AdoptResources)
+		checkMachines := rpc.Method(r.CheckMachines)
 
 		r.AddMethod("MigrationTarget", 4, "Prechecks", preChecks)
 		r.AddMethod("MigrationTarget", 4, "CACert", caCert)
 		r.AddMethod("MigrationTarget", 4, "AdoptResources", adoptResources)
 		r.AddMethod("MigrationTarget", 4, "Abort", adoptResources)
+		r.AddMethod("MigrationTarget", 4, "CheckMachines", checkMachines)
 
 		return []int{4}
 	}
@@ -58,6 +60,33 @@ func init() {
 // but doesn't actually require the result to have len() > 0, we can return an empty result.
 func (r *controllerRoot) CACert() (jujuparams.BytesResult, error) {
 	return jujuparams.BytesResult{}, nil
+}
+
+func (r *controllerRoot) CheckMachines(ctx context.Context, args params.ModelArgs) (params.ErrorResults, error) {
+	const op = errors.Op("jujuapi.CheckMachines")
+
+	if !r.user.JimmAdmin {
+		return params.ErrorResults{}, errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
+
+	modelTag, err := names.ParseModelTag(args.ModelTag)
+	if err != nil {
+		return params.ErrorResults{}, errors.E(op, err)
+	}
+
+	results, err := r.jimm.JujuManager().CheckMachines(ctx, r.user, modelTag.Id())
+	if err != nil {
+		return params.ErrorResults{}, errors.E(op, err)
+	}
+	var errorResults []params.ErrorResult
+	for _, result := range results {
+		jujuError := jujuparams.Error{
+			Message: result.Error(),
+		}
+		errorResults = append(errorResults, jujuparams.ErrorResult{Error: &jujuError})
+	}
+
+	return params.ErrorResults{Results: errorResults}, nil
 }
 
 // Abort implements the Abort method of the MigrationTarget facade.

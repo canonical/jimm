@@ -243,6 +243,7 @@ type JujuManager interface {
 	// in the order they are expected to be called.
 	PrepareModelMigration(ctx context.Context, user *openfga.User, modelUUID string, targetControllerName string, userMapping map[string]string) error
 	Prechecks(ctx context.Context, user *openfga.User, model migration.ModelInfo) error
+	CheckMachines(ctx context.Context, user *openfga.User, modelUUID string) ([]error, error)
 	AdoptResources(ctx context.Context, user *openfga.User, modelUUID string, sourceControllerVersion version.Number) error
 	AbortMigration(ctx context.Context, user *openfga.User, modelUUID string) error
 

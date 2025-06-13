@@ -55,6 +55,10 @@ type API interface {
 	// with the associated models.
 	CheckCredentialModels(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error)
 
+	// CheckMachines compares the machines in state with the ones
+	// reported by the provider and reports any discrepancies.
+	CheckMachines(modelUUID string) ([]error, error)
+
 	// Close closes the API connection.
 	Close() error
 

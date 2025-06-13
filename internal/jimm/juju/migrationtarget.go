@@ -56,6 +56,36 @@ func (j *JujuManager) AbortMigration(ctx context.Context, user *openfga.User, mo
 	return nil
 }
 
+// CheckMachines checks the machines in the model with the given UUID
+// and compares them with the ones reported by the provider.
+// It calls the CheckMachines method on the target Juju controller.
+func (j *JujuManager) CheckMachines(ctx context.Context, user *openfga.User, modelUUID string) ([]error, error) {
+	const op = errors.Op("jimm.CheckMachines")
+
+	incomingModel := dbmodel.IncomingModelMigration{
+		ModelUUID: sql.NullString{
+			String: modelUUID,
+			Valid:  true,
+		},
+	}
+	err := j.Database.GetIncomingModelMigration(ctx, &incomingModel)
+	if err != nil {
+		return nil, errors.E(op, fmt.Errorf("failed to get model migration %q: %w", modelUUID, err))
+	}
+
+	api, err := j.dialController(ctx, &incomingModel.TargetController)
+	if err != nil {
+		return nil, errors.E(op, fmt.Errorf("failed to dial controller: %w", err))
+	}
+	defer api.Close()
+
+	machineErrors, err := api.CheckMachines(modelUUID)
+	if err != nil {
+		return nil, errors.E(op, fmt.Errorf("failed to check machines: %w", err))
+	}
+	return machineErrors, nil
+}
+
 // Prechecks checks that the model can be migrated to the target controller.
 // It does this by calling the method of the same name on the target Juju controller.
 // As part of all model migrations passing through JIMM, it modifies the model description
