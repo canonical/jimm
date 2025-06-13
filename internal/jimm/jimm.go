@@ -239,6 +239,9 @@ type JujuManager interface {
 	ValidateModelUpgrade(ctx context.Context, u *openfga.User, mt names.ModelTag, force bool) error
 
 	// Migration related methods
+	// The migration methods below are sorted roughly
+	// in the order they are expected to be called.
+	PrepareModelMigration(ctx context.Context, user *openfga.User, modelUUID string, targetControllerName string, userMapping map[string]string) error
 	Prechecks(ctx context.Context, user *openfga.User, model migration.ModelInfo) error
 
 	// Other methods
@@ -268,7 +271,6 @@ type JujuManager interface {
 	RevokeOfferAccessOnController(ctx context.Context, user *openfga.User, ut names.UserTag, offerURL string, access jujuparams.OfferAccessPermission) error
 	UpdateCloud(ctx context.Context, u *openfga.User, ct names.CloudTag, cloud jujucloud.Cloud) error
 	UpdateCloudCredential(ctx context.Context, u *openfga.User, args juju.UpdateCloudCredentialArgs) ([]jujuparams.UpdateCredentialModelResult, error)
-	PrepareModelMigration(ctx context.Context, user *openfga.User, modelUUID string, targetControllerName string, userMapping map[string]string) error
 
 	// These are methods on the Juju manager that don't need to be mocked and can be removed from this interface later.
 	UpdateMetrics(ctx context.Context)

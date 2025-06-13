@@ -56,5 +56,9 @@ func (r *controllerRoot) Prechecks(ctx context.Context, args jujuparams.Migratio
 		AgentVersion:           args.AgentVersion,
 		ControllerAgentVersion: args.ControllerAgentVersion,
 	}
-	return r.jimm.JujuManager().Prechecks(ctx, r.user, model)
+	err = r.jimm.JujuManager().Prechecks(ctx, r.user, model)
+	if err != nil {
+		return errors.E(op, err)
+	}
+	return nil
 }

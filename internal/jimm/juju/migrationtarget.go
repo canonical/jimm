@@ -22,23 +22,23 @@ import (
 func (j *JujuManager) Prechecks(ctx context.Context, user *openfga.User, model migration.ModelInfo) error {
 	const op = errors.Op("jimm.Prechecks")
 
-	modelMigration := dbmodel.IncomingModelMigration{
+	incomingModel := dbmodel.IncomingModelMigration{
 		ModelUUID: sql.NullString{
 			String: model.UUID,
 			Valid:  true,
 		},
 	}
-	err := j.Database.GetIncomingModelMigration(ctx, &modelMigration)
+	err := j.Database.GetIncomingModelMigration(ctx, &incomingModel)
 	if err != nil {
 		return errors.E(op, fmt.Errorf("failed to get model migration %q: %w", model.UUID, err))
 	}
 
-	err = j.modifyMigrationInfo(&model, modelMigration.UserMapping)
+	err = j.modifyMigrationInfo(&model, incomingModel.UserMapping)
 	if err != nil {
 		return errors.E(op, fmt.Errorf("failed to modify migration info: %w", err))
 	}
 
-	api, err := j.dialController(ctx, &modelMigration.TargetController)
+	api, err := j.dialController(ctx, &incomingModel.TargetController)
 	if err != nil {
 		return errors.E(op, fmt.Errorf("failed to dial controller: %w", err))
 	}
@@ -60,21 +60,13 @@ func (j *JujuManager) modifyMigrationInfo(model *migration.ModelInfo, userMappin
 		// controller to another, where the owner is already an external user.
 		return nil
 	}
-	newOwnerFound := false
-	for originalUser, newUser := range userMapping {
-		if originalUser == model.Owner.Id() {
-			if !names.IsValidUser(newUser) {
-				return errors.E(fmt.Errorf("invalid external user name %q", newUser))
-			}
-			model.Owner = names.NewUserTag(newUser)
-			newOwnerFound = true
-		}
-	}
-	if !newOwnerFound {
+	newOwner, ok := userMapping[model.Owner.Id()]
+	if !ok {
 		// If the owner is not found in the user mappings, we return an error.
 		// This is to ensure that the migration does not proceed with an invalid owner.
 		return errors.E(fmt.Errorf("no external user mapping found for local user %q", model.Owner.Id()))
 	}
+	model.Owner = names.NewUserTag(newOwner)
 	// TODO: Replace fields on the model description including the model owner and users.
 
 	return nil

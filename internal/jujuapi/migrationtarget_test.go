@@ -11,6 +11,8 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
+	"github.com/canonical/jimm/v3/pkg/api"
+	"github.com/canonical/jimm/v3/pkg/api/params"
 )
 
 type migrationTargetSuite struct {
@@ -29,9 +31,10 @@ func (s *migrationTargetSuite) TestPrechecks(c *gc.C) {
 		Cloud:       jimmtest.TestCloudName,
 		CloudRegion: jimmtest.TestCloudRegionName,
 	}
+	modelUUID := "00000001-0000-0000-0000-000000000001"
 	modelDescription := description.NewModel(modelDescriptionArgs)
 	model := migration.ModelInfo{
-		UUID:                   "00000001-0000-0000-0000-000000000001",
+		UUID:                   modelUUID,
 		Owner:                  names.NewUserTag("alice"),
 		Name:                   "test-model",
 		ControllerAgentVersion: version.MustParse("3.5.0"),
@@ -42,5 +45,15 @@ func (s *migrationTargetSuite) TestPrechecks(c *gc.C) {
 	err := client.Prechecks(model)
 	c.Assert(err, gc.ErrorMatches, `.*model migration not found`)
 
-	// TODO: Run a prepare model migration call and then call preChecks again.
+	prepareModelMigration := params.PrepareModelMigrationRequest{
+		ModelTag:             names.NewModelTag(modelUUID).String(),
+		TargetControllerName: "controller-1", // Default name of the initial controller added to JIMM.
+		UserMapping:          map[string]string{"alice": "alice@canonical.com"},
+	}
+	jimmClient := api.NewClient(conn)
+	err = jimmClient.PrepareModelMigration(&prepareModelMigration)
+	c.Assert(err, gc.IsNil)
+
+	err = client.Prechecks(model)
+	c.Assert(err, gc.IsNil)
 }
